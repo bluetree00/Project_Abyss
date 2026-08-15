@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8a1113414e229c4a84e61fb122944f0, type: 3}
+  m_Name: first_clear
+  m_EditorClassIdentifier: Assembly-CSharp::Achievement
+  category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
+  icon: {fileID: 0}
+  codeName: first_clear
+  displayName: "\uBC14\uB2E5\uC744 \uBCF4\uB2E4"
+  description: "\uC2EC\uC5F0\uC744 \uC644\uC8FC"
+  taskGroups:
+  - tasks:
+    - {fileID: 11400000, guid: 9769fc4be0713884093bb7ad39270acb, type: 2}
+  rewards:
+  - {fileID: 11400000, guid: e376586cf43850a4fa1fa24420a9f78a, type: 2}
+  useAutoCompletion: 0
+  isCancelable: 0
+  isSavable: 1
+  acceptionConditions: []
+  cancelConditions: []
+  afterQuest: {fileID: 0}
+  acceptFeedbackType: 0
+  acceptFeedbackId: 
+  completeFeedbackType: 0
+  completeFeedbackId: 
+  timeLimit: 0

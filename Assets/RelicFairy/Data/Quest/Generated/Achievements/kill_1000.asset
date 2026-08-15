@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8a1113414e229c4a84e61fb122944f0, type: 3}
+  m_Name: kill_1000
+  m_EditorClassIdentifier: Assembly-CSharp::Achievement
+  category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
+  icon: {fileID: 0}
+  codeName: kill_1000
+  displayName: "\uCC9C\uC778 \uD559\uC0B4\uC790"
+  description: "\uBAAC\uC2A4\uD130 1000\uB9C8\uB9AC \uCC98\uCE58"
+  taskGroups:
+  - tasks:
+    - {fileID: 11400000, guid: 1f02d5aebf42ff04cba3b8372f420a06, type: 2}
+  rewards:
+  - {fileID: 11400000, guid: ac7983fdc40ab784f9c0bedaeceb25e8, type: 2}
+  useAutoCompletion: 0
+  isCancelable: 0
+  isSavable: 1
+  acceptionConditions: []
+  cancelConditions: []
+  afterQuest: {fileID: 0}
+  acceptFeedbackType: 0
+  acceptFeedbackId: 
+  completeFeedbackType: 0
+  completeFeedbackId: 
+  timeLimit: 0

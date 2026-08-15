@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8a1113414e229c4a84e61fb122944f0, type: 3}
+  m_Name: enhance_9
+  m_EditorClassIdentifier: Assembly-CSharp::Achievement
+  category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
+  icon: {fileID: 0}
+  codeName: enhance_9
+  displayName: "\uBA85\uC7A5\uC758 \uC190"
+  description: "\uBB34\uAE30 +9 \uB3C4\uB2EC"
+  taskGroups:
+  - tasks:
+    - {fileID: 11400000, guid: 4b99f36af4ad7f34b8df36cadbdea2dc, type: 2}
+  rewards:
+  - {fileID: 11400000, guid: 56e849be1220e40499c5d519e8d7f23f, type: 2}
+  useAutoCompletion: 0
+  isCancelable: 0
+  isSavable: 1
+  acceptionConditions: []
+  cancelConditions: []
+  afterQuest: {fileID: 0}
+  acceptFeedbackType: 0
+  acceptFeedbackId: 
+  completeFeedbackType: 0
+  completeFeedbackId: 
+  timeLimit: 0

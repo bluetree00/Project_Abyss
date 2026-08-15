@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8a1113414e229c4a84e61fb122944f0, type: 3}
+  m_Name: elite_30
+  m_EditorClassIdentifier: Assembly-CSharp::Achievement
+  category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
+  icon: {fileID: 0}
+  codeName: elite_30
+  displayName: "\uC815\uC608 \uC0AC\uB0E5\uAFBC"
+  description: "\uC815\uC608 30 \uCC98\uCE58"
+  taskGroups:
+  - tasks:
+    - {fileID: 11400000, guid: 02b22eff65f1e9a4b97166981be18dc1, type: 2}
+  rewards:
+  - {fileID: 11400000, guid: 16447038f5522f54ba6f5d8eb2f6b7a5, type: 2}
+  useAutoCompletion: 0
+  isCancelable: 0
+  isSavable: 1
+  acceptionConditions: []
+  cancelConditions: []
+  afterQuest: {fileID: 0}
+  acceptFeedbackType: 0
+  acceptFeedbackId: 
+  completeFeedbackType: 0
+  completeFeedbackId: 
+  timeLimit: 0

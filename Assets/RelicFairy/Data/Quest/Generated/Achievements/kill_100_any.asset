@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a8a1113414e229c4a84e61fb122944f0, type: 3}
   m_Name: kill_100_any
   m_EditorClassIdentifier: Assembly-CSharp::Achievement
-  category: {fileID: 11400000, guid: e80ec1002c6239a42977fb8300370ba5, type: 2}
+  category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
   icon: {fileID: 0}
   codeName: kill_100_any
   displayName: "\uBC31\uC778 \uD559\uC0B4\uC790"
@@ -22,7 +22,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: e040b52eecc278e49b8da96889859162, type: 2}
   rewards:
   - {fileID: 11400000, guid: 70e3e2f3975685a4292c95c4473a72e1, type: 2}
-  useAutoCompletion: 1
+  useAutoCompletion: 0
   isCancelable: 0
   isSavable: 1
   acceptionConditions: []

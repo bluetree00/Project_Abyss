@@ -12,17 +12,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a8a1113414e229c4a84e61fb122944f0, type: 3}
   m_Name: boss_first
   m_EditorClassIdentifier: Assembly-CSharp::Achievement
-  category: {fileID: 11400000, guid: 9967a5f50e66dd2499d5c90f9669082e, type: 2}
+  category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
   icon: {fileID: 0}
   codeName: boss_first
   displayName: "\uCCAB \uBCF4\uC2A4 \uCC98\uCE58"
-  description: "\uCCAB \uBCF4\uC2A4 \uCC98\uCE58"
+  description: "\uBCF4\uC2A4\uB97C \uCC98\uC74C \uC4F0\uB7EC\uB728\uB9AC\uB2E4"
   taskGroups:
   - tasks:
     - {fileID: 11400000, guid: 3e1fbf7cac6d92544a3b5013ded69f92, type: 2}
   rewards:
   - {fileID: 11400000, guid: 3cec8f9a586c29348afdae420439f364, type: 2}
-  useAutoCompletion: 1
+  useAutoCompletion: 0
   isCancelable: 0
   isSavable: 1
   acceptionConditions: []

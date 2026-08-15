@@ -224,14 +224,29 @@ public static class QuestSOGenerator
         if (string.IsNullOrEmpty(rewardType) || rewardType.ToLowerInvariant() == "none")
             return null;
 
-        // 현재 Gold만 지원. Item은 ItemSO 룩업 필요 — 후속.
-        if (rewardType.ToLowerInvariant() != "gold")
+        string kind = rewardType.ToLowerInvariant();
+        string path = $"{kOutputRoot}/Rewards/{Sanitize(codeName)}_Reward.asset";
+
+        // Essence — 업적의 정본 보상. 계정 영구 재화라 런이 없는 거점에서도 지급된다.
+        if (kind == "essence")
+        {
+            var eso = ScriptableObject.CreateInstance<EssenceReward>();
+            var es = new SerializedObject(eso);
+            es.FindProperty("essenceAmount").intValue = amount;
+            es.FindProperty("quantity").intValue      = amount;
+            es.FindProperty("description").stringValue = $"심연의 정수 {amount}";
+            es.ApplyModifiedPropertiesWithoutUndo();
+            CreateOrReplace(eso, path);
+            return eso;
+        }
+
+        // Gold는 <b>런 재화</b>라 인런 퀘스트 전용이다. 업적에 붙이면 거점 수령 시 런이 없어 증발한다.
+        if (kind != "gold")
         {
             Debug.LogWarning($"[QuestSOGenerator] '{codeName}': rewardType '{rewardType}' 미지원 — 보상 없이 생성.");
             return null;
         }
 
-        string path = $"{kOutputRoot}/Rewards/{Sanitize(codeName)}_Reward.asset";
         var so = ScriptableObject.CreateInstance<GoldReward>();
         var s = new SerializedObject(so);
         s.FindProperty("goldAmount").intValue = amount;

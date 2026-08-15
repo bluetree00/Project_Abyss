@@ -12,4 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6fee0ddb4f43f3f4aab7cf51874e9eb9, type: 3}
   m_Name: Target_clear_50_rooms
   m_EditorClassIdentifier: Assembly-CSharp::StringTarget
-  value: '*'
+  value: roomClears

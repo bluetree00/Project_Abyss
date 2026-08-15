@@ -30,4 +30,15 @@ public static class QuestEvents
     public static void ReportRoomClear(string category)  => Report("Room", category, 1);
     public static void ReportItemCollect(string itemId)  => Report("Item", itemId, 1);
     public static void ReportGold(int amount)            => Report("Gold", "*", amount);
+
+    /// <summary>업적 진척이 보는 카테고리. 값은 <b>누적이 아니라 절대값</b>이므로 Task는 SimpleSet을 쓴다.</summary>
+    public const string RecordCategory = "Record";
+
+    /// <summary>
+    /// 영구 기록 하나를 업적에 흘린다. <b>런 종료 시 1회</b>만 호출한다.
+    /// <para><b>왜 이 경로인가</b> — 업적은 「기록의 표시 형태」다(정본). 처치·방·상점을
+    /// QuestEvents로 따로 세면 같은 사실을 두 곳이 기억하게 되고, 이어하기나 저장 시점에 따라 어긋난다.
+    /// <see cref="UserGameData.records"/> 하나만 정본으로 두고 그 값을 그대로 실어 보낸다.</para>
+    /// </summary>
+    public static void ReportRecord(string key, int value) => Report(RecordCategory, key, value);
 }

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a8a1113414e229c4a84e61fb122944f0, type: 3}
   m_Name: clear_50_rooms
   m_EditorClassIdentifier: Assembly-CSharp::Achievement
-  category: {fileID: 11400000, guid: 0912c96fd3e6cf0429209aa4b4ad45dd, type: 2}
+  category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
   icon: {fileID: 0}
   codeName: clear_50_rooms
   displayName: "\uBC29 \uD0D0\uD5D8\uAC00"
@@ -22,7 +22,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 611b3d19ff6d8d94aac316ee6358dfe3, type: 2}
   rewards:
   - {fileID: 11400000, guid: 2b2ecdab77bb06a449843bd877e6b297, type: 2}
-  useAutoCompletion: 1
+  useAutoCompletion: 0
   isCancelable: 0
   isSavable: 1
   acceptionConditions: []

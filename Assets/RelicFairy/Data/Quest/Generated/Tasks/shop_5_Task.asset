@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ce6fd903e505270419ee161a87ef1855, type: 3}
+  m_Name: shop_5_Task
+  m_EditorClassIdentifier: Assembly-CSharp::Task
+  category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
+  codeName: shop_5
+  description: "\uC0C1\uC810 5\uD68C \uC774\uC6A9"
+  action: {fileID: 11400000, guid: 7e0a371758dfd2b4789c8d866fb69076, type: 2}
+  targets:
+  - {fileID: 11400000, guid: 9679c876e8f10374383b163f98f7f895, type: 2}
+  intialSuccessValue: {fileID: 0}
+  needSuccessToComplete: 5
+  canReceiveReportDuringCompletion: 0

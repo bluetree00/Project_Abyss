@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8a1113414e229c4a84e61fb122944f0, type: 3}
+  m_Name: depth_5
+  m_EditorClassIdentifier: Assembly-CSharp::Achievement
+  category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
+  icon: {fileID: 0}
+  codeName: depth_5
+  displayName: "\uB418\uB3CC\uC544\uC628 \uC790"
+  description: "\uC2EC\uC5F0 \uAE4A\uC774 5 \uB3C4\uB2EC"
+  taskGroups:
+  - tasks:
+    - {fileID: 11400000, guid: 290dd4a9f10301c4f9610a7dbf0c85f5, type: 2}
+  rewards:
+  - {fileID: 11400000, guid: 2382c72c4d2d7f148bf3d56eca1b0e48, type: 2}
+  useAutoCompletion: 0
+  isCancelable: 0
+  isSavable: 1
+  acceptionConditions: []
+  cancelConditions: []
+  afterQuest: {fileID: 0}
+  acceptFeedbackType: 0
+  acceptFeedbackId: 
+  completeFeedbackType: 0
+  completeFeedbackId: 
+  timeLimit: 0

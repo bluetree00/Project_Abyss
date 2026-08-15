@@ -9,10 +9,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5975bac0508729d4083af375f68f1b19, type: 3}
+  m_Script: {fileID: 11500000, guid: cd34faa5884d483429772c58d142b91b, type: 3}
   m_Name: kill_100_any_Reward
-  m_EditorClassIdentifier: Assembly-CSharp::GoldReward
+  m_EditorClassIdentifier: Assembly-CSharp::EssenceReward
   icon: {fileID: 0}
-  description: "\uACE8\uB4DC 1000"
-  quantity: 1000
-  goldAmount: 1000
+  description: "\uC2EC\uC5F0\uC758 \uC815\uC218 200"
+  quantity: 200
+  essenceAmount: 200

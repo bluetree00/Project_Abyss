@@ -194,6 +194,31 @@ public class QuestManager
         }
     }
 
+    /// <summary>
+    /// 수령 대기 중인 <b>업적</b>을 전부 완료 처리(=보상 지급)한다.
+    /// <para>업적은 <see cref="_activeAchievements"/>라는 별도 목록에 들어가므로
+    /// <see cref="CompleteWaitingQuests"/>로는 <b>한 건도 수령되지 않는다.</b></para>
+    /// <para>연출이 필요한 경로(제단 [모두 받기])는 이 메서드를 쓰지 말고 뷰가 스태거로
+    /// <c>Complete()</c>를 개별 호출한다 — 여기서 한 프레임에 끝내면 "우르르 쏟아지는" 순간이 사라진다.</para>
+    /// </summary>
+    public void CompleteWaitingAchievements()
+    {
+        foreach (var achievement in _activeAchievements.ToList())
+        {
+            if (achievement.IsCompltable)
+                achievement.Complete();
+        }
+    }
+
+    /// <summary>수령 대기 중인 업적 수 — 미수령 배지(●)와 [모두 받기 N]에 쓴다.</summary>
+    public int WaitingAchievementCount()
+    {
+        int n = 0;
+        foreach (var a in _activeAchievements)
+            if (a.IsCompltable) n++;
+        return n;
+    }
+
     /// <summary>제한 시간 초과 등으로 퀘스트를 실패 처리. 활성 목록에서 제거하고 onQuestFailed 발행(보상/afterQuest 없음).</summary>
     public void FailQuest(Quest quest)
     {
@@ -286,7 +311,42 @@ public class QuestManager
         LoadSaveDatas(root[kActiveAchievementsSavePath],   _achievementDatabase, LoadActiveQuest);
         LoadSaveDatas(root[kCompletedAchievementsSavePath], _achievementDatabase, LoadCompletedQuest);
 
+        RegisterNewAchievements();
         return true;
+    }
+
+    /// <summary>
+    /// 세이브에 없는 <b>신규 업적</b>을 등록한다.
+    ///
+    /// <para><see cref="SeedFreshSlot"/>은 세이브가 <b>없을 때만</b> 돌기 때문에,
+    /// 업적을 추가하고 배포하면 <b>기존 플레이어에게는 영영 안 보인다.</b>
+    /// 실제로 업적을 3개에서 21개로 늘렸을 때 화면에 3개만 떴다.</para>
+    ///
+    /// <para>이미 진행/완료된 것은 건드리지 않으므로 진척이 초기화되지 않는다.</para>
+    /// </summary>
+    private void RegisterNewAchievements()
+    {
+        if (_achievementDatabase == null) return;
+
+        int added = 0;
+        _suppressSave = true;
+
+        foreach (var achievement in _achievementDatabase.Quests)
+        {
+            if (achievement == null) continue;
+            if (ContainInActiveAchievement(achievement) || ContainInCompleteAchievement(achievement)) continue;
+
+            Register(achievement, notify: false);   // 복원 맥락이라 등장 연출을 쏘지 않는다
+            added++;
+        }
+
+        _suppressSave = false;
+
+        if (added > 0)
+        {
+            Debug.Log($"[QuestManager] 신규 업적 {added}개 등록(기존 세이브에 없던 것)");
+            Save();
+        }
     }
 
     private void LoadSaveDatas(JToken datasToken, QuestDatabase database, Action<QuestSaveData, Quest> onSuccess)
