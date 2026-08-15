@@ -22,6 +22,39 @@ public sealed class RuneArtLibrarySO : ScriptableObject
     [SerializeField, Tooltip("속성별 룬 테두리. elementArt와 동일 인덱스.")]
     private Sprite[] elementBorder = new Sprite[6];
 
+    [SerializeField, Tooltip("판 위 블록 칸 타일. ElementDef.Order(불/얼음/전기/풀/빛/어둠).\n" +
+                             "룬 아이콘(elementArt)과 분리된 슬롯이다 — 룬 자체는 룬 아트로, " +
+                             "그 룬이 차지한 칸은 속성 타일로 그린다.")]
+    private Sprite[] blockTile = new Sprite[6];
+
+    [Header("판 외곽 액자 — 조각 조립(상·하·좌·우 + 코너 4)")]
+    [SerializeField, Tooltip("가로 변. 좌우 코너 사이를 늘려 채운다.")]
+    private Sprite frameTop, frameBottom;
+    [SerializeField, Tooltip("세로 변. 상하 코너 사이를 늘려 채운다.")]
+    private Sprite frameLeft, frameRight;
+    [SerializeField, Tooltip("네 귀퉁이. 늘리지 않고 원본 비율로 둔다.")]
+    private Sprite frameTL, frameTR, frameBL, frameBR;
+
+    public Sprite FrameTop    => frameTop;
+    public Sprite FrameBottom => frameBottom;
+    public Sprite FrameLeft   => frameLeft;
+    public Sprite FrameRight  => frameRight;
+    public Sprite FrameTL     => frameTL;
+    public Sprite FrameTR     => frameTR;
+    public Sprite FrameBL     => frameBL;
+    public Sprite FrameBR     => frameBR;
+
+    /// <summary>판 외곽 액자 조각이 갖춰졌나. 하나라도 없으면 액자를 그리지 않는다.</summary>
+    public bool HasBoardFrame => frameTop && frameBottom && frameLeft && frameRight
+                              && frameTL && frameTR && frameBL && frameBR;
+
+    /// <summary>
+    /// 판에 놓인 룬이 차지하는 <b>칸</b>에 깔 속성 타일.
+    /// 미할당이면 null → 호출측이 기존 룬 아트로 폴백한다.
+    /// </summary>
+    public Sprite GetBlockTile(int elementIndex)
+        => (blockTile == null || elementIndex < 0 || elementIndex >= blockTile.Length) ? null : blockTile[elementIndex];
+
     /// <summary>등급에 해당하는 룬 아트. 범위를 벗어나면 마지막(또는 첫) 유효 스프라이트로 폴백.</summary>
     public Sprite GetArt(ItemRarity rarity) => Pick(gradeArt, (int)rarity);
 

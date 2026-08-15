@@ -228,8 +228,15 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     {
         if (ItemData == null) return;
 
-        RuneArt.ResolveRuneCell(ItemData.element, ItemData.rarity, Color.white,
-            out var art, out var tint);
+        // 1순위: 속성 블록 타일 — 룬이 차지한 칸은 그 룬의 속성으로 칠한다(룬 아이콘과 별개 슬롯).
+        //        이미 속성색으로 그려진 타일이라 틴트를 곱하지 않는다.
+        // 2순위: 타일이 없으면 기존 규칙(속성 룬 아트 → 없으면 등급 아트 + 속성색 틴트).
+        var art  = RuneArt.GetBlockTile(ItemData.element);
+        var tint = Color.white;
+
+        if (art == null)
+            RuneArt.ResolveRuneCell(ItemData.element, ItemData.rarity, Color.white, out art, out tint);
+
         if (art == null) return;
 
         foreach (Transform child in transform)

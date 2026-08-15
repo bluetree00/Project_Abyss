@@ -501,6 +501,8 @@ public sealed class UI_GridPanel : UI_Base
         _hexGridView = hexRootGO.AddComponent<MerlinRuneHexGridView>();
         _hexGridView.SetZoneTiles(_zoneTiles, _centerTile);   // 타일 미배선 시 기존 색상 방식 유지
 
+        BuildBoardFrame(_hexGridRoot);
+
         // 드래그 힌트 (아이템 미배치 시 표시, CenterPanel 직속 → 최후 렌더 보장)
         var hintGO = MakeTxt(go.transform, "DragHint",
             "보관함의 룬을 끌어\n판에 놓으세요", 15f,
@@ -1197,6 +1199,10 @@ public sealed class UI_GridPanel : UI_Base
 
         if (!GridManager.Instance.TryPlaceShapeAt(shape, square))
         {
+            // 점유만 치우면 놓을 수 있는가 — 레전더리는 자기 존의 대부분을 먹으므로
+            // 기존 룬을 손으로 하나씩 빼게 두면 보상이 노동이 된다. 한 번에 묻는다.
+            if (TryOfferSalvagePlacement(shape)) return;
+
             BoardManager.Instance?.ReSlotAndReturn(shape);   // 주차 구역으로 되돌린다
             ShowToast("여기엔 놓을 수 없습니다");
             return;
@@ -1204,6 +1210,104 @@ public sealed class UI_GridPanel : UI_Base
 
         BoardManager.Instance?.OnShapePlaced(shape);
         GridManager.Instance.ClearPreview();
+    }
+
+    // ── 자리 비우고 배치 ─────────────────────────────────────
+
+    private readonly List<RuntimeItemData> _salvageBlockers = new();
+    private Shape _salvagePendingShape;
+
+    /// <summary>
+    /// 놓으려는 자리를 <b>기존 룬만</b>이 막고 있으면 "폐기하고 배치할까"를 묻는다.
+    /// <para>속성 존 불일치나 판 밖처럼 <b>치워도 못 놓는</b> 경우는 묻지 않는다 —
+    /// 헛되이 폐기시키면 그게 진짜 손실이다.</para>
+    /// </summary>
+    /// <returns>확인 창을 띄웠으면 true(호출부는 되돌리기를 하지 않는다).</returns>
+    private bool TryOfferSalvagePlacement(Shape shape)
+    {
+        if (GridManager.Instance == null) return false;
+        if (!GridManager.Instance.TryGetBlockingItems(shape, _salvageBlockers)) return false;
+        if (_salvageBlockers.Count == 0) return false;
+
+        int ore = 0;
+        foreach (var it in _salvageBlockers) ore += RuneSalvage.OreValueOf(it);
+
+        _salvagePendingShape = shape;
+        if (_confirmDialogText != null)
+            _confirmDialogText.text =
+                $"이 자리의 룬 {_salvageBlockers.Count}개를 폐기하고 배치합니다.\n\n" +
+                $"<color=#63D9C0>원석 +{ore}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
+
+        // 확인창을 <b>보관함 전량 폐기</b>와 공유하므로 버튼 동작을 이번 용도로 갈아끼운다.
+        // 안 갈아끼우면 [폐기]가 보관함을 통째로 비운다.
+        RebindConfirmDialog(OnSalvagePlacementConfirm, OnSalvagePlacementCancel);
+        ShowConfirmDialog();
+        return true;
+    }
+
+    /// <summary>확인창 버튼의 동작을 교체한다. 다이얼로그가 두 용도(전량 폐기 / 자리 비우고 배치)를 공유한다.</summary>
+    private void RebindConfirmDialog(UnityEngine.Events.UnityAction onConfirm,
+                                     UnityEngine.Events.UnityAction onCancel)
+    {
+        if (_confirmDialogDiscardBtn != null)
+        {
+            _confirmDialogDiscardBtn.onClick.RemoveAllListeners();
+            _confirmDialogDiscardBtn.onClick.AddListener(onConfirm);
+        }
+        if (_confirmDialogKeepBtn != null)
+        {
+            _confirmDialogKeepBtn.onClick.RemoveAllListeners();
+            _confirmDialogKeepBtn.onClick.AddListener(onCancel);
+        }
+    }
+
+    /// <summary>확인창을 원래 용도(보관함 전량 폐기)로 되돌린다.</summary>
+    private void RestoreConfirmDialogDefault()
+        => RebindConfirmDialog(OnDialogDiscardAll, OnDialogKeep);
+
+    /// <summary>확인 — 막고 있던 룬을 전부 폐기(원석 환원)하고 그 자리에 배치한다.</summary>
+    private void OnSalvagePlacementConfirm()
+    {
+        HideConfirmDialog();
+        RestoreConfirmDialogDefault();   // 다음 「전량 폐기」가 이 동작을 물려받지 않도록
+
+        var shape = _salvagePendingShape;
+        _salvagePendingShape = null;
+        if (shape == null) return;
+
+        int ore = 0;
+        foreach (var item in _salvageBlockers)
+        {
+            RemovePlacedItem(item);                    // 판에서 내리고
+            _inventory?.DiscardFromStaging(item);      // 보관함에서도 없앤다(진짜 폐기)
+            _stagingArea?.RemoveShapeForItem(item);
+            ore += RuneSalvage.Refund(item);
+        }
+        _salvageBlockers.Clear();
+
+        if (GridManager.Instance != null && GridManager.Instance.TryPlaceShape(shape))
+        {
+            BoardManager.Instance?.OnShapePlaced(shape);
+            GridManager.Instance.ClearPreview();
+            ShowToast($"배치 완료 — 원석 +{ore}");
+        }
+        else
+        {
+            // 비웠는데도 못 놓는 경우(예상 밖) — 룬만 잃지 않도록 되돌린다.
+            BoardManager.Instance?.ReSlotAndReturn(shape);
+            ShowToast("배치에 실패했습니다");
+        }
+    }
+
+    private void OnSalvagePlacementCancel()
+    {
+        HideConfirmDialog();
+        RestoreConfirmDialogDefault();
+        var shape = _salvagePendingShape;
+        _salvagePendingShape = null;
+        _salvageBlockers.Clear();
+
+        if (shape != null) BoardManager.Instance?.ReSlotAndReturn(shape);
     }
 
     /// <summary>판에서 룬을 회수해 보관함으로 되돌린다. 드래그로 빼낼 때와 같은 경로.</summary>
@@ -1417,8 +1521,17 @@ public sealed class UI_GridPanel : UI_Base
 
         int remaining = _inventory.StagingCount;
         if (_confirmDialogText != null)
-            _confirmDialogText.text = $"보관함에 아이템 {remaining}개가 있습니다.\n미배치 아이템은 폐기됩니다.";
+        {
+            // 합계 환원량을 먼저 보여준다 — "버려진다"만 있으면 손실로만 읽힌다.
+            int ore = 0;
+            foreach (var it in _inventory.StagingItems) ore += RuneSalvage.OreValueOf(it);
 
+            _confirmDialogText.text =
+                $"보관함에 아이템 {remaining}개가 있습니다.\n미배치 아이템은 폐기됩니다.\n\n" +
+                $"<color=#63D9C0>원석 +{ore}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
+        }
+
+        RestoreConfirmDialogDefault();   // 직전이 「자리 비우고 배치」였을 수 있다
         ShowConfirmDialog();
     }
 
@@ -1444,11 +1557,14 @@ public sealed class UI_GridPanel : UI_Base
         if (_inventory == null) { ClosePanel(); return; }
 
         var toDiscard = new List<RuntimeItemData>(_inventory.StagingItems);
+        int ore = 0;
         foreach (var item in toDiscard)
         {
             _stagingArea?.RemoveShapeForItem(item);
             _inventory.DiscardFromStaging(item);
+            ore += RuneSalvage.Refund(item);   // 전량 폐기도 원석으로 환원된다
         }
+        if (ore > 0) Debug.Log($"[GridPanel] 보관함 전량 폐기 → 원석 +{ore}");
 
         ClosePanel();
     }
@@ -1626,4 +1742,87 @@ public sealed class UI_GridPanel : UI_Base
 
         return btn;
     }
+
+    /// <summary>
+    /// 판 <b>바깥 테두리</b>만 액자로 두른다(조각 8개: 가로 변 2 · 세로 변 2 · 코너 4).
+    ///
+    /// 칸 자체에는 아트를 깔지 않는다 — 이 판은 존 색으로 어느 칸이 무슨 속성인지 읽는 UI라,
+    /// 예전에 판 배경 그림을 깔았다가 존 타일이 텍스처에 묻혀 되돌린 적이 있다(위 주석 참고).
+    /// 액자는 판 밖으로만 나가므로 그 가독성을 건드리지 않는다.
+    /// </summary>
+    private void BuildBoardFrame(RectTransform board)
+    {
+        var lib = RuneArt.Library;
+        if (lib == null || !lib.HasBoardFrame || board == null) return;
+
+        var root = new GameObject("BoardFrame", typeof(RectTransform)).GetComponent<RectTransform>();
+        root.SetParent(board, false);
+        root.anchorMin = Vector2.zero;
+        root.anchorMax = Vector2.one;
+        root.offsetMin = Vector2.zero;
+        root.offsetMax = Vector2.zero;
+
+        // 코너는 원본 비율 그대로, 변은 코너 사이를 늘려 채운다.
+        const float CW = 46f, CH = 44f;   // 코너 조각 76×74 → 판 크기에 맞춘 표시치
+        const float EW = 24f;             // 변 두께
+
+        Corner(root, "TL", lib.FrameTL, new Vector2(0f, 1f), CW, CH);
+        Corner(root, "TR", lib.FrameTR, new Vector2(1f, 1f), CW, CH);
+        Corner(root, "BL", lib.FrameBL, new Vector2(0f, 0f), CW, CH);
+        Corner(root, "BR", lib.FrameBR, new Vector2(1f, 0f), CW, CH);
+
+        Edge(root, "Top",    lib.FrameTop,    true,  1f, CW, EW);
+        Edge(root, "Bottom", lib.FrameBottom, true,  0f, CW, EW);
+        Edge(root, "Left",   lib.FrameLeft,   false, 0f, CH, EW);
+        Edge(root, "Right",  lib.FrameRight,  false, 1f, CH, EW);
+    }
+
+    private static void Corner(RectTransform parent, string name, Sprite art, Vector2 anchor, float w, float h)
+    {
+        var go = new GameObject("Frame_" + name, typeof(RectTransform), typeof(CanvasRenderer));
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(parent, false);
+        rt.anchorMin = rt.anchorMax = rt.pivot = anchor;
+        rt.sizeDelta = new Vector2(w, h);
+        rt.anchoredPosition = Vector2.zero;
+        var img = go.AddComponent<Image>();
+        img.sprite = art;
+        img.raycastTarget = false;   // 액자가 칸 클릭·드롭을 먹으면 배치가 막힌다
+    }
+
+    /// <summary>변 조각 — 코너 사이를 늘린다. horizontal=true면 가로 변(상/하), false면 세로 변(좌/우).</summary>
+    private static void Edge(RectTransform parent, string name, Sprite art,
+                             bool horizontal, float side, float cornerInset, float thickness)
+    {
+        var go = new GameObject("Frame_" + name, typeof(RectTransform), typeof(CanvasRenderer));
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(parent, false);
+
+        if (horizontal)
+        {
+            rt.anchorMin = new Vector2(0f, side);
+            rt.anchorMax = new Vector2(1f, side);
+            rt.pivot     = new Vector2(0.5f, side);
+            rt.offsetMin = new Vector2(cornerInset, 0f);
+            rt.offsetMax = new Vector2(-cornerInset, 0f);
+            rt.sizeDelta = new Vector2(rt.sizeDelta.x, thickness);
+        }
+        else
+        {
+            rt.anchorMin = new Vector2(side, 0f);
+            rt.anchorMax = new Vector2(side, 1f);
+            rt.pivot     = new Vector2(side, 0.5f);
+            rt.offsetMin = new Vector2(0f, cornerInset);
+            rt.offsetMax = new Vector2(0f, -cornerInset);
+            rt.sizeDelta = new Vector2(thickness, rt.sizeDelta.y);
+        }
+        rt.anchoredPosition = Vector2.zero;
+
+        var img = go.AddComponent<Image>();
+        img.sprite = art;
+        img.type   = Image.Type.Sliced;   // 변은 늘어난다 — 보더 없으면 통짜로 늘어난다
+        img.raycastTarget = false;
+    }
+
+
 }

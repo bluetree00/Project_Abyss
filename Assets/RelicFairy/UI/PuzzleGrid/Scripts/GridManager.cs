@@ -222,6 +222,44 @@ public class GridManager : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// 이 셰이프를 지금 자리에 놓으려 할 때 <b>길을 막고 있는 룬들</b>을 모은다.
+    ///
+    /// <para>레전더리는 자기 속성 존의 대부분(14/19칸)을 먹으므로, 그 속성을 키워놨다면
+    /// 배치에 앞서 <b>기존 룬을 다 걷어내야</b> 한다. 손으로 하나씩 빼게 두면
+    /// "좋은 걸 얻었는데 노동이 시작된다"가 되므로, 한 번에 묻고 한 번에 처리하기 위한 조회다.</para>
+    ///
+    /// <para><b>점유 외의 이유</b>(판 밖 · 배치 불가 칸 · 속성 존 불일치)로 막혀 있으면
+    /// 걷어내도 못 놓으므로 <c>false</c>를 돌려준다 — 헛되이 폐기시키지 않는다.</para>
+    /// </summary>
+    /// <returns>점유만 치우면 놓을 수 있으면 true. blockers는 그때 비워야 할 룬 목록.</returns>
+    public bool TryGetBlockingItems(Shape shape, List<RuntimeItemData> blockers)
+    {
+        blockers?.Clear();
+        if (shape == null) return false;
+
+        string element     = RuneZoneRule.ElementOf(shape.ItemData);
+        bool   isLegendary = shape.ItemData?.rarity == ItemRarity.Legendary;
+
+        for (int i = 0; i < shape.transform.childCount; i++)
+        {
+            var block = shape.transform.GetChild(i) as RectTransform;
+            if (block == null) continue;
+
+            GridSquare square = FindClosestSquare(block);
+            if (square == null) return false;                                   // 판 밖
+            if (!square.isPlaceable) return false;                              // 애초에 못 놓는 칸
+            if (!RuneZoneRule.Accepts(square, element, isLegendary)) return false;   // 속성 존 불일치
+
+            if (!square.isOccupied) continue;
+
+            var occupier = square.occupyingItem;
+            if (occupier == null) return false;   // 점유인데 주인을 모른다 — 안전하게 포기
+            if (blockers != null && !blockers.Contains(occupier)) blockers.Add(occupier);
+        }
+        return true;
+    }
+
     /// <summary>셰이프 프리뷰를 지운다.</summary>
     public void ClearPreview()
     {

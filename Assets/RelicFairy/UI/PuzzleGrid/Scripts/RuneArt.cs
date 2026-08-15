@@ -15,6 +15,9 @@ public static class RuneArt
 
     public static bool IsLoaded => _lib != null;
 
+    /// <summary>라이브러리 직접 접근 — 판 외곽 액자처럼 조각을 여러 개 꺼내 쓰는 곳에서 사용. 미로드면 null.</summary>
+    public static RuneArtLibrarySO Library => _lib;
+
     // 도메인리로드 비활성(fast play mode)에서도 정적 상태가 새 세션으로 새로 시작하도록 초기화
     // (라이브러리는 불변이라 성능 폴백일 뿐이지만, UISkin/EffectIconRegistry 관례와 맞춘다).
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -75,6 +78,16 @@ public static class RuneArt
         sprite = elemArt != null ? elemArt : GetArt(rarity);
         tint   = elemArt != null ? Color.white : ElementDef.IdColor(elementId, fallbackColor);
     }
+
+    /// <summary>
+    /// 판에 놓인 룬이 <b>차지하는 칸</b>에 깔 속성 타일.
+    ///
+    /// 룬 아이콘과는 다른 슬롯이다 — 룬 자체는 자기 룬 아트로 정체성을 유지하고,
+    /// 차지한 블록 모양은 그 룬의 속성 타일로 칠해 "어느 속성이 판 어디를 먹었는지"가 한눈에 보이게 한다.
+    /// 미할당이면 null → 호출측이 기존 <see cref="ResolveRuneCell"/> 규칙으로 폴백한다.
+    /// </summary>
+    public static Sprite GetBlockTile(string elementId)
+        => _lib != null ? _lib.GetBlockTile(ElementIndex(elementId)) : null;
 
     private static int ElementIndex(string elementId)
     {

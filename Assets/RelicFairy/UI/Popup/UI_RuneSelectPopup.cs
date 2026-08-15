@@ -45,6 +45,12 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     // 모양 미리보기 셀은 고정 크기가 아니라 <b>박스에 맞춰 확대</b>한다.
     // 고정 22px이던 시절엔 1칸 룬이 점처럼 보여 무슨 모양인지 분간이 안 됐다.
     private const float ShapeBoxH   = 150f;  // 모양 미리보기 박스 높이
+    // 모양 박스는 좌우 2단이다 — 왼쪽에 룬 고유 아트, 오른쪽에 블록 모양.
+    // "이 룬이 무엇인가"와 "판에서 어떤 모양을 먹는가"는 다른 정보라 자리를 나눠 준다.
+    // 룬 아트는 "무엇인가"를 알려주고 모양은 "놓을 수 있는가"를 알려준다.
+    // 판정에 실제로 쓰이는 건 모양이라, 아트 칸을 줄여 모양 쪽에 자리를 넘긴다.
+    private const float RuneArtBoxW = 88f;
+    private const float RuneArtPad  = 10f;
     private const float MiniGap     = 4f;
     private const float MiniCellMax = 62f;   // 1~2칸 룬이 시원하게 보이는 상한
     private const float MiniCellMin = 18f;   // 9칸(3×3)도 박스를 안 넘도록 하한
@@ -551,6 +557,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, -18f), new Vector2(_cardW - 40f, ShapeBoxH));
 
+        BuildRuneArtSlot(shapeBox.transform, data);
         bool canPlace = BuildShapePreview(shapeBox.transform, data);
 
         // 이름
@@ -683,6 +690,39 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     }
 
     /// <summary>모양 셀을 그리고, 지금 판에 놓을 자리가 있는지 반환한다.</summary>
+    /// <summary>
+    /// 모양 박스 왼쪽 칸에 <b>룬 고유 아트</b>를 세운다.
+    /// 오른쪽 블록 모양이 "판에서 몇 칸을 어떻게 먹는가"를 말한다면, 이쪽은 "이게 어떤 룬인가"를 말한다.
+    /// 등급 룬 아트를 쓰고 속성색으로 테두리를 둘러, 속성 타일로 그려진 모양과 같은 룬임을 잇는다.
+    /// </summary>
+    private void BuildRuneArtSlot(Transform root, RuntimeItemData data)
+    {
+        float left = -(_cardW - 40f) * 0.5f + 8f + RuneArtBoxW * 0.5f;
+        var half = new Vector2(0.5f, 0.5f);
+
+        var frame = ShopUIStyle.MakeImage(root, "RuneArtFrame", ShopUIStyle.IconBg);
+        ShopUIStyle.Anchor(frame.rectTransform, half, half, half,
+            new Vector2(left, 0f), new Vector2(RuneArtBoxW, RuneArtBoxW));
+        ShopUIStyle.Skin(frame, UISkin.RuneSelect?.runeTile, sliced: true);
+
+        // 룬 자체 아트 — 속성 타일이 아니라 등급 룬 아트를 쓴다(둘을 갈라놓는 것이 이번 구조의 핵심).
+        var art = RuneArt.GetArt(data.rarity);
+        if (art == null) art = RuneArt.GetArtByElement(data.element);
+        if (art == null) return;
+
+        var icon = ShopUIStyle.MakeImage(frame.transform, "RuneArt", Color.white);
+        ShopUIStyle.Anchor(icon.rectTransform, half, half, half,
+            Vector2.zero, Vector2.one * (RuneArtBoxW - 18f));
+        icon.preserveAspect = true;
+        ShopUIStyle.Skin(icon, art);
+
+        // 속성 표식 — 아트가 등급 기준이라 속성이 안 드러난다. 하단에 얇은 속성색 띠로 잇는다.
+        var strip = ShopUIStyle.MakeImage(frame.transform, "ElemStrip",
+            ElementDef.IdColor(data.element, ShopUIStyle.TextDim));
+        ShopUIStyle.Anchor(strip.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+            new Vector2(0f, 7f), new Vector2(RuneArtBoxW - 22f, 5f));
+    }
+
     private bool BuildShapePreview(Transform root, RuntimeItemData data)
     {
         var entry = Managers.RuneData?.GetShape(data.shapeId);
@@ -705,7 +745,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         int cols = maxX - minX + 1, rows = maxY - minY + 1;
 
         // 박스에 꽉 차도록 셀 크기를 역산 — 1칸 룬은 크게, 큰 모양은 줄여서 항상 형태가 읽히게 한다.
-        float boxW = _cardW - 40f - 16f;   // ShapeBox 폭 - 여백
+        // 왼쪽 룬 아트 칸을 뺀 나머지가 모양이 쓸 수 있는 폭이다.
+        float boxW = _cardW - 40f - 16f - RuneArtBoxW - RuneArtPad;
         float boxH = ShapeBoxH   - 16f;
         float fitW = (boxW - (cols - 1) * MiniGap) / Mathf.Max(1, cols);
         float fitH = (boxH - (rows - 1) * MiniGap) / Mathf.Max(1, rows);
@@ -713,7 +754,9 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
         float totalW = cols * (cellSize + MiniGap) - MiniGap;
         float totalH = rows * (cellSize + MiniGap) - MiniGap;
-        float startX = -totalW * 0.5f + cellSize * 0.5f;
+        // 모양은 박스 전체가 아니라 <b>오른쪽 칸</b> 한가운데에 놓는다.
+        float shapeCenterX = (RuneArtBoxW + RuneArtPad) * 0.5f;
+        float startX = shapeCenterX - totalW * 0.5f + cellSize * 0.5f;
         float startY =  totalH * 0.5f - cellSize * 0.5f;
 
         // 스프라이트/틴트 규칙은 RuneArt.ResolveRuneCell 한곳에서 정한다(네 경로 동일 규칙).
@@ -722,6 +765,12 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         RuneArt.ResolveRuneCell(data.element, data.rarity, new Color(0.7f, 0.7f, 0.75f),
             out Sprite art, out Color tint);
         if (art == null) art = UISkin.RuneSelect?.runeTile;
+
+        // 판 위 블록과 <b>같은 속성 타일</b>로 그린다 — 미리보기의 목적이 "이 룬이 판에서 어떻게
+        // 보일지"를 알려주는 것이라, 판과 다른 그림을 보여주면 설명이 되지 않는다.
+        // 타일은 이미 속성색으로 그려져 있어 틴트를 곱하지 않는다.
+        var blockTile = RuneArt.GetBlockTile(data.element);
+        if (blockTile != null) { art = blockTile; tint = Color.white; }
         Color dimTint = new Color(tint.r * 0.5f, tint.g * 0.5f, tint.b * 0.5f, 0.7f);
 
         foreach (var o in offsets)

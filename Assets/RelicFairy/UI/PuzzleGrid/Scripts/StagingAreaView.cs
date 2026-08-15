@@ -424,12 +424,16 @@ public sealed class StagingAreaView : MonoBehaviour
         var shapePreviewRT = shapePreviewGO.GetComponent<RectTransform>();
         // 위쪽 끝은 NEW 뱃지·[X] 버튼(모두 22px 이하 = 슬롯 높이의 약 15%)이 차지하는 띠 아래로
         // 물린다. 예전엔 0.90까지 올라가 모양 미리보기가 뱃지·버튼과 겹쳤다.
-        shapePreviewRT.anchorMin        = new Vector2(0.10f, 0.32f);
-        shapePreviewRT.anchorMax        = new Vector2(0.90f, 0.84f);
+        // 좌: 룬 고유 아트 / 우: 블록 모양. 겹쳐 놓으면 둘 다 안 읽혀서 칸을 나눈다
+        // ("이게 어떤 룬인가"와 "판에서 어떤 모양을 먹는가"는 서로 다른 정보다).
+        shapePreviewRT.anchorMin        = new Vector2(0.42f, 0.32f);
+        shapePreviewRT.anchorMax        = new Vector2(0.92f, 0.84f);
         shapePreviewRT.sizeDelta        = Vector2.zero;
         shapePreviewRT.anchoredPosition = Vector2.zero;
         LayoutRebuilder.ForceRebuildLayoutImmediate(shapePreviewRT);   // rect 확정 후 셀 크기 역산
         BuildCardShapePreview(shapePreviewRT, item);
+
+        BuildRuneArtPane(slotGO.transform, item);
 
         // 이름 (하단 상단부)
         var nameTxtGO = new GameObject("Name", typeof(RectTransform));
@@ -702,6 +706,41 @@ public sealed class StagingAreaView : MonoBehaviour
             : new Color(color.r, color.g, color.b, color.a * 0.35f);
     }
 
+    /// <summary>
+    /// 카드 왼쪽 칸에 <b>룬 고유 아트</b>를 세운다(오른쪽 모양 칸과 분리).
+    /// 아트는 등급 기준이라 속성이 안 드러나서, 아래에 얇은 속성색 띠를 둬 오른쪽 속성 타일과 잇는다.
+    /// </summary>
+    private static void BuildRuneArtPane(Transform slot, RuntimeItemData item)
+    {
+        var art = RuneArt.GetArt(item.rarity);
+        if (art == null) art = RuneArt.GetArtByElement(item.element);
+        if (art == null) return;
+
+        var go = new GameObject("RuneArtPane", typeof(RectTransform), typeof(Image));
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(slot, false);
+        rt.anchorMin        = new Vector2(0.08f, 0.38f);
+        rt.anchorMax        = new Vector2(0.38f, 0.80f);
+        rt.sizeDelta        = Vector2.zero;
+        rt.anchoredPosition = Vector2.zero;
+
+        var img = go.GetComponent<Image>();
+        img.sprite         = art;
+        img.preserveAspect = true;
+        img.raycastTarget  = false;
+
+        var strip = new GameObject("ElemStrip", typeof(RectTransform), typeof(Image));
+        var srt = (RectTransform)strip.transform;
+        srt.SetParent(slot, false);
+        srt.anchorMin        = new Vector2(0.10f, 0.34f);
+        srt.anchorMax        = new Vector2(0.36f, 0.365f);
+        srt.sizeDelta        = Vector2.zero;
+        srt.anchoredPosition = Vector2.zero;
+        var simg = strip.GetComponent<Image>();
+        simg.color         = ElementDef.IdColor(item.element, new Color(0.6f, 0.6f, 0.7f));
+        simg.raycastTarget = false;
+    }
+
     // ── Card Shape Preview ──
 
     private void BuildCardShapePreview(RectTransform root, RuntimeItemData item)
@@ -748,6 +787,10 @@ public sealed class StagingAreaView : MonoBehaviour
         RuneArt.ResolveRuneCell(item.element, item.rarity,
             GridThumbnail.GetItemColor(item.instanceId), out var art, out var tint);
 
+        // 판 위 블록과 같은 속성 타일로 통일 — 대기열에서 본 모양이 판에서 그대로 나와야 한다.
+        var blockTile = RuneArt.GetBlockTile(item.element);
+        if (blockTile != null) { art = blockTile; tint = Color.white; }
+
         foreach (var o in offsets)
         {
             int col = o.x - minX;
@@ -766,6 +809,7 @@ public sealed class StagingAreaView : MonoBehaviour
             img.preserveAspect = art != null;
             img.raycastTarget  = false;
         }
+
     }
 
     // ── Event Handlers ──
@@ -865,7 +909,14 @@ public sealed class StagingAreaView : MonoBehaviour
     {
         _pendingDiscard = item;
         if (_discardDialogText != null)
-            _discardDialogText.text = $"\"{item.displayName ?? item.itemId}\"\n폐기하시겠습니까?";
+        {
+            // 폐기 전에 <b>얼마가 돌아오는지</b> 보여준다. 안 보이면 그냥 버리는 것으로 읽혀
+            // 「폐기 → 원석 → 정제소」 순환을 플레이어가 인지하지 못한다.
+            int ore = RuneSalvage.OreValueOf(item);
+            _discardDialogText.text =
+                $"\"{item.displayName ?? item.itemId}\"\n폐기하시겠습니까?\n\n" +
+                $"<color=#63D9C0>원석 +{ore}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
+        }
         if (_discardDialog != null)
             _discardDialog.SetActive(true);
     }
@@ -886,6 +937,9 @@ public sealed class StagingAreaView : MonoBehaviour
         RemoveShapeForItem(item);
         var run = GameRunBootstrapper.Instance?.Run;
         run?.ItemInventory?.DiscardFromStaging(item);
+
+        // 폐기는 손실이 아니라 <b>다음 룬을 뽑을 기회</b>다 — 원석으로 돌려주고 정제소가 그걸 먹는다.
+        RuneSalvage.Refund(item);
     }
 
     // ── Helpers ──

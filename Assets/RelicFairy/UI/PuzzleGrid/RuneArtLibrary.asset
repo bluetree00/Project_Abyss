@@ -38,3 +38,18 @@ MonoBehaviour:
   - {fileID: 21300000, guid: fb2abd701233bb04598d66b6a642a7bb, type: 3}
   - {fileID: 0}
   - {fileID: 21300000, guid: 805511152fcf3a843acb075102b5761f, type: 3}
+  blockTile:
+  - {fileID: 21300000, guid: d654ed05229ea1146a845502cffaf9fc, type: 3}
+  - {fileID: 21300000, guid: 26d6099eba6066a488d5bd0b1cbc174c, type: 3}
+  - {fileID: 21300000, guid: 3ebf00a4023b0194f89ab76717bb2177, type: 3}
+  - {fileID: 21300000, guid: d23c4aba99ed99a4891a67ceb209c8ae, type: 3}
+  - {fileID: 21300000, guid: 71cc04ae78c7e2b46b964256a9889876, type: 3}
+  - {fileID: 21300000, guid: 1c6a3e83f7ac11747bab8c6104cae1d9, type: 3}
+  frameTop: {fileID: 21300000, guid: 5ca307768ed06ed4aa19c7097ae3d5ea, type: 3}
+  frameBottom: {fileID: 21300000, guid: 42d1d1398b13101439e63b7d2642cebe, type: 3}
+  frameLeft: {fileID: 21300000, guid: f886a15dc0edd974393623a6815dd9e8, type: 3}
+  frameRight: {fileID: 21300000, guid: fc7b32e1dca71fb43b4362304d748107, type: 3}
+  frameTL: {fileID: 21300000, guid: a541f45c873c7314eae8d1d4cad594bf, type: 3}
+  frameTR: {fileID: 21300000, guid: 9359cbabe388aee459bf95fb59d81388, type: 3}
+  frameBL: {fileID: 21300000, guid: 50c63ac1631a59840a9bfcb03c375b99, type: 3}
+  frameBR: {fileID: 21300000, guid: 9e4977dfa392fe848add0251e1ee75c4, type: 3}
