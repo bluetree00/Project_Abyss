@@ -139,6 +139,7 @@ public static class EffectDescriptionFormatter
             case "frost":                     return "서리";
             case "freeze":                    return "빙결";
             case "shatter":                   return "분쇄";
+            case "bleed":                     return "출혈";
             case "poison": case "item_poison": return "중독";
             case "poison_atk":                return "약화";
             case "vulnerable":                return "취약";

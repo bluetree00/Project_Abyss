@@ -18,6 +18,12 @@ public static class CovenantPalette
         public float coefficient;   // 효과 배율(원인 리스크 비례)
         public int   thresholdInt;  // 연타/연속 처치 필요 수
         public float thresholdF;    // 주기(초)/윈도우(초)
+
+        // ── 형상(효과의 질적 변형이 읽는 축) ──────────────
+        // 효과 코드가 원인 id로 if를 쓰면 원인 추가마다 효과 전부를 다시 손봐야 한다.
+        // "어떤 원인이 어떤 형상인가"는 여기 데이터에만 적고, 효과는 형상만 본다.
+        public CauseClass cls;
+        public bool       targeted;   // 발동 순간 '이 적'이라고 가리킬 대상이 있는가
     }
 
     public struct EffectDef
@@ -32,21 +38,22 @@ public static class CovenantPalette
         public float             cap;     // 유효 수치 상한(0 = 무제한). Count 모드에선 최대 횟수.
         public float             icd;     // 내부 쿨다운(초). 0 = 없음.
         public EffectAxis        axis;    // 드래프트 방어축 보장에 쓰는 분류
-        public StatusCurrency    status;  // 카드 배지 표시용 상태 통화
+        public StatusCurrency    status;  // 상태 통화(카드 배지 + 시너지 힌트)
+        public StatusRole        role;    // 그 통화를 거는가(Apply) 먹는가(Consume)
     }
 
     private static readonly Dictionary<string, CauseDef> _causes = new()
     {
-        ["streak"]   = new CauseDef { id="streak",   name="연격",     desc="같은 적을 3연타할 때마다", tag="집중", trigger=CauseTriggerKind.OnHitStreakSameTarget, category=CovenantCategory.ActionConditional, coefficient=1.5f, thresholdInt=3 },
-        ["slaughter"]= new CauseDef { id="slaughter",name="학살",     desc="5연속 처치 시",           tag="연쇄", trigger=CauseTriggerKind.OnKillStreak,        category=CovenantCategory.ActionConditional, coefficient=4.0f, thresholdInt=5 },
-        ["swap"]     = new CauseDef { id="swap",     name="전환",     desc="무기 교체 직후 3초 내 공격 시", tag="기동", trigger=CauseTriggerKind.OnWeaponSwapWindow, category=CovenantCategory.CombatRhythm,     coefficient=2.5f, thresholdF=3f },
-        ["clear"]    = new CauseDef { id="clear",    name="개선",     desc="방을 클리어할 때",         tag="연쇄", trigger=CauseTriggerKind.OnRoomClear,         category=CovenantCategory.RunStructure,     coefficient=3.0f },
-        ["heartbeat"]= new CauseDef { id="heartbeat",name="심장박동", desc="4초마다",                 tag="지속", trigger=CauseTriggerKind.Periodic,            category=CovenantCategory.RunStructure,     coefficient=1.0f, thresholdF=4f },
-        ["concerto"] = new CauseDef { id="concerto", name="연주",     desc="스킬을 사용할 때",         tag="스킬", trigger=CauseTriggerKind.OnSkillUse,          category=CovenantCategory.CombatRhythm,     coefficient=2.0f },
-        ["hunt"]     = new CauseDef { id="hunt",     name="사냥 개시", desc="처치 직후 3초 내 공격 시", tag="처치", trigger=CauseTriggerKind.OnKillThenHitWindow, category=CovenantCategory.ActionConditional, coefficient=2.0f, thresholdF=3f },
-        ["opener"]   = new CauseDef { id="opener",   name="선제",     desc="방 진입 후 첫 타격 시",     tag="개전", trigger=CauseTriggerKind.OnFirstHitInRoom,    category=CovenantCategory.RunStructure,     coefficient=1.5f },
-        ["besiege"]  = new CauseDef { id="besiege",  name="포위",     desc="인접한 적이 3 이상일 때",   tag="위험", trigger=CauseTriggerKind.OnProximity,         category=CovenantCategory.ActionConditional, coefficient=3.0f, thresholdInt=3, thresholdF=2f },
-        ["march"]    = new CauseDef { id="march",    name="행군",     desc="12m 이동할 때마다",         tag="기동", trigger=CauseTriggerKind.OnMoveDistance,      category=CovenantCategory.CombatRhythm,     coefficient=1.5f, thresholdF=12f },
+        ["streak"]   = new CauseDef { id="streak",   name="연격",     desc="같은 적을 3연타할 때마다", tag="집중", trigger=CauseTriggerKind.OnHitStreakSameTarget, category=CovenantCategory.ActionConditional, coefficient=1.5f, thresholdInt=3, cls=CauseClass.Melee,    targeted=true  },
+        ["slaughter"]= new CauseDef { id="slaughter",name="학살",     desc="5연속 처치 시",           tag="연쇄", trigger=CauseTriggerKind.OnKillStreak,        category=CovenantCategory.ActionConditional, coefficient=4.0f, thresholdInt=5, cls=CauseClass.Kill,     targeted=false },
+        ["swap"]     = new CauseDef { id="swap",     name="전환",     desc="무기 교체 직후 3초 내 공격 시", tag="기동", trigger=CauseTriggerKind.OnWeaponSwapWindow, category=CovenantCategory.CombatRhythm,     coefficient=2.5f, thresholdF=3f,  cls=CauseClass.Mobility, targeted=true  },
+        ["clear"]    = new CauseDef { id="clear",    name="개선",     desc="방을 클리어할 때",         tag="연쇄", trigger=CauseTriggerKind.OnRoomClear,         category=CovenantCategory.RunStructure,     coefficient=3.0f,                 cls=CauseClass.Boundary, targeted=false },
+        ["heartbeat"]= new CauseDef { id="heartbeat",name="심장박동", desc="4초마다",                 tag="지속", trigger=CauseTriggerKind.Periodic,            category=CovenantCategory.RunStructure,     coefficient=1.0f, thresholdF=4f,  cls=CauseClass.Passive,  targeted=false },
+        ["concerto"] = new CauseDef { id="concerto", name="연주",     desc="스킬을 사용할 때",         tag="스킬", trigger=CauseTriggerKind.OnSkillUse,          category=CovenantCategory.CombatRhythm,     coefficient=2.0f,                 cls=CauseClass.Skill,    targeted=false },
+        ["hunt"]     = new CauseDef { id="hunt",     name="사냥 개시", desc="처치 직후 3초 내 공격 시", tag="처치", trigger=CauseTriggerKind.OnKillThenHitWindow, category=CovenantCategory.ActionConditional, coefficient=2.0f, thresholdF=3f,  cls=CauseClass.Kill,     targeted=true  },
+        ["opener"]   = new CauseDef { id="opener",   name="선제",     desc="방 진입 후 첫 타격 시",     tag="개전", trigger=CauseTriggerKind.OnFirstHitInRoom,    category=CovenantCategory.RunStructure,     coefficient=1.5f,                 cls=CauseClass.Boundary, targeted=true  },
+        ["besiege"]  = new CauseDef { id="besiege",  name="포위",     desc="인접한 적이 3 이상일 때",   tag="위험", trigger=CauseTriggerKind.OnProximity,         category=CovenantCategory.ActionConditional, coefficient=3.0f, thresholdInt=3, thresholdF=2f, cls=CauseClass.Danger, targeted=false },
+        ["march"]    = new CauseDef { id="march",    name="행군",     desc="12m 이동할 때마다",         tag="기동", trigger=CauseTriggerKind.OnMoveDistance,      category=CovenantCategory.CombatRhythm,     coefficient=1.5f, thresholdF=12f, cls=CauseClass.Mobility, targeted=false },
     };
 
     // 기존 5종(supernova/fury/bloodmark/curse/execute)은 <b>id를 바꾸지 않는다</b> —
@@ -60,31 +67,54 @@ public static class CovenantPalette
 
         ["fury"]      = new EffectDef { id="fury",      name="격노",     desc="일시적으로 피해가 증폭된다",  tag="강화",
             kind=EffectKind.DamageBuff, magnitude=0.30f, duration=4f,
-            mode=CovenantScaleMode.Damped, cap=1.2f, axis=EffectAxis.Offense,  status=StatusCurrency.Momentum },
+            mode=CovenantScaleMode.Damped, cap=1.2f, axis=EffectAxis.Offense,  status=StatusCurrency.Momentum, role=StatusRole.Apply },
 
         ["curse"]     = new EffectDef { id="curse",     name="저주",     desc="대상이 받는 피해가 증폭된다", tag="상태이상",
             kind=EffectKind.Curse,      magnitude=0.20f, duration=5f,
-            mode=CovenantScaleMode.Damped, cap=0.8f, axis=EffectAxis.Offense,  status=StatusCurrency.Vulnerable },
+            mode=CovenantScaleMode.Damped, cap=0.8f, axis=EffectAxis.Offense,  status=StatusCurrency.Vulnerable, role=StatusRole.Apply },
 
         // 처형 임계는 sqrt로 완만하게 — 선형이면 고계수 원인에서 "절반 이하 즉사"가 되어 보스전이 무너진다.
-        ["execute"]   = new EffectDef { id="execute",   name="처형",     desc="저체력 대상을 즉사시킨다",    tag="공격",
+        ["execute"]   = new EffectDef { id="execute",   name="처형",     desc="상태에 절인 저체력 대상을 즉사시킨다", tag="공격",
             kind=EffectKind.Execute,    magnitude=0.15f,
             mode=CovenantScaleMode.Sqrt,   cap=0.35f, axis=EffectAxis.Offense, status=StatusCurrency.None },
 
         ["ember"]     = new EffectDef { id="ember",     name="잔불",     desc="대상을 불태운다",             tag="상태이상",
             kind=EffectKind.Burn,       magnitude=0.20f, duration=4f,
-            mode=CovenantScaleMode.Damped, cap=0.8f, axis=EffectAxis.Offense,  status=StatusCurrency.Burn },
+            mode=CovenantScaleMode.Damped, cap=0.8f, axis=EffectAxis.Offense,  status=StatusCurrency.Burn, role=StatusRole.Apply },
+
+        // 출혈은 걸수록 커진다 — 화상(더 강한 쪽 유지)과 달리 dps가 스택으로 누적된다.
+        ["hemorrhage"]= new EffectDef { id="hemorrhage",name="출혈",     desc="상처가 벌어져 계속 덧난다",   tag="상태이상",
+            kind=EffectKind.BleedStack, magnitude=0.15f, duration=4f,
+            mode=CovenantScaleMode.Damped, cap=0.5f, axis=EffectAxis.Offense,  status=StatusCurrency.Bleed, role=StatusRole.Apply },
+
+        // ── 소모형(상태 통화를 먹는다) ───────────────────
+        // 셋 모두 <b>어떤 상태도 부여하지 않는다</b>. 먹으면서 걸면 자기 먹이를 자기가 만들어
+        // 한 번의 발동이 프레임 안에서 스스로를 되먹인다(무한 기폭).
+        ["detonate"]  = new EffectDef { id="detonate",  name="기폭",     desc="걸린 화상·출혈을 터뜨린다",   tag="폭발",
+            kind=EffectKind.Detonate,   magnitude=0.5f,  radius=4f,
+            mode=CovenantScaleMode.Damped, cap=1.2f, axis=EffectAxis.Offense,  status=StatusCurrency.Burn, role=StatusRole.Consume },
+
+        ["sanguine"]  = new EffectDef { id="sanguine",  name="흡정",     desc="걸린 화상·출혈을 보호막으로 빨아들인다", tag="생존",
+            kind=EffectKind.Sanguine,   magnitude=0.5f,
+            mode=CovenantScaleMode.Damped, cap=1.2f, icd=2f,
+            // 방어축이 아니라 보조축이다 — 다른 서약이 상태를 걸어줘야만 방패가 된다.
+            // 이걸 Survival로 두면 드래프트의 "생존 카드 한 장 보장"이 조건부 카드로 채워져 보장이 아니게 된다.
+            axis=EffectAxis.Utility,   status=StatusCurrency.Bleed, role=StatusRole.Consume },
+
+        ["harvest"]   = new EffectDef { id="harvest",   name="수확",     desc="걸린 상태를 거둬 재촉과 금으로 바꾼다", tag="경제",
+            kind=EffectKind.Harvest,    magnitude=0.8f,
+            mode=CovenantScaleMode.Damped, cap=2f,   icd=4f, axis=EffectAxis.Utility, status=StatusCurrency.Burn, role=StatusRole.Consume },
 
         // ── 방어 ────────────────────────────────────────
         // 매 타격마다 리필되면 소모보다 리필이 빨라 사실상 무적이 된다 → icd로 발동 간격을 강제.
         ["bloodmark"] = new EffectDef { id="bloodmark", name="피의 보호막", desc="굳은 피가 보호막이 된다",  tag="생존",
             kind=EffectKind.Shield,     magnitude=12f,
-            mode=CovenantScaleMode.Sqrt,   cap=40f,  icd=3f, axis=EffectAxis.Survival, status=StatusCurrency.Shield },
+            mode=CovenantScaleMode.Sqrt,   cap=40f,  icd=3f, axis=EffectAxis.Survival, status=StatusCurrency.Shield, role=StatusRole.Apply },
 
         // 무적 시간은 계수로 늘리면 안 된다(고계수 원인 = 상시 무적) → CovenantScaleMode.None + 긴 icd.
         ["aegis"]     = new EffectDef { id="aegis",     name="성역",     desc="아주 잠시 무적이 된다",       tag="생존",
             kind=EffectKind.Invincible, magnitude=0.5f,
-            mode=CovenantScaleMode.None,             icd=8f, axis=EffectAxis.Survival, status=StatusCurrency.Shield },
+            mode=CovenantScaleMode.None,             icd=8f, axis=EffectAxis.Survival, status=StatusCurrency.Shield, role=StatusRole.Apply },
 
         // 원인 계수가 '충전 횟수'가 된다 — 위험한 조건일수록 더 여러 번 버틴다.
         ["lastbreath"]= new EffectDef { id="lastbreath",name="마지막 숨결", desc="치명적인 피해를 한 번 견딘다", tag="생존",
@@ -94,7 +124,7 @@ public static class CovenantPalette
         // ── 보조 ────────────────────────────────────────
         ["momentum"]  = new EffectDef { id="momentum",  name="박차",     desc="이동·공격 속도가 중첩된다",   tag="가속",
             kind=EffectKind.StatBuff,   magnitude=0.04f, duration=6f,
-            mode=CovenantScaleMode.Damped, cap=0.10f, axis=EffectAxis.Utility, status=StatusCurrency.Momentum },
+            mode=CovenantScaleMode.Damped, cap=0.10f, axis=EffectAxis.Utility, status=StatusCurrency.Momentum, role=StatusRole.Apply },
 
         ["goldrain"]  = new EffectDef { id="goldrain",  name="황금비",   desc="골드가 쏟아진다",             tag="경제",
             kind=EffectKind.GoldBurst,  magnitude=6f,
@@ -137,4 +167,26 @@ public static class CovenantPalette
     /// <summary>해당 효과가 방어축(Survival)인지. 드래프트 보장/리롤 axisLock 판정용.</summary>
     public static bool IsSurvivalEffect(string id)
         => TryGetEffect(id, out var e) && e.axis == EffectAxis.Survival;
+
+    // ── 금지 조합 ─────────────────────────────────────────
+    /// <summary>
+    /// 벼릴 수 없는 원인×효과 짝. 카드 자체는 계속 뽑히되(원인·효과는 서로 독립으로 굴린다)
+    /// 이 짝으로는 조립을 막는다 — 두 부류다:
+    ///  • 발동 조건이 사실상 상시라 방어 효과가 "무적 상시화"가 되는 것(심장박동·행군·포위 × 성역/보호막)
+    ///  • 처치가 원인인데 결과가 처형이라, 처형이 다시 처치를 만들어 스스로를 먹이는 것(사냥/학살 × 처형)
+    ///
+    /// 런타임(<see cref="AssembledCovenant"/>)에서는 <b>막지 않는다</b> — 이미 이 짝을 저장해 둔 런이
+    /// 있으면 서약이 통째로 사라진다. 새로 만드는 것만 막는 게 옳다.
+    /// </summary>
+    private static readonly HashSet<string> _bannedPairs = new()
+    {
+        "heartbeat|aegis",
+        "march|aegis", "march|bloodmark", "march|execute",
+        "besiege|aegis",
+        "hunt|execute", "slaughter|execute",
+    };
+
+    public static bool IsBannedPair(string causeId, string effectId)
+        => !string.IsNullOrEmpty(causeId) && !string.IsNullOrEmpty(effectId)
+           && _bannedPairs.Contains(causeId + "|" + effectId);
 }

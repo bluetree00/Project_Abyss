@@ -14,4 +14,12 @@ public enum EffectKind
     Invincible,   // 짧은 무적 (PlayerController.SetInvincible). ICD 필수 — 스케일 금지(ScaleMode.None).
     DeathSave,    // 치명 피해 1회 생존 (TryPreventDeath). 유효 '횟수'가 충전량(ScaleMode.Count).
     StatBuff,     // 이속/공속 중첩 버프 (GetStatModifiers + 버프창). 「박차」.
+
+    // ── 상태 통화 걸기/먹기 (B급) ────────────────────────
+    // 소모형(Detonate/Sanguine/Harvest)은 어떤 상태도 <b>부여하지 않는다</b>.
+    // 먹으면서 걸면 자기가 먹을 것을 자기가 만들어 무한 기폭이 된다.
+    BleedStack,   // 출혈 중첩 부여 (MonsterBleed.ApplyStacked). dps = 유효공격력 × 유효수치 / 스택.
+    Detonate,     // 기폭: 화상+출혈 잔량을 소모해 즉시 피해 + 반경 확산. 원인 형상에 따라 단일/광역.
+    Sanguine,     // 흡정: 화상+출혈 잔량을 소모해 보호막으로 환산.
+    Harvest,      // 수확: 화상+출혈 잔량을 소모해 스킬 쿨감 + 골드로 환산.
 }

@@ -35,16 +35,30 @@ public enum EffectAxis
 }
 
 /// <summary>
-/// 효과가 다루는 상태 통화 4종(화상/취약/보호막/기세).
-/// A급 범위에서는 <b>카드 배지 표시 전용</b>이다 — 통화끼리 주고받는 환전소는 C급이라 이번엔 없다.
+/// 효과가 다루는 상태 통화 5종(화상/출혈/취약/보호막/기세).
+/// 배지 표시에 더해, <see cref="StatusRole"/>과 짝지어 "서약끼리 물리는가"(시너지 힌트)를 판정한다.
+/// 통화를 서로 바꿔주는 환전소와 감전(shock)은 C급이라 아직 없다.
 /// </summary>
 public enum StatusCurrency
 {
     None,
     Burn,        // 화상
+    Bleed,       // 출혈
     Vulnerable,  // 취약
     Shield,      // 보호막
     Momentum,    // 기세
+}
+
+/// <summary>
+/// 효과가 통화를 <b>거는가 먹는가</b>. 그물이 성립하려면 방향이 필요하다 —
+/// 부여만 있으면 상태가 쌓이기만 하고, 소모만 있으면 먹을 게 없다.
+/// 소모형은 어떤 상태도 부여하지 않는다(부여+소모를 겸하면 스스로를 먹여 무한 기폭이 된다).
+/// </summary>
+public enum StatusRole
+{
+    None,
+    Apply,     // 부여 — 통화를 건다
+    Consume,   // 소모 — 걸린 통화를 먹고 다른 것으로 바꾼다
 }
 
 /// <summary>축/통화 표시명 — 카드 배지·미리보기 공용.</summary>
@@ -60,11 +74,23 @@ public static class EffectTaxonomy
     public static string DisplayName(this StatusCurrency c) => c switch
     {
         StatusCurrency.Burn       => "화상",
+        StatusCurrency.Bleed      => "출혈",
         StatusCurrency.Vulnerable => "취약",
         StatusCurrency.Shield     => "보호막",
         StatusCurrency.Momentum   => "기세",
         _                         => null,
     };
+
+    /// <summary>지속피해 계열(화상·출혈)인지.</summary>
+    public static bool IsDot(this StatusCurrency c)
+        => c == StatusCurrency.Burn || c == StatusCurrency.Bleed;
+
+    /// <summary>
+    /// 두 통화가 같은 군인지 — 소모형(기폭·흡정·수확)은 화상과 출혈을 가리지 않고 먹기 때문에
+    /// 둘을 한 군으로 본다. 이게 없으면 「출혈」×「기폭」 같은 실제로 물리는 조합이 힌트에 안 뜬다.
+    /// </summary>
+    public static bool SameFamily(StatusCurrency a, StatusCurrency b)
+        => a != StatusCurrency.None && (a == b || (a.IsDot() && b.IsDot()));
 
     /// <summary>카드 배지 문구. 통화가 없으면 축만. 예: "생존 · 보호막".</summary>
     public static string Badge(EffectAxis axis, StatusCurrency status)

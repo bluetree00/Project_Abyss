@@ -22,6 +22,47 @@ public static class CovenantMath
     /// <summary>「박차」 최대 중첩.</summary>
     public const int MomentumMaxStacks = 5;
 
+    // ── 상태 통화 소모 비율(스펙 고정값) ──────────────────
+    // 이 셋은 티어·계수로 스케일하지 않는다. "얼마를 먹는가"까지 커지면 소모형이 걸어주는 서약을
+    // 통째로 굶겨 그물이 아니라 독식이 된다. 커지는 쪽은 '먹은 것을 무엇으로 바꾸는가'(Effective)다.
+    /// <summary>「기폭」이 먹는 화상·출혈 잔량 비율.</summary>
+    public const float DetonateFraction = 0.60f;
+    /// <summary>「흡정」이 먹는 화상·출혈 잔량 비율.</summary>
+    public const float SanguineFraction = 0.40f;
+    /// <summary>「수확」이 먹는 화상·출혈 잔량 비율.</summary>
+    public const float HarvestFraction  = 0.30f;
+    /// <summary>「수확」 1회 골드.</summary>
+    public const int   HarvestGold      = 3;
+
+    /// <summary>「출혈」 최대 중첩.</summary>
+    public const int BleedMaxStacks = 5;
+
+    // ── 원인 형상별 질적 변형 ────────────────────────────
+    /// <summary>「박차」 기동 원인 변형의 중첩 상한(이속 위주 → 더 오래 쌓인다).</summary>
+    public const int MomentumMobilityMaxStacks = 8;
+    /// <summary>「박차」 변형에서 <b>주축이 아닌</b> 스탯이 받는 비율.</summary>
+    public const float MomentumOffAxisRatio = 0.35f;
+    /// <summary>「박차」 처치 원인 변형의 지속 배수.</summary>
+    public const float MomentumKillDurationMult = 2f;
+
+    /// <summary>「격노」 위험 원인 변형의 증폭 배수(대신 인접이 흩어지면 즉시 꺼진다).</summary>
+    public const float FuryDangerBonus = 1.25f;
+
+    /// <summary>「처형」 임계에 곱해지는 상태 통화 1종당 배수.</summary>
+    public const float ExecuteStatusMult = 1.5f;
+    /// <summary>「처형」 경계 원인 변형(최저 HP 표식)의 임계 배수.</summary>
+    public const float ExecuteBoundaryMult = 2f;
+
+    /// <summary>
+    /// 「처형」 임계 절대 상한. 통화 3종(화상·출혈·취약)이 다 걸리면 배수만 3.375배라
+    /// 상한이 없으면 임계가 1을 넘어 <b>체력과 무관하게</b> 즉사한다.
+    /// </summary>
+    public const float ExecuteThresholdCap = 0.60f;
+
+    /// <summary>원인 형상에 따른 「박차」 중첩 상한.</summary>
+    public static int MomentumStackCap(CauseClass cls)
+        => cls == CauseClass.Mobility ? MomentumMobilityMaxStacks : MomentumMaxStacks;
+
     // ── 원재료 ──────────────────────────────────────────
     /// <summary>티어 반영 원인 계수(스케일 적용 전 원값). UI의 "봉인 계수" 표기가 이 값이다.</summary>
     public static float RawCoef(in CovenantPalette.CauseDef cause, CovenantTier causeTier)

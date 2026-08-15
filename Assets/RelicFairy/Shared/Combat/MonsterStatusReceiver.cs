@@ -143,6 +143,34 @@ namespace RelicFairy.Monster
         public float GetRemainingDotDamage(string id)
             => _dot.TryGetValue(id, out var d) ? d.damagePerTick * d.remainingTicks : 0f;
 
+        /// <summary>현재 틱당 피해(없으면 0). 중첩형 재부여가 "얼마에 얹을지" 알아야 해서 노출한다.</summary>
+        public float GetDotDamagePerTick(string id)
+            => _dot.TryGetValue(id, out var d) && d.remainingTicks > 0 ? d.damagePerTick : 0f;
+
+        /// <summary>
+        /// DoT의 잔여 틱을 fraction만큼 <b>차감하고 소모된 피해 가치를 반환</b>한다. 피해는 넣지 않는다 —
+        /// 소모한 가치를 무엇으로 바꿀지(폭발·보호막·쿨감)는 부르는 쪽이 정한다.
+        ///
+        /// 두 가지를 일부러 하지 않는다:
+        ///  • 딕셔너리에서 제거하지 않는다 — DoT 틱 피해가 적을 죽이면 그 처치가 서약을 물고
+        ///    이 함수까지 돌아올 수 있다. 그 시점 <see cref="Tick"/>은 _dot을 순회 중이라
+        ///    여기서 지우면 순회가 통째로 터진다. 잔여 0인 슬롯은 다음 Tick이 정리한다.
+        ///  • onExpire를 발화시키지 않는다(전부 소모돼도) — 소모는 '정상 만료'가 아니다.
+        ///    만료 연쇄(점화 만료 → 작열 폭발)까지 딸려오면 소모 전용 효과가 상태를 되살린다.
+        /// </summary>
+        public float ConsumeDot(string id, float fraction)
+        {
+            if (string.IsNullOrEmpty(id) || !_dot.TryGetValue(id, out var d) || d.remainingTicks <= 0) return 0f;
+
+            fraction = Mathf.Clamp01(fraction);
+            if (fraction <= 0f) return 0f;
+
+            int consumed = Mathf.Clamp(Mathf.CeilToInt(d.remainingTicks * fraction), 1, d.remainingTicks);
+            d.remainingTicks -= consumed;
+            if (d.remainingTicks <= 0) d.onExpire = null;
+            return d.damagePerTick * consumed;
+        }
+
         // ── 표시(UI) ───────────────────────────────────────
         /// <summary>
         /// 지금 걸려 있는 상태이상을 UI 모델(BuffViewItem)로 뽑는다 — 플레이어 버프창과 같은 규격.

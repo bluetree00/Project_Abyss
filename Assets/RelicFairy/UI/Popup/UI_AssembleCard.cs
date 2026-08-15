@@ -64,8 +64,12 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private CovenantSkinSO _gradeSkin;
     private Image[]        _gradePieces;
 
+    // 보유 서약과 통화가 물리는 카드 — 등급색과 구분되는 청록 글로우로 상시 은은하게 켠다.
+    private static readonly Color SynergyGlow = new(0.35f, 0.90f, 0.80f);
+    private const float SynergyGlowAlpha = 0.16f;
+
     private Color  _gradeColor = Color.white;
-    private bool   _selected, _hover;
+    private bool   _selected, _hover, _synergy;
     private bool   _layoutApplied;
     private CancellationTokenSource _tweenCts;
 
@@ -248,6 +252,7 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (_glow) _glow.color = new Color(tierColor.r, tierColor.g, tierColor.b, 0f);   // 평시 꺼둠
         SetSealed(false);
         _selected = false;
+        _synergy  = false;   // 리롤로 다른 효과가 오면 시너지 판정도 새로 받아야 한다
         ApplyCardBg();
         RefreshVisual(instant: true);
         RevealAsync(tier).Forget();   // 등급별 등장 연출
@@ -261,6 +266,14 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
         ApplyCardBg();   // 선택 시 밝은 양피지 → 어두운 판
         RefreshVisual(instant: false);
         if (on && !wasSelected) PopAsync().Forget();   // 새로 선택된 카드만 팝
+    }
+
+    /// <summary>보유 서약과 통화가 물리는 카드 표시(청록 글로우). 선택/호버보다 약해 서로 가리지 않는다.</summary>
+    public void SetSynergy(bool on)
+    {
+        if (_synergy == on) return;
+        _synergy = on;
+        RefreshVisual(instant: false);
     }
 
     public void SetSealed(bool on) { if (_sealedOverlay) _sealedOverlay.SetActive(on); }
@@ -326,14 +339,22 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private void RefreshVisual(bool instant)
     {
         float target = _selected ? SelectScale : (_hover ? HoverScale : 1f);
-        if (_glow)
-        {
-            // 카드 전체를 채우는 단색 글로우라 너무 진하면 텍스트가 묻힌다 — 은은한 등급 틴트로.
-            float a = _selected ? 0.20f : (_hover ? 0.10f : 0f);
-            _glow.color = new Color(_gradeColor.r, _gradeColor.g, _gradeColor.b, a);
-        }
+        if (_glow) _glow.color = RestGlow();
         if (instant) { transform.localScale = Vector3.one * target; return; }
         TweenScaleAsync(target).Forget();
+    }
+
+    /// <summary>
+    /// 평시 글로우 색. 선택/호버는 등급색, 아무것도 아닐 때 시너지 카드만 청록으로 켠다.
+    /// 등장 연출(<see cref="RevealAsync"/>)의 착지점도 이 값을 쓴다 — 안 그러면 연출이 끝나는 순간
+    /// 시너지 표시가 덮여 사라진다(연출은 비동기라 늦게 착지한다).
+    /// </summary>
+    private Color RestGlow()
+    {
+        if (_selected) return new Color(_gradeColor.r, _gradeColor.g, _gradeColor.b, 0.20f);
+        if (_hover)    return new Color(_gradeColor.r, _gradeColor.g, _gradeColor.b, 0.10f);
+        if (_synergy)  return new Color(SynergyGlow.r, SynergyGlow.g, SynergyGlow.b, SynergyGlowAlpha);
+        return new Color(_gradeColor.r, _gradeColor.g, _gradeColor.b, 0f);
     }
 
     private async UniTaskVoid TweenScaleAsync(float target)
@@ -390,7 +411,7 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
         float startScale = tier switch { CovenantTier.Ruby => 1.20f, CovenantTier.Gold => 1.14f, _ => 1.09f };
         float peakGlow   = tier switch { CovenantTier.Ruby => 0.85f, CovenantTier.Gold => 0.55f, _ => 0.32f };
         float restScale  = _selected ? SelectScale : 1f;
-        float restGlow   = _selected ? 0.20f : 0f;
+        var   peakColor  = new Color(_gradeColor.r, _gradeColor.g, _gradeColor.b, peakGlow);
 
         try
         {
@@ -401,12 +422,11 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
                 float k = Mathf.Clamp01(t / RevealTime);
                 float ease = 1f - (1f - k) * (1f - k);   // ease-out
                 transform.localScale = Vector3.one * Mathf.Lerp(startScale, restScale, ease);
-                if (_glow)
-                    _glow.color = new Color(_gradeColor.r, _gradeColor.g, _gradeColor.b, Mathf.Lerp(peakGlow, restGlow, ease));
+                if (_glow) _glow.color = Color.Lerp(peakColor, RestGlow(), ease);
                 await UniTask.Yield(PlayerLoopTiming.Update, ct);
             }
             transform.localScale = Vector3.one * restScale;
-            if (_glow) _glow.color = new Color(_gradeColor.r, _gradeColor.g, _gradeColor.b, restGlow);
+            if (_glow) _glow.color = RestGlow();
         }
         catch (System.OperationCanceledException) { }
     }

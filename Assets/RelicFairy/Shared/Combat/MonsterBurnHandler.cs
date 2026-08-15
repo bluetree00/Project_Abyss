@@ -58,23 +58,43 @@ public sealed class MonsterBurnHandler : MonoBehaviour
         Destroy(this);
     }
 
-    /// <summary>대상 화상의 fraction(0~1)만큼을 즉시 피해로 터뜨리고, 그 비율만큼 잔여를 줄인다(나머지는 계속 탄다). — 가웨인 '불사르기'.</summary>
-    public static void DetonateOn(GameObject target, float fraction)
-    {
-        if (target != null && target.TryGetComponent<MonsterBurnHandler>(out var h)) h.Detonate(fraction);
-    }
+    /// <summary>
+    /// 대상 화상의 fraction(0~1)만큼을 즉시 피해로 터뜨리고, 그 비율만큼 잔여를 줄인다(나머지는 계속 탄다). — 가웨인 '불사르기'.
+    /// 반환 = 실제로 터뜨린 피해량(없으면 0) — 서약 「기폭」이 이 값에 비례해 반경 확산을 매긴다.
+    /// </summary>
+    public static float DetonateOn(GameObject target, float fraction)
+        => target != null && target.TryGetComponent<MonsterBurnHandler>(out var h) ? h.Detonate(fraction) : 0f;
 
-    /// <summary>남은 화상의 fraction 비율을 즉시 피해로 가하고, 그만큼 잔여시간을 소진. 전부 소진되면 소멸.</summary>
-    public void Detonate(float fraction)
+    /// <summary>남은 화상의 fraction 비율을 즉시 피해로 가하고, 그만큼 잔여시간을 소진. 전부 소진되면 소멸. 반환 = 가한 피해.</summary>
+    public float Detonate(float fraction)
     {
         fraction = Mathf.Clamp01(fraction);
-        if (_target == null || fraction <= 0f || _remaining <= 0f) return;
+        if (_target == null || fraction <= 0f || _remaining <= 0f) return 0f;
 
         float burst = _dps * _remaining * fraction;
         if (burst > 0f) DealDot(burst);
 
         _remaining -= _remaining * fraction;   // 터뜨린 비율만큼 잔여 소진
         if (_remaining <= 0f) Destroy(this);
+        return burst;
+    }
+
+    /// <summary>
+    /// 화상 잔량의 fraction만큼을 <b>피해 없이</b> 걷어내고 그 가치를 반환한다(흡정·수확).
+    /// 터뜨리기(Detonate)와 갈라 두는 이유: 빨아먹는 효과가 피해까지 넣으면 소모형이 사실상 딜 증가가 되어
+    /// "무엇을 포기하고 무엇을 얻는가"가 사라진다.
+    /// </summary>
+    public static float DrainOn(GameObject target, float fraction)
+    {
+        if (target == null || !target.TryGetComponent<MonsterBurnHandler>(out var h)) return 0f;
+
+        fraction = Mathf.Clamp01(fraction);
+        if (fraction <= 0f || h._remaining <= 0f) return 0f;
+
+        float value = h._dps * h._remaining * fraction;
+        h._remaining -= h._remaining * fraction;
+        if (h._remaining <= 0f) Destroy(h);
+        return value;
     }
 
     /// <summary>

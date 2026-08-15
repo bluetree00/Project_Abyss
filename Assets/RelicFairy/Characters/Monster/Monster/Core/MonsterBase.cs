@@ -841,6 +841,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             into.Add(MonsterStatusReceiver.MakeItem("burn", 1, burn.Remaining01, burn.Remaining));
     }
 
+    /// <summary>지금 '취약'(받피증폭)이 하나라도 걸려 있는지. 서약 「처형」이 상태 통화 종수를 셀 때 쓴다.</summary>
+    public bool HasDamageTakenAmp => CurrentDamageTakenMult() > 1.0001f;
+
     /// <summary>현재 활성 받피증폭 디버프 합산 배율(1 + 만료되지 않은 슬롯들의 amp 합). 슬롯 없으면 1.</summary>
     private float CurrentDamageTakenMult()
     {

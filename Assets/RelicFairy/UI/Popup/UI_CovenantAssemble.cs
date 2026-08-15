@@ -24,6 +24,7 @@ public class UI_CovenantAssemble : UI_Popup
     private static readonly Color SilverColor = new(0.80f, 0.82f, 0.88f);
     private static readonly Color GoldColor   = new(0.95f, 0.74f, 0.28f);
     private static readonly Color RubyColor   = new(0.92f, 0.28f, 0.40f);   // 루비 = 진홍
+    private static readonly Color SynergyColor = new(0.35f, 0.90f, 0.80f);  // 시너지 = 청록(등급색과 안 겹치게)
 
     // ── [SerializeField] ─────────────────────────────────
     [Header("제목")]
@@ -80,6 +81,9 @@ public class UI_CovenantAssemble : UI_Popup
     private int _selCause, _selEffect;
     private int _whetLeft;
     private UniTaskCompletionSource<string> _tcs;
+
+    // 시너지 힌트 — 프리팹에 자리가 없어 효과 줄을 복제해 그 아래 한 줄을 만든다(EnsureWhetButton과 같은 방침).
+    private TMP_Text _synergyText;
 
     // ── Public Properties ────────────────────────────────
     public override bool BlocksGameplay => true;
@@ -408,8 +412,26 @@ public class UI_CovenantAssemble : UI_Popup
             if (_causeCards[i]) _causeCards[i].SetSelected(i == _selCause);
         for (int i = 0; i < _effectCards.Length; i++)
             if (_effectCards[i]) _effectCards[i].SetSelected(i == _selEffect);
+        RefreshSynergyGlow();
         UpdatePreview();
         UpdateConnectors();
+    }
+
+    /// <summary>보유 서약(런 중 조립 서약만). 시너지 판정의 상대편.</summary>
+    private static IReadOnlyList<CovenantBase> HeldCovenants
+        => GameRunBootstrapper.Instance?.Run?.CovenantHandler?.Covenants;
+
+    /// <summary>이미 가진 서약과 통화가 물리는 효과 카드를 켠다 — 그물은 고르는 순간 보여야 짤 수 있다.</summary>
+    private void RefreshSynergyGlow()
+    {
+        var held = HeldCovenants;
+        if (_effectCards == null) return;
+
+        for (int i = 0; i < _effectCards.Length; i++)
+        {
+            if (_effectCards[i] == null || i >= _effects.Count) continue;
+            _effectCards[i].SetSynergy(CovenantAssemblePreview.HasSynergy(_effects[i].id, held));
+        }
     }
 
     /// <summary>선택된 원인/효과 카드에서 중앙 결과 카드로 이어지는 대각 연결선을 갱신.</summary>
@@ -462,14 +484,59 @@ public class UI_CovenantAssemble : UI_Popup
         SetText(_previewEffect,    $"효과  {p.EffectAmountLabel()}  ({p.Badge})");
         SetText(_forgeSummary,     $"{p.causeName} × {p.effectName}  →  {p.effectDesc}");
 
+        UpdateSynergyLine(p);
+
         // 이미 가진 조합은 TryAdd가 조용히 거절해 "벼렸는데 아무 일도 없는" 상태가 된다.
-        // 누르기 전에 잠가서 그 헛손질을 없앤다.
+        // 금지 조합은 TryAdd 자체는 통과하지만 밸런스가 무너지는 짝이라 팔레트가 막는다.
+        // 둘 다 누르기 전에 잠가서 헛손질과 사고를 없앤다.
         if (_forgeButton)
         {
-            bool owned = IsOwned(SelectedId());
-            _forgeButton.interactable = !owned;
-            if (owned) SetText(_forgeSummary, "이미 보유한 조합 — 원인이나 효과를 바꿔야 벼릴 수 있다");
+            bool owned  = IsOwned(SelectedId());
+            bool banned = CovenantPalette.IsBannedPair(cause.id, effect.id);
+            _forgeButton.interactable = !owned && !banned;
+
+            if (banned)     SetText(_forgeSummary, "봉인된 조합 — 이 원인으로는 이 효과를 벼릴 수 없다");
+            else if (owned) SetText(_forgeSummary, "이미 보유한 조합 — 원인이나 효과를 바꿔야 벼릴 수 있다");
         }
+    }
+
+    /// <summary>선택된 조합이 보유 서약과 물리면 한 줄로 알려준다. 없으면 줄을 감춘다.</summary>
+    private void UpdateSynergyLine(CovenantAssemblePreview p)
+    {
+        EnsureSynergyText();
+        if (_synergyText == null) return;
+
+        string hint = p.SynergyHint(HeldCovenants);
+        _synergyText.gameObject.SetActive(!string.IsNullOrEmpty(hint));
+        if (!string.IsNullOrEmpty(hint)) _synergyText.text = hint;
+    }
+
+    /// <summary>
+    /// 시너지 줄을 효과 줄 바로 아래에 만든다(프리팹 무수술 — 연마 버튼과 같은 방침).
+    /// 효과 줄을 복제하는 이유: 폰트·정렬·자동축소 설정이 이미 이 팝업에 맞게 저작돼 있다.
+    /// </summary>
+    private void EnsureSynergyText()
+    {
+        if (_synergyText != null || _previewEffect == null) return;
+
+        var src   = (RectTransform)_previewEffect.transform;
+        var clone = Instantiate(_previewEffect, src.parent);
+        clone.name  = "SynergyText(Runtime)";
+        clone.color = SynergyColor;
+
+        // 자리는 앵커로만 잡는다 — 팝업이 막 생성된 시점엔 rect.height가 아직 0이라
+        // 픽셀로 내리면 효과 줄과 완전히 겹친다.
+        var rt = (RectTransform)clone.transform;
+        float h = src.anchorMax.y - src.anchorMin.y;
+        rt.anchorMin        = src.anchorMin - new Vector2(0f, h);
+        rt.anchorMax        = src.anchorMax - new Vector2(0f, h);
+        rt.pivot            = src.pivot;
+        rt.sizeDelta        = src.sizeDelta;
+        rt.localScale       = src.localScale;
+        rt.anchoredPosition = src.anchoredPosition;
+
+        FitSingleLine(clone);
+        _synergyText = clone;
     }
 
     private string SelectedId()
