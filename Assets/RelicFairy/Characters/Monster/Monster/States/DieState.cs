@@ -23,6 +23,11 @@ public class DieState : IMonsterState
         // 골드 코인 드롭
         SpawnGoldDrop(ctx);
 
+        // 정수 조각은 처치 N마리마다 한 번 떨어진다 — 그 자리를 트래커에 알려준다.
+        // (QuestEvents.OnMonsterKilled는 이름만 넘겨 위치를 모른다.)
+        if (ctx.Monster != null)
+            GameRunBootstrapper.Instance?.EssenceTracker?.ReportKillPosition(ctx.Monster.transform.position);
+
         // 처치 연출 — 막타(킬) 히트스톱 + 사망 위치 VFX 버스트
         //
         // 히트스톱은 <b>플레이어가 직접 때려서 죽였을 때만</b> 건다. 화상·독 틱(Dot)이나 장판·시너지

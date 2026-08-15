@@ -640,11 +640,13 @@ public sealed class PlayerRuntimeStats
         Recalculate();
     }
 
-    // ── 유물의 각성 ──────────────────────────────────────────────────────────────
+    // ── 기억의 제단 (구 「유물의 각성」) ────────────────────────────────────────────
 
     /// <summary>
-    /// 런 시작 시 영구 각성 보너스를 적용한다.
-    /// BackendGameData.Data와 Managers.RelicAwakening이 준비된 후 호출.
+    /// 런 시작 시 기억의 제단 해금분을 적용한다.
+    /// <para><b>각성 6계열(공격력·방어력·이동속도·쿨감·행운·흡혈) 영구 스탯은 폐기됐다</b> — 정본 §1.
+    /// 항상 적용되는 값이라 런 안의 성장을 읽기 어렵게 만들었다(각성 검 +54가 런 성장 80~110의 50~65%).
+    /// 지금 남는 영구 스탯은 <b>최대 체력 하나</b>뿐이고, 그것도 「존속」 갈래에서 해금해야 붙는다.</para>
     /// </summary>
     public void RefreshAwakening()
     {
@@ -657,23 +659,8 @@ public sealed class PlayerRuntimeStats
         _awakeningLuck      = 0;
         _awakeningLifesteal = 0f;
 
-        var userData = BackendGameData.Instance?.Data;
-        var mgr      = Managers.RelicAwakening;
-        if (userData == null || mgr == null || !mgr.IsInitialized)
-        {
-            Recalculate();
-            return;
-        }
-
-        foreach (var cat in AwakeningCategory.All)
-        {
-            int level = userData.GetAwakeningLevel(cat);
-            if (level <= 0) continue;
-
-            var entries = mgr.GetEntriesUpToLevel(cat, level);
-            foreach (var e in entries)
-                ApplyAwakeningEntry(e);
-        }
+        if (MemoryAltarService.IsUnlocked(MemoryAltarCatalog.MaxHpUp))
+            _awakeningMaxHp = MemoryAltarCatalog.MaxHpBonus;
 
         if (_awakeningMaxHp != 0)
         {
@@ -682,25 +669,6 @@ public sealed class PlayerRuntimeStats
         }
 
         Recalculate();
-    }
-
-    private void ApplyAwakeningEntry(RelicAwakeningEntry e)
-    {
-        switch (e.stat_type)
-        {
-            case "AttackPower":
-                _awakeningMelee  += (int)e.value;
-                _awakeningRanged += (int)e.value;
-                break;
-            case "MeleeAttack":              _awakeningMelee     += (int)e.value; break;
-            case "RangedAttack":             _awakeningRanged    += (int)e.value; break;
-            case "Defense":                  _awakeningDefense   += (int)e.value; break;
-            case "MaxHp":                    _awakeningMaxHp     += (int)e.value; break;
-            case "MoveSpeed":                _awakeningMoveSpeed += e.value;      break;
-            case "SkillCooldownReduction":   _awakeningSkillCdr  += e.value;      break;
-            case "Luck":                     _awakeningLuck      += (int)e.value; break;
-            case "Lifesteal":                _awakeningLifesteal += e.value;      break;
-        }
     }
 
     /// <summary>서약 핸들러에서 스탯 기여를 읽어 레이어를 갱신한다.</summary>

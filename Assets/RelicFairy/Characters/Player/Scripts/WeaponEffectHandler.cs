@@ -86,8 +86,16 @@ public class WeaponEffectHandler
                 if (effectObj.TryGetComponent<BasicArrow>(out var arrow))
                 {
                     Vector3 fireDir;
-                    Vector3 firePos = playerTransform.position + playerTransform.forward * 1f + Vector3.up * 1f
-                                    + playerTransform.TransformDirection(e.positionOffset);
+
+                    // 조준 방향은 '명령된' 정면(AimForward)에서 온다. transform.forward는 회전이
+                    // FixedUpdate+보간을 거친 결과라 최대 한 물리 스텝 뒤처지고, 공격속도가 빠르면
+                    // 그 지연 안에 발사가 끼어 화살이 겨냥한 곳보다 이전 방향으로 나갔다.
+                    Vector3 aimForward = _player.AimForward;
+
+                    // 총구 위치도 같은 기준을 써야 한다 — 위치는 옛 방향, 방향은 새 방향이면
+                    // 화살이 몸 옆에서 비스듬히 튀어나온다.
+                    Vector3 firePos = playerTransform.position + aimForward * 1f + Vector3.up * 1f
+                                    + Quaternion.LookRotation(aimForward) * e.positionOffset;
 
                     if (!_player.IsGrounded())
                     {
@@ -97,8 +105,8 @@ public class WeaponEffectHandler
                     }
                     else
                     {
-                        // 지상: 수평 forward
-                        fireDir = playerTransform.forward;
+                        // 지상: 수평 조준 방향
+                        fireDir = aimForward;
                         fireDir.y = 0f;
                         fireDir.Normalize();
                     }
@@ -146,7 +154,6 @@ public class WeaponEffectHandler
 
                 // 합쳐진 프리팹: 같은 오브젝트에 ColliderInstance가 있으면 데미지 주입
                 bool hasCI = effectObj.TryGetComponent<ColliderInstance>(out var embedded);
-                Debug.Log($"[EffectHandler] Effect spawned: {effectObj.name}, hasColliderInstance={hasCI}, collider={s.collider != null}");
                 if (hasCI)
                 {
                     if (s.collider != null)

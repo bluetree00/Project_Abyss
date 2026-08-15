@@ -456,18 +456,43 @@ public class DodgePresentation : MonoBehaviour
     }
 
     // ── 먼지 VFX (1회 스폰) ───────────────────────────────────────
-    // 프리팹 미할당 → 스킵. 풀 미등록 일회성 VFX이므로 플레이어 자체 VFX(SpawnHitBloodVfx)와 동일하게
-    // Instantiate + 파티클 수명 후 Destroy. 부모 없음 → 회피 출발 지점에 고정(대시로 멀어져도 그 자리).
+    /// <summary>
+    /// 회피 출발 지점의 먼지. 부모 없음 → 대시로 멀어져도 출발한 자리에 남는다.
+    ///
+    /// 회피는 전투 중 가장 자주 눌리는 키라 매번 Instantiate/Destroy하면 할당과 히칭이 누적된다
+    /// (잔상은 공들여 풀링해 놓고 먼지만 새고 있었다). 프리팹이 CharacterData의 직접 참조라
+    /// Addressables 키가 없으므로 <see cref="ObjectPoolerManager.SpawnFromPrefab"/>로 인스턴스ID 키잉해 푼다.
+    /// </summary>
     private void SpawnDust()
     {
         if (_data == null || _data.dodgeDustVfxPrefab == null) return;
 
         Vector3 pos = transform.position + Vector3.up * _data.dodgeDustHeightOffset;
-        var go = Instantiate(_data.dodgeDustVfxPrefab, pos, _data.dodgeDustVfxPrefab.transform.rotation);
+        Quaternion rot = _data.dodgeDustVfxPrefab.transform.rotation;
 
+        var pooler = Managers.ObjectPooler;
+        if (pooler == null)
+        {
+            // 풀러가 없는 컨텍스트(부트 이전·씬 정리 중) — 연출을 통째로 죽이지 않고 예전 방식으로 폴백.
+            var fallback = Instantiate(_data.dodgeDustVfxPrefab, pos, rot);
+            Destroy(fallback, DustLifetime(fallback));
+            return;
+        }
+
+        var go = pooler.SpawnFromPrefab(_data.dodgeDustVfxPrefab, ObjectPoolerManager.PoolType.Effect, pos, rot);
+        if (go == null) return;
+
+        // 파티클 Clear+Play·스케일 원복·수명 후 자동 반환을 PooledOneShotVfx가 전담한다
+        // (풀 재사용 시 이전 회피의 파티클이 남아 보이는 것을 막는 안전장치가 그 안에 있다).
+        if (!go.TryGetComponent<PooledOneShotVfx>(out var vfx)) vfx = go.AddComponent<PooledOneShotVfx>();
+        vfx.Play(DustLifetime(go));
+    }
+
+    /// <summary>파티클이 완전히 사그라들 때까지의 시간. 시스템이 없으면 보수적으로 2초.</summary>
+    private static float DustLifetime(GameObject go)
+    {
         var ps = go.GetComponent<ParticleSystem>() ?? go.GetComponentInChildren<ParticleSystem>();
-        float life = ps != null ? ps.main.duration + ps.main.startLifetimeMultiplier + 0.3f : 2f;
-        Destroy(go, life);
+        return ps != null ? ps.main.duration + ps.main.startLifetimeMultiplier + 0.3f : 2f;
     }
 
     // ── 트레일 ────────────────────────────────────────────────────

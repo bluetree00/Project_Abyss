@@ -2,7 +2,11 @@ using System.Collections.Generic;
 using RelicFairy.Monster;
 using UnityEngine;
 
-public class BasicArrow : MonoBehaviour
+/// <summary>
+/// 기본 화살. <b>풀에서 재사용</b>되므로 발사 간 상태가 새지 않게 하는 게 핵심이다
+/// (<see cref="IPooledObject"/>로 스폰·복귀 시점을 잡는다).
+/// </summary>
+public class BasicArrow : MonoBehaviour, IPooledObject
 {
     /// <summary>히트 VFX 안전 수명(초). CombatDamage의 클램프 구간(0.5~3s) 안쪽 값.</summary>
     private const float HitVfxLife = 2f;
@@ -14,7 +18,25 @@ public class BasicArrow : MonoBehaviour
     /// <summary>유도 탐색용 공유 버퍼 — 투사체마다 리스트를 만들면 발사마다 할당이 생긴다.</summary>
     private static readonly List<MonsterBase> s_homingBuffer = new();
 
+    /// <summary>스윕 1회가 담을 수 있는 최대 충돌 수.</summary>
+    private const int SweepMax = 12;
+    private static readonly RaycastHit[] s_sweepHits = new RaycastHit[SweepMax];
+    private static readonly SweepDistanceComparer s_sweepOrder = new();
+
+    /// <summary>가까운 충돌부터 처리해야 화살이 첫 대상에서 멈춘다.</summary>
+    private sealed class SweepDistanceComparer : System.Collections.Generic.IComparer<RaycastHit>
+    {
+        public int Compare(RaycastHit a, RaycastHit b) => a.distance.CompareTo(b.distance);
+    }
+
     [SerializeField] private float speed = 30f;
+
+    /// <summary>
+    /// 스윕 판정 반경(m). 프리팹 콜라이더(반지름 0.05)는 속도 30m/s에 비해 너무 얇아
+    /// 물리 스텝 사이(0.6m)를 통째로 건너뛴다 — 판정은 콜라이더가 아니라 이 값으로 한다.
+    /// </summary>
+    [SerializeField] private float hitRadius = 0.35f;
+
     [SerializeField] private float damage = 20f;
     [SerializeField] private float lifetime = 5f;
     [SerializeField] private Vector3 modelRotationOffset = new Vector3(0f, -90f, 0f);
@@ -51,6 +73,77 @@ public class BasicArrow : MonoBehaviour
     private bool  _returning;
     private Transform _homingTarget;
 
+    // ── 풀 재사용 안전장치 ──────────────────────────────────
+    private TrailRenderer _trail;
+    private MeshRenderer  _meshRenderer;
+
+    /// <summary>이미 회수됐는지. 이중 Despawn을 막는다 — 같은 인스턴스가 큐에 두 번 들어가면
+    /// 다음 두 발이 같은 오브젝트를 받아 한 발이 다른 발 위치로 순간이동한다.</summary>
+    private bool _dead;
+
+    /// <summary>발사 세대. 비동기 이펙트 로드가 끝났을 때 "그때 그 발사"가 맞는지 확인하는 토큰.</summary>
+    private int _generation;
+
+    /// <summary>
+    /// 첫 이동 전까지 트레일 기록을 막는 구간인지.
+    ///
+    /// 발사까지 좌표가 여러 번 옮겨진다 — 풀에서 소켓 위치로 꺼내고, 총구 위치로 옮기고,
+    /// 부채꼴 갈래는 각자 옆으로 벌어진 지점에서 시작한다. 그 사이 트레일이 정점을 기록하면
+    /// 이전 지점과 새 지점을 잇는 줄이 남아 "화살은 여기 있는데 꼬리는 저기서 온" 모양이 된다.
+    /// Clear만으로는 옮겨질 때마다 쫓아다녀야 하므로, 아예 첫 Update까지 기록을 끈다.
+    /// </summary>
+    private bool _trailWarmup;
+
+    // ── Lifecycle ───────────────────────────────────────────
+
+    private void Awake()
+    {
+        _trail        = GetComponent<TrailRenderer>();
+        _meshRenderer = GetComponent<MeshRenderer>();
+    }
+
+    // ── 풀 훅 ───────────────────────────────────────────────
+
+    /// <summary>
+    /// 풀에서 꺼내진 직후. 풀러가 위치를 먼저 세팅한 뒤 부르므로, 여기서 지운 트레일은
+    /// 새 총구 위치에서 다시 시작한다.
+    /// </summary>
+    public void OnSpawn(object param = null)
+    {
+        _dead = false;
+        _generation++;
+        ResetTrail();
+    }
+
+    /// <summary>풀로 돌아가기 직전. 죽은 자리의 잔상을 남기지 않는다.</summary>
+    public void OnDespawn()
+    {
+        CleanupVisualEffect();
+        ResetTrail();
+    }
+
+    /// <summary>
+    /// 트레일 정점 제거. <b>비활성화만으로는 지워지지 않는다</b> — Clear를 부르지 않으면
+    /// 이전에 죽은 위치와 새 발사 위치를 잇는 선이 한 프레임 그려져, 저쪽에서 화살이
+    /// 되돌아오는 것처럼 보인다.
+    /// </summary>
+    private void ResetTrail()
+    {
+        if (_trail == null) return;
+        _trail.emitting = false;   // 이 시점 이후의 좌표 이동을 기록하지 않는다
+        _trail.Clear();
+        _trailWarmup = true;
+    }
+
+    /// <summary>첫 이동을 마친 뒤 트레일을 실제 비행 경로에서 다시 시작시킨다.</summary>
+    private void BeginTrail()
+    {
+        _trailWarmup = false;
+        if (_trail == null) return;
+        _trail.Clear();            // 워밍업 동안 혹시 남은 정점 제거
+        _trail.emitting = true;
+    }
+
     /// <summary>기본 발사</summary>
     public void Fire(Vector3 dir, GameObject instigator = null, float dmg = -1f)
     {
@@ -79,6 +172,10 @@ public class BasicArrow : MonoBehaviour
         SetModelVisible(true);
         gameObject.SetActive(true);
         ApplyRotation();
+
+        // 풀을 거치지 않고 직접 Fire되는 경로(이미 활성인 인스턴스 재발사)에서도 잔상이 남지 않게.
+        _dead = false;
+        ResetTrail();
     }
 
     /// <summary>관통 설정</summary>
@@ -124,10 +221,20 @@ public class BasicArrow : MonoBehaviour
             ? Quaternion.LookRotation(direction)
             : transform.rotation;
 
+        int gen = _generation;   // 이 발사의 세대를 기억해 둔다
+
         var fx = await Managers.ObjectPooler.SpawnAsync(
             effectKey, ObjectPoolerManager.PoolType.Effect,
             transform.position, effectRot);
         if (fx == null) return;
+
+        // 로드를 기다리는 동안 화살이 죽고 풀에서 재사용됐다면, 이 이펙트는 '남의 발사'에 붙는다.
+        // 그대로 두면 이전 발사의 비주얼이 새 화살을 타고 다닌다.
+        if (gen != _generation || _dead || this == null)
+        {
+            Managers.ObjectPooler?.Despawn(fx);
+            return;
+        }
 
         fx.transform.SetParent(transform, true);  // worldPositionStays=true
         fx.transform.localScale = Vector3.one * scale;
@@ -145,10 +252,8 @@ public class BasicArrow : MonoBehaviour
 
     private void SetModelVisible(bool visible)
     {
-        var meshRenderer = GetComponent<MeshRenderer>();
-        if (meshRenderer != null) meshRenderer.enabled = visible;
-        var trail = GetComponent<TrailRenderer>();
-        if (trail != null) trail.enabled = visible;
+        if (_meshRenderer != null) _meshRenderer.enabled = visible;
+        if (_trail != null) _trail.enabled = visible;
     }
 
     private void ApplyRotation()
@@ -163,11 +268,45 @@ public class BasicArrow : MonoBehaviour
 
         if (_homing > 0f) SteerHoming(Time.deltaTime);
 
-        transform.position += direction * (speed * _speedMult) * Time.deltaTime;
+        // 이동은 물리가 아니라 좌표 대입이라, 트리거만 믿으면 물리 스텝 사이(속도 30 → 0.6m)를
+        // 통째로 건너뛴다. 프리팹 콜라이더가 반지름 0.05m라 그 틈에 몬스터가 통으로 들어가
+        // "직선 화살은 안 맞고 선회하는 유도 화살만 맞는" 증상이 났다.
+        // → 이번 프레임에 지나갈 구간을 먼저 훑고, 그다음에 옮긴다.
+        float stepDist = speed * _speedMult * Time.deltaTime;
+        SweepForward(transform.position, direction, stepDist);
+        if (_dead) return;
+
+        transform.position += direction * stepDist;
+
+        // 좌표 재배치가 모두 끝난 뒤 첫 이동을 마친 지금부터 기록을 시작한다.
+        if (_trailWarmup) BeginTrail();
 
         _timer -= Time.deltaTime;
         if (_timer <= 0f)
             Deactivate();
+    }
+
+    /// <summary>이동 구간을 구체로 훑어 충돌을 찾는다. 프레임률·물리 틱과 무관하게 같은 판정이 나온다.</summary>
+    private void SweepForward(Vector3 from, Vector3 dir, float dist)
+    {
+        if (dist <= 0f) return;
+
+        int n = Physics.SphereCastNonAlloc(from, hitRadius, dir, s_sweepHits, dist,
+                                           ~0, QueryTriggerInteraction.Collide);
+        if (n <= 0) return;
+        if (n > 1) System.Array.Sort(s_sweepHits, 0, n, s_sweepOrder);
+
+        for (int i = 0; i < n; i++)
+        {
+            if (_dead) return;   // 앞쪽 대상에서 이미 소멸했으면 뒤는 보지 않는다
+
+            var col = s_sweepHits[i].collider;
+            if (col == null) continue;
+
+            // 시작 지점에 이미 겹쳐 있으면 point가 (0,0,0)으로 온다 — 그때는 출발점을 쓴다.
+            Vector3 point = s_sweepHits[i].distance > 0f ? s_sweepHits[i].point : from;
+            HandleHit(col, point);
+        }
     }
 
     /// <summary>
@@ -208,9 +347,25 @@ public class BasicArrow : MonoBehaviour
         return null;
     }
 
+    /// <summary>
+    /// 몬스터가 스스로 화살 위로 걸어 들어오는 경우를 위한 보조 경로.
+    /// 주 판정은 <see cref="SweepForward"/>이며, 중복은 _dead(비관통)와 _pierced(관통)가 막는다.
+    /// </summary>
     private void OnTriggerEnter(Collider other)
     {
-        if (other.gameObject == _instigator) return;
+        if (other == null) return;
+        HandleHit(other, other.ClosestPoint(transform.position));
+    }
+
+    private void HandleHit(Collider other, Vector3 hitPoint)
+    {
+        if (_dead) return;
+
+        // 시전자 본인은 건너뛴다. 스윕은 총구(플레이어 앞 1m)에서 시작하므로 자식 콜라이더까지 확인해야
+        // 자기 몸에 맞고 사라지지 않는다 — 예전 트리거 경로는 루트만 봤다.
+        if (_instigator != null &&
+            (other.gameObject == _instigator || other.transform.IsChildOf(_instigator.transform))) return;
+        if (other.transform == transform || other.transform.IsChildOf(transform)) return;
 
         // IDamageable은 루트(MonsterBase/TrainingDummy)에 있고 피격 콜라이더는 자식(MonsterHit 레이어)이다.
         // 콜라이더 자신만 보면(TryGetComponent) 대상을 못 찾아 화살이 맞아도 피해가 0이었다.
@@ -241,18 +396,18 @@ public class BasicArrow : MonoBehaviour
                 Owner               = _instigator,
                 ActionType          = WeaponActionType.GroundLight,
                 KnockbackMultiplier = 1f,
-                HitPoint            = other.ClosestPoint(transform.position),
+                HitPoint            = hitPoint,
                 SourcePosition      = _instigator != null ? _instigator.transform.position : transform.position,
                 IsRanged            = true,
                 SkipHitVfx          = true,
             });
         }
 
-        SpawnHitEffect(other);
+        SpawnHitEffect(hitPoint);
 
         // 폭발
         if (_explode)
-            DoExplosion(other.ClosestPoint(transform.position));
+            DoExplosion(hitPoint);
 
         // 관통 처리
         if (_pierce)
@@ -283,6 +438,11 @@ public class BasicArrow : MonoBehaviour
 
     private void Deactivate()
     {
+        // 같은 프레임에 타이머 만료와 충돌이 겹치면 두 번 불릴 수 있다. 그대로 두면 Despawn이
+        // 두 번 돌아 같은 인스턴스가 큐에 중복 등록되고, 다음 두 발이 같은 오브젝트를 받는다.
+        if (_dead) return;
+        _dead = true;
+
         CleanupVisualEffect();
         SetModelVisible(true);
 
@@ -332,11 +492,10 @@ public class BasicArrow : MonoBehaviour
         }
     }
 
-    private async void SpawnHitEffect(Collider other)
+    private async void SpawnHitEffect(Vector3 hitPos)
     {
         if (string.IsNullOrEmpty(hitEffectKey)) return;
 
-        Vector3 hitPos = other.ClosestPoint(transform.position);
         var fx = await Managers.ObjectPooler.SpawnAsync(
             hitEffectKey, ObjectPoolerManager.PoolType.Effect,
             hitPos, Quaternion.identity);

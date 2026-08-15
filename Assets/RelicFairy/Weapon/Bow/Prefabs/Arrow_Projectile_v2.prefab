@@ -132,7 +132,7 @@ CapsuleCollider:
   serializedVersion: 2
   m_Radius: 0.05
   m_Height: 0.5
-  m_Direction: 2
+  m_Direction: 0
   m_Center: {x: -0.14466676, y: 0.00074275024, z: -0.0000000027939677}
 --- !u!96 &2699887615658761202
 TrailRenderer:

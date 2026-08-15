@@ -187,6 +187,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     {
         OnDied?.Invoke(this);
         QuestEvents.ReportKill(_config?.monsterName ?? "Unknown");
+
+        // 기억의 제단 할인 조건용 집계. 보스는 GameRunSession.NotifyBossRoomCleared가 세므로
+        // 여기서는 정예만 — 둘 다 세면 보스 처치가 이중 계상된다.
+        var run = GameRunBootstrapper.Instance?.Run;
+        run?.ReportKill();
+        if (Grade == MonsterGrade.Elite) run?.ReportEliteKill();
     }
 
     /// <summary>보스 HP 바 초기화용. Config 로드 후 유효.</summary>

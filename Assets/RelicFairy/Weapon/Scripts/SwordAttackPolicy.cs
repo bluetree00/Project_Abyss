@@ -49,7 +49,6 @@ public class SwordAttackPolicy : IAttackInputPolicy
         // 릴리즈 → 차지 취소 or Light 공격
         c.SetPendingAttack(Command.Light);
         c.InputBuffer.Push(Command.Light);
-        Debug.Log($"[SwordPolicy] Released -> Light");
     }
 
     public void Tick(PlayerController c, float dt)
@@ -63,7 +62,6 @@ public class SwordAttackPolicy : IAttackInputPolicy
         {
             _startTime       = Time.unscaledTime;
             _chargingStarted = false;
-            Debug.Log("[SwordPolicy] Blocking ended mid-hold -> reset charge timer");
         }
         _wasBlocked = isBlocked;
 
@@ -77,7 +75,6 @@ public class SwordAttackPolicy : IAttackInputPolicy
             _chargingStarted = true;
             _chargeConsumed  = true;   // 이번 누름의 차지 소진 — 손을 뗄 때까지 재진입 금지
             c.InputBuffer.Push(Command.Charge);
-            Debug.Log($"[SwordPolicy] Charging started (held={held:F2})");
         }
     }
 }

@@ -196,6 +196,10 @@ public class PlayerController : CharacterBase
         // [서약] 피격 통보 (실제 적용 피해량)
         covHandler?.OnTakeDamage(finalDmg);
 
+        // 「무결」 기행 — 이 챕터의 무피격 판정을 깬다. 회피·무효는 위에서 이미 return되므로
+        // 여기 도달했다는 건 실제로 맞았다는 뜻이다.
+        GameRunBootstrapper.Instance?.Run?.ReportPlayerDamaged();
+
         // 사망 판정 — 아이템(OnNearDeath) 부활 실패 후 HP 0이면 서약 사망방지 체크, 그래도 0이면 사망 처리.
         TryHandleDeath();
 
@@ -254,6 +258,15 @@ public class PlayerController : CharacterBase
         {
             RuntimeStats.SetHp(Mathf.Max(1, RuntimeStats.Hp)); // 서약 사망방지 → 사망 취소
             _invincibleEnd = Time.time + 1f;
+        }
+        else if (run != null && run.TryConsumeMetaRevive())
+        {
+            // 기억의 제단 「부활 1회」 — 런당 1회, 체력 절반으로 일어난다.
+            // 서약 사망방지보다 <b>뒤에</b> 둔다: 서약은 런 안에서 얻은 것이라 먼저 소모돼야
+            // 영구 해금이 런 자원을 대신 태우는 일이 없다.
+            RuntimeStats.SetHp(Mathf.Max(1, RuntimeStats.MaxHp / 2));
+            _invincibleEnd = Time.time + 2f;
+            Debug.Log("[MemoryAltar] 부활 1회 소모 — 체력 절반으로 복귀");
         }
         else
         {
@@ -1027,6 +1040,33 @@ public class PlayerController : CharacterBase
     /// 실제 적용은 FixedUpdate(ApplyFacing)에서 Rigidbody.MoveRotation으로 수행.</summary>
     public void RequestFacing(Quaternion rot) { _targetFacing = rot; _facingDirty = true; }
 
+    /// <summary>
+    /// 지금 <b>겨냥한</b> 정면(수평). 투사체·판정은 이 값을 써야 한다.
+    ///
+    /// 회전은 <see cref="RequestFacing"/>이 목표만 적어두고 FixedUpdate(ApplyFacing)에서
+    /// Rigidbody.MoveRotation으로 적용된 뒤 Interpolate 보간까지 거친다. 그래서
+    /// <c>transform.forward</c>는 명령보다 최대 한 물리 스텝(기본 0.02s) 뒤처진다.
+    /// 공격이 느릴 때는 그 사이 물리가 여러 번 돌아 티가 안 나지만, <b>공격속도가 빨라지면
+    /// 조준 요청과 발사 사이가 물리 틱보다 짧아져 화살이 이전 방향으로 나간다.</b>
+    ///
+    /// 이동 회전(슬루) 중에는 목표가 '앞으로 돌아갈 각도'라 조준이 아니므로, 그때는
+    /// 실제 각도를 그대로 쓴다.
+    /// </summary>
+    public Vector3 AimForward
+    {
+        get
+        {
+            // 직접 지정(조준)이 아직 적용 대기 중이면 그게 의도다 — 이동 슬루보다 우선한다.
+            // RequestFacing은 슬루를 그 자리에서 끄지 않고 ApplyFacing이 끄므로, 이 우선순위가
+            // 없으면 '이동 중 공격'에서 다시 옛 방향으로 새어나간다.
+            if (!_facingDirty && _facingSlewActive) return transform.forward;
+
+            Vector3 f = _targetFacing * Vector3.forward;
+            f.y = 0f;
+            return f.sqrMagnitude > 0.0001f ? f.normalized : transform.forward;
+        }
+    }
+
     /// <summary>이동 회전 목표를 지정한다. 목표 Yaw로 degPerSec 각속도로 FixedUpdate(ApplyFacing)에서 적분 → 프레임률 독립.</summary>
     public void RequestFacingSlew(float targetYaw, float degPerSec)
     {
@@ -1052,6 +1092,9 @@ public class PlayerController : CharacterBase
     protected override async UniTask InitAsync()
     {
         await base.InitAsync();
+
+        // 회전 목표 초기값 — 기본값은 (0,0,0,0) 영 쿼터니언이라 AimForward가 방향을 못 낸다.
+        _targetFacing = transform.rotation;
 
         Clock = new UnscaledClock();
         InputBuffer = new InputBuffer(Clock, capacity: 16, bufferWindowSec: 0.4f, dedupeSec: 0.04f);
@@ -2226,11 +2269,27 @@ public class PlayerController : CharacterBase
             _ = EffectHandler.PlayEffect(CurrentAttackTypeForEffect, Combo.CurrentComboStep, step, ActiveExecution);
     }
 
+    /// <summary>
+    /// 피격 혈흔 — 플레이어에 부모로 붙어 함께 움직인다.
+    ///
+    /// 피격은 연속으로 들어오므로 매번 Instantiate/Destroy하면 할당이 누적된다. 프리팹이 인스펙터
+    /// 직접 참조(Addressables 키 없음)라 <see cref="ObjectPoolerManager.SpawnFromPrefab"/>으로 푼다.
+    /// </summary>
     private void SpawnHitBloodVfx()
     {
         if (_hitBloodVfxPrefab == null) return;
+
         Vector3 pos = transform.position + Vector3.up * _hitBloodVfxHeightOffset;
-        var go = Instantiate(_hitBloodVfxPrefab, pos, _hitBloodVfxPrefab.transform.rotation, transform);
+        Quaternion rot = _hitBloodVfxPrefab.transform.rotation;
+
+        var pooler = Managers.ObjectPooler;
+        GameObject go = pooler != null
+            ? pooler.SpawnFromPrefab(_hitBloodVfxPrefab, ObjectPoolerManager.PoolType.Effect, pos, rot)
+            : Instantiate(_hitBloodVfxPrefab, pos, rot);
+        if (go == null) return;
+
+        // 부모 → 스케일 순서. 먼저 붙이지 않으면 SetParent가 월드 스케일을 보존하려고 localScale을 되돌린다.
+        go.transform.SetParent(transform, worldPositionStays: true);
         go.transform.localScale = Vector3.one * _hitBloodVfxScale;
 
         var systems = go.GetComponentsInChildren<ParticleSystem>(true);
@@ -2242,7 +2301,12 @@ public class PlayerController : CharacterBase
 
         var ps = go.GetComponent<ParticleSystem>() ?? go.GetComponentInChildren<ParticleSystem>();
         float lifetime = ps != null ? ps.main.duration + ps.main.startLifetimeMultiplier + 0.3f : 3f;
-        Destroy(go, lifetime);
+
+        if (pooler == null) { Destroy(go, lifetime); return; }
+
+        // 스케일은 위에서 절대값으로 직접 넣었으므로 스케일 미적용 오버로드를 쓴다(곱연산 누적 방지).
+        if (!go.TryGetComponent<PooledOneShotVfx>(out var vfx)) vfx = go.AddComponent<PooledOneShotVfx>();
+        vfx.Play(lifetime);
     }
 
 }
