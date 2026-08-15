@@ -1,39 +1,23 @@
 ﻿passive_id,item_name,slot,effect_type,trigger,value,value2,value3,max_stack,duration,description,stat_version,shape_id,grade,element
-item_t1_dull_blade,힘의 룬,1,AllDamage,Always,4,0,0,0,0,공격력 +4,1,1,Common,
-item_t1_old_deck,방벽의 룬,1,Defense,Always,5,0,0,0,0,방어력 +5,1,1,Common,
-item_t1_thick_hide,활력의 룬,1,MaxHP,Always,25,0,0,0,0,최대 HP +25,1,2,Common,
-item_t1_sturdy_nail,균형의 룬,1,AllDamage,Always,3,0,0,0,0,공격력 +3,1,3,Common,
-item_t1_sturdy_nail,균형의 룬,2,Defense,Always,3,0,0,0,0,방어력 +3,1,3,Common,
 item_t1_weight,충격의 룬,1,AllDamage,Always,6,0,0,0,0,공격력 +6,1,1,Common,
-item_t1_steel_plate,철벽의 룬,1,Defense,Always,7,0,0,0,0,방어력 +7,1,1,Common,
 item_t1_traveler_pack,생명의 룬,1,MaxHP,Always,35,0,0,0,0,최대 HP +35,1,2,Common,
-item_t1_old_whetstone,연마의 룬,1,AllDamage,Always,5,0,0,0,0,공격력 +5,1,3,Common,
 item_t1_patched_cloth,보호의 룬,1,Defense,Always,4,0,0,0,0,방어력 +4,1,1,Common,
 item_t1_patched_cloth,보호의 룬,2,MaxHP,Always,15,0,0,0,0,최대 HP +15,1,1,Common,
-item_t1_rusty_nail,미약의 룬,1,AllDamage,Always,3,0,0,0,0,공격력 +3,1,1,Common,
 item_t1_crude_charm,수호의 룬,1,MaxHP,Always,20,0,0,0,0,최대 HP +20,1,2,Common,
 item_t1_crude_charm,수호의 룬,2,Defense,Always,2,0,0,0,0,방어력 +2,1,2,Common,
 item_t1_dull_awl,찌르기의 룬,1,AllDamage,Always,5,0,0,0,0,공격력 +5,1,3,Common,
 item_t1_dull_awl,찌르기의 룬,2,MaxHP,Always,10,0,0,0,0,최대 HP +10,1,3,Common,
-item_t1_old_chain,인내의 룬,1,Defense,Always,6,0,0,0,0,방어력 +6,1,1,Common,
 item_t1_small_weight,중량의 룬,1,AllDamage,Always,4,0,0,0,0,공격력 +4,1,1,Common,
 item_t1_small_weight,중량의 룬,2,Defense,Always,2,0,0,0,0,방어력 +2,1,1,Common,
-item_t1_spare_strap,여력의 룬,1,MaxHP,Always,30,0,0,0,0,최대 HP +30,1,2,Common,
-item_t1_worn_strap,단련의 룬,1,AllDamage,Always,4,0,0,0,0,공격력 +4,1,3,Common,
 item_t1_dull_shield,방패의 룬,1,Defense,Always,8,0,0,0,0,방어력 +8,1,1,Common,
-item_t1_wind_foot,질주의 룬,1,MoveSpeed,Always,0.09,0,0,0,0,이동속도 +9%,1,1,Common,
 item_t1_keen_eye,간파의 룬,1,CritChance,Always,0.04,0,0,0,0,치명타 확률 +4%,1,2,Common,
 item_t1_heavy_blade,중타의 룬,1,CritDamage,Always,0.12,0,0,0,0,치명타 피해 +12%,1,3,Common,
-item_t1_focus_orb,가속의 룬,1,SkillCooldownReduction,Always,0.08,0,0,0,0,스킬 쿨타임 -8%,1,1,Common,
 item_t1_training_stone,수련의 룬,1,SkillDamage,Always,0.07,0,0,0,0,스킬 피해 +7%,1,1,Common,
-item_t1_quick_wrist,신속의 룬,1,AttackSpeed,Always,0.08,0,0,0,0,공격속도 +8%,1,2,Common,
 item_t1_vitality_seed,성장의 룬,1,MaxHPPercent,Always,0.12,0,0,0,0,최대 HP +12%,1,3,Common,
 item_t1_swift_charm,쾌속의 룬,1,MoveSpeed,Always,0.11,0,0,0,0,이동속도 +11%,1,1,Common,
 item_t1_destruction_sigil,문양의 룬,1,CritDamage,Always,0.15,0,0,0,0,치명타 피해 +15%,1,1,Common,
-item_t1_enhance_band,단축의 룬,1,SkillCooldownReduction,Always,0.1,0,0,0,0,스킬 쿨타임 -10%,1,2,Common,
 item_t1_sharp_blade,예기의 룬,1,AllDamage,Always,0.07,0,0,0,0,공격력 +7%,1,3,Common,
 item_t1_leather_armor,방어의 룬,1,DefensePercent,Always,0.08,0,0,0,0,방어력 +8%,1,1,Common,
-item_t1_quick_ankle,질풍의 룬,1,MoveSpeed,Always,0.1,0,0,0,0,이동속도 +10%,1,1,Common,
 item_t1_enhanced_tendon,강화의 룬,1,AttackSpeed,Always,0.09,0,0,0,0,공격속도 +9%,1,2,Common,
 item_t1_keen_focus,집중의 룬,1,CritChance,Always,0.05,0,0,0,0,치명타 확률 +5%,1,3,Common,
 item_t1_light_shard,광속의 룬,1,SkillCooldownReduction,Always,0.11,0,0,0,0,스킬 쿨타임 -11%,1,1,Common,
@@ -44,7 +28,6 @@ item_t1_focus_eye,통찰의 룬,1,CondCritChance,SameTarget,0.08,3,0,0,0,같은 
 item_t1_move_power,질주력의 룬,1,CondAllDamage,WhileMoving,0.12,0,0,0,0,이동 중 공격력 +12%,1,1,Common,
 item_t1_preempt_blade,선제의 룬,1,CondMoveSpeed,AfterRoomEnter,0.25,0,0,0,5,방 진입 후 5초간 이동속도 +25%,1,2,Common,
 item_t1_guard_instinct,본능의 룬,1,CondMaxHpPercent,DefenseAbove,0.12,30,0,0,0,방어력 30 이상일 때 최대 HP +12%,1,3,Common,
-item_t1_attack_flow,흐름의 룬,1,CondCritDamage,Consecutive,0.15,5,0,0,0,연속 공격 5회 이상 시 치명타 피해 +15%,1,1,Common,
 item_t1_stillness_power,정적의 룬,1,FirstHitBonus,Stationary,0.2,0,0,0,0.5,0.5초 이상 정지 후 첫 공격 피해 +20%,1,1,Common,
 item_t1_skill_lingering,여운의 룬,1,CondDefensePercent,AfterSkill,0.15,0,0,0,3,스킬 사용 후 3초간 방어력 +15%,1,2,Common,
 item_t1_threat_armor,위협의 룬,1,CondDefensePercent,EnemiesNearby,0.15,2,0,0,0,주변 3m 내 적 2체 이상일 때 방어력 +15%,1,3,Common,
@@ -134,6 +117,42 @@ item_t2_battlefield_rule,지배의 룬,1,CondAllDamage,SingleEnemy,0.25,0,0,0,0,
 item_t2_survival_will,생존의 룬,1,CondMaxHpPercent,HPBelow50,0.15,0,0,0,0,HP 50% 이하 시 최대 HP +15%,1,5,Rare,
 item_t2_survival_will,생존의 룬,2,CondDefensePercent,HPBelow50,0.1,0,0,0,0,HP 50% 이하 시 방어력 +10%,1,5,Rare,
 item_t2_first_strike,선공의 룬,1,FirstHitBonus,FirstAttackInRoom,0.4,0,0,0,0,방 진입 후 첫 번째 공격 피해 +40%,1,6,Rare,
+item_t3_fire_ember,잔불의 룬,3,AllDamage,Always,14,0,0,0,0,공격력 +14,1,39,Epic,FIRE
+item_t3_fire_ember,잔불의 룬,3,PoisonOnHit,OnHit,0.2,0.12,0,0,3,"적중 시 20% 화상(공격력 12%/틱, 3초)",1,39,Epic,FIRE
+item_t3_fire_scar,화상의 룬,4,MaxHP,Always,70,0,0,0,0,최대 체력 +70,1,45,Epic,FIRE
+item_t3_fire_scar,화상의 룬,4,DamageReflect,OnHit,0.25,0,0,0,0,받은 피해의 25% 반사,1,45,Epic,FIRE
+item_t3_fire_spark,불티의 룬,4,CritDamage,Always,0.2,0,0,0,0,치명타 피해 +20%,1,46,Epic,FIRE
+item_t3_fire_spark,불티의 룬,4,ExtraAttack,OnHit,0.12,0,0,0,0,적중 시 12% 추가타,1,46,Epic,FIRE
+item_t3_ice_frost,서리의 룬,4,AllDamage,Always,12,0,0,0,0,공격력 +12,1,47,Epic,ICE
+item_t3_ice_frost,서리의 룬,4,Freeze,OnHit,0.1,0,0,0,1.2,적중 시 10% 빙결 1.2초,1,47,Epic,ICE
+item_t3_ice_congeal,동결의 룬,4,Defense,Always,16,0,0,0,0,방어력 +16,1,48,Epic,ICE
+item_t3_ice_congeal,동결의 룬,4,DamageReduction,Always,0.1,0,0,0,0,받는 피해 -10%,1,48,Epic,ICE
+item_t3_ice_crystal,결정의 룬,3,CritChance,Always,0.07,0,0,0,0,치명타 확률 +7%,1,40,Epic,ICE
+item_t3_ice_crystal,결정의 룬,3,ProjectilePierce,Always,1,0,0,0,0,투사체 관통 +1,1,40,Epic,ICE
+item_t3_elec_static,정전의 룬,3,AttackSpeed,Always,0.1,0,0,0,0,공격속도 +10%,1,41,Epic,ELECTRIC
+item_t3_elec_static,정전의 룬,3,Stun,OnHit,0.08,0,0,0,0.8,적중 시 8% 기절 0.8초,1,41,Epic,ELECTRIC
+item_t3_elec_rod,피뢰의 룬,4,Defense,Always,14,0,0,0,0,방어력 +14,1,49,Epic,ELECTRIC
+item_t3_elec_rod,피뢰의 룬,4,DefenseOnHit,OnHit,2,0,0,10,0,피격 시 방어 +2 누적(최대 10),1,49,Epic,ELECTRIC
+item_t3_elec_arc,방전의 룬,4,CritChance,Always,0.08,0,0,0,0,치명타 확률 +8%,1,50,Epic,ELECTRIC
+item_t3_elec_arc,방전의 룬,4,ProjectileCount,Always,1,0,0,0,0,투사체 수 +1,1,50,Epic,ELECTRIC
+item_t3_grass_venom,맹독의 룬,3,CritChance,Always,0.06,0,0,0,0,치명타 확률 +6%,1,42,Epic,GRASS
+item_t3_grass_venom,맹독의 룬,3,PoisonOnHit,OnHit,0.2,0.12,0,0,4,"적중 시 20% 중독(공격력 12%/틱, 4초)",1,42,Epic,GRASS
+item_t3_grass_bloom,번식의 룬,4,MaxHP,Always,80,0,0,0,0,최대 체력 +80,1,51,Epic,GRASS
+item_t3_grass_bloom,번식의 룬,4,HPRegenOnHit,OnHit,1,0,0,0,0,적중 시 체력 회복,1,51,Epic,GRASS
+item_t3_grass_spore,포자의 룬,4,Defense,Always,12,0,0,0,0,방어력 +12,1,52,Epic,GRASS
+item_t3_grass_spore,포자의 룬,4,DebuffDuration,Always,0.25,0,0,0,0,디버프 지속 +25%,1,52,Epic,GRASS
+item_t3_light_radiance,광채의 룬,3,CritChance,Always,0.09,0,0,0,0,치명타 확률 +9%,1,43,Epic,LIGHT
+item_t3_light_radiance,광채의 룬,3,CondAllDamage,SingleEnemy,0.18,0,0,0,0,단일 대상 피해 +18%,1,43,Epic,LIGHT
+item_t3_light_grace,가호의 룬,4,MaxHP,Always,70,0,0,0,0,최대 체력 +70,1,53,Epic,LIGHT
+item_t3_light_grace,가호의 룬,4,HealingReceived,Always,0.2,0,0,0,0,받는 회복량 +20%,1,53,Epic,LIGHT
+item_t3_light_sanctum,성역의 룬,5,CritDamage,Always,0.24,0,0,0,0,치명타 피해 +24%,1,56,Epic,LIGHT
+item_t3_light_sanctum,성역의 룬,5,HPRegenOnClear,OnRoomClear,0.05,0,0,0,0,방 클리어 시 체력 5% 회복,1,56,Epic,LIGHT
+item_t3_dark_erode,잠식의 룬,4,AllDamage,Always,16,0,0,0,0,공격력 +16,1,54,Epic,DARK
+item_t3_dark_erode,잠식의 룬,4,FirstAttackAfterRoll,Always,0.4,0,0,0,0,구르기 직후 첫 공격 +40%,1,54,Epic,DARK
+item_t3_dark_shade,암영의 룬,4,Defense,Always,15,0,0,0,0,방어력 +15,1,55,Epic,DARK
+item_t3_dark_shade,암영의 룬,4,DebuffResistance,Always,0.3,0,0,0,0,디버프 저항 +30%,1,55,Epic,DARK
+item_t3_dark_afterimage,잔상의 룬,3,MoveSpeed,Always,0.08,0,0,0,0,이동속도 +8%,1,44,Epic,DARK
+item_t3_dark_afterimage,잔상의 룬,3,RollDistance,Always,0.25,0,0,0,0,구르기 거리 +25%,1,44,Epic,DARK
 item_t4_fire_aoe,마그마 분출,14,FireLegendAoe,OnTimer,0.65,6.0,5.0,1,0,마그마 광역: 6초마다 반경 5m 화염 폭발 공격력 65%,1,21,Legendary,FIRE
 item_t4_fire_single,불사조 강타,11,FireLegendSingle,OnHitCount,3.5,12.0,0.5,1,0,불사조 단일기: 12회 적중마다 공격력 350% 강타,1,22,Legendary,FIRE
 item_t4_fire_proj,화염 오브,9,FireLegendProjectile,OnActivate,0.8,0.1,5.0,1,0,화염 오브: 전투 중 오브 5개 비행 궤적 화염 장판,1,23,Legendary,FIRE
@@ -144,7 +163,7 @@ item_t4_elec_aoe,천둥 폭격,11,ElecLegendAoe,OnTimer,0.7,10.0,3.0,1,0,번개 
 item_t4_elec_single,과전류 포박,11,ElecLegendSingle,OnTimer,0.4,15.0,2.0,1,0,전기 포박: 15초마다 단일 3초 포박 + 방전 폭발,1,28,Legendary,ELECTRIC
 item_t4_elec_proj,전자기 구체,9,ElecLegendProjectile,OnActivate,0.6,3.0,1.2,1,0,전자기 구체: 전투 중 3개 자율 공격 구체 배치,1,29,Legendary,ELECTRIC
 item_t4_grass_aoe,포자 폭발,14,GrassLegendAoe,OnTimer,0.4,10.0,0.12,1,0,독 포자: 10초마다 전 필드 독 40% + DoT,1,30,Legendary,GRASS
-item_t4_grass_single,덩굴 구속,11,GrassLegendSingle,OnTimer,0.8,15.0,2.4,1,0,덩굴 구속: 20초마다 최강 적 구속 + 독 240%,1,31,Legendary,GRASS
+item_t4_grass_single,덩굴 구속,11,GrassLegendSingle,OnTimer,0.8,15.0,2.4,1,0,덩굴 구속: 15초마다 최강 적 구속 + 독 240%,1,31,Legendary,GRASS
 item_t4_grass_proj,사방 독 화살,9,GrassLegendProjectile,OnActivate,0.7,3.0,1.0,1,0,독 화살: 4방향 관통 화살 지속 발사,1,32,Legendary,GRASS
 item_t4_light_aoe,신성 폭발,15,LightLegendAoe,OnTimer,0.8,12.0,0.4,1,0,신성 폭발: 12초마다 반경 6m 공격력 80%,1,33,Legendary,LIGHT
 item_t4_light_single,성스러운 심판,13,LightLegendSingle,OnCritCount,1.5,15.0,5.0,1,0,빛의 심판: 치명타 15회마다 집중 광선 5타 150%,1,34,Legendary,LIGHT
