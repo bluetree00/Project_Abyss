@@ -21,6 +21,23 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private const float TweenTime   = 0.12f;
     private const float RevealTime  = 0.26f;   // 등장(드래프트/리롤) 연출 길이
 
+    // ── 카드 내부 정규화 배치 ────────────────────────────
+    // 프리팹은 티어 라벨과 리롤 버튼만 고정 px(각 34px)로 authoring돼 있다. 카드가 목업 크기
+    // (238×115)로 줄면 리롤 버튼이 설명 위로, 티어 라벨이 이름 위로 올라탄다(저작 크기 367×164
+    // 에서도 상자 기준으론 이미 겹쳐 있었다 — 글자가 짧아 눈에 안 띄었을 뿐).
+    // 아래 비율은 <b>저작값을 저작 카드 크기로 나눈 것</b>이다. 같은 배치를 카드 크기와 무관하게
+    // 재현하되, 세로 띠를 서로 물리지 않게 잘라 어떤 크기에서도 겹침이 생기지 않는다.
+    private const float PadX     = 0.06f;                  // 이름/설명 저작 좌우 여백
+    private const float HeaderY1 = 1f - 10f / 164f;        // 티어 줄 상단 = 저작 상단 여백 10px
+    private const float HeaderY0 = HeaderY1 - 34f / 164f;  // 티어 줄 높이 = 저작 34px
+    private const float GapY     = 4f / 164f;              // 저작 티어 하단(44) ↔ 리롤 상단(48) 간격
+    private const float BodyY1   = HeaderY0 - GapY;
+    private const float BodyY0   = 0.12f;                  // 저작 설명 하단
+    private const float SubY1    = BodyY0 + (BodyY1 - BodyY0) * 0.4f;   // 저작 이름:설명 = 0.42:0.28
+    private const float RerollX1 = 1f - 18f / 367f;        // 저작 리롤 우측 여백
+    private const float RerollX0 = RerollX1 - 34f / 367f;  // 저작 리롤 폭
+    private const float TierX1   = RerollX0 - 4f / 367f;   // 리롤과 세로 간격만큼 가로로도 띄운다
+
     // ── [SerializeField] ─────────────────────────────────
     [SerializeField] private Button     _selectButton;
     [SerializeField] private Button     _rerollButton;
@@ -49,6 +66,7 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     private Color  _gradeColor = Color.white;
     private bool   _selected, _hover;
+    private bool   _layoutApplied;
     private CancellationTokenSource _tweenCts;
 
     private bool HasFrameSkin => _silverFrame != null || _goldFrame != null || _rubyFrame != null;
@@ -194,6 +212,8 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
     /// </param>
     public void Bind(string title, string sub, CovenantTier tier, Color tierColor, string badge = null)
     {
+        ApplyProportionalLayout();
+
         // 이름·설명은 팔레트에서 오는 가변 길이 문자열이라 고정 박스를 넘기기 쉽다.
         // 카드 밖으로 흘러 옆 카드 위에 겹치지 않도록, 여기서 박스 안에 가둔다.
         if (_nameText) { _nameText.text = title; FitInBox(_nameText, wrap: false); }
@@ -256,6 +276,33 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
     public void OnPointerExit(PointerEventData e)  { _hover = false; RefreshVisual(false); }
 
     // ── Private Methods ──────────────────────────────────
+
+    /// <summary>
+    /// 카드 내부(티어 줄 · 리롤 · 이름 · 설명)를 카드 rect 대비 비율로 다시 앉힌다.
+    /// 카드 하나당 1회면 충분해 플래그로 막는다(리롤로 Bind가 다시 와도 좌표는 그대로다).
+    /// </summary>
+    private void ApplyProportionalLayout()
+    {
+        if (_layoutApplied) return;
+        _layoutApplied = true;
+
+        // 티어 라벨의 부모(TierBadge)는 카드를 꽉 채우므로 카드 비율을 그대로 쓸 수 있다.
+        Place(_tierText,     PadX,     HeaderY0, TierX1,      HeaderY1);
+        Place(_rerollButton, RerollX0, HeaderY0, RerollX1,    HeaderY1);
+        Place(_nameText,     PadX,     SubY1,    1f - PadX,   BodyY1);
+        Place(_subText,      PadX,     BodyY0,   1f - PadX,   SubY1);
+    }
+
+    private static void Place(Component c, float x0, float y0, float x1, float y1)
+    {
+        if (c == null) return;
+        var rt = (RectTransform)c.transform;
+        rt.anchorMin = new Vector2(x0, y0);
+        rt.anchorMax = new Vector2(x1, y1);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = Vector2.zero;
+        rt.anchoredPosition = Vector2.zero;
+    }
 
     /// <summary>박스 안에 가둔다 — 자동 크기는 authoring 값을 넘지 않고 줄이기만 한다.</summary>
     private static void FitInBox(TMP_Text t, bool wrap)

@@ -583,6 +583,14 @@ public class UI_CovenantAssemble : UI_Popup
         if (lbl == null) return;
         lbl.text     = "리롤";
         lbl.fontSize = 14f;
+
+        // 버튼이 카드 비율을 따라가면서 카드가 작을 땐 22px까지 좁아진다 — 14pt 두 글자가 넘친다.
+        // 다른 라벨과 같은 규칙으로 박스 안에 가둔다(키우지는 않는다).
+        lbl.textWrappingMode = TextWrappingModes.NoWrap;
+        lbl.overflowMode     = TextOverflowModes.Ellipsis;
+        lbl.enableAutoSizing = true;
+        lbl.fontSizeMax      = 14f;
+        lbl.fontSizeMin      = 8f;
     }
 
     /// <summary>
