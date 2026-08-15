@@ -17,6 +17,13 @@ public class QuestDatabase : ScriptableObject
         => quests.FirstOrDefault(x => x.CodeName == codeName);
 
 #if UNITY_EDITOR
+    // 이 DB는 <b>한 종류만</b> 담는다 — QuestDatabase는 퀘스트, AchievementDatabase는 업적.
+    // QuestManager가 두 목록을 따로 받기 때문이다(Initialize(questDb, achievementDb)).
+    //
+    // ⚠ 아래 두 메뉴는 목록을 통째로 갈아치우므로 <b>엉뚱한 에셋에서 누르면 내용이 사라진다</b>.
+    //   평소에는 메뉴 「RelicFairy/Gameplay/Quest/Rebuild Database」를 쓴다 —
+    //   에셋 경로명으로 종류를 판별해 두 DB를 한 번에, 올바르게 채운다.
+
     [ContextMenu("FindQuests")]
     private void FindQuests() => FindQuestByType<Quest>();
 

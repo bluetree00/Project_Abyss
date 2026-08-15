@@ -61,6 +61,139 @@ public class AchievementListView : MonoBehaviour
     /// <summary>조회 전용(로비·ESC 책자). 수령 버튼이 동작하지 않는다.</summary>
     public bool ReadOnly { get; set; }
 
+    // ── 분류 필터 ────────────────────────────────────────────────────────
+    //
+    // 21개가 한 목록이면 「진행 중」만 14개가 쏟아져 3단 정렬만으로는 훑기 어렵다.
+    // CSV의 category는 전부 「Record」라 데이터에 분류가 없으므로 <b>대상 키에서 유도</b>한다 —
+    // 새 컬럼을 만들면 CSV·생성기·서버를 다 건드려야 하는데, 키만 보면 분류가 이미 결정돼 있다.
+    public enum AchCategory { All, Reach, Combat, Build, Explore, Feat }
+
+    private static readonly (AchCategory Cat, string Label)[] Categories =
+    {
+        (AchCategory.All,     "전체"),
+        (AchCategory.Reach,   "도달"),
+        (AchCategory.Combat,  "전투"),
+        (AchCategory.Build,   "빌드"),
+        (AchCategory.Explore, "탐색"),
+        (AchCategory.Feat,    "기행"),
+    };
+
+    private AchCategory _filter = AchCategory.All;
+    private readonly List<Image>    _chipBg    = new();
+    private readonly List<TMP_Text> _chipLabel = new();
+    private bool _chipsBuilt;
+
+    private bool PassFilter(Quest q) => _filter == AchCategory.All || CategoryOf(q) == _filter;
+
+    /// <summary>
+    /// 목록 위 분류 칩. 프리팹에 자리가 없어도 코드가 만들어 붙인다 — 아트 배선 전에도 동작해야 한다.
+    /// 「수령 가능」 머리 위에 놓아 3단 정렬을 가리지 않는다.
+    /// </summary>
+    private void EnsureChips()
+    {
+        if (_chipsBuilt) return;
+        _chipsBuilt = true;
+
+        var anchor = claimableHeaderRow != null ? claimableHeaderRow.transform.parent
+                   : (claimableRows != null ? claimableRows.parent : null);
+        if (anchor == null) return;
+
+        var bar = new GameObject("ChipBar", typeof(RectTransform)).GetComponent<RectTransform>();
+        bar.SetParent(anchor, false);
+        bar.anchorMin = new Vector2(0f, 1f);
+        bar.anchorMax = new Vector2(1f, 1f);
+        bar.pivot     = new Vector2(0.5f, 1f);
+        bar.sizeDelta = new Vector2(0f, 34f);
+        bar.anchoredPosition = new Vector2(0f, 4f);
+        bar.SetAsFirstSibling();
+
+        float x = 0f;
+        for (int i = 0; i < Categories.Length; i++)
+        {
+            var (cat, label) = Categories[i];
+            float w = i == 0 ? 96f : 76f;
+
+            var chip = new GameObject($"Chip_{cat}", typeof(RectTransform)).GetComponent<RectTransform>();
+            chip.SetParent(bar, false);
+            chip.anchorMin = chip.anchorMax = new Vector2(0f, 0.5f);
+            chip.pivot     = new Vector2(0f, 0.5f);
+            chip.sizeDelta = new Vector2(w, 30f);
+            chip.anchoredPosition = new Vector2(x, 0f);
+            x += w + 8f;
+
+            var img = chip.gameObject.AddComponent<Image>();
+            img.color = AltarPalette.TabOff;
+            _chipBg.Add(img);
+
+            var txt = new GameObject("Label", typeof(RectTransform)).GetComponent<RectTransform>();
+            txt.SetParent(chip, false);
+            txt.anchorMin = Vector2.zero; txt.anchorMax = Vector2.one;
+            txt.offsetMin = Vector2.zero; txt.offsetMax = Vector2.zero;
+            var tmp = txt.gameObject.AddComponent<TextMeshProUGUI>();
+            tmp.fontSize = 15f;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.raycastTarget = false;
+            _chipLabel.Add(tmp);
+
+            var btn = chip.gameObject.AddComponent<Button>();
+            btn.transition = Selectable.Transition.None;
+            var picked = cat;
+            btn.onClick.AddListener(() => { _filter = picked; Refresh(); });
+        }
+    }
+
+    /// <summary>칩 색과 개수를 갱신한다. 「전체」에만 총 개수를 붙여 목록 규모를 알린다.</summary>
+    private void RefreshChips()
+    {
+        EnsureChips();
+        if (_chipBg.Count == 0) return;
+
+        var mgr = Managers.Quest;
+        int total = 0;
+        if (mgr != null)
+        {
+            total = mgr.ActiveAchievements.Count + mgr.CompletedAchievements.Count;
+        }
+
+        for (int i = 0; i < _chipBg.Count && i < Categories.Length; i++)
+        {
+            bool on = Categories[i].Cat == _filter;
+            _chipBg[i].color    = on ? AltarPalette.TabOn : AltarPalette.TabOff;
+            _chipLabel[i].color = on ? AltarPalette.Gold  : AltarPalette.TextDim;
+            _chipLabel[i].text  = i == 0 ? $"{Categories[i].Label} {total}" : Categories[i].Label;
+        }
+    }
+
+    private static readonly string[] ReachKeys   = { "maxChapter", "maxDepth", "clears" };
+    private static readonly string[] CombatKeys  = { "kills", "eliteKills", "bossKills" };
+    private static readonly string[] BuildKeys   = { "maxEnhance", "refineCount" };
+    private static readonly string[] FeatKeys    = { "noPotionClear", "noSpecialClear", "flawlessChapter" };
+
+    /// <summary>대상 키 → 분류. 어디에도 안 걸리면 「탐색」으로 떨어뜨려 목록에서 사라지지 않게 한다.</summary>
+    private static AchCategory CategoryOf(Quest q)
+    {
+        if (HasAnyTarget(q, ReachKeys))  return AchCategory.Reach;
+        if (HasAnyTarget(q, CombatKeys)) return AchCategory.Combat;
+        if (HasAnyTarget(q, BuildKeys))  return AchCategory.Build;
+        if (HasAnyTarget(q, FeatKeys))   return AchCategory.Feat;
+        return AchCategory.Explore;   // roomClears · shopUses · 미상
+    }
+
+    private static bool HasAnyTarget(Quest q, string[] keys)
+    {
+        var groups = q?.TaskGroups;
+        if (groups == null) return false;
+
+        foreach (var g in groups)
+            foreach (var t in g.Tasks)
+            {
+                if (t == null) continue;
+                foreach (var k in keys)
+                    if (t.ContainsTarget(k)) return true;
+            }
+        return false;
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     private void Awake()
@@ -84,6 +217,24 @@ public class AchievementListView : MonoBehaviour
 
     // ── Public Methods ───────────────────────────────────────────────────
 
+    /// <summary>
+    /// 외부(하단 행동 바)에서 [모두 받기]를 부르는 통로.
+    /// 스태거 연출·저장·중복 실행 가드가 전부 이 뷰에 있으므로 로직을 복제하지 않고 위임한다.
+    /// </summary>
+    public void ClaimAll() => ClaimAllAsync().Forget();
+
+    /// <summary>수령 시 받게 될 정수 합. 하단 버튼이 "얼마를 받는지"를 미리 말하는 데 쓴다.</summary>
+    public int PendingEssence()
+    {
+        var mgr = Managers.Quest;
+        if (mgr == null) return 0;
+
+        int sum = 0;
+        foreach (var a in mgr.ActiveAchievements)
+            if (a.IsCompltable) sum += EssenceOf(a);
+        return sum;
+    }
+
     public void Refresh()
     {
         var mgr = Managers.Quest;
@@ -93,12 +244,17 @@ public class AchievementListView : MonoBehaviour
         var running   = new List<Quest>();
         var claimed   = new List<Quest>();
 
+        // 분류 필터는 3단 정렬 <b>안쪽</b>에 건다 — 정렬 구조는 그대로 두고 보이는 것만 줄인다.
         foreach (var a in mgr.ActiveAchievements)
         {
+            if (!PassFilter(a)) continue;
             if (a.IsCompltable) claimable.Add(a);
             else                running.Add(a);
         }
-        foreach (var a in mgr.CompletedAchievements) claimed.Add(a);
+        foreach (var a in mgr.CompletedAchievements)
+            if (PassFilter(a)) claimed.Add(a);
+
+        RefreshChips();
 
         // 목표에 가까운 것이 위 — 근접도가 곧 동기다.
         running.Sort((x, y) => ProgressOf(y).CompareTo(ProgressOf(x)));

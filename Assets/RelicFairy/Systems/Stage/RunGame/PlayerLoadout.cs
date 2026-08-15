@@ -42,16 +42,34 @@ public class PlayerLoadout
         bool changed = Relic != relic;
         Relic = relic;
         if (changed) _relicPartIds.Clear();
+        EvaluateFirstRun();
     }
 
     public void SetWeaponSlot0(WeaponSO weapon) => WeaponSlot0 = weapon;
-    public void SetWeaponSlot1(WeaponSO weapon) => WeaponSlot1 = weapon;
+
+    public void SetWeaponSlot1(WeaponSO weapon)
+    {
+        WeaponSlot1 = weapon;
+        EvaluateFirstRun();
+    }
+
+    /// <summary>
+    /// 유물과 원거리 무기가 <b>둘 다</b> 정해지는 순간 초행을 판정한다.
+    /// 종료 시점에 보면 그 사이 기록이 쓰여 "방금 한 것" 때문에 초행이 아니게 된다 — 확정 시 1회다.
+    /// </summary>
+    private void EvaluateFirstRun()
+    {
+        if (Relic == null || WeaponSlot1 == null) return;
+        FirstRunService.MarkLoadout(Relic.Id.ToString(), WeaponSlot1.name);
+    }
 
     /// <summary>보스 클리어 드래프트가 호출. 중복 part_id는 무시.</summary>
     public void AddRelicPart(string partId)
     {
-        if (!string.IsNullOrEmpty(partId) && !_relicPartIds.Contains(partId))
-            _relicPartIds.Add(partId);
+        if (string.IsNullOrEmpty(partId) || _relicPartIds.Contains(partId)) return;
+
+        _relicPartIds.Add(partId);
+        FirstRunService.MarkCorePart(partId);   // 처음 밟는 파츠면 초행 보너스가 붙는다
     }
 
     /// <summary>이미 보유한 파츠인지 — 드래프트 후보 중복 배제에 사용.</summary>

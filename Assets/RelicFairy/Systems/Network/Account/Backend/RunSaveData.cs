@@ -59,6 +59,7 @@ public class RunSaveData
     public string rangedPartsJson;        // RangedPartListWrapper JSON — 원거리 파츠 장착·레벨
     public int    rangedInvested;         // 원거리 무기 강화 누적 투자 재료(파츠 슬롯 해금 근거)
     public int    rangedGrantedTier;      // 파츠를 지급받은 티어 수(재접속 중복 지급 방지)
+    public string contractIds = "";       // 이번 런의 계약 id(쉼표) — 진척은 세션 카운터가 정본이라 저장하지 않는다
 
     // 절차생성 진행 상태 (RunFlowController/RunSequencer)
     public int    masterSeed;

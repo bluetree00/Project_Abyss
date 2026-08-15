@@ -267,6 +267,12 @@ public class RunProgressManager : MonoBehaviour
             d.rangedGrantedTier          = parts.GrantedTier;
         }
 
+        // 계약 — id만 저장한다. 진척은 세션 카운터(처치·방·강화)가 정본이라 따로 적으면 어긋난다.
+        if (RunContracts.Current != null)
+        {
+            d.contractIds = RunContracts.Current.ToSaveString();
+        }
+
         // 룬 보드 점유 셀 (시너지 권위)
         var cw    = new Vector2IntListWrapper();
         var cells = MerlinRuneBridge.Instance?.CaptureRuneCells();

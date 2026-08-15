@@ -25,6 +25,10 @@ public class UI_AwakeningPanel : UI_Popup
     [Header("헤더")]
     [SerializeField] private TMP_Text essenceText;
 
+    [Tooltip("다음 해금까지의 진행바. 미배선이면 코드가 헤더 아래에 만들어 붙인다.")]
+    [SerializeField] private TMP_Text nextGoalText;
+    [SerializeField] private Image    nextGoalFill;
+
     [Header("상위 탭 (업적 / 해금)")]
     [SerializeField] private Button   achievementTab;
     [SerializeField] private TMP_Text achievementTabLabel;
@@ -197,6 +201,7 @@ public class UI_AwakeningPanel : UI_Popup
         int essence = MemoryAltarService.Essence;
         if (essenceText) essenceText.text = $"{essence:N0}";
 
+        RefreshNextGoalBar(essence);
         RefreshBadge();
 
         if (!_achievementMode)
@@ -211,6 +216,87 @@ public class UI_AwakeningPanel : UI_Popup
         }
 
         RefreshActionBar(essence);
+    }
+
+    /// <summary>
+    /// 헤더의 <b>다음 해금 진행바</b>. 업적을 수령하면 이 막대가 차오르고, 다 차면 문구가 바뀐다 —
+    /// 정수를 받는 곳과 쓰는 곳을 같은 화면에 둔 이유가 여기서 눈에 보인다.
+    ///
+    /// 정수 숫자만으로는 "받아서 뭐가 되는가"를 알 수 없어, 수령의 결과가 화면에서 사라져 있었다.
+    /// </summary>
+    private void RefreshNextGoalBar(int essence)
+    {
+        EnsureNextGoalBar();
+        if (nextGoalText == null) return;
+
+        var next = MemoryAltarService.GetNextGoal();
+        if (next == null)
+        {
+            nextGoalText.text = "열 수 있는 것을 모두 열었다";
+            nextGoalText.color = AltarPalette.TextFaint;
+            if (nextGoalFill) SetFill(nextGoalFill, 1f);
+            return;
+        }
+
+        var goal = next.Value;
+        int left = Mathf.Max(0, goal.Cost - essence);
+        bool ready = left <= 0;
+
+        nextGoalText.text  = ready
+            ? $"다음 · 「{goal.Node.DisplayName}」        해금 가능"
+            : $"다음 · 「{goal.Node.DisplayName}」        −{left:N0}";
+        nextGoalText.color = ready ? AltarPalette.Gold : AltarPalette.TextDim;
+        if (nextGoalFill) SetFill(nextGoalFill, goal.Cost > 0 ? (float)essence / goal.Cost : 1f);
+    }
+
+    private static void SetFill(Image fill, float ratio01)
+    {
+        var rt = fill.rectTransform;
+        rt.anchorMin = new Vector2(0f, 0f);
+        rt.anchorMax = new Vector2(Mathf.Clamp01(ratio01), 1f);
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+    }
+
+    /// <summary>프리팹에 아직 없으면 정수 표시 아래에 만들어 붙인다(아트 배선 전에도 동작하게).</summary>
+    private void EnsureNextGoalBar()
+    {
+        if (nextGoalText != null || essenceText == null) return;
+
+        var anchor = essenceText.rectTransform;
+        var parent = anchor.parent;
+
+        var label = new GameObject("Txt_NextGoal", typeof(RectTransform)).GetComponent<RectTransform>();
+        label.SetParent(parent, false);
+        CopyAnchors(anchor, label, yOffset: -56f, height: 20f);
+        nextGoalText = label.gameObject.AddComponent<TextMeshProUGUI>();
+        nextGoalText.fontSize = 15f;
+        nextGoalText.alignment = TextAlignmentOptions.Right;
+        nextGoalText.color = AltarPalette.TextDim;
+        nextGoalText.raycastTarget = false;
+
+        var track = new GameObject("Bar_NextGoal", typeof(RectTransform)).GetComponent<RectTransform>();
+        track.SetParent(parent, false);
+        CopyAnchors(anchor, track, yOffset: -80f, height: 10f);
+        var trackImg = track.gameObject.AddComponent<Image>();
+        trackImg.color = AltarPalette.AccentLocked;
+        trackImg.raycastTarget = false;
+
+        var fill = new GameObject("Fill", typeof(RectTransform)).GetComponent<RectTransform>();
+        fill.SetParent(track, false);
+        nextGoalFill = fill.gameObject.AddComponent<Image>();
+        nextGoalFill.color = AltarPalette.Essence;
+        nextGoalFill.raycastTarget = false;
+        SetFill(nextGoalFill, 0f);
+    }
+
+    private static void CopyAnchors(RectTransform src, RectTransform dst, float yOffset, float height)
+    {
+        dst.anchorMin = src.anchorMin;
+        dst.anchorMax = src.anchorMax;
+        dst.pivot     = src.pivot;
+        dst.sizeDelta = new Vector2(src.sizeDelta.x, height);
+        dst.anchoredPosition = src.anchoredPosition + new Vector2(0f, yOffset);
     }
 
     /// <summary>미수령 업적이 있으면 탭에 ●를 켠다 — 이 점 하나가 업적을 열게 만든다.</summary>
@@ -254,6 +340,16 @@ public class UI_AwakeningPanel : UI_Popup
         else                                 SetActionButton(false, "정수 부족", $"{state.Cost - essence:N0} 모자람");
     }
 
+    /// <summary>
+    /// 업적 탭의 하단 행동 바 — <b>[모두 받기] 주 버튼</b>.
+    ///
+    /// 예전엔 여기에 항상 비활성인 「목록에서 받기」를 띄웠다. 1472×126을 차지하면서 눌리지 않아
+    /// "고장난 버튼"으로 읽혔고, 정작 주 행동은 목록 안 작은 버튼에만 있었다.
+    /// 해금 탭의 구매 버튼과 같은 자리라 조작 위치도 일관된다.
+    ///
+    /// 수령이 무엇을 여는지도 함께 말한다 — 정수를 받는 곳과 쓰는 곳을 같은 화면에 둔 이유가
+    /// 이 한 줄에서 성립한다("받자마자 쓸 수 있다").
+    /// </summary>
     private void RefreshAchievementAction()
     {
         int waiting = WaitingAchievements();
@@ -264,9 +360,23 @@ public class UI_AwakeningPanel : UI_Popup
             return;
         }
 
-        SetActionText($"받아갈 것이 {waiting}개 있다",
-                      "수령한 정수는 그대로 「해금」에서 쓸 수 있다", "");
-        SetActionButton(false, "목록에서 받기", "");
+        int gain = achievementList != null ? achievementList.PendingEssence() : 0;
+        SetActionText($"받아갈 것이 {waiting}개 있다", BuildClaimLead(gain), "");
+        SetActionButton(true, $"모두 받기 {waiting}", gain > 0 ? $"+{gain:N0}" : "");
+    }
+
+    /// <summary>수령 후 무엇이 열리는지 한 줄 — 다음 해금까지 남는 정수를 계산해 붙인다.</summary>
+    private static string BuildClaimLead(int gain)
+    {
+        var next = MemoryAltarService.GetNextGoal();
+        if (next == null || gain <= 0) return "수령한 정수는 그대로 「해금」에서 쓸 수 있다";
+
+        var goal  = next.Value;
+        int after = MemoryAltarService.Essence + gain;
+        int left  = goal.Cost - after;
+        return left <= 0
+            ? $"수령하면 +{gain:N0} — 「{goal.Node.DisplayName}」을 바로 열 수 있다"
+            : $"수령하면 +{gain:N0} — 「{goal.Node.DisplayName}」 해금까지 {left:N0} 남는다";
     }
 
     private static string BuildActionCondition(AltarNodeState state, MemoryAltarNode node)
@@ -315,7 +425,10 @@ public class UI_AwakeningPanel : UI_Popup
 
     private void OnActionClicked()
     {
-        if (readOnly || _achievementMode) return;
+        if (readOnly) return;
+
+        // 업적 탭에서는 이 버튼이 [모두 받기]다. 스태거 연출·저장은 목록 뷰가 소유하므로 위임한다.
+        if (_achievementMode) { achievementList?.ClaimAll(); return; }
 
         // 고른 것이 없으면 하단 바가 「다음 목표」를 가리키고 있으므로 그것을 산다.
         var node = _selected ?? MemoryAltarService.GetNextGoal()?.Node;

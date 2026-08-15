@@ -13,6 +13,24 @@ MonoBehaviour:
   m_Name: AchievementDatabase
   m_EditorClassIdentifier: Assembly-CSharp::QuestDatabase
   quests:
+  - {fileID: 11400000, guid: 494124c30f80e874babc6b004b2e6b30, type: 2}
   - {fileID: 11400000, guid: 614a50f82d2ad6d42bf0b791d31ed924, type: 2}
+  - {fileID: 11400000, guid: c605692d16683a843ba6065a29444f3b, type: 2}
   - {fileID: 11400000, guid: 8b2d9c574800ca749814b85d94820c6a, type: 2}
+  - {fileID: 11400000, guid: 99550f43ec60efd419e991494055858c, type: 2}
+  - {fileID: 11400000, guid: 175c7ff75b40a3d48aa811efc33d3afa, type: 2}
+  - {fileID: 11400000, guid: 426f849fc1872ff4aa3632cf8fb5d5d7, type: 2}
+  - {fileID: 11400000, guid: 7d3da069f6750a2408aee6d4a75f0207, type: 2}
+  - {fileID: 11400000, guid: af35f9b49561fe944ab2a10a8f461293, type: 2}
+  - {fileID: 11400000, guid: 08f665a990bc95e47870dd6c0250e554, type: 2}
+  - {fileID: 11400000, guid: 2130d562da3acc34eba1b9b8c88509f4, type: 2}
+  - {fileID: 11400000, guid: 066cca5ebafa1f440b627d6fb40a0faa, type: 2}
+  - {fileID: 11400000, guid: 5ce1245eb373993489d51c933449b889, type: 2}
   - {fileID: 11400000, guid: 2a05c8325521bfa4d8cb60cf0c62f09a, type: 2}
+  - {fileID: 11400000, guid: 4835e93769013cc46aa1e3c7d675789c, type: 2}
+  - {fileID: 11400000, guid: 9e0840901b08d86479085ca3d9901a96, type: 2}
+  - {fileID: 11400000, guid: c48a15492982ecc42b88808476882e12, type: 2}
+  - {fileID: 11400000, guid: 229feaa23793ae046b697ae37f01d17b, type: 2}
+  - {fileID: 11400000, guid: 53e60c31dec99dd47b69241f116fb5d4, type: 2}
+  - {fileID: 11400000, guid: 695ab98ea9e74a147accf27ab542df3f, type: 2}
+  - {fileID: 11400000, guid: bc440c820344b6a499f3f811e0d51026, type: 2}

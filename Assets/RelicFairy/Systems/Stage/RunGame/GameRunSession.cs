@@ -322,6 +322,12 @@ public sealed class GameRunSession
             RangedPartsState.Current = new RangedPartsState();
             RangedPartsState.ApplyTestCarry();   // 베이스캠프 테스트 제단을 쓴 경우에만 동작(평소 무해)
 
+            // 계약 3개 부여. 시드를 챕터에 섞어 런마다 다른 조합이 나오되, 같은 시드는 같은 계약을 준다.
+            RunContracts.Current = new RunContracts();
+            RunContracts.Current.RollIfEmpty(new System.Random(Environment.TickCount ^ (int)CurrentChapter));
+
+            FirstRunService.BeginRun();   // 초행 판정은 로드아웃이 확정될 때 들어온다
+
             // 신규 런 강화재료 시작 지급 — 재련소(첫 소비처)가 이벤트방(첫 생산처)보다 앞 순번일 수 있어
             // 첫 재련소에서 강화재료=0이 되는 갭을 막는 안전장치. 이어하기(RestoreFromSaveAsync)는 이 경로를
             // 거치지 않으므로 이중지급 없음. 신규 런 = 새 세션(FuelBank 잔량 0)이라 정확히 초기량만 지급된다.
@@ -390,6 +396,14 @@ public sealed class GameRunSession
                     RangedPartsState.Current.Restore(pw.items, save.rangedInvested, save.rangedGrantedTier);
             }
 
+            // 계약 복원 — 이어하기는 같은 계약을 이어간다. 세이브에 없으면(구 세이브) 새로 뽑는다.
+            RunContracts.Current = new RunContracts();
+            RunContracts.Current.Restore(save.contractIds);
+            if (!RunContracts.Current.HasAny)
+            {
+                RunContracts.Current.RollIfEmpty(new System.Random(Environment.TickCount ^ (int)CurrentChapter));
+            }
+
             if (!string.IsNullOrEmpty(save.itemsJson))
             {
                 var itemWrapper = JsonUtility.FromJson<ItemListWrapper>(save.itemsJson);
@@ -452,6 +466,21 @@ public sealed class GameRunSession
         var endState = isCleared ? RunState.RunClear : RunState.RunEnd;
         CurrentRunState = endState;
         OnRunStateChanged?.Invoke(endState);
+
+        // ── 계약 정산 ──
+        // 달성분만 자동 지급한다. 수령 버튼을 두지 않는 이유는 주기 때문이다 — 매 런 생기는 목표를
+        // 수령까지 요구하면 피곤하고, 죽은 직후에 버튼을 누르게 만드는 것도 어색하다.
+        // 「죽어도 헛되지 않았다」는 <b>실패한 런에서도 이만큼 남는다</b>는 사실이 만든다.
+        int contractEssence = RunContracts.Current?.EarnedEssence(this) ?? 0;
+        if (contractEssence > 0)
+        {
+            RunDelta.GainedEssence += contractEssence;
+            Debug.Log($"[계약] 정산 — {RunContracts.Current.DoneCount(this)}건 달성 · 정수 +{contractEssence}");
+        }
+
+        // ── 초행 정산 ──
+        // 계약분까지 포함한 총액에 배율을 건다 — 초행을 깊이 끌고 갈수록 이득이 커지는 게 설계 의도다.
+        RunDelta.GainedEssence += FirstRunService.SettleRun(RunDelta.GainedEssence);
 
         var result = new EndRunResult(
             isCleared:     isCleared,
