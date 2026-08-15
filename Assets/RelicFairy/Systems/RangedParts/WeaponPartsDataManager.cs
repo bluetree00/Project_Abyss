@@ -12,6 +12,7 @@ using UnityEngine;
 /// <see cref="RelicPartsDataManager"/>와 동일한 패턴이라 운용 방식(차트 갱신·캐시 정리)이 같다.
 ///
 /// CSV 컬럼: index | part_id | part_name | description | kind | base_value | per_level | milestone_every | max_level
+///          | cost_base | cost_growth
 /// </summary>
 public sealed class WeaponPartsDataManager
 {
@@ -138,6 +139,8 @@ public sealed class WeaponPartsDataManager
                 per_level       = row.TryGetFloat("per_level"),
                 milestone_every = row.TryGetInt("milestone_every"),
                 max_level       = row.TryGetInt("max_level"),
+                cost_base       = row.TryGetInt("cost_base"),
+                cost_growth     = row.TryGetFloat("cost_growth"),
             };
         }
         catch { return null; }

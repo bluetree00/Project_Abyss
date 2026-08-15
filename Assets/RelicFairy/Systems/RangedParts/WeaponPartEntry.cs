@@ -17,6 +17,7 @@ public enum RangedPartKind
 /// WEAPON_PARTS_DATA 차트 1행 = 원거리 파츠 하나의 정적 정의.
 ///
 /// CSV 컬럼: index | part_id | part_name | description | kind | base_value | per_level | milestone_every | max_level
+///          | cost_base | cost_growth
 ///
 /// 효과값은 두 가지로 표현한다:
 ///  · <b>연속형</b>(폭발 반경·유도 강도·크기) — base_value + per_level × (레벨-1)
@@ -41,6 +42,11 @@ public sealed class WeaponPartEntry
     /// <summary>강화 상한. 0이면 무제한(밸런스상 권장하지 않음).</summary>
     public int    max_level;
 
+    /// <summary>Lv.1 → Lv.2 강화에 드는 강화재료. 0이면 <see cref="DefaultCostBase"/>.</summary>
+    public int    cost_base;
+    /// <summary>레벨당 비용 배율(복리). 0이면 <see cref="DefaultCostGrowth"/>.</summary>
+    public float  cost_growth;
+
     /// <summary>문자열 kind → enum. 알 수 없으면 Split로 폴백(데이터 오타가 조용히 무효화되지 않게 로그는 매니저가 남긴다).</summary>
     public RangedPartKind Kind => kind switch
     {
@@ -63,6 +69,24 @@ public sealed class WeaponPartEntry
             return base_value + (level - 1) / milestone_every;   // 정수 나눗셈 = 계단
 
         return base_value + per_level * (level - 1);
+    }
+
+    /// <summary>데이터가 비었을 때의 비용 기본값 — 차트 미갱신 상태에서도 강화가 공짜가 되지 않게 한다.</summary>
+    private const int   DefaultCostBase   = 3;
+    private const float DefaultCostGrowth = 1.35f;
+
+    /// <summary>
+    /// <paramref name="level"/> → <paramref name="level"/>+1 강화에 드는 강화재료.
+    /// 복리로 급증해 "끝까지 다 올리기"가 불가능하게 만든다 — 어느 파츠를 포기할지가 선택이 된다.
+    /// 상한에 도달했으면 0(강화 불가).
+    /// </summary>
+    public int CostAt(int level)
+    {
+        if (max_level > 0 && level >= max_level) return 0;
+
+        int   b = cost_base   > 0  ? cost_base   : DefaultCostBase;
+        float g = cost_growth > 0f ? cost_growth : DefaultCostGrowth;
+        return UnityEngine.Mathf.CeilToInt(b * UnityEngine.Mathf.Pow(g, UnityEngine.Mathf.Max(0, level - 1)));
     }
 }
 
