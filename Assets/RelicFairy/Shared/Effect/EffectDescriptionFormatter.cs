@@ -113,6 +113,9 @@ public static class EffectDescriptionFormatter
         switch (statusId)
         {
             case "ignite": case "burn":                       return "fire";
+            // 출혈은 속성이 없다 — 아이콘 어휘에 전용 키가 없어 피해계(적색) 키로 보낸다.
+            // 라벨("출혈")은 LabelForStatus가 이미 갖고 있어, 없던 건 아이콘 한 칸뿐이었다.
+            case "bleed":                                     return "dmg";
             case "frost":  case "freeze": case "shatter":     return "freeze";
             case "poison": case "item_poison":
             case "poison_atk": case "vulnerable":             return "poison";

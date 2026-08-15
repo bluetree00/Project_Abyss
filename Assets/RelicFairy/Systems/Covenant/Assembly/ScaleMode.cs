@@ -35,9 +35,9 @@ public enum EffectAxis
 }
 
 /// <summary>
-/// 효과가 다루는 상태 통화 5종(화상/출혈/취약/보호막/기세).
+/// 효과가 다루는 상태 통화 6종(화상/출혈/감전/취약/보호막/기세).
 /// 배지 표시에 더해, <see cref="StatusRole"/>과 짝지어 "서약끼리 물리는가"(시너지 힌트)를 판정한다.
-/// 통화를 서로 바꿔주는 환전소와 감전(shock)은 C급이라 아직 없다.
+/// 실제 상태는 <see cref="CovenantStatus"/>(환전소)가 기존 채널에 위임해 다룬다 — 저장소는 늘지 않는다.
 /// </summary>
 public enum StatusCurrency
 {
@@ -47,6 +47,7 @@ public enum StatusCurrency
     Vulnerable,  // 취약
     Shield,      // 보호막
     Momentum,    // 기세
+    Shock,       // 감전 — 슬로우 채널("shock") 재사용. 쌓아 두었다가 「정지」로 터뜨린다.
 }
 
 /// <summary>
@@ -78,6 +79,7 @@ public static class EffectTaxonomy
         StatusCurrency.Vulnerable => "취약",
         StatusCurrency.Shield     => "보호막",
         StatusCurrency.Momentum   => "기세",
+        StatusCurrency.Shock      => "감전",
         _                         => null,
     };
 
@@ -86,8 +88,9 @@ public static class EffectTaxonomy
         => c == StatusCurrency.Burn || c == StatusCurrency.Bleed;
 
     /// <summary>
-    /// 두 통화가 같은 군인지 — 소모형(기폭·흡정·수확)은 화상과 출혈을 가리지 않고 먹기 때문에
+    /// 두 통화가 같은 군인지 — 소모형(기폭·수확)은 화상과 출혈을 가리지 않고 먹기 때문에
     /// 둘을 한 군으로 본다. 이게 없으면 「출혈」×「기폭」 같은 실제로 물리는 조합이 힌트에 안 뜬다.
+    /// 감전은 제 군을 따로 갖는다(「정지」만 먹는다).
     /// </summary>
     public static bool SameFamily(StatusCurrency a, StatusCurrency b)
         => a != StatusCurrency.None && (a == b || (a.IsDot() && b.IsDot()));

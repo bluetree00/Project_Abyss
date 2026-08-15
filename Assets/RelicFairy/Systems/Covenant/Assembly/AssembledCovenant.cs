@@ -22,9 +22,6 @@ public sealed class AssembledCovenant : CovenantBase
     // 처형 「표식」 탐색 반경 — 경계 원인(개선·선제)은 방 단위 사건이라 근접 반경으로는 짚을 게 없다.
     private const float ExecuteMarkRadius      = 12f;
 
-    // 화상 틱 간격 — 다른 화상 사용처(SolarZone/FireField)와 같은 결로 맞춘다.
-    private const float BurnTickInterval = 0.5f;
-
     // 루비 발동 VFX 키. 자산이 없으면 CovenantBase.Vfx가 조용히 무동작한다.
     private const string RubyVfxKey = "VFX/Covenant/RubyProc";
 
@@ -69,6 +66,12 @@ public sealed class AssembledCovenant : CovenantBase
     private int   _momentumStacks;
     private float _momentumEnd;
     private readonly StatModifier[] _momentumMods = new StatModifier[2];
+
+    // 「결계」 — 발동 시점에 굳힌 받피 감소량과 만료 시각.
+    // 감소량을 매 피격마다 다시 세지 않는 이유: 그러면 결계의 두께가 맞는 순간에만 얇아졌다 두꺼워졌다 해
+    // 플레이어가 "지금 얼마나 단단한가"를 알 수 없다. 두께는 걸리는 순간 정해진다.
+    private float _wardReduction;
+    private float _wardEnd;
 
     /// <summary>
     /// 효과 적용 중 플래그. 광역 폭발이 적을 죽이면 그 처치가 다시 원인(학살·사냥 개시)을 물고
@@ -246,6 +249,13 @@ public sealed class AssembledCovenant : CovenantBase
             damage *= 1f + FuryAmp;
     }
 
+    /// <summary>「결계」 — 지속 중 받는 피해 감소. 체력을 되돌리는 게 아니라 애초에 덜 맞는다.</summary>
+    public override void ModifyIncomingDamage(ref float damage, CombatContext ctx)
+    {
+        if (_resolved && _effect.kind == EffectKind.Ward && Time.time < _wardEnd)
+            damage *= 1f - _wardReduction;
+    }
+
     /// <summary>「격노」 증폭량 — 위험 원인(포위)이면 1.25배, 대신 포위가 풀리는 순간 꺼진다(④).</summary>
     private float FuryAmp
         => Eff * (_cause.cls == CauseClass.Danger ? CovenantMath.FuryDangerBonus : 1f);
@@ -325,6 +335,19 @@ public sealed class AssembledCovenant : CovenantBase
             return true;
         }
 
+        if (_resolved && _effect.kind == EffectKind.Ward && Time.time < _wardEnd)
+        {
+            item = new BuffViewItem(
+                iconKey:     "def",
+                label:       $"{_effect.name} 받는 피해 -{_wardReduction * 100f:0}%",
+                stacks:      1,
+                remaining01: Remaining01(_wardEnd, _effect.duration),
+                remainText:  string.Empty,
+                source:      BuffSource.Relic,
+                isDebuff:    false);
+            return true;
+        }
+
         item = default;
         return false;
     }
@@ -360,7 +383,7 @@ public sealed class AssembledCovenant : CovenantBase
             case EffectKind.AoeBurst:
             {
                 Vector3 pos = target != null ? target.transform.position : PlayerPos;
-                DealAoe(pos, CovenantMath.EffectiveRadius(_effect), Eff);
+                DealAoe(pos, SupernovaRadius(pos), Eff);
                 return true;
             }
             case EffectKind.DamageBuff:
@@ -393,11 +416,17 @@ public sealed class AssembledCovenant : CovenantBase
             case EffectKind.Detonate:
                 return Detonate(target);
 
-            case EffectKind.Sanguine:
-                return Sanguine(ResolveTarget(target));
-
             case EffectKind.Harvest:
                 return Harvest(ResolveTarget(target));
+
+            case EffectKind.Arcflash:
+                return Arcflash(target);
+
+            case EffectKind.Stasis:
+                return Stasis(target);
+
+            case EffectKind.Ward:
+                return Ward();
 
             case EffectKind.Invincible:
                 if (Ctx.Player == null) return false;
@@ -429,12 +458,13 @@ public sealed class AssembledCovenant : CovenantBase
     }
 
     // ── 효과 헬퍼 ─────────────────────────────────────────
+    // 통화를 걸고·키우고·먹는 일은 전부 <see cref="CovenantStatus"/>(환전소)를 지난다.
+    // 여기서 채널을 직접 부르면 "무엇이 통화인가"를 아는 곳이 효과 수만큼 늘어난다.
+
     private bool ApplyCurse(GameObject target)
     {
-        if (target == null) return false;
-        var mb = target.GetComponentInParent<MonsterBase>();
-        if (mb == null) return false;
-        mb.ApplyDamageTakenAmp(Eff, _effect.duration, "cov_curse");
+        if (Live(target) == null) return false;
+        CovenantStatus.Apply(target, StatusCurrency.Vulnerable, Eff, _effect.duration, Ctx?.Player?.gameObject);
         return true;
     }
 
@@ -446,7 +476,7 @@ public sealed class AssembledCovenant : CovenantBase
         float dps = EffectiveAttack() * Eff;
         if (dps <= 0f) return false;
 
-        MonsterBurnHandler.Apply(target, dps, _effect.duration, BurnTickInterval, Ctx.Player.gameObject);
+        CovenantStatus.Apply(target, StatusCurrency.Burn, dps, _effect.duration, Ctx.Player.gameObject);
         return true;
     }
 
@@ -458,11 +488,149 @@ public sealed class AssembledCovenant : CovenantBase
         float dps = EffectiveAttack() * Eff;
         if (dps <= 0f) return false;
 
-        MonsterBleed.ApplyStacked(target, dps, _effect.duration, CovenantMath.BleedMaxStacks, Ctx.Player.gameObject);
+        CovenantStatus.Amplify(target, StatusCurrency.Bleed, dps, _effect.duration, Ctx.Player.gameObject);
         return true;
     }
 
-    // ── 소모형(기폭·흡정·수확) ────────────────────────────
+    // ── 감전 계열(C3) ─────────────────────────────────────
+    /// <summary>
+    /// 방전 — 대상과 인근에 감전 1스택씩. 원인 형상 분기:
+    ///  • 스킬 원인 → <b>순차 체인</b>. 한 발이 적을 타고 넘어가는 그림이라 대상 수가 한 명 더 붙되,
+    ///    다음 적이 <see cref="CovenantMath.ArcflashChainHop"/> 안에 없으면 거기서 끊긴다(뭉친 무리에 강하다).
+    ///    체인이 뻗는 범위 자체는 두 방식 모두 발동 지점 반경 안이다 — 한 발이 방을 가로지르지 않게.
+    ///  • 그 외 → <b>방사형</b>. 발동 지점에서 가까운 순으로 반경 안을 채운다(퍼진 무리에 고르다).
+    /// 감전의 세기는 늘 1스택 고정 — 커지는 건 '몇에게 거는가'다.
+    /// </summary>
+    private bool Arcflash(GameObject target)
+    {
+        if (Ctx?.Player == null) return false;
+
+        var primary = Live(ResolveTarget(target));
+        if (primary == null) return false;
+
+        var inst = Ctx.Player.gameObject;
+        Shock(primary, inst);
+
+        bool  chain = _cause.cls == CauseClass.Skill;
+        int   extra = EffCount + (chain ? CovenantMath.ArcflashChainBonus : 0);
+        float radius = CovenantMath.EffectiveRadius(_effect);
+
+        // 훑기를 먼저 끝낸다 — _probe는 서약 인스턴스끼리 공유하는 정적 버퍼다(CollectLiveEnemies 주석 참조).
+        CollectLiveEnemies(primary.transform.position, radius, primary);
+
+        Vector3 from = primary.transform.position;
+        for (int i = 0; i < extra; i++)
+        {
+            var next = TakeNearest(from, chain ? CovenantMath.ArcflashChainHop : radius);
+            if (next == null) break;
+            Shock(next, inst);
+            if (chain) from = next.transform.position;   // 체인만 발판을 옮긴다
+        }
+        _areaScratch.Clear();
+        return true;
+    }
+
+    private static void Shock(MonsterBase mb, GameObject instigator)
+        => CovenantStatus.Amplify(mb.gameObject, StatusCurrency.Shock, 0f, 0f, instigator);
+
+    /// <summary>
+    /// 정지 — 반경 안에 쌓인 감전을 전부 걷어 그 스택 수만큼 오래 멈춰 세운다.
+    /// 걷기와 걸기를 두 바퀴로 나눈 이유: 한 바퀴에서 걷고 바로 기절시키면 그 기절이 다른 서약의 원인을
+    /// 물고 돌아와 순회 중인 목록을 흔든다. 먼저 다 걷고, 총량이 정해진 뒤에 건다.
+    /// 보스는 지속을 깎는다 — 감전만 쌓아 두면 페이즈가 통째로 건너뛰어진다.
+    /// </summary>
+    private bool Stasis(GameObject target)
+    {
+        if (Ctx?.Player == null) return false;
+
+        var    origin = Live(ResolveTarget(target));
+        Vector3 center = origin != null ? origin.transform.position : PlayerPos;
+        float   radius = CovenantMath.EffectiveRadius(_effect);
+
+        CollectLiveEnemies(center, radius, null);
+        if (_areaScratch.Count == 0) return false;
+
+        int stacks = 0;
+        for (int i = 0; i < _areaScratch.Count; i++)
+        {
+            var mb = _areaScratch[i];
+            if (mb != null && !mb.IsDead)
+                stacks += Mathf.RoundToInt(
+                    CovenantStatus.Consume(mb.gameObject, StatusCurrency.Shock, 1f, Ctx.Player.gameObject, false));
+        }
+        if (stacks <= 0) { _areaScratch.Clear(); return false; }
+
+        float duration = Mathf.Min(Eff * stacks, CovenantMath.StasisStunCap);
+        GuidelineVisual.AoeBurst(center, radius, GuidelineVisual.ToastKind.Covenant);
+
+        for (int i = 0; i < _areaScratch.Count; i++)
+        {
+            var mb = _areaScratch[i];
+            if (mb == null || mb.IsDead) continue;
+            mb.ApplyStun(mb.Grade == MonsterGrade.Boss ? duration * CovenantMath.StasisBossMult : duration);
+        }
+        _areaScratch.Clear();
+        return true;
+    }
+
+    // ── 결계(비-흡혈 방어) ────────────────────────────────
+    /// <summary>
+    /// 결계 — 잠시 받는 피해가 줄어든다. 주변에 상태가 걸린 적이 많을수록 두꺼워지되,
+    /// <b>적에게서 아무것도 가져오지 않는다</b>(상태를 읽기만 하고 걷어가지 않는다).
+    /// 그래서 소모형이 아니고, 통화를 걸어 줄 서약이 없어도 기본 두께만큼은 혼자 선다 —
+    /// 드래프트의 "생존 카드 한 장 보장"을 조건부가 아닌 카드로 채울 수 있는 이유다.
+    /// </summary>
+    private bool Ward()
+    {
+        if (Ctx?.Player == null) return false;
+
+        int steeped = CountSteeped(PlayerPos, CovenantMath.EffectiveRadius(_effect));
+        _wardReduction = Mathf.Min(Eff + CovenantMath.WardPerSteepedEnemy * steeped,
+                                   CovenantMath.WardReductionCap);
+        _wardEnd = Time.time + _effect.duration;
+        return true;
+    }
+
+    /// <summary>「초신성」 반경(B7) — 반경 안에 절여진 적 1체당 넓어진다. 상태를 깔아 둔 판일수록 폭발이 크다.</summary>
+    private float SupernovaRadius(Vector3 center)
+    {
+        float baseRadius = CovenantMath.EffectiveRadius(_effect);
+        return Mathf.Min(
+            baseRadius + CovenantMath.SupernovaRadiusPerSteeped * CountSteeped(center, baseRadius),
+            CovenantMath.AoeRadiusCap);
+    }
+
+    /// <summary>반경 내에서 상태 통화가 하나라도 걸린 적의 수.</summary>
+    private int CountSteeped(Vector3 center, float radius)
+    {
+        CollectLiveEnemies(center, radius, null);
+        int n = 0;
+        for (int i = 0; i < _areaScratch.Count; i++)
+            if (CovenantStatus.HasAny(_areaScratch[i])) n++;
+        _areaScratch.Clear();
+        return n;
+    }
+
+    /// <summary>_areaScratch에서 from에 가장 가까운 대상을 <b>꺼내</b> 반환(maxDist 초과면 null). 같은 적을 두 번 잡지 않는다.</summary>
+    private MonsterBase TakeNearest(Vector3 from, float maxDist)
+    {
+        int best = -1;
+        float bestSq = maxDist * maxDist;
+        for (int i = 0; i < _areaScratch.Count; i++)
+        {
+            var mb = _areaScratch[i];
+            if (mb == null || mb.IsDead) continue;
+            float sq = (mb.transform.position - from).sqrMagnitude;
+            if (sq <= bestSq) { bestSq = sq; best = i; }
+        }
+        if (best < 0) return null;
+
+        var picked = _areaScratch[best];
+        _areaScratch.RemoveAt(best);
+        return picked;
+    }
+
+    // ── 소모형(기폭·수확·정지) ────────────────────────────
     // 셋 다 상태를 <b>부여하지 않는다</b>. 먹을 게 없으면 false를 돌려 쿨다운도 연출도 소모하지 않는다 —
     // "터뜨릴 게 없는데 쿨만 돈다"가 되면 걸기-터뜨리기의 순서가 플레이어에게 보이지 않는다.
 
@@ -485,14 +653,7 @@ public sealed class AssembledCovenant : CovenantBase
     /// <summary>한 대상의 화상·출혈을 소모해 즉시 피해로 바꾼다. spread=true면 회수한 가치에 비례해 주변에 파편.</summary>
     private bool DetonateOne(MonsterBase mb, bool spread)
     {
-        var go = mb.gameObject;
-
-        // 화상은 핸들러가 소모와 동시에 피해까지 처리한다. 출혈은 값만 회수되므로 피해는 여기서 넣는다.
-        float burn  = MonsterBurnHandler.DetonateOn(go, CovenantMath.DetonateFraction);
-        float bleed = MonsterBleed.Consume(go, CovenantMath.DetonateFraction);
-        if (bleed > 0f) mb.TakeSynergyDamage(bleed, Ctx.Player.gameObject, 1f, false, DamageKind.Synergy);
-
-        float total = burn + bleed;
+        float total = ConsumeDots(mb.gameObject, CovenantMath.DetonateFraction, asDamage: true);
         if (total <= 0f) return false;
 
         if (spread) SpreadBurst(mb, total * Eff);
@@ -534,26 +695,16 @@ public sealed class AssembledCovenant : CovenantBase
         _areaScratch.Clear();
     }
 
-    /// <summary>흡정 — 걸린 화상·출혈을 피해 없이 걷어 보호막으로 환산한다.</summary>
-    private bool Sanguine(GameObject target)
-    {
-        var mb = Live(target);
-        if (mb == null || Ctx?.Player?.RuntimeStats == null) return false;
-
-        float value = DrainStatus(mb.gameObject, CovenantMath.SanguineFraction);
-        if (value <= 0f) return false;
-
-        Ctx.Player.RuntimeStats.AddShield(value * Eff);
-        return true;
-    }
-
-    /// <summary>수확 — 걸린 화상·출혈을 걷어 스킬 재촉(쿨감)과 금으로 바꾼다.</summary>
+    /// <summary>
+    /// 수확 — 걸린 화상·출혈을 걷어 스킬 재촉(쿨감)과 금으로 바꾼다.
+    /// 체력에는 손대지 않는다 — 걷은 것이 회복으로 돌아오면 상태를 거두는 서약이 곧 흡혈이 된다.
+    /// </summary>
     private bool Harvest(GameObject target)
     {
         var mb = Live(target);
         if (mb == null) return false;
 
-        float value = DrainStatus(mb.gameObject, CovenantMath.HarvestFraction);
+        float value = ConsumeDots(mb.gameObject, CovenantMath.HarvestFraction, asDamage: false);
         if (value <= 0f) return false;
 
         Ctx.Player?.CooldownTracker?.ReduceAllCooldowns(Eff);
@@ -561,9 +712,13 @@ public sealed class AssembledCovenant : CovenantBase
         return true;
     }
 
-    /// <summary>화상+출혈 잔량을 fraction만큼 피해 없이 걷어내고 그 가치를 합산해 반환.</summary>
-    private static float DrainStatus(GameObject go, float fraction)
-        => MonsterBurnHandler.DrainOn(go, fraction) + MonsterBleed.Consume(go, fraction);
+    /// <summary>화상+출혈 잔량을 fraction만큼 걷고 그 가치를 합산해 반환. asDamage=true면 걷은 만큼 즉시 피해.</summary>
+    private float ConsumeDots(GameObject go, float fraction, bool asDamage)
+    {
+        var inst = Ctx?.Player != null ? Ctx.Player.gameObject : null;
+        return CovenantStatus.Consume(go, StatusCurrency.Burn,  fraction, inst, asDamage)
+             + CovenantStatus.Consume(go, StatusCurrency.Bleed, fraction, inst, asDamage);
+    }
 
     /// <summary>
     /// 처형 — 상태에 절여진 저체력 대상을 즉사시킨다.
@@ -589,7 +744,7 @@ public sealed class AssembledCovenant : CovenantBase
 
         float baseT    = Eff;
         float threshold = Mathf.Min(
-            baseT * Mathf.Pow(CovenantMath.ExecuteStatusMult, StatusKindCount(mb))
+            baseT * Mathf.Pow(CovenantMath.ExecuteStatusMult, CovenantStatus.CountKinds(mb.gameObject))
                   * (boundary ? CovenantMath.ExecuteBoundaryMult : 1f),
             CovenantMath.ExecuteThresholdCap);
 
@@ -603,17 +758,6 @@ public sealed class AssembledCovenant : CovenantBase
         else
             mb.TakeDamage(mb.CurrentHp * 10f, Ctx.Player.gameObject, 0.3f);
         return true;
-    }
-
-    /// <summary>대상에게 걸린 상태 통화 종수(화상·출혈·취약).</summary>
-    private static int StatusKindCount(MonsterBase mb)
-    {
-        var go = mb.gameObject;
-        int n = 0;
-        if (go.TryGetComponent<MonsterBurnHandler>(out var burn) && burn.Remaining > 0f) n++;
-        if (MonsterBleed.Remaining(go) > 0f) n++;
-        if (mb.HasDamageTakenAmp) n++;
-        return n;
     }
 
     /// <summary>처형 성공 시 화상을 가장 가까운 다른 적에게 옮긴다(B4). 화상이 없으면 무동작.</summary>

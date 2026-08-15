@@ -56,8 +56,8 @@ public static class CovenantPalette
         ["march"]    = new CauseDef { id="march",    name="행군",     desc="12m 이동할 때마다",         tag="기동", trigger=CauseTriggerKind.OnMoveDistance,      category=CovenantCategory.CombatRhythm,     coefficient=1.5f, thresholdF=12f, cls=CauseClass.Mobility, targeted=false },
     };
 
-    // 기존 5종(supernova/fury/bloodmark/curse/execute)은 <b>id를 바꾸지 않는다</b> —
-    // 이미 저장된 런의 서약 id가 이 문자열을 그대로 참조한다. 수치·모드만 손본다.
+    // 살아 있는 효과의 id는 <b>바꾸지 않는다</b> — 이미 저장된 런의 서약 id가 이 문자열을 그대로 참조한다.
+    // 수치·모드만 손본다. 없애야 할 때는 정의를 지우고 아래 _aliasEffect에 이어붙일 곳을 적는다.
     private static readonly Dictionary<string, EffectDef> _effects = new()
     {
         // ── 공격 ────────────────────────────────────────
@@ -94,16 +94,23 @@ public static class CovenantPalette
             kind=EffectKind.Detonate,   magnitude=0.5f,  radius=4f,
             mode=CovenantScaleMode.Damped, cap=1.2f, axis=EffectAxis.Offense,  status=StatusCurrency.Burn, role=StatusRole.Consume },
 
-        ["sanguine"]  = new EffectDef { id="sanguine",  name="흡정",     desc="걸린 화상·출혈을 보호막으로 빨아들인다", tag="생존",
-            kind=EffectKind.Sanguine,   magnitude=0.5f,
-            mode=CovenantScaleMode.Damped, cap=1.2f, icd=2f,
-            // 방어축이 아니라 보조축이다 — 다른 서약이 상태를 걸어줘야만 방패가 된다.
-            // 이걸 Survival로 두면 드래프트의 "생존 카드 한 장 보장"이 조건부 카드로 채워져 보장이 아니게 된다.
-            axis=EffectAxis.Utility,   status=StatusCurrency.Bleed, role=StatusRole.Consume },
-
+        // 수확은 상태를 '거둘' 뿐 체력을 건드리지 않는다 — 회복이 아니라 쿨감과 금이다.
         ["harvest"]   = new EffectDef { id="harvest",   name="수확",     desc="걸린 상태를 거둬 재촉과 금으로 바꾼다", tag="경제",
             kind=EffectKind.Harvest,    magnitude=0.8f,
             mode=CovenantScaleMode.Damped, cap=2f,   icd=4f, axis=EffectAxis.Utility, status=StatusCurrency.Burn, role=StatusRole.Consume },
+
+        // ── 감전 통화(C3) ───────────────────────────────
+        // 감전의 세기는 고정 상수(1스택)다. 커지는 쪽은 '몇에게 거는가' — 소모 비율을 상수로 둔 것과 같은 결이다.
+        // 통화를 거는 힘까지 계수로 키우면 부여형 하나가 그물 전체를 혼자 먹여 소모형이 남아돌게 된다.
+        ["arcflash"]  = new EffectDef { id="arcflash",  name="방전",     desc="대상과 인근 적에게 감전이 옮겨붙는다", tag="상태이상",
+            kind=EffectKind.Arcflash,   magnitude=2f,    radius=5f,
+            mode=CovenantScaleMode.Count,  cap=5f,   axis=EffectAxis.Offense,  status=StatusCurrency.Shock, role=StatusRole.Apply },
+
+        // 스택당 지속이 크면 한 번 걸고 바로 터뜨려도 상한(StasisStunCap)에 붙어 "쌓는" 행위가 무의미해진다.
+        // 정적 시뮬 기준 1회 방전 직후 0.4~2.1초 / 포화(5중첩)에서야 상한 — 쌓을수록 보상되게 잡은 값.
+        ["stasis"]    = new EffectDef { id="stasis",    name="정지",     desc="쌓인 감전을 터뜨려 주변을 멈춰 세운다", tag="제어",
+            kind=EffectKind.Stasis,     magnitude=0.12f, radius=4.5f,
+            mode=CovenantScaleMode.Damped, cap=0.35f, icd=6f, axis=EffectAxis.Survival, status=StatusCurrency.Shock, role=StatusRole.Consume },
 
         // ── 방어 ────────────────────────────────────────
         // 매 타격마다 리필되면 소모보다 리필이 빨라 사실상 무적이 된다 → icd로 발동 간격을 강제.
@@ -117,9 +124,18 @@ public static class CovenantPalette
             mode=CovenantScaleMode.None,             icd=8f, axis=EffectAxis.Survival, status=StatusCurrency.Shield, role=StatusRole.Apply },
 
         // 원인 계수가 '충전 횟수'가 된다 — 위험한 조건일수록 더 여러 번 버틴다.
+        // 사망 시 HP 복구는 <b>사망 방지</b>지 흡혈이 아니다 — 적에게서 빨아 오는 것이 없다.
         ["lastbreath"]= new EffectDef { id="lastbreath",name="마지막 숨결", desc="치명적인 피해를 한 번 견딘다", tag="생존",
             kind=EffectKind.DeathSave,  magnitude=1f,
             mode=CovenantScaleMode.Count,  cap=3f,   axis=EffectAxis.Survival, status=StatusCurrency.None },
+
+        // 「흡정」(적에게 걸린 상태를 보호막으로 빨아들이던 효과)이 있던 자리.
+        // 빨아들이는 결 자체를 없애는 대신, 방어축이 한 칸 비지 않도록 <b>자기 조건만으로</b> 서는 방패를 둔다 —
+        // 상태는 읽기만 하고 걷어가지 않는다(먹지 않으니 소모형이 아니고, 그래서 부여형 없이도 혼자 성립한다).
+        // icd(6초)보다 지속이 길면 사실상 상시 감소가 된다 — 지속을 icd보다 짧게 둬 '켜고 끄는' 창을 남긴다.
+        ["ward"]      = new EffectDef { id="ward",      name="결계",     desc="잠시 받는 피해가 줄어든다(절여진 적이 많을수록 두껍게)", tag="생존",
+            kind=EffectKind.Ward,       magnitude=0.10f, radius=6f, duration=4f,
+            mode=CovenantScaleMode.Damped, cap=0.25f, icd=6f, axis=EffectAxis.Survival, status=StatusCurrency.None },
 
         // ── 보조 ────────────────────────────────────────
         ["momentum"]  = new EffectDef { id="momentum",  name="박차",     desc="이동·공격 속도가 중첩된다",   tag="가속",
@@ -140,8 +156,15 @@ public static class CovenantPalette
     // 세이브에는 id 문자열만 남는다. 나중에 효과·원인의 이름을 바꾸거나 통합하면 옛 세이브의 id가
     // 어디에도 없는 이름이 되어 서약이 통째로 사라진다. 개명하는 그날 여기 한 줄("옛 id" → "새 id")만
     // 적으면 되도록 조회 경로에 미리 끼워 둔다. 지금은 개명한 적이 없어 비어 있는 게 정상이다.
+    //
+    // sanguine(흡정) → ward(결계): 흡정은 적에게 걸린 상태를 <b>빨아들여</b> 보호막으로 바꾸는 효과였다.
+    // 흡혈 계열을 통째로 걷어내기로 해 폐기하고, 같은 자리(방어)를 지키되 적에게서 무엇도 가져오지 않는
+    // 결계로 잇는다. 이미 「흡정」을 벼려 둔 런은 슬롯을 잃지 않고 결계로 해석된다.
     private static readonly Dictionary<string, string> _aliasCause  = new();
-    private static readonly Dictionary<string, string> _aliasEffect = new();
+    private static readonly Dictionary<string, string> _aliasEffect = new()
+    {
+        ["sanguine"] = "ward",
+    };
 
     private static readonly List<string> _causeIds  = new(_causes.Keys);
     private static readonly List<string> _effectIds =
@@ -168,6 +191,49 @@ public static class CovenantPalette
     public static bool IsSurvivalEffect(string id)
         => TryGetEffect(id, out var e) && e.axis == EffectAxis.Survival;
 
+    /// <summary>
+    /// "생존 카드 한 장 보장"을 실제로 채울 수 있는 효과인지 — 방어축이면서 <b>소모형이 아닌</b> 것.
+    /// 소모형 방어(정지)는 다른 서약이 감전을 걸어줘야만 방패가 된다. 그것으로 보장을 채우면
+    /// 부여형이 없는 판에서 "생존 카드는 있는데 아무것도 못 하는" 카드가 보장 자리에 앉는다.
+    /// </summary>
+    public static bool IsGuaranteedSurvivalEffect(string id)
+        => TryGetEffect(id, out var e) && e.axis == EffectAxis.Survival && e.role != StatusRole.Consume;
+
+    // ── 드래프트 페어링(C4) ───────────────────────────────
+    /// <summary>
+    /// 지금 뽑을 수 있는 효과 id들. <b>소모형은 그 통화를 걸어 줄 서약을 이미 가졌을 때만</b> 등장한다.
+    ///
+    /// 소모형 단독은 아무 일도 하지 않는다 — 먹을 게 없으면 발동조차 안 한다(Fire가 false를 돌려준다).
+    /// 첫 서약이 「기폭」이면 플레이어는 벼린 서약이 한 번도 터지지 않는 런을 그대로 보게 된다.
+    /// 그래서 첫 서약(보유 0)에는 부여형·중립형만 내보내고, 부여형을 쥔 뒤부터 그 통화를 먹는 카드를 푼다.
+    ///
+    /// 같은 <b>통화군</b>까지 본다(화상·출혈은 한 군 — 소모형이 둘을 가리지 않고 먹는다).
+    /// 화상만 가진 사람에게 감전 소모형(정지)을 내보내면 "부여형은 있는데 안 물리는" 카드가 되기 때문이다.
+    /// </summary>
+    public static IReadOnlyList<string> DraftableEffectIds(IReadOnlyList<CovenantBase> held)
+    {
+        var result = new List<string>(_effectIds.Count);
+        for (int i = 0; i < _effectIds.Count; i++)
+        {
+            var id = _effectIds[i];
+            if (!TryGetEffect(id, out var e)) continue;
+            if (e.role == StatusRole.Consume && !HasApplierFor(e.status, held)) continue;
+            result.Add(id);
+        }
+        return result;
+    }
+
+    /// <summary>보유 서약 중 같은 통화군을 <b>거는</b> 것이 하나라도 있는가.</summary>
+    private static bool HasApplierFor(StatusCurrency status, IReadOnlyList<CovenantBase> held)
+    {
+        if (held == null) return false;
+        for (int i = 0; i < held.Count; i++)
+            if (held[i] is AssembledCovenant a && a.Resolved && a.Role == StatusRole.Apply &&
+                EffectTaxonomy.SameFamily(status, a.Status))
+                return true;
+        return false;
+    }
+
     // ── 금지 조합 ─────────────────────────────────────────
     /// <summary>
     /// 벼릴 수 없는 원인×효과 짝. 카드 자체는 계속 뽑히되(원인·효과는 서로 독립으로 굴린다)
@@ -180,8 +246,8 @@ public static class CovenantPalette
     /// </summary>
     private static readonly HashSet<string> _bannedPairs = new()
     {
-        "heartbeat|aegis",
-        "march|aegis", "march|bloodmark", "march|execute",
+        "heartbeat|aegis", "heartbeat|ward",
+        "march|aegis", "march|bloodmark", "march|execute", "march|ward",
         "besiege|aegis",
         "hunt|execute", "slaughter|execute",
     };

@@ -27,9 +27,7 @@ public static class CovenantMath
     // 통째로 굶겨 그물이 아니라 독식이 된다. 커지는 쪽은 '먹은 것을 무엇으로 바꾸는가'(Effective)다.
     /// <summary>「기폭」이 먹는 화상·출혈 잔량 비율.</summary>
     public const float DetonateFraction = 0.60f;
-    /// <summary>「흡정」이 먹는 화상·출혈 잔량 비율.</summary>
-    public const float SanguineFraction = 0.40f;
-    /// <summary>「수확」이 먹는 화상·출혈 잔량 비율.</summary>
+    /// <summary>「수확」이 먹는 화상·출혈 잔량 비율. 체력은 건드리지 않는다 — 쿨감과 금으로만 환전된다.</summary>
     public const float HarvestFraction  = 0.30f;
     /// <summary>「수확」 1회 골드.</summary>
     public const int   HarvestGold      = 3;
@@ -58,6 +56,26 @@ public static class CovenantMath
     /// 상한이 없으면 임계가 1을 넘어 <b>체력과 무관하게</b> 즉사한다.
     /// </summary>
     public const float ExecuteThresholdCap = 0.60f;
+
+    // ── 감전 계열(C3) ────────────────────────────────────
+    /// <summary>「방전」 체인 변형(스킬 원인)이 방사형보다 더 잡는 대상 수.</summary>
+    public const int ArcflashChainBonus = 1;
+    /// <summary>「방전」 체인이 한 번에 건너뛸 수 있는 최대 거리(m). 방사형은 효과 radius를 그대로 쓴다.</summary>
+    public const float ArcflashChainHop = 4f;
+
+    /// <summary>「정지」 기절 지속 = 유효 수치 × 소모한 감전 스택. 그 절대 상한(초).</summary>
+    public const float StasisStunCap = 3.0f;
+    /// <summary>「정지」 보스 기절 지속 배수 — 페이즈·연출이 통째로 건너뛰어지지 않게 깎는다.</summary>
+    public const float StasisBossMult = 0.30f;
+
+    // ── 결계(비-흡혈 방어) ────────────────────────────────
+    /// <summary>「결계」 반경 내 상태가 걸린 적 1체당 추가 받피 감소.</summary>
+    public const float WardPerSteepedEnemy = 0.03f;
+    /// <summary>「결계」 받피 감소 절대 상한. 넘기면 방어가 아니라 무적이 된다.</summary>
+    public const float WardReductionCap = 0.45f;
+
+    /// <summary>「초신성」 반경 내 상태가 걸린 적 1체당 반경 증가(m) — B7. 상한은 <see cref="AoeRadiusCap"/>.</summary>
+    public const float SupernovaRadiusPerSteeped = 0.4f;
 
     /// <summary>원인 형상에 따른 「박차」 중첩 상한.</summary>
     public static int MomentumStackCap(CauseClass cls)

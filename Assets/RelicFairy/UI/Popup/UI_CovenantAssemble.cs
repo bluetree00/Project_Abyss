@@ -118,7 +118,9 @@ public class UI_CovenantAssemble : UI_Popup
         ApplyPanelSkin();
 
         _causes   = CovenantAssembleService.DraftCauses(DraftCount, _rng, _forceSilver);
-        _effects  = CovenantAssembleService.DraftEffects(DraftCount, _rng, _forceSilver);
+        // 보유 서약을 넘겨 페어링을 건다(C4) — 걸어 줄 서약이 없는데 먹는 서약만 손에 쥐면
+        // 벼린 서약이 한 번도 터지지 않는 런이 된다.
+        _effects  = CovenantAssembleService.DraftEffects(DraftCount, _rng, _forceSilver, HeldCovenants);
         _selCause = 0;
         _selEffect = 0;
 
@@ -392,8 +394,8 @@ public class UI_CovenantAssemble : UI_Popup
         }
         else
         {
-            // 효과는 방어축 보장을 리롤로 우회할 수 없다(axisLock) — 서비스가 판정한다.
-            rolled = CovenantAssembleService.RerollEffectCard(data, idx, _rng, _forceSilver);
+            // 효과는 방어축 보장·페어링을 리롤로 우회할 수 없다(axisLock + C4) — 서비스가 판정한다.
+            rolled = CovenantAssembleService.RerollEffectCard(data, idx, _rng, _forceSilver, HeldCovenants);
         }
         if (rolled == null) return;
 

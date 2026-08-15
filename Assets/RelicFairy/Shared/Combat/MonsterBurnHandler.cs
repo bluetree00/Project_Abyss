@@ -79,8 +79,14 @@ public sealed class MonsterBurnHandler : MonoBehaviour
         return burst;
     }
 
+    /// <summary>남은 화상의 피해 가치(dps × 잔여시간). 걷어내지 않는다 — 상태 통화의 '잔고'를 읽는 창구.</summary>
+    public static float ChargeOn(GameObject target)
+        => target != null && target.TryGetComponent<MonsterBurnHandler>(out var h)
+            ? h._dps * Mathf.Max(0f, h._remaining)
+            : 0f;
+
     /// <summary>
-    /// 화상 잔량의 fraction만큼을 <b>피해 없이</b> 걷어내고 그 가치를 반환한다(흡정·수확).
+    /// 화상 잔량의 fraction만큼을 <b>피해 없이</b> 걷어내고 그 가치를 반환한다(수확).
     /// 터뜨리기(Detonate)와 갈라 두는 이유: 빨아먹는 효과가 피해까지 넣으면 소모형이 사실상 딜 증가가 되어
     /// "무엇을 포기하고 무엇을 얻는가"가 사라진다.
     /// </summary>

@@ -844,6 +844,22 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>지금 '취약'(받피증폭)이 하나라도 걸려 있는지. 서약 「처형」이 상태 통화 종수를 셀 때 쓴다.</summary>
     public bool HasDamageTakenAmp => CurrentDamageTakenMult() > 1.0001f;
 
+    /// <summary>활성 받피증폭의 합(0.2 = 받는 피해 +20%). 서약 환전소가 '취약' 통화 잔고를 읽는다.</summary>
+    public float DamageTakenAmpTotal => CurrentDamageTakenMult() - 1f;
+
+    /// <summary>활성 받피증폭 중 가장 늦게 끝나는 슬롯의 남은 시간(초). 없으면 0.</summary>
+    public float DamageTakenAmpRemaining
+    {
+        get
+        {
+            if (_dmgTakenAmpSlots.Count == 0) return 0f;
+            float now = Time.time, best = 0f;
+            foreach (var kv in _dmgTakenAmpSlots)   // Dictionary struct enumerator — alloc 없음
+                if (kv.Value.expire > now) best = Mathf.Max(best, kv.Value.expire - now);
+            return best;
+        }
+    }
+
     /// <summary>현재 활성 받피증폭 디버프 합산 배율(1 + 만료되지 않은 슬롯들의 amp 합). 슬롯 없으면 1.</summary>
     private float CurrentDamageTakenMult()
     {

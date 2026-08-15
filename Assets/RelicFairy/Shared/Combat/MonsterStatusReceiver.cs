@@ -94,6 +94,24 @@ namespace RelicFairy.Monster
         public int GetSlowStacks(string id)
             => _slow.TryGetValue(id, out var s) && Time.time < s.until ? s.stacks : 0;
 
+        /// <summary>
+        /// 슬로우 중첩을 <b>전부 걷어내고 걷은 수를 반환</b>한다(서약 「정지」가 감전을 먹는 경로).
+        /// 부분 소모를 두지 않는 이유: 중첩은 정수라 "40%만 먹기"가 반올림에 따라 0이 되거나 1이 되어
+        /// 같은 발동이 판마다 다른 값을 낸다. 통화를 먹는 쪽은 "얼마나 쌓였는가"를 전부 받아 간다.
+        ///
+        /// <see cref="ConsumeDot"/>과 같은 이유로 딕셔너리에서 지우지 않는다 — 이 호출은 광역 피해·처치를
+        /// 물고 들어올 수 있고, 그때 <see cref="Tick"/>은 _slow를 순회 중이다. 빈 슬롯은 다음 Tick이 치운다.
+        /// </summary>
+        public int ConsumeSlow(string id)
+        {
+            if (string.IsNullOrEmpty(id) || !_slow.TryGetValue(id, out var s) || Time.time >= s.until) return 0;
+
+            int taken = s.stacks;
+            s.stacks = 0;
+            s.until  = 0f;
+            return taken;
+        }
+
         // ── 적별 내부 쿨다운(재빙결 방지 등) ───────────────
         public void SetCooldown(string id, float duration)
         {

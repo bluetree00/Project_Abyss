@@ -83,8 +83,12 @@ public readonly struct CovenantAssemblePreview
             EffectKind.Detonate   => causeTargeted
                 ? $"화상·출혈 {CovenantMath.DetonateFraction * 100f:0}% 기폭 · 파편 ×{effective:0.0} · 반경 {radius:0.0}"
                 : $"주변 전체 화상·출혈 {CovenantMath.DetonateFraction * 100f:0}% 분산 기폭 · 반경 {radius:0.0}",
-            EffectKind.Sanguine   => $"화상·출혈 {CovenantMath.SanguineFraction * 100f:0}% 흡수 → 보호막 ×{effective:0.0}",
             EffectKind.Harvest    => $"화상·출혈 {CovenantMath.HarvestFraction * 100f:0}% 수확 → 쿨감 {effective:0.0}초 · 골드 +{CovenantMath.HarvestGold}",
+            EffectKind.Arcflash   => causeClass == CauseClass.Skill
+                ? $"감전 1중첩 · 순차 체인 {effectiveCount + CovenantMath.ArcflashChainBonus + 1}체 (간격 {CovenantMath.ArcflashChainHop:0}m)"
+                : $"감전 1중첩 · 방사형 {effectiveCount + 1}체 · 반경 {radius:0.0}",
+            EffectKind.Stasis     => $"감전 전량 소모 → 반경 {radius:0.0} 기절 (1중첩당 {effective:0.00}초 · 최대 {CovenantMath.StasisStunCap:0.0}초)",
+            EffectKind.Ward       => $"받는 피해 -{effective * 100f:0}% · {duration:0}초 (상태 걸린 적 1체당 -{CovenantMath.WardPerSteepedEnemy * 100f:0}%p · 최대 -{CovenantMath.WardReductionCap * 100f:0}%)",
             _                     => $"{effective:0.0}",
         };
     }
