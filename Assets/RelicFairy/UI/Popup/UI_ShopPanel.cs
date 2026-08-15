@@ -304,6 +304,12 @@ public sealed class UI_ShopPanel : UI_Popup
             _cards.Add(BuildCard(w, i));
     }
 
+    /// <summary>
+    /// 상품 카드 1장. 내용 좌표는 <b>양피지의 쓸 수 있는 안쪽</b>에 맞춘다 —
+    /// 좌표는 <b>완성본 목업의 카드를 격자로 재서</b> 그대로 옮겼다(카드 179×171 기준):
+    ///   아이콘 72×99@(11,7) · 배지 43×17@(122,10) · 이름 y113 · 효과 y136 · 가격 y139 · 코인 20×22@(148,138).
+    /// 밝기 임계로 추정한 "쓸 수 있는 영역"보다 목업이 아래까지 쓰므로, 추정이 아니라 목업을 따른다.
+    /// </summary>
     private Card BuildCard(Transform parent, int index)
     {
         int captured = index;
@@ -318,21 +324,21 @@ public sealed class UI_ShopPanel : UI_Popup
 
         // 아이콘 칸 — 채움 + 테두리 2겹, 그 사이에 상품 아이콘.
         var fill = ShopUIStyle.MakeImage(bg.transform, "IconFill", new Color(0.05f, 0.05f, 0.07f, 1f));
-        PlaceIn(bg.transform, fill, 11f, 9f, 72f, 97f);
+        PlaceIn(bg.transform, fill, 11f, 7f, 72f, 99f);
         ShopUIStyle.Skin(fill, _skin?.iconFill, sliced: true);
 
         c.Icon = ShopUIStyle.MakeImage(bg.transform, "Icon", new Color(1f, 1f, 1f, 0f));
-        PlaceIn(bg.transform, c.Icon, 15f, 13f, 64f, 89f);
+        PlaceIn(bg.transform, c.Icon, 15f, 11f, 64f, 91f);
         c.Icon.preserveAspect = true;
 
         var frame = ShopUIStyle.MakeImage(bg.transform, "IconFrame", new Color(1f, 1f, 1f, 0f));
-        PlaceIn(bg.transform, frame, 11f, 9f, 72f, 97f);
+        PlaceIn(bg.transform, frame, 11f, 7f, 72f, 99f);
         frame.raycastTarget = false;
         ShopUIStyle.Skin(frame, _skin?.iconFrame, sliced: true);
 
         // 카테고리 배지 — 바탕(아트) + 글자(아트가 있으면 그 위 라벨은 끈다).
         c.BadgeBg = ShopUIStyle.MakeImage(bg.transform, "BadgeBg", CatColor[0]);
-        PlaceIn(bg.transform, c.BadgeBg, 121f, 9f, 44f, 19f);
+        PlaceIn(bg.transform, c.BadgeBg, 122f, 10f, 43f, 17f);
 
         c.BadgeGlyph = ShopUIStyle.MakeImage(c.BadgeBg.transform, "BadgeGlyph", new Color(1f, 1f, 1f, 0f));
         ShopUIStyle.Stretch(c.BadgeGlyph.rectTransform, 2f);
@@ -345,20 +351,21 @@ public sealed class UI_ShopPanel : UI_Popup
 
         c.Name = ShopUIStyle.MakeText(bg.transform, "Name", 15f, FontStyles.Bold,
                                       TextAlignmentOptions.TopLeft, new Color(0.18f, 0.12f, 0.06f, 1f));
-        PlaceIn(bg.transform, c.Name, 11f, 108f, 157f, 20f);
+        PlaceIn(bg.transform, c.Name, 11f, 112f, 157f, 20f);
         FitLine(c.Name);
 
         c.Effect = ShopUIStyle.MakeText(bg.transform, "Effect", 11.5f, FontStyles.Normal,
                                         TextAlignmentOptions.TopLeft, new Color(0.38f, 0.28f, 0.18f, 1f));
-        PlaceIn(bg.transform, c.Effect, 11f, 128f, 157f, 16f);
+        // 효과와 가격은 같은 높이에서 좌우로 갈린다 — 효과가 카드 폭을 다 먹으면 가격과 겹친다.
+        PlaceIn(bg.transform, c.Effect, 11f, 135f, 95f, 17f);
         FitLine(c.Effect);
 
         c.Price = ShopUIStyle.MakeText(bg.transform, "Price", 16f, FontStyles.Bold,
                                        TextAlignmentOptions.MidlineRight, new Color(0.25f, 0.17f, 0.08f, 1f));
-        PlaceIn(bg.transform, c.Price, 11f, 143f, 127f, 20f);
+        PlaceIn(bg.transform, c.Price, 11f, 139f, 134f, 20f);
 
         c.PriceCoin = ShopUIStyle.MakeImage(bg.transform, "PriceCoin", ShopUIStyle.Gold);
-        PlaceIn(bg.transform, c.PriceCoin, 143f, 145f, 17f, 17f);
+        PlaceIn(bg.transform, c.PriceCoin, 148f, 138f, 20f, 22f);
         c.PriceCoin.preserveAspect = true;
         ShopUIStyle.Skin(c.PriceCoin, _skin?.goldCoin);
 
@@ -408,12 +415,13 @@ public sealed class UI_ShopPanel : UI_Popup
 
         _selFlavor = ShopUIStyle.MakeText(s, "Flavor", 12f, FontStyles.Italic,
                                           TextAlignmentOptions.Top, new Color(0.42f, 0.32f, 0.22f, 1f));
-        PlaceIn(s, _selFlavor, 24f, 390f, 206f, 34f);
+        PlaceIn(s, _selFlavor, 24f, 372f, 206f, 34f);
         _selFlavor.textWrappingMode = TextWrappingModes.Normal;
 
         // 구매버튼 아트는 <b>빈 명판</b>이다 — 라벨을 반드시 그려야 글자가 생긴다.
         _buyBtn = MakeButton(s, "Buy", "사겠네", _skin?.buyButton, out _buyLabel);
-        PlaceIn(s, _buyBtn, 10f, 428f, 235f, 86f);
+        // 양피지의 쓸 수 있는 아래끝은 503이다 — 428+86=514면 버튼이 종이 밖으로 걸친다.
+        PlaceIn(s, _buyBtn, 10f, 412f, 235f, 86f);
         _buyLabel.fontSize = 20f;
         _buyLabel.color    = new Color(0.96f, 0.88f, 0.72f, 1f);
         _buyBtn.onClick.AddListener(OnBuyClicked);

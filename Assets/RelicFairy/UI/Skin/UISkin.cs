@@ -15,12 +15,18 @@ public static class UISkin
     private const string WeaponForgeAddress = "UI/WeaponForgeSkin";
     private const string CrucibleAddress    = "UI/CrucibleSkin";
     private const string ShopAddress        = "UI/ShopSkin";
+    private const string RelicInfoAddress   = "UI/RelicInfoSkin";
+    private const string DialogueAddress    = "UI/DialogueSkin";
+    private const string CovenantAddress    = "UI/CovenantSkin";
 
     private static RefinerySkinSO    _refinery;
     private static RuneSelectSkinSO  _runeSelect;
     private static WeaponForgeSkinSO _weaponForge;
     private static CrucibleSkinSO    _crucible;
     private static ShopSkinSO        _shop;
+    private static RelicInfoSkinSO   _relicInfo;
+    private static DialogueSkinSO    _dialogue;
+    private static CovenantSkinSO    _covenant;
     private static bool _tried;
 
     /// <summary>정제소 스킨. 미로드/미등록이면 null → 코드로 그린 색 박스가 그대로 보인다.</summary>
@@ -38,6 +44,15 @@ public static class UISkin
     /// <summary>상점(심연의 행상) 스킨. 미로드/미등록이면 null → 색 폴백.</summary>
     public static ShopSkinSO Shop => _shop;
 
+    /// <summary>유물 선택 팝업 스킨. 미로드/미등록이면 null → 색 폴백.</summary>
+    public static RelicInfoSkinSO RelicInfo => _relicInfo;
+
+    /// <summary>대화 팝업 스킨. 미로드/미등록이면 null → 프리팹 기존 모습 유지.</summary>
+    public static DialogueSkinSO Dialogue => _dialogue;
+
+    /// <summary>서약 조립 팝업 스킨. 미로드/미등록이면 null → 프리팹 구 아트 유지.</summary>
+    public static CovenantSkinSO Covenant => _covenant;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
@@ -46,6 +61,9 @@ public static class UISkin
         _weaponForge = null;
         _crucible    = null;
         _shop        = null;
+        _relicInfo   = null;
+        _dialogue    = null;
+        _covenant    = null;
         _tried       = false;
     }
 
@@ -60,6 +78,9 @@ public static class UISkin
         _weaponForge = await LoadOrNull<WeaponForgeSkinSO>(WeaponForgeAddress, "무기 선택");
         _crucible    = await LoadOrNull<CrucibleSkinSO>(CrucibleAddress, "재련소");
         _shop        = await LoadOrNull<ShopSkinSO>(ShopAddress, "상점");
+        _relicInfo   = await LoadOrNull<RelicInfoSkinSO>(RelicInfoAddress, "유물 선택");
+        _dialogue    = await LoadOrNull<DialogueSkinSO>(DialogueAddress, "대화창");
+        _covenant    = await LoadOrNull<CovenantSkinSO>(CovenantAddress, "서약");
     }
 
     private static async UniTask<T> LoadOrNull<T>(string address, string label) where T : Object

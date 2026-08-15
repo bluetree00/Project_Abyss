@@ -27,8 +27,13 @@ public class UI_RelicInfoPopup : UI_Popup
     private const float PanelWidth     = 1280f;
     private const float PortraitWidth  = 340f;
     // 일러 칸이 오른쪽 정보 열보다 훨씬 길면 Q카드 아래에 죽은 공간이 남는다 → 비슷하게 맞춘다.
-    private const float PortraitHeight = 400f;
+    // 목업의 액자는 230×297(세로/가로 1.29)이고 초상화 아트도 697:907(=1.29)로 같다.
+    // 폭 340에 맞추면 세로는 440이 되어야 액자가 안 찌그러진다.
+    // ※ 예전에 "패널이 너무 길다"고 330으로 줄인 적이 있는데, 그건 액자 비율을 깨서
+    //    오차를 키운 잘못된 처방이었다. 실제로 440이면 내용 총 높이가 프레임 아트 비율에도 더 가깝다.
+    private const float PortraitHeight = 440f;
     private const float AccentBar      = 4f;
+    private const float ButtonRowHeight = 62f;
     private const float StatLabelWidth = 132f;  // 수치 표의 라벨 열 폭(고정해야 값이 세로로 정렬된다)
 
     private static readonly Color PanelBg   = new(0.07f, 0.06f, 0.10f, 0.97f);
@@ -73,6 +78,7 @@ public class UI_RelicInfoPopup : UI_Popup
     private RectTransform _passiveZone;   // 상시 능력 — 패널 하단, 가로 2열
 
     // 테마색으로 다시 칠할 요소들(유물마다 톤이 다르다). Init에서 만들고 Bind에서 재도색.
+    private RelicInfoSkinSO _skin;
     private Outline _panelOutline;
     private Image   _confirmBg;
     private Outline _confirmLine;
@@ -136,7 +142,8 @@ public class UI_RelicInfoPopup : UI_Popup
         if (_title != null)        _title.color = theme;
         if (_panelOutline != null) _panelOutline.effectColor = theme;
 
-        if (_confirmBg != null)
+        // 아트 버튼은 톤을 곱하지 않는다 — 회색 금속 명판이 유물 색으로 물들어버린다.
+        if (_confirmBg != null && _skin?.selectButton == null)
         {
             // 버튼 배경은 톤을 어둡게 깐 색(글자와 대비). 톤을 0.28배 정도로 눌러 쓴다.
             _confirmBg.color = new Color(theme.r * 0.32f, theme.g * 0.28f, theme.b * 0.14f, 1f);
@@ -181,6 +188,10 @@ public class UI_RelicInfoPopup : UI_Popup
             if (string.IsNullOrWhiteSpace(tags[i])) continue;
 
             var chip = NewImage("Tag", _tagRow, ChipBg);
+            // 칩 폭은 글자 길이에 따라 변한다 — 9-slice로 늘리고, 아트는 자식으로 깐다.
+            // (칩은 ContentSizeFitter로 글자 폭을 재는데, 스프라이트를 직접 넣으면
+            //  아트 원본 폭 222px가 preferredWidth로 보고돼 칩이 전부 같은 크기로 뚱뚱해진다.)
+            AddBackdrop(chip, _skin?.tagChip, sliced: true);
 
             // 칩은 글자 폭만큼만 오그라들어야 한다. 안 그러면 균등 분할돼 거대한 '버튼'처럼 보이고,
             // 누를 수 있는 것으로 오인된다(affordance 오류).
@@ -245,11 +256,19 @@ public class UI_RelicInfoPopup : UI_Popup
 
         var card = NewImage("Card", parent, hero ? HeroCardBg : CardBg);
 
-        if (hero)   // 금테 — 이 카드가 이 유물의 정체성임을 한눈에
+        // 아트가 있으면 색 박스 대신 그것을 쓴다. 고유(스킬)는 큰 강조 칸, 상시는 하단 2열 칸.
+        var cardArt = hero ? _skin?.uniqueCard : _skin?.PassivePlate(parent.childCount - 1);
+        AddBackdrop(card, cardArt, sliced: true);
+
+        if (hero)
         {
-            var line = card.gameObject.AddComponent<Outline>();
-            line.effectColor    = new Color(accent.r, accent.g, accent.b, 0.55f);
-            line.effectDistance = new Vector2(1.5f, -1.5f);
+            // 금테 — 아트가 없을 때만. 아트엔 이미 테두리가 있어 겹치면 이중선이 된다.
+            if (cardArt == null)
+            {
+                var line = card.gameObject.AddComponent<Outline>();
+                line.effectColor    = new Color(accent.r, accent.g, accent.b, 0.55f);
+                line.effectDistance = new Vector2(1.5f, -1.5f);
+            }
         }
         else        // 상시 능력은 2열로 나란히 — 폭을 균등 분할한다
         {
@@ -450,15 +469,30 @@ public class UI_RelicInfoPopup : UI_Popup
         Stretch(dim.rectTransform);
         dim.raycastTarget = true;
 
-        var panel = NewImage("Panel", root, PanelBg);
+        _skin = UISkin.RelicInfo;
+
+        var panel = NewImage("Panel", root, _skin?.panelFrame != null ? Color.white : PanelBg);
         var prt = panel.rectTransform;
         prt.anchorMin = prt.anchorMax = new Vector2(0.5f, 0.5f);
         prt.pivot     = new Vector2(0.5f, 0.5f);
         prt.sizeDelta = new Vector2(PanelWidth, 300f);
 
-        _panelOutline = panel.gameObject.AddComponent<Outline>();
-        _panelOutline.effectColor    = PanelLine;
-        _panelOutline.effectDistance = new Vector2(2f, -2f);
+        // 아트에 테두리가 이미 그려져 있으면 Outline을 아예 붙이지 않는다 — 이중선이 되고,
+        // _panelOutline이 null이면 ApplyTheme의 유물 톤 덧칠도 자동으로 건너뛴다.
+        if (_skin?.panelFrame != null)
+        {
+            // 프레임 아트 중앙 알파가 70%라 그것만 깔면 게임 월드가 그대로 비쳐 글자가 안 읽힌다.
+            // 불투명 바닥판을 뒤에 깔고 그 위에 프레임을 올린다(둘 다 레이아웃 밖 자식).
+            // 순서 주의: 둘 다 SetAsFirstSibling이라 <b>나중에 넣은 쪽이 뒤로</b> 간다.
+            AddBackdrop(panel, _skin.panelFrame, sliced: false);
+            AddSolidFill(panel, PanelBg);
+        }
+        else
+        {
+            _panelOutline = panel.gameObject.AddComponent<Outline>();
+            _panelOutline.effectColor    = PanelLine;
+            _panelOutline.effectDistance = new Vector2(2f, -2f);
+        }
 
         var v = panel.gameObject.AddComponent<VerticalLayoutGroup>();
         v.padding = new RectOffset(38, 38, 32, 30);
@@ -565,6 +599,15 @@ public class UI_RelicInfoPopup : UI_Popup
                                       new Color(TitleColor.r, TitleColor.g, TitleColor.b, 0.30f),
                                       FontStyles.Bold, TextAlignmentOptions.Center);
         Stretch(_placeholderInitial.rectTransform);
+
+        // 액자는 일러스트·플레이스홀더 위로 지나가야 한다(마지막 자식).
+        if (_skin?.portraitFrame != null)
+        {
+            var frame = NewImage("Frame", box, Color.white);
+            Stretch(frame.rectTransform);
+            frame.raycastTarget = false;
+            ShopUIStyle.Skin(frame, _skin.portraitFrame);
+        }
     }
 
     private void BuildInfoColumn(RectTransform parent)
@@ -615,37 +658,111 @@ public class UI_RelicInfoPopup : UI_Popup
     private void BuildButtons(RectTransform parent)
     {
         var row = NewRect("Buttons", parent);
-        row.gameObject.AddComponent<LayoutElement>().preferredHeight = 62f;
+        row.gameObject.AddComponent<LayoutElement>().preferredHeight = ButtonRowHeight;
 
         var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
         h.spacing = 14f;
-        h.childControlWidth = true;  h.childForceExpandWidth  = true;
+        h.childAlignment = TextAnchor.MiddleCenter;
+        // 아트 버튼은 "선택"·"취소" 글자가 구워져 있다 — 폭을 강제로 늘리면 글자가 2.4배 가로로
+        // 늘어나 뭉개진다(패널 폭 1204를 반씩 나눠 595×62가 되던 문제). 아트 비율대로 고정한다.
+        bool artButtons = _skin?.selectButton != null || _skin?.cancelButton != null;
+        h.childControlWidth = true;  h.childForceExpandWidth  = !artButtons;
         h.childControlHeight = true; h.childForceExpandHeight = true;
 
         // 확정 버튼은 참조를 잡아 둔다 — ApplyTheme가 유물 톤으로 다시 칠한다.
         MakeButton(row, "선택", new Color(0.34f, 0.27f, 0.10f, 1f), TitleColor, Confirm,
-                   out _confirmBg, out _confirmLine, out _confirmLabel);
+                   _skin?.selectButton, out _confirmBg, out _confirmLine, out _confirmLabel);
         MakeButton(row, "취소", new Color(0.16f, 0.16f, 0.19f, 1f), BodyColor,  Cancel,
-                   out _, out _, out _);
+                   _skin?.cancelButton, out _, out _, out _);
     }
 
+    /// <summary>
+    /// 아트가 있으면 색·테두리·라벨을 모두 아트에 넘긴다 — 납품본 버튼에는 "선택"·"취소" 글자가
+    /// 이미 구워져 있어, 코드 라벨을 남기면 글자가 두 벌로 겹쳐 읽힌다.
+    /// </summary>
     private void MakeButton(RectTransform parent, string label, Color bg, Color fg, Action onClick,
-                            out Image bgImg, out Outline outline, out TMP_Text labelText)
+                            Sprite art, out Image bgImg, out Outline outline, out TMP_Text labelText)
     {
-        var img = NewImage("Btn_" + label, parent, bg);
+        var img = NewImage("Btn_" + label, parent, art != null ? Color.white : bg);
         var btn = img.gameObject.AddComponent<Button>();
         btn.targetGraphic = img;
         btn.onClick.AddListener(() => onClick());
 
-        var line = img.gameObject.AddComponent<Outline>();
-        line.effectColor    = new Color(fg.r, fg.g, fg.b, 0.5f);
-        line.effectDistance = new Vector2(1.5f, -1.5f);
+        Outline line = null;
+        if (art != null)
+        {
+            // 버튼도 자식으로 깐다 — 아트 원본(466×117)이 행 높이 62를 밀어내 버튼이 뚱뚱해진다.
+            AddBackdrop(img, art, sliced: false);
+
+            // 아트 비율(466:117)대로 폭을 못 박는다. 안 그러면 행이 폭을 반씩 나눠줘 가로로 늘어난다.
+            var le = img.gameObject.GetComponent<LayoutElement>() ?? img.gameObject.AddComponent<LayoutElement>();
+            float w = ButtonRowHeight * (art.rect.width / Mathf.Max(1f, art.rect.height));
+            le.preferredWidth = w;
+            le.minWidth       = w;
+            le.flexibleWidth  = 0f;
+        }
+        else
+        {
+            line = img.gameObject.AddComponent<Outline>();
+            line.effectColor    = new Color(fg.r, fg.g, fg.b, 0.5f);
+            line.effectDistance = new Vector2(1.5f, -1.5f);
+        }
 
         var t = NewText("Label", img.rectTransform, 25f, fg, FontStyles.Bold, TextAlignmentOptions.Center);
         t.text = label;
         Stretch(t.rectTransform);
+        if (art != null) t.gameObject.SetActive(false);
 
         bgImg = img; outline = line; labelText = t;
+    }
+
+    /// <summary>레이아웃에 영향을 주지 않는 불투명 바닥판. 프레임 아트가 반투명일 때 뒤를 막는다.</summary>
+    private static void AddSolidFill(Image host, Color color)
+    {
+        if (host == null) return;
+
+        var go = new GameObject("Fill", typeof(RectTransform), typeof(CanvasRenderer));
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(host.rectTransform, false);
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+        go.AddComponent<LayoutElement>().ignoreLayout = true;
+
+        var img = go.AddComponent<Image>();
+        img.color         = color;
+        img.raycastTarget = false;
+        rt.SetAsFirstSibling();
+    }
+
+    /// <summary>
+    /// 아트를 <b>자식으로</b> 깐다. 절대 대상 오브젝트의 Image에 직접 넣지 말 것 —
+    /// <see cref="Image"/>는 <c>ILayoutElement</c>라 스프라이트 <b>원본 픽셀 크기</b>를 preferredSize로
+    /// 보고한다. 레이아웃 그룹/ContentSizeFitter가 그 값을 채택하면 칸이 아트 해상도만큼 부푼다
+    /// (패널이 1728px 높이로, 상시 카드가 1128px 폭으로 터졌던 원인).
+    /// 자식 + <c>ignoreLayout</c>이면 크기 계산에서 완전히 빠진다.
+    /// </summary>
+    private static void AddBackdrop(Image host, Sprite art, bool sliced)
+    {
+        if (host == null || art == null) return;
+
+        host.color = new Color(1f, 1f, 1f, 0f);   // 색 폴백은 감춘다 — 아트가 그 자리를 대신한다
+
+        var go = new GameObject("Bg", typeof(RectTransform), typeof(CanvasRenderer));
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(host.rectTransform, false);
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+        go.AddComponent<LayoutElement>().ignoreLayout = true;
+
+        var img = go.AddComponent<Image>();
+        img.sprite        = art;
+        img.type          = sliced ? Image.Type.Sliced : Image.Type.Simple;
+        img.raycastTarget = false;
+        rt.SetAsFirstSibling();   // 내용보다 뒤에 깔린다
     }
 
     // ── 생성 헬퍼 ─────────────────────────────────────────────

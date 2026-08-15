@@ -24,20 +24,24 @@ public class UI_RangedForgePopup : UI_Popup
     // 아트가 있으면 패널은 bg.png 비율(1289:1338 = 0.9634)을 지켜야 테두리와 상·하단 문장이 찌그러지지 않는다.
     // 높이는 "내용이 필요로 하는 세로(≈590) + 아트 프레임 여백(위 72 / 아래 52)"로 잡았다 —
     // 목업 비율만 따르면 프레임 여백만큼 내용이 눌려 이름·스탯이 겹친다(FixHeight 주석 참고).
-    private const float SkinPanelWidth  = 688f;
-    private const float SkinPanelHeight = 714f;
+    // 크기는 완성본 목업(전체 샷.png)을 재서 환산했다 — bg 실측 890×924, 패널 747 → 배율 0.826.
+    // 세로 예산: 카드 내용(홀더198+이름34+배지20+태그22+스탯104+간격40+여백12 = 430)
+    //          + 제목38 + 부제20 + 도트16 + 구분장식37 + 버튼45 + 행간격60 + 프레임여백(77+52) = 775.
+    // 모자라면 카드 하단(스탯)이 도트·구분장식 위로 흘러넘친다.
+    private const float SkinPanelWidth  = 747f;
+    private const float SkinPanelHeight = 775f;
     private const float PanelWidth  = 620f;
     private const float PanelHeight = 640f;   // 카드 내용(아이콘+4줄 스탯)이 눌리지 않을 최소치
     private const float SlideTime   = 0.18f;
 
     // 아이콘 홀더 — 채움(356) 기준. 테두리·외곽선은 원본 비율대로 조금씩 크다.
-    private const float HolderSize        = 184f;
+    private const float HolderSize        = 198f;   // 목업 240 × 환산 0.826
     private const float HolderFrameScale  = 359f / 356f;
     private const float HolderOutlineScale = 373f / 356f;
 
-    private const float ArrowW = 42f, ArrowH = 102f;   // 좌/우측 버튼 84×204
+    private const float ArrowW = 45f, ArrowH = 110f;   // 목업 55×133 × 환산 0.826
     private const float DividerW = 280f, DividerH = 37f;
-    private const float EquipW = 160f, EquipH = 52f;   // 장착버튼 254×84
+    private const float EquipW = 137f, EquipH = 45f;   // 목업 166×55 × 환산 0.826 — 예전 160×52는 17% 컸다
 
     private static readonly Color PanelBg   = new(0.07f, 0.06f, 0.10f, 0.97f);
     private static readonly Color PanelLine = new(0.55f, 0.72f, 0.95f, 1f);
@@ -260,9 +264,21 @@ public class UI_RangedForgePopup : UI_Popup
 
     private void Confirm()
     {
-        if (_index < 0 || _index >= _entries.Count) return;
+        if (_index < 0 || _index >= _entries.Count)
+        {
+            Debug.LogWarning($"[RangedForge] 장착 불가 — 표시 중인 후보가 없다(index={_index}, 후보 {_entries.Count}개).");
+            return;
+        }
+
         var e = _entries[_index];
-        if (e.Locked) return;
+        // 잠금 무기(석궁=특전)는 버튼 자체가 비활성이라 여기까지 오지 않는 게 정상이다.
+        // 그래도 '눌리지 않는다'는 신고가 오면 원인이 잠금인지 아닌지 바로 갈리도록 남긴다.
+        if (e.Locked)
+        {
+            Debug.LogWarning($"[RangedForge] 장착 불가 — '{e.Weapon?.displayName}'는 잠금({e.LockReason}). 좌우로 넘겨 해금된 무기를 고를 것.");
+            return;
+        }
+
         Complete(e.Weapon);
     }
 
@@ -303,7 +319,7 @@ public class UI_RangedForgePopup : UI_Popup
 
         var v = panel.gameObject.AddComponent<VerticalLayoutGroup>();
         // 아트 여백은 bg.png의 프레임 안쪽 비율(위 0.100 / 아래 0.067 / 좌우 얇은 금선)에서 뽑았다.
-        v.padding = skinned ? new RectOffset(30, 30, 72, 52) : new RectOffset(28, 28, 24, 22);
+        v.padding = skinned ? new RectOffset(30, 30, 77, 52) : new RectOffset(28, 28, 24, 22);
         v.spacing = 12f;
         v.childControlWidth = true;  v.childForceExpandWidth  = true;
         v.childControlHeight = true; v.childForceExpandHeight = false;
@@ -444,6 +460,9 @@ public class UI_RangedForgePopup : UI_Popup
         if (hasHolder) ShopUIStyle.Stretch(_icon.rectTransform, 22f);
         else           Stretch(_icon.rectTransform);
         _icon.preserveAspect = true;
+        // 카드는 표시 전용이다 — 누를 수 있는 건 좌우 화살표와 하단 버튼뿐.
+        // 레이캐스트를 켜두면 카드가 조금만 넘쳐도 그 아래 버튼을 덮어 '안 눌리는' 상태가 된다.
+        _icon.raycastTarget = false;
 
         // 테두리·외곽선은 아이콘 위로 지나가야 액자가 된다(원본 비율대로 조금씩 크다).
         // 채움이 없으면 칸 크기가 홀더 기준이 아니라서 겹쳐봐야 어긋난다 — 세트로만 얹는다.

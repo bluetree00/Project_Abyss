@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: RefinerySkin
   m_EditorClassIdentifier:
   windowFrame: {fileID: 21300000, guid: e2f62482bd5cc04438fc39212cb8e625, type: 3}
-  titleBar: {fileID: 21300000, guid: bc3bc3e9ed82aee4ea9a0925955b75fc, type: 3}
+  titleBar: {fileID: 21300000, guid: 73d723e709bb1214fa2466a49d9f7b9d, type: 3}
   oreIcon: {fileID: 0}
   altarBackground: {fileID: 21300000, guid: e2f62482bd5cc04438fc39212cb8e625, type: 3}
   nodeBase:
@@ -22,14 +22,14 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   nodeGlyph:
-  - {fileID: 21300000, guid: 4d583ed53be1c4d4f975c764ba1f3bb7, type: 3}
-  - {fileID: 21300000, guid: 559858266b2de06419e1034f400eb41c, type: 3}
-  - {fileID: 21300000, guid: a56c7bc91aaf09d4e86bc4d9e7df8d9c, type: 3}
-  - {fileID: 21300000, guid: fa86e8a7e357cfa4295a51fb424fe1e5, type: 3}
-  - {fileID: 21300000, guid: e4d070aea52be56458c20343a7d0c1b2, type: 3}
-  - {fileID: 21300000, guid: cdf767890338d08468d584757b361e13, type: 3}
-  slotFrame: {fileID: 21300000, guid: a01a1b223520b9a4e86dc029c80318ea, type: 3}
-  altarCore: {fileID: 21300000, guid: 67f4504862633824b9482408bd243f93, type: 3}
+  - {fileID: 21300000, guid: d17e52e89f89ea6498a08b473cc15dc9, type: 3}
+  - {fileID: 21300000, guid: f155a1a089643b44dbbfe4d9e99d58fc, type: 3}
+  - {fileID: 21300000, guid: c5fd54a09f0ea534f9e19f2ebce48f5f, type: 3}
+  - {fileID: 21300000, guid: d10aee55f0fb68949a54511a32595273, type: 3}
+  - {fileID: 21300000, guid: 58ab3b918d4ec884fbb45c3742ebb66d, type: 3}
+  - {fileID: 21300000, guid: 7210cf0004db1454d972b8380d0d1856, type: 3}
+  slotFrame: {fileID: 21300000, guid: ad76e24e909e40f499983a70cd015932, type: 3}
+  altarCore: {fileID: 0}
   gradeBorder:
   - {fileID: 0}
   - {fileID: 0}
@@ -40,7 +40,7 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
-  feverTrack: {fileID: 21300000, guid: 955c9c47f8c6b974999daaa14b5cd0f5, type: 3}
+  feverTrack: {fileID: 21300000, guid: ea829299bc8ec4d40a662ee86436b686, type: 3}
   feverCell:
   - {fileID: 21300000, guid: e0dba11820aeffc4b848c5d6a67870b4, type: 3}
   - {fileID: 21300000, guid: aa0d4cbad5fb8d64288978aeedc51f4e, type: 3}
@@ -51,7 +51,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 4b9bf5055164e8c408752c2104b9a5db, type: 3}
   - {fileID: 21300000, guid: fcb5f671c1577a64abc1667f46db59f3, type: 3}
   barTrack: {fileID: 21300000, guid: 8e075da0701c4ba45b5a339bcf2b31bc, type: 3}
-  oddsPanel: {fileID: 21300000, guid: 7efec974caffb3e4090c1c9609c117dc, type: 3}
+  oddsPanel: {fileID: 21300000, guid: ea829299bc8ec4d40a662ee86436b686, type: 3}
   barFrame: {fileID: 21300000, guid: 33c437d87ba102f4da5160e453e4e074, type: 3}
   barFill:
   - {fileID: 21300000, guid: 22649799b53120748b28f9c50b43ee60, type: 3}
@@ -68,20 +68,20 @@ MonoBehaviour:
   - {fileID: 0}
   reservedBadge: {fileID: 0}
   costPlate:
-  - {fileID: 21300000, guid: 9e05086e7fd811e4697852607a87e3df, type: 3}
+  - {fileID: 21300000, guid: b099c055f8d71ac40adcada975f14dd9, type: 3}
   - {fileID: 0}
   - {fileID: 0}
   spinButton:
-  - {fileID: 21300000, guid: 4ca753fc7c624a446be9b98cfe327fe7, type: 3}
+  - {fileID: 21300000, guid: 04dc98dfe45152a4bbad05c1e4743c34, type: 3}
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
   reforgeButton:
-  - {fileID: 21300000, guid: bc0ebf990bb58f041ae3e59465197482, type: 3}
+  - {fileID: 21300000, guid: b099c055f8d71ac40adcada975f14dd9, type: 3}
   - {fileID: 0}
   - {fileID: 0}
   perkBadge:
-  - {fileID: 21300000, guid: 09703447bc8f30442b74a8a6aed71bb8, type: 3}
+  - {fileID: 21300000, guid: b099c055f8d71ac40adcada975f14dd9, type: 3}
   - {fileID: 0}
   - {fileID: 0}
   condenseRare: []

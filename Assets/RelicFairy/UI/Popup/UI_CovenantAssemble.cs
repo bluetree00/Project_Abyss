@@ -58,6 +58,10 @@ public class UI_CovenantAssemble : UI_Popup
     [SerializeField] private Image _prismBorder;    // 프리즘 테두리@2x
     [SerializeField] private Sprite _panelBgSprite, _panelBorderSprite, _prismBgSprite, _prismBorderSprite;
 
+    [Header("열 머리표 — 개편본 아트(원인/결과/효과) 대상")]
+    [SerializeField] private Image    _causeHeaderChip,  _resultHeaderChip,  _effectHeaderChip;
+    [SerializeField] private TMP_Text _causeHeaderText,  _resultHeaderText,  _effectHeaderText;
+
     [Header("연결선 — 선택 카드 → 중앙 결과 카드")]
     [SerializeField] private RectTransform _connectorLeft;   // 선택된 원인 카드 → 프리즘 좌측
     [SerializeField] private RectTransform _connectorRight;  // 선택된 효과 카드 → 프리즘 우측
@@ -156,6 +160,7 @@ public class UI_CovenantAssemble : UI_Popup
     private void BindCard(UI_AssembleCard card, CovenantDraftCard d, bool isCause)
     {
         card.SetSkin(_silverFrame, _goldFrame, _rubyFrame, _cardBgSprite);   // 등급 아트 주입(Bind 전)
+        card.SetGradeSkin(UISkin.Covenant);   // 개편본(조각 조립 테두리 + 양피지 카드) — 없으면 위 구 아트 유지
         if (isCause && CovenantPalette.TryGetCause(d.id, out var c))
             card.Bind(c.name, c.desc, d.tier, TierColor(d.tier));
         else if (!isCause && CovenantPalette.TryGetEffect(d.id, out var e))
@@ -169,6 +174,85 @@ public class UI_CovenantAssemble : UI_Popup
         SkinImage(_panelBorder, _panelBorderSprite);
         SkinImage(_prismBg,     _prismBgSprite);
         SkinImage(_prismBorder, _prismBorderSprite);
+
+        // 개편본 스킨이 있으면 프리팹에 꽂힌 구 아트를 덮어쓴다.
+        // 양피지 배경은 자체 테두리(말린 양끝)를 갖고 있어, 코드가 그리던 별도 테두리 판은 지운다.
+        var skin = UISkin.Covenant;
+        if (skin == null) return;
+
+        if (skin.panelBg != null)
+        {
+            SkinImage(_panelBg, skin.panelBg);
+            if (_panelBorder != null) _panelBorder.enabled = false;
+        }
+        if (skin.resultScroll != null)
+        {
+            SkinImage(_prismBg, skin.resultScroll);
+            if (_prismBorder != null) _prismBorder.enabled = false;
+        }
+
+        ApplyHeaderChips(skin);
+        ApplyMockupLayout();
+    }
+
+    // ── 완성본 목업(서약 풀샷.png 1306×948) 실측 비율 ──────────
+    // 프리팹은 구 아트 기준(Book 1600×840, 비율 1.905)으로 authoring돼 있어
+    // 양피지 아트(1292:919 = 1.406) 위에 얹으면 카드가 1.5배 크고 좌상으로 치우친다.
+    // 프리팹을 수술하는 대신 런타임에 비율로 다시 앉힌다 — 되돌리기 쉽고 재납품에도 강하다.
+    private const float BookAspect  = 1.406f;
+    private const float BookHeight  = 946f;
+    private const float CardXCause  = 0.1631f, CardXEffect = 0.6623f;
+    private const float CardW       = 0.1792f, CardH       = 0.1213f;
+    private const float CardY0      = 0.3586f, CardStep    = 0.1440f;
+    private const float PrismX      = 0.3599f, PrismW      = 0.2833f;
+    private const float PrismY      = 0.3534f, PrismH      = 0.4430f;
+
+    /// <summary>목업 비율대로 판과 카드·두루마리를 다시 앉힌다.</summary>
+    private void ApplyMockupLayout()
+    {
+        var book = _panelBg != null ? _panelBg.rectTransform : null;
+        if (book == null) return;
+
+        book.sizeDelta = new Vector2(BookHeight * BookAspect, BookHeight);
+
+        for (int i = 0; i < 3; i++)
+        {
+            PlaceByFraction(Card(_causeCards, i),  CardXCause,  CardY0 + CardStep * i, CardW, CardH);
+            PlaceByFraction(Card(_effectCards, i), CardXEffect, CardY0 + CardStep * i, CardW, CardH);
+        }
+        if (_prismBg != null)
+            PlaceByFraction(_prismBg.rectTransform, PrismX, PrismY, PrismW, PrismH);
+    }
+
+    private static RectTransform Card(UI_AssembleCard[] arr, int i)
+        => (arr != null && i < arr.Length && arr[i] != null) ? (RectTransform)arr[i].transform : null;
+
+    /// <summary>부모(Book) 대비 비율로 배치. 좌상단 기준 — 목업을 그대로 옮기기 위해.</summary>
+    private static void PlaceByFraction(RectTransform rt, float x, float y, float w, float h)
+    {
+        if (rt == null) return;
+        rt.anchorMin = new Vector2(x, 1f - (y + h));
+        rt.anchorMax = new Vector2(x + w, 1f - y);
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+        rt.anchoredPosition = Vector2.zero;
+    }
+
+    /// <summary>열 머리표(원인·결과·효과) 교체. 아트에 글자가 구워져 있어 코드 라벨은 끈다.</summary>
+    private void ApplyHeaderChips(CovenantSkinSO skin)
+    {
+        SkinHeader(_causeHeaderChip,  _causeHeaderText,  skin.headerCause);
+        SkinHeader(_resultHeaderChip, _resultHeaderText, skin.headerResult);
+        SkinHeader(_effectHeaderChip, _effectHeaderText, skin.headerEffect);
+    }
+
+    private static void SkinHeader(Image chip, TMP_Text label, Sprite art)
+    {
+        if (chip == null || art == null) return;
+        chip.sprite = art;
+        chip.type   = Image.Type.Simple;   // 글자가 구워져 있어 9-slice로 늘리면 깨진다
+        chip.color  = Color.white;
+        if (label != null) label.gameObject.SetActive(false);
     }
 
     private static void SkinImage(Image img, Sprite sprite)

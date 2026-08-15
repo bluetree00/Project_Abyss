@@ -38,6 +38,15 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
     // ── Private ──────────────────────────────────────────
     // 등급 테두리 아트 — 팝업(UI_CovenantAssemble)이 SetSkin으로 주입.
     private Sprite _silverFrame, _goldFrame, _rubyFrame;
+
+    // 개편본 등급 테두리 — 조각 조립식(위·아래 장식바 2 + 모서리 4).
+    private const float GradeBarW    = 150f;   // 골드.png 186×52 원본 비율
+    private const float GradeBarH    = 42f;
+    private const float GradeCornerW = 34f;    // 골드 테두리.png 53×88
+    private const float GradeCornerH = 56f;
+    private CovenantSkinSO _gradeSkin;
+    private Image[]        _gradePieces;
+
     private Color  _gradeColor = Color.white;
     private bool   _selected, _hover;
     private CancellationTokenSource _tweenCts;
@@ -71,6 +80,106 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
         }
     }
 
+    /// <summary>
+    /// 개편본 스킨 주입. 등급 테두리가 <b>조각 조립식</b>(위·아래 가로 장식바 + 네 귀퉁이 모서리)이라
+    /// 한 장짜리 <see cref="_tierFrame"/>으로는 표현할 수 없어, 조각 6개를 카드에 깔고 등급마다 갈아끼운다.
+    /// 카드 바탕은 선택 여부로 밝은 양피지 ↔ 어두운 판이 교체된다.
+    /// </summary>
+    public void SetGradeSkin(CovenantSkinSO skin)
+    {
+        if (skin == null || !skin.HasGradeFrames) return;
+
+        _gradeSkin = skin;
+        if (_tierFrame != null) _tierFrame.gameObject.SetActive(false);   // 구 액자와 겹치지 않게
+
+        // 선택 표시는 프리팹에서 구 카드 크기에 맞춰 authoring된 사각형이라, 개편 카드보다 크고
+        // 위치도 어긋나 회색 판이 카드 밖으로 삐져나온다. 카드에 딱 맞게 늘려 붙인다.
+        if (_selectedMark != null &&
+            _selectedMark.TryGetComponent<RectTransform>(out var markRt))
+        {
+            markRt.anchorMin = Vector2.zero;
+            markRt.anchorMax = Vector2.one;
+            markRt.offsetMin = Vector2.zero;
+            markRt.offsetMax = Vector2.zero;
+            markRt.anchoredPosition = Vector2.zero;
+        }
+
+        EnsureGradePieces();
+        ApplyCardBg();
+    }
+
+    /// <summary>조각 6개를 1회 생성한다. 카드 크기가 변해도 앵커로 따라간다.</summary>
+    private void EnsureGradePieces()
+    {
+        if (_gradePieces != null) return;
+
+        var root = (RectTransform)transform;
+        _gradePieces = new Image[6];
+
+        // 위·아래 가로 장식바 — 카드 중앙 상/하단에 걸친다.
+        _gradePieces[0] = MakePiece(root, "GradeBar_T", new Vector2(0.5f, 1f), new Vector2(GradeBarW, GradeBarH), Vector2.zero, Vector2.one);
+        _gradePieces[1] = MakePiece(root, "GradeBar_B", new Vector2(0.5f, 0f), new Vector2(GradeBarW, GradeBarH), Vector2.zero, new Vector2(1f, -1f));
+
+        // 네 귀퉁이 — 좌상단 아트 하나를 축 반전해 나머지 셋으로 쓴다.
+        _gradePieces[2] = MakePiece(root, "GradeCorner_TL", new Vector2(0f, 1f), new Vector2(GradeCornerW, GradeCornerH), Vector2.zero, new Vector2( 1f,  1f));
+        _gradePieces[3] = MakePiece(root, "GradeCorner_TR", new Vector2(1f, 1f), new Vector2(GradeCornerW, GradeCornerH), Vector2.zero, new Vector2(-1f,  1f));
+        _gradePieces[4] = MakePiece(root, "GradeCorner_BL", new Vector2(0f, 0f), new Vector2(GradeCornerW, GradeCornerH), Vector2.zero, new Vector2( 1f, -1f));
+        _gradePieces[5] = MakePiece(root, "GradeCorner_BR", new Vector2(1f, 0f), new Vector2(GradeCornerW, GradeCornerH), Vector2.zero, new Vector2(-1f, -1f));
+    }
+
+    private static Image MakePiece(RectTransform parent, string name, Vector2 anchor, Vector2 size, Vector2 offset, Vector2 flip)
+    {
+        var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer));
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(parent, false);
+        rt.anchorMin = rt.anchorMax = anchor;
+
+        // 피벗을 모서리에 두고 localScale로 뒤집으면 <b>피벗을 축으로</b> 반전돼 조각이 카드 밖으로 나간다
+        // (우측 모서리들이 카드 오른쪽에 붕 떠 보이던 원인). 피벗을 한가운데로 두고
+        // 위치를 안쪽으로 반 칸 밀면, 뒤집어도 제자리에서 거울상만 된다.
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = size;
+        rt.anchoredPosition = new Vector2(
+            offset.x + (anchor.x == 0.5f ? 0f : (anchor.x < 0.5f ? size.x * 0.5f : -size.x * 0.5f)),
+            offset.y + (anchor.y == 0.5f ? 0f : (anchor.y < 0.5f ? size.y * 0.5f : -size.y * 0.5f)));
+        rt.localScale = new Vector3(flip.x, flip.y, 1f);   // 아트 1장을 반전해 재사용
+
+        var img = go.AddComponent<Image>();
+        img.raycastTarget = false;   // 장식이 카드 클릭을 먹으면 선택이 안 된다
+        return img;
+    }
+
+    /// <summary>현재 등급에 맞춰 조각 스프라이트를 갈아끼운다.</summary>
+    private void ApplyGradePieces(CovenantTier tier)
+    {
+        if (_gradeSkin == null || _gradePieces == null) return;
+
+        var bar    = _gradeSkin.GradeBar(tier);
+        var corner = _gradeSkin.GradeCorner(tier);
+
+        for (int i = 0; i < _gradePieces.Length; i++)
+        {
+            var img = _gradePieces[i];
+            if (img == null) continue;
+            var art = i < 2 ? bar : corner;
+            img.sprite = art;
+            img.enabled = art != null;
+        }
+    }
+
+    /// <summary>선택 여부에 따라 카드 바탕을 밝은 양피지 ↔ 어두운 판으로 교체.</summary>
+    private void ApplyCardBg()
+    {
+        if (_gradeSkin == null || _cardBg == null) return;
+
+        var art = _selected ? _gradeSkin.cardSelected : _gradeSkin.cardIdle;
+        if (art == null) return;
+
+        _cardBg.sprite = art;
+        _cardBg.type   = Image.Type.Sliced;
+        _cardBg.color  = Color.white;
+    }
+
     public void Bind(string title, string sub, CovenantTier tier, Color tierColor)
     {
         // 이름·설명은 팔레트에서 오는 가변 길이 문자열이라 고정 박스를 넘기기 쉽다.
@@ -99,9 +208,12 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
             }
         }
 
+        ApplyGradePieces(tier);   // 개편본: 조각 조립 테두리를 이 등급으로 갈아끼운다
+
         if (_glow) _glow.color = new Color(tierColor.r, tierColor.g, tierColor.b, 0f);   // 평시 꺼둠
         SetSealed(false);
         _selected = false;
+        ApplyCardBg();
         RefreshVisual(instant: true);
         RevealAsync(tier).Forget();   // 등급별 등장 연출
     }
@@ -111,6 +223,7 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (_selectedMark) _selectedMark.SetActive(on);
         bool wasSelected = _selected;
         _selected = on;
+        ApplyCardBg();   // 선택 시 밝은 양피지 → 어두운 판
         RefreshVisual(instant: false);
         if (on && !wasSelected) PopAsync().Forget();   // 새로 선택된 카드만 팝
     }

@@ -5,20 +5,15 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 상점 UI 공용 스타일/빌더 + 교체 훅.
+/// 상점·재련소·정제소 UI 공용 스타일/빌더.
 /// 다크 판타지·유물(RelicFairy) 톤의 팔레트·여백·등급 위계를 한 곳에서 관리한다.
 ///
-/// 아트/사운드 교체 슬롯:
-///  - FrameSpriteKey / PanelSpriteKey / CoinSpriteKey: Addressable 스프라이트 키. 비우면 단색 폴백.
-///  - Sfx: 사운드 훅(Action&lt;string&gt;). 외부(SoundManager 등)가 할당하면 구매/거부/리롤 시 호출.
-/// 코드 수정 없이 이 필드만 채우면 실제 에셋/사운드로 승격된다.
+/// 아트 교체는 화면별 SkinSO(<see cref="ShopSkinSO"/> 등)가 담당하고, 여기서는
+/// <see cref="Skin"/>이 그 스프라이트를 색 박스 위에 얹는 일만 한다.
+/// 사운드는 <see cref="Sfx"/> 훅으로 교체한다.
 /// </summary>
 public static class ShopUIStyle
 {
-    // ── 교체 훅 (기본 비어있음) ─────────────────────────────
-    public static string PanelSpriteKey = "";   // 윈도우 배경 9-slice
-    public static string FrameSpriteKey = "";    // 카드 테두리 9-slice
-    public static string CoinSpriteKey  = "";    // 골드 코인 아이콘
     /// <summary>
     /// 상점·재련소 SFX 훅. <b>기본 라우팅이 걸려 있다</b> — 예전엔 이 필드에 대입하는 코드가
     /// 프로젝트 어디에도 없어서, <c>PlaySfx</c>를 부르는 22곳(상점 구매·거부·리롤, 재련소 성공·잭팟·실패)이
@@ -157,40 +152,12 @@ public static class ShopUIStyle
         return tmp;
     }
 
-    /// <summary>골드 코인 글리프. 스프라이트 키 있으면 Image, 없으면 ● TMP 폴백.</summary>
-    public static GameObject MakeCoin(Transform parent, float size)
-    {
-        if (!string.IsNullOrEmpty(CoinSpriteKey))
-        {
-            var img = MakeImage(parent, "Coin", Color.white);
-            img.preserveAspect = true;
-            var le = img.gameObject.AddComponent<LayoutElement>();
-            le.preferredWidth = size; le.preferredHeight = size;
-            // 스프라이트는 호출측에서 비동기 로드해 주입(현재는 단색 폴백 비표시 방지용 흰색)
-            img.color = Gold;
-            return img.gameObject;
-        }
-        var t = MakeText(parent, "Coin", size, FontStyles.Bold, TextAlignmentOptions.Center, Gold);
-        t.text = "●";
-        var le2 = t.gameObject.AddComponent<LayoutElement>();
-        le2.preferredWidth = size; le2.preferredHeight = size;
-        return t.gameObject;
-    }
-
     public static void Stretch(RectTransform rt, float pad = 0f)
     {
         rt.anchorMin = Vector2.zero;
         rt.anchorMax = Vector2.one;
         rt.offsetMin = new Vector2(pad, pad);
         rt.offsetMax = new Vector2(-pad, -pad);
-    }
-
-    public static void StretchOffsets(RectTransform rt, float left, float bottom, float right, float top)
-    {
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = new Vector2(left, bottom);
-        rt.offsetMax = new Vector2(-right, -top);
     }
 
     public static void Anchor(RectTransform rt, Vector2 min, Vector2 max, Vector2 pivot, Vector2 pos, Vector2 size)

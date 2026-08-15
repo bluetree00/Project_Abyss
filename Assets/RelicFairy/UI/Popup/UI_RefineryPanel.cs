@@ -23,15 +23,17 @@ public sealed class UI_RefineryPanel : UI_Popup
     // 창 크기는 배경 아트(정제소 바탕@2x 2089×1267)의 실치수 = 1044×634.
     // 요소 크기는 전부 각 아트의 실치수(@2x ÷ 2), 위치는 완성본 전체 사진(890×538)에서
     // 창 중심 기준 오프셋을 환산(가로 ×1.173 / 세로 ×1.178)한 값이다.
-    private const float WindowW   = 1044f;
-    private const float WindowH   = 634f;
-    private const float AltarSize = 170f;   // 중앙 원 테두리 339@2x
-    private const float RingR     = 143f;   // 육각 링 반지름
-    private const float AltarCx   = -20f;   // 제단 중심 — 우측 상태 컬럼을 피해 살짝 왼쪽
-    private const float AltarCy   = 11f;
-    private const float HexW      = 89f;    // 룬 육각 179@2x
-    private const float HexH      = 77f;
-    private const float ColX      = 344f;   // 우측 상태 컬럼 중심
+    // 완성본 목업(정제소 전체 이미지.png 1171×829)을 실측해 옮긴 값. 창 비율을 목업과 맞춘다
+    // — 예전 1044×634(1.65)는 가로로 납작해서, 세로로 긴 육각 링과 사이드 패널이 들어가지 않았다.
+    private const float WindowW   = 1170f;
+    private const float WindowH   = 828f;
+    private const float AltarSize = 135f;   // 중앙 최종룬 482@1x — 정사각 결과 틀
+    private const float RingR     = 152f;   // 육각 링 반지름 — 목업 젬 중심 실측
+    private const float AltarCx   = 0f;     // 목업은 링이 창 정중앙에 있다
+    private const float AltarCy   = -4f;
+    private const float HexW      = 91f;    // 목업의 젬 실측(약 90×103) — 원본 비율보다 살짝 납작하게 그려져 있다
+    private const float HexH      = 103f;
+    private const float ColX      = 390f;   // 우측 상태 컬럼 중심
 
     /// <summary>모든 요소를 창 중심 기준 오프셋으로 배치한다 — 완성본 좌표를 그대로 옮기기 위해.</summary>
     private static readonly Vector2 Half = new(0.5f, 0.5f);
@@ -129,7 +131,7 @@ public sealed class UI_RefineryPanel : UI_Popup
         // 제목바 — 완성본은 좌 제목 / 우 원석 한 줄뿐이다(부제 없음).
         var bar = ShopUIStyle.MakeImage(_root, "TitleBar", ShopUIStyle.BandFill);
         ShopUIStyle.Anchor(bar.rectTransform, Half, Half, Half,
-            new Vector2(0f, 237f), new Vector2(1004f, 56f));
+            new Vector2(0f, 307f), new Vector2(965f, 90f));
         ShopUIStyle.Skin(bar, UISkin.Refinery?.titleBar, sliced: true);
 
         var title = ShopUIStyle.MakeText(bar.transform, "Title", 21f, FontStyles.Bold,
@@ -216,7 +218,7 @@ public sealed class UI_RefineryPanel : UI_Popup
         _rarLine = ShopUIStyle.MakeText(_root, "RarLine", 15f, FontStyles.Bold,
             TextAlignmentOptions.Center, ShopUIStyle.TextDim);
         ShopUIStyle.Anchor(_rarLine.rectTransform, Half, Half, Half,
-            new Vector2(AltarCx, -113f), new Vector2(560f, 24f));
+            new Vector2(AltarCx, -196f), new Vector2(560f, 24f));
     }
 
     /// <summary>우측 상태 컬럼 — 피버(위) / 확률(아래). 정제소 재미의 두 축을 눈에 보이게 세운다.</summary>
@@ -224,10 +226,10 @@ public sealed class UI_RefineryPanel : UI_Popup
     {
         // 크기는 아트 실치수(피버칸 621×216 / 확률막대 바탕 609×255 @2x).
         _feverGauge = FeverGaugeView.Create(_root, Half, Half, Half,
-            new Vector2(ColX, 140f), new Vector2(310f, 108f));
+            new Vector2(ColX, 117f), new Vector2(310f, 140f));
 
         _oddsBar = OddsBarView.Create(_root, Half, Half, Half,
-            new Vector2(ColX, 1f), new Vector2(304f, 128f));
+            new Vector2(ColX, -69f), new Vector2(310f, 150f));
     }
 
     /// <summary>
@@ -239,23 +241,22 @@ public sealed class UI_RefineryPanel : UI_Popup
         var skin = UISkin.Refinery;
 
         _costPlateImg = MakeArtButton("CostPlate", First(skin?.costPlate), null,
-            new Vector2(-321f, -219f), new Vector2(239f, 48f), null);
+            new Vector2(-311f, -274f), new Vector2(250f, 69f), null);
 
-        // 숫자는 아트의 "비용" 글자 오른쪽 빈자리에 놓는다.
-        _costText = ShopUIStyle.MakeText(_costPlateImg.transform, "Cost", 17f, FontStyles.Bold,
-            TextAlignmentOptions.Right, ShopUIStyle.TextPrimary);
-        ShopUIStyle.Anchor(_costText.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f),
-            new Vector2(-22f, 0f), new Vector2(150f, 26f));
+        // 완성본 버튼 아트는 글자가 없는 빈 판이다 — 비용 숫자는 판 가운데에 놓는다.
+        _costText = ShopUIStyle.MakeText(_costPlateImg.transform, "Cost", 18f, FontStyles.Bold,
+            TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
+        ShopUIStyle.Stretch(_costText.rectTransform, 10f);
 
         _spinBtnImg = MakeArtButton("SpinBtn", First(skin?.spinButton), "돌리기",
-            new Vector2(-12f, -219f), new Vector2(335f, 55f), OnSpinClicked);
+            new Vector2(2f, -274f), new Vector2(315f, 71f), OnSpinClicked);
 
         var re = MakeArtButton("ReforgeBtn", First(skin?.reforgeButton), "재점화",
-            new Vector2(290f, -218f), new Vector2(194f, 47f), OnReforgeClicked);
+            new Vector2(307f, -274f), new Vector2(255f, 70f), OnReforgeClicked);
         _reforgeBtn = re.gameObject;
 
         var free = MakeArtButton("FreeSpin", First(skin?.perkBadge), null,
-            new Vector2(-13f, -277f), new Vector2(239f, 36f), null);
+            new Vector2(0f, -344f), new Vector2(250f, 46f), null);
         _freeBtn = free.gameObject;
         _freeLabel = ShopUIStyle.MakeText(free.transform, "Label", 14f, FontStyles.Bold,
             TextAlignmentOptions.Center, Color.white);
@@ -266,15 +267,15 @@ public sealed class UI_RefineryPanel : UI_Popup
         _hint = ShopUIStyle.MakeText(_root, "Hint", 13f, FontStyles.Normal,
             TextAlignmentOptions.Center, ShopUIStyle.TextDim);
         ShopUIStyle.Anchor(_hint.rectTransform, Half, Half, Half,
-            new Vector2(AltarCx, -166f), new Vector2(640f, 20f));
+            new Vector2(AltarCx, -224f), new Vector2(640f, 20f));
         _hint.text = "";
     }
 
     /// <summary>
-    /// 아트 한 장짜리 버튼. 아트에 글자가 구워져 있으면 <paramref name="fallbackLabel"/>은 그리지 않는다 —
-    /// 아트가 없을 때만(색 폴백) 글자를 얹어 "무슨 버튼인지 모르는 상태"를 막는다.
+    /// 아트 한 장짜리 버튼. <b>완성본 버튼 아트에는 글자가 없다</b>(빈 판) — 라벨은 항상 코드가 그린다.
+    /// 예전 아트는 "돌리기/재점화/비용"이 구워져 있어 라벨을 억제했는데, 그대로 두면 이제 무지 버튼이 된다.
     /// </summary>
-    private Image MakeArtButton(string name, Sprite sprite, string fallbackLabel,
+    private Image MakeArtButton(string name, Sprite sprite, string label,
                                 Vector2 pos, Vector2 size, Action onClick)
     {
         var img = ShopUIStyle.MakeImage(_root, name, sprite != null ? Color.white : ShopUIStyle.GoldPillBg,
@@ -282,12 +283,12 @@ public sealed class UI_RefineryPanel : UI_Popup
         ShopUIStyle.Anchor(img.rectTransform, Half, Half, Half, pos, size);
         ShopUIStyle.Skin(img, sprite, sliced: true);
 
-        if (sprite == null && fallbackLabel != null)
+        if (label != null)
         {
             var lbl = ShopUIStyle.MakeText(img.transform, "Label", 19f, FontStyles.Bold,
                 TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
             ShopUIStyle.Stretch(lbl.rectTransform);
-            lbl.text = fallbackLabel;
+            lbl.text = label;
         }
 
         if (onClick != null) AddClick(img.gameObject, onClick);
@@ -440,6 +441,9 @@ public sealed class UI_RefineryPanel : UI_Popup
 
         var outcome = _svc.Craft(_selectedElement);
         if (!outcome.Success) { _hint.text = outcome.FailReason; _busy = false; Refresh(); return; }
+
+        // 「정제 품질」 할인 조건 집계. RefineryService는 런 참조가 없어 호출부에서 센다.
+        GameRunBootstrapper.Instance?.Run?.ReportRefineUse();
 
         await PlayRevealAsync(outcome);
 
