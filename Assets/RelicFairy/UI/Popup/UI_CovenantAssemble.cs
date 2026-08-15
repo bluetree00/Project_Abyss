@@ -216,41 +216,127 @@ public class UI_CovenantAssemble : UI_Popup
     // 프리팹을 수술하는 대신 런타임에 비율로 다시 앉힌다 — 되돌리기 쉽고 재납품에도 강하다.
     private const float BookAspect  = 1.406f;
     private const float BookHeight  = 946f;
+    private const float BookMargin  = 0.96f;   // 화면 대비 판이 차지할 최대 비율
     private const float CardXCause  = 0.1631f, CardXEffect = 0.6623f;
     private const float CardW       = 0.1792f, CardH       = 0.1213f;
     private const float CardY0      = 0.3586f, CardStep    = 0.1440f;
     private const float PrismX      = 0.3599f, PrismW      = 0.2833f;
     private const float PrismY      = 0.3534f, PrismH      = 0.4430f;
 
-    /// <summary>목업 비율대로 판과 카드·두루마리를 다시 앉힌다.</summary>
+    /// <summary>
+    /// 목업 비율대로 판과 카드·두루마리를 다시 앉힌다.
+    ///
+    /// 카드·두루마리는 판(Book)의 직계가 아니라 <b>열(Column) 밑</b>에 산다. 목업 비율은 판 기준이라
+    /// 그대로 열에 먹이면 좌표계가 두 번 좁혀져 카드가 판 폭의 5%(71px)로 쪼그라들고 바깥으로 밀린다.
+    /// 대신 <b>열의 가로 폭 자체</b>를 목업 열 폭에 맞추고, 세로만 열 좌표계로 환산해 앉힌다 —
+    /// 이러면 열에 매달린 머리표(원인/결과/효과)도 카드 위로 같이 따라온다.
+    /// </summary>
     private void ApplyMockupLayout()
     {
-        var book = _panelBg != null ? _panelBg.rectTransform : null;
-        if (book == null) return;
+        var book  = _panelBg != null ? _panelBg.rectTransform : null;
+        var prism = _prismBg != null ? _prismBg.rectTransform : null;
+        if (book == null || prism == null) return;
 
-        book.sizeDelta = new Vector2(BookHeight * BookAspect, BookHeight);
+        var causeCol  = ColumnOf(Card(_causeCards, 0),  book);
+        var effectCol = ColumnOf(Card(_effectCards, 0), book);
+        var prismCol  = ColumnOf(prism, book);
+        if (causeCol == null || effectCol == null || prismCol == null) return;   // 구조가 바뀌면 프리팹 그대로 둔다
+
+        ResizeBook(book);
+        SetColumnX(causeCol,  CardXCause,  CardW);
+        SetColumnX(effectCol, CardXEffect, CardW);
+        SetColumnX(prismCol,  PrismX,      PrismW);
 
         for (int i = 0; i < 3; i++)
         {
-            PlaceByFraction(Card(_causeCards, i),  CardXCause,  CardY0 + CardStep * i, CardW, CardH);
-            PlaceByFraction(Card(_effectCards, i), CardXEffect, CardY0 + CardStep * i, CardW, CardH);
+            PlaceInColumn(Card(_causeCards, i),  causeCol,  CardY0 + CardStep * i, CardH);
+            PlaceInColumn(Card(_effectCards, i), effectCol, CardY0 + CardStep * i, CardH);
         }
-        if (_prismBg != null)
-            PlaceByFraction(_prismBg.rectTransform, PrismX, PrismY, PrismW, PrismH);
+
+        PlaceInColumn(prism, prismCol, PrismY, PrismH);
+        FitPreviewTextsToScroll(prism);
+    }
+
+    /// <summary>
+    /// 판 크기는 목업 실측(1330×946)이되 화면을 넘지 않게 가둔다.
+    /// 21:9 이상 초광폭에서는 캔버스 논리 높이가 946보다 작아져(2560×1080 → 935) 판 위·아래가 잘린다.
+    /// </summary>
+    private static void ResizeBook(RectTransform book)
+    {
+        float h = BookHeight;
+        if (book.parent is RectTransform area && area.rect.width > 1f && area.rect.height > 1f)
+        {
+            h = Mathf.Min(h, area.rect.height * BookMargin);
+            h = Mathf.Min(h, area.rect.width  * BookMargin / BookAspect);
+        }
+        book.sizeDelta = new Vector2(h * BookAspect, h);
     }
 
     private static RectTransform Card(UI_AssembleCard[] arr, int i)
         => (arr != null && i < arr.Length && arr[i] != null) ? (RectTransform)arr[i].transform : null;
 
-    /// <summary>부모(Book) 대비 비율로 배치. 좌상단 기준 — 목업을 그대로 옮기기 위해.</summary>
-    private static void PlaceByFraction(RectTransform rt, float x, float y, float w, float h)
+    /// <summary>rt가 매달린 열. 열이 판의 직계일 때만 유효하다(목업 비율의 기준이 판이라서).</summary>
+    private static RectTransform ColumnOf(RectTransform rt, RectTransform book)
+    {
+        if (rt == null) return null;
+        var col = rt.parent as RectTransform;
+        return (col != null && col.parent == book) ? col : null;
+    }
+
+    /// <summary>열의 가로 구간을 판 기준 비율로 맞춘다. 세로는 저작값 유지 — 머리표 자리가 거기 걸려 있다.</summary>
+    private static void SetColumnX(RectTransform col, float x, float w)
+    {
+        col.anchorMin = new Vector2(x,     col.anchorMin.y);
+        col.anchorMax = new Vector2(x + w, col.anchorMax.y);
+        col.sizeDelta = Vector2.zero;
+        col.anchoredPosition = Vector2.zero;
+    }
+
+    /// <summary>목업의 판 기준 세로 구간(y=위에서부터, h=높이)을 열 좌표계로 환산해 앉힌다. 가로는 열을 꽉 채운다.</summary>
+    private static void PlaceInColumn(RectTransform rt, RectTransform col, float y, float h)
     {
         if (rt == null) return;
-        rt.anchorMin = new Vector2(x, 1f - (y + h));
-        rt.anchorMax = new Vector2(x + w, 1f - y);
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
+        float c0   = col.anchorMin.y;
+        float span = col.anchorMax.y - c0;
+        if (span <= 0.0001f) return;
+
+        rt.anchorMin = new Vector2(0f, ((1f - (y + h)) - c0) / span);
+        rt.anchorMax = new Vector2(1f, ((1f - y)       - c0) / span);
+        rt.sizeDelta = Vector2.zero;
         rt.anchoredPosition = Vector2.zero;
+    }
+
+    /// <summary>
+    /// 미리보기 글자들은 두루마리의 자식이 아니라 <b>형제</b>다 — 두루마리만 목업 자리로 옮기면
+    /// 글자는 열 전체 높이에 남아 위·아래로 삐져나온다(제목은 통째로 두루마리 밖, 효과는 아래로 62px).
+    /// 저작된 상대 배치는 그대로 둔 채, 글자 묶음의 세로 구간만 두루마리 안으로 눌러 넣는다.
+    /// 이미 맞춰진 상태에서 다시 돌아도 같은 구간으로 사상돼 값이 흔들리지 않는다.
+    /// </summary>
+    private void FitPreviewTextsToScroll(RectTransform scroll)
+    {
+        var texts = new[] { _previewTitle, _previewSentence, _previewCondition, _previewCoef, _previewEffect };
+        var col   = scroll.parent;
+
+        float lo = 1f, hi = 0f;
+        foreach (var t in texts)
+        {
+            if (t == null || t.transform.parent != col) continue;
+            var rt = (RectTransform)t.transform;
+            lo = Mathf.Min(lo, rt.anchorMin.y);
+            hi = Mathf.Max(hi, rt.anchorMax.y);
+        }
+        if (hi - lo <= 0.0001f) return;
+
+        float s0 = scroll.anchorMin.y, s1 = scroll.anchorMax.y;
+        foreach (var t in texts)
+        {
+            if (t == null || t.transform.parent != col) continue;
+            var rt = (RectTransform)t.transform;
+            rt.anchorMin = new Vector2(rt.anchorMin.x, Mathf.Lerp(s0, s1, (rt.anchorMin.y - lo) / (hi - lo)));
+            rt.anchorMax = new Vector2(rt.anchorMax.x, Mathf.Lerp(s0, s1, (rt.anchorMax.y - lo) / (hi - lo)));
+            rt.sizeDelta = Vector2.zero;
+            rt.anchoredPosition = Vector2.zero;
+        }
     }
 
     /// <summary>열 머리표(원인·결과·효과) 교체. 아트에 글자가 구워져 있어 코드 라벨은 끈다.</summary>
@@ -451,13 +537,16 @@ public class UI_CovenantAssemble : UI_Popup
         clone.name = "WhetButton(Runtime)";
         clone.onClick.RemoveAllListeners();   // 프리팹에 구워진 리스너까지 제거
 
+        // 자리는 앵커로만 잡는다 — 벼리기 버튼 위로 정확히 한 칸(하단 바 높이만큼).
+        // rect.height로 올리면 팝업이 막 생성돼 레이아웃이 아직 계산되지 않았을 때 0이 나와
+        // 벼리기 버튼과 완전히 겹쳐버린다.
         var rt = (RectTransform)clone.transform;
-        rt.anchorMin        = src.anchorMin;
-        rt.anchorMax        = src.anchorMax;
+        rt.anchorMin        = src.anchorMin + Vector2.up;
+        rt.anchorMax        = src.anchorMax + Vector2.up;
         rt.pivot            = src.pivot;
         rt.sizeDelta        = src.sizeDelta;
         rt.localScale       = src.localScale;
-        rt.anchoredPosition = src.anchoredPosition + new Vector2(0f, src.rect.height + 10f);
+        rt.anchoredPosition = src.anchoredPosition;
 
         _whetButton = clone;
     }

@@ -90,7 +90,10 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (skin == null || !skin.HasGradeFrames) return;
 
         _gradeSkin = skin;
-        if (_tierFrame != null) _tierFrame.gameObject.SetActive(false);   // 구 액자와 겹치지 않게
+
+        // 구 액자와 겹치지 않게 끈다. ⚠️ GameObject를 끄면 안 된다 —
+        // 등급명·통화 배지를 그리는 TierText가 이 액자의 <b>자식</b>이라, 같이 꺼져 카드에서 사라진다.
+        if (_tierFrame != null) _tierFrame.enabled = false;
 
         // 선택 표시는 프리팹에서 구 카드 크기에 맞춰 authoring된 사각형이라, 개편 카드보다 크고
         // 위치도 어긋나 회색 판이 카드 밖으로 삐져나온다. 카드에 딱 맞게 늘려 붙인다.
@@ -143,6 +146,10 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
             offset.x + (anchor.x == 0.5f ? 0f : (anchor.x < 0.5f ? size.x * 0.5f : -size.x * 0.5f)),
             offset.y + (anchor.y == 0.5f ? 0f : (anchor.y < 0.5f ? size.y * 0.5f : -size.y * 0.5f)));
         rt.localScale = new Vector3(flip.x, flip.y, 1f);   // 아트 1장을 반전해 재사용
+
+        // 테두리는 장식이다 — 맨 뒤로 보내지 않으면 나중에 붙은 자식이라 이름·설명 위를 덮는다
+        // (위·아래 장식바 42px가 이름 상단 21px, 설명 전체와 겹친다).
+        rt.SetAsFirstSibling();
 
         var img = go.AddComponent<Image>();
         img.raycastTarget = false;   // 장식이 카드 클릭을 먹으면 선택이 안 된다
