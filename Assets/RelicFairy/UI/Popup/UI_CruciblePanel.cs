@@ -44,6 +44,18 @@ public sealed class UI_CruciblePanel : UI_Popup
     private const float JackpotPulsePeak  = 0.7f;   // 전체화면 펄스 강도
     private const float JackpotPulseDur   = 0.4f;
 
+    // ── 스테이지 중앙 결과 팝업 (판정을 시선 위에서 크게) ──
+    private const float ResultPopDur    = 0.12f;  // 등장(큰 글씨 → 제자리)
+    private const float ResultHoldDur   = 0.85f;
+    private const float ResultFadeDur   = 0.30f;
+    private const float ResultY         = 220f;   // 스테이지 중앙 기준 — 카드 윗변(+159)과 타입 줄(+263) 사이
+    private const float SuccessFontSize = 40f;
+    private const float SuccessPopScale = 1.35f;
+    private const float JackpotFontSize = 56f;    // 잭팟은 한눈에 다르게
+    private const float JackpotPopScale = 1.9f;
+    private const float RejectFontSize  = 28f;    // 거부(재료 부족 등)는 판정이 아니라 안내
+    private const float RejectPopScale  = 1.12f;
+
     private static readonly Color SuccessFlash  = new(0.28f, 0.72f, 0.34f, 1f);
     private static readonly Color JackpotFlash  = new(1f,    0.78f, 0.30f, 1f);
     private static readonly Color FailFlash     = new(0.60f, 0.14f, 0.14f, 1f);
@@ -76,6 +88,8 @@ public sealed class UI_CruciblePanel : UI_Popup
     // 전체화면 탭형 재설계 — 스킨/탭/스테이지 컨테이너
     private CrucibleSkinSO _skin;
     private RectTransform  _meleeStage, _rangedStage;
+    private TMP_Text       _stageResult;      // 스테이지 중앙 결과 팝업(두 탭 공용)
+    private int            _stageResultSeq;   // 연타 시 이전 페이드가 새 결과를 지우지 않게 하는 세대 번호
     private Image          _tabWeaponImg, _tabRangedImg;
     private int            _activeTab;   // 0=무기강화 1=원거리 파츠
 
@@ -117,7 +131,9 @@ public sealed class UI_CruciblePanel : UI_Popup
 
     private bool _built;
     private bool _closing;
-    private bool _animating; // 연출 진행 중 재입력 잠금
+    private bool _animating;   // 연출 재생 중(결과는 이미 확정 — 표시층만 진행 중)
+    private bool _skipAnim;    // 재입력이 들어와 진행 중 연출을 즉시 끝내는 중
+    private Action _queued;    // 연출 중 눌린 다음 강화(항상 최신 1개만 유지)
 
     // ── Lifecycle ───────────────────────────────────────────
 
@@ -311,6 +327,78 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         BuildMeleeCard(_meleeStage);
         BuildRangedCard(_rangedStage);
+
+        BuildStageResult(area);   // 마지막 형제 = 두 스테이지 위에 겹쳐 그려진다
+    }
+
+    /// <summary>
+    /// 스테이지 중앙 결과 팝업. 성공/실패/잭팟 판정이 반대편 정보창 여덟째 줄에만 뜨면
+    /// 시선(카드·게이지)과 어긋나 판정을 놓친다 — 같은 문구를 카드 바로 위에 크게 겹쳐 띄운다.
+    /// 두 탭 스테이지가 같은 자리에 겹치므로 탭 컨테이너가 아니라 StageArea에 직접 붙인다.
+    /// </summary>
+    private void BuildStageResult(Transform area)
+    {
+        var t = ShopUIStyle.MakeText(area, "StageResult", SuccessFontSize, FontStyles.Bold,
+                                     TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
+        var half = new Vector2(0.5f, 0.5f);
+        ShopUIStyle.Anchor(t.rectTransform, half, half, half, new Vector2(0f, ResultY), new Vector2(900f, 62f));
+        _stageResult = t;
+        t.gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// 결과 팝업 표시. 문구는 정보창(<see cref="_resultText"/>)이 방금 만든 것을 그대로 쓴다 —
+    /// 두 곳에서 각자 문장을 만들면 판정이 어긋날 수 있다.
+    /// </summary>
+    private void ShowStageResult(string richText, float fontSize, float popScale)
+    {
+        if (_stageResult == null || string.IsNullOrEmpty(richText)) return;
+        _stageResult.text     = richText;
+        _stageResult.fontSize = fontSize;
+        _stageResultSeq++;
+        StageResultAsync(_stageResultSeq, popScale).Forget();
+    }
+
+    /// <summary>등장 → 유지 → 페이드. 연출 잠금 바깥에서 굴러 연타를 막지 않는다(세대가 바뀌면 즉시 물러남).</summary>
+    private async UniTaskVoid StageResultAsync(int seq, float popScale)
+    {
+        var rt = _stageResult.rectTransform;
+        _stageResult.gameObject.SetActive(true);
+        _stageResult.alpha = 1f;
+
+        try
+        {
+            float t = 0f;
+            while (t < 1f)
+            {
+                if (seq != _stageResultSeq) return;
+                t = Mathf.Min(t + Time.unscaledDeltaTime / ResultPopDur, 1f);
+                rt.localScale = Vector3.one * Mathf.Lerp(popScale, 1f, t);
+                await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
+            }
+
+            t = 0f;
+            while (t < ResultHoldDur)
+            {
+                if (seq != _stageResultSeq) return;
+                t += Time.unscaledDeltaTime;
+                await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
+            }
+
+            t = 0f;
+            while (t < ResultFadeDur)
+            {
+                if (seq != _stageResultSeq) return;
+                t += Time.unscaledDeltaTime;
+                _stageResult.alpha = 1f - t / ResultFadeDur;
+                await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
+            }
+        }
+        catch (OperationCanceledException) { return; }   // 패널 파괴
+
+        if (seq != _stageResultSeq) return;
+        _stageResult.gameObject.SetActive(false);
+        _stageResult.alpha = 1f;
     }
 
     /// <summary>탭별 스테이지 컨테이너 — StageArea를 꽉 채우는 재련소 바탕 패널.</summary>
@@ -813,7 +901,8 @@ public sealed class UI_CruciblePanel : UI_Popup
           + $"\n<size=88%>재료 {(have >= cost ? cost.ToString() : $"<color=#FF5250>{cost}</color>")}"
           + $" <color=#9A98A0>/ 보유 {have}</color>  ·  <color=#FFD24A>쓴 재료만큼 파츠 투자가 쌓인다</color></size>";
         _rangedWeaponLabel.text = $"원거리 무기 강화 ({cost})";
-        _rangedWeaponBtn.interactable = !_animating && have >= cost;
+        // 연출 중에도 켜 둔다 — 재입력이 연출을 건너뛰고 다음 강화로 이어지는 경로(QueueWhileAnimating).
+        _rangedWeaponBtn.interactable = have >= cost;
     }
 
     /// <summary>투자 진척 게이지 갱신.</summary>
@@ -880,10 +969,14 @@ public sealed class UI_CruciblePanel : UI_Popup
             PlaceInfoRow(_detailJackpot, -262f,  56f);   // 시너지
             PlaceInfoRow(_milestoneLabel,-322f,  30f);
             PlaceInfoRow(_streakText,    -356f,  30f);
+            // 7·8행이 재배치에서 빠져 있어 34px 격자 자리(-292/-326)에 그대로 남았고,
+            // 2줄로 벌린 시너지 행(-262~-318)·마일스톤 행과 겹쳐 글자가 포개졌다 — 벌어진 만큼 함께 민다.
+            PlaceInfoRow(_resultText,      -390f, 30f);
+            PlaceInfoRow(_eventEffectText, -424f, 28f);   // 패널 466 — 아래끝 452로 안에 든다
         }
         else
         {
-            for (int i = 0; i < 7; i++)
+            for (int i = 0; i < 9; i++)
                 PlaceInfoRow(RowAt(i), -54f - i * 34f, 30f);
         }
     }
@@ -896,7 +989,9 @@ public sealed class UI_CruciblePanel : UI_Popup
         3 => _detailFail,
         4 => _detailJackpot,
         5 => _milestoneLabel,
-        _ => _streakText,
+        6 => _streakText,
+        7 => _resultText,
+        _ => _eventEffectText,
     };
 
     private static void PlaceInfoRow(TMP_Text t, float y, float h)
@@ -936,17 +1031,14 @@ public sealed class UI_CruciblePanel : UI_Popup
         ShopUIStyle.Anchor(_jackpotHint.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0),
                            new Vector2(colRight, Margin + 240), new Vector2(InfoColW, 26));
 
-        float halfW = (InfoColW - 14f) / 2f;
-
-        var switchBtn = MakeStyledButton(w, "Switch", "전환", out var switchLbl);
-        ShopUIStyle.Anchor((RectTransform)switchBtn.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0),
-                           new Vector2(colRight - halfW - 14f, Margin), new Vector2(halfW, 103));
-        SkinButton(switchBtn, _skin?.switchButton, switchLbl);
-        switchBtn.onClick.AddListener(() => SelectTab(_activeTab == 0 ? 1 : 0));
+        // 탭 전환은 상단 탭 두 개가 이미 한다 — 여기 있던 [전환] 버튼은 같은 동작의 두 번째 입구였고,
+        // 강화하기 바로 아래 큰 버튼이라 "슬롯 전환"으로도 읽혔다. 지워서 하단은 [나가기] 하나만 둔다.
+        // 버튼 아트가 304×147@2x(비 2.07)라 폭을 컬럼 전체로 늘리면 찌그러진다 — 크기는 두고 컬럼 가운데로.
+        float btnW = (InfoColW - 14f) / 2f;
 
         var exitBtn = MakeStyledButton(w, "Exit", "나가기", out var exitLbl);
         ShopUIStyle.Anchor((RectTransform)exitBtn.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0),
-                           new Vector2(colRight, Margin), new Vector2(halfW, 103));
+                           new Vector2(colRight - (InfoColW - btnW) * 0.5f, Margin), new Vector2(btnW, 103));
         SkinButton(exitBtn, _skin?.exitButton, exitLbl);
         exitBtn.onClick.AddListener(ClosePopupUI);
 
@@ -1223,9 +1315,23 @@ public sealed class UI_CruciblePanel : UI_Popup
             _dialogText.text = _controller.GetDialogue(CrucibleMood.Taunt);
     }
 
+    /// <summary>
+    /// 연출 중 재입력 처리. 강화는 반복 행위라 매회 연출이 끝날 때까지 잠그면 대기가 곧 불편이 된다 —
+    /// 다시 누르면 진행 중 연출을 즉시 완료(<see cref="_skipAnim"/>)시키고 그 동작을 예약해 이어서 실행한다.
+    /// 결과·재료 차감은 컨트롤러가 이미 확정한 뒤이고 연출은 표시층 전용이라, 스킵해도 데이터는 그대로다.
+    /// </summary>
+    private bool QueueWhileAnimating(Action again)
+    {
+        if (!_animating) return false;
+        _skipAnim = true;
+        _queued   = again;   // 덮어쓰기 = 예약은 1개 — 연타가 쌓여 나중에 몰아서 터지지 않게
+        return true;
+    }
+
     private void OnEnhanceClicked()
     {
-        if (_controller == null || _animating) return;
+        if (_controller == null) return;
+        if (QueueWhileAnimating(OnEnhanceClicked)) return;
 
         // 파츠 탭은 무기가 아니라 '장착된 파츠'를 올린다 — 대상이 다르므로 경로를 가른다.
         if (_activeTab == 1) { EnhanceSelectedPart(); return; }
@@ -1241,7 +1347,8 @@ public sealed class UI_CruciblePanel : UI_Popup
     /// </summary>
     private void OnRangedWeaponEnhanceClicked()
     {
-        if (_controller == null || _animating) return;
+        if (_controller == null) return;
+        if (QueueWhileAnimating(OnRangedWeaponEnhanceClicked)) return;
 
         var result = _controller.TryEnhance(PlayerWeaponManager.Slot1);
         PlayEnhanceSequence(result, EnhanceView.RangedWeapon).Forget();
@@ -1303,13 +1410,13 @@ public sealed class UI_CruciblePanel : UI_Popup
         if (r.IsReject)
         {
             ShowResultText(r, view);
+            ShowStageResult(_resultText.text, RejectFontSize, RejectPopScale);
             if (r.outcome != EnhanceOutcome.RejectMaxed) ShopUIStyle.PlaySfx("crucible_fail");
             RefreshAll();
             return;
         }
 
         _animating = true;
-        SetActionsInteractable(false);
         ShowResultText(r, view);
 
         // 파츠 탭은 1번 카드에 파츠를 그리므로 상한도 파츠 정의에서 온다(무기 강화 상한이 아님).
@@ -1342,8 +1449,13 @@ public sealed class UI_CruciblePanel : UI_Popup
         catch (OperationCanceledException) { return; } // 패널 파괴 — 정적 서비스는 자립적, 정리 불필요
 
         _animating = false;
-        SetActionsInteractable(true);
+        _skipAnim  = false;
         RefreshAll(); // 연출 후 최종 확정
+
+        // 연출 중 눌린 재입력을 여기서 이어 실행한다 — 결과가 확정·반영된 뒤라야 다음 강화가 올바른 값에 걸린다.
+        var next = _queued;
+        _queued = null;
+        next?.Invoke();
     }
 
     private async UniTask SuccessSequence(int slot, EnhanceResult r, int max, bool count)
@@ -1351,6 +1463,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         ShopUIStyle.PlaySfx("crucible_success");
         HitFeelService.HitStop(0.6f, 0.05f); // 시간정지 팝업에선 timeScale 무효(무해) — 카메라측 반응만
         if (count) await CountLevel(slot, r.beforeLevel, r.afterLevel, max);
+        ShowStageResult(_resultText.text, SuccessFontSize, SuccessPopScale);   // 카운트가 멎는 순간 = 판정 순간
         await UniTask.WhenAll(PunchCard(slot, PunchScale, PunchDur),
                               FlashCard(slot, SuccessFlash));
     }
@@ -1361,6 +1474,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         VolumePulseService.Pulse(JackpotPulsePeak, JackpotPulseDur); // 전체화면 크로매틱+블룸(unscaled)
         HitFeelService.Heavy();
         if (count) await CountLevel(slot, r.beforeLevel, r.afterLevel, max);
+        ShowStageResult(_resultText.text, JackpotFontSize, JackpotPopScale);
         await UniTask.WhenAll(PunchCard(slot, JackpotPunchScale, JackpotPunchDur),
                               FlashCard(slot, JackpotFlash));
     }
@@ -1374,6 +1488,8 @@ public sealed class UI_CruciblePanel : UI_Popup
             await CountLevel(slot, r.beforeLevel, r.afterLevel, max);
         float amp   = nearMiss ? FailShakeAmp * NearMissShakeMult : FailShakeAmp;
         Color flash = nearMiss ? NearMissFlash : FailFlash;
+        // 쉐이크와 같은 프레임에 띄운다 — 흔들림이 곧 판정이라 문구가 늦으면 둘이 따로 논다.
+        ShowStageResult(_resultText.text, SuccessFontSize, nearMiss ? JackpotPopScale : SuccessPopScale);
         await UniTask.WhenAll(ShakeCard(slot, amp, FailShakeDur),
                               FlashCard(slot, flash));
     }
@@ -1471,13 +1587,6 @@ public sealed class UI_CruciblePanel : UI_Popup
         f.offsetMin = Vector2.zero; f.offsetMax = Vector2.zero;
     }
 
-    private void SetActionsInteractable(bool on)
-    {
-        if (_enhanceBtn != null) _enhanceBtn.interactable = on;
-        if (_rangedWeaponBtn != null) _rangedWeaponBtn.interactable = on;
-        foreach (var b in _legendBtns) if (b != null) b.interactable = on;
-    }
-
     /// <summary>레벨 셀 + 게이지를 before→after로 한 단계씩 표기(카운트업/다운).</summary>
     private async UniTask CountLevel(int slot, int before, int after, int max)
     {
@@ -1491,11 +1600,16 @@ public sealed class UI_CruciblePanel : UI_Popup
         SetGauge(slot, lvl, max);
         while (lvl != after)
         {
+            if (_skipAnim) break;
             await Hold(perStep);
             lvl += step;
             _cardLevel[slot].text = FormatLevel(lvl, max, slot == RangedCard);
             SetGauge(slot, lvl, max);
         }
+
+        // 스킵으로 중간에 끊겨도 표기는 최종값이어야 한다(RefreshAll이 뒤에 오지만, 그 사이 프레임이 남는다).
+        _cardLevel[slot].text = FormatLevel(after, max, slot == RangedCard);
+        SetGauge(slot, after, max);
     }
 
     /// <summary>카드 스케일 펀치(ShopSlot PopAsync 이식). unscaledDeltaTime.</summary>
@@ -1506,6 +1620,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         float t = 0f;
         while (t < 1f)
         {
+            if (_skipAnim) break;
             t = Mathf.Min(t + Time.unscaledDeltaTime / dur, 1f);
             float s = 1f + amp * Mathf.Sin(t * Mathf.PI);
             rt.localScale = Vector3.one * s;
@@ -1523,6 +1638,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         float t = 0f;
         while (t < FlashDur)
         {
+            if (_skipAnim) break;
             t += Time.unscaledDeltaTime;
             img.color = Color.Lerp(flash, baseCol, t / FlashDur);
             await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
@@ -1539,6 +1655,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         float t = 0f;
         while (t < dur)
         {
+            if (_skipAnim) break;
             t += Time.unscaledDeltaTime;
             float damp = 1f - (t / dur);
             rt.anchoredPosition = basePos + new Vector2(Mathf.Sin(t * 60f) * amp * damp, 0f);
@@ -1552,6 +1669,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         float t = 0f;
         while (t < seconds)
         {
+            if (_skipAnim) return;
             t += Time.unscaledDeltaTime;
             await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
         }
@@ -1895,7 +2013,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         }
 
         // 무기 탭 복귀 — 파츠 탭에서 껐던 버튼을 되살린다(안 그러면 탭을 옮겨도 꺼진 채 남는다).
-        if (_enhanceBtn != null) _enhanceBtn.interactable = !_animating;
+        if (_enhanceBtn != null) _enhanceBtn.interactable = true;
 
         var w = _controller.GetSlot(_targetSlot);
         if (w == null)
@@ -1987,7 +2105,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         if (_streakText != null) _streakText.text = "";
 
         // 상한이거나 재료가 모자라면 버튼을 끈다 — 눌러도 거부만 뜨는 버튼이 활성으로 보이면 안 된다.
-        if (_enhanceBtn != null) _enhanceBtn.interactable = !_animating && !maxed && have >= cost;
+        if (_enhanceBtn != null) _enhanceBtn.interactable = !maxed && have >= cost;
 
         if (_detailSuccess != null)
         {
