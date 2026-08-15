@@ -563,7 +563,7 @@ public class StartRoomGate : MonoBehaviour
     {
         var bootstrapper = GameRunBootstrapper.Instance;
 
-        // [서약 폐기] 사전제작 서약 예약(PlayerLoadout.ReservedCovenants) 적용을 폐기.
+        // [서약 폐기] 사전제작 서약 예약(구 PlayerLoadout 서약 예약 API) 적용을 폐기 — 해당 API도 삭제됨.
         // 서약 획득은 챕터 시작 대기방의 조립 서약 제단(WorldCovenantAltar)으로 일원화됨.
 
         // 플레이어 이동 복구

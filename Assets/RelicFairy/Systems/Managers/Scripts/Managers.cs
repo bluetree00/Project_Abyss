@@ -50,7 +50,6 @@ public sealed class Managers : MonoBehaviour
     private BuffDataManager _buffDataManager;
     private ChapterDataManager _chapterDataManager;
     private RunStructureDataManager _runStructureDataManager;
-    private CovenantDataManager _covenantDataManager;
     private RelicStatDataManager _relicStatDataManager;
     private RelicAwakeningDataManager _relicAwakeningDataManager;
     private RelicPartsDataManager _relicPartsDataManager;
@@ -309,20 +308,6 @@ public sealed class Managers : MonoBehaviour
         }
     }
 
-
-    public static CovenantDataManager CovenantData
-    {
-        get
-        {
-            var inst = Instance;
-            if (inst == null) return null;
-
-            if (inst._covenantDataManager == null)
-                inst._covenantDataManager = new CovenantDataManager();
-
-            return inst._covenantDataManager;
-        }
-    }
 
     public static RelicStatDataManager RelicStatData
     {

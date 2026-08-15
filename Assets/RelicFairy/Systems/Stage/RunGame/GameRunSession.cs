@@ -127,11 +127,7 @@ public sealed class GameRunSession
     public ItemEffectManager EffectManager { get; private set; } = new ItemEffectManager();
     public CovenantHandler CovenantHandler { get; private set; } = new CovenantHandler();
 
-    private CovenantDataTableSO _covenantDataTable;
     private bool _covenantInitialized;
-
-    /// <summary>런 시작 전(Awake 등)에 DataTable SO를 주입해 BindPlayer 시 자동으로 CovenantHandler를 초기화한다.</summary>
-    public void SetCovenantDataTable(CovenantDataTableSO dataTable) => _covenantDataTable = dataTable;
 
     /// <summary>존 단위 진행 서비스. startWithZoneLayout 모드에서만 초기화된다.</summary>
     public ZoneProgressionService ZoneProgression { get; private set; }
@@ -739,7 +735,7 @@ public sealed class GameRunSession
         if (!_covenantInitialized && PlayerState != null && player?.RuntimeStats != null)
         {
             _covenantInitialized = true;
-            var covenantCtx = new CovenantContext(player, player.RuntimeStats, PlayerState, this, _covenantDataTable);
+            var covenantCtx = new CovenantContext(player, player.RuntimeStats, PlayerState, this);
             CovenantHandler.Initialize(covenantCtx);
         }
 

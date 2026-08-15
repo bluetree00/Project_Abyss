@@ -179,10 +179,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
              "일치 없으면 themeMatch=\"*\" 범용 카탈로그로 폴백.")]
     [SerializeField] private DecorationCatalogSO[] decorationCatalogs;
 
-    [Header("Covenant")]
-    [Tooltip("서약 수치 데이터 테이블 SO. 비어있으면 각 서약 구현체의 하드코딩 fallback 값 사용.")]
-    [SerializeField] private CovenantDataTableSO covenantDataTable;
-
     [Header("Awakening")]
     [Tooltip("런 중 심연의 정수를 추적하는 컴포넌트. 없으면 자동 생성.")]
     [SerializeField] private EssenceTracker essenceTracker;
@@ -236,8 +232,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var uiRoot = UIRootBootstrapper.Instance;
         if (uiRoot != null)
             uiRoot.BindHudToRun(_run);
-
-        _run.SetCovenantDataTable(covenantDataTable);
 
         if (disableSceneBakedNavMeshOnStart)
             DisableSceneBakedNavMesh();
@@ -431,7 +425,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await InitMapDataAsync();
         await InitPlayerDataAsync();
         await InitItemDataAsync();
-        await InitCovenantDataAsync();
         await InitRelicAwakeningAsync();
         await InitChapterDataAsync();
         await InitRunStructureDataAsync();
@@ -639,15 +632,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             catch (System.OperationCanceledException) { /* 정상 취소 */ }
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ShopData 예외: {e.Message}"); }
         }
-    }
-
-    private async UniTask InitCovenantDataAsync()
-    {
-        var covenantData = Managers.CovenantData;
-        if (covenantData == null || covenantData.IsInitialized) return;
-
-        try { await covenantData.InitializeAsync(); }
-        catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] CovenantData 예외: {e.Message}"); }
     }
 
     private async UniTask InitRelicAwakeningAsync()

@@ -8,19 +8,16 @@ public sealed class CovenantContext
     public PlayerRuntimeStats  Stats     { get; }
     public PlayerRunState      RunState  { get; }
     public GameRunSession      Session   { get; }
-    public CovenantDataTableSO DataTable { get; }
 
     public CovenantContext(
         PlayerController    player,
         PlayerRuntimeStats  stats,
         PlayerRunState      runState,
-        GameRunSession      session,
-        CovenantDataTableSO dataTable = null)
+        GameRunSession      session)
     {
         Player    = player;
         Stats     = stats;
         RunState  = runState;
         Session   = session;
-        DataTable = dataTable;
     }
 }

@@ -20,10 +20,6 @@ public class PlayerLoadout
     // 슬롯 1 = 서브 장비 (Q 스킬 전용)
     public WeaponSO WeaponSlot1 { get; private set; }
 
-    // 베이스캠프에서 픽업한 서약 id 예약. 던전 진입(핸들러 Initialize 후) 시 CovenantHandler.TryAdd로 적용.
-    private readonly List<string> _reservedCovenants = new();
-    public IReadOnlyList<string> ReservedCovenants => _reservedCovenants;
-
     // 보스 클리어 드래프트로 이번 런에 획득한 유물 파츠 id(개화 = 런 내 임시 성장). Clear()에서 리셋.
     private readonly List<string> _relicPartIds = new();
     public IReadOnlyList<string> RelicPartIds => _relicPartIds;
@@ -51,13 +47,6 @@ public class PlayerLoadout
     public void SetWeaponSlot0(WeaponSO weapon) => WeaponSlot0 = weapon;
     public void SetWeaponSlot1(WeaponSO weapon) => WeaponSlot1 = weapon;
 
-    /// <summary>베이스캠프 서약 픽업이 호출. 중복 id는 무시.</summary>
-    public void AddCovenant(string id)
-    {
-        if (!string.IsNullOrEmpty(id) && !_reservedCovenants.Contains(id))
-            _reservedCovenants.Add(id);
-    }
-
     /// <summary>보스 클리어 드래프트가 호출. 중복 part_id는 무시.</summary>
     public void AddRelicPart(string partId)
     {
@@ -75,7 +64,6 @@ public class PlayerLoadout
         Relic              = null;
         WeaponSlot0        = null;
         WeaponSlot1        = null;
-        _reservedCovenants.Clear();
         _relicPartIds.Clear();
     }
 }

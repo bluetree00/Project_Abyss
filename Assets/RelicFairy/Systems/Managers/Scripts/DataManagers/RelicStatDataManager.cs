@@ -7,7 +7,7 @@ using UnityEngine;
 
 /// <summary>
 /// 뒤끝 CDN에서 RELIC_STAT_DATA 차트를 로드한다. relic_id + slot → float 수치.
-/// CovenantDataManager 패턴 복제(캐시 → CDN → Addressables 폴백).
+/// 표준 차트 매니저 패턴(캐시 → CDN → Addressables 폴백).
 ///
 /// CSV 컬럼: index | relic_id | slot | description | value | stat_version
 /// </summary>

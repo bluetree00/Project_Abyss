@@ -35,39 +35,11 @@ public abstract class CovenantBase
     public virtual UnityEngine.Sprite Icon    => null;
 
     protected CovenantContext Ctx  { get; private set; }
-    public    CovenantDataSO  Data { get; private set; }
 
     // ── 생명주기 ────────────────────────────────────────
     public virtual void Initialize(CovenantContext ctx)
     {
-        Ctx  = ctx ?? throw new ArgumentNullException(nameof(ctx));
-        Data = ctx.DataTable?.Get(CovenantId);
-    }
-
-    /// <summary>
-    /// 스테이지별 float 수치 반환.
-    /// 우선순위: 서버(CovenantDataManager) → SO(CovenantDataSO) → fallback.
-    /// </summary>
-    protected float V(int index, float fallback = 0f)
-    {
-        var serverMgr = Managers.CovenantData;
-        if (serverMgr != null && serverMgr.IsInitialized && serverMgr.HasData(CovenantId))
-            return serverMgr.Get(CovenantId, Stage, index, fallback);
-
-        return Data != null ? Data.Get(Stage, index, fallback) : fallback;
-    }
-
-    /// <summary>
-    /// 스테이지별 int 수치 반환.
-    /// 우선순위: 서버(CovenantDataManager) → SO(CovenantDataSO) → fallback.
-    /// </summary>
-    protected int VI(int index, int fallback = 0)
-    {
-        var serverMgr = Managers.CovenantData;
-        if (serverMgr != null && serverMgr.IsInitialized && serverMgr.HasData(CovenantId))
-            return serverMgr.GetInt(CovenantId, Stage, index, fallback);
-
-        return Data != null ? Data.GetInt(Stage, index, fallback) : fallback;
+        Ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
     }
 
     public virtual void Dispose() { }

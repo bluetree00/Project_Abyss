@@ -23,7 +23,6 @@ public static class ServerCacheCleaner
         "merlin_rune_synergy_data.json", // BlockDataManager (synergy)
         "merlin_rune_piece_data.json",  // BlockDataManager (piece)
         "merlin_rune_zone_map.json",    // BlockDataManager (zone map)
-        "covenant_stat_data.json",      // CovenantDataManager
         "relic_awakening_data.json",    // RelicAwakeningDataManager
     };
 
