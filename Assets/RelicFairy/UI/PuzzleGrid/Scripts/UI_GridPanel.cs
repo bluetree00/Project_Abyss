@@ -550,9 +550,11 @@ public sealed class UI_GridPanel : UI_Base
         var scrollGO = Go("StagingScroll");
         scrollGO.transform.SetParent(parent, false);
         _stagingScrollRT = scrollGO.GetComponent<RectTransform>();
-        // 위쪽 0.62~1.0은 아무것도 없이 비어 있었고, 정작 슬롯은 가로로 넘쳐 잘렸다.
-        // 2열 그리드(약 470×472)가 통째로 들어가도록 위로 넓힌다.
-        _stagingScrollRT.anchorMin = new Vector2(0f, 0.27f);
+        // 2열 그리드가 통째로 들어가야 한다. 슬롯 아트(326×214)와 슬롯(220×144)은 종횡비가
+        // 같아 폭을 못 늘리므로 필요 높이는 472px로 고정 — 0.27~0.88(608px)은 136px이 남았다.
+        // 남는 세로는 아래 룬 상세로 넘긴다(273 → 385px). 상세는 효과 문구가 길어 세로가 곧 가독성이다.
+        // 0.405는 필요치와 정확히 같아 반올림 1px에도 잘렸다 — 16px 여유를 둔 0.389로 잡는다.
+        _stagingScrollRT.anchorMin = new Vector2(0f, 0.389f);
         _stagingScrollRT.anchorMax = new Vector2(1f, 0.88f);
         _stagingScrollRT.offsetMin = new Vector2(4f, 4f);
         _stagingScrollRT.offsetMax = new Vector2(-4f, -4f);
@@ -705,7 +707,7 @@ public sealed class UI_GridPanel : UI_Base
         type.GetField("rarityBar", rf)?.SetValue(_itemInfoPanel, rarityBarImg);
 
         // itemName
-        var nameTxtGO = MakeTxt(itemRootGO.transform, "ItemName", "", 15f,
+        var nameTxtGO = MakeTxt(itemRootGO.transform, "ItemName", "", 20f,
             new Color(0.95f, 0.97f, 1f, 1f), bold: true);
         var nameRT = nameTxtGO.GetComponent<RectTransform>();
         nameRT.anchorMin = new Vector2(0f, 0.48f);
@@ -717,7 +719,7 @@ public sealed class UI_GridPanel : UI_Base
         type.GetField("itemName", rf)?.SetValue(_itemInfoPanel, nameTxt);
 
         // rarityText
-        var rarityTxtGO = MakeTxt(itemRootGO.transform, "RarityText", "", 12.5f,
+        var rarityTxtGO = MakeTxt(itemRootGO.transform, "RarityText", "", 16f,
             new Color(0.78f, 0.78f, 0.88f, 1f));
         var rarityTxtRT = rarityTxtGO.GetComponent<RectTransform>();
         rarityTxtRT.anchorMin = new Vector2(0f, 0.38f);
@@ -794,7 +796,7 @@ public sealed class UI_GridPanel : UI_Base
         infoRootGO.transform.SetParent(parent, false);
         _itemInfoRoot = infoRootGO.GetComponent<RectTransform>();
         _itemInfoRoot.anchorMin = new Vector2(0f, 0f);
-        _itemInfoRoot.anchorMax = new Vector2(1f, 0.27f);
+        _itemInfoRoot.anchorMax = new Vector2(1f, 0.389f);   // 보관함 하단(0.389)과 맞물린다 — 겹치면 안 된다
         _itemInfoRoot.offsetMin = new Vector2(4f, 4f);
         _itemInfoRoot.offsetMax = new Vector2(-4f, -4f);
 
@@ -802,13 +804,13 @@ public sealed class UI_GridPanel : UI_Base
         infoBG.color = new Color(0.11f, 0.13f, 0.19f, 0.90f);
 
         // "선택:" 레이블
-        var selLbl = MakeTxt(infoRootGO.transform, "SelectLabel", "선택:", 11f,
+        var selLbl = MakeTxt(infoRootGO.transform, "SelectLabel", "선택:", 15f,
             new Color(0.55f, 0.60f, 0.75f, 1f));
         var selRT = selLbl.GetComponent<RectTransform>();
         selRT.anchorMin = new Vector2(0f, 1f);
         selRT.anchorMax = new Vector2(1f, 1f);
-        selRT.sizeDelta = new Vector2(0f, 18f);
-        selRT.anchoredPosition = new Vector2(0f, -9f);
+        selRT.sizeDelta = new Vector2(0f, 24f);
+        selRT.anchoredPosition = new Vector2(0f, -12f);
 
         // ItemInfoPanel 컴포넌트 추가 (필수 SerializeField를 코드로 초기화)
         _itemInfoPanel = infoRootGO.AddComponent<ItemInfoPanel>();
@@ -821,15 +823,15 @@ public sealed class UI_GridPanel : UI_Base
         placeRT.anchorMin        = new Vector2(0.05f, 0f);
         placeRT.anchorMax        = new Vector2(0.95f, 0f);
         placeRT.pivot            = new Vector2(0.5f, 0f);
-        placeRT.sizeDelta        = new Vector2(0f, 34f);
-        placeRT.anchoredPosition = new Vector2(0f, 4f);
+        placeRT.sizeDelta        = new Vector2(0f, 46f);
+        placeRT.anchoredPosition = new Vector2(0f, 6f);
 
         _placeBG      = placeGO.AddComponent<Image>();
         _placeBG.color = new Color(0.20f, 0.28f, 0.40f, 0.65f);
         _placeButton  = placeGO.AddComponent<Button>();
         _placeButton.targetGraphic = _placeBG;
 
-        var placeTxtGO = MakeTxt(placeGO.transform, "PlaceLabel", "끌어서 배치", 13f,
+        var placeTxtGO = MakeTxt(placeGO.transform, "PlaceLabel", "끌어서 배치", 17f,
             new Color(0.7f, 0.78f, 0.90f, 0.8f), bold: true);
         var placeTxtRT = placeTxtGO.GetComponent<RectTransform>();
         placeTxtRT.anchorMin = Vector2.zero;

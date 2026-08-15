@@ -51,9 +51,9 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
     private static readonly string[] DebugSpawnItems =
     {
-        "item_t1_dull_blade",          // 힘의 룬 — 전체 공격력 +4 (Always)
+        "item_t1_weight",              // 충격의 룬 — 전체 공격력 +6 (Always)
         "item_t1_swift_charm",         // 쾌속의 룬 — 이동속도 +0.11 (Always)
-        "item_t1_old_deck",            // 방벽의 룬 — 방어력 +5 (Always)
+        "item_t1_dull_shield",         // 방패의 룬 — 방어력 +8 (Always)
         "item_t1_crisis_blade",        // 위기의 룬 — 공격력 +18% (HPBelow50)
         "item_t1_preempt_blade",       // 선제의 룬 — 이동속도 +25% (AfterRoomEnter)
         "item_t1_threat_armor",        // 위협의 룬 — 방어력 +15% (EnemiesNearby)

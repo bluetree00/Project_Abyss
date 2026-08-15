@@ -144,9 +144,9 @@ public sealed class ItemInfoPanel : MonoBehaviour
 
         var style = EffectRowStyle.Default;
         style.fontAsset       = panelFont;
-        style.fontSize        = 13f;
-        style.iconSize        = 16f;
-        style.rowHeight       = 20f;
+        style.fontSize        = 16f;
+        style.iconSize        = 20f;
+        style.rowHeight       = 26f;
         style.usePrefixArrows = true;
         style.normalColor     = COLOR_NORMAL_FX;
         style.riskColor       = COLOR_RISK;

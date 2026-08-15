@@ -18,9 +18,15 @@ using UnityEngine.UI;
 public sealed class MerlinRuneHexGridView : MonoBehaviour
 {
     // ── Constants ──
-    private const float CELL_SIZE = 50f;
-    private const float CELL_GAP  = 4f;
-    private const float CELL_STEP = CELL_SIZE + CELL_GAP;   // 54f — GridManager.GetGap() 기준값
+    // 판은 13열 × 12행이고 CenterPanel(화면 20%~75% = 1052×1010)에 그려진다.
+    // 셀 50일 때 판이 698×648에 그쳐 중앙의 절반 이상이 빈 채로 남았다 —
+    // 화면에서 가장 중요한 요소가 가장 작게 보이는 상태였다.
+    // 폭 (13-1)*STEP+CELL ≤ 1028, 높이 12*STEP ≤ 986을 만족하는 최대치가 72다(→ 1008×936).
+    // Shape는 GridManager.GetGap()=CELL_STEP, 시각 크기는 squareVisualSize=CELL_SIZE를
+    // 따라오므로 이 두 상수만 바꾸면 드래그 조각까지 함께 커진다.
+    private const float CELL_SIZE = 72f;
+    private const float CELL_GAP  = 6f;
+    private const float CELL_STEP = CELL_SIZE + CELL_GAP;   // 78f — GridManager.GetGap() 기준값
 
     // 한 면만 붙어도 배치 허용: 점유 셀로부터 이 거리 내의 빈 셀을 isPlaceable=true로 표시
     // 값 = 최대 블록 선형 길이(5셀) → 5셀짜리 블록도 한 끝만 닿으면 배치 가능

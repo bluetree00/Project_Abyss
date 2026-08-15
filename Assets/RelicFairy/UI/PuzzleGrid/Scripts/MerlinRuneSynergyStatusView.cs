@@ -181,7 +181,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         trt.anchorMax = new Vector2(0.55f, 1f);
         trt.offsetMin = trt.offsetMax = Vector2.zero;
         titleTxt.text          = "◆ 속성 시너지";
-        titleTxt.fontSize      = 12f;
+        titleTxt.fontSize      = 17f;
         titleTxt.fontStyle     = FontStyles.Bold;
         titleTxt.color         = new Color(0.75f, 0.90f, 1.00f, 1f);
         titleTxt.alignment     = TextAlignmentOptions.MidlineLeft;
@@ -195,7 +195,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         drt.offsetMin = Vector2.zero;
         drt.offsetMax = new Vector2(-8f, 0f);
         descTxt.text               = "블록을 배치하면 시너지가 표시됩니다";
-        descTxt.fontSize           = 9f;
+        descTxt.fontSize           = 12f;
         descTxt.color              = new Color(0.48f, 0.54f, 0.72f, 0.85f);
         descTxt.alignment          = TextAlignmentOptions.MidlineRight;
         descTxt.textWrappingMode = TextWrappingModes.NoWrap;
@@ -278,13 +278,13 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         var rxGO = new GameObject("ReactionBanner", typeof(RectTransform));
         rxGO.transform.SetParent(_rowContainer, false);
         _reactionText = rxGO.AddComponent<TextMeshProUGUI>();
-        _reactionText.fontSize      = 11f;
+        _reactionText.fontSize      = 15f;
         _reactionText.fontStyle     = FontStyles.Bold;
         _reactionText.color         = new Color(1f, 0.82f, 0.45f, 1f);   // 반응 = 금빛
         _reactionText.alignment     = TextAlignmentOptions.Left;
         _reactionText.raycastTarget = false;
         var rxLe = rxGO.AddComponent<UnityEngine.UI.LayoutElement>();
-        rxLe.minHeight = 18f;
+        rxLe.minHeight = 24f;
         rxGO.SetActive(false);
 
         // 빈 상태 안내 (존이 하나도 없을 때)
@@ -296,7 +296,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         ert.offsetMin = ert.offsetMax = Vector2.zero;
         var eTxt = _emptyLabelGO.AddComponent<TextMeshProUGUI>();
         eTxt.text          = "셀을 배치하면\n시너지가 표시됩니다";
-        eTxt.fontSize      = 11f;
+        eTxt.fontSize      = 15f;
         eTxt.color         = new Color(0.40f, 0.43f, 0.56f, 0.65f);
         eTxt.alignment     = TextAlignmentOptions.Center;
         eTxt.raycastTarget = false;
@@ -313,7 +313,9 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
 
         row.go = new GameObject($"Row_{zoneId}", typeof(RectTransform));
         row.go.transform.SetParent(_rowContainer, false);
-        row.go.AddComponent<LayoutElement>().preferredHeight = 34f;
+        // 좌측 패널 뷰포트는 약 879px인데 6행 × 34px = 251px(29%)만 쓰고 나머지가 비어 있었다.
+        // 폭(384px)은 고정이라 남는 건 세로뿐이므로, 행을 키워 글자를 읽히게 만든다.
+        row.go.AddComponent<LayoutElement>().preferredHeight = 72f;
         var rowBg = row.go.AddComponent<Image>();
         rowBg.color = COLOR_ROW_BG_ACTIVE;
         if (_rowBgSkin != null)   // 시너지 바탕
@@ -355,7 +357,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         nrt.offsetMax = Vector2.zero;
         var nameTxt = nameGO.AddComponent<TextMeshProUGUI>();
         nameTxt.text               = $"{ZONE_ICONS[idx]} {ZONE_NAMES[idx]}";
-        nameTxt.fontSize           = 12f;
+        nameTxt.fontSize           = 17f;
         nameTxt.fontStyle          = FontStyles.Bold;
         nameTxt.color              = zoneColor;
         nameTxt.alignment          = TextAlignmentOptions.MidlineLeft;
@@ -372,7 +374,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         crt.offsetMin = crt.offsetMax = Vector2.zero;
         var countTxt = countGO.AddComponent<TextMeshProUGUI>();
         countTxt.text               = "0";
-        countTxt.fontSize           = 14f;
+        countTxt.fontSize           = 24f;
         countTxt.fontStyle          = FontStyles.Bold;
         countTxt.color              = new Color(0.92f, 0.96f, 1.00f, 1f);
         countTxt.alignment          = TextAlignmentOptions.Midline;
@@ -407,7 +409,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             lrt.offsetMax = new Vector2(-2f, 0f);
             var lTxt = lblGO.AddComponent<TextMeshProUGUI>();
             lTxt.text               = $"{b + 1}단계";
-            lTxt.fontSize           = 8.5f;
+            lTxt.fontSize           = 12f;
             lTxt.color              = new Color(0.50f, 0.53f, 0.66f, 1f);
             lTxt.alignment          = TextAlignmentOptions.Center;
             lTxt.textWrappingMode = TextWrappingModes.NoWrap;
