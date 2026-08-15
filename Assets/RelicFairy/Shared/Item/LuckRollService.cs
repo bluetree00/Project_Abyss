@@ -71,10 +71,11 @@ public static class LuckRollService
         cumulative += rW;
         if (roll < cumulative) return ItemRarity.Rare;
 
+        // 상위 등급은 기억의 제단에서 열려야 실제로 나온다 — 미해금이면 하위로 강등(정본 §4).
         cumulative += eW;
-        if (roll < cumulative) return ItemRarity.Epic;
+        if (roll < cumulative) return MemoryAltarService.ClampRarity(ItemRarity.Epic);
 
-        return ItemRarity.Legendary;
+        return MemoryAltarService.ClampRarity(ItemRarity.Legendary);
     }
 
     /// <summary>Luck 기반 결과창 드롭 발생 확률(0~1) 조회.</summary>

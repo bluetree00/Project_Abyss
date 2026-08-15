@@ -174,6 +174,7 @@ public class ItemDataManager
                 duration     = row.TryGetFloat("duration"),
                 cooldown     = row.TryGetFloat("cooldown"),
                 shape_id     = row.TryGetInt("shape_id"),
+                element      = row.TryGetString("element"),
                 icon_key     = row.TryGetString("icon_key"),
                 description  = row.TryGetString("description"),
                 stat_version = row.TryGetInt("stat_version"),

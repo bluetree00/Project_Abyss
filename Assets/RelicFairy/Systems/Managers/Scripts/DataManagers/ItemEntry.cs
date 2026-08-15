@@ -27,6 +27,14 @@ public class ItemEntry
     public float  duration;
     public float  cooldown;
     public int    shape_id;         // MERLIN_RUNE_PIECE_DATA 참조
+
+    /// <summary>
+    /// 룬 속성(ElementDef Id: FIRE/ICE/ELECTRIC/GRASS/LIGHT/DARK). <b>빈 값 = 범용</b>(어느 존에나 배치).
+    /// <para>아래 등급은 범용, 윗 등급은 전용 — Common·Rare는 순수 스탯이라 비우고,
+    /// Epic·Legendary는 효과 자체가 속성이므로 반드시 채운다. 안 채우면 「마그마 분출」이
+    /// 얼음 존에만 놓이는 모순이 생긴다(<see cref="RuneZoneRule"/>).</para>
+    /// </summary>
+    public string element;
     public string icon_key;
     public string description;
     public int    stat_version;

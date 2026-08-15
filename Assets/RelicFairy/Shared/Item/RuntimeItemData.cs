@@ -36,14 +36,32 @@ public class RuntimeItemData
 
     // ── 속성 배정 ──
 
-    /// <summary>속성이 비어 있으면 6속성 중 하나를 무작위 배정한다(생성 1회). 이미 있으면 유지(세이브 복원).</summary>
+    /// <summary>
+    /// 속성을 확정한다. 이미 있으면 유지(데이터가 지정했거나 세이브 복원).
+    ///
+    /// <para><b>아래 등급은 범용, 윗 등급은 전용.</b>
+    /// Common·Rare는 순수 스탯이라 속성 정체성이 없다 → <b>빈 값으로 둔다.</b>
+    /// <see cref="RuneZoneRule"/>이 빈 속성을 "어디든 놓인다"로 처리하므로, 그게 곧 범용 조각이다.
+    /// Epic·Legendary는 효과 자체가 속성이므로 데이터(<c>ITEM_DATA.element</c>)가 지정한다 —
+    /// 안 지정하면 「마그마 분출」이 얼음 존에만 놓이는 모순이 생긴다.</para>
+    ///
+    /// <para>예전엔 등급과 무관하게 6속성을 무작위로 박았는데, 그러면 범용 조각이 사라지고
+    /// 상위 룬의 정체성도 데이터와 어긋난다.</para>
+    /// </summary>
     public void EnsureElement()
     {
         if (!string.IsNullOrEmpty(element)) return;
+        if (rarity != ItemRarity.Epic && rarity != ItemRarity.Legendary) return;   // 범용 — 빈 값 유지
+
+        // 상위 등급인데 데이터에 속성이 없다 = 데이터 결함. 놓을 곳이 없어지는 것보다는
+        // 무작위라도 배정해 살려두고, 경고로 드러낸다.
         var order = ElementDef.Order;
         element = order != null && order.Count > 0
             ? order[UnityEngine.Random.Range(0, order.Count)]
             : ElementDef.CenterId;
+
+        UnityEngine.Debug.LogWarning(
+            $"[RuntimeItemData] '{itemId}'({rarity}) 속성 미지정 — ITEM_DATA.element를 채워야 한다. 임시 배정: {element}");
     }
 
     // ── 세이브 복원 ──
@@ -176,6 +194,14 @@ public class RuntimeItemData
                 "Active"   => ItemCategory.Active,
                 _          => ItemCategory.Ring,
             };
+        }
+
+        // 속성 — CSV가 정본. 빈 값이면 범용(어느 존에나)이고, 그건 Common·Rare의 정상 상태다.
+        foreach (var e in entries)
+        {
+            if (string.IsNullOrEmpty(e?.element)) continue;
+            data.element = e.element;
+            break;
         }
 
         // SO 병합 — CSV에 없는 표시 정보를 SO에서 채움
