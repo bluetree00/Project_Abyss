@@ -250,11 +250,15 @@ public class BackendGameData : MonoBehaviour
         Data.highestChapter  = SafeInt(row,   "highestChapter", 0);
         Data.totalGoldEarned = SafeInt(row,   "totalGoldEarned",0);
 
-        // 유물의 각성
         Data.lichEncounterCount   = SafeInt(row, "lichEncounterCount",   0);
         Data.sealBrokenBossIds    = SafeString(row, "sealBrokenBossIds", "");
 
+        // 기억의 제단 — 해금/기록. 구세이브에는 컬럼이 없으므로 빈 문자열로 떨어진다(= 아무것도 해금 안 됨).
+        Data.unlockedIds          = SafeString(row, "unlockedIds",       "");
+        Data.records              = SafeString(row, "records",           "");
+
         Data.abyssEssence         = SafeInt(row, "abyssEssence",         0);
+        // [레거시] 각성 6계열 — 환급 원장으로만 읽는다. MemoryAltarService가 정수로 되돌린 뒤 0이 된다.
         Data.awakeningLevelSword  = SafeInt(row, "awakeningLevelSword",  0);
         Data.awakeningLevelShield = SafeInt(row, "awakeningLevelShield", 0);
         Data.awakeningLevelHeart  = SafeInt(row, "awakeningLevelHeart",  0);
@@ -274,10 +278,14 @@ public class BackendGameData : MonoBehaviour
         { "totalClears",          Data.totalClears          },
         { "highestChapter",       Data.highestChapter       },
         { "totalGoldEarned",      Data.totalGoldEarned      },
-        // 유물의 각성
         { "lichEncounterCount",   Data.lichEncounterCount   },
         { "sealBrokenBossIds",    Data.sealBrokenBossIds ?? "" },
+        // 기억의 제단 — 해금/기록
+        { "unlockedIds",          Data.unlockedIds ?? ""    },
+        { "records",              Data.records ?? ""        },
         { "abyssEssence",         Data.abyssEssence         },
+        // [레거시] 각성 6계열 — 환급 후 0이 저장된다
+
         { "awakeningLevelSword",  Data.awakeningLevelSword  },
         { "awakeningLevelShield", Data.awakeningLevelShield },
         { "awakeningLevelHeart",  Data.awakeningLevelHeart  },

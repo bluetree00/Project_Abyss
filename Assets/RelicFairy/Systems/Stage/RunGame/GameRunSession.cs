@@ -171,7 +171,14 @@ public sealed class GameRunSession
     public RoomPlanKind CurrentRoomKind { get; private set; } = RoomPlanKind.Normal;
 
     /// <summary>방 진입 시 RunFlowController가 호출.</summary>
-    public void SetCurrentRoomKind(RoomPlanKind kind) => CurrentRoomKind = kind;
+    public void SetCurrentRoomKind(RoomPlanKind kind)
+    {
+        CurrentRoomKind = kind;
+
+        // 「고독」 기행 — 특수방을 하나도 안 들르고 완주했는가.
+        if (kind is RoomPlanKind.Shop or RoomPlanKind.Event or RoomPlanKind.Crucible or RoomPlanKind.Refinery)
+            SpecialRoomVisits++;
+    }
 
     // 씬 전환 시 무기 슬롯 복원용
     public WeaponData[] SavedWeaponSlots { get; private set; }
@@ -216,7 +223,15 @@ public sealed class GameRunSession
     public event Action<Vector3> OnBossRoomCleared;
 
     /// <summary>RoomWaveController에서 보스방 클리어 시 호출. OnBossRoomCleared 구독자(챕터 게이트)에게 알린다.</summary>
-    public void NotifyBossRoomCleared(Vector3 center) => OnBossRoomCleared?.Invoke(center);
+    public void NotifyBossRoomCleared(Vector3 center)
+    {
+        BossKillCount++;
+
+        // 보스방 클리어 = 챕터 완료. 이 챕터를 한 대도 안 맞고 끝냈으면 기행 1회.
+        if (!_damagedThisChapter) FlawlessChapters++;
+        _damagedThisChapter = false;
+        OnBossRoomCleared?.Invoke(center);
+    }
 
     public event Action<PlayerRunState> OnPlayerStateReady;
     public event Action<PlayerController> OnPlayerBound;
@@ -365,7 +380,7 @@ public sealed class GameRunSession
             {
                 var pw = JsonUtility.FromJson<RangedPartListWrapper>(save.rangedPartsJson);
                 if (pw?.items != null)
-                    RangedPartsState.Current.Restore(pw.items, save.rangedWeaponEnhanceLevel);
+                    RangedPartsState.Current.Restore(pw.items, save.rangedInvested, save.rangedGrantedTier);
             }
 
             if (!string.IsNullOrEmpty(save.itemsJson))
@@ -437,7 +452,18 @@ public sealed class GameRunSession
             gainedGold:    RunDelta.GainedGold,
             gainedEssence: RunDelta.GainedEssence,
             gainedItems:   RunDelta.GainedItems.ToArray(),
-            reason:        reason
+            reason:        reason,
+            abyssDepth:    AbyssDepth,
+            roomClears:    _roomClearRecords.Count,
+            kills:         KillCount,
+            potionUsed:    PotionUsedThisRun,
+            specialVisits: SpecialRoomVisits,
+            flawless:      FlawlessChapters,
+            eliteKills:    EliteKillCount,
+            bossKills:     BossKillCount,
+            shopUses:      ShopUseCount,
+            refineUses:    RefineUseCount,
+            maxEnhance:    MaxEnhanceLevel
         );
 
         OnRunEnded?.Invoke(result);
@@ -595,8 +621,19 @@ public sealed class GameRunSession
     }
 
     /// <summary>설정상 진행 가능한 마지막 챕터. ChapterRegistry._finalChapter(없으면 Chapter3).
-    /// Ch4는 빌드에서 제외된 미완 콘텐츠라, 레지스트리 유실 시에도 없는 씬으로 진행하지 않도록 Chapter3로 폴백한다.</summary>
-    private ChapterId FinalChapter => _chapterRegistry != null ? _chapterRegistry.FinalChapter : ChapterId.Chapter3;
+    /// Ch4는 빌드에서 제외된 미완 콘텐츠라, 레지스트리 유실 시에도 없는 씬으로 진행하지 않도록 Chapter3로 폴백한다.
+    /// <para>「챕터 4 개방」을 해금하면 한 챕터 더 나아간다 — 다만 <b>레지스트리 상한을 넘지는 않는다.</b>
+    /// 해금이 없는 씬을 여는 열쇠가 되면 안 되므로, 레지스트리가 Ch3까지만 인정하면 해금해도 Ch3에 머문다.</para></summary>
+    private ChapterId FinalChapter
+    {
+        get
+        {
+            var registryMax = _chapterRegistry != null ? _chapterRegistry.FinalChapter : ChapterId.Chapter3;
+            if (!MemoryAltarService.IsChapter4Unlocked && registryMax > ChapterId.Chapter3)
+                return ChapterId.Chapter3;
+            return registryMax;
+        }
+    }
 
     /// <summary>현재 챕터 다음에 진행할 챕터가 남아 있으면 true. 마지막 챕터면 false(= 보스 클리어 시 런 클리어).</summary>
     public bool HasNextChapter() => CurrentChapter + 1 <= FinalChapter;
@@ -621,15 +658,25 @@ public sealed class GameRunSession
     }
 
     /// <summary>무한 루프 진입 — 심연 깊이를 올리고 Ch1으로 회귀한다(로드아웃은 유지, 적 스탯만 스케일↑).
-    /// 최종 보스 클리어 후 '계속'을 선택했을 때 호출. 챕터 전환 기계를 재사용하되 목적지만 Ch1으로 되돌린다.</summary>
-    public void BeginAbyssLoop()
+    /// 최종 보스 클리어 후 '계속'을 선택했을 때 호출. 챕터 전환 기계를 재사용하되 목적지만 Ch1으로 되돌린다.
+    /// <para>「심연 깊이 개방」이 없으면 <b>false</b>를 돌려준다 — 호출부는 그냥 런 클리어로 마감해야 한다.
+    /// 첫 완주가 이 노드의 선행 조건이므로, 해금 전에는 루프 자체가 존재하지 않는다(정본 §2-3).</para></summary>
+    /// <returns>루프에 진입했으면 true. false면 상태를 전혀 바꾸지 않았다.</returns>
+    public bool BeginAbyssLoop()
     {
-        if (!IsRunning) return;
+        if (!IsRunning) return false;
+
+        if (!MemoryAltarService.IsAbyssDepthUnlocked)
+        {
+            Debug.Log("[GameRun] 심연 깊이 미해금 — 루프 진입 없이 런을 종료한다.");
+            return false;
+        }
 
         AbyssDepth++;
         CurrentChapter = ChapterId.Chapter1;
         ResolveActiveTheme();
         ChangeRunState(RunState.Map);
+        return true;
     }
 
     /// <summary>
@@ -795,8 +842,18 @@ public sealed class GameRunSession
         if (!IsRunning) return;
         if (amount <= 0) return;
 
-        RunDelta.GainedEssence += amount;
+        RunDelta.GainedEssence += Mathf.RoundToInt(amount * EssenceDepthMultiplier);
     }
+
+    /// <summary>
+    /// 「깊이 보상 배율」 해금 시 깊이마다 +15%. 미해금이면 1배 — 깊이를 내려가도 수급이 안 늘어난다.
+    /// <para>깊이가 오를수록 적이 ×1.25로 세지는데 보상이 그대로면 깊이가 순손해가 된다.
+    /// 이 노드가 그 기울기를 메우는 자리라, 곱은 <b>수급 깔때기 한 곳</b>에만 건다.</para>
+    /// </summary>
+    private float EssenceDepthMultiplier =>
+        MemoryAltarService.IsUnlocked(MemoryAltarCatalog.DepthReward)
+            ? 1f + AbyssDepth * 0.15f
+            : 1f;
 
     public void AddItem(ItemId itemId, int count)
     {
@@ -807,6 +864,75 @@ public sealed class GameRunSession
     }
 
     // ── 포션 ──────────────────────────────────────────────────
+
+    // ── 기억의 제단 기록 집계 ─────────────────────────────────
+    // 런 <b>안에서만</b> 센다. 영구 기록(UserGameData.records)에는 EndRun 시 1회만 반영한다 —
+    // 매 이벤트마다 저장하면 저장 빈도가 올라가고 이어하기와 얽힌다(정본 §8-1).
+
+    public int KillCount        { get; private set; }
+
+    // ── 기행 판정 ──
+    /// <summary>이 런에서 포션을 한 번이라도 썼는가.</summary>
+    public bool PotionUsedThisRun   { get; private set; }
+    /// <summary>이 런에서 들른 특수방(상점·이벤트·재련·정제) 수.</summary>
+    public int  SpecialRoomVisits   { get; private set; }
+    /// <summary>피격 없이 클리어한 챕터 누적.</summary>
+    public int  FlawlessChapters    { get; private set; }
+    private bool _damagedThisChapter;
+
+    /// <summary>플레이어가 실제로 피해를 입었다. 무피격 챕터 판정을 깬다.</summary>
+    public void ReportPlayerDamaged() => _damagedThisChapter = true;
+    public int EliteKillCount   { get; private set; }
+    public int BossKillCount    { get; private set; }
+    public int ShopUseCount     { get; private set; }
+    public int RefineUseCount   { get; private set; }
+    public int MaxEnhanceLevel  { get; private set; }
+
+    /// <summary>「부활 1회」를 이 런에서 이미 썼는가. 이어하기로 되살아나지 않도록 세이브에 실린다.</summary>
+    public bool MetaReviveUsed { get; private set; }
+
+    /// <summary>
+    /// 「부활 1회」를 소모한다. 해금돼 있고 아직 안 썼을 때만 true.
+    /// <para>런 스코프라 사망 시 자연히 사라진다 — 다음 런에 다시 1회가 주어진다.</para>
+    /// </summary>
+    public bool TryConsumeMetaRevive()
+    {
+        if (MetaReviveUsed) return false;
+        if (!MemoryAltarService.HasRevive) return false;
+
+        MetaReviveUsed = true;
+        return true;
+    }
+
+    /// <summary>이어하기 복원 — 세이브에 실린 제단 관련 런 상태를 되돌린다.</summary>
+    public void RestoreAltarProgress(bool reviveUsed, int kills, int eliteKills, int bossKills,
+                                     int shopUses, int refineUses, int maxEnhance,
+                                     bool potionUsed, int specialVisits, int flawless)
+    {
+        MetaReviveUsed      = reviveUsed;
+        PotionUsedThisRun   = potionUsed;
+        SpecialRoomVisits   = specialVisits;
+        FlawlessChapters    = flawless;
+        KillCount        = kills;
+        EliteKillCount   = eliteKills;
+        BossKillCount    = bossKills;
+        ShopUseCount     = shopUses;
+        RefineUseCount   = refineUses;
+        MaxEnhanceLevel  = maxEnhance;
+    }
+
+    public void ReportKill()      => KillCount++;
+    public void ReportPotionUsed() => PotionUsedThisRun = true;
+    public void ReportEliteKill() => EliteKillCount++;
+    public void ReportBossKill()  => BossKillCount++;
+    public void ReportShopUse()   => ShopUseCount++;
+    public void ReportRefineUse() => RefineUseCount++;
+
+    /// <summary>무기 강화 성공 시 도달 수치를 보고한다(최고치만 남는다).</summary>
+    public void ReportEnhanceLevel(int level)
+    {
+        if (level > MaxEnhanceLevel) MaxEnhanceLevel = level;
+    }
 
     // ── 상점 정비소 연결점 ────────────────────────────────────
 
@@ -852,6 +978,8 @@ public sealed class GameRunSession
             return false;
         }
         if (!PlayerState.TryConsumePotion()) return false;
+
+        PotionUsedThisRun = true;   // 「금욕」 기행 판정 — 실제로 소비된 순간에만 센다
 
         int heal = Mathf.Max(1, Mathf.RoundToInt(Player.RuntimeStats.MaxHp * PotionHealRatio));
         Player.Heal(heal);

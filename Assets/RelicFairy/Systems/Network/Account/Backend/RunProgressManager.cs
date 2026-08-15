@@ -213,6 +213,17 @@ public class RunProgressManager : MonoBehaviour
         d.currentRoomRewardPending = m.currentRoomRewardPending;   // 미수령 보상 → 복원 시 1회만 재배치
         d.crucibleRollIndex  = m.crucibleRollIndex;    // 재련소 RNG 스트림 위치(save-scum 방지)
 
+        d.metaReviveUsed  = m.metaReviveUsed;          // 부활 재사용 방지
+        d.killCount       = m.killCount;
+        d.potionUsedThisRun = m.potionUsedThisRun;
+        d.specialRoomVisits = m.specialRoomVisits;
+        d.flawlessChapters  = m.flawlessChapters;
+        d.eliteKillCount  = m.eliteKillCount;          // 해금 할인 조건용 집계
+        d.bossKillCount   = m.bossKillCount;
+        d.shopUseCount    = m.shopUseCount;
+        d.refineUseCount  = m.refineUseCount;
+        d.maxEnhanceLevel = m.maxEnhanceLevel;
+
         var cdw = new CooldownListWrapper();
         if (m.cooldowns != null) cdw.items.AddRange(m.cooldowns);
         d.cooldownsJson = JsonUtility.ToJson(cdw);
@@ -252,7 +263,8 @@ public class RunProgressManager : MonoBehaviour
             var partWrapper = new RangedPartListWrapper();
             partWrapper.items.AddRange(parts.Equipped_);
             d.rangedPartsJson            = JsonUtility.ToJson(partWrapper);
-            d.rangedWeaponEnhanceLevel   = parts.WeaponEnhanceLevel;
+            d.rangedInvested             = parts.Invested;
+            d.rangedGrantedTier          = parts.GrantedTier;
         }
 
         // 룬 보드 점유 셀 (시너지 권위)

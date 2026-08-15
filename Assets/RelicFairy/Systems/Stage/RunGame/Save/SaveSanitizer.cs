@@ -117,7 +117,13 @@ public static class SaveSanitizer
 
         d.abyssEssence = ClampMin(d.abyssEssence, 0, ref changed);
 
-        // 각성 레벨: ≥0만. 상한은 차트(GetMaxLevel) 구동이라 여기서 강제하지 않는다(과도 개입 방지).
+        // 기억의 제단 — 해금/기록 CSV. 구세이브에는 필드 자체가 없어 null로 들어올 수 있다.
+        // 내용은 검증하지 않는다 — 모르는 노드 id는 조회에서 그냥 안 맞을 뿐이고,
+        // 여기서 지우면 이름이 바뀐 노드의 해금이 통째로 날아간다(거부·삭제 금지 원칙).
+        if (d.unlockedIds == null) { d.unlockedIds = ""; changed = true; }
+        if (d.records     == null) { d.records     = ""; changed = true; }
+
+        // [레거시] 각성 레벨: ≥0만. 환급 전 세이브를 위해 남긴다.
         d.awakeningLevelSword  = ClampMin(d.awakeningLevelSword,  0, ref changed);
         d.awakeningLevelShield = ClampMin(d.awakeningLevelShield, 0, ref changed);
         d.awakeningLevelHeart  = ClampMin(d.awakeningLevelHeart,  0, ref changed);

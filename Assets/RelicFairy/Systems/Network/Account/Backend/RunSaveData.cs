@@ -57,7 +57,8 @@ public class RunSaveData
     public string runePlacementsJson;     // RunePlacementListWrapper JSON — Shape 재구성(재편집)용
     public string stagingItemsJson;       // ItemListWrapper JSON — 보관함 아이템
     public string rangedPartsJson;        // RangedPartListWrapper JSON — 원거리 파츠 장착·레벨
-    public int    rangedWeaponEnhanceLevel; // 원거리 무기 강화 레벨(파츠 슬롯 해금 근거)
+    public int    rangedInvested;         // 원거리 무기 강화 누적 투자 재료(파츠 슬롯 해금 근거)
+    public int    rangedGrantedTier;      // 파츠를 지급받은 티어 수(재접속 중복 지급 방지)
 
     // 절차생성 진행 상태 (RunFlowController/RunSequencer)
     public int    masterSeed;
@@ -80,6 +81,19 @@ public class RunSaveData
     public bool   currentRoomCleared;     // 클리어 후 저장 지원 — 복원 시 몹 재스폰 방지 + 출구 개방
     public bool   currentRoomRewardPending; // 클리어 보상 미수령 — 복원 시 보상 재배치(수령했으면 false → 이중지급 차단)
     public int    crucibleRollIndex;      // 재련소 결정적 롤 소비 수 — 복원 시 스트림 진행(save-scum 방지)
+
+    // 기억의 제단 — 부활 소모 여부(save-scum 방지) + 해금 할인 조건용 런 집계
+    public bool   metaReviveUsed;
+    public int    killCount;
+    public bool   potionUsedThisRun;
+    public int    specialRoomVisits;
+    public int    flawlessChapters;
+    public int    eliteKillCount;
+    public int    bossKillCount;
+    public int    shopUseCount;
+    public int    refineUseCount;
+    public int    maxEnhanceLevel;
+
     public string cooldownsJson;          // CooldownListWrapper JSON
 }
 
