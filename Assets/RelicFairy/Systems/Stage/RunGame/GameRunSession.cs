@@ -163,6 +163,13 @@ public sealed class GameRunSession
     public int CrucibleRollIndex { get; set; }
 
     /// <summary>
+    /// 조립 서약 「연마」(티어만 재굴림)를 이번 런에서 이미 썼는지. 런당 1회.
+    /// 팝업이 아니라 런이 쥐고 있어야 한다 — 팝업마다 초기화되면 서약을 얻을 때마다 한 번씩 연마할 수 있다.
+    /// (세이브에는 넣지 않는다. 이어하기로 한 번 돌려받는 건 손해가 아니고, 스키마를 건드리지 않는 쪽이 싸다.)
+    /// </summary>
+    public bool CovenantWhetUsed { get; set; }
+
+    /// <summary>
     /// 지금 들어와 있는 방의 종류. 클리어 보상(<see cref="RoomRewardTable"/>)이 이 값으로 갈린다 —
     /// 정예방이 일반방과 같은 보상을 주던 결함(통합설계서 §3-2)의 해소 지점.
     /// 방 빌드 권한은 RunFlowController에 있으므로 그쪽이 방 진입마다 세팅한다.

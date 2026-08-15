@@ -180,7 +180,12 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _cardBg.color  = Color.white;
     }
 
-    public void Bind(string title, string sub, CovenantTier tier, Color tierColor)
+    /// <param name="badge">
+    /// 축·상태 통화 배지("생존 · 보호막"). 등급 라벨 뒤에 붙는다 —
+    /// 카드 앞면에서 "이게 공격이냐 생존이냐"를 이름 해석 없이 알 수 있어야 방어축 보장이 눈에 보인다.
+    /// 전용 슬롯을 새로 만들지 않고 기존 등급 라벨에 얹는다(프리팹 무수술).
+    /// </param>
+    public void Bind(string title, string sub, CovenantTier tier, Color tierColor, string badge = null)
     {
         // 이름·설명은 팔레트에서 오는 가변 길이 문자열이라 고정 박스를 넘기기 쉽다.
         // 카드 밖으로 흘러 옆 카드 위에 겹치지 않도록, 여기서 박스 안에 가둔다.
@@ -188,8 +193,11 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (_subText)  { _subText.text  = sub;   FitInBox(_subText,  wrap: true);  }
         if (_tierText)
         {
-            _tierText.text  = tier.DisplayName();
+            _tierText.text  = string.IsNullOrEmpty(badge)
+                ? tier.DisplayName()
+                : tier.DisplayName() + "  " + badge;
             _tierText.color = tierColor;   // 등급명도 등급색으로
+            FitInBox(_tierText, wrap: false);
         }
 
         _gradeColor = tierColor;

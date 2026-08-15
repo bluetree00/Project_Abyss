@@ -45,6 +45,9 @@ public class UI_CovenantAssemble : UI_Popup
     [SerializeField] private TMP_Text _forgeSummary;
     [SerializeField] private Button   _forgeButton;
 
+    [Header("연마 — id 고정 · 티어만 재굴림(런당 1회). 미배선 시 벼리기 버튼을 복제해 만든다")]
+    [SerializeField] private Button   _whetButton;
+
     [Header("스킨 — 등급 테두리 아트(카드에 주입)")]
     [SerializeField] private Sprite _silverFrame;   // 실버 테두리@2x
     [SerializeField] private Sprite _goldFrame;     // 골드 테두리@2x
@@ -75,6 +78,7 @@ public class UI_CovenantAssemble : UI_Popup
     private List<CovenantDraftCard> _causes;
     private List<CovenantDraftCard> _effects;
     private int _selCause, _selEffect;
+    private int _whetLeft;
     private UniTaskCompletionSource<string> _tcs;
 
     // ── Public Properties ────────────────────────────────
@@ -122,7 +126,18 @@ public class UI_CovenantAssemble : UI_Popup
             _forgeButton.onClick.RemoveAllListeners();
             _forgeButton.onClick.AddListener(OnForge);
         }
+
+        // 연마는 런당 1회 — 남은 횟수는 런이 쥐고 있다(팝업마다 되살아나면 서약을 얻을 때마다 한 번씩 쓸 수 있다).
+        _whetLeft = (GameRunBootstrapper.Instance?.Run?.CovenantWhetUsed ?? false) ? 0 : 1;
+        EnsureWhetButton();
+        if (_whetButton)
+        {
+            _whetButton.onClick.RemoveAllListeners();
+            _whetButton.onClick.AddListener(OnWhet);
+        }
+
         RefreshRerollText();
+        RefreshWhetUi();
         RefreshSelection();
     }
 
@@ -164,7 +179,7 @@ public class UI_CovenantAssemble : UI_Popup
         if (isCause && CovenantPalette.TryGetCause(d.id, out var c))
             card.Bind(c.name, c.desc, d.tier, TierColor(d.tier));
         else if (!isCause && CovenantPalette.TryGetEffect(d.id, out var e))
-            card.Bind(e.name, e.desc, d.tier, TierColor(d.tier));
+            card.Bind(e.name, e.desc, d.tier, TierColor(d.tier), EffectTaxonomy.Badge(e.axis, e.status));
     }
 
     /// <summary>패널/중앙 결과카드에 아트 스프라이트 적용(지정된 것만 — 미지정 시 기존 외형 유지).</summary>
@@ -276,13 +291,20 @@ public class UI_CovenantAssemble : UI_Popup
         if (_rerollsLeft <= 0) return;
         Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
 
-        var pool = isCause ? CovenantPalette.CauseIds : CovenantPalette.EffectIds;
         var data = isCause ? _causes : _effects;
 
-        var exclude = new HashSet<string>();
-        for (int i = 0; i < data.Count; i++) exclude.Add(data[i].id);
-
-        var rolled = CovenantAssembleService.RerollCard(pool, exclude, _rng, _forceSilver);
+        CovenantDraftCard? rolled;
+        if (isCause)
+        {
+            var exclude = new HashSet<string>();
+            for (int i = 0; i < data.Count; i++) exclude.Add(data[i].id);
+            rolled = CovenantAssembleService.RerollCard(CovenantPalette.CauseIds, exclude, _rng, _forceSilver);
+        }
+        else
+        {
+            // 효과는 방어축 보장을 리롤로 우회할 수 없다(axisLock) — 서비스가 판정한다.
+            rolled = CovenantAssembleService.RerollEffectCard(data, idx, _rng, _forceSilver);
+        }
         if (rolled == null) return;
 
         data[idx] = rolled.Value;
@@ -351,18 +373,101 @@ public class UI_CovenantAssemble : UI_Popup
         SetText(_previewSentence, $"\"{p.ResultSentence}\"");
         SetText(_previewCondition, $"발동 조건  {p.causeDesc}");
         SetText(_previewCoef,      $"봉인 계수  ×{p.coefficient:0.0}");
-        SetText(_previewEffect,    $"효과  {p.EffectAmountLabel()}");
+        SetText(_previewEffect,    $"효과  {p.EffectAmountLabel()}  ({p.Badge})");
         SetText(_forgeSummary,     $"{p.causeName} × {p.effectName}  →  {p.effectDesc}");
+
+        // 이미 가진 조합은 TryAdd가 조용히 거절해 "벼렸는데 아무 일도 없는" 상태가 된다.
+        // 누르기 전에 잠가서 그 헛손질을 없앤다.
+        if (_forgeButton)
+        {
+            bool owned = IsOwned(SelectedId());
+            _forgeButton.interactable = !owned;
+            if (owned) SetText(_forgeSummary, "이미 보유한 조합 — 원인이나 효과를 바꿔야 벼릴 수 있다");
+        }
     }
+
+    private string SelectedId()
+    {
+        var cause  = _causes[_selCause];
+        var effect = _effects[_selEffect];
+        return AssembledCovenant.MakeId(cause.id, cause.tier, effect.id, effect.tier);
+    }
+
+    private static bool IsOwned(string id)
+        => GameRunBootstrapper.Instance?.Run?.CovenantHandler?.Has(id) ?? false;
 
     private void RefreshRerollText() => SetText(_rerollCountText, $"리롤 {_rerollsLeft}");
 
-    private void OnForge()
+    // ── 연마 ─────────────────────────────────────────────
+    /// <summary>
+    /// 연마 — 고른 원인·효과의 <b>id는 그대로</b> 두고 티어만 다시 굴린다(실버 50 / 골드 35 / 루비 15).
+    /// 리롤은 "다른 걸 뽑고 싶다"이고 연마는 "이 조합 그대로, 더 세게"다 — 원하는 조합을 찾고도
+    /// 티어가 실버라 버려야 했던 경우를 위한 런당 단 한 번의 손.
+    /// </summary>
+    private void OnWhet()
     {
+        if (_whetLeft <= 0) return;
         Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+
         var cause  = _causes[_selCause];
         var effect = _effects[_selEffect];
-        string id = AssembledCovenant.MakeId(cause.id, cause.tier, effect.id, effect.tier);
+        _causes[_selCause]   = new CovenantDraftCard(cause.id,  CovenantAssembleService.RollWhetTier(_rng, _forceSilver));
+        _effects[_selEffect] = new CovenantDraftCard(effect.id, CovenantAssembleService.RollWhetTier(_rng, _forceSilver));
+
+        if (_causeCards != null  && _selCause  < _causeCards.Length  && _causeCards[_selCause])
+            BindCard(_causeCards[_selCause],   _causes[_selCause],   true);
+        if (_effectCards != null && _selEffect < _effectCards.Length && _effectCards[_selEffect])
+            BindCard(_effectCards[_selEffect], _effects[_selEffect], false);
+
+        _whetLeft = 0;
+        var run = GameRunBootstrapper.Instance?.Run;
+        if (run != null) run.CovenantWhetUsed = true;
+
+        RefreshWhetUi();
+        RefreshSelection();
+    }
+
+    private void RefreshWhetUi()
+    {
+        if (_whetButton == null) return;
+        _whetButton.interactable = _whetLeft > 0;
+
+        var lbl = _whetButton.GetComponentInChildren<TMP_Text>(true);
+        if (lbl == null) return;
+        lbl.text = _whetLeft > 0 ? "연마 1" : "연마 0";
+        lbl.fontSize = 16f;
+    }
+
+    /// <summary>
+    /// 연마 버튼이 프리팹에 배선되지 않았으면 벼리기 버튼을 복제해 바로 위에 세운다.
+    /// 프리팹 수술 없이 기능이 화면에 실제로 존재하게 하려는 것 — 배선되면 이 경로는 타지 않는다.
+    /// </summary>
+    private void EnsureWhetButton()
+    {
+        if (_whetButton != null || _forgeButton == null) return;
+
+        var src = (RectTransform)_forgeButton.transform;
+        var clone = Instantiate(_forgeButton, src.parent);
+        clone.name = "WhetButton(Runtime)";
+        clone.onClick.RemoveAllListeners();   // 프리팹에 구워진 리스너까지 제거
+
+        var rt = (RectTransform)clone.transform;
+        rt.anchorMin        = src.anchorMin;
+        rt.anchorMax        = src.anchorMax;
+        rt.pivot            = src.pivot;
+        rt.sizeDelta        = src.sizeDelta;
+        rt.localScale       = src.localScale;
+        rt.anchoredPosition = src.anchoredPosition + new Vector2(0f, src.rect.height + 10f);
+
+        _whetButton = clone;
+    }
+
+    private void OnForge()
+    {
+        string id = SelectedId();
+        if (IsOwned(id)) return;   // 잠금이 뚫린 경로(키보드 등) 대비 최종 방어
+
+        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
 
         // 닫기가 먼저다. TrySetResult가 대기 측(WorldCovenantAltar.OpenAsync) 후속을 동기로 재개시킬 수 있어,
         // 순서를 뒤집으면 팝업이 열린 채(=HUD 차단/timeScale 0) 획득 안내가 떠 안내가 화면에 눌어붙는다.
