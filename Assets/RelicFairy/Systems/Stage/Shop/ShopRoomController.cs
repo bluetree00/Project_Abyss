@@ -157,12 +157,15 @@ public class ShopRoomController : MonoBehaviour
         var playerState = _run.PlayerState;
         if (playerState == null) return ShopPurchaseResult.Unavailable;
 
-        if (slot.Service.HasValue)
-            return PurchaseService(slot, slot.Service.Value);
+        var result = slot.Service.HasValue
+            ? PurchaseService(slot, slot.Service.Value)
+            : slot.Entry != null
+                ? PurchaseFromEntry(slot, slot.Entry, playerState)
+                : PurchaseFromLegacy(slot, slot.LegacyItem, playerState);
 
-        return slot.Entry != null
-            ? PurchaseFromEntry(slot, slot.Entry, playerState)
-            : PurchaseFromLegacy(slot, slot.LegacyItem, playerState);
+        // 「상인의 인장」 할인 조건 집계. 성공한 구매만 센다.
+        if (result == ShopPurchaseResult.Success) _run.ReportShopUse();
+        return result;
     }
 
     /// <summary>심연의 행상 정규 상품 구매(인덱스). 골드 차감 → 지급 → 품절 처리.</summary>
@@ -206,6 +209,7 @@ public class ShopRoomController : MonoBehaviour
         }
 
         p.Sold = true;
+        _run.ReportShopUse();               // 「상인의 인장」 할인 조건 집계(행상 경로)
         RunFlowController.Active?.SaveNow("shop-product");
         OnShopChanged?.Invoke();
         return ShopPurchaseResult.Success;

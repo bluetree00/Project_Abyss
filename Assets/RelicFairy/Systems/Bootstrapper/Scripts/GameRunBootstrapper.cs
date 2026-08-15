@@ -315,7 +315,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var run = _run;
         if (run == null) { HandleRunClear(); return; }
 
-        run.BeginAbyssLoop();   // 깊이++ · CurrentChapter=Ch1 · 상태=Map
+        // 깊이++ · CurrentChapter=Ch1 · 상태=Map. 「심연 깊이 개방」 미해금이면 루프가 없으므로 그냥 클리어로 마감한다.
+        if (!run.BeginAbyssLoop()) { HandleRunClear(); return; }
 
         // 챕터 전환과 동일: 다음 씬의 부트스트래퍼가 '새 챕터 시작'으로 처리(이어하기 아님) → 로드아웃/서약/파츠/아이템 유지.
         AppBootstrapper.Instance?.MarkChapterAdvance();
@@ -347,7 +348,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
 
-        var candidates = PickRandomParts(pool, 3);
+        // 「파츠 드래프트 4」 해금 시 후보가 3 → 4로 늘어난다(정본 Ⅱ 등장).
+        var candidates = PickRandomParts(pool, MemoryAltarService.PartsDraftCount);
 
         var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_RelicPartDraftPopup>();
         if (popup == null)
@@ -660,6 +662,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         try { await runStructureData.InitializeAsync(); }
         catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] RunStructureData 예외: {e.Message}"); }
     }
+
+    /// <summary>정수 트래커 — 사망 처리(DieState)가 처치 위치를 알려주기 위해 접근한다.</summary>
+    public EssenceTracker EssenceTracker => essenceTracker;
 
     private void BindEssenceTracker()
     {
@@ -1801,7 +1806,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         toExit.y = 0f;                   // 수평 방향만 — 게이트가 위/아래에 있어도 고개를 들지 않는다
         if (toExit.sqrMagnitude < 0.01f) return fallback;
 
-        return Quaternion.LookRotation(toExit.normalized, Vector3.up);
+        // 직교축으로 스냅한다. 방은 격자로 지어지고 출구도 네 변 중 하나에 붙으므로 '정면'은 항상 90° 단위다.
+        // 그런데 스폰 지점과 게이트가 가로로 어긋나 있으면 실제 벡터는 어중간한 각(예: 23°)이 되고,
+        // 카메라 인계가 이 각을 그대로 헤딩으로 쓰기 때문에(HandToGameplayCamera alignHeadingToTarget:true)
+        // 챕터에 들어설 때마다 화면이 비스듬히 돌아간 채 시작된다. 어긋난 정도가 방 배치마다 달라
+        // "가끔 돌아간다"로 보였다. 스냅하면 출구를 정면에 두는 의도는 그대로 두고 기울기만 없앤다.
+        float yaw = Quaternion.LookRotation(toExit.normalized, Vector3.up).eulerAngles.y;
+        return Quaternion.Euler(0f, Mathf.Round(yaw / 90f) * 90f, 0f);
     }
 
     private Vector3 ResolvePlayerSpawnFromGrid(TileType[,] grid, Vector3 anchor, int w, int h)
@@ -3277,6 +3288,16 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             currentRoomCleared = save.currentRoomCleared,   // 클리어 상태로 복원 → 몹 재스폰 X
             currentRoomRewardPending = save.currentRoomRewardPending,   // 미수령 보상만 복원(구버전=false)
             crucibleRollIndex  = save.crucibleRollIndex,    // 재련소 RNG 스트림 재개 위치
+            metaReviveUsed     = save.metaReviveUsed,       // 부활 재사용 방지(구버전=false)
+            killCount          = save.killCount,
+            potionUsedThisRun  = save.potionUsedThisRun,
+            specialRoomVisits  = save.specialRoomVisits,
+            flawlessChapters   = save.flawlessChapters,
+            eliteKillCount     = save.eliteKillCount,       // 해금 할인 조건용 집계(구버전=0)
+            bossKillCount      = save.bossKillCount,
+            shopUseCount       = save.shopUseCount,
+            refineUseCount     = save.refineUseCount,
+            maxEnhanceLevel    = save.maxEnhanceLevel,
             cooldowns          = cooldowns,
         };
     }

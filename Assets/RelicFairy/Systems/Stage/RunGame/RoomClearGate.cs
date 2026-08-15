@@ -246,6 +246,10 @@ public class RoomClearGate : MonoBehaviour
     private System.Collections.Generic.List<(RuntimeItemData data, ItemSO so)> RollRewardChoices(
         int count, ItemRarity? floor = null)
     {
+        // 「룬 4지선다」 해금 — <b>3지선다 라운드만</b> 넓힌다.
+        // 단일 드랍(count 1) 규칙까지 늘리면 선택의 폭이 아니라 획득량이 바뀌어 경제가 어긋난다.
+        if (count == 3) count = MemoryAltarService.RuneChoiceCount;
+
         var result = new System.Collections.Generic.List<(RuntimeItemData, ItemSO)>(count);
         var rule   = RoomRewardTable.For(RoomKind());
         if (count <= 0 || !RoomRewardTable.RollDrop(rule)) return result;

@@ -104,11 +104,13 @@ public class WeaponForgeAltar : MonoBehaviour
                 return;
             }
 
+            // 잠금 근거를 기억의 제단으로 옮긴다 — 석궁은 "특전 해금"으로 하드코딩돼 있어
+            // 무엇을 하면 열리는지 플레이어가 알 수 없었다. 이제 제단의 「출발」 갈래가 연다.
             var entries = new List<UI_RangedForgePopup.Entry>(2);
             if (bowOption != null)
-                entries.Add(new UI_RangedForgePopup.Entry { Weapon = bowOption });
+                entries.Add(new UI_RangedForgePopup.Entry { Weapon = bowOption });   // 활은 기본 지급
             if (crossbowOption != null)
-                entries.Add(new UI_RangedForgePopup.Entry { Weapon = crossbowOption, Locked = true, LockReason = "특전 해금" });
+                entries.Add(MakeForgeEntry(crossbowOption, MemoryAltarCatalog.WeaponCrossbow));
 
             popup.Setup(entries);
             var ranged = await popup.WaitForChoiceAsync().AttachExternalCancellation(ct);
@@ -136,6 +138,21 @@ public class WeaponForgeAltar : MonoBehaviour
             Debug.LogWarning($"[WeaponForgeAltar] ClaimAsync 실패: {ex.Message}");
             _busy = false;
         }
+    }
+
+    /// <summary>제단 해금 여부로 선택지의 잠금 상태를 정한다. 잠긴 항목도 <b>목록에는 남긴다</b> —
+    /// 무엇이 있는지 보여야 그것을 열러 갈 이유가 생긴다(빈 목록은 목표가 되지 못한다).</summary>
+    private static UI_RangedForgePopup.Entry MakeForgeEntry(MainWeaponSO weapon, string nodeId)
+    {
+        bool unlocked = MemoryAltarService.IsUnlocked(nodeId);
+        var node = MemoryAltarCatalog.Get(nodeId);
+
+        return new UI_RangedForgePopup.Entry
+        {
+            Weapon     = weapon,
+            Locked     = !unlocked,
+            LockReason = unlocked ? null : $"기억의 제단 — {node?.BaseCost ?? 0:N0} ◆",
+        };
     }
 
     private async UniTask EquipChoiceAsync(PlayerLoadout loadout, WeaponSO ranged, CancellationToken ct)

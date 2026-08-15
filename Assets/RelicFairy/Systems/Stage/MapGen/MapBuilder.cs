@@ -619,7 +619,14 @@ public class MapBuilder
     /// <param name="widthCells">개구부 폭(셀 수). 측벽은 폭+1 위치에 세운다.</param>
     /// <param name="lengthCells">바깥으로 뻗는 길이(셀 수). 0 이하면 아무것도 안 함.</param>
     /// <summary>문 하나의 복도+챔버에 배치할 실시간 조명 상한. 방마다 문이 최대 3개라 캡이 없으면 조명이 폭증한다.</summary>
-    private const int MaxCorridorLights = 12;
+    private const int MaxCorridorLights = 4;
+
+    /// <summary>
+    /// 복도·챔버 조명에 곱하는 감쇠. 이 조명들은 <b>'문 너머에 뭔가 있다'는 깊이 단서</b>일 뿐
+    /// 플레이 공간 조명이 아니다. 본 방과 같은 세기(WallTorch 3.5 / 반경 9m)로 켜두면 좁은 복도에서
+    /// 서로 겹쳐 가산되고, 봉인 석문이 올라가는 순간 그게 문틈으로 한꺼번에 쏟아져 화면이 날아간다.
+    /// </summary>
+    private const float CorridorLightDim = 0.35f;
 
     public static List<PlacedBlock> BuildDoorCorridor(
         BlockPalette palette,
@@ -688,6 +695,11 @@ public class MapBuilder
                 Quaternion.LookRotation(parent.TransformDirection(inward)),
                 parent);
             lightCfg.wallLightTint?.ApplyTo(go);   // 챕터 무드
+
+            // 연출용 감쇠 — 팔레트 무드(색·intensityMul)를 적용한 뒤 마지막에 곱한다.
+            var lt = go.GetComponentInChildren<Light>();   // WallTorch는 Light가 자식에 있다
+            if (lt != null) lt.intensity *= CorridorLightDim;
+
             lightBudget--;
         }
 

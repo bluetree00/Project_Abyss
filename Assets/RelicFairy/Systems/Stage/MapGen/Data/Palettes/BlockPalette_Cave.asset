@@ -37,7 +37,7 @@ MonoBehaviour:
   - {fileID: 2100000, guid: 689a51d0a482da549b7448b20f594464, type: 2}
   decalsPer100SqM: 8
   veilMode: 0
-  corridorFogPrefab: {fileID: 6930174999031227623, guid: a3a908fc5452d224bb73a08f9b798a09,
+  corridorFogPrefab: {fileID: 7727956308063794643, guid: 353e4ca07ddad704b8539591387bee38,
     type: 3}
   veilLayers: 2
   veilHeight: 2.4

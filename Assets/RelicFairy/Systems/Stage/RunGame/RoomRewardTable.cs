@@ -113,9 +113,10 @@ public static class RoomRewardTable
         cumulative += w.Rare;
         if (roll < cumulative) return ItemRarity.Rare;
 
+        // 상위 등급은 기억의 제단에서 열려야 실제로 나온다 — 미해금이면 하위로 강등(정본 §4).
         cumulative += w.Epic;
-        if (roll < cumulative) return ItemRarity.Epic;
+        if (roll < cumulative) return MemoryAltarService.ClampRarity(ItemRarity.Epic);
 
-        return ItemRarity.Legendary;
+        return MemoryAltarService.ClampRarity(ItemRarity.Legendary);
     }
 }

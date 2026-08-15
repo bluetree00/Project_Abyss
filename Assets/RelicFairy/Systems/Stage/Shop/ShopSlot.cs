@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>
 /// 상점 진열 1칸의 표현-독립 데이터.
 /// ShopRoomController가 등급 롤 결과(ShopEntry)를 표시용 메타와 함께 캐싱해 보관하고,
-/// UI(UI_ShopPanel/UI_ShopSlotView)가 이를 읽어 그린다.
+/// UI(UI_ShopPanel)가 이를 읽어 그린다.
 ///
 /// 기존 월드 매대(ShopStallInteraction)의 _entry/_sold/_owned/_pending 상태를
 /// 데이터 객체 1개로 옮긴 것 — 표현만 교체하고 데이터/계산 로직은 재사용한다.

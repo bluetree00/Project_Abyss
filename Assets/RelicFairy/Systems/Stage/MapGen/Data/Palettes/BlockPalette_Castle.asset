@@ -42,7 +42,7 @@ MonoBehaviour:
   veilHeight: 1
   veilScale: 1
   veilTint: {r: 0, g: 0, b: 0, a: 0}
-  veilRadianceIntensity: 7.5
+  veilRadianceIntensity: 2.5
   sealDoorPrefab: {fileID: 1030972349, guid: abc00000000015049655650342659921, type: 3}
   sealDoorMotion: 0
   blocks:

@@ -187,7 +187,14 @@ public class RunFlowController : MonoBehaviour
 
         // 재련소 결정적 롤 스트림 재개 위치 — 방 안 저장 후 재접속해도 같은 롤을 다시 굴리지 못하게.
         var resumeSession = GameRunBootstrapper.Instance?.Run;
-        if (resumeSession != null) resumeSession.CrucibleRollIndex = meta.crucibleRollIndex;
+        if (resumeSession != null)
+        {
+            resumeSession.CrucibleRollIndex = meta.crucibleRollIndex;
+            // 부활 소모 여부와 해금 조건 집계도 함께 복원 — 안 하면 부활이 되살아나고 진척이 0으로 돌아간다.
+            resumeSession.RestoreAltarProgress(meta.metaReviveUsed, meta.killCount, meta.eliteKillCount, meta.bossKillCount,
+                                               meta.shopUseCount, meta.refineUseCount, meta.maxEnhanceLevel,
+                                               meta.potionUsedThisRun, meta.specialRoomVisits, meta.flawlessChapters);
+        }
 
         var key = !string.IsNullOrEmpty(poolKey) ? poolKey : _poolKey;
         _pool = await Managers.ZoneLayout.LoadPoolAsync(key);
@@ -678,6 +685,16 @@ public class RunFlowController : MonoBehaviour
             currentRoomCleared = _currentRoomCleared,
             currentRoomRewardPending = _currentRoomRewardPending,
             crucibleRollIndex  = session.CrucibleRollIndex,
+            metaReviveUsed     = session.MetaReviveUsed,
+            killCount          = session.KillCount,
+            potionUsedThisRun  = session.PotionUsedThisRun,
+            specialRoomVisits  = session.SpecialRoomVisits,
+            flawlessChapters   = session.FlawlessChapters,
+            eliteKillCount     = session.EliteKillCount,
+            bossKillCount      = session.BossKillCount,
+            shopUseCount       = session.ShopUseCount,
+            refineUseCount     = session.RefineUseCount,
+            maxEnhanceLevel    = session.MaxEnhanceLevel,
             cooldowns          = cooldowns,
         };
 
