@@ -21,9 +21,13 @@ public sealed class SolarNoonSun : MonoBehaviour
     // 마법진을 눕히거나 기울이면 옆으로 퍼져 화면을 덮는다 → 항상 카메라를 마주 보게 세운다.
     // PlanetCrash 아트는 원본 자체가 거대해서(반경 수십 m) 낮게·크게 두면 화면을 통째로 덮는다.
     // '하늘에 떠 있는 먼 태양'으로 읽히도록 <b>높이 올리고 크기는 줄인다</b>.
-    private const float  Height    = 14f;    // 머리 위 상공 높이
+    // ⚠️ 이 셋은 서로 물려 있다. 태양은 <b>플레이어에 붙어 따라다니므로</b> 항상 화면 안에 있고,
+    //    크기를 조금만 키워도 프레임을 통째로 덮는다. 게다가 HDR 파티클이라 Bloom이 한 번 더 부풀린다 —
+    //    정오 진입 순간 화면이 하얗게 날아가 앞이 안 보이던 원인이 여기였다(2026-08-14 QA).
+    //    '하늘에 떠 있는 먼 태양'으로 읽히려면 <b>더 높이, 더 작게</b>가 맞다.
+    private const float  Height    = 20f;    // 머리 위 상공 높이
     private const float  Forward   = 1.6f;   // 캐릭터 정면(로컬 +Z)으로 살짝 앞 — 카메라 가림 완화(높이는 유지)
-    private const float  Scale     = 2.5f;   // 태양 크기(머리 위 정오 태양)
+    private const float  Scale     = 1.0f;   // 태양 크기(머리 위 정오 태양)
     private const float  FadeTime  = 0.4f;   // 등장/퇴장 페이드
 
     private Transform _host;
