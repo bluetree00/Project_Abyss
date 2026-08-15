@@ -1,3 +1,5 @@
+using System;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -92,7 +94,22 @@ public class UI_Lobby : UI_Scene
 
     private void OnClickAwakening()
     {
-        Managers.UI.ShowPopupUI<UI_AwakeningPanel>();
+        OpenAltarReadOnlyAsync().Forget();
+    }
+
+    /// <summary>
+    /// 로비에서는 기억의 제단을 <b>조회 전용</b>으로 연다.
+    /// <para>여기서 해금까지 되면 거점에 돌아올 이유가 사라지고, 「죽음 → 복귀 동선 → 재출발」이라는
+    /// 전체 설계가 무의미해진다. 정수를 쓰는 것은 거점 제단에서만.</para>
+    /// </summary>
+    private async UniTaskVoid OpenAltarReadOnlyAsync()
+    {
+        try
+        {
+            var panel = await Managers.UI.ShowPopupUIAndGetAsync<UI_AwakeningPanel>();
+            if (panel != null) panel.ReadOnly = true;
+        }
+        catch (OperationCanceledException) { }
     }
 
     private void OnClickExit()
