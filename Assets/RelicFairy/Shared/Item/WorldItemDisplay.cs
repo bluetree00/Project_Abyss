@@ -173,16 +173,9 @@ public class WorldItemDisplay : MonoBehaviour
         var hud = UnityEngine.Object.FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
         if (hud == null || _runtimeData == null) return;
 
-        string color = _runtimeData.rarity switch
-        {
-            ItemRarity.Rare => "#00FFFF",
-            ItemRarity.Epic => "#CC66FF",
-            _               => "#FFFFFF",
-        };
-
         // 효과 요약
         var sb = new System.Text.StringBuilder();
-        sb.Append($"<color={color}>{_runtimeData.displayName}</color> 획득!");
+        sb.Append($"<color=#{RarityColorTable.GetHex(_runtimeData.rarity)}>{_runtimeData.displayName}</color> 획득!");
 
         foreach (var eff in _runtimeData.effects)
         {
@@ -272,7 +265,7 @@ public class WorldItemDisplay : MonoBehaviour
         _worldText.text = _runtimeData.displayName;
         _worldText.fontSize = textSize;
         _worldText.alignment = TextAlignmentOptions.Center;
-        _worldText.color = GetRarityColor(_runtimeData.rarity);
+        _worldText.color = RarityColorTable.Get(_runtimeData.rarity);
         _worldText.textWrappingMode = TextWrappingModes.NoWrap;
         _worldText.sortingOrder = UISortingOrder.WorldLabel;
 
@@ -281,14 +274,6 @@ public class WorldItemDisplay : MonoBehaviour
         if (_camTransform != null)
             _worldText.transform.rotation = _camTransform.rotation;
     }
-
-    private static Color GetRarityColor(ItemRarity rarity) => rarity switch
-    {
-        ItemRarity.Common => Color.white,
-        ItemRarity.Rare   => Color.cyan,
-        ItemRarity.Epic   => new Color(0.8f, 0.4f, 1f),
-        _                 => Color.white,
-    };
 
     // ── 월드 프롬프트 ([F] 얻기) ────────────────────────────
 
