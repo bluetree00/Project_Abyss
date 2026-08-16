@@ -54,8 +54,8 @@ public class UI_Pause : UI_Popup
 		Bind<TextMeshProUGUI>(typeof(Texts));
 		Bind<Button>(typeof(Buttons));
 
-		GetTMPText((int)Texts.resumeText).text = "Resume";
-		GetTMPText((int)Texts.exitText).text = "Exit";
+		GetTMPText((int)Texts.resumeText).text = "계속하기";
+		GetTMPText((int)Texts.exitText).text = "나가기";
 
 		// 버튼 이벤트 바인딩
 		GameObject tabChapter = GetButton((int)Buttons.Tab_Chapter).gameObject;
