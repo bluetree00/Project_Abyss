@@ -82,7 +82,9 @@ public sealed class AnimatorOverrideService
 
     /// <summary>
     /// 유물 오버라이드 — <b>무기 교체(<see cref="ResetOverrides"/>)로 되돌아가지 않는다.</b>
-    /// Q 슬롯은 유물 전용이라 원복 대상(_dirtyKeys)에 넣지 않는다.
+    /// 원복 대상(_dirtyKeys)에 넣지 않는 것이 유일한 차이다.
+    /// 유물 Q는 전용 상태(RelicQ_*)를 쓰므로 보통은 무기와 키가 겹치지 않지만,
+    /// 공용 상태를 쓰는 유물이 생겨도 무기 교체에 지워지지 않도록 여기서 보장한다.
     /// </summary>
     public bool OverrideRelic(string keyName, AnimationClip newClip)
     {

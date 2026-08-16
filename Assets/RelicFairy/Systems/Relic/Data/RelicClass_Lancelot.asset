@@ -57,7 +57,7 @@ MonoBehaviour:
   passives: []
   qSkillClipKey: 
   qSkillClipSequence:
-  - stateName: QSkill_01
+  - stateName: RelicQ_Slash1
     clipKey: RelicQ_Slash1
   - stateName: RelicQ_Slash2
     clipKey: RelicQ_Slash2

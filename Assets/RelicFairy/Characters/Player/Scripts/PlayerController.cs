@@ -912,7 +912,7 @@ public class PlayerController : CharacterBase
     }
 
     /// <summary>
-    /// 유물 Q 애니 클립을 로드해 <b>유물 레인</b>으로 오버라이드한다(무기 교체로 지워지지 않는다).
+    /// 유물 Q 애니 클립을 로드해 유물 전용 상태(RelicQ_*)에 물린다 — 무기 교체로 지워지지 않는다.
     ///
     /// 유물 클립 키는 무기 프리로드 경로(PreloadWeaponClipsAsync)에 포함되지 않아 캐시에 없다 —
     /// 그래서 여기서 직접 로드한 뒤 오버라이드한다. 로드는 비동기지만 Q 입력 전까지만 끝나면 되므로
@@ -1874,10 +1874,6 @@ public class PlayerController : CharacterBase
         var animSet = newWeapon.animationSet;
         foreach (var mapping in animSet.GetAllMappings())
         {
-            // Q 슬롯은 유물 전용이다 — 무기 스킬은 E/R로 옮겨갔고, 애님셋에 남은 QSkill 매핑은 레거시 잔재다.
-            // 여기서 덮으면 유물이 건 Q 모션이 무기 장착 순간 사라진다. 데이터는 그대로 두고 참조만 끊는다.
-            if (mapping.actionType == WeaponActionType.QSkill) continue;
-
             var clip = Managers.AnimationResources.GetClip(mapping.addressableKey);
             if (clip == null) continue; // 어드레서블 미등록 — AnimationResourceManager 가 이미 경고했다.
 

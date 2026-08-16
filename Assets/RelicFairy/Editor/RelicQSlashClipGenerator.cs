@@ -31,10 +31,11 @@ public static class RelicQSlashClipGenerator
     private const string GroupName      = "Animations";
     private const float  StateSpeed     = 2f;            // QSkill_01과 동일 — 참격 템포를 맞춘다
 
-    // addState=false : 시퀀스 1단은 기존 QSkill_01 상태에 오버라이드로 얹으므로 새 상태가 필요 없다.
+    // 세 단계 모두 전용 상태를 쓴다 — QSkill_01은 무기 E/R 스킬(Katana HolySlash·PhantomDance, Bow FocusShot)이
+    // animationOverride로 직접 지목하는 공용 상태라, 유물이 여기 끼면 무기 스킬 모션이 유물 참격으로 바뀐다.
     private static readonly (string fbx, string clip, string outName, bool addState)[] Sources =
     {
-        ("Assets/RelicFairy/Animations/Player/Test_01/Attack/NormalAttack_1.FBX", "GroundLightAttack_01", "RelicQ_Slash1", false),
+        ("Assets/RelicFairy/Animations/Player/Test_01/Attack/NormalAttack_1.FBX", "GroundLightAttack_01", "RelicQ_Slash1", true),
         ("Assets/RelicFairy/Animations/Player/Test_01/Attack/NormalAttack_2.FBX", "GroundLightAttack_02", "RelicQ_Slash2", true),
         ("Assets/RelicFairy/Animations/Player/Test_01/Attack/NormalAttack_3.FBX", "GroundLightAttack_03", "RelicQ_Slash3", true),
     };
