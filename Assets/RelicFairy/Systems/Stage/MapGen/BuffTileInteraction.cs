@@ -187,7 +187,7 @@ public class BuffTileInteraction : MonoBehaviour
         _promptGo.transform.localPosition = Vector3.up * PromptOffsetY;
 
         _promptText = _promptGo.AddComponent<TextMeshPro>();
-        _promptText.text = "<color=#FFD700>[F]</color> 열기";
+        _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> 열기";
         _promptText.fontSize = 4f;
         _promptText.alignment = TextAlignmentOptions.Center;
         _promptText.color = Color.white;

@@ -690,12 +690,7 @@ public class InventoryPageView : MonoBehaviour
         _hoveredItem = item;
 
         // 내용 구성
-        string rarityColor = item.rarity switch
-        {
-            ItemRarity.Rare => "#00FFFF",
-            ItemRarity.Epic => "#CC66FF",
-            _ => "#FFFFFF",
-        };
+        string rarityColor = $"#{RarityColorTable.GetHex(item.rarity)}";
 
         string text = $"<color={rarityColor}><b>{item.displayName}</b></color>\n";
         text += $"<size=10><color=#AAAAAA>{item.rarity} · {item.category}</color></size>\n";

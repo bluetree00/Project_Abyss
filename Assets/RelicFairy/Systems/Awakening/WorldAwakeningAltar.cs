@@ -138,7 +138,7 @@ public class WorldAwakeningAltar : MonoBehaviour
         _promptText.textWrappingMode = TextWrappingModes.NoWrap;
         _promptText.sortingOrder = UISortingOrder.WorldPrompt;
         TMPOutlineHelper.ApplyDefault(_promptText);
-        _promptText.text = "<color=#FFD700>[F]</color> 각성 관리";
+        _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> 각성 관리";
 
         _promptGo.SetActive(false);
     }

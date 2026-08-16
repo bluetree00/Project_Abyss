@@ -453,7 +453,7 @@ public class ClearRewardTrigger : MonoBehaviour
         var textGO = new GameObject("PromptText");
         textGO.transform.SetParent(panelGO.transform, false);
         var tmp    = textGO.AddComponent<TextMeshProUGUI>();
-        tmp.text      = "<color=#FFD700>[F]</color>  보상 수령";
+        tmp.text      = $"<color={UIPalette.GoldHex}>[F]</color>  보상 수령";
         tmp.fontSize  = 20f;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color     = Color.white;

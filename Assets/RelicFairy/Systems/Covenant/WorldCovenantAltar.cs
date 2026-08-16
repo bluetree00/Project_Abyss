@@ -265,7 +265,7 @@ public class WorldCovenantAltar : MonoBehaviour
         _promptText.textWrappingMode = TextWrappingModes.NoWrap;
         _promptText.sortingOrder = UISortingOrder.WorldPrompt;
         TMPOutlineHelper.ApplyDefault(_promptText);
-        _promptText.text = "<color=#FFD700>[F]</color> 서약 조립";
+        _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> 서약 조립";
 
         _promptGo.SetActive(false);
     }

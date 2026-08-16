@@ -118,7 +118,7 @@ public sealed class RangedPartsTestAltar : MonoBehaviour
 
         var t = _promptGo.AddComponent<TextMeshPro>();
         if (worldTextFont != null) t.font = worldTextFont;
-        t.text      = "<color=#FFD700>[F]</color> 파츠 테스트";
+        t.text      = $"<color={UIPalette.GoldHex}>[F]</color> 파츠 테스트";
         t.fontSize  = 4f;
         t.alignment = TextAlignmentOptions.Center;
         t.color     = Color.white;

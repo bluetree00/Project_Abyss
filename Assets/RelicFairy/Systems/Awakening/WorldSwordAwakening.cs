@@ -237,7 +237,7 @@ public sealed class WorldSwordAwakening : MonoBehaviour
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.sortingOrder = UISortingOrder.WorldPrompt;
         TMPOutlineHelper.ApplyDefault(tmp);
-        tmp.text = "<color=#FFD700>[F]</color> 검을 쥔다";
+        tmp.text = $"<color={UIPalette.GoldHex}>[F]</color> 검을 쥔다";
 
         _promptGo.SetActive(false);
     }

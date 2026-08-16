@@ -89,7 +89,7 @@ public sealed class GambleBoxChallenge : MonoBehaviour, IInteractionChallenge
     private void CreateVisuals()
     {
         _label  = MakeText("도박 상자", _boxPos + Vector3.up * LabelHeight, 3f, new Color(0.95f, 0.8f, 0.35f), 10);
-        _prompt = MakeText("<color=#FFD700>[F]</color> 개봉", _boxPos + Vector3.up * PromptHeight, 4f, Color.white, 11);
+        _prompt = MakeText($"<color={UIPalette.GoldHex}>[F]</color> 개봉", _boxPos + Vector3.up * PromptHeight, 4f, Color.white, 11);
         _prompt.gameObject.SetActive(false);
     }
 
