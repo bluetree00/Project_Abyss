@@ -152,6 +152,35 @@ public static class ShopUIStyle
         return tmp;
     }
 
+    /// <summary>
+    /// 코드로 만든 버튼에 <b>눌림 연출</b>을 건다.
+    ///
+    /// 런타임 <c>AddComponent&lt;Button&gt;</c>에는 에디터의 Reset이 돌지 않아 <c>targetGraphic</c>이 비어 있다 —
+    /// 그 상태에선 ColorBlock을 아무리 채워도 색이 한 번도 바뀌지 않는다(그래서 코드 생성 버튼들이
+    /// 눌러도 아무 반응이 없었다). 그래픽을 여기서 함께 물려 둔다.
+    ///
+    /// 틴트는 <c>CanvasRenderer</c> 색이라 <c>Image.color</c> 위에 <b>곱해진다</b> — 아트를 얹은 버튼이나
+    /// 상태색을 손수 칠하는 버튼(정제소 Tint 등)에 걸어도 평상시 모습은 그대로다.
+    /// </summary>
+    public static void ApplyButtonColors(Button btn, Graphic target = null)
+    {
+        if (btn == null) return;
+
+        var g = target != null ? target : btn.GetComponent<Graphic>();
+        if (g == null) return;   // 칠할 대상이 없으면 전환을 켜 봐야 의미가 없다
+
+        btn.targetGraphic = g;
+        btn.transition    = Selectable.Transition.ColorTint;
+
+        var cb = btn.colors;
+        cb.normalColor      = Color.white;
+        cb.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
+        cb.pressedColor     = new Color(0.85f, 0.85f, 0.85f, 1f);
+        cb.disabledColor    = new Color(1f, 1f, 1f, 0.45f);   // 곱셈이라 알파로 죽인다(아트 버튼도 같은 규약)
+        cb.fadeDuration     = 0.08f;
+        btn.colors = cb;
+    }
+
     public static void Stretch(RectTransform rt, float pad = 0f)
     {
         rt.anchorMin = Vector2.zero;

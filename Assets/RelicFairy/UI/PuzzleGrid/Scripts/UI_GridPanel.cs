@@ -1462,6 +1462,7 @@ public sealed class UI_GridPanel : UI_Base
 
     private void OnBackClicked()
     {
+        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
         ClosePanel();
     }
 
@@ -1485,7 +1486,14 @@ public sealed class UI_GridPanel : UI_Base
 
     private void OnResetClicked()
     {
-        if (_totalPlacedCells == 0) return;
+        // 배치가 없으면 확인 대화상자를 띄울 것도 없다 — 다만 조용히 삼키면 버튼이 죽은 것으로 읽힌다.
+        if (_totalPlacedCells == 0)
+        {
+            ShopUIStyle.PlaySfx("shop_reject");
+            ShowToast("배치된 룬이 없습니다");
+            return;
+        }
+        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
         ShowResetConfirmDialog();
     }
 
@@ -1515,6 +1523,8 @@ public sealed class UI_GridPanel : UI_Base
 
     private void OnConfirmClicked()
     {
+        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+
         if (_inventory == null || _inventory.StagingCount == 0)
         {
             ClosePanel();

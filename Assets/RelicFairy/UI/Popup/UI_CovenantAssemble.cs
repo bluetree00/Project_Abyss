@@ -551,7 +551,26 @@ public class UI_CovenantAssemble : UI_Popup
     private static bool IsOwned(string id)
         => GameRunBootstrapper.Instance?.Run?.CovenantHandler?.Has(id) ?? false;
 
-    private void RefreshRerollText() => SetText(_rerollCountText, $"리롤 {_rerollsLeft}");
+    /// <summary>
+    /// 남은 리롤 표시 + <b>카드의 리롤 버튼 게이팅</b>. 소진 뒤에도 버튼이 멀쩡히 켜져 있으면
+    /// 눌러도 아무 일이 없어(<see cref="Reroll"/>의 첫 줄에서 return) 고장으로 읽힌다.
+    /// 고르는 버튼(SelectButton)은 건드리지 않는다 — 리롤이 떨어져도 서약은 골라야 한다.
+    /// </summary>
+    private void RefreshRerollText()
+    {
+        SetText(_rerollCountText, $"리롤 {_rerollsLeft}");
+
+        bool canReroll = _rerollsLeft > 0;
+        GateReroll(_causeCards,  canReroll);
+        GateReroll(_effectCards, canReroll);
+    }
+
+    private static void GateReroll(UI_AssembleCard[] cards, bool on)
+    {
+        if (cards == null) return;
+        for (int i = 0; i < cards.Length; i++)
+            if (cards[i] && cards[i].RerollButton) cards[i].RerollButton.interactable = on;
+    }
 
     // ── 연마 ─────────────────────────────────────────────
     /// <summary>

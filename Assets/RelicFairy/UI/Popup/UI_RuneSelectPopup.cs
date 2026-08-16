@@ -812,7 +812,10 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
         bool hasSel = index >= 0;
         if (_confirmLabel != null)
+        {
             _confirmLabel.color = hasSel ? ShopUIStyle.TextPrimary : ShopUIStyle.TextDim;
+            if (hasSel) _confirmLabel.text = "선택";   // 미선택 안내를 띄웠다면 되돌린다
+        }
         if (_confirmBtnImg != null)
             _confirmBtnImg.color = _skinned ? (hasSel ? Color.white : new Color(1f, 1f, 1f, 0.5f))
                                             : (hasSel ? ShopUIStyle.GoldPillBg : ShopUIStyle.BandFill);
@@ -831,7 +834,12 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private void OnConfirmClicked()
     {
         if (_selected < 0 || _candidates == null || _selected >= _candidates.Count)
-            return;   // 미선택 — 아무 일도 하지 않는다
+        {
+            // 미선택 — 예전엔 조용히 return이라 버튼이 죽은 것으로 읽혔다. 무엇이 빠졌는지 버튼이 직접 말한다.
+            ShopUIStyle.PlaySfx("shop_reject");
+            if (_confirmLabel != null) _confirmLabel.text = "카드를 고르세요";
+            return;
+        }
 
         Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
         var item = _candidates[_selected].data;
@@ -878,7 +886,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private static void AddClick(GameObject go, Action onClick)
     {
         var btn = go.GetComponent<Button>() ?? go.AddComponent<Button>();
-        btn.transition = Selectable.Transition.None;
+        ShopUIStyle.ApplyButtonColors(btn);
         btn.onClick.AddListener(() => onClick?.Invoke());
     }
 

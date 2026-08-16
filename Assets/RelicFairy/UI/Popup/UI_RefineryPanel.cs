@@ -268,7 +268,8 @@ public sealed class UI_RefineryPanel : UI_Popup
             TextAlignmentOptions.Center, ShopUIStyle.TextDim);
         ShopUIStyle.Anchor(_hint.rectTransform, Half, Half, Half,
             new Vector2(AltarCx, -224f), new Vector2(640f, 20f));
-        _hint.text = "";
+        // 열자마자 무엇부터 해야 하는지 — 고른 것이 생기면 Select가 지운다.
+        _hint.text = "정제할 속성 젬을 하나 고르세요";
     }
 
     /// <summary>
@@ -426,8 +427,17 @@ public sealed class UI_RefineryPanel : UI_Popup
 
     private void OnSpinClicked()
     {
-        if (_busy || _svc == null || _selectedElement == null) return;
-        if (!_svc.CanAfford) { _hint.text = "원석이 부족합니다"; return; }
+        if (_busy || _svc == null) return;
+
+        // 미선택은 예전엔 조용히 return이었다 — 버튼이 흐린 이유를 화면 어디서도 말하지 않아
+        // "고장난 버튼"으로 읽혔다. 거절에는 반드시 사유가 붙는다.
+        if (_selectedElement == null)
+        {
+            _hint.text = "속성 젬을 하나 고르세요";
+            ShopUIStyle.PlaySfx("shop_reject");
+            return;
+        }
+        if (!_svc.CanAfford) { _hint.text = "원석이 부족합니다"; ShopUIStyle.PlaySfx("shop_reject"); return; }
         SpinAsync().Forget();
     }
 
@@ -458,7 +468,17 @@ public sealed class UI_RefineryPanel : UI_Popup
 
     private void OnReforgeClicked()
     {
-        if (_busy || _svc == null || !_svc.CanReforge) return;
+        if (_busy || _svc == null) return;
+
+        // 재점화는 '한 번 뽑은 결과'가 있어야 쓸 수 있고 런당 1회뿐이다 — 어느 쪽으로 막혔는지 말해 준다.
+        if (!_svc.CanReforge)
+        {
+            _hint.text = _selectedElement == null || _resultBox == null || !_resultBox.gameObject.activeSelf
+                ? "먼저 돌려서 룬을 뽑으세요"
+                : "재점화는 한 번뿐입니다";
+            ShopUIStyle.PlaySfx("shop_reject");
+            return;
+        }
         ReforgeAsync().Forget();
     }
 
@@ -607,7 +627,7 @@ public sealed class UI_RefineryPanel : UI_Popup
     private static void AddClick(GameObject go, Action onClick)
     {
         var btn = go.GetComponent<Button>() ?? go.AddComponent<Button>();
-        btn.transition = Selectable.Transition.None;
+        ShopUIStyle.ApplyButtonColors(btn);
         btn.onClick.AddListener(() => onClick?.Invoke());
     }
 }

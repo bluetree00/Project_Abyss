@@ -105,11 +105,11 @@ public class UI_AwakeningPanel : UI_Popup
     {
         base.Init();
 
-        if (closeButton  != null) closeButton.onClick.AddListener(ClosePopupUI);
+        if (closeButton  != null) closeButton.onClick.AddListener(OnCloseClicked);
         if (actionButton != null) actionButton.onClick.AddListener(OnActionClicked);
 
-        if (achievementTab != null) achievementTab.onClick.AddListener(() => SetMode(true));
-        if (unlockTab      != null) unlockTab.onClick.AddListener(() => SetMode(false));
+        if (achievementTab != null) achievementTab.onClick.AddListener(() => { PlayClickSfx(); SetMode(true); });
+        if (unlockTab      != null) unlockTab.onClick.AddListener(() => { PlayClickSfx(); SetMode(false); });
 
         if (rowTemplate != null) rowTemplate.gameObject.SetActive(false);
 
@@ -323,7 +323,8 @@ public class UI_AwakeningPanel : UI_Popup
         if (state.Node == null)
         {
             SetActionText("전부 열었다", "이제 남은 것은 깊이뿐이다", "");
-            SetActionButton(false, "닫기", "");
+            // 「닫기」라고 써 두면 눌리지 않는 버튼이 고장으로 읽힌다 — 업적 탭의 빈 상태와 같은 표기로 맞춘다.
+            SetActionButton(false, "—", "");
             return;
         }
 
@@ -419,9 +420,17 @@ public class UI_AwakeningPanel : UI_Popup
 
     private static int WaitingAchievements() => Managers.Quest?.WaitingAchievementCount() ?? 0;
 
+    private static void PlayClickSfx() => Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+
     private void HandleClaimed() => Refresh();
 
     // ── Event Handlers ────────────────────────────────────────────────────
+
+    private void OnCloseClicked()
+    {
+        PlayClickSfx();
+        ClosePopupUI();
+    }
 
     private void OnActionClicked()
     {
@@ -434,9 +443,29 @@ public class UI_AwakeningPanel : UI_Popup
         var node = _selected ?? MemoryAltarService.GetNextGoal()?.Node;
         if (node == null) return;
 
-        if (!MemoryAltarService.TryUnlock(node)) { Refresh(); return; }
+        // 되돌릴 수 없는 메타 진행이다 — 열렸는지 아닌지가 소리와 움직임으로도 남아야 한다.
+        if (!MemoryAltarService.TryUnlock(node))
+        {
+            ShopUIStyle.PlaySfx("shop_reject");
+            Refresh();
+            return;
+        }
 
+        ShopUIStyle.PlaySfx("enhance_success");
+        PunchActionButtonAsync().Forget();
         SaveAndRefreshAsync().Forget();
+    }
+
+    /// <summary>해금 직후 행동 버튼을 한 번 튕긴다(팝업은 timeScale=0이라 unscaled 트윈뿐이다).</summary>
+    private async UniTaskVoid PunchActionButtonAsync()
+    {
+        if (actionButton == null) return;
+        try
+        {
+            await UIJuice.PunchAsync((RectTransform)actionButton.transform, 0.12f, 0.25f,
+                                     this.GetCancellationTokenOnDestroy());
+        }
+        catch (OperationCanceledException) { }
     }
 
     private async UniTaskVoid SaveAndRefreshAsync()

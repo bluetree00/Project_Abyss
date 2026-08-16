@@ -453,7 +453,13 @@ public sealed class UI_ShopPanel : UI_Popup
         _rerollBtn.gameObject.SetActive(enabled);
         if (!enabled) return;
 
-        bool artTruthful = _skin?.rerollButton != null && _controller.RerollCost == RerollCostBakedInArt;
+        // 골드가 모자라면 눌러도 거절음만 났다 — 살 수 있는지를 버튼이 먼저 보여준다(구매 버튼과 같은 규약).
+        // 그러면 아트에 구워진 가격만으로는 '왜 안 되는지'를 말할 수 없으므로, 그때만 아트를 걷어내고
+        // 사유를 글자로 그린다(가격이 어긋날 때 아트를 걷어내는 이 메서드의 기존 처리와 같은 방식).
+        bool affordable  = _controller.PlayerGold >= _controller.RerollCost;
+        bool artTruthful = _skin?.rerollButton != null && _controller.RerollCost == RerollCostBakedInArt && affordable;
+
+        _rerollBtn.interactable = affordable;
 
         if (_rerollImg != null)
         {
@@ -464,7 +470,9 @@ public sealed class UI_ShopPanel : UI_Popup
         if (_rerollLabel != null)
         {
             _rerollLabel.gameObject.SetActive(!artTruthful);
-            _rerollLabel.text = $"새로고침  {_controller.RerollCost}";
+            _rerollLabel.text = affordable
+                ? $"새로고침  {_controller.RerollCost}"
+                : $"<color=#FF5250>골드 부족</color>  {_controller.RerollCost}";   // 230px 버튼 — 사유를 앞에 짧게
         }
     }
 
@@ -691,7 +699,7 @@ public sealed class UI_ShopPanel : UI_Popup
     private static void AddClick(GameObject go, System.Action onClick)
     {
         var btn = go.GetComponent<Button>() ?? go.AddComponent<Button>();
-        btn.transition = Selectable.Transition.None;
+        ShopUIStyle.ApplyButtonColors(btn);
         btn.onClick.AddListener(() => onClick?.Invoke());
     }
 
@@ -703,13 +711,7 @@ public sealed class UI_ShopPanel : UI_Popup
         ShopUIStyle.Skin(img, skin, sliced: true);
 
         var btn = go.GetComponent<Button>();
-        var cb = btn.colors;
-        cb.normalColor = Color.white;
-        cb.highlightedColor = new Color(1.12f, 1.12f, 1.12f, 1f);
-        cb.pressedColor = new Color(0.86f, 0.86f, 0.86f, 1f);
-        cb.disabledColor = new Color(1f, 1f, 1f, 0.4f);
-        cb.fadeDuration = 0.08f;
-        btn.colors = cb;
+        ShopUIStyle.ApplyButtonColors(btn, img);
 
         labelText = ShopUIStyle.MakeText(go.transform, "Label", 16f, FontStyles.Bold,
                                          TextAlignmentOptions.Center, ShopUIStyle.Gold);

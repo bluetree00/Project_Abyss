@@ -284,7 +284,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         t.text = label;
         ShopUIStyle.Stretch(t.rectTransform);
         var btn = tab.gameObject.AddComponent<Button>();
-        btn.transition = Selectable.Transition.None;
+        ShopUIStyle.ApplyButtonColors(btn, tab);
         btn.onClick.AddListener(() => onClick?.Invoke());
         return tab;
     }
@@ -744,7 +744,7 @@ public sealed class UI_CruciblePanel : UI_Popup
 
             int idx = i;   // 클로저 캡처 — 루프 변수를 그대로 쓰면 전 슬롯이 마지막 인덱스를 가리킨다
             var btn = slot.gameObject.AddComponent<Button>();
-            btn.transition = Selectable.Transition.None;
+            ShopUIStyle.ApplyButtonColors(btn, slot);
             btn.onClick.AddListener(() => SelectPartSlot(idx));
 
             // 호버 미리보기 — 손을 올리면 상세가 임시로 그 파츠를 보여주고, 떼면 선택한 것으로 돌아온다.
@@ -816,7 +816,7 @@ public sealed class UI_CruciblePanel : UI_Popup
 
             int idx = i;
             var btn = b.gameObject.AddComponent<Button>();
-            btn.transition = Selectable.Transition.None;
+            ShopUIStyle.ApplyButtonColors(btn, b);
             btn.onClick.AddListener(() => ClaimPart(idx));
         }
 
@@ -1266,7 +1266,7 @@ public sealed class UI_CruciblePanel : UI_Popup
                            new Vector2(0, 30), new Vector2(-24, 24));
 
         var pick = card.transform.parent.gameObject.AddComponent<Button>();
-        pick.transition = Selectable.Transition.None;
+        ShopUIStyle.ApplyButtonColors(pick);
         return pick;
     }
 
@@ -1342,8 +1342,11 @@ public sealed class UI_CruciblePanel : UI_Popup
         if (wm == null || wd == null) { HideEvolvePanel(); return; }
 
         // 조건: 강화 레벨
+        // 거절 사유는 진화 패널이 <b>덮고 있는</b> 정보창에 뜬다 — 패널을 닫아야 그 줄이 보인다
+        // (성공 경로와 같은 처리).
         if (!WeaponEvolutionSO.IsUnlocked(b, wd.enhanceLevel))
         {
+            HideEvolvePanel();
             if (_resultText != null)
                 _resultText.text = $"<color=#C7554A>강화 {b.requiredEnhanceLevel} 이상이어야 한다</color>";
             ShopUIStyle.PlaySfx("shop_reject");
@@ -1354,6 +1357,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         var fuel = _controller.Run?.FuelBank;
         if (b.cost > 0 && !(fuel?.TrySpend(FuelKind.EnhanceMaterial, b.cost) ?? false))
         {
+            HideEvolvePanel();
             if (_resultText != null) _resultText.text = "<color=#C7554A>재료가 부족하다</color>";
             ShopUIStyle.PlaySfx("shop_reject");
             return;
@@ -1400,15 +1404,10 @@ public sealed class UI_CruciblePanel : UI_Popup
     private static Button MakeStyledButton(Transform parent, string name, string label, out TMP_Text labelText)
     {
         var go = ShopUIStyle.MakeRect(parent, name, typeof(Image), typeof(Button));
-        go.GetComponent<Image>().color = ShopUIStyle.BuyFill;
+        var img = go.GetComponent<Image>();
+        img.color = ShopUIStyle.BuyFill;
         var btn = go.GetComponent<Button>();
-        var cb = btn.colors;
-        cb.normalColor = Color.white;
-        cb.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
-        cb.pressedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
-        cb.disabledColor = ShopUIStyle.BuyDisabled;
-        cb.fadeDuration = 0.08f;
-        btn.colors = cb;
+        ShopUIStyle.ApplyButtonColors(btn, img);
         labelText = ShopUIStyle.MakeText(go.transform, "Label", 18f, FontStyles.Bold,
                                          TextAlignmentOptions.Center, ShopUIStyle.Gold);
         labelText.text = label;
@@ -2197,8 +2196,10 @@ public sealed class UI_CruciblePanel : UI_Popup
             return;
         }
 
-        // 무기 탭 복귀 — 파츠 탭에서 껐던 버튼을 되살린다(안 그러면 탭을 옮겨도 꺼진 채 남는다).
-        if (_enhanceBtn != null) _enhanceBtn.interactable = true;
+        // 무기 탭 복귀 — 예전엔 여기서 무조건 켰다. 무기가 없거나 최대치거나 재료가 모자라도 눌리는 버튼이라
+        // 누르면 거절 문구만 뜨는 '고장난 버튼'이 됐다. 아래 분기가 조건을 만족할 때만 다시 켠다
+        // (파츠 강화·원거리 강화 버튼과 같은 규약).
+        if (_enhanceBtn != null) _enhanceBtn.interactable = false;
 
         var w = _controller.GetSlot(_targetSlot);
         if (w == null)
@@ -2222,8 +2223,14 @@ public sealed class UI_CruciblePanel : UI_Popup
         {
             float chance = _controller.SuccessChanceAt(_targetSlot);
             int cost = _controller.CostAt(_targetSlot);
+            int have = _controller.FuelAmount;
             _successText.text = $"성공률 <color=#7AD46E>{chance * 100f:F0}%</color>";
-            _costText.text = $"재료 {cost}";
+            _costText.text = have >= cost
+                ? $"재료 {cost} <color=#9A98A0>/ 보유 {have}</color>"
+                : $"<color=#FF5250>재료 {cost}</color> <color=#9A98A0>/ 보유 {have}</color>";
+
+            // 연출 중에도 켜 둔다 — 재입력이 연출을 건너뛰고 다음 강화로 이어지는 경로(QueueWhileAnimating).
+            if (_enhanceBtn != null) _enhanceBtn.interactable = have >= cost;
         }
 
         _streakText.text = _controller.Streak > 0 ? $"▲ 연속 {_controller.Streak}" : "";

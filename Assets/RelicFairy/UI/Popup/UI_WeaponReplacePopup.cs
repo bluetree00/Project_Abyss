@@ -126,6 +126,7 @@ public class UI_WeaponReplacePopup : UI_Popup
 
     private void Complete(int? slotIndex)
     {
+        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
         _tcs?.TrySetResult(slotIndex);
         ClosePopupUI();
     }

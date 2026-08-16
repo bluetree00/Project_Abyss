@@ -113,6 +113,7 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
 
     private void OnOpenGridClicked()
     {
+        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
         _interactionTcs?.TrySetResult();
 
         if (_item == null || _inventory == null) { ClosePopupUI(); return; }
@@ -138,6 +139,7 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
 
     private void OnRejectClicked()
     {
+        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
         _interactionTcs?.TrySetResult();
         ClosePopupUI();
     }
