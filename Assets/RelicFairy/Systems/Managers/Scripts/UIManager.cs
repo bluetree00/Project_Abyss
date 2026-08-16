@@ -26,7 +26,6 @@ public class UIManager
     private Transform _worldRoot;   // Canvas_WorldSpace
 
     // 루트가 주입된 경우 DDOL 캔버스 자식으로, 아니면 레거시 @UI_Root 사용
-    private Transform SceneParent => _sceneRoot != null ? _sceneRoot : GetLegacyRoot();
     private Transform PopupParent => _popupRoot != null ? _popupRoot : GetLegacyRoot();
 
     private bool IsRootInjected => _sceneRoot != null;
@@ -44,13 +43,28 @@ public class UIManager
     }
 
     /// <summary>
-    /// 레거시 폴백: @UIRoot 미사용 환경(테스트 씬 등)에서 자체 Root 생성
+    /// 레거시 폴백: @UIRoot 미사용 환경(테스트 씬 등)에서 자체 Root 생성.
+    /// ⚠️ 과거엔 Canvas 없는 빈 GameObject였다 — 팝업이 자기 Canvas로 홀로 서면서
+    /// CanvasScaler가 없어 Constant Pixel Size로 동작(저해상도 잘림/고해상도 축소).
+    /// 프로젝트 표준(1920×1080 / ScaleWithScreenSize / Match 0.5) 캔버스를 부착한다.
     /// </summary>
     private Transform GetLegacyRoot()
     {
         GameObject root = GameObject.Find("@UI_Root");
         if (root == null)
             root = new GameObject { name = "@UI_Root" };
+
+        Canvas canvas = Util.GetOrAddComponent<Canvas>(root);
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+        var scaler = Util.GetOrAddComponent<UnityEngine.UI.CanvasScaler>(root);
+        scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
+
+        Util.GetOrAddComponent<UnityEngine.UI.GraphicRaycaster>(root);
+
         return root.transform;
     }
 
