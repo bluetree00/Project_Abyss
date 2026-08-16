@@ -192,6 +192,7 @@ public class BuffTileInteraction : MonoBehaviour
         _promptText.alignment = TextAlignmentOptions.Center;
         _promptText.color = Color.white;
         _promptText.textWrappingMode = TextWrappingModes.NoWrap;
+        _promptText.sortingOrder = UISortingOrder.WorldPrompt;
 
         var rect = _promptGo.GetComponent<RectTransform>();
         rect.sizeDelta = new Vector2(3f, 1f);

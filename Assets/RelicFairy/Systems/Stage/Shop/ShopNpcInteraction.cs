@@ -95,6 +95,7 @@ public class ShopNpcInteraction : MonoBehaviour
         _promptTmp.alignment = TextAlignmentOptions.Center;
         _promptTmp.color = Color.white;
         _promptTmp.textWrappingMode = TextWrappingModes.NoWrap;
+        _promptTmp.sortingOrder = UISortingOrder.WorldPrompt;
         _promptTmp.text = promptText;
 
         TMPOutlineHelper.ApplyDefault(_promptTmp);

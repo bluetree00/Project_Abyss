@@ -26,6 +26,7 @@ public sealed class ExitCompassHud : MonoBehaviour
     private const float AccentW     = 6f;    // 좌측 방 종류 색 띠
     private const float PadX        = 18f;
     private const float ArrowGap    = 26f;   // 배지 왼쪽 바깥 화살표 간격
+    private const float StackGapY   = 10f;   // 같은 변에 몰린 배지끼리 세로로 벌리는 간격
 
     private static readonly Color PlateColor = new(0.04f, 0.05f, 0.08f, 0.88f);
     private static readonly Color SubColor   = new(0.74f, 0.78f, 0.86f, 1f);
@@ -44,6 +45,7 @@ public sealed class ExitCompassHud : MonoBehaviour
     public static ExitCompassHud Instance => _instance;
 
     private readonly List<Entry> _entries = new();
+    private readonly List<Vector2> _placed = new();   // 이번 프레임에 배치된 배지 중심(겹침 해소용, 재사용해 할당 없음)
     private RectTransform _root;
     private Camera        _cam;
     private Canvas        _canvas;   // 배지 폭을 픽셀로 환산해 가장자리 클램프에 쓴다
@@ -192,6 +194,7 @@ public sealed class ExitCompassHud : MonoBehaviour
 
         float w = Screen.width, h = Screen.height;
         var   center = new Vector2(w * 0.5f, h * 0.5f);
+        _placed.Clear();
 
         for (int i = 0; i < _entries.Count; i++)
         {
@@ -233,9 +236,39 @@ public sealed class ExitCompassHud : MonoBehaviour
             pos.x = Mathf.Clamp(pos.x, leftPad + 8f, w - halfW - 8f);
             pos.y = Mathf.Clamp(pos.y, halfH + 8f,  h - halfH - 8f);
 
+            // 출구가 같은 변으로 몰리면 배지가 같은 자리에 겹쳐 한 장만 읽힌다 — 세로로 쌓아 벌린다.
+            pos = StackAwayFromPlaced(pos, halfW, halfH, halfH * 2f + StackGapY * scale, h);
+            _placed.Add(pos);
+
             e.Rect.gameObject.SetActive(true);
             e.Rect.position = pos;                                // Overlay 캔버스 → 스크린 좌표 그대로
         }
+    }
+
+    /// <summary>
+    /// 이미 배치된 배지와 겹치면 아래로 밀어 쌓는다(바닥에 닿으면 위로). 순회 횟수를 배치 수로 묶어
+    /// 밀어낸 자리가 또 겹치는 연쇄도 유한하게 끝난다.
+    /// </summary>
+    private Vector2 StackAwayFromPlaced(Vector2 pos, float halfW, float halfH, float step, float screenH)
+    {
+        float minY = halfH + 8f;
+        float maxY = screenH - halfH - 8f;
+
+        for (int guard = 0; guard < _placed.Count; guard++)
+        {
+            int hit = -1;
+            for (int j = 0; j < _placed.Count; j++)
+            {
+                if (Mathf.Abs(_placed[j].x - pos.x) < halfW * 2f &&
+                    Mathf.Abs(_placed[j].y - pos.y) < halfH * 2f) { hit = j; break; }
+            }
+            if (hit < 0) break;
+
+            float down = _placed[hit].y - step;
+            pos.y = down >= minY ? down : _placed[hit].y + step;
+            pos.y = Mathf.Clamp(pos.y, minY, maxY);
+        }
+        return pos;
     }
 
     /// <summary>중심에서 dir 방향으로 쏜 반직선이 화면(여백 적용) 경계와 만나는 점.</summary>
