@@ -33,6 +33,11 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
     private RunItemInventory           _inventory;
     private UniTaskCompletionSource    _interactionTcs;
 
+    // 등급 연출 대상. 루트는 UI_Popup의 열기 애니가 이미 잡고 있어 창 본체(Panel)를 쓴다.
+    private RectTransform _panelRt;
+    private Image         _panelImage;
+    private TMP_Text      _rejectLabel;
+
     private static readonly Color COLOR_RISK      = new(1f,    0.35f, 0.35f, 1f);
     private static readonly Color COLOR_NORMAL_FX = new(0.85f, 0.92f, 1f,   1f);
     private static readonly Color COLOR_COMMON    = new(0.75f, 0.75f, 0.75f, 1f);
@@ -43,6 +48,12 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
     private const float MINI_CELL_SIZE = 26f;
     private const float MINI_CELL_GAP  = 3f;
 
+    /// <summary>
+    /// 룬 선택 팝업(<see cref="UI_RuneSelectPopup"/>) 대비 연출 강도. 이 알림은 훨씬 자주 뜨므로
+    /// 같은 스펙을 이만큼 눌러 쓴다 — 등급 차등은 남기고 자극만 줄인다.
+    /// </summary>
+    private const float JUICE_SCALE = 0.7f;
+
     // ── Lifecycle ──
     public override void Init()
     {
@@ -51,7 +62,17 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
         if (openGridButton != null)
             openGridButton.onClick.AddListener(OnOpenGridClicked);
         if (rejectButton != null)
+        {
             rejectButton.onClick.AddListener(OnRejectClicked);
+            _rejectLabel = rejectButton.GetComponentInChildren<TMP_Text>(true);
+        }
+
+        // 연출 대상 해석(1회). 못 찾으면 연출만 빠지고 기능은 그대로다.
+        if (transform.Find("Panel") is RectTransform panel)
+        {
+            _panelRt = panel;
+            panel.TryGetComponent(out _panelImage);
+        }
     }
 
     protected override void OnDestroy()
@@ -98,7 +119,9 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
         // 레어도
         if (rarityText != null)
         {
-            rarityText.text  = RarityLabel(item.rarity);
+            // 등급 라벨은 보상 연출과 같은 표기를 쓴다 — 여기 로컬 표는 Epic·Legendary가 같은 ◆라
+            // 최상위가 형태로 구별되지 않았다(RewardPresentation.RarityLabel이 ★로 분리한 그 문제).
+            rarityText.text  = RewardPresentation.RarityLabel(item.rarity);
             rarityText.color = RarityColor(item.rarity);
         }
 
@@ -107,6 +130,12 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
 
         // Shape 미니 프리뷰
         BuildShapePreview(item);
+
+        // 거부의 대가를 버튼에 병기한다 — 확인 창은 끼우지 않는다(원클릭 유지).
+        ApplyRejectWarning();
+
+        // 등급 차등 등장. 결과는 이미 확정이고 여기선 "얼마나 크게 보여줄지"만 정한다.
+        PresentAsync(item.rarity).Forget();
     }
 
     // ── Button Handlers ──
@@ -139,9 +168,66 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
 
     private void OnRejectClicked()
     {
-        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+        // 획득과 소리로 갈린다 — 낮은 피치가 "버렸다"는 확정감을 준다. 흐름은 그대로 원클릭.
+        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton, 1f, 0.72f).Forget();
+        if (_rejectLabel != null)
+            UIJuice.FlashAsync(_rejectLabel, COLOR_RISK, 0.10f, 1, destroyCancellationToken).Forget();
+
         _interactionTcs?.TrySetResult();
         ClosePopupUI();
+    }
+
+    // ── Presentation ──
+
+    /// <summary>
+    /// 거부 버튼에 "돌아오는 것이 없다"를 병기한다.
+    ///
+    /// 보관함 폐기(<see cref="RuneSalvage"/>)와 달리 <b>이 경로엔 원석 환원이 없다</b> —
+    /// 아이템이 인벤토리에 들어가기 전에 버려지기 때문이다. 그래서 환원량 대신 소실을 적는다.
+    /// 확인 창을 끼우지 않는 이유는 원클릭 거부가 이 팝업의 속도이기 때문 — 정보만 늘린다.
+    /// </summary>
+    private void ApplyRejectWarning()
+    {
+        if (_rejectLabel == null) return;
+
+        _rejectLabel.richText = true;
+        _rejectLabel.text     = "거부\n<size=68%><color=#FF9A9A>환원 없이 사라짐</color></size>";
+    }
+
+    /// <summary>
+    /// 등급 차등 등장 연출. <see cref="RewardPresentation"/> 스펙을 그대로 쓰되
+    /// <see cref="JUICE_SCALE"/>만큼 눌러 쓴다(§C-2 스펙표는 룬 선택 팝업 기준).
+    ///
+    /// Common은 스펙상 플래시·펄스가 0이라 조용히 뜨고, Legendary만 회전·2회 플래시·볼륨 펄스까지 붙는다.
+    /// <b>어느 버튼도 이 연출을 기다리지 않는다</b> — 획득·거부는 처음부터 눌린다(§C-1 스킵 규칙).
+    /// </summary>
+    private async UniTaskVoid PresentAsync(ItemRarity rarity)
+    {
+        var spec = RewardPresentation.For(rarity);
+        if (spec.CardPopDuration <= 0f) return;   // 연출 끔
+
+        var ct = destroyCancellationToken;
+        try
+        {
+            Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton, 0.5f, spec.SfxPitch).Forget();
+
+            if (_panelRt != null)
+                await UIJuice.PopInAsync(_panelRt, null, spec.CardPopDuration,
+                                         fromScale:   1f - 0.10f * JUICE_SCALE,
+                                         fromYOffset: -18f * JUICE_SCALE,
+                                         rotZ:        spec.CardPopRotation * JUICE_SCALE, ct);
+
+            // 프레임 플래시 — 창 바탕을 등급색 쪽으로 당겼다 되돌린다. 완전 치환이 아니라
+            // 55% 혼합이라 아이콘·글자가 색에 묻히지 않는다.
+            if (spec.FlashPulses > 0 && _panelImage != null)
+                UIJuice.FlashAsync(_panelImage,
+                                   Color.Lerp(_panelImage.color, RewardPresentation.FrameColor(rarity), 0.55f),
+                                   0.18f * JUICE_SCALE, spec.FlashPulses, ct).Forget();
+
+            if (spec.PulsePeak > 0f)
+                VolumePulseService.Pulse(spec.PulsePeak * JUICE_SCALE, spec.PulseDuration);
+        }
+        catch (System.OperationCanceledException) { }
     }
 
     // ── Effect List ──
@@ -232,13 +318,5 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
         ItemRarity.Epic      => COLOR_EPIC,
         ItemRarity.Legendary => COLOR_LEGENDARY,
         _                    => COLOR_COMMON,
-    };
-
-    private static string RarityLabel(ItemRarity rarity) => rarity switch
-    {
-        ItemRarity.Rare      => "◇ Rare",
-        ItemRarity.Epic      => "◆ Epic",
-        ItemRarity.Legendary => "◆ Legendary",
-        _                    => "· Common",
     };
 }

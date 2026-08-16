@@ -158,13 +158,19 @@ public class UI_WeaponReplacePopup : UI_Popup
         trigger.SetTooltipPanel(tooltipPanel, tooltipName, tooltipDesc, tooltipCooldown);
     }
 
+    /// <summary>
+    /// 「이 슬롯을 새 무기로 바꾸면 어떻게 되는가」를 칠한다.
+    ///
+    /// 기준은 <b>플레이어 이득</b> 하나다 — delta &gt; 0이면 새 무기가 이 슬롯보다 세다 = 바꾸면 이득 =
+    /// ▲ + 초록. 예전엔 화살표는 ▲인데 색은 빨강이라 두 신호가 반대를 가리켰다(P2-3).
+    /// </summary>
     private void ApplyDelta(TMP_Text statText, TMP_Text deltaText, float slotValue, float newValue)
     {
         float delta = newValue - slotValue;
         if (statText != null)
         {
             if (Mathf.Approximately(delta, 0f)) statText.color = ColorNeutral;
-            else statText.color = delta > 0 ? ColorDown : ColorUp;
+            else statText.color = delta > 0 ? ColorUp : ColorDown;
         }
         if (deltaText != null)
         {
@@ -174,11 +180,11 @@ public class UI_WeaponReplacePopup : UI_Popup
             }
             else if (delta > 0)
             {
-                deltaText.text = $"▲+{delta:F0}"; deltaText.color = ColorDown;
+                deltaText.text = $"▲+{delta:F0}"; deltaText.color = ColorUp;
             }
             else
             {
-                deltaText.text = $"▼{delta:F0}"; deltaText.color = ColorUp;
+                deltaText.text = $"▼{delta:F0}"; deltaText.color = ColorDown;
             }
         }
     }

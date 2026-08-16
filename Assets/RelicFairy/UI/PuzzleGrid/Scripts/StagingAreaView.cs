@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -194,6 +195,18 @@ public sealed class StagingAreaView : MonoBehaviour
             int idx = FindSlotIndex(item);
             if (idx >= 0) ApplySlotBorderColor(idx, item);
         }
+    }
+
+    /// <summary>
+    /// 이 룬의 슬롯을 한 번 튕긴다. <b>표시 전용</b> — 선택 상태·인벤토리 어느 것도 건드리지 않는다.
+    /// 「끌어다 놓으세요」 안내가 어느 칸을 말하는지 가리키는 용도(P0-3).
+    /// </summary>
+    public void PulseItem(RuntimeItemData item)
+    {
+        int idx = FindSlotIndex(item);
+        if (idx < 0 || _slotGOs[idx] == null) return;
+
+        PulseSlotAsync(_slotGOs[idx].GetComponent<RectTransform>()).Forget();
     }
 
     /// <summary>이 아이템에 연결된 Shape. 클릭 배치가 "무엇을 놓을지" 찾는 데 쓴다. 없으면 null.</summary>
@@ -672,6 +685,15 @@ public sealed class StagingAreaView : MonoBehaviour
         rt.anchoredPosition = new Vector2(
              SLOT_SPACING + col * (SLOT_WIDTH  + SLOT_SPACING),
             -SLOT_SPACING - row * (SLOT_HEIGHT + SLOT_SPACING));
+    }
+
+    /// <summary>슬롯 한 칸 스케일 펀치. 팝업이 아니라 오버레이지만 룬판은 시간정지 중일 수 있어 unscaled(UIJuice)로 돈다.</summary>
+    private async UniTaskVoid PulseSlotAsync(RectTransform rt)
+    {
+        if (rt == null) return;
+
+        try { await UIJuice.PunchAsync(rt, 0.08f, 0.22f, destroyCancellationToken); }
+        catch (System.OperationCanceledException) { }
     }
 
     private int FindSlotIndex(RuntimeItemData item)

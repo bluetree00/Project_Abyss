@@ -71,6 +71,7 @@ public sealed class UI_RefineryPanel : UI_Popup
     private TMP_Text      _eventTitle;
     private GameObject    _reforgeBtn;
     private TMP_Text      _reservedText;     // 과열·불티가 '다음 회 예약됨'을 알리는 표시
+    private TMP_Text      _eventPointer;     // 제단 → 배너로 시선을 넘기는 화살표(연출 전용, 상시 비표시)
 
     // ── Lifecycle ──
 
@@ -328,6 +329,17 @@ public sealed class UI_RefineryPanel : UI_Popup
             new Vector2(ColX, -82f), new Vector2(304f, 20f));
         _reservedText.richText = true;
 
+        // 시선 유도용 화살표. 결과가 뜨는 순간 눈은 중앙 제단에 있고 배너는 좌상단이라,
+        // 배너만 켜면 그냥 못 본다. 링(반지름 152)과 배너 오른쪽 끝(-271) 사이 빈 줄에 세운다
+        // — 배너를 옮기면 완성본 목업 좌표가 깨지므로 배너 대신 시선을 옮긴다(P2-5).
+        _eventPointer = ShopUIStyle.MakeText(_root, "EvPointer", 26f, FontStyles.Bold,
+            TextAlignmentOptions.Center, ShopUIStyle.RarityGlow(ItemRarity.Epic));
+        ShopUIStyle.Anchor(_eventPointer.rectTransform, Half, Half, Half,
+            new Vector2(-235f, 96f), new Vector2(70f, 30f));
+        _eventPointer.text          = "◀";
+        _eventPointer.raycastTarget = false;
+        _eventPointer.gameObject.SetActive(false);
+
         _eventBanner.SetActive(false);
     }
 
@@ -445,6 +457,7 @@ public sealed class UI_RefineryPanel : UI_Popup
     {
         _busy = true;
         _eventBanner.SetActive(false);
+        if (_eventPointer != null) _eventPointer.gameObject.SetActive(false);
         _resultBox.gameObject.SetActive(false);
         _rarLine.text = "";
         Refresh();
@@ -486,6 +499,7 @@ public sealed class UI_RefineryPanel : UI_Popup
     {
         _busy = true;
         _eventBanner.SetActive(false);
+        if (_eventPointer != null) _eventPointer.gameObject.SetActive(false);
         _resultBox.gameObject.SetActive(false);
         Refresh();
 
@@ -589,7 +603,34 @@ public sealed class UI_RefineryPanel : UI_Popup
         ShopUIStyle.Skin(_eventBannerImg, art);
 
         _eventBanner.SetActive(true);
+        PlayEventAttentionAsync(tone).Forget();
         Refresh();   // 재점화 가능 여부가 바뀌므로 하단 버튼 상태를 다시 칠한다
+    }
+
+    /// <summary>
+    /// 배너를 <b>켜는 것</b>과 <b>보게 하는 것</b>은 다르다. 배너는 제자리에 두고(목업 좌표 보존)
+    /// 등장 펀치 + 제목 플래시로 배너 자체를 흔들고, 제단 옆 화살표를 잠깐 띄워 시선만 넘긴다.
+    /// 표시 전용 — 이벤트 효과·확률·버튼 상태 어느 것도 여기서 바뀌지 않는다(P2-5).
+    /// </summary>
+    private async UniTaskVoid PlayEventAttentionAsync(Color tone)
+    {
+        var ct = this.GetCancellationTokenOnDestroy();
+        try
+        {
+            UIJuice.PunchAsync(_eventBannerRT, 0.10f, 0.26f, ct).Forget();
+            if (_eventTitle != null)
+                UIJuice.FlashAsync(_eventTitle, Color.white, 0.13f, 2, ct).Forget();
+
+            if (_eventPointer == null) return;
+
+            _eventPointer.color = tone;
+            _eventPointer.gameObject.SetActive(true);
+            UIJuice.PunchAsync(_eventPointer.rectTransform, 0.22f, 0.30f, ct).Forget();
+
+            await UIJuice.FadeOutAsync(_eventPointer, 1f, 0.75f, ct);
+            _eventPointer.gameObject.SetActive(false);
+        }
+        catch (OperationCanceledException) { }
     }
 
     /// <summary>다음 회로 넘어간 효과(과열·불티)를 상시 표시한다. 소진되면 자동으로 사라진다.</summary>

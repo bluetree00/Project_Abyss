@@ -831,8 +831,10 @@ public sealed class UI_GridPanel : UI_Base
         _placeButton  = placeGO.AddComponent<Button>();
         _placeButton.targetGraphic = _placeBG;
 
-        var placeTxtGO = MakeTxt(placeGO.transform, "PlaceLabel", "끌어서 배치", 17f,
-            new Color(0.7f, 0.78f, 0.90f, 0.8f), bold: true);
+        // 라벨은 <b>행동 유도문</b>이다 — "끌어서 배치"는 명령형 두 단어라 주 액션 버튼으로 읽혔고,
+        // 실제 배치는 드래그로만 일어나므로 눌러도 아무 일이 없는 죽은 버튼처럼 보였다(P0-3).
+        var placeTxtGO = MakeTxt(placeGO.transform, "PlaceLabel", "보관함 룬을 격자로 끌어다 놓으세요", 14f,
+            new Color(0.7f, 0.78f, 0.90f, 0.8f));
         var placeTxtRT = placeTxtGO.GetComponent<RectTransform>();
         placeTxtRT.anchorMin = Vector2.zero;
         placeTxtRT.anchorMax = Vector2.one;
@@ -1549,13 +1551,17 @@ public sealed class UI_GridPanel : UI_Base
 
     private void OnPlaceClicked()
     {
-        // 현재 선택된 아이템을 그리드에 배치 시도.
-        // GridManager는 드래그 앤 드롭 기반이므로 코드 직접 배치 API 미제공.
-        // 보관함 첫 아이템을 InfoPanel에 표시하여 사용자가 드래그하도록 유도.
+        // GridManager는 드래그 앤 드롭 기반이라 코드 직접 배치 API가 없다 — 이 버튼은 배치가 아니라
+        // <b>지시</b>다. 보관함 첫 아이템을 InfoPanel에 띄우고, 그 슬롯을 한 번 튕겨
+        // "여기서 끌어라"를 가리킨다. 눌렀는데 소리도 반응도 없던 것이 죽은 버튼의 절반이었다.
         if (_inventory == null || _inventory.StagingCount == 0) return;
+
+        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+
         var item = _inventory.StagingItems[0];
         _itemInfoPanel?.ShowItem(item, isNew: false);
         _stagingArea?.HighlightItem(item);
+        _stagingArea?.PulseItem(item);
     }
 
     private void OnDialogKeep()
@@ -1654,13 +1660,16 @@ public sealed class UI_GridPanel : UI_Base
     private void UpdatePlaceButtonState(bool hasItem)
     {
         if (_placeBG == null) return;
+
+        // 안내색이지 주액션색이 아니다 — 파란 채움은 "누르면 배치된다"는 신호였고,
+        // 배치는 드래그로만 일어나므로 그 신호가 거짓이었다(P0-3). 활성/비활성 대비만 남긴다.
         _placeBG.color = hasItem
-            ? new Color(0.22f, 0.50f, 0.88f, 0.92f)
-            : new Color(0.20f, 0.28f, 0.40f, 0.55f);
+            ? new Color(0.18f, 0.22f, 0.30f, 0.75f)
+            : new Color(0.16f, 0.19f, 0.26f, 0.45f);
         if (_placeLabel != null)
             _placeLabel.color = hasItem
-                ? new Color(1f, 1f, 1f, 0.95f)
-                : new Color(0.7f, 0.78f, 0.90f, 0.55f);
+                ? new Color(0.78f, 0.85f, 0.95f, 0.92f)
+                : new Color(0.66f, 0.72f, 0.84f, 0.45f);
     }
 
     // ── Hex Grid Hint ──
