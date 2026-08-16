@@ -152,6 +152,9 @@ public sealed class UI_EscMenu : MonoBehaviour
         btn.targetGraphic = img;
         btn.onClick.AddListener(onClick);
 
+        // UI_Popup을 상속하지 않아 자동 부착 경로를 못 탄다 — 팝업과 같은 손맛을 여기서 직접 건다.
+        img.gameObject.AddComponent<UIButtonFeedback>();
+
         NewLabel("Label", img.transform, label, 26f, LabelColor, Vector2.zero, new Vector2(BtnW, BtnH));
     }
 

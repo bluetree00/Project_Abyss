@@ -1262,6 +1262,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var cb = btn.colors; cb.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f); cb.fadeDuration = 0.08f;
         btn.colors = cb;
         btn.onClick.AddListener(() => onClick?.Invoke());
+
+        // UI_Popup을 상속하지 않아 자동 부착 경로를 못 탄다 — 팝업과 같은 손맛을 여기서 직접 건다.
+        card.gameObject.AddComponent<UIButtonFeedback>();
     }
 
     /// <summary>
