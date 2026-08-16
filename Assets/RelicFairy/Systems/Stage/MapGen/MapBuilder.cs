@@ -11,9 +11,16 @@ public class MapBuilder
     // ── 출구 조명 위계 (웨이파인딩) ──────────────────────────────
     // 출구를 '더 중요해 보이는 조명'으로 승격해 밝기 대비로 경로를 읽히게 한다.
     // 근거: R. Yang, "How to Light a Level"(GDC 2018) — 출구가 여럿이면 균일이 아니라
-    //       중요도에 따라 다르게 밝힌다. 값은 인게임에서 튜닝.
-    private const float DoorLightIntensityMul = 1.6f;
-    private const float DoorLightRangeMul     = 1.35f;
+    //       중요도에 따라 다르게 밝힌다.
+    //
+    // ⚠️ 승격은 <b>세기가 아니라 범위</b>로 준다. WallTorch 프리팹에는 ButoLight(볼류메트릭)가
+    //    inheritDataFromLightComponent=true로 붙어 있어 <b>Light.intensity를 그대로 상속</b>한다
+    //    (RenderingUpgradeSetup.AttachButoLightToRoomPrefabs). 세기를 올리면 표면 조도만이 아니라
+    //    공중의 볼륨 광구까지 같은 배율로 밝아지는데, WallTorch는 메시가 없는 순수 Point Light라
+    //    그 광구가 "문 옆 허공에 떠 있는 눈부신 섬광"으로 읽혔다(2026-08-16 QA, 전 챕터 재현).
+    //    범위를 넓히면 밝은 '영역'이 커져 위계는 그대로 서면서 광구 최고 휘도는 오르지 않는다.
+    private const float DoorLightIntensityMul = 1.15f;
+    private const float DoorLightRangeMul     = 1.6f;
     private const int   DoorLightsPerDoor     = 2;
 
     /// <summary>생성된 블록 정보.</summary>
