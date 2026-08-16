@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// 온보딩 목표 지시 화살표. 대상이 화면 안이면 **3D 월드 화살표**(대상 위 부유 + 바운스 + 빌보드),
@@ -127,11 +128,18 @@ public sealed class OnboardingGuideArrow : MonoBehaviour
 
     private RectTransform CreateScreenIndicator()
     {
-        var canvasGo = new GameObject("GuideArrowCanvas", typeof(Canvas));
+        var canvasGo = new GameObject("GuideArrowCanvas", typeof(Canvas), typeof(CanvasScaler));
         canvasGo.transform.SetParent(transform, false);
         var canvas = canvasGo.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = UISortingOrder.HudIndicator;
+
+        // 프로젝트 캔버스 기준 준수 — 1920×1080, Scale With Screen Size, Match 0.5
+        // 화살표 배치는 RectTransform.position(=화면 픽셀)으로 계산하므로 스케일러와 무관하다.
+        var scaler = canvasGo.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight  = 0.5f;
 
         var go = new GameObject("GuideArrowUI", typeof(RectTransform));
         go.transform.SetParent(canvasGo.transform, false);

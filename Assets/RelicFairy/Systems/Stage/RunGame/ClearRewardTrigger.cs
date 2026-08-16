@@ -431,7 +431,12 @@ public class ClearRewardTrigger : MonoBehaviour
         var canvas = _promptGO.AddComponent<Canvas>();
         canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = UISortingOrder.WorldProp;
-        _promptGO.AddComponent<CanvasScaler>();
+        // 프로젝트 캔버스 기준 준수 — 1920×1080, Scale With Screen Size, Match 0.5
+        // (설정 없이 붙이면 Constant Pixel Size가 기본이라 고해상도에서 프롬프트가 쪼그라들었다)
+        var scaler = _promptGO.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight  = 0.5f;
         _promptGO.AddComponent<GraphicRaycaster>();
 
         var panelGO  = new GameObject("Panel");

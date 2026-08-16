@@ -1119,6 +1119,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = UISortingOrder.RunBoundary;
 
+        // 프로젝트 캔버스 기준 준수 — 1920×1080, Scale With Screen Size, Match 0.5
+        var scaler = go.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight  = 0.5f;
+
         var tmp = new GameObject("Text").AddComponent<TextMeshProUGUI>();
         tmp.transform.SetParent(go.transform, false);
         if (TMP_Settings.defaultFontAsset != null) tmp.font = TMP_Settings.defaultFontAsset;
@@ -1187,6 +1193,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = UISortingOrder.RunChoice;
         go.AddComponent<GraphicRaycaster>();
+
+        // 프로젝트 캔버스 기준 준수 — 1920×1080, Scale With Screen Size, Match 0.5
+        var scaler = go.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight  = 0.5f;
 
         TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
         try
@@ -1264,6 +1276,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var canvas = go.AddComponent<Canvas>();
         canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = UISortingOrder.RunBoundary;
+
+        // 프로젝트 캔버스 기준 준수 — 1920×1080, Scale With Screen Size, Match 0.5
+        var scaler = go.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight  = 0.5f;
 
         try
         {

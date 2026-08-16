@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// 이벤트 전투 챌린지 HUD(소형) — 목표 + 실시간 상태(타이머/피격수) + 잠정 등급. 런타임 생성(ScreenSpaceOverlay).
@@ -12,10 +13,16 @@ public sealed class UI_ChallengeHud : MonoBehaviour
 
     public static UI_ChallengeHud Create()
     {
-        var canvasGO = new GameObject("ChallengeHudCanvas", typeof(Canvas));
+        var canvasGO = new GameObject("ChallengeHudCanvas", typeof(Canvas), typeof(CanvasScaler));
         var canvas = canvasGO.GetComponent<Canvas>();
         canvas.renderMode  = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = UISortingOrder.HudIndicator;
+
+        // 프로젝트 캔버스 기준 준수 — 1920×1080, Scale With Screen Size, Match 0.5
+        var scaler = canvasGO.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight  = 0.5f;
 
         var hud = canvasGO.AddComponent<UI_ChallengeHud>();
         hud._objective = hud.MakeText(canvasGO.transform, new Vector2(0f, -44f), 30f, new Color(1f, 0.9f, 0.5f));

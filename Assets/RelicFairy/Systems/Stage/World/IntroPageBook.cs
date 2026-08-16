@@ -93,6 +93,12 @@ public sealed class IntroPageBook : MonoBehaviour
         canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = SortingOrder;
 
+        // 프로젝트 캔버스 기준 준수 — 1920×1080, Scale With Screen Size, Match 0.5
+        var scaler = go.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight  = 0.5f;
+
         var cg = go.AddComponent<CanvasGroup>();
         cg.alpha          = 0f;
         cg.blocksRaycasts = false;
