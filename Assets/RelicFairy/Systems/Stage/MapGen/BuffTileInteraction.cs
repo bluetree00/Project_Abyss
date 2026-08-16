@@ -48,6 +48,7 @@ public class BuffTileInteraction : MonoBehaviour
             _promptGo.transform.rotation = Camera.main.transform.rotation;
 
         if (_used || isPedestal || !_playerInRange) return;
+        if (UIInputGate.Blocked) return;
 
         if (Input.GetKeyDown(KeyCode.F))
             Activate();

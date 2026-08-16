@@ -61,6 +61,7 @@ public class WorldCovenantAltar : MonoBehaviour
         AnimateTome();
 
         if (_opening || _used || !_playerInRange) return;
+        if (UIInputGate.Blocked) return;
         if (Input.GetKeyDown(KeyCode.F))
             OpenAsync(this.GetCancellationTokenOnDestroy()).Forget();
     }

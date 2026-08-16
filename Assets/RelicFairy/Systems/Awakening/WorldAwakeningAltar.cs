@@ -42,6 +42,7 @@ public class WorldAwakeningAltar : MonoBehaviour
         BillboardTexts();
 
         if (_opening || !_playerInRange) return;
+        if (UIInputGate.Blocked) return;
         if (Input.GetKeyDown(KeyCode.F))
             OpenAsync(this.GetCancellationTokenOnDestroy()).Forget();
     }

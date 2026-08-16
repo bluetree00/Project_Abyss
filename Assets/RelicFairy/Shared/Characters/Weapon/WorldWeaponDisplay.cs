@@ -53,6 +53,7 @@ public class WorldWeaponDisplay : MonoBehaviour
             _promptGo.transform.rotation = _camTransform.rotation;
 
         if (_pickedUp || !_playerInRange) return;
+        if (UIInputGate.Blocked) return;
 
         if (Input.GetKeyDown(KeyCode.F))
             TryPickup();

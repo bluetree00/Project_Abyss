@@ -37,6 +37,7 @@ public class ShopNpcInteraction : MonoBehaviour
             _promptGo.transform.rotation = Camera.main.transform.rotation;
 
         if (!_enabled || !_playerInRange) return;
+        if (UIInputGate.Blocked) return;
 
         if (Input.GetKeyDown(KeyCode.F))
             OnInteract?.Invoke();

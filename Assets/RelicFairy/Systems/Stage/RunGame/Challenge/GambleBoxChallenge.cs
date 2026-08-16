@@ -56,7 +56,7 @@ public sealed class GambleBoxChallenge : MonoBehaviour, IInteractionChallenge
 
         bool inRange = (pt.position - _boxPos).sqrMagnitude <= InteractRange * InteractRange;
         if (_prompt != null) _prompt.gameObject.SetActive(inRange);
-        if (inRange && Input.GetKeyDown(KeyCode.F)) Resolve();
+        if (inRange && !UIInputGate.Blocked && Input.GetKeyDown(KeyCode.F)) Resolve();
     }
 
     private void Resolve()

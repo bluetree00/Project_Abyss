@@ -45,6 +45,7 @@ public sealed class IntroSwordPickup : MonoBehaviour
             _promptGo.transform.rotation = Camera.main.transform.rotation;
 
         if (_consumed || !_playerInRange) return;
+        if (UIInputGate.Blocked) return;
 
         if (Input.GetKeyDown(KeyCode.F))
         {

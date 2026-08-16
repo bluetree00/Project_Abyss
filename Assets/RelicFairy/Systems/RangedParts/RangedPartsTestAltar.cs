@@ -47,6 +47,7 @@ public sealed class RangedPartsTestAltar : MonoBehaviour
         Billboard();
 
         if (!_playerInRange) return;
+        if (UIInputGate.Blocked) return;
         if (Input.GetKeyDown(KeyCode.F))
             UI_RangedPartsTestPanel.Toggle();
     }

@@ -55,6 +55,7 @@ public class WeaponForgeAltar : MonoBehaviour
     {
         BillboardTexts();
         if (_claimed || _busy || _player == null) return;
+        if (UIInputGate.Blocked) return;
         if (Input.GetKeyDown(KeyCode.F))
             ClaimAsync(this.GetCancellationTokenOnDestroy()).Forget();
     }

@@ -97,6 +97,7 @@ public class ClearRewardTrigger : MonoBehaviour
             UpdateWorldIndicator();
 
         if (_rewarded || !_playerInRange || _rewards == null || _rewards.Count == 0) return;
+        if (UIInputGate.Blocked) return;
 
         if (Input.GetKeyDown(KeyCode.F))
             OpenRewardFlowAsync().Forget();

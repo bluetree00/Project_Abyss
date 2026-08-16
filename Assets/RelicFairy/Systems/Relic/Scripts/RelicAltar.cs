@@ -52,6 +52,7 @@ public class RelicAltar : MonoBehaviour
     {
         BillboardTexts();
         if (_claimed || _player == null) return;
+        if (UIInputGate.Blocked) return;
         if (Input.GetKeyDown(KeyCode.F)) OpenInfoPopup();
     }
 

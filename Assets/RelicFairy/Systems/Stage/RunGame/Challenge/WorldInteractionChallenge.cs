@@ -73,7 +73,7 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
             if (m.Prompt != null) m.Prompt.gameObject.SetActive(inRange);
             if (inRange && d <= best) { best = d; hot = i; }
         }
-        if (hot >= 0 && Input.GetKeyDown(KeyCode.F)) OnActivate(hot);
+        if (hot >= 0 && !UIInputGate.Blocked && Input.GetKeyDown(KeyCode.F)) OnActivate(hot);
     }
 
     private void OnDestroy() => OnDestroyChallenge();

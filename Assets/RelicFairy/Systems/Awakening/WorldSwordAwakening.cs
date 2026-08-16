@@ -67,6 +67,7 @@ public sealed class WorldSwordAwakening : MonoBehaviour
     {
         BillboardTexts();
         if (_claimed || _busy || _player == null) return;
+        if (UIInputGate.Blocked) return;
         if (Input.GetKeyDown(KeyCode.F))
             AwakenAsync(this.GetCancellationTokenOnDestroy()).Forget();
     }
