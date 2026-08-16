@@ -902,14 +902,64 @@ public class PlayerController : CharacterBase
             RuntimeStats?.ApplyRelicStats(relicMods);
         }
 
-        if (!string.IsNullOrEmpty(relicClass.QSkillClipKey))
-            TryOverrideClip("QSkill_01", relicClass.QSkillClipKey);
+        ApplyRelicQAnimationAsync().Forget();
 
         // 외형 — 현재는 오라 VFX만(키 있을 때). 추후 모델/애니메이터 변형은 이 지점에서 확장.
         if (!string.IsNullOrEmpty(relicClass.AuraVfxKey))
             SpawnRelicAuraAsync(relicClass.AuraVfxKey, relicClass.AuraSocket).Forget();
 
         Debug.Log($"[PlayerController] 유물 적용: {relicClass.Id} (char_id={relicCharId}, passives={relicClass.Passives?.Length ?? 0})");
+    }
+
+    /// <summary>
+    /// 유물 Q 애니 클립을 로드해 <b>유물 레인</b>으로 오버라이드한다(무기 교체로 지워지지 않는다).
+    ///
+    /// 유물 클립 키는 무기 프리로드 경로(PreloadWeaponClipsAsync)에 포함되지 않아 캐시에 없다 —
+    /// 그래서 여기서 직접 로드한 뒤 오버라이드한다. 로드는 비동기지만 Q 입력 전까지만 끝나면 되므로
+    /// 오라 VFX와 같은 fire-and-forget으로 둔다.
+    /// </summary>
+    private async UniTaskVoid ApplyRelicQAnimationAsync()
+    {
+        if (relicClass == null || _animSvc == null) return;
+
+        int steps = relicClass.QSkillStepCount;
+        var keys = new System.Collections.Generic.List<string>(steps);
+        for (int i = 0; i < steps; i++)
+        {
+            var key = relicClass.QSkillClipKeyAt(i);
+            if (!string.IsNullOrEmpty(key)) keys.Add(key);
+        }
+        if (keys.Count == 0) return;   // 클립 키 미설정 유물 — 컨트롤러 기본 클립 그대로(폴백)
+
+        try
+        {
+            await Managers.AnimationResources.PreloadClipsAsync(keys);
+        }
+        catch (System.OperationCanceledException) { return; }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[PlayerController] 유물 Q 클립 프리로드 실패: {e.Message}");
+            return;
+        }
+
+        if (this == null || _animSvc == null) return;
+
+        for (int i = 0; i < steps; i++)
+        {
+            var clipKey = relicClass.QSkillClipKeyAt(i);
+            if (string.IsNullOrEmpty(clipKey)) continue;
+
+            var clip = Managers.AnimationResources.GetClip(clipKey);
+            if (clip == null)
+            {
+                Debug.LogWarning($"[PlayerController] 유물 Q 클립 '{clipKey}' 로드 실패 — 기본 클립 유지");
+                continue;
+            }
+
+            var stateName = relicClass.QSkillStateAt(i);
+            if (!_animSvc.OverrideRelic(stateName, clip))
+                Debug.LogWarning($"[PlayerController] 유물 Q 오버라이드 실패 — 컨트롤러에 '{stateName}' 이름의 원본 클립이 없다.");
+        }
     }
 
     /// <summary>유물 오라 VFX를 소켓(없으면 루트)에 부착. 재적용 시 기존 인스턴스를 먼저 정리(멱등).</summary>

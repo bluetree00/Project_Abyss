@@ -20,6 +20,9 @@ public sealed class AnimatorOverrideService
     private readonly Dictionary<string, AnimationClip> _baselineByName;
     // 현재 무기가 덮어쓴 키 — 다음 무기 적용 전 이 키들만 베이스라인으로 되돌린다.
     private readonly HashSet<string> _dirtyKeys;
+    // 유물이 소유한 키 — 무기 레인(Override/ResetOverrides)이 건드리지 못한다.
+    // Q 모션의 주인은 무기가 아니라 유물이므로, 무기 교체로 지워지면 안 된다.
+    private readonly Dictionary<string, AnimationClip> _relicByName;
 
     public AnimatorOverrideService(Animator anim)
     {
@@ -51,6 +54,7 @@ public sealed class AnimatorOverrideService
         _currentMap = new Dictionary<AnimationClip, AnimationClip>(128);
         _baselineByName = new Dictionary<string, AnimationClip>(128);
         _dirtyKeys = new HashSet<string>();
+        _relicByName = new Dictionary<string, AnimationClip>(4);
 
         BuildCache();
     }
@@ -71,17 +75,35 @@ public sealed class AnimatorOverrideService
         }
     }
 
+    /// <summary>무기/캐릭터 레인 오버라이드. 유물이 소유한 키는 건너뛴다(유물 우선).</summary>
     public bool Override(string keyName, AnimationClip newClip)
     {
         if (!_originalByName.TryGetValue(keyName, out var original)) return false;
+        // 키가 없는 게 아니라 주인이 다를 뿐이므로 실패로 보고하지 않는다(무기 쪽 경고 오발생 방지).
+        if (_relicByName.ContainsKey(keyName)) return true;
         AOC[original] = newClip;
         _currentMap[original] = newClip;
         _dirtyKeys.Add(keyName);
         return true;
     }
 
+    /// <summary>
+    /// 유물 레인 오버라이드 — 무기 교체(<see cref="ResetOverrides"/>)로 지워지지 않는다.
+    /// 유물 Q 모션이 무기 장착 순서에 따라 사라지던 문제의 해소점.
+    /// </summary>
+    public bool OverrideRelic(string keyName, AnimationClip newClip)
+    {
+        if (!_originalByName.TryGetValue(keyName, out var original)) return false;
+        _relicByName[keyName] = newClip;
+        _dirtyKeys.Remove(keyName);   // 무기 레인에서 소유권을 회수 — 이후 Reset 대상에서 빠진다
+        AOC[original] = newClip;
+        _currentMap[original] = newClip;
+        return true;
+    }
+
     /// <summary>현재 무기가 덮어쓴 오버라이드를 베이스라인(무기 미적용 기본 클립)으로 되돌린다.
-    /// 무기 교체/해제 시 이전 무기의 클립(로코모션 포함)이 남는 것을 방지.</summary>
+    /// 무기 교체/해제 시 이전 무기의 클립(로코모션 포함)이 남는 것을 방지.
+    /// 유물 소유 키는 _dirtyKeys에 들어가지 않으므로 여기서 건드려지지 않는다.</summary>
     public void ResetOverrides()
     {
         if (_dirtyKeys.Count == 0) return;

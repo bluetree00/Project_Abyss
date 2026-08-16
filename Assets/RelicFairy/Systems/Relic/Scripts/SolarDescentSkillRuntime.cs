@@ -14,10 +14,9 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
     private const int V_FIRST_HIT = 10, V_SKILL_MULT = 11, V_BURN_DURATION = 12, V_BURN_TICK_RATIO = 13;
 
     // ── 타이밍은 애니와 이펙트에 맞춘다(실측) ─────────────────────────
-    //  • 애니 QSkill_01 : 클립 1.0초 × 상태 speed 2 = 실제 0.5초. 내리치는 접촉 프레임이 대략 0.4초.
+    //  • 애니 : 유물 데이터(RelicClassSO.qSkillClipSequence)가 지정한 Q 상태. 미지정이면 QSkill_01.
     //  • 착탄 VFX(Effect_10_BigMeteorHitEffect) : 스폰 즉시 터진다(첫 파티클 delay 0) · 전체 3초.
     //    → 스윙이 꽂히는 순간에 폭발과 피해를 동시에 얹는다. 그전에 때리면 허공을 치는 것처럼 보인다.
-    private const string AnimName        = "QSkill_01";
     // '해를 떨어뜨린다'는 무게 — 높은 하늘에서, 크게, 조금 길게 떨어진다.
     private const float  MeteorFallHeight = 22f;   // 불덩이가 시작하는 하늘 높이
     private const float  MeteorFallTime   = 0.6f;  // 낙하 시간(높은 만큼 길게)
@@ -50,7 +49,11 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
 
         ctx.RotateToMouse();
         ctx.SetMoveScale(0f);
-        ctx.Animator?.CrossFade(AnimName, 0.1f);
+
+        // Q 모션의 주인은 무기가 아니라 유물이다 — 상태 이름을 유물 데이터에서 읽는다(미설정이면 기본 상태).
+        var relicClass = ctx.Controller != null ? ctx.Controller.RelicClass : null;
+        string state = relicClass != null ? relicClass.QSkillStateAt(0) : RelicClassSO.DefaultQSkillState;
+        ctx.Animator?.CrossFade(state, 0.1f);
     }
 
     public void OnUpdate(SkillExecutionContext ctx)

@@ -15,53 +15,8 @@ MonoBehaviour:
   m_GroupName: Animations
   m_GUID: 0a9de3b8d1639ea458a78d5bd1683e8e
   m_SerializeEntries:
-  - m_GUID: 23b63fe2908bd8f44b91adfd54eae9a9
-    m_Address: QSkill_Iasen
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 46339d9a70aebad4bb4d5f1d9afa3fe2
-    m_Address: AirLightAttack_02
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8fc3055e4345da8439787a4a3f8ed725
-    m_Address: AirLightAttack_01
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: ccf8398431c6b7b49b55be6ccda46a09
-    m_Address: AirLightAttack_03
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 165130b8a71020641b870cab32d18c5e
     m_Address: Nameless_GroundLight_01
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: b285d65889a8c414784007cbd6eb7bcc
-    m_Address: Nameless_GroundLight_02
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e4263221de5102548a26722e06080ab4
-    m_Address: Nameless_GroundLight_03
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 679a031c10fa6e74c89b97a739405d0b
-    m_Address: Nameless_GroundHeavy
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: bf73bdf8395ba6b439fc8aa1723feddc
-    m_Address: Nameless_AirLight_01
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 90fe648682d1f4046906ba56a20a3042
-    m_Address: Nameless_AirLight_02
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -70,13 +25,73 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 23b63fe2908bd8f44b91adfd54eae9a9
+    m_Address: QSkill_Iasen
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 372217f2ccd51fa4b8b326fa27b34987
+    m_Address: RelicQ_Slash1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 46339d9a70aebad4bb4d5f1d9afa3fe2
+    m_Address: AirLightAttack_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 50b9698aa5cc9ed4c9dff986e1b47e21
+    m_Address: RelicQ_Slash2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 679a031c10fa6e74c89b97a739405d0b
+    m_Address: Nameless_GroundHeavy
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7630e2f0bffa82b499e6db3686051600
+    m_Address: RelicQ_Slash3
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 87e6801dab4ba7548860abbec171eb70
     m_Address: Nameless_AirPlunge
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8fc3055e4345da8439787a4a3f8ed725
+    m_Address: AirLightAttack_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 90fe648682d1f4046906ba56a20a3042
+    m_Address: Nameless_AirLight_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b285d65889a8c414784007cbd6eb7bcc
+    m_Address: Nameless_GroundLight_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bf73bdf8395ba6b439fc8aa1723feddc
+    m_Address: Nameless_AirLight_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ccf8398431c6b7b49b55be6ccda46a09
+    m_Address: AirLightAttack_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d0b40337e2a96b943a8cf513ff2c4ff7
     m_Address: NamelessSlash
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e4263221de5102548a26722e06080ab4
+    m_Address: Nameless_GroundLight_03
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

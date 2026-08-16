@@ -49,6 +49,23 @@ public class RelicAbilityInfo
 }
 
 /// <summary>
+/// 유물 Q 애니메이션 한 단계. 여러 단계를 <b>순서대로 이어 재생</b>해 다단 모션을 만든다.
+///
+/// <b>stateName은 오버라이드 키를 겸한다.</b> AnimatorOverrideController의 키는 상태 이름이 아니라
+/// 그 상태가 물고 있는 <b>원본 클립의 이름</b>이므로, 둘이 같도록 컨트롤러를 구성해야 한다
+/// (QSkill_01 상태 = QSkill_01 클립, RelicQ_Slash2 상태 = RelicQ_Slash2 클립 …).
+/// </summary>
+[System.Serializable]
+public class RelicQAnimStep
+{
+    [Tooltip("애니메이터 상태 이름. 컨트롤러 원본 클립 이름과 같아야 한다(오버라이드 키 겸용).")]
+    public string stateName;
+
+    [Tooltip("이 상태에 물릴 클립의 Addressables 키. 비우면 컨트롤러 기본 클립을 그대로 쓴다.")]
+    public string clipKey;
+}
+
+/// <summary>
 /// 유물 클래스 정의(정적 데이터). 몸은 CombatGirl 고정, 유물이 패시브 + 고유스킬 + 외형(오라)만 부여.
 /// 스탯은 부여하지 않는다(베이스 스탯은 CombatGirl 공통).
 /// 코드가 필요한 패시브/스킬 로직은 <see cref="RelicId"/> 기반 팩토리(RelicRegistry)에서 처리한다.
@@ -85,8 +102,11 @@ public class RelicClassSO : ScriptableObject
     [SerializeField] private PassiveSO[] passives;
 
     [Header("고유 스킬 (Q)")]
-    [SerializeField, Tooltip("Q스킬 'QSkill_01' state 클립으로 쓸 Addressables 키")]
+    [SerializeField, Tooltip("Q스킬 'QSkill_01' state 클립으로 쓸 Addressables 키. 아래 시퀀스가 있으면 무시된다.")]
     private string qSkillClipKey;
+
+    [SerializeField, Tooltip("Q 애니 시퀀스 — 순서대로 이어 재생해 다단 모션을 만든다. 비우면 위 단일 클립 키(QSkill_01)를 쓴다.")]
+    private RelicQAnimStep[] qSkillClipSequence;
     [SerializeField, Tooltip("Q 입력 시 카메라 연출. 비우면 연출 생략")]
     private UltimateCinematicConfig qSkillCinematic;
 
@@ -113,6 +133,29 @@ public class RelicClassSO : ScriptableObject
     public StatModifier[] Stats => stats;
     public string QSkillClipKey => qSkillClipKey;
     public UltimateCinematicConfig QSkillCinematic => qSkillCinematic;
+
+    /// <summary>시퀀스 미설정 유물이 쓰는 기본 Q 상태 — 기존 하드코딩과 같은 값(폴백).</summary>
+    public const string DefaultQSkillState = "QSkill_01";
+
+    private bool HasQSequence => qSkillClipSequence != null && qSkillClipSequence.Length > 0;
+
+    /// <summary>Q 애니가 이어 재생할 단계 수. 시퀀스가 없으면 1(기본 상태 하나).</summary>
+    public int QSkillStepCount => HasQSequence ? qSkillClipSequence.Length : 1;
+
+    /// <summary>i번째 단계에서 재생할 애니메이터 상태 이름. 범위를 벗어나면 양끝으로 물린다.</summary>
+    public string QSkillStateAt(int i)
+    {
+        if (!HasQSequence) return DefaultQSkillState;
+        var step = qSkillClipSequence[Mathf.Clamp(i, 0, qSkillClipSequence.Length - 1)];
+        return string.IsNullOrEmpty(step?.stateName) ? DefaultQSkillState : step.stateName;
+    }
+
+    /// <summary>i번째 단계 상태에 물릴 클립의 Addressables 키. 비어 있으면 컨트롤러 기본 클립 유지.</summary>
+    public string QSkillClipKeyAt(int i)
+    {
+        if (!HasQSequence) return i == 0 ? qSkillClipKey : null;
+        return qSkillClipSequence[Mathf.Clamp(i, 0, qSkillClipSequence.Length - 1)]?.clipKey;
+    }
     public string AuraVfxKey => auraVfxKey;
     public string AuraSocket => auraSocket;
 }

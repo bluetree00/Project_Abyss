@@ -7,21 +7,25 @@ using UnityEngine;
 ///
 /// ── 타이밍은 '이펙트'에 맞춘다(실측) ─────────────────────────────
 ///   • 이펙트 Effect_36_MadnessSlash : 본체 슬래시 <b>~1.75초</b> (잔광은 3.5초까지 남지만 그건 여운)
-///   • 애니메이션 QSkill_01          : 클립 1.0초 × 상태 speed 2 = <b>실제 0.5초</b>
 ///
 /// 타격은 이펙트가 도는 <b>내내 이어지다가 이펙트가 끝날 때 막타로 닫힌다</b>.
 /// 앞쪽에 연타를 몰아넣고 뒤를 비우면 "때리는 건 벌써 끝났는데 이펙트만 남아 도는" 위화감이 난다.
 ///
-/// 애니가 0.5초뿐이라 그냥 두면 중간에 마지막 포즈로 굳는다 → <b>연타 동안 베기 모션을 이어 붙이고</b>,
-/// 막타 직전에 한 번 더 걸어 스윙 중간에 판정이 꽂히게 한다.
+/// ── 애니는 '시퀀스'다 ────────────────────────────────────────────
+/// 베기 한 클립은 연타 창(1.7초)보다 짧아 그냥 두면 중간에 마지막 포즈로 굳는다.
+/// 그래서 유물 데이터(<see cref="RelicClassSO"/>.qSkillClipSequence)가 준 참격 단계들을
+/// <b>순서대로 이어 붙여</b> 창을 채우고, 막타 직전에 마지막 참격을 처음부터 다시 건다.
+///
+/// 이어 붙이는 시점은 상수 주기가 아니라 <b>현재 클립이 실제로 끝났는지</b>(normalizedTime)로 판단한다.
+/// 유물·무기마다 클립 길이와 상태 speed가 달라, 상수로 잡으면 앞부분만 반복되며 끊긴다.
 ///
 /// 매 타가 콘을 새로 질의하므로 도중에 들어온 적도 맞는다.
 /// </summary>
 public sealed class JudgmentStrikeRuntime : ISkillRuntime
 {
-    private const string AnimName  = "QSkill_01";
-    private const float  AnimBlend = 0.08f;
-    private const float  AnimPlayback = 0.5f;    // 실측 재생 길이 — 이 주기로 베기를 이어 붙인다
+    private const float  AnimBlend  = 0.08f;
+    private const float  ReplayAt   = 0.94f;   // 현재 참격이 이만큼 진행되면 다음 참격으로 넘긴다
+    private const float  MinStepGap = 0.05f;   // CrossFade가 애니메이터에 반영되기 전 중복 전환 방지
 
     // ── 이펙트에 타이밍을 맞춘다(실측) ─────────────────────────────
     // Effect_36_MadnessSlash 는 스폰 후 <b>1.5초 지점에 파티클 4개가 동시에 터지는 '강조 버스트'</b>가 있다
@@ -42,8 +46,13 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     private readonly LancelotMadnessRelic _relic;
     private float _elapsed;
     private int   _hitsDone;
-    private int   _animsPlayed;
     private bool  _finisherAnimPlayed;
+
+    // ── 애니 시퀀스 상태 ──
+    private RelicClassSO _relicClass;   // Q 상태 이름의 출처(없으면 기본 상태 1개)
+    private int   _stepCount;
+    private int   _stepIndex;
+    private float _lastStepAt;
 
     public JudgmentStrikeRuntime(LancelotMadnessRelic relic) { _relic = relic; }
 
@@ -53,10 +62,16 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
 
     public void OnEnter(SkillExecutionContext ctx)
     {
-        _elapsed = 0f; _hitsDone = 0; _animsPlayed = 1; _finisherAnimPlayed = false;
+        _elapsed = 0f; _hitsDone = 0; _finisherAnimPlayed = false;
+
+        // Q 모션의 주인은 무기가 아니라 유물이다 — 상태 이름을 유물 데이터에서 읽는다.
+        _relicClass = ctx.Controller != null ? ctx.Controller.RelicClass : null;
+        _stepCount  = _relicClass != null ? _relicClass.QSkillStepCount : 1;
+        _stepIndex  = 0;
+
         ctx.RotateToMouse();
         ctx.SetMoveScale(0f);
-        ctx.Animator?.CrossFade(AnimName, AnimBlend);
+        PlayStep(ctx, 0);
     }
 
     public void OnUpdate(SkillExecutionContext ctx)
@@ -83,22 +98,39 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     }
 
     // ── Private Methods ───────────────────────────────────────────
-    /// <summary>0.5초짜리 베기를 이어 붙여 연타 내내 캐릭터가 계속 베게 한다. 막타 직전엔 한 번 더.</summary>
+    /// <summary>현재 참격이 끝나면 다음 참격으로 넘겨 연타 내내 캐릭터가 계속 베게 한다. 막타 직전엔 마지막 참격을 한 번 더.</summary>
     private void TickAnimation(SkillExecutionContext ctx)
     {
-        if (ctx.Animator == null) return;
+        var anim = ctx.Animator;
+        if (anim == null) return;
 
         if (!_finisherAnimPlayed && _elapsed >= FinisherAnimAt)
         {
             _finisherAnimPlayed = true;
-            ctx.Animator.CrossFade(AnimName, AnimBlend, 0, 0f);   // 처음부터 다시
+            PlayStep(ctx, _stepCount - 1);   // 마무리 = 시퀀스의 마지막 참격을 처음부터
             return;
         }
+        if (_finisherAnimPlayed) return;
 
-        if (!_finisherAnimPlayed && _elapsed >= _animsPlayed * AnimPlayback)
-        {
-            _animsPlayed++;
-            ctx.Animator.CrossFade(AnimName, AnimBlend, 0, 0f);
-        }
+        // CrossFade 직후 몇 프레임은 아직 이전 상태가 현재 상태로 보고된다 — 그때 또 넘기면 첫 참격이 겹쳐 튄다.
+        if (_elapsed - _lastStepAt < MinStepGap || anim.IsInTransition(0)) return;
+
+        // 클립 길이·상태 speed는 유물/무기마다 다르므로 상수 주기 대신 '이 참격이 끝났는가'로 판단한다.
+        var state = anim.GetCurrentAnimatorStateInfo(0);
+        if (!state.IsName(StateName(_stepIndex))) return;   // 피격 등으로 끊겼으면 애니에 관여하지 않는다
+        if (state.normalizedTime < ReplayAt) return;
+
+        PlayStep(ctx, _stepIndex + 1);
     }
+
+    /// <summary>시퀀스 index번째 참격을 처음부터 재생. 시퀀스 끝에 닿으면 앞으로 돌아 계속 몰아친다.</summary>
+    private void PlayStep(SkillExecutionContext ctx, int index)
+    {
+        _stepIndex  = _stepCount > 0 ? ((index % _stepCount) + _stepCount) % _stepCount : 0;
+        _lastStepAt = _elapsed;
+        ctx.Animator?.CrossFade(StateName(_stepIndex), AnimBlend, 0, 0f);
+    }
+
+    private string StateName(int step)
+        => _relicClass != null ? _relicClass.QSkillStateAt(step) : RelicClassSO.DefaultQSkillState;
 }
