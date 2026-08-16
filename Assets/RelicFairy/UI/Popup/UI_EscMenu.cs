@@ -25,7 +25,7 @@ public sealed class UI_EscMenu : MonoBehaviour
     private static readonly Color BtnBg      = new(0.16f, 0.19f, 0.27f, 1f);
     private static readonly Color BtnQuitBg  = new(0.30f, 0.13f, 0.15f, 1f);
     private static readonly Color LabelColor = new(0.94f, 0.96f, 1f, 1f);
-    private static readonly Color TitleColor = new(1f, 0.88f, 0.55f, 1f);
+    private static readonly Color TitleColor = UIPalette.Gold;
 
     // ── Private ──────────────────────────────────────────────
     private GameObject _root;

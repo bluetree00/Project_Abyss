@@ -20,8 +20,8 @@ public static class AltarPalette
     public static readonly Color CardUnlocked = new(0.078f, 0.129f, 0.125f, 1f);
 
     // ── 강조 ─────────────────────────────────────────────
-    /// <summary>행동색 — 지금 누를 수 있는 것에만.</summary>
-    public static readonly Color Gold        = new(0.890f, 0.659f, 0.298f);
+    /// <summary>행동색 — 지금 누를 수 있는 것에만. 화면 공용 금색(<see cref="UIPalette.Gold"/>)을 쓴다.</summary>
+    public static readonly Color Gold        = UIPalette.Gold;
     /// <summary>황동 위에 얹는 글자색.</summary>
     public static readonly Color OnGold      = new(0.059f, 0.039f, 0.020f);
     /// <summary>정보색 — 정수·완료.</summary>

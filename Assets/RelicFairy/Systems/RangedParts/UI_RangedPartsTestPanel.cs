@@ -19,7 +19,7 @@ public sealed class UI_RangedPartsTestPanel : MonoBehaviour
     private const float PanelW     = 720f;
 
     private static readonly Color PanelBg = new(0.06f, 0.07f, 0.10f, 0.96f);
-    private static readonly Color Gold    = new(1f, 0.82f, 0.35f);
+    private static readonly Color Gold    = UIPalette.Gold;
     private static readonly Color Dim     = new(0.70f, 0.74f, 0.82f);
 
     private static UI_RangedPartsTestPanel _instance;
@@ -176,7 +176,7 @@ public sealed class UI_RangedPartsTestPanel : MonoBehaviour
                 ? $"효과값 {def.ValueAt(Mathf.Max(1, lv)):0.##} · 다음 강화 {def.CostAt(Mathf.Max(1, lv))}재료"
                 : "";
             _rowLabels[i].text = lv > 0
-                ? $"<color=#FFD24D>●</color> {nm}  Lv.{lv}   <color=#9AA3B5>{val}</color>"
+                ? $"<color={UIPalette.GoldHex}>●</color> {nm}  Lv.{lv}   <color=#9AA3B5>{val}</color>"
                 : $"<color=#5A6072>○</color> {nm}  <color=#9AA3B5>미장착</color>";
         }
 
@@ -194,7 +194,7 @@ public sealed class UI_RangedPartsTestPanel : MonoBehaviour
         RangedParts.Apply(ref req);
 
         var sb = new StringBuilder();
-        sb.AppendLine("<color=#FFD24D>발사 결과 미리보기</color> (기본 피해 100 기준)");
+        sb.AppendLine($"<color={UIPalette.GoldHex}>발사 결과 미리보기</color> (기본 피해 100 기준)");
         sb.AppendLine($"  투사체 {req.count}발 · 확산 {(req.count > 1 ? 30 : 0)}°");
         sb.AppendLine($"  관통 {req.pierce} · 피해배율 ×{req.damageMult:0.##} · 크기 ×{req.sizeMult:0.##}");
         sb.AppendLine($"  폭발반경 {req.explodeRadius:0.##} · 유도 {req.homingStrength:0}°/s"

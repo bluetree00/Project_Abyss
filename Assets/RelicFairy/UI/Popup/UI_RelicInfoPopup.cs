@@ -43,7 +43,7 @@ public class UI_RelicInfoPopup : UI_Popup
     private static readonly Color ChipBg    = new(0.20f, 0.18f, 0.24f, 1f);
     private static readonly Color HolderBg  = new(0.13f, 0.12f, 0.17f, 1f);
 
-    private static readonly Color TitleColor = new(0.96f, 0.84f, 0.45f, 1f);
+    private static readonly Color TitleColor = UIPalette.Gold;
     private static readonly Color TagLineCol = new(0.78f, 0.74f, 0.66f, 1f);
     private static readonly Color LoreColor  = new(0.55f, 0.52f, 0.48f, 1f);
     private static readonly Color BodyColor  = new(0.86f, 0.84f, 0.79f, 1f);

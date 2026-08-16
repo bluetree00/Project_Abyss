@@ -335,6 +335,6 @@ public class WorldItemDisplay : MonoBehaviour
 
         _promptText.text = owned
             ? "<color=#888888>이미 보유 중</color>"
-            : "<color=#FFD700>[F]</color> 얻기";
+            : $"<color={UIPalette.GoldHex}>[F]</color> 얻기";
     }
 }

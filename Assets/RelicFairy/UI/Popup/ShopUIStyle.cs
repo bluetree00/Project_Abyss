@@ -62,7 +62,7 @@ public static class ShopUIStyle
     public static readonly Color IconBg       = new(0.045f, 0.045f, 0.075f, 1f);
 
     public static readonly Color GoldPillBg   = new(0.16f, 0.13f, 0.06f, 1f);
-    public static readonly Color Gold         = new(1f, 0.82f, 0.28f, 1f);
+    public static readonly Color Gold         = UIPalette.Gold;
     public static readonly Color TextPrimary  = new(0.93f, 0.91f, 0.85f, 1f);   // parchment
     public static readonly Color TextDim      = new(0.62f, 0.60f, 0.64f, 1f);
     public static readonly Color RejectRed    = new(1f, 0.32f, 0.30f, 1f);

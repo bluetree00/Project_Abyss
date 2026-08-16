@@ -30,12 +30,12 @@ public sealed class TreasureVaultChallenge : WorldInteractionChallenge
         {
             float ang = (Mathf.PI * 2f) * i / ChestCount + 0.4f;
             Vector3 p = _center + new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * Radius;
-            AddMarker(p, "보물 상자", new Color(0.95f, 0.82f, 0.4f), "<color=#F2D26A>[F]</color> 개봉", i);
+            AddMarker(p, "보물 상자", UIPalette.Gold, $"<color={UIPalette.GoldHex}>[F]</color> 개봉", i);
         }
         _timerLabel = MakeText($"보물고 · {Mathf.CeilToInt(TimeLimit)}초", _center + Vector3.up * 3.2f,
-                               4f, new Color(1f, 0.9f, 0.55f), 12);
+                               4f, UIPalette.Gold, 12);
         _timing = true;
-        Notice($"보물고! <color=#F2D26A>{Mathf.CeilToInt(TimeLimit)}초</color> 안에 상자를 열어라");
+        Notice($"보물고! <color={UIPalette.GoldHex}>{Mathf.CeilToInt(TimeLimit)}초</color> 안에 상자를 열어라");
     }
 
     protected override void Tick()

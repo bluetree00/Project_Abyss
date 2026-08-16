@@ -220,7 +220,7 @@ public class WeaponForgeAltar : MonoBehaviour
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.sortingOrder = UISortingOrder.WorldPrompt;
         TMPOutlineHelper.ApplyDefault(tmp);
-        tmp.text = "<color=#FFD700>[F]</color> 보조 무기";
+        tmp.text = $"<color={UIPalette.GoldHex}>[F]</color> 보조 무기";
 
         _promptGo.SetActive(false);
     }

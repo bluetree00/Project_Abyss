@@ -25,7 +25,7 @@ public sealed class UI_ChallengeHud : MonoBehaviour
         scaler.matchWidthOrHeight  = 0.5f;
 
         var hud = canvasGO.AddComponent<UI_ChallengeHud>();
-        hud._objective = hud.MakeText(canvasGO.transform, new Vector2(0f, -44f), 30f, new Color(1f, 0.9f, 0.5f));
+        hud._objective = hud.MakeText(canvasGO.transform, new Vector2(0f, -44f), 30f, UIPalette.Gold);
         hud._status    = hud.MakeText(canvasGO.transform, new Vector2(0f, -82f), 25f, Color.white);
         return hud;
     }

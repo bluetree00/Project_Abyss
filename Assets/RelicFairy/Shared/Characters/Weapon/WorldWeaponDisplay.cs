@@ -256,7 +256,7 @@ public class WorldWeaponDisplay : MonoBehaviour
         _promptText = _promptGo.AddComponent<TextMeshPro>();
         if (worldTextFont != null)
             _promptText.font = worldTextFont;
-        _promptText.text = "<color=#FFD700>[F]</color> 얻기";
+        _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> 얻기";
         _promptText.fontSize = 4f;
         _promptText.alignment = TextAlignmentOptions.Center;
         _promptText.color = Color.white;
