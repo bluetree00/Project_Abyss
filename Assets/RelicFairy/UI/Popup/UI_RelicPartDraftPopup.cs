@@ -23,10 +23,11 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     // ── 레이아웃 ──
     private const float WindowW = 1100f;
     private const float WindowH = 600f;
-    private const float CardW   = 300f;
+    private const float CardW   = 300f;   // 카드 폭 상한 — 후보가 많으면 이 아래로 줄어든다
     private const float CardH   = 400f;
     private const float CardGap = 24f;
     private const float CardY   = -30f;
+    private const float CardSideMargin = 40f;   // 카드 열 좌우 여백(창 안쪽)
 
     private static readonly Color CardSelected = new(0.20f, 0.17f, 0.10f, 1f);
     private static readonly Color SelectBorder = new(0.88f, 0.72f, 0.32f, 1f);
@@ -42,6 +43,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     private List<RelicPartEntry> _candidates;
     private int _selected = -1;
     private bool _built;
+    private float _cardW = CardW;   // 후보 수에 맞춰 산출된 실제 카드 폭
 
     private Transform _windowRoot;
     private TMP_Text  _subtitle;
@@ -162,8 +164,13 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         _cards.Clear();
 
         int n = _candidates.Count;
-        float totalW = n * CardW + (n - 1) * CardGap;
-        float startX = -totalW * 0.5f + CardW * 0.5f;
+
+        // 카드 폭은 후보 수에 맞춰 줄인다. 300 고정이면 4지선다에서 카드가 창 밖으로 밀려난다.
+        float avail = WindowW - CardSideMargin * 2f - (n - 1) * CardGap;
+        _cardW = Mathf.Min(CardW, avail / Mathf.Max(1, n));
+
+        float totalW = n * _cardW + (n - 1) * CardGap;
+        float startX = -totalW * 0.5f + _cardW * 0.5f;
 
         for (int i = 0; i < n; i++)
         {
@@ -175,7 +182,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             var cardRT = (RectTransform)card.transform.parent;   // 위치/크기는 테두리(outer)에
             ShopUIStyle.Anchor(cardRT,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(startX + i * (CardW + CardGap), CardY), new Vector2(CardW, CardH));
+                new Vector2(startX + i * (_cardW + CardGap), CardY), new Vector2(_cardW, CardH));
 
             AddClick(cardRT.gameObject, () => SetSelected(idx));
 
@@ -215,21 +222,21 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
         ShopUIStyle.Anchor(name.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -92f), new Vector2(CardW - 24f, 34f));
+            new Vector2(0f, -92f), new Vector2(_cardW - 24f, 34f));
         name.text = entry.part_name ?? entry.part_id;
 
         // 구분선
         var divider = ShopUIStyle.MakeImage(card, "Divider", ShopUIStyle.BronzeLine);
         ShopUIStyle.Anchor(divider.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -134f), new Vector2(CardW - 60f, 2f));
+            new Vector2(0f, -134f), new Vector2(_cardW - 60f, 2f));
 
         // 설명(기능) — 카드의 핵심. 여러 줄 허용.
         var desc = ShopUIStyle.MakeText(card, "Desc", 16f, FontStyles.Normal,
             TextAlignmentOptions.Top, ShopUIStyle.TextPrimary);
         ShopUIStyle.Anchor(desc.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -150f), new Vector2(CardW - 40f, 180f));
+            new Vector2(0f, -150f), new Vector2(_cardW - 40f, 180f));
         desc.enableWordWrapping = true;
         desc.text = entry.description ?? string.Empty;
     }
