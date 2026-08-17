@@ -52,38 +52,63 @@ public sealed class SoundManager
         public int Version;
     }
 
-    public void SetMasterVolume(float volume)
+    /// <param name="save">false면 PlayerPrefs 기록을 건너뛴다. 슬라이더 드래그처럼 값이 초당 수십 번
+    /// 바뀌는 경로에서 매번 <c>PlayerPrefs.Save()</c>(윈도우는 레지스트리 flush)를 치면 끊긴다.
+    /// 드래그 중엔 false로 즉시 반영만 하고, 손을 뗄 때 <see cref="SaveVolumePrefs"/>로 한 번 저장한다.</param>
+    public void SetMasterVolume(float volume, bool save = true)
     {
         _masterVolume = Mathf.Clamp01(volume);
-        PlayerPrefs.SetFloat(kMasterVolKey, _masterVolume);
-        PlayerPrefs.Save();
+        if (save)
+        {
+            PlayerPrefs.SetFloat(kMasterVolKey, _masterVolume);
+            PlayerPrefs.Save();
+        }
+
         if (_mixer != null)
             _mixer.SetFloat(kMixerParamMaster, LinearToDb(_masterVolume));
+        else
+            ApplyFallbackBgmVolume(); // 폴백에선 마스터도 ChannelScale에 곱해진다 — 재생 중 BGM에 즉시 반영
     }
 
-    public void SetBgmVolume(float volume)
+    /// <inheritdoc cref="SetMasterVolume(float, bool)" path="/param[@name='save']"/>
+    public void SetBgmVolume(float volume, bool save = true)
     {
         _bgmVolume = Mathf.Clamp01(volume);
-        PlayerPrefs.SetFloat(kBgmVolKey, _bgmVolume);
-        PlayerPrefs.Save();
+        if (save)
+        {
+            PlayerPrefs.SetFloat(kBgmVolKey, _bgmVolume);
+            PlayerPrefs.Save();
+        }
 
         if (_mixer != null)
             _mixer.SetFloat(kMixerParamBgm, LinearToDb(_bgmVolume));
         else
-        {
-            var src = GetAudioSource(Define.Sound.Bgm);
-            if (src != null) src.volume = _bgmVolume; // 폴백: 채널 곱셈
-        }
+            ApplyFallbackBgmVolume(); // 폴백: 채널 곱셈
     }
 
-    public void SetEffectVolume(float volume)
+    /// <inheritdoc cref="SetMasterVolume(float, bool)" path="/param[@name='save']"/>
+    public void SetEffectVolume(float volume, bool save = true)
     {
         _effectVolume = Mathf.Clamp01(volume);
-        PlayerPrefs.SetFloat(kEffectVolKey, _effectVolume);
-        PlayerPrefs.Save();
+        if (save)
+        {
+            PlayerPrefs.SetFloat(kEffectVolKey, _effectVolume);
+            PlayerPrefs.Save();
+        }
+
         if (_mixer != null)
             _mixer.SetFloat(kMixerParamSfx, LinearToDb(_effectVolume));
-        // 폴백: 풀 이펙트는 재생 시점에 _effectVolume를 곱하므로 별도 처리 불필요
+        // 폴백: 풀 이펙트는 재생 시점에 ChannelScale을 곱하므로 별도 처리 불필요
+    }
+
+    /// <summary>드래그 중 save:false로 미뤄 둔 볼륨 값을 한 번에 기록한다.</summary>
+    public void SaveVolumePrefs()
+    {
+        PlayerPrefs.SetFloat(kMasterVolKey, _masterVolume);
+        PlayerPrefs.SetFloat(kBgmVolKey,    _bgmVolume);
+        PlayerPrefs.SetFloat(kEffectVolKey, _effectVolume);
+        PlayerPrefs.SetFloat(kUiVolKey,     _uiVolume);
+        PlayerPrefs.Save();
     }
 
     public void SetUiVolume(float volume)
@@ -393,12 +418,22 @@ public sealed class SoundManager
     }
 
     // 믹서가 있으면 채널 음량은 믹서가 처리 → 소스엔 per-clip 상대볼륨(1f)만.
-    // 믹서가 없으면(폴백) 기존처럼 소스 볼륨에 채널 음량을 곱한다.
+    // 믹서가 없으면(폴백) 소스 볼륨에 채널 음량을 곱한다.
+    // ⚠️ 마스터도 여기서 곱한다. 프로젝트에 AudioMixer 에셋(GameAudioMixer)이 아직 없어
+    //    실행 경로는 항상 이 폴백인데, 예전엔 마스터가 믹서 파라미터로만 나가서
+    //    마스터 볼륨을 어떻게 움직여도 소리가 그대로였다(설정 화면의 죽은 노브).
     private float ChannelScale(Define.Sound type)
     {
         if (_mixer != null)
             return 1f;
-        return type == Define.Sound.Bgm ? _bgmVolume : _effectVolume;
+        return _masterVolume * (type == Define.Sound.Bgm ? _bgmVolume : _effectVolume);
+    }
+
+    /// <summary>폴백 경로에서 재생 중인 BGM 소스에 현재 채널 음량을 다시 적용한다.</summary>
+    private void ApplyFallbackBgmVolume()
+    {
+        var src = GetAudioSource(Define.Sound.Bgm);
+        if (src != null) src.volume = ChannelScale(Define.Sound.Bgm);
     }
 
     private static float LinearToDb(float linear)
