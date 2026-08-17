@@ -145,6 +145,11 @@ public sealed class UI_Settings : MonoBehaviour
         var sound = Managers.Sound;
         if (sound != null)
         {
+            // Init이 PlayerPrefs를 필드로 읽어들인다. 부트에서 이미 불렸겠지만 멱등하므로 한 번 더 부른다 —
+            // 안 불린 상태로 읽으면 저장값 대신 초기값(1.0)이 보이고, 슬라이더를 건드리는 순간
+            // 그 1.0이 저장된 볼륨을 덮어쓴다.
+            sound.Init();
+
             SetSlider(_masterSlider, _masterValue, sound.MasterVolume);
             SetSlider(_bgmSlider,    _bgmValue,    sound.BgmVolume);
             SetSlider(_sfxSlider,    _sfxValue,    sound.EffectVolume);
@@ -175,6 +180,11 @@ public sealed class UI_Settings : MonoBehaviour
     private static void SetSlider(Slider slider, TMP_Text valueText, float value)
     {
         if (slider != null) slider.SetValueWithoutNotify(value);
+        SetValueText(valueText, value);
+    }
+
+    private static void SetValueText(TMP_Text valueText, float value)
+    {
         if (valueText != null) valueText.text = Mathf.RoundToInt(value * 100f) + "%";
     }
 
@@ -539,7 +549,7 @@ public sealed class UI_Settings : MonoBehaviour
     {
         if (_suppressCallbacks) return;
         Managers.Sound?.SetMasterVolume(v, save: false);
-        SetSlider(null, _masterValue, v);
+        SetValueText(_masterValue, v);
         _volumeDirty = true;
     }
 
@@ -547,7 +557,7 @@ public sealed class UI_Settings : MonoBehaviour
     {
         if (_suppressCallbacks) return;
         Managers.Sound?.SetBgmVolume(v, save: false);
-        SetSlider(null, _bgmValue, v);
+        SetValueText(_bgmValue, v);
         _volumeDirty = true;
     }
 
@@ -555,7 +565,7 @@ public sealed class UI_Settings : MonoBehaviour
     {
         if (_suppressCallbacks) return;
         Managers.Sound?.SetEffectVolume(v, save: false);
-        SetSlider(null, _sfxValue, v);
+        SetValueText(_sfxValue, v);
         _volumeDirty = true;
     }
 
