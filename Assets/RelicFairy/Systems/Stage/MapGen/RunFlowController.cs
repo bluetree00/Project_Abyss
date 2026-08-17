@@ -210,7 +210,11 @@ public class RunFlowController : MonoBehaviour
         _sequencer = new RunSequencer(_pool, _resolvedStructure, _chapterSeed, _bossThresholdOverride);
         _sequencer.RestoreState(meta.visitCount, meta.seqPhase, meta.shopUsed, meta.eventUsed, meta.cooldowns,
                                 meta.crucibleUsed, meta.refineryUsed,
-                                meta.shopMiss, meta.eventMiss, meta.crucibleMiss, meta.refineryMiss);
+                                meta.shopMiss, meta.eventMiss, meta.crucibleMiss, meta.refineryMiss,
+                                // 구 세이브(hasBossProgress=false)는 -1로 넘겨 visitCount 폴백을 태운다.
+                                // 직전 진입 방 = 지금 복원 중인 방이므로 currentRoomKind가 곧 _lastCommittedKind다.
+                                meta.hasBossProgress ? meta.bossProgress : -1,
+                                meta.currentRoomKind);
         _runPlan   = _sequencer.BuildPlan(); // 이어하기: 동일 시드+config로 일정표 재생성(직렬화 없음, 원본과 동일)
         DumpRunPlan(_chapterSeed);
 
@@ -371,7 +375,9 @@ public class RunFlowController : MonoBehaviour
 
         // 방 종류를 런 세션에 알린다 — 클리어 보상(RoomRewardTable)이 이 값으로 갈린다.
         // 방 빌드보다 먼저 세팅해야 RoomClearGate가 붙는 시점(AttachRoomClearController)에 이미 유효하다.
-        grb.Run?.SetCurrentRoomKind(plan.kind);
+        // 이어하기 재생성은 특수방 방문으로 세지 않는다 — ResumeAsync가 RestoreAltarProgress로
+        // 저장된 SpecialRoomVisits(그 방문이 이미 포함된 값)를 되돌려놓기 때문에 여기서 또 올리면 이중 계상된다.
+        grb.Run?.SetCurrentRoomKind(plan.kind, countSpecialVisit: !_resuming);
 
         var dir = WipeDir(fromEdge);
         _heading = (int)fromEdge; // 탄 출구의 절대 방향 = 새 진행 방향 → 다음 방을 이만큼 회전
@@ -668,6 +674,8 @@ public class RunFlowController : MonoBehaviour
             masterSeed         = _masterSeed,
             chapterSeed        = _chapterSeed,
             visitCount         = _sequencer.VisitCount,
+            bossProgress       = _sequencer.BossProgress,
+            hasBossProgress    = true,
             seqPhase           = _sequencer.PhaseInt,
             shopUsed           = _sequencer.ShopUsed,
             eventUsed          = _sequencer.EventUsed,

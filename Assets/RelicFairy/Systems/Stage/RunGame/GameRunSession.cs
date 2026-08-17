@@ -178,12 +178,15 @@ public sealed class GameRunSession
     public RoomPlanKind CurrentRoomKind { get; private set; } = RoomPlanKind.Normal;
 
     /// <summary>방 진입 시 RunFlowController가 호출.</summary>
-    public void SetCurrentRoomKind(RoomPlanKind kind)
+    /// <param name="countSpecialVisit">특수방이면 방문 수를 올릴지. 이어하기 재생성(같은 방을 다시 짓는 것)은
+    /// false로 넘긴다 — 저장된 SpecialRoomVisits가 이미 그 방문을 포함하고 있어 그대로 두면 이중 계상된다.</param>
+    public void SetCurrentRoomKind(RoomPlanKind kind, bool countSpecialVisit = true)
     {
         CurrentRoomKind = kind;
 
         // 「고독」 기행 — 특수방을 하나도 안 들르고 완주했는가.
-        if (kind is RoomPlanKind.Shop or RoomPlanKind.Event or RoomPlanKind.Crucible or RoomPlanKind.Refinery)
+        if (countSpecialVisit &&
+            kind is RoomPlanKind.Shop or RoomPlanKind.Event or RoomPlanKind.Crucible or RoomPlanKind.Refinery)
             SpecialRoomVisits++;
     }
 

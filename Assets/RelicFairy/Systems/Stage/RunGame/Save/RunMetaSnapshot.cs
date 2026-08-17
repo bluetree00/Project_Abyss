@@ -12,6 +12,12 @@ public struct RunMetaSnapshot
     /// 0이면 구버전 세이브 → 복원 시 마스터 시드+챕터로 재계산(무손실 폴백).</summary>
     public int chapterSeed;
     public int visitCount;          // RunSequencer 진행 방 수
+    /// <summary>보스 임계값 진행 수(= 방문한 전투방 수). visitCount와 갈라진다 — 특수방은 깊이를 소모하지 않는다.</summary>
+    public int bossProgress;
+    /// <summary>bossProgress가 실려 있는 세이브인가. 구버전(필드 없음)은 false로 남고,
+    /// 복원 시 visitCount로 폴백한다(= 전 방이 임계치를 소모하던 옛 동작 그대로).
+    /// bossProgress=0이 정상값일 수 있어 0을 '없음' 표식으로 못 쓴다.</summary>
+    public bool hasBossProgress;
     public int seqPhase;            // RunSequencer.Phase (int)
     // 특수방 챕터 캡 소모(= 실제로 방문한 횟수). 4종 전부 저장해야 이어하기로 캡이 리셋되지 않는다.
     public int shopUsed;

@@ -87,6 +87,11 @@ public class RunSequencer
 
     private Phase _phase = Phase.Normal;
     private int   _visitCount;
+    /// <summary>보스 임계값(BossThreshold) 진행 수 — <b>전투방 진입만</b> 센다.
+    /// _visitCount와 갈라져 있다: _visitCount는 방별 RNG 시드(<see cref="Combine"/>)의 축이라
+    /// 종류와 무관하게 매 방 증가해야 하고(같은 값이 두 번 나오면 같은 방·같은 출구가 재현된다),
+    /// 보스까지의 거리는 전투방만 세야 특수방을 챙길수록 전투가 사라지지 않는다.</summary>
+    private int   _bossProgress;
     private int   _shopUsed;
     private int   _eventUsed;
     private int   _crucibleUsed;   // 챕터당 1
@@ -100,8 +105,15 @@ public class RunSequencer
 
     // 특수방 후보 셔플용 재사용 버퍼(롤마다 new 방지)
     private readonly List<RoomPlanKind> _specialBuffer = new(4);
+    // 하드 피티 전용 버퍼. _specialBuffer와 나눠 쓴다 — 피티 결과를 들고 있는 동안
+    // 같은 롤 안에서 RollKind가 _specialBuffer를 덮어쓰기 때문.
+    private readonly List<RoomPlanKind> _pityCandidates = new(4);
+    private readonly List<RoomPlanKind> _pityForced     = new(2);
+    // 이번 롤에서 각 문에 강제할 종류(null=자유 롤). 문 수와 같은 길이 고정 버퍼.
+    private readonly RoomPlanKind?[]    _forcedSlots    = new RoomPlanKind?[2];
 
     public int  VisitCount     => _visitCount;
+    public int  BossProgress   => _bossProgress;
     public bool InBossApproach => _phase != Phase.Normal;
     public bool IsDone         => _phase == Phase.Done;
 
@@ -141,14 +153,22 @@ public class RunSequencer
 
     /// <summary>이어하기: 저장된 시퀀서 진행 상태를 복원한다.
     /// 재련/정제 캡과 PRD 미출현 누적은 구 세이브에 없으므로 기본값 0(=만량·미출현 없음)으로 폴백한다.</summary>
+    /// <param name="bossProgress">보스 임계값 진행 수. 음수면 구 세이브(필드 없음) → visitCount로 폴백한다
+    /// (= 전 방이 임계치를 소모하던 옛 동작 그대로라, 이어하기로 챕터가 갑자기 길어지지 않는다).</param>
+    /// <param name="lastCommittedKind">직전 진입 방 종류(RoomPlanKind int). 음수면 Normal.</param>
     public void RestoreState(int visitCount, int phase, int shopUsed, int eventUsed,
                              IEnumerable<CooldownKV> cooldowns,
                              int crucibleUsed = 0, int refineryUsed = 0,
                              int shopMiss = 0, int eventMiss = 0,
-                             int crucibleMiss = 0, int refineryMiss = 0)
+                             int crucibleMiss = 0, int refineryMiss = 0,
+                             int bossProgress = -1, int lastCommittedKind = -1)
     {
         _visitCount   = visitCount;
+        _bossProgress = bossProgress >= 0 ? bossProgress : visitCount;
         _phase        = (Phase)phase;
+        // 직전 진입 방 종류를 복원하지 않으면 이어하기 직후 '같은 특수방 연속 방지' 가드가 풀려
+        // 상점에서 저장 → 재접속 → 바로 다음 문에 또 상점이 뜨는 일이 생긴다.
+        _lastCommittedKind = lastCommittedKind >= 0 ? (RoomPlanKind)lastCommittedKind : RoomPlanKind.Normal;
         _shopUsed     = shopUsed;
         _eventUsed    = eventUsed;
         _crucibleUsed = crucibleUsed;
@@ -200,7 +220,7 @@ public class RunSequencer
             return result;
         }
         if (_phase == Phase.PreBoss
-            || (_phase == Phase.Normal && _config != null && _visitCount >= EffectiveBossThreshold))
+            || (_phase == Phase.Normal && _config != null && _bossProgress >= EffectiveBossThreshold))
         {
             _phase = Phase.PreBoss;
             result.Add(new DoorPlan { kind = RoomPlanKind.PreBoss, entry = BossEntry(_config?.PreBossRoomKey, RoomPlanKind.PreBoss) });
@@ -211,22 +231,32 @@ public class RunSequencer
         var rng = new System.Random(Combine(_seed, _visitCount));
 
         // 특수방 타이밍은 <b>고정 마일스톤이 아니라 PRD 확률</b>이 정한다(§방구조 개편).
-        // 예외는 하나뿐 — 보스까지 남은 방이 모자라면 아직 못 만난 특수방을 강제 배치한다(하드 피티).
-        RoomPlanKind? forced = PendingPitySpecial(rng);
+        // 예외는 하나뿐 — 보스까지 남은 전투방이 모자라면 아직 못 만난 특수방을 강제 배치한다(하드 피티).
+        int forcedCount = CollectPitySpecials(rng);
+
+        // 강제분을 어느 문에 놓을지 정한다.
+        //  · 2종 이상 밀려 있으면 <b>두 문 모두</b> 특수방으로 채운다(종류는 서로 다르게).
+        //    한 문(항상 0번)에만 박던 예전 코드는 플레이어가 늘 반대 문만 고르면 그대로 회피돼
+        //    재련소·정제소·상점을 한 번도 못 들르는 런이 나왔다 — 피티가 '제시'만 하고 '보장'을 못 했다.
+        //    종류가 서로 다르므로 "상점 | 상점" 같은 무의미한 중복 선택지는 생기지 않는다.
+        //  · 1종뿐이면 어느 문에 놓을지 무작위 — 항상 0번 문이던 위치 편향을 없앤다.
+        _forcedSlots[0] = _forcedSlots[1] = null;
+        if (forcedCount >= 2)
+        {
+            _forcedSlots[0] = _pityForced[0];
+            _forcedSlots[1] = _pityForced[1];
+        }
+        else if (forcedCount == 1)
+        {
+            _forcedSlots[rng.Next(2)] = _pityForced[0];
+        }
 
         // 일반 페이즈 — 2슬롯(직진/턴). 특수방(상점/이벤트/재련소/정제소)은 한 문쌍 최대 1개.
-        // 피티 강제는 '문 하나'에만 적용한다 — 두 문을 같은 종류로 채우면
-        // "상점 | 상점"처럼 중복 선택지가 되어 고르는 의미가 사라진다.
-        bool specialUsed = false;
+        // 피티가 걸린 롤에서는 굴려서 나온 특수방을 더 얹지 않는다(강제분만 남긴다).
+        bool specialUsed = forcedCount > 0;
         for (int i = 0; i < 2; i++)
         {
-            RoomPlanKind kind;
-            if (forced.HasValue && i == 0)
-            {
-                kind = forced.Value;
-                if (IsSpecialKind(kind)) specialUsed = true;   // 나머지 문은 특수방 금지
-            }
-            else kind = RollKind(rng, ref specialUsed);
+            RoomPlanKind kind = _forcedSlots[i] ?? RollKind(rng, ref specialUsed);
 
             // 같은 특수 종류가 두 문에 겹치면 강등(중복 선택지 방지)
             if (i > 0 && IsSpecialKind(kind) && result[0].kind == kind) kind = RoomPlanKind.Normal;
@@ -242,6 +272,14 @@ public class RunSequencer
     public void CommitEntry(DoorPlan chosen)
     {
         _visitCount++;
+
+        // 보스 임계값 진행은 <b>전투방만</b> 센다. 예전엔 종류를 가리지 않고 셌기 때문에
+        // 상점·재련소·정제소·이벤트를 챙길수록 보스까지 남은 전투방이 그만큼 사라졌다
+        // (특수방을 다 들르면 전투방이 절반 이하). 이제 특수방은 '깊이'를 소모하지 않는다.
+        // 런이 무한정 길어지지 않는 근거: 특수방은 챕터 캡(ShopMaxPerChapter/EventMaxPerChapter,
+        // 재련·정제 각 1회)이 있어 한 챕터의 최대 방 수는 BossThreshold + 캡 합으로 묶인다.
+        if (!IsSpecialKind(chosen.kind)) _bossProgress++;
+
         TickCooldowns();
 
         if (chosen.entry != null && !string.IsNullOrEmpty(chosen.entry.pool_key))
@@ -314,6 +352,16 @@ public class RunSequencer
         else if (k == RoomPlanKind.Refinery) _refineryUsed++;
     }
 
+    /// <summary>이 챕터에서 해당 특수방을 실제로 방문한 횟수(= 캡 소모량).</summary>
+    private int UsedOf(RoomPlanKind k) => k switch
+    {
+        RoomPlanKind.Shop     => _shopUsed,
+        RoomPlanKind.Event    => _eventUsed,
+        RoomPlanKind.Crucible => _crucibleUsed,
+        RoomPlanKind.Refinery => _refineryUsed,
+        _                     => 0,
+    };
+
     private int MissOf(RoomPlanKind k) => k switch
     {
         RoomPlanKind.Shop     => _shopMiss,
@@ -349,35 +397,50 @@ public class RunSequencer
     }
 
     /// <summary>
-    /// 하드 피티 — 보스까지 남은 방이 '아직 못 만난 특수방 수' 이하로 줄면 그 중 하나를 강제 배치한다.
-    /// 순수 확률만 두면 "챕터 내내 상점 0회" 같은 불운이 나오므로 상한을 건다(가장 오래 기다린 종류 우선).
+    /// 하드 피티 — 보스까지 남은 <b>전투방</b>이 '아직 한 번도 못 만난 특수방 수' 이하로 줄면
+    /// 그 종류들을 강제 배치 대상으로 <see cref="_pityForced"/>에 모은다(miss 큰 순, 최대 2개 = 문 수).
+    /// 순수 확률만 두면 "챕터 내내 상점 0회" 같은 불운이 나오므로 상한을 건다.
+    ///
+    /// 후보는 <b>미방문(Used==0)</b>으로 한정한다. 캡 잔여(상점 2회 중 1회 사용 등)까지 후보로 잡으면,
+    /// 비전투 방문이 임계치를 소모하지 않게 된 뒤로는 roomsLeft가 줄지 않는 채로 강제가 이어져
+    /// 챕터 말미가 특수방으로만 채워진다. 피티의 목적은 '최소 1회 보장'이지 '캡 소진'이 아니다.
+    /// 이 한정 덕에 강제는 종류당 1회씩 최대 4회로 끝난다(방문할 때마다 후보에서 빠진다).
     /// </summary>
-    private RoomPlanKind? PendingPitySpecial(System.Random rng)
+    /// <returns>강제할 종류 수(0~2). 결과는 <see cref="_pityForced"/>에 담긴다.</returns>
+    private int CollectPitySpecials(System.Random rng)
     {
-        if (_config == null) return null;
+        _pityForced.Clear();
+        if (_config == null) return 0;
 
-        int roomsLeft = EffectiveBossThreshold - _visitCount;
-        if (roomsLeft <= 0) return null;
+        int roomsLeft = EffectiveBossThreshold - _bossProgress;
+        if (roomsLeft <= 0) return 0;
 
-        // 가장 오래 기다린(miss 최대) 종류들을 모은다.
-        _specialBuffer.Clear();
-        int pending = 0, bestMiss = -1;
+        _pityCandidates.Clear();
         for (int i = 0; i < SpecialKinds.Length; i++)
         {
             var k = SpecialKinds[i];
-            if (!CanUseSpecial(k) || BaseChance(k) <= 0f) continue;
-            pending++;
-
-            int m = MissOf(k);
-            if (m > bestMiss) { bestMiss = m; _specialBuffer.Clear(); _specialBuffer.Add(k); }
-            else if (m == bestMiss) _specialBuffer.Add(k);
+            if (UsedOf(k) > 0 || !CanUseSpecial(k) || BaseChance(k) <= 0f) continue;
+            _pityCandidates.Add(k);
         }
 
-        if (pending == 0 || roomsLeft > pending || _specialBuffer.Count == 0) return null;
+        if (_pityCandidates.Count == 0 || roomsLeft > _pityCandidates.Count) return 0;
 
-        // ⚠️ 동률일 때 무작위로 고른다. 배열 순서대로 뽑으면 miss가 같은 초반에 항상 상점만 강제돼
+        // 가장 오래 기다린(miss 최대) 종류부터 뽑는다.
+        // ⚠️ 동률일 때 무작위로 고른다(저수지 표집). 배열 순서대로 뽑으면 miss가 같은 초반에 항상 상점만 강제돼
         //    재련·정제가 뒤로 밀리고 노출이 극단적으로 치우친다(시뮬레이션에서 상점 독점 확인).
-        return _specialBuffer[rng.Next(_specialBuffer.Count)];
+        while (_pityForced.Count < _forcedSlots.Length && _pityCandidates.Count > 0)
+        {
+            int bestMiss = -1, tie = 0, pick = 0;
+            for (int i = 0; i < _pityCandidates.Count; i++)
+            {
+                int m = MissOf(_pityCandidates[i]);
+                if (m > bestMiss) { bestMiss = m; tie = 1; pick = i; }
+                else if (m == bestMiss && rng.Next(++tie) == 0) pick = i;
+            }
+            _pityForced.Add(_pityCandidates[pick]);
+            _pityCandidates.RemoveAt(pick);
+        }
+        return _pityForced.Count;
     }
 
     /// <summary>보스/보스전방 템플릿 해석: 지정 pool_key 우선, 비었거나 못 찾으면 카테고리 첫 항목으로 폴백.
@@ -449,7 +512,9 @@ public class RunSequencer
         if (available.Count == 0) available = byCategory;
 
         // 난이도 윈도로 추가 좁히기 (충족 후보 없으면 무시)
-        float target = _config != null ? _config.DifficultyAt(_visitCount) : 0f;
+        // 곡선의 정의역은 0~BossThreshold(= 보스까지의 거리)이므로 축은 _visitCount가 아니라 _bossProgress다.
+        // 방문 수를 쓰면 특수방을 챙긴 만큼 곡선이 앞당겨져 마지막 전투방들이 일찍 최대 난이도에 붙는다.
+        float target = _config != null ? _config.DifficultyAt(_bossProgress) : 0f;
         var windowed = available.FindAll(p => Mathf.Abs(p.difficulty_scale - target) <= DifficultyTolerance);
         var finalSet = windowed.Count > 0 ? windowed : available;
 
