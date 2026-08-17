@@ -191,14 +191,15 @@ public class PlayerController : CharacterBase
 
             // 룬 속성 OnDamaged 통지(어둠 게이지 등). 실제 피해가 들어갈 때만 — i-frame/회피/무효/사망무효는 위에서 이미 return.
             _runeEffects?.NotifyDamaged(finalDmg, attacker);
+
+            // 「무결」 기행 — 이 챕터의 무피격 판정을 깬다.
+            // 회피·무효는 위에서 return되지만 finalDmg가 0으로 깎이는 경로(방어력·받피감소·실드 전량 흡수)는
+            // 여기까지 내려온다. 블록 밖에 두면 HP가 1도 안 깎였는데 무피격이 깨진다.
+            GameRunBootstrapper.Instance?.Run?.ReportPlayerDamaged();
         }
 
         // [서약] 피격 통보 (실제 적용 피해량)
         covHandler?.OnTakeDamage(finalDmg);
-
-        // 「무결」 기행 — 이 챕터의 무피격 판정을 깬다. 회피·무효는 위에서 이미 return되므로
-        // 여기 도달했다는 건 실제로 맞았다는 뜻이다.
-        GameRunBootstrapper.Instance?.Run?.ReportPlayerDamaged();
 
         // 사망 판정 — 아이템(OnNearDeath) 부활 실패 후 HP 0이면 서약 사망방지 체크, 그래도 0이면 사망 처리.
         TryHandleDeath();

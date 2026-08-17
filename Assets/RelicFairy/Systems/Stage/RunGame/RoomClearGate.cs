@@ -115,8 +115,7 @@ public class RoomClearGate : MonoBehaviour
         if (_isBossRoom)
         {
             // 보스 보상은 룬이 아니라 '유물 파츠 드래프트(3지선다)'가 담당한다.
-            // 여기서는 아무 보상도 굴리지 않는다. 단, 보상 트리거는 아래에서 반드시 스폰해야 한다
-            // — 최종 보스 런 클리어·챕터 전환 처리가 ClearRewardTrigger에 달려 있기 때문.
+            // 여기서는 아무 보상도 굴리지 않는다(보상 트리거도 스폰하지 않는다 — 아래 스폰 지점 주석 참조).
             Debug.Log("[RoomClearGate] 보스방 — 룬 보상 없음(유물 파츠 드래프트 담당)");
         }
         else if (_challengeGrade.HasValue)

@@ -459,8 +459,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 베이스캠프(영속 허브)에서 로드아웃 확정 후 진입한 새 런: 바로 전투가 아니라 Zone0를 대기 방으로 띄운다.
         // IsNewRunPending(로비 새 런 신호, BaseCamp 경유 시 미소비 상태로 유지)을 여기서 소비한다.
         // 디버그 패널이 있어도 허브발 실제 새 런이 우선한다(디버그 패널은 IsStartRoomScene이면 자동 시작을 보류).
-        bool newRunFromHub = (AppBootstrapper.Instance?.Loadout?.IsReady ?? false)
-            && (AppBootstrapper.Instance?.ConsumeNewRunPending() ?? false);
+        // ⚠️ 소비를 먼저 한다. 단축평가로 IsReady가 false면 ConsumeNewRunPending이 호출조차 되지 않아
+        //    새 런 신호가 소비되지 않은 채 남고, 이후 아무 전투 씬 진입에서나 뒤늦게 발동했다.
+        //    이 지점이 그 신호의 지정 소비처이므로(BaseCamp 게이트가 직전에 세워 보낸다) 무조건 소비한다.
+        bool newRunPending = AppBootstrapper.Instance?.ConsumeNewRunPending() ?? false;
+        bool newRunFromHub = newRunPending && (AppBootstrapper.Instance?.Loadout?.IsReady ?? false);
 
         // 챕터 전환 진입: 기존 런(IsRunning) 유지하되 저장 이어하기가 아니라 새 챕터를 처음부터 시작.
         bool chapterAdvance = AppBootstrapper.Instance?.ConsumeChapterAdvance() ?? false;

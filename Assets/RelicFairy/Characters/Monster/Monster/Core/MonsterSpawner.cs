@@ -341,47 +341,52 @@ public class MonsterSpawner : MonoBehaviour
 
         // 이 웨이브 동안 targetGrade를 그룹별로 일시 교체 — TrySpawnOneAsync의 PassesGradeFilter에 반영됨.
         // SpawnWaveAsync는 같은 인스턴스에 대해 순차 실행되므로 동시성 문제 없음.
+        // ⚠️ 복원은 반드시 finally에서 한다. 예전엔 이탈 지점마다 손으로 되돌렸는데, 그중 어디도 잡지 못하는
+        //    예외(TrySpawnOneAsync 내부 취소 등)가 한 번 터지면 교체된 등급이 그대로 눌러앉아
+        //    다음 방·다음 웨이브의 스폰 등급 필터까지 오염됐다.
         var prevGrade = targetGrade;
-
-        // 챕터 수량 배율(ChapterDataSO.monsterCountScale) — 높은 챕터일수록 웨이브 마릿수 증가.
-        float countScale = AppBootstrapper.Instance?.CurrentRun?.CurrentMonsterCountScale ?? 1f;
-
-        // 총 스폰 대상 수 — 마지막 한 마리 뒤에는 대기하지 않도록 카운트다운에 사용.
-        int remaining = 0;
-        foreach (var g in _waveEntries) remaining += ScaleCount(g.spawnCount, countScale);
-
-        int spawned = 0;
-        for (int g = 0; g < _waveEntries.Length; g++)
+        try
         {
-            targetGrade = _waveEntries[g].maxGrade; // 이 그룹의 등급 상한(AtMost)
-            int count   = ScaleCount(_waveEntries[g].spawnCount, countScale);
+            // 챕터 수량 배율(ChapterDataSO.monsterCountScale) — 높은 챕터일수록 웨이브 마릿수 증가.
+            float countScale = AppBootstrapper.Instance?.CurrentRun?.CurrentMonsterCountScale ?? 1f;
 
-            for (int i = 0; i < count; i++)
+            // 총 스폰 대상 수 — 마지막 한 마리 뒤에는 대기하지 않도록 카운트다운에 사용.
+            int remaining = 0;
+            foreach (var g in _waveEntries) remaining += ScaleCount(g.spawnCount, countScale);
+
+            int spawned = 0;
+            for (int g = 0; g < _waveEntries.Length; g++)
             {
-                if (ct.IsCancellationRequested) { targetGrade = prevGrade; return spawned; }
+                targetGrade = _waveEntries[g].maxGrade; // 이 그룹의 등급 상한(AtMost)
+                int count   = ScaleCount(_waveEntries[g].spawnCount, countScale);
 
-                // 방 전체 동시 상한(MonsterBudget)을 여기서도 지킨다.
-                // 예전엔 이 경로에 검사가 없어, 절차생성 방(전부 웨이브 모드)에서는 상한이 사실상 죽어 있었다
-                // — 정예방 32마리가 한꺼번에 살아 있었다. 자리가 날 때까지 기다렸다가 이어서 소환한다.
-                if (!await WaitForSpawnBudgetAsync(ct)) { targetGrade = prevGrade; return spawned; }
-
-                if (await TrySpawnOneAsync()) spawned++;
-                remaining--;
-
-                // 마지막 한 마리 뒤에는 대기 생략 — 스폰 완료를 지체시키지 않음.
-                if (remaining <= 0) continue;
-
-                float delay = UnityEngine.Random.Range(_waveSpawnDelayMin, _waveSpawnDelayMax);
-                try
+                for (int i = 0; i < count; i++)
                 {
-                    await UniTask.Delay(System.TimeSpan.FromSeconds(delay), cancellationToken: ct);
-                }
-                catch (System.OperationCanceledException) { targetGrade = prevGrade; return spawned; }
-            }
-        }
+                    if (ct.IsCancellationRequested) return spawned;
 
-        targetGrade = prevGrade; // 복원
-        return spawned;
+                    // 방 전체 동시 상한(MonsterBudget)을 여기서도 지킨다.
+                    // 예전엔 이 경로에 검사가 없어, 절차생성 방(전부 웨이브 모드)에서는 상한이 사실상 죽어 있었다
+                    // — 정예방 32마리가 한꺼번에 살아 있었다. 자리가 날 때까지 기다렸다가 이어서 소환한다.
+                    if (!await WaitForSpawnBudgetAsync(ct)) return spawned;
+
+                    if (await TrySpawnOneAsync()) spawned++;
+                    remaining--;
+
+                    // 마지막 한 마리 뒤에는 대기 생략 — 스폰 완료를 지체시키지 않음.
+                    if (remaining <= 0) continue;
+
+                    float delay = UnityEngine.Random.Range(_waveSpawnDelayMin, _waveSpawnDelayMax);
+                    try
+                    {
+                        await UniTask.Delay(System.TimeSpan.FromSeconds(delay), cancellationToken: ct);
+                    }
+                    catch (System.OperationCanceledException) { return spawned; }
+                }
+            }
+
+            return spawned;
+        }
+        finally { targetGrade = prevGrade; }
     }
 
     /// <summary>
