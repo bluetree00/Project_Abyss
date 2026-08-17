@@ -59,6 +59,8 @@ public static class UISortingOrder
     // ── 500~599 : 시스템 모달(최고 간섭) ───────────────────
     /// <summary>일시정지·확인창 등 게임을 멈추는 모달.</summary>
     public const int SystemModal  = 500;
+    /// <summary>시스템 모달 <b>위</b>에 겹치는 2단 모달(일시정지 → 설정). 밴드(500~599) 안이다.</summary>
+    public const int SystemModalTop = 510;
 
     // ── 600~699 : 시네마틱 연출 ────────────────────────────
     /// <summary>얼티밋 연출.</summary>
