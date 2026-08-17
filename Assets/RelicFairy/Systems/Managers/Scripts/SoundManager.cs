@@ -112,13 +112,19 @@ public sealed class SoundManager
         PlayerPrefs.Save();
     }
 
-    public void SetUiVolume(float volume)
+    /// <inheritdoc cref="SetMasterVolume(float, bool)" path="/param[@name='save']"/>
+    public void SetUiVolume(float volume, bool save = true)
     {
         _uiVolume = Mathf.Clamp01(volume);
-        PlayerPrefs.SetFloat(kUiVolKey, _uiVolume);
-        PlayerPrefs.Save();
+        if (save)
+        {
+            PlayerPrefs.SetFloat(kUiVolKey, _uiVolume);
+            PlayerPrefs.Save();
+        }
+
         if (_mixer != null)
             _mixer.SetFloat(kMixerParamUi, LinearToDb(_uiVolume));
+        // 폴백(믹서 없음)엔 UI 채널이 없다 — ChannelScale은 BGM/효과음만 나눈다.
     }
 
     public void SetEventTable(SoundEventTableSO table) => _eventTable = table;

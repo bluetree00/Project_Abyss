@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 설정 화면 — 오디오(마스터/배경음/효과음) + 화면(해상도/창모드).
+/// 설정 화면 — 오디오(마스터/배경음/효과음/UI) + 화면(해상도/창모드).
 ///
 /// <para><b>기존 시스템에 붙기만 한다.</b> 볼륨은 <see cref="SoundManager"/>의 채널 API(믹서 있으면 믹서,
 /// 없으면 폴백 곱셈)로, 화면은 <see cref="ScreenSettings"/>(Screen.SetResolution + PlayerPrefs)로 나간다.
@@ -23,7 +23,7 @@ public sealed class UI_Settings : MonoBehaviour
     // ── Constants ────────────────────────────────────────────
     private const int SortingOrder = UISortingOrder.SystemModalTop;
 
-    private const float PanelW = 800f, PanelH = 564f;
+    private const float PanelW = 800f, PanelH = 618f;
     private const float SidePad = 40f, TopPad = 30f;
     private const float RowH = 48f, RowGap = 6f;
 
@@ -53,8 +53,8 @@ public sealed class UI_Settings : MonoBehaviour
     // ── Private ──────────────────────────────────────────────
     private GameObject _root;
 
-    private Slider _masterSlider, _bgmSlider, _sfxSlider;
-    private TMP_Text _masterValue, _bgmValue, _sfxValue;
+    private Slider _masterSlider, _bgmSlider, _sfxSlider, _uiSlider;
+    private TMP_Text _masterValue, _bgmValue, _sfxValue, _uiValue;
 
     private TMP_Dropdown _resolutionDropdown;
     private TMP_Text     _windowModeLabel;
@@ -153,6 +153,7 @@ public sealed class UI_Settings : MonoBehaviour
             SetSlider(_masterSlider, _masterValue, sound.MasterVolume);
             SetSlider(_bgmSlider,    _bgmValue,    sound.BgmVolume);
             SetSlider(_sfxSlider,    _sfxValue,    sound.EffectVolume);
+            SetSlider(_uiSlider,     _uiValue,     sound.UiVolume);
         }
 
         _fullscreen = ScreenSettings.HasSaved ? ScreenSettings.SavedFullscreen : ScreenSettings.IsFullscreenNow;
@@ -235,6 +236,7 @@ public sealed class UI_Settings : MonoBehaviour
         y = AddVolumeRow(panel.transform, y, "마스터", out _masterSlider, out _masterValue, OnMasterChanged);
         y = AddVolumeRow(panel.transform, y, "배경음", out _bgmSlider,    out _bgmValue,    OnBgmChanged);
         y = AddVolumeRow(panel.transform, y, "효과음", out _sfxSlider,    out _sfxValue,    OnSfxChanged);
+        y = AddVolumeRow(panel.transform, y, "UI",     out _uiSlider,     out _uiValue,     OnUiChanged);
 
         y -= 14f;
         y = AddSectionLabel(panel.transform, y, "화면");
@@ -566,6 +568,14 @@ public sealed class UI_Settings : MonoBehaviour
         if (_suppressCallbacks) return;
         Managers.Sound?.SetEffectVolume(v, save: false);
         SetValueText(_sfxValue, v);
+        _volumeDirty = true;
+    }
+
+    private void OnUiChanged(float v)
+    {
+        if (_suppressCallbacks) return;
+        Managers.Sound?.SetUiVolume(v, save: false);
+        SetValueText(_uiValue, v);
         _volumeDirty = true;
     }
 
