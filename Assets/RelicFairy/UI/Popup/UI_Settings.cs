@@ -4,16 +4,21 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 설정 화면 — 오디오(마스터/배경음/효과음/UI) + 화면(해상도/창모드).
+/// 설정 화면 — 오디오(마스터/배경음/효과음/UI) + 화면(해상도/창모드) + 그래픽(품질 7항목).
 ///
 /// <para><b>기존 시스템에 붙기만 한다.</b> 볼륨은 <see cref="SoundManager"/>의 채널 API(믹서 있으면 믹서,
-/// 없으면 폴백 곱셈)로, 화면은 <see cref="ScreenSettings"/>(Screen.SetResolution + PlayerPrefs)로 나간다.
-/// 이 클래스는 값을 들고 있지 않다 — 표시와 입력 전달만 한다.</para>
+/// 없으면 폴백 곱셈)로, 화면은 <see cref="ScreenSettings"/>, 그래픽은 <see cref="GraphicsQualitySettings"/>로
+/// 나간다. 이 클래스는 값을 들고 있지 않다 — 표시와 입력 전달만 한다.</para>
 ///
 /// <para><b>프리팹 대신 런타임 생성</b>인 이유는 <see cref="UI_EscMenu"/>와 같다. UIManager.ShowPopupUI는
 /// "UI/Popup/{타입명}" Addressable 프리팹을 요구하는데, 항목을 추가하려면 Addressables 그룹 에셋을
 /// 함께 건드려야 하고 번들 재빌드가 빠지면 조용히 안 뜬다. 앵커를 직접 잡으므로 21:9·4:3·저해상도에서
 /// 레이아웃이 깨질 여지도 없다.</para>
+///
+/// <para><b>2단 구성이고 ScrollRect를 쓰지 않는다.</b> 항목이 13개로 늘어 한 열로는 세로가 남지 않는데,
+/// 스크롤을 넣으면 마스크가 TMP_Dropdown의 펼친 목록까지 잘라 먹는다(목록은 드롭다운 자신의 자식으로
+/// 생성된다). 왼쪽 열 6행 + 오른쪽 열 7행으로 나누면 패널이 1480×620에 들어가고, 이 크기는 검증 대상
+/// 최소치인 5:4(논리 1611×1289)·21:9(2217×935)·1280×720(1920×1080) 어디서도 화면 밖으로 안 나간다.</para>
 ///
 /// <para>시간 정지는 <b>잡지 않는다</b>. 인게임에선 항상 ESC 메뉴(TimeScaleArbiter 보유) 위에 겹쳐 열리고,
 /// 로비에선 멈출 게임플레이가 없다. 여기서 또 잡으면 로비의 연출까지 같이 멈춘다.</para>
@@ -23,18 +28,27 @@ public sealed class UI_Settings : MonoBehaviour
     // ── Constants ────────────────────────────────────────────
     private const int SortingOrder = UISortingOrder.SystemModalTop;
 
-    private const float PanelW = 800f, PanelH = 618f;
+    private const float PanelW = 1480f, PanelH = 620f;
     private const float SidePad = 40f, TopPad = 30f;
     private const float RowH = 48f, RowGap = 6f;
+    private const float TitleH = 54f, SectionH = 34f, SectionGap = 14f;
 
     private const float LabelW = 200f;
-    private const float CtrlW  = 380f;
+    private const float CtrlW  = 340f;
     private const float ValueW = 110f;
 
-    // 패널 로컬 x — 왼쪽 라벨 열 / 가운데 컨트롤 열 / 오른쪽 수치 열
-    private const float LabelX = -PanelW * 0.5f + SidePad + LabelW * 0.5f;   // -260
-    private const float CtrlX  = -PanelW * 0.5f + SidePad + LabelW + 20f + CtrlW * 0.5f; // 50
-    private const float ValueX =  PanelW * 0.5f - SidePad - ValueW * 0.5f;   // 305
+    // 한 열 = 라벨 200 + 20 + 컨트롤 340 + 10 + 수치 110.
+    private const float ColW   = LabelW + 20f + CtrlW + 10f + ValueW; // 680
+    private const float ColGap = 40f;
+
+    // 열 중심의 패널 로컬 x. 왼쪽에 오디오+화면(6행), 오른쪽에 그래픽(7행)이 앉아 높이가 맞는다.
+    private const float ColLeftX  = -PanelW * 0.5f + SidePad + ColW * 0.5f;                 // -360
+    private const float ColRightX = -PanelW * 0.5f + SidePad + ColW + ColGap + ColW * 0.5f; // +360
+
+    // 열 중심 기준 오프셋 — 라벨 열 / 컨트롤 열 / 수치 열
+    private const float LabelDx = -ColW * 0.5f + LabelW * 0.5f;               // -240
+    private const float CtrlDx  = -ColW * 0.5f + LabelW + 20f + CtrlW * 0.5f; // +50
+    private const float ValueDx =  ColW * 0.5f - ValueW * 0.5f;               // +285
 
     private static readonly Color Backdrop    = new(0f, 0f, 0f, 0.78f);
     private static readonly Color PanelBg     = new(0.08f, 0.09f, 0.13f, 0.98f);
@@ -59,10 +73,15 @@ public sealed class UI_Settings : MonoBehaviour
     private TMP_Dropdown _resolutionDropdown;
     private TMP_Text     _windowModeLabel;
 
+    private TMP_Dropdown _presetDropdown, _aaDropdown, _shadowDropdown, _postDropdown, _fpsDropdown;
+    private Slider       _renderScaleSlider;
+    private TMP_Text     _renderScaleValue, _vsyncLabel;
+
     private List<Vector2Int> _resolutions = new();
     private bool _fullscreen = true;
     private bool _suppressCallbacks;   // 값 복원 중 onValueChanged가 되먹임되는 것을 막는다
     private bool _volumeDirty;         // 드래그 중 미뤄 둔 볼륨 저장이 남아 있는가
+    private bool _graphicsDirty;       // 렌더 스케일 드래그 중 미뤄 둔 저장이 남아 있는가
 
     // ── Properties ───────────────────────────────────────────
     public bool IsOpen => _root != null && _root.activeSelf;
@@ -76,11 +95,20 @@ public sealed class UI_Settings : MonoBehaviour
     /// </summary>
     private void Update()
     {
-        if (!_volumeDirty) return;
+        if (!_volumeDirty && !_graphicsDirty) return;
         if (Input.GetMouseButton(0)) return;
 
-        _volumeDirty = false;
-        Managers.Sound?.SaveVolumePrefs();
+        if (_volumeDirty)
+        {
+            _volumeDirty = false;
+            Managers.Sound?.SaveVolumePrefs();
+        }
+
+        if (_graphicsDirty)
+        {
+            _graphicsDirty = false;
+            GraphicsQualitySettings.SavePrefs();
+        }
     }
 
     // ── Public Methods ───────────────────────────────────────
@@ -175,7 +203,48 @@ public sealed class UI_Settings : MonoBehaviour
         _resolutionDropdown.SetValueWithoutNotify(Mathf.Max(0, index));
         _resolutionDropdown.RefreshShownValue();
 
+        RefreshGraphicsFromSystems();
+
         _suppressCallbacks = false;
+    }
+
+    /// <summary>
+    /// 그래픽 표시값을 <see cref="GraphicsQualitySettings"/>에서 다시 읽는다.
+    /// <b>호출 측이 <see cref="_suppressCallbacks"/>를 잡아 준다</b> — 프리셋 전환처럼 다른 노브까지
+    /// 한꺼번에 되돌리는 경로에서도 재진입 없이 쓰기 위해서다.
+    /// </summary>
+    private void RefreshGraphicsFromSystems()
+    {
+        SetDropdown(_presetDropdown, GraphicsQualitySettings.PresetIndex);
+        SetDropdown(_aaDropdown,     GraphicsQualitySettings.Antialiasing);
+        SetDropdown(_shadowDropdown, GraphicsQualitySettings.Shadows);
+        SetDropdown(_postDropdown,   GraphicsQualitySettings.PostProcessing);
+        SetDropdown(_fpsDropdown,    GraphicsQualitySettings.FrameRateIndex);
+
+        SetSlider(_renderScaleSlider, _renderScaleValue, GraphicsQualitySettings.RenderScale);
+        UpdateVSyncRow();
+    }
+
+    private static void SetDropdown(TMP_Dropdown dropdown, int value)
+    {
+        if (dropdown == null) return;
+        dropdown.SetValueWithoutNotify(Mathf.Clamp(value, 0, Mathf.Max(0, dropdown.options.Count - 1)));
+        dropdown.RefreshShownValue();
+    }
+
+    /// <summary>
+    /// vSync가 켜져 있으면 <c>Application.targetFrameRate</c>는 무시된다 — 죽은 노브를 남기지 않도록
+    /// 프레임 상한 드롭다운을 함께 잠근다(상호배타).
+    /// </summary>
+    private void UpdateVSyncRow()
+    {
+        bool on = GraphicsQualitySettings.VSync;
+
+        if (_vsyncLabel != null)
+            _vsyncLabel.text = on ? "켜기" : "끄기";
+
+        if (_fpsDropdown != null)
+            _fpsDropdown.interactable = !on;
     }
 
     private static void SetSlider(Slider slider, TMP_Text valueText, float value)
@@ -229,103 +298,153 @@ public sealed class UI_Settings : MonoBehaviour
         outline.effectDistance = new Vector2(2f, -2f);
 
         // 위에서 아래로 내려가는 커서. 각 요소는 [y - h/2]에 중심을 둔다.
-        float y = PanelH * 0.5f - TopPad;
+        float top = PanelH * 0.5f - TopPad;
+        top = AddTitle(panel.transform, top) - 8f;
 
-        y = AddTitle(panel.transform, y);
-        y = AddSectionLabel(panel.transform, y, "오디오");
-        y = AddVolumeRow(panel.transform, y, "마스터", out _masterSlider, out _masterValue, OnMasterChanged);
-        y = AddVolumeRow(panel.transform, y, "배경음", out _bgmSlider,    out _bgmValue,    OnBgmChanged);
-        y = AddVolumeRow(panel.transform, y, "효과음", out _sfxSlider,    out _sfxValue,    OnSfxChanged);
-        y = AddVolumeRow(panel.transform, y, "UI",     out _uiSlider,     out _uiValue,     OnUiChanged);
+        // ── 왼쪽 열 — 오디오 4 + 화면 2 (총 418) ──
+        float y = top;
+        y = AddSectionLabel(panel.transform, ColLeftX, y, "오디오");
+        y = AddVolumeRow(panel.transform, ColLeftX, y, "마스터", out _masterSlider, out _masterValue, OnMasterChanged);
+        y = AddVolumeRow(panel.transform, ColLeftX, y, "배경음", out _bgmSlider,    out _bgmValue,    OnBgmChanged);
+        y = AddVolumeRow(panel.transform, ColLeftX, y, "효과음", out _sfxSlider,    out _sfxValue,    OnSfxChanged);
+        y = AddVolumeRow(panel.transform, ColLeftX, y, "UI",     out _uiSlider,     out _uiValue,     OnUiChanged);
 
-        y -= 14f;
-        y = AddSectionLabel(panel.transform, y, "화면");
-        y = AddResolutionRow(panel.transform, y);
-        y = AddWindowModeRow(panel.transform, y);
+        y -= SectionGap;
+        y = AddSectionLabel(panel.transform, ColLeftX, y, "화면");
+        y = AddResolutionRow(panel.transform, ColLeftX, y);
+        y = AddWindowModeRow(panel.transform, ColLeftX, y);
 
-        y -= 18f;
-        AddCloseButton(panel.transform, y);
+        // ── 오른쪽 열 — 그래픽 7 (총 418) ──
+        y = top;
+        y = AddSectionLabel(panel.transform, ColRightX, y, "그래픽");
+        y = AddDropdownRow(panel.transform, ColRightX, y, "품질 프리셋", "Preset",
+                           GraphicsQualitySettings.PresetNames, OnPresetChanged, out _presetDropdown);
+        y = AddSliderRow(panel.transform, ColRightX, y, "렌더 스케일",
+                         GraphicsQualitySettings.MinRenderScale, GraphicsQualitySettings.MaxRenderScale,
+                         out _renderScaleSlider, out _renderScaleValue, OnRenderScaleChanged);
+        y = AddDropdownRow(panel.transform, ColRightX, y, "안티앨리어싱", "Antialiasing",
+                           GraphicsQualitySettings.AaNames, OnAntialiasingChanged, out _aaDropdown);
+        y = AddDropdownRow(panel.transform, ColRightX, y, "그림자 품질", "Shadow",
+                           GraphicsQualitySettings.ShadowNames, OnShadowChanged, out _shadowDropdown);
+        y = AddDropdownRow(panel.transform, ColRightX, y, "포스트프로세싱", "Post",
+                           GraphicsQualitySettings.PostNames, OnPostProcessingChanged, out _postDropdown);
+        y = AddToggleRow(panel.transform, ColRightX, y, "수직 동기화", "VSync",
+                         OnToggleVSync, out _vsyncLabel);
+        y = AddDropdownRow(panel.transform, ColRightX, y, "프레임 상한", "FrameCap",
+                           GraphicsQualitySettings.FpsNames, OnFrameRateChanged, out _fpsDropdown);
+
+        AddCloseButton(panel.transform);
     }
 
     private static float AddTitle(Transform panel, float y)
     {
-        const float H = 54f;
-        NewLabel("Title", panel, "설정", 36f, TitleColor, new Vector2(0f, y - H * 0.5f),
-                 new Vector2(PanelW - SidePad * 2f, H), TextAlignmentOptions.Center);
-        return y - H - 6f;
+        NewLabel("Title", panel, "설정", 36f, TitleColor, new Vector2(0f, y - TitleH * 0.5f),
+                 new Vector2(PanelW - SidePad * 2f, TitleH), TextAlignmentOptions.Center);
+        return y - TitleH - 6f;
     }
 
-    private static float AddSectionLabel(Transform panel, float y, string text)
+    private static float AddSectionLabel(Transform panel, float cx, float y, string text)
     {
-        const float H = 34f;
         NewLabel($"Section_{text}", panel, text, 24f, SectionColor,
-                 new Vector2(LabelX, y - H * 0.5f), new Vector2(LabelW, H), TextAlignmentOptions.Left);
-        return y - H - RowGap;
+                 new Vector2(cx + LabelDx, y - SectionH * 0.5f), new Vector2(LabelW, SectionH),
+                 TextAlignmentOptions.Left);
+        return y - SectionH - RowGap;
     }
 
-    private float AddVolumeRow(Transform panel, float y, string label,
+    /// <summary>행의 왼쪽 라벨을 놓고, 컨트롤이 앉을 중심 y를 돌려준다.</summary>
+    private static float AddRowLabel(Transform panel, float cx, float y, string name, string label)
+    {
+        float cy = y - RowH * 0.5f;
+        NewLabel($"Label_{name}", panel, label, 24f, LabelColor,
+                 new Vector2(cx + LabelDx, cy), new Vector2(LabelW, RowH), TextAlignmentOptions.Left);
+        return cy;
+    }
+
+    private float AddVolumeRow(Transform panel, float cx, float y, string label,
+                               out Slider slider, out TMP_Text valueText,
+                               UnityEngine.Events.UnityAction<float> onChanged)
+        => AddSliderRow(panel, cx, y, label, 0f, 1f, out slider, out valueText, onChanged);
+
+    private float AddSliderRow(Transform panel, float cx, float y, string label,
+                               float min, float max,
                                out Slider slider, out TMP_Text valueText,
                                UnityEngine.Events.UnityAction<float> onChanged)
     {
-        float cy = y - RowH * 0.5f;
+        float cy = AddRowLabel(panel, cx, y, label, label);
 
-        NewLabel($"Label_{label}", panel, label, 24f, LabelColor,
-                 new Vector2(LabelX, cy), new Vector2(LabelW, RowH), TextAlignmentOptions.Left);
-
-        slider = NewSlider(panel, $"Slider_{label}", new Vector2(CtrlX, cy), new Vector2(CtrlW, 24f));
+        slider = NewSlider(panel, $"Slider_{label}", new Vector2(cx + CtrlDx, cy), new Vector2(CtrlW, 24f), min, max);
         slider.onValueChanged.AddListener(onChanged);
 
         valueText = NewLabel($"Value_{label}", panel, "100%", 22f, LabelColor,
-                             new Vector2(ValueX, cy), new Vector2(ValueW, RowH), TextAlignmentOptions.Right);
+                             new Vector2(cx + ValueDx, cy), new Vector2(ValueW, RowH), TextAlignmentOptions.Right);
 
         return y - RowH - RowGap;
     }
 
-    private float AddResolutionRow(Transform panel, float y)
+    private float AddDropdownRow(Transform panel, float cx, float y, string label, string name,
+                                 IReadOnlyList<string> options,
+                                 UnityEngine.Events.UnityAction<int> onChanged,
+                                 out TMP_Dropdown dropdown)
     {
-        float cy = y - RowH * 0.5f;
+        float cy = AddRowLabel(panel, cx, y, name, label);
 
-        NewLabel("Label_Resolution", panel, "해상도", 24f, LabelColor,
-                 new Vector2(LabelX, cy), new Vector2(LabelW, RowH), TextAlignmentOptions.Left);
+        dropdown = NewDropdown(panel, $"Dropdown_{name}", new Vector2(cx + CtrlDx, cy), new Vector2(CtrlW, 44f));
 
-        _resolutionDropdown = NewDropdown(panel, new Vector2(CtrlX, cy), new Vector2(CtrlW, 44f));
+        var list = new List<string>(options.Count);
+        for (int i = 0; i < options.Count; i++)
+            list.Add(options[i]);
+        dropdown.AddOptions(list);
+
+        dropdown.onValueChanged.AddListener(onChanged);
+        return y - RowH - RowGap;
+    }
+
+    /// <summary>가운데 글자만 바뀌는 토글 버튼 행(창 모드·수직 동기화). 상태 글자는 out으로 넘긴다.</summary>
+    private float AddToggleRow(Transform panel, float cx, float y, string label, string name,
+                               UnityEngine.Events.UnityAction onClick, out TMP_Text stateLabel)
+    {
+        float cy = AddRowLabel(panel, cx, y, name, label);
+
+        var img = NewImage($"Btn_{name}", panel, CtrlBg);
+        var rt = img.rectTransform;
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(cx + CtrlDx, cy);
+        rt.sizeDelta = new Vector2(CtrlW, 44f);
+
+        var btn = img.gameObject.AddComponent<Button>();
+        btn.targetGraphic = img;
+        btn.onClick.AddListener(onClick);
+        img.gameObject.AddComponent<UIButtonFeedback>();
+
+        stateLabel = NewLabel("Label", img.transform, string.Empty, 22f, LabelColor,
+                              Vector2.zero, new Vector2(CtrlW, 44f), TextAlignmentOptions.Center);
+
+        return y - RowH - RowGap;
+    }
+
+    private float AddResolutionRow(Transform panel, float cx, float y)
+    {
+        float cy = AddRowLabel(panel, cx, y, "Resolution", "해상도");
+
+        // 항목은 모니터가 보고하는 목록이라 RefreshFromSystems가 채운다.
+        _resolutionDropdown = NewDropdown(panel, "Dropdown_Resolution", new Vector2(cx + CtrlDx, cy), new Vector2(CtrlW, 44f));
         _resolutionDropdown.onValueChanged.AddListener(OnResolutionChanged);
 
         return y - RowH - RowGap;
     }
 
-    private float AddWindowModeRow(Transform panel, float y)
+    private float AddWindowModeRow(Transform panel, float cx, float y)
+        => AddToggleRow(panel, cx, y, "창 모드", "WindowMode", OnToggleWindowMode, out _windowModeLabel);
+
+    /// <summary>패널 아래쪽에 고정. 두 열의 길이가 달라져도 버튼 위치는 흔들리지 않는다.</summary>
+    private void AddCloseButton(Transform panel)
     {
-        float cy = y - RowH * 0.5f;
-
-        NewLabel("Label_WindowMode", panel, "창 모드", 24f, LabelColor,
-                 new Vector2(LabelX, cy), new Vector2(LabelW, RowH), TextAlignmentOptions.Left);
-
-        var img = NewImage("Btn_WindowMode", panel, CtrlBg);
-        var rt = img.rectTransform;
-        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = new Vector2(CtrlX, cy);
-        rt.sizeDelta = new Vector2(CtrlW, 44f);
-
-        var btn = img.gameObject.AddComponent<Button>();
-        btn.targetGraphic = img;
-        btn.onClick.AddListener(OnToggleWindowMode);
-        img.gameObject.AddComponent<UIButtonFeedback>();
-
-        _windowModeLabel = NewLabel("Label", img.transform, "전체 화면", 22f, LabelColor,
-                                    Vector2.zero, new Vector2(CtrlW, 44f), TextAlignmentOptions.Center);
-
-        return y - RowH - RowGap;
-    }
-
-    private void AddCloseButton(Transform panel, float y)
-    {
-        const float W = 240f, H = 60f;
+        const float W = 240f, H = 60f, BottomPad = 28f;
 
         var img = NewImage("Btn_Close", panel, CtrlBg);
         var rt = img.rectTransform;
         rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = new Vector2(0f, y - H * 0.5f);
+        rt.anchoredPosition = new Vector2(0f, -PanelH * 0.5f + BottomPad + H * 0.5f);
         rt.sizeDelta = new Vector2(W, H);
 
         var btn = img.gameObject.AddComponent<Button>();
@@ -386,7 +505,7 @@ public sealed class UI_Settings : MonoBehaviour
     }
 
     /// <summary>uGUI 기본 Slider 계층(Background / Fill Area·Fill / Handle Slide Area·Handle)을 그대로 만든다.</summary>
-    private static Slider NewSlider(Transform parent, string name, Vector2 pos, Vector2 size)
+    private static Slider NewSlider(Transform parent, string name, Vector2 pos, Vector2 size, float min, float max)
     {
         var go = new GameObject(name, typeof(RectTransform));
         go.transform.SetParent(parent, false);
@@ -437,10 +556,10 @@ public sealed class UI_Settings : MonoBehaviour
         slider.handleRect    = hRt;
         slider.targetGraphic = handle;
         slider.direction     = Slider.Direction.LeftToRight;
-        slider.minValue      = 0f;
-        slider.maxValue      = 1f;
+        slider.minValue      = min;
+        slider.maxValue      = max;
         slider.wholeNumbers  = false;
-        slider.value         = 1f;
+        slider.value         = max;
         return slider;
     }
 
@@ -448,12 +567,12 @@ public sealed class UI_Settings : MonoBehaviour
     /// TMP_Dropdown은 캡션/화살표 외에 <b>비활성 Template</b>(Viewport + Content + Item Toggle)이 반드시
     /// 있어야 목록이 열린다. 프리팹 없이 쓰려면 그 계층을 손으로 만들어 줘야 한다.
     /// </summary>
-    private static TMP_Dropdown NewDropdown(Transform parent, Vector2 pos, Vector2 size)
+    private static TMP_Dropdown NewDropdown(Transform parent, string name, Vector2 pos, Vector2 size)
     {
         const float ItemH = 32f;
         const float ListH = 168f;
 
-        var bg = NewImage("Dropdown_Resolution", parent, CtrlBg);
+        var bg = NewImage(name, parent, CtrlBg);
         var rt = bg.rectTransform;
         rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = pos;
@@ -599,5 +718,73 @@ public sealed class UI_Settings : MonoBehaviour
             : new Vector2Int(Screen.width, Screen.height);
 
         ScreenSettings.Apply(res.x, res.y, _fullscreen);
+    }
+
+    // ── Event Handlers · 그래픽 ───────────────────────────────
+
+    // 프리셋은 티어 에셋을 갈아끼우면서 개별 노브도 그 티어 기본값으로 되돌린다 → 표시를 통째로 다시 읽는다.
+    private void OnPresetChanged(int index)
+    {
+        if (_suppressCallbacks) return;
+
+        GraphicsQualitySettings.SetPreset(index);
+
+        _suppressCallbacks = true;
+        RefreshGraphicsFromSystems();
+        _suppressCallbacks = false;
+    }
+
+    // 렌더 스케일은 볼륨과 같은 드래그 경로다 — 즉시 반영만 하고 저장은 손을 뗄 때 Update가 한 번 한다.
+    private void OnRenderScaleChanged(float v)
+    {
+        if (_suppressCallbacks) return;
+
+        GraphicsQualitySettings.SetRenderScale(v, save: false);
+        SetValueText(_renderScaleValue, v);
+        _graphicsDirty = true;
+        SyncPresetLabel();
+    }
+
+    private void OnAntialiasingChanged(int index)
+    {
+        if (_suppressCallbacks) return;
+        GraphicsQualitySettings.SetAntialiasing(index);
+        SyncPresetLabel();
+    }
+
+    private void OnShadowChanged(int index)
+    {
+        if (_suppressCallbacks) return;
+        GraphicsQualitySettings.SetShadows(index);
+        SyncPresetLabel();
+    }
+
+    private void OnPostProcessingChanged(int index)
+    {
+        if (_suppressCallbacks) return;
+        GraphicsQualitySettings.SetPostProcessing(index);
+        SyncPresetLabel();
+    }
+
+    private void OnToggleVSync()
+    {
+        GraphicsQualitySettings.SetVSync(!GraphicsQualitySettings.VSync);
+        UpdateVSyncRow();
+        SyncPresetLabel();
+    }
+
+    private void OnFrameRateChanged(int index)
+    {
+        if (_suppressCallbacks) return;
+        GraphicsQualitySettings.SetFrameRateIndex(index);
+        SyncPresetLabel();
+    }
+
+    /// <summary>개별 노브를 만졌으면 프리셋 표시를 「사용자 지정」으로 옮긴다.</summary>
+    private void SyncPresetLabel()
+    {
+        _suppressCallbacks = true;
+        SetDropdown(_presetDropdown, GraphicsQualitySettings.PresetIndex);
+        _suppressCallbacks = false;
     }
 }
