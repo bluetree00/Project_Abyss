@@ -95,8 +95,13 @@ public class UI_Pause : UI_Popup
 			// Resume 과 동일하게 팝업을 닫고 timeScale 복원(닫기→Release 순서 정합, 멱등).
 			Managers.UI.ClosePopupUI(this);
 			TimeScaleArbiter.Release(this);
-			// TODO: 실제 게임 종료/메인화면 이동 씬 전환 미구현. 현재는 팝업 닫기+게임 재개만 수행.
-			Debug.Log("게임 종료 또는 메인화면 이동");
+
+			// 「나가기」= 로비로 이동. 진행 중 런이 있으면 정식 종료 경로를 먼저 태운다 —
+			// 건너뛰면 이전 런의 보스 체력바·서약·골드가 로비까지 따라온다(UI_EscMenu.OnLobby와 같은 계약).
+			if (AppBootstrapper.Instance != null && AppBootstrapper.Instance.CurrentRun != null)
+				AppBootstrapper.Instance.EndRun();
+
+			AppBootstrapper.Instance?.RequestLoad(Define.Scene.Lobby);
 		}, Define.UIEvent.Click);
 
 	}

@@ -152,13 +152,20 @@ public sealed class EscBookPopup : UI_Popup
 
     private void OnOption()
     {
-        Debug.Log("[EscBookPopup] Option clicked");
+        UI_Settings.Open();
     }
 
     private void OnLobby()
     {
-        Debug.Log("[EscBookPopup] Lobby clicked");
+        // 먼저 닫아 timeScale을 되돌린다 — 로딩 연출과 로비가 멈춘 채 뜨면 안 된다.
         ClosePopup();
+
+        // 진행 중 런이 있으면 정식 종료 경로를 태운다(로컬 런 세이브 폐기 + HUD 정리).
+        // 건너뛰면 이전 런의 보스 체력바·서약·골드가 로비까지 따라온다. UI_EscMenu.OnLobby와 같은 계약.
+        if (AppBootstrapper.Instance != null && AppBootstrapper.Instance.CurrentRun != null)
+            AppBootstrapper.Instance.EndRun();
+
+        AppBootstrapper.Instance?.RequestLoad(Define.Scene.Lobby);
     }
 
     private void OnQuit()
