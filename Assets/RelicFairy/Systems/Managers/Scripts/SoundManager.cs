@@ -19,6 +19,7 @@ public sealed class SoundManager
     private const string kMixerParamUi     = "UiVolume";
     private const string kMixerGroupBgm = "Master/BGM";
     private const string kMixerGroupSfx = "Master/SFX";
+    private const string kMixerResourcePath = "GameAudioMixer";
     private const float MinVolumeDb = -80f;
 
     private readonly AudioSource[] _audioSources = new AudioSource[(int)Define.Sound.MaxCount];
@@ -161,6 +162,13 @@ public sealed class SoundManager
         EnsureAudioSource(root.transform, Define.Sound.Bgm, loop: true);
         EnsureAudioSource(root.transform, Define.Sound.Effect, loop: false);
         EnsureEffectPool(root.transform);
+
+        // 믹서는 Resources에서 직접 집는다. AppBootstrapper의 Addressable 경로("GameAudioMixer")는
+        // 아직 엔트리가 등록돼 있지 않아 항상 null을 돌려주고, 그 경로만 믿으면 마스터·UI 채널이
+        // 영원히 폴백(= 죽은 노브)으로 남는다. Addressable이 나중에 등록되면 SetMixer가 같은 에셋으로
+        // 한 번 더 불릴 뿐이라 멱등하다.
+        if (_mixer == null)
+            SetMixer(Resources.Load<AudioMixer>(kMixerResourcePath));
 
         var bgmSrc = GetAudioSource(Define.Sound.Bgm);
         if (bgmSrc != null) bgmSrc.volume = ChannelScale(Define.Sound.Bgm);
