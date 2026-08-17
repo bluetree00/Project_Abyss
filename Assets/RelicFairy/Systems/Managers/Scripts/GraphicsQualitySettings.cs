@@ -100,6 +100,26 @@ public static class GraphicsQualitySettings
         }
     }
 
+    /// <summary>
+    /// 프레임 상한 행에 실제로 <b>보여 줄</b> 글자. 인덱스만 믿으면 화면이 거짓말을 한다 —
+    /// vSync가 켜져 있으면 상한 자체가 무시되고(기본 티어 High Fidelity가 vSyncCount=1이다),
+    /// 저장 이력이 없을 때의 <c>_fps</c>는 부팅이 걸어 둔 실효 상한이라 <see cref="FpsNames"/>에
+    /// 없는 값(모니터 주사율 등)일 수 있다. 둘 다 <see cref="FrameRateIndex"/>는 0으로 떨어져
+    /// 「무제한」이 뜨는데, 실제로는 상한이 걸려 있다.
+    /// </summary>
+    public static string FrameCapDisplay
+    {
+        get
+        {
+            EnsureLoaded();
+            if (_vsync)    return "— (수직 동기화)";
+            if (_fps <= 0) return FpsNames[0];
+
+            int index = FrameRateIndex;
+            return index > 0 ? FpsNames[index] : _fps.ToString();
+        }
+    }
+
     // ── Public Methods ───────────────────────────────────────
 
     /// <summary>프리셋(0~2)을 고른다 — 티어 에셋을 갈아끼우고 개별 노브를 그 티어 기본값으로 되돌린다.</summary>
@@ -260,7 +280,12 @@ public static class GraphicsQualitySettings
         _shadow      = PlayerPrefs.GetInt  (kShadowKey,      3);
         _post        = PlayerPrefs.GetInt  (kPostKey,        2);
         _vsync       = PlayerPrefs.GetInt  (kVSyncKey,       QualitySettings.vSyncCount > 0 ? 1 : 0) != 0;
-        _fps         = PlayerPrefs.GetInt  (kFpsKey,         0);
+
+        // 저장 이력이 없으면 0(무제한)이 아니라 부팅이 실제로 걸어 둔 상한을 물려받는다.
+        // AppBootstrapper가 주사율에 맞춰 targetFrameRate를 잡아 두는데, 0으로 시작하면
+        // ① 화면엔 「무제한」이 뜨고 ② 다른 노브를 하나만 만져도 ApplyFrameRate가 그 상한을 조용히 푼다.
+        // -1(미설정)은 Max가 0으로 눌러 준다.
+        _fps         = PlayerPrefs.GetInt  (kFpsKey,         Mathf.Max(0, Application.targetFrameRate));
     }
 
     private static void MarkCustom() => _custom = true;

@@ -235,6 +235,11 @@ public sealed class UI_Settings : MonoBehaviour
     /// <summary>
     /// vSync가 켜져 있으면 <c>Application.targetFrameRate</c>는 무시된다 — 죽은 노브를 남기지 않도록
     /// 프레임 상한 드롭다운을 함께 잠근다(상호배타).
+    ///
+    /// <para>잠근 다음엔 <b>글자도 바꾼다</b>. 옵션 인덱스가 가리키는 이름을 그대로 두면 잠긴 행에
+    /// 「무제한」이 남아 실제 상한과 어긋나 보인다 — 표시는
+    /// <see cref="GraphicsQualitySettings.FrameCapDisplay"/>가 정한다. 이 함수는 표시값을 다시 읽는
+    /// 모든 경로의 끝에서 불리므로(SetDropdown의 RefreshShownValue 뒤) 캡션 덮어쓰기가 살아남는다.</para>
     /// </summary>
     private void UpdateVSyncRow()
     {
@@ -243,8 +248,11 @@ public sealed class UI_Settings : MonoBehaviour
         if (_vsyncLabel != null)
             _vsyncLabel.text = on ? "켜기" : "끄기";
 
-        if (_fpsDropdown != null)
-            _fpsDropdown.interactable = !on;
+        if (_fpsDropdown == null) return;
+
+        _fpsDropdown.interactable = !on;
+        if (_fpsDropdown.captionText != null)
+            _fpsDropdown.captionText.text = GraphicsQualitySettings.FrameCapDisplay;
     }
 
     private static void SetSlider(Slider slider, TMP_Text valueText, float value)
@@ -571,6 +579,14 @@ public sealed class UI_Settings : MonoBehaviour
     {
         const float ItemH = 32f;
         const float ListH = 168f;
+        const float Gap   = 2f;
+
+        // 목록은 컨트롤 아래로 펼쳐지는 게 기본인데, 아래쪽 행에선 그러면 패널 밖으로 흘러나온다.
+        // TMP_Dropdown이 스스로 하는 반전은 <b>루트 캔버스</b> 밖으로 나갈 때만 걸리므로(Show의
+        // FlipLayoutOnAxis는 rootCanvasRect 기준) 화면 안이기만 하면 패널을 넘든 말든 그냥 둔다.
+        // 목록 높이를 줄이면 여섯 항목짜리(프레임 상한)가 더 잘게 스크롤될 뿐이고, ScrollRect는
+        // 클래스 주석대로 마스크가 목록을 잘라 먹는다 → 방향만 뒤집는다.
+        bool dropUp = pos.y - size.y * 0.5f - Gap - ListH < -PanelH * 0.5f;
 
         var bg = NewImage(name, parent, CtrlBg);
         var rt = bg.rectTransform;
@@ -585,11 +601,14 @@ public sealed class UI_Settings : MonoBehaviour
         var template = new GameObject("Template", typeof(RectTransform), typeof(Image),
                                       typeof(ScrollRect), typeof(CanvasGroup));
         template.transform.SetParent(bg.transform, false);
+        // 펼친 목록은 이 템플릿의 앵커·피벗을 그대로 복제해 쓴다(TMP_Dropdown.Show가 SetParent(.., false)로
+        // 붙인다) → 위로 펼치려면 여기서 위 모서리에 걸어 두면 된다. 항목이 적어 목록이 줄어들 때도
+        // 피벗 쪽 모서리가 고정되므로 어느 방향이든 컨트롤에 붙어 있다.
         var tRt = template.GetComponent<RectTransform>();
-        tRt.anchorMin = new Vector2(0f, 0f);
-        tRt.anchorMax = new Vector2(1f, 0f);
-        tRt.pivot     = new Vector2(0.5f, 1f);
-        tRt.anchoredPosition = new Vector2(0f, -2f);
+        tRt.anchorMin = new Vector2(0f, dropUp ? 1f : 0f);
+        tRt.anchorMax = new Vector2(1f, dropUp ? 1f : 0f);
+        tRt.pivot     = new Vector2(0.5f, dropUp ? 0f : 1f);
+        tRt.anchoredPosition = new Vector2(0f, dropUp ? Gap : -Gap);
         tRt.sizeDelta = new Vector2(0f, ListH);
         template.GetComponent<Image>().color = PanelBg;
 
