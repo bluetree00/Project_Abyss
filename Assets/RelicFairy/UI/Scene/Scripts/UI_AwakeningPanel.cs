@@ -420,7 +420,7 @@ public class UI_AwakeningPanel : UI_Popup
 
     private static int WaitingAchievements() => Managers.Quest?.WaitingAchievementCount() ?? 0;
 
-    private static void PlayClickSfx() => Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+    private static void PlayClickSfx() => Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
 
     private void HandleClaimed() => Refresh();
 

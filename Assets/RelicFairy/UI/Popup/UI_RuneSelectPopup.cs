@@ -209,7 +209,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private async UniTask PresentCardAsync(CardView card, RewardPresentation.TierSpec spec,
                                            System.Threading.CancellationToken ct)
     {
-        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton, 0.55f, spec.SfxPitch).Forget();
+        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton, 0.55f, spec.SfxPitch).Forget();
 
         await UIJuice.PopInAsync(card.Rt, card.Group, spec.CardPopDuration,
                                  fromScale: 0.9f, fromYOffset: -18f, rotZ: spec.CardPopRotation, ct);
@@ -263,7 +263,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             if (r == steps) break;
 
             // 각 단 상승마다 피치가 오른다 — "승급의 첫 신호는 사운드"(§C-3-b).
-            Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton, 0.4f,
+            Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton, 0.4f,
                                             RewardPresentation.For(shown).SfxPitch).Forget();
 
             // 니어미스 — ★ 직전 ◆에서 한 번만 멈칫한다.
@@ -795,7 +795,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private void SetSelected(int index)
     {
         SkipReveal();
-        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
         _selected = index;
 
         for (int i = 0; i < _cards.Count; i++)
@@ -841,7 +841,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             return;
         }
 
-        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
         var item = _candidates[_selected].data;
         Result  = item;
         Skipped = false;
@@ -873,7 +873,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
     private void OnSkipClicked()
     {
-        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
         Result  = null;
         Skipped = true;
         // 닫기를 resolve보다 먼저 — OnConfirmClicked와 동일 이유(다중 라운드 좀비 팝업 → timeScale 고착 방지).

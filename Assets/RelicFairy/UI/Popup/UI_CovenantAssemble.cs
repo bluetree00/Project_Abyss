@@ -372,7 +372,7 @@ public class UI_CovenantAssemble : UI_Popup
 
     private void Select(bool isCause, int idx)
     {
-        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
         if (isCause) _selCause = idx;
         else         _selEffect = idx;
         RefreshSelection();
@@ -381,7 +381,7 @@ public class UI_CovenantAssemble : UI_Popup
     private void Reroll(bool isCause, int idx)
     {
         if (_rerollsLeft <= 0) return;
-        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
 
         var data = isCause ? _causes : _effects;
 
@@ -581,7 +581,7 @@ public class UI_CovenantAssemble : UI_Popup
     private void OnWhet()
     {
         if (_whetLeft <= 0) return;
-        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
 
         var cause  = _causes[_selCause];
         var effect = _effects[_selEffect];
@@ -644,7 +644,7 @@ public class UI_CovenantAssemble : UI_Popup
         string id = SelectedId();
         if (IsOwned(id)) return;   // 잠금이 뚫린 경로(키보드 등) 대비 최종 방어
 
-        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
 
         // 닫기가 먼저다. TrySetResult가 대기 측(WorldCovenantAltar.OpenAsync) 후속을 동기로 재개시킬 수 있어,
         // 순서를 뒤집으면 팝업이 열린 채(=HUD 차단/timeScale 0) 획득 안내가 떠 안내가 화면에 눌어붙는다.

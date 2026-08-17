@@ -209,7 +209,7 @@ public class ClearRewardTrigger : MonoBehaviour
                 HitFeelService.CameraShake(0.06f, 0.20f);
 
             // 상승 SFX — 신규 클립 없이 기존 1클립을 피치 램프로 쓴다(§C-4 "피치 인자로 무료 티어링").
-            Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton, 0.5f, ChargeStartPitch).Forget();
+            Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton, 0.5f, ChargeStartPitch).Forget();
 
             // 보상 오브젝트 떨림 — 내용 공개 전 상자가 떨리는 신호(각성 사전 신호).
             Vector3 basePos = transform.position;
@@ -228,7 +228,7 @@ public class ClearRewardTrigger : MonoBehaviour
             }
             transform.position = basePos;
 
-            Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton, 0.6f, spec.SfxPitch).Forget();
+            Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton, 0.6f, spec.SfxPitch).Forget();
         }
         finally
         {

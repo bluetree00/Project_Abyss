@@ -142,7 +142,7 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
 
     private void OnOpenGridClicked()
     {
-        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
         _interactionTcs?.TrySetResult();
 
         if (_item == null || _inventory == null) { ClosePopupUI(); return; }
@@ -169,7 +169,7 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
     private void OnRejectClicked()
     {
         // 획득과 소리로 갈린다 — 낮은 피치가 "버렸다"는 확정감을 준다. 흐름은 그대로 원클릭.
-        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton, 1f, 0.72f).Forget();
+        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton, 1f, 0.72f).Forget();
         if (_rejectLabel != null)
             UIJuice.FlashAsync(_rejectLabel, COLOR_RISK, 0.10f, 1, destroyCancellationToken).Forget();
 
@@ -209,7 +209,7 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
         var ct = destroyCancellationToken;
         try
         {
-            Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton, 0.5f, spec.SfxPitch).Forget();
+            Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton, 0.5f, spec.SfxPitch).Forget();
 
             if (_panelRt != null)
                 await UIJuice.PopInAsync(_panelRt, null, spec.CardPopDuration,

@@ -1464,7 +1464,7 @@ public sealed class UI_GridPanel : UI_Base
 
     private void OnBackClicked()
     {
-        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
         ClosePanel();
     }
 
@@ -1495,7 +1495,7 @@ public sealed class UI_GridPanel : UI_Base
             ShowToast("배치된 룬이 없습니다");
             return;
         }
-        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
         ShowResetConfirmDialog();
     }
 
@@ -1525,7 +1525,7 @@ public sealed class UI_GridPanel : UI_Base
 
     private void OnConfirmClicked()
     {
-        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
 
         if (_inventory == null || _inventory.StagingCount == 0)
         {
@@ -1556,7 +1556,7 @@ public sealed class UI_GridPanel : UI_Base
         // "여기서 끌어라"를 가리킨다. 눌렀는데 소리도 반응도 없던 것이 죽은 버튼의 절반이었다.
         if (_inventory == null || _inventory.StagingCount == 0) return;
 
-        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
 
         var item = _inventory.StagingItems[0];
         _itemInfoPanel?.ShowItem(item, isNew: false);

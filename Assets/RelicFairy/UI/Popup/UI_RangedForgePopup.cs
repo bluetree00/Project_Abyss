@@ -286,7 +286,7 @@ public class UI_RangedForgePopup : UI_Popup
 
     private void Complete(WeaponSO result)
     {
-        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
         _tcs?.TrySetResult(result);
         ClosePopupUI();
     }

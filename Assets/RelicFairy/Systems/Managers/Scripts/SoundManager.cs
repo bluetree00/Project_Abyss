@@ -19,6 +19,7 @@ public sealed class SoundManager
     private const string kMixerParamUi     = "UiVolume";
     private const string kMixerGroupBgm = "Master/BGM";
     private const string kMixerGroupSfx = "Master/SFX";
+    private const string kMixerGroupUi  = "Master/UI";
     private const string kMixerResourcePath = "GameAudioMixer";
     private const float MinVolumeDb = -80f;
 
@@ -41,6 +42,7 @@ public sealed class SoundManager
     private AudioMixer _mixer;
     private AudioMixerGroup _bgmGroup;
     private AudioMixerGroup _sfxGroup;
+    private AudioMixerGroup _uiGroup;
 
     public float BgmVolume    => _bgmVolume;
     public float EffectVolume => _effectVolume;
@@ -124,7 +126,7 @@ public sealed class SoundManager
 
         if (_mixer != null)
             _mixer.SetFloat(kMixerParamUi, LinearToDb(_uiVolume));
-        // 폴백(믹서 없음)엔 UI 채널이 없다 — ChannelScale은 BGM/효과음만 나눈다.
+        // 폴백에선 UiChannelScale이 재생 시점에 곱해지므로 여기서 할 일이 없다(효과음과 동형).
     }
 
     public void SetEventTable(SoundEventTableSO table) => _eventTable = table;
@@ -137,6 +139,7 @@ public sealed class SoundManager
 
         _bgmGroup = FindGroup(kMixerGroupBgm);
         _sfxGroup = FindGroup(kMixerGroupSfx);
+        _uiGroup  = FindGroup(kMixerGroupUi);
 
         RouteExistingSources();
         ApplyAllVolumesToMixer();
@@ -286,6 +289,28 @@ public sealed class SoundManager
 
     public UniTask PlayEffectAsync(string key, float volume = 1f, float pitch = 1f)
         => PlayAsync(key, Define.Sound.Effect, volume, pitch);
+
+    /// <summary>
+    /// UI 조작음 전용 재생. 효과음과 같은 풀을 쓰되 출력을 Master/UI 그룹으로 빼고
+    /// 음량도 UI 채널(<see cref="UiVolume"/>)로 계산한다.
+    ///
+    /// <para>이 경로가 없을 땐 UI 클릭음이 전부 <see cref="PlayEffectAsync"/>로 나가 SFX 그룹에
+    /// 섞였고, 그래서 UI 볼륨은 믹서에 파라미터만 있고 통과하는 소리가 없는 죽은 노브였다.
+    /// <c>Define.Sound</c>에 항목을 늘리지 않은 건 그 enum이 전용 AudioSource 배열의 인덱스라
+    /// (BGM처럼) 단일 소스가 필요한 채널에만 해당하기 때문이다 — UI는 풀링 재생이면 충분하다.</para>
+    /// </summary>
+    public async UniTask PlayUiAsync(string key, float volume = 1f, float pitch = 1f)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            return;
+
+        var audioClip = await GetOrAddAudioClipAsync(key);
+        if (audioClip == null)
+            return;
+
+        PlayPooledEffect(audioClip, null, volume, pitch, 0f, 1f, 500f,
+                         AudioRolloffMode.Logarithmic, uiChannel: true);
+    }
 
     public async UniTask PlayEffectAtAsync(
         string key,
@@ -442,6 +467,9 @@ public sealed class SoundManager
             return 1f;
         return _masterVolume * (type == Define.Sound.Bgm ? _bgmVolume : _effectVolume);
     }
+
+    /// <summary>UI 채널 음량. 믹서가 있으면 Master/UI 그룹이 처리하므로 소스엔 1f만 준다.</summary>
+    private float UiChannelScale() => _mixer != null ? 1f : _masterVolume * _uiVolume;
 
     /// <summary>폴백 경로에서 재생 중인 BGM 소스에 현재 채널 음량을 다시 적용한다.</summary>
     private void ApplyFallbackBgmVolume()
@@ -604,7 +632,8 @@ public sealed class SoundManager
         AudioRolloffMode rolloffMode,
         bool loop = false,
         bool autoRelease = true,
-        float startTime = 0f)
+        float startTime = 0f,
+        bool uiChannel = false)
     {
         if (audioClip == null)
             return null;
@@ -619,8 +648,9 @@ public sealed class SoundManager
         source.gameObject.SetActive(true);
         source.transform.position = position ?? Vector3.zero;
         source.clip = audioClip;
-        source.volume = volume * ChannelScale(Define.Sound.Effect);
-        source.outputAudioMixerGroup = _sfxGroup; // 믹서 없으면 null = 기본 출력
+        source.volume = volume * (uiChannel ? UiChannelScale() : ChannelScale(Define.Sound.Effect));
+        // 믹서 없으면 null = 기본 출력. UI는 Master/UI로 빼서 UI 볼륨 슬라이더가 실제로 걸리게 한다.
+        source.outputAudioMixerGroup = uiChannel ? _uiGroup : _sfxGroup;
         source.pitch = pitch;
         source.loop = loop;
         source.playOnAwake = false;

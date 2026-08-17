@@ -46,7 +46,7 @@ public static class ShopUIStyle
             _                  => (0.65f, 1.00f),
         };
 
-        sound.PlayEffectAsync(SoundKey.Sfx.UiButton, volume, pitch).Forget();
+        sound.PlayUiAsync(SoundKey.Sfx.UiButton, volume, pitch).Forget();
     }
 
     // ── 팔레트 (다크 판타지/유물) ───────────────────────────
