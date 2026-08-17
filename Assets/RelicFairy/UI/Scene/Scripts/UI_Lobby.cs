@@ -87,9 +87,13 @@ public class UI_Lobby : UI_Scene
         SetTitleImage(true);
     }
 
+    /// <summary>
+    /// 예전엔 UI_Pause(챕터/무기/인벤 탭)를 열었다 — 로비에서 일시정지 화면을 여는 배선 자체가 잘못이었고,
+    /// 그 탭들은 갱신 로직이 전부 주석 처리된 자리표시자라 볼 것도 없었다. 실제 설정 화면으로 돌린다.
+    /// </summary>
     private void OnClickSettings()
     {
-        Managers.UI.ShowPopupUI<UI_Pause>();
+        UI_Settings.Open();
     }
 
     private void OnClickAwakening()

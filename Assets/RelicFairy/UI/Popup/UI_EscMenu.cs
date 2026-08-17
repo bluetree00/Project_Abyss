@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// ESC 메뉴 — 계속하기 / 로비로 가기 / 게임 종료.
+/// ESC 메뉴 — 계속하기 / 설정 / 로비로 가기 / 게임 종료.
 ///
 /// 프리팹·Addressable 없이 런타임에 자기 UI를 만든다. UIManager.ShowPopupUI 경로는
 /// "UI/Popup/{타입명}" Addressable 프리팹을 요구하는데, 이 메뉴 하나 때문에 프리팹 저작과
@@ -16,7 +16,9 @@ public sealed class UI_EscMenu : MonoBehaviour
 {
     // ── Constants ────────────────────────────────────────────
     private const int   SortingOrder = UISortingOrder.SystemModal;
-    private const float PanelW = 420f, PanelH = 340f;
+    // 버튼 4개 기준 높이. 타이틀(중심 -52, 높이 48) 아래 17px, 마지막 버튼 아래 17px가 되도록 계산한 값이다.
+    // 버튼을 늘리거나 줄이면 PanelH도 ±(BtnH + BtnGap) 해야 여백 대칭이 유지된다.
+    private const float PanelW = 420f, PanelH = 422f;
     private const float BtnW   = 320f, BtnH   = 66f, BtnGap = 16f;
 
     private static readonly Color Backdrop   = new(0f, 0f, 0f, 0.72f);
@@ -92,11 +94,13 @@ public sealed class UI_EscMenu : MonoBehaviour
         NewLabel("Title", panel.transform, "일시정지", 34f, TitleColor,
                  new Vector2(0f, PanelH * 0.5f - 52f), new Vector2(PanelW - 40f, 48f));
 
-        // 버튼 3개 묶음의 시작 y. 타이틀 아래 여백과 패널 하단 여백이 17px로 같아지는 값이다.
-        float top = 44f;
-        NewButton(panel.transform, "계속하기",   new Vector2(0f, top),                        BtnBg,     OnResume);
-        NewButton(panel.transform, "로비로 가기", new Vector2(0f, top - (BtnH + BtnGap)),      BtnBg,     OnLobby);
-        NewButton(panel.transform, "게임 종료",   new Vector2(0f, top - (BtnH + BtnGap) * 2f), BtnQuitBg, OnQuit);
+        // 버튼 묶음의 시작 y. 타이틀 아래 여백과 패널 하단 여백이 17px로 같아지는 값이다.
+        float top  = PanelH * 0.5f - 126f;
+        float step = BtnH + BtnGap;
+        NewButton(panel.transform, "계속하기",   new Vector2(0f, top),            BtnBg,     OnResume);
+        NewButton(panel.transform, "설정",       new Vector2(0f, top - step),     BtnBg,     OnSettings);
+        NewButton(panel.transform, "로비로 가기", new Vector2(0f, top - step * 2f), BtnBg,     OnLobby);
+        NewButton(panel.transform, "게임 종료",   new Vector2(0f, top - step * 3f), BtnQuitBg, OnQuit);
     }
 
     private static void Stretch(RectTransform rt)
@@ -160,6 +164,10 @@ public sealed class UI_EscMenu : MonoBehaviour
 
     // ── Event Handlers ───────────────────────────────────────
     private void OnResume() => Close();
+
+    // 설정은 이 메뉴를 닫지 않고 위에 겹쳐 연다(sortingOrder SystemModalTop).
+    // 닫으면 시간 정지가 풀려 설정을 만지는 동안 게임이 다시 돈다.
+    private void OnSettings() => UI_Settings.Open();
 
     private void OnLobby()
     {

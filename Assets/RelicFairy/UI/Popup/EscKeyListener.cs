@@ -4,6 +4,7 @@ using UnityEngine;
 /// @Popup에 항상 활성 상태로 부착. 프로젝트의 유일한 ESC 진입점.
 ///
 /// 우선순위:
+///   0) 설정 화면이 열려있으면 그것부터 닫는다 — ESC 메뉴 위에 겹쳐 열리므로 항상 가장 위다.
 ///   1) ESC 메뉴가 열려있으면 닫는다(토글).
 ///   2) 북 팝업이 열려있으면 닫는다(레거시 — 다른 경로로 열렸을 때만 해당).
 ///   3) 팝업 스택이 비어있지 않으면 ESC를 소비한다 — 최상단이 CloseOnEscape면 그 1개만 닫고,
@@ -28,6 +29,9 @@ public sealed class EscKeyListener : MonoBehaviour
     private void Update()
     {
         if (!Input.GetKeyDown(KeyCode.Escape)) return;
+
+        // 설정은 ESC 메뉴 위에도, 로비 단독으로도 열린다 — 어느 쪽이든 가장 먼저 닫힌다.
+        if (UI_Settings.CloseIfOpen()) return;
 
         if (_menu != null && _menu.IsOpen)
         {
