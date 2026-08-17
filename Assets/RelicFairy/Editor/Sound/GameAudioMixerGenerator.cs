@@ -22,7 +22,9 @@ using UnityEngine;
 /// </summary>
 public static class GameAudioMixerGenerator
 {
-    private const string MixerPath   = "Assets/RelicFairy/Systems/Sound/GameAudioMixer.mixer";
+    // Resources 아래에 둔다. SoundManager.Init이 Resources.Load("GameAudioMixer")로 직접 집어
+    // SetMixer하는 게 현재의 주 경로다(AppBootstrapper의 Addressable 경로는 보조).
+    private const string MixerPath   = "Assets/RelicFairy/Resources/GameAudioMixer.mixer";
     private const string AddressKey  = "GameAudioMixer";
 
     // SoundManager의 kMixerGroup* / kMixerParam* 와 1:1 대응.
