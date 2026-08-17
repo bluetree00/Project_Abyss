@@ -749,6 +749,9 @@ public class RunFlowController : MonoBehaviour
     {
         if (room == null) return;
 
+        // 살아있는 몬스터는 방 자식이 아니라 @Pools(DDOL) 밑에 있어 방을 파괴해도 그대로 남는다.
+        // → 다음 방까지 따라와 클리어 판정(alive 카운트)과 타겟팅을 오염시키므로 먼저 회수한다.
+        RelicFairy.Monster.MonsterBase.DespawnAll();
         // 이전 방의 드랍(골드 코인·클리어 보상·버린 아이템)은 부모가 없어 방 파괴로 안 지워진다.
         // → 다음 방에 흔적으로 떠다니지 않도록 여기서 일괄 정리.
         RoomScopedDrop.ClearAll();

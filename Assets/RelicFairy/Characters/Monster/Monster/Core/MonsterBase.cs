@@ -69,6 +69,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     // 플레이 세션마다 초기화되므로 에디터 SO 원본은 절대 오염되지 않는다.
     static readonly Dictionary<string, MonsterConfigSO> _configCache = new();
 
+    // ── 활성 몬스터 장부 ───────────────────────────────────
+    // 풀(@Pools)은 DontDestroyOnLoad라 방 파괴·씬 전환·런 종료로도 활성 몬스터가 죽지 않는다.
+    // 살아남은 몬스터는 다음 방까지 따라와 클리어 판정을 오염시키므로, 회수 지점에서
+    // DespawnAll()로 일괄 정리한다. OnEnable/OnDisable에서만 갱신한다.
+    static readonly HashSet<MonsterBase> _activeMonsters = new();
+
     [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ClearConfigCache() => _configCache.Clear();
 
@@ -1282,11 +1288,39 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     // 풀 재사용 — OnEnable/OnDisable 콜백
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+    /// <summary>
+    /// 현재 활성화된 모든 몬스터를 풀로 회수한다. 방 파괴·런 종료처럼 몬스터를 남길 이유가 없는 지점에서 호출.
+    /// @Pools가 DontDestroyOnLoad라 방을 파괴해도 몬스터는 살아남는다 — 남으면 다음 방을 따라다니며
+    /// 클리어 판정과 타겟팅을 오염시킨다. Despawn이 SetActive(false)로 OnDisable을 태워 장부에서 빠지므로
+    /// 스냅샷을 뜬 뒤 순회한다. (RoomScopedDrop.ClearAll / GroundFieldBase.DespawnAll과 같은 계약)
+    /// </summary>
+    public static void DespawnAll()
+    {
+        if (_activeMonsters.Count == 0) return;
+
+        var snapshot = new MonsterBase[_activeMonsters.Count];
+        _activeMonsters.CopyTo(snapshot);
+        foreach (var m in snapshot)
+        {
+            if (m == null) continue;
+            Managers.ObjectPooler?.Despawn(m.gameObject);
+        }
+        _activeMonsters.Clear();
+    }
+
     protected virtual void OnEnable()
     {
         // 세대 카운터는 _config 유무와 무관하게 먼저 증가 — 아직 InitAsync 미완 상태에서도
         // 외부 콜백이 풀 재사용을 감지할 수 있도록.
         _generationId++;
+
+        _activeMonsters.Add(this);
+
+        // 죽지 않고 풀로 돌아간 인스턴스에는 이전 방 컨트롤러의 OnDied 구독이 그대로 남는다
+        // (구독 해제는 사망 콜백 안에서만 이뤄지므로). 그대로 재사용하면 이번 사망이
+        // 파괴된 이전 컨트롤러까지 깨워 두 방의 클리어 판정이 동시에 돌아간다.
+        // 스폰 통지(OnMonsterSpawned)는 이 뒤에 오므로 새 구독은 안전하다.
+        OnDied = null;
 
         // 활성화 토큰 갱신 — 이전 DissolveEffect 복원 태스크를 차단
         _activationCts?.Cancel();
@@ -1373,6 +1407,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     protected virtual void OnDisable()
     {
+        _activeMonsters.Remove(this);
+
         // 비활성화 시 활성화 토큰을 취소 — 풀 반환 중 남아있는 DissolveEffect 복원 태스크를 차단한다.
         _activationCts?.Cancel();
         _activationCts?.Dispose();

@@ -174,10 +174,19 @@ public sealed class UI_EscMenu : MonoBehaviour
         // 시간부터 되돌린다 — 로딩 연출과 로비가 timeScale 0으로 멈춘 채 뜨면 안 된다.
         Close();
 
-        // 진행 중 런이 있으면 정식 종료 경로를 태운다(로컬 런 세이브 폐기 + HUD 정리).
-        // 이걸 건너뛰면 이전 런의 보스 체력바·서약·골드가 로비까지 따라온다.
+        // 진행 중 런이 있으면 <b>세션까지</b> 정식 종료한다.
+        // AppBootstrapper.EndRun()만 부르면 세이브 폐기와 HUD 해제밖에 안 된다 —
+        // GameRunSession.EndRun()을 안 태우면 룬판(MerlinRuneBridge.ClearBoard)이 DDOL로 살아남아
+        // 다음 런에 이전 룬이 박힌 채 시작되고, EffectManager/CovenantHandler.Cleanup과
+        // PlayerState.Deactivate도 건너뛴다.
+        //
+        // 순서 주의: AppBootstrapper.EndRun()이 <b>먼저</b>다. 그래야 OnRunEnded 구독이 끊긴 상태에서
+        // 세션 종료가 돌아 <b>포기한 런에는 정산(정수·골드)을 주지 않는다</b>는 계약이 지켜진다.
+        // 정리만 태우고 보상은 주지 않는 경로가 이것뿐이라 순서에 의미가 있다.
+        var run = GameRunBootstrapper.Instance?.Run ?? AppBootstrapper.Instance?.CurrentRun;
         if (AppBootstrapper.Instance != null && AppBootstrapper.Instance.CurrentRun != null)
             AppBootstrapper.Instance.EndRun();
+        run?.EndRun(isCleared: false, reason: "abandon");
 
         AppBootstrapper.Instance?.RequestLoad(Define.Scene.Lobby);
     }

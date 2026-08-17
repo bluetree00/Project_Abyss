@@ -511,6 +511,10 @@ public sealed class GameRunSession
         // 적용 이력만 지우면 판 위의 룬이 다음 런까지 남아 빈 인벤토리와 어긋난다 → 판째로 버린다.
         MerlinRuneBridge.Instance?.ClearBoard();
 
+        // 살아있는 몬스터도 같은 이유로 수동 회수 — 풀(@Pools)이 DDOL이라 씬 전환으로 죽지 않는다.
+        // 남겨두면 허브·다음 런까지 따라와 이전 런의 적이 돌아다닌다.
+        RelicFairy.Monster.MonsterBase.DespawnAll();
+
         // Optional: end => none (keeps HUD consistent if it remains alive)
         RequestHudMode(HUDIds.Mode.None);
 
