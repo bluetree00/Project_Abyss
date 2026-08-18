@@ -135,6 +135,58 @@ public sealed class AddressableManager
     }
 
     /// <summary>
+    /// ✅ 라벨로 <b>여러 개</b>를 한 번에 로드. 목록을 손으로 유지하는 에셋(예: 퀘스트 DB)을 없애는 데 쓴다.
+    ///
+    /// 손 목록은 항목을 추가하고 재연결을 빼먹으면 조용히 비어 버린다 — 실제로 업적 21개 중 3개만
+    /// 등록돼 화면이 비었던 사고가 그것이다. 라벨은 에셋에 붙어 다니므로 그 단계 자체가 사라진다.
+    ///
+    /// 라벨이 없거나 실패해도 예외를 던지지 않고 빈 목록을 돌려준다(부팅을 멈추지 않는다).
+    /// </summary>
+    public async UniTask<IList<T>> LoadAssetsByLabelAsync<T>(string label) where T : UnityEngine.Object
+    {
+        var empty = (IList<T>)Array.Empty<T>();
+        if (string.IsNullOrEmpty(label)) return empty;
+
+        await EnsureInitializedAsync();
+
+        try
+        {
+            var locHandle = Addressables.LoadResourceLocationsAsync(label, typeof(T));
+            await locHandle.ToUniTask();
+
+            bool none = locHandle.Status != AsyncOperationStatus.Succeeded
+                     || locHandle.Result == null || locHandle.Result.Count == 0;
+            Addressables.Release(locHandle);
+            if (none)
+            {
+                Debug.LogWarning($"[AddressableManager] 라벨 '{label}'에 걸린 {typeof(T).Name} 에셋이 없습니다.");
+                return empty;
+            }
+
+            var handle = Addressables.LoadAssetsAsync<T>(label, null);
+            await handle.ToUniTask();
+
+            if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
+            {
+                Debug.LogWarning($"[AddressableManager] 라벨 '{label}' 로드 실패.");
+                return empty;
+            }
+
+            // 핸들은 캐시에 넣지 않는다 — 라벨 로드는 부팅 1회성이고, 개별 키 캐시와 규약이 다르다.
+            _labelHandles.Add(handle);
+            return handle.Result;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[AddressableManager] 라벨 '{label}' 로드 예외: {e.Message}");
+            return empty;
+        }
+    }
+
+    /// <summary>라벨 로드 핸들 — 해제는 앱 종료/전체 정리에서 일괄 처리한다.</summary>
+    private readonly List<AsyncOperationHandle> _labelHandles = new();
+
+    /// <summary>
     /// ✅ 안전 로드: 키가 Addressable 카탈로그에 없거나 로드 실패해도 예외를 던지지 않고 null을 반환.
     /// (Addressables는 존재하지 않는 키에 대해 InvalidKeyException을 LogException까지 해버리므로
     ///  위치 존재 여부를 LoadResourceLocationsAsync로 먼저 확인한다.)
@@ -341,6 +393,12 @@ public sealed class AddressableManager
         }
 
         _assetHandles.Clear();
+
+        // 라벨 로드분은 키 캐시에 없다 — 여기서 같이 걷지 않으면 앱 종료까지 남는다.
+        foreach (var handle in _labelHandles)
+            if (handle.IsValid()) Addressables.Release(handle);
+        _labelHandles.Clear();
+
         UpdateDebugList();
 
         Debug.Log("[AddressableManager] Released All Assets");

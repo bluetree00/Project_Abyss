@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEditor;
+using UnityEditor.AddressableAssets;
+using UnityEditor.AddressableAssets.Settings;
 using UnityEngine;
 
 /// <summary>
@@ -29,9 +31,14 @@ public static class QuestSOGenerator
     private const string kCsvPath     = "Assets/RelicFairy/Data/Quest/QuestDefinition.csv";
     private const string kOutputRoot  = "Assets/RelicFairy/Data/Quest/Generated";
 
+    // 생성한 퀘스트/업적 에셋 경로 ↔ 붙일 라벨. 배치 편집(StartAssetEditing) 중에는 GUID가 아직
+    // 잡히지 않을 수 있어, Refresh 뒤에 한 번에 등록한다.
+    private static readonly List<(string path, string label)> s_pendingLabels = new();
+
     [MenuItem(kMenuPath)]
     public static void GenerateFromCSV()
     {
+        s_pendingLabels.Clear();
         string fullCsv = Path.Combine(Application.dataPath, "../", kCsvPath);
         if (!File.Exists(fullCsv))
         {
@@ -148,8 +155,10 @@ public static class QuestSOGenerator
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
-        Debug.Log($"[QuestSOGenerator] 완료 — Quest {quests}, Achievement {achievements}, 건너뜀 {skipped}. " +
-                  $"다음: RelicFairy/Gameplay/Quest/Rebuild Database 실행 → {kOutputRoot}");
+        ApplyAddressableLabels();
+        AssetDatabase.SaveAssets();
+
+        Debug.Log($"[QuestSOGenerator] 완료 — Quest {quests}, Achievement {achievements}, 건너뜀 {skipped} → {kOutputRoot}");
     }
 
     // ── 생성 헬퍼 ──────────────────────────────────────────────
@@ -305,7 +314,61 @@ public static class QuestSOGenerator
 
         s.ApplyModifiedPropertiesWithoutUndo();
         CreateOrReplace(so, path);
+        // 런타임은 이 라벨로 목록을 모은다 — 여기서 붙여야 CSV에 행을 추가하는 것만으로 게임에 반영된다.
+        s_pendingLabels.Add((path, isAchievement ? QuestLabels.Achievement : QuestLabels.Quest));
         return so;
+    }
+
+    /// <summary>
+    /// 이미 생성돼 있는 에셋에 라벨만 다시 붙인다. 재생성(=GUID 교체) 없이 고칠 때 쓴다.
+    /// </summary>
+    [MenuItem("RelicFairy/Gameplay/Quest/Apply Addressable Labels")]
+    public static void ApplyLabelsToExisting()
+    {
+        s_pendingLabels.Clear();
+        Collect($"{kOutputRoot}/Quests",       QuestLabels.Quest);
+        Collect($"{kOutputRoot}/Achievements", QuestLabels.Achievement);
+        ApplyAddressableLabels();
+        AssetDatabase.SaveAssets();
+
+        static void Collect(string folder, string label)
+        {
+            foreach (var guid in AssetDatabase.FindAssets("t:Quest", new[] { folder }))
+                s_pendingLabels.Add((AssetDatabase.GUIDToAssetPath(guid), label));
+        }
+    }
+
+    /// <summary>생성된 퀘스트/업적을 어드레서블 기본 그룹에 등록하고 라벨을 붙인다.</summary>
+    private static void ApplyAddressableLabels()
+    {
+        var settings = AddressableAssetSettingsDefaultObject.Settings;
+        if (settings == null)
+        {
+            Debug.LogError("[QuestSOGenerator] AddressableAssetSettings 없음 — 라벨 등록 실패. " +
+                           "라벨이 없으면 런타임 목록이 비어 퀘스트·업적이 하나도 뜨지 않는다.");
+            return;
+        }
+
+        settings.AddLabel(QuestLabels.Quest, false);
+        settings.AddLabel(QuestLabels.Achievement, false);
+
+        int count = 0;
+        foreach (var (path, label) in s_pendingLabels)
+        {
+            string guid = AssetDatabase.AssetPathToGUID(path);
+            if (string.IsNullOrEmpty(guid))
+            {
+                Debug.LogWarning($"[QuestSOGenerator] GUID 없음 — 라벨 건너뜀: {path}");
+                continue;
+            }
+
+            var entry = settings.CreateOrMoveEntry(guid, settings.DefaultGroup, false, false);
+            entry.SetLabel(label, true, false, false);
+            count++;
+        }
+
+        settings.SetDirty(AddressableAssetSettings.ModificationEvent.EntryMoved, null, true);
+        Debug.Log($"[QuestSOGenerator] 어드레서블 라벨 {count}건 등록.");
     }
 
     private static void EnsureDatabase(string path)

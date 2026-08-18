@@ -25,15 +25,33 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 066cca5ebafa1f440b627d6fb40a0faa
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/enhance_9.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 07757cf211bd45044a1f1917658b9e66
     m_Address: VFX_ExtraAttack
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 08f665a990bc95e47870dd6c0250e554
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/elite_100.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0987dfb5814de5043844d6dba2e8f3cf
     m_Address: ItemSODatabase
     m_ReadOnly: 0
     m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0dd3f6f57d3da5c40a295a89d6324a7d
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Quests/tut_covenant.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Quest
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0f14191108fddf644b2b93fb6eac8b7b
     m_Address: UI/Popup/UI_RelicPartDraftPopup
@@ -65,20 +83,44 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 175c7ff75b40a3d48aa811efc33d3afa
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/depth_3_clear.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1f33e38f004dea4459c7e28969c59464
     m_Address: Illust_God_Default
     m_ReadOnly: 0
     m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2130d562da3acc34eba1b9b8c88509f4
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/enhance_6.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2233958ca04e2474fb9dd492603df663
     m_Address: UI/RefinerySkin
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 229feaa23793ae046b697ae37f01d17b
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/refine_30.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2774a226feab2a14894ec2ae8a52eea6
     m_Address: Lobby
     m_ReadOnly: 0
     m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2a05c8325521bfa4d8cb60cf0c62f09a
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/kill_100_any.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2fdaa0f1669510d4facfcbc0327037a6
     m_Address: Ch3_Map
@@ -87,6 +129,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2ff3c3d93538a434e963eafdab340c37
     m_Address: Button
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 316c97aa6d8bdae4a8d71febd3052fd6
+    m_Address: UI/DialogueSkin
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -145,6 +192,30 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 422382185d558764082dcdd29457bc89
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Quests/tut_enter_gate.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Quest
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 426f849fc1872ff4aa3632cf8fb5d5d7
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/depth_5.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4835e93769013cc46aa1e3c7d675789c
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/kill_1000.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 494124c30f80e874babc6b004b2e6b30
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/boss_10.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4c7fb6fbc39560845a086e84d9f1ce15
     m_Address: UI/Popup/UI_RefineryPanel
     m_ReadOnly: 0
@@ -170,6 +241,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 53e60c31dec99dd47b69241f116fb5d4
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/refine_100.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 573fc951263aaca4ab0ed43304b89f42
     m_Address: UI/CrucibleSkin
     m_ReadOnly: 0
@@ -185,6 +262,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5ce1245eb373993489d51c933449b889
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/first_clear.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 5f4c52e422f3e1348bd9e78c3d4bcf18
     m_Address: BaseCamp
     m_ReadOnly: 0
@@ -194,6 +277,12 @@ MonoBehaviour:
     m_Address: LegendaryVfxCatalog
     m_ReadOnly: 0
     m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 614a50f82d2ad6d42bf0b791d31ed924
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/boss_first.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 616ea02332804bc4fb1dc30a16c74b70
     m_Address: Ch3_Boss
@@ -209,6 +298,30 @@ MonoBehaviour:
     m_Address: UI/Popup/UI_DialoguePopup
     m_ReadOnly: 0
     m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6525728d92addb54d94eb6c70a0adba4
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Quests/collect_gold_1000.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Quest
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 66539ca74a647b641bf0e0b7336ee66c
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Quests/tut_select_equip.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Quest
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 695ab98ea9e74a147accf27ab542df3f
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/shop_5.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6e6fa982cf6140e42bf113daa4f6e187
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Quests/hidden_elite_ambush.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Quest
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7030943ff0db8b143aa282079060903f
     m_Address: UI/Popup/UI_RuneSelectPopup
@@ -230,6 +343,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7d3da069f6750a2408aee6d4a75f0207
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/depth_10.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7d70eb2b598c6fe47a2073d65c24ce90
     m_Address: sword_1
     m_ReadOnly: 0
@@ -250,13 +369,19 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8ec87d839631de74ea7870ad93b63eb5
-    m_Address: Ch1_Map
+  - m_GUID: 8b0b0056b0739024b8ae7246f17df9d2
+    m_Address: UI/RelicInfoSkin
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 9396a1704f2be8a41addba3c7eab9f0d
-    m_Address: UI/Popup/UI_Pause
+  - m_GUID: 8b2d9c574800ca749814b85d94820c6a
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/clear_50_rooms.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8ec87d839631de74ea7870ad93b63eb5
+    m_Address: Ch1_Map
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -265,20 +390,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8b0b0056b0739024b8ae7246f17df9d2
-    m_Address: UI/RelicInfoSkin
+  - m_GUID: 99550f43ec60efd419e991494055858c
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/clear_300_rooms.asset
     m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 316c97aa6d8bdae4a8d71febd3052fd6
-    m_Address: UI/DialogueSkin
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: f6a6d056bb4423944a369de0f0ae1e22
-    m_Address: UI/CovenantSkin
-    m_ReadOnly: 0
-    m_SerializedLabels: []
+    m_SerializedLabels:
+    - Achievement
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 9b097f7e7ab5a134fb5d5e38ead48cb1
     m_Address: Illust_Intro_Page03
@@ -295,6 +411,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9e0840901b08d86479085ca3d9901a96
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/reach_ch2.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a624e7cbff1a4c74ba6c7ba0e3e38937
     m_Address: Game_Intro
     m_ReadOnly: 0
@@ -309,6 +431,12 @@ MonoBehaviour:
     m_Address: VFX_DamageReflect
     m_ReadOnly: 0
     m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: af35f9b49561fe944ab2a10a8f461293
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/elite_30.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b2fc212087f94454595128336e811841
     m_Address: UI/Popup/UI_CovenantAssemble
@@ -335,6 +463,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bc440c820344b6a499f3f811e0d51026
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/shop_30.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c004dd9604a3985439fb2e97d98773a6
     m_Address: RuneArtLibrary
     m_ReadOnly: 0
@@ -349,6 +483,18 @@ MonoBehaviour:
     m_Address: UI/Popup/UI_AwakeningPanel
     m_ReadOnly: 0
     m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c48a15492982ecc42b88808476882e12
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/reach_ch3.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c605692d16683a843ba6065a29444f3b
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/clear_5.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Achievement
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ca58b3c4bf8304440a7ab62986fce7ef
     m_Address: BloodShot
@@ -416,10 +562,33 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ec0c0e25d0e16df4388cd1e4b84277f7
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Quests/tut_acquire_relic.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Quest
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ed05ce722a2662e4884869290424979c
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Quests/clear_room_3.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Quest
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f57f53ea551199c4d8e7a657e81d8859
     m_Address: Ch2_Map
     m_ReadOnly: 0
     m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f6a6d056bb4423944a369de0f0ae1e22
+    m_Address: UI/CovenantSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fe7f9f73b295a094c98efda66b2878c4
+    m_Address: Assets/RelicFairy/Data/Quest/Generated/Quests/kill_monster_20.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Quest
     FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}

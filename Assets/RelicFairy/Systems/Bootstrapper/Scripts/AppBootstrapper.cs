@@ -799,21 +799,28 @@ public sealed class AppBootstrapper : MonoBehaviour
         var addr = Managers.AddressableManager;
         if (addr == null) return;
 
-        QuestDatabase questDb = null;
-        QuestDatabase achievementDb = null;
+        // 라벨로 폴더째 모은다. 예전엔 QuestDatabase 에셋 두 개의 <b>손 목록</b>을 읽었는데,
+        // CSV로 항목을 늘린 뒤 「Rebuild Database」를 빼먹으면 그 목록이 낡은 채 남아
+        // 업적 21개 중 3개만 등록되는 사고가 났다. 라벨은 에셋에 붙어 다녀 그 단계가 사라진다.
+        var quests       = await addr.LoadAssetsByLabelAsync<Quest>(QuestLabels.Quest);
+        var achievements = await addr.LoadAssetsByLabelAsync<Achievement>(QuestLabels.Achievement);
 
-        try { questDb       = await addr.TryLoadAssetAsync<QuestDatabase>("QuestDatabase"); }
-        catch (Exception e) { Debug.LogWarning($"[AppBootstrapper] QuestDatabase 로드 실패: {e.Message}"); }
+        // Quest 라벨에는 파생형(Achievement)이 섞일 수 있다 — 정확히 그 타입만 남긴다.
+        var pureQuests = new List<Quest>();
+        foreach (var q in quests)
+            if (q != null && q.GetType() == typeof(Quest)) pureQuests.Add(q);
 
-        try { achievementDb = await addr.TryLoadAssetAsync<QuestDatabase>("AchievementDatabase"); }
-        catch (Exception e) { Debug.LogWarning($"[AppBootstrapper] AchievementDatabase 로드 실패: {e.Message}"); }
+        var achievementList = new List<Quest>();
+        foreach (var a in achievements)
+            if (a != null) achievementList.Add(a);
 
-        Debug.Log($"[AppBootstrapper] Quest DB 로드 결과 — QuestDatabase={(questDb != null)}, AchievementDatabase={(achievementDb != null)}");
+        Debug.Log($"[AppBootstrapper] 퀘스트 라벨 로드 — 퀘스트 {pureQuests.Count} · 업적 {achievementList.Count}");
 
-        if (questDb != null || achievementDb != null)
-            Managers.Quest.Initialize(questDb, achievementDb);
+        if (pureQuests.Count > 0 || achievementList.Count > 0)
+            Managers.Quest.Initialize(pureQuests, achievementList);
         else
-            Debug.Log("[AppBootstrapper] QuestDatabase 없음 — Quest 시스템 대기 상태 유지");
+            Debug.LogWarning($"[AppBootstrapper] 라벨 '{QuestLabels.Quest}'/'{QuestLabels.Achievement}'에 걸린 에셋이 없습니다 — " +
+                             "메뉴 「RelicFairy/Gameplay/Quest/Generate From CSV」로 생성·라벨링하세요.");
     }
 
     private async UniTask EnsureUIRootAsync()

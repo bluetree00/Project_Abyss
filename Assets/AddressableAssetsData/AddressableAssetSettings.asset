@@ -128,6 +128,8 @@ MonoBehaviour:
     - Chapter1
     - SO Grids
     - SO Shape
+    - Quest
+    - Achievement
   m_SchemaTemplates: []
   m_GroupTemplateObjects:
   - {fileID: 11400000, guid: 799fe80f69a5e774aae68b9e2a6babfb, type: 2}

@@ -6,6 +6,22 @@ using UnityEngine;
 using UnityEditor;
 #endif
 
+/// <summary>
+/// 퀘스트·업적 에셋을 모으는 <b>어드레서블 라벨</b>. 생성기(라벨 부착)와 부트(라벨 로드)가
+/// 같은 문자열을 봐야 하므로 한곳에 둔다 — 양쪽에 문자열을 흩어 놓으면 오타 하나로 목록이 빈다.
+/// </summary>
+public static class QuestLabels
+{
+    public const string Quest       = "Quest";
+    public const string Achievement = "Achievement";
+}
+
+/// <summary>
+/// ⚠️ <b>런타임에서는 더 이상 쓰지 않는다.</b> 부트는 <see cref="QuestLabels"/> 라벨로 폴더째 모은다.
+///
+/// 이 에셋의 손 목록은 CSV로 항목을 늘린 뒤 재연결을 빼먹으면 조용히 낡아, 업적 21개 중 3개만
+/// 등록되는 사고를 냈다. 에디터 도구(Rebuild Database)와의 호환을 위해 타입만 남긴다.
+/// </summary>
 [CreateAssetMenu(menuName = "Quest/QuestDatabase", fileName = "QuestDatabase")]
 public class QuestDatabase : ScriptableObject
 {

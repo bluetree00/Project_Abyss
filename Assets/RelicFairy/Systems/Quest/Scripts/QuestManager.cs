@@ -42,8 +42,9 @@ public class QuestManager
     private readonly List<Quest> _activeAchievements    = new List<Quest>();
     private readonly List<Quest> _completedAchievements = new List<Quest>();
 
-    private QuestDatabase _questDatabase;
-    private QuestDatabase _achievementDatabase;
+    // 손 목록(QuestDatabase 에셋) 대신 라벨로 모은 풀. 동기화할 대상이 없으니 어긋날 수도 없다.
+    private readonly List<Quest> _questPool       = new List<Quest>();
+    private readonly List<Quest> _achievementPool = new List<Quest>();
 
     // 진행도는 슬롯별 파일이 정본(quest_save_{slot}.json). 슬롯 = 독립 세이브.
     private readonly QuestSaveStore _store = new QuestSaveStore();
@@ -57,7 +58,7 @@ public class QuestManager
     public IReadOnlyList<Quest> CompletedAchievements => _completedAchievements;
 
     /// <summary>QuestDatabase가 주입돼 RegisterQuest가 가능한 상태인지. (비동기 부트스트랩 완료 신호)</summary>
-    public bool IsInitialized => _questDatabase != null;
+    public bool IsInitialized => _questPool.Count > 0 || _achievementPool.Count > 0;
 
     public QuestManager()
     {
@@ -68,10 +69,22 @@ public class QuestManager
     // Initialise — call from Bootstrapper after Addressables ready
     // ──────────────────────────────────────────────────────────
 
-    public void Initialize(QuestDatabase questDb, QuestDatabase achievementDb)
+    /// <summary>
+    /// 퀘스트·업적 목록을 주입한다.
+    ///
+    /// 예전엔 <see cref="QuestDatabase"/> 에셋 <b>두 개</b>를 받았는데, 그 목록은 손으로 유지되는
+    /// 참조 배열이라 CSV로 항목을 늘린 뒤 재연결을 빼먹으면 조용히 비었다 — 업적 21개 중 3개만
+    /// 등록돼 화면이 텅 빈 사고가 그것이다. 이제 부트가 <b>어드레서블 라벨</b>로 폴더째 모아 넘긴다.
+    /// 라벨은 에셋에 붙어 다니므로 동기화할 대상 자체가 없다.
+    /// </summary>
+    public void Initialize(IReadOnlyList<Quest> quests, IReadOnlyList<Quest> achievements)
     {
-        _questDatabase       = questDb;
-        _achievementDatabase = achievementDb;
+        _questPool.Clear();
+        _achievementPool.Clear();
+        if (quests != null)      foreach (var q in quests)      if (q != null) _questPool.Add(q);
+        if (achievements != null) foreach (var a in achievements) if (a != null) _achievementPool.Add(a);
+
+        Debug.Log($"[QuestManager] 주입 — 퀘스트 {_questPool.Count} · 업적 {_achievementPool.Count}");
 
         if (!Load())
             SeedFreshSlot(notify: true);
@@ -109,10 +122,10 @@ public class QuestManager
     /// 항목마다 저장하면 파일을 수십 번 쓰므로 끝에 1회만 저장한다.</summary>
     private void SeedFreshSlot(bool notify)
     {
-        if (_achievementDatabase == null) return;
+        if (_achievementPool.Count == 0) return;
 
         _suppressSave = true;
-        foreach (var achievement in _achievementDatabase.Quests)
+        foreach (var achievement in _achievementPool)
             Register(achievement, notify);
         _suppressSave = false;
         Save();
@@ -157,13 +170,13 @@ public class QuestManager
     /// </summary>
     public Quest RegisterQuest(string codeName)
     {
-        if (_questDatabase == null)
+        if (_questPool.Count == 0)
         {
             Debug.LogWarning("[QuestManager] QuestDatabase 미초기화 — RegisterQuest 무시.");
             return null;
         }
 
-        var quest = _questDatabase.FindQuestBy(codeName);
+        var quest = FindInPool(_questPool, codeName);
         if (quest == null)
         {
             Debug.LogWarning($"[QuestManager] '{codeName}' 퀘스트를 DB에서 찾을 수 없음.");
@@ -306,10 +319,10 @@ public class QuestManager
             return false;
         }
 
-        LoadSaveDatas(root[kActiveQuestsSavePath],         _questDatabase,       LoadActiveQuest);
-        LoadSaveDatas(root[kCompletedQuestsSavePath],      _questDatabase,       LoadCompletedQuest);
-        LoadSaveDatas(root[kActiveAchievementsSavePath],   _achievementDatabase, LoadActiveQuest);
-        LoadSaveDatas(root[kCompletedAchievementsSavePath], _achievementDatabase, LoadCompletedQuest);
+        LoadSaveDatas(root[kActiveQuestsSavePath],          _questPool,       LoadActiveQuest);
+        LoadSaveDatas(root[kCompletedQuestsSavePath],       _questPool,       LoadCompletedQuest);
+        LoadSaveDatas(root[kActiveAchievementsSavePath],    _achievementPool, LoadActiveQuest);
+        LoadSaveDatas(root[kCompletedAchievementsSavePath], _achievementPool, LoadCompletedQuest);
 
         RegisterNewAchievements();
         return true;
@@ -326,12 +339,12 @@ public class QuestManager
     /// </summary>
     private void RegisterNewAchievements()
     {
-        if (_achievementDatabase == null) return;
+        if (_achievementPool.Count == 0) return;
 
         int added = 0;
         _suppressSave = true;
 
-        foreach (var achievement in _achievementDatabase.Quests)
+        foreach (var achievement in _achievementPool)
         {
             if (achievement == null) continue;
             if (ContainInActiveAchievement(achievement) || ContainInCompleteAchievement(achievement)) continue;
@@ -349,16 +362,24 @@ public class QuestManager
         }
     }
 
-    private void LoadSaveDatas(JToken datasToken, QuestDatabase database, Action<QuestSaveData, Quest> onSuccess)
+    private void LoadSaveDatas(JToken datasToken, List<Quest> pool, Action<QuestSaveData, Quest> onSuccess)
     {
         if (datasToken is not JArray datas) return;
         foreach (var data in datas)
         {
             var saveData = data.ToObject<QuestSaveData>();
-            var quest = database?.FindQuestBy(saveData.codeName);
+            var quest = FindInPool(pool, saveData.codeName);
             if (quest != null)
                 onSuccess.Invoke(saveData, quest);
         }
+    }
+
+    private static Quest FindInPool(List<Quest> pool, string codeName)
+    {
+        if (string.IsNullOrEmpty(codeName)) return null;
+        for (int i = 0; i < pool.Count; i++)
+            if (pool[i] != null && pool[i].CodeName == codeName) return pool[i];
+        return null;
     }
 
     private void LoadActiveQuest(QuestSaveData saveData, Quest quest)
