@@ -897,10 +897,12 @@ public class RunFlowController : MonoBehaviour
     {
         int n = Mathf.Min(_gates.Count, exits.Count);
         var marks = new List<(Transform target, string title, string subtitle, Color color)>(n);
+        int revealed = 0;
         for (int i = 0; i < n; i++)
         {
             if (_gates[i] == null) continue;
             RevealGateAsync(_gates[i], exits[i]).Forget();
+            revealed++;
 
             // 카메라가 정면 고정이라 옆쪽 출구는 화면 밖으로 나간다 —
             // 나침반 HUD로 "어느 방향에 어떤 방"인지 항상 보이게 한다.
@@ -913,6 +915,15 @@ public class RunFlowController : MonoBehaviour
         }
         if (marks.Count > 0) ExitCompassHud.Create().SetExits(marks);
         // 매칭 안 된 여분 슬롯은 봉인 상태 유지(목적지 없음)
+
+        // 목적지는 롤됐는데 공개된 게이트가 하나도 없으면 방을 나갈 수단이 사라진다 = 조용한 소프트락.
+        // 정상 경로에선 발생하지 않는다: 출구 0개면 HandleRoomCleared가 앞에서 return하고,
+        // 보스방은 RollExits가 Phase.Done이라 애초에 여기 오지 않는다(게이트 0개가 정상인 유일한 방).
+        // 즉 이 로그가 뜨면 출구 슬롯 없는 방이 풀에 들어온 데이터 회귀다 — 조용히 갇히지 않게 남긴다.
+        if (revealed == 0)
+            Debug.LogError($"[RunFlow] 출구 게이트 0개 — 방 탈출 불가(소프트락). " +
+                           $"visit={_sequencer?.VisitCount} exits={exits.Count} slots={_gates.Count} " +
+                           $"room={(_current?.roomGO != null ? _current.roomGO.name : "?")}");
     }
 
     /// <param name="sealDoor">true면 봉인 석문을 세워 가둔다(전투방). false면 석문 없이 통과 대기(비전투방).</param>
