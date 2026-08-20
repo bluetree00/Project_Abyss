@@ -122,6 +122,48 @@ public static class GraphicsQualitySettings
 
     // ── Public Methods ───────────────────────────────────────
 
+    /// <summary>
+    /// 어느 한 순간의 그래픽 선택 전부. 설정 화면이 <b>열릴 때</b> 떠 두었다가
+    /// 「취소」로 그대로 되돌린다 — 미리보기로 만져 본 값이 그냥 남지 않게.
+    /// </summary>
+    public readonly struct Snapshot
+    {
+        public readonly int   Level;
+        public readonly bool  Custom;
+        public readonly float RenderScale;
+        public readonly int   Aa, Shadow, Post, Fps;
+        public readonly bool  VSync;
+
+        internal Snapshot(int level, bool custom, float renderScale, int aa, int shadow, int post, bool vsync, int fps)
+        {
+            Level = level; Custom = custom; RenderScale = renderScale;
+            Aa = aa; Shadow = shadow; Post = post; VSync = vsync; Fps = fps;
+        }
+    }
+
+    /// <summary>지금 값을 통째로 뜬다.</summary>
+    public static Snapshot Capture()
+    {
+        EnsureLoaded();
+        return new Snapshot(_level, _custom, _renderScale, _aa, _shadow, _post, _vsync, _fps);
+    }
+
+    /// <summary>
+    /// 뜬 값으로 되돌리고 화면에 다시 얹는다.
+    /// <paramref name="save"/>가 false면 <b>PlayerPrefs를 건드리지 않는다</b> —
+    /// 「취소」는 디스크에 아무 흔적도 남기지 않아야 한다.
+    /// </summary>
+    public static void RestoreSnapshot(in Snapshot s, bool save)
+    {
+        EnsureLoaded();
+
+        _level = s.Level; _custom = s.Custom; _renderScale = s.RenderScale;
+        _aa = s.Aa; _shadow = s.Shadow; _post = s.Post; _vsync = s.VSync; _fps = s.Fps;
+
+        ApplyAll();
+        if (save) SavePrefs();
+    }
+
     /// <summary>프리셋(0~2)을 고른다 — 티어 에셋을 갈아끼우고 개별 노브를 그 티어 기본값으로 되돌린다.</summary>
     public static void SetPreset(int level)
     {

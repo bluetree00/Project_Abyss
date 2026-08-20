@@ -456,11 +456,17 @@ public class GameCameraController : MonoBehaviour
             if (this == null) return;
             if (myVersion != _panVersion) return;   // 컷신이 제어권을 가져갔다
             ct.ThrowIfCancellationRequested();
-            t += Time.deltaTime;
+            // ⚠️ <b>unscaled 고정.</b> 이 블렌드는 fire-and-forget으로 돌고, 호출측(대기방 진입)은
+            //    곧바로 대사 팝업을 띄운다. 대사 팝업은 BlocksGameplay라 timeScale을 0으로 잡는다 —
+            //    scaled 시간을 쓰면 t가 한 프레임도 늘지 않아 <b>블렌드가 중간 포즈에서 얼어붙는다.</b>
+            //    카메라가 정면으로 돌아오지 못한 채 대사 내내 비스듬히 고정되던 원인(2026-08-20 QA).
+            //    Brain 재활성·_isPanning 해제도 루프 뒤에 있어 그동안 통째로 보류된다.
+            float dt = Time.unscaledDeltaTime;
+            t += dt;
             float k    = Mathf.Clamp01(t / dur);
             float ease = 1f - (1f - k) * (1f - k) * (1f - k); // easeOutCubic
 
-            _cinemachine.InternalUpdateCameraState(Vector3.up, Time.deltaTime);
+            _cinemachine.InternalUpdateCameraState(Vector3.up, dt);
             Vector3    toPos = _cinemachine.State.FinalPosition;
             Quaternion toRot = _cinemachine.State.FinalOrientation;
 
@@ -1103,7 +1109,16 @@ public class GameCameraController : MonoBehaviour
         Quaternion fromRot = transform.rotation;
 
         // 방 전체를 담는 넓은 부감 — 방 중앙 위로 끌어올려 내려다본다.
-        Vector3    toPos   = roomCenter + new Vector3(0f, wideHeight, -wideBack);
+        //
+        // ⚠️ 물러나는 방향은 <b>월드 -Z가 아니라 지금 카메라가 보던 방향의 반대</b>다.
+        //    월드 고정으로 두면, 동쪽 문으로 들어와 카메라 헤딩이 90°인 상태에서 부감이 항상 0°를
+        //    바라보게 되어 <b>화면이 통째로 돌았다가 연출이 끝나면 도로 돌아온다</b>(2026-08-20 QA).
+        //    플레이어 기준 구도를 유지하면 위로 물러났다 돌아오는 동작만 남고 회전은 사라진다.
+        Vector3 backDir = -transform.forward;
+        backDir.y = 0f;
+        backDir = backDir.sqrMagnitude > 0.001f ? backDir.normalized : Vector3.back;
+
+        Vector3    toPos   = roomCenter + Vector3.up * wideHeight + backDir * wideBack;
         Vector3    lookDir = roomCenter - toPos;
         Quaternion toRot   = lookDir.sqrMagnitude > 0.01f
             ? Quaternion.LookRotation(lookDir, Vector3.up)
