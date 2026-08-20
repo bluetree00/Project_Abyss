@@ -60,6 +60,8 @@ public sealed class UI_Settings : MonoBehaviour
     private static readonly Color LabelColor  = new(0.94f, 0.96f, 1f, 1f);
     private static readonly Color SectionColor= new(0.62f, 0.74f, 0.88f, 1f);
     private static readonly Color TitleColor  = UIPalette.Gold;
+    private static readonly Color ConfirmColor = new(0.20f, 0.34f, 0.50f, 1f);   // 확정 = 강조
+    private static readonly Color CancelColor  = new(0.16f, 0.17f, 0.22f, 1f);   // 되돌림 = 보조
 
     // ── Static ───────────────────────────────────────────────
     private static UI_Settings _instance;
@@ -78,7 +80,17 @@ public sealed class UI_Settings : MonoBehaviour
     private TMP_Text     _renderScaleValue, _vsyncLabel;
 
     private List<Vector2Int> _resolutions = new();
+
+    // 화면 설정은 <b>즉시 적용하지 않는다</b> — 드롭다운을 고를 때마다 창이 다시 잡히면
+    // 펼쳐 둔 목록이 사라지고 되돌릴 방법도 없다. 여기 담아 두었다가 「완료」에서 한 번에 나간다.
+    private Vector2Int _pendingRes;
     private bool _fullscreen = true;
+
+    // 열 때의 값. 「취소」로 여기까지 되돌린다 — 소리·그래픽은 조절하는 동안 미리보기로 살아 있어서
+    // 되돌릴 기준이 있어야 한다.
+    private GraphicsQualitySettings.Snapshot _entryGraphics;
+    private float _entryMaster, _entryBgm, _entrySfx, _entryUi;
+    private bool  _entryCaptured;
     private bool _suppressCallbacks;   // 값 복원 중 onValueChanged가 되먹임되는 것을 막는다
     private bool _volumeDirty;         // 드래그 중 미뤄 둔 볼륨 저장이 남아 있는가
     private bool _graphicsDirty;       // 렌더 스케일 드래그 중 미뤄 둔 저장이 남아 있는가
@@ -155,13 +167,73 @@ public sealed class UI_Settings : MonoBehaviour
     {
         if (_root == null) Build();
 
+        _entryGraphics = GraphicsQualitySettings.Capture();
+        var sound0 = Managers.Sound;
+        if (sound0 != null)
+        {
+            sound0.Init();
+            _entryMaster = sound0.MasterVolume;
+            _entryBgm    = sound0.BgmVolume;
+            _entrySfx    = sound0.EffectVolume;
+            _entryUi     = sound0.UiVolume;
+        }
+        _entryCaptured = true;
+
         RefreshFromSystems();
         _root.SetActive(true);
         _root.transform.SetAsLastSibling();
     }
 
+    /// <summary>
+    /// 「취소」와 ESC가 같이 쓰는 경로. 미리보기로 바뀐 소리·그래픽을 <b>열 때 값으로 되돌리고</b> 닫는다.
+    /// 화면(해상도·창모드)은 애초에 적용하지 않았으므로 되돌릴 것이 없다.
+    /// </summary>
     private void CloseInternal()
     {
+        if (_entryCaptured)
+        {
+            // 개별 노브(AA·그림자·프레임 상한 등)는 각자 SavePrefs를 이미 해 버렸다 —
+            // 되돌림도 저장까지 해야 다음 부팅에 만져 본 값이 살아 돌아오지 않는다.
+            GraphicsQualitySettings.RestoreSnapshot(_entryGraphics, save: true);
+
+            var sound = Managers.Sound;
+            if (sound != null)
+            {
+                sound.SetMasterVolume(_entryMaster, save: false);
+                sound.SetBgmVolume   (_entryBgm,    save: false);
+                sound.SetEffectVolume(_entrySfx,    save: false);
+                sound.SetUiVolume    (_entryUi,     save: false);
+                sound.SaveVolumePrefs();
+            }
+
+            _volumeDirty = _graphicsDirty = false;
+            _entryCaptured = false;
+        }
+
+        if (_root != null) _root.SetActive(false);
+    }
+
+    /// <summary>
+    /// 「완료」 — 지금 화면에 보이는 값을 확정한다.
+    /// 미리보기로 이미 걸려 있는 소리·그래픽은 저장만 하면 되고,
+    /// 화면(해상도·창모드)은 <b>여기서 처음 적용된다</b>.
+    /// </summary>
+    private void ConfirmInternal()
+    {
+        _volumeDirty = _graphicsDirty = false;
+        _entryCaptured = false;   // 아래 닫기가 되돌리지 않도록 먼저 끈다
+
+        Managers.Sound?.SaveVolumePrefs();
+        GraphicsQualitySettings.SavePrefs();
+
+        // 값이 그대로면 건드리지 않는다 — 같은 해상도로 SetResolution을 부르면 창만 한 번 깜빡인다.
+        bool changed = !ScreenSettings.HasSaved
+                       || ScreenSettings.SavedWidth  != _pendingRes.x
+                       || ScreenSettings.SavedHeight != _pendingRes.y
+                       || ScreenSettings.SavedFullscreen != _fullscreen;
+        if (changed && _pendingRes.x > 0 && _pendingRes.y > 0)
+            ScreenSettings.Apply(_pendingRes.x, _pendingRes.y, _fullscreen);
+
         if (_root != null) _root.SetActive(false);
     }
 
@@ -202,6 +274,9 @@ public sealed class UI_Settings : MonoBehaviour
         int index = _resolutions.IndexOf(current);
         _resolutionDropdown.SetValueWithoutNotify(Mathf.Max(0, index));
         _resolutionDropdown.RefreshShownValue();
+
+        // 열 때의 선택이 곧 초기 대기값이다. 아무것도 안 고치고 「완료」를 눌러도 화면이 안 흔들린다.
+        _pendingRes = (index >= 0 && index < _resolutions.Count) ? _resolutions[index] : current;
 
         RefreshGraphicsFromSystems();
 
@@ -318,7 +393,7 @@ public sealed class UI_Settings : MonoBehaviour
         y = AddVolumeRow(panel.transform, ColLeftX, y, "UI",     out _uiSlider,     out _uiValue,     OnUiChanged);
 
         y -= SectionGap;
-        y = AddSectionLabel(panel.transform, ColLeftX, y, "화면");
+        y = AddSectionLabel(panel.transform, ColLeftX, y, "화면  (완료 시 적용)");
         y = AddResolutionRow(panel.transform, ColLeftX, y);
         y = AddWindowModeRow(panel.transform, ColLeftX, y);
 
@@ -341,7 +416,7 @@ public sealed class UI_Settings : MonoBehaviour
         y = AddDropdownRow(panel.transform, ColRightX, y, "프레임 상한", "FrameCap",
                            GraphicsQualitySettings.FpsNames, OnFrameRateChanged, out _fpsDropdown);
 
-        AddCloseButton(panel.transform);
+        AddBottomButtons(panel.transform);
     }
 
     private static float AddTitle(Transform panel, float y)
@@ -444,24 +519,35 @@ public sealed class UI_Settings : MonoBehaviour
     private float AddWindowModeRow(Transform panel, float cx, float y)
         => AddToggleRow(panel, cx, y, "창 모드", "WindowMode", OnToggleWindowMode, out _windowModeLabel);
 
-    /// <summary>패널 아래쪽에 고정. 두 열의 길이가 달라져도 버튼 위치는 흔들리지 않는다.</summary>
-    private void AddCloseButton(Transform panel)
+    /// <summary>
+    /// 패널 아래쪽에 고정. 두 열의 길이가 달라져도 버튼 위치는 흔들리지 않는다.
+    /// 「완료」가 확정, 「취소」(=ESC)가 되돌림 — 닫는 길이 둘로 갈려야 미리보기가 성립한다.
+    /// </summary>
+    private void AddBottomButtons(Transform panel)
     {
-        const float W = 240f, H = 60f, BottomPad = 28f;
+        const float W = 240f, H = 60f, BottomPad = 28f, Gap = 24f;
 
-        var img = NewImage("Btn_Close", panel, CtrlBg);
+        float cy = -PanelH * 0.5f + BottomPad + H * 0.5f;
+        MakeBottomButton(panel, "Btn_Cancel",  "취소", new Vector2(-(W + Gap) * 0.5f, cy), W, H, CancelColor,  CloseInternal);
+        MakeBottomButton(panel, "Btn_Confirm", "완료", new Vector2( (W + Gap) * 0.5f, cy), W, H, ConfirmColor, ConfirmInternal);
+    }
+
+    private static void MakeBottomButton(Transform panel, string name, string label, Vector2 pos,
+                                         float w, float h, Color fill, UnityEngine.Events.UnityAction onClick)
+    {
+        var img = NewImage(name, panel, fill);
         var rt = img.rectTransform;
         rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = new Vector2(0f, -PanelH * 0.5f + BottomPad + H * 0.5f);
-        rt.sizeDelta = new Vector2(W, H);
+        rt.anchoredPosition = pos;
+        rt.sizeDelta = new Vector2(w, h);
 
         var btn = img.gameObject.AddComponent<Button>();
         btn.targetGraphic = img;
-        btn.onClick.AddListener(CloseInternal);
+        btn.onClick.AddListener(onClick);
         img.gameObject.AddComponent<UIButtonFeedback>();
 
-        NewLabel("Label", img.transform, "닫기", 26f, LabelColor, Vector2.zero,
-                 new Vector2(W, H), TextAlignmentOptions.Center);
+        NewLabel("Label", img.transform, label, 26f, LabelColor, Vector2.zero,
+                 new Vector2(w, h), TextAlignmentOptions.Center);
     }
 
     // ── Widget Factory ───────────────────────────────────────
@@ -717,26 +803,19 @@ public sealed class UI_Settings : MonoBehaviour
         _volumeDirty = true;
     }
 
+    // 화면은 여기서 적용하지 않는다 — 고른 값만 담고, 실제 전환은 ConfirmInternal(「완료」)이 한다.
     private void OnResolutionChanged(int index)
     {
         if (_suppressCallbacks) return;
         if (index < 0 || index >= _resolutions.Count) return;
 
-        var res = _resolutions[index];
-        ScreenSettings.Apply(res.x, res.y, _fullscreen);
+        _pendingRes = _resolutions[index];
     }
 
     private void OnToggleWindowMode()
     {
         _fullscreen = !_fullscreen;
         UpdateWindowModeLabel();
-
-        int i = _resolutionDropdown != null ? _resolutionDropdown.value : -1;
-        var res = (i >= 0 && i < _resolutions.Count)
-            ? _resolutions[i]
-            : new Vector2Int(Screen.width, Screen.height);
-
-        ScreenSettings.Apply(res.x, res.y, _fullscreen);
     }
 
     // ── Event Handlers · 그래픽 ───────────────────────────────

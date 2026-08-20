@@ -25,10 +25,15 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     public override bool CloseOnEscape  => false;   // 보상 결정이라 실수로 닫히면 안 된다 — 선택/넘기기로만 종료
 
     // ── 레이아웃 ──
-    private const float WindowW = 1040f;   // 룬 획득 바탕 아트 실측(2081×1241 @2x → 1040×620)
-    private const float WindowH = 620f;
+    // 배경 아트는 9슬라이스가 아니라 통짜로 늘어난다(Skin(window, background) — sliced 아님).
+    // 따라서 크기는 원본 비율 2081:1241(=1.6774)을 지켜야 왜곡되지 않는다.
+    // 1040×620은 1920 화면의 54%뿐이라 4지선다에서 카드가 222px로 눌렸고, 효과 문구
+    // ("스킬 사용 후 4초간 최대 HP +10%" ≈ 200px)가 가용 166px를 넘어 잘렸다.
+    // 1400×835로 키우면 비율을 유지한 채 카드가 설계 상한 300px에 도달한다.
+    private const float WindowW = 1400f;
+    private const float WindowH = 835f;
     private const float CardW   = 300f;   // 카드 폭 상한 — 후보가 많으면 이 아래로 줄어든다
-    private const float CardH   = 380f;
+    private const float CardH   = 560f;   // 창 확대분을 카드 세로에 돌려 효과칸을 넓힌다
     private const float CardGap = 24f;
     private const float CardSideMargin = 40f;   // 카드 열 좌우 여백(창 안쪽)
 
@@ -40,19 +45,21 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private const float OddsBarMargin = 8f;
     // 하단 [선택]/[넘기기]와 겹치지 않게 카드를 살짝 올린다.
     // -26이면 막대와의 여유가 6px뿐이라 720p(0.667배)에서 4px로 뭉개져 붙어 보였다 → -20으로 12px 확보.
-    private const float CardY   = -20f;
+    // 카드 배치 가능 밴드 = 타이틀바 아래(+339.5) ~ 확률바/버튼 위(-319.5).
+    // CardH 560을 0에 두면 위 60 / 아래 40으로 양쪽 여유가 고르게 남는다.
+    private const float CardY   = 0f;
 
     // 모양 미리보기 셀은 고정 크기가 아니라 <b>박스에 맞춰 확대</b>한다.
     // 고정 22px이던 시절엔 1칸 룬이 점처럼 보여 무슨 모양인지 분간이 안 됐다.
-    private const float ShapeBoxH   = 150f;  // 모양 미리보기 박스 높이
+    private const float ShapeBoxH   = 210f;  // 모양 미리보기 박스 높이
     // 모양 박스는 좌우 2단이다 — 왼쪽에 룬 고유 아트, 오른쪽에 블록 모양.
     // "이 룬이 무엇인가"와 "판에서 어떤 모양을 먹는가"는 다른 정보라 자리를 나눠 준다.
     // 룬 아트는 "무엇인가"를 알려주고 모양은 "놓을 수 있는가"를 알려준다.
     // 판정에 실제로 쓰이는 건 모양이라, 아트 칸을 줄여 모양 쪽에 자리를 넘긴다.
-    private const float RuneArtBoxW = 88f;
+    private const float RuneArtBoxW = 120f;
     private const float RuneArtPad  = 10f;
     private const float MiniGap     = 4f;
-    private const float MiniCellMax = 62f;   // 1~2칸 룬이 시원하게 보이는 상한
+    private const float MiniCellMax = 74f;   // 1~2칸 룬이 시원하게 보이는 상한(ShapeBox 210 확대분 반영)
     private const float MiniCellMin = 18f;   // 9칸(3×3)도 박스를 안 넘도록 하한
 
     // ── 공개 연출 ──
@@ -70,6 +77,9 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private readonly List<CardView> _cards = new();
     private List<(RuntimeItemData data, ItemSO so)> _candidates;
     private RunItemInventory _inventory;
+    private const float SelectedCardScale   = 1.05f;   // 선택 카드 확대
+    private const float UnselectedCardAlpha = 0.55f;   // 비선택 카드 감광
+
     private int _selected = -1;
     private float _cardW = CardW;   // 후보 수에 맞춰 산출된 실제 카드 폭
     private bool _built;
@@ -77,10 +87,10 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
     private UniTaskCompletionSource _interactionTcs;
 
-    private TMP_Text _counterText;
-    private Image    _confirmBtnImg;
-    private TMP_Text _confirmLabel;
-    private Image    _screenFlash;      // Legendary 전체화면 플래시 오버레이(코드 생성 Image 1장)
+    [SerializeField] private TMP_Text _counterText;
+    [SerializeField] private Image    _confirmBtnImg;
+    [SerializeField] private TMP_Text _confirmLabel;
+    [SerializeField] private Image    _screenFlash;      // Legendary 전체화면 플래시 오버레이(코드 생성 Image 1장)
 
     /// <summary>공개 시퀀스 진행 중인가 — 아무 입력이 들어오면 즉시 스냅한다.</summary>
     private bool _revealing;
@@ -305,6 +315,9 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     {
         if (_built) return;
         _built = true;
+        // 프리팹이 구워져 있으면 <b>짓지 않고 잇기만 한다</b> — 다시 지으면 UI가 두 벌 겹친다.
+        if (transform.childCount > 0) { BindBakedHierarchy(); return; }
+
 
         ShopUIStyle.Stretch(GetComponent<RectTransform>());
 
@@ -358,7 +371,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         _screenFlash.raycastTarget = false;
     }
 
-    private Transform _windowRoot;
+    [SerializeField] private Transform _windowRoot;
 
     private void BuildFooter()
     {
@@ -555,17 +568,17 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         var shapeBox = ShopUIStyle.MakeImage(card, "ShapeBox", ShopUIStyle.IconBg);
         ShopUIStyle.Anchor(shapeBox.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -18f), new Vector2(_cardW - 40f, ShapeBoxH));
+            new Vector2(0f, -14f), new Vector2(_cardW - 40f, ShapeBoxH));
 
         BuildRuneArtSlot(shapeBox.transform, data);
         bool canPlace = BuildShapePreview(shapeBox.transform, data);
 
         // 이름
-        var name = ShopUIStyle.MakeText(card, "Name", 19f, FontStyles.Bold,
+        var name = ShopUIStyle.MakeText(card, "Name", 24f, FontStyles.Bold,
             TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
         ShopUIStyle.Anchor(name.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -172f), new Vector2(_cardW - 24f, 26f));
+            new Vector2(0f, -236f), new Vector2(_cardW - 24f, 32f));
         name.text = data.displayName ?? data.itemId;
         FitSingleLine(name);
 
@@ -573,12 +586,12 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         int cells = CellCount(data.shapeId);
         var elem  = ElementDef.GetById(data.element);
         string elemTag = elem != null ? $"  ·  <color={ElementDef.IdHex(data.element)}>{elem.Icon}{elem.Name}</color>" : "";
-        var meta = ShopUIStyle.MakeText(card, "Meta", 14f, FontStyles.Normal,
+        var meta = ShopUIStyle.MakeText(card, "Meta", 17f, FontStyles.Normal,
             TextAlignmentOptions.Center, ShopUIStyle.RarityGlow(data.rarity));
         meta.richText = true;
         ShopUIStyle.Anchor(meta.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -200f), new Vector2(_cardW - 24f, 22f));
+            new Vector2(0f, -272f), new Vector2(_cardW - 24f, 26f));
         // 등급 라벨은 굴림 리빌이 다시 쓴다 — 뒤에 붙는 고정부(칸수·속성)만 따로 보관한다.
         string metaSuffix = (cells > 0 ? $" · {cells}칸" : string.Empty) + elemTag;
         if (view != null)
@@ -597,14 +610,14 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             ShopUIStyle.Skin(fxBg, fxSkin, sliced: true);
             ShopUIStyle.Anchor(fxBg.rectTransform,
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -224f), new Vector2(_cardW - 28f, 96f));
+                new Vector2(0f, -308f), new Vector2(_cardW - 28f, 192f));
         }
 
         // 효과 목록
         var fxRoot = ShopUIStyle.MakeRect(card, "Effects").GetComponent<RectTransform>();
         ShopUIStyle.Anchor(fxRoot,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -228f), new Vector2(_cardW - 32f, 86f));
+            new Vector2(0f, -314f), new Vector2(_cardW - 32f, 182f));
         var vlg = fxRoot.gameObject.AddComponent<VerticalLayoutGroup>();
         vlg.childControlHeight = false; vlg.childForceExpandHeight = false;
         vlg.spacing = 2f;
@@ -619,11 +632,11 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             ShopUIStyle.Skin(bar, placeSkin, sliced: true);
             ShopUIStyle.Anchor(bar.rectTransform,
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                new Vector2(0f, 16f), new Vector2(_cardW - 28f, 32f));
+                new Vector2(0f, 16f), new Vector2(_cardW - 28f, 36f));
             badgeParent = bar.transform;
         }
 
-        var badge = ShopUIStyle.MakeText(badgeParent, "PlaceBadge", 14f, FontStyles.Bold,
+        var badge = ShopUIStyle.MakeText(badgeParent, "PlaceBadge", 16f, FontStyles.Bold,
             TextAlignmentOptions.Center, placeSkin != null ? Color.white : (canPlace ? OkColor : NoColor));
         if (placeSkin != null)
             ShopUIStyle.Stretch(badge.rectTransform);
@@ -656,9 +669,9 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         if (data.effects == null) return;
 
         var style = EffectRowStyle.Default;
-        style.fontSize        = 14f;
-        style.iconSize        = 16f;
-        style.rowHeight       = 20f;
+        style.fontSize        = 15f;
+        style.iconSize        = 19f;
+        style.rowHeight       = 26f;
         style.usePrefixArrows = true;
 
         // 효과가 많은 룬은 행이 박스를 넘어 아래 배지·카드 밖까지 밀고 나갔다(레이아웃이 뭉개진 주범).
@@ -808,6 +821,14 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             if (_cards[i].Fill != null)
                 _cards[i].Fill.color = _skinned ? Color.white
                                                 : (on ? CardSelected : ShopUIStyle.CardFill);
+
+            // 프레임 밝기(0.62↔1.0)만으로는 선택이 드러나지 않는다 — 그 위에 등급 테두리
+            // (RarityFrame)가 더 밝고 두껍게 깔려 있어, 같은 등급 후보가 늘어서면 네 장이
+            // 똑같이 빛나 보였다. 등급색과 충돌하지 않는 축인 <b>크기와 명암</b>으로 표시한다.
+            if (_cards[i].Rt != null)
+                _cards[i].Rt.localScale = Vector3.one * (on ? SelectedCardScale : 1f);
+            if (_cards[i].Group != null)
+                _cards[i].Group.alpha = (index < 0 || on) ? 1f : UnselectedCardAlpha;
         }
 
         bool hasSel = index >= 0;
@@ -882,6 +903,23 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     }
 
     // ── Helpers ──
+
+    /// <summary>
+    /// 구워진 프리팹을 잇는다 — <b>계층·좌표·아트는 프리팹이 갖고, 코드는 배선만 한다.</b>
+    /// 직렬화되지 않는 것(코드가 붙인 클릭 리스너·런타임 목록)만 되살린다.
+    /// 이름으로 찾는다 — 빌더가 붙이던 이름 그대로 프리팹에 굳어 있다.
+    /// </summary>
+    private void BindBakedHierarchy()
+    {
+        BindClick("Window/ConfirmBtn", OnConfirmClicked);
+        BindClick("Window/SkipBtn",    OnSkipClicked);
+    }
+
+    private void BindClick(string path, Action onClick)
+    {
+        var t = transform.Find(path);
+        if (t != null) AddClick(t.gameObject, onClick);
+    }
 
     private static void AddClick(GameObject go, Action onClick)
     {

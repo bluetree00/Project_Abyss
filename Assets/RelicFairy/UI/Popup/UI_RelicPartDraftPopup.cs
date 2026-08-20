@@ -45,10 +45,10 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     private bool _built;
     private float _cardW = CardW;   // 후보 수에 맞춰 산출된 실제 카드 폭
 
-    private Transform _windowRoot;
-    private TMP_Text  _subtitle;
-    private Image     _confirmBtnImg;
-    private TMP_Text  _confirmLabel;
+    [SerializeField] private Transform _windowRoot;
+    [SerializeField] private TMP_Text  _subtitle;
+    [SerializeField] private Image     _confirmBtnImg;
+    [SerializeField] private TMP_Text  _confirmLabel;
 
     private UniTaskCompletionSource _interactionTcs;
 
@@ -108,6 +108,9 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     {
         if (_built) return;
         _built = true;
+        // 프리팹이 구워져 있으면 <b>짓지 않고 잇기만 한다</b> — 다시 지으면 UI가 두 벌 겹친다.
+        if (transform.childCount > 0) { BindBakedHierarchy(); return; }
+
 
         ShopUIStyle.Stretch(GetComponent<RectTransform>());
 
@@ -278,6 +281,17 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     }
 
     // ── Helpers ──
+
+    /// <summary>
+    /// 구워진 프리팹을 잇는다 — <b>계층·좌표·아트는 프리팹이 갖고, 코드는 배선만 한다.</b>
+    /// 직렬화되지 않는 것(코드가 붙인 클릭 리스너·런타임 목록)만 되살린다.
+    /// 이름으로 찾는다 — 빌더가 붙이던 이름 그대로 프리팹에 굳어 있다.
+    /// </summary>
+    private void BindBakedHierarchy()
+    {
+        var t = transform.Find("Window/ConfirmBtn");
+        if (t != null) AddClick(t.gameObject, OnConfirmClicked);
+    }
 
     private static void AddClick(GameObject go, Action onClick)
     {

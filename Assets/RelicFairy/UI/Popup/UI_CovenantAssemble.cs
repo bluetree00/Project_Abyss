@@ -142,6 +142,9 @@ public class UI_CovenantAssemble : UI_Popup
             _whetButton.onClick.AddListener(OnWhet);
         }
 
+        // 연마 버튼은 위 EnsureWhetButton에서야 생기므로 하단 바 톤을 한 번 더 태운다(멱등).
+        ApplyBottomBarSkin();
+
         RefreshRerollText();
         RefreshWhetUi();
         RefreshSelection();
@@ -212,8 +215,13 @@ public class UI_CovenantAssemble : UI_Popup
             if (_prismBorder != null) _prismBorder.enabled = false;
         }
 
+        // 제목은 양피지 두루마리의 <b>말린 나무 봉 위</b>에 얹힌다 — authoring 금색(0.83,0.68,0.3)은
+        // 봉의 갈색과 명도가 겹쳐 글자가 뭉개진다. 밝은 상아색으로 올려 대비를 준다.
+        if (_titleText != null) _titleText.color = TitleOnScroll;
+
         ApplyHeaderChips(skin);
         ApplyMockupLayout();
+        ApplyBottomBarSkin();
     }
 
     // ── 완성본 목업(서약 풀샷.png 1306×948) 실측 비율 ──────────
@@ -223,44 +231,29 @@ public class UI_CovenantAssemble : UI_Popup
     private const float BookAspect  = 1.406f;
     private const float BookHeight  = 946f;
     private const float BookMargin  = 0.96f;   // 화면 대비 판이 차지할 최대 비율
-    private const float CardXCause  = 0.1631f, CardXEffect = 0.6623f;
-    private const float CardW       = 0.1792f, CardH       = 0.1213f;
-    private const float CardY0      = 0.3586f, CardStep    = 0.1440f;
-    private const float PrismX      = 0.3599f, PrismW      = 0.2833f;
-    private const float PrismY      = 0.3534f, PrismH      = 0.4430f;
 
+    // ── 톤 ──────────────────────────────────────────────
+    // 배치는 프리팹이 갖지만 <b>색은 코드가 칠한다</b> — 프리팹 authoring 색이 구 아트 기준(형광 보라 버튼 ·
+    // 흰 글자)이라 양피지 위에서 튀거나 날아간다. 아트 재납품에 따라 바뀌는 값이라 한곳에 모아 둔다.
+    private static readonly Color TitleOnScroll = new(0.97f, 0.93f, 0.80f, 1f);
+    private static readonly Color ForgeFill     = new(0.36f, 0.26f, 0.13f, 1f);   // 청동
+    private static readonly Color WhetFill      = new(0.25f, 0.21f, 0.14f, 1f);   // 눌린 청동(보조)
+    private static readonly Color BtnLabel      = new(0.97f, 0.93f, 0.80f, 1f);
+    private static readonly Color InkOnBook     = new(0.20f, 0.14f, 0.08f, 1f);
+    private static readonly Color InkOnBookDim  = new(0.36f, 0.28f, 0.19f, 1f);
     /// <summary>
-    /// 목업 비율대로 판과 카드·두루마리를 다시 앉힌다.
+    /// <b>판 크기만</b> 정한다. 그 안의 배치는 <b>프리팹이 정본</b>이다.
     ///
-    /// 카드·두루마리는 판(Book)의 직계가 아니라 <b>열(Column) 밑</b>에 산다. 목업 비율은 판 기준이라
-    /// 그대로 열에 먹이면 좌표계가 두 번 좁혀져 카드가 판 폭의 5%(71px)로 쪼그라들고 바깥으로 밀린다.
-    /// 대신 <b>열의 가로 폭 자체</b>를 목업 열 폭에 맞추고, 세로만 열 좌표계로 환산해 앉힌다 —
-    /// 이러면 열에 매달린 머리표(원인/결과/효과)도 카드 위로 같이 따라온다.
+    /// <para>예전엔 여기서 열·카드·머리표·미리보기 글자까지 전부 다시 앉혔다. 목업 비율을 코드가 쥐고 있어
+    /// 인스펙터에서 옮겨도 플레이하면 원위치였고, 화면을 보며 고칠 방법이 상수를 만지고 재컴파일하는 것뿐이었다.
+    /// 그 값들은 프리팹 앵커로 구워 넣었다 — 전부 판 대비 <b>비율</b>이라 판이 줄면 같이 줄어든다.</para>
+    ///
+    /// <para>판 크기만 코드에 남는 이유: 「목업 실측 946을 넘지 않되 화면 밖으로도 나가지 않는다」는
+    /// 상한이 있는 규칙이라 앵커로는 표현되지 않는다. 바깥은 코드, 안쪽은 프리팹.</para>
     /// </summary>
     private void ApplyMockupLayout()
     {
-        var book  = _panelBg != null ? _panelBg.rectTransform : null;
-        var prism = _prismBg != null ? _prismBg.rectTransform : null;
-        if (book == null || prism == null) return;
-
-        var causeCol  = ColumnOf(Card(_causeCards, 0),  book);
-        var effectCol = ColumnOf(Card(_effectCards, 0), book);
-        var prismCol  = ColumnOf(prism, book);
-        if (causeCol == null || effectCol == null || prismCol == null) return;   // 구조가 바뀌면 프리팹 그대로 둔다
-
-        ResizeBook(book);
-        SetColumnX(causeCol,  CardXCause,  CardW);
-        SetColumnX(effectCol, CardXEffect, CardW);
-        SetColumnX(prismCol,  PrismX,      PrismW);
-
-        for (int i = 0; i < 3; i++)
-        {
-            PlaceInColumn(Card(_causeCards, i),  causeCol,  CardY0 + CardStep * i, CardH);
-            PlaceInColumn(Card(_effectCards, i), effectCol, CardY0 + CardStep * i, CardH);
-        }
-
-        PlaceInColumn(prism, prismCol, PrismY, PrismH);
-        FitPreviewTextsToScroll(prism);
+        if (_panelBg != null) ResizeBook(_panelBg.rectTransform);
     }
 
     /// <summary>
@@ -278,71 +271,31 @@ public class UI_CovenantAssemble : UI_Popup
         book.sizeDelta = new Vector2(h * BookAspect, h);
     }
 
-    private static RectTransform Card(UI_AssembleCard[] arr, int i)
-        => (arr != null && i < arr.Length && arr[i] != null) ? (RectTransform)arr[i].transform : null;
-
-    /// <summary>rt가 매달린 열. 열이 판의 직계일 때만 유효하다(목업 비율의 기준이 판이라서).</summary>
-    private static RectTransform ColumnOf(RectTransform rt, RectTransform book)
-    {
-        if (rt == null) return null;
-        var col = rt.parent as RectTransform;
-        return (col != null && col.parent == book) ? col : null;
-    }
-
-    /// <summary>열의 가로 구간을 판 기준 비율로 맞춘다. 세로는 저작값 유지 — 머리표 자리가 거기 걸려 있다.</summary>
-    private static void SetColumnX(RectTransform col, float x, float w)
-    {
-        col.anchorMin = new Vector2(x,     col.anchorMin.y);
-        col.anchorMax = new Vector2(x + w, col.anchorMax.y);
-        col.sizeDelta = Vector2.zero;
-        col.anchoredPosition = Vector2.zero;
-    }
-
-    /// <summary>목업의 판 기준 세로 구간(y=위에서부터, h=높이)을 열 좌표계로 환산해 앉힌다. 가로는 열을 꽉 채운다.</summary>
-    private static void PlaceInColumn(RectTransform rt, RectTransform col, float y, float h)
-    {
-        if (rt == null) return;
-        float c0   = col.anchorMin.y;
-        float span = col.anchorMax.y - c0;
-        if (span <= 0.0001f) return;
-
-        rt.anchorMin = new Vector2(0f, ((1f - (y + h)) - c0) / span);
-        rt.anchorMax = new Vector2(1f, ((1f - y)       - c0) / span);
-        rt.sizeDelta = Vector2.zero;
-        rt.anchoredPosition = Vector2.zero;
-    }
-
     /// <summary>
-    /// 미리보기 글자들은 두루마리의 자식이 아니라 <b>형제</b>다 — 두루마리만 목업 자리로 옮기면
-    /// 글자는 열 전체 높이에 남아 위·아래로 삐져나온다(제목은 통째로 두루마리 밖, 효과는 아래로 62px).
-    /// 저작된 상대 배치는 그대로 둔 채, 글자 묶음의 세로 구간만 두루마리 안으로 눌러 넣는다.
-    /// 이미 맞춰진 상태에서 다시 돌아도 같은 구간으로 사상돼 값이 흔들리지 않는다.
+    /// 하단 바 <b>톤만</b> 맞춘다 — 위치는 프리팹 앵커(0.082~0.158)가 갖는다.
+    /// 프리팹 버튼은 형광 보라라 양피지 위에서 혼자 튀고, 요약·리롤 글자는 흰색이라 날아간다.
     /// </summary>
-    private void FitPreviewTextsToScroll(RectTransform scroll)
+    private void ApplyBottomBarSkin()
     {
-        var texts = new[] { _previewTitle, _previewSentence, _previewCondition, _previewCoef, _previewEffect };
-        var col   = scroll.parent;
+        TintButton(_forgeButton, ForgeFill);
+        TintButton(_whetButton,  WhetFill);
 
-        float lo = 1f, hi = 0f;
-        foreach (var t in texts)
-        {
-            if (t == null || t.transform.parent != col) continue;
-            var rt = (RectTransform)t.transform;
-            lo = Mathf.Min(lo, rt.anchorMin.y);
-            hi = Mathf.Max(hi, rt.anchorMax.y);
-        }
-        if (hi - lo <= 0.0001f) return;
+        if (_forgeSummary    != null) _forgeSummary.color    = InkOnBook;
+        if (_rerollCountText != null) _rerollCountText.color = InkOnBookDim;
+        if (_synergyText     != null) _synergyText.color     = InkOnBookDim;
+    }
 
-        float s0 = scroll.anchorMin.y, s1 = scroll.anchorMax.y;
-        foreach (var t in texts)
+    private static void TintButton(Button btn, Color fill)
+    {
+        if (btn == null) return;
+
+        if (btn.TryGetComponent<Image>(out var img))
         {
-            if (t == null || t.transform.parent != col) continue;
-            var rt = (RectTransform)t.transform;
-            rt.anchorMin = new Vector2(rt.anchorMin.x, Mathf.Lerp(s0, s1, (rt.anchorMin.y - lo) / (hi - lo)));
-            rt.anchorMax = new Vector2(rt.anchorMax.x, Mathf.Lerp(s0, s1, (rt.anchorMax.y - lo) / (hi - lo)));
-            rt.sizeDelta = Vector2.zero;
-            rt.anchoredPosition = Vector2.zero;
+            img.sprite = null;   // 프리팹에 구워진 보라 판을 걷어낸다
+            img.color  = fill;
         }
+        foreach (var t in btn.GetComponentsInChildren<TMP_Text>(true))
+            t.color = BtnLabel;
     }
 
     /// <summary>열 머리표(원인·결과·효과) 교체. 아트에 글자가 구워져 있어 코드 라벨은 끈다.</summary>
@@ -697,7 +650,16 @@ public class UI_CovenantAssemble : UI_Popup
         FitSingleLine(_previewTitle);
         FitSingleLine(_previewCondition);
         FitSingleLine(_previewCoef);
-        FitSingleLine(_previewEffect);
+        // 효과 줄은 "감전 1중첩 · 방사형 3체 · 반경 5.5m"처럼 길어 한 줄로는 반드시 잘린다.
+        // 상자가 세로로 넉넉하니(종이면 아래 1/4) 줄바꿈을 허용해 끝까지 읽히게 한다.
+        if (_previewEffect != null)
+        {
+            _previewEffect.textWrappingMode = TextWrappingModes.Normal;
+            _previewEffect.overflowMode     = TextOverflowModes.Truncate;
+            _previewEffect.enableAutoSizing = true;
+            _previewEffect.fontSizeMin      = Mathf.Max(9f, _previewEffect.fontSize * 0.7f);
+            _previewEffect.fontSizeMax      = _previewEffect.fontSize;
+        }
         FitSingleLine(_forgeSummary);
 
         // 중앙 결과 문장 — 여러 줄 허용 + 박스에 맞게 자동 축소(최대 62%까지만 줄인다)

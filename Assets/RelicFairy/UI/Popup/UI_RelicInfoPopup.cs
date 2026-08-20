@@ -36,7 +36,8 @@ public class UI_RelicInfoPopup : UI_Popup
     private const float ButtonRowHeight = 62f;
     private const float StatLabelWidth = 132f;  // 수치 표의 라벨 열 폭(고정해야 값이 세로로 정렬된다)
 
-    private static readonly Color PanelBg   = new(0.07f, 0.06f, 0.10f, 0.97f);
+    // 판은 완전 불투명이어야 한다 — 0.97이면 뒤의 월드 조명·바닥이 옅게 배어 글자와 경쟁한다.
+    private static readonly Color PanelBg   = new(0.07f, 0.06f, 0.10f, 1f);
     private static readonly Color PanelLine = new(0.85f, 0.72f, 0.35f, 1f);
     private static readonly Color CardBg    = new(0.12f, 0.11f, 0.15f, 1f);
     private static readonly Color HeroCardBg = new(0.16f, 0.13f, 0.10f, 1f);   // Q스킬 카드
@@ -49,6 +50,8 @@ public class UI_RelicInfoPopup : UI_Popup
     private static readonly Color BodyColor  = new(0.86f, 0.84f, 0.79f, 1f);
     private static readonly Color SummaryCol   = new(0.80f, 0.78f, 0.74f, 1f);   // 너무 죽이면 안 읽힌다
     private static readonly Color StatLabelCol = new(0.58f, 0.56f, 0.54f, 1f);   // 표의 라벨 열
+    // Q스킬 카드는 유물 톤(가웨인=주황금) 판이 깔린다 — 회색 라벨은 그 위에서 읽히지 않는다.
+    private static readonly Color StatLabelHeroCol = new(0.96f, 0.90f, 0.78f, 0.92f);
     private static readonly Color BadgeColor = new(0.58f, 0.56f, 0.53f, 1f);
     private static readonly Color ChipText   = new(0.82f, 0.80f, 0.76f, 1f);
     private static readonly Color SectionCol = new(0.55f, 0.60f, 0.72f, 1f);   // 존 제목
@@ -59,6 +62,16 @@ public class UI_RelicInfoPopup : UI_Popup
     private static readonly Color AccentState   = new(0.98f, 0.52f, 0.30f, 1f);
     private static readonly Color AccentSkill   = new(0.96f, 0.84f, 0.45f, 1f);
 
+    /// <summary>패널이 차지할 수 있는 화면 비율 상한. 넘으면 통째로 축소한다.</summary>
+    private const float ScreenFill = 0.94f;
+    /// <summary>이보다 작은 화면 rect는 "아직 레이아웃 전"으로 보고 클램프를 건너뛴다.</summary>
+    private const float MinClampExtent = 400f;
+
+    // 테두리.png(2589×1728) 실측 — 테두리 선 안쪽이 세로 0.1024~0.9508이고, 그 위·아래는
+    // 나침반과 ▽ 장식이 사는 <b>투명 여백</b>이다. 아트를 이만큼 rect 밖으로 내민다.
+    private const float PanelArtMarginTop    = 0.1024f;
+    private const float PanelArtMarginBottom = 0.0492f;
+
     private const float CardIntroDelay    = 0.14f;
     private const float CardIntroStagger  = 0.06f;
     private const float CardIntroDuration = 0.22f;
@@ -67,22 +80,23 @@ public class UI_RelicInfoPopup : UI_Popup
     private RelicClassSO _relic;
     private Action       _onConfirm;
 
-    private Image         _portrait;
-    private RectTransform _placeholder;
-    private TMP_Text      _placeholderInitial;
-    private TMP_Text      _title;
-    private TMP_Text      _tagline;
-    private TMP_Text      _lore;
-    private RectTransform _tagRow;
-    private RectTransform _skillZone;     // 고유 스킬(Q) — 일러스트 옆, 세로 1열
-    private RectTransform _passiveZone;   // 상시 능력 — 패널 하단, 가로 2열
+    [SerializeField] private RectTransform _panel;
+    [SerializeField] private Image         _portrait;
+    [SerializeField] private RectTransform _placeholder;
+    [SerializeField] private TMP_Text      _placeholderInitial;
+    [SerializeField] private TMP_Text      _title;
+    [SerializeField] private TMP_Text      _tagline;
+    [SerializeField] private TMP_Text      _lore;
+    [SerializeField] private RectTransform _tagRow;
+    [SerializeField] private RectTransform _skillZone;     // 고유 스킬(Q) — 일러스트 옆, 세로 1열
+    [SerializeField] private RectTransform _passiveZone;   // 상시 능력 — 패널 하단, 가로 2열
 
     // 테마색으로 다시 칠할 요소들(유물마다 톤이 다르다). Init에서 만들고 Bind에서 재도색.
     private RelicInfoSkinSO _skin;
-    private Outline _panelOutline;
-    private Image   _confirmBg;
-    private Outline _confirmLine;
-    private TMP_Text _confirmLabel;
+    [SerializeField] private Outline _panelOutline;
+    [SerializeField] private Image   _confirmBg;
+    [SerializeField] private Outline _confirmLine;
+    [SerializeField] private TMP_Text _confirmLabel;
     private Color   _accentSkill = AccentSkill;   // Q카드 강조색(테마색으로 덮인다)
 
     private readonly List<GameObject> _spawned = new();
@@ -127,7 +141,39 @@ public class UI_RelicInfoPopup : UI_Popup
         BuildTags();
         BuildCards();
 
+        ClampPanelToScreen();
         PlayIntroAsync(++_introGen).Forget();
+    }
+
+    /// <summary>
+    /// 패널이 화면을 넘지 않게 가둔다.
+    ///
+    /// 패널 높이는 <see cref="ContentSizeFitter"/>가 내용에서 뽑는데 상한이 없다 — 16:9에서 이미
+    /// 화면 높이의 98%를 쓰고, 21:9(2560×1080)처럼 논리 높이가 935로 줄면 <b>위·아래가 잘려나간다</b>
+    /// (스킬 줄이 많은 유물일수록 먼저 잘린다). 넘칠 때만 통째로 축소해 비율을 유지한다.
+    /// </summary>
+    private void ClampPanelToScreen()
+    {
+        if (_panel == null) return;
+
+        _panel.localScale = Vector3.one;                       // 이전 배율 위에 또 곱하지 않는다
+        LayoutRebuilder.ForceRebuildLayoutImmediate(_panel);   // Fitter 결과를 지금 확정시킨다
+
+        var screen = (RectTransform)transform;
+        float availW = screen.rect.width  * ScreenFill;
+        float availH = screen.rect.height * ScreenFill;
+
+        // 화면 rect가 아직 안 잡혔으면 축소하지 않는다. 여기서 작은 값을 믿으면 판이 7%로
+        // 쪼그라들어 버튼도 못 누른다 — 클램프는 넘칠 때만 도는 안전장치지 레이아웃이 아니다.
+        if (availW < MinClampExtent || availH < MinClampExtent)
+        {
+            _panel.localScale = Vector3.one;
+            return;
+        }
+
+        float k = Mathf.Min(1f, availW / Mathf.Max(1f, _panel.rect.width),
+                                availH / Mathf.Max(1f, _panel.rect.height));
+        _panel.localScale = new Vector3(k, k, 1f);
     }
 
     /// <summary>
@@ -357,7 +403,7 @@ public class UI_RelicInfoPopup : UI_Popup
             h.childControlWidth = true;  h.childForceExpandWidth  = false;
             h.childControlHeight = true; h.childForceExpandHeight = false;
 
-            var l = NewText("L", row, 16f, StatLabelCol, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+            var l = NewText("L", row, 16f, hero ? StatLabelHeroCol : StatLabelCol, FontStyles.Normal, TextAlignmentOptions.TopLeft);
             l.text = label;
             l.textWrappingMode = TextWrappingModes.NoWrap;
             var lle = l.gameObject.AddComponent<LayoutElement>();
@@ -463,9 +509,20 @@ public class UI_RelicInfoPopup : UI_Popup
     // ── 절차 생성 레이아웃 ─────────────────────────────────────
     private void BuildLayout()
     {
+        // 프리팹이 구워져 있으면 <b>짓지 않고 잇기만 한다</b> — 다시 지으면 UI가 두 벌 겹친다.
+        if (transform.childCount > 0) { BindBakedHierarchy(); return; }
+
         var root = (RectTransform)transform;
 
-        var dim = NewImage("Dim", root, new Color(0f, 0f, 0f, 0.65f));
+        // ⚠️ 프리팹 루트는 화면 한가운데 <b>100×100</b>으로 authoring 돼 있다. 판은 자식이라
+        // 잘리지 않고 제 크기로 그려지지만, 암막은 그 100×100만 덮어 <b>월드가 한 번도 어두워진 적이 없다</b>
+        // — "HUD·월드가 팝업 위로 올라온다"고 보이던 정체가 이것이다. 루트부터 화면 전체로 편다.
+        root.anchorMin = Vector2.zero;
+        root.anchorMax = Vector2.one;
+        root.offsetMin = Vector2.zero;
+        root.offsetMax = Vector2.zero;
+
+        var dim = NewImage("Dim", root, new Color(0f, 0f, 0f, 0.88f));
         Stretch(dim.rectTransform);
         dim.raycastTarget = true;
 
@@ -484,7 +541,7 @@ public class UI_RelicInfoPopup : UI_Popup
             // 프레임 아트 중앙 알파가 70%라 그것만 깔면 게임 월드가 그대로 비쳐 글자가 안 읽힌다.
             // 불투명 바닥판을 뒤에 깔고 그 위에 프레임을 올린다(둘 다 레이아웃 밖 자식).
             // 순서 주의: 둘 다 SetAsFirstSibling이라 <b>나중에 넣은 쪽이 뒤로</b> 간다.
-            AddBackdrop(panel, _skin.panelFrame, sliced: false);
+            AddBackdrop(panel, _skin.panelFrame, sliced: false, PanelArtMarginTop, PanelArtMarginBottom);
             AddSolidFill(panel, PanelBg);
         }
         else
@@ -493,6 +550,8 @@ public class UI_RelicInfoPopup : UI_Popup
             _panelOutline.effectColor    = PanelLine;
             _panelOutline.effectDistance = new Vector2(2f, -2f);
         }
+
+        _panel = prt;
 
         var v = panel.gameObject.AddComponent<VerticalLayoutGroup>();
         v.padding = new RectOffset(38, 38, 32, 30);
@@ -526,6 +585,7 @@ public class UI_RelicInfoPopup : UI_Popup
 
         _passiveZone = NewRect("Cards", section);
         var h = _passiveZone.gameObject.AddComponent<HorizontalLayoutGroup>();
+        h.padding = new RectOffset(12, 12, 8, 12);   // 상시 카드도 같은 글로우 여백 규칙
         h.spacing = 14f;
         h.childAlignment = TextAnchor.UpperLeft;
         h.childControlWidth = true;  h.childForceExpandWidth  = true;
@@ -642,6 +702,9 @@ public class UI_RelicInfoPopup : UI_Popup
 
         _skillZone = NewRect("Cards", skillSection);
         var lv = _skillZone.gameObject.AddComponent<VerticalLayoutGroup>();
+        // 카드 아트(고유.png)는 <b>바깥 25px이 네온 글로우</b>다 — 여백 없이 붙이면 그 빛이
+        // 왼쪽 액자와 아래 「상시 능력」 라벨을 파고든다. 글로우가 앉을 자리를 비워 둔다.
+        lv.padding = new RectOffset(12, 12, 8, 12);
         lv.spacing = 8f;
         lv.childControlWidth = true;  lv.childForceExpandWidth  = true;
         lv.childControlHeight = true; lv.childForceExpandHeight = false;
@@ -743,7 +806,10 @@ public class UI_RelicInfoPopup : UI_Popup
     /// (패널이 1728px 높이로, 상시 카드가 1128px 폭으로 터졌던 원인).
     /// 자식 + <c>ignoreLayout</c>이면 크기 계산에서 완전히 빠진다.
     /// </summary>
-    private static void AddBackdrop(Image host, Sprite art, bool sliced)
+    /// <param name="marginTop">아트에서 <b>테두리 선 위쪽</b>이 차지하는 비율(장식이 사는 여백).</param>
+    /// <param name="marginBottom">아트에서 테두리 선 아래쪽이 차지하는 비율.</param>
+    private static void AddBackdrop(Image host, Sprite art, bool sliced,
+                                    float marginTop = 0f, float marginBottom = 0f)
     {
         if (host == null || art == null) return;
 
@@ -752,8 +818,14 @@ public class UI_RelicInfoPopup : UI_Popup
         var go = new GameObject("Bg", typeof(RectTransform), typeof(CanvasRenderer));
         var rt = (RectTransform)go.transform;
         rt.SetParent(host.rectTransform, false);
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
+
+        // 여백이 있는 아트는 <b>rect 밖으로 내밀어</b> 테두리 선 안쪽이 rect와 정확히 겹치게 한다.
+        // 0~1로 그냥 늘리면 장식 여백만큼 선이 안으로 밀려, 그 띠에 깔린 불투명 바닥판이
+        // 테두리 바깥으로 삐져나온 판때기처럼 보인다(그게 "뒤에 레거시 배경").
+        float inner = 1f - marginTop - marginBottom;
+        float over  = inner > 0.01f ? 1f / inner : 1f;
+        rt.anchorMin = new Vector2(0f, -marginBottom * over);
+        rt.anchorMax = new Vector2(1f, 1f + marginTop * over);
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
         go.AddComponent<LayoutElement>().ignoreLayout = true;
@@ -763,6 +835,31 @@ public class UI_RelicInfoPopup : UI_Popup
         img.type          = sliced ? Image.Type.Sliced : Image.Type.Simple;
         img.raycastTarget = false;
         rt.SetAsFirstSibling();   // 내용보다 뒤에 깔린다
+    }
+
+    /// <summary>
+    /// 구워진 프리팹을 잇는다 — 계층·좌표·아트는 프리팹이 갖고, 코드는 배선만 한다.
+    /// 능력 카드·태그 칩은 <see cref="Bind"/>가 데이터마다 새로 만드므로 여기서 다룰 것이 없다.
+    /// </summary>
+    private void BindBakedHierarchy()
+    {
+        _skin  = UISkin.RelicInfo;
+        _panel = transform.Find("Panel") as RectTransform;
+
+        BindClick("Panel/Buttons/Btn_선택", Confirm);
+        BindClick("Panel/Buttons/Btn_취소", Cancel);
+    }
+
+    private void BindClick(string path, Action onClick)
+    {
+        var t = transform.Find(path);
+        if (t == null) return;
+
+        var btn = t.GetComponent<Button>();
+        if (btn == null) return;
+
+        btn.onClick.RemoveAllListeners();
+        btn.onClick.AddListener(() => onClick());
     }
 
     // ── 생성 헬퍼 ─────────────────────────────────────────────

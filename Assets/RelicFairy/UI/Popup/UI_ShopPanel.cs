@@ -39,13 +39,21 @@ public sealed class UI_ShopPanel : UI_Popup
     private const float CornerW    =  73f, CornerH   = 108f, CornerInsetX = 58f;
     private const float CornerTopY =   8f, CornerBottomY = 690f;
     private const float GoldX      = 752f, GoldY     =  56f, GoldIconSize = 22f;
-    private const float DealX      = 110f, DealY     = 160f, DealW   = 590f, DealH  = 149f;
-    private const float GridX      = 116f, GridY     = 326f;
-    private const float CardW      = 179f, CardH     = 171f;
-    private const float CardStepX  = 201.5f, CardStepY = 194f;
+    // ★ 목업 아트를 전체샷에 템플릿 매칭해 실측한 값(상관 0.97/0.91).
+    //   ⚠️ 바깥 rect를 고칠 때 <b>내부를 배율로 키우면 안 된다</b> — 내부 요소는 카드 아트의 일부가 아니라
+    //   그 위에 얹힌 별개 이미지라, 목업에서 <b>절대 위치가 고정</b>이다. rect 원점이 움직인 만큼만 옮긴다.
+    //   (배율로 키웠더니 코인·배지가 우하단으로 18px 밀려 카드 밖으로 걸쳤다.)
+    //   예전 값은 <b>아트 rect가 아니라 눈으로 잰 "보이는 판"</b>이라 카드가 13% 작았다.
+    //   아트에는 투명 여백이 있어(카드 좌2.1%·우4.9%·상2.2%·하5.2%) rect는 보이는 판보다 커야 한다.
+    private const float DealX      =  95f, DealY     = 158f, DealW   = 625f, DealH  = 158f;
+    private const float GridX      = 110f, GridY     = 322f;
+    private const float CardW      = 205f, CardH     = 196f;
+    private const float CardStepX  = 201.5f, CardStepY = 191f;
     private const int   GridCols   = 3, GridRows = 2;
     private const float RerollW    = 230f, RerollH   =  53f, RerollY = 718f;
-    private const float SelX       = 757f, SelY      = 168f, SelW    = 254f, SelH   = 520f;
+    // 구매창도 카드와 같은 문제였다 — 아트 rect가 아니라 눈으로 잰 "보이는 종이"를 썼다.
+    // 구매창.png(885×1811)는 좌1.7%·우3.8%·상0.8%·하1.8%가 투명이라 rect가 그만큼 커야 한다.
+    private const float SelX       = 755f, SelY      = 141f, SelW    = 290f, SelH   = 594f;
 
     // 카테고리 색 — 아트 배지가 없는 룬·재료의 폴백이자, 배지 있는 칸의 선택 강조색.
     private static readonly Color[] CatColor =
@@ -62,15 +70,15 @@ public sealed class UI_ShopPanel : UI_Popup
     private ShopRoomController _controller;
     private ShopSkinSO _skin;
 
-    private TMP_Text _goldText, _dialogText;
-    private Button   _rerollBtn;
-    private Image    _rerollImg;
-    private TMP_Text _rerollLabel;
+    [SerializeField] private TMP_Text _goldText, _dialogText;
+    [SerializeField] private Button   _rerollBtn;
+    [SerializeField] private Image    _rerollImg;
+    [SerializeField] private TMP_Text _rerollLabel;
 
     // 특가
-    private GameObject _dealRoot;
-    private Image      _dealIcon;
-    private TMP_Text   _dealCat, _dealName, _dealDesc, _dealOldPrice, _dealPrice;
+    [SerializeField] private GameObject _dealRoot;
+    [SerializeField] private Image      _dealIcon;
+    [SerializeField] private TMP_Text   _dealCat, _dealName, _dealDesc, _dealOldPrice, _dealPrice;
 
     // 상품 카드
     private sealed class Card
@@ -82,10 +90,10 @@ public sealed class UI_ShopPanel : UI_Popup
     private readonly List<Card> _cards = new();
 
     // 고른 물건
-    private Image    _selPreview, _selNamePlate;
-    private TMP_Text _selName, _selCat, _selEffect, _selApply, _selValue, _selWorry, _selFlavor;
-    private Button   _buyBtn;
-    private TMP_Text _buyLabel;
+    [SerializeField] private Image    _selPreview, _selNamePlate;
+    [SerializeField] private TMP_Text _selName, _selCat, _selEffect, _selApply, _selValue, _selWorry, _selFlavor;
+    [SerializeField] private Button   _buyBtn;
+    [SerializeField] private TMP_Text _buyLabel;
 
     private int _selectedIndex = -1;   // -1 = 미선택, -2 = 특가
     private const int SpecialIndex = -2;
@@ -158,6 +166,9 @@ public sealed class UI_ShopPanel : UI_Popup
     {
         if (_built) return;
         _built = true;
+        // 프리팹이 구워져 있으면 <b>짓지 않고 잇기만 한다</b> — 다시 지으면 UI가 두 벌 겹친다.
+        if (transform.childCount > 0) { BindBakedHierarchy(); return; }
+
 
         ShopUIStyle.Stretch(GetComponent<RectTransform>());
 
@@ -183,6 +194,59 @@ public sealed class UI_ShopPanel : UI_Popup
 
         // 모서리 장식은 마지막 — 내용 위로 지나가야 액자가 된다.
         BuildCorners(w);
+    }
+
+    /// <summary>
+    /// 구워진 프리팹을 잇는다 — <b>계층·좌표·아트는 프리팹이 갖고, 코드는 배선만 한다.</b>
+    ///
+    /// <para>클릭 리스너와 <see cref="_cards"/> 목록은 직렬화되지 않는다(리스너는 코드가 붙인 것이고,
+    /// 목록은 <c>readonly</c> 런타임 상태다). 그 둘만 여기서 되살린다.
+    /// 이름으로 찾는다 — 빌더가 붙이던 이름 그대로라 프리팹에도 같은 이름으로 굳어 있다.</para>
+    /// </summary>
+    private void BindBakedHierarchy()
+    {
+        _cards.Clear();
+
+        for (int i = 0; i < GridCols * GridRows; i++)
+        {
+            var root = transform.Find($"Window/Card{i}");
+            if (root == null) continue;
+
+            int captured = i;
+            var c = new Card
+            {
+                Root       = root.gameObject,
+                Bg         = root.GetComponent<Image>(),
+                Icon       = Img(root, "Icon"),
+                BadgeBg    = Img(root, "BadgeBg"),
+                BadgeGlyph = Img(root, "BadgeGlyph"),
+                SoldStamp  = Img(root, "SoldStamp"),
+                PriceCoin  = Img(root, "PriceCoin"),
+                BadgeText  = Txt(root, "BadgeText"),
+                Name       = Txt(root, "Name"),
+                Effect     = Txt(root, "Effect"),
+                Price      = Txt(root, "Price"),
+            };
+            _cards.Add(c);
+            AddClick(root.gameObject, () => Select(captured));
+        }
+
+        if (_dealRoot != null) AddClick(_dealRoot, () => Select(SpecialIndex));
+
+        Rewire(_buyBtn,    OnBuyClicked);
+        Rewire(_rerollBtn, OnRerollClicked);
+        Rewire(transform.Find("Window/Exit")?.GetComponent<Button>(), ClosePopupUI);
+    }
+
+    private static Image    Img(Transform p, string n) => p.Find(n)?.GetComponent<Image>();
+    private static TMP_Text Txt(Transform p, string n) => p.Find(n)?.GetComponent<TMP_Text>();
+
+    /// <summary>같은 팝업이 다시 열려도 리스너가 겹쳐 쌓이지 않도록 지우고 건다.</summary>
+    private static void Rewire(Button btn, UnityEngine.Events.UnityAction fn)
+    {
+        if (btn == null) return;
+        btn.onClick.RemoveAllListeners();
+        btn.onClick.AddListener(fn);
     }
 
     /// <summary>상단 — 어두운 띠 + 간판(등불 일체) + 골드 + 우상단 문장.</summary>
@@ -256,33 +320,33 @@ public sealed class UI_ShopPanel : UI_Popup
             var tab = ShopUIStyle.MakeText(card.transform, "Tab", 15f, FontStyles.Bold,
                                            TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
             tab.text = "오늘의 특가";
-            PlaceIn(card.transform, tab, 12f, 6f, 150f, 26f);
+            PlaceIn(card.transform, tab, 27f, 8f, 150f, 26f);
         }
 
         // 리본이 좌상단을 덮으므로 내용은 그 아래·오른쪽에서 시작한다.
         _dealIcon = ShopUIStyle.MakeImage(card.transform, "Icon", new Color(0.05f, 0.05f, 0.07f, 1f));
-        PlaceIn(card.transform, _dealIcon, 28f, 40f, 88f, 88f);
+        PlaceIn(card.transform, _dealIcon, 43f, 42f, 88f, 88f);
         _dealIcon.preserveAspect = true;
 
         _dealCat = ShopUIStyle.MakeText(card.transform, "Cat", 13f, FontStyles.Normal,
                                         TextAlignmentOptions.TopLeft, new Color(0.36f, 0.26f, 0.16f, 1f));
-        PlaceIn(card.transform, _dealCat, 132f, 40f, 300f, 20f);
+        PlaceIn(card.transform, _dealCat, 147f, 42f, 268f, 20f);
 
         _dealName = ShopUIStyle.MakeText(card.transform, "Name", 23f, FontStyles.Bold,
                                          TextAlignmentOptions.TopLeft, new Color(0.20f, 0.13f, 0.07f, 1f));
-        PlaceIn(card.transform, _dealName, 132f, 60f, 300f, 30f);
+        PlaceIn(card.transform, _dealName, 147f, 62f, 268f, 30f);
 
         _dealDesc = ShopUIStyle.MakeText(card.transform, "Desc", 13f, FontStyles.Normal,
                                          TextAlignmentOptions.TopLeft, new Color(0.36f, 0.26f, 0.16f, 1f));
-        PlaceIn(card.transform, _dealDesc, 132f, 92f, 330f, 22f);
+        PlaceIn(card.transform, _dealDesc, 147f, 94f, 268f, 22f);
 
         _dealOldPrice = ShopUIStyle.MakeText(card.transform, "OldPrice", 14f, FontStyles.Strikethrough,
                                              TextAlignmentOptions.MidlineRight, new Color(0.42f, 0.32f, 0.22f, 1f));
-        PlaceIn(card.transform, _dealOldPrice, 420f, 42f, 140f, 22f);
+        PlaceIn(card.transform, _dealOldPrice, 427f, 44f, 150f, 22f);
 
         _dealPrice = ShopUIStyle.MakeText(card.transform, "Price", 27f, FontStyles.Bold,
                                           TextAlignmentOptions.MidlineRight, new Color(0.45f, 0.28f, 0.06f, 1f));
-        PlaceIn(card.transform, _dealPrice, 420f, 66f, 140f, 34f);
+        PlaceIn(card.transform, _dealPrice, 427f, 68f, 150f, 34f);
     }
 
     /// <summary>부모 사각형 안쪽 기준 배치(목업 px). 부모의 좌상단이 원점.</summary>
@@ -324,21 +388,21 @@ public sealed class UI_ShopPanel : UI_Popup
 
         // 아이콘 칸 — 채움 + 테두리 2겹, 그 사이에 상품 아이콘.
         var fill = ShopUIStyle.MakeImage(bg.transform, "IconFill", new Color(0.05f, 0.05f, 0.07f, 1f));
-        PlaceIn(bg.transform, fill, 11f, 7f, 72f, 99f);
+        PlaceIn(bg.transform, fill, 15f, 11f, 74f, 98f);
         ShopUIStyle.Skin(fill, _skin?.iconFill, sliced: true);
 
         c.Icon = ShopUIStyle.MakeImage(bg.transform, "Icon", new Color(1f, 1f, 1f, 0f));
-        PlaceIn(bg.transform, c.Icon, 15f, 11f, 64f, 91f);
+        PlaceIn(bg.transform, c.Icon, 19f, 15f, 66f, 90f);
         c.Icon.preserveAspect = true;
 
         var frame = ShopUIStyle.MakeImage(bg.transform, "IconFrame", new Color(1f, 1f, 1f, 0f));
-        PlaceIn(bg.transform, frame, 11f, 7f, 72f, 99f);
+        PlaceIn(bg.transform, frame, 15f, 11f, 74f, 98f);
         frame.raycastTarget = false;
         ShopUIStyle.Skin(frame, _skin?.iconFrame, sliced: true);
 
         // 카테고리 배지 — 바탕(아트) + 글자(아트가 있으면 그 위 라벨은 끈다).
         c.BadgeBg = ShopUIStyle.MakeImage(bg.transform, "BadgeBg", CatColor[0]);
-        PlaceIn(bg.transform, c.BadgeBg, 122f, 10f, 43f, 17f);
+        PlaceIn(bg.transform, c.BadgeBg, 123f, 10f, 50f, 22f);
 
         c.BadgeGlyph = ShopUIStyle.MakeImage(c.BadgeBg.transform, "BadgeGlyph", new Color(1f, 1f, 1f, 0f));
         ShopUIStyle.Stretch(c.BadgeGlyph.rectTransform, 2f);
@@ -351,27 +415,27 @@ public sealed class UI_ShopPanel : UI_Popup
 
         c.Name = ShopUIStyle.MakeText(bg.transform, "Name", 15f, FontStyles.Bold,
                                       TextAlignmentOptions.TopLeft, new Color(0.18f, 0.12f, 0.06f, 1f));
-        PlaceIn(bg.transform, c.Name, 11f, 112f, 157f, 20f);
+        PlaceIn(bg.transform, c.Name, 17f, 112f, 175f, 20f);
         FitLine(c.Name);
 
         c.Effect = ShopUIStyle.MakeText(bg.transform, "Effect", 11.5f, FontStyles.Normal,
                                         TextAlignmentOptions.TopLeft, new Color(0.38f, 0.28f, 0.18f, 1f));
         // 효과와 가격은 같은 높이에서 좌우로 갈린다 — 효과가 카드 폭을 다 먹으면 가격과 겹친다.
-        PlaceIn(bg.transform, c.Effect, 11f, 135f, 95f, 17f);
+        PlaceIn(bg.transform, c.Effect, 17f, 135f, 120f, 17f);
         FitLine(c.Effect);
 
         c.Price = ShopUIStyle.MakeText(bg.transform, "Price", 16f, FontStyles.Bold,
                                        TextAlignmentOptions.MidlineRight, new Color(0.25f, 0.17f, 0.08f, 1f));
-        PlaceIn(bg.transform, c.Price, 11f, 139f, 134f, 20f);
+        PlaceIn(bg.transform, c.Price, 17f, 139f, 140f, 20f);
 
         c.PriceCoin = ShopUIStyle.MakeImage(bg.transform, "PriceCoin", ShopUIStyle.Gold);
-        PlaceIn(bg.transform, c.PriceCoin, 148f, 138f, 20f, 22f);
+        PlaceIn(bg.transform, c.PriceCoin, 152f, 142f, 21f, 22f);
         c.PriceCoin.preserveAspect = true;
         ShopUIStyle.Skin(c.PriceCoin, _skin?.goldCoin);
 
         // 품절 도장 — 카드 중앙에 겹친다. 기본은 꺼둔다.
         c.SoldStamp = ShopUIStyle.MakeImage(bg.transform, "SoldStamp", new Color(1f, 1f, 1f, 0f));
-        PlaceIn(bg.transform, c.SoldStamp, (CardW - 161f) * 0.5f, (CardH - 85f) * 0.5f, 161f, 85f);
+        PlaceIn(bg.transform, c.SoldStamp, (CardW - 175f) * 0.5f, (CardH - 92f) * 0.5f, 175f, 92f);
         c.SoldStamp.raycastTarget = false;
         ShopUIStyle.Skin(c.SoldStamp, _skin?.soldStamp);
         c.SoldStamp.gameObject.SetActive(false);
@@ -388,13 +452,13 @@ public sealed class UI_ShopPanel : UI_Popup
         var s = col.transform;
 
         _selPreview = ShopUIStyle.MakeImage(s, "Preview", new Color(1f, 1f, 1f, 0f));
-        PlaceIn(s, _selPreview, 72f, 28f, 110f, 145f);
+        PlaceIn(s, _selPreview, 85f, 80f, 88f, 122f);
         _selPreview.preserveAspect = true;
 
         // 이름 명판 — 전용 아트가 납품되지 않았다. 단색 사각형 하나로 두면 양피지 위에서
         // '덜 그려진 칸'처럼 보이므로, 어두운 테두리 + 밝은 채움 2겹으로 판의 두께를 만든다.
         _selNamePlate = ShopUIStyle.MakeImage(s, "NamePlate", new Color(0.26f, 0.06f, 0.05f, 1f));
-        PlaceIn(s, _selNamePlate, 16f, 190f, 222f, 52f);
+        PlaceIn(s, _selNamePlate, 14f, 222f, 214f, 52f);
 
         var plateFill = ShopUIStyle.MakeImage(_selNamePlate.transform, "Fill", new Color(0.48f, 0.11f, 0.10f, 1f));
         ShopUIStyle.Stretch(plateFill.rectTransform, 3f);
@@ -406,22 +470,25 @@ public sealed class UI_ShopPanel : UI_Popup
 
         _selCat = ShopUIStyle.MakeText(s, "Cat", 13f, FontStyles.Bold,
                                        TextAlignmentOptions.Center, CatColor[0]);
-        PlaceIn(s, _selCat, 24f, 250f, 206f, 20f);
+        PlaceIn(s, _selCat, 26f, 305f, 206f, 22f);
 
-        _selEffect = DetailRow(s, "Effect", 274f);
-        _selApply  = DetailRow(s, "Apply",  300f);
-        _selValue  = DetailRow(s, "Value",  334f);
-        _selWorry  = DetailRow(s, "Worry",  360f);
+        // 4줄이 flavor(402)와 buy(424) 위에서 끝나야 한다 — 예전 값(274·300·334·360)은
+        // 마지막 줄(360~386)이 flavor(372~406) 위로 올라타 글자가 겹쳐 찍혔다.
+        _selEffect = DetailRow(s, "Effect", 331f);
+        _selApply  = DetailRow(s, "Apply",  355f);
+        _selValue  = DetailRow(s, "Value",  379f);
+        _selWorry  = DetailRow(s, "Worry",  403f);
 
         _selFlavor = ShopUIStyle.MakeText(s, "Flavor", 12f, FontStyles.Italic,
                                           TextAlignmentOptions.Top, new Color(0.42f, 0.32f, 0.22f, 1f));
-        PlaceIn(s, _selFlavor, 24f, 372f, 206f, 34f);
+        PlaceIn(s, _selFlavor, 22f, 429f, 214f, 22f);
         _selFlavor.textWrappingMode = TextWrappingModes.Normal;
 
         // 구매버튼 아트는 <b>빈 명판</b>이다 — 라벨을 반드시 그려야 글자가 생긴다.
         _buyBtn = MakeButton(s, "Buy", "사겠네", _skin?.buyButton, out _buyLabel);
-        // 양피지의 쓸 수 있는 아래끝은 503이다 — 428+86=514면 버튼이 종이 밖으로 걸친다.
-        PlaceIn(s, _buyBtn, 10f, 412f, 235f, 86f);
+        // 목업의 [사겠네]는 종이 기준 437~497에 보인다. 아트에 투명 여백이 있어 424에 86을 놓으면
+        // 그 자리에 정확히 앉는다(424+86=510, 종이 512 안).
+        PlaceIn(s, _buyBtn, 12f, 451f, 235f, 86f);
         _buyLabel.fontSize = 20f;
         _buyLabel.color    = new Color(0.96f, 0.88f, 0.72f, 1f);
         _buyBtn.onClick.AddListener(OnBuyClicked);
@@ -496,7 +563,7 @@ public sealed class UI_ShopPanel : UI_Popup
                                      TextAlignmentOptions.Top, new Color(0.24f, 0.17f, 0.10f, 1f));
         t.richText = true;
         t.textWrappingMode = TextWrappingModes.Normal;
-        PlaceIn(s, t, 24f, my, 206f, 26f);
+        PlaceIn(s, t, 26f, my, 206f, 24f);
         return t;
     }
 

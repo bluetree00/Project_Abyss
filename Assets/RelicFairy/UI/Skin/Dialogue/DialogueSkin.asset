@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 79cfb46166174f0489458c1bd3f06c7a, type: 3}
   m_Name: DialogueSkin
   m_EditorClassIdentifier:
-  plate: {fileID: 21300000, guid: 8e5a8e877de8aeb47a578d89f62f68c9, type: 3}
+  plate: {fileID: 21300000, guid: 18e793abfa6a26f44a8853478c9f2421, type: 3}
   cornerTopLeft: {fileID: 21300000, guid: 25060842bc3dbb745a4898847fefa964, type: 3}
   cornerTopRight: {fileID: 21300000, guid: be7f0d9179fc74749aa80fdb01b00cc2, type: 3}
   cornerBottomLeft: {fileID: 21300000, guid: fbbeb29c714fec14e80f2f27c0460bde, type: 3}

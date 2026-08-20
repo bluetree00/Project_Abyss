@@ -31,7 +31,7 @@ public sealed class FeverGaugeView : MonoBehaviour
     };
     private static readonly Color EmptyCell = new(0.14f, 0.14f, 0.18f, 1f);
 
-    private Image[] _cells;
+    [SerializeField] private Image[] _cells;
     private TMP_Text _label;
     private TMP_Text _hint;
     private int _shownLevel = -1;

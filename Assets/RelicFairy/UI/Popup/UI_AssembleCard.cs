@@ -21,23 +21,6 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private const float TweenTime   = 0.12f;
     private const float RevealTime  = 0.26f;   // 등장(드래프트/리롤) 연출 길이
 
-    // ── 카드 내부 정규화 배치 ────────────────────────────
-    // 프리팹은 티어 라벨과 리롤 버튼만 고정 px(각 34px)로 authoring돼 있다. 카드가 목업 크기
-    // (238×115)로 줄면 리롤 버튼이 설명 위로, 티어 라벨이 이름 위로 올라탄다(저작 크기 367×164
-    // 에서도 상자 기준으론 이미 겹쳐 있었다 — 글자가 짧아 눈에 안 띄었을 뿐).
-    // 아래 비율은 <b>저작값을 저작 카드 크기로 나눈 것</b>이다. 같은 배치를 카드 크기와 무관하게
-    // 재현하되, 세로 띠를 서로 물리지 않게 잘라 어떤 크기에서도 겹침이 생기지 않는다.
-    private const float PadX     = 0.06f;                  // 이름/설명 저작 좌우 여백
-    private const float HeaderY1 = 1f - 10f / 164f;        // 티어 줄 상단 = 저작 상단 여백 10px
-    private const float HeaderY0 = HeaderY1 - 34f / 164f;  // 티어 줄 높이 = 저작 34px
-    private const float GapY     = 4f / 164f;              // 저작 티어 하단(44) ↔ 리롤 상단(48) 간격
-    private const float BodyY1   = HeaderY0 - GapY;
-    private const float BodyY0   = 0.12f;                  // 저작 설명 하단
-    private const float SubY1    = BodyY0 + (BodyY1 - BodyY0) * 0.4f;   // 저작 이름:설명 = 0.42:0.28
-    private const float RerollX1 = 1f - 18f / 367f;        // 저작 리롤 우측 여백
-    private const float RerollX0 = RerollX1 - 34f / 367f;  // 저작 리롤 폭
-    private const float TierX1   = RerollX0 - 4f / 367f;   // 리롤과 세로 간격만큼 가로로도 띄운다
-
     // ── [SerializeField] ─────────────────────────────────
     [SerializeField] private Button     _selectButton;
     [SerializeField] private Button     _rerollButton;
@@ -57,10 +40,23 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private Sprite _silverFrame, _goldFrame, _rubyFrame;
 
     // 개편본 등급 테두리 — 조각 조립식(위·아래 장식바 2 + 모서리 4).
-    private const float GradeBarW    = 150f;   // 골드.png 186×52 원본 비율
-    private const float GradeBarH    = 42f;
-    private const float GradeCornerW = 34f;    // 골드 테두리.png 53×88
-    private const float GradeCornerH = 56f;
+    // 완성 목업(서약 풀샷.png)에서 카드 몸통 223×106 위에 장식바 113×31, 모서리 34×53으로
+    // 얹혀 있다. <b>고정 px로 두면 안 된다</b> — 판(Book)이 해상도에 따라 줄면 조각만 그대로
+    // 남아 카드를 통째로 덮는다(1920 기준으로도 장식바가 30% 컸다).
+    private const float GradeBarWFrac    = 0.507f;   // 113 / 223
+    private const float GradeBarHFrac    = 0.292f;   //  31 / 106
+    private const float GradeCornerWFrac = 0.152f;   //  34 / 223
+    private const float GradeCornerHFrac = 0.500f;   //  53 / 106
+
+    // 카드 바탕이 선택 여부로 <b>명도가 뒤집힌다</b>(밝은 양피지 ↔ 어두운 판).
+    // 프리팹 authoring 색(흰 이름·옅은 보라 설명)은 어두운 구 카드 기준이라 양피지 위에서 글자가 날아간다.
+    private static readonly Color InkOnParchment    = new(0.16f, 0.11f, 0.06f, 1f);
+    private static readonly Color InkDimOnParchment = new(0.34f, 0.26f, 0.17f, 1f);
+    private static readonly Color InkOnDark         = new(0.96f, 0.92f, 0.82f, 1f);
+    private static readonly Color InkDimOnDark      = new(0.74f, 0.69f, 0.58f, 1f);
+
+    // 프리팹 리롤 버튼은 형광 보라라 양피지 카드 위에서 혼자 튄다. 청동으로 눌러 담는다.
+    private static readonly Color RerollFill = new(0.36f, 0.26f, 0.13f, 0.92f);
     private CovenantSkinSO _gradeSkin;
     private Image[]        _gradePieces;
 
@@ -70,7 +66,6 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     private Color  _gradeColor = Color.white;
     private bool   _selected, _hover, _synergy;
-    private bool   _layoutApplied;
     private CancellationTokenSource _tweenCts;
 
     private bool HasFrameSkin => _silverFrame != null || _goldFrame != null || _rubyFrame != null;
@@ -130,7 +125,22 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
         }
 
         EnsureGradePieces();
+        TintRerollButton();
         ApplyCardBg();
+    }
+
+    /// <summary>리롤 버튼을 양피지 톤에 맞춘다. 개편 스킨이 붙은 카드에서만 돈다.</summary>
+    private void TintRerollButton()
+    {
+        if (_rerollButton == null) return;
+
+        if (_rerollButton.TryGetComponent<Image>(out var img))
+        {
+            img.sprite = null;
+            img.color  = RerollFill;
+        }
+        foreach (var t in _rerollButton.GetComponentsInChildren<TMP_Text>(true))
+            t.color = InkOnDark;
     }
 
     /// <summary>조각 6개를 1회 생성한다. 카드 크기가 변해도 앵커로 따라간다.</summary>
@@ -141,36 +151,42 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
         var root = (RectTransform)transform;
         _gradePieces = new Image[6];
 
-        // 위·아래 가로 장식바 — 카드 중앙 상/하단에 걸친다.
-        _gradePieces[0] = MakePiece(root, "GradeBar_T", new Vector2(0.5f, 1f), new Vector2(GradeBarW, GradeBarH), Vector2.zero, Vector2.one);
-        _gradePieces[1] = MakePiece(root, "GradeBar_B", new Vector2(0.5f, 0f), new Vector2(GradeBarW, GradeBarH), Vector2.zero, new Vector2(1f, -1f));
+        float bw = GradeBarWFrac * 0.5f;
+        float bh = GradeBarHFrac * 0.5f;
+        float cw = GradeCornerWFrac;
+        float ch = GradeCornerHFrac;
+
+        // 위·아래 가로 장식바 — 아트의 가로선이 세로 정중앙이라 <b>모서리 선에 걸터앉혀야</b> 한다.
+        // 안쪽으로 반 칸 밀어 넣으면 다이아 장식이 통째로 카드 안으로 들어와 이름 위를 덮는다.
+        _gradePieces[0] = MakePiece(root, "GradeBar_T", new Vector2(0.5f - bw, 1f - bh), new Vector2(0.5f + bw, 1f + bh), Vector2.one);
+        _gradePieces[1] = MakePiece(root, "GradeBar_B", new Vector2(0.5f - bw,     -bh), new Vector2(0.5f + bw,      bh), new Vector2(1f, -1f));
 
         // 네 귀퉁이 — 좌상단 아트 하나를 축 반전해 나머지 셋으로 쓴다.
-        _gradePieces[2] = MakePiece(root, "GradeCorner_TL", new Vector2(0f, 1f), new Vector2(GradeCornerW, GradeCornerH), Vector2.zero, new Vector2( 1f,  1f));
-        _gradePieces[3] = MakePiece(root, "GradeCorner_TR", new Vector2(1f, 1f), new Vector2(GradeCornerW, GradeCornerH), Vector2.zero, new Vector2(-1f,  1f));
-        _gradePieces[4] = MakePiece(root, "GradeCorner_BL", new Vector2(0f, 0f), new Vector2(GradeCornerW, GradeCornerH), Vector2.zero, new Vector2( 1f, -1f));
-        _gradePieces[5] = MakePiece(root, "GradeCorner_BR", new Vector2(1f, 0f), new Vector2(GradeCornerW, GradeCornerH), Vector2.zero, new Vector2(-1f, -1f));
+        // 세로로 카드 절반씩 차지해 위·아래 조각이 한가운데서 만나 테두리 한 줄이 된다(목업과 동일).
+        _gradePieces[2] = MakePiece(root, "GradeCorner_TL", new Vector2(0f,      1f - ch), new Vector2(cw, 1f), new Vector2( 1f,  1f));
+        _gradePieces[3] = MakePiece(root, "GradeCorner_TR", new Vector2(1f - cw, 1f - ch), new Vector2(1f, 1f), new Vector2(-1f,  1f));
+        _gradePieces[4] = MakePiece(root, "GradeCorner_BL", new Vector2(0f,      0f), new Vector2(cw, ch), new Vector2( 1f, -1f));
+        _gradePieces[5] = MakePiece(root, "GradeCorner_BR", new Vector2(1f - cw, 0f), new Vector2(1f, ch), new Vector2(-1f, -1f));
     }
 
-    private static Image MakePiece(RectTransform parent, string name, Vector2 anchor, Vector2 size, Vector2 offset, Vector2 flip)
+    /// <summary>
+    /// 조각 하나. 크기를 <b>앵커로</b> 잡아 카드가 커지든 줄든 비율이 유지된다
+    /// (sizeDelta 고정이면 판이 줄어드는 초광폭·저해상도에서 조각만 남아 카드를 덮는다).
+    /// 피벗은 한가운데 — localScale 반전이 제자리 거울상이 되어 조각이 카드 밖으로 튀지 않는다.
+    /// </summary>
+    private static Image MakePiece(RectTransform parent, string name, Vector2 aMin, Vector2 aMax, Vector2 flip)
     {
         var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer));
         var rt = (RectTransform)go.transform;
         rt.SetParent(parent, false);
-        rt.anchorMin = rt.anchorMax = anchor;
-
-        // 피벗을 모서리에 두고 localScale로 뒤집으면 <b>피벗을 축으로</b> 반전돼 조각이 카드 밖으로 나간다
-        // (우측 모서리들이 카드 오른쪽에 붕 떠 보이던 원인). 피벗을 한가운데로 두고
-        // 위치를 안쪽으로 반 칸 밀면, 뒤집어도 제자리에서 거울상만 된다.
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = size;
-        rt.anchoredPosition = new Vector2(
-            offset.x + (anchor.x == 0.5f ? 0f : (anchor.x < 0.5f ? size.x * 0.5f : -size.x * 0.5f)),
-            offset.y + (anchor.y == 0.5f ? 0f : (anchor.y < 0.5f ? size.y * 0.5f : -size.y * 0.5f)));
+        rt.anchorMin = aMin;
+        rt.anchorMax = aMax;
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = Vector2.zero;
+        rt.anchoredPosition = Vector2.zero;
         rt.localScale = new Vector3(flip.x, flip.y, 1f);   // 아트 1장을 반전해 재사용
 
-        // 테두리는 장식이다 — 맨 뒤로 보내지 않으면 나중에 붙은 자식이라 이름·설명 위를 덮는다
-        // (위·아래 장식바 42px가 이름 상단 21px, 설명 전체와 겹친다).
+        // 테두리는 장식이다 — 맨 뒤로 보내지 않으면 나중에 붙은 자식이라 이름·설명 위를 덮는다.
         rt.SetAsFirstSibling();
 
         var img = go.AddComponent<Image>();
@@ -207,7 +223,24 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _cardBg.sprite = art;
         _cardBg.type   = Image.Type.Sliced;
         _cardBg.color  = Color.white;
+
+        ApplyInkColors(_selected);
     }
+
+    /// <summary>
+    /// 바탕 명도에 맞춰 글자색을 뒤집는다. 개편 스킨이 붙은 카드에서만 돈다 —
+    /// 아트가 없으면 바탕이 여전히 어두운 구 카드라 authoring 색이 맞다.
+    /// </summary>
+    private void ApplyInkColors(bool darkBg)
+    {
+        if (_nameText) _nameText.color = darkBg ? InkOnDark    : InkOnParchment;
+        if (_subText)  _subText.color  = darkBg ? InkDimOnDark : InkDimOnParchment;
+        if (_tierText) _tierText.color = darkBg ? _gradeColor  : DarkenForParchment(_gradeColor);
+    }
+
+    /// <summary>등급색을 양피지 위에서 읽히게 눌러 담는다(실버가 특히 배경에 날아간다).</summary>
+    private static Color DarkenForParchment(Color c)
+        => new(c.r * 0.40f, c.g * 0.34f, c.b * 0.28f, 1f);
 
     /// <param name="badge">
     /// 축·상태 통화 배지("생존 · 보호막"). 등급 라벨 뒤에 붙는다 —
@@ -216,8 +249,6 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
     /// </param>
     public void Bind(string title, string sub, CovenantTier tier, Color tierColor, string badge = null)
     {
-        ApplyProportionalLayout();
-
         // 이름·설명은 팔레트에서 오는 가변 길이 문자열이라 고정 박스를 넘기기 쉽다.
         // 카드 밖으로 흘러 옆 카드 위에 겹치지 않도록, 여기서 박스 안에 가둔다.
         if (_nameText) { _nameText.text = title; FitInBox(_nameText, wrap: false); }
@@ -289,33 +320,6 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
     public void OnPointerExit(PointerEventData e)  { _hover = false; RefreshVisual(false); }
 
     // ── Private Methods ──────────────────────────────────
-
-    /// <summary>
-    /// 카드 내부(티어 줄 · 리롤 · 이름 · 설명)를 카드 rect 대비 비율로 다시 앉힌다.
-    /// 카드 하나당 1회면 충분해 플래그로 막는다(리롤로 Bind가 다시 와도 좌표는 그대로다).
-    /// </summary>
-    private void ApplyProportionalLayout()
-    {
-        if (_layoutApplied) return;
-        _layoutApplied = true;
-
-        // 티어 라벨의 부모(TierBadge)는 카드를 꽉 채우므로 카드 비율을 그대로 쓸 수 있다.
-        Place(_tierText,     PadX,     HeaderY0, TierX1,      HeaderY1);
-        Place(_rerollButton, RerollX0, HeaderY0, RerollX1,    HeaderY1);
-        Place(_nameText,     PadX,     SubY1,    1f - PadX,   BodyY1);
-        Place(_subText,      PadX,     BodyY0,   1f - PadX,   SubY1);
-    }
-
-    private static void Place(Component c, float x0, float y0, float x1, float y1)
-    {
-        if (c == null) return;
-        var rt = (RectTransform)c.transform;
-        rt.anchorMin = new Vector2(x0, y0);
-        rt.anchorMax = new Vector2(x1, y1);
-        rt.pivot     = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = Vector2.zero;
-        rt.anchoredPosition = Vector2.zero;
-    }
 
     /// <summary>박스 안에 가둔다 — 자동 크기는 authoring 값을 넘지 않고 줄이기만 한다.</summary>
     private static void FitInBox(TMP_Text t, bool wrap)

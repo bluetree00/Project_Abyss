@@ -25,16 +25,6 @@ public class UI_DialoguePopup : UI_Popup
     public static event Action<string> OnLineIllustration;
 
     // ── 스킨 장식 크기 (원본 비율 유지) ──
-    private const float CornerW  = 120f;   // 모서리 장식 251×234 → 0.48배
-    private const float CornerH  = 112f;
-    // 대사 상자 — 아트 비율(677:318)에 다가가면서 가독 행폭을 지키는 크기.
-    private const float BoxWidth  = 1180f;
-    private const float BoxHeight = 340f;
-    private const float BoxBottom =  36f;
-    private const float FlourishW      = 620f;
-    private const float FlourishTopH   = 294f;   // 대화창 상단 1401×665 — 대부분 투명, 장식은 중앙 띠
-    private const float FlourishBottomH = 99f;   // 대화창 하단 879×141
-
     // ─────────────────────────────────────────────────────────
     // SerializeField
     // ─────────────────────────────────────────────────────────
@@ -102,65 +92,15 @@ public class UI_DialoguePopup : UI_Popup
     private void ApplySkin()
     {
         var skin = UISkin.Dialogue;
-        if (skin == null || bodyText == null) return;
+        if (skin?.plate == null || bodyText == null) return;
 
-        // 상자 = 대사 본문의 부모. 이름으로 찾지 않아 프리팹 이름이 바뀌어도 안 깨진다.
-        var box = bodyText.transform.parent as RectTransform;
-        if (box == null) return;
-
-        if (box.TryGetComponent<Image>(out var plate))
+        // 상자 바탕만 갈아끼운다. <b>크기·장식은 프리팹이 정본</b>이다 —
+        // 예전엔 여기서 상자를 1280×304로 다시 잡고 모서리 4·가로 장식 2를 코드로 만들어 붙였다.
+        // 그래서 인스펙터에서 옮겨도 플레이하면 원위치였다. 그 여섯은 이제 TextBox의 실제 자식이다.
+        // 스킨을 갈아끼울 일이 남아 있어 바탕 한 장만 코드에 남긴다(미지정이면 프리팹 그대로).
+        if (bodyText.transform.parent is RectTransform box &&
+            box.TryGetComponent<Image>(out var plate))
             ShopUIStyle.Skin(plate, skin.plate, sliced: true);
-
-        // 상자 비율 보정 — 프리팹은 1383×300(4.6)인데 바탕 아트는 677:318(2.1)이라
-        // 9-slice로도 가운데가 2.2배 늘어나 무늬가 퍼지고, 한 줄이 너무 길어 읽기도 나쁘다.
-        // 폭을 줄이고 높이를 키워 아트 비율에 다가가고 가독 행폭(약 60자)에 맞춘다.
-        box.anchorMin = new Vector2(0.5f, 0f);
-        box.anchorMax = new Vector2(0.5f, 0f);
-        box.pivot     = new Vector2(0.5f, 0f);
-        box.sizeDelta = new Vector2(BoxWidth, BoxHeight);
-        box.anchoredPosition = new Vector2(0f, BoxBottom);
-
-        AddCorner(box, "Corner_TL", skin.cornerTopLeft,     new Vector2(0f, 1f));
-        AddCorner(box, "Corner_TR", skin.cornerTopRight,    new Vector2(1f, 1f));
-        AddCorner(box, "Corner_BL", skin.cornerBottomLeft,  new Vector2(0f, 0f));
-        AddCorner(box, "Corner_BR", skin.cornerBottomRight, new Vector2(1f, 0f));
-
-        AddFlourish(box, "Flourish_Top",    skin.flourishTop,    1f, FlourishTopH);
-        AddFlourish(box, "Flourish_Bottom", skin.flourishBottom, 0f, FlourishBottomH);
-    }
-
-    /// <summary>상자 귀퉁이 장식. 앵커를 그 모서리에 붙여 상자 폭이 변해도 따라간다.</summary>
-    private static void AddCorner(RectTransform box, string name, Sprite art, Vector2 corner)
-    {
-        if (art == null) return;
-
-        var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer));
-        var rt = (RectTransform)go.transform;
-        rt.SetParent(box, false);
-        rt.anchorMin = rt.anchorMax = rt.pivot = corner;
-        rt.sizeDelta = new Vector2(CornerW, CornerH);
-        rt.anchoredPosition = Vector2.zero;
-
-        var img = go.AddComponent<Image>();
-        img.sprite = art;
-        img.raycastTarget = false;   // 장식이 클릭(대사 넘기기)을 먹으면 안 된다
-    }
-
-    /// <summary>위·아래 모서리 중앙 장식. 아트가 대부분 투명이라 통짜로 얹어야 위치가 맞는다.</summary>
-    private static void AddFlourish(RectTransform box, string name, Sprite art, float anchorY, float height)
-    {
-        if (art == null) return;
-
-        var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer));
-        var rt = (RectTransform)go.transform;
-        rt.SetParent(box, false);
-        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, anchorY);
-        rt.sizeDelta = new Vector2(FlourishW, height);
-        rt.anchoredPosition = Vector2.zero;
-
-        var img = go.AddComponent<Image>();
-        img.sprite = art;
-        img.raycastTarget = false;
     }
 
     private void Update()

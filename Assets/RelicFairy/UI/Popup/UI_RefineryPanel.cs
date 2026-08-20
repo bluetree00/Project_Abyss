@@ -31,8 +31,10 @@ public sealed class UI_RefineryPanel : UI_Popup
     private const float RingR     = 152f;   // 육각 링 반지름 — 목업 젬 중심 실측
     private const float AltarCx   = 0f;     // 목업은 링이 창 정중앙에 있다
     private const float AltarCy   = -4f;
-    private const float HexW      = 91f;    // 목업의 젬 실측(약 90×103) — 원본 비율보다 살짝 납작하게 그려져 있다
-    private const float HexH      = 103f;
+    // 목업 아트(빨간룬.png 283×339)를 전체샷에 템플릿 매칭한 실측(상관 0.85) — 96×115.
+    // 예전 값 91×103은 눈으로 잰 것이라 12% 작았고 비율도 0.883으로 원본(0.835)과 달라 납작했다.
+    private const float HexW      = 96f;
+    private const float HexH      = 115f;
     private const float ColX      = 390f;   // 우측 상태 컬럼 중심
 
     /// <summary>모든 요소를 창 중심 기준 오프셋으로 배치한다 — 완성본 좌표를 그대로 옮기기 위해.</summary>
@@ -46,32 +48,32 @@ public sealed class UI_RefineryPanel : UI_Popup
     private bool _busy;
     private bool _built;
 
-    private Transform _root;
-    private Image    _window;    // 창 배경(9-slice 대체 대상) — 정제소 바탕 아트
+    [SerializeField] private Transform _root;
+    [SerializeField] private Image    _window;    // 창 배경(9-slice 대체 대상) — 정제소 바탕 아트
     private readonly List<(string id, Image jewel, Image frame, GameObject go)> _gems = new();
-    private Image    _altarGlow;
-    private Image    _resultBox;
-    private Image    _resultSym;
-    private TMP_Text _resultAmt;
-    private TMP_Text _rarLine;
-    private OddsBarView    _oddsBar;
-    private FeverGaugeView _feverGauge;
-    private TMP_Text _costText;
-    private TMP_Text _oreText;    // 우상단 원석 보유 카운터(완성본)
-    private TMP_Text _hint;
-    private Image    _spinBtnImg;
-    private Image    _costPlateImg;
-    private Image    _altarRing;
-    private GameObject    _freeBtn;      // 첫 돌리기 무료(방 특전) — 아트에 글자가 없어 라벨을 얹는다
-    private TMP_Text      _freeLabel;
-    private GameObject    _eventBanner;
-    private RectTransform _eventBannerRT;
-    private Image         _eventBannerImg;   // MakeFrame의 inner(채움) — 종류별 색/아트 스왑 대상
-    private TMP_Text      _eventText;
-    private TMP_Text      _eventTitle;
-    private GameObject    _reforgeBtn;
-    private TMP_Text      _reservedText;     // 과열·불티가 '다음 회 예약됨'을 알리는 표시
-    private TMP_Text      _eventPointer;     // 제단 → 배너로 시선을 넘기는 화살표(연출 전용, 상시 비표시)
+    [SerializeField] private Image    _altarGlow;
+    [SerializeField] private Image    _resultBox;
+    [SerializeField] private Image    _resultSym;
+    [SerializeField] private TMP_Text _resultAmt;
+    [SerializeField] private TMP_Text _rarLine;
+    [SerializeField] private OddsBarView    _oddsBar;
+    [SerializeField] private FeverGaugeView _feverGauge;
+    [SerializeField] private TMP_Text _costText;
+    [SerializeField] private TMP_Text _oreText;    // 우상단 원석 보유 카운터(완성본)
+    [SerializeField] private TMP_Text _hint;
+    [SerializeField] private Image    _spinBtnImg;
+    [SerializeField] private Image    _costPlateImg;
+    [SerializeField] private Image    _altarRing;
+    [SerializeField] private GameObject    _freeBtn;      // 첫 돌리기 무료(방 특전) — 아트에 글자가 없어 라벨을 얹는다
+    [SerializeField] private TMP_Text      _freeLabel;
+    [SerializeField] private GameObject    _eventBanner;
+    [SerializeField] private RectTransform _eventBannerRT;
+    [SerializeField] private Image         _eventBannerImg;   // MakeFrame의 inner(채움) — 종류별 색/아트 스왑 대상
+    [SerializeField] private TMP_Text      _eventText;
+    [SerializeField] private TMP_Text      _eventTitle;
+    [SerializeField] private GameObject    _reforgeBtn;
+    [SerializeField] private TMP_Text      _reservedText;     // 과열·불티가 '다음 회 예약됨'을 알리는 표시
+    [SerializeField] private TMP_Text      _eventPointer;     // 제단 → 배너로 시선을 넘기는 화살표(연출 전용, 상시 비표시)
 
     // ── Lifecycle ──
 
@@ -116,6 +118,9 @@ public sealed class UI_RefineryPanel : UI_Popup
         if (_built) return;
         _built = true;
 
+        // 프리팹이 구워져 있으면 <b>짓지 않고 잇기만 한다</b> — 다시 지으면 UI가 두 벌 겹친다.
+        if (transform.childCount > 0) { BindBakedHierarchy(); return; }
+
         ShopUIStyle.Stretch(GetComponent<RectTransform>());
 
         var veil = ShopUIStyle.MakeImage(transform, "Veil", ShopUIStyle.Veil, raycast: true);
@@ -154,6 +159,40 @@ public sealed class UI_RefineryPanel : UI_Popup
         ApplySkin();
 
         AddClick(veil.gameObject, () => { if (!_busy) ClosePopupUI(); });
+    }
+
+    /// <summary>
+    /// 구워진 프리팹을 잇는다 — <b>계층·좌표·아트는 프리팹이 갖고, 코드는 배선만 한다.</b>
+    ///
+    /// <para>직렬화되지 않는 둘만 되살린다: 코드가 붙인 클릭 리스너와, 런타임 목록 <see cref="_gems"/>.
+    /// 이름으로 찾는다 — 빌더가 붙이던 이름 그대로 프리팹에 굳어 있다.</para>
+    /// </summary>
+    private void BindBakedHierarchy()
+    {
+        _gems.Clear();
+
+        foreach (string id in ElementDef.Order)
+        {
+            var slot = _root != null ? _root.Find($"Gem_{id}") : null;
+            if (slot == null) continue;
+
+            string cap = id;
+            AddClick(slot.gameObject, () => Select(cap));
+            _gems.Add((id, slot.Find("Jewel")?.GetComponent<Image>(),
+                       slot.GetComponent<Image>(), slot.gameObject));
+        }
+
+        var veil = transform.Find("Veil");
+        if (veil != null) AddClick(veil.gameObject, () => { if (!_busy) ClosePopupUI(); });
+
+        BindClick("SpinBtn",    OnSpinClicked);
+        BindClick("ReforgeBtn", OnReforgeClicked);
+    }
+
+    private void BindClick(string name, Action onClick)
+    {
+        var t = _root != null ? _root.Find(name) : null;
+        if (t != null) AddClick(t.gameObject, onClick);
     }
 
     private void BuildGems()

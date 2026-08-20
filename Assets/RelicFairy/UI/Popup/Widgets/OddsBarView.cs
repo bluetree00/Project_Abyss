@@ -21,9 +21,9 @@ public sealed class OddsBarView : MonoBehaviour
     private static readonly string[] TierName = { "Rare", "Epic", "Legend" };
     private static readonly Color TrackColor = new(0.09f, 0.09f, 0.12f, 1f);
 
-    private RectTransform[] _fillRT;
-    private Image[]   _fillImg;
-    private TMP_Text[] _pct;
+    [SerializeField] private RectTransform[] _fillRT;
+    [SerializeField] private Image[]   _fillImg;
+    [SerializeField] private TMP_Text[] _pct;
     private float _trackW;
 
     public static OddsBarView Create(Transform parent, Vector2 anchorMin, Vector2 anchorMax,

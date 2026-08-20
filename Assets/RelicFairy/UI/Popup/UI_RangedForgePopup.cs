@@ -66,20 +66,20 @@ public class UI_RangedForgePopup : UI_Popup
     }
 
     // ── Private ───────────────────────────────────────────────
-    private RectTransform _stage;        // 무대(레이아웃 자식, 고정) — 슬라이드로 만지지 않는다
-    private RectTransform _slider;       // 무대 안에서 좌우로 밀려 들어오는 카드 컨테이너(레이아웃 무관)
-    private Image         _stageGlow;    // 무대 배경 — 무기 테마색으로 은은하게 물든다
-    private CanvasGroup   _cardGroup;    // 현재 카드 알파/스케일
-    private Image         _icon;
-    private TMP_Text      _name;
-    private TMP_Text      _badge;
-    private TMP_Text      _tag;
-    private TMP_Text      _stats;
-    private Button        _prev, _next;
-    private RectTransform _dots;
-    private Button        _confirm;
-    private Image         _confirmBg;
-    private TMP_Text      _confirmLabel;
+    [SerializeField] private RectTransform _stage;        // 무대(레이아웃 자식, 고정) — 슬라이드로 만지지 않는다
+    [SerializeField] private RectTransform _slider;       // 무대 안에서 좌우로 밀려 들어오는 카드 컨테이너(레이아웃 무관)
+    [SerializeField] private Image         _stageGlow;    // 무대 배경 — 무기 테마색으로 은은하게 물든다
+    [SerializeField] private CanvasGroup   _cardGroup;    // 현재 카드 알파/스케일
+    [SerializeField] private Image         _icon;
+    [SerializeField] private TMP_Text      _name;
+    [SerializeField] private TMP_Text      _badge;
+    [SerializeField] private TMP_Text      _tag;
+    [SerializeField] private TMP_Text      _stats;
+    [SerializeField] private Button        _prev, _next;
+    [SerializeField] private RectTransform _dots;
+    [SerializeField] private Button        _confirm;
+    [SerializeField] private Image         _confirmBg;
+    [SerializeField] private TMP_Text      _confirmLabel;
 
     private WeaponForgeSkinSO _skin;
 
@@ -294,7 +294,14 @@ public class UI_RangedForgePopup : UI_Popup
     // ── 레이아웃 ───────────────────────────────────────────────
     private void BuildLayout()
     {
+        // 프리팹이 구워져 있으면 <b>짓지 않고 잇기만 한다</b> — 다시 지으면 UI가 두 벌 겹친다.
+        if (transform.childCount > 0) { BindBakedHierarchy(); return; }
+
         var root = (RectTransform)transform;
+
+        // 프리팹 루트는 화면 한가운데 100×100이다 — 다른 팝업들이 첫 줄에서 루트부터 펴는 이유가 이것이다.
+        // 안 펴면 아래 암막이 그 100×100만 덮어 뒤의 월드·HUD가 그대로 살아 있다.
+        Stretch(root);
 
         var dim = NewImage("Dim", root, new Color(0f, 0f, 0f, 0.65f));
         Stretch(dim.rectTransform);
@@ -388,6 +395,56 @@ public class UI_RangedForgePopup : UI_Popup
         BuildCardBody(_slider);
 
         _next = BuildArrow(row, "▶", +1, _skin?.arrowRight);
+    }
+
+    /// <summary>
+    /// 구워진 프리팹을 잇는다 — 계층·좌표·아트는 프리팹이 갖고, 코드는 배선만 한다.
+    ///
+    /// <para>화살표 두 개는 <b>형제 이름이 같다</b>(둘 다 "Arrow"). 순서로 가른다 —
+    /// 빌더가 왼쪽(-1)을 먼저 만들므로 프리팹에서도 그 순서로 굳어 있다.</para>
+    /// </summary>
+    private void BindBakedHierarchy()
+    {
+        _skin = UISkin.WeaponForge;
+
+        _arrowGlyphs.Clear();
+        _arrowArts.Clear();
+
+        var row = _stage != null ? _stage.parent : null;
+        int dir = -1;
+        if (row != null)
+        {
+            foreach (Transform child in row)
+            {
+                if (child.name != "Arrow") continue;
+                if (!child.TryGetComponent<Button>(out var arrow)) continue;
+
+                int captured = dir;
+                arrow.onClick.RemoveAllListeners();
+                arrow.onClick.AddListener(() => Step(captured));
+
+                var glyph = child.Find("G")?.GetComponent<TMP_Text>();
+                if (glyph != null) _arrowGlyphs[arrow] = glyph;
+                var art = child.Find("Art")?.GetComponent<Image>();
+                if (art != null) _arrowArts[arrow] = art;
+
+                if (captured < 0) _prev = arrow; else _next = arrow;
+                dir = 1;
+            }
+        }
+
+        if (_confirm != null)
+        {
+            _confirm.onClick.RemoveAllListeners();
+            _confirm.onClick.AddListener(Confirm);
+        }
+
+        var cancel = transform.Find("Panel/Buttons/Btn_Cancel")?.GetComponent<Button>();
+        if (cancel != null)
+        {
+            cancel.onClick.RemoveAllListeners();
+            cancel.onClick.AddListener(Cancel);
+        }
     }
 
     /// <summary>
