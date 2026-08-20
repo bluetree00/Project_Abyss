@@ -147,3 +147,9 @@ crashlytics-build.properties
 
 # 외부 에셋 원본 보관소 (로컬 유지, git 추적 제외) — 사용분은 RelicFairy/_Imported로 이동됨
 Assets/_ThirdParty/
+
+# UI 프리팹 베이크 백업 (로컬 유지, git 추적 제외)
+# UIPrefabBaker가 덮어쓰기 전 타임스탬프 사본을 쌓는 생성물이라 베이크할 때마다 늘어난다.
+# 소스가 아니므로 공유 브랜치에 올리지 않는다 — 되돌리기는 git 히스토리로 한다.
+Assets/RelicFairy/UI/_PrefabBackup/
+Assets/RelicFairy/UI/_PrefabBackup.meta
