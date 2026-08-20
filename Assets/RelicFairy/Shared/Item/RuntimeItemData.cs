@@ -39,29 +39,33 @@ public class RuntimeItemData
     /// <summary>
     /// 속성을 확정한다. 이미 있으면 유지(데이터가 지정했거나 세이브 복원).
     ///
-    /// <para><b>아래 등급은 범용, 윗 등급은 전용.</b>
-    /// Common·Rare는 순수 스탯이라 속성 정체성이 없다 → <b>빈 값으로 둔다.</b>
-    /// <see cref="RuneZoneRule"/>이 빈 속성을 "어디든 놓인다"로 처리하므로, 그게 곧 범용 조각이다.
-    /// Epic·Legendary는 효과 자체가 속성이므로 데이터(<c>ITEM_DATA.element</c>)가 지정한다 —
-    /// 안 지정하면 「마그마 분출」이 얼음 존에만 놓이는 모순이 생긴다.</para>
+    /// <para><b>모든 등급이 속성을 갖는다.</b> Common·Rare는 데이터에 속성이 없으므로
+    /// 드랍 시점에 6속성 중 <b>무작위</b>로 배정한다 — 같은 「힘의 룬」이라도 이번 판에서는
+    /// 불, 다음 판에서는 얼음으로 나온다. 이게 판마다 배치가 달라지는 이유가 된다.</para>
     ///
-    /// <para>예전엔 등급과 무관하게 6속성을 무작위로 박았는데, 그러면 범용 조각이 사라지고
-    /// 상위 룬의 정체성도 데이터와 어긋난다.</para>
+    /// <para>Epic·Legendary는 효과 자체가 속성이라 데이터(<c>ITEM_DATA.element</c>)가 고정한다 —
+    /// 「마그마 분출」이 얼음 존에 놓이면 모순이다. 그래서 이쪽만 미지정을 경고로 드러낸다.</para>
+    ///
+    /// <para>한때 Common·Rare를 빈 값(=범용, 어디든 배치)으로 뒀는데, 그러면 120종 중 84종이
+    /// <see cref="RuneZoneRule"/>의 제약을 받지 않아 속성 존이 색깔만 다른 칸이 됐고,
+    /// 속성 블록 타일도 상위 36종에서만 보였다.</para>
+    ///
+    /// <para>배정은 <b>인스턴스 단위</b>다. 직렬화되므로 세이브 복원 시 그대로 유지된다.</para>
     /// </summary>
     public void EnsureElement()
     {
         if (!string.IsNullOrEmpty(element)) return;
-        if (rarity != ItemRarity.Epic && rarity != ItemRarity.Legendary) return;   // 범용 — 빈 값 유지
 
-        // 상위 등급인데 데이터에 속성이 없다 = 데이터 결함. 놓을 곳이 없어지는 것보다는
-        // 무작위라도 배정해 살려두고, 경고로 드러낸다.
         var order = ElementDef.Order;
         element = order != null && order.Count > 0
             ? order[UnityEngine.Random.Range(0, order.Count)]
             : ElementDef.CenterId;
 
-        UnityEngine.Debug.LogWarning(
-            $"[RuntimeItemData] '{itemId}'({rarity}) 속성 미지정 — ITEM_DATA.element를 채워야 한다. 임시 배정: {element}");
+        // 상위 등급은 데이터가 속성을 고정해야 한다 — 비어 있으면 데이터 결함이므로 드러낸다.
+        // 하위 등급의 무작위 배정은 정상 동작이라 조용히 지나간다.
+        if (rarity == ItemRarity.Epic || rarity == ItemRarity.Legendary)
+            UnityEngine.Debug.LogWarning(
+                $"[RuntimeItemData] '{itemId}'({rarity}) 속성 미지정 — ITEM_DATA.element를 채워야 한다. 임시 배정: {element}");
     }
 
     // ── 세이브 복원 ──
