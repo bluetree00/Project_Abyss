@@ -125,9 +125,14 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         return useLeft ? _owner.handTransformLeft : _owner.handTransform;
     }
 
-    // 활/석궁은 전용 왼손 소켓이 없어 모델이 마운트에 거꾸로 붙는다(발사 방향은 정상). 장착 시 Y 180° 보정.
-    // 게임에서 보며 이 값만 조정. 0이면 보정 없음.
-    private const float RangedMountYawCorrection = 180f;
+    // 활/석궁 장착 방향 보정(도, Y축). <b>0 = 보정 없음이 정상</b>이다.
+    //
+    // 예전엔 왼손 전용 소켓이 없어 활이 손 본(hand_l)에 직접 붙었고, 본 축과 모델 축이 어긋나
+    // 거꾸로/틀어져 보였다. 그걸 여기서 Y 180°로 눌러 놨는데, yaw 하나로는 pitch·roll을 못 잡는다.
+    //
+    // 이제 프리팹에 <b>WeaponMountLeft</b> 소켓(hand_l 자식)이 있고 방향은 그 소켓이 소유한다.
+    // 각도가 어긋나면 <b>코드가 아니라 프리팹의 소켓을 회전</b>시킬 것 — 조정점이 둘이면 서로를 상쇄한다.
+    private const float RangedMountYawCorrection = 0f;
 
     /// <summary>활/석궁 인스턴스의 장착 방향을 보정한다. 생성 직후 1회만 호출(재장착/전환 시 중복 360° 방지).</summary>
     private static void ApplyMountOrientation(GameObject instance, WeaponData data)

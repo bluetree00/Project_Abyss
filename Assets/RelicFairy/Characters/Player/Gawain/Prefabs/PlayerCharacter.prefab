@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1280743698974340677
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 487665933803685195}
+  m_Layer: 0
+  m_Name: WeaponMountLeft
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &487665933803685195
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1280743698974340677}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.000000007590404, y: 0.9848078, z: -0.1736482, w: -0.000000043047315}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4130405021627115033}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2241106678724358236
 GameObject:
   m_ObjectHideFlags: 0
@@ -223,6 +254,8 @@ MonoBehaviour:
   maxPelvisDrop: 0.35
   maxFootReach: 0.5
   footPlantRange: 0.12
+  footSwingSpeed: 1.2
+  positionLerpSpeed: 15
   weightLerpSpeed: 14
   pelvisLerpSpeed: 12
 --- !u!1001 &1697851272020990271
@@ -360,6 +393,10 @@ PrefabInstance:
     - {fileID: 8453127767987955806, guid: b5f2179a52b86c14589ef598cfa7ffa5, type: 3}
     - {fileID: -2391214066831052713, guid: b5f2179a52b86c14589ef598cfa7ffa5, type: 3}
     m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: -5846270692196909274, guid: b5f2179a52b86c14589ef598cfa7ffa5,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 487665933803685195}
     - targetCorrespondingSourceObject: {fileID: -2349476437193732044, guid: b5f2179a52b86c14589ef598cfa7ffa5,
         type: 3}
       insertIndex: -1
@@ -400,6 +437,12 @@ MonoBehaviour:
   gravity: 0.3
   maxBendAngle: 60
   maxDeltaTime: 0.03
+--- !u!4 &4130405021627115033 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -5846270692196909274, guid: b5f2179a52b86c14589ef598cfa7ffa5,
+    type: 3}
+  m_PrefabInstance: {fileID: 1697851272020990271}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &5254294612690553099 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -2349476437193732044, guid: b5f2179a52b86c14589ef598cfa7ffa5,
