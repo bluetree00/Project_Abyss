@@ -396,7 +396,7 @@ public sealed class GameRunSession
             {
                 var pw = JsonUtility.FromJson<RangedPartListWrapper>(save.rangedPartsJson);
                 if (pw?.items != null)
-                    RangedPartsState.Current.Restore(pw.items, save.rangedInvested, save.rangedGrantedTier);
+                    RangedPartsState.Current.Restore(pw.items);
             }
 
             // 계약 복원 — 이어하기는 같은 계약을 이어간다. 세이브에 없으면(구 세이브) 새로 뽑는다.

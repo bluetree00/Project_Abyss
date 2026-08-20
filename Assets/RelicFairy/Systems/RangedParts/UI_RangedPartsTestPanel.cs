@@ -116,8 +116,7 @@ public sealed class UI_RangedPartsTestPanel : MonoBehaviour
     {
         var st = RangedPartsState.Current;
         if (st.LevelOf(partId) > 0) st.Unequip(partId);
-        else if (!st.Equip(partId))
-            Debug.Log($"[파츠테스트] 슬롯이 가득 찼습니다 (상한 {RangedPartsState.MaxSlots}칸) — 하나 해제 후 장착하세요");
+        else st.Equip(partId);
         Refresh();
     }
 
@@ -152,16 +151,11 @@ public sealed class UI_RangedPartsTestPanel : MonoBehaviour
         var st   = RangedPartsState.Current;
         var data = Managers.WeaponParts;
 
-        // 테스트 편의: 투자액을 최상위 임계 이상으로 올려 슬롯을 전부 열어둔다.
-        // (실제 런에서는 재련소에서 원거리 무기에 재료를 부어야 열린다.)
-        if (st.UnlockedSlots < RangedPartsState.MaxSlots)
-            st.AddInvestment(RangedPartsState.ThresholdAt(RangedPartsState.MaxSlots - 1) - st.Invested);
-
         // 던전 진입 시 파츠 상태가 새로 만들어지므로, 지금 구성을 이월 대상으로 등록해 둔다.
-        RangedPartsState.SetTestCarry(st.Equipped_, st.Invested);
+        RangedPartsState.SetTestCarry(st.Equipped_);
 
         if (_slotInfo != null)
-            _slotInfo.text = $"슬롯 {st.Equipped_.Count} / {st.UnlockedSlots}   ·   투자 {st.Invested}   ·   "
+            _slotInfo.text = $"켠 파츠 {st.ActiveCount}   ·   투입 {st.TotalSpent}   ·   "
                            + (RangedPartsState.HasTestCarry
                               ? "<color=#7FE3FF>던전 진입 시 이월됨</color>"
                               : "<color=#9AA3B5>이월 없음</color>");

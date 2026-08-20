@@ -2,21 +2,21 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 원거리 슬롯에 장착된 파츠의 <b>런타임 상태</b>. 런 스코프이며 세이브 대상이다.
+/// 원거리 파츠의 <b>런타임 상태</b>. 런 스코프이며 세이브 대상이다.
 ///
-/// 정적 정의(<see cref="WeaponPartEntry"/>)와 분리한 이유 — 파츠는 런 중에 장착·강화되므로
+/// 정적 정의(<see cref="WeaponPartEntry"/>)와 분리한 이유 — 파츠는 런 중에 강화되므로
 /// ScriptableObject/CSV 같은 정적 자산에 상태를 담을 수 없다.
 ///
-/// 슬롯 해금은 <b>원거리 무기에 누적 투자한 강화재료</b>에 종속된다(기획 확정 2026-08-13).
+/// <b>내장형</b>(기획 확정 2026-08-20) — 파츠는 슬롯에 꽂는 물건이 아니라 무기에 내장된 계통이다.
+/// 5종이 항상 존재하고 레벨만 다르다. Lv0 = 꺼짐, Lv1 이상 = 켜짐.
 ///
-/// 강화 <i>레벨</i>이 아니라 <i>투자액</i>을 쓰는 이유:
-///  · 레벨 축은 간격을 벌릴 수 없다 — 기대 비용이 +4=10, +6=49, +7=145, +9=2358로 폭발해
-///    "+3마다 한 칸" 같은 설계가 성립하지 않는다. 1레벨 간격으로 욱여넣으면
-///    "강화 한 번 = 파츠 하나"로 읽혀 마일스톤이 마일스톤답지 않다.
-///  · 투자액 축은 임계를 자유롭게 벌릴 수 있고, 그 사이에 강화 시도가 여러 번 들어간다.
-///  · <b>실패해도 진척이 쌓인다</b>. 강화 실패는 재료와 레벨을 함께 앗아가지만, 파츠 게이지는
-///    올라간다 — 도박 구간의 좌절을 완충한다.
-///  · 레벨 하락으로 슬롯이 닫혀 장착 파츠가 소실되던 문제가 구조적으로 사라진다(투자는 되돌아가지 않는다).
+/// 이전의 슬롯 지급형(누적 투자 12/30/55/90으로 4칸을 여는 방식)은 폐기했다:
+///  · 슬롯을 다 열면 런 수입 106 중 90이 통행세로 나가 <b>꽂은 파츠를 키울 재료가 안 남았다</b>.
+///  · 슬롯 4칸에 파츠 5종이라 "하나만 버리기"였고, 그건 선택이 아니었다.
+///  · 파츠는 런 스코프인데 통행세만 매 런 반복돼 성장이 아니라 절차가 됐다.
+///
+/// 선택은 "무엇을 고를까"가 아니라 <b>"재료를 어디에 몰아줄까"</b>다.
+/// 그래서 이 클래스에는 게이트가 없다 — 있는 건 파츠별 레벨뿐이다.
 /// </summary>
 public sealed class RangedPartsState
 {
@@ -27,19 +27,6 @@ public sealed class RangedPartsState
         public string partId;
         public int    level;
     }
-
-    /// <summary>
-    /// 슬롯이 열리는 누적 투자액(강화재료). 런 총 수입 ~106 기준 11% / 28% / 52% / 85%.
-    /// 초기 세팅은 가볍게 — 조일 때는 이 배열만 올리면 된다.
-    /// </summary>
-    private static readonly int[] TierThresholds = { 12, 30, 55, 90 };
-
-    /// <summary>슬롯 상한 — UI·밸런스 한계. 임계 개수와 같아야 한다.</summary>
-    public  const int MaxSlots        = 4;
-
-    /// <summary>i번째 슬롯이 열리는 누적 투자액. 범위 밖이면 0(UI 표기용).</summary>
-    public static int ThresholdAt(int slotIndex)
-        => slotIndex >= 0 && slotIndex < TierThresholds.Length ? TierThresholds[slotIndex] : 0;
 
     private static RangedPartsState _current;
 
@@ -59,14 +46,10 @@ public sealed class RangedPartsState
     // 던전에 들어가는 순간 사라진다. 그러면 "장착은 되는데 쏴볼 수가 없는" 도구가 된다.
     // 테스트 제단을 쓴 경우에만 채워지고, 안 썼으면 완전히 무해하다.
     private static List<Equipped> _testCarry;
-    private static int _testCarryInvested;
 
     /// <summary>테스트 제단이 현재 구성을 이월 대상으로 등록한다.</summary>
-    public static void SetTestCarry(IReadOnlyList<Equipped> equipped, int invested)
-    {
-        _testCarry = equipped != null && equipped.Count > 0 ? new List<Equipped>(equipped) : null;
-        _testCarryInvested = invested;
-    }
+    public static void SetTestCarry(IReadOnlyList<Equipped> equipped)
+        => _testCarry = equipped != null && equipped.Count > 0 ? new List<Equipped>(equipped) : null;
 
     /// <summary>이월 해제 — 테스트를 끝낸 뒤 정상 런으로 돌아갈 때.</summary>
     public static void ClearTestCarry() => _testCarry = null;
@@ -75,92 +58,50 @@ public sealed class RangedPartsState
     public static void ApplyTestCarry()
     {
         if (_testCarry == null || _testCarry.Count == 0) return;
-        Current.Restore(_testCarry, _testCarryInvested, _testCarry.Count);
+        Current.Restore(_testCarry);
         Debug.Log($"[파츠테스트] 테스트 구성 {_testCarry.Count}개를 새 런에 이월했습니다");
     }
 
     public static bool HasTestCarry => _testCarry != null && _testCarry.Count > 0;
 
+    /// <summary>켜진 파츠만 담는다(Lv1 이상). 꺼진 파츠는 여기 없고, 목록 표시는 정적 정의가 담당한다.</summary>
     private readonly List<Equipped> _equipped = new();
-    private int _invested;
-    private int _grantedTier;
 
     public IReadOnlyList<Equipped> Equipped_ => _equipped;
     public bool HasAny => _equipped.Count > 0;
 
-    /// <summary>원거리 무기 강화에 지금까지 부은 강화재료 총량(실패분 포함).</summary>
-    public int Invested => _invested;
+    /// <summary>켠 파츠 수.</summary>
+    public int ActiveCount => _equipped.Count;
 
-    /// <summary>파츠를 이미 지급받은 티어 수. 미수령 티어를 세는 기준.</summary>
-    public int GrantedTier => _grantedTier;
-
-    /// <summary>투자액으로 도달한 티어 수 = 해금 슬롯 수. 0이면 파츠를 하나도 쓸 수 없다.</summary>
-    public int UnlockedSlots
+    /// <summary>
+    /// 지금까지 파츠에 부은 강화재료 총량. 레벨에서 역산하므로 따로 들고 다니지 않는다
+    /// (별도 필드로 두면 세이브·복원에서 레벨과 어긋날 수 있다).
+    /// </summary>
+    public int TotalSpent
     {
         get
         {
-            int n = 0;
-            for (int i = 0; i < TierThresholds.Length; i++)
-                if (_invested >= TierThresholds[i]) n++;
-            return Mathf.Min(n, MaxSlots);
-        }
-    }
+            var data = Managers.WeaponParts;
+            if (data == null) return 0;
 
-    /// <summary>아직 파츠를 고르지 않은 티어 수. 0보다 크면 재련소가 선택을 제시한다.</summary>
-    public int PendingGrants => Mathf.Max(0, UnlockedSlots - _grantedTier);
-
-    /// <summary>다음 티어 임계액. 이미 전부 열었으면 0.</summary>
-    public int NextThreshold
-    {
-        get
-        {
-            int n = UnlockedSlots;
-            return n < TierThresholds.Length ? TierThresholds[n] : 0;
-        }
-    }
-
-    /// <summary>현재 티어 구간의 시작액 — 진척 게이지의 0점.</summary>
-    public int CurrentTierFloor
-    {
-        get
-        {
-            int n = UnlockedSlots;
-            return n <= 0 ? 0 : TierThresholds[n - 1];
-        }
-    }
-
-    /// <summary>다음 티어까지의 진척(0~1). 전부 열었으면 1.</summary>
-    public float ProgressToNext
-    {
-        get
-        {
-            int next = NextThreshold;
-            if (next <= 0) return 1f;
-            int floor = CurrentTierFloor;
-            return Mathf.Clamp01((float)(_invested - floor) / Mathf.Max(1, next - floor));
+            int sum = 0;
+            for (int i = 0; i < _equipped.Count; i++)
+            {
+                var def = data.GetById(_equipped[i].partId);
+                if (def == null) continue;
+                // Lv N = CostAt(0) + CostAt(1) + ... + CostAt(N-1) 을 이미 지불한 상태.
+                for (int lv = 0; lv < _equipped[i].level; lv++) sum += def.CostAt(lv);
+            }
+            return sum;
         }
     }
 
     // ── 상태 변경 ───────────────────────────────────────────
 
-    /// <summary>
-    /// 원거리 무기 강화에 재료를 썼음을 기록한다. <b>실패해도 부른다</b> —
-    /// 투자는 결과와 무관하게 쌓이는 게 이 축의 요점이다. 재련소가 강화 확정 직후 호출.
-    /// </summary>
-    public void AddInvestment(int material)
-    {
-        if (material <= 0) return;
-        _invested += material;
-    }
-
-    /// <summary>티어 파츠 지급을 확정한다(선택 완료). 중복 지급 방지용 이력.</summary>
-    public void ConsumeGrant() => _grantedTier = Mathf.Min(_grantedTier + 1, MaxSlots);
-
-    /// <summary>파츠 장착. 슬롯이 남아 있고 같은 파츠를 중복 장착하지 않을 때만 성공.</summary>
+    /// <summary>파츠를 켠다(Lv0 → Lv1). 이미 켜져 있으면 아무것도 하지 않는다.</summary>
     public bool Equip(string partId, int level = 1)
     {
         if (string.IsNullOrEmpty(partId)) return false;
-        if (_equipped.Count >= UnlockedSlots) return false;
         if (IndexOf(partId) >= 0) return false;
 
         _equipped.Add(new Equipped { partId = partId, level = Mathf.Max(1, level) });
@@ -175,11 +116,15 @@ public sealed class RangedPartsState
         return true;
     }
 
-    /// <summary>파츠 레벨 상승(재련소 강화 성공). 상한은 정의의 max_level.</summary>
+    /// <summary>
+    /// 파츠 레벨 상승. <b>꺼진 파츠(Lv0)면 켜는 것부터</b> 처리한다 —
+    /// 내장형에는 "장착"이라는 별도 단계가 없어, 첫 강화가 곧 활성화다.
+    /// 상한은 정의의 max_level.
+    /// </summary>
     public bool LevelUp(string partId, int delta = 1)
     {
         int i = IndexOf(partId);
-        if (i < 0) return false;
+        if (i < 0) return Equip(partId, delta);
 
         var def = Managers.WeaponParts?.GetById(partId);
         int max = def != null && def.max_level > 0 ? def.max_level : int.MaxValue;
@@ -197,16 +142,13 @@ public sealed class RangedPartsState
     }
 
     /// <summary>이어하기 복원.</summary>
-    public void Restore(IEnumerable<Equipped> equipped, int invested, int grantedTier)
+    public void Restore(IEnumerable<Equipped> equipped)
     {
         _equipped.Clear();
-        if (equipped != null)
-            foreach (var e in equipped)
-                if (!string.IsNullOrEmpty(e.partId)) _equipped.Add(e);
+        if (equipped == null) return;
 
-        _invested    = Mathf.Max(0, invested);
-        // 지급 이력은 최소한 장착 수만큼은 되어야 한다 — 안 그러면 복원 후 이미 받은 티어를 또 준다.
-        _grantedTier = Mathf.Clamp(Mathf.Max(grantedTier, _equipped.Count), 0, MaxSlots);
+        foreach (var e in equipped)
+            if (!string.IsNullOrEmpty(e.partId) && e.level > 0) _equipped.Add(e);
     }
 
     // ── 발사 요청에 반영 ────────────────────────────────────

@@ -263,8 +263,6 @@ public class RunProgressManager : MonoBehaviour
             var partWrapper = new RangedPartListWrapper();
             partWrapper.items.AddRange(parts.Equipped_);
             d.rangedPartsJson            = JsonUtility.ToJson(partWrapper);
-            d.rangedInvested             = parts.Invested;
-            d.rangedGrantedTier          = parts.GrantedTier;
         }
 
         // 계약 — id만 저장한다. 진척은 세션 카운터(처치·방·강화)가 정본이라 따로 적으면 어긋난다.

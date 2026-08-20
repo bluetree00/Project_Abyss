@@ -223,10 +223,6 @@ public class CrucibleRoomController : MonoBehaviour
         // 롤 소비 기록 — 거부(재료부족/최대치)는 롤을 굴리지 않으므로 세지 않는다.
         if (!result.IsReject) BumpRoll(1);
 
-        // 원거리 슬롯에 부은 재료는 파츠 티어의 진척이 된다. 성공·실패를 가리지 않는 게 요점 —
-        // 강화 실패는 재료와 레벨을 함께 앗아가지만, 그 손실이 파츠 게이지로는 남는다.
-        if (targetSlot == PlayerWeaponManager.Slot1 && result.spent > 0)
-            RangedPartsState.Current?.AddInvestment(result.spent);
 
         if (result.outcome == EnhanceOutcome.Success)
         {
@@ -272,8 +268,8 @@ public class CrucibleRoomController : MonoBehaviour
         if (state == null || fuel == null || def == null)
             return EnhanceResult.Reject(EnhanceOutcome.RejectInvalid);
 
+        // 내장형 — Lv0(꺼짐)은 거부가 아니라 '켜기'다. 장착이라는 별도 단계가 없다.
         int level = state.LevelOf(partId);
-        if (level <= 0) return EnhanceResult.Reject(EnhanceOutcome.RejectInvalid);   // 미장착
         if (def.max_level > 0 && level >= def.max_level)
             return EnhanceResult.Reject(EnhanceOutcome.RejectMaxed);
 

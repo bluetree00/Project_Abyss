@@ -70,9 +70,9 @@ public sealed class UI_CruciblePanel : UI_Popup
     private int _targetSlot = PlayerWeaponManager.Slot0;
 
     // 헤더
-    private TMP_Text _fuelText;
-    private TMP_Text _oreText;
-    private TMP_Text _dialogText;
+    [SerializeField] private TMP_Text _fuelText;
+    [SerializeField] private TMP_Text _oreText;
+    [SerializeField] private TMP_Text _dialogText;
 
     // 슬롯 카드(2)
     private readonly Image[]         _cardBg        = new Image[2];
@@ -83,68 +83,71 @@ public sealed class UI_CruciblePanel : UI_Popup
     private readonly Vector2[]       _cardBasePos   = new Vector2[2]; // 카드 기준 앵커 위치(쉐이크 복원용)
 
     // 원거리 파츠 — 완성본 원거리 탭은 4슬롯(활·분열·관통·빈). 슬롯 UI는 레이아웃, 로직은 Phase 3.
-    private readonly Image[]    _partsSlots = new Image[4];
-    private readonly TMP_Text[] _partsMark  = new TMP_Text[4];
+    // 파츠 5종 = 5행. 내장형이라 '슬롯'이 아니라 파츠 정의 목록의 인덱스가 곧 행 번호다.
+    private const int PartRows = 5;
+    private readonly Image[]    _partsSlots = new Image[PartRows];
+    private readonly TMP_Text[] _partsMark  = new TMP_Text[PartRows];
 
     // 전체화면 탭형 재설계 — 스킨/탭/스테이지 컨테이너
     private CrucibleSkinSO _skin;
-    private RectTransform  _meleeStage, _rangedStage;
-    private TMP_Text       _stageResult;      // 스테이지 중앙 결과 팝업(두 탭 공용)
+    [SerializeField] private RectTransform  _meleeStage, _rangedStage;
+    [SerializeField] private TMP_Text       _stageResult;      // 스테이지 중앙 결과 팝업(두 탭 공용)
     private int            _stageResultSeq;   // 연타 시 이전 페이드가 새 결과를 지우지 않게 하는 세대 번호
-    private Image          _tabWeaponImg, _tabRangedImg;
+    [SerializeField] private Image          _tabWeaponImg, _tabRangedImg;
     private int            _activeTab;   // 0=무기강화 1=원거리 파츠
 
     // 근접 집중 카드 — 안전/도박 구간 배지 + 진화 마일스톤(실데이터: DropAt/레벨/승급)
-    private Image    _zoneBg;
-    private TMP_Text _zoneTag;
-    private TMP_Text _milestoneLabel;
+    [SerializeField] private Image    _zoneBg;
+    [SerializeField] private TMP_Text _zoneTag;
+    [SerializeField] private TMP_Text _milestoneLabel;
 
     // 이벤트 배너(HasEvent — Discount/Fever) + 진화 선택 패널(선택 연출)
-    private GameObject _eventBanner;
-    private TMP_Text   _eventBannerText;
-    private GameObject _evolvePanel;
-    private Button     _evolveBtn;
-    private TMP_Text   _branchAName, _branchBName;
-    private Button     _branchABtn,  _branchBBtn;
+    [SerializeField] private GameObject _eventBanner;
+    [SerializeField] private TMP_Text   _eventBannerText;
+    [SerializeField] private GameObject _evolvePanel;
+    [SerializeField] private Button     _evolveBtn;
+    [SerializeField] private TMP_Text   _branchAName, _branchBName;
+    [SerializeField] private Button     _branchABtn,  _branchBBtn;
 
     // 디테일 콘텐츠 — 무기 타입·티어 라인 + "다음 강화 상세"(성공/실패/잭팟) + 정보 잭팟·이벤트효과
-    private TMP_Text _focusTypeText;
-    private TMP_Text _detailSuccess, _detailFail, _detailJackpot;
-    private TMP_Text _dockTypeText;
-    private TMP_Text _eventEffectText;
+    [SerializeField] private TMP_Text _focusTypeText;
+    [SerializeField] private TMP_Text _detailSuccess, _detailFail, _detailJackpot;
+    [SerializeField] private TMP_Text _dockTypeText;
+    [SerializeField] private TMP_Text _eventEffectText;
 
     // 정보
-    private TMP_Text _successText;
-    private TMP_Text _costText;
-    private TMP_Text _streakText;
-    private TMP_Text _resultText;
+    [SerializeField] private TMP_Text _successText;
+    [SerializeField] private TMP_Text _costText;
+    [SerializeField] private TMP_Text _streakText;
+    [SerializeField] private TMP_Text _resultText;
 
-    private Button   _enhanceBtn;
-    private TMP_Text _enhanceLabel;
-    private TMP_Text _jackpotHint;
+    [SerializeField] private Button   _enhanceBtn;
+    [SerializeField] private TMP_Text _enhanceLabel;
+    [SerializeField] private TMP_Text _jackpotHint;
 
     // 원거리 무기(슬롯1) 강화 행 — 파츠 슬롯을 여는 유일한 투자 경로.
-    private Button   _rangedWeaponBtn;
-    private TMP_Text _rangedWeaponLabel;
-    private TMP_Text _rangedWeaponInfo;
 
     // ── 원거리 탭(2차 레이아웃) ──
-    private TMP_Text _slotSummary;
-    private TMP_Text _partKindText;
-    private TMP_Text _partGrowthText;
-    private TMP_Text _partDescText;
-    private TMP_Text _partSynergyText;
-    private TMP_Text _partCostText;
-    private Button   _partEnhanceBtn;
-    private TMP_Text _partEnhanceLabel;
+    [SerializeField] private TMP_Text _slotSummary;
+    [SerializeField] private TMP_Text _partKindText;
+    [SerializeField] private TMP_Text _partGrowthText;
+    [SerializeField] private TMP_Text _partDescText;
+    [SerializeField] private TMP_Text _partSynergyText;
+    [SerializeField] private TMP_Text _partCostText;
+    [SerializeField] private Button   _partEnhanceBtn;
+    [SerializeField] private TMP_Text _partEnhanceLabel;
 
     // 슬롯 카드 내부 — 클릭 없이 조합을 읽으려면 카드가 스스로 내용을 말해야 한다.
-    private readonly TMP_Text[] _slotKind = new TMP_Text[4];
-    private readonly TMP_Text[] _slotVal  = new TMP_Text[4];
-    private readonly TMP_Text[] _slotName = new TMP_Text[4];
-    private readonly TMP_Text[] _slotLv   = new TMP_Text[4];
-    private readonly RectTransform[] _slotBar = new RectTransform[4];
-    private RectTransform _promoteRow;
+    private readonly TMP_Text[] _slotKind = new TMP_Text[PartRows];
+    private readonly TMP_Text[] _slotVal  = new TMP_Text[PartRows];
+    private readonly TMP_Text[] _slotName = new TMP_Text[PartRows];
+    private readonly TMP_Text[] _slotLv   = new TMP_Text[PartRows];
+    private readonly RectTransform[] _slotBar = new RectTransform[PartRows];
+    // 행마다 강화 버튼을 둔다 — 이 화면의 질문이 "어디에 몰아줄까"라, 비용이 한 번에
+    // 하나씩만 보이면(예전의 상세 패널 버튼 1개) 5종 비교가 성립하지 않는다.
+    private readonly Button[]   _slotBtn   = new Button[PartRows];
+    private readonly TMP_Text[] _slotBtnLbl= new TMP_Text[PartRows];
+    [SerializeField] private RectTransform _promoteRow;
     private readonly List<Button> _legendBtns = new();
 
     private bool _built;
@@ -200,6 +203,9 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         if (_built) return;
         _built = true;
+        // 프리팹이 구워져 있으면 <b>짓지 않고 잇기만 한다</b> — 다시 지으면 UI가 두 벌 겹친다.
+        if (transform.childCount > 0) { BindBakedHierarchy(); return; }
+
         _skin = UISkin.Crucible;
 
         ShopUIStyle.Stretch(GetComponent<RectTransform>());
@@ -228,6 +234,78 @@ public sealed class UI_CruciblePanel : UI_Popup
         _promoteRow.gameObject.SetActive(false);
 
         SelectTab(0);
+    }
+
+    /// <summary>
+    /// 구워진 프리팹을 잇는다 — <b>계층·좌표·아트는 프리팹이 갖고, 코드는 배선만 한다.</b>
+    ///
+    /// <para>파츠 행 배열들은 <c>readonly</c>라 직렬화되지 않는다(Unity는 readonly 필드를 저장하지 않는다).
+    /// 행 이름 <c>PartRow{i}</c>로 찾아 다시 채우고, 클릭·호버도 그때 같이 건다.</para>
+    /// </summary>
+    private void BindBakedHierarchy()
+    {
+        _skin = UISkin.Crucible;
+
+        for (int i = 0; i < PartRows; i++)
+        {
+            var row = FindDeep($"PartRow{i}");
+            if (row == null) continue;
+
+            _partsSlots[i] = row.GetComponent<Image>();
+            _slotKind[i]   = Txt(row, "Mark");
+            _slotName[i]   = Txt(row, "Nm");
+            _slotVal[i]    = Txt(row, "Val");
+            _slotLv[i]     = Txt(row, "Lv");
+            _slotBar[i]    = row.Find("LvBar") as RectTransform;
+            _partsMark[i]  = Txt(row, "Lock");
+
+            var enhance = row.Find("RowEnhance");
+            if (enhance != null && enhance.TryGetComponent<Button>(out var eb))
+            {
+                int bi = i;
+                _slotBtn[i]    = eb;
+                _slotBtnLbl[i] = enhance.GetComponentInChildren<TMP_Text>(true);
+                eb.onClick.RemoveAllListeners();
+                eb.onClick.AddListener(() => EnhancePartRow(bi));
+            }
+
+            int idx = i;
+            if (row.TryGetComponent<Button>(out var rowBtn))
+            {
+                rowBtn.onClick.RemoveAllListeners();
+                rowBtn.onClick.AddListener(() => SelectPartSlot(idx));
+            }
+            if (row.TryGetComponent<EventTrigger>(out var hover))
+            {
+                hover.triggers.Clear();
+                AddTrigger(hover, EventTriggerType.PointerEnter, () => { _hoverPartSlot = idx; RefreshRangedCard(); });
+                AddTrigger(hover, EventTriggerType.PointerExit,  () => { _hoverPartSlot = -1;  RefreshRangedCard(); });
+            }
+        }
+
+        Rewire(_enhanceBtn, OnEnhanceClicked);
+        Rewire(_evolveBtn,  ShowEvolvePanel);
+        Rewire(_branchABtn, () => OnBranchClicked(0));
+        Rewire(_branchBBtn, () => OnBranchClicked(1));
+        Rewire(FindDeep("Exit")?.GetComponent<Button>(),          ClosePopupUI);
+        Rewire(FindDeep("EvolveCancel")?.GetComponent<Button>(),  HideEvolvePanel);
+    }
+
+    private Transform FindDeep(string name)
+    {
+        foreach (var t in GetComponentsInChildren<Transform>(true))
+            if (t.name == name) return t;
+        return null;
+    }
+
+    private static TMP_Text Txt(Transform p, string n) => p.Find(n)?.GetComponent<TMP_Text>();
+
+    /// <summary>같은 팝업이 다시 열려도 리스너가 겹쳐 쌓이지 않도록 지우고 건다.</summary>
+    private static void Rewire(Button btn, UnityEngine.Events.UnityAction fn)
+    {
+        if (btn == null) return;
+        btn.onClick.RemoveAllListeners();
+        btn.onClick.AddListener(fn);
     }
 
     private void BuildTopBar(Transform w)
@@ -299,22 +377,26 @@ public sealed class UI_CruciblePanel : UI_Popup
         ApplyTab(_tabWeaponImg, _skin?.tabWeaponOn, _skin?.tabWeaponOff, tab == 0);
         ApplyTab(_tabRangedImg, _skin?.tabRangedOn, _skin?.tabRangedOff, tab == 1);
 
-        // 액션 컬럼의 강화 버튼은 <b>무기 탭 전용</b>이다.
-        // 파츠 탭에는 상세 패널 안에 자체 강화 버튼이 있다 — 여기에도 두면 같은 동작의 버튼이 둘이 되고,
-        // 화면 오른쪽 끝이라 고르는 곳·읽는 곳과 멀어 동선이 세 군데로 흩어진다.
+        // 액션 컬럼의 강화·진화 버튼은 <b>근접 탭 전용</b>이다.
+        // 파츠 탭에는 행마다 강화 버튼이 있고, 진화(승급)는 근접 무기 대상이라
+        // 원거리 화면에 남겨두면 "지금 무엇을 올리는 버튼인지"가 어긋난다.
         if (_enhanceBtn != null) _enhanceBtn.gameObject.SetActive(tab == 0);
+        if (_evolveBtn  != null && tab == 1) _evolveBtn.gameObject.SetActive(false);
         if (tab == 0)
         {
             if (_enhanceLabel != null) _enhanceLabel.text = "강화하기";
             SkinButton(_enhanceBtn, _skin?.enhanceButton, _enhanceLabel);
         }
 
-        _targetSlot = tab == 0 ? PlayerWeaponManager.Slot0 : 1;
+        // 강화 대상 슬롯은 <b>항상 근접</b>이다. 원거리 무기 강화를 폐지했으므로 탭을 옮겨도 바뀌지 않는다.
+        // 예전엔 탭1에서 Slot1로 바꿨는데, 연출 큐에 남은 예약이 탭 전환 뒤 실행되면
+        // 엉뚱한 슬롯을 강화할 수 있는 경로였다.
+        _targetSlot = PlayerWeaponManager.Slot0;
 
         // 정보창은 탭 전환에도 살아 있는 공용 컬럼이다 — 파츠 탭에서는 발사 미리보기로 쓴다.
         if (_infoTitle != null) _infoTitle.text = tab == 0 ? "강화정보" : "발사 미리보기";
 
-        if (tab == 1) RefreshRangedParts();   // 장착·해금 상태를 열 때마다 최신으로
+        if (tab == 1) RefreshRangedParts();   // 파츠 레벨·비용을 열 때마다 최신으로
         if (_controller != null) { UpdateTargetDialogue(); RefreshAll(); }
     }
 
@@ -552,23 +634,22 @@ public sealed class UI_CruciblePanel : UI_Popup
 
     // ── 원거리 탭 레이아웃 상수 (스테이지 1257×599, 좌상단 기준) ──
     //
-    // 이 탭에는 <b>행동이 둘</b>이다 — 무기 강화(슬롯을 연다)와 파츠 강화(레벨을 올린다).
-    // 각 버튼을 '그 결과가 보이는 곳' 옆에 붙인다: 무기 강화는 투자 게이지와 같은 행에,
-    // 파츠 강화는 레벨·효과를 읽은 상세 패널 안에. 예전엔 둘 다 화면 오른쪽 끝 액션 컬럼에 있어
-    // 고르는 곳·읽는 곳·누르는 곳이 세 군데로 흩어져 있었다.
+    // 이 탭에는 <b>행동이 하나</b>다 — 파츠 강화. 원거리 무기 강화는 폐지했다:
+    // 그건 파츠 슬롯 게이지를 채우려고 붙은 것이고, 내장형 전환으로 슬롯이 사라지면서 이유도 사라졌다
+    // (원래 기획 2026-07-18도 "무기 자체 레벨 강화 없음 · 성장은 파츠로만"이었다).
+    // 공격력·공격속도는 캐릭터 스탯이 담당하므로 파츠는 '발사 형태'만 다룬다.
     private const float RxPad     = 40f;    // 스테이지 좌우 여백
     private const float RxHeadY   = 24f;    // 헤더 띠 y
     private const float RxHeadH   = 52f;
     private const float RxBodyY   = 96f;    // 본문 y
-    private const float RxBodyH   = 390f;
+    // 무기 강화 행(y502 h68)을 폐지하면서 그 자리를 본문이 흡수했다.
+    // 그냥 비워 두면 화면 아래가 뚫린 것처럼 읽혀, 행 높이를 키워 여백을 안으로 돌렸다.
+    private const float RxBodyH   = 458f;
     private const float RxColLW   = 520f;   // 좌 — 조합
     private const float RxColRX   = 600f;   // 우 — 상세 시작 x
     private const float RxColRW   = 617f;
-    private const float RxWeapY   = 502f;   // 무기 행 y
-    private const float RxWeapH   = 68f;
-    private const float RxCardW   = 248f;   // 슬롯 카드
-    private const float RxCardH   = 183f;
-    private const float RxCardGap = 24f;
+    private const float RxRowH    = 82f;    // 파츠 행 — 5행 × 82 + 4갭 × 12 = 458 (본문 높이와 정확히 일치)
+    private const float RxRowGap  = 12f;
 
     /// <summary>스테이지 좌상단 기준 배치(anchor·pivot 모두 좌상단).</summary>
     private static void PlaceTL(RectTransform rt, float x, float y, float w, float h)
@@ -596,7 +677,6 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         BuildRangedParts(stage);
         BuildPartDetail(stage);
-        BuildRangedWeaponRow(stage);
     }
 
     /// <summary>
@@ -626,35 +706,31 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         _cardLevel[1] = ShopUIStyle.MakeText(c, "Level", 20f, FontStyles.Bold,
                                              TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
-        PlaceTL(_cardLevel[1].rectTransform, padX, 92f, innerW, 26f);
+        PlaceTL(_cardLevel[1].rectTransform, padX, 96f, innerW, 28f);
 
-        _cardGaugeFill[1] = BuildBar(c, "LevelBar", padX, 122f, innerW, 16f);
+        _cardGaugeFill[1] = BuildBar(c, "LevelBar", padX, 130f, innerW, 18f);
 
         _cardAtk[1] = ShopUIStyle.MakeText(c, "Delta", 26f, FontStyles.Bold,
                                            TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
-        PlaceTL(_cardAtk[1].rectTransform, padX, 148f, innerW, 34f);
+        PlaceTL(_cardAtk[1].rectTransform, padX, 162f, innerW, 40f);
 
         _partGrowthText = ShopUIStyle.MakeText(c, "Growth", 15f, FontStyles.Normal,
                                                TextAlignmentOptions.TopLeft, ShopUIStyle.TextDim);
-        PlaceTL(_partGrowthText.rectTransform, padX, 184f, innerW, 22f);
+        PlaceTL(_partGrowthText.rectTransform, padX, 208f, innerW, 24f);
 
         _partDescText = ShopUIStyle.MakeText(c, "Desc", 16f, FontStyles.Normal,
                                              TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
-        PlaceTL(_partDescText.rectTransform, padX, 214f, innerW, 52f);
+        PlaceTL(_partDescText.rectTransform, padX, 244f, innerW, 84f);
 
         _partSynergyText = ShopUIStyle.MakeText(c, "Synergy", 15f, FontStyles.Normal,
                                                 TextAlignmentOptions.TopLeft, new Color(0.50f, 0.89f, 1f));
-        PlaceTL(_partSynergyText.rectTransform, padX, 268f, innerW, 22f);
+        PlaceTL(_partSynergyText.rectTransform, padX, 334f, innerW, 24f);
 
-        // 강화 버튼 — 패널 하단. 라벨 2줄(동작 / 비용)로 눌리기 직전에 필요한 정보가 버튼에 붙는다.
-        _partEnhanceBtn = MakeStyledButton(c, "PartEnhance", "파츠 강화하기", out _partEnhanceLabel);
-        _partEnhanceLabel.fontSize = 20f;
-        PlaceTL((RectTransform)_partEnhanceBtn.transform, padX, RxBodyH - 78f, innerW, 58f);
-        _partEnhanceBtn.onClick.AddListener(EnhanceSelectedPart);
-
+        // 강화 버튼은 좌열의 각 행으로 옮겼다 — 이 패널은 이제 <b>결과 전담</b>이다.
+        // (_partEnhanceBtn / _partCostText 는 null로 남으며, 갱신 함수들이 null을 걸러낸다.)
         _partCostText = ShopUIStyle.MakeText(c, "PartCost", 14f, FontStyles.Normal,
-                                             TextAlignmentOptions.Center, ShopUIStyle.TextDim);
-        PlaceTL(_partCostText.rectTransform, padX, RxBodyH - 22f, innerW, 20f);
+                                             TextAlignmentOptions.TopLeft, ShopUIStyle.TextDim);
+        PlaceTL(_partCostText.rectTransform, padX, RxBodyH - 62f, innerW, 26f);
     }
 
     /// <summary>단순 진행 막대(트랙 + 채움). 채움 RectTransform을 돌려준다.</summary>
@@ -672,31 +748,6 @@ public sealed class UI_CruciblePanel : UI_Popup
         return fr;
     }
 
-    /// <summary>
-    /// 원거리 <b>무기</b> 강화 행(본체 아래 빈 띠). 파츠 슬롯은 이 무기에 부은 재료로만 열리므로
-    /// (<see cref="RangedPartsState.AddInvestment"/>), 이 진입점이 없으면 파츠 계통 전체가 도달 불가가 된다.
-    /// 강화 버튼(우측 컬럼)은 <b>장착 파츠</b>를 올리는 다른 대상이라 겸할 수 없다 — 행을 따로 둔다.
-    /// </summary>
-    private void BuildRangedWeaponRow(RectTransform stage)
-    {
-        // 무기 정보 · 투자 게이지 · 강화 버튼을 <b>한 행</b>에 둔다.
-        // 버튼을 누르면 바로 옆 게이지가 차오르므로 "무기에 부은 재료가 파츠 슬롯을 연다"는
-        // 인과가 화면에서 직접 보인다(예전엔 게이지가 위, 버튼이 화면 오른쪽 끝이라 끊겨 있었다).
-        _rangedWeaponInfo = ShopUIStyle.MakeText(stage, "RangedWeaponInfo", 15f, FontStyles.Normal,
-                                                 TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextPrimary);
-        PlaceTL(_rangedWeaponInfo.rectTransform, RxPad, RxWeapY, 520f, RxWeapH);
-
-        _investText = ShopUIStyle.MakeText(stage, "InvestText", 14f, FontStyles.Normal,
-                                           TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextDim);
-        PlaceTL(_investText.rectTransform, RxPad + 540f, RxWeapY, 380f, 24f);
-
-        _investFill = BuildBar(stage, "InvestTrack", RxPad + 540f, RxWeapY + 28f, 380f, 14f).GetComponent<Image>();
-
-        _rangedWeaponBtn = MakeStyledButton(stage, "RangedWeaponEnhance", "원거리 무기 강화", out _rangedWeaponLabel);
-        _rangedWeaponLabel.fontSize = 17f;
-        PlaceTL((RectTransform)_rangedWeaponBtn.transform, RxPad + 957f, RxWeapY + 4f, 220f, 58f);
-        _rangedWeaponBtn.onClick.AddListener(OnRangedWeaponEnhanceClicked);
-    }
 
     /// <summary>
     /// 파츠 슬롯 4칸. 내용은 <see cref="RangedPartsState"/>가 정하고, 클릭하면 강화 대상으로 선택된다.
@@ -704,57 +755,61 @@ public sealed class UI_CruciblePanel : UI_Popup
     /// </summary>
     private void BuildRangedParts(Transform c)
     {
-        // 2×2 그리드. 카드가 커진 만큼 종류·효과값·이름·레벨을 카드 안에 직접 담아,
-        // 클릭해서 정보창을 열지 않아도 조합 전체가 읽히게 한다.
-        for (int i = 0; i < _partsSlots.Length; i++)
+        // 5행 리스트. 행 = 파츠 정의 목록의 인덱스이며 슬롯이 아니다 —
+        // 파츠는 항상 5종 전부 존재하고 레벨(0=꺼짐)만 다르다.
+        var data = Managers.WeaponParts;
+
+        for (int i = 0; i < PartRows; i++)
         {
-            float cx = RxPad  + (i % 2) * (RxCardW + RxCardGap);
-            float cy = RxBodyY + (i / 2) * (RxCardH + RxCardGap);
+            float ry = RxBodyY + i * (RxRowH + RxRowGap);
 
-            var slot = ShopUIStyle.MakeImage(c, $"PartSlot{i}", new Color(0.10f, 0.08f, 0.13f, 1f));
-            PlaceTL(slot.rectTransform, cx, cy, RxCardW, RxCardH);
-            ShopUIStyle.Skin(slot, _skin?.slotFrame, sliced: true);
-            _partsSlots[i] = slot;
+            var row = ShopUIStyle.MakeImage(c, $"PartRow{i}", new Color(0.10f, 0.08f, 0.13f, 1f));
+            PlaceTL(row.rectTransform, RxPad, ry, RxColLW, RxRowH);
+            ShopUIStyle.Skin(row, _skin?.slotFrame, sliced: true);
+            _partsSlots[i] = row;
 
-            const float p = 16f;
-            float iw = RxCardW - p * 2f;
+            _slotKind[i] = ShopUIStyle.MakeText(row.transform, "Mark", 17f, FontStyles.Bold,
+                                                TextAlignmentOptions.Center, ShopUIStyle.Gold);
+            PlaceTL(_slotKind[i].rectTransform, 14f, 32f, 22f, 20f);
 
-            _slotKind[i] = ShopUIStyle.MakeText(slot.transform, "Kind", 14f, FontStyles.Bold,
-                                                TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
-            PlaceTL(_slotKind[i].rectTransform, p, 12f, iw, 20f);
+            _slotName[i] = ShopUIStyle.MakeText(row.transform, "Nm", 19f, FontStyles.Bold,
+                                                TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextPrimary);
+            PlaceTL(_slotName[i].rectTransform, 44f, 14f, 150f, 28f);
 
-            _slotVal[i] = ShopUIStyle.MakeText(slot.transform, "Val", 38f, FontStyles.Bold,
-                                               TextAlignmentOptions.BottomLeft, ShopUIStyle.TextPrimary);
-            PlaceTL(_slotVal[i].rectTransform, p, 56f, iw, 46f);
+            _slotVal[i] = ShopUIStyle.MakeText(row.transform, "Val", 15f, FontStyles.Normal,
+                                               TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextDim);
+            PlaceTL(_slotVal[i].rectTransform, 44f, 46f, 150f, 24f);
 
-            _slotName[i] = ShopUIStyle.MakeText(slot.transform, "Nm", 15f, FontStyles.Normal,
-                                                TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
-            PlaceTL(_slotName[i].rectTransform, p, 108f, iw, 22f);
+            _slotLv[i] = ShopUIStyle.MakeText(row.transform, "Lv", 16f, FontStyles.Bold,
+                                              TextAlignmentOptions.MidlineLeft, ShopUIStyle.Gold);
+            PlaceTL(_slotLv[i].rectTransform, 200f, 30f, 56f, 24f);
 
-            _slotLv[i] = ShopUIStyle.MakeText(slot.transform, "Lv", 13f, FontStyles.Normal,
-                                              TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextDim);
-            PlaceTL(_slotLv[i].rectTransform, p, 136f, 62f, 18f);
+            _slotBar[i] = BuildBar(row.transform, "LvBar", 262f, 35f, 132f, 14f);
 
-            _slotBar[i] = BuildBar(slot.transform, "LvBar", p + 66f, 140f, iw - 66f, 10f);
+            // 행 강화 버튼 — 누른 자리에서 결과(레벨·게이지)가 바로 갱신된다.
+            _slotBtn[i] = MakeStyledButton(row.transform, "RowEnhance", "강화", out _slotBtnLbl[i]);
+            _slotBtnLbl[i].fontSize = 15f;
+            PlaceTL((RectTransform)_slotBtn[i].transform, 406f, 15f, 100f, 52f);
+            int bi = i;
+            _slotBtn[i].onClick.AddListener(() => EnhancePartRow(bi));
 
-            // 빈 칸·잠긴 칸에서 쓰는 중앙 문구. 장착 칸에서는 꺼둔다.
-            _partsMark[i] = ShopUIStyle.MakeText(slot.transform, "Mark", 17f, FontStyles.Bold,
+            // 잠금·미해금 문구용 중앙 텍스트. 평시엔 꺼둔다.
+            _partsMark[i] = ShopUIStyle.MakeText(row.transform, "Lock", 15f, FontStyles.Normal,
                                                  TextAlignmentOptions.Center, ShopUIStyle.TextDim);
             ShopUIStyle.Stretch(_partsMark[i].rectTransform);
+            _partsMark[i].gameObject.SetActive(false);
 
-            int idx = i;   // 클로저 캡처 — 루프 변수를 그대로 쓰면 전 슬롯이 마지막 인덱스를 가리킨다
-            var btn = slot.gameObject.AddComponent<Button>();
-            ShopUIStyle.ApplyButtonColors(btn, slot);
+            int idx = i;
+            var btn = row.gameObject.AddComponent<Button>();
+            ShopUIStyle.ApplyButtonColors(btn, row);
             btn.onClick.AddListener(() => SelectPartSlot(idx));
 
-            // 호버 미리보기 — 손을 올리면 상세가 임시로 그 파츠를 보여주고, 떼면 선택한 것으로 돌아온다.
-            // 클릭은 '강화 대상 고정'에만 쓴다. 이게 없으면 4개를 비교하려고 클릭할 때마다 대상이 바뀐다.
-            var hover = slot.gameObject.AddComponent<EventTrigger>();
+            // 호버 미리보기 — 손만 올려도 상세가 그 파츠를 보여준다. 클릭은 대상 고정 전용.
+            var hover = row.gameObject.AddComponent<EventTrigger>();
             AddTrigger(hover, EventTriggerType.PointerEnter, () => { _hoverPartSlot = idx; RefreshRangedCard(); });
             AddTrigger(hover, EventTriggerType.PointerExit,  () => { _hoverPartSlot = -1;  RefreshRangedCard(); });
         }
 
-        BuildGrantRow(c);
         RefreshRangedParts();
     }
 
@@ -770,165 +825,23 @@ public sealed class UI_CruciblePanel : UI_Popup
     /// <summary>마우스가 올라간 슬롯. -1이면 없음. 선택(_selectedPartSlot)과 별개로 상세만 미리 보여준다.</summary>
     private int _hoverPartSlot = -1;
 
-    private Image    _investFill;
-    private TMP_Text _investText;
-    private RectTransform _grantRow;
-    private readonly Image[]    _grantBtn  = new Image[5];
-    private readonly TMP_Text[] _grantText = new TMP_Text[5];
-    private readonly string[]   _grantIds  = new string[5];
 
-    /// <summary>
-    /// 원거리 투자 진척 게이지. 슬롯 해금이 <b>강화 성공이 아니라 투자액</b>에 걸리므로,
-    /// 강화에 실패해도 이 막대는 오른다 — 도박 구간의 손실을 여기서 되돌려준다.
-    /// </summary>
-    /// <summary>
-    /// 티어를 넘겼을 때 뜨는 파츠 선택 목록. 상세 패널 <b>위에 덮는</b> 오버레이라
-    /// 다른 요소를 밀어내지 않는다(예전엔 하단에 56px 행이 튀어나와 레이아웃이 출렁였다).
-    ///
-    /// 미보유 파츠를 전부 제시한다 — 후보를 무작위로 줄이면 결정적 롤을 하나 더 써야 하고,
-    /// 그 롤은 방 안 저장으로 되감을 수 있다. 선택압은 후보 제한이 아니라 슬롯 희소성이 만든다.
-    /// </summary>
-    private void BuildGrantRow(Transform stage)
-    {
-        var panel = ShopUIStyle.MakeImage(stage, "GrantPanel", new Color(0.13f, 0.10f, 0.07f, 1f), raycast: true);
-        PlaceTL(panel.rectTransform, RxColRX, RxBodyY, RxColRW, RxBodyH);
-        ShopUIStyle.Skin(panel, _skin?.slotFrame, sliced: true);
-        _grantRow = panel.rectTransform;
 
-        var head = ShopUIStyle.MakeText(panel.transform, "GrantTitle", 22f, FontStyles.Bold,
-                                        TextAlignmentOptions.Center, ShopUIStyle.Gold);
-        PlaceTL(head.rectTransform, 20f, 16f, RxColRW - 40f, 30f);
-        head.text = "슬롯이 열렸다 — 받을 파츠를 고르세요";
-
-        const float rowH = 58f, gap = 8f;
-        for (int i = 0; i < _grantBtn.Length; i++)
-        {
-            var b = ShopUIStyle.MakeImage(panel.transform, $"Grant{i}", new Color(0.18f, 0.14f, 0.09f, 1f));
-            PlaceTL(b.rectTransform, 24f, 58f + i * (rowH + gap), RxColRW - 48f, rowH);
-            ShopUIStyle.Skin(b, _skin?.slotFrame, sliced: true);
-            _grantBtn[i] = b;
-
-            var t = ShopUIStyle.MakeText(b.transform, "T", 15f, FontStyles.Bold,
-                                         TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextPrimary);
-            ShopUIStyle.Anchor(t.rectTransform, new Vector2(0, 0), new Vector2(1, 1), new Vector2(0.5f, 0.5f),
-                               new Vector2(10f, 0f), new Vector2(-32f, 0f));
-            _grantText[i] = t;
-
-            int idx = i;
-            var btn = b.gameObject.AddComponent<Button>();
-            ShopUIStyle.ApplyButtonColors(btn, b);
-            btn.onClick.AddListener(() => ClaimPart(idx));
-        }
-
-        panel.gameObject.SetActive(false);
-    }
-
-    /// <summary>티어 보상으로 파츠를 확정한다. 지급 이력을 소비해 재접속 시 중복 지급을 막는다.</summary>
-    private void ClaimPart(int index)
-    {
-        var state = RangedPartsState.Current;
-        if (state == null || state.PendingGrants <= 0) return;
-        if (index < 0 || index >= _grantIds.Length) return;
-
-        string id = _grantIds[index];
-        if (string.IsNullOrEmpty(id)) return;
-
-        if (!state.Equip(id)) return;
-        state.ConsumeGrant();
-
-        var def = Managers.WeaponParts?.GetById(id);
-        _selectedPartSlot = state.Equipped_.Count - 1;
-        _hoverPartSlot    = -1;   // 오버레이가 닫히면 커서는 패널 위에 떠 있으므로 호버를 남기지 않는다
-        SetPartHint(def != null ? $"{def.part_name} 획득 — {def.description}" : "파츠 획득");
-        ShopUIStyle.PlaySfx("crucible_success");
-
-        _controller?.SavePartGrant();
-        RefreshAll();
-    }
-
-    /// <summary>미수령 티어가 있으면 선택 행을 띄우고, 없으면 감춘다.</summary>
-    private void RefreshGrantRow()
-    {
-        if (_grantRow == null) return;
-
-        var state = RangedPartsState.Current;
-        bool pending = state != null && state.PendingGrants > 0;
-        _grantRow.gameObject.SetActive(pending);
-        if (!pending) return;
-
-        var all = Managers.WeaponParts?.All;
-        int shown = 0;
-        for (int i = 0; i < _grantBtn.Length; i++)
-        {
-            var def = FindNthUnowned(all, state, i);
-            _grantIds[i] = def?.part_id;
-            bool on = def != null;
-            _grantBtn[i].gameObject.SetActive(on);
-            if (!on) continue;
-
-            // 한 줄에 이름 · Lv.1 효과 · 종류 — 고르기 전에 무엇을 받는지 다 보인다.
-            _grantText[i].text = $"<b>{def.part_name}</b>   <color=#FFD24A>{PartValueText(def, def.ValueAt(1))}</color>"
-                               + $"   <size=88%><color=#9A98A0>{PartKindLabel(def)}</color></size>";
-            shown++;
-        }
-
-        if (shown > 0) SetPartHint("슬롯이 열렸다 — 받을 파츠를 고르세요");
-    }
-
-    /// <summary>미보유 파츠 중 n번째. 없으면 null.</summary>
-    private static WeaponPartEntry FindNthUnowned(System.Collections.Generic.IReadOnlyList<WeaponPartEntry> all,
-                                                  RangedPartsState state, int n)
-    {
-        if (all == null) return null;
-        int seen = 0;
-        for (int i = 0; i < all.Count; i++)
-        {
-            if (state.LevelOf(all[i].part_id) != 0) continue;
-            if (seen == n) return all[i];
-            seen++;
-        }
-        return null;
-    }
-
-    /// <summary>강화 대상으로 고른 파츠 슬롯. -1이면 미선택.</summary>
+    /// <summary>강화 대상으로 고른 파츠 행. -1이면 미선택.</summary>
     private int _selectedPartSlot = -1;
 
     /// <summary>
-    /// 파츠 슬롯 클릭 — 강화 대상 선택 전용. 이미 선택된 칸을 다시 누르면 해제한다.
-    ///
-    /// 빈 칸을 눌러 공짜로 끼우던 임시 경로는 없앴다. 파츠는 원거리 무기 투자로 티어를 넘겨야
-    /// 받는다(<see cref="RefreshGrantRow"/>가 선택을 제시한다).
+    /// 파츠 행 클릭 — 강화 대상 선택 전용(다시 누르면 해제). 강화는 행의 버튼이 한다.
+    /// index는 파츠 정의 목록의 인덱스다(슬롯이 아니다).
     /// </summary>
     private void SelectPartSlot(int index)
     {
-        var state = RangedPartsState.Current;
-        if (state == null) return;
+        var all = Managers.WeaponParts?.All;
+        if (all == null || index < 0 || index >= all.Count) return;
 
-        // 잠긴 칸은 선택 불가. 그래도 아무 반응 없이 끝내면 "고장난 버튼"으로 읽힌다 —
-        // 무엇을 해야 열리는지 말해준다.
-        if (index >= state.UnlockedSlots)
-        {
-            int need = RangedPartsState.ThresholdAt(index);
-            SetPartHint(need > 0
-                ? $"슬롯 잠김 — 원거리 무기 강화에 누적 {need} 투자하면 열린다 (지금 {state.Invested})"
-                : "슬롯 잠김");
-            ShopUIStyle.PlaySfx("shop_reject");
-            return;
-        }
-
-        if (index >= state.Equipped_.Count)
-        {
-            SetPartHint(state.PendingGrants > 0
-                ? "아래에서 받을 파츠를 고르세요"
-                : $"원거리 무기에 {state.NextThreshold - state.Invested} 더 투자하면 파츠를 받습니다");
-            return;
-        }
-
-        // 이미 선택된 칸을 다시 누르면 선택 해제(장착은 유지 — 파츠는 이제 유한 자원이다)
         if (_selectedPartSlot == index)
         {
             _selectedPartSlot = -1;
-            SetPartHint("선택 해제");
             RefreshRangedParts();
             RefreshRangedCard();
             return;
@@ -939,73 +852,75 @@ public sealed class UI_CruciblePanel : UI_Popup
         RefreshRangedCard();
     }
 
+    /// <summary>행 버튼 — 그 행을 대상으로 고정하고 곧바로 강화한다(연출·큐는 기존 경로 재사용).</summary>
+    private void EnhancePartRow(int index)
+    {
+        _selectedPartSlot = index;
+        RefreshRangedCard();
+        EnhanceSelectedPart();
+    }
+
     /// <summary>파츠 탭 안내 문구. 전용 슬롯이 없어 NPC 대사창을 그대로 쓴다(정보가 한 곳에 모임).</summary>
     private void SetPartHint(string msg)
     {
         if (_dialogText != null) _dialogText.text = msg;
     }
 
-    /// <summary>장착 상태를 슬롯 UI에 반영한다. 파츠 탭을 열거나 강화한 뒤 호출.</summary>
+    /// <summary>5행을 파츠 정의 목록으로 채운다. 파츠 탭을 열거나 강화한 뒤 호출.</summary>
     private void RefreshRangedParts()
     {
         var state = RangedPartsState.Current;
-        var data  = Managers.WeaponParts;
-
-        // 슬롯 해금은 원거리 무기에 부은 누적 재료가 정한다(레벨이 아니다) — 상태가 스스로 안다.
-        RefreshInvestBar(state);
-        RefreshGrantRow();
+        var all   = Managers.WeaponParts?.All;
+        int have  = _controller != null ? _controller.FuelAmount : 0;
 
         if (_slotSummary != null && state != null)
-            _slotSummary.text = $"슬롯 <color=#FFD24A>{state.Equipped_.Count}</color> / {state.UnlockedSlots}"
-                              + (state.PendingGrants > 0 ? "   <color=#FFD24A>◆ 받을 파츠 있음</color>" : "");
+            _slotSummary.text = $"켠 파츠 <color=#FFD24A>{state.ActiveCount}</color> / {(all?.Count ?? 0)}"
+                              + $"   ·   투입 {state.TotalSpent}   ·   보유 <color=#FFD24A>{have}</color>";
 
-        for (int i = 0; i < _partsSlots.Length; i++)
+        for (int i = 0; i < PartRows; i++)
         {
             if (_partsSlots[i] == null) continue;
 
-            bool unlocked = state != null && i < state.UnlockedSlots;
-            bool filled   = unlocked && i < state.Equipped_.Count;
+            var def = all != null && i < all.Count ? all[i] : null;
+            bool exists = def != null;
 
-            // 장착 칸에서만 세부 텍스트를 켜고, 빈/잠긴 칸은 중앙 문구 하나로 대신한다.
-            SetSlotDetailVisible(i, filled);
-            _partsMark[i].gameObject.SetActive(!filled);
+            SetSlotDetailVisible(i, exists);
+            _partsMark[i].gameObject.SetActive(!exists);
+            if (_slotBtn[i] != null) _slotBtn[i].gameObject.SetActive(exists);
 
-            if (!unlocked)
+            if (!exists)
             {
-                int need = RangedPartsState.ThresholdAt(i);
-                _partsMark[i].text  = need > 0 ? $"잠김\n<size=80%>{need} 투자</size>" : "잠김";
-                _partsMark[i].color = new Color(0.34f, 0.30f, 0.43f);
+                // 정의가 없는 남는 행 — 데이터가 5종보다 적을 때만 보인다.
+                _partsMark[i].text   = "";
                 _partsSlots[i].color = new Color(0.09f, 0.07f, 0.11f, 1f);
                 continue;
             }
 
-            if (!filled)
-            {
-                // 받을 것이 있으면 빈 칸이 곧 진입점이 된다 — 별도 행을 띄우지 않는다.
-                bool pending = state.PendingGrants > 0;
-                _partsMark[i].text  = pending ? "<color=#FFD24A>＋ 받기</color>\n<size=75%>슬롯이 열렸다</size>"
-                                              : "빈 슬롯";
-                _partsMark[i].color = pending ? ShopUIStyle.Gold : ShopUIStyle.TextDim;
-                _partsSlots[i].color = pending ? new Color(0.16f, 0.13f, 0.08f, 1f)
-                                               : new Color(0.10f, 0.08f, 0.13f, 1f);
-                continue;
-            }
+            int level = state != null ? state.LevelOf(def.part_id) : 0;
+            int max   = def.max_level > 0 ? def.max_level : Mathf.Max(1, level);
+            bool on   = level > 0;
+            bool maxed = def.max_level > 0 && level >= def.max_level;
 
-            var e   = state.Equipped_[i];
-            var def = data?.GetById(e.partId);
-            int max = def != null && def.max_level > 0 ? def.max_level : e.level;
+            // 꺼짐(Lv0)도 목록에 그대로 남긴다 — 없는 것과 안 켠 것은 다르다.
+            _slotKind[i].text  = on ? "◆" : "◇";
+            _slotKind[i].color = on ? ShopUIStyle.Gold : ShopUIStyle.TextDim;
+            _slotName[i].text  = def.part_name;
+            _slotVal[i].text   = on ? PartValueText(def, def.ValueAt(level)) : "꺼짐";
+            _slotLv[i].text    = on ? $"Lv.{level}" : "—";
+            SetBar(_slotBar[i], max > 0 ? (float)level / max : 0f);
 
-            _slotKind[i].text = def != null ? $"◆ {PartKindShort(def)}" : "";
-            _slotVal[i].text  = def != null ? PartValueText(def, def.ValueAt(e.level)) : "";
-            _slotName[i].text = def != null ? def.part_name : e.partId;
-            _slotLv[i].text   = $"Lv.{e.level}";
-            SetBar(_slotBar[i], max > 0 ? (float)e.level / max : 0f);
+            int cost = _controller != null ? _controller.PartCostAt(def.part_id) : 0;
+            if (_slotBtnLbl[i] != null)
+                _slotBtnLbl[i].text = maxed ? "최대" : (on ? $"강화 ◆{cost}" : $"켜기 ◆{cost}");
+            if (_slotBtn[i] != null)
+                _slotBtn[i].interactable = !maxed && have >= cost && !_animating;
 
-            // 선택된 칸은 금색 바탕으로 — 우측 상세가 어느 칸을 보고 있는지 색으로 이어진다.
             bool sel = (i == _selectedPartSlot);
-            _partsSlots[i].color = sel ? new Color(0.18f, 0.14f, 0.09f, 1f)
-                                       : new Color(0.10f, 0.08f, 0.13f, 1f);
-            _slotName[i].color   = sel ? ShopUIStyle.Gold : ShopUIStyle.TextPrimary;
+            _partsSlots[i].color = sel  ? new Color(0.18f, 0.14f, 0.09f, 1f)
+                                 : on   ? new Color(0.12f, 0.10f, 0.15f, 1f)
+                                        : new Color(0.09f, 0.07f, 0.11f, 1f);
+            _slotName[i].color   = sel ? ShopUIStyle.Gold
+                                 : on  ? ShopUIStyle.TextPrimary : ShopUIStyle.TextDim;
         }
     }
 
@@ -1015,7 +930,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         if (_slotVal[i]  != null) _slotVal[i].gameObject.SetActive(on);
         if (_slotName[i] != null) _slotName[i].gameObject.SetActive(on);
         if (_slotLv[i]   != null) _slotLv[i].gameObject.SetActive(on);
-        if (_slotBar[i]  != null) _slotBar[i].gameObject.SetActive(on);
+        if (_slotBar[i]  != null) _slotBar[i].parent.gameObject.SetActive(on);
     }
 
     private static void SetBar(RectTransform fill, float ratio01)
@@ -1036,64 +951,6 @@ public sealed class UI_CruciblePanel : UI_Popup
         RangedPartKind.Homing  => "유도",
         _                      => "거력",
     };
-
-    /// <summary>
-    /// 원거리 무기 강화 행 갱신 — 이름·강화단계·성공률·비용. 이 무기에 부은 재료가 곧 파츠 투자이므로
-    /// 그 인과를 한 줄로 붙여 둔다(투자 게이지만 보면 무엇이 게이지를 올리는지 알 수 없다).
-    /// </summary>
-    private void RefreshRangedWeaponRow()
-    {
-        if (_rangedWeaponBtn == null || _controller == null) return;
-
-        const int slot = PlayerWeaponManager.Slot1;
-        var w = _controller.GetSlot(slot);
-        if (w == null)
-        {
-            _rangedWeaponInfo.text = "<color=#9A98A0>원거리 무기 없음 — 무기대에서 먼저 고르세요</color>";
-            _rangedWeaponLabel.text = "원거리 무기 강화";
-            _rangedWeaponBtn.interactable = false;
-            return;
-        }
-
-        int max = _controller.MaxAt(slot);
-        if (!_controller.CanEnhance(slot))
-        {
-            _rangedWeaponInfo.text = $"{w.displayName}  <color=#FFD24A>+{w.enhanceLevel}</color>"
-                                   + $"  <size=85%><color=#8AB0D5>최대 강화 도달</color></size>";
-            _rangedWeaponLabel.text = "최대 강화";
-            _rangedWeaponBtn.interactable = false;
-            return;
-        }
-
-        int   cost   = _controller.CostAt(slot);
-        int   have   = _controller.FuelAmount;
-        int   drop   = _controller.DropAt(slot);
-        float chance = _controller.SuccessChanceAt(slot);
-
-        _rangedWeaponInfo.text =
-            $"{w.displayName}  <color=#FFD24A>+{w.enhanceLevel}</color><size=85%><color=#9A98A0>/{max}</color></size>"
-          + $"   성공률 <color=#7AD46E>{chance * 100f:F0}%</color>"
-          + (drop > 0 ? $"  <size=85%><color=#FF7A6A>실패 -{drop}</color></size>" : "")
-          + $"\n<size=88%>재료 {(have >= cost ? cost.ToString() : $"<color=#FF5250>{cost}</color>")}"
-          + $" <color=#9A98A0>/ 보유 {have}</color>  ·  <color=#FFD24A>쓴 재료만큼 파츠 투자가 쌓인다</color></size>";
-        _rangedWeaponLabel.text = $"원거리 무기 강화 ({cost})";
-        // 연출 중에도 켜 둔다 — 재입력이 연출을 건너뛰고 다음 강화로 이어지는 경로(QueueWhileAnimating).
-        _rangedWeaponBtn.interactable = have >= cost;
-    }
-
-    /// <summary>투자 진척 게이지 갱신.</summary>
-    private void RefreshInvestBar(RangedPartsState state)
-    {
-        if (_investFill == null || state == null) return;
-
-        SetBar(_investFill.rectTransform, state.ProgressToNext);
-
-        if (_investText == null) return;
-        int next = state.NextThreshold;
-        _investText.text = next <= 0
-            ? $"원거리 투자 {state.Invested} — 슬롯 전부 해금"
-            : $"원거리 투자 <color=#FFD24A>{state.Invested}</color> / {next}   ·   다음 파츠까지 {next - state.Invested}";
-    }
 
     /// <summary>우측 강화정보 컬럼 — 완성본의 세로 정보창. 성공률/재료/성공시/실패시/잭팟/진화까지 + 스트릭/결과/이벤트.</summary>
     private void BuildInfoColumn(Transform w)
@@ -1123,7 +980,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     }
 
     /// <summary>정보 컬럼의 한 줄. 위에서부터 34px 간격.</summary>
-    private TMP_Text _infoTitle;
+    [SerializeField] private TMP_Text _infoTitle;
 
     // 탭별 행 높이 분기(ApplyInfoRowLayout)는 제거했다 — 파츠 설명 문장을 이 좁은 격자에 끼우느라
     // 필요했던 것인데, 상세가 스테이지 우측 패널로 옮겨가고 정보창은 수치 표(발사 미리보기)만 남아
@@ -1468,19 +1325,6 @@ public sealed class UI_CruciblePanel : UI_Popup
     }
 
     /// <summary>
-    /// 원거리 무기(슬롯1) 강화. 소모한 재료는 성공·실패를 가리지 않고 파츠 투자로 적립되므로
-    /// (<see cref="CrucibleRoomController.TryEnhance"/>), 이 버튼이 슬롯 해금·파츠 지급의 출발점이다.
-    /// </summary>
-    private void OnRangedWeaponEnhanceClicked()
-    {
-        if (_controller == null) return;
-        if (QueueWhileAnimating(OnRangedWeaponEnhanceClicked)) return;
-
-        var result = _controller.TryEnhance(PlayerWeaponManager.Slot1);
-        PlayEnhanceSequence(result, EnhanceView.RangedWeapon).Forget();
-    }
-
-    /// <summary>
     /// 선택한 파츠를 1레벨 올린다. 임계를 넘으면 효과가 계단 상승한다(분열 갈래 +1 등).
     /// 판정은 <b>확정</b>이고 재료만 든다 — 실패 도박은 무기 강화의 축이고, 계단형 파츠에 겹치면
     /// 체감이 탁해진다. 재료 차감·저장은 컨트롤러(<see cref="CrucibleRoomController.TryEnhancePart"/>)가 소유한다.
@@ -1488,7 +1332,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     private void EnhanceSelectedPart()
     {
         if (_controller == null) return;
-        // 상세 패널 버튼에 직결돼 있어 연출 중에도 클릭이 들어온다 — 무기 강화와 같은 큐를 태운다
+        // 행 버튼에 직결돼 있어 연출 중에도 클릭이 들어온다 — 근접 강화와 같은 큐를 태운다
         // (연출을 건너뛰고 다음 강화로 이어지되, 예약은 1개만 남아 나중에 몰아서 터지지 않는다).
         if (QueueWhileAnimating(EnhanceSelectedPart)) return;
 
@@ -1507,9 +1351,9 @@ public sealed class UI_CruciblePanel : UI_Popup
     /// <summary>지금 강화 대상으로 선택된 파츠 id. 미선택/무효면 null.</summary>
     private string SelectedPartId()
     {
-        var state = RangedPartsState.Current;
-        if (state == null || _selectedPartSlot < 0 || _selectedPartSlot >= state.Equipped_.Count) return null;
-        return state.Equipped_[_selectedPartSlot].partId;
+        var all = Managers.WeaponParts?.All;
+        if (all == null || _selectedPartSlot < 0 || _selectedPartSlot >= all.Count) return null;
+        return all[_selectedPartSlot].part_id;
     }
 
     /// <summary>선택 파츠의 정의. 미선택이면 null.</summary>
@@ -1836,10 +1680,11 @@ public sealed class UI_CruciblePanel : UI_Popup
             _eventBanner.SetActive(ev);
             if (ev && _eventBannerText != null) _eventBannerText.text = _controller.EventBanner;
         }
+        // 진화는 근접 무기 대상이라 파츠 탭에서는 감춘다(대상과 화면이 어긋나는 것을 막는다).
         if (_evolveBtn != null)
-            _evolveBtn.gameObject.SetActive(_controller.CanPromote(PlayerWeaponManager.Slot0));
+            _evolveBtn.gameObject.SetActive(_activeTab == 0 && _controller.CanPromote(PlayerWeaponManager.Slot0));
 
-        // 잭팟은 두 무기 강화(근접·원거리) 모두에 걸린다 — 탭과 무관하게 항상 최신값.
+        // 잭팟은 근접 무기 강화(도박)에만 걸린다 — 파츠 강화는 확정이라 굴리지 않는다.
         if (_jackpotHint != null)
             _jackpotHint.text = $"잭팟 <color=#FFD24A>{_controller.JackpotChance * 100f:F0}%</color>"
                               + (_controller.Streak > 0
@@ -1872,8 +1717,7 @@ public sealed class UI_CruciblePanel : UI_Popup
             }
         }
 
-        RefreshRangedParts();   // 슬롯 4칸 — 강화·연료 변동으로도 갱신되어야 한다
-        RefreshRangedWeaponRow();
+        RefreshRangedParts();   // 파츠 5행 — 강화·연료 변동으로도 버튼 상태가 바뀐다
         RefreshRangedCard();
         RefreshFocusExtras();
         RefreshInfo();
@@ -1900,9 +1744,7 @@ public sealed class UI_CruciblePanel : UI_Popup
             _cardAtk[RangedCard].text = "";
             _partGrowthText.text = "";
             _partSynergyText.text = "";
-            _partDescText.text = state != null && state.UnlockedSlots == 0
-                ? "원거리 무기를 강화하면 파츠 슬롯이 열린다."
-                : "왼쪽 칸을 누르면 강화 대상이 된다.";
+            _partDescText.text = "왼쪽 목록에서 파츠를 고르면 여기에 결과가 나온다.";
             SetBar(_cardGaugeFill[RangedCard], 0f);
             SetPartButton(null, 0, 0, false);
             return;
@@ -1930,38 +1772,31 @@ public sealed class UI_CruciblePanel : UI_Popup
     /// <summary>마우스가 올라간 슬롯의 파츠. 없으면 null.</summary>
     private WeaponPartEntry HoveredPartDef()
     {
-        var state = RangedPartsState.Current;
-        if (state == null || _hoverPartSlot < 0 || _hoverPartSlot >= state.Equipped_.Count) return null;
-        return Managers.WeaponParts?.GetById(state.Equipped_[_hoverPartSlot].partId);
+        var all = Managers.WeaponParts?.All;
+        if (all == null || _hoverPartSlot < 0 || _hoverPartSlot >= all.Count) return null;
+        return all[_hoverPartSlot];
     }
 
-    /// <summary>상세 패널 하단 강화 버튼 — 라벨과 비용 줄, 그리고 누를 수 있는지.</summary>
+    /// <summary>
+    /// 상세 패널의 비용 줄. 강화 버튼 자체는 좌열 각 행으로 옮겼으므로(<c>_partEnhanceBtn</c>은 null)
+    /// 여기서는 "지금 얼마 드는가"만 적는다 — 누르는 곳 옆에는 비용이 이미 붙어 있고,
+    /// 이 줄은 고른 파츠를 읽는 동안 같은 정보를 잃지 않게 하는 용도다.
+    /// </summary>
     private void SetPartButton(WeaponPartEntry def, int cost, int have, bool usable)
     {
+        if (_partCostText != null)
+        {
+            if (def == null) _partCostText.text = "";
+            else if (def.max_level > 0 && RangedPartsState.Current.LevelOf(def.part_id) >= def.max_level)
+                _partCostText.text = "<color=#8AB0D5>더 올릴 수 없다</color>";
+            else
+                _partCostText.text = have >= cost
+                    ? $"강화 비용 <color=#FFD24A>{cost}</color> · 보유 {have} · <color=#7AD46E>실패 없음</color>"
+                    : $"<color=#FF5250>강화 비용 {cost}</color> · 보유 {have}";
+        }
+
         if (_partEnhanceBtn == null) return;
-
-        if (def == null)
-        {
-            _partEnhanceLabel.text = "파츠 강화하기";
-            _partCostText.text     = "";
-            _partEnhanceBtn.interactable = false;
-            return;
-        }
-
-        bool maxed = def.max_level > 0 && RangedPartsState.Current.LevelOf(def.part_id) >= def.max_level;
-        if (maxed)
-        {
-            _partEnhanceLabel.text = "최대 강화";
-            _partCostText.text     = "<color=#8AB0D5>더 올릴 수 없다</color>";
-            _partEnhanceBtn.interactable = false;
-            return;
-        }
-
-        _partEnhanceLabel.text = "파츠 강화하기";
-        _partCostText.text = have >= cost
-            ? $"재료 <color=#FFD24A>{cost}</color> · 보유 {have} · <color=#7AD46E>실패 없음</color>"
-            : $"<color=#FF5250>재료 {cost}</color> · 보유 {have}";
-        _partEnhanceBtn.interactable = usable && have >= cost && !_animating;
+        _partEnhanceBtn.interactable = def != null && usable && have >= cost && !_animating;
     }
 
     /// <summary>파츠 효과 한 줄 — 지금 값과 다음 레벨 값. 계단형은 임계 전까지 값이 그대로라 남은 강수도 함께 보인다.</summary>
