@@ -102,7 +102,11 @@ public class MapBuilder
                 });
 
                 // 벽 블록 수직 반복 — 같은 프리팹을 위로 쌓아 자연스러운 높이 연출(Stacked 모드).
-                // GPU 인스턴싱(URP 기본)으로 동일 메시+머티리얼은 자동 배칭되어 드로우콜 증가가 적다.
+                // ⚠️ 레이어 간격은 cellSize(1m) 고정이다 — 벽 프리팹은 반드시 <b>1m 큐브</b>여야 이음매 없이 쌓인다.
+                //    3m 큐브를 Stacked로 돌리면 3배 겹치고, Single로 돌리면 wallHeight로 계산되는 천장과 어긋난다.
+                // 배칭은 SRP Batcher가 담당한다(URP 에셋 m_UseSRPBatcher=1). SetPass 전환이 묶여 CPU 비용은 낮지만
+                // 드로우콜은 인스턴스 수만큼 나가므로 wallHeight에 선형 비례한다. 머티리얼의 GPU 인스턴싱 체크는
+                // SRP Batcher가 우선하므로 실질 미적용이다.
                 // Single 모드(절벽 등 자연지형)는 셀당 1개만 배치 — 높이는 프리팹 메시가 소유하므로 반복하지 않는다.
                 if (renderType == TileType.Wall && palette.WallMode == WallBuildMode.Stacked && wallLayers > 1)
                 {

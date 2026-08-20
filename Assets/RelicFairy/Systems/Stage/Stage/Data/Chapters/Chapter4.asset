@@ -13,17 +13,17 @@ MonoBehaviour:
   m_Name: Chapter4
   m_EditorClassIdentifier: Assembly-CSharp::ChapterDataSO
   chapterId: 4
-  chapterName: "\uC2EC\uC5F0\uC758 \uD611\uACE1"
-  description: "\uC774 \uACB0\uACFC\uB294 \uB204\uAD6C\uC758 \uC695\uB9DD\uC778\uAC00"
+  chapterName: "\uC554\uD751\uB300\uC9C0"
+  description: "\uC138\uACC4\uC758 \uADFC\uC6D0. \uBE5B\uC774 \uC874\uC7AC\uD558\uC9C0 \uC54A\uB294 \uACF3"
   mapBackground: {fileID: 0}
   mapBackgroundTint: {r: 1, g: 1, b: 1, a: 1}
-  mapBackgroundKey: map_12
+  mapBackgroundKey: map_void
   decorationSprites: []
   theme: Fortress
-  bgmKey: bgm_abyss
+  bgmKey: bgm_void
   difficultyScale: 3.0
   monsterCountScale: 1.6
-  monsterPoolTag: 4
+  monsterPoolTag: void
   bossSpawnTable: {fileID: 11400000, guid: 880c546a040888c499c89d944405966e, type: 2}
   middleLayers: 11
   peakLayer: 7
