@@ -141,57 +141,62 @@ public static class MemoryAltarCatalog
         // ── Ⅰ 출발 (5) — 무엇으로 시작하는가 ──────────────
         // 이 게임에서 <b>런 시작 시점에 정해지는 것</b>은 원거리 무기·인장·계승뿐이다.
         // 주무기는 항상 무형검이고(시나리오), 그 형(形)은 런 안에서 재련소가 벼린다.
-        new(WeaponCrossbow, AltarBranch.Start, "석궁",              "무기대에 석궁이 선택지로 선다",            2400,
-            Rec.MaxEnhance, 6, "무기 +6 도달", 1600),
-        new(PartsInherit,   AltarBranch.Start, "파츠 영구 계승",     "파츠 1개를 다음 런으로 가져간다",           2400,
-            Rec.MaxChapter, 3, "3챕터 도달", 1600),
-        new(SigilMerchant,  AltarBranch.Start, "상인의 인장",        "상점 가격이 낮아진 채로 시작한다",           2000,
-            Rec.ShopUses, 5, "상점 5회 이용", 1400),
-        new(SigilSmith,     AltarBranch.Start, "대장장이의 인장",    "무기 강화 성공률이 오른 채로 시작한다",       2000,
-            Rec.MaxEnhance, 9, "무기 +9 도달", 1400),
-        new(SigilAscetic,   AltarBranch.Start, "고행자의 인장",      "더 적은 보상 대신 더 큰 배율로 시작한다",     6000,
-            Rec.MaxDepth, 6, "깊이 6 클리어", 3000),
+        //
+        // ★ 순서 = 사슬이다. 위에서 아래로 <b>값과 조건 난이도가 함께 오른다</b>.
+        //   예전 배열(2400·2400·2000·2000·6000)은 값이 오르내려, 화면에서 눈이 가장 먼저 닿는 열이
+        //   하필 가장 무작위해 보였다. 갈래 합계(14,800)는 그대로라 경제 시뮬은 다시 돌리지 않아도 된다.
+        new(SigilMerchant,  AltarBranch.Start, "상인의 인장",     "상점 가격  −15%",              1400,
+            Rec.ShopUses, 5, "상점 5회 이용", 1000),
+        new(SigilSmith,     AltarBranch.Start, "대장장이의 인장", "강화 성공률  +8%p",            2000,
+            Rec.MaxEnhance, 6, "무기 +6 도달", 1400),
+        new(WeaponCrossbow, AltarBranch.Start, "석궁",           "시작 원거리 무기  1종 → 2종",   2600,
+            Rec.EliteKills, 30, "정예 30회 처치", 1700),
+        new(PartsInherit,   AltarBranch.Start, "파츠 영구 계승",  "다음 런 계승  0개 → 1개",       3600,
+            Rec.MaxChapter, 3, "3챕터 도달", 2400),
+        new(SigilAscetic,   AltarBranch.Start, "고행자의 인장",   "보상 −1개 · 수급 ×1.6 (토글)",  5200,
+            Rec.MaxDepth, 6, "깊이 6 클리어", 2600),
 
         // ── Ⅱ 등장 (8) ★ 제단의 심장 ─────────────────────
         // 전부 "풀에 들어오되 매 런 다시 뽑아야 하는 것"이다 — 확률적이라 열려도 안 나올 수 있다.
         // ★ 이 노드가 <b>온램프</b>다 — 첫 챕터를 깨면 약 280정수가 들어오므로 400은 그 다음 런에 닿는다.
         // (정본의 「카타나 300」이 맡던 자리다. 카타나는 무형검 진화 분기라 노드에서 빠졌고,
         //  그 자리를 비워두면 최저가가 1,000이 되어 첫 해금이 8런째로 밀린다 — 시뮬레이션 실측.)
-        new(RuneChoice4,    AltarBranch.Appear, "룬 4지선다",        "룬 선택지가 3개에서 4개로 늘어난다",          400,
+        new(RuneChoice4,    AltarBranch.Appear, "룬 4지선다",        "룬 선택  3개 → 4개",          400,
             Rec.RoomClears, 50, "방 50회 클리어", 280),
-        new(PartsDraft4,    AltarBranch.Appear, "파츠 드래프트 4",   "보스 파츠 선택지가 3개에서 4개로 늘어난다",   1200,
+        new(PartsDraft4,    AltarBranch.Appear, "파츠 드래프트 4",   "보스 파츠 선택  3개 → 4개",   1200,
             Rec.BossKills, 3, "보스 3회 처치", 800),
-        new(RefineQuality,  AltarBranch.Appear, "정제 품질",         "존핵 상위 등급 확률이 오른다",              1800,
+        new(RefineQuality,  AltarBranch.Appear, "정제 품질",         "존핵 Epic 확률  +12%p",              1800,
             Rec.RefineCount, 30, "정제 30회", 1200),
-        new(RuneEpic,       AltarBranch.Appear, "Epic 룬 개방",      "Epic 등급이 드랍 풀에 들어온다 (값 ×1.5)",   4000,
+        new(RuneEpic,       AltarBranch.Appear, "Epic 룬 개방",      "드랍 최고 등급  Rare → Epic",   4000,
             Rec.MaxDepth, 1, "깊이 1 클리어", 2000),
-        new(CorePartsTier1, AltarBranch.Appear, "코어 파츠 1차",     "유물 메커닉이 바뀌는 코어 파츠가 등장한다",   5200,
+        new(CorePartsTier1, AltarBranch.Appear, "코어 파츠 1차",     "코어 파츠 후보  1종 → 2종",   5200,
             Rec.MaxDepth, 2, "깊이 2 클리어", 2600),
-        new(RuneLegendary,  AltarBranch.Appear, "Legendary 룬 개방", "Legendary 등급이 드랍 풀에 들어온다 (값 ×2.2)", 6400,
+        new(RuneLegendary,  AltarBranch.Appear, "Legendary 룬 개방", "드랍 최고 등급  Epic → Legendary", 6400,
             Rec.MaxDepth, 3, "깊이 3 클리어", 3200),
-        new(CorePartsAll,   AltarBranch.Appear, "코어 파츠 전체",    "유물당 코어 파츠 3종이 전부 등장한다",       7600,
+        new(CorePartsAll,   AltarBranch.Appear, "코어 파츠 전체",    "코어 파츠 후보  2종 → 3종",       7600,
             Rec.MaxDepth, 4, "깊이 4 클리어", 3800),
         // 승급 자체는 해금 없이도 된다(강화 MAX면 가능) — 해금이 넓히는 것은 <b>후보의 수</b>다.
         // 미해금이면 엑스칼리버 하나로 고정되고, 열면 갈라틴·아론다이트까지 셋 중에 고른다.
-        new(WeaponEvolve,   AltarBranch.Appear, "전설 3종 개방",     "승급 시 전설 후보가 1종에서 3종으로 늘어난다", 8000,
+        new(WeaponEvolve,   AltarBranch.Appear, "전설 3종 개방",     "승급 전설 후보  1종 → 3종", 8000,
             Rec.MaxDepth, 5, "깊이 5 클리어", 4000),
 
         // ── Ⅲ 존속 (2) — 조건 없음 ───────────────────────
         // 벽을 넘게 해주는 것이라 무조건 열려야 한다. 영구 공격력은 0이다.
-        new(Revive,  AltarBranch.Endure, "부활 1회",      "런당 1회 부활한다",        1200),
-        new(MaxHpUp, AltarBranch.Endure, "최대 체력 +76", "최대 체력이 76 오른다",    1500),
+        new(Revive,  AltarBranch.Endure, "부활 1회",      "런당 부활  0회 → 1회",        1200),
+        new(MaxHpUp, AltarBranch.Endure, "최대 체력 +76", "최대 체력  +76",    1500),
 
         // ── Ⅳ 심연 (3) ──────────────────────────────────
         // 앞의 둘만 조건이 <b>자물쇠</b>다 — 논리적 선후가 있어 데드락이 아니다(정본 §2-3).
-        new(AbyssDepth,  AltarBranch.Abyss, "심연 깊이 개방", "완주 후 더 깊이 이어갈 수 있다", 1000,
+        new(AbyssDepth,  AltarBranch.Abyss, "심연 깊이 개방", "완주 후  다회차 개방", 1000,
             Rec.Clears, 1, "첫 완주", 1000, conditionRequired: true),
-        new(Chapter4,    AltarBranch.Abyss, "챕터 4 개방",   "4챕터로 나아갈 수 있다",         1800,
+        new(Chapter4,    AltarBranch.Abyss, "챕터 4 개방",   "도달 가능 챕터  3 → 4",         1800,
             Rec.MaxDepth, 1, "깊이 1 도달", 1800, conditionRequired: true),
-        new(DepthReward, AltarBranch.Abyss, "깊이 보상 배율", "깊이마다 보상이 15% 늘어난다",   3000,
+        new(DepthReward, AltarBranch.Abyss, "깊이 보상 배율", "정수 수급  깊이당 +15%",   3000,
             Rec.MaxDepth, 2, "깊이 2 클리어", 2200),
     };
 
     private static Dictionary<string, MemoryAltarNode> _byId;
+    private static Dictionary<string, MemoryAltarNode> _prevInBranch;
 
     public static IReadOnlyList<MemoryAltarNode> All => Nodes;
 
@@ -208,7 +213,30 @@ public static class MemoryAltarCatalog
         return _byId.TryGetValue(id, out var node) ? node : null;
     }
 
-    /// <summary>갈래 하나의 노드를 정의 순서대로 — 화면의 열 순서가 곧 이 순서다.</summary>
+    /// <summary>
+    /// 같은 갈래에서 <b>바로 앞</b> 노드. 갈래의 첫 노드면 null.
+    /// <para>이것이 사슬이다 — 앞을 열어야 다음을 살 수 있다. <b>기록 자물쇠가 아니다</b>:
+    /// 앞 칸은 정수만으로 항상 넘을 수 있고 방향이 하나뿐이라 순환(데드락)이 생길 수 없다.
+    /// 갈래가 넷이라 언제나 최대 네 칸이 동시에 열려 있어 선택도 살아 있다.</para>
+    /// </summary>
+    public static MemoryAltarNode PreviousInBranch(MemoryAltarNode node)
+    {
+        if (node == null) return null;
+
+        if (_prevInBranch == null)
+        {
+            _prevInBranch = new Dictionary<string, MemoryAltarNode>(Nodes.Length);
+            var last = new Dictionary<AltarBranch, MemoryAltarNode>();
+            foreach (var n in Nodes)
+            {
+                _prevInBranch[n.Id] = last.TryGetValue(n.Branch, out var p) ? p : null;
+                last[n.Branch] = n;
+            }
+        }
+        return _prevInBranch.TryGetValue(node.Id, out var prev) ? prev : null;
+    }
+
+    /// <summary>갈래 하나의 노드를 정의 순서대로 — 화면의 열 순서가 곧 사슬 순서다.</summary>
     public static List<MemoryAltarNode> GetBranch(AltarBranch branch)
     {
         var list = new List<MemoryAltarNode>(8);

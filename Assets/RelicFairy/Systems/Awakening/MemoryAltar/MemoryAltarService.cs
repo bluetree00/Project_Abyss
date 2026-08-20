@@ -22,6 +22,15 @@ public struct AltarNodeState
 
     /// <summary>조건이 자물쇠인 예외 노드인데 아직 조건을 못 채웠다.</summary>
     public bool BlockedByRequirement;
+
+    /// <summary>
+    /// 같은 갈래의 <b>앞 칸</b>이 아직 안 열렸다. 갈래는 사슬이라 위에서부터 차례로 열린다.
+    /// <para>기록 자물쇠와 다르다 — 앞 칸은 정수만으로 항상 넘을 수 있고 방향이 하나뿐이다.</para>
+    /// </summary>
+    public bool BlockedByChain;
+
+    /// <summary>이 갈래에서 <b>지금 살 차례</b>인 칸. 갈래마다 정확히 0개 또는 1개다.</summary>
+    public bool IsNextInChain;
 }
 
 /// <summary>
@@ -61,8 +70,14 @@ public static class MemoryAltarService
         state.Cost = state.ConditionMet ? node.DiscountCost : node.BaseCost;
         state.BlockedByRequirement = node.ConditionRequired && !state.ConditionMet;
 
+        // 사슬 — 같은 갈래의 앞 칸이 안 열렸으면 아직 차례가 아니다.
+        var prev = MemoryAltarCatalog.PreviousInBranch(node);
+        state.BlockedByChain = prev != null && !(data?.IsUnlocked(prev.Id) ?? false);
+        state.IsNextInChain  = !state.Unlocked && !state.BlockedByChain;
+
         state.CanBuy = !state.Unlocked
                     && !state.BlockedByRequirement
+                    && !state.BlockedByChain
                     && (data?.abyssEssence ?? 0) >= state.Cost;
 
         return state;
@@ -82,7 +97,7 @@ public static class MemoryAltarService
         foreach (var node in MemoryAltarCatalog.All)
         {
             var s = GetState(node);
-            if (s.Unlocked || s.BlockedByRequirement) continue;
+            if (s.Unlocked || s.BlockedByRequirement || s.BlockedByChain) continue;
             if (best == null || s.Cost < best.Value.Cost) best = s;
         }
         return best;
@@ -116,6 +131,13 @@ public static class MemoryAltarService
         if (state.BlockedByRequirement)
         {
             Debug.Log($"[MemoryAltar] 선행 조건 미충족: {node.DisplayName} ({node.ConditionLabel})");
+            return false;
+        }
+
+        if (state.BlockedByChain)
+        {
+            var prev = MemoryAltarCatalog.PreviousInBranch(node);
+            Debug.Log($"[MemoryAltar] 사슬 미도달: {node.DisplayName} — 앞의 「{prev?.DisplayName}」이 먼저다");
             return false;
         }
 

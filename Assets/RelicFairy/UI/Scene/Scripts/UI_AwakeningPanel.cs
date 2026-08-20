@@ -21,6 +21,14 @@ using UnityEngine.UI;
 /// </summary>
 public class UI_AwakeningPanel : UI_Popup
 {
+    // ── Constants ──────────────────────────────────────────────────────────
+    /// <summary>
+    /// ESC로 닫힌다. 화면 우상단에 「ESC 닫기」 안내를 띄우면서 이 값을 안 올려서,
+    /// ESC가 <see cref="UIManager.TryCloseTopPopupOnEscape"/>에 <b>소비만 되고 아무 일도 안 났다</b>.
+    /// 닫기 버튼과 같은 경로(ClosePopupUI)라 저장·정리 흐름도 동일하다.
+    /// </summary>
+    public override bool CloseOnEscape => true;
+
     // ── 직렬화 필드 ────────────────────────────────────────────────────────
     [Header("헤더")]
     [SerializeField] private TMP_Text essenceText;
@@ -74,6 +82,7 @@ public class UI_AwakeningPanel : UI_Popup
         { "무엇으로 시작하는가", "무엇이 나올 수 있는가", "얼마나 버틸 수 있는가", "얼마나 깊이 갈 수 있는가" };
 
     private readonly List<List<AltarNodeRowView>> _rows = new();
+    private readonly List<List<MemoryAltarNode>>   _branchNodes = new();
     private MemoryAltarNode _selected;
     private bool _achievementMode;
 
@@ -151,16 +160,17 @@ public class UI_AwakeningPanel : UI_Popup
             var list = new List<AltarNodeRowView>();
             _rows.Add(list);
 
+            // 열이 비어 있어도 자리를 채운다 — 아래 continue로 건너뛰면 _rows와 인덱스가 어긋나
+            // 갈래 진척(RefreshBranchCounts)이 옆 열의 숫자를 쓴다.
+            var nodes = MemoryAltarCatalog.GetBranch(Branches[c]);
+            _branchNodes.Add(nodes);
+
             if (branchTitles    != null && c < branchTitles.Length    && branchTitles[c])
                 branchTitles[c].text = MemoryAltarCatalog.BranchLabel(Branches[c]);
             if (branchQuestions != null && c < branchQuestions.Length && branchQuestions[c])
                 branchQuestions[c].text = BranchQuestions[c];
 
             if (c >= branchColumns.Length || branchColumns[c] == null) continue;
-
-            var nodes = MemoryAltarCatalog.GetBranch(Branches[c]);
-            if (branchCounts != null && c < branchCounts.Length && branchCounts[c])
-                branchCounts[c].text = nodes.Count.ToString();
 
             foreach (var node in nodes)
             {
@@ -171,6 +181,29 @@ public class UI_AwakeningPanel : UI_Popup
                 row.SetOnSelect(() => Select(captured));
                 list.Add(row);
             }
+        }
+    }
+
+    /// <summary>
+    /// 열 머리의 진척 표시(2/5). 사슬이라 <b>어디까지 왔는지</b>가 갈래마다 하나의 숫자로 떨어진다.
+    /// 다 열면 숫자 대신 ✦ — 목록의 끝이 아니라 갈래의 완성으로 읽힌다.
+    /// </summary>
+    private void RefreshBranchCounts()
+    {
+        if (branchCounts == null) return;
+
+        for (int c = 0; c < _branchNodes.Count && c < branchCounts.Length; c++)
+        {
+            if (branchCounts[c] == null) continue;
+
+            var nodes = _branchNodes[c];
+            int done = 0;
+            for (int i = 0; i < nodes.Count; i++)
+                if (MemoryAltarService.IsUnlocked(nodes[i].Id)) done++;
+
+            bool complete = done >= nodes.Count && nodes.Count > 0;
+            branchCounts[c].text  = complete ? "✦" : $"{done}/{nodes.Count}";
+            branchCounts[c].color = complete ? AltarPalette.Essence : AltarPalette.TextDim;
         }
     }
 
@@ -213,6 +246,8 @@ public class UI_AwakeningPanel : UI_Popup
                 for (int i = 0; i < list.Count && i < nodes.Count; i++)
                     list[i].Refresh(MemoryAltarService.GetState(nodes[i]), essence, nodes[i] == _selected);
             }
+
+            RefreshBranchCounts();
         }
 
         RefreshActionBar(essence);
@@ -336,6 +371,11 @@ public class UI_AwakeningPanel : UI_Popup
                       BuildActionCondition(state, node));
 
         if (state.Unlocked)                  SetActionButton(false, "해금됨", "");
+        else if (state.BlockedByChain)
+        {
+            var prev = MemoryAltarCatalog.PreviousInBranch(node);
+            SetActionButton(false, "아직 차례가 아니다", prev != null ? $"앞의 「{prev.DisplayName}」을 먼저 연다" : "");
+        }
         else if (state.BlockedByRequirement) SetActionButton(false, "선행 조건 필요", node.ConditionLabel);
         else if (state.CanBuy)               SetActionButton(true,  $"{state.Cost:N0} ◆ 해금", "");
         else                                 SetActionButton(false, "정수 부족", $"{state.Cost - essence:N0} 모자람");
