@@ -2,11 +2,16 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// 히트 이벤트 허브. 공격자/피격자 양측 연출 구독자(카메라 쉐이크, Flash 쉐이더, Volume 펄스 등)가
-/// OnHit 이벤트를 구독하여 반응한다.
+/// 히트 이벤트 허브. 연출을 <b>두 계층으로 갈라</b> 내보낸다.
 ///
-/// 실제 Hit-Stop / Camera Shake 실행은 HitFeelService에 위임 (하위 호환).
-/// Phase 2~3 에서 VictimHitFeedback / VolumePulseService 등이 OnHit 구독 예정.
+///  · <b>국소</b>(착탄 지점마다 나야 옳다) — 피격자 플래시·히트 VFX·데미지 숫자.
+///    타격 1건마다 즉시 발행한다: IHitReceiver 직접 호출 + <see cref="OnHit"/>.
+///  · <b>글로벌</b>(공격 1회당 한 번이어야 옳다) — 히트스톱·카메라 셰이크·풀스크린 플래시·PostFX 펄스.
+///    <see cref="GlobalFeelCoalescer"/>에 적립만 하고, 프레임 끝에 합산본이 1회 발행된다.
+///
+/// 갈라놓지 않으면 분열·관통·폭발이 붙은 원거리 한 발이 화면 연출을 수십 겹으로 터뜨린다.
+/// 새 화면 연출을 붙일 때는 <see cref="GlobalFeelCoalescer.OnBurst"/>를 구독할 것 —
+/// <see cref="OnHit"/>을 구독하면 다시 같은 문제로 돌아간다.
 /// </summary>
 public static class HitFeedbackService
 {
@@ -16,29 +21,19 @@ public static class HitFeedbackService
 
     // ── Public Methods ────────────────────────────────────────────
     /// <summary>
-    /// 이펙트-타겟 콜라이더 충돌 시점에서 호출.
-    /// 1) 기본 HitStop + CameraShake (⑨ + ① 기존 HitFeel)
-    /// 2) target의 IHitReceiver 직접 호출 (🔵 피격자 로컬 피드백 — Flash/PointLight)
-    /// 3) OnHit 이벤트 발행 (🔴 글로벌 구독자 — 카메라/PostFX 등 Phase 3+)
+    /// 피해가 실제로 들어간 시점에서 호출.
+    /// 1) target의 IHitReceiver 직접 호출 (🔵 국소 — 피격자 Flash/PointLight)
+    /// 2) OnHit 이벤트 발행 (🔵 국소 — 타격 1건 단위로 알아야 하는 구독자)
+    /// 3) 글로벌 화면 연출은 프레임 합산기에 적립 (🔴 프레임 끝에 1회 발행)
     /// </summary>
     public static void RaiseHit(in HitInfo info)
     {
-        PlayDefaultFeel(info);
         DispatchToTargetReceiver(info);
         DispatchToGlobalSubscribers(info);
+        GlobalFeelCoalescer.Accumulate(info);
     }
 
     // ── Private Methods ───────────────────────────────────────────
-    /// <summary>
-    /// 크리티컬/일반 기본 피드백. 기존 HitFeelService API에 포워딩하여 기존 체감을 그대로 유지한다.
-    /// Phase 3에서 WeaponHitProfileSO 도입 시 프로필 우선으로 전환.
-    /// </summary>
-    private static void PlayDefaultFeel(in HitInfo info)
-    {
-        // AttackDirection(공격자→피격자)을 그대로 넘겨 카메라가 타격 방향으로 밀린다.
-        HitFeelService.Hit(info.Damage, info.IsCritical, WeaponFeelTable.For(info.WeaponType), info.AttackDirection);
-    }
-
     /// <summary>피격자 로컬 피드백 — IHitReceiver 구현체에게 직접 전달.</summary>
     private static void DispatchToTargetReceiver(in HitInfo info)
     {
@@ -49,7 +44,7 @@ public static class HitFeedbackService
         catch (Exception e) { Debug.LogException(e); }
     }
 
-    /// <summary>글로벌 구독자에게 OnHit 이벤트 발행 — 예외 격리.</summary>
+    /// <summary>국소 구독자에게 OnHit 이벤트 발행(타격 1건 단위) — 예외 격리.</summary>
     private static void DispatchToGlobalSubscribers(in HitInfo info)
     {
         var handlers = OnHit;

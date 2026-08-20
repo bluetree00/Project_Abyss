@@ -1,3 +1,4 @@
+using System.Text;
 using TMPro;
 using UnityEngine;
 
@@ -10,6 +11,8 @@ using UnityEngine;
 ///   • 후반 축소 — 관련성이 떨어질수록 작아지며 사라진다.
 ///   • 영수증 캐스케이드 — 같은 대상에 연타가 꽂히면 <b>위로 한 칸씩 쌓여</b> 열을 이룬다.
 ///     (cascadeIndex 를 스포너가 넘긴다. 흩뿌리면 난잡하고, 쌓으면 "몇 대 때렸는지"가 읽힌다.)
+///   • 자릿수 아치 — 가운데 자릿수가 살짝 높은 완만한 호(메이플 계열의 시그니처).
+///     숫자가 평평한 문자열이 아니라 하나의 '물체'로 읽혀 타격감이 붙는다.
 ///
 /// 풀링되며 라이프타임 종료 시 비활성화 (재사용 대비).
 /// </summary>
@@ -38,6 +41,12 @@ public class DamagePopup : MonoBehaviour
     [SerializeField] private float endScale = 0.7f;
     [Tooltip("이 진행도(0~1)부터 축소를 시작한다.")]
     [SerializeField] private float shrinkStart = 0.55f;
+
+    [Header("Digit Arc")]
+    // 정점을 직접 미는 대신 리치텍스트 <voffset>을 쓴다. TMP가 레이아웃 단계에서 적용하므로
+    // 캔버스 리빌드(알파 변화 등)에 지워지지 않고, 매 프레임 ForceMeshUpdate 비용도 들지 않는다.
+    [Tooltip("가운데 자릿수가 올라가는 높이(em). 0이면 아치 없음(평직).")]
+    [SerializeField] private float arcHeight = 0.1f;
 
     [Header("Receipt Cascade")]
     [Tooltip("연타가 같은 대상에 꽂힐 때 한 칸씩 올려 쌓는 간격(m).")]
@@ -93,6 +102,9 @@ public class DamagePopup : MonoBehaviour
     // 팝업마다 머티리얼을 만들면 배칭이 깨지므로 딱 두 개만 둔다.
     private static Material s_outlineMat;
     private static Material s_critMat;
+
+    // 아치 문자열 조립용 — 한 프레임에 수십 개가 뜨므로 Show마다 새로 만들지 않는다.
+    private static readonly StringBuilder s_sb = new StringBuilder(64);
 
     // ── Private ─────────────────────────────────────────────────────
     private Vector3 _startWorldPos;
@@ -175,7 +187,7 @@ public class DamagePopup : MonoBehaviour
         if (label != null)
         {
             int amount = Mathf.RoundToInt(Mathf.Abs(damage));
-            label.text = isCrit ? $"{amount}!" : amount.ToString();
+            label.text = BuildArcText(amount, isCrit);
             ApplyStyle(isCrit, kind, element);
             label.transform.localScale = Vector3.zero;   // 팝이 0에서 시작
         }
@@ -221,6 +233,34 @@ public class DamagePopup : MonoBehaviour
 
         label.enableVertexGradient = false;
         label.color = ColorForKind(kind);
+    }
+
+    /// <summary>
+    /// 자릿수를 완만한 호로 배치한 리치텍스트를 만든다.
+    /// 높이 = arcHeight × (1 − 4·(t−0.5)²) — 가운데가 최고점, 양 끝은 정확히 0이라
+    /// 숫자 전체가 위로 들뜨지 않고 기준선에 앉는다.
+    /// 자릿수가 2 이하면 호가 성립하지 않으므로(대칭이라 전부 같은 높이) 그냥 평직으로 둔다.
+    /// </summary>
+    private string BuildArcText(int amount, bool isCrit)
+    {
+        string digits = amount.ToString();
+        string body   = isCrit ? digits + "!" : digits;
+
+        int n = body.Length;
+        if (arcHeight <= 0f || n <= 2) return body;
+
+        s_sb.Clear();
+        for (int i = 0; i < n; i++)
+        {
+            float t   = (float)i / (n - 1);
+            float d   = t - 0.5f;
+            float off = arcHeight * (1f - 4f * d * d);
+
+            if (off > 0.0001f) s_sb.Append("<voffset=").Append(off.ToString("0.###")).Append("em>");
+            s_sb.Append(body[i]);
+            if (off > 0.0001f) s_sb.Append("</voffset>");
+        }
+        return s_sb.ToString();
     }
 
     private Color ColorForKind(DamageKind kind) => kind switch

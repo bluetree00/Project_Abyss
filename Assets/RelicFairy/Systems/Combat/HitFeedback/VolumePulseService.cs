@@ -57,7 +57,7 @@ public static class VolumePulseService
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
-        HitFeedbackService.OnHit -= OnHit; // 중복 구독 방지 (Init 에서 += 재등록)
+        GlobalFeelCoalescer.OnBurst -= OnHitBurst; // 중복 구독 방지 (Init 에서 += 재등록)
         _initialized   = false;
         _host          = null;
         _volume        = null;
@@ -80,7 +80,7 @@ public static class VolumePulseService
         BuildVolume();
         BuildCurve();
 
-        HitFeedbackService.OnHit += OnHit;
+        GlobalFeelCoalescer.OnBurst += OnHitBurst;
     }
 
     // ── Public Methods ────────────────────────────────────────────
@@ -145,15 +145,18 @@ public static class VolumePulseService
     }
 
     // ── Event Handler ─────────────────────────────────────────────
-    private static void OnHit(HitInfo info)
+    private static void OnHitBurst(HitBurst burst)
     {
-        bool isCrit = info.IsCritical;
+        bool isCrit = burst.AnyCritical;
 
         // ① 비크리 약타/연타는 풀스크린 PostFX 펄스 생략 — 멀미·시각노이즈 방지.
         //    크리티컬은 임계/쿨다운 무시하고 항상 발화(타격감 보존).
+        //    ⚠ 크리가 쿨다운을 무시하는 규약은, 프레임 합산(GlobalFeelCoalescer) 이전엔
+        //    분열 볼리의 크리 여러 발이 각자 펄스를 걸어 화면을 통째로 흔들던 구멍이었다.
+        //    합산 후에는 프레임당 최대 1회라 이 면제가 안전하다.
         if (!isCrit)
         {
-            if (info.Damage < PulseDamageThreshold) return;
+            if (burst.MaxDamage < PulseDamageThreshold) return;
             if (Time.unscaledTime - _lastPulseTime < PulseMinInterval) return;
         }
 

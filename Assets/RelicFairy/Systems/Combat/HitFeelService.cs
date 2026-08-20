@@ -113,16 +113,25 @@ public static class HitFeelService
 
     /// <summary>방향(공격자→피격자)까지 반영한 히트 피드백. hitDirection 이 0이면 무방향과 동일.</summary>
     public static void Hit(float damage, bool isCritical, in WeaponFeel feel, Vector3 hitDirection)
+        => Hit(damage, isCritical, feel, hitDirection, 1f);
+
+    /// <summary>
+    /// 셰이크 세기 배수까지 받는 히트 피드백. 다중 타격을 한 번으로 합쳐 쓸 때
+    /// (<see cref="GlobalFeelCoalescer"/>) "여러 발 맞췄다"를 셰이크에만 얹기 위한 노브다.
+    /// 히트스톱 길이에는 곱하지 않는다 — 스무 발 볼리가 크리 한 방보다 오래 멈추면 답답해진다.
+    /// </summary>
+    public static void Hit(float damage, bool isCritical, in WeaponFeel feel, Vector3 hitDirection, float shakeScale)
     {
+        float amp = Mathf.Max(0f, shakeScale);
         if (isCritical)
         {
             HitStop(feel.CritStopScale, CritStopDuration(damage) * feel.StopDurationMult);
-            CameraShakeDirectional(hitDirection, feel.CritShakeAmp, feel.CritShakeDur);
+            CameraShakeDirectional(hitDirection, feel.CritShakeAmp * amp, feel.CritShakeDur);
         }
         else
         {
             HitStop(feel.StopScale, HitStopDuration(damage) * feel.StopDurationMult);
-            CameraShakeDirectional(hitDirection, feel.ShakeAmp, feel.ShakeDur);
+            CameraShakeDirectional(hitDirection, feel.ShakeAmp * amp, feel.ShakeDur);
         }
     }
 

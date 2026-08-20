@@ -19,6 +19,13 @@ public static class DamagePopupSpawner
     private const float CascadeWindow  = 0.7f;
     private const int   CascadeMaxStep = 7;   // 그 이상은 화면 밖으로 나가므로 되감는다
 
+    /// <summary>
+    /// 순번 1칸당 스폰을 미루는 시간(초). 분열·다단은 <b>같은 프레임</b>에 수십 발이 꽂히는데,
+    /// 그걸 동시에 찍으면 위로 쌓여도 '기둥이 흘러 올라가는' 게 아니라 벽처럼 한꺼번에 박힌다.
+    /// 순번만큼 늦춰야 아래에서 위로 흐르며 읽힌다. 순번 0(=서로 다른 대상)은 지연이 없다.
+    /// </summary>
+    private const float CascadeStagger = 0.04f;
+
     private struct Cascade { public int index; public float lastTime; }
     private static readonly Dictionary<int, Cascade> _cascades = new();
 
@@ -51,6 +58,7 @@ public static class DamagePopupSpawner
                              DamageKind kind = DamageKind.Normal, RuneElement? element = null)
     {
         if (damage <= 0f) return;
+        // 순번은 '지금' 확정한다 — 지연 뒤에 뽑으면 같은 프레임의 연타가 서로 순번을 덮어쓴다.
         SpawnAsync(worldPos, damage, isCrit, NextCascadeIndex(targetId), kind, element).Forget();
     }
 
@@ -74,6 +82,11 @@ public static class DamagePopupSpawner
     {
         await EnsurePrefabAsync();
         if (_prefab == null) return;
+
+        // 순번만큼 늦게 찍는다. 지연 뒤에 풀에서 꺼내므로 대기 중 인스턴스를 붙잡고 있지 않는다.
+        if (cascadeIndex > 0)
+            await UniTask.Delay(System.TimeSpan.FromSeconds(CascadeStagger * cascadeIndex),
+                                DelayType.DeltaTime);
 
         var popup = GetFromPool();
         if (popup == null) return;
