@@ -20,6 +20,17 @@ public class BasicArrow : MonoBehaviour, IPooledObject
 
     /// <summary>스윕 1회가 담을 수 있는 최대 충돌 수.</summary>
     private const int SweepMax = 12;
+
+    /// <summary>귀환 진입 지점에서 이 거리(m)를 벗어나야 그 대상을 다시 때릴 수 있다. 어떤 몬스터 몸통보다 넉넉히 크다.</summary>
+    private const float ReentryGuardDist = 2f;
+
+
+    /// <summary>
+    /// 재공격 단계의 선회 배수. 관통을 다 쓴 화살이 다음 표적을 잡으려면 대개 크게 꺾어야 하는데,
+    /// 선회 반경 = 속도 / 각속도라 속도 30에 유도 1레벨(90°/s)이면 반경이 19m다 — 방 안에서 성립하지 않는다.
+    /// 배수를 얹어 3m대로 낮춘다. 이게 없으면 "다시 공격한다"가 그냥 직진으로 끝난다.
+    /// </summary>
+    private const float ReturnTurnMult = 6f;
     private static readonly RaycastHit[] s_sweepHits = new RaycastHit[SweepMax];
     private static readonly SweepDistanceComparer s_sweepOrder = new();
 
@@ -68,10 +79,26 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     private float _speedMult = 1f;
     /// <summary>유도 선회 강도(0=직선). 초당 회전 각도로 쓴다 — 에임 보정이 아니라 궤적 조작.</summary>
     private float _homing;
-    /// <summary>관통 후 뒤로 선회해 되돌아올지(유도 × 관통 시너지).</summary>
+    /// <summary>관통을 다 쓴 뒤 관통 예산을 한 번 되채워 재공격할지(유도 × 관통 시너지).</summary>
     private bool  _returnOnPierce;
-    private bool  _returning;
-    private Transform _homingTarget;
+    /// <summary>예산을 이미 한 번 되채웠는지. 리필은 발사당 1회뿐이라 이 플래그가 상한 역할을 한다.</summary>
+    private bool  _pierceRefilled;
+    /// <summary>
+    /// 추적 중인 적. Transform이 아니라 <see cref="MonsterBase"/>로 들고 있어야 <b>HP까지</b> 볼 수 있다.
+    /// 몹은 죽어도 사망 연출 동안 오브젝트가 살아 있어, 활성 여부만 보면 화살이 시체 주위를 맴돈다.
+    /// </summary>
+    private MonsterBase _homingTarget;
+
+    /// <summary>
+    /// 귀환 진입 시점에 <b>몸을 겹치고 있던</b> 대상. 이 자리를 벗어나기 전까지는 무시한다.
+    ///
+    /// 귀환에 들어가면 관통 기록을 비워 같은 적을 다시 때릴 수 있게 하는데, 그 순간 화살은
+    /// 아직 방금 뚫은 몬스터 안에 있다. 그대로 두면 다음 프레임에 제자리에서 그 몬스터를 다시 때리고
+    /// 관통 예산을 즉시 소진해 <b>돌아서기도 전에 자멸</b>한다(관통 1인 기본 조합이 정확히 이 경우).
+    /// </summary>
+    private GameObject _reentryGuard;
+    private Vector3    _reentryGuardPoint;
+
 
     // ── 풀 재사용 안전장치 ──────────────────────────────────
     private TrailRenderer _trail;
@@ -166,8 +193,9 @@ public class BasicArrow : MonoBehaviour, IPooledObject
         _speedMult      = 1f;
         _homing         = 0f;
         _returnOnPierce = false;
-        _returning      = false;
+        _pierceRefilled = false;
         _homingTarget   = null;
+        _reentryGuard   = null;
 
         SetModelVisible(true);
         gameObject.SetActive(true);
@@ -311,20 +339,22 @@ public class BasicArrow : MonoBehaviour, IPooledObject
 
     /// <summary>
     /// 유도 — 목표를 향해 <b>궤적을 선회</b>시킨다(순간 방향 전환이 아니라 초당 각도 제한).
-    /// 되돌아오는 중이면 시전자를 목표로 삼아 부메랑처럼 돌아온다.
+    /// 목표는 <b>항상 적</b>이다. 시전자를 목표로 삼던 예전 귀환 로직은 폐기했다 —
+    /// 시전자는 피격 대상에서 제외돼 있어 통과만 하고, 통과한 뒤 다시 선회해 돌아오기를 반복해
+    /// 수명이 끝날 때까지 플레이어를 따라다녔다.
+    /// 노릴 적이 없으면 선회하지 않고 그대로 날아가다 수명이 다해 사라진다.
     /// </summary>
     private void SteerHoming(float dt)
     {
-        Transform goal = _returning
-            ? (_instigator != null ? _instigator.transform : null)
-            : AcquireTarget();
-        if (goal == null) return;
+        var goal = AcquireTarget();
+        if (goal == null) return;   // 표적 없음 → 직진 → 수명 만료로 소멸
 
         Vector3 desired = (goal.position + Vector3.up * 0.8f) - transform.position;
         if (desired.sqrMagnitude < 0.01f) return;
 
+        float turn = _homing * (_pierceRefilled ? ReturnTurnMult : 1f);
         direction = Vector3.RotateTowards(direction, desired.normalized,
-                                          _homing * Mathf.Deg2Rad * dt, 0f).normalized;
+                                          turn * Mathf.Deg2Rad * dt, 0f).normalized;
         ApplyRotation();
     }
 
@@ -332,7 +362,11 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     private Transform AcquireTarget()
     {
         // 매 프레임 재탐색하지 않는다 — 대상이 살아있으면 그대로 유지(탐색 비용·궤적 흔들림 방지).
-        if (_homingTarget != null && _homingTarget.gameObject.activeInHierarchy) return _homingTarget;
+        // 단 HP가 0이 되는 순간 놓는다. 활성 여부만 보면 사망 연출 중인 시체를 계속 쫓는다.
+        if (_homingTarget != null && _homingTarget.gameObject.activeInHierarchy && _homingTarget.CurrentHp > 0)
+            return _homingTarget.transform;
+
+        _homingTarget = null;
 
         int n = CombatQuery.GetNearbyEnemies(transform.position, HomingSearchRadius, _instigator,
                                              HomingSearchMax, s_homingBuffer);
@@ -341,8 +375,8 @@ public class BasicArrow : MonoBehaviour, IPooledObject
             var mb = s_homingBuffer[i];
             if (mb == null) continue;
             if (_pierced != null && _pierced.Contains(mb.gameObject)) continue;   // 이미 뚫은 적은 건너뛴다
-            _homingTarget = mb.transform;
-            return _homingTarget;
+            _homingTarget = mb;
+            return mb.transform;
         }
         return null;
     }
@@ -383,6 +417,13 @@ public class BasicArrow : MonoBehaviour, IPooledObject
         // 관통 중복 판정도 콜라이더가 아니라 대상 단위로 — 몬스터가 콜라이더를 여러 개 가지면 중복 피격된다.
         if (_pierce && _pierced != null && _pierced.Contains(victim)) return;
 
+        // 귀환 직후 제자리 재타격 차단 — 그 자리를 벗어나면 가드를 풀고 다시 때릴 수 있게 한다.
+        if (victim == _reentryGuard)
+        {
+            if ((transform.position - _reentryGuardPoint).sqrMagnitude < ReentryGuardDist * ReentryGuardDist) return;
+            _reentryGuard = null;
+        }
+
         if (damageable != null)
         {
             // 주 피해 파이프라인 위임 — 예전엔 이 아래로 파이프라인(사전보정·서약·크릿·타격감·사후효과)을
@@ -418,13 +459,19 @@ public class BasicArrow : MonoBehaviour, IPooledObject
 
             if (_pierceCount >= _maxPierceCount)
             {
-                // [유도 × 관통] 관통을 다 쓰면 사라지는 대신 뒤로 돌아 되돌아온다.
-                // 돌아오는 동안 관통 기록을 비워 같은 적을 다시 때릴 수 있게 한다(재타격이 이 조합의 보상).
-                if (_returnOnPierce && !_returning && _homing > 0f)
+                // [유도 × 관통] 관통을 다 쓰면 사라지는 대신 예산을 한 번 되채워 다음 표적을 노린다.
+                // 관통 기록도 비워 같은 적을 다시 때릴 수 있게 한다(재타격이 이 조합의 보상).
+                // 노릴 적이 없으면 선회하지 않고 그대로 날아가다 수명이 다해 사라진다.
+                if (_returnOnPierce && !_pierceRefilled && _homing > 0f)
                 {
-                    _returning = true;
+                    _pierceRefilled = true;
                     _pierceCount = 0;
                     _pierced?.Clear();
+
+                    // 기록을 비운 순간 화살은 아직 이 몬스터 안에 있다 — 벗어나기 전까지만 이 대상을 막는다.
+                    // 막지 않으면 다음 프레임에 제자리 재타격으로 관통을 다 쓰고 돌아서기 전에 사라진다.
+                    _reentryGuard      = victim;
+                    _reentryGuardPoint = transform.position;
                 }
                 else Deactivate();
             }
