@@ -186,8 +186,11 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
                 ActionType          = WeaponActionType.QSkill,
                 KnockbackMultiplier = isLast ? 0.8f : 0.05f,
 
-                // 연타는 방어력을 무시한다. 감산 방어력(보스 20)이 20번 빠지면 잘게 쪼갠 피해가
-                // 전부 하한 1로 뭉개져 연타가 통째로 증발한다. 마무리는 한 방이라 정상 계산.
+                // 연타는 방어력을 무시한다.
+                // 몬스터 피해식이 감산이다 — actual = max(1, 피해 − 방어). 10타로 줄여 타당 피해가
+                // 2배(ATK100·40스택 기준 29)로 올랐어도, 보스 방어 20을 빼면 9만 남아 69%가 증발한다.
+                // '총 피해를 n등분한 뒤 각각에 방어를 빼는' 구조 자체가 다단히트에 불리해서,
+                // 타수를 줄이는 것만으로는 못 없앤다. 마무리는 한 방이라 정상 계산한다.
                 DefenseIgnore       = isLast ? 0f : 1f,
 
                 HitPoint            = target.transform.position + Vector3.up * 1.2f,

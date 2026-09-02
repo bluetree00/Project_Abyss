@@ -143,7 +143,8 @@ public class PlayerController : CharacterBase
 
         // [받피감소 통합 채널] 아이템/캐릭터/어둠룬 피해감소(%)를 한 곳에서 1회 적용.
         // (DamageReductionEffect.OnPreTakeDamage 제거 → 여기로 통합. DamageReduction은 Recalculate에서 Clamp01.)
-        float dr = RuntimeStats.DamageReduction;
+        // 스탠스(스킬 시전 중 방어)는 같은 채널에 얹는다 — 따로 곱하면 감소가 두 번 적용된다.
+        float dr = Mathf.Clamp01(RuntimeStats.DamageReduction + _stanceDefenseAdd);
         if (dr > 0f)
             finalDmg = Mathf.Max(0, Mathf.RoundToInt(finalDmg * (1f - dr)));
 
@@ -211,7 +212,10 @@ public class PlayerController : CharacterBase
         // 잡힌 상태(IsGrabbed)에서도 생략한다. 보스 손에 붙들린 채 내리찍히는 동안 포이즈가 터지면
         // 몸은 손바닥에 고정돼 있는데 자세만 '날아감(누움)'으로 바뀌어, 잡혀 있는데 누워 있는 그림이 된다.
         // 붙들린 동안의 연출 권한은 잡기 패턴이 가진다.
-        if (!_dead && !IsGrabbed && Poise != null && CharacterData != null && RuntimeStats != null)
+        // 스탠스 중이면 포이즈 계산 자체를 건너뛴다. <b>면역이지 무적이 아니다</b> —
+        // 피해는 위에서 그대로 들어갔고, 여기서 막는 건 '날아감'뿐이다.
+        // 2.75초를 제자리에서 버티는 스킬(랜슬롯 Q 등)은 이게 없으면 성립하지 않는다.
+        if (!_dead && !IsGrabbed && !PoiseImmune && Poise != null && CharacterData != null && RuntimeStats != null)
         {
             float maxPoise = RuntimeStats.MaxPoise;
             float immunity = CharacterData.knockbackImmunity;
@@ -808,6 +812,39 @@ public class PlayerController : CharacterBase
     /// <summary>포이즈(아머치) 게이지 — 누적 임팩트가 최대치를 넘으면 날아감(LocoState.Launched) 발동.</summary>
     public PoiseController Poise { get; private set; }
 
+    // ── 스킬 스탠스 ──────────────────────────────────────────────
+    // 시전 중 '넘어지지 않고 버티는' 상태. 스킬마다 하드코딩하지 않도록 얇은 계층으로 둔다.
+    //
+    // 소유자 토큰을 두는 이유 — 스탠스가 겹치면 방어 가산이 누적되고, 먼저 끝난 스킬이
+    // 나중 스킬의 스탠스를 꺼버린다. 한 번에 하나만 유효하게 만든다.
+    private object _stanceOwner;
+    private float  _stanceDefenseAdd;
+
+    /// <summary>스탠스 중인가 — 포이즈 브레이크(날아감)를 막는다. 피해 자체는 그대로 받는다.</summary>
+    public bool PoiseImmune => _stanceOwner != null;
+
+    /// <summary>스탠스가 더해주는 피해 감소율(0~1). 받피감소 채널에 가산된다.</summary>
+    public float StanceDefenseAdd => _stanceDefenseAdd;
+
+    /// <summary>
+    /// 스탠스 시작. owner는 해제 권한을 가진 주체(보통 스킬 런타임 자신)다.
+    /// 이미 다른 스탠스가 켜져 있으면 <b>덮어쓰지 않는다</b> — 먼저 켠 쪽이 끝까지 소유한다.
+    /// </summary>
+    public void BeginStance(object owner, float defenseAdd)
+    {
+        if (owner == null || _stanceOwner != null) return;
+        _stanceOwner      = owner;
+        _stanceDefenseAdd = Mathf.Clamp01(defenseAdd);
+    }
+
+    /// <summary>스탠스 해제. 자기가 켠 것만 끌 수 있다(중단·사망 경로에서도 반드시 호출).</summary>
+    public void EndStance(object owner)
+    {
+        if (owner == null || !ReferenceEquals(_stanceOwner, owner)) return;
+        _stanceOwner      = null;
+        _stanceDefenseAdd = 0f;
+    }
+
     /// <summary>스태미너 게이지 — 대시(회피)의 자원 게이트. 쿨타임을 대체한다.</summary>
     public StaminaController Stamina { get; private set; }
 
@@ -919,8 +956,12 @@ public class PlayerController : CharacterBase
     /// 그래서 여기서 직접 로드한 뒤 오버라이드한다. 로드는 비동기지만 Q 입력 전까지만 끝나면 되므로
     /// 오라 VFX와 같은 fire-and-forget으로 둔다.
     /// </summary>
+    /// <summary>유물 Q 클립 오버라이드가 끝났는가. Q 입력이 로드보다 빠르면 평타 모션이 나온다.</summary>
+    public bool RelicQAnimationReady { get; private set; }
+
     private async UniTaskVoid ApplyRelicQAnimationAsync()
     {
+        RelicQAnimationReady = false;
         if (relicClass == null || _animSvc == null) return;
 
         int steps = relicClass.QSkillStepCount;
@@ -930,7 +971,7 @@ public class PlayerController : CharacterBase
             var key = relicClass.QSkillClipKeyAt(i);
             if (!string.IsNullOrEmpty(key)) keys.Add(key);
         }
-        if (keys.Count == 0) return;   // 클립 키 미설정 유물 — 컨트롤러 기본 클립 그대로(폴백)
+        if (keys.Count == 0) { RelicQAnimationReady = true; return; }   // 클립 키 미설정 — 기본 클립 폴백이 정상
 
         try
         {
@@ -953,14 +994,17 @@ public class PlayerController : CharacterBase
             var clip = Managers.AnimationResources.GetClip(clipKey);
             if (clip == null)
             {
-                Debug.LogWarning($"[PlayerController] 유물 Q 클립 '{clipKey}' 로드 실패 — 기본 클립 유지");
+                // 조용히 넘기면 안 된다 — 기본 클립(NormalAttack_*)이 남아 Q가 평타 모션으로 나간다.
+                Debug.LogError($"[PlayerController] 유물 Q 클립 '{clipKey}' 로드 실패 — Q가 평타 모션으로 재생된다");
                 continue;
             }
 
             var stateName = relicClass.QSkillStateAt(i);
             if (!_animSvc.OverrideRelic(stateName, clip))
-                Debug.LogWarning($"[PlayerController] 유물 Q 오버라이드 실패 — 컨트롤러에 '{stateName}' 이름의 원본 클립이 없다.");
+                Debug.LogError($"[PlayerController] 유물 Q 오버라이드 실패 — 컨트롤러에 '{stateName}' 이름의 원본 클립이 없다.");
         }
+
+        RelicQAnimationReady = true;
     }
 
     /// <summary>유물 오라 VFX를 소켓(없으면 루트)에 부착. 재적용 시 기존 인스턴스를 먼저 정리(멱등).</summary>

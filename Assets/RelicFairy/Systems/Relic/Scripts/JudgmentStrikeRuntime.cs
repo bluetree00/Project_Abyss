@@ -27,6 +27,22 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     private const float  ReplayAt   = 0.94f;   // 현재 참격이 이만큼 진행되면 다음 참격으로 넘긴다
     private const float  MinStepGap = 0.05f;   // CrossFade가 애니메이터에 반영되기 전 중복 전환 방지
 
+    /// <summary>
+    /// 기대한 참격 상태가 아닐 때 이만큼 지나면 <b>포기하지 않고 다시 건다</b>.
+    /// 예전엔 상태가 한 번 어긋나면 매 프레임 return이라 연타 구간 내내 애니가 멈췄고,
+    /// 막타만 PlayStep을 직접 불러 "마지막 하나만 재생되는" 증상이 났다.
+    /// </summary>
+    private const float  AnimRecoverAfter = 0.35f;
+
+    /// <summary>
+    /// 시전 중 피해 감소. 광기 40스택이 이미 '받는 피해 +30%'를 올려둔 상태라,
+    /// 이 값은 강화가 아니라 그 페널티를 원점으로 되돌리는 몫이다.
+    /// </summary>
+    private const float  StanceDefense = 0.30f;
+
+    /// <summary>Q 전용 검 어드레서블 키. 없으면 장착 무기를 숨기기만 한다(맨손 참격 &gt; 활로 후려치기).</summary>
+    private const string QSwordKey = "Relic/Lancelot/QSword";
+
     // ── 이펙트에 타이밍을 맞춘다(실측) ─────────────────────────────
     // Effect_36_MadnessSlash 는 스폰 후 <b>1.5초 지점에 파티클 4개가 동시에 터지는 '강조 버스트'</b>가 있다
     // (PS0/1/2/4 : startDelay 1.5s). 이게 이 이펙트의 클라이맥스다.
@@ -35,8 +51,13 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     private const float  SkillDuration = 2.75f;
 
     private const float  FirstHitTime = 0.16f;   // 첫 타(선딜)
-    private const float  HitInterval  = 0.09f;   // 연타 간격 — 짧게 유지(타당 피해는 그만큼 잘게)
-    private const int    FlurryHits   = 20;      // 0.16 ~ 1.87초. 막타를 늦춘 만큼 연타로 채워 빈 구간을 없앤다
+
+    // ── 타수는 '읽히는가'가 정한다 ──────────────────────────────
+    // 예전엔 20타 × 0.085초(초당 11.7타)였다. 사람이 두세 자리 숫자를 읽는 데 0.25초쯤 걸리므로
+    // 초당 4개가 상한인데 12개가 쏟아졌다 — 어떤 표시 기법으로도 개별 틱이 읽히지 않는 간격이었다.
+    // 10타 × 0.17초로 낮춰 타당 피해를 2배로 키우고(2.75% → 5.5%) 근사치라도 잡히게 한다.
+    private const float  HitInterval  = 0.17f;
+    private const int    FlurryHits   = 10;      // 0.16 ~ 1.69초. 막타(2.40초)까지 0.7초 여유
 
     private const float  FinisherAnimAt = 2.10f; // 마무리 베기 모션
     private const float  FinisherHitAt  = 2.40f; // 막타 — 강조 버스트가 한창일 때 꽂는다
@@ -44,6 +65,13 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     private const int    HitCount = FlurryHits + 1;   // 연타 + 마무리
 
     private readonly LancelotMadnessRelic _relic;
+
+    // ── Q 전용 검 ──
+    // Q는 유물 스킬이라 모션이 검 참격인데, 손에 들린 오브젝트는 장착 무기 그대로다.
+    // 활을 든 채 검을 휘두르면 활로 후려치는 그림이 나온다 — 시전 동안만 바꿔 낀다.
+    private GameObject _hiddenWeapon;   // 숨긴 장착 무기(복구 대상)
+    private GameObject _qSword;         // 띄운 전용 검
+
     private float _elapsed;
     private int   _hitsDone;
     private bool  _finisherAnimPlayed;
@@ -71,6 +99,12 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
 
         ctx.RotateToMouse();
         ctx.SetMoveScale(0f);
+
+        // 2.75초를 제자리에서 버티는 스킬이라 스탠스가 없으면 연타 도중 날아가 끊긴다.
+        // 면역은 '넘어짐'에만 걸리고 피해는 그대로 받는다.
+        ctx.Controller?.BeginStance(this, StanceDefense);
+        SwapToQSword(ctx);
+
         PlayStep(ctx, 0);
     }
 
@@ -95,6 +129,10 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         // 스킬이 중간에 끊겨도(피격·사망) 남은 타는 버린다 — 종료 후 유령 판정 방지.
         _hitsDone = HitCount;
         ctx.SetMoveScale(1f);
+
+        // 중단·사망 경로도 이 함수를 지나므로 스탠스·무기가 새지 않는다.
+        ctx.Controller?.EndStance(this);
+        RestoreWeapon();
     }
 
     // ── Private Methods ───────────────────────────────────────────
@@ -117,7 +155,16 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
 
         // 클립 길이·상태 speed는 유물/무기마다 다르므로 상수 주기 대신 '이 참격이 끝났는가'로 판단한다.
         var state = anim.GetCurrentAnimatorStateInfo(0);
-        if (!state.IsName(StateName(_stepIndex))) return;   // 피격 등으로 끊겼으면 애니에 관여하지 않는다
+
+        if (!state.IsName(StateName(_stepIndex)))
+        {
+            // 기대 상태가 아니다(피격·다른 상태가 끼어듦). 예전엔 여기서 그냥 return이라
+            // 한 번 어긋나면 연타가 끝날 때까지 애니가 영영 안 넘어갔다.
+            // 잠깐 기다렸다가 현재 참격을 다시 걸어 되살린다.
+            if (_elapsed - _lastStepAt >= AnimRecoverAfter) PlayStep(ctx, _stepIndex);
+            return;
+        }
+
         if (state.normalizedTime < ReplayAt) return;
 
         PlayStep(ctx, _stepIndex + 1);
@@ -129,6 +176,74 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         _stepIndex  = _stepCount > 0 ? ((index % _stepCount) + _stepCount) % _stepCount : 0;
         _lastStepAt = _elapsed;
         ctx.Animator?.CrossFade(StateName(_stepIndex), AnimBlend, 0, 0f);
+    }
+
+    /// <summary>장착 무기를 숨기고 전용 검을 오른손 소켓에 붙인다. 에셋이 없으면 숨기기까지만 한다.</summary>
+    private void SwapToQSword(SkillExecutionContext ctx)
+    {
+        var ctrl = ctx.Controller;
+        if (ctrl == null) return;
+
+        var equipped = ctrl.WeaponManager?.CurrentWeaponInstance;
+        if (equipped != null && equipped.activeSelf)
+        {
+            equipped.SetActive(false);
+            _hiddenWeapon = equipped;
+        }
+
+        // 검 참격 모션은 오른손 기준이라 WeaponMount에 붙인다(활은 왼손이라 여기가 아니다).
+        var socket = ctrl.handTransform;
+        if (socket == null) return;
+
+        SpawnQSwordAsync(socket).Forget();
+    }
+
+    /// <summary>
+    /// 전용 검 스폰. 로드가 끝났을 때 스킬이 이미 끝났으면 즉시 버린다 —
+    /// 안 그러면 검이 손에 남아 다음 전투 내내 따라다닌다.
+    /// </summary>
+    private async Cysharp.Threading.Tasks.UniTaskVoid SpawnQSwordAsync(Transform socket)
+    {
+        GameObject go = null;
+        try
+        {
+            go = await Managers.AddressableManager.InstantiateAsync(QSwordKey, socket);
+        }
+        catch (System.OperationCanceledException) { return; }
+        catch (System.Exception)
+        {
+            // 에셋 미수급 상태 — 무기를 숨긴 것만으로도 "활로 후려치기"는 사라진다.
+            return;
+        }
+
+        if (go == null) return;
+
+        // 스킬이 이미 끝났거나 무기가 복구된 뒤라면 방금 만든 검은 쓸 데가 없다.
+        if (_hiddenWeapon == null && _qSword == null)
+        {
+            Managers.AddressableManager?.ReleaseInstance(go);
+            return;
+        }
+
+        go.transform.localPosition = Vector3.zero;
+        go.transform.localRotation = Quaternion.identity;
+        _qSword = go;
+    }
+
+    /// <summary>전용 검 회수 + 장착 무기 복구. 중단·사망 경로에서도 반드시 지나야 한다.</summary>
+    private void RestoreWeapon()
+    {
+        if (_qSword != null)
+        {
+            Managers.AddressableManager?.ReleaseInstance(_qSword);
+            _qSword = null;
+        }
+
+        if (_hiddenWeapon != null)
+        {
+            _hiddenWeapon.SetActive(true);
+            _hiddenWeapon = null;
+        }
     }
 
     private string StateName(int step)
