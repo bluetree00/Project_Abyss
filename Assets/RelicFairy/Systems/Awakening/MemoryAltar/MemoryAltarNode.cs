@@ -145,7 +145,7 @@ public static class MemoryAltarCatalog
         // ★ 순서 = 사슬이다. 위에서 아래로 <b>값과 조건 난이도가 함께 오른다</b>.
         //   예전 배열(2400·2400·2000·2000·6000)은 값이 오르내려, 화면에서 눈이 가장 먼저 닿는 열이
         //   하필 가장 무작위해 보였다. 갈래 합계(14,800)는 그대로라 경제 시뮬은 다시 돌리지 않아도 된다.
-        new(SigilMerchant,  AltarBranch.Start, "상인의 인장",     "상점 가격  −15%",              1400,
+        new(SigilMerchant,  AltarBranch.Start, "상인의 인장",     "상점 가격  -15%",              1400,
             Rec.ShopUses, 5, "상점 5회 이용", 1000),
         new(SigilSmith,     AltarBranch.Start, "대장장이의 인장", "강화 성공률  +8%p",            2000,
             Rec.MaxEnhance, 6, "무기 +6 도달", 1400),
@@ -153,7 +153,7 @@ public static class MemoryAltarCatalog
             Rec.EliteKills, 30, "정예 30회 처치", 1700),
         new(PartsInherit,   AltarBranch.Start, "파츠 영구 계승",  "다음 런 계승  0개 → 1개",       3600,
             Rec.MaxChapter, 3, "3챕터 도달", 2400),
-        new(SigilAscetic,   AltarBranch.Start, "고행자의 인장",   "보상 −1개 · 수급 ×1.6 (토글)",  5200,
+        new(SigilAscetic,   AltarBranch.Start, "고행자의 인장",   "보상 -1개 · 수급 ×1.6 (토글)",  5200,
             Rec.MaxDepth, 6, "깊이 6 클리어", 2600),
 
         // ── Ⅱ 등장 (8) ★ 제단의 심장 ─────────────────────
@@ -245,12 +245,17 @@ public static class MemoryAltarCatalog
         return list;
     }
 
+    /// <summary>
+    /// 갈래 이름. <b>번호를 붙이지 않는다</b> — 「Ⅰ→Ⅱ→Ⅲ→Ⅳ」는 순서를 약속하는데
+    /// 갈래 사이엔 순서가 없다(넷 중 아무 데나 고른다). 순서가 있는 것은 갈래 <b>안쪽</b>이고,
+    /// 그건 화면의 사슬 레일이 말한다. 진척은 열 머리의 n/N이 따로 보여준다.
+    /// </summary>
     public static string BranchLabel(AltarBranch branch) => branch switch
     {
-        AltarBranch.Start  => "Ⅰ 출발",
-        AltarBranch.Appear => "Ⅱ 등장",
-        AltarBranch.Endure => "Ⅲ 존속",
-        AltarBranch.Abyss  => "Ⅳ 심연",
+        AltarBranch.Start  => "출발",
+        AltarBranch.Appear => "등장",
+        AltarBranch.Endure => "존속",
+        AltarBranch.Abyss  => "심연",
         _                  => "",
     };
 }

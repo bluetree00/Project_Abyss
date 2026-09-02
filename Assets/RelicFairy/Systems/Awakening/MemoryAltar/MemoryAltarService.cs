@@ -223,6 +223,24 @@ public static class MemoryAltarService
     /// <summary>룬 선택지 개수(기본 3, 해금 시 4).</summary>
     public static int RuneChoiceCount   => IsUnlocked(MemoryAltarCatalog.RuneChoice4) ? 4 : 3;
 
+    /// <summary>
+    /// 룬 선택 화면에 그릴 <b>잠긴 자리</b> 수. 3지선다 라운드에서만, 아직 해금 전일 때만 1이다.
+    ///
+    /// <para>3지선다가 아닌 라운드(단일 드랍·이미 4지선다)는 해금해도 넓어지지 않으므로 0이다 —
+    /// 빈 자리는 <b>실제로 열릴 수 있는 칸</b>일 때만 약속이 된다.</para>
+    /// </summary>
+    public static int RuneLockedSlots(int shownCount) =>
+        shownCount == 3 && !IsUnlocked(MemoryAltarCatalog.RuneChoice4) ? 1 : 0;
+
+    /// <summary>
+    /// 코어 파츠 후보 수. 미해금 <b>1</b> → 「1차」 2 → 「전체」 3.
+    /// <para>잠그지 않고 <b>넓히는</b> 쪽으로 설계했다 — 정본 §1의 「가능성의 확장」과 같은 결이고,
+    /// 미해금 플레이어에게서 지금 받던 보상을 빼앗지 않는다.</para>
+    /// </summary>
+    public static int CorePartChoiceCount =>
+        IsUnlocked(MemoryAltarCatalog.CorePartsAll)   ? 3 :
+        IsUnlocked(MemoryAltarCatalog.CorePartsTier1) ? 2 : 1;
+
     /// <summary>보스 파츠 드래프트 개수(기본 3, 해금 시 4).</summary>
     public static int PartsDraftCount   => IsUnlocked(MemoryAltarCatalog.PartsDraft4) ? 4 : 3;
 
