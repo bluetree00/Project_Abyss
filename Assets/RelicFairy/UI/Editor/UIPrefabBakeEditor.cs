@@ -91,13 +91,17 @@ public static class UIPrefabBakeEditor
 
             m.Invoke(comp, null);
 
+            // 빌더는 목업 px를 점 앵커에 박는다 — 그대로 두면 창을 키워도 내용이 안 따라온다.
+            // 다 지어진 계층을 한 번 훑어 비율 앵커로 바꾼다(자리는 그대로다).
+            int frac = UIFractionalAnchorEditor.Convert(root);
+
             int n = root.GetComponentsInChildren<Transform>(true).Length;
             if (n <= 1) { Debug.LogError($"[Bake] {typeName} — 계층이 생기지 않았다(자식 0). 저장하지 않는다."); return; }
 
             if (!Backup(path)) { Debug.LogError($"[Bake] 백업 실패 — 굽지 않는다: {path}"); return; }
 
             PrefabUtility.SaveAsPrefabAsset(root, path, out bool ok);
-            Debug.Log(ok ? $"[Bake] 구움: {typeName} — 오브젝트 {n}개"
+            Debug.Log(ok ? $"[Bake] 구움: {typeName} — 오브젝트 {n}개 · 비율 앵커 {frac}개"
                          : $"[Bake] 저장 실패: {path}");
         }
         catch (Exception e)
