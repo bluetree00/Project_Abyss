@@ -10,6 +10,20 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "RelicFairy/Rune/Art Library", fileName = "RuneArtLibrary")]
 public sealed class RuneArtLibrarySO : ScriptableObject
 {
+    /// <summary>기능 하나에 문양 하나. <c>effectType</c>은 ITEM_DATA의 <c>effect_type</c>과 같은 글자다.</summary>
+    [System.Serializable]
+    public struct EffectIcon
+    {
+        [Tooltip("ITEM_DATA의 effect_type (예: AllDamage · Freeze · FireLegendAoe)")]
+        public string effectType;
+        public Sprite icon;
+    }
+
+    [Header("기능별 문양 — 룬이 무엇을 하는지가 아이콘으로 읽혀야 한다")]
+    [SerializeField, Tooltip("효과 종류마다 다른 문양. 비어 있으면 아래 등급/속성 아트로 폴백한다.\n" +
+                             "룬 120종은 효과 54종을 나눠 쓰므로, 여기 54칸이면 모든 룬이 제 문양을 갖는다.")]
+    private EffectIcon[] effectIcons = new EffectIcon[0];
+
     [SerializeField, Tooltip("등급별 룬 아트. 0=Common,1=Rare,2=Epic,3=Legendary,4=예비")]
     private Sprite[] gradeArt = new Sprite[5];
 
@@ -34,6 +48,22 @@ public sealed class RuneArtLibrarySO : ScriptableObject
     private Sprite frameLeft, frameRight;
     [SerializeField, Tooltip("네 귀퉁이. 늘리지 않고 원본 비율로 둔다.")]
     private Sprite frameTL, frameTR, frameBL, frameBR;
+
+    /// <summary>
+    /// 기능에 대응하는 문양. 없으면 null → 호출측이 등급/속성 아트로 폴백한다.
+    ///
+    /// <para>표가 작아(≤54) 선형 탐색으로 충분하다 — 사전을 만들면 <c>OnValidate</c> 이후
+    /// 갱신 시점을 따로 관리해야 해서 오히려 깨지기 쉽다.</para>
+    /// </summary>
+    public Sprite GetIconByEffect(string effectType)
+    {
+        if (string.IsNullOrEmpty(effectType) || effectIcons == null) return null;
+        for (int i = 0; i < effectIcons.Length; i++)
+            if (effectIcons[i].icon != null &&
+                string.Equals(effectIcons[i].effectType, effectType, System.StringComparison.OrdinalIgnoreCase))
+                return effectIcons[i].icon;
+        return null;
+    }
 
     public Sprite FrameTop    => frameTop;
     public Sprite FrameBottom => frameBottom;

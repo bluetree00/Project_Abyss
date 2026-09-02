@@ -132,12 +132,18 @@ public sealed class UI_RefineryPanel : UI_Popup
             new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
             Vector2.zero, new Vector2(WindowW, WindowH));
         _root = window.transform;
+        // 화면 맞춤은 빌더가 붙인다 — 프리팹에만 붙이면 재굽기 때 사라진다.
+        // 크기를 가진 것은 테두리(부모)라 거기에 붙인다.
+        window.transform.parent.gameObject.AddComponent<UIWindowFitter>()
+              .Configure(maxScale: UIWindowFitter.ContentScreen);
         _window = window;
 
         // 제목바 — 완성본은 좌 제목 / 우 원석 한 줄뿐이다(부제 없음).
         var bar = ShopUIStyle.MakeImage(_root, "TitleBar", ShopUIStyle.BandFill);
+        // 폭 1020 = 아트 「타이틀 에리어」(3241×286 · 비율 11.33)를 높이 90에 맞춘 값.
+        // 965면 비율 10.7이라 화살촉 양끝이 안으로 눌린다(완성본은 1035 폭).
         ShopUIStyle.Anchor(bar.rectTransform, Half, Half, Half,
-            new Vector2(0f, 307f), new Vector2(965f, 90f));
+            new Vector2(0f, 307f), new Vector2(1020f, 90f));
         ShopUIStyle.Skin(bar, UISkin.Refinery?.titleBar, sliced: true);
 
         var title = ShopUIStyle.MakeText(bar.transform, "Title", 21f, FontStyles.Bold,
@@ -281,7 +287,7 @@ public sealed class UI_RefineryPanel : UI_Popup
         var skin = UISkin.Refinery;
 
         _costPlateImg = MakeArtButton("CostPlate", First(skin?.costPlate), null,
-            new Vector2(-311f, -274f), new Vector2(250f, 69f), null);
+            new Vector2(-311f, -274f), new Vector2(250f, 50f), null);
 
         // 완성본 버튼 아트는 글자가 없는 빈 판이다 — 비용 숫자는 판 가운데에 놓는다.
         _costText = ShopUIStyle.MakeText(_costPlateImg.transform, "Cost", 18f, FontStyles.Bold,
@@ -289,10 +295,10 @@ public sealed class UI_RefineryPanel : UI_Popup
         ShopUIStyle.Stretch(_costText.rectTransform, 10f);
 
         _spinBtnImg = MakeArtButton("SpinBtn", First(skin?.spinButton), "돌리기",
-            new Vector2(2f, -274f), new Vector2(315f, 71f), OnSpinClicked);
+            new Vector2(2f, -274f), new Vector2(315f, 52f), OnSpinClicked);
 
         var re = MakeArtButton("ReforgeBtn", First(skin?.reforgeButton), "재점화",
-            new Vector2(307f, -274f), new Vector2(255f, 70f), OnReforgeClicked);
+            new Vector2(307f, -274f), new Vector2(255f, 62f), OnReforgeClicked);
         _reforgeBtn = re.gameObject;
 
         var free = MakeArtButton("FreeSpin", First(skin?.perkBadge), null,
@@ -344,8 +350,12 @@ public sealed class UI_RefineryPanel : UI_Popup
         _eventBannerImg = ShopUIStyle.MakeImage(_root, "EventBanner", ShopUIStyle.BandFill);
         _eventBanner   = _eventBannerImg.gameObject;
         _eventBannerRT = _eventBannerImg.rectTransform;
+        // 상자 236×186(1.269)은 실제로 배선된 아트 「돌발 이벤트 배너@2x」(473×372 = 1.272)와
+        // 정확히 맞는 값이다. 완성본의 좌측 패널은 세로형(200×275)이라 달라 보이지만
+        // 그건 다른 아트(「세부지표 3」 589×822)이고 현재 어디에도 배선돼 있지 않다 —
+        // 둘 중 무엇이 정본인지는 기획 판단이라 배선된 아트에 상자를 맞춰 둔다.
         ShopUIStyle.Anchor(_eventBannerRT, Half, Half, Half,
-            new Vector2(-389f, 140f), new Vector2(236f, 186f));   // 아트 실치수 473×372@2x
+            new Vector2(-389f, 140f), new Vector2(236f, 186f));
         _eventBannerImg.preserveAspect = true;
 
         // 아트는 위아래 육각 장식이 본문 밖으로 뻗는다 — 글자는 안쪽 상자(대략 세로 62%)에만 넣는다.
@@ -440,6 +450,19 @@ public sealed class UI_RefineryPanel : UI_Popup
         if (_svc == null) return;
         var (rare, epic, leg) = _svc.CurrentOdds();
         _oddsBar?.SetOdds(rare, epic, leg, _svc.NextHeat);
+
+        // 해금 몫을 확률 표 옆에 밝힌다 — 상위 등급이 왜 잘 나오는지가 보여야 한다.
+        // <b>대입</b>이어야 한다. Refresh는 한 번의 돌리기에 여러 번 불리므로(오픈·젬 선택·
+        // 돌리기·이벤트) 누적(+=)하면 같은 문구가 계속 덧붙어 줄이 끝없이 길어진다.
+        if (_rarLine != null && MemoryAltarService.IsUnlocked(MemoryAltarCatalog.RefineQuality))
+        {
+            const string mark = "정제 품질 +";
+            string body = _rarLine.text;
+            int cut = body.IndexOf(mark, System.StringComparison.Ordinal);
+            if (cut >= 0) body = body.Substring(0, cut).TrimEnd();
+            _rarLine.text = body +
+                $"   <color=#C99C4F>정제 품질 +{RefineryService.QualityUnlockEpic * 100f:F0}%p</color>";
+        }
         _feverGauge?.SetLevel(_svc.Fever);
         RefreshReserved();
 
@@ -447,7 +470,7 @@ public sealed class UI_RefineryPanel : UI_Popup
         _costText.text  = cost <= 0 ? "무료" : cost.ToString();
         _costText.color = cost <= 0 ? ShopUIStyle.Gold
                         : (_svc.CanAfford ? ShopUIStyle.TextPrimary : ShopUIStyle.RejectRed);
-        if (_oreText != null) _oreText.text = $"원석 {_svc.OreOwned}";
+        CurrencyCounter.Apply(_oreText, _svc.OreOwned, "원석 ");
 
         // 방 특전은 하단 '첫 돌리기 무료' 버튼으로 드러낸다(상시 탭이면 숨김).
         string perk = _svc.RoomPerkLabel;
@@ -509,13 +532,22 @@ public sealed class UI_RefineryPanel : UI_Popup
 
         await PlayRevealAsync(outcome);
 
-        _busy = false;
-        Refresh();
-
         // 재점화(다시 굴리기)를 쓸 수 있으면 그 선택을 기다린다 — 그 경우가 아니면
         // 결과를 잠깐 보여준 뒤 배치 화면으로 자동으로 넘긴다.
-        if (!_svc.CanReforge)
+        //
+        // 자동으로 넘어가는 쪽에서는 <b>잠금을 풀지 않는다</b>. 여기서 _busy를 풀면
+        // 넘어가기까지의 900ms 동안 [돌리기]가 다시 눌리고, 그 두 번째 굴림은
+        // 원석만 빠진 채 결과 연출을 못 보고 화면이 닫혀버린다(원석은 Craft 진입 즉시 차감된다).
+        if (_svc.CanReforge)
+        {
+            _busy = false;
+            Refresh();
+        }
+        else
+        {
+            Refresh();
             await HandOffToGridAsync(outcome.Rune);
+        }
     }
 
     private void OnReforgeClicked()
@@ -629,7 +661,13 @@ public sealed class UI_RefineryPanel : UI_Popup
             _                          => ("쌍생",   "존핵을 하나 더 얻었다."),
         };
 
-        _eventBannerRT.sizeDelta = hero ? new Vector2(245f, 157f) : new Vector2(215f, 138f);
+        // 배너는 스트레치 앵커다 — sizeDelta는 크기가 아니라 <b>앵커폭에 더해지는 값</b>이라
+        // 절대 크기를 그냥 대입하면 앵커폭 236×186 위에 얹혀 481×343(면적 2.2배)이 된다.
+        // 배선된 아트(473×372 = 1.272)의 비율을 지키는 두 크기다. 비율을 벗어나면
+        // preserveAspect가 짧은 축에 맞춰 줄여 배너가 작아진다.
+        var bannerSize = hero ? new Vector2(236f, 186f) : new Vector2(212f, 167f);
+        _eventBannerRT.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, bannerSize.x);
+        _eventBannerRT.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical,   bannerSize.y);
         _eventTitle.color        = tone;
         _eventTitle.text         = head;
         _eventText.text          = body;

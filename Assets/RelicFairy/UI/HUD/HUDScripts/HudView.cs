@@ -12,18 +12,22 @@ public sealed class HudView : MonoBehaviour
     // 런 재화(강화재료·원석) 임시 아이콘 색 — 전용 아이콘 에셋 나오면 교체.
     private static readonly Color EnhanceMatIcon = new(0.90f, 0.55f, 0.20f); // 강화재료(주황)
     private static readonly Color RuneOreIcon    = new(0.35f, 0.70f, 0.95f); // 원석(청록)
+    private static readonly Color EssenceIcon    = new(0.29f, 0.76f, 0.67f); // 심연의 정수(가라앉은 청록)
 
     // 재화별 테두리 틴트 — 같은 테두리 아트를 색으로만 구분한다(재화당 아트를 따로 받지 않기 위함).
     // 소비처와 색을 1:1로 묶어 "이 색 = 이 방에서 쓰는 것"이 학습되게 한다.
     private static readonly Color GoldFrameTint    = new(0.85f, 0.70f, 0.29f); // 골드   → 상점
     private static readonly Color EnhanceFrameTint = new(0.90f, 0.55f, 0.20f); // 강화재료 → 재련소
     private static readonly Color RuneOreFrameTint = new(0.35f, 0.70f, 0.95f); // 원석    → 정제소
+    private static readonly Color EssenceFrameTint = new(0.29f, 0.76f, 0.67f); // 정수    → 기억의 제단
 
     // 툴팁 문구 — 소비처 + "런이 끝나면 사라진다"(하드리셋 규칙을 재화 단에서 알린다).
     private const string TipGoldTitle    = "골드";
     private const string TipGoldBody     = "상점에서 물건과 서비스를 산다.\n런이 끝나면 사라진다.";
     private const string TipEnhanceTitle = "강화재료";
     private const string TipEnhanceBody  = "재련소에서 무기를 강화·진화한다.\n런이 끝나면 사라진다.";
+    private const string TipEssenceTitle = "심연의 정수";
+    private const string TipEssenceBody  = "런을 넘어 남는 유일한 재화. 기억의 제단에서 해금에 쓴다.";
     private const string TipRuneOreTitle = "원석";
     private const string TipRuneOreBody  = "정제소에서 존핵 룬을 벼린다.\n런이 끝나면 사라진다.";
 
@@ -48,6 +52,14 @@ public sealed class HudView : MonoBehaviour
     [Tooltip("코인 없는 공용 테두리(추가 리소스). 지정하면 모든 재화가 동일 테두리를 쓴다.")]
     [SerializeField] private Sprite currencyFrameSprite;
 
+    [Header("재화 아이콘 (없으면 색 사각형으로 폴백)")]
+    [Tooltip("골드. 테두리 아트에 코인이 이미 있으면 비워 둔다.")]
+    [SerializeField] private Sprite goldIconSprite;
+    [SerializeField] private Sprite enhanceMatIconSprite;
+    [SerializeField] private Sprite runeOreIconSprite;
+    [Tooltip("심연의 정수(기억의 조각).")]
+    [SerializeField] private Sprite essenceIconSprite;
+
     [SerializeField] private Vector2 currencyPillSize    = new Vector2(150f, 40f);
     [SerializeField] private float   currencyPillSpacing = 8f;
     [Tooltip("재화 라인 위치 — 화면 우상단 코너 기준 오프셋(음수=안쪽). 목업은 코너에 붙지 않고 안쪽으로 들어와 있다.")]
@@ -66,6 +78,9 @@ public sealed class HudView : MonoBehaviour
     private GameObject    _runeOreSlot;
     private TMP_Text      _enhanceMatText;
     private TMP_Text      _runeOreText;
+    private GameObject    _essenceSlot;
+    private TMP_Text      _essenceText;
+    private bool          _essenceSeen;
     private bool          _currencyBuilt;
 
     // 재화 표시 정책 — "실제로 얻은 재화만 보인다".
@@ -136,7 +151,7 @@ public sealed class HudView : MonoBehaviour
         _currencyRow.anchorMax = new Vector2(1f, 1f);
         _currencyRow.pivot     = new Vector2(1f, 1f);
         _currencyRow.anchoredPosition = currencyRowOffset;
-        _currencyRow.sizeDelta = new Vector2(currencyPillSize.x * 3f + currencyPillSpacing * 2f, currencyPillSize.y);
+        _currencyRow.sizeDelta = new Vector2(currencyPillSize.x * 4f + currencyPillSpacing * 3f, currencyPillSize.y);
 
         var hlg = rowGo.GetComponent<HorizontalLayoutGroup>();
         hlg.spacing            = currencyPillSpacing;
@@ -146,17 +161,27 @@ public sealed class HudView : MonoBehaviour
 
         // 골드 — 기존 goldText를 pill 안으로 이동(래거시 위치 정리). 테두리엔 코인이 포함됨.
         _goldSlot = MakeCurrencyPill("Pill_Gold", goldFrameSprite != null ? goldFrameSprite : currencyFrameSprite,
-                                     iconColor: null, GoldFrameTint, TipGoldTitle, TipGoldBody, out _, reuseText: goldText);
+                                     iconColor: null, GoldFrameTint, TipGoldTitle, TipGoldBody, out _,
+                                     reuseText: goldText, iconSprite: goldIconSprite);
 
         // 강화재료 / 원석 — 코인 없는 공용 테두리가 있으면 그걸, 없으면 배경(내부)만.
         _enhanceMatSlot = MakeCurrencyPill("Pill_EnhanceMat", currencyFrameSprite, EnhanceMatIcon,
-                                           EnhanceFrameTint, TipEnhanceTitle, TipEnhanceBody, out _enhanceMatText);
+                                           EnhanceFrameTint, TipEnhanceTitle, TipEnhanceBody, out _enhanceMatText,
+                                           iconSprite: enhanceMatIconSprite);
         _runeOreSlot    = MakeCurrencyPill("Pill_RuneOre",    currencyFrameSprite, RuneOreIcon,
-                                           RuneOreFrameTint, TipRuneOreTitle, TipRuneOreBody, out _runeOreText);
+                                           RuneOreFrameTint, TipRuneOreTitle, TipRuneOreBody, out _runeOreText,
+                                           iconSprite: runeOreIconSprite);
+        // 심연의 정수 — 런 중에도 줍는데 지금까지는 제단에서만 보였다. 얻는 곳과 보이는 곳이
+        // 어긋나면 "이게 쌓이고 있다"는 사실 자체가 전달되지 않는다.
+        _essenceSlot = MakeCurrencyPill("Pill_Essence", currencyFrameSprite, EssenceIcon,
+                                        EssenceFrameTint, TipEssenceTitle, TipEssenceBody, out _essenceText,
+                                        iconSprite: essenceIconSprite);
+
         // 아직 아무것도 얻지 않은 상태로 시작 — 획득 시 setter가 켠다.
         _goldSlot?.SetActive(_goldSeen);
         _enhanceMatSlot.SetActive(false);
         _runeOreSlot.SetActive(false);
+        _essenceSlot.SetActive(false);
 
         // 래거시 골드 아이콘 — 테두리 아트에 코인이 있어 중복이므로 숨김.
         if (hideLegacyGoldIcon && goldFrameSprite != null)
@@ -175,7 +200,8 @@ public sealed class HudView : MonoBehaviour
     /// <summary>재화 pill 1개: 공통 배경(골드바 내부) + 테두리(선택) + 아이콘(선택) + 수치.</summary>
     private GameObject MakeCurrencyPill(string name, Sprite frame, Color? iconColor,
                                         Color frameTint, string tipTitle, string tipBody,
-                                        out TMP_Text valueText, TMP_Text reuseText = null)
+                                        out TMP_Text valueText, TMP_Text reuseText = null,
+                                        Sprite iconSprite = null)
     {
         var pill = new GameObject(name, typeof(RectTransform));
         var prt  = (RectTransform)pill.transform;
@@ -208,11 +234,23 @@ public sealed class HudView : MonoBehaviour
         chlg.childControlWidth  = true;  chlg.childControlHeight = true;
         chlg.childForceExpandWidth = false; chlg.childForceExpandHeight = false;
 
-        if (iconColor.HasValue)   // 골드는 테두리 아트에 코인이 있어 아이콘 생략
+        // 아이콘 — 아트가 있으면 그림, 없으면 예전처럼 재화색 사각형.
+        // 골드는 테두리 아트에 코인이 이미 있어 둘 다 없으면 생략된다.
+        if (iconSprite != null || iconColor.HasValue)
         {
             var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image));
             iconGo.transform.SetParent(crt, false);
-            iconGo.GetComponent<Image>().color = iconColor.Value;
+            var iconImg = iconGo.GetComponent<Image>();
+
+            if (iconSprite != null)
+            {
+                iconImg.sprite         = iconSprite;
+                iconImg.color          = Color.white;
+                iconImg.preserveAspect = true;   // 세로로 긴 아이콘이 있어 비율을 지켜야 한다
+            }
+            else iconImg.color = iconColor.Value;
+
+            iconImg.raycastTarget = false;
             var ile = iconGo.AddComponent<LayoutElement>();
             ile.preferredWidth = 20f; ile.preferredHeight = 20f;
         }
@@ -318,7 +356,7 @@ public sealed class HudView : MonoBehaviour
     public void SetGold(int gold)
     {
         EnsureCurrencyRow();
-        if (goldText != null) goldText.text = gold.ToString();
+        CurrencyCounter.Apply(goldText, gold);
 
         if (gold > 0) _goldSeen = true;
         ApplyCurrencyVisibility();
@@ -327,7 +365,7 @@ public sealed class HudView : MonoBehaviour
     public void SetEnhanceMaterial(int amount)
     {
         EnsureCurrencyRow();
-        if (_enhanceMatText != null) _enhanceMatText.text = amount.ToString();
+        CurrencyCounter.Apply(_enhanceMatText, amount);
 
         if (amount > 0) _enhanceMatSeen = true;
         ApplyCurrencyVisibility();
@@ -336,9 +374,19 @@ public sealed class HudView : MonoBehaviour
     public void SetRuneOre(int amount)
     {
         EnsureCurrencyRow();
-        if (_runeOreText != null) _runeOreText.text = amount.ToString();
+        CurrencyCounter.Apply(_runeOreText, amount);
 
         if (amount > 0) _runeOreSeen = true;
+        ApplyCurrencyVisibility();
+    }
+
+    /// <summary>런 중 적립된 심연의 정수. 런을 넘어 남는 유일한 재화라 획득이 눈에 보여야 한다.</summary>
+    public void SetEssence(int amount)
+    {
+        EnsureCurrencyRow();
+        CurrencyCounter.Apply(_essenceText, amount);
+
+        if (amount > 0) _essenceSeen = true;
         ApplyCurrencyVisibility();
     }
 
@@ -356,6 +404,8 @@ public sealed class HudView : MonoBehaviour
             _enhanceMatSlot.SetActive(_enhanceMatSeen);
         if (_runeOreSlot != null && _runeOreSlot.activeSelf != _runeOreSeen)
             _runeOreSlot.SetActive(_runeOreSeen);
+        if (_essenceSlot != null && _essenceSlot.activeSelf != _essenceSeen)
+            _essenceSlot.SetActive(_essenceSeen);
     }
 
     /// <summary>

@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -18,6 +20,12 @@ using UnityEngine.UI;
 /// </summary>
 public class AltarNodeRowView : MonoBehaviour
 {
+    // ── 사슬 레일 ─────────────────────────────────────────────────────────
+    private const float RailX     = 6f;    // 행 왼쪽 안쪽 여백(AccentBar 3px 바로 옆)
+    private const float MarkSize  = 15f;
+    private const float LinkWidth = 1.5f;
+    private const float LinkReach = 40f;   // 행 위·아래로 뻗는 길이 — 간격 6px를 넉넉히 건넌다
+
     // ── 자리별 배치 ───────────────────────────────────────────────────────
     /// <summary>
     /// 한 자리의 배치. <b>인스펙터에서 조절한다</b> — 행은 상태에 따라 높이가 2.6배까지 달라지는
@@ -43,10 +51,10 @@ public class AltarNodeRowView : MonoBehaviour
     [SerializeField] private SeatLayout turnSeat = new()
     {
         height = 74f,
-        name      = new Rect( 16f,  8f, 150f, 22f),
+        name      = new Rect( 26f,  8f, 142f, 22f),
         cost      = new Rect(-14f,  8f, 120f, 22f),
-        change    = new Rect( 16f, 32f, 300f, 17f),
-        condition = new Rect( 16f, 51f, 300f, 15f),
+        change    = new Rect( 26f, 32f, 290f, 17f),
+        condition = new Rect( 26f, 51f, 290f, 15f),
         fontSizes = new Vector3(17f, 13f, 12f),
         reachBottom = 6f,
     };
@@ -54,15 +62,15 @@ public class AltarNodeRowView : MonoBehaviour
     [SerializeField] private SeatLayout passedSeat = new()
     {
         height = 40f,
-        name      = new Rect(16f,  4f, 260f, 18f),
-        change    = new Rect(16f, 23f, 300f, 14f),
+        name      = new Rect(26f,  4f, 250f, 18f),
+        change    = new Rect(26f, 23f, 290f, 14f),
         fontSizes = new Vector3(15f, 12f, 12f),
     };
 
     [SerializeField] private SeatLayout aheadSeat = new()
     {
         height = 28f,
-        name      = new Rect(16f, 5f, 300f, 18f),
+        name      = new Rect(26f, 5f, 290f, 18f),
         fontSizes = new Vector3(14f, 12f, 12f),
     };
 
@@ -89,7 +97,53 @@ public class AltarNodeRowView : MonoBehaviour
     private Action   _onSelect;
     private TMP_Text _changeText;
 
+    // 사슬 레일 — 행 왼쪽 바깥에 세로로 선다. 런타임 1회 생성.
+    private Image    _linkUp, _linkDown;
+    private Image    _markBg;
+    private TMP_Text _markGlyph;
+
     // ── Public Methods ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// 해금 순간 이 행을 <b>한 번 밝힌다</b>. 되돌릴 수 없는 진행이라 화면에도 자국이 남아야 한다.
+    ///
+    /// <para>그동안은 효과음과 <b>행동 버튼</b>만 반응했다 — 정작 열린 노드는 조용히 색만 바뀌어,
+    /// 14,800짜리 마지막 칸이나 첫 칸이나 화면 반응이 똑같았다.</para>
+    ///
+    /// <para>띠(왼쪽 이음매)를 흰빛으로 튕겼다가 제 색으로 가라앉힌다 — 사슬의 <b>이음매가 채워지는</b>
+    /// 자리라 여기가 밝아지면 "한 칸 나아갔다"로 읽힌다. 팝업은 timeScale=0이므로 unscaled뿐이다.</para>
+    /// </summary>
+    public async UniTask PlayUnlockAsync(CancellationToken ct)
+    {
+        if (accentBar == null) return;
+
+        var target = accentBar.color;
+        var flash  = Color.white;
+        var rt     = (RectTransform)transform;
+        var baseScale = rt.localScale;
+
+        try
+        {
+            const float Dur = 0.45f;
+            float t = 0f;
+            while (t < Dur)
+            {
+                t += Time.unscaledDeltaTime;
+                float k = Mathf.Clamp01(t / Dur);
+                accentBar.color = Color.Lerp(flash, target, k);
+                // 초반에만 살짝 부풀었다 제자리로 — 목록 전체가 들썩이지 않게 폭은 작게 둔다.
+                float pop = 1f + 0.04f * (1f - k) * Mathf.Sin(k * Mathf.PI * 2f);
+                rt.localScale = baseScale * pop;
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (accentBar != null) accentBar.color = target;
+            rt.localScale = baseScale;
+        }
+    }
 
     public void Refresh(AltarNodeState state, int essence, bool selected)
     {
@@ -118,6 +172,7 @@ public class AltarNodeRowView : MonoBehaviour
         }
 
         LayoutForSeat(seat, L);
+        RefreshRail(state, seat, h);
         RefreshTone(state, seat, selected);
         RefreshText(state, node, seat);
         RefreshReach(state, essence, seat);
@@ -160,10 +215,10 @@ public class AltarNodeRowView : MonoBehaviour
         _ => new SeatLayout
         {
             height    = 74f,
-            name      = new Rect( 16f,  8f, 150f, 22f),
+            name      = new Rect( 26f,  8f, 142f, 22f),
             cost      = new Rect(-14f,  8f, 120f, 22f),
-            change    = new Rect( 16f, 32f, 300f, 17f),
-            condition = new Rect( 16f, 51f, 300f, 15f),
+            change    = new Rect( 26f, 32f, 290f, 17f),
+            condition = new Rect( 26f, 51f, 290f, 15f),
             fontSizes = new Vector3(17f, 13f, 12f),
             reachBottom = 6f,
         },
@@ -189,6 +244,91 @@ public class AltarNodeRowView : MonoBehaviour
         {
             Put(EnsureChangeText(), L.change, L.fontSizes.y);
         }
+    }
+
+    /// <summary>
+    /// 사슬 레일 — 행 왼쪽에 <b>표식과 잇는 선</b>을 그린다. 열을 세로로 훑는 것만으로
+    /// 어디까지 왔는지가 읽히게 하는 장치다(행 높이만으로는 상태가 안 읽힌다).
+    ///
+    /// <para>표식 ✔ 지난 것 · ◆ 지금 차례 · ○ 아직 먼 것 · 🔒 선행 조건이 자물쇠인 칸.
+    /// 잇는 선은 <b>지난 구간은 정수색 실선</b>, <b>다음으로 가는 구간은 금색</b>,
+    /// 그 아래는 흐린 선이다 — 색이 바뀌는 지점이 곧 "지금 여기"다.</para>
+    /// </summary>
+    private void RefreshRail(AltarNodeState state, Seat seat, float rowHeight)
+    {
+        EnsureRail();
+        if (_markBg == null) return;
+
+        bool passed = seat == Seat.Passed;
+        bool turn   = seat == Seat.Turn;
+        bool locked = state.BlockedByRequirement;
+
+        var on   = AltarPalette.Essence;
+        var next = AltarPalette.Gold;
+        var off  = AltarPalette.AccentLocked;
+
+        // 표식은 폰트(DNFForgedBlade)에 <b>실제로 있는</b> 기호만 쓴다.
+        // 예전 ✔·🔒·○는 셋 다 TTF에 없어 화면에서 전부 □(두부)로 나왔다.
+        _markGlyph.text = passed ? "■" : locked ? "×" : turn ? "◆" : "◇";
+        _markGlyph.color = passed ? on : turn ? next : off;
+        _markBg.color    = passed ? on : new Color(off.r, off.g, off.b, 0.35f);
+
+        // 위쪽 선: 이 칸이 열렸으면 여기까지 이어진 것이다.
+        // 아래쪽 선: 다음 칸이 '차례'가 되므로, 내가 열렸을 때만 금색으로 흐른다.
+        _linkUp.color   = passed ? on : off;
+        _linkDown.color = passed ? next : off;
+
+        // 표식을 행 세로 가운데에 맞춘다 — 행 높이가 자리마다 달라 고정값이면 어긋난다.
+        _markBg.rectTransform.anchoredPosition = new Vector2(RailX, -rowHeight * 0.5f);
+    }
+
+    private void EnsureRail()
+    {
+        if (_markBg != null) return;
+
+        var parent = (RectTransform)transform;
+
+        _linkUp   = MakeLink(parent, "Link_Up",   new Vector2(0f, 1f));
+        _linkDown = MakeLink(parent, "Link_Down", new Vector2(0f, 0f));
+
+        var bg = new GameObject("Mark", typeof(RectTransform), typeof(CanvasRenderer));
+        var rt = (RectTransform)bg.transform;
+        rt.SetParent(parent, false);
+        rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(MarkSize, MarkSize);
+        _markBg = bg.AddComponent<Image>();
+        _markBg.raycastTarget = false;
+
+        _markGlyph = new GameObject("Glyph", typeof(RectTransform), typeof(CanvasRenderer))
+            .AddComponent<TextMeshProUGUI>();
+        var grt = _markGlyph.rectTransform;
+        grt.SetParent(rt, false);
+        grt.anchorMin = Vector2.zero; grt.anchorMax = Vector2.one;
+        grt.offsetMin = Vector2.zero; grt.offsetMax = Vector2.zero;
+        _markGlyph.fontSize = 11f;
+        // 글자가 판 밖으로 나가지 않게 — 최대는 설계 크기로 묶으므로 커지지 않고, 안 들어갈 때만 줄어든다.
+        _markGlyph.enableAutoSizing = true;
+        _markGlyph.fontSizeMax = 11f;
+        _markGlyph.fontSizeMin = 9f;
+        _markGlyph.alignment = TextAlignmentOptions.Center;
+        _markGlyph.raycastTarget = false;
+    }
+
+    /// <summary>표식 사이를 잇는 세로선. 행 위·아래로 절반씩 뻗어 옆 행의 것과 만난다.</summary>
+    private static Image MakeLink(RectTransform parent, string name, Vector2 anchor)
+    {
+        var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer));
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(parent, false);
+        rt.anchorMin = rt.anchorMax = anchor;
+        rt.pivot     = new Vector2(0.5f, anchor.y);
+        rt.sizeDelta = new Vector2(LinkWidth, LinkReach);
+        rt.anchoredPosition = new Vector2(RailX, 0f);
+
+        var img = go.AddComponent<Image>();
+        img.raycastTarget = false;
+        return img;
     }
 
     /// <summary>Rect의 y는 <b>아래로 재는 값</b>이라 anchoredPosition에는 부호를 뒤집어 넣는다.</summary>
@@ -242,7 +382,7 @@ public class AltarNodeRowView : MonoBehaviour
     {
         if (nameText)
         {
-            nameText.text     = seat == Seat.Passed ? $"✔ {node.DisplayName}" : node.DisplayName;
+            nameText.text     = seat == Seat.Passed ? $"■ {node.DisplayName}" : node.DisplayName;
             nameText.color    = seat switch
             {
                 Seat.Passed => AltarPalette.Essence,
@@ -302,7 +442,7 @@ public class AltarNodeRowView : MonoBehaviour
     {
         if (!node.HasCondition) return "조건 없음";
 
-        if (state.ConditionMet) return $"✔ {node.ConditionLabel}";
+        if (state.ConditionMet) return $"■ {node.ConditionLabel}";
 
         string progress = $"{Mathf.Min(state.Progress, state.Target)}/{state.Target}";
         return node.ConditionRequired

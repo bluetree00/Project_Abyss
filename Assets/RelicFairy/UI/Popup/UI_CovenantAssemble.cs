@@ -46,8 +46,6 @@ public class UI_CovenantAssemble : UI_Popup
     [SerializeField] private TMP_Text _forgeSummary;
     [SerializeField] private Button   _forgeButton;
 
-    [Header("연마 — id 고정 · 티어만 재굴림(런당 1회). 미배선 시 벼리기 버튼을 복제해 만든다")]
-    [SerializeField] private Button   _whetButton;
 
     [Header("스킨 — 등급 테두리 아트(카드에 주입)")]
     [SerializeField] private Sprite _silverFrame;   // 실버 테두리@2x
@@ -79,10 +77,9 @@ public class UI_CovenantAssemble : UI_Popup
     private List<CovenantDraftCard> _causes;
     private List<CovenantDraftCard> _effects;
     private int _selCause, _selEffect;
-    private int _whetLeft;
     private UniTaskCompletionSource<string> _tcs;
 
-    // 시너지 힌트 — 프리팹에 자리가 없어 효과 줄을 복제해 그 아래 한 줄을 만든다(EnsureWhetButton과 같은 방침).
+    // 시너지 힌트 — 프리팹에 자리가 없어 효과 줄을 복제해 그 아래 한 줄을 만든다.
     private TMP_Text _synergyText;
 
     // ── Public Properties ────────────────────────────────
@@ -133,20 +130,10 @@ public class UI_CovenantAssemble : UI_Popup
             _forgeButton.onClick.AddListener(OnForge);
         }
 
-        // 연마는 런당 1회 — 남은 횟수는 런이 쥐고 있다(팝업마다 되살아나면 서약을 얻을 때마다 한 번씩 쓸 수 있다).
-        _whetLeft = (GameRunBootstrapper.Instance?.Run?.CovenantWhetUsed ?? false) ? 0 : 1;
-        EnsureWhetButton();
-        if (_whetButton)
-        {
-            _whetButton.onClick.RemoveAllListeners();
-            _whetButton.onClick.AddListener(OnWhet);
-        }
 
-        // 연마 버튼은 위 EnsureWhetButton에서야 생기므로 하단 바 톤을 한 번 더 태운다(멱등).
         ApplyBottomBarSkin();
 
         RefreshRerollText();
-        RefreshWhetUi();
         RefreshSelection();
     }
 
@@ -177,6 +164,7 @@ public class UI_CovenantAssemble : UI_Popup
                 card.RerollButton.onClick.RemoveAllListeners();
                 card.RerollButton.onClick.AddListener(() => Reroll(isCause, idx));
                 FixRerollLabel(card.RerollButton);
+                PlaceRerollAtTop(card.RerollButton);
             }
         }
     }
@@ -229,15 +217,16 @@ public class UI_CovenantAssemble : UI_Popup
     // 양피지 아트(1292:919 = 1.406) 위에 얹으면 카드가 1.5배 크고 좌상으로 치우친다.
     // 프리팹을 수술하는 대신 런타임에 비율로 다시 앉힌다 — 되돌리기 쉽고 재납품에도 강하다.
     private const float BookAspect  = 1.406f;
-    private const float BookHeight  = 946f;
-    private const float BookMargin  = 0.96f;   // 화면 대비 판이 차지할 최대 비율
+    // 다른 컨텐츠 화면(UIWindowFitter)과 <b>같은 값</b>이어야 한다. 예전엔 목업 실측 946을
+    // 상한으로 두고 여백도 0.96이라, 이 화면만 세로 87.6%로 열려 재련소·상점(94%)과 크기가 달랐다.
+    private const float BookMargin  = 0.94f;
+    private const float BookFallbackH = 946f;   // 부모 크기를 못 잴 때만 쓰는 값
 
     // ── 톤 ──────────────────────────────────────────────
     // 배치는 프리팹이 갖지만 <b>색은 코드가 칠한다</b> — 프리팹 authoring 색이 구 아트 기준(형광 보라 버튼 ·
     // 흰 글자)이라 양피지 위에서 튀거나 날아간다. 아트 재납품에 따라 바뀌는 값이라 한곳에 모아 둔다.
     private static readonly Color TitleOnScroll = new(0.97f, 0.93f, 0.80f, 1f);
     private static readonly Color ForgeFill     = new(0.36f, 0.26f, 0.13f, 1f);   // 청동
-    private static readonly Color WhetFill      = new(0.25f, 0.21f, 0.14f, 1f);   // 눌린 청동(보조)
     private static readonly Color BtnLabel      = new(0.97f, 0.93f, 0.80f, 1f);
     private static readonly Color InkOnBook     = new(0.20f, 0.14f, 0.08f, 1f);
     private static readonly Color InkOnBookDim  = new(0.36f, 0.28f, 0.19f, 1f);
@@ -262,11 +251,13 @@ public class UI_CovenantAssemble : UI_Popup
     /// </summary>
     private static void ResizeBook(RectTransform book)
     {
-        float h = BookHeight;
+        float h = BookFallbackH;
         if (book.parent is RectTransform area && area.rect.width > 1f && area.rect.height > 1f)
         {
-            h = Mathf.Min(h, area.rect.height * BookMargin);
-            h = Mathf.Min(h, area.rect.width  * BookMargin / BookAspect);
+            // 목업 실측을 상한으로 걸지 않는다 — 다른 화면들도 목업 크기를 넘겨 화면에 맞춘다.
+            // 세로를 먼저 채우고, 가로가 모자라면 가로에 맞춘다(아트 비율은 항상 지킨다).
+            h = area.rect.height * BookMargin;
+            h = Mathf.Min(h, area.rect.width * BookMargin / BookAspect);
         }
         book.sizeDelta = new Vector2(h * BookAspect, h);
     }
@@ -277,12 +268,48 @@ public class UI_CovenantAssemble : UI_Popup
     /// </summary>
     private void ApplyBottomBarSkin()
     {
-        TintButton(_forgeButton, ForgeFill);
-        TintButton(_whetButton,  WhetFill);
+        ApplyForgeBanner();
 
         if (_forgeSummary    != null) _forgeSummary.color    = InkOnBook;
         if (_rerollCountText != null) _rerollCountText.color = InkOnBookDim;
         if (_synergyText     != null) _synergyText.color     = InkOnBookDim;
+    }
+
+    /// <summary>
+    /// 조립 버튼 — 납품 양피지 배너를 입히고 <b>아트 비율(3.34:1)로 폭을 다시 잡는다</b>.
+    ///
+    /// <para>버튼이 299×51(5.86:1)이라 그대로 넣으면 양끝 나침반·밀랍인장이 세로로 짓눌린다.
+    /// 높이는 그대로 두고 폭만 비율에 맞추면 장식이 제 모양을 지킨다.</para>
+    ///
+    /// <para>연마를 걷어내 하단 바에 이 버튼 하나만 남았다 — 넓게 앉아도 자리가 충분하고,
+    /// 「체결」이라는 되돌릴 수 없는 행동에 무게도 맞는다.</para>
+    ///
+    /// <para>아트가 없으면 예전 청동 틴트로 돌아간다.</para>
+    /// </summary>
+    private void ApplyForgeBanner()
+    {
+        var art = UISkin.Covenant?.forgeBanner;
+        if (art == null || _forgeButton == null) { TintButton(_forgeButton, ForgeFill); return; }
+
+        if (_forgeButton.TryGetComponent<Image>(out var img))
+        {
+            img.sprite = art;
+            img.type   = Image.Type.Sliced;   // 양끝 장식은 늘리지 않는다
+            img.color  = Color.white;
+        }
+
+        var rt = (RectTransform)_forgeButton.transform;
+        float h = rt.rect.height > 1f ? rt.rect.height : rt.sizeDelta.y;
+        if (h > 1f)
+        {
+            float aspect = art.rect.width / Mathf.Max(1f, art.rect.height);
+            // 이 버튼도 스트레치 앵커라 sizeDelta는 앵커폭(≈300)에 더해진다.
+            // 절대 폭은 앵커와 무관하게 크기를 세우는 이 API로 준다.
+            rt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, h * aspect);
+        }
+
+        foreach (var lbl in _forgeButton.GetComponentsInChildren<TMP_Text>(true))
+            lbl.color = BtnLabel;
     }
 
     private static void TintButton(Button btn, Color fill)
@@ -467,7 +494,7 @@ public class UI_CovenantAssemble : UI_Popup
     }
 
     /// <summary>
-    /// 시너지 줄을 효과 줄 바로 아래에 만든다(프리팹 무수술 — 연마 버튼과 같은 방침).
+    /// 시너지 줄을 효과 줄 바로 아래에 만든다(프리팹 무수술).
     /// 효과 줄을 복제하는 이유: 폰트·정렬·자동축소 설정이 이미 이 팝업에 맞게 저작돼 있다.
     /// </summary>
     private void EnsureSynergyText()
@@ -525,73 +552,8 @@ public class UI_CovenantAssemble : UI_Popup
             if (cards[i] && cards[i].RerollButton) cards[i].RerollButton.interactable = on;
     }
 
-    // ── 연마 ─────────────────────────────────────────────
-    /// <summary>
-    /// 연마 — 고른 원인·효과의 <b>id는 그대로</b> 두고 티어만 다시 굴린다(실버 50 / 골드 35 / 루비 15).
-    /// 리롤은 "다른 걸 뽑고 싶다"이고 연마는 "이 조합 그대로, 더 세게"다 — 원하는 조합을 찾고도
-    /// 티어가 실버라 버려야 했던 경우를 위한 런당 단 한 번의 손.
-    /// </summary>
-    private void OnWhet()
-    {
-        if (_whetLeft <= 0) return;
-        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
-
-        var cause  = _causes[_selCause];
-        var effect = _effects[_selEffect];
-        _causes[_selCause]   = new CovenantDraftCard(cause.id,  CovenantAssembleService.RollWhetTier(_rng, _forceSilver));
-        _effects[_selEffect] = new CovenantDraftCard(effect.id, CovenantAssembleService.RollWhetTier(_rng, _forceSilver));
-
-        if (_causeCards != null  && _selCause  < _causeCards.Length  && _causeCards[_selCause])
-            BindCard(_causeCards[_selCause],   _causes[_selCause],   true);
-        if (_effectCards != null && _selEffect < _effectCards.Length && _effectCards[_selEffect])
-            BindCard(_effectCards[_selEffect], _effects[_selEffect], false);
-
-        _whetLeft = 0;
-        var run = GameRunBootstrapper.Instance?.Run;
-        if (run != null) run.CovenantWhetUsed = true;
-
-        RefreshWhetUi();
-        RefreshSelection();
-    }
-
-    private void RefreshWhetUi()
-    {
-        if (_whetButton == null) return;
-        _whetButton.interactable = _whetLeft > 0;
-
-        var lbl = _whetButton.GetComponentInChildren<TMP_Text>(true);
-        if (lbl == null) return;
-        lbl.text = _whetLeft > 0 ? "연마 1" : "연마 0";
-        lbl.fontSize = 16f;
-    }
-
-    /// <summary>
-    /// 연마 버튼이 프리팹에 배선되지 않았으면 벼리기 버튼을 복제해 바로 위에 세운다.
-    /// 프리팹 수술 없이 기능이 화면에 실제로 존재하게 하려는 것 — 배선되면 이 경로는 타지 않는다.
-    /// </summary>
-    private void EnsureWhetButton()
-    {
-        if (_whetButton != null || _forgeButton == null) return;
-
-        var src = (RectTransform)_forgeButton.transform;
-        var clone = Instantiate(_forgeButton, src.parent);
-        clone.name = "WhetButton(Runtime)";
-        clone.onClick.RemoveAllListeners();   // 프리팹에 구워진 리스너까지 제거
-
-        // 자리는 앵커로만 잡는다 — 벼리기 버튼 위로 정확히 한 칸(하단 바 높이만큼).
-        // rect.height로 올리면 팝업이 막 생성돼 레이아웃이 아직 계산되지 않았을 때 0이 나와
-        // 벼리기 버튼과 완전히 겹쳐버린다.
-        var rt = (RectTransform)clone.transform;
-        rt.anchorMin        = src.anchorMin + Vector2.up;
-        rt.anchorMax        = src.anchorMax + Vector2.up;
-        rt.pivot            = src.pivot;
-        rt.sizeDelta        = src.sizeDelta;
-        rt.localScale       = src.localScale;
-        rt.anchoredPosition = src.anchoredPosition;
-
-        _whetButton = clone;
-    }
-
+    // ── 체결 ─────────────────────────────────────────────
+    /// <summary>고른 원인·효과 한 쌍을 확정하고 팝업을 닫는다.</summary>
     private void OnForge()
     {
         string id = SelectedId();
@@ -618,6 +580,28 @@ public class UI_CovenantAssemble : UI_Popup
     /// 리롤 버튼 라벨. 프리팹은 ↻(U+21BB)로 authoring 돼 있는데 본문 폰트(DNFForgedBlade)에
     /// 그 글리프가 없어 화면에는 빈 네모(□)만 나온다 — 폰트에 있는 글자로 바꿔 준다.
     /// </summary>
+    /// <summary>
+    /// 교체 버튼을 카드 <b>상단 우측</b>으로 올린다.
+    ///
+    /// <para>프리팹에서는 카드 오른쪽 <b>아래</b> 구석(196,72)에 있었다 — 기획은 선택지 위에
+    /// 작게 얹힌 「돌리는」 버튼이었는데, 아래에 있으면 카드 본문(이름·설명)을 다 읽고 나서야
+    /// 눈에 들어와 "다시 뽑을까"를 고민하는 시점과 어긋난다.</para>
+    ///
+    /// <para>비율 앵커로 잡아 카드가 커지든 작아지든 같은 자리에 붙는다.</para>
+    /// </summary>
+    private static void PlaceRerollAtTop(Button btn)
+    {
+        if (btn == null) return;
+        var rt = (RectTransform)btn.transform;
+
+        // 카드 287×102 기준 — 우측 상단에 48×21이 여백 6을 두고 앉는다.
+        rt.anchorMin = new Vector2(1f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot     = new Vector2(1f, 1f);
+        rt.sizeDelta        = new Vector2(48f, 21f);
+        rt.anchoredPosition = new Vector2(-6f, -6f);
+    }
+
     private static void FixRerollLabel(Button btn)
     {
         var lbl = btn.GetComponentInChildren<TMP_Text>(true);

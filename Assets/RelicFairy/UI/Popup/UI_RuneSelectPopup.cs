@@ -75,6 +75,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
     // ── 상태 ──
     private readonly List<CardView> _cards = new();
+    private readonly List<GameObject> _lockedRoots = new();   // 잠긴 자리(해금하면 채워질 칸)
+    private int _lockedSlots;
     private List<(RuntimeItemData data, ItemSO so)> _candidates;
     private RunItemInventory _inventory;
     private const float SelectedCardScale   = 1.05f;   // 선택 카드 확대
@@ -143,10 +145,16 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     }
 
     /// <summary>후보를 주입해 카드를 구성한다. ShowPopupUIAndGetAsync 직후 호출.</summary>
-    public void Setup(List<(RuntimeItemData data, ItemSO so)> candidates, RunItemInventory inventory)
+    /// <param name="lockedSlots">
+    /// 해금하면 <b>실제로 더 열릴 수 있는</b> 칸 수. 빈 자리로 미리 그려 무엇이 늘어나는지 보여준다.
+    /// 이 방의 규칙이 애초에 확장 대상이 아니면 0이다 — 없는 확장을 약속하면 안 된다.
+    /// </param>
+    public void Setup(List<(RuntimeItemData data, ItemSO so)> candidates, RunItemInventory inventory,
+                      int lockedSlots = 0)
     {
-        _candidates = candidates;
-        _inventory  = inventory;
+        _candidates  = candidates;
+        _inventory   = inventory;
+        _lockedSlots = Mathf.Max(0, lockedSlots);
 
         if (candidates == null || candidates.Count == 0)
         {
@@ -212,6 +220,10 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             // 취소·스킵 어느 경로로 빠져도 카드가 반투명·축소 상태로 남지 않게 확정한다.
             for (int i = 0; i < _cards.Count; i++) RevealCardInstant(_cards[i]);
             _revealing = false;
+
+            // 위 한 줄이 배율·투명도를 되돌리므로, 연출 도중에 고른 카드가 있으면
+            // 선택 강조가 함께 지워진다(_selected만 남고 화면에는 표시가 사라진다).
+            if (_selected >= 0) ApplySelectionVisual(_selected);
         }
     }
 
@@ -331,6 +343,10 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
             Vector2.zero, new Vector2(WindowW, WindowH));
         _windowRoot = window.transform;
+        // 화면 맞춤은 빌더가 붙인다 — 프리팹에만 붙이면 재굽기 때 사라진다.
+        // 크기를 가진 것은 테두리(부모)라 거기에 붙인다.
+        window.transform.parent.gameObject.AddComponent<UIWindowFitter>()
+              .Configure(maxScale: UIWindowFitter.ContentScreen);
 
         var skin = UISkin.RuneSelect;
         _skinned = skin != null;
@@ -382,7 +398,9 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             ShopUIStyle.BronzeLine, ShopUIStyle.BandFill, 2f, raycast: true);
         ShopUIStyle.Anchor((RectTransform)confirm.transform.parent,
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(-90f, 14f), new Vector2(200f, 52f));
+            // 314×52 = 아트 「선택 버튼@2x」(670×111 · 비율 6.04)를 높이 52에 맞춘 값.
+            // 200이면 4.08이라 버튼이 세로로 눌린다(아트 실치수는 335×55).
+            new Vector2(-126f, 14f), new Vector2(314f, 52f));
         _confirmBtnImg = confirm;
         ShopUIStyle.Skin(_confirmBtnImg, skin?.confirmButton, sliced: true);
         AddClick(confirm.transform.parent.gameObject, OnConfirmClicked);
@@ -397,7 +415,9 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             ShopUIStyle.CardBorder, ShopUIStyle.CardFill, 2f, raycast: true);
         ShopUIStyle.Anchor((RectTransform)skip.transform.parent,
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(120f, 14f), new Vector2(140f, 52f));
+            // 212×52 = 아트 「넘기기 버튼@2x」(387×95 · 비율 4.07)를 높이 52에 맞춘 값.
+            // 두 버튼을 40px 간격으로 묶어 창 정중앙에 오도록 x를 다시 잡았다.
+            new Vector2(177f, 14f), new Vector2(212f, 52f));
         ShopUIStyle.Skin(skip, skin?.skipButton, sliced: true);
         AddClick(skip.transform.parent.gameObject, OnSkipClicked);
 
@@ -422,9 +442,24 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         var kind = GameRunBootstrapper.Instance?.Run?.CurrentRoomKind ?? RoomPlanKind.Normal;
         var (rare, epic, legendary) = RoomRewardTable.For(kind).Weights.Normalized();
 
-        var bar = OddsBarView.Create(_windowRoot,
+        OddsBarView.Create(_windowRoot,
             new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f),
             new Vector2(OddsBarMargin, OddsBarMargin), new Vector2(OddsBarW, OddsBarH));
+        RefreshOdds();
+    }
+
+    /// <summary>
+    /// 방 종류에 맞는 확률을 막대에 싣는다. <b>구운 경로에서도 반드시 한 번 불러야 한다</b> —
+    /// 프리팹에 굳은 값은 베이크 당시의 일반방 기준이라, 정예방에 들어가도 일반방 확률을
+    /// 그대로 보여주는 <b>거짓 정보</b>가 된다.
+    /// </summary>
+    private void RefreshOdds()
+    {
+        var bar = GetComponentInChildren<OddsBarView>(true);
+        if (bar == null) return;
+
+        var kind = GameRunBootstrapper.Instance?.Run?.CurrentRoomKind ?? RoomPlanKind.Normal;
+        var (rare, epic, legendary) = RoomRewardTable.For(kind).Weights.Normalized();
         bar.SetOdds(rare, epic, legendary, heated: false);
     }
 
@@ -432,15 +467,24 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     {
         foreach (var c in _cards) if (c.Root != null) Destroy(c.Root);
         _cards.Clear();
+        foreach (var g in _lockedRoots) if (g != null) Destroy(g);
+        _lockedRoots.Clear();
+
+        // 창은 화면에 맞춰 커지지만 아래 배치는 전부 목업 px다 — 배율 레이어가 그 차이를 흡수한다.
+        // 이게 없으면 넓어진 판에 원래 크기 카드가 떠 있게 된다.
+        var layer = UIProportional.EnsureScaledLayer(_windowRoot, "CardLayer", WindowW, WindowH) ?? (RectTransform)_windowRoot;
 
         int n = _candidates.Count;
+        // 잠긴 자리도 줄의 일부다 — 폭 산출과 중앙 정렬에 함께 넣어야 줄이 흐트러지지 않고,
+        // 해금 뒤에 카드가 "그 자리로" 들어오는 것으로 보인다.
+        int slots = n + _lockedSlots;
 
-        // 카드 폭은 후보 수에 맞춰 줄인다. 300 고정이던 시절엔 3장까지만 창에 들어갔고,
+        // 카드 폭은 칸 수에 맞춰 줄인다. 300 고정이던 시절엔 3장까지만 창에 들어갔고,
         // 정예방 4지선다(RoomRewardTable)에서 카드가 창 밖으로 밀려났다.
-        float avail = WindowW - CardSideMargin * 2f - (n - 1) * CardGap;
-        _cardW = Mathf.Min(CardW, avail / Mathf.Max(1, n));
+        float avail = WindowW - CardSideMargin * 2f - (slots - 1) * CardGap;
+        _cardW = Mathf.Min(CardW, avail / Mathf.Max(1, slots));
 
-        float totalW = n * _cardW + (n - 1) * CardGap;
+        float totalW = slots * _cardW + (slots - 1) * CardGap;
         float startX = -totalW * 0.5f + _cardW * 0.5f;
 
         for (int i = 0; i < n; i++)
@@ -448,7 +492,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             int idx = i;   // 클로저 캡처
             var (data, so) = _candidates[i];
 
-            var card = ShopUIStyle.MakeFrame(_windowRoot, $"Card{i}",
+            var card = ShopUIStyle.MakeFrame(layer, $"Card{i}",
                 ShopUIStyle.CardBorder, ShopUIStyle.CardFill, 2f, raycast: true);
             var cardRT = (RectTransform)card.transform.parent;   // 위치/크기는 테두리(outer)에
             ShopUIStyle.Anchor(cardRT,
@@ -486,6 +530,14 @@ public sealed class UI_RuneSelectPopup : UI_Popup
                 view.Group.alpha  = 0f;
                 view.Rt.localScale = Vector3.one * 0.9f;
             }
+        }
+
+        for (int i = 0; i < _lockedSlots; i++)
+        {
+            int slot = n + i;
+            _lockedRoots.Add(UILockedSlot.Build(layer, $"Locked{i}",
+                new Vector2(startX + slot * (_cardW + CardGap), CardY),
+                new Vector2(_cardW, CardH)));
         }
     }
 
@@ -718,10 +770,16 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             new Vector2(left, 0f), new Vector2(RuneArtBoxW, RuneArtBoxW));
         ShopUIStyle.Skin(frame, UISkin.RuneSelect?.runeTile, sliced: true);
 
-        // 룬 자체 아트 — 속성 타일이 아니라 등급 룬 아트를 쓴다(둘을 갈라놓는 것이 이번 구조의 핵심).
-        var art = RuneArt.GetArt(data.rarity);
+        // 문양은 <b>기능(effect_type)</b>이 먼저다 — 룬이 무엇을 하는지가 아이콘으로 읽혀야 한다.
+        // 기능 문양이 없으면 예전처럼 등급 → 속성 순으로 폴백한다.
+        var art = RuneArt.GetIconByEffect(EffectTypeOf(data));
+        if (art == null) art = RuneArt.GetArt(data.rarity);
         if (art == null) art = RuneArt.GetArtByElement(data.element);
         if (art == null) return;
+
+        // 등급 광휘 — 좋은 룬일수록 문양이 도드라져야 한다. 문양 <b>뒤</b>에 깔아야
+        // 빛이 새어나오는 것처럼 보인다(위에 얹으면 문양을 덮어 흐려진다).
+        AddGradeGlow(frame.transform, data.rarity);
 
         var icon = ShopUIStyle.MakeImage(frame.transform, "RuneArt", Color.white);
         ShopUIStyle.Anchor(icon.rectTransform, half, half, half,
@@ -734,6 +792,44 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             ElementDef.IdColor(data.element, ShopUIStyle.TextDim));
         ShopUIStyle.Anchor(strip.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
             new Vector2(0f, 7f), new Vector2(RuneArtBoxW - 22f, 5f));
+    }
+
+    /// <summary>
+    /// 이 룬의 기능 키. 효과의 정본은 CSV(ITEM_DATA)라 거기서 첫 <c>effect_type</c>을 읽는다.
+    /// 한 룬이 여러 줄(슬롯)을 가질 수 있는데, 문양은 <b>대표 효과</b> 하나로 정한다.
+    /// </summary>
+    private static string EffectTypeOf(RuntimeItemData data)
+    {
+        if (data == null || string.IsNullOrEmpty(data.itemId)) return null;
+        var entries = Managers.ItemData?.GetItem(data.itemId);
+        if (entries == null) return null;
+        for (int i = 0; i < entries.Count; i++)
+            if (!string.IsNullOrEmpty(entries[i].effect_type)) return entries[i].effect_type;
+        return null;
+    }
+
+    /// <summary>
+    /// 등급 광휘 — Epic부터 문양 뒤에 은은한 빛을 깐다.
+    ///
+    /// <para>Common·Rare는 깔지 않는다. 전부 빛나면 아무것도 안 빛나는 것과 같아서,
+    /// 흔한 룬이 조용해야 좋은 룬이 눈에 걸린다.</para>
+    /// </summary>
+    private static void AddGradeGlow(Transform frame, ItemRarity rarity)
+    {
+        if (rarity < ItemRarity.Epic) return;
+
+        var c = RewardPresentation.FrameColor(rarity);
+        float a = rarity >= ItemRarity.Legendary ? 0.42f : 0.24f;
+        float s = rarity >= ItemRarity.Legendary ? 1.16f : 1.06f;
+
+        var glow = ShopUIStyle.MakeImage(frame, "GradeGlow", new Color(c.r, c.g, c.b, a));
+        var half = new Vector2(0.5f, 0.5f);
+        ShopUIStyle.Anchor(glow.rectTransform, half, half, half,
+            Vector2.zero, Vector2.one * ((RuneArtBoxW - 18f) * s));
+        glow.raycastTarget = false;
+
+        var soft = UISkin.RuneSelect?.runeTile;
+        if (soft != null) ShopUIStyle.Skin(glow, soft, sliced: true);
     }
 
     private bool BuildShapePreview(Transform root, RuntimeItemData data)
@@ -810,7 +906,16 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         SkipReveal();
         Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
         _selected = index;
+        ApplySelectionVisual(index);
+    }
 
+    /// <summary>
+    /// 선택 강조(테두리색·배율·명암)만 다시 입힌다 — 소리도, 상태 변경도 하지 않는다.
+    /// 공개 연출의 마무리(<see cref="RevealCardInstant"/>)가 카드 배율·투명도를 되돌리므로,
+    /// 연출 도중에 고른 카드가 있으면 연출이 끝난 뒤 이걸 한 번 더 불러야 강조가 살아남는다.
+    /// </summary>
+    private void ApplySelectionVisual(int index)
+    {
         for (int i = 0; i < _cards.Count; i++)
         {
             bool on = (i == index);
@@ -911,14 +1016,23 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     /// </summary>
     private void BindBakedHierarchy()
     {
-        BindClick("Window/ConfirmBtn", OnConfirmClicked);
-        BindClick("Window/SkipBtn",    OnSkipClicked);
+        // 아트 적용 여부는 구운 프리팹에 남은 <b>스프라이트 자체</b>로 판정한다.
+        // 빌드 경로에서만 세우던 값이라 잇지 않으면 영영 false로 남고,
+        // 아트가 멀쩡히 있는데도 무지 배경용 어두운 색(BandFill·GoldPillBg)이
+        // 스프라이트에 곱해져 「선택」 버튼과 카드 테두리가 검게 보인다.
+        _skinned = _confirmBtnImg != null && _confirmBtnImg.sprite != null;
+
+        RefreshOdds();
+
+        BindClick("ConfirmBtn", OnConfirmClicked);
+        BindClick("SkipBtn",    OnSkipClicked);
     }
 
-    private void BindClick(string path, Action onClick)
+    private void BindClick(string name, Action onClick)
     {
-        var t = transform.Find(path);
+        var t = ShopUIStyle.FindDeep(transform, name);
         if (t != null) AddClick(t.gameObject, onClick);
+        else Debug.LogWarning($"[UI_RuneSelectPopup] 배선 실패 — 「{name}」을 못 찾았다. 버튼이 죽는다.");
     }
 
     private static void AddClick(GameObject go, Action onClick)

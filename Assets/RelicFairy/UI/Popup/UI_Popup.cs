@@ -36,8 +36,13 @@ public class UI_Popup : UI_Base
         _cg = gameObject.GetOrAddComponent<CanvasGroup>();
 
         foreach (var btn in GetComponentsInChildren<Button>(true))
+        {
+            // 자기 배율을 직접 굴리는 UI에는 붙이지 않는다 — 같은 localScale을 두고 다투면
+            // 마우스를 뗄 때 기준 크기로 되돌아가 선택 강조가 지워진다.
+            if (btn.GetComponent<IOwnsButtonScale>() != null) continue;
             if (btn.GetComponent<UIButtonFeedback>() == null)
                 btn.gameObject.AddComponent<UIButtonFeedback>();
+        }
     }
 
     // ── Open ─────────────────────────────────────────────────

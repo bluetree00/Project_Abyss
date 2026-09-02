@@ -26,7 +26,11 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     private const float CardW   = 300f;   // 카드 폭 상한 — 후보가 많으면 이 아래로 줄어든다
     private const float CardH   = 400f;
     private const float CardGap = 24f;
-    private const float CardY   = -30f;
+    // 카드 세로 중심. 창 중심 기준으로 카드는 CardY ± CardH/2를 차지하는데,
+    // 「장착」 버튼이 -212~-268에 있어 -30이면 카드 아래끝(-230)이 버튼 위 18px를 덮는다.
+    // 카드는 raycast를 받고 나중에 그려지므로 그 띠의 클릭까지 가져간다. -8이면
+    // 카드가 +192~-208이 되어 버튼과 4px, 부제(-아래끝 +212)와 20px 간격이 남는다.
+    private const float CardY   = -8f;
     private const float CardSideMargin = 40f;   // 카드 열 좌우 여백(창 안쪽)
 
     private static readonly Color CardSelected = new(0.20f, 0.17f, 0.10f, 1f);
@@ -40,6 +44,8 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
 
     // ── 상태 ──
     private readonly List<CardView> _cards = new();
+    private readonly List<GameObject> _lockedRoots = new();   // 잠긴 자리(해금하면 채워질 칸)
+    private int _lockedSlots;
     private List<RelicPartEntry> _candidates;
     private int _selected = -1;
     private bool _built;
@@ -79,9 +85,14 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     }
 
     /// <summary>후보를 주입해 카드를 구성한다. ShowPopupUIAndGetAsync 직후 호출.</summary>
-    public void Setup(List<RelicPartEntry> candidates)
+    /// <param name="lockedSlots">
+    /// 해금하면 <b>실제로 더 열릴 수 있는</b> 칸 수. 빈 자리로 미리 그려 무엇이 늘어나는지 보여준다.
+    /// 풀이 모자라 해금해도 안 늘어나는 경우에는 0을 넘겨야 한다 — 없는 확장을 약속하면 안 된다.
+    /// </param>
+    public void Setup(List<RelicPartEntry> candidates, int lockedSlots = 0)
     {
-        _candidates = candidates;
+        _candidates   = candidates;
+        _lockedSlots  = Mathf.Max(0, lockedSlots);
 
         if (candidates == null || candidates.Count == 0)
         {
@@ -124,6 +135,9 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
             Vector2.zero, new Vector2(WindowW, WindowH));
         _windowRoot = window.transform;
+        // 화면 맞춤은 빌더가 붙인다 — 프리팹에만 붙이면 재굽기 때 사라진다.
+        // 크기를 가진 것은 테두리(부모)라 거기에 붙인다.
+        window.transform.parent.gameObject.AddComponent<UIWindowFitter>().Configure();
 
         // 제목
         var title = ShopUIStyle.MakeText(_windowRoot, "Title", 26f, FontStyles.Bold,
@@ -165,14 +179,23 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     {
         foreach (var c in _cards) if (c.Root != null) Destroy(c.Root);
         _cards.Clear();
+        foreach (var g in _lockedRoots) if (g != null) Destroy(g);
+        _lockedRoots.Clear();
+
+        // 창은 화면에 맞춰 커지지만 아래 배치는 전부 목업 px다 — 배율 레이어가 그 차이를 흡수한다.
+        // 이게 없으면 넓어진 판에 원래 크기 카드가 떠 있게 된다.
+        var layer = UIProportional.EnsureScaledLayer(_windowRoot, "CardLayer", WindowW, WindowH) ?? (RectTransform)_windowRoot;
 
         int n = _candidates.Count;
+        // 잠긴 자리도 줄의 일부다 — 폭 산출과 중앙 정렬에 함께 넣어야 줄이 흐트러지지 않고,
+        // 해금 뒤에 카드가 "그 자리로" 들어오는 것으로 보인다.
+        int slots = n + _lockedSlots;
 
-        // 카드 폭은 후보 수에 맞춰 줄인다. 300 고정이면 4지선다에서 카드가 창 밖으로 밀려난다.
-        float avail = WindowW - CardSideMargin * 2f - (n - 1) * CardGap;
-        _cardW = Mathf.Min(CardW, avail / Mathf.Max(1, n));
+        // 카드 폭은 칸 수에 맞춰 줄인다. 300 고정이면 4지선다에서 카드가 창 밖으로 밀려난다.
+        float avail = WindowW - CardSideMargin * 2f - (slots - 1) * CardGap;
+        _cardW = Mathf.Min(CardW, avail / Mathf.Max(1, slots));
 
-        float totalW = n * _cardW + (n - 1) * CardGap;
+        float totalW = slots * _cardW + (slots - 1) * CardGap;
         float startX = -totalW * 0.5f + _cardW * 0.5f;
 
         for (int i = 0; i < n; i++)
@@ -180,7 +203,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             int idx = i;   // 클로저 캡처
             var entry = _candidates[i];
 
-            var card = ShopUIStyle.MakeFrame(_windowRoot, $"Card{i}",
+            var card = ShopUIStyle.MakeFrame(layer, $"Card{i}",
                 ShopUIStyle.CardBorder, ShopUIStyle.CardFill, 2f, raycast: true);
             var cardRT = (RectTransform)card.transform.parent;   // 위치/크기는 테두리(outer)에
             ShopUIStyle.Anchor(cardRT,
@@ -197,6 +220,14 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             });
 
             BuildCardContent(card.transform, entry);
+        }
+
+        for (int i = 0; i < _lockedSlots; i++)
+        {
+            int slot = n + i;
+            _lockedRoots.Add(UILockedSlot.Build(layer, $"Locked{i}",
+                new Vector2(startX + slot * (_cardW + CardGap), CardY),
+                new Vector2(_cardW, CardH)));
         }
     }
 
@@ -248,7 +279,8 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
 
     private void SetSelected(int index)
     {
-        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        // 초기화(-1)에도 소리를 내면 팝업이 열리는 순간 아무도 안 눌렀는데 클릭음이 울린다.
+        if (index >= 0) Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
         _selected = index;
 
         for (int i = 0; i < _cards.Count; i++)
@@ -262,7 +294,10 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
 
         bool hasSel = index >= 0;
         if (_confirmLabel != null)
+        {
             _confirmLabel.color = hasSel ? ShopUIStyle.TextPrimary : ShopUIStyle.TextDim;
+            if (hasSel) _confirmLabel.text = "장착";   // 미선택 안내를 띄웠다면 되돌린다
+        }
         if (_confirmBtnImg != null)
             _confirmBtnImg.color = hasSel ? ShopUIStyle.GoldPillBg : ShopUIStyle.BandFill;
     }
@@ -272,7 +307,13 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     private void OnConfirmClicked()
     {
         if (_selected < 0 || _candidates == null || _selected >= _candidates.Count)
-            return;   // 미선택 — 아무 일도 하지 않는다
+        {
+            // 미선택. 조용히 return하면 버튼이 죽은 것으로 읽힌다 —
+            // 무엇이 빠졌는지 버튼이 직접 말하게 한다(룬 선택 팝업과 같은 규약).
+            ShopUIStyle.PlaySfx("shop_reject");
+            if (_confirmLabel != null) _confirmLabel.text = "카드를 고르세요";
+            return;
+        }
 
         Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
         Result = _candidates[_selected];
@@ -289,8 +330,9 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     /// </summary>
     private void BindBakedHierarchy()
     {
-        var t = transform.Find("Window/ConfirmBtn");
+        var t = ShopUIStyle.FindDeep(transform, "ConfirmBtn");
         if (t != null) AddClick(t.gameObject, OnConfirmClicked);
+        else Debug.LogWarning("[UI_RelicPartDraftPopup] 배선 실패 — 「ConfirmBtn」을 못 찾았다. 장착 버튼이 죽는다.");
     }
 
     private static void AddClick(GameObject go, Action onClick)

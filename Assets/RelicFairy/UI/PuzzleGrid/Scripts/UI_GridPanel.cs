@@ -582,7 +582,9 @@ public sealed class UI_GridPanel : UI_Base
         viewportRT.anchorMin = new Vector2(0f, 0f);
         viewportRT.anchorMax = new Vector2(1f, 1f);
         viewportRT.offsetMin = new Vector2(0f, 0f);
-        viewportRT.offsetMax = new Vector2(0f, -24f);
+        // 제목("아이템 목록")이 상단 22px를 쓰므로 -24면 간격이 2px뿐이고,
+        // 슬롯 아트의 테두리와 맞닿아 제목이 첫 줄 슬롯에 얹힌 것처럼 보인다.
+        viewportRT.offsetMax = new Vector2(0f, -32f);
         viewportGO.AddComponent<RectMask2D>();
 
         var scrollRect = scrollGO.AddComponent<ScrollRect>();

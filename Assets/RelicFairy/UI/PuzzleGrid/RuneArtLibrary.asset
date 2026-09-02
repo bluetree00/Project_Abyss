@@ -11,7 +11,116 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e84eeaaaeea40cc4b89857fbca395491, type: 3}
   m_Name: RuneArtLibrary
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
+  effectIcons:
+  - effectType: AllDamage
+    icon: {fileID: 21300000, guid: 8cac4bb4c5c7adc419901190c5112cb2, type: 3}
+  - effectType: MaxHP
+    icon: {fileID: 21300000, guid: 1451598a2aef7cc43a8395be5b633ead, type: 3}
+  - effectType: Defense
+    icon: {fileID: 21300000, guid: 2b77c99046535f04786bbfb32a13a7c4, type: 3}
+  - effectType: CritChance
+    icon: {fileID: 21300000, guid: 4cad690f3d2f13b489fa981bc6c804ae, type: 3}
+  - effectType: CritDamage
+    icon: {fileID: 21300000, guid: 73cf6004c16b74b4eb510375ded5c4cc, type: 3}
+  - effectType: SkillDamage
+    icon: {fileID: 21300000, guid: 50fe08a8220863f49b62661d6c4f6319, type: 3}
+  - effectType: MaxHPPercent
+    icon: {fileID: 21300000, guid: 00788a0f2727c3545b4bcc33fc86a288, type: 3}
+  - effectType: MoveSpeed
+    icon: {fileID: 21300000, guid: c3e85ed6b7630004abe5f10730756ad8, type: 3}
+  - effectType: DefensePercent
+    icon: {fileID: 21300000, guid: 1677a01075a77474c85f53c1a3d41c02, type: 3}
+  - effectType: AttackSpeed
+    icon: {fileID: 21300000, guid: 279bf916856f0b94681d6ee9c2fa394a, type: 3}
+  - effectType: SkillCooldownReduction
+    icon: {fileID: 21300000, guid: d8abe05af12cd304696eb0aae847a460, type: 3}
+  - effectType: CondAllDamage
+    icon: {fileID: 21300000, guid: 4f97ce7080390d5429612d1a6ffe9fe2, type: 3}
+  - effectType: CondDefensePercent
+    icon: {fileID: 21300000, guid: 3cafb43f1b7ef854a9035a8f39bd6270, type: 3}
+  - effectType: CondAttackSpeed
+    icon: {fileID: 21300000, guid: ed81f0933c5a1ac4c8675a19d4e64529, type: 3}
+  - effectType: CondCritChance
+    icon: {fileID: 21300000, guid: 0ca894b639d111c4dbe9da0f0642eccf, type: 3}
+  - effectType: CondMoveSpeed
+    icon: {fileID: 21300000, guid: bc1cf17ae8da5a74490dc2e881f1f55a, type: 3}
+  - effectType: CondMaxHpPercent
+    icon: {fileID: 21300000, guid: 90751b064f2e31a4f9a0f2027d77b1e1, type: 3}
+  - effectType: FirstHitBonus
+    icon: {fileID: 21300000, guid: 266303490d5834e4aa3dbbd2d398e26a, type: 3}
+  - effectType: CondCritDamage
+    icon: {fileID: 21300000, guid: 6cde1296cdeb90b48a35ee09ee3ac99a, type: 3}
+  - effectType: CondSkillDamage
+    icon: {fileID: 21300000, guid: 21f74096ba3ee9646ba1a0afa0815276, type: 3}
+  - effectType: PoisonOnHit
+    icon: {fileID: 21300000, guid: 3c6112ce93ba20942a755d19dd0b5f91, type: 3}
+  - effectType: DamageReflect
+    icon: {fileID: 21300000, guid: e18b656822f03c1459c56f8a75f0e0ec, type: 3}
+  - effectType: ExtraAttack
+    icon: {fileID: 21300000, guid: 112c1d643c0a90c42aa1dd3fd1553b85, type: 3}
+  - effectType: Freeze
+    icon: {fileID: 21300000, guid: 3682160cace99c745a6f4d085db52deb, type: 3}
+  - effectType: DamageReduction
+    icon: {fileID: 21300000, guid: ddaf9c8df059ac54e99ee15d3d719671, type: 3}
+  - effectType: ProjectilePierce
+    icon: {fileID: 21300000, guid: 2ddf5d11c0a76c54fb9dc666ed888c70, type: 3}
+  - effectType: Stun
+    icon: {fileID: 21300000, guid: 3aa4e8db11a0c114b908f0d04b641c0b, type: 3}
+  - effectType: DefenseOnHit
+    icon: {fileID: 21300000, guid: f60e3e514f52c824989cdf2dbf170f67, type: 3}
+  - effectType: ProjectileCount
+    icon: {fileID: 21300000, guid: 47732f6fd0f6bf1418444cc3c60b8de3, type: 3}
+  - effectType: HPRegenOnHit
+    icon: {fileID: 21300000, guid: 2ce0e0cc4f6dd2a4eafb2028fe20a7ea, type: 3}
+  - effectType: DebuffDuration
+    icon: {fileID: 21300000, guid: 732266446d9f09547b5faaecb61e5a79, type: 3}
+  - effectType: HealingReceived
+    icon: {fileID: 21300000, guid: 477e2d81b0d7b3741a16f28b37967701, type: 3}
+  - effectType: HPRegenOnClear
+    icon: {fileID: 21300000, guid: af0e5a0a770f6144bbf5c603cbd5a06e, type: 3}
+  - effectType: FirstAttackAfterRoll
+    icon: {fileID: 21300000, guid: e81ff1518445d0c4d8cf786f26435cc5, type: 3}
+  - effectType: DebuffResistance
+    icon: {fileID: 21300000, guid: 3b3230cc6babfb741b3ef063d3906739, type: 3}
+  - effectType: RollDistance
+    icon: {fileID: 21300000, guid: 1a44ed4068b3d39499400b9ce6de5970, type: 3}
+  - effectType: FireLegendAoe
+    icon: {fileID: 21300000, guid: f184db54876223840891cfc882942033, type: 3}
+  - effectType: FireLegendSingle
+    icon: {fileID: 21300000, guid: 801b97b7a509c1442b7a3c2d0f3a0694, type: 3}
+  - effectType: FireLegendProjectile
+    icon: {fileID: 21300000, guid: 94d3f9e726b449a48bfd652a6dd8af14, type: 3}
+  - effectType: IceLegendAoe
+    icon: {fileID: 21300000, guid: 969e1a70ed8981649bb0234f0e4d68c4, type: 3}
+  - effectType: IceLegendSingle
+    icon: {fileID: 21300000, guid: 775481f99e4630549867736ff3f073bf, type: 3}
+  - effectType: IceLegendField
+    icon: {fileID: 21300000, guid: 9178009152cdb9941b6cb963783ce3bf, type: 3}
+  - effectType: ElecLegendAoe
+    icon: {fileID: 21300000, guid: 21f9d935e15411b4c87fec9144c8dfa1, type: 3}
+  - effectType: ElecLegendSingle
+    icon: {fileID: 21300000, guid: 80bce433126261a4fb331e61983048b2, type: 3}
+  - effectType: ElecLegendProjectile
+    icon: {fileID: 21300000, guid: 4307e71b7746f504ea675eab31814a2d, type: 3}
+  - effectType: GrassLegendAoe
+    icon: {fileID: 21300000, guid: c61b22b72aaea0a4989d72a52d89026a, type: 3}
+  - effectType: GrassLegendSingle
+    icon: {fileID: 21300000, guid: 09e8031506cb1484c8abce83a0fccf8c, type: 3}
+  - effectType: GrassLegendProjectile
+    icon: {fileID: 21300000, guid: cdb7b3a592445fa4ba7d26069264f7f8, type: 3}
+  - effectType: LightLegendAoe
+    icon: {fileID: 21300000, guid: 5f53e12c350852c48ac585015e6feb39, type: 3}
+  - effectType: LightLegendSingle
+    icon: {fileID: 21300000, guid: 9d1ad1e7986fe6643b2df6eb13ca527d, type: 3}
+  - effectType: LightLegendProjectile
+    icon: {fileID: 21300000, guid: 3878e99b4e867174ca142ccdd5c1ff30, type: 3}
+  - effectType: DarkLegendAoe
+    icon: {fileID: 21300000, guid: 79881b1eda76cc642957ace316ac3c03, type: 3}
+  - effectType: DarkLegendSingle
+    icon: {fileID: 21300000, guid: 3ed24350cc3e82d449d54e40259fa821, type: 3}
+  - effectType: DarkLegendProjectile
+    icon: {fileID: 21300000, guid: 08b2dd72d558b8444b96477351760674, type: 3}
   gradeArt:
   - {fileID: 21300000, guid: 133df5ea363dad34c9bd526a800d2ac2, type: 3}
   - {fileID: 21300000, guid: 6307f1c43beae894d8de368905fa9137, type: 3}
@@ -41,7 +150,7 @@ MonoBehaviour:
   blockTile:
   - {fileID: 21300000, guid: d654ed05229ea1146a845502cffaf9fc, type: 3}
   - {fileID: 21300000, guid: 26d6099eba6066a488d5bd0b1cbc174c, type: 3}
-  - {fileID: 21300000, guid: 3ebf00a4023b0194f89ab76717bb2177, type: 3}
+  - {fileID: 21300000, guid: d3743b41ce538a94aacd42384d49de69, type: 3}
   - {fileID: 21300000, guid: d23c4aba99ed99a4891a67ceb209c8ae, type: 3}
   - {fileID: 21300000, guid: 71cc04ae78c7e2b46b964256a9889876, type: 3}
   - {fileID: 21300000, guid: 1c6a3e83f7ac11747bab8c6104cae1d9, type: 3}

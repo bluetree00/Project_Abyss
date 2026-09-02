@@ -31,9 +31,15 @@ public sealed class FeverGaugeView : MonoBehaviour
     };
     private static readonly Color EmptyCell = new(0.14f, 0.14f, 0.18f, 1f);
 
+    // 아트가 있을 때 쓰는 <b>게이지 전체 한 장</b>. 납품본 「피버0~7」은 전부 405×70으로
+    // 크기가 같다 — 칸 하나가 아니라 단계별 전체 그림이라는 뜻이다.
+    [SerializeField] private Image _strip;
+    // 아트가 없을 때만 쓰는 폴백 칸 7개.
     [SerializeField] private Image[] _cells;
-    private TMP_Text _label;
-    private TMP_Text _hint;
+    // 구운 프리팹에서도 살아남아야 한다 — 직렬화하지 않으면 null이라
+    // 피버가 올라도 안내문이 "0/7"에 영구히 멈춘다.
+    [SerializeField] private TMP_Text _label;
+    [SerializeField] private TMP_Text _hint;
     private int _shownLevel = -1;
 
     /// <summary>부모 아래에 게이지를 짓는다. size = 트랙 전체 크기.</summary>
@@ -65,18 +71,37 @@ public sealed class FeverGaugeView : MonoBehaviour
         ShopUIStyle.Anchor(view._hint.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
             new Vector2(-12f, -6f), new Vector2(size.x - 110f, LabelH));
 
-        // 칸 — 트랙 안쪽 가로 폭을 균등 분할.
+        // 납품된 「피버0~7」은 <b>전부 405×70으로 크기가 같다</b> — 칸 하나가 아니라
+        // 게이지 전체의 단계별 그림이다. 그걸 칸마다 넣으면 405×70이 37×98 칸에 눌려
+        // 15배 찌그러진다. 아트가 있으면 <b>한 장</b>을 단계에 따라 갈아끼운다.
         float padX = 12f;
-        float cellW = (size.x - padX * 2f - CellGap * (MaxLevel - 1)) / MaxLevel;
-        float cellH = Mathf.Max(14f, size.y - LabelH - 22f);
+        float barW = size.x - padX * 2f;
+        float barH = Mathf.Max(14f, size.y - LabelH - 22f);
+        var art0 = skin != null ? skin.FeverCell(0) : null;
 
-        view._cells = new Image[MaxLevel];
-        for (int i = 0; i < MaxLevel; i++)
+        if (art0 != null)
         {
-            var cell = ShopUIStyle.MakeImage(inner, $"Cell{i}", EmptyCell);
-            ShopUIStyle.Anchor(cell.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f),
-                new Vector2(padX + i * (cellW + CellGap), 10f), new Vector2(cellW, cellH));
-            view._cells[i] = cell;
+            // 아트 비율을 지켜 트랙 안쪽에 앉힌다. 남는 세로는 위아래로 고르게 나눈다.
+            float aspect = art0.rect.width / Mathf.Max(1f, art0.rect.height);
+            float w = Mathf.Min(barW, barH * aspect);
+            float h = w / aspect;
+            view._strip = ShopUIStyle.MakeImage(inner, "Strip", Color.white);
+            ShopUIStyle.Anchor(view._strip.rectTransform,
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                new Vector2(0f, 10f + (barH - h) * 0.5f), new Vector2(w, h));
+            view._strip.preserveAspect = true;
+        }
+        else
+        {
+            float cellW = (barW - CellGap * (MaxLevel - 1)) / MaxLevel;
+            view._cells = new Image[MaxLevel];
+            for (int i = 0; i < MaxLevel; i++)
+            {
+                var cell = ShopUIStyle.MakeImage(inner, $"Cell{i}", EmptyCell);
+                ShopUIStyle.Anchor(cell.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f),
+                    new Vector2(padX + i * (cellW + CellGap), 10f), new Vector2(cellW, barH));
+                view._cells[i] = cell;
+            }
         }
 
         view.SetLevel(0);
@@ -94,20 +119,20 @@ public sealed class FeverGaugeView : MonoBehaviour
 
         var skin = UISkin.Refinery;
 
-        for (int i = 0; i < _cells.Length; i++)
+        if (_strip != null)
         {
-            bool lit = i < clamped;
-            var img = _cells[i];
-            if (img == null) continue;
+            // 단계 그림 한 장을 통째로 교체한다 — 늘리지 않으므로 비율이 보존된다.
+            var sprite = skin != null ? skin.FeverCell(clamped) : null;
+            if (sprite != null) _strip.sprite = sprite;
+        }
+        else if (_cells != null)
+        {
+            for (int i = 0; i < _cells.Length; i++)
+            {
+                var img = _cells[i];
+                if (img == null) continue;
 
-            // 아트가 있으면 단계별 칸 스프라이트(0=식은 칸), 없으면 열 색 계단으로 폴백.
-            var sprite = skin != null ? skin.FeverCell(lit ? i + 1 : 0) : null;
-            if (sprite != null)
-            {
-                ShopUIStyle.Skin(img, sprite, sliced: true);
-            }
-            else
-            {
+                bool lit = i < clamped;
                 img.sprite = null;
                 img.color  = lit ? HeatSteps[Mathf.Min(i + 1, HeatSteps.Length - 1)] : EmptyCell;
             }

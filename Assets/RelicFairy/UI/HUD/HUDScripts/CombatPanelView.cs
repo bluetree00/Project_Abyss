@@ -47,6 +47,9 @@ public sealed class CombatPanelView : MonoBehaviour
     [SerializeField] private float ghostLerpSpeed = 1.2f;
 
     private Image _hpFrameImg;
+    private RectTransform _reviveBadge;    // 부활 잔여 표식(체력바 왼쪽)
+    private Image         _reviveFrame;
+    private TMP_Text      _reviveLabel;
     private bool HasHpSkin => hpTrackSprite != null || hpFillHighSprite != null || hpFillLowSprite != null;
 
     // 무기 슬롯(배경·테두리·아이콘 원형)은 <b>프리팹이 정본</b>이다 — @UIRoot/WeaponPanel 하위에
@@ -188,6 +191,10 @@ public sealed class CombatPanelView : MonoBehaviour
     private static readonly Color WeaponColor = new Color(0.45f, 0.70f, 1.00f, 1f);  // 무기=강철청
 
     // HP fill 색: 가득=초록 → 절반=노랑 → 위험=빨강 (전주의적 위험 신호)
+    private static readonly Color ReviveOn     = new Color(0.75f, 0.58f, 0.22f, 0.92f);
+    private static readonly Color ReviveOff    = new Color(0.18f, 0.17f, 0.16f, 0.75f);
+    private static readonly Color ReviveInkOn  = new Color(0.14f, 0.10f, 0.04f, 1f);
+    private static readonly Color ReviveInkOff = new Color(0.45f, 0.43f, 0.40f, 1f);
     private static readonly Color HpColorFull = new Color(0.30f, 0.82f, 0.35f, 1f);
     private static readonly Color HpColorMid  = new Color(0.95f, 0.78f, 0.20f, 1f);
     private static readonly Color HpColorLow  = new Color(0.90f, 0.22f, 0.20f, 1f);
@@ -1103,6 +1110,7 @@ public sealed class CombatPanelView : MonoBehaviour
         // HP fill 이미지가 미할당이면 슬라이더 Fill에서 확보(색상 제어용)
         if (hpFillImage == null && hpSlider != null && hpSlider.fillRect != null)
             hpFillImage = hpSlider.fillRect.GetComponent<Image>();
+        BuildReviveBadge();   // 부활 잔여 — 체력바와 같은 곳에서 읽혀야 "목숨"으로 읽힌다
         CleanHpBarVisual();   // 늘어난 장식 아트 → 단색 플랫 바
         if (hpText != null)
         {
@@ -1162,6 +1170,60 @@ public sealed class CombatPanelView : MonoBehaviour
     }
 
     /// <summary>transform 직속 빈 RectTransform 컨테이너 생성.</summary>
+    /// <summary>
+    /// 「부활 1회」 표식. <b>체력바 왼쪽 끝</b>에 붙는다 — 재화가 아니라 목숨이라,
+    /// 재화 줄이 아니라 체력과 같은 자리에서 읽혀야 한다.
+    ///
+    /// <para>해금하지 않았으면 아예 만들지 않는다(빈 표식은 잡음일 뿐이다).
+    /// 소모하면 지우지 않고 <b>꺼진 채로 남긴다</b> — 사라지면 "원래 없었나" 싶지만,
+    /// 꺼진 표식은 "방금 그걸 썼다"를 말한다.</para>
+    /// </summary>
+    private void BuildReviveBadge()
+    {
+        if (_hpBar == null || _reviveBadge != null) return;
+
+        var go = new GameObject("ReviveBadge", typeof(RectTransform));
+        _reviveBadge = (RectTransform)go.transform;
+        _reviveBadge.SetParent(_hpBar, false);
+        _reviveBadge.anchorMin = new Vector2(0f, 0.5f);
+        _reviveBadge.anchorMax = new Vector2(0f, 0.5f);
+        _reviveBadge.pivot     = new Vector2(1f, 0.5f);
+        _reviveBadge.anchoredPosition = new Vector2(-10f, 0f);   // 체력바 바로 왼쪽 바깥
+        _reviveBadge.sizeDelta = new Vector2(58f, 30f);
+
+        _reviveFrame = go.AddComponent<Image>();
+        _reviveFrame.color         = ReviveOn;
+        _reviveFrame.raycastTarget = false;
+
+        var labelGo = new GameObject("Label", typeof(RectTransform));
+        labelGo.transform.SetParent(_reviveBadge, false);
+        var lrt = (RectTransform)labelGo.transform;
+        lrt.anchorMin = Vector2.zero; lrt.anchorMax = Vector2.one;
+        lrt.offsetMin = Vector2.zero; lrt.offsetMax = Vector2.zero;
+
+        _reviveLabel = labelGo.AddComponent<TextMeshProUGUI>();
+        _reviveLabel.text          = "부활";
+        _reviveLabel.fontSize      = 15f;
+        _reviveLabel.fontStyle     = FontStyles.Bold;
+        _reviveLabel.alignment     = TextAlignmentOptions.Center;
+        _reviveLabel.color         = ReviveInkOn;
+        _reviveLabel.raycastTarget = false;
+
+        _reviveBadge.gameObject.SetActive(false);   // 해금·잔여를 아는 Presenter가 켠다
+    }
+
+    /// <summary>부활 표식을 갱신한다. <paramref name="owned"/>가 false면 표식 자체를 감춘다.</summary>
+    public void SetRevive(bool owned, bool available)
+    {
+        if (_reviveBadge == null) return;
+
+        _reviveBadge.gameObject.SetActive(owned);
+        if (!owned) return;
+
+        if (_reviveFrame != null) _reviveFrame.color = available ? ReviveOn  : ReviveOff;
+        if (_reviveLabel != null) _reviveLabel.color = available ? ReviveInkOn : ReviveInkOff;
+    }
+
     private RectTransform CreateContainer(string name, Vector2 anchor, Vector2 pos, Vector2 size, Vector2 pivot)
     {
         var go = new GameObject(name, typeof(RectTransform));

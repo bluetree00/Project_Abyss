@@ -94,10 +94,23 @@ public sealed class HudPresenter : MonoBehaviour
             _fuelBank.OnFuelChanged -= HandleFuelChanged;
             _fuelBank = null;
         }
+        if (_run != null)
+        {
+            _run.OnEssenceChanged -= HandleEssenceChanged;
+            _run.OnReviveChanged  -= HandleReviveChanged;
+            _run = null;
+        }
+        if (_run != null)
+        {
+            _run.OnEssenceChanged -= HandleEssenceChanged;
+            _run.OnReviveChanged  -= HandleReviveChanged;
+            _run = null;
+        }
 
         _provider = provider;
         _state = run?.PlayerState;
         _fuelBank = run?.FuelBank;
+        _run = run;
 
         // 버프 핸들러 구독
         UnbindBuffHandler();
@@ -154,6 +167,16 @@ public sealed class HudPresenter : MonoBehaviour
         {
             HandleFuelChanged();
             _fuelBank.OnFuelChanged += HandleFuelChanged;
+        }
+
+        // 심연의 정수 — 런을 넘어 남는 유일한 재화. 줍는 곳과 보이는 곳을 맞춘다.
+        if (_run != null)
+        {
+            HandleEssenceChanged(_run.RunDelta?.GainedEssence ?? 0);
+            _run.OnEssenceChanged += HandleEssenceChanged;
+
+            HandleReviveChanged(_run.HasReviveCharge);
+            _run.OnReviveChanged += HandleReviveChanged;
         }
 
         // 현재 버프 즉시 반영
@@ -346,6 +369,17 @@ public sealed class HudPresenter : MonoBehaviour
         view.SetEnhanceMaterial(_fuelBank.EnhanceMaterial);
         view.SetRuneOre(_fuelBank.RuneOre);
     }
+
+    private void HandleEssenceChanged(int total) => view?.SetEssence(total);
+
+    /// <summary>
+    /// 부활 잔여 표기. <b>해금 여부</b>와 <b>이 런에서 남았는지</b>는 다른 질문이라 둘 다 넘긴다 —
+    /// 해금 안 했으면 표식을 감추고, 해금했는데 썼으면 꺼진 채로 남긴다.
+    /// </summary>
+    private void HandleReviveChanged(bool available)
+        => view?.CombatPanel?.SetRevive(MemoryAltarService.HasRevive, available);
+
+    private GameRunSession _run;
     private void HandleWeaponChanged(WeaponData _, GameObject __) => RefreshWeaponSlots();
     private void HandleEquippedWeaponRefreshed(WeaponData _) => RefreshWeaponSlots();
     private void HandleBuffsChanged() => RefreshBuffWindow();

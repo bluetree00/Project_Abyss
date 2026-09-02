@@ -310,6 +310,10 @@ public class UI_RangedForgePopup : UI_Popup
         bool skinned = _skin?.panelBackground != null;
 
         var panel = NewImage("Panel", root, skinned ? Color.white : PanelBg);
+        // 세로 레이아웃 그룹이 배치하는 판이라 글꼴은 키우지 않는다 —
+        // 상자가 안 커지는데 글자만 키우면 넘친다.
+        panel.gameObject.AddComponent<UIWindowFitter>()
+             .Configure(scaleFonts: false, maxScale: UIWindowFitter.ContentScreen);
         var prt = panel.rectTransform;
         prt.anchorMin = prt.anchorMax = new Vector2(0.5f, 0.5f);
         prt.pivot = new Vector2(0.5f, 0.5f);
@@ -705,6 +709,11 @@ public class UI_RangedForgePopup : UI_Popup
         t.alignment = align;
         t.raycastTarget = false;
         t.textWrappingMode = TextWrappingModes.Normal;
+        // 글자가 판 밖으로 나가지 않게 하는 안전망 — TMP 기본 넘침은 잘라내지 않고 <b>바깥에 그린다</b>.
+        // 최대를 설계 크기로 묶으므로 커지지는 않고, 안 들어갈 때만 줄어든다.
+        t.enableAutoSizing = true;
+        t.fontSizeMax      = size;
+        t.fontSizeMin      = Mathf.Max(9f, size * 0.55f);
         ApplyReadableMaterial(t);
         return t;
     }

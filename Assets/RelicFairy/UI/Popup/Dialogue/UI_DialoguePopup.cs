@@ -85,7 +85,7 @@ public class UI_DialoguePopup : UI_Popup
     /// 디자이너 아트를 프리팹 위에 얹는다. 스킨이 없으면 아무것도 하지 않아 지금 모습이 그대로 남는다.
     ///
     /// 대상은 <b>대사 상자와 그 장식뿐</b>이다:
-    ///  - AdvanceButton은 상자를 덮는 1390×240 투명 클릭 캐처라 판을 입히면 대사가 가려진다.
+    ///  - AdvanceButton은 대사 상자를 그대로 덮는 1280×304 투명 클릭 캐처라 판을 입히면 대사가 가려진다.
     ///  - Background는 전체화면 암막이라 대응 아트가 없다.
     /// 상자는 화면 폭을 따라 늘어나므로 바탕은 반드시 9-slice로 넣는다.
     /// </summary>
@@ -105,7 +105,10 @@ public class UI_DialoguePopup : UI_Popup
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.F) || Input.GetMouseButtonDown(0))
+        // 마우스 클릭은 <b>AdvanceButton</b>(상자를 덮는 투명 캐처)이 받는다.
+        // 여기서 GetMouseButtonDown을 또 보면 누를 때(Update)와 뗄 때(onClick) 두 번 불려
+        // 한 번 클릭에 두 줄이 넘어가고, UI 가림 판정도 건너뛰어 다른 창 위를 눌러도 넘어간다.
+        if (Input.GetKeyDown(KeyCode.F))
             OnAdvanceClicked();
     }
 

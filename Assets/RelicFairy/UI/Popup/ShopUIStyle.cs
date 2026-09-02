@@ -131,6 +131,31 @@ public static class ShopUIStyle
     }
 
     /// <summary>테두리 프레임: 바깥(테두리색) + 안쪽 인셋(채움색). 안쪽 Image를 반환.</summary>
+    /// <summary>
+    /// 자손 중 이름이 같은 첫 오브젝트를 찾는다(비활성 포함).
+    ///
+    /// <para><b>왜 고정 경로를 쓰지 않는가</b> — 구워진 팝업을 다시 잇는 코드가
+    /// <c>transform.Find("Window/ConfirmBtn")</c>처럼 경로를 박아 뒀는데,
+    /// <see cref="MakeFrame"/>이 테두리(outer)와 채움(Fill) 두 겹을 만들기 때문에
+    /// 실제 계층은 <c>Window/Fill/ConfirmBtn</c>로 한 단 더 깊었다. 경로가 어긋나면 <c>null</c>이
+    /// 조용히 돌아오고 <b>버튼에 리스너가 안 붙은 채로 화면이 뜬다</b> —
+    /// 눌러도 아무 일이 없어 "고장난 버튼"으로 보인다.</para>
+    ///
+    /// <para>이름은 빌더가 정하는 고유값이라, 깊이가 바뀌어도 이름으로 찾으면 안 깨진다.</para>
+    /// </summary>
+    public static Transform FindDeep(Transform root, string name)
+    {
+        if (root == null || string.IsNullOrEmpty(name)) return null;
+        if (root.name == name) return root;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var hit = FindDeep(root.GetChild(i), name);
+            if (hit != null) return hit;
+        }
+        return null;
+    }
+
     public static Image MakeFrame(Transform parent, string name, Color border, Color fill, float thickness, bool raycast = false)
     {
         var outer = MakeImage(parent, name, border, raycast);
@@ -149,6 +174,14 @@ public static class ShopUIStyle
         tmp.alignment = align;
         tmp.color = color;
         tmp.raycastTarget = false;
+
+        // 글자가 <b>판 밖으로 나가지 않게</b> 하는 안전망.
+        // TMP 기본 넘침 설정은 상자를 넘는 글자를 잘라내지 않고 그대로 <b>바깥에 그린다</b> —
+        // 그래서 긴 한글 이름이나 좁은 배지에서 글자가 배경을 벗어나 떠 있었다.
+        // 최대를 설계 크기로 묶으므로 <b>커지지는 않고</b>, 안 들어갈 때만 줄어든다.
+        tmp.enableAutoSizing = true;
+        tmp.fontSizeMax = size;
+        tmp.fontSizeMin = Mathf.Max(9f, size * 0.55f);
         return tmp;
     }
 

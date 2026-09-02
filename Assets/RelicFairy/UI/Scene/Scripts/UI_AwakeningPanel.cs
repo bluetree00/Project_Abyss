@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -28,6 +29,15 @@ public class UI_AwakeningPanel : UI_Popup
     /// 닫기 버튼과 같은 경로(ClosePopupUI)라 저장·정리 흐름도 동일하다.
     /// </summary>
     public override bool CloseOnEscape => true;
+
+    /// <summary>
+    /// 화면 전체를 덮는 모달이므로 <b>게임플레이를 막는다</b>.
+    /// 이걸 켜지 않으면 (1) 뒤에서 플레이어가 계속 움직이고,
+    /// (2) <see cref="UIInputGate.Blocked"/>가 false로 남아 F키로 폴링하는 월드 상호작용이
+    /// 팝업 위에서 그대로 발동하며, (3) 이 화면의 연출이 전제하는 timeScale=0이 성립하지 않는다.
+    /// 상점·재련소·정제소·서약·룬선택·유물정보가 모두 같은 규약이다.
+    /// </summary>
+    public override bool BlocksGameplay => true;
 
     // ── 직렬화 필드 ────────────────────────────────────────────────────────
     [Header("헤더")]
@@ -81,6 +91,13 @@ public class UI_AwakeningPanel : UI_Popup
     private static readonly string[] BranchQuestions =
         { "무엇으로 시작하는가", "무엇이 나올 수 있는가", "얼마나 버틸 수 있는가", "얼마나 깊이 갈 수 있는가" };
 
+    private static readonly Color BannerFill = new(0.09f, 0.08f, 0.07f, 0.94f);
+    private const float BannerY = -18f;
+
+    private RectTransform _banner;
+    private CanvasGroup   _bannerGroup;
+    private TMP_Text      _bannerTitle, _bannerDesc;
+
     private readonly List<List<AltarNodeRowView>> _rows = new();
     private readonly List<List<MemoryAltarNode>>   _branchNodes = new();
     private MemoryAltarNode _selected;
@@ -114,7 +131,24 @@ public class UI_AwakeningPanel : UI_Popup
     {
         base.Init();
 
-        if (closeButton  != null) closeButton.onClick.AddListener(OnCloseClicked);
+        // 컨텐츠 화면 크기 규칙을 다른 화면과 맞춘다. 이 화면만 맞춤 장치가 없어
+        // 프리팹 크기(1560×1000) 그대로 열렸고, 재련소·상점(세로 94%)과 크기가 달랐다.
+        if (transform.Find("Panel_Main") is RectTransform panel &&
+            panel.GetComponent<UIWindowFitter>() == null)
+        {
+            panel.gameObject.AddComponent<UIWindowFitter>()
+                 .Configure(maxScale: UIWindowFitter.ContentScreen);
+        }
+
+        if (closeButton != null)
+        {
+            closeButton.onClick.AddListener(OnCloseClicked);
+
+            // 「ESC 닫기」 안내는 별도 라벨이던 것을 버튼 안으로 합쳤다 —
+            // 둘 다 우상단 앵커라 y -110 / -114로 4px 차이에 포개져 있었다.
+            var label = closeButton.GetComponentInChildren<TMP_Text>(true);
+            if (label != null) label.text = "닫기  ESC";
+        }
         if (actionButton != null) actionButton.onClick.AddListener(OnActionClicked);
 
         if (achievementTab != null) achievementTab.onClick.AddListener(() => { PlayClickSfx(); SetMode(true); });
@@ -202,7 +236,7 @@ public class UI_AwakeningPanel : UI_Popup
                 if (MemoryAltarService.IsUnlocked(nodes[i].Id)) done++;
 
             bool complete = done >= nodes.Count && nodes.Count > 0;
-            branchCounts[c].text  = complete ? "✦" : $"{done}/{nodes.Count}";
+            branchCounts[c].text  = complete ? "◆" : $"{done}/{nodes.Count}";
             branchCounts[c].color = complete ? AltarPalette.Essence : AltarPalette.TextDim;
         }
     }
@@ -232,7 +266,7 @@ public class UI_AwakeningPanel : UI_Popup
     private void Refresh()
     {
         int essence = MemoryAltarService.Essence;
-        if (essenceText) essenceText.text = $"{essence:N0}";
+        CurrencyCounter.Apply(essenceText, essence);
 
         RefreshNextGoalBar(essence);
         RefreshBadge();
@@ -279,7 +313,7 @@ public class UI_AwakeningPanel : UI_Popup
 
         nextGoalText.text  = ready
             ? $"다음 · 「{goal.Node.DisplayName}」        해금 가능"
-            : $"다음 · 「{goal.Node.DisplayName}」        −{left:N0}";
+            : $"다음 · 「{goal.Node.DisplayName}」        -{left:N0}";
         nextGoalText.color = ready ? AltarPalette.Gold : AltarPalette.TextDim;
         if (nextGoalFill) SetFill(nextGoalFill, goal.Cost > 0 ? (float)essence / goal.Cost : 1f);
     }
@@ -306,6 +340,10 @@ public class UI_AwakeningPanel : UI_Popup
         CopyAnchors(anchor, label, yOffset: -56f, height: 20f);
         nextGoalText = label.gameObject.AddComponent<TextMeshProUGUI>();
         nextGoalText.fontSize = 15f;
+        // 글자가 판 밖으로 나가지 않게 — 최대는 설계 크기로 묶으므로 커지지 않고, 안 들어갈 때만 줄어든다.
+        nextGoalText.enableAutoSizing = true;
+        nextGoalText.fontSizeMax = 15f;
+        nextGoalText.fontSizeMin = 10f;
         nextGoalText.alignment = TextAlignmentOptions.Right;
         nextGoalText.color = AltarPalette.TextDim;
         nextGoalText.raycastTarget = false;
@@ -330,8 +368,14 @@ public class UI_AwakeningPanel : UI_Popup
         dst.anchorMin = src.anchorMin;
         dst.anchorMax = src.anchorMax;
         dst.pivot     = src.pivot;
-        dst.sizeDelta = new Vector2(src.sizeDelta.x, height);
         dst.anchoredPosition = src.anchoredPosition + new Vector2(0f, yOffset);
+
+        // 세로로 늘린 앵커에서 sizeDelta.y는 높이가 아니라 <b>앵커 높이에 더해지는 값</b>이다.
+        // 기준으로 삼는 Txt_Essence가 양축 비율 앵커(세로 스팬 0.054 × 부모 1000 = 54)라,
+        // 예전처럼 sizeDelta.y = height로 대입하면 10짜리 막대가 64, 20짜리 라벨이 74가 됐다.
+        // 그 판이 헤더 밴드를 가로질러 「등장」 열 머리를 통째로 덮었다.
+        dst.sizeDelta = new Vector2(src.sizeDelta.x, dst.sizeDelta.y);   // 가로는 기준과 같게
+        dst.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
     }
 
     /// <summary>미수령 업적이 있으면 탭에 ●를 켠다 — 이 점 하나가 업적을 열게 만든다.</summary>
@@ -370,7 +414,7 @@ public class UI_AwakeningPanel : UI_Popup
                       node.Description,
                       BuildActionCondition(state, node));
 
-        if (state.Unlocked)                  SetActionButton(false, "해금됨", "");
+        if (state.Unlocked)                  RefreshUnlockedAction(node);
         else if (state.BlockedByChain)
         {
             var prev = MemoryAltarCatalog.PreviousInBranch(node);
@@ -379,6 +423,39 @@ public class UI_AwakeningPanel : UI_Popup
         else if (state.BlockedByRequirement) SetActionButton(false, "선행 조건 필요", node.ConditionLabel);
         else if (state.CanBuy)               SetActionButton(true,  $"{state.Cost:N0} ◆ 해금", "");
         else                                 SetActionButton(false, "정수 부족", $"{state.Cost - essence:N0} 모자람");
+    }
+
+    /// <summary>
+    /// 이미 열린 노드의 행동 바. 대부분은 「해금됨」으로 끝나지만, <b>계속 조작할 것이 있는</b>
+    /// 두 노드는 여기서 그 조작을 받는다 — 열고 나서도 화면이 죽지 않는다.
+    ///
+    /// <para>「고행자의 인장」은 해금이 곧 적용이 아니다. 자발적 난이도라 켜고 끌 수 있어야 하고,
+    /// 그 스위치를 둘 자리로는 이 노드 자신이 가장 자연스럽다(새 화면이 필요 없다).</para>
+    ///
+    /// <para>「파츠 영구 계승」은 자동이라 조작이 없지만, <b>지금 무엇을 물고 있는지</b>는 보여야 한다.
+    /// 안 보이면 다음 런이 왜 달라졌는지 설명되지 않는다.</para>
+    /// </summary>
+    private void RefreshUnlockedAction(MemoryAltarNode node)
+    {
+        if (node.Id == MemoryAltarCatalog.SigilAscetic)
+        {
+            bool on = AsceticSigilService.Active;
+            SetActionButton(true, on ? "인장 해제" : "인장 착용",
+                            on ? "지금 착용 중 · 보상 -1개 / 정수 ×1.6" : "켜면 다음 런부터 적용된다");
+            return;
+        }
+
+        if (node.Id == MemoryAltarCatalog.PartsInherit)
+        {
+            string name = PartInheritanceService.InheritedPartName;
+            SetActionButton(false, "해금됨",
+                            string.IsNullOrEmpty(name)
+                                ? "런을 마치면 마지막에 고른 파츠가 계승된다"
+                                : $"현재 계승 · {name}");
+            return;
+        }
+
+        SetActionButton(false, "해금됨", "");
     }
 
     /// <summary>
@@ -426,7 +503,7 @@ public class UI_AwakeningPanel : UI_Popup
         if (!node.HasCondition) return "조건 없음 — 언제든 열 수 있다";
 
         if (state.ConditionMet)
-            return $"✔ {node.ConditionLabel} — 할인가 적용 중";
+            return $"■ {node.ConditionLabel} — 할인가 적용 중";
 
         return node.ConditionRequired
             ? $"선행 조건 · {node.ConditionLabel}  {state.Progress}/{state.Target}"
@@ -483,6 +560,15 @@ public class UI_AwakeningPanel : UI_Popup
         var node = _selected ?? MemoryAltarService.GetNextGoal()?.Node;
         if (node == null) return;
 
+        // 이미 열린 「고행자의 인장」에서는 이 버튼이 <b>착용 스위치</b>다(구매가 아니다).
+        if (node.Id == MemoryAltarCatalog.SigilAscetic && MemoryAltarService.IsUnlocked(node.Id))
+        {
+            AsceticSigilService.Toggle();
+            ShopUIStyle.PlaySfx("shop_click");
+            SaveAndRefreshAsync().Forget();
+            return;
+        }
+
         // 되돌릴 수 없는 메타 진행이다 — 열렸는지 아닌지가 소리와 움직임으로도 남아야 한다.
         if (!MemoryAltarService.TryUnlock(node))
         {
@@ -493,7 +579,8 @@ public class UI_AwakeningPanel : UI_Popup
 
         ShopUIStyle.PlaySfx("enhance_success");
         PunchActionButtonAsync().Forget();
-        SaveAndRefreshAsync().Forget();
+        // 갱신이 먼저다 — 행이 다시 그려진 뒤에 그 행을 밝혀야 연출이 결과 위에 얹힌다.
+        SaveRefreshAndCelebrateAsync(node).Forget();
     }
 
     /// <summary>해금 직후 행동 버튼을 한 번 튕긴다(팝업은 timeScale=0이라 unscaled 트윈뿐이다).</summary>
@@ -512,6 +599,146 @@ public class UI_AwakeningPanel : UI_Popup
     {
         await SaveAsync();
         Refresh();
+    }
+
+    /// <summary>저장·갱신 뒤 <b>무엇이 열렸는지</b>를 화면에 남긴다 — 노드 점등 + 배너.</summary>
+    private async UniTaskVoid SaveRefreshAndCelebrateAsync(MemoryAltarNode node)
+    {
+        await SaveAsync();
+        Refresh();
+
+        var ct = this.GetCancellationTokenOnDestroy();
+        try
+        {
+            var row = FindRow(node);
+            if (row != null) row.PlayUnlockAsync(ct).Forget();
+            await ShowUnlockBannerAsync(node, ct);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    /// <summary>
+    /// 「무엇이 열렸는가」 배너. 이름 한 줄 + <b>변화 한 줄</b>(A → B)이다.
+    ///
+    /// <para>이름만 띄우면 "샀다"까지만 전해진다. 정작 알아야 할 것은 <b>내 다음 런이 어떻게 달라지는가</b>라
+    /// 노드가 이미 갖고 있는 변화 문구를 그대로 얹는다.</para>
+    ///
+    /// <para>화면 위쪽 가운데에 잠깐 떴다가 사라진다 — 확인 버튼을 요구하지 않는다.
+    /// 해금은 이미 끝난 일이고, 배너는 통보지 질문이 아니다.</para>
+    /// </summary>
+    private async UniTask ShowUnlockBannerAsync(MemoryAltarNode node, CancellationToken ct)
+    {
+        if (node == null) return;
+        EnsureBanner();
+        if (_banner == null) return;
+
+        if (_bannerTitle != null) _bannerTitle.text = $"열렸다 — {node.DisplayName}";
+        if (_bannerDesc  != null) _bannerDesc.text  = node.Description;
+
+        _banner.gameObject.SetActive(true);
+        var group = _bannerGroup;
+        var rt    = _banner;
+
+        const float In = 0.22f, Hold = 1.9f, Out = 0.45f;
+        try
+        {
+            float t = 0f;
+            while (t < In)                                  // 살짝 내려오며 떠오른다
+            {
+                t += Time.unscaledDeltaTime;
+                float k = Mathf.Clamp01(t / In);
+                group.alpha = k;
+                rt.anchoredPosition = new Vector2(0f, Mathf.Lerp(BannerY + 18f, BannerY, k));
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+            group.alpha = 1f;
+            rt.anchoredPosition = new Vector2(0f, BannerY);
+
+            await UniTask.Delay(System.TimeSpan.FromSeconds(Hold), DelayType.UnscaledDeltaTime,
+                                PlayerLoopTiming.Update, ct);
+
+            t = 0f;
+            while (t < Out)
+            {
+                t += Time.unscaledDeltaTime;
+                group.alpha = 1f - Mathf.Clamp01(t / Out);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (_banner != null) _banner.gameObject.SetActive(false);
+        }
+    }
+
+    /// <summary>배너를 1회 만든다. 프리팹에 없는 요소라 런타임에 세운다.</summary>
+    private void EnsureBanner()
+    {
+        if (_banner != null) return;
+
+        var parent = unlockRoot != null ? unlockRoot.transform : transform;
+        var go = new GameObject("UnlockBanner", typeof(RectTransform));
+        _banner = (RectTransform)go.transform;
+        _banner.SetParent(parent, false);
+        _banner.anchorMin = new Vector2(0.5f, 1f);
+        _banner.anchorMax = new Vector2(0.5f, 1f);
+        _banner.pivot     = new Vector2(0.5f, 1f);
+        _banner.sizeDelta = new Vector2(560f, 76f);
+        _banner.anchoredPosition = new Vector2(0f, BannerY);
+
+        var bg = go.AddComponent<Image>();
+        bg.color         = BannerFill;
+        bg.raycastTarget = false;                 // 통보일 뿐 — 아래 조작을 막으면 안 된다
+        _bannerGroup     = go.AddComponent<CanvasGroup>();
+        _bannerGroup.blocksRaycasts = false;
+        _bannerGroup.interactable   = false;
+
+        _bannerTitle = MakeBannerText("Title", 22f, FontStyles.Bold,   AltarPalette.Gold,   new Vector2(0f, -12f), 28f);
+        _bannerDesc  = MakeBannerText("Desc",  16f, FontStyles.Normal, AltarPalette.Essence, new Vector2(0f, -42f), 24f);
+
+        go.SetActive(false);
+    }
+
+    private TMP_Text MakeBannerText(string name, float size, FontStyles style, Color color,
+                                    Vector2 pos, float height)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(_banner, false);
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot     = new Vector2(0.5f, 1f);
+        rt.offsetMin = new Vector2(14f, rt.offsetMin.y);
+        rt.offsetMax = new Vector2(-14f, rt.offsetMax.y);
+        rt.anchoredPosition = pos;
+        rt.sizeDelta = new Vector2(rt.sizeDelta.x, height);
+
+        var txt = go.AddComponent<TextMeshProUGUI>();
+        txt.fontSize      = size;
+        // 글자가 판 밖으로 나가지 않게 — 최대는 설계 크기로 묶으므로 커지지 않고, 안 들어갈 때만 줄어든다.
+        txt.enableAutoSizing = true;
+        txt.fontSizeMax      = size;
+        txt.fontSizeMin      = Mathf.Max(9f, size * 0.55f);
+        txt.fontStyle     = style;
+        txt.color         = color;
+        txt.alignment     = TextAlignmentOptions.Center;
+        txt.raycastTarget = false;
+        txt.textWrappingMode = TextWrappingModes.NoWrap;
+        txt.overflowMode  = TextOverflowModes.Ellipsis;
+        return txt;
+    }
+
+    /// <summary>노드에 대응하는 행을 찾는다. 열·행 목록이 카탈로그 순서와 1:1이라 인덱스로 떨어진다.</summary>
+    private AltarNodeRowView FindRow(MemoryAltarNode node)
+    {
+        if (node == null) return null;
+        for (int c = 0; c < _branchNodes.Count && c < _rows.Count; c++)
+        {
+            int i = _branchNodes[c].IndexOf(node);
+            if (i >= 0 && i < _rows[c].Count) return _rows[c][i];
+        }
+        return null;
     }
 
     private async UniTask SaveAsync()

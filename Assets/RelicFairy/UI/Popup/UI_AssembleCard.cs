@@ -12,7 +12,7 @@ using UnityEngine.EventSystems;
 /// UX 연출: 등급색 글로우(실버/골드/루비) · 선택 시 스케일 팝 + 글로우 점등 · 호버 살짝 확대.
 /// 등급 테두리 아트는 팝업이 SetSkin으로 주입(카드별 개별 배선 불필요).
 /// </summary>
-public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+public class UI_AssembleCard : MonoBehaviour, IOwnsButtonScale, IPointerEnterHandler, IPointerExitHandler
 {
     // ── Constants ────────────────────────────────────────
     private const float SelectScale = 1.06f;
@@ -328,8 +328,14 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
         t.textWrappingMode = wrap ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
         t.overflowMode     = wrap ? TextOverflowModes.Truncate : TextOverflowModes.Ellipsis;
         t.enableAutoSizing = true;
-        t.fontSizeMax      = authored;
-        t.fontSizeMin      = Mathf.Max(9f, authored * 0.6f);
+
+        // 자동크기는 줄바꿈을 끈 상태에서 <b>가로만</b> 맞춘다 — 상자가 낮으면 글자가
+        // 세로로 잘린다(서약 이름 상자 229×35에 필요 높이 39). 한 줄 선호높이는 글꼴의
+        // 약 1.45배이므로, 줄바꿈이 없는 글에 한해 상자 높이에서 상한을 역산해 함께 묶는다.
+        float cap = wrap ? authored
+                         : Mathf.Min(authored, t.rectTransform.rect.height / 1.45f);
+        t.fontSizeMax = Mathf.Max(9f, cap);
+        t.fontSizeMin = Mathf.Max(9f, t.fontSizeMax * 0.6f);
     }
 
     private Sprite FrameFor(CovenantTier tier) => tier switch

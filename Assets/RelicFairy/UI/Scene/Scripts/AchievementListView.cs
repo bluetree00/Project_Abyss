@@ -201,7 +201,18 @@ public class AchievementListView : MonoBehaviour
         if (rowTemplate != null) rowTemplate.gameObject.SetActive(false);
 
         if (claimAllButton != null)
+        {
             claimAllButton.onClick.AddListener(() => ClaimAllAsync().Forget());
+
+            // [모두 받기] 아트. 스킨이 없으면 기존 색 버튼 그대로 동작한다.
+            var art = UISkin.Achievement?.claimAllButton;
+            if (art != null && claimAllButton.TryGetComponent<Image>(out var img))
+            {
+                img.sprite = art;
+                img.type   = Image.Type.Sliced;
+                img.color  = Color.white;
+            }
+        }
 
         if (claimedHeaderButton != null)
             claimedHeaderButton.onClick.AddListener(() => { _claimedExpanded = !_claimedExpanded; Refresh(); });

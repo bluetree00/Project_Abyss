@@ -31,6 +31,8 @@ public class AchievementRowView : MonoBehaviour
     [Header("배경 · 기호")]
     [SerializeField] private Image    background;
     [SerializeField] private TMP_Text symbolText;
+    [Tooltip("좌측 표식 그림(✦/▶/✔). 비어 있으면 symbolText 글자를 그대로 쓴다.")]
+    [SerializeField] private Image    markImage;
 
     [Header("본문")]
     [SerializeField] private TMP_Text nameText;
@@ -69,14 +71,46 @@ public class AchievementRowView : MonoBehaviour
 
     private void RefreshTone(AchievementRowState s)
     {
+        var skin = UISkin.Achievement;
+
         if (background)
-            background.color = s.Claimable ? AltarPalette.RowClaimable
-                             : s.Claimed   ? AltarPalette.RowClaimed
-                                           : AltarPalette.RowIdle;
+        {
+            // 상태마다 <b>판이 다르다</b>. 색만 바꾸던 시절엔 "받을 수 있다"가 목록에서 안 튀어
+            // 수령을 놓쳤다 — 판 자체가 다르면 훑기만 해도 걸린다.
+            var art = skin?.Row(s.Claimable, s.Claimed);
+            if (art != null)
+            {
+                background.sprite = art;
+                background.type   = Image.Type.Sliced;
+                background.color  = Color.white;
+            }
+            else
+            {
+                background.sprite = null;
+                background.color  = s.Claimable ? AltarPalette.RowClaimable
+                                  : s.Claimed   ? AltarPalette.RowClaimed
+                                                : AltarPalette.RowIdle;
+            }
+        }
+
+        // 좌측 표식 — 아트가 있으면 글자 대신 그림을 쓴다.
+        var mark = skin?.Mark(s.Claimable, s.Claimed);
+        if (markImage != null)
+        {
+            markImage.gameObject.SetActive(mark != null);
+            if (mark != null)
+            {
+                markImage.sprite        = mark;
+                markImage.color         = Color.white;
+                markImage.preserveAspect = true;
+            }
+        }
 
         if (symbolText)
         {
-            symbolText.text  = s.Claimable ? "✧" : s.Claimed ? "✔" : "▸";
+            // 아트 표식이 자리를 대신하면 글자는 감춘다(둘이 겹치면 기호가 두 개로 보인다).
+            symbolText.gameObject.SetActive(mark == null || markImage == null);
+            symbolText.text  = s.Claimable ? "◆" : s.Claimed ? "■" : "▶";
             symbolText.color = s.Claimable ? AltarPalette.Gold
                              : s.Claimed   ? AltarPalette.TextFaint
                                            : AltarPalette.TextDim;
@@ -100,6 +134,9 @@ public class AchievementRowView : MonoBehaviour
             conditionText.color = s.Claimed ? AltarPalette.TextFaint : AltarPalette.TextDim;
         }
 
+        // 게이지 아트 — 채움/바탕/테두리 세 겹. 채움은 fillAmount로 늘어나므로 가로 9-slice가 맞다.
+        ApplyGaugeArt();
+
         if (progressFill)
         {
             // 달성/수령 행에서는 막대가 정보가 아니라 잡음이 된다.
@@ -115,8 +152,44 @@ public class AchievementRowView : MonoBehaviour
     }
 
     /// <summary>버튼과 진척 표시가 <b>같은 자리</b>를 나눠 쓴다 — 상태에 따라 내용만 바뀐다.</summary>
+    /// <summary>
+    /// 진척 게이지에 아트를 입힌다. 한 번만 하면 되지만 <see cref="Refresh"/>가 여러 번 불려도
+    /// 같은 스프라이트를 다시 넣을 뿐이라 안전하다(스킨이 늦게 로드될 수도 있어 매번 확인한다).
+    /// </summary>
+    private void ApplyGaugeArt()
+    {
+        var skin = UISkin.Achievement;
+        if (skin == null || progressFill == null) return;
+
+        if (skin.gaugeFill != null)
+        {
+            progressFill.sprite = skin.gaugeFill;
+            progressFill.type   = Image.Type.Filled;
+            progressFill.color  = Color.white;
+        }
+
+        // 바탕은 채움의 부모(Bar_BG)다.
+        if (skin.gaugeTrack != null &&
+            progressFill.transform.parent != null &&
+            progressFill.transform.parent.TryGetComponent<Image>(out var track))
+        {
+            track.sprite = skin.gaugeTrack;
+            track.type   = Image.Type.Sliced;
+            track.color  = Color.white;
+        }
+    }
+
     private void RefreshAction(AchievementRowState s)
     {
+        // [받기] 버튼 아트 — 없으면 기존 색 버튼 그대로.
+        var btnArt = UISkin.Achievement?.claimButton;
+        if (btnArt != null && claimButtonImage != null)
+        {
+            claimButtonImage.sprite = btnArt;
+            claimButtonImage.type   = Image.Type.Sliced;
+            claimButtonImage.color  = Color.white;
+        }
+
         if (claimButton) claimButton.gameObject.SetActive(s.Claimable);
         if (statusText)  statusText.gameObject.SetActive(!s.Claimable);
 
@@ -135,12 +208,12 @@ public class AchievementRowView : MonoBehaviour
 
         if (s.Claimed)
         {
-            statusText.text  = "✔";
+            statusText.text  = "■";
             statusText.color = AltarPalette.TextFaint;
         }
         else
         {
-            statusText.text  = s.Progress01 > 0f ? $"{Mathf.FloorToInt(s.Progress01 * 100f)}%" : "–";
+            statusText.text  = s.Progress01 > 0f ? $"{Mathf.FloorToInt(s.Progress01 * 100f)}%" : "—";
             statusText.color = AltarPalette.TextDim;
         }
     }

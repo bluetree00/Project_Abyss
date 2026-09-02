@@ -371,14 +371,30 @@ public sealed class UI_Settings : MonoBehaviour
         var dim = NewImage("Backdrop", _root.transform, Backdrop);
         Stretch(dim.rectTransform);
 
+        var skin = UISkin.Settings;
+
         var panel = NewImage("Panel", _root.transform, PanelBg);
         var prt = panel.rectTransform;
         prt.anchorMin = prt.anchorMax = prt.pivot = new Vector2(0.5f, 0.5f);
         prt.anchoredPosition = Vector2.zero;
         prt.sizeDelta = new Vector2(PanelW, PanelH);
-        var outline = panel.gameObject.AddComponent<Outline>();
-        outline.effectColor    = PanelEdge;
-        outline.effectDistance = new Vector2(2f, -2f);
+
+        if (skin?.panel != null)
+        {
+            // 아트에 테두리·모서리 장식이 그려져 있다 — Outline을 겹치면 이중선이 된다.
+            panel.sprite = skin.panel;
+            panel.type   = Image.Type.Simple;
+            panel.color  = Color.white;
+        }
+        else
+        {
+            var outline = panel.gameObject.AddComponent<Outline>();
+            outline.effectColor    = PanelEdge;
+            outline.effectDistance = new Vector2(2f, -2f);
+        }
+
+        // 화면 맞춤 — 판이 목업 비율을 지킨 채 화면에 맞춰 커진다.
+        panel.gameObject.AddComponent<UIWindowFitter>().Configure(maxScale: UIWindowFitter.ContentScreen);
 
         // 위에서 아래로 내려가는 커서. 각 요소는 [y - h/2]에 중심을 둔다.
         float top = PanelH * 0.5f - TopPad;
@@ -528,14 +544,22 @@ public sealed class UI_Settings : MonoBehaviour
         const float W = 240f, H = 60f, BottomPad = 28f, Gap = 24f;
 
         float cy = -PanelH * 0.5f + BottomPad + H * 0.5f;
-        MakeBottomButton(panel, "Btn_Cancel",  "취소", new Vector2(-(W + Gap) * 0.5f, cy), W, H, CancelColor,  CloseInternal);
-        MakeBottomButton(panel, "Btn_Confirm", "완료", new Vector2( (W + Gap) * 0.5f, cy), W, H, ConfirmColor, ConfirmInternal);
+        var skin = UISkin.Settings;
+        MakeBottomButton(panel, "Btn_Cancel",  "취소", new Vector2(-(W + Gap) * 0.5f, cy), W, H, CancelColor,  CloseInternal,   skin?.cancelButton);
+        MakeBottomButton(panel, "Btn_Confirm", "완료", new Vector2( (W + Gap) * 0.5f, cy), W, H, ConfirmColor, ConfirmInternal, skin?.applyButton);
     }
 
     private static void MakeBottomButton(Transform panel, string name, string label, Vector2 pos,
-                                         float w, float h, Color fill, UnityEngine.Events.UnityAction onClick)
+                                         float w, float h, Color fill, UnityEngine.Events.UnityAction onClick,
+                                         Sprite art = null)
     {
         var img = NewImage(name, panel, fill);
+        if (art != null)
+        {
+            img.sprite = art;
+            img.type   = Image.Type.Sliced;
+            img.color  = Color.white;
+        }
         var rt = img.rectTransform;
         rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = pos;
@@ -608,7 +632,15 @@ public sealed class UI_Settings : MonoBehaviour
         rt.anchoredPosition = pos;
         rt.sizeDelta = size;
 
+        var skin = UISkin.Settings;
+
         var bg = NewImage("Background", go.transform, TrackBg);
+        if (skin?.gaugeTrack != null)
+        {
+            bg.sprite = skin.gaugeTrack;
+            bg.type   = Image.Type.Sliced;
+            bg.color  = Color.white;
+        }
         var bgRt = bg.rectTransform;
         bgRt.anchorMin = new Vector2(0f, 0.25f);
         bgRt.anchorMax = new Vector2(1f, 0.75f);
@@ -624,6 +656,12 @@ public sealed class UI_Settings : MonoBehaviour
         faRt.offsetMax = new Vector2(-15f, 0f);
 
         var fill = NewImage("Fill", fillArea.transform, TrackFill);
+        if (skin?.gaugeFill != null)
+        {
+            fill.sprite = skin.gaugeFill;
+            fill.type   = Image.Type.Sliced;
+            fill.color  = Color.white;
+        }
         var fRt = fill.rectTransform;
         fRt.anchorMin = new Vector2(0f, 0f);
         fRt.anchorMax = new Vector2(1f, 1f);
@@ -640,6 +678,12 @@ public sealed class UI_Settings : MonoBehaviour
         haRt.offsetMax = new Vector2(-10f, 0f);
 
         var handle = NewImage("Handle", handleArea.transform, HandleColor);
+        if (skin?.gaugeKnob != null)
+        {
+            handle.sprite         = skin.gaugeKnob;
+            handle.color          = Color.white;
+            handle.preserveAspect = true;
+        }
         var hRt = handle.rectTransform;
         hRt.anchorMin = new Vector2(0f, 0f);
         hRt.anchorMax = new Vector2(0f, 1f);

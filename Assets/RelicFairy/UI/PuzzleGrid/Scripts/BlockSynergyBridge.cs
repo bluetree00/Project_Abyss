@@ -700,7 +700,10 @@ public class MerlinRuneBridge : MonoBehaviour
         return new GridAssetData
         {
             id = gridId,
-            displayName = meta?.grid_name ?? gridId,
+            // 이름의 <b>단일 출처는 ElementDef</b>다. 차트(zone_name)를 먼저 쓰면
+            // 코드에서 속성 이름을 바꿔도 차트가 옛 이름을 그대로 띄워 화면에서 이름이 갈린다
+            // (실제로 「얼음」→「물」로 바꿀 때 여기만 얼음으로 남았다). 차트는 폴백으로만 둔다.
+            displayName = ElementDef.GetById(gridId)?.Name ?? meta?.grid_name ?? gridId,
             pattern = new GridPatternData
             {
                 rows = rowCount,

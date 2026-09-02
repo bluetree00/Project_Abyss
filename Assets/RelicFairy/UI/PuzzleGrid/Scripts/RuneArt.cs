@@ -42,6 +42,10 @@ public static class RuneArt
     }
 
     /// <summary>등급 룬 아트(미로드 시 null → 색상 폴백).</summary>
+    /// <summary>기능(effect_type)에 대응하는 문양. 없으면 null.</summary>
+    public static Sprite GetIconByEffect(string effectType)
+        => _lib != null ? _lib.GetIconByEffect(effectType) : null;
+
     public static Sprite GetArt(ItemRarity rarity) => _lib != null ? _lib.GetArt(rarity) : null;
 
     /// <summary>등급 룬 테두리(미로드 시 null).</summary>

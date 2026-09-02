@@ -588,7 +588,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             {
                 var s = sorted[i];
                 bool met   = count >= s.threshold;
-                string chk = met ? "<color=#55FF88>●</color>" : "◇";
+                string chk = met ? "<color=#55FF88>◆</color>" : "◇";
                 string desc = string.IsNullOrEmpty(s.description) ? s.effect_type : s.description;
                 sb.AppendLine($"{chk} <b>({s.threshold}칸)</b> {desc}");
             }

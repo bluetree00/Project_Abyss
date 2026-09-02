@@ -24,7 +24,9 @@ public sealed class OddsBarView : MonoBehaviour
     [SerializeField] private RectTransform[] _fillRT;
     [SerializeField] private Image[]   _fillImg;
     [SerializeField] private TMP_Text[] _pct;
-    private float _trackW;
+    // 막대 폭은 Create에서 한 번 계산된다 — 직렬화하지 않으면 구운 프리팹에서 0으로
+    // 되살아나 모든 확률 막대가 폭 0이 된다(막대가 아예 안 보인다).
+    [SerializeField] private float _trackW;
 
     public static OddsBarView Create(Transform parent, Vector2 anchorMin, Vector2 anchorMax,
                                      Vector2 pivot, Vector2 pos, Vector2 size)
@@ -108,21 +110,50 @@ public sealed class OddsBarView : MonoBehaviour
         {
             float p = Mathf.Clamp01(v[i]);
 
-            if (_fillRT[i] != null)
-                _fillRT[i].sizeDelta = new Vector2(_trackW * p, 0f);
+            var sprite = skin != null ? skin.BarFill(i, heated) : null;
+
+            var f = _fillRT[i];
+            if (f != null)
+            {
+                // 앵커를 매번 좌측 기준으로 되돌린다 — 비율 앵커로 구워지면 sizeDelta가
+                // '더해지는 값'이 되어 폭 계산이 통째로 무너진다(굳은 비율 + 준 폭).
+                f.anchorMin        = new Vector2(0f, 0f);
+                f.anchorMax        = new Vector2(sprite != null ? 1f : 0f, 1f);
+                f.pivot            = new Vector2(0f, 0.5f);
+                f.anchoredPosition = Vector2.zero;
+
+                if (sprite != null)
+                {
+                    // 아트가 있으면 폭은 트랙에 꽉 채우고 잘라내기는 fillAmount가 한다.
+                    // 폭 자체를 줄이면 막대 아트가 가로로 눌린다(30%에서 1.78배 왜곡).
+                    f.sizeDelta = Vector2.zero;
+                }
+                else
+                {
+                    // 폴백(단색)은 잘라낼 무늬가 없으니 예전처럼 폭으로 표현한다.
+                    // 트랙은 매번 실측한다 — 베이크 상수만 믿으면 창이 커졌을 때 100%가 다 못 찬다.
+                    float trackW = f.parent is RectTransform tr && tr.rect.width > 1f
+                                 ? tr.rect.width : _trackW;
+                    f.sizeDelta = new Vector2(trackW * p, 0f);
+                }
+            }
 
             if (_fillImg[i] != null)
             {
-                var sprite = skin != null ? skin.BarFill(i, heated) : null;
                 if (sprite != null)
                 {
                     ShopUIStyle.Skin(_fillImg[i], sprite, sliced: true);
+                    _fillImg[i].type       = Image.Type.Filled;
+                    _fillImg[i].fillMethod = Image.FillMethod.Horizontal;
+                    _fillImg[i].fillOrigin = (int)Image.OriginHorizontal.Left;
+                    _fillImg[i].fillAmount = p;
                 }
                 else
                 {
                     // 폴백: 등급색. 과열이면 상위 두 줄만 밝게 띄워 "지금 유리하다"를 알린다.
                     var c = ShopUIStyle.RarityGlow(TierRarity[i]);
                     _fillImg[i].sprite = null;
+                    _fillImg[i].type   = Image.Type.Simple;   // 아트가 있다 없어지면 Filled가 남는다
                     _fillImg[i].color  = (heated && i > 0) ? Color.Lerp(c, Color.white, 0.35f) : c;
                 }
             }
