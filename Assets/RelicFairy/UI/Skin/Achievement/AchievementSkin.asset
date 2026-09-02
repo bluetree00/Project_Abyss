@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 691fe55b550edf543a41bfec3700b041, type: 3}
+  m_Name: AchievementSkin
+  m_EditorClassIdentifier:
+  rowClaimable: {fileID: 21300000, guid: 6ee5d0735ae519c43a98732302b3f3dd, type: 3}
+  rowProgress: {fileID: 21300000, guid: f04491144e8bd14479fa7102383d1fd4, type: 3}
+  rowClaimed: {fileID: 21300000, guid: f69c5ef0852ead34da32b0b776994e5e, type: 3}
+  markClaimable: {fileID: 21300000, guid: e9742eaa0e572d847ab9233f83d57db7, type: 3}
+  markProgress: {fileID: 21300000, guid: f87e78d1214691f4cbe5cb8fc1020011, type: 3}
+  markClaimed: {fileID: 21300000, guid: 2dac00b6fc696ed49bc2fe12f4bf4518, type: 3}
+  gaugeFrame: {fileID: 21300000, guid: 2cd53cdfe57578244a358fba7b76e815, type: 3}
+  gaugeTrack: {fileID: 21300000, guid: 51af18316794ec442a95e1d2d50409a5, type: 3}
+  gaugeFill: {fileID: 21300000, guid: 3d73a751d5a6ddf46a74128e7a642354, type: 3}
+  claimButton: {fileID: 21300000, guid: c56cc33fd5772e1449d1558c3f35dae5, type: 3}
+  claimAllButton: {fileID: 21300000, guid: 71b24a06e749433439c918d46d7e5977, type: 3}
+  bottomBar: {fileID: 21300000, guid: f59a6cdc9cacc9a4392d696f5c891719, type: 3}
+  chipOn: {fileID: 21300000, guid: af4deb698e70a4b44b4719707db31bc0, type: 3}
+  chipOff: {fileID: 21300000, guid: f2ba795e4bb16fe468a1224e85ac1fe3, type: 3}

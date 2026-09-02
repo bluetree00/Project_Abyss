@@ -21,6 +21,7 @@ public static class SkinArtImporter
     private const string RuneGridFolder     = "Assets/RelicFairy/UI/Skin/RuneGrid/Sprites";
     private const string RuneSelectFolder   = "Assets/RelicFairy/UI/Skin/RuneSelect/Art";
     private const string RefineryOldFolder  = "Assets/RelicFairy/UI/Skin/Refinery/Art";
+    private const string PuzzleRuneFolder   = "Assets/RelicFairy/UI/PuzzleGrid/Sprites/Runes";
 
     /// <summary>파일 1장의 목표 설정. border는 9-slice(L,B,R,T) — 0이면 Simple로 쓰는 아트.</summary>
     private readonly struct Rule
@@ -168,7 +169,8 @@ public static class SkinArtImporter
     {
         new("불룬.png",         128),
         new("물룬.png",         128),   // → ICE(얼음). 글리프는 물방울이지만 색이 맞아 그대로 쓴다
-        new("전기룬_임시.png",   128),   // 바람룬을 노랑으로 재색한 임시본 — 정식 전기룬 오면 교체
+        new("전기룬.png",       128),   // 정식 납품본(781×784 → 형제와 같은 164×166으로 축소)
+        new("전기룬_임시.png",   128),   // [사용 안 함] 바람룬 재색 임시본 — 정식본으로 교체 완료
         new("풀룬.png",         128),
         new("빛룬.png",         128),
         new("어둠룬.png",       128),
@@ -180,6 +182,20 @@ public static class SkinArtImporter
         new("테두리 좌.png",     128, 0, 40, 0, 40), new("테두리 우.png",     128, 0, 40, 0, 40),
         new("테두리 좌상단.png", 128), new("테두리 우상단.png", 128),
         new("테두리 좌하단.png", 128), new("테두리 우하단.png", 128),
+    };
+
+    // ── 속성 룬비석 (elementArt/elementBorder) ──────────────────
+    // 납품 원본이 2437×2344인데 임포트 상한이 2048로 남아 있어 1장당 약 5MB, 5장 26MB를 먹는다.
+    // 실제 최대 표시는 룬 획득 카드의 문양칸 102×102(그것도 기능·등급 아트가 없을 때의 폴백)이고
+    // 스테이징 슬롯은 그보다 작다. 256이면 표시 크기의 2.5배로 충분하다.
+    private static readonly Rule[] PuzzleRuneRules =
+    {
+        new("룬1.png", 256), new("룬2.png", 256), new("룬3.png", 256),
+        new("룬4.png", 256), new("룬5.png", 256),
+        // 테두리는 원본이 44×38이라 그대로 둔다.
+        new("룬1 테두리@2x.png", 128), new("룬2 테두리@2x.png", 128), new("룬3 테두리@2x.png", 128),
+        new("룬4 테두리@2x.png", 128), new("룬5 테두리@2x.png", 128),
+        new("룬 테두리_1@2x.png", 128),
     };
 
     // ── 기존 화면의 9-slice 보정 ────────────────────────────────
@@ -214,6 +230,7 @@ public static class SkinArtImporter
         changed += Apply(RuneGridFolder,    RuneGridRules);
         changed += Apply(RuneSelectFolder,  RuneSelectRules);
         changed += Apply(RefineryOldFolder, RefineryOldRules);
+        changed += Apply(PuzzleRuneFolder,  PuzzleRuneRules);
 
         AssetDatabase.Refresh();
         Debug.Log($"[SkinArtImporter] {changed}장 재임포트 완료.");

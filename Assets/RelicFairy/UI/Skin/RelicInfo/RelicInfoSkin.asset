@@ -19,5 +19,7 @@ MonoBehaviour:
   passivePlate:
   - {fileID: 0}
   - {fileID: 0}
+  namePlate: {fileID: 21300000, guid: e5741c852cd2a734ba7bcdebf89dcde3, type: 3}
+  divider: {fileID: 21300000, guid: 48bbfaa2181c4c34087d74f512c21084, type: 3}
   selectButton: {fileID: 21300000, guid: 2b8bc082c459267478ba0ea5c41a47f1, type: 3}
   cancelButton: {fileID: 21300000, guid: b60e63bf03a07da41b19b2eeaed63b77, type: 3}

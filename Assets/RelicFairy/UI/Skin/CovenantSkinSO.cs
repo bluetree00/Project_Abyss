@@ -30,6 +30,12 @@ public sealed class CovenantSkinSO : ScriptableObject
     public Sprite cardIdle;       // 비선택 바탕(밝은 양피지)
     public Sprite cardSelected;   // 선택 바탕(어두운 판)
 
+    [Header("하단 체결 버튼")]
+    [Tooltip("「조립」 배너(1352×405 · 3.34:1). 양끝 나침반·밀랍인장이 늘어나면 안 되므로 9-slice로 넣는다.")]
+    public Sprite forgeBanner;
+    [Tooltip("조립 배너 2안(1348×453 · 2.98:1). 비워 두면 1안만 쓴다.")]
+    public Sprite forgeBannerAlt;
+
     [Header("등급 테두리 조각 — CovenantTier 순서(0=Silver 1=Gold 2=Ruby)")]
     [Tooltip("위·아래 가로 장식바.")]
     public Sprite[] gradeBar    = new Sprite[3];

@@ -33,6 +33,12 @@ public sealed class RelicInfoSkinSO : ScriptableObject
              "단색 채움이라 그 위 글자를 못 읽는다. 그래서 현재 비워 뒀다(색 폴백이 더 읽힌다).")]
     public Sprite[] passivePlate = new Sprite[2];
 
+    [Header("이름판 / 구분선")]
+    [Tooltip("초상화 아래 이름판. 목업에서 유물 이름이 우측 열이 아니라 여기로 내려왔다.")]
+    public Sprite namePlate;
+    [Tooltip("버튼 위 장식 구분선. 통짜로 늘린다(중앙에 마름모 문장이 있어 9-slice 금지).")]
+    public Sprite divider;
+
     [Header("버튼 (글자가 아트에 구워져 있다 — 코드 라벨을 겹치면 안 된다)")]
     public Sprite selectButton;
     public Sprite cancelButton;

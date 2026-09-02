@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8fffd3c7b5498a4d9353ae6b19e8b70, type: 3}
+  m_Name: SettingsSkin
+  m_EditorClassIdentifier:
+  panel: {fileID: 21300000, guid: 265bcb1e25d1f0c4793ad6eaf76165ad, type: 3}
+  topOrnament: {fileID: 21300000, guid: 7d802a55c308b0e4e992ccef5f392631, type: 3}
+  divider: {fileID: 21300000, guid: 040324c336f6929449d6dd14fd83a7bb, type: 3}
+  ornament: {fileID: 21300000, guid: aedbf9b172310174a8dc18d981452c87, type: 3}
+  gaugeTrack: {fileID: 21300000, guid: b77ee920adbef1849859443a274e7425, type: 3}
+  gaugeFill: {fileID: 21300000, guid: e44322b41230437448b07fcca46a1412, type: 3}
+  gaugeKnob: {fileID: 21300000, guid: 4802f0f91c506034aa1ceefc363c77c5, type: 3}
+  dropdownBox: {fileID: 21300000, guid: e7850ad3d2402bb41b6f792bbd6cde28, type: 3}
+  dropdownArrow: {fileID: 21300000, guid: a1c46d87c2365874ba337016f4fb48be, type: 3}
+  dropdownListBg: {fileID: 21300000, guid: e63863e1a98d5874884a47c110198857, type: 3}
+  dropdownItem: {fileID: 21300000, guid: 034c6e68f31bbb441accd35d9c5754e6, type: 3}
+  dropdownArrowOpen: {fileID: 21300000, guid: 2b030cf350f83a64a8945b8c586c38da, type: 3}
+  applyButton: {fileID: 21300000, guid: 81ca60fb96d143d478ef99e689a0771a, type: 3}
+  cancelButton: {fileID: 21300000, guid: c6f2058ef530d4e4491a676db941e604, type: 3}
+  offButton: {fileID: 21300000, guid: 4803b676f65bed944a377521230a1a7a, type: 3}
+  resetButton: {fileID: 21300000, guid: 53987f66389f4a74487222de9f461f99, type: 3}
