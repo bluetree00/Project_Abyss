@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.AI;
@@ -226,7 +227,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             _run = new GameRunSession();
             if (app != null)
+            {
                 app.BeginRun(_run);
+                // 「파츠 영구 계승」 — 새 런에서만 얹는다. 챕터 전환·이어하기는 CurrentRun이 살아 있어
+                // 이 갈래로 오지 않으므로 파츠가 두 번 붙지 않는다.
+                PartInheritanceService.ApplyToRun(app.Loadout);
+            }
         }
 
         var uiRoot = UIRootBootstrapper.Instance;
@@ -342,6 +348,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         int bossTier = (_run != null && _run.IsNextChapterFinal()) ? 3 : 1;
 
         var pool = Managers.RelicParts?.GetDraftPool(relicId, bossTier, loadout.RelicPartIds);
+
+        // 코어 파츠(tier 3)는 해금에 따라 <b>후보 수만</b> 줄인다 — 잠그지 않는다.
+        //   미해금 1종 · 「코어 파츠 1차」 2종 · 「코어 파츠 전체」 3종.
+        // 잠가 버리면 최종 직전 보스가 보상 없는 보스가 되고, 지금까지 받던 것을 빼앗는 모양이 된다.
+        // ⚠️ 자르는 곳은 여기다. GetDraftPool 안이 아니다 — 그 풀은 초행 보너스·선행 파츠 판정도 쓰는 공용 경로다.
+        // 자르기 전 풀 크기를 남긴다 — 해금해도 <b>실제로</b> 더 나올 수 있는지 판정하는 근거다.
+        int poolBeforeTrim = pool?.Count ?? 0;
+        if (bossTier == 3) pool = TrimCoreParts(pool);
+
         if (pool == null || pool.Count == 0)
         {
             Debug.Log($"[GameRunBootstrapper] 파츠 드래프트 후보 없음 (relic={relicId}, tier={bossTier}) — 스킵");
@@ -350,6 +365,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 「파츠 드래프트 4」 해금 시 후보가 3 → 4로 늘어난다(정본 Ⅱ 등장).
         var candidates = PickRandomParts(pool, MemoryAltarService.PartsDraftCount);
+
+        // 해금하면 열릴 자리를 빈 칸으로 미리 보여준다.
+        // 코어는 1→2→3(최대 3), 기능 파츠는 3→4(최대 4)까지 넓어진다.
+        // 풀이 모자라면 해금해도 안 늘어나므로 min을 취한다 — 없는 확장을 약속하지 않는다.
+        int maxSlots    = bossTier == 3 ? 3 : 4;
+        int lockedSlots = Mathf.Max(0, Mathf.Min(maxSlots, poolBeforeTrim) - candidates.Count);
 
         var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_RelicPartDraftPopup>();
         if (popup == null)
@@ -362,7 +383,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
 
         var interactionTask = popup.WaitForInteractionAsync(ct);
-        popup.Setup(candidates);
+        popup.Setup(candidates, lockedSlots);
         await interactionTask;
 
         if (popup.Result != null)
@@ -378,6 +399,22 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// 호출 경로 둘: (1) 보스 드래프트 획득 직후 살아있는 플레이어에, (2) OnPlayerBound로
     /// 새 챕터/이어하기의 새 플레이어에 런 고정 파츠 재활성.
     /// </summary>
+    /// <summary>
+    /// 코어 파츠 후보를 해금 단계만큼만 남긴다(1 → 2 → 3종).
+    /// <para>앞에서부터 자른다 — <c>GetDraftPool</c>이 CSV 정의 순서를 지키므로,
+    /// 미해금 플레이어는 <b>항상 같은 첫 코어</b>를 본다. 무작위로 자르면 "이번엔 뭐가 나올까"가
+    /// 해금이 아니라 운의 문제가 되어, 해금이 무엇을 넓히는지 읽히지 않는다.</para>
+    /// </summary>
+    private static List<RelicPartEntry> TrimCoreParts(List<RelicPartEntry> pool)
+    {
+        if (pool == null || pool.Count == 0) return pool;
+
+        int allowed = MemoryAltarService.CorePartChoiceCount;
+        if (pool.Count <= allowed) return pool;
+
+        return pool.GetRange(0, allowed);
+    }
+
     private void ActivateRelicParts(PlayerController player)
     {
         var loadout = AppBootstrapper.Instance?.Loadout;
@@ -2996,6 +3033,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         _run?.BindPlayer(player);
         _run?.RequestHudMode(HUDIds.Mode.Combat);
+        // 카메라를 플레이어 등 뒤로 정렬한다(alignHeadingToTarget 기본 true).
+        // 시작방은 <b>문을 정면에 두고 시작</b>하는 것이 의도된 구도다 — FaceStartRoomExit가
+        // 플레이어를 출구 쪽으로 돌리고, 카메라가 그 각을 물려받아 문이 화면 정면에 온다.
+        // ⚠️ 헤딩을 0°로 고정하면 이 구도가 깨진다(문이 화면 옆으로 밀려남). 고정하지 말 것.
         GameCameraController.Instance?.HandToGameplayCamera(player.transform);
 
         // 챕터 시작 대기방: 조립 서약 제단 배치(선택 픽업은 억제해도 서약 제단은 항상 제공)
@@ -3140,6 +3181,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 투어 종료 → 게임플레이 카메라로 핸드오프. BindPlayer(OnPlayerBound) 전에 호출해
         // 레거시 줌인 인트로(PlayIntroAsync)가 발화되지 않도록 _introStarted를 선점한다.
+        // 카메라를 플레이어 등 뒤로 정렬한다(alignHeadingToTarget 기본 true).
+        // 시작방은 <b>문을 정면에 두고 시작</b>하는 것이 의도된 구도다 — FaceStartRoomExit가
+        // 플레이어를 출구 쪽으로 돌리고, 카메라가 그 각을 물려받아 문이 화면 정면에 온다.
+        // ⚠️ 헤딩을 0°로 고정하면 이 구도가 깨진다(문이 화면 옆으로 밀려남). 고정하지 말 것.
         GameCameraController.Instance?.HandToGameplayCamera(player.transform);
 
         // HUD를 플레이어에 바인딩 — 무기 선택 시 HUD 슬롯이 즉시 갱신되도록
@@ -3269,6 +3314,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
         _run?.BindPlayer(player);
         _run?.RequestHudMode(HUDIds.Mode.Combat);
+        // 카메라를 플레이어 등 뒤로 정렬한다(alignHeadingToTarget 기본 true).
+        // 시작방은 <b>문을 정면에 두고 시작</b>하는 것이 의도된 구도다 — FaceStartRoomExit가
+        // 플레이어를 출구 쪽으로 돌리고, 카메라가 그 각을 물려받아 문이 화면 정면에 온다.
+        // ⚠️ 헤딩을 0°로 고정하면 이 구도가 깨진다(문이 화면 옆으로 밀려남). 고정하지 말 것.
         GameCameraController.Instance?.HandToGameplayCamera(player.transform);
 
         // 챕터 시작 대기방: 조립 서약 제단 배치(챕터마다 서약 획득 기회)

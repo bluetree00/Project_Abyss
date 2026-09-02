@@ -19,9 +19,15 @@ public static class CovenantAssembleService
     private const double GoldCut = 0.60;
     private const double RubyCut = 0.90;
 
-    // 연마 확률(실버 50 / 골드 35 / 루비 15) — 런당 1회뿐이라 일반 굴림보다 후하게.
-    private const double WhetGoldCut = 0.50;
-    private const double WhetRubyCut = 0.85;
+    // 교체 확률(실버 50 / 골드 35 / 루비 15) — 처음 배분보다 후하다.
+    //
+    // <b>교체가 등급의 기회이기도 하다</b>: 카드를 바꾸는 것은 "이 효과가 싫다"이지만,
+    // 실버가 떠서 아쉬운 카드를 넘길 때도 쓰인다. 첫 배분과 같은 확률이면 교체가
+    // 순수 손실 위험이라 아무도 안 굴린다 — 후하게 줘야 굴릴 이유가 생긴다.
+    // (연마는 폐기했다. 재굴림이 둘이면 규칙을 두 번 배워야 하는데, 등급만 다시 굴리는 쪽은
+    //  교체의 하위 호환이라 값을 못 했다. 그 확률을 여기로 흡수했다.)
+    private const double RerollGoldCut = 0.50;
+    private const double RerollRubyCut = 0.85;
 
     public static List<CovenantDraftCard> DraftCauses(int count, System.Random rng, bool forceSilver)
         => DraftCards(CovenantPalette.CauseIds, count, rng, forceSilver);
@@ -49,7 +55,7 @@ public static class CovenantAssembleService
     {
         var id = RerollOne(pool, excludeIds, rng, requireSurvival: false);
         if (id == null) return null;
-        return new CovenantDraftCard(id, RollTier(rng, forceSilver));
+        return new CovenantDraftCard(id, RollRerollTier(rng, forceSilver));
     }
 
     /// <summary>
@@ -74,16 +80,16 @@ public static class CovenantAssembleService
         bool mustSurvival = guaranteed <= 1 && CovenantPalette.IsGuaranteedSurvivalEffect(current[idx].id);
         var id = RerollOne(CovenantPalette.DraftableEffectIds(held), exclude, rng, mustSurvival);
         if (id == null) return null;
-        return new CovenantDraftCard(id, RollTier(rng, forceSilver));
+        return new CovenantDraftCard(id, RollRerollTier(rng, forceSilver));
     }
 
     /// <summary>티어 1회 굴림. forceSilver면 무조건 실버.</summary>
     public static CovenantTier RollTier(System.Random rng, bool forceSilver)
         => RollTier(rng, forceSilver, GoldCut, RubyCut);
 
-    /// <summary>연마 — id는 그대로 두고 티어만 다시 굴린다(실버 50 / 골드 35 / 루비 15).</summary>
-    public static CovenantTier RollWhetTier(System.Random rng, bool forceSilver)
-        => RollTier(rng, forceSilver, WhetGoldCut, WhetRubyCut);
+    /// <summary>교체 티어 굴림 — 첫 배분보다 후하다(실버 50 / 골드 35 / 루비 15).</summary>
+    public static CovenantTier RollRerollTier(System.Random rng, bool forceSilver)
+        => RollTier(rng, forceSilver, RerollGoldCut, RerollRubyCut);
 
     // ── 내부 ─────────────────────────────────────────────
     private static CovenantTier RollTier(System.Random rng, bool forceSilver, double goldCut, double rubyCut)

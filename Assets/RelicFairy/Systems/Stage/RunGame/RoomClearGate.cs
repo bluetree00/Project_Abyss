@@ -249,6 +249,9 @@ public class RoomClearGate : MonoBehaviour
         // 단일 드랍(count 1) 규칙까지 늘리면 선택의 폭이 아니라 획득량이 바뀌어 경제가 어긋난다.
         if (count == 3) count = MemoryAltarService.RuneChoiceCount;
 
+        // 고행자의 인장 — 해금 확장 뒤에 건다. 켜져 있으면 늘어난 폭에서 한 칸을 도로 내놓는 셈이다.
+        count = AsceticSigilService.ApplyChoiceCount(count);
+
         var result = new System.Collections.Generic.List<(RuntimeItemData, ItemSO)>(count);
         var rule   = RoomRewardTable.For(RoomKind());
         if (count <= 0 || !RoomRewardTable.RollDrop(rule)) return result;

@@ -28,10 +28,14 @@ public static class ElementDef
 
     // 시너지 존 6속성 — 표시 순서 = 이 배열 순서
     // 보드 코드(char)는 ZONE_MAP과 호환 유지: 'T'=전기(Electric), 'P'=풀(Grass).
+    //
+    // ⚠ Id "ICE"는 <b>데이터 키</b>다 — 표시 이름만 「물」로 바꿨고 키는 그대로 둔다.
+    //   키를 바꾸면 시너지 차트(zone_id)·존맵('I')·전설 효과·CDN 원본이 한꺼번에 갈라져
+    //   그 속성 시너지가 조용히 죽는다. 플레이어에게 보이는 것은 Name뿐이라 이걸로 충분하다.
     private static readonly Entry[] s_Elements =
     {
         new("FIRE",     'F', "불",   "▲", new Color(1.00f, 0.38f, 0.22f)),
-        new("ICE",      'I', "얼음", "◇",  new Color(0.45f, 0.80f, 1.00f)),
+        new("ICE",      'I', "물",   "◇",  new Color(0.45f, 0.80f, 1.00f)),
         new("ELECTRIC", 'T', "전기", "↗", new Color(1.00f, 0.88f, 0.25f)),
         new("GRASS",    'P', "풀",   "▼",  new Color(0.55f, 0.82f, 0.30f)),
         new("LIGHT",    'L', "빛",   "◆",  new Color(1.00f, 0.95f, 0.65f)),
