@@ -153,7 +153,8 @@ public class UI_RangedForgePopup : UI_Popup
         Color theme = w.uiThemeColor.a > 0.01f ? w.uiThemeColor : Accent;
         Color accent = e.Locked ? LockColor : theme;
 
-        _icon.sprite = w.icon;
+        _icon.sprite  = w.icon;
+        _icon.enabled = w.icon != null;   // 아이콘이 없는 무기는 흰 네모 대신 빈 홀더로
         _icon.color  = w.icon != null ? Color.white : new Color(1f, 1f, 1f, 0.12f);
 
         _name.text  = w.displayName;
@@ -303,7 +304,7 @@ public class UI_RangedForgePopup : UI_Popup
         // 안 펴면 아래 암막이 그 100×100만 덮어 뒤의 월드·HUD가 그대로 살아 있다.
         Stretch(root);
 
-        var dim = NewImage("Dim", root, new Color(0f, 0f, 0f, 0.65f));
+        var dim = NewImage("Dim", root, new Color(0f, 0f, 0f, 0.8f));   // 팝업 공통 암막(ShopUIStyle.Veil과 동일)
         Stretch(dim.rectTransform);
         dim.raycastTarget = true;
 
@@ -313,7 +314,7 @@ public class UI_RangedForgePopup : UI_Popup
         // 세로 레이아웃 그룹이 배치하는 판이라 글꼴은 키우지 않는다 —
         // 상자가 안 커지는데 글자만 키우면 넘친다.
         panel.gameObject.AddComponent<UIWindowFitter>()
-             .Configure(scaleFonts: false, maxScale: UIWindowFitter.ContentScreen);
+             .Configure(scaleFonts: false, maxScale: UIWindowFitter.ContentScreen, scaleTransform: true);
         var prt = panel.rectTransform;
         prt.anchorMin = prt.anchorMax = new Vector2(0.5f, 0.5f);
         prt.pivot = new Vector2(0.5f, 0.5f);
@@ -331,7 +332,8 @@ public class UI_RangedForgePopup : UI_Popup
 
         var v = panel.gameObject.AddComponent<VerticalLayoutGroup>();
         // 아트 여백은 bg.png의 프레임 안쪽 비율(위 0.100 / 아래 0.067 / 좌우 얇은 금선)에서 뽑았다.
-        v.padding = skinned ? new RectOffset(30, 30, 77, 52) : new RectOffset(28, 28, 24, 22);
+        // 합성본(전체 샷 931×925): 제목 위 0.17, 버튼 아래 0.16 — 775 기준 130/125.
+        v.padding = skinned ? new RectOffset(30, 30, 130, 125) : new RectOffset(28, 28, 24, 22);
         v.spacing = 12f;
         v.childControlWidth = true;  v.childForceExpandWidth  = true;
         v.childControlHeight = true; v.childForceExpandHeight = false;
@@ -340,7 +342,7 @@ public class UI_RangedForgePopup : UI_Popup
         // 제목 + 안내
         var title = NewText("Title", prt, 30f, TitleColor, FontStyles.Bold, TextAlignmentOptions.Center);
         title.text = "보조 무기 — 원거리";
-        var sub = NewText("Sub", prt, 14f, SubColor, FontStyles.Normal, TextAlignmentOptions.Center);
+        var sub = NewText("Sub", prt, 16f, SubColor, FontStyles.Normal, TextAlignmentOptions.Center);
         sub.text = "주무기 <color=#CFC0A0>무명의 형상</color>은 이미 손에 있다. 곁에 둘 하나를 고른다.";
 
         BuildViewer(prt);   // ◀  [카드]  ▶
@@ -372,6 +374,8 @@ public class UI_RangedForgePopup : UI_Popup
         row.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
         var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
         h.spacing = 6f;
+        // 합성본에서 화살표는 판 가장자리(0.047)가 아니라 안쪽(0.118)에 선다 — 747 기준 좌우 53.
+        h.padding = new RectOffset(53, 53, 0, 0);
         h.childAlignment = TextAnchor.MiddleCenter;
         h.childControlWidth = true;  h.childForceExpandWidth  = false;
         h.childControlHeight = true; h.childForceExpandHeight = true;
@@ -493,7 +497,7 @@ public class UI_RangedForgePopup : UI_Popup
         var v = stage.gameObject.AddComponent<VerticalLayoutGroup>();
         v.spacing = 10f;
         v.padding = new RectOffset(6, 6, 6, 6);
-        v.childAlignment = TextAnchor.UpperCenter;
+        v.childAlignment = TextAnchor.MiddleCenter;   // 합성본은 홀더가 무대 세로 중앙(0.54)에 온다
         v.childControlWidth = true;  v.childForceExpandWidth  = true;
         v.childControlHeight = true; v.childForceExpandHeight = false;
 
@@ -518,6 +522,7 @@ public class UI_RangedForgePopup : UI_Popup
         }
 
         _icon = NewImage("Icon", host, Color.white);
+        _icon.enabled = false;   // 항목이 적용되기 전엔 그리지 않는다 — 빈 Image는 흰 네모로 뜬다
         // 홀더 안에서는 테두리를 먹지 않도록 안쪽으로 들여넣는다.
         if (hasHolder) ShopUIStyle.Stretch(_icon.rectTransform, 22f);
         else           Stretch(_icon.rectTransform);

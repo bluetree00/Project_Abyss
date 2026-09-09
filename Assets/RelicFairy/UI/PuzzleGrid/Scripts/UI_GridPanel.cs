@@ -58,7 +58,6 @@ public sealed class UI_GridPanel : UI_Base
     private RectTransform _synergyStatusRoot;
 
     // 우측: 상단 스테이징(스크롤) / 하단 아이템정보 + 배치버튼
-    private RectTransform _stagingScrollRT;
     private RectTransform _itemInfoRoot;
     private Button        _placeButton;
 
@@ -364,7 +363,6 @@ public sealed class UI_GridPanel : UI_Base
         BuildHeader();
         BuildMainArea();
         BuildFooter();
-        if (_footerRT != null) _footerRT.gameObject.SetActive(false);   // 하단 정리 — 중앙보너스 푸터 숨김
     }
 
     /// <summary>이미지에 스프라이트 주입(비파괴 — sprite null이면 기존 유지). fill=true면 늘려 채움, false면 종횡비 보존.</summary>
@@ -404,7 +402,7 @@ public sealed class UI_GridPanel : UI_Base
         backRT.anchorMax = new Vector2(0f, 1f);
 
         // 타이틀 텍스트 (중앙)
-        var titleGO = MakeTxt(headerGO.transform, "Title", "그리드 배치", 18f,
+        var titleGO = MakeTxt(headerGO.transform, "Title", "그리드 배치", 22f,
             new Color(0.88f, 0.92f, 1f, 1f), bold: true);
         var titleRT = titleGO.GetComponent<RectTransform>();
         titleRT.anchorMin = new Vector2(0.3f, 0f);
@@ -445,7 +443,7 @@ public sealed class UI_GridPanel : UI_Base
         _mainAreaRT = mainGO.GetComponent<RectTransform>();
         _mainAreaRT.anchorMin        = new Vector2(0f, 0f);
         _mainAreaRT.anchorMax        = new Vector2(1f, 1f);
-        _mainAreaRT.offsetMin        = new Vector2(0f, 10f);   // footer 제거(하단 정리) — 최소 여백만
+        _mainAreaRT.offsetMin        = new Vector2(0f, 184f);  // 하단 보관함 바 180px(의뢰서 F4) + 여백
         _mainAreaRT.offsetMax        = new Vector2(0f, -60f);  // header 60px
 
         BuildLeftPanel(mainGO.transform);
@@ -460,15 +458,20 @@ public sealed class UI_GridPanel : UI_Base
         go.transform.SetParent(parent, false);
         _leftPanelRT = go.GetComponent<RectTransform>();
         _leftPanelRT.anchorMin = new Vector2(0f,    0f);
-        _leftPanelRT.anchorMax = new Vector2(0.20f, 1f);
+        _leftPanelRT.anchorMax = new Vector2(0.22f, 1f);
         _leftPanelRT.offsetMin = _leftPanelRT.offsetMax = Vector2.zero;
 
-        // 좌측 = TFT식 시너지 패널(개수 + 호버 효과). 캐릭터 정보는 정리(제거).
+        // 의뢰서 F2: 좌 = 캐릭터 정보(초상·HP·2×3 스탯·활성 효과) 위, 속성 시너지 아래.
+        _charInfoView = CharacterInfoPanelView.Create(go.transform);
+        var charRT = (RectTransform)_charInfoView.transform;
+        charRT.anchorMin = new Vector2(0f, 0.46f);
+        charRT.anchorMax = new Vector2(1f, 1f);
+        charRT.offsetMin = charRT.offsetMax = Vector2.zero;
         var synGO = Go("SynergyStatusRoot");
         synGO.transform.SetParent(go.transform, false);
         _synergyStatusRoot = synGO.GetComponent<RectTransform>();
         _synergyStatusRoot.anchorMin = Vector2.zero;
-        _synergyStatusRoot.anchorMax = Vector2.one;
+        _synergyStatusRoot.anchorMax = new Vector2(1f, 0.46f);
         _synergyStatusRoot.offsetMin = _synergyStatusRoot.offsetMax = Vector2.zero;
         _synergyStatusView = synGO.AddComponent<MerlinRuneSynergyStatusView>();
         _synergyStatusView.SetSkin(_synergyBgSprite, _synergyBorderSprite);   // 시너지 바탕/테두리
@@ -480,7 +483,7 @@ public sealed class UI_GridPanel : UI_Base
         var go = Go("CenterPanel");
         go.transform.SetParent(parent, false);
         _centerPanelRT = go.GetComponent<RectTransform>();
-        _centerPanelRT.anchorMin = new Vector2(0.20f, 0f);
+        _centerPanelRT.anchorMin = new Vector2(0.22f, 0f);
         _centerPanelRT.anchorMax = new Vector2(0.75f, 1f);
         _centerPanelRT.offsetMin = new Vector2(2f, 0f);
         _centerPanelRT.offsetMax = new Vector2(-2f, 0f);
@@ -505,8 +508,8 @@ public sealed class UI_GridPanel : UI_Base
 
         // 드래그 힌트 (아이템 미배치 시 표시, CenterPanel 직속 → 최후 렌더 보장)
         var hintGO = MakeTxt(go.transform, "DragHint",
-            "보관함의 룬을 끌어\n판에 놓으세요", 15f,
-            new Color(0.62f, 0.68f, 0.85f, 0.45f));
+            "보관함의 룬을 끌어\n판에 놓으세요", 18f,
+            new Color(0.70f, 0.76f, 0.90f, 0.80f));
         _hexGridHintText = hintGO.GetComponent<TMP_Text>();
         var hintRT = hintGO.GetComponent<RectTransform>();
         hintRT.anchorMin = new Vector2(0f, 0.0f);
@@ -537,133 +540,10 @@ public sealed class UI_GridPanel : UI_Base
 
         var rightBG = go.AddComponent<Image>();
         rightBG.color = new Color(0.12f, 0.14f, 0.20f, 0.95f);
-
-        // 상단 70%: StagingAreaView (스크롤)
-        BuildStagingScrollArea(go.transform);
-
-        // 하단 30%: ItemInfoPanel + 배치 버튼
+        // 의뢰서 F3: 우 = 아이템 정보만. 보관함은 하단 바(F4)로 갔다.
         BuildItemInfoArea(go.transform);
     }
 
-    private void BuildStagingScrollArea(Transform parent)
-    {
-        var scrollGO = Go("StagingScroll");
-        scrollGO.transform.SetParent(parent, false);
-        _stagingScrollRT = scrollGO.GetComponent<RectTransform>();
-        // 2열 그리드가 통째로 들어가야 한다. 슬롯 아트(326×214)와 슬롯(220×144)은 종횡비가
-        // 같아 폭을 못 늘리므로 필요 높이는 472px로 고정 — 0.27~0.88(608px)은 136px이 남았다.
-        // 남는 세로는 아래 룬 상세로 넘긴다(273 → 385px). 상세는 효과 문구가 길어 세로가 곧 가독성이다.
-        // 0.405는 필요치와 정확히 같아 반올림 1px에도 잘렸다 — 16px 여유를 둔 0.389로 잡는다.
-        _stagingScrollRT.anchorMin = new Vector2(0f, 0.389f);
-        _stagingScrollRT.anchorMax = new Vector2(1f, 0.88f);
-        _stagingScrollRT.offsetMin = new Vector2(4f, 4f);
-        _stagingScrollRT.offsetMax = new Vector2(-4f, -4f);
-
-        // 룬 배치 테두리(326×214@2x)·바탕(287×204@2x)은 <b>슬롯 한 칸</b>용 아트다.
-        // 목록 패널 전체에 늘려 쓰면 장식이 뭉개지므로, 여기는 어두운 판만 두고
-        // 아트는 StagingAreaView가 칸마다 얹는다.
-        var scrollBG = scrollGO.AddComponent<Image>();
-        scrollBG.color = new Color(0.10f, 0.12f, 0.18f, 0.75f);
-
-        // "보관함" 레이블
-        var lblGO = MakeTxt(scrollGO.transform, "StagingLabel", "아이템 목록", 15f,
-            new Color(0.82f, 0.87f, 1.00f, 1f));
-        var lblRT = lblGO.GetComponent<RectTransform>();
-        lblRT.anchorMin = new Vector2(0f, 1f);
-        lblRT.anchorMax = new Vector2(1f, 1f);
-        lblRT.sizeDelta = new Vector2(0f, 22f);
-        lblRT.anchoredPosition = new Vector2(0f, -11f);
-        lblGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
-
-        // Scroll viewport (레이블 아래)
-        var viewportGO = Go("Viewport");
-        viewportGO.transform.SetParent(scrollGO.transform, false);
-        var viewportRT = viewportGO.GetComponent<RectTransform>();
-        viewportRT.anchorMin = new Vector2(0f, 0f);
-        viewportRT.anchorMax = new Vector2(1f, 1f);
-        viewportRT.offsetMin = new Vector2(0f, 0f);
-        // 제목("아이템 목록")이 상단 22px를 쓰므로 -24면 간격이 2px뿐이고,
-        // 슬롯 아트의 테두리와 맞닿아 제목이 첫 줄 슬롯에 얹힌 것처럼 보인다.
-        viewportRT.offsetMax = new Vector2(0f, -32f);
-        viewportGO.AddComponent<RectMask2D>();
-
-        var scrollRect = scrollGO.AddComponent<ScrollRect>();
-        scrollRect.horizontal        = false;   // 슬롯이 2열 그리드라 넘치면 세로로 넘친다
-        scrollRect.vertical          = true;
-        scrollRect.scrollSensitivity = 30f;
-        scrollRect.movementType      = ScrollRect.MovementType.Clamped;
-        scrollRect.inertia           = true;
-
-        // ScrollContent — StagingAreaView가 좌상단 기준 2열 그리드로 슬롯을 놓으므로
-        // 좌상단 고정 앵커로 두고 크기는 StagingAreaView가 sizeDelta로 정한다.
-        var contentGO = Go("ScrollContent");
-        contentGO.transform.SetParent(viewportGO.transform, false);
-        var contentRT = contentGO.GetComponent<RectTransform>();
-        contentRT.anchorMin        = new Vector2(0f, 1f);
-        contentRT.anchorMax        = new Vector2(0f, 1f);
-        contentRT.pivot            = new Vector2(0f, 1f);
-        contentRT.anchoredPosition = Vector2.zero;
-
-        scrollRect.content  = contentRT;
-        scrollRect.viewport = viewportRT;
-
-        // 세로 스크롤바 — 카드를 끌면 그 드래그가 배치용으로 소비되므로(SlotDragHandler),
-        // 목록을 훑을 수단이 휠밖에 없어진다. 잡고 내릴 수 있는 막대를 오른쪽에 세운다.
-        scrollRect.verticalScrollbar = BuildStagingScrollbar(scrollGO.transform, viewportRT);
-        scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
-
-        // StagingAreaView 추가 후 Init으로 scrollContent 전달 + 슬롯 빌드
-        _stagingArea = scrollGO.AddComponent<StagingAreaView>();
-        _stagingArea.SetSlotSkin(_stagingBgSprite, _stagingBorderSprite);   // 슬롯 빌드 전에 주입
-        _stagingArea.Init(contentRT);
-    }
-
-    /// <summary>
-    /// 보관함 목록의 세로 스크롤바를 만든다(뷰포트 오른쪽에 세로 막대).
-    /// AutoHideAndExpandViewport라 넘칠 때만 나타나고, 없을 땐 목록이 폭을 온전히 쓴다.
-    /// </summary>
-    private Scrollbar BuildStagingScrollbar(Transform parent, RectTransform viewportRT)
-    {
-        const float BarW = 10f;
-
-        var barGO = Go("StagingScrollbar");
-        barGO.transform.SetParent(parent, false);
-        var barRT = barGO.GetComponent<RectTransform>();
-        barRT.anchorMin        = new Vector2(1f, 0f);
-        barRT.anchorMax        = new Vector2(1f, 1f);
-        barRT.pivot            = new Vector2(1f, 0.5f);
-        barRT.sizeDelta        = new Vector2(BarW, viewportRT.sizeDelta.y);
-        barRT.anchoredPosition = new Vector2(-2f, 0f);
-
-        var barBg = barGO.AddComponent<Image>();
-        barBg.color = new Color(0.06f, 0.07f, 0.11f, 0.75f);
-
-        var slideGO = Go("SlidingArea");
-        slideGO.transform.SetParent(barGO.transform, false);
-        var slideRT = slideGO.GetComponent<RectTransform>();
-        slideRT.anchorMin = Vector2.zero;
-        slideRT.anchorMax = Vector2.one;
-        slideRT.offsetMin = new Vector2(1f, 1f);
-        slideRT.offsetMax = new Vector2(-1f, -1f);
-
-        var handleGO = Go("Handle");
-        handleGO.transform.SetParent(slideGO.transform, false);
-        var handleRT = handleGO.GetComponent<RectTransform>();
-        handleRT.sizeDelta = Vector2.zero;
-        var handleImg = handleGO.AddComponent<Image>();
-        handleImg.color = new Color(0.45f, 0.52f, 0.68f, 0.95f);
-
-        var bar = barGO.AddComponent<Scrollbar>();
-        bar.direction     = Scrollbar.Direction.BottomToTop;
-        bar.handleRect    = handleRT;
-        bar.targetGraphic = handleImg;
-        return bar;
-    }
-
-    /// <summary>
-    /// ItemInfoPanel의 필수 SerializeField를 코드로 생성한 UI 오브젝트로 주입한다.
-    /// Inspector 연결 없이 동작하도록 최소 UI 구조를 빌드한다.
-    /// </summary>
     private void BuildAndInjectItemInfoPanelFields(GameObject root)
     {
         if (_itemInfoPanel == null) return;
@@ -749,8 +629,9 @@ public sealed class UI_GridPanel : UI_Base
         var shapePreviewGO = new GameObject("ShapePreview", typeof(RectTransform));
         shapePreviewGO.transform.SetParent(itemRootGO.transform, false);
         var shapePreviewRT = shapePreviewGO.GetComponent<RectTransform>();
-        shapePreviewRT.anchorMin = new Vector2(0.6f, 0.60f);
-        shapePreviewRT.anchorMax = new Vector2(1.0f, 1.00f);
+        // 룬은 ItemSO 아이콘이 없어 위 칸(itemIcon)이 비어 있다 — 모양 미리보기를 그 자리 가운데에 크게 둔다(실측 09-09: 우측 구석 22px 타일).
+        shapePreviewRT.anchorMin = new Vector2(0.2f, 0.62f);
+        shapePreviewRT.anchorMax = new Vector2(0.8f, 1.00f);
         shapePreviewRT.offsetMin = shapePreviewRT.offsetMax = Vector2.zero;
         type.GetField("shapePreviewRoot", rf)?.SetValue(_itemInfoPanel, shapePreviewRT);
 
@@ -763,7 +644,7 @@ public sealed class UI_GridPanel : UI_Base
         emptyRootRT.offsetMin = emptyRootRT.offsetMax = Vector2.zero;
         type.GetField("emptyRoot", rf)?.SetValue(_itemInfoPanel, emptyRootGO);
 
-        var emptyTxtGO = MakeTxt(emptyRootGO.transform, "EmptyText", "아이템을 선택하세요", 12f,
+        var emptyTxtGO = MakeTxt(emptyRootGO.transform, "EmptyText", "아이템을 선택하세요", 16f,
             new Color(0.45f, 0.48f, 0.58f, 0.8f));
         var emptyTxtRT = emptyTxtGO.GetComponent<RectTransform>();
         emptyTxtRT.anchorMin = Vector2.zero;
@@ -783,14 +664,18 @@ public sealed class UI_GridPanel : UI_Base
         newBadgeRT.anchoredPosition = new Vector2(2f, -2f);
         var newBadgeBG = newBadgeGO.AddComponent<Image>();
         newBadgeBG.color = new Color(1f, 0.3f, 0.3f, 0.95f);
-        var newBadgeTxtGO = MakeTxt(newBadgeGO.transform, "Label", "NEW", 8f, Color.white, bold: true);
+        var newBadgeTxtGO = MakeTxt(newBadgeGO.transform, "Label", "NEW", 10f, Color.white, bold: true);
         var newBadgeTxtRT = newBadgeTxtGO.GetComponent<RectTransform>();
         newBadgeTxtRT.anchorMin = Vector2.zero;
         newBadgeTxtRT.anchorMax = Vector2.one;
         newBadgeTxtRT.sizeDelta = Vector2.zero;
         newBadgeTxtGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
         type.GetField("newBadge", rf)?.SetValue(_itemInfoPanel, newBadgeGO);
-    }
+    
+        // AddComponent 직후 Awake의 ShowEmpty는 필드 주입 전이라 아무것도 못 숨긴다 — 주입이 끝난 지금 빈 상태로 맞춘다.
+        // 안 그러면 OpenPanel을 거치지 않고 켜졌을 때 스프라이트 없는 아이콘이 흰 사각형으로, NEW 배지가 켜진 채 남는다.
+        _itemInfoPanel.ShowEmpty();
+}
 
     private void BuildItemInfoArea(Transform parent)
     {
@@ -798,7 +683,7 @@ public sealed class UI_GridPanel : UI_Base
         infoRootGO.transform.SetParent(parent, false);
         _itemInfoRoot = infoRootGO.GetComponent<RectTransform>();
         _itemInfoRoot.anchorMin = new Vector2(0f, 0f);
-        _itemInfoRoot.anchorMax = new Vector2(1f, 0.389f);   // 보관함 하단(0.389)과 맞물린다 — 겹치면 안 된다
+        _itemInfoRoot.anchorMax = new Vector2(1f, 1f);
         _itemInfoRoot.offsetMin = new Vector2(4f, 4f);
         _itemInfoRoot.offsetMax = new Vector2(-4f, -4f);
 
@@ -806,7 +691,7 @@ public sealed class UI_GridPanel : UI_Base
         infoBG.color = new Color(0.11f, 0.13f, 0.19f, 0.90f);
 
         // "선택:" 레이블
-        var selLbl = MakeTxt(infoRootGO.transform, "SelectLabel", "선택:", 15f,
+        var selLbl = MakeTxt(infoRootGO.transform, "SelectLabel", "선택:", 16f,
             new Color(0.55f, 0.60f, 0.75f, 1f));
         var selRT = selLbl.GetComponent<RectTransform>();
         selRT.anchorMin = new Vector2(0f, 1f);
@@ -835,8 +720,8 @@ public sealed class UI_GridPanel : UI_Base
 
         // 라벨은 <b>행동 유도문</b>이다 — "끌어서 배치"는 명령형 두 단어라 주 액션 버튼으로 읽혔고,
         // 실제 배치는 드래그로만 일어나므로 눌러도 아무 일이 없는 죽은 버튼처럼 보였다(P0-3).
-        var placeTxtGO = MakeTxt(placeGO.transform, "PlaceLabel", "보관함 룬을 격자로 끌어다 놓으세요", 14f,
-            new Color(0.7f, 0.78f, 0.90f, 0.8f));
+        var placeTxtGO = MakeTxt(placeGO.transform, "PlaceLabel", "보관함 룬을 격자로 끌어다 놓으세요", 16f,
+            new Color(0.78f, 0.85f, 0.95f, 0.95f));
         var placeTxtRT = placeTxtGO.GetComponent<RectTransform>();
         placeTxtRT.anchorMin = Vector2.zero;
         placeTxtRT.anchorMax = Vector2.one;
@@ -848,50 +733,49 @@ public sealed class UI_GridPanel : UI_Base
     // Footer (50px 고정, 하단)
     private void BuildFooter()
     {
+        // 의뢰서 F4: 하단 보관함 5칸 고정. 슬롯 220×144 × 5 + 간격 → 1160×164, 가운데 정렬.
         var footerGO = Go("Footer");
         footerGO.transform.SetParent(transform, false);
         _footerRT = footerGO.GetComponent<RectTransform>();
         _footerRT.anchorMin        = new Vector2(0f, 0f);
         _footerRT.anchorMax        = new Vector2(1f, 0f);
-        _footerRT.sizeDelta        = new Vector2(0f, 50f);
-        _footerRT.anchoredPosition = new Vector2(0f, 25f);
-
+        _footerRT.sizeDelta        = new Vector2(0f, 180f);
+        _footerRT.anchoredPosition = new Vector2(0f, 90f);
         var footerBG = footerGO.AddComponent<Image>();
         footerBG.color = new Color(0.10f, 0.12f, 0.16f, 0.98f);
 
-        // 활성 시너지 텍스트 (좌측 69%)
-        var actGO = MakeTxt(footerGO.transform, "ActiveSyn",
-            "활성: —          미달성: —", 12f, new Color(0.75f, 0.88f, 1f, 1f));
-        var actRT = actGO.GetComponent<RectTransform>();
-        actRT.anchorMin = new Vector2(0f, 0f);
-        actRT.anchorMax = new Vector2(0.69f, 1f);
-        actRT.offsetMin = new Vector2(12f, 0f);
-        actRT.offsetMax = new Vector2(-4f, 0f);
+        var lblGO = MakeTxt(footerGO.transform, "StagingLabel", "보관함", 16f,
+            new Color(0.82f, 0.87f, 1f, 1f), bold: true);
+        var lblRT = lblGO.GetComponent<RectTransform>();
+        lblRT.anchorMin = new Vector2(0f, 1f);
+        lblRT.anchorMax = new Vector2(0f, 1f);
+        lblRT.pivot     = new Vector2(0f, 1f);
+        lblRT.anchoredPosition = new Vector2(16f, -6f);
+        lblRT.sizeDelta = new Vector2(200f, 22f);
+
+        // StagingAreaView는 콘텐츠 좌상단 기준으로 슬롯을 놓는다 — 바 가운데에 1160 폭 콘텐츠를 세운다.
+        var contentGO = Go("StagingBar");
+        contentGO.transform.SetParent(footerGO.transform, false);
+        var contentRT = contentGO.GetComponent<RectTransform>();
+        contentRT.anchorMin        = new Vector2(0.5f, 1f);
+        contentRT.anchorMax        = new Vector2(0.5f, 1f);
+        contentRT.pivot            = new Vector2(0f, 1f);
+        contentRT.anchoredPosition = new Vector2(-580f, -8f);
+        _stagingArea = footerGO.AddComponent<StagingAreaView>();
+        _stagingArea.SetSlotSkin(_stagingBgSprite, _stagingBorderSprite);   // 슬롯 빌드 전에 주입
+        _stagingArea.SetColumns(RunItemInventory.MaxStagingCapacity);        // 5열 1행
+        _stagingArea.Init(contentRT);
+
+        // 예전 푸터 텍스트(활성 시너지·중앙 보너스·셀 카운트)는 시너지 패널이 대신한다 — 만들되 숨긴다(RefreshFooter 참조 유지).
+        var actGO = MakeTxt(footerGO.transform, "ActiveSyn", "", 12f, Color.white);
         _footerActiveSynText = actGO.GetComponent<TMP_Text>();
-        _footerActiveSynText.textWrappingMode = TextWrappingModes.NoWrap;
-        _footerActiveSynText.alignment = TextAlignmentOptions.MidlineLeft;
-
-        // CENTER 보너스 표시 (중간 11%)
-        var centerGO = MakeTxt(footerGO.transform, "CenterBonus", "", 11f,
-            new Color(0.50f, 0.55f, 0.70f, 0.6f));
-        var centerRT = centerGO.GetComponent<RectTransform>();
-        centerRT.anchorMin = new Vector2(0.69f, 0f);
-        centerRT.anchorMax = new Vector2(0.82f, 1f);
-        centerRT.offsetMin = centerRT.offsetMax = Vector2.zero;
+        actGO.SetActive(false);
+        var centerGO = MakeTxt(footerGO.transform, "CenterBonus", "", 11f, Color.white);
         _footerCenterText = centerGO.GetComponent<TMP_Text>();
-        _footerCenterText.alignment         = TextAlignmentOptions.Center;
-        _footerCenterText.textWrappingMode = TextWrappingModes.NoWrap;
-
-        // 셀 카운트 (우측 18%)
-        var cntGO = MakeTxt(footerGO.transform, "CellCount", "0/20 셀 배치됨", 12f,
-            new Color(0.65f, 0.70f, 0.85f, 1f));
-        var cntRT = cntGO.GetComponent<RectTransform>();
-        cntRT.anchorMin = new Vector2(0.82f, 0f);
-        cntRT.anchorMax = new Vector2(1.00f, 1f);
-        cntRT.offsetMin = new Vector2(0f, 0f);
-        cntRT.offsetMax = new Vector2(-12f, 0f);
+        centerGO.SetActive(false);
+        var cntGO = MakeTxt(footerGO.transform, "CellCount", "", 12f, Color.white);
         _footerCellCountText = cntGO.GetComponent<TMP_Text>();
-        _footerCellCountText.alignment = TextAlignmentOptions.MidlineRight;
+        cntGO.SetActive(false);
     }
 
     // ── Confirm Dialog ──
@@ -1757,7 +1641,7 @@ public sealed class UI_GridPanel : UI_Base
         lblRT.sizeDelta = Vector2.zero;
         var txt = lblGO.AddComponent<TextMeshProUGUI>();
         txt.text          = label;
-        txt.fontSize      = 13f;
+        txt.fontSize      = 16f;
         txt.color         = Color.white;
         txt.alignment     = TextAlignmentOptions.Center;
         txt.raycastTarget = false;

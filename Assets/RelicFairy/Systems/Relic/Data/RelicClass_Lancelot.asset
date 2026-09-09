@@ -56,6 +56,8 @@ MonoBehaviour:
   rosterIllust: {fileID: 0}
   passives: []
   qSkillClipKey: 
+  qSkillMainState: RelicQ_Main
+  qSkillMainClipKey: 
   qSkillClipSequence:
   - stateName: RelicQ_Slash1
     clipKey: RelicQ_Slash1

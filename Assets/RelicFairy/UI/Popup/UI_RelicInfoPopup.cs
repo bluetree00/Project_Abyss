@@ -261,6 +261,23 @@ public class UI_RelicInfoPopup : UI_Popup
         {
             if (string.IsNullOrWhiteSpace(tags[i])) continue;
 
+            // 완성 칩 아트(아이콘+글자가 구워진 156×45)가 있는 태그는 그 한 장으로 끝낸다 —
+            // 바탕·글자를 얹으면 두 겹이 된다. 크기는 아트 비율로 고정(행 높이 45에 맞춤).
+            // 납품이 가웨인 3종뿐이라 다른 유물 태그는 아래 글자 칩으로 폴백한다.
+            var tagArt = _skin?.TagSprite(tags[i]);
+            if (tagArt != null)
+            {
+                var artChip = NewImage("Tag", _tagRow, Color.white);
+                artChip.sprite = tagArt;
+                artChip.preserveAspect = true;
+                var artLe = artChip.gameObject.AddComponent<LayoutElement>();
+                artLe.preferredHeight = 45f;
+                artLe.preferredWidth  = 45f * tagArt.rect.width / Mathf.Max(1f, tagArt.rect.height);
+                artLe.flexibleWidth   = 0f;
+                _spawned.Add(artChip.gameObject);
+                continue;
+            }
+
             var chip = NewImage("Tag", _tagRow, ChipBg);
             // 칩 폭은 글자 길이에 따라 변한다 — 9-slice로 늘리고, 아트는 자식으로 깐다.
             // (칩은 ContentSizeFitter로 글자 폭을 재는데, 스프라이트를 직접 넣으면
@@ -279,10 +296,10 @@ public class UI_RelicInfoPopup : UI_Popup
             fit.verticalFit   = ContentSizeFitter.FitMode.Unconstrained;
 
             var le = chip.gameObject.AddComponent<LayoutElement>();
-            le.preferredHeight = 24f;
+            le.preferredHeight = 28f;   // 16px 줄높이(≈21) + 위아래 3 — 24였을 땐 글자가 13.9까지 줄었다
             le.flexibleWidth   = 0f;
 
-            var t = NewText("T", chip.rectTransform, 15f, ChipText, FontStyles.Normal, TextAlignmentOptions.Center);
+            var t = NewText("T", chip.rectTransform, 16f, ChipText, FontStyles.Normal, TextAlignmentOptions.Center);
             t.text = tags[i];
             t.textWrappingMode = TextWrappingModes.NoWrap;
 
@@ -388,7 +405,7 @@ public class UI_RelicInfoPopup : UI_Popup
         name.text = a.name;
         name.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
-        var badge = NewText("Badge", head, 15f, BadgeColor, FontStyles.Normal, TextAlignmentOptions.MidlineRight);
+        var badge = NewText("Badge", head, 16f, BadgeColor, FontStyles.Normal, TextAlignmentOptions.MidlineRight);
         badge.text = string.IsNullOrWhiteSpace(a.badge) ? DefaultBadge(a.kind) : a.badge;
         badge.textWrappingMode = TextWrappingModes.NoWrap;
         badge.gameObject.AddComponent<LayoutElement>().flexibleWidth = 0f;

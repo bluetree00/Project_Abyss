@@ -65,6 +65,7 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
     public override void Init()
     {
         base.Init();
+        EnsureVeil();   // 팝업 공통 암막 — 반투명 판 뒤로 3D 씬 바닥 무늬가 비쳐 글자를 못 읽었다(2026-09-09 실측)
 
         if (openGridButton != null)
             openGridButton.onClick.AddListener(OnOpenGridClicked);
@@ -255,10 +256,11 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
 
         var style = EffectRowStyle.Default;
         style.fontAsset       = popupFont;
-        style.fontSize        = 14f;
+        style.fontSize        = 16f;   // 가독성 하한(2026-09-09)
         style.iconSize        = 18f;
         style.rowHeight       = 22f;
         style.usePrefixArrows = true;
+        style.wrap            = true;   // 판 폭 565px에 긴 효과 문장이 한 줄로 안 들어간다
         style.normalColor     = COLOR_NORMAL_FX;
         style.riskColor       = COLOR_RISK;
 
@@ -333,4 +335,13 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
         ItemRarity.Legendary => COLOR_LEGENDARY,
         _                    => COLOR_COMMON,
     };
+
+    /// <summary>다른 팝업(상점·정제소·룬 획득)과 같은 0.8 암막을 맨 뒤에 깐다. 저작 프리팹이라 코드로 보장한다.</summary>
+    private void EnsureVeil()
+    {
+        if (transform.Find("Veil") != null) return;
+        var veil = ShopUIStyle.MakeImage(transform, "Veil", ShopUIStyle.Veil, raycast: true);
+        ShopUIStyle.Stretch(veil.rectTransform);
+        veil.transform.SetAsFirstSibling();
+    }
 }

@@ -33,6 +33,37 @@ public sealed class HudBootstrapper : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 억제 해제 + 알파 페이드 인. <see cref="SetStartRoomSuppressed"/>(false)와 같은 표시 규칙(모드는 건드리지 않음)에
+    /// 알파만 0→1로 올린다 — 허브에서 검을 쥔 뒤 HUD 전체가 한 프레임에 튀어나오던 것을 없앤다.
+    /// 전투 진입용 <see cref="FadeInStartRoomAsync"/>와 달리 Combat 모드를 강제하지 않는다.
+    /// </summary>
+    public async Cysharp.Threading.Tasks.UniTask RevealStartRoomAsync(float duration)
+    {
+        var target = hudVisualRoot != null ? hudVisualRoot : presenter?.transform;
+        CanvasGroup cg = null;
+        if (target != null)
+        {
+            cg = target.GetComponent<CanvasGroup>();
+            if (cg == null) cg = target.gameObject.AddComponent<CanvasGroup>();
+            cg.alpha = 0f;   // 켜기 전에 투명 — 첫 프레임 팝 방지
+        }
+
+        SetStartRoomSuppressed(false);
+        if (cg == null) return;
+        if (duration <= 0f) { cg.alpha = 1f; return; }
+
+        float e = 0f;
+        while (e < duration)
+        {
+            if (cg == null) return;   // 씬 전환으로 파괴
+            e += Time.deltaTime;
+            cg.alpha = Mathf.Clamp01(e / duration);
+            await Cysharp.Threading.Tasks.UniTask.Yield();
+        }
+        if (cg != null) cg.alpha = 1f;
+    }
+
     /// <summary>HUD를 페이드로 표시(전투 진입 연출). 억제 해제 후 CanvasGroup 알파 0→1.</summary>
     public async Cysharp.Threading.Tasks.UniTask FadeInStartRoomAsync(float duration)
     {

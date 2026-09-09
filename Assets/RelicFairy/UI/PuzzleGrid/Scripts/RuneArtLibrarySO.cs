@@ -27,13 +27,24 @@ public sealed class RuneArtLibrarySO : ScriptableObject
     [SerializeField, Tooltip("등급별 룬 아트. 0=Common,1=Rare,2=Epic,3=Legendary,4=예비")]
     private Sprite[] gradeArt = new Sprite[5];
 
-    [SerializeField, Tooltip("등급별 룬 테두리. gradeArt와 동일 인덱스")]
+    // [미배선] 등급 테두리 — <see cref="GetBorder"/>를 호출하는 코드가 프로젝트에 하나도 없다.
+    // git 이력상 <b>한 번도 연결된 적이 없는</b> 예비 API다(끊긴 게 아니라 처음부터 안 썼다).
+    // 룬 아이콘에 등급 액자를 두르려던 흔적으로 보이며, 지금 등급은 아트 자체(룬1~5)로만 읽힌다.
+    // 배열과 아트는 남긴다 — 07-22 납품본이고 바탕화면 원본 폴더가 이미 정리돼 <b>백업이 없다</b>.
+    // 등급 액자를 살릴 거면 여기가 제자리고, 정말 버릴 거면 파일까지 같이 결정해야 한다.
+    [SerializeField, Tooltip("[미배선] 등급별 룬 테두리. gradeArt와 동일 인덱스. 호출처 0 — 예비 슬롯.")]
     private Sprite[] borderArt = new Sprite[5];
 
-    [SerializeField, Tooltip("속성별 룬 아트. ElementDef.Order(불/얼음/전기/풀/빛/어둠). 빈 칸은 null → 색 틴트 폴백.")]
+    // [비움] 속성별 룬 아트 — 2026-09-03 정리.
+    // 여기 있던 룬1~5는 <b>gradeArt와 똑같은 파일</b>을 속성 순서로 다시 담은 중복이었다.
+    // 같은 돌 한 장이 "불 속성"이자 "Common 등급"일 수는 없어 뜻이 갈렸고, 5장뿐이라 빛이 비어
+    // 빛 룬만 무늬 없는 등급석으로 떨어졌다. 지금은 08-28 납품 blockTile(6/6 완비)이
+    // 네 경로(판 블록·선택 팝업·대기열·보관함 정보판)를 모두 덮어 여긴 도달하지 않는다.
+    // 배열은 남겨 둔다 — 속성 전용 아트가 새로 납품되면 여기 채우는 것이 제자리다.
+    [SerializeField, Tooltip("[미사용] 속성별 룬 아트. 지금은 blockTile이 전 경로를 덮는다. 속성 전용 아트 납품 시 사용.")]
     private Sprite[] elementArt = new Sprite[6];
 
-    [SerializeField, Tooltip("속성별 룬 테두리. elementArt와 동일 인덱스.")]
+    [SerializeField, Tooltip("[미사용] 속성별 룬 테두리. GetBorderByElement를 읽는 곳이 없다.")]
     private Sprite[] elementBorder = new Sprite[6];
 
     [SerializeField, Tooltip("판 위 블록 칸 타일. ElementDef.Order(불/얼음/전기/풀/빛/어둠).\n" +

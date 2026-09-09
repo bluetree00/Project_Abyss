@@ -424,13 +424,16 @@ public sealed class IntroMordredDirector : MonoBehaviour
         var drifter = sword.GetComponentInParent<VoidDrifter>();
         if (drifter != null) drifter.enabled = false;
 
-        // 손의 검이 디졸브로 나타난다(장착 시 PlayerWeaponManager가 PlayAppear 재생).
-        await EquipToSlotAsync(player, namelessWeaponKey, MeleeSlot, setActive: true);
+        // 제단의 검이 흩어지는 동안 손의 검이 같은 안개로 맺힌다 — 넘겨받기.
+        // 예전엔 장착(불투명 기본 디졸브)이 끝난 '뒤에' 제단 검이 빠져, 두 자루가 잠시 같이 보였다.
+        // 둘 다 반투명 안개 머티리얼(M_NamelessFog)이라 DissolveEffect 대신 알파 페이드로 맞춘다.
+        var standFade = MaterialFade.FadeOutAsync(sword, swordHandOverDuration, ct);
 
-        // 제단의 검은 <b>머티리얼을 교체하지 않고</b> 알파만 낮추며 사라진다.
-        // DissolveEffect는 머티리얼을 통째로 갈아끼우는 방식이라, 반투명 안개 머티리얼
-        // (M_NamelessFog, alpha 0.32)에 씌우면 셰이더가 맞지 않아 핑크 잔상이 남는다.
-        await MaterialFade.FadeOutAsync(sword, swordHandOverDuration, ct);
+        MaterialFade.FadeInHandle handIn = null;
+        await EquipToSlotAsync(player, namelessWeaponKey, MeleeSlot, setActive: true,
+                               playAppear: false, beforeShow: go => handIn = MaterialFade.BeginFadeIn(go));
+        var handFade = handIn != null ? MaterialFade.FadeInAsync(handIn, swordHandOverDuration, ct) : UniTask.CompletedTask;
+        await UniTask.WhenAll(standFade, handFade);
 
         sword.SetActive(false);
         await DelaySafe(0.3f, ct);
@@ -671,7 +674,8 @@ public sealed class IntroMordredDirector : MonoBehaviour
     /// (<see cref="GameRunBootstrapper.EquipWeaponToPlayerAsync"/> — 애니 클립 프리로드 + 고정 슬롯)를 그대로 쓴다.
     /// AcquireWeaponAsync(key, autoEquip:false)는 소유 목록에만 넣고 슬롯 장착을 하지 않아 실제로 들리지 않는다.
     /// </summary>
-    private static async UniTask EquipToSlotAsync(PlayerController player, string weaponSOKey, int slotIndex, bool setActive)
+    private static async UniTask EquipToSlotAsync(PlayerController player, string weaponSOKey, int slotIndex, bool setActive,
+                                                  bool playAppear = true, Action<GameObject> beforeShow = null)
     {
         if (player == null || string.IsNullOrEmpty(weaponSOKey)) return;
 
@@ -682,7 +686,7 @@ public sealed class IntroMordredDirector : MonoBehaviour
             return;
         }
 
-        await GameRunBootstrapper.EquipWeaponToPlayerAsync(so, player, slotIndex, setActive);
+        await GameRunBootstrapper.EquipWeaponToPlayerAsync(so, player, slotIndex, setActive, playAppear, beforeShow);
     }
 
     /// <summary>원거리 무기 튜토리얼 — 멀린 내레이션 톤의 비차단 자막으로 순차 표시.</summary>

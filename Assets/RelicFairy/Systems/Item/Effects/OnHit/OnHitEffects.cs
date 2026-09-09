@@ -113,7 +113,7 @@ public sealed class TeleportSwapEffect : ItemEffectBase
 
 public sealed class HPRegenOnHitEffect : ItemEffectBase
 {
-    // 다단 히트로 매 타격마다 회복하는 과회복 방지 — 내부 쿨다운(value2초, 기본 0.5s).
+    // 다단 히트로 매 타격마다 쌓이는 것 방지 — 내부 쿨다운(value2초, 기본 0.5s).
     private const float DefaultCooldown = 0.5f;
     private float _cooldownEnd;
 
@@ -125,9 +125,12 @@ public sealed class HPRegenOnHitEffect : ItemEffectBase
         if (Time.time < _cooldownEnd) return;
 
         _cooldownEnd = Time.time + (_value2 > 0f ? _value2 : DefaultCooldown);
-        int heal = Mathf.Max(1, (int)_value);
-        ctx.Player.Heal(heal);
-        ItemGuide.Toast(ctx.Player.transform.position, $"회복 +{heal}");
+
+        // 적중 시 <b>회복</b>이었다 — 적을 때려 HP를 얻는 전형적인 흡혈이라 정책상 둘 수 없다.
+        // 흡수량은 그대로 두고 보호막으로 바꾼다(적에게서 가져오는 것 없음).
+        float amount = Mathf.Max(1f, _value);
+        ctx.Player.RuntimeStats.AddShield(amount);
+        ItemGuide.Toast(ctx.Player.transform.position, $"보호막 +{(int)amount}");
     }
 }
 

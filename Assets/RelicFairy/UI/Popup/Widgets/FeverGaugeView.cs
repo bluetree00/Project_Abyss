@@ -60,13 +60,13 @@ public sealed class FeverGaugeView : MonoBehaviour
         var view = rootRT.gameObject.AddComponent<FeverGaugeView>();
         var inner = frame.transform;
 
-        view._label = ShopUIStyle.MakeText(inner, "Label", 13f, FontStyles.Bold,
+        view._label = ShopUIStyle.MakeText(inner, "Label", 16f, FontStyles.Bold,
             TextAlignmentOptions.Left, ShopUIStyle.RarityGlow(ItemRarity.Legendary));
         ShopUIStyle.Anchor(view._label.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
             new Vector2(12f, -6f), new Vector2(90f, LabelH));
         view._label.text = "피버";
 
-        view._hint = ShopUIStyle.MakeText(inner, "Hint", 11.5f, FontStyles.Normal,
+        view._hint = ShopUIStyle.MakeText(inner, "Hint", 14f, FontStyles.Normal,
             TextAlignmentOptions.Right, ShopUIStyle.TextDim);
         ShopUIStyle.Anchor(view._hint.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
             new Vector2(-12f, -6f), new Vector2(size.x - 110f, LabelH));

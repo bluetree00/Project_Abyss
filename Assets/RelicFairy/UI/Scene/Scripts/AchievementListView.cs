@@ -103,7 +103,7 @@ public class AchievementListView : MonoBehaviour
         bar.anchorMin = new Vector2(0f, 1f);
         bar.anchorMax = new Vector2(1f, 1f);
         bar.pivot     = new Vector2(0.5f, 1f);
-        bar.sizeDelta = new Vector2(0f, 34f);
+        bar.sizeDelta = new Vector2(0f, 36f);
         bar.anchoredPosition = new Vector2(0f, 4f);
         bar.SetAsFirstSibling();
 
@@ -117,7 +117,7 @@ public class AchievementListView : MonoBehaviour
             chip.SetParent(bar, false);
             chip.anchorMin = chip.anchorMax = new Vector2(0f, 0.5f);
             chip.pivot     = new Vector2(0f, 0.5f);
-            chip.sizeDelta = new Vector2(w, 30f);
+            chip.sizeDelta = new Vector2(w, 32f);   // 의뢰서 03: 분류 칩 높이 32
             chip.anchoredPosition = new Vector2(x, 0f);
             x += w + 8f;
 
@@ -130,7 +130,7 @@ public class AchievementListView : MonoBehaviour
             txt.anchorMin = Vector2.zero; txt.anchorMax = Vector2.one;
             txt.offsetMin = Vector2.zero; txt.offsetMax = Vector2.zero;
             var tmp = txt.gameObject.AddComponent<TextMeshProUGUI>();
-            tmp.fontSize = 15f;
+            tmp.fontSize = 16f;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.raycastTarget = false;
             _chipLabel.Add(tmp);

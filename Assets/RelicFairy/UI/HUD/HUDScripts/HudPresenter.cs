@@ -530,10 +530,13 @@ public sealed class HudPresenter : MonoBehaviour
             view.CombatPanel.SetWeaponSlot(i, info);
         }
 
+        // 슬롯 모델: Q = 유물 고유(아이콘은 유물 SO에 아직 없어 뷰 폴백), E = 무기 skillE,
+        // R = 무기 skillQ(레거시 필드명 — ActSkillState.GetSkillSO와 동일 매핑).
+        // 예전엔 Q에 무기 skillQ 아이콘을 띄워 실제 발동(유물)과 어긋났고 R은 늘 비어 있었다.
         var current = _weaponManager.CurrentWeaponData;
-        view.CombatPanel.SetSkillIcon(SkillType.Q, current?.skillQIcon);
+        view.CombatPanel.SetSkillIcon(SkillType.Q, null);
         view.CombatPanel.SetSkillIcon(SkillType.E, current?.skillEIcon);
-        view.CombatPanel.SetSkillIcon(SkillType.R, current?.skillRIcon);
+        view.CombatPanel.SetSkillIcon(SkillType.R, current?.skillQIcon);
 
         // 스킬 없는 슬롯(무형검 등)은 잠금 표시. 무기 교체·진화 때마다 이 경로가 다시 돌아
         // 스킬이 생기면 자동으로 풀린다(별도 해제 처리 불필요).

@@ -28,13 +28,14 @@ public sealed class UI_Settings : MonoBehaviour
     // ── Constants ────────────────────────────────────────────
     private const int SortingOrder = UISortingOrder.SystemModalTop;
 
-    private const float PanelW = 1480f, PanelH = 620f;
+    private const float PanelW = 1480f, PanelH = 859f;   // 납품 판(bg 1498×869) 비율 — 620이면 아트가 1.38배 눌린다
     private const float SidePad = 40f, TopPad = 30f;
-    private const float RowH = 48f, RowGap = 6f;
-    private const float TitleH = 54f, SectionH = 34f, SectionGap = 14f;
+    private const float RowH = 60f, RowGap = 14f;   // 드롭다운 박스 아트 341×54가 들어가는 높이. 행 간격 74 ≈ 납품 구분선(작대기) 529/7
+    private const float TitleH = 54f, SectionH = 40f, SectionGap = 14f;
 
     private const float LabelW = 200f;
     private const float CtrlW  = 340f;
+    private const float DropdownH = 54f;   // 납품 펼치는 박스 341×54 — CtrlW 340과 1:1
     private const float ValueW = 110f;
 
     // 한 열 = 라벨 200 + 20 + 컨트롤 340 + 10 + 수치 110.
@@ -68,6 +69,7 @@ public sealed class UI_Settings : MonoBehaviour
 
     // ── Private ──────────────────────────────────────────────
     private GameObject _root;
+    private bool _builtWithSkin;   // Build() 시점에 UISkin.Settings가 있었는가
 
     private Slider _masterSlider, _bgmSlider, _sfxSlider, _uiSlider;
     private TMP_Text _masterValue, _bgmValue, _sfxValue, _uiValue;
@@ -165,6 +167,13 @@ public sealed class UI_Settings : MonoBehaviour
 
     private void OpenInternal()
     {
+        // 스킨은 앱 부트에서 fire-and-forget으로 로드된다(UISkin.PreloadAsync). 그 전에 열려 맨 판으로 구워졌다면
+        // 스킨이 도착한 뒤 첫 열기에서 한 번 다시 굽는다 — 안 그러면 세션 내내 맨 판으로 남는다.
+        if (_root != null && !_builtWithSkin && UISkin.Settings != null)
+        {
+            Destroy(_root);
+            _root = null;
+        }
         if (_root == null) Build();
 
         _entryGraphics = GraphicsQualitySettings.Capture();
@@ -354,6 +363,10 @@ public sealed class UI_Settings : MonoBehaviour
         _root = new GameObject("SettingsRoot", typeof(RectTransform), typeof(Canvas),
                                typeof(CanvasScaler), typeof(GraphicRaycaster));
         _root.transform.SetParent(transform, false);
+        // 호스트(@Popup)가 Canvas_Popup 아래라 이 캔버스는 중첩 캔버스다 — 중첩 캔버스는 화면 크기로 안 늘어나고
+        // 기본 100×100에 머문다. 그러면 판의 UIWindowFitter가 그 100×100에 맞춰 판을 94×39로 눌러 버린다.
+        // 부모 캔버스에 꽉 채워야 fitter가 화면 기준으로 판을 잡는다.
+        Stretch((RectTransform)_root.transform);
 
         var canvas = _root.GetComponent<Canvas>();
         canvas.renderMode      = RenderMode.ScreenSpaceOverlay;
@@ -372,6 +385,7 @@ public sealed class UI_Settings : MonoBehaviour
         Stretch(dim.rectTransform);
 
         var skin = UISkin.Settings;
+        _builtWithSkin = skin != null;
 
         var panel = NewImage("Panel", _root.transform, PanelBg);
         var prt = panel.rectTransform;
@@ -439,7 +453,21 @@ public sealed class UI_Settings : MonoBehaviour
     {
         NewLabel("Title", panel, "설정", 36f, TitleColor, new Vector2(0f, y - TitleH * 0.5f),
                  new Vector2(PanelW - SidePad * 2f, TitleH), TextAlignmentOptions.Center);
-        return y - TitleH - 6f;
+        float bottom = y - TitleH - 6f;
+        // 의뢰서 B1 「창 + 타이틀바(바 1)」 — 납품 상단 장식(1357×38)을 제목 바로 아래 원본 크기로 깐다.
+        var ornament = UISkin.Settings?.topOrnament;
+        if (ornament != null)
+        {
+            var img = NewImage("TitleOrnament", panel, Color.white);
+            img.sprite = ornament;
+            img.raycastTarget = false;
+            var rt = img.rectTransform;
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = new Vector2(0f, bottom - 19f);
+            rt.sizeDelta = new Vector2(1357f, 38f);
+            bottom -= 38f + 8f;
+        }
+        return bottom;
     }
 
     private static float AddSectionLabel(Transform panel, float cx, float y, string text)
@@ -487,7 +515,7 @@ public sealed class UI_Settings : MonoBehaviour
     {
         float cy = AddRowLabel(panel, cx, y, name, label);
 
-        dropdown = NewDropdown(panel, $"Dropdown_{name}", new Vector2(cx + CtrlDx, cy), new Vector2(CtrlW, 44f));
+        dropdown = NewDropdown(panel, $"Dropdown_{name}", new Vector2(cx + CtrlDx, cy), new Vector2(CtrlW, DropdownH));
 
         var list = new List<string>(options.Count);
         for (int i = 0; i < options.Count; i++)
@@ -526,7 +554,7 @@ public sealed class UI_Settings : MonoBehaviour
         float cy = AddRowLabel(panel, cx, y, "Resolution", "해상도");
 
         // 항목은 모니터가 보고하는 목록이라 RefreshFromSystems가 채운다.
-        _resolutionDropdown = NewDropdown(panel, "Dropdown_Resolution", new Vector2(cx + CtrlDx, cy), new Vector2(CtrlW, 44f));
+        _resolutionDropdown = NewDropdown(panel, "Dropdown_Resolution", new Vector2(cx + CtrlDx, cy), new Vector2(CtrlW, DropdownH));
         _resolutionDropdown.onValueChanged.AddListener(OnResolutionChanged);
 
         return y - RowH - RowGap;
@@ -541,7 +569,7 @@ public sealed class UI_Settings : MonoBehaviour
     /// </summary>
     private void AddBottomButtons(Transform panel)
     {
-        const float W = 240f, H = 60f, BottomPad = 28f, Gap = 24f;
+        const float W = 289f, H = 74f, BottomPad = 60f, Gap = 24f;   // 납품 적용/취소 버튼 289×74 원본 크기
 
         float cy = -PanelH * 0.5f + BottomPad + H * 0.5f;
         var skin = UISkin.Settings;
@@ -642,16 +670,16 @@ public sealed class UI_Settings : MonoBehaviour
             bg.color  = Color.white;
         }
         var bgRt = bg.rectTransform;
-        bgRt.anchorMin = new Vector2(0f, 0.25f);
-        bgRt.anchorMax = new Vector2(1f, 0.75f);
+        bgRt.anchorMin = new Vector2(0f, 0.1875f);
+        bgRt.anchorMax = new Vector2(1f, 0.8125f);
         bgRt.offsetMin = bgRt.offsetMax = Vector2.zero;
         bg.raycastTarget = false;
 
         var fillArea = new GameObject("Fill Area", typeof(RectTransform));
         fillArea.transform.SetParent(go.transform, false);
         var faRt = fillArea.GetComponent<RectTransform>();
-        faRt.anchorMin = new Vector2(0f, 0.25f);
-        faRt.anchorMax = new Vector2(1f, 0.75f);
+        faRt.anchorMin = new Vector2(0f, 0.1875f);
+        faRt.anchorMax = new Vector2(1f, 0.8125f);
         faRt.offsetMin = new Vector2(5f, 0f);
         faRt.offsetMax = new Vector2(-15f, 0f);
 
@@ -707,8 +735,8 @@ public sealed class UI_Settings : MonoBehaviour
     /// </summary>
     private static TMP_Dropdown NewDropdown(Transform parent, string name, Vector2 pos, Vector2 size)
     {
-        const float ItemH = 32f;
-        const float ListH = 168f;
+        const float ItemH = 47f;    // 납품 내부 박스 334×47
+        const float ListH = 234f;   // 납품 펼쳐진 박스 341×234
         const float Gap   = 2f;
 
         // 목록은 컨트롤 아래로 펼쳐지는 게 기본인데, 아래쪽 행에선 그러면 패널 밖으로 흘러나온다.
@@ -719,6 +747,13 @@ public sealed class UI_Settings : MonoBehaviour
         bool dropUp = pos.y - size.y * 0.5f - Gap - ListH < -PanelH * 0.5f;
 
         var bg = NewImage(name, parent, CtrlBg);
+        var skin = UISkin.Settings;
+        if (skin?.dropdownBox != null)
+        {
+            bg.sprite = skin.dropdownBox;   // 341×54, 박스 크기와 1:1이라 통짜
+            bg.type   = Image.Type.Simple;
+            bg.color  = Color.white;
+        }
         var rt = bg.rectTransform;
         rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = pos;
@@ -726,6 +761,16 @@ public sealed class UI_Settings : MonoBehaviour
 
         var caption = NewLabel("Label", bg.transform, string.Empty, 22f, LabelColor,
                                Vector2.zero, size, TextAlignmentOptions.Center);
+        if (skin?.dropdownArrow != null)
+        {
+            var arrow = NewImage("Arrow", bg.transform, Color.white);
+            arrow.sprite = skin.dropdownArrow;   // 18×12
+            arrow.raycastTarget = false;
+            var aRt = arrow.rectTransform;
+            aRt.anchorMin = aRt.anchorMax = aRt.pivot = new Vector2(1f, 0.5f);
+            aRt.anchoredPosition = new Vector2(-14f, 0f);
+            aRt.sizeDelta = new Vector2(18f, 12f);
+        }
 
         // ── Template (비활성) ──
         var template = new GameObject("Template", typeof(RectTransform), typeof(Image),
@@ -740,7 +785,9 @@ public sealed class UI_Settings : MonoBehaviour
         tRt.pivot     = new Vector2(0.5f, dropUp ? 0f : 1f);
         tRt.anchoredPosition = new Vector2(0f, dropUp ? Gap : -Gap);
         tRt.sizeDelta = new Vector2(0f, ListH);
-        template.GetComponent<Image>().color = PanelBg;
+        var tImg = template.GetComponent<Image>();
+        if (skin?.dropdownListBg != null) { tImg.sprite = skin.dropdownListBg; tImg.type = Image.Type.Simple; tImg.color = Color.white; }
+        else tImg.color = PanelBg;
 
         var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
         viewport.transform.SetParent(template.transform, false);
@@ -771,6 +818,7 @@ public sealed class UI_Settings : MonoBehaviour
         iRt.sizeDelta = new Vector2(0f, ItemH);
 
         var itemBg = NewImage("Item Background", item.transform, new Color(0.12f, 0.14f, 0.2f, 1f));
+        if (skin?.dropdownItem != null) { itemBg.sprite = skin.dropdownItem; itemBg.type = Image.Type.Simple; itemBg.color = Color.white; }
         Stretch(itemBg.rectTransform);
 
         var check = NewImage("Item Checkmark", item.transform, TitleColor);

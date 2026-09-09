@@ -35,6 +35,8 @@ public class UI_DialoguePopup : UI_Popup
     [Header("Text Box")]
     [SerializeField] private TextMeshProUGUI speakerNameText;
     [SerializeField] private TextMeshProUGUI bodyText;
+    [Tooltip("이름 옆 역할 태그(참고 이미지의 「작가」). 비어 있으면 숨긴다. 프리팹에 없으면 런타임에 만든다.")]
+    [SerializeField] private TextMeshProUGUI roleTagText;
 
     [Header("Advance")]
     [SerializeField] private Button advanceButton;
@@ -51,6 +53,11 @@ public class UI_DialoguePopup : UI_Popup
     [SerializeField] private string dragonName  = "화룡";
     [SerializeField] private string deathKnightName = "죽음의 기사";
 
+    [Header("Speaker Titles — 이름 옆 역할 태그")]
+    [Tooltip("DialogueSpeaker 순서(None·Merlin·Shadow·Lich·Mordred·Arthur·Knight·ForestGuardian·Dragon·DeathKnight). "
+             + "기획 문구가 오기 전까지 비워 둔다 — 빈 칸은 태그를 숨긴다.")]
+    [SerializeField] private string[] speakerTitles = new string[10];
+
     [Header("Typewriter")]
     [SerializeField, Min(0.01f)] private float charDelay = 0.03f;
 
@@ -65,6 +72,13 @@ public class UI_DialoguePopup : UI_Popup
     private bool _skipRequested;
     private UniTaskCompletionSource _advanceTcs;
 
+    // 이미지형 띠(참고 이미지 스타일) — 본문은 한 페이지에 두 줄까지, 진행 표식은 타자가 끝난 뒤 점멸.
+    private const int   MaxLinesPerPage = 2;
+    private const float HintBlinkPeriod = 0.8f;
+    private static readonly Color BandColor = new(0f, 0f, 0f, 0.65f);   // 암막 0.4 위에서 띠가 읽히는 값(실측 09-09)
+    private static readonly Color RoleTagColor = new(0.72f, 0.74f, 0.78f, 1f);
+    private TextMeshProUGUI _advanceHint;
+
     private readonly Dictionary<string, Sprite> _illustCache = new();
     private readonly List<Action> _releaseActions = new();
 
@@ -74,34 +88,85 @@ public class UI_DialoguePopup : UI_Popup
 
     public override void Init()
     {
+        // 열리는 순간부터 초상 슬롯은 투명 — 대사가 붙기 전 프리팹 기본(흰색·스프라이트 없음)이 흰 네모로 뜬다.
+        if (portrait != null) portrait.color = new Color(1f, 1f, 1f, 0f);
+
         base.Init();
         if (advanceButton != null)
             advanceButton.onClick.AddListener(OnAdvanceClicked);
 
         ApplySkin();
+        EnsureImageStyleNodes();
     }
 
     /// <summary>
-    /// 디자이너 아트를 프리팹 위에 얹는다. 스킨이 없으면 아무것도 하지 않아 지금 모습이 그대로 남는다.
-    ///
-    /// 대상은 <b>대사 상자와 그 장식뿐</b>이다:
-    ///  - AdvanceButton은 대사 상자를 그대로 덮는 1280×304 투명 클릭 캐처라 판을 입히면 대사가 가려진다.
-    ///  - Background는 전체화면 암막이라 대응 아트가 없다.
-    /// 상자는 화면 폭을 따라 늘어나므로 바탕은 반드시 9-slice로 넣는다.
+    /// 띠 바탕을 입힌다. 이미지형(2026-09-09): 액자·모서리·장식·이름 판은 프리팹에서 걷었고,
+    /// 남은 것은 <b>반투명 검은 띠 하나</b>다. 디자이너 띠 아트(<see cref="DialogueSkinSO.band"/>)가 있으면 그것을,
+    /// 없으면 코드가 만든 둥근 소프트 판을 9-slice로 깐다 — 아트 없이도 참고 이미지 모습이 나온다.
     /// </summary>
     private void ApplySkin()
     {
-        var skin = UISkin.Dialogue;
-        if (skin?.plate == null || bodyText == null) return;
+        if (bodyText == null) return;
+        if (!(bodyText.transform.parent is RectTransform box) || !box.TryGetComponent<Image>(out var band)) return;
 
-        // 상자 바탕만 갈아끼운다. <b>크기·장식은 프리팹이 정본</b>이다 —
-        // 예전엔 여기서 상자를 1280×304로 다시 잡고 모서리 4·가로 장식 2를 코드로 만들어 붙였다.
-        // 그래서 인스펙터에서 옮겨도 플레이하면 원위치였다. 그 여섯은 이제 TextBox의 실제 자식이다.
-        // 스킨을 갈아끼울 일이 남아 있어 바탕 한 장만 코드에 남긴다(미지정이면 프리팹 그대로).
-        if (bodyText.transform.parent is RectTransform box &&
-            box.TryGetComponent<Image>(out var plate))
-            ShopUIStyle.Skin(plate, skin.plate, sliced: true);
+        var art = UISkin.Dialogue?.band;
+        if (art != null)
+        {
+            ShopUIStyle.Skin(band, art, sliced: true);   // 색은 아트가 갖는다
+            return;
+        }
+        band.sprite = GetBandSprite();
+        band.type   = Image.Type.Sliced;
+        band.color  = BandColor;
     }
+
+    /// <summary>
+    /// 이미지형 띠에 필요한 노드 둘을 프리팹에 없으면 런타임에 만든다 —
+    /// 이름 옆 <b>역할 태그</b>(이름 폭에 따라 자리가 바뀌므로 코드가 놓는다)와 띠 우하단 <b>진행 표식</b>(▼).
+    /// </summary>
+    private void EnsureImageStyleNodes()
+    {
+        if (speakerNameText != null && roleTagText == null)
+        {
+            roleTagText = MakeLabel(speakerNameText.rectTransform, "RoleTag", 15f, RoleTagColor,
+                                    TextAlignmentOptions.MidlineLeft);
+            var rt = roleTagText.rectTransform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot     = new Vector2(0f, 0.5f);
+            rt.sizeDelta = new Vector2(240f, 24f);
+            roleTagText.gameObject.SetActive(false);
+        }
+
+        if (_advanceHint == null && bodyText != null && bodyText.transform.parent is RectTransform box)
+        {
+            _advanceHint = MakeLabel(box, "AdvanceHint", 12f, new Color(1f, 1f, 1f, 0.9f), TextAlignmentOptions.Center);
+            var rt = _advanceHint.rectTransform;
+            rt.anchorMin = rt.anchorMax = new Vector2(1f, 0f);
+            rt.pivot     = new Vector2(1f, 0f);
+            rt.anchoredPosition = new Vector2(-18f, 14f);
+            rt.sizeDelta = new Vector2(24f, 20f);
+            _advanceHint.text = "▼";   // 글리프 화이트리스트 안의 기호
+            _advanceHint.gameObject.SetActive(false);
+        }
+    }
+
+    private TextMeshProUGUI MakeLabel(RectTransform parent, string name, float size, Color color, TextAlignmentOptions align)
+    {
+        var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer));
+        go.transform.SetParent(parent, false);
+        var t = go.AddComponent<TextMeshProUGUI>();
+        if (bodyText != null && bodyText.font != null) t.font = bodyText.font;
+        t.fontSize = size;
+        t.color = color;
+        t.alignment = align;
+        t.raycastTarget = false;
+        t.textWrappingMode = TextWrappingModes.NoWrap;
+        t.overflowMode = TextOverflowModes.Overflow;
+        return t;
+    }
+
+    /// <summary>띠 바탕 — 공용 생성기(둥근 사각 반경 28 · 소프트 14 · 9-slice 42). 아트가 오면 <see cref="DialogueSkinSO.band"/>로 갈아끼운다.</summary>
+    private static Sprite GetBandSprite() => UIProceduralSprites.RoundedRect(radius: 28f, feather: 14f);
 
     private void Update()
     {
@@ -204,6 +269,12 @@ public class UI_DialoguePopup : UI_Popup
 
     private void ReleaseIllustrations()
     {
+        // 해제 전에 슬롯을 비운다 — 파괴된 스프라이트를 물고 있는 Image는 흰 사각형으로 그려진다.
+        if (portrait != null)
+        {
+            portrait.sprite = null;
+            portrait.color  = new Color(1f, 1f, 1f, 0f);
+        }
         foreach (var release in _releaseActions)
             release();
         _releaseActions.Clear();
@@ -215,16 +286,77 @@ public class UI_DialoguePopup : UI_Popup
         SetSpeakerName(line.speaker);
         ApplyIllustration(line.illustrationKey, ct);
 
-        if (bodyText != null)
-            bodyText.text = string.Empty;
+        // 띠에는 두 줄까지만 — 넘치는 문장은 같은 화자의 다음 페이지로 나눠 넘긴다.
+        var pages = SplitPages(line.text);
+        for (int p = 0; p < pages.Count; p++)
+        {
+            if (bodyText != null)
+                bodyText.text = string.Empty;
 
-        _isTyping = true;
-        _skipRequested = false;
-        _advanceTcs = new UniTaskCompletionSource();
+            _isTyping = true;
+            _skipRequested = false;
+            _advanceTcs = new UniTaskCompletionSource();
 
-        TypewriterAsync(line.text, ct).Forget();
+            TypewriterAsync(pages[p], ct).Forget();
+            BlinkHintAsync(_advanceTcs, ct).Forget();
 
-        await _advanceTcs.Task.AttachExternalCancellation(ct);
+            await _advanceTcs.Task.AttachExternalCancellation(ct);
+        }
+    }
+
+    /// <summary>
+    /// 본문을 <see cref="MaxLinesPerPage"/>줄 단위로 나눈다. 실제 폰트·폭으로 한 번 재서 3줄째 첫 글자에서 자른다.
+    /// (리치텍스트 태그가 페이지 경계를 걸치는 문장은 드물어 따로 닫지 않는다.)
+    /// </summary>
+    private List<string> SplitPages(string text)
+    {
+        var pages = new List<string>();
+        if (bodyText == null || string.IsNullOrEmpty(text)) { pages.Add(text ?? string.Empty); return pages; }
+
+        string rest = text;
+        for (int guard = 0; guard < 16 && !string.IsNullOrEmpty(rest); guard++)
+        {
+            bodyText.text = rest;
+            bodyText.maxVisibleCharacters = int.MaxValue;
+            bodyText.ForceMeshUpdate();
+            var info = bodyText.textInfo;
+            if (info.lineCount <= MaxLinesPerPage) { pages.Add(rest); break; }
+
+            int cutChar = info.lineInfo[MaxLinesPerPage].firstCharacterIndex;
+            int srcIdx  = cutChar > 0 && cutChar < info.characterCount ? info.characterInfo[cutChar].index : -1;
+            if (srcIdx <= 0 || srcIdx >= rest.Length) { pages.Add(rest); break; }
+
+            pages.Add(rest.Substring(0, srcIdx).TrimEnd());
+            rest = rest.Substring(srcIdx).TrimStart();
+        }
+        bodyText.text = string.Empty;
+        return pages;
+    }
+
+    /// <summary>타자가 끝난 뒤 띠 우하단 ▼가 0.8초 주기로 숨 쉰다 — 넘길 수 있다는 신호. 넘기면 꺼진다.</summary>
+    private async UniTaskVoid BlinkHintAsync(UniTaskCompletionSource page, CancellationToken ct)
+    {
+        if (_advanceHint == null) return;
+        try
+        {
+            while (_isTyping && page == _advanceTcs)
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            if (page != _advanceTcs) return;
+
+            _advanceHint.gameObject.SetActive(true);
+            float t = 0f;
+            while (page == _advanceTcs && page.Task.Status == UniTaskStatus.Pending)
+            {
+                t += Time.unscaledDeltaTime;
+                _advanceHint.alpha = 0.35f + 0.65f * (0.5f + 0.5f * Mathf.Sin(t * Mathf.PI * 2f / HintBlinkPeriod));
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (_advanceHint != null) _advanceHint.gameObject.SetActive(false);
+        }
     }
 
     private void ApplyIllustration(string key, CancellationToken ct)
@@ -252,6 +384,12 @@ public class UI_DialoguePopup : UI_Popup
         {
             portrait.sprite = sprite;
             FadeIllustrationAsync(ct).Forget();
+        }
+        else
+        {
+            // 키는 있는데 못 불러온 줄 — 이전 대사의 초상(해제돼 파괴된 스프라이트)이 남으면 흰 네모가 뜬다.
+            portrait.sprite = null;
+            portrait.color  = new Color(1f, 1f, 1f, 0f);
         }
     }
 
@@ -332,6 +470,24 @@ public class UI_DialoguePopup : UI_Popup
             DialogueSpeaker.DeathKnight    => deathKnightName,
             _                      => string.Empty,
         };
+        ApplyRoleTag(speaker);
+    }
+
+    /// <summary>이름 옆 역할 태그 — 이름 폭을 재서 오른쪽 8px, 기준선보다 6px 위에 놓는다. 문구가 없으면 숨긴다.</summary>
+    private void ApplyRoleTag(DialogueSpeaker speaker)
+    {
+        if (roleTagText == null || speakerNameText == null) return;
+
+        int idx = (int)speaker;
+        string title = speakerTitles != null && idx >= 0 && idx < speakerTitles.Length ? speakerTitles[idx] : null;
+        bool show = !string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(speakerNameText.text);
+        roleTagText.gameObject.SetActive(show);
+        if (!show) return;
+
+        roleTagText.text = title;
+        speakerNameText.ForceMeshUpdate();
+        float half = speakerNameText.preferredWidth * 0.5f;
+        roleTagText.rectTransform.anchoredPosition = new Vector2(half + 8f, 6f);
     }
 
     // ─────────────────────────────────────────────────────────

@@ -94,7 +94,7 @@ public class FocusShotBehaviorSO : SkillBehaviorSO
             ctx.RotateToMouse();
             ctx.SetMoveScale(0f);
 
-            _skillTier = Mathf.Clamp(ctx.WeaponData?.tier ?? 1, 1, 3);
+            _skillTier = ctx.SkillTier;
 
             // 티어별 설정: 높을수록 적은 발수, 높은 데미지, 큰 이펙트
             switch (_skillTier)
@@ -225,20 +225,29 @@ public class FocusShotBehaviorSO : SkillBehaviorSO
                 _data.arrowKey, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.LookRotation(dir));
             if (obj == null) return;
 
-            obj.transform.localScale = Vector3.one * scale;
+            if (!obj.TryGetComponent<BasicArrow>(out var arrow)) return;
 
-            if (obj.TryGetComponent<BasicArrow>(out var arrow))
-            {
-                arrow.Fire(dir, ctx.Controller.gameObject, dmg);
-                arrow.SetPierce(99);
+            // 기본공격과 같은 퍼널 — 파츠·아이템·방버프가 집중샷에도 얹힌다(분열이면 갈래가 늘고, 거력이면 더 굵어진다).
+            var req = ProjectileRequest.Create(_data.arrowKey, pos, dir, dmg, ctx.Controller.gameObject, ctx.SourceSlot, scale);
+            CombatSpawner.SpawnProjectile(ref req, arrow, extra => ApplyFocusExtras(extra, req, dmg));
+            obj.transform.localScale = Vector3.one * (scale * req.sizeMult);
+            ApplyFocusExtras(obj, req, dmg);
+        }
 
-                if (!string.IsNullOrEmpty(_data.projectileEffectKey))
-                    arrow.SetVisualEffect(_data.projectileEffectKey, _projectileScale);
+        /// <summary>집중샷 고유분 — 항상 관통, 비주얼, 3단계 추가 히트. 파츠와 겹치는 값은 큰 쪽.</summary>
+        private void ApplyFocusExtras(GameObject obj, in ProjectileRequest req, float dmg)
+        {
+            if (obj == null || !obj.TryGetComponent<BasicArrow>(out var arrow)) return;
 
-                // 3단계: 피격 시 추가 히트 이펙트
-                if (_skillTier >= 3 && !string.IsNullOrEmpty(_data.tier3ExtraHitKey))
-                    arrow.SetExplosion(2f, dmg * 0.3f, _data.tier3ExtraHitKey, _data.tier3ExtraHitScale);
-            }
+            arrow.SetPierce(Mathf.Max(99, req.pierce));
+
+            if (!string.IsNullOrEmpty(_data.projectileEffectKey))
+                arrow.SetVisualEffect(_data.projectileEffectKey, _projectileScale);
+
+            // 3단계: 피격 시 추가 히트 이펙트
+            if (_skillTier >= 3 && !string.IsNullOrEmpty(_data.tier3ExtraHitKey))
+                arrow.SetExplosion(Mathf.Max(2f, req.explodeRadius), dmg * req.damageMult * 0.3f,
+                    _data.tier3ExtraHitKey, _data.tier3ExtraHitScale);
         }
 
         private async void SpawnChargeEffect(SkillExecutionContext ctx)

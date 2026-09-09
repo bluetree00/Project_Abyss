@@ -134,19 +134,19 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 805511152fcf3a843acb075102b5761f, type: 3}
   - {fileID: 21300000, guid: 9df4baf787d9d424ab65a3819e890c4a, type: 3}
   elementArt:
-  - {fileID: 21300000, guid: a1d3f59b88d2cb24581c2103eb586af1, type: 3}
-  - {fileID: 21300000, guid: 6307f1c43beae894d8de368905fa9137, type: 3}
-  - {fileID: 21300000, guid: 73b2a914bc7a67e43ab04b6182b40707, type: 3}
-  - {fileID: 21300000, guid: 133df5ea363dad34c9bd526a800d2ac2, type: 3}
   - {fileID: 0}
-  - {fileID: 21300000, guid: 374ec8ccd23f96944b91bb689689cec3, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   elementBorder:
-  - {fileID: 21300000, guid: 7fd3871888c72e9498991cd1ad8eabfd, type: 3}
-  - {fileID: 21300000, guid: 1b46f308bae91064eaddafaf755013c3, type: 3}
-  - {fileID: 21300000, guid: 9df4baf787d9d424ab65a3819e890c4a, type: 3}
-  - {fileID: 21300000, guid: fb2abd701233bb04598d66b6a642a7bb, type: 3}
   - {fileID: 0}
-  - {fileID: 21300000, guid: 805511152fcf3a843acb075102b5761f, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   blockTile:
   - {fileID: 21300000, guid: d654ed05229ea1146a845502cffaf9fc, type: 3}
   - {fileID: 21300000, guid: 26d6099eba6066a488d5bd0b1cbc174c, type: 3}

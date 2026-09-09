@@ -36,6 +36,11 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
     // 이펙트가 판정보다 크면 "닿았는데 안 맞는다"는 체감이 생긴다.
     private const float JudgmentVfxScale     = 0.42f;   // 연타 1타분(작고 빠르게)
     private const float JudgmentFinisherVfx  = 1.5f;    // 마무리 강타 배수 → 0.63
+    /// <summary>
+    /// 막타 이펙트를 이만큼 미리 돌려놓고 켠다. Effect_36은 스폰 1.5초 뒤에 클라이맥스 버스트가 터지는데,
+    /// 막타는 '지금' 꽂히므로 그대로 두면 캐릭터가 자세를 푼 뒤에야 터진다(그리고 3초 소멸에 잘린다).
+    /// </summary>
+    private const float JudgmentFinisherVfxPrewarm = 1.2f;
 
     // 연타는 훑고, 마무리 한 방이 총 피해의 절반 가까이를 가져간다("몰아치다 마지막에 크게").
     private const float JudgmentFinisherShare = 0.45f;
@@ -151,11 +156,8 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         if (fwd.sqrMagnitude < 0.001f) return;
         fwd.Normalize();
 
-        if (isFirst)
-        {
-            GuidelineVisual.Cone(pos, fwd, JudgmentRange, JudgmentHalfAngle);
-            GuidelineVisual.Toast(pos + Vector3.up * 2.4f, "심판의 일격", GuidelineVisual.ToastKind.Relic);
-        }
+        // 판정 가이드라인(바닥 콘 + 스킬명 토스트)은 개발용 임시 표시라 제거했다.
+        // 범위는 참격 VFX가 이미 보여주고 있고, 겹쳐 그리면 화면만 지저분해진다.
 
         // 참격 VFX — 연타는 좌우로 각을 엇갈리고 높이를 바꿔 몰아치는 인상을 주고,
         // 마무리는 정면·크게 내리꽂아 한 방임을 읽히게 한다.
@@ -163,12 +165,14 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         float height = isLast ? 0.9f : 0.55f + 0.12f * (hitIndex % 3);
         float scale  = JudgmentVfxScale * (isLast ? JudgmentFinisherVfx : 1f);
         Vector3 vfxDir = Quaternion.AngleAxis(yaw, Vector3.up) * fwd;
-        RelicStateVfx.PlayOneShot(JudgmentVfxKey, pos + vfxDir * 2f + Vector3.up * height, scale, vfxDir);
+        RelicStateVfx.PlayOneShot(JudgmentVfxKey, pos + vfxDir * 2f + Vector3.up * height, scale, vfxDir,
+                                  isLast ? JudgmentFinisherVfxPrewarm : 0f);
 
         var owner  = _owner.gameObject;
         var buffer = new List<GameObject>(16);
         // 몬스터로 좁히지 않고 IDamageable 전체를 잡는다 — 그래야 훈련용 허수아비에도 들어간다.
-        int found  = CombatQuery.GetDamageablesInCone(pos, fwd, JudgmentRange, JudgmentHalfAngle, owner, 32, buffer);
+        int found  = CombatQuery.GetDamageablesInCone(pos, fwd, JudgmentRange, JudgmentHalfAngle, owner, 32, buffer,
+                                              showGuide: false);   // 참격 VFX가 범위를 보여준다
 
         RFLog.D($"[랜슬롯Q] {hitIndex + 1}/{hitCount}타{(isLast ? " (마무리)" : "")} | 피해 {dmg:F0} | 적중 {found}");
 

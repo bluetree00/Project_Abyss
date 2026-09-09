@@ -14,7 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MainWeaponSO
   weaponDisplayKey: T0_Nameless_Display
   weaponPrefabKey: T0_Nameless_Weapon
-  displayName: "무명의 형상"
+  displayName: "\uBB34\uBA85\uC758 \uD615\uC0C1"
+  tagline: 
+  uiThemeColor: {r: 0, g: 0, b: 0, a: 0}
   iconKey: T1_KatanaIcon
   icon: {fileID: 21300000, guid: 2e8414774381f0444805c23b0d8bf7a8, type: 3}
   tier: 1
@@ -33,8 +35,8 @@ MonoBehaviour:
   trailVfxPrefab: {fileID: 0}
   weaponType: 4
   evolution: {fileID: 11400000, guid: d304dc9e4d717bf4e883f9568f239aae, type: 2}
-  skillQ: {fileID: 0}
-  skillE: {fileID: 0}
+  skillQ: {fileID: 11400000, guid: d4501dced9b3c6e4bb517348f3432141, type: 2}
+  skillE: {fileID: 11400000, guid: 149bd3563a448c24da7eb4e4a8f8a5e3, type: 2}
   holdThreshold: 1.2
   promoteMode: 0
   chargeStages: 2

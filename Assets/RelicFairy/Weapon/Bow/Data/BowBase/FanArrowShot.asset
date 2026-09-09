@@ -16,7 +16,7 @@ MonoBehaviour:
   spreadAngle: 60
   arrowKey: Basic_Arrow_01
   baseDamagePerArrow: 25
-  fireDelay: 0.2
+  fireDelay: 0.55
   forwardOffset: 1
   upOffset: 1
   pierceMaxCount: 5
@@ -32,5 +32,5 @@ MonoBehaviour:
   tier3ExtraHitScale: 1.5
   muzzleEffectKey: BowEMuzzleFlash
   muzzleEffectScale: 1
-  endDelay: 0.3
+  endDelay: 0.45
   animationOverride:

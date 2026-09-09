@@ -184,9 +184,12 @@ public sealed class DarkAbyssEffect : DarkRuneEffectBase
         int pick = Random.Range(0, 4);
         switch (pick)
         {
-            case 0: // 회복(최대HP 5%) — 즉발
-                int heal = Mathf.RoundToInt(player.RuntimeStats.MaxHp * 0.05f);
-                if (heal > 0) player.Heal(heal);
+            case 0: // 보호막(최대HP 5%) — 즉발
+                // 예전엔 같은 5%를 <b>회복</b>으로 줬는데, 이 프로젝트는 흡혈·회복 계열을 두지 않는다
+                // (맞고 회복하는 방어가 서면 "안 맞는 플레이"와 다른 방어 선택지의 값이 사라진다).
+                // 흡수량은 그대로 두고 성질만 바꾼다 — 적에게서 가져오는 것 없이 내 조건으로만 선다.
+                float shield = player.RuntimeStats.MaxHp * 0.05f;
+                if (shield > 0f) player.RuntimeStats.AddShield(shield);
                 break;
 
             case 1: // 주변 몹 방어 감소(받피 증폭) — 즉발

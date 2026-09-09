@@ -65,6 +65,36 @@ public static class RuneArt
     public static Sprite GetBorderByElement(string elementId) => _lib != null ? _lib.GetBorderByElement(ElementIndex(elementId)) : null;
 
     /// <summary>
+    /// 이 룬의 <b>대표 문양</b> — 기능(effect_type) → 등급 → 속성 순으로 떨어진다.
+    ///
+    /// <para>같은 룬이 화면마다 다른 얼굴이면 안 되므로 순서를 여기 한 곳에만 둔다.
+    /// 실제로 획득 팝업만 기능 문양을 쓰고 대기열은 등급 아트에서 시작해,
+    /// 「전투력의 룬」이 팝업에선 칼날인데 배치 화면에선 돌 각인석으로 보였다.</para>
+    /// </summary>
+    public static Sprite ResolveRuneIcon(RuntimeItemData data)
+    {
+        if (data == null) return null;
+        var art = GetIconByEffect(EffectTypeOf(data));
+        if (art == null) art = GetArt(data.rarity);
+        if (art == null) art = GetArtByElement(data.element);
+        return art;
+    }
+
+    /// <summary>
+    /// 룬의 기능 키. 효과 정본은 ITEM_DATA라 거기서 첫 <c>effect_type</c>을 읽는다.
+    /// 한 룬이 여러 슬롯을 가질 수 있는데 문양은 <b>대표 효과</b> 하나로 정한다.
+    /// </summary>
+    public static string EffectTypeOf(RuntimeItemData data)
+    {
+        if (data == null || string.IsNullOrEmpty(data.itemId)) return null;
+        var entries = Managers.ItemData?.GetItem(data.itemId);
+        if (entries == null) return null;
+        for (int i = 0; i < entries.Count; i++)
+            if (!string.IsNullOrEmpty(entries[i].effect_type)) return entries[i].effect_type;
+        return null;
+    }
+
+    /// <summary>
     /// 룬 한 칸의 겉모습(각인석 스프라이트 + 틴트)을 정하는 <b>단일 창구</b>.
     ///
     /// 속성 전용 각인석이 있으면 이미 그 속성색으로 채색돼 있으므로 흰색으로 둔다.

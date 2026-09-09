@@ -41,7 +41,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
     private static readonly Color C_COVENANT    = new(1.00f, 0.80f, 0.25f, 1f);
 
     // BottomBar 높이(px). ApplyRightPanelLayout과 동일값 유지.
-    private const float BOTTOM_BAR_PX = 150f;
+    private const float BOTTOM_BAR_PX = 0f;
 
     // ── Private fields ────────────────────────────────────────────
     private Image      _portraitImg;
@@ -192,7 +192,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         _portraitImg.preserveAspect = true;
 
         // 캐릭터 이름 (굵게)
-        _nameText = Txt(go.transform, "CharName", "—", 14f, C_HDR_TXT, bold: true);
+        _nameText = Txt(go.transform, "CharName", "—", 18f, C_HDR_TXT, bold: true);
         var nrt = _nameText.GetComponent<RectTransform>();
         nrt.anchorMin = new Vector2(0f, 0.45f);
         nrt.anchorMax = new Vector2(1f, 1f);
@@ -201,7 +201,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         _nameText.alignment = TextAlignmentOptions.MidlineLeft;
 
         // 부제 (클래스 등 보조 정보)
-        var subTxt = Txt(go.transform, "SubInfo", "캐릭터 정보", 9.5f, C_SUB_TXT);
+        var subTxt = Txt(go.transform, "SubInfo", "캐릭터 정보", 16f, C_SUB_TXT);
         var srt2 = subTxt.GetComponent<RectTransform>();
         srt2.anchorMin = new Vector2(0f, 0f);
         srt2.anchorMax = new Vector2(1f, 0.52f);
@@ -221,13 +221,13 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         sec.AddComponent<Image>().color = C_SECTION_BG;
 
         // "HP" 레이블
-        var lbl = Txt(sec.transform, "HPLabel", "HP", 9f, C_LBL);
+        var lbl = Txt(sec.transform, "HPLabel", "HP", 16f, C_LBL);
         Anc(lbl.GetComponent<RectTransform>(),
             new Vector2(0.04f, 0.55f), new Vector2(0.18f, 1f));
         lbl.alignment = TextAlignmentOptions.MidlineLeft;
 
         // HP 수치 텍스트
-        _hpText = Txt(sec.transform, "HPValue", "— / —", 10.5f, C_VAL, bold: true);
+        _hpText = Txt(sec.transform, "HPValue", "— / —", 16f, C_VAL, bold: true);
         Anc(_hpText.GetComponent<RectTransform>(),
             new Vector2(0.18f, 0.52f), new Vector2(0.97f, 1f));
         _hpText.alignment = TextAlignmentOptions.MidlineRight;
@@ -291,13 +291,13 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         strip.AddComponent<Image>().color = accent;
 
         // 레이블 (상단, 흐릿하게)
-        var lblT = Txt(card.transform, "Label", label, 9f, C_LBL);
+        var lblT = Txt(card.transform, "Label", label, 16f, C_LBL);
         Anc(lblT.GetComponent<RectTransform>(),
             new Vector2(0.14f, 0.52f), new Vector2(0.98f, 0.98f));
         lblT.alignment = TextAlignmentOptions.MidlineLeft;
 
         // 수치 (하단, 크고 밝게)
-        var valT = Txt(card.transform, "Value", "—", 15f, C_VAL, bold: true);
+        var valT = Txt(card.transform, "Value", "—", 18f, C_VAL, bold: true);
         Anc(valT.GetComponent<RectTransform>(),
             new Vector2(0.12f, 0.04f), new Vector2(0.98f, 0.56f));
         valT.alignment = TextAlignmentOptions.MidlineLeft;
@@ -323,10 +323,11 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         // 헤더 바
         var hdr = Go("EffectsHdr");
         hdr.transform.SetParent(parent, false);
+        // 16px 한 줄(줄높이 ≈21)이 들어가게 띠를 0.046(≈21px)로 — 예전 0.032(≈14px)는 글자가 잘렸다.
         Anc(hdr.GetComponent<RectTransform>(),
-            new Vector2(0f, 0.356f), new Vector2(1f, 0.388f));
+            new Vector2(0f, 0.346f), new Vector2(1f, 0.392f));
         hdr.AddComponent<Image>().color = C_SECTION_BG;
-        var hdrTxt = Txt(hdr.transform, "Title", "◆ 활성 효과", 10f, C_HDR_TXT);
+        var hdrTxt = Txt(hdr.transform, "Title", "◆ 활성 효과", 16f, C_HDR_TXT);
         Anc(hdrTxt.GetComponent<RectTransform>(),
             new Vector2(0.04f, 0f), new Vector2(1f, 1f));
         hdrTxt.alignment = TextAlignmentOptions.MidlineLeft;
@@ -335,7 +336,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         var scrollGO = Go("EffectsScroll");
         scrollGO.transform.SetParent(parent, false);
         Anc(scrollGO.GetComponent<RectTransform>(),
-            Vector2.zero, new Vector2(1f, 0.354f));
+            Vector2.zero, new Vector2(1f, 0.346f));
         scrollGO.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.06f);
         var mask = scrollGO.AddComponent<RectMask2D>();
         mask.padding = new Vector4(0f, 4f, 0f, 4f);
@@ -535,7 +536,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         _chipAccentBar.raycastTarget = false;
 
         // 배지 (상단 절반)
-        _chipTooltipBadge = Txt(_chipTooltip.transform, "Badge", "", 13f,
+        _chipTooltipBadge = Txt(_chipTooltip.transform, "Badge", "", 16f,
             new Color(0.80f, 0.92f, 1f, 1f), bold: true);
         var brt = _chipTooltipBadge.GetComponent<RectTransform>();
         brt.anchorMin = new Vector2(0f, 0.52f);
@@ -555,7 +556,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         divGO.AddComponent<Image>().color = new Color(0.35f, 0.48f, 0.75f, 0.50f);
 
         // 본문 텍스트 (하단 절반)
-        _chipTooltipBody = Txt(_chipTooltip.transform, "Body", "", 15f,
+        _chipTooltipBody = Txt(_chipTooltip.transform, "Body", "", 16f,
             new Color(0.96f, 0.98f, 1f, 1f));
         var trt = _chipTooltipBody.GetComponent<RectTransform>();
         trt.anchorMin = Vector2.zero;
@@ -644,7 +645,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         blrt.offsetMin = blrt.offsetMax = Vector2.zero;
         var badgeTxt = badgeLblGO.AddComponent<TextMeshProUGUI>();
         badgeTxt.text          = badge;
-        badgeTxt.fontSize      = 10f;
+        badgeTxt.fontSize      = 12f;
         badgeTxt.color         = accent;
         badgeTxt.alignment     = TextAlignmentOptions.Center;
         badgeTxt.raycastTarget = false;
@@ -656,7 +657,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
             new Vector2(0.08f, 0f), new Vector2(0.72f, 1f));
         var bodyTxt = bodyGO.AddComponent<TextMeshProUGUI>();
         bodyTxt.text = body;
-        bodyTxt.fontSize = 11.5f;
+        bodyTxt.fontSize = 14f;
         bodyTxt.color = new Color(
             Mathf.Clamp01(accent.r * 0.65f + 0.35f),
             Mathf.Clamp01(accent.g * 0.65f + 0.35f),
@@ -689,7 +690,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         go.AddComponent<LayoutElement>().preferredHeight = 32f;
         var txt = go.AddComponent<TextMeshProUGUI>();
         txt.text          = "효과 없음";
-        txt.fontSize      = 10f;
+        txt.fontSize      = 12f;
         txt.color         = new Color(0.38f, 0.42f, 0.52f, 0.7f);
         txt.alignment     = TextAlignmentOptions.Center;
         txt.raycastTarget = false;

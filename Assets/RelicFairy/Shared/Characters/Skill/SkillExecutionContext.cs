@@ -23,6 +23,12 @@ public class SkillExecutionContext
     public WeaponEffectHandler EffectHandler => Controller.EffectHandler;
     public PlayerRuntimeStats RuntimeStats => Controller.RuntimeStats;
 
+    /// <summary>스킬 단계(1~3). 정적 tier가 아니라 강화(근접)·파츠(원거리)에서 파생 — <see cref="SkillTierResolver"/>.</summary>
+    public int SkillTier => SkillTierResolver.Resolve(WeaponData);
+
+    /// <summary>이 스킬을 쏜 무기 슬롯. 투사체 퍼널(<see cref="CombatSpawner"/>)의 파츠 스코프 게이트에 쓴다.</summary>
+    public int SourceSlot => Controller?.WeaponManager?.CurrentSlotIndex ?? 0;
+
     public void RotateToMouse() => Controller.RotateTowardsMousePosition();
     public void SetMoveScale(float s) => Controller.SetMoveScale(s);
 

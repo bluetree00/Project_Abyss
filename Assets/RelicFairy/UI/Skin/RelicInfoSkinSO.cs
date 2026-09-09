@@ -25,6 +25,18 @@ public sealed class RelicInfoSkinSO : ScriptableObject
     [Tooltip("태그 칩 바탕. 칩 폭이 글자 길이에 따라 변하므로 좌우 9-slice 필수.")]
     public Sprite tagChip;
 
+    /// <summary>태그 문자열 → 완성 칩 아트(아이콘+글자가 구워진 156×45). 일치하는 태그만 아트를 쓴다.</summary>
+    [System.Serializable]
+    public struct TagArt
+    {
+        [Tooltip("RelicClassSO.tags의 문자열과 정확히 같아야 한다(공백 포함).")]
+        public string tag;
+        public Sprite sprite;
+    }
+
+    [Tooltip("완성본 칩 아트. 납품은 가웨인 3종(시간 순환·버스트 구간·화상)뿐이라 다른 유물 태그는 tagChip 위 글자로 폴백한다.")]
+    public TagArt[] tagArts = new TagArt[0];
+
     [Header("능력 카드")]
     [Tooltip("고유(스킬) 카드 바탕 — 팝업에서 가장 큰 강조 칸.")]
     public Sprite uniqueCard;
@@ -42,6 +54,15 @@ public sealed class RelicInfoSkinSO : ScriptableObject
     [Header("버튼 (글자가 아트에 구워져 있다 — 코드 라벨을 겹치면 안 된다)")]
     public Sprite selectButton;
     public Sprite cancelButton;
+
+    /// <summary>태그 문자열에 맞는 완성 칩 아트. 없으면 null → 호출측이 tagChip + 글자로 폴백한다.</summary>
+    public Sprite TagSprite(string tag)
+    {
+        if (tagArts == null || string.IsNullOrEmpty(tag)) return null;
+        for (int i = 0; i < tagArts.Length; i++)
+            if (tagArts[i].sprite != null && tagArts[i].tag == tag) return tagArts[i].sprite;
+        return null;
+    }
 
     /// <summary>상시 능력 칸 아트. 범위를 넘으면 마지막 것을 돌려준다(칸 수가 유물마다 다르다).</summary>
     public Sprite PassivePlate(int index)

@@ -93,6 +93,7 @@ public class UI_AwakeningPanel : UI_Popup
 
     private static readonly Color BannerFill = new(0.09f, 0.08f, 0.07f, 0.94f);
     private const float BannerY = -18f;
+    private const float RowSpacing = 22f;   // 열 VLG spacing — 와이어프레임 행 간격
 
     private RectTransform _banner;
     private CanvasGroup   _bannerGroup;
@@ -144,10 +145,23 @@ public class UI_AwakeningPanel : UI_Popup
         {
             closeButton.onClick.AddListener(OnCloseClicked);
 
-            // 「ESC 닫기」 안내는 별도 라벨이던 것을 버튼 안으로 합쳤다 —
-            // 둘 다 우상단 앵커라 y -110 / -114로 4px 차이에 포개져 있었다.
+            // 「ESC 닫기」 안내(Txt_CloseHint)는 버튼의 <b>자식</b>이다(09-09 프리팹). 형제였을 땐 이 탐색이 비어
+            // 프리팹 글자(어두운 4E4A61)가 판 위에 묻혀 있었다.
             var label = closeButton.GetComponentInChildren<TMP_Text>(true);
-            if (label != null) label.text = "닫기  ESC";
+            if (label != null)
+            {
+                label.text      = "닫기  ESC";
+                label.alignment = TextAlignmentOptions.Center;
+                label.color     = AltarPalette.TextPrimary;
+            }
+
+            // 와이어프레임(09-09): 우상단 닫기는 글자만이 아니라 <b>둥근 판 버튼</b>이다. 아트 없이 코드 판으로.
+            if (closeButton.TryGetComponent<Image>(out var closeImg))
+            {
+                closeImg.sprite = UIProceduralSprites.RoundedRect(radius: 8f, feather: 2f);
+                closeImg.type   = Image.Type.Sliced;
+                closeImg.color  = new Color(0.16f, 0.16f, 0.18f, 1f);
+            }
         }
         if (actionButton != null) actionButton.onClick.AddListener(OnActionClicked);
 
@@ -163,6 +177,12 @@ public class UI_AwakeningPanel : UI_Popup
         }
 
         BuildColumns();
+
+        // 납품 하단바(853×106)를 ActionBar 바탕에 깐다 — 합성본(업적3)의 「받아갈 것이 N개 있다」 띠.
+        // 띠가 판 폭을 따라 늘어나므로 가로 9-slice(좌우 24, SkinArtImporter)로 둥근 끝만 지킨다.
+        if (transform.Find("Panel_Main/ActionBar") is RectTransform actionBar &&
+            actionBar.TryGetComponent<Image>(out var actionBarImage))
+            ShopUIStyle.Skin(actionBarImage, UISkin.Achievement?.bottomBar, sliced: true);
 
         // 폐기된 각성 6계열에 쓴 정수를 되돌린다(1회성). 제단을 여는 시점엔 비용표 로드가 끝나 있다.
         if (!readOnly && MemoryAltarService.TryRefundLegacyAwakening() > 0)
@@ -244,7 +264,7 @@ public class UI_AwakeningPanel : UI_Popup
     private void SetMode(bool achievements)
     {
         _achievementMode = achievements;
-
+        LayoutActionBar(achievements);
         if (unlockRoot)      unlockRoot.SetActive(!achievements);
         if (achievementRoot) achievementRoot.SetActive(achievements);
 
@@ -337,12 +357,12 @@ public class UI_AwakeningPanel : UI_Popup
 
         var label = new GameObject("Txt_NextGoal", typeof(RectTransform)).GetComponent<RectTransform>();
         label.SetParent(parent, false);
-        CopyAnchors(anchor, label, yOffset: -56f, height: 20f);
+        CopyAnchors(anchor, label, yOffset: -56f, height: 22f);   // 16px 줄 높이(20.6)가 들어가야 자동 축소가 안 걸린다
         nextGoalText = label.gameObject.AddComponent<TextMeshProUGUI>();
-        nextGoalText.fontSize = 15f;
+        nextGoalText.fontSize = 16f;
         // 글자가 판 밖으로 나가지 않게 — 최대는 설계 크기로 묶으므로 커지지 않고, 안 들어갈 때만 줄어든다.
         nextGoalText.enableAutoSizing = true;
-        nextGoalText.fontSizeMax = 15f;
+        nextGoalText.fontSizeMax = 16f;
         nextGoalText.fontSizeMin = 10f;
         nextGoalText.alignment = TextAlignmentOptions.Right;
         nextGoalText.color = AltarPalette.TextDim;
@@ -517,6 +537,48 @@ public class UI_AwakeningPanel : UI_Popup
         if (actionCondition) actionCondition.text = cond;
     }
 
+    /// <summary>
+    /// 하단 행동 바의 두 얼굴. 업적 탭 = 의뢰서 02(띠 126 · 두 줄 + 큰 버튼). 해금 탭 = 와이어프레임(09-09):
+    /// 얇은 띠 66 · 「이름  변화」 한 줄 + 조건 한 줄 · 오른쪽 작은 주황 버튼 176×46. 열 폭(0.049~0.958)과 맞춘다.
+    /// </summary>
+    private void LayoutActionBar(bool achievements)
+    {
+        if (!(transform.Find("Panel_Main/ActionBar") is RectTransform bar)) return;
+        static void Anc(Component c, float x0, float y0, float x1, float y1)
+        {
+            if (c == null) return;
+            var rt = (RectTransform)c.transform;
+            rt.anchorMin = new Vector2(x0, y0); rt.anchorMax = new Vector2(x1, y1);
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+        }
+
+        if (achievements)
+        {
+            bar.anchorMin = new Vector2(0f, 0f); bar.anchorMax = new Vector2(1f, 0f);
+            bar.anchoredPosition = new Vector2(0f, 26f); bar.sizeDelta = new Vector2(-88f, 126f);
+            Anc(actionName,      0.0177f, 0.587f, 0.643f, 0.841f);
+            Anc(actionDesc,      0.0177f, 0.381f, 0.643f, 0.571f);
+            Anc(actionCondition, 0.0177f, 0.175f, 0.643f, 0.349f);
+            Anc(actionButton,    0.799f,  0.222f, 0.982f, 0.778f);
+            if (actionName) actionName.fontSize = 22f;
+            if (actionDesc) actionDesc.color = AltarPalette.TextPrimary;
+        }
+        else
+        {
+            bar.anchorMin = new Vector2(0.049f, 0f); bar.anchorMax = new Vector2(0.958f, 0f);
+            bar.anchoredPosition = new Vector2(0f, 65f); bar.sizeDelta = new Vector2(0f, 66f);
+            Anc(actionName,      0.016f, 0.50f, 0.34f, 0.95f);
+            Anc(actionDesc,      0.34f,  0.50f, 0.84f, 0.95f);
+            Anc(actionCondition, 0.016f, 0.05f, 0.84f, 0.48f);
+            Anc(actionButton,    0.868f, 0.14f, 0.984f, 0.86f);
+            if (actionName) actionName.fontSize = 20f;
+            if (actionDesc) actionDesc.color = AltarPalette.Gold;   // 「변화」는 이 화면의 값이다
+        }
+        if (actionName)      actionName.alignment      = TextAlignmentOptions.MidlineLeft;
+        if (actionDesc)      actionDesc.alignment      = TextAlignmentOptions.MidlineLeft;
+        if (actionCondition) actionCondition.alignment = TextAlignmentOptions.MidlineLeft;
+    }
+
     private void SetActionButton(bool enabled, string label, string sub)
     {
         bool usable = enabled && !readOnly;
@@ -528,11 +590,15 @@ public class UI_AwakeningPanel : UI_Popup
             actionButtonLabel.text  = readOnly && enabled ? "제단에서 해금" : label;
             actionButtonLabel.color = usable ? AltarPalette.OnGold : AltarPalette.TextDim;
         }
+        // 해금 탭의 얇은 바(66px)엔 버튼 부제가 들어갈 자리가 없다 — 조건 줄 끝에 붙인다.
+        bool subOnButton = _achievementMode && !string.IsNullOrEmpty(sub);
         if (actionButtonSub)
         {
-            actionButtonSub.gameObject.SetActive(!string.IsNullOrEmpty(sub));
+            actionButtonSub.gameObject.SetActive(subOnButton);
             actionButtonSub.text = sub;
         }
+        if (!_achievementMode && !string.IsNullOrEmpty(sub) && actionCondition)
+            actionCondition.text = string.IsNullOrEmpty(actionCondition.text) ? sub : actionCondition.text + "   ·   " + sub;
     }
 
     private static int WaitingAchievements() => Managers.Quest?.WaitingAchievementCount() ?? 0;
@@ -601,20 +667,101 @@ public class UI_AwakeningPanel : UI_Popup
         Refresh();
     }
 
-    /// <summary>저장·갱신 뒤 <b>무엇이 열렸는지</b>를 화면에 남긴다 — 노드 점등 + 배너.</summary>
+    /// <summary>
+    /// 저장·갱신 뒤 <b>무엇이 열렸는지</b>를 화면에 남긴다 — 기획 「순차해금 개편」 §7-1 해금 순간(1.2초).
+    ///
+    /// <para>0.00 정수 카운터 감소 + 판 미세 진동 → 0.25 산 칸 점화 → 0.55 빛이 사슬을 타고 내려감 →
+    /// 0.90 다음 칸이 차례로 승격(축약 행에서 자라며 테두리 점등·◆ 이동) → 1.20 하단 행동 바 교체 강조 + 배너.</para>
+    ///
+    /// <para>핵심은 0.55~0.90이다 — "이걸 샀더니 다음이 열렸다"가 몸으로 읽히는 구간. 갱신(Refresh)은 먼저 해 두고,
+    /// 다음 칸만 잠깐 옛 높이로 되돌려 자라는 모습을 보여준다.</para>
+    /// </summary>
     private async UniTaskVoid SaveRefreshAndCelebrateAsync(MemoryAltarNode node)
     {
+        var nextNode = NextInBranch(node);
+        var nextRow  = FindRow(nextNode);
+        float nextFrom = nextRow != null ? nextRow.CurrentHeight : 0f;   // Refresh 전(축약 행) 높이
+
         await SaveAsync();
         Refresh();
 
         var ct = this.GetCancellationTokenOnDestroy();
         try
         {
+            if (nextRow != null && nextFrom > 0f) nextRow.SetHeightImmediate(nextFrom);
+
+            ShakePanelAsync(ct).Forget();                                            // 0.00
+            await UniTask.Delay(250, DelayType.UnscaledDeltaTime, PlayerLoopTiming.Update, ct);
+
             var row = FindRow(node);
-            if (row != null) row.PlayUnlockAsync(ct).Forget();
+            if (row != null) row.PlayUnlockAsync(ct).Forget();                       // 0.25 점화
+            await UniTask.Delay(300, DelayType.UnscaledDeltaTime, PlayerLoopTiming.Update, ct);
+
+            if (row != null && nextRow != null)                                      // 0.55 빛 흐름 — 표식 중심 사이
+                await row.PlayFlowDownAsync(row.CurrentHeight * 0.5f + RowSpacing + nextFrom * 0.5f, ct);
+            if (nextRow != null) await nextRow.PlayBecomeTurnAsync(nextFrom, ct);   // 0.90 승격
+
+            FlashActionBarAsync(ct).Forget();                                        // 1.20 행동 바 교체 강조
             await ShowUnlockBannerAsync(node, ct);
         }
         catch (OperationCanceledException) { }
+    }
+
+    /// <summary>같은 갈래에서 바로 다음 칸. 마지막이면 null.</summary>
+    private MemoryAltarNode NextInBranch(MemoryAltarNode node)
+    {
+        if (node == null) return null;
+        for (int c = 0; c < _branchNodes.Count; c++)
+        {
+            int i = _branchNodes[c].IndexOf(node);
+            if (i >= 0) return i + 1 < _branchNodes[c].Count ? _branchNodes[c][i + 1] : null;
+        }
+        return null;
+    }
+
+    /// <summary>기획 §7-1 0.00 「화면 미세 진동」 — 판을 ±2px로 0.15초 흔든다(unscaled).</summary>
+    private async UniTaskVoid ShakePanelAsync(CancellationToken ct)
+    {
+        if (!(transform.Find("Panel_Main") is RectTransform panel)) return;
+        var basePos = panel.anchoredPosition;
+        const float Dur = 0.15f;
+        float t = 0f;
+        try
+        {
+            while (t < Dur)
+            {
+                t += Time.unscaledDeltaTime;
+                float k = 1f - Mathf.Clamp01(t / Dur);
+                panel.anchoredPosition = basePos + new Vector2(
+                    Mathf.Sin(t * 90f) * 2f * k, Mathf.Cos(t * 70f) * 1.5f * k);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally { if (panel != null) panel.anchoredPosition = basePos; }
+    }
+
+    /// <summary>기획 §7-1 1.20 — 하단 행동 바가 새 「다음 목표」로 바뀌었음을 한 번 밝혀 알린다.</summary>
+    private async UniTaskVoid FlashActionBarAsync(CancellationToken ct)
+    {
+        if (!(transform.Find("Panel_Main/ActionBar") is RectTransform bar) ||
+            !bar.TryGetComponent<Image>(out var img)) return;
+        var baseCol = img.color;
+        var lit     = Color.Lerp(baseCol, Color.white, 0.35f);
+        const float Dur = 0.45f;
+        float t = 0f;
+        try
+        {
+            while (t < Dur)
+            {
+                t += Time.unscaledDeltaTime;
+                float k = Mathf.Clamp01(t / Dur);
+                img.color = Color.Lerp(lit, baseCol, k);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally { if (img != null) img.color = baseCol; }
     }
 
     /// <summary>

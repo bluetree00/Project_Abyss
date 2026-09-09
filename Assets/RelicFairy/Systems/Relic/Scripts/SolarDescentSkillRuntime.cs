@@ -52,7 +52,9 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
 
         // Q 모션의 주인은 무기가 아니라 유물이다 — 상태 이름을 유물 데이터에서 읽는다(미설정이면 기본 상태).
         var relicClass = ctx.Controller != null ? ctx.Controller.RelicClass : null;
-        string state = relicClass != null ? relicClass.QSkillStateAt(0) : RelicClassSO.DefaultQSkillState;
+        // 시퀀스 0번이 아니라 단독 모션 상태(RelicQ_Main)를 쓴다 — QSkill_01은 무기 R이 덮어쓰는 공용 상태라
+        // 활을 들면 조준 대기 자세로 태양을 불렀다.
+        string state = relicClass != null ? relicClass.QSkillMainState : RelicClassSO.DefaultQSkillState;
         ctx.Animator?.CrossFade(state, 0.1f);
     }
 

@@ -342,6 +342,7 @@ public sealed class UI_ShopPanel : UI_Popup
         _dealIcon = ShopUIStyle.MakeImage(card.transform, "Icon", new Color(0.05f, 0.05f, 0.07f, 1f));
         PlaceIn(card.transform, _dealIcon, 43f, 42f, 88f, 88f, DealW, DealH);
         _dealIcon.preserveAspect = true;
+        _dealIcon.enabled = false;   // 특가가 채워질 때 켠다 — 구워진 기본 상태가 검은 네모로 남지 않게
 
         _dealCat = ShopUIStyle.MakeText(card.transform, "Cat", 13f, FontStyles.Normal,
                                         TextAlignmentOptions.TopLeft, new Color(0.36f, 0.26f, 0.16f, 1f));
@@ -629,7 +630,11 @@ public sealed class UI_ShopPanel : UI_Popup
             int orig = _controller.SpecialOriginalPrice;
             _dealOldPrice.text = orig > deal.Price ? orig.ToString() : "";
         }
-        if (_dealIcon != null && deal.Icon != null) ShopUIStyle.Skin(_dealIcon, deal.Icon);
+        if (_dealIcon != null)
+        {
+            _dealIcon.enabled = deal.Icon != null;   // 아이콘 없는 특가는 검은 네모 대신 빈 자리로
+            if (deal.Icon != null) ShopUIStyle.Skin(_dealIcon, deal.Icon);
+        }
     }
 
     private void RefreshCards()

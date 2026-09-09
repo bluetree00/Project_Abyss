@@ -87,48 +87,6 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
-    - baseClipName: ESkill_02
-      addressableKey: BowESkill_02
-      actionType: 4
-      comboIndex: 1
-      isPlunge: 0
-      plungeFallSpeed: 0
-      plungeDescendAt: 0
-      comboWindowOpen: -1
-      comboWindowClose: -1
-      attackEndAt: -1
-    - baseClipName: ESkill_03
-      addressableKey: BowESkill_03
-      actionType: 4
-      comboIndex: 2
-      isPlunge: 0
-      plungeFallSpeed: 0
-      plungeDescendAt: 0
-      comboWindowOpen: -1
-      comboWindowClose: -1
-      attackEndAt: -1
-    - baseClipName: HeavyCharge
-      addressableKey: BowHeavyCharge
-      actionType: 2
-      comboIndex: 0
-      isPlunge: 0
-      plungeFallSpeed: 0
-      plungeDescendAt: 0
-      comboWindowOpen: -1
-      comboWindowClose: -1
-      attackEndAt: -1
-    - baseClipName: GroundHeavyAttack
-      addressableKey: BowHeavyAttack_01
-      actionType: 2
-      comboIndex: 0
-      isPlunge: 0
-      plungeFallSpeed: 0
-      plungeDescendAt: 0
-      comboWindowOpen: -1
-      comboWindowClose: -1
-      attackEndAt: -1
-  - groupType: 1
-    clipMappings:
     - baseClipName: AirLightAttack_01
       addressableKey: BowAirAttack_01
       actionType: 6
@@ -159,16 +117,6 @@ MonoBehaviour:
       comboWindowOpen: 0.1
       comboWindowClose: 0.4
       attackEndAt: 0.45
-    - baseClipName: AirHeavyAttack
-      addressableKey: BowAirHeavy
-      actionType: 7
-      comboIndex: 0
-      isPlunge: 0
-      plungeFallSpeed: 0
-      plungeDescendAt: 0
-      comboWindowOpen: -1
-      comboWindowClose: -1
-      attackEndAt: -1
     - baseClipName: AirPlungeAttack
       addressableKey: BowAirPlunge
       actionType: 8

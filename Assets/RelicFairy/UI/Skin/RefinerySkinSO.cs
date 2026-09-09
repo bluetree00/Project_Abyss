@@ -31,7 +31,12 @@ public sealed class RefinerySkinSO : ScriptableObject
 
     [Header("R5 결과 슬롯")]
     public Sprite slotFrame;
-    [Tooltip("중앙 원 바탕 — 제단 코어 채움(결과 뒤).")]
+    // [비움] 중앙 원 바탕 — 2026-09-03.
+    // 「정제소 중앙 원 바탕@2x」가 들어 있었는데 <b>순수 검정 원판</b>(RGB 0,0,0 · 불투명 78%)이라,
+    // 속이 비치는 「중앙 최종룬」 액자 뒤에 깔리면서 결과가 비었을 때 중앙이 검은 구멍으로 보였다.
+    // 그 검은 원은 @2x 세트의 「정제소 중앙 원 테두리@2x」와 한 쌍인데 짝이 미배선이라 혼자 남아 있었다.
+    // 완성본(정제소 UI 리소스)의 중앙은 액자 한 장뿐이고 뒤로 배경 무늬가 비친다 → 비워 둔다.
+    [Tooltip("[비움] 중앙 원 바탕 — 제단 코어 채움(결과 뒤). 넣으면 액자 뒤에 깔린다.")]
     public Sprite altarCore;
     [Tooltip("등급 테두리. 0=Common 1=Rare 2=Epic 3=Legendary")]
     public Sprite[] gradeBorder = new Sprite[4];
@@ -52,6 +57,10 @@ public sealed class RefinerySkinSO : ScriptableObject
     public Sprite[] barFill       = new Sprite[3];
     [Tooltip("과열(다음 회 확률 2배) 상태 채움. 비우면 barFill을 그대로 쓴다.")]
     public Sprite[] barFillHeated = new Sprite[3];
+
+    [Header("좌측 상주 판")]
+    [Tooltip("완성본 좌측 세로 패널(세부지표 3, 589×822). 돌발 이벤트 배너가 이 위에 뜬다. 의뢰서 \"좌 = 무대\".")]
+    public Sprite eventPanel;
 
     [Header("R8 돌발 이벤트")]
     [Tooltip("재점화 — 460×96. 나머지 셋보다 확실히 크다.")]

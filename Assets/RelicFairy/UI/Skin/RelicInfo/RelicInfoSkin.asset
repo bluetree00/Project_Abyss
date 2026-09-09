@@ -15,6 +15,11 @@ MonoBehaviour:
   panelFrame: {fileID: 21300000, guid: 8da200035f43b714495f43b2fd00e6d9, type: 3}
   portraitFrame: {fileID: 21300000, guid: 2e6138af520131743b864e8b99bb95a9, type: 3}
   tagChip: {fileID: 21300000, guid: 68bd3deb09afe99449ad2648d4b6149f, type: 3}
+  tagArts:
+  - tag: 시간 순환
+    sprite: {fileID: 21300000, guid: 91954100613043f4f805f6f7cc9d1e91, type: 3}
+  - tag: 버스트 구간
+    sprite: {fileID: 21300000, guid: f5a2ed58b54c96b4aa72311d8bfa8b21, type: 3}
   uniqueCard: {fileID: 21300000, guid: df15ed24f8513cf44ab4bec429132e47, type: 3}
   passivePlate:
   - {fileID: 0}

@@ -9,6 +9,18 @@ using UnityEngine.UI;
 /// </summary>
 public class UI_WeaponReplacePopup : UI_Popup
 {
+    public override void Init()
+    {
+        base.Init();
+        // 팝업 공통 암막 — 나무판 팝업 주변으로 3D 씬이 그대로 보였다(2026-09-09 실측).
+        if (transform.Find("Veil") == null)
+        {
+            var veil = ShopUIStyle.MakeImage(transform, "Veil", ShopUIStyle.Veil, raycast: true);
+            ShopUIStyle.Stretch(veil.rectTransform);
+            veil.transform.SetAsFirstSibling();
+        }
+    }
+
     public override bool BlocksGameplay => true; // 무기 교체 선택 중 시간정지 + 입력잠금
 
     // ── 슬롯 0 (왼쪽) ─────────────────────────────────────────

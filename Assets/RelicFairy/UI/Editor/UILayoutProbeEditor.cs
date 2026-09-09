@@ -139,7 +139,7 @@ public static class UILayoutProbeEditor
         }
     }
 
-    private static void Walk(RectTransform rt, RectTransform root, string parentPath, int depth,
+    internal static void Walk(RectTransform rt, RectTransform root, string parentPath, int depth,
                              ref int order, StringBuilder sb, ref bool first)
     {
         for (int i = 0; i < rt.childCount; i++)
@@ -158,7 +158,7 @@ public static class UILayoutProbeEditor
         }
     }
 
-    private static void Emit(RectTransform rt, RectTransform root, string path, int depth, int order, StringBuilder sb)
+    internal static void Emit(RectTransform rt, RectTransform root, string path, int depth, int order, StringBuilder sb)
     {
         // 루트 로컬 좌표로 환산한다 — 부모 배율·회전이 모두 반영된 <b>실제로 보이는</b> 사각형이다.
         var corners = new Vector3[4];
@@ -177,7 +177,8 @@ public static class UILayoutProbeEditor
         if (rt.TryGetComponent<Button>(out var btn))
             sb.Append(",\"btn\":true,\"btnOn\":").Append(btn.interactable ? "true" : "false");
 
-        if (rt.TryGetComponent<Image>(out var img))
+        // 꺼진 Image(enabled=false)는 안 그려진다 — 스킨이 끈 구판 조각을 왜곡으로 오판하지 않게 건너뛴다.
+        if (rt.TryGetComponent<Image>(out var img) && img.enabled)
         {
             sb.Append(",\"img\":{\"a\":").Append(F(img.color.a))
               .Append(",\"ray\":").Append(img.raycastTarget ? "true" : "false")
@@ -196,14 +197,21 @@ public static class UILayoutProbeEditor
 
         if (rt.TryGetComponent<TMP_Text>(out var t))
         {
+            // 비활성·미초기화 TMP는 preferredWidth 계산에서 예외를 던지고 text가 null일 수 있다 — 한 노드 때문에 덤프 전체가 깨지면 안 된다.
+            float prefW = 0f, prefH = 0f;
+            string txt = t.text ?? string.Empty;
+            try { if (rt.gameObject.activeInHierarchy) { prefW = t.preferredWidth; prefH = t.preferredHeight; } }
+            catch (System.Exception) { }
             sb.Append(",\"tmp\":{\"size\":").Append(F(t.fontSize))
               .Append(",\"auto\":").Append(t.enableAutoSizing ? "true" : "false")
               .Append(",\"min\":").Append(F(t.fontSizeMin)).Append(",\"max\":").Append(F(t.fontSizeMax))
-              .Append(",\"prefW\":").Append(F(t.preferredWidth)).Append(",\"prefH\":").Append(F(t.preferredHeight))
+              .Append(",\"prefW\":").Append(F(prefW)).Append(",\"prefH\":").Append(F(prefH))
               .Append(",\"wrap\":").Append(t.textWrappingMode != TextWrappingModes.NoWrap ? "true" : "false")
               .Append(",\"ha\":").Append((int)t.horizontalAlignment)
               .Append(",\"va\":").Append((int)t.verticalAlignment)
-              .Append(",\"text\":\"").Append(Esc(t.text.Length > 40 ? t.text.Substring(0, 40) : t.text)).Append("\"}");
+              .Append(",\"col\":\"").Append(ColorUtility.ToHtmlStringRGBA(t.color)).Append('"')
+              .Append(",\"font\":\"").Append(Esc(t.font != null ? t.font.name : "")).Append('"')
+              .Append(",\"text\":\"").Append(Esc(txt.Length > 40 ? txt.Substring(0, 40) : txt)).Append("\"}");
         }
 
         if (rt.GetComponent<LayoutGroup>() != null)        sb.Append(",\"group\":true");
@@ -214,10 +222,10 @@ public static class UILayoutProbeEditor
         sb.Append('}');
     }
 
-    private static string F(float v) =>
+    internal static string F(float v) =>
         float.IsNaN(v) || float.IsInfinity(v) ? "0" : v.ToString("0.##", CultureInfo.InvariantCulture);
 
-    private static string Esc(string s)
+    internal static string Esc(string s)
     {
         if (string.IsNullOrEmpty(s)) return "";
         var sb = new StringBuilder(s.Length + 8);

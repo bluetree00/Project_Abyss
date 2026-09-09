@@ -160,7 +160,7 @@ public static class RewardPresentation
         ItemRarity.Rare      => "◇ Rare",
         ItemRarity.Epic      => "◆ Epic",
         ItemRarity.Legendary => "★ Legendary",
-        _                    => "· Common",
+        _                    => "□ Common",   // 가운뎃점은 구분자와 겹쳐 "· Common · 2칸"으로 읽혔다 — 빈 네모(글리프 화이트리스트)
     };
 
     /// <summary>등급 프레임 색(불투명). 카드 테두리·월드 인디케이터 공용 — "프레임=희귀도" 규칙(P0-8).</summary>

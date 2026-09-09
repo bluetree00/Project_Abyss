@@ -2784,6 +2784,16 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         if (spawners.Count == 0 && bossSpawner == null) return;
 
+        // 이미 붙어 있으면 다시 붙이지 않는다. 컨트롤러가 둘이면 각자 _cleared를 들고
+        // 클리어 시퀀스를 따로 돌려 <b>보상이 두 번</b> 나온다(RoomClearGate의 _activated는
+        // 게이트 인스턴스별이라 컨트롤러가 다른 오브젝트에 붙으면 막지 못한다).
+        // 빌더가 셋(존/절차/블록맵)이고 각각 이 함수를 부르므로 방어해 둔다.
+        if (mapGO.TryGetComponent<RoomWaveController>(out var existing))
+        {
+            Debug.LogWarning($"[AttachRoomClear] '{mapGO.name}'에 이미 RoomWaveController가 있다 — 중복 부착 생략(보상 이중 지급 방지)", mapGO);
+            return;
+        }
+
         Debug.Log($"[AttachRoomClear] GO='{mapGO.name}' spawners={spawners.Count} bossSpawner={bossSpawner?.name ?? "null"}");
         var controller = mapGO.AddComponent<RoomWaveController>();
         controller.Initialize(_run, spawners, bossSpawner, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab);
@@ -3710,13 +3720,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// 각 스테이션이 획득 순서와 무관하게 자기 슬롯에 독립 장착하는 용도
     /// (무형검=Slot0 활성, 원거리=Slot1 비활성 등).
     /// </summary>
-    public static async UniTask EquipWeaponToPlayerAsync(WeaponSO weaponSO, PlayerController player, int slotIndex, bool setActive = true)
+    public static async UniTask EquipWeaponToPlayerAsync(WeaponSO weaponSO, PlayerController player, int slotIndex, bool setActive = true,
+                                                         bool playAppear = true, System.Action<GameObject> beforeShow = null)
     {
         var wm = player?.WeaponManager;
         if (wm == null || weaponSO == null) return;
         var weaponData = new WeaponData(weaponSO);
         await PreloadWeaponClipsAsync(weaponData);
-        await wm.AcquireWeaponToSlotAsync(weaponData, slotIndex, setActive);
+        await wm.AcquireWeaponToSlotAsync(weaponData, slotIndex, setActive, playAppear, beforeShow);
     }
 
     /// <summary>무기 데이터의 애니메이션 클립을 AcquireWeapon 전에 로드</summary>

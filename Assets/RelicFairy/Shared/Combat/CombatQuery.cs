@@ -65,7 +65,7 @@ public static class CombatQuery
     /// 빛 광폭발/원뿔 등에 사용. 반환 = 채운 개수.
     /// </summary>
     public static int GetEnemiesInCone(Vector3 origin, Vector3 forward, float range, float halfAngleDeg,
-                                       int max, List<MonsterBase> buffer)
+                                       int max, List<MonsterBase> buffer, bool showGuide = true)
     {
         if (buffer == null) return 0;
         buffer.Clear();
@@ -76,8 +76,9 @@ public static class CombatQuery
         forward.Normalize();
         float cosHalf = Mathf.Cos(halfAngleDeg * Mathf.Deg2Rad);
 
-        // [가이드라인 비주얼] 원뿔 광역 질의 표시(통지만)
-        GuidelineVisual.Cone(origin, forward, range, halfAngleDeg);
+        // [가이드라인 비주얼] 원뿔 광역 질의 표시(개발용). 자체 VFX가 범위를 이미 보여주는
+        // 스킬은 showGuide:false로 끈다 — 겹쳐 그리면 화면만 지저분해진다.
+        if (showGuide) GuidelineVisual.Cone(origin, forward, range, halfAngleDeg);
 
         int n = Physics.OverlapSphereNonAlloc(origin, range, s_overlap, MonsterBase.HitLayerMask, QueryTriggerInteraction.Collide);
         for (int i = 0; i < n; i++)
@@ -128,7 +129,7 @@ public static class CombatQuery
 
     /// <summary>원뿔(halfAngleDeg) 내 IDamageable을 가까운 순으로 채운다. <see cref="GetNearbyDamageables"/>의 원뿔판.</summary>
     public static int GetDamageablesInCone(Vector3 origin, Vector3 forward, float range, float halfAngleDeg,
-                                           GameObject exclude, int max, List<GameObject> buffer)
+                                           GameObject exclude, int max, List<GameObject> buffer, bool showGuide = true)
     {
         if (buffer == null) return 0;
         buffer.Clear();
@@ -139,7 +140,7 @@ public static class CombatQuery
         forward.Normalize();
         float cosHalf = Mathf.Cos(halfAngleDeg * Mathf.Deg2Rad);
 
-        GuidelineVisual.Cone(origin, forward, range, halfAngleDeg);
+        if (showGuide) GuidelineVisual.Cone(origin, forward, range, halfAngleDeg);
 
         int n = Physics.OverlapSphereNonAlloc(origin, range, s_overlap, MonsterBase.HitLayerMask, QueryTriggerInteraction.Collide);
         CollectDamageables(n, exclude, buffer);

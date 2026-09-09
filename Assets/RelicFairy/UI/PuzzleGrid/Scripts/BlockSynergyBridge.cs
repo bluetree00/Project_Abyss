@@ -542,6 +542,11 @@ public class MerlinRuneBridge : MonoBehaviour
 
         DowngradeBelowThreshold(blockData, zoneCounts);
 
+        // ⚠️ 임계값이 존마다 다른 건 오타가 아니다 — <b>4단계 임계 = 그 존의 칸 수</b>다.
+        //    ZONE_MAP 실측: 불·물·전기·어둠 19칸 → 19 / 풀·빛 20칸 → 20 / 중앙 16칸 → 16.
+        //    즉 4단계는 "존을 100% 채웠다"는 뜻이고, 3단계(13 vs 14)도 같은 비율(≈0.69)을 따른다.
+        //    차트만 보면 13/19와 14/20이 어긋나 보여 맞추고 싶어지는데, 맞추면 풀·빛은
+        //    존을 다 채워도 4단계가 안 뜨거나(21로 올릴 때) 한 칸 남기고 떠버린다(19로 내릴 때).
         foreach (var kvp in zoneCounts)
         {
             string zoneId       = kvp.Key;

@@ -2366,7 +2366,7 @@ MonoBehaviour:
   nicknameText: {fileID: 3397901793256520361}
   goldText: {fileID: 7100000000000000004}
   goldFrameSprite: {fileID: 21300000, guid: 6df1a575a4a43554687b69ff7496ec00, type: 3}
-  goldInnerSprite: {fileID: 21300000, guid: 3d8b8869bdd23284c9d178025ceff6d4, type: 3}
+  goldInnerSprite: {fileID: 21300000, guid: 5414c66a58e386c4a84735838ee4d203, type: 3}
   currencyFrameSprite: {fileID: 21300000, guid: 0a57773c9c78b894db6c06567872c900,
     type: 3}
   goldIconSprite: {fileID: 21300000, guid: 687454dc4aee20f41a61fc5cc22a45de, type: 3}

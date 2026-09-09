@@ -195,10 +195,11 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         drt.offsetMin = Vector2.zero;
         drt.offsetMax = new Vector2(-8f, 0f);
         descTxt.text               = "블록을 배치하면 시너지가 표시됩니다";
-        descTxt.fontSize           = 12f;
+        descTxt.fontSize           = 16f;
         descTxt.color              = new Color(0.48f, 0.54f, 0.72f, 0.85f);
         descTxt.alignment          = TextAlignmentOptions.MidlineRight;
-        descTxt.textWrappingMode = TextWrappingModes.NoWrap;
+        // 안내문(182px)이 칸(163px)보다 길어 끝이 잘렸다(2026-09-09 실측). 칸이 두 줄 높이는 되므로 줄바꿈을 허용한다.
+        descTxt.textWrappingMode = TextWrappingModes.Normal;
         descTxt.raycastTarget      = false;
     }
 
@@ -278,7 +279,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         var rxGO = new GameObject("ReactionBanner", typeof(RectTransform));
         rxGO.transform.SetParent(_rowContainer, false);
         _reactionText = rxGO.AddComponent<TextMeshProUGUI>();
-        _reactionText.fontSize      = 15f;
+        _reactionText.fontSize      = 16f;
         _reactionText.fontStyle     = FontStyles.Bold;
         _reactionText.color         = new Color(1f, 0.82f, 0.45f, 1f);   // 반응 = 금빛
         _reactionText.alignment     = TextAlignmentOptions.Left;
@@ -296,8 +297,8 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         ert.offsetMin = ert.offsetMax = Vector2.zero;
         var eTxt = _emptyLabelGO.AddComponent<TextMeshProUGUI>();
         eTxt.text          = "셀을 배치하면\n시너지가 표시됩니다";
-        eTxt.fontSize      = 15f;
-        eTxt.color         = new Color(0.40f, 0.43f, 0.56f, 0.65f);
+        eTxt.fontSize      = 16f;
+        eTxt.color         = new Color(0.55f, 0.58f, 0.72f, 0.85f);
         eTxt.alignment     = TextAlignmentOptions.Center;
         eTxt.raycastTarget = false;
         _emptyLabelGO.SetActive(true);
@@ -409,7 +410,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             lrt.offsetMax = new Vector2(-2f, 0f);
             var lTxt = lblGO.AddComponent<TextMeshProUGUI>();
             lTxt.text               = $"{b + 1}단계";
-            lTxt.fontSize           = 12f;
+            lTxt.fontSize           = 14f;
             lTxt.color              = new Color(0.50f, 0.53f, 0.66f, 1f);
             lTxt.alignment          = TextAlignmentOptions.Center;
             lTxt.textWrappingMode = TextWrappingModes.NoWrap;

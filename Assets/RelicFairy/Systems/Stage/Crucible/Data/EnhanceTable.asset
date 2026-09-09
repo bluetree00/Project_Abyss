@@ -17,19 +17,19 @@ MonoBehaviour:
     dropAmount: 0
     cost: 1
   - successRate: 0.95
-    dropAmount: 1
+    dropAmount: 0
     cost: 1
   - successRate: 0.85
-    dropAmount: 1
+    dropAmount: 0
     cost: 2
   - successRate: 0.7
-    dropAmount: 1
+    dropAmount: 0
     cost: 3
   - successRate: 0.55
-    dropAmount: 1
+    dropAmount: 0
     cost: 4
   - successRate: 0.45
-    dropAmount: 1
+    dropAmount: 0
     cost: 6
   - successRate: 0.35
     dropAmount: 2

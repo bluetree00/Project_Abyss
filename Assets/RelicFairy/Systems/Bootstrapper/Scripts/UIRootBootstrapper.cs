@@ -76,6 +76,14 @@ public sealed class UIRootBootstrapper : MonoBehaviour
                                        : Cysharp.Threading.Tasks.UniTask.CompletedTask;
     }
 
+    /// <summary>억제 해제 + 페이드 인(모드 강제 없음). 허브의 무형검 각성·무기대·게이트가 쓴다.</summary>
+    public Cysharp.Threading.Tasks.UniTask RevealHudAsync(float duration)
+    {
+        EnsureHudBootstrapper();
+        return hudBootstrapper != null ? hudBootstrapper.RevealStartRoomAsync(duration)
+                                       : Cysharp.Threading.Tasks.UniTask.CompletedTask;
+    }
+
     private void EnsureHudBootstrapper()
     {
         if (hudBootstrapper == null)

@@ -810,6 +810,33 @@ public class PlayerController : CharacterBase
     public ComboController Combo { get; private set; }
 
     /// <summary>포이즈(아머치) 게이지 — 누적 임팩트가 최대치를 넘으면 날아감(LocoState.Launched) 발동.</summary>
+    // ── 로코모션 방향 파라미터 ────────────────────────────────
+    // 2D 블렌드 트리(MoveBlend)가 몸 기준 로컬 속도를 좌표로 쓴다.
+    //
+    // 왜 로컬인가 — facing은 즉시 돌지 않고 turnSpeedDegPerSec로 슬루한다. 그래서 전환 중엔
+    // 항상 '몸 방향 ≠ 진행 방향'이고, 그 각차가 곧 블렌드 좌표다. 이 값이 있어야
+    // 선회 중 몸이 기우는 그림이 나온다 — 없으면 어느 쪽으로 틀든 정면 클립만 돌아 미끄러진다.
+    private static readonly int MoveXHash = Animator.StringToHash("MoveX");
+    private static readonly int MoveYHash = Animator.StringToHash("MoveY");
+
+    /// <summary>방향 전환 감쇠. 너무 작으면 값이 튀고, 크면 몸이 굼뜨게 따라온다.</summary>
+    private const float MoveDirDamp = 0.10f;
+
+    private void UpdateLocomotionDirection()
+    {
+        if (Anim == null || Rigid == null || CharacterData == null) return;
+
+        Vector3 v = Rigid.linearVelocity;
+        v.y = 0f;
+
+        // 정규화 기준은 달리기 속도 — 걷기는 자연히 0.625 언저리에 떨어져 걷기 링에 붙는다.
+        float runSpeed = CharacterData.baseRunSpeed > 0.01f ? CharacterData.baseRunSpeed : 8f;
+        Vector3 local  = transform.InverseTransformDirection(v) / runSpeed;
+
+        Anim.SetFloat(MoveXHash, Mathf.Clamp(local.x, -1f, 1f), MoveDirDamp, Time.deltaTime);
+        Anim.SetFloat(MoveYHash, Mathf.Clamp(local.z, -1f, 1f), MoveDirDamp, Time.deltaTime);
+    }
+
     public PoiseController Poise { get; private set; }
 
     // ── 스킬 스탠스 ──────────────────────────────────────────────
@@ -956,22 +983,21 @@ public class PlayerController : CharacterBase
     /// 그래서 여기서 직접 로드한 뒤 오버라이드한다. 로드는 비동기지만 Q 입력 전까지만 끝나면 되므로
     /// 오라 VFX와 같은 fire-and-forget으로 둔다.
     /// </summary>
-    /// <summary>유물 Q 클립 오버라이드가 끝났는가. Q 입력이 로드보다 빠르면 평타 모션이 나온다.</summary>
-    public bool RelicQAnimationReady { get; private set; }
-
     private async UniTaskVoid ApplyRelicQAnimationAsync()
     {
-        RelicQAnimationReady = false;
         if (relicClass == null || _animSvc == null) return;
 
         int steps = relicClass.QSkillStepCount;
-        var keys = new System.Collections.Generic.List<string>(steps);
+        var keys = new System.Collections.Generic.List<string>(steps + 1);
         for (int i = 0; i < steps; i++)
         {
             var key = relicClass.QSkillClipKeyAt(i);
             if (!string.IsNullOrEmpty(key)) keys.Add(key);
         }
-        if (keys.Count == 0) { RelicQAnimationReady = true; return; }   // 클립 키 미설정 — 기본 클립 폴백이 정상
+        // 단독 모션(캐스트·마무리) 클립 — 시퀀스와 별개 키.
+        string mainKey = relicClass.QSkillMainClipKey;
+        if (!string.IsNullOrEmpty(mainKey)) keys.Add(mainKey);
+        if (keys.Count == 0) return;   // 클립 키 미설정 유물 — 컨트롤러 기본 클립 그대로(폴백)
 
         try
         {
@@ -1004,7 +1030,14 @@ public class PlayerController : CharacterBase
                 Debug.LogError($"[PlayerController] 유물 Q 오버라이드 실패 — 컨트롤러에 '{stateName}' 이름의 원본 클립이 없다.");
         }
 
-        RelicQAnimationReady = true;
+        if (!string.IsNullOrEmpty(mainKey))
+        {
+            var mainClip = Managers.AnimationResources.GetClip(mainKey);
+            if (mainClip == null)
+                Debug.LogError($"[PlayerController] 유물 Q 단독 모션 클립 '{mainKey}' 로드 실패 — 기본 클립 유지");
+            else if (!_animSvc.OverrideRelic(relicClass.QSkillMainState, mainClip))
+                Debug.LogError($"[PlayerController] 유물 Q 단독 모션 오버라이드 실패 — 컨트롤러에 '{relicClass.QSkillMainState}' 원본 클립이 없다.");
+        }
     }
 
     /// <summary>유물 오라 VFX를 소켓(없으면 루트)에 부착. 재적용 시 기존 인스턴스를 먼저 정리(멱등).</summary>
@@ -1314,6 +1347,8 @@ public class PlayerController : CharacterBase
 
         locoSM?.Update();
         actSM?.Update();
+
+        UpdateLocomotionDirection();
 
         if (locoSM != null) locoStateDebug = locoSM.CurrentId;
         if (actSM != null) actStateDebug = actSM.CurrentId;
@@ -1828,14 +1863,16 @@ public class PlayerController : CharacterBase
 
         if (isInAct) return;
 
-        if (InputBuffer.TryConsume(Game.Inputs.Command.Charge))
-        {
-            if (CanAttack()) actSM.Change(ActState.Charge);
-            return;
-        }
+        // [강공격 봉인] 장비 강공격을 전부 걷어내는 중이라 <b>액션 진입 자체를</b> 막는다.
+        // 애니 매핑만 지우면 액션은 살아 있어 컨트롤러 기본 클립(다른 무기 모션)이 튀어나온다.
+        //
+        // 차지는 버리고, Heavy는 <b>약공격으로 대체</b>한다 — 그냥 버리면 활을 만충까지 당겼다
+        // 놓았을 때 한 발도 안 나간다(BowAttackPolicy.OnCanceled가 만충 시 Heavy를 밀어 넣는다).
+        // 봉인을 풀 때는 이 두 줄만 지우면 원래 경로로 돌아온다.
+        if (InputBuffer.TryConsume(Game.Inputs.Command.Charge)) return;
         if (InputBuffer.TryConsume(Game.Inputs.Command.Heavy))
         {
-            if (CanAttack()) { SetPendingAttack(Game.Inputs.Command.Heavy); actSM.Change(ActState.AttackReady); }
+            if (CanAttack()) { SetPendingAttack(Game.Inputs.Command.Light); actSM.Change(ActState.AttackReady); }
             return;
         }
         if (InputBuffer.TryConsume(Game.Inputs.Command.Light))

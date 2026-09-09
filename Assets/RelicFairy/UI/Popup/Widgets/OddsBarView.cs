@@ -60,10 +60,11 @@ public sealed class OddsBarView : MonoBehaviour
             float y = -(TopPad + i * (rowH + RowGap));
             var rar = TierRarity[i];
 
-            var lbl = ShopUIStyle.MakeText(inner, $"L{i}", 12f, FontStyles.Bold,
-                TextAlignmentOptions.Left, ShopUIStyle.RarityGlow(rar));
+            var lbl = ShopUIStyle.MakeText(inner, $"L{i}", 16f, FontStyles.Bold,
+                TextAlignmentOptions.Left, ShopUIStyle.Rarity(rar));   // 글로우색(알파 0.26~0.42)은 글자로 못 쓴다 — 정색
+            // 글상자는 행보다 6px 높게(창 배율 뒤 16px 줄높이 ≈ 20.6이 rowH 16에 안 들어가 15로 줄었다). 중심은 막대와 같다.
             ShopUIStyle.Anchor(lbl.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(padX, y), new Vector2(LabelW, rowH));
+                new Vector2(padX, y + 3f), new Vector2(LabelW, rowH + 6f));
             lbl.text = TierName[i];
 
             var track = ShopUIStyle.MakeImage(inner, $"T{i}", TrackColor);
@@ -87,10 +88,10 @@ public sealed class OddsBarView : MonoBehaviour
                 ShopUIStyle.Skin(bf, skin.barFrame, sliced: true);
             }
 
-            var pct = ShopUIStyle.MakeText(inner, $"P{i}", 12f, FontStyles.Bold,
+            var pct = ShopUIStyle.MakeText(inner, $"P{i}", 16f, FontStyles.Bold,
                 TextAlignmentOptions.Right, ShopUIStyle.TextPrimary);
             ShopUIStyle.Anchor(pct.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(padX + LabelW + view._trackW, y), new Vector2(PctW, rowH));
+                new Vector2(padX + LabelW + view._trackW, y + 3f), new Vector2(PctW, rowH + 6f));
             view._pct[i] = pct;
         }
 

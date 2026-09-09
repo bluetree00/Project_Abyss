@@ -31,8 +31,8 @@ public static class AltarPalette
 
     // ── 글자 ─────────────────────────────────────────────
     public static readonly Color TextPrimary = new(0.902f, 0.882f, 0.957f);
-    public static readonly Color TextDim     = new(0.482f, 0.459f, 0.573f);
-    public static readonly Color TextFaint   = new(0.325f, 0.310f, 0.396f);
+    public static readonly Color TextDim     = new(0.640f, 0.615f, 0.740f)   /* 밝기 0.47→0.63, 가독성 2026-09-09 */;
+    public static readonly Color TextFaint   = new(0.520f, 0.495f, 0.620f)   /* 밝기 0.30→0.50 */;
 
     // ── 조용한 버튼(살 수 없음 / 수령 불가) ────────────────
     public static readonly Color BtnQuiet    = new(0.153f, 0.145f, 0.216f, 1f);

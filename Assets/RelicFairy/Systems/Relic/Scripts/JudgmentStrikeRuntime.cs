@@ -1,3 +1,6 @@
+using System;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -24,8 +27,6 @@ using UnityEngine;
 public sealed class JudgmentStrikeRuntime : ISkillRuntime
 {
     private const float  AnimBlend  = 0.08f;
-    private const float  ReplayAt   = 0.94f;   // 현재 참격이 이만큼 진행되면 다음 참격으로 넘긴다
-    private const float  MinStepGap = 0.05f;   // CrossFade가 애니메이터에 반영되기 전 중복 전환 방지
 
     /// <summary>
     /// 기대한 참격 상태가 아닐 때 이만큼 지나면 <b>포기하지 않고 다시 건다</b>.
@@ -43,12 +44,28 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     /// <summary>Q 전용 검 어드레서블 키. 없으면 장착 무기를 숨기기만 한다(맨손 참격 &gt; 활로 후려치기).</summary>
     private const string QSwordKey = "Relic/Lancelot/QSword";
 
+    /// <summary>
+    /// 마무리 강타 전용 상태. 연타(RelicQ_Slash*)와 <b>다른 모션</b>이라야 "한 방"으로 읽힌다.
+    /// 유물 데이터의 단독 모션 상태(RelicQ_Main)를 쓴다 — 예전 QSkill_01은 무기 R 스킬이 덮어쓰는 공용 상태라
+    /// 활을 들면 조준 대기 자세로, 대검을 들면 대검 R 모션으로 마무리가 나갔다.
+    /// </summary>
+    private string FinisherState => _relicClass != null ? _relicClass.QSkillMainState : RelicClassSO.DefaultQSkillState;
+
+    // ── 마무리 연출 ──────────────────────────────────────────────
+    /// <summary>마무리 클립이 이 지점(정규화 시간)에 닿으면 포즈를 멈춰 세운다 — 이펙트가 도는 동안 자세가 풀리지 않게.</summary>
+    private const float HoldPoseAtNormalized = 0.96f;
+    /// <summary>막타 순간 세계를 멈춘다(실시간 초). 플레이어 애니메이터도 Normal 갱신이라 함께 멈춰 '한 컷'이 된다.</summary>
+    private const float TimeStopRealSeconds = 0.45f;
+    private const float TimeStopScale       = 0.03f;
+    private static readonly object TimeStopOwner = new object();
+
     // ── 이펙트에 타이밍을 맞춘다(실측) ─────────────────────────────
     // Effect_36_MadnessSlash 는 스폰 후 <b>1.5초 지점에 파티클 4개가 동시에 터지는 '강조 버스트'</b>가 있다
     // (PS0/1/2/4 : startDelay 1.5s). 이게 이 이펙트의 클라이맥스다.
     // 막타는 이 버스트에 얹혀야 한다 — 그보다 먼저 때리면 "때린 건 끝났는데 이펙트만 나중에 터지는" 꼴이 된다.
     // 첫 참격이 0.16초에 뜨므로 그 버스트는 0.16 + 1.5 = 약 1.66초부터 시작해 이후로 이어진다.
-    private const float  SkillDuration = 2.75f;
+    // 마무리 뒤 포즈를 잡고 버티는 시간까지 포함한다 — 막타 이펙트 본체(2.5초)가 도는 동안 걷기로 풀리면 김이 샌다.
+    private const float  SkillDuration = 3.6f;
 
     private const float  FirstHitTime = 0.16f;   // 첫 타(선딜)
 
@@ -59,7 +76,7 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     private const float  HitInterval  = 0.17f;
     private const int    FlurryHits   = 10;      // 0.16 ~ 1.69초. 막타(2.40초)까지 0.7초 여유
 
-    private const float  FinisherAnimAt = 2.10f; // 마무리 베기 모션
+    private const float  FinisherAnimAt = 1.75f; // 마무리 베기 모션(RelicQ_Main = SPAttack01 1.45s → 막타가 45% 지점에 얹힌다)
     private const float  FinisherHitAt  = 2.40f; // 막타 — 강조 버스트가 한창일 때 꽂는다
 
     private const int    HitCount = FlurryHits + 1;   // 연타 + 마무리
@@ -75,6 +92,7 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     private float _elapsed;
     private int   _hitsDone;
     private bool  _finisherAnimPlayed;
+    private bool  _holdingPose;
 
     // ── 애니 시퀀스 상태 ──
     private RelicClassSO _relicClass;   // Q 상태 이름의 출처(없으면 기본 상태 1개)
@@ -90,7 +108,7 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
 
     public void OnEnter(SkillExecutionContext ctx)
     {
-        _elapsed = 0f; _hitsDone = 0; _finisherAnimPlayed = false;
+        _elapsed = 0f; _hitsDone = 0; _finisherAnimPlayed = false; _holdingPose = false;
 
         // Q 모션의 주인은 무기가 아니라 유물이다 — 상태 이름을 유물 데이터에서 읽는다.
         _relicClass = ctx.Controller != null ? ctx.Controller.RelicClass : null;
@@ -119,6 +137,14 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         {
             _relic?.PerformJudgmentStrike(ctx.PlayerTransform, _hitsDone, HitCount);
             _hitsDone++;
+            // 막타 — 세계를 한 컷 멈춘다. 연타 사이의 일반 히트스톱(우선순위 10)보다 위(SlowMotion 100)라 겹쳐도 이쪽이 이긴다.
+            if (_hitsDone == HitCount) BeginTimeStop(ctx);
+
+            // 연타 애니는 <b>타격에 맞춰</b> 넘긴다. 예전엔 클립이 끝나야(normalizedTime 0.94) 넘겨서
+            // 1.5초에 참격이 서너 번뿐이라 "반복은 되는데 연타로 안 보이는" 상태였다.
+            // 한 타 = 한 참격이면 0.17초마다 칼이 바뀌어 몰아치는 것으로 읽힌다.
+            // 막타는 별도 모션이 따로 들어가므로 여기서 제외한다.
+            if (!_finisherAnimPlayed && _hitsDone < FlurryHits) PlayStep(ctx, _stepIndex + 1);
         }
 
         if (_elapsed >= SkillDuration) ctx.RequestEnd?.Invoke();
@@ -130,9 +156,12 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         _hitsDone = HitCount;
         ctx.SetMoveScale(1f);
 
-        // 중단·사망 경로도 이 함수를 지나므로 스탠스·무기가 새지 않는다.
+        // 중단·사망 경로도 이 함수를 지나므로 스탠스·무기·포즈 홀드·시간 정지가 새지 않는다.
         ctx.Controller?.EndStance(this);
         RestoreWeapon();
+        if (_holdingPose && ctx.Animator != null) ctx.Animator.speed = 1f;
+        _holdingPose = false;
+        TimeScaleArbiter.Release(TimeStopOwner);
     }
 
     // ── Private Methods ───────────────────────────────────────────
@@ -145,29 +174,55 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         if (!_finisherAnimPlayed && _elapsed >= FinisherAnimAt)
         {
             _finisherAnimPlayed = true;
-            PlayStep(ctx, _stepCount - 1);   // 마무리 = 시퀀스의 마지막 참격을 처음부터
+
+            // 마무리는 <b>연타와 다른 모션</b>이어야 한 방임이 읽힌다.
+            // 예전엔 시퀀스의 마지막 참격을 한 번 더 걸어서, 앞선 연타와 구분이 안 됐다.
+            anim.CrossFade(FinisherState, AnimBlend, 0, 0f);
+            _lastStepAt = _elapsed;
             return;
         }
-        if (_finisherAnimPlayed) return;
-
-        // CrossFade 직후 몇 프레임은 아직 이전 상태가 현재 상태로 보고된다 — 그때 또 넘기면 첫 참격이 겹쳐 튄다.
-        if (_elapsed - _lastStepAt < MinStepGap || anim.IsInTransition(0)) return;
-
-        // 클립 길이·상태 speed는 유물/무기마다 다르므로 상수 주기 대신 '이 참격이 끝났는가'로 판단한다.
-        var state = anim.GetCurrentAnimatorStateInfo(0);
-
-        if (!state.IsName(StateName(_stepIndex)))
+        if (_finisherAnimPlayed)
         {
-            // 기대 상태가 아니다(피격·다른 상태가 끼어듦). 예전엔 여기서 그냥 return이라
-            // 한 번 어긋나면 연타가 끝날 때까지 애니가 영영 안 넘어갔다.
-            // 잠깐 기다렸다가 현재 참격을 다시 걸어 되살린다.
-            if (_elapsed - _lastStepAt >= AnimRecoverAfter) PlayStep(ctx, _stepIndex);
+            // 마무리 클립이 끝자락에 닿으면 자세를 그대로 세운다. 스킬 종료(OnExit)에서 되돌린다.
+            if (!_holdingPose && !anim.IsInTransition(0))
+            {
+                var fin = anim.GetCurrentAnimatorStateInfo(0);
+                if (fin.IsName(FinisherState) && fin.normalizedTime >= HoldPoseAtNormalized)
+                {
+                    anim.speed    = 0f;
+                    _holdingPose  = true;
+                }
+            }
             return;
         }
 
-        if (state.normalizedTime < ReplayAt) return;
+        // 연타 참격 전환은 타격 시점(OnUpdate)이 소유한다. 여기서는 <b>복구만</b> 한다 —
+        // 피격 등으로 다른 상태가 끼어들어 참격이 끊겼을 때 되살리는 역할이다.
+        if (_elapsed - _lastStepAt < AnimRecoverAfter || anim.IsInTransition(0)) return;
 
-        PlayStep(ctx, _stepIndex + 1);
+        var state = anim.GetCurrentAnimatorStateInfo(0);
+        if (!state.IsName(StateName(_stepIndex))) PlayStep(ctx, _stepIndex);
+    }
+
+    /// <summary>막타 순간의 시간 정지. 실시간으로 잰 뒤 풀며, 스킬이 먼저 끊기면 OnExit이 푼다.</summary>
+    private void BeginTimeStop(SkillExecutionContext ctx)
+    {
+        TimeScaleArbiter.Acquire(TimeStopOwner, TimeStopScale, TimeScaleArbiter.Priority.SlowMotion);
+        var ct = ctx.Controller != null ? ctx.Controller.GetCancellationTokenOnDestroy() : CancellationToken.None;
+        ReleaseTimeStopAsync(ct).Forget();
+    }
+
+    private static async UniTaskVoid ReleaseTimeStopAsync(CancellationToken ct)
+    {
+        try
+        {
+            await UniTask.Delay(TimeSpan.FromSeconds(TimeStopRealSeconds), DelayType.UnscaledDeltaTime, cancellationToken: ct);
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            TimeScaleArbiter.Release(TimeStopOwner);
+        }
     }
 
     /// <summary>시퀀스 index번째 참격을 처음부터 재생. 시퀀스 끝에 닿으면 앞으로 돌아 계속 몰아친다.</summary>
@@ -202,21 +257,18 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     /// 전용 검 스폰. 로드가 끝났을 때 스킬이 이미 끝났으면 즉시 버린다 —
     /// 안 그러면 검이 손에 남아 다음 전투 내내 따라다닌다.
     /// </summary>
-    private async Cysharp.Threading.Tasks.UniTaskVoid SpawnQSwordAsync(Transform socket)
+    private async UniTaskVoid SpawnQSwordAsync(Transform socket)
     {
-        GameObject go = null;
+        GameObject go;
         try
         {
+            // 키가 없으면 매니저가 경고만 남기고 null을 준다(예외·에러 로그 없음).
+            // 전용 검은 아직 수급 전이라 '없는 게 정상'인 경로다.
             go = await Managers.AddressableManager.InstantiateAsync(QSwordKey, socket);
         }
         catch (System.OperationCanceledException) { return; }
-        catch (System.Exception)
-        {
-            // 에셋 미수급 상태 — 무기를 숨긴 것만으로도 "활로 후려치기"는 사라진다.
-            return;
-        }
 
-        if (go == null) return;
+        if (go == null) return;   // 미수급 — 무기를 숨긴 것만으로도 "활로 후려치기"는 사라진다
 
         // 스킬이 이미 끝났거나 무기가 복구된 뒤라면 방금 만든 검은 쓸 데가 없다.
         if (_hiddenWeapon == null && _qSword == null)

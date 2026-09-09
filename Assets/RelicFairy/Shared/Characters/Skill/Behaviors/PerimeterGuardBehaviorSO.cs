@@ -59,7 +59,7 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
 
         public void OnEnter(SkillExecutionContext ctx)
         {
-            _skillTier = Mathf.Clamp(ctx.WeaponData?.tier ?? 1, 1, 3);
+            _skillTier = ctx.SkillTier;
 
             // 3단계: 3파에 걸쳐 검기가 커지며 공격
             _maxCasts = _skillTier >= 3 ? 3 : (_skillTier >= 2 ? 2 : 1);

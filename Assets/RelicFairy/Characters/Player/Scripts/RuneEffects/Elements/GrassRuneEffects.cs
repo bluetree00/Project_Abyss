@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 using RelicFairy.Monster;
@@ -7,7 +6,7 @@ using RelicFairy.Monster;
 // ☘ 풀 Grass — 독안개 장판 (4단계 누적, 필드 중심)
 //
 // FD(GroundFieldBase 풀링/추적/겹침 레지스트리) + ST DoT를 그대로 재사용 — 신규 인프라 최소.
-// 추가분: ST에 DoT onTick(회복) + 적 공격 디버프(ApplyAttackSlow) 일반화(얼음/어둠 재사용).
+// 추가분: 적 공격 디버프(ApplyAttackSlow) 일반화(얼음/어둠 재사용).
 //
 // 데이터 키(실데이터): GrassMist / GrassMistPlus / GrassMistInsight / GrassMistDominion. threshold=점유수(6/10/14/20).
 // 독 상태 id="poison". 1단계만 장판을 스폰하고, 2~4단계는 장판 동작을 조정하는 마커.
@@ -17,7 +16,7 @@ public abstract class GrassRuneEffectBase : RuneElementEffectBase { }
 
 /// <summary>
 /// 1단계 살포 — 적중 자리에 독안개 장판(최대3, 10초). 장판이 내부 적에 초당 공4% 독 DoT.
-/// 2~4단계 활성 여부를 읽어 장판 설정(크기/겹침/회복/디버프/병합/보스받뎀)을 구성한다.
+/// 2~4단계 활성 여부를 읽어 장판 설정(크기/겹침/보호막/디버프/병합/보스받뎀)을 구성한다.
 /// value=독비율(0.04), duration=장판수명(10).
 /// </summary>
 public sealed class GrassMistEffect : GrassRuneEffectBase
@@ -58,7 +57,7 @@ public sealed class GrassMistEffect : GrassRuneEffectBase
         c.radiusMult   = 1f + (plus ? plusE.value : 0f) + (insight ? insightE.value : 0f);     // +50%씩
         c.overlapBonus = plus ? plusE.value2 : 0f;                                              // 겹침 독피해 +50%
         c.dotMult      = dominion ? dominionE.value : 1f;                                       // 지배 독×2
-        c.healPct      = dominion ? dominionE.value2 : (insight ? insightE.value2 : 0f);        // 회복 0.1%/0.2%
+        c.shieldPctPerSec = dominion ? dominionE.value2 : (insight ? insightE.value2 : 0f);     // 초당 보호막 0.1%/0.2%
         c.atkDebuff    = (insight ? insightE.value3 : 0f) + (dominion ? 0.3f : 0f);             // 공-20% + 집중분산 근사
         c.bossAmp      = dominion ? dominionE.value3 : 0f;                                      // 보스 받뎀 +15%
         c.mergeAll     = dominion;
@@ -69,10 +68,10 @@ public sealed class GrassMistEffect : GrassRuneEffectBase
 /// <summary>2단계 강화 — 마커. 장판 크기 +50%, 겹침 영역 독피해 +50%(장판이 Config로 읽음).</summary>
 public sealed class GrassMistPlusEffect : GrassRuneEffectBase { }
 
-/// <summary>3단계 간파 — 마커. 크기 +50%, 독피해 시 HP 0.1% 회복, 겹침 시 적 공-20%.</summary>
+/// <summary>3단계 간파 — 마커. 크기 +50%, 안개 안에서 초당 보호막 0.1%, 겹침 시 적 공-20%.</summary>
 public sealed class GrassMistInsightEffect : GrassRuneEffectBase { }
 
-/// <summary>4단계 독무 지배 — 마커. 장판 닿으면 전체 겹침판정, 독×2, 회복0.2%, 집중분산, 보스 받뎀 +15%.</summary>
+/// <summary>4단계 독무 지배 — 마커. 장판 닿으면 전체 겹침판정, 독×2, 초당 보호막 0.2%, 집중분산, 보스 받뎀 +15%.</summary>
 public sealed class GrassMistDominionEffect : GrassRuneEffectBase { }
 
 // ── FD 재사용: 독안개 장판 ───────────────────────────────────────────────────
@@ -91,7 +90,11 @@ public sealed class PoisonField : GroundFieldBase
         public float radiusMult;  // 크기 배율
         public float overlapBonus;// 겹침 영역 독피해 가산(+0.5)
         public float dotMult;     // 독피해 배율(지배 ×2)
-        public float healPct;     // 독피해 시 회복(최대HP 비율)
+        // 예전엔 healPct — <b>독피해가 들어갈 때마다</b> 최대HP 비율만큼 회복했다.
+        // 흡혈·회복 계열은 이 프로젝트가 두지 않는 것이고("적에게서 가져오는가"가 판정 기준),
+        // 게다가 적 1마리마다 콜백이 돌아 <b>적이 많을수록 회복이 배로 늘어나는</b> 의도 밖 배율이 있었다.
+        // 지금은 "내 안개 안에 서 있다"는 자기 조건으로만 서는 보호막이다 — 적은 관여하지 않는다.
+        public float shieldPctPerSec;  // 장판 안에 있는 동안 초당 보호막(최대HP 비율)
         public float atkDebuff;   // 겹침 시 적 공격 디버프
         public float bossAmp;     // 보스 받는피해 증폭
         public bool  mergeAll;    // 닿은 장판 전체 겹침 판정
@@ -114,7 +117,6 @@ public sealed class PoisonField : GroundFieldBase
     private PlayerController _player;
     private Config _cfg;
     private float  _reapplyTimer;
-    private Action _healAction;
 
     /// <summary>최대 3개 — 초과 시 가장 오래된 장판을 Despawn.</summary>
     public static void SpawnAt(PlayerController player, Vector3 pos, Config cfg)
@@ -123,7 +125,6 @@ public sealed class PoisonField : GroundFieldBase
         f._player     = player;
         f._cfg        = cfg;
         f._reapplyTimer = 0f;
-        f._healAction = cfg.healPct > 0f ? f.HealOnTick : null;
         f.Initialize(pos, BASE_RADIUS * Mathf.Max(0.1f, cfg.radiusMult), cfg.life,
                      player != null ? player.gameObject : null);
 
@@ -145,6 +146,8 @@ public sealed class PoisonField : GroundFieldBase
         if (_reapplyTimer > 0f) return;
         _reapplyTimer = REAPPLY;
 
+        GrantShieldIfInside();
+
         QueryEnemies(16);
         for (int i = 0; i < _enemyBuffer.Count; i++)
         {
@@ -156,7 +159,7 @@ public sealed class PoisonField : GroundFieldBase
                 : PoisonFieldsContaining(mb.transform.position) >= 2;
 
             float perTick = _cfg.perTick * _cfg.dotMult * (overlap ? 1f + _cfg.overlapBonus : 1f);
-            mb.Status.ApplyDot("poison", perTick, DOT_INTERVAL, DOT_TICKS, _player.gameObject, 1f, null, _healAction);
+            mb.Status.ApplyDot("poison", perTick, DOT_INTERVAL, DOT_TICKS, _player.gameObject, 1f, null, null);
 
             if (_cfg.atkDebuff > 0f && overlap)
                 mb.Status.ApplyAttackSlow("poison_atk", _cfg.atkDebuff, DEBUFF_DUR);
@@ -172,11 +175,13 @@ public sealed class PoisonField : GroundFieldBase
         _player = null;
     }
 
-    private void HealOnTick()
+    /// <summary>내 안개 안에 서 있는 동안 초당 보호막. 적 상태·피해와 무관한 자기 조건이다.</summary>
+    private void GrantShieldIfInside()
     {
-        if (_player == null) return;
-        int h = Mathf.RoundToInt(_player.RuntimeStats.MaxHp * _cfg.healPct);
-        if (h > 0) _player.Heal(h);
+        if (_player == null || _cfg.shieldPctPerSec <= 0f) return;
+        float r = Radius;
+        if ((Center - _player.transform.position).sqrMagnitude > r * r) return;
+        _player.RuntimeStats.AddShield(_player.RuntimeStats.MaxHp * _cfg.shieldPctPerSec);
     }
 
     private bool FieldTouchesAnother()

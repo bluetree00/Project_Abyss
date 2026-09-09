@@ -195,18 +195,22 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     // 각 스테이션(무형검=Slot0, 원거리=Slot1 등)이 획득 순서와 무관하게
     // 자기 슬롯에 독립적으로 장착하기 위한 진입점. 다른 슬롯/스테이션을 참조하지 않는다.
     // ----------------------
-    public async UniTask AcquireWeaponToSlotAsync(WeaponData runtimeData, int slotIndex, bool setActive = true)
+    /// <param name="playAppear">기본 디졸브 등장을 재생할지. 호출측이 고유 등장 연출(안개 페이드 등)을 쓰면 false.</param>
+    /// <param name="beforeShow">인스턴스가 켜지기 <b>직전</b>에 한 번 호출 — 첫 프레임 전에 투명하게 만드는 등 준비용.</param>
+    public async UniTask AcquireWeaponToSlotAsync(WeaponData runtimeData, int slotIndex, bool setActive = true,
+                                                  bool playAppear = true, Action<GameObject> beforeShow = null)
     {
         if (runtimeData == null || slotIndex < 0 || slotIndex >= SlotCount) return;
 
         _owned.Add(runtimeData);
-        await EquipToSlotAsync(slotIndex, runtimeData, setActive);
+        await EquipToSlotAsync(slotIndex, runtimeData, setActive, playAppear, beforeShow);
     }
 
     // ----------------------
     // 슬롯 장착 (기존 장비는 비활성화)
     // ----------------------
-    private async UniTask EquipToSlotAsync(int slotIndex, WeaponData runtimeData, bool setActive = false)
+    private async UniTask EquipToSlotAsync(int slotIndex, WeaponData runtimeData, bool setActive = false,
+                                           bool playAppear = true, Action<GameObject> beforeShow = null)
     {
         if (slotIndex < 0 || slotIndex >= SlotCount || runtimeData == null) return;
 
@@ -262,10 +266,11 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         {
             var parent = ResolveHandTransform(runtimeData);
             slot.instance.transform.SetParent(parent, false);
+            beforeShow?.Invoke(slot.instance);   // 켜기 전 — 첫 프레임에 통째로 보이는 팝을 막을 마지막 기회
             slot.instance.SetActive(setActive);
 
-            // 등장 연출
-            if (setActive)
+            // 등장 연출 — 호출측이 고유 연출을 쓰면(무형검 안개 넘겨받기) 기본 디졸브는 생략
+            if (setActive && playAppear)
                 DissolveEffect.PlayAppear(slot.instance, 0.4f);
         }
 

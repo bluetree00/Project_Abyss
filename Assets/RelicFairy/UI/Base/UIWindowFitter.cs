@@ -34,6 +34,9 @@ public sealed class UIWindowFitter : MonoBehaviour
     [Range(1f, 3f)]
     [SerializeField] private float maxScale = 1.3f;
 
+    [Tooltip("창을 sizeDelta 대신 localScale로 키운다. 세로 레이아웃 그룹처럼 자식이 픽셀 크기로 짜인 창은 " +
+             "상자만 커지고 내용이 안 따라오므로, 통째로 배율을 걸어 목업 비례를 그대로 지킨다.")]
+    [SerializeField] private bool scaleTransform = false;
     /// <summary>
     /// <b>컨텐츠 화면</b>(플레이어가 머무는 주 화면)이 쓰는 확대 상한.
     ///
@@ -77,11 +80,13 @@ public sealed class UIWindowFitter : MonoBehaviour
     /// 코드로 붙일 때 설정을 함께 준다. 프리팹에 손으로 붙이면 인스펙터 값이 쓰이지만,
     /// <b>재굽기가 계층을 다시 만들면 손으로 붙인 컴포넌트는 사라진다</b> — 그래서 빌더가 붙인다.
     /// </summary>
-    public UIWindowFitter Configure(float margin = 0.94f, bool scaleFonts = true, float maxScale = 1.3f)
+    public UIWindowFitter Configure(float margin = 0.94f, bool scaleFonts = true, float maxScale = 1.3f,
+                                    bool scaleTransform = false)
     {
-        this.margin     = margin;
-        this.scaleFonts = scaleFonts;
-        this.maxScale   = maxScale;
+        this.margin         = margin;
+        this.scaleFonts     = scaleFonts;
+        this.maxScale       = maxScale;
+        this.scaleTransform = scaleTransform;
         return this;
     }
 
@@ -106,6 +111,14 @@ public sealed class UIWindowFitter : MonoBehaviour
         if (maxScale > 1f) h = Mathf.Min(h, _baseH * maxScale);
         if (neverShrink)   h = Mathf.Max(h, _baseH);
 
+        if (scaleTransform)
+        {
+            // 기준 크기는 그대로 두고 배율만 건다 — 글꼴·자식 픽셀 크기가 전부 같이 커진다.
+            _rt.sizeDelta  = new Vector2(_baseW, _baseH);
+            float s = h / _baseH;
+            _rt.localScale = new Vector3(s, s, 1f);
+            return;
+        }
         _rt.sizeDelta = new Vector2(h * aspect, h);
 
         if (scaleFonts) UIProportional.ScaleFonts(_rt, h / _baseH);
