@@ -105,6 +105,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4cbf96b561d83db419b318e319aab1cf
+    m_Address: UI/SettingsSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a0e7d6dce9c8e2042af2763fe0487008
+    m_Address: UI/AchievementSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 229feaa23793ae046b697ae37f01d17b
     m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/refine_30.asset
     m_ReadOnly: 0

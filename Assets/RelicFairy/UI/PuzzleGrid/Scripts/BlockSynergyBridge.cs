@@ -20,7 +20,9 @@ public class MerlinRuneBridge : MonoBehaviour
 {
     // ── Constants ──
     // 그리드 squareGap 과 Shape cellSize 를 동일 값으로 유지해 크기를 일치시킴
-    private const float GRID_CELL_SIZE = 54f;   // CELL_SIZE(50) + CELL_GAP(4) = MerlinRuneHexGridView.CELL_STEP
+    // 판의 칸 간격은 뷰가 정한다 — 여기에 숫자를 따로 적어 두면 뷰가 바뀔 때 조용히 어긋난다
+    // (실제로 뷰가 78로 커진 뒤에도 54로 남아 있었다). 2026-09-10 실측에서 발견.
+    private const float GRID_CELL_SIZE = MerlinRuneHexGridView.CellStep;
 
     // ── Static ──
     public static MerlinRuneBridge Instance { get; private set; }
@@ -542,6 +544,11 @@ public class MerlinRuneBridge : MonoBehaviour
 
         DowngradeBelowThreshold(blockData, zoneCounts);
 
+        // ⚠️ 임계값이 존마다 다른 건 오타가 아니다 — <b>4단계 임계 = 그 존의 칸 수</b>다.
+        //    ZONE_MAP 실측: 불·물·전기·어둠 19칸 → 19 / 풀·빛 20칸 → 20 / 중앙 16칸 → 16.
+        //    즉 4단계는 "존을 100% 채웠다"는 뜻이고, 3단계(13 vs 14)도 같은 비율(≈0.69)을 따른다.
+        //    차트만 보면 13/19와 14/20이 어긋나 보여 맞추고 싶어지는데, 맞추면 풀·빛은
+        //    존을 다 채워도 4단계가 안 뜨거나(21로 올릴 때) 한 칸 남기고 떠버린다(19로 내릴 때).
         foreach (var kvp in zoneCounts)
         {
             string zoneId       = kvp.Key;
@@ -700,7 +707,10 @@ public class MerlinRuneBridge : MonoBehaviour
         return new GridAssetData
         {
             id = gridId,
-            displayName = meta?.grid_name ?? gridId,
+            // 이름의 <b>단일 출처는 ElementDef</b>다. 차트(zone_name)를 먼저 쓰면
+            // 코드에서 속성 이름을 바꿔도 차트가 옛 이름을 그대로 띄워 화면에서 이름이 갈린다
+            // (실제로 「얼음」→「물」로 바꿀 때 여기만 얼음으로 남았다). 차트는 폴백으로만 둔다.
+            displayName = ElementDef.GetById(gridId)?.Name ?? meta?.grid_name ?? gridId,
             pattern = new GridPatternData
             {
                 rows = rowCount,

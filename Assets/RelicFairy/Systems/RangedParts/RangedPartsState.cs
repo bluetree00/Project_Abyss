@@ -73,6 +73,17 @@ public sealed class RangedPartsState
     /// <summary>켠 파츠 수.</summary>
     public int ActiveCount => _equipped.Count;
 
+    /// <summary>파츠 레벨 합 — 원거리 스킬 단계(<see cref="SkillTierResolver"/>)의 진행도.</summary>
+    public int TotalLevel
+    {
+        get
+        {
+            int sum = 0;
+            for (int i = 0; i < _equipped.Count; i++) sum += _equipped[i].level;
+            return sum;
+        }
+    }
+
     /// <summary>
     /// 지금까지 파츠에 부은 강화재료 총량. 레벨에서 역산하므로 따로 들고 다니지 않는다
     /// (별도 필드로 두면 세이브·복원에서 레벨과 어긋날 수 있다).

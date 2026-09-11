@@ -33,6 +33,9 @@ public class CrucibleRoomController : MonoBehaviour
     private const float JackpotMaxChance   = 0.5f;
 
     private const float DiscountCostMult    = 0.5f;   // 반값 재련
+    /// <summary>「대장장이의 인장」(기억의 제단 Ⅰ 출발) 해금 시 붙는 성공률. 화로 이벤트와 <b>합연산</b>이다.</summary>
+    public const float SmithSigilBonus = 0.08f;   // 성공률 +8%p
+
     private const float FeverSuccessBonus   = 0.15f;  // 성공률 +15%p
     private const float BountyJackpotBonus  = 0.15f;  // 잭팟 확률 +15%p (방 전체)
     private const float CurseSuccessPenalty = 0.10f;  // 성공률 -10%p (방 전체)
@@ -87,7 +90,18 @@ public class CrucibleRoomController : MonoBehaviour
     public CrucibleEvent ActiveEvent => _event;
     public bool HasEvent => _event != CrucibleEvent.None;
     private float CostMult     => _event == CrucibleEvent.Discount ? DiscountCostMult : 1f;
-    private float SuccessBonus => _event switch
+    /// <summary>
+    /// 성공률 상시 보정 — 화로 이벤트 + 해금 인장. <b>표시와 굴림이 같은 값을 봐야 한다.</b>
+    /// 예전엔 표시(SuccessChanceAt)에만 인장을 더하고 굴림(TryEnhance)에는 안 넘겨,
+    /// 화면은 +8%p인데 실제 확률은 그대로인 거짓말이 됐다. 여기 한 곳에서 합친다.
+    /// </summary>
+    private float SuccessBonus => EventBonus + SigilBonus;
+
+    /// <summary>「대장장이의 인장」(기억의 제단 Ⅰ 출발) 상시 보정.</summary>
+    public static float SigilBonus =>
+        MemoryAltarService.IsUnlocked(MemoryAltarCatalog.SigilSmith) ? SmithSigilBonus : 0f;
+
+    private float EventBonus => _event switch
     {
         CrucibleEvent.Fever => FeverSuccessBonus,
         CrucibleEvent.Curse => -CurseSuccessPenalty,
@@ -186,7 +200,8 @@ public class CrucibleRoomController : MonoBehaviour
         return w != null && _table != null && !WeaponEnhanceService.IsMaxed(w, _table);
     }
 
-    public float SuccessChanceAt(int slot) => Mathf.Clamp01(WeaponEnhanceService.SuccessChance(GetSlot(slot), _table) + SuccessBonus);
+    public float SuccessChanceAt(int slot) =>
+        Mathf.Clamp01(WeaponEnhanceService.SuccessChance(GetSlot(slot), _table) + SuccessBonus);
     public int   MaxAt(int slot)           => WeaponEnhanceService.MaxEnhance(GetSlot(slot), _table);
     public int   CostAt(int slot)          { var w = GetSlot(slot); return (w != null && _table != null) ? WeaponEnhanceService.CostWith(_table, w.enhanceLevel, CostMult) : 0; }
     public int   DropAt(int slot)          { var w = GetSlot(slot); return (w != null && _table != null) ? _table.DropAt(w.enhanceLevel) : 0; }

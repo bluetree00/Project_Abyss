@@ -59,6 +59,8 @@ MonoBehaviour:
   rosterIllust: {fileID: 0}
   passives: []
   qSkillClipKey: 
+  qSkillMainState: RelicQ_Main
+  qSkillMainClipKey: 
   qSkillCinematic: {fileID: 0}
   stats: []
   auraVfxKey: 

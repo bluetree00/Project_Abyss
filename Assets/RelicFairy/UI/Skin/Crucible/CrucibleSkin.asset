@@ -12,32 +12,34 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c6da03314bb89ff4faa6e50ff8ad5d1e, type: 3}
   m_Name: CrucibleSkin
   m_EditorClassIdentifier:
-  background: {fileID: 21300000, guid: d4ae3505f6598804b852d9c364060644, type: 3}
-  stagePanel: {fileID: 21300000, guid: 47724c26ba8ce9643ae16064dec3231c, type: 3}
+  background: {fileID: 21300000, guid: 441979ee55630d54ea424d630e9f746c, type: 3}
+  stagePanel: {fileID: 21300000, guid: 8a789ab2230952845a18513669e6d4ac, type: 3}
   anvilIcon: {fileID: 21300000, guid: 5f08b11721d3f0c4fb2dd0c3278a28ba, type: 3}
   decor1: {fileID: 21300000, guid: 694c1f5af6305b641978d412d35d7276, type: 3}
   diamondDecor: {fileID: 21300000, guid: 4d8919884c264014a8982bf8ef63772a, type: 3}
-  arrow: {fileID: 21300000, guid: 5a8d467ca84bd034fac5b2e4c9603de6, type: 3}
+  arrow: {fileID: 21300000, guid: ec35d9d119aa4b647a93713465046e92, type: 3}
   tabWeaponOn: {fileID: 21300000, guid: 0fe4b385c49ccc44aab19af6005550fa, type: 3}
   tabWeaponOff: {fileID: 21300000, guid: c0b42f3772487b540ada881e63de39e1, type: 3}
   tabRangedOn: {fileID: 21300000, guid: e5cb32d0802f54b44b6b00ed09026bc7, type: 3}
   tabRangedOff: {fileID: 21300000, guid: aff4b17063d0f45499d7c86bde3a5ebe, type: 3}
-  slotFrame: {fileID: 21300000, guid: 1cf9e764d214bf64ca416d50202f7ceb, type: 3}
-  slotFill: {fileID: 21300000, guid: 32552188e1ce824458b6fd19007ed8e2, type: 3}
+  slotFrame: {fileID: 21300000, guid: 7c776e5c8b251d641bde0b446441193a, type: 3}
+  slotFill: {fileID: 21300000, guid: 7c776e5c8b251d641bde0b446441193a, type: 3}
   slotFill2: {fileID: 21300000, guid: 83093e96eb7cd9f459cfa86f4c846df2, type: 3}
   slotFill2Alt: {fileID: 21300000, guid: d2d16ed6d3add454a8e352f5cd05a056, type: 3}
   weaponExample: {fileID: 21300000, guid: dbe827c444f77cf4ea42a3db1a769430, type: 3}
-  gaugeTrack: {fileID: 21300000, guid: 9c650934369eef44ca2d336d23b48f6b, type: 3}
-  gaugeFill: {fileID: 21300000, guid: cbca94acaaee8574d9b0adb33ba16a1f, type: 3}
-  gaugeFrame: {fileID: 21300000, guid: 3948472e609b7884294d728715da0940, type: 3}
+  gaugeTrack: {fileID: 21300000, guid: 7a4beee7b30bf7441bff6eb2b36731b8, type: 3}
+  gaugeFill: {fileID: 0}
+  gaugeFrame: {fileID: 0}
   rangedGaugeFill: {fileID: 21300000, guid: 0e9a4e99d154aa647a1d94956f3f1bf8, type: 3}
   rangedGaugeFrame: {fileID: 21300000, guid: 264f5e35221aabb44ab962ea63719d4f, type: 3}
   rangedGaugeMark: {fileID: 21300000, guid: 5562e368a941e774e92fb3634a555717, type: 3}
-  infoPanel: {fileID: 21300000, guid: c9934c347f019d04fbca13823c370f90, type: 3}
-  riskBadge: {fileID: 21300000, guid: 7de014b27e4308f439e94b0c752b197c, type: 3}
+  atkPlate: {fileID: 21300000, guid: 9e1709586839bed4187e8f67208e874e, type: 3}
+  dialogueBand: {fileID: 21300000, guid: efd2da19bfebc2845b46e15052aff3cf, type: 3}
+  infoPanel: {fileID: 21300000, guid: aaaaa3f76abd5a54d8ecab4157ffb790, type: 3}
+  riskBadge: {fileID: 21300000, guid: 3ebf397e52bcd6a42b631ba026f364aa, type: 3}
   enhanceButton: {fileID: 21300000, guid: 79de94ba93230c54db4dae4f3060191f, type: 3}
   partEnhanceButton: {fileID: 21300000, guid: 134a838e3a9b4fa49a5b2aa98db0f59c, type: 3}
   switchButton: {fileID: 21300000, guid: 609c4415b1afe514b9da2bfdb11d6490, type: 3}
-  exitButton: {fileID: 21300000, guid: 78faa9904af73d345a0ed9b53ef8e6f5, type: 3}
+  exitButton: {fileID: 21300000, guid: d46a364431f44414e92e54bc9a82cdeb, type: 3}
   currencySlot: {fileID: 21300000, guid: 62742ba0c7e912a4c8a870abcd526caf, type: 3}
   currencyGem: {fileID: 21300000, guid: 9e9ee8887b46d9441bf98360fe9312bc, type: 3}

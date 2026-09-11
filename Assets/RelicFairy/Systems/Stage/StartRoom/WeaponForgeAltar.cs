@@ -174,8 +174,8 @@ public class WeaponForgeAltar : MonoBehaviour
             ranged, player, PlayerWeaponManager.Slot1, setActive: false);
         ct.ThrowIfCancellationRequested();
 
-        // 장착 완료 → 허브에서 전투 HUD 표시(테스트용).
-        UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
+        // 장착 완료 → 허브에서 전투 HUD를 페이드로 표시.
+        UIRootBootstrapper.Instance?.RevealHudAsync(0.6f).Forget();
     }
 
     // ── World Text / Prompt (RelicAltar 패턴) ─────────────────

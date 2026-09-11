@@ -43,10 +43,11 @@ public sealed class RelicStateVfx : MonoBehaviour
     /// scale은 프리팹 원본 크기에 곱하는 배율(1이면 원본). 이펙트가 실제 판정 범위보다 커 보이면 여기서 줄인다.
     /// forward를 주면 그 방향을 바라보게 회전(전방 참격 등). Vector3.zero면 회전 없음.
     /// </summary>
-    public static void PlayOneShot(string addressableKey, Vector3 pos, float scale = 1f, Vector3 forward = default)
+    /// <param name="prewarm">파티클을 이 시간만큼 미리 진행시킨 상태로 켠다(초). 지연 버스트가 있는 이펙트의 클라이맥스를 앞당길 때.</param>
+    public static void PlayOneShot(string addressableKey, Vector3 pos, float scale = 1f, Vector3 forward = default, float prewarm = 0f)
     {
         if (!string.IsNullOrEmpty(addressableKey))
-            PlayOneShotAsync(addressableKey, pos, scale, forward).Forget();
+            PlayOneShotAsync(addressableKey, pos, scale, forward, prewarm).Forget();
     }
 
     private async UniTaskVoid EnsureAsync(string stateKey)
@@ -102,7 +103,7 @@ public sealed class RelicStateVfx : MonoBehaviour
             if (binders[i].Target == null) binders[i].Target = transform;
     }
 
-    private static async UniTaskVoid PlayOneShotAsync(string key, Vector3 pos, float scale, Vector3 forward)
+    private static async UniTaskVoid PlayOneShotAsync(string key, Vector3 pos, float scale, Vector3 forward, float prewarm)
     {
         GameObject go = null;
         try { go = await Managers.AddressableManager.InstantiateAsync(key, null, true); }
@@ -118,6 +119,16 @@ public sealed class RelicStateVfx : MonoBehaviour
 
         if (forward.sqrMagnitude > 0.0001f)
             t.rotation = Quaternion.LookRotation(forward.normalized, Vector3.up);
+
+        if (prewarm > 0f)
+        {
+            // 시스템마다 따로 돌린다 — 자식까지 한 번에 돌리면 각자의 startDelay가 뭉개진다.
+            foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                ps.Simulate(prewarm, false, true);
+                ps.Play(false);
+            }
+        }
 
         Destroy(go, 3f);
     }

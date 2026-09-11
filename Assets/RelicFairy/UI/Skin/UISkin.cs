@@ -18,6 +18,8 @@ public static class UISkin
     private const string RelicInfoAddress   = "UI/RelicInfoSkin";
     private const string DialogueAddress    = "UI/DialogueSkin";
     private const string CovenantAddress    = "UI/CovenantSkin";
+    private const string AchievementAddress = "UI/AchievementSkin";
+    private const string SettingsAddress    = "UI/SettingsSkin";
 
     private static RefinerySkinSO    _refinery;
     private static RuneSelectSkinSO  _runeSelect;
@@ -27,6 +29,8 @@ public static class UISkin
     private static RelicInfoSkinSO   _relicInfo;
     private static DialogueSkinSO    _dialogue;
     private static CovenantSkinSO    _covenant;
+    private static AchievementSkinSO _achievement;
+    private static SettingsSkinSO    _settings;
     private static bool _tried;
 
     /// <summary>정제소 스킨. 미로드/미등록이면 null → 코드로 그린 색 박스가 그대로 보인다.</summary>
@@ -53,6 +57,12 @@ public static class UISkin
     /// <summary>서약 조립 팝업 스킨. 미로드/미등록이면 null → 프리팹 구 아트 유지.</summary>
     public static CovenantSkinSO Covenant => _covenant;
 
+    /// <summary>업적 목록 스킨. 미로드/미등록이면 null → 색 폴백.</summary>
+    public static AchievementSkinSO Achievement => _achievement;
+
+    /// <summary>환경설정 스킨. 미로드/미등록이면 null → 색 폴백.</summary>
+    public static SettingsSkinSO Settings => _settings;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
@@ -64,6 +74,8 @@ public static class UISkin
         _relicInfo   = null;
         _dialogue    = null;
         _covenant    = null;
+        _achievement = null;
+        _settings    = null;
         _tried       = false;
     }
 
@@ -81,6 +93,8 @@ public static class UISkin
         _relicInfo   = await LoadOrNull<RelicInfoSkinSO>(RelicInfoAddress, "유물 선택");
         _dialogue    = await LoadOrNull<DialogueSkinSO>(DialogueAddress, "대화창");
         _covenant    = await LoadOrNull<CovenantSkinSO>(CovenantAddress, "서약");
+        _achievement = await LoadOrNull<AchievementSkinSO>(AchievementAddress, "업적");
+        _settings    = await LoadOrNull<SettingsSkinSO>(SettingsAddress, "환경설정");
     }
 
     private static async UniTask<T> LoadOrNull<T>(string address, string label) where T : Object

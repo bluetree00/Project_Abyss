@@ -75,8 +75,8 @@ public class FanArrowBehaviorSO : SkillBehaviorSO
             ctx.RotateToMouse();
             ctx.SetMoveScale(0f);
 
-            // 무기 티어로 스킬 단계 결정 (1~3)
-            _skillTier = Mathf.Clamp(ctx.WeaponData?.tier ?? 1, 1, 3);
+            // 스킬 단계(1~3) — 강화/파츠에서 파생(SkillTierResolver)
+            _skillTier = ctx.SkillTier;
 
             _phase = Phase.WindUp;
             _timer = 0f;
@@ -172,7 +172,21 @@ public class FanArrowBehaviorSO : SkillBehaviorSO
 
             if (!obj.TryGetComponent<BasicArrow>(out var arrow)) return;
 
-            arrow.Fire(dir, ctx.Controller.gameObject, dmg);
+            // 기본공격과 같은 퍼널을 지난다 — 원거리 파츠(분열·관통·폭발·유도·거력)·아이템·방버프가
+            // 스킬 화살에도 얹힌다. 예전엔 여기서 Fire를 직접 불러 파츠가 스킬엔 안 닿았다.
+            var req = ProjectileRequest.Create(_data.arrowKey, pos, dir, dmg, ctx.Controller.gameObject, ctx.SourceSlot);
+            CombatSpawner.SpawnProjectile(ref req, arrow, extra => ApplySkillExtras(extra, req, dmg, tier));
+            obj.transform.localScale = Vector3.one * req.sizeMult;
+            ApplySkillExtras(obj, req, dmg, tier);
+        }
+
+        /// <summary>
+        /// 퍼널이 세팅한 화살(주 투사체·분열 갈래 모두)에 스킬 고유분을 얹는다.
+        /// 파츠와 축이 겹치는 항목(관통·폭발)은 큰 쪽을 쓴다 — 중복 적용이 아니라 합류.
+        /// </summary>
+        private void ApplySkillExtras(GameObject obj, in ProjectileRequest req, float dmg, int tier)
+        {
+            if (obj == null || !obj.TryGetComponent<BasicArrow>(out var arrow)) return;
 
             // 투사체 비주얼 이펙트
             if (!string.IsNullOrEmpty(_data.projectileEffectKey))
@@ -180,7 +194,7 @@ public class FanArrowBehaviorSO : SkillBehaviorSO
 
             // 2단계 이상: 관통
             if (tier >= 2)
-                arrow.SetPierce(_data.pierceMaxCount);
+                arrow.SetPierce(Mathf.Max(_data.pierceMaxCount, req.pierce));
 
             // 3단계: 관통 + 폭발 + 추가 히트 이펙트
             if (tier >= 3)
@@ -189,8 +203,8 @@ public class FanArrowBehaviorSO : SkillBehaviorSO
                     ? _data.tier3ExtraHitKey : _data.explodeEffectKey;
                 float hitScale = !string.IsNullOrEmpty(_data.tier3ExtraHitKey)
                     ? _data.tier3ExtraHitScale : _data.explodeEffectScale;
-                arrow.SetExplosion(_data.explodeRadius, dmg * _data.explodeDamageRatio,
-                    hitKey, hitScale);
+                arrow.SetExplosion(Mathf.Max(_data.explodeRadius, req.explodeRadius),
+                    dmg * req.damageMult * _data.explodeDamageRatio, hitKey, hitScale);
             }
         }
 

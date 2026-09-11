@@ -107,6 +107,9 @@ public sealed class AppBootstrapper : MonoBehaviour
 
     private static void HandleRunEnded(EndRunResult result)
     {
+        // 계승 파츠는 <b>여기서 동기로</b> 확정한다 — 아래 저장은 비동기라,
+        // 그 사이에 EndRun()이 Loadout.Clear()를 부르면 고를 대상이 사라진다.
+        PartInheritanceService.CaptureFromRun(Instance?.Loadout);
         HandleRunEndedAsync(result).Forget();
     }
 

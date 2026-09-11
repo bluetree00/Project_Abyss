@@ -29,6 +29,25 @@ public static class DamagePopupSpawner
     private struct Cascade { public int index; public float lastTime; }
     private static readonly Dictionary<int, Cascade> _cascades = new();
 
+    // ── 다단히트 숫자 합산 ────────────────────────────────────────
+    // 분열 투사체 20발처럼 <b>같은 순간에</b> 꽂히는 피해는 숫자를 따로 띄워봐야 겹쳐서 못 읽는다.
+    // 같은 대상에 창(MergeWindow) 안으로 다시 꽂히면 이미 떠 있는 팝업의 값을 올린다.
+    //
+    // 창은 <b>눈이 숫자를 분리하지 못하는 구간</b>에만 걸어야 한다 — 사람이 두세 자리를 읽는 데
+    // 0.25초쯤 걸리므로, 그보다 느리게 들어오는 타격은 각자 보여주는 게 맞다.
+    // 그래서 0.12초로 잡는다: 동시 타격은 합치고, 읽을 수 있는 간격의 연타(랜슬롯 Q 0.17초)는 건드리지 않는다.
+    private const float MergeWindow = 0.12f;
+
+    private struct Merge { public DamagePopup popup; public float total; public float lastTime; public bool crit; }
+    private static readonly Dictionary<int, Merge> _merges = new();
+
+    /// <summary>
+    /// 합산 항목이 이만큼 쌓이면 만료분을 걷어낸다. 한 번 맞고 다시 안 맞는 몹은
+    /// 스스로 지워질 계기가 없어(다음 타가 와야 만료 판정이 돈다) 런 내내 남는다.
+    /// </summary>
+    private const int MergePruneAt = 64;
+    private static readonly List<int> _pruneBuf = new();
+
     // free 큐: 반환된(비활성) 인스턴스만 보관 → GetFromPool 은 O(1) 디큐.
     // 완료 시 DamagePopup 이 ReturnToPool 콜백으로 스스로 재입큐한다.
     private static readonly Queue<DamagePopup> _pool = new();
@@ -44,6 +63,7 @@ public static class DamagePopupSpawner
     {
         _pool.Clear();
         _cascades.Clear();
+        _merges.Clear();
         _prefab  = null;
         _root    = null;
         _loading = false;
@@ -55,11 +75,41 @@ public static class DamagePopupSpawner
     /// kind: 피해 출처 — 색으로 구분된다(일반/시너지/DoT).
     /// </summary>
     public static void Spawn(Vector3 worldPos, float damage, bool isCrit = false, int targetId = 0,
-                             DamageKind kind = DamageKind.Normal, RuneElement? element = null)
+                             DamageKind kind = DamageKind.Normal, RuneElement? element = null,
+                             bool merge = true)
     {
         if (damage <= 0f) return;
+
+        // 같은 대상에 연달아 꽂히면 이미 떠 있는 숫자를 키운다 — 새 팝업을 만들지 않는다.
+        if (merge && targetId != 0 && TryMerge(targetId, damage, isCrit, kind, element)) return;
+
         // 순번은 '지금' 확정한다 — 지연 뒤에 뽑으면 같은 프레임의 연타가 서로 순번을 덮어쓴다.
-        SpawnAsync(worldPos, damage, isCrit, NextCascadeIndex(targetId), kind, element).Forget();
+        SpawnAsync(worldPos, damage, isCrit, NextCascadeIndex(targetId), kind, element, targetId).Forget();
+    }
+
+    /// <summary>
+    /// 창 안의 기존 팝업에 피해를 더한다. 성공하면 true(새 스폰 불필요).
+    /// 팝업이 이미 수명을 다했거나(풀 반환) 창을 넘겼으면 false — 그때는 새로 띄운다.
+    /// </summary>
+    private static bool TryMerge(int targetId, float damage, bool isCrit,
+                                 DamageKind kind, RuneElement? element)
+    {
+        if (!_merges.TryGetValue(targetId, out var m)) return false;
+
+        if (m.popup == null || !m.popup.IsShowing || Time.time - m.lastTime > MergeWindow)
+        {
+            _merges.Remove(targetId);
+            return false;
+        }
+
+        m.total   += damage;
+        m.lastTime = Time.time;
+        m.crit    |= isCrit;                 // 한 번이라도 크리가 섞이면 합산 숫자를 크리로 승격
+        _merges[targetId] = m;
+
+        // 값만 올리고 수명을 되감는다 — 쌓이는 동안 숫자가 사라지면 안 된다.
+        m.popup.Accumulate(m.total, m.crit, kind, element);
+        return true;
     }
 
     /// <summary>대상별 연타 순번. 창(CascadeWindow) 안에 다시 맞으면 +1, 지나면 0으로 리셋.</summary>
@@ -78,7 +128,7 @@ public static class DamagePopupSpawner
     }
 
     private static async UniTaskVoid SpawnAsync(Vector3 worldPos, float damage, bool isCrit, int cascadeIndex,
-                                                DamageKind kind, RuneElement? element)
+                                                DamageKind kind, RuneElement? element, int targetId = 0)
     {
         await EnsurePrefabAsync();
         if (_prefab == null) return;
@@ -92,6 +142,25 @@ public static class DamagePopupSpawner
         if (popup == null) return;
 
         popup.Show(worldPos, damage, isCrit, kind, cascadeIndex, element);
+
+        // 다음 타가 이 팝업에 얹힐 수 있게 등록한다.
+        if (targetId != 0)
+        {
+            if (_merges.Count >= MergePruneAt) PruneMerges();
+            _merges[targetId] = new Merge { popup = popup, total = damage, lastTime = Time.time, crit = isCrit };
+        }
+    }
+
+    /// <summary>창을 넘긴 합산 항목 제거. 순회 중 삭제를 피해 키를 모았다가 지운다.</summary>
+    private static void PruneMerges()
+    {
+        float now = Time.time;
+        _pruneBuf.Clear();
+        foreach (var kv in _merges)
+            if (now - kv.Value.lastTime > MergeWindow) _pruneBuf.Add(kv.Key);
+
+        for (int i = 0; i < _pruneBuf.Count; i++) _merges.Remove(_pruneBuf[i]);
+        _pruneBuf.Clear();
     }
 
     private static async UniTask EnsurePrefabAsync()

@@ -573,7 +573,7 @@ public class StartRoomGate : MonoBehaviour
         if (bootstrapper != null)
             await bootstrapper.StartProcGenRunAsync();
 
-        UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
+        UIRootBootstrapper.Instance?.RevealHudAsync(0.6f).Forget();
     }
 
     // ── Player freeze helpers ─────────────────────────────────────

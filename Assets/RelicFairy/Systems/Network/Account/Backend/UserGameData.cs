@@ -52,6 +52,13 @@ public class UserGameData
     /// 해금 <b>할인 조건</b>과 업적 <b>진척</b>이 같은 값을 본다 — 정본 §2·§6.</summary>
     public string records = "";
 
+    // ── 기억의 제단 — 「출발」 갈래의 런 간 상태 ──────────
+    /// <summary>「파츠 영구 계승」으로 다음 런에 넘길 파츠 id. 빈 문자열이면 계승 없음.</summary>
+    public string inheritedPartId = "";
+
+    /// <summary>「고행자의 인장」 착용 여부. 해금해도 <b>켜야</b> 적용된다(자발적 난이도라 강제하지 않는다).</summary>
+    public bool asceticSigilOn;
+
     // ── [레거시] 유물의 각성 6계열 ──────────────────────
     // 영구 스탯은 폐기됐다(정본 §1 — 항상 적용되어 숙련 가독성을 훼손). 스탯 적용은 이미 끊겨 있고,
     // 이 필드들은 <b>환급 마이그레이션 원장</b>으로만 남는다. MemoryAltarService가 정수로 되돌린 뒤 0으로 만든다.
@@ -80,6 +87,9 @@ public class UserGameData
 
         unlockedIds          = "";
         records              = "";
+
+        inheritedPartId      = "";
+        asceticSigilOn       = false;
 
         abyssEssence         = 0;
         awakeningLevelSword  = 0;

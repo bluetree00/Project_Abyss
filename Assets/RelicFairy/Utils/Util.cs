@@ -53,7 +53,12 @@ public class Util
         }
         else
         {
-            foreach (T component in go.GetComponentsInChildren<T>())
+            // includeInactive: true — <b>비활성 오브젝트도 찾는다.</b>
+            // 기본값(false)이던 시절엔 처음에 꺼져 있는 UI가 UI_Base.Bind에서 통째로 실패했다.
+            // 실패는 LogWarning뿐이라 조용히 넘어가고, 호출부의 ?. 때문에 리스너가 안 붙어
+            // "보이지도 않고 눌러도 안 되는 버튼"이 남았다(로비 Btn_Awakening이 그랬다).
+            // 바로 아래 FindDeepChild는 이미 true를 넘기고 있었다 — 이쪽만 빠져 있었다.
+            foreach (T component in go.GetComponentsInChildren<T>(true))
             {
                 if (string.IsNullOrEmpty(name) || component.name == name)
                     return component;

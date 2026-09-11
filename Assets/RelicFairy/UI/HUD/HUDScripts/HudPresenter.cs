@@ -94,10 +94,23 @@ public sealed class HudPresenter : MonoBehaviour
             _fuelBank.OnFuelChanged -= HandleFuelChanged;
             _fuelBank = null;
         }
+        if (_run != null)
+        {
+            _run.OnEssenceChanged -= HandleEssenceChanged;
+            _run.OnReviveChanged  -= HandleReviveChanged;
+            _run = null;
+        }
+        if (_run != null)
+        {
+            _run.OnEssenceChanged -= HandleEssenceChanged;
+            _run.OnReviveChanged  -= HandleReviveChanged;
+            _run = null;
+        }
 
         _provider = provider;
         _state = run?.PlayerState;
         _fuelBank = run?.FuelBank;
+        _run = run;
 
         // 버프 핸들러 구독
         UnbindBuffHandler();
@@ -154,6 +167,16 @@ public sealed class HudPresenter : MonoBehaviour
         {
             HandleFuelChanged();
             _fuelBank.OnFuelChanged += HandleFuelChanged;
+        }
+
+        // 심연의 정수 — 런을 넘어 남는 유일한 재화. 줍는 곳과 보이는 곳을 맞춘다.
+        if (_run != null)
+        {
+            HandleEssenceChanged(_run.RunDelta?.GainedEssence ?? 0);
+            _run.OnEssenceChanged += HandleEssenceChanged;
+
+            HandleReviveChanged(_run.HasReviveCharge);
+            _run.OnReviveChanged += HandleReviveChanged;
         }
 
         // 현재 버프 즉시 반영
@@ -346,6 +369,17 @@ public sealed class HudPresenter : MonoBehaviour
         view.SetEnhanceMaterial(_fuelBank.EnhanceMaterial);
         view.SetRuneOre(_fuelBank.RuneOre);
     }
+
+    private void HandleEssenceChanged(int total) => view?.SetEssence(total);
+
+    /// <summary>
+    /// 부활 잔여 표기. <b>해금 여부</b>와 <b>이 런에서 남았는지</b>는 다른 질문이라 둘 다 넘긴다 —
+    /// 해금 안 했으면 표식을 감추고, 해금했는데 썼으면 꺼진 채로 남긴다.
+    /// </summary>
+    private void HandleReviveChanged(bool available)
+        => view?.CombatPanel?.SetRevive(MemoryAltarService.HasRevive, available);
+
+    private GameRunSession _run;
     private void HandleWeaponChanged(WeaponData _, GameObject __) => RefreshWeaponSlots();
     private void HandleEquippedWeaponRefreshed(WeaponData _) => RefreshWeaponSlots();
     private void HandleBuffsChanged() => RefreshBuffWindow();
@@ -496,10 +530,13 @@ public sealed class HudPresenter : MonoBehaviour
             view.CombatPanel.SetWeaponSlot(i, info);
         }
 
+        // 슬롯 모델: Q = 유물 고유(아이콘은 유물 SO에 아직 없어 뷰 폴백), E = 무기 skillE,
+        // R = 무기 skillQ(레거시 필드명 — ActSkillState.GetSkillSO와 동일 매핑).
+        // 예전엔 Q에 무기 skillQ 아이콘을 띄워 실제 발동(유물)과 어긋났고 R은 늘 비어 있었다.
         var current = _weaponManager.CurrentWeaponData;
-        view.CombatPanel.SetSkillIcon(SkillType.Q, current?.skillQIcon);
+        view.CombatPanel.SetSkillIcon(SkillType.Q, null);
         view.CombatPanel.SetSkillIcon(SkillType.E, current?.skillEIcon);
-        view.CombatPanel.SetSkillIcon(SkillType.R, current?.skillRIcon);
+        view.CombatPanel.SetSkillIcon(SkillType.R, current?.skillQIcon);
 
         // 스킬 없는 슬롯(무형검 등)은 잠금 표시. 무기 교체·진화 때마다 이 경로가 다시 돌아
         // 스킬이 생기면 자동으로 풀린다(별도 해제 처리 불필요).

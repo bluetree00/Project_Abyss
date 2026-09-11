@@ -36,7 +36,7 @@ public class MultiShotBehaviorSO : SkillBehaviorSO
 
         public void OnEnter(SkillExecutionContext ctx)
         {
-            int tier = Mathf.Clamp(ctx.WeaponData?.tier ?? 1, 1, 3);
+            int tier = ctx.SkillTier;
 
             int extraShots = tier switch
             {

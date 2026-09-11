@@ -13,6 +13,13 @@ using Cysharp.Threading.Tasks;
 /// </summary>
 public sealed class UI_ItemAcquisitionPopup : UI_Popup
 {
+    /// <summary>
+    /// 선택을 강제하는 팝업이므로 게임플레이를 막는다 — 이게 없으면 시간정지·입력잠금이
+    /// 걸리지 않아 뒤에서 플레이어가 계속 움직이고, 월드의 F키 상호작용도 그대로 발동한다.
+    /// 같은 보상 흐름의 형제 팝업(룬 선택·파츠 드래프트)은 모두 켜 두었다.
+    /// </summary>
+    public override bool BlocksGameplay => true;
+
     // ── SerializeField ──
     [Header("아이템 정보")]
     [SerializeField] private Image       itemIcon;
@@ -58,6 +65,7 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
     public override void Init()
     {
         base.Init();
+        EnsureVeil();   // 팝업 공통 암막 — 반투명 판 뒤로 3D 씬 바닥 무늬가 비쳐 글자를 못 읽었다(2026-09-09 실측)
 
         if (openGridButton != null)
             openGridButton.onClick.AddListener(OnOpenGridClicked);
@@ -143,9 +151,13 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
     private void OnOpenGridClicked()
     {
         Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
-        _interactionTcs?.TrySetResult();
 
-        if (_item == null || _inventory == null) { ClosePopupUI(); return; }
+        if (_item == null || _inventory == null)
+        {
+            ClosePopupUI();
+            _interactionTcs?.TrySetResult();
+            return;
+        }
 
         // 보관함에 추가. 가득 차면 실패하는데, 과거엔 이 실패를 무시하고 팝업만 닫아
         // <b>아이템이 조용히 사라졌다</b> → 실패 시 그리드로 넘겨 '보류' 상태로 들고 있게 한다.
@@ -154,7 +166,10 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
             ItemEffectVfxHelper.ShowNotice(
                 $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.MaxStagingCapacity}칸) — 자리를 비우면 자동으로 추가됩니다");
 
+        // <b>닫기를 먼저, 결과 통지를 나중에.</b> 순서를 뒤집으면 기다리던 다음 보상 팝업이
+        // 이 팝업이 아직 스택에 남은 채로 열려 교착·아이템 유실이 난다(프로젝트 규약).
         ClosePopupUI();
+        _interactionTcs?.TrySetResult();
 
         // 프리팹이 비활성 상태여서 Instance가 null인 경우 ShowOverlayUI로 Awake를 트리거
         if (UI_GridPanel.Instance == null)
@@ -173,8 +188,8 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
         if (_rejectLabel != null)
             UIJuice.FlashAsync(_rejectLabel, COLOR_RISK, 0.10f, 1, destroyCancellationToken).Forget();
 
-        _interactionTcs?.TrySetResult();
         ClosePopupUI();
+        _interactionTcs?.TrySetResult();
     }
 
     // ── Presentation ──
@@ -241,10 +256,11 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
 
         var style = EffectRowStyle.Default;
         style.fontAsset       = popupFont;
-        style.fontSize        = 14f;
+        style.fontSize        = 16f;   // 가독성 하한(2026-09-09)
         style.iconSize        = 18f;
         style.rowHeight       = 22f;
         style.usePrefixArrows = true;
+        style.wrap            = true;   // 판 폭 565px에 긴 효과 문장이 한 줄로 안 들어간다
         style.normalColor     = COLOR_NORMAL_FX;
         style.riskColor       = COLOR_RISK;
 
@@ -319,4 +335,13 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
         ItemRarity.Legendary => COLOR_LEGENDARY,
         _                    => COLOR_COMMON,
     };
+
+    /// <summary>다른 팝업(상점·정제소·룬 획득)과 같은 0.8 암막을 맨 뒤에 깐다. 저작 프리팹이라 코드로 보장한다.</summary>
+    private void EnsureVeil()
+    {
+        if (transform.Find("Veil") != null) return;
+        var veil = ShopUIStyle.MakeImage(transform, "Veil", ShopUIStyle.Veil, raycast: true);
+        ShopUIStyle.Stretch(veil.rectTransform);
+        veil.transform.SetAsFirstSibling();
+    }
 }

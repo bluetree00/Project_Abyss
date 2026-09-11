@@ -101,12 +101,26 @@ public sealed class RefineryService
     public (float rare, float epic, float legend) CurrentOdds()
         => Odds(Fever, NextHeat, RoomPerk == RefineryPerk.Lucky);
 
+    /// <summary>「정제 품질」(기억의 제단 Ⅱ 등장) 해금 시 Epic 확률에 더해지는 몫. Rare에서 넘어온다.</summary>
+    public const float QualityUnlockEpic = 0.12f;
+
     private static (float rare, float epic, float legend) Odds(int fever, bool heat, bool lucky)
     {
         float epic = Mathf.Min(0.55f, 0.15f + fever * 0.06f);
+
+        // 해금 보정은 피버 상한(0.55) 위에 얹는다 — 상한에 닿은 뒤에도 해금이 값을 해야 한다.
+        // 과열(heat)의 2배와는 곱연산이라 둘이 겹치면 확실히 체감된다.
+        if (MemoryAltarService.IsUnlocked(MemoryAltarCatalog.RefineQuality))
+            epic += QualityUnlockEpic;
         float leg  = Mathf.Min(0.25f, 0.03f + fever * 0.025f);
         if (heat)  { epic = Mathf.Min(0.70f, epic * 2f); leg = Mathf.Min(0.40f, leg * 2f); }
         if (lucky) { leg  = Mathf.Min(0.45f, leg * 2f); }                                  // 방 특전: Legendary 2배
+
+        // 세 몫의 합이 1을 넘지 않게 정규화한다. 피버·과열·특전이 겹치면 epic+leg가 1.15까지 올라가
+        // Rare가 확률 0이 되고 표시용 rare가 <b>음수</b>로 나온다(확률바가 뒤집힌다).
+        // Legendary를 먼저 보장하고 Epic이 남은 몫을 가져간다 — 상위 등급이 손해 보지 않는 순서다.
+        leg  = Mathf.Min(leg, 1f);
+        epic = Mathf.Min(epic, 1f - leg);
         return (Mathf.Max(0f, 1f - epic - leg), epic, leg);
     }
 

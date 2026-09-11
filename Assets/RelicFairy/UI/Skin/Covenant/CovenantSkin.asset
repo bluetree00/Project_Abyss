@@ -19,6 +19,8 @@ MonoBehaviour:
   headerEffect: {fileID: 21300000, guid: 81eaad7f58e79fd45ab5688a6768b3fa, type: 3}
   cardIdle: {fileID: 21300000, guid: 83f4965088a50e44b85e09bd4f9dc073, type: 3}
   cardSelected: {fileID: 21300000, guid: 54e39fd17e371064098981100dd10b12, type: 3}
+  forgeBanner: {fileID: 21300000, guid: 70c505380ff9a1344b9aac506cedeee2, type: 3}
+  forgeBannerAlt: {fileID: 21300000, guid: 7b5d1ad5e941d38489caf8c3dc5be2ff, type: 3}
   gradeBar:
   - {fileID: 21300000, guid: a8e40da4fed5973429d3ac34ae526dc3, type: 3}
   - {fileID: 21300000, guid: d0ad440556eff034393ac665acf96287, type: 3}

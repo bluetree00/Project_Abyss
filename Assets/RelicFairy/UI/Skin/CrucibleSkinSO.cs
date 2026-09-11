@@ -47,6 +47,11 @@ public sealed class CrucibleSkinSO : ScriptableObject
     public Sprite rangedGaugeMark;   // 원거리 강화 게이지 표시(마일스톤)
 
     [Header("정보 / 배지")]
+    // ── 신규 납품본(_신규_20260828) 전용 칸 ──
+    // 상자 비율이 이미 이 아트에 맞춰져 있어, 필드만 있으면 그대로 들어간다.
+    public Sprite atkPlate;      // 공격력 올라가는 표기칸 (1128×111 = 10.16 · 상자 375×37 = 10.14)
+    public Sprite dialogueBand;  // 대장장이칸 (2272×305 = 7.449 · 대사 밴드 756×102 = 7.41)
+
     public Sprite infoPanel;     // 강화정보창
     public Sprite riskBadge;     // 위험 하락
 

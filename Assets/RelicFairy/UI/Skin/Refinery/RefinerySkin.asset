@@ -52,6 +52,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: fcb5f671c1577a64abc1667f46db59f3, type: 3}
   barTrack: {fileID: 21300000, guid: 8e075da0701c4ba45b5a339bcf2b31bc, type: 3}
   oddsPanel: {fileID: 21300000, guid: ea829299bc8ec4d40a662ee86436b686, type: 3}
+  eventPanel: {fileID: 21300000, guid: 6d3cf68c5b911e546acca7b75fef21e2, type: 3}
   barFrame: {fileID: 21300000, guid: 33c437d87ba102f4da5160e453e4e074, type: 3}
   barFill:
   - {fileID: 21300000, guid: 22649799b53120748b28f9c50b43ee60, type: 3}
@@ -69,21 +70,21 @@ MonoBehaviour:
   reservedBadge: {fileID: 0}
   costPlate:
   - {fileID: 21300000, guid: b099c055f8d71ac40adcada975f14dd9, type: 3}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 21300000, guid: b099c055f8d71ac40adcada975f14dd9, type: 3}
+  - {fileID: 21300000, guid: b099c055f8d71ac40adcada975f14dd9, type: 3}
   spinButton:
   - {fileID: 21300000, guid: 04dc98dfe45152a4bbad05c1e4743c34, type: 3}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 21300000, guid: 04dc98dfe45152a4bbad05c1e4743c34, type: 3}
+  - {fileID: 21300000, guid: 04dc98dfe45152a4bbad05c1e4743c34, type: 3}
+  - {fileID: 21300000, guid: 04dc98dfe45152a4bbad05c1e4743c34, type: 3}
   reforgeButton:
   - {fileID: 21300000, guid: b099c055f8d71ac40adcada975f14dd9, type: 3}
-  - {fileID: 0}
-  - {fileID: 0}
-  perkBadge:
   - {fileID: 21300000, guid: b099c055f8d71ac40adcada975f14dd9, type: 3}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 21300000, guid: b099c055f8d71ac40adcada975f14dd9, type: 3}
+  perkBadge:
+  - {fileID: 21300000, guid: 09703447bc8f30442b74a8a6aed71bb8, type: 3}
+  - {fileID: 21300000, guid: 09703447bc8f30442b74a8a6aed71bb8, type: 3}
+  - {fileID: 21300000, guid: 09703447bc8f30442b74a8a6aed71bb8, type: 3}
   condenseRare: []
   condenseEpic: []
   condenseLegendary: []

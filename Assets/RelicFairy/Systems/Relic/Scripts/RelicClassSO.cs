@@ -107,6 +107,10 @@ public class RelicClassSO : ScriptableObject
 
     [SerializeField, Tooltip("Q 애니 시퀀스 — 순서대로 이어 재생해 다단 모션을 만든다. 비우면 위 단일 클립 키(QSkill_01)를 쓴다.")]
     private RelicQAnimStep[] qSkillClipSequence;
+    [SerializeField, Tooltip("Q 단독 모션(가웨인 캐스트·랜슬롯 마무리) 상태. 비우면 QSkill_01 — 무기 R 스킬이 덮어쓰는 공용 상태라 든 무기에 따라 모션이 바뀐다. 전용 상태 RelicQ_Main 권장")]
+    private string qSkillMainState = DefaultQSkillState;
+    [SerializeField, Tooltip("위 상태에 물릴 클립 Addressables 키. 비우면 컨트롤러 기본 클립")]
+    private string qSkillMainClipKey;
     [SerializeField, Tooltip("Q 입력 시 카메라 연출. 비우면 연출 생략")]
     private UltimateCinematicConfig qSkillCinematic;
 
@@ -133,6 +137,9 @@ public class RelicClassSO : ScriptableObject
     public StatModifier[] Stats => stats;
     public string QSkillClipKey => qSkillClipKey;
     public UltimateCinematicConfig QSkillCinematic => qSkillCinematic;
+    /// <summary>Q 단독 모션 상태(비우면 QSkill_01 폴백). 시퀀스(연타)와 별개 — 캐스트·마무리처럼 한 번 재생하는 모션.</summary>
+    public string QSkillMainState => string.IsNullOrEmpty(qSkillMainState) ? DefaultQSkillState : qSkillMainState;
+    public string QSkillMainClipKey => qSkillMainClipKey;
 
     /// <summary>시퀀스 미설정 유물이 쓰는 기본 Q 상태 — 기존 하드코딩과 같은 값(폴백).</summary>
     public const string DefaultQSkillState = "QSkill_01";

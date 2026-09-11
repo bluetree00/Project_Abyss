@@ -25,14 +25,15 @@ public sealed class StagingAreaView : MonoBehaviour
     // 대신 세로로 200px 넘게 남았다. 2열 그리드로 바꿔 5칸을 한눈에 보이게 한다
     // (열 폭 = (뷰포트 470 - 여백 3×10) / 2 = 220 → 높이 220/1.523 ≈ 144).
     private const int   SLOT_COLUMNS  = 2;
+    private int _columns = SLOT_COLUMNS;   // Init 전에 SetColumns로 바꾼다 — 하단 보관함 바는 5열 1행(의뢰서 F4)
     private const float SLOT_WIDTH    = 220f;
     private const float SLOT_HEIGHT   = 144f;
     private const float SLOT_SPACING  = 10f;
     private const float GRID_CELL_SIZE = 120f;
 
     /// <summary>고정 슬롯을 2열로 깔았을 때 필요한 줄 수.</summary>
-    private static int SlotRows =>
-        (RunItemInventory.MaxStagingCapacity + SLOT_COLUMNS - 1) / SLOT_COLUMNS;
+    private int SlotRows =>
+        (RunItemInventory.MaxStagingCapacity + _columns - 1) / _columns;
 
     private static readonly Color COLOR_NEW_BORDER      = new(1f, 0.92f, 0.3f, 1f);
     private static readonly Color COLOR_NORMAL_BORDER   = new(0.4f, 0.4f, 0.5f, 0.7f);
@@ -108,6 +109,9 @@ public sealed class StagingAreaView : MonoBehaviour
     // ── Public Init ──
 
     /// <summary>코드로 생성 시 scrollContent를 주입하고 슬롯을 빌드한다. UI_GridPanel에서 AddComponent 직후 호출.</summary>
+    /// <summary>슬롯 격자 열 수. <see cref="Init"/> 전에 불러야 한다(슬롯은 Init에서 놓인다).</summary>
+    public void SetColumns(int columns) => _columns = Mathf.Max(1, columns);
+
     public void Init(RectTransform content)
     {
         scrollContent = content;
@@ -316,8 +320,8 @@ public sealed class StagingAreaView : MonoBehaviour
             var emptyTxt = emptyTxtGO.AddComponent<TextMeshProUGUI>();
             if (cardFont != null) emptyTxt.font = cardFont;
             emptyTxt.text      = "빈 슬롯";
-            emptyTxt.fontSize  = 11f;
-            emptyTxt.color     = new Color(0.4f, 0.4f, 0.5f, 0.5f);
+            emptyTxt.fontSize  = 16f;
+            emptyTxt.color     = new Color(0.55f, 0.55f, 0.66f, 0.85f);
             emptyTxt.alignment = TextAlignmentOptions.Center;
             emptyTxt.raycastTarget = false;
 
@@ -338,7 +342,7 @@ public sealed class StagingAreaView : MonoBehaviour
         // scrollContent 크기 = 2열 그리드 전체 크기. 뷰포트(약 470×630) 안에 들어가므로
         // 실제로는 스크롤이 걸리지 않고 5칸이 모두 보인다.
         scrollContent.sizeDelta = new Vector2(
-            SLOT_SPACING + SLOT_COLUMNS * (SLOT_WIDTH  + SLOT_SPACING),
+            SLOT_SPACING + _columns * (SLOT_WIDTH  + SLOT_SPACING),
             SLOT_SPACING + SlotRows     * (SLOT_HEIGHT + SLOT_SPACING));
     }
 
@@ -452,14 +456,14 @@ public sealed class StagingAreaView : MonoBehaviour
         var nameTxtGO = new GameObject("Name", typeof(RectTransform));
         nameTxtGO.transform.SetParent(slotGO.transform, false);
         var nameRT = nameTxtGO.GetComponent<RectTransform>();
-        nameRT.anchorMin        = new Vector2(0f, 0.17f);
-        nameRT.anchorMax        = new Vector2(1f, 0.30f);
+        nameRT.anchorMin        = new Vector2(0f, 0.16f);   // 24px — 16px 줄높이(20.6)가 Ellipsis에 잘리지 않게(19px이던 때 이름이 통째로 사라졌다)
+        nameRT.anchorMax        = new Vector2(1f, 0.32f);
         nameRT.sizeDelta        = Vector2.zero;
         nameRT.anchoredPosition = Vector2.zero;
         var nameTxt = nameTxtGO.AddComponent<TextMeshProUGUI>();
         if (cardFont != null) nameTxt.font = cardFont;
         nameTxt.text              = item.displayName ?? item.itemId;
-        nameTxt.fontSize          = 12f;
+        nameTxt.fontSize          = 16f;   // 가독성 하한
         nameTxt.alignment         = TextAlignmentOptions.Center;
         nameTxt.textWrappingMode = TextWrappingModes.NoWrap;
         nameTxt.overflowMode      = TextOverflowModes.Ellipsis;
@@ -468,14 +472,14 @@ public sealed class StagingAreaView : MonoBehaviour
         var fxTxtGO = new GameObject("Effect", typeof(RectTransform));
         fxTxtGO.transform.SetParent(slotGO.transform, false);
         var fxRT = fxTxtGO.GetComponent<RectTransform>();
-        fxRT.anchorMin        = new Vector2(0f, 0.02f);
-        fxRT.anchorMax        = new Vector2(1f, 0.16f);
+        fxRT.anchorMin        = new Vector2(0f, 0.01f);
+        fxRT.anchorMax        = new Vector2(1f, 0.155f);
         fxRT.sizeDelta        = Vector2.zero;
         fxRT.anchoredPosition = Vector2.zero;
         var fxTxt = fxTxtGO.AddComponent<TextMeshProUGUI>();
         if (cardFont != null) fxTxt.font = cardFont;
         fxTxt.text              = EffectLine(item);
-        fxTxt.fontSize          = 11f;
+        fxTxt.fontSize          = 14f;   // 카드 220×150 — 16이면 두 줄로 넘친다
         fxTxt.fontStyle         = FontStyles.Bold;
         fxTxt.color             = new Color(0.86f, 0.92f, 0.66f, 1f);
         fxTxt.alignment         = TextAlignmentOptions.Center;
@@ -535,7 +539,7 @@ public sealed class StagingAreaView : MonoBehaviour
         var xTxt = xTxtGO.AddComponent<TextMeshProUGUI>();
         if (cardFont != null) xTxt.font = cardFont;
         xTxt.text          = "X";
-        xTxt.fontSize      = 12f;
+        xTxt.fontSize      = 14f;
         xTxt.alignment     = TextAlignmentOptions.Center;
         xTxt.color         = Color.white;
         xTxt.raycastTarget = false;
@@ -626,7 +630,7 @@ public sealed class StagingAreaView : MonoBehaviour
         rt.anchorMax        = new Vector2(0f, 1f);
         rt.pivot            = new Vector2(0f, 0.5f);
         rt.sizeDelta        = new Vector2(
-            SLOT_SPACING + SLOT_COLUMNS * (SLOT_WIDTH + SLOT_SPACING), SLOT_SPACING);
+            SLOT_SPACING + _columns * (SLOT_WIDTH + SLOT_SPACING), SLOT_SPACING);
         rt.anchoredPosition = Vector2.zero;
 
         var lineGO = new GameObject("Line", typeof(RectTransform));
@@ -663,7 +667,7 @@ public sealed class StagingAreaView : MonoBehaviour
 
         // 경계가 줄 중간에 떨어지면(예: 미배치 3개) 가로선을 그을 자리가 없다 — 그땐 감춘다.
         // NEW 뱃지가 이미 새 아이템을 표시하므로 구분선이 없어도 읽힌다.
-        bool show = nonNewCount > 0 && newCount > 0 && nonNewCount % SLOT_COLUMNS == 0;
+        bool show = nonNewCount > 0 && newCount > 0 && nonNewCount % _columns == 0;
         _sectionDivider.SetActive(show);
         if (!show) return;
 
@@ -675,10 +679,10 @@ public sealed class StagingAreaView : MonoBehaviour
     // ── Layout Helpers ──
 
     /// <summary>index번 슬롯을 2열 그리드의 좌상단 기준 위치에 놓는다.</summary>
-    private static void PositionSlot(RectTransform rt, int index)
+    private void PositionSlot(RectTransform rt, int index)
     {
-        int col = index % SLOT_COLUMNS;
-        int row = index / SLOT_COLUMNS;
+        int col = index % _columns;
+        int row = index / _columns;
         rt.anchorMin        = new Vector2(0f, 1f);
         rt.anchorMax        = new Vector2(0f, 1f);
         rt.pivot            = new Vector2(0f, 1f);
@@ -734,8 +738,10 @@ public sealed class StagingAreaView : MonoBehaviour
     /// </summary>
     private static void BuildRuneArtPane(Transform slot, RuntimeItemData item)
     {
-        var art = RuneArt.GetArt(item.rarity);
-        if (art == null) art = RuneArt.GetArtByElement(item.element);
+        // 문양 결정은 RuneArt.ResolveRuneIcon 한곳에서 — 기능 → 등급 → 속성.
+        // 예전엔 여기만 기능 문양을 건너뛰고 등급 아트에서 시작해, 같은 룬이
+        // 획득 팝업에선 기능 칼날이고 배치 화면에선 돌 각인석으로 보였다.
+        var art = RuneArt.ResolveRuneIcon(item);
         if (art == null) return;
 
         var go = new GameObject("RuneArtPane", typeof(RectTransform), typeof(Image));

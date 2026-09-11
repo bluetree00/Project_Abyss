@@ -273,6 +273,22 @@ public sealed class AddressableManager
     // -------------------------
 
     /// <summary>
+    /// 이 키로 로드 가능한 위치가 있는가. 던지지 않고 확인만 한다 —
+    /// Addressables는 없는 키에 예외를 던지며 <b>스스로 에러 로그를 남기므로</b>,
+    /// "없을 수도 있는" 에셋은 반드시 이걸로 먼저 걸러야 콘솔이 깨끗하다.
+    /// </summary>
+    public async UniTask<bool> HasKeyAsync<T>(string key)
+    {
+        if (string.IsNullOrEmpty(key)) return false;
+
+        var loc = Addressables.LoadResourceLocationsAsync(key, typeof(T));
+        await loc.ToUniTask();
+        bool ok = loc.Status == AsyncOperationStatus.Succeeded && loc.Result != null && loc.Result.Count > 0;
+        Addressables.Release(loc);
+        return ok;
+    }
+
+    /// <summary>
     /// ✅ Addressables.InstantiateAsync로 "새 인스턴스" 생성 (캐시 X)
     /// - 생성된 인스턴스는 instanceId로 handle을 추적하여 ReleaseInstance가 가능
     /// </summary>
@@ -282,6 +298,15 @@ public sealed class AddressableManager
             throw new ArgumentException("[AddressableManager] InstantiateAsync failed: prefabKey is null/empty");
 
         await EnsureInitializedAsync();
+
+        // 키가 없으면 Addressables가 InvalidKeyException을 <b>내부에서 먼저 로그로 뱉는다</b> —
+        // 호출부가 try/catch로 감싸도 콘솔은 이미 빨갛게 물든다. 미등록이 정상 경로인 호출
+        // (아직 수급 안 된 선택적 에셋 등)을 위해, 던지기 전에 존재부터 확인하고 조용히 null을 준다.
+        if (!await HasKeyAsync<GameObject>(prefabKey))
+        {
+            Debug.LogWarning($"[AddressableManager] 미등록 키 — 인스턴스 생성 생략: {prefabKey}");
+            return null;
+        }
 
         AsyncOperationHandle<GameObject> handle =
             parent != null

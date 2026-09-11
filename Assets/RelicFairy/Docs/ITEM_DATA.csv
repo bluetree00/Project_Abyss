@@ -138,7 +138,7 @@ item_t3_elec_arc,방전의 룬,4,ProjectileCount,Always,1,0,0,0,0,투사체 수 
 item_t3_grass_venom,맹독의 룬,3,CritChance,Always,0.06,0,0,0,0,치명타 확률 +6%,1,42,Epic,GRASS
 item_t3_grass_venom,맹독의 룬,3,PoisonOnHit,OnHit,0.2,0.12,0,0,4,"적중 시 20% 중독(공격력 12%/틱, 4초)",1,42,Epic,GRASS
 item_t3_grass_bloom,번식의 룬,4,MaxHP,Always,80,0,0,0,0,최대 체력 +80,1,51,Epic,GRASS
-item_t3_grass_bloom,번식의 룬,4,HPRegenOnHit,OnHit,1,0,0,0,0,적중 시 체력 회복,1,51,Epic,GRASS
+item_t3_grass_bloom,번식의 룬,4,HPRegenOnHit,OnHit,1,0,0,0,0,적중 시 보호막,1,51,Epic,GRASS
 item_t3_grass_spore,포자의 룬,4,Defense,Always,12,0,0,0,0,방어력 +12,1,52,Epic,GRASS
 item_t3_grass_spore,포자의 룬,4,DebuffDuration,Always,0.25,0,0,0,0,디버프 지속 +25%,1,52,Epic,GRASS
 item_t3_light_radiance,광채의 룬,3,CritChance,Always,0.09,0,0,0,0,치명타 확률 +9%,1,43,Epic,LIGHT
@@ -146,7 +146,7 @@ item_t3_light_radiance,광채의 룬,3,CondAllDamage,SingleEnemy,0.18,0,0,0,0,�
 item_t3_light_grace,가호의 룬,4,MaxHP,Always,70,0,0,0,0,최대 체력 +70,1,53,Epic,LIGHT
 item_t3_light_grace,가호의 룬,4,HealingReceived,Always,0.2,0,0,0,0,받는 회복량 +20%,1,53,Epic,LIGHT
 item_t3_light_sanctum,성역의 룬,5,CritDamage,Always,0.24,0,0,0,0,치명타 피해 +24%,1,56,Epic,LIGHT
-item_t3_light_sanctum,성역의 룬,5,HPRegenOnClear,OnRoomClear,0.05,0,0,0,0,방 클리어 시 체력 5% 회복,1,56,Epic,LIGHT
+item_t3_light_sanctum,성역의 룬,5,HPRegenOnClear,OnRoomClear,0.05,0,0,0,0,방 클리어 시 최대 체력 5% 보호막,1,56,Epic,LIGHT
 item_t3_dark_erode,잠식의 룬,4,AllDamage,Always,16,0,0,0,0,공격력 +16,1,54,Epic,DARK
 item_t3_dark_erode,잠식의 룬,4,FirstAttackAfterRoll,Always,0.4,0,0,0,0,구르기 직후 첫 공격 +40%,1,54,Epic,DARK
 item_t3_dark_shade,암영의 룬,4,Defense,Always,15,0,0,0,0,방어력 +15,1,55,Epic,DARK

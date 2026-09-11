@@ -87,6 +87,10 @@ public class ShapeScrollView : MonoBehaviour
         content.anchorMax        = new Vector2(1f, 1f);
         content.pivot            = new Vector2(0.5f, 1f);
         content.anchoredPosition = Vector2.zero;
+        // 좌우 스트레치로 바꾸는 순간 sizeDelta.x는 <b>뷰포트에 더해지는 값</b>이 된다.
+        // 프리팹의 100이 그대로 남아 내용이 뷰포트보다 100px 넓어지므로 여기서 0으로 내린다.
+        // 세로는 레이아웃이 채우는 값이라 건드리지 않는다.
+        content.sizeDelta = new Vector2(0f, content.sizeDelta.y);
     }
 
     void Start()

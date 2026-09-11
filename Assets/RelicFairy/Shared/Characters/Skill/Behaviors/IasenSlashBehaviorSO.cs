@@ -21,6 +21,13 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
     public float baseDamagePerSlash = 5f;
     public float knockbackMultiplier = 0.2f;
 
+    [Header("2단계 (스킬 단계 ≥ 2 — SkillTierResolver)")]
+    [Tooltip("2단계에서 추가되는 연참 수")]
+    public int tier2ExtraSlashCount = 2;
+    [Tooltip("2단계 마무리 이펙트(대시 종점, 연참이 끝난 뒤). 비우면 없음")]
+    public string tier2FinishEffectKey = "";
+    public float tier2FinishEffectScale = 1f;
+
     [Header("마무리")]
     public float endDelay = 0.3f;
 
@@ -50,6 +57,8 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
         private Phase _phase;
         private float _timer;
         private int _slashIndex;
+        private int _slashTotal;
+        private int _skillTier;
         private Vector3 _dashStart, _dashEnd;
         private readonly List<IDamageable> _hitTargets = new();
         private readonly HashSet<GameObject> _hitObjects = new();
@@ -79,6 +88,8 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
             _hitTargets.Clear();
             _hitObjects.Clear();
             _slashIndex = 0;
+            _skillTier  = ctx.SkillTier;
+            _slashTotal = _data.slashCount + (_skillTier >= 2 ? Mathf.Max(0, _data.tier2ExtraSlashCount) : 0);
             _timer = 0f;
             _phase = Phase.Dash;
 
@@ -168,10 +179,15 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
                 ApplySlashDamage(ctx);
                 _slashIndex++;
 
-                if (_slashIndex >= _data.slashCount)
+                if (_slashIndex >= _slashTotal)
                 {
                     _timer = 0f;
                     _phase = Phase.End;
+
+                    // 2단계 마무리 — 연참이 끝난 자리(대시 종점)에서 한 번
+                    if (_skillTier >= 2 && !string.IsNullOrEmpty(_data.tier2FinishEffectKey))
+                        SpawnEffect(ctx, _data.tier2FinishEffectKey,
+                            ctx.PlayerTransform.position + Vector3.up * 1f, 1.5f, _data.tier2FinishEffectScale);
                 }
             }
         }
@@ -224,12 +240,13 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
         }
 
         // ── Effect Helper ──
-        private static async void SpawnEffect(SkillExecutionContext ctx, string key, Vector3 pos, float lifetime)
+        private static async void SpawnEffect(SkillExecutionContext ctx, string key, Vector3 pos, float lifetime, float scale = 1f)
         {
             if (string.IsNullOrEmpty(key)) return;
             var obj = await Managers.ObjectPooler.SpawnAsync(
                 key, ObjectPoolerManager.PoolType.Effect, pos, ctx.PlayerTransform.rotation);
             if (obj == null) return;
+            if (!Mathf.Approximately(scale, 1f)) obj.transform.localScale = Vector3.one * scale;
             if (obj.TryGetComponent<EffectBehaviour>(out var eb))
                 eb.Initialize(eb.behaviorSO, ctx.PlayerTransform, lifetime);
             else

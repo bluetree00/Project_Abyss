@@ -141,7 +141,8 @@ public class ShopDataManager
             Debug.LogWarning($"[ShopDataManager] ResolvePrice rarity lookup 실패 (category={entry.category}, target={entry.target_id}) — Common 폴백");
             rarity = ItemRarity.Common;
         }
-        return _priceTable.GetBasePrice(entry.category, rarity);
+        // 「상인의 인장」 해금 시 −15%. 가격이 나가는 두 경로(여기 · AbyssPeddlerCatalog) 모두에 건다.
+        return AbyssPeddlerCatalog.MerchantSigil.Apply(_priceTable.GetBasePrice(entry.category, rarity));
     }
 
     // ── 내부 ──────────────────────────────────

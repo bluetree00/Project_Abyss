@@ -46,8 +46,10 @@ public sealed class EffectRowWidget : MonoBehaviour
         hlg.childForceExpandHeight = false;
 
         var le = go.AddComponent<LayoutElement>();
-        le.preferredHeight = style.rowHeight;
         le.minHeight = style.rowHeight;
+        // wrap이면 높이를 고정하지 않는다 — 두 줄로 접힌 라벨만큼 행이 자라야 한다(고정하면 둘째 줄이 상자 밖으로 나간다).
+        // 부모 LayoutGroup이 childControlHeight=true여야 이 값이 산다. wrap이 아니면 예전과 같이 고정 높이.
+        if (!style.wrap) le.preferredHeight = style.rowHeight;
 
         // ── 아이콘 ──
         var iconGO = new GameObject("Icon", typeof(RectTransform), typeof(Image));
@@ -76,23 +78,28 @@ public sealed class EffectRowWidget : MonoBehaviour
     }
 
     /// <summary>생성 + 바인드 원샷.</summary>
-    public static EffectRowWidget Create(Transform parent, in EffectRowStyle style, in EffectDisplay display)
+    public static EffectRowWidget Create(Transform parent, in EffectRowStyle style, in EffectDisplay display,
+                                         string effectType = null)
     {
         var w = Create(parent, style);
-        w.Bind(display);
+        w.Bind(display, effectType);
         return w;
     }
 
     /// <summary>슬롯에서 바로 생성 + 바인드.</summary>
     public static EffectRowWidget Create(Transform parent, in EffectRowStyle style, ItemEffectSlot slot)
-        => Create(parent, style, EffectDescriptionFormatter.Describe(slot));
+        => Create(parent, style, EffectDescriptionFormatter.Describe(slot), slot.effectType);
 
-    /// <summary>표시 데이터 적용.</summary>
-    public void Bind(in EffectDisplay display)
+    /// <summary>표시 데이터 적용. <paramref name="effectType"/>은 계열 아이콘이 없을 때 룬 기능 문양을 찾는 열쇠.</summary>
+    public void Bind(in EffectDisplay display, string effectType = null)
     {
         if (_icon != null)
         {
-            var sprite = EffectIconRegistry.GetSprite(display.IconKey);
+            // 룬의 기능 문양(RuneArtLibrary effectIcons)이 먼저다 — 획득 팝업·정보판·보관함에서 같은 효과가
+            // 같은 얼굴로 보이게. 계열 아이콘 레지스트리는 아트가 없으면 색 점 플레이스홀더를 돌려주므로
+            // (null이 아니다) 뒤에 둔다 — 색 점은 효과를 구별하지 못한다.
+            var sprite = !string.IsNullOrEmpty(effectType) ? RuneArt.GetIconByEffect(effectType) : null;
+            if (sprite == null) sprite = EffectIconRegistry.GetSprite(display.IconKey);
             _icon.sprite  = sprite;
             _icon.enabled = sprite != null;
             _icon.gameObject.SetActive(sprite != null);
@@ -107,7 +114,7 @@ public sealed class EffectRowWidget : MonoBehaviour
         }
     }
 
-    public void Bind(ItemEffectSlot slot) => Bind(EffectDescriptionFormatter.Describe(slot));
+    public void Bind(ItemEffectSlot slot) => Bind(EffectDescriptionFormatter.Describe(slot), slot.effectType);
 }
 
 /// <summary>효과 행 위젯의 표시 스타일. <see cref="EffectRowStyle.Default"/>에서 시작해 필요한 값만 수정.</summary>

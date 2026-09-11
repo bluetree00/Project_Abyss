@@ -16,11 +16,14 @@ public static class SkinArtImporter
     private const string ForgeFolder    = "Assets/RelicFairy/UI/Skin/WeaponForge/Sprites";
     private const string RefineryFolder  = "Assets/RelicFairy/UI/Skin/Refinery/Sprites";
     private const string RelicInfoFolder = "Assets/RelicFairy/UI/Skin/RelicInfo/Sprites";
-    private const string DialogueFolder  = "Assets/RelicFairy/UI/Skin/Dialogue/Sprites";
     private const string CovenantFolder     = "Assets/RelicFairy/UI/Skin/Covenant/Sprites";
     private const string RuneGridFolder     = "Assets/RelicFairy/UI/Skin/RuneGrid/Sprites";
     private const string RuneSelectFolder   = "Assets/RelicFairy/UI/Skin/RuneSelect/Art";
     private const string RefineryOldFolder  = "Assets/RelicFairy/UI/Skin/Refinery/Art";
+    private const string PuzzleRuneFolder   = "Assets/RelicFairy/UI/PuzzleGrid/Sprites/Runes";
+    private const string AchievementFolder  = "Assets/RelicFairy/UI/Skin/Achievement/Sprites";
+    private const string BamaoFolder        = "Assets/RelicFairy/Prefabs/UI/Bamao/BamaoUIPack/Sprites/Button";
+    private const string CrucibleFolder     = "Assets/RelicFairy/UI/Skin/Crucible/Art";
 
     /// <summary>파일 1장의 목표 설정. border는 9-slice(L,B,R,T) — 0이면 Simple로 쓰는 아트.</summary>
     private readonly struct Rule
@@ -117,26 +120,6 @@ public static class SkinArtImporter
         new("취소.png",           256),                 // "취소" 글자 구워짐
     };
 
-    // ── 대화창 (대사 상자 1383×300, 화면 폭을 따라 늘어남) ──
-    // 버튼 6종은 대응하는 자리가 없어 배선하지 않았지만(AdvanceButton은 투명 클릭 캐처),
-    // 나중에 선택지 UI가 생기면 바로 쓰도록 임포트 설정만 맞춰둔다.
-    private static readonly Rule[] DialogueRules =
-    {
-        new("바탕1.png",            1024, 60, 60, 60, 60),   // 대사 상자 바탕 — 폭 가변이라 9-slice
-        new("바탕2.png",            1024, 60, 60, 60, 60),   // 대체 바탕(미사용)
-        new("대화창 좌상단.png",       256),
-        new("대화창 우상단.png",       256),
-        new("대화창 좌하단.png",       256),
-        new("대화창 우하단.png",       256),
-        new("대화창 상단.png",        1024),   // 대부분 투명 — 통짜로 놓아야 위치가 맞는다
-        new("대화창 하단.png",        1024),
-        new("버튼1.png",             256),   // 이하 미사용(자리 미정)
-        new("버튼2.png",             256),
-        new("버튼3.png",             256),
-        new("버튼4.png",             256),
-        new("버튼5.png",             512),
-        new("긴버튼1.png",            512),
-    };
 
     // ── 서약 조립 (개편본: 양피지 + 등급 테두리) ────────────────
     // 카드 바탕은 카드 크기를 따라가므로 9-slice, 등급 조각·머리표는 글자/장식이라 통짜.
@@ -168,7 +151,8 @@ public static class SkinArtImporter
     {
         new("불룬.png",         128),
         new("물룬.png",         128),   // → ICE(얼음). 글리프는 물방울이지만 색이 맞아 그대로 쓴다
-        new("전기룬_임시.png",   128),   // 바람룬을 노랑으로 재색한 임시본 — 정식 전기룬 오면 교체
+        new("전기룬.png",       128),   // 정식 납품본(781×784 → 형제와 같은 164×166으로 축소)
+        new("전기룬_임시.png",   128),   // [사용 안 함] 바람룬 재색 임시본 — 정식본으로 교체 완료
         new("풀룬.png",         128),
         new("빛룬.png",         128),
         new("어둠룬.png",       128),
@@ -182,6 +166,20 @@ public static class SkinArtImporter
         new("테두리 좌하단.png", 128), new("테두리 우하단.png", 128),
     };
 
+    // ── 속성 룬비석 (elementArt/elementBorder) ──────────────────
+    // 납품 원본이 2437×2344인데 임포트 상한이 2048로 남아 있어 1장당 약 5MB, 5장 26MB를 먹는다.
+    // 실제 최대 표시는 룬 획득 카드의 문양칸 102×102(그것도 기능·등급 아트가 없을 때의 폴백)이고
+    // 스테이징 슬롯은 그보다 작다. 256이면 표시 크기의 2.5배로 충분하다.
+    private static readonly Rule[] PuzzleRuneRules =
+    {
+        new("룬1.png", 256), new("룬2.png", 256), new("룬3.png", 256),
+        new("룬4.png", 256), new("룬5.png", 256),
+        // 테두리는 원본이 44×38이라 그대로 둔다.
+        new("룬1 테두리@2x.png", 128), new("룬2 테두리@2x.png", 128), new("룬3 테두리@2x.png", 128),
+        new("룬4 테두리@2x.png", 128), new("룬5 테두리@2x.png", 128),
+        new("룬 테두리_1@2x.png", 128),
+    };
+
     // ── 기존 화면의 9-slice 보정 ────────────────────────────────
     // 이 아트들은 sliced로 그려지는데 보더가 0이라 액자·테두리가 통째로 늘어난다.
     // 특히 룬 획득 카드는 후보 수에 따라 폭이 변하고(_cardW = Min(300, avail/n)),
@@ -193,12 +191,51 @@ public static class SkinArtImporter
         new("룬 획득 카드@2x.png",      2048, 70, 70, 70, 70),   // 장식 모서리 액자
         new("룬 획득 카드 바탕@2x.png",  2048, 30, 30, 30, 30),
         new("룬 획득 타이틀@2x.png",     2048, 40,  0, 40,  0),   // 가로로만 늘어나는 긴 바
+        // 둥근 모서리 단색 판 3종 — 카드 안에서 정사각(룬 타일)·세로로 긴 상자(효과 칸)·가로 띠(놓을 자리)로 늘어난다.
+        // 경계 없이 Sliced면 그냥 늘어나 ×1.4~3.0 왜곡(2026-09-09 런타임 실측). 모서리 반경(~10px@2x)만 지킨다.
+        new("룬 타일@2x.png",           2048, 12, 12, 12, 12),
+        new("효과 칸@2x.png",           2048, 12, 12, 12, 12),
+        new("놓을 자리 있음@2x.png",     2048, 12, 12, 12, 12),
+        new("놓을 자리 없음@2x.png",     2048, 12, 12, 12, 12),
     };
 
     private static readonly Rule[] RefineryOldRules =
     {
         new("확률 막대 테두리@2x.png",    2048, 20, 0, 20, 0),
         new("확률 막대 검은바탕@2x.png",  2048, 20, 0, 20, 0),
+    };
+
+    // ── 업적 (기억의 제단) ─────────────────────────────────
+    // ── 재련소 · 원거리 파츠 탭 ────────────────────────────────
+    private static readonly Rule[] CrucibleRules =
+    {
+        // 상세 패널(370×410)에 9-slice로 얹는다 — 316×233 아트의 팔각 모서리(~32px)만 지킨다.
+        new("원거리 강화 바탕@2x.png",   512, 32, 32, 32, 32),
+        new("원거리 강화 테두리@2x.png", 512, 32, 32, 32, 32),
+    };
+
+    private static readonly Rule[] AchievementRules =
+    {
+        // 「받아갈 것」 띠. ActionBar가 판 폭을 따라 늘어나므로 좌우 모서리(둥근 끝 ~20px)만 지킨다.
+        new("하단바.png", 1024, 24, 0, 24, 0),
+        // 행 바탕 3상태(853×60). 목록 폭을 따라 늘어난다 — 둥근 끝 ~12px만 지킨다.
+        new("행_진행중.png",   1024, 16, 0, 16, 0),
+        new("행_수령가능.png", 1024, 16, 0, 16, 0),
+        new("행_받음.png",     1024, 16, 0, 16, 0),
+        // 버튼·칩 — 글자 길이에 따라 폭이 변할 수 있어 좌우만 지킨다.
+        new("버튼_모두받기.png", 256, 14, 0, 14, 0),
+        new("버튼_받기.png",     128, 12, 0, 12, 0),
+        new("칩_선택.png",       128,  8, 0,  8, 0),
+        new("칩_비선택.png",     128,  8, 0,  8, 0),
+    };
+
+    // ── 무기 교체 팝업 (Bamao 나무판 — 디자이너 납품 없음, 팩 원본을 9-slice로만 바로잡는다) ──
+    private static readonly Rule[] BamaoRules =
+    {
+        // 판(1217×704): 거친 가장자리 60px만 지키고 가운데 나뭇결을 늘린다.
+        new("Popup_wood_bg.png",    1024, 60, 60, 60, 60),
+        // 제목 띠(1000×189): 양끝 못 박힌 부분 200px을 지킨다. 세로는 56까지 눌리므로 위아래 경계는 두지 않는다.
+        new("Popup_wood_title.png", 1024, 200, 0, 200, 0),
     };
 
     [MenuItem("RelicFairy/UI/Import Skin Art (All Screens)")]
@@ -209,15 +246,20 @@ public static class SkinArtImporter
         changed += Apply(ForgeFolder,       ForgeRules);
         changed += Apply(RefineryFolder,    RefineryRules);
         changed += Apply(RelicInfoFolder,   RelicInfoRules);
-        changed += Apply(DialogueFolder,    DialogueRules);
         changed += Apply(CovenantFolder,    CovenantRules);
         changed += Apply(RuneGridFolder,    RuneGridRules);
         changed += Apply(RuneSelectFolder,  RuneSelectRules);
         changed += Apply(RefineryOldFolder, RefineryOldRules);
+        changed += Apply(PuzzleRuneFolder,  PuzzleRuneRules);
+        changed += Apply(AchievementFolder, AchievementRules);
+        changed += Apply(BamaoFolder,       BamaoRules);
+        changed += Apply(CrucibleFolder,    CrucibleRules);
 
         AssetDatabase.Refresh();
         Debug.Log($"[SkinArtImporter] {changed}장 재임포트 완료.");
-        EditorUtility.DisplayDialog("완료", $"스킨 아트 {changed}장의 임포트 설정을 적용했습니다.", "확인");
+        // 모달(DisplayDialog)은 쓰지 않는다 — MCP로 실행하면 확인을 누를 사람이 없어 에디터 메인 루프가 그 창에 잡히고,
+        // 그 뒤 모든 MCP 명령이 "ping not answered"로 죽는다(2026-09-08 실측). 결과는 콘솔 로그로 남긴다.
+        Debug.Log($"[SkinArtImporter] 스킨 아트 {changed}장의 임포트 설정을 적용했습니다.");
     }
 
     private static int Apply(string folder, Rule[] rules)

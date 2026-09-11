@@ -15,9 +15,9 @@ MonoBehaviour:
   _branches:
   - branchId: katana
     target: {fileID: 11400000, guid: dad215bb626832f4cbf0767639d63223, type: 2}
-    requiredEnhanceLevel: 0
+    requiredEnhanceLevel: 5
     cost: 0
   - branchId: greatsword
     target: {fileID: 11400000, guid: 0d8b8950bf4141849b02fd45cdbb4974, type: 2}
-    requiredEnhanceLevel: 0
+    requiredEnhanceLevel: 5
     cost: 0

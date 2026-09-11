@@ -62,7 +62,7 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
 
         public void OnEnter(SkillExecutionContext ctx)
         {
-            _skillTier = Mathf.Clamp(ctx.WeaponData?.tier ?? 1, 1, 3);
+            _skillTier = ctx.SkillTier;
             _timer = 0f;
             _phase = Phase.Charge;
             _hitTargets.Clear();

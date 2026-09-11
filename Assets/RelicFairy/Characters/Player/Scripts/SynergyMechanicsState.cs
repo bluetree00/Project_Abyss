@@ -14,8 +14,15 @@ namespace RelicFairy
         /// <summary>현재 누적 실드 값.</summary>
         public float ShieldCurrentValue;
 
-        /// <summary>실드 상한 (최대 HP 대비 비율).</summary>
-        public float ShieldCapRatio;
+        /// <summary>
+        /// 실드 상한 (최대 HP 대비 비율).
+        ///
+        /// ⚠️ <b>선언 시점에 값을 준다.</b> 예전엔 0으로 시작하고 <see cref="Reset"/>이 0.3을 세웠는데,
+        /// Reset을 부르는 곳이 프로젝트에 하나도 없어 상한이 계속 0이었다.
+        /// 그러면 <c>ShieldCap = MaxHp × 0 = 0</c>이라 <c>AddShield</c>가 무엇을 넣든 0으로 클램프돼
+        /// <b>보호막이 통째로 무효</b>였다(서약의 보호막 효과도 같이 죽어 있었다).
+        /// </summary>
+        public float ShieldCapRatio = 0.3f;
 
         public void Reset()
         {

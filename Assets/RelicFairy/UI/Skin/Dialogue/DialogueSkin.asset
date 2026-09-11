@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: DialogueSkin
   m_EditorClassIdentifier:
   plate: {fileID: 21300000, guid: 18e793abfa6a26f44a8853478c9f2421, type: 3}
+  namePlate: {fileID: 21300000, guid: 230d218a209b1cd40bdbcef97ae5991b, type: 3}
   cornerTopLeft: {fileID: 21300000, guid: 25060842bc3dbb745a4898847fefa964, type: 3}
   cornerTopRight: {fileID: 21300000, guid: be7f0d9179fc74749aa80fdb01b00cc2, type: 3}
   cornerBottomLeft: {fileID: 21300000, guid: fbbeb29c714fec14e80f2f27c0460bde, type: 3}

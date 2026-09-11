@@ -131,6 +131,31 @@ public static class ShopUIStyle
     }
 
     /// <summary>테두리 프레임: 바깥(테두리색) + 안쪽 인셋(채움색). 안쪽 Image를 반환.</summary>
+    /// <summary>
+    /// 자손 중 이름이 같은 첫 오브젝트를 찾는다(비활성 포함).
+    ///
+    /// <para><b>왜 고정 경로를 쓰지 않는가</b> — 구워진 팝업을 다시 잇는 코드가
+    /// <c>transform.Find("Window/ConfirmBtn")</c>처럼 경로를 박아 뒀는데,
+    /// <see cref="MakeFrame"/>이 테두리(outer)와 채움(Fill) 두 겹을 만들기 때문에
+    /// 실제 계층은 <c>Window/Fill/ConfirmBtn</c>로 한 단 더 깊었다. 경로가 어긋나면 <c>null</c>이
+    /// 조용히 돌아오고 <b>버튼에 리스너가 안 붙은 채로 화면이 뜬다</b> —
+    /// 눌러도 아무 일이 없어 "고장난 버튼"으로 보인다.</para>
+    ///
+    /// <para>이름은 빌더가 정하는 고유값이라, 깊이가 바뀌어도 이름으로 찾으면 안 깨진다.</para>
+    /// </summary>
+    public static Transform FindDeep(Transform root, string name)
+    {
+        if (root == null || string.IsNullOrEmpty(name)) return null;
+        if (root.name == name) return root;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var hit = FindDeep(root.GetChild(i), name);
+            if (hit != null) return hit;
+        }
+        return null;
+    }
+
     public static Image MakeFrame(Transform parent, string name, Color border, Color fill, float thickness, bool raycast = false)
     {
         var outer = MakeImage(parent, name, border, raycast);
@@ -149,6 +174,14 @@ public static class ShopUIStyle
         tmp.alignment = align;
         tmp.color = color;
         tmp.raycastTarget = false;
+
+        // 글자가 <b>판 밖으로 나가지 않게</b> 하는 안전망.
+        // TMP 기본 넘침 설정은 상자를 넘는 글자를 잘라내지 않고 그대로 <b>바깥에 그린다</b> —
+        // 그래서 긴 한글 이름이나 좁은 배지에서 글자가 배경을 벗어나 떠 있었다.
+        // 최대를 설계 크기로 묶으므로 <b>커지지는 않고</b>, 안 들어갈 때만 줄어든다.
+        tmp.enableAutoSizing = true;
+        tmp.fontSizeMax = size;
+        tmp.fontSizeMin = Mathf.Max(9f, size * 0.55f);
         return tmp;
     }
 
@@ -212,5 +245,37 @@ public static class ShopUIStyle
         img.sprite = sprite;
         img.type   = sliced ? Image.Type.Sliced : Image.Type.Simple;
         img.color  = tint ?? Color.white;
+
+        // 9-slice 경계는 <b>아트의 픽셀 크기</b> 그대로 그려진다. 상점 아트는 원본이 크고(카드 628×600·경계 56)
+        // 그려지는 칸은 작아서(205×196), 좌우 경계만 112 — 칸의 55%를 장식이 먹고 가운데 종이가 38%만 남았다.
+        // 그래서 아이콘·이름·태그가 종이 밖 나무 위에 얹힌 것처럼 보였다(2026-09-10 게임 화면).
+        // 아이콘 틀(223×298·경계 40)은 아예 경계 합(80)이 칸(74)보다 커서 슬라이스가 깨진다.
+        // pixelsPerUnitMultiplier가 정확히 이 경우를 위한 손잡이다 — 축소 배율만큼 경계를 함께 줄인다.
+        if (sliced) img.pixelsPerUnitMultiplier = SliceScale(img, sprite);
+    }
+
+    /// <summary>그려질 칸 대비 아트가 몇 배 큰지(≥1). 9-slice 경계를 그만큼 줄이는 데 쓴다.</summary>
+    private static float SliceScale(Image img, Sprite sprite)
+    {
+        var rt = img.rectTransform;
+        float w = rt.rect.width  > 1f ? rt.rect.width  : Mathf.Abs(rt.sizeDelta.x);
+        float h = rt.rect.height > 1f ? rt.rect.height : Mathf.Abs(rt.sizeDelta.y);
+        if (w <= 1f || h <= 1f) return 1f;
+
+        // ① 아트가 칸보다 몇 배 큰가(축소비). 가로·세로 중 작은 쪽 — 큰 쪽을 쓰면 모서리가 뭉개진다.
+        float scale = Mathf.Max(1f, Mathf.Min(sprite.rect.width / w, sprite.rect.height / h));
+
+        // ② 그래도 장식이 두꺼우면 상한을 건다. 경계값(spriteBorder)은 <b>원본 해상도 기준</b>으로 적혀 있는데
+        //    텍스처는 플랫폼 설정(maxTextureSize)으로 이미 줄어들어 있어, 축소비만으로는 부족하다
+        //    (카드: 원본 628 → 임포트 256, 경계 56 그대로 → 칸 205의 27%를 한 변이 먹었다).
+        //    장식이 칸의 12%를 넘지 않게 맞춘다 — 카드 아트의 실제 장식 비율(56/628 = 8.9%)에 가깝다.
+        float b = Mathf.Max(Mathf.Max(sprite.border.x, sprite.border.z),
+                            Mathf.Max(sprite.border.y, sprite.border.w));
+        if (b > 0f)
+        {
+            float maxDrawn = Mathf.Min(w, h) * 0.12f;
+            if (b / scale > maxDrawn) scale = b / maxDrawn;
+        }
+        return scale;
     }
 }

@@ -20,6 +20,9 @@ public sealed class WorldSwordAwakening : MonoBehaviour
     private const float PromptOffsetY = 2.0f;
     private const float TextHeight    = 1.4f;
     private const float SwordVisualHeight = 0.6f;   // 제단 위에 뜬 검의 높이
+    /// <summary>제단 검이 흩어지고 손의 검이 맺히는 넘겨받기 시간(초). 둘이 같은 길이로 겹친다.</summary>
+    private const float HandOverDuration = 1.1f;
+    private const float HudFadeDuration  = 0.8f;
 
     [Header("무형검 (기본 지급 주무기)")]
     [SerializeField] private MainWeaponSO namelessWeapon;
@@ -126,36 +129,49 @@ public sealed class WorldSwordAwakening : MonoBehaviour
             // 항상 Slot0 고정·활성. 원거리 스테이션 상태를 참조하지 않는다(획득 순서 독립).
             loadout.SetWeaponSlot0(namelessWeapon);
             var player = _player;
+
+            // ── 넘겨받기 — 제단의 검이 흩어지는 동안 손의 검이 같은 안개로 맺힌다.
+            //   ① 제단 검은 F를 누른 즉시 알파가 빠지기 시작한다(클립 프리로드·인스턴스 로드를 기다리는 '빈 시간'이 없다).
+            //   ② 손의 검은 로드가 끝나는 대로 알파 0에서 올라온다 — beforeShow에서 먼저 투명하게 만들어
+            //      첫 프레임에 통째로 튀어나오지 않게 한다.
+            //   두 검 모두 반투명 안개 머티리얼(M_NamelessFog)이라 DissolveEffect(불투명 디졸브 교체)를 쓰지 않는다 —
+            //   예전엔 장착의 기본 디졸브가 불투명 실루엣으로 깜빡인 뒤 제단 검이 뒤늦게 빠져 '갑자기 생긴' 것처럼 보였다.
+            if (_swordVisual != null && _swordVisual.TryGetComponent<VoidDrifter>(out var drifter))
+                drifter.enabled = false;   // 사라지는 동안 흔들리지 않게
+            var standFade = _swordVisual != null
+                ? MaterialFade.FadeOutAsync(_swordVisual, HandOverDuration, ct)
+                : UniTask.CompletedTask;
+
+            MaterialFade.FadeInHandle handIn = null;
             if (player != null)
             {
                 await GameRunBootstrapper.EquipWeaponToPlayerAsync(
-                    namelessWeapon, player, PlayerWeaponManager.Slot0, setActive: true);
+                    namelessWeapon, player, PlayerWeaponManager.Slot0, setActive: true,
+                    playAppear: false, beforeShow: go => handIn = MaterialFade.BeginFadeIn(go));
                 ct.ThrowIfCancellationRequested();
+            }
+            var handFade = handIn != null ? MaterialFade.FadeInAsync(handIn, HandOverDuration, ct) : UniTask.CompletedTask;
+            await UniTask.WhenAll(standFade, handFade);
+            ct.ThrowIfCancellationRequested();
+
+            if (_swordVisual != null)
+            {
+                // 제단 디졸브가 이 렌더러까지 집어삼켜 머티리얼을 되살리지 않도록 먼저 걷어낸다.
+                Destroy(_swordVisual);
+                _swordVisual = null;
             }
 
             _claimed = true;
 
             // 각성 신호 — 온보딩/퀘스트가 다음 단계(원거리 무기대)를 개방.
             QuestEvents.Report(questCategory, namelessWeapon != null ? namelessWeapon.name : "Nameless");
-
             if (player != null)
                 GuidelineVisual.Toast(player.transform.position + Vector3.up * 2.4f, "무형검 각성", GuidelineVisual.ToastKind.Relic);
 
-            // 각성 후 HUD(전투) 표시.
-            UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
+            // 각성 후 HUD(전투) — 검이 손에 맺힌 뒤 페이드로 띄운다(예전엔 SetActive로 한 프레임에 전부 튀어나왔다).
+            UIRootBootstrapper.Instance?.RevealHudAsync(HudFadeDuration).Forget();
 
             Debug.Log($"[WorldSwordAwakening] 무형검 각성: {namelessWeapon.displayName} → 슬롯0");
-
-            // 제단 위의 검은 <b>디졸브를 쓰지 않는다</b>. DissolveEffect는 머티리얼을 통째로 갈아끼우는데
-            // 무형검 비주얼은 반투명 안개 머티리얼(M_NamelessFog)이라 셰이더가 맞지 않아 핑크로 깨진다
-            // (인트로 IntroMordredDirector가 같은 이유로 알파 페이드를 쓴다). 알파만 낮춰 지운다.
-            if (_swordVisual != null)
-            {
-                await MaterialFade.FadeOutAsync(_swordVisual, 0.6f, ct);
-                // 제단 디졸브가 이 렌더러까지 집어삼켜 머티리얼을 되살리지 않도록 먼저 걷어낸다.
-                Destroy(_swordVisual);
-                _swordVisual = null;
-            }
 
             DissolveEffect.PlayDisappear(gameObject, 0.6f, () => { if (this != null) Destroy(gameObject); });
         }

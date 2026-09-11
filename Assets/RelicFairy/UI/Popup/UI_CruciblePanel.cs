@@ -22,13 +22,40 @@ public sealed class UI_CruciblePanel : UI_Popup
     public override bool CloseOnEscape  => true; // ESC = 나가기(기존 동작, EscKeyListener 공용 경로)
 
     // 전체화면 탭형 레이아웃(디자이너 완성본 기준). 창=캔버스 꽉, 좌 스테이지 / 우 정보 컬럼 / 하단 대사 밴드.
+    // ── 목업 좌표계 (납품 전체모습 = 1167×834) ────────────────
+    // 좌표는 합성본에서 실측했다: 패널 테두리는 주황 픽셀을 직접 찾아 경계를 땄고,
+    // 조각들은 템플릿 매칭으로 자리를 확인했다(무기 슬롯 0.977/0.958 · 대장장이칸 1.000).
+    // 창 크기는 UIWindowFitter가 화면에 맞춰 키운다 — 여기 숫자는 그대로 두면 된다.
+    private const float MockW = 1167f, MockH = 834f;
+
+    // 최상위
+    private const float TabY = 101f, TabW = 174f, TabH = 57f;
+    // 완성본(전체모습.png · 1167×834 = 이 좌표계와 1:1)의 탭 자리는 136 / 325다.
+    // 제목은 그 위 빈 밴드(y 0~100)로 올려 자리를 비켜준다 — 탭을 밀면 완성본과 어긋난다.
+    private const float Tab0X = 134f, Tab1X = 326f;
+    private const float StageX = 20f,  StageY = 171f, StagePanelW = 754f, StagePanelH = 491f;
+    private const float InfoX  = 803f, InfoY  = 171f, InfoW = 342f, InfoH = 491f;
+    private const float LogX   = 18f,  LogY   = 675f, LogW  = 756f, LogH  = 102f;
+    private const float ExitX  = 837f, ExitY  = 696f, ExitW = 264f, ExitH = 67f;
+
+    // 스테이지 안쪽(스테이지 패널 기준 상대 좌표)
+    private const float SlotAX = 155f, SlotBX = 460f, SlotY = 84f, SlotWH = 174f;
+    private const float BadgeX = 196f, BadgeY = 34f,  BadgeW = 89f,  BadgeH = 67f;
+    private const float ArrowX = 374f, ArrowY = 142f, ArrowW = 41f,  ArrowH = 53f;
+    // AtkH는 37이다 — 신규 「공격력 올라가는 표기칸」(1128×111 = 10.16)을 폭 375에 맞춘 값(10.14).
+    // 한때 게이지와 겹친다고 28로 줄였는데, 신규 게이지바는 불투명 구간이 세로 6%(가운데 얇은 선)뿐이라
+    // 상자가 313~397이어도 실제로 보이는 건 352~357이다. 겹치지 않는다.
+    private const float AtkX   = 206f, AtkY   = 285f, AtkW  = 375f,  AtkH  = 37f;
+    // GaugeH는 84다 — 신규 납품본 「강화 게이지바」(2196×251 · 비율 8.749)를 폭 731에 맞춘 값(8.70).
+    // 한때 37로 줄인 적이 있는데 그건 구세대 「강화 게이지 검은 바탕」(19.7) 기준이라 잘못이었다.
+    private const float GaugeX = 11f,  GaugeY = 313f, GaugeW = 731f, GaugeH = 84f;
+    private const float WarnX  = 191f, WarnY  = 381f, WarnW = 376f,  WarnH = 29f;
+    private const float DoX    = 253f, DoY    = 422f, DoW   = 251f,  DoH   = 65f;
+
     private const float Margin   = 28f;
     private const float TopBarH  = 92f;
     private const float InfoColW = 440f;    // 우측 강화정보 컬럼 폭
     private const float ColGap   = 26f;
-    private const float DialogH  = 118f;    // 하단 대사 밴드 높이
-    private const float StageW   = 1257f;   // 재련소 배경 아트 실치수(1676×798@2x ÷ 2 × 1.5)
-    private const float StageH   = 599f;
 
     // ── 연출 노브 (도파민 레이어; 표시층 전용, 결과/데이터 불변) ──
     private const float PunchScale        = 0.14f;  // 성공 카드 스케일 펀치 진폭
@@ -49,7 +76,6 @@ public sealed class UI_CruciblePanel : UI_Popup
     private const float ResultPopDur    = 0.12f;  // 등장(큰 글씨 → 제자리)
     private const float ResultHoldDur   = 0.85f;
     private const float ResultFadeDur   = 0.30f;
-    private const float ResultY         = 220f;   // 스테이지 중앙 기준 — 카드 윗변(+159)과 타입 줄(+263) 사이
     private const float SuccessFontSize = 40f;
     private const float SuccessPopScale = 1.35f;
     private const float JackpotFontSize = 56f;    // 잭팟은 한눈에 다르게
@@ -213,10 +239,16 @@ public sealed class UI_CruciblePanel : UI_Popup
         var veil = ShopUIStyle.MakeImage(transform, "Veil", ShopUIStyle.Veil, raycast: true);
         ShopUIStyle.Stretch(veil.rectTransform);
 
-        // 전체화면 창(캔버스 꽉) — 배경 일러스트가 아트, 단색은 폴백.
+        // 창 — 납품 목업(1167×834) 비율의 판. 예전엔 캔버스를 꽉 채웠는데, 새 아트가
+        // 16:9가 아니라 1.4 비율이라 그대로 늘리면 배경 일러스트가 가로로 찌그러진다.
+        // 화면 맞춤은 UIWindowFitter가 한다 — 자식이 비율 앵커라 통째로 따라온다.
         var window = ShopUIStyle.MakeImage(transform, "Window", ShopUIStyle.WindowFill, raycast: true);
-        ShopUIStyle.Stretch(window.rectTransform);
+        var wrt = window.rectTransform;
+        wrt.anchorMin = wrt.anchorMax = wrt.pivot = new Vector2(0.5f, 0.5f);
+        wrt.anchoredPosition = Vector2.zero;
+        wrt.sizeDelta = new Vector2(MockW, MockH);
         ShopUIStyle.Skin(window, _skin?.background);
+        window.gameObject.AddComponent<UIWindowFitter>().Configure(maxScale: UIWindowFitter.ContentScreen);
         var w = window.transform;
 
         BuildTopBar(w);
@@ -283,12 +315,50 @@ public sealed class UI_CruciblePanel : UI_Popup
             }
         }
 
+        // ── 무기 카드 재바인딩 ──
+        // 카드 참조 배열들은 readonly라 직렬화되지 않는다 — 구운 프리팹에서는 전부 null로 되살아난다.
+        // RefreshAll은 _cardBg[0].color를 가드 없이 만지므로, 여기서 잇지 않으면 화면이 열리는 순간 죽는다.
+        var target = FindDeep("TargetCard");
+        var result = FindDeep("ResultCard");
+        if (target != null)
+        {
+            _cardBg[0]      = target.GetComponent<Image>();
+            _cardName[0]    = Txt(target, "Name");
+            _cardBasePos[0] = Vector2.zero;              // 빌드 경로와 같은 펀치 연출 기준점
+        }
+        if (result != null) _cardLevel[0] = Txt(result, "Level");
+
+        // 공격력 줄과 게이지는 카드가 아니라 <b>스테이지</b>에 달린다 — 카드의 부모가 곧 그 스테이지다.
+        var meleeStage = target?.parent;
+        if (meleeStage != null)
+        {
+            _cardAtk[0]       = Txt(meleeStage, "Atk");
+            _cardGaugeFill[0] = meleeStage.Find("GaugeTrack")?.Find("Fill") as RectTransform;
+        }
+
+        var partDetail = FindDeep("PartDetail");
+        if (partDetail != null)
+        {
+            _cardBg[1]        = partDetail.GetComponent<Image>();
+            _cardBasePos[1]   = ((RectTransform)partDetail).anchoredPosition;
+            _cardName[1]      = Txt(partDetail, "Name");
+            _cardLevel[1]     = Txt(partDetail, "Level");
+            _cardAtk[1]       = Txt(partDetail, "Delta");
+            _cardGaugeFill[1] = partDetail.Find("LevelBar")?.Find("Fill") as RectTransform;
+        }
+
         Rewire(_enhanceBtn, OnEnhanceClicked);
         Rewire(_evolveBtn,  ShowEvolvePanel);
         Rewire(_branchABtn, () => OnBranchClicked(0));
         Rewire(_branchBBtn, () => OnBranchClicked(1));
         Rewire(FindDeep("Exit")?.GetComponent<Button>(),          ClosePopupUI);
         Rewire(FindDeep("EvolveCancel")?.GetComponent<Button>(),  HideEvolvePanel);
+
+        // 탭 클릭은 람다로 건 <b>비영속 리스너</b>라 프리팹에 저장되지 않는다 —
+        // 다시 걸지 않으면 구운 화면에서 원거리 파츠 탭으로 갈 길 자체가 없다.
+        Rewire(FindDeep("TabWeapon")?.GetComponent<Button>(), () => SelectTab(0));
+        Rewire(FindDeep("TabRanged")?.GetComponent<Button>(), () => SelectTab(1));
+        SelectTab(0);
     }
 
     private Transform FindDeep(string name)
@@ -312,25 +382,33 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         // 타이틀 — 모루 아이콘 + 재련소
         var anvil = ShopUIStyle.MakeImage(w, "Anvil", ShopUIStyle.Gold);
-        ShopUIStyle.Anchor(anvil.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
-                           new Vector2(Margin + 6, -Margin - 4), new Vector2(50, 50));
+        // 목업 상단 좌측은 비어 있다 — 탭(x=134) 왼쪽 자리에 모루+제목을 넣는다.
+        Place(anvil.rectTransform, 14f, TabY + 6f, 44f, 44f);
         anvil.preserveAspect = true;
         ShopUIStyle.Skin(anvil, _skin?.anvilIcon);
 
         var title = ShopUIStyle.MakeText(w, "Title", 30f, FontStyles.Bold,
                                          TextAlignmentOptions.MidlineLeft, ShopUIStyle.Gold);
         title.text = "재련소";
-        ShopUIStyle.Anchor(title.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
-                           new Vector2(Margin + 72, -Margin - 4), new Vector2(150, 46));
+        // 제목 칸은 목업상 56px뿐인데(탭이 134px에서 시작한다) 줄바꿈이 켜져 있으면
+        // "재련소"가 세 줄로 쪼개져 40px 상자를 116px로 넘긴다. 한 줄로 묶고
+        // 자동크기가 폭에 맞춰 줄이게 둔다.
+        title.textWrappingMode = TextWrappingModes.NoWrap;
+        // 의뢰본에서 제목은 <b>탭과 같은 줄 맨 왼쪽</b>(모루 아이콘 옆)이다.
+        // 전체모습.png에서 탭(136~) 왼쪽이 비어 있던 자리가 곧 이곳이다.
+        // 의뢰본의 「재련소」 글자 폭은 이 좌표계로 약 52px이라 56px 칸에 들어간다 —
+        // 문제는 폭이 아니라 줄바꿈이었다(3줄로 쪼개져 넘쳤다).
+        // 칸은 70px여야 한다 — 자동크기 최소 글꼴(16.5)에서 「재련소」가 필요로 하는 폭이 70이다.
+        // 56이면 그 최소에서도 넘쳐 잘린다. 모루를 24→14로 밀어 그만큼을 만들었다.
+        Place(title.rectTransform, 62f, TabY + 8f, 70f, 40f);
 
         // 탭 — 무기강화 / 원거리 파츠. 아트 실치수 390×131@2x → 293×98, 여기선 0.8배로 상단바에 맞춘다.
-        _tabWeaponImg = MakeTab(w, "TabWeapon", "무기강화",    Margin + 240, () => SelectTab(0));
-        _tabRangedImg = MakeTab(w, "TabRanged", "원거리 파츠", Margin + 490, () => SelectTab(1));
+        _tabWeaponImg = MakeTab(w, "TabWeapon", "무기강화",    Tab0X, () => SelectTab(0));
+        _tabRangedImg = MakeTab(w, "TabRanged", "원거리 파츠", Tab1X, () => SelectTab(1));
 
         // 재화 — 원석 젬(우측 끝) + 강화재료(그 왼쪽). 칸 크기는 재화 칸 아트 실치수 175×71.
         var gem = ShopUIStyle.MakeImage(w, "GemPill", ShopUIStyle.GoldPillBg);
-        ShopUIStyle.Anchor(gem.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
-                           new Vector2(-Margin, -Margin), new Vector2(175, 71));
+        Place(gem.rectTransform, MockW - 24f - 144f, TabY + 4f, 144f, 50f);
         ShopUIStyle.Skin(gem, _skin?.currencySlot, sliced: true);
         var gemIcon = ShopUIStyle.MakeImage(gem.transform, "GemIcon", ShopUIStyle.Gold);
         ShopUIStyle.Anchor(gemIcon.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f),
@@ -343,8 +421,7 @@ public sealed class UI_CruciblePanel : UI_Popup
                            new Vector2(-18, 0), new Vector2(104, 30));
 
         var pill = ShopUIStyle.MakeImage(w, "FuelPill", ShopUIStyle.GoldPillBg);
-        ShopUIStyle.Anchor(pill.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
-                           new Vector2(-Margin - 187, -Margin), new Vector2(175, 71));
+        Place(pill.rectTransform, MockW - 24f - 144f - 154f, TabY + 4f, 144f, 50f);
         ShopUIStyle.Skin(pill, _skin?.currencySlot, sliced: true);
         _fuelText = ShopUIStyle.MakeText(pill.transform, "Fuel", 20f, FontStyles.Bold,
                                          TextAlignmentOptions.Center, ShopUIStyle.Gold);
@@ -355,8 +432,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     private Image MakeTab(Transform w, string name, string label, float xFromLeft, Action onClick)
     {
         var tab = ShopUIStyle.MakeImage(w, name, ShopUIStyle.BandFill, raycast: true);
-        ShopUIStyle.Anchor(tab.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
-                           new Vector2(xFromLeft, -Margin + 4), new Vector2(234, 79));
+        Place(tab.rectTransform, xFromLeft, TabY, TabW, TabH);
         var t = ShopUIStyle.MakeText(tab.transform, "L", 18f, FontStyles.Bold,
                                      TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
         t.text = label;
@@ -373,6 +449,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         _activeTab = tab;
         if (_meleeStage != null)  _meleeStage.gameObject.SetActive(tab == 0);
         if (_rangedStage != null) _rangedStage.gameObject.SetActive(tab == 1);
+
 
         ApplyTab(_tabWeaponImg, _skin?.tabWeaponOn, _skin?.tabWeaponOff, tab == 0);
         ApplyTab(_tabRangedImg, _skin?.tabRangedOn, _skin?.tabRangedOff, tab == 1);
@@ -421,11 +498,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     private void BuildStages(Transform w)
     {
         var area = ShopUIStyle.MakeRect(w, "StageArea").GetComponent<RectTransform>();
-        area.anchorMin = new Vector2(0, 0);
-        area.anchorMax = new Vector2(1, 1);
-        area.pivot     = new Vector2(0.5f, 0.5f);
-        area.offsetMin = new Vector2(Margin, DialogH + Margin);
-        area.offsetMax = new Vector2(-(InfoColW + ColGap + Margin), -(TopBarH + Margin));
+        Place(area, StageX, StageY, StagePanelW, StagePanelH);
 
         _meleeStage  = MakeStage(area, "MeleeStage");
         _rangedStage = MakeStage(area, "RangedStage");
@@ -445,8 +518,8 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         var t = ShopUIStyle.MakeText(area, "StageResult", SuccessFontSize, FontStyles.Bold,
                                      TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
-        var half = new Vector2(0.5f, 0.5f);
-        ShopUIStyle.Anchor(t.rectTransform, half, half, half, new Vector2(0f, ResultY), new Vector2(900f, 62f));
+        // 폭 900은 스테이지(754)보다 넓어 좌우로 53px씩 삐져나갔다 — 스테이지 안에 가둔다.
+        PlaceIn(t.rectTransform, 27f, 90f, 700f, 62f, StagePanelW, StagePanelH);
         _stageResult = t;
         t.gameObject.SetActive(false);
     }
@@ -510,9 +583,10 @@ public sealed class UI_CruciblePanel : UI_Popup
     private RectTransform MakeStage(Transform parent, string name)
     {
         var img = ShopUIStyle.MakeImage(parent, name, new Color(0.09f, 0.07f, 0.10f, 0.96f), raycast: true);
-        // 재련소 배경 아트 실치수 1257×599 — 늘리면 문양이 뭉개져서, 영역을 채우지 않고 중앙에 그대로 놓는다.
-        var half = new Vector2(0.5f, 0.5f);
-        ShopUIStyle.Anchor(img.rectTransform, half, half, half, Vector2.zero, new Vector2(StageW, StageH));
+        // 스테이지 영역을 <b>그대로 채운다</b>. 예전엔 옛 아트 실치수(1257×599)를 영역 안에 중앙 배치했는데,
+        // 그러면 스테이지가 영역보다 커져 <b>안쪽 요소의 비율 기준이 어긋난다</b>(무기 슬롯이 1.667배로 벌어졌다).
+        // 새 판 아트는 754×491(=1.535)로 영역과 비율이 같아 늘려도 문양이 안 뭉개진다.
+        ShopUIStyle.Stretch(img.rectTransform);
         ShopUIStyle.Skin(img, _skin?.stagePanel, sliced: true);
         return img.rectTransform;
     }
@@ -542,6 +616,9 @@ public sealed class UI_CruciblePanel : UI_Popup
         fr.anchorMin = new Vector2(0f, 0f); fr.anchorMax = new Vector2(0f, 1f); fr.pivot = new Vector2(0f, 0.5f);
         fr.offsetMin = Vector2.zero; fr.offsetMax = Vector2.zero;
         ShopUIStyle.Skin(fill, fillArt, sliced: true);
+        // 채움 아트가 없으면 <b>투명</b>하게 둔다. 신규 「강화 게이지바」는 실패·성공·대성공이
+        // 이미 그려진 한 장이라, 그 위에 색 막대를 덧그리면 구간이 가려진다.
+        if (fillArt == null) fill.color = new Color(1f, 1f, 1f, 0f);
 
         if (frameArt != null)
         {
@@ -566,8 +643,9 @@ public sealed class UI_CruciblePanel : UI_Popup
         // 위험/안전 배지. 아트(위험 하락)에는 "위험-하락" 글자가 구워져 있어 도박구간에서만 쓴다 —
         // 안전구간에는 아트가 없으므로 색 알약 + 글자로 그린다(둘이 겹치지 않게 서로 배타).
         _zoneBg = ShopUIStyle.MakeImage(stage, "ZoneBg", new Color(0.15f, 0.32f, 0.20f, 1f));
-        ShopUIStyle.Anchor(_zoneBg.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
-                           new Vector2(-20, -18), new Vector2(135, 48));
+        // 목업은 이 경고를 우상단 알약이 아니라 게이지 아래 <b>가로 띠</b>로 옮겼다 —
+        // 위험 여부는 게이지(단계)와 함께 읽어야 판단이 되므로 그 바로 아래가 맞는 자리다.
+        PlaceIn(_zoneBg.rectTransform, WarnX, WarnY, WarnW, WarnH, StagePanelW, StagePanelH);
         _zoneTag = ShopUIStyle.MakeText(_zoneBg.transform, "ZoneTag", 15f, FontStyles.Bold,
                                         TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
         _zoneTag.text = "안전구간";
@@ -576,22 +654,25 @@ public sealed class UI_CruciblePanel : UI_Popup
         // 타입·티어(스테이지 좌상단)
         _focusTypeText = ShopUIStyle.MakeText(stage, "TypeTier", 15f, FontStyles.Bold,
                                               TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
-        ShopUIStyle.Anchor(_focusTypeText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                           new Vector2(20, -14), new Vector2(-260, 22));
+        PlaceIn(_focusTypeText.rectTransform, 16f, 12f, 300f, 22f, StagePanelW, StagePanelH);
 
         // 무기 카드 ▸ 결과 카드. 두 장을 중앙 가까이 모은다 —
         // 스테이지 양끝에 붙여 두면 가운데가 통째로 비어 "빈 화면"으로 읽힌다.
-        var cardSize = new Vector2(340f, 251f);   // 무기 넣는칸 테두리 547×404@2x
+        var cardSize = new Vector2(SlotWH, SlotWH);
         var half = new Vector2(0.5f, 0.5f);
-        _cardBg[0]      = MakeSlotCard(stage, "TargetCard", half, new Vector2(-236f, 34f), cardSize);
-        _cardBasePos[0] = new Vector2(-236f, 34f);
-        var resultCard  = MakeSlotCard(stage, "ResultCard", half, new Vector2(236f, 34f), cardSize);
+        _cardBg[0]      = MakeSlotCard(stage, "TargetCard", half, Vector2.zero, cardSize);
+        var resultCard  = MakeSlotCard(stage, "ResultCard", half, Vector2.zero, cardSize);
+        // 목업 실측 자리로 다시 앉힌다(스테이지 754×491 기준). 같은 아트가 두 번 쓰이는 자리다.
+        PlaceIn(_cardBg[0].rectTransform,        SlotAX, SlotY, SlotWH, SlotWH, StagePanelW, StagePanelH);
+        PlaceIn((RectTransform)resultCard.transform, SlotBX, SlotY, SlotWH, SlotWH, StagePanelW, StagePanelH);
+        // 펀치 연출은 anchoredPosition을 흔든다 — 비율 앵커라 기준점은 0이다.
+        _cardBasePos[0] = Vector2.zero;
 
         // 화살표(가운데) — 재련소 화살표 86×98@2x
         if (_skin?.arrow != null)
         {
             var arrow = ShopUIStyle.MakeImage(stage, "Arrow", Color.white);
-            ShopUIStyle.Anchor(arrow.rectTransform, half, half, half, new Vector2(0, 34f), new Vector2(65, 74));
+            PlaceIn(arrow.rectTransform, ArrowX, ArrowY, ArrowW, ArrowH, StagePanelW, StagePanelH);
             arrow.preserveAspect = true;
             ShopUIStyle.Skin(arrow, _skin.arrow);
         }
@@ -599,7 +680,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         {
             var arrow = ShopUIStyle.MakeText(stage, "Arrow", 40f, FontStyles.Bold, TextAlignmentOptions.Center, ShopUIStyle.Gold);
             arrow.text = "▶";
-            ShopUIStyle.Anchor(arrow.rectTransform, half, half, half, new Vector2(0, 34f), new Vector2(65, 74));
+            PlaceIn(arrow.rectTransform, ArrowX, ArrowY, ArrowW, ArrowH, StagePanelW, StagePanelH);
         }
 
         // 무기 예시 아이콘(좌 카드) — 무기 예시 233×232@2x
@@ -622,36 +703,61 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         // 공격력 전→후. 카드가 보여주는 건 강화 단계뿐이라 "그래서 얼마나 세지나"가 화면에 없었다.
         // 두 카드(아래끝 -91)와 게이지(-193.5) 사이의 빈 띠에 한 줄로 깐다.
+        // 공격력 표기칸 아트를 글자 <b>뒤에</b> 깐다 — 형제 순서가 곧 그리기 순서라 먼저 만든다.
+        if (_skin?.atkPlate != null)
+        {
+            var atkPlate = ShopUIStyle.MakeImage(stage, "AtkPlate", Color.white);
+            PlaceIn(atkPlate.rectTransform, AtkX, AtkY, AtkW, AtkH, StagePanelW, StagePanelH);
+            ShopUIStyle.Skin(atkPlate, _skin.atkPlate);
+            atkPlate.raycastTarget = false;
+        }
+
         _cardAtk[0] = ShopUIStyle.MakeText(stage, "Atk", 19f, FontStyles.Bold,
                                            TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
-        ShopUIStyle.Anchor(_cardAtk[0].rectTransform, half, half, half,
-                           new Vector2(0f, -136f), new Vector2(900f, 30f));
+        PlaceIn(_cardAtk[0].rectTransform, AtkX, AtkY, AtkW, AtkH, StagePanelW, StagePanelH);
 
         // 하단 강화 게이지 — 테두리 아트 1588×129@2x(가로세로비 12.3)를 지켜 납작하게 눌리지 않게 한다.
+        // 게이지는 목업 자리(스테이지 기준 11,313 · 731×84)로 옮긴다.
+        // ⚠ 새 납품본 「강화 게이지바」는 채워지는 막대가 아니라 <b>적·녹·주황 위험 구간 띠</b>다 —
+        //    그건 채움 로직이 아니라 현재 단계를 가리키는 표식이 필요해 아직 갈아끼우지 않았다.
         _cardGaugeFill[0] = BuildGauge(stage, _skin?.gaugeTrack, _skin?.gaugeFill, _skin?.gaugeFrame,
-                                       30f, 76f, 1100f);
+                                       StagePanelH - GaugeY - GaugeH, GaugeH, GaugeW);
+
+        // 구역 배지(381~410)는 게이지(313~397) 아래끝에 걸치도록 설계된 자리다.
+        // 그런데 배지를 게이지보다 <b>먼저</b> 만들어서 게이지가 배지의 55%를 덮고 있었다.
+        // 형제 순서가 곧 그리기 순서이므로 맨 뒤로 보내 위에 오게 한다.
+        if (_zoneBg != null) _zoneBg.transform.SetAsLastSibling();
     }
 
-    // ── 원거리 탭 레이아웃 상수 (스테이지 1257×599, 좌상단 기준) ──
+    // ── 원거리 탭 레이아웃 상수 (스테이지 754×491 = StagePanelW×H, 좌상단 기준) ──
     //
     // 이 탭에는 <b>행동이 하나</b>다 — 파츠 강화. 원거리 무기 강화는 폐지했다:
     // 그건 파츠 슬롯 게이지를 채우려고 붙은 것이고, 내장형 전환으로 슬롯이 사라지면서 이유도 사라졌다
     // (원래 기획 2026-07-18도 "무기 자체 레벨 강화 없음 · 성장은 파츠로만"이었다).
     // 공격력·공격속도는 캐릭터 스탯이 담당하므로 파츠는 '발사 형태'만 다룬다.
-    private const float RxPad     = 40f;    // 스테이지 좌우 여백
-    private const float RxHeadY   = 24f;    // 헤더 띠 y
-    private const float RxHeadH   = 52f;
-    private const float RxBodyY   = 96f;    // 본문 y
-    // 무기 강화 행(y502 h68)을 폐지하면서 그 자리를 본문이 흡수했다.
-    // 그냥 비워 두면 화면 아래가 뚫린 것처럼 읽혀, 행 높이를 키워 여백을 안으로 돌렸다.
-    private const float RxBodyH   = 458f;
-    private const float RxColLW   = 520f;   // 좌 — 조합
-    private const float RxColRX   = 600f;   // 우 — 상세 시작 x
-    private const float RxColRW   = 617f;
-    private const float RxRowH    = 82f;    // 파츠 행 — 5행 × 82 + 4갭 × 12 = 458 (본문 높이와 정확히 일치)
-    private const float RxRowGap  = 12f;
+    //
+    // 예전엔 옛 스테이지(1257×599) 좌표를 배율 레이어(×0.6)로 통째로 줄였는데, 창 fitter의 글자 배율과
+    // 겹쳐 실제 글자가 10~13px까지 내려갔다(실측 09-08). 이제 스테이지 실크기 좌표로 짜서 비율 앵커로
+    // 굳히고(PlaceIn) fitter 배율만 받는다 — 근접 탭과 같은 규약. 3띠(헤더/본문 2열)·좌우 폭 비율은 그대로다.
+    private const float RxPad     = 24f;    // 스테이지 좌우 여백
+    private const float RxHeadY   = 14f;    // 헤더 띠 y
+    private const float RxHeadH   = 32f;
+    private const float RxBodyY   = 56f;    // 본문 y
+    private const float RxBodyH   = 410f;   // 5행 × 74 + 4갭 × 10 (본문 높이와 정확히 일치)
+    private const float RxColLW   = 312f;   // 좌 — 조합 (옛 520 × 0.6)
+    private const float RxColRX   = 360f;   // 우 — 상세 시작 x
+    private const float RxColRW   = 370f;   // 360 + 370 = 730 = 754 − 24
+    private const float RxRowH    = 74f;    // 파츠 행
+    private const float RxRowGap  = 10f;
 
-    /// <summary>스테이지 좌상단 기준 배치(anchor·pivot 모두 좌상단).</summary>
+    /// <summary>목업 좌상단 기준 사각형을 창(<see cref="MockW"/>×<see cref="MockH"/>) 기준 비율 앵커로 굳힌다.</summary>
+    private static void Place(RectTransform rt, float x, float y, float w, float h)
+        => UIProportional.Place(rt, x, y, w, h, MockW, MockH);
+
+    /// <summary>목업 좌표를 <b>부모 사각형 기준</b>으로 앉힌다(스테이지 안쪽 요소용).</summary>
+    private static void PlaceIn(RectTransform rt, float x, float y, float w, float h, float pw, float ph)
+        => UIProportional.Place(rt, x, y, w, h, pw, ph);
+
     private static void PlaceTL(RectTransform rt, float x, float y, float w, float h)
     {
         var tl = new Vector2(0f, 1f);
@@ -666,14 +772,14 @@ public sealed class UI_CruciblePanel : UI_Popup
     /// </summary>
     private void BuildRangedCard(RectTransform stage)
     {
-        _dockTypeText = ShopUIStyle.MakeText(stage, "RangedTitle", 26f, FontStyles.Bold,
+        _dockTypeText = ShopUIStyle.MakeText(stage, "RangedTitle", 20f, FontStyles.Bold,
                                              TextAlignmentOptions.MidlineLeft, ShopUIStyle.Gold);
-        PlaceTL(_dockTypeText.rectTransform, RxPad, RxHeadY, 520f, RxHeadH);
+        PlaceIn(_dockTypeText.rectTransform, RxPad, RxHeadY, RxColLW, RxHeadH, StagePanelW, StagePanelH);
         _dockTypeText.text = "원거리 파츠";
 
-        _slotSummary = ShopUIStyle.MakeText(stage, "SlotSummary", 16f, FontStyles.Normal,
+        _slotSummary = ShopUIStyle.MakeText(stage, "SlotSummary", 14f, FontStyles.Normal,
                                             TextAlignmentOptions.MidlineRight, ShopUIStyle.TextDim);
-        PlaceTL(_slotSummary.rectTransform, RxPad + 560f, RxHeadY, 1257f - RxPad * 2f - 560f, RxHeadH);
+        PlaceIn(_slotSummary.rectTransform, RxColRX, RxHeadY, RxColRW, RxHeadH, StagePanelW, StagePanelH);
 
         BuildRangedParts(stage);
         BuildPartDetail(stage);
@@ -687,64 +793,75 @@ public sealed class UI_CruciblePanel : UI_Popup
     private void BuildPartDetail(RectTransform stage)
     {
         var panel = ShopUIStyle.MakeImage(stage, "PartDetail", new Color(0.11f, 0.09f, 0.14f, 1f));
-        PlaceTL(panel.rectTransform, RxColRX, RxBodyY, RxColRW, RxBodyH);
-        ShopUIStyle.Skin(panel, _skin?.slotFrame, sliced: true);
+        PlaceIn(panel.rectTransform, RxColRX, RxBodyY, RxColRW, RxBodyH, StagePanelW, StagePanelH);
+        // 원거리 전용 아트(「원거리 강화 바탕」+「테두리」, 316×233). 패널(370×410)은 세로가 더 길어
+        // 9-slice(SkinArtImporter 32px)로 늘린다 — 근접 「강화 무기 바탕」(정사각)을 빌려 쓰지 않는다.
+        if (_skin?.rangedGaugeFill != null)
+            ShopUIStyle.Skin(panel, _skin.rangedGaugeFill, sliced: true);
+        if (_skin?.rangedGaugeFrame != null)
+        {
+            var frame = ShopUIStyle.MakeImage(panel.transform, "Frame", Color.white);
+            ShopUIStyle.Skin(frame, _skin.rangedGaugeFrame, sliced: true);
+            ShopUIStyle.Stretch(frame.rectTransform);
+            frame.raycastTarget = false;
+        }
         _cardBg[1]      = panel;
         _cardBasePos[1] = panel.rectTransform.anchoredPosition;
         var c = panel.transform;
 
-        const float padX = 26f;
+        const float padX = 16f;
         float innerW = RxColRW - padX * 2f;
 
-        _cardName[1] = ShopUIStyle.MakeText(c, "Name", 30f, FontStyles.Bold,
+        _cardName[1] = ShopUIStyle.MakeText(c, "Name", 22f, FontStyles.Bold,
                                             TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
-        PlaceTL(_cardName[1].rectTransform, padX, 20f, innerW, 38f);
+        PlaceIn(_cardName[1].rectTransform, padX, 16f, innerW, 30f, RxColRW, RxBodyH);
 
-        _partKindText = ShopUIStyle.MakeText(c, "Kind", 16f, FontStyles.Normal,
+        _partKindText = ShopUIStyle.MakeText(c, "Kind", 14f, FontStyles.Normal,
                                              TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
-        PlaceTL(_partKindText.rectTransform, padX, 58f, innerW, 22f);
+        PlaceIn(_partKindText.rectTransform, padX, 48f, innerW, 20f, RxColRW, RxBodyH);
 
-        _cardLevel[1] = ShopUIStyle.MakeText(c, "Level", 20f, FontStyles.Bold,
+        _cardLevel[1] = ShopUIStyle.MakeText(c, "Level", 16f, FontStyles.Bold,
                                              TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
-        PlaceTL(_cardLevel[1].rectTransform, padX, 96f, innerW, 28f);
+        PlaceIn(_cardLevel[1].rectTransform, padX, 80f, innerW, 24f, RxColRW, RxBodyH);
 
-        _cardGaugeFill[1] = BuildBar(c, "LevelBar", padX, 130f, innerW, 18f);
+        _cardGaugeFill[1] = BuildBar(c, "LevelBar", padX, 108f, innerW, 12f, RxColRW, RxBodyH);
 
-        _cardAtk[1] = ShopUIStyle.MakeText(c, "Delta", 26f, FontStyles.Bold,
+        _cardAtk[1] = ShopUIStyle.MakeText(c, "Delta", 20f, FontStyles.Bold,
                                            TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
-        PlaceTL(_cardAtk[1].rectTransform, padX, 162f, innerW, 40f);
+        PlaceIn(_cardAtk[1].rectTransform, padX, 132f, innerW, 30f, RxColRW, RxBodyH);
 
-        _partGrowthText = ShopUIStyle.MakeText(c, "Growth", 15f, FontStyles.Normal,
+        _partGrowthText = ShopUIStyle.MakeText(c, "Growth", 14f, FontStyles.Normal,
                                                TextAlignmentOptions.TopLeft, ShopUIStyle.TextDim);
-        PlaceTL(_partGrowthText.rectTransform, padX, 208f, innerW, 24f);
+        PlaceIn(_partGrowthText.rectTransform, padX, 166f, innerW, 20f, RxColRW, RxBodyH);
 
-        _partDescText = ShopUIStyle.MakeText(c, "Desc", 16f, FontStyles.Normal,
+        _partDescText = ShopUIStyle.MakeText(c, "Desc", 14f, FontStyles.Normal,
                                              TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
-        PlaceTL(_partDescText.rectTransform, padX, 244f, innerW, 84f);
+        PlaceIn(_partDescText.rectTransform, padX, 196f, innerW, 80f, RxColRW, RxBodyH);
 
-        _partSynergyText = ShopUIStyle.MakeText(c, "Synergy", 15f, FontStyles.Normal,
+        _partSynergyText = ShopUIStyle.MakeText(c, "Synergy", 14f, FontStyles.Normal,
                                                 TextAlignmentOptions.TopLeft, new Color(0.50f, 0.89f, 1f));
-        PlaceTL(_partSynergyText.rectTransform, padX, 334f, innerW, 24f);
+        PlaceIn(_partSynergyText.rectTransform, padX, 282f, innerW, 20f, RxColRW, RxBodyH);
 
         // 강화 버튼은 좌열의 각 행으로 옮겼다 — 이 패널은 이제 <b>결과 전담</b>이다.
         // (_partEnhanceBtn / _partCostText 는 null로 남으며, 갱신 함수들이 null을 걸러낸다.)
         _partCostText = ShopUIStyle.MakeText(c, "PartCost", 14f, FontStyles.Normal,
                                              TextAlignmentOptions.TopLeft, ShopUIStyle.TextDim);
-        PlaceTL(_partCostText.rectTransform, padX, RxBodyH - 62f, innerW, 26f);
+        PlaceIn(_partCostText.rectTransform, padX, RxBodyH - 48f, innerW, 22f, RxColRW, RxBodyH);
     }
 
     /// <summary>단순 진행 막대(트랙 + 채움). 채움 RectTransform을 돌려준다.</summary>
-    private RectTransform BuildBar(Transform parent, string name, float x, float y, float w, float h)
+    private RectTransform BuildBar(Transform parent, string name, float x, float y, float w, float h,
+                                   float pw, float ph)
     {
         var track = ShopUIStyle.MakeImage(parent, name, new Color(0.10f, 0.09f, 0.12f, 1f));
-        PlaceTL(track.rectTransform, x, y, w, h);
-        ShopUIStyle.Skin(track, _skin?.gaugeTrack, sliced: true);
+        PlaceIn(track.rectTransform, x, y, w, h, pw, ph);
+        // 근접 「강화 게이지바」(2048x234 = 8.75:1)는 이 얇은 막대(최대 30:1)엔 3.5배 늘어난다.
+        // 호출처가 둘 다 원거리이므로 근접 아트를 걷어내고 무지 판으로 둔다.
 
         var fill = ShopUIStyle.MakeImage(track.transform, "Fill", ShopUIStyle.Gold);
         var fr = fill.rectTransform;
         fr.anchorMin = new Vector2(0f, 0f); fr.anchorMax = new Vector2(0f, 1f); fr.pivot = new Vector2(0f, 0.5f);
         fr.offsetMin = Vector2.zero; fr.offsetMax = Vector2.zero;
-        ShopUIStyle.Skin(fill, _skin?.gaugeFill, sliced: true);
         return fr;
     }
 
@@ -764,32 +881,33 @@ public sealed class UI_CruciblePanel : UI_Popup
             float ry = RxBodyY + i * (RxRowH + RxRowGap);
 
             var row = ShopUIStyle.MakeImage(c, $"PartRow{i}", new Color(0.10f, 0.08f, 0.13f, 1f));
-            PlaceTL(row.rectTransform, RxPad, ry, RxColLW, RxRowH);
-            ShopUIStyle.Skin(row, _skin?.slotFrame, sliced: true);
+            PlaceIn(row.rectTransform, RxPad, ry, RxColLW, RxRowH, StagePanelW, StagePanelH);
+            // 정사각 슬롯 아트를 6.4:1 행에 넣으면 6.34배 뭉개진다 — BuildPartDetail의 주석 참조.
             _partsSlots[i] = row;
 
-            _slotKind[i] = ShopUIStyle.MakeText(row.transform, "Mark", 17f, FontStyles.Bold,
+            // 행 74px 안 3줄: 표식·이름·레벨 / 효과값 / 레벨 막대. 버튼은 오른쪽 세로 중앙.
+            _slotKind[i] = ShopUIStyle.MakeText(row.transform, "Mark", 16f, FontStyles.Bold,
                                                 TextAlignmentOptions.Center, ShopUIStyle.Gold);
-            PlaceTL(_slotKind[i].rectTransform, 14f, 32f, 22f, 20f);
+            PlaceIn(_slotKind[i].rectTransform, 10f, 10f, 18f, 24f, RxColLW, RxRowH);
 
-            _slotName[i] = ShopUIStyle.MakeText(row.transform, "Nm", 19f, FontStyles.Bold,
+            _slotName[i] = ShopUIStyle.MakeText(row.transform, "Nm", 17f, FontStyles.Bold,
                                                 TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextPrimary);
-            PlaceTL(_slotName[i].rectTransform, 44f, 14f, 150f, 28f);
+            PlaceIn(_slotName[i].rectTransform, 32f, 8f, 140f, 26f, RxColLW, RxRowH);
 
-            _slotVal[i] = ShopUIStyle.MakeText(row.transform, "Val", 15f, FontStyles.Normal,
-                                               TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextDim);
-            PlaceTL(_slotVal[i].rectTransform, 44f, 46f, 150f, 24f);
-
-            _slotLv[i] = ShopUIStyle.MakeText(row.transform, "Lv", 16f, FontStyles.Bold,
+            _slotLv[i] = ShopUIStyle.MakeText(row.transform, "Lv", 15f, FontStyles.Bold,
                                               TextAlignmentOptions.MidlineLeft, ShopUIStyle.Gold);
-            PlaceTL(_slotLv[i].rectTransform, 200f, 30f, 56f, 24f);
+            PlaceIn(_slotLv[i].rectTransform, 176f, 10f, 44f, 24f, RxColLW, RxRowH);
 
-            _slotBar[i] = BuildBar(row.transform, "LvBar", 262f, 35f, 132f, 14f);
+            _slotVal[i] = ShopUIStyle.MakeText(row.transform, "Val", 14f, FontStyles.Normal,
+                                               TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextDim);
+            PlaceIn(_slotVal[i].rectTransform, 32f, 36f, 188f, 20f, RxColLW, RxRowH);
+
+            _slotBar[i] = BuildBar(row.transform, "LvBar", 32f, 60f, 188f, 6f, RxColLW, RxRowH);
 
             // 행 강화 버튼 — 누른 자리에서 결과(레벨·게이지)가 바로 갱신된다.
             _slotBtn[i] = MakeStyledButton(row.transform, "RowEnhance", "강화", out _slotBtnLbl[i]);
             _slotBtnLbl[i].fontSize = 15f;
-            PlaceTL((RectTransform)_slotBtn[i].transform, 406f, 15f, 100f, 52f);
+            PlaceIn((RectTransform)_slotBtn[i].transform, 222f, 17f, 80f, 40f, RxColLW, RxRowH);
             int bi = i;
             _slotBtn[i].onClick.AddListener(() => EnhancePartRow(bi));
 
@@ -957,8 +1075,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         var panel = ShopUIStyle.MakeImage(w, "InfoPanel", ShopUIStyle.BandFill);
         // 강화정보창 643×680@2x → 세로비 유지(0.945)로 잡아야 팔각 프레임이 찌그러지지 않는다.
-        ShopUIStyle.Anchor(panel.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
-                           new Vector2(-Margin, -(TopBarH + Margin)), new Vector2(InfoColW, 466));
+        Place(panel.rectTransform, InfoX, InfoY, InfoW, InfoH);
         ShopUIStyle.Skin(panel, _skin?.infoPanel, sliced: true);
         var p = panel.transform;
 
@@ -999,39 +1116,41 @@ public sealed class UI_CruciblePanel : UI_Popup
     /// <summary>우측 하단 조작 컬럼 — 강화하기(큰) + 전환/나가기(2열) + 진화(조건부).</summary>
     private void BuildActionsColumn(Transform w)
     {
-        float colRight = -Margin;
 
         // 크기는 각 아트 실치수(강화하기 629×172 · 전환/나가기 304×147 @2x, 화면 배율 0.75).
         _enhanceBtn = MakeStyledButton(w, "Enhance", "강화하기", out _enhanceLabel);
         _enhanceLabel.fontSize = 24f;
-        ShopUIStyle.Anchor((RectTransform)_enhanceBtn.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0),
-                           new Vector2(colRight, Margin + 115), new Vector2(InfoColW, 120));
+        // 목업은 이 버튼을 우측 컬럼이 아니라 <b>스테이지 아래 가운데</b>에 둔다 —
+        // 무기·게이지를 보고 누르는 흐름이라 시선이 오른쪽으로 튀지 않는다.
+        // 부모는 창 그대로다(탭 전환 동작을 건드리지 않는다).
+        Place((RectTransform)_enhanceBtn.transform, StageX + DoX, StageY + DoY, DoW, DoH);
         SkinButton(_enhanceBtn, _skin?.enhanceButton, _enhanceLabel);
         _enhanceBtn.onClick.AddListener(OnEnhanceClicked);
 
         // 잭팟 확률은 지를지 말지를 가르는 수치인데 정보창 다섯째 줄에만 있어, 버튼을 보는 순간엔 시야 밖이었다.
         _jackpotHint = ShopUIStyle.MakeText(w, "JackpotHint", 15f, FontStyles.Bold,
                                             TextAlignmentOptions.Center, ShopUIStyle.Gold);
-        ShopUIStyle.Anchor(_jackpotHint.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0),
-                           new Vector2(colRight, Margin + 240), new Vector2(InfoColW, 26));
+        Place(_jackpotHint.rectTransform, InfoX, InfoY + InfoH + 6f, InfoW, 24f);
 
         // 탭 전환은 상단 탭 두 개가 이미 한다 — 여기 있던 [전환] 버튼은 같은 동작의 두 번째 입구였고,
         // 강화하기 바로 아래 큰 버튼이라 "슬롯 전환"으로도 읽혔다. 지워서 하단은 [나가기] 하나만 둔다.
-        // 버튼 아트가 304×147@2x(비 2.07)라 폭을 컬럼 전체로 늘리면 찌그러진다 — 크기는 두고 컬럼 가운데로.
-        float btnW = (InfoColW - 14f) / 2f;
+        // 목업은 [나가기]를 정보 패널 아래 오른쪽(837,696 · 264×67)에 둔다.
 
         var exitBtn = MakeStyledButton(w, "Exit", "나가기", out var exitLbl);
-        ShopUIStyle.Anchor((RectTransform)exitBtn.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0),
-                           new Vector2(colRight - (InfoColW - btnW) * 0.5f, Margin), new Vector2(btnW, 103));
-        SkinButton(exitBtn, _skin?.exitButton, exitLbl);
+        Place((RectTransform)exitBtn.transform, ExitX, ExitY, ExitW, ExitH);
+        // 신규 납품(08-28) 「나가기 버튼」은 글자 없는 민무늬 판이다 — 완성본(전체모습.png)처럼 코드 라벨을 남긴다.
+        SkinButton(exitBtn, _skin?.exitButton, exitLbl, bakedLabel: false);
+        exitLbl.color = new Color(0.78f, 0.86f, 1f, 1f);
         exitBtn.onClick.AddListener(ClosePopupUI);
 
         // 진화 버튼 — 조건 충족 시에만 노출(RefreshAll). 전용 아트가 없어 색 버튼 그대로 둔다.
         // 잭팟 줄(Margin+240~266) 위로 올려 겹치지 않게 한다.
         _evolveBtn = MakeStyledButton(w, "Evolve", "진화", out _);
         _evolveBtn.GetComponent<Image>().color = new Color(0.40f, 0.28f, 0.62f, 1f);
-        ShopUIStyle.Anchor((RectTransform)_evolveBtn.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0),
-                           new Vector2(colRight, Margin + 278), new Vector2(InfoColW, 46));
+        // 예전 자리(InfoX, InfoY+InfoH+34)는 803~1145 × 696~736이라 나가기 버튼
+        // (837~1101 × 696~763)을 정면으로 덮었다. 의뢰서가 「강화하기 · 진화」를 한 묶음으로
+        // 제시하므로, 스테이지 안 강화하기 오른쪽에 나란히 둔다.
+        Place((RectTransform)_evolveBtn.transform, StageX + 535f, StageY + DoY, 200f, DoH);
         _evolveBtn.onClick.AddListener(ShowEvolvePanel);
         _evolveBtn.gameObject.SetActive(false);
     }
@@ -1040,20 +1159,20 @@ public sealed class UI_CruciblePanel : UI_Popup
     private void BuildDialogueBand(Transform w)
     {
         var band = ShopUIStyle.MakeImage(w, "DialogueBand", ShopUIStyle.BandFill);
+        ShopUIStyle.Skin(band, _skin?.dialogueBand, sliced: true);   // 신규 「대장장이칸」
         var bandRT = band.rectTransform;
-        bandRT.anchorMin = new Vector2(0, 0); bandRT.anchorMax = new Vector2(1, 0); bandRT.pivot = new Vector2(0.5f, 0);
-        bandRT.offsetMin = new Vector2(Margin, Margin);
-        bandRT.offsetMax = new Vector2(-(InfoColW + ColGap + Margin), Margin + DialogH - 8);
+        // 의뢰서가 대사 밴드를 <b>화면의 주역</b>으로 못박았고(가독성 최우선),
+        // 완성본에도 하단 좌측 756×102 자리가 그려져 있다. 레거시 앵커 계산 대신
+        // 그 목업 좌표(LogX/LogY/LogW/LogH)를 그대로 쓴다 — 상수는 있는데 안 쓰이고 있었다.
+        Place(bandRT, LogX, LogY, LogW, LogH);
 
-        var portrait = ShopUIStyle.MakeImage(band.transform, "Portrait", ShopUIStyle.PortraitBg);
-        ShopUIStyle.Anchor(portrait.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f),
-                           new Vector2(12, 0), new Vector2(84, DialogH - 26));
-
+        // 초상 칸은 두지 않는다 — 대장장이 초상 아트가 없어 늘 빈 색판이었고, 완성본(전체모습.png)의
+        // 띠에도 초상 자리가 없다. 아트가 오면 그때 칸을 되살린다.
         _dialogText = ShopUIStyle.MakeText(band.transform, "Dialog", 17f, FontStyles.Italic,
                                            TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextPrimary);
         var dtRT = _dialogText.rectTransform;
         dtRT.anchorMin = new Vector2(0, 0); dtRT.anchorMax = new Vector2(1, 1); dtRT.pivot = new Vector2(0.5f, 0.5f);
-        dtRT.offsetMin = new Vector2(112, 8); dtRT.offsetMax = new Vector2(-16, -8);
+        dtRT.offsetMin = new Vector2(28, 8); dtRT.offsetMax = new Vector2(-16, -8);
         _dialogText.text = "쇠는 두드릴수록 강해지지… 운이 따라준다면 말이야.";
     }
 
@@ -1277,13 +1396,14 @@ public sealed class UI_CruciblePanel : UI_Popup
     /// 아트가 붙는 순간 코드 라벨을 꺼야 한다 — 안 그러면 "강화하가기"처럼 두 벌이 겹쳐 읽힌다.
     /// 아트가 없을 때만 라벨이 남아 색 폴백에서도 무슨 버튼인지 알 수 있다.
     /// </summary>
-    private static void SkinButton(Button btn, Sprite art, TMP_Text label = null)
+    private static void SkinButton(Button btn, Sprite art, TMP_Text label = null, bool bakedLabel = true)
     {
         if (btn == null) return;
         if (art == null) return;
 
         var img = btn.GetComponent<Image>();
         ShopUIStyle.Skin(img, art, sliced: true);
+        if (!bakedLabel) return;   // 글자 없는 판 아트 — 라벨을 그대로 둔다
         var lbl = label != null ? label : btn.GetComponentInChildren<TMP_Text>(true);
         if (lbl != null) lbl.gameObject.SetActive(false);
     }
@@ -1670,9 +1790,9 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         if (_controller == null) return;
 
-        _fuelText.text = $"강화재료 {_controller.FuelAmount}";
+        CurrencyCounter.Apply(_fuelText, _controller.FuelAmount, "강화재료 ");
         if (_oreText != null)
-            _oreText.text = (_controller.Run?.FuelBank?.RuneOre ?? 0).ToString();
+            CurrencyCounter.Apply(_oreText, _controller.Run?.FuelBank?.RuneOre ?? 0);
 
         if (_eventBanner != null)
         {
@@ -1746,9 +1866,12 @@ public sealed class UI_CruciblePanel : UI_Popup
             _partSynergyText.text = "";
             _partDescText.text = "왼쪽 목록에서 파츠를 고르면 여기에 결과가 나온다.";
             SetBar(_cardGaugeFill[RangedCard], 0f);
+            // 고른 파츠가 없을 땐 레벨 막대 트랙도 감춘다 — 아트 바탕 위에 빈 띠만 남아 보인다.
+            _cardGaugeFill[RangedCard].parent.gameObject.SetActive(false);
             SetPartButton(null, 0, 0, false);
             return;
         }
+        _cardGaugeFill[RangedCard].parent.gameObject.SetActive(true);
 
         int level = state.LevelOf(def.part_id);
         int max   = def.max_level > 0 ? def.max_level : level;
@@ -1994,19 +2117,33 @@ public sealed class UI_CruciblePanel : UI_Popup
     private string MilestoneText(WeaponData w, int max, bool maxed)
     {
         int left = Mathf.Max(0, max - w.enhanceLevel);
+        string line;
 
         if (w.CanEvolve)
-            return maxed ? "◆ 진화 가능!" : $"◆ 진화까지 {left}강";
-
-        if (w.evolutionStage > 0)
+            line = maxed ? "◆ 진화 가능!" : $"◆ 진화까지 {left}강";
+        else if (w.evolutionStage > 0)
         {
             int mastery = WeaponEnhanceService.MasteryLevel(w, _controller.Table);
-            if (maxed)      return $"◆ 마스터리 {mastery}단계 (최종)";
-            if (mastery > 0) return $"◆ 마스터리 {mastery}단계 · 앞으로 {left}강";
-            return $"◆ 마스터리 개방까지 {Mathf.Max(0, WeaponEnhanceService.BaseEnhanceCap(w, _controller.Table) - w.enhanceLevel)}강";
+            if (maxed)           line = $"◆ 마스터리 {mastery}단계 (최종)";
+            else if (mastery > 0) line = $"◆ 마스터리 {mastery}단계 · 앞으로 {left}강";
+            else line = $"◆ 마스터리 개방까지 {Mathf.Max(0, WeaponEnhanceService.BaseEnhanceCap(w, _controller.Table) - w.enhanceLevel)}강";
         }
+        else
+            line = maxed ? "" : $"◆ 최대까지 {left}강";
 
-        return maxed ? "" : $"◆ 최대까지 {left}강";
+        return AppendSkillTier(w, max, line);
+    }
+
+    /// <summary>
+    /// 스킬 단계 안내 — 강화가 스킬에 닿는다는 걸 이 줄에서 읽히게 한다.
+    /// 다음 임계가 이 무기의 상한 밖이면(무형검 6강에서 3단계 +10) 표시하지 않는다.
+    /// </summary>
+    private static string AppendSkillTier(WeaponData w, int max, string line)
+    {
+        if (SkillTierResolver.IsRanged(w)) return line;   // 원거리는 파츠 탭이 담당
+        if (!SkillTierResolver.TryGetNext(w, max, out int nextTier, out int remaining)) return line;
+        string skill = $"◇ 스킬 {nextTier}단계까지 {remaining}강";
+        return string.IsNullOrEmpty(line) ? skill : $"{line}  {skill}";
     }
 
     /// <summary>마스터리 누적 효과(스킬 확장) 한 줄. 없으면 빈 문자열.</summary>
@@ -2059,7 +2196,11 @@ public sealed class UI_CruciblePanel : UI_Popup
             float chance = _controller.SuccessChanceAt(_targetSlot);
             int cost = _controller.CostAt(_targetSlot);
             int have = _controller.FuelAmount;
-            _successText.text = $"성공률 <color=#7AD46E>{chance * 100f:F0}%</color>";
+            // 해금이 값을 하는 만큼 화면이 그걸 말해야 한다 — 안 그러면 산 보람이 안 보인다.
+            string sigil = CrucibleRoomController.SigilBonus > 0f
+                ? $" <color=#C99C4F>인장 +{CrucibleRoomController.SigilBonus * 100f:F0}%p</color>"
+                : "";
+            _successText.text = $"성공률 <color=#7AD46E>{chance * 100f:F0}%</color>{sigil}";
             _costText.text = have >= cost
                 ? $"재료 {cost} <color=#9A98A0>/ 보유 {have}</color>"
                 : $"<color=#FF5250>재료 {cost}</color> <color=#9A98A0>/ 보유 {have}</color>";

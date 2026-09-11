@@ -77,7 +77,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
             ctx.RotateToMouse();
             ctx.SetMoveScale(0f);
 
-            _skillTier = Mathf.Clamp(ctx.WeaponData?.tier ?? 1, 1, 3);
+            _skillTier = ctx.SkillTier;
 
             _hitTargets.Clear();
             _hitObjects.Clear();

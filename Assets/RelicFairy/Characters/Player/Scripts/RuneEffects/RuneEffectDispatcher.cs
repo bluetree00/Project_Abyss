@@ -15,6 +15,28 @@ using UnityEngine;
 /// </summary>
 public sealed class RuneEffectDispatcher : IBuffViewSource
 {
+    /// <summary>
+    /// <b>value2도 효과 크기</b>인 단계들 — 여기 있는 것만 value와 함께 증폭한다.
+    ///
+    /// 공명은 원래 value만 곱했는데, 차트를 보면 단계의 절반이 value2에 들어 있는 곳이 있다.
+    /// 예를 들어 정전기는 value=기본공속 0.10, value2=스택당공속 0.01이라 만스택에서 둘이 같은 크기다 —
+    /// value만 곱하면 중앙을 채울수록 <b>효과의 절반만</b> 오르고, 빌드 간 균형이 조용히 틀어진다.
+    ///
+    /// 반대로 지속시간·횟수·요구중첩·소모임계는 곱하면 안 되고(3초가 4.5초가 되는 식),
+    /// 광채 획득량·어둠 게이지량 같은 <b>자원 증가율</b>도 뺐다 — 임계 도달 속도가 같이 빨라져
+    /// 상위 단계 발동 빈도까지 복리로 흔들리기 때문이다. 순수 전투 수치만 넣는다.
+    /// </summary>
+    private static readonly HashSet<string> s_amplifyValue2 = new()
+    {
+        "ElecStatic",         // 스택당 공격속도
+        "IceShatter",         // 방어 감소
+        "GrassMistPlus",      // 겹침 영역 독피해
+        "GrassMistInsight",   // 초당 보호막
+        "GrassMistDominion",  // 초당 보호막
+        "DarkRelease",        // 받는 피해 감소
+        "LightField",         // 치명타 피해
+    };
+
     private readonly PlayerController       _player;
     private readonly List<IRuneEffect>      _active      = new();
     private readonly HashSet<string>        _activeTypes = new();
@@ -186,7 +208,8 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
 
     /// <summary>
     /// value에 공명 배수를 적용한 <b>사본</b>을 만든다(원본 불변 — 복리 누적 방지).
-    /// ⚠️ value만 곱한다. value2/value3는 지속시간·횟수·간격이 섞여 있어 일괄 배수가 위험하다.
+    /// ⚠️ value3는 절대 곱하지 않는다(지속시간·간격 전용).
+    /// value2는 <see cref="s_amplifyValue2"/>에 든 단계에서만 곱한다 — 거기선 효과 크기이기 때문이다.
     /// </summary>
     private RuneSynergyEntry Amplified(RuneSynergyEntry src)
     {
@@ -204,7 +227,7 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
             effect_type  = src.effect_type,
             trigger      = src.trigger,
             value        = src.value * mult,         // ← 증폭 지점(중앙 공명 × 존핵)
-            value2       = src.value2,
+            value2       = s_amplifyValue2.Contains(src.effect_type) ? src.value2 * mult : src.value2,
             value3       = src.value3,
             max_stack    = src.max_stack,
             duration     = src.duration,

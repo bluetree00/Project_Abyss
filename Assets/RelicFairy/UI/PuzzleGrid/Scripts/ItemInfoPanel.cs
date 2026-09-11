@@ -18,8 +18,8 @@ public sealed class ItemInfoPanel : MonoBehaviour
 {
     // ── Constants ──
     private const float SLIDE_DURATION  = 0.22f;
-    private const float MINI_CELL_SIZE  = 22f;
-    private const float MINI_CELL_GAP   = 2f;
+    private const float MINI_CELL_SIZE  = 44f;   // 아이콘 자리를 대신하는 실물 — 22는 손톱만 했다
+    private const float MINI_CELL_GAP   = 4f;
 
     private static readonly Color COLOR_RISK      = new(1f, 0.35f, 0.35f, 1f);
     private static readonly Color COLOR_NORMAL_FX = new(0.85f, 0.92f, 1f,  1f);
@@ -125,6 +125,8 @@ public sealed class ItemInfoPanel : MonoBehaviour
     /// <summary>빈 상태를 표시한다.</summary>
     public void ShowEmpty()
     {
+        // 코드로 조립된 패널엔 itemRoot가 없어 아이콘이 그대로 남는다 — 스프라이트 없는 Image는 흰 사각형으로 보인다(2026-09-09 실측).
+        if (itemIcon != null) itemIcon.enabled = false;
         _currentItem = null;
         if (itemRoot  != null) itemRoot.SetActive(false);
         if (emptyRoot != null) emptyRoot.SetActive(true);
@@ -197,6 +199,12 @@ public sealed class ItemInfoPanel : MonoBehaviour
         // 같은 룬이 보관함·판·선택 팝업과 다르게 보였다.
         RuneArt.ResolveRuneCell(item.element, item.rarity, new Color(0.3f, 0.85f, 0.45f, 0.9f),
             out var art, out var cellColor);
+
+        // 판 위 블록과 같은 속성 타일로 통일 — 드래그 블록·선택 팝업·대기열이 모두 이 순서다.
+        // 여기만 빠져 있어 같은 룬이 보관함에서 다른 얼굴이었고, 특히 각인석이 없는 빛 룬은
+        // 정보판에서만 무늬 없는 등급석으로 떨어졌다. 타일은 속성색이 이미 칠해져 틴트를 곱하지 않는다.
+        var blockTile = RuneArt.GetBlockTile(item.element);
+        if (blockTile != null) { art = blockTile; cellColor = Color.white; }
 
         float totalW = cols * (MINI_CELL_SIZE + MINI_CELL_GAP) - MINI_CELL_GAP;
         float totalH = rows * (MINI_CELL_SIZE + MINI_CELL_GAP) - MINI_CELL_GAP;

@@ -42,4 +42,4 @@ MonoBehaviour:
   tier3DashLineExtraKey:
   tier3DashLineExtraScale: 1.5
   useWeaponTrail: 1
-  animationOverride: QSkill_01
+  animationOverride: QSkill_02

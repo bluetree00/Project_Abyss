@@ -51,10 +51,18 @@ public class EnhanceTableSO : ScriptableObject
     [Tooltip("스킬 쿨다운 감소 % (0.03 = -3%/단계)")]
     [SerializeField] private float _masterySkillCdrPerLevel = 0.03f;
 
+    [Header("스킬 단계 임계 — 2·3단계가 열리는 지점 (근접=강화 레벨 / 원거리=파츠 총레벨)")]
+    [Tooltip("근접: 강화 레벨이 이 값에 닿을 때마다 스킬 단계 +1. 기본 +5 / +10 (기획 §3.3)")]
+    [SerializeField] private int[] _meleeSkillTierMilestones  = { 5, 10 };
+    [Tooltip("원거리: 파츠 총레벨이 이 값에 닿을 때마다 스킬 단계 +1.")]
+    [SerializeField] private int[] _rangedSkillTierMilestones = { 4, 10 };
+
     [Header("승급 전설 (택1 분기)")]
     [SerializeField] private LegendDef[] _legends;
 
     public LegendDef[] Legends => _legends ?? Array.Empty<LegendDef>();
+    public int[] MeleeSkillTierMilestones  => _meleeSkillTierMilestones  ?? Array.Empty<int>();
+    public int[] RangedSkillTierMilestones => _rangedSkillTierMilestones ?? Array.Empty<int>();
 
     /// <summary>current level에서 성공률. 범위 밖이면 마지막 스텝값(없으면 0).</summary>
     public float SuccessAt(int level)

@@ -48,6 +48,16 @@ public static class UIPrefabBakeEditor
     /// 이미 구운 것을 <b>비우고 다시</b> 굽는다. 직렬화 필드를 추가했거나 빌더를 고쳐
     /// 결과가 달라졌을 때 쓴다. 백업은 매번 새로 남으므로 되돌릴 길은 유지된다.
     /// </summary>
+    // 하나씩 강제로 다시 굽는다 — 한 번에 7종을 구우면 MCP 명령이 1분을 넘겨 웹소켓이 갇힌다.
+    // 손으로 고친 프리팹 값이 코드 빌더에도 들어 있는지(다음 베이크에 되돌아가지 않는지) 검증할 때 쓴다.
+    [MenuItem("RelicFairy/UI/Bake — 강제 재굽기(하나)/상점")]            private static void ForceShop()      => Bake("UI_ShopPanel",           "BuildChrome", force: true);
+    [MenuItem("RelicFairy/UI/Bake — 강제 재굽기(하나)/유물 정보")]        private static void ForceRelicInfo() => Bake("UI_RelicInfoPopup",      "BuildLayout", force: true);
+    [MenuItem("RelicFairy/UI/Bake — 강제 재굽기(하나)/정제소")]          private static void ForceRefinery()  => Bake("UI_RefineryPanel",       "BuildUI",     force: true);
+    [MenuItem("RelicFairy/UI/Bake — 강제 재굽기(하나)/원거리 선택")]      private static void ForceRanged()    => Bake("UI_RangedForgePopup",    "BuildLayout", force: true);
+    [MenuItem("RelicFairy/UI/Bake — 강제 재굽기(하나)/룬 선택")]         private static void ForceRune()      => Bake("UI_RuneSelectPopup",     "BuildChrome", force: true);
+    [MenuItem("RelicFairy/UI/Bake — 강제 재굽기(하나)/파츠 드래프트")]    private static void ForceDraft()     => Bake("UI_RelicPartDraftPopup", "BuildChrome", force: true);
+    [MenuItem("RelicFairy/UI/Bake — 강제 재굽기(하나)/재련소")]          private static void ForceCrucible()  => Bake("UI_CruciblePanel",       "BuildChrome", force: true);
+
     [MenuItem("RelicFairy/UI/Bake — 강제 재굽기(전체)")]
     private static void RebakeAll()
     {
@@ -91,13 +101,17 @@ public static class UIPrefabBakeEditor
 
             m.Invoke(comp, null);
 
+            // 빌더는 목업 px를 점 앵커에 박는다 — 그대로 두면 창을 키워도 내용이 안 따라온다.
+            // 다 지어진 계층을 한 번 훑어 비율 앵커로 바꾼다(자리는 그대로다).
+            int frac = UIFractionalAnchorEditor.Convert(root);
+
             int n = root.GetComponentsInChildren<Transform>(true).Length;
             if (n <= 1) { Debug.LogError($"[Bake] {typeName} — 계층이 생기지 않았다(자식 0). 저장하지 않는다."); return; }
 
             if (!Backup(path)) { Debug.LogError($"[Bake] 백업 실패 — 굽지 않는다: {path}"); return; }
 
             PrefabUtility.SaveAsPrefabAsset(root, path, out bool ok);
-            Debug.Log(ok ? $"[Bake] 구움: {typeName} — 오브젝트 {n}개"
+            Debug.Log(ok ? $"[Bake] 구움: {typeName} — 오브젝트 {n}개 · 비율 앵커 {frac}개"
                          : $"[Bake] 저장 실패: {path}");
         }
         catch (Exception e)

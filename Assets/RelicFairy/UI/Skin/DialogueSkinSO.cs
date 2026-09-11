@@ -6,25 +6,14 @@ using UnityEngine;
 /// 미할당 슬롯은 <see cref="ShopUIStyle.Skin"/>에서 무시되어 프리팹 기존 모습이 그대로 남는다.
 /// Addressable 키 "UI/DialogueSkin"으로 1회 로드해 캐싱한다(<see cref="UISkin"/>). <see cref="RefinerySkinSO"/> 관례.
 ///
-/// ※ 이 화면에서 <b>스킨 대상은 대사 상자와 그 장식뿐</b>이다.
+/// ※ 이미지형 개편(2026-09-09)으로 액자·모서리·장식·이름 판 슬롯은 걷었다 — 남은 스킨 대상은 띠 한 장이다.
 ///   AdvanceButton은 1390×240짜리 투명 클릭 캐처라 판을 입히면 대사를 덮어버린다 — 건드리지 않는다.
 ///   납품본의 버튼 6종은 대응하는 자리가 없어 슬롯을 두지 않았다(선택지 UI가 생기면 그때).
 /// </summary>
 [CreateAssetMenu(menuName = "RelicFairy/UI/Dialogue Skin", fileName = "DialogueSkin")]
 public sealed class DialogueSkinSO : ScriptableObject
 {
-    [Header("대사 상자")]
-    [Tooltip("대사 상자 바탕. 상자가 화면 폭을 따라 늘어나므로 9-slice 필수.")]
-    public Sprite plate;
-
-    [Header("모서리 장식 (상자 네 귀퉁이)")]
-    public Sprite cornerTopLeft;
-    public Sprite cornerTopRight;
-    public Sprite cornerBottomLeft;
-    public Sprite cornerBottomRight;
-
-    [Header("가로 장식 (상자 위·아래 모서리 중앙)")]
-    [Tooltip("대부분이 투명한 넓은 캔버스에 얇은 장식이 들어있다 — 통짜로 놓아야 위치가 맞는다.")]
-    public Sprite flourishTop;
-    public Sprite flourishBottom;
+    [Header("대사 띠 (이미지형 · 2026-09-09)")]
+    [Tooltip("하단 반투명 띠(1160×168) 바탕. 비어 있으면 코드가 만든 둥근 소프트 판(검정 α0.55)을 쓴다. 9-slice 필수.")]
+    public Sprite band;
 }

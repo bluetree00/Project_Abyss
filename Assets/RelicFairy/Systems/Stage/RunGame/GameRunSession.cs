@@ -162,12 +162,6 @@ public sealed class GameRunSession
     /// </summary>
     public int CrucibleRollIndex { get; set; }
 
-    /// <summary>
-    /// 조립 서약 「연마」(티어만 재굴림)를 이번 런에서 이미 썼는지. 런당 1회.
-    /// 팝업이 아니라 런이 쥐고 있어야 한다 — 팝업마다 초기화되면 서약을 얻을 때마다 한 번씩 연마할 수 있다.
-    /// (세이브에는 넣지 않는다. 이어하기로 한 번 돌려받는 건 손해가 아니고, 스키마를 건드리지 않는 쪽이 싸다.)
-    /// </summary>
-    public bool CovenantWhetUsed { get; set; }
 
     /// <summary>
     /// 지금 들어와 있는 방의 종류. 클리어 보상(<see cref="RoomRewardTable"/>)이 이 값으로 갈린다 —
@@ -885,8 +879,14 @@ public sealed class GameRunSession
         if (!IsRunning) return;
         if (amount <= 0) return;
 
-        RunDelta.GainedEssence += Mathf.RoundToInt(amount * EssenceDepthMultiplier);
+        // 고행자의 인장 — 보상을 줄인 대가는 여기서 돌아온다.
+        float gain = AsceticSigilService.ApplyEssence(amount * EssenceDepthMultiplier);
+        RunDelta.GainedEssence += Mathf.RoundToInt(gain);
+        OnEssenceChanged?.Invoke(RunDelta.GainedEssence);
     }
+
+    /// <summary>런 중 적립 정수가 변할 때. HUD가 구독해 재화 칸을 갱신한다(골드의 OnGoldChanged와 같은 규약).</summary>
+    public event System.Action<int> OnEssenceChanged;
 
     /// <summary>
     /// 「깊이 보상 배율」 해금 시 깊이마다 +15%. 미해금이면 1배 — 깊이를 내려가도 수급이 안 늘어난다.
@@ -944,8 +944,20 @@ public sealed class GameRunSession
         if (!MemoryAltarService.HasRevive) return false;
 
         MetaReviveUsed = true;
+        OnReviveChanged?.Invoke(false);
         return true;
     }
+
+    /// <summary>
+    /// 지금 부활이 남아 있는가(해금돼 있고 이 런에서 아직 안 씀). HUD가 이걸 표시한다.
+    ///
+    /// <para>표시가 없던 시절엔 가장 비싼 안전망이 <b>구매 순간 외엔 존재하지 않았다</b> —
+    /// 가진 줄 모르다가 죽을 때 갑자기 살아났다. 보험을 샀는데 증서가 없는 셈이다.</para>
+    /// </summary>
+    public bool HasReviveCharge => !MetaReviveUsed && MemoryAltarService.HasRevive;
+
+    /// <summary>부활 잔여가 변할 때(소모·복원). HUD가 구독한다.</summary>
+    public event System.Action<bool> OnReviveChanged;
 
     /// <summary>이어하기 복원 — 세이브에 실린 제단 관련 런 상태를 되돌린다.</summary>
     public void RestoreAltarProgress(bool reviveUsed, int kills, int eliteKills, int bossKills,
@@ -953,6 +965,7 @@ public sealed class GameRunSession
                                      bool potionUsed, int specialVisits, int flawless)
     {
         MetaReviveUsed      = reviveUsed;
+        OnReviveChanged?.Invoke(HasReviveCharge);   // 이어하기 복원 — HUD도 같이 되돌아가야 한다
         PotionUsedThisRun   = potionUsed;
         SpecialRoomVisits   = specialVisits;
         FlawlessChapters    = flawless;

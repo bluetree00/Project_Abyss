@@ -320,7 +320,9 @@ public class ClearRewardTrigger : MonoBehaviour
         }
 
         var interactionTask = popup.WaitForInteractionAsync(ct);
-        popup.Setup(candidates, _run.ItemInventory);
+        // 해금하면 열릴 자리를 빈 칸으로 미리 보여준다 — 해금 뒤 "그 자리가 채워지는" 것으로 읽힌다.
+        popup.Setup(candidates, _run.ItemInventory,
+                    MemoryAltarService.RuneLockedSlots(candidates.Count));
         await interactionTask;
 
         if (popup.Skipped)

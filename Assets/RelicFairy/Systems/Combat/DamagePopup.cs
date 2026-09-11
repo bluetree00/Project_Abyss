@@ -112,6 +112,8 @@ public class DamagePopup : MonoBehaviour
     private float _elapsed;
     private float _baseScale;      // 크리 등으로 정해지는 기준 배율(팝/축소는 여기에 곱해진다)
     private bool _active;
+    /// <summary>합산으로 값이 올라간 직후인가 — 다음 프레임에 작은 팝을 한 번 준다.</summary>
+    private bool _popKick;
     private Camera _cam;
     private System.Action<DamagePopup> _onReleased;
 
@@ -138,7 +140,12 @@ public class DamagePopup : MonoBehaviour
 
         // 팝 → 안착 → 후반 축소
         if (label != null)
-            label.transform.localScale = Vector3.one * (_baseScale * ScaleCurve(t));
+        {
+            // 합산으로 값이 오른 프레임엔 팝을 한 번 더 준다(숫자가 커진 걸 눈이 잡게).
+            float kick = _popKick ? popScale : 1f;
+            _popKick = false;
+            label.transform.localScale = Vector3.one * (_baseScale * ScaleCurve(t) * kick);
+        }
 
         // 페이드
         if (canvasGroup != null)
@@ -157,6 +164,37 @@ public class DamagePopup : MonoBehaviour
     }
 
     // ── Public Methods ───────────────────────────────────────────────
+    /// <summary>아직 화면에 떠 있는가. 합산(Accumulate) 대상이 될 수 있는지 판단하는 조건.</summary>
+    public bool IsShowing => _active;
+
+    /// <summary>
+    /// 이미 떠 있는 숫자에 값을 <b>더해 갱신</b>한다(다단히트 합산).
+    ///
+    /// 새 팝업을 띄우지 않는 게 요점이다 — 연타 21타를 각각 띄우면 자잘한 숫자가 화면을 덮어
+    /// "얼마나 넣었나"가 오히려 안 읽힌다. 대신 한 숫자가 커지는 걸 보여준다.
+    ///
+    /// 수명을 되감아(_elapsed 축소) 쌓이는 동안 사라지지 않게 하고, 작은 팝을 다시 줘
+    /// "지금 또 들어갔다"를 눈으로 알린다.
+    /// </summary>
+    public void Accumulate(float total, bool isCrit, DamageKind kind, RuneElement? element)
+    {
+        if (!_active || label == null) return;
+
+        // 남은 수명을 절반 지점으로 되돌린다. 0으로 만들면 매 타마다 처음부터 튀어올라 산만하다.
+        _elapsed = Mathf.Min(_elapsed, lifetime * 0.35f);
+
+        _baseScale = SizeForDamage(total) * (isCrit ? critScale : 1f);
+
+        int amount = Mathf.RoundToInt(Mathf.Abs(total));
+        label.text = BuildArcText(amount, isCrit);
+        ApplyStyle(isCrit, kind, element);
+
+        // 값이 오른 순간에만 작은 팝 — 스케일을 팝 시작점으로 되돌려 ScaleCurve가 다시 튕기게 한다.
+        _popKick = true;
+
+        if (canvasGroup != null) canvasGroup.alpha = 1f;
+    }
+
     /// <summary>풀이 완료 시 재사용 큐로 회수하도록 연결하는 콜백. 풀 인스턴스화 직후 1회 설정.</summary>
     public void SetReleaseCallback(System.Action<DamagePopup> onReleased) => _onReleased = onReleased;
 
@@ -169,6 +207,7 @@ public class DamagePopup : MonoBehaviour
     {
         _elapsed = 0f;
         _active = true;
+        _popKick = false;
         if (s_cam == null) s_cam = Camera.main;   // 파괴 시 Unity-null → 재탐색, 평시엔 캐시 재사용
         _cam = s_cam;
 

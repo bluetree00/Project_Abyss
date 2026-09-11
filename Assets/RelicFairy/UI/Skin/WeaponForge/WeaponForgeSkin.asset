@@ -17,7 +17,7 @@ MonoBehaviour:
   holderFill: {fileID: 21300000, guid: 6f3060bf47febe647b6ff3d08c257606, type: 3}
   holderFrame: {fileID: 21300000, guid: e193410630ecdb64cb9d2668f77340b0, type: 3}
   holderOutline: {fileID: 21300000, guid: cc277355b6a74f14986102ff3f5a972a, type: 3}
-  arrowLeft: {fileID: 21300000, guid: c96008797f05f294bab36f41d5b9f930, type: 3}
-  arrowRight: {fileID: 21300000, guid: cf6a6d1f8e6cbe24ba922a876e7f9ad8, type: 3}
+  arrowLeft: {fileID: 21300000, guid: cf6a6d1f8e6cbe24ba922a876e7f9ad8, type: 3}
+  arrowRight: {fileID: 21300000, guid: c96008797f05f294bab36f41d5b9f930, type: 3}
   equipButton: {fileID: 21300000, guid: 2d903220996245b40abc427c9155e903, type: 3}
   equipGlyph: {fileID: 21300000, guid: 2467d51592f099e4da4d883badee0ced, type: 3}

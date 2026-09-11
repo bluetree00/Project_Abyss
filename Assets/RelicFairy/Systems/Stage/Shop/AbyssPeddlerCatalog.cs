@@ -175,6 +175,10 @@ public static class AbyssPeddlerCatalog
         }
         if (draw.Count == 0) return res;
 
+        // 「상인의 인장」 — 특가를 고르기 <b>전에</b> 건다. 나중에 걸면 취소선 원가만 싸지고
+        // 특가는 그대로라 할인이 이중으로 보이거나 역전된다.
+        for (int i = 0; i < draw.Count; i++) draw[i] = MerchantSigil.Apply(draw[i]);
+
         // 뽑은 7종 중 1개를 특가로
         int specialIdx = rng.Next(draw.Count);
         var pick = draw[specialIdx];
@@ -187,6 +191,28 @@ public static class AbyssPeddlerCatalog
             if (i != specialIdx) res.Products.Add(draw[i]);
 
         return res;
+    }
+
+    /// <summary>
+    /// 「상인의 인장」(기억의 제단 Ⅰ 출발) — 상점 전 품목 −15%.
+    /// <para><see cref="ShopProduct.Price"/>가 읽기 전용이라 값만 바꾼 사본을 만든다.
+    /// 미해금이면 원본을 그대로 돌려주므로 할당이 늘지 않는다.</para>
+    /// </summary>
+    public static class MerchantSigil
+    {
+        public const float Discount = 0.15f;
+
+        public static bool Active => MemoryAltarService.IsUnlocked(MemoryAltarCatalog.SigilMerchant);
+
+        public static int Apply(int price)
+            => Active ? Mathf.Max(1, Mathf.RoundToInt(price * (1f - Discount))) : price;
+
+        public static ShopProduct Apply(ShopProduct p)
+        {
+            if (p == null || !Active) return p;
+            return new ShopProduct(p.Category, p.DisplayName, p.EffectText, p.DetailText,
+                                   Apply(p.Price), p.Rarity, p.Icon, p.Grant);
+        }
     }
 
     /// <summary>룬·버프·재료·포션 풀을 넉넉히 만든다(품목 다양성). 데이터 미로드 카테고리는 자동 제외.</summary>

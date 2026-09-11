@@ -21,15 +21,40 @@ MonoBehaviour:
   animGroups:
   - groupType: 0
     clipMappings:
-    - baseClipName: Idle_Wait_B
-      addressableKey: SS_Idle
-      actionType: 0
-    - baseClipName: Mvm_Walk
-      addressableKey: 'APose_Walk[GhostSamurai_APose_Strafe_Walk_F_Loop_Inplace]'
-      actionType: 0
-    - baseClipName: Mvm_PowerDash_Front
-      addressableKey: SS_Sprint
-      actionType: 0
+    - baseClipName: GhostSamurai_Common_Idle_Inplace
+      addressableKey: APose_Idle
+    - baseClipName: GhostSamurai_Common_StrafeWalkF_Inplace
+      addressableKey: APose_Strafe_Walk_F_Loop
+    - baseClipName: GhostSamurai_Common_StrafeWalkFL_Inplace
+      addressableKey: APose_Strafe_Walk_FL
+    - baseClipName: GhostSamurai_Common_StrafeWalkFR_Inplace
+      addressableKey: APose_Strafe_Walk_FR
+    - baseClipName: GhostSamurai_Common_StrafeWalkL_Inplace
+      addressableKey: APose_Strafe_Walk_L
+    - baseClipName: GhostSamurai_Common_StrafeWalkR_Inplace
+      addressableKey: APose_Strafe_Walk_R
+    - baseClipName: GhostSamurai_Common_StrafeWalkB_Inplace
+      addressableKey: APose_Strafe_Walk_B
+    - baseClipName: GhostSamurai_Common_StrafeWalkBL_Inplace
+      addressableKey: APose_Strafe_Walk_BL
+    - baseClipName: GhostSamurai_Common_StrafeWalkBR_Inplace
+      addressableKey: APose_Strafe_Walk_BR
+    - baseClipName: GhostSamurai_Common_StrafeRun_F_Inplace
+      addressableKey: APose_Strafe_Run_F_Loop
+    - baseClipName: GhostSamurai_Common_StrafeRun_FL_Inplace
+      addressableKey: APose_Strafe_Run_FL
+    - baseClipName: GhostSamurai_Common_StrafeRun_FR_Inplace
+      addressableKey: APose_Strafe_Run_FR
+    - baseClipName: GhostSamurai_Common_StrafeRun_L_Inplace
+      addressableKey: APose_Strafe_Run_L
+    - baseClipName: GhostSamurai_Common_StrafeRun_R_Inplace
+      addressableKey: APose_Strafe_Run_R
+    - baseClipName: GhostSamurai_Common_StrafeRun_B_Inplace
+      addressableKey: APose_Strafe_Run_B
+    - baseClipName: GhostSamurai_Common_StrafeRun_BL_Inplace
+      addressableKey: APose_Strafe_Run_BL
+    - baseClipName: GhostSamurai_Common_StrafeRun_BR_Inplace
+      addressableKey: APose_Strafe_Run_BR
     - baseClipName: GroundLightAttack_01
       addressableKey: GreatswordAttack_01
       actionType: 1
@@ -104,38 +129,6 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
-    - baseClipName: HeavyCharge
-      addressableKey: GreatswordGuardLoop
-      actionType: 2
-      comboIndex: 0
-      isPlunge: 0
-      plungeFallSpeed: 0
-      plungeDescendAt: 0
-      comboWindowOpen: -1
-      comboWindowClose: -1
-      attackEndAt: -1
-    - baseClipName: GroundHeavyAttack
-      addressableKey: GreatswordGuardAttack
-      actionType: 2
-      comboIndex: 0
-      isPlunge: 0
-      plungeFallSpeed: 0
-      plungeDescendAt: 0
-      comboWindowOpen: -1
-      comboWindowClose: -1
-      attackEndAt: -1
-    - baseClipName: HeavyChargeAccept
-      addressableKey: GreatswordGuardAccept
-      actionType: 2
-      comboIndex: 1
-      isPlunge: 0
-      plungeFallSpeed: 0
-      plungeDescendAt: 0
-      comboWindowOpen: -1
-      comboWindowClose: -1
-      attackEndAt: -1
-  - groupType: 1
-    clipMappings:
     - baseClipName: AirLightAttack_01
       addressableKey: GreatswordAirLight_01
       actionType: 6
@@ -156,16 +149,6 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: 0.9
-    - baseClipName: AirHeavyAttack
-      addressableKey: GreatswordAirHeavy
-      actionType: 7
-      comboIndex: 0
-      isPlunge: 0
-      plungeFallSpeed: 0
-      plungeDescendAt: 0
-      comboWindowOpen: -1
-      comboWindowClose: -1
-      attackEndAt: -1
     - baseClipName: AirPlungeAttack
       addressableKey: GreatswordAirPlunge
       actionType: 8

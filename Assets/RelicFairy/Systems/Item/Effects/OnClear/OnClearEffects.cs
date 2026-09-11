@@ -4,6 +4,15 @@ using UnityEngine;
 // 방/보스 클리어 시 발동하는 효과
 // ═══════════════════════════════════════════════════════════
 
+/// <summary>
+/// 방 클리어 시 보호막. <b>회복이 아니다</b> — 이 프로젝트는 흡혈·회복 계열을 두지 않는다.
+///
+/// <para>value는 최대HP 비율이다(차트 0.05 = 5%). 예전엔 <c>(int)_value</c>로 잘라 써서
+/// 0.05가 <b>0</b>이 됐고, 「성역의 룬」은 설명만 "5% 회복"이고 실제론 아무것도 안 했다.</para>
+///
+/// <para>effect_type 키는 <c>HPRegenOnClear</c> 그대로 둔다 — 차트가 CDN 구동이라
+/// 키를 바꾸면 재업로드 전까지 아이템이 통째로 죽는다. 이름과 동작이 어긋나는 건 그 대가다.</para>
+/// </summary>
 public sealed class HPRegenOnClearEffect : ItemEffectBase
 {
     public HPRegenOnClearEffect(ItemEffectSlot s) : base(s) { }
@@ -11,9 +20,10 @@ public sealed class HPRegenOnClearEffect : ItemEffectBase
     public override void OnRoomClear(ItemEffectContext ctx)
     {
         if (ctx.Player == null) return;
-        ctx.Player.Heal((int)_value);
-        ItemGuide.Toast(ctx.Player.transform.position, $"회복 +{(int)_value}");
-        Debug.Log($"[HPRegenOnClear] 체력 {_value} 회복");
+        float amount = ctx.Player.RuntimeStats.MaxHp * _value;
+        if (amount <= 0f) return;
+        ctx.Player.RuntimeStats.AddShield(amount);
+        ItemGuide.Toast(ctx.Player.transform.position, $"보호막 +{(int)amount}");
     }
 }
 
@@ -49,9 +59,10 @@ public sealed class HPRegenOnRecipeEffect : ItemEffectBase
     public override void OnRecipeComplete(ItemEffectContext ctx)
     {
         if (ctx.Player == null) return;
-        ctx.Player.Heal((int)_value);
-        ItemGuide.Toast(ctx.Player.transform.position, $"회복 +{(int)_value}");
-        Debug.Log($"[HPRegenOnRecipe] 체력 {_value} 회복");
+        // 회복 → 보호막. 여긴 value가 고정값이라 비율로 읽지 않는다(사용 아이템 0종).
+        if (_value <= 0f) return;
+        ctx.Player.RuntimeStats.AddShield(_value);
+        ItemGuide.Toast(ctx.Player.transform.position, $"보호막 +{(int)_value}");
     }
 }
 
@@ -149,9 +160,10 @@ public sealed class HPRegenOnBossEnterEffect : ItemEffectBase
     public override void OnBossEnter(ItemEffectContext ctx)
     {
         if (ctx.Player == null) return;
-        ctx.Player.Heal((int)_value);
-        ItemGuide.Toast(ctx.Player.transform.position, $"회복 +{(int)_value}");
-        Debug.Log($"[HPRegenOnBossEnter] 보스방 진입 — 체력 {_value} 회복");
+        // 회복 → 보호막. 여긴 value가 고정값이라 비율로 읽지 않는다(사용 아이템 0종).
+        if (_value <= 0f) return;
+        ctx.Player.RuntimeStats.AddShield(_value);
+        ItemGuide.Toast(ctx.Player.transform.position, $"보스방 진입 — 보호막 +{(int)_value}");
     }
 }
 
