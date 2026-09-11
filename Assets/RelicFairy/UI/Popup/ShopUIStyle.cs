@@ -245,5 +245,37 @@ public static class ShopUIStyle
         img.sprite = sprite;
         img.type   = sliced ? Image.Type.Sliced : Image.Type.Simple;
         img.color  = tint ?? Color.white;
+
+        // 9-slice 경계는 <b>아트의 픽셀 크기</b> 그대로 그려진다. 상점 아트는 원본이 크고(카드 628×600·경계 56)
+        // 그려지는 칸은 작아서(205×196), 좌우 경계만 112 — 칸의 55%를 장식이 먹고 가운데 종이가 38%만 남았다.
+        // 그래서 아이콘·이름·태그가 종이 밖 나무 위에 얹힌 것처럼 보였다(2026-09-10 게임 화면).
+        // 아이콘 틀(223×298·경계 40)은 아예 경계 합(80)이 칸(74)보다 커서 슬라이스가 깨진다.
+        // pixelsPerUnitMultiplier가 정확히 이 경우를 위한 손잡이다 — 축소 배율만큼 경계를 함께 줄인다.
+        if (sliced) img.pixelsPerUnitMultiplier = SliceScale(img, sprite);
+    }
+
+    /// <summary>그려질 칸 대비 아트가 몇 배 큰지(≥1). 9-slice 경계를 그만큼 줄이는 데 쓴다.</summary>
+    private static float SliceScale(Image img, Sprite sprite)
+    {
+        var rt = img.rectTransform;
+        float w = rt.rect.width  > 1f ? rt.rect.width  : Mathf.Abs(rt.sizeDelta.x);
+        float h = rt.rect.height > 1f ? rt.rect.height : Mathf.Abs(rt.sizeDelta.y);
+        if (w <= 1f || h <= 1f) return 1f;
+
+        // ① 아트가 칸보다 몇 배 큰가(축소비). 가로·세로 중 작은 쪽 — 큰 쪽을 쓰면 모서리가 뭉개진다.
+        float scale = Mathf.Max(1f, Mathf.Min(sprite.rect.width / w, sprite.rect.height / h));
+
+        // ② 그래도 장식이 두꺼우면 상한을 건다. 경계값(spriteBorder)은 <b>원본 해상도 기준</b>으로 적혀 있는데
+        //    텍스처는 플랫폼 설정(maxTextureSize)으로 이미 줄어들어 있어, 축소비만으로는 부족하다
+        //    (카드: 원본 628 → 임포트 256, 경계 56 그대로 → 칸 205의 27%를 한 변이 먹었다).
+        //    장식이 칸의 12%를 넘지 않게 맞춘다 — 카드 아트의 실제 장식 비율(56/628 = 8.9%)에 가깝다.
+        float b = Mathf.Max(Mathf.Max(sprite.border.x, sprite.border.z),
+                            Mathf.Max(sprite.border.y, sprite.border.w));
+        if (b > 0f)
+        {
+            float maxDrawn = Mathf.Min(w, h) * 0.12f;
+            if (b / scale > maxDrawn) scale = b / maxDrawn;
+        }
+        return scale;
     }
 }

@@ -319,6 +319,7 @@ public sealed class HudView : MonoBehaviour
 
     private Transform _mapIcon;
     private bool      _mapIconSearched;
+    private bool      _mapIconArtWarned;
 
     /// <summary>TopBar 맵 아이콘 표시. 참조가 없어 이름으로 1회만 찾아 캐시한다(GoldIcon과 동일 패턴).</summary>
     private void SetMapIconVisible(bool on)
@@ -328,8 +329,22 @@ public sealed class HudView : MonoBehaviour
             _mapIconSearched = true;
             _mapIcon = FindChildRecursive(transform, "HUD_Map");
         }
-        if (_mapIcon != null && _mapIcon.gameObject.activeSelf != on)
-            _mapIcon.gameObject.SetActive(on);
+        // 아트가 없는 아이콘은 <b>흰 사각형</b>으로 뜬다. 이 자리는 전투·보스 모드에서만 켜져
+        // 로비 실측에선 안 보였고, 런 HUD 실측(2026-09-10)에서 우상단 150×150 흰 판으로 드러났다.
+        // 스프라이트가 붙기 전까지는 켜지 않는다 — 지도는 좌상단 미니맵이 이미 보여준다.
+        bool show = on;
+        if (show && _mapIcon != null && _mapIcon.TryGetComponent<Image>(out var mapImg) && mapImg.sprite == null)
+        {
+            show = false;
+            if (!_mapIconArtWarned)
+            {
+                _mapIconArtWarned = true;
+                Debug.LogWarning("[HudView] HUD_Map에 스프라이트가 없어 맵 아이콘을 띄우지 않는다(흰 사각형 방지). 아트 배선 필요.");
+            }
+        }
+
+        if (_mapIcon != null && _mapIcon.gameObject.activeSelf != show)
+            _mapIcon.gameObject.SetActive(show);
     }
 
     public void EnsureCombatPanelVisible()

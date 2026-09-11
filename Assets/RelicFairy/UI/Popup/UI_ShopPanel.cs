@@ -408,21 +408,25 @@ public sealed class UI_ShopPanel : UI_Popup
 
         // 아이콘 칸 — 채움 + 테두리 2겹, 그 사이에 상품 아이콘.
         var fill = ShopUIStyle.MakeImage(bg.transform, "IconFill", new Color(0.05f, 0.05f, 0.07f, 1f));
-        PlaceIn(bg.transform, fill, 15f, 11f, 74f, 98f, CardW, CardH);
+        // 카드 아트의 종이(장식 안쪽)는 설계 좌표로 x 16~176 · y 24~173이다 — 그 안에 앉힌다.
+        // 예전 값(15,11)은 왼쪽·위 장식 위에 걸쳐 아이콘이 카드 밖으로 나온 것처럼 보였다.
+        PlaceIn(bg.transform, fill, 24f, 24f, 70f, 88f, CardW, CardH);
         ShopUIStyle.Skin(fill, _skin?.iconFill, sliced: true);
 
         c.Icon = ShopUIStyle.MakeImage(bg.transform, "Icon", new Color(1f, 1f, 1f, 0f));
-        PlaceIn(bg.transform, c.Icon, 19f, 15f, 66f, 90f, CardW, CardH);
+        PlaceIn(bg.transform, c.Icon, 28f, 28f, 62f, 80f, CardW, CardH);
         c.Icon.preserveAspect = true;
 
         var frame = ShopUIStyle.MakeImage(bg.transform, "IconFrame", new Color(1f, 1f, 1f, 0f));
-        PlaceIn(bg.transform, frame, 15f, 11f, 74f, 98f, CardW, CardH);
+        PlaceIn(bg.transform, frame, 24f, 24f, 70f, 88f, CardW, CardH);
         frame.raycastTarget = false;
         ShopUIStyle.Skin(frame, _skin?.iconFrame, sliced: true);
 
         // 카테고리 배지 — 바탕(아트) + 글자(아트가 있으면 그 위 라벨은 끈다).
         c.BadgeBg = ShopUIStyle.MakeImage(bg.transform, "BadgeBg", CatColor[0]);
-        PlaceIn(bg.transform, c.BadgeBg, 123f, 10f, 50f, 22f, CardW, CardH);
+        // 카드 아트의 <b>밝은 종이</b>는 rect의 7.5%~80%(설계 15~164)다. 123+50=173은 그 밖(장식 위)이라
+        // 게임 화면에서 태그가 카드에서 삐져나온 것처럼 보였다 — 오른쪽 끝을 종이 안으로 넣는다.
+        PlaceIn(bg.transform, c.BadgeBg, 112f, 24f, 50f, 22f, CardW, CardH);
 
         c.BadgeGlyph = ShopUIStyle.MakeImage(c.BadgeBg.transform, "BadgeGlyph", new Color(1f, 1f, 1f, 0f));
         ShopUIStyle.Stretch(c.BadgeGlyph.rectTransform, 2f);
@@ -435,21 +439,23 @@ public sealed class UI_ShopPanel : UI_Popup
 
         c.Name = ShopUIStyle.MakeText(bg.transform, "Name", 15f, FontStyles.Bold,
                                       TextAlignmentOptions.TopLeft, new Color(0.18f, 0.12f, 0.06f, 1f));
-        PlaceIn(bg.transform, c.Name, 17f, 112f, 175f, 20f, CardW, CardH);
+        PlaceIn(bg.transform, c.Name, 24f, 118f, 150f, 20f, CardW, CardH);
         FitLine(c.Name);
 
         c.Effect = ShopUIStyle.MakeText(bg.transform, "Effect", 11.5f, FontStyles.Normal,
                                         TextAlignmentOptions.TopLeft, new Color(0.38f, 0.28f, 0.18f, 1f));
         // 효과와 가격은 같은 높이에서 좌우로 갈린다 — 효과가 카드 폭을 다 먹으면 가격과 겹친다.
-        PlaceIn(bg.transform, c.Effect, 17f, 135f, 120f, 17f, CardW, CardH);
+        // 120이면 효과 오른쪽 끝(137)과 가격 글자 시작(≈127)이 물려 실제로 겹쳤다(2026-09-10 게임 화면).
+        // 가격 세 자리(≈30px)와 코인이 들어갈 자리를 남겨 95로 줄인다.
+        PlaceIn(bg.transform, c.Effect, 24f, 141f, 95f, 17f, CardW, CardH);
         FitLine(c.Effect);
 
         c.Price = ShopUIStyle.MakeText(bg.transform, "Price", 16f, FontStyles.Bold,
                                        TextAlignmentOptions.MidlineRight, new Color(0.25f, 0.17f, 0.08f, 1f));
-        PlaceIn(bg.transform, c.Price, 17f, 139f, 140f, 20f, CardW, CardH);
+        PlaceIn(bg.transform, c.Price, 24f, 145f, 116f, 20f, CardW, CardH);   // 오른쪽 끝 140 = 코인 앞
 
         c.PriceCoin = ShopUIStyle.MakeImage(bg.transform, "PriceCoin", ShopUIStyle.Gold);
-        PlaceIn(bg.transform, c.PriceCoin, 152f, 142f, 21f, 22f, CardW, CardH);
+        PlaceIn(bg.transform, c.PriceCoin, 142f, 148f, 21f, 22f, CardW, CardH);   // 142~163 — 종이 안(≤176)
         c.PriceCoin.preserveAspect = true;
         ShopUIStyle.Skin(c.PriceCoin, _skin?.goldCoin);
 

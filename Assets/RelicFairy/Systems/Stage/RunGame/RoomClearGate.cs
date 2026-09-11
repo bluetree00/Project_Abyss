@@ -129,7 +129,7 @@ public class RoomClearGate : MonoBehaviour
             var cr = ChallengeRewardTable.DefaultReward(_challengeGrade.Value, ChapterNum(), _isInteraction);
             int count = Mathf.Max(1, cr.rewardCount);
             for (int i = 0; i < count; i++)
-                rewards.AddRange(RollRewardChoices(RuneChoiceCount, cr.baseRarity));
+                rewards.AddRange(RollRewardChoices(RuneChoiceCount, cr.baseRarity, floorGuaranteesOneOnly: true));
 
             choiceRounds = count;
             isChoice     = rewards.Count > 0;
@@ -242,8 +242,14 @@ public class RoomClearGate : MonoBehaviour
     /// 선택 팝업용 후보 N개를 뽑는다. 드랍 판정은 한 번만 하고, 같은 아이템이 겹치지 않도록 중복을 배제한다.
     /// 풀이 후보 수보다 작으면 뽑힌 만큼만 반환한다(호출부가 개수를 확인할 것).
     /// </summary>
+    /// <param name="floorGuaranteesOneOnly">
+    /// true면 <paramref name="floor"/>를 <b>후보 한 장에만</b> 건다(나머지는 방 자체 하한으로 개별 굴림).
+    /// 챌린지 등급 보상이 이 경로다 — 예전엔 하한을 후보 전부에 걸어 플래티넘이면 <b>4장이 모두 전설</b>로 떴고,
+    /// 고를 것이 없어 3지선다가 형식만 남았다. 보장(최소 한 장)은 지키면서 등급은 장마다 다르게 굴린다.
+    /// 정예방처럼 <b>방 자체가 정한 하한</b>은 그대로 전 후보에 걸린다(§3-2 정예=Rare 하한).
+    /// </param>
     private System.Collections.Generic.List<(RuntimeItemData data, ItemSO so)> RollRewardChoices(
-        int count, ItemRarity? floor = null)
+        int count, ItemRarity? floor = null, bool floorGuaranteesOneOnly = false)
     {
         // 「룬 4지선다」 해금 — <b>3지선다 라운드만</b> 넓힌다.
         // 단일 드랍(count 1) 규칙까지 늘리면 선택의 폭이 아니라 획득량이 바뀌어 경제가 어긋난다.
@@ -262,7 +268,12 @@ public class RoomClearGate : MonoBehaviour
 
         for (int attempt = 0; attempt < maxAttempts && result.Count < count; attempt++)
         {
-            var (d, s) = PickItemByRolledRarity(floor, rule.Weights);
+            // 보장분은 첫 한 장에만. 나머지는 방이 정한 하한(정예=Rare, 일반=없음)으로 개별 굴림.
+            var effFloor = floorGuaranteesOneOnly
+                ? (result.Count == 0 ? floor : rule.RarityFloor)
+                : floor;
+
+            var (d, s) = PickItemByRolledRarity(effFloor, rule.Weights);
             if (d == null || s == null) continue;
             if (!picked.Add(s.itemId)) continue;   // 이미 뽑힌 아이템 → 다시 굴림
             result.Add((d, s));

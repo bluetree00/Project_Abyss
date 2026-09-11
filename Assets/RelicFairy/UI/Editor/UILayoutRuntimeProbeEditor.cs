@@ -152,31 +152,87 @@ public static class UILayoutRuntimeProbeEditor
         catch (OperationCanceledException) { return; }
         catch (Exception e) { Debug.LogWarning($"[UILayoutRuntimeProbe] HUD 실측 실패 — {e.Message}"); }
 
-        // 룬 그리드는 오버레이 UI(UI_GridPanel)다 — ShowOverlayUI로 켠 뒤 재고 Close로 닫는다.
+        // 베이스캠프의 HUD는 <b>로비 모드</b>(TopBar만)다 — 런에서 보이는 전투 패널·서약·미니맵을 재려면
+        // 게임과 같은 경로인 HudPresenter.SetMode(Combat)로 켠다(HudPresenter.ResolveSections가 조합을 정한다).
+        // 슬롯 값은 런타임에 덮어써지므로(프리팹 값은 죽은 데이터) 실제 자릿수의 표본을 먹여야 넘침이 드러난다.
         try
         {
-            Managers.UI.ShowOverlayUI<UI_GridPanel>();
-            await UniTask.DelayFrame(SettleFrames * 2);
+            var presenter = UnityEngine.Object.FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
+            var hudView   = UnityEngine.Object.FindFirstObjectByType<HudView>(FindObjectsInactive.Include);
+            if (presenter != null && hudView != null)
+            {
+                presenter.SetMode(HUDIds.Mode.Combat);
+                await UniTask.DelayFrame(SettleFrames);
+                FeedHudSample(hudView);
+                await UniTask.DelayFrame(SettleFrames);
+
+                var hudCombat = GameObject.Find("Canvas_HUD");
+                await ShotAsync("HUD_Canvas#combat");
+                if (hudCombat != null && hudCombat.transform is RectTransform hcrt
+                    && Dump(hcrt, "HUD_Canvas#combat", sb, ref firstScreen)) screens++;
+
+                presenter.SetMode(HUDIds.Mode.Lobby);   // 다음 화면 실측이 전투 HUD를 배경에 깔지 않도록 되돌린다
+                await UniTask.DelayFrame(2);
+            }
+            else Debug.LogWarning("[UILayoutRuntimeProbe] HudPresenter/HudView가 없어 런 HUD 실측을 건너뛴다.");
+        }
+        catch (OperationCanceledException) { return; }
+        catch (Exception e) { Debug.LogWarning($"[UILayoutRuntimeProbe] 런 HUD 실측 실패 — {e.Message}"); }
+
+        // 룬 그리드.
+        // ⚠️ ShowOverlayUI는 gameObject.SetActive(true)만 한다 — <b>판(육각 셀)을 짓는 것은 Open()</b>(OpenPanel)이다.
+        //    예전 실측이 중앙을 빈 채로 찍고 "판은 런에서만 생긴다"고 본 것은 이 경로를 안 탔기 때문이다.
+        //    순서도 게임과 같아야 한다: 판(Puzzle)을 먼저 세워야 Open()이 BoardManager.Instance를 만나
+        //    EnterExternalGrid로 육각 판과 묶는다(런에서는 GameRunBootstrapper가 먼저 세운다).
+        try
+        {
+            Managers.UI.ShowOverlayUI<UI_GridPanel>();          // 인스턴스만 확보한다(Instance 세팅)
+            await UniTask.DelayFrame(SettleFrames);
             var grid = UI_GridPanel.Instance;
             if (grid != null && grid.transform is RectTransform grt)
             {
-                // 베이스캠프엔 런 인벤토리가 없다 — 표본 룬 5개짜리 보관함을 꽂아 카드·아이콘까지 잰다(판은 런에서만 생긴다).
+                // ① 베이스캠프엔 런 인벤토리가 없다 — 표본 룬 5개짜리 보관함을 꽂아 카드·아이콘까지 잰다.
+                System.Reflection.MethodInfo onStagingChanged = null;
                 try
                 {
                     var inv = new RunItemInventory();
                     foreach (var (data, _) in SampleRunes(5)) inv.AddToStaging(data);
                     var invField = typeof(UI_GridPanel).GetField("_inventory",
                         System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-                    var onChanged = typeof(UI_GridPanel).GetMethod("OnStagingChanged",
+                    onStagingChanged = typeof(UI_GridPanel).GetMethod("OnStagingChanged",
                         System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
                     if (invField != null && inv.StagingCount > 0)
                     {
                         invField.SetValue(grid, inv);
-                        onChanged?.Invoke(grid, null);
+                        onStagingChanged?.Invoke(grid, null);
                         await UniTask.DelayFrame(SettleFrames);
                     }
                 }
                 catch (Exception e) { Debug.LogWarning("[UILayoutRuntimeProbe] 그리드 표본 보관함 실패: " + e.Message); }
+
+                // ② 판을 세운다 — GameRunBootstrapper가 런 시작에 부르는 그 메서드다.
+                try
+                {
+                    var bridge = MerlinRuneBridge.Instance
+                              ?? UnityEngine.Object.FindFirstObjectByType<MerlinRuneBridge>(FindObjectsInactive.Include);
+                    if (bridge != null)
+                    {
+                        bridge.InitializeGridsFromServer();
+                        for (int i = 0; i < 180 && BoardManager.Instance == null; i++)
+                            await UniTask.DelayFrame(1);
+                        if (BoardManager.Instance == null)
+                            Debug.LogWarning("[UILayoutRuntimeProbe] 룬판(BoardManager)이 서지 않았다 — 룬 데이터 초기화를 보라.");
+                    }
+                    else Debug.LogWarning("[UILayoutRuntimeProbe] MerlinRuneBridge를 찾지 못했다(@UIRoot 확인).");
+                }
+                catch (Exception e) { Debug.LogWarning("[UILayoutRuntimeProbe] 룬판 스폰 실패: " + e.Message); }
+
+                // ③ 게임과 같은 경로로 연다 — 여기서 육각 셀이 지어지고 판과 묶인다.
+                grid.Open();
+                await UniTask.DelayFrame(SettleFrames * 3);
+                onStagingChanged?.Invoke(grid, null);           // 판을 만난 뒤라야 카드 모양 미리보기가 실물로 그려진다
+                await UniTask.DelayFrame(SettleFrames);
+
                 await ShotAsync("UI_GridPanel");
                 if (Dump(grt, "UI_GridPanel", sb, ref firstScreen)) screens++;
                 grid.Close();
@@ -202,6 +258,11 @@ public static class UILayoutRuntimeProbeEditor
         catch (Exception e) { Debug.LogWarning($"[UILayoutRuntimeProbe] UI_Settings 실측 실패 — {e.Message}"); }
         finally { UI_Settings.CloseIfOpen(); }
 
+        // 표본용 임시 오브젝트 정리 — 남기면 다음 화면 실측의 배경에 섞인다.
+        for (int i = 0; i < _tempFeedObjects.Count; i++)
+            if (_tempFeedObjects[i] != null) UnityEngine.Object.Destroy(_tempFeedObjects[i]);
+        _tempFeedObjects.Clear();
+
         sb.Append("]}");
         string dir = Path.Combine(Directory.GetCurrentDirectory(), "Temp");
         Directory.CreateDirectory(dir);
@@ -214,6 +275,9 @@ public static class UILayoutRuntimeProbeEditor
     /// 데이터형 팝업에 실제 자산으로 만든 표본을 먹인다. 전부 best-effort — 하나가 실패해도 다음 화면 실측은 계속된다.
     /// 유물 SO·무기 SO는 에디터 AssetDatabase로, 파츠 풀은 Managers.RelicParts로, 룬은 정제소의 존핵 생성기로 만든다.
     /// </summary>
+    /// <summary>표본을 먹이려고 만든 임시 씬 오브젝트 — 실측이 끝나면 지운다.</summary>
+    private static readonly System.Collections.Generic.List<GameObject> _tempFeedObjects = new();
+
     private static void FeedSampleData(UI_Popup popup)
     {
         try
@@ -228,6 +292,38 @@ public static class UILayoutRuntimeProbeEditor
                 {
                     var relic = FirstAsset<RelicClassSO>();
                     if (relic != null) relicInfo.Setup(relic, () => { });
+                    break;
+                }
+                case UI_ShopPanel shop:
+                {
+                    // 상점은 <b>행상 진열(AbyssPeddlerCatalog)</b>을 읽는다. 빈 채로 열면 카드가 어두운 빈 판이라
+                    // 합성본과 대조가 불가능했다("배치 결함인지 표본 탓인지 모른다"가 여기서 계속 걸렸다).
+                    // 게임이 쓰는 그 빌더로 진열을 만들어 컨트롤러에 꽂는다(방 시드 고정 = 매번 같은 진열).
+                    var shopGo   = new GameObject("~ProbeShopController");
+                    var shopCtrl = shopGo.AddComponent<ShopRoomController>();
+                    var peddlerF = typeof(ShopRoomController).GetField("_peddler",
+                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                    peddlerF?.SetValue(shopCtrl, AbyssPeddlerCatalog.Build(new System.Random(7)));
+                    shop.Bind(shopCtrl);
+                    _tempFeedObjects.Add(shopGo);
+                    break;
+                }
+                case UI_RangedForgePopup ranged:
+                {
+                    // 빈 채로 열면 카드가 접혀 있어 <b>스탯이 무대를 넘치는 것도, 테마색 판도 안 보인다</b>
+                    // (2026-09-10 게임 화면에서 드러난 결함을 프로브가 못 잡던 이유). 실제 무기 2종을 먹인다 —
+                    // 하나는 잠금으로 두어 배지 줄이 생겼을 때의 높이까지 함께 잰다.
+                    var rw = Assets<WeaponSO>(2);
+                    if (rw.Count > 0)
+                    {
+                        var list = new System.Collections.Generic.List<UI_RangedForgePopup.Entry>
+                        {
+                            new() { Weapon = rw[0] },
+                        };
+                        if (rw.Count > 1)
+                            list.Add(new UI_RangedForgePopup.Entry { Weapon = rw[1], Locked = true, LockReason = "제단 해금 필요" });
+                        ranged.Setup(list);
+                    }
                     break;
                 }
                 case UI_WeaponReplacePopup weaponReplace:
@@ -392,6 +488,53 @@ public static class UILayoutRuntimeProbeEditor
             await UniTask.DelayFrame(SettleFrames);
         }
         catch (System.Exception e) { Debug.LogWarning("[UILayoutRuntimeProbe] 해금 연출 미리보기 실패: " + e.Message); }
+    }
+
+    /// <summary>
+    /// 런 HUD 표본. 재화·체력·물약·스탯·무기 슬롯에 <b>실제 자릿수</b>를 먹인다 —
+    /// 슬롯 값은 런타임에 덮어써지므로 프리팹 값만 보면 넘침·빈 칸을 못 잡는다.
+    /// </summary>
+    /// <summary>
+    /// 프로브 전용 유물 자원 표본. 광기 게이지(검 실루엣 바)는 유물이 바인딩돼야 나타나므로
+    /// 이 표본이 없으면 <b>체력바 아래 절반이 빈 채로 측정</b>된다(2026-09-10 게임 화면에서 겹침이 드러난 자리).
+    /// </summary>
+    private sealed class SampleRelicResource : IRelicResource
+    {
+        public float           Fill         => 0.62f;
+        public RelicGaugeStyle Style        => RelicGaugeStyle.Bar;
+        public string          Label        => "광기 62%";
+        public int             Phase        => 1;
+        public Color           BarColor     => new(0.95f, 0.35f, 0.25f, 1f);
+        public bool            IsSkillReady => false;
+        public event Action OnChanged { add { } remove { } }
+        public void Tick(float deltaTime) { }
+        public void OnAttackLanded(GameObject target) { }
+        public void OnKill(GameObject target) { }
+        public RelicResourceState Capture() => default;
+        public void Restore(RelicResourceState state) { }
+        public void ApplyConfig(RelicResourceConfig config) { }
+    }
+
+    private static void FeedHudSample(HudView view)
+    {
+        view.SetGold(128450);
+        view.SetEnhanceMaterial(3280);
+        view.SetRuneOre(742);
+        view.SetEssence(12960);
+
+        var combat = view.CombatPanel;
+        if (combat == null) return;
+
+        combat.SetHp(834, 1250);
+        combat.SetPotion(2, 3);
+        combat.SetStats(146, 88);
+        combat.SetRevive(true, true);
+        combat.SetWeaponSlot(0, new WeaponSlotInfo { HasWeapon = true, Name = "여명의 대검", Attack = 146f, Defense = 12f });
+        combat.SetWeaponSlot(1, new WeaponSlotInfo { HasWeapon = true, Name = "심연의 장궁", Attack = 121f, Defense = 8f });
+        combat.SetActiveWeapon(0);
+        combat.SetSkillCooldown(SkillType.E, 4.2f, 9f);
+        combat.SetSkillLocked(SkillType.R, true);
+        combat.SetRelicResource(new SampleRelicResource());   // 광기 게이지(검 실루엣) — 체력바와의 간격을 재려면 필요
     }
 
     private static async UniTask ShotAsync(string name, int settleMs = 500)

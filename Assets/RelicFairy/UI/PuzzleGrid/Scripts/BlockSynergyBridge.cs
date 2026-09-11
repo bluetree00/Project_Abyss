@@ -20,7 +20,9 @@ public class MerlinRuneBridge : MonoBehaviour
 {
     // ── Constants ──
     // 그리드 squareGap 과 Shape cellSize 를 동일 값으로 유지해 크기를 일치시킴
-    private const float GRID_CELL_SIZE = 54f;   // CELL_SIZE(50) + CELL_GAP(4) = MerlinRuneHexGridView.CELL_STEP
+    // 판의 칸 간격은 뷰가 정한다 — 여기에 숫자를 따로 적어 두면 뷰가 바뀔 때 조용히 어긋난다
+    // (실제로 뷰가 78로 커진 뒤에도 54로 남아 있었다). 2026-09-10 실측에서 발견.
+    private const float GRID_CELL_SIZE = MerlinRuneHexGridView.CellStep;
 
     // ── Static ──
     public static MerlinRuneBridge Instance { get; private set; }

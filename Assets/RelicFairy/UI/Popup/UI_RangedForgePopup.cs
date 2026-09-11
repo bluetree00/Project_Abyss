@@ -168,6 +168,15 @@ public class UI_RangedForgePopup : UI_Popup
 
         _stats.text = e.Locked ? "<color=#8A6B6B>특전으로 해금되는 무기</color>" : StatBlock(w);
 
+        // ⚠️ 코드로 구운 스프라이트(UIProceduralSprites)는 <b>프리팹에 직렬화되지 않는다</b> —
+        //    베이크된 프리팹에서는 null로 되살아나 각진 색판으로 보였다(2026-09-10 게임 화면의 초록 판때기).
+        //    그래서 짓는 곳이 아니라 <b>쓰는 곳</b>에서 한 번 붙인다.
+        if (_stageGlow.sprite == null)
+        {
+            _stageGlow.sprite = UIProceduralSprites.RoundedRect(radius: 36f, feather: 28f, size: 160);
+            _stageGlow.type   = Image.Type.Sliced;
+        }
+
         // 테마색으로 톤 통일 — 무대 배경 은은하게 물들이고, 확정 버튼도 이 색을 따른다.
         _stageGlow.color = e.Locked
             ? new Color(LockColor.r, LockColor.g, LockColor.b, 0.05f)
@@ -332,8 +341,10 @@ public class UI_RangedForgePopup : UI_Popup
 
         var v = panel.gameObject.AddComponent<VerticalLayoutGroup>();
         // 아트 여백은 bg.png의 프레임 안쪽 비율(위 0.100 / 아래 0.067 / 좌우 얇은 금선)에서 뽑았다.
-        // 합성본(전체 샷 931×925): 제목 위 0.17, 버튼 아래 0.16 — 775 기준 130/125.
-        v.padding = skinned ? new RectOffset(30, 30, 130, 125) : new RectOffset(28, 28, 24, 22);
+        // 합성본은 제목 위 0.17(775 기준 130)이지만 <b>합성본엔 스탯 4줄이 없다</b> —
+        // 코드가 더한 이름·설명·스탯을 담으면 카드가 무대를 97px 넘겨 도트·구분선 위로 흘렀다(2026-09-10 게임 화면).
+        // 아트 프레임 안쪽은 위 0.067(52)까지라 96/92는 여전히 프레임 안이다. 그만큼 무대가 넓어진다.
+        v.padding = skinned ? new RectOffset(30, 30, 96, 92) : new RectOffset(28, 28, 24, 22);
         v.spacing = 12f;
         v.childControlWidth = true;  v.childForceExpandWidth  = true;
         v.childControlHeight = true; v.childForceExpandHeight = false;
@@ -396,6 +407,12 @@ public class UI_RangedForgePopup : UI_Popup
         // 무대 배경 — 무기 테마색으로 은은하게 물드는 판(카드보다 뒤).
         _stageGlow = NewImage("Glow", _slider, new Color(1f, 1f, 1f, 0f));
         Stretch(_stageGlow.rectTransform);
+        // 각진 사각형이면 알파가 낮아도 '색판'으로 읽힌다(게임 화면에서 초록 판때기로 보였다).
+        // 모서리를 둥글리고 가장자리를 흐려 <b>물든 자국</b>처럼 보이게 한다.
+        // ⚠️ 9-slice 경계 = 반경 + 소프트다. 기본 96px 스프라이트에 36+28=64를 쓰면 좌우 경계가 서로 겹쳐
+        //    슬라이스가 깨진다(가장자리가 안 흐려졌다). 경계 128이 들어가도록 판을 160으로 굽는다.
+        _stageGlow.sprite = UIProceduralSprites.RoundedRect(radius: 36f, feather: 28f, size: 160);
+        _stageGlow.type   = Image.Type.Sliced;
         _stageGlow.raycastTarget = false;
         // 배경 판이라 세로 레이아웃의 한 칸을 차지하면 안 된다 — 카드 내용이 그만큼 밀려 눌린다.
         _stageGlow.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
@@ -506,14 +523,25 @@ public class UI_RangedForgePopup : UI_Popup
         // (이름·설명·스탯이 한 덩어리로 뭉치던 원인). 그래서 각 줄에 높이를 못 박는다.
         bool hasHolder = _skin?.holderFill != null;
         var iconBox = NewRect("IconBox", stage);
-        FixHeight(iconBox.gameObject, hasHolder ? HolderSize : 130f);
+        // 글자 줄은 높이를 못 박지만(눌리면 겹친다) <b>아이콘 칸만은 줄어들 수 있어야 한다</b> —
+        // 무대가 좁을 때 누군가는 양보해야 하고, 양보해도 정보가 사라지지 않는 것은 아이콘뿐이다.
+        // min < preferred면 VerticalLayoutGroup이 이 칸에서만 모자란 만큼을 뺀다.
+        var iconLe = iconBox.gameObject.AddComponent<LayoutElement>();
+        iconLe.preferredHeight = hasHolder ? HolderSize : 130f;
+        iconLe.minHeight       = 96f;
+        iconLe.flexibleHeight  = 0f;
 
         // 아트 홀더는 정사각형이라 폭 전체를 쓰면 안 된다 — 가운데 정사각 칸을 따로 만든다.
         RectTransform host = iconBox;
         if (hasHolder)
         {
             host = NewRect("Holder", iconBox);
-            CenterBox(host, HolderSize, HolderSize);
+            // 칸을 꽉 채우되 정사각을 지킨다(AspectRatioFitter). 고정 크기로 두면 칸이 줄어도
+            // 홀더는 그대로라 아래 글자와 겹친다.
+            Stretch(host);
+            var fit = host.gameObject.AddComponent<AspectRatioFitter>();
+            fit.aspectMode  = AspectRatioFitter.AspectMode.FitInParent;
+            fit.aspectRatio = 1f;
 
             var fill = NewImage("Fill", host, Color.white);
             Stretch(fill.rectTransform);
@@ -558,7 +586,7 @@ public class UI_RangedForgePopup : UI_Popup
         // 스탯 블록(4줄 세로 정렬)
         _stats = NewText("Stats", stage, 16f, BodyColor, FontStyles.Normal, TextAlignmentOptions.Center);
         _stats.lineSpacing = 6f;
-        FixHeight(_stats.gameObject, 104f);
+        FixHeight(_stats.gameObject, 92f);   // 4줄 × (16 + 줄간격 6) = 88 + 여유
     }
 
     /// <summary>부모 한가운데 고정 크기 칸을 만든다(레이아웃이 늘리지 못하게).</summary>
@@ -575,7 +603,14 @@ public class UI_RangedForgePopup : UI_Popup
         if (art == null) return;
 
         var img = NewImage(name, host, Color.white);
-        CenterBox(img.rectTransform, HolderSize * scale, HolderSize * scale);
+        // 홀더보다 scale배 크게 — <b>앵커를 0~1 밖으로</b> 벌려 홀더 크기가 바뀌어도 비율이 유지된다.
+        // 고정 크기(CenterBox)로 두면 홀더가 줄어들 때 테두리만 옛 크기로 남아 액자가 어긋난다.
+        float over = (scale - 1f) * 0.5f;
+        var rt = img.rectTransform;
+        rt.anchorMin = new Vector2(-over, -over);
+        rt.anchorMax = new Vector2(1f + over, 1f + over);
+        rt.offsetMin = rt.offsetMax = Vector2.zero;
+        rt.pivot     = new Vector2(0.5f, 0.5f);
         img.raycastTarget = false;
         ShopUIStyle.Skin(img, art);
     }

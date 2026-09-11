@@ -317,12 +317,18 @@ public sealed class CombatPanelView : MonoBehaviour
             hpFillImage.sprite = null;   // 늘어난 fill 아트 → 단색(슬라이더가 폭 제어)
             hpFillImage.type   = Image.Type.Simple;
         }
-        if (hpText != null) hpText.fontSize = 11f;   // 얇은 바에 맞춘 소형 수치
+        // 바 안쪽(620×21)에 얹는 수치다. 11px은 바에는 맞았지만 글자 하한(16)에 한참 못 미쳐
+        // 런 중 체력을 읽으려면 눈을 붙여야 했다(2026-09-10 런 HUD 실측). 21px 트랙에 16px은 들어간다.
+        if (hpText != null) hpText.fontSize = 16f;
     }
 
     /// <summary>디자이너 아트로 체력바 스킨 적용: 트랙(바탕) + fill(초록/빨강) + 테두리 오버레이.</summary>
     private void ApplyHpSkin()
     {
+        // 수치 글자 크기는 프리팹이 11px로 구워 두었다 — 스킨 경로는 CleanHpBarVisual을 타지 않아
+        // 그 값이 그대로 살아 런 중 체력이 읽히지 않았다(2026-09-10 런 HUD 실측). 트랙(620×21)에 16px은 들어간다.
+        if (hpText != null) hpText.fontSize = 16f;
+
         // 트랙(배경) — 프레임 안쪽 창에 맞춰 인셋(넘침 방지)
         if (hpTrackSprite != null && _hpBar != null && FindChildRecursive(_hpBar, "Background") is RectTransform bgRT
             && bgRT.TryGetComponent<Image>(out var bgImg))
@@ -522,15 +528,17 @@ public sealed class CombatPanelView : MonoBehaviour
         // 게이지 외곽 테두리(검 실루엣 라인)
         AddSkinLayer(_relicBar, "SkinFrame", relicGaugeFrameSprite, true);
 
-        // 라벨이 검 실루엣에 묻히지 않도록 바 위쪽으로 뺀다.
+        // 라벨 자리 — 바 <b>위쪽 바깥</b>으로 빼면 바로 위 체력바와 겹친다(라벨 80~94 vs 체력바 88~159,
+        // 2026-09-10 게임 화면에서 「광기 0%」가 체력바에 물려 있었다). 검 실루엣은 위쪽 1/3이 비어 있으므로
+        // <b>바 안쪽 상단</b>에 얹는다 — 외곽선이 이미 있어 실루엣 위에서도 읽힌다.
         if (_relicBarLabel != null)
         {
             var lrt = _relicBarLabel.rectTransform;
             lrt.anchorMin = new Vector2(0f, 1f);
             lrt.anchorMax = new Vector2(1f, 1f);
-            lrt.pivot     = new Vector2(0.5f, 0f);
-            lrt.offsetMin = new Vector2(0f, 0f);
-            lrt.offsetMax = new Vector2(0f, 14f);
+            lrt.pivot     = new Vector2(0.5f, 1f);
+            lrt.offsetMin = new Vector2(0f, -24f);   // 16px 글자의 줄높이는 21 — 18px 칸이면 상자가 모자란다
+            lrt.offsetMax = new Vector2(0f, -2f);
         }
     }
 
@@ -924,6 +932,9 @@ public sealed class CombatPanelView : MonoBehaviour
         {
             if (iconImage == null) return;
             iconImage.sprite = icon;
+            // 아이콘 아트는 정사각이 아니다(예: Icon_Sword 25×75) — 정사각 슬롯에 늘리면 3배로 뭉개진다.
+            // 프리팹 배선 아이콘이라 여기서 규격을 강제한다(키 라벨을 StyleKeyLabel로 맞추는 것과 같은 이유).
+            iconImage.preserveAspect = true;
             iconImage.gameObject.SetActive(icon != null);
             // 잠금 중이면 새 아이콘도 어둡게 유지(SetIcon이 SetLocked보다 늦게 와도 톤이 안 튄다).
             iconImage.color = _locked ? new Color(0.30f, 0.30f, 0.34f, 0.85f) : Color.white;
@@ -1336,7 +1347,8 @@ public sealed class CombatPanelView : MonoBehaviour
         lrt.offsetMin = Vector2.zero; lrt.offsetMax = Vector2.zero;
         _relicBarLabel = lblGO.AddComponent<TextMeshProUGUI>();
         AssignSafeFont(_relicBarLabel);
-        _relicBarLabel.fontSize = 10f;
+        // 10px은 글자 하한(16)의 절반이라 게이지 수치가 안 읽혔다(2026-09-10). 바 안쪽 18px 칸에 맞춰 16px.
+        _relicBarLabel.fontSize = 16f;
         _relicBarLabel.alignment = TextAlignmentOptions.Center;
         _relicBarLabel.color = Color.white;
         _relicBarLabel.raycastTarget = false;

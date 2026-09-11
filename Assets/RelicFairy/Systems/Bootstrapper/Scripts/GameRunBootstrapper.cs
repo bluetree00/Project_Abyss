@@ -260,10 +260,16 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         bool isFinal = !(_run?.HasNextChapter() ?? false);
 
         // 1) 유물 파츠 드래프트 — 설계서 §1-6: Ch1·Ch2·Ch3 클리어에 픽, Ch4(최종)는 픽 없음(승리).
+        //    드래프트(팝업·파츠 활성)에서 예외가 나도 여기서 삼킨다 — 이 시퀀스의 뒤가 <b>다음 스테이지 포탈</b>이라
+        //    예외 하나에 런 진행이 통째로 막힌다(포탈이 안 생기는 소프트락). 보상은 잃어도 길은 열린다.
         if (!isFinal)
         {
             try { await ShowRelicPartDraftAsync(ct); }
             catch (System.OperationCanceledException) { return; }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[BossClear] 파츠 드래프트 예외 — 건너뛰고 출구를 연다: {e}");
+            }
         }
 
         // 2) 최종 보스: 무한 루프 갈림길(계속=심연 회귀 / 귀환=런 종료). 비최종: 이어지는 길로 다음 챕터.
@@ -278,12 +284,23 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
         else
         {
-            // 코리더 스타일(CorridorStyleSO)은 레거시 존맵 데이터에 묶여 있어 절차 생성 방에는 없다.
-            // null을 넘기면 BossExitPath가 아레나 바닥 머티리얼을 그대로 빌려 톤을 맞춘다.
+            // 게이트 위치는 BossExitPath가 정한다(마커 안쪽 → 입구 반대편 → 방 중심). center는 방 루트 위치다.
             Debug.Log($"[BossClear] BossExitPath.Spawn 호출. center={center}, arena={(_currentArena != null ? _currentArena.name : "null")}");
-            Vector3 exitPos = BossExitPath.Spawn(center, _currentArena, null);
-            Debug.Log($"[BossClear] Spawn 완료. exitPos={exitPos}");
-            await PlayExitPathCinematicAsync(exitPos, ct);
+            Vector3 exitPos = center;
+            try
+            {
+                exitPos = BossExitPath.Spawn(center, _currentArena);
+                Debug.Log($"[BossClear] Spawn 완료. exitPos={exitPos}");
+            }
+            catch (System.Exception e)
+            {
+                // 길 깔기(아레나 마커·벽 개방·바닥 스냅)가 실패해도 게이트는 세운다 — 포탈 없는 보스방은 런 사망과 같다.
+                Debug.LogError($"[BossClear] BossExitPath 실패 — 방 중심에 챕터 게이트만 세운다: {e}");
+                if (GameObject.Find("@ChapterGate") == null) ChapterGate.Spawn(center);
+            }
+            try { await PlayExitPathCinematicAsync(exitPos, ct); }
+            catch (System.OperationCanceledException) { }
+            catch (System.Exception e) { Debug.LogWarning($"[BossClear] 카메라 연출 예외(무시): {e.Message}"); }
         }
     }
 

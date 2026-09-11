@@ -422,8 +422,10 @@ public sealed class RoomWaveController : MonoBehaviour
             gate.Activate(_hasKillPosition ? _lastKillPosition : transform.position);
 
             // 보스방 클리어 신호 발행 — 챕터 게이트 스폰 트리거(이벤트 기반, 보스/DieState 코드 무수정).
+            // 넘기는 위치는 <b>방 루트(중심)</b>다. 예전엔 보스 사망 위치를 넘겨 아레나 정보가 없을 때
+            // 게이트가 보스 시체 위에 났다. 보상 이펙트만 사망 위치를 쓴다(위 gate.Activate).
             if (_bossSpawner != null)
-                _run?.NotifyBossRoomCleared(_hasKillPosition ? _lastKillPosition : transform.position);
+                _run?.NotifyBossRoomCleared(transform.position);
 
             // 절차 진행: 출구 게이트 배치 트리거 (레거시 contiguous 경로엔 구독자 없음 → 무영향)
             OnRoomCleared?.Invoke();
