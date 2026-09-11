@@ -18,8 +18,9 @@ public abstract class DarkRuneEffectBase : RuneElementEffectBase
     protected const string RELEASE_ATK    = "darkReleaseAtk";    // 암흑 공% 기여(float)
     protected const string RELEASE_DR     = "darkReleaseDR";     // 암흑 피해감소 기여(float)
     protected const string RELEASE_ACTIVE = "darkReleaseActive"; // 암흑 중(1/0) — 그림자 잔상 판정
-    protected const string ABYSS_ATK      = "darkAbyssAtk";      // 심연각성 공% 버프(float)
-    protected const string ABYSS_DR       = "darkAbyssDR";       // 심연각성 피해감소 버프(float)
+    protected const string ABYSS_ATK         = "darkAbyssAtk";         // 심연각성 공% 버프(float)
+    protected const string ABYSS_DR          = "darkAbyssDR";          // 심연각성 피해감소 버프(float)
+    protected const string ABYSS_RELEASE_EXT = "darkAbyssReleaseExt";  // 심연각성 암흑 해방 연장(초)
 }
 
 /// <summary>
@@ -90,11 +91,12 @@ public sealed class DarkReleaseEffect : DarkRuneEffectBase
         var res = Res(player);
         if (res == null) return;
 
-        float dur = Entry.duration > 0f ? Entry.duration : 5f;
+        float ext = res.GetFloat(ABYSS_RELEASE_EXT);   // 심연각성 연장 시간
+        float dur = (Entry.duration > 0f ? Entry.duration : 5f) + ext;
         _releaseUntil = Time.time + dur;
         res.Consume(GAUGE);   // 게이지 리셋 → 임계 재무장
 
-        // 심연각성(4단계): 랜덤 버프
+        // 심연각성(4단계): 확정 강화
         (player.RuneEffects?.GetActive("DarkAbyss") as DarkAbyssEffect)?.Grant(player, dur);
     }
 
@@ -164,56 +166,49 @@ public sealed class DarkAfterimageEffect : DarkRuneEffectBase
 }
 
 /// <summary>
-/// 4단계 심연 각성 — 게이지 달성 시 랜덤 버프 1개(암흑 해방이 호출). 공격력/피해감소(SL)·회복·주변몹 방어감소.
-/// SL 채널은 DarkErosion이 합산하므로 abyss 기여를 float로 게시(타이머 만료 시 해제). 본 효과는 마커 + Grant.
+/// 4단계 심연 각성 — 게이지 달성(암흑 해방)마다 확정 강화 3종:
+///   1. 공격력 +25% 시한부 (SL, DarkErosion이 합산)
+///   2. 주변 적 받는 피해 +20% (ApplyDamageTakenAmp, 암흑 지속과 동일)
+///   3. 암흑 해방 지속시간 +2초 (DarkRelease가 ABYSS_RELEASE_EXT를 읽어 적용)
+/// value=공%(0.25), value2=받뎀증폭(0.20), value3=해방연장초(2.0).
 /// </summary>
 public sealed class DarkAbyssEffect : DarkRuneEffectBase
 {
     private const float NEARBY_RADIUS = 6f;
     private static readonly List<MonsterBase> s_buf = new();
 
-    private float  _buffUntil;
-    private string _buffFloatKey;   // 시한부 SL 기여 키(공%/피해감소). 즉발 버프(회복/디버프)는 null.
+    private float _atkUntil;
 
-    /// <summary>랜덤 버프 1개 부여. duration = 암흑 지속과 동일.</summary>
+    public override void OnActivate(PlayerController player)
+    {
+        base.OnActivate(player);
+        // 암흑 해방 연장을 항상 활성 상태로 유지 — 비활성화 시 DarkRelease가 기본 지속으로 복귀
+        Res(player)?.SetFloat(ABYSS_RELEASE_EXT, Entry.value3 > 0f ? Entry.value3 : 2f);
+    }
+
+    /// <summary>공격력 + 주변 적 받뎀 증폭. DarkRelease.Trigger가 호출한다.</summary>
     public void Grant(PlayerController player, float duration)
     {
         var res = Res(player);
         if (res == null) return;
 
-        int pick = Random.Range(0, 4);
-        switch (pick)
-        {
-            case 0: // 회복(최대HP 5%) — 즉발
-                int heal = Mathf.RoundToInt(player.RuntimeStats.MaxHp * 0.05f);
-                if (heal > 0) player.Heal(heal);
-                break;
+        // 공격력 +25% (시한부, DarkErosion Tick이 SL 합산)
+        res.SetFloat(ABYSS_ATK, Entry.value > 0f ? Entry.value : 0.25f);
+        _atkUntil = Time.time + duration;
 
-            case 1: // 주변 몹 방어 감소(받피 증폭) — 즉발
-                int n = CombatQuery.GetNearbyEnemies(player.transform.position, NEARBY_RADIUS, null, 16, s_buf);
-                for (int i = 0; i < n; i++) s_buf[i].ApplyDamageTakenAmp(0.2f, duration, "vulnerable");
-                break;
+        // 주변 적 받는 피해 증폭 (즉발)
+        float vulnAmp = Entry.value2 > 0f ? Entry.value2 : 0.2f;
+        int n = CombatQuery.GetNearbyEnemies(player.transform.position, NEARBY_RADIUS, null, 16, s_buf);
+        for (int i = 0; i < n; i++) s_buf[i].ApplyDamageTakenAmp(vulnAmp, duration, "vulnerable");
 
-            case 2: // 공격력 +20% — 시한부(DarkErosion이 SL 합산)
-                res.SetFloat(ABYSS_ATK, 0.2f);
-                _buffFloatKey = ABYSS_ATK;
-                _buffUntil = Time.time + duration;
-                break;
-
-            case 3: // 받피 -15% — 시한부
-                res.SetFloat(ABYSS_DR, 0.15f);
-                _buffFloatKey = ABYSS_DR;
-                _buffUntil = Time.time + duration;
-                break;
-        }
+        ElementVfxPlayer.PlayBurst(RuneElement.Dark, player.transform.position);
     }
 
     public override void Tick(float dt, PlayerController player)
     {
-        if (_buffUntil <= 0f || Time.time < _buffUntil) return;
-        _buffUntil = 0f;
-        if (_buffFloatKey != null) Res(player)?.SetFloat(_buffFloatKey, 0f);
-        _buffFloatKey = null;
+        if (_atkUntil <= 0f || Time.time < _atkUntil) return;
+        _atkUntil = 0f;
+        Res(player)?.SetFloat(ABYSS_ATK, 0f);
     }
 
     public override void OnDeactivate()
@@ -223,8 +218,8 @@ public sealed class DarkAbyssEffect : DarkRuneEffectBase
         {
             res.SetFloat(ABYSS_ATK, 0f);
             res.SetFloat(ABYSS_DR, 0f);
+            res.SetFloat(ABYSS_RELEASE_EXT, 0f);
         }
-        _buffUntil = 0f;
-        _buffFloatKey = null;
+        _atkUntil = 0f;
     }
 }

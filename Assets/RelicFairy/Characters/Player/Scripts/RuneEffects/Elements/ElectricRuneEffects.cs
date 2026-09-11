@@ -24,7 +24,6 @@ public abstract class ElectricRuneEffectBase : RuneElementEffectBase
     protected const string KEY_STACK      = "ElecStatic";          // 정전기 스택
     protected const string KEY_CONSUMED   = "ElecConsumedStacks";  // 방전이 소모한 스택 수(감전이 읽음)
     protected const string KEY_TARGET     = "ElecDischargeTarget"; // 방전 대상(감전이 공유)
-    protected const string KEY_SHOCK_AS   = "ElecShockAtkSpeed";   // 감전 중 공속 기여(정전기가 합산)
 }
 
 /// <summary>
@@ -50,9 +49,8 @@ public sealed class ElecStaticEffect : ElectricRuneEffectBase
         if (res == null || stats == null) return;
 
         int stacks   = res.GetStack(KEY_STACK);
-        float own    = Entry.value + stacks * Entry.value2;        // 기본 + 스택당
-        float total  = own + res.GetFloat(KEY_SHOCK_AS);           // 감전 중 +8% 합산
-        stats.SetSynergyDynamicAttackSpeed(total);                 // 무변동 시 내부에서 재계산 생략
+        float total  = Entry.value + stacks * Entry.value2;        // 기본 + 스택당
+        stats.SetSynergyDynamicAttackSpeed(total);
     }
 
     public override void OnDeactivate()
@@ -100,13 +98,12 @@ public sealed class ElecDischargeEffect : ElectricRuneEffectBase
 
 /// <summary>
 /// 3단계 감전 — 방전 시 대상 감전(마비). 기본 1초 + 소모 스택당 가산, 최대 3초.
-/// 감전 동안 플레이어 공속 +8%(정전기가 합산). value=기본지속(1), value2=최대지속(3), value3=공속(0.08).
+/// 감전 동안 해당 적 받는 피해 +8%(ApplyDamageTakenAmp). value=기본지속(1), value2=최대지속(3), value3=받는피해증폭(0.08).
 /// 방전(2단계)과 동일 OnSkillUsed에 반응하되, 활성 순서상 방전이 먼저 소모/대상 기록 후 실행된다.
 /// </summary>
 public sealed class ElecShockEffect : ElectricRuneEffectBase
 {
-    private const int STATIC_MAX_STACKS = 10;   // 지속 보간 분모
-    private float _shockUntil;
+    private const int STATIC_MAX_STACKS = 10;
 
     public override void OnSkillUsed(PlayerController player)
     {
@@ -116,26 +113,16 @@ public sealed class ElecShockEffect : ElectricRuneEffectBase
         int consumed = res.GetRegister(KEY_CONSUMED);
         if (consumed <= 0) return;
 
-        float perStack = (Entry.value2 - Entry.value) / STATIC_MAX_STACKS;        // (3-1)/10 = 0.2s
+        float perStack = (Entry.value2 - Entry.value) / STATIC_MAX_STACKS;
         float dur = Mathf.Min(Entry.value2, Entry.value + consumed * perStack);
 
         var targetGo = res.GetTarget(KEY_TARGET);
         var mb = targetGo != null ? targetGo.GetComponentInParent<MonsterBase>() : null;
-        if (mb != null) mb.ApplyStun(dur);
+        if (mb == null) return;
 
-        _shockUntil = Time.time + dur;
-    }
-
-    public override void Tick(float dt, PlayerController player)
-    {
-        var res = Res(player);
-        if (res == null) return;
-        res.SetFloat(KEY_SHOCK_AS, Time.time < _shockUntil ? Entry.value3 : 0f);
-    }
-
-    public override void OnDeactivate()
-    {
-        CachedPlayer?.RuneEffects?.Resources?.SetFloat(KEY_SHOCK_AS, 0f);
+        mb.ApplyStun(dur);
+        if (Entry.value3 > 0f)
+            mb.ApplyDamageTakenAmp(Entry.value3, dur, "shocked");
     }
 }
 
