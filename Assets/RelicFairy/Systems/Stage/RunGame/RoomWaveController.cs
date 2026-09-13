@@ -20,7 +20,8 @@ using UnityEngine;
 public sealed class RoomWaveController : MonoBehaviour
 {
     private const float PreExitDelay     = 0.8f;
-    private const float BetweenWaveDelay = 2.0f;
+    /// <summary>웨이브 사이 대기(초). 속공 챌린지 제한시간 산출이 이 값을 포함해야 해서 공개한다.</summary>
+    public  const float BetweenWaveDelay = 2.0f;
     // alive 카운터 정합 감시 주기(초). 전투 중 계속 도는 값이라 너무 촘촘하면 낭비다.
     private const float AliveWatchdogInterval = 3.0f;
 

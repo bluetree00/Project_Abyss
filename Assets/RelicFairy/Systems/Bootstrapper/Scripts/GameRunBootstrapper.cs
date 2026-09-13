@@ -2436,6 +2436,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             // 전투 챌린지 — 스포너 있는 이벤트방에 성과 오버레이.
             var (type, param) = ParseChallengeType(typeHint);
+            // 속공 제한시간이 <b>방마다 몬스터 수가 다른데 45초 고정</b>이었다 — Ch4(15마리·3웨이브)는
+            // 처치 속도가 아무리 빨라도 제한을 넘어 항상 최하 등급이 나온다. pool_key에 명시(":30")가
+            // 없으면 그 방의 실제 스폰 계획에서 산출한다.
+            if (type == CombatChallengeOverlay.OverlayType.TimeLimit
+                && (string.IsNullOrEmpty(typeHint) || typeHint.IndexOf(':') < 0))
+                param = ResolveTimeLimitFor(roomGO, param);
             var overlay = roomGO.AddComponent<CombatChallengeOverlay>();
             overlay.Initialize(_run, type, param);
             Debug.Log($"[GameRunBootstrapper] 이벤트 전투 챌린지 부착: {type}({param}) — {typeHint}");
@@ -2469,6 +2475,28 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             c.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab);
             Debug.Log($"[GameRunBootstrapper] 이벤트 보물고 부착 — {typeHint}");
         }
+    }
+
+    /// <summary>
+    /// 방의 스포너 계획(총 마릿수·웨이브 수)에서 속공 제한시간을 산출한다.
+    /// 마리당 4초 + 웨이브 간 대기 + 진입·이동 여유 6초.
+    /// 등급 곡선(Platinum ≤0.5배 / Gold ≤0.75배 / Silver ≤1배)은 그대로 두고 기준선만 방에 맞춘다 —
+    /// 보통 플레이면 Silver, 잘하면 Gold, 아주 잘해야 Platinum이 되도록.
+    /// </summary>
+    private static float ResolveTimeLimitFor(GameObject roomGO, float fallback)
+    {
+        var spawners = roomGO.GetComponentsInChildren<MonsterSpawner>(true);
+        if (spawners == null || spawners.Length == 0) return fallback;
+
+        int monsters = 0, waves = 1;
+        foreach (var s in spawners)
+        {
+            if (s == null) continue;
+            monsters += s.PlannedTotalSpawns;
+            waves = Mathf.Max(waves, s.PlannedWaveCount);
+        }
+        if (monsters <= 0) return fallback;
+        return monsters * 4f + (waves - 1) * RoomWaveController.BetweenWaveDelay + 6f;
     }
 
     /// <summary>pool_key 등 키 문자열에서 챌린지 종류 유추: "hitless/flawless"=무결, "speed/timelimit/rush"=속공, 기본=속공45.

@@ -12,7 +12,14 @@ using UnityEngine.UI;
 /// </summary>
 public sealed class FeverGaugeView : MonoBehaviour
 {
-    public const int MaxLevel = 7;
+    /// <summary>
+    /// 게이지 칸 수 = <b>확률이 실제로 포화하는 피버 값</b>.
+    /// RefineryService.Odds 기준 Epic은 fever 7에서(0.15+0.06f → 0.55 상한), Legendary는
+    /// <b>fever 9에서</b>(0.03+0.025f → 0.25 상한) 멈춘다. 7로 두면 7단계에서 "최고조"라 표시하는
+    /// 동안 전설 확률이 아직 오르는 중이라, 게이지가 거짓말을 한다. 느린 쪽(9)에 맞춘다.
+    /// ⚠️ Odds의 계수를 바꾸면 이 값도 같이 맞춰야 한다.
+    /// </summary>
+    public const int MaxLevel = 9;
 
     private const float LabelH = 20f;
     private const float CellGap = 4f;

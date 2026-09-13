@@ -25,17 +25,20 @@ public sealed class TreasureVaultChallenge : WorldInteractionChallenge
 
     protected override void PlaceMarkers(Transform player)
     {
-        _center = player.position;
+        // 원 중심을 방 안쪽으로 한 번 밀어낸다 — 진입 지점은 문 개구부 안쪽(벽 가장자리)이라
+        // 거기를 중심으로 원을 그리면 상자 절반이 벽 밖/벽 속에 박힌다.
+        _center = SafeSpot(player.position, Inward, Radius);
         for (int i = 0; i < ChestCount; i++)
         {
             float ang = (Mathf.PI * 2f) * i / ChestCount + 0.4f;
-            Vector3 p = _center + new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * Radius;
-            AddMarker(p, "보물 상자", UIPalette.Gold, $"<color={UIPalette.GoldHex}>[F]</color> 개봉", i);
+            var dir = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+            AddMarker(SafeSpot(_center, dir, Radius), ChallengeFlavor.ChestName(Run), UIPalette.Gold,
+                      $"<color={UIPalette.GoldHex}>[F]</color> 개봉", i);
         }
-        _timerLabel = MakeText($"보물고 · {Mathf.CeilToInt(TimeLimit)}초", _center + Vector3.up * 3.2f,
+        _timerLabel = MakeText($"{ChallengeFlavor.VaultName(Run)} · {Mathf.CeilToInt(TimeLimit)}초", _center + Vector3.up * 3.2f,
                                4f, UIPalette.Gold, 12);
         _timing = true;
-        Notice($"보물고! <color={UIPalette.GoldHex}>{Mathf.CeilToInt(TimeLimit)}초</color> 안에 상자를 열어라");
+        Notice($"{ChallengeFlavor.VaultName(Run)}! <color={UIPalette.GoldHex}>{Mathf.CeilToInt(TimeLimit)}초</color> 안에 열어라");
     }
 
     protected override void Tick()
@@ -45,7 +48,7 @@ public sealed class TreasureVaultChallenge : WorldInteractionChallenge
 
         if (!_timing || IsResolved) return;
         _timeLeft -= Time.deltaTime;
-        if (_timerLabel != null) _timerLabel.text = $"보물고 · {Mathf.Max(0, Mathf.CeilToInt(_timeLeft))}초";
+        if (_timerLabel != null) _timerLabel.text = $"{ChallengeFlavor.VaultName(Run)} · {Mathf.Max(0, Mathf.CeilToInt(_timeLeft))}초";
         if (_timeLeft <= 0f) Resolve();
     }
 
@@ -73,7 +76,7 @@ public sealed class TreasureVaultChallenge : WorldInteractionChallenge
                              : _opened == 3 ? ChallengeGrade.Silver
                              : _opened == 2 ? ChallengeGrade.Bronze
                              :                ChallengeGrade.Fail;
-        Notice($"보물고 종료 — {_opened}/{ChestCount} 개봉 · <color=#8fd3ff>{GradeName(grade)}</color>");
+        Notice($"{ChallengeFlavor.VaultName(Run)} 종료 — {_opened}/{ChestCount} 개봉 · <color=#8fd3ff>{GradeName(grade)}</color>");
         FinishWith(grade, _center);
     }
 }

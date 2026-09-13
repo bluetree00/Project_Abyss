@@ -32,6 +32,35 @@ public static class ServiceRoomDecorPlacer
     }
 
     /// <summary>
+    /// 기준점에서 가장 넓게 트인 수평 방향. 같은 여유면 <paramref name="hint"/> 쪽을 유지한다.
+    /// <para>방 진입 직후 <c>player.forward</c>는 이전 방에서 넘어온 값이다
+    /// (<c>RunFlowController.MovePlayer</c>가 위치만 옮기고 회전은 두므로) — 벽을 향할 수 있어
+    /// 그대로 배치 기준으로 쓰면 소품·마커가 벽 속에 박힌다. 그 보정용.</para>
+    /// </summary>
+    public static Vector3 ResolveOpenDirection(Vector3 origin, Vector3 hint)
+    {
+        hint.y = 0f;
+        if (hint.sqrMagnitude < 0.0001f) hint = Vector3.forward;
+        hint.Normalize();
+
+        Vector3 best = hint;
+        float bestScore = float.NegativeInfinity;
+        for (int i = 0; i < 16; i++)
+        {
+            Vector3 d = Quaternion.Euler(0f, i * 22.5f, 0f) * hint;
+            float clear = 0f;
+            for (float r = 1.5f; r <= 6f; r += 1.5f)
+            {
+                if (!IsFree(origin + d * r)) break;
+                clear = r;
+            }
+            float score = clear * 10f + Vector3.Dot(d, hint);
+            if (score > bestScore) { bestScore = score; best = d; }
+        }
+        return best;
+    }
+
+    /// <summary>
     /// 기준점(NPC) 주변에서 원하는 방향·거리에 가장 가까운 <b>빈 자리</b>를 찾는다.
     /// 각도를 좌우로 흔들어 보고, 그래도 없으면 반경을 줄여 재시도한다. 전부 실패하면 false.
     /// </summary>

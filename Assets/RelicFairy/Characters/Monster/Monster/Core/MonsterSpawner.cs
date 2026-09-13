@@ -160,6 +160,22 @@ public class MonsterSpawner : MonoBehaviour
     /// _waveEntries의 모든 그룹을 하나의 웨이브로 합쳐 연속 스폰한다.</summary>
     public int WaveCount => (_waveEntries != null && _waveEntries.Length > 0) ? 1 : 0;
 
+    /// <summary>이번 방에서 스폰할 <b>총 마릿수 계획</b>. 웨이브 모드는 전 웨이브 합, 레거시는 maxTotalSpawns.
+    /// (웨이브 모드에선 maxTotalSpawns가 설정되지 않아 MaxTotalSpawns가 0이다.)</summary>
+    public int PlannedTotalSpawns
+    {
+        get
+        {
+            if (_waveEntries == null || _waveEntries.Length == 0) return maxTotalSpawns;
+            int n = 0;
+            for (int i = 0; i < _waveEntries.Length; i++) n += _waveEntries[i].spawnCount;
+            return n;
+        }
+    }
+
+    /// <summary>이번 방의 웨이브 수 계획(레거시 모드는 1).</summary>
+    public int PlannedWaveCount => (_waveEntries != null && _waveEntries.Length > 0) ? _waveEntries.Length : 1;
+
     /// <summary>몬스터가 실제로 스폰된 직후 발행. (풀에서 꺼낸 MonsterBase 인스턴스 전달)
     /// RoomClearController가 몬스터 OnDied를 체이닝하는 데 사용.</summary>
     public event System.Action<MonsterBase> OnMonsterSpawned;

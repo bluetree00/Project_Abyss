@@ -16,31 +16,31 @@ MonoBehaviour:
   - displayName: FairyBatMonster
     addressableKey: FairyBat/FairyBat
     grade: 0
-    poolTags: 02000000
+    poolTags: 03000000
     weight: 1
     enabled: 1
   - displayName: GolemMonster
     addressableKey: Golem/Golem
     grade: 1
-    poolTags: 03000000
+    poolTags: 020000000300000004000000
     weight: 1
     enabled: 1
   - displayName: SkeletonMonster
     addressableKey: Skeleton/Skeleton
     grade: 0
-    poolTags: 03000000
+    poolTags: 0300000004000000
     weight: 1
     enabled: 1
   - displayName: SlimeMonster
     addressableKey: Slime/Slime
     grade: 0
-    poolTags: 02000000
+    poolTags: 0100000002000000
     weight: 1
     enabled: 1
   - displayName: SnailMonster
     addressableKey: Snail/Snail
     grade: 0
-    poolTags: 04000000
+    poolTags: 0200000004000000
     weight: 1
     enabled: 1
   - displayName: SpiderMonster
@@ -52,7 +52,7 @@ MonoBehaviour:
   - displayName: MonsterPlantMonster
     addressableKey: MonsterPlant/MonsterPlant
     grade: 1
-    poolTags: 01000000
+    poolTags: 0100000003000000
     weight: 1
     enabled: 1
   - displayName: EvilMageMonster
@@ -64,7 +64,7 @@ MonoBehaviour:
   - displayName: OrcMonster
     addressableKey: Orc/Orc
     grade: 1
-    poolTags: 03000000
+    poolTags: 020000000300000004000000
     weight: 1
     enabled: 1
   - displayName: DragonMonster
@@ -76,7 +76,7 @@ MonoBehaviour:
   - displayName: BeholderMonster
     addressableKey: Beholder/Beholder
     grade: 2
-    poolTags: 02000000
+    poolTags: 03000000
     weight: 1
     enabled: 1
   - displayName: ChestMonsterMonster
@@ -94,7 +94,7 @@ MonoBehaviour:
   - displayName: FlyingDemonMonster
     addressableKey: FlyingDemon/FlyingDemon
     grade: 2
-    poolTags: 04000000
+    poolTags: 02000000
     weight: 1
     enabled: 1
   - displayName: LizardWarriorMonster
@@ -106,13 +106,13 @@ MonoBehaviour:
   - displayName: RatAssassinMonster
     addressableKey: RatAssassin/RatAssassin
     grade: 0
-    poolTags: 03000000
+    poolTags: 0300000004000000
     weight: 1
     enabled: 1
   - displayName: SpecterMonster
     addressableKey: Specter/Specter
     grade: 2
-    poolTags: 02000000
+    poolTags: 01000000
     weight: 1
     enabled: 1
   - displayName: WerewolfMonster
@@ -142,19 +142,19 @@ MonoBehaviour:
   - displayName: BlackKnightMonster
     addressableKey: BlackKnight/BlackKnight
     grade: 2
-    poolTags: 03000000
+    poolTags: 04000000
     weight: 1
     enabled: 1
   - displayName: CactusMonster
     addressableKey: Cactus/Cactus
     grade: 1
-    poolTags: 04000000
+    poolTags: 0200000004000000
     weight: 1
     enabled: 1
   - displayName: CyclopsMonster
     addressableKey: Cyclops/Cyclops
     grade: 2
-    poolTags: 04000000
+    poolTags: 0200000004000000
     weight: 1
     enabled: 1
   - displayName: DemonKingMonster
@@ -166,13 +166,13 @@ MonoBehaviour:
   - displayName: FishmanMonster
     addressableKey: Fishman/Fishman
     grade: 1
-    poolTags: 02000000
+    poolTags: 01000000
     weight: 1
     enabled: 1
   - displayName: MushroomAngryMonster
     addressableKey: MushroomAngry/MushroomAngry
     grade: 0
-    poolTags: 04000000
+    poolTags: 02000000
     weight: 1
     enabled: 1
   - displayName: MushroomSmileMonster
@@ -190,13 +190,13 @@ MonoBehaviour:
   - displayName: SalamanderMonster
     addressableKey: Salamander/Salamander
     grade: 2
-    poolTags: 04000000
+    poolTags: 02000000
     weight: 1
     enabled: 1
   - displayName: StingRayMonster
     addressableKey: StingRay/StingRay
     grade: 1
-    poolTags: 02000000
+    poolTags: 01000000
     weight: 1
     enabled: 1
   - displayName: DragonBossMonster

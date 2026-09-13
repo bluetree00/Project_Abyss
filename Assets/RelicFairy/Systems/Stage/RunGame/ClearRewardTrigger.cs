@@ -262,8 +262,13 @@ public class ClearRewardTrigger : MonoBehaviour
             var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_ItemAcquisitionPopup>();
             if (popup == null)
             {
-                _run.ItemInventory.AddToStaging(data);
-                Debug.Log($"[ClearRewardTrigger] 팝업 로드 실패 — 자동 추가: {data.displayName}");
+                // 보관함이 가득 차면 AddToStaging이 false를 돌려준다. 반환값을 버리면 아이템이
+                // 조용히 사라진다(프로젝트 규약 — 팝업 경로는 이미 같은 이유로 실패를 처리한다).
+                if (!_run.ItemInventory.AddToStaging(data))
+                    ItemEffectVfxHelper.ShowNotice(
+                        $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.MaxStagingCapacity}칸) — {data.displayName} 지급 실패");
+                else
+                    Debug.Log($"[ClearRewardTrigger] 팝업 로드 실패 — 자동 추가: {data.displayName}");
                 continue;
             }
 
@@ -313,8 +318,11 @@ public class ClearRewardTrigger : MonoBehaviour
             if (fallback != null)
             {
                 _run.EffectManager?.OnItemPickup(fallback);
-                _run.ItemInventory.AddToStaging(fallback);
-                Debug.LogWarning($"[ClearRewardTrigger] 선택 팝업 로드 실패 — 첫 후보 자동 지급: {fallback.displayName}");
+                if (!_run.ItemInventory.AddToStaging(fallback))
+                    ItemEffectVfxHelper.ShowNotice(
+                        $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.MaxStagingCapacity}칸) — {fallback.displayName} 지급 실패");
+                else
+                    Debug.LogWarning($"[ClearRewardTrigger] 선택 팝업 로드 실패 — 첫 후보 자동 지급: {fallback.displayName}");
             }
             return;
         }

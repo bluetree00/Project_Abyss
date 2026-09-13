@@ -151,7 +151,18 @@ public class WorldItemDisplay : MonoBehaviour
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
 
-        run?.ItemInventory.AddToStaging(_runtimeData);
+        // 보관함 만차면 <b>월드에 그대로 남긴다</b>. 반환값을 버리면 아래에서 ConfirmPickup이
+        // 오브젝트를 파괴하는데 "획득" 알림은 그대로 떠, 플레이어는 받은 줄 알고 잃는다.
+        // (프로젝트 규약 — 팝업/상점 경로는 이미 같은 이유로 실패를 처리한다.)
+        if (run?.ItemInventory != null && !run.ItemInventory.AddToStaging(_runtimeData))
+        {
+            _pickedUp = false;
+            if (col != null) col.enabled = true;
+            RefreshPrompt();
+            ItemEffectVfxHelper.ShowNotice(
+                $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.MaxStagingCapacity}칸) — 자리를 비우고 다시 주우세요");
+            return;
+        }
 
         // 아이템 효과: OnItemPickup hook
         run?.EffectManager?.OnItemPickup(_runtimeData);

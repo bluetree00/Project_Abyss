@@ -17,10 +17,12 @@ public sealed class SacrificeAltarChallenge : WorldInteractionChallenge
 
     protected override void PlaceMarkers(Transform player)
     {
-        Vector3 fwd = player.forward, right = player.right, at = player.position;
-        AddMarker(at + fwd * 3.8f - right * 2.2f, "제물 제단", new Color(0.95f, 0.55f, 0.45f),
+        // 기준을 player.forward가 아니라 실제로 트인 방향(Inward)으로 — MovePlayer가 회전을 안 세운다.
+        Vector3 at = player.position, fwd = Inward;
+        Vector3 right = Vector3.Cross(Vector3.up, fwd);
+        AddMarker(SafeSpot(at, (fwd * 3.8f - right * 2.2f).normalized, 4.4f), ChallengeFlavor.AltarName(Run), new Color(0.95f, 0.55f, 0.45f),
                   "<color=#FF9668>[F]</color> 물약을 바친다", TagAltar);
-        AddMarker(at + fwd * 3.8f + right * 2.2f, "떠난다", new Color(0.7f, 0.72f, 0.78f),
+        AddMarker(SafeSpot(at, (fwd * 3.8f + right * 2.2f).normalized, 4.4f), "떠난다", new Color(0.7f, 0.72f, 0.78f),
                   "<color=#B8C0CC>[F]</color> 그냥 지나친다", TagLeave);
     }
 
