@@ -44,8 +44,6 @@ public class ActSkillState : ActSkillStateBase<ActState>
 
         // 스킬 진입 시 잔여 공격 입력 제거
         _controller.InputBuffer.TryConsume(Game.Inputs.Command.Light);
-        _controller.InputBuffer.TryConsume(Game.Inputs.Command.Heavy);
-        _controller.InputBuffer.TryConsume(Game.Inputs.Command.Charge);
 
         _ctx = new SkillExecutionContext
         {

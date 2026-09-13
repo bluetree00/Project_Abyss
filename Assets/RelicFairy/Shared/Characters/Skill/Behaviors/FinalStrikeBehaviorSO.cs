@@ -76,7 +76,6 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
             SpawnChargeEffect(ctx);
 
             ctx.Controller.InputBuffer.TryConsume(Game.Inputs.Command.Light);
-            ctx.Controller.InputBuffer.TryConsume(Game.Inputs.Command.Heavy);
         }
 
         public void OnUpdate(SkillExecutionContext ctx)

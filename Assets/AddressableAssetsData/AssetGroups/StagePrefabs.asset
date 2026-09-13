@@ -45,6 +45,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 315eef84caf09fb4087d76fc034cdc59
+    m_Address: Plaza_Boss_Ch4
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 9cef999bcb09aa542bd36dfab694eb3e
     m_Address: Arena_Boss_Ch3_Intro
     m_ReadOnly: 0

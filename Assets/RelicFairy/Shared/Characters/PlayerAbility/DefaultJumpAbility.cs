@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// 플레이어 점프/접지. 접지 구현이 <b>두 갈래</b>이고 CharacterData.useFloatingController가 그중 하나를 고른다.
@@ -19,14 +19,8 @@ public class DefaultJumpAbility : IJumpAbility
     //============================================================
     // Constants
     //============================================================
-    private const float AirAttackGravityScale = 0.05f;
-    private const float AirAttackMaxFallSpeed = -1f;
-
     // 착지 직후 일정 시간 동안 ground 상태를 유지 (바운스 플리커 방지)
     private const float LandingLockDuration = 0.1f;
-
-    // 착지 후 방향 입력을 받을 수 있도록 점프 재사용 대기 시간
-    private const float JumpCooldownAfterLanding = 0.18f;
 
     // 플로팅: rideHeight + 이 값까지 적중하면 접지로 간주(호버 허용오차).
     private const float FloatGroundTolerance = 0.15f;
@@ -126,12 +120,9 @@ public class DefaultJumpAbility : IJumpAbility
     //============================================================
     private readonly CharacterData _data;
     private bool _isGrounded;
-    private bool _isJumping;
     private float _landingLockTimer;
-    private float _jumpCooldownTimer;
 
     // 플로팅 컨트롤러 상태
-    private bool  _jumpSuppressSpring;   // 점프 상승 동안 스프링 끔(끌어내림 방지)
     private bool  _floatHasGround;       // 이번 프레임 호버 캐스트 적중 여부
     private float _floatHitDist;         // 호버 캐스트 적중 거리
 
@@ -139,7 +130,6 @@ public class DefaultJumpAbility : IJumpAbility
     // Properties
     //============================================================
     public bool IsGrounded => _isGrounded;
-    public bool IsJumping => _isJumping;
 
     //============================================================
     // Constructor
@@ -149,29 +139,8 @@ public class DefaultJumpAbility : IJumpAbility
         _data = data;
     }
 
-    //============================================================
-    // Public Methods
-    //============================================================
-    public void Jump(PlayerController controller)
-    {
-        if (!_isGrounded) return;
-        if (_jumpCooldownTimer > 0f) return;
-
-        var rb = controller.Rigid;
-        if (rb == null) return;
-
-        _isJumping = true;
-        _landingLockTimer = 0f;
-
-        // 플로팅: 상승 동안 스프링을 꺼 호버가 끌어내리지 않게 한다(하강 시 자동 재개).
-        if (_data != null && _data.useFloatingController)
-            _jumpSuppressSpring = true;
-
-        // 기존 수직 속도 제거 후 점프 속도 직접 적용 (mass 무관)
-        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
-        rb.AddForce(Vector3.up * _data.jumpForce, ForceMode.VelocityChange);
-        rb.linearDamping = _data.airDrag;
-    }
+    // [점프 폐기] Jump()는 제거됐다. 이 클래스는 이제 접지 판정과 중력(낙하)만 담당한다.
+    // 공중 상태(LocoState.Air)는 낙하·넉백으로만 진입한다.
 
     // 접지 판정 시점의 지면까지 실거리. 접지 밴드 안에서 떠 있는지 판별하는 데 쓴다.
     private float _groundHitDistance = float.PositiveInfinity;
@@ -245,9 +214,6 @@ public class DefaultJumpAbility : IJumpAbility
 
     public void UpdateGroundCheck(PlayerController controller)
     {
-        if (_jumpCooldownTimer > 0f)
-            _jumpCooldownTimer -= Time.fixedDeltaTime;
-
         if (_data != null && _data.useFloatingController)
         {
             UpdateFloatGroundCheck(controller);
@@ -297,11 +263,11 @@ public class DefaultJumpAbility : IJumpAbility
         // 계단 하강 스냅 — 직전에 접지였고 점프가 아닌데 한 단 아래에 지면이 있으면,
         // 낙하로 처리하지 않고 그 지면까지 따라 내려간다.
         float rest = GetRestProbeDistance(controller);
-        _stepDownActive = !rawGrounded && wasGrounded && !_isJumping && probeHit &&
+        _stepDownActive = !rawGrounded && wasGrounded && probeHit &&
                           _groundHitDistance <= rest + MaxStepDownHeight;
 
         if (rawGrounded) _coyoteUntil = Time.time + GroundCoyoteTime;
-        _isGrounded = rawGrounded || _stepDownActive || (!_isJumping && Time.time < _coyoteUntil);
+        _isGrounded = rawGrounded || _stepDownActive || Time.time < _coyoteUntil;
 
         Debug.DrawRay(rayOrigin, Vector3.down * rayLength, _isGrounded ? Color.green : Color.red);
 
@@ -423,17 +389,6 @@ public class DefaultJumpAbility : IJumpAbility
             gravity *= _data.fallMultiplier;
         }
 
-        // 공중 공격 체공
-        bool isAirAttacking = controller.AirAttackUsed
-                           && controller.Combo != null
-                           && controller.Combo.IsAttacking;
-        if (isAirAttacking)
-        {
-            gravity *= AirAttackGravityScale;
-            if (rb.linearVelocity.y < AirAttackMaxFallSpeed)
-                rb.linearVelocity = new Vector3(rb.linearVelocity.x, AirAttackMaxFallSpeed, rb.linearVelocity.z);
-        }
-
         rb.AddForce(Vector3.up * gravity, ForceMode.Acceleration);
     }
 
@@ -442,10 +397,7 @@ public class DefaultJumpAbility : IJumpAbility
     //============================================================
     private void OnLanded(PlayerController controller)
     {
-        _isJumping = false;
         _landingLockTimer = LandingLockDuration;
-        _jumpCooldownTimer = JumpCooldownAfterLanding;
-        controller.AirAttackUsed = false;
 
         var rb = controller.Rigid;
         if (rb != null)
@@ -530,8 +482,7 @@ public class DefaultJumpAbility : IJumpAbility
         if (nearGround) _snapDownGraceUntil = Time.time + SnapDownGrace;
         bool recentlyGrounded = wasGrounded || Time.time < _snapDownGraceUntil;
         bool snapDown   = recentlyGrounded && _floatHasGround && _floatHitDist <= ride + stepDown;
-        // 점프 상승 중(_jumpSuppressSpring)엔 접지 아님(공중/중력).
-        _isGrounded = (nearGround || snapDown) && !_jumpSuppressSpring;
+        _isGrounded = nearGround || snapDown;
 
         if (_isGrounded && !wasGrounded) OnLanded(controller);
         if (!_isGrounded && wasGrounded)
@@ -546,10 +497,6 @@ public class DefaultJumpAbility : IJumpAbility
     {
         var rb = controller.Rigid;
         if (rb == null) return;
-
-        // 점프 상승이 끝나면(하강 전환) 스프링 재개 허용.
-        if (_jumpSuppressSpring && rb.linearVelocity.y <= 0f)
-            _jumpSuppressSpring = false;
 
         // 계단 하강 — 스프링에 맡기면 못 따라간다.
         //
@@ -616,16 +563,6 @@ public class DefaultJumpAbility : IJumpAbility
         // 호버 밖(점프/낙하) → 일반 중력(기존 로직과 동일).
         float gravity = _data.gravity;
         if (rb.linearVelocity.y < 0f) gravity *= _data.fallMultiplier;
-
-        bool isAirAttacking = controller.AirAttackUsed
-                           && controller.Combo != null
-                           && controller.Combo.IsAttacking;
-        if (isAirAttacking)
-        {
-            gravity *= AirAttackGravityScale;
-            if (rb.linearVelocity.y < AirAttackMaxFallSpeed)
-                rb.linearVelocity = new Vector3(rb.linearVelocity.x, AirAttackMaxFallSpeed, rb.linearVelocity.z);
-        }
         rb.AddForce(Vector3.up * gravity, ForceMode.Acceleration);
     }
 }

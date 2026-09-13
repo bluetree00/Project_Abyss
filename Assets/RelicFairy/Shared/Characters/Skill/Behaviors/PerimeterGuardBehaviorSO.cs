@@ -84,7 +84,6 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
             _castIndex++;
 
             ctx.Controller.InputBuffer.TryConsume(Game.Inputs.Command.Light);
-            ctx.Controller.InputBuffer.TryConsume(Game.Inputs.Command.Heavy);
         }
 
         public void OnUpdate(SkillExecutionContext ctx)

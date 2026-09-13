@@ -58,9 +58,6 @@ public class ActAttackState : ILayerState<ActState>
     private const float LungeCastHeight   = 0.5f;   // 캐스트 원점 높이 오프셋(가슴 높이)
     private static readonly RaycastHit[] _lungeCastBuf = new RaycastHit[16];
 
-    private static readonly int AirLightAttackValueHash =
-        Animator.StringToHash("AirLightAttackValue");
-
     // ── 초기화 ───────────────────────────────────────────────────────────────
     public void Init(PlayerController controller, ILayerStateChanger<ActState> stateChanger)
     {
@@ -69,28 +66,10 @@ public class ActAttackState : ILayerState<ActState>
     }
 
     // ── Enter ────────────────────────────────────────────────────────────────
+    // [공중 공격 폐기] 이 상태는 ActAttackReadyState를 통해서만 진입하고, 그쪽이 공중 진입을
+    // 막으므로 Enter 시점은 항상 지상이다. 낙하공격 위임·체공·공중 콤보 수 분기는 전부 제거됐다.
     public void Enter()
     {
-        // 공중 콤보 스텝이 낙하 공격으로 지정된 경우 ActPlungeState로 위임
-        if (!_controller.IsGrounded())
-        {
-            int  plungeStep    = _controller.Combo.CurrentComboStep;
-            var  plungeAction  = _controller.CurrentAttackTypeForEffect;
-            var  plungeMapping = TryGetClipMapping(plungeStep, plungeAction, isAir: true);
-            if (plungeMapping != null && plungeMapping.isPlunge)
-            {
-                _controller.CurrentAttackTypeForEffect = WeaponActionType.AirPlunge;
-                _controller.PendingPlunge = new PlayerController.PlungeInfo
-                {
-                    fallClipName = plungeMapping.baseClipName,
-                    fallSpeed    = plungeMapping.plungeFallSpeed,
-                    descendAt    = plungeMapping.plungeDescendAt
-                };
-                _stateChanger.Change(ActState.Plunge);
-                return;
-            }
-        }
-
         _execution = new AbilityExecution();
         _controller.ActiveExecution = _execution;
         // 회전은 PlayCurrentComboAnimation 에서 ClipMapping 의 AimAssist 옵션과 함께 일괄 처리한다.
@@ -109,22 +88,8 @@ public class ActAttackState : ILayerState<ActState>
             _controller.SetMoveScale(0f);
         }
 
-        var  action = _controller.CurrentAttackTypeForEffect;
-        var  wd     = _controller.WeaponManager?.CurrentWeaponData;
-        bool isAir  = !_controller.IsGrounded();
-        _maxCombo = wd != null
-            ? (isAir ? Mathf.Max(1, wd.airEndCount) : Mathf.Max(1, wd.groundEndCount))
-            : 1;
-
-        // 공중 공격 진입 시 체공 + 사용 플래그
-        if (isAir)
-        {
-            // 활: 화살 발사 시점에만 체공 (WeaponEffectHandler에서 처리)
-            bool isBow = wd != null && (wd.weaponType == WeaponType.Bow || wd.weaponType == WeaponType.Crossbow);
-            if (!isBow)
-                _controller.StartAirHover();
-            _controller.AirAttackUsed = true;
-        }
+        var wd = _controller.WeaponManager?.CurrentWeaponData;
+        _maxCombo = wd != null ? Mathf.Max(1, wd.groundEndCount) : 1;
 
         _waitingForComboInput = false;
         _stateElapsed = 0f;
@@ -459,7 +424,6 @@ public class ActAttackState : ILayerState<ActState>
     private void OnAttackEnd()
     {
         _controller.Combo.IncrementStep();
-        bool isAir = !_controller.IsGrounded();
 
         if (_controller.Combo.CurrentComboStep >= _maxCombo)
         {
@@ -467,33 +431,12 @@ public class ActAttackState : ILayerState<ActState>
             _controller.Combo.ResetStep();
             _controller.Combo.CloseWindow();
             _controller.NotifyComboFinished(finalStep);
-            // 콤보 마지막 타 — 회수를 재생한다(공중은 Exit 에서 JumpBlend 로 복귀하므로 제외).
-            if (!isAir && TryEnterRecovery()) return;
+            // 콤보 마지막 타 — 회수를 재생한다(TryEnterRecovery가 공중이면 스스로 거른다).
+            if (TryEnterRecovery()) return;
             _stateChanger.Change(ActState.None);
             return;
         }
 
-        // 공중: 콤보 대기 없이 입력이 있으면 즉시 다음 타, 없으면 종료
-        if (isAir)
-        {
-            if (_controller.Combo.NextComboQueued)
-            {
-                _controller.Combo.SetNextComboQueued(false);
-                var wd2 = _controller.WeaponManager?.CurrentWeaponData;
-                bool isBow2 = wd2 != null && (wd2.weaponType == WeaponType.Bow || wd2.weaponType == WeaponType.Crossbow);
-                if (!isBow2)
-                    _controller.StartAirHover();
-                PlayCurrentComboAnimation();
-            }
-            else
-            {
-                _controller.Combo.ResetStep();
-                _stateChanger.Change(ActState.None);
-            }
-            return;
-        }
-
-        // 지상: 기존 콤보 로직
         if (_controller.Combo.NextComboQueued)
         {
             _controller.Combo.SetNextComboQueued(false);
@@ -563,26 +506,13 @@ public class ActAttackState : ILayerState<ActState>
     {
         if (_controller == null || _controller.Anim == null) return;
 
-        int  step   = _controller.Combo.CurrentComboStep;
-        var  action = _controller.CurrentAttackTypeForEffect;
-        bool isAir  = !_controller.IsGrounded();
+        int step   = _controller.Combo.CurrentComboStep;
+        var action = _controller.CurrentAttackTypeForEffect;
 
-        // 이 단계의 mapping 확보 (회전/이동/MoveScale 결정)
-        _currentMapping = TryGetClipMapping(step, action, isAir);
-
-        // 공중 콤보 스텝이 낙하 공격으로 지정된 경우 → 낙하공격 위임(콤보 진행 중 전환. Enter()의 라우팅과 동일).
-        if (isAir && _currentMapping != null && _currentMapping.isPlunge)
-        {
-            _controller.CurrentAttackTypeForEffect = WeaponActionType.AirPlunge;
-            _controller.PendingPlunge = new PlayerController.PlungeInfo
-            {
-                fallClipName = _currentMapping.baseClipName,
-                fallSpeed    = _currentMapping.plungeFallSpeed,
-                descendAt    = _currentMapping.plungeDescendAt
-            };
-            _stateChanger.Change(ActState.Plunge);
-            return;
-        }
+        // 이 단계의 mapping 확보 (회전/이동/MoveScale 결정).
+        // [공중 공격 폐기] 지상 클립만 조회한다 — 콤보 도중 턱에서 떨어져 잠깐 공중이 되어도
+        // 진행 중인 공격은 지상 공격이므로 클립 그룹을 바꾸면 안 된다.
+        _currentMapping = TryGetClipMapping(step, action);
 
         // 목표 회전 계산 — 적용은 RotateTowards 로 매 프레임 (외부 회전 영향에도 자연 수렴)
         // 동시에 에임어시스트가 고른 적을 받아 런지 거리의 신뢰 소스로 사용(좁은 SphereCast 수직/각도 빗나감 보완).
@@ -644,39 +574,30 @@ public class ActAttackState : ILayerState<ActState>
         if (_currentMapping != null)
             _controller.SetMoveScale(_currentMapping.moveInputScale);
 
-        string mappedBaseName    = TryGetMappedBaseClipName(step, action, isAir);
+        string mappedBaseName    = TryGetMappedBaseClipName(step, action);
         string fallbackStateName = $"{action}Attack_{(step + 1):00}";
         string stateToPlay       = !string.IsNullOrEmpty(mappedBaseName)
                                    ? mappedBaseName
                                    : fallbackStateName;
-
-        // Debug.Log($"[ActAttackState] Play: step={step}, action={action}, isAir={isAir}, mapped={mappedBaseName ?? "null"}, fallback={fallbackStateName}, final={stateToPlay}");
 
         Animator anim       = _controller.Anim;
         int      layerIndex = 0;
         int      stateHash  = Animator.StringToHash(stateToPlay);
         int      playedHash = 0;
 
-        if (!isAir)
+        if (anim.HasState(layerIndex, stateHash))
         {
-            if (anim.HasState(layerIndex, stateHash))
+            anim.CrossFadeInFixedTime(stateHash, 0.06f);
+            playedHash = stateHash;
+        }
+        else if (stateToPlay != fallbackStateName)
+        {
+            int fbHash = Animator.StringToHash(fallbackStateName);
+            if (anim.HasState(layerIndex, fbHash))
             {
-                anim.CrossFadeInFixedTime(stateHash, 0.06f);
-                playedHash = stateHash;
-            }
-            else if (stateToPlay != fallbackStateName)
-            {
-                int fbHash = Animator.StringToHash(fallbackStateName);
-                if (anim.HasState(layerIndex, fbHash))
-                {
-                    anim.CrossFadeInFixedTime(fbHash, 0.06f);
-                    playedHash = fbHash;
-                    Debug.Log($"[ActAttackState] Fallback to ground state: {fallbackStateName}");
-                }
-                else
-                {
-                    Debug.LogWarning($"[ActAttackState] State not found: {stateToPlay}");
-                }
+                anim.CrossFadeInFixedTime(fbHash, 0.06f);
+                playedHash = fbHash;
+                Debug.Log($"[ActAttackState] Fallback to ground state: {fallbackStateName}");
             }
             else
             {
@@ -685,25 +606,7 @@ public class ActAttackState : ILayerState<ActState>
         }
         else
         {
-            if (anim.HasState(layerIndex, stateHash))
-            {
-                anim.CrossFadeInFixedTime(stateHash, 0.06f);
-                playedHash = stateHash;
-            }
-            else
-            {
-                int fbHash = Animator.StringToHash(fallbackStateName);
-                if (anim.HasState(layerIndex, fbHash))
-                {
-                    anim.CrossFadeInFixedTime(fbHash, 0.06f);
-                    playedHash = fbHash;
-                    Debug.Log($"[ActAttackState] Air state not found ({stateToPlay}), fallback: {fallbackStateName}");
-                }
-                else
-                {
-                    Debug.LogWarning($"[ActAttackState] Air state not found: {stateToPlay}, fallback: {fallbackStateName}");
-                }
-            }
+            Debug.LogWarning($"[ActAttackState] State not found: {stateToPlay}");
         }
 
         // 폴링 상태 초기화 및 타이밍 로드
@@ -713,7 +616,7 @@ public class ActAttackState : ILayerState<ActState>
         _attackEndFired    = false;
         _stateElapsed      = 0f;
 
-        var mapping = TryGetClipMapping(step, action, isAir);
+        var mapping = TryGetClipMapping(step, action);
         var animSet = _controller.WeaponManager?.CurrentWeaponData?.animationSet
                       as WeaponAnimationSetSO;
         (_comboOpen, _comboClose, _attackEnd) = ResolveTiming(mapping, animSet);
@@ -775,20 +678,22 @@ public class ActAttackState : ILayerState<ActState>
     }
 
     // ── ClipMapping 조회 유틸 ────────────────────────────────────────────────
+    // [공중 공격 폐기] 공중 그룹(WeaponAnimGroup.Air) 조회 경로는 제거됐다.
+    // enum 값 자체는 무기 SO 에셋에 직렬화돼 있어 남겨둔다.
     private WeaponAnimationSetSO.ClipMapping TryGetClipMapping(
-        int comboStep, WeaponActionType action, bool isAir)
+        int comboStep, WeaponActionType action)
     {
         var wd      = _controller.WeaponManager?.CurrentWeaponData;
         var animSet = wd?.animationSet as WeaponAnimationSetSO;
         if (animSet == null) return null;
 
-        WeaponAnimGroup group = isAir ? WeaponAnimGroup.Air : WeaponAnimGroup.Ground;
-        return animSet.GetMappings(group, action).FirstOrDefault(m => m.comboIndex == comboStep);
+        return animSet.GetMappings(WeaponAnimGroup.Ground, action)
+                      .FirstOrDefault(m => m.comboIndex == comboStep);
     }
 
-    private string TryGetMappedBaseClipName(int comboStep, WeaponActionType action, bool isAir)
+    private string TryGetMappedBaseClipName(int comboStep, WeaponActionType action)
     {
-        var mapping = TryGetClipMapping(comboStep, action, isAir);
+        var mapping = TryGetClipMapping(comboStep, action);
         return (mapping != null && !string.IsNullOrEmpty(mapping.baseClipName))
             ? mapping.baseClipName
             : null;

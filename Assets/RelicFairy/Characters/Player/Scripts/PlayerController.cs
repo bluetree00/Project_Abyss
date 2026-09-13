@@ -43,9 +43,6 @@ public class PlayerController : CharacterBase
 
     public WeaponActionType CurrentAttackTypeForEffect { get; set; }
 
-    /// <summary>강공 차지 완료도(0~1). ActAttackChargeState가 발동 시점에 기록, WeaponEffectHandler가 원형 AoE 반경 스케일에 사용.</summary>
-    public float HeavyChargeLevel01 { get; set; }
-
     // PendingAttack 초기화
     public void ClearPendingAttack()
     {
@@ -1125,10 +1122,9 @@ public class PlayerController : CharacterBase
     }
 
     //============================================================
-    // Runtime Flags (점프 모듈에서 관리하는 상태를 위임)
+    // Runtime Flags (접지 모듈에서 관리하는 상태를 위임)
     //============================================================
     public bool IsGrounded() => JumpAbility?.IsGrounded ?? true;
-    public bool IsJumping => JumpAbility?.IsJumping ?? false;
 
     /// <summary>
     /// 공격/스킬 등 Act 상태가 캐릭터 facing(회전)을 소유 중인지 여부.
@@ -1405,8 +1401,20 @@ public class PlayerController : CharacterBase
             float remaining = Mathf.Abs(Mathf.DeltaAngle(cur, _slewTargetYaw));
             float ease = Mathf.Max(FacingSlewEaseFloor, Mathf.SmoothStep(0f, 1f, remaining / FacingSlewEaseOutAngle));
             float next = Mathf.MoveTowardsAngle(cur, _slewTargetYaw, _slewDegPerSec * ease * Time.fixedDeltaTime);
-            Rigid.MoveRotation(Quaternion.Euler(0f, next, 0f));
+            // 슬루 결과를 _targetFacing에 계속 반영해 둔다 — 슬루가 끝나 아래 유지 분기로 넘어갈 때
+            // 이어받을 값이 최신이어야 마지막 각도에서 그대로 멈춘다(옛 목표로 튀지 않음).
+            _targetFacing = Quaternion.Euler(0f, next, 0f);
+            Rigid.MoveRotation(_targetFacing);
+            return;
         }
+
+        // 유휴 — 마지막으로 명령한 facing을 매 물리 스텝 다시 확정한다.
+        //
+        // Y축 회전은 제약이 풀려 있다(m_Constraints=80은 X/Z만 freeze). 그래서 오브젝트에 몸이 닿으면
+        // 접촉 토크로 몸이 돌아가는데, FreezeRotation()은 물리 스텝 <b>전에</b> 각속도만 0으로 만들 뿐이라
+        // 스텝 중에 이미 생긴 회전은 되돌리지 못한다. 예전엔 이 분기가 없어(아무것도 쓰지 않고 빠져나감)
+        // 그 회전이 그대로 누적돼, 벽에 몸을 비비면 캐릭터가 조금씩 틀어졌다.
+        Rigid.MoveRotation(_targetFacing);
     }
 
     private void OnDisable()
@@ -1734,7 +1742,6 @@ public class PlayerController : CharacterBase
         inputActions.Player.RSkill.performed += _ => InputBuffer.Push(Command.RSkill);
 
         // [점프 폐기] 자유 점프 제거 — 스페이스 입력을 점프에 연결하지 않는다. 공중 상태(낙하·넉백)는 유지.
-        // ProcessJump/JumpAbility.Jump는 이 구독이 유일한 진입점이라 도달 불가(사장) 상태가 된다.
         inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(0);
         inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(1);
         inputActions.Player.PuzzleToggle.performed += _ => TogglePuzzleGrid();
@@ -1789,12 +1796,9 @@ public class PlayerController : CharacterBase
         actSM.Register(ActState.None,        new ActNoneState());
         actSM.Register(ActState.AttackReady, new ActAttackReadyState());
         actSM.Register(ActState.Attack,      new ActAttackState());
-        actSM.Register(ActState.Charge,      new ActAttackChargeState());
-        actSM.Register(ActState.HeavyAttack, new ActHeavyAttackState());
         actSM.Register(ActState.QSkill,      new ActSkillState(SkillType.Q, WeaponActionType.QSkill));
         actSM.Register(ActState.ESkill,      new ActSkillState(SkillType.E, WeaponActionType.ESkill));
         actSM.Register(ActState.RSkill,      new ActSkillState(SkillType.R, WeaponActionType.RSkill));
-        actSM.Register(ActState.Plunge,      new ActPlungeState());
         actSM.Register(ActState.Pickup,      new ActPickupState());
 
         locoSM.Change(IsGrounded() ? LocoState.Idle : LocoState.Air);
@@ -1836,11 +1840,7 @@ public class PlayerController : CharacterBase
 
         // 스킬 중에는 공격 관련 입력 소비하고 무시
         if (isInSkill)
-        {
             InputBuffer.TryConsume(Game.Inputs.Command.Light);
-            InputBuffer.TryConsume(Game.Inputs.Command.Heavy);
-            InputBuffer.TryConsume(Game.Inputs.Command.Charge);
-        }
 
         if (InputBuffer.TryConsume(Game.Inputs.Command.Dodge))
         {
@@ -1863,18 +1863,8 @@ public class PlayerController : CharacterBase
 
         if (isInAct) return;
 
-        // [강공격 봉인] 장비 강공격을 전부 걷어내는 중이라 <b>액션 진입 자체를</b> 막는다.
-        // 애니 매핑만 지우면 액션은 살아 있어 컨트롤러 기본 클립(다른 무기 모션)이 튀어나온다.
-        //
-        // 차지는 버리고, Heavy는 <b>약공격으로 대체</b>한다 — 그냥 버리면 활을 만충까지 당겼다
-        // 놓았을 때 한 발도 안 나간다(BowAttackPolicy.OnCanceled가 만충 시 Heavy를 밀어 넣는다).
-        // 봉인을 풀 때는 이 두 줄만 지우면 원래 경로로 돌아온다.
-        if (InputBuffer.TryConsume(Game.Inputs.Command.Charge)) return;
-        if (InputBuffer.TryConsume(Game.Inputs.Command.Heavy))
-        {
-            if (CanAttack()) { SetPendingAttack(Game.Inputs.Command.Light); actSM.Change(ActState.AttackReady); }
-            return;
-        }
+        // [강공격 봉인] 강공격/차지 커맨드는 생산자(무기 입력 정책)에서 제거됐다 —
+        // 여기서 걸러낼 것도 남아 있지 않으므로 약공격 한 갈래만 남는다.
         if (InputBuffer.TryConsume(Game.Inputs.Command.Light))
         {
             if (CanAttack()) { SetPendingAttack(Game.Inputs.Command.Light); actSM.Change(ActState.AttackReady); }
@@ -1925,8 +1915,6 @@ public class PlayerController : CharacterBase
     protected virtual bool IsInAttackOrSkillState() =>
         actSM.CurrentId == ActState.Attack      ||
         actSM.CurrentId == ActState.AttackReady ||
-        actSM.CurrentId == ActState.Charge      ||
-        actSM.CurrentId == ActState.HeavyAttack ||
         actSM.CurrentId == ActState.QSkill      ||
         actSM.CurrentId == ActState.ESkill      ||
         actSM.CurrentId == ActState.RSkill;
@@ -2006,24 +1994,11 @@ public class PlayerController : CharacterBase
             return;
         }
 
+        // [강공격 봉인] 차지 임계값(holdThreshold)·단계 수(chargeStages)를 넘기던 인자는 사라졌다.
+        // 두 정책은 현재 "누르고 떼면 약공격 1회"로 동일하게 동작한다 — 무기별 입력 차이가
+        // 다시 생기면 이 switch가 그대로 분기점이 된다.
         switch (wd.weaponType)
         {
-            case WeaponType.Katana:
-                _attackPolicy = new SwordAttackPolicy(
-                    enterThreshold: 0.4f,
-                    fullThreshold: wd.holdThreshold,
-                    maxChargeStage: wd.chargeStages
-                );
-                break;
-
-            case WeaponType.Greatsword:
-                _attackPolicy = new SwordAttackPolicy(
-                    enterThreshold: 0.5f,
-                    fullThreshold: wd.holdThreshold,
-                    maxChargeStage: wd.chargeStages
-                );
-                break;
-
             case WeaponType.Bow:
             case WeaponType.Crossbow:
                 _attackPolicy = new BowAttackPolicy();
@@ -2041,37 +2016,6 @@ public class PlayerController : CharacterBase
             new PassiveContext { comboStep = stepIndex });
     }
     public void OnAnimationEventTag(string tag) { /* 구현 */ }
-
-    //============================================================
-    // Jump (모듈에 위임)
-    //============================================================
-
-    /// <summary>공중 공격 1사이클 사용 여부. 착지 시 리셋.</summary>
-    public bool AirAttackUsed { get; set; } = false;
-
-    public void ProcessJump()
-    {
-        if (IsFrozen) return;
-        if (!IsGrounded()) return;
-
-        JumpAbility?.Jump(this);
-
-        // Jump가 쿨다운에 의해 무시됐으면 애니메이션도 스킵
-        if (!IsJumping) return;
-
-        // 즉시 점프 애니메이션 시작 (AirState 전이를 기다리지 않음)
-        Anim.SetFloat("JumpValue", 0f);
-        Anim.CrossFadeInFixedTime("JumpBlend", 0.08f);
-    }
-
-    /// <summary>공중 공격 진입 시 호출 — 낙하 속도를 즉시 멈추고 체공 시작</summary>
-    public void StartAirHover()
-    {
-        if (Rigid != null && !IsGrounded())
-        {
-            Rigid.linearVelocity = new Vector3(Rigid.linearVelocity.x, 0f, Rigid.linearVelocity.z);
-        }
-    }
 
     //============================================================
     // Inventory / Weapon / Camera
@@ -2103,19 +2047,6 @@ public class PlayerController : CharacterBase
         Rigid.linearVelocity = new Vector3(0f, Rigid.linearVelocity.y, 0f);
     }
 
-    /// <summary>낙하 공격 상태인지 여부 (LocoAirState 착지 처리 분기용)</summary>
-    public bool IsPlunging => actSM?.CurrentId == ActState.Plunge;
-
-    /// <summary>강공격 실행 중 여부 — SwordPolicy.OnCanceled에서 릴리즈 중복 처리 억제에 사용</summary>
-    public bool IsInHeavyAttackState => actSM?.CurrentId == ActState.HeavyAttack;
-
-    /// <summary>차지 불가 상태: 공격 중·공중·회피 중. SwordAttackPolicy 타이머 리셋 조건에 사용</summary>
-    public bool IsChargeBlocked =>
-        Combo.IsAttacking ||
-        !IsGrounded() ||
-        locoSM?.CurrentId == LocoState.Dodge ||
-        IsLaunched;
-
     /// <summary>피격 넉백으로 날아가는 중(착지 회복 포함) — 이 동안 모든 조작 불가.</summary>
     public bool IsLaunched => locoSM?.CurrentId == LocoState.Launched;
 
@@ -2135,15 +2066,6 @@ public class PlayerController : CharacterBase
         PendingPickupSource = source;
         actSM.Change(ActState.Pickup);
     }
-
-    /// <summary>낙하 공격 진입 시 전달할 데이터 (공격 상태 → ActPlungeState)</summary>
-    public struct PlungeInfo
-    {
-        public string fallClipName;
-        public float  fallSpeed;
-        public float  descendAt;   // 하강 시작 normalizedTime (0 = 즉시)
-    }
-    public PlungeInfo PendingPlunge { get; set; }
 
     /// <summary>
     /// actSM이 None이 아니면 강제로 None으로 전환 (착지·회피 캔슬 시 사용)
@@ -2356,13 +2278,12 @@ public class PlayerController : CharacterBase
 
     /// <summary>
     /// AE_AttackEnd 애니메이션 이벤트 수신 — 스킬 상태 종료 전용.
-    /// ActState.Attack 및 ActState.HeavyAttack은 각 상태가 자체 처리하므로 스킵한다.
+    /// ActState.Attack은 상태가 자체 처리하므로 스킵한다.
     /// </summary>
     private void Safe_OnAttackAnimationEnd()
     {
-        // Attack / HeavyAttack은 각 State가 자체적으로 종료를 처리한다
-        if (actSM.CurrentId == ActState.Attack ||
-            actSM.CurrentId == ActState.HeavyAttack)
+        // Attack은 State가 자체적으로 종료를 처리한다
+        if (actSM.CurrentId == ActState.Attack)
             return;
 
         Combo.SetAttacking(false);

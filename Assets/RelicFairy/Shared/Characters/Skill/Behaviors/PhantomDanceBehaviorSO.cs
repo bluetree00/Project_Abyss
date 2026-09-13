@@ -90,8 +90,6 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
 
             // 스킬 진입 시 잔여 공격 입력 제거
             ctx.Controller.InputBuffer.TryConsume(Game.Inputs.Command.Light);
-            ctx.Controller.InputBuffer.TryConsume(Game.Inputs.Command.Heavy);
-            ctx.Controller.InputBuffer.TryConsume(Game.Inputs.Command.Charge);
         }
 
         public void OnUpdate(SkillExecutionContext ctx)

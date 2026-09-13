@@ -238,9 +238,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_BindingMode: 4
   m_FollowOffset: {x: 0, y: 5, z: -2}
-  m_XDamping: 0
-  m_YDamping: 0
-  m_ZDamping: 0
+  m_XDamping: 0.12
+  m_YDamping: 0.12
+  m_ZDamping: 0.12
   m_AngularDampingMode: 0
   m_PitchDamping: 0
   m_YawDamping: 0
@@ -365,9 +365,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_BindingMode: 4
   m_FollowOffset: {x: 0, y: 5, z: -2}
-  m_XDamping: 0
-  m_YDamping: 0
-  m_ZDamping: 0
+  m_XDamping: 0.12
+  m_YDamping: 0.12
+  m_ZDamping: 0.12
   m_AngularDampingMode: 0
   m_PitchDamping: 0
   m_YawDamping: 0
@@ -642,9 +642,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_BindingMode: 4
   m_FollowOffset: {x: 0, y: 5, z: -2}
-  m_XDamping: 0
-  m_YDamping: 0
-  m_ZDamping: 0
+  m_XDamping: 0.12
+  m_YDamping: 0.12
+  m_ZDamping: 0.12
   m_AngularDampingMode: 0
   m_PitchDamping: 0
   m_YawDamping: 0
@@ -1038,7 +1038,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: b910ecc1c1bbcbd4c8299187517c2489, type: 2}
   - {fileID: 11400000, guid: 7909de08ad09e004a944a43f51512e65, type: 2}
   - {fileID: 11400000, guid: 4b4f07306239f16488bca7a61cb44a78, type: 2}
-  covenantDataTable: {fileID: 0}
   essenceTracker: {fileID: 0}
 --- !u!1 &7934002030709558994
 GameObject:
@@ -1346,6 +1345,7 @@ MonoBehaviour:
   startRoomTourHeight: 6
   startRoomTourArc: 90
   startRoomPlayerBlendDuration: 1.2
+  startRoomHandoffTimeout: 8
   startRoomTourFrameDuration: 0.5
   startRoomTourFrameAspect: 2.39
   startRoomTourDimAlpha: 0.2

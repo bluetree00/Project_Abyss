@@ -14,6 +14,7 @@ public class LichSkeletonMonster : MonsterBase
     public const string PrefabAddress = "LichSkeleton/LichSkeleton";
     private const int   MaxConcurrent = 8;     // 동시 생존 상한 — 초과 시 가장 오래된 비봉인 해골 정리
     private const float Lifetime      = 25f;   // 개체 수명(초). 봉인 해골은 면제.
+    private const float FallCullDepth = 12f;   // 스폰 높이보다 이만큼 아래로 떨어지면 정리 (지형 붕괴 대비)
 
     // ── MonsterBase 추상 멤버 ─────────────────────────────
     protected override string ConfigAddress   => "LichSkeleton/LichSkeletonConfig";
@@ -38,6 +39,8 @@ public class LichSkeletonMonster : MonsterBase
 
     private float _spawnTime;
     private bool  _lifetimeExpired;
+    private float _spawnY;
+    private bool  _fellOut;
 
     // ── 수명주기 ──────────────────────────────────────────
 
@@ -46,6 +49,9 @@ public class LichSkeletonMonster : MonsterBase
         base.OnEnable();
         _spawnTime       = Time.time;
         _lifetimeExpired = false;
+        // 풀러가 SetActive 전에 위치를 확정하므로 여기서 스폰 높이를 캡처해도 안전하다.
+        _spawnY          = transform.position.y;
+        _fellOut         = false;
         Live.Add(this);
         EnforceCap();
     }
@@ -61,6 +67,15 @@ public class LichSkeletonMonster : MonsterBase
         base.Update();
         if (_lifetimeExpired) return;
         if (_runtime != null && _runtime.IsDead) return;
+
+        // 구멍으로 떨어진 개체 정리 — SkeletonDirectChaseState의 직선 이동은 사라진 바닥 위를 그대로 지난다.
+        if (!_fellOut && transform.position.y < _spawnY - FallCullDepth)
+        {
+            _fellOut = true;
+            HandleFellOutOfArena();
+            return;
+        }
+
         if (Lifetime > 0f && Time.time - _spawnTime >= Lifetime)
         {
             _lifetimeExpired = true;
@@ -102,6 +117,27 @@ public class LichSkeletonMonster : MonsterBase
             if (HiddenObjectNames.Contains(t.name))
                 t.gameObject.SetActive(false);
         }
+    }
+
+    // ── 내부 메서드 ────────────────────────────────────────
+
+    /// <summary>
+    /// 아레나 밖(구멍)으로 떨어진 해골 처리.
+    ///
+    /// 봉인 해골을 그냥 풀에 반납하면 MonsterBase.OnDied가 발행되지 않아
+    /// SealBreaker의 남은 봉인 수가 줄지 않는다. sealActiveTime 기본값이 0(제한 없음)이라
+    /// 리치가 영구 무적으로 남는다 — 수명 면제와 같은 이유다. 정상 사망 경로를 태워 봉인을 해제한다.
+    /// </summary>
+    private void HandleFellOutOfArena()
+    {
+        if (TryGetComponent<SealSkeletonMarker>(out _))
+        {
+            // TakeDamage → OnFatalDamage → DieState → RaiseDied → SealSkeletonMarker가 봉인 해제
+            TakeDamage(999999f, null);
+            return;
+        }
+
+        Cull(this);
     }
 
     // ── 정적 관리 ──────────────────────────────────────────

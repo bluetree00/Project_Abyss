@@ -16,6 +16,17 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerController))]
 public class FallRecoveryController : MonoBehaviour
 {
+    // ── 상수 ───────────────────────────────────────────────
+    /// <summary>안전 지점의 바닥이 사라졌을 때 바깥으로 넓혀가며 대체 바닥을 찾는 링 반경(m).</summary>
+    private static readonly float[] SearchRadii = { 2f, 4f, 7f, 11f, 16f };
+
+    /// <summary>각 링에서 검사할 8방위 (XZ 단위벡터).</summary>
+    private static readonly Vector2[] SearchDirs =
+    {
+        new( 1f,      0f     ), new( 0.707f,  0.707f), new( 0f,  1f     ), new(-0.707f,  0.707f),
+        new(-1f,      0f     ), new(-0.707f, -0.707f), new( 0f, -1f     ), new( 0.707f, -0.707f),
+    };
+
     [SerializeField, Tooltip("이 Y 이하로 떨어지면 낙사 판정. SafeFloor(=baseY-0.05) 보다 충분히 아래로.")]
     private float fallThresholdY = -5f;
 
@@ -36,6 +47,9 @@ public class FallRecoveryController : MonoBehaviour
 
     [SerializeField, Min(0f), Tooltip("낙사 복구 직후 무적 시간(초).")]
     private float invincibleSeconds = 1.0f;
+
+    [SerializeField, Min(1f), Tooltip("리스폰 전 바닥 실존 확인용 레이캐스트 시작 높이(m). 밟고 있던 지형이 사라졌는지 판정한다.")]
+    private float groundProbeHeight = 60f;
 
     private PlayerController _pc;
     private Rigidbody _rb;
@@ -95,10 +109,16 @@ public class FallRecoveryController : MonoBehaviour
             if (_pc.RuntimeStats.Hp <= 0) _pc.NotifyHpDepleted();
         }
 
-        // 리스폰 위치 — 안전 지점이 확보된 상태면 그 위에, 아니면 현재 XZ 유지한 상태에서 Y=0 복귀
-        Vector3 target = _hasSafe
-            ? _lastSafe + new Vector3(0f, respawnOffsetY, 0f)
+        // 리스폰 위치 — 안전 지점 아래에 바닥이 "지금도" 남아 있는지 확인한 뒤 결정한다.
+        Vector3 candidate = _hasSafe
+            ? _lastSafe
             : new Vector3(transform.position.x, respawnOffsetY, transform.position.z);
+
+        if (!TryResolveRespawn(candidate, out Vector3 target))
+        {
+            target = candidate + new Vector3(0f, respawnOffsetY, 0f);
+            Debug.LogWarning($"[FallRecovery] {candidate} 주변에서 바닥을 찾지 못했다 — 원래 좌표로 복구한다.", this);
+        }
 
         transform.position = target;
 
@@ -112,5 +132,53 @@ public class FallRecoveryController : MonoBehaviour
         _pc?.SetInvincible(invincibleSeconds);
 
         _recovering = false;
+    }
+
+    /// <summary>
+    /// 리스폰 좌표를 실제로 남아 있는 바닥 위로 보정한다.
+    ///
+    /// 지형이 전투 중 붕괴하는 전장(리치 보스 아레나 등)에서는 _lastSafe가 이미 사라진 타일의
+    /// 좌표일 수 있다. 그대로 리스폰하면 허공에서 다시 추락 → 또 리스폰이 반복돼
+    /// HP가 바닥날 때까지 빠져나올 수 없다. 바닥이 없으면 주변 링을 넓혀가며 대체 지점을 찾는다.
+    /// </summary>
+    private bool TryResolveRespawn(Vector3 candidate, out Vector3 result)
+    {
+        if (TryFindGroundY(candidate, out float y))
+        {
+            result = new Vector3(candidate.x, y + respawnOffsetY, candidate.z);
+            return true;
+        }
+
+        for (int r = 0; r < SearchRadii.Length; r++)
+        {
+            for (int d = 0; d < SearchDirs.Length; d++)
+            {
+                var probe = new Vector3(candidate.x + SearchDirs[d].x * SearchRadii[r],
+                                        candidate.y,
+                                        candidate.z + SearchDirs[d].y * SearchRadii[r]);
+                if (!TryFindGroundY(probe, out float py)) continue;
+
+                result = new Vector3(probe.x, py + respawnOffsetY, probe.z);
+                return true;
+            }
+        }
+
+        result = candidate;
+        return false;
+    }
+
+    /// <summary>주어진 XZ 아래로 레이를 쏴 실제 바닥이 있으면 true를 반환하고 그 높이를 넘긴다.</summary>
+    private bool TryFindGroundY(Vector3 at, out float groundY)
+    {
+        var origin = new Vector3(at.x, at.y + groundProbeHeight, at.z);
+        if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, groundProbeHeight * 2f,
+                            groundLayer, QueryTriggerInteraction.Ignore))
+        {
+            groundY = hit.point.y;
+            return true;
+        }
+
+        groundY = 0f;
+        return false;
     }
 }
