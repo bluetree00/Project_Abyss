@@ -22,9 +22,30 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: phase2entry
   breakOverride: 0.3
-  entryDuration: 2
+  targetPage: 2
+  form: 3
+  dialogueKey: Lich_Page2_Nightmare
+  speedMultiplier: 1.2
+  attackSpeedMultiplier: 1.2
+  breakDurationMin: 0.3
+  breakDurationMax: 0.8
+  entryDuration: 3
   recoveryDuration: 0.5
-  blastTiming: 0.6
+  blastTiming: 0.85
+  bindChains: 0
+  chainTiming: 0.45
+  blast: 1
   blastRadius: 10
   damageMultiplier: 0
   knockbackMultiplier: 3
+  collapseOuterRing: 1
+  crackOuterRing: 0
+  restoreFloor: 0
+  cinematic: 1
+  refillSeconds: 2.4
+  roarHoldSeconds: 1.1
+  closeUpTiming: 0.08
+  closeUpHold: 0.9
+  slowMoTiming: 0.5
+  slowMoScale: 0.5
+  slowMoSeconds: 0.6

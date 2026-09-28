@@ -22,19 +22,17 @@ public sealed class UI_EscMenu : MonoBehaviour
     private const float BtnW   = 320f, BtnH   = 66f, BtnGap = 16f;
 
     private static readonly Color Backdrop   = new(0f, 0f, 0f, 0.72f);
-    private static readonly Color PanelBg    = new(0.08f, 0.09f, 0.13f, 0.97f);
-    private static readonly Color PanelEdge  = new(0.52f, 0.72f, 0.86f, 0.85f);
-    private static readonly Color BtnBg      = new(0.16f, 0.19f, 0.27f, 1f);
-    private static readonly Color BtnQuitBg  = new(0.30f, 0.13f, 0.15f, 1f);
-    private static readonly Color LabelColor = new(0.94f, 0.96f, 1f, 1f);
-    private static readonly Color TitleColor = UIPalette.Gold;
+    // 전 화면 공통 언어(UITheme) — 인디고 글래스 판 + 금 가는 선, 주 버튼 금 · 보조 먹빛 · 종료 가라앉은 진홍(09-28 UI 톤 통일).
+    private static readonly Color LabelColor = UITheme.Ink;
+    private static readonly Color TitleColor = UITheme.Gold;
 
     // ── Private ──────────────────────────────────────────────
-    private GameObject _root;
-    private bool       _quitting;
+    private GameObject    _root;
+    private RectTransform _panel;
+    private bool          _quitting;
 
     // ── Properties ───────────────────────────────────────────
-    public bool IsOpen => _root != null && _root.activeSelf;
+    public bool IsOpen => _root != null && (_root.TryGetComponent<UIFader>(out var f) ? f.Visible : _root.activeSelf);
 
     // ── Lifecycle ────────────────────────────────────────────
     private void OnDestroy()
@@ -49,13 +47,13 @@ public sealed class UI_EscMenu : MonoBehaviour
         if (_quitting) return;
         if (_root == null) Build();
 
-        _root.SetActive(true);
+        UIFader.On(_root, _panel).Show();   // 순간 등장 → 공통 박자(09-28)
         TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
     }
 
     public void Close()
     {
-        if (_root != null) _root.SetActive(false);
+        if (_root != null) UIFader.On(_root, _panel).Hide();
         TimeScaleArbiter.Release(this);
     }
 
@@ -65,6 +63,9 @@ public sealed class UI_EscMenu : MonoBehaviour
         _root = new GameObject("EscMenuRoot", typeof(RectTransform), typeof(Canvas),
                                typeof(CanvasScaler), typeof(GraphicRaycaster));
         _root.transform.SetParent(transform, false);
+        // 루트를 화면 전체로 — 새 RectTransform 기본 100×100이라 막(Backdrop)이 패널 뒤 가운데에만 깔려
+        // 화면이 한 번도 어두워지지 않았다(09-28 UI 전수, 「팝업 루트 100×100」 함정).
+        Stretch((RectTransform)_root.transform);
 
         var canvas = _root.GetComponent<Canvas>();
         canvas.renderMode  = RenderMode.ScreenSpaceOverlay;
@@ -81,26 +82,25 @@ public sealed class UI_EscMenu : MonoBehaviour
         var dim = NewImage("Backdrop", _root.transform, Backdrop);
         Stretch(dim.rectTransform);
 
-        // 패널
-        var panel = NewImage("Panel", _root.transform, PanelBg);
+        // 패널 — 인디고 글래스 + 금 가는 선
+        var panel = NewImage("Panel", _root.transform, UITheme.Window);
         var prt = panel.rectTransform;
         prt.anchorMin = prt.anchorMax = prt.pivot = new Vector2(0.5f, 0.5f);
         prt.anchoredPosition = Vector2.zero;
         prt.sizeDelta = new Vector2(PanelW, PanelH);
-        var outline = panel.gameObject.AddComponent<Outline>();
-        outline.effectColor    = PanelEdge;
-        outline.effectDistance = new Vector2(2f, -2f);
+        UITheme.StylePanel(panel, UITheme.Window);
+        _panel = prt;
 
-        NewLabel("Title", panel.transform, "일시정지", 34f, TitleColor,
-                 new Vector2(0f, PanelH * 0.5f - 52f), new Vector2(PanelW - 40f, 48f));
+        UITheme.StyleText(NewLabel("Title", panel.transform, "일시정지", 34f, TitleColor,
+                 new Vector2(0f, PanelH * 0.5f - 52f), new Vector2(PanelW - 40f, 48f)), TitleColor);
 
         // 버튼 묶음의 시작 y. 타이틀 아래 여백과 패널 하단 여백이 17px로 같아지는 값이다.
         float top  = PanelH * 0.5f - 126f;
         float step = BtnH + BtnGap;
-        NewButton(panel.transform, "계속하기",   new Vector2(0f, top),            BtnBg,     OnResume);
-        NewButton(panel.transform, "설정",       new Vector2(0f, top - step),     BtnBg,     OnSettings);
-        NewButton(panel.transform, "로비로 가기", new Vector2(0f, top - step * 2f), BtnBg,     OnLobby);
-        NewButton(panel.transform, "게임 종료",   new Vector2(0f, top - step * 3f), BtnQuitBg, OnQuit);
+        NewButton(panel.transform, "계속하기",   new Vector2(0f, top),            UITheme.CtaTint,       OnResume);
+        NewButton(panel.transform, "설정",       new Vector2(0f, top - step),     UITheme.SecondaryTint, OnSettings);
+        NewButton(panel.transform, "로비로 가기", new Vector2(0f, top - step * 2f), UITheme.SecondaryTint, OnLobby);
+        NewButton(panel.transform, "게임 종료",   new Vector2(0f, top - step * 3f), UITheme.DangerTint,    OnQuit);
     }
 
     private static void Stretch(RectTransform rt)
@@ -143,14 +143,15 @@ public sealed class UI_EscMenu : MonoBehaviour
         return tmp;
     }
 
-    private void NewButton(Transform parent, string label, Vector2 pos, Color bg,
+    private void NewButton(Transform parent, string label, Vector2 pos, Color tint,
                            UnityEngine.Events.UnityAction onClick)
     {
-        var img = NewImage($"Btn_{label}", parent, bg);
+        var img = NewImage($"Btn_{label}", parent, tint);
         var rt  = img.rectTransform;
         rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = pos;
         rt.sizeDelta = new Vector2(BtnW, BtnH);
+        UITheme.StyleButton(img, tint);   // 전 화면 같은 베벨 버튼(크기를 잡은 뒤 — 9-slice 배율이 칸 크기를 본다)
 
         var btn = img.gameObject.AddComponent<Button>();
         btn.targetGraphic = img;
@@ -159,7 +160,7 @@ public sealed class UI_EscMenu : MonoBehaviour
         // UI_Popup을 상속하지 않아 자동 부착 경로를 못 탄다 — 팝업과 같은 손맛을 여기서 직접 건다.
         img.gameObject.AddComponent<UIButtonFeedback>();
 
-        NewLabel("Label", img.transform, label, 26f, LabelColor, Vector2.zero, new Vector2(BtnW, BtnH));
+        UITheme.StyleText(NewLabel("Label", img.transform, label, 26f, LabelColor, Vector2.zero, new Vector2(BtnW, BtnH)), LabelColor);
     }
 
     // ── Event Handlers ───────────────────────────────────────

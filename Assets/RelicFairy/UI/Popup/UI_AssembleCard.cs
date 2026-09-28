@@ -40,13 +40,17 @@ public class UI_AssembleCard : MonoBehaviour, IOwnsButtonScale, IPointerEnterHan
     private Sprite _silverFrame, _goldFrame, _rubyFrame;
 
     // 개편본 등급 테두리 — 조각 조립식(위·아래 장식바 2 + 모서리 4).
-    // 완성 목업(서약 풀샷.png)에서 카드 몸통 223×106 위에 장식바 113×31, 모서리 34×53으로
-    // 얹혀 있다. <b>고정 px로 두면 안 된다</b> — 판(Book)이 해상도에 따라 줄면 조각만 그대로
-    // 남아 카드를 통째로 덮는다(1920 기준으로도 장식바가 30% 컸다).
-    private const float GradeBarWFrac    = 0.507f;   // 113 / 223
+    // 완성 목업(서약 풀샷.png)에서 카드 <b>몸통</b> 223×106 위에 장식바 113×31, 모서리 34×53으로
+    // 얹혀 있다(바탕 아트 1:1 위에 조각 0.6배). <b>고정 px로 두면 안 된다</b> — 판(Book)이 해상도에 따라
+    // 줄면 조각만 그대로 남아 카드를 통째로 덮는다.
+    //
+    // 높이만 몸통 비율로 잡고 <b>폭은 아트 비율로</b> 따라가게 한다. 등급마다 조각 비율이 다르다
+    // (모서리 철 0.640 · 골드 0.602 · 루비 0.591) — 폭까지 비율로 고정하면 루비 모서리가 6.8% 늘어났다.
     private const float GradeBarHFrac    = 0.292f;   //  31 / 106
-    private const float GradeCornerWFrac = 0.152f;   //  34 / 223
-    private const float GradeCornerHFrac = 0.500f;   //  53 / 106
+    private const float GradeCornerHFrac = 0.500f;   //  53 / 106 — 위·아래 조각이 몸통 한가운데서 만난다
+
+    // 통화 배지와 이름이 한 줄을 나눠 쓸 때 사이 간격.
+    private const float BadgeGap = 8f;
 
     // 카드 바탕이 선택 여부로 <b>명도가 뒤집힌다</b>(밝은 양피지 ↔ 어두운 판).
     // 프리팹 authoring 색(흰 이름·옅은 보라 설명)은 어두운 구 카드 기준이라 양피지 위에서 글자가 날아간다.
@@ -57,8 +61,9 @@ public class UI_AssembleCard : MonoBehaviour, IOwnsButtonScale, IPointerEnterHan
 
     // 프리팹 리롤 버튼은 형광 보라라 양피지 카드 위에서 혼자 튄다. 청동으로 눌러 담는다.
     private static readonly Color RerollFill = new(0.36f, 0.26f, 0.13f, 0.92f);
-    private CovenantSkinSO _gradeSkin;
-    private Image[]        _gradePieces;
+    private CovenantSkinSO      _gradeSkin;
+    private Image[]             _gradePieces;
+    private AspectRatioFitter[] _gradeFitters;
 
     // 보유 서약과 통화가 물리는 카드 — 등급색과 구분되는 청록 글로우로 상시 은은하게 켠다.
     private static readonly Color SynergyGlow = new(0.35f, 0.90f, 0.80f);
@@ -124,9 +129,37 @@ public class UI_AssembleCard : MonoBehaviour, IOwnsButtonScale, IPointerEnterHan
             markRt.anchoredPosition = Vector2.zero;
         }
 
+        // 바탕을 먼저 개편본으로 바꾼다 — 몸통 여백은 바탕 스프라이트의 PPU로 환산하므로 구 아트가 꽂힌 채 재면 틀린다.
+        ApplyCardBg();
+
+        // 글로우는 카드 rect 전체(그림자 띠 포함)를 덮던 단색 판이라, 켜지면 그림자 자리까지 네모가 떠 보였다.
+        if (_glow != null) InsetToBody(_glow.rectTransform);
+
         EnsureGradePieces();
         TintRerollButton();
-        ApplyCardBg();
+    }
+
+    /// <summary>
+    /// 리롤 버튼을 카드 <b>바깥쪽 옆</b>에 붙인다(원인 열=왼쪽, 효과 열=오른쪽). 세로는 몸통 가운데.
+    ///
+    /// <para>예전엔 우측 상단에 얹혀 등급 테두리의 오른쪽 위 모서리를 통째로 가렸고,
+    /// 그 줄은 이제 통화 배지가 쓴다. 카드 옆은 인쇄 테두리까지 60px 남짓 비어 있다.</para>
+    /// </summary>
+    public void DockReroll(bool outerLeft)
+    {
+        if (_rerollButton == null) return;
+        var rt = (RectTransform)_rerollButton.transform;
+        Vector4 inset = BodyInset();
+        const float gap = 6f;
+
+        rt.anchorMin = rt.anchorMax = new Vector2(outerLeft ? 0f : 1f, 0.5f);
+        rt.pivot     = new Vector2(outerLeft ? 1f : 0f, 0.5f);
+        rt.sizeDelta = new Vector2(40f, 24f);
+        // 몸통 가운데 = rect 가운데에서 (아래 여백 − 위 여백)/2만큼 위.
+        float y = (inset.y - inset.w) * 0.5f;
+        rt.anchoredPosition = outerLeft
+            ? new Vector2(inset.x - gap, y)
+            : new Vector2(-inset.z + gap, y);
     }
 
     /// <summary>리롤 버튼을 양피지 톤에 맞춘다. 개편 스킨이 붙은 카드에서만 돈다.</summary>
@@ -143,55 +176,88 @@ public class UI_AssembleCard : MonoBehaviour, IOwnsButtonScale, IPointerEnterHan
             t.color = InkOnDark;
     }
 
-    /// <summary>조각 6개를 1회 생성한다. 카드 크기가 변해도 앵커로 따라간다.</summary>
+    /// <summary>
+    /// 조각 6개를 1회 생성한다. 조각은 카드 rect가 아니라 <b>몸통</b>(그림자 뺀 불투명 판)을 두른 틀에 붙는다 —
+    /// 카드 크기가 변해도 틀이 앵커로 따라간다.
+    /// </summary>
     private void EnsureGradePieces()
     {
         if (_gradePieces != null) return;
 
-        var root = (RectTransform)transform;
-        _gradePieces = new Image[6];
+        var frame = (RectTransform)new GameObject("GradeFrame", typeof(RectTransform)).transform;
+        frame.SetParent(transform, false);
+        InsetToBody(frame);
+        // 글로우(몸통 틴트) 바로 위, 글자 아래 — 틴트가 테두리를 덮지 않고, 테두리가 글자를 덮지 않는다.
+        bool glowIsChild = _glow != null && _glow.transform.parent == transform;
+        frame.SetSiblingIndex(glowIsChild ? _glow.transform.GetSiblingIndex() + 1 : 0);
 
-        float bw = GradeBarWFrac * 0.5f;
+        _gradePieces  = new Image[6];
+        _gradeFitters = new AspectRatioFitter[6];
+
         float bh = GradeBarHFrac * 0.5f;
-        float cw = GradeCornerWFrac;
         float ch = GradeCornerHFrac;
 
-        // 위·아래 가로 장식바 — 아트의 가로선이 세로 정중앙이라 <b>모서리 선에 걸터앉혀야</b> 한다.
+        // 위·아래 가로 장식바 — 아트의 가로선이 세로 정중앙이라 <b>몸통 모서리 선에 걸터앉혀야</b> 한다.
         // 안쪽으로 반 칸 밀어 넣으면 다이아 장식이 통째로 카드 안으로 들어와 이름 위를 덮는다.
-        _gradePieces[0] = MakePiece(root, "GradeBar_T", new Vector2(0.5f - bw, 1f - bh), new Vector2(0.5f + bw, 1f + bh), Vector2.one);
-        _gradePieces[1] = MakePiece(root, "GradeBar_B", new Vector2(0.5f - bw,     -bh), new Vector2(0.5f + bw,      bh), new Vector2(1f, -1f));
+        MakePiece(frame, 0, "GradeBar_T", new Vector2(0.5f, 1f - bh), new Vector2(0.5f, 1f + bh), new Vector2(0.5f, 0.5f), new Vector2(1f,  1f));
+        MakePiece(frame, 1, "GradeBar_B", new Vector2(0.5f,     -bh), new Vector2(0.5f,      bh), new Vector2(0.5f, 0.5f), new Vector2(1f, -1f));
 
-        // 네 귀퉁이 — 좌상단 아트 하나를 축 반전해 나머지 셋으로 쓴다.
-        // 세로로 카드 절반씩 차지해 위·아래 조각이 한가운데서 만나 테두리 한 줄이 된다(목업과 동일).
-        _gradePieces[2] = MakePiece(root, "GradeCorner_TL", new Vector2(0f,      1f - ch), new Vector2(cw, 1f), new Vector2( 1f,  1f));
-        _gradePieces[3] = MakePiece(root, "GradeCorner_TR", new Vector2(1f - cw, 1f - ch), new Vector2(1f, 1f), new Vector2(-1f,  1f));
-        _gradePieces[4] = MakePiece(root, "GradeCorner_BL", new Vector2(0f,      0f), new Vector2(cw, ch), new Vector2( 1f, -1f));
-        _gradePieces[5] = MakePiece(root, "GradeCorner_BR", new Vector2(1f - cw, 0f), new Vector2(1f, ch), new Vector2(-1f, -1f));
+        // 네 귀퉁이 — 좌상단 아트 하나를 축 반전해 나머지 셋으로 쓴다. 아트의 왼쪽 끝이 L자의 바깥선이라
+        // 피벗을 왼쪽(x=0)에 두면 반전해도 바깥선이 몸통 가장자리에 붙는다(오른쪽은 x=1에서 안쪽으로 자란다).
+        // 세로로 몸통 절반씩 차지해 위·아래 조각이 한가운데서 만나 테두리 한 줄이 된다(목업과 동일).
+        MakePiece(frame, 2, "GradeCorner_TL", new Vector2(0f, 1f - ch), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2( 1f,  1f));
+        MakePiece(frame, 3, "GradeCorner_TR", new Vector2(1f, 1f - ch), new Vector2(1f, 1f), new Vector2(0f, 0.5f), new Vector2(-1f,  1f));
+        MakePiece(frame, 4, "GradeCorner_BL", new Vector2(0f, 0f),      new Vector2(0f, ch), new Vector2(0f, 0.5f), new Vector2( 1f, -1f));
+        MakePiece(frame, 5, "GradeCorner_BR", new Vector2(1f, 0f),      new Vector2(1f, ch), new Vector2(0f, 0.5f), new Vector2(-1f, -1f));
     }
 
     /// <summary>
-    /// 조각 하나. 크기를 <b>앵커로</b> 잡아 카드가 커지든 줄든 비율이 유지된다
-    /// (sizeDelta 고정이면 판이 줄어드는 초광폭·저해상도에서 조각만 남아 카드를 덮는다).
-    /// 피벗은 한가운데 — localScale 반전이 제자리 거울상이 되어 조각이 카드 밖으로 튀지 않는다.
+    /// 조각 하나. <b>높이는 앵커</b>(몸통 비율), <b>폭은 아트 비율</b>(<see cref="AspectRatioFitter"/>)이 정한다 —
+    /// 등급마다 조각 비율이 달라 폭까지 비율로 고정하면 등급별로 늘어나는 정도가 달라진다.
+    /// localScale 반전은 피벗을 축으로 한 거울상이다.
     /// </summary>
-    private static Image MakePiece(RectTransform parent, string name, Vector2 aMin, Vector2 aMax, Vector2 flip)
+    private void MakePiece(RectTransform parent, int index, string name, Vector2 aMin, Vector2 aMax, Vector2 pivot, Vector2 flip)
     {
         var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer));
         var rt = (RectTransform)go.transform;
         rt.SetParent(parent, false);
         rt.anchorMin = aMin;
         rt.anchorMax = aMax;
-        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.pivot     = pivot;
         rt.sizeDelta = Vector2.zero;
         rt.anchoredPosition = Vector2.zero;
         rt.localScale = new Vector3(flip.x, flip.y, 1f);   // 아트 1장을 반전해 재사용
 
-        // 테두리는 장식이다 — 맨 뒤로 보내지 않으면 나중에 붙은 자식이라 이름·설명 위를 덮는다.
-        rt.SetAsFirstSibling();
-
         var img = go.AddComponent<Image>();
         img.raycastTarget = false;   // 장식이 카드 클릭을 먹으면 선택이 안 된다
-        return img;
+
+        var fit = go.AddComponent<AspectRatioFitter>();
+        fit.aspectMode = AspectRatioFitter.AspectMode.HeightControlsWidth;
+
+        _gradePieces[index]  = img;
+        _gradeFitters[index] = fit;
+    }
+
+    /// <summary>
+    /// 몸통 여백(아트 px)을 캔버스 단위로. 9-slice 가장자리는 <c>테두리 ÷ (pixelsPerUnit × 배수)</c>로 그려지므로
+    /// 가장자리 안에 든 그림자 띠도 같은 비율로 화면에 앉는다.
+    /// </summary>
+    private Vector4 BodyInset()
+    {
+        if (_gradeSkin == null || _cardBg == null) return Vector4.zero;
+        float ppu = _cardBg.pixelsPerUnit * _cardBg.pixelsPerUnitMultiplier;
+        return ppu > 0f ? _gradeSkin.CardBodyInset / ppu : _gradeSkin.CardBodyInset;
+    }
+
+    /// <summary>rect를 카드 몸통(그림자 뺀 판)에 맞춘다.</summary>
+    private void InsetToBody(RectTransform rt)
+    {
+        Vector4 inset = BodyInset();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.offsetMin = new Vector2(inset.x, inset.y);
+        rt.offsetMax = new Vector2(-inset.z, -inset.w);
     }
 
     /// <summary>현재 등급에 맞춰 조각 스프라이트를 갈아끼운다.</summary>
@@ -209,6 +275,8 @@ public class UI_AssembleCard : MonoBehaviour, IOwnsButtonScale, IPointerEnterHan
             var art = i < 2 ? bar : corner;
             img.sprite = art;
             img.enabled = art != null;
+            if (art != null && _gradeFitters[i] != null)
+                _gradeFitters[i].aspectRatio = art.rect.width / Mathf.Max(1f, art.rect.height);
         }
     }
 
@@ -235,12 +303,8 @@ public class UI_AssembleCard : MonoBehaviour, IOwnsButtonScale, IPointerEnterHan
     {
         if (_nameText) _nameText.color = darkBg ? InkOnDark    : InkOnParchment;
         if (_subText)  _subText.color  = darkBg ? InkDimOnDark : InkDimOnParchment;
-        if (_tierText) _tierText.color = darkBg ? _gradeColor  : DarkenForParchment(_gradeColor);
+        if (_tierText) _tierText.color = darkBg ? InkDimOnDark : InkDimOnParchment;
     }
-
-    /// <summary>등급색을 양피지 위에서 읽히게 눌러 담는다(실버가 특히 배경에 날아간다).</summary>
-    private static Color DarkenForParchment(Color c)
-        => new(c.r * 0.40f, c.g * 0.34f, c.b * 0.28f, 1f);
 
     /// <param name="badge">
     /// 축·상태 통화 배지("생존 · 보호막"). 등급 라벨 뒤에 붙는다 —
@@ -251,15 +315,26 @@ public class UI_AssembleCard : MonoBehaviour, IOwnsButtonScale, IPointerEnterHan
     {
         // 이름·설명은 팔레트에서 오는 가변 길이 문자열이라 고정 박스를 넘기기 쉽다.
         // 카드 밖으로 흘러 옆 카드 위에 겹치지 않도록, 여기서 박스 안에 가둔다.
-        if (_nameText) { _nameText.text = title; FitInBox(_nameText, wrap: false); }
-        if (_subText)  { _subText.text  = sub;   FitInBox(_subText,  wrap: true);  }
+        if (_subText)  { _subText.text  = UIKoreanWrap.Words(sub); FitInBox(_subText, wrap: true); }
+
+        // 등급은 테두리(실버·골드·루비 조각)가 말하므로 글자로 다시 적지 않는다 — 그 자리를 통화 배지가 쓴다.
+        // 배지는 이름과 한 줄을 나눠 쓴다(이름 왼쪽 · 배지 오른쪽). 이름 상자 오른쪽을 배지 폭만큼 비워
+        // 긴 이름(「피의 보호막」)이 배지 위로 겹치지 않게 한다.
         if (_tierText)
         {
-            _tierText.text  = string.IsNullOrEmpty(badge)
-                ? tier.DisplayName()
-                : tier.DisplayName() + "  " + badge;
-            _tierText.color = tierColor;   // 등급명도 등급색으로
+            _tierText.text  = badge ?? string.Empty;
+            _tierText.color = tierColor;
             FitInBox(_tierText, wrap: false);
+        }
+        if (_nameText)
+        {
+            float reserve = 0f;
+            if (_tierText && !string.IsNullOrEmpty(badge))
+                reserve = _tierText.GetPreferredValues(badge, 0f, 0f).x + BadgeGap;
+            var nrt = _nameText.rectTransform;
+            nrt.offsetMax = new Vector2(-reserve, nrt.offsetMax.y);
+            _nameText.text = title;
+            FitInBox(_nameText, wrap: false);
         }
 
         _gradeColor = tierColor;
@@ -330,12 +405,27 @@ public class UI_AssembleCard : MonoBehaviour, IOwnsButtonScale, IPointerEnterHan
         t.enableAutoSizing = true;
 
         // 자동크기는 줄바꿈을 끈 상태에서 <b>가로만</b> 맞춘다 — 상자가 낮으면 글자가
-        // 세로로 잘린다(서약 이름 상자 229×35에 필요 높이 39). 한 줄 선호높이는 글꼴의
-        // 약 1.45배이므로, 줄바꿈이 없는 글에 한해 상자 높이에서 상한을 역산해 함께 묶는다.
+        // 세로로 잘린다(서약 이름 상자 229×35에 필요 높이 39). 줄바꿈이 없는 글에 한해
+        // 상자 높이에서 상한을 역산해 함께 묶는다.
+        //
+        // 나누는 값은 <b>글꼴에서 읽는다</b>. 예전엔 1.45로 어림했는데 DNFForgedBlade의 실제
+        // 줄높이는 1.286이라, 이름·등급이 상자에 들어가고도 11% 더 작게 그려졌다
+        // (이름 25.5px ← 28.7px 가능). 글꼴을 바꾸면 이 값도 따라와야 해서 상수로 두지 않는다.
         float cap = wrap ? authored
-                         : Mathf.Min(authored, t.rectTransform.rect.height / 1.45f);
+                         : Mathf.Min(authored, t.rectTransform.rect.height / LineHeightRatio(t));
         t.fontSizeMax = Mathf.Max(9f, cap);
         t.fontSizeMin = Mathf.Max(9f, t.fontSizeMax * 0.6f);
+    }
+
+    /// <summary>
+    /// 글꼴 한 줄이 차지하는 높이 배수. TMP는 <c>faceInfo.lineHeight / faceInfo.pointSize</c>로 줄을 넘긴다.
+    /// 2%의 여유를 얹는다 — 자동 크기가 상자와 정확히 같아지면 반올림 한 번에 아랫줄이 잘린다.
+    /// </summary>
+    private static float LineHeightRatio(TMP_Text t)
+    {
+        var face = t.font != null ? t.font.faceInfo : default;
+        float r = face.pointSize > 0f ? face.lineHeight / face.pointSize : 1.286f;
+        return Mathf.Max(1f, r) * 1.02f;
     }
 
     private Sprite FrameFor(CovenantTier tier) => tier switch
@@ -361,7 +451,9 @@ public class UI_AssembleCard : MonoBehaviour, IOwnsButtonScale, IPointerEnterHan
     /// </summary>
     private Color RestGlow()
     {
-        if (_selected) return new Color(_gradeColor.r, _gradeColor.g, _gradeColor.b, 0.20f);
+        // 개편 스킨에선 선택 = 어두운 판으로 바뀌는 것 자체가 표시다. 그 위에 등급색 20%를 덮으면
+        // 실버(거의 흰색)가 판을 회색으로 씻어 글자 대비가 무너졌다(목업은 판을 어둡게 둔다).
+        if (_selected) return new Color(_gradeColor.r, _gradeColor.g, _gradeColor.b, _gradeSkin != null ? 0f : 0.20f);
         if (_hover)    return new Color(_gradeColor.r, _gradeColor.g, _gradeColor.b, 0.10f);
         if (_synergy)  return new Color(SynergyGlow.r, SynergyGlow.g, SynergyGlow.b, SynergyGlowAlpha);
         return new Color(_gradeColor.r, _gradeColor.g, _gradeColor.b, 0f);

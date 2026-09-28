@@ -16,18 +16,24 @@ MonoBehaviour:
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
-  weight: 1
+  weight: 3
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
   maxRange: 28
-  castDuration: 0.7
-  recoveryDuration: 0.8
-  projectilePrefab: {fileID: 8219135346948029772, guid: b2ce76029b8d8114daf86124ad53931a,
-    type: 3}
-  projectileSpeed: 18
-  projectileRange: 32
-  damageMultiplier: 0
   patternCooldown: 8
-  trajectoryBeamWidth: 0.15
+  castDuration: 0.7
+  signalDuration: 0.15
+  outSeconds: 1
+  returnSeconds: 1
+  endDuration: 0.5
+  recoveryDuration: 0.4
+  maxDistance: 30
+  curve: 6
+  spinHeight: 1.2
+  crackSpacing: 3
+  chainTether: 0
+  hitRadius: 1.5
+  damageMultiplier: 1.3
+  knockbackMultiplier: 1

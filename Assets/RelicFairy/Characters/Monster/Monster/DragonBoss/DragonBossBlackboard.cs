@@ -19,8 +19,11 @@ public enum BodyState
 /// </summary>
 public class DragonBossBlackboard : BossAttackBlackboard
 {
-    /// <summary>드래곤 브레스 원소 종류. BossColumnHazard 에서 사용.</summary>
-    public enum DragonElement { Fire, Ice, Thunder }
+    /// <summary>
+    /// 드래곤 브레스 원소 종류. BossColumnHazard 에서 사용.
+    /// Abyss = 2페이지 「심연의 화룡」 동안 고정되는 네 번째 원소(검은 불). 직렬화 값이라 맨 뒤에 붙인다.
+    /// </summary>
+    public enum DragonElement { Fire, Ice, Thunder, Abyss }
 
     public bool HasSummonedAt70;
     public bool HasSummonedAt40;
@@ -60,6 +63,18 @@ public class DragonBossBlackboard : BossAttackBlackboard
 
     public float AirBiteCooldown;
     public float IceSlamCooldown;
+    /// <summary>할퀴기 전용 쿨다운 — 예전엔 공중 패턴과 LeapCooldown을 같이 써서 착지 뒤 할퀴기가 자주 잠겼다(09-28).</summary>
+    public float ClawSlashCooldown;
+    /// <summary>지상 브레스 쿨다운 — 없을 땐 「착지 → 브레스 → 이륙」이 고정 순환이 됐다(09-28).</summary>
+    public float GroundBreathCooldown;
+
+    // ── 2페이지 「심연의 화룡」 (09-28 설계 §4) ─────────────
+    public float BlackFlameStormCooldown;   // DL1 흑염 폭풍
+    public float ElementConcertCooldown;    // DL2 원소 합주
+    public float VoidFallCooldown;          // DL3 공허 낙하
+    public float AbyssDiveCooldown;         // DL4 심연 급강하
+    /// <summary>공허 낙하 · 검은 태양 동안 수동 운석을 멈춘다 — 기둥 뒤 · 날개 아래에 숨은 자리에 운석이 떨어지지 않게.</summary>
+    public bool  PassiveMeteorSuppressed;
 
     // ── 피격 방향 ─────────────────────────────────────────
     public enum HitDirection { Front, Back, Left, Right }
@@ -110,6 +125,12 @@ public class DragonBossBlackboard : BossAttackBlackboard
         base.TickCooldowns(deltaTime);
         if (AirBiteCooldown > 0f) AirBiteCooldown -= deltaTime;
         if (IceSlamCooldown > 0f) IceSlamCooldown -= deltaTime;
+        if (ClawSlashCooldown > 0f) ClawSlashCooldown -= deltaTime;
+        if (GroundBreathCooldown > 0f) GroundBreathCooldown -= deltaTime;
+        if (BlackFlameStormCooldown > 0f) BlackFlameStormCooldown -= deltaTime;
+        if (ElementConcertCooldown  > 0f) ElementConcertCooldown  -= deltaTime;
+        if (VoidFallCooldown        > 0f) VoidFallCooldown        -= deltaTime;
+        if (AbyssDiveCooldown       > 0f) AbyssDiveCooldown       -= deltaTime;
     }
 
     public new void Reset()
@@ -127,7 +148,14 @@ public class DragonBossBlackboard : BossAttackBlackboard
         AirLoopReturnState    = null;
         AirBiteCooldown       = 0f;
         IceSlamCooldown       = 0f;
-        Poise                 = MaxPoise;
+        ClawSlashCooldown     = 0f;
+        GroundBreathCooldown  = 0f;
+        BlackFlameStormCooldown = 0f;
+        ElementConcertCooldown  = 0f;
+        VoidFallCooldown        = 0f;
+        AbyssDiveCooldown       = 0f;
+        PassiveMeteorSuppressed = false;
+        Poise                = MaxPoise;
         IsPoiseBroken         = false;
         LastHitDirection      = HitDirection.Front;
         IsSummonGated         = false;

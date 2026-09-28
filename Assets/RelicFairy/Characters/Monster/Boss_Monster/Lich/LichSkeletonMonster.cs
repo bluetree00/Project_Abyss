@@ -4,8 +4,10 @@ using UnityEngine;
 namespace RelicFairy.Monster
 {
 /// <summary>
-/// 리치 해골 소환수 — LichSkeletonSummonPattern이 소환하는 일반 몬스터.
-/// Lich 프리팹을 기반으로 의상·무기를 OnInitialized에서 비활성화해 뼈대만 표시한다.
+/// 리치 낫 해골 — LichSkeletonSummonPattern이 소환하는 일반 몬스터(연출·UX 시나리오 §12-2).
+/// 리치 모델에서 의상·책을 OnInitialized에서 끄고 <b>낫은 남긴</b> 작은 사신. 애니메이션은 리치 것을 그대로 쓴다.
+/// 등장: 바닥 아래에서 riseSeconds 동안 떠오른다(그동안 이동·공격 없음, 맞기는 함).
+/// 죽음: 뼛가루(SkeletonDeath 칸).
 /// NavMesh가 없는 환경(테스트씬 등)에서도 플레이어를 직접 추적한다.
 /// </summary>
 public class LichSkeletonMonster : MonsterBase
@@ -15,6 +17,9 @@ public class LichSkeletonMonster : MonsterBase
     private const int   MaxConcurrent = 8;     // 동시 생존 상한 — 초과 시 가장 오래된 비봉인 해골 정리
     private const float Lifetime      = 25f;   // 개체 수명(초). 봉인 해골은 면제.
     private const float FallCullDepth = 12f;   // 스폰 높이보다 이만큼 아래로 떨어지면 정리 (지형 붕괴 대비)
+    private const float RiseSeconds   = 0.8f;  // 바닥에서 떠오르는 시간 — 그동안 이동·공격 없음
+    private const float RiseDepth     = 1.8f;  // 바닥 아래 이만큼에서 시작
+    private const float DefaultReach  = 2.4f;  // 공격 모양이 부채꼴이 아닐 때 베기 이펙트 반경
 
     // ── MonsterBase 추상 멤버 ─────────────────────────────
     protected override string ConfigAddress   => "LichSkeleton/LichSkeletonConfig";
@@ -26,7 +31,6 @@ public class LichSkeletonMonster : MonsterBase
     private static readonly HashSet<string> HiddenObjectNames = new()
     {
         "SK_BookOpen Equip",
-        "SK_Scythe Equip",
         "Bookss",
         "Clothing",
         "SkirtSeparate",
@@ -41,6 +45,9 @@ public class LichSkeletonMonster : MonsterBase
     private bool  _lifetimeExpired;
     private float _spawnY;
     private bool  _fellOut;
+    private float _riseTimer;
+    private bool  _hitWasDealt;   // 공격 판정 순간 감지(이번 공격의 판정이 났는가)
+    private bool  _nameCleared;   // 머리 위 이름을 지웠다(스폰마다 한 번)
 
     // ── 수명주기 ──────────────────────────────────────────
 
@@ -52,21 +59,34 @@ public class LichSkeletonMonster : MonsterBase
         // 풀러가 SetActive 전에 위치를 확정하므로 여기서 스폰 높이를 캡처해도 안전하다.
         _spawnY          = transform.position.y;
         _fellOut         = false;
+        _riseTimer       = RiseSeconds;
+        _hitWasDealt     = false;
+        _nameCleared     = false;
+        transform.position += Vector3.down * RiseDepth;   // 바닥 아래에서 떠오른다
         Live.Add(this);
         EnforceCap();
+        OnDied += HandleDied;
     }
 
     protected override void OnDisable()
     {
+        OnDied -= HandleDied;
         Live.Remove(this);
         base.OnDisable();
     }
 
     protected override void Update()
     {
+        if (_riseTimer > 0f)
+        {
+            TickRise();
+            return;   // 떠오르는 동안 FSM 정지 — 이동·공격 없음
+        }
         base.Update();
         if (_lifetimeExpired) return;
         if (_runtime != null && _runtime.IsDead) return;
+        ClearNameLabel();
+        TickSlashVfx();
 
         // 구멍으로 떨어진 개체 정리 — SkeletonDirectChaseState의 직선 이동은 사라진 바닥 위를 그대로 지난다.
         if (!_fellOut && transform.position.y < _spawnY - FallCullDepth)
@@ -120,6 +140,50 @@ public class LichSkeletonMonster : MonsterBase
     }
 
     // ── 내부 메서드 ────────────────────────────────────────
+
+    /// <summary>바닥에서 떠오른다 — 빠르게 솟았다가 끝에 살짝 느려진다.</summary>
+    private void TickRise()
+    {
+        _riseTimer -= Time.deltaTime;
+        float k    = 1f - Mathf.Clamp01(_riseTimer / RiseSeconds);
+        float ease = 1f - (1f - k) * (1f - k);
+        Vector3 p  = transform.position;
+        p.y        = _spawnY - RiseDepth * (1f - ease);
+        transform.position = p;
+    }
+
+    /// <summary>
+    /// 머리 위 이름을 지운다(HP바는 남긴다) — 해골이 여럿 몰리면 「리치 해골」 이름표가 겹쳐 화면을 덮었다(09-19).
+    /// HP바는 스폰 뒤 비동기로 붙고, 풀에서 다시 켜질 때 이름을 다시 쓰므로 붙은 뒤 한 번 지운다.
+    /// </summary>
+    private void ClearNameLabel()
+    {
+        if (_nameCleared || HpBar == null) return;
+        HpBar.SetMonsterInfo(string.Empty);
+        _nameCleared = true;
+    }
+
+    /// <summary>
+    /// 낫 베기 이펙트 — 공격 판정이 나는 순간(AttackHitDealt가 켜질 때) 몸 방향 부채꼴 크기로.
+    /// 공용 부채꼴 공격(MonsterConeAttackSO)은 이펙트를 내지 않아 해골 베기가 맨몸으로 보였다(09-19 사용자 지적).
+    /// </summary>
+    private void TickSlashVfx()
+    {
+        bool dealt = _runtime != null && _runtime.AttackHitDealt;
+        if (dealt && !_hitWasDealt)
+        {
+            float reach = _config?.stat?.attackShape is MonsterConeAttackSO cone ? cone.range : DefaultReach;
+            LichPatternUtil.SlashVfx(transform.position, transform.forward, reach, LichSwing.RightToLeft);
+            LichSfx.Play(LichSfxSlot.ScytheSwing, transform.position, 0.45f);
+        }
+        _hitWasDealt = dealt;
+    }
+
+    private void HandleDied(MonsterBase _)
+    {
+        LichVfx.Play(LichVfxSlot.SkeletonDeath, transform.position + Vector3.up * 0.8f, Quaternion.identity);
+        LichSfx.Play(LichSfxSlot.Collapse, transform.position, 0.35f);
+    }
 
     /// <summary>
     /// 아레나 밖(구멍)으로 떨어진 해골 처리.

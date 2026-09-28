@@ -16,22 +16,49 @@ MonoBehaviour:
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
-  weight: 1
+  weight: 3
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
   maxRange: 30
-  castDuration: 0.6
-  shotInterval: 0.5
-  recoveryDuration: 0.5
-  shotCount: 3
-  telegraphDuration: 1
-  activeDuration: 0.6
-  zoneRadius: 1.2
-  groundYOffset: 0.05
-  damageMultiplier: 0.7
-  tickInterval: 0.5
-  zonesPerShot: 5
-  scatterRadius: 3
-  patternCooldown: 5
+  patternCooldown: 8
+  castDuration: 1.2
+  signalDuration: 0.2
+  elementSlot: 0.9
+  endDuration: 0.6
+  recoveryDuration: 0.4
+  circleOrbit: 2.2
+  circleHeight: 1.2
+  circleIdleScale: 0.7
+  circleLitScale: 1.5
+  fireWarn: 0.6
+  fireBeamSeconds: 1.2
+  fireLength: 30
+  fireWidth: 3
+  fireDamage: 1.3
+  fireKnockback: 1
+  fireScorchSeconds: 2
+  fireScorchSpacing: 5
+  fireScorchDamage: 0.1
+  iceCount: 5
+  iceArea: 6
+  iceRadius: 1.5
+  iceWarn: 0.6
+  iceDamage: 0.8
+  iceSlowScale: 0.6
+  iceSlowSeconds: 4
+  boltCount: 3
+  boltInterval: 0.4
+  boltWarn: 0.5
+  boltRadius: 1.8
+  boltDamage: 0.9
+  orbSpeed: 4
+  orbTurn: 90
+  orbSeconds: 6
+  orbRadius: 1.2
+  orbDamage: 1
+  orbKnockback: 0.5
+  riseHeight: 2.5
+  retreatDistance: 4
+  retreatSeconds: 1.2

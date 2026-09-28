@@ -55,6 +55,9 @@ public class WorldItemDisplay : MonoBehaviour
 
     private void Update()
     {
+        // 시작 때 카메라가 아직 없었으면 다시 잡는다(없으면 라벨이 영영 안 돈다).
+        if (_camTransform == null && Camera.main != null) _camTransform = Camera.main.transform;
+
         // 텍스트 빌보드
         if (_worldText != null && _camTransform != null)
             _worldText.transform.rotation = _camTransform.rotation;
@@ -280,7 +283,7 @@ public class WorldItemDisplay : MonoBehaviour
         _worldText.textWrappingMode = TextWrappingModes.NoWrap;
         _worldText.sortingOrder = UISortingOrder.WorldLabel;
 
-        TMPOutlineHelper.ApplyDefault(_worldText);
+        TMPOutlineHelper.ApplySoftShadow(_worldText);
 
         if (_camTransform != null)
             _worldText.transform.rotation = _camTransform.rotation;
@@ -316,7 +319,7 @@ public class WorldItemDisplay : MonoBehaviour
         _promptText.textWrappingMode = TextWrappingModes.NoWrap;
         _promptText.sortingOrder = UISortingOrder.WorldPrompt;
 
-        TMPOutlineHelper.ApplyDefault(_promptText);
+        TMPOutlineHelper.ApplySoftShadow(_promptText);
 
         _promptGo.SetActive(false);
     }

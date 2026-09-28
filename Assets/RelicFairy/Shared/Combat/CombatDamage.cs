@@ -94,6 +94,8 @@ public static class CombatDamage
 
         /// <summary>히트 VFX를 이 파이프라인에서 스폰하지 않는다(호출자가 자체 VFX를 띄우는 경우).</summary>
         public bool SkipHitVfx;
+        /// <summary>스킬의 마무리 일격. 타격 연출 단계(막타)만 바꾼다 — 피해 계산과는 무관(09-25).</summary>
+        public bool IsFinisher;
     }
 
     public static bool IsMeleeAction(WeaponActionType a) =>
@@ -225,6 +227,23 @@ public static class CombatDamage
 
         Vector3 attackDir = target.transform.position - origin;
 
+        // 무적 대상 — 피해가 무시된 타격에 「맞은」 반응(빨간 깜빡임·히트스톱·화면 플래시)을 주지 않는다.
+        // 대신 막힘 표시 기회를 주고 빠진다(무적인지 모른 채 계속 때리던 문제).
+        if (tgtMb != null && tgtMb.IsDamageImmuneNow)
+        {
+            tgtMb.NotifyBlockedHit(hitPoint);
+            mgr?.OnPostDealDamage(new DamageReport
+            {
+                DamageDealt = 0f,
+                Attacker    = owner,
+                Target      = target,
+                IsCrit      = isCrit,
+                HitPosition = hitPoint,
+                ActionType  = actionType,
+            });
+            return 0f;   // 피해 0 — 막혔다
+        }
+
         var hitInfo = new HitInfo(
             attacker:        owner,
             target:          target,
@@ -233,7 +252,8 @@ public static class CombatDamage
             damage:          finalDmg,
             isCritical:      isCrit,
             actionType:      actionType,
-            weaponType:      weaponData != null ? weaponData.weaponType : WeaponType.None);
+            weaponType:      weaponData != null ? weaponData.weaponType : WeaponType.None,
+            isFinisher:      req.IsFinisher);
 
         HitFeedbackService.RaiseHit(hitInfo);
 

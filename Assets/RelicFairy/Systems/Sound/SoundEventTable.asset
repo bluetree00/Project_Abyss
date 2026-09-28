@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 544eed5e5f29bf64aaa53cb33dbfcdf3, type: 3}
+  m_Name: SoundEventTable
+  m_EditorClassIdentifier: Assembly-CSharp::SoundEventTableSO
+  _entries:
+  - eventId: player_swing
+    sfxKey: sfx_player_swing
+    volume: 0.3
+    pitchJitter: 0.08
+  - eventId: player_swing_heavy
+    sfxKey: sfx_player_swing_heavy
+    volume: 0.4
+    pitchJitter: 0.06
+  - eventId: player_shot
+    sfxKey: sfx_player_shot
+    volume: 0.3
+    pitchJitter: 0.1
+  - eventId: player_skill
+    sfxKey: sfx_player_skill
+    volume: 0.5
+    pitchJitter: 0.05
+  - eventId: player_finisher
+    sfxKey: sfx_player_finisher
+    volume: 0.55
+    pitchJitter: 0.04
+  - eventId: relic_sun_fall
+    sfxKey: sfx_relic_sun_fall
+    volume: 0.7
+    pitchJitter: 0
+  - eventId: relic_sun_impact
+    sfxKey: sfx_relic_sun_impact
+    volume: 0.85
+    pitchJitter: 0
+  - eventId: door_open
+    sfxKey: OpenDoor
+    volume: 0.55
+    pitchJitter: 0
+  - eventId: gold_pickup
+    sfxKey: sfx_gold_pickup
+    volume: 0.45
+    pitchJitter: 0.08
+  - eventId: item_pickup
+    sfxKey: sfx_item_pickup
+    volume: 0.6
+    pitchJitter: 0.05

@@ -27,8 +27,18 @@ public class UserGameData
     public bool IsBossSealBroken(string bossId)
     {
         if (string.IsNullOrEmpty(bossId) || string.IsNullOrEmpty(sealBrokenBossIds)) return false;
-        foreach (var id in sealBrokenBossIds.Split(','))
-            if (id == bossId) return true;
+
+        // 할당 없이 훑는다 — 악몽 규칙이 이 판정을 매 프레임(스태미나 바 등) 부른다.
+        int start = 0;
+        while (start <= sealBrokenBossIds.Length)
+        {
+            int end = sealBrokenBossIds.IndexOf(',', start);
+            if (end < 0) end = sealBrokenBossIds.Length;
+            if (end - start == bossId.Length &&
+                string.CompareOrdinal(sealBrokenBossIds, start, bossId, 0, bossId.Length) == 0)
+                return true;
+            start = end + 1;
+        }
         return false;
     }
 
@@ -143,6 +153,7 @@ public class UserGameData
         AddRecord(MemoryAltarCatalog.Rec.RoomClears,  result.RoomClears);
         AddRecord(MemoryAltarCatalog.Rec.ShopUses,    result.ShopUses);
         AddRecord(MemoryAltarCatalog.Rec.RefineCount, result.RefineUses);
+        AddRecord(MemoryAltarCatalog.Rec.Covenants,   result.Covenants);
 
         // 완주 횟수는 totalClears가 정본이지만, 조건 판정이 records 한 곳만 보도록 같이 적어둔다.
         SetRecordMax(MemoryAltarCatalog.Rec.Clears, totalClears);

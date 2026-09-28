@@ -1,7 +1,7 @@
-using System;
-
 /// <summary>
 /// Q/E/R 스킬 상태 공통 기반 (Template Method).
+///
+/// 골격(Enter/Update/Exit)은 <c>sealed</c>다 — 파생 클래스는 아래 훅만 채우고 순서는 바꿀 수 없다.
 ///
 /// 고정 구조:
 ///   Enter → 쿨다운 체크 → OnSkillUse 패시브 → OnEnter()
@@ -13,14 +13,10 @@ using System;
 ///   - OnEnter     : 스킬 고유 동작 (애니메이션, AbilityExecution 등)
 ///   - OnExit      : 스킬 종료 후 정리 (선택)
 /// </summary>
-public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
-    where TActState : struct, Enum
+public abstract class ActSkillStateBase : LayerStateBase<ActState>
 {
-    protected PlayerController            _controller;
-    protected ILayerStateChanger<TActState> _stateChanger;
-
     /// <summary>
-    /// 스킬이 실제로 발동했는지. Enter()의 차단 분기가 Change(default)를 부르면 상태머신이
+    /// 스킬이 실제로 발동했는지. Enter()의 차단 분기가 Change(None)을 부르면 상태머신이
     /// "방금 진입한 이 상태"의 Exit()를 그 자리에서 실행한다 — 이 플래그가 없으면 그 Exit이
     /// 쿨다운을 새로 덮어써서, 쿨다운 중 연타 시 스킬이 영구히 안 나간다.
     /// </summary>
@@ -28,22 +24,16 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
 
     protected abstract SkillType Slot { get; }
 
-    // ── ILayerState 구현 ─────────────────────────────────────────────────────
+    // ── 템플릿 골격 (파생 재정의 불가) ───────────────────────────────────────
 
-    public void Init(PlayerController controller, ILayerStateChanger<TActState> stateChanger)
-    {
-        _controller   = controller;
-        _stateChanger = stateChanger;
-    }
-
-    public void Enter()
+    public sealed override void Enter()
     {
         _entered = false;
 
         if (!_controller.CooldownTracker.IsReady(Slot))
         {
             UnityEngine.Debug.Log($"[SkillBase] {Slot} blocked by cooldown");
-            _stateChanger.Change(default);   // None(0) 으로 복귀
+            _stateChanger.Change(ActState.None);
             return;
         }
 
@@ -54,13 +44,15 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
             && _controller.CreateCharacterSkillRuntime(Slot) != null
             && !_controller.RelicBehavior.CanUseSkill(Slot))
         {
-            _stateChanger.Change(default);
+            _stateChanger.Change(ActState.None);
             return;
         }
 
         _entered = true;
 
         UnityEngine.Debug.Log($"[SkillBase] {Slot} Enter");
+        // 무기 스킬 시작음(09-25). Q는 유물 스킬이라 각자 소리를 낸다(가웨인 태양 낙하·랜슬롯 참격).
+        if (Slot != SkillType.Q) Managers.Sound?.PlayEvent(SoundEvent.PlayerSkill);
         _controller.FirePassive(PassiveTrigger.OnSkillUse,
             new PassiveContext { skillUsed = Slot });
 
@@ -77,9 +69,9 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
         OnEnter();
     }
 
-    public void Update() => OnUpdate();
+    public sealed override void Update() => OnUpdate();
 
-    public void Exit()
+    public sealed override void Exit()
     {
         // 차단 분기로 되돌아온 진입은 발동이 아니다 — 쿨다운도, OnExit 정리도 건드리지 않는다.
         if (!_entered) return;
@@ -87,6 +79,8 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
 
         // 스킬 종료 시 쿨다운 시작 (SkillCooldownReduction 반영). 엘레인/베디비어 부활.
         float cd = GetCooldown();
+        // 악몽 규칙(역류하는 술식) — 무기 스킬(E·R)만 늘린다. Q는 유물 전용(자원 게이트)이다.
+        if (Slot != SkillType.Q) cd *= NightmareRules.WeaponSkillCooldownMultiplier;
         if (cd > 0f)
             _controller.CooldownTracker.StartCooldown(Slot, cd, _controller.RuntimeStats.SkillCooldownReduction);
 

@@ -37,6 +37,7 @@ public class PlayerWeaponTrailVfx : MonoBehaviour
     private Transform _tip;                   // 현재 무기 칼끝
     private Transform _root;                  // 현재 무기 칼밑
     private GameObject _loadedPrefab;         // 현재 인스턴스화돼 있는 프리팹
+    private string _swingSfxEvent;            // 휘두름 소리 이벤트(원거리 무기는 null) — 무기 교체 때 정한다
     private bool _subscribed;
 
     // ── Lifecycle ─────────────────────────────────────────────────
@@ -118,6 +119,9 @@ public class PlayerWeaponTrailVfx : MonoBehaviour
     private void HandleWeaponChanged(WeaponData data, GameObject instance)
     {
         _weaponTrailPrefab = data != null ? data.trailVfxPrefab : null;
+        _swingSfxEvent = data == null || data.weaponType.GetAttackStatKind() == AttackStatKind.Ranged ? null
+                       : data.weaponType == WeaponType.Greatsword ? SoundEvent.PlayerSwingHeavy
+                       : SoundEvent.PlayerSwing;
 
         WeaponInstance wi = instance != null ? instance.GetComponent<WeaponInstance>() : null;
         _tip = wi != null ? wi.tipPoint : null;
@@ -133,6 +137,9 @@ public class PlayerWeaponTrailVfx : MonoBehaviour
 
     private void HandleBeginAttackTrail()
     {
+        // 휘두름 소리도 같은 신호(칼끝 궤적 시작 = 스윙이 시작되는 순간)에 얹는다(09-25). 트레일 프리팹이 없어도 소리는 난다.
+        if (_swingSfxEvent != null) Managers.Sound?.PlayEvent(_swingSfxEvent);
+
         // 애니 이벤트 — 인스턴스화 금지. 무기 프리팹이 선로딩돼 있을 때만 시작.
         if (_trail == null || _weaponTrailPrefab == null) return;
         if (_loadedPrefab != _weaponTrailPrefab) return;

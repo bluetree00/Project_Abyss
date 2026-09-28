@@ -12,24 +12,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f29c57877bc8651428487ef82e2b25f5, type: 3}
   m_Name: LichSkeletonConfig
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
-  monsterName: "리치 해골"
+  monsterName: "\uB9AC\uCE58 \uD574\uACE8"
   grade: 1
   playerLayer:
     serializedVersion: 2
     m_Bits: 64
-  visualHeightMeters: 1.64
+  visualHeightMeters: 1.2
   stat:
     maxHp: 400
     defense: 8
     attackPower: 18
     moveSpeed: 2.8
-    nativeElement: -1
-    attackRange: 1.8
+    attackRange: 2.2
     attackRadius: 1.5
     attackRate: 1.5
     attackDelay: 0.6
     knockbackForce: 4
-    attackShape: {fileID: 0}
+    attackShape: {fileID: 11400000, guid: 304a325ab4273d5408b80f070d7c0b45, type: 2}
     hitVfxPrefab: {fileID: 0}
     hitVfxScale: 1
     hitVfxOffset: {x: 0, y: 0, z: 0}
@@ -42,7 +41,7 @@ MonoBehaviour:
     patrolSpeed: 1.5
     waypointWaitTime: 0.5
   combat:
-    damageApplyDelay: 0.4
+    damageApplyDelay: 0.5
     maxHitsPerAttack: 0
     targetLayer:
       serializedVersion: 2
@@ -50,22 +49,29 @@ MonoBehaviour:
   animation:
     animatorControllerAddress: Lich/LichAnimator
     idleStateName: Idle
-    patrolStateName: Walk
+    patrolStateName: Run
     chaseStateName: Run
-    attackReadyStateName: AttackReady
-    attackStateName: Attack
+    attackReadyStateName: Idle
+    attackStateName: ScytheCombo1
     getHitStateName: GetHit
     dieStateName: Die
-    attackTrigger:
-    getHitTrigger:
-    dieTrigger:
-    detectTrigger:
-    speedParam:
+    attackTrigger: ScytheCombo1
+    getHitTrigger: 
+    dieTrigger: 
+    detectTrigger: 
+    speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15
   drop:
     coinMin: 1
     coinMax: 3
     coinValue: 1
+  death:
+    despawnDelay: 1.5
+    dissolveDuration: 0.6
+    deathVfxKey: DieEffect_01
+    deathVfxScale: 1
+    killHitStopScale: 0.04
+    killHitStopDuration: 0.09
   specialStates: []
   stateOverrides: []

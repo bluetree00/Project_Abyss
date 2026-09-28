@@ -6,28 +6,28 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/RelicFairy/Scenes/GameScenes/Lobby.unity
+    path: Assets/RelicFairy/Scenes/Build/Lobby.unity
     guid: cdbd8c9b3f2ec4c4687c2ec5c6a9e8a5
   - enabled: 1
-    path: Assets/RelicFairy/Scenes/GameScenes/Tutorial.unity
+    path: Assets/RelicFairy/Scenes/Build/Tutorial.unity
     guid: 80a2e6d6ca3577947b5747c86530bf45
   - enabled: 1
-    path: Assets/RelicFairy/Scenes/GameScenes/BaseCamp.unity
+    path: Assets/RelicFairy/Scenes/Build/BaseCamp.unity
     guid: b7865cfa39d36804b9590a88ae51d679
   - enabled: 1
-    path: Assets/RelicFairy/Scenes/GameScenes/Game_Intro.unity
+    path: Assets/RelicFairy/Scenes/Build/Game_Intro.unity
     guid: 19eb44a4fe30ddb4b9ed3f8b75c62df7
   - enabled: 1
-    path: Assets/RelicFairy/Scenes/GameScenes/GameScene_Ch1.unity
+    path: Assets/RelicFairy/Scenes/Build/GameScene_Ch1.unity
     guid: 99c9720ab356a0642a771bea13969a05
   - enabled: 1
-    path: Assets/RelicFairy/Scenes/GameScenes/GameScene_Ch2.unity
+    path: Assets/RelicFairy/Scenes/Build/GameScene_Ch2.unity
     guid: 35ff12cdb4f67db4ca6cb2762775a311
   - enabled: 1
-    path: Assets/RelicFairy/Scenes/GameScenes/GameScene_Ch3.unity
+    path: Assets/RelicFairy/Scenes/Build/GameScene_Ch3.unity
     guid: b8013b35c501d334caf0a5fe95d20fb3
   - enabled: 1
-    path: Assets/RelicFairy/Scenes/GameScenes/GameScene_Ch4.unity
+    path: Assets/RelicFairy/Scenes/Build/GameScene_Ch4.unity
     guid: f2deb1da329cb2e41a7666b674f6563b
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: 9ab410270870c5d438a3caf7889cab42,

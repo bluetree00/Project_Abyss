@@ -275,7 +275,7 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
                 if (col.gameObject == ctx.Controller.gameObject) continue;
                 if (alreadyHit != null && !alreadyHit.Add(col.gameObject)) continue;
                 if (col.TryGetComponent<IDamageable>(out var d))
-                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f);
+                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f, isFinisher: true);   // 마무리 폭발
             }
         }
 
@@ -319,7 +319,8 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
                 if (mapping != null) animName = mapping.baseClipName;
             }
 
-            ctx.Animator.CrossFade(animName, 0.05f);
+            // 대시가 끝나는 순간(첫 판정)에 발도가 닿게 — 발도 클립은 1.63초에 닿는다(09-25 실측).
+            SkillAnimSync.CrossFadeToContact(ctx.Animator, animName, _data.dashDuration, 0.05f);
         }
 
         private static async void SpawnEffect(SkillExecutionContext ctx, string key, Vector3 pos, float lifetime)

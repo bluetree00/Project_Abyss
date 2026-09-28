@@ -175,6 +175,7 @@ public class FanArrowBehaviorSO : SkillBehaviorSO
             // 기본공격과 같은 퍼널을 지난다 — 원거리 파츠(분열·관통·폭발·유도·거력)·아이템·방버프가
             // 스킬 화살에도 얹힌다. 예전엔 여기서 Fire를 직접 불러 파츠가 스킬엔 안 닿았다.
             var req = ProjectileRequest.Create(_data.arrowKey, pos, dir, dmg, ctx.Controller.gameObject, ctx.SourceSlot);
+            req.actionType = ctx.ActionType;   // 스킬 피해 증가가 붙도록 — 기본 공격으로 신고하면 안 된다
             CombatSpawner.SpawnProjectile(ref req, arrow, extra => ApplySkillExtras(extra, req, dmg, tier));
             obj.transform.localScale = Vector3.one * req.sizeMult;
             ApplySkillExtras(obj, req, dmg, tier);

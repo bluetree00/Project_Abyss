@@ -23,7 +23,7 @@ MonoBehaviour:
   breakOverride: -1
   _airChaseLeftStateName: AirChaseLeft
   _airChaseRightStateName: AirChaseRight
-  _hideHeight: 20
+  _hideHeight: 8
   _flySpeed: 20
   _warningRowCount: 15
   _warningDuration: 2
@@ -33,7 +33,7 @@ MonoBehaviour:
   _previewTimeScale: 0.25
   _cameraReturnDuration: 1.2
   _slowReleaseRatio: 0.15
-  _lightHeightOffset: 21
+  _lightHeightOffset: 9
   _lightIntensity: 4
   _lightRange: 60
   _lightSpotAngle: 55
@@ -46,7 +46,7 @@ MonoBehaviour:
   _flameBreathBaseLength: 10
   _flameBreathBaseWidth: 1
   _flameBreathScale: 1
-  _breathHorizReach: 0
+  _breathHorizReach: 7
   _flameTsunamiPrefab: {fileID: 7082525810440381746, guid: 7239f2bebff5f5b4a91fc5d1c2c4619b,
     type: 3}
   _tsunamiColInterval: 2

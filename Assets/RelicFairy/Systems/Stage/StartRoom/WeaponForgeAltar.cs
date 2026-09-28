@@ -152,7 +152,8 @@ public class WeaponForgeAltar : MonoBehaviour
         {
             Weapon     = weapon,
             Locked     = !unlocked,
-            LockReason = unlocked ? null : $"기억의 제단 — {node?.BaseCost ?? 0:N0} ◆",
+            // 제단이 실제로 받는 값(조건을 채웠으면 할인가) — 기본가를 적으면 제단 가격과 어긋난다(09-26 감사).
+            LockReason = unlocked ? null : $"기억의 제단 — {(node != null ? MemoryAltarService.GetState(node).Cost : 0):N0} ◆",
         };
     }
 
@@ -161,6 +162,8 @@ public class WeaponForgeAltar : MonoBehaviour
         // 무형검(슬롯0)은 각성 제단(WorldSwordAwakening)에서만 하사된다 — 무기대는 보조 원거리(슬롯1)만.
         // 폴백 없음: 각성을 거치지 않았으면 무형검을 주지 않는다(원거리만).
         loadout.SetWeaponSlot1(ranged);
+        // 얻기 연출 — 공방에서 빛이 떠올라 등으로 날아와 붙는다(베이스캠프에서만, 조작은 막지 않음)
+        BaseCampFxDirector.Instance?.PlayAcquire(transform.position + Vector3.up * 1.2f, BaseCampFxDirector.AcquireKind.Ranged);
 
         // 퀘스트: 장비 선택 보고 (범용 채널)
         QuestEvents.Report("Equip", ranged != null ? ranged.name : "Weapon");
@@ -182,7 +185,13 @@ public class WeaponForgeAltar : MonoBehaviour
 
     private void BillboardTexts()
     {
-        if (_camTransform == null) return;
+        if (_camTransform == null)
+        {
+            // 시작 때 카메라가 아직 없었으면(테스트 허브 → 베이스캠프 등) 여기서 다시 잡는다 — Start 한 번만 잡으면 라벨이 영영 안 돈다.
+            var cam = Camera.main;
+            if (cam == null) return;
+            _camTransform = cam.transform;
+        }
         if (_worldText != null) _worldText.transform.rotation = _camTransform.rotation;
         if (_promptGo != null && _promptGo.activeSelf) _promptGo.transform.rotation = _camTransform.rotation;
     }
@@ -201,7 +210,7 @@ public class WeaponForgeAltar : MonoBehaviour
         _worldText.color = new Color(0.85f, 0.85f, 0.95f);
         _worldText.textWrappingMode = TextWrappingModes.NoWrap;
         _worldText.sortingOrder = UISortingOrder.WorldLabel;
-        TMPOutlineHelper.ApplyDefault(_worldText);
+        TMPOutlineHelper.ApplySoftShadow(_worldText);
 
         if (_camTransform != null) _worldText.transform.rotation = _camTransform.rotation;
     }
@@ -219,7 +228,7 @@ public class WeaponForgeAltar : MonoBehaviour
         tmp.color = Color.white;
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.sortingOrder = UISortingOrder.WorldPrompt;
-        TMPOutlineHelper.ApplyDefault(tmp);
+        TMPOutlineHelper.ApplySoftShadow(tmp);
         tmp.text = $"<color={UIPalette.GoldHex}>[F]</color> 보조 무기";
 
         _promptGo.SetActive(false);

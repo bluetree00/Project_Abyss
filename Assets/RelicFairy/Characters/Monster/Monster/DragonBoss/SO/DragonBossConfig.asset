@@ -18,9 +18,9 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   stat:
-    maxHp: 30000
-    defense: 60
-    attackPower: 300
+    maxHp: 16000
+    defense: 6
+    attackPower: 260
     moveSpeed: 7
     nativeElement: -1
     attackRange: 4
@@ -54,7 +54,7 @@ MonoBehaviour:
     attackReadyStateName: AttackReady
     attackStateName: AttackReady
     getHitStateName: GetHit
-    dieStateName: Die
+    dieStateName: Death
     attackTrigger: 
     getHitTrigger: 
     dieTrigger: 
@@ -94,6 +94,42 @@ MonoBehaviour:
   condDistFar: 8
   condTimePressureSecs: 8
   patternEntries:
+  - conditions: 2a000000
+    patterns:
+    - {fileID: 11400000, guid: ac890ac725edd494d8fba84002b41182, type: 2}
+    selectionMode: 0
+    forceExecute: 1
+  - conditions: 2b000000
+    patterns:
+    - {fileID: 11400000, guid: 073cb44eb8c282247b2a6251c762a5c9, type: 2}
+    selectionMode: 0
+    forceExecute: 1
+  - conditions: 2c000000
+    patterns:
+    - {fileID: 11400000, guid: c48239b7126fa644284c593612ea0bfa, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions: 290000000f000000
+    patterns:
+    - {fileID: 11400000, guid: d6ad2cdb070cf7746b9e482391a44610, type: 2}
+    - {fileID: 11400000, guid: 8141604f71a07674ea967670107f8c27, type: 2}
+    - {fileID: 11400000, guid: c48239b7126fa644284c593612ea0bfa, type: 2}
+    - {fileID: 11400000, guid: bbacaaa3c18412847a13c95618559fe2, type: 2}
+    - {fileID: 11400000, guid: f6eacd7249a31834a9927d48e8122f1d, type: 2}
+    - {fileID: 11400000, guid: ceeafc3c15fb0a74ea297c4a28a371ed, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions: 2900000010000000
+    patterns:
+    - {fileID: 11400000, guid: 4e1d020cf84b49849ed4042ac0fbd229, type: 2}
+    - {fileID: 11400000, guid: b6697dc0d78e4532b3078c733584c916, type: 2}
+    - {fileID: 11400000, guid: 8141604f71a07674ea967670107f8c27, type: 2}
+    - {fileID: 11400000, guid: c48239b7126fa644284c593612ea0bfa, type: 2}
+    - {fileID: 11400000, guid: bbacaaa3c18412847a13c95618559fe2, type: 2}
+    - {fileID: 11400000, guid: f6eacd7249a31834a9927d48e8122f1d, type: 2}
+    - {fileID: 11400000, guid: c94a7c14f97ed6a42aac9c357b1691e7, type: 2}
+    selectionMode: 0
+    forceExecute: 0
   - conditions: 06000000
     patterns:
     - {fileID: 11400000, guid: 837b1b81e711cce44836ceaa00fd1fbd, type: 2}

@@ -16,14 +16,25 @@ MonoBehaviour:
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
-  weight: 1
+  weight: 2
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
-  castDuration: 1.2
+  patternCooldown: 25
+  castDuration: 1.5
+  legionDuration: 12
   recoveryDuration: 0.5
-  spawnCount: 2
-  skeletonPrefab: {fileID: 5098245364127042272, guid: 119497b481e20d54f843d3cf322d7234, type: 3}
-  spawnRadius: 4
-  patternCooldown: 12
+  skeletonPrefab: {fileID: 5098245364127042272, guid: 119497b481e20d54f843d3cf322d7234,
+    type: 3}
+  perSide: 2
+  edgeInset: 3
+  sideSpacing: 2.5
+  markRadius: 2.2
+  hoverHeight: 4
+  orbitRadius: 3
+  orbitLeg: 2.5
+  boltAt: 5
+  boltWarn: 0.6
+  boltRadius: 1.8
+  boltDamage: 0.6

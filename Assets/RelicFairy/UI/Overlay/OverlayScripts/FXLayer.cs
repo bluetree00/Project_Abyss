@@ -33,6 +33,8 @@ namespace RelicFairy.UI.Overlay
 
         private void Awake()
         {
+            StretchToParent();
+
             // 프리팹에서 활성화되어 있으면 Init 생략돼도 안전하게 캐싱
             if (flashView    == null) flashView    = GetComponentInChildren<FullScreenFlashView>(true);
             if (zoomLineView == null) zoomLineView = GetComponentInChildren<ZoomLineView>(true);
@@ -56,6 +58,20 @@ namespace RelicFairy.UI.Overlay
         {
             if (vignetteView == null) return;
             vignetteView.Vignette(color, intensity, duration);
+        }
+
+        // ── Private Methods ───────────────────────────────────────────
+        // 원본 프리팹 루트는 루트 캔버스로 저장돼 앵커 (0,0)·크기 0·스케일 0이다. @Overlay 아래 중첩되면 아무도
+        // 크기를 몰아 주지 않아, 화면 전체 연출 3종이 처음부터 크기 0으로 한 번도 안 보였다(09-20 실측) → 직접 편다.
+        private void StretchToParent()
+        {
+            var rt = (RectTransform)transform;
+            rt.anchorMin  = Vector2.zero;
+            rt.anchorMax  = Vector2.one;
+            rt.pivot      = new Vector2(0.5f, 0.5f);
+            rt.offsetMin  = Vector2.zero;
+            rt.offsetMax  = Vector2.zero;
+            rt.localScale = Vector3.one;
         }
     }
 }

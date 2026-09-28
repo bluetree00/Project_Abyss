@@ -30,6 +30,12 @@ public sealed class ShopProduct
     public int Price { get; }
     public ItemRarity Rarity { get; }
     public Sprite Icon { get; }
+    /// <summary>
+    /// 룬 상품의 원본(표시 전용). 룬 선택 카드와 같은 규격(효과 전부·속성·칸 수·놓을 자리)을 그리려면 필요하다 —
+    /// 예전엔 효과 문장 한 줄(<see cref="EffectText"/>)만 넘겨 효과가 둘인 룬의 둘째 줄이 화면에서 사라졌다(09-25).
+    /// 지급은 <see cref="Grant"/>가 새로 만든다. 룬이 아니면 null.
+    /// </summary>
+    public RuntimeItemData Rune { get; }
 
     /// <summary>구매 확정 시 실제 지급/적용. 컨트롤러가 골드 차감 뒤 호출. 성공 시 true.</summary>
     public Func<GameRunSession, bool> Grant { get; }
@@ -39,7 +45,7 @@ public sealed class ShopProduct
 
     public ShopProduct(ShopProductCategory category, string displayName, string effectText,
                        string detailText, int price, ItemRarity rarity, Sprite icon,
-                       Func<GameRunSession, bool> grant)
+                       Func<GameRunSession, bool> grant, RuntimeItemData rune = null)
     {
         Category    = category;
         DisplayName = displayName;
@@ -49,6 +55,7 @@ public sealed class ShopProduct
         Rarity      = rarity;
         Icon        = icon;
         Grant       = grant;
+        Rune        = rune;
     }
 
     public bool Purchasable => !Sold && Grant != null;

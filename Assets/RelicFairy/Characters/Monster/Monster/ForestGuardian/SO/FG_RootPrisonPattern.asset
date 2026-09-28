@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a855c5906789c64f8db2d4fab712a77, type: 3}
+  m_Name: FG_RootPrisonPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.FGRootPrisonPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: fl1_root_prison
+  breakOverride: -1
+  maxRange: 12
+  ringRadius: 4
+  gapWidth: 2.4
+  wallSegmentLength: 1.3
+  wallHeight: 2.4
+  wallThickness: 0.7
+  gapJitterDegrees: 35
+  castDuration: 0.7
+  trapDuration: 1.6
+  armLead: 0.4
+  wallLinger: 0.4
+  recoveryDuration: 0.6
+  damageMultiplier: 1.4
+  knockbackMultiplier: 1.5
+  wallVfxPrefab: {fileID: 1210069404974878, guid: fbab27c98b168764eb295cfff1e9f61f,
+    type: 3}
+  wallVfxScale: 1
+  slamVfxPrefab: {fileID: 8719263370430895187, guid: cfcf1b1a67677664b8243dfeeeeb152e,
+    type: 3}
+  slamVfxScale: 4
+  riseSfx: {fileID: 8300000, guid: 5dfd2a02b507f11479a9ae6871fe4543, type: 3}
+  slamSfx: {fileID: 8300000, guid: f7969cd033cac7442990349fcd4605cb, type: 3}

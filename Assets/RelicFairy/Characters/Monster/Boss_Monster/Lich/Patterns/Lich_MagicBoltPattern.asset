@@ -16,18 +16,26 @@ MonoBehaviour:
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
-  weight: 3
+  weight: 6
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: magicbolt
   breakOverride: -1
   maxRange: 25
-  castDuration: 0.8
-  recoveryDuration: 0.5
-  projectilePrefab: {fileID: 8282548314473357432, guid: 6dff2fd6f02ca2d459b3fa8e7896a429,
-    type: 3}
-  projectileSpeed: 14
-  projectileRange: 30
-  damageMultiplier: 0
   patternCooldown: 4
-  trajectoryBeamWidth: 0.12
+  castDuration: 0.72
+  boltCount: 4
+  boltInterval: 0.35
+  flightTime: 0.5
+  endDuration: 0.5
+  recoveryDuration: 0.3
+  impactRadius: 2
+  damageMultiplier: 1.1
+  knockbackMultiplier: 0.4
+  arcHeight: 1.5
+  driftDistance: 2
+  lastBoltLead: 1
+  lastBoltLeadMax: 4
+  lingerRadius: 1.6
+  lingerSeconds: 1.6
+  lingerDamage: 0.12

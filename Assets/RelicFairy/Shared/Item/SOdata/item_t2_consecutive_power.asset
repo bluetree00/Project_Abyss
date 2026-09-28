@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t2_consecutive_power
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t2_consecutive_power
-  displayName: "\uC5F0\uD0C0\uC758 \uB8EC"
+  displayName: "\uC9D1\uC694\uD55C \uBD84\uB178\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 1

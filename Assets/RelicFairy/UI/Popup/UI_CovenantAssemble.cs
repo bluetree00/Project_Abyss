@@ -19,6 +19,7 @@ public class UI_CovenantAssemble : UI_Popup
     // ── Constants ────────────────────────────────────────
     private const int DraftCount     = 3;
     private const int DefaultRerolls = 2;
+    private const float TitleDrop    = 26f;   // 제목을 찢긴 종이 윗가장자리에서 종이 안으로(09-28)
 
     // ── Static ───────────────────────────────────────────
     private static readonly Color SilverColor = new(0.80f, 0.82f, 0.88f);
@@ -74,10 +75,14 @@ public class UI_CovenantAssemble : UI_Popup
     private System.Random _rng;
     private bool _forceSilver;
     private int  _rerollsLeft;
+    private bool _titleDropped;
     private List<CovenantDraftCard> _causes;
     private List<CovenantDraftCard> _effects;
     private int _selCause, _selEffect;
     private UniTaskCompletionSource<string> _tcs;
+
+    // 개편(양피지) 스킨에선 연결선을 긋지 않는다 — ApplyPanelSkin 주석 참조.
+    private bool _connectorsOff;
 
     // 시너지 힌트 — 프리팹에 자리가 없어 효과 줄을 복제해 그 아래 한 줄을 만든다.
     private TMP_Text _synergyText;
@@ -109,15 +114,23 @@ public class UI_CovenantAssemble : UI_Popup
         _rerollsLeft = DefaultRerolls;
         _tcs         = new UniTaskCompletionSource<string>();
         SetText(_titleText, "봉인된 예언자의 서약서");
-        if (_titleText) { _titleText.fontSize = 28f; FitSingleLine(_titleText); }
+        if (_titleText)
+        {
+            _titleText.fontSize = 28f; FitSingleLine(_titleText);
+            // 제목이 찢긴 종이 윗가장자리에 걸쳐 윗부분은 어두운 배경, 아랫부분은 밝은 종이 위였다 — 종이 안으로 한 번 내린다.
+            if (!_titleDropped)
+            {
+                _titleDropped = true;
+                ((RectTransform)_titleText.transform).anchoredPosition += new Vector2(0f, -TitleDrop);
+            }
+        }
 
         ConfigureTextFitting();
         ApplyPanelSkin();
 
-        _causes   = CovenantAssembleService.DraftCauses(DraftCount, _rng, _forceSilver);
         // 보유 서약을 넘겨 페어링을 건다(C4) — 걸어 줄 서약이 없는데 먹는 서약만 손에 쥐면
-        // 벼린 서약이 한 번도 터지지 않는 런이 된다.
-        _effects  = CovenantAssembleService.DraftEffects(DraftCount, _rng, _forceSilver, HeldCovenants);
+        // 벼린 서약이 한 번도 터지지 않는 런이 된다. 원인 × 효과 9칸은 전부 벼릴 수 있는 짝으로만 제시된다.
+        CovenantAssembleService.DraftBoard(DraftCount, _rng, _forceSilver, HeldCovenants, out _causes, out _effects);
         _selCause = 0;
         _selEffect = 0;
 
@@ -164,7 +177,7 @@ public class UI_CovenantAssemble : UI_Popup
                 card.RerollButton.onClick.RemoveAllListeners();
                 card.RerollButton.onClick.AddListener(() => Reroll(isCause, idx));
                 FixRerollLabel(card.RerollButton);
-                PlaceRerollAtTop(card.RerollButton);
+                card.DockReroll(outerLeft: isCause);   // 원인 열은 왼쪽 바깥, 효과 열은 오른쪽 바깥
             }
         }
     }
@@ -203,9 +216,15 @@ public class UI_CovenantAssemble : UI_Popup
             if (_prismBorder != null) _prismBorder.enabled = false;
         }
 
-        // 제목은 양피지 두루마리의 <b>말린 나무 봉 위</b>에 얹힌다 — authoring 금색(0.83,0.68,0.3)은
-        // 봉의 갈색과 명도가 겹쳐 글자가 뭉개진다. 밝은 상아색으로 올려 대비를 준다.
-        if (_titleText != null) _titleText.color = TitleOnScroll;
+        // 제목은 종이 위에 먹으로 — 봉은 좌우 세로라 윗가장자리엔 봉이 없고, 상아색은 밝은 종이 위에서 대비가 없었다(09-28 UI 전수).
+        if (_titleText != null) _titleText.color = InkOnBook;
+
+        // 연결선(선택 카드 → 결과 두루마리)은 구 아트 시절 넓은 판(1600×840)에 맞춘 장식이다. 양피지 배치에선
+        // 열과 두루마리 사이가 18px뿐이라, 위·아래 카드를 고르면 두루마리 옆에 170px짜리 거의 수직인 선이
+        // 떠 있을 뿐 무엇도 잇지 않는다(목업에도 없다). 구 판 테두리·프리즘 테두리처럼 개편 스킨에선 끈다.
+        _connectorsOff = true;
+        if (_connectorLeft)  _connectorLeft.gameObject.SetActive(false);
+        if (_connectorRight) _connectorRight.gameObject.SetActive(false);
 
         ApplyHeaderChips(skin);
         ApplyMockupLayout();
@@ -225,7 +244,6 @@ public class UI_CovenantAssemble : UI_Popup
     // ── 톤 ──────────────────────────────────────────────
     // 배치는 프리팹이 갖지만 <b>색은 코드가 칠한다</b> — 프리팹 authoring 색이 구 아트 기준(형광 보라 버튼 ·
     // 흰 글자)이라 양피지 위에서 튀거나 날아간다. 아트 재납품에 따라 바뀌는 값이라 한곳에 모아 둔다.
-    private static readonly Color TitleOnScroll = new(0.97f, 0.93f, 0.80f, 1f);
     private static readonly Color ForgeFill     = new(0.36f, 0.26f, 0.13f, 1f);   // 청동
     private static readonly Color BtnLabel      = new(0.97f, 0.93f, 0.80f, 1f);
     private static readonly Color InkOnBook     = new(0.20f, 0.14f, 0.08f, 1f);
@@ -370,12 +388,12 @@ public class UI_CovenantAssemble : UI_Popup
         {
             var exclude = new HashSet<string>();
             for (int i = 0; i < data.Count; i++) exclude.Add(data[i].id);
-            rolled = CovenantAssembleService.RerollCard(CovenantPalette.CauseIds, exclude, _rng, _forceSilver);
+            rolled = CovenantAssembleService.RerollCauseCard(exclude, _rng, _forceSilver, _effects, HeldCovenants);
         }
         else
         {
-            // 효과는 방어축 보장·페어링을 리롤로 우회할 수 없다(axisLock + C4) — 서비스가 판정한다.
-            rolled = CovenantAssembleService.RerollEffectCard(data, idx, _rng, _forceSilver, HeldCovenants);
+            // 효과는 방어축 보장·페어링·짝 규칙을 리롤로 우회할 수 없다(axisLock + C4) — 서비스가 판정한다.
+            rolled = CovenantAssembleService.RerollEffectCard(data, idx, _rng, _forceSilver, HeldCovenants, _causes);
         }
         if (rolled == null) return;
 
@@ -419,7 +437,7 @@ public class UI_CovenantAssemble : UI_Popup
     /// <summary>선택된 원인/효과 카드에서 중앙 결과 카드로 이어지는 대각 연결선을 갱신.</summary>
     private void UpdateConnectors()
     {
-        if (_bookRect == null || _prismRect == null) return;
+        if (_connectorsOff || _bookRect == null || _prismRect == null) return;
 
         if (_connectorLeft && _causeCards != null && _selCause < _causeCards.Length && _causeCards[_selCause])
             DrawLine(_connectorLeft,
@@ -460,10 +478,10 @@ public class UI_CovenantAssemble : UI_Popup
 
         SetText(_previewTitle,
             $"{p.causeName}[{p.causeTier.DisplayName()}] × {p.effectName}[{p.effectTier.DisplayName()}]");
-        SetText(_previewSentence, $"\"{p.ResultSentence}\"");
+        SetText(_previewSentence, UIKoreanWrap.Words($"\"{p.ResultSentence}\""));
         SetText(_previewCondition, $"발동 조건  {p.causeDesc}");
         SetText(_previewCoef,      $"봉인 계수  ×{p.coefficient:0.0}");
-        SetText(_previewEffect,    $"효과  {p.EffectAmountLabel()}  ({p.Badge})");
+        SetText(_previewEffect,    UIKoreanWrap.Words($"효과  {p.EffectAmountLabel()}  ({p.Badge})"));
         SetText(_forgeSummary,     $"{p.causeName} × {p.effectName}  →  {p.effectDesc}");
 
         UpdateSynergyLine(p);
@@ -490,7 +508,7 @@ public class UI_CovenantAssemble : UI_Popup
 
         string hint = p.SynergyHint(HeldCovenants);
         _synergyText.gameObject.SetActive(!string.IsNullOrEmpty(hint));
-        if (!string.IsNullOrEmpty(hint)) _synergyText.text = hint;
+        if (!string.IsNullOrEmpty(hint)) _synergyText.text = UIKoreanWrap.Words(hint);
     }
 
     /// <summary>
@@ -580,28 +598,6 @@ public class UI_CovenantAssemble : UI_Popup
     /// 리롤 버튼 라벨. 프리팹은 ↻(U+21BB)로 authoring 돼 있는데 본문 폰트(DNFForgedBlade)에
     /// 그 글리프가 없어 화면에는 빈 네모(□)만 나온다 — 폰트에 있는 글자로 바꿔 준다.
     /// </summary>
-    /// <summary>
-    /// 교체 버튼을 카드 <b>상단 우측</b>으로 올린다.
-    ///
-    /// <para>프리팹에서는 카드 오른쪽 <b>아래</b> 구석(196,72)에 있었다 — 기획은 선택지 위에
-    /// 작게 얹힌 「돌리는」 버튼이었는데, 아래에 있으면 카드 본문(이름·설명)을 다 읽고 나서야
-    /// 눈에 들어와 "다시 뽑을까"를 고민하는 시점과 어긋난다.</para>
-    ///
-    /// <para>비율 앵커로 잡아 카드가 커지든 작아지든 같은 자리에 붙는다.</para>
-    /// </summary>
-    private static void PlaceRerollAtTop(Button btn)
-    {
-        if (btn == null) return;
-        var rt = (RectTransform)btn.transform;
-
-        // 카드 287×102 기준 — 우측 상단에 48×21이 여백 6을 두고 앉는다.
-        rt.anchorMin = new Vector2(1f, 1f);
-        rt.anchorMax = new Vector2(1f, 1f);
-        rt.pivot     = new Vector2(1f, 1f);
-        rt.sizeDelta        = new Vector2(48f, 21f);
-        rt.anchoredPosition = new Vector2(-6f, -6f);
-    }
-
     private static void FixRerollLabel(Button btn)
     {
         var lbl = btn.GetComponentInChildren<TMP_Text>(true);

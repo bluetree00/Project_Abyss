@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da4099e54407b9c4ab43dac896344b75, type: 3}
+  m_Name: Lich_M6p_SkeletonSummon
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichSkeletonSummonPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 2
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  patternCooldown: 25
+  castDuration: 1.5
+  legionDuration: 12
+  recoveryDuration: 0.5
+  skeletonPrefab: {fileID: 5098245364127042272, guid: 119497b481e20d54f843d3cf322d7234,
+    type: 3}
+  perSide: 2
+  edgeInset: 12
+  sideSpacing: 2.5
+  markRadius: 2.2
+  hoverHeight: 4
+  orbitRadius: 3
+  orbitLeg: 2.5
+  boltAt: 5
+  boltWarn: 0.6
+  boltRadius: 1.8
+  boltDamage: 0.6

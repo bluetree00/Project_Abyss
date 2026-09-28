@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t2_heavy_armor_piece
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t2_heavy_armor_piece
-  displayName: "\uD30C\uD3B8\uC758 \uB8EC"
+  displayName: "\uAD73\uAC74\uD55C \uC218\uD638\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 1

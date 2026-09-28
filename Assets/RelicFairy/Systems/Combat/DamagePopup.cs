@@ -88,10 +88,10 @@ public class DamagePopup : MonoBehaviour
     [Header("Outline")]
     // 아웃라인은 가독성의 필수 요소(리서치 공통). 폰트의 공용 머티리얼에 넣으면 그 폰트를 쓰는
     // 모든 텍스트가 오염되므로, 런타임 사본을 하나 만들어 팝업끼리만 공유한다(배칭 유지).
-    [SerializeField] private float outlineWidth = 0.2f;
+    [SerializeField] private float outlineWidth = 0.13f;   // 09-27 0.2 → 0.13: 「글자가 너무 굵다」 — 대비는 그림자로
     [SerializeField] private Color outlineColor = new(0.05f, 0.03f, 0.06f, 1f);
     [Tooltip("글자 두께 보정. 기본 폰트가 얇게 구워져 있어 숫자가 흐려 보이는 것을 메운다.")]
-    [SerializeField] private float faceDilate = 0.12f;
+    [SerializeField] private float faceDilate = 0f;   // 09-27 0.12 → 0: 기본 폰트(DNFForgedBlade Bold)는 얇지 않다 — 두께 보정이 획을 뭉갰다
 
     // ── Static ──────────────────────────────────────────────────────
     // 빌보드용 메인 카메라 — 전 팝업 공유 1회 캐시. Camera.main(FindWithTag)을 Show마다 부르지 않는다.
@@ -338,6 +338,7 @@ public class DamagePopup : MonoBehaviour
             s_outlineMat.SetFloat(ShaderUtilities.ID_OutlineWidth, outlineWidth);
             s_outlineMat.SetColor(ShaderUtilities.ID_OutlineColor, outlineColor);
             s_outlineMat.SetFloat(ShaderUtilities.ID_FaceDilate,   faceDilate);
+            AddSoftShadow(s_outlineMat);
         }
 
         if (s_critMat == null)
@@ -352,10 +353,23 @@ public class DamagePopup : MonoBehaviour
             s_critMat.SetColor(ShaderUtilities.ID_GlowColor,    critGlowColor);
             s_critMat.SetFloat(ShaderUtilities.ID_GlowPower,    critGlowPower);
             s_critMat.SetFloat(ShaderUtilities.ID_GlowOuter,    0.3f);
+            AddSoftShadow(s_critMat);
         }
 
         label.fontSharedMaterial = s_outlineMat;
     }
+    /// <summary>아래로 번지는 부드러운 그림자 — 테두리를 가늘게 줄인 만큼 밝은 바닥·이펙트 위 대비를 맡는다.</summary>
+    private static void AddSoftShadow(Material m)
+    {
+        if (!m.HasProperty(ShaderUtilities.ID_UnderlayColor)) return;
+        m.EnableKeyword(ShaderUtilities.Keyword_Underlay);
+        m.SetColor(ShaderUtilities.ID_UnderlayColor, new Color(0f, 0f, 0f, 0.6f));
+        m.SetFloat(ShaderUtilities.ID_UnderlayOffsetX, 0.3f);
+        m.SetFloat(ShaderUtilities.ID_UnderlayOffsetY, -0.45f);
+        m.SetFloat(ShaderUtilities.ID_UnderlayDilate, 0.15f);
+        m.SetFloat(ShaderUtilities.ID_UnderlaySoftness, 0.5f);
+    }
+
     /// <summary>0 → popScale 오버슈트 → 1.0 안착 → 후반 endScale 로 축소.</summary>
     private float ScaleCurve(float t)
     {

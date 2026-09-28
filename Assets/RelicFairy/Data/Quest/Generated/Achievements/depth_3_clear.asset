@@ -16,7 +16,7 @@ MonoBehaviour:
   icon: {fileID: 0}
   codeName: depth_3_clear
   displayName: "\uC2EC\uC5F0\uC758 \uC0C1\uC8FC\uC790"
-  description: "\uC2EC\uC5F0 \uAE4A\uC774 3 \uD074\uB9AC\uC5B4"
+  description: "\uC2EC\uC5F0 \uAE4A\uC774 3 \uB3C4\uB2EC"
   taskGroups:
   - tasks:
     - {fileID: 11400000, guid: e27b207ad9a3806418d524c260063793, type: 2}

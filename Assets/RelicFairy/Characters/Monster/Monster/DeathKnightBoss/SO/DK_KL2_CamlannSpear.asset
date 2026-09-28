@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5fd6db9771be7854ebbe9e0566315612, type: 3}
+  m_Name: DK_KL2_CamlannSpear
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.DKCamlannSpearPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: kl2_camlann
+  breakOverride: -1
+  lineInterval: 0.45
+  lineAim: 0.2
+  lineTelegraph: 0.5
+  crossDelay: 0.9
+  lockLead: 0.4
+  recoveryTime: 0.5
+  crossRadius: 2.2
+  lineVfxPrefab: {fileID: 1644958980890870, guid: d0ebac18aae7a7349a6feb3ac42cbccd,
+    type: 3}
+  crossVfxPrefab: {fileID: 1992029900475280859, guid: 4dfb534a3a08e5d49bd0b6362fbedce1,
+    type: 3}
+  crossVfxScale: 0.4
+  spearSfx: {fileID: 8300000, guid: 63bebc3cef4f5d94ca240156706febee, type: 3}
+  crossSfx: {fileID: 8300000, guid: a5b4676a78851ad408e98b3c68202f75, type: 3}
+  lineDamageMultiplier: 1
+  crossDamageMultiplier: 1.3
+  knockbackMultiplier: 1

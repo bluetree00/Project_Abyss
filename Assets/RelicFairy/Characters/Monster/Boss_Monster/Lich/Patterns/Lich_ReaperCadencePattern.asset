@@ -25,7 +25,7 @@ MonoBehaviour:
   maxTriggerRange: 8
   approachStopRange: 3
   approachDuration: 0.7
-  sweepHitDelay: 0.4
+  sweepHitDelay: 0.5
   sweepDuration: 1
   gapDuration: 0.25
   feintHoldDuration: 0.7
@@ -36,12 +36,10 @@ MonoBehaviour:
   sweepRadius: 4
   sweepHalfAngle: 60
   finisherRadiusMult: 1.4
-  finisherHalfAngle: 120
+  finisherSlamOffset: 1.5
+  parryable: 1
   sweepDamageMult: 1
   finisherDamageMult: 2
   sweepKnockbackMult: 1.2
   finisherKnockbackMult: 2.5
   patternCooldown: 11
-  slashVfxPrefab: {fileID: 0}
-  finisherVfxPrefab: {fileID: 0}
-  vfxLifetime: 2

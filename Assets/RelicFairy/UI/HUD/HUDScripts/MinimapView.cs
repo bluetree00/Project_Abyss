@@ -10,6 +10,7 @@ using UnityEngine.UI;
 ///   - AddMarker / RemoveMarker 로 마커 동적 생성·제거
 ///   - 플레이어 마커는 별도 Image로 항상 최상단 유지
 ///   - HudView.SetSections() 의 Section.Minimap 플래그로 패널 ON/OFF
+///   - 방 범위가 없으면(베이스캠프 · 런 밖) 판을 투명하게 숨긴다 — 빈 회색 판이 떴다(09-28)
 ///
 /// 연결 순서:
 ///   1) Initialize(roomCenter, roomSize)  ← GameRunBootstrapper가 맵 빌드 후 호출
@@ -26,6 +27,7 @@ public sealed class MinimapView : MonoBehaviour
     // ── Private ──────────────────────────────────────────────
     private RectTransform _markerContainer;
     private RectTransform _playerMarkerRect;
+    private CanvasGroup   _group;
 
     private Vector3 _roomCenter;
     private Vector2 _roomHalfSize;
@@ -34,6 +36,10 @@ public sealed class MinimapView : MonoBehaviour
 
     private readonly Dictionary<Transform, MinimapMarker> _markers = new();
     private readonly List<MinimapMarker>                  _toRemove = new();
+
+    // ── Properties ───────────────────────────────────────────
+    /// <summary>방 범위를 받았는가. 없으면 판을 숨긴다.</summary>
+    public bool HasRoom => _roomHalfSize.x > 0f && _roomHalfSize.y > 0f;
 
     // ── Lifecycle ────────────────────────────────────────────
     private void Awake()
@@ -48,6 +54,10 @@ public sealed class MinimapView : MonoBehaviour
 
         if (_playerMarkerRect != null)
             _playerMarkerRect.gameObject.SetActive(false);
+
+        if (!TryGetComponent(out _group)) _group = gameObject.AddComponent<CanvasGroup>();
+        ApplyTheme();
+        ApplyVisible();
     }
 
     private void LateUpdate()
@@ -75,6 +85,16 @@ public sealed class MinimapView : MonoBehaviour
         // 기존 마커들 범위 갱신 (재사용 케이스 대비)
         foreach (var m in _markers.Values)
             m.UpdateBounds(_roomCenter, _roomHalfSize, mapDisplayHalfSize);
+
+        ApplyVisible();
+    }
+
+    /// <summary>런을 떠날 때 호출 — 범위·마커를 비우고 판을 숨긴다(다음 씬에서 지난 방을 그리지 않게).</summary>
+    public void ClearRoom()
+    {
+        _roomHalfSize = Vector2.zero;
+        ClearAllMarkers();
+        ApplyVisible();
     }
 
     public void SetPlayerTransform(Transform playerTr)
@@ -133,6 +153,41 @@ public sealed class MinimapView : MonoBehaviour
     }
 
     // ── Private Methods ──────────────────────────────────────
+
+    /// <summary>
+    /// 공통 글래스 판(UITheme) — 임시 테두리 아트(하늘색 네모 틀) · 네모 바탕이 월드 위 회색 네모로 떴다
+    /// (09-28 UI 톤 통일, 사용자 결정 「공통 글래스 판으로 재질만」). 둥근 인디고 판 + 금 가는 선, 마스크도 둥글게.
+    /// 플레이어 점은 원색 초록 → 양피지 잉크(몬스터 빨강과 갈린다).
+    /// </summary>
+    private void ApplyTheme()
+    {
+        if (TryGetComponent<Image>(out var plate)) UITheme.StylePanel(plate, UITheme.Glass, UITheme.GoldLine, 12f);
+
+        var frame = FindChildRecursive(transform, "Img_Frame");
+        if (frame != null) frame.gameObject.SetActive(false);
+
+        var mask = FindChildRecursive(transform, "Mask_Area");
+        if (mask != null && mask.TryGetComponent<Image>(out var maskImg))
+        {
+            maskImg.sprite = UIProceduralSprites.RoundedRect(radius: 10f, feather: 1.5f);
+            maskImg.type   = Image.Type.Sliced;
+            if (mask.TryGetComponent<Mask>(out var m)) m.showMaskGraphic = false;
+        }
+
+        var bg = FindChildRecursive(transform, "Img_MapBg");
+        if (bg != null && bg.TryGetComponent<Image>(out var bgImg)) bgImg.color = new Color(0.02f, 0.02f, 0.04f, 0.35f);
+
+        if (_playerMarkerRect != null && _playerMarkerRect.TryGetComponent<Image>(out var dot)) dot.color = UITheme.Ink;
+    }
+    /// <summary>범위가 없으면 판 전체(테두리 포함)를 투명하게. 켜기/끄기는 HudView 섹션이 하므로 활성 상태는 두고 알파만 쓴다.</summary>
+    private void ApplyVisible()
+    {
+        if (_group == null) return;
+        bool on = HasRoom;
+        _group.alpha          = on ? 1f : 0f;
+        _group.blocksRaycasts = on;
+    }
+
     private void UpdatePlayerMarker()
     {
         if (_playerTransform == null || _playerMarkerRect == null) return;

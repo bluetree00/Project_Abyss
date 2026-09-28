@@ -10,7 +10,8 @@ using TMPro;
 /// ⚠️ 판정 기준은 <b>속성별 점유 셀 '개수'</b>다 — 셀이 서로 붙어 있는지(연결/클러스터)는 보지 않는다.
 ///    과거 '연결 클러스터' 방식에서 개수 방식으로 바뀌었으니 이름·문구에 '연결'을 다시 쓰지 말 것.
 ///
-/// 점유 개수 > 0인 존만 행이 동적으로 추가되고, 0이 되면 행이 사라진다.
+/// 09-25: 모든 존(6속성 + 중앙)을 <b>항상</b> 한 줄씩 보여 준다. 0칸인 존도 다음 문턱(1단계 6칸·중앙 4칸)을
+/// 미리 알린다 — 예전엔 룬을 놓기 전까지 이 칸이 통째로 비어 무엇을 채우는지 알 수 없었다.
 ///
 /// Refresh(zoneCounts) : MerlinRuneBridge.OnZoneCellsUpdated에서 호출.
 /// </summary>
@@ -48,7 +49,9 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         ZONE_COLORS[n] = ElementDef.CenterColor;
     }
 
-    private static readonly Color COLOR_BG_PANEL      = new(0.12f, 0.14f, 0.20f, 0.90f);
+    // 위 캐릭터 정보 판과 같은 바탕 — 두 판의 색이 달라(0.05 vs 0.12) 좌측 열이 이어 붙인 조각처럼 보였다(09-28).
+    private static readonly Color COLOR_BG_PANEL      = new(0.05f, 0.06f, 0.09f, 0.98f);
+    private const float Gutter = CharacterInfoPanelView.Gutter;   // 좌측 열 공통 좌우 여백
     private static readonly Color COLOR_ROW_BG_ACTIVE = new(0.17f, 0.19f, 0.26f, 0.92f);
     private static readonly Color COLOR_BADGE_OFF     = new(0.18f, 0.20f, 0.28f, 0.85f);
 
@@ -63,6 +66,15 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         public TMP_Text[] tierLabels = new TMP_Text[4];
         public int        zoneIdx;
     }
+
+    private const float RowH = 42f;   // 7행이 영역(≈321)에 들어가는 높이 — 44면 13px 넘쳐 중앙 행이 잘렸다(09-27)
+    private static readonly Color CountInk = new(0.92f, 0.96f, 1.00f, 1f);
+    private static readonly Color AmpInk   = new(1.00f, 0.80f, 0.35f, 1f);   // 정제소 핵이 키우는 존의 칸 수
+    private IReadOnlyDictionary<string, float> _amps;   // 존별 핵 증폭 배수(SetZoneAmplifiers)
+    // 납품 행 아트(시너지 바탕·테두리 248×104~106) = 왼쪽 육각 + 알약. 경계가 없어 44px 행에 늘리면 육각이 납작해진다 —
+    // 왼쪽 육각(≈104px)을 경계로 준 9-slice 사본을 쓴다. 배율은 원본 높이/행 높이(육각이 행 높이만 한 정사각이 되게).
+    private static readonly Vector4 RowArtBorder = new(104f, 10f, 26f, 10f);
+    private static Sprite _rowBgSliced, _rowBorderSliced;
 
     // ── Private fields ──
     private readonly Dictionary<string, ZoneRow> _rows  = new();
@@ -90,25 +102,14 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
 
     public void Refresh(IReadOnlyDictionary<string, int> zoneCounts)
     {
-        // 룬을 <b>하나라도 놓은</b> 존은 목록에 띄운다(예전엔 첫 임계에 도달해야만 나타나서,
-        // 효과를 다 채우기 전엔 무슨 시너지인지 알 수 없었다). 각 행은 현재 개수와
-        // "다음 단계까지 얼마나 남았는지"를 함께 보여준다(RefreshRow). 순서 = 처음 놓은 순서.
-        var placed = new HashSet<string>();
+        // 시너지 데이터가 있는 존은 <b>전부</b> 고정 순서로 띄운다(09-25). 0칸이어도 행이 있어야
+        // "어느 속성을 몇 칸 채우면 무엇이 열리는가"가 룬을 놓기 전에 보인다.
+        _activeOrder.Clear();
         for (int i = 0; i < ZONE_ORDER.Length; i++)
         {
             var zone = ZONE_ORDER[i];
             var syn = Managers.RuneData?.GetZoneSynergies(zone);
-            if (syn == null || syn.Count == 0) continue;
-            int c = 0; zoneCounts?.TryGetValue(zone, out c);
-            if (c > 0) placed.Add(zone);
-        }
-
-        // 표시 순서 갱신: 빈 존 제거 + 새로 채워진 존 append(놓은 순서 = 등장 순서)
-        _activeOrder.RemoveAll(z => !placed.Contains(z));
-        for (int i = 0; i < ZONE_ORDER.Length; i++)
-        {
-            var zone = ZONE_ORDER[i];
-            if (placed.Contains(zone) && !_activeOrder.Contains(zone)) _activeOrder.Add(zone);
+            if (syn != null && syn.Count > 0) _activeOrder.Add(zone);
         }
 
         // 목록에서 빠진(비활성) 행 파괴
@@ -152,6 +153,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
                 int count = 0;
                 zoneCounts?.TryGetValue(_hoveredZoneId, out count);
                 UpdateTooltipContent(_hoveredZoneId, count);
+                PositionTooltipNear(tr.go.GetComponent<RectTransform>());
             }
             else
             {
@@ -168,38 +170,39 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         var go = new GameObject("GuideHeader", typeof(RectTransform));
         go.transform.SetParent(transform, false);
         var rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0f, 0.88f);
-        rt.anchorMax = new Vector2(1f, 1.00f);
-        rt.offsetMin = new Vector2(2f, 1f);
-        rt.offsetMax = new Vector2(-2f, -1f);
-        go.AddComponent<Image>().color = new Color(0.14f, 0.18f, 0.26f, 0.88f);
+        // 위에서 고정 높이 — 활성 효과 머리띠와 같은 띠(예전 비율 0.12 ≈ 44px라 위 띠의 두 배였다).
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.offsetMin = new Vector2(Gutter, -(1f + CharacterInfoPanelView.SectionBandH));
+        rt.offsetMax = new Vector2(-Gutter, -1f);
+        go.AddComponent<Image>().color = CharacterInfoPanelView.SectionBand;
 
         var titleTxt = new GameObject("Title", typeof(RectTransform)).AddComponent<TextMeshProUGUI>();
         titleTxt.transform.SetParent(go.transform, false);
         var trt = titleTxt.GetComponent<RectTransform>();
         trt.anchorMin = new Vector2(0.04f, 0f);
-        trt.anchorMax = new Vector2(0.55f, 1f);
+        trt.anchorMax = new Vector2(0.45f, 1f);
         trt.offsetMin = trt.offsetMax = Vector2.zero;
         titleTxt.text          = "◆ 속성 시너지";
         titleTxt.fontSize      = 17f;
         titleTxt.fontStyle     = FontStyles.Bold;
-        titleTxt.color         = new Color(0.75f, 0.90f, 1.00f, 1f);
+        titleTxt.color         = CharacterInfoPanelView.SectionInk;
         titleTxt.alignment     = TextAlignmentOptions.MidlineLeft;
         titleTxt.raycastTarget = false;
 
         var descTxt = new GameObject("Desc", typeof(RectTransform)).AddComponent<TextMeshProUGUI>();
         descTxt.transform.SetParent(go.transform, false);
         var drt = descTxt.GetComponent<RectTransform>();
-        drt.anchorMin = new Vector2(0.55f, 0f);
+        drt.anchorMin = new Vector2(0.45f, 0f);
         drt.anchorMax = new Vector2(1f, 1f);
         drt.offsetMin = Vector2.zero;
         drt.offsetMax = new Vector2(-8f, 0f);
-        descTxt.text               = "블록을 배치하면 시너지가 표시됩니다";
+        descTxt.text               = "칸을 채우면 열린다";
         descTxt.fontSize           = 16f;
         descTxt.color              = new Color(0.48f, 0.54f, 0.72f, 0.85f);
         descTxt.alignment          = TextAlignmentOptions.MidlineRight;
-        // 안내문(182px)이 칸(163px)보다 길어 끝이 잘렸다(2026-09-09 실측). 칸이 두 줄 높이는 되므로 줄바꿈을 허용한다.
-        descTxt.textWrappingMode = TextWrappingModes.Normal;
+        // 띠가 한 줄 높이(32)라 줄바꿈하면 잘린다 — 칸을 0.45부터로 넓혀 한 줄에 넣는다(09-28).
+        descTxt.textWrappingMode = TextWrappingModes.NoWrap;
         descTxt.raycastTarget      = false;
     }
 
@@ -239,9 +242,9 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         viewGO.transform.SetParent(transform, false);
         var viewRT = viewGO.GetComponent<RectTransform>();
         viewRT.anchorMin = new Vector2(0f, 0f);
-        viewRT.anchorMax = new Vector2(1f, 0.87f);
+        viewRT.anchorMax = new Vector2(1f, 1f);
         viewRT.offsetMin = new Vector2(0f, 2f);
-        viewRT.offsetMax = new Vector2(0f, -2f);
+        viewRT.offsetMax = new Vector2(0f, -(CharacterInfoPanelView.SectionBandH + 4f));
         viewGO.AddComponent<RectMask2D>();
 
         var scrollRect = viewGO.AddComponent<ScrollRect>();
@@ -263,7 +266,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         var vlg = contentGO.AddComponent<VerticalLayoutGroup>();
         vlg.childAlignment       = TextAnchor.UpperLeft;
         vlg.spacing              = 3f;
-        vlg.padding              = new RectOffset(4, 4, 4, 4);
+        vlg.padding              = new RectOffset((int)Gutter, (int)Gutter, 4, 4);   // 머리띠·위 판과 같은 좌우 선
         vlg.childControlWidth    = true;
         vlg.childControlHeight   = false;
         vlg.childForceExpandWidth  = true;
@@ -293,8 +296,9 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         _emptyLabelGO.transform.SetParent(transform, false);
         var ert = _emptyLabelGO.GetComponent<RectTransform>();
         ert.anchorMin = Vector2.zero;
-        ert.anchorMax = new Vector2(1f, 0.87f);
-        ert.offsetMin = ert.offsetMax = Vector2.zero;
+        ert.anchorMax = Vector2.one;
+        ert.offsetMin = Vector2.zero;
+        ert.offsetMax = new Vector2(0f, -(CharacterInfoPanelView.SectionBandH + 4f));
         var eTxt = _emptyLabelGO.AddComponent<TextMeshProUGUI>();
         eTxt.text          = "셀을 배치하면\n시너지가 표시됩니다";
         eTxt.fontSize      = 16f;
@@ -308,6 +312,9 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
     private Sprite _rowBgSkin, _rowBorderSkin;
     public void SetSkin(Sprite bg, Sprite border) { _rowBgSkin = bg; _rowBorderSkin = border; }
 
+    /// <summary>존별 핵 증폭 배수(1.2 = +20%). 다음 <see cref="Refresh"/>에 반영된다. null이면 없음.</summary>
+    public void SetZoneAmplifiers(IReadOnlyDictionary<string, float> amps) => _amps = amps;
+
     private ZoneRow BuildRow(string zoneId, int idx)
     {
         var row = new ZoneRow { zoneIdx = idx };
@@ -316,21 +323,29 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         row.go.transform.SetParent(_rowContainer, false);
         // 좌측 패널 뷰포트는 약 879px인데 6행 × 34px = 251px(29%)만 쓰고 나머지가 비어 있었다.
         // 폭(384px)은 고정이라 남는 건 세로뿐이므로, 행을 키워 글자를 읽히게 만든다.
-        row.go.AddComponent<LayoutElement>().preferredHeight = 72f;
+        // 7존(6속성 + 중앙)이 스크롤 없이 한눈에 들어가게 한 줄 행(44px). 예전 72px 두 줄 행은 놓은 존만 떠서 가능했다.
+        row.go.AddComponent<LayoutElement>().preferredHeight = RowH;
+        // VLG가 높이를 잡지 않으므로(childControlHeight=false) 높이는 직접 준다 — 안 주면 RectTransform 기본값 100으로 선다.
+        ((RectTransform)row.go.transform).sizeDelta = new Vector2(0f, RowH);
         var rowBg = row.go.AddComponent<Image>();
         rowBg.color = COLOR_ROW_BG_ACTIVE;
-        if (_rowBgSkin != null)   // 시너지 바탕
+        _rowBgSliced     ??= ShopUIStyle.SlicedCopy(_rowBgSkin,     RowArtBorder);
+        _rowBorderSliced ??= ShopUIStyle.SlicedCopy(_rowBorderSkin, RowArtBorder);
+        bool rowArt = _rowBgSliced != null;
+        if (rowArt)   // 시너지 바탕
         {
-            rowBg.sprite = _rowBgSkin; rowBg.type = Image.Type.Sliced; rowBg.color = Color.white;
+            rowBg.sprite = _rowBgSliced; rowBg.type = Image.Type.Sliced; rowBg.color = Color.white;
+            rowBg.pixelsPerUnitMultiplier = _rowBgSkin.rect.height / RowH;
         }
-        if (_rowBorderSkin != null)   // 시너지 테두리 — 위에 얹는 프레임
+        if (_rowBorderSliced != null)   // 시너지 테두리 — 위에 얹는 프레임
         {
             var bd = new GameObject("Border", typeof(RectTransform), typeof(Image));
             bd.transform.SetParent(row.go.transform, false);
             var brt = (RectTransform)bd.transform;
             brt.anchorMin = Vector2.zero; brt.anchorMax = Vector2.one; brt.offsetMin = brt.offsetMax = Vector2.zero;
             var bi = bd.GetComponent<Image>();
-            bi.sprite = _rowBorderSkin; bi.type = Image.Type.Sliced; bi.raycastTarget = false;
+            bi.sprite = _rowBorderSliced; bi.type = Image.Type.Sliced; bi.raycastTarget = false;
+            bi.pixelsPerUnitMultiplier = _rowBorderSkin.rect.height / RowH;
             brt.SetAsLastSibling();
         }
 
@@ -347,13 +362,17 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         row.accentStrip = accent.AddComponent<Image>();
         row.accentStrip.color         = zoneColor;
         row.accentStrip.raycastTarget = false;
+        if (rowArt) accent.SetActive(false);   // 육각 아트가 행의 머리 — 색 띠는 폴백 전용
+
+        // 육각 칸(아트가 있으면 왼쪽 ≈11%)과 나머지 — 아트가 없으면 예전 비율
+        float hexR  = rowArt ? 0.11f : 0.022f;
 
         // 아이콘+이름 (4~22%)
         var nameGO = new GameObject("Name", typeof(RectTransform));
         nameGO.transform.SetParent(row.go.transform, false);
         var nrt = nameGO.GetComponent<RectTransform>();
-        nrt.anchorMin = new Vector2(0.022f, 0.08f);
-        nrt.anchorMax = new Vector2(0.22f, 0.92f);
+        nrt.anchorMin = new Vector2(rowArt ? 0.125f : 0.022f, 0.08f);
+        nrt.anchorMax = new Vector2(rowArt ? 0.275f : 0.22f, 0.92f);
         nrt.offsetMin = new Vector2(4f, 0f);
         nrt.offsetMax = Vector2.zero;
         var nameTxt = nameGO.AddComponent<TextMeshProUGUI>();
@@ -370,12 +389,12 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         var countGO = new GameObject("Count", typeof(RectTransform));
         countGO.transform.SetParent(row.go.transform, false);
         var crt = countGO.GetComponent<RectTransform>();
-        crt.anchorMin = new Vector2(0.22f, 0.08f);
-        crt.anchorMax = new Vector2(0.30f, 0.92f);
+        crt.anchorMin = new Vector2(rowArt ? 0f : 0.22f, 0.08f);          // 아트가 있으면 육각 안에 칸 수
+        crt.anchorMax = new Vector2(rowArt ? hexR : 0.30f, 0.92f);
         crt.offsetMin = crt.offsetMax = Vector2.zero;
         var countTxt = countGO.AddComponent<TextMeshProUGUI>();
         countTxt.text               = "0";
-        countTxt.fontSize           = 24f;
+        countTxt.fontSize           = 20f;
         countTxt.fontStyle          = FontStyles.Bold;
         countTxt.color              = new Color(0.92f, 0.96f, 1.00f, 1f);
         countTxt.alignment          = TextAlignmentOptions.Midline;
@@ -384,7 +403,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         row.countText = countTxt;
 
         // 4단계 트랙 (30~99%) — 각 단계 = 한 칸, 임계값 도달 시 점등
-        const float TRACK_L = 0.30f, TRACK_R = 0.99f;
+        float TRACK_L = rowArt ? 0.285f : 0.30f, TRACK_R = rowArt ? 0.965f : 0.99f;
         float segW = (TRACK_R - TRACK_L) / 4f;
         for (int b = 0; b < 4; b++)
         {
@@ -410,7 +429,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             lrt.offsetMax = new Vector2(-2f, 0f);
             var lTxt = lblGO.AddComponent<TextMeshProUGUI>();
             lTxt.text               = $"{b + 1}단계";
-            lTxt.fontSize           = 14f;
+            lTxt.fontSize           = 16f;   // 14 → 16(하한). 한 줄만 — 단계 이름(최대 6자)은 활성 효과 목록·툴팁에
             lTxt.color              = new Color(0.50f, 0.53f, 0.66f, 1f);
             lTxt.alignment          = TextAlignmentOptions.Center;
             lTxt.textWrappingMode = TextWrappingModes.NoWrap;
@@ -446,7 +465,11 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         Color zoneColor = GetZoneColor(row.zoneIdx);
 
         if (row.countText != null)
+        {
             row.countText.SetText(count.ToString());
+            // 정제소 핵이 이 존을 키우고 있으면 칸 수가 금빛 — 배율은 툴팁(09-27: 핵을 놓아도 표에 아무 변화가 없었다).
+            row.countText.color = AmpOf(zoneId) > 0 ? AmpInk : CountInk;
+        }
 
         var synergies = Managers.RuneData?.GetZoneSynergies(zoneId);
         var sorted    = new List<RuneSynergyEntry>();
@@ -473,9 +496,8 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
 
             if (row.tierLabels[b] != null)
             {
-                // 도달: 단계명(예: 점화), 미도달: 필요 칸 수
-                string line2 = !hasData ? "—" : (met ? TierEffectName(sorted[b]) : $"{sorted[b].threshold}칸");
-                row.tierLabels[b].text      = $"{b + 1}단계\n{line2}";
+                // 도달: 「N단계」가 켜진다 / 미도달: 필요 칸 수. 한 줄(16px) — 단계 이름은 6자까지라 칸(≈60px)에 안 든다.
+                row.tierLabels[b].text      = !hasData ? "—" : (met ? $"{b + 1}단계" : $"{sorted[b].threshold}칸");
                 row.tierLabels[b].fontStyle = isCur ? FontStyles.Bold : FontStyles.Normal;
                 row.tierLabels[b].color     = met
                     ? new Color(
@@ -487,84 +509,87 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         }
     }
 
-    /// <summary>description "N단계 이름: 설명" 에서 "이름"만 추출. 실패 시 effect_type.</summary>
-    private static string TierEffectName(RuneSynergyEntry e)
-    {
-        if (!string.IsNullOrEmpty(e.description))
-        {
-            int colon = e.description.IndexOf(':');
-            string head = colon > 0 ? e.description.Substring(0, colon) : e.description;
-            int sp = head.IndexOf(' ');
-            if (sp > 0 && sp + 1 < head.Length) return head.Substring(sp + 1).Trim();
-        }
-        return e.effect_type;
-    }
-
     // ── Tooltip ──
 
     private void BuildTooltip()
     {
-        _tooltipGO = new GameObject("Tooltip", typeof(RectTransform));
-        _tooltipGO.transform.SetParent(transform, false);
+        _tooltipGO = new GameObject("SynergyTooltip", typeof(RectTransform));
+        // 룬판 루트 아래 — 이 뷰(좌측 패널)의 자식이면 뒤에 그려지는 중앙 판(룬 칸)이 툴팁을 덮었다(09-28 사용자 캡처).
+        _tooltipGO.transform.SetParent(TooltipRoot, false);
         var rt = _tooltipGO.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0f, 0.40f);
-        rt.anchorMax = new Vector2(0.65f, 0.86f);
-        rt.offsetMin = new Vector2(4f, 4f);
-        rt.offsetMax = new Vector2(-4f, -4f);
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot     = new Vector2(0f, 0.5f);
+        rt.sizeDelta = new Vector2(TooltipMinWidth, 200f);
 
+        // 공통 글래스 판 + 금 가는 선(UITheme) — 푸른 판 · 하늘색 선이 이 화면만 따로 놀았다(09-29).
         var bg = _tooltipGO.AddComponent<Image>();
-        bg.color = new Color(0.08f, 0.09f, 0.14f, 0.97f);
-
-        var border = new GameObject("Border", typeof(RectTransform));
-        border.transform.SetParent(_tooltipGO.transform, false);
-        var brt = border.GetComponent<RectTransform>();
-        brt.anchorMin = Vector2.zero;
-        brt.anchorMax = Vector2.one;
-        brt.offsetMin = brt.offsetMax = Vector2.zero;
-        border.AddComponent<Image>().color = new Color(0.25f, 0.38f, 0.65f, 0.40f);
+        bg.raycastTarget = false;
+        UITheme.StylePanel(bg, new Color(0.05f, 0.045f, 0.08f, 0.97f), UITheme.GoldLine, 8f);
 
         var textGO = new GameObject("Text", typeof(RectTransform));
         textGO.transform.SetParent(_tooltipGO.transform, false);
         var trt = textGO.GetComponent<RectTransform>();
         trt.anchorMin = Vector2.zero;
         trt.anchorMax = Vector2.one;
-        trt.offsetMin = new Vector2(8f, 6f);
-        trt.offsetMax = new Vector2(-8f, -6f);
+        trt.offsetMin = new Vector2(TooltipPadX, TooltipPadY);
+        trt.offsetMax = new Vector2(-TooltipPadX, -TooltipPadY);
         _tooltipText = textGO.AddComponent<TextMeshProUGUI>();
-        _tooltipText.fontSize          = 11f;
-        _tooltipText.color             = new Color(0.88f, 0.93f, 1.00f, 1f);
+        _tooltipText.fontSize          = TooltipFont;
+        _tooltipText.color             = UITheme.Ink;
         _tooltipText.alignment         = TextAlignmentOptions.TopLeft;
-        _tooltipText.textWrappingMode = TextWrappingModes.Normal;
+        _tooltipText.textWrappingMode  = TextWrappingModes.NoWrap;   // 문장 중간 줄바꿈 금지 — 폭을 내용에 맞춘다(09-29)
+        _tooltipText.lineSpacing       = 6f;
         _tooltipText.raycastTarget     = false;
+        TMPOutlineHelper.ApplySoftShadow(_tooltipText);
 
         _tooltipGO.SetActive(false);
     }
 
+    // 툴팁 — 룬판 루트 좌표로 놓는다. 폭은 가장 긴 줄에 맞추되(줄바꿈 없음) 이 범위 안 — 넘으면 글자를 줄인다.
+    private const float TooltipMinWidth = 360f;
+    private const float TooltipMaxWidth = 760f;
+    private const float TooltipPadX     = 16f;
+    private const float TooltipPadY     = 12f;
+    private const float TooltipFont     = 16f;
+    private float _tooltipWidth = TooltipMinWidth;
+
+    // 수치(10초 · 4% · +50% · ×2 · 3칸 …)만 골라 금빛 굵게 — 설명 속 숫자가 글에 묻혔다(09-29 사용자).
+    private static readonly System.Text.RegularExpressions.Regex NumberRx =
+        new(@"[+\-−×x]?\d+(?:\.\d+)?(?:%p|%|초|칸|m|회|배|단계)?", System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex TierPrefixRx =
+        new(@"^\s*\d+\s*단계\s*", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static string EmphasizeNumbers(string s, string hex)
+        => NumberRx.Replace(s, m => $"<color={hex}><b>{m.Value}</b></color>");
+
+    /// <summary>툴팁의 부모 — 룬판 루트(모든 패널 위). 룬판이 아직 없으면 이 뷰.</summary>
+    private Transform TooltipRoot => UI_GridPanel.Instance != null ? UI_GridPanel.Instance.transform : transform;
+
+    /// <summary>
+    /// 행 오른쪽 — 좌측 패널 바깥(판 위)에 띄운다. 행 위에 뜨면 보려던 단계 칩을 덮는다(2026-09-14).
+    /// 높이는 내용에 맞추고, 화면 안으로 세로를 가둔다. 좌표는 룬판 루트 기준(부모가 루트라서).
+    /// </summary>
     private void PositionTooltipNear(RectTransform rowRT)
     {
-        if (_tooltipGO == null || rowRT == null) return;
-        var rt = _tooltipGO.GetComponent<RectTransform>();
+        if (_tooltipGO == null || rowRT == null || _tooltipText == null) return;
+        var rt   = (RectTransform)_tooltipGO.transform;
+        var root = rt.parent as RectTransform;
+        if (root == null) return;
 
-        // 행의 localY 중심을 구해 툴팁 Y 계산
-        Vector2 localCenter = transform.InverseTransformPoint(
-            rowRT.TransformPoint(rowRT.rect.center));
-        float yCenter = (localCenter.y - ((RectTransform)transform).rect.yMin)
-                      / ((RectTransform)transform).rect.height;
+        var me = (RectTransform)transform;
+        Vector2 rowC  = root.InverseTransformPoint(rowRT.TransformPoint(rowRT.rect.center));
+        Vector2 edge  = root.InverseTransformPoint(me.TransformPoint(new Vector3(me.rect.xMax, 0f, 0f)));
 
-        bool showAbove = yCenter < 0.45f;
-        if (showAbove)
-        {
-            rt.anchorMin = new Vector2(0f, Mathf.Clamp01(yCenter + 0.02f));
-            rt.anchorMax = new Vector2(0.65f, Mathf.Clamp01(yCenter + 0.48f));
-        }
-        else
-        {
-            rt.anchorMin = new Vector2(0f, Mathf.Clamp01(yCenter - 0.48f));
-            rt.anchorMax = new Vector2(0.65f, Mathf.Clamp01(yCenter - 0.02f));
-        }
-        rt.offsetMin = new Vector2(4f, 4f);
-        rt.offsetMax = new Vector2(-4f, -4f);
-        _tooltipGO.transform.SetAsLastSibling();
+        float h = _tooltipText.GetPreferredValues(_tooltipText.text, _tooltipWidth - TooltipPadX * 2f, 0f).y
+                + TooltipPadY * 2f;
+        var rr = root.rect;
+        float y = Mathf.Clamp(rowC.y, rr.yMin + h * 0.5f + 8f, rr.yMax - h * 0.5f - 8f);
+
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot            = new Vector2(0f, 0.5f);
+        rt.sizeDelta        = new Vector2(_tooltipWidth, h);
+        rt.anchoredPosition = new Vector2(edge.x + 10f - rr.center.x, y - rr.center.y);
+        rt.SetAsLastSibling();
     }
 
     private void UpdateTooltipContent(string zoneId, int count)
@@ -575,44 +600,76 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
 
         var synergies = Managers.RuneData?.GetZoneSynergies(zoneId);
         var sb = new System.Text.StringBuilder();
+        string zoneHex = ColorUtility.ToHtmlStringRGB(GetZoneColor(idx));
 
-        sb.AppendLine($"<b><color=#B8E0FF>{ZONE_ICONS[idx]} {ZONE_NAMES[idx]} ({zoneId})</color></b>");
-        sb.AppendLine($"현재 채움: <b>{count}칸</b>");
-        sb.AppendLine();
-
+        List<RuneSynergyEntry> sorted = null;
+        int nextThr = 0;
         if (synergies != null && synergies.Count > 0)
         {
-            var sorted = new List<RuneSynergyEntry>(synergies);
+            sorted = new List<RuneSynergyEntry>(synergies);
             sorted.Sort((a, b) => a.threshold.CompareTo(b.threshold));
+            foreach (var s in sorted)
+                if (count < s.threshold) { nextThr = s.threshold; break; }
+        }
 
+        // 머리 — 존 이름 · 지금 몇 칸 · 다음 단계까지(한 줄, 가장 먼저 읽히게)
+        string next = nextThr > 0 ? $"   <color=#9A93A6>다음 단계까지</color> <color=#FFD98A><b>{nextThr - count}칸</b></color>" : "   <color=#6BE08A>모든 단계 달성</color>";
+        sb.AppendLine($"<size=19><b><color=#{zoneHex}>{ZONE_ICONS[idx]} {ZONE_NAMES[idx]}</color></b></size>   <color=#9A93A6>채움</color> <b>{count}칸</b>{next}");
+        int amp = AmpOf(zoneId);
+        if (amp > 0) sb.AppendLine($"<color=#FFCB5A>◆ 핵 증폭 +{amp}%</color>  <color=#9A93A6>이 존의 시너지 효과가 커진다</color>");
+
+        if (sorted != null)
+        {
             for (int i = 0; i < sorted.Count; i++)
             {
                 var s = sorted[i];
-                bool met   = count >= s.threshold;
-                string chk = met ? "<color=#55FF88>◆</color>" : "◇";
+                bool met    = count >= s.threshold;
+                bool isNext = s.threshold == nextThr;
                 string desc = string.IsNullOrEmpty(s.description) ? s.effect_type : s.description;
-                sb.AppendLine($"{chk} <b>({s.threshold}칸)</b> {desc}");
-            }
 
-            int maxThr = sorted[sorted.Count - 1].threshold;
-            if (count < maxThr)
-            {
-                int nextThr = 0;
-                foreach (var s in sorted)
-                    if (count < s.threshold) { nextThr = s.threshold; break; }
-                if (nextThr > 0)
-                    sb.AppendLine($"\n다음 단계까지 <b>{nextThr - count}칸</b> 더 필요");
+                // 「1단계 독안개 살포: 효과, 효과」 → 이름 · 효과(쉼표 절을 「·」로 이어 한 줄)
+                string name = null, effect = desc;
+                int colon = desc.IndexOf(':');
+                if (colon > 0) { name = TierPrefixRx.Replace(desc.Substring(0, colon), string.Empty).Trim(); effect = desc.Substring(colon + 1).Trim(); }
+                effect = string.Join("  ·  ", effect.Split(new[] { ", ", "," }, System.StringSplitOptions.RemoveEmptyEntries));
+
+                string mark   = met ? "<color=#6BE08A>◆</color>" : isNext ? "<color=#FFCB5A>◇</color>" : "<color=#6E6A78>◇</color>";
+                string head   = met ? "#EDE6D8" : isNext ? "#FFD98A" : "#8E8A98";
+                string numHex = met || isNext ? "#FFD98A" : "#C9B98A";
+                string body   = met || isNext ? "#D9D3C4" : "#8E8A98";
+
+                sb.AppendLine();
+                sb.AppendLine($"{mark} <color={head}><b>{s.threshold}칸</b>{(string.IsNullOrEmpty(name) ? string.Empty : $"  {name}")}</color>");
+                sb.AppendLine($"<indent=1.4em><color={body}>{EmphasizeNumbers(effect, numHex)}</color></indent>");
             }
         }
         else
         {
-            sb.AppendLine("(시너지 데이터 없음)");
+            sb.AppendLine();
+            sb.AppendLine("<color=#9A93A6>(시너지 데이터 없음)</color>");
         }
 
-        _tooltipText.SetText(sb.ToString().TrimEnd());
+        string text = sb.ToString().TrimEnd();
+        _tooltipText.enableAutoSizing = false;
+        _tooltipText.fontSize = TooltipFont;
+        _tooltipText.SetText(text);
+
+        // 폭 = 가장 긴 줄(줄바꿈 없음). 최대 폭을 넘는 긴 설명만 글자를 줄여 판 안에 넣는다.
+        float need = _tooltipText.GetPreferredValues(text, float.PositiveInfinity, 0f).x + TooltipPadX * 2f + 4f;
+        _tooltipWidth = Mathf.Clamp(need, TooltipMinWidth, TooltipMaxWidth);
+        if (need > TooltipMaxWidth)
+        {
+            _tooltipText.enableAutoSizing = true;
+            _tooltipText.fontSizeMax = TooltipFont;
+            _tooltipText.fontSizeMin = 12f;
+        }
     }
 
     // ── Helpers ──
+
+    /// <summary>이 존의 핵 증폭(%). 없으면 0.</summary>
+    private int AmpOf(string zoneId)
+        => _amps != null && _amps.TryGetValue(zoneId, out var m) ? Mathf.RoundToInt((m - 1f) * 100f) : 0;
 
     private static Color GetZoneColor(int idx) =>
         (idx >= 0 && idx < ZONE_COLORS.Length) ? ZONE_COLORS[idx] : Color.white;

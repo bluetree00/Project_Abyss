@@ -57,11 +57,16 @@ public class GetHitState : IMonsterState
 
         // 넉백으로 밀린 Rigidbody 속도를 정지시킨 후 kinematic 복원 → NavMesh에 재스냅
         var rb = ctx.Monster.GetComponent<Rigidbody>();
+        // 넉백 없이 경직에 들어온 경우(가해자 없음·보스 등급)엔 바디가 여전히 kinematic이다 —
+        // 그때 속도를 넣으면 경고만 난다. DieState와 같은 가드.
         if (rb != null)
         {
-            rb.linearVelocity  = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
-            rb.isKinematic     = true;
+            if (!rb.isKinematic)
+            {
+                rb.linearVelocity  = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+            rb.isKinematic = true;
         }
 
         ctx.Agent.enabled = true;

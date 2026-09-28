@@ -180,3 +180,95 @@ Mordred_Corrupted,1,Mordred,,<color=#E0453F>그대의 어깨에. <b>죽음으로
 Intro_Prologue,0,None,Illust_Intro_Page03,아서의 시대. 원탁에 앉을 자격은 오직 검으로 주어졌다.
 Intro_Prologue,1,None,Illust_Intro_Page02,그 검은 왕이 내리지 않는다. 원탁의 가장 강한 기사가 건넨다.
 Intro_Prologue,2,None,Illust_Intro_Page01,"오늘, 한 기사가 자신의 검을 받으러 간다."
+Mission_Seal,0,Merlin,Illust_God_Default,"저들을 쓰러뜨릴 힘은, 아직 네게 없어."
+Mission_Seal,1,Merlin,Illust_God_Default,하지만 봉인할 수는 있어. 넷 — 넷을 모두 묶으면 이 순환도 멈춰.
+Mission_Seal,2,Shadow,Illust_Shadow_Default,봉인이라. …멀린다운 답이군.
+Seal_Ch1_First,0,Merlin,Illust_God_Default,하나. 숲이 조용해졌어.
+Seal_Ch2_First,0,Merlin,Illust_God_Default,둘. 불길이 사슬 아래 잠들었어.
+Seal_Ch2_First,1,Shadow,Illust_Shadow_Default,사슬은 녹기도 하지.
+Seal_Ch3_First,0,Merlin,Illust_God_Default,셋. …그날 네 어깨에 검을 대던 손이었어. 이제 쉬게 하자.
+Story_Chapter4Door,0,Merlin,Illust_God_Default,남은 건 하나. 성소의 가장 안쪽… 문이 열릴 거야.
+Story_Chapter4Door,1,Merlin,Illust_God_Default,기억의 제단에서 그 문을 열 수 있어.
+Nightmare_Begin,0,Merlin,Illust_God_Default,"…봉인이, 전부 무너졌어. 내 술식이… 그의 손에 있었어."
+Nightmare_Begin,1,Shadow,Illust_Shadow_Default,말했잖아. 돌아가라고. 늦지 않았을 때.
+Nightmare_Begin,2,Merlin,Illust_God_Default,"이제 봉인이 아니야, 작은 빛. 끝을 내야 해."
+Nightmare_Begin,3,Shadow,Illust_Shadow_Default,"걱정 마. 그 녀석, 이제 그럴 만큼 자랐으니까."
+Chapter1_Enter_Nightmare_First,0,Shadow,Illust_Shadow_Default,같은 숲이 아니야. 뿌리가 발목을 노려.
+Chapter1_Enter_Nightmare_First,1,Merlin,Illust_God_Default,봉인은 없어. 이번엔 베어 넘어가.
+Chapter1_Enter_Nightmare_R1,0,Shadow,Illust_Shadow_Default,뿌리가 또 발을 붙잡겠지. 가볍게 굴러.
+Chapter2_Enter_Nightmare_First,0,Shadow,Illust_Shadow_Default,불길이 사슬을 녹였어. 방패도 오래 못 버텨.
+Chapter2_Enter_Nightmare_First,1,Merlin,Illust_God_Default,막기보다 먼저 끝내. 그게 이 땅의 방식이야.
+Chapter2_Enter_Nightmare_R1,0,Merlin,Illust_God_Default,방패는 금방 녹아. 먼저 베어.
+Chapter3_Enter_Nightmare_First,0,Shadow,Illust_Shadow_Default,맹세가 부서진 성채야. 여기선 서약도 다 붙들 수 없어.
+Chapter3_Enter_Nightmare_First,1,Merlin,Illust_God_Default,…모르드레드가 기다려. 이번엔 쉬게 해주자.
+Chapter3_Enter_Nightmare_R1,0,Shadow,Illust_Shadow_Default,부서진 맹세 위에선 손이 모자라지. 고를 걸 골라.
+Chapter4_Enter_Nightmare_First,0,Merlin,Illust_God_Default,그가 내 술식을 쥐고 있어. 기술이 쉽게 돌아오지 않을 거야.
+Chapter4_Enter_Nightmare_First,1,Shadow,Illust_Shadow_Default,"사슬도, 봉인도 없는 제단이야. 끝을 보러 가."
+Chapter4_Enter_Nightmare_R1,0,Shadow,Illust_Shadow_Default,술식이 거꾸로 흐르는 곳이야. 기술을 아껴.
+Kill_Ch1_First,0,Merlin,Illust_God_Default,숲의 수호자가 쓰러졌어. 이번엔 봉인이 아니라 — 끝이야.
+Kill_Ch2_First,0,Merlin,Illust_God_Default,화룡의 불이 꺼졌어. 다시는 사슬을 녹이지 못해.
+Kill_Ch3_First,0,Merlin,Illust_God_Default,…모르드레드. 이제야 네 검을 내려놓는구나.
+Lich_Intro_Sealed,0,Lich,Lich_Portrait,알고 있었어.
+Lich_Intro_Sealed,1,Lich,Lich_Portrait,언젠간 올 거라고. 멀린이 그렇게 만들었으니까.
+Lich_Intro_Sealed,2,Lich,Lich_Portrait,그 얼굴. 그 눈. 나는 알아. 네가 무엇인지.
+Lich_Intro_Sealed,3,Lich,Lich_Portrait,멀린이 소환한 영혼. 세계를 구하러 온 빛.
+Lich_Intro_Sealed,4,Lich,Lich_Portrait,멀린의 기억. 그의 지식. 그의 목소리. 모두 내 안에 있다.
+Lich_Intro_Sealed,5,Lich,Lich_Portrait_Calm,…나를 봉인하러 왔겠지. 멀린의 봉인술로.
+Lich_Intro_Sealed,6,Lich,Lich_Portrait_Calm,그 술식이 누구 손에 있는지도 모르고.
+Lich_Intro_Sealed,7,Lich,Lich_Portrait_Rage,그럼에도 오겠다면... 받아라.
+Lich_Bound_Phase,0,Lich,Lich_Portrait_Rage,이 정도로 날 가둘 수 있을 것 같나!
+Lich_Bound_Phase,1,Merlin,Illust_God_Default,세 봉인이… 그를 묶고 있어!
+Seal_Ritual,0,Merlin,Illust_God_Default,지금이야! 봉인석을 깨워!
+Seal_Ritual_Done,0,Merlin,Illust_God_Default,됐어… 이게 마지막 봉인이야.
+Seal_Collapse,0,Lich,Lich_Portrait_Calm,"멀린의 봉인술이라. …그 술식이 지금 어디 있는지, 잊었나."
+Seal_Collapse,1,Merlin,Illust_God_Default,안 돼… 역류하고 있어!
+Seal_Collapse,2,Lich,Lich_Portrait_Rage,봉인은 끝났다. 다음엔 — 네가 끝날 차례다.
+Seal_Collapse,3,Shadow,Illust_Shadow_Default,말했잖아. 버티지 못할 거라고.
+Lich_Intro_Nightmare,0,Lich,Lich_Portrait,"사슬도, 봉인도 없다."
+Lich_Intro_Nightmare,1,Lich,Lich_Portrait_Calm,이제 알겠지. 넌 나를 죽여야 한다.
+Lich_Intro_Nightmare,2,Lich,Lich_Portrait_Calm,그 순간 — 멀린도 완전히 사라진다는 것도 알면서.
+Lich_Intro_Nightmare,3,Lich,Lich_Portrait_Rage,그럼에도 오겠다면... 받아라.
+Lich_Encounter_NM_R1,0,Lich,Lich_Portrait,또 왔나. 이번엔 무엇이 무너질까.
+Lich_Encounter_NM_R2,0,Lich,Lich_Portrait_Calm,사슬 없는 나를 몇 번이나 보는군.
+Lich_Encounter_NM_R3,0,Lich,Lich_Portrait_Rage,제단이 또 무너지겠군. 너와 함께.
+Lich_Page2_Nightmare,0,Lich,Lich_Portrait_Calm,…흥미롭군. 멀린조차 이 정도의 영혼은 부르지 못했을 텐데.
+Lich_Page2_Nightmare,1,Lich,Lich_Portrait_Calm,멀린의 마법만으론 모자라다는 거군.
+Lich_Page2_Nightmare,2,Lich,Lich_Portrait_Rage,좋다. 이 제단째 — 무너뜨려주마.
+Lich_Page3,0,Lich,Lich_Portrait_Rage,여기가 마지막 땅이다.
+Lich_Page3,1,Lich,Lich_Portrait_Rage,…영혼이여. 너도 결국 복사될 것이다.
+Lich_ReverseSeal,0,Lich,Lich_Portrait_Calm,네 봉인술이다. 돌려주지.
+Lich_MerlinVoice,0,Lich,Lich_Portrait_Calm,…작은 빛. 이리 오렴.
+Lich_MerlinVoice,1,Merlin,Illust_God_Default,그건 내가 아니야!
+Lich_FinalSpell,0,Lich,Lich_Portrait_Rage,제단째 떨어져라!
+Lich_FinalSpell,1,Merlin,Illust_God_Default,봉인석 조각이 아직 빛나! 저걸로 끌어내려!
+Lich_Death_Deep,0,Lich,Lich_Portrait_Dying,또… 이 결말인가.
+Ending_Morgana,0,Shadow,Illust_Shadow_Default,잘했어.
+Ending_Morgana,1,Shadow,Illust_Shadow_Default,실험은 완벽하게 끝났으니까.
+Ending_Morgana,2,Shadow,Illust_Shadow_Default,봉인? 처음부터 버티지 못하게 만든 거야. 봉인으로는 영혼이 자라지 않거든.
+Ending_Morgana,3,Shadow,Illust_Shadow_Default,너도. 멀린도. 저 리치도 — 전부 내 계획의 한 부분이었어.
+Ending_Morgana,4,Merlin,Illust_God_Default,모르가나...
+Ending_Morgana,5,Merlin,Illust_God_Default,역시 그녀였군.
+Ending_Morgana,6,Merlin,Illust_God_Default,아직...
+Ending_Morgana,7,Merlin,Illust_God_Default,...끝나지 않았어.
+Epilogue_First,0,Merlin,Illust_God_Default,"…돌아왔구나. 목소리가 잘 나오지 않아. 그 안의 나는, 정말로 사라졌나 봐."
+Epilogue_First,1,Merlin,Illust_God_Default,그래도 너를 붙든 이 손은 남았어.
+Epilogue_First,2,Shadow,Illust_Shadow_Default,"감동적이네. …작은 빛, 너는 완성됐어. 이제 아래로 와."
+Epilogue_First,3,Merlin,Illust_God_Default,가지 말라곤 못 하겠구나. …그래도 네 발로 가. 그녀의 설계가 아니라.
+Ending_Card,0,None,title,랠릭페어리
+Ending_Card,1,None,header,봉인이 무너진 뒤
+Ending_Card,2,None,,"리치는 쓰러졌고, 멀린의 목소리는 더는 들리지 않는다."
+Ending_Card,3,None,,봉인은 처음부터 버티지 못하게 설계되어 있었다.
+Ending_Card,4,None,,작은 빛은 이제 — 제 발로 심연을 향한다.
+Ending_Credits,0,None,title,랠릭페어리
+Ending_Credits,1,None,, 
+Ending_Credits,2,None,header,플레이해 주셔서 감사합니다
+Ending_Credits,3,None,, 
+Ending_Credits,4,None,,여정은 심연으로 이어집니다.
+Lich_Legion,0,Lich,Lich_Portrait_Calm,일어나라. 이 제단 아래 잠든 자들이여.
+Lich_Ward,0,Lich,Lich_Portrait,결계여 — 나를 감싸라.
+Lich_Ward,1,Merlin,Illust_God_Default,결계야! 청록빛 해골을 쓰러뜨려!
+Lich_Ward_Broken,0,Merlin,Illust_God_Default,결계가 깨졌어! 지금이야!
+Lich_Ward_Timeout,0,Lich,Lich_Portrait_Calm,늦었군. 결계는 이미 완성됐다.
+Lich_Realign,0,Lich,Lich_Portrait_Rage,불과 얼음과 번개와 어둠 — 이 제단을 넷으로 나눈다.
+Lich_ChainBreak,0,Lich,Lich_Portrait_Rage,끊어라… 끊어져라…!
+Lich_DarkRain,0,Lich,Lich_Portrait_Rage,암흑이여 — 쏟아져라.

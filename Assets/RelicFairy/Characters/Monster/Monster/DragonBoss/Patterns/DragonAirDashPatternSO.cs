@@ -399,15 +399,23 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         float maxDistance = Mathf.Max(Data.DashDistance, DragonPatternFloorUtils.GetRoomMaxExtent());
         _effectiveDashDistance = DragonPatternFloorUtils.DistanceToFloorEdge(origin, _dashDirection, maxDistance);
         Vector3 center = origin + _dashDirection * (_effectiveDashDistance * 0.5f);
+        // 2페이지(심연)엔 검은 불 색으로 — 알파는 에셋 값 유지
+        Color lineColor = Data.WarningLineColor;
+        if (ctx.Monster is DragonBossMonster dragon && dragon.IsAbyssPage)
+        {
+            Color abyss = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Abyss);
+            lineColor = new Color(abyss.r, abyss.g, abyss.b, lineColor.a);
+        }
         _warningZone = DragonBossWarningZone.CreateRectangle(
             "DashRangeWarning",
             center,
             Quaternion.LookRotation(_dashDirection, Vector3.up),
             Data.DashHitRadius * 2f,
             _effectiveDashDistance,
-            Data.WarningLineColor,
+            lineColor,
             Data.WarningDuration + 0.5f,
             Data.WarningMarkerHeightOffset);
+        _warningZone.BeginFill(Data.WarningDuration);   // 다 차는 순간 돌진
     }
 
     private void DestroyWarningZone()
@@ -435,7 +443,8 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
                 continue;
 
             _playerHit = true;
-            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier));
+            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier), ctx.Monster.gameObject,
+                              false, HitWeight.Heavy);   // 돌진 충돌 — 강
             break;
         }
     }

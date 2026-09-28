@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ccd35ad99a25a7747b6ec256bf16bffc, type: 3}
+  m_Name: ScreenWipeSkin
+  m_EditorClassIdentifier: Assembly-CSharp::ScreenWipeSkinSO
+  _shader: {fileID: 4800000, guid: 381335219239e174faa5a2bea8574298, type: 3}
+  _inkNoise: {fileID: 2800000, guid: d113b1a332c9c6d41a7548303f317b48, type: 3}
+  _sigil: {fileID: 2800000, guid: 4ca3a6d757e699743a44a2b194ae4582, type: 3}
+  _ragged: 0.12
+  _noiseScale: 0.7
+  _rimWidth: 0.022
+  _rimIntensity: 1.1
+  _abyss: {r: 0.025, g: 0.022, b: 0.045, a: 1}
+  _tintMin: 0.12
+  _tintMax: 0.45
+  _drift: 0.04
+  _sigilScale: 0.62
+  _sigilAlpha: 0.3
+  _sigilSpin: 0.5

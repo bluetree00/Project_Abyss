@@ -50,8 +50,11 @@ public class RunSaveData
     public int    weapon1EvolutionStage;  // WeaponData.evolutionStage (슬롯 1)
     public string weapon0LegendId;        // WeaponData.legendId (슬롯 0 승급 분기)
     public string weapon1LegendId;        // WeaponData.legendId (슬롯 1 승급 분기)
+    public string weapon0Engravings;      // WeaponData.engravings (슬롯 0 스킬 각인, 쉼표 구분) — 09-25
+    public string weapon1Engravings;      // WeaponData.engravings (슬롯 1)
 
     public string relicKey;               // PlayerLoadout.Relic SO 이름(Addressables 키)
+    public string relicPartIds = "";      // 보스 클리어 특전으로 얻은 유물 파츠 part_id(쉼표) — 런 진행분
     public string covenantsJson;          // CovenantListWrapper JSON
     public string runeCellsJson;          // Vector2IntListWrapper JSON — 룬 보드 점유 셀(시너지 권위)
     public string runePlacementsJson;     // RunePlacementListWrapper JSON — Shape 재구성(재편집)용
@@ -94,6 +97,7 @@ public class RunSaveData
     public int    shopUseCount;
     public int    refineUseCount;
     public int    maxEnhanceLevel;
+    public int    abyssDepth;             // 심연 깊이(순환 회차) — 구버전 세이브는 0
 
     public string cooldownsJson;          // CooldownListWrapper JSON
 }

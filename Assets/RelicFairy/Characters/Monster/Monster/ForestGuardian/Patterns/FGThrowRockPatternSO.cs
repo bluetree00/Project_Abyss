@@ -84,9 +84,6 @@ public class FGThrowRockPatternSO : BossPatternSO
     [Tooltip("투사체 스케일 (XYZ)")]
     public Vector3 rockScale = Vector3.one;
 
-    [Tooltip("착지 경고장판 프리팹 (DiscMeshWarning 포함). null이면 effectPrefab 사용.")]
-    public GameObject warningZonePrefab;
-
     [Tooltip("경고장판 반경 (m)")]
     public float warningRadius = 2.5f;
 
@@ -109,9 +106,6 @@ public class FGThrowRockPatternSO : BossPatternSO
     }
 
     public override SpecialStateBase GetRuntimeState() => _state;
-
-    internal GameObject ResolveWarningPrefab()
-        => warningZonePrefab != null ? warningZonePrefab : effectPrefab;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -139,7 +133,6 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     private float              _grabDuration;
     private float              _postThrowDuration;
     private float              _launchDist;
-    private Vector3            _warningTargetScale;
     private float              _warningGrowDuration;
     private float              _warningGrowTimer;
     private Transform          _handBone;
@@ -210,12 +203,11 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
                 break;
 
             case Phase.PostThrow:
-                // 경고 장판 서서히 커지기 (착지 위치 중심에서 서서히 확장)
+                // 가이드 채우기 — 바위가 날아오는 동안 착지 원이 차오른다
                 if (_warningGO != null && _warningGrowDuration > 0f)
                 {
                     _warningGrowTimer += Time.deltaTime * SpeedMult(ctx);
-                    float wt = Mathf.Clamp01(_warningGrowTimer / _warningGrowDuration);
-                    _warningGO.transform.localScale = Vector3.Lerp(Vector3.zero, _warningTargetScale, wt);
+                    PatternGuideHelper.SetProgress(_warningGO, _warningGrowTimer / _warningGrowDuration);
                 }
 
                 // 투사체 소멸 감지 — Destroy 호출 직후 Unity null 체크가 true
@@ -237,17 +229,12 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
                     SpawnFragmentWarnings();
                 }
 
-                // 경고장판 서서히 확장
+                // 파편 가이드 채우기
                 if (_fragmentWarningsSpawned && Data.fragmentLandDelay > 0f)
                 {
-                    float growElapsed = _fragmentTimer - Data.fragmentWarningStartDelay;
-                    float ft = Mathf.Clamp01(growElapsed / Data.fragmentLandDelay);
-                    float fs = Data.fragmentWarningRadius;
+                    float ft = (_fragmentTimer - Data.fragmentWarningStartDelay) / Data.fragmentLandDelay;
                     for (int i = 0; i < FragmentCount; i++)
-                    {
-                        if (_fragmentWarnings[i] != null)
-                            _fragmentWarnings[i].transform.localScale = Vector3.Lerp(Vector3.zero, new Vector3(fs, 1f, fs), ft);
-                    }
+                        PatternGuideHelper.SetProgress(_fragmentWarnings[i], ft);
                 }
 
                 // 파편 착지 — 피격판정 + 사운드 + 이펙트
@@ -375,26 +362,15 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     // ── 경고장판 ─────────────────────────────────────────
     private void SpawnWarning(Vector3 landPos)
     {
-        var prefab = Data.ResolveWarningPrefab();
-        if (prefab == null) return;
-
-        Vector3 pos = landPos;
-        pos.y += 0.02f;
-        float s = Data.warningRadius;
-        _warningTargetScale  = new Vector3(s, 1f, s);
         _warningGrowTimer    = 0f;
-        // 비행 시간만큼 장판이 서서히 커지도록 확장 시간 설정 (최소 0.3s)
+        // 비행 시간만큼 가이드가 차오르도록 (최소 0.3s)
         _warningGrowDuration = Mathf.Max(0.3f, Data.projectileSpeed > 0f ? _launchDist / Data.projectileSpeed : 0.5f);
-        _warningGO = Managers.ObjectPooler.SpawnFromPrefab(prefab, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.identity);
-        _warningGO.transform.localScale = Vector3.zero;  // 처음엔 0 → PostThrow에서 서서히 확장
+        PatternGuideHelper.SafeDestroy(ref _warningGO);
+        _warningGO = PatternGuideHelper.Prepare(
+            PatternGuideHelper.Disc(landPos, Data.warningRadius, PatternGuideHelper.Telegraph), ForestGuardianMonster.GuideFlow);
     }
 
-    private void DespawnWarning()
-    {
-        if (_warningGO == null) return;
-        Managers.ObjectPooler.Despawn(_warningGO);
-        _warningGO = null;
-    }
+    private void DespawnWarning() => PatternGuideHelper.SafeDestroy(ref _warningGO);
 
     private void DespawnRock()
     {
@@ -406,7 +382,6 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     // ── 파편 경고장판 ────────────────────────────────────
     private void SpawnFragmentWarnings()
     {
-        var   prefab  = Data.ResolveWarningPrefab();
         float r       = Data.fragmentSpreadRadius;
         var   angles  = Data.fragmentAngles;
         for (int i = 0; i < FragmentCount; i++)
@@ -417,10 +392,9 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
             Vector3 pos    = _landingPos + offset;
             _fragmentPositions[i] = pos;
 
-            if (prefab == null) continue;
-            pos.y += 0.02f;
-            _fragmentWarnings[i] = Managers.ObjectPooler.SpawnFromPrefab(prefab, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.identity);
-            _fragmentWarnings[i].transform.localScale = Vector3.zero;
+            PatternGuideHelper.SafeDestroy(ref _fragmentWarnings[i]);
+            _fragmentWarnings[i] = PatternGuideHelper.Prepare(
+                PatternGuideHelper.Disc(pos, Data.fragmentWarningRadius, PatternGuideHelper.Telegraph), ForestGuardianMonster.GuideFlow);
         }
     }
 
@@ -438,12 +412,7 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
         vfxComp.Play(lifetime);
     }
 
-    private void DespawnFragmentWarning(int i)
-    {
-        if (_fragmentWarnings[i] == null) return;
-        Managers.ObjectPooler.Despawn(_fragmentWarnings[i]);
-        _fragmentWarnings[i] = null;
-    }
+    private void DespawnFragmentWarning(int i) => PatternGuideHelper.SafeDestroy(ref _fragmentWarnings[i]);
 
     private void DespawnAllFragmentWarnings()
     {
@@ -463,7 +432,7 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
         if (player == null) return;
 
         int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.fragmentDamageMultiplier));
-        player.TakeDamage(dmg);
+        player.TakeDamage(dmg, ctx.Monster.gameObject);
 
         Vector3 dir = playerPos - pos;
         dir.y = 0.3f;

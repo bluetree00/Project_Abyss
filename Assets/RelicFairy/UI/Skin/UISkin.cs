@@ -20,6 +20,8 @@ public static class UISkin
     private const string CovenantAddress    = "UI/CovenantSkin";
     private const string AchievementAddress = "UI/AchievementSkin";
     private const string SettingsAddress    = "UI/SettingsSkin";
+    private const string RelicPartDraftAddress = "UI/RelicPartDraftSkin";
+    public  const string ScreenWipeAddress  = "UI/ScreenWipeSkin";   // 에디터 생성기(ScreenWipeSkinCreator)도 이 주소로 등록
 
     private static RefinerySkinSO    _refinery;
     private static RuneSelectSkinSO  _runeSelect;
@@ -31,6 +33,8 @@ public static class UISkin
     private static CovenantSkinSO    _covenant;
     private static AchievementSkinSO _achievement;
     private static SettingsSkinSO    _settings;
+    private static RelicPartDraftSkinSO _relicPartDraft;
+    private static ScreenWipeSkinSO  _screenWipe;
     private static bool _tried;
 
     /// <summary>정제소 스킨. 미로드/미등록이면 null → 코드로 그린 색 박스가 그대로 보인다.</summary>
@@ -63,6 +67,12 @@ public static class UISkin
     /// <summary>환경설정 스킨. 미로드/미등록이면 null → 색 폴백.</summary>
     public static SettingsSkinSO Settings => _settings;
 
+    /// <summary>유물 개화(파츠 드래프트) 스킨. 아트 납품 전이라 보통 null → 색·기호 폴백.</summary>
+    public static RelicPartDraftSkinSO RelicPartDraft => _relicPartDraft;
+
+    /// <summary>방 전환 와이프 스킨. 미로드/미등록이면 null → ScreenFade가 단색 판으로 동작.</summary>
+    public static ScreenWipeSkinSO ScreenWipe => _screenWipe;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
@@ -76,6 +86,8 @@ public static class UISkin
         _covenant    = null;
         _achievement = null;
         _settings    = null;
+        _relicPartDraft = null;
+        _screenWipe  = null;
         _tried       = false;
     }
 
@@ -95,6 +107,8 @@ public static class UISkin
         _covenant    = await LoadOrNull<CovenantSkinSO>(CovenantAddress, "서약");
         _achievement = await LoadOrNull<AchievementSkinSO>(AchievementAddress, "업적");
         _settings    = await LoadOrNull<SettingsSkinSO>(SettingsAddress, "환경설정");
+        _relicPartDraft = await LoadOrNull<RelicPartDraftSkinSO>(RelicPartDraftAddress, "유물 개화");
+        _screenWipe  = await LoadOrNull<ScreenWipeSkinSO>(ScreenWipeAddress, "방 전환 와이프");
     }
 
     private static async UniTask<T> LoadOrNull<T>(string address, string label) where T : Object

@@ -25,7 +25,7 @@ MonoBehaviour:
   endDelay: 0.3
   dashEffectKey: 
   dashTrailKey: IasenDashFire
-  slashEffectKey: IasenFinishFlash
+  slashEffectKey: NamelessIasenFinish
   hitEffectKey: SwordHitImpact
   hitEffectScale: 1.4
   playerTrailKey: 

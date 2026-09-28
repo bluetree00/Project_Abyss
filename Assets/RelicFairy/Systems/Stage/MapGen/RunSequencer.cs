@@ -268,6 +268,16 @@ public class RunSequencer
         return result;
     }
 
+    /// <summary>
+    /// 테스트 허브 전용 — 일반 방을 건너뛰고 보스 전방 문 계획을 만든다(페이즈를 PreBoss로 전환).
+    /// 이어서 <see cref="CommitEntry"/>로 진입을 확정하면 그 방의 출구가 보스방이다.
+    /// </summary>
+    public DoorPlan BeginBossApproach()
+    {
+        _phase = Phase.PreBoss;
+        return new DoorPlan { kind = RoomPlanKind.PreBoss, entry = BossEntry(_config?.PreBossRoomKey, RoomPlanKind.PreBoss) };
+    }
+
     /// <summary>문 통과로 다음 방 진입 확정 시 호출 — visitCount 증가, 쿨다운 갱신, 페이즈 전이.</summary>
     public void CommitEntry(DoorPlan chosen)
     {

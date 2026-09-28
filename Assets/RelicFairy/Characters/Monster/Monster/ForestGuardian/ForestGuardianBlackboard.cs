@@ -129,6 +129,18 @@ public class ForestGuardianBlackboard
     }
 
     /// <summary>
+    /// 강인도와 무관하게 그로기를 <paramref name="seconds"/> 동안 건다 — 2페이지 간판 「숲의 심장」 성공 보상.
+    /// 끝나면 평소 그로기처럼 강인도가 가득 찬 채로 풀린다(<see cref="Tick"/>).
+    /// </summary>
+    public void ForceGroggy(float seconds)
+    {
+        Toughness       = 0f;
+        IsGroggy        = true;
+        GroggyTimer     = Mathf.Max(0.1f, seconds);
+        BigAttackWindow = 0f;
+    }
+
+    /// <summary>
     /// 방어도 데미지 적용. 방어도가 0 이하면 파괴 상태로 전환 후 즉시 회복.
     /// isHeavy=true (빅윈도우 피격)이면 HeavyPoiseDamage 적용 → 1회에 파괴.
     /// 그로기 중이면 적용하지 않는다.

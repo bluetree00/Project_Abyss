@@ -50,7 +50,7 @@ public sealed class UI_CovenantSlot : MonoBehaviour
         }
 
         if (_nameText != null)
-            _nameText.text = covenant.DisplayName;
+            _nameText.text = UIKoreanWrap.Words(covenant.DisplayName);   // 「마지막 숨결[골드]」가 낱말 중간에서 갈리지 않게
 
         // 효과 설명.
         // 조립 서약은 원인/결과가 별도 데이터다 → 한 줄로 이어붙이지 않고 <b>줄을 나눠</b> 보여준다(좁은 칸에서 훨씬 읽힌다).
@@ -79,7 +79,7 @@ public sealed class UI_CovenantSlot : MonoBehaviour
             }
 
             bool has = !string.IsNullOrEmpty(text);
-            _descText.text = text;
+            _descText.text = UIKoreanWrap.Words(text);
             _descText.gameObject.SetActive(has);
         }
 

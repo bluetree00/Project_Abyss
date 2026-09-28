@@ -21,16 +21,27 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     public override bool CloseOnEscape  => false;   // 보상 결정이라 실수로 닫히면 안 된다 — 선택으로만 종료
 
     // ── 레이아웃 ──
-    private const float WindowW = 1100f;
-    private const float WindowH = 600f;
-    private const float CardW   = 300f;   // 카드 폭 상한 — 후보가 많으면 이 아래로 줄어든다
-    private const float CardH   = 400f;
-    private const float CardGap = 24f;
-    // 카드 세로 중심. 창 중심 기준으로 카드는 CardY ± CardH/2를 차지하는데,
-    // 「장착」 버튼이 -212~-268에 있어 -30이면 카드 아래끝(-230)이 버튼 위 18px를 덮는다.
-    // 카드는 raycast를 받고 나중에 그려지므로 그 띠의 클릭까지 가져간다. -8이면
-    // 카드가 +192~-208이 되어 버튼과 4px, 부제(-아래끝 +212)와 20px 간격이 남는다.
-    private const float CardY   = -8f;
+    private const float WindowW = 1280f;
+    private const float WindowH = 760f;
+    private const float CardW   = 380f;   // 카드 폭 상한 — 후보가 많으면 이 아래로 줄어든다
+    private const float CardH   = 520f;
+    private const float CardGap = 28f;
+
+    // 카드 안 세로 순서(카드 위끝 기준). 아트가 오기 전에 자리를 먼저 굳혀 둔다 —
+    // 스프라이트만 꽂으면 되도록, 칸 크기는 납품 명세(문서 §개화 리소스)와 같은 값이다.
+    private const float SymbolBox  = 168f;   // 문양 칸 — 계열 문양 또는 파츠 전용 문양
+    private const float SymbolTop  = -62f;
+    private const float NameTop    = -244f;
+    private const float DividerTop = -288f;
+    private const float DescTop    = -302f;
+    private const float DescH      = 130f;
+    private const float FootTop    = -444f;   // 꼬리말 띠 위끝(카드 바닥에서 18px 띄운다)
+    private const float FootH      = 58f;
+    private const float SelectedCardScale = 1.04f;
+    // 카드 세로 중심. 카드는 CardY ± CardH/2를 차지한다. 창 760 기준으로 「장착」 버튼은
+    // -350~-294, 부제 아래끝은 +270이다. -14면 카드가 +246~-274가 되어 부제와 24px,
+    // 버튼과 20px가 남는다 — 카드는 raycast를 받고 나중에 그려지므로 겹치면 버튼 클릭을 가져간다.
+    private const float CardY   = -14f;
     private const float CardSideMargin = 40f;   // 카드 열 좌우 여백(창 안쪽)
 
     private static readonly Color CardSelected = new(0.20f, 0.17f, 0.10f, 1f);
@@ -49,7 +60,9 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     private List<RelicPartEntry> _candidates;
     private int _selected = -1;
     private bool _built;
+    private bool _skinned;          // 아트 로드 성공 — 선택 피드백을 색 틴트 대신 밝기로 처리
     private float _cardW = CardW;   // 후보 수에 맞춰 산출된 실제 카드 폭
+    private bool _themed;           // 아트 없음 — 공통 언어(둥근 창·베벨 버튼)를 입혔다
 
     [SerializeField] private Transform _windowRoot;
     [SerializeField] private TMP_Text  _subtitle;
@@ -63,9 +76,10 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
 
     private sealed class CardView
     {
-        public Image      Border;
-        public Image      Fill;
-        public GameObject Root;
+        public Image         Border;
+        public Image         Fill;
+        public GameObject    Root;
+        public RectTransform Rt;
     }
 
     // ── Lifecycle ──
@@ -139,23 +153,28 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         // 크기를 가진 것은 테두리(부모)라 거기에 붙인다.
         window.transform.parent.gameObject.AddComponent<UIWindowFitter>().Configure();
 
-        // 제목
-        var title = ShopUIStyle.MakeText(_windowRoot, "Title", 26f, FontStyles.Bold,
-            TextAlignmentOptions.Left, ShopUIStyle.TextPrimary);
-        ShopUIStyle.Anchor(title.rectTransform,
-            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(34f, -26f), new Vector2(600f, 36f));
+        // 타이틀 띠 — 아트 자리(900×72). 미납품이면 띠 색만 남고 글자는 그대로 읽힌다.
+        var titleBar = ShopUIStyle.MakeImage(_windowRoot, "TitleBar", ShopUIStyle.BandFill);
+        ShopUIStyle.Anchor(titleBar.rectTransform,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -14f), new Vector2(900f, 72f));
+
+        // 제목 — 띠 위 가운데. 개화는 런 중 몇 번 없는 사건이라 화면이 먼저 그렇게 말해야 한다.
+        var title = ShopUIStyle.MakeText(titleBar.transform, "Title", 30f, FontStyles.Bold,
+            TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
+        ShopUIStyle.Stretch(title.rectTransform);
         title.text = "유물 개화";
 
         // 부제(Setup에서 코어/기능에 맞게 갱신)
-        _subtitle = ShopUIStyle.MakeText(_windowRoot, "Subtitle", 16f, FontStyles.Normal,
-            TextAlignmentOptions.Left, ShopUIStyle.TextDim);
+        _subtitle = ShopUIStyle.MakeText(_windowRoot, "Subtitle", 17f, FontStyles.Normal,
+            TextAlignmentOptions.Center, ShopUIStyle.TextDim);
         ShopUIStyle.Anchor(_subtitle.rectTransform,
-            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(35f, -60f), new Vector2(700f, 26f));
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -96f), new Vector2(900f, 26f));
         _subtitle.text = "이번 런의 유물을 키울 파츠를 하나 고르세요";
 
         BuildFooter();
+        ApplySkin();
     }
 
     private void BuildFooter()
@@ -212,12 +231,19 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
 
             AddClick(cardRT.gameObject, () => SetSelected(idx));
 
-            _cards.Add(new CardView
+            var view = new CardView
             {
                 Root   = cardRT.gameObject,
                 Border = cardRT.GetComponent<Image>(),
                 Fill   = card,
-            });
+                Rt     = cardRT,
+            };
+            // 카드 액자·채움 — 아트가 오면 여기로 들어온다(미납품이면 색 박스 유지).
+            var cardSkin = UISkin.RelicPartDraft;
+            ShopUIStyle.Skin(view.Border, cardSkin?.cardFrame, sliced: true);
+            ShopUIStyle.Skin(view.Fill,   cardSkin?.cardFill,  sliced: true);
+            if (!_skinned) UITheme.RoundFrame(view.Fill, 14f);
+            _cards.Add(view);
 
             BuildCardContent(card.transform, entry);
         }
@@ -234,45 +260,94 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     private void BuildCardContent(Transform card, RelicPartEntry entry)
     {
         Color kindColor = KindColorOf(entry.part_kind);
+        int   kindIdx   = KindIndexOf(entry.part_kind);
+        var   skin      = UISkin.RelicPartDraft;
 
-        // 종류 리본(상단 띠)
+        // 종류 리본(상단) — 끝이 흐려지는 빛줄기(네모 색 띠는 웹 카드처럼 읽혔다, 09-28 UI 톤 통일)
         var ribbon = ShopUIStyle.MakeImage(card, "Ribbon", kindColor);
         ShopUIStyle.Anchor(ribbon.rectTransform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-            Vector2.zero, new Vector2(0f, 4f));
+            new Vector2(0f, -3f), new Vector2(-28f, 6f));
+        ribbon.sprite = UITheme.SoftBand;
 
         // 종류 배지(칩)
         var kindBox = ShopUIStyle.MakeFrame(card, "KindChip", kindColor, ShopUIStyle.IconBg, 2f);
         ShopUIStyle.Anchor((RectTransform)kindBox.transform.parent,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -34f), new Vector2(150f, 40f));
+            new Vector2(0f, -20f), new Vector2(150f, 36f));
+        ShopUIStyle.Skin(kindBox, skin?.KindChip(kindIdx), sliced: true);
         var kindLabel = ShopUIStyle.MakeText(kindBox.transform, "KindLabel", 17f, FontStyles.Bold,
             TextAlignmentOptions.Center, kindColor);
         ShopUIStyle.Stretch(kindLabel.rectTransform);
         kindLabel.text = KindLabelOf(entry.part_kind);
 
+        // 문양 자리 — 카드의 절반을 그림이 가져간다(아트 납품 전에 자리부터 굳힌다).
+        // 아트가 없으면 계열색 원반 + 기호가 대신 선다. 빈 사각형으로 두면 "미완성"으로 읽히고,
+        // 나중에 그림을 넣을 때 레이아웃을 다시 짜야 한다.
+        var disc = ShopUIStyle.MakeImage(card, "SymbolDisc",
+            new Color(kindColor.r * 0.22f, kindColor.g * 0.22f, kindColor.b * 0.22f, 1f));
+        ShopUIStyle.Anchor(disc.rectTransform,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, SymbolTop), new Vector2(SymbolBox, SymbolBox));
+        disc.sprite = UIProceduralSprites.RoundedRect(radius: 52f, feather: 26f, size: 168);
+
+        var mark = ShopUIStyle.MakeText(disc.transform, "SymbolMark", 96f, FontStyles.Bold,
+            TextAlignmentOptions.Center, kindColor);
+        ShopUIStyle.Stretch(mark.rectTransform);
+        mark.text = KindMarkOf(entry.part_kind);
+
+        // 실제 문양 — 파츠 전용이 있으면 그것, 없으면 계열 문양. 둘 다 없으면 원반만 남는다.
+        var art = skin?.PartSymbol(entry.part_id) ?? skin?.KindEmblem(kindIdx);
+        if (art != null)
+        {
+            var symbol = ShopUIStyle.MakeImage(disc.transform, "Symbol", Color.white);
+            ShopUIStyle.Stretch(symbol.rectTransform);
+            symbol.sprite         = art;
+            symbol.preserveAspect = true;
+            mark.gameObject.SetActive(false);   // 아트가 오면 임시 기호는 물러난다
+        }
+
         // 이름
-        var name = ShopUIStyle.MakeText(card, "Name", 22f, FontStyles.Bold,
+        var name = ShopUIStyle.MakeText(card, "Name", 25f, FontStyles.Bold,
             TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
         ShopUIStyle.Anchor(name.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -92f), new Vector2(_cardW - 24f, 34f));
+            new Vector2(0f, NameTop), new Vector2(_cardW - 32f, 36f));
         name.text = entry.part_name ?? entry.part_id;
 
         // 구분선
         var divider = ShopUIStyle.MakeImage(card, "Divider", ShopUIStyle.BronzeLine);
         ShopUIStyle.Anchor(divider.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -134f), new Vector2(_cardW - 60f, 2f));
+            new Vector2(0f, DividerTop), new Vector2(_cardW - 72f, 2f));
 
         // 설명(기능) — 카드의 핵심. 여러 줄 허용.
-        var desc = ShopUIStyle.MakeText(card, "Desc", 16f, FontStyles.Normal,
+        var desc = ShopUIStyle.MakeText(card, "Desc", 17f, FontStyles.Normal,
             TextAlignmentOptions.Top, ShopUIStyle.TextPrimary);
         ShopUIStyle.Anchor(desc.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -150f), new Vector2(_cardW - 40f, 180f));
+            new Vector2(0f, DescTop), new Vector2(_cardW - 44f, DescH));
         desc.enableWordWrapping = true;
         desc.text = entry.description ?? string.Empty;
+
+        // 꼬리말 — 선행 파츠가 있으면 그것을, 없으면 이 계열이 무엇을 바꾸는지 한 줄.
+        // 카드 아래 3분의 1이 통째로 비어 있던 자리다(09-21 검수).
+        var footBand = ShopUIStyle.MakeImage(card, "FootBand",
+            new Color(kindColor.r * 0.16f, kindColor.g * 0.16f, kindColor.b * 0.16f, 1f));
+        ShopUIStyle.Anchor(footBand.rectTransform,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, FootTop), new Vector2(_cardW - 24f, FootH));
+        footBand.sprite = UIProceduralSprites.RoundedRect(radius: 12f, feather: 6f, size: 64);
+
+        var foot = ShopUIStyle.MakeText(footBand.transform, "Foot", 16f, FontStyles.Normal,
+            TextAlignmentOptions.Center, ShopUIStyle.TextDim);
+        ShopUIStyle.Anchor(foot.rectTransform,
+            new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f),
+            Vector2.zero, new Vector2(-24f, -10f));
+        foot.enableWordWrapping = true;
+        foot.text = string.IsNullOrEmpty(entry.requires)
+            ? KindHintOf(entry.part_kind)
+            : $"선행 · {entry.requires}";
     }
 
     // ── 선택 상태 ──
@@ -287,9 +362,14 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         {
             bool on = (i == index);
             if (_cards[i].Border != null)
-                _cards[i].Border.color = on ? SelectBorder : ShopUIStyle.CardBorder;
+                _cards[i].Border.color = _skinned ? (on ? Color.white : new Color(0.62f, 0.62f, 0.66f))
+                                                  : (on ? SelectBorder : ShopUIStyle.CardBorder);
             if (_cards[i].Fill != null)
-                _cards[i].Fill.color = on ? CardSelected : ShopUIStyle.CardFill;
+                _cards[i].Fill.color = _skinned ? Color.white
+                                                : (on ? CardSelected : ShopUIStyle.CardFill);
+            // 고른 카드는 한 치수 커진다 — 재련소 탭·HUD 무기 칸과 같은 「선택 = 금테 + 확대」 규약.
+            if (_cards[i].Rt != null)
+                _cards[i].Rt.localScale = Vector3.one * (on ? SelectedCardScale : 1f);
         }
 
         bool hasSel = index >= 0;
@@ -299,7 +379,26 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             if (hasSel) _confirmLabel.text = "장착";   // 미선택 안내를 띄웠다면 되돌린다
         }
         if (_confirmBtnImg != null)
-            _confirmBtnImg.color = hasSel ? ShopUIStyle.GoldPillBg : ShopUIStyle.BandFill;
+            _confirmBtnImg.color = _themed ? (hasSel ? UITheme.CtaTint : UITheme.CtaTintOff)
+                                           : (hasSel ? ShopUIStyle.GoldPillBg : ShopUIStyle.BandFill);
+    }
+
+    /// <summary>
+    /// 아트가 없을 때의 공통 언어 — 둥근 창 + 금 가는 선, 둥근 카드, 공통 베벨 [장착]. 네모 판 · 윗단 색 띠 · 평판 버튼이
+    /// 웹 관리 화면처럼 읽혔다(09-28 UI 톤 진단 D4). 아트(RelicPartDraftSkin)가 오면 그쪽이 우선이다.
+    /// </summary>
+    private void ApplyTheme()
+    {
+        if (_skinned) return;
+        var window = ShopUIStyle.FindDeep(transform, "Window");
+        var fill   = window != null ? window.Find("Fill") : null;
+        if (fill != null && fill.TryGetComponent<Image>(out var fillImg))
+        {
+            UITheme.RoundFrame(fillImg, 18f);
+            if (window.TryGetComponent<Image>(out var edge)) edge.color = UITheme.GoldLine;
+        }
+        _themed = UITheme.StyleFrameButton(_confirmBtnImg, UITheme.CtaTintOff);
+        if (_confirmLabel != null) TMPOutlineHelper.ApplySoftShadow(_confirmLabel);
     }
 
     // ── 버튼 ──
@@ -333,6 +432,28 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         var t = ShopUIStyle.FindDeep(transform, "ConfirmBtn");
         if (t != null) AddClick(t.gameObject, OnConfirmClicked);
         else Debug.LogWarning("[UI_RelicPartDraftPopup] 배선 실패 — 「ConfirmBtn」을 못 찾았다. 장착 버튼이 죽는다.");
+
+        ApplySkin();
+    }
+
+    /// <summary>
+    /// 창·타이틀 띠·버튼에 아트를 입힌다. 스프라이트가 없으면 아무것도 하지 않는다 —
+    /// <b>아트 0장이어도 화면은 지금 모습 그대로다</b>(룬 선택 팝업과 같은 관례).
+    /// 코드로 짓는 경로와 구운 프리팹 경로 양쪽에서 부른다.
+    /// </summary>
+    private void ApplySkin()
+    {
+        var skin = UISkin.RelicPartDraft;
+        _skinned = skin != null && skin.cardFrame != null;
+
+        var window = ShopUIStyle.FindDeep(transform, "Window");
+        if (window != null) ShopUIStyle.Skin(window.GetComponent<Image>(), skin?.background);
+
+        var titleBar = ShopUIStyle.FindDeep(transform, "TitleBar");
+        if (titleBar != null) ShopUIStyle.Skin(titleBar.GetComponent<Image>(), skin?.titleBar, sliced: true);
+
+        if (_confirmBtnImg != null) ShopUIStyle.Skin(_confirmBtnImg, skin?.confirmButton, sliced: true);
+        ApplyTheme();
     }
 
     private static void AddClick(GameObject go, Action onClick)
@@ -349,6 +470,36 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         RelicPartKind.Behavior => KindBehavior,
         RelicPartKind.Trigger  => KindTrigger,
         _                      => ShopUIStyle.TextDim,
+    };
+
+    /// <summary>스킨 배열 순서 — core·effect·behavior·trigger. CSV part_kind와 1:1.</summary>
+    private static int KindIndexOf(string kind) => kind switch
+    {
+        RelicPartKind.Core     => 0,
+        RelicPartKind.Effect   => 1,
+        RelicPartKind.Behavior => 2,
+        RelicPartKind.Trigger  => 3,
+        _                      => 1,
+    };
+
+    /// <summary>문양 아트가 오기 전까지 쓰는 임시 기호. 폰트 아틀라스에 이미 있는 글자만 쓴다.</summary>
+    private static string KindMarkOf(string kind) => kind switch
+    {
+        RelicPartKind.Core     => "★",
+        RelicPartKind.Effect   => "◆",
+        RelicPartKind.Behavior => "◇",
+        RelicPartKind.Trigger  => "□",
+        _                      => "◆",
+    };
+
+    /// <summary>이 계열이 무엇을 바꾸는지 한 줄. 선행 파츠가 없는 카드의 꼬리말로 쓴다.</summary>
+    private static string KindHintOf(string kind) => kind switch
+    {
+        RelicPartKind.Core     => "유물의 작동 원리를 다시 짠다",
+        RelicPartKind.Effect   => "새 상태이상·부가 판정이 붙는다",
+        RelicPartKind.Behavior => "Q·패시브가 작동하는 방식이 바뀐다",
+        RelicPartKind.Trigger  => "새로운 발동 조건이 생긴다",
+        _                      => string.Empty,
     };
 
     private static string KindLabelOf(string kind) => kind switch

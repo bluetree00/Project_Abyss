@@ -1,3 +1,5 @@
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using TMPro;
@@ -12,6 +14,10 @@ public sealed class HudBootstrapper : MonoBehaviour
     private GameRunSession _run;
     private float _panelGuardTimer;
     private bool _startRoomSuppressed;
+    private bool  _popupHidden;        // 게임을 멈추는 팝업이 열려 있다 — HUD를 걷는다(09-28)
+    private float _fadeAlpha = 1f;     // 시작방 페이드가 정한 알파(팝업이 닫히면 이 값으로 돌아간다)
+    private float _popupDim  = 1f;     // 1 = 보임, 0 = 팝업에 걷힘 — 사이 값은 걷히는/돌아오는 중(0.12/0.16초)
+    private CancellationTokenSource _popupDimCts;
 
     public MinimapView MinimapView => presenter != null ? presenter.MinimapView : null;
 
@@ -46,22 +52,22 @@ public sealed class HudBootstrapper : MonoBehaviour
         {
             cg = target.GetComponent<CanvasGroup>();
             if (cg == null) cg = target.gameObject.AddComponent<CanvasGroup>();
-            cg.alpha = 0f;   // 켜기 전에 투명 — 첫 프레임 팝 방지
+            ApplyHudAlpha(cg, 0f);   // 켜기 전에 투명 — 첫 프레임 팝 방지
         }
 
         SetStartRoomSuppressed(false);
         if (cg == null) return;
-        if (duration <= 0f) { cg.alpha = 1f; return; }
+        if (duration <= 0f) { ApplyHudAlpha(cg, 1f); return; }
 
         float e = 0f;
         while (e < duration)
         {
             if (cg == null) return;   // 씬 전환으로 파괴
             e += Time.deltaTime;
-            cg.alpha = Mathf.Clamp01(e / duration);
+            ApplyHudAlpha(cg, Mathf.Clamp01(e / duration));
             await Cysharp.Threading.Tasks.UniTask.Yield();
         }
-        if (cg != null) cg.alpha = 1f;
+        if (cg != null) ApplyHudAlpha(cg, 1f);
     }
 
     /// <summary>HUD를 페이드로 표시(전투 진입 연출). 억제 해제 후 CanvasGroup 알파 0→1.</summary>
@@ -79,17 +85,75 @@ public sealed class HudBootstrapper : MonoBehaviour
         var cg = target.GetComponent<CanvasGroup>();
         if (cg == null) cg = target.gameObject.AddComponent<CanvasGroup>();
 
-        if (duration <= 0f) { cg.alpha = 1f; return; }
+        if (duration <= 0f) { ApplyHudAlpha(cg, 1f); return; }
 
-        cg.alpha = 0f;
+        ApplyHudAlpha(cg, 0f);
         float e = 0f;
         while (e < duration)
         {
             e += Time.deltaTime;
-            cg.alpha = Mathf.Clamp01(e / duration);
+            ApplyHudAlpha(cg, Mathf.Clamp01(e / duration));
             await Cysharp.Threading.Tasks.UniTask.Yield();
         }
-        cg.alpha = 1f;
+        ApplyHudAlpha(cg, 1f);
+    }
+
+    /// <summary>
+    /// 게임을 멈추는 팝업(BlocksGameplay)이 열려 있는 동안 HUD를 걷는다 — 막이 없는 팝업 가장자리에 무기·스킬 칸이 걸치고
+    /// 반투명 창(기억의 제단) 안으로 비쳤다(09-28 UI 전수). 활성 상태는 시작방 억제가, 알파는 페이드가 쓰므로
+    /// 알파만 <see cref="ApplyHudAlpha"/>로 합쳐 정한다(보스 대사 UI_BossBark는 HUD 루트 밖이라 남는다).
+    /// </summary>
+    public void SetPopupHidden(bool hidden)
+    {
+        bool same = hidden == _popupHidden;
+        _popupHidden = hidden;
+        var cg = HudGroup();
+        if (cg == null) { _popupDim = hidden ? 0f : 1f; return; }
+        cg.blocksRaycasts = !hidden;
+
+        float target = hidden ? 0f : 1f;
+        if (same && (_popupDimCts != null || Mathf.Approximately(_popupDim, target))) return;   // 이미 그쪽으로 가는 중 · 도착
+
+        // 순간 소멸은 팝업(0.16초에 걸쳐 나타남)보다 HUD가 먼저 튀어 「원색·순간 등장 금지」에 걸렸다(09-28 UI 톤 진단).
+        _popupDimCts?.Cancel();
+        _popupDimCts?.Dispose();
+        _popupDimCts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+        FadePopupDimAsync(cg, target, hidden ? UIFader.CloseSec : UIFader.OpenSec, _popupDimCts).Forget();
+    }
+
+    /// <summary>페이드 알파를 기록하고, 팝업 걷힘 정도를 곱해 건다.</summary>
+    private void ApplyHudAlpha(CanvasGroup cg, float fadeAlpha)
+    {
+        _fadeAlpha        = fadeAlpha;
+        cg.alpha          = fadeAlpha * _popupDim;
+        cg.blocksRaycasts = !_popupHidden;
+    }
+
+    private CanvasGroup HudGroup()
+    {
+        var target = hudVisualRoot != null ? hudVisualRoot : presenter != null ? presenter.transform : null;
+        if (target == null) return null;
+        var cg = target.GetComponent<CanvasGroup>();
+        return cg != null ? cg : target.gameObject.AddComponent<CanvasGroup>();
+    }
+
+    private async UniTaskVoid FadePopupDimAsync(CanvasGroup cg, float target, float dur, CancellationTokenSource cts)
+    {
+        try
+        {
+            while (!Mathf.Approximately(_popupDim, target))
+            {
+                _popupDim = Mathf.MoveTowards(_popupDim, target, Time.unscaledDeltaTime / dur);
+                if (cg == null) return;
+                cg.alpha = _fadeAlpha * _popupDim;
+                await UniTask.Yield(PlayerLoopTiming.Update, cts.Token);
+            }
+        }
+        catch (System.OperationCanceledException) { }
+        finally
+        {
+            if (_popupDimCts == cts) { _popupDimCts.Dispose(); _popupDimCts = null; }
+        }
     }
 
     private void Awake()
@@ -141,6 +205,12 @@ public sealed class HudBootstrapper : MonoBehaviour
         _panelGuardTimer = 0.2f;
         // 바운드 보스가 있으면 씬 이름 무관하게 Boss HUD 유지
         if (!IsInGameScene() && (presenter == null || !presenter.HasBoundBoss)) return;
+
+        // 컷신 모드(봉인 의식 · 보스 페이즈 전환)는 요청한 쪽이 끝낼 때까지 유지한다 — 되돌리면 전투 HUD가 다시 뜨고 페이즈 바 차오름이 끊긴다.
+        // EnsureHudHierarchyVisible보다 먼저 본다(그 안의 하드 가드가 전투 패널을 강제로 켠다).
+        if (_run != null && _run.TryGetHudMode(out var held) &&
+            (held == HUDIds.Mode.Cutscene || held == HUDIds.Mode.BossCutscene))
+            return;
 
         EnsureHudHierarchyVisible();
         if (presenter != null)
@@ -390,6 +460,14 @@ public sealed class HudBootstrapper : MonoBehaviour
         {
             ForceCanvasGroupVisible(panelCombat);
             ForceTextsVisible(panelCombat);
+        }
+
+        // 위 하드 가드는 전투 패널 부모의 CanvasGroup 알파를 전부 1로 되돌린다 — 차단 팝업이 떠 있으면 숨김을 다시 건다
+        // (런 안에서만 0.2초마다 돌아, 팝업 동안 걷은 HUD가 되살아났다 — 09-28 UI 전수).
+        if (_popupHidden || _popupDim < 1f)
+        {
+            var cg = HudGroup();
+            if (cg != null) { cg.alpha = _fadeAlpha * _popupDim; cg.blocksRaycasts = !_popupHidden; }
         }
     }
 

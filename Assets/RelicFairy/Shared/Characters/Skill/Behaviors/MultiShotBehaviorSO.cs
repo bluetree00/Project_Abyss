@@ -25,12 +25,16 @@ public class MultiShotBehaviorSO : SkillBehaviorSO
 
     [Header("애니메이션")]
     [SerializeField] private string animationOverride;
+    [Tooltip("시전 자세를 보여 줄 시간(초). 즉시 버프라도 이 동안은 스킬 상태를 유지해 동작이 보이게 한다.")]
+    [SerializeField] private float castTime = 0.35f;
 
     public override ISkillRuntime CreateRuntime() => new Runtime(this);
 
     private class Runtime : ISkillRuntime
     {
         private readonly MultiShotBehaviorSO _data;
+
+        private float _castEndTime;
 
         public Runtime(MultiShotBehaviorSO data) => _data = data;
 
@@ -64,10 +68,29 @@ public class MultiShotBehaviorSO : SkillBehaviorSO
             // 비동기로 버프 해제 예약
             ScheduleRemoveBuff(ctx).Forget();
 
-            ctx.RequestEnd();
+            // 09-21: 예전엔 여기서 바로 끝내 <b>동작이 하나도 안 나왔다</b>(가만히 선 채 버프만 걸렸다).
+            // 짧은 시전 자세를 보여 준 뒤 끝낸다 — 클립은 무기 애니 세트가 석궁용으로 덮어쓴다.
+            PlayCastAnimation(ctx);
+            _castEndTime = Time.time + Mathf.Max(0f, _data.castTime);
+            if (_data.castTime <= 0f) ctx.RequestEnd();
         }
 
-        public void OnUpdate(SkillExecutionContext ctx) { }
+        public void OnUpdate(SkillExecutionContext ctx)
+        {
+            if (_castEndTime > 0f && Time.time >= _castEndTime)
+            {
+                _castEndTime = 0f;
+                ctx.RequestEnd();
+            }
+        }
+
+        private void PlayCastAnimation(SkillExecutionContext ctx)
+        {
+            var anim = ctx.Animator;
+            if (anim == null) return;
+            string state = string.IsNullOrEmpty(_data.animationOverride) ? "QSkill_01" : _data.animationOverride;
+            anim.CrossFade(state, 0.05f, 0);
+        }
         public void OnExit(SkillExecutionContext ctx) { }
 
         private async UniTaskVoid ScheduleRemoveBuff(SkillExecutionContext ctx)

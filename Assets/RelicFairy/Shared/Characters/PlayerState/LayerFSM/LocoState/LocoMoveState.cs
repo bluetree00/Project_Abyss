@@ -1,10 +1,7 @@
 using UnityEngine;
 
-public class LocoMoveState : ILayerState<LocoState>
+public class LocoMoveState : LayerStateBase<LocoState>
 {
-    private PlayerController _controller;
-    private ILayerStateChanger<LocoState> _stateChanger;
-
     // MoveSpeed 댐핑 — 비대칭.
     // 가속측은 아주 살짝만(0.06): 프레임 단위 계단을 뭉개는 정도. 이 값이 곧 출발 지연이라
     // 즉발감을 원하면 여기부터 깎아야 한다(1.5×damp 만큼 도달이 늦어진다).
@@ -27,13 +24,7 @@ public class LocoMoveState : ILayerState<LocoState>
     private float _animFloor;   // 이동 입력 유지 중 블렌드 하한(도달한 최고 속도비, 의도 속도로 상한)
     private float _noInputSince; // 이동 입력이 0이 된 시각(음수 = 입력 유지 중). 유예 판정용
 
-    public void Init(PlayerController c, ILayerStateChanger<LocoState> changer)
-    {
-        _controller = c;
-        _stateChanger = changer;
-    }
-
-    public void Enter()
+    public override void Enter()
     {
         // 공격/스킬 중이면 CrossFade 생략 (공격 애니메이션 덮어쓰기 방지)
         // 회피 종료처럼 자세 차이가 큰 복귀는 RequestLocoBlend로 더 긴 블렌드를 예약해 스냅을 없앤다.
@@ -54,7 +45,7 @@ public class LocoMoveState : ILayerState<LocoState>
         }
     }
 
-    public void Update()
+    public override void Update()
     {
         var dir = _controller.MoveDirection * _controller.MoveScale;
         bool hasInput = dir.sqrMagnitude > 0.0001f;
@@ -125,7 +116,7 @@ public class LocoMoveState : ILayerState<LocoState>
             _stateChanger.Change(LocoState.Idle);
     }
 
-    public void Exit() => _controller.IsRunning = false;
+    public override void Exit() => _controller.IsRunning = false;
 
     // 목표가 현재보다 크면 가속(느린 damp), 작으면 감속(빠른 damp).
     static void SetSpeedParam(Animator anim, float target01)

@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7170dc99867faaf418ac4291d7f06544, type: 3}
+  m_Name: Lich_M3p_ArcaneOrb
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichArcaneOrbPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 3
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  maxRange: 25
+  patternCooldown: 6
+  castDuration: 1
+  signalDuration: 0.2
+  rollDuration: 6
+  endDuration: 0.8
+  recoveryDuration: 0.4
+  orbCount: 3
+  fanAngle: 120
+  orbRadius: 3
+  orbSpeed: 6.6
+  spawnDistance: 3
+  crackSpacing: 2.5
+  damageMultiplier: 1
+  knockbackMultiplier: 1.2
+  recoilDistance: 3
+  recoilSeconds: 0.6
+  bounces: 1

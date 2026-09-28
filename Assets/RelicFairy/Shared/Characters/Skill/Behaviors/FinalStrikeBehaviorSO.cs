@@ -149,7 +149,7 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
             foreach (var target in _hitTargets)
             {
                 if (target == null) continue;
-                ctx.DealDamage(target, extraDmg, _data.knockbackMultiplier * 1.5f);
+                ctx.DealDamage(target, extraDmg, _data.knockbackMultiplier * 1.5f, isFinisher: true);
             }
 
             // 티어별 추가 피격 이펙트
@@ -192,7 +192,7 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
 
                 if (col.TryGetComponent<IDamageable>(out var d))
                 {
-                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier);
+                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier, isFinisher: true);   // 스킬 자체가 한 방 — 본타가 막타
                     _hitTargets.Add(d);
                     _hitObjects.Add(col.gameObject);
                 }
@@ -248,7 +248,8 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
                 }
             }
 
-            ctx.Animator.CrossFade(animName, 0.05f);
+            // 차지가 끝나는 순간(판정)에 클립의 내려찍기가 닿게 — 클립 앞부분을 건너뛴다(09-25 실측: 닿음 1.22초 ↔ 판정 0.6초).
+            SkillAnimSync.CrossFadeToContact(ctx.Animator, animName, _data.chargeDuration, 0.05f);
         }
 
         private async void SpawnChargeEffect(SkillExecutionContext ctx)

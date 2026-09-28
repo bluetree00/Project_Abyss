@@ -44,7 +44,7 @@ public static class UILockedSlot
             new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f),
             new Vector2(0f, 12f), new Vector2(0f, 26f));
 
-        var sub = ShopUIStyle.MakeText(frame.transform, "LockCaption", 14f, FontStyles.Normal,
+        var sub = ShopUIStyle.MakeText(frame.transform, "LockCaption", 16f, FontStyles.Normal,   // 가독성 하한 16(09-26, 14였다)
                                        TextAlignmentOptions.Center, InkDim);
         sub.text = caption;
         sub.raycastTarget = false;

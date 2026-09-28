@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t3_grass_bloom
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t3_grass_bloom
-  displayName: "\uBC88\uC2DD\uC758 \uB8EC"
+  displayName: "\uAC10\uC2F8\uB294 \uC232\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 2

@@ -28,11 +28,12 @@ public readonly struct EndRunResult
     public readonly int ShopUses;
     public readonly int RefineUses;
     public readonly int MaxEnhance;
+    public readonly int Covenants;   // 이번 런에 맺은 서약 수(기억의 제단 「서약」 갈래 할인 조건)
 
     public EndRunResult(bool isCleared, ChapterId chapter, int gainedGold, int gainedEssence, ItemStack[] gainedItems, string reason,
                         int abyssDepth = 0, int roomClears = 0, int kills = 0, int eliteKills = 0, int bossKills = 0,
                         int shopUses = 0, int refineUses = 0, int maxEnhance = 0,
-                        bool potionUsed = false, int specialVisits = 0, int flawless = 0)
+                        bool potionUsed = false, int specialVisits = 0, int flawless = 0, int covenants = 0)
     {
         IsCleared     = isCleared;
         Chapter       = chapter;
@@ -52,5 +53,6 @@ public readonly struct EndRunResult
         ShopUses      = shopUses;
         RefineUses    = refineUses;
         MaxEnhance    = maxEnhance;
+        Covenants     = covenants;
     }
 }

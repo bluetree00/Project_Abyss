@@ -7,6 +7,7 @@ using UnityEngine;
 /// 동작:
 ///   · Update: 플레이어가 Ground layer 위에 있으면 현재 위치를 _lastSafe 로 갱신
 ///   · transform.position.y &lt; fallThresholdY → 복구 절차 실행
+///     (방이 <see cref="SetFallDepthOverride"/>로 덮어쓰면 '마지막 안전 지점 − 깊이'로 판정)
 ///
 /// 복구 절차:
 ///   1. RuntimeStats.MaxHp × fallDamageRatio 만큼 HP 감소 (passive 트리거 없이 직접)
@@ -26,6 +27,12 @@ public class FallRecoveryController : MonoBehaviour
         new( 1f,      0f     ), new( 0.707f,  0.707f), new( 0f,  1f     ), new(-0.707f,  0.707f),
         new(-1f,      0f     ), new(-0.707f, -0.707f), new( 0f, -1f     ), new( 0.707f, -0.707f),
     };
+
+    // ── 낙하 깊이 덮어쓰기(방 단위) ─────────────────────────
+    // 절대 높이 판정은 바닥이 y≈0인 방에서 5m만 떨어져도 복구돼 '떨어지는 감각'이 없다(리치 아레나 붕괴 바닥).
+    // 주인은 Unity 객체 — 파괴되면 == null이 되어 덮어쓰기가 저절로 풀린다(해제를 놓쳐도 남지 않는다).
+    private static Object s_depthOwner;
+    private static float  s_depthBelowLastSafe;
 
     [SerializeField, Tooltip("이 Y 이하로 떨어지면 낙사 판정. SafeFloor(=baseY-0.05) 보다 충분히 아래로.")]
     private float fallThresholdY = -5f;
@@ -57,6 +64,10 @@ public class FallRecoveryController : MonoBehaviour
     private bool _hasSafe;
     private bool _recovering;
 
+    /// <summary>지금 적용되는 낙사 판정 높이 — 덮어쓰기가 있으면 마지막 안전 지점 기준, 없으면 절대 높이.</summary>
+    private float CurrentFallThresholdY =>
+        s_depthOwner != null ? _lastSafe.y - s_depthBelowLastSafe : fallThresholdY;
+
     private void Awake()
     {
         _pc = GetComponent<PlayerController>();
@@ -70,7 +81,7 @@ public class FallRecoveryController : MonoBehaviour
         if (_recovering) return;
 
         // 1) 낙사 판정
-        if (transform.position.y < fallThresholdY)
+        if (transform.position.y < CurrentFallThresholdY)
         {
             Recover();
             return;
@@ -93,12 +104,32 @@ public class FallRecoveryController : MonoBehaviour
     /// <summary>PitTrigger 등 외부에서 낙사 복구를 즉시 발동한다.</summary>
     public void ForceRecover() => Recover();
 
+    /// <summary>
+    /// 낙사 판정을 '마지막으로 밟은 안전 지점보다 <paramref name="depthBelowLastSafe"/> m 아래'로 바꾼다.
+    /// 무너지는 전장처럼 떨어지는 감각이 필요한 방이 켜고, 방을 떠날 때 <see cref="ClearFallDepthOverride"/>로 끈다.
+    /// 마지막 호출이 이긴다. <paramref name="owner"/>가 파괴되면 저절로 풀린다.
+    /// </summary>
+    public static void SetFallDepthOverride(Object owner, float depthBelowLastSafe)
+    {
+        if (owner == null) return;
+        s_depthOwner         = owner;
+        s_depthBelowLastSafe = Mathf.Max(0f, depthBelowLastSafe);
+    }
+
+    /// <summary>덮어쓰기를 끈다 — 건 주인만 끌 수 있다(다른 방이 뒤늦게 부른 해제가 지금 방의 설정을 지우지 않게).</summary>
+    public static void ClearFallDepthOverride(Object owner)
+    {
+        if (owner != null && s_depthOwner == owner) s_depthOwner = null;
+    }
+
     private void Recover()
     {
         _recovering = true;
 
-        // HP 차감 — passive 트리거 없이 직접 (낙사는 특수 원인)
-        if (_pc != null && _pc.RuntimeStats != null)
+        // HP 차감 — passive 트리거 없이 직접 (낙사는 특수 원인).
+        // 베이스캠프(허브)에선 깎지 않는다 — 떠 있는 광장은 투명 벽이 막지만, 그래도 떨어지면 벌이 아니라 제자리로(재설계 §4).
+        bool inHub = BaseCampBootstrapper.Instance != null;
+        if (!inHub && _pc != null && _pc.RuntimeStats != null)
         {
             int maxHp = _pc.RuntimeStats.MaxHp;
             int dmg = Mathf.Max(1, Mathf.RoundToInt(maxHp * fallDamageRatio));

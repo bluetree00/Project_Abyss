@@ -9,6 +9,14 @@ using UnityEngine.AI;
 /// </summary>
 public class LegendaryRuntime : MonoBehaviour
 {
+    // URP는 GrabPass를 지원하지 않는다. 이 셰이더로 그리면 화면이 하얗게 덮이고 `_GrabTexture` 오류가 매 프레임 찍힌다
+    // (에디터에선 씬 뷰가 같은 오류를 내 Error Pause로 플레이가 멈춘다 — 09-19 「심연 잠식 뒤 타격 0」의 원인).
+    // 이펙트 팩 원본은 다른 곳도 같이 쓰므로 고치지 않고, 띄울 때 왜곡 조각만 끈다.
+    private static readonly HashSet<string> GrabPassShaders = new()
+    {
+        "GAPH Custom Shader/Distortion Effect", "Hovl/Particles/Distortion", "Hovl/Particles/BlendDistort",
+    };
+
     public static LegendaryRuntime Instance { get; private set; }
     public static LegendaryVfxCatalog Catalog => Instance?._catalog;
 
@@ -87,6 +95,7 @@ public class LegendaryRuntime : MonoBehaviour
     {
         if (prefab == null) return;
         var vfx = Instantiate(prefab, pos, rot);
+        DisableGrabPassRenderers(vfx);
         var ls = Vector3.one * scale;
         if (yScale >= 0f) ls.y = yScale;
         vfx.transform.localScale = ls;
@@ -107,6 +116,17 @@ public class LegendaryRuntime : MonoBehaviour
         foreach (var col in vfx.GetComponentsInChildren<Collider>())
             col.enabled = false;
         Destroy(vfx, lifetime);
+    }
+
+    /// <summary>GrabPass 왜곡 조각(URP 미지원)만 끈다 — 나머지 파티클은 그대로 그려진다.</summary>
+    public static void DisableGrabPassRenderers(GameObject vfx)
+    {
+        if (vfx == null) return;
+        foreach (var r in vfx.GetComponentsInChildren<Renderer>(true))
+        {
+            var m = r.sharedMaterial;
+            if (m != null && m.shader != null && GrabPassShaders.Contains(m.shader.name)) r.enabled = false;
+        }
     }
 
     /// <summary>현재 씬 NavMesh 삼각분할을 기반으로 맵 내 임의 위치를 반환한다. 투사체/필드 배치용.</summary>

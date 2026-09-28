@@ -25,7 +25,7 @@ public class WeaponEffectHandler
         if (abilitySteps == null || abilitySteps.Count == 0) return;
 
         var playerTransform = _player.transform;
-        var handTransform = _player.handTransform;
+        var handTransform = _player.HandTransform;
         if (handTransform == null) return;
 
         foreach (var s in abilitySteps)
@@ -122,6 +122,7 @@ public class WeaponEffectHandler
 
                     CombatSpawner.SpawnProjectile(ref req, arrow, execution != null ? execution.RegisterEffect : null);
                     execution?.RegisterEffect(effectObj);
+                    Managers.Sound?.PlayEvent(SoundEvent.PlayerShot);   // 발사음(09-25) — 갈래가 여러 발이어도 한 번
 
                     // 주 투사체 크기도 파츠(크기·위력) 반영 — 추가 갈래는 퍼널이 이미 적용한다.
                     effectObj.transform.localScale = Vector3.one * (e.scaleMultiplier * req.sizeMult);

@@ -49,9 +49,6 @@ public class FGSmashPatternSO : BossPatternSO
 
     // ── 비주얼 ────────────────────────────────────────────
     [Header("Warning Zone")]
-    [Tooltip("경고 장판 프리팹 (360° 원형 디스크). null이면 effectPrefab 사용.")]
-    public GameObject warningZonePrefab;
-
     [Tooltip("경고 장판 이펙트 크기 배율 (기본 1, 파티클 자체 크기 기준)")]
     public float warningZoneScale = 1f;
 
@@ -97,9 +94,6 @@ public class FGSmashPatternSO : BossPatternSO
     }
 
     public override SpecialStateBase GetRuntimeState() => _state;
-
-    internal GameObject ResolveWarningPrefab()
-        => warningZonePrefab != null ? warningZonePrefab : effectPrefab;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -121,7 +115,6 @@ public class FGSmashState : FullLockState<FGSmashPatternSO>
     private GameObject _warningGO;
     private GameObject _shockwaveGO;
     private Vector3    _impactPos;          // 손이 닿을 지점 — 경고장판·이펙트·데미지 공유
-    private Vector3    _warningTargetScale;
 
     public FGSmashState(FGSmashPatternSO data) : base(data) { }
 
@@ -155,17 +148,14 @@ public class FGSmashState : FullLockState<FGSmashPatternSO>
         switch (_phase)
         {
             case Phase.Warning:
-                // 경고 장판 서서히 커지기 (보스 기준 원형 → 보스에서부터 서서히 확장)
-                if (_warningGO != null && Data.warningDuration > 0f)
-                {
-                    float t = Mathf.Clamp01(_timer / Data.warningDuration);
-                    _warningGO.transform.localScale = Vector3.Lerp(Vector3.zero, _warningTargetScale, t);
-                }
+                // 가이드 채우기 — 크기는 처음부터 판정 범위 그대로, 안쪽이 차오른다
+                if (Data.warningDuration > 0f)
+                    PatternGuideHelper.SetProgress(_warningGO, _timer / Data.warningDuration);
                 if (_timer >= Data.warningDuration)
                 {
                     _timer = 0f;
                     _phase = Phase.Impact;
-                    DespawnWarning();
+                    PatternGuideHelper.Arm(_warningGO);   // 내리치는 동안 판정 색으로 남긴다
                     PlayAnim(ctx, _isLeftHand ? AnimLeft : AnimRight);  // 경고 종료 → 타격 애니메이션
                 }
                 break;
@@ -199,6 +189,7 @@ public class FGSmashState : FullLockState<FGSmashPatternSO>
                 {
                     _timer = 0f;
                     _phase = Phase.Recovery;
+                    DespawnWarning();
                     DespawnShockwave();
                 }
                 break;
@@ -265,23 +256,11 @@ public class FGSmashState : FullLockState<FGSmashPatternSO>
     // ── 경고 장판 (임팩트 지점 원형 디스크) ──────────────
     private void SpawnWarning(MonsterContext ctx)
     {
-        var prefab = Data.ResolveWarningPrefab();
-        if (prefab == null) return;
-
-        Vector3 pos  = _impactPos;
-        pos.y       += 0.02f;
-        float s      = Data.range;
-        _warningTargetScale = new Vector3(s, 1f, s);
-        _warningGO = Managers.ObjectPooler.SpawnFromPrefab(prefab, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.identity);
-        _warningGO.transform.localScale = Vector3.zero;
+        _warningGO = PatternGuideHelper.Prepare(
+            PatternGuideHelper.Disc(_impactPos, Data.range, PatternGuideHelper.Telegraph), ForestGuardianMonster.GuideFlow);
     }
 
-    private void DespawnWarning()
-    {
-        if (_warningGO == null) return;
-        Managers.ObjectPooler.Despawn(_warningGO);
-        _warningGO = null;
-    }
+    private void DespawnWarning() => PatternGuideHelper.SafeDestroy(ref _warningGO);
 
     // ── 충격파 링 ─────────────────────────────────────────
     private void SpawnShockwave(MonsterContext ctx)
@@ -328,7 +307,7 @@ public class FGSmashState : FullLockState<FGSmashPatternSO>
         if (player == null) return;
 
         int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
-        player.TakeDamage(dmg);
+        player.TakeDamage(dmg, ctx.Monster.gameObject, false, HitWeight.Heavy);   // 간판기 — 강
 
         Vector3 dir = ctx.Runtime.PlayerTarget.position - _impactPos;
         dir.y = 0.3f;

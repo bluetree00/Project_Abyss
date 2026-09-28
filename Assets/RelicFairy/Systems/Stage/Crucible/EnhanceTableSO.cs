@@ -52,10 +52,10 @@ public class EnhanceTableSO : ScriptableObject
     [SerializeField] private float _masterySkillCdrPerLevel = 0.03f;
 
     [Header("스킬 단계 임계 — 2·3단계가 열리는 지점 (근접=강화 레벨 / 원거리=파츠 총레벨)")]
-    [Tooltip("근접: 강화 레벨이 이 값에 닿을 때마다 스킬 단계 +1. 기본 +5 / +10 (기획 §3.3)")]
-    [SerializeField] private int[] _meleeSkillTierMilestones  = { 5, 10 };
-    [Tooltip("원거리: 파츠 총레벨이 이 값에 닿을 때마다 스킬 단계 +1.")]
-    [SerializeField] private int[] _rangedSkillTierMilestones = { 4, 10 };
+    [Tooltip("근접: 강화 레벨이 이 값에 닿을 때마다 스킬 단계 +1. 기본 +3 / +6 (09-25 도달 범위로 당김 — 기획 스킬구성_재련소연결)")]
+    [SerializeField] private int[] _meleeSkillTierMilestones  = { 3, 6 };
+    [Tooltip("원거리: 파츠 총레벨이 이 값에 닿을 때마다 스킬 단계 +1. 기본 2 / 10 (근접과 재료 비용을 맞춤)")]
+    [SerializeField] private int[] _rangedSkillTierMilestones = { 2, 10 };
 
     [Header("승급 전설 (택1 분기)")]
     [SerializeField] private LegendDef[] _legends;

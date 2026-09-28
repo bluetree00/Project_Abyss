@@ -25,6 +25,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 058c6c6f7bee2fc45a91fbdb528a9035
+    m_Address: PhantomDanceFinish
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 079de72b89b92fc45920409aa3f61598
     m_Address: BowETier3Hit
     m_ReadOnly: 0
@@ -37,6 +42,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0952022740cf25142b154ad3db271021
     m_Address: VFX_Shock
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0cb3807c7fb4e1845b97e66f3996f66c
+    m_Address: RangedPartsExplosion
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -367,11 +377,26 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: df21b8a649ddcc845b93de8025fd4923
+    m_Address: CovenantVfxSet
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: df8384e9e946c054099e3b4a01b82abc
     m_Address: FrontAttackHit
     m_ReadOnly: 0
     m_SerializedLabels:
     - default
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: df8bef245b1373047a1e1320f5ed6ac2
+    m_Address: HolySlashFinish
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dfb11343e1f738848a39590c5e36c883
+    m_Address: NamelessIasenFinish
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e23741b3f14f27e46a31d8d542a2033e
     m_Address: BowChargeEffect

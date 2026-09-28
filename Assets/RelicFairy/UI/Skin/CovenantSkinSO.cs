@@ -30,6 +30,12 @@ public sealed class CovenantSkinSO : ScriptableObject
     public Sprite cardIdle;       // 비선택 바탕(밝은 양피지)
     public Sprite cardSelected;   // 선택 바탕(어두운 판)
 
+    // 바탕 아트는 오른쪽·아래로 그림자를 23px 품고 있다(알파 100→0). 등급 테두리를 카드 rect 끝에 붙이면
+    // 왼쪽·위는 몸통에 붙고 오른쪽·아래만 23px 떠서 테두리가 어긋나 보였다. 조각은 이 몸통에 붙인다.
+    [Tooltip("카드 바탕에서 그림자·투명 여백을 뺀 불투명 몸통까지의 거리(아트 px) — x=왼 y=아래 z=오른 w=위.\n" +
+             "등급 테두리·글로우가 이 몸통에 붙는다. 바탕 아트를 바꾸면 이 값도 다시 잰다(알파 230 기준).")]
+    [SerializeField] private Vector4 cardBodyInset = new Vector4(4f, 23f, 23f, 6f);
+
     [Header("하단 체결 버튼")]
     [Tooltip("「조립」 배너(1352×405 · 3.34:1). 양끝 나침반·밀랍인장이 늘어나면 안 되므로 9-slice로 넣는다.")]
     public Sprite forgeBanner;
@@ -41,6 +47,8 @@ public sealed class CovenantSkinSO : ScriptableObject
     public Sprite[] gradeBar    = new Sprite[3];
     [Tooltip("네 귀퉁이 모서리 조각. 좌상단 모양 하나로 나머지 셋은 코드가 뒤집어 쓴다.")]
     public Sprite[] gradeCorner = new Sprite[3];
+
+    public Vector4 CardBodyInset => cardBodyInset;
 
     public Sprite GradeBar(CovenantTier t)    => Pick(gradeBar, (int)t);
     public Sprite GradeCorner(CovenantTier t) => Pick(gradeCorner, (int)t);

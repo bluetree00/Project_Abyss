@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -10,6 +11,7 @@ using UnityEngine;
 ///
 /// 새 연출 시스템을 만들지 않는다 — 타격감(<see cref="HitFeelService"/>)과
 /// 화면 펄스(<see cref="VolumePulseService"/>)를 그대로 재사용한다.
+/// 효과 VFX(초신성 폭발·결계 등)도 여기서 낸다 — 프리팹은 <see cref="CovenantVfxSet"/>, 재생은 <see cref="ElementVfxPlayer"/>의 풀.
 /// <b>Time.timeScale을 직접 건드리지 않는다</b>(TimeScaleArbiter 소유). 정지는 HitFeelService.HitStop만.
 /// </summary>
 public static class CovenantFxService
@@ -17,22 +19,30 @@ public static class CovenantFxService
     // ── Constants ────────────────────────────────────────
     private const float Throttle = 0.4f;   // 효과별 최소 발동 간격(초, unscaled)
 
+    /// <summary>효과 VFX 세트 Addressable 키.</summary>
+    public const string SetKey  = "CovenantVfxSet";
+    /// <summary>루비 발동 VFX 키(세트 안).</summary>
+    public const string RubyKey = "ruby";
+
     // 실버 — 존재감만. 연타 원인(연격 등)에 얹혀도 거슬리지 않을 만큼 약하게.
-    private const float SilverShakeAmp = 0.04f, SilverShakeDur = 0.06f;
+    private const float SilverShakeAmp = HitFeelService.DealtShakeBasic, SilverShakeDur = 0.06f;   // 09-25: 0.04 → 기본 공격 상한
 
     // 골드 — 짧고 얕은 정지 + 중간 셰이크 + 화면 펄스.
     private const float GoldStopScale  = 0.10f, GoldStopDur    = 0.05f;
-    private const float GoldShakeAmp   = 0.10f, GoldShakeDur   = 0.12f;
+    private const float GoldShakeAmp   = HitFeelService.DealtShakeSkill, GoldShakeDur   = 0.12f;   // 09-25: 0.10 → 스킬 상한
     private const float GoldPulsePeak  = 0.35f, GoldPulseDur   = 0.12f;
 
     // 루비 — 더 깊고 긴 정지(단 0.10s 상한) + 방향성 셰이크 + 큰 펄스 + VFX.
     private const float RubyStopScale  = 0.04f, RubyStopDur    = 0.10f;
-    private const float RubyShakeAmp   = 0.18f, RubyShakeDur   = 0.18f;
+    private const float RubyShakeAmp   = HitFeelService.DealtShakeFinisher, RubyShakeDur   = 0.18f;   // 09-25: 0.18(최대치) → 막타 상한
     private const float RubyPulsePeak  = 0.70f, RubyPulseDur   = 0.20f;
 
     // ── Static ───────────────────────────────────────────
     private static readonly Dictionary<string, float> _lastPlay = new();
     private static int _lastFrame = -1;
+
+    private static CovenantVfxSet _set;
+    private static bool _setLoading;
 
     // 도메인 리로드 OFF 2회차 대비 — unscaledTime은 0부터 다시 흐르는데 _lastPlay에는
     // 지난 세션의 큰 시각이 남아 (now - last)가 음수가 되고, 연출이 영구히 스로틀에 걸린다.
@@ -42,6 +52,8 @@ public static class CovenantFxService
     {
         _lastPlay.Clear();
         _lastFrame = -1;
+        _set        = null;
+        _setLoading = false;
     }
 
     // ── Public Methods ───────────────────────────────────
@@ -83,5 +95,41 @@ public static class CovenantFxService
                 break;
         }
         return true;
+    }
+
+    /// <summary>효과 VFX 세트를 미리 읽어 둔다 — 첫 발동에서 이펙트가 빠지지 않게. 서약 핸들러 초기화가 부른다.</summary>
+    public static void Preload() => LoadSetAsync().Forget();
+
+    /// <summary>
+    /// 효과 VFX 1회. radius>0이면 판정 반경에 크기를 맞춘다(세트가 반경 맞춤으로 표시한 항목만).
+    /// 세트가 아직 없거나 키가 없으면 조용히 넘어간다 — 연출이 빠질 뿐 효과는 이미 들어갔다.
+    /// </summary>
+    public static void Burst(string key, Vector3 pos, float radius = 0f)
+    {
+        if (_set == null) { Preload(); return; }
+        if (_set.TryGet(key, radius, out var prefab, out float scale, out float life))
+            ElementVfxPlayer.PlayPrefab(prefab, pos, scale, life);
+    }
+
+    /// <summary>효과 VFX를 대상에 붙인다(대상+프리팹별 1개, 다시 붙이면 수명 갱신). duration≤0이면 세트의 기본 지속.</summary>
+    public static void Attach(string key, Transform target, float duration = 0f)
+    {
+        if (target == null) return;
+        if (_set == null) { Preload(); return; }
+        if (_set.TryGet(key, 0f, out var prefab, out float scale, out float life))
+            ElementVfxPlayer.AttachPrefab(prefab, target, duration > 0f ? duration : life, scale);
+    }
+
+    // ── Private Methods ──────────────────────────────────
+    private static async UniTaskVoid LoadSetAsync()
+    {
+        if (_set != null || _setLoading) return;
+        _setLoading = true;
+        try
+        {
+            _set = await Managers.AddressableManager.TryLoadAssetAsync<CovenantVfxSet>(SetKey);
+            if (_set == null) Debug.LogWarning($"[CovenantFx] '{SetKey}' Addressable 로드 실패 — 서약 효과 VFX 미표시");
+        }
+        finally { _setLoading = false; }
     }
 }

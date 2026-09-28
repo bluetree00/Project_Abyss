@@ -88,6 +88,18 @@ namespace RelicFairy.UI
                 _canvasGroup.interactable = false;
                 _canvasGroup.blocksRaycasts = false;
             }
+
+            // 반투명 검은 네모 띠(웹 자막처럼 보였다) → 좌우 끝이 흐려지는 띠. 글 폭(1152)이 흐림 구간에 덜 걸리게
+            // 양옆으로 240씩 넓힌다(09-28 UI 톤 통일). 글자는 부드러운 그림자(글자 정본).
+            if (_background != null)
+            {
+                _background.sprite = UITheme.SoftBand;
+                _background.type   = Image.Type.Simple;
+                _background.color  = new Color(0.02f, 0.02f, 0.04f, 0.80f);
+                _background.rectTransform.sizeDelta += new Vector2(480f, 24f);
+            }
+            if (_label != null) TMPOutlineHelper.ApplySoftShadow(_label);
+            if (_speakerLabel != null) TMPOutlineHelper.ApplySoftShadow(_speakerLabel);
         }
 
         private void OnDestroy()
@@ -107,6 +119,55 @@ namespace RelicFairy.UI
             if (Instance == null) return;
             Instance.Enqueue(text, type, speaker, null);
         }
+
+        /// <summary>
+        /// 대사 CSV(DIALOGUE_DATA)의 한 시퀀스를 자막으로 순서대로 띄운다. 시퀀스가 없으면 false.
+        /// 멀린·그림자 줄은 내레이션, 그 밖의 화자는 첫 줄만 <paramref name="firstLineType"/>이고 나머지는 일반 바크 —
+        /// PhaseAnnounce는 큐를 비우므로 연달아 쓰면 앞줄이 지워진다.
+        /// </summary>
+        public static bool ShowDialogue(string sequenceKey, BossBarkType firstLineType = BossBarkType.Bark)
+        {
+            if (Instance == null || string.IsNullOrEmpty(sequenceKey)) return false;
+            var lines = Managers.DialogueData?.GetLines(sequenceKey);
+            if (lines == null || lines.Length == 0) return false;
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i];
+                if (line == null || string.IsNullOrEmpty(line.text)) continue;
+                Instance.Enqueue(line.text, TypeFor(line.speaker, i == 0 ? firstLineType : BossBarkType.Bark), line.speaker, null);
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// 대사 CSV 시퀀스의 한 줄만 띄운다. <paramref name="interrupt"/>면 대기열을 비우고 바로 띄운다 —
+        /// 컷신처럼 줄마다 시각이 정해져 있을 때(앞 줄이 길어 뒤로 밀리지 않게).
+        /// </summary>
+        public static bool ShowDialogueLine(string sequenceKey, int index,
+                                            BossBarkType bossLineType = BossBarkType.Bark, bool interrupt = false)
+        {
+            if (Instance == null || string.IsNullOrEmpty(sequenceKey)) return false;
+            var lines = Managers.DialogueData?.GetLines(sequenceKey);
+            if (lines == null || index < 0 || index >= lines.Length) return false;
+
+            var line = lines[index];
+            if (line == null || string.IsNullOrEmpty(line.text)) return false;
+
+            if (interrupt)
+            {
+                Instance._queue.Clear();
+                Instance.InterruptCurrent();
+            }
+            Instance.Enqueue(line.text, TypeFor(line.speaker, bossLineType), line.speaker, null);
+            return true;
+        }
+
+        /// <summary>멀린·그림자 줄은 내레이션 자막, 그 밖의 화자는 지정한 종류.</summary>
+        private static BossBarkType TypeFor(DialogueSpeaker speaker, BossBarkType otherType)
+            => speaker == DialogueSpeaker.Merlin || speaker == DialogueSpeaker.Shadow
+                ? BossBarkType.MerlinNarration
+                : otherType;
 
         /// <summary>표시 후 페이드아웃까지 완료될 때까지 대기한다. (보스 등장 연출의 카메라 단계 동기화용)</summary>
         public static UniTask ShowAndWaitAsync(string text, BossBarkType type = BossBarkType.Bark,
@@ -273,8 +334,9 @@ namespace RelicFairy.UI
             DialogueSpeaker.Lich    => "리치",
             DialogueSpeaker.Mordred => "모르드레드",
             DialogueSpeaker.Knight  => "기사",
-            DialogueSpeaker.Merlin  => "???",
-            DialogueSpeaker.Shadow  => "그림자",
+            // 대사창(UI_DialoguePopup)과 같은 공개 규칙 — 리치가 이름을 부른 뒤 멀린, 엔딩 뒤 모르가나.
+            DialogueSpeaker.Merlin  => StoryProgress.IsMerlinNamed ? "멀린" : "???",
+            DialogueSpeaker.Shadow  => StoryProgress.HasEnded ? "모르가나" : "그림자",
             DialogueSpeaker.Arthur  => "아서왕",
             DialogueSpeaker.ForestGuardian => "숲의 수호자",
             DialogueSpeaker.Dragon  => "화룡",

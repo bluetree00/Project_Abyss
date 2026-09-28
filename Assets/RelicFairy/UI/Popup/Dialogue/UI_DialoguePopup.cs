@@ -44,7 +44,11 @@ public class UI_DialoguePopup : UI_Popup
     [Header("Speaker Names")]
     [Tooltip("멀린 — 정체를 감추는 동안 \"???\"로 표기.")]
     [SerializeField] private string merlinName  = "???";
+    [Tooltip("리치가 멀린의 이름을 부른 뒤(또는 그림자가 부르는 사망 횟수 이후) 쓰는 이름.")]
+    [SerializeField] private string merlinRevealedName = "멀린";
     [SerializeField] private string shadowName  = "그림자";
+    [Tooltip("엔딩(모르가나 정체 공개) 뒤 쓰는 이름.")]
+    [SerializeField] private string shadowRevealedName = "모르가나";
     [SerializeField] private string lichName    = "리치";
     [SerializeField] private string mordredName = "모르드레드";
     [SerializeField] private string arthurName  = "아서왕";
@@ -76,6 +80,12 @@ public class UI_DialoguePopup : UI_Popup
     private const int   MaxLinesPerPage = 2;
     private const float HintBlinkPeriod = 0.8f;
     private static readonly Color BandColor = new(0f, 0f, 0f, 0.65f);   // 암막 0.4 위에서 띠가 읽히는 값(실측 09-09)
+    // 화면 아래 그림자판 — 띠 밑으로 HUD(체력바·스탯)가 비쳐 대사와 겹쳤다(09-28). 아래 75%는 거의 불투명, 위 25%에서 옅어진다.
+    // 고른 그라데이션(0.85→0)은 체력바 높이에서 0.5라 선형 색공간에선 HUD가 그대로 비쳤다(1차 실측).
+    private const float HudShadeHeight = 300f;
+    private const float HudShadeSolid  = 0.75f;   // 이 비율까지 불투명 — 체력바(≈150)·스탯 줄(≈185)이 들어간다
+    private static readonly Color HudShadeColor = new(0f, 0f, 0f, 0.94f);
+    private static Sprite s_shadeFade;
     private static readonly Color RoleTagColor = new(0.72f, 0.74f, 0.78f, 1f);
     private TextMeshProUGUI _advanceHint;
 
@@ -97,6 +107,7 @@ public class UI_DialoguePopup : UI_Popup
 
         ApplySkin();
         EnsureImageStyleNodes();
+        EnsureHudShade();
     }
 
     /// <summary>
@@ -163,6 +174,46 @@ public class UI_DialoguePopup : UI_Popup
         t.textWrappingMode = TextWrappingModes.NoWrap;
         t.overflowMode = TextOverflowModes.Overflow;
         return t;
+    }
+
+    /// <summary>
+    /// 화면 아래 그림자판(<see cref="HudShadeHeight"/>) — 대사 띠 밑으로 HUD 체력바·스탯이 비쳐 글자와 겹쳤다(09-28 던전 대기방).
+    /// HUD를 끄지 않고(연출·시작방이 HUD 표시를 따로 쥔다) 이 팝업 안에서 가린다. 암막(Background) 바로 위 = 초상·띠 아래.
+    /// </summary>
+    private void EnsureHudShade()
+    {
+        if (transform.Find("HudShade") != null) return;
+        var go = new GameObject("HudShade", typeof(RectTransform), typeof(CanvasRenderer));
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(transform, false);
+        var bg = transform.Find("Background");
+        rt.SetSiblingIndex(bg != null ? bg.GetSiblingIndex() + 1 : 0);
+        rt.anchorMin = new Vector2(0f, 0f);
+        rt.anchorMax = new Vector2(1f, 0f);
+        rt.pivot     = new Vector2(0.5f, 0f);
+        rt.anchoredPosition = Vector2.zero;
+        rt.sizeDelta        = new Vector2(0f, HudShadeHeight);
+        var img = go.AddComponent<Image>();
+        img.sprite        = ShadeFade();
+        img.color         = HudShadeColor;
+        img.raycastTarget = false;
+    }
+
+    /// <summary>아래 <see cref="HudShadeSolid"/>까지 불투명 → 위로 투명해지는 세로 그라데이션(1×64, 한 번 구워 공유).</summary>
+    private static Sprite ShadeFade()
+    {
+        if (s_shadeFade != null) return s_shadeFade;
+        var tex = new Texture2D(1, 64, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave };
+        for (int y = 0; y < 64; y++)
+        {
+            float t = y / 63f;
+            float a = t <= HudShadeSolid ? 1f : 1f - (t - HudShadeSolid) / (1f - HudShadeSolid);
+            tex.SetPixel(0, y, new Color(1f, 1f, 1f, a));
+        }
+        tex.Apply();
+        s_shadeFade = Sprite.Create(tex, new Rect(0, 0, 1, 64), new Vector2(0.5f, 0.5f), 100f);
+        s_shadeFade.hideFlags = HideFlags.HideAndDontSave;
+        return s_shadeFade;
     }
 
     /// <summary>띠 바탕 — 공용 생성기(둥근 사각 반경 28 · 소프트 14 · 9-slice 42). 아트가 오면 <see cref="DialogueSkinSO.band"/>로 갈아끼운다.</summary>
@@ -459,8 +510,8 @@ public class UI_DialoguePopup : UI_Popup
         if (speakerNameText == null) return;
         speakerNameText.text = speaker switch
         {
-            DialogueSpeaker.Merlin  => merlinName,
-            DialogueSpeaker.Shadow  => shadowName,
+            DialogueSpeaker.Merlin  => StoryProgress.IsMerlinNamed ? merlinRevealedName : merlinName,
+            DialogueSpeaker.Shadow  => StoryProgress.HasEnded      ? shadowRevealedName : shadowName,
             DialogueSpeaker.Lich    => lichName,
             DialogueSpeaker.Mordred => mordredName,
             DialogueSpeaker.Arthur  => arthurName,

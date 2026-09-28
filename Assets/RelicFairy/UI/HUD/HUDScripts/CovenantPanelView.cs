@@ -11,6 +11,9 @@ public sealed class CovenantPanelView : MonoBehaviour
 {
     [SerializeField] private UI_CovenantSlot[] _slots;
 
+    private GridLayoutGroup _grid;        // 09-27: 세로 줄 → 격자(4칸은 2열)
+    private TMP_Text        _countLabel;  // 「서약 n/N」
+
     [Header("서약 슬롯 스킨 (선택 — 미지정 시 기존 외형 유지)")]
     [SerializeField] private Sprite covenantFrameSprite;   // 서약 테두리
     [SerializeField] private Sprite covenantInnerSprite;   // 서약 내부
@@ -28,10 +31,15 @@ public sealed class CovenantPanelView : MonoBehaviour
     [SerializeField] private Vector4 slotContentPadding = new Vector4(14f, 12f, 14f, 12f);
     [Tooltip("제목/설명 사이 간격")]
     [SerializeField] private float contentSpacing = 6f;
-    [Tooltip("제목(서약 이름) 폰트 크기 — 한 줄에 들어가게")]
-    [SerializeField] private float titleFontSize = 14f;
+    // 하한 16px 기준([[project_ui_improvement_pass_20260909]])에 맞춘 값.
+    // 09-09 가독성 패스가 조립 팝업만 올리고 이 패널을 빠뜨려 11px로 남아 있었다 —
+    // 런 내내 화면에 떠 있는 표시라 체감은 여기가 가장 크다.
+    // 실측(DNFForgedBlade 줄높이 1.286): 설명 상자 209×88에서 가장 긴 조합
+    // (「심장박동 × 결계」 4줄)이 15px에 82%를 쓴다. 16px은 넘친다.
+    [Tooltip("제목(서약 이름) 폰트 크기 — 이름이 길면 두 줄로 접힌다")]
+    [SerializeField] private float titleFontSize = 16f;
     [Tooltip("설명 폰트 크기")]
-    [SerializeField] private float descFontSize = 11f;
+    [SerializeField] private float descFontSize = 15f;
 
     private bool HasSkin => covenantFrameSprite != null || covenantInnerSprite != null;
 
@@ -65,15 +73,25 @@ public sealed class CovenantPanelView : MonoBehaviour
         prt.anchoredPosition = panelOffset;
         prt.sizeDelta = new Vector2(slotSize.x, prt.sizeDelta.y);   // 높이는 ContentSizeFitter가 결정
 
-        // 세로 배치: 간격만 조정하고 크기는 LayoutElement가 결정하게 한다.
-        if (TryGetComponent<VerticalLayoutGroup>(out var vlg))
+        // 09-27: 세로 줄(VLG) → 격자. 「서약 슬롯 +1」로 4칸이 되면 세로로 쌓은 윗변(y 993)이 미니맵(아랫변 928)을 덮었다 —
+        // 4칸은 2열 2줄로 놓는다(윗변 ≈ 670). 1~3칸은 지금처럼 한 줄 세로. 순서도 같다(위 → 아래, 왼 → 오).
+        var pad = new RectOffset(4, 4, 4, 4);
+        if (TryGetComponent<VerticalLayoutGroup>(out var vlg)) { pad = vlg.padding; DestroyImmediate(vlg); }
+        if (!TryGetComponent(out _grid)) _grid = gameObject.AddComponent<GridLayoutGroup>();
+        _grid.padding         = pad;
+        _grid.cellSize        = slotSize;
+        _grid.spacing         = new Vector2(slotSpacing, slotSpacing);
+        _grid.startCorner     = GridLayoutGroup.Corner.UpperLeft;
+        _grid.startAxis       = GridLayoutGroup.Axis.Horizontal;
+        _grid.childAlignment  = TextAnchor.LowerLeft;
+        _grid.constraint      = GridLayoutGroup.Constraint.FixedColumnCount;
+        _grid.constraintCount = 1;
+        if (TryGetComponent<ContentSizeFitter>(out var fitter))
         {
-            vlg.spacing = slotSpacing;
-            vlg.childControlWidth      = true;
-            vlg.childControlHeight     = true;
-            vlg.childForceExpandWidth  = false;
-            vlg.childForceExpandHeight = false;
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;
         }
+        EnsureCountLabel();
 
         foreach (var slot in _slots)
         {
@@ -257,6 +275,14 @@ public sealed class CovenantPanelView : MonoBehaviour
     {
         if (_slots == null) return;
 
+        int count = covenants != null ? covenants.Count : 0;
+        if (_grid != null) _grid.constraintCount = count > 3 ? 2 : 1;
+        if (_countLabel != null)
+        {
+            _countLabel.gameObject.SetActive(count > 0);
+            _countLabel.text = $"서약 {count}/{Mathf.Max(count, CovenantHandler.Capacity)}";   // 상한 전에 맺어 둔 세이브 복원은 넘칠 수 있다
+        }
+
         for (int i = 0; i < _slots.Length; i++)
         {
             if (_slots[i] == null) continue;
@@ -268,8 +294,31 @@ public sealed class CovenantPanelView : MonoBehaviour
         }
     }
 
+    /// <summary>「서약 n/N」 — 패널 위에 떠서 격자 배치에 끼지 않는다. 한도는 제단 「서약 슬롯 +1」로 3 → 4.</summary>
+    private void EnsureCountLabel()
+    {
+        if (_countLabel != null) return;
+        var go = new GameObject("CountLabel", typeof(RectTransform), typeof(CanvasRenderer), typeof(LayoutElement));
+        go.transform.SetParent(transform, false);
+        go.GetComponent<LayoutElement>().ignoreLayout = true;
+        var rt = (RectTransform)go.transform;
+        rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
+        rt.pivot     = new Vector2(0f, 0f);
+        rt.anchoredPosition = new Vector2(6f, 2f);
+        rt.sizeDelta = new Vector2(200f, 22f);
+        _countLabel = go.AddComponent<TextMeshProUGUI>();
+        _countLabel.fontSize = 16f;
+        _countLabel.fontStyle = FontStyles.Normal;
+        _countLabel.alignment = TextAlignmentOptions.BottomLeft;
+        _countLabel.color = new Color(0.93f, 0.88f, 0.76f, 0.95f);
+        _countLabel.raycastTarget = false;
+        TMPOutlineHelper.ApplySoftShadow(_countLabel);
+        go.SetActive(false);
+    }
+
     public void Clear()
     {
+        if (_countLabel != null) _countLabel.gameObject.SetActive(false);
         if (_slots == null) return;
         foreach (var slot in _slots)
             slot?.SetEmpty();

@@ -16,25 +16,25 @@ MonoBehaviour:
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
-  weight: 1
+  weight: 2
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: DarkRain
   breakOverride: -1
-  chargeDuration: 0.8
-  waveCount: 8
-  wavePeriod: 1
-  recoveryDuration: 1
-  zonesPerWave: 3
-  minSpread: 0.3
-  maxSpread: 2.5
-  zoneRadius: 1.5
-  telegraphDuration: 0.8
-  activeDuration: 0.7
-  groundYOffset: 0.05
-  damageMultiplier: 0.4
-  tickInterval: 0.5
-  skeletonPrefab: {fileID: 0}
-  skeletonCount: 0
-  skeletonSpawnRadius: 5
   patternCooldown: 25
+  chargeDuration: 1.5
+  rainDuration: 5
+  endDuration: 0.5
+  recoveryDuration: 0.4
+  dropsPerSecond: 12
+  dropWarn: 0.8
+  dropRadius: 1.5
+  damageMultiplier: 0.8
+  nearPlayerBias: 0.35
+  nearPlayerRadius: 8
+  safeCount: 4
+  safeRadius: 3
+  safeMoveInterval: 1.8
+  safeMoveCount: 2
+  riseHeight: 5
+  cloudHeight: 16

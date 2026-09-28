@@ -69,6 +69,11 @@ public class UI_SaveSlotCard : MonoBehaviour
         if (deleteButton != null) deleteButton.gameObject.SetActive(_hasSave);
         if (startButtonText != null) startButtonText.text = _hasSave ? "이어하기" : "새 게임";
 
+        // 빈 슬롯 가운데 글이 버튼과 같은 「새 게임」이라 두 번 읽혔다(09-28 UI 전수).
+        if (!_hasSave && emptyRoot != null && emptyRoot.transform.Find("Txt_Empty") is Transform empty
+            && empty.TryGetComponent<TMP_Text>(out var emptyText))
+            emptyText.text = "빈 슬롯";
+
         if (!_hasSave) return;
 
         // 슬롯에 필요한 정보는 "얼마나 오래" "몇 번 시도했나" 둘뿐이다.
@@ -85,6 +90,14 @@ public class UI_SaveSlotCard : MonoBehaviour
         // 남는 슬롯은 숨겨 카드가 비대해지지 않게 한다.
         if (nameText    != null) nameText.gameObject.SetActive(false);
         if (savedAtText != null) savedAtText.gameObject.SetActive(false);
+
+        // 두 줄만 남으면 세로 그룹의 「늘려 채우기」가 카드 높이를 반씩 나눠 두 줄이 멀리 떨어졌다 — 가운데로 모은다(09-28 UI 전수).
+        if (filledRoot.TryGetComponent<VerticalLayoutGroup>(out var vlg))
+        {
+            vlg.childForceExpandHeight = false;
+            vlg.childAlignment         = TextAnchor.MiddleCenter;
+            vlg.spacing                = 18f;
+        }
     }
 
     // ─────────────────────────────────────────────────────────

@@ -16,13 +16,13 @@ MonoBehaviour:
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
-  weight: 0.1975366
+  weight: 1
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
   minRange: 5
-  maxRange: 10
+  maxRange: 20
   throwNormalizedTime: 0.3
   throwExtraDelay: 1.0
   recoveryDuration: 0.5

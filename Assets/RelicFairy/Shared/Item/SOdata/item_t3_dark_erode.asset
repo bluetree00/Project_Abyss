@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t3_dark_erode
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t3_dark_erode
-  displayName: "\uC7A0\uC2DD\uC758 \uB8EC"
+  displayName: "\uB36E\uCE58\uB294 \uADF8\uB9BC\uC790\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 2

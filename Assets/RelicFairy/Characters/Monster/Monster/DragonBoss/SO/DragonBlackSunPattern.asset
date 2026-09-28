@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 488cbb511bba62246a1343d0066a7de5, type: 3}
+  m_Name: DragonBlackSunPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.DragonBlackSunPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: black_sun
+  breakOverride: -1
+  _hoverHeight: 8
+  _liftSpeed: 8
+  _edgeMargin: 11
+  _chargeSeconds: 10
+  _armLeadSeconds: 0.6
+  _wingOffset: 6
+  _weakPointRadius: 1.3
+  _hitsPerWing: 4
+  _weakPointHitVfx: {fileID: 1766868900565162, guid: f82a1a892a042c1438f8f4704a37e11b,
+    type: 3}
+  _weakPointHitVfxScale: 0.8
+  _weakPointBreakVfx: {fileID: 1220213892471706, guid: 800cddb992d3f5e4eb2348b90447f4a7,
+    type: 3}
+  _weakPointBreakVfxScale: 1.6
+  _breakSfx: {fileID: 0}
+  _fallSpeed: 16
+  _groggySeconds: 4
+  _fallImpactVfx: {fileID: 1312756255662086, guid: a7cb112e9339d01408d0002aede091cf,
+    type: 3}
+  _fallImpactVfxScale: 1.5
+  _fallImpactSfx: {fileID: 0}
+  _failMaxHpRatio: 0.6
+  _failKnockbackMult: 0.8
+  _failVfxPrefab: {fileID: 1312756255662086, guid: a7cb112e9339d01408d0002aede091cf,
+    type: 3}
+  _failVfxScale: 5
+  _failSfx: {fileID: 0}
+  _descendSpeed: 10
+  _sunVfxPrefab: {fileID: 1180268408184453300, guid: 80cf365a0d4411a4099f07a0bec382d7,
+    type: 3}
+  _sunScaleStart: 0.3
+  _sunScaleEnd: 1.6
+  _sunHeightAbove: 5
+  _chargeSfx: {fileID: 0}
+  _announceLine: "\uAC80\uC740 \uD0DC\uC591\uC774\u2026 \uB5A0\uC624\uB978\uB2E4."
+  _brokenLine: 
+  _failLine: 
+  _launchStateName: Takeoff_Launch
+  _riseStateName: Takeoff_Rise
+  _hoverStateName: Airborne_Hover
+  _crashStateName: AirDashCrash
+  _fallStateName: AirDashFall
+  _groggyStateName: USleep Idle
+  _getUpStateName: AirDashRecover
+  _descendStateName: Landing_Descend
+  _touchdownStateName: Landing_Touchdown
+  _recoverSeconds: 1.2

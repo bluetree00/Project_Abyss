@@ -166,7 +166,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     public float EffectiveAttackPower => _config != null ? _config.stat.attackPower : 0f;
 
     /// <summary>유효 최대 HP. 챕터 난이도 배율(difficultyScale) 반영.</summary>
-    public int EffectiveMaxHp => _config != null ? Mathf.RoundToInt(_config.stat.maxHp * _difficultyScale) : 0;
+    public int EffectiveMaxHp => _config != null ? Mathf.RoundToInt(_config.stat.maxHp * _difficultyScale * BossHpScale) : 0;
+
+    /// <summary>보스 총 체력 배율 — 2페이지 보스(악몽기)는 1 + 2페이지 몫(BossPages.HpScale). 공격력(AttackMultiplier)엔 영향 없음.</summary>
+    protected virtual float BossHpScale => 1f;
 
     /// <summary>몬스터 등급(Common/Rare/Elite/Boss). 대상 수가 아니라 '상대의 격'으로 보상을 정할 때 쓴다.</summary>
     public MonsterGrade Grade => _config != null ? _config.grade : MonsterGrade.Common;
@@ -209,7 +212,46 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>파생 클래스가 HP바 부가 표기에 접근하기 위한 읽기 전용 핸들(허수아비 DPS 분석 등). 아직 없으면 null.</summary>
     protected MonsterHPBar HpBar => _hpBar;
-    public string BossName  => _config != null ? _config.monsterName : string.Empty;
+
+    /// <summary>
+    /// 머리 위에 띄울 이름 — <b>영문</b>(09-27 사용자 「다시 영문으로」). 설정 이름(Orc·RatAssassin)을 단어로 띄운다(「Rat Assassin」).
+    /// 설정 이름이 한글인 몬스터(외눈슬라임·리치·리치 해골)는 차트 ID(Slime·Lich)로 대신한다. 보스 HUD 이름(<see cref="BossName"/>)은 별개다.
+    /// </summary>
+    public virtual string DisplayName
+    {
+        get
+        {
+            string own = _config != null ? _config.monsterName : string.Empty;
+            string id  = ServerStatId;
+            return SpaceWords(IsLatinName(own) ? own : IsLatinName(id) ? id : own);
+        }
+    }
+
+    private static bool IsLatinName(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return false;
+        foreach (char ch in s) if (ch > 127) return false;
+        return true;
+    }
+
+    /// <summary>「RatAssassin」 → 「Rat Assassin」, 「DragonBoss」 → 「Dragon Boss」. 밑줄도 띄운다.</summary>
+    private static string SpaceWords(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return string.Empty;
+        var sb = new System.Text.StringBuilder(s.Length + 4);
+        for (int i = 0; i < s.Length; i++)
+        {
+            char ch = s[i];
+            if (ch == '_') { sb.Append(' '); continue; }
+            bool wordStart = i > 0 && char.IsUpper(ch)
+                          && (char.IsLower(s[i - 1]) || (i + 1 < s.Length && char.IsLower(s[i + 1]) && char.IsUpper(s[i - 1])));
+            if (wordStart) sb.Append(' ');
+            sb.Append(ch);
+        }
+        return sb.ToString();
+    }
+    /// <summary>보스 HUD 이름. 전투 모드에 따라 이름이 바뀌는 보스(리치 봉인/해방)가 오버라이드한다.</summary>
+    public virtual string BossName => _config != null ? _config.monsterName : string.Empty;
 
     // ── 특수 상태 인스턴스 (SO 데이터로 자동 생성) ────────
     private readonly List<SpecialStateBase> _specialStates = new();
@@ -388,7 +430,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (UseWorldHPBar && gameObject.activeInHierarchy && !_worldHPBarSuppressed)
         {
             _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, EffectiveMaxHp, _hpBarAnchor != null ? _hpBarAnchor : _headBone, HPBarHeadOffset);
-            _hpBar?.SetMonsterInfo(_config.monsterName);
+            _hpBar?.SetMonsterInfo(DisplayName);
         }
 
         OnInitialized();
@@ -578,6 +620,16 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>현재 FullLockState 등 특수 상태(Constraints != None)가 실행 중이면 true.</summary>
     public bool IsInSpecialState
         => _fsm != null && _fsm.CurrentConstraints != SpecialStateConstraint.None;
+
+    /// <summary>
+    /// 지금 피해를 통째로 무시하는가(특수 상태 무적). 자체 무적 플래그를 쓰는 보스는 오버라이드한다.
+    /// 이 값이 참이면 타격 파이프라인이 피격 반응(빨간 깜빡임·히트스톱·화면 플래시) 대신 <see cref="NotifyBlockedHit"/>를 부른다.
+    /// </summary>
+    public virtual bool IsDamageImmuneNow
+        => _fsm != null && (_fsm.CurrentConstraints & SpecialStateConstraint.Invincible) != 0;
+
+    /// <summary>무적에 막혔다 — 「맞았다」가 아니라 「막혔다」를 보여줄 기회. 기본은 아무것도 하지 않는다.</summary>
+    public virtual void NotifyBlockedHit(Vector3 hitPoint) { }
 
     // ── 조건 훅 (공용 상태가 위임, 파생 클래스에서 오버라이드 가능) ────────
 
@@ -896,7 +948,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         float defense = _baseDefense * _defenseMulti * Mathf.Clamp01(1f - defenseIgnore);
         float actual  = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
         _runtime.CurrentHp -= (int)actual;
-        if (HpFloorMin1 && _runtime.CurrentHp < 1) _runtime.CurrentHp = 1; // [인트로] 이길 수 없는 연출: 처치 방지
+        int hpFloor = DamageHpFloor;   // [인트로] 이길 수 없는 연출 · 페이지 보스의 전환 임계
+        if (_runtime.CurrentHp < hpFloor) _runtime.CurrentHp = hpFloor;
 
         DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID(), kind, element);
 
@@ -961,6 +1014,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>인트로 등 "이길 수 없는" 연출용 — true면 피해로 HP가 1 미만으로 떨어지지 않아 처치되지 않는다. 기본 false(무변화).</summary>
     public bool HpFloorMin1 { get; set; }
 
+    /// <summary>
+    /// 피해로 HP가 이 값 아래로 내려가지 않는다(0이면 제한 없음). 기본은 <see cref="HpFloorMin1"/>만 반영한다.
+    /// 페이지 보스가 전환 연출 전에 HP를 임계값에 붙잡아 두려고 오버라이드한다 — 한 방에 페이지를 건너뛰지 않게.
+    /// </summary>
+    protected virtual int DamageHpFloor => HpFloorMin1 ? 1 : 0;
+
     public virtual void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
     {
         if (_runtime == null || _runtime.IsDead) return;
@@ -980,7 +1039,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         float defense = _baseDefense * _defenseMulti;
         float actual = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
         _runtime.CurrentHp -= (int)actual;
-        if (HpFloorMin1 && _runtime.CurrentHp < 1) _runtime.CurrentHp = 1; // [인트로] 이길 수 없는 연출: 처치 방지
+        int hpFloor = DamageHpFloor;   // [인트로] 이길 수 없는 연출 · 페이지 보스의 전환 임계
+        if (_runtime.CurrentHp < hpFloor) _runtime.CurrentHp = hpFloor;
 
         // 데미지 팝업 — 모든 데미지 소스에 일관 표시 (각 호출처에서 별도 호출 불필요)
         DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID());
@@ -1319,8 +1379,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         // 죽지 않고 풀로 돌아간 인스턴스에는 이전 방 컨트롤러의 OnDied 구독이 그대로 남는다
         // (구독 해제는 사망 콜백 안에서만 이뤄지므로). 그대로 재사용하면 이번 사망이
         // 파괴된 이전 컨트롤러까지 깨워 두 방의 클리어 판정이 동시에 돌아간다.
-        // 스폰 통지(OnMonsterSpawned)는 이 뒤에 오므로 새 구독은 안전하다.
-        OnDied = null;
+        // 첫 활성화에는 남은 구독이 있을 수 없으므로 비우지 않는다 — 배치 보스(BossSpawner.placedBoss)는
+        // 스폰 통지(OnMonsterSpawned)를 <b>켜기 전에</b> 보내므로, 여기서 비우면 방 클리어 구독이 사라져
+        // 보스를 잡아도 방이 끝나지 않는다(Ch1~3 보스방 소프트락, 2026-09-18 실측).
+        if (_generationId > 1) OnDied = null;
 
         // 활성화 토큰 갱신 — 이전 DissolveEffect 복원 태스크를 차단
         _activationCts?.Cancel();
@@ -1473,7 +1535,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             _hpBar = null;
         }
         if (_config != null)
-            _hpBar?.SetMonsterInfo(_config.monsterName);
+            _hpBar?.SetMonsterInfo(DisplayName);
         _hpBarRequesting = false;
     }
 

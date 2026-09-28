@@ -46,7 +46,7 @@ public static class CovenantPalette
     {
         ["streak"]   = new CauseDef { id="streak",   name="연격",     desc="같은 적을 3연타할 때마다", tag="집중", trigger=CauseTriggerKind.OnHitStreakSameTarget, category=CovenantCategory.ActionConditional, coefficient=1.5f, thresholdInt=3, cls=CauseClass.Melee,    targeted=true  },
         ["slaughter"]= new CauseDef { id="slaughter",name="학살",     desc="5연속 처치 시",           tag="연쇄", trigger=CauseTriggerKind.OnKillStreak,        category=CovenantCategory.ActionConditional, coefficient=4.0f, thresholdInt=5, cls=CauseClass.Kill,     targeted=false },
-        ["swap"]     = new CauseDef { id="swap",     name="전환",     desc="무기 교체 직후 3초 내 공격 시", tag="기동", trigger=CauseTriggerKind.OnWeaponSwapWindow, category=CovenantCategory.CombatRhythm,     coefficient=2.5f, thresholdF=3f,  cls=CauseClass.Mobility, targeted=true  },
+        ["swap"]     = new CauseDef { id="swap",     name="전환",     desc="무기 교체 후 3초 내 공격 시", tag="기동", trigger=CauseTriggerKind.OnWeaponSwapWindow, category=CovenantCategory.CombatRhythm,     coefficient=2.5f, thresholdF=3f,  cls=CauseClass.Mobility, targeted=true  },
         ["clear"]    = new CauseDef { id="clear",    name="개선",     desc="방을 클리어할 때",         tag="연쇄", trigger=CauseTriggerKind.OnRoomClear,         category=CovenantCategory.RunStructure,     coefficient=3.0f,                 cls=CauseClass.Boundary, targeted=false },
         ["heartbeat"]= new CauseDef { id="heartbeat",name="심장박동", desc="4초마다",                 tag="지속", trigger=CauseTriggerKind.Periodic,            category=CovenantCategory.RunStructure,     coefficient=1.0f, thresholdF=4f,  cls=CauseClass.Passive,  targeted=false },
         ["concerto"] = new CauseDef { id="concerto", name="연주",     desc="스킬을 사용할 때",         tag="스킬", trigger=CauseTriggerKind.OnSkillUse,          category=CovenantCategory.CombatRhythm,     coefficient=2.0f,                 cls=CauseClass.Skill,    targeted=false },
@@ -133,7 +133,7 @@ public static class CovenantPalette
         // 빨아들이는 결 자체를 없애는 대신, 방어축이 한 칸 비지 않도록 <b>자기 조건만으로</b> 서는 방패를 둔다 —
         // 상태는 읽기만 하고 걷어가지 않는다(먹지 않으니 소모형이 아니고, 그래서 부여형 없이도 혼자 성립한다).
         // icd(6초)보다 지속이 길면 사실상 상시 감소가 된다 — 지속을 icd보다 짧게 둬 '켜고 끄는' 창을 남긴다.
-        ["ward"]      = new EffectDef { id="ward",      name="결계",     desc="잠시 받는 피해가 줄어든다(절여진 적이 많을수록 두껍게)", tag="생존",
+        ["ward"]      = new EffectDef { id="ward",      name="결계",     desc="잠시 받는 피해가 줄어든다(절인 적이 많을수록 두껍게)", tag="생존",
             kind=EffectKind.Ward,       magnitude=0.10f, radius=6f, duration=4f,
             mode=CovenantScaleMode.Damped, cap=0.25f, icd=6f, axis=EffectAxis.Survival, status=StatusCurrency.None },
 
@@ -152,6 +152,12 @@ public static class CovenantPalette
     // goldrain(황금비): 골드 보상은 서약이 아니라 상점·보상 쪽에서 다루기로 해 등장시키지 않는다.
     private static readonly HashSet<string> _draftExcluded = new() { "goldrain" };
 
+    // 뽑기 풀에서 제외할 원인(정의는 남긴다 — 저장된 서약 해석용).
+    // clear(개선): 방이 비고 퇴장 대기까지 끝난 뒤에 발동한다. 적을 짚는 효과 9개는 짚을 적이 없고,
+    // 짧은 자기 강화 4개(격노·성역·결계·박차)는 다음 방 전투가 시작되기 전에 끝난다.
+    // 15개 효과 중 2개(피의 보호막·마지막 숨결)만 뜻이 있어 제시되는 조합 칸을 낭비시킨다(09-17 조합 감사).
+    private static readonly HashSet<string> _draftExcludedCauses = new() { "clear" };
+
     // ── 별칭(id 개명 대비) ────────────────────────────────
     // 세이브에는 id 문자열만 남는다. 나중에 효과·원인의 이름을 바꾸거나 통합하면 옛 세이브의 id가
     // 어디에도 없는 이름이 되어 서약이 통째로 사라진다. 개명하는 그날 여기 한 줄("옛 id" → "새 id")만
@@ -166,12 +172,50 @@ public static class CovenantPalette
         ["sanguine"] = "ward",
     };
 
-    private static readonly List<string> _causeIds  = new(_causes.Keys);
+    private static readonly List<string> _causeIds  =
+        new(System.Linq.Enumerable.Where(_causes.Keys, id => !_draftExcludedCauses.Contains(id)));
     private static readonly List<string> _effectIds =
         new(System.Linq.Enumerable.Where(_effects.Keys, id => !_draftExcluded.Contains(id)));
 
     public static IReadOnlyList<string> CauseIds  => _causeIds;
     public static IReadOnlyList<string> EffectIds => _effectIds;
+
+    // ── 개방 단계(기억의 제단 「서약」 갈래) ─────────────────
+    // 카드가 <b>드래프트에 나오기 시작하는</b> 단계. 표에 없는 id는 0(처음부터)으로 본다.
+    // 해석(TryGet*)과 런타임은 이 단계를 보지 않는다 — 저장된 서약은 단계와 무관하게 그대로 산다.
+    //
+    // 0단(원인 5 · 효과 7) = 서약이 무엇인지 <b>가르치는</b> 카드. 원인은 시간·행동·경계·전투를 한 번씩
+    //   (심장박동·연주·선제·학살·연격), 효과는 공격·생존·지속(초신성·격노·피의 보호막·마지막 숨결·박차·잔불·출혈).
+    //   마지막 숨결이 0단인 이유(09-17): 어떤 원인과도 봉인되지 않는 유일한 생존 카드다. 피의 보호막만 있으면
+    //   심장박동이 제시된 판(봉인 짝)에는 생존 카드를 함께 보여 줄 수 없어 「생존 카드 한 장 보장」이 깨졌다.
+    //   (개선은 09-17 뽑기에서 뺐다 — _draftExcludedCauses)
+    //   잔불·출혈은 유물 정체성(가웨인=화상 · 랜슬롯=출혈)과 곧바로 맞물린다.
+    // 1단(+3·+2)  원인: 전환·사냥 개시·포위 / 효과: 저주·성역 — 혼자서도 서는 것
+    // 2단(+1·+3)  원인: 행군 / 효과: 처형·기폭·수확 — <b>화상·출혈이 쌓여야</b> 빛나는 것
+    // 3단(+0·+3)  효과: 방전·정지·결계 — 감전 통화는 거는 것(방전)과 먹는 것(정지)이 <b>같은 단계</b>에 온다
+    // 맞물려야 빛나는 카드를 뒤로 미루는 것이 친절하다 — 초반에 주면 "왜 아무 일도 안 나지?"가 된다.
+    private static readonly Dictionary<string, int> _unlockStep = new()
+    {
+        ["swap"] = 1, ["hunt"] = 1, ["besiege"] = 1,
+        ["march"] = 2,
+
+        ["curse"] = 1, ["aegis"] = 1,
+        ["execute"] = 2, ["detonate"] = 2, ["harvest"] = 2,
+        ["arcflash"] = 3, ["stasis"] = 3, ["ward"] = 3,
+    };
+
+    /// <summary>원인·효과 카드 하나가 드래프트에 나오기 시작하는 개방 단계(0~3).</summary>
+    public static int UnlockStep(string id)
+        => id != null && _unlockStep.TryGetValue(id, out int step) ? step : 0;
+
+    /// <summary>개방 단계 <paramref name="step"/>까지 열린 원인 id.</summary>
+    public static IReadOnlyList<string> DraftableCauseIds(int step)
+    {
+        var result = new List<string>(_causeIds.Count);
+        foreach (var id in _causeIds)
+            if (UnlockStep(id) <= step) result.Add(id);
+        return result;
+    }
 
     public static bool TryGetCause(string id, out CauseDef def)
     {
@@ -210,12 +254,13 @@ public static class CovenantPalette
     /// 같은 <b>통화군</b>까지 본다(화상·출혈은 한 군 — 소모형이 둘을 가리지 않고 먹는다).
     /// 화상만 가진 사람에게 감전 소모형(정지)을 내보내면 "부여형은 있는데 안 물리는" 카드가 되기 때문이다.
     /// </summary>
-    public static IReadOnlyList<string> DraftableEffectIds(IReadOnlyList<CovenantBase> held)
+    public static IReadOnlyList<string> DraftableEffectIds(IReadOnlyList<CovenantBase> held, int step)
     {
         var result = new List<string>(_effectIds.Count);
         for (int i = 0; i < _effectIds.Count; i++)
         {
             var id = _effectIds[i];
+            if (UnlockStep(id) > step) continue;   // 기억의 제단에서 아직 열지 않은 카드
             if (!TryGetEffect(id, out var e)) continue;
             if (e.role == StatusRole.Consume && !HasApplierFor(e.status, held)) continue;
             result.Add(id);
@@ -246,11 +291,36 @@ public static class CovenantPalette
     /// </summary>
     private static readonly HashSet<string> _bannedPairs = new()
     {
-        "heartbeat|aegis", "heartbeat|ward",
+        "heartbeat|aegis", "heartbeat|ward", "heartbeat|bloodmark",
         "march|aegis", "march|bloodmark", "march|execute", "march|ward",
         "besiege|aegis",
         "hunt|execute", "slaughter|execute",
+
+        // 황금비는 _draftExcluded로 이미 풀에서 빠져 있다. 그 한 줄이 유일한 방어이던 것을 여기서 겹친다 —
+        // 골드는 상한 없이 누적되는 유일한 효과라(AddGold에 상한이 없다) 상시 원인과 물리면
+        // 다른 조합처럼 '상시 포화'가 아니라 진짜로 발산한다. 루비 기준 465골드/분 = 런당 약 2만 골드로,
+        // 상점 진열 전량(3,351골드)의 6배다. 제외 줄이 사라지거나 조립 경로가 늘어도 이 줄이 남는다.
+        "march|goldrain", "heartbeat|goldrain",
     };
+
+    /// <summary>
+    /// 이 원인과 효과를 한 서약으로 벼릴 수 있는가 — 봉인된 짝이 아니고, 같은 짝을 이미 들고 있지 않다(등급 무관).
+    /// 드래프트는 제시하는 원인 × 효과가 <b>전부</b> 이 판정을 통과하게 카드를 고른다 — 고를 수 없는 칸을 보여 주면
+    /// 그 칸이 낭비된다. 같은 짝을 막는 이유: 두 번째 짝은 첫째와 같은 순간에 같은 일을 해 칸만 차지한다
+    /// (화상은 더 센 쪽만 남고, 보호막·결계는 같은 쿨에 겹친다).
+    /// </summary>
+    public static bool CanPair(string causeId, string effectId, IReadOnlyList<CovenantBase> held)
+    {
+        if (IsBannedPair(causeId, effectId)) return false;
+        if (held == null) return true;
+        for (int i = 0; i < held.Count; i++)
+        {
+            if (held[i] is not AssembledCovenant a || a.CauseId != causeId) continue;
+            string heldEffect = TryGetEffect(a.EffectId, out var e) ? e.id : a.EffectId;   // 별칭(옛 id) 정규화
+            if (heldEffect == effectId) return false;
+        }
+        return true;
+    }
 
     public static bool IsBannedPair(string causeId, string effectId)
         => !string.IsNullOrEmpty(causeId) && !string.IsNullOrEmpty(effectId)

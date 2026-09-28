@@ -103,6 +103,9 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
 {
     private enum Phase { Rise, Charge, Sweep, Descend, Recovery }
 
+    private const float FlowBurstInterval = 0.12f;
+    private const float FlowBurstScale    = 0.6f;
+
     private Phase      _phase;
     private float      _timer;
     private float      _groundY;    // 격류 바닥 평면 Y
@@ -113,6 +116,9 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
     private GameObject _beam;       // 텔레그래프 가이드
     private GameObject _chargeVfx;  // 시전 VFX 인스턴스
     private GameObject _beamVfx;    // 빔 VFX 인스턴스
+    private Transform  _beamFrom;   // 격류 광선 두 끝(LichVfx.PlayBeamTracked가 매 프레임 따라간다)
+    private Transform  _beamTo;
+    private bool       _signaled;
 
     public LichArcaneTorrentState(LichArcaneTorrentPatternSO data) : base(data) { }
 
@@ -123,6 +129,7 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         _tickTimer = 0f;
         _flowTimer = 0f;
         _groundY   = (ctx.Monster as LichMonster)?.SpawnGroundY ?? ctx.Transform.position.y;
+        _signaled  = false;
 
         ctx.Animator?.CrossFade("DeathRayStart", 0.1f);
 
@@ -147,6 +154,8 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
             case Phase.Charge:
                 UpdateBeamVisual(ctx);
                 UpdateChargeVfx(ctx);
+                // 보라가 차오르고 발사 0.15초 전 빨강(리치 예고 규약).
+                LichPatternUtil.TickTelegraph(_beam, _timer, Data.chargeDuration, 0.15f, ref _signaled);
                 if (_timer >= Data.chargeDuration) BeginSweep(ctx);
                 break;
 
@@ -177,6 +186,7 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         PatternGuideHelper.SafeDestroy(ref _beam);
         DestroyVfx(ref _chargeVfx);
         DestroyVfx(ref _beamVfx);
+        DestroyBeamEnds();
 
         var mc = (ctx.Monster as LichMonster)?.MovementController;
         mc?.RequestMovementState(LichMovementState.AltitudeDescend);
@@ -200,8 +210,9 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         // 시작각: 플레이어 yaw에서 스윕 반대편으로 오프셋 → 격류가 플레이어 위치를 가로지른다.
         _beamAngle = YawToPlayer(ctx) - _sweepDir * (Data.sweepArc * 0.5f);
 
-        _beam = PatternGuideHelper.Beam(
-            BeamOrigin(ctx), BeamDir(), Data.beamRange, Data.beamWidth, PatternGuideHelper.Telegraph);
+        _beam = LichPatternUtil.PrepareTelegraph(
+            PatternGuideHelper.Beam(BeamOrigin(ctx), BeamDir(), Data.beamRange, Data.beamWidth, LichPatternUtil.Arcane),
+            LichPatternUtil.Arcane);
         AimBossToBeam(ctx);
         UpdateBeamVisual(ctx);
 
@@ -217,9 +228,18 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         _tickTimer = 0f;
         _flowTimer = 0f;
         ctx.Animator?.CrossFade("DeathRayLoop", 0.1f);
-        PatternGuideHelper.SetColor(_beam, PatternGuideHelper.Active);
+        PatternGuideHelper.SetColor(_beam, LichPatternUtil.Lethal);
+        LichPatternUtil.Impact(LichImpact.Heavy);
+        LichSfx.Play(LichSfxSlot.FireBeam, ctx.Transform.position);
 
-        // 빔 VFX 훅 — 바닥 격류를 따라 스폰.
+        // 격류 광선 — 바닥 높이로 쓸고 돈다(두 끝을 매 프레임 옮긴다).
+        _beamFrom = new GameObject("LichTorrent_From").transform;
+        _beamTo   = new GameObject("LichTorrent_To").transform;
+        UpdateBeamEnds(ctx);
+        // 굵기 ×2 — 판정 폭(1.2 m) 그대로면 화면에서 가는 흰 선으로만 보였다(09-19 실측).
+        LichVfx.PlayBeamTracked(LichVfxSlot.ArcaneBeam, _beamFrom, _beamTo, Data.beamWidth * 2f, Data.sweepDuration + 0.1f);
+
+        // 빔 VFX 훅(에셋 지정 시) — 바닥 격류를 따라 스폰.
         if (Data.beamVfxPrefab != null && _beamVfx == null)
             _beamVfx = Object.Instantiate(Data.beamVfxPrefab, BeamOrigin(ctx), Quaternion.LookRotation(BeamDir()));
     }
@@ -232,6 +252,7 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         PatternGuideHelper.SafeDestroy(ref _beam);
         DestroyVfx(ref _chargeVfx);
         DestroyVfx(ref _beamVfx);
+        DestroyBeamEnds();
         (ctx.Monster as LichMonster)?.MovementController?
             .RequestMovementState(LichMovementState.AltitudeDescend);
     }
@@ -263,7 +284,8 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         Vector3 origin = BeamOrigin(ctx);
         Vector3 dir    = BeamDir();
         _beam.transform.position   = origin + dir * (Data.beamRange * 0.5f) + Vector3.up * 0.04f;
-        _beam.transform.rotation   = Quaternion.LookRotation(Vector3.up, dir);
+        // 앞면이 위를 보게(PatternGuideHelper.Beam과 같은 회전) — 반대로 두면 뒷면 컬링으로 안 보인다(09-19 감사).
+        _beam.transform.rotation   = Quaternion.LookRotation(Vector3.down, dir);
         _beam.transform.localScale = new Vector3(Data.beamWidth, Data.beamRange, 1f);
     }
 
@@ -274,8 +296,27 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         _chargeVfx.transform.rotation = ctx.Transform.rotation;
     }
 
+    /// <summary>격류 광선 두 끝 — 리치 앞 바닥에서 사정거리 끝까지, 바닥 살짝 위.</summary>
+    private void UpdateBeamEnds(MonsterContext ctx)
+    {
+        if (_beamFrom == null || _beamTo == null) return;
+        Vector3 origin = BeamOrigin(ctx) + Vector3.up * 0.4f;
+        Vector3 dir    = BeamDir();
+        _beamFrom.position = origin + dir * 0.8f;
+        _beamTo.position   = origin + dir * Data.beamRange;
+    }
+
+    private void DestroyBeamEnds()
+    {
+        if (_beamFrom != null) Object.Destroy(_beamFrom.gameObject);
+        if (_beamTo   != null) Object.Destroy(_beamTo.gameObject);
+        _beamFrom = null;
+        _beamTo   = null;
+    }
+
     private void UpdateBeamVfx(MonsterContext ctx)
     {
+        UpdateBeamEnds(ctx);
         if (_beamVfx == null) return;
         _beamVfx.transform.position = BeamOrigin(ctx);
         _beamVfx.transform.rotation = Quaternion.LookRotation(BeamDir());
@@ -283,9 +324,8 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
 
     private void AimBossToBeam(MonsterContext ctx)
     {
-        Vector3 dir = BeamDir();
-        if (dir.sqrMagnitude > 0.001f)
-            ctx.Transform.rotation = Quaternion.LookRotation(dir);
+        // 몸 방향을 격류에 쥐어 준다 — 이동 컨트롤러가 플레이어 쪽으로 되돌리지 않게.
+        LichPatternUtil.HoldFacing(ctx, _beamAngle, 3600f);
     }
 
     /// <summary>격류 라인을 따라 마력 모트를 방출 — 레이저가 아닌 "흐르는 마법 기류" 연출.</summary>
@@ -293,19 +333,14 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
     {
         if (Data.flowEmitInterval <= 0f) return;
         _flowTimer += Time.deltaTime;
-        if (_flowTimer < Data.flowEmitInterval) return;
+        if (_flowTimer < FlowBurstInterval) return;
         _flowTimer = 0f;
 
+        // 격류를 따라 터지는 보라 별 — 기본 도형 구체(회색 모트) 대신 실제 이펙트(09-19). 초당 약 8개로 제한.
         Vector3 origin = BeamOrigin(ctx);
         Vector3 dir    = BeamDir();
-        int count = Mathf.Max(1, Data.flowMotesPerEmit);
-        for (int i = 0; i < count; i++)
-        {
-            float along = Random.Range(2f, Data.beamRange);
-            Vector3 pos = origin + dir * along + Vector3.up * 0.3f;
-            PatternGuideHelper.Sphere(pos, Data.flowMoteRadius, PatternGuideHelper.Summon,
-                lifetime: Data.flowMoteLifetime);
-        }
+        float along = Random.Range(2f, Data.beamRange);
+        LichVfx.Play(LichVfxSlot.DarkRainImpact, origin + dir * along + Vector3.up * 0.2f, Quaternion.identity, FlowBurstScale);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -319,29 +354,12 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         _tickTimer += Time.deltaTime;
         if (_tickTimer < Data.tickInterval) return;
 
-        Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
-        toPlayer.y = 0f;
-        float dist = toPlayer.magnitude;
-        if (dist > Data.beamRange || dist < 0.01f) return;
-
-        // 거리에 따른 격류 폭의 각도 환산 — 가까울수록 넓게 판정.
-        float halfWidthAngle = Mathf.Atan2(Data.beamWidth * 0.5f, dist) * Mathf.Rad2Deg;
-        if (Vector3.Angle(BeamDir(), toPlayer) > halfWidthAngle) return;
-
-        _tickTimer = 0f;
-
-        var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
-        if (player == null) return;
-
-        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
-        player.TakeDamage(dmg);
-
-        if (Data.knockbackMultiplier > 0f)
+        // 바닥 직선(사정거리 × 폭) — 공용 판정이라 회피 무적이면 맞지 않고 넉백도 없다.
+        if (LichPatternUtil.HitBeam(ctx, BeamOrigin(ctx), BeamDir(), Data.beamRange, Data.beamWidth * 0.5f,
+                                    Data.damageMultiplier, Data.knockbackMultiplier))
         {
-            Vector3 kb = toPlayer.normalized;
-            kb.y = 0.2f;
-            if (kb.sqrMagnitude > 0.001f) kb.Normalize();
-            player.ApplyKnockback(kb * ctx.Config.stat.knockbackForce * Data.knockbackMultiplier);
+            _tickTimer = 0f;
+            LichPatternUtil.Impact(LichImpact.Light, true);
         }
     }
 

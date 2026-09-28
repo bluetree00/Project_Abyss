@@ -17,6 +17,8 @@ public class ProcRoomGate : MonoBehaviour
     public DoorPlan     Plan => _plan;
     public RoomPlanKind Kind => _plan.kind;
     public DoorEdge     Edge => _edge; // 전환 와이프 방향(직진=North / 턴=East·West)
+    /// <summary>통과 가능 상태인지(클리어 후 개방됨). 테스트 메뉴가 열린 출구를 찾는 데 쓴다.</summary>
+    public bool         IsArmed => _armed;
 
     /// <summary>봉인 상태로 생성 — 위치/엣지만 정해지고 종류 미공개·통과 불가. 클리어 시 Reveal로 개방.</summary>
     public void InitializeSealed(DoorEdge edge, Action<ProcRoomGate> onChosen)

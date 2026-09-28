@@ -74,3 +74,23 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
+    - baseClipName: QSkill_01
+      addressableKey: BowQSkill_02
+      actionType: 3
+      comboIndex: 0
+      isPlunge: 0
+      plungeFallSpeed: 0
+      plungeDescendAt: 0
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+    - baseClipName: ESkill_01
+      addressableKey: BowESkill_01
+      actionType: 4
+      comboIndex: 0
+      isPlunge: 0
+      plungeFallSpeed: 0
+      plungeDescendAt: 0
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1

@@ -33,6 +33,15 @@ public static class VolumePulseService
     private const float PulseDamageThreshold = 1f;    // 이하 약타/DoT 틱은 풀스크린 펄스 생략 (히트스톱/플래시/데미지넘버는 별개)
     private const float PulseMinInterval     = 0.12f; // 비크리 연타 시 펄스 최소 간격(초). 크리는 무시하고 항상 발화.
 
+    // 주는 쪽 단계별 펄스 상한(09-25) — 매 타격 반복되는 연출이라 기본·스킬 타격은 「살짝」에 묶는다.
+    // 막타만 원래 세기(0.35)를 쓴다. 크리는 같은 단계 안에서 조금 더 세다. 수동 Pulse(보스·서약 연출)는 무관.
+    private const float CapBasic            = 0.08f;
+    private const float CapBasicCritical    = 0.12f;
+    private const float CapSkill            = 0.12f;
+    private const float CapSkillCritical    = 0.18f;
+    private const float CapFinisher         = PeakNormal;
+    private const float CapFinisherCritical = 0.50f;
+
     // ── Static ────────────────────────────────────────────────────
     private class Host : MonoBehaviour { }
 
@@ -160,11 +169,18 @@ public static class VolumePulseService
             if (Time.unscaledTime - _lastPulseTime < PulseMinInterval) return;
         }
 
-        float peak     = isCrit ? PeakCritical     : PeakNormal;
+        float peak     = Mathf.Min(isCrit ? PeakCritical : PeakNormal, CapFor(burst.Tier, isCrit));
         float duration = isCrit ? DurationCritical : DurationNormal;
         _lastPulseTime = Time.unscaledTime;
         StartPulse(peak, duration);
     }
+
+    private static float CapFor(DealtHitTier tier, bool isCrit) => tier switch
+    {
+        DealtHitTier.Finisher => isCrit ? CapFinisherCritical : CapFinisher,
+        DealtHitTier.Skill    => isCrit ? CapSkillCritical    : CapSkill,
+        _                     => isCrit ? CapBasicCritical    : CapBasic,
+    };
 
     private static void StartPulse(float peak, float duration)
     {

@@ -92,6 +92,7 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
 
         var owner = ctx.Controller.gameObject;
 
+        Managers.Sound?.PlayEvent(SoundEvent.RelicSunFall);   // 떨어지는 태양 — 착탄(0.6초 뒤)에 맞춰 차오르는 소리
         SolarMeteor.Strike(impact, MeteorFallHeight, MeteorFallTime, ImpactVfxScale, ImpactRadius,
                            onGroundContact: sunPos => OnMeteorFallTick(sunPos, fallDmg, owner),
                            onImpact:        ()      => OnMeteorImpact(impact, effAtk, impactDmg, owner));
@@ -121,6 +122,7 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
         float burnDur = V(V_BURN_DURATION, 6f);
 
         GuidelineVisual.SynergyDamage(impact + Vector3.up * 0.2f, false);   // 착탄 표시
+        Managers.Sound?.PlayEvent(SoundEvent.RelicSunImpact);
         HitFeelService.CameraShake(0.28f, 0.30f);                          // 태양이 하늘에서 꽂히는 무게
         HitFeelService.HitStop(0.05f, 0.06f);                              // 착탄 순간 짧은 정지 — 타격의 방점
 
@@ -144,6 +146,7 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
                 KnockbackMultiplier = 0.3f,
                 HitPoint            = target.transform.position + Vector3.up * 1.2f,
                 SourcePosition      = impact,
+                IsFinisher          = true,   // 태양 낙하 한 방 — 막타 연출
             });
 
             // 화상은 2차 피해(DoT) — 파이프라인을 타지 않는다(틱마다 크릿/흡혈이 터지면 안 됨).

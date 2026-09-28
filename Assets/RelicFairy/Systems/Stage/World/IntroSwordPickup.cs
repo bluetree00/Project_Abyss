@@ -97,7 +97,7 @@ public sealed class IntroSwordPickup : MonoBehaviour
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.text = promptText;
 
-        TMPOutlineHelper.ApplyDefault(tmp);
+        TMPOutlineHelper.ApplySoftShadow(tmp);
 
         _promptGo.SetActive(false);
     }

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t3_fire_scar
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t3_fire_scar
-  displayName: "\uD654\uC0C1\uC758 \uB8EC"
+  displayName: "\uB418\uBC1B\uC544\uCE58\uB294 \uD654\uC5FC\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 2

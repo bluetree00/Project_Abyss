@@ -21,9 +21,22 @@ MonoBehaviour:
   baseRangedAttack: 0
   baseDefense: 20
   baseLuck: 10
+  basePoise: 100
+  poiseImpactPerDamage: 2.5
+  poiseRegenDelay: 1.5
+  poiseRegenPerSec: 40
+  knockbackImmunity: 1.5
+  launchHorizontalForce: 8
+  launchUpForce: 6
+  launchLandRecovery: 0.25
+  launchLandIFrame: 0.3
   comboDuration: 3
   heavyAttackChargeThreshold: 1.5
   heavyAttackReleaseTime: 0.4
+  maxStamina: 100
+  dodgeStaminaCost: 25
+  staminaRegenPerSec: 25
+  staminaRegenDelay: 0.5
   dashSpeed: 22
   dashDuration: 0.18
   dodgeCooldown: 0.25
@@ -31,6 +44,33 @@ MonoBehaviour:
   dodgeIFrameDuration: 0.3
   dodgeMomentumBlend: 0
   dodgeRecoveryWindow: 0
+  perfectDodgeSenseRadius: 4
+  perfectDodgeTimeScale: 0.35
+  perfectDodgeDuration: 1.2
+  perfectDodgeSpeedBoost: 1.3
+  perfectDodgeStaminaRefund: 25
+  perfectDodgeCounterSpeed: 1.5
+  perfectDodgeCounterHitRefund: 5
+  perfectDodgeCounterLungeReach: 6
+  perfectDodgeTriggerSfx: sfx_player_perfect_dodge
+  perfectDodgeCounterDashSfx: sfx_player_counter_dash
+  perfectDodgeCounterEndSfx: sfx_player_counter_end
+  perfectDodgeStrikePulse: 2.2
+  perfectDodgeDashTrailMinDistance: 1.5
+  hitSfxLight: sfx_player_hit_light
+  hitSfxMedium: sfx_player_hit_medium
+  hitSfxHeavy: sfx_player_hit_heavy
+  dashGaugeBase: {fileID: 21300000, guid: c8789c6b4c8bdb04a950227ea6e5e58d, type: 3}
+  dashGaugeFill: {fileID: 21300000, guid: 7ffb991baa2e5cf4eb3896b04f21c518, type: 3}
+  dashGaugeFrame: {fileID: 21300000, guid: ec87115709bb81e46974c1f40695a8e5, type: 3}
+  perfectDodgeSaturation: -85
+  perfectDodgeVignette: 0.35
+  perfectDodgeFadeIn: 0.05
+  perfectDodgeFadeOut: 0.25
+  perfectDodgeFreeze: 0.07
+  perfectDodgeTint: {r: 0.35, g: 0.85, b: 1, a: 0.7}
+  perfectDodgeTintEmission: 2.5
+  perfectDodgeGhostInterval: 0.045
   dodgeGhostMaterial: {fileID: 2100000, guid: e355357bd41b38f4e8bdee996b722638, type: 2}
   dodgeGhostInterval: 0.035
   dodgeGhostLifetime: 0.3
@@ -60,8 +100,6 @@ MonoBehaviour:
   minFallAnimHeight: 0.6
   useFloatingController: 1
   floatRideHeight: 0.4
-  floatSpring: 4000
-  floatDamper: 900
   floatProbeExtra: 0.3
   floatStepDownDistance: 0.5
   airControlMultiplier: 0.5

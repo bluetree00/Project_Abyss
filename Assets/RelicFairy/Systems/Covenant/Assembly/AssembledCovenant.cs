@@ -22,10 +22,21 @@ public sealed class AssembledCovenant : CovenantBase
     // 처형 「표식」 탐색 반경 — 경계 원인(개선·선제)은 방 단위 사건이라 근접 반경으로는 짚을 게 없다.
     private const float ExecuteMarkRadius      = 12f;
 
-    // 루비 발동 VFX 키. 자산이 없으면 CovenantBase.Vfx가 조용히 무동작한다.
-    private const string RubyVfxKey = "VFX/Covenant/RubyProc";
+    // ── 전투 게이트 ───────────────────────────────────────
+    // 상시 원인(심장박동·행군)이 적을 요구하는 반경. 전투 중인 방은 덮되 클리어된 방·복도·상점은 벗어난다.
+    private const float CombatGateRadius   = 18f;
+    // 마지막으로 적을 본 뒤 게이트가 열린 채 남는 시간(초). 카이팅·처치 직후 공백으로 발동이 끊기지 않게.
+    private const float CombatGateGrace    = 4f;
+    // 게이트 판정 주기(초) — 매 프레임 OverlapSphere를 새로 돌 이유가 없다.
+    private const float CombatGateInterval = 0.5f;
 
-    private static readonly Collider[] _probe = new Collider[32];
+    // 기폭이 대상 하나를 터뜨릴 때의 VFX 키(범위 폭발은 효과 id 그대로).
+    private const string DetonateHitVfx = "detonate_hit";
+
+    // 적 탐색은 몬스터 타격 레이어(MonsterHit)만 훑는다. 방은 1m 칸마다 바닥 콜라이더를 깔아 반경 5m에도 80개가 넘는데,
+    // 레이어 없이 훑으면 버퍼가 바닥으로 차서 몬스터가 한 마리도 안 담긴다(에디터 실측 — CombatQuery와 같은 사고).
+    private const int ProbeSize = 128;
+    private static readonly Collider[] _probe = new Collider[ProbeSize];
 
     // 광역 효과가 훑어 담는 대상 목록. 인스턴스별로 따로 갖는다 — 정적으로 두면 광역 피해가
     // 다른 서약의 원인을 물었을 때 그 서약이 같은 리스트를 비워버려 진행 중인 순회가 사라진다.
@@ -51,6 +62,7 @@ public sealed class AssembledCovenant : CovenantBase
     private bool  _firstHitArmed;      // 선제
     private float _proximityTimer, _proximityCd;   // 포위
     private Vector3 _lastPos; private bool _movePrimed; private float _moveAccum;   // 행군
+    private float _gateTimer, _gateOpenUntil;   // 전투 게이트
 
     // 효과 타이머(격노)
     private bool  _buffActive;
@@ -125,6 +137,11 @@ public sealed class AssembledCovenant : CovenantBase
         : CovenantId;
     public override string BasicDescription => _resolved ? _cause.desc + " → " + _effect.desc : string.Empty;
 
+    // 조립에 쓰인 부품 id. CovenantHandler가 봉인된 짝(IsBannedPair)을 서비스단에서 거르는 데 쓴다 —
+    // 조립 화면의 버튼 잠금만으로는 UI 밖 진입점이 하나라도 생기는 순간 뚫린다.
+    public string CauseId  => _causeId;
+    public string EffectId => _effectId;
+
     // 원인/결과를 따로 노출 → HUD가 한 줄로 이어붙이지 않고 줄을 나눠 보여준다.
     public override string CauseText  => _resolved ? _cause.desc  : null;
     public override string EffectText => _resolved ? _effect.desc : null;
@@ -194,6 +211,7 @@ public sealed class AssembledCovenant : CovenantBase
         switch (_cause.trigger)
         {
             case CauseTriggerKind.Periodic:
+                if (!CombatGateOpen(deltaTime)) break;
                 _periodicTimer += deltaTime;
                 if (_periodicTimer >= _cause.thresholdF) { _periodicTimer = 0f; ApplyEffect(null); }
                 break;
@@ -218,6 +236,9 @@ public sealed class AssembledCovenant : CovenantBase
                 }
                 break;
             case CauseTriggerKind.OnMoveDistance:
+                // 전투 밖에서 걸은 거리는 세지 않는다 — 누적만 막고 재진입 시 다시 재면
+                // 복도를 지나온 것만으로 방에 들어서자마자 한 번 터지는 일이 생긴다.
+                if (!CombatGateOpen(deltaTime)) { _movePrimed = false; _moveAccum = 0f; break; }
                 if (Ctx?.Player != null)
                 {
                     Vector3 p = PlayerPos;
@@ -302,6 +323,7 @@ public sealed class AssembledCovenant : CovenantBase
 
         _deathSaveCharges--;
         CovenantFxService.Play(_effectTier, _effectId, Vector3.zero);
+        if (Ctx?.Player != null) CovenantFxService.Burst(_effect.id, PlayerPos);
         return true;
     }
 
@@ -383,7 +405,9 @@ public sealed class AssembledCovenant : CovenantBase
             case EffectKind.AoeBurst:
             {
                 Vector3 pos = target != null ? target.transform.position : PlayerPos;
-                DealAoe(pos, SupernovaRadius(pos), Eff);
+                float radius = SupernovaRadius(pos);
+                DealAoe(pos, radius, Eff);
+                CovenantFxService.Burst(_effect.id, pos, radius);
                 return true;
             }
             case EffectKind.DamageBuff:
@@ -393,6 +417,7 @@ public sealed class AssembledCovenant : CovenantBase
             case EffectKind.Shield:
                 if (Ctx.Player?.RuntimeStats == null) return false;
                 Ctx.Player.RuntimeStats.AddShield(Eff);
+                CovenantFxService.Attach(_effect.id, Ctx.Player.transform);
                 return true;
 
             case EffectKind.GoldBurst:
@@ -431,6 +456,7 @@ public sealed class AssembledCovenant : CovenantBase
             case EffectKind.Invincible:
                 if (Ctx.Player == null) return false;
                 Ctx.Player.SetInvincible(Eff);
+                CovenantFxService.Attach(_effect.id, Ctx.Player.transform, Eff);
                 return true;
 
             case EffectKind.StatBuff:
@@ -447,14 +473,14 @@ public sealed class AssembledCovenant : CovenantBase
         }
     }
 
-    /// <summary>티어 도파민 연출 — 루비만 VFX까지 얹는다(Vfx는 CovenantBase 헬퍼 재사용).</summary>
+    /// <summary>티어 도파민 연출 — 루비만 VFX까지 얹는다.</summary>
     private void PlayTierFx(GameObject target)
     {
         Vector3 pos = target != null ? target.transform.position : PlayerPos;
         Vector3 dir = pos - PlayerPos;
 
         if (CovenantFxService.Play(_effectTier, _effectId, dir) && _effectTier == CovenantTier.Ruby)
-            Vfx(RubyVfxKey, pos);
+            CovenantFxService.Burst(CovenantFxService.RubyKey, pos);
     }
 
     // ── 효과 헬퍼 ─────────────────────────────────────────
@@ -510,6 +536,7 @@ public sealed class AssembledCovenant : CovenantBase
 
         var inst = Ctx.Player.gameObject;
         Shock(primary, inst);
+        ElementVfxPlayer.PlayBurst(RuneElement.Electric, primary.transform.position);   // 번개 룬과 같은 연출
 
         bool  chain = _cause.cls == CauseClass.Skill;
         int   extra = EffCount + (chain ? CovenantMath.ArcflashChainBonus : 0);
@@ -524,6 +551,8 @@ public sealed class AssembledCovenant : CovenantBase
             var next = TakeNearest(from, chain ? CovenantMath.ArcflashChainHop : radius);
             if (next == null) break;
             Shock(next, inst);
+            ElementVfxPlayer.PlayBeam(RuneElement.Electric, from + Vector3.up, next.transform.position + Vector3.up);
+            ElementVfxPlayer.PlayBurst(RuneElement.Electric, next.transform.position);
             if (chain) from = next.transform.position;   // 체인만 발판을 옮긴다
         }
         _areaScratch.Clear();
@@ -562,6 +591,7 @@ public sealed class AssembledCovenant : CovenantBase
 
         float duration = Mathf.Min(Eff * stacks, CovenantMath.StasisStunCap);
         GuidelineVisual.AoeBurst(center, radius, GuidelineVisual.ToastKind.Covenant);
+        CovenantFxService.Burst(_effect.id, center, radius);
 
         for (int i = 0; i < _areaScratch.Count; i++)
         {
@@ -588,6 +618,7 @@ public sealed class AssembledCovenant : CovenantBase
         _wardReduction = Mathf.Min(Eff + CovenantMath.WardPerSteepedEnemy * steeped,
                                    CovenantMath.WardReductionCap);
         _wardEnd = Time.time + _effect.duration;
+        CovenantFxService.Attach(_effect.id, Ctx.Player.transform, _effect.duration);
         return true;
     }
 
@@ -655,6 +686,7 @@ public sealed class AssembledCovenant : CovenantBase
     {
         float total = ConsumeDots(mb.gameObject, CovenantMath.DetonateFraction, asDamage: true);
         if (total <= 0f) return false;
+        CovenantFxService.Burst(DetonateHitVfx, mb.transform.position);
 
         if (spread) SpreadBurst(mb, total * Eff);
         return true;
@@ -676,6 +708,7 @@ public sealed class AssembledCovenant : CovenantBase
             if (mb != null && !mb.IsDead) any |= DetonateOne(mb, spread: false);
         }
         _areaScratch.Clear();
+        if (any) CovenantFxService.Burst(_effect.id, PlayerPos, radius);
         return any;
     }
 
@@ -690,6 +723,7 @@ public sealed class AssembledCovenant : CovenantBase
         if (_areaScratch.Count == 0) return;
 
         GuidelineVisual.AoeBurst(center, radius, GuidelineVisual.ToastKind.Covenant);
+        CovenantFxService.Burst(_effect.id, center, radius);
         for (int i = 0; i < _areaScratch.Count; i++)
             _areaScratch[i]?.TakeSynergyDamage(amount, Ctx.Player.gameObject, 1f, false, DamageKind.Synergy);
         _areaScratch.Clear();
@@ -706,6 +740,7 @@ public sealed class AssembledCovenant : CovenantBase
 
         float value = ConsumeDots(mb.gameObject, CovenantMath.HarvestFraction, asDamage: false);
         if (value <= 0f) return false;
+        CovenantFxService.Burst(_effect.id, mb.transform.position);
 
         Ctx.Player?.CooldownTracker?.ReduceAllCooldowns(Eff);
         Ctx.Session?.AddGold(CovenantMath.HarvestGold);
@@ -749,6 +784,7 @@ public sealed class AssembledCovenant : CovenantBase
             CovenantMath.ExecuteThresholdCap);
 
         if ((float)mb.CurrentHp / max > threshold) return false;
+        CovenantFxService.Burst(_effect.id, mb.transform.position);
 
         // 전염이 먼저다 — 대상을 먼저 죽이면 화상 핸들러가 함께 사라져 옮길 불이 남지 않는다.
         if (mb.Grade != MonsterGrade.Boss) SpreadBurnFrom(mb);
@@ -794,7 +830,8 @@ public sealed class AssembledCovenant : CovenantBase
     private void CollectLiveEnemies(Vector3 center, float radius, MonsterBase except)
     {
         _areaScratch.Clear();
-        int n = Physics.OverlapSphereNonAlloc(center, radius, _probe);
+        int n = Physics.OverlapSphereNonAlloc(center, radius, _probe, MonsterBase.HitLayerMask,
+                                              QueryTriggerInteraction.Collide);
         for (int i = 0; i < n; i++)
         {
             var col = _probe[i];
@@ -837,7 +874,8 @@ public sealed class AssembledCovenant : CovenantBase
 
     private GameObject NearestLiveEnemy(Vector3 center, float radius, MonsterBase except = null)
     {
-        int n = Physics.OverlapSphereNonAlloc(center, radius, _probe);
+        int n = Physics.OverlapSphereNonAlloc(center, radius, _probe, MonsterBase.HitLayerMask,
+                                              QueryTriggerInteraction.Collide);
         GameObject best = null; float bestSq = float.MaxValue;
         for (int i = 0; i < n; i++)
         {
@@ -850,10 +888,39 @@ public sealed class AssembledCovenant : CovenantBase
         return best;
     }
 
+    /// <summary>
+    /// 상시 원인(심장박동·행군)은 <b>근처에 산 적이 있을 때만</b> 굴린다.
+    ///
+    /// 이 둘은 전투와 무관하게 흐르는 원인이라, <b>적이 없어도 Fire가 성립하는 효과</b>
+    /// (격노·박차·보호막·성역·결계·황금비)와 물리면 빈 방을 걸어다니거나 가만히 서 있는 것만으로
+    /// 가동률이 100%가 된다 — 걷기 5m/s면 행군 12m는 2.4초, 심장박동은 4초 주기라
+    /// 효과의 지속(4~6초)도 icd(3초)도 전부 넘겨버린다. 골드처럼 상한 없이 누적되는 효과라면
+    /// 그대로 무한 수급이 된다.
+    ///
+    /// 적을 요구하는 효과(초신성·처형·화상…)는 ResolveTarget이 null을 돌려줘 이미 막히지만,
+    /// 자기완결 효과는 막을 곳이 여기뿐이다. 짝을 하나씩 봉인하는 것과 달리 이 게이트는
+    /// 원인·효과가 늘어나도 같이 따라온다.
+    ///
+    /// 유예(<see cref="CombatGateGrace"/>)를 두는 이유: 거리를 벌리는 카이팅이나 마지막 한 마리를
+    /// 잡은 직후의 공백에서 발동이 뚝 끊기면 전투 중 조합까지 못 쓰게 된다.
+    /// </summary>
+    private bool CombatGateOpen(float deltaTime)
+    {
+        _gateTimer += deltaTime;
+        if (_gateTimer >= CombatGateInterval)
+        {
+            _gateTimer = 0f;
+            if (CountNearbyEnemies(CombatGateRadius) > 0)
+                _gateOpenUntil = Time.time + CombatGateGrace;
+        }
+        return Time.time < _gateOpenUntil;
+    }
+
     private int CountNearbyEnemies(float radius)
     {
         if (Ctx?.Player == null) return 0;
-        int n = Physics.OverlapSphereNonAlloc(PlayerPos, radius, _probe);
+        int n = Physics.OverlapSphereNonAlloc(PlayerPos, radius, _probe, MonsterBase.HitLayerMask,
+                                              QueryTriggerInteraction.Collide);
         int count = 0;
         for (int i = 0; i < n; i++)
         {

@@ -12,6 +12,8 @@ using UnityEngine.UI;
 /// </summary>
 public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
 {
+    private const float DragAlpha = 0.72f;   // 끄는 동안 조각 알파 — 미리보기가 비치게
+
     private static int _idCounter = 0;
 
     [Header("Identity")]
@@ -135,6 +137,7 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         // Visual feedback: scale multiplier
         float mul = (dragAsset != null) ? dragAsset.selectedScale.x : 1.1f;
         rt.localScale = cachedStartLocalScale * mul;
+        SetDragAlpha(DragAlpha);
 
         // Apply pointer offset ONCE at drag start (so it doesn't accumulate)
         if (dragAsset != null && dragAsset.pointerOffset != Vector2.zero)
@@ -162,6 +165,7 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     {
         // Restore base scale (placement manager will snap position)
         rt.localScale = cachedStartLocalScale;
+        SetDragAlpha(1f);
 
         GridManager.Instance?.ClearPreview();
 
@@ -179,10 +183,20 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         }
         else
         {
+            // 왜 안 들어갔는지 말한다 — 예전엔 말없이 보관함으로 사라졌다(09-27).
+            string why = GridManager.Instance.DescribeDropFailure(this);
+            if (why != null) UI_GridPanel.NotifyDropRejected(why);
             BoardManager.Instance.ReSlotAndReturn(this);
         }
 
         if (_layout != null) _layout.ignoreLayout = false;
+    }
+
+    /// <summary>끄는 동안 조각을 반투명하게 — 아래 판의 초록/빨강 미리보기가 비쳐야 어디에 놓이는지 보인다(09-27).</summary>
+    private void SetDragAlpha(float a)
+    {
+        if (!TryGetComponent<CanvasGroup>(out var cg)) cg = gameObject.AddComponent<CanvasGroup>();
+        cg.alpha = a;
     }
 
     public void OnPointerClick(PointerEventData eventData)
@@ -246,6 +260,41 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             img.type           = Image.Type.Simple;
             img.color          = tint;
             img.preserveAspect = true;
+        }
+
+        ApplyLegendarySheen();
+    }
+
+    /// <summary>
+    /// 전설 룬은 판 위에서도 금빛 광택이 흐른다(보관함·획득 카드와 같은 표시).
+    /// 칸마다 광택을 붙이되 x 위치만큼 늦춰, 빛 한 줄기가 모양 전체를 왼쪽에서 오른쪽으로 가로지르게 한다.
+    /// 같은 Shape에 다른 룬이 다시 묶이면 광택을 걷는다.
+    /// </summary>
+    private void ApplyLegendarySheen()
+    {
+        bool legendary = ItemData != null && ItemData.rarity == ItemRarity.Legendary;
+        float minX = float.MaxValue;
+        foreach (Transform child in transform)
+            if (child is RectTransform r && r.anchoredPosition.x < minX) minX = r.anchoredPosition.x;
+
+        foreach (Transform child in transform)
+        {
+            if (child is not RectTransform brt) continue;
+            child.TryGetComponent<StagingSlotShimmer>(out var sheen);
+            if (!legendary)
+            {
+                if (sheen == null) continue;
+                Destroy(sheen);
+                var mask = child.Find("ShimmerMask");
+                if (mask != null) Destroy(mask.gameObject);
+                continue;
+            }
+
+            if (sheen == null) sheen = child.gameObject.AddComponent<StagingSlotShimmer>();
+            float w = Mathf.Max(1f, brt.rect.width);
+            float speed = (w + 90f) / 0.5f;   // 광택 한 번이 칸을 지나는 속도(StagingSlotShimmer 스윕 0.5초)
+            sheen.Configure(StagingSlotShimmer.LegendaryTint, 0.5f, 1.6f, w,
+                            phase: -(brt.anchoredPosition.x - minX) / speed);
         }
     }
 

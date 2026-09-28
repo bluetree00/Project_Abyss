@@ -42,6 +42,22 @@ public abstract class BossPatternSO : SpecialStateDataBase
     [Tooltip("≥ 0: 이 패턴 완료 후 사용할 브레이크 쿨다운 고정값 (초). -1: Config의 기본 랜덤 사용.")]
     public float breakOverride = -1f;
 
+    [Tooltip("연계 — 이 패턴이 끝나면 쉬지 않고(0.5초) 이어 낼 패턴. 2페이지 구성 §9 「컨셉 연계기」. 비우면 없음")]
+    public BossPatternSO followUp;
+
+    [Tooltip("연계를 2페이지 후반(간판 뒤)에만 쓴다")]
+    public bool followUpLateOnly = true;
+
+    [Tooltip("연계 쿨다운(초) — 이 안에 같은 연계가 다시 오면 이어 내지 않는다(09-28: 쿨다운이 없어 후반이 두 패턴 되풀이로 굳었다)")]
+    public float followUpCooldown = 14f;
+
+    /// <summary>지금 <see cref="followUp"/>을 이어 낼 때인가 — 후반 전용이면 2페이지 간판 뒤에만.</summary>
+    public bool FollowUpActive(MonsterBase monster)
+        => followUp != null && (!followUpLateOnly || (monster as IPagedBoss)?.Pages?.IsLate == true);
+
+    /// <summary>연계로 이어질 때 낼 수 있는가 — 기본은 <see cref="CanExecute"/>. 연계는 앞 패턴의 일부라 자기 쿨다운은 안 보게 재정의할 수 있다.</summary>
+    public virtual bool CanFollowUp(BossPatternContext ctx) => CanExecute(ctx);
+
     /// <summary>
     /// 보스 초기화 시 1회 호출된다.
     /// 파생 클래스에서 런타임 상태 인스턴스와 오브젝트 풀을 생성한다.

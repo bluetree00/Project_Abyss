@@ -1,0 +1,76 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3ea14d55ee66c9a47b36ec4122a71e2f, type: 3}
+  m_Name: CovenantVfxSet
+  m_EditorClassIdentifier: Assembly-CSharp::CovenantVfxSet
+  entries:
+  - key: supernova
+    prefab: {fileID: 4020421568969601508, guid: 0ced40189347d054588156810ea36d23,
+      type: 3}
+    scale: 1
+    nativeRadius: 3.4
+    life: 2
+  - key: detonate
+    prefab: {fileID: 6981941031284743971, guid: edbcd3b3c18ccf44db5b7031741faf88,
+      type: 3}
+    scale: 1
+    nativeRadius: 3.5
+    life: 2
+  - key: detonate_hit
+    prefab: {fileID: 1651363388222792, guid: a32d87b33cadfed4b83eeaa564eb7724, type: 3}
+    scale: 0.5
+    nativeRadius: 0
+    life: 1
+  - key: execute
+    prefab: {fileID: 5490221094549253126, guid: 6917c8ff75e3f2c44ad44d8df072e2dd,
+      type: 3}
+    scale: 1
+    nativeRadius: 0
+    life: 1.5
+  - key: stasis
+    prefab: {fileID: 6533228452991066826, guid: f9604ed79c6db494fb939d0a585130a6,
+      type: 3}
+    scale: 1
+    nativeRadius: 4.4
+    life: 1.2
+  - key: harvest
+    prefab: {fileID: 1824691927606644, guid: 51f58a7ac453dab48a238fee31899d31, type: 3}
+    scale: 0.5
+    nativeRadius: 0
+    life: 1.2
+  - key: bloodmark
+    prefab: {fileID: 1269619656826376, guid: 8d50ead57204b1e4ea67b269c30f2bb5, type: 3}
+    scale: 0.6
+    nativeRadius: 0
+    life: 1.5
+  - key: aegis
+    prefab: {fileID: 1341365785022538, guid: 3f30c0442b887064bb00401ceb9a8816, type: 3}
+    scale: 0.6
+    nativeRadius: 0
+    life: 0.5
+  - key: ward
+    prefab: {fileID: 4481419373420190473, guid: a1f3d2db3e03101408c646570eefe2e1,
+      type: 3}
+    scale: 0.6
+    nativeRadius: 0
+    life: 4
+  - key: lastbreath
+    prefab: {fileID: 2605316480486226868, guid: 114ab6919cf39484e946697e02cfa078,
+      type: 3}
+    scale: 0.5
+    nativeRadius: 0
+    life: 1.5
+  - key: ruby
+    prefab: {fileID: 1761614549529672, guid: 7ee7aea814e67034c991de25882a040b, type: 3}
+    scale: 1.5
+    nativeRadius: 0
+    life: 1

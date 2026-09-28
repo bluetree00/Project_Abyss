@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t2_calm_crit
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t2_calm_crit
-  displayName: "\uCE58\uBA85\uC758 \uB8EC"
+  displayName: "\uACE0\uC694\uD55C \uC9D1\uC911\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 1

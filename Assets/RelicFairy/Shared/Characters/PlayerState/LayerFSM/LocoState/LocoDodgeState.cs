@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class LocoDodgeState : ILayerState<LocoState>
+public class LocoDodgeState : LayerStateBase<LocoState>
 {
     // 정지 회피 시 "직전 이동 속도방향" 폴백을 인정할 최소 수평 속도(제곱, m²/s²).
     // 이보다 느리면 사실상 정지로 보고 바라보는 방향으로 폴백 → 진짜 정지 상태는 현행과 동일.
@@ -15,9 +15,6 @@ public class LocoDodgeState : ILayerState<LocoState>
     // 잘라내면 원인이 무엇이든 확실히 막힌다(오르막 주행은 그대로 가능).
     private const float MaxDashRiseSpeed = 3f;
 
-    private PlayerController _controller;
-    private ILayerStateChanger<LocoState> _stateChanger;
-
     private Vector3 _dodgeDir;
     private Vector3 _entryHorizVel; // 회피 진입 시점의 수평 속도(모멘텀 블렌드/방향 폴백용)
     private float _moveEndTime;
@@ -31,10 +28,7 @@ public class LocoDodgeState : ILayerState<LocoState>
     private bool _iframeApplied;     // 이번 회피에서 SetInvincible 이미 호출했는지(중복 방지)
     private bool _iframeOpen;        // OnDodgeIFrame(true) 신호를 보냈고 아직 닫지 않았는지
 
-    public void Init(PlayerController controller, ILayerStateChanger<LocoState> stateChanger)
-    { _controller = controller; _stateChanger = stateChanger; }
-
-    public void Enter()
+    public override void Enter()
     {
         _controller.RotateTowardsInput();
 
@@ -89,14 +83,14 @@ public class LocoDodgeState : ILayerState<LocoState>
         // 회피 시작 연출 신호(먼지·트레일). i-frame 창과 무관하게 회피 진입 즉시 1회.
         _controller.RaiseDodgeStart();
 
-        // 대시 펀치 — 진입 순간 짧은 약한 카메라 셰이크로 가속감 부여.
-        HitFeelService.CameraShake(0.05f, 0.1f);
+        // [제거 2026-09-16] 대시 펀치(진입 순간 카메라 셰이크)를 뺐다 — 카메라는 이동·대시 중 흔들리지 않는 것이 원칙.
+        // 대시는 가장 잦은 동작이라 매번 흔들면 화면 전체가 떨려 보인다. 가속감은 먼지·트레일(RaiseDodgeStart)이 맡는다.
 
         // startDelay==0이면 Enter 즉시 무적 적용(아래 헬퍼가 시각 도달 검사).
         TryApplyIFrame();
     }
 
-    public void Update()
+    public override void Update()
     {
         // 무적 창 켜기/시각 피드백 닫기 (이동 처리와 독립).
         TryApplyIFrame();
@@ -125,7 +119,12 @@ public class LocoDodgeState : ILayerState<LocoState>
             if (blend > 0f)
                 dashVel = Vector3.Lerp(dashVel, _entryHorizVel, blend);
 
-            _controller.Rigid.linearVelocity = new Vector3(dashVel.x, vy, dashVel.z);
+            // [벽 파고듦 차단] 로코모션과 같은 규칙 — 접촉 중인 벽을 향하는 성분을 제거한다.
+            // 대시는 매 프레임 속도를 통째로 덮어쓰므로, 벽으로 대시하면 파고듦↔되밀림 진동이 그대로 나온다.
+            // 벽을 따라 미끄러지는 성분은 남아 벽을 스치는 대시는 그대로 된다.
+            Vector2 dashHoriz = _controller.ClipMoveTargetToWalls(new Vector2(dashVel.x, dashVel.z));
+
+            _controller.Rigid.linearVelocity = new Vector3(dashHoriz.x, vy, dashHoriz.y);
         }
         else
         {
@@ -180,7 +179,7 @@ public class LocoDodgeState : ILayerState<LocoState>
         }
     }
 
-    public void Exit()
+    public override void Exit()
     {
         // 구르기 자세 → 로코모션 복귀는 자세 차이가 커서 로코모션 기본 블렌드(0.14s)면 아직 짧다.
         // 다음 로코모션 진입의 크로스페이드를 길게 예약해 부드럽게 이어붙인다(다른 전이엔 영향 없음).

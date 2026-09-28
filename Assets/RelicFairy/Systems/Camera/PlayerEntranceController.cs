@@ -6,7 +6,7 @@ using System.Threading;
 /// <summary>
 /// 씬 진입 시 플레이어 등장 연출 오케스트레이터.
 /// 카메라 인트로 완료를 기다렸다가, 캐릭터별 <see cref="PlayerEntranceBehaviourSO"/>에 연출을 위임한다.
-/// 플레이어 상태(inputReady, 물리, 렌더러 가시성)는 이 컨트롤러가 관리한다.
+/// 플레이어 상태(조작 정지, 물리, 렌더러 가시성)는 이 컨트롤러가 관리한다.
 /// </summary>
 public sealed class PlayerEntranceController : MonoBehaviour
 {
@@ -18,7 +18,7 @@ public sealed class PlayerEntranceController : MonoBehaviour
     private bool _entrancePlayed;
 
     // ── Events ──
-    /// <summary>등장 연출이 완전히 끝난 직후 발생 (inputReady 활성화 후)</summary>
+    /// <summary>등장 연출이 완전히 끝난 직후 발생 (조작 정지 해제 후)</summary>
     public event Action OnEntranceComplete;
 
     // ── Public Methods ──
@@ -44,7 +44,7 @@ public sealed class PlayerEntranceController : MonoBehaviour
         }
 
         // 플레이어 비활성 (입력 차단 + 렌더러 숨김)
-        _player.inputReady = false;
+        _player.SetControlSuspended(true);
         SetPlayerVisible(false);
 
         // 물리 비활성 (연출 중 중력 간섭 방지)
@@ -105,7 +105,7 @@ public sealed class PlayerEntranceController : MonoBehaviour
             {
                 if (_player.Rigid != null)
                     _player.Rigid.isKinematic = false;
-                _player.inputReady = true;
+                _player.SetControlSuspended(false);
             }
 
             OnEntranceComplete?.Invoke();
@@ -124,7 +124,7 @@ public sealed class PlayerEntranceController : MonoBehaviour
         SetPlayerVisible(true);
         if (_player.Rigid != null)
             _player.Rigid.isKinematic = false;
-        _player.inputReady = true;
+        _player.SetControlSuspended(false);
     }
 
     private void SetPlayerVisible(bool visible)

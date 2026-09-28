@@ -224,7 +224,7 @@ MonoBehaviour:
   _hitBloodVfxPrefab: {fileID: 0}
   _hitBloodVfxScale: 1
   _hitBloodVfxHeightOffset: 1
-  _globalAttackAnimSpeedScale: 1.25
+  _globalAttackAnimSpeedScale: 1
   characterData: {fileID: 11400000, guid: da974d0847d259d45a495f76043c83af, type: 2}
   relicClass: {fileID: 0}
   debugInvincible: 0

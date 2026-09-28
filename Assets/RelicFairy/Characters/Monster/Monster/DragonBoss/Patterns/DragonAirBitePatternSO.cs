@@ -415,6 +415,7 @@ internal sealed class DragonAirBreathState : FullLockState<DragonAirBreathPatter
             new Color(1f, 0.28f, 0.18f, 0.85f),
             Data.WarningMarkerLifetime,
             Data.WarningMarkerHeightOffset);
+        _activeWarningZone.BeginFill(Mathf.Max(0.05f, Data.HitTime - Data.WarningTime));   // 다 차는 순간 = 물기 판정
     }
 
     private void ApplyFireballImpact(MonsterContext ctx)

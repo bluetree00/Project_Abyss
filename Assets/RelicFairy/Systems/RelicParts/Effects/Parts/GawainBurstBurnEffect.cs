@@ -4,6 +4,8 @@
 /// 플레이어 공격 적중(OnHit) 시 대상 화상의 50%를 즉발 피해로 전환한다. 나머지 절반은 계속 탄다.
 /// 폭발 피해는 TakeSynergyDamage(DoT) 경로라 OnPostDealDamage를 안 타 재귀가 없다.
 /// 화상은 GawainSolarBurnPassive가 부여 — 이 파츠는 그 잔여를 앞당겨 소비할 뿐이다.
+/// 소비는 진짜 소비다: 같은 타격의 재부여가 터뜨린 만큼을 되채우지 못하게 막는다(<see cref="MonsterBurnHandler.HoldRefreshThisFrame"/>).
+/// 계속 때리면 화상이 절반씩 앞당겨 터지다 다 타면 다시 붙는다 — 화상 총량을 빨리 쏟는 파츠.
 /// </summary>
 public sealed class GawainBurstBurnEffect : RelicPartEffect
 {
@@ -17,7 +19,8 @@ public sealed class GawainBurstBurnEffect : RelicPartEffect
         // 화상 잔여가 있을 때만 터뜨리고, 그 자리에 화염 버스트를 낸다.
         if (!hit.Target.TryGetComponent<MonsterBurnHandler>(out var burn) || burn.Remaining <= 0f) return;
 
-        MonsterBurnHandler.DetonateOn(hit.Target, BurstFraction);
+        burn.Detonate(BurstFraction);
+        burn.HoldRefreshThisFrame();
         ElementVfxPlayer.PlayBurst(RuneElement.Fire, hit.HitPoint, 1f);
     }
 }

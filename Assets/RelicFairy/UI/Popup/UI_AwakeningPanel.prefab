@@ -2482,32 +2482,32 @@ MonoBehaviour:
     fontSizes: {x: 18, y: 16, z: 15}
     reachBottom: 0
   aheadSeat:
-    height: 34
+    height: 54
     name:
       serializedVersion: 2
       x: 14
-      y: 6
-      width: 240
+      y: 4
+      width: 150
       height: 22
     cost:
       serializedVersion: 2
-      x: 0
-      y: 0
-      width: 0
-      height: 0
+      x: -12
+      y: 4
+      width: 100
+      height: 22
     change:
       serializedVersion: 2
-      x: 0
-      y: 0
-      width: 0
-      height: 0
+      x: 14
+      y: 26
+      width: 240
+      height: 24
     condition:
       serializedVersion: 2
       x: 0
       y: 0
       width: 0
       height: 0
-    fontSizes: {x: 16, y: 14, z: 14}
+    fontSizes: {x: 17, y: 16, z: 14}
     reachBottom: 0
   background: {fileID: 7740581684294964830}
   accentBar: {fileID: 3432421380635270897}

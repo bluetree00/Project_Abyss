@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t2_skill_burst
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t2_skill_burst
-  displayName: "\uD3ED\uBC1C\uC758 \uB8EC"
+  displayName: "\uC8FC\uBB38 \uAE43\uB4E0 \uBD84\uB178\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 1

@@ -327,7 +327,7 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
             Data.DangerZoneHeightOffset,
             Data.WarningOutlineWidth,
             startEmpty: true);
-        _warningZone.BeginCircleFill(Data.WarningDuration);
+        _warningZone.BeginFill(Data.WarningDuration);
     }
 
     private void SpawnIcePillars(MonsterContext ctx)
@@ -366,7 +366,8 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
                       ?? col.GetComponentInParent<PlayerController>();
             if (player == null) continue;
 
-            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier));
+            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier), ctx.Monster.gameObject,
+                              false, HitWeight.Heavy);   // 다이브 — 강
             Data.playerStatusEffect?.Apply(player);
             break;
         }

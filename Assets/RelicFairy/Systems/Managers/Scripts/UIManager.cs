@@ -370,6 +370,10 @@ public class UIManager
             TimeScaleArbiter.Release(this);
             SetPlayerInput(true);
         }
+
+        // 차단 팝업이 떠 있는 동안 HUD를 걷는다 — 막 없는 팝업 가장자리에 무기·스킬 칸이 걸치고 반투명 창 안으로 비쳤다(09-28).
+        var uiRoot = UIRootBootstrapper.Instance;
+        if (uiRoot != null) uiRoot.SetHudPopupHidden(shouldBlock);
     }
 
     /// <summary>

@@ -18,6 +18,10 @@ public sealed class ProcRoomResult
     /// <summary>문 등장 방식(BlockPalette). 뿌리 같은 자연물은 떨어지지 않고 바닥에서 자라야 한다.</summary>
     public SealDoorMotion               sealDoorMotion;
 
+    /// <summary>이 방 테마의 출구 문틀 프리팹(BlockPalette). 석문이 열려도 남는 기둥·상인방·화로.
+    /// null이면 지금처럼 개구부만 남는다.</summary>
+    public GameObject                   gateFramePrefab;
+
     public ProcExitSlot                 entrance;     // 들어온 입구 — 진입 후 잠금(봉인) 패널 배치용
     public List<ProcExitSlot>           exits;        // 클리어 후 공개할 출구 슬롯
     public List<MapBuilder.PlacedBlock> blocks;       // 디졸브 등장용 블록(빌드 시 렌더러 숨김 상태) — 화면 복귀 후 호출자가 재생

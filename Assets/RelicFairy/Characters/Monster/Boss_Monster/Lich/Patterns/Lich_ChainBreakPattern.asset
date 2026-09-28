@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 961aa177040b1914fbc43d6d9df6c2d7, type: 3}
+  m_Name: Lich_ChainBreakPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichChainBreakPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 2
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: chainbreak
+  breakOverride: -1
+  maxRange: 25
+  patternCooldown: 18
+  castDuration: 1
+  waveCount: 3
+  waveInterval: 1
+  staggerDuration: 2
+  recoveryDuration: 0.5
+  ringSpeed: 10
+  ringThickness: 1.5
+  ringMaxRadius: 24
+  damageMultiplier: 1
+  knockbackMultiplier: 1

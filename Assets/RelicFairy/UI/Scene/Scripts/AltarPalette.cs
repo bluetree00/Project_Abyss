@@ -30,9 +30,10 @@ public static class AltarPalette
     public static readonly Color AccentLocked = new(0.180f, 0.169f, 0.243f);
 
     // ── 글자 ─────────────────────────────────────────────
-    public static readonly Color TextPrimary = new(0.902f, 0.882f, 0.957f);
-    public static readonly Color TextDim     = new(0.640f, 0.615f, 0.740f)   /* 밝기 0.47→0.63, 가독성 2026-09-09 */;
-    public static readonly Color TextFaint   = new(0.520f, 0.495f, 0.620f)   /* 밝기 0.30→0.50 */;
+    // 글자는 전 화면 공통 잉크(UITheme) — 이 화면만 푸른 흰색이라 다른 화면과 온도가 달랐다(09-28 UI 톤 통일). 밝기는 그대로.
+    public static readonly Color TextPrimary = UITheme.Ink;
+    public static readonly Color TextDim     = new(0.660f, 0.635f, 0.680f)   /* 밝기 0.47→0.63, 가독성 2026-09-09 */;
+    public static readonly Color TextFaint   = new(0.540f, 0.520f, 0.565f)   /* 밝기 0.30→0.50 */;
 
     // ── 조용한 버튼(살 수 없음 / 수령 불가) ────────────────
     public static readonly Color BtnQuiet    = new(0.153f, 0.145f, 0.216f, 1f);

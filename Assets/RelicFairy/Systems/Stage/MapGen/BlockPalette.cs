@@ -152,6 +152,10 @@ public class BlockPalette : ScriptableObject
              "고딕 석문 하나를 전 테마에 쓰면 숲·심연 방에서 컨셉이 어긋난다.")]
     [SerializeField] private GameObject sealDoorPrefab;
 
+    [Tooltip("이 테마의 출구 문틀(기둥·상인방·화로). 석문이 열려도 남아 「여기가 출구」를 알려 준다. " +
+             "개구부 20×12 m 기준으로 만들고, 실제 개구부에 맞춰 균등 배율이 적용된다.")]
+    [SerializeField] private GameObject gateFramePrefab;
+
     [Tooltip("봉인 문 등장 방식.\n" +
              "Drop = 개구부 위에서 내리닫이처럼 떨어진다(석문·철문).\n" +
              "Grow = 바닥에 붙은 채 아래에서 자라오른다(뿌리·덩굴 등 유기물).\n" +
@@ -172,6 +176,7 @@ public class BlockPalette : ScriptableObject
     public float DecalsPer100SqM => decalsPer100SqM;
     public GameObject       CorridorFogPrefab => corridorFogPrefab;
     public GameObject       SealDoorPrefab    => sealDoorPrefab;
+    public GameObject       GateFramePrefab   => gateFramePrefab;
     public SealDoorMotion   SealDoorMotion    => sealDoorMotion;
     public CorridorVeilMode VeilMode          => veilMode;
     public int              VeilLayers        => Mathf.Max(1, veilLayers);

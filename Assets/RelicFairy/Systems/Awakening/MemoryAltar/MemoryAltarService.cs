@@ -204,7 +204,7 @@ public static class MemoryAltarService
     public static bool IsLegendaryUnlocked => IsUnlocked(MemoryAltarCatalog.RuneLegendary);
 
     /// <summary>
-    /// 굴려 나온 등급을 <b>해금된 범위로 내린다</b>. 이것이 「등장」 갈래가 실제로 작동하는 지점이다.
+    /// 굴려 나온 등급을 <b>해금된 범위로 내린다</b>. 이것이 「룬」 갈래의 등급 해금이 실제로 작동하는 지점이다.
     /// <para>가중치를 건드리지 않고 <b>결과만</b> 내리는 이유: 굴림 자체는 시드 결정적이어야
     /// 이어하기 복원이 어긋나지 않는다. 클램프는 순수 함수라 결정성을 깨지 않는다.</para>
     /// <para>둘 다 미해금이면 Legendary → Epic → Rare로 연쇄 강등된다.</para>
@@ -215,6 +215,36 @@ public static class MemoryAltarService
         if (rolled == ItemRarity.Epic      && !IsEpicUnlocked)      rolled = ItemRarity.Rare;
         return rolled;
     }
+
+    /// <summary>
+    /// 지금 나올 수 있는 룬 최고 등급. 등급이 <b>정해진 채로</b> 고르는 경로(상점 진열)는 굴림이 없어
+    /// <see cref="ClampRarity"/>를 탈 수 없으니 이 값으로 후보를 거른다.
+    /// </summary>
+    public static ItemRarity MaxRuneRarity => ClampRarity(ItemRarity.Legendary);
+
+    /// <summary>
+    /// 등급 확률 세 몫을 해금 범위로 <b>접는다</b> — 잠긴 등급의 몫은 한 단계 아래로 넘어간다.
+    /// <para>굴림 결과만 내리는 <see cref="ClampRarity"/>와 같은 규칙인데, 확률을 <b>화면에 보여주는</b> 경로(정제소)는
+    /// 표시와 굴림이 같은 값을 봐야 해서 확률 자체를 접는다. 접지 않으면 "전설 25%"를 보여 주고 영웅을 준다.</para>
+    /// </summary>
+    public static (float rare, float epic, float legend) FoldOdds(float rare, float epic, float legend)
+    {
+        if (!IsLegendaryUnlocked) { epic += legend; legend = 0f; }
+        if (!IsEpicUnlocked)      { rare += epic;   epic   = 0f; }
+        return (rare, epic, legend);
+    }
+
+    /// <summary>
+    /// 서약 카드(원인·효과) 개방 단계 0~3. 사슬이라 앞 단계 없이 뒤 단계가 열려 있을 수 없지만,
+    /// 재정렬 이전 세이브처럼 구멍이 날 수 있어 <b>가장 높은 열린 단계</b>를 그대로 쓴다.
+    /// </summary>
+    public static int CovenantPartStep =>
+        IsUnlocked(MemoryAltarCatalog.CovenantParts3) ? 3 :
+        IsUnlocked(MemoryAltarCatalog.CovenantParts2) ? 2 :
+        IsUnlocked(MemoryAltarCatalog.CovenantParts1) ? 1 : 0;
+
+    /// <summary>한 런에 맺을 수 있는 서약 수(기본 3, 「서약 칸 +1」 해금 시 4).</summary>
+    public static int CovenantSlots => IsUnlocked(MemoryAltarCatalog.CovenantSlot) ? 4 : 3;
 
     public static bool IsChapter4Unlocked  => IsUnlocked(MemoryAltarCatalog.Chapter4);
     public static bool IsAbyssDepthUnlocked=> IsUnlocked(MemoryAltarCatalog.AbyssDepth);
@@ -229,8 +259,13 @@ public static class MemoryAltarService
     /// <para>3지선다가 아닌 라운드(단일 드랍·이미 4지선다)는 해금해도 넓어지지 않으므로 0이다 —
     /// 빈 자리는 <b>실제로 열릴 수 있는 칸</b>일 때만 약속이 된다.</para>
     /// </summary>
-    public static int RuneLockedSlots(int shownCount) =>
-        shownCount == 3 && !IsUnlocked(MemoryAltarCatalog.RuneChoice4) ? 1 : 0;
+    public static int RuneLockedSlots(int shownCount)
+    {
+        // 고행자의 인장이 켜져 있으면 보이는 수가 한 장 줄어 있다 — 해금이 넓히는 건 <b>인장 전</b> 3지선다 라운드다.
+        // 정예 4지선다가 인장으로 3장이 된 걸 3지선다로 읽어, 해금해도 안 열릴 빈 자리를 보이던 문제(09-26 감사).
+        int before = AsceticSigilService.Active ? shownCount + AsceticSigilService.ChoicePenalty : shownCount;
+        return before == 3 && !IsUnlocked(MemoryAltarCatalog.RuneChoice4) ? 1 : 0;
+    }
 
     /// <summary>
     /// 코어 파츠 후보 수. 미해금 <b>1</b> → 「1차」 2 → 「전체」 3.

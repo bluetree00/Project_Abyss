@@ -28,6 +28,7 @@ using UnityEngine;
 public static class QuestSOGenerator
 {
     private const string kMenuPath   = "RelicFairy/Gameplay/Quest/Generate From CSV";
+    private const string kMenuPathKeep = "RelicFairy/Gameplay/Quest/Add Missing From CSV (Keep Existing)";
     private const string kCsvPath     = "Assets/RelicFairy/Data/Quest/QuestDefinition.csv";
     private const string kOutputRoot  = "Assets/RelicFairy/Data/Quest/Generated";
 
@@ -36,7 +37,17 @@ public static class QuestSOGenerator
     private static readonly List<(string path, string label)> s_pendingLabels = new();
 
     [MenuItem(kMenuPath)]
-    public static void GenerateFromCSV()
+    public static void GenerateFromCSV() => Generate(keepExisting: false);
+
+    /// <summary>
+    /// 에셋이 없는 행만 새로 만들고, 이미 있는 행은 <b>이름·설명 문구만 제자리에서</b> 고친다.
+    /// 전체 생성(<see cref="GenerateFromCSV"/>)은 기존 에셋을 지우고 다시 만들어 GUID가 전부 바뀐다 —
+    /// 행 하나를 추가하려고 그걸 돌리면 안 된다.
+    /// </summary>
+    [MenuItem(kMenuPathKeep)]
+    public static void AddMissingFromCSV() => Generate(keepExisting: true);
+
+    private static void Generate(bool keepExisting)
     {
         s_pendingLabels.Clear();
         string fullCsv = Path.Combine(Application.dataPath, "../", kCsvPath);
@@ -66,7 +77,7 @@ public static class QuestSOGenerator
         var afterLinks    = new System.Collections.Generic.List<(string from, string to)>();
 
         AssetDatabase.StartAssetEditing();
-        int quests = 0, achievements = 0, skipped = 0;
+        int quests = 0, achievements = 0, skipped = 0, kept = 0;
         try
         {
             for (int i = 1; i < lines.Length; i++)
@@ -110,6 +121,12 @@ public static class QuestSOGenerator
                 }
 
                 bool isAchievement = type == "achievement";
+
+                if (keepExisting && TryUpdateExistingText(codeName, displayName, description, isAchievement))
+                {
+                    kept++;
+                    continue;
+                }
 
                 var category = GetOrCreateCategory(categoryStr);
                 var action   = GetOrCreateAction(actionStr);
@@ -158,7 +175,30 @@ public static class QuestSOGenerator
         ApplyAddressableLabels();
         AssetDatabase.SaveAssets();
 
-        Debug.Log($"[QuestSOGenerator] 완료 — Quest {quests}, Achievement {achievements}, 건너뜀 {skipped} → {kOutputRoot}");
+        Debug.Log($"[QuestSOGenerator] 완료 — 새로 만듦 Quest {quests}, Achievement {achievements} · " +
+                  $"문구만 갱신 {kept} · 건너뜀 {skipped} → {kOutputRoot}");
+    }
+
+    /// <summary>이미 있는 퀘스트/업적이면 이름·설명(퀘스트와 태스크)만 고치고 true. 없으면 false.</summary>
+    private static bool TryUpdateExistingText(string codeName, string displayName, string description, bool isAchievement)
+    {
+        string folder = isAchievement ? "Achievements" : "Quests";
+        var quest = AssetDatabase.LoadAssetAtPath<Quest>($"{kOutputRoot}/{folder}/{Sanitize(codeName)}.asset");
+        if (quest == null) return false;
+
+        var s = new SerializedObject(quest);
+        s.FindProperty("displayName").stringValue = displayName;
+        s.FindProperty("description").stringValue = description;
+        if (s.ApplyModifiedPropertiesWithoutUndo()) EditorUtility.SetDirty(quest);
+
+        var task = AssetDatabase.LoadAssetAtPath<Task>($"{kOutputRoot}/Tasks/{Sanitize(codeName)}_Task.asset");
+        if (task != null)
+        {
+            var ts = new SerializedObject(task);
+            ts.FindProperty("description").stringValue = description;
+            if (ts.ApplyModifiedPropertiesWithoutUndo()) EditorUtility.SetDirty(task);
+        }
+        return true;
     }
 
     // ── 생성 헬퍼 ──────────────────────────────────────────────

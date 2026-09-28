@@ -16,6 +16,8 @@ public class WorldAwakeningAltar : MonoBehaviour
     [SerializeField] private TMP_FontAsset worldTextFont;
     [SerializeField] private float textHeight = 1.2f;
     [SerializeField] private float textSize   = 3f;
+    [Tooltip("이름판·[F] 안내를 옮긴다(이 오브젝트 로컬) — 베이스캠프 기억의 제단은 받침 위 글자가 제단 기둥 모형에 가렸다(ae·98 09-28)")]
+    [SerializeField] private Vector3 labelOffset;
 
     // ── 상수 ─────────────────────────────────────────────────────────────
     private const float PromptOffsetY = 1.8f;
@@ -100,7 +102,13 @@ public class WorldAwakeningAltar : MonoBehaviour
 
     private void BillboardTexts()
     {
-        if (_camTransform == null) return;
+        if (_camTransform == null)
+        {
+            // 시작 때 카메라가 아직 없었으면(테스트 허브 → 베이스캠프 등) 여기서 다시 잡는다 — Start 한 번만 잡으면 라벨이 영영 안 돈다.
+            var cam = Camera.main;
+            if (cam == null) return;
+            _camTransform = cam.transform;
+        }
         if (_worldText != null)
             _worldText.transform.rotation = _camTransform.rotation;
         if (_promptGo != null && _promptGo.activeSelf)
@@ -111,24 +119,24 @@ public class WorldAwakeningAltar : MonoBehaviour
     {
         var go = new GameObject("AltarLabel");
         go.transform.SetParent(transform, false);
-        go.transform.localPosition = Vector3.up * textHeight;
+        go.transform.localPosition = Vector3.up * textHeight + labelOffset;
 
         _worldText = go.AddComponent<TextMeshPro>();
         if (worldTextFont != null) _worldText.font = worldTextFont;
-        _worldText.text = "유물 각성";
+        _worldText.text = "기억의 제단";   // 여는 창이 기억의 제단(UI_AwakeningPanel) — 옛 이름 「유물 각성」이 베이스캠프 구역 이름과 어긋났다(09-28)
         _worldText.fontSize = textSize;
         _worldText.alignment = TextAlignmentOptions.Center;
         _worldText.color = new Color(0.9f, 0.7f, 0.2f);
         _worldText.textWrappingMode = TextWrappingModes.NoWrap;
         _worldText.sortingOrder = UISortingOrder.WorldLabel;
-        TMPOutlineHelper.ApplyDefault(_worldText);
+        TMPOutlineHelper.ApplySoftShadow(_worldText);
     }
 
     private void CreatePrompt()
     {
         _promptGo = new GameObject("InteractPrompt");
         _promptGo.transform.SetParent(transform, false);
-        _promptGo.transform.localPosition = Vector3.up * PromptOffsetY;
+        _promptGo.transform.localPosition = Vector3.up * PromptOffsetY + labelOffset;   // 이름판과 같이 — 「[F]」도 제단 모형에 가렸다(98 09-28)
 
         _promptText = _promptGo.AddComponent<TextMeshPro>();
         if (worldTextFont != null) _promptText.font = worldTextFont;
@@ -137,7 +145,7 @@ public class WorldAwakeningAltar : MonoBehaviour
         _promptText.color = Color.white;
         _promptText.textWrappingMode = TextWrappingModes.NoWrap;
         _promptText.sortingOrder = UISortingOrder.WorldPrompt;
-        TMPOutlineHelper.ApplyDefault(_promptText);
+        TMPOutlineHelper.ApplySoftShadow(_promptText);
         _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> 각성 관리";
 
         _promptGo.SetActive(false);

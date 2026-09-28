@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t2_warrior_legacy
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t2_warrior_legacy
-  displayName: "\uC720\uC0B0\uC758 \uB8EC"
+  displayName: "\uACAC\uACE0\uD55C \uD30C\uAD34\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 1

@@ -19,6 +19,12 @@ public sealed class UI_GridPanel : UI_Base
     // ── Static ──
     public static UI_GridPanel Instance { get; private set; }
 
+    /// <summary>드래그 놓기가 거절된 이유를 토스트로 알린다(Shape.OnEndDrag). 룬판이 없으면 아무 일도 없다.</summary>
+    public static void NotifyDropRejected(string reason)
+    {
+        if (Instance != null && !string.IsNullOrEmpty(reason)) Instance.ShowToast(reason, warn: true);
+    }
+
     // ── Properties ──
     public RectTransform BoardContainer => _boardContainer;
     public bool IsOpen => _isOpen;
@@ -59,7 +65,6 @@ public sealed class UI_GridPanel : UI_Base
 
     // 우측: 상단 스테이징(스크롤) / 하단 아이템정보 + 배치버튼
     private RectTransform _itemInfoRoot;
-    private Button        _placeButton;
 
     // ── Private: Header buttons ──
     private Button  _backButton;
@@ -86,12 +91,20 @@ public sealed class UI_GridPanel : UI_Base
     private Button     _resetDialogYes;
     private Button     _resetDialogNo;
 
-    // ── Private: Place Button ──
-    private Image    _placeBG;
-    private TMP_Text _placeLabel;
-
-    // ── Private: Hex Grid Hint ──
-    private TMP_Text _hexGridHintText;
+    // ── Private: 룬 선택 규격 크롬(09-25) ──
+    private const float HeaderH      = 80f;    // 제목 띠(룬 선택 팝업과 같은 아트)
+    private const float ActionAreaH  = 140f;   // 오른쪽 아래 안내 두 줄 + [초기화][완료]
+    private const float OpenSlideDur = 0.28f;
+    private Image    _headerBandImg;
+    private TMP_Text _headerStatusText;
+    private Image    _cardBgImg;
+    private Image    _resetBtnImg;
+    private Image    _confirmBtnImg;
+    private TMP_Text _stagingCountText;
+    private bool     _chromeSkinned;
+    private Vector2  _headerRest, _leftRest, _rightRest;
+    private CancellationTokenSource _openFxCts;
+    private CancellationTokenSource _closeFadeCts;   // 닫기 페이드 — 도는 중 다시 열면 취소
 
     // ── Private: Footer Center Bonus ──
     private TMP_Text _footerCenterText;
@@ -105,6 +118,8 @@ public sealed class UI_GridPanel : UI_Base
     private RuntimeItemData  _pendingAddItem;   // 보관함이 가득 차 아직 못 넣은 획득 아이템(자리 나면 자동 추가)
     private bool             _isOpen;
     private bool             _layoutBuilt;
+    private bool             _raisedAbovePopups;   // 팝업(상점) 위로 올려 연 상태 — 닫을 때 원래 순서로
+    private int              _orderBeforeRaise;
     private int              _totalPlacedCells;
 
     // 아이템 배치 위치 캐시: instanceId → 헥사 그리드 셀 좌표
@@ -132,6 +147,8 @@ public sealed class UI_GridPanel : UI_Base
         TimeScaleArbiter.Release(this);
         _toastCts?.Cancel();
         _toastCts?.Dispose();
+        _openFxCts?.Cancel();
+        _openFxCts?.Dispose();
         if (Instance == this) Instance = null;
     }
 
@@ -168,7 +185,6 @@ public sealed class UI_GridPanel : UI_Base
         if (_backButton    != null) _backButton.onClick.AddListener(OnBackClicked);
         if (_resetButton   != null) _resetButton.onClick.AddListener(OnResetClicked);
         if (_confirmButton != null) _confirmButton.onClick.AddListener(OnConfirmClicked);
-        if (_placeButton   != null) _placeButton.onClick.AddListener(OnPlaceClicked);
 
         if (_confirmDialogKeepBtn    != null) _confirmDialogKeepBtn.onClick.AddListener(OnDialogKeep);
         if (_confirmDialogDiscardBtn != null) _confirmDialogDiscardBtn.onClick.AddListener(OnDialogDiscardAll);
@@ -209,7 +225,6 @@ public sealed class UI_GridPanel : UI_Base
         if (_backButton    != null) _backButton.onClick.RemoveListener(OnBackClicked);
         if (_resetButton   != null) _resetButton.onClick.RemoveListener(OnResetClicked);
         if (_confirmButton != null) _confirmButton.onClick.RemoveListener(OnConfirmClicked);
-        if (_placeButton   != null) _placeButton.onClick.RemoveListener(OnPlaceClicked);
 
         if (_confirmDialogKeepBtn    != null) _confirmDialogKeepBtn.onClick.RemoveListener(OnDialogKeep);
         if (_confirmDialogDiscardBtn != null) _confirmDialogDiscardBtn.onClick.RemoveListener(OnDialogDiscardAll);
@@ -230,7 +245,7 @@ public sealed class UI_GridPanel : UI_Base
         ClosePanel();
     }
 
-    /// <summary>새로 획득한 아이템을 강조하며 패널을 연다. UI_ItemAcquisitionPopup [그리드 열기]에서 호출.</summary>
+    /// <summary>새로 획득한 아이템을 강조하며 패널을 연다. 룬 선택 팝업이 고른 직후 부른다.</summary>
     public void ShowWithNewItem(RuntimeItemData newItem)
     {
         _pendingNewItem = newItem;
@@ -248,6 +263,25 @@ public sealed class UI_GridPanel : UI_Base
         TryFlushPendingAdd();   // 여는 사이에 자리가 났을 수도 있다
     }
 
+    /// <summary>
+    /// 열린 팝업(상점 등) <b>위로</b> 올린다. 이 패널 캔버스는 팝업 스택(410~) 아래인 400이라,
+    /// 상점에서 룬을 사면 룬판이 상점 뒤에 열려 보이지도 눌리지도 않았다(09-19 실측).
+    /// 상시로 올리지 않는 이유: 평소엔 팝업이 이 판 위에 떠야 한다. 닫을 때 원래 순서로 돌린다.
+    /// </summary>
+    public void RaiseAbovePopups()
+    {
+        if (!TryGetComponent<Canvas>(out var canvas)) return;
+
+        int top = int.MinValue;
+        foreach (var p in FindObjectsByType<UI_Popup>(FindObjectsSortMode.None))
+            if (p.isActiveAndEnabled && p.TryGetComponent<Canvas>(out var pc)) top = Mathf.Max(top, pc.sortingOrder);
+        if (top == int.MinValue || top < canvas.sortingOrder) return;
+
+        if (!_raisedAbovePopups) { _orderBeforeRaise = canvas.sortingOrder; _raisedAbovePopups = true; }
+        canvas.overrideSorting = true;
+        canvas.sortingOrder    = top + 1;
+    }
+
     // 갤러리 모드(EnterGalleryMode)·편집 모드(EnterEditMode)는 단일 편집 화면으로 개편되며 폐기됐다.
     // 두 함수 모두 빈 껍데기였고 호출처도 없어 제거함. 갤러리 뷰(GridGalleryView.cs)도 함께 삭제.
 
@@ -256,9 +290,11 @@ public sealed class UI_GridPanel : UI_Base
     private void OpenPanel()
     {
         _isOpen = true;
+        _closeFadeCts?.Cancel();   // 닫히는 페이드 중에 다시 열면 끄지 않는다
         TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
         gameObject.SetActive(true);
         BringToFront();
+        EnsureChromeSkin();
         FadeInAsync().Forget();
 
         var run   = GameRunBootstrapper.Instance?.Run;
@@ -288,6 +324,7 @@ public sealed class UI_GridPanel : UI_Base
 
             // 초기 점유 상태 반영 (재오픈 시 이전 배치 복원)
             _hexGridView.RefreshOccupiedCells();
+            _hexGridView.SetPieceGroups(_placedItemPositions);
             _hexGridView.UpdateAdjacencyConstraints();
 
         }
@@ -299,8 +336,8 @@ public sealed class UI_GridPanel : UI_Base
 
         RefreshSynergyStatus();
         RefreshFooter();
+        RefreshHeaderStatus();
         RefreshInfoPanelDefault();
-        UpdateHexGridHint();
 
         // 배치할 룬의 속성 존을 판에서 강조(어디 놓으면 시너지인지 안내).
         // RefreshSynergyStatus가 칸 색을 다시 칠하므로 반드시 그 뒤에 세운다.
@@ -311,6 +348,8 @@ public sealed class UI_GridPanel : UI_Base
             _itemInfoPanel?.ShowItem(_pendingNewItem, isNew: true);
             _pendingNewItem = null;
         }
+
+        PlayOpenFxAsync().Forget();   // 보관함이 새로 그려진 뒤에 — 올라올 카드가 정해져 있어야 한다
     }
 
     /// <summary>
@@ -332,10 +371,36 @@ public sealed class UI_GridPanel : UI_Base
     private void ClosePanel()
     {
         _isOpen = false;
+        _openFxCts?.Cancel();
+        if (_raisedAbovePopups && TryGetComponent<Canvas>(out var canvas)) canvas.sortingOrder = _orderBeforeRaise;
+        _raisedAbovePopups = false;
         TimeScaleArbiter.Release(this);
         HideConfirmDialog();
         GameRunBootstrapper.Instance?.Run?.ExitGridSynergy();
-        gameObject.SetActive(false);
+        FadeOutAndHideAsync().Forget();   // 열 때는 0.18초 페이드인데 닫을 때만 순간 소멸했다(09-28 UI 톤 통일)
+    }
+
+    private async UniTaskVoid FadeOutAndHideAsync()
+    {
+        _closeFadeCts?.Cancel();
+        _closeFadeCts?.Dispose();
+        _closeFadeCts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+        var ct = _closeFadeCts.Token;
+        if (_canvasGroup != null) _canvasGroup.blocksRaycasts = false;
+        try
+        {
+            while (_canvasGroup != null && _canvasGroup.alpha > 0f)
+            {
+                _canvasGroup.alpha = Mathf.MoveTowards(_canvasGroup.alpha, 0f, Time.unscaledDeltaTime / UIFader.CloseSec);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+            gameObject.SetActive(false);
+        }
+        catch (System.OperationCanceledException) { }
+        finally
+        {
+            if (_canvasGroup != null) _canvasGroup.blocksRaycasts = true;
+        }
     }
 
     // ── Layout 빌드 ──
@@ -375,7 +440,8 @@ public sealed class UI_GridPanel : UI_Base
         img.preserveAspect = !fill;
     }
 
-    // Header (60px 고정, 상단)
+    // Header (80px, 상단) — 룬 선택 팝업의 제목 띠 아트(EnsureChromeSkin). 제목 32 · 상태 22.
+    // [초기화][완료]는 오른쪽 상세 아래로 옮겼다(09-25) — 머리줄 오른쪽 끝의 90px 빨강·초록 칸은 주 행동으로 읽히지 않았다.
     private void BuildHeader()
     {
         var headerGO = Go("Header");
@@ -383,56 +449,49 @@ public sealed class UI_GridPanel : UI_Base
         _headerRT = headerGO.GetComponent<RectTransform>();
         _headerRT.anchorMin        = new Vector2(0f, 1f);
         _headerRT.anchorMax        = new Vector2(1f, 1f);
-        _headerRT.sizeDelta        = new Vector2(0f, 60f);
-        _headerRT.anchoredPosition = new Vector2(0f, -30f);
+        _headerRT.pivot            = new Vector2(0.5f, 1f);
+        _headerRT.sizeDelta        = new Vector2(-48f, HeaderH - 8f);
+        _headerRT.anchoredPosition = new Vector2(0f, -6f);
+        _headerRest = _headerRT.anchoredPosition;
 
-        var hdrBG = headerGO.AddComponent<Image>();
-        hdrBG.color = new Color(0.14f, 0.16f, 0.22f, 1f);
+        _headerBandImg = headerGO.AddComponent<Image>();
+        _headerBandImg.color = new Color(0.10f, 0.12f, 0.18f, 0.96f);   // 아트 미로드 폴백
 
-        // ← 뒤로가기 버튼 (좌측)
+        // ← 뒤로가기 — 둥근 단추(테두리 원 + 안쪽 원)
         _backButton = MakeButton(headerGO.transform, "BackBtn",
-            new Vector2(0f, 0f), new Vector2(0f, 1f),
-            new Vector2(60f, 0f), Vector2.zero,
-            new Color(0.22f, 0.26f, 0.36f, 1f), "←");
-        var backRT = _backButton.GetComponent<RectTransform>();
-        backRT.pivot = new Vector2(0f, 0.5f);
-        backRT.anchoredPosition = new Vector2(8f, 0f);
-        backRT.sizeDelta = new Vector2(48f, -12f);
-        backRT.anchorMin = new Vector2(0f, 0f);
-        backRT.anchorMax = new Vector2(0f, 1f);
+            new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+            new Vector2(50f, 50f), new Vector2(44f, 0f),
+            new Color(0.45f, 0.52f, 0.70f, 1f), "←");
+        var backImg = _backButton.GetComponent<Image>();
+        backImg.sprite = RuneCardKit.Disc;
+        ShopUIStyle.ApplyButtonColors(_backButton, backImg);
+        var backFill = ShopUIStyle.MakeImage(_backButton.transform, "Fill", new Color(0.05f, 0.07f, 0.12f, 1f));
+        backFill.sprite = RuneCardKit.Disc;
+        ShopUIStyle.Stretch(backFill.rectTransform, 2.5f);
+        backFill.transform.SetAsFirstSibling();
+        var backLbl = _backButton.GetComponentInChildren<TMP_Text>();
+        if (backLbl != null) { backLbl.fontSize = 26f; backLbl.color = new Color(0.88f, 0.92f, 1f, 1f); }
 
-        // 타이틀 텍스트 (중앙)
-        var titleGO = MakeTxt(headerGO.transform, "Title", "그리드 배치", 22f,
-            new Color(0.88f, 0.92f, 1f, 1f), bold: true);
+        // 제목 — 이 화면의 이름과 할 일을 한 줄로
+        var titleGO = MakeTxt(headerGO.transform, "Title",
+            "<b>룬판</b>   <size=22><color=#C9D0E4>보관함의 룬을 판에 놓으세요</color></size>", 32f,
+            new Color(0.97f, 0.94f, 0.85f, 1f));
         var titleRT = titleGO.GetComponent<RectTransform>();
-        titleRT.anchorMin = new Vector2(0.3f, 0f);
-        titleRT.anchorMax = new Vector2(0.7f, 1f);
-        titleRT.sizeDelta = Vector2.zero;
-        titleGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+        titleRT.anchorMin        = new Vector2(0f, 0f);
+        titleRT.anchorMax        = new Vector2(0.6f, 1f);
+        titleRT.offsetMin        = new Vector2(84f, 0f);
+        titleRT.offsetMax        = Vector2.zero;
+        titleGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.MidlineLeft;
 
-        // [초기화] 버튼 (우측, 완료 버튼 왼쪽)
-        _resetButton = MakeButton(headerGO.transform, "ResetBtn",
-            new Vector2(1f, 0f), new Vector2(1f, 1f),
-            new Vector2(90f, -14f), new Vector2(-106f, 0f),
-            new Color(0.45f, 0.22f, 0.18f, 0.9f), "초기화");
-        var resetRT = _resetButton.GetComponent<RectTransform>();
-        resetRT.pivot           = new Vector2(1f, 0.5f);
-        resetRT.anchoredPosition = new Vector2(-110f, 0f);
-
-        // [정제소] 버튼은 이 화면에서 뺐다 — 정제소는 자기 방(NPC)에서 들어가는 콘텐츠라
-        // 배치 화면에 입구를 하나 더 두면 두 화면의 경계가 흐려진다. OpenRefinery()는 남겨 둔다.
-
-        // [완료] 버튼 (우측 끝)
-        _confirmButton = MakeButton(headerGO.transform, "ConfirmBtn",
-            new Vector2(1f, 0f), new Vector2(1f, 1f),
-            new Vector2(96f, -14f), new Vector2(-8f, 0f),
-            new Color(0.18f, 0.45f, 0.22f, 0.95f), "완료");
-        var confirmRT = _confirmButton.GetComponent<RectTransform>();
-        confirmRT.pivot = new Vector2(1f, 0.5f);
-        confirmRT.anchorMin = new Vector2(1f, 0f);
-        confirmRT.anchorMax = new Vector2(1f, 1f);
-        confirmRT.sizeDelta = new Vector2(96f, -14f);
-        confirmRT.anchoredPosition = new Vector2(-8f, 0f);
+        // 상태 — 보관함 N/5 · 배치 M (RefreshHeaderStatus)
+        var statusGO = MakeTxt(headerGO.transform, "Status", "", 22f, new Color(0.72f, 0.76f, 0.86f, 1f));
+        var statusRT = statusGO.GetComponent<RectTransform>();
+        statusRT.anchorMin        = new Vector2(0.6f, 0f);
+        statusRT.anchorMax        = new Vector2(1f, 1f);
+        statusRT.offsetMin        = Vector2.zero;
+        statusRT.offsetMax        = new Vector2(-36f, 0f);
+        _headerStatusText = statusGO.GetComponent<TMP_Text>();
+        _headerStatusText.alignment = TextAlignmentOptions.MidlineRight;
     }
 
     // MainArea — Header 하단 ~ Footer 상단
@@ -444,7 +503,7 @@ public sealed class UI_GridPanel : UI_Base
         _mainAreaRT.anchorMin        = new Vector2(0f, 0f);
         _mainAreaRT.anchorMax        = new Vector2(1f, 1f);
         _mainAreaRT.offsetMin        = new Vector2(0f, 184f);  // 하단 보관함 바 180px(의뢰서 F4) + 여백
-        _mainAreaRT.offsetMax        = new Vector2(0f, -60f);  // header 60px
+        _mainAreaRT.offsetMax        = new Vector2(0f, -(HeaderH + 4f));  // 제목 띠 80 + 여백
 
         BuildLeftPanel(mainGO.transform);
         BuildCenterPanel(mainGO.transform);
@@ -475,6 +534,7 @@ public sealed class UI_GridPanel : UI_Base
         _synergyStatusRoot.offsetMin = _synergyStatusRoot.offsetMax = Vector2.zero;
         _synergyStatusView = synGO.AddComponent<MerlinRuneSynergyStatusView>();
         _synergyStatusView.SetSkin(_synergyBgSprite, _synergyBorderSprite);   // 시너지 바탕/테두리
+        _leftRest = _leftPanelRT.anchoredPosition;
     }
 
     // CenterPanel (20% ~ 75%)
@@ -506,17 +566,8 @@ public sealed class UI_GridPanel : UI_Base
 
         BuildBoardFrame(_hexGridRoot);
 
-        // 드래그 힌트 (아이템 미배치 시 표시, CenterPanel 직속 → 최후 렌더 보장)
-        var hintGO = MakeTxt(go.transform, "DragHint",
-            "보관함의 룬을 끌어\n판에 놓으세요", 18f,
-            new Color(0.70f, 0.76f, 0.90f, 0.80f));
-        _hexGridHintText = hintGO.GetComponent<TMP_Text>();
-        var hintRT = hintGO.GetComponent<RectTransform>();
-        hintRT.anchorMin = new Vector2(0f, 0.0f);
-        hintRT.anchorMax = new Vector2(1f, 1.0f);
-        hintRT.offsetMin = hintRT.offsetMax = Vector2.zero;
-        _hexGridHintText.alignment         = TextAlignmentOptions.Center;
-        _hexGridHintText.textWrappingMode = TextWrappingModes.Normal;
+        // (판 가운데 「보관함의 룬을 끌어 판에 놓으세요」 판은 09-27에 뺐다 — 중앙 존을 340×86으로 덮었다.
+        //  끄는 곳 안내는 보관함 머리글 아래 상시 문구가 맡는다: BuildFooter)
 
         // BoardContainer: GridManager/MerlinRuneBridge와 연동하는 영역
         var boardGO = Go("BoardContainer");
@@ -537,203 +588,198 @@ public sealed class UI_GridPanel : UI_Base
         _rightPanelRT.anchorMax = new Vector2(1.00f, 1f);
         _rightPanelRT.offsetMin = new Vector2(2f, 0f);
         _rightPanelRT.offsetMax = Vector2.zero;
+        _rightRest = _rightPanelRT.anchoredPosition;
 
+        // 바탕은 옅게 — 이 칸의 주인공은 보석 테두리 카드다(판 바탕이 비쳐야 카드가 떠 보인다).
         var rightBG = go.AddComponent<Image>();
-        rightBG.color = new Color(0.12f, 0.14f, 0.20f, 0.95f);
+        rightBG.color = new Color(0.05f, 0.06f, 0.10f, 0.45f);
         // 의뢰서 F3: 우 = 아이템 정보만. 보관함은 하단 바(F4)로 갔다.
         BuildItemInfoArea(go.transform);
     }
 
+    /// <summary>
+    /// 오른쪽 상세 — 룬 선택 카드와 같은 얼굴(09-25). ItemInfoPanel의 필드를 코드로 만들어 주입한다.
+    /// 카드 = 위 「고른 룬」 줄 아래부터 아래 안내·버튼 줄 위까지. 등급 보석 테두리·뒤집기는 ItemInfoPanel이 카드에 건다.
+    /// </summary>
     private void BuildAndInjectItemInfoPanelFields(GameObject root)
     {
         if (_itemInfoPanel == null) return;
 
         var rf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
         var type = typeof(ItemInfoPanel);
+        void Inject(string field, object value) => type.GetField(field, rf)?.SetValue(_itemInfoPanel, value);
 
-        // CanvasGroup
         var cg = root.AddComponent<CanvasGroup>();
-        type.GetField("canvasGroup", rf)?.SetValue(_itemInfoPanel, cg);
+        Inject("canvasGroup", cg);
 
-        // itemRoot: 아이템 표시 영역
-        var itemRootGO = new GameObject("ItemRoot", typeof(RectTransform));
-        itemRootGO.transform.SetParent(root.transform, false);
-        var itemRootRT = itemRootGO.GetComponent<RectTransform>();
-        itemRootRT.anchorMin = new Vector2(0f, 0.10f);
-        itemRootRT.anchorMax = new Vector2(1f, 0.92f);
-        itemRootRT.offsetMin = new Vector2(4f, 0f);
-        itemRootRT.offsetMax = new Vector2(-4f, 0f);
-        type.GetField("itemRoot", rf)?.SetValue(_itemInfoPanel, itemRootGO);
+        // 카드
+        var cardGO = Go("RuneCard");
+        cardGO.transform.SetParent(root.transform, false);
+        var cardRT = cardGO.GetComponent<RectTransform>();
+        cardRT.anchorMin = Vector2.zero;
+        cardRT.anchorMax = Vector2.one;
+        cardRT.offsetMin = new Vector2(0f, ActionAreaH);
+        cardRT.offsetMax = new Vector2(0f, -34f);
+        _cardBgImg = cardGO.AddComponent<Image>();
+        _cardBgImg.color         = new Color(0.06f, 0.07f, 0.11f, 0.96f);   // 아트 미로드 폴백(EnsureChromeSkin이 카드 바탕 아트로)
+        _cardBgImg.raycastTarget = false;
+        Inject("itemRoot", cardGO);
+        Inject("cardRoot", cardRT);
 
-        // itemIcon
-        var iconGO = new GameObject("ItemIcon", typeof(RectTransform));
-        iconGO.transform.SetParent(itemRootGO.transform, false);
-        var iconRT = iconGO.GetComponent<RectTransform>();
-        iconRT.anchorMin = new Vector2(0f, 0.62f);
-        iconRT.anchorMax = new Vector2(1f, 1f);
-        iconRT.sizeDelta = Vector2.zero;
-        var iconImg = iconGO.AddComponent<Image>();
-        iconImg.raycastTarget = false;
-        type.GetField("itemIcon", rf)?.SetValue(_itemInfoPanel, iconImg);
+        var top = new Vector2(0.5f, 1f);
+        var mid = new Vector2(0.5f, 0.5f);
 
-        // rarityBar
-        var rarityBarGO = new GameObject("RarityBar", typeof(RectTransform));
-        rarityBarGO.transform.SetParent(itemRootGO.transform, false);
-        var rarityBarRT = rarityBarGO.GetComponent<RectTransform>();
-        rarityBarRT.anchorMin = new Vector2(0f, 1f);
-        rarityBarRT.anchorMax = new Vector2(1f, 1f);
-        rarityBarRT.sizeDelta = new Vector2(0f, 4f);
-        rarityBarRT.anchoredPosition = Vector2.zero;
-        var rarityBarImg = rarityBarGO.AddComponent<Image>();
-        rarityBarImg.raycastTarget = false;
-        type.GetField("rarityBar", rf)?.SetValue(_itemInfoPanel, rarityBarImg);
+        // 등급빛 + 문양 — 카드 위쪽 칸의 주인공
+        var glow = ShopUIStyle.MakeImage(cardRT, "IconGlow", Color.clear);
+        ShopUIStyle.Anchor(glow.rectTransform, top, top, mid, new Vector2(0f, -122f), new Vector2(280f, 280f));
+        Inject("iconGlow", glow);
 
-        // itemName
-        var nameTxtGO = MakeTxt(itemRootGO.transform, "ItemName", "", 20f,
-            new Color(0.95f, 0.97f, 1f, 1f), bold: true);
-        var nameRT = nameTxtGO.GetComponent<RectTransform>();
-        nameRT.anchorMin = new Vector2(0f, 0.48f);
-        nameRT.anchorMax = new Vector2(1f, 0.62f);
-        nameRT.offsetMin = nameRT.offsetMax = Vector2.zero;
-        var nameTxt = nameTxtGO.GetComponent<TMP_Text>();
-        nameTxt.textWrappingMode = TextWrappingModes.NoWrap;
-        nameTxt.alignment = TextAlignmentOptions.MidlineLeft;
-        type.GetField("itemName", rf)?.SetValue(_itemInfoPanel, nameTxt);
+        var icon = ShopUIStyle.MakeImage(cardRT, "ItemIcon", Color.white);
+        icon.preserveAspect = true;
+        ShopUIStyle.Anchor(icon.rectTransform, top, top, mid, new Vector2(0f, -122f), new Vector2(168f, 168f));
+        Inject("itemIcon", icon);
 
-        // rarityText
-        var rarityTxtGO = MakeTxt(itemRootGO.transform, "RarityText", "", 16f,
-            new Color(0.78f, 0.78f, 0.88f, 1f));
-        var rarityTxtRT = rarityTxtGO.GetComponent<RectTransform>();
-        rarityTxtRT.anchorMin = new Vector2(0f, 0.38f);
-        rarityTxtRT.anchorMax = new Vector2(1f, 0.48f);
-        rarityTxtRT.offsetMin = rarityTxtRT.offsetMax = Vector2.zero;
-        type.GetField("rarityText", rf)?.SetValue(_itemInfoPanel, rarityTxtGO.GetComponent<TMP_Text>());
+        // 이름 30
+        var nameGO = MakeTxt(cardRT, "ItemName", "", 30f, new Color(0.97f, 0.95f, 0.88f, 1f), bold: true);
+        var nameRT = nameGO.GetComponent<RectTransform>();
+        nameRT.anchorMin        = new Vector2(0f, 1f);
+        nameRT.anchorMax        = new Vector2(1f, 1f);
+        nameRT.pivot            = new Vector2(0.5f, 1f);
+        nameRT.sizeDelta        = new Vector2(-40f, 42f);
+        nameRT.anchoredPosition = new Vector2(0f, -224f);
+        var nameTxt = nameGO.GetComponent<TMP_Text>();
+        nameTxt.alignment    = TextAlignmentOptions.Center;
+        nameTxt.overflowMode = TextOverflowModes.Ellipsis;
+        Inject("itemName", nameTxt);
 
-        // effectListRoot
-        var effectListGO = new GameObject("EffectList", typeof(RectTransform));
-        effectListGO.transform.SetParent(itemRootGO.transform, false);
-        var effectListRT = effectListGO.GetComponent<RectTransform>();
-        effectListRT.anchorMin = new Vector2(0f, 0f);
-        effectListRT.anchorMax = new Vector2(1f, 0.36f);
-        effectListRT.offsetMin = effectListRT.offsetMax = Vector2.zero;
-        var vlgEffect = effectListGO.AddComponent<VerticalLayoutGroup>();
-        vlgEffect.childAlignment       = TextAnchor.UpperLeft;
-        vlgEffect.spacing              = 2f;
-        vlgEffect.childControlWidth    = true;
-        vlgEffect.childControlHeight   = false;
-        vlgEffect.childForceExpandWidth  = true;
-        vlgEffect.childForceExpandHeight = false;
-        type.GetField("effectListRoot", rf)?.SetValue(_itemInfoPanel, effectListGO.transform);
+        // 등급·칸 수 / 속성 칩 줄
+        var chipGO = Go("ChipRow");
+        chipGO.transform.SetParent(cardRT, false);
+        var chipRT = chipGO.GetComponent<RectTransform>();
+        ShopUIStyle.Anchor(chipRT, new Vector2(0f, 1f), new Vector2(1f, 1f), mid, new Vector2(0f, -290f), new Vector2(0f, 30f));
+        Inject("chipRow", chipRT);
 
-        // shapePreviewRoot
-        var shapePreviewGO = new GameObject("ShapePreview", typeof(RectTransform));
-        shapePreviewGO.transform.SetParent(itemRootGO.transform, false);
-        var shapePreviewRT = shapePreviewGO.GetComponent<RectTransform>();
-        // 룬은 ItemSO 아이콘이 없어 위 칸(itemIcon)이 비어 있다 — 모양 미리보기를 그 자리 가운데에 크게 둔다(실측 09-09: 우측 구석 22px 타일).
-        shapePreviewRT.anchorMin = new Vector2(0.2f, 0.62f);
-        shapePreviewRT.anchorMax = new Vector2(0.8f, 1.00f);
-        shapePreviewRT.offsetMin = shapePreviewRT.offsetMax = Vector2.zero;
-        type.GetField("shapePreviewRoot", rf)?.SetValue(_itemInfoPanel, shapePreviewRT);
+        // 효과 — 전부, 줄바꿈 허용(행이 자기 높이로 선다)
+        var fxGO = Go("EffectList");
+        fxGO.transform.SetParent(cardRT, false);
+        var fxRT = fxGO.GetComponent<RectTransform>();
+        fxRT.anchorMin = Vector2.zero;
+        fxRT.anchorMax = Vector2.one;
+        fxRT.offsetMin = new Vector2(28f, 146f);
+        fxRT.offsetMax = new Vector2(-24f, -318f);
+        var vlg = fxGO.AddComponent<VerticalLayoutGroup>();
+        vlg.childAlignment         = TextAnchor.UpperLeft;
+        vlg.spacing                = 6f;
+        vlg.childControlWidth      = true;
+        vlg.childControlHeight     = true;
+        vlg.childForceExpandWidth  = true;
+        vlg.childForceExpandHeight = false;
+        Inject("effectListRoot", fxRT);
 
-        // emptyRoot + emptyText
-        var emptyRootGO = new GameObject("EmptyRoot", typeof(RectTransform));
+        // 모양(왼쪽 아래) + 놓을 자리(오른쪽 아래) — 모양이 "놓을 수 있는가"의 근거라 같은 줄에 둔다
+        var shapeGO = Go("ShapePreview");
+        shapeGO.transform.SetParent(cardRT, false);
+        var shapeRT = shapeGO.GetComponent<RectTransform>();
+        ShopUIStyle.Anchor(shapeRT, Vector2.zero, Vector2.zero, Vector2.zero, new Vector2(24f, 24f), new Vector2(170f, 110f));
+        Inject("shapePreviewRoot", shapeRT);
+
+        var fitFill = ShopUIStyle.MakeFrame(cardRT, "FitBadge", Color.clear, Color.clear, 1.5f);
+        var fitRT = (RectTransform)fitFill.transform.parent;
+        ShopUIStyle.Anchor(fitRT, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-24f, 40f), new Vector2(190f, 34f));
+        var fitLbl = ShopUIStyle.MakeText(fitFill.transform, "Label", 17f, FontStyles.Bold, TextAlignmentOptions.Center, Color.white);
+        fitLbl.enableAutoSizing = false;
+        ShopUIStyle.Stretch(fitLbl.rectTransform);
+        Inject("fitBorder", fitRT.GetComponent<Image>());
+        Inject("fitFill", fitFill);
+        Inject("fitLabel", fitLbl);
+
+        // NEW — 카드 위 끝에 걸터앉는 금빛 칩(16px). 예전 10px 빨강 글자는 읽히지 않았다.
+        var newGO = Go("NewBadge");
+        newGO.transform.SetParent(cardRT, false);
+        var newRT = newGO.GetComponent<RectTransform>();
+        ShopUIStyle.Anchor(newRT, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(22f, -2f), new Vector2(60f, 26f));
+        var newBG = newGO.AddComponent<Image>();
+        newBG.color         = new Color(0.88f, 0.71f, 0.25f, 1f);
+        newBG.raycastTarget = false;
+        var newLblGO = MakeTxt(newRT, "Label", "NEW", 16f, new Color(0.10f, 0.07f, 0.02f, 1f), bold: true);
+        var newLblRT = newLblGO.GetComponent<RectTransform>();
+        newLblRT.anchorMin = Vector2.zero;
+        newLblRT.anchorMax = Vector2.one;
+        newLblRT.offsetMin = newLblRT.offsetMax = Vector2.zero;
+        newLblGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+        Inject("newBadge", newGO);
+
+        // 빈 상태
+        var emptyRootGO = Go("EmptyRoot");
         emptyRootGO.transform.SetParent(root.transform, false);
         var emptyRootRT = emptyRootGO.GetComponent<RectTransform>();
         emptyRootRT.anchorMin = Vector2.zero;
         emptyRootRT.anchorMax = Vector2.one;
-        emptyRootRT.offsetMin = emptyRootRT.offsetMax = Vector2.zero;
-        type.GetField("emptyRoot", rf)?.SetValue(_itemInfoPanel, emptyRootGO);
+        emptyRootRT.offsetMin = new Vector2(0f, ActionAreaH);
+        emptyRootRT.offsetMax = new Vector2(0f, -34f);
+        Inject("emptyRoot", emptyRootGO);
 
-        var emptyTxtGO = MakeTxt(emptyRootGO.transform, "EmptyText", "아이템을 선택하세요", 16f,
-            new Color(0.45f, 0.48f, 0.58f, 0.8f));
+        var emptyTxtGO = MakeTxt(emptyRootGO.transform, "EmptyText", "보관함에서 룬을 고르면\n여기에 자세히 나옵니다", 18f,
+            new Color(0.64f, 0.69f, 0.82f, 0.9f));
         var emptyTxtRT = emptyTxtGO.GetComponent<RectTransform>();
         emptyTxtRT.anchorMin = Vector2.zero;
         emptyTxtRT.anchorMax = Vector2.one;
         emptyTxtRT.offsetMin = emptyTxtRT.offsetMax = Vector2.zero;
-        emptyTxtGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
-        type.GetField("emptyText", rf)?.SetValue(_itemInfoPanel, emptyTxtGO.GetComponent<TMP_Text>());
+        var emptyTxt = emptyTxtGO.GetComponent<TMP_Text>();
+        emptyTxt.alignment        = TextAlignmentOptions.Center;
+        emptyTxt.textWrappingMode = TextWrappingModes.Normal;
+        Inject("emptyText", emptyTxt);
 
-        // newBadge
-        var newBadgeGO = new GameObject("NewBadge", typeof(RectTransform));
-        newBadgeGO.transform.SetParent(itemRootGO.transform, false);
-        var newBadgeRT = newBadgeGO.GetComponent<RectTransform>();
-        newBadgeRT.anchorMin        = new Vector2(0f, 1f);
-        newBadgeRT.anchorMax        = new Vector2(0f, 1f);
-        newBadgeRT.pivot            = new Vector2(0f, 1f);
-        newBadgeRT.sizeDelta        = new Vector2(36f, 16f);
-        newBadgeRT.anchoredPosition = new Vector2(2f, -2f);
-        var newBadgeBG = newBadgeGO.AddComponent<Image>();
-        newBadgeBG.color = new Color(1f, 0.3f, 0.3f, 0.95f);
-        var newBadgeTxtGO = MakeTxt(newBadgeGO.transform, "Label", "NEW", 10f, Color.white, bold: true);
-        var newBadgeTxtRT = newBadgeTxtGO.GetComponent<RectTransform>();
-        newBadgeTxtRT.anchorMin = Vector2.zero;
-        newBadgeTxtRT.anchorMax = Vector2.one;
-        newBadgeTxtRT.sizeDelta = Vector2.zero;
-        newBadgeTxtGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
-        type.GetField("newBadge", rf)?.SetValue(_itemInfoPanel, newBadgeGO);
-    
         // AddComponent 직후 Awake의 ShowEmpty는 필드 주입 전이라 아무것도 못 숨긴다 — 주입이 끝난 지금 빈 상태로 맞춘다.
         // 안 그러면 OpenPanel을 거치지 않고 켜졌을 때 스프라이트 없는 아이콘이 흰 사각형으로, NEW 배지가 켜진 채 남는다.
         _itemInfoPanel.ShowEmpty();
-}
+    }
 
     private void BuildItemInfoArea(Transform parent)
     {
         var infoRootGO = Go("ItemInfoRoot");
         infoRootGO.transform.SetParent(parent, false);
         _itemInfoRoot = infoRootGO.GetComponent<RectTransform>();
-        _itemInfoRoot.anchorMin = new Vector2(0f, 0f);
-        _itemInfoRoot.anchorMax = new Vector2(1f, 1f);
-        _itemInfoRoot.offsetMin = new Vector2(4f, 4f);
-        _itemInfoRoot.offsetMax = new Vector2(-4f, -4f);
+        _itemInfoRoot.anchorMin = Vector2.zero;
+        _itemInfoRoot.anchorMax = Vector2.one;
+        _itemInfoRoot.offsetMin = new Vector2(18f, 10f);
+        _itemInfoRoot.offsetMax = new Vector2(-18f, -8f);
 
-        var infoBG = infoRootGO.AddComponent<Image>();
-        infoBG.color = new Color(0.11f, 0.13f, 0.19f, 0.90f);
-
-        // "선택:" 레이블
-        var selLbl = MakeTxt(infoRootGO.transform, "SelectLabel", "선택:", 16f,
-            new Color(0.55f, 0.60f, 0.75f, 1f));
+        var selLbl = MakeTxt(infoRootGO.transform, "SelectLabel", "고른 룬", 17f,
+            new Color(0.72f, 0.77f, 0.88f, 1f), bold: true);
         var selRT = selLbl.GetComponent<RectTransform>();
-        selRT.anchorMin = new Vector2(0f, 1f);
-        selRT.anchorMax = new Vector2(1f, 1f);
-        selRT.sizeDelta = new Vector2(0f, 24f);
-        selRT.anchoredPosition = new Vector2(0f, -12f);
+        selRT.anchorMin        = new Vector2(0f, 1f);
+        selRT.anchorMax        = new Vector2(1f, 1f);
+        selRT.pivot            = new Vector2(0f, 1f);
+        selRT.sizeDelta        = new Vector2(0f, 24f);
+        selRT.anchoredPosition = new Vector2(4f, 0f);
 
         // ItemInfoPanel 컴포넌트 추가 (필수 SerializeField를 코드로 초기화)
         _itemInfoPanel = infoRootGO.AddComponent<ItemInfoPanel>();
         BuildAndInjectItemInfoPanelFields(infoRootGO);
 
-        // [배치하기] 버튼 (하단)
-        var placeGO = new GameObject("PlaceBtn", typeof(RectTransform));
-        placeGO.transform.SetParent(infoRootGO.transform, false);
-        var placeRT = placeGO.GetComponent<RectTransform>();
-        placeRT.anchorMin        = new Vector2(0.05f, 0f);
-        placeRT.anchorMax        = new Vector2(0.95f, 0f);
-        placeRT.pivot            = new Vector2(0.5f, 0f);
-        placeRT.sizeDelta        = new Vector2(0f, 46f);
-        placeRT.anchoredPosition = new Vector2(0f, 6f);
+        // 안내 두 줄 — 예전 「가짜 버튼」 자리. 배치는 드래그·칸 누르기로만 일어나므로 버튼이 아니라 문장이다.
+        var hintGO = MakeTxt(infoRootGO.transform, "PlaceHint",
+            "카드를 끌어 놓거나, 골라서 칸을 누른다\n놓인 룬은 판 밖으로 끌면 보관함으로", 17f,
+            new Color(0.74f, 0.79f, 0.90f, 0.95f));
+        var hintRT = hintGO.GetComponent<RectTransform>();
+        hintRT.anchorMin        = new Vector2(0f, 0f);
+        hintRT.anchorMax        = new Vector2(1f, 0f);
+        hintRT.pivot            = new Vector2(0.5f, 0f);
+        hintRT.sizeDelta        = new Vector2(0f, 48f);
+        hintRT.anchoredPosition = new Vector2(0f, 80f);
+        var hintTxt = hintGO.GetComponent<TMP_Text>();
+        hintTxt.alignment        = TextAlignmentOptions.Center;
+        hintTxt.textWrappingMode = TextWrappingModes.Normal;
 
-        _placeBG      = placeGO.AddComponent<Image>();
-        _placeBG.color = new Color(0.20f, 0.28f, 0.40f, 0.65f);
-        _placeButton  = placeGO.AddComponent<Button>();
-        _placeButton.targetGraphic = _placeBG;
-
-        // 라벨은 <b>행동 유도문</b>이다 — "끌어서 배치"는 명령형 두 단어라 주 액션 버튼으로 읽혔고,
-        // 실제 배치는 드래그로만 일어나므로 눌러도 아무 일이 없는 죽은 버튼처럼 보였다(P0-3).
-        var placeTxtGO = MakeTxt(placeGO.transform, "PlaceLabel", "보관함 룬을 격자로 끌어다 놓으세요", 16f,
-            new Color(0.78f, 0.85f, 0.95f, 0.95f));
-        var placeTxtRT = placeTxtGO.GetComponent<RectTransform>();
-        placeTxtRT.anchorMin = Vector2.zero;
-        placeTxtRT.anchorMax = Vector2.one;
-        placeTxtRT.sizeDelta = Vector2.zero;
-        _placeLabel = placeTxtGO.GetComponent<TMP_Text>();
-        _placeLabel.alignment = TextAlignmentOptions.Center;
+        // [초기화](보조 — 넘기기 아트) · [완료](주 — 선택 아트). 아트는 열 때 입힌다(EnsureChromeSkin).
+        _resetButton   = MakeActionButton(infoRootGO.transform, "ResetBtn",   "초기화", 0f,    0.36f, primary: false, out _resetBtnImg);
+        _confirmButton = MakeActionButton(infoRootGO.transform, "ConfirmBtn", "완료",   0.39f, 1f,    primary: true,  out _confirmBtnImg);
     }
 
-    // Footer (50px 고정, 하단)
+    // Footer (180px, 하단) — 보관함 바. 카드 272폭 5칸(09-25: 220 → 272, 바 오른쪽 빈 공간을 글자에 준다).
     private void BuildFooter()
     {
-        // 의뢰서 F4: 하단 보관함 5칸 고정. 슬롯 220×144 × 5 + 간격 → 1160×164, 가운데 정렬.
         var footerGO = Go("Footer");
         footerGO.transform.SetParent(transform, false);
         _footerRT = footerGO.GetComponent<RectTransform>();
@@ -742,25 +788,49 @@ public sealed class UI_GridPanel : UI_Base
         _footerRT.sizeDelta        = new Vector2(0f, 180f);
         _footerRT.anchoredPosition = new Vector2(0f, 90f);
         var footerBG = footerGO.AddComponent<Image>();
-        footerBG.color = new Color(0.10f, 0.12f, 0.16f, 0.98f);
+        footerBG.color = new Color(0.06f, 0.08f, 0.13f, 0.98f);
 
-        var lblGO = MakeTxt(footerGO.transform, "StagingLabel", "보관함", 16f,
-            new Color(0.82f, 0.87f, 1f, 1f), bold: true);
+        // 위 끝 금빛 머리선 — 판과 보관함의 경계
+        var line = ShopUIStyle.MakeImage(footerGO.transform, "TopLine", new Color(0.91f, 0.73f, 0.33f, 0.45f));
+        ShopUIStyle.Anchor(line.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(0f, 1.5f));
+
+        var lblGO = MakeTxt(footerGO.transform, "StagingLabel", "보관함", 24f,
+            new Color(0.95f, 0.92f, 0.84f, 1f), bold: true);
         var lblRT = lblGO.GetComponent<RectTransform>();
         lblRT.anchorMin = new Vector2(0f, 1f);
         lblRT.anchorMax = new Vector2(0f, 1f);
         lblRT.pivot     = new Vector2(0f, 1f);
-        lblRT.anchoredPosition = new Vector2(16f, -6f);
-        lblRT.sizeDelta = new Vector2(200f, 22f);
+        lblRT.anchoredPosition = new Vector2(34f, -20f);
+        lblRT.sizeDelta = new Vector2(200f, 32f);
 
-        // StagingAreaView는 콘텐츠 좌상단 기준으로 슬롯을 놓는다 — 바 가운데에 1160 폭 콘텐츠를 세운다.
+        var cntGO = MakeTxt(footerGO.transform, "StagingCount", "", 20f, new Color(0.80f, 0.84f, 0.94f, 1f));
+        var cntRT = cntGO.GetComponent<RectTransform>();
+        cntRT.anchorMin = new Vector2(0f, 1f);
+        cntRT.anchorMax = new Vector2(0f, 1f);
+        cntRT.pivot     = new Vector2(0f, 1f);
+        cntRT.anchoredPosition = new Vector2(34f, -56f);
+        cntRT.sizeDelta = new Vector2(200f, 28f);
+        _stagingCountText = cntGO.GetComponent<TMP_Text>();
+
+        // 끄는 곳 — 보관함 카드가 손잡이다(09-27 사용자 「룬을 드래그하는 곳이 어디인지 표기」). 늘 떠 있다.
+        var dragGO = MakeTxt(footerGO.transform, "DragHint", "▲ 카드를 끌어\n판에 놓기", 18f,
+            new Color(0.93f, 0.80f, 0.48f, 1f));
+        var dragRT = dragGO.GetComponent<RectTransform>();
+        dragRT.anchorMin = dragRT.anchorMax = dragRT.pivot = new Vector2(0f, 1f);
+        dragRT.anchoredPosition = new Vector2(34f, -96f);
+        dragRT.sizeDelta        = new Vector2(230f, 56f);
+        TMPOutlineHelper.ApplySoftShadow(dragGO.GetComponent<TMP_Text>());
+
+        // StagingAreaView는 콘텐츠 좌상단 기준으로 슬롯을 놓는다 — 바 가운데보다 60 오른쪽(왼쪽 라벨 자리)에 세운다.
+        float barW = StagingAreaView.SLOT_SPACING
+                   + RunItemInventory.MaxStagingCapacity * (StagingAreaView.SLOT_WIDTH + StagingAreaView.SLOT_SPACING);
         var contentGO = Go("StagingBar");
         contentGO.transform.SetParent(footerGO.transform, false);
         var contentRT = contentGO.GetComponent<RectTransform>();
         contentRT.anchorMin        = new Vector2(0.5f, 1f);
         contentRT.anchorMax        = new Vector2(0.5f, 1f);
         contentRT.pivot            = new Vector2(0f, 1f);
-        contentRT.anchoredPosition = new Vector2(-580f, -8f);
+        contentRT.anchoredPosition = new Vector2(-barW * 0.5f + 60f, -8f);
         _stagingArea = footerGO.AddComponent<StagingAreaView>();
         _stagingArea.SetSlotSkin(_stagingBgSprite, _stagingBorderSprite);   // 슬롯 빌드 전에 주입
         _stagingArea.SetColumns(RunItemInventory.MaxStagingCapacity);        // 5열 1행
@@ -773,9 +843,9 @@ public sealed class UI_GridPanel : UI_Base
         var centerGO = MakeTxt(footerGO.transform, "CenterBonus", "", 11f, Color.white);
         _footerCenterText = centerGO.GetComponent<TMP_Text>();
         centerGO.SetActive(false);
-        var cntGO = MakeTxt(footerGO.transform, "CellCount", "", 12f, Color.white);
-        _footerCellCountText = cntGO.GetComponent<TMP_Text>();
-        cntGO.SetActive(false);
+        var cntHiddenGO = MakeTxt(footerGO.transform, "CellCount", "", 12f, Color.white);
+        _footerCellCountText = cntHiddenGO.GetComponent<TMP_Text>();
+        cntHiddenGO.SetActive(false);
     }
 
     // ── Confirm Dialog ──
@@ -800,30 +870,31 @@ public sealed class UI_GridPanel : UI_Base
         panelRT.anchorMin        = new Vector2(0.5f, 0.5f);
         panelRT.anchorMax        = new Vector2(0.5f, 0.5f);
         panelRT.pivot            = new Vector2(0.5f, 0.5f);
-        panelRT.sizeDelta        = new Vector2(340f, 130f);
+        panelRT.sizeDelta        = new Vector2(460f, 210f);   // 18px 네 줄 + 버튼(13px로 끼워 넣던 340×130)
         panelRT.anchoredPosition = Vector2.zero;
         panelGO.AddComponent<Image>().color = new Color(0.10f, 0.11f, 0.17f, 0.98f);
 
         var textGO = MakeTxt(panelGO.transform, "Text",
-            "보관함 아이템이 남아 있습니다.", 13f, new Color(0.9f, 0.92f, 1f, 1f));
+            "보관함 아이템이 남아 있습니다.", 18f, new Color(0.9f, 0.92f, 1f, 1f));
         var textRT = textGO.GetComponent<RectTransform>();
-        textRT.anchorMin = new Vector2(0f, 0.42f);
+        textRT.anchorMin = new Vector2(0f, 0.36f);
         textRT.anchorMax = new Vector2(1f, 1f);
-        textRT.sizeDelta = Vector2.zero;
+        textRT.offsetMin = new Vector2(18f, 0f);
+        textRT.offsetMax = new Vector2(-18f, -10f);
         _confirmDialogText = textGO.GetComponent<TMP_Text>();
         _confirmDialogText.alignment     = TextAlignmentOptions.Center;
         _confirmDialogText.textWrappingMode = TextWrappingModes.Normal;
 
         // [계속 배치] 버튼
         _confirmDialogKeepBtn = MakeButton(panelGO.transform, "KeepBtn",
-            new Vector2(0.08f, 0f), new Vector2(0.45f, 0.38f),
-            Vector2.zero, new Vector2(0f, 4f),
+            new Vector2(0.08f, 0.08f), new Vector2(0.45f, 0.30f),
+            Vector2.zero, Vector2.zero,
             new Color(0.25f, 0.27f, 0.35f, 1f), "계속 배치");
 
         // [폐기 후 종료] 버튼
         _confirmDialogDiscardBtn = MakeButton(panelGO.transform, "DiscardBtn",
-            new Vector2(0.55f, 0f), new Vector2(0.92f, 0.38f),
-            Vector2.zero, new Vector2(0f, 4f),
+            new Vector2(0.55f, 0.08f), new Vector2(0.92f, 0.30f),
+            Vector2.zero, Vector2.zero,
             new Color(0.72f, 0.18f, 0.18f, 1f), "폐기 후 종료");
 
         _confirmDialog.SetActive(false);
@@ -831,7 +902,9 @@ public sealed class UI_GridPanel : UI_Base
 
     private void ShowConfirmDialog()
     {
-        if (_confirmDialog != null) _confirmDialog.SetActive(true);
+        if (_confirmDialog == null) return;
+        _confirmDialog.transform.SetAsLastSibling();   // 판에 놓인 룬(Puzzle, 루트 직속)보다 위 — 어두운 막 위로 룬이 비쳤다
+        _confirmDialog.SetActive(true);
     }
 
     private void HideConfirmDialog()
@@ -847,15 +920,15 @@ public sealed class UI_GridPanel : UI_Base
         _synergyToast.transform.SetParent(transform, false);
 
         var rt = _synergyToast.GetComponent<RectTransform>();
-        rt.anchorMin        = new Vector2(0.21f, 0.87f);
-        rt.anchorMax        = new Vector2(0.74f, 0.95f);
+        rt.anchorMin        = new Vector2(0.24f, 0.80f);   // 제목 띠(위 80px)를 덮지 않게 그 아래 판 위쪽에
+        rt.anchorMax        = new Vector2(0.73f, 0.86f);
         rt.offsetMin        = Vector2.zero;
         rt.offsetMax        = Vector2.zero;
 
         _synergyToast.AddComponent<Image>().color = new Color(0.04f, 0.14f, 0.08f, 0.93f);
 
         var textGO = MakeTxt(_synergyToast.transform, "Text",
-            "", 14f, new Color(0.3f, 1f, 0.55f, 1f));
+            "", 18f, new Color(0.3f, 1f, 0.55f, 1f));
         var textRT = textGO.GetComponent<RectTransform>();
         textRT.anchorMin = Vector2.zero;
         textRT.anchorMax = Vector2.one;
@@ -878,13 +951,22 @@ public sealed class UI_GridPanel : UI_Base
         _hexGridView?.PlayZoneSynergyBurst(zoneId);
     }
 
-    /// <summary>짧은 안내 문구(배치 실패 사유 등). 시너지 토스트와 같은 자리를 쓴다.</summary>
-    private void ShowToast(string message) => ShowSynergyToastAsync(message, prefix: false).Forget();
+    /// <summary>짧은 안내 문구(배치 실패 사유 등). 시너지 토스트와 같은 자리를 쓴다. <paramref name="warn"/>면 붉은 띠.</summary>
+    private void ShowToast(string message, bool warn = false) => ShowSynergyToastAsync(message, prefix: false, warn).Forget();
 
     private UniTaskVoid ShowSynergyToastAsync(string description) => ShowSynergyToastAsync(description, prefix: true);
 
-    private async UniTaskVoid ShowSynergyToastAsync(string description, bool prefix)
+    // 알림 띠 색 — 시너지·완료는 초록, 거절·실패는 붉은색(09-27: 거절도 초록이라 성공처럼 읽혔다).
+    private static readonly Color ToastOkPlate   = new(0.04f, 0.14f, 0.08f, 0.93f);
+    private static readonly Color ToastOkInk     = new(0.30f, 1.00f, 0.55f, 1f);
+    private static readonly Color ToastWarnPlate = new(0.20f, 0.05f, 0.05f, 0.93f);
+    private static readonly Color ToastWarnInk   = new(1.00f, 0.66f, 0.58f, 1f);
+
+    private async UniTaskVoid ShowSynergyToastAsync(string description, bool prefix, bool warn = false)
     {
+        if (_synergyToast != null && _synergyToast.TryGetComponent<Image>(out var plate))
+            plate.color = warn ? ToastWarnPlate : ToastOkPlate;
+        if (_synergyToastText != null) _synergyToastText.color = warn ? ToastWarnInk : ToastOkInk;
         _toastCts?.Cancel();
         _toastCts?.Dispose();
         _toastCts = new CancellationTokenSource();
@@ -893,7 +975,10 @@ public sealed class UI_GridPanel : UI_Base
         if (_synergyToastText != null)
             _synergyToastText.text = prefix ? $"◆ 시너지 활성화!  {description}" : description;
         if (_synergyToast != null)
+        {
+            _synergyToast.transform.SetAsLastSibling();   // 판에 놓인 룬 밑에 깔리지 않게
             _synergyToast.SetActive(true);
+        }
 
         try
         {
@@ -934,7 +1019,7 @@ public sealed class UI_GridPanel : UI_Base
         _stagingArea?.Refresh(_inventory);
         RefreshInfoPanelDefault();
         RefreshFooter();
-        UpdatePlaceButtonState(_inventory?.StagingCount > 0);
+        RefreshHeaderStatus();
     }
 
     /// <summary>
@@ -962,6 +1047,7 @@ public sealed class UI_GridPanel : UI_Base
     {
         RefreshSynergyStatus();
         RefreshFooter();
+        RefreshHeaderStatus();
     }
 
     // ── GridManager Event Bridge ──
@@ -972,7 +1058,6 @@ public sealed class UI_GridPanel : UI_Base
         _inventory?.PlaceItem(item);
         _itemInfoPanel?.ShowItem(item, isNew: false);
         _totalPlacedCells += GetItemCellCount(item);
-        UpdateHexGridHint();
 
         // 룬을 놓았으면 속성 매칭 강조는 역할을 다했으므로 해제한다.
         _hexGridView?.SetPlacementElementHint(null);
@@ -1002,6 +1087,9 @@ public sealed class UI_GridPanel : UI_Base
                 _hexGridView.RefreshOccupiedCells();
             }
 
+            // 어느 칸이 어느 룬의 것인지 알려야 <b>조각 단위 외곽선</b>이 그려진다.
+            // 안 넘기면 칸마다 테두리가 따로 떠서 같은 모양 조각이 붙었을 때 구분이 안 된다.
+            _hexGridView.SetPieceGroups(_placedItemPositions);
             _hexGridView.UpdateAdjacencyConstraints();
         }
 
@@ -1016,7 +1104,6 @@ public sealed class UI_GridPanel : UI_Base
         Debug.Log($"[GridChk] 해제 수신: {item?.instanceId} (frame {Time.frameCount})");
         _inventory?.UnplaceItem(item);
         _totalPlacedCells = Mathf.Max(0, _totalPlacedCells - GetItemCellCount(item));
-        UpdateHexGridHint();
 
         if (_hexGridView != null)
         {
@@ -1030,6 +1117,7 @@ public sealed class UI_GridPanel : UI_Base
             {
                 _hexGridView.RefreshOccupiedCells();
             }
+            _hexGridView.SetPieceGroups(_placedItemPositions);
             _hexGridView.UpdateAdjacencyConstraints();
         }
 
@@ -1072,10 +1160,10 @@ public sealed class UI_GridPanel : UI_Base
         }
 
         var item = PlacementTarget;
-        if (item == null) { ShowToast("보관함에서 룬을 먼저 고르세요"); return; }
+        if (item == null) { ShowToast("보관함에서 룬을 먼저 고르세요", warn: true); return; }
 
         var shape = _stagingArea?.GetShapeForItem(item);
-        if (shape == null) { ShowToast("이 룬의 모양 정보를 찾지 못했습니다"); return; }
+        if (shape == null) { ShowToast("이 룬의 모양 정보를 찾지 못했습니다", warn: true); return; }
 
         // 판 좌표계로 먼저 옮긴다. 주차 구역(shapeHost)은 스케일이 다르고 마스크에 잘려 있어,
         // 거기 둔 채로 위치를 계산하면 블록이 칸과 어긋난다. 블록은 그리드 gap 크기로 만들어져
@@ -1094,7 +1182,7 @@ public sealed class UI_GridPanel : UI_Base
             if (TryOfferSalvagePlacement(shape)) return;
 
             BoardManager.Instance?.ReSlotAndReturn(shape);   // 주차 구역으로 되돌린다
-            ShowToast("여기엔 놓을 수 없습니다");
+            ShowToast("여기엔 놓을 수 없습니다", warn: true);
             return;
         }
 
@@ -1185,7 +1273,7 @@ public sealed class UI_GridPanel : UI_Base
         {
             // 비웠는데도 못 놓는 경우(예상 밖) — 룬만 잃지 않도록 되돌린다.
             BoardManager.Instance?.ReSlotAndReturn(shape);
-            ShowToast("배치에 실패했습니다");
+            ShowToast("배치에 실패했습니다", warn: true);
         }
     }
 
@@ -1229,22 +1317,30 @@ public sealed class UI_GridPanel : UI_Base
     {
         _stagingArea?.HighlightItem(item);
         _itemInfoPanel?.ShowItem(item, isNew: false);
-        UpdatePlaceButtonState(item != null);
 
         // 고른 룬의 속성 존을 판에서 강조한다. 이게 없으면 판이 전 칸 균일하게 밝아
         // "어디에 놓을 수 있는지"가 화면에 전혀 안 나온다(빈 판은 모든 칸이 배치 가능이라 대비가 0).
-        _hexGridView?.SetPlacementElementHint(item?.element);
+        _hexGridView?.SetPlacementElementHint(item?.element, RuneZoneRule.NoCenter(item));
     }
 
     private void OnStagingItemHovered(RuntimeItemData item)
     {
         _itemInfoPanel?.ShowItem(item, isNew: false);
-        if (item != null) _hexGridView?.SetPlacementElementHint(item.element);
+        if (item != null) _hexGridView?.SetPlacementElementHint(item.element, RuneZoneRule.NoCenter(item));
     }
 
     private void OnStagingItemUnhovered()
     {
-        RefreshInfoPanelDefault();
+        // 지금 <b>고른 룬</b>으로 되돌린다. 예전엔 보관함 첫 룬으로 되돌려(RefreshInfoPanelDefault) 3번 카드를 고르고
+        // 판으로 손을 옮기면 판 강조·클릭 배치 대상이 1번으로 바뀌었다(09-27).
+        var sel = _stagingArea?.HighlightedItem;
+        bool inStorage = false;
+        if (sel != null && _inventory != null)
+            for (int i = 0; i < _inventory.StagingCount; i++)
+                if (_inventory.StagingItems[i] == sel) { inStorage = true; break; }
+
+        if (inStorage) _itemInfoPanel?.ShowItem(sel, isNew: false);
+        else           RefreshInfoPanelDefault();
         RefreshPlacementHint();   // 호버 해제 → 지금 고른 룬 기준으로 되돌린다
     }
 
@@ -1264,7 +1360,7 @@ public sealed class UI_GridPanel : UI_Base
                   ?? _stagingArea?.HighlightedItem
                   ?? (_inventory != null && _inventory.StagingCount > 0 ? _inventory.StagingItems[0] : null);
 
-        _hexGridView.SetPlacementElementHint(target?.element);
+        _hexGridView.SetPlacementElementHint(target?.element, RuneZoneRule.NoCenter(target));
     }
 
     // ── Info Panel Default ──
@@ -1284,7 +1380,6 @@ public sealed class UI_GridPanel : UI_Base
             _itemInfoPanel.ShowEmpty();
             _stagingArea?.HighlightItem(null);
         }
-        UpdatePlaceButtonState(hasItems);
     }
 
     // ── Synergy Status Refresh ──
@@ -1293,6 +1388,7 @@ public sealed class UI_GridPanel : UI_Base
     {
         // 항상 최신 점유 상태에서 cluster를 계산한 뒤 갱신 (패널 재오픈 시 이전 결과 보존)
         _hexGridView?.RefreshOccupiedCells();
+        _synergyStatusView?.SetZoneAmplifiers(_hexGridView?.GetZoneAmplifiers());   // 정제소 핵이 키우는 존 표시
         _synergyStatusView?.Refresh(MerlinRuneBridge.Instance?.GetZoneOccupiedCounts());
     }
 
@@ -1378,7 +1474,7 @@ public sealed class UI_GridPanel : UI_Base
         if (_totalPlacedCells == 0)
         {
             ShopUIStyle.PlaySfx("shop_reject");
-            ShowToast("배치된 룬이 없습니다");
+            ShowToast("배치된 룬이 없습니다", warn: true);
             return;
         }
         Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
@@ -1405,7 +1501,6 @@ public sealed class UI_GridPanel : UI_Base
         _hexGridView?.UpdateAdjacencyConstraints();
         RefreshSynergyStatus();
         RefreshFooter();
-        UpdateHexGridHint();
         _stagingArea?.Refresh(_inventory);
     }
 
@@ -1433,21 +1528,6 @@ public sealed class UI_GridPanel : UI_Base
 
         RestoreConfirmDialogDefault();   // 직전이 「자리 비우고 배치」였을 수 있다
         ShowConfirmDialog();
-    }
-
-    private void OnPlaceClicked()
-    {
-        // GridManager는 드래그 앤 드롭 기반이라 코드 직접 배치 API가 없다 — 이 버튼은 배치가 아니라
-        // <b>지시</b>다. 보관함 첫 아이템을 InfoPanel에 띄우고, 그 슬롯을 한 번 튕겨
-        // "여기서 끌어라"를 가리킨다. 눌렀는데 소리도 반응도 없던 것이 죽은 버튼의 절반이었다.
-        if (_inventory == null || _inventory.StagingCount == 0) return;
-
-        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
-
-        var item = _inventory.StagingItems[0];
-        _itemInfoPanel?.ShowItem(item, isNew: false);
-        _stagingArea?.HighlightItem(item);
-        _stagingArea?.PulseItem(item);
     }
 
     private void OnDialogKeep()
@@ -1495,12 +1575,12 @@ public sealed class UI_GridPanel : UI_Base
         panelRT.anchorMin        = new Vector2(0.5f, 0.5f);
         panelRT.anchorMax        = new Vector2(0.5f, 0.5f);
         panelRT.pivot            = new Vector2(0.5f, 0.5f);
-        panelRT.sizeDelta        = new Vector2(320f, 110f);
+        panelRT.sizeDelta        = new Vector2(420f, 170f);
         panelRT.anchoredPosition = Vector2.zero;
         panelGO.AddComponent<Image>().color = new Color(0.10f, 0.11f, 0.17f, 0.98f);
 
         var textGO = MakeTxt(panelGO.transform, "Text",
-            "배치된 아이템을 모두 초기화합니다.", 13f, new Color(0.9f, 0.92f, 1f, 1f));
+            "배치된 룬을 모두 보관함으로 되돌립니다.", 18f, new Color(0.9f, 0.92f, 1f, 1f));
         var textRT = textGO.GetComponent<RectTransform>();
         textRT.anchorMin = new Vector2(0f, 0.44f);
         textRT.anchorMax = new Vector2(1f, 1f);
@@ -1508,13 +1588,13 @@ public sealed class UI_GridPanel : UI_Base
         textGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
 
         _resetDialogNo = MakeButton(panelGO.transform, "CancelBtn",
-            new Vector2(0.08f, 0f), new Vector2(0.45f, 0.40f),
-            Vector2.zero, new Vector2(0f, 4f),
+            new Vector2(0.08f, 0.10f), new Vector2(0.45f, 0.40f),
+            Vector2.zero, Vector2.zero,
             new Color(0.25f, 0.27f, 0.35f, 1f), "취소");
 
         _resetDialogYes = MakeButton(panelGO.transform, "ResetBtn",
-            new Vector2(0.55f, 0f), new Vector2(0.92f, 0.40f),
-            Vector2.zero, new Vector2(0f, 4f),
+            new Vector2(0.55f, 0.10f), new Vector2(0.92f, 0.40f),
+            Vector2.zero, Vector2.zero,
             new Color(0.65f, 0.20f, 0.18f, 1f), "초기화");
 
         _resetDialog.SetActive(false);
@@ -1522,7 +1602,9 @@ public sealed class UI_GridPanel : UI_Base
 
     private void ShowResetConfirmDialog()
     {
-        if (_resetDialog != null) _resetDialog.SetActive(true);
+        if (_resetDialog == null) return;
+        _resetDialog.transform.SetAsLastSibling();     // 판에 놓인 룬보다 위
+        _resetDialog.SetActive(true);
     }
 
     private void HideResetConfirmDialog()
@@ -1539,31 +1621,6 @@ public sealed class UI_GridPanel : UI_Base
     private void OnResetConfirmNo()
     {
         HideResetConfirmDialog();
-    }
-
-    // ── Place Button State ──
-
-    private void UpdatePlaceButtonState(bool hasItem)
-    {
-        if (_placeBG == null) return;
-
-        // 안내색이지 주액션색이 아니다 — 파란 채움은 "누르면 배치된다"는 신호였고,
-        // 배치는 드래그로만 일어나므로 그 신호가 거짓이었다(P0-3). 활성/비활성 대비만 남긴다.
-        _placeBG.color = hasItem
-            ? new Color(0.18f, 0.22f, 0.30f, 0.75f)
-            : new Color(0.16f, 0.19f, 0.26f, 0.45f);
-        if (_placeLabel != null)
-            _placeLabel.color = hasItem
-                ? new Color(0.78f, 0.85f, 0.95f, 0.92f)
-                : new Color(0.66f, 0.72f, 0.84f, 0.45f);
-    }
-
-    // ── Hex Grid Hint ──
-
-    private void UpdateHexGridHint()
-    {
-        if (_hexGridHintText != null)
-            _hexGridHintText.gameObject.SetActive(_totalPlacedCells == 0);
     }
 
     // ── CENTER Bonus ──
@@ -1593,6 +1650,100 @@ public sealed class UI_GridPanel : UI_Base
         }
         catch (System.OperationCanceledException) { }
         if (_canvasGroup != null) _canvasGroup.alpha = 1f;
+    }
+
+    // ── 룬 선택 규격 크롬 (09-25) ──
+
+    /// <summary>
+    /// 룬 선택 팝업의 아트(제목 띠·카드 바탕)와 공통 버튼을 입힌다. 스킨은 앱 부트에서 비동기로 들어오고
+    /// 이 패널은 그보다 먼저(@UIRoot Awake) 지어지므로, 열 때 한 번 입힌다. 스킨이 없으면 색 폴백 그대로.
+    /// </summary>
+    private void EnsureChromeSkin()
+    {
+        if (_chromeSkinned) return;
+        var skin = UISkin.RuneSelect;
+        if (skin == null) return;
+        _chromeSkinned = true;
+
+        ShopUIStyle.Skin(_headerBandImg, skin.titleBar,      sliced: true);
+        // 행동 버튼 = 전 화면 공통 베벨(금 = 완료 · 먹빛 = 초기화). 예전엔 룬 획득의 선택/넘기기 아트를 빌렸는데
+        // 거기 글자가 구워져 있어 「완료」「초기화」 밑에 「선택」「넘기기」가 비쳤다(09-28 UI 톤 진단).
+        UITheme.StyleButton(_confirmBtnImg, UITheme.CtaTint);
+        UITheme.StyleButton(_resetBtnImg,   UITheme.SecondaryTint);
+        ShopUIStyle.Skin(_cardBgImg,     skin.cardFill,      sliced: true);
+    }
+
+    /// <summary>머리줄 상태(보관함 N/5 · 배치 M)와 보관함 바 개수. 인벤토리가 바뀔 때마다.</summary>
+    private void RefreshHeaderStatus()
+    {
+        int cap    = RunItemInventory.MaxStagingCapacity;
+        int staged = _inventory?.StagingCount ?? 0;
+        int placed = _inventory?.PlacedItems?.Count ?? 0;
+        _headerStatusText?.SetText($"보관함 <color=#FFFFFF>{staged}/{cap}</color>    ·    배치 <color=#FFFFFF>{placed}</color>");
+        _stagingCountText?.SetText($"{staged} / {cap}");
+    }
+
+    /// <summary>
+    /// 열기 연출 — 제목 띠가 위에서, 왼쪽·오른쪽 칸이 옆에서 살짝 미끄러져 들어오고 보관함 카드가 차례로 올라온다.
+    /// 룬판은 자주 여는 화면이라 전체 0.45초 안(룬 선택 팝업처럼 멈추지 않는다). 판 자체는 움직이지 않는다 —
+    /// 놓인 룬 조각이 판과 따로 그려져 판만 움직이면 어긋난다.
+    /// </summary>
+    private async UniTaskVoid PlayOpenFxAsync()
+    {
+        _openFxCts?.Cancel();
+        _openFxCts?.Dispose();
+        _openFxCts = new CancellationTokenSource();
+        var ct = _openFxCts.Token;
+
+        _stagingArea?.PlayDealIn(0.06f);
+        try
+        {
+            for (float t = 0f; t < 1f; )
+            {
+                t += Time.unscaledDeltaTime / OpenSlideDur;
+                float k = 1f - Mathf.Pow(1f - Mathf.Clamp01(t), 3f);
+                float r = 1f - k;
+                if (_headerRT     != null) _headerRT.anchoredPosition     = _headerRest + new Vector2(0f, 14f * r);
+                if (_leftPanelRT  != null) _leftPanelRT.anchoredPosition  = _leftRest   + new Vector2(-20f * r, 0f);
+                if (_rightPanelRT != null) _rightPanelRT.anchoredPosition = _rightRest  + new Vector2(20f * r, 0f);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (System.OperationCanceledException) { }
+        finally
+        {
+            if (_headerRT     != null) _headerRT.anchoredPosition     = _headerRest;
+            if (_leftPanelRT  != null) _leftPanelRT.anchoredPosition  = _leftRest;
+            if (_rightPanelRT != null) _rightPanelRT.anchoredPosition = _rightRest;
+        }
+    }
+
+    /// <summary>오른쪽 아래 행동 버튼. 아트가 오기 전엔 색 판(주 = 청색, 보조 = 어두운 판).</summary>
+    private static Button MakeActionButton(Transform parent, string name, string label,
+                                           float xMin, float xMax, bool primary, out Image img)
+    {
+        var go = Go(name);
+        go.transform.SetParent(parent, false);
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin        = new Vector2(xMin, 0f);
+        rt.anchorMax        = new Vector2(xMax, 0f);
+        rt.pivot            = new Vector2(0.5f, 0f);
+        rt.sizeDelta        = new Vector2(0f, 64f);
+        rt.anchoredPosition = new Vector2(0f, 8f);
+
+        img = go.AddComponent<Image>();
+        img.color = primary ? new Color(0.20f, 0.36f, 0.55f, 1f) : new Color(0.18f, 0.20f, 0.28f, 1f);
+        var btn = go.AddComponent<Button>();
+        ShopUIStyle.ApplyButtonColors(btn, img);
+
+        var lblGO = MakeTxt(go.transform, "Label", label, primary ? 24f : 22f,
+            primary ? new Color(0.98f, 0.95f, 0.86f, 1f) : new Color(0.82f, 0.86f, 0.96f, 1f), bold: true);
+        var lblRT = lblGO.GetComponent<RectTransform>();
+        lblRT.anchorMin = Vector2.zero;
+        lblRT.anchorMax = Vector2.one;
+        lblRT.offsetMin = lblRT.offsetMax = Vector2.zero;
+        lblGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+        return btn;
     }
 
     // ── Static Helpers ──
@@ -1641,7 +1792,7 @@ public sealed class UI_GridPanel : UI_Base
         lblRT.sizeDelta = Vector2.zero;
         var txt = lblGO.AddComponent<TextMeshProUGUI>();
         txt.text          = label;
-        txt.fontSize      = 16f;
+        txt.fontSize      = 18f;
         txt.color         = Color.white;
         txt.alignment     = TextAlignmentOptions.Center;
         txt.raycastTarget = false;

@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2cb08023b67589641bf1ea52ad381fbb, type: 3}
+  m_Name: Lich_N1_InvertedSeal
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichInvertedSealPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  maxTriggerRange: 22
+  patternCooldown: 18
+  openDuration: 1.2
+  signalDuration: 0.2
+  activeDuration: 2.4
+  endDuration: 0.6
+  recoveryDuration: 0.4
+  chainCount: 3
+  chainInterval: 0.25
+  spreadAngle: 35
+  chainSpeed: 7
+  chainTurn: 70
+  chainLifetime: 3.2
+  sealSeconds: 8
+  slowScale: 0.85
+  slowSeconds: 3
+  brokenStagger: 0.5

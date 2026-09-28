@@ -38,7 +38,10 @@ public sealed class LayerStateMachine<TId> where TId : struct, Enum
     /// </summary>
     public void Change(TId next)
     {
-        if (CurrentId.Equals(next)) return; // 동일 상태는 Enter 재호출 방지
+        // 동일 상태는 Enter 재호출 방지 — 단 아직 아무 상태도 없으면 첫 전환은 받는다.
+        // CurrentId는 enum 기본값(Idle/None)으로 시작해, 첫 Change(Idle)가 '같은 상태'로 무시되면
+        // 상태 객체가 비어 Update가 돌지 않았다(땅에 닿은 채 스폰되면 이동 입력이 안 먹는다).
+        if (_current != null && CurrentId.Equals(next)) return;
         if (!_map.TryGetValue(next, out var s)) return;
 
         _current?.Exit();

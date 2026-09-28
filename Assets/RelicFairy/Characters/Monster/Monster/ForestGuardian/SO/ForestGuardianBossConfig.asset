@@ -19,8 +19,8 @@ MonoBehaviour:
     m_Bits: 64
   stat:
     maxHp: 7000
-    defense: 50
-    attackPower: 100
+    defense: 5
+    attackPower: 180
     moveSpeed: 3
     attackRange: 2.5
     attackRadius: 1
@@ -83,33 +83,70 @@ MonoBehaviour:
   condDistFar: 5
   condTimePressureSecs: 8
   patternEntries:
-  - conditions: 0c000000
+  - conditions: 2a000000
+    patterns:
+    - {fileID: 11400000, guid: 7f3974dd2541ab74d83d2aa6068b4811, type: 2}
+    selectionMode: 0
+    forceExecute: 1
+  - conditions: 2b000000
+    patterns:
+    - {fileID: 11400000, guid: 17d0d40611fd53946b3d48200c47d718, type: 2}
+    selectionMode: 0
+    forceExecute: 1
+  - conditions: 2c000000
+    patterns:
+    - {fileID: 11400000, guid: 60b5cb02ac4f10a489632aac680a6609, type: 2}
+    - {fileID: 11400000, guid: 295c167eb8b9f9748a02ff1674b1bb6b, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions: 2900000001000000
+    patterns:
+    - {fileID: 11400000, guid: 60b5cb02ac4f10a489632aac680a6609, type: 2}
+    - {fileID: 11400000, guid: 32491d96f7e2e4c488e3a0d29b01e08b, type: 2}
+    - {fileID: 11400000, guid: 9f6f6baa2e1a52b4a8b8ac2dff018dc7, type: 2}
+    - {fileID: 11400000, guid: 384a86726bd98af4dbb579935de50960, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions: 2900000002000000
+    patterns:
+    - {fileID: 11400000, guid: 9af0d6dff7796d6488ea81777f39e4a9, type: 2}
+    - {fileID: 11400000, guid: 295c167eb8b9f9748a02ff1674b1bb6b, type: 2}
+    - {fileID: 11400000, guid: 60b5cb02ac4f10a489632aac680a6609, type: 2}
+    - {fileID: 11400000, guid: 32491d96f7e2e4c488e3a0d29b01e08b, type: 2}
+    - {fileID: 11400000, guid: b250c44439411aa4089a082e52376197, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions: 280000000c000000
     patterns:
     - {fileID: 11400000, guid: fa354ae064f49b141b23ca89f81ba16e, type: 2}
     selectionMode: 0
     forceExecute: 1
-  - conditions: 1100000001000000
-    patterns:
-    - {fileID: 11400000, guid: e7cb3b96bd55b2147b9721f52ecf0ad2, type: 2}
-    - {fileID: 11400000, guid: 9f6f6baa2e1a52b4a8b8ac2dff018dc7, type: 2}
-    - {fileID: 11400000, guid: 444a70a23acbeb24e89537eb41e6f592, type: 2}
-    selectionMode: 2
-    forceExecute: 0
-  - conditions: 1100000002000000
-    patterns:
-    - {fileID: 11400000, guid: 0576a9463f438fa4b8eab3c31bcec713, type: 2}
-    selectionMode: 2
-    forceExecute: 0
-  - conditions: 1200000001000000
+  - conditions: 280000001100000001000000
     patterns:
     - {fileID: 11400000, guid: e7cb3b96bd55b2147b9721f52ecf0ad2, type: 2}
     - {fileID: 11400000, guid: 9f6f6baa2e1a52b4a8b8ac2dff018dc7, type: 2}
     - {fileID: 11400000, guid: 444a70a23acbeb24e89537eb41e6f592, type: 2}
     - {fileID: 11400000, guid: 384a86726bd98af4dbb579935de50960, type: 2}
-    selectionMode: 2
+    selectionMode: 0
     forceExecute: 0
-  - conditions: 1200000002000000
+  - conditions: 280000001100000002000000
+    patterns:
+    - {fileID: 11400000, guid: 0576a9463f438fa4b8eab3c31bcec713, type: 2}
+    - {fileID: 11400000, guid: eb2d6e1b4d85f054ebec564461c12cbc, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions: 280000001200000001000000
+    patterns:
+    - {fileID: 11400000, guid: e7cb3b96bd55b2147b9721f52ecf0ad2, type: 2}
+    - {fileID: 11400000, guid: 9f6f6baa2e1a52b4a8b8ac2dff018dc7, type: 2}
+    - {fileID: 11400000, guid: 444a70a23acbeb24e89537eb41e6f592, type: 2}
+    - {fileID: 11400000, guid: 384a86726bd98af4dbb579935de50960, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions: 280000001200000002000000
     patterns:
     - {fileID: 11400000, guid: b250c44439411aa4089a082e52376197, type: 2}
-    selectionMode: 2
+    - {fileID: 11400000, guid: 0576a9463f438fa4b8eab3c31bcec713, type: 2}
+    - {fileID: 11400000, guid: eb2d6e1b4d85f054ebec564461c12cbc, type: 2}
+    selectionMode: 0
     forceExecute: 0

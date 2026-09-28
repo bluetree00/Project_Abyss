@@ -19,7 +19,7 @@ public class SkillExecutionContext
     public Transform PlayerTransform => Controller.transform;
     public Animator Animator => Controller.Anim;
     public Rigidbody Rigidbody => Controller.Rigid;
-    public Transform HandTransform => Controller.handTransform;
+    public Transform HandTransform => Controller.HandTransform;
     public WeaponEffectHandler EffectHandler => Controller.EffectHandler;
     public PlayerRuntimeStats RuntimeStats => Controller.RuntimeStats;
 
@@ -45,7 +45,7 @@ public class SkillExecutionContext
     /// IDamageable.TakeDamage를 직접 부르면 크리티컬·아이템·서약·패시브·타격감이 전부 스킵되므로
     /// 스킬은 반드시 이 경로를 쓴다(ActionType이 자동으로 Q/E/R로 전달된다).
     /// </summary>
-    public float DealDamage(UnityEngine.GameObject target, float damage, float knockback)
+    public float DealDamage(UnityEngine.GameObject target, float damage, float knockback, bool isFinisher = false)
     {
         if (target == null || Controller == null) return 0f;
 
@@ -58,13 +58,14 @@ public class SkillExecutionContext
             KnockbackMultiplier = knockback,
             HitPoint            = target.transform.position + UnityEngine.Vector3.up * 1f,
             SourcePosition      = Controller.transform.position,
+            IsFinisher          = isFinisher,
         });
     }
 
     /// <summary>IDamageable 대상 오버로드 — 스킬 Behavior들이 IDamageable 목록을 들고 있어 편의 제공.</summary>
-    public float DealDamage(IDamageable target, float damage, float knockback)
+    public float DealDamage(IDamageable target, float damage, float knockback, bool isFinisher = false)
     {
         var go = (target as UnityEngine.Component)?.gameObject;
-        return go != null ? DealDamage(go, damage, knockback) : 0f;
+        return go != null ? DealDamage(go, damage, knockback, isFinisher) : 0f;
     }
 }

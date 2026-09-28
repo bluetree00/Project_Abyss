@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class LocoAirState : ILayerState<LocoState>
+public class LocoAirState : LayerStateBase<LocoState>
 {
     // MinorDrop: 낙하 높이가 임계 미만 — 추락/착지 애니 생략, 로코모션 유지.
     // [점프 폐기] 상승 단계(Start)는 제거됐다 — 공중 진입이 낙하·넉백뿐이라 도달할 수 없었다.
@@ -15,22 +15,13 @@ public class LocoAirState : ILayerState<LocoState>
     private const float LandShakeMinSpeed = 6f;
     private const float LandShakeMaxSpeed = 18f;
 
-    private PlayerController _controller;
-    private ILayerStateChanger<LocoState> _stateChanger;
-
     private AirPhase _phase;
     private float _landingTimer;
     private float _takeoffY;     // 낙하 시작 시점의 Y (누적 낙하 높이 안전망용)
     private float _fallThreshold; // 이번 낙하의 추락 애니 임계 높이
     private float _maxFallSpeed;  // 체공 중 최대 하강 속도(착지 충격 셰이크 강도용)
 
-    public void Init(PlayerController controller, ILayerStateChanger<LocoState> stateChanger)
-    {
-        _controller = controller;
-        _stateChanger = stateChanger;
-    }
-
-    public void Enter()
+    public override void Enter()
     {
         _landingTimer = 0f;
         _maxFallSpeed = 0f;
@@ -54,7 +45,7 @@ public class LocoAirState : ILayerState<LocoState>
         }
     }
 
-    public void Update()
+    public override void Update()
     {
         switch (_phase)
         {
@@ -96,7 +87,7 @@ public class LocoAirState : ILayerState<LocoState>
         }
     }
 
-    public void Exit()
+    public override void Exit()
     {
         _controller.IsLanding = false;
     }

@@ -27,7 +27,14 @@ public sealed class OnboardingGuideArrow : MonoBehaviour
     private Camera _cam;
     private Transform _target;
 
+    /// <summary>연출 동안 화살표를 숨긴다(대상은 유지) — 무형검 받기에서 카메라가 다가가자 문 위 ▼가 화면 위 가운데를 크게 덮었다(ae 09-28).</summary>
+    public static bool Suppressed { get; set; }
+
     public bool HasTarget => _target != null;
+
+    // 도메인 리로드가 꺼져 있으면 정적 값이 이전 플레이에서 남는다
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => Suppressed = false;
 
     private void Awake()
     {
@@ -41,6 +48,12 @@ public sealed class OnboardingGuideArrow : MonoBehaviour
     private void LateUpdate()
     {
         if (_target == null) return;
+        if (Suppressed)
+        {
+            SetWorldArrowActive(false);
+            SetScreenIndicatorActive(false);
+            return;
+        }
         if (_cam == null) { _cam = Camera.main; if (_cam == null) return; }
 
         Vector3 targetPos = _target.position;

@@ -1,0 +1,284 @@
+{
+  "rows": [
+    {
+      "slot": "CastCharge",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Skill 5.wav",
+      "volume": 0.9,
+      "startTime": 0.0,
+      "pitch": 0.95,
+      "minDistance": 0,
+      "note": "스웰 — 큰 마법 충전"
+    },
+    {
+      "slot": "CastShort",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Skill 9.wav",
+      "volume": 0.8,
+      "startTime": 0.0,
+      "pitch": 1.05,
+      "minDistance": 0,
+      "note": "짧은 시전"
+    },
+    {
+      "slot": "BoltFire",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Skill 1.wav",
+      "volume": 0.8,
+      "startTime": 0.0,
+      "pitch": 1.0,
+      "minDistance": 0,
+      "note": "마력탄 발사(칼날 볼리)"
+    },
+    {
+      "slot": "BoltImpact",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Hit Skill9.wav",
+      "volume": 0.9,
+      "startTime": 0.0,
+      "pitch": 1.0,
+      "minDistance": 0,
+      "note": "마법 착탄"
+    },
+    {
+      "slot": "Vanish",
+      "path": "Assets/RelicFairy/Characters/Monster/Monster/DeathKnightBoss/Art/Sound/TPOUT.mp3",
+      "volume": 1.0,
+      "startTime": 0.0,
+      "pitch": 0.92,
+      "minDistance": 0,
+      "note": "사라짐 — DK에 연결만 돼 있던 파일"
+    },
+    {
+      "slot": "Appear",
+      "path": "Assets/RelicFairy/Characters/Monster/Monster/DeathKnightBoss/Art/Sound/TPIN.mp3",
+      "volume": 1.0,
+      "startTime": 0.0,
+      "pitch": 0.92,
+      "minDistance": 0,
+      "note": "나타남"
+    },
+    {
+      "slot": "SlamImpact",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Skill 7.wav",
+      "volume": 1.0,
+      "startTime": 0.0,
+      "pitch": 0.9,
+      "minDistance": 0,
+      "note": "낙하 강타 · 대형 폭발"
+    },
+    {
+      "slot": "FireBeam",
+      "path": "Assets/RelicFairy/Characters/Monster/Monster/DeathKnightBoss/Art/Sound/Beam.mp3",
+      "volume": 0.9,
+      "startTime": 0.0,
+      "pitch": 1.0,
+      "minDistance": 0,
+      "note": "관통 광선"
+    },
+    {
+      "slot": "IceCast",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Skill 8.wav",
+      "volume": 0.85,
+      "startTime": 0.0,
+      "pitch": 1.0,
+      "minDistance": 0,
+      "note": "얼음"
+    },
+    {
+      "slot": "LightningCast",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Skill 2.wav",
+      "volume": 0.85,
+      "startTime": 0.0,
+      "pitch": 1.0,
+      "minDistance": 0,
+      "note": "낙뢰"
+    },
+    {
+      "slot": "DarkOrb",
+      "path": "Assets/RelicFairy/Characters/Monster/Monster/DeathKnightBoss/Art/Sound/Soul.mp3",
+      "volume": 0.9,
+      "startTime": 0.0,
+      "pitch": 0.85,
+      "minDistance": 0,
+      "note": "어둠 구체 · 소환"
+    },
+    {
+      "slot": "ZoneHum",
+      "path": "Assets/RelicFairy/Characters/Monster/Monster/DeathKnightBoss/Art/Sound/Zone.mp3",
+      "volume": 0.8,
+      "startTime": 0.0,
+      "pitch": 0.9,
+      "minDistance": 0,
+      "note": "결계 · 원형 영역"
+    },
+    {
+      "slot": "CircleSpawn",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Skill 10.wav",
+      "volume": 0.7,
+      "startTime": 0.0,
+      "pitch": 1.0,
+      "minDistance": 0,
+      "note": "바닥 원 생성"
+    },
+    {
+      "slot": "WardCrack",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Hit Skill9.wav",
+      "volume": 1.0,
+      "startTime": 0.0,
+      "pitch": 0.8,
+      "minDistance": 0,
+      "note": "결계에 금 감"
+    },
+    {
+      "slot": "WardBreak",
+      "path": "Assets/RelicFairy/Characters/Monster/Monster/DragonBoss/Art/Sound/Slam.mp3",
+      "volume": 1.0,
+      "startTime": 0.0,
+      "pitch": 0.85,
+      "minDistance": 0,
+      "note": "결계 파괴"
+    },
+    {
+      "slot": "ScytheSwing",
+      "path": "Assets/RelicFairy/Characters/Monster/Monster/DeathKnightBoss/Art/Sound/Big Slash.mp3",
+      "volume": 1.0,
+      "startTime": 0.5,
+      "pitch": 1.0,
+      "minDistance": 0,
+      "note": "큰 베기 — 앞 0.5초 예비음 건너뜀(DK와 같은 방식)"
+    },
+    {
+      "slot": "ScytheSlash",
+      "path": "Assets/RelicFairy/Characters/Monster/Monster/DeathKnightBoss/Art/Sound/Slash1.mp3",
+      "volume": 0.95,
+      "startTime": 0.0,
+      "pitch": 1.0,
+      "minDistance": 0,
+      "note": "짧은 베기"
+    },
+    {
+      "slot": "ScytheThrow",
+      "path": "Assets/RelicFairy/Characters/Monster/Monster/ForestGuardian/Art/Sound/Throw.mp3",
+      "volume": 1.0,
+      "startTime": 0.0,
+      "pitch": 0.95,
+      "minDistance": 0,
+      "note": "낫 투척"
+    },
+    {
+      "slot": "ScytheCatch",
+      "path": "Assets/RelicFairy/Characters/Monster/Monster/DeathKnightBoss/Art/Sound/Slash2.mp3",
+      "volume": 0.9,
+      "startTime": 0.0,
+      "pitch": 0.95,
+      "minDistance": 0,
+      "note": "낫 받기"
+    },
+    {
+      "slot": "ChainPulse",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Skill 10.wav",
+      "volume": 0.9,
+      "startTime": 0.0,
+      "pitch": 0.75,
+      "minDistance": 0,
+      "note": "사슬이 팽팽해짐 — 전용 사슬 소리가 없어 대용(결정 D8)"
+    },
+    {
+      "slot": "RainStart",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Skill 6.wav",
+      "volume": 1.0,
+      "startTime": 0.0,
+      "pitch": 0.9,
+      "minDistance": 0,
+      "note": "어둠의 비 시작(유성우)"
+    },
+    {
+      "slot": "RainLoop",
+      "path": "Assets/RelicFairy/Characters/Monster/Monster/DragonBoss/Art/Sound/Rain.mp3",
+      "volume": 0.55,
+      "startTime": 0.0,
+      "pitch": 0.9,
+      "minDistance": 0,
+      "note": "비 루프"
+    },
+    {
+      "slot": "SealStoneHit",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Hit Skill9.wav",
+      "volume": 0.9,
+      "startTime": 0.0,
+      "pitch": 1.15,
+      "minDistance": 0,
+      "note": "봉인석 타격"
+    },
+    {
+      "slot": "SealStoneHum",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Vefects/Item Pickup VFX URP/Audio/WAV/Vefects_SFX_Item_Legendary_Loop.wav",
+      "volume": 0.6,
+      "startTime": 0.0,
+      "pitch": 1.0,
+      "minDistance": 0,
+      "note": "봉인석 점화 허밍(루프)"
+    },
+    {
+      "slot": "SealComplete",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Skill 5.wav",
+      "volume": 1.0,
+      "startTime": 0.0,
+      "pitch": 0.85,
+      "minDistance": 0,
+      "note": "봉인 완성 · 사망"
+    },
+    {
+      "slot": "Collapse",
+      "path": "Assets/RelicFairy/Characters/Monster/Monster/ForestGuardian/Art/Sound/Ground.mp3",
+      "volume": 1.0,
+      "startTime": 0.0,
+      "pitch": 0.8,
+      "minDistance": 0,
+      "note": "제단 붕괴 · 돌"
+    },
+    {
+      "slot": "PageTransition",
+      "path": "Assets/RelicFairy/Characters/Monster/Monster/DragonBoss/Art/Sound/StormWing.mp3",
+      "volume": 0.9,
+      "startTime": 0.0,
+      "pitch": 0.9,
+      "minDistance": 0,
+      "note": "페이지 전환 바람"
+    },
+    {
+      "slot": "Blocked",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Hit Skill9.wav",
+      "volume": 0.8,
+      "startTime": 0.0,
+      "pitch": 0.7,
+      "minDistance": 0,
+      "note": "무적에 막힘(예비)"
+    },
+    {
+      "slot": "ParryCue",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Skill 3.wav",
+      "volume": 0.9,
+      "startTime": 0.8,
+      "note": "패링 창 「쨍」 — 밝은 소리(무게중심 6 kHz). 앞 무음·상승 0.8 s를 건너뛴다. 청취 확인 필요(V5)"
+    },
+    {
+      "slot": "ParryClash",
+      "path": "Assets/RelicFairy/Characters/Monster/Monster/DeathKnightBoss/Art/Sound/Slash2.mp3",
+      "volume": 1.0,
+      "startTime": 0.0,
+      "note": "튕겨냄 — 금속 부딪힘 대용(프로젝트에 칼 부딪힘 소리 없음). 청취 확인 필요(V5)"
+    },
+    {
+      "slot": "BindSnap",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Skill 4.wav",
+      "volume": 0.9,
+      "startTime": 0.4,
+      "note": "사슬이 감겨 묶임. 청취 확인 필요(V5)"
+    },
+    {
+      "slot": "TileRestore",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/Skill 11.wav",
+      "volume": 0.7,
+      "startTime": 0.15,
+      "note": "부서진 바닥 복구. 청취 확인 필요(V5)"
+    }
+  ]
+}

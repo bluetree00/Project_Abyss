@@ -22,7 +22,6 @@ public class BowAttackPolicy : IAttackInputPolicy
         if (!_holding) return;
         _holding = false;
 
-        c.SetPendingAttack(Command.Light);
         c.InputBuffer.Push(Command.Light);
     }
 

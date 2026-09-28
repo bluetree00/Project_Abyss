@@ -62,10 +62,10 @@ public class UI_AwakeningPanel : UI_Popup
     [SerializeField] private AchievementListView achievementList;
 
     [Header("갈래 열 (출발·등장·존속·심연 순)")]
-    [SerializeField] private Transform[] branchColumns;   // 4개
-    [SerializeField] private TMP_Text[]  branchTitles;    // 4개
-    [SerializeField] private TMP_Text[]  branchQuestions; // 4개
-    [SerializeField] private TMP_Text[]  branchCounts;    // 4개
+    [SerializeField] private Transform[] branchColumns;   // 프리팹 4개 — 「원거리」 열은 EnsureColumnCount가 장비 열을 복제해 끼운다
+    [SerializeField] private TMP_Text[]  branchTitles;    // 〃
+    [SerializeField] private TMP_Text[]  branchQuestions; // 〃
+    [SerializeField] private TMP_Text[]  branchCounts;    // 〃
     [SerializeField] private AltarNodeRowView rowTemplate;
 
     [Header("하단 행동 바")]
@@ -85,15 +85,16 @@ public class UI_AwakeningPanel : UI_Popup
     [SerializeField] private bool readOnly;
 
     // ── 비공개 필드 ────────────────────────────────────────────────────────
+    // 09-27 「원거리」 갈래 신설(사용자 결정) — 「무엇을 들고 가나」 옆에 「무엇을 쏘나」.
     private static readonly AltarBranch[] Branches =
-        { AltarBranch.Start, AltarBranch.Appear, AltarBranch.Endure, AltarBranch.Abyss };
+        { AltarBranch.Rune, AltarBranch.Covenant, AltarBranch.Gear, AltarBranch.Ranged, AltarBranch.Journey };
 
-    private static readonly string[] BranchQuestions =
-        { "무엇으로 시작하는가", "무엇이 나올 수 있는가", "얼마나 버틸 수 있는가", "얼마나 깊이 갈 수 있는가" };
 
     private static readonly Color BannerFill = new(0.09f, 0.08f, 0.07f, 0.94f);
     private const float BannerY = -18f;
-    private const float RowSpacing = 22f;   // 열 VLG spacing — 와이어프레임 행 간격
+    // 열 VLG spacing. 앞선 칸이 두 줄이 되면서 22 → 12 — 제일 긴 열(장비 9행)이 열 높이 636에
+    // 들어와야 한다(78 + 74 + 7×52 + 8×12 = 612). 연출(PlayFlowDownAsync)도 이 값으로 거리를 잰다.
+    private const float RowSpacing = 12f;
 
     private RectTransform _banner;
     private CanvasGroup   _bannerGroup;
@@ -132,6 +133,9 @@ public class UI_AwakeningPanel : UI_Popup
     {
         base.Init();
 
+        // 열 수(와 판 폭)를 먼저 정한다 — 아래 창 맞춤(UIWindowFitter)은 붙는 순간의 판 크기를 기준으로 잡는다.
+        EnsureColumnCount();
+
         // 컨텐츠 화면 크기 규칙을 다른 화면과 맞춘다. 이 화면만 맞춤 장치가 없어
         // 프리팹 크기(1560×1000) 그대로 열렸고, 재련소·상점(세로 94%)과 크기가 달랐다.
         if (transform.Find("Panel_Main") is RectTransform panel &&
@@ -140,6 +144,10 @@ public class UI_AwakeningPanel : UI_Popup
             panel.gameObject.AddComponent<UIWindowFitter>()
                  .Configure(maxScale: UIWindowFitter.ContentScreen);
         }
+
+        // 판 테두리가 없어 모서리가 뚝 끊긴 평판이었다 — 전 화면 공통 글래스(둥근 모서리 + 금 가는 선, 09-28 UI 톤 통일).
+        if (transform.Find("Panel_Main") is RectTransform main && main.TryGetComponent<Image>(out var mainImg))
+            UITheme.StylePanel(mainImg, mainImg.color, UITheme.GoldLine, 18f);
 
         if (closeButton != null)
         {
@@ -205,6 +213,53 @@ public class UI_AwakeningPanel : UI_Popup
     // ── Private Methods ───────────────────────────────────────────────────
 
     /// <summary>열마다 노드를 한 번만 만든다. 갈래를 오갈 일이 없으니 재생성도 없다.</summary>
+    /// <summary>
+    /// 프리팹은 4열이다. 갈래가 5개면 장비 열을 복제해 바로 뒤에 끼운다 — 머리(갈래 이름·질문·진척)까지 같이 복제되고,
+    /// 가로 그룹이 폭을 다시 나눈다. 5열이 좁아지지 않게 판 1560 → 1720 · 열 간격 40 → 24 · 판 좌우 여백 −141 → −80
+    /// (열 폭 약 330 → 309, 행 273 → 252). 판 폭만 두면(행 224) 긴 이름(「보스 파츠 선택지 +1」)이 값 옆에서 14px로 줄었다(09-27 실측).
+    /// 창 맞춤(Init)보다 먼저 불려야 넓힌 폭이 기준이 된다. 행은 아직 없다(BuildColumns가 이 뒤에 채운다).
+    /// </summary>
+    private void EnsureColumnCount()
+    {
+        if (branchColumns == null || branchColumns.Length >= Branches.Length || branchColumns.Length < 3) return;
+        const int   Src    = 2;       // 장비
+        const float PanelW = 1720f;   // 5열 판 폭 — 세로 94% 맞춤에서 화면 1746px(좌우 87px 남는다)
+        var srcCol = branchColumns[Src];
+        if (srcCol == null) return;
+
+        var clone = Instantiate(srcCol.gameObject, srcCol.parent);
+        clone.name = "Col_Ranged";
+        clone.transform.SetSiblingIndex(srcCol.GetSiblingIndex() + 1);
+        branchColumns   = InsertAt(branchColumns, Src + 1, clone.transform);
+        branchTitles    = InsertAt(branchTitles,    Src + 1, TwinText(branchTitles,    Src, srcCol, clone.transform));
+        branchQuestions = InsertAt(branchQuestions, Src + 1, TwinText(branchQuestions, Src, srcCol, clone.transform));
+        branchCounts    = InsertAt(branchCounts,    Src + 1, TwinText(branchCounts,    Src, srcCol, clone.transform));
+
+        if (srcCol.parent != null && srcCol.parent.TryGetComponent<HorizontalLayoutGroup>(out var hlg)) hlg.spacing = 24f;
+        if (srcCol.parent is RectTransform cols) cols.sizeDelta = new Vector2(-80f, cols.sizeDelta.y);
+        if (transform.Find("Panel_Main") is RectTransform panel) panel.sizeDelta = new Vector2(PanelW, panel.sizeDelta.y);
+    }
+
+    private static T[] InsertAt<T>(T[] arr, int index, T item)
+    {
+        if (arr == null) return null;
+        var list = new List<T>(arr);
+        list.Insert(Mathf.Min(index, list.Count), item);
+        return list.ToArray();
+    }
+
+    /// <summary>원본 열 안의 글자가 복제본에서 같은 자리에 있는 것(열 밖이면 null).</summary>
+    private static TMP_Text TwinText(TMP_Text[] arr, int src, Transform srcCol, Transform clone)
+    {
+        if (arr == null || src >= arr.Length || arr[src] == null) return null;
+        var parts = new List<string>();
+        var t = arr[src].transform;
+        while (t != null && t != srcCol) { parts.Insert(0, t.name); t = t.parent; }
+        if (t != srcCol) return null;
+        var found = clone.Find(string.Join("/", parts));
+        return found != null && found.TryGetComponent<TMP_Text>(out var tmp) ? tmp : null;
+    }
+
     private void BuildColumns()
     {
         if (rowTemplate == null || branchColumns == null) return;
@@ -222,9 +277,14 @@ public class UI_AwakeningPanel : UI_Popup
             if (branchTitles    != null && c < branchTitles.Length    && branchTitles[c])
                 branchTitles[c].text = MemoryAltarCatalog.BranchLabel(Branches[c]);
             if (branchQuestions != null && c < branchQuestions.Length && branchQuestions[c])
-                branchQuestions[c].text = BranchQuestions[c];
+                branchQuestions[c].text = MemoryAltarCatalog.BranchQuestion(Branches[c]);
 
             if (c >= branchColumns.Length || branchColumns[c] == null) continue;
+
+            // 간격은 코드가 쥔다 — 프리팹 값이 RowSpacing과 어긋나면 해금 연출의 빛줄기가
+            // 다음 칸을 빗나간다(거리 계산이 이 상수를 쓴다).
+            if (branchColumns[c].TryGetComponent<VerticalLayoutGroup>(out var vlg))
+                vlg.spacing = RowSpacing;
 
             foreach (var node in nodes)
             {
@@ -256,6 +316,9 @@ public class UI_AwakeningPanel : UI_Popup
                 if (MemoryAltarService.IsUnlocked(nodes[i].Id)) done++;
 
             bool complete = done >= nodes.Count && nodes.Count > 0;
+            // 프리팹에 13.3px(자동 크기 상한)로 구워져 있었다 — 갈래 진척은 한눈에 읽혀야 하는 숫자다.
+            branchCounts[c].enableAutoSizing = false;
+            branchCounts[c].fontSize         = 16f;
             branchCounts[c].text  = complete ? "◆" : $"{done}/{nodes.Count}";
             branchCounts[c].color = complete ? AltarPalette.Essence : AltarPalette.TextDim;
         }
@@ -585,6 +648,7 @@ public class UI_AwakeningPanel : UI_Popup
 
         if (actionButton)      actionButton.interactable = usable;
         if (actionButtonImage) actionButtonImage.color = usable ? AltarPalette.Gold : AltarPalette.BtnQuiet;
+        UIAffordGlow.Set(actionButtonImage, usable);   // 지금 해금할 수 있으면 은은한 불(09-29)
         if (actionButtonLabel)
         {
             actionButtonLabel.text  = readOnly && enabled ? "제단에서 해금" : label;

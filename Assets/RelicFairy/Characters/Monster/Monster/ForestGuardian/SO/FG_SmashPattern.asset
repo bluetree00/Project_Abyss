@@ -16,7 +16,7 @@ MonoBehaviour:
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
-  weight: 0.00000001445244
+  weight: 1
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: smash

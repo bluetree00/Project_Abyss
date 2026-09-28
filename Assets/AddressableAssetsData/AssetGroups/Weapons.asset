@@ -156,11 +156,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: c8d6a64eb8c657e46b1dd6ae4dd4328f
-    m_Address: UI/Popup/UI_WeaponReplacePopup
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: cbf7b96bd6742054bb98dad9531eed5c
     m_Address: T1_Greatsword_Display
     m_ReadOnly: 0
@@ -188,6 +183,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ea4bbd29c1a93b3409f1f5431e071106
     m_Address: T3_Greatsword
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ebb1d87d03bb6cb419b83db6e1d08bea
+    m_Address: Relic/Lancelot/QSword
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

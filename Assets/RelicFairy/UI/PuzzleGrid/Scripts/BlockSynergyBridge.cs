@@ -243,6 +243,21 @@ public class MerlinRuneBridge : MonoBehaviour
                 boardManager.shapeHost.pivot = new Vector2(0.5f, 1f);
             }
 
+            // 레거시 잔재 정리 — 옛 「셰이프 목록」의 세로 스크롤바가 화면 오른쪽 끝에 34×972 회색 띠로 남아 있었다.
+            // 목록은 하단 보관함으로 대체됐고 이 뷰는 드래그 고스트를 담는 그릇으로만 쓴다.
+            // ⚠️ 오브젝트만 끄면 ScrollRect(AutoHideAndExpandViewport)가 <b>다시 켠다</b> — 참조부터 끊는다.
+            var legacyBar = boardManager.gameplayRoot.transform.Find("Scrollbar Vertical");
+            if (legacyBar != null)
+            {
+                var ownerScroll = boardManager.gameplayRoot.GetComponentInChildren<ScrollRect>(true);
+                if (ownerScroll != null && ownerScroll.verticalScrollbar != null)
+                {
+                    ownerScroll.verticalScrollbar          = null;
+                    ownerScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+                }
+                if (legacyBar.gameObject.activeSelf) legacyBar.gameObject.SetActive(false);
+            }
+
             // spawnOrigin: X=0(중앙), Y=120(탭스트립 + 여백 확보)
             boardManager.spawnOrigin = new Vector2(0f, 120f);
 

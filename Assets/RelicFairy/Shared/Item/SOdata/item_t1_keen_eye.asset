@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t1_keen_eye
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t1_keen_eye
-  displayName: "\uAC04\uD30C\uC758 \uB8EC"
+  displayName: "\uC815\uD655\uD55C \uD544\uC0B4\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 0

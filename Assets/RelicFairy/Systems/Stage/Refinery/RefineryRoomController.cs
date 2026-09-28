@@ -3,27 +3,27 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
-/// 정제소 방 런타임 컨트롤러 (NPC + 룬판).
+/// 정제소 방 런타임 컨트롤러 (NPC + 정제대).
 ///
-/// 역할: 룬(아이템) 지급/관리 스테이션. 비전투 방(상점/재련소와 동일 흐름).
-/// NPC 상호작용 → 룬판(<see cref="UI_GridPanel"/>)을 연다. 지급 로직은 후속(임의 내용 단계).
+/// 역할: 비전투 방(상점/재련소와 동일 흐름). NPC 상호작용 → 정제소 패널(<see cref="UI_RefineryPanel"/>)을 연다.
+/// 뽑은 룬은 패널이 룬판으로 넘긴다. 방 특전은 09-28 정제소 단순화(무작위 뽑기)로 걷었다.
 ///
 /// 결정성: _roomRng는 소품 배치에만 쓴다(전투/보상 롤 없음).
 /// </summary>
 public sealed class RefineryRoomController : MonoBehaviour
 {
-    private const float NpcStandHeight = 1f;   // 앵커 없는 폴백 스폰 시 캡슐 바닥이 지면에 닿도록.
+    private const float NpcStandHeight = 1f;   // 캡슐 바닥(발)이 지면에 닿도록 — 앵커 · 폴백 모두.
 
     /// <summary>NPC 앞 정제대까지의 거리(m) — NPC가 제단 뒤에 선 구도.</summary>
     private const float CounterDistance = 2.5f;
 
-    /// <summary>정제사 잡담 — 원석/존핵 룬 컨셉.</summary>
+    /// <summary>정제사 잡담 — 원석에서 무엇이 나올지 모르는 뽑기 컨셉.</summary>
     private static readonly string[] ChatterLines =
     {
-        "원석 속에 잠든 속성을 깨워주지.",
+        "원석 속에 무엇이 잠들었는지는 돌려 봐야 알지.",
         "판을 채우면… 힘이 공명한다.",
-        "존핵은 아무렇게나 벼려지지 않아.",
-        "이번엔 어떤 속성을 응축할까?",
+        "같은 돌에서 같은 룬이 두 번 나오는 법은 없어.",
+        "한 번 더? 다음 돌은 다를지도 모르지.",
         "돌은 거짓말을 하지 않는다.",
     };
 
@@ -34,9 +34,6 @@ public sealed class RefineryRoomController : MonoBehaviour
     private ShopNpcInteraction _npc;
     private bool _initialized;
     private bool _uiOpen;
-
-    /// <summary>이 방의 특전(입장 시 결정성 롤로 1종). 방은 "좋은 조건으로 정제하는 곳".</summary>
-    private RefineryPerk _perk = RefineryPerk.None;
 
     private void OnDestroy()
     {
@@ -54,23 +51,21 @@ public sealed class RefineryRoomController : MonoBehaviour
         _run     = run;
         _roomRng = roomRng ?? new System.Random();
 
-        // 방 특전 결정 — 같은 시드면 같은 특전(결정성 유지).
-        _perk = (RefineryPerk)(1 + _roomRng.Next(0, 3));   // Discount / Lucky / FirstFree
-
         var (npcPos, npcRot) = ResolveNpcPlacement();
         SpawnNpc(npcPrefab, npcPos, npcRot);
         SpawnDecor(npcPos, npcRot);
 
         _initialized = true;
-        Debug.Log($"[Refinery] 초기화 완료(NPC+정제소). 방 특전={_perk}");
+        Debug.Log("[Refinery] 초기화 완료(NPC+정제소).");
     }
 
     // ── NPC ────────────────────────────────────────────────
     private (Vector3 pos, Quaternion rot) ResolveNpcPlacement()
     {
+        // 앵커는 바닥 높이 점 — 서는 높이를 더한다(안 더해 NPC·정제대가 1.1 m 박혔다, 09-29).
         var anchor = GetComponentInChildren<ShopNpcAnchor>(true);
         if (anchor != null)
-            return (anchor.transform.position, anchor.transform.rotation);
+            return (ServiceRoomDecorPlacer.NpcStandPoint(anchor.transform.position, NpcStandHeight), anchor.transform.rotation);
 
         Vector3 pos = transform.position;
         pos.y += NpcStandHeight;
@@ -82,7 +77,7 @@ public sealed class RefineryRoomController : MonoBehaviour
     {
         if (npcPrefab == null)
         {
-            Debug.LogWarning("[Refinery] NPC 프리팹 없음 — 룬판을 열 수 없습니다.");
+            Debug.LogWarning("[Refinery] NPC 프리팹 없음 — 정제소를 열 수 없습니다.");
             return;
         }
 
@@ -104,7 +99,7 @@ public sealed class RefineryRoomController : MonoBehaviour
         OpenRefineryAsync().Forget();
     }
 
-    /// <summary>정제소 패널을 방 특전과 함께 연다. 특전은 패널이 닫힐 때 해제된다(상시 탭엔 안 붙음).</summary>
+    /// <summary>정제소 패널을 연다.</summary>
     private async UniTaskVoid OpenRefineryAsync()
     {
         var svc = _run?.Refinery;
@@ -112,7 +107,6 @@ public sealed class RefineryRoomController : MonoBehaviour
 
         _uiOpen = true;
         if (_npc != null) _npc.SetInteractable(false);
-        svc.SetRoomPerk(_perk);
 
         try
         {
@@ -120,13 +114,12 @@ public sealed class RefineryRoomController : MonoBehaviour
             if (panel == null)
             {
                 Debug.LogWarning("[Refinery] UI_RefineryPanel 로드 실패");
-                svc.ClearRoomPerk();
                 HandlePanelClosed();
                 return;
             }
             panel.OnClosed += HandlePanelClosed;   // 팝업은 닫힐 때 파괴되므로 해제는 불필요
         }
-        catch (OperationCanceledException) { svc.ClearRoomPerk(); HandlePanelClosed(); }
+        catch (OperationCanceledException) { HandlePanelClosed(); }
     }
 
     /// <summary>UI_RefineryPanel이 닫힐 때 호출 — 중복 오픈 가드 해제.</summary>

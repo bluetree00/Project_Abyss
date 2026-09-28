@@ -1,0 +1,248 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fed32b7d8c164e64dae58668d4fea1d0, type: 3}
+  m_Name: LichSfxSet
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichSfxSetSO
+  entries:
+  - slot: 1
+    clip: {fileID: 8300000, guid: d64e4487ce196b64b97f65f33819a0e0, type: 3}
+    volume: 0.9
+    startTime: 0
+    pitch: 0.95
+    minDistance: 0
+    note: "\uC2A4\uC6F0 \u2014 \uD070 \uB9C8\uBC95 \uCDA9\uC804"
+  - slot: 2
+    clip: {fileID: 8300000, guid: 55c745a0fc7464e448b6120951de8779, type: 3}
+    volume: 0.8
+    startTime: 0
+    pitch: 1.05
+    minDistance: 0
+    note: "\uC9E7\uC740 \uC2DC\uC804"
+  - slot: 3
+    clip: {fileID: 8300000, guid: 0f806d9f8ebdc0c4990726f6cdfae22e, type: 3}
+    volume: 0.8
+    startTime: 0
+    pitch: 1
+    minDistance: 0
+    note: "\uB9C8\uB825\uD0C4 \uBC1C\uC0AC(\uCE7C\uB0A0 \uBCFC\uB9AC)"
+  - slot: 4
+    clip: {fileID: 8300000, guid: 80a04f4eb8c56a24c82b1f4314f0ba78, type: 3}
+    volume: 0.9
+    startTime: 0
+    pitch: 1
+    minDistance: 0
+    note: "\uB9C8\uBC95 \uCC29\uD0C4"
+  - slot: 5
+    clip: {fileID: 8300000, guid: 9d4c1b34966ce5140815b611bd572b0b, type: 3}
+    volume: 1
+    startTime: 0
+    pitch: 0.92
+    minDistance: 0
+    note: "\uC0AC\uB77C\uC9D0 \u2014 DK\uC5D0 \uC5F0\uACB0\uB9CC \uB3FC \uC788\uB358
+      \uD30C\uC77C"
+  - slot: 6
+    clip: {fileID: 8300000, guid: 843f88f7315a7b34384ff4b7fb882ad8, type: 3}
+    volume: 1
+    startTime: 0
+    pitch: 0.92
+    minDistance: 0
+    note: "\uB098\uD0C0\uB0A8"
+  - slot: 7
+    clip: {fileID: 8300000, guid: 339d6920ba96a9e44912e66d36be4f4c, type: 3}
+    volume: 1
+    startTime: 0
+    pitch: 0.9
+    minDistance: 0
+    note: "\uB099\uD558 \uAC15\uD0C0 \xB7 \uB300\uD615 \uD3ED\uBC1C"
+  - slot: 8
+    clip: {fileID: 8300000, guid: 63bebc3cef4f5d94ca240156706febee, type: 3}
+    volume: 0.9
+    startTime: 0
+    pitch: 1
+    minDistance: 0
+    note: "\uAD00\uD1B5 \uAD11\uC120"
+  - slot: 9
+    clip: {fileID: 8300000, guid: c54d31c7df8cb7d4e80622a6f62f4507, type: 3}
+    volume: 0.85
+    startTime: 0
+    pitch: 1
+    minDistance: 0
+    note: "\uC5BC\uC74C"
+  - slot: 10
+    clip: {fileID: 8300000, guid: f2e58036cd78a674e994db153e191210, type: 3}
+    volume: 0.85
+    startTime: 0
+    pitch: 1
+    minDistance: 0
+    note: "\uB099\uB8B0"
+  - slot: 11
+    clip: {fileID: 8300000, guid: d795247655948904fa25373f9ea53606, type: 3}
+    volume: 0.9
+    startTime: 0
+    pitch: 0.85
+    minDistance: 0
+    note: "\uC5B4\uB460 \uAD6C\uCCB4 \xB7 \uC18C\uD658"
+  - slot: 12
+    clip: {fileID: 8300000, guid: 3a39861fff5dbef4bbb1fd94e286c037, type: 3}
+    volume: 0.8
+    startTime: 0
+    pitch: 0.9
+    minDistance: 0
+    note: "\uACB0\uACC4 \xB7 \uC6D0\uD615 \uC601\uC5ED"
+  - slot: 13
+    clip: {fileID: 8300000, guid: bfca528ec585a864ebff437b4ab6d80e, type: 3}
+    volume: 0.7
+    startTime: 0
+    pitch: 1
+    minDistance: 0
+    note: "\uBC14\uB2E5 \uC6D0 \uC0DD\uC131"
+  - slot: 14
+    clip: {fileID: 8300000, guid: 80a04f4eb8c56a24c82b1f4314f0ba78, type: 3}
+    volume: 1
+    startTime: 0
+    pitch: 0.8
+    minDistance: 0
+    note: "\uACB0\uACC4\uC5D0 \uAE08 \uAC10"
+  - slot: 15
+    clip: {fileID: 8300000, guid: 0c0623ff0510b8d4598a8825a338dad6, type: 3}
+    volume: 1
+    startTime: 0
+    pitch: 0.85
+    minDistance: 0
+    note: "\uACB0\uACC4 \uD30C\uAD34"
+  - slot: 20
+    clip: {fileID: 8300000, guid: a5b4676a78851ad408e98b3c68202f75, type: 3}
+    volume: 1
+    startTime: 0.5
+    pitch: 1
+    minDistance: 0
+    note: "\uD070 \uBCA0\uAE30 \u2014 \uC55E 0.5\uCD08 \uC608\uBE44\uC74C \uAC74\uB108\uB700(DK\uC640
+      \uAC19\uC740 \uBC29\uC2DD)"
+  - slot: 21
+    clip: {fileID: 8300000, guid: e5efd731d55ee4c4ebd407ed3f949a33, type: 3}
+    volume: 0.95
+    startTime: 0
+    pitch: 1
+    minDistance: 0
+    note: "\uC9E7\uC740 \uBCA0\uAE30"
+  - slot: 22
+    clip: {fileID: 8300000, guid: b8065bcffeb6d854ca0bf24c3833df18, type: 3}
+    volume: 1
+    startTime: 0
+    pitch: 0.95
+    minDistance: 0
+    note: "\uB0AB \uD22C\uCC99"
+  - slot: 23
+    clip: {fileID: 8300000, guid: 8b7acdd4373d9d145bb0ad06fee6b391, type: 3}
+    volume: 0.9
+    startTime: 0
+    pitch: 0.95
+    minDistance: 0
+    note: "\uB0AB \uBC1B\uAE30"
+  - slot: 24
+    clip: {fileID: 8300000, guid: bfca528ec585a864ebff437b4ab6d80e, type: 3}
+    volume: 0.9
+    startTime: 0
+    pitch: 0.75
+    minDistance: 0
+    note: "\uC0AC\uC2AC\uC774 \uD33D\uD33D\uD574\uC9D0 \u2014 \uC804\uC6A9 \uC0AC\uC2AC
+      \uC18C\uB9AC\uAC00 \uC5C6\uC5B4 \uB300\uC6A9(\uACB0\uC815 D8)"
+  - slot: 25
+    clip: {fileID: 8300000, guid: 11f5a6ec61bc7ae46b15ed167b50519a, type: 3}
+    volume: 1
+    startTime: 0
+    pitch: 0.9
+    minDistance: 0
+    note: "\uC5B4\uB460\uC758 \uBE44 \uC2DC\uC791(\uC720\uC131\uC6B0)"
+  - slot: 26
+    clip: {fileID: 8300000, guid: a06387a0fba4b4143ad732379a923964, type: 3}
+    volume: 0.55
+    startTime: 0
+    pitch: 0.9
+    minDistance: 0
+    note: "\uBE44 \uB8E8\uD504"
+  - slot: 30
+    clip: {fileID: 8300000, guid: 80a04f4eb8c56a24c82b1f4314f0ba78, type: 3}
+    volume: 0.9
+    startTime: 0
+    pitch: 1.15
+    minDistance: 0
+    note: "\uBD09\uC778\uC11D \uD0C0\uACA9"
+  - slot: 31
+    clip: {fileID: 8300000, guid: 561d4ba8e9fabb543a0998dc07c15b4d, type: 3}
+    volume: 0.6
+    startTime: 0
+    pitch: 1
+    minDistance: 0
+    note: "\uBD09\uC778\uC11D \uC810\uD654 \uD5C8\uBC0D(\uB8E8\uD504)"
+  - slot: 32
+    clip: {fileID: 8300000, guid: d64e4487ce196b64b97f65f33819a0e0, type: 3}
+    volume: 1
+    startTime: 0
+    pitch: 0.85
+    minDistance: 0
+    note: "\uBD09\uC778 \uC644\uC131 \xB7 \uC0AC\uB9DD"
+  - slot: 33
+    clip: {fileID: 8300000, guid: 5dfd2a02b507f11479a9ae6871fe4543, type: 3}
+    volume: 1
+    startTime: 0
+    pitch: 0.8
+    minDistance: 0
+    note: "\uC81C\uB2E8 \uBD95\uAD34 \xB7 \uB3CC"
+  - slot: 34
+    clip: {fileID: 8300000, guid: 7bb47a62404b27440be4b118c1261a24, type: 3}
+    volume: 0.9
+    startTime: 0
+    pitch: 0.9
+    minDistance: 0
+    note: "\uD398\uC774\uC9C0 \uC804\uD658 \uBC14\uB78C"
+  - slot: 35
+    clip: {fileID: 8300000, guid: 80a04f4eb8c56a24c82b1f4314f0ba78, type: 3}
+    volume: 0.8
+    startTime: 0
+    pitch: 0.7
+    minDistance: 0
+    note: "\uBB34\uC801\uC5D0 \uB9C9\uD798(\uC608\uBE44)"
+  - slot: 40
+    clip: {fileID: 8300000, guid: d043519c03adf5b4bbba96049cd1de44, type: 3}
+    volume: 0.9
+    startTime: 0.8
+    pitch: 0
+    minDistance: 0
+    note: "\uD328\uB9C1 \uCC3D \u300C\uCA0D\u300D \u2014 \uBC1D\uC740 \uC18C\uB9AC(\uBB34\uAC8C\uC911\uC2EC
+      6 kHz). \uC55E \uBB34\uC74C\xB7\uC0C1\uC2B9 0.8 s\uB97C \uAC74\uB108\uB6F4\uB2E4.
+      \uCCAD\uCDE8 \uD655\uC778 \uD544\uC694(V5)"
+  - slot: 41
+    clip: {fileID: 8300000, guid: 8b7acdd4373d9d145bb0ad06fee6b391, type: 3}
+    volume: 1
+    startTime: 0
+    pitch: 0
+    minDistance: 0
+    note: "\uD295\uACA8\uB0C4 \u2014 \uAE08\uC18D \uBD80\uB52A\uD798 \uB300\uC6A9(\uD504\uB85C\uC81D\uD2B8\uC5D0
+      \uCE7C \uBD80\uB52A\uD798 \uC18C\uB9AC \uC5C6\uC74C). \uCCAD\uCDE8 \uD655\uC778
+      \uD544\uC694(V5)"
+  - slot: 42
+    clip: {fileID: 8300000, guid: 15519c007e7ba5241802ac3ac4c4c53b, type: 3}
+    volume: 0.9
+    startTime: 0.4
+    pitch: 0
+    minDistance: 0
+    note: "\uC0AC\uC2AC\uC774 \uAC10\uACA8 \uBB36\uC784. \uCCAD\uCDE8 \uD655\uC778
+      \uD544\uC694(V5)"
+  - slot: 43
+    clip: {fileID: 8300000, guid: 640497f2589cc26499ee347fa4ec86ca, type: 3}
+    volume: 0.7
+    startTime: 0.15
+    pitch: 0
+    minDistance: 0
+    note: "\uBD80\uC11C\uC9C4 \uBC14\uB2E5 \uBCF5\uAD6C. \uCCAD\uCDE8 \uD655\uC778
+      \uD544\uC694(V5)"

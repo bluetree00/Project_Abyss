@@ -30,6 +30,20 @@ public static class UIProceduralSprites
                 return Mathf.Clamp01(1f - band);                      // 1px 안티에일리어싱
             }));
 
+    /// <summary>
+    /// 바깥으로 번지는 부드러운 후광(흰색) — 안쪽 둥근 사각은 비어 있어 버튼 위에 겹쳐도 면을 덮지 않는다.
+    /// 칸은 대상보다 <paramref name="feather"/>만큼 크게 잡는다(가장자리에서 가장 진하고 바깥으로 사라진다). 9-slice 경계 = 반경 + 번짐.
+    /// </summary>
+    public static Sprite SoftHalo(float radius = 10f, float feather = 16f, int size = 96)
+        => Get($"halo_{radius}_{feather}_{size}", () => Bake(size, radius + feather + 2f,
+            (x, y) =>
+            {
+                float d = RoundedSdf(x, y, size, radius, feather);   // 안쪽 사각(번짐만큼 들인) 밖으로의 거리
+                if (d <= 0f) return 0f;                               // 안쪽 비움
+                float t = 1f - Mathf.Clamp01(d / feather);
+                return t * t;
+            }));
+
     /// <summary>꽉 찬 원(흰색).</summary>
     public static Sprite Circle(int size = 64)
         => Get($"circle_{size}", () => Bake(size, 0f, (x, y) =>

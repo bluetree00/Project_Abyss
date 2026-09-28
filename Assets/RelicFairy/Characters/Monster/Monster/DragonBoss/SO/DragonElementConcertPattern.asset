@@ -1,0 +1,61 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5bb206bb6ef79b34083b76b127bf5c4d, type: 3}
+  m_Name: DragonElementConcertPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.DragonElementConcertPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 26
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: element_concert
+  breakOverride: -1
+  followUp: {fileID: 11400000, guid: 8141604f71a07674ea967670107f8c27, type: 2}
+  followUpLateOnly: 1
+  _cooldown: 18
+  _telegraphSeconds: 1
+  _stepInterval: 0.8
+  _armHoldSeconds: 0.25
+  _iceCount: 6
+  _iceRingRadius: 3.2
+  _iceDiscRadius: 2
+  _iceDamageMult: 0.9
+  _iceStatus: {fileID: 0}
+  _iceVfxPrefab: {fileID: 1965956805206708, guid: 18923174f2b0caa4d9dbc5fe46052f5b,
+    type: 3}
+  _iceVfxScale: 1
+  _iceSfx: {fileID: 0}
+  _thunderHalfLength: 14
+  _thunderWidth: 2.2
+  _thunderAngle: 45
+  _thunderDamageMult: 0.9
+  _thunderStatus: {fileID: 0}
+  _thunderVfxPrefab: {fileID: 1219712984032920, guid: b87545f0bb40e5f4d910e8c21aacafb7,
+    type: 3}
+  _thunderVfxScale: 1
+  _thunderVfxSpacing: 3.5
+  _thunderSfx: {fileID: 0}
+  _fireCount: 8
+  _fireScatterRadius: 6.5
+  _fireDiscRadius: 1.8
+  _fireMinSeparation: 2.6
+  _fireDamageMult: 0.9
+  _fireStatus: {fileID: 0}
+  _fireVfxPrefab: {fileID: 4830294202082529915, guid: 2850b16fc529cf247beb49ced59cb6c5,
+    type: 3}
+  _fireVfxScale: 1
+  _fireSfx: {fileID: 0}
+  _groundStateName: UAttackWindHighStart
+  _airStateName: Airborne_Hover
+  _endPoseSeconds: 0.4

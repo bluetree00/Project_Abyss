@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t1_enhanced_tendon
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t1_enhanced_tendon
-  displayName: "\uAC15\uD654\uC758 \uB8EC"
+  displayName: "\uC608\uB9AC\uD55C \uC9C8\uD48D\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 0

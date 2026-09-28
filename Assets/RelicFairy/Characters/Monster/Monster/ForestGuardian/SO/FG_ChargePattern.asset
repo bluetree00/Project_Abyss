@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7147667f70766e74bb908667940577b4, type: 3}
+  m_Name: FG_ChargePattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.FGChargePatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: charge
+  breakOverride: -1
+  minRange: 6
+  maxRange: 40
+  windupDuration: 1
+  lockDuration: 0.45
+  windupTurnSpeed: 240
+  recoveryDuration: 0.7
+  chargeSpeed: 16
+  overshoot: 3
+  stopBeforeEdge: 1.5
+  width: 2.6
+  damageMultiplier: 1.3
+  knockbackMultiplier: 1.6
+  hitRadius: 1.8

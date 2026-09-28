@@ -22,7 +22,7 @@ public sealed class UITooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPoi
 
     private static readonly Color PanelFill   = new(0.06f, 0.06f, 0.09f, 0.96f);
     private static readonly Color PanelBorder = new(0.72f, 0.62f, 0.38f, 1f);
-    private static readonly Color BodyColor   = new(0.78f, 0.80f, 0.86f, 1f);
+    private static readonly Color BodyColor   = new(0.93f, 0.94f, 0.97f, 1f);
 
     private static readonly Vector3[] _corners = new Vector3[4];
 
@@ -145,6 +145,12 @@ public sealed class UITooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPoi
         fillImg.raycastTarget = false;
         frt.SetAsFirstSibling();
 
+        // ⚠ 표시면은 VerticalLayoutGroup이라 <b>자식의 앵커·크기를 전부 빼앗는다</b> —
+        // 이 판을 레이아웃에서 빼지 않으면 세로 0으로 눌려 사라지고, 테두리용 이미지(재화색)가
+        // 통째로 배경이 된다. 그러면 밝은 재화색 판 위에 옅은 글자가 얹혀 안 읽힌다(사용자 지적 09-21).
+        var fillLayout = fill.AddComponent<LayoutElement>();
+        fillLayout.ignoreLayout = true;
+
         var vlg = _surface.GetComponent<VerticalLayoutGroup>();
         vlg.padding = new RectOffset((int)PadX, (int)PadX, (int)PadY, (int)PadY);
         vlg.spacing = 4f;
@@ -155,8 +161,8 @@ public sealed class UITooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPoi
         fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
         fitter.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;
 
-        _titleText = MakeLine("Title", 17f, FontStyles.Bold, PanelBorder);
-        _bodyText  = MakeLine("Body",  14f, FontStyles.Normal, BodyColor);
+        _titleText = MakeLine("Title", 18f, FontStyles.Bold, PanelBorder);
+        _bodyText  = MakeLine("Body",  16f, FontStyles.Normal, BodyColor);   // 가독성 하한 16
 
         _surface.SetActive(false);
     }

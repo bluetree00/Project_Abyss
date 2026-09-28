@@ -16,19 +16,21 @@ MonoBehaviour:
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
-  weight: 1
+  weight: 3
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
   maxTriggerRange: 25
-  strikeDelay: 0.5
-  blinkInterval: 0.4
-  recoveryDuration: 0.6
-  strikeCount: 3
-  backOffset: 2.5
-  blinkVfxPrefab: {fileID: 0}
-  damageMultiplier: 0
-  hitRadius: 2
-  knockbackMultiplier: 1.5
   patternCooldown: 9
+  strikeCount: 3
+  markDuration: 0.45
+  slashDelay: 0.25
+  blinkInterval: 0.2
+  endDuration: 0.6
+  recoveryDuration: 0.4
+  backOffset: 2.2
+  hitRadius: 3.2
+  hitHalfAngle: 75
+  damageMultiplier: 1
+  knockbackMultiplier: 1.5

@@ -167,6 +167,8 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         Vector3 vfxDir = Quaternion.AngleAxis(yaw, Vector3.up) * fwd;
         RelicStateVfx.PlayOneShot(JudgmentVfxKey, pos + vfxDir * 2f + Vector3.up * height, scale, vfxDir,
                                   isLast ? JudgmentFinisherVfxPrewarm : 0f);
+        // 참격마다 휘두름 소리 — 마무리는 무거운 쪽. 적중 소리(막타음)는 타격 단계가 따로 낸다.
+        Managers.Sound?.PlayEvent(isLast ? SoundEvent.PlayerSwingHeavy : SoundEvent.PlayerSwing);
 
         var owner  = _owner.gameObject;
         var buffer = new List<GameObject>(16);
@@ -200,6 +202,7 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
                 HitPoint            = target.transform.position + Vector3.up * 1.2f,
                 SourcePosition      = pos,
                 ComboStep           = hitIndex,
+                IsFinisher          = isLast,   // 마무리 한 방만 막타 연출
             });
 
             // 심판 낙인(매 타 갱신 → 지속시간은 마무리 기준). 몬스터 전용 상태라 더미는 건너뛴다.

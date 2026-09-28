@@ -1,69 +1,69 @@
-//============================================================
-// 네임스페이스 및 의존성
-//============================================================
 using System;
-using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 //============================================================
-// CharacterBase 클래스
-// 기본 플레이어 및 캐릭터 동작의 기반이 되는 컴포넌트 관리 클래스
-// Rigidbody와 Animator 컴포넌트 접근과 초기화, 기본 업데이트 처리를 담당
+// CharacterBase — 캐릭터 컴포넌트의 기반 (직접 부착하지 않는다)
+//
+// Rigidbody·Animator 캐싱과 "비동기 초기화" 골격(Template Method)을 제공한다.
+// 파생 클래스는 InitAsync를 재정의해 base.InitAsync 뒤에 자기 초기화를 잇는다.
 //============================================================
-public class CharacterBase : MonoBehaviour
+public abstract class CharacterBase : MonoBehaviour
 {
+    // ── SerializeField ────────────────────────────────────────────
+    // 리지드바디 컴포넌트 (물리 연산용). 초기화 시 같은 오브젝트의 컴포넌트로 다시 잡는다.
+    [SerializeField] private Rigidbody rb;
+
+    // ── Private ───────────────────────────────────────────────────
     // 애니메이터 컴포넌트 (캐릭터 애니메이션 제어용)
     protected Animator anim;
-    public Animator Anim => anim;  // 외부에서 접근 가능하도록 프로퍼티 제공
 
-    // 리지드바디 컴포넌트 (물리 연산용)
-    [SerializeField] private Rigidbody rb;
-    public Rigidbody Rigid => rb;  // 외부에서 접근 가능하도록 프로퍼티 제공
+    // ── Properties ────────────────────────────────────────────────
+    public Animator  Anim  => anim;
+    public Rigidbody Rigid => rb;
 
-    // 캐릭터 Transform 컴포넌트 (위치, 회전, 크기 제어용)
-    public Transform playerTransform;
+    // ── Lifecycle ─────────────────────────────────────────────────
+    // Awake에서 비동기 초기화를 시작한다. 첫 await 전까지는 Awake 안에서 동기로 실행된다.
+    private void Awake()
+    {
+        // enabled=false는 전시(Display) 목적으로 비활성화된 인스턴스 — 초기화 불필요
+        if (!enabled) return;
+        RunInitAsync(destroyCancellationToken).Forget();
+    }
 
-    // 리지드바디 회전 고정을 위해 각속도를 0으로 리셋하는 함수
+    // ── Protected Methods ─────────────────────────────────────────
+    /// <summary>비동기 초기화 훅. 파생 클래스는 base 호출 뒤에 자기 초기화를 잇는다.</summary>
+    protected virtual UniTask InitAsync(CancellationToken ct)
+    {
+        CacheCoreComponents();
+        return UniTask.CompletedTask;
+    }
+
+    /// <summary>리지드바디 회전 고정을 위해 각속도를 0으로 리셋한다.</summary>
     protected void FreezeRotation()
     {
         if (Rigid == null || Rigid.isKinematic) return;
         Rigid.angularVelocity = Vector3.zero;
     }
 
-    //============================================================
-    // 초기화 (비동기)
-    // Awake() 시점에서 비동기로 컴포넌트 초기화 수행
-    //============================================================
-    private async void Awake()
+    // ── Private Methods ───────────────────────────────────────────
+    private async UniTaskVoid RunInitAsync(CancellationToken ct)
     {
-        // enabled=false는 전시(Display) 목적으로 비활성화된 인스턴스 — 초기화 불필요
-        if (!enabled) return;
-        await InitAsync();
+        try
+        {
+            await InitAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // 초기화 도중 파괴 — 정상 종료
+        }
     }
 
-    // 비동기 초기화 함수 (파생 클래스에서 재정의 가능)
-    protected virtual async UniTask InitAsync()
+    // 핵심 컴포넌트(Animator, Rigidbody) 캐싱
+    private void CacheCoreComponents()
     {
-        InitCoreComponents();
-        await UniTask.CompletedTask;  // 혹시 비동기 작업 추가시 대비
-    }
-
-    // 핵심 컴포넌트(Animator, Rigidbody, Transform) 초기화
-    private void InitCoreComponents()
-    {
-        rb = GetComponent<Rigidbody>();
+        rb   = GetComponent<Rigidbody>();
         anim = GetComponent<Animator>();
-        playerTransform = transform;
-    }
-
-    //============================================================
-    // 매 프레임 기본 업데이트 처리
-    // 리지드바디의 회전이 물리적 영향으로 변경되는 것을 방지하기 위한 회전 고정 처리
-    //============================================================
-    protected virtual void Update()
-    {
-        FreezeRotation();
     }
 }

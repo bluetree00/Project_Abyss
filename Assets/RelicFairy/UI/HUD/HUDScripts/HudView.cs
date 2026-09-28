@@ -29,14 +29,12 @@ public sealed class HudView : MonoBehaviour
     private const string TipEssenceTitle = "심연의 정수";
     private const string TipEssenceBody  = "런을 넘어 남는 유일한 재화. 기억의 제단에서 해금에 쓴다.";
     private const string TipRuneOreTitle = "원석";
-    private const string TipRuneOreBody  = "정제소에서 존핵 룬을 벼린다.\n런이 끝나면 사라진다.";
+    private const string TipRuneOreBody  = "정제소에서 무작위 룬을 뽑는다.\n런이 끝나면 사라진다.";
 
     [Header("Sections")]
     [SerializeField] private GameObject topBarRoot;
     [SerializeField] private CombatPanelView combatPanel;
-    [SerializeField] private GameObject gridPanel;
     [SerializeField] private BossPanelView bossPanelView;
-    [SerializeField] private GameObject systemNoticesRoot;
     [SerializeField] private GameObject minimapPanel;
     [SerializeField] private CovenantPanelView covenantPanel;
 
@@ -66,10 +64,6 @@ public sealed class HudView : MonoBehaviour
     [SerializeField] private Vector2 currencyRowOffset   = new Vector2(-56f, -74f);
     [Tooltip("pill 내용(아이콘+수치)을 테두리 안쪽으로 들여넣는 여백 (L,B,R,T)")]
     [SerializeField] private Vector4 currencyPillPadding = new Vector4(14f, 8f, 14f, 8f);
-    /// <summary>테두리 아트에 코인이 그려져 있어 기존 GoldIcon과 중복될 때 숨긴다.</summary>
-    [SerializeField] private bool hideLegacyGoldIcon = true;
-    [Tooltip("래거시 상단바 배경판(Panel_TopBar의 Image) 투명화 — 재화 pill이 자체 배경을 가져 이중이 된다.")]
-    [SerializeField] private bool hideLegacyTopBarBg = true;
 
     // 재화 라인 — 골드/강화재료/원석이 같은 줄에 같은 배경으로. 0이면 연료 pill 숨김.
     private RectTransform _currencyRow;
@@ -159,8 +153,10 @@ public sealed class HudView : MonoBehaviour
         hlg.childControlWidth  = true;  hlg.childControlHeight = true;
         hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
 
-        // 골드 — 기존 goldText를 pill 안으로 이동(래거시 위치 정리). 테두리엔 코인이 포함됨.
-        _goldSlot = MakeCurrencyPill("Pill_Gold", goldFrameSprite != null ? goldFrameSprite : currencyFrameSprite,
+        // 골드 — 기존 goldText를 pill 안으로 이동(래거시 위치 정리).
+        // 공용 칸 테두리(새 「재화 UI」 세트)가 있으면 그걸 쓴다 — 옛 @2x 골드바 테두리는 코인이 박힌 6.5:1 아트라
+        // 150×40에 눌려(×1.72) 코인이 타원이 되고, 골드 아이콘(아이콘_골드)과 겹쳐 코인이 두 개로 보였다(09-19).
+        _goldSlot = MakeCurrencyPill("Pill_Gold", currencyFrameSprite != null ? currencyFrameSprite : goldFrameSprite,
                                      iconColor: null, GoldFrameTint, TipGoldTitle, TipGoldBody, out _,
                                      reuseText: goldText, iconSprite: goldIconSprite);
 
@@ -182,19 +178,6 @@ public sealed class HudView : MonoBehaviour
         _enhanceMatSlot.SetActive(false);
         _runeOreSlot.SetActive(false);
         _essenceSlot.SetActive(false);
-
-        // 래거시 골드 아이콘 — 테두리 아트에 코인이 있어 중복이므로 숨김.
-        if (hideLegacyGoldIcon && goldFrameSprite != null)
-        {
-            var legacy = FindChildRecursive(transform, "GoldIcon");
-            if (legacy != null && legacy.gameObject.activeSelf)
-                legacy.gameObject.SetActive(false);
-        }
-
-        // 래거시 상단바 배경판(Panel_TopBar의 Image) — 재화 pill이 자체 배경(골드바 내부)을 가지므로
-        // 뒤에 남으면 이중 배경으로 보인다. 스킨 시 투명화(오브젝트는 유지 — 자식 레이아웃 보존).
-        if (hideLegacyTopBarBg && parent.TryGetComponent<Image>(out var topBarBg))
-            topBarBg.color = new Color(0f, 0f, 0f, 0f);
     }
 
     /// <summary>재화 pill 1개: 공통 배경(골드바 내부) + 테두리(선택) + 아이콘(선택) + 수치.</summary>
@@ -302,49 +285,12 @@ public sealed class HudView : MonoBehaviour
 
         SetActiveSafe(topBarRoot,       (sections & HUDIds.Section.TopBar)        != 0);
         SetActiveSafe(combatPanel,      showCombat);
-        SetActiveSafe(gridPanel,        (sections & HUDIds.Section.GridPanel)      != 0);
         SetActiveSafe(bossPanelView,    (sections & HUDIds.Section.BossPanel)      != 0);
-        SetActiveSafe(systemNoticesRoot,(sections & HUDIds.Section.SystemNotices)  != 0);
-        bool showMinimap = (sections & HUDIds.Section.Minimap) != 0;
-        SetActiveSafe(minimapPanel,     showMinimap);
+        SetActiveSafe(minimapPanel,     (sections & HUDIds.Section.Minimap)        != 0);
         SetActiveSafe(covenantPanel,    (sections & HUDIds.Section.CovenantPanel)  != 0);
-
-        // TopBar의 맵 아이콘은 미니맵과 한 세트다. 로비엔 맵이 없는데 TopBar만 켜져
-        // 아이콘이 홀로 남아 있었다 — 미니맵 섹션에 묶어 함께 켜고 끈다.
-        SetMapIconVisible(showMinimap);
 
         if (showCombat)
             EnsureCombatPanelVisible();
-    }
-
-    private Transform _mapIcon;
-    private bool      _mapIconSearched;
-    private bool      _mapIconArtWarned;
-
-    /// <summary>TopBar 맵 아이콘 표시. 참조가 없어 이름으로 1회만 찾아 캐시한다(GoldIcon과 동일 패턴).</summary>
-    private void SetMapIconVisible(bool on)
-    {
-        if (!_mapIconSearched)
-        {
-            _mapIconSearched = true;
-            _mapIcon = FindChildRecursive(transform, "HUD_Map");
-        }
-        // 아트가 없는 아이콘은 <b>흰 사각형</b>으로 뜬다. 이 자리는 전투·보스 모드에서만 켜져
-        // 로비 실측에선 안 보였고, 런 HUD 실측(2026-09-10)에서 우상단 150×150 흰 판으로 드러났다.
-        // 스프라이트가 붙기 전까지는 켜지 않는다 — 지도는 좌상단 미니맵이 이미 보여준다.
-        bool show = on;
-        if (show && _mapIcon != null && _mapIcon.TryGetComponent<Image>(out var mapImg) && mapImg.sprite == null)
-        {
-            show = false;
-            if (!_mapIconArtWarned)
-            {
-                _mapIconArtWarned = true;
-                Debug.LogWarning("[HudView] HUD_Map에 스프라이트가 없어 맵 아이콘을 띄우지 않는다(흰 사각형 방지). 아트 배선 필요.");
-            }
-        }
-
-        if (_mapIcon != null && _mapIcon.gameObject.activeSelf != show)
-            _mapIcon.gameObject.SetActive(show);
     }
 
     public void EnsureCombatPanelVisible()

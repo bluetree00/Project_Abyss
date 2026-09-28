@@ -14,8 +14,6 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
 {
     // ── Panel Colors ──────────────────────────────────────────────
     private static readonly Color C_BG         = new(0.05f, 0.06f, 0.09f, 0.98f);
-    private static readonly Color C_HEADER_BG  = new(0.07f, 0.09f, 0.14f, 1f);
-    private static readonly Color C_SECTION_BG = new(0.07f, 0.08f, 0.12f, 1f);
     private static readonly Color C_CARD_BG    = new(0.09f, 0.10f, 0.15f, 0.85f);
     private static readonly Color C_DIVIDER    = new(0.18f, 0.22f, 0.32f, 0.8f);
 
@@ -43,8 +41,19 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
     // BottomBar 높이(px). ApplyRightPanelLayout과 동일값 유지.
     private const float BOTTOM_BAR_PX = 0f;
 
+    // 좌측 열 공통 좌우 여백 — 아래 속성 시너지(MerlinRuneSynergyStatusView.Gutter)와 같은 값(09-28, 섹션마다 0~25px로 제각각이었다).
+    public  const float Gutter  = 12f;
+    private const float NameX   = 64f;   // 초상(52) + 12 — 초상이 없으면 0으로 당긴다
+    // 섹션 머리띠 — 속성 시너지 머리띠와 같은 모양(색·글자). 같은 열의 두 제목이 서로 다른 띠라 조각나 보였다.
+    public static readonly Color SectionBand = new(0.14f, 0.18f, 0.26f, 0.88f);
+    public static readonly Color SectionInk  = new(0.75f, 0.90f, 1.00f, 1f);
+    // 머리띠 높이 — 활성 효과(≈21px)와 속성 시너지(≈44px)가 비율 앵커라 서로 달랐다(09-28). 둘 다 이 고정 높이.
+    public const float SectionBandH = 32f;
+
     // ── Private fields ────────────────────────────────────────────
     private Image      _portraitImg;
+    private GameObject _portraitBg;
+    private RectTransform _nameRT, _subRT;
     private TMP_Text   _nameText;
     private RectTransform _hpFill;
     private Image      _hpFillImg;
@@ -148,8 +157,8 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         var crt = contentGO.GetComponent<RectTransform>();
         crt.anchorMin = Vector2.zero;
         crt.anchorMax = Vector2.one;
-        crt.offsetMin = new Vector2(0f, BOTTOM_BAR_PX);
-        crt.offsetMax = Vector2.zero;
+        crt.offsetMin = new Vector2(Gutter, BOTTOM_BAR_PX + 6f);
+        crt.offsetMax = new Vector2(-Gutter, -6f);
 
         var ct = contentGO.transform;
         BuildHeader(ct);
@@ -167,7 +176,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         var go = Go("Header");
         go.transform.SetParent(parent, false);
         Anc(go.GetComponent<RectTransform>(), new Vector2(0f, 0.880f), Vector2.one);
-        go.AddComponent<Image>().color = C_HEADER_BG;
+        // (머리 바탕 판은 뺐다 — 열 전체가 한 장의 판으로 읽히게, 09-28)
 
         // 초상화 배경 (좌측 정사각형)
         var portraitBgGO = Go("PortraitBG");
@@ -177,8 +186,9 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         pbrt.anchorMax        = new Vector2(0f, 1f);
         pbrt.pivot            = new Vector2(0f, 0.5f);
         pbrt.sizeDelta        = new Vector2(52f, -8f);
-        pbrt.anchoredPosition = new Vector2(8f, 0f);
+        pbrt.anchoredPosition = Vector2.zero;
         portraitBgGO.AddComponent<Image>().color = new Color(0.14f, 0.17f, 0.26f, 1f);
+        _portraitBg = portraitBgGO;
 
         // 초상화 이미지 (별도 자식 GO)
         var portraitImgGO = Go("PortraitImg");
@@ -192,22 +202,24 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         _portraitImg.preserveAspect = true;
 
         // 캐릭터 이름 (굵게)
-        _nameText = Txt(go.transform, "CharName", "—", 18f, C_HDR_TXT, bold: true);
+        _nameText = Txt(go.transform, "CharName", "—", 22f, C_HDR_TXT, bold: true);   // 09-25: 18 → 22(패널 제목)
         var nrt = _nameText.GetComponent<RectTransform>();
         nrt.anchorMin = new Vector2(0f, 0.45f);
         nrt.anchorMax = new Vector2(1f, 1f);
-        nrt.offsetMin = new Vector2(68f, 0f);
-        nrt.offsetMax = new Vector2(-6f, 0f);
+        nrt.offsetMin = new Vector2(NameX, 0f);
+        nrt.offsetMax = Vector2.zero;
         _nameText.alignment = TextAlignmentOptions.MidlineLeft;
+        _nameRT = nrt;
 
         // 부제 (클래스 등 보조 정보)
         var subTxt = Txt(go.transform, "SubInfo", "캐릭터 정보", 16f, C_SUB_TXT);
         var srt2 = subTxt.GetComponent<RectTransform>();
         srt2.anchorMin = new Vector2(0f, 0f);
         srt2.anchorMax = new Vector2(1f, 0.52f);
-        srt2.offsetMin = new Vector2(68f, 2f);
-        srt2.offsetMax = new Vector2(-6f, 0f);
+        srt2.offsetMin = new Vector2(NameX, 2f);
+        srt2.offsetMax = Vector2.zero;
         subTxt.alignment = TextAlignmentOptions.MidlineLeft;
+        _subRT = srt2;
     }
 
     // ── HP Section ────────────────────────────────────────────────
@@ -218,25 +230,25 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         sec.transform.SetParent(parent, false);
         Anc(sec.GetComponent<RectTransform>(),
             new Vector2(0f, 0.785f), new Vector2(1f, 0.878f));
-        sec.AddComponent<Image>().color = C_SECTION_BG;
+        // (섹션 바탕 판은 뺐다 — 머리·HP·스탯이 한 장의 판 위에 놓인다, 09-28)
 
         // "HP" 레이블
         var lbl = Txt(sec.transform, "HPLabel", "HP", 16f, C_LBL);
         Anc(lbl.GetComponent<RectTransform>(),
-            new Vector2(0.04f, 0.55f), new Vector2(0.18f, 1f));
+            new Vector2(0f, 0.55f), new Vector2(0.18f, 1f));
         lbl.alignment = TextAlignmentOptions.MidlineLeft;
 
         // HP 수치 텍스트
         _hpText = Txt(sec.transform, "HPValue", "— / —", 16f, C_VAL, bold: true);
         Anc(_hpText.GetComponent<RectTransform>(),
-            new Vector2(0.18f, 0.52f), new Vector2(0.97f, 1f));
+            new Vector2(0.18f, 0.52f), new Vector2(1f, 1f));
         _hpText.alignment = TextAlignmentOptions.MidlineRight;
 
         // 바 트랙 (어두운 배경)
         var track = Go("BarTrack");
         track.transform.SetParent(sec.transform, false);
         Anc(track.GetComponent<RectTransform>(),
-            new Vector2(0.04f, 0.08f), new Vector2(0.96f, 0.50f));
+            new Vector2(0f, 0.14f), new Vector2(1f, 0.42f));   // 스탯 카드와 좌우 끝을 맞춘다
         track.AddComponent<Image>().color = new Color(0.15f, 0.08f, 0.08f, 0.9f);
 
         // 채움 바
@@ -259,7 +271,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         Anc(grid.GetComponent<RectTransform>(),
             new Vector2(0f, 0.395f), new Vector2(1f, 0.782f));
 
-        const float L = 0.02f, R = 0.49f, RL = 0.51f, RR = 0.98f;
+        const float L = 0f, R = 0.485f, RL = 0.515f, RR = 1f;   // 좌우 끝 = 열 여백(HP 막대·머리띠와 같은 선)
         const float R1T = 0.97f, R1B = 0.68f;
         const float R2T = 0.65f, R2B = 0.36f;
         const float R3T = 0.33f, R3B = 0.03f;
@@ -268,8 +280,8 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         _txtDef   = StatCard(grid.transform, "방어력",   C_DEF,   new(RL, R1B), new(RR, R1T));
         _txtLuck  = StatCard(grid.transform, "행운",     C_LUCK,  new(L,  R2B), new(R,  R2T));
         _txtSpd   = StatCard(grid.transform, "이동속도", C_SPD,   new(RL, R2B), new(RR, R2T));
-        _txtCdr   = StatCard(grid.transform, "스킬CDR",  C_CDR,   new(L,  R3B), new(R,  R3T));
-        _txtMaxHp = StatCard(grid.transform, "최대HP",   C_MAXHP, new(RL, R3B), new(RR, R3T));
+        _txtCdr   = StatCard(grid.transform, "스킬 쿨감", C_CDR,   new(L,  R3B), new(R,  R3T));   // 약어(CDR) 대신 한글
+        _txtMaxHp = StatCard(grid.transform, "최대 HP",  C_MAXHP, new(RL, R3B), new(RR, R3T));
     }
 
     private TMP_Text StatCard(Transform parent, string label, Color accent,
@@ -297,7 +309,8 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         lblT.alignment = TextAlignmentOptions.MidlineLeft;
 
         // 수치 (하단, 크고 밝게)
-        var valT = Txt(card.transform, "Value", "—", 18f, C_VAL, bold: true);
+        // 값이 카드의 주인공 — 라벨(16)보다 확실히 크게. 칸 높이(≈26px)에 22px 한 줄이 든다.
+        var valT = Txt(card.transform, "Value", "—", 22f, C_VAL, bold: true);
         Anc(valT.GetComponent<RectTransform>(),
             new Vector2(0.12f, 0.04f), new Vector2(0.98f, 0.56f));
         valT.alignment = TextAlignmentOptions.MidlineLeft;
@@ -323,11 +336,12 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         // 헤더 바
         var hdr = Go("EffectsHdr");
         hdr.transform.SetParent(parent, false);
-        // 16px 한 줄(줄높이 ≈21)이 들어가게 띠를 0.046(≈21px)로 — 예전 0.032(≈14px)는 글자가 잘렸다.
-        Anc(hdr.GetComponent<RectTransform>(),
-            new Vector2(0f, 0.346f), new Vector2(1f, 0.392f));
-        hdr.AddComponent<Image>().color = C_SECTION_BG;
-        var hdrTxt = Txt(hdr.transform, "Title", "◆ 활성 효과", 16f, C_HDR_TXT);
+        // 스탯 판 아래(0.392)에서 SectionBandH만큼 — 속성 시너지 머리띠와 같은 높이(예전 비율 0.046 ≈ 21px).
+        var hrt = hdr.GetComponent<RectTransform>();
+        Anc(hrt, new Vector2(0f, 0.392f), new Vector2(1f, 0.392f));
+        hrt.offsetMin = new Vector2(0f, -SectionBandH);
+        hdr.AddComponent<Image>().color = SectionBand;   // 속성 시너지 머리띠와 같은 띠
+        var hdrTxt = Txt(hdr.transform, "Title", "◆ 활성 효과", 17f, SectionInk, bold: true);   // 속성 시너지 제목(17 굵게)과 같은 급
         Anc(hdrTxt.GetComponent<RectTransform>(),
             new Vector2(0.04f, 0f), new Vector2(1f, 1f));
         hdrTxt.alignment = TextAlignmentOptions.MidlineLeft;
@@ -335,8 +349,9 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         // ScrollRect 뷰포트
         var scrollGO = Go("EffectsScroll");
         scrollGO.transform.SetParent(parent, false);
-        Anc(scrollGO.GetComponent<RectTransform>(),
-            Vector2.zero, new Vector2(1f, 0.346f));
+        var srt = scrollGO.GetComponent<RectTransform>();
+        Anc(srt, Vector2.zero, new Vector2(1f, 0.392f));
+        srt.offsetMax = new Vector2(0f, -SectionBandH);
         scrollGO.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.06f);
         var mask = scrollGO.AddComponent<RectMask2D>();
         mask.padding = new Vector4(0f, 4f, 0f, 4f);
@@ -359,10 +374,12 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
 
         var vlg = content.AddComponent<VerticalLayoutGroup>();
         vlg.childAlignment       = TextAnchor.UpperLeft;
-        vlg.spacing              = 3f;
-        vlg.padding              = new RectOffset(4, 4, 4, 4);
+        vlg.spacing              = 4f;
+        vlg.padding              = new RectOffset(0, 0, 6, 4);
         vlg.childControlWidth    = true;
-        vlg.childControlHeight   = false;
+        // 높이도 그룹이 잡아야 칩의 LayoutElement(34)가 먹는다 — false면 새 오브젝트 기본 100px이 그대로 남아
+        // 서약 칩 하나가 100px 금색 상자가 됐다(09-28 사용자 캡처).
+        vlg.childControlHeight   = true;
         vlg.childForceExpandWidth  = true;
         vlg.childForceExpandHeight = false;
 
@@ -378,12 +395,16 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
     private void RefreshHeader()
     {
         var charData = _run?.Player?.CharacterData;
+        // 런의 CharacterData는 공용 기본 SO(이름 "PlayerCharacter")다 — 누구로 싸우는지는 장착 유물이 정한다.
+        var relic = _run?.Player?.RelicClass;
         if (_nameText != null)
-            _nameText.text = charData != null ? charData.characterName : "—";
+            _nameText.text = relic != null && !string.IsNullOrEmpty(relic.DisplayName) ? relic.DisplayName
+                           : charData != null ? charData.characterName : "—";
 
-        if (_portraitImg != null && charData?.portrait != null)
+        var portrait = relic != null && relic.Portrait != null ? relic.Portrait : charData?.portrait;
+        if (_portraitImg != null && portrait != null)
         {
-            _portraitImg.sprite = charData.portrait;
+            _portraitImg.sprite = portrait;
             _portraitImg.color  = Color.white;
         }
         else if (_portraitImg != null)
@@ -391,6 +412,13 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
             _portraitImg.sprite = null;
             _portraitImg.color  = new Color(0.25f, 0.30f, 0.45f, 0.6f);
         }
+
+        // 초상이 없으면 빈 네모를 띄우지 않는다 — 이름을 왼쪽 끝으로 당긴다(09-28: 빈 칸이 고장처럼 보였다).
+        bool hasPortrait = portrait != null;
+        if (_portraitBg != null) _portraitBg.SetActive(hasPortrait);
+        float nx = hasPortrait ? NameX : 0f;
+        if (_nameRT != null) _nameRT.offsetMin = new Vector2(nx, _nameRT.offsetMin.y);
+        if (_subRT  != null) _subRT.offsetMin  = new Vector2(nx, _subRT.offsetMin.y);
     }
 
     private void RefreshStats()
@@ -453,9 +481,10 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
                         "OnUse"   => "사용시",
                         _         => e.trigger,
                     };
-                    float pct  = e.value * 100f;
-                    string body = $"{e.effect_type}  {(pct >= 0 ? "+" : "")}{pct:F0}%";
-                    _effectRows.Add(MakeChip(body, badge, accent));
+                    // 코드 이름(FireEmber 등)이 그대로 보였다 — 차트 설명의 「N단계 이름」을 쓴다(없을 때만 코드명).
+                    string elemName = ElementDef.GetById(zoneId)?.Name ?? zoneId;
+                    string body = $"{elemName} {TierTitle(e)}";
+                    _effectRows.Add(MakeChip(body, badge, accent, e.description));
                     any = true;
                 }
             }
@@ -472,7 +501,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
                     CovenantStage.Evolved  => "진화",
                     _                      => "기본",
                 };
-                _effectRows.Add(MakeChip(c.DisplayName, badge, C_COVENANT));
+                _effectRows.Add(MakeChip(c.DisplayName, badge, C_COVENANT, c.DisplayName));
                 any = true;
             }
         }
@@ -608,13 +637,23 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
 
     // ── Chip Builders ─────────────────────────────────────────────
 
-    private GameObject MakeChip(string body, string badge, Color accent)
+    private const float ChipH = 34f;   // 16px 한 줄 + 위아래 여백
+
+    /// <summary>차트 설명 "N단계 이름: 설명"의 앞머리("N단계 이름"). 설명이 없으면 코드명.</summary>
+    private static string TierTitle(RuneSynergyEntry e)
+    {
+        if (string.IsNullOrEmpty(e.description)) return e.effect_type;
+        int colon = e.description.IndexOf(':');
+        return (colon > 0 ? e.description.Substring(0, colon) : e.description).Trim();
+    }
+
+    private GameObject MakeChip(string body, string badge, Color accent, string detail = null)
     {
         var go = Go("Chip");
         go.transform.SetParent(_effectContent, false);
-        go.AddComponent<LayoutElement>().preferredHeight = 38f;
+        go.AddComponent<LayoutElement>().preferredHeight = ChipH;
         go.AddComponent<Image>().color = new Color(
-            accent.r * 0.14f, accent.g * 0.14f, accent.b * 0.14f, 0.88f);
+            accent.r * 0.10f, accent.g * 0.10f, accent.b * 0.10f, 0.75f);
 
         // 좌측 악센트 스트립
         var strip = Go("Strip");
@@ -622,21 +661,20 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         var srt = strip.GetComponent<RectTransform>();
         srt.anchorMin        = Vector2.zero;
         srt.anchorMax        = new Vector2(0f, 1f);
-        srt.sizeDelta        = new Vector2(4f, 0f);
-        srt.anchoredPosition = new Vector2(2f, 0f);
+        srt.sizeDelta        = new Vector2(3f, 0f);
+        srt.anchoredPosition = new Vector2(1.5f, 0f);
         strip.AddComponent<Image>().color = accent;
 
-        // 배지 (우측)
+        // 배지 (우측) — 글자 태그. 예전의 색 블록(62px)은 칩보다 무거워 「기본」 같은 부가 정보가 주인공처럼 보였다.
         var badgeGO = Go("Badge");
         badgeGO.transform.SetParent(go.transform, false);
         var brt = badgeGO.GetComponent<RectTransform>();
         brt.anchorMin        = new Vector2(1f, 0.15f);
         brt.anchorMax        = new Vector2(1f, 0.85f);
         brt.pivot            = new Vector2(1f, 0.5f);
-        brt.sizeDelta        = new Vector2(46f, 0f);
+        brt.sizeDelta        = new Vector2(62f, 0f);
         brt.anchoredPosition = new Vector2(-3f, 0f);
-        badgeGO.AddComponent<Image>().color = new Color(
-            accent.r * 0.30f, accent.g * 0.30f, accent.b * 0.30f, 0.9f);
+        badgeGO.AddComponent<Image>().color = Color.clear;
         var badgeLblGO = Go("BadgeLabel");
         badgeLblGO.transform.SetParent(badgeGO.transform, false);
         var blrt = badgeLblGO.GetComponent<RectTransform>();
@@ -645,19 +683,19 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         blrt.offsetMin = blrt.offsetMax = Vector2.zero;
         var badgeTxt = badgeLblGO.AddComponent<TextMeshProUGUI>();
         badgeTxt.text          = badge;
-        badgeTxt.fontSize      = 12f;
-        badgeTxt.color         = accent;
-        badgeTxt.alignment     = TextAlignmentOptions.Center;
+        badgeTxt.fontSize      = 16f;   // 12px는 하한 아래였다
+        badgeTxt.color         = new Color(accent.r, accent.g, accent.b, 0.8f);
+        badgeTxt.alignment     = TextAlignmentOptions.MidlineRight;
         badgeTxt.raycastTarget = false;
 
         // 본문 텍스트
         var bodyGO = Go("Body");
         bodyGO.transform.SetParent(go.transform, false);
         Anc(bodyGO.GetComponent<RectTransform>(),
-            new Vector2(0.08f, 0f), new Vector2(0.72f, 1f));
+            new Vector2(0.04f, 0f), new Vector2(0.80f, 1f));
         var bodyTxt = bodyGO.AddComponent<TextMeshProUGUI>();
         bodyTxt.text = body;
-        bodyTxt.fontSize = 14f;
+        bodyTxt.fontSize = 16f;
         bodyTxt.color = new Color(
             Mathf.Clamp01(accent.r * 0.65f + 0.35f),
             Mathf.Clamp01(accent.g * 0.65f + 0.35f),
@@ -665,11 +703,12 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         bodyTxt.alignment          = TextAlignmentOptions.MidlineLeft;
         bodyTxt.raycastTarget      = false;
         bodyTxt.textWrappingMode = TextWrappingModes.NoWrap;
+        bodyTxt.overflowMode     = TextOverflowModes.Ellipsis;   // 긴 서약 이름(「연주[실버] × 마지막 숨결[실버]」)은 태그 앞에서 말줄임 — 전문은 툴팁
 
         // 마우스 호버 → 툴팁 표시
         var et = go.AddComponent<EventTrigger>();
         var chipRT = go.GetComponent<RectTransform>();
-        string cb = badge, cy = body;
+        string cb = badge, cy = string.IsNullOrEmpty(detail) ? body : detail;   // 툴팁은 설명 전문
         Color ca = accent;
 
         var enter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
@@ -687,11 +726,11 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
     {
         var go = Go("NoEffect");
         go.transform.SetParent(_effectContent, false);
-        go.AddComponent<LayoutElement>().preferredHeight = 32f;
+        go.AddComponent<LayoutElement>().preferredHeight = ChipH;
         var txt = go.AddComponent<TextMeshProUGUI>();
-        txt.text          = "효과 없음";
-        txt.fontSize      = 12f;
-        txt.color         = new Color(0.38f, 0.42f, 0.52f, 0.7f);
+        txt.text          = "룬을 놓으면 켜진 효과가 여기 쌓입니다";   // 「효과 없음」 대신 할 일을 한 줄로
+        txt.fontSize      = 16f;                                   // 글자 하한(12px·α0.7은 판에 묻혔다)
+        txt.color         = new Color(0.55f, 0.60f, 0.72f, 0.85f);
         txt.alignment     = TextAlignmentOptions.Center;
         txt.raycastTarget = false;
         return go;

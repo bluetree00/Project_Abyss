@@ -207,6 +207,9 @@ public static class EffectDescriptionFormatter
             case EffectUnit.Chance:
                 return $"{(value * 100f).ToString("0.#", ci)}% 확률";
 
+            case EffectUnit.Percent:
+                return $"{sign}{value.ToString("0.#", ci)}%";
+
             case EffectUnit.Auto:
             default:
                 // AllDamage 휴리스틱: |value|>=1 → 절댓값, 아니면 비율.
@@ -233,7 +236,8 @@ public static class EffectDescriptionFormatter
                 return true;
         }
         // 확률/지속/표기없음은 음수여도 해로움으로 단정하지 않음(부호가 페널티를 뜻하지 않을 수 있음).
-        if (unit == EffectUnit.Ratio || unit == EffectUnit.Flat || unit == EffectUnit.FlatInt || unit == EffectUnit.Auto)
+        if (unit == EffectUnit.Ratio || unit == EffectUnit.Flat || unit == EffectUnit.FlatInt || unit == EffectUnit.Auto
+            || unit == EffectUnit.Percent)
             return value < 0f;
         return false;
     }

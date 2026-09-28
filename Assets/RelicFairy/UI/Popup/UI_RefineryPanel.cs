@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -8,9 +9,10 @@ using UnityEngine.UI;
 /// <summary>
 /// 정제소 패널 (Canvas_Popup, Addressable "UI_RefineryPanel").
 ///
-/// 원석을 넣고 돌려 판을 강화하는 특수 룬(존핵)을 만든다. 로직은 <see cref="RefineryService"/>(런 스코프),
-/// 이 패널은 그 표현: 속성 젬 선택 → 돌리기 → 등급 리빌 → 결과/돌발 이벤트 표시 → 보관함으로.
-/// 설계: 바탕화면 기획/RelicFairy_기획_정제소_속성응축.md
+/// 원석을 넣고 돌리면 룬 하나가 무작위로 나온다. 로직은 <see cref="RefineryService"/>(런 스코프),
+/// 이 패널은 그 표현: 돌리기 → 등급 리빌(젬 링의 불이 돌다 나온 룬의 속성에 멎는다) → 결과 → 룬판으로.
+/// 09-28 사용자 「간단하게 줄여서 룬을 랜덤으로 뽑는 시스템으로」 — 속성 선택 · 피버 · 돌발 이벤트 · 재점화 · 방 특전을 걷었다.
+/// 구운 프리팹에 남은 그 요소들은 <see cref="EnsureRuntimeLayout"/>가 숨긴다.
 /// </summary>
 public sealed class UI_RefineryPanel : UI_Popup
 {
@@ -36,6 +38,15 @@ public sealed class UI_RefineryPanel : UI_Popup
     private const float HexW      = 96f;
     private const float HexH      = 115f;
     private const float ColX      = 390f;   // 우측 상태 컬럼 중심
+    private const float OddsY     = AltarCy; // 확률 막대 — 피버가 비운 자리로 올려 제단 높이에(09-28)
+    private const float FooterY   = -274f;
+    private const float CostX     = -170f;   // 하단 [비용][돌리기] 두 칸 — 재점화가 빠져 가운데로 모은다
+    private const float SpinX     =  170f;
+    private const string IdleHint = "원석을 넣고 돌리면 룬 하나가 나온다";
+
+    /// <summary>걷은 기능(09-28)의 구운 요소 — 피버 · 돌발 배너 · 화살표 · 예약 표시 · 재점화 · 방 특전.</summary>
+    private static readonly string[] RetiredNodes =
+        { "FeverGauge", "EventBanner", "EvPointer", "Reserved", "ReforgeBtn", "FreeSpin" };
 
     /// <summary>모든 요소를 창 중심 기준 오프셋으로 배치한다 — 완성본 좌표를 그대로 옮기기 위해.</summary>
     private static readonly Vector2 Half = new(0.5f, 0.5f);
@@ -43,9 +54,9 @@ public sealed class UI_RefineryPanel : UI_Popup
     private static readonly Color HeatDefault = new(0.92f, 0.64f, 0.29f, 1f);
 
     private RefineryService _svc;
-    private string _selectedElement;
     private bool _busy;
     private bool _built;
+    private bool _themedSpin;   // [돌리기]에 공통 베벨을 입혔다 — 누를 수 있음/없음을 금 틴트로
 
     [SerializeField] private Transform _root;
     [SerializeField] private Image    _window;    // 창 배경(9-slice 대체 대상) — 정제소 바탕 아트
@@ -56,23 +67,28 @@ public sealed class UI_RefineryPanel : UI_Popup
     [SerializeField] private TMP_Text _resultAmt;
     [SerializeField] private TMP_Text _rarLine;
     [SerializeField] private OddsBarView    _oddsBar;
-    [SerializeField] private FeverGaugeView _feverGauge;
     [SerializeField] private TMP_Text _costText;
     [SerializeField] private TMP_Text _oreText;    // 우상단 원석 보유 카운터(완성본)
     [SerializeField] private TMP_Text _hint;
     [SerializeField] private Image    _spinBtnImg;
     [SerializeField] private Image    _costPlateImg;
     [SerializeField] private Image    _altarRing;
-    [SerializeField] private GameObject    _freeBtn;      // 첫 돌리기 무료(방 특전) — 아트에 글자가 없어 라벨을 얹는다
-    [SerializeField] private TMP_Text      _freeLabel;
-    [SerializeField] private GameObject    _eventBanner;
-    [SerializeField] private RectTransform _eventBannerRT;
-    [SerializeField] private Image         _eventBannerImg;   // MakeFrame의 inner(채움) — 종류별 색/아트 스왑 대상
-    [SerializeField] private TMP_Text      _eventText;
-    [SerializeField] private TMP_Text      _eventTitle;
-    [SerializeField] private GameObject    _reforgeBtn;
-    [SerializeField] private TMP_Text      _reservedText;     // 과열·불티가 '다음 회 예약됨'을 알리는 표시
-    [SerializeField] private TMP_Text      _eventPointer;     // 제단 → 배너로 시선을 넘기는 화살표(연출 전용, 상시 비표시)
+
+    // ── 응축 3박자 (기획_정제소 §7 · 구현설계 R5) ──
+    // 기획: "로 자체가 빛을 응결 · 등급이 높을수록 연출이 길고 화려". 예전엔 링이 0.5초 깜빡이고
+    // 결과가 그냥 떠서, 전설이 나와도 흔한 것과 같은 그림이었다(09-19 검수).
+    private const float GatherBase = 0.45f;   // 빛을 모으는 시간(+등급마다 0.26초)
+    private const int   MoteCount  = 14;      // 제단으로 빨려드는 불티
+    private const float SlipDur    = 0.22f;   // 결과가 판으로 넘어가며 빨려드는 시간
+
+    [SerializeField] private RectTransform _fxRoot;       // 제단 위 연출 층(결과 틀보다 뒤)
+    [SerializeField] private Image         _revealFlash;  // 공개 섬광(등급색)
+    [SerializeField] private Image         _revealRays;   // 전설 전용 빛살
+    private Image[] _motes;   // 코드로 그린 빛 — 프리팹에 저장되지 않아 런타임에 만든다
+
+    // ── 좌측 「나올 룬 / 나온 룬」 판 (09-27 · 09-28) ── 프리팹이 구워져 있어 런타임에 짓는다.
+    private Image    _infoGem;
+    private TMP_Text _infoCaption, _infoName, _infoDesc, _infoFoot;
 
     // ── Lifecycle ──
 
@@ -81,6 +97,8 @@ public sealed class UI_RefineryPanel : UI_Popup
         base.Init();
         _svc = GameRunBootstrapper.Instance?.Run?.Refinery;
         BuildUI();
+        EnsureRuntimeLayout();
+        RefreshInfo();
         Refresh();
     }
 
@@ -88,13 +106,6 @@ public sealed class UI_RefineryPanel : UI_Popup
     {
         base.OnDestroy();
         OnClosed?.Invoke();
-    }
-
-    /// <summary>방 특전은 이 패널을 닫으면 사라진다 — 상시 탭(룬판 버튼)으로 다시 열면 특전 없이 열려야 한다.</summary>
-    public override void ClosePopupUI()
-    {
-        _svc?.ClearRoomPerk();
-        base.ClosePopupUI();
     }
 
     /// <summary>
@@ -160,7 +171,7 @@ public sealed class UI_RefineryPanel : UI_Popup
         BuildAltar();
         BuildSide();
         BuildFooter();
-        BuildEvent();
+        BuildInfoPanel();
         ApplySkin();
 
         AddClick(veil.gameObject, () => { if (!_busy) ClosePopupUI(); });
@@ -176,22 +187,23 @@ public sealed class UI_RefineryPanel : UI_Popup
     {
         _gems.Clear();
 
+        // 젬 링은 이제 고르는 곳이 아니라 장식 — 돌리는 동안 불이 돌다 나온 룬의 속성에 멎는다.
+        // 구울 때 붙은 버튼은 꺼서 누를 수 있어 보이지 않게 한다.
         foreach (string id in ElementDef.Order)
         {
             var slot = _root != null ? _root.Find($"Gem_{id}") : null;
             if (slot == null) continue;
 
-            string cap = id;
-            AddClick(slot.gameObject, () => Select(cap));
-            _gems.Add((id, slot.Find("Jewel")?.GetComponent<Image>(),
-                       slot.GetComponent<Image>(), slot.gameObject));
+            if (slot.TryGetComponent<Button>(out var gemBtn)) gemBtn.enabled = false;
+            var frame = slot.GetComponent<Image>();
+            if (frame != null) frame.raycastTarget = false;
+            _gems.Add((id, slot.Find("Jewel")?.GetComponent<Image>(), frame, slot.gameObject));
         }
 
         var veil = transform.Find("Veil");
         if (veil != null) AddClick(veil.gameObject, () => { if (!_busy) ClosePopupUI(); });
 
-        BindClick("SpinBtn",    OnSpinClicked);
-        BindClick("ReforgeBtn", OnReforgeClicked);
+        BindClick("SpinBtn", OnSpinClicked);
     }
 
     private void BindClick(string name, Action onClick)
@@ -253,8 +265,8 @@ public sealed class UI_RefineryPanel : UI_Popup
             string id = order[i];
             Color col = ElementDef.IdColor(id, ShopUIStyle.TextDim);
 
-            // 완성본에는 육각 뒤에 카드 상자가 없다 — 클릭 판정만 갖는 투명 컨테이너를 쓴다.
-            var slot = ShopUIStyle.MakeImage(_root, $"Gem_{id}", Color.clear, raycast: true);
+            // 완성본에는 육각 뒤에 카드 상자가 없다 — 투명 컨테이너(장식이라 클릭을 받지 않는다).
+            var slot = ShopUIStyle.MakeImage(_root, $"Gem_{id}", Color.clear);
             var rt = slot.rectTransform;
             float a = ang[i < ang.Length ? i : 0] * Mathf.Deg2Rad;
             ShopUIStyle.Anchor(rt, Half, Half, Half,
@@ -267,8 +279,6 @@ public sealed class UI_RefineryPanel : UI_Popup
                 Vector2.zero, new Vector2(HexW, HexH));
             jewel.preserveAspect = true;
 
-            string cap = id;
-            AddClick(rt.gameObject, () => Select(cap));
             _gems.Add((id, jewel, slot, rt.gameObject));
         }
     }
@@ -292,6 +302,17 @@ public sealed class UI_RefineryPanel : UI_Popup
         ShopUIStyle.Skin(_altarRing, UISkin.Refinery?.slotFrame, tint: HeatDefault);   // 중앙 원 테두리
         _altarRing.preserveAspect = true;
 
+        // 응축 연출 층 — 결과 틀보다 <b>먼저</b> 만든다(형제 순서 = 그리기 순서라 섬광·빛살이 결과 뒤로 간다).
+        _fxRoot = ShopUIStyle.MakeRect(_altarGlow.transform, "CondenseFx").GetComponent<RectTransform>();
+        ShopUIStyle.Anchor(_fxRoot, Half, Half, Half, Vector2.zero, new Vector2(AltarSize * 4f, AltarSize * 4f));
+
+        _revealRays = ShopUIStyle.MakeImage(_fxRoot, "Rays", new Color(1f, 0.84f, 0.47f, 0f));
+        ShopUIStyle.Stretch(_revealRays.rectTransform);
+        _revealRays.gameObject.SetActive(false);
+
+        _revealFlash = ShopUIStyle.MakeImage(_fxRoot, "Flash", Color.clear);
+        ShopUIStyle.Stretch(_revealFlash.rectTransform);
+
         // 결과 룬 박스(초기 숨김)
         _resultBox = ShopUIStyle.MakeImage(_altarGlow.transform, "Result", Color.clear);
         ShopUIStyle.Anchor(_resultBox.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
@@ -311,20 +332,16 @@ public sealed class UI_RefineryPanel : UI_Popup
             new Vector2(AltarCx, -196f), new Vector2(560f, 24f));
     }
 
-    /// <summary>우측 상태 컬럼 — 피버(위) / 확률(아래). 정제소 재미의 두 축을 눈에 보이게 세운다.</summary>
+    /// <summary>우측 상태 컬럼 — 등급 확률 막대 하나(제단 높이). 피버 게이지는 걷었다(09-28).</summary>
     private void BuildSide()
     {
-        // 크기는 아트 실치수(피버칸 621×216 / 확률막대 바탕 609×255 @2x).
-        _feverGauge = FeverGaugeView.Create(_root, Half, Half, Half,
-            new Vector2(ColX, 117f), new Vector2(310f, 140f));
-
+        // 크기는 아트 실치수(확률막대 바탕 609×255 @2x).
         _oddsBar = OddsBarView.Create(_root, Half, Half, Half,
-            new Vector2(ColX, -69f), new Vector2(310f, 150f));
+            new Vector2(ColX, OddsY), new Vector2(310f, 150f));
     }
 
     /// <summary>
-    /// 완성본 하단 = [비용] [돌리기] [재점화] 한 줄 + 그 아래 [첫 돌리기 무료].
-    /// 비용·돌리기·재점화 아트에는 글자가 이미 구워져 있어 라벨을 얹지 않는다(겹쳐 읽히지 않게).
+    /// 하단 = [비용] [돌리기] 한 줄. 완성본의 [재점화]·[첫 돌리기 무료]는 걷었다(09-28 무작위 뽑기로 단순화).
     /// </summary>
     private void BuildFooter()
     {
@@ -335,7 +352,7 @@ public sealed class UI_RefineryPanel : UI_Popup
         // 아트는 Sprites 세트의 「버튼 우측/중앙」(글자 없는 파란 베벨, 가로 9-slice 200)이라
         // 폭은 자유롭고 높이 70에 맞춘다. 예전 @2x 세트(글자 구워짐)는 라벨과 겹쳐 두 번 읽혔다.
         _costPlateImg = MakeArtButton("CostPlate", First(skin?.costPlate), null,
-            new Vector2(-330f, -274f), new Vector2(298f, 70f), null);
+            new Vector2(CostX, FooterY), new Vector2(298f, 70f), null);
 
         // 완성본 버튼 아트는 글자가 없는 빈 판이다 — 비용 숫자는 판 가운데에 놓는다.
         _costText = ShopUIStyle.MakeText(_costPlateImg.transform, "Cost", 18f, FontStyles.Bold,
@@ -343,27 +360,15 @@ public sealed class UI_RefineryPanel : UI_Popup
         ShopUIStyle.Stretch(_costText.rectTransform, 10f);
 
         _spinBtnImg = MakeArtButton("SpinBtn", First(skin?.spinButton), "돌리기",
-            new Vector2(1f, -274f), new Vector2(316f, 70f), OnSpinClicked);
-
-        var re = MakeArtButton("ReforgeBtn", First(skin?.reforgeButton), "재점화",
-            new Vector2(318f, -274f), new Vector2(278f, 70f), OnReforgeClicked);
-        _reforgeBtn = re.gameObject;
-
-        var free = MakeArtButton("FreeSpin", First(skin?.perkBadge), null,
-            new Vector2(0f, -344f), new Vector2(250f, 46f), null);
-        _freeBtn = free.gameObject;
-        _freeLabel = ShopUIStyle.MakeText(free.transform, "Label", 16f, FontStyles.Bold,
-            TextAlignmentOptions.Center, Color.white);
-        ShopUIStyle.Stretch(_freeLabel.rectTransform);
-        _freeBtn.SetActive(false);
+            new Vector2(SpinX, FooterY), new Vector2(316f, 70f), OnSpinClicked);
 
         // 안내·거절 사유. 완성본에 상설 문구는 없으므로 할 말이 있을 때만 뜬다.
         _hint = ShopUIStyle.MakeText(_root, "Hint", 16f, FontStyles.Normal,
             TextAlignmentOptions.Center, ShopUIStyle.TextDim);
         ShopUIStyle.Anchor(_hint.rectTransform, Half, Half, Half,
             new Vector2(AltarCx, -224f), new Vector2(640f, 20f));
-        // 열자마자 무엇부터 해야 하는지 — 고른 것이 생기면 Select가 지운다.
-        _hint.text = "정제할 속성 젬을 하나 고르세요";
+        // 열자마자 무엇을 하는 곳인지 — 돌리면 지운다.
+        _hint.text = IdleHint;
     }
 
     /// <summary>
@@ -392,66 +397,21 @@ public sealed class UI_RefineryPanel : UI_Popup
 
     private static Sprite First(Sprite[] arr) => (arr != null && arr.Length > 0) ? arr[0] : null;
 
-    private void BuildEvent()
+    private void BuildInfoPanel()
     {
-        // 완성본: 돌발 배너는 좌상단. 아트(육각 장식 포함)를 한 장으로 깔고 제목/설명 두 줄을 안쪽에 넣는다.
-        // 좌측 상주 판 — 완성본의 세로 패널(세부지표 3, 0.72 비율). 의뢰서 "좌 = 무대".
-        // 돌발 이벤트 배너는 결과 뒤에만 잠깐 뜨므로, 이 판이 없으면 평상시 좌측이 통째로 비어 보였다.
-        // 배너보다 먼저 만들어 뒤에 깔린다. 좌표는 창 중심 기준: 좌상단 (50,232) 198×276 → (-436, 44).
+        // 좌측 상주 판 — 완성본의 세로 패널(세부지표 3, 0.72 비율). 의뢰서 "좌 = 무대". 안의 글은 EnsureRuntimeLayout이 짓는다.
+        // 좌표는 창 중심 기준: 좌상단 (50,232) 198×276 → (-436, 44). 이름 「EventPanel」은 구운 프리팹과 맞춘다
+        // (돌발 배너를 걷기 전 이름 — 09-28).
         var eventPanel = ShopUIStyle.MakeImage(_root, "EventPanel", ShopUIStyle.BandFill);
         ShopUIStyle.Anchor(eventPanel.rectTransform, Half, Half, Half,
             new Vector2(-436f, 44f), new Vector2(198f, 276f));
         eventPanel.raycastTarget = false;
-
-        _eventBannerImg = ShopUIStyle.MakeImage(_root, "EventBanner", ShopUIStyle.BandFill);
-        _eventBanner   = _eventBannerImg.gameObject;
-        _eventBannerRT = _eventBannerImg.rectTransform;
-        // 상자 236×186(1.269)은 실제로 배선된 아트 「돌발 이벤트 배너@2x」(473×372 = 1.272)와
-        // 정확히 맞는 값이다. 완성본의 좌측 패널은 세로형(200×275)이라 달라 보이지만
-        // 그건 다른 아트(「세부지표 3」 589×822)이고 현재 어디에도 배선돼 있지 않다 —
-        // 둘 중 무엇이 정본인지는 기획 판단이라 배선된 아트에 상자를 맞춰 둔다.
-        ShopUIStyle.Anchor(_eventBannerRT, Half, Half, Half,
-            new Vector2(-389f, 140f), new Vector2(236f, 186f));
-        _eventBannerImg.preserveAspect = true;
-
-        // 아트는 위아래 육각 장식이 본문 밖으로 뻗는다 — 글자는 안쪽 상자(대략 세로 62%)에만 넣는다.
-        _eventTitle = ShopUIStyle.MakeText(_eventBanner.transform, "EvTitle", 19f, FontStyles.Bold,
-            TextAlignmentOptions.Left, ShopUIStyle.RarityGlow(ItemRarity.Epic));
-        ShopUIStyle.Anchor(_eventTitle.rectTransform, Half, Half, Half,
-            new Vector2(-14f, 26f), new Vector2(160f, 26f));
-
-        _eventText = ShopUIStyle.MakeText(_eventBanner.transform, "EvTxt", 12.5f, FontStyles.Normal,
-            TextAlignmentOptions.TopLeft, ShopUIStyle.TextDim);
-        ShopUIStyle.Anchor(_eventText.rectTransform, Half, Half, Half,
-            new Vector2(-14f, -14f), new Vector2(160f, 44f));
-
-        // 예약 배지 — 과열·불티는 배너가 사라진 뒤에도 다음 회까지 효과가 남는다.
-        // 이게 없으면 "아까 뭐가 걸렸더라?"가 되어 이벤트의 값어치가 절반으로 준다.
-        // 확률 패널 바로 아래 — 피버 게이지(위)와 겹치지 않는 유일한 빈 줄이다.
-        _reservedText = ShopUIStyle.MakeText(_root, "Reserved", 12.5f, FontStyles.Bold,
-            TextAlignmentOptions.Right, ShopUIStyle.RarityGlow(ItemRarity.Legendary));
-        ShopUIStyle.Anchor(_reservedText.rectTransform, Half, Half, Half,
-            new Vector2(ColX, -82f), new Vector2(304f, 20f));
-        _reservedText.richText = true;
-
-        // 시선 유도용 화살표. 결과가 뜨는 순간 눈은 중앙 제단에 있고 배너는 좌상단이라,
-        // 배너만 켜면 그냥 못 본다. 링(반지름 152)과 배너 오른쪽 끝(-271) 사이 빈 줄에 세운다
-        // — 배너를 옮기면 완성본 목업 좌표가 깨지므로 배너 대신 시선을 옮긴다(P2-5).
-        _eventPointer = ShopUIStyle.MakeText(_root, "EvPointer", 26f, FontStyles.Bold,
-            TextAlignmentOptions.Center, ShopUIStyle.RarityGlow(ItemRarity.Epic));
-        ShopUIStyle.Anchor(_eventPointer.rectTransform, Half, Half, Half,
-            new Vector2(-235f, 96f), new Vector2(70f, 30f));
-        _eventPointer.text          = "◀";
-        _eventPointer.raycastTarget = false;
-        _eventPointer.gameObject.SetActive(false);
-
-        _eventBanner.SetActive(false);
     }
 
     /// <summary>
     /// 디자이너 아트를 코드로 그린 박스 위에 얹는다. 스킨 미로드면 아무것도 안 하고 색 폴백을 유지한다
     /// (<see cref="UISkin.PreloadAsync"/>는 앱 부트에서 fire-and-forget — 런 중 여는 이 패널은 이미 로드됨).
-    /// 위젯(피버·확률)과 돌발 배너는 각자 <see cref="UISkin.Refinery"/>를 참조하므로 여기서 다루지 않는다.
+    /// 위젯(확률 막대)은 각자 <see cref="UISkin.Refinery"/>를 참조하므로 여기서 다루지 않는다.
     /// </summary>
     private void ApplySkin()
     {
@@ -486,79 +446,198 @@ public sealed class UI_RefineryPanel : UI_Popup
 
     // ── 상태 ──
 
-    private void Select(string elementId)
+    /// <summary>
+    /// 젬 링에서 한 속성만 밝힌다(null이면 모두 같은 밝기). 돌리는 동안 불이 돌고, 결과가 나오면 그 룬의 속성에 멎는다.
+    /// 각인 아트는 이미 채색돼 있어 색으로는 못 알리므로 크기·밝기로 가른다.
+    /// </summary>
+    private void LightGem(string elementId)
     {
-        if (_busy) return;
-        _selectedElement = elementId;
-        Color col = ElementDef.IdColor(elementId, HeatDefault);
-
-        // 각인 아트는 이미 채색돼 있어 색으로는 선택을 알릴 수 없다 —
-        // 고른 것은 살짝 키우고, 나머지는 흐려 링 전체가 "하나 골랐다"로 읽히게 한다.
         for (int i = 0; i < _gems.Count; i++)
         {
-            bool on = _gems[i].id == elementId;
             var j = _gems[i].jewel;
             if (j == null) continue;
-            j.transform.localScale = Vector3.one * (on ? 1.14f : 0.94f);
+            bool on = elementId == null || _gems[i].id == elementId;
+            j.transform.localScale = Vector3.one * (elementId == null ? 1f : on ? 1.14f : 0.94f);
             var c = j.color;
             j.color = new Color(c.r, c.g, c.b, on ? 1f : 0.45f);
         }
+    }
 
-        // 중앙 링이 고른 속성색으로 물든다 — 완성본의 초록 링이 그 자리다.
-        if (_altarRing != null) _altarRing.color = col;
+    /// <summary>
+    /// 구운 프리팹 위에 런타임으로 얹는 것들 — 좌측 「나올 룬 / 나온 룬」 판, 결과 칸(둥근 판 + 룬 그림 자리),
+    /// 걷은 기능의 요소 숨기기 · 하단 두 칸 · 확률 막대 자리. BuildUI는 구운 프리팹이면 돌지 않으므로 여기서 한 번 짓는다.
+    /// </summary>
+    private void EnsureRuntimeLayout()
+    {
+        foreach (var gone in RetiredNodes)
+        {
+            var t = _root != null ? _root.Find(gone) : null;
+            if (t != null) t.gameObject.SetActive(false);
+        }
+        PlaceIfFound("CostPlate", CostX, FooterY, 298f, 70f);
+        PlaceIfFound("SpinBtn",   SpinX, FooterY, 316f, 70f);
+        // [돌리기] = 전 화면 공통 베벨(금). [원석 N]은 누르는 것이 아니라 표시판인데 돌리기와 똑같은 청색 버튼이라
+        // 눌러야 할 것처럼 보였다 → 글래스 판 + 금 가는 선(09-28 UI 톤 통일).
+        if (_spinBtnImg != null && UITheme.ButtonBevel != null)
+        {
+            UITheme.StyleButton(_spinBtnImg, UITheme.CtaTint);
+            _themedSpin = true;
+        }
+        if (_costPlateImg != null) UITheme.StylePanel(_costPlateImg, UITheme.Band, UITheme.GoldLine, 12f);
+        if (_costText != null) TMPOutlineHelper.ApplySoftShadow(_costText);
+        if (_oddsBar != null)
+            PlaceProportional((RectTransform)_oddsBar.transform, ColX, OddsY, 310f, 150f, WindowW, WindowH);
+        if (_hint != null) _hint.text = IdleHint;   // 구운 글은 옛 안내(「속성 젬을 고르세요」)
 
-        _hint.text = "";
-        Refresh();
+        if (_resultBox != null)
+        {
+            _resultBox.sprite = UIProceduralSprites.RoundedRect(radius: 14f, feather: 2f);
+            _resultBox.type   = Image.Type.Sliced;
+        }
+        // 구운 프리팹은 요소마다 <b>비율 앵커</b>(창 크기를 따라감)다 — 위치도 비율로 준다(PlaceProportional).
+        // 절대 좌표를 주면 앵커 기준으로 밀려 결과 줄이 버튼 아래로 내려갔다(09-27 실측).
+        const float ResultBox = 96f;   // 결과 틀 설계 크기(제단 135 × 0.711)
+        if (_resultSym != null)
+        {
+            _resultSym.preserveAspect = true;
+            PlaceProportional(_resultSym.rectTransform, 0f, 14f, 50f, 50f, ResultBox, ResultBox);   // 보석은 위
+        }
+        if (_resultAmt != null)
+        {
+            PlaceProportional(_resultAmt.rectTransform, 0f, -31f, ResultBox, 22f, ResultBox, ResultBox);   // 칸 수는 아래(바닥에서 6~28)
+            TMPOutlineHelper.ApplySoftShadow(_resultAmt);   // 등급색 칸 위 — 등급색 글자면 묻혔다(09-28)
+        }
+        // 결과 줄은 아래 보석(어둠, 아래끝 -213)과 버튼(위끝 -239) 사이 — -196이면 보석 위에 겹쳤다(09-21 캡처부터).
+        if (_rarLine != null)
+            PlaceProportional(_rarLine.rectTransform, AltarCx, -226f, 560f, 24f, WindowW, WindowH);
+
+        var panel = _root != null ? _root.Find("EventPanel") : null;
+        if (panel == null || _infoName != null) return;
+
+        // 창 맞춤(UIWindowFitter)은 이 패널이 켜질 때 이미 글자 크기를 키웠다 — 뒤에 만드는 글자는 같은 배율을 직접 곱한다.
+        float k = _root is RectTransform win && win.rect.height > 1f ? win.rect.height / WindowH : 1f;
+        const float PanelW = 198f, PanelH = 276f;   // 좌측 판 설계 크기
+
+        _infoCaption = InfoText(panel, "InfoCaption", 16f * k, ShopUIStyle.TextDim, 113f, 22f, PanelW, PanelH);
+
+        _infoGem = ShopUIStyle.MakeImage(panel, "InfoGem", Color.white);
+        PlaceProportional(_infoGem.rectTransform, 0f, 52f, 70f, 84f, PanelW, PanelH);
+        _infoGem.preserveAspect = true;
+        _infoGem.raycastTarget  = false;
+
+        _infoName = InfoText(panel, "InfoName", 19f * k, ShopUIStyle.TextPrimary, -11f, 26f, PanelW, PanelH);
+        // 효과는 두 줄 넘게 올 수 있다(영웅·조건부 룬) — 세 줄 높이를 주고, 넘치면 13까지만 줄인다.
+        _infoDesc = InfoText(panel, "InfoDesc", 16f * k, ShopUIStyle.TextPrimary, -62f, 66f, PanelW, PanelH);
+        _infoDesc.textWrappingMode = TextWrappingModes.Normal;
+        _infoDesc.enableAutoSizing = true;
+        _infoDesc.fontSizeMin      = 13f * k;
+        _infoDesc.fontSizeMax      = 16f * k;
+        _infoFoot = InfoText(panel, "InfoFoot", 16f * k, ShopUIStyle.TextDim, -112f, 22f, PanelW, PanelH);
+    }
+
+    /// <summary>창 바로 아래 요소를 설계 좌표(창 중심 기준)로 다시 놓는다 — 구운 비율 앵커 그대로.</summary>
+    private void PlaceIfFound(string name, float cx, float cy, float w, float h)
+    {
+        if (_root != null && _root.Find(name) is RectTransform rt)
+            PlaceProportional(rt, cx, cy, w, h, WindowW, WindowH);
+    }
+
+    /// <summary>
+    /// 부모 설계 크기(<paramref name="parentW"/>×<paramref name="parentH"/>) 기준 중심 좌표·크기를 <b>비율 앵커</b>로 준다 —
+    /// 창 맞춤이 창 크기를 바꿔도 자리가 같이 따라간다(구운 프리팹과 같은 방식).
+    /// </summary>
+    private static void PlaceProportional(RectTransform rt, float cx, float cy, float w, float h, float parentW, float parentH)
+    {
+        rt.anchorMin = new Vector2(0.5f + (cx - w * 0.5f) / parentW, 0.5f + (cy - h * 0.5f) / parentH);
+        rt.anchorMax = new Vector2(0.5f + (cx + w * 0.5f) / parentW, 0.5f + (cy + h * 0.5f) / parentH);
+        rt.pivot            = Half;
+        rt.anchoredPosition = Vector2.zero;
+        rt.sizeDelta        = Vector2.zero;
+    }
+
+    private static TMP_Text InfoText(Transform parent, string name, float size, Color color,
+                                     float cy, float height, float parentW, float parentH)
+    {
+        var t = ShopUIStyle.MakeText(parent, name, size, FontStyles.Normal, TextAlignmentOptions.Top, color);
+        if (t.enableAutoSizing) t.fontSizeMax = size;
+        PlaceProportional(t.rectTransform, 0f, cy, parentW - 20f, height, parentW, parentH);
+        t.raycastTarget = false;
+        TMPOutlineHelper.ApplySoftShadow(t);
+        return t;
+    }
+
+    /// <summary>
+    /// 좌측 판 — 돌리기 전엔 무엇이 나오는 곳인지, 돌린 뒤엔 <b>나온 룬</b>(얼굴 · 이름 · 효과 · 칸 수 · 속성).
+    /// 효과 글은 CSV 원문(카드·보관함과 같은 말)이다.
+    /// </summary>
+    private void RefreshInfo(RuntimeItemData rune = null)
+    {
+        if (_infoName == null) return;
+
+        if (rune == null)
+        {
+            _infoCaption.text = "나올 룬";
+            _infoGem.sprite   = RuneArt.GetArt(ItemRarity.Rare);
+            _infoGem.enabled  = _infoGem.sprite != null;
+            _infoName.text    = "무작위 룬 하나";
+            _infoName.color   = ShopUIStyle.TextPrimary;
+            _infoDesc.text    = "희귀 이상 · 효과와 속성,\n모양은 룬마다 다르다";
+            _infoFoot.text    = "";
+            return;
+        }
+
+        _infoCaption.text = "나온 룬";
+        _infoGem.sprite   = RuneArt.ResolveRuneIcon(rune);
+        _infoGem.enabled  = _infoGem.sprite != null;
+        _infoName.text    = rune.displayName;
+        _infoName.color   = ShopUIStyle.RarityGlow(rune.rarity);
+
+        var sb = new System.Text.StringBuilder();
+        foreach (var s in rune.effects)
+        {
+            if (s == null) continue;
+            if (sb.Length > 0) sb.Append('\n');
+            sb.Append(!string.IsNullOrEmpty(s.description) ? s.description : EffectDescriptionFormatter.Describe(s).Label);
+        }
+        _infoDesc.text = sb.ToString();
+
+        var e     = string.IsNullOrEmpty(rune.element) ? null : ElementDef.GetById(rune.element);
+        int cells = RuneCardKit.CellCount(rune);
+        _infoFoot.text = (cells > 0 ? $"{cells}칸" : "") + (e != null ? $" · {e.Name} 존" : "");
     }
 
     private void Refresh()
     {
         if (_svc == null) return;
         var (rare, epic, leg) = _svc.CurrentOdds();
-        _oddsBar?.SetOdds(rare, epic, leg, _svc.NextHeat);
+        _oddsBar?.SetOdds(rare, epic, leg, false);
 
         // 해금 몫을 확률 표 옆에 밝힌다 — 상위 등급이 왜 잘 나오는지가 보여야 한다.
         // <b>대입</b>이어야 한다. Refresh는 한 번의 돌리기에 여러 번 불리므로(오픈·젬 선택·
         // 돌리기·이벤트) 누적(+=)하면 같은 문구가 계속 덧붙어 줄이 끝없이 길어진다.
         if (_rarLine != null && MemoryAltarService.IsUnlocked(MemoryAltarCatalog.RefineQuality))
         {
-            const string mark = "정제 품질 +";
+            const string mark = "정제 등급 상승 +";
             string body = _rarLine.text;
             int cut = body.IndexOf(mark, System.StringComparison.Ordinal);
             if (cut >= 0) body = body.Substring(0, cut).TrimEnd();
             _rarLine.text = body +
-                $"   <color=#C99C4F>정제 품질 +{RefineryService.QualityUnlockEpic * 100f:F0}%p</color>";
+                $"   <color=#C99C4F>정제 등급 상승 +{RefineryService.QualityUnlockEpic * 100f:F0}%p</color>";
         }
-        _feverGauge?.SetLevel(_svc.Fever);
-        RefreshReserved();
-
-        int cost = _svc.CurrentCost;
-        _costText.text  = cost <= 0 ? "무료" : cost.ToString();
-        _costText.color = cost <= 0 ? ShopUIStyle.Gold
-                        : (_svc.CanAfford ? ShopUIStyle.TextPrimary : ShopUIStyle.RejectRed);
+        // 숫자만 있으면 무엇으로 치르는지 안 읽힌다 — 우상단 보유량(「원석 N」)과 같은 말로 적는다.
+        _costText.text  = $"원석 {_svc.CurrentCost}";
+        _costText.color = _svc.CanAfford ? ShopUIStyle.TextPrimary : ShopUIStyle.RejectRed;
         CurrencyCounter.Apply(_oreText, _svc.OreOwned, "원석 ");
 
-        // 방 특전은 하단 '첫 돌리기 무료' 버튼으로 드러낸다(상시 탭이면 숨김).
-        string perk = _svc.RoomPerkLabel;
-        if (_freeBtn != null)
-        {
-            bool showPerk = !string.IsNullOrEmpty(perk);
-            _freeBtn.SetActive(showPerk);
-            if (showPerk && _freeLabel != null) _freeLabel.text = perk;
-        }
-
-        bool canSpin = _selectedElement != null && _svc.CanAfford && !_busy;
-        Tint(_spinBtnImg, canSpin);
-
-        // 재점화는 완성본처럼 상시 자리를 지키되, 쓸 수 없을 땐 흐려진다.
-        if (_reforgeBtn != null)
-            Tint(_reforgeBtn.GetComponent<Image>(), _svc.CanReforge && !_busy);
+        Tint(_spinBtnImg, _svc.CanAfford && !_busy);
+        UIAffordGlow.Set(_spinBtnImg, _svc.CanAfford && !_busy);   // 돌릴 수 있을 때만 은은한 불(09-29)
     }
 
     /// <summary>글자가 구워진 버튼 아트는 색을 갈아끼울 수 없어, 밝기로 활성/비활성을 알린다.</summary>
     private void Tint(Image img, bool enabled)
     {
         if (img == null) return;
+        if (_themedSpin && img == _spinBtnImg) { img.color = enabled ? UITheme.CtaTint : UITheme.CtaTintOff; return; }
         if (img.sprite != null) img.color = enabled ? Color.white : new Color(0.45f, 0.45f, 0.5f, 0.75f);
         else                    img.color = enabled ? ShopUIStyle.GoldPillBg : ShopUIStyle.BandFill;
     }
@@ -569,14 +648,7 @@ public sealed class UI_RefineryPanel : UI_Popup
     {
         if (_busy || _svc == null) return;
 
-        // 미선택은 예전엔 조용히 return이었다 — 버튼이 흐린 이유를 화면 어디서도 말하지 않아
-        // "고장난 버튼"으로 읽혔다. 거절에는 반드시 사유가 붙는다.
-        if (_selectedElement == null)
-        {
-            _hint.text = "속성 젬을 하나 고르세요";
-            ShopUIStyle.PlaySfx("shop_reject");
-            return;
-        }
+        // 거절에는 반드시 사유가 붙는다 — 흐린 버튼만으로는 "고장난 버튼"으로 읽혔다.
         if (!_svc.CanAfford) { _hint.text = "원석이 부족합니다"; ShopUIStyle.PlaySfx("shop_reject"); return; }
         SpinAsync().Forget();
     }
@@ -584,13 +656,12 @@ public sealed class UI_RefineryPanel : UI_Popup
     private async UniTaskVoid SpinAsync()
     {
         _busy = true;
-        _eventBanner.SetActive(false);
-        if (_eventPointer != null) _eventPointer.gameObject.SetActive(false);
         _resultBox.gameObject.SetActive(false);
         _rarLine.text = "";
+        _hint.text    = "";
         Refresh();
 
-        var outcome = _svc.Craft(_selectedElement);
+        var outcome = _svc.Craft();
         if (!outcome.Success) { _hint.text = outcome.FailReason; _busy = false; Refresh(); return; }
 
         // 「정제 품질」 할인 조건 집계. RefineryService는 런 참조가 없어 호출부에서 센다.
@@ -598,212 +669,218 @@ public sealed class UI_RefineryPanel : UI_Popup
 
         await PlayRevealAsync(outcome);
 
-        // 재점화(다시 굴리기)를 쓸 수 있으면 그 선택을 기다린다 — 그 경우가 아니면
-        // 결과를 잠깐 보여준 뒤 배치 화면으로 자동으로 넘긴다.
-        //
-        // 자동으로 넘어가는 쪽에서는 <b>잠금을 풀지 않는다</b>. 여기서 _busy를 풀면
-        // 넘어가기까지의 900ms 동안 [돌리기]가 다시 눌리고, 그 두 번째 굴림은
-        // 원석만 빠진 채 결과 연출을 못 보고 화면이 닫혀버린다(원석은 Craft 진입 즉시 차감된다).
-        if (_svc.CanReforge)
-        {
-            _busy = false;
-            Refresh();
-        }
-        else
-        {
-            Refresh();
-            await HandOffToGridAsync(outcome.Rune);
-        }
-    }
-
-    private void OnReforgeClicked()
-    {
-        if (_busy || _svc == null) return;
-
-        // 재점화는 '한 번 뽑은 결과'가 있어야 쓸 수 있고 런당 1회뿐이다 — 어느 쪽으로 막혔는지 말해 준다.
-        if (!_svc.CanReforge)
-        {
-            _hint.text = _selectedElement == null || _resultBox == null || !_resultBox.gameObject.activeSelf
-                ? "먼저 돌려서 룬을 뽑으세요"
-                : "재점화는 한 번뿐입니다";
-            ShopUIStyle.PlaySfx("shop_reject");
-            return;
-        }
-        ReforgeAsync().Forget();
-    }
-
-    private async UniTaskVoid ReforgeAsync()
-    {
-        _busy = true;
-        _eventBanner.SetActive(false);
-        if (_eventPointer != null) _eventPointer.gameObject.SetActive(false);
-        _resultBox.gameObject.SetActive(false);
+        // 결과를 잠깐 보여 준 뒤 배치 화면으로 넘긴다. <b>잠금은 풀지 않는다</b> — 풀면 넘어가기까지의 900ms 동안
+        // [돌리기]가 다시 눌려, 두 번째 굴림은 원석만 빠진 채 결과 연출을 못 보고 화면이 닫힌다.
         Refresh();
-
-        var outcome = _svc.Reforge(_selectedElement);
-        if (outcome.Success) await PlayRevealAsync(outcome);
-
-        _busy = false;
-        Refresh();
-
-        // 재점화는 1회뿐(이미 소진) → 결과를 잠깐 보여준 뒤 배치 화면으로 넘긴다.
-        if (outcome.Success) await HandOffToGridAsync(outcome.Rune);
+        await HandOffToGridAsync(outcome.Rune);
     }
 
     /// <summary>결과를 잠깐 보여준 뒤(≈0.9초) 정제소를 닫고 그 룬을 판에 올린다.</summary>
     private async UniTask HandOffToGridAsync(RuntimeItemData rune)
     {
         if (rune == null) return;
-        try { await UniTask.Delay(900, ignoreTimeScale: true, cancellationToken: this.GetCancellationTokenOnDestroy()); }
+        try
+        {
+            var ct = this.GetCancellationTokenOnDestroy();
+            await UniTask.Delay(900, ignoreTimeScale: true, cancellationToken: ct);
+            await SlipToGridAsync(ct);   // 결과가 아래로 빨려 들어간 뒤 판이 열린다 — 어디로 가는지가 보이게
+        }
         catch (OperationCanceledException) { return; }
 
         OpenGridForRune(rune);
     }
 
+    /// <summary>
+    /// 응축 3박자 — ① 로가 빛을 모으고(젬 링의 불이 돈다) ② 섬광과 함께 공개하고(나온 룬의 속성에 멎는다) ③ 결과가 안착한다.
+    /// 등급이 높을수록 모으는 시간이 길고 섬광이 세며, 전설에는 빛살이 돈다(기획_정제소 §7).
+    /// </summary>
     private async UniTask PlayRevealAsync(RefineryOutcome outcome)
     {
-        // 제단 달아오름
-        Color heat = ElementDef.IdColor(_selectedElement, HeatDefault);
+        string elem = outcome.Rune?.element;
+        Color heat = ElementDef.IdColor(elem, HeatDefault);
+        Color rc   = ShopUIStyle.RarityGlow(outcome.Rarity);
+        int   tier = RarityTier(outcome.Rarity);
         var ct = this.GetCancellationTokenOnDestroy();
+
+        EnsureCondenseFx();
+        ShopUIStyle.PlaySfx("refine_spin");
+        try { await GatherAsync(HeatDefault, GatherBase + 0.26f * tier, ct); }   // 아직 속성을 모른다 — 로의 불빛으로
+        catch (OperationCanceledException) { return; }
+        LightGem(elem);
+
+        FlashAsync(rc, tier).Forget();   // ② 공개 — 등급색 섬광(전설은 오버로드 + 빛살)
+
+        // 결과 룬
+        _resultBox.gameObject.SetActive(true);
+        _resultBox.color = new Color(rc.r, rc.g, rc.b, 0.28f);
+        // 결과 얼굴 = 그 룬이 보관함·판에서 쓸 얼굴. 아래 줄은 칸 수(판에서 차지할 크기).
+        var icon = RuneArt.ResolveRuneIcon(outcome.Rune);
+        _resultSym.sprite = icon;
+        _resultSym.color  = icon != null ? Color.white : heat;
+        int cells = RuneCardKit.CellCount(outcome.Rune);
+        _resultAmt.text  = cells > 0 ? $"{cells}칸" : "";
+        _resultAmt.color = ShopUIStyle.TextPrimary;   // 등급은 칸 색 · 결과 줄이 말한다
+
+        _rarLine.color = rc;
+        _rarLine.text  = $"{RarLabel(outcome.Rarity)} · {outcome.Rune?.displayName}";
+        if (_altarRing != null) _altarRing.color = heat;
+        RefreshInfo(outcome.Rune);
+
+        Managers.Sound?.PlayEvent(SoundEvent.ItemPickup);
+        ShopUIStyle.PlaySfx(tier >= 3 ? "refine_legend" : "refine_reveal");
+
+        // ③ 안착 — 결과가 크게 튀어나와 제자리로. 등급이 높을수록 크게 튄다.
+        try { await PopResultAsync(tier, ct); }
+        catch (OperationCanceledException) { }
+    }
+
+    // ── 응축 연출 (표시층 전용 — 결과·등급은 RefineryService가 이미 확정했다) ──
+
+    /// <summary>① 모음 — 불티가 돌며 제단으로 빨려들고, 링이 점점 빠르게 달아오르며, 젬 링의 불이 돌다 느려진다.</summary>
+    private async UniTask GatherAsync(Color heat, float dur, CancellationToken ct)
+    {
+        if (_motes != null)
+            for (int i = 0; i < _motes.Length; i++)
+                if (_motes[i] != null) _motes[i].gameObject.SetActive(true);
+
+        float t = 0f;
+        while (t < dur)
+        {
+            t += Time.unscaledDeltaTime;
+            float k = Mathf.Clamp01(t / dur);
+            if (_motes != null)
+            {
+                for (int i = 0; i < _motes.Length; i++)
+                {
+                    if (_motes[i] == null) continue;
+                    float ang = i / (float)_motes.Length * Mathf.PI * 2f + k * 3.2f;   // 돌면서 빨려든다
+                    float r   = Mathf.Lerp(230f, 6f, k * k);
+                    _motes[i].rectTransform.anchoredPosition = new Vector2(Mathf.Cos(ang) * r, Mathf.Sin(ang) * r);
+                    _motes[i].color = new Color(heat.r, heat.g, heat.b, Mathf.Sin(k * Mathf.PI) * 0.9f);
+                }
+            }
+            if (_altarRing != null)
+            {
+                // 달아오르는 건 링이다 — 원 바탕은 아트라 색을 건드리면 그림이 물든다.
+                float p = 0.45f + 0.55f * Mathf.PingPong(t * (3f + 6f * k), 1f);
+                _altarRing.color = new Color(heat.r * p, heat.g * p, heat.b * p, 1f);
+            }
+            // 젬 링의 불이 돈다 — 빠르게 시작해 끝에 느려진다(무작위 뽑기의 손맛). 멎는 자리는 PlayRevealAsync가 정한다.
+            if (_gems.Count > 0) LightGem(_gems[(int)(k * (2f - k) * 14f) % _gems.Count].id);
+            await UniTask.Yield(PlayerLoopTiming.Update, ct);
+        }
+
+        if (_motes != null)
+            for (int i = 0; i < _motes.Length; i++)
+                if (_motes[i] != null) _motes[i].gameObject.SetActive(false);
+        if (_altarRing != null) _altarRing.color = heat;
+    }
+
+    /// <summary>② 공개 — 등급색 섬광. 전설은 더 세고 길며 빛살이 함께 돈다.</summary>
+    private async UniTaskVoid FlashAsync(Color rc, int tier)
+    {
+        if (_revealFlash == null) return;
+        float dur  = 0.32f + 0.12f * tier;
+        float peak = 0.45f + 0.18f * tier;
+        bool  rays = tier >= 3 && _revealRays != null;
+        if (rays) _revealRays.gameObject.SetActive(true);
+
         try
         {
-            // 달아오르는 건 링이다 — 원 바탕은 아트라 색을 건드리면 그림이 물든다.
             float t = 0f;
-            while (t < 0.5f)
+            while (t < dur)
             {
                 t += Time.unscaledDeltaTime;
-                float k = 0.45f + 0.55f * Mathf.PingPong(t * 3f, 1f);
-                if (_altarRing != null)
-                    _altarRing.color = new Color(heat.r * k, heat.g * k, heat.b * k, 1f);
-                await UniTask.Yield(ct);
+                float k = Mathf.Clamp01(t / dur);
+                _revealFlash.color = new Color(rc.r, rc.g, rc.b, peak * (1f - k));
+                if (rays)
+                {
+                    _revealRays.color = new Color(rc.r, rc.g, rc.b, 0.75f * Mathf.Sin(k * Mathf.PI));
+                    _revealRays.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -70f * k);
+                }
+                await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
             }
         }
         catch (OperationCanceledException) { return; }
 
-        // 결과 룬
-        Color rc = ShopUIStyle.RarityGlow(outcome.Rarity);
-        _resultBox.gameObject.SetActive(true);
-        _resultBox.color = new Color(rc.r, rc.g, rc.b, 0.28f);
-        _resultSym.color = heat;
-        _resultAmt.text  = $"+{AmtOf(outcome.Rune)}%";
-        _resultAmt.color = rc;
-
-        var e = ElementDef.GetById(_selectedElement);
-        string en = e != null ? e.Name : _selectedElement;
-        _rarLine.color = rc;
-        _rarLine.text = $"{RarLabel(outcome.Rarity)} 존핵 — {en} 존 시너지 +{AmtOf(outcome.Rune)}%";
-        if (_altarRing != null) _altarRing.color = heat;
-
-        Managers.Sound?.PlayEvent(SoundEvent.ItemPickup);
-
-        // 돌발 이벤트
-        ShowEvent(outcome.EventKind);
+        _revealFlash.color = Color.clear;
+        if (_revealRays != null) _revealRays.gameObject.SetActive(false);
     }
 
-    /// <summary>
-    /// 돌발 이벤트 배너. 4종이 <b>서로 다른 종류의 기쁨</b>이라 크기·색으로 구별한다.
-    /// 특히 재점화는 이 화면을 다시 돌리게 만드는 유일한 장치라 나머지 셋보다 확실히 크게 띄운다
-    /// (존핵은 속성당 사실상 한 번만 챙기면 되는 물건이라, 나쁜 결과를 뒤집을 수 있다는 게 핵심 유인).
-    /// </summary>
-    private void ShowEvent(RefineryEventKind ev)
+    /// <summary>③ 안착 — 결과 틀이 크게 튀어나와 제자리로 줄어든다.</summary>
+    private async UniTask PopResultAsync(int tier, CancellationToken ct)
     {
-        if (ev == RefineryEventKind.None) return;
-
-        var skin = UISkin.Refinery;
-        bool  hero = ev == RefineryEventKind.Reignite;
-        Color tone = ev switch
+        if (_resultBox == null) return;
+        var rt = _resultBox.rectTransform;
+        float dur  = 0.26f + 0.06f * tier;
+        float from = 1.9f + 0.4f * tier;
+        float t = 0f;
+        while (t < dur)
         {
-            RefineryEventKind.Reignite => new Color(1.00f, 0.54f, 0.23f),   // 되돌리기 — 불씨
-            RefineryEventKind.Overheat => new Color(0.88f, 0.42f, 0.16f),   // 예고 — 달아오름
-            RefineryEventKind.Spark    => ShopUIStyle.RarityGlow(ItemRarity.Legendary),
-            _                          => new Color(0.62f, 0.49f, 0.90f),   // 쌍생 — 분열
-        };
-        // 제목과 설명을 나눈다 — 완성본 배너가 "재점화 / 결과를 1회 무료로 다시 굴린다" 두 단이다.
-        (string head, string body) = ev switch
-        {
-            RefineryEventKind.Reignite => ("재점화", "결과를 1회 무료로 다시 굴린다."),
-            RefineryEventKind.Overheat => ("과열",   "다음 돌리기의 상위 등급 확률이 2배."),
-            RefineryEventKind.Spark    => ("불티",   "다음 돌리기를 무료로 돌린다."),
-            _                          => ("쌍생",   "존핵을 하나 더 얻었다."),
-        };
-
-        // 배너는 스트레치 앵커다 — sizeDelta는 크기가 아니라 <b>앵커폭에 더해지는 값</b>이라
-        // 절대 크기를 그냥 대입하면 앵커폭 236×186 위에 얹혀 481×343(면적 2.2배)이 된다.
-        // 배선된 아트(473×372 = 1.272)의 비율을 지키는 두 크기다. 비율을 벗어나면
-        // preserveAspect가 짧은 축에 맞춰 줄여 배너가 작아진다.
-        var bannerSize = hero ? new Vector2(236f, 186f) : new Vector2(212f, 167f);
-        _eventBannerRT.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, bannerSize.x);
-        _eventBannerRT.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical,   bannerSize.y);
-        _eventTitle.color        = tone;
-        _eventTitle.text         = head;
-        _eventText.text          = body;
-
-        // 아트가 있으면 종류별 배너로 스왑 — 없으면 색 폴백이 그대로 남는다.
-        var art = hero ? skin?.bannerReignite
-                       : (skin?.bannerSmall != null && skin.bannerSmall.Length > 0
-                          ? skin.bannerSmall[Mathf.Clamp((int)ev - 2, 0, skin.bannerSmall.Length - 1)]
-                          : skin?.bannerReignite);
-        ShopUIStyle.Skin(_eventBannerImg, art);
-
-        _eventBanner.SetActive(true);
-        PlayEventAttentionAsync(tone).Forget();
-        Refresh();   // 재점화 가능 여부가 바뀌므로 하단 버튼 상태를 다시 칠한다
-    }
-
-    /// <summary>
-    /// 배너를 <b>켜는 것</b>과 <b>보게 하는 것</b>은 다르다. 배너는 제자리에 두고(목업 좌표 보존)
-    /// 등장 펀치 + 제목 플래시로 배너 자체를 흔들고, 제단 옆 화살표를 잠깐 띄워 시선만 넘긴다.
-    /// 표시 전용 — 이벤트 효과·확률·버튼 상태 어느 것도 여기서 바뀌지 않는다(P2-5).
-    /// </summary>
-    private async UniTaskVoid PlayEventAttentionAsync(Color tone)
-    {
-        var ct = this.GetCancellationTokenOnDestroy();
-        try
-        {
-            UIJuice.PunchAsync(_eventBannerRT, 0.10f, 0.26f, ct).Forget();
-            if (_eventTitle != null)
-                UIJuice.FlashAsync(_eventTitle, Color.white, 0.13f, 2, ct).Forget();
-
-            if (_eventPointer == null) return;
-
-            _eventPointer.color = tone;
-            _eventPointer.gameObject.SetActive(true);
-            UIJuice.PunchAsync(_eventPointer.rectTransform, 0.22f, 0.30f, ct).Forget();
-
-            await UIJuice.FadeOutAsync(_eventPointer, 1f, 0.75f, ct);
-            _eventPointer.gameObject.SetActive(false);
+            t += Time.unscaledDeltaTime;
+            float k = Mathf.Clamp01(t / dur);
+            float s = Mathf.Lerp(from, 1f, 1f - (1f - k) * (1f - k));
+            rt.localScale = new Vector3(s, s, 1f);
+            await UniTask.Yield(PlayerLoopTiming.Update, ct);
         }
-        catch (OperationCanceledException) { }
+        rt.localScale = Vector3.one;
     }
 
-    /// <summary>다음 회로 넘어간 효과(과열·불티)를 상시 표시한다. 소진되면 자동으로 사라진다.</summary>
-    private void RefreshReserved()
+    /// <summary>결과가 판 쪽(아래)으로 빨려 들어간다 — 룬판이 열리기 직전의 손짓.</summary>
+    private async UniTask SlipToGridAsync(CancellationToken ct)
     {
-        if (_reservedText == null) return;
-        if (_svc == null) { _reservedText.text = ""; return; }
+        if (_resultBox == null || !_resultBox.gameObject.activeSelf) return;
+        var rt = _resultBox.rectTransform;
+        Vector2 from = rt.anchoredPosition;
+        float t = 0f;
+        while (t < SlipDur)
+        {
+            t += Time.unscaledDeltaTime;
+            float k = Mathf.Clamp01(t / SlipDur);
+            rt.anchoredPosition = from + new Vector2(0f, -200f * k * k);
+            float s = Mathf.Lerp(1f, 0.4f, k);
+            rt.localScale = new Vector3(s, s, 1f);
+            await UniTask.Yield(PlayerLoopTiming.Update, ct);
+        }
+        rt.anchoredPosition = from;      // 다음 돌리기를 위해 제자리로(가린 채 되돌린다)
+        rt.localScale       = Vector3.one;
+        _resultBox.gameObject.SetActive(false);
+    }
 
-        string s = "";
-        if (_svc.NextHeat) s  = "<color=#FF8A3A>▲ 과열 예약</color>";
-        if (_svc.NextFree) s += (s.Length > 0 ? "   " : "") + "<color=#FFCB5A>◆ 불티 예약</color>";
-        _reservedText.text = s;
+    private static int RarityTier(ItemRarity r) => r switch
+    {
+        ItemRarity.Legendary => 3,
+        ItemRarity.Epic      => 2,
+        ItemRarity.Rare      => 1,
+        _                    => 0,
+    };
+
+    /// <summary>코드로 그린 빛(불티·섬광·빛살)은 프리팹에 저장되지 않는다 — 처음 돌릴 때 만든다.</summary>
+    private void EnsureCondenseFx()
+    {
+        if (_motes != null || _fxRoot == null) return;
+
+        var dot = UI_RuneSelectPopup.SoftDot;
+        if (_revealFlash != null) _revealFlash.sprite = dot;
+        if (_revealRays  != null) _revealRays.sprite  = UI_RuneSelectPopup.Rays;
+
+        _motes = new Image[MoteCount];
+        for (int i = 0; i < MoteCount; i++)
+        {
+            var img = ShopUIStyle.MakeImage(_fxRoot, "Mote", Color.clear);
+            img.sprite = dot;
+            var rt = img.rectTransform;
+            rt.anchorMin = rt.anchorMax = rt.pivot = Half;
+            rt.sizeDelta = new Vector2(18f, 18f);
+            img.gameObject.SetActive(false);
+            _motes[i] = img;
+        }
     }
 
     // ── Helpers ──
 
-    private static int AmtOf(RuntimeItemData rune)
-    {
-        if (rune?.effects != null)
-            foreach (var s in rune.effects)
-                if (s.effectType == "AmplifyZone") return Mathf.RoundToInt(s.value);
-        return 0;
-    }
-
-    private static string RarLabel(ItemRarity r) => r switch
-    {
-        ItemRarity.Legendary => "◆ Legendary",
-        ItemRarity.Epic      => "Epic",
-        _                    => "Rare",
-    };
+    // 등급 표기는 한 곳(RewardPresentation)에서 — 획득 카드·룬판과 같은 기호(◇ Rare · ◆ Epic · ★ Legendary).
+    private static string RarLabel(ItemRarity r) => RewardPresentation.RarityLabel(r);
 
     private static string Pct(float f) => Mathf.RoundToInt(f * 100f) + "%";
     private static string HexOf(ItemRarity r) => ColorUtility.ToHtmlStringRGB(ShopUIStyle.RarityGlow(r));

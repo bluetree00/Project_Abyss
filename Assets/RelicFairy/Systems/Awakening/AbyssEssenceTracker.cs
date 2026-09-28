@@ -13,13 +13,17 @@ public sealed class EssenceTracker : MonoBehaviour
 {
     // ── 설정 ────────────────────────────────────────────────────────────
     // 수급값은 정본 §7 기준. 첫 해금(300)이 첫 사망 직후에 오도록 잡혀 있다 — 사망런 500~800 / 완주 ~1,400.
+    // [09-28 사용자 결정] +10% — 기억의 제단에 원거리 갈래(5노드)가 더해져 전부 해금이 38 → 41런이 됐다. 완주 구성
+    // (방 26×15 · 보스 4×120 · 처치 약 68배치×8)에서 처치 8→9 · 방 15→16 · 보스 120→132 = +142(+10.0%) → 약 38런으로 되돌린다
+    // (시뮬 `RelicFairy_문서/기획/시뮬/altar_sim_20260928.py`, 베이스캠프 재설계 설계서 §2-1).
+    // ⚠️ 이 컴포넌트는 씬·프리팹에 없고 GameRunBootstrapper가 AddComponent로 붙인다 — 여기 기본값이 곧 실제 값이다.
     [Header("처치 적립")]
     [SerializeField] private int killsPerBatch    = 10;  // N마리 처치마다 1회 지급
-    [SerializeField] private int essencePerBatch  = 8;   // 처치 배치 지급량
+    [SerializeField] private int essencePerBatch  = 9;   // 처치 배치 지급량
 
     [Header("방 클리어 적립")]
-    [SerializeField] private int essencePerRoom   = 15;
-    [SerializeField] private int essencePerBoss   = 120;
+    [SerializeField] private int essencePerRoom   = 16;
+    [SerializeField] private int essencePerBoss   = 132;
 
     // ── 상태 ────────────────────────────────────────────────────────────
     private GameRunSession _session;

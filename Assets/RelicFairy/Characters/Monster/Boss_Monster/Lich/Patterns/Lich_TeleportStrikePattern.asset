@@ -16,20 +16,23 @@ MonoBehaviour:
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
-  weight: 1
+  weight: 3
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: teleportstrike
   breakOverride: -1
   maxTriggerRange: 30
-  vanishDuration: 0.4
-  strikeDelay: 0.7
-  strikeDuration: 0.5
-  recoveryDuration: 0.5
-  sideOffset: 2.5
-  teleportVfxPrefab: {fileID: 3981002320176267511, guid: 74c2d05dda379b544b4ec156bbb81a27,
-    type: 3}
-  damageMultiplier: 0
-  hitRadius: 2
-  knockbackMultiplier: 1.8
   patternCooldown: 6
+  vanishDuration: 0.7
+  targetDuration: 0.9
+  appearLead: 0.3
+  dropDuration: 0.25
+  punishDuration: 0.9
+  recoveryDuration: 0.5
+  hitRadius: 4
+  damageMultiplier: 1.4
+  knockbackMultiplier: 1.8
+  dropHeight: 8
+  breakRadius: 7
+  breakWarn: 1
+  breakSeconds: -1

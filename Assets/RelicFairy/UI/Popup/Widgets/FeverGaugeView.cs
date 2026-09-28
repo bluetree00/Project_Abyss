@@ -129,7 +129,7 @@ public sealed class FeverGaugeView : MonoBehaviour
         if (_strip != null)
         {
             // 단계 그림 한 장을 통째로 교체한다 — 늘리지 않으므로 비율이 보존된다.
-            var sprite = skin != null ? skin.FeverCell(clamped) : null;
+            var sprite = skin != null ? skin.FeverCell(ArtIndex(clamped, skin.feverCell?.Length ?? 0)) : null;
             if (sprite != null) _strip.sprite = sprite;
         }
         else if (_cells != null)
@@ -147,9 +147,28 @@ public sealed class FeverGaugeView : MonoBehaviour
 
         if (_hint != null)
         {
+            // 숫자는 <b>그림에 켜진 칸 수</b>로 센다 — 납품 그림은 7칸인데 「n/9」를 쓰면 켜진 칸과 숫자가 어긋났다(09-27).
+            int artCount = _strip != null && skin != null ? (skin.feverCell?.Length ?? 0) : 0;
+            int shown = artCount > 1 ? ArtIndex(clamped, artCount) : clamped;
+            int total = artCount > 1 ? artCount - 1 : MaxLevel;
             _hint.text = clamped >= MaxLevel
                 ? "<color=#FFCB5A>최고조 — 상위 등급 최대</color>"
-                : (clamped > 0 ? $"{clamped}/{MaxLevel}  확률 상승 중" : $"0/{MaxLevel}  연속으로 돌리면 오른다");
+                : (shown > 0 ? $"{shown}/{total}  확률 상승 중" : $"0/{total}  연속으로 돌리면 오른다");
         }
+    }
+
+    // ── Private Methods ──
+
+    /// <summary>
+    /// 단계(0~MaxLevel) → 납품 그림 인덱스. 그림은 0~7의 8장인데 단계는 9까지라, 그대로 쓰면 7부터
+    /// 꽉 찬 그림이 떠 「최고조」로 읽혔다(09-14에 고친 거짓이 아트 경로에서 되살아남).
+    /// 0은 빈 그림, MaxLevel만 꽉 찬 그림, 그 사이는 1~(마지막-1)에 고르게 나눈다.
+    /// </summary>
+    private static int ArtIndex(int level, int artCount)
+    {
+        int last = artCount - 1;
+        if (level <= 0 || last <= 0) return 0;
+        if (level >= MaxLevel) return last;
+        return 1 + (level - 1) * (last - 1) / Mathf.Max(1, MaxLevel - 1);
     }
 }

@@ -20,8 +20,14 @@ namespace RelicFairy.Monster
 ///
 /// ━━ 패턴 가중치 회복 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ///  패턴 실행 직후 weight=0, 5~10초에 걸쳐 원래값으로 복원.
+///
+/// ━━ 2페이지 「고목의 분노」 (악몽기만 — BossPages, 09-28 설계 확정 §3) ━━━━━━━━━━
+///  위의 1·2페이즈 전투 전부가 1페이지다. 체력 = 기존 × 1.4, 1페이지 몫이 다 깎이면 전환 패턴(무적) →
+///  아레나 가장자리 3.5 m 가시 뿌리 띠(영구) · 몸이 붉게 → 2페이지 새 패턴 FL1~FL4 + 간판 FL-S(2페이지 50%).
+///  HpRatio는 1페이지 동안 1페이지 기준(1→0)이라 50% 페이즈 경계가 그대로 돌고, 2페이지에선 0.4→0이라 다시 켜지지 않는다.
+///  봉인기(Pages.Enabled=false)엔 체력 · 바 · 패턴 전부 지금과 같다.
 /// </summary>
-public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
+public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, IBossHudSource
 {
     // ── 상수 ─────────────────────────────────────────────────
     private const string Phase2BodyMatAddress  = "ForestGuardian/Materials/TreantD";
@@ -29,8 +35,29 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
     private const float  Phase2HpThreshold     = 0.5f;
     private const float  WeightRecoveryMin     = 5f;
     private const float  WeightRecoveryMax     = 10f;
+    private const float  ArenaFallbackHalfSize = 14f;     // 바닥 상자를 못 찾을 때 — Ch1 아레나 28×28
+    private const float  DirectHitMinInterval  = 0.1f;    // 한 번 휘두름의 다단 판정을 「한 대」로 센다(간판 약점)
+    private const string HeartGroggyStatusId   = "fg_heart";
+
+    private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+
+    /// <summary>패턴 가이드 채움 색 — 숲 테마(호박빛). 선은 공통 예고색(노랑)→판정색(빨강).</summary>
+    internal static readonly Color GuideFlow = new Color(1f, 0.55f, 0.12f);
+
+    /// <summary>안전 표시(흰색) — 보스 공통 색 규약(리치와 같은 값). 뿌리 감옥 틈 · 뿌리 회오리 안쪽.</summary>
+    internal static readonly Color GuideSafe = new Color(0.95f, 0.95f, 0.90f);
 
     // ── Inspector ────────────────────────────────────────────
+    [Header("ForestGuardian — 표시")]
+    [Tooltip("보스 체력바 이름. config.monsterName은 퀘스트 처치 키라 바꾸지 않는다")]
+    [SerializeField] private string _bossDisplayName = "숲의 수호자";
+
+    [Header("ForestGuardian — 패턴 가이드 (SkillIndicator)")]
+    [Tooltip("원형·부채꼴 가이드 머티리얼 — 리치 가이드를 숲 문양으로 바꾼 것. 비우면 프리미티브로 폴백")]
+    [SerializeField] private Material _circleGuideMaterial;
+    [Tooltip("직선 가이드 머티리얼(브레스). 비우면 프리미티브로 폴백")]
+    [SerializeField] private Material _arrowGuideMaterial;
+
     [Header("ForestGuardian — 렌더러")]
     [Tooltip("body 머티리얼(index 0)을 가진 Renderer 배열")]
     [SerializeField] private Renderer[] _bodyRenderers;
@@ -65,6 +92,19 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
     [Tooltip("걷기 클립 내 발이 땅에 닿는 시점 (normalizedTime). 108프레임 기준 20·48·75·102프레임")]
     [SerializeField] private float[] _footstepPhases = { 0.185f, 0.444f, 0.694f, 0.944f };
 
+    [Header("ForestGuardian — 2페이지 무대 (가시 뿌리 띠, 악몽기만)")]
+    [Tooltip("아레나 가장자리에서 이 폭(m)만큼 가시 뿌리가 영구히 덮는다")]
+    [SerializeField] private float      _thornBandWidth      = 3.5f;
+    [Tooltip("가시 뿌리 띠 바닥 색(반투명)")]
+    [SerializeField] private Color      _thornBandColor      = new Color(0.55f, 0.10f, 0.06f, 0.45f);
+    [Tooltip("띠를 따라 늘어놓을 가시 이펙트(시각 전용). 비우면 바닥 띠만")]
+    [SerializeField] private GameObject _thornBandVfxPrefab;
+    [SerializeField] private float      _thornBandVfxScale   = 1f;
+    [Tooltip("띠 안에 있으면 0.5초마다 attackPower × 이 배율 피해")]
+    [SerializeField] private float      _thornBandDamageMult = 0.12f;
+    [Tooltip("2페이지 몸 색 — 초록빛이 붉게(머티리얼 _BaseColor에 곱한다)")]
+    [SerializeField] private Color      _page2BodyTint       = new Color(1f, 0.55f, 0.45f);
+
     // ── MonsterBase 추상 멤버 ─────────────────────────────────
     protected override string ConfigAddress  => "ForestGuardian/ForestGuardianConfig";
     protected override string DataAddress    => string.Empty;
@@ -73,12 +113,35 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
     protected override bool   UseWorldHPBar  => false;
 
     // ── IBoss ─────────────────────────────────────────────────
+    /// <summary>
+    /// 페이즈 경계용 체력 비율 — 2페이지가 있으면 1페이지 동안 1페이지 기준(1→0), 2페이지에선 0.4→0(BossPages.PhaseRatio).
+    /// 봉인기엔 예전 공식(현재 / config 최대) 그대로.
+    /// </summary>
     public float HpRatio =>
         (_runtime != null && _config != null && _config.stat.maxHp > 0)
-        ? (float)_runtime.CurrentHp / _config.stat.maxHp
+        ? Pages.PhaseRatio(_runtime.CurrentHp, _config.stat.maxHp)
         : 1f;
 
     public BossAttackBlackboard Blackboard => _coreBB;
+
+    // ── 2페이지 (IPagedBoss) ──────────────────────────────────
+    /// <summary>페이지 부품 — MonsterBase가 초기화 중 EffectiveMaxHp를 읽을 때 처음 만들어진다(악몽기 여부를 그때 읽는다).</summary>
+    public BossPages Pages => _pages ??= CreatePages();
+
+    protected override float BossHpScale    => Pages.HpScale;
+    protected override int   DamageHpFloor  => Pages.HpFloor(base.DamageHpFloor);
+
+    // ── IBossHudSource (페이지 바 — BossPages에 위임) ─────────────
+    public float[] HudPageMarkers  => Pages.HudPageMarkers;
+    public int     HudPage         => Pages.HudPage;
+    public bool    HudInvulnerable => IsInvulnerableNow;
+    public event Action<bool>       HudInvulnerableChanged;
+    public event Action<float>      HudVulnerableWindow;
+    public event Action             HudPageMarkersChanged;
+    public event Action<int, float> HudPageRefill;
+
+    private bool IsInvulnerableNow =>
+        _fsm != null && (_fsm.CurrentConstraints & SpecialStateConstraint.Invincible) != 0;
 
     // ── ForestGuardian 공개 접근 ──────────────────────────────
     public ForestGuardianBlackboard FGBlackboard => _fgBB;
@@ -89,12 +152,35 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
     public float   EntranceCamHoldDuration   => _entranceCamHoldDuration;
     public float   EntranceCamReturnDuration => _entranceCamReturnDuration;
 
+    // ── 2페이지 패턴이 읽는 무대 정보 ─────────────────────────────
+    /// <summary>아레나 바닥 XZ 경계(가시 띠 · 간판 채널링 자리).</summary>
+    internal Bounds  ArenaBoundsXZ       { get { EnsureArena(); return _arenaBounds; } }
+    internal float   ArenaFloorY         { get { EnsureArena(); return _arenaFloorY; } }
+    internal Vector3 ArenaCenter         { get { EnsureArena(); return new Vector3(_arenaBounds.center.x, _arenaFloorY, _arenaBounds.center.z); } }
+    internal Color   ThornBandColor      => _thornBandColor;
+    internal float   ThornBandDamageMult => _thornBandDamageMult;
+
+    /// <summary>플레이어의 직접 타격(실제로 체력이 깎인 것) 누적 수 — 간판 「숲의 심장」이 시작 값과의 차로 센다.</summary>
+    internal int DirectHitCount => _directHitCount;
+
     // ── 내부 필드 ─────────────────────────────────────────────
     private ForestGuardianBlackboard _fgBB;
     private BossAttackBlackboard     _coreBB;
     private BossPatternRunner        _runner;
     private BossPatternContext       _patternCtx;
     private FGDormantState _dormantState;
+
+    // 2페이지
+    private BossPages       _pages;
+    private BossStageHazard _stageHazard;
+    private Bounds          _arenaBounds;
+    private float           _arenaFloorY;
+    private bool            _arenaResolved;
+    private bool            _thornWidened;
+    private bool            _page2Tinted;
+    private bool            _lastHudInvulnerable;
+    private int             _directHitCount;
+    private float           _lastDirectHitTime = -1f;
 
     // 목소리 사운드
     private float _voiceSfxTimer;
@@ -109,7 +195,6 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
     private struct WeightRecoveryEntry
     {
         public BossPatternSO Pattern;
-        public float         OriginalWeight;
         public float         Timer;
         public float         Duration;
     }
@@ -143,6 +228,25 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
         }
     }
 
+    /// <summary>
+    /// 페이즈 체력 범위 — 공용 HpBelow/HpAbove(현재 / config 최대)는 2페이지 체력 배율(×1.4)을 모르므로
+    /// 페이지 기준 <see cref="HpRatio"/>로 본다. 봉인기엔 두 공식이 같다.
+    /// </summary>
+    private sealed class FGHpRatioCondition : ICondition
+    {
+        private readonly ForestGuardianMonster _fg;
+        private readonly float                 _threshold;
+        private readonly bool                  _below;
+        public FGHpRatioCondition(ForestGuardianMonster fg, float threshold, bool below)
+        {
+            _fg        = fg;
+            _threshold = threshold;
+            _below     = below;
+        }
+        public bool Evaluate(BossPatternContext ctx)
+            => _below ? _fg.HpRatio <= _threshold : _fg.HpRatio > _threshold;
+    }
+
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 레이어드 FSM 상태 등록
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -173,6 +277,9 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
 
         _fgBB   = new ForestGuardianBlackboard();
         _coreBB = new BossAttackBlackboard();
+
+        // 가이드는 정적 주입 — 보스마다 자기 것을 넣는다(리치 뒤에 오면 리치 것이 남아 있다)
+        PatternGuideHelper.SetMaterials(_circleGuideMaterial, _arrowGuideMaterial);
 
         _patternCtx = new BossPatternContext
         {
@@ -215,7 +322,9 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
     {
         base.Update();
 
+        if (IsDead) return;   // 사망 뒤 그로기 · 페이즈 판정이 사망 모션을 피격으로 덮던 결함
         if (_fgBB == null || _coreBB == null) return;
+        TickHudInvulnerable();
         if (_dormantState != null && _dormantState.IsActive) return;
 
         float dt = Time.deltaTime;
@@ -271,7 +380,9 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
                 amount *= 0.7f;           // 2페이즈: 30% 감소
         }
 
+        int hpBefore = CurrentHp;
         base.TakeDamage(amount, instigator, knockbackMultiplier, isCrit);
+        if (CurrentHp < hpBefore) CountDirectHit();   // 무적 · 사망 가드에 막힌 타격은 세지 않는다
     }
 
     protected override void OnDamageTaken()
@@ -303,11 +414,19 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
 
     protected override void OnEnable()
     {
+        // 2페이지 부품은 base가 EffectiveMaxHp(= 페이지 체력 배율)로 체력을 채우기 전에 비운다 — 이번 전투의 악몽기 여부를 다시 읽게.
+        ResetPages();
+        _arenaResolved = false;
         base.OnEnable();
         _runner?.Reset();
         _coreBB?.Reset();
         _fgBB?.Reset();
         _weightRecoveries.Clear();
+        _thornWidened        = false;
+        _directHitCount      = 0;
+        _lastDirectHitTime   = -1f;
+        _lastHudInvulnerable = false;
+        RestoreBodyTint();
         _phase2Transitioning    = false;
         _voiceSfxTimer          = 0f;
         _voiceSfxNextInterval = Random.Range(_voiceSfxIntervalMin, _voiceSfxIntervalMax);
@@ -319,6 +438,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
     protected override void OnDisable()
     {
         UnbindBossHudIfBound();
+        ClearStageHazard();   // 가시 띠는 보스가 죽으면 스스로 사라지지만, 죽지 않고 풀로 돌아가면 남는다
         base.OnDisable();
     }
 
@@ -373,13 +493,17 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
 
     private ICondition BuildSingleCondition(BossConditionKey key, BossConfigSO config)
     {
+        // 2페이지 키(Page_1 · Page_2 · Page_TransitionDue · Page_SignatureDue) — 아래 기본 분기가 AlwaysTrue라 먼저 거른다
+        if (BossPageCondition.TryBuild(key, this, () => Pages, out var pageCondition))
+            return pageCondition;
+
         return key switch
         {
-            BossConditionKey.Phase2          => new HpBelowCondition(config.condPhase2HpThreshold),
+            BossConditionKey.Phase2          => new FGHpRatioCondition(this, config.condPhase2HpThreshold, below: true),
             BossConditionKey.Dist_Close      => new MaxRangeCondition(config.condDistClose),
             BossConditionKey.Dist_Far        => new MinRangeCondition(config.condDistFar),
             BossConditionKey.TimePressure    => new NormalModeTimerCondition(config.condTimePressureSecs),
-            BossConditionKey.FG_Phase1             => new HpAboveCondition(config.condPhase2HpThreshold),
+            BossConditionKey.FG_Phase1             => new FGHpRatioCondition(this, config.condPhase2HpThreshold, below: false),
             BossConditionKey.FG_Phase2             => new FGPhase2Condition(_fgBB),
             BossConditionKey.FG_PhaseChangePending => new FGPhaseChangePendingCondition(_fgBB),
             BossConditionKey.FG_IsPhase2           => new FGPhase2Condition(_fgBB),
@@ -394,28 +518,25 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
         _coreBB.LastPatternTag  = pattern.patternTag;
         _coreBB.NormalModeTimer = 0f;
 
-        // 가중치 즉시 0, 5~10초에 걸쳐 복원 예약
-        float original = pattern.weight;
-        if (original <= 0f) return;
+        // 가중치 배율 즉시 0, 5~10초에 걸쳐 1로 복원 예약.
+        // 배율은 러너에만 둔다 — 패턴 SO에 직접 쓰면 공용 에셋에 값이 남아 다음 전투까지 따라간다
+        // (그렇게 굳은 값이 커밋돼 있었다: Smash 1.4e-8 · Punch 0.045 …).
+        if (pattern.weight <= 0f) return;
 
-        pattern.weight = 0f;
+        _runner?.SetWeightScale(pattern, 0f);
 
-        // 기존 회복 항목 제거 — 부분 회복 중 재발동 시 OriginalWeight가 계속 감소하는 버그 방지
-        // 이전 항목에 더 높은 원래 값이 있으면 그 값으로 복원
+        // 기존 회복 항목 제거 — 부분 회복 중 재발동하면 처음부터 다시 센다
         for (int i = _weightRecoveries.Count - 1; i >= 0; i--)
         {
             if (!ReferenceEquals(_weightRecoveries[i].Pattern, pattern)) continue;
-            if (_weightRecoveries[i].OriginalWeight > original)
-                original = _weightRecoveries[i].OriginalWeight;
             _weightRecoveries.RemoveAt(i);
         }
 
         _weightRecoveries.Add(new WeightRecoveryEntry
         {
-            Pattern        = pattern,
-            OriginalWeight = original,
-            Timer          = 0f,
-            Duration       = Random.Range(WeightRecoveryMin, WeightRecoveryMax),
+            Pattern  = pattern,
+            Timer    = 0f,
+            Duration = Random.Range(WeightRecoveryMin, WeightRecoveryMax),
         });
     }
 
@@ -426,11 +547,10 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
             var e = _weightRecoveries[i];
             e.Timer += dt;
             float t = Mathf.Clamp01(e.Timer / e.Duration);
-            e.Pattern.weight = Mathf.Lerp(0f, e.OriginalWeight, t);
+            _runner?.SetWeightScale(e.Pattern, t);
 
             if (t >= 1f)
             {
-                e.Pattern.weight = e.OriginalWeight;
                 _weightRecoveries.RemoveAt(i);
             }
             else
@@ -463,6 +583,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
             {
                 ApplyMaterials(_bodyRenderers, matBody, 0);
                 ApplyMaterials(_limbRenderers, matLimb, 1);
+                if (_page2Tinted) SetBodyTint(_page2BodyTint);   // 2페이지에 들어선 뒤 로드가 끝났으면 새 머티리얼에도 붉은 빛
                 Debug.Log("[FG] 머티리얼 교체 완료", this);
             }
             else
@@ -555,10 +676,140 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 2페이지 「고목의 분노」 — IPagedBoss · 무대 · 간판 보상
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>전환 전경 — 아레나 가장자리 띠가 가시 뿌리로 뒤덮인다(영구, <paramref name="seconds"/> 동안 자라남).</summary>
+    public void OnPageStageChange(float seconds)
+    {
+        ClearStageHazard();
+        EnsureArena();
+        _stageHazard = BossStageHazard.CreateEdgeBand(this, _arenaBounds, _arenaFloorY, _thornBandWidth, seconds,
+                                                      _thornBandColor, _thornBandVfxPrefab, _thornBandVfxScale, _thornBandDamageMult);
+        Debug.Log($"[FG] 2페이지 무대 — 가시 뿌리 띠 {_thornBandWidth:F1} m · 아레나 {_arenaBounds.size.x:F0}×{_arenaBounds.size.z:F0} m", this);
+    }
+
+    /// <summary>
+    /// 전환 끝 — 2페이지. 몸이 붉게 물든다.
+    /// 한 방에 1페이지를 건너뛰어 1페이지의 2페이즈(머티리얼 · 속도 · 강인도)를 못 거쳤으면 지금 켠다 —
+    /// 2페이지는 2페이즈 위에 얹히고, 1페이지 페이즈 전환 패턴(FG_Phase2Entry)이 2페이지에 끼어들지 않는다.
+    /// </summary>
+    public void OnPage2Entered()
+    {
+        if (_fgBB != null && !_fgBB.IsPhase2) TriggerPhase2();
+        _page2Tinted = true;
+        SetBodyTint(_page2BodyTint);
+    }
+
+    /// <summary>전환 · 간판이 끝나면 추격으로 — 다른 패턴과 같은 복귀.</summary>
+    public void ReturnToCombat()
+    {
+        if (IsDead) return;
+        ChangeState<ChaseState>();
+    }
+
+    /// <summary>간판 실패 — 가시 띠를 영구히 넓힌다(한 번만, 설계 §6 「무대 변화는 영구 · 상한」).</summary>
+    internal void WidenThornBand(float extra)
+    {
+        if (_thornWidened || _stageHazard == null) return;
+        _thornWidened = true;
+        _stageHazard.Widen(extra);
+    }
+
+    /// <summary>간판 성공 — 그로기 <paramref name="seconds"/>초 + 받는 피해 증가. HUD에 무방비 창을 알린다.</summary>
+    internal void BeginHeartGroggy(float seconds, float damageTakenAmp)
+    {
+        _fgBB?.ForceGroggy(seconds);
+        if (damageTakenAmp > 0f) ApplyDamageTakenAmp(damageTakenAmp, seconds, HeartGroggyStatusId);
+        HudVulnerableWindow?.Invoke(seconds);
+    }
+
+    /// <summary>HUD에 칠 수 있는 창을 알린다 — 간판 약점 채널링.</summary>
+    internal void NotifyVulnerableWindow(float seconds) => HudVulnerableWindow?.Invoke(seconds);
+
+    private BossPages CreatePages()
+    {
+        var pages = new BossPages(this, BossPages.ResolveEnabled());
+        pages.HudPageRefill         += HandlePageRefill;
+        pages.HudPageMarkersChanged += HandlePageMarkersChanged;
+        return pages;
+    }
+
+    private void ResetPages()
+    {
+        if (_pages == null) return;
+        _pages.HudPageRefill         -= HandlePageRefill;
+        _pages.HudPageMarkersChanged -= HandlePageMarkersChanged;
+        _pages = null;
+    }
+
+    /// <summary>아레나 바닥 상자(브레스와 같은 탐색, 스폰 지점 기준). 바닥 높이는 보스가 선 스폰 높이.</summary>
+    private void EnsureArena()
+    {
+        if (_arenaResolved) return;
+        _arenaResolved = true;
+        Vector3 refPos = _runtime != null ? _runtime.SpawnPosition : transform.position;
+        _arenaBounds = DragonPatternFloorUtils.ResolveArenaBoundsXZ(refPos, ArenaFallbackHalfSize);
+        _arenaFloorY = refPos.y;
+    }
+
+    private void ClearStageHazard()
+    {
+        if (_stageHazard != null) Destroy(_stageHazard.gameObject);
+        _stageHazard = null;
+    }
+
+    private void CountDirectHit()
+    {
+        float now = Time.time;
+        if (now - _lastDirectHitTime < DirectHitMinInterval) return;
+        _lastDirectHitTime = now;
+        _directHitCount++;
+    }
+
+    private void TickHudInvulnerable()
+    {
+        bool inv = IsInvulnerableNow;
+        if (inv == _lastHudInvulnerable) return;
+        _lastHudInvulnerable = inv;
+        HudInvulnerableChanged?.Invoke(inv);
+    }
+
+    private void RestoreBodyTint()
+    {
+        if (!_page2Tinted) return;
+        _page2Tinted = false;
+        SetBodyTint(Color.white);
+    }
+
+    /// <summary>몸 · 팔다리 머티리얼(인스턴스)의 _BaseColor. MPB는 피격 플래시(VictimHitFeedback)가 매번 비우므로 쓰지 않는다.</summary>
+    private void SetBodyTint(Color tint)
+    {
+        TintRenderers(_bodyRenderers, tint);
+        if (!ReferenceEquals(_limbRenderers, _bodyRenderers)) TintRenderers(_limbRenderers, tint);
+    }
+
+    private static void TintRenderers(Renderer[] renderers, Color tint)
+    {
+        if (renderers == null) return;
+        foreach (var r in renderers)
+        {
+            if (r == null) continue;
+            foreach (var m in r.materials)
+                if (m != null && m.HasProperty(BaseColorId)) m.SetColor(BaseColorId, tint);
+        }
+    }
+
+    private void HandlePageRefill(int page, float seconds) => HudPageRefill?.Invoke(page, seconds);
+    private void HandlePageMarkersChanged()                => HudPageMarkersChanged?.Invoke();
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // IBossEntrance
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     public override bool HasEntranceAnimation => true;
+
+    public override string BossName => _bossDisplayName;
 
     // OnEntranceRequested 는 발행하지 않는다 — BRC 카메라 팬 개입 방지
     public event Action OnEntranceRequested;

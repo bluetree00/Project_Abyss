@@ -16,12 +16,19 @@ using UnityEngine;
 /// <b>양보하고 아무것도 하지 않는다</b> — 연출이 저장/복원하는 궤도를 덮어써서 깨뜨리지 않기 위해.
 ///
 /// PlayerController가 런타임에 자동 부착한다(DodgePresentation과 동일 패턴).
+///
+/// <b>구역 궤도</b>(<see cref="CameraZone"/>)는 이 컴포넌트의 <b>베이스를 바꾼다</b> — 이 컴포넌트가 매 프레임 궤도를 덮어쓰므로
+/// 궤도를 직접 바꾸면 한 프레임 만에 지워졌다(09-28 실측: 회랑·하강 구역 무효). 교전 확장은 그 위에 그대로 더해진다.
 /// </summary>
 [DisallowMultipleComponent]
 public class CombatCameraFraming : MonoBehaviour
 {
     // ── Constants ─────────────────────────────────────────────────
     private const int   MaxQuery = 16;   // 적 질의 상한(가독성 판단엔 이 정도면 충분)
+
+    // ── Static ────────────────────────────────────────────────────
+    /// <summary>지금 궤도를 맡고 있는 프레이밍(플레이어에 붙은 것). 구역 궤도가 이쪽 베이스를 바꾼다.</summary>
+    public static CombatCameraFraming Active { get; private set; }
 
     // ── SerializeField ────────────────────────────────────────────
     [Header("교전 판정")]
@@ -58,6 +65,13 @@ public class CombatCameraFraming : MonoBehaviour
     private float _baseFov;
     private bool  _captured;
 
+    // 구역 베이스(높이, 거리) — 저작 베이스에서 구역 값으로, 구역을 나가면 다시 저작 베이스로 보간한다.
+    private readonly Vector2[] _curBase  = new Vector2[3];
+    private readonly Vector2[] _fromBase = new Vector2[3];
+    private readonly Vector2[] _toBase   = new Vector2[3];
+    private float _baseBlendT = 1f;
+    private float _baseBlendDur = 1f;
+
     private readonly List<MonsterBase> _buffer = new(MaxQuery);
     private float _queryTimer;
     private float _intensity;         // 0=평시, 1=최대 교전 (현재값 — 매 프레임 목표로 수렴)
@@ -65,6 +79,13 @@ public class CombatCameraFraming : MonoBehaviour
 
     // ── Lifecycle ─────────────────────────────────────────────────
     private void Awake() => _player = GetComponent<PlayerController>();
+
+    private void OnEnable() => Active = this;
+
+    private void OnDisable()
+    {
+        if (ReferenceEquals(Active, this)) Active = null;
+    }
 
     private void LateUpdate()
     {
@@ -78,8 +99,35 @@ public class CombatCameraFraming : MonoBehaviour
             return;
         }
 
+        // 보스방이 자기 구도를 쓰겠다고 하면 평시 구도로 천천히 돌아간 뒤 멈춘다(넓어졌다 좁아지기 반복 방지).
+        if (gcc != null && gcc.IsCombatFramingSuppressed)
+        {
+            if (_intensity <= 0f) return;
+            _targetIntensity = 0f;
+            _intensity = Mathf.MoveTowards(_intensity, 0f, zoomInSpeed * Time.unscaledDeltaTime);
+            ApplyFraming();
+            return;
+        }
+
         UpdateIntensity();
         ApplyFraming();
+    }
+
+    // ── Public Methods ────────────────────────────────────────────
+    /// <summary>구역 진입 — 베이스를 구역 궤도(높이, 거리)로 보간한다. 교전 확장은 그 위에 더해진다.</summary>
+    public void SetZoneBase(Vector2 top, Vector2 mid, Vector2 bot, float duration)
+    {
+        if (!EnsureCamera()) return;
+        BeginBaseBlend(top, mid, bot, duration);
+    }
+
+    /// <summary>구역 이탈 — 저작 베이스(씬/프리팹 값)로 되돌린다.</summary>
+    public void ClearZoneBase(float duration)
+    {
+        if (!EnsureCamera()) return;
+        BeginBaseBlend(new Vector2(_baseOrbits[0].m_Height, _baseOrbits[0].m_Radius),
+                       new Vector2(_baseOrbits[1].m_Height, _baseOrbits[1].m_Radius),
+                       new Vector2(_baseOrbits[2].m_Height, _baseOrbits[2].m_Radius), duration);
     }
 
     // ── Private Methods ───────────────────────────────────────────
@@ -106,6 +154,8 @@ public class CombatCameraFraming : MonoBehaviour
             };
             _baseFov  = _cam.m_Lens.FieldOfView;   // m_CommonLens=1 이라 이 한 곳이 전 리그에 적용된다
             _captured = true;
+            for (int i = 0; i < 3; i++) _curBase[i] = new Vector2(_baseOrbits[i].m_Height, _baseOrbits[i].m_Radius);
+            _baseBlendT = _baseBlendDur;
 
             // 진단 — 프리팹/씬에 저작된 값이 런타임에 실제로 들어왔는지 확인.
             // 다른 무언가가 궤도를 덮어쓰고 있으면 여기 찍히는 값이 저작값과 다르다.
@@ -138,8 +188,25 @@ public class CombatCameraFraming : MonoBehaviour
         _intensity = Mathf.MoveTowards(_intensity, _targetIntensity, speed * Time.unscaledDeltaTime);
     }
 
+    private void BeginBaseBlend(Vector2 top, Vector2 mid, Vector2 bot, float duration)
+    {
+        for (int i = 0; i < 3; i++) _fromBase[i] = _curBase[i];
+        _toBase[0] = top; _toBase[1] = mid; _toBase[2] = bot;
+        _baseBlendDur = Mathf.Max(0.01f, duration);
+        _baseBlendT = 0f;
+    }
+
+    private void UpdateBaseBlend()
+    {
+        if (_baseBlendT >= _baseBlendDur) return;
+        _baseBlendT = Mathf.Min(_baseBlendDur, _baseBlendT + Time.unscaledDeltaTime);
+        float k = Mathf.SmoothStep(0f, 1f, _baseBlendT / _baseBlendDur);
+        for (int i = 0; i < 3; i++) _curBase[i] = Vector2.Lerp(_fromBase[i], _toBase[i], k);
+    }
+
     private void ApplyFraming()
     {
+        UpdateBaseBlend();
         float h = extraHeight * _intensity;
         float r = extraRadius * _intensity;
 
@@ -147,8 +214,8 @@ public class CombatCameraFraming : MonoBehaviour
         {
             _cam.m_Orbits[i] = new CinemachineFreeLook.Orbit
             {
-                m_Height = _baseOrbits[i].m_Height + h,
-                m_Radius = _baseOrbits[i].m_Radius + r,
+                m_Height = _curBase[i].x + h,
+                m_Radius = _curBase[i].y + r,
             };
         }
 

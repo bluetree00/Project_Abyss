@@ -119,7 +119,7 @@ public sealed class GambleBoxChallenge : MonoBehaviour, IInteractionChallenge
         t.color = color;
         t.textWrappingMode = TextWrappingModes.NoWrap;
         t.sortingOrder = order;
-        TMPOutlineHelper.ApplyDefault(t);
+        TMPOutlineHelper.ApplySoftShadow(t);
         return t;
     }
 

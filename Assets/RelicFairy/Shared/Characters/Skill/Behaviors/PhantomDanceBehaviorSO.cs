@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using RelicFairy.Monster;
 
 /// <summary>
 /// 환영베기 — 카타나 Q스킬.
@@ -10,6 +11,11 @@ using UnityEngine;
 ///   1단계: 제자리 5회 공격
 ///   2단계: + 전방 검기 3회 발사 (관통 데미지)
 ///   3단계: + 검기 발사 후 1회 폭발 범위 공격
+///
+/// 각인(09-25 시범, 기획 스킬구성_재련소연결 A안): 2단계에 오를 때 둘 중 하나를 고르면 「검기 발사」가 바뀐다.
+///   잔상 추격 — 검기가 앞자리 대신 <b>가까운 적들을 하나씩 쫓아가</b> 벤다(흩어진 적).
+///   응축     — 검기를 <b>한 번에 모아</b> 크게 벤다(단단한 한 놈). 3단계 폭발은 둘 다 그대로 붙는다.
+/// 고르지 않았으면(선택 화면 전·옛 세이브) 예전 「검기 3연발」.
 /// </summary>
 [CreateAssetMenu(menuName = "Game/Skill/PhantomDanceBehavior")]
 public class PhantomDanceBehaviorSO : SkillBehaviorSO
@@ -30,6 +36,16 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
     public float slashProjectileRadius = 1.5f;
     public string slashProjectileEffectKey = "ShinySlash";
     public float slashProjectileEffectScale = 1f;
+
+    [Header("각인 (2단계 택1) — 고르지 않았으면 위 「검기 발사」 그대로")]
+    [Tooltip("잔상 추격: 쫓아갈 적을 찾는 반경(m)")]
+    public float pursuitRadius = 8f;
+    [Tooltip("잔상 추격: 적 자리에서 베는 반경(m)")]
+    public float pursuitHitRadius = 1.2f;
+    [Tooltip("응축: 검기 N발 피해 합 × 이 배율을 한 번에")]
+    public float condenseDamageMult = 1.2f;
+    public float condenseRadiusMult = 1.6f;
+    public float condenseEffectScaleMult = 2f;
 
     [Header("3단계: 검기 폭발")]
     public float slashExplodeDelay = 0.3f;
@@ -54,6 +70,9 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
     [Tooltip("난무 시 번갈아 사용할 공격 상태들 (비어있으면 GroundLightAttack_01~03 사용)")]
     public string[] flurryAnimStates;
 
+    public const string EngravePursuit  = "phantom_pursuit";    // 잔상 추격
+    public const string EngraveCondense = "phantom_condense";   // 응축
+
     public override ISkillRuntime CreateRuntime() => new Runtime(this);
 
     private class Runtime : ISkillRuntime
@@ -65,6 +84,8 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
         private int _hitIndex;
         private int _slashIndex;
         private int _skillTier;
+        private bool _pursuit, _condense;
+        private readonly List<MonsterBase> _pursuitTargets = new();
         private readonly List<IDamageable> _hitTargets = new();
         private readonly HashSet<GameObject> _hitObjects = new();
         private Vector3 _slashCenter;
@@ -78,6 +99,8 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
             ctx.SetMoveScale(0f);
 
             _skillTier = ctx.SkillTier;
+            _pursuit   = ctx.WeaponData != null && ctx.WeaponData.HasEngraving(EngravePursuit);
+            _condense  = !_pursuit && ctx.WeaponData != null && ctx.WeaponData.HasEngraving(EngraveCondense);
 
             _hitTargets.Clear();
             _hitObjects.Clear();
@@ -162,6 +185,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
                             + ctx.PlayerTransform.forward * _data.slashProjectileDistance;
                         _phase = Phase.SlashProjectile;
                         _slashIndex = 0;
+                        if (_pursuit) GatherPursuitTargets(ctx);
                     }
                     else
                     {
@@ -174,6 +198,9 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
         // ── Phase: SlashProjectile (검기 발사 3회) ──
         private void UpdateSlashProjectile(SkillExecutionContext ctx)
         {
+            if (_condense) { UpdateCondense(ctx); return; }
+            if (_pursuit && _pursuitTargets.Count > 0) { UpdatePursuit(ctx); return; }
+
             if (_timer >= _data.slashProjectileDelay)
             {
                 _timer = 0f;
@@ -184,8 +211,10 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
                 foreach (var col in colliders)
                 {
                     if (col.gameObject == ctx.Controller.gameObject) continue;
+                    // 3단계는 뒤에 검기 폭발이 막타 — 그 아래 단계는 마지막 검기가 막타
                     if (col.TryGetComponent<IDamageable>(out var d))
-                        ctx.DealDamage(d, dmg, _data.knockbackMultiplier);
+                        ctx.DealDamage(d, dmg, _data.knockbackMultiplier,
+                            _skillTier < 3 && _slashIndex >= _data.slashProjectileCount - 1);
                 }
 
                 // 검기 이펙트
@@ -208,6 +237,62 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
             }
         }
 
+        // ── 각인: 잔상 추격 — 검기가 가까운 적을 하나씩 쫓아가 벤다 ──
+        private void GatherPursuitTargets(SkillExecutionContext ctx)
+        {
+            var pos = ctx.PlayerTransform.position;
+            CombatQuery.GetNearbyEnemies(pos, _data.pursuitRadius, ctx.Controller.gameObject, 16, _pursuitTargets);
+            _pursuitTargets.Sort((a, b) => (a.transform.position - pos).sqrMagnitude.CompareTo((b.transform.position - pos).sqrMagnitude));
+        }
+
+        private void UpdatePursuit(SkillExecutionContext ctx)
+        {
+            if (_timer < _data.slashProjectileDelay) return;
+            _timer = 0f;
+
+            // 검기 i번째 = i번째로 가까운 적(적이 검기 수보다 적으면 가까운 쪽부터 다시)
+            var target = _pursuitTargets[_slashIndex % _pursuitTargets.Count];
+            if (target != null && !target.IsDead) _slashCenter = target.transform.position;
+
+            bool last = _slashIndex >= _data.slashProjectileCount - 1;
+            float dmg = ctx.CalculateDamage(_data.slashProjectileDamage);
+            foreach (var col in Physics.OverlapSphere(_slashCenter, _data.pursuitHitRadius))
+            {
+                if (col.gameObject == ctx.Controller.gameObject) continue;
+                if (col.TryGetComponent<IDamageable>(out var d))
+                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier, _skillTier < 3 && last);
+            }
+            SpawnEffectScaled(ctx, _data.slashProjectileEffectKey, _slashCenter + Vector3.up * 1f, _data.slashProjectileEffectScale, 0.6f);
+
+            _slashIndex++;
+            if (_slashIndex >= _data.slashProjectileCount)
+            {
+                _timer = 0f;
+                _phase = _skillTier >= 3 ? Phase.SlashExplode : Phase.End;   // 폭발은 마지막으로 쫓아간 자리에서
+            }
+        }
+
+        // ── 각인: 응축 — 검기를 한 번에 모아 크게 벤다 ──
+        private void UpdateCondense(SkillExecutionContext ctx)
+        {
+            if (_timer < _data.slashProjectileDelay * 2f) return;   // 모으는 한 박자
+            _timer = 0f;
+
+            float dmg    = ctx.CalculateDamage(_data.slashProjectileDamage) * _data.slashProjectileCount * _data.condenseDamageMult;
+            float radius = _data.slashProjectileRadius * _data.condenseRadiusMult;
+            foreach (var col in Physics.OverlapSphere(_slashCenter, radius))
+            {
+                if (col.gameObject == ctx.Controller.gameObject) continue;
+                if (col.TryGetComponent<IDamageable>(out var d))
+                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f, _skillTier < 3);
+            }
+            SpawnEffectScaled(ctx, _data.slashProjectileEffectKey, _slashCenter + Vector3.up * 1f,
+                              _data.slashProjectileEffectScale * _data.condenseEffectScaleMult, 0.8f);
+
+            _slashIndex = _data.slashProjectileCount;
+            _phase = _skillTier >= 3 ? Phase.SlashExplode : Phase.End;
+        }
+
         // ── Phase: SlashExplode (검기 폭발) ──
         private void UpdateSlashExplode(SkillExecutionContext ctx)
         {
@@ -223,7 +308,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
                     if (col.gameObject == ctx.Controller.gameObject) continue;
                     if (col.TryGetComponent<IDamageable>(out var d))
                     {
-                        ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f);
+                        ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f, isFinisher: true);   // 검기 폭발
 
                         // 피격 이펙트
                         var hitOffset = new Vector3(

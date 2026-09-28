@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t3_dark_afterimage
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t3_dark_afterimage
-  displayName: "\uC794\uC0C1\uC758 \uB8EC"
+  displayName: "\uAC00\uBCBC\uC6B4 \uADF8\uB9BC\uC790\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 2

@@ -11,7 +11,10 @@ public sealed class UI_ChallengeHud : MonoBehaviour
     private TextMeshProUGUI _objective;
     private TextMeshProUGUI _status;
 
-    public static UI_ChallengeHud Create()
+    public static UI_ChallengeHud Create() => Create(0f);
+
+    /// <summary><paramref name="topOffset"/>만큼 아래에 — 보스 체력바(상단)와 겹치지 않게(리치 F4).</summary>
+    public static UI_ChallengeHud Create(float topOffset)
     {
         var canvasGO = new GameObject("ChallengeHudCanvas", typeof(Canvas), typeof(CanvasScaler));
         var canvas = canvasGO.GetComponent<Canvas>();
@@ -25,8 +28,21 @@ public sealed class UI_ChallengeHud : MonoBehaviour
         scaler.matchWidthOrHeight  = 0.5f;
 
         var hud = canvasGO.AddComponent<UI_ChallengeHud>();
-        hud._objective = hud.MakeText(canvasGO.transform, new Vector2(0f, -44f), 30f, UIPalette.Gold);
-        hud._status    = hud.MakeText(canvasGO.transform, new Vector2(0f, -82f), 25f, Color.white);
+
+        // 월드 위에 글자만 떠 있었다 — 좌우가 흐린 어두운 띠를 깐다(보스 대사 띠와 같은 결, 09-28 UI 톤 통일).
+        var band = new GameObject("Band", typeof(RectTransform)).AddComponent<Image>();
+        band.transform.SetParent(canvasGO.transform, false);
+        var brt = band.rectTransform;
+        brt.anchorMin = brt.anchorMax = new Vector2(0.5f, 1f);
+        brt.pivot     = new Vector2(0.5f, 1f);
+        brt.anchoredPosition = new Vector2(0f, -30f - topOffset);
+        brt.sizeDelta        = new Vector2(1300f, 110f);
+        band.sprite        = UITheme.SoftBand;
+        band.color         = new Color(0.02f, 0.02f, 0.04f, 0.72f);
+        band.raycastTarget = false;
+
+        hud._objective = hud.MakeText(canvasGO.transform, new Vector2(0f, -44f - topOffset), 30f, UIPalette.Gold);
+        hud._status    = hud.MakeText(canvasGO.transform, new Vector2(0f, -82f - topOffset), 25f, UITheme.Ink);
         return hud;
     }
 
@@ -57,7 +73,7 @@ public sealed class UI_ChallengeHud : MonoBehaviour
         t.color             = color;
         t.raycastTarget     = false;
         t.textWrappingMode  = TextWrappingModes.NoWrap;
-        TMPOutlineHelper.ApplyDefault(t);
+        TMPOutlineHelper.ApplySoftShadow(t);   // 두꺼운 검정 테두리 대신 부드러운 그림자(글자 정본 09-27)
         return t;
     }
 }

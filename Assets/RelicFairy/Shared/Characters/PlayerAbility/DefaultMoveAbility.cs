@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class DefaultMoveAbility : IMoveAbility<PlayerController>
+public class DefaultMoveAbility : IMoveAbility
 {
     // 회전 각속도 폴백(도/초). CharacterData.turnSpeedDegPerSec 미설정 시 사용. 즉발 액션 지향 → 빠른 기본값.
     private const float DefaultTurnSpeed = 720f;
@@ -42,7 +42,8 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         {
             float decel = (cd != null && cd.moveDecel > 0.01f) ? cd.moveDecel : DefaultDecel;
             Vector2 stopped = Vector2.MoveTowards(curHoriz, Vector2.zero, decel * dt);
-            rb.linearVelocity = new Vector3(stopped.x, rb.linearVelocity.y, stopped.y);
+            // 키네마틱(등장 연출 등이 위치를 쥔 구간)엔 속도가 무시되고 경고만 쌓인다 — 쓰지 않는다.
+            if (!rb.isKinematic) rb.linearVelocity = new Vector3(stopped.x, rb.linearVelocity.y, stopped.y);
             owner.IntendedSpeed01 = 0f;
             owner.StopFacingSlew();
             return;
@@ -87,6 +88,13 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
 
         // ② 빠른 추격 레이어: 목표(moveDir×currentMaxSpeed)를 가속으로 추격.
         Vector2 target = moveDir2 * currentMaxSpeed;
+
+        // [벽 파고듦 차단] 접촉 중인 벽을 향하는 성분을 목표에서 먼저 제거한다.
+        // 이게 없으면 벽에 붙은 채 이동 입력을 유지할 때 매 프레임 벽 쪽 속도를 새로 만들어내고,
+        // 캡슐이 파고들었다 되밀리며 물리 주기로 진동한다(카메라가 그대로 흔들림).
+        // 벽을 따라 미끄러지는 성분은 남으므로 벽을 스치며 달리는 조작감은 그대로다.
+        target = owner.ClipMoveTargetToWalls(target);
+
         float accel = (cd != null && cd.moveAccel > 0.01f) ? cd.moveAccel : DefaultAccel;
         // 역방향 전환이면 가속 부스트(빠릿한 반전).
         if (curHoriz.sqrMagnitude > 0.01f && Vector2.Dot(curHoriz, target) < 0f)
@@ -98,7 +106,10 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
 
         Vector2 newHoriz = Vector2.MoveTowards(curHoriz, target, accel * dt);
         newHoriz = Vector2.ClampMagnitude(newHoriz, currentMaxSpeed); // 합속도 제한
-        rb.linearVelocity = new Vector3(newHoriz.x, rb.linearVelocity.y, newHoriz.y);
+        // 최종 속도에서도 한 번 더 깎는다 — curHoriz에 솔버가 남긴 벽 방향 잔여가 있으면
+        // MoveTowards 중간값이 다시 벽을 향할 수 있다. 여기서 0으로 만들어야 침투가 확실히 사라진다.
+        newHoriz = owner.ClipMoveTargetToWalls(newHoriz);
+        if (!rb.isKinematic) rb.linearVelocity = new Vector3(newHoriz.x, rb.linearVelocity.y, newHoriz.y);
 
         // 회전 권한 일원화: 공격/스킬 등 Act 상태가 facing을 소유 중이면 이동 회전(슬루)을 정지하고 양보.
         if (owner.IsActionControllingFacing) { owner.StopFacingSlew(); return; }
@@ -156,7 +167,7 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         float remaining = topHit.point.y - pos.y;
         float climbRate = Mathf.Clamp(deltaY * speed / Mathf.Max(0.05f, footHit.distance), MinStepClimbSpeed, MaxStepClimbSpeed);
         float vy = Mathf.Min(climbRate, remaining / dt);
-        if (rb.linearVelocity.y < vy)
+        if (rb.linearVelocity.y < vy && !rb.isKinematic)
             rb.linearVelocity = new Vector3(rb.linearVelocity.x, vy, rb.linearVelocity.z);
 
         owner.MarkStepClimbing();   // 상승 중 공중/낙하 상태 억제(groundCheckDistance < 스텝높이 대응)

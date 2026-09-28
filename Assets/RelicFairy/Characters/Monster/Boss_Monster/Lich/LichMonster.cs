@@ -11,26 +11,59 @@ namespace RelicFairy.Monster
 /// 리치 (Lich) 보스 MonoBehaviour.
 /// Chapter 4 최종 보스 — 멀린의 육체를 탈취한 외부 존재.
 ///
-/// ━━ 페이즈 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-///  Phase 1 (HP 100~40%) : 봉인 상태. 마법 투사체 / 순간이동 타격 패턴.
-///  Phase 2 (HP 40~0%)   : 완전 해방. 데스레이 / 영혼 흡수 강화 패턴.
+/// ━━ 두 전투 (모드는 전투 시작 때 세계 단계로 정한다) ━━━━━━━━━━━━━━━━━━━━
+///  A 봉인된 리치 (봉인기) : P1 대마법 (100→40) → T1 사슬의 각성 → P2′ 사슬에 묶인 낫 (40→0)
+///                           → HP 0 = 봉인 → 붕괴 → 퇴각
+///  B 해방된 리치 (악몽기) : P1⁺ (100→60) → T2 봉인은 없다 → P2 대마법+낫 (60→25)
+///                           → T3 최후의 원 → P3 영혼 복제 (25→0) → 사망 (첫 처치 = 엔딩)
+///  페이지 임계에선 HP가 더 내려가지 않는다(<see cref="DamageHpFloor"/>) — 한 방에 페이지를 건너뛰지 않게.
 ///
-/// ━━ 조건 키 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-///  Lich_Phase1       : HpAboveCondition — 봉인 상태 (HP > 40%)
-///  Lich_IsPhase2     : LichBlackboard.IsPhase2 flag — 해방 상태 진입 완료
-///  Lich_Phase2Pending: HP ≤ 40% && !IsPhase2 — 페이즈 전환 대기
+/// ━━ 조건 키 (페이지 키 + 모드 키 조합으로 풀을 가른다) ━━━━━━━━━━━━━━━━━━
+///  Lich_Phase1 / Lich_IsPhase2 / Lich_Phase3 : 현재 페이지 1 / 2 / 3
+///  Lich_Phase2Pending / Lich_Phase3Pending    : 다음 페이지로 넘어갈 HP에 닿음 (전환 패턴 강제 발동)
+///  Lich_Sealed / Lich_Nightmare               : 이번 전투의 모드
+///
+/// 설계: 바탕화면 기획 「리치보스_완전설계_봉인기_악몽기」.
 /// </summary>
-public class LichMonster : MonsterBase, IBoss, IBossEntrance
+public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
 {
     // ── 상수 ─────────────────────────────────────────────────
-    private const float Phase2HpThreshold    = 0.4f;
-    private const float Phase2SpeedMult      = 1.3f;
-    private const float Phase2AttackMult     = 1.25f;
-    private const float Phase2HpRestoreRatio = 0.12f; // Phase 2 진입 시 최대 HP의 12% 회복
-    private const int   Phase2UnlockAt       = 3;     // (구·디버그) 조우 횟수 기반 해금 임계. 출시 게이트는 BossSealService.
-    private const string SealBossId          = "lich"; // 봉인 서비스 키(메타 영구 페이즈2 해금)
-    private const float RetreatDuration      = 2.5f;
-    private const float Phase2PreviewDuration = 12f; // 2차 조우 Phase 2 미리보기 노출 시간 (GDD: 10~20s)
+    private const int    Phase2UnlockAt       = 3;                  // 에디터 옛 조우 횟수 디버그 전용 — 이 횟수부터 악몽기로 본다
+    private const string DeathDeepDialogueKey = "Lich_Death_Deep";  // 엔딩 뒤 처치
+    private const string CastBoneName         = "hand_r";           // 마법이 나가는 손
+    private const string BookMaterialName     = "MI_Book";          // 책 발광 머티리얼(인스턴스는 이름 뒤에 (Instance))
+    private const float  AuraFloorLift        = 0.05f;
+    private const float  ArenaOrbitBlend      = 1.2f;
+    private const float  BlockedFxGap         = 0.12f;   // 막힘 표시 최소 간격(연타로 겹치지 않게)
+
+    // 패링(연출·UX 시나리오 §12-3) — 낫이 빛나는 창 안에 맞받아치면 그 공격을 튕겨낸다.
+    private const float  ParryRange           = 6f;      // 원거리 저격 패링 방지(수평 거리)
+    private const float  ParryStaggerDuration = 1.2f;
+    private const float  ParrySlowScale       = 0.3f;
+    private const float  ParrySlowSeconds     = 0.15f;
+    private const float  DeathBurstScale      = 0.55f;   // 사망 폭발 — 근접 구도에서도 화면을 덮지 않게
+    private const float  DeathImpactDelay     = 0.8f;    // 사망 → 코어에 떨어지는 충격
+    private const string ParryHintText        = "낫이 빛나는 순간 — 맞받아쳐라";
+
+    private static readonly Color ParryGlintTint = new Color(1f, 0.85f, 0.35f, 1f);
+
+    private static readonly int BookGlowId = Shader.PropertyToID("_EmissiveBoots2");
+
+    /// <summary>제단 구도 한 벌 — FreeLook 세 리그의 (높이, 반경).</summary>
+    [Serializable]
+    private struct ArenaOrbit
+    {
+        public Vector2 top;
+        public Vector2 middle;
+        public Vector2 bottom;
+
+        public ArenaOrbit(Vector2 top, Vector2 middle, Vector2 bottom)
+        {
+            this.top    = top;
+            this.middle = middle;
+            this.bottom = bottom;
+        }
+    }
 
     // ── MonsterBase 추상 멤버 ─────────────────────────────────
     public  const  string PrefabAddress    = "Lich/Lich";
@@ -42,14 +75,26 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
 
     // ── IBoss ─────────────────────────────────────────────────
     public float HpRatio =>
-        (_runtime != null && _config != null && _config.stat.maxHp > 0)
-        ? (float)_runtime.CurrentHp / _config.stat.maxHp
+        (_runtime != null && EffectiveMaxHp > 0)
+        ? (float)_runtime.CurrentHp / EffectiveMaxHp
         : 1f;
 
     public BossAttackBlackboard Blackboard => _lichBB;
 
     // ── 공개 접근 ─────────────────────────────────────────────
     public LichBlackboard LichBB => _lichBB;
+
+    // ── IBossHudSource ───────────────────────────────────────
+    public float[] HudPageMarkers  => PageThresholds;
+    public int     HudPage         => _hudPage;
+    public bool    HudInvulnerable => IsInvulnerableNow;
+    public event Action<bool>       HudInvulnerableChanged;
+    public event Action<float>      HudVulnerableWindow;
+    public event Action             HudPageMarkersChanged;
+    public event Action<int, float> HudPageRefill;
+
+    private bool IsInvulnerableNow =>
+        _fsm != null && (_fsm.CurrentConstraints & SpecialStateConstraint.Invincible) != 0;
 
     // ── 내부 필드 ─────────────────────────────────────────────
     private LichBlackboard         _lichBB;
@@ -67,15 +112,58 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     private Color                  _originalAmbientColor;
     private float                  _originalMainLightIntensity;
     private Color                  _originalMainLightColor;
+    private Transform              _castPoint;
+    private Renderer[]             _bodyRenderers;
+    private GameObject             _auraMarker;
+    private bool                   _bodyVisible = true;
+    private bool                   _lastInvulnerable;
+    private bool                   _arenaCameraOn;
+    private Renderer               _bookRenderer;
+    private Material               _bookMaterial;
+    private float                  _bookBaseGlow = -1f;
+    private float                  _bookPulse;
+    private float                  _bookPulseSeconds = 0.6f;
+    private float                  _lastBlockedFx = -1f;
+    private float                  _parryWindowEnd = -1f;
+    private bool                   _parried;
+    private bool                   _parryHintShown;
+    private int                    _hudPage = 1;   // HP바가 보여 주는 페이즈 — 전환 연출이 바를 채우기 시작할 때 넘어간다
+    private LichSwingDriver        _swing;         // 낫 휘두름을 판정 순간에 맞춘다(처음 쓸 때 만든다)
+    private float                  _damageTakenMult = 1f;   // 그로기 등 — 받는 피해 배율
 
     public LichMovementController MovementController => _movementController;
+
+    private LichSwingDriver Swing
+    {
+        get
+        {
+            if (_swing == null && _animator != null)
+            {
+                _swing = new LichSwingDriver(_animator);
+                _swing.StrikeStarted += HandleSwingStrike;
+            }
+            return _swing;
+        }
+    }
+
+    /// <summary>지금 패링 창이 열려 있는가(낫이 빛나는 중).</summary>
+    public bool IsParryWindowOpen => !_parried && Time.time <= _parryWindowEnd;
+
+    /// <summary>마법이 나가는 손(오른손 본). 없으면 리치 자신.</summary>
+    public Transform CastPoint => _castPoint != null ? _castPoint : transform;
 
     /// <summary>스폰 지점 Y — 해골 소환 등 지면 높이 추정에 사용.</summary>
     public float SpawnGroundY => _movementController != null ? _movementController.GroundY : transform.position.y;
 
+    [Header("── 페이지 · 모드 ──────────────────────────────")]
+    [Tooltip("봉인기(봉인된 리치) 페이지 전환 HP 비율 — 내림차순. [40%] = P1 → T1 → P2′")]
+    [SerializeField] private float[] _sealedPageThresholds    = { 0.4f };
+    [Tooltip("악몽기(해방된 리치) 페이지 전환 HP 비율 — 내림차순. [60%, 25%] = P1⁺ → T2 → P2 → T3 → P3")]
+    [SerializeField] private float[] _nightmarePageThresholds = { 0.6f, 0.25f };
+    [SerializeField] private string  _sealedBossName          = "봉인된 리치";
+    [SerializeField] private string  _nightmareBossName       = "해방된 리치";
+
     [Header("── 등장 연출 ──────────────────────────────────")]
-    [Tooltip("Appear 애니메이션 종료 후 전투 진입까지 대기 시간 (초). Appear 클립 길이와 맞춘다.")]
-    [SerializeField] private float _entranceDuration = 4f;
     [Tooltip("플레이어 감지 반경 (m). 방 입장 시 자연스럽게 감지되도록 방 크기에 맞게 설정한다.")]
     [SerializeField] private float _detectionRange = 20f;
 
@@ -92,6 +180,28 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     [SerializeField] private Color _mainLightTint      = new Color(0.55f, 0.25f, 1.0f);
     [Tooltip("라이팅 전환 시간 (초).")]
     [SerializeField] private float _lightingTransition = 2.5f;
+    [Tooltip("2페이즈 무대 변화 — 주변광(핏빛 보라).")]
+    [SerializeField] private Color _page2AmbientColor  = new Color(0.10f, 0.01f, 0.05f);
+    [Tooltip("2페이즈 무대 변화 — 주 조명 색(진홍).")]
+    [SerializeField] private Color _page2LightTint     = new Color(1.0f, 0.22f, 0.35f);
+    [Tooltip("2페이즈 무대 변화 — 주 조명 강도 배율(원래 강도 기준).")]
+    [SerializeField, Range(0f, 1f)] private float _page2LightMult = 0.35f;
+
+    [Header("── 전투 카메라 「제단 구도」 (연출·UX 시나리오 §10-4) ──")]
+    [Tooltip("기본 게임 구도(중간 리그 높이 7.3 · 반경 4)보다 높고 멀리 — 60 m 제단의 리치와 바닥 예고를 화면에 담는다")]
+    [SerializeField] private ArenaOrbit _altarOrbitWide   = new ArenaOrbit(new Vector2(12.0f, 4.6f), new Vector2(10.0f, 5.6f), new Vector2(6.6f, 5.2f));
+    [Tooltip("악몽기 2페이지 — 교전 거리가 가까워져 조금 당긴다")]
+    [SerializeField] private ArenaOrbit _altarOrbitNear   = new ArenaOrbit(new Vector2(11.0f, 4.2f), new Vector2(9.0f, 5.0f), new Vector2(6.0f, 4.8f));
+    [Tooltip("3페이지 — 코어 20 m를 꽉 채우는 근접 구도(설계서 §6)")]
+    [SerializeField] private ArenaOrbit _altarOrbitClose  = new ArenaOrbit(new Vector2(9.8f, 3.8f), new Vector2(8.2f, 4.6f), new Vector2(5.4f, 4.4f));
+    [Tooltip("봉인 의식 — 봉인석 넷이 다 보이게 높이")]
+    [SerializeField] private ArenaOrbit _altarOrbitRitual = new ArenaOrbit(new Vector2(15.0f, 6.0f), new Vector2(13.0f, 7.0f), new Vector2(9.0f, 6.5f));
+
+    [Header("── 몸 발광 · 발밑 표식 ─────────────────────────")]
+    [Tooltip("시전 순간 책 발광 배율(머티리얼 기본값 대비)")]
+    [SerializeField] private float _bookPulseBoost = 3.5f;
+    [Tooltip("날고 있는 리치의 바닥 위치 표식 배율(BossAura 칸)")]
+    [SerializeField] private float _auraMarkerScale = 0.6f;
 
     [Header("── 패턴 가이드 (SkillIndicator) ──────────────")]
     [Tooltip("원형/AoE 텔레그래프 머티리얼 (taecg/SkillIndicator/Circle). 비우면 프리미티브로 폴백.")]
@@ -109,16 +219,16 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     [Tooltip("true: 전투 시작 즉시 Phase2 상태로 강제 진입 (DarkRain 등 Phase2 패턴 테스트용). _debugSkipEntrance가 true일 때만 동작.")]
     [SerializeField] private bool _debugForcePhase2;
     private int _debugSessionCount; // 플레이 중 자동 진행되는 세션 카운터
+    private bool _debugAutoPatternsOff; // 테스트 — 패턴 러너 정지(강제 실행만)
 #endif
 
     /// <summary>
-    /// 3차+ 조우부터 Phase 2가 영구 해금됨. (Lich_Phase2Pending 조건의 게이트)
+    /// 세계가 악몽기인가 = 이번 전투를 해방된 리치(B)로 치르는가. 전투 시작 때 <see cref="ResolveMode"/>가 읽어
+    /// 블랙보드에 고정한다(전투 도중 붕괴가 일어나도 그 전투의 모드는 바뀌지 않는다).
     ///
     /// ── 분기 지점 ───────────────────────────────────────────────────
-    ///  • 테스트(에디터): _debugOverrideEncounter 켜고 _debugEncounterCount로 제어.
-    ///      3 이상 → 처음부터 Phase2 노출 / 1~2 → 봉인(Phase1)만, 사망 시 자동 +1로 전 페이즈 순환.
-    ///  • 출시(빌드): 아래 BackendGameData.lichEncounterCount >= Phase2UnlockAt 게이트가 적용됨.
-    ///      해금 조건(횟수/시점)을 바꾸려면 Phase2UnlockAt 또는 이 반환식을 조정한다.
+    ///  • 출시: <see cref="StoryProgress.IsNightmare"/> — 봉인기에 리치를 봉인하는 순간 붕괴가 일어나 악몽기로.
+    ///  • 테스트: 메뉴 RelicFairy/Test Run/Story/Override (저장 안 함). 인스펙터의 옛 조우 횟수 디버그도 남아 있다.
     /// </summary>
     public bool IsPhase2Unlocked
     {
@@ -127,8 +237,8 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
 #if UNITY_EDITOR
             if (_debugOverrideEncounter) return _debugSessionCount >= Phase2UnlockAt;
 #endif
-            // 출시 게이트 — 초회 클리어 시 봉인이 해제되면 이후 조우부터 페이즈2 해금(메타 영구).
-            return BossSealService.IsSealBroken(SealBossId);
+            // 출시 게이트 — 봉인기에 리치를 봉인하는 순간 붕괴가 일어나고, 악몽기부터 페이즈2가 열린다(메타 영구).
+            return StoryProgress.IsNightmare;
         }
     }
 
@@ -139,30 +249,54 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     // 평가 시점에 ctx.Boss로 활성 Lich를 조회해 항상 올바른 블랙보드를 사용한다.
     private sealed class LichPhase1Condition : ICondition
     {
-        // Phase2 미진입(봉인) 상태이면 Phase1 패턴을 허용한다.
-        // Phase2 전환은 HP ≤ 40%(Lich_Phase2Pending) 조건이 전담하며 SealBreaker와는 무관하다.
+        // 첫 전환 전 — 두 모드 공통. 전환은 Lich_Phase2Pending이 전담하며 결계(SealBreaker)와는 무관하다.
         public bool Evaluate(BossPatternContext ctx)
-            => !((ctx.Boss as LichMonster)?.LichBB?.IsPhase2 ?? false);
+            => ((ctx.Boss as LichMonster)?.LichBB?.Page ?? 1) == 1;
     }
 
     private sealed class LichPhase2Condition : ICondition
     {
+        // 정확히 2페이지 — 3페이지에서 2페이지 풀이 섞이지 않게(낫 패턴 게이트 IsPhase2는 2 이상).
         public bool Evaluate(BossPatternContext ctx)
-            => (ctx.Boss as LichMonster)?.LichBB?.IsPhase2 ?? false;
+            => ((ctx.Boss as LichMonster)?.LichBB?.Page ?? 1) == 2;
     }
 
     private sealed class LichPhase2PendingCondition : ICondition
     {
-        // HP 40% 이하 도달 시 Phase2Entry 발동. SealBreaker와 완전히 독립된 조건.
-        // Phase2는 해금(3차+ 조우, 디버그 시 _debugSessionCount) 이후에만 전환된다.
-        // 해금 전(1·2차)에는 봉인 상태(Phase1)로만 싸우고 HP 0에서 퇴각한다.
+        // 1페이지에서 첫 임계에 닿음 — 봉인기 T1 / 악몽기 T2 (모드 키로 가른다).
+        public bool Evaluate(BossPatternContext ctx)
+            => (ctx.Boss as LichMonster)?.IsPageTransitionDue(1) ?? false;
+    }
+
+    private sealed class LichPhase3Condition : ICondition
+    {
+        public bool Evaluate(BossPatternContext ctx)
+            => ((ctx.Boss as LichMonster)?.LichBB?.Page ?? 1) == 3;
+    }
+
+    private sealed class LichPhase3PendingCondition : ICondition
+    {
+        // 2페이지에서 둘째 임계에 닿음 — 임계가 둘인 악몽기만 해당(T3).
+        public bool Evaluate(BossPatternContext ctx)
+            => (ctx.Boss as LichMonster)?.IsPageTransitionDue(2) ?? false;
+    }
+
+    private sealed class LichFinalMagicPendingCondition : ICondition
+    {
+        // 3페이지 · HP 임계 · 아직 안 막음 — F4 「최후의 대마법」 강제.
+        public bool Evaluate(BossPatternContext ctx)
+            => (ctx.Boss as LichMonster)?.IsFinalMagicDue ?? false;
+    }
+
+    private sealed class LichModeCondition : ICondition
+    {
+        private readonly bool _nightmare;
+        public LichModeCondition(bool nightmare) => _nightmare = nightmare;
+
         public bool Evaluate(BossPatternContext ctx)
         {
-            var lich = ctx.Boss as LichMonster;
-            return lich != null
-                && lich.IsPhase2Unlocked
-                && lich.HpRatio <= Phase2HpThreshold
-                && !(lich.LichBB?.IsPhase2 ?? false);
+            var bb = (ctx.Boss as LichMonster)?.LichBB;
+            return bb != null && bb.IsNightmare == _nightmare;
         }
     }
 
@@ -206,6 +340,13 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         _formController = GetComponentInChildren<LichFormController>();
         _formController?.HideAll(); // 등장 연출 전 숨김 — TriggerEntrance()에서 디졸브 인
 
+        _castPoint     = FindDeep(transform, CastBoneName);
+        _bodyRenderers = (_formController != null ? _formController.transform : transform)
+                         .GetComponentsInChildren<Renderer>(true);
+        LichVfx.LoadAsync().Forget();   // 패턴 이펙트 목록 — 없어도 패턴은 돈다
+        LichSfx.LoadAsync().Forget();   // 패턴 소리 목록 — 없어도 패턴은 돈다
+        FindBookRenderer();
+
         // 공중 이동 컨트롤러 초기화 (NavMeshAgent 비활성화 후 직접 Transform 제어)
         _movementController = GetComponent<LichMovementController>();
         if (_movementController == null)
@@ -215,6 +356,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
             navAgent.enabled = false;
 
         _lichBB = new LichBlackboard();
+        ResolveMode();   // HUD 이름(BindBossHud)이 모드를 읽는다 — 먼저 정한다
 
         _patternCtx = new BossPatternContext
         {
@@ -232,7 +374,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
             isAlive:     () => _runtime != null && !_runtime.IsDead && !IsPlayerDead(),
             isInRange:   () => _runtime?.PlayerTarget != null,
             changeState: s  => ChangeState(s),
-            onExecuted:  p  => { _lichBB.LastPatternTag = p.patternTag; _lichBB.NormalModeTimer = 0f; });
+            onExecuted:  p  => { _lichBB.LastPatternTag = p.patternTag; _lichBB.NormalModeTimer = 0f; LichPatternProbe.BeginPattern(p.name); });
 
         _movementController?.Init(_lichBB);
 
@@ -248,7 +390,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
 #endif
 
         // 등장 대기 상태로 진입 — Appear 애니메이션은 TriggerEntrance() 호출 시 시작
-        _dormantState = new LichDormantState(_entranceDuration, _detectionRange);
+        _dormantState = new LichDormantState(_detectionRange);
 
 #if UNITY_EDITOR
         if (_debugSkipEntrance)
@@ -259,11 +401,11 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
             ChangeState<ChaseState>();
             if (_debugForcePhase2)
             {
-                ApplyPhase2Buffs(); // 내부에서 IsPhase2 가드로 중복 적용 방지
-                // HP를 임계값 아래로 설정 — Phase1 엔트리(HP > 40%) 조건이 false가 되도록
-                if (_runtime != null && _config != null)
-                    _runtime.CurrentHp = Mathf.RoundToInt(_config.stat.maxHp * (Phase2HpThreshold - 0.05f));
-                Debug.Log("[LichMonster] debugForcePhase2 — Phase2 강제 적용 완료");
+                // 2페이지로 바로 — 전환 연출 없이 페이지·폼만. HP는 첫 임계 조금 아래로.
+                EnterPageCore(2, _lichBB.IsNightmare ? LichForm.Phase2 : LichForm.Phase2_Bound, 1f, 1f, -1f, -1f);
+                if (_runtime != null)
+                    _runtime.CurrentHp = Mathf.RoundToInt(EffectiveMaxHp * (PageThresholds[0] - 0.05f));
+                Debug.Log("[LichMonster] debugForcePhase2 — 2페이지 강제 적용 완료");
             }
             return;
         }
@@ -286,6 +428,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     protected override void Update()
     {
         base.Update();
+        _swing?.Tick(Time.deltaTime);
 
         if (_lichBB == null) return;
         if (_runtime != null && _runtime.IsDead) return;
@@ -306,6 +449,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         }
 
         _movementController?.Tick(dt, _runtime?.PlayerTarget);
+        TickPresentation(dt);
 
         // 패턴이 active → inactive 로 전환된 시점에 취약 구간 알림
         bool nowPattern = _runner?.IsPatternActive ?? false;
@@ -313,6 +457,9 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
             _movementController?.NotifyPatternEnded();
         _prevPatternActive = nowPattern;
 
+#if UNITY_EDITOR
+        if (_debugAutoPatternsOff) return;
+#endif
         _runner?.Tick(dt);
     }
 
@@ -325,21 +472,37 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         base.OnEnable();
         _runner?.Reset();
         _lichBB?.Reset();
+        ResolveMode();
         _movementController?.OnRecycled();
         _pendingTriggerEntrance = false;
         _lightingChanged        = false;
 
         // 풀 재사용: 숨김 후 등장 연출 재진입 (TriggerEntrance에서 다시 디졸브 인)
         _formController?.HideAll();
+        SetBodyVisible(true);   // 순간이동 도중 비활성화됐어도 몸은 돌아온다
+        _lastInvulnerable = false;
+        _parryWindowEnd   = -1f;
+        _parried          = false;
+        _parryHintShown   = false;
         if (_dormantState != null)
             ChangeState(_dormantState);
 
         BindBossHud();
+        ArenaTileGrid.TileRestoring += HandleTileRestoring;
     }
 
     protected override void OnDisable()
     {
+        ArenaTileGrid.TileRestoring -= HandleTileRestoring;
         UnbindBossHudIfBound();
+        LichHazards.Clear();
+        LichCrack.ClearAll();
+        LichVfx.Stop(ref _auraMarker);
+        LichStageShift.Clear();
+        LichSealShard.ClearAll();
+        LichSoulCopy.ClearAll();
+        LichSealChainBolt.ClearAll();
+        SetArenaCamera(false);
         if (_spawnedFog != null) { Destroy(_spawnedFog); _spawnedFog = null; }
         _atmosphereCts?.Cancel();
         _atmosphereCts?.Dispose();
@@ -360,6 +523,38 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
 
     // Lich는 BossPatternRunner 전용 — MonsterBase 기본 근접 공격 완전 비활성화
     public override bool ShouldEnterAttackReady(MonsterContext ctx) => false;
+
+    /// <summary>
+    /// 리치는 맞을 때마다 움찔하지 않는다 — 활강·패턴 리듬을 피격이 끊지 않게(다른 보스의 경직 게이트와 같은 역할).
+    /// 무방비는 패턴이 정한 휘청 창(<see cref="NotifyVulnerableWindow"/>)으로만 준다.
+    /// </summary>
+    protected override void OnDamageTaken()
+    {
+        base.OnDamageTaken();
+        _suppressGetHitThisHit = true;
+    }
+
+    private void TryParry(GameObject instigator)
+    {
+        if (_parried || Time.time > _parryWindowEnd || instigator == null) return;
+        var player = _runtime?.PlayerTarget;
+        if (player == null) return;
+
+        var src = instigator.transform;
+        if (src != player && !src.IsChildOf(player)) return;
+        if (LichPatternUtil.FlatDistance(transform.position, player.position) > ParryRange) return;
+
+        _parried        = true;
+        _parryWindowEnd = -1f;
+        Debug.Log("[Lich] 패링 — 낫을 튕겨냈다", this);
+
+        Vector3 at = Vector3.Lerp(CastPoint.position, player.position + Vector3.up, 0.5f);
+        LichVfx.Play(LichVfxSlot.ParryClash, at, Quaternion.identity);
+        LichSfx.Play(LichSfxSlot.ParryClash, at);
+        LichCinematics.Flash(Color.white, 0.12f, 0.15f);   // 패링 — 자주 나오니 옅게(09-20 화면 실측: 선형 합성이라 0.3도 진하다)
+        LichCinematics.SlowMo(ParrySlowScale, ParrySlowSeconds);
+        LichPatternUtil.Impact(LichImpact.Medium, false);
+    }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // IBossEntrance
@@ -382,6 +577,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         _runner?.EnsureMinBreakCooldown(3f);
         OnCombatReady?.Invoke();
         RaiseBossCombatReady();
+        SetArenaCamera(true);
     }
 
     /// <summary>BossRoomController가 카메라 팬 완료 후 호출 — Appear 애니메이션 + 보스 이름 UI 시작.</summary>
@@ -394,66 +590,168 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 페이즈 2 진입
+    // 모드 · 페이지
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    /// <summary>LichPhase2EntryPatternSO 완료 후 호출. 속도·공격 속도·패턴 딜레이 적용.</summary>
-    public void ApplyPhase2Buffs()
-    {
-        if (_lichBB == null || _lichBB.IsPhase2) return;
+    public override string BossName =>
+        _lichBB != null && _lichBB.IsNightmare ? _nightmareBossName : _sealedBossName;
 
-        _lichBB.SetPhase2();
+    /// <summary>이번 전투의 페이지 전환 임계(내림차순). 개수 + 1 = 페이지 수.</summary>
+    public float[] PageThresholds =>
+        _lichBB != null && _lichBB.IsNightmare ? _nightmarePageThresholds : _sealedPageThresholds;
+
+    /// <summary>
+    /// 다음 페이지 전환 임계에서 HP를 붙잡는다 — 전환 연출을 거치기 전엔 그 아래로 내려가지 않는다.
+    /// 마지막 페이지에선 제한 없음(처치 가능).
+    /// </summary>
+    protected override int DamageHpFloor
+    {
+        get
+        {
+            int floor = base.DamageHpFloor;
+            if (_lichBB == null) return floor;
+            var thresholds = PageThresholds;
+            int next = _lichBB.Page - 1;
+            if (thresholds == null || next >= thresholds.Length)
+            {
+                // 마지막 페이지 — 최후의 대마법(F4)을 막기 전엔 그 임계 아래로 깎이지 않는다.
+                if (_lichBB.IsNightmare && _lichBB.Page >= 3 && !_lichBB.FinalMagicDone)
+                    return Mathf.Max(floor, Mathf.CeilToInt(FinalMagicThreshold * EffectiveMaxHp));
+                return floor;
+            }
+            return Mathf.Max(floor, Mathf.CeilToInt(thresholds[next] * EffectiveMaxHp));
+        }
+    }
+
+    /// <summary>최후의 대마법(F4) 임계 — 3페이지에서 HP 비율이 이 아래면 강제 발동.</summary>
+    private const float FinalMagicThreshold = 0.10f;
+
+    /// <summary>3페이지 최후의 대마법(F4)을 쓸 때가 됐는가 — 임계에 닿았고 아직 막지 않았다.</summary>
+    public bool IsFinalMagicDue
+        => _lichBB != null && _lichBB.IsNightmare && _lichBB.Page >= 3 && !_lichBB.FinalMagicDone
+           && HpRatio <= FinalMagicThreshold + 0.0001f;
+
+    /// <summary><paramref name="fromPage"/>에서 다음 페이지로 넘어갈 HP에 닿았는가 (전환 패턴 강제 발동 조건).</summary>
+    public bool IsPageTransitionDue(int fromPage)
+    {
+        if (_lichBB == null || _lichBB.Page != fromPage) return false;
+        var thresholds = PageThresholds;
+        int idx = fromPage - 1;
+        return thresholds != null && idx < thresholds.Length && HpRatio <= thresholds[idx];
+    }
+
+    /// <summary>LichPhase2EntryPatternSO(페이지 전환) 완료 시 호출 — 페이지를 올리고 그 페이지의 버프·폼을 건다.</summary>
+    public void EnterPage(LichPhase2EntryPatternSO transition)
+    {
+        if (transition == null) return;
+        EnterPageCore(transition.targetPage, transition.form,
+                      transition.speedMultiplier, transition.attackSpeedMultiplier,
+                      transition.breakDurationMin, transition.breakDurationMax);
+    }
+
+    /// <summary>
+    /// 페이즈 전환 컷신 — 다음 페이즈 HP바가 <paramref name="seconds"/> 동안 차오르기 시작한다(HUD가 받아 그린다).
+    /// HP 자체는 페이즈 경계에 붙잡혀 있고, 바는 그 경계부터 다음 경계까지를 한 줄로 보여 준다.
+    /// </summary>
+    public void BeginPageRefill(int page, float seconds)
+    {
+        _hudPage = page;
+        HudPageRefill?.Invoke(page, seconds);
+    }
+
+    /// <summary>폼 전환(디졸브) — 봉인 의식·붕괴 컷신이 쓴다.</summary>
+    internal void DissolveToForm(LichForm form)
+    {
+        if (_formController != null)
+            _formController.DissolveInFormAsync(form, destroyCancellationToken).Forget();
+    }
+
+    /// <summary>세계 단계를 읽어 이번 전투의 모드를 블랙보드에 정한다(HP바 눈금도 모드를 따른다).</summary>
+    private void ResolveMode()
+    {
+        _lichBB?.SetMode(IsPhase2Unlocked);
+        _hudPage = 1;
+        HudPageMarkersChanged?.Invoke();
+    }
+
+    /// <summary>결계 패턴 설정 — 봉인 의식이 주기 공격·방해 해골 값을 빌린다. 없으면 null(기본값).</summary>
+    private LichSealBreakerPatternSO FindWardPattern()
+    {
+        if (_config is not BossConfigSO boss || boss.patternEntries == null) return null;
+        foreach (var entry in boss.patternEntries)
+        {
+            if (entry?.patterns == null) continue;
+            foreach (var pattern in entry.patterns)
+                if (pattern is LichSealBreakerPatternSO ward) return ward;
+        }
+        return null;
+    }
+
+    private void EnterPageCore(int page, LichForm form, float speedMult, float attackSpeedMult,
+                               float breakMin, float breakMax)
+    {
+        if (_lichBB == null || page <= _lichBB.Page) return;
+
+        _lichBB.SetPage(page);
 
         if (_runtime != null)
-            _runtime.SpeedMultiplier = Phase2SpeedMult;
+            _runtime.SpeedMultiplier = speedMult;
+        _lichBB.AttackSpeedMult = attackSpeedMult;
 
-        _lichBB.AttackSpeedMult = Phase2AttackMult;
+        // 휴식 덮어쓰기는 블랙보드에만 — 공용 BossConfig SO를 건드리지 않는다.
+        if (breakMin >= 0f) _lichBB.BreakDurationMinOverride = breakMin;
+        if (breakMax >= 0f) _lichBB.BreakDurationMaxOverride = breakMax;
 
-        // HP 회복 (최대 HP의 12%)
-        if (_runtime != null && _config != null)
+        // 전환 컷신이 폼을 이미 드러냈으면(포효 순간) 다시 디졸브하지 않는다.
+        if (_formController != null && _formController.CurrentForm != form)
+            _formController.DissolveInFormAsync(form, destroyCancellationToken).Forget();
+
+        if (_hudPage < page)
         {
-            int restore = Mathf.RoundToInt(_config.stat.maxHp * Phase2HpRestoreRatio);
-            _runtime.CurrentHp = Mathf.Min(_runtime.CurrentHp + restore, _config.stat.maxHp);
+            _hudPage = page;
+            HudPageMarkersChanged?.Invoke();
         }
 
-        UI_BossBark.Show("영혼이여. 너도 결국 복사될 것이다.", BossBarkType.PhaseAnnounce);
+        if (_arenaCameraOn) ApplyArenaOrbit(OrbitForPage());
 
-        // Phase2 전환: 책·의복 즉시 숨김, 낫 디졸브 인
-        if (_formController != null)
-            _formController.DissolveInFormAsync(LichForm.Phase2, destroyCancellationToken).Forget();
-
-        _lichBB.BreakDurationMinOverride = 0.3f;
-        _lichBB.BreakDurationMaxOverride = 0.8f;
-
-        Debug.Log($"[Lich] Phase 2 해방 — HP={_runtime?.CurrentHp} ratio={HpRatio:F2}", this);
+        Debug.Log($"[Lich] {page}페이지 진입 ({(_lichBB.IsNightmare ? "해방" : "봉인")}) — HP={_runtime?.CurrentHp} ratio={HpRatio:F2} 폼={form}", this);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 내부 헬퍼
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    /// <summary>HP 0 도달 시 호출. 조우 횟수에 따라 퇴각 or 사망.</summary>
+    /// <summary>HP 0 도달 시 호출(마지막 페이지에서만 — 그 전엔 HP가 임계에 붙잡힌다). 모드에 따라 봉인 or 사망.</summary>
     protected override void OnFatalDamage()
     {
-        // 전투 종료 — 보스보다 오래 남는 생존 해골 정리(퇴각·사망 공통).
+        // 전투 종료 — 보스보다 오래 남는 생존 해골·장판 정리(퇴각·사망 공통).
         LichSkeletonMonster.DespawnAll();
+        LichHazards.Clear();
+        LichSoulCopy.ClearAll();
+        LichSealChainBolt.ClearAll();
+        LichVfx.Stop(ref _auraMarker, 0.5f);
 
-        if (!IsPhase2Unlocked)
+        if (_lichBB == null || !_lichBB.IsNightmare)
         {
-            // 봉인 상태 격파 = 초회 클리어 → 봉인 해제(메타 영구). 이후 조우부터 페이즈2가 열린다.
-            // (해제는 다음 조우부터 반영되므로 지금 판정 흐름은 그대로 '봉인 퇴각' 연출로 진행)
-            BossSealService.BreakSeal(SealBossId);
-
-            // 봉인 상태: 퇴각(사라짐) 연출 후 보스방 완료
-            DoRetreatAsync(destroyCancellationToken).Forget();
+            // 봉인기 — 봉인 의식을 거쳐 리치를 봉인하는 순간 봉인이 버티지 못하고 무너진다(붕괴).
+            // 세계 기록(모든 보스 봉인 해제 → 악몽기)은 의식이 완성될 때 남긴다. 반영은 다음 조우부터.
+            RunSealedEndAsync(destroyCancellationToken).Forget();
             return;
         }
-        // 3차+ 조우 완전 격파 — 멀린 내레이션 후 실제 사망 처리
-        UI_BossBark.Show("리치가 쓰러졌다. 하지만... 이건 끝이 아니야.", BossBarkType.MerlinNarration);
+
+        // 악몽기 완전 격파 — 첫 처치는 엔딩(대사·카드는 보스 클리어 흐름이 튼다), 이후는 짧은 바크.
+        if (!StoryProgress.MarkEnding())
+            UI_BossBark.ShowDialogue(DeathDeepDialogueKey);
+        PlayDeathPresentation();
+        SetArenaCamera(false);
         base.OnFatalDamage();
     }
 
-    private async UniTaskVoid DoRetreatAsync(System.Threading.CancellationToken ct)
+    /// <summary>
+    /// 봉인된 리치의 끝 — 봉인 의식 → 붕괴 컷신(<see cref="LichSealRitual"/>) → 퇴장 → 보스방 완료.
+    /// 골드·사망 이펙트 없음, <see cref="MonsterBase.RaiseDied"/>로 방 클리어.
+    /// </summary>
+    private async UniTaskVoid RunSealedEndAsync(CancellationToken ct)
     {
         // 진행 중이던 패턴 특수 상태를 빠져나가 Exit(가이드·빔·VFX 정리)를 보장한다.
         // 사망 시 Update가 정지하므로 패턴이 스스로 종료하지 못해 월드 오브젝트가 잔존하는 문제 방지.
@@ -462,35 +760,18 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         _movementController?.SetLocked(true);
         _runner?.Reset();
 
-#if UNITY_EDITOR
-        int count = _debugOverrideEncounter
-            ? _debugSessionCount
-            : BackendGameData.Instance?.Data?.lichEncounterCount ?? 1;
-#else
-        int count = BackendGameData.Instance?.Data?.lichEncounterCount ?? 1;
-#endif
-
-        // 2차 조우: Phase 2 형태 잠깐 노출 후 재봉인 (GDD §8.3)
-        if (count == 2)
-        {
-            UI_BossBark.Show("균열이 심화됐다. 다음엔 막지 못할 것이다.", BossBarkType.MerlinNarration);
-            if (await DoPhase2PreviewAsync(ct) == false) return;
-        }
-        else
-        {
-            string bark = count <= 1 ? "봉인에 균열이 생겼어." : "균열이 심화됐다. 다음엔 막지 못할 것이다.";
-            UI_BossBark.Show(bark, BossBarkType.MerlinNarration);
-        }
-
-        _ctx.Animator?.CrossFade("Die", 0.2f);
-
         try
         {
-            await UniTask.Delay(TimeSpan.FromSeconds(RetreatDuration), cancellationToken: ct);
+            await new LichSealRitual(this, _ctx, FindWardPattern()).RunAsync(ct);
         }
         catch (OperationCanceledException)
         {
             return;
+        }
+        catch (Exception e)
+        {
+            // 의식이 깨져도 방은 끝나야 한다 — 여기서 멈추면 출구 없는 보스방에 갇힌다.
+            Debug.LogError($"[Lich] 봉인 의식 예외 — 방 클리어로 넘어간다: {e}", this);
         }
 
 #if UNITY_EDITOR
@@ -505,31 +786,120 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     }
 
     /// <summary>
-    /// 2차 조우 전용 — Phase 2 비주얼 폼으로 잠깐 전환 후 재봉인.
-    /// 취소 시 false 반환.
+    /// LichDormantState.TriggerEntrance에서 호출(컨트롤러 팬·폴백 팬 공통 경로) — 이번 전투의 모드를 확정한다.
+    /// 스폰 뒤 세계 단계가 바뀌었을 수 있다(테스트 오버라이드 등).
     /// </summary>
-    private async UniTask<bool> DoPhase2PreviewAsync(System.Threading.CancellationToken ct)
+    internal void BeginEncounter()
     {
-        // Phase 2 외형만 전환 (블랙보드·스탯은 건드리지 않음)
-        _formController?.ApplyForm(LichForm.Phase2);
-        _ctx.Animator?.CrossFade("Phase2Entry", 0.1f);
-        UI_BossBark.Show("...다음엔, 이 균열이 봉인을 삼킬 것이다.", BossBarkType.MerlinNarration);
-
-        try
-        {
-            await UniTask.Delay(TimeSpan.FromSeconds(Phase2PreviewDuration), cancellationToken: ct);
-        }
-        catch (OperationCanceledException)
-        {
-            _formController?.ApplyForm(LichForm.Phase1);
-            return false;
-        }
-
-        // 재봉인 — Phase 1 외형으로 복귀
-        _formController?.ApplyForm(LichForm.Phase1);
-        _ctx.Animator?.CrossFade("Die", 0.1f);
-        return true;
+        ResolveMode();
+        Debug.Log($"[Lich] 전투 시작 — {BossName} · 페이지 임계 [{string.Join(", ", PageThresholds)}]", this);
     }
+
+    /// <summary>
+    /// 몸(모델·장비)을 그리거나 감춘다 — 순간이동 패턴용. 렌더러의 켜짐 상태는 폼 컨트롤러가 쥐고 있으므로
+    /// 건드리지 않고 <see cref="Renderer.forceRenderingOff"/>만 바꾼다.
+    /// </summary>
+    public void SetBodyVisible(bool visible)
+    {
+        _bodyVisible = visible;
+        if (_bodyRenderers == null) return;
+        foreach (var r in _bodyRenderers)
+            if (r != null) r.forceRenderingOff = !visible;
+    }
+
+    /// <summary>무적에 막혔다 — 「맞았다」 대신 막힘 표시(결계 돔 · 전환 · 사라짐).</summary>
+    public override void NotifyBlockedHit(Vector3 hitPoint)
+    {
+        if (Time.time - _lastBlockedFx < BlockedFxGap) return;
+        _lastBlockedFx = Time.time;
+        LichVfx.PlayTinted(LichVfxSlot.ArcaneOrbBurst, hitPoint, Quaternion.identity, 0.35f, new Color(0.8f, 0.9f, 1f, 1f));
+        LichSfx.Play(LichSfxSlot.Blocked, hitPoint, 0.8f);
+    }
+
+    /// <summary>
+    /// 패링 판정 — 창이 열린 동안 플레이어의 타격이 닿으면 이번 낫 공격을 튕겨낸다.
+    /// 그 타격의 피해는 평소대로 들어간다(맞받아친 보상은 휘청으로 준다).
+    /// </summary>
+    public override void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
+    {
+        TryParry(instigator);
+        base.TakeDamage(amount * _damageTakenMult, instigator, knockbackMultiplier, isCrit);
+    }
+
+    /// <summary>받는 피해 배율 — 최후의 대마법을 막은 그로기 동안 올린다. 1이면 보통.</summary>
+    public void SetDamageTakenMultiplier(float mult) => _damageTakenMult = Mathf.Max(0f, mult);
+
+    /// <summary>
+    /// 낫 공격 판정 직전에 연다 — 낫이 금빛으로 빛나고 「쨍」 소리가 난다. 판정 순간 <see cref="ConsumeParried"/>로 닫는다.
+    /// </summary>
+    public void OpenParryWindow(float seconds)
+    {
+        _parried        = false;
+        _parryWindowEnd = Time.time + Mathf.Max(0.05f, seconds);
+
+        Vector3 glint = CastPoint.position;
+        LichVfx.PlayTinted(LichVfxSlot.ParryGlint, glint, Quaternion.identity, 1f, ParryGlintTint);
+        LichSfx.Play(LichSfxSlot.ParryCue, glint);
+
+        if (_parryHintShown) return;
+        _parryHintShown = true;
+        UI_BossBark.Show(ParryHintText, BossBarkType.PatternAnnounce);
+    }
+
+    /// <summary>
+    /// 낫 휘두름 — <paramref name="contactIn"/>초 뒤 판정 순간에 클립의 접촉 프레임이 오도록 튼다
+    /// (느린 준비 → 빠른 베기 → 접촉 멈칫). 휙 소리는 드라이버가 베기 구간에 낸다.
+    /// </summary>
+    public void PlaySwing(LichSwing swing, float contactIn, float holdSeconds = 0.07f)
+        => Swing?.Play(swing, contactIn, holdSeconds);
+
+    /// <summary>휘두름 드라이버를 멈춘다(애니메이터 속도 1).</summary>
+    public void StopSwing() => _swing?.Cancel();
+
+    /// <summary>시전 박자 — <paramref name="releaseIn"/>초 뒤 방출 프레임(충전 자세로 버티다 내뻗는다).</summary>
+    public void PlayCastBeat(LichCast cast, float releaseIn, float snapSpeed = 2f, float holdSeconds = 0.1f)
+        => Swing?.PlayBeat(cast, releaseIn, snapSpeed, holdSeconds);
+
+    /// <summary>판정 순간 패턴이 부른다 — 튕겨냈으면 true(이 공격의 피해를 주지 말 것). 창은 닫힌다.</summary>
+    public bool ConsumeParried()
+    {
+        bool parried    = _parried;
+        _parried        = false;
+        _parryWindowEnd = -1f;
+        return parried;
+    }
+
+    /// <summary>튕겨낸 뒤의 휘청 — 몸이 젖혀지고 HP바가 금빛으로 맥동한다. 패턴은 돌려받은 시간만큼 멈춰 있는다.</summary>
+    public float BeginParryStagger()
+    {
+        _swing?.Cancel();
+        if (_animator != null) _animator.CrossFade("GetHit", 0.05f);
+        NotifyVulnerableWindow(ParryStaggerDuration);
+        return ParryStaggerDuration;
+    }
+
+    /// <summary>무방비 창이 열렸다 — HP바가 금빛으로 맥동한다(패턴의 반격창 · 휘청에서 부른다).</summary>
+    public void NotifyVulnerableWindow(float seconds)
+    {
+        if (seconds > 0f) HudVulnerableWindow?.Invoke(seconds);
+    }
+
+    /// <summary>시전 순간 — 책이 잠깐 밝게 빛난다.</summary>
+    public void PulseBook(float seconds = 0.6f)
+    {
+        _bookPulse        = 1f;
+        _bookPulseSeconds = Mathf.Max(0.05f, seconds);
+    }
+
+    /// <summary>봉인 의식 동안 제단 전체를 담는 높은 구도(false면 페이지 구도로 돌아간다).</summary>
+    internal void SetRitualCamera(bool on)
+    {
+        if (!_arenaCameraOn) return;
+        ApplyArenaOrbit(on ? _altarOrbitRitual : OrbitForPage());
+    }
+
+    /// <summary>손에 든 낫을 숨기거나(투척 중) 현재 폼대로 되돌린다.</summary>
+    public void SetScytheVisible(bool visible) => _formController?.SetScytheVisible(visible);
 
     /// <summary>LichDormantState.TriggerEntrance에서 호출 — Appear 애니메이션 시점에 Phase1 장비 디졸브 인.</summary>
     public void ShowPhase1Form()
@@ -608,6 +978,41 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         }
     }
 
+    /// <summary>
+    /// 2페이즈 무대 변화 — 조명을 핏빛 보라로 <paramref name="seconds"/> 동안 옮긴다. 원래 조명은 전투가 끝날 때 그대로 되돌린다.
+    /// </summary>
+    public void ShiftToPage2Lighting(float seconds)
+    {
+        if (!_lightingChanged) return;
+        ShiftLightingAsync(seconds, destroyCancellationToken).Forget();
+    }
+
+    private async UniTaskVoid ShiftLightingAsync(float seconds, CancellationToken ct)
+    {
+        var   sun        = RenderSettings.sun;
+        Color fromAmb    = RenderSettings.ambientLight;
+        Color fromTint   = sun != null ? sun.color : Color.white;
+        float fromInt    = sun != null ? sun.intensity : 1f;
+        float toInt      = _originalMainLightIntensity * _page2LightMult;
+        float t          = 0f;
+        try
+        {
+            while (t < seconds)
+            {
+                t += Time.deltaTime;
+                float f = Mathf.Clamp01(t / Mathf.Max(0.01f, seconds));
+                RenderSettings.ambientLight = Color.Lerp(fromAmb, _page2AmbientColor, f);
+                if (sun != null)
+                {
+                    sun.color     = Color.Lerp(fromTint, _page2LightTint, f);
+                    sun.intensity = Mathf.Lerp(fromInt, toInt, f);
+                }
+                await UniTask.Yield(ct);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
     private void RestoreLighting()
     {
         if (!_lightingChanged) return;
@@ -623,8 +1028,11 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     }
 
     /// <summary>LichDormantState.Enter에서 호출 — 플레이어가 실제 보스방에 진입한 시점에 조우 기록.</summary>
-    public void StartEncounterRecord() =>
+    public void StartEncounterRecord()
+    {
+        StoryProgress.MarkLichMet();   // 리치가 멀린의 이름을 부르는 순간 — 대사창 표시명 공개
         RecordEncounterAsync(destroyCancellationToken).Forget();
+    }
 
     private async UniTaskVoid RecordEncounterAsync(System.Threading.CancellationToken ct)
     {
@@ -648,6 +1056,57 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     }
 
 #if UNITY_EDITOR
+    /// <summary>[테스트] 패턴 자동 선택을 켜고 끈다 — 끄면 강제 실행한 패턴만 돈다. 새 값을 돌려준다.</summary>
+    public bool Editor_ToggleAutoPatterns()
+    {
+        _debugAutoPatternsOff = !_debugAutoPatternsOff;
+        return !_debugAutoPatternsOff;
+    }
+
+    /// <summary>
+    /// [테스트] 설정에 든 패턴을 타입 이름으로 찾아 지금 바로 실행한다(쿨다운·패턴 조건 무시).
+    /// 같은 타입이 여러 풀에 있으면(봉인판·해방판 에셋) 지금 조건이 맞는 풀의 것을 먼저 고른다.
+    /// 다른 패턴이 진행 중이거나 등장 연출 중이면 거절한다. 메뉴 RelicFairy/Test Run/Boss Room/9 Force Lich Pattern.
+    /// </summary>
+    public bool Editor_ForcePattern(string patternTypeName)
+    {
+        if (!Application.isPlaying || _lichBB == null || IsInSpecialState) return false;
+        if (_dormantState != null && _dormantState.IsActive) return false;
+        if (_config is not BossConfigSO boss || boss.patternEntries == null) return false;
+
+        BossPatternSO found = null;
+        for (int pass = 0; pass < 2 && found == null; pass++)
+        {
+            foreach (var entry in boss.patternEntries)
+            {
+                if (entry?.patterns == null) continue;
+                if (pass == 0 && !entry.EvaluateConditions(_patternCtx)) continue;
+                foreach (var pattern in entry.patterns)
+                {
+                    if (pattern == null || pattern.GetType().Name != patternTypeName) continue;
+                    found = pattern;
+                    break;
+                }
+                if (found != null) break;
+            }
+        }
+        if (found == null) return false;
+
+        var state = found.GetRuntimeState();
+        if (state == null) return false;
+        LichPatternProbe.BeginPattern(found.name);
+        ChangeState(state);
+        _lichBB.LastPatternTag = found.patternTag;
+        Debug.Log($"[Lich] 테스트 강제 실행 — {found.name}", this);
+        return true;
+    }
+
+    /// <summary>[테스트] 패턴 자동 선택이 켜져 있는가.</summary>
+    public bool Editor_AutoPatternsEnabled => !_debugAutoPatternsOff;
+
+    /// <summary>[테스트] 패턴 · 전환 · 등장 연출 중인가(강제 실행이 거절되는 동안).</summary>
+    public bool Editor_IsBusy => IsInSpecialState || (_dormantState != null && _dormantState.IsActive);
+
     private void Editor_HandleDied(MonsterBase _)
     {
         // Phase 2 실제 사망 경로 — DieState에서 RaiseDied() 호출 시 진입
@@ -745,8 +1204,169 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
             BossConditionKey.Lich_Phase1         => new LichPhase1Condition(),
             BossConditionKey.Lich_IsPhase2       => new LichPhase2Condition(),
             BossConditionKey.Lich_Phase2Pending  => new LichPhase2PendingCondition(),
+            BossConditionKey.Lich_Phase3         => new LichPhase3Condition(),
+            BossConditionKey.Lich_Phase3Pending  => new LichPhase3PendingCondition(),
+            BossConditionKey.Lich_FinalMagicPending => new LichFinalMagicPendingCondition(),
+            BossConditionKey.Lich_Sealed         => new LichModeCondition(nightmare: false),
+            BossConditionKey.Lich_Nightmare      => new LichModeCondition(nightmare: true),
             _                                    => new AlwaysTrue(),
         };
+    }
+
+    // ── 연출: 무적 표시 · 발밑 표식 · 책 발광 · 전투 구도 ──────────
+
+    private void TickPresentation(float dt)
+    {
+        bool inv = IsInvulnerableNow;
+        if (inv != _lastInvulnerable)
+        {
+            _lastInvulnerable = inv;
+            HudInvulnerableChanged?.Invoke(inv);
+        }
+
+        TickAuraMarker();
+        TickBookGlow(dt);
+    }
+
+    /// <summary>날고 있는 리치의 바닥 위치 — 카메라가 내려다봐서 떠 있는 몸만으론 위치가 안 읽힌다(시나리오 §3 U7).</summary>
+    private void TickAuraMarker()
+    {
+        if (!_bodyVisible || _movementController == null)
+        {
+            if (_auraMarker != null) LichVfx.Stop(ref _auraMarker, 0.2f);
+            return;
+        }
+
+        Vector3 floor = transform.position;
+        floor.y = _movementController.FloorY + AuraFloorLift;
+        if (_auraMarker == null)
+        {
+            if (LichVfx.Has(LichVfxSlot.BossAura))
+                _auraMarker = LichVfx.PlayLoop(LichVfxSlot.BossAura, floor, Quaternion.identity, _auraMarkerScale);
+            return;
+        }
+        _auraMarker.transform.position = floor;
+    }
+
+    private void FindBookRenderer()
+    {
+        if (_bodyRenderers == null) return;
+        foreach (var r in _bodyRenderers)
+        {
+            if (r == null) continue;
+            foreach (var m in r.sharedMaterials)
+            {
+                if (m == null || !m.name.StartsWith(BookMaterialName, StringComparison.Ordinal)) continue;
+                _bookRenderer = r;
+                return;
+            }
+        }
+    }
+
+    private void TickBookGlow(float dt)
+    {
+        if (_bookPulse <= 0f || _bookRenderer == null) return;
+
+        // 디졸브가 머티리얼을 잠시 바꿔 끼우므로 매번 책 머티리얼인지 확인하고 인스턴스를 잡는다.
+        var shared = _bookRenderer.sharedMaterial;
+        if (shared == null || !shared.name.StartsWith(BookMaterialName, StringComparison.Ordinal)) return;
+        if (_bookMaterial != shared)
+        {
+            _bookMaterial = _bookRenderer.material;
+            _bookBaseGlow = _bookMaterial.HasProperty(BookGlowId) ? _bookMaterial.GetFloat(BookGlowId) : -1f;
+        }
+        if (_bookBaseGlow < 0f)
+        {
+            _bookPulse = 0f;
+            return;
+        }
+
+        _bookPulse = Mathf.MoveTowards(_bookPulse, 0f, dt / _bookPulseSeconds);
+        float boost = 1f + (_bookPulseBoost - 1f) * _bookPulse;
+        _bookMaterial.SetFloat(BookGlowId, Mathf.Max(0.5f, _bookBaseGlow) * boost);
+    }
+
+    private ArenaOrbit OrbitForPage()
+    {
+        int page = _lichBB?.Page ?? 1;
+        if (page >= 3) return _altarOrbitClose;
+        if (page == 2 && _lichBB != null && _lichBB.IsNightmare) return _altarOrbitNear;
+        return _altarOrbitWide;
+    }
+
+    /// <summary>등장 연출이 카메라를 돌려주기 직전 — 전투 구도를 먼저 깔아 두면 인계 블렌드가 곧장 그 구도에 내려앉는다.</summary>
+    internal void PrepareArenaCamera() => SetArenaCamera(true, 0.01f);
+
+    private void SetArenaCamera(bool on, float blend = ArenaOrbitBlend)
+    {
+        var cam = GameCameraController.Instance;
+        if (cam == null || _arenaCameraOn == on) return;
+        _arenaCameraOn = on;
+        if (on) ApplyArenaOrbit(OrbitForPage(), blend);
+        else    cam.DeactivateArenaOrbit(blend);
+    }
+
+    private static void ApplyArenaOrbit(ArenaOrbit o, float blend = ArenaOrbitBlend)
+        => GameCameraController.Instance?.ActivateArenaOrbit(o.top, o.middle, o.bottom, blend);
+
+    /// <summary>
+    /// 악몽기 사망 — 슬로모 · 흰 플래시 · 사망 폭발 → 낫이 부서진다 → 0.8초 뒤 코어에 떨어지는 충격(설계서 §4-7).
+    /// 폭발은 작게 — 3페이지 근접 구도에서 배율 1이면 화면을 덮고, 곧 뜨는 엔딩 대사창의 일시정지에 그대로 얼어붙는다(09-19 실측).
+    /// </summary>
+    private void PlayDeathPresentation()
+    {
+        Vector3 body = transform.position + Vector3.up * 1.2f;
+        LichVfx.Play(LichVfxSlot.DeathBurst, body, Quaternion.identity, DeathBurstScale);
+        LichVfx.Play(LichVfxSlot.SkeletonDeath, body, Quaternion.identity, 1.2f);   // 부서진 낫 · 뼛가루
+        SetScytheVisible(false);
+        LichSfx.Play(LichSfxSlot.SealComplete, body);
+        LichCinematics.SlowMo(0.4f, 0.8f);
+        LichCinematics.Flash(Color.white, 0.25f, 0.35f);   // 사망 — 절정(0.6은 화면·HUD가 다 하얗게 지워졌다, 09-20 실측)
+        LichPatternUtil.Impact(LichImpact.Transition);
+        DeathImpactAsync(new Vector3(transform.position.x, FloorYForDeath(), transform.position.z), destroyCancellationToken).Forget();
+    }
+
+    /// <summary>사망 +0.8초 — 리치가 코어에 떨어지는 충격(작은 충격파 · 떨림).</summary>
+    private static async UniTaskVoid DeathImpactAsync(Vector3 floor, CancellationToken ct)
+    {
+        try
+        {
+            await UniTask.Delay(TimeSpan.FromSeconds(DeathImpactDelay), cancellationToken: ct);
+        }
+        catch (OperationCanceledException) { return; }
+        LichVfx.Play(LichVfxSlot.SlamImpact, floor, Quaternion.identity, LichPatternUtil.NovaScale(4f));
+        LichSfx.Play(LichSfxSlot.SlamImpact, floor);
+        ArenaTileGrid.Active?.Tremble(floor, 6f, 0.5f);
+    }
+
+    private float FloorYForDeath()
+    {
+        var grid = ArenaTileGrid.Active;
+        return grid != null && grid.TryGetWorldCenter(out var c) ? c.y : transform.position.y;
+    }
+
+    private static Transform FindDeep(Transform root, string name)
+    {
+        foreach (Transform child in root)
+        {
+            if (child.name == name) return child;
+            var found = FindDeep(child, name);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 이벤트 핸들러
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>부서진 바닥이 떠오른다 — 청록 복구 빛과 소리(연출·UX 시나리오 §12-4).</summary>
+    private void HandleSwingStrike() => LichSfx.Play(LichSfxSlot.ScytheSwing, transform.position);
+
+    private void HandleTileRestoring(Vector3 cellCenter, float seconds)
+    {
+        LichVfx.Play(LichVfxSlot.TileRestore, cellCenter, Quaternion.identity);
+        LichSfx.Play(LichSfxSlot.TileRestore, cellCenter, 0.7f);
     }
 }
 }

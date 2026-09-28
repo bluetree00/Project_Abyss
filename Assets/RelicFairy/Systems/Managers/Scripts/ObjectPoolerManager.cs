@@ -52,6 +52,7 @@ public class ObjectPoolerManager
     private readonly Dictionary<PoolType, Transform> _categoryRoots = new();
 
     private Transform _root;
+    private Transform _inactiveStage;   // 새 인스턴스가 태어나는 비활성 대기소
 
     // =========================
     // Constructor
@@ -79,6 +80,11 @@ public class ObjectPoolerManager
             go.transform.SetParent(_root);
             _categoryRoots[type] = go.transform;
         }
+
+        var stage = new GameObject("~InactiveStage");
+        stage.SetActive(false);
+        stage.transform.SetParent(_root);
+        _inactiveStage = stage.transform;
     }
 
     // =========================
@@ -279,7 +285,10 @@ public class ObjectPoolerManager
 
     private GameObject CreateInstance(PoolConfig config)
     {
-        var obj = UnityEngine.Object.Instantiate(config.prefab);
+        // 비활성 대기소 아래에 만든다. 활성 프리팹을 그냥 Instantiate하면 그 자리(원점)에서 Awake·OnEnable이 돌아
+        // 몬스터 NavMeshAgent가 NavMesh 없는 원점에서 켜지며 「Failed to create agent」 경고가 났다(09-24 실측 25건).
+        // 첫 SetActive(true)는 SpawnInternal이 스폰 위치로 옮긴 뒤라 그때 제자리에서 초기화된다.
+        var obj = UnityEngine.Object.Instantiate(config.prefab, _inactiveStage, false);
         obj.name = config.key;
         obj.SetActive(false);
 

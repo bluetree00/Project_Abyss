@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88bf497b2bed27e45bedf1113a8685ec, type: 3}
+  m_Name: FG_SeedStormPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.FGSeedStormPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: fl3_seed_storm
+  breakOverride: -1
+  followUp: {fileID: 11400000, guid: 60b5cb02ac4f10a489632aac680a6609, type: 2}
+  followUpLateOnly: 1
+  minRange: 5
+  maxRange: 25
+  seedCount: 5
+  ringMin: 2.5
+  ringMax: 4.5
+  angleJitter: 20
+  landRadius: 1.6
+  arcHeight: 4
+  gatherDuration: 0.6
+  flightTime: 1.2
+  armLead: 0.4
+  recoveryDuration: 0.7
+  bushLifetime: 8
+  maxBushes: 6
+  bushRadius: 1.5
+  bushTickSeconds: 0.5
+  bushDamageMultiplier: 0.15
+  bushColor: {r: 0.45, g: 0.12, b: 0.06, a: 0.55}
+  impactDamageMultiplier: 1
+  knockbackMultiplier: 1
+  seedPrefab: {fileID: 0}
+  seedScale: 1
+  impactVfxPrefab: {fileID: 1438542530079480, guid: 21710859533a00746ad2bdd323061a2d,
+    type: 3}
+  impactVfxScale: 1.5
+  bushVfxPrefab: {fileID: 7783260515450327712, guid: b2a67ea31d78fbc4393c566bc3178464,
+    type: 3}
+  bushVfxScale: 1
+  throwSfx: {fileID: 8300000, guid: b8065bcffeb6d854ca0bf24c3833df18, type: 3}
+  landSfx: {fileID: 8300000, guid: f7969cd033cac7442990349fcd4605cb, type: 3}

@@ -73,6 +73,9 @@ public class TrainingDummyMonster : MonsterBase
     protected override string ConfigAddress => configAddress;
     protected override string DataAddress   => dataAddress;
 
+    /// <summary>머리 위 이름 — 흉내 대상(configAddress의 몬스터) 이름이 아니라 허수아비 자신(09-28: 「Orc」로 떴다).</summary>
+    public override string DisplayName => "Training Dummy";
+
     // ── Lifecycle ───────────────────────────────────────────────────
 
     /// <summary>
@@ -153,7 +156,8 @@ public class TrainingDummyMonster : MonsterBase
             _navAgent.velocity  = Vector3.zero;
         }
 
-        if (TryGetComponent<Rigidbody>(out var rb))
+        // kinematic 바디엔 속도를 넣지 않는다 — 효과 없이 경고만 난다(몬스터 바디는 평소 kinematic).
+        if (TryGetComponent<Rigidbody>(out var rb) && !rb.isKinematic)
         {
             rb.linearVelocity  = Vector3.zero;
             rb.angularVelocity = Vector3.zero;

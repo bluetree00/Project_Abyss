@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
@@ -5,16 +6,20 @@ using UnityEngine.UI;
 public class UI_Popup : UI_Base
 {
     // ── Constants ────────────────────────────────────────────
-    private const float OpenDuration  = 0.20f;
-    private const float CloseDuration = 0.14f;
+    // 공통 박자(UIFader) — 의뢰서 §3 「페이드+스케일 0.15초 · 과함 지양」. 예전 0.20초 · 0.85→1 · 튕김(EaseOutBack)은
+    // 장난감처럼 튀었고, 루트째 배율을 줘 화면 전체 막까지 움츠러들었다(09-28 UI 톤 진단).
+    private const float OpenDuration  = UIFader.OpenSec;
+    private const float CloseDuration = UIFader.CloseSec;
 
-    private static readonly Vector3 OpenStartScale = Vector3.one * 0.85f;
-    private static readonly Vector3 CloseEndScale  = Vector3.one * 0.92f;
+    private static readonly Vector3 OpenStartScale = Vector3.one * UIFader.PanelFromScale;
+    private static readonly Vector3 CloseEndScale  = Vector3.one * UIFader.PanelToScale;
 
     // ── Private ──────────────────────────────────────────────
     private CanvasGroup   _cg;
     private RectTransform _rt;
     private bool          _isClosing;
+    private readonly List<RectTransform> _fullScreen = new();   // 막처럼 화면을 가득 덮는 자식 — 배율을 되돌려 고정
+    private bool          _fullScreenCollected;
 
     // ── Public ───────────────────────────────────────────────
     /// <summary>true면 이 팝업이 열려있는 동안 게임플레이를 차단한다(인게임 시간정지 + 플레이어 입력잠금).
@@ -50,9 +55,10 @@ public class UI_Popup : UI_Base
     /// <summary>UIManager가 팝업 표시 직후 호출. fire-and-forget.</summary>
     internal void PlayOpenAnimation()
     {
-        _isClosing     = false;
-        _cg.alpha      = 0f;
-        _rt.localScale = OpenStartScale;
+        _isClosing = false;
+        CollectFullScreen();
+        _cg.alpha  = 0f;
+        SetScale(OpenStartScale.x);
         OpenAsync().Forget();
     }
 
@@ -62,15 +68,42 @@ public class UI_Popup : UI_Base
         while (t < 1f && !_isClosing)
         {
             t = Mathf.Min(t + Time.unscaledDeltaTime / OpenDuration, 1f);
-            _rt.localScale = Vector3.LerpUnclamped(OpenStartScale, Vector3.one, EaseOutBack(t));
-            _cg.alpha      = Mathf.Clamp01(t * 2f);
+            float e = EaseOutCubic(t);
+            SetScale(Mathf.Lerp(OpenStartScale.x, 1f, e));
+            _cg.alpha = e;
             await UniTask.Yield(PlayerLoopTiming.Update);
             if (this == null) return;
         }
         if (!_isClosing)
         {
-            _rt.localScale = Vector3.one;
-            _cg.alpha      = 1f;
+            SetScale(1f);
+            _cg.alpha = 1f;
+        }
+    }
+
+    /// <summary>
+    /// 루트 배율을 주되, 화면을 가득 덮는 자식(막 · 전체 바탕)은 되돌려 제자리에 둔다 — 판만 살짝 커지는 것처럼 보인다.
+    /// 되돌림이 정확하려면 자식의 기준점이 루트와 같아야 한다(가득 늘인 자식은 대개 가운데 기준).
+    /// </summary>
+    private void SetScale(float s)
+    {
+        _rt.localScale = Vector3.one * s;
+        var inv = Vector3.one * (s > 0.0001f ? 1f / s : 1f);
+        for (int i = 0; i < _fullScreen.Count; i++)
+            if (_fullScreen[i] != null) _fullScreen[i].localScale = inv;
+    }
+
+    private void CollectFullScreen()
+    {
+        if (_fullScreenCollected || _rt == null) return;
+        _fullScreenCollected = true;
+        for (int i = 0; i < _rt.childCount; i++)
+        {
+            if (!(_rt.GetChild(i) is RectTransform c)) continue;
+            bool full = c.anchorMin == Vector2.zero && c.anchorMax == Vector2.one
+                     && c.offsetMin.sqrMagnitude < 1f && c.offsetMax.sqrMagnitude < 1f
+                     && (c.pivot - _rt.pivot).sqrMagnitude < 0.0001f;
+            if (full) _fullScreen.Add(c);
         }
     }
 
@@ -103,16 +136,17 @@ public class UI_Popup : UI_Base
     {
         if (_cg != null && _rt != null)
         {
-            float   startAlpha = _cg.alpha;
-            Vector3 startScale = _rt.localScale;
-            float   t          = 0f;
+            CollectFullScreen();
+            float startAlpha = _cg.alpha;
+            float startScale = _rt.localScale.x;
+            float t          = 0f;
 
             while (t < 1f)
             {
                 t = Mathf.Min(t + Time.unscaledDeltaTime / CloseDuration, 1f);
                 float e    = EaseInQuad(t);
-                _rt.localScale = Vector3.Lerp(startScale, CloseEndScale, e);
-                _cg.alpha      = Mathf.Lerp(startAlpha, 0f, e);
+                SetScale(Mathf.Lerp(startScale, CloseEndScale.x, e));
+                _cg.alpha  = Mathf.Lerp(startAlpha, 0f, e);
                 await UniTask.Yield(PlayerLoopTiming.Update);
                 if (this == null) return;
             }
@@ -124,12 +158,7 @@ public class UI_Popup : UI_Base
 
     // ── Easing ───────────────────────────────────────────────
 
-    private static float EaseOutBack(float t)
-    {
-        const float c1 = 1.70158f;
-        const float c3 = c1 + 1f;
-        return 1f + c3 * Mathf.Pow(t - 1f, 3f) + c1 * Mathf.Pow(t - 1f, 2f);
-    }
+    private static float EaseOutCubic(float t) => 1f - (1f - t) * (1f - t) * (1f - t);
 
     private static float EaseInQuad(float t) => t * t;
 }

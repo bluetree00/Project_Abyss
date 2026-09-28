@@ -29,6 +29,7 @@ public class UI_Lobby : UI_Scene
     // ─────────────────────────────────────────────────────────
 
     private CanvasGroup _titleImageCG;
+    private System.Threading.CancellationTokenSource _titleCts;
 
     // ─────────────────────────────────────────────────────────
     // Lifecycle
@@ -129,10 +130,27 @@ public class UI_Lobby : UI_Scene
     // Private Methods
     // ─────────────────────────────────────────────────────────
 
+    /// <summary>타이틀 그림 — 슬롯 패널과 교차 페이드(예전엔 알파가 0/1로 순간 전환, 09-28 UI 톤 통일).</summary>
     private void SetTitleImage(bool visible)
     {
         if (_titleImageCG == null) return;
-        _titleImageCG.alpha = visible ? 1f : 0f;
         _titleImageCG.blocksRaycasts = false;
+        _titleCts?.Cancel();
+        _titleCts?.Dispose();
+        _titleCts = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+        FadeTitleAsync(visible ? 1f : 0f, visible ? UIFader.OpenSec : UIFader.CloseSec, _titleCts.Token).Forget();
+    }
+
+    private async UniTaskVoid FadeTitleAsync(float target, float dur, System.Threading.CancellationToken ct)
+    {
+        try
+        {
+            while (_titleImageCG != null && !Mathf.Approximately(_titleImageCG.alpha, target))
+            {
+                _titleImageCG.alpha = Mathf.MoveTowards(_titleImageCG.alpha, target, Time.unscaledDeltaTime / dur);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (System.OperationCanceledException) { }
     }
 }

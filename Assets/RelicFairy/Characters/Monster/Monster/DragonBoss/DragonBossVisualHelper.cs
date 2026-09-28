@@ -16,7 +16,9 @@ public static class DragonBossVisualHelper
             DragonBossBlackboard.DragonElement.Ice     => new Color(0.5f,  0.85f, 1.0f),
             DragonBossBlackboard.DragonElement.Thunder => new Color(0.65f, 0.3f,  1.0f),
             DragonBossBlackboard.DragonElement.Fire    => new Color(1.0f,  0.35f, 0.1f),
-            _                                          => new Color(1.0f,  0.35f, 0.1f),
+            // 심연(2페이지) — 검보라. 번개(밝은 보라)와 헷갈리지 않게 더 어둡고 붉게.
+            DragonBossBlackboard.DragonElement.Abyss   => new Color(0.42f, 0.08f, 0.55f),
+            _                                      => new Color(1.0f,  0.35f, 0.1f),
         };
     }
 

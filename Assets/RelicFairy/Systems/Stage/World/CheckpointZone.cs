@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// 방 입구에 배치하는 체크포인트 마커. 한 방당 한 번만 소비된다.
-/// 진행 세이브는 로컬 권위(RunFlowController.SaveRunState → SaveRunLocal)가 방 경계에서 담당한다.
+/// 진행 세이브는 로컬 권위(RunFlowController.SaveRunState → SaveRunLocal)가 챕터 첫 방에서 한 번 담당한다(09-25).
 /// </summary>
 [RequireComponent(typeof(Collider))]
 public class CheckpointZone : MonoBehaviour

@@ -21,8 +21,8 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
-  minRange: 6
-  warningDuration: 0.6
+  minRange: 5
+  warningDuration: 1
   breathStartDuration: 0.8
   breathDuration: 3.5
   breathEndDuration: 0.6

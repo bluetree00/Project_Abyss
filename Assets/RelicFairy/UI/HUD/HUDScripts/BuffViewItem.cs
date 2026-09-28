@@ -17,9 +17,9 @@ public readonly struct BuffViewItem
     public readonly string IconKey;
     /// <summary>한글 라벨 + 수치까지 포함한 본문. 예: "공격력 +10%".</summary>
     public readonly string Label;
-    /// <summary>중첩 수(없으면 1). P4 스택 배지용 — P1 표시 미사용.</summary>
+    /// <summary>중첩 수(없으면 1). 버프 칸 우하단 「×N」(BuffCell).</summary>
     public readonly int Stacks;
-    /// <summary>잔여 비율 0~1(게이지). 무한/해당없음이면 -1. P4 게이지용 — P1 표시 미사용.</summary>
+    /// <summary>잔여 비율 0~1(게이지). 무한/해당없음이면 -1. 버프 칸 아래 게이지(BuffCell).</summary>
     public readonly float Remaining01;
     /// <summary>잔여 표기. 예: "[3방]" / "" (없음).</summary>
     public readonly string RemainText;

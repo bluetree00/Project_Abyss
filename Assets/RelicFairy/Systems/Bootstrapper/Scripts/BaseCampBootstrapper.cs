@@ -25,6 +25,10 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
     [Tooltip("스폰할 CombatGirl 베이스 몸 Addressables 키. GameRunBootstrapper.startBodyKey와 동일.")]
     [SerializeField] private string playerBodyKey = "PlayerCharacter";
 
+    [Header("무형검 (처음 한 번 받은 뒤 자동 지급)")]
+    [Tooltip("무형검 SO — 이 슬롯이 검을 한 번 받았으면(기록) 베이스캠프가 슬롯0에 쥐여 준다. WorldSwordAwakening과 같은 SO.")]
+    [SerializeField] private MainWeaponSO namelessWeapon;
+
     [Header("Intro Dialogue")]
     [Tooltip("베이스캠프 진입 시 재생할 대화 시퀀스 SO. 서버 CSV에 'StartRoom' 시퀀스가 없을 때 폴백으로 사용.")]
     [SerializeField] private DialogueSequenceSO introDialogueSO;
@@ -33,8 +37,15 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
     [SerializeField, Min(0f)] private float introDialogueDelay = 0.8f;
 
     private PlayerController _player;
+    // 스폰 지점이 바라보는 방향 — 카메라 인계 뒤 heading을 이 값으로 맞춘다(복귀 첫 화면에 세 스테이션이 들어오게, ae 실측 09-27).
+    private float? _spawnYaw;
+    // 프롤로그에서 곧장 온 첫 진입인가 — 소환 연출(처음 2.5초 / 복귀 1.5초)을 가른다.
+    private bool _spawnedFromIntro;
 
     public PlayerController Player => _player;
+
+    /// <summary>페이드인·카메라 인계·시작 대사까지 끝났는가 — 처음 연출(멀린의 공간 생성)은 이 뒤에 시작한다(09-28 ae 실측: 검은 로딩 뒤에서 시작됐다).</summary>
+    public bool IsReady { get; private set; }
 
     private void Awake()
     {
@@ -53,6 +64,7 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         await UniTask.WaitUntil(() => AppBootstrapper.Instance == null || AppBootstrapper.Instance.IsReady);
 
         var ct = this.GetCancellationTokenOnDestroy();
+        var summon = UniTask.CompletedTask;
         try
         {
             Managers.Sound.PlayBgmAsync("BaseCamp").Forget();
@@ -81,9 +93,22 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             // await 판을 쓴다 — fire-and-forget이면 블렌드가 끝나기 전에 페이드인/시작 대사가 나가
             // 카메라가 자리를 못 잡은 화면 위로 대사창이 뜬다.
             if (_player != null && cam != null)
+            {
                 await cam.HandToGameplayCameraAsync(_player.transform, true, ct);
+                // 인계는 heading을 플레이어 facing으로 맞추지만 facing이 스폰 회전을 따르지 않을 수 있다 —
+                // 화면이 아직 검을 때 스폰 지점 방향으로 스냅한다(보간 없이).
+                if (_spawnYaw.HasValue) cam.SetHeadingImmediate(_spawnYaw.Value);
+            }
 
-            await ScreenFade.In(0.4f, ct);
+            // 소환 연출 — 화면이 검을 때 디졸브 재질을 데운 뒤 시작해 페이드인과 나란히 돈다(첫 프레임부터 몸이 가려진다).
+            var fx = BaseCampFxDirector.Instance;
+            if (fx != null && _player != null)
+            {
+                await DissolveEffect.WarmupAsync(ct);
+                summon = fx.PlaySummonArrivalAsync(_player, SummonKindForArrival(), ct);
+            }
+
+            await ScreenFade.In(_spawnedFromIntro ? 1.0f : 0.4f, ct);   // 첫 소환은 암전에서 천천히
         }
         catch (OperationCanceledException) { return; }
 
@@ -100,12 +125,15 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         // 플레이어가 화면을 인지하기 전에 UI가 덮는다.
         try
         {
+            // 소환이 끝난 뒤 대사 — 대사창은 시간을 멈춰, 스케일 시간으로 도는 등장 디졸브가 반쯤에서 멈춘다.
+            await summon;
             if (introDialogueDelay > 0f)
                 await UniTask.Delay(TimeSpan.FromSeconds(introDialogueDelay), cancellationToken: ct);
 
             await ShowIntroDialogueAsync(ct);
         }
         catch (OperationCanceledException) { }
+        finally { IsReady = true; }
     }
 
     private void OnDestroy()
@@ -163,6 +191,11 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             : (returnSpawnPoint != null ? returnSpawnPoint : playerSpawnPoint);
         Vector3 pos    = overridePos ?? (spawn != null ? spawn.position : Vector3.zero);
         Quaternion rot = overrideRot ?? (spawn != null ? spawn.rotation : Quaternion.identity);
+        if (!overridePos.HasValue)
+        {
+            _spawnYaw = spawn != null ? spawn.eulerAngles.y : (float?)null;
+            _spawnedFromIntro = fromIntro;
+        }
 
         var go = Instantiate(prefab, pos, rot);
         var player = go.GetComponent<PlayerController>();
@@ -178,6 +211,15 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
 
         // 선택된 유물 적용 (Loadout.Relic 없으면 no-op).
         player.SetRelicAndApply(AppBootstrapper.Instance?.Loadout?.Relic);
+
+        // 무형검은 처음 한 번만 소환의 방에서 받는다 — 받은 적이 있는 슬롯이면 여기서 쥐여 준다(베이스캠프 재설계 §2).
+        // 런이 끝나면 로드아웃이 비워지므로(PlayerLoadout.Clear) 복귀할 때마다 다시 채운다. 판 안 진화(카타나·대검)는 그 판에서만.
+        var lo = AppBootstrapper.Instance?.Loadout;
+        if (lo != null && lo.WeaponSlot0 == null && namelessWeapon != null && HasAwakenedSword())
+        {
+            lo.SetWeaponSlot0(namelessWeapon);
+            Debug.Log("[BaseCampBootstrapper] 무형검 자동 지급 — 이 슬롯은 이미 검을 받았다(기록/이행).");
+        }
 
         // 장비(무기) 적용 — 허브에서도 장착·테스트 가능하도록 Loadout 무기를 장착.
         await EquipLoadoutWeaponsAsync(player, ct);
@@ -232,6 +274,29 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         RespawnAsync(this.GetCancellationTokenOnDestroy()).Forget();
     }
 
+    /// <summary>
+    /// 이 세이브 슬롯이 무형검을 이미 받았는가 — 기록(<see cref="MemoryAltarCatalog.Rec.SwordAwakened"/>)이 있거나,
+    /// 기록이 생기기 전의 세이브라도 던전에 한 번이라도 들어갔으면 받은 것으로 친다(기존 세이브 이행, 설계서 §2).
+    /// </summary>
+    public static bool HasAwakenedSword()
+    {
+        if ((BackendGameData.Instance?.Data?.GetRecord(MemoryAltarCatalog.Rec.SwordAwakened) ?? 0) > 0) return true;
+        var rpm = RunProgressManager.Instance;
+        return rpm != null && RunProgressManager.GetRetryCount(rpm.ActiveSlotIndex) > 0;
+    }
+
+    /// <summary>소환 연출 종류 — 프롤로그에서 온 첫 진입이면 처음, 아니면 복귀 사유(소비하지 않고 읽음)로 사망 보랏빛 / 클리어 금빛.</summary>
+    private BaseCampFxDirector.SummonKind SummonKindForArrival()
+    {
+        if (_spawnedFromIntro) return BaseCampFxDirector.SummonKind.First;
+        return RunReturnTracker.PeekReason() switch
+        {
+            RunReturnTracker.Reason.Death => BaseCampFxDirector.SummonKind.Death,
+            RunReturnTracker.Reason.Clear => BaseCampFxDirector.SummonKind.Clear,
+            _                             => BaseCampFxDirector.SummonKind.Return,
+        };
+    }
+
     private async UniTaskVoid RespawnAsync(CancellationToken ct)
     {
         if (_respawning)
@@ -272,12 +337,18 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         if (dlgMgr != null && !dlgMgr.IsInitialized)
             await dlgMgr.InitializeAsync();
 
+        // 옛 세이브(리치 봉인만 깨진 상태)를 붕괴 규칙에 맞춘 뒤 이야기 비트를 고른다.
+        StoryProgress.EnsureConsistency();
+
         var reason = RunReturnTracker.ConsumeReason(out int count);
-        DialogueLine[] lines = reason switch
+
+        // 이야기 비트(엔딩·붕괴·봉인/처치 첫 기록)가 있으면 평소 복귀 대사 대신 그것을 튼다.
+        DialogueLine[] lines = reason != RunReturnTracker.Reason.None ? StoryDialogue.TakeReturnBeat(dlgMgr) : null;
+        lines ??= reason switch
         {
             RunReturnTracker.Reason.Death => dlgMgr?.GetCountLines("RunFail", count),
             RunReturnTracker.Reason.Clear => dlgMgr?.GetCountLines("RunClear", count),
-            _                             => dlgMgr?.GetVisitLines(IntroSequenceId),
+            _                             => WithMission(dlgMgr, dlgMgr?.GetVisitLines(IntroSequenceId)),
         };
         lines ??= introDialogueSO?.Lines;
         if (lines == null || lines.Length == 0) return;
@@ -286,6 +357,19 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         if (popup == null) return;
 
         await popup.ShowAsync(lines);
+    }
+
+    /// <summary>거점 방문 대사 뒤에 봉인기 사명을 한 번 이어 붙인다(사명이 없거나 이미 봤으면 그대로).</summary>
+    private static DialogueLine[] WithMission(DialogueDataManager dlgMgr, DialogueLine[] visit)
+    {
+        var mission = StoryDialogue.TakeMission(dlgMgr);
+        if (mission == null) return visit;
+        if (visit == null || visit.Length == 0) return mission;
+
+        var merged = new DialogueLine[visit.Length + mission.Length];
+        visit.CopyTo(merged, 0);
+        mission.CopyTo(merged, visit.Length);
+        return merged;
     }
 
     /// <summary>Main Camera에 GameCameraController가 없으면 부착. GameRunBootstrapper.EnsureCameraController와 동일.</summary>

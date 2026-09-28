@@ -391,7 +391,11 @@ public sealed class PlayerRuntimeStats
     private float _reactionDamageReduction;
 
     /// <summary>치명타 확률 보너스 합(%포인트). 무기 크릿 위에 가산. CombatCalculator.RollCrit이 읽음.</summary>
-    public float CritChanceBonus => _relicCritChance + _buffCritChance + _synergyDynCritChance + _itemDyn.critChance + _itemCritChance + _reactionCritChance;
+    // 치명 확률은 %포인트(0~100)로 굴린다(CombatCalculator: Random.value*100 < chance). 무기·유물은 %p(10 = 10%)로 오지만
+    // 룬(정적·조건부)·속성 시너지·속성 반응은 데이터가 비율(0.05 = 5%)이다 — 그대로 더하면 +5%가 +0.05%p가 되어
+    // 치명 룬 14종과 빛 시너지가 사실상 무효였다(09-19). 비율 원천만 ×100 해서 합친다.
+    public float CritChanceBonus => _relicCritChance + _buffCritChance
+        + 100f * (_synergyDynCritChance + _itemDyn.critChance + _itemCritChance + _reactionCritChance);
     /// <summary>치명타 피해 배율 보너스 합(가산). 무기 크릿 배율 위에 가산.</summary>
     public float CritDamageBonus => _relicCritDamage + _buffCritDamage + _synergyDynCritDamage + _itemDyn.critDamage + _itemCritDamage + _reactionCritDamage;
 

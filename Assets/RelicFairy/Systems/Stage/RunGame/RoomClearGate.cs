@@ -291,6 +291,9 @@ public class RoomClearGate : MonoBehaviour
     {
         var rarity = RoomRewardTable.RollRarity(weights);
         if (floor.HasValue && rarity < floor.Value) rarity = floor.Value;   // 방 종류·챌린지 등급 rarity 하한
+        // 하한 <b>뒤에</b> 다시 내린다 — RollRarity 안의 클램프만으로는 하한(챌린지 플래티넘=전설 · 골드=영웅)이
+        // 기억의 제단 등급 해금을 도로 뚫는다.
+        rarity = MemoryAltarService.ClampRarity(rarity);
 
         // 등급 폴백 — 굴린 등급에 보유 아이템이 없을 수 있다(예: 아이템 풀이 Common/Rare뿐인데
         // LuckRollTable은 luck 1부터 Epic/Legendary를 굴린다). 드랍을 통째로 날리는 대신 한 단계씩

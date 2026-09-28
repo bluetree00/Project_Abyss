@@ -21,15 +21,22 @@ public sealed class ExitCompassHud : MonoBehaviour
     private const int   SortOrder   = UISortingOrder.HudIndicator;  // 팝업 위에 뜨던 버그 수정(640→120)
 
     // 배지 치수(1920×1080 기준). 맨 텍스트가 아니라 판때기 배지로 띄워야 배경과 섞이지 않는다.
-    private const float PlateW      = 264f;
+    private const float PlateW      = 264f;  // 최소 폭 — 글자가 길면 MaxPlateW까지 늘린다
+    private const float MaxPlateW   = 460f;
     private const float PlateH      = 76f;
     private const float AccentW     = 6f;    // 좌측 방 종류 색 띠
     private const float PadX        = 18f;
     private const float ArrowGap    = 26f;   // 배지 왼쪽 바깥 화살표 간격
     private const float StackGapY   = 10f;   // 같은 변에 몰린 배지끼리 세로로 벌리는 간격
 
-    private static readonly Color PlateColor = new(0.04f, 0.05f, 0.08f, 0.88f);
-    private static readonly Color SubColor   = new(0.74f, 0.78f, 0.86f, 1f);
+    // 가장자리로 밀린 배지가 비키는 띠(1920×1080 기준). 위 가운데는 보스 체력바 · 패턴 예고 · 챌린지 목표(44~126) ·
+    // 퀘스트 알림 자리, 아래는 무기 칸(이름 포함) · 체력바 · 스킬 칸 자리다 — 배지가 그 위에 얹혀 글이 섞였다(09-28 UI 전수).
+    private const float TopCenterBand  = 190f;   // 퀘스트 완료 알림이 80~175를 쓴다(2차 실측)
+    private const float TopCenterHalfW = 520f;
+    private const float BottomHudBand  = 380f;   // 버프 아이콘 줄이 무기 이름 위(336~372)로 올라갔다(09-28)
+
+    private static readonly Color SubColor   = UITheme.Ink;
+    private const float AppearSec = 0.25f;   // 배지가 순간 등장하지 않게(09-28 UI 톤 통일)
 
     private sealed class Entry
     {
@@ -37,9 +44,12 @@ public sealed class ExitCompassHud : MonoBehaviour
         public RectTransform   Rect;      // 배지 루트
         public RectTransform   ArrowRect; // 화면 밖일 때만 켜지는 방향 지시자(회전)
         public Graphic         Arrow;
+        public CanvasGroup     Group;     // 등장 페이드
+        public float           Width;     // 이 배지의 판 폭(글자에 맞춘 값)
     }
 
     private static ExitCompassHud _instance;
+    private static bool s_popupHidden;   // 게임을 멈추는 팝업이 열려 있다 — 배지가 팝업 창 가장자리에 비쳤다(09-29)
 
     /// <summary>생성돼 있으면 반환(없으면 null) — 정리용. 생성이 필요하면 Create()를 쓴다.</summary>
     public static ExitCompassHud Instance => _instance;
@@ -49,6 +59,7 @@ public sealed class ExitCompassHud : MonoBehaviour
     private RectTransform _root;
     private Camera        _cam;
     private Canvas        _canvas;   // 배지 폭을 픽셀로 환산해 가장자리 클램프에 쓴다
+    private CanvasGroup   _group;    // 팝업 동안 배지 전체를 걷는다
 
     /// <summary>없으면 만들고 반환. 씬 전환에도 살아남지 않아도 되는 런 스코프 HUD.</summary>
     public static ExitCompassHud Create()
@@ -75,6 +86,10 @@ public sealed class ExitCompassHud : MonoBehaviour
         if (_instance != null && _instance != this) { Destroy(gameObject); return; }
         _instance = this;
         _canvas   = GetComponent<Canvas>();
+        if (!TryGetComponent(out _group)) _group = gameObject.AddComponent<CanvasGroup>();
+        _group.blocksRaycasts = false;
+        _group.interactable   = false;
+        _group.alpha          = s_popupHidden ? 0f : 1f;
     }
 
     private void OnDestroy()
@@ -83,6 +98,9 @@ public sealed class ExitCompassHud : MonoBehaviour
     }
 
     // ── Public Methods ────────────────────────────────────
+
+    /// <summary>막는 팝업(BlocksGameplay)이 열리고 닫힐 때 — HUD와 같이 걷고 되살린다(UIRootBootstrapper가 부른다).</summary>
+    public static void SetPopupHidden(bool hidden) => s_popupHidden = hidden;
 
     /// <summary>
     /// 표시할 출구 목록 교체. 각 출구를 <b>배지</b>(어두운 판 + 종류 색 띠 + 이름 + 보상 요약)로 만든다.
@@ -103,39 +121,60 @@ public sealed class ExitCompassHud : MonoBehaviour
             go.transform.SetParent(_root, false);
             var rt = go.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);  // 스트레치 방지 — 자식 배치 기준을 중앙으로 고정
-            rt.sizeDelta = new Vector2(PlateW, PlateH);
 
-            // 판때기 — 밝은 배경에서도 글자가 묻히지 않게 어두운 반투명 판을 깐다.
-            var plate = NewGraphic<Image>(rt, "Plate", new Vector2(PlateW, PlateH), Vector2.zero);
-            plate.color = PlateColor;
+            var group = go.AddComponent<CanvasGroup>();
+            group.alpha = 0f;
+            group.blocksRaycasts = false;
 
-            // 좌측 색 띠 — 방 종류를 색으로 먼저 읽히게(글리프보다 빠름).
-            var accent = NewGraphic<Image>(rt, "Accent", new Vector2(AccentW, PlateH),
-                                           new Vector2(-(PlateW - AccentW) * 0.5f, 0f));
-            accent.color = color;
+            // 판때기 — 밝은 배경에서도 글자가 묻히지 않게 어두운 글래스 판(둥근 모서리 + 방 색 가는 선, 09-28 UI 톤 통일).
+            var plate  = NewGraphic<Image>(rt, "Plate", Vector2.zero, Vector2.zero);
+            // 좌측 색 띠 — 방 종류를 색으로 먼저 읽히게(글리프보다 빠름). 둥근 판 안쪽에 둥근 막대로.
+            var accent = NewGraphic<Image>(rt, "Accent", Vector2.zero, Vector2.zero);
 
             // 1행: 종류
-            var t = NewGraphic<TextMeshProUGUI>(rt, "Title", new Vector2(PlateW - PadX * 2f, 38f),
-                                                new Vector2(PadX * 0.5f, 15f));
+            var t = NewGraphic<TextMeshProUGUI>(rt, "Title", Vector2.zero, Vector2.zero);
             t.text             = title;
             t.fontSize         = 30f;
             t.fontStyle        = FontStyles.Bold;
             t.alignment        = TextAlignmentOptions.Left;
             t.color            = color;
             t.textWrappingMode = TextWrappingModes.NoWrap;
+            TMPOutlineHelper.ApplySoftShadow(t);
 
             // 2행: 그 방에서 얻는 것(정보량이 결정을 만든다)
-            var s = NewGraphic<TextMeshProUGUI>(rt, "Sub", new Vector2(PlateW - PadX * 2f, 30f),
-                                                new Vector2(PadX * 0.5f, -17f));
+            var s = NewGraphic<TextMeshProUGUI>(rt, "Sub", Vector2.zero, Vector2.zero);
             s.text             = subtitle;
             s.fontSize         = 20f;
             s.alignment        = TextAlignmentOptions.Left;
             s.color            = SubColor;
             s.textWrappingMode = TextWrappingModes.NoWrap;
+            TMPOutlineHelper.ApplySoftShadow(s);
+
+            // 판 폭은 글자에 맞춘다 — 폭 264 고정이면 「희귀 이상 · 후보 4 · 강화재료 2」가 판 밖으로 나갔다(09-29).
+            // 그래도 넘치는 긴 줄은 글자를 줄인다(판은 MaxPlateW까지만).
+            float textW  = Mathf.Max(t.GetPreferredValues(title ?? string.Empty).x, s.GetPreferredValues(subtitle ?? string.Empty).x);
+            float plateW = Mathf.Clamp(textW + PadX * 2f + AccentW + 10f, PlateW, MaxPlateW);
+            float innerW = plateW - PadX * 2f - AccentW;
+            t.enableAutoSizing = s.enableAutoSizing = true;
+            t.fontSizeMax = 30f; t.fontSizeMin = 22f;
+            s.fontSizeMax = 20f; s.fontSizeMin = 15f;
+
+            rt.sizeDelta = new Vector2(plateW, PlateH);
+            plate.rectTransform.sizeDelta = new Vector2(plateW, PlateH);
+            UITheme.StylePanel(plate, UITheme.Glass, new Color(color.r, color.g, color.b, 0.45f), 10f);
+            accent.rectTransform.sizeDelta        = new Vector2(AccentW, PlateH - 18f);
+            accent.rectTransform.anchoredPosition = new Vector2(-(plateW - AccentW) * 0.5f + 7f, 0f);
+            accent.sprite = UIProceduralSprites.RoundedRect(radius: 3f, feather: 1f, size: 32);
+            accent.type   = Image.Type.Sliced;
+            accent.color  = color;
+            t.rectTransform.sizeDelta        = new Vector2(innerW, 38f);
+            t.rectTransform.anchoredPosition = new Vector2((PadX + AccentW) * 0.5f, 15f);
+            s.rectTransform.sizeDelta        = new Vector2(innerW, 30f);
+            s.rectTransform.anchoredPosition = new Vector2((PadX + AccentW) * 0.5f, -17f);
 
             // 방향 화살표 — 글리프 8종 대신 ▶ 하나를 회전시킨다(폰트에 없는 ↖↙가 □로 깨지던 문제 해소).
             var arrow = NewGraphic<TextMeshProUGUI>(rt, "Arrow", new Vector2(40f, 40f),
-                                                    new Vector2(-(PlateW * 0.5f + ArrowGap), 0f));
+                                                    new Vector2(-(plateW * 0.5f + ArrowGap), 0f));
             arrow.text      = "▶";
             arrow.fontSize  = 34f;
             arrow.fontStyle = FontStyles.Bold;
@@ -148,6 +187,8 @@ public sealed class ExitCompassHud : MonoBehaviour
                 Rect      = rt,
                 ArrowRect = arrow.rectTransform,
                 Arrow     = arrow,
+                Group     = group,
+                Width     = plateW,
             });
         }
     }
@@ -188,6 +229,13 @@ public sealed class ExitCompassHud : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (_group != null)
+        {
+            float target = s_popupHidden ? 0f : 1f;
+            if (!Mathf.Approximately(_group.alpha, target))
+                _group.alpha = Mathf.MoveTowards(_group.alpha, target,
+                    Time.unscaledDeltaTime / (s_popupHidden ? UIFader.CloseSec : UIFader.OpenSec));
+        }
         if (_entries.Count == 0) return;
         if (_cam == null) _cam = Camera.main;
         if (_cam == null) return;
@@ -230,7 +278,7 @@ public sealed class ExitCompassHud : MonoBehaviour
 
             // 배지는 맨 텍스트보다 넓어 가장자리에서 잘린다 — 실제 배지 폭(캔버스 스케일 반영)으로 최종 클램프.
             float scale = _canvas != null ? _canvas.scaleFactor : 1f;
-            float halfW = PlateW * 0.5f * scale;
+            float halfW = e.Width * 0.5f * scale;
             float halfH = PlateH * 0.5f * scale;
             float leftPad = onScreen ? halfW : halfW + (ArrowGap + 20f) * scale;
             pos.x = Mathf.Clamp(pos.x, leftPad + 8f, w - halfW - 8f);
@@ -238,11 +286,24 @@ public sealed class ExitCompassHud : MonoBehaviour
 
             // 출구가 같은 변으로 몰리면 배지가 같은 자리에 겹쳐 한 장만 읽힌다 — 세로로 쌓아 벌린다.
             pos = StackAwayFromPlaced(pos, halfW, halfH, halfH * 2f + StackGapY * scale, h);
+            if (!onScreen) pos = AvoidHudBands(pos, halfW, halfH, scale, w, h);   // 화면 안 배지는 출구 위에 그대로
             _placed.Add(pos);
 
             e.Rect.gameObject.SetActive(true);
+            if (e.Group != null && e.Group.alpha < 1f)
+                e.Group.alpha = Mathf.Min(1f, e.Group.alpha + Time.unscaledDeltaTime / AppearSec);
             e.Rect.position = pos;                                // Overlay 캔버스 → 스크린 좌표 그대로
         }
+    }
+
+    /// <summary>가장자리로 밀린 배지를 위 가운데 띠 아래 · 아래 HUD 띠 위로 옮긴다(스크린 좌표, y는 아래에서 위).</summary>
+    private static Vector2 AvoidHudBands(Vector2 pos, float halfW, float halfH, float scale, float w, float h)
+    {
+        float topLimit = h - TopCenterBand * scale - halfH;
+        if (pos.y > topLimit && Mathf.Abs(pos.x - w * 0.5f) < TopCenterHalfW * scale + halfW) pos.y = topLimit;
+        float bottomLimit = BottomHudBand * scale + halfH;
+        if (pos.y < bottomLimit) pos.y = bottomLimit;
+        return pos;
     }
 
     /// <summary>

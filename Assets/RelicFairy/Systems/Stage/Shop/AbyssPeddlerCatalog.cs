@@ -185,7 +185,7 @@ public static class AbyssPeddlerCatalog
         res.SpecialOriginalPrice = pick.Price;
         int dealPrice = Mathf.Max(1, Mathf.RoundToInt(pick.Price * (1f - SpecialDiscount)));
         res.Special = new ShopProduct(pick.Category, pick.DisplayName, pick.EffectText,
-            "전 상품 중 무작위로 골라진 오늘의 매물", dealPrice, pick.Rarity, pick.Icon, pick.Grant);
+            "전 상품 중 무작위로 골라진 오늘의 매물", dealPrice, pick.Rarity, pick.Icon, pick.Grant, pick.Rune);
 
         for (int i = 0; i < draw.Count; i++)
             if (i != specialIdx) res.Products.Add(draw[i]);
@@ -210,8 +210,9 @@ public static class AbyssPeddlerCatalog
         public static ShopProduct Apply(ShopProduct p)
         {
             if (p == null || !Active) return p;
+            // 룬 원본(Rune)도 넘긴다 — 빠뜨리면 할인된 룬이 등급·효과 전부·놓을 자리 없이 떴다(09-25 실측).
             return new ShopProduct(p.Category, p.DisplayName, p.EffectText, p.DetailText,
-                                   Apply(p.Price), p.Rarity, p.Icon, p.Grant);
+                                   Apply(p.Price), p.Rarity, p.Icon, p.Grant, p.Rune);
         }
     }
 
@@ -270,7 +271,12 @@ public static class AbyssPeddlerCatalog
         var all = itemData.GetAllItems();
         if (all == null || all.Count == 0) return null;
 
-        var runeIds = all.Where(kv => kv.Value != null && kv.Value.Count > 0 && kv.Value[0].shape_id > 0)
+        // 기억의 제단에서 아직 열지 않은 등급은 진열하지 않는다. 드랍은 굴린 뒤 내리지만(ClampRarity)
+        // 진열 룬은 등급이 정해진 채로 고르므로 후보에서 뺀다 — 안 그러면 320골드짜리 전설 룬이
+        // 제단의 「영웅·전설 룬 등장」(수천 정수)을 건너뛴다.
+        var maxRarity = MemoryAltarService.MaxRuneRarity;
+        var runeIds = all.Where(kv => kv.Value != null && kv.Value.Count > 0 && kv.Value[0].shape_id > 0
+                                      && ParseRarity(kv.Value[0].ResolvedRarity) <= maxRarity)
                          .Select(kv => kv.Key).ToList();
         if (runeIds.Count == 0) return null;
 
@@ -285,19 +291,28 @@ public static class AbyssPeddlerCatalog
             ? $"{meta.effect_type} +{meta.value:0.##}"
             : meta.description;
 
+        // 속성이 빈 룬(평범·희귀)은 FromServer마다 속성을 새로 굴린다 — 진열·아이콘·받는 룬을 따로 만들면
+        // 카드엔 「빛」인데 「불」 룬을 받았다(09-26 캡처). 여기서 한 번 굴린 속성을 셋이 같이 쓴다.
+        var shown = RuntimeItemData.FromServer(entries);
+
+        // 진열 카드도 룬의 대표 문양으로 — 획득 카드·보관함·룬판과 같은 얼굴(RuneArt 한 곳에서 정한다).
+        // 예전엔 모든 룬이 공용 「룬」 아이콘(회색 원) 하나라 무엇을 파는지 그림으로 구분되지 않았다.
+        var runeIcon = RuneArt.ResolveRuneIcon(shown) ?? EffectIconRegistry.GetSprite(IconRune);
         return new ShopProduct(ShopProductCategory.Rune, name, effect,
-            "적용  구매 즉시 판에 배치", RarityPrice(rarity), rarity, EffectIconRegistry.GetSprite(IconRune),
+            "적용  구매 즉시 판에 배치", RarityPrice(rarity), rarity, runeIcon,
             s =>
             {
                 if (s?.ItemInventory == null) return false;
                 var data = RuntimeItemData.FromServer(entries);
                 if (data == null) return false;
+                if (shown != null) data.element = shown.element;   // 진열에 보인 속성 그대로
 
                 // 사자마자 바로 조합(배치)할 수 있게 룬판을 열어준다 — 룬 획득 보상과 같은 흐름.
                 bool added = s.ItemInventory.AddToStaging(data);
                 OpenGridForRune(data, added);
                 return true;   // 보관함 만차여도 '보류'로 판이 들고 가므로 구매는 성립
-            });
+            },
+            rune: shown);   // 표시 전용 사본 — 효과 전부·속성·칸 수·놓을 자리(받는 룬과 같은 속성)
     }
 
     /// <summary>구매한 룬을 즉시 배치할 수 있도록 룬판을 연다(만차면 보류 아이템으로).</summary>
@@ -309,6 +324,8 @@ public static class AbyssPeddlerCatalog
 
         if (added) UI_GridPanel.Instance.ShowWithNewItem(data);
         else       UI_GridPanel.Instance.ShowWithPendingItem(data);
+        // 상점 팝업은 열린 채다 — 판을 그 위로 올려야 보이고 눌린다. 판을 닫으면 상점으로 돌아온다.
+        UI_GridPanel.Instance.RaiseAbovePopups();
     }
 
     private static ItemRarity ParseRarity(string raw)

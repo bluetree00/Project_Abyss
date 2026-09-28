@@ -16,6 +16,7 @@ public readonly struct HitInfo
     public readonly bool             IsCritical;
     public readonly WeaponActionType ActionType;
     public readonly WeaponType       WeaponType;   // 무기별 손맛 프로필(WeaponFeelTable) 조회용. 미지정 시 None=Default.
+    public readonly bool             IsFinisher;   // 스킬의 마무리 일격 — 주는 쪽 연출 단계(막타)를 정한다(09-25)
 
     public HitInfo(
         GameObject attacker,
@@ -25,7 +26,8 @@ public readonly struct HitInfo
         float damage,
         bool isCritical,
         WeaponActionType actionType,
-        WeaponType weaponType = WeaponType.None)
+        WeaponType weaponType = WeaponType.None,
+        bool isFinisher = false)
     {
         Attacker        = attacker;
         Target          = target;
@@ -36,5 +38,6 @@ public readonly struct HitInfo
         IsCritical      = isCritical;
         ActionType      = actionType;
         WeaponType      = weaponType;
+        IsFinisher      = isFinisher;
     }
 }

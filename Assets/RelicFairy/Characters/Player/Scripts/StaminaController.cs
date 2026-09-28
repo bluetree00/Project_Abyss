@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 /// <summary>
@@ -10,6 +11,9 @@ public class StaminaController
 {
     private float _current;
     private float _regenDelayRemaining;   // 대시 직후 잠깐은 회복이 멈춘다
+
+    /// <summary>게이지를 돌려받았다(실제로 찬 양). 대시 게이지 뷰가 '돌아온 칸'을 번쩍이는 데 쓴다.</summary>
+    public event Action<float> Refunded;
     private bool  _initialized;
 
     /// <summary>현재 스태미너.</summary>
@@ -45,6 +49,21 @@ public class StaminaController
         _current             = Mathf.Max(0f, _current - amount);
         _regenDelayRemaining = Mathf.Max(0f, regenDelay);   // 대시 직후엔 잠깐 안 찬다
         return true;
+    }
+
+    /// <summary>
+    /// 게이지를 되돌려준다(저스트 회피 보상 등). 최대치를 넘지 않고, 걸려 있던 회복 지연도 푼다 —
+    /// 보상으로 돌려받은 직후에 회복까지 멈춰 있으면 '돌려받은' 느낌이 반감된다.
+    /// </summary>
+    public void Refund(float amount, float max)
+    {
+        if (!_initialized) ResetFull(max);
+        if (amount <= 0f) return;
+
+        float before         = _current;
+        _current             = Mathf.Min(max, _current + amount);
+        _regenDelayRemaining = 0f;
+        if (_current > before) Refunded?.Invoke(_current - before);
     }
 
     /// <summary>매 프레임 호출 — 대시 직후 짧은 지연이 끝나면 계속 회복.</summary>

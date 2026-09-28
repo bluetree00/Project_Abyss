@@ -113,6 +113,8 @@ public class RelicClassSO : ScriptableObject
     private string qSkillMainClipKey;
     [SerializeField, Tooltip("Q 입력 시 카메라 연출. 비우면 연출 생략")]
     private UltimateCinematicConfig qSkillCinematic;
+    [SerializeField, Tooltip("HUD Q 칸 아이콘(흰 선화). 비우면 HUD 폴백 아이콘")]
+    private Sprite qSkillIcon;
 
     [Header("스탯 (공통 CombatGirl 베이스 위에 가산)")]
     [SerializeField] private StatModifier[] stats;
@@ -137,6 +139,8 @@ public class RelicClassSO : ScriptableObject
     public StatModifier[] Stats => stats;
     public string QSkillClipKey => qSkillClipKey;
     public UltimateCinematicConfig QSkillCinematic => qSkillCinematic;
+    /// <summary>HUD Q 칸 아이콘. 비면 HUD가 폴백 아이콘을 쓴다.</summary>
+    public Sprite QSkillIcon => qSkillIcon;
     /// <summary>Q 단독 모션 상태(비우면 QSkill_01 폴백). 시퀀스(연타)와 별개 — 캐스트·마무리처럼 한 번 재생하는 모션.</summary>
     public string QSkillMainState => string.IsNullOrEmpty(qSkillMainState) ? DefaultQSkillState : qSkillMainState;
     public string QSkillMainClipKey => qSkillMainClipKey;

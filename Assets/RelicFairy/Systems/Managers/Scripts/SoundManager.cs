@@ -147,8 +147,9 @@ public sealed class SoundManager
 
     public void PlayEvent(string eventId)
     {
-        if (_eventTable == null || !_eventTable.TryGet(eventId, out var sfxKey, out var volume)) return;
-        PlayEffectAsync(sfxKey, volume).Forget();
+        if (_eventTable == null || !_eventTable.TryGet(eventId, out var sfxKey, out var volume, out var jitter)) return;
+        float pitch = jitter > 0f ? 1f + Random.Range(-jitter, jitter) : 1f;
+        PlayEffectAsync(sfxKey, volume, pitch).Forget();
     }
 
     public void Init()

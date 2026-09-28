@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 425912f2b874f3d449fd2640f67f50f2, type: 3}
+  m_Name: Lich_DarkRain_Bound
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichDarkRainPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 2
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: darkrain_bound
+  breakOverride: -1
+  patternCooldown: 25
+  chargeDuration: 1.5
+  rainDuration: 5
+  endDuration: 0.5
+  recoveryDuration: 0.4
+  dropsPerSecond: 6
+  dropWarn: 0.8
+  dropRadius: 1.5
+  damageMultiplier: 0.8
+  nearPlayerBias: 0.35
+  nearPlayerRadius: 8
+  safeCount: 4
+  safeRadius: 4.8
+  safeMoveInterval: 1.8
+  safeMoveCount: 2
+  safeMovePreview: 0.6
+  riseHeight: 5
+  cloudHeight: 16

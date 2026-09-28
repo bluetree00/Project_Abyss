@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t3_ice_congeal
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t3_ice_congeal
-  displayName: "\uB3D9\uACB0\uC758 \uB8EC"
+  displayName: "\uB9C9\uC544\uC11C\uB294 \uC5BC\uC74C\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 2

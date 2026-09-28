@@ -60,10 +60,23 @@ public enum BossConditionKey
     DK_IsEnraged = 20,  // Enrage 상태 (HP ≤ enrageHpThreshold, 공격속도/이동속도 증가)
     DK_IsPhase1  = 24,  // !DKBlackboard.IsPhase2 — Phase2 전환 전 (1페이즈 전용 조건)
 
-    // ── Lich (리치) 전용 ─────────────────────────────────────────
-    Lich_Phase1        = 21,  // HpAboveCondition(condPhase2HpThreshold) — 봉인 상태 (HP > 40%)
-    Lich_IsPhase2      = 22,  // LichBlackboard.IsPhase2 flag — 완전 해방 상태
-    Lich_Phase2Pending = 23,  // HP ≤ 40% && !IsPhase2 — 페이즈 전환 대기
+    // ── Lich (리치) 전용 — 페이지 키는 모드 키(Sealed/Nightmare)와 함께 써서 두 전투의 풀을 가른다 ──
+    Lich_Phase1        = 21,  // 1페이지 (첫 전환 전) — 두 모드 공통
+    Lich_IsPhase2      = 22,  // 2페이지 — 봉인기 P2′ 「사슬에 묶인 낫」 / 악몽기 P2 「대마법+낫」
+    Lich_Phase2Pending = 23,  // 1페이지 && HP ≤ 첫 임계 — 2페이지 전환 대기 (봉인기 T1 / 악몽기 T2)
+    Lich_Sealed        = 25,  // 봉인기 전투 (봉인된 리치)
+    Lich_Nightmare     = 26,  // 악몽기 전투 (해방된 리치)
+    Lich_Phase3        = 27,  // 3페이지 「영혼 복제」 (악몽기만)
+    Lich_Phase3Pending = 28,  // 2페이지 && HP ≤ 둘째 임계 — 3페이지 전환 대기 (T3 최후의 원)
+    Lich_FinalMagicPending = 29,  // 3페이지 && HP ≤ 최후의 대마법 임계 && 아직 안 막음 (F4 강제)
+
+    // ── 2페이지(해방) 공용 — 숲 · 화룡 · 기사 (BossPages, 09-28) ──
+    Page_1             = 40,  // 2페이지가 아님(봉인기 전투 전부 포함)
+    Page_2             = 41,  // 2페이지(악몽기 해방 페이지)
+    Page_TransitionDue = 42,  // 1페이지 체력이 다 깎임 — 전환 패턴 강제
+    Page_SignatureDue  = 43,  // 2페이지 체력 50% · 간판 아직 — 간판 패턴 강제
+    Page_Opener        = 44,  // 2페이지 개막 — 아직 2페이지 패턴을 안 씀(§9 구성: 목표를 보여 주는 패턴 먼저)
+    Page_Late          = 45,  // 2페이지 후반 — 간판을 쓴 뒤(연계기 · 쉬는 시간 −25%)
 }
 
 [System.Serializable]

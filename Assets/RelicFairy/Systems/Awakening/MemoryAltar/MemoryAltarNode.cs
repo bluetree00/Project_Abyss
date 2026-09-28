@@ -1,16 +1,22 @@
 using System.Collections.Generic;
 
-/// <summary>기억의 제단 갈래 — 추상어가 아니라 플레이어가 실제로 갖는 질문으로 묶는다(정본 §3).</summary>
+/// <summary>
+/// 기억의 제단 갈래 — <b>무엇이 넓어지는가</b>(시스템)로 묶는다. 이름만 보고 무엇이 열리는지 알 수 있어야 한다.
+/// <para>2026-09-16 재정렬 — 예전 갈래(출발·등장·존속·심연)는 질문으로 묶여 룬 해금이 두 갈래에 흩어져 있었다.
+/// 값(0~3)은 저장되지 않는다(노드 정의가 코드에 있다).</para>
+/// </summary>
 public enum AltarBranch
 {
-    /// <summary>Ⅰ 출발 — 무엇으로 시작하는가</summary>
-    Start,
-    /// <summary>Ⅱ 등장 — 무엇이 나올 수 있는가 (제단의 심장)</summary>
-    Appear,
-    /// <summary>Ⅲ 존속 — 얼마나 버틸 수 있는가</summary>
-    Endure,
-    /// <summary>Ⅳ 심연 — 얼마나 깊이 갈 수 있는가</summary>
-    Abyss,
+    /// <summary>룬 — 어떤 룬이 나오나</summary>
+    Rune,
+    /// <summary>서약 — 어떤 서약을 맺나</summary>
+    Covenant,
+    /// <summary>장비 — 무엇을 들고 가나</summary>
+    Gear,
+    /// <summary>여정 — 얼마나 멀리 가나</summary>
+    Journey,
+    /// <summary>원거리 — 무엇을 쏘나(석궁 + 시작 파츠 4종, 09-27 신설 — 장비 열이 12칸이 되어 화면에 안 들어갔다)</summary>
+    Ranged,
 }
 
 /// <summary>
@@ -67,7 +73,7 @@ public sealed class MemoryAltarNode
 }
 
 /// <summary>
-/// 기억의 제단이 파는 것 전량(21노드). 정본 §3 표를 그대로 옮긴 것.
+/// 기억의 제단이 파는 것 전량(26노드 · 갈래 5 — 룬 4 · 서약 4 · 장비 7 · 원거리 5 · 여정 6).
 /// <para><b>왜 CSV가 아니라 코드인가</b> — 차트로 빼면 CDN 스키마 변경이라 조율이 필요하다.
 /// 초기엔 정적 등록이 빠르다(<c>CovenantPalette</c> 선례). 정본 §10-6의 열린 결정.</para>
 /// </summary>
@@ -90,6 +96,7 @@ public static class MemoryAltarCatalog
         public const string RefineCount = "refineCount";  // 정제 누적
         public const string Clears      = "clears";       // 완주 누적
         public const string Kills       = "kills";        // 몬스터 처치 누적
+        public const string Covenants   = "covenants";    // 서약 맺은 수 누적(런 종료 시 그 런의 보유 수)
 
         // ── 기행(自發 난이도) — 완주 전에 자발적으로 어렵게 가는 사람을 위한 축 ──
         public const string NoPotionClear   = "noPotionClear";   // 포션 0개로 완주(0/1)
@@ -99,17 +106,26 @@ public static class MemoryAltarCatalog
         /// <summary>각성 6계열 정수 환급을 이미 수행했는가(1회성 마이그레이션 가드).</summary>
         public const string AwakeningRefunded = "awakeningRefunded";
 
+        /// <summary>무형검을 한 번 받았는가(0/1) — 베이스캠프 재설계: 검은 처음 한 번만 소환의 방에서 받고,
+        /// 이후엔 베이스캠프가 슬롯0에 자동으로 쥐여 준다. 업적 진척이 아니므로 <see cref="All"/>에 넣지 않는다.</summary>
+        public const string SwordAwakened = "swordAwakened";
+
         /// <summary>업적 진척으로 흘려보낼 기록 키 전량. 내부 가드(AwakeningRefunded)는 제외한다.</summary>
         public static readonly string[] All =
         {
             MaxDepth, MaxChapter, EliteKills, BossKills, Kills,
-            RoomClears, MaxEnhance, ShopUses, RefineCount, Clears,
+            RoomClears, MaxEnhance, ShopUses, RefineCount, Clears, Covenants,
             NoPotionClear, NoSpecialClear, FlawlessChapter,
         };
     }
 
     // ── 노드 id ─────────────────────────────────────────
     public const string WeaponCrossbow = "weapon_crossbow";
+    // 시작 원거리 파츠 — 분열의 시위만 처음부터 열려 있고 나머지 넷은 여기서 연다(09-27 사용자 결정).
+    public const string PartPierce     = "part_pierce_unlock";
+    public const string PartPower      = "part_power_unlock";
+    public const string PartHoming     = "part_homing_unlock";
+    public const string PartExplode    = "part_explode_unlock";
     // ⚠️ 카타나·대검·활은 <b>노드가 아니다.</b>
     //   · 활  = 기본 지급 원거리 무기.
     //   · 카타나·대검 = 무형검(T0_Nameless)의 <b>런 중 진화 분기</b>(NamelessEvolution). 매 런 무료로 열려 있다.
@@ -129,6 +145,11 @@ public static class MemoryAltarCatalog
     public const string CorePartsAll   = "core_parts_all";
     public const string WeaponEvolve   = "weapon_evolve";
 
+    public const string CovenantParts1 = "covenant_parts_1";
+    public const string CovenantSlot   = "covenant_slot";
+    public const string CovenantParts2 = "covenant_parts_2";
+    public const string CovenantParts3 = "covenant_parts_3";
+
     public const string Revive         = "revive_once";
     public const string MaxHpUp        = "max_hp_up";
 
@@ -138,61 +159,97 @@ public static class MemoryAltarCatalog
 
     private static readonly MemoryAltarNode[] Nodes =
     {
-        // ── Ⅰ 출발 (5) — 무엇으로 시작하는가 ──────────────
-        // 이 게임에서 <b>런 시작 시점에 정해지는 것</b>은 원거리 무기·인장·계승뿐이다.
-        // 주무기는 항상 무형검이고(시나리오), 그 형(形)은 런 안에서 재련소가 벼린다.
+        // 갈래 = <b>무엇이 넓어지는가</b>(시스템)다. 예전 갈래(출발·등장·존속·심연)는 플레이어의 질문으로 묶었지만
+        // 이름만 보고는 무엇이 열리는지 알 수 없었다 — 룬은 「출발」과 「등장」에 흩어져 있었다(2026-09-16 재정렬).
         //
         // ★ 순서 = 사슬이다. 위에서 아래로 <b>값과 조건 난이도가 함께 오른다</b>.
-        //   예전 배열(2400·2400·2000·2000·6000)은 값이 오르내려, 화면에서 눈이 가장 먼저 닿는 열이
-        //   하필 가장 무작위해 보였다. 갈래 합계(14,800)는 그대로라 경제 시뮬은 다시 돌리지 않아도 된다.
-        new(SigilMerchant,  AltarBranch.Start, "상인의 인장",     "상점 가격  -15%",              1400,
-            Rec.ShopUses, 5, "상점 5회 이용", 1000),
-        new(SigilSmith,     AltarBranch.Start, "대장장이의 인장", "강화 성공률  +8%p",            2000,
-            Rec.MaxEnhance, 6, "무기 +6 도달", 1400),
-        new(WeaponCrossbow, AltarBranch.Start, "석궁",           "시작 원거리 무기  1종 → 2종",   2600,
-            Rec.EliteKills, 30, "정예 30회 처치", 1700),
-        new(PartsInherit,   AltarBranch.Start, "파츠 영구 계승",  "다음 런 계승  0개 → 1개",       3600,
-            Rec.MaxChapter, 3, "3챕터 도달", 2400),
-        new(SigilAscetic,   AltarBranch.Start, "고행자의 인장",   "보상 -1개 · 수급 ×1.6 (토글)",  5200,
-            Rec.MaxDepth, 6, "깊이 6 클리어", 2600),
+        //   순서는 확장 페이즈(A 정착 1~8런 · B 확장 9~16 · C 심화 17~22 · D 완성 23~34)를 따른다.
+        //   가격은 정수 수급 곡선(런당 500 → 850 → 1,050 → 1,400 → 1,500)에 맞춰 시뮬레이션으로 정했다 —
+        //   할인가 합 39,450 · 심연 입장 17런 · 챕터 4 개방 23~24런 · 전부 해금 약 38런
+        //   (설계서 「시스템별 확장설계」 · 「해금체계 점진개방」).
+        //   [09-28] 원거리 갈래(할인가 합 4,420)를 더하면 같은 모델로 전부 해금 38 → 41런(챕터 4 21런 · 심연 24런 — 09-17 이야기 순서 반영).
+        //   정수 수급 +10%로 38런으로 되돌렸다(09-28 사용자 결정 — EssenceTracker 처치 9 · 방 16 · 보스 132, 설계서 §2-1).
+        //   속성 존 5·6번째(다음 작업)가 룬 갈래에 들어오면 할인가 합은 약 43,250, 전부 해금은 약 40런이 된다.
 
-        // ── Ⅱ 등장 (8) ★ 제단의 심장 ─────────────────────
-        // 전부 "풀에 들어오되 매 런 다시 뽑아야 하는 것"이다 — 확률적이라 열려도 안 나올 수 있다.
-        // ★ 이 노드가 <b>온램프</b>다 — 첫 챕터를 깨면 약 280정수가 들어오므로 400은 그 다음 런에 닿는다.
-        // (정본의 「카타나 300」이 맡던 자리다. 카타나는 무형검 진화 분기라 노드에서 빠졌고,
-        //  그 자리를 비워두면 최저가가 1,000이 되어 첫 해금이 8런째로 밀린다 — 시뮬레이션 실측.)
-        new(RuneChoice4,    AltarBranch.Appear, "룬 4지선다",        "룬 선택  3개 → 4개",          400,
-            Rec.RoomClears, 50, "방 50회 클리어", 280),
-        new(PartsDraft4,    AltarBranch.Appear, "파츠 드래프트 4",   "보스 파츠 선택  3개 → 4개",   1200,
-            Rec.BossKills, 3, "보스 3회 처치", 800),
-        new(RefineQuality,  AltarBranch.Appear, "정제 품질",         "존핵 Epic 확률  +12%p",              1800,
-            Rec.RefineCount, 30, "정제 30회", 1200),
-        new(RuneEpic,       AltarBranch.Appear, "Epic 룬 개방",      "드랍 최고 등급  Rare → Epic",   4000,
-            Rec.MaxDepth, 1, "깊이 1 클리어", 2000),
-        new(CorePartsTier1, AltarBranch.Appear, "코어 파츠 1차",     "코어 파츠 후보  1종 → 2종",   5200,
-            Rec.MaxDepth, 2, "깊이 2 클리어", 2600),
-        new(RuneLegendary,  AltarBranch.Appear, "Legendary 룬 개방", "드랍 최고 등급  Epic → Legendary", 6400,
-            Rec.MaxDepth, 3, "깊이 3 클리어", 3200),
-        new(CorePartsAll,   AltarBranch.Appear, "코어 파츠 전체",    "코어 파츠 후보  2종 → 3종",       7600,
-            Rec.MaxDepth, 4, "깊이 4 클리어", 3800),
+        // ── 룬 — 어떤 룬이 나오나 ─────────────────────────
+        new(RuneChoice4,    AltarBranch.Rune, "룬 선택지 +1",   "룬을 고를 때  3장 → 4장",          700,
+            Rec.RoomClears, 50, "방 50회 클리어", 450),
+        new(RuneEpic,       AltarBranch.Rune, "영웅 룬 등장",   "룬 최고 등급  희귀 → 영웅",        3000,
+            Rec.Clears, 1, "첫 완주", 1900),
+        // 영웅 룬 <b>뒤</b>여야 한다 — 영웅이 잠겨 있으면 정제소도 영웅을 낼 수 없어(등급 제한) 사 봐야 효과가 없다.
+        new(RefineQuality,  AltarBranch.Rune, "정제 등급 상승", "정제소 영웅 확률  +12%p",          3200,
+            Rec.RefineCount, 30, "정제 30회", 2000),
+        new(RuneLegendary,  AltarBranch.Rune, "전설 룬 등장",   "룬 최고 등급  영웅 → 전설",        4500,
+            Rec.MaxDepth, 2, "심연 깊이 2 도달", 2800),
+
+        // ── 서약 — 어떤 서약을 맺나 ───────────────────────
+        // 원인·효과 카드는 네 단계로 열린다(<see cref="CovenantPalette"/>의 개방 단계). 처음 5·6은 서약이
+        // 무엇인지 가르치는 카드만 — 다른 서약과 맞물려야 빛나는 것(기폭·수확·정지·처형)은 뒤로 미룬다.
+        new(CovenantParts1, AltarBranch.Covenant, "서약 카드 +5", "원인 5 → 8종 · 효과 7 → 9종",   2100,
+            Rec.Covenants, 5, "서약 5번 맺기", 1300),
+        new(CovenantSlot,   AltarBranch.Covenant, "서약 칸 +1",   "한 런에 맺는 서약  3 → 4개",    2700,
+            Rec.Covenants, 15, "서약 15번 맺기", 1700),
+        new(CovenantParts2, AltarBranch.Covenant, "서약 카드 +4", "원인 8 → 9종 · 효과 9 → 12종",  3000,
+            Rec.Clears, 1, "첫 완주", 1800),
+        new(CovenantParts3, AltarBranch.Covenant, "서약 카드 +3", "효과 12 → 15종",                4000,
+            Rec.MaxDepth, 1, "심연 깊이 1 도달", 2500),
+
+        // ── 장비 — 무엇을 들고 가나 ───────────────────────
+        // 런 시작에 들고 나가는 것(원거리 무기·인장·계승)과 보스가 주는 유물 파츠, 재련소가 벼리는 전설 무기.
+        // 주무기는 항상 무형검이고(시나리오), 카타나·대검은 런 안의 진화 분기라 노드가 아니다.
+        new(SigilMerchant,  AltarBranch.Gear, "상인의 인장",        "상점 가격  -15%",                 1400,
+            Rec.ShopUses, 5, "상점 5회 이용", 900),
+        new(SigilSmith,     AltarBranch.Gear, "대장장이의 인장",    "재련 강화 성공률  +8%p",          1900,
+            Rec.MaxEnhance, 6, "무기 +6 도달", 1200),
+        // 09-27 감사: 유물마다 기능 파츠가 4개라 둘째 드래프트·이어받기 뒤엔 3장뿐이다 — 설명이 그 한계를 말한다.
+        new(PartsDraft4,    AltarBranch.Gear, "보스 파츠 선택지 +1", "보스 파츠를 고를 때  3장 → 4장 (남은 파츠가 있을 때)", 2200,
+            Rec.BossKills, 3, "보스 3회 처치", 1400),
+        new(CorePartsTier1, AltarBranch.Gear, "코어 파츠 2종",      "코어 파츠 후보  1종 → 2종",       3000,
+            Rec.MaxChapter, 3, "챕터 3 도달", 1900),
         // 승급 자체는 해금 없이도 된다(강화 MAX면 가능) — 해금이 넓히는 것은 <b>후보의 수</b>다.
         // 미해금이면 엑스칼리버 하나로 고정되고, 열면 갈라틴·아론다이트까지 셋 중에 고른다.
-        new(WeaponEvolve,   AltarBranch.Appear, "전설 3종 개방",     "승급 전설 후보  1종 → 3종", 8000,
-            Rec.MaxDepth, 5, "깊이 5 클리어", 4000),
+        new(WeaponEvolve,   AltarBranch.Gear, "전설 무기 3종",      "승급할 전설 무기  1종 → 3종",     3800,
+            Rec.MaxDepth, 1, "심연 깊이 1 도달", 2400),
+        // 09-27 감사: 선행 파츠가 필요한 코어(랜슬롯 「피의 만찬」 ← 출혈 낙인)는 그 파츠를 가진 뒤에야 후보에 든다.
+        new(CorePartsAll,   AltarBranch.Gear, "코어 파츠 3종",      "코어 파츠 후보  2종 → 3종 (선행 파츠가 필요한 코어는 그 뒤에)", 4200,
+            Rec.MaxDepth, 2, "심연 깊이 2 도달", 2600),
+        new(PartsInherit,   AltarBranch.Gear, "파츠 이어받기",      "다음 런에 파츠 1개를 가져간다",   4800,
+            Rec.MaxDepth, 4, "심연 깊이 4 도달", 3000),
 
-        // ── Ⅲ 존속 (2) — 조건 없음 ───────────────────────
-        // 벽을 넘게 해주는 것이라 무조건 열려야 한다. 영구 공격력은 0이다.
-        new(Revive,  AltarBranch.Endure, "부활 1회",      "런당 부활  0회 → 1회",        1200),
-        new(MaxHpUp, AltarBranch.Endure, "최대 체력 +76", "최대 체력  +76",    1500),
+        // ── 원거리 — 무엇을 쏘나 (09-27 신설) ─────────────
+        // 석궁(장비에서 이동) + 시작 파츠 4종. 파츠는 베이스캠프 파츠 작업대에서 매 런 하나를 Lv1로 들고 나간다 —
+        // 분열의 시위는 기본으로 열려 있다(사용자 결정). 사슬 순서 = 값·조건 오름차순.
+        // [09-28 수급 시뮬] 확장 페이즈마다 하나씩: 관통 1런 · 석궁 3런(A 정착의 「시작 선택지」 — 확장설계 §1) · 거력 8런 ·
+        //   추적 11런(B) · 작렬 18런(C, 첫 완주). 예전 값(관통·거력·석궁 정예30·추적 정예15·작렬 보스2)은 석궁·추적·작렬이 9~13런에
+        //   몰려 B의 서약 카드를 15런까지 밀었고, 조건이 사슬 순서와 거꾸로였다(석궁 30 뒤에 추적 15). 설계서 §2-1.
+        new(PartPierce,     AltarBranch.Ranged, "관통의 촉",        "시작 파츠  +관통",                500,
+            Rec.RoomClears, 30, "방 30회 클리어", 320),
+        new(WeaponCrossbow, AltarBranch.Ranged, "석궁",             "시작 원거리 무기  활 → 활·석궁",  900,
+            Rec.EliteKills, 5, "정예 5회 처치", 600),
+        new(PartPower,      AltarBranch.Ranged, "거력의 축",        "시작 파츠  +거력",                1400,
+            Rec.EliteKills, 15, "정예 15회 처치", 900),
+        new(PartHoming,     AltarBranch.Ranged, "추적의 깃",        "시작 파츠  +추적",                1700,
+            Rec.EliteKills, 30, "정예 30회 처치", 1100),
+        new(PartExplode,    AltarBranch.Ranged, "작렬의 탄두",      "시작 파츠  +작렬",                2400,
+            Rec.Clears, 1, "첫 완주", 1500),
 
-        // ── Ⅳ 심연 (3) ──────────────────────────────────
-        // 앞의 둘만 조건이 <b>자물쇠</b>다 — 논리적 선후가 있어 데드락이 아니다(정본 §2-3).
-        new(AbyssDepth,  AltarBranch.Abyss, "심연 깊이 개방", "완주 후  다회차 개방", 1000,
-            Rec.Clears, 1, "첫 완주", 1000, conditionRequired: true),
-        new(Chapter4,    AltarBranch.Abyss, "챕터 4 개방",   "도달 가능 챕터  3 → 4",         1800,
-            Rec.MaxDepth, 1, "깊이 1 도달", 1800, conditionRequired: true),
-        new(DepthReward, AltarBranch.Abyss, "깊이 보상 배율", "정수 수급  깊이당 +15%",   3000,
-            Rec.MaxDepth, 2, "깊이 2 클리어", 2200),
+        // ── 여정 — 얼마나 멀리 가나 ───────────────────────
+        // 버티는 것(부활·체력)이 먼저, 더 깊이 가는 것(심연·챕터 4)이 뒤다. 사슬이라 심연 앞에는
+        // 싸고 이른 생존 노드만 둔다 — 진행 관문 앞에 비싼 칸이 끼면 챕터 4가 몇 런씩 밀린다.
+        // 부활·체력은 조건 없음: 벽을 넘게 해주는 것이라 무조건 열려야 한다. 영구 공격력은 0이다.
+        new(Revive,       AltarBranch.Journey, "부활 1회",       "쓰러져도 한 번 다시 일어선다",   1000),
+        new(MaxHpUp,      AltarBranch.Journey, "최대 체력 +76",  "최대 체력  +76",                 1300),
+        // 이 둘만 조건이 <b>자물쇠</b>다 — 논리적 선후가 있어 데드락이 아니다(정본 §2-3).
+        // [09-17 재배치] 이야기 순서와 맞춘다 — 세 보스를 봉인(첫 완주)하면 성소의 문(챕터 4)이 열리고,
+        // 심연(순환)은 악몽기 리치를 쓰러뜨린 엔딩 뒤에 열린다. (기획 「최종장이후_사이클시나리오」 v2 §3-2)
+        new(Chapter4,     AltarBranch.Journey, "챕터 4 개방",    "갈 수 있는 챕터  3 → 4",         1800,
+            Rec.Clears, 1, "첫 완주", 1800, conditionRequired: true),
+        new(AbyssDepth,   AltarBranch.Journey, "심연 입장",      "엔딩 뒤 — 더 깊은 회차에 도전",  1000,
+            StoryProgress.Rec.Ending, 1, "성소의 주인을 완전히 쓰러뜨리기", 1000, conditionRequired: true),
+        new(DepthReward,  AltarBranch.Journey, "깊이 보상",      "심연 깊이마다 정수  +15%",       4200,
+            Rec.MaxDepth, 2, "심연 깊이 2 도달", 2600),
+        new(SigilAscetic, AltarBranch.Journey, "고행자의 인장",  "보상 선택지 -1 · 정수 ×1.6 (켜고 끄기)", 5100,
+            Rec.MaxDepth, 6, "심연 깊이 6 도달", 3200),
     };
 
     private static Dictionary<string, MemoryAltarNode> _byId;
@@ -252,10 +309,22 @@ public static class MemoryAltarCatalog
     /// </summary>
     public static string BranchLabel(AltarBranch branch) => branch switch
     {
-        AltarBranch.Start  => "출발",
-        AltarBranch.Appear => "등장",
-        AltarBranch.Endure => "존속",
-        AltarBranch.Abyss  => "심연",
-        _                  => "",
+        AltarBranch.Rune     => "룬",
+        AltarBranch.Covenant => "서약",
+        AltarBranch.Gear     => "장비",
+        AltarBranch.Journey  => "여정",
+        AltarBranch.Ranged   => "원거리",
+        _                    => "",
+    };
+
+    /// <summary>갈래 머리의 한 줄 물음 — 이 열에서 무엇이 넓어지는지를 말한다.</summary>
+    public static string BranchQuestion(AltarBranch branch) => branch switch
+    {
+        AltarBranch.Rune     => "어떤 룬이 나오나",
+        AltarBranch.Covenant => "어떤 서약을 맺나",
+        AltarBranch.Gear     => "무엇을 들고 가나",
+        AltarBranch.Journey  => "얼마나 멀리 가나",
+        AltarBranch.Ranged   => "무엇을 쏘나",
+        _                    => "",
     };
 }

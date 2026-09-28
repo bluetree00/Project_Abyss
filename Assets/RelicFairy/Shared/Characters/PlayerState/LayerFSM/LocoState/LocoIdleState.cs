@@ -1,17 +1,8 @@
 using UnityEngine;
 
-public class LocoIdleState : ILayerState<LocoState>
+public class LocoIdleState : LayerStateBase<LocoState>
 {
-    private PlayerController _controller;
-    private ILayerStateChanger<LocoState> _stateChanger;
-
-    public void Init(PlayerController c, ILayerStateChanger<LocoState> changer)
-    {
-        _controller = c;
-        _stateChanger = changer;
-    }
-
-    public void Enter()
+    public override void Enter()
     {
         // 공격/스킬 중이면 CrossFade 생략 (공격 애니메이션 덮어쓰기 방지)
         // 회피 종료처럼 자세 차이가 큰 복귀는 RequestLocoBlend로 더 긴 블렌드를 예약해 스냅을 없앤다.
@@ -24,7 +15,7 @@ public class LocoIdleState : ILayerState<LocoState>
         _controller.ClearRunAfterDash();
     }
 
-    public void Update()
+    public override void Update()
     {
         var dir = _controller.MoveDirection * _controller.MoveScale;
 
@@ -49,8 +40,6 @@ public class LocoIdleState : ILayerState<LocoState>
             _stateChanger.Change(LocoState.Move);
         }
     }
-
-    public void Exit() { }
 
     // 정지 방향은 빠르게 따라붙어야 발이 안 끌린다 → 기본 damp 0.08.
     static void SetSpeedParam(Animator anim, float target01, float damp = 0.08f)

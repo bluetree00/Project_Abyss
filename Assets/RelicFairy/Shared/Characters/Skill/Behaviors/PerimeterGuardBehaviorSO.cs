@@ -146,7 +146,7 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
                     if (_hitByExpand.Contains(col.gameObject)) continue;
                     if (col.TryGetComponent<IDamageable>(out var d))
                     {
-                        ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f);
+                        ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f, _expandWave >= MaxExpandWaves);   // 마지막 확산파가 막타
                         _hitByExpand.Add(col.gameObject);
 
                         SpawnEffect(ctx, _data.hitEffectKey,
@@ -188,7 +188,7 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
                 if (_hitPerCast.Contains(col.gameObject)) continue;
                 if (col.TryGetComponent<IDamageable>(out var d))
                 {
-                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier);
+                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier, isLastWave);
                     _hitPerCast.Add(col.gameObject);
 
                     SpawnEffect(ctx, _data.hitEffectKey,
@@ -249,7 +249,8 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
                 }
             }
 
-            ctx.Animator.Play(animName, 0, 0f);
+            // 시전마다 판정이 바로 나간다 — 회전 베기가 가장 빠른 순간(1.27초)을 지금에 맞춰 중간부터 재생(09-25).
+            SkillAnimSync.PlayToContact(ctx.Animator, animName, 0f);
         }
 
         private static async void SpawnEffect(SkillExecutionContext ctx, string key,

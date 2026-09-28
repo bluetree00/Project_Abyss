@@ -41,7 +41,7 @@ public class ClearRewardTrigger : MonoBehaviour
     private int  _choiceRounds = 1;  // 3지선다를 몇 번 반복할지(챌린지 다중 보상)
 
     /// <summary>선택을 넘겼을 때 주는 원석 수(밸런스 값).</summary>
-    private const int SkipOreReward = 1;
+    public const int SkipOreReward = 1;   // 룬 선택 팝업이 넘기기 버튼 옆에 같은 값을 표기한다
 
     private GameObject _promptGO;
     private GameObject _worldIndicatorGO;
@@ -238,9 +238,11 @@ public class ClearRewardTrigger : MonoBehaviour
     }
 
     /// <summary>
-    /// 각 보상 아이템을 UI_ItemAcquisitionPopup으로 순서대로 표시.
-    /// [그리드 열기] → 보관함 추가, [거부] → 폐기.
-    /// Popup 로드 실패 시 자동으로 보관함에 추가.
+    /// 보상을 순서대로 표시한다. 3지선다든 단일 지급이든 <b>같은 화면</b>(룬 선택 팝업)을 쓴다.
+    ///
+    /// 예전에는 단일 지급만 UI_ItemAcquisitionPopup(납품 아트 없는 레거시 판)을 탔다 —
+    /// 같은 룬이 방에 따라 전혀 다른 화면으로 나왔다(09-21 사용자 지적). 후보 1장짜리
+    /// 선택 팝업으로 보내면 화면이 하나로 합쳐지고, 넘기기 대가(원석)도 규칙이 같아진다.
     /// </summary>
     private async UniTask GiveAllRewardsWithPopupAsync(System.Threading.CancellationToken ct)
     {
@@ -252,31 +254,14 @@ public class ClearRewardTrigger : MonoBehaviour
             return;
         }
 
-        foreach (var (data, _) in _rewards)
+        foreach (var (data, so) in _rewards)
         {
             if (data == null) continue;
 
-            _run.EffectManager?.OnItemPickup(data);
-
-            // 팝업 표시 — 실패하면 자동 추가
-            var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_ItemAcquisitionPopup>();
-            if (popup == null)
-            {
-                // 보관함이 가득 차면 AddToStaging이 false를 돌려준다. 반환값을 버리면 아이템이
-                // 조용히 사라진다(프로젝트 규약 — 팝업 경로는 이미 같은 이유로 실패를 처리한다).
-                if (!_run.ItemInventory.AddToStaging(data))
-                    ItemEffectVfxHelper.ShowNotice(
-                        $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.MaxStagingCapacity}칸) — {data.displayName} 지급 실패");
-                else
-                    Debug.Log($"[ClearRewardTrigger] 팝업 로드 실패 — 자동 추가: {data.displayName}");
-                continue;
-            }
-
-            popup.Setup(data, _run.ItemInventory);
-
-            // 버튼 클릭 즉시 resolve — 0.14s 닫기 애니메이션을 기다리지 않는다
-            await popup.WaitForInteractionAsync(ct);
-
+            // 후보 1장 = 선택의 여지가 없는 지급. 확장 자리(잠긴 칸)는 3지선다에만 의미가 있으므로
+            // 끈다 — 고를 게 없는 화면에 "해금하면 칸이 는다"를 그리면 거짓 약속이 된다.
+            await ShowOneRuneChoiceAsync(
+                new List<(RuntimeItemData data, ItemSO so)> { (data, so) }, ct, offerLockedSlots: false);
         }
     }
 
@@ -306,8 +291,12 @@ public class ClearRewardTrigger : MonoBehaviour
     /// 3지선다 1회. 넘기면 원석으로 환원한다.
     /// 팝업 로드 실패 시 첫 후보를 자동 지급해 보상이 증발하지 않게 한다.
     /// </summary>
+    /// <param name="offerLockedSlots">
+    /// 해금하면 열릴 빈 자리를 함께 그릴지. 단일 지급 경로는 false — 늘어날 선택지가 애초에 없다.
+    /// </param>
     private async UniTask ShowOneRuneChoiceAsync(
-        List<(RuntimeItemData data, ItemSO so)> candidates, System.Threading.CancellationToken ct)
+        List<(RuntimeItemData data, ItemSO so)> candidates, System.Threading.CancellationToken ct,
+        bool offerLockedSlots = true)
     {
         if (candidates == null || candidates.Count == 0) return;
 
@@ -330,7 +319,7 @@ public class ClearRewardTrigger : MonoBehaviour
         var interactionTask = popup.WaitForInteractionAsync(ct);
         // 해금하면 열릴 자리를 빈 칸으로 미리 보여준다 — 해금 뒤 "그 자리가 채워지는" 것으로 읽힌다.
         popup.Setup(candidates, _run.ItemInventory,
-                    MemoryAltarService.RuneLockedSlots(candidates.Count));
+                    offerLockedSlots ? MemoryAltarService.RuneLockedSlots(candidates.Count) : 0);
         await interactionTask;
 
         if (popup.Skipped)

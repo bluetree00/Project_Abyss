@@ -15,6 +15,10 @@ MonoBehaviour:
   skillName: "\uC8FC\uBCC0\uACBD\uACC4"
   description: "\uC804\uBC29 2m \uC8FC\uBCC0\uC758 \uC801\uC744 \uC6D0\uD615\uC73C\uB85C
     \uBCA4\uB2E4."
-  icon: {fileID: 21300000, guid: 48fa0a512f0e58144ab04be80d7e4816, type: 3}
+  icon: {fileID: 21300000, guid: 074b47eca8584f64c86d03e3401472c9, type: 3}
+  iconTier2: {fileID: 21300000, guid: 7fdd86690d799ca4d866b16500a429f4, type: 3}
+  iconTier3: {fileID: 21300000, guid: beb989754d28f3e48954bb5e2d812cae, type: 3}
+  _tier2Change: "2\uC5F0\uC18D \uC2DC\uC804"
+  _tier3Change: "3\uC5F0\uC18D\xB7\uAC80\uAE30 \uD655\uC7A5"
   cooldown: 5
   behavior: {fileID: 11400000, guid: a69d11a528097b04da4eaacce890874e, type: 2}

@@ -11,6 +11,21 @@ using UnityEngine.UI;
 public class MonsterHPBar : MonoBehaviour
 {
     // ─────────────────────────────────────────────────────────────
+    // Constants — 09-27 2차(사용자: 「깔끔하고 보기 좋게」): 이름판을 없애고 가는 바 + 그림자 이름만 남긴다.
+    //   1차의 둥근 이름판(청동 테두리)은 몬스터가 모이면 판끼리 겹쳐 상자 더미로 읽혔다.
+    // ─────────────────────────────────────────────────────────────
+
+    private const float FadeInSec    = 0.18f;
+    private const float FlashSec     = 0.16f;
+    private const float BarRadius    = 2f;     // 바 높이 7 — 둥글기를 크게 주면 채움(사각) 끝과 어긋난다
+
+    private static readonly Color OutlineColor = new(0f, 0f, 0f, 0.80f);          // 1px 윤곽 — 밝은 바닥에서도 바가 떠 보이게
+    private static readonly Color TrackColor   = new(0.10f, 0.09f, 0.12f, 0.72f);  // 빈 홈 — 살짝 비친다
+    private static readonly Color GlossColor   = new(1f, 1f, 1f, 0.08f);           // 채움 윗면 광택(채운 만큼만) — 선형 색공간이라 0.18은 분홍으로 떴다
+    private static readonly Color NameInk      = new(0.93f, 0.91f, 0.87f, 0.95f);
+    private static readonly Color FlashColor   = new(1f, 0.90f, 0.82f, 1f);
+
+    // ─────────────────────────────────────────────────────────────
     // SerializeField
     // ─────────────────────────────────────────────────────────────
 
@@ -67,6 +82,12 @@ public class MonsterHPBar : MonoBehaviour
 
     private TMPro.TMP_Text _subLabel;
 
+    private bool          _styled;
+    private Image         _gloss;
+    private CanvasGroup   _group;
+    private float         _fadeT = 1f;
+    private float         _flash;
+
     // 디버프 아이콘 행 — 프리팹에 앵커가 없어 _subLabel/_nameLabel과 같은 절차 생성 패턴으로 만든다.
     private sealed class StatusCell
     {
@@ -102,6 +123,11 @@ public class MonsterHPBar : MonoBehaviour
     {
         if (_monster == null) return;
 
+        if (_fadeT < 1f && _group != null)
+        {
+            _fadeT = Mathf.Min(1f, _fadeT + Time.unscaledDeltaTime / FadeInSec);
+            _group.alpha = _fadeT;
+        }
         UpdateHpAnimation();
         UpdatePosition();
     }
@@ -136,7 +162,12 @@ public class MonsterHPBar : MonoBehaviour
 
         if (_subLabel != null) _subLabel.text = string.Empty;
 
+        EnsureStyle();
         EnsureNameLabel();
+        // 등장 — 머리 위에 툭 나타나지 않고 짧게 번진다
+        _fadeT = 0f;
+        _flash = 0f;
+        if (_group != null) _group.alpha = 0f;
         gameObject.SetActive(true);
     }
 
@@ -164,22 +195,16 @@ public class MonsterHPBar : MonoBehaviour
         _subLabel.gameObject.SetActive(!string.IsNullOrEmpty(text));
     }
 
-    /// <summary>몬스터 이름을 체력바 위 라벨에 표시. 검정 테두리로 가독성 확보.</summary>
-    public void SetMonsterName(string monsterName)
-    {
-        EnsureNameLabel();
-        if (_nameLabel == null) return;
-        _nameLabel.text = monsterName ?? string.Empty;
-        TMPOutlineHelper.ApplyDefault(_nameLabel);
-    }
+    /// <summary>몬스터 이름을 체력바 위 라벨에 표시.</summary>
+    public void SetMonsterName(string monsterName) => SetMonsterInfo(monsterName);
 
-    /// <summary>몬스터 이름을 체력바 라벨에 표시.</summary>
+    /// <summary>몬스터 이름을 체력바 위 라벨에 표시. 빈 이름이면 바만 남는다.</summary>
     public void SetMonsterInfo(string monsterName)
     {
         EnsureNameLabel();
         if (_nameLabel == null) return;
         _nameLabel.text = monsterName ?? string.Empty;
-        TMPOutlineHelper.ApplyDefault(_nameLabel);
+        TMPOutlineHelper.ApplySoftShadow(_nameLabel);
     }
 
     /// <summary>
@@ -243,6 +268,7 @@ public class MonsterHPBar : MonoBehaviour
             _ghostRatio  = _displayRatio;
             _ghostTimer  = _ghostDelay;
             _ghostActive = true;
+            _flash       = 1f;   // 맞은 순간 채움이 잠깐 밝아진다
         }
         _targetRatio = newRatio;
     }
@@ -254,6 +280,7 @@ public class MonsterHPBar : MonoBehaviour
     private void UpdateHpAnimation()
     {
         float dt = Time.deltaTime;
+        if (_flash > 0f) _flash = Mathf.Max(0f, _flash - Time.unscaledDeltaTime / FlashSec);
         _displayRatio = Mathf.MoveTowards(_displayRatio, _targetRatio, _hpLerpSpeed * dt);
 
         if (_ghostActive)
@@ -282,7 +309,8 @@ public class MonsterHPBar : MonoBehaviour
     {
         if (_hpFill == null) return;
         _hpFill.fillAmount = ratio;
-        _hpFill.color = _hpColor;
+        _hpFill.color = _flash > 0f ? Color.Lerp(_hpColor, FlashColor, _flash * 0.65f) : _hpColor;
+        if (_gloss != null) _gloss.fillAmount = ratio;
     }
 
     private void ApplyGhostFill(float ratio)
@@ -420,12 +448,68 @@ public class MonsterHPBar : MonoBehaviour
 
         _nameLabel = go.AddComponent<TMPro.TextMeshProUGUI>();
         _nameLabel.alignment          = TMPro.TextAlignmentOptions.Center;
-        _nameLabel.color              = Color.white;
-        _nameLabel.fontStyle          = TMPro.FontStyles.Bold;
+        _nameLabel.color              = NameInk;
+        _nameLabel.fontStyle          = TMPro.FontStyles.Normal;   // 기본 폰트(DNFForgedBlade Bold)가 이미 굵다 — 가짜 굵게를 더하면 뭉갠다
+        _nameLabel.characterSpacing   = 0.5f;
         _nameLabel.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
         _nameLabel.overflowMode       = TMPro.TextOverflowModes.Overflow;
         _nameLabel.raycastTarget      = false;
         _nameLabel.fontSize           = _nameLabelFontSize;
+    }
+
+    /// <summary>
+    /// 바 윤곽·광택·페이드 그룹 — 프리팹에 없는 것을 한 번만 붙인다(풀 재사용 시 다시 안 짓는다).
+    /// 바는 검은 1px 윤곽 안의 반투명 홈, 채움 위쪽 절반에 옅은 광택. 이름 뒤에는 판을 깔지 않는다(그림자만).
+    /// </summary>
+    private void EnsureStyle()
+    {
+        if (_styled) return;
+        _styled = true;
+
+        if (!TryGetComponent(out _group)) _group = gameObject.AddComponent<CanvasGroup>();
+        _group.blocksRaycasts = false;
+        _group.interactable   = false;
+
+        if (_barRoot == null) return;
+
+        var bar  = UIProceduralSprites.RoundedRect(radius: BarRadius, feather: 1f, size: 32);
+        // 채움·잔상·광택은 곧은 막대 — 프리팹 채움 그림은 양끝이 가늘어져 가득 차도 홈 끝에 닿지 않았다(09-27 실측).
+        // Filled는 스프라이트가 있어야 채운 만큼만 그린다(없으면 전체를 덮는다).
+        var flat = UIProceduralSprites.RoundedRect(radius: 1f, feather: 0.5f, size: 8);
+        if (_hpFill != null)    _hpFill.sprite    = flat;
+        if (_ghostFill != null) _ghostFill.sprite = flat;
+        var bgT = _barRoot.Find("BG");
+        if (bgT != null && bgT.TryGetComponent<Image>(out var bgImg))
+        {
+            bgImg.sprite = bar; bgImg.type = Image.Type.Sliced; bgImg.pixelsPerUnitMultiplier = 2.2f;
+            bgImg.color  = TrackColor;
+        }
+
+        var outlineGo = new GameObject("Outline", typeof(RectTransform), typeof(CanvasRenderer));
+        outlineGo.transform.SetParent(_barRoot, false);
+        outlineGo.transform.SetAsFirstSibling();   // 홈 뒤 — 한 치 크게 깔려 테두리로 보인다
+        var ort = (RectTransform)outlineGo.transform;
+        ort.anchorMin = Vector2.zero; ort.anchorMax = Vector2.one;
+        ort.offsetMin = new Vector2(-1f, -1f); ort.offsetMax = new Vector2(1f, 1f);
+        var outline = outlineGo.AddComponent<Image>();
+        outline.sprite = bar; outline.type = Image.Type.Sliced; outline.pixelsPerUnitMultiplier = 2.2f;
+        outline.color  = OutlineColor;
+        outline.raycastTarget = false;
+
+        // 광택 — 채움과 같은 양만큼만(가로 채우기), 위쪽 절반. 빈 홈까지 밝히면 바가 회색으로 뜬다.
+        var glossGo = new GameObject("Gloss", typeof(RectTransform), typeof(CanvasRenderer));
+        glossGo.transform.SetParent(_barRoot, false);
+        var grt = (RectTransform)glossGo.transform;
+        grt.anchorMin = new Vector2(0f, 0.5f); grt.anchorMax = Vector2.one;
+        grt.offsetMin = Vector2.zero; grt.offsetMax = new Vector2(0f, -1f);
+        _gloss = glossGo.AddComponent<Image>();
+        _gloss.sprite = flat;
+        _gloss.color = GlossColor;
+        _gloss.raycastTarget = false;
+        _gloss.type = Image.Type.Filled;
+        _gloss.fillMethod = Image.FillMethod.Horizontal;
+        _gloss.fillOrigin = (int)Image.OriginHorizontal.Left;
+        _gloss.fillAmount = _displayRatio;
     }
 
     private void UpdatePosition()

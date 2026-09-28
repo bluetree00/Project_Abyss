@@ -1,15 +1,12 @@
 using UnityEngine;
 using UnityEngine.UI;
 
+/// <summary>마커 종류 — 넘기는 곳은 몬스터·보스뿐이다(플레이어 점은 MinimapView의 Img_PlayerMarker).
+/// 0·2·4·5·6(Player·Elite·Portal·Shop·Prop)은 쓰는 곳이 없어 걷었다(09-28) — 번호는 다시 쓰지 않는다.</summary>
 public enum MinimapMarkerType
 {
-    Player   = 0,
     Monster  = 1,
-    Elite    = 2,
     Boss     = 3,
-    Portal   = 4,
-    Shop     = 5,
-    Prop     = 6,
 }
 
 /// <summary>
@@ -21,12 +18,7 @@ public sealed class MinimapMarker : MonoBehaviour
 {
     // ── Constants ───────────────────────────────────────────
     private static readonly Color ColorMonster = new(1f,   0.25f, 0.25f, 1f);
-    private static readonly Color ColorElite   = new(1f,   0.6f,  0.1f,  1f);
     private static readonly Color ColorBoss    = new(0.8f, 0f,    0f,    1f);
-    private static readonly Color ColorPortal  = new(0.4f, 0.8f,  1f,    1f);
-    private static readonly Color ColorShop    = new(1f,   0.9f,  0.2f,  1f);
-    private static readonly Color ColorProp    = new(0.6f, 0.6f,  0.6f,  1f);
-    private static readonly Color ColorPlayer  = new(1f,   1f,    1f,    1f);
 
     // ── Private ─────────────────────────────────────────────
     private RectTransform _rect;
@@ -106,14 +98,6 @@ public sealed class MinimapMarker : MonoBehaviour
         _rect.anchoredPosition = new Vector2(nx * _mapHalfSize.x, ny * _mapHalfSize.y);
     }
 
-    private static Color ResolveColor(MinimapMarkerType type) => type switch
-    {
-        MinimapMarkerType.Monster => ColorMonster,
-        MinimapMarkerType.Elite   => ColorElite,
-        MinimapMarkerType.Boss    => ColorBoss,
-        MinimapMarkerType.Portal  => ColorPortal,
-        MinimapMarkerType.Shop    => ColorShop,
-        MinimapMarkerType.Prop    => ColorProp,
-        _                         => ColorPlayer,
-    };
+    private static Color ResolveColor(MinimapMarkerType type) =>
+        type == MinimapMarkerType.Boss ? ColorBoss : ColorMonster;
 }

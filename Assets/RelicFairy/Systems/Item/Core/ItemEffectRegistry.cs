@@ -181,6 +181,11 @@ public static class ItemEffectRegistry
         Register("DarkLegendSingle",      s => new DarkLegendSingleEffect(s));
         Register("DarkLegendProjectile",  s => new DarkLegendProjectileEffect(s));
 
+        // 존핵(정제소) — 증폭은 룬판이 존별 배수로 적용한다(MerlinRuneHexGridView.GetZoneAmplifiers → RuneEffectDispatcher).
+        // 효과 인스턴스는 없다(null → ItemEffectManager가 건너뛴다). 등록하지 않으면 GenericStatEffect 폴백이
+        // 증폭치 20/30/45를 「모든 피해 고정 +」로 더해, 판 어디에 두든(중앙 포함) 공격력이 새어 들어갔다(09-27).
+        Register("AmplifyZone", _ => null);
+
         Debug.Log($"[ItemEffectRegistry] {_creators.Count}개 effectType 등록 완료");
     }
 }

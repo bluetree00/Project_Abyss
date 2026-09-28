@@ -22,20 +22,18 @@ public static class AwakeningPopupCreator
     private const string Address   = "UI/Popup/UI_AwakeningPanel";
 
     private static readonly AltarBranch[] Branches =
-        { AltarBranch.Start, AltarBranch.Appear, AltarBranch.Endure, AltarBranch.Abyss };
+        { AltarBranch.Rune, AltarBranch.Covenant, AltarBranch.Gear, AltarBranch.Journey };
 
     // ── 레이아웃 치수 ─────────────────────────────────────────────────────
-    // 한 갈래 최대 8노드(Ⅱ 등장) = 4열 × 2행이 <b>잘리지 않고</b> 들어가야 한다.
+    // 한 갈래 최대 8노드(장비) = 4열 × 2행이 <b>잘리지 않고</b> 들어가야 한다.
     // 초안은 카드 높이가 내용보다 작아 첫 행 버튼이 찌그러졌다 — 아래 숫자는 그 역산이다.
     private const float PanelW  = 1560f;
     private const float PanelH  = 1000f;
     private const float Pad     = 44f;
     private const float HeaderH = 172f;   // 제목 + 정수 + 탭 + 구분선
-    private const float ColsH   = 660f;   // 열머리 66 + 간격 6 + 본문 588. Ⅱ 등장 8노드 = 8×66 + 7×6 = 570
+    private const float ColsH   = 660f;   // 열머리 66 + 간격 6 + 본문 588. 장비 8노드 = 8×66 + 7×6 = 570
     private const float ActionH = 126f;
 
-    private static readonly string[] Questions =
-        { "무엇으로 시작하는가", "무엇이 나올 수 있는가", "얼마나 버틸 수 있는가", "얼마나 깊이 갈 수 있는가" };
 
     private static readonly Color CInk     = new(0.910f, 0.890f, 0.960f);
     private static readonly Color CDim     = new(0.494f, 0.471f, 0.588f);
@@ -128,7 +126,7 @@ public static class AwakeningPopupCreator
         var colQ   = new TextMeshProUGUI[Branches.Length];
         var colN   = new TextMeshProUGUI[Branches.Length];
         for (int i = 0; i < Branches.Length; i++)
-            (colTf[i], colTtl[i], colQ[i], colN[i]) = MakeColumn(cols.transform, Branches[i], Questions[i], layer);
+            (colTf[i], colTtl[i], colQ[i], colN[i]) = MakeColumn(cols.transform, Branches[i], MemoryAltarCatalog.BranchQuestion(Branches[i]), layer);
 
         var rowTemplate = MakeNodeRow(colTf[0], layer);
         rowTemplate.gameObject.SetActive(false);

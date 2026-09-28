@@ -80,6 +80,8 @@ public class GameCameraController : MonoBehaviour
     private CinemachineFreeLook.Orbit[] _savedBossOrbits;
     private CinemachineFreeLook.Orbit[] _savedDKPlayerOrbits;
     private CinemachineFreeLook.Orbit[] _savedProcessionalOrbits;
+    private CinemachineFreeLook.Orbit[] _savedArenaOrbits;
+    private readonly System.Collections.Generic.HashSet<object> _framingSuppressors = new();
 
     // heading 회전 연출(RotateHeadingTo) 중복 실행 방지 — 새 요청이 오면 이전 회전을 취소한다.
     private CancellationTokenSource _headingCts;
@@ -106,7 +108,13 @@ public class GameCameraController : MonoBehaviour
     /// </summary>
     public bool IsOrbitOverridden =>
         _bossOrbitViewActive || _topDownViewActive || _isPanning
-        || _savedDKPlayerOrbits != null || _savedProcessionalOrbits != null;
+        || _savedDKPlayerOrbits != null || _savedProcessionalOrbits != null || _savedArenaOrbits != null;
+
+    /// <summary>
+    /// 전투 자동 줌아웃(<see cref="CombatCameraFraming"/>)을 멈춰 달라는 요청이 있는가 — 보스방이 자기 구도를 쓸 때.
+    /// 궤도를 점유하지는 않는다(점유는 <see cref="IsOrbitOverridden"/>).
+    /// </summary>
+    public bool IsCombatFramingSuppressed => _framingSuppressors.Count > 0;
 
     // ── Events ──
     /// <summary>카메라 인트로 줌인이 완전히 끝난 직후 발생</summary>
@@ -125,6 +133,19 @@ public class GameCameraController : MonoBehaviour
         _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
         _brain = GetComponent<CinemachineBrain>();
         _camera = GetComponent<Camera>();
+
+        // 카메라 갱신은 LateUpdate로 고정한다 — SmartUpdate(에셋 기본값)를 쓰면 안 된다.
+        //
+        // SmartUpdate는 추적 대상이 "물리 스텝 뒤에 움직였나 / LateUpdate에 움직였나"를 세서
+        // 대상별로 갱신 주기를 고른다. 그런데 Follow 대상인 CameraRigAnchor는 LateUpdate에서만
+        // 움직이고, Brain과 실행 순서가 같아(둘 다 0) 선후가 정해져 있지 않다. Anchor가 Brain보다
+        // 늦게 돌면 그 이동이 다음 프레임의 물리 스텝 확인에서 잡혀 'Fixed 이동'으로 집계되고,
+        // 60fps 근처에서는 대부분의 프레임에 물리 스텝이 끼므로 Fixed로 분류된다 →
+        // 카메라가 50Hz로만 갱신돼 60Hz 화면에서 이동·대시 중 끊기듯 떨린다(프레임률 따라 달라짐).
+        //
+        // 플레이어는 Rigidbody Interpolate라 LateUpdate 시점의 위치가 이미 매끄럽다 → LateUpdate가 정답.
+        // 씬마다 에셋 값을 고치는 대신 여기서 일괄 고정한다(이 컴포넌트가 모든 게임플레이 카메라에 붙어 있다).
+        if (_brain != null) _brain.m_UpdateMethod = CinemachineBrain.UpdateMethod.LateUpdate;
 
         // Cinemachine 비활성 (인트로 끝까지)
         if (_brain != null) _brain.enabled = false;
@@ -291,6 +312,10 @@ public class GameCameraController : MonoBehaviour
     /// </summary>
     public void ApplyZoneOrbit(Vector2 top, Vector2 mid, Vector2 bot, float duration = 1.2f)
     {
+        // 전투 동적 프레이밍이 매 프레임 궤도를 덮어쓰므로 구역 궤도는 그 「베이스」를 바꾼다(09-28 — 직접 바꾸면 한 프레임 만에 지워졌다).
+        var framing = CombatCameraFraming.Active;
+        if (framing != null) { framing.SetZoneBase(top, mid, bot, duration); return; }
+
         EnsureCinemachineRefs();
         if (_cinemachine == null) return;
 
@@ -310,6 +335,9 @@ public class GameCameraController : MonoBehaviour
     /// <summary>구역 이탈 시 기본(구역 진입 전) 오빗으로 복귀. 저장값이 없으면 무시.</summary>
     public void RestoreZoneOrbit(float duration = 1.2f)
     {
+        var framing = CombatCameraFraming.Active;
+        if (framing != null) { framing.ClearZoneBase(duration); return; }
+
         EnsureCinemachineRefs();
         if (_cinemachine == null || _savedZoneOrbits == null) return;
 
@@ -889,6 +917,78 @@ public class GameCameraController : MonoBehaviour
         _savedProcessionalOrbits = null;
 
         TransitionDKOrbitAsync(top, mid, bot, duration, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    // ── Arena Orbit (보스 아레나 전투 구도) ─────────────────────
+    /// <summary>
+    /// 보스 아레나 전투 구도 — 플레이어 추적·수평각은 그대로 두고 오빗(높이, 반경)만 옮긴다.
+    /// 이미 켜져 있으면 새 값으로 옮겨 간다(페이지별 구도). 원래 오빗은 처음 켤 때 한 번 저장한다.
+    /// 켜진 동안 <see cref="IsOrbitOverridden"/> — 전투 자동 줌아웃이 양보한다.
+    /// </summary>
+    public void ActivateArenaOrbit(Vector2 top, Vector2 middle, Vector2 bottom, float duration = 1.0f)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null) return;
+
+        if (_savedArenaOrbits == null)
+        {
+            _savedArenaOrbits = new CinemachineFreeLook.Orbit[]
+            {
+                _cinemachine.m_Orbits[0],
+                _cinemachine.m_Orbits[1],
+                _cinemachine.m_Orbits[2],
+            };
+        }
+
+        TransitionDKOrbitAsync(top, middle, bottom, duration, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>아레나 구도를 끄고 원래 오빗으로 서서히 되돌린다.</summary>
+    public void DeactivateArenaOrbit(float duration = 1.0f)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null || _savedArenaOrbits == null) return;
+
+        var top = new Vector2(_savedArenaOrbits[0].m_Height, _savedArenaOrbits[0].m_Radius);
+        var mid = new Vector2(_savedArenaOrbits[1].m_Height, _savedArenaOrbits[1].m_Radius);
+        var bot = new Vector2(_savedArenaOrbits[2].m_Height, _savedArenaOrbits[2].m_Radius);
+        _savedArenaOrbits = null;
+
+        TransitionDKOrbitAsync(top, mid, bot, duration, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>전투 자동 줌아웃 정지 요청을 걸거나 푼다. 요청자가 하나라도 남아 있으면 정지.</summary>
+    public void SetCombatFramingSuppressed(object owner, bool suppressed)
+    {
+        if (owner == null) return;
+        if (suppressed) _framingSuppressors.Add(owner);
+        else            _framingSuppressors.Remove(owner);
+    }
+
+    /// <summary>
+    /// 수동 제어 중인 카메라를 <paramref name="position"/>으로 옮기며 <paramref name="lookAt"/>을 보게 한다(컷신 샷).
+    /// <see cref="TakeManualControl"/> 뒤에 쓴다. 실시간 기준 — 슬로모·대사창 중에도 움직인다.
+    /// </summary>
+    public async UniTask MoveManualCameraAsync(Vector3 position, Vector3 lookAt, float duration, CancellationToken ct)
+    {
+        if (this == null) return;
+        Vector3    fromP = transform.position;
+        Quaternion fromR = transform.rotation;
+        Vector3    dir   = lookAt - position;
+        Quaternion toR   = dir.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(dir, Vector3.up) : fromR;
+        float      d     = Mathf.Max(0.0001f, duration);
+
+        for (float t = 0f; t < d; )
+        {
+            ct.ThrowIfCancellationRequested();
+            t += Time.unscaledDeltaTime;
+            float k = PanEase(t / d);
+            transform.position = Vector3.Lerp(fromP, position, k);
+            transform.rotation = Quaternion.Slerp(fromR, toR, k);
+            await UniTask.Yield(PlayerLoopTiming.Update, ct);
+        }
+        transform.position = position;
+        transform.rotation = toR;
     }
 
     /// <summary>

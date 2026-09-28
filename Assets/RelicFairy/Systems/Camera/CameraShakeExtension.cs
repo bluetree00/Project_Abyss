@@ -25,13 +25,20 @@ public class CameraShakeExtension : CinemachineExtension
     private float   _punchMaxAngle = 3f;
     private float   _punchDecay = 8f;
 
-    /// <summary>쉐이크 트라우마를 추가(기존 값과 max). amount/maxAngle/frequency/decay 동시 설정.</summary>
+    // FreeLook은 리그 카메라 3개를 매 프레임 갱신하며 리그마다 이 콜백을 부른다 → 감쇠를 프레임당 1회로 묶는다.
+    // 안 묶으면 감쇠가 3배로 돌아 흔들림이 설계 길이의 약 1/3에서 끝났다(강공 0.35초 → 실측 0.12초, 09-25).
+    private int     _lastDecayFrame = -1;
+
+    /// <summary>쉐이크 트라우마를 추가(기존 값과 max). 새 흔들림이 지금 흔들림 이상일 때만 각도·주파수·감쇠를 바꾼다.
+    /// 예전엔 세기만 max로 남기고 감쇠를 무조건 덮어써서, 보스 강공(0.45초) 도중 약한 피격 흔들림(0.1초) 한 번이면
+    /// 보스 흔들림이 0.12초 만에 꺼졌다(09-25). 약한 흔들림은 큰 흔들림에 묻혀야 한다.</summary>
     public void AddTrauma(float amount, float maxAngle, float frequency, float decayPerSecond)
     {
+        if (amount < _trauma) return;
         _maxAngle       = maxAngle;
         _frequency      = frequency;
         _decayPerSecond = Mathf.Max(0.01f, decayPerSecond);
-        _trauma         = Mathf.Clamp01(Mathf.Max(_trauma, amount));
+        _trauma         = Mathf.Clamp01(amount);
     }
 
     /// <summary>방향성 펀치를 추가 — 타격이 온 방향으로 카메라를 밀어낸다.
@@ -39,10 +46,11 @@ public class CameraShakeExtension : CinemachineExtension
     public void AddDirectionalPunch(Vector3 worldDir, float amount, float maxAngle, float decayPerSecond)
     {
         if (worldDir.sqrMagnitude < 0.0001f) return;
+        if (amount < _punchAmount) return;   // AddTrauma와 같은 규칙 — 약한 펀치가 센 펀치의 방향·감쇠를 뺏지 않는다
         _punchDir      = worldDir.normalized;
         _punchMaxAngle = maxAngle;
         _punchDecay    = Mathf.Max(0.01f, decayPerSecond);
-        _punchAmount   = Mathf.Clamp01(Mathf.Max(_punchAmount, amount));
+        _punchAmount   = Mathf.Clamp01(amount);
     }
 
     protected override void PostPipelineStageCallback(
@@ -58,8 +66,9 @@ public class CameraShakeExtension : CinemachineExtension
 
         // 감쇠는 unscaledDeltaTime — 저timeScale(히트스톱/슬로모)에서도 실시간으로 줄어 trauma 고착 방지.
         // deltaTime > 0f 가드는 에디터 비재생 프레임(deltaTime=-1) 보호용으로 유지.
-        if (deltaTime > 0f)
+        if (deltaTime > 0f && _lastDecayFrame != Time.frameCount)
         {
+            _lastDecayFrame = Time.frameCount;
             _trauma      = Mathf.Max(0f, _trauma      - _decayPerSecond * Time.unscaledDeltaTime);
             _punchAmount = Mathf.Max(0f, _punchAmount - _punchDecay     * Time.unscaledDeltaTime);
         }
