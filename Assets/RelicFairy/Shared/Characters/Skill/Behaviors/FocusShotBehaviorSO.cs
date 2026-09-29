@@ -229,6 +229,8 @@ public class FocusShotBehaviorSO : SkillBehaviorSO
 
             // 기본공격과 같은 퍼널 — 파츠·아이템·방버프가 집중샷에도 얹힌다(분열이면 갈래가 늘고, 거력이면 더 굵어진다).
             var req = ProjectileRequest.Create(_data.arrowKey, pos, dir, dmg, ctx.Controller.gameObject, ctx.SourceSlot, scale);
+            req.actionType = ctx.ActionType;   // 스킬 피해 증가가 붙도록 — 기본 공격으로 신고하면 안 된다
+            req.isFinisher = true;             // 차지샷 한 발이 곧 마무리 일격 — 타격 연출 단계(막타)
             CombatSpawner.SpawnProjectile(ref req, arrow, extra => ApplyFocusExtras(extra, req, dmg));
             obj.transform.localScale = Vector3.one * (scale * req.sizeMult);
             ApplyFocusExtras(obj, req, dmg);

@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8bb9778b73862094b9f9d903448d255b, type: 3}
+  m_Name: FG_RootWhirlPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.FGRootWhirlPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: fl4_root_whirl
+  breakOverride: -1
+  maxRange: 9
+  innerRadius: 5
+  outerRadius: 10
+  windupDuration: 0.55
+  spinHitDelay: 0.85
+  outerDelay: 0.6
+  armLead: 0.4
+  recoveryDuration: 0.8
+  innerDamageMultiplier: 1.3
+  outerDamageMultiplier: 1.2
+  knockbackMultiplier: 1.5
+  innerVfxPrefab: {fileID: 8719263370430895187, guid: cfcf1b1a67677664b8243dfeeeeb152e,
+    type: 3}
+  innerVfxScale: 5
+  outerVfxPrefab: {fileID: 1210069404974878, guid: fbab27c98b168764eb295cfff1e9f61f,
+    type: 3}
+  outerVfxScale: 1.2
+  outerVfxCount: 10
+  spinSfx: {fileID: 8300000, guid: 9e677fd5d57097f489aa2c459ea96a78, type: 3}
+  outerSfx: {fileID: 8300000, guid: 5dfd2a02b507f11479a9ae6871fe4543, type: 3}

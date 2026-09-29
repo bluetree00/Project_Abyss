@@ -19,7 +19,8 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
                       V_FRENZY_MOVE = 8, V_SKILL_BASE = 10,
                       V_SKILL_PER = 11, V_BRAND_DUR = 12, V_BRAND_AMP = 13;
     private const string PassiveTip =
-        "찢긴 서약의 검 — 적중으로 광기를 쌓아 공격력이 오르지만 받는 피해도 늘어난다. 광기 최대치에서 '광란'(이속)에 들며 심판의 일격을 쓸 수 있다";
+        "찢긴 서약의 검 — 적중마다 광기(일반 1 · 정예 2 · 엘리트 3 · 보스 5, 최대 40): 스택당 공격력 +1% · 받는 피해 +0.75%. " +
+        "40스택에서 '광란' 4초(이동속도 +20%) · 심판의 일격 1회";
 
     // VFX Addressable 키(에셋 배선 후 실 프리팹 등록). 미등록 시 무해.
     // 광란 오라는 2겹이다 — 붉은 분노(Rage) 위에 검보라 저주(Cursed)를 얹어
@@ -167,6 +168,8 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         Vector3 vfxDir = Quaternion.AngleAxis(yaw, Vector3.up) * fwd;
         RelicStateVfx.PlayOneShot(JudgmentVfxKey, pos + vfxDir * 2f + Vector3.up * height, scale, vfxDir,
                                   isLast ? JudgmentFinisherVfxPrewarm : 0f);
+        // 참격마다 휘두름 소리 — 마무리는 무거운 쪽. 적중 소리(막타음)는 타격 단계가 따로 낸다.
+        Managers.Sound?.PlayEvent(isLast ? SoundEvent.PlayerSwingHeavy : SoundEvent.PlayerSwing);
 
         var owner  = _owner.gameObject;
         var buffer = new List<GameObject>(16);
@@ -200,6 +203,7 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
                 HitPoint            = target.transform.position + Vector3.up * 1.2f,
                 SourcePosition      = pos,
                 ComboStep           = hitIndex,
+                IsFinisher          = isLast,   // 마무리 한 방만 막타 연출
             });
 
             // 심판 낙인(매 타 갱신 → 지속시간은 마무리 기준). 몬스터 전용 상태라 더미는 건너뛴다.

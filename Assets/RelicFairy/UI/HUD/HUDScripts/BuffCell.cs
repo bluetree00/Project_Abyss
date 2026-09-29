@@ -148,8 +148,9 @@ public sealed class BuffCell : MonoBehaviour, IPointerEnterHandler, IPointerExit
             : EffectIconRegistry.GetSprite(item.IconKey);
 
         bool hasStack = item.Stacks > 1;
+        // 끌 때 글자도 비운다 — 재사용 칸이라 HUD 하드 가드가 다시 켜면 앞 버프의 「×N」이 남았다(09-28).
+        _stack.text = hasStack ? "×" + item.Stacks : string.Empty;
         _stack.gameObject.SetActive(hasStack);
-        if (hasStack) _stack.text = "×" + item.Stacks;
 
         ApplyRemaining(item.Remaining01);
     }

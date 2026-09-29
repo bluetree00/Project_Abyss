@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t1_light_shard
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t1_light_shard
-  displayName: "\uAD11\uC18D\uC758 \uB8EC"
+  displayName: "\uD750\uB974\uB294 \uB9C8\uB825\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 0

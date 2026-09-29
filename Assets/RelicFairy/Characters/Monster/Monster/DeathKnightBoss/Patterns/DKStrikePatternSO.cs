@@ -344,7 +344,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         if (player == null) return;
 
         int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
-        player.TakeDamage(dmg);
+        player.TakeDamage(dmg, ctx.Monster.gameObject, false, HitWeight.Heavy);   // 전역 베기 — 강
 
         Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
         toPlayer.y = 0.2f;
@@ -478,6 +478,11 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         if (monsterLayer >= 0)
             foreach (var r in go.GetComponentsInChildren<Renderer>(true))
                 r.gameObject.layer = monsterLayer;
+
+        // 콜라이더가 있는 루트는 MonsterHit — 근접 판정은 MonsterHit·Player만 겹침 검사한다.
+        // 루트가 Monster/Default로 남아 근접으로 검을 못 부쉈다 → 방패(안전지대)도 못 만들어 Strike를 피할 수 없었다(09-26 기사 검증).
+        int hitLayer = LayerMask.NameToLayer("MonsterHit");
+        if (hitLayer >= 0) go.layer = hitLayer;
 
         _swords.Add(sword);
     }

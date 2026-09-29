@@ -12,6 +12,10 @@ public sealed class GambleBoxChallenge : MonoBehaviour, IInteractionChallenge
     private const float InteractRange = 2.8f;
     private const float LabelHeight   = 1.4f;
     private const float PromptHeight  = 2.0f;
+    /// <summary>이 시간이 지나면 자동 개봉. 개봉(OnResolved) 전까지 출구가 열리지 않으므로 탈출구가 필요하다.</summary>
+    private const float AutoOpenSeconds = 60f;
+
+    private float _elapsed;
 
     private GameRunSession  _run;
     private LuckRollTableSO _luckTable;
@@ -46,13 +50,23 @@ public sealed class GambleBoxChallenge : MonoBehaviour, IInteractionChallenge
 
         if (!_placed)
         {
-            _camT   = Camera.main != null ? Camera.main.transform : null;
-            _boxPos = pt.position + pt.forward * 3f;   // 플레이어 앞 = 도달 보장
+            _camT = Camera.main != null ? Camera.main.transform : null;
+            // pt.forward를 그대로 쓰면 안 된다 — RunFlowController.MovePlayer가 위치만 옮기고
+            // 캐릭터 회전은 이전 방 값을 그대로 둔다(카메라만 정렬). 진입 직후 forward가 벽을 향하면
+            // 상자가 벽 속에 생겨 F를 누를 수 없고, 개봉 전엔 출구가 안 열리므로 그대로 갇힌다.
+            ServiceRoomDecorPlacer.SyncPhysics();
+            var inward = ServiceRoomDecorPlacer.ResolveOpenDirection(pt.position, pt.forward);
+            _boxPos = ServiceRoomDecorPlacer.TryFindSpot(pt.position, inward, 3f, pt.position.y, out var p)
+                      ? p : pt.position;
             CreateVisuals();
             _placed = true;
         }
 
         Billboard();
+
+        // 자동 개봉 — 어떤 이유로든 상자에 닿지 못해도 방을 떠날 수 있게 하는 안전장치.
+        _elapsed += Time.deltaTime;
+        if (_elapsed >= AutoOpenSeconds) { Resolve(); return; }
 
         bool inRange = (pt.position - _boxPos).sqrMagnitude <= InteractRange * InteractRange;
         if (_prompt != null) _prompt.gameObject.SetActive(inRange);
@@ -88,7 +102,7 @@ public sealed class GambleBoxChallenge : MonoBehaviour, IInteractionChallenge
 
     private void CreateVisuals()
     {
-        _label  = MakeText("도박 상자", _boxPos + Vector3.up * LabelHeight, 3f, new Color(0.95f, 0.8f, 0.35f), 10);
+        _label  = MakeText(ChallengeFlavor.GambleName(_run), _boxPos + Vector3.up * LabelHeight, 3f, new Color(0.95f, 0.8f, 0.35f), 10);
         _prompt = MakeText($"<color={UIPalette.GoldHex}>[F]</color> 개봉", _boxPos + Vector3.up * PromptHeight, 4f, Color.white, 11);
         _prompt.gameObject.SetActive(false);
     }
@@ -105,7 +119,7 @@ public sealed class GambleBoxChallenge : MonoBehaviour, IInteractionChallenge
         t.color = color;
         t.textWrappingMode = TextWrappingModes.NoWrap;
         t.sortingOrder = order;
-        TMPOutlineHelper.ApplyDefault(t);
+        TMPOutlineHelper.ApplySoftShadow(t);
         return t;
     }
 

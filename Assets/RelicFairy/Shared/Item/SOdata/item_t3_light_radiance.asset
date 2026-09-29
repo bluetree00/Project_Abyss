@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t3_light_radiance
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t3_light_radiance
-  displayName: "\uAD11\uCC44\uC758 \uB8EC"
+  displayName: "\uACB0\uD22C\uD558\uB294 \uC131\uAD11\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 2

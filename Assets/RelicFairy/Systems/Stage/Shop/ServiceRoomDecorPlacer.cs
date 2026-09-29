@@ -12,6 +12,7 @@ using UnityEngine;
 public static class ServiceRoomDecorPlacer
 {
     private const int   WallLayer     = 8;      // MapBuilder 규약(Wall=8, Ground=3)
+    private const int   GroundLayer   = 3;
     private const float ClearRadius   = 0.75f;  // 소품이 차지한다고 보는 반경(m)
     private const float WallKeepOut   = 1.1f;   // 벽에서 최소 이 정도는 떨어뜨린다
     private const float NpcClearRadius= 2.0f;   // NPC 몸에서 이보다 가까이는 소품을 두지 않는다(관통 방지)
@@ -23,12 +24,60 @@ public static class ServiceRoomDecorPlacer
     /// <summary>방 블록이 막 생성된 직후 물리 쿼리를 쓰기 전에 1회 호출(콜라이더 등록 보장).</summary>
     public static void SyncPhysics() => Physics.SyncTransforms();
 
+    /// <summary>
+    /// 그 지점의 실제 바닥 윗면 높이. 서비스 앵커(NS 토큰 · 손맵 앵커)는 「바닥 근처 점」일 뿐 윗면이 아니다 —
+    /// 앵커 높이에 그대로 세웠더니 NPC·소품이 바닥에 박혔다(09-29). 바닥을 못 찾으면 <paramref name="fallback"/>.
+    /// </summary>
+    public static float GroundYAt(Vector3 pos, float fallback)
+    {
+        return Physics.Raycast(pos + Vector3.up * 1.5f, Vector3.down, out var hit, 4f,
+                               1 << GroundLayer, QueryTriggerInteraction.Ignore)
+            ? hit.point.y : fallback;
+    }
+
+    /// <summary>앵커에 NPC를 세울 위치 — 발(루트 − <paramref name="standHeight"/>)이 바닥 윗면에 닿게.</summary>
+    public static Vector3 NpcStandPoint(Vector3 anchorPos, float standHeight)
+    {
+        Physics.SyncTransforms();   // 갓 지은 바닥 블록을 쿼리에 반영
+        anchorPos.y = GroundYAt(anchorPos, anchorPos.y) + standHeight;
+        return anchorPos;
+    }
+
     /// <summary>해당 지점이 벽과 겹치지 않는가.</summary>
     public static bool IsFree(Vector3 pos, float radius = ClearRadius)
     {
         int n = Physics.OverlapSphereNonAlloc(
             pos + Vector3.up * 0.5f, radius, _hits, 1 << WallLayer, QueryTriggerInteraction.Ignore);
         return n == 0;
+    }
+
+    /// <summary>
+    /// 기준점에서 가장 넓게 트인 수평 방향. 같은 여유면 <paramref name="hint"/> 쪽을 유지한다.
+    /// <para>방 진입 직후 <c>player.forward</c>는 이전 방에서 넘어온 값이다
+    /// (<c>RunFlowController.MovePlayer</c>가 위치만 옮기고 회전은 두므로) — 벽을 향할 수 있어
+    /// 그대로 배치 기준으로 쓰면 소품·마커가 벽 속에 박힌다. 그 보정용.</para>
+    /// </summary>
+    public static Vector3 ResolveOpenDirection(Vector3 origin, Vector3 hint)
+    {
+        hint.y = 0f;
+        if (hint.sqrMagnitude < 0.0001f) hint = Vector3.forward;
+        hint.Normalize();
+
+        Vector3 best = hint;
+        float bestScore = float.NegativeInfinity;
+        for (int i = 0; i < 16; i++)
+        {
+            Vector3 d = Quaternion.Euler(0f, i * 22.5f, 0f) * hint;
+            float clear = 0f;
+            for (float r = 1.5f; r <= 6f; r += 1.5f)
+            {
+                if (!IsFree(origin + d * r)) break;
+                clear = r;
+            }
+            float score = clear * 10f + Vector3.Dot(d, hint);
+            if (score > bestScore) { bestScore = score; best = d; }
+        }
+        return best;
     }
 
     /// <summary>

@@ -27,6 +27,12 @@ public sealed class QuestNotifierView : MonoBehaviour
             canvasGroup = GetComponent<CanvasGroup>();
         if (canvasGroup != null)
             canvasGroup.alpha = 0f;
+
+        // 공통 언어(09-28 UI 톤 통일): 이 알림만 NotoSansKR · 평평한 남색 판이었다 → 기본 글꼴(DNF) + 부드러운 그림자,
+        // 인디고 글래스 판 + 금 가는 선. 제목 = 금, 내용 = 잉크.
+        if (TryGetComponent<Image>(out var plate)) UITheme.StylePanel(plate, UITheme.Glass);
+        UITheme.StyleText(titleText, UITheme.Gold);
+        UITheme.StyleText(labelText, UITheme.Ink);
     }
 
     /// <summary>토스트 1건을 페이드 인 → 유지 → 페이드 아웃. 취소 시 즉시 숨김.</summary>

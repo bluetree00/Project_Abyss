@@ -26,25 +26,32 @@ public sealed class StagingAreaView : MonoBehaviour
     // (열 폭 = (뷰포트 470 - 여백 3×10) / 2 = 220 → 높이 220/1.523 ≈ 144).
     private const int   SLOT_COLUMNS  = 2;
     private int _columns = SLOT_COLUMNS;   // Init 전에 SetColumns로 바꾼다 — 하단 보관함 바는 5열 1행(의뢰서 F4)
-    private const float SLOT_WIDTH    = 220f;
-    private const float SLOT_HEIGHT   = 144f;
-    private const float SLOT_SPACING  = 10f;
+    // 09-25 UX: 220 → 272. 보관함 바 오른쪽이 260px 넘게 비어 있었다 — 그 폭을 카드 글자(이름·효과)에 준다.
+    // 슬롯 테두리 아트(326×214)는 이 비율보다 좁아 빈 칸에서만 비율을 지켜 가운데에 세운다(BuildFixedSlots).
+    public  const float SLOT_WIDTH    = 272f;
+    public  const float SLOT_HEIGHT   = 144f;
+    public  const float SLOT_SPACING  = 14f;
     private const float GRID_CELL_SIZE = 120f;
+    private const float SELECT_LIFT   = 8f;     // 고른 카드가 들리는 높이
+    private const float DEAL_RISE     = 40f;    // 열 때 아래에서 올라오는 거리
+    private const float DEAL_DUR      = 0.20f;
+    private const float DEAL_STAGGER  = 0.045f; // 룬판은 자주 열어 짧게 — 5칸이 다 올라와도 0.45초 안
+    private const float HOVER_SCALE   = 1.03f;  // 손을 얹은 카드 — 「잡을 수 있다」
+    private const float DRAG_GHOST    = 0.4f;   // 끄는 동안 원래 카드(잔상)
 
-    /// <summary>고정 슬롯을 2열로 깔았을 때 필요한 줄 수.</summary>
+    /// <summary>고정 슬롯을 열 수로 깔았을 때 필요한 줄 수(보이는 칸 기준).</summary>
     private int SlotRows =>
-        (RunItemInventory.MaxStagingCapacity + _columns - 1) / _columns;
+        (_capacity + _columns - 1) / _columns;
 
     private static readonly Color COLOR_NEW_BORDER      = new(1f, 0.92f, 0.3f, 1f);
     private static readonly Color COLOR_NORMAL_BORDER   = new(0.4f, 0.4f, 0.5f, 0.7f);
     private static readonly Color COLOR_SELECTED_BORDER = new(0.3f, 0.85f, 1f, 1f);
+    private static readonly Color HoverGlowColor        = new(1f, 0.84f, 0.45f, 0.85f);
     private static readonly Color COLOR_EMPTY_BG        = new(0.14f, 0.14f, 0.20f, 0.7f);
     private static readonly Color COLOR_EMPTY_BORDER    = new(0.3f, 0.3f, 0.4f, 0.4f);
-
-    private static readonly Color COLOR_COMMON    = new(0.7f, 0.7f, 0.7f, 1f);
-    private static readonly Color COLOR_RARE      = new(0.3f, 0.6f, 1f,   1f);
-    private static readonly Color COLOR_EPIC      = new(0.7f, 0.3f, 1f,   1f);
-    private static readonly Color COLOR_LEGENDARY = new(1f,   0.7f, 0.2f, 1f);
+    private static readonly Color FilledTint            = new(0.34f, 0.35f, 0.42f, 1f);   // 룬이 든 칸의 바탕 아트 곱
+    private static readonly Color NameInk               = new(0.98f, 0.97f, 0.93f, 1f);
+    private static readonly Color SelectedNameInk       = new(1f, 0.84f, 0.45f, 1f);
 
     // ── SerializeField ──
     [Header("스크롤 컨텐츠")]
@@ -67,6 +74,9 @@ public sealed class StagingAreaView : MonoBehaviour
     // ── Private ──
     // 고정 슬롯 구조
     private readonly GameObject[] _slotGOs       = new GameObject[RunItemInventory.MaxStagingCapacity];
+    // 보이는 칸 수와 카드 폭 — 제단 「룬 보관함 +1 · +2」로 5 → 7. 칸은 상한(7)만큼 미리 만들고 이만큼만 켠다(09-29).
+    private int   _capacity  = 5;
+    private float _slotWidth = SLOT_WIDTH;
     private readonly RuntimeItemData[] _slotItems = new RuntimeItemData[RunItemInventory.MaxStagingCapacity];
 
     // Shape 관리
@@ -93,6 +103,9 @@ public sealed class StagingAreaView : MonoBehaviour
         _slotFrameSprite = frame;
     }
 
+    // 열기 연출
+    private System.Threading.CancellationTokenSource _dealCts;
+
     // 폐기 확인 다이얼로그
     private RuntimeItemData _pendingDiscard;
     private GameObject      _discardDialog;
@@ -112,6 +125,32 @@ public sealed class StagingAreaView : MonoBehaviour
     /// <summary>슬롯 격자 열 수. <see cref="Init"/> 전에 불러야 한다(슬롯은 Init에서 놓인다).</summary>
     public void SetColumns(int columns) => _columns = Mathf.Max(1, columns);
 
+    /// <summary>지금 보이는 칸 수.</summary>
+    public int Capacity => _capacity;
+
+    /// <summary>
+    /// 보이는 칸 수와 카드 폭을 바꾼다 — 넘는 칸은 끄고, 나머지는 새 폭으로 다시 줄 세운다.
+    /// 카드 안 글자 · 모양은 비율 앵커라 폭을 따라간다. Init 전에도, 뒤에도 불러도 된다.
+    /// </summary>
+    public void ApplyCapacity(int capacity, float slotWidth)
+    {
+        _capacity  = Mathf.Clamp(capacity, 1, RunItemInventory.MaxStagingCapacity);
+        _slotWidth = slotWidth;
+        for (int i = 0; i < _slotGOs.Length; i++)
+        {
+            var go = _slotGOs[i];
+            if (go == null) continue;
+            go.SetActive(i < _capacity);
+            var rt = (RectTransform)go.transform;
+            rt.sizeDelta = new Vector2(_slotWidth, SLOT_HEIGHT);
+            PositionSlot(rt, i);
+        }
+        if (scrollContent != null)
+            scrollContent.sizeDelta = new Vector2(
+                SLOT_SPACING + _columns * (_slotWidth + SLOT_SPACING),
+                SLOT_SPACING + SlotRows * (SLOT_HEIGHT + SLOT_SPACING));
+    }
+
     public void Init(RectTransform content)
     {
         scrollContent = content;
@@ -120,6 +159,8 @@ public sealed class StagingAreaView : MonoBehaviour
 
     private void OnDestroy()
     {
+        _dealCts?.Cancel();
+        _dealCts?.Dispose();
         HideDiscardDialog();
         _shapeByInstanceId.Clear();
         _newItemIds.Clear();
@@ -185,19 +226,67 @@ public sealed class StagingAreaView : MonoBehaviour
     /// <summary>카드 테두리를 하이라이트한다. RefreshInfoPanelDefault에서 선택된 아이템을 표시할 때 호출.</summary>
     public void HighlightItem(RuntimeItemData item)
     {
-        // 이전 하이라이트 해제
-        if (_highlightedItem != null)
-        {
-            int prevIdx = FindSlotIndex(_highlightedItem);
-            if (prevIdx >= 0) ApplySlotBorderColor(prevIdx, _highlightedItem);
-        }
-
+        // 이전 하이라이트 해제 — 기준을 먼저 바꾼 뒤 칠한다(들림·등급빛이 새 기준으로 계산되게)
+        var prev = _highlightedItem;
         _highlightedItem = item;
+
+        if (prev != null && prev != item)
+        {
+            int prevIdx = FindSlotIndex(prev);
+            if (prevIdx >= 0) ApplySlotBorderColor(prevIdx, prev);
+        }
 
         if (item != null)
         {
             int idx = FindSlotIndex(item);
             if (idx >= 0) ApplySlotBorderColor(idx, item);
+        }
+    }
+
+    /// <summary>
+    /// 패널을 열 때 룬이 든 칸을 아래에서 차례로 올린다(룬 선택 카드 등장과 같은 70ms 간격). 빈 칸은 움직이지 않는다.
+    /// 룬판은 자주 여는 화면이라 전체가 0.45초 안에 끝나게 짧게 둔다. 표시 전용 — 선택·인벤토리 상태는 그대로다.
+    /// </summary>
+    public void PlayDealIn(float delay)
+    {
+        _dealCts?.Cancel();
+        _dealCts?.Dispose();
+        _dealCts = new System.Threading.CancellationTokenSource();
+        int order = 0;
+        for (int i = 0; i < RunItemInventory.MaxStagingCapacity; i++)
+        {
+            if (_slotItems[i] == null || _slotGOs[i] == null) continue;
+            DealSlotAsync(i, delay + order * DEAL_STAGGER, _dealCts.Token).Forget();
+            order++;
+        }
+    }
+
+    private async UniTaskVoid DealSlotAsync(int index, float delay, System.Threading.CancellationToken ct)
+    {
+        var go = _slotGOs[index];
+        var rt = go.GetComponent<RectTransform>();
+        // ?? 금지 — 에디터의 GetComponent는 없을 때 가짜 null을 돌려줘 ??를 통과한다(MissingComponentException, 09-25 실측)
+        if (!go.TryGetComponent<CanvasGroup>(out var cg)) cg = go.AddComponent<CanvasGroup>();
+        try
+        {
+            cg.alpha = 0f;
+            rt.anchoredPosition = SlotRestPos(index) + new Vector2(0f, -DEAL_RISE);
+            if (delay > 0f) await UniTask.Delay(System.TimeSpan.FromSeconds(delay), ignoreTimeScale: true, cancellationToken: ct);
+            for (float t = 0f; t < 1f; )
+            {
+                t += Time.unscaledDeltaTime / DEAL_DUR;
+                float p = Mathf.Clamp01(t);
+                float e = 1f - Mathf.Pow(1f - p, 3f);
+                cg.alpha = p;
+                rt.anchoredPosition = SlotRestPos(index) + new Vector2(0f, -DEAL_RISE * (1f - e));   // 도중에 골라도 들림을 따라간다
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (System.OperationCanceledException) { }
+        finally
+        {
+            if (cg != null) cg.alpha = 1f;
+            if (rt != null) rt.anchoredPosition = SlotRestPos(index);
         }
     }
 
@@ -234,7 +323,7 @@ public sealed class StagingAreaView : MonoBehaviour
     /// 파괴하면 안 되는 이름들 — 슬롯을 다시 빌드하지 않으므로 한 번 잃으면 복구되지 않는다.
     /// </summary>
     private static bool IsSlotChrome(string childName)
-        => childName == "Border" || childName == "EmptyLabel" || childName == "Frame";
+        => childName == "Border" || childName == "EmptyLabel" || childName == "Frame" || childName == "HoverGlow";
 
     /// <summary>슬롯 본체의 테두리선 색을 바꾼다(테두리는 Border가 아니라 슬롯 자신에 붙어 있다).</summary>
     private static void SetSlotOutline(GameObject slotGO, Color color)
@@ -254,8 +343,9 @@ public sealed class StagingAreaView : MonoBehaviour
             var slotGO = new GameObject($"Slot_{i}", typeof(RectTransform));
             slotGO.transform.SetParent(scrollContent, false);
             var rt = slotGO.GetComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(SLOT_WIDTH, SLOT_HEIGHT);
+            rt.sizeDelta = new Vector2(_slotWidth, SLOT_HEIGHT);
             PositionSlot(rt, i);
+            if (i >= _capacity) slotGO.SetActive(false);
 
             // 빈 슬롯 배경 — 테두리선은 여기 붙인다.
             // 예전엔 Border 이미지가 슬롯 전체를 반투명하게 한 번 더 덮어 배경과 두 겹으로 겹쳤고,
@@ -304,10 +394,12 @@ public sealed class StagingAreaView : MonoBehaviour
                 frameRT.sizeDelta = Vector2.zero;
                 var frameImg = frameGO.AddComponent<Image>();
                 frameImg.sprite = _slotFrameSprite;
-                // 테두리 아트(326×214)는 슬롯(220×144)과 비율이 같아 균일 축소된다 —
-                // 9슬라이스 경계가 없으므로 Sliced로 두면 어차피 Simple로 늘어난다.
-                frameImg.type          = Image.Type.Simple;
-                frameImg.raycastTarget = false;
+                // 테두리 아트(326×214)는 9슬라이스 경계가 없어 늘리면 모서리 장식이 찌그러진다.
+                // 슬롯이 272로 넓어져(09-25) 비율이 달라졌으므로 비율을 지켜 가운데에 세운다.
+                // 이 테두리는 <b>빈 칸</b> 표시다 — 룬이 들면 등급 보석 테두리로 바뀐다(RefreshSlotDisplay).
+                frameImg.type           = Image.Type.Simple;
+                frameImg.preserveAspect = true;
+                frameImg.raycastTarget  = false;
             }
 
             // 빈 슬롯 텍스트 (기본 표시)
@@ -319,7 +411,7 @@ public sealed class StagingAreaView : MonoBehaviour
             emptyRT.sizeDelta = Vector2.zero;
             var emptyTxt = emptyTxtGO.AddComponent<TextMeshProUGUI>();
             if (cardFont != null) emptyTxt.font = cardFont;
-            emptyTxt.text      = "빈 슬롯";
+            emptyTxt.text      = "빈 칸";
             emptyTxt.fontSize  = 16f;
             emptyTxt.color     = new Color(0.55f, 0.55f, 0.66f, 0.85f);
             emptyTxt.alignment = TextAlignmentOptions.Center;
@@ -328,6 +420,8 @@ public sealed class StagingAreaView : MonoBehaviour
             var hover = slotGO.AddComponent<SlotHoverHandler>();
             hover.onEnter = item => OnItemHovered?.Invoke(item);
             hover.onExit  = ()   => OnItemUnhovered?.Invoke();
+            hover.owner   = this;
+            hover.index   = i;
 
             // 카드에서 바로 끌어 판에 놓는다. 주차 구역(레거시 패널)은 감춰 둔 채,
             // 이 카드가 그 셰이프의 손잡이 역할을 한다 — 드래그 본체는 Shape가 그대로 처리한다.
@@ -342,7 +436,7 @@ public sealed class StagingAreaView : MonoBehaviour
         // scrollContent 크기 = 2열 그리드 전체 크기. 뷰포트(약 470×630) 안에 들어가므로
         // 실제로는 스크롤이 걸리지 않고 5칸이 모두 보인다.
         scrollContent.sizeDelta = new Vector2(
-            SLOT_SPACING + _columns * (SLOT_WIDTH  + SLOT_SPACING),
+            SLOT_SPACING + _columns * (_slotWidth + SLOT_SPACING),
             SLOT_SPACING + SlotRows     * (SLOT_HEIGHT + SLOT_SPACING));
     }
 
@@ -370,6 +464,10 @@ public sealed class StagingAreaView : MonoBehaviour
         var borderImg = slotGO.transform.Find("Border")?.GetComponent<Image>();
         var emptyLbl  = slotGO.transform.Find("EmptyLabel")?.gameObject;
 
+        // 빈 칸 테두리(납품 슬롯 아트)는 빈 칸에서만 — 룬이 들면 등급 보석 테두리가 대신한다(두 겹 테두리 방지).
+        var frame = slotGO.transform.Find("Frame");
+        if (frame != null) frame.gameObject.SetActive(item == null);
+
         var hover = slotGO.GetComponent<SlotHoverHandler>();
         if (hover != null) hover.item = item;
 
@@ -387,6 +485,7 @@ public sealed class StagingAreaView : MonoBehaviour
             if (borderImg != null) borderImg.color = Color.clear;   // 빈 칸엔 틴트 없음(테두리는 슬롯 본체)
             SetSlotOutline(slotGO, COLOR_EMPTY_BORDER);
             if (emptyLbl != null)  emptyLbl.SetActive(true);
+            ((RectTransform)slotGO.transform).anchoredPosition = SlotRestPos(index);   // 들린 채 비지 않게
         }
         else
         {
@@ -394,7 +493,8 @@ public sealed class StagingAreaView : MonoBehaviour
             if (emptyLbl != null)  emptyLbl.SetActive(false);
             bool isNew = _newItemIds.Contains(item.instanceId);
 
-            if (bgImg != null)     bgImg.color     = hasArt ? Color.white : new Color(0.18f, 0.18f, 0.26f, 0.95f);
+            // 룬이 든 칸은 바탕 아트를 어둡게 누른다 — 흰색 그대로면 밝은 회색 판이라 룬 문양·글자가 떴다(09-25 캡처).
+            if (bgImg != null)     bgImg.color     = hasArt ? FilledTint : new Color(0.18f, 0.18f, 0.26f, 0.95f);
             if (borderImg != null)
             {
                 ApplySlotBorderColor(index, item);   // 상태색은 한 창구에서만 칠한다
@@ -402,8 +502,10 @@ public sealed class StagingAreaView : MonoBehaviour
 
             BuildCardContent(slotGO, item, isNew);
 
-            // 배치 전 카드에 shimmer 반짝임 효과
-            slotGO.AddComponent<StagingSlotShimmer>();
+            // 배치 전 카드에 shimmer 반짝임 효과 — 전설은 금빛으로 더 자주(획득 카드·판과 같은 광택)
+            var shimmer = slotGO.AddComponent<StagingSlotShimmer>();
+            if (item.rarity == ItemRarity.Legendary)
+                shimmer.Configure(StagingSlotShimmer.LegendaryTint, 0.55f, 1.6f, _slotWidth);
         }
     }
 
@@ -420,16 +522,7 @@ public sealed class StagingAreaView : MonoBehaviour
 
     private void BuildCardContent(GameObject slotGO, RuntimeItemData item, bool isNew)
     {
-        // 레어도 라인 (상단)
-        var rarityBar = new GameObject("RarityBar", typeof(RectTransform));
-        rarityBar.transform.SetParent(slotGO.transform, false);
-        var rbRT = rarityBar.GetComponent<RectTransform>();
-        rbRT.anchorMin        = new Vector2(0f, 1f);
-        rbRT.anchorMax        = new Vector2(1f, 1f);
-        rbRT.sizeDelta        = new Vector2(0f, 5f);
-        rbRT.anchoredPosition = Vector2.zero;
-        var rbImg = rarityBar.AddComponent<Image>();
-        rbImg.color = RarityColor(item.rarity);
+        // 등급은 카드 둘레의 보석 테두리가 말한다(아래 끝에서 세운다) — 예전 위 끝 5px 색 띠는 뺐다.
 
         // 모양 프리뷰 — 카드의 <b>주인공</b>. 룬은 "효과가 좋아도 판에 안 들어가면 무의미"하므로
         // 플레이어가 가장 먼저 보는 것이 모양이어야 한다. 카드 상단 대부분을 차지한다.
@@ -443,8 +536,8 @@ public sealed class StagingAreaView : MonoBehaviour
         // 물린다. 예전엔 0.90까지 올라가 모양 미리보기가 뱃지·버튼과 겹쳤다.
         // 좌: 룬 고유 아트 / 우: 블록 모양. 겹쳐 놓으면 둘 다 안 읽혀서 칸을 나눈다
         // ("이게 어떤 룬인가"와 "판에서 어떤 모양을 먹는가"는 서로 다른 정보다).
-        shapePreviewRT.anchorMin        = new Vector2(0.42f, 0.32f);
-        shapePreviewRT.anchorMax        = new Vector2(0.92f, 0.84f);
+        shapePreviewRT.anchorMin        = new Vector2(0.44f, 0.40f);
+        shapePreviewRT.anchorMax        = new Vector2(0.93f, 0.88f);
         shapePreviewRT.sizeDelta        = Vector2.zero;
         shapePreviewRT.anchoredPosition = Vector2.zero;
         LayoutRebuilder.ForceRebuildLayoutImmediate(shapePreviewRT);   // rect 확정 후 셀 크기 역산
@@ -452,18 +545,34 @@ public sealed class StagingAreaView : MonoBehaviour
 
         BuildRuneArtPane(slotGO.transform, item);
 
+        // 글자 판 — 이름·효과는 룬 아트 <b>위에</b> 얹힌다. 아트가 밝은 룬(노랑·하늘)에서는
+        // 흰 글자가 그대로 묻혔다(사용자 지적 09-21). 아래 3분의 1에 잉크 판을 깔아 대비를 고정한다.
+        var inkGO = new GameObject("TextInk", typeof(RectTransform));
+        inkGO.transform.SetParent(slotGO.transform, false);
+        var inkRT = inkGO.GetComponent<RectTransform>();
+        inkRT.anchorMin        = new Vector2(0f, 0f);
+        inkRT.anchorMax        = new Vector2(1f, 0.37f);
+        inkRT.sizeDelta        = Vector2.zero;
+        inkRT.anchoredPosition = Vector2.zero;
+        var inkImg = inkGO.AddComponent<Image>();
+        inkImg.color         = new Color(0.03f, 0.03f, 0.05f, 0.90f);   // 0.74는 노란 룬 아트에서 여전히 떴다(실측 09-21)
+        inkImg.raycastTarget = false;
+
         // 이름 (하단 상단부)
         var nameTxtGO = new GameObject("Name", typeof(RectTransform));
         nameTxtGO.transform.SetParent(slotGO.transform, false);
         var nameRT = nameTxtGO.GetComponent<RectTransform>();
-        nameRT.anchorMin        = new Vector2(0f, 0.16f);   // 24px — 16px 줄높이(20.6)가 Ellipsis에 잘리지 않게(19px이던 때 이름이 통째로 사라졌다)
-        nameRT.anchorMax        = new Vector2(1f, 0.32f);
-        nameRT.sizeDelta        = Vector2.zero;
-        nameRT.anchoredPosition = Vector2.zero;
+        // 25px — 18px 줄높이(23)가 Ellipsis에 잘리지 않게(칸이 줄높이보다 낮으면 TMP가 줄을 통째로 버린다 — 09-21 실측)
+        nameRT.anchorMin        = new Vector2(0f, 0.19f);
+        nameRT.anchorMax        = new Vector2(1f, 0.365f);
+        nameRT.offsetMin        = new Vector2(8f, 0f);
+        nameRT.offsetMax        = new Vector2(-8f, 0f);
         var nameTxt = nameTxtGO.AddComponent<TextMeshProUGUI>();
         if (cardFont != null) nameTxt.font = cardFont;
         nameTxt.text              = item.displayName ?? item.itemId;
-        nameTxt.fontSize          = 16f;   // 가독성 하한
+        nameTxt.fontSize          = 18f;   // 룬 선택 규격 — 카드 이름은 효과(16)보다 한 단 크게
+        nameTxt.fontStyle         = FontStyles.Bold;
+        nameTxt.color             = _highlightedItem == item ? SelectedNameInk : NameInk;   // 잉크 판 위 양피지 흰색 · 고르면 금빛
         nameTxt.alignment         = TextAlignmentOptions.Center;
         nameTxt.textWrappingMode = TextWrappingModes.NoWrap;
         nameTxt.overflowMode      = TextOverflowModes.Ellipsis;
@@ -472,34 +581,38 @@ public sealed class StagingAreaView : MonoBehaviour
         var fxTxtGO = new GameObject("Effect", typeof(RectTransform));
         fxTxtGO.transform.SetParent(slotGO.transform, false);
         var fxRT = fxTxtGO.GetComponent<RectTransform>();
-        fxRT.anchorMin        = new Vector2(0f, 0.01f);
-        fxRT.anchorMax        = new Vector2(1f, 0.155f);
-        fxRT.sizeDelta        = Vector2.zero;
-        fxRT.anchoredPosition = Vector2.zero;
+        fxRT.anchorMin        = new Vector2(0f, 0.02f);
+        fxRT.anchorMax        = new Vector2(1f, 0.185f);
+        fxRT.offsetMin        = new Vector2(8f, 0f);
+        fxRT.offsetMax        = new Vector2(-8f, 0f);
         var fxTxt = fxTxtGO.AddComponent<TextMeshProUGUI>();
         if (cardFont != null) fxTxt.font = cardFont;
         fxTxt.text              = EffectLine(item);
-        fxTxt.fontSize          = 14f;   // 카드 220×150 — 16이면 두 줄로 넘친다
+        fxTxt.fontSize          = 16f;   // 잉크 판을 깔아 자리가 생겼다(줄바꿈 없음 + 말줄임이라 넘치지 않는다)
         fxTxt.fontStyle         = FontStyles.Bold;
-        fxTxt.color             = new Color(0.86f, 0.92f, 0.66f, 1f);
+        fxTxt.color             = new Color(0.93f, 0.97f, 0.72f, 1f);
         fxTxt.alignment         = TextAlignmentOptions.Center;
         fxTxt.textWrappingMode = TextWrappingModes.NoWrap;
         fxTxt.overflowMode      = TextOverflowModes.Ellipsis;
         fxTxt.raycastTarget     = false;
 
-        // NEW 뱃지
+        // 등급 보석 테두리 — 룬 선택 카드와 같은 조각을 카드 크기(272)에 맞춰 줄여 얹는다. 글자·단추보다 아래.
+        RuneCardKit.BuildGemFrame((RectTransform)slotGO.transform, item.rarity, 30f, 118f, bottomBar: false);
+
+        // NEW 뱃지 — 위 끝에 걸터앉은 금빛 칩(16px). 예전 9px 빨강 글자는 읽히지 않았다.
         if (isNew)
         {
             var badgeGO = new GameObject("NewBadge", typeof(RectTransform));
             badgeGO.transform.SetParent(slotGO.transform, false);
             var badgeBG = badgeGO.AddComponent<Image>();
-            badgeBG.color = new Color(1f, 0.3f, 0.3f, 0.95f);
+            badgeBG.color         = new Color(0.88f, 0.71f, 0.25f, 1f);
+            badgeBG.raycastTarget = false;
             var badgeRT = badgeGO.GetComponent<RectTransform>();
             badgeRT.anchorMin        = new Vector2(0f, 1f);
             badgeRT.anchorMax        = new Vector2(0f, 1f);
-            badgeRT.pivot            = new Vector2(0f, 1f);
-            badgeRT.sizeDelta        = new Vector2(34f, 16f);
-            badgeRT.anchoredPosition = new Vector2(2f, -2f);
+            badgeRT.pivot            = new Vector2(0f, 0.5f);
+            badgeRT.sizeDelta        = new Vector2(52f, 24f);
+            badgeRT.anchoredPosition = new Vector2(10f, -2f);
 
             var badgeTxtGO = new GameObject("NewBadgeText", typeof(RectTransform));
             badgeTxtGO.transform.SetParent(badgeGO.transform, false);
@@ -510,25 +623,31 @@ public sealed class StagingAreaView : MonoBehaviour
             var badgeTxt = badgeTxtGO.AddComponent<TextMeshProUGUI>();
             if (cardFont != null) badgeTxt.font = cardFont;
             badgeTxt.text          = "NEW";
-            badgeTxt.fontSize      = 9f;
+            badgeTxt.fontSize      = 16f;
+            badgeTxt.fontStyle     = FontStyles.Bold;
             badgeTxt.alignment     = TextAlignmentOptions.Center;
-            badgeTxt.color         = Color.white;
+            badgeTxt.color         = new Color(0.10f, 0.07f, 0.02f, 1f);
             badgeTxt.raycastTarget = false;
         }
 
-        // [X] 폐기 버튼
+        // [×] 폐기 버튼 — 모서리에 걸친 둥근 단추(30px). 예전 22px 빨강 네모 + 14px X는 카드 위 경고처럼 튀었다.
         var xBtnGO = new GameObject("DiscardBtn", typeof(RectTransform));
         xBtnGO.transform.SetParent(slotGO.transform, false);
         var xRT = xBtnGO.GetComponent<RectTransform>();
         xRT.anchorMin        = new Vector2(1f, 1f);
         xRT.anchorMax        = new Vector2(1f, 1f);
-        xRT.pivot            = new Vector2(1f, 1f);
-        xRT.sizeDelta        = new Vector2(22f, 22f);
-        xRT.anchoredPosition = new Vector2(-2f, -2f);
-        var xImg = xBtnGO.AddComponent<Image>();
-        xImg.color = new Color(0.8f, 0.2f, 0.2f, 0.9f);
+        xRT.pivot            = new Vector2(0.5f, 0.5f);
+        xRT.sizeDelta        = new Vector2(30f, 30f);
+        xRT.anchoredPosition = new Vector2(-6f, -4f);
+        var xRing = xBtnGO.AddComponent<Image>();
+        xRing.sprite = RuneCardKit.Disc;
+        xRing.color  = new Color(0.42f, 0.45f, 0.56f, 1f);
         var xBtn = xBtnGO.AddComponent<Button>();
-        xBtn.targetGraphic = xImg;
+        ShopUIStyle.ApplyButtonColors(xBtn, xRing);
+
+        var xFill = ShopUIStyle.MakeImage(xBtnGO.transform, "Fill", new Color(0.07f, 0.08f, 0.12f, 1f));
+        xFill.sprite = RuneCardKit.Disc;
+        ShopUIStyle.Stretch(xFill.rectTransform, 2f);
 
         var xTxtGO = new GameObject("X", typeof(RectTransform));
         xTxtGO.transform.SetParent(xBtnGO.transform, false);
@@ -538,10 +657,11 @@ public sealed class StagingAreaView : MonoBehaviour
         xTxtRT.sizeDelta = Vector2.zero;
         var xTxt = xTxtGO.AddComponent<TextMeshProUGUI>();
         if (cardFont != null) xTxt.font = cardFont;
-        xTxt.text          = "X";
-        xTxt.fontSize      = 14f;
+        xTxt.text          = "×";
+        xTxt.fontSize      = 22f;
+        xTxt.fontStyle     = FontStyles.Bold;
         xTxt.alignment     = TextAlignmentOptions.Center;
-        xTxt.color         = Color.white;
+        xTxt.color         = new Color(0.92f, 0.94f, 1f, 1f);
         xTxt.raycastTarget = false;
 
         var capturedItem = item;
@@ -630,7 +750,7 @@ public sealed class StagingAreaView : MonoBehaviour
         rt.anchorMax        = new Vector2(0f, 1f);
         rt.pivot            = new Vector2(0f, 0.5f);
         rt.sizeDelta        = new Vector2(
-            SLOT_SPACING + _columns * (SLOT_WIDTH + SLOT_SPACING), SLOT_SPACING);
+            SLOT_SPACING + _columns * (_slotWidth + SLOT_SPACING), SLOT_SPACING);
         rt.anchoredPosition = Vector2.zero;
 
         var lineGO = new GameObject("Line", typeof(RectTransform));
@@ -681,14 +801,26 @@ public sealed class StagingAreaView : MonoBehaviour
     /// <summary>index번 슬롯을 2열 그리드의 좌상단 기준 위치에 놓는다.</summary>
     private void PositionSlot(RectTransform rt, int index)
     {
-        int col = index % _columns;
-        int row = index / _columns;
         rt.anchorMin        = new Vector2(0f, 1f);
         rt.anchorMax        = new Vector2(0f, 1f);
         rt.pivot            = new Vector2(0f, 1f);
-        rt.anchoredPosition = new Vector2(
-             SLOT_SPACING + col * (SLOT_WIDTH  + SLOT_SPACING),
+        rt.anchoredPosition = SlotBasePos(index);
+    }
+
+    private Vector2 SlotBasePos(int index)
+    {
+        int col = index % _columns;
+        int row = index / _columns;
+        return new Vector2(
+             SLOT_SPACING + col * (_slotWidth + SLOT_SPACING),
             -SLOT_SPACING - row * (SLOT_HEIGHT + SLOT_SPACING));
+    }
+
+    /// <summary>쉬는 자리 — 고른 카드는 <see cref="SELECT_LIFT"/>만큼 들려 있다(룬 선택 카드의 「고르면 들림」과 같은 말).</summary>
+    private Vector2 SlotRestPos(int index)
+    {
+        bool selected = _slotItems[index] != null && _slotItems[index] == _highlightedItem;
+        return SlotBasePos(index) + (selected ? new Vector2(0f, SELECT_LIFT) : Vector2.zero);
     }
 
     /// <summary>슬롯 한 칸 스케일 펀치. 팝업이 아니라 오버레이지만 룬판은 시간정지 중일 수 있어 unscaled(UIJuice)로 돈다.</summary>
@@ -698,6 +830,54 @@ public sealed class StagingAreaView : MonoBehaviour
 
         try { await UIJuice.PunchAsync(rt, 0.08f, 0.22f, destroyCancellationToken); }
         catch (System.OperationCanceledException) { }
+    }
+
+    /// <summary>
+    /// 카드에 손을 얹으면 살짝 커지고 금빛 테두리가 선다 — 「잡을 수 있는 것」으로 읽히게(의뢰서 「호버=글로우」, 09-27).
+    /// 빈 칸은 반응하지 않는다. 테두리는 처음 필요할 때 만든다(골격 이름 HoverGlow — 카드 내용 갈이에서 살아남는다).
+    /// </summary>
+    private void SetSlotHover(int index, bool on)
+    {
+        if (index < 0 || index >= _slotGOs.Length || _slotGOs[index] == null) return;
+        on &= _slotItems[index] != null;
+        var slot = _slotGOs[index].transform;
+        slot.localScale = on ? Vector3.one * HOVER_SCALE : Vector3.one;
+
+        var glow = slot.Find("HoverGlow");
+        if (glow == null && on)
+        {
+            var img = ShopUIStyle.MakeImage(slot, "HoverGlow", HoverGlowColor);
+            img.sprite        = UIProceduralSprites.RoundedOutline(radius: 12f, stroke: 2.5f);
+            img.type          = Image.Type.Sliced;
+            img.raycastTarget = false;
+            ShopUIStyle.Stretch(img.rectTransform, -3f);
+            glow = img.transform;
+            // 골격(Border·EmptyLabel·Frame) 바로 뒤 = 카드 내용 아래 — 맨 위에 두면 NEW 배지·× 위로 선이 그어졌다(09-27 실측).
+            int chrome = 0;
+            for (int c = 0; c < slot.childCount; c++)
+            {
+                var n = slot.GetChild(c).name;
+                if (n != "HoverGlow" && IsSlotChrome(n)) chrome++;
+            }
+            glow.SetSiblingIndex(chrome);
+        }
+        if (glow == null) return;
+        glow.gameObject.SetActive(on);
+    }
+
+    /// <summary>카드를 잡으면 그 룬을 고른 것으로 친다 — 판의 속성 존 강조가 손에 쥔 룬을 따라온다. 카드는 잔상으로 흐려진다.</summary>
+    private void BeginCardDrag(RuntimeItemData item, GameObject slotGO)
+    {
+        if (item != null && item != _highlightedItem) OnItemSelected?.Invoke(item);
+        SetSlotHover(System.Array.IndexOf(_slotGOs, slotGO), false);
+        if (slotGO == null) return;
+        if (!slotGO.TryGetComponent<CanvasGroup>(out var cg)) cg = slotGO.AddComponent<CanvasGroup>();
+        cg.alpha = DRAG_GHOST;
+    }
+
+    private void EndCardDrag(GameObject slotGO)
+    {
+        if (slotGO != null && slotGO.TryGetComponent<CanvasGroup>(out var cg)) cg.alpha = 1f;
     }
 
     private int FindSlotIndex(RuntimeItemData item)
@@ -725,11 +905,17 @@ public sealed class StagingAreaView : MonoBehaviour
 
         SetSlotOutline(slotGO, color);
 
+        // 상태는 <b>들림 + 등급빛</b>으로 말한다. 예전엔 상태색(청록·노랑)을 알파 0.35로 카드 전체에 덮어
+        // 어두운 판이 밝은 색판으로 보였다(09-25 캡처) — 룬 아트·글자가 그 색에 묻혔다.
+        bool selected = item != null && _highlightedItem == item;
+        ((RectTransform)slotGO.transform).anchoredPosition = SlotRestPos(index);
+
+        // 판 전체를 덮는 틴트는 쓰지 않는다 — 고른 카드가 통째로 회색 판처럼 떴다(09-25 2차 캡처).
+        // 고른 표시는 들림 + 이름 금색(룬 선택 카드의 「고르면 들림·금빛」과 같은 말).
         var borderImg = slotGO.transform.Find("Border")?.GetComponent<Image>();
-        if (borderImg == null) return;
-        borderImg.color = item == null
-            ? Color.clear
-            : new Color(color.r, color.g, color.b, color.a * 0.35f);
+        if (borderImg != null) borderImg.color = Color.clear;
+        var nameTxt = slotGO.transform.Find("Name")?.GetComponent<TMP_Text>();
+        if (nameTxt != null) nameTxt.color = selected ? SelectedNameInk : NameInk;
     }
 
     /// <summary>
@@ -744,11 +930,20 @@ public sealed class StagingAreaView : MonoBehaviour
         var art = RuneArt.ResolveRuneIcon(item);
         if (art == null) return;
 
+        // 문양 뒤 등급빛 — 룬 선택 카드의 문양 칸과 같은 빛(평범은 옅게).
+        var rc = ShopUIStyle.Rarity(item.rarity);
+        var glow = ShopUIStyle.MakeImage(slot, "RuneArtGlow",
+            new Color(rc.r, rc.g, rc.b, item.rarity == ItemRarity.Common ? 0.16f : 0.40f));
+        glow.sprite = UI_RuneSelectPopup.SoftDot;
+        glow.rectTransform.anchorMin = new Vector2(0.00f, 0.30f);
+        glow.rectTransform.anchorMax = new Vector2(0.42f, 1.02f);
+        glow.rectTransform.offsetMin = glow.rectTransform.offsetMax = Vector2.zero;
+
         var go = new GameObject("RuneArtPane", typeof(RectTransform), typeof(Image));
         var rt = (RectTransform)go.transform;
         rt.SetParent(slot, false);
-        rt.anchorMin        = new Vector2(0.08f, 0.38f);
-        rt.anchorMax        = new Vector2(0.38f, 0.80f);
+        rt.anchorMin        = new Vector2(0.06f, 0.42f);
+        rt.anchorMax        = new Vector2(0.36f, 0.90f);
         rt.sizeDelta        = Vector2.zero;
         rt.anchoredPosition = Vector2.zero;
 
@@ -760,8 +955,8 @@ public sealed class StagingAreaView : MonoBehaviour
         var strip = new GameObject("ElemStrip", typeof(RectTransform), typeof(Image));
         var srt = (RectTransform)strip.transform;
         srt.SetParent(slot, false);
-        srt.anchorMin        = new Vector2(0.10f, 0.34f);
-        srt.anchorMax        = new Vector2(0.36f, 0.365f);
+        srt.anchorMin        = new Vector2(0.08f, 0.385f);
+        srt.anchorMax        = new Vector2(0.34f, 0.405f);
         srt.sizeDelta        = Vector2.zero;
         srt.anchoredPosition = Vector2.zero;
         var simg = strip.GetComponent<Image>();
@@ -875,7 +1070,7 @@ public sealed class StagingAreaView : MonoBehaviour
         panelRT.anchorMin        = new Vector2(0.5f, 0.5f);
         panelRT.anchorMax        = new Vector2(0.5f, 0.5f);
         panelRT.pivot            = new Vector2(0.5f, 0.5f);
-        panelRT.sizeDelta        = new Vector2(280f, 110f);
+        panelRT.sizeDelta        = new Vector2(400f, 180f);   // 17px 세 줄 + 버튼 — 280×110에 13px로 끼워 넣었었다
         panelRT.anchoredPosition = Vector2.zero;
         var panelBG = panelGO.AddComponent<Image>();
         panelBG.color = new Color(0.1f, 0.1f, 0.16f, 0.98f);
@@ -883,21 +1078,21 @@ public sealed class StagingAreaView : MonoBehaviour
         var textGO = new GameObject("Text", typeof(RectTransform));
         textGO.transform.SetParent(panelGO.transform, false);
         var textRT = textGO.GetComponent<RectTransform>();
-        textRT.anchorMin = new Vector2(0f, 0.42f);
+        textRT.anchorMin = new Vector2(0f, 0.36f);
         textRT.anchorMax = Vector2.one;
-        textRT.sizeDelta = Vector2.zero;
+        textRT.sizeDelta = new Vector2(-24f, -12f);
         _discardDialogText = textGO.AddComponent<TextMeshProUGUI>();
         if (cardFont != null) _discardDialogText.font = cardFont;
-        _discardDialogText.fontSize  = 13f;
+        _discardDialogText.fontSize  = 17f;
         _discardDialogText.alignment = TextAlignmentOptions.Center;
         _discardDialogText.color     = new Color(0.9f, 0.9f, 0.95f, 1f);
 
         BuildDialogButton(panelGO, "YesBtn",
-            new Vector2(0.08f, 0f), new Vector2(0.45f, 0.4f),
+            new Vector2(0.08f, 0.08f), new Vector2(0.45f, 0.34f),
             new Color(0.75f, 0.18f, 0.18f, 1f), "폐기", OnDiscardConfirm);
 
         BuildDialogButton(panelGO, "NoBtn",
-            new Vector2(0.55f, 0f), new Vector2(0.92f, 0.4f),
+            new Vector2(0.55f, 0.08f), new Vector2(0.92f, 0.34f),
             new Color(0.25f, 0.25f, 0.32f, 1f), "취소", HideDiscardDialog);
 
         _discardDialog.SetActive(false);
@@ -913,7 +1108,7 @@ public sealed class StagingAreaView : MonoBehaviour
         btnRT.anchorMin        = anchorMin;
         btnRT.anchorMax        = anchorMax;
         btnRT.sizeDelta        = Vector2.zero;
-        btnRT.anchoredPosition = new Vector2(0f, 6f);
+        btnRT.anchoredPosition = Vector2.zero;
         var btnBG = btnGO.AddComponent<Image>();
         btnBG.color = bgColor;
         var btn = btnGO.AddComponent<Button>();
@@ -927,7 +1122,7 @@ public sealed class StagingAreaView : MonoBehaviour
         var lblTxt = lblGO.AddComponent<TextMeshProUGUI>();
         if (cardFont != null) lblTxt.font = cardFont;
         lblTxt.text      = label;
-        lblTxt.fontSize  = 13f;
+        lblTxt.fontSize  = 18f;
         lblTxt.alignment = TextAlignmentOptions.Center;
         lblTxt.color     = Color.white;
         lblTxt.raycastTarget = false;
@@ -946,7 +1141,14 @@ public sealed class StagingAreaView : MonoBehaviour
                 $"<color=#63D9C0>원석 +{ore}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
         }
         if (_discardDialog != null)
+        {
+            // 판에 놓인 룬(Puzzle — 룬판 루트 직속·맨 위)이 어두운 막 위로 비쳤다 — 룬판 루트의 맨 위로 옮긴다(09-27).
+            var panel = GetComponentInParent<UI_GridPanel>();
+            if (panel != null && _discardDialog.transform.parent != panel.transform)
+                _discardDialog.transform.SetParent(panel.transform, false);
+            _discardDialog.transform.SetAsLastSibling();
             _discardDialog.SetActive(true);
+        }
     }
 
     private void HideDiscardDialog()
@@ -970,15 +1172,6 @@ public sealed class StagingAreaView : MonoBehaviour
         RuneSalvage.Refund(item);
     }
 
-    // ── Helpers ──
-
-    private static Color RarityColor(ItemRarity rarity) => rarity switch
-    {
-        ItemRarity.Rare      => COLOR_RARE,
-        ItemRarity.Epic      => COLOR_EPIC,
-        ItemRarity.Legendary => COLOR_LEGENDARY,
-        _                    => COLOR_COMMON,
-    };
 
     // ── Nested: Drag Handler ──
 
@@ -1001,6 +1194,7 @@ public sealed class StagingAreaView : MonoBehaviour
             _shape = owner != null ? owner.GetShapeForItem(item) : null;
             if (_shape == null) return;
 
+            owner.BeginCardDrag(item, gameObject);   // 고른 룬 = 끄는 룬 · 카드는 잔상
             _shape.OnBeginDrag(eventData);   // 부모가 gameplayRoot로 바뀌며 감춤(알파0)에서 벗어난다
             MoveToPointer(eventData);
         }
@@ -1010,6 +1204,7 @@ public sealed class StagingAreaView : MonoBehaviour
         public void OnEndDrag(PointerEventData eventData)
         {
             if (_shape == null) return;
+            owner?.EndCardDrag(gameObject);
             _shape.OnEndDrag(eventData);
             _shape = null;
         }
@@ -1039,14 +1234,18 @@ public sealed class StagingAreaView : MonoBehaviour
         public RuntimeItemData                item;
         public System.Action<RuntimeItemData> onEnter;
         public System.Action                  onExit;
+        public StagingAreaView                owner;
+        public int                            index;
 
         public void OnPointerEnter(PointerEventData eventData)
         {
+            owner?.SetSlotHover(index, true);
             if (item != null) onEnter?.Invoke(item);
         }
 
         public void OnPointerExit(PointerEventData eventData)
         {
+            owner?.SetSlotHover(index, false);
             onExit?.Invoke();
         }
     }

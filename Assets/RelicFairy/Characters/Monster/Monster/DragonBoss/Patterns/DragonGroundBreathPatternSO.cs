@@ -23,9 +23,13 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     [SerializeField] private float _prepareDuration = 2f;
     [SerializeField] private float _breathDuration  = 5f;
 
+    [Header("쿨다운")]
+    [Tooltip("끝난 뒤 다시 쓰기까지 (초) — 0이면 없음")]
+    [SerializeField] private float _cooldown = 12f;
+
     [Header("회전 속도 (도/초)")]
-    [SerializeField] private float _rotateSpeedPrepare = 60f;
-    [SerializeField] private float _rotateSpeedBreath  = 30f;
+    [SerializeField] private float _rotateSpeedPrepare = 100f;
+    [SerializeField] private float _rotateSpeedBreath  = 60f;
 
     [Header("브레스 데미지")]
     [Tooltip("사거리 최대 한도. 맵 경계가 이보다 가까우면 경계까지만 닿는다 — 맵 끝까지 닿게 하려면 맵 크기보다 크게 설정")]
@@ -66,6 +70,7 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     public float  BreathDuration        => _breathDuration;
     public float  RotateSpeedPrepare    => _rotateSpeedPrepare;
     public float  RotateSpeedBreath     => _rotateSpeedBreath;
+    public float  Cooldown              => _cooldown;
     public float  BreathRange           => _breathRange;
     public float  BreathRadius          => _breathRadius;
     public int    BreathDamagePerSec    => _breathDamagePerSec;
@@ -90,7 +95,8 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     public override bool CanExecute(BossPatternContext ctx)
         => ctx.Ctx.Runtime.PlayerTarget != null
            && ctx.Blackboard is DragonBossBlackboard bb
-           && bb.BodyState == BodyState.Grounded;
+           && bb.BodyState == BodyState.Grounded
+           && bb.GroundBreathCooldown <= 0f;
 
     public override SpecialStateBase GetRuntimeState() => _runtimeState;
 }
@@ -198,6 +204,8 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
     public override void Exit(MonsterContext ctx)
     {
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
+            bb.GroundBreathCooldown = Data.Cooldown;
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.isStopped = false;
         StopBreathSfx();
         ReleasePooledEffect(ref _breathEffect);
@@ -212,6 +220,8 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         RotateToPlayer(ctx, Data.RotateSpeedPrepare);
         SyncEffect(_warningEffect, ctx);
         SyncRangeIndicator(ctx);
+        if (Data.PrepareDuration > 0f)
+            PatternGuideHelper.SetProgress(_rangeIndicator, _timer / Data.PrepareDuration);
 
         if (_timer < Data.PrepareDuration) return;
 
@@ -222,8 +232,8 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
         PlayAnim(ctx, Data.BreathLoopStateName);
         SpawnBreath(ctx);
-        // 범위 경고장판은 브레스 중에도 유지 (색상만 완전 불투명으로 전환)
-        SetRangeIndicatorAlpha(Data.BreathColor.r, Data.BreathColor.g, Data.BreathColor.b, 0.8f);
+        // 범위 가이드는 브레스 중에도 유지 — 판정 색으로 바꾼다
+        PatternGuideHelper.Arm(_rangeIndicator);
     }
 
     // ── Phase: Breathing ──────────────────────────────────────────────────────
@@ -348,24 +358,9 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
     private void SpawnRangeIndicator(MonsterContext ctx)
     {
-        _rangeIndicator = new GameObject("BreathRangeWarning");
-        var lr = _rangeIndicator.AddComponent<LineRenderer>();
-
-        lr.useWorldSpace     = true;
-        lr.positionCount     = 2;
-        lr.startWidth        = Data.BreathRadius * 2f;
-        lr.endWidth          = Data.BreathRadius * 2f;
-        lr.numCapVertices    = 4;
-        lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        lr.receiveShadows    = false;
-
-        var mat = new Material(Shader.Find("Sprites/Default"));
         Color c = Data.BreathColor;
-        mat.color     = new Color(c.r, c.g, c.b, 0.55f);
-        lr.material   = mat;
-        lr.startColor = new Color(c.r, c.g, c.b, 0.6f);
-        lr.endColor   = new Color(c.r, c.g, c.b, 0.15f);
-
+        _rangeIndicator = PatternGuideHelper.Prepare(
+            PatternGuideHelper.Beam(ctx.Transform.position, ctx.Transform.forward, 1f, Data.BreathRadius * 2f, c), c);
         SyncRangeIndicator(ctx);
     }
 
@@ -373,8 +368,6 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
     private void SyncRangeIndicator(MonsterContext ctx, float? overrideRange = null)
     {
         if (_rangeIndicator == null) return;
-        var lr = _rangeIndicator.GetComponent<LineRenderer>();
-        if (lr == null) return;
 
         Vector3 forward = ctx.Transform.forward;
         forward.y = 0f;
@@ -386,19 +379,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         Vector3 origin = new Vector3(mouthPos.x, groundY, mouthPos.z);
         float range = overrideRange ?? DragonPatternFloorUtils.DistanceToFloorEdge(origin, forward, Data.BreathRange);
 
-        lr.SetPosition(0, origin);
-        lr.SetPosition(1, origin + forward * range);
-    }
-
-    private void SetRangeIndicatorAlpha(float r, float g, float b, float a)
-    {
-        if (_rangeIndicator == null) return;
-        var lr = _rangeIndicator.GetComponent<LineRenderer>();
-        if (lr == null) return;
-        lr.startColor = new Color(r, g, b, a);
-        lr.endColor   = new Color(r, g, b, a * 0.4f);
-        if (lr.material != null)
-            lr.material.color = new Color(r, g, b, a);
+        PatternGuideHelper.PlaceBeam(_rangeIndicator, origin, forward, range, Data.BreathRadius * 2f);
     }
 
     // ── TintEffect ────────────────────────────────────────────────────────────
@@ -522,7 +503,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         if (player == null) return;
 
         float dmg = ctx.Config.stat.attackPower * Data.DamageMultiplier * DamageTick;
-        player.TakeDamage(Mathf.RoundToInt(dmg));
+        player.TakeDamage(Mathf.RoundToInt(dmg), ctx.Monster.gameObject, false, HitWeight.Light);   // 브레스 틱 — 약
         Data.StatusEffect?.Apply(player);
     }
 

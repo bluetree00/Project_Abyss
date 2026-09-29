@@ -35,6 +35,14 @@ public static class RuneZoneRule
     public static bool Accepts(GridSquare square, string elementId, bool isLegendary = false)
         => square == null || Accepts(square.zoneCode, elementId, isLegendary);
 
+    /// <summary>
+    /// 중앙(CENTER)에 못 놓는 룬인가 — 레전드리와 <b>존핵</b>(정제소). 존핵의 증폭은 자기 속성 존에서만 돌아
+    /// 중앙에 두면 아무 효과 없는 칸이 된다(기획 정제소 §3-1 「안 맞는 존에 놓으면 무효」).
+    /// <see cref="Accepts(char,string,bool)"/>의 세 번째 인자로 넘긴다.
+    /// </summary>
+    public static bool NoCenter(RuntimeItemData item)
+        => item != null && (item.rarity == ItemRarity.Legendary || RefineryService.IsZoneCore(item));
+
     /// <summary>룬 아이템의 속성 zone_id("FIRE" 등). 아이템이 없거나 무속성이면 null.</summary>
     public static string ElementOf(RuntimeItemData item)
         => item != null && !string.IsNullOrEmpty(item.element) ? item.element : null;

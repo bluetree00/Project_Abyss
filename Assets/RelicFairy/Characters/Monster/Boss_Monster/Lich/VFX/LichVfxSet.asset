@@ -1,0 +1,594 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 001561d08e869214a89fe0a691a077b0, type: 3}
+  m_Name: LichVfxSet
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichVfxSetSO
+  entries:
+  - slot: 1
+    prefab: {fileID: 6010434030211556052, guid: 86fb4dcd3ac9b8b479b5bae451719ebd,
+      type: 3}
+    scale: 1.1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Spells Pack \uBE44\uC804 \uC2DC\uC804 \uC18C\uC6A9\uB3CC\uC774(\uBC18\uBCF5)
+      \u2014 \uB370\uBAA8 \uBC1C\uC0AC\uAE30\uB294 LichVfx\uAC00 \uB048\uB2E4"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 10
+    prefab: {fileID: 5912344974454636654, guid: 174b164cad6fbdb4eb2769a452399510,
+      type: 3}
+    scale: 0.6
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "MSP \uBCF4\uB77C \uBC88\uAC1C\uD0C4(\uBC18\uBCF5)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 11
+    prefab: {fileID: 3728020703757951210, guid: e9f62bf1880228f4eab10427ee363528,
+      type: 3}
+    scale: 0.4
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0.6
+    note: "Spells Pack \uBE44\uC804 \uD3ED\uBC1C 3 \u2014 \uC791\uAC8C"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 12
+    prefab: {fileID: 5490221094549253126, guid: 6917c8ff75e3f2c44ad44d8df072e2dd,
+      type: 3}
+    scale: 0.8
+    offset: {x: 0, y: 0.05, z: 0}
+    lifetime: 1.5
+    note: "Spells Pack \uBE44\uC804 \uD3ED\uBC1C \u2014 \uACE0\uB9AC+\uAD6C, \uBC18\uACBD
+      \uC57D 2 m"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 2
+    prefab: {fileID: 3470175545269027477, guid: 3f498e4cf53914e48b44a0340f496a52,
+      type: 3}
+    scale: 1.1
+    offset: {x: 0, y: 1.2, z: 0}
+    lifetime: 1.5
+    note: "Spells Pack \uBE44\uC804 \uD3ED\uBC1C 2 \u2014 \uBCF4\uB77C \uC5F0\uAE30"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 3
+    prefab: {fileID: 5490221094549253126, guid: 6917c8ff75e3f2c44ad44d8df072e2dd,
+      type: 3}
+    scale: 1.1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 1.2
+    note: "Spells Pack \uBE44\uC804 \uD3ED\uBC1C(\uACE0\uACF5 \uCD9C\uD604)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 4
+    prefab: {fileID: 1348390491135638, guid: d7d554880214e644bbbbfc89aa884b26, type: 3}
+    scale: 2
+    offset: {x: 0, y: 0.1, z: 0}
+    lifetime: 1.5
+    note: "Hovl \uBCF4\uB77C \uAD6C\uCCB4 \uD3ED\uBC1C(Hit 17 nova) \u2014 \uBC18\uACBD
+      4 m. 09-18 \uAD50\uCCB4(\uBD84\uD64D \uC5F0\uAE30 \uB369\uC5B4\uB9AC\uC600\uC74C)
+      \xB7 09-19 \uD310\uC815 \uB300\uC870(Boss Room/11): \uD310\uC815 \uBC18\uACBD\uC758
+      \uC57D 30%\uB85C \uBCF4\uC5EC \xD72"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 5
+    prefab: {fileID: 7264909701002127926, guid: 72643d98a2de9c743b9888ccf1539c80,
+      type: 3}
+    scale: 0.3
+    offset: {x: 0, y: 0.5, z: 0}
+    lifetime: 2.5
+    note: "SSEP2 \uC545\uB9C8\uC758 \uAC10\uC625 \u2014 \uBCF4\uB77C \uC18C\uC6A9\uB3CC\uC774
+      \uACE0\uB9AC(\u203B EMP\uB294 GrabPass \uC65C\uACE1\uC774 URP \uD654\uBA74\uC744
+      \uB36E\uC5B4 \uAD50\uCCB4)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 13
+    prefab: {fileID: 1938559062727932, guid: b056e80a15927884a8d19c5ec18a6de9, type: 3}
+    scale: 0.6
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Hovl \uBD88 \uB9C8\uBC95\uC9C4"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 14
+    prefab: {fileID: 1658448689254514, guid: ee581131052aa0e4d9dea523e5bacb4a, type: 3}
+    scale: 0.6
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Hovl \uBB3C(\uC5BC\uC74C) \uB9C8\uBC95\uC9C4"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 15
+    prefab: {fileID: 1334179685657794, guid: 37ffde710e1caa44d842f936899af19f, type: 3}
+    scale: 0.6
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Hovl \uBC88\uAC1C \uB9C8\uBC95\uC9C4"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 16
+    prefab: {fileID: 13531440185366499, guid: ea2807df7b2a48f4396037f07b37eafe, type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Spells Pack \uBE44\uC804 \uC2DC\uC804 \uB8EC \uACE0\uB9AC"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 18
+    prefab: {fileID: 5814864941146802141, guid: d3b04768c83040b419f8960119e0bced,
+      type: 3}
+    scale: 0.25
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 1.5
+    note: "Spells Pack \uC5BC\uC74C \uCC3D"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 19
+    prefab: {fileID: 4186470608034871016, guid: 4b780a14d074f2f4cb9b853b6644dce1,
+      type: 3}
+    scale: 0.4
+    offset: {x: 0, y: 0.1, z: 0}
+    lifetime: 1
+    note: "MSP \uC5BC\uC74C \uACB0\uC815 \uCC29\uD0C4"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 20
+    prefab: {fileID: 1266534244052857346, guid: 84a2671b622e73d40b57cbf7db774c2d,
+      type: 3}
+    scale: 0.08
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 1.5
+    note: "SSEP2 \uB099\uB8B0 \uAE30\uB465"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 21
+    prefab: {fileID: 8881179166184986975, guid: 0acb59c36e3495a43abbde5a801c28d2,
+      type: 3}
+    scale: 0.45
+    offset: {x: 0, y: 1, z: 0}
+    lifetime: 0
+    note: "SSEP2 \uC545\uB9C8 \uAD6C\uCCB4(\uC791\uAC8C, \uBC18\uBCF5 \uAC15\uC81C)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 22
+    prefab: {fileID: 3470175545269027477, guid: 3f498e4cf53914e48b44a0340f496a52,
+      type: 3}
+    scale: 0.6
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 1.2
+    note: "Spells Pack \uBE44\uC804 \uD3ED\uBC1C 2"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 23
+    prefab: {fileID: 8881179166184986975, guid: 0acb59c36e3495a43abbde5a801c28d2,
+      type: 3}
+    scale: 1.15
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "SSEP2 \uC545\uB9C8 \uAD6C\uCCB4 \u2014 \uBCF4\uC774\uB294 \uBC18\uACBD
+      \uC57D 3 m(\uBC18\uBCF5 \uAC15\uC81C)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 24
+    prefab: {fileID: 3728020703757951210, guid: e9f62bf1880228f4eab10427ee363528,
+      type: 3}
+    scale: 2
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 1.5
+    note: "Spells Pack \uBE44\uC804 \uD3ED\uBC1C 3 \xB7 09-19 \uD310\uC815 \uB300\uC870:
+      \uD310\uC815\uC758 \uC57D 15% \u2192 \xD72(\uC7AC\uCE21\uC815 \uD544\uC694)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 25
+    prefab: {fileID: 217051656145255241, guid: cd1835015a7136e479b54f5fa9f3993f, type: 3}
+    scale: 1.5
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Spells Pack \uBE44\uC804 \uBC14\uB2E5 \uC8FC\uBB38(\uBC18\uBCF5) \u2014
+      \uBC18\uACBD \uC57D 5 m"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 26
+    prefab: {fileID: 1348390491135638, guid: d7d554880214e644bbbbfc89aa884b26, type: 3}
+    scale: 2.5
+    offset: {x: 0, y: 0.1, z: 0}
+    lifetime: 1.5
+    note: "Hovl Hit 17 nova \u2014 \uBC18\uACBD 5 m. 09-18 \uAD50\uCCB4 \xB7 09-19
+      \uD310\uC815 \uB300\uC870: \uD310\uC815\uC758 \uC57D 25% \u2192 \xD72"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 27
+    prefab: {fileID: 6640501052880962967, guid: 66cfb511f8effdc489478be604bab435,
+      type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Spells Pack \uC5B4\uB460 4 \uBCF4\uB77C \uBCC0\uD615"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 30
+    prefab: {fileID: 3192426079943343367, guid: 74191c569ba27d14d8023c27caa4bcf9,
+      type: 3}
+    scale: 0.8
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Spells Pack \uBD88 \uBC14\uB2E5(\uBC18\uBCF5)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 31
+    prefab: {fileID: 2069352338822879331, guid: 9bd2b17ccd2d70e4890d08479ab9f4a2,
+      type: 3}
+    scale: 0.2
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "SSEP1 \uC5BC\uC74C \uC7A5\uD310(\uD480 \uBC16 \uC0DD\uC131)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 32
+    prefab: {fileID: 2790239246667695447, guid: 2f0c96fa9be733c49b02f90a5800ef48,
+      type: 3}
+    scale: 0.13
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "SSEP1 \uBC88\uAC1C \uC7A5\uD310"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 33
+    prefab: {fileID: 8100751516763994463, guid: a566b7c8c7df18c4ba44056226c21053,
+      type: 3}
+    scale: 0.25
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "SSEP1 \uBCF4\uB77C \uC5F0\uAE30 \uC7A5\uD310"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 40
+    prefab: {fileID: 1919708242137258, guid: e60d36cff17a1ce4db49ef54f9e72f61, type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 1
+    note: "Hovl2 \uD070 \uBCA0\uAE30 \u2014 \uB0AB \uADDC\uC57D \uBE68\uAC15\uC73C\uB85C
+      \uC0C9 \uC785\uD798(09-18) \xB7 09-19 \uC624\uD504\uC14B 0(\uD68C\uC804\uC5D0
+      \uAC19\uC774 \uB3CC\uC544 \uB4A4\uC9D1\uC73C\uBA74 \uBC14\uB2E5 \uC544\uB798\uB85C
+      \uAC10) \u2014 \uB192\uC774\uB294 \uCF54\uB4DC(SlashHeight)"
+    beamLength: 0
+    tint: {r: 1, g: 0.22745098, b: 0.22745098, a: 1}
+  - slot: 50
+    prefab: {fileID: 1761614549529672, guid: f2fcfb64ef05e064b8cdab8538cd1c5e, type: 3}
+    scale: 0.8
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 1.5
+    note: "Hovl \uAE08\uBE5B \uC0AC\uC2AC \uACE0\uB9AC(\uBC18\uBCF5) \u2014 \uBAB8\uC5D0
+      \uAC10\uAE34 \uBD09\uC778 \uC0AC\uC2AC. 09-18 \uAD50\uCCB4"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 51
+    prefab: {fileID: 1290426356431852618, guid: 32614a0360ca45044b4436c4f3c5a6a9,
+      type: 3}
+    scale: 0.2
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "SSEP1 \uC5B4\uB460 \uC0AC\uC2AC \uB2AA"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 52
+    prefab: {fileID: 4993568638942088851, guid: 13b7fdb99d291054ab23ba24b4c37776,
+      type: 3}
+    scale: 0.14
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Hovl \uCCAD\uB85D \uD14C\uB450\uB9AC \uC6D0(\uBC18\uBCF5) \u2014 \uBD09\uC778\uC11D
+      \uBC14\uB2E5(\uCCAD\uB85D = \uCE60 \uC218 \uC788\uC74C). 09-18 \uAD50\uCCB4(\uC544\uC774\uD15C
+      \uD6A8\uACFC\uC74C \uB8E8\uD504 \uC81C\uAC70)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 57
+    prefab: {fileID: 8705053025583827179, guid: 07f751a1f5c9f9c48b5fa767509cda9a,
+      type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "AncientAltar \uB8EC\uC11D(RuneRock_1, \uB192\uC774 2.6 m) + Totems \uC7AC\uC9C8
+      \uB8EC \uBC1C\uAD11(\uCCAD\uB85D) \u2014 \uAE30\uBCF8 \uB3C4\uD615 \uAE30\uB465
+      \uB300\uCCB4. 09-18"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 58
+    prefab: {fileID: 1031125134, guid: abc00000000003064275970823802713, type: 3}
+    scale: 8
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "2\uD398\uC774\uC988 \uBB34\uB300 \uBCC0\uD654 \u2014 \uBB34\uB108\uC9C4
+      \uADC0\uD241\uC774 \uC2EC\uC5F0\uC5D0\uC11C \uC19F\uB294 \uAC70\uB300 \uC11D\uC0C1(\uB450\uAC74
+      \uC4F4 \uC218\uD638\uC0C1, Gothic SM_Statue_01a). 09-19 \uC2E4\uCE21: \xD76\uC740
+      \uACE0\uB515 \uCCA8\uD0D1\uBCF4\uB2E4 \uC791\uC544 \xD78"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 53
+    prefab: {fileID: 8697400331180497108, guid: fabdc41743036b945ade90d43535856b,
+      type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Vefects \uAE08\uBE5B \uAE30\uB465(\uBC18\uBCF5)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 54
+    prefab: {fileID: 4186470608034871016, guid: 4b780a14d074f2f4cb9b853b6644dce1,
+      type: 3}
+    scale: 0.8
+    offset: {x: 0, y: 0.5, z: 0}
+    lifetime: 1.2
+    note: "MSP \uC5BC\uC74C \uACB0\uC815 \uD30C\uD3B8"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 17
+    prefab: {fileID: 6531319713837899222, guid: 3ecc26f6d4062be44b0a099e114ff00c,
+      type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "PixPlays \uD654\uC5FC \uAD11\uC120 \u2014 \uD329 \uB4DC\uB77C\uC774\uBC84(BeamVfx)\uAC00
+      \uBAB8\uD1B5 \uAE38\uC774\xB7\uB05D \uD3ED\uBC1C\uC744 \uB9DE\uCD98\uB2E4"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 35
+    prefab: {fileID: 2352610519853280536, guid: 5eeaa49a26f1bb7468d756408c7434a4,
+      type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "\uC6D0\uC18C \uACA9\uB958(\uC545\uBABD\uAE30 P2) \u2014 \uBC14\uB2E5\uC744
+      \uC4F8\uACE0 \uB3C4\uB294 \uBE44\uC804 \uACA9\uB958. PixPlays \uBC14\uB78C
+      \uAD11\uC120\uC744 \uBCF4\uB77C\uB85C(09-19, \uB80C\uB354\uB9C1 \uBE44\uAD50
+      \uB300\uAE30)"
+    beamLength: 0
+    tint: {r: 0.7058824, g: 0.36078432, b: 1, a: 1}
+  - slot: 41
+    prefab: {fileID: 2414816008507225855, guid: 17cfcc57fb4d15e498045ccaf7c70bc4,
+      type: 3}
+    scale: 0.09
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "SSEP1 \uC8FD\uC74C\uC758 \uD68C\uC804 \u2014 \uB0A0\uC544\uAC00\uB294
+      \uB0AB(\uBC18\uBCF5 \uAC15\uC81C)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 44
+    prefab: {fileID: 5912344974454636654, guid: 174b164cad6fbdb4eb2769a452399510,
+      type: 3}
+    scale: 0.8
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "MSP \uBCF4\uB77C \uBC88\uAC1C\uD0C4 \u2014 \uB5A8\uC5B4\uC9C0\uB294 \uC904\uAE30"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 45
+    prefab: {fileID: 4550076289710732121, guid: 8f2f58d7a42129d4183953d600976851,
+      type: 3}
+    scale: 0.3
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0.8
+    note: "MSP \uBCF4\uB77C \uBCC4 \uCC29\uD0C4 \u2014 \uBC18\uACBD 1.5 m"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 46
+    prefab: {fileID: 8100751516763994463, guid: a566b7c8c7df18c4ba44056226c21053,
+      type: 3}
+    scale: 0.2
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "SSEP1 \uBCF4\uB77C \uC5F0\uAE30 \u2014 \uC0C1\uACF5 \uAD6C\uB984(\uC791\uAC8C
+      \u2014 1.2\uBC30\uC5D0\uC11C \uD654\uBA74\uC744 \uB36E\uC5C8\uB2E4)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 28
+    prefab: {fileID: 7441502302898250610, guid: f0d3fa0fecf173a41bae576a89e37923,
+      type: 3}
+    scale: 2.2
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Spells Pack \uBE44\uC804 \uBC29\uD328 \u2014 \uBC18\uACBD 10 m\uB85C(\uBC18\uBCF5)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 29
+    prefab: {fileID: 1348390491135638, guid: d7d554880214e644bbbbfc89aa884b26, type: 3}
+    scale: 2.5
+    offset: {x: 0, y: 0.5, z: 0}
+    lifetime: 1.8
+    note: "Hovl Hit 17 nova \u2014 \uACB0\uACC4 \uD30C\uAD34 \uBC18\uACBD 10 m. 09-18
+      \uAD50\uCCB4"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 55
+    prefab: {fileID: 5706960345115239278, guid: b7ccc161176536948b1b274f53795233,
+      type: 3}
+    scale: 0.3
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 1.5
+    note: "SSEP1 \uAE08\uBE5B \uC0AC\uC2AC \uAD6C(HolyRedemption) \u2014 \uBD09\uC778
+      \uC0AC\uC2AC\uC774 \uAC10\uAE30\uB294 \uC21C\uAC04(\uC61B ChainGold)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 6
+    prefab: {fileID: 3594149076506533137, guid: 6fc914f49e5ff664ea5e8a29573adde7,
+      type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Spells Pack \uBE44\uC804 \uB8EC \uC6D0(\uBC18\uBCF5) \u2014 \uB0A0\uACE0
+      \uC788\uB294 \uB9AC\uCE58\uC758 \uBC14\uB2E5 \uD45C\uC2DD"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 42
+    prefab: {fileID: 1716391117806116, guid: 6c45d61ea68f82b4eb2c7f1ff7fdcb81, type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 1
+    note: "Hovl \uBCF4\uB77C \uC21C\uAC04\uC774\uB3D9 \uC12C\uAD11 \u2014 C4 \uB3C4\uCC29
+      \uC790\uB9AC(\uD770 \uD2F4\uD2B8). 09-20: PhantomShow\uB294 \uCE74\uB4DC\uAC00
+      \uC81C\uB2E8 \uC804\uCCB4\uB85C \uD769\uC5B4\uC838 \uD654\uBA74\uC744 \uB36E\uC5B4
+      \uAD50\uCCB4"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 60
+    prefab: {fileID: 6935568911942545081, guid: 96aacb3c58028424aa3e5f4e5c55f12e,
+      type: 3}
+    scale: 0.2
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "SSEP1 \uC2DC\uACC4\uD615 \uBD09\uC778\uC9C4 \u2014 \uBCF4\uB77C\uB85C
+      \uC0C9 \uC785\uD798(F2)"
+    beamLength: 0
+    tint: {r: 0.6901961, g: 0.4392157, b: 1, a: 1}
+  - slot: 63
+    prefab: {fileID: 5813194599007461377, guid: 4092d73b4f103fc4a828c97d6a3b3ded,
+      type: 3}
+    scale: 0.3
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 2
+    note: "SSEP1 \uD770 \uC218\uC9C1 \uD30C\uC1C4 \u2014 \uC0AC\uB9DD(\uB9E4\uBC88
+      \uC0C8\uB85C \uC0DD\uC131)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 56
+    prefab: {fileID: 5511052677990246615, guid: 34d0599d37e35ac4ebeab64c18d00ccc,
+      type: 3}
+    scale: 0.2
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 3
+    note: "SSEP1 \uAE08\uBE5B \uACE0\uB9AC + \uBE5B\uAE30\uB465 \u2014 \uBD09\uC778
+      \uC644\uC131(\uAE08 = \uD50C\uB808\uC774\uC5B4\uC758 \uBD09\uC778)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 70
+    prefab: {fileID: 3942825033974895155, guid: 6be92596c1a7ee04893f5af9b1a33bf3,
+      type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Hovl \uC804\uCCB4 \uD654\uBA74 \u2014 \uBCF4\uB77C \uAC00\uC7A5\uC790\uB9AC(\uD398\uC774\uC9C0
+      \uC804\uD658)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 71
+    prefab: {fileID: 3942825033974895155, guid: 8b08fc045b6efa84bbe2dd3eeed90fa5,
+      type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Hovl \uC804\uCCB4 \uD654\uBA74 \u2014 \uBD09\uC778 \uC644\uC131"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 72
+    prefab: {fileID: 3942825033974895155, guid: 1c24a4c46891dd544b15cfba7a45bab7,
+      type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Hovl \uC804\uCCB4 \uD654\uBA74 \u2014 \uCD5C\uD6C4\uC758 \uB300\uB9C8\uBC95"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 73
+    prefab: {fileID: 3942825033974895155, guid: 7297fe0a5e06fb644a731296af23d579,
+      type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Hovl \uC804\uCCB4 \uD654\uBA74 \u2014 \uCF54\uC5B4\uB85C \uB044\uB294
+      \uBC14\uB78C"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 34
+    prefab: {fileID: 4832121135125949560, guid: d67be8e74f13e26429aece1e53a117b7,
+      type: 3}
+    scale: 0.25
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "\uC5EC\uC6B4 \uC7A5\uD310(\uBC18\uBCF5) \u2014 \uD638\uCD9C \uBC30\uC728
+      = \uBC18\uACBD(m). \uD310\uC815 \uD06C\uAE30 \uB300\uC870(Boss Room/11)\uB85C
+      \uB9DE\uCD9C \uAC83. 09-18 2\uCC28 \uAC1C\uD3B8 \xA712-5 \xB7 09-19 \uAC10\uC0AC:
+      0.5\uB294 \uD310\uC815\uC758 2~4\uBC30 \u2192 0.25"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 36
+    prefab: {fileID: 1658448689254514, guid: ee581131052aa0e4d9dea523e5bacb4a, type: 3}
+    scale: 0.5
+    offset: {x: 0, y: 0.1, z: 0}
+    lifetime: 1.5
+    note: "\uBD80\uC11C\uC9C4 \uBC14\uB2E5\uC774 \uB5A0\uC624\uB97C \uB54C \uCCAD\uB85D
+      \uC6D0(\uCE78 5 m). \xA712-4"
+    beamLength: 0
+    tint: {r: 0.49803922, g: 0.9490196, b: 1, a: 1}
+  - slot: 47
+    prefab: {fileID: 1509486939602526, guid: 2bdfafb54af034a46815013e96d908d0, type: 3}
+    scale: 0.5
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0.6
+    note: "\uD328\uB9C1 \uCC3D \u2014 \uB0AB(\uC190)\uC758 \uAE08\uBE5B \uC12C\uAD11.
+      \uCF54\uB4DC\uAC00 \uAE08\uBE5B\uC73C\uB85C \uC0C9 \uC785\uD798. \xA712-3"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 48
+    prefab: {fileID: 460321523706951053, guid: d4be339cf2250de4696c7b598a6d3fa9, type: 3}
+    scale: 1.5
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 1.2
+    note: "\uD328\uB9C1 \uC131\uACF5 \u2014 \uD295\uACA8\uB0B4\uB294 \uAE08\uBE5B
+      \uBD88\uAF43. \xA712-3"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 49
+    prefab: {fileID: 1228060220772394, guid: 26ca230b5e25e7a4394b9883f13f4527, type: 3}
+    scale: 0.3
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "\uC0AC\uC2AC \uACB0\uBC15 \u2014 \uBB36\uC778 \uD50C\uB808\uC774\uC5B4
+      \uBC1C\uBC11 \uAE08\uBE5B \uACE0\uB9AC(\uBC18\uBCF5). \xA712-5"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 65
+    prefab: {fileID: 3255629840924039632, guid: efaca1b73cf772a429555136dcf8766d,
+      type: 3}
+    scale: 0.8
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 2
+    note: "\uB0AB \uD574\uACE8\uC774 \uBD80\uC11C\uC9C0\uB294 \uBF1B\uAC00\uB8E8(\uBCF4\uB77C
+      \uD3ED\uBC1C). \xA712-2"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 66
+    prefab: {fileID: 6640501052880962967, guid: 66cfb511f8effdc489478be604bab435,
+      type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 3.5
+    note: "Spells Pack \uC5B4\uB460 \uBD84\uCD9C(\uBCF4\uB77C \uBC88\uAC1C \uCD09\uC218
+      \xB7 \uAC80\uC740 \uC5F0\uAE30) \u2014 \uB9AC\uCE58 \uB4F1\uC7A5: \uC81C\uB2E8
+      \uBC14\uB2E5\uC5D0\uC11C \uC19F\uC544 \uBAB8\uC774 \uB514\uC878\uBE0C \uC778(09-20
+      \uB80C\uB354 \uBE44\uAD50 01\uBC88)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 67
+    prefab: {fileID: 4550076289710732121, guid: a73108d561dbdf34ba462e73e97ed541,
+      type: 3}
+    scale: 0.38
+    offset: {x: 0, y: 1, z: 0}
+    lifetime: 2
+    note: "MSP \uBCF4\uB77C \uC12C\uAD11 \uD3ED\uBC1C \u2014 \uD398\uC774\uC9C0 \uC804\uD658(\uD718\uCCAD
+      \xB7 \uD3EC\uD6A8). \uB4F1\uC7A5\uACFC \uB2E4\uB978 \uC790\uC6D0\uC73C\uB85C(09-20
+      \uC0AC\uC6A9\uC790 \uC9C0\uC801: \uB4F1\uC7A5 \xB7 \uC804\uD658\uC774 \uAC19\uC740
+      \uC774\uD399\uD2B8)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  chainMaterial: {fileID: 2100000, guid: 78ae7c5cda35e6d47abbbd3ada229965, type: 2}
+  crackMaterial: {fileID: 2100000, guid: 06ed439858d6b394eb2fbeda50f0ec16, type: 2}

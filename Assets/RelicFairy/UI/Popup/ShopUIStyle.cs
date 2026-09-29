@@ -38,11 +38,20 @@ public static class ShopUIStyle
             "crucible_success" => (0.85f, 1.20f),
             "enhance_success"  => (0.85f, 1.20f),
             "shop_buy"         => (0.80f, 1.10f),
+            "shop_deal"        => (0.95f, 1.60f),   // 특가는 종소리로 구분(기획: 소리 구분)
+            "shop_select"      => (0.45f, 0.95f),   // 좌판에서 물건을 집는 소리
             "shop_reroll"      => (0.70f, 1.25f),
+            "refine_spin"      => (0.55f, 0.85f),   // 정제소 — 로가 빛을 모으기 시작
+            "refine_reveal"    => (0.80f, 1.15f),   // 공개
+            "refine_legend"    => (1.00f, 1.50f),   // 전설 오버로드
             "shop_open"        => (0.60f, 1.00f),
             "shop_close"       => (0.55f, 0.90f),
             "crucible_fail"    => (0.80f, 0.65f),
+            "crucible_hit"     => (0.90f, 0.55f),   // 망치가 모루에 닿는 순간(낮은 쿵)
             "shop_reject"      => (0.65f, 0.70f),
+            "altar_engrave"    => (0.80f, 1.30f),   // 기억의 제단 — 각인(짧은 금속 울림)
+            "altar_grow"       => (0.50f, 1.60f),   // 빛실이 자란다(오르는 음)
+            "altar_keystone"   => (1.00f, 1.55f),   // 열쇠 노드(종)
             _                  => (0.65f, 1.00f),
         };
 
@@ -50,10 +59,11 @@ public static class ShopUIStyle
     }
 
     // ── 팔레트 (다크 판타지/유물) ───────────────────────────
-    public static readonly Color Veil        = new(0f, 0f, 0f, 0.80f);
-    public static readonly Color WindowFill   = new(0.055f, 0.050f, 0.085f, 0.992f);
-    public static readonly Color WindowBorder = new(0.52f, 0.40f, 0.20f, 1f);   // aged bronze
-    public static readonly Color BandFill     = new(0.10f, 0.085f, 0.135f, 1f);
+    // 바탕·선·글자는 전 화면 공통 언어(UITheme, 의뢰서 §3)를 가리킨다 — 값은 원래 이곳 것 그대로(09-28 UI 톤 통일).
+    public static readonly Color Veil        = UITheme.Veil;
+    public static readonly Color WindowFill   = UITheme.Window;
+    public static readonly Color WindowBorder = UITheme.Bronze;   // aged bronze
+    public static readonly Color BandFill     = UITheme.Band;
     public static readonly Color BronzeLine   = new(0.55f, 0.42f, 0.22f, 0.9f);
     public static readonly Color PortraitBg   = new(0.04f, 0.04f, 0.07f, 1f);
 
@@ -63,8 +73,8 @@ public static class ShopUIStyle
 
     public static readonly Color GoldPillBg   = new(0.16f, 0.13f, 0.06f, 1f);
     public static readonly Color Gold         = UIPalette.Gold;
-    public static readonly Color TextPrimary  = new(0.93f, 0.91f, 0.85f, 1f);   // parchment
-    public static readonly Color TextDim      = new(0.62f, 0.60f, 0.64f, 1f);
+    public static readonly Color TextPrimary  = UITheme.Ink;    // parchment
+    public static readonly Color TextDim      = UITheme.Mute;
     public static readonly Color RejectRed    = new(1f, 0.32f, 0.30f, 1f);
 
     public static readonly Color BuyFill      = new(0.42f, 0.32f, 0.14f, 1f);   // bronze button
@@ -212,6 +222,30 @@ public static class ShopUIStyle
         cb.disabledColor    = new Color(1f, 1f, 1f, 0.45f);   // 곱셈이라 알파로 죽인다(아트 버튼도 같은 규약)
         cb.fadeDuration     = 0.08f;
         btn.colors = cb;
+    }
+
+    /// <summary>
+    /// 같은 텍스처·영역으로 <b>9-slice 경계만 준 런타임 사본</b>. 납품 아트에 경계가 없어 늘리면 모서리가 뭉개질 때 쓴다 —
+    /// .meta(임포트 설정)는 건드리지 않는다. 코드로 만든 스프라이트라 구운 프리팹엔 저장되지 않는다(런타임에 입힐 것).
+    /// border = (왼쪽, 아래, 오른쪽, 위) 원본 px. 영역을 못 읽으면(아틀라스 촘촘 포장 등) null.
+    /// </summary>
+    public static Sprite SlicedCopy(Sprite src, Vector4 border)
+    {
+        if (src == null || src.texture == null) return null;
+        try
+        {
+            var rect = src.packed ? src.textureRect : src.rect;
+            var copy = Sprite.Create(src.texture, rect, new Vector2(0.5f, 0.5f), src.pixelsPerUnit, 0,
+                                     SpriteMeshType.FullRect, border);
+            copy.name      = src.name + "_Sliced";
+            copy.hideFlags = HideFlags.HideAndDontSave;
+            return copy;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[ShopUIStyle] 9-slice 사본 실패({src.name}): {e.Message}");
+            return null;
+        }
     }
 
     public static void Stretch(RectTransform rt, float pad = 0f)

@@ -20,10 +20,24 @@ namespace RelicFairy.Monster
 /// ━━ 패턴 시스템 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ///  BossPatternRunner 가 Update() 에서 틱되어 BossConfigSO 의
 ///  patternEntries 를 평가하고 패턴 SpecialState 를 발동한다.
+///
+/// ━━ 2페이지 「심연의 화룡」 (악몽기만, 09-28 설계 §4) ━━━━━━━━━━
+///  BossPages 가 체력 두 줄 · 전환 · 간판(검은 태양) 시점을 정한다. 2페이지 동안 원소는 Abyss 로 고정되고
+///  (1페이지 원소 풀 · 소환이 다시 켜지지 않는다) 아레나 가장자리에 검은 불 띠가 영구로 남는다.
 /// </summary>
-public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
+public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, IBossHudSource
 {
     // ── 드래곤 전용 설정 (Inspector) ──────────────────────
+    [Header("Dragon — 표시")]
+    [Tooltip("보스 체력바 이름. config.monsterName은 퀘스트 처치 키라 바꾸지 않는다")]
+    [SerializeField] private string _bossDisplayName = "화룡";
+
+    [Header("Dragon — 패턴 가이드 (SkillIndicator)")]
+    [Tooltip("원형 가이드 머티리얼 — 리치 가이드를 화룡 문양으로 바꾼 것. 비우면 프리미티브로 폴백")]
+    [SerializeField] private Material _circleGuideMaterial;
+    [Tooltip("직선 가이드 머티리얼(돌진·브레스·폭풍 날개). 비우면 프리미티브로 폴백")]
+    [SerializeField] private Material _arrowGuideMaterial;
+
     [Header("Dragon — 애니메이션 상태 이름")]
     [SerializeField] private string _walkChaseStateName  = "WalkChase";
     [SerializeField] private string _runChaseStateName   = "RunChase";
@@ -175,6 +189,19 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     [Tooltip("메테오 버스트 지속 시간 상한 (초)")]
     [SerializeField] private float _passiveMeteorBurstMax = 10f;
 
+    [Header("Dragon — 2페이지 「심연의 화룡」 무대 (악몽기)")]
+    [Tooltip("전환 때 아레나 가장자리에 영구로 타오르는 검은 불 띠 폭 (m)")]
+    [SerializeField] private float _abyssEdgeBandWidth = 3f;
+    [Tooltip("띠 안에 있으면 0.5초마다 받는 피해 = 공격력 × 이 값")]
+    [SerializeField] private float _abyssEdgeDamageMult = 0.08f;
+    [Tooltip("띠를 따라 늘어놓는 검은 불 이펙트 — 비우면 바닥 띠만")]
+    [SerializeField] private GameObject _abyssEdgeVfxPrefab;
+    [SerializeField] private float _abyssEdgeVfxScale = 1f;
+    [Tooltip("2페이지 몸 색상 회전(셰이더 _Hue, 1 = 한 바퀴) — 붉은 몸을 검보라로. 셰이더에 _BaseColor가 없어 원소 틴트(MPB)는 보이지 않는다")]
+    [SerializeField] private float _abyssBodyHueShift = -0.2f;
+    [Tooltip("2페이지 몸 색 곱(셰이더 _Tint) — 조금 어둡게")]
+    [SerializeField] private Color _abyssBodyTint = new Color(0.8f, 0.7f, 0.9f, 1f);
+
     // ── 읽기 전용 프로퍼티 (상태 클래스에서 접근) ──────────
     public string WalkChaseStateName   => _walkChaseStateName;
     public string RunChaseStateName    => _runChaseStateName;
@@ -227,12 +254,49 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     public float   EntranceBreathSfxLeadTime  => _entranceBreathSfxLeadTime;
 
     // ── IBoss ─────────────────────────────────────────────
+    /// <summary>
+    /// 페이즈 · 원소 · 소환 경계가 읽는 체력 비율. 악몽기(2페이지 있음)엔 1페이지 기준(1 → 0),
+    /// 2페이지엔 0.4 → 0 — 1페이지용 경계가 다시 켜지지 않는다. 봉인기엔 예전 공식 그대로.
+    /// </summary>
     public float HpRatio =>
-        (_config != null && _config.stat.maxHp > 0)
-            ? (float)_runtime.CurrentHp / _config.stat.maxHp
+        (_config != null && _runtime != null && _config.stat.maxHp > 0)
+            ? Pages.PhaseRatio(_runtime.CurrentHp, _config.stat.maxHp)
             : 1f;
 
     public BossAttackBlackboard Blackboard => _dragonBB;
+
+    // ── 2페이지 (BossPages) ───────────────────────────────
+    /// <summary>체력 두 줄 · 전환 · 간판 시점. 초기화 중 EffectiveMaxHp가 먼저 읽을 수 있어 처음 읽을 때 만든다.</summary>
+    public BossPages Pages => _pages ??= CreatePages();
+    public string StoryBossId => StoryProgress.Dragon;
+
+    /// <summary>2페이지(전환 포함) — 원소 Abyss 고정 · 소환 없음.</summary>
+    public bool IsAbyssPage => Pages.IsPage2 || Pages.Transitioning;
+
+    /// <summary>지금 원소. 1페이지 = 체력 비율(Ice &gt;70% · Thunder 40~70% · Fire ≤40%), 2페이지 = Abyss.</summary>
+    public DragonBossBlackboard.DragonElement CurrentElement
+    {
+        get
+        {
+            if (IsAbyssPage) return DragonBossBlackboard.DragonElement.Abyss;
+            float ratio = HpRatio;
+            if (ratio > 0.7f) return DragonBossBlackboard.DragonElement.Ice;
+            if (ratio > 0.4f) return DragonBossBlackboard.DragonElement.Thunder;
+            return DragonBossBlackboard.DragonElement.Fire;
+        }
+    }
+
+    protected override float BossHpScale   => Pages.HpScale;
+    protected override int   DamageHpFloor => Pages.HpFloor(base.DamageHpFloor);
+
+    // ── IBossHudSource ────────────────────────────────────
+    public float[] HudPageMarkers  => Pages.HudPageMarkers;
+    public int     HudPage         => Pages.HudPage;
+    public bool    HudInvulnerable => IsDamageImmuneNow;
+    public event Action<bool>       HudInvulnerableChanged;
+    public event Action<float>      HudVulnerableWindow;
+    public event Action             HudPageMarkersChanged;
+    public event Action<int, float> HudPageRefill;
 
     // ── 보스 전용 필드 ────────────────────────────────────
     private DragonBossBlackboard         _dragonBB;
@@ -244,6 +308,19 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     private System.Threading.CancellationTokenSource _meteorPassiveCts;
     private Vector3                      _preEntranceSpawnPos;
     private bool                         _hasPreEntranceSpawnPos;
+
+    // ── 2페이지 ───────────────────────────────────────────
+    private BossPages                    _pages;
+    private BossStageHazard              _stageHazard;       // 가장자리 검은 불 띠(영구) — 풀 반환 때 거둔다
+    private static readonly int          HueId  = Shader.PropertyToID("_Hue");
+    private static readonly int          TintId = Shader.PropertyToID("_Tint");
+    private Material[]                   _abyssMats;         // 몸 · 날개 머티리얼 인스턴스(눈 제외) — 처음 2페이지 때 만든다
+    private float[]                      _abyssBaseHue;
+    private Color[]                      _abyssBaseTint;
+    private bool                         _abyssLook;
+    private bool                         _abyssBlending;     // 전환 동안 서서히 바뀌는 중
+    private bool                         _lastHudInvulnerable;
+    private System.Threading.CancellationTokenSource _pageTransitionCts;
 
     // ── 공중 히트박스 ─────────────────────────────────────
     private CapsuleCollider _capsule;
@@ -279,6 +356,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     protected override string ConfigAddress => "DragonBossConfig";
     // ConfigAddress에 '/'가 없어 기본 ServerStatId 추출이 "DragonBossConfig"가 되어 CSV id("DragonBoss")와 불일치 → 명시 지정.
     protected override string ServerStatId  => "DragonBoss";
+
+    public override string BossName => _bossDisplayName;
     protected override string DataAddress   => null;
     protected override bool   UseWorldHPBar => false;
 
@@ -335,6 +414,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         }
 
         InitializeRoomContext(); // OnEnable이 _runtime 생성 전에 호출된 경우를 위한 재시도
+        // 가이드는 정적 주입 — 보스마다 자기 것을 넣는다(리치 뒤에 오면 리치 것이 남아 있다)
+        PatternGuideHelper.SetMaterials(_circleGuideMaterial, _arrowGuideMaterial);
         // BreathSweep/FireballRain 경고장판 풀 사전 워밍 — 전투 중 첫 스폰 시 CreatePrimitive 렉 방지
         QuadTilePool.Prewarm(DragonBossRoomContext.Width * DragonBossRoomContext.Height);
         BindBossHud();
@@ -383,6 +464,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         base.Update();
         if (_runtime == null || _runtime.IsDead || _dragonBB == null) return;
 
+        TickHudInvulnerable();
+
         // 등장 연출 중에는 패턴 러너와 무브먼트 완전 정지
         if (_dormantState != null && _dormantState.IsActive) return;
 
@@ -404,9 +487,11 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         _prevBodyState = _dragonBB.BodyState;
 
         // 공중 진입 직후 랜덤 선회량 채울 때까지 패턴 발동 잠금
+        // 단 2페이지 전환 · 간판(검은 태양)은 선회 잠금을 기다리지 않는다 — 체력이 경계에 붙잡힌 채 선회만 돌지 않게
         bool airPatternLocked = _dragonBB.BodyState == BodyState.Airborne
             && _dragonBB.AirOrbitAccumulatedDegrees < _airOrbitCurrentLockDegrees;
-        if (!airPatternLocked)
+        bool pageUrgent = Pages.TransitionDue(_runtime.CurrentHp) || Pages.SignatureDue(_runtime.CurrentHp);
+        if (!airPatternLocked || pageUrgent)
             _runner?.Tick(Time.deltaTime);
 
         SyncAirborneHitbox();
@@ -564,6 +649,9 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
 
     protected override void OnEnable()
     {
+        // 풀 재사용 — 이번 전투가 악몽기인지 다시 정한다. base.OnEnable이 HP를 EffectiveMaxHp(= 페이지 배율 포함)로 채우므로 그 전에 비운다.
+        _pages = null;
+        DestroyStageHazard();
         base.OnEnable();
         InitializeRoomContext();
         _dragonBB?.Reset();
@@ -571,6 +659,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         CacheTransitionPatternBaseWeights();
         UpdateTransitionPatternWeights();
         BindBossHud();
+        HudPageMarkersChanged?.Invoke();    // 같은 보스를 다시 묶으면 HUD가 눈금을 다시 읽지 않는다 — 새 전투의 두 줄 여부를 알린다
+        _lastHudInvulnerable        = false;
         _airborneHitboxActive       = true; // 다음 프레임 SyncAirborneHitbox에서 지상 상태로 강제 복원
         _prevBodyState              = BodyState.Grounded;
         _airOrbitCurrentLockDegrees = 0f;
@@ -584,6 +674,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         // pool 재활성 시 Ice 페이즈 색상으로 리셋
         DragonBossVisualHelper.ApplyBodyTint(transform,
             DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice));
+        SetAbyssBodyLook(false);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -593,6 +684,9 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 피격 처리 (쉴드)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>소환 게이트(무적) 구간도 「막힘」으로 읽히게 한다(공용 규약).</summary>
+    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || (_dragonBB != null && _dragonBB.IsSummonGated);
 
     public override void TakeDamage(float amount, GameObject instigator,
         float knockbackMultiplier = 1f,
@@ -605,7 +699,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         }
 
         // HP가 소환 임계값에 이미 도달해 있고 해당 소환이 미발동이면 데미지 전 즉시 무적
-        if (_dragonBB != null && _config != null && _runtime != null && _config.stat.maxHp > 0)
+        // (2페이지엔 소환이 없다 — 비율이 0.4 → 0으로 다시 내려가도 게이트를 걸지 않는다)
+        if (_dragonBB != null && _config != null && _runtime != null && _config.stat.maxHp > 0 && !IsAbyssPage)
         {
             float ratio = HpRatio;
             if ((!_dragonBB.HasSummonedAt70 && ratio <= 0.7f) ||
@@ -632,11 +727,12 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     {
         if (_dragonBB == null) return;
 
-        // 소환 임계값 돌파 시 무적 게이트 설정 — 소환 패턴 완료까지 이후 데미지 차단
+        // 소환 임계값 돌파 시 무적 게이트 설정 — 소환 패턴 완료까지 이후 데미지 차단 (2페이지엔 소환 없음)
         float ratio = HpRatio;
-        if ((!_dragonBB.HasSummonedAt70 && ratio <= 0.7f) ||
-            (!_dragonBB.HasSummonedAt40 && ratio <= 0.4f) ||
-            (!_dragonBB.HasSummonedAt10 && ratio <= 0.1f))
+        if (!IsAbyssPage &&
+            ((!_dragonBB.HasSummonedAt70 && ratio <= 0.7f) ||
+             (!_dragonBB.HasSummonedAt40 && ratio <= 0.4f) ||
+             (!_dragonBB.HasSummonedAt10 && ratio <= 0.1f)))
         {
             _dragonBB.SetSummonGated(true);
         }
@@ -656,7 +752,74 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     protected override void OnDisable()
     {
         StopMeteorPassiveRunner();
+        _pageTransitionCts?.Cancel();
+        _pageTransitionCts?.Dispose();
+        _pageTransitionCts = null;
+        DestroyStageHazard();
         base.OnDisable();
+    }
+
+    /// <summary>
+    /// 2페이지 몸 색(검보라) — 화룡 셰이더(Malbers)엔 _BaseColor가 없어 <see cref="DragonBossVisualHelper.ApplyBodyTint"/>(MPB)가 보이지 않고,
+    /// 피격 번쩍임(VictimHitFeedback)도 끝날 때 MPB를 비운다 → 머티리얼 인스턴스의 색상 회전(_Hue) · 곱(_Tint)을 바꾼다. 눈 머티리얼은 뺀다.
+    /// </summary>
+    private void SetAbyssBodyLook(bool on)
+    {
+        if (on == _abyssLook && !_abyssBlending) return;
+        if (on && _abyssMats == null) CacheAbyssMaterials();
+        if (_abyssMats == null) return;
+        _abyssBlending = false;   // 서서히 바뀌던 중이면 여기서 끝
+        _abyssLook = on;
+        ApplyAbyssBlend(on ? 1f : 0f);
+    }
+
+    /// <summary>0 = 원래 몸 · 1 = 심연(검보라).</summary>
+    private void ApplyAbyssBlend(float k)
+    {
+        for (int i = 0; i < _abyssMats.Length; i++)
+        {
+            var m = _abyssMats[i];
+            if (m == null) continue;
+            Color t = _abyssBaseTint[i];
+            m.SetFloat(HueId, _abyssBaseHue[i] + _abyssBodyHueShift * k);
+            m.SetColor(TintId, Color.Lerp(t, new Color(t.r * _abyssBodyTint.r, t.g * _abyssBodyTint.g, t.b * _abyssBodyTint.b, t.a), k));
+        }
+    }
+
+    /// <summary>전환 — 바가 차오르는 <paramref name="seconds"/> 동안 몸이 서서히 검보라로. 도중에 초기화되면 멈춘다.</summary>
+    private async UniTaskVoid BlendAbyssBodyAsync(float seconds)
+    {
+        if (_abyssLook) return;
+        if (_abyssMats == null) CacheAbyssMaterials();
+        if (_abyssMats == null) return;
+        _abyssBlending = true;
+        var ct = destroyCancellationToken;
+        try
+        {
+            for (float t = 0f; t < seconds && _abyssBlending; t += Time.unscaledDeltaTime)
+            {
+                ApplyAbyssBlend(t / seconds);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException) { return; }
+        if (_abyssBlending) SetAbyssBodyLook(true);
+    }
+
+    private void CacheAbyssMaterials()
+    {
+        var mats = new System.Collections.Generic.List<Material>();
+        foreach (var r in GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            foreach (var m in r.materials)
+                if (m != null && m.HasProperty(HueId) && m.HasProperty(TintId) && !m.name.Contains("Eye")) mats.Add(m);
+        _abyssMats     = mats.ToArray();
+        _abyssBaseHue  = new float[_abyssMats.Length];
+        _abyssBaseTint = new Color[_abyssMats.Length];
+        for (int i = 0; i < _abyssMats.Length; i++)
+        {
+            _abyssBaseHue[i]  = _abyssMats[i].GetFloat(HueId);
+            _abyssBaseTint[i] = _abyssMats[i].GetColor(TintId);
+        }
     }
 
     private void StartMeteorPassiveRunner()
@@ -746,10 +909,17 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
 
         _dragonBB.LastPatternTag = pattern.patternTag;
 
+        if (pattern is BossPageTransitionPatternSO)
+            PrepareForPageTransition();
+
+        // 몸 상태를 바꾸며 끝나는 패턴(이착륙 · 급강하 · 추락)은 연속 카운트를 새로 센다
         if (pattern is DragonTakeoffPatternSO
             || pattern is DragonLandingPatternSO
             || pattern is DragonSummonPatternSO
-            || pattern is DragonIceSlamPatternSO)
+            || pattern is DragonIceSlamPatternSO
+            || pattern is BossPageTransitionPatternSO
+            || pattern is DragonAbyssDivePatternSO
+            || pattern is DragonBlackSunPatternSO)
         {
             _dragonBB.GroundedPatternStreak = 0;
             _dragonBB.AirbornePatternStreak = 0;
@@ -856,6 +1026,10 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
 
     private ICondition BuildCondition(BossConditionKey key, BossConfigSO config)
     {
+        // 2페이지 공용 키(Page_1 · Page_2 · Page_TransitionDue · Page_SignatureDue) — 기본 분기(AlwaysTrue)로 새지 않게 먼저
+        if (BossPageCondition.TryBuild(key, this, () => Pages, out var pageCondition))
+            return pageCondition;
+
         return key switch
         {
             BossConditionKey.Phase2               => new HpBelowCondition(config.condPhase2HpThreshold),
@@ -877,6 +1051,130 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
             _                                      => new AlwaysTrue(),
         };
     }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 2페이지 「심연의 화룡」 — IPagedBoss
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>전환 전경 — 아레나 가장자리 띠가 검은 불로 타오른다(영구) · 몸 색 검보라.</summary>
+    public void OnPageStageChange(float seconds)
+    {
+        if (_runtime == null) return;
+        DestroyStageHazard();
+        Bounds arena  = DragonPatternFloorUtils.GetRoomFloorBoundsXZ();
+        float  floorY = DragonPatternFloorUtils.GetFloorY(arena.center, _runtime.SpawnPosition.y);
+        Color  abyss  = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Abyss);
+        _stageHazard = BossStageHazard.CreateEdgeBand(this, arena, floorY, _abyssEdgeBandWidth, seconds,
+            new Color(abyss.r, abyss.g, abyss.b, 0.45f), _abyssEdgeVfxPrefab, _abyssEdgeVfxScale, _abyssEdgeDamageMult);
+        BlendAbyssBodyAsync(seconds).Forget();   // 바가 차오르는 동안 몸이 서서히 검보라로(09-29)
+    }
+
+    /// <summary>2페이지 진입 — 소환 흔적을 닫고(새끼 용 없음) 연출 뒤 한숨 돌릴 틈을 준다.</summary>
+    public void OnPage2Entered()
+    {
+        if (_dragonBB != null)
+        {
+            _dragonBB.HasSummonedAt70 = true;
+            _dragonBB.HasSummonedAt40 = true;
+            _dragonBB.HasSummonedAt10 = true;
+            // 1페이지 막판(10% 소환 직전)에 걸린 소환 게이트가 남으면 2페이지 내내 무적이 된다
+            _dragonBB.SetSummonGated(false);
+        }
+        SetAbyssBodyLook(true);
+        _runner?.EnsureMinBreakCooldown(1.5f);
+    }
+
+    /// <summary>전환 · 간판 뒤 복귀 — 공중이면 선회(AttackReady), 지상이면 거리 따라 걷기/달리기 추격.</summary>
+    public void ReturnToCombat()
+    {
+        if (_runtime == null || _runtime.PlayerTarget == null || IsPlayerDead())
+        {
+            ChangeState<PatrolState>();
+            return;
+        }
+        if (_dragonBB != null && _dragonBB.BodyState == BodyState.Airborne)
+        {
+            ChangeState<AttackReadyState>();
+            return;
+        }
+        if (_runtime.DistToPlayer > _walkToRunThreshold)
+            ChangeState<DragonRunChaseState>();
+        else
+            ChangeState<ChaseState>();
+    }
+
+    /// <summary>무방비 창 — HUD가 보스 바를 번쩍인다(검은 태양 격추 그로기).</summary>
+    public void RaiseHudVulnerableWindow(float seconds)
+    {
+        if (seconds > 0f) HudVulnerableWindow?.Invoke(seconds);
+    }
+
+    private BossPages CreatePages()
+    {
+        var pages = new BossPages(this, BossPages.ResolveEnabled());
+        // HUD는 보스(IBossHudSource) 이벤트를 구독한다 — 풀 재사용으로 BossPages가 새로 만들어져도 구독이 끊기지 않게 중계
+        pages.HudPageRefill         += HandlePageRefill;
+        pages.HudPageMarkersChanged += HandlePageMarkersChanged;
+        return pages;
+    }
+
+    /// <summary>전환이 시작되는 순간 — 탑다운 카메라를 먼저 풀고(전환 카메라와 다투지 않게), 공중이면 땅으로 내린다.</summary>
+    private void PrepareForPageTransition()
+    {
+        // 탑다운이 켜진 채 전환 카메라가 제어를 잡으면 복귀 뒤 탑다운 상태가 꼬인다. 휘청(0.5초) 안에 끝나게 짧게.
+        GameCameraController.Instance?.DeactivateDragonTopDownView(0.3f);
+        if (_dragonBB == null || _dragonBB.BodyState != BodyState.Airborne) return;
+
+        _pageTransitionCts?.Cancel();
+        _pageTransitionCts?.Dispose();
+        _pageTransitionCts = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(destroyCancellationToken);
+        DescendForPageTransitionAsync(_pageTransitionCts.Token).Forget();
+    }
+
+    /// <summary>「휘청 — 추락 직전」: 공중에서 전환이 걸리면 실시간 0.6초에 땅으로 내려앉힌다(연출 슬로모와 무관).</summary>
+    private async UniTaskVoid DescendForPageTransitionAsync(System.Threading.CancellationToken ct)
+    {
+        const float Seconds = 0.6f;
+        Vector3 from   = transform.position;
+        float   floorY = DragonPatternFloorUtils.GetFloorY(from, _runtime.SpawnPosition.y);
+        try
+        {
+            for (float t = 0f; t < Seconds; )
+            {
+                t += Time.unscaledDeltaTime;
+                Vector3 p = transform.position;
+                p.y = Mathf.Lerp(from.y, floorY, Mathf.Clamp01(t / Seconds));
+                transform.position = p;
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (_runtime == null || _runtime.IsDead || _dragonBB == null) return;
+        _dragonBB.BodyState = BodyState.Grounded;
+        DragonPatternFloorUtils.SnapToFloorAndRestoreAgent(_ctx);
+        if (_ctx.Agent != null && _ctx.Agent.isOnNavMesh) _ctx.Agent.isStopped = true;   // 전환 상태 Exit가 다시 푼다
+    }
+
+    private void DestroyStageHazard()
+    {
+        if (_stageHazard != null) Destroy(_stageHazard.gameObject);
+        _stageHazard = null;
+    }
+
+    private void TickHudInvulnerable()
+    {
+        bool inv = HudInvulnerable;
+        if (inv == _lastHudInvulnerable) return;
+        _lastHudInvulnerable = inv;
+        HudInvulnerableChanged?.Invoke(inv);
+    }
+
+    private void HandlePageRefill(int page, float seconds) => HudPageRefill?.Invoke(page, seconds);
+    private void HandlePageMarkersChanged()                => HudPageMarkersChanged?.Invoke();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // IBossEntrance

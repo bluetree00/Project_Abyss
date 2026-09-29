@@ -14,9 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MainWeaponSO
   weaponDisplayKey: T3_Crossbow_Display
   weaponPrefabKey: T3_Crossbow_Weapon
-  displayName: "전설의 석궁"
+  displayName: "\uC804\uC124\uC758 \uC11D\uAD81"
+  tagline: 
+  uiThemeColor: {r: 0, g: 0, b: 0, a: 0}
   iconKey: T3_CrossbowIcon
-  icon: {fileID: 21300000, guid: 3498fcefa3e7e9046a22f82375ad2587, type: 3}
+  icon: {fileID: 21300000, guid: d526ef740b1dee843915699aaef42a1e, type: 3}
   tier: 3
   rarity: 2
   baseAttack: 25
@@ -24,11 +26,15 @@ MonoBehaviour:
   attackSpeed: 1
   attackRange: 8
   areaOfEffect: 0.5
+  critChance: 25
+  critDamage: 1.25
   groundEndCount: 2
   airEndCount: 2
   animationSet: {fileID: 11400000, guid: 13c9508a14118774a854c352a7399486, type: 2}
   abilitySet: {fileID: 11400000, guid: 1d00c30a7d27c9f45998d431e3ee7f75, type: 2}
+  trailVfxPrefab: {fileID: 0}
   weaponType: 6
+  evolution: {fileID: 0}
   skillQ: {fileID: 11400000, guid: f13606e204e18f64ea72e2d77f8d9ee1, type: 2}
   skillE: {fileID: 11400000, guid: cdd3c33e1f408f94bb84c42b02776fa7, type: 2}
   holdThreshold: 2

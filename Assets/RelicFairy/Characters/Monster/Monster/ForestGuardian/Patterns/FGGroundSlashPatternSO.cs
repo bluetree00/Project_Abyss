@@ -63,9 +63,6 @@ public class FGGroundSlashPatternSO : BossPatternSO
 
     // ── 비주얼 ────────────────────────────────────────────
     [Header("GroundSlash — Visual")]
-    [Tooltip("디스크 경고 장판 프리팹 (DiscMeshWarning 포함)")]
-    public GameObject warningDiscPrefab;
-
     [Tooltip("내려찍기 임팩트 VFX 프리팹")]
     public GameObject slamVfxPrefab;
 
@@ -113,8 +110,6 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
     private int        _hitIndex;
     private bool       _vfxFired;
     private GameObject _warningGO;
-    private Vector3    _warningStartScale;
-    private Vector3    _warningTargetScale;
 
     public FGGroundSlashState(FGGroundSlashPatternSO data) : base(data) { }
 
@@ -138,15 +133,12 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
         switch (_phase)
         {
             case Phase.Warning:
-                if (_warningGO != null && Data.warningDuration > 0f)
-                {
-                    float t = Mathf.Clamp01(_timer / Data.warningDuration);
-                    _warningGO.transform.localScale = Vector3.Lerp(_warningStartScale, _warningTargetScale, t);
-                }
+                if (Data.warningDuration > 0f)
+                    PatternGuideHelper.SetProgress(_warningGO, _timer / Data.warningDuration);
 
                 if (_timer >= Data.warningDuration)
                 {
-                    DespawnWarning();
+                    PatternGuideHelper.Arm(_warningGO);   // 내려찍어 판정이 날 때까지 판정 색으로 남긴다
                     _timer    = 0f;
                     _vfxFired = false;
                     _phase    = Phase.Strike;
@@ -162,6 +154,7 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
                         Managers.Sound?.PlayEffectAt(Data.groundSfx, ctx.Transform.position);
                     SpawnSlamVfx(ctx, _hitIndex);
                     TryDealDamage(ctx, _hitIndex);
+                    DespawnWarning();
                 }
 
                 bool  isLastHit   = _hitIndex >= Data.HitCount - 1;
@@ -229,7 +222,7 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
         if (player == null) return;
 
         int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
-        player.TakeDamage(dmg);
+        player.TakeDamage(dmg, ctx.Monster.gameObject);
 
         // 위로 + 보스에서 멀어지는 방향으로 발사
         Vector3 outDir = playerPos - bossPos;
@@ -246,26 +239,14 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
     // ── 경고 장판 ─────────────────────────────────────────
     private void SpawnWarningDisc(MonsterContext ctx, int hitIndex)
     {
-        if (Data.warningDiscPrefab == null) return;
-
-        // 1~3타 모두 0부터 전체 디스크 확장 — 경고장판 = 피격 범위 일치
-        float startS  = 0f;
-        float targetS = Data.GetHitRange(hitIndex);
-        _warningStartScale  = new Vector3(startS,  1f, startS);
-        _warningTargetScale = new Vector3(targetS, 1f, targetS);
-
-        Vector3 pos = ctx.Transform.position;
-        pos.y += 0.02f;
-        _warningGO = Managers.ObjectPooler.SpawnFromPrefab(Data.warningDiscPrefab, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.identity);
-        _warningGO.transform.localScale = _warningStartScale;
+        // 1~3타 모두 0~판정 반경 전체 — 가이드 = 피격 범위 일치
+        PatternGuideHelper.SafeDestroy(ref _warningGO);
+        _warningGO = PatternGuideHelper.Prepare(
+            PatternGuideHelper.Disc(ctx.Transform.position, Data.GetHitRange(hitIndex), PatternGuideHelper.Telegraph),
+            ForestGuardianMonster.GuideFlow);
     }
 
-    private void DespawnWarning()
-    {
-        if (_warningGO == null) return;
-        Managers.ObjectPooler.Despawn(_warningGO);
-        _warningGO = null;
-    }
+    private void DespawnWarning() => PatternGuideHelper.SafeDestroy(ref _warningGO);
 
     // ── 임팩트 VFX ────────────────────────────────────────
     private void SpawnSlamVfx(MonsterContext ctx, int hitIndex)

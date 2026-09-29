@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 24526038509fdcd4394dd0c7ec75f163, type: 3}
+  m_Name: Lich_ScytheThrow_Bound
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichScytheThrowPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 3
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: scythethrow_bound
+  breakOverride: -1
+  maxRange: 12
+  patternCooldown: 8
+  castDuration: 0.7
+  signalDuration: 0.15
+  outSeconds: 0.6
+  returnSeconds: 0.6
+  endDuration: 0.5
+  recoveryDuration: 0.4
+  maxDistance: 12
+  curve: 0
+  spinHeight: 1.2
+  crackSpacing: 0
+  chainTether: 1
+  hitRadius: 1.5
+  damageMultiplier: 1.3
+  knockbackMultiplier: 1
+  bindSeconds: 0.8
+  bindFollowRadius: 2.6
+  bindFollowAfter: 0.5
+  bindFollowDamage: 0.9

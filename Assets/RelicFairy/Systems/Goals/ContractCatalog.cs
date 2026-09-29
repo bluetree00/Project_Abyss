@@ -43,9 +43,12 @@ public static class ContractCatalog
     private const string SpecialAllId  = "special_all";
     private const string SpecialNoneId = "special_none";
 
+    private const int ReachTarget = 2;
+
+    // 순환(심연 깊이 ≥1)에 들어갔다면 최종 챕터를 이미 지났다 — 챕터가 1로 돌아가도 달성으로 본다.
     public static readonly ContractDef Reach = new(
-        ReachId, "챕터 2 도달", 2, 60,
-        s => (int)s.CurrentChapter);
+        ReachId, "챕터 2 도달", ReachTarget, 60,
+        s => s.AbyssDepth > 0 ? ReachTarget : (int)s.CurrentChapter);
 
     /// <summary>1번 슬롯을 뺀 추첨 대상.</summary>
     public static readonly ContractDef[] Pool =

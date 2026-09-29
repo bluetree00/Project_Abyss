@@ -67,6 +67,9 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     private bool _explode;
     private float _explodeRadius;
     private float _explodeDamage;
+    // 이 화살이 '무슨 행동'으로 나갔는가. 스킬이 쏜 화살은 스킬로 신고해야 스킬 피해 증가가 붙는다(09-21).
+    private WeaponActionType _actionType = WeaponActionType.GroundLight;
+    private bool _isFinisher;   // 스킬 막타(차지샷 등) — 연출 단계만
     private string _explodeEffectKey;
     private float _explodeEffectScale;
 
@@ -190,6 +193,8 @@ public class BasicArrow : MonoBehaviour, IPooledObject
         _visualEffect = null;
 
         // 파츠 옵션은 발사마다 초기화 — 풀에서 재사용되므로 이전 발사의 설정이 남으면 안 된다.
+        _actionType     = WeaponActionType.GroundLight;   // 스킬이 쏜 화살이면 SetActionType이 곧바로 덮어쓴다
+        _isFinisher     = false;
         _speedMult      = 1f;
         _homing         = 0f;
         _returnOnPierce = false;
@@ -214,6 +219,12 @@ public class BasicArrow : MonoBehaviour, IPooledObject
         _pierceCount = 0;
         _pierced = new HashSet<GameObject>();
     }
+
+    /// <summary>이 화살을 쏜 행동(기본 공격 · Q/E/R 스킬). 피해 파이프라인의 스킬 판정에 쓰인다.</summary>
+    public void SetActionType(WeaponActionType actionType) => _actionType = actionType;
+
+    /// <summary>스킬 마무리 일격 화살인지(타격 연출 단계용).</summary>
+    public void SetFinisher(bool isFinisher) => _isFinisher = isFinisher;
 
     /// <summary>폭발 설정</summary>
     public void SetExplosion(float radius, float explosionDamage, string effectKey = "", float effectScale = 1f)
@@ -435,7 +446,8 @@ public class BasicArrow : MonoBehaviour, IPooledObject
                 Target              = victim,
                 BaseDamage          = damage,
                 Owner               = _instigator,
-                ActionType          = WeaponActionType.GroundLight,
+                ActionType          = _actionType,
+                IsFinisher          = _isFinisher,
                 KnockbackMultiplier = 1f,
                 HitPoint            = hitPoint,
                 SourcePosition      = _instigator != null ? _instigator.transform.position : transform.position,
@@ -535,7 +547,24 @@ public class BasicArrow : MonoBehaviour, IPooledObject
             // 직접 맞은 대상은 이미 데미지 받음 — 주변 적만
             if (_pierce && _pierced != null && _pierced.Contains(victim)) continue;
 
-            d.TakeDamage(_explodeDamage, _instigator);
+            // 직격과 같은 파이프라인으로 넣는다(09-21 사용자 결정). 예전엔 TakeDamage를 직접 불러
+            // 크리티컬·스킬 피해%·서약 출력변조·아이템 효과·타격감이 통째로 빠졌다 — 폭발로 죽이면
+            // 출혈·화염장 같은 효과가 하나도 안 터졌다. 직격 경로를 CombatDamage.Deal로 합칠 때 여기가 남겨졌다.
+            //  · SkipHitVfx : 폭발 이펙트가 이미 떠 있다 — 대상마다 히트 VFX를 또 띄우면 겹쳐서 지저분하다
+            //  · SourcePosition = 폭발 중심 : 넉백이 터진 지점에서 밀려나야 자연스럽다(시전자 위치 아님)
+            CombatDamage.Deal(new CombatDamage.Request
+            {
+                Target              = victim,
+                BaseDamage          = _explodeDamage,
+                Owner               = _instigator,
+                ActionType          = _actionType,
+                IsFinisher          = _isFinisher,
+                KnockbackMultiplier = 1f,
+                HitPoint            = victim.transform.position,
+                SourcePosition      = center,
+                IsRanged            = true,
+                SkipHitVfx          = true,
+            });
         }
     }
 

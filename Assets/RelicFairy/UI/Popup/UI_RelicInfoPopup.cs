@@ -35,7 +35,9 @@ public class UI_RelicInfoPopup : UI_Popup
     private const float NameX     = 88f,  NameY     = 376f, NameW     = 270f, NameH     = 63f;
     private const float TagY      = 145f, TagW      = 156f, TagH      = 45f;
     private const float Tag0X     = 400f, TagStepX  = 186f;
-    private const float CardX     = 397f, CardY     = 231f, CardW     = 533f, CardH     = 207f;
+    // 능력 칸은 목업 207에서 구분선(470) 앞까지 19px 늘렸다 — 스크롤 칸이라 마지막 줄이 반쯤 잘린 채 보였다(09-28).
+    private const float CardX     = 397f, CardY     = 231f, CardW     = 533f, CardH     = 226f;
+    private static readonly Vector2Int CardFade = new(0, 18);   // 스크롤 칸 위아래 가장자리 흐림 — 「더 있음」으로 읽히게
     // 구분선은 완성본에서 <b>버튼 바로 위</b>(≈470)를 가로지르는 장식이다.
     // 한때 615로 내려놨었는데(설명 줄과 겹친다는 이유), 완성본 「풀샷」을 잘라 확인하니
     // 560~646 구간엔 버튼 끝과 판 테두리뿐이고 구분선은 470에 있다. 615는 오판이었다.
@@ -235,7 +237,11 @@ public class UI_RelicInfoPopup : UI_Popup
         var sprite = _relic.Portrait != null ? _relic.Portrait : _relic.RosterIllust;
 
         _portrait.gameObject.SetActive(sprite != null);
-        _placeholder.gameObject.SetActive(sprite == null);
+        // 초상 틀 아트는 가운데 별 장식이 있는 상자다 — 일러스트가 없으면 그 장식이 빈 자리 표시다.
+        // 예전엔 단색 바탕 + 이름 첫 글자가 틀 위를 덮었다(09-28 UI 전수). 틀 아트가 없을 때만 첫 글자로.
+        var frame = _placeholder.parent != null ? _placeholder.parent.GetComponent<Image>() : null;
+        bool frameArt = frame != null && frame.sprite != null;
+        _placeholder.gameObject.SetActive(sprite == null && !frameArt);
 
         if (sprite != null) { _portrait.sprite = sprite; return; }
 
@@ -257,6 +263,13 @@ public class UI_RelicInfoPopup : UI_Popup
         _tagRow.gameObject.SetActive(has);
         if (!has) return;
 
+        // 한 유물의 태그는 모양이 같아야 한다 — 아트가 없는 태그가 하나라도 섞이면 전부 글자 칩으로 그린다.
+        // (09-28: 가웨인 「화상」만 글자 칩이라 셋이 달라 보였다. 납품 「태그_화상.png」엔 글자가 「버스트 구간」으로
+        //  잘못 구워져 있어 연결할 수 없다 — 재납품 대기.)
+        bool allArt = true;
+        for (int i = 0; i < tags.Length; i++)
+            if (!string.IsNullOrWhiteSpace(tags[i]) && _skin?.TagSprite(tags[i]) == null) { allArt = false; break; }
+
         for (int i = 0; i < tags.Length; i++)
         {
             if (string.IsNullOrWhiteSpace(tags[i])) continue;
@@ -264,7 +277,7 @@ public class UI_RelicInfoPopup : UI_Popup
             // 완성 칩 아트(아이콘+글자가 구워진 156×45)가 있는 태그는 그 한 장으로 끝낸다 —
             // 바탕·글자를 얹으면 두 겹이 된다. 크기는 아트 비율로 고정(행 높이 45에 맞춤).
             // 납품이 가웨인 3종뿐이라 다른 유물 태그는 아래 글자 칩으로 폴백한다.
-            var tagArt = _skin?.TagSprite(tags[i]);
+            var tagArt = allArt ? _skin?.TagSprite(tags[i]) : null;
             if (tagArt != null)
             {
                 var artChip = NewImage("Tag", _tagRow, Color.white);
@@ -287,7 +300,7 @@ public class UI_RelicInfoPopup : UI_Popup
             // 칩은 글자 폭만큼만 오그라들어야 한다. 안 그러면 균등 분할돼 거대한 '버튼'처럼 보이고,
             // 누를 수 있는 것으로 오인된다(affordance 오류).
             var h = chip.gameObject.AddComponent<HorizontalLayoutGroup>();
-            h.padding = new RectOffset(11, 11, 3, 3);
+            h.padding = new RectOffset(16, 16, 4, 4);
             h.childControlWidth = true;  h.childForceExpandWidth  = false;
             h.childControlHeight = true; h.childForceExpandHeight = false;
 
@@ -296,10 +309,11 @@ public class UI_RelicInfoPopup : UI_Popup
             fit.verticalFit   = ContentSizeFitter.FitMode.Unconstrained;
 
             var le = chip.gameObject.AddComponent<LayoutElement>();
-            le.preferredHeight = 28f;   // 16px 줄높이(≈21) + 위아래 3 — 24였을 땐 글자가 13.9까지 줄었다
+            // 아트 칩(높이 45)과 한 줄에 서도 무게가 맞게 38 · 18px(09-28) — 28 · 16px일 땐 아트 칩 옆에서 점처럼 작았다.
+            le.preferredHeight = 38f;
             le.flexibleWidth   = 0f;
 
-            var t = NewText("T", chip.rectTransform, 16f, ChipText, FontStyles.Normal, TextAlignmentOptions.Center);
+            var t = NewText("T", chip.rectTransform, 18f, ChipText, FontStyles.Normal, TextAlignmentOptions.Center);
             t.text = tags[i];
             t.textWrappingMode = TextWrappingModes.NoWrap;
 
@@ -591,8 +605,8 @@ public class UI_RelicInfoPopup : UI_Popup
 
         if (_skin?.panelFrame != null)
         {
-            // 프레임 아트 중앙 알파가 70%라 그것만 깔면 월드가 비쳐 글자가 안 읽힌다.
-            AddSolidFill(panel, PanelBg);
+            // 판 아트(「테두리」)는 가운데까지 불투명하다 — 예전엔 옛 아트(중앙 70%)를 메우려 단색을 자식으로 깔았는데,
+            // 자식은 부모 위에 그려져 틀을 통째로 가렸다(09-28 UI 전수).
             panel.sprite = _skin.panelFrame;
             panel.type   = Image.Type.Simple;
         }
@@ -718,7 +732,7 @@ public class UI_RelicInfoPopup : UI_Popup
         viewport.anchorMax = new Vector2(0.955f, 0.92f);
         viewport.offsetMin = Vector2.zero;
         viewport.offsetMax = Vector2.zero;
-        viewport.gameObject.AddComponent<RectMask2D>();
+        viewport.gameObject.AddComponent<RectMask2D>().softness = CardFade;
 
         var content = NewRect("Content", viewport);
         content.anchorMin = new Vector2(0f, 1f);
@@ -1014,26 +1028,6 @@ public class UI_RelicInfoPopup : UI_Popup
         bgImg = img; outline = line; labelText = t;
     }
 
-    /// <summary>레이아웃에 영향을 주지 않는 불투명 바닥판. 프레임 아트가 반투명일 때 뒤를 막는다.</summary>
-    private static void AddSolidFill(Image host, Color color)
-    {
-        if (host == null) return;
-
-        var go = new GameObject("Fill", typeof(RectTransform), typeof(CanvasRenderer));
-        var rt = (RectTransform)go.transform;
-        rt.SetParent(host.rectTransform, false);
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
-        go.AddComponent<LayoutElement>().ignoreLayout = true;
-
-        var img = go.AddComponent<Image>();
-        img.color         = color;
-        img.raycastTarget = false;
-        rt.SetAsFirstSibling();
-    }
-
     /// <summary>
     /// 아트를 <b>자식으로</b> 깐다. 절대 대상 오브젝트의 Image에 직접 넣지 말 것 —
     /// <see cref="Image"/>는 <c>ILayoutElement</c>라 스프라이트 <b>원본 픽셀 크기</b>를 preferredSize로
@@ -1080,6 +1074,18 @@ public class UI_RelicInfoPopup : UI_Popup
     {
         _skin  = UISkin.RelicInfo;
         _panel = transform.Find("Panel") as RectTransform;
+
+        // 능력 칸 — 구운 비율 앵커를 새 높이로 다시 놓고, 스크롤 가장자리를 흐리게(09-28 UI 전수).
+        if (_panel != null && _panel.Find("AbilityCard") is RectTransform card)
+        {
+            Place(card, CardX, CardY, CardW, CardH);
+            if (card.Find("Viewport") is RectTransform vp && vp.TryGetComponent<RectMask2D>(out var mask)) mask.softness = CardFade;
+        }
+
+        // 구운 판에 남은 단색 「Fill」(자식)이 틀 아트를 덮었다 — 판 아트가 있으면 끈다(09-28 UI 전수).
+        var fill = _panel != null ? _panel.Find("Fill") : null;
+        if (fill != null && _panel.TryGetComponent<Image>(out var panelImg) && panelImg.sprite != null)
+            fill.gameObject.SetActive(false);
 
         // 능력 칸이 카드 아트를 갖는 새 배치다 — 항목까지 아트를 깔면 액자가 두 겹이 된다.
         _heroCardUsesOwnArt = false;

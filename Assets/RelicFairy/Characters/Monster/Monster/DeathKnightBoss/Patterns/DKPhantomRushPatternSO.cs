@@ -306,7 +306,7 @@ public class DKPhantomRushState : FullLockState<DKPhantomRushPatternSO>
         if (player == null) return;
 
         int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
-        player.TakeDamage(dmg);
+        player.TakeDamage(dmg, ctx.Monster != null ? ctx.Monster.gameObject : null);   // 가해자 = 기사(09-26)
 
         Vector3 kb = (ctx.Runtime.PlayerTarget.position - _capturedCellCenter).normalized;
         kb.y = 0.2f;

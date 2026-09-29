@@ -4,10 +4,10 @@ using UnityEngine;
 namespace RelicFairy.Monster
 {
 /// <summary>
-/// 봉인 해골(Seal Skeleton)에 부착하는 마커.
+/// 결계 해골(옛 이름 Seal Skeleton)에 부착하는 마커.
 ///
 /// MonsterBase.OnDied를 구독해 해당 해골이 죽으면 OnKilled를 발행하고
-/// 바닥 마커 디스크(파란색)를 제거한다.
+/// 바닥 마커 디스크(청록)를 제거한다.
 /// LichSealBreakerPatternSO의 상태가 이 이벤트로 남은 봉인 수를 추적한다.
 /// </summary>
 public class SealSkeletonMarker : MonoBehaviour
@@ -35,7 +35,7 @@ public class SealSkeletonMarker : MonoBehaviour
         _monster.OnDied += HandleDied;
 
         // 바닥 마커 디스크 (봉인 색상)
-        _disc          = PatternGuideHelper.Disc(transform.position, 0.7f, PatternGuideHelper.Seal);
+        _disc          = PatternGuideHelper.Disc(transform.position, 0.7f, PatternGuideHelper.Breakable);   // 청록 = 공격해서 끊을 수 있음
         _discTransform = _disc.transform;
     }
 

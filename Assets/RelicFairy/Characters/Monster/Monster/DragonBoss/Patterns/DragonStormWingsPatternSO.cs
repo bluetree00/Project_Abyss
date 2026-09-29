@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace RelicFairy.Monster
 {
@@ -22,7 +21,6 @@ public class DragonStormWingsPatternSO : BossPatternSO
     [SerializeField] private float  _warningDuration     = 2f;
     [SerializeField] private float  _warningWidth        = 8f;
     [SerializeField] private float  _warningLength       = 14f;
-    [SerializeField] private float  _borderLineWidth     = 0.15f;
     [SerializeField] private Color  _warningColor        = new Color(0.65f, 0.3f, 1.0f, 0.45f);
 
     [Header("공격")]
@@ -56,7 +54,6 @@ public class DragonStormWingsPatternSO : BossPatternSO
     public float  WarningDuration    => _warningDuration;
     public float  WarningWidth       => _warningWidth;
     public float  WarningLength      => _warningLength;
-    public float  BorderLineWidth    => _borderLineWidth;
     public Color  WarningColor       => _warningColor;
     public float  AttackAnimDuration => _attackAnimDuration;
     public int    AttackDamage       => _attackDamage;
@@ -101,14 +98,10 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
     private int     _landingHash;
 
     // 경고 장판
-    private GameObject _fillGo;
-    private GameObject _borderGo;
-    private Material   _fillMat;
-    private Material   _borderMat;
+    private GameObject _guide;
     private Vector3    _warnCenter;
     private Quaternion _warnRotation;
     private Vector3    _toPlayer;
-    private float      _targetAlpha;
     private float      _effectiveLength;
     private bool       _windBlastSpawned;
     private bool       _wingStrikeSfxPlayed;
@@ -208,7 +201,6 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
     {
         Color elementBase = DragonBossVisualHelper.GetElementColor(Data.Element);
         Color c = new Color(elementBase.r, elementBase.g, elementBase.b, Data.WarningColor.a);
-        _targetAlpha = c.a;
 
         // 바닥 기준 위치 — 지형 z-fighting 방지용 0.3f 오프셋
         float groundY = DragonPatternFloorUtils.GetFloorY(ctx.Transform.position, ctx.Runtime.SpawnPosition.y) + 0.3f;
@@ -236,45 +228,9 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
         _warnCenter   = bossFloor + _toPlayer * (_effectiveLength * 0.5f);
         _warnRotation = Quaternion.LookRotation(_toPlayer, Vector3.up);
 
-        // ── 채움 Plane (PrimitiveType.Plane = 기본 +Y 방향, 바닥에 눕힘, alpha 0→target) ──
-        _fillGo = GameObject.CreatePrimitive(PrimitiveType.Plane);
-        _fillGo.name = "StormWingsFill";
-        Object.Destroy(_fillGo.GetComponent<MeshCollider>());
-        var mr = _fillGo.GetComponent<MeshRenderer>();
-        mr.shadowCastingMode = ShadowCastingMode.Off;
-        mr.receiveShadows    = false;
-
-        _fillMat = CreateTransparentMat(new Color(c.r, c.g, c.b, 0f));
-        mr.material = _fillMat;
-
-        // Plane 기본 normal = +Y. LookRotation(_toPlayer, Vector3.up) → 방향만 회전, 면은 유지
-        // Plane 기본 크기 = 10×10 → WarningWidth/10, WarningLength/10 으로 스케일
-        _fillGo.transform.position   = _warnCenter;
-        _fillGo.transform.rotation   = Quaternion.LookRotation(_toPlayer, Vector3.up);
-        _fillGo.transform.localScale = new Vector3(Data.WarningWidth / 10f, 1f, _effectiveLength / 10f);
-
-        // ── 테두리 LineRenderer (즉시 완전 불투명) ────────────────────
-        _borderGo = new GameObject("StormWingsBorder");
-        var lr    = _borderGo.AddComponent<LineRenderer>();
-        _borderMat = CreateTransparentMat(new Color(c.r, c.g, c.b, 1f));
-        lr.material          = _borderMat;
-        lr.useWorldSpace     = true;
-        lr.loop              = true;
-        lr.positionCount     = 4;
-        lr.startWidth        = Data.BorderLineWidth;
-        lr.endWidth          = Data.BorderLineWidth;
-        lr.shadowCastingMode = ShadowCastingMode.Off;
-        lr.receiveShadows    = false;
-
-        Vector3 right  = Vector3.Cross(Vector3.up, _toPlayer).normalized * (Data.WarningWidth * 0.5f);
-        Vector3 fwdVec = _toPlayer * _effectiveLength;
-        lr.SetPositions(new[]
-        {
-            bossFloor - right,
-            bossFloor + right,
-            bossFloor + right + fwdVec,
-            bossFloor - right + fwdVec,
-        });
+        // 보스 발밑에서 플레이어 쪽으로 바닥 끝까지 · 폭 WarningWidth — 속성 색으로 차오른다
+        _guide = PatternGuideHelper.Prepare(
+            PatternGuideHelper.Beam(bossFloor, _toPlayer, _effectiveLength, Data.WarningWidth, c), c);
     }
 
     private void UpdateWarning(MonsterContext ctx)
@@ -287,16 +243,11 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
             Managers.Sound?.PlayEffectAt(Data.WingStrikeSfx, _warnCenter);
         }
 
-        // fill alpha 0 → target
-        float t = Mathf.Clamp01(_timer / Data.WarningDuration);
-        if (_fillMat != null)
-        {
-            Color col = _fillMat.color;
-            col.a = Mathf.Lerp(0f, _targetAlpha, t);
-            _fillMat.color = col;
-        }
+        PatternGuideHelper.SetProgress(_guide, _timer / Data.WarningDuration);
 
         if (_timer < Data.WarningDuration) return;
+
+        PatternGuideHelper.Arm(_guide);   // 날개를 치는 동안 판정 색으로 — 돌풍이 나가면 치운다
 
         _phase = Phase.Attack;
         _timer = 0f;
@@ -399,23 +350,9 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
 
     // ── 경고 장판 정리 ────────────────────────────────────────────────────────
 
-    private void DestroyWarning()
-    {
-        if (_fillGo   != null) { Object.Destroy(_fillGo);    _fillGo   = null; }
-        if (_borderGo != null) { Object.Destroy(_borderGo);  _borderGo = null; }
-        if (_fillMat  != null) { Object.Destroy(_fillMat);   _fillMat  = null; }
-        if (_borderMat!= null) { Object.Destroy(_borderMat); _borderMat= null; }
-    }
+    private void DestroyWarning() => PatternGuideHelper.SafeDestroy(ref _guide);
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private static Material CreateTransparentMat(Color color)
-    {
-        var shader = Shader.Find("Sprites/Default");
-        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
-        var mat = new Material(shader) { color = color };
-        return mat;
-    }
 
     private static void PlayAnim(MonsterContext ctx, string stateName)
     {

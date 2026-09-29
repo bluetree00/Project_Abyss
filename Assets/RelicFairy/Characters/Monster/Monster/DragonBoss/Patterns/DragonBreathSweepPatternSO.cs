@@ -10,6 +10,8 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     [Header("Air Animation")]
     [SerializeField] private string _airChaseLeftStateName = "AirChaseLeft";
     [SerializeField] private string _airChaseRightStateName = "AirChaseRight";
+    [Tooltip("마무리(잔불·메테오 소멸 대기) 동안 아레나 안쪽 가장자리 상공에서 정지 비행하는 상태")]
+    [SerializeField] private string _hoverStateName = "URFlyStand";
 
     [Header("Flight")]
     [SerializeField] private float _hideHeight = 6f;
@@ -103,6 +105,7 @@ public class DragonBreathSweepPatternSO : BossPatternSO
 
     public string AirChaseLeftStateName => _airChaseLeftStateName;
     public string AirChaseRightStateName => _airChaseRightStateName;
+    public string HoverStateName => _hoverStateName;
     public float HideHeight => _hideHeight;
     public float FlySpeed => _flySpeed;
     public int WarningRowCount => _warningRowCount;
@@ -211,7 +214,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private const float FlyThroughPadding   = 3f;
     private const float FlyToStartTolerance = 1.5f;
-    private const float FlyOffscreenPadding = 40f;
+    private const float InnerHoverMargin    = 4f;   // 마무리 정지 비행 — 아레나 가장자리에서 안쪽으로(m)
 
     private Phase _phase;
     private float _timer;
@@ -230,6 +233,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     private Vector3 _sweepRight = Vector3.forward;
     private Vector3 _laneCenter;
 
+    private bool     _hovering;
     private bool     _animSlowActive;
     private Animator _savedAnimator;
     private int      _revealedTileCount;
@@ -285,6 +289,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     {
         _phase             = Phase.FlyToStart;
         _timer             = 0f;
+        _hovering          = false;
         _sweepIndex        = 0;
         _nextColIndex      = 0;
         _currentFlyAnim    = null;
@@ -515,7 +520,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     {
         UpdateLivingTsunamis(ctx);
         UpdateLivingScorches();
-        MoveDragonOffscreen(ctx);
+        MoveDragonToInnerHover(ctx);
         // 잔불 + 공중 메테오가 모두 소멸할 때까지 대기
         if (_tsunamis.Count != 0 || _meteors.Count != 0) return;
 
@@ -667,12 +672,42 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             ctx.Transform.position, target, Data.FlySpeed * Time.deltaTime);
     }
 
-    private void MoveDragonOffscreen(MonsterContext ctx)
+    // 마무리(잔불·메테오 소멸 대기) — 아레나 안쪽 가장자리 상공에서 플레이어를 보며 정지 비행한다.
+    // [09-26] 전에는 레인 끝 +40 m 화면 밖으로 날아가 기다려서, 이 몇 초 동안 칠 수단이 없었다
+    //         (보스 시뮬: 휩쓸기 중 화룡 거리 중앙 35 m · 근접 사거리 안 38%). 높이는 그대로라 원거리로 친다.
+    private void MoveDragonToInnerHover(MonsterContext ctx)
     {
-        Vector3 target = _laneCenter + _sweepDir * (_flyThroughEndProj + FlyOffscreenPadding);
+        Vector3 target = ClampInsideArena(_laneCenter + _sweepDir * _sweepEndProj, InnerHoverMargin);
         target.y = ctx.Runtime.SpawnPosition.y + Data.HideHeight;
         ctx.Transform.position = Vector3.MoveTowards(
             ctx.Transform.position, target, Data.FlySpeed * Time.deltaTime);
+
+        if (ctx.Runtime.PlayerTarget != null)
+        {
+            Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+            toPlayer.y = 0f;
+            if (toPlayer.sqrMagnitude > 0.01f)
+                ctx.Transform.rotation = Quaternion.Slerp(
+                    ctx.Transform.rotation,
+                    Quaternion.LookRotation(toPlayer.normalized, Vector3.up),
+                    Time.deltaTime * 5f);
+        }
+
+        if (!_hovering && (ctx.Transform.position - target).sqrMagnitude < 0.25f)
+        {
+            _hovering = true;
+            PlayAnim(ctx, Data.HoverStateName);
+        }
+    }
+
+    private static Vector3 ClampInsideArena(Vector3 p, float margin)
+    {
+        Vector3 c  = DragonBossRoomContext.WorldCenter;
+        float   hx = Mathf.Max(0f, (DragonBossRoomContext.Width  - 1) * 0.5f * DragonBossRoomContext.CellSize - margin);
+        float   hz = Mathf.Max(0f, (DragonBossRoomContext.Height - 1) * 0.5f * DragonBossRoomContext.CellSize - margin);
+        p.x = Mathf.Clamp(p.x, c.x - hx, c.x + hx);
+        p.z = Mathf.Clamp(p.z, c.z - hz, c.z + hz);
+        return p;
     }
 
     private float GetColumnProjection(int index)
@@ -875,7 +910,8 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
-        player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.BreathDamageMultiplier));
+        player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.BreathDamageMultiplier), ctx.Monster.gameObject,
+                          false, HitWeight.Light);   // 휩쓸기 불길 틱 — 약
         PlayerStatusEffectVisuals.ApplyScreenEffectTimed(Data.ScreenFireEffectPrefab, 1f, Data.ScreenFireGraceDuration, "StatusEffectScreen_" + StatusEffectType.Slow);
     }
 
@@ -892,7 +928,8 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
-        player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.TsunamiDamageMultiplier));
+        player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.TsunamiDamageMultiplier), ctx.Monster.gameObject,
+                          false, HitWeight.Heavy);   // 화염 해일 — 강
         PlayerStatusEffectVisuals.ApplyScreenEffectTimed(Data.ScreenFireEffectPrefab, 1f, Data.ScreenFireGraceDuration, "StatusEffectScreen_" + StatusEffectType.Slow);
     }
 

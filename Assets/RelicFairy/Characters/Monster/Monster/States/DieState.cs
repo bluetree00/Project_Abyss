@@ -98,8 +98,30 @@ public class DieState : IMonsterState
         int count = UnityEngine.Random.Range(min, max + 1);
         if (count <= 0) return;
 
+        count = Mathf.Max(1, Mathf.RoundToInt(count * GoldScale(config.grade)));
+
         GoldCoinPickup.SpawnDrops(ctx.Monster.transform.position, count, drop.coinValue);
     }
+
+    /// <summary>
+    /// 등급별 골드 배율. 등급 간 낙차를 만들되(정예 1마리 = Common 4마리) <b>상점 충당률을 무너뜨리지 않는</b> 선.
+    ///
+    /// 왜 배율이 필요한가: MonsterConfigSO 36개 중 30개에 drop 블록이 없어 C# 기본값(5~8)으로 역직렬화되고,
+    /// 값이 있는 6개도 5개가 같은 5~8이다. 즉 <b>슬라임과 흑기사와 보스가 같은 골드</b>를 준다.
+    ///
+    /// ⚠️ 계수는 <b>런의 실제 등급 구성</b>에 묶여 있다. 현재 구성은 Common 31% / Rare 38% / Elite 32%
+    /// (룸풀 토큰 기준)이고, 이 값이면 가중평균 0.93 → 런당 약 2,200골드 → 상점 진열가 3,351 대비
+    /// <b>충당률 66%</b>다. 진열의 3분의 2만 살 수 있어야 "무엇을 포기할까"가 성립한다.
+    /// 룸풀 토큰의 등급 비중을 바꾸면 <b>여기도 함께 재계산해야 한다</b> —
+    /// 구 구성(C60/R28/E12) 기준 계수를 새 구성에 그대로 쓰면 가중평균이 1.42로 튀어 충당률 101%가 된다(실측).
+    /// </summary>
+    private static float GoldScale(MonsterGrade grade) => grade switch
+    {
+        MonsterGrade.Rare  => 0.8f,
+        MonsterGrade.Elite => 1.6f,
+        MonsterGrade.Boss  => 5f,
+        _                  => 0.4f,
+    };
 
     // ── 처치 VFX ──────────────────────────────────────────
 

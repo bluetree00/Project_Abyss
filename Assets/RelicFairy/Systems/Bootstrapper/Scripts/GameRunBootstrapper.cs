@@ -275,6 +275,27 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 2) 최종 보스: 무한 루프 갈림길(계속=심연 회귀 / 귀환=런 종료). 비최종: 이어지는 길로 다음 챕터.
         if (isFinal)
         {
+            // 악몽기 리치를 처음 쓰러뜨렸다 — 엔딩(리치의 죽음 · 모르가나 · 카드 · 크레딧) 뒤 귀환.
+            // 연출이 깨져도 귀환은 해야 한다(출구 없는 보스방에 갇히지 않게).
+            if (StoryProgress.ConsumePendingEnding())
+            {
+                try { await EndingSequence.PlayAsync(ct); }
+                catch (System.OperationCanceledException) { return; }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[BossClear] 엔딩 연출 예외 — 건너뛰고 귀환한다: {e}");
+                }
+            }
+
+            // 「심연 입장」 전에는 루프가 없다 — 고를 것이 없는 선택창을 띄우지 않고 바로 귀환한다.
+            // (예전엔 선택창이 떠서 「더 깊이」를 눌러도 조용히 귀환 처리됐다)
+            // 심연은 엔딩 뒤의 세계다 — 재배치 이전에 노드를 산 세이브도 엔딩 전에는 순환하지 않는다.
+            if (!MemoryAltarService.IsAbyssDepthUnlocked || !StoryProgress.HasEnded)
+            {
+                HandleRunClear();
+                return;
+            }
+
             bool goDeeper;
             try { goDeeper = await ShowAbyssLoopChoiceAsync(ct); }
             catch (System.OperationCanceledException) { return; }
@@ -342,6 +363,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (!run.BeginAbyssLoop()) { HandleRunClear(); return; }
 
         // 챕터 전환과 동일: 다음 씬의 부트스트래퍼가 '새 챕터 시작'으로 처리(이어하기 아님) → 로드아웃/서약/파츠/아이템 유지.
+        EssenceShardPickup.CollectAll();   // 보스 정수 조각을 줍기 전에 씬이 바뀌지 않게
         AppBootstrapper.Instance?.MarkChapterAdvance();
         AppBootstrapper.Instance?.RequestLoad(AppBootstrapper.GetSceneForChapter(ChapterId.Chapter1));
         Debug.Log($"[GameRunBootstrapper] 무한 루프 진입 — 심연 깊이 {run.AbyssDepth}, Ch1 회귀");
@@ -526,6 +548,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             await StartNextChapterInSceneAsync(this.GetCancellationTokenOnDestroy());
         else if (_run != null && _run.IsRunning && !hasDebugPanel)
             await ContinueProcGenRunAsync(this.GetCancellationTokenOnDestroy());
+        else if (newRunFromHub && TestRunRequest.ConsumeBossApproach(ResolveCurrentChapter()))
+            await StartTestBossApproachAsync();
         else if (newRunFromHub)
             await StartWaitingRoomAsync();
         else if (IsInStartRoom)
@@ -534,13 +558,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             await StartCombatDirectAsync(); // 에디터 직접 실행 fallback (DebugStageRunPanel 없을 때만)
 
         AppBootstrapper.Instance?.NotifySceneReady();
-
-        // 디버그 스탯 UI 생성
-        if (Object.FindFirstObjectByType<DebugStatsBootstrap>() == null)
-        {
-            var debugGO = new GameObject("@DebugStatsBootstrap");
-            debugGO.AddComponent<DebugStatsBootstrap>();
-        }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         // 디버그 그리드 치트 패널 생성
@@ -584,6 +601,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             Managers.AddressableManager.ReleaseInstance(_currentMapGO);
             _currentMapGO = null;
         }
+
+        // 미니맵은 DDOL UI라 런 씬을 떠나도 남는다 — 지난 방을 비워 베이스캠프에서 빈 판이 뜨지 않게(09-28).
+        var uiRoot = UIRootBootstrapper.Instance;
+        var minimap = uiRoot != null ? uiRoot.GetMinimapView() : null;
+        if (minimap != null) minimap.ClearRoom();
 
         _run = null;
     }
@@ -1029,7 +1051,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// 허브(스타트 방) 이탈 시 절차 진행 시작. RunFlowController를 확보(없으면 AddComponent)하고
     /// 허브와 겹치지 않는 먼 앵커에 첫 방을 빌드한다. 레거시 ZoneProgression 경로를 대체.
     /// </summary>
-    public async UniTask StartProcGenRunAsync()
+    /// <param name="startAtBossApproach">테스트 허브 전용 — 일반 방 없이 보스 대기방부터 시작.</param>
+    public async UniTask StartProcGenRunAsync(bool startAtBossApproach = false)
     {
         var flow = runFlowController != null ? runFlowController : gameObject.AddComponent<RunFlowController>();
         flow.SetBossThresholdOverride(debugBossThresholdOverride);
@@ -1049,7 +1072,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var structureKey = ResolveStructureKey(chapter, serverEntry, chapterSO);
 
         // 허브(Zone 0, ~원점)와 겹치지 않게 먼 앵커에서 격리 빌드
-        await flow.StartRunAsync(new Vector3(0f, 0f, 2000f), poolKey, structureKey);
+        await flow.StartRunAsync(new Vector3(0f, 0f, 2000f), poolKey, structureKey, startAtBossApproach);
     }
 
     /// <summary>챕터별 레벨 스파인(RunStructureConfig) Addressable 키 해석: 서버 → SO → 규칙(CHAPTER_N_RUN_STRUCTURE) 폴백.
@@ -1111,6 +1134,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             // 다음 챕터 전용 씬을 로드 — 로드된 GameScene의 GameRunBootstrapper가 IsChapterAdvancePending을
             // 감지해 저장 이어하기가 아니라 새 챕터를 처음부터 시작한다(StartNextChapterInSceneAsync).
             // 화면 전환 가림은 RequestLoad의 로딩 오버레이가 담당한다.
+            EssenceShardPickup.CollectAll();   // 보스방에 남은 정수 조각 — 씬이 바뀌면 사라진다
             AppBootstrapper.Instance?.MarkChapterAdvance();
             AppBootstrapper.Instance?.RequestLoad(AppBootstrapper.GetSceneForChapter(chapter));
             Debug.Log($"[GameRunBootstrapper] 챕터 전환 → Chapter {(int)chapter} 씬 로드 요청");
@@ -1158,10 +1182,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             else           await ShowMerlinRevivalAsync(ct);
 
             // 4) 메타 저장(OnRunEnded) 먼저 → 정리(ClearLocalRun+Loadout.Clear) → 허브 복귀
+            //    클리어면 최종 보스 정수 조각을 정산 전에 적립한다(사망은 못 주운 만큼 잃는다).
+            if (isCleared) EssenceShardPickup.CollectAll();
             _run?.EndRun(isCleared, isCleared ? "clear" : "death");
             RunReturnTracker.RecordRunEnd(isCleared);   // BaseCamp 복귀 대사(사망/클리어 카운트) 기록
             AppBootstrapper.Instance?.EndRun();
-            AppBootstrapper.Instance?.RequestLoad(Define.Scene.BaseCamp);
+            if (!TestRunRequest.TryReturnToHub())   // 테스트 허브에서 시작한 런은 허브로 돌아간다
+                AppBootstrapper.Instance?.RequestLoad(Define.Scene.BaseCamp);
         }
         catch (System.OperationCanceledException) { TimeScaleArbiter.Release(this); }
     }
@@ -1182,13 +1209,23 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.matchWidthOrHeight  = 0.5f;
 
+        // 전투 화면 위에 글자만 떠서 순간 등장 · 순간 소멸하던 것 → 좌우가 흐린 어두운 띠 위에서 페이드(09-28 UI 톤 통일).
+        var group = go.AddComponent<CanvasGroup>();
+        group.alpha = 0f;
+        var band = new GameObject("Band").AddComponent<Image>();
+        band.transform.SetParent(go.transform, false);
+        band.sprite        = UITheme.SoftBand;
+        band.color         = new Color(0.02f, 0.02f, 0.04f, 0.82f);
+        band.raycastTarget = false;
+        band.rectTransform.sizeDelta        = new Vector2(1500f, isCleared ? 340f : 190f);
+        band.rectTransform.anchoredPosition = new Vector2(0f, isCleared ? -30f : 0f);
+
         var tmp = new GameObject("Text").AddComponent<TextMeshProUGUI>();
         tmp.transform.SetParent(go.transform, false);
-        if (TMP_Settings.defaultFontAsset != null) tmp.font = TMP_Settings.defaultFontAsset;
         tmp.text      = msg;
         tmp.fontSize  = 48f;
         tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color     = new Color(0.85f, 0.8f, 0.7f);
+        UITheme.StyleText(tmp, UITheme.Ink);
         var rt = tmp.rectTransform;
         rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
         rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
@@ -1198,18 +1235,16 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             int depth = _run?.AbyssDepth ?? 0;
             string sub2 = depth > 0
-                ? $"심연 {depth}층까지 내려갔다 돌아왔다\n<size=24>각성으로 더 깊이 — 다음 여정에서</size>"
+                ? $"심연 {depth}층까지 내려갔다 돌아왔다\n<size=24>기억의 제단에서 채비하고 — 다음엔 더 깊이</size>"
                 : "…그러나 심연은 언제든 다시 그대를 부를 것이다";
 
             var subGO = new GameObject("Subtext");
             var sub = subGO.AddComponent<TextMeshProUGUI>();
             sub.transform.SetParent(go.transform, false);
-            if (TMP_Settings.defaultFontAsset != null) sub.font = TMP_Settings.defaultFontAsset;
             sub.text          = sub2;
             sub.fontSize      = 30f;
-            sub.fontStyle     = FontStyles.Italic;
             sub.alignment     = TextAlignmentOptions.Center;
-            sub.color         = new Color(0.62f, 0.58f, 0.72f);
+            UITheme.StyleText(sub, UITheme.Mute);   // 가짜 기울임 대신 흐린 잉크(글자 정본)
             var srt = sub.rectTransform;
             srt.anchorMin = new Vector2(0f, 0.5f); srt.anchorMax = new Vector2(1f, 0.5f);
             srt.pivot     = new Vector2(0.5f, 1f);
@@ -1226,6 +1261,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             {
                 if (Input.anyKeyDown) break;   // 스킵 입력
                 t += Time.unscaledDeltaTime;
+                group.alpha = Mathf.Min(1f, t / 0.35f);
+                await UniTask.Yield(ct);
+            }
+            for (float f = group.alpha; f > 0f; )
+            {
+                f -= Time.unscaledDeltaTime / 0.3f;
+                group.alpha = Mathf.Max(0f, f);
                 await UniTask.Yield(ct);
             }
         }
@@ -1260,26 +1302,35 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
         try
         {
+            // 순간 등장 → 공통 박자로 페이드(09-28 UI 톤 통일). 고르면 같은 박자로 걷힌다.
+            var group = go.AddComponent<CanvasGroup>();
+            group.alpha = 0f;
+
             var veil = MakeFullRect(go.transform, "Veil");
             veil.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.72f);
 
             MakeCenterText(go.transform, "심연이 그대를 놓아주지 않는다",
-                34f, new Color(0.82f, 0.78f, 0.92f), new Vector2(0f, 210f), 46f);
+                34f, UITheme.Gold, new Vector2(0f, 210f), 46f);
             MakeCenterText(go.transform, $"더 깊이 들어갈수록 적은 강해진다   ·   심연 깊이 {nextDepth}",
-                20f, new Color(0.66f, 0.63f, 0.76f), new Vector2(0f, 150f), 30f);
+                20f, UITheme.Mute, new Vector2(0f, 150f), 30f);
 
-            // [계속] — 더 깊은 심연으로
+            // [계속] — 더 깊은 심연으로(주 선택 = 금)
             MakeChoiceButton(go.transform, new Vector2(-190f, -20f),
-                "더 깊이", "적이 강해지지만 성장을 잇는다", new Color(0.55f, 0.45f, 0.95f),
+                "더 깊이", "적이 강해지지만 성장을 잇는다", UITheme.Gold,
                 () => tcs.TrySetResult(true));
 
-            // [귀환] — 베이스캠프로
+            // [귀환] — 베이스캠프로(보조 = 흐린 잉크)
             MakeChoiceButton(go.transform, new Vector2(190f, -20f),
-                "귀환", "여기서 마치고 베이스캠프로 돌아간다", new Color(0.45f, 0.55f, 0.62f),
+                "귀환", "여기서 마치고 베이스캠프로 돌아간다", UITheme.Mute,
                 () => tcs.TrySetResult(false));
 
+            FadeGroupAsync(group, 1f, UIFader.OpenSec, ct).Forget();
+            bool deeper;
             using (ct.Register(() => tcs.TrySetCanceled()))
-                return await tcs.Task;
+                deeper = await tcs.Task;
+            group.blocksRaycasts = false;
+            await FadeGroupAsync(group, 0f, UIFader.CloseSec, ct);
+            return deeper;
         }
         finally
         {
@@ -1288,30 +1339,23 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
     }
 
-    /// <summary>루프 갈림길용 큰 선택 버튼(코드 생성). 제목 + 설명 2줄.</summary>
+    /// <summary>루프 갈림길용 큰 선택 카드(코드 생성). 제목 + 설명 2줄. accent = 테두리 선 · 제목 색(주 = 금, 보조 = 흐린 잉크).</summary>
     private void MakeChoiceButton(Transform parent, Vector2 pos, string title, string desc, Color accent, System.Action onClick)
     {
         var card = new GameObject($"Choice_{title}").AddComponent<Image>();
         card.transform.SetParent(parent, false);
-        card.color = new Color(0.12f, 0.11f, 0.16f, 0.98f);
         var rt = card.rectTransform;
         rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = pos;
         rt.sizeDelta = new Vector2(340f, 200f);
 
-        // 상단 액센트 띠
-        var bar = new GameObject("Accent").AddComponent<Image>();
-        bar.transform.SetParent(card.transform, false);
-        bar.color = accent;
-        var brt = bar.rectTransform;
-        brt.anchorMin = new Vector2(0f, 1f); brt.anchorMax = new Vector2(1f, 1f);
-        brt.pivot = new Vector2(0.5f, 1f);
-        brt.anchoredPosition = Vector2.zero; brt.sizeDelta = new Vector2(0f, 6f);
+        // 인디고 글래스 카드 + 가는 선 — 윗단 색 띠(웹 카드처럼 보였다) 대신 테두리 색으로 주/보조를 가른다(09-28 UI 톤 통일).
+        UITheme.StylePanel(card, UITheme.Band, new Color(accent.r, accent.g, accent.b, 0.55f));
 
-        var titleTmp = MakeCenterText(card.transform, title, 26f, new Color(0.92f, 0.9f, 0.96f), new Vector2(0f, 40f), 36f);
-        titleTmp.fontStyle = FontStyles.Bold;
-        MakeCenterText(card.transform, desc, 15f, new Color(0.68f, 0.66f, 0.74f), new Vector2(0f, -30f), 60f).enableWordWrapping = true;
+        // 기본 글꼴이 이미 굵다 — 가짜 굵게 금지(글자 정본).
+        MakeCenterText(card.transform, title, 26f, accent, new Vector2(0f, 40f), 36f);
+        MakeCenterText(card.transform, desc, 16f, UITheme.Mute, new Vector2(0f, -30f), 60f).enableWordWrapping = true;   // 가독성 하한 16
 
         var btn = card.gameObject.AddComponent<Button>();
         btn.transition = Selectable.Transition.ColorTint;
@@ -1359,7 +1403,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             var artSprite = await LoadRevivalArtAsync();
             if (artSprite != null) artImg.sprite = artSprite;
 
-            // 사망 문구(상단) — 일러스트의 룬 고리보다 위쪽 여백에 얹는다.
+            // 사망 문구(상단) — 암전 위에 먼저 홀로 뜨고, 일러스트가 차오르는 동안 물러난다.
+            // 이 자리(y 380)는 일러스트 룬 고리 안쪽·멀린 두건 위라, 남겨 두면 어두운 빨강이 보라 두건에 묻혀 안 읽혔다(09-19 캡처).
+            // 고리 위 여백은 푸시인(×1.08)으로 고리가 올라와 결국 겹친다 — 자리를 옮기는 대신 교대로 보여준다.
             var deadTxt = MakeCenterText(go.transform, "그대의 영혼이 흩어졌다...",
                 34f, new Color(0.75f, 0.35f, 0.35f), new Vector2(0f, 380f), 44f);
             deadTxt.color = new Color(0.75f, 0.35f, 0.35f, 0f);
@@ -1391,11 +1437,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 }
                 if (merlinTxt != null && k > 0.4f)
                     merlinTxt.color = new Color(0.78f, 0.74f, 0.92f, Mathf.Clamp01((k - 0.4f) / 0.4f));
+                if (deadTxt != null && artSprite != null)
+                    deadTxt.color = new Color(0.75f, 0.35f, 0.35f, 1f - ease);
                 if (Input.anyKeyDown) skipped = true;
                 await UniTask.Yield(ct);
             }
             if (artImg    != null) artImg.color    = Color.white;
             if (merlinTxt != null) merlinTxt.color = new Color(0.78f, 0.74f, 0.92f, 1f);
+            if (deadTxt   != null && artSprite != null) deadTxt.color = new Color(0.75f, 0.35f, 0.35f, 0f);
 
             // [연출 3] 대사를 읽을 시간 — 그동안에도 푸시인은 계속된다.
             float hold = 0f; const float holdDur = 1.8f;
@@ -1499,17 +1548,26 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         var tmp = new GameObject("Text").AddComponent<TextMeshProUGUI>();
         tmp.transform.SetParent(parent, false);
-        if (TMP_Settings.defaultFontAsset != null) tmp.font = TMP_Settings.defaultFontAsset;
         tmp.text      = text;
         tmp.fontSize  = fontSize;
         tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color     = color;
+        UITheme.StyleText(tmp, color);   // 기본 글꼴 + 부드러운 그림자(글자 정본)
         var rt = tmp.rectTransform;
         rt.anchorMin = new Vector2(0f, 0.5f); rt.anchorMax = new Vector2(1f, 0.5f);
         rt.pivot     = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = anchoredPos;
         rt.sizeDelta = new Vector2(0f, height);
         return tmp;
+    }
+
+    /// <summary>코드로 짓는 오버레이의 공통 박자(unscaled — 시간이 멈춘 동안에도).</summary>
+    private static async UniTask FadeGroupAsync(CanvasGroup g, float to, float dur, CancellationToken ct)
+    {
+        while (g != null && !Mathf.Approximately(g.alpha, to))
+        {
+            g.alpha = Mathf.MoveTowards(g.alpha, to, Time.unscaledDeltaTime / dur);
+            await UniTask.Yield(PlayerLoopTiming.Update, ct);
+        }
     }
 
     /// <summary>세션 챕터가 미설정(기본 0, 유효하지 않음)이면 활성 씬 이름(GameScene_ChN)에서 챕터를 유추한다.</summary>
@@ -1603,11 +1661,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 커스텀 손맵 아레나(보스 등): arena_template_key가 있으면 격자 지형 대신 프리팹이 방 전체를 제공한다.
         // 지형/보스/트리거/배리어를 모두 프리팹이 담은 길 1 구조 — docs/boss-custom-arena-design.md 참조.
-        bool useCustomArena = !string.IsNullOrEmpty(entry.arena_template_key);
+        // 테스트 허브가 이 챕터 보스방에 다른 아레나를 지정했으면 그것을 쓴다(평소엔 룸풀 값 그대로).
+        string arenaKey = TestRunRequest.ResolveArenaKey(entry, ResolveCurrentChapter());
+        bool useCustomArena = !string.IsNullOrEmpty(arenaKey);
         // 커스텀 아레나 키가 Addressable에 없으면(미제작 챕터 등) 격자 보스룸으로 폴백 — 빈 방/보스 미스폰 방지.
-        if (useCustomArena && !await Managers.AddressableManager.KeyExistsAsync(entry.arena_template_key))
+        if (useCustomArena && !await Managers.AddressableManager.KeyExistsAsync(arenaKey))
         {
-            Debug.LogWarning($"[GameRunBootstrapper] arena '{entry.arena_template_key}' 미등록 — 기본 격자 보스룸으로 폴백");
+            Debug.LogWarning($"[GameRunBootstrapper] arena '{arenaKey}' 미등록 — 기본 격자 보스룸으로 폴백");
             useCustomArena = false;
         }
         Vector3? customArenaEntryPos = null; // 커스텀 아레나: 프리팹 PlayerSpawn 마커 위치(있으면 grid 입구 대신 사용 → 격자 정렬 불필요)
@@ -1626,12 +1686,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             GameObject arena = null;
             try
             {
-                arena = await Managers.AddressableManager.InstantiateAsync(entry.arena_template_key, roomGO.transform);
+                arena = await Managers.AddressableManager.InstantiateAsync(arenaKey, roomGO.transform);
             }
             catch (System.OperationCanceledException) { throw; }
             catch (System.Exception ex)
             {
-                Debug.LogWarning($"[GameRunBootstrapper] arena '{entry.arena_template_key}' 인스턴스 실패: {ex.Message}");
+                Debug.LogWarning($"[GameRunBootstrapper] arena '{arenaKey}' 인스턴스 실패: {ex.Message}");
             }
             if (arena != null)
             {
@@ -1642,7 +1702,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 // 회전 적용 후의 월드 좌표라 heading 회전이 자동 반영된다 — 프리팹 바닥을 격자 입구에 맞출 필요가 없다.
                 var playerSpawn = arena.transform.Find("PlayerSpawn");
                 if (playerSpawn != null) customArenaEntryPos = playerSpawn.position;
-                else Debug.LogWarning($"[GameRunBootstrapper] arena '{entry.arena_template_key}'에 PlayerSpawn 자식 없음 — grid 입구로 폴백");
+                else Debug.LogWarning($"[GameRunBootstrapper] arena '{arenaKey}'에 PlayerSpawn 자식 없음 — grid 입구로 폴백");
 
                 // 출구: 프리팹 Exit 마커(Exit/Exit1/Exit2…)를 우선 사용 — PlayerSpawn 규약과 동일.
                 customArenaExits = CollectArenaExitSlots(arena.transform, wallLayers * blockCellSize);
@@ -1652,7 +1712,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning($"[GameRunBootstrapper] arena '{entry.arena_template_key}' 미배치 — 빈 방으로 진행 ({entry.pool_key})");
+                Debug.LogWarning($"[GameRunBootstrapper] arena '{arenaKey}' 미배치 — 빈 방으로 진행 ({entry.pool_key})");
             }
         }
         else
@@ -1765,6 +1825,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             hasCeiling = palette != null && palette.HasCeiling, // 천장 방이면 상공 부감 인트로 스킵(천장만 비치는 문제)
             sealDoorPrefab = palette != null ? palette.SealDoorPrefab : null, // 테마 문(없으면 공용 폴백)
             sealDoorMotion = palette != null ? palette.SealDoorMotion : SealDoorMotion.Drop,
+            gateFramePrefab = palette != null ? palette.GateFramePrefab : null,   // 출구 문틀(석문이 열려도 남는다)
 
             entryPos = customArenaEntryPos ?? (cls.entrance.HasValue
                 ? CellToWorldFloor(cls.entrance.Value, anchor, w, h) + DoorInwardOffset(doorInfos[cls.entrance.Value].edge)
@@ -2436,6 +2497,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             // 전투 챌린지 — 스포너 있는 이벤트방에 성과 오버레이.
             var (type, param) = ParseChallengeType(typeHint);
+            // 속공 제한시간이 <b>방마다 몬스터 수가 다른데 45초 고정</b>이었다 — Ch4(15마리·3웨이브)는
+            // 처치 속도가 아무리 빨라도 제한을 넘어 항상 최하 등급이 나온다. pool_key에 명시(":30")가
+            // 없으면 그 방의 실제 스폰 계획에서 산출한다.
+            if (type == CombatChallengeOverlay.OverlayType.TimeLimit
+                && (string.IsNullOrEmpty(typeHint) || typeHint.IndexOf(':') < 0))
+                param = ResolveTimeLimitFor(roomGO, param);
             var overlay = roomGO.AddComponent<CombatChallengeOverlay>();
             overlay.Initialize(_run, type, param);
             Debug.Log($"[GameRunBootstrapper] 이벤트 전투 챌린지 부착: {type}({param}) — {typeHint}");
@@ -2469,6 +2536,28 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             c.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab);
             Debug.Log($"[GameRunBootstrapper] 이벤트 보물고 부착 — {typeHint}");
         }
+    }
+
+    /// <summary>
+    /// 방의 스포너 계획(총 마릿수·웨이브 수)에서 속공 제한시간을 산출한다.
+    /// 마리당 4초 + 웨이브 간 대기 + 진입·이동 여유 6초.
+    /// 등급 곡선(Platinum ≤0.5배 / Gold ≤0.75배 / Silver ≤1배)은 그대로 두고 기준선만 방에 맞춘다 —
+    /// 보통 플레이면 Silver, 잘하면 Gold, 아주 잘해야 Platinum이 되도록.
+    /// </summary>
+    private static float ResolveTimeLimitFor(GameObject roomGO, float fallback)
+    {
+        var spawners = roomGO.GetComponentsInChildren<MonsterSpawner>(true);
+        if (spawners == null || spawners.Length == 0) return fallback;
+
+        int monsters = 0, waves = 1;
+        foreach (var s in spawners)
+        {
+            if (s == null) continue;
+            monsters += s.PlannedTotalSpawns;
+            waves = Mathf.Max(waves, s.PlannedWaveCount);
+        }
+        if (monsters <= 0) return fallback;
+        return monsters * 4f + (waves - 1) * RoomWaveController.BetweenWaveDelay + 6f;
     }
 
     /// <summary>pool_key 등 키 문자열에서 챌린지 종류 유추: "hitless/flawless"=무결, "speed/timelimit/rush"=속공, 기본=속공45.
@@ -2867,7 +2956,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         controller.SetDecorPrefabs(shopDecorPrefabs);   // 판매대 + 뒤쪽 소품(Initialize 전에)
         controller.Initialize(_run, catalog, luckRollTable, shopSlotCount, roomRng,
-                              npcPrefab, shopWeaponSlotFallback, shopRerollEnabled, shopRerollCost);
+                              npcPrefab, shopWeaponSlotFallback,
+                              shopRerollEnabled || MemoryAltarService.IsShopRerollUnlocked,   // 기억의 제단 「상점 새로고침」(09-29)
+                              shopRerollCost);
     }
 
     private async UniTask<ShopCatalogSO> LoadShopCatalogAsync(string roomId)
@@ -3076,6 +3167,43 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     }
 
     /// <summary>
+    /// 테스트 허브(Scenes/Test/BaseCamp_Test) 전용 — 대기방 둘러보기·서약 제단·대사 없이
+    /// 요청 챕터의 보스 대기방(PreBoss)부터 런을 시작한다.
+    /// Zone0는 플레이어가 떨어지지 않도록 스폰 발판으로만 빌드하고, 곧바로 절차 런을 PreBoss 방부터 연다.
+    /// </summary>
+    private async UniTask StartTestBossApproachAsync()
+    {
+        var chapter = TestRunRequest.Chapter;
+        Debug.Log($"[TestRun] {chapter} 보스 대기방 직행 — 보스 아레나 {TestRunRequest.BossArenaOverride ?? "룸풀 기본"}");
+
+        if (UIRootBootstrapper.Instance == null)
+            await UniTask.WaitUntil(() => UIRootBootstrapper.Instance != null || !this);
+        UIRootBootstrapper.Instance?.BindHudToRun(_run);
+
+        await ScreenFade.Out(0f);
+        await SpawnStartZoneFromLayoutAsync(this.GetCancellationTokenOnDestroy(), suppressInteractables: true);
+
+        if (_run != null && !_run.IsRunning)
+            await _run.StartNewRunAsync(chapter, key => Managers.AddressableManager.LoadAssetAsync<TextAsset>(key));
+
+        var player = await SpawnPlayerAsync(startBodyKey);
+        if (player == null)
+        {
+            Debug.LogError("[TestRun] 플레이어 스폰 실패");
+            await ScreenFade.In(0.4f);
+            return;
+        }
+
+        _run?.BindPlayer(player);
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
+        GameCameraController.Instance?.HandToGameplayCamera(player.transform);
+
+        // 방 전환 커버 → PreBoss 빌드 → 플레이어 이동 → 리빌까지 RunFlowController가 처리한다.
+        await StartProcGenRunAsync(startAtBossApproach: true);
+        await ScreenFade.In(0.4f);
+    }
+
+    /// <summary>
     /// 로비 → GameScene 직행 시 스타트 방을 로드하고 플레이어를 스폰한다.
     /// 세션은 IsRunning=false 상태를 유지해 StageMap이 새 런으로 정상 시작되도록 한다.
     /// 캐릭터/무기 선택은 StartRoomPickup/StartRoomGate로 처리.
@@ -3126,6 +3254,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// </summary>
     private void SpawnCovenantAltar(Vector3 basePos)
     {
+        // 악몽 규칙(부서진 맹세) — 이 챕터에선 새 서약을 맺을 수 없다. CSV가 세운 제단은 제단 쪽에서 거절한다.
+        if (NightmareRules.BlocksCovenantAltar)
+        {
+            Debug.Log("[GameRunBootstrapper] 악몽 규칙 「부서진 맹세」 — 서약 제단을 세우지 않는다");
+            return;
+        }
+
         var existing = Object.FindFirstObjectByType<WorldCovenantAltar>(FindObjectsInactive.Include);
         if (existing != null)
         {
@@ -3142,7 +3277,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (dlg == null) return;
         if (!dlg.IsInitialized) await dlg.InitializeAsync();
 
-        var lines = dlg.GetVisitLines($"Chapter{(int)chapter}_Enter");
+        // 악몽기엔 악몽판 대사(규칙 암시)가 있으면 그것을 — 없으면 평소 대사로.
+        string key = $"Chapter{(int)chapter}_Enter";
+        string nightmareKey = key + "_Nightmare";
+        if (StoryProgress.IsNightmare && (dlg.HasSequence(nightmareKey + "_First") || dlg.HasSequence(nightmareKey)))
+            key = nightmareKey;
+
+        var lines = dlg.GetVisitLines(key);
         if (lines == null || lines.Length == 0) return;
 
         // 선택/편집 UI가 열려있으면 닫힐 때까지 대기 후 대사(대사끼리도 큐잉).
@@ -3398,6 +3539,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             shopUseCount       = save.shopUseCount,
             refineUseCount     = save.refineUseCount,
             maxEnhanceLevel    = save.maxEnhanceLevel,
+            abyssDepth         = save.abyssDepth,       // 순환 중 이어하기(구버전=0)
             cooldowns          = cooldowns,
         };
     }
@@ -3747,6 +3889,26 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await wm.AcquireWeaponToSlotAsync(weaponData, slotIndex, setActive, playAppear, beforeShow);
     }
 
+    /// <summary>
+    /// 장착 전에 클립 · 무기 프리팹을 미리 로드한다 — 받는 순간 로드 대기가 없게(베이스캠프 무형검 받침: F 뒤 3.9초 늦었다, ae 09-28).
+    /// 실패해도 장착할 때 다시 로드하므로 경고만 남긴다.
+    /// </summary>
+    public static async UniTask PrewarmWeaponAsync(WeaponSO weaponSO)
+    {
+        if (weaponSO == null) return;
+        try
+        {
+            var data = new WeaponData(weaponSO);
+            await PreloadWeaponClipsAsync(data);
+            if (!string.IsNullOrEmpty(data.weaponPrefabKey))
+                await Managers.AddressableManager.LoadAssetAsync<GameObject>(data.weaponPrefabKey);
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"[GameRunBootstrapper] 무기 미리 로드 실패({weaponSO.name}): {ex.Message}");
+        }
+    }
+
     /// <summary>무기 데이터의 애니메이션 클립을 AcquireWeapon 전에 로드</summary>
     private static async UniTask PreloadWeaponClipsAsync(WeaponData data)
     {
@@ -3776,6 +3938,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         var roomCenter = mapGO != null ? mapGO.transform.position : Vector3.zero;
         var roomSize   = new Vector2(gridW * blockCellSize, gridH * blockCellSize);
+        // 커스텀 아레나는 CSV 격자보다 훨씬 크다 — 격자 크기로 잡으면 입구의 플레이어가 범위 밖이라 점이 판 구석에 붙었다(09-28 실측).
+        if (mapGO != null && _currentArena != null && _currentArena.IsChildOf(mapGO.transform)
+            && TryArenaFloorBounds(_currentArena, out var floor))
+        {
+            roomCenter = new Vector3(floor.center.x, roomCenter.y, floor.center.z);
+            roomSize   = new Vector2(floor.size.x, floor.size.z);
+        }
         minimap.Initialize(roomCenter, roomSize);
 
         if (mapGO == null) return;
@@ -3786,6 +3955,27 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             spawner.OnMonsterSpawned += monster => OnMinimapMonsterSpawned(capturedMinimap, monster);
             _minimapSpawnerSubs.Add(spawner);
         }
+    }
+
+    /// <summary>아레나 바닥의 월드 범위 — Ground 레이어 콜라이더(없으면 트리거 아닌 콜라이더 전부)를 합친다.</summary>
+    private static bool TryArenaFloorBounds(Transform arena, out Bounds bounds)
+    {
+        Physics.SyncTransforms();   // 방금 놓고 돌린 프리팹 — 콜라이더 범위를 지금 위치로 맞춘다
+        int ground = LayerMask.NameToLayer("Ground");
+        var cols   = arena.GetComponentsInChildren<Collider>(false);
+        bounds = default;
+        bool has = false;
+        for (int pass = 0; pass < 2 && !has; pass++)
+        {
+            foreach (var col in cols)
+            {
+                if (col == null || col.isTrigger) continue;
+                if (pass == 0 && col.gameObject.layer != ground) continue;
+                if (!has) { bounds = col.bounds; has = true; }
+                else bounds.Encapsulate(col.bounds);
+            }
+        }
+        return has && bounds.size.x > 1f && bounds.size.z > 1f;
     }
 
     private void UnsubscribeMinimapSpawners(MinimapView minimap)

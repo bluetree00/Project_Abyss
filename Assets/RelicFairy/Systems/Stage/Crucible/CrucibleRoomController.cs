@@ -14,7 +14,7 @@ using UnityEngine;
 public class CrucibleRoomController : MonoBehaviour
 {
     // ── Constants ───────────────────────────────────────────
-    private const float NpcStandHeight = 1f; // 앵커 없는 폴백 스폰 시 캡슐 바닥이 지면에 닿도록.
+    private const float NpcStandHeight = 1f; // 캡슐 바닥(발)이 지면에 닿도록 — 앵커 · 폴백 모두.
 
     /// <summary>NPC 앞 작업대까지의 거리(m) — NPC가 카운터 뒤에 선 구도를 만든다.</summary>
     private const float CounterDistance = 2.5f;
@@ -202,6 +202,14 @@ public class CrucibleRoomController : MonoBehaviour
 
     public float SuccessChanceAt(int slot) =>
         Mathf.Clamp01(WeaponEnhanceService.SuccessChance(GetSlot(slot), _table) + SuccessBonus);
+    /// <summary>보정 전 기본 성공률 — 화면이 「무엇이 확률을 올렸는지」 나눠 보여 줄 때만(굴림은 SuccessChanceAt).</summary>
+    public float BaseSuccessChanceAt(int slot) => Mathf.Clamp01(WeaponEnhanceService.SuccessChance(GetSlot(slot), _table));
+    /// <summary>화로 이벤트가 성공률에 더하는 몫(열기 +, 저주 −). 인장은 <see cref="SigilBonus"/>.</summary>
+    public float EventSuccessBonus => EventBonus;
+    /// <summary>잭팟 확률의 연속 성공 가산 · 풍요 이벤트 가산(표시용).</summary>
+    public float StreakJackpotBonus => JackpotPerStreak * _streak;
+    public float EventJackpotBonus  => BountyBonus;
+    public bool  IsDiscountEvent    => _event == CrucibleEvent.Discount;
     public int   MaxAt(int slot)           => WeaponEnhanceService.MaxEnhance(GetSlot(slot), _table);
     public int   CostAt(int slot)          { var w = GetSlot(slot); return (w != null && _table != null) ? WeaponEnhanceService.CostWith(_table, w.enhanceLevel, CostMult) : 0; }
     public int   DropAt(int slot)          { var w = GetSlot(slot); return (w != null && _table != null) ? _table.DropAt(w.enhanceLevel) : 0; }
@@ -300,6 +308,11 @@ public class CrucibleRoomController : MonoBehaviour
 
         SaveNow("crucible-part-enhance");   // S3: 확정 즉시 저장 — 다음 방까지 미루면 진행분이 날아간다
         OnCrucibleChanged?.Invoke();
+
+        // 원거리 <b>스킬 단계</b>는 무기 강화가 아니라 이 파츠 총합 레벨에서 나온다(SkillTierResolver, 임계 2·10).
+        // 그런데 여기서 아무 통지도 안 해 HUD가 예전 값을 그대로 들고 있었다 — 단계가 올라도 스킬 아이콘·표시가
+        // 무기를 바꾸기 전까지 그대로였다(09-21). 장착 무기 갱신 통지를 보내 HUD가 다시 읽게 한다.
+        RefreshEquippedIfCurrent(_run?.Player?.WeaponManager?.GetCurrentSlotIndex() ?? -1);
 
         // chance=1 / roll=0 → 연출층이 '확정 성공'으로 읽는다(니어미스 판정에도 걸리지 않음).
         return new EnhanceResult
@@ -486,9 +499,10 @@ public class CrucibleRoomController : MonoBehaviour
 
     private (Vector3 pos, Quaternion rot) ResolveNpcPlacement()
     {
+        // 앵커는 바닥 높이 점 — 서는 높이를 더한다(안 더해 NPC·작업대가 1.1 m 박혔다, 09-29).
         var anchor = GetComponentInChildren<ShopNpcAnchor>(true);
         if (anchor != null)
-            return (anchor.transform.position, anchor.transform.rotation);
+            return (ServiceRoomDecorPlacer.NpcStandPoint(anchor.transform.position, NpcStandHeight), anchor.transform.rotation);
 
         Vector3 pos = transform.position;
         pos.y += NpcStandHeight;

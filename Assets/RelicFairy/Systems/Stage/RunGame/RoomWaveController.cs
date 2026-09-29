@@ -20,7 +20,11 @@ using UnityEngine;
 public sealed class RoomWaveController : MonoBehaviour
 {
     private const float PreExitDelay     = 0.8f;
-    private const float BetweenWaveDelay = 2.0f;
+    // 보스방은 사망 연출(despawn 1.5~3초 + 디졸브 0.6초)이 끝난 뒤 클리어 절차로 — 0.8초면 개화 팝업(시간 정지)이
+    // 쓰러지는 모습을 덮어, 팝업을 닫은 뒤에야 보였다(09-25 보스 시뮬 실측: 사망 1.1~1.5초 뒤 팝업).
+    private const float BossPreExitDelay = 3.0f;
+    /// <summary>웨이브 사이 대기(초). 속공 챌린지 제한시간 산출이 이 값을 포함해야 해서 공개한다.</summary>
+    public  const float BetweenWaveDelay = 2.0f;
     // alive 카운터 정합 감시 주기(초). 전투 중 계속 도는 값이라 너무 촘촘하면 낭비다.
     private const float AliveWatchdogInterval = 3.0f;
 
@@ -411,7 +415,8 @@ public sealed class RoomWaveController : MonoBehaviour
         var ct = this.GetCancellationTokenOnDestroy();
         try
         {
-            await UniTask.Delay(TimeSpan.FromSeconds(PreExitDelay), ignoreTimeScale: true, cancellationToken: ct);
+            float delay = _bossSpawner != null ? BossPreExitDelay : PreExitDelay;
+            await UniTask.Delay(TimeSpan.FromSeconds(delay), ignoreTimeScale: true, cancellationToken: ct);
 
             _run?.EnterStandby();
 

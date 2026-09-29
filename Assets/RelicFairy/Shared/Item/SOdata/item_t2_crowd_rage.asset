@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t2_crowd_rage
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t2_crowd_rage
-  displayName: "\uAD11\uC5ED\uBD84\uB178\uC758 \uB8EC"
+  displayName: "\uD3EC\uC704\uB41C \uBD84\uB178\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 1

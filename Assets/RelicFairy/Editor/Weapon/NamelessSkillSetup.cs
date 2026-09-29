@@ -24,9 +24,9 @@ public static class NamelessSkillSetup
     private const string WeaponPath = DataDir + "/T0_Nameless.asset";
     private const string IasenSrc   = "Assets/RelicFairy/Shared/Characters/Skill/Behaviors/IasenSlash.asset";
 
-    // 아이콘은 기존 카타나 E / 화염베기 아이콘을 임시로 빌린다(아트 후속).
-    private const string IconEGuid = "5932011b449ac234197ea8c6600fb8fe";
-    private const string IconRGuid = "ea5d9aa3689141f4da41f072b5dd4d64";
+    // 아이콘은 HUD 임시 선화(UI/HUD/Sprites/SkillIcons_Temp — 무형참·무형일섬). 정식 아트가 오면 교체.
+    private const string IconEGuid = "f2f9d29cb77162f45b04a9323304c090";
+    private const string IconRGuid = "7c81c294755be9949a8908959b251607";
 
     private const string EffectsGroup = "Effects";
     private const string Beam = "Assets/RelicFairy/_Imported/EffectSource/MasterStylizedProjectiles/Projectiles/YellowSwordBeam/Prefabs";

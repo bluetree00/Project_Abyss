@@ -33,11 +33,27 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
     private Transform _camT;
     private bool _placed;
     private bool _resolved;
+    private float _elapsed;
+    private Vector3 _inward = Vector3.forward;
 
     public event Action OnResolved;
 
     protected IReadOnlyList<Marker> AllMarkers => _markers;
     protected bool IsResolved => _resolved;
+
+    /// <summary>
+    /// 방 안쪽으로 <b>실제로 열린</b> 방향. <c>player.forward</c>를 그대로 쓰면 안 된다 —
+    /// <c>RunFlowController.MovePlayer</c>는 위치만 옮기고 캐릭터 회전은 이전 방 값을 그대로 둔다(카메라만 정렬).
+    /// 진입 직후 forward가 벽을 향할 수 있고, 그러면 마커가 벽 속에 생겨 도달 불가가 된다.
+    /// </summary>
+    protected Vector3 Inward => _inward;
+
+    /// <summary>
+    /// 이 시간이 지나면 자동 해결한다. <b>탈출구가 없으면 소프트락</b>이다 —
+    /// 해결(OnResolved) 전까지 RunFlowController가 출구 게이트를 열지 않기 때문.
+    /// 0 이하면 자동 해결 없음(자체 타이머를 가진 서브클래스용).
+    /// </summary>
+    protected virtual float AutoResolveSeconds => 60f;
 
     /// <summary>SetupEventRoom이 호출 — 세션·보상 이펙트 주입. (서브클래스별 추가 Init은 각자 정의)</summary>
     public void InitBase(GameRunSession run, LuckRollTableSO table, GameObject endEffect, GameObject endEffect2)
@@ -53,6 +69,8 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
         if (!_placed)
         {
             _camT = Camera.main != null ? Camera.main.transform : null;
+            ServiceRoomDecorPlacer.SyncPhysics();   // 방 블록이 막 생성됨 — 물리 쿼리 전 콜라이더 등록 보장
+            _inward = ServiceRoomDecorPlacer.ResolveOpenDirection(pt.position, pt.forward);
             PlaceMarkers(pt);
             _placed = true;
         }
@@ -60,6 +78,15 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
         Billboard();
         Tick();
         if (_resolved) return;
+
+        // 자동 해결 — 마커에 닿지 못하는 상황에서도 방을 떠날 수 있게 하는 안전장치.
+        _elapsed += Time.deltaTime;
+        if (AutoResolveSeconds > 0f && _elapsed >= AutoResolveSeconds)
+        {
+            Notice("<color=#B8C0CC>시간이 다 됐다</color> — 출구가 열렸다");
+            FinishWith(ChallengeGrade.Bronze, pt.position);
+            return;
+        }
 
         // 범위 내 가장 가까운 미소비 마커 → F 활성화.
         int hot = -1;
@@ -83,6 +110,16 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
     protected abstract void OnActivate(int markerIndex);
     protected virtual void Tick() {}
     protected virtual void OnDestroyChallenge() {}
+
+    // ── 배치 안전장치 ──────────────────────────────────────
+
+    /// <summary>
+    /// 벽·장식을 피해 실제로 설 수 있는 자리를 찾는다. 전부 막히면 <paramref name="origin"/> 자체로 폴백한다
+    /// (= 플레이어가 서 있는 곳이므로 반드시 도달 가능).
+    /// <para>마커 좌표를 순수 수학으로 잡으면 방 입구가 벽 가장자리라 상당수가 벽 속에 박힌다.</para>
+    /// </summary>
+    protected Vector3 SafeSpot(Vector3 origin, Vector3 dir, float dist)
+        => ServiceRoomDecorPlacer.TryFindSpot(origin, dir, dist, origin.y, out var p) ? p : origin;
 
     // ── 마커/보상 유틸 ────────────────────────────────────
     protected int AddMarker(Vector3 pos, string label, Color labelColor, string prompt, object tag = null)
@@ -154,7 +191,7 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
         t.color = color;
         t.textWrappingMode = TextWrappingModes.NoWrap;
         t.sortingOrder = order;
-        TMPOutlineHelper.ApplyDefault(t);
+        TMPOutlineHelper.ApplySoftShadow(t);
         return t;
     }
 

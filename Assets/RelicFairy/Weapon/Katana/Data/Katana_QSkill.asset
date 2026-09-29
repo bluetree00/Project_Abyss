@@ -15,6 +15,21 @@ MonoBehaviour:
   skillName: "\uD658\uC601\uBCA0\uAE30"
   description: "\uC81C\uC790\uB9AC\uC5D0\uC11C \uC804\uBC29 \uBC94\uC704\uC758 \uC801\uC744
     \uB2E4\uC218 \uD0C0\uACA9\uD558\uB294 \uC5F0\uC18D \uACF5\uACA9\uC785\uB2C8\uB2E4."
-  icon: {fileID: 21300000, guid: 5932011b449ac234197ea8c6600fb8fe, type: 3}
+  icon: {fileID: 21300000, guid: eb5c4da9e6b89794caa3be2683b8665b, type: 3}
+  iconTier2: {fileID: 21300000, guid: d2b65b7fd1c91e548bf72e7407747e5a, type: 3}
+  iconTier3: {fileID: 21300000, guid: fae76247a6a80ed4a8433b753461e38d, type: 3}
+  _tier2Change: "\uAC01\uC778 \uD0DD1(\uCD94\uACA9\xB7\uC751\uCD95)"
+  _tier3Change: "\uAC80\uAE30 \uD3ED\uBC1C \uBC18\uACBD 3m(25+\uACF5\uACA9\uB825)"
+  _engravings:
+  - id: phantom_pursuit
+    tier: 2
+    displayName: "\uC794\uC0C1 \uCD94\uACA9"
+    description: "\uAC80\uAE30 3\uBC1C(\uAC01 12+\uACF5\uACA9\uB825)\uC774 8m \uC548 \uAC00\uAE4C\uC6B4 \uC801\uBD80\uD130 \uD558\uB098\uC529 \uCAD3\uC544\uAC00 \uBCA4\uB2E4. \uD769\uC5B4\uC9C4 \uC801\uC5D0\uAC8C."
+  - id: phantom_condense
+    tier: 2
+    displayName: "\uC751\uCD95"
+    description: "\uAC80\uAE30 3\uBC1C\uC744 \uD55C \uBC88\uC5D0 \uBAA8\uC544 \uD06C\uAC8C
+      \uBCA4\uB2E4(\uD53C\uD574 \uD569 \xD71.2 \xB7 \uBC94\uC704 \xD71.6). \uB2E8\uB2E8\uD55C
+      \uD55C \uB188\uC5D0\uAC8C."
   cooldown: 9
   behavior: {fileID: 11400000, guid: 18e152d2bf0e4c458a4025f70eee98ee, type: 2}

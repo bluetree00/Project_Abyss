@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 07b90a658e4082844ac88bfb317bb3f5, type: 3}
+  m_Name: DragonBlackFlameStormPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.DragonBlackFlameStormPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 30
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: abyss_storm
+  breakOverride: -1
+  _cooldown: 16
+  _lineCount: 2
+  _aimSeconds: 1.2
+  _lockSeconds: 0.4
+  _trackDegPerSec: 120
+  _lineGap: 0.35
+  _lineWidth: 3
+  _maxLength: 80
+  _hitDamageMult: 1.4
+  _stripSeconds: 6
+  _stripDamageMult: 0.12
+  _waveVfxPrefab: {fileID: 1220213892471706, guid: 800cddb992d3f5e4eb2348b90447f4a7,
+    type: 3}
+  _waveVfxScale: 1.4
+  _waveSpacing: 3
+  _waveSpeed: 45
+  _mouthVfxPrefab: {fileID: 1766868900565162, guid: f82a1a892a042c1438f8f4704a37e11b,
+    type: 3}
+  _mouthVfxScale: 1.5
+  _stripVfxPrefab: {fileID: 1220213892471706, guid: 800cddb992d3f5e4eb2348b90447f4a7,
+    type: 3}
+  _stripVfxScale: 0.8
+  _stripVfxSpacing: 4
+  _breathSfx: {fileID: 0}
+  _aimStateName: UAttack FireBreath L
+  _fireStateName: UAttack FireBreath Loop
+  _airStateName: Airborne_Hover
+  _endPoseSeconds: 0.5

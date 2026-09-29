@@ -99,6 +99,28 @@ public sealed class ElementVfxPlayer : MonoBehaviour
         return inst.DoAttachAura(element, target, duration, 1f, body: true);
     }
 
+    /// <summary>
+    /// 속성과 무관한 프리팹을 위치에 1회 재생(서약 효과 등). 속성 버스트와 같은 풀·수명 규칙을 쓴다.
+    /// scale = 프리팹 배율, life = 회수 시각(초, unscaled).
+    /// </summary>
+    public static void PlayPrefab(GameObject prefab, Vector3 pos, float scale = 1f, float life = BurstTtl)
+    {
+        if (prefab == null) return;
+        var inst = Instance; if (inst == null) return;
+        inst.DoPlayPrefab(prefab, pos, scale, life);
+    }
+
+    /// <summary>
+    /// 속성과 무관한 프리팹을 대상에 부착(대상+프리팹별 1개, 재부착 시 수명 갱신). 반환=해제 핸들(0=실패).
+    /// </summary>
+    public static int AttachPrefab(GameObject prefab, Transform target, float duration, float scale = 1f)
+    {
+        if (prefab == null || target == null) return 0;
+        var inst = Instance; if (inst == null) return 0;
+        return inst.DoAttachPrefab(prefab, target, duration, scale,
+                                   target.GetInstanceID() + "|p" + prefab.GetInstanceID());
+    }
+
     /// <summary>핸들로 오라 즉시 해제(만료 전 상태 소멸 시).</summary>
     public static void ReleaseAura(int handle)
     {
@@ -182,10 +204,15 @@ public sealed class ElementVfxPlayer : MonoBehaviour
         var prefab = _registry.GetBurst(element);
         if (prefab == null) return;
 
-        var it = Spawn(prefab, pos, Mathf.Max(0.1f, radiusScale));
+        DoPlayPrefab(prefab, pos, Mathf.Max(0.1f, radiusScale), BurstTtl);
+    }
+
+    private void DoPlayPrefab(GameObject prefab, Vector3 pos, float scale, float life)
+    {
+        var it = Spawn(prefab, pos, Mathf.Max(0.05f, scale));
         if (it == null) return;
         it.follow = null;
-        it.life   = BurstTtl;
+        it.life   = life;
         it.age    = 0f;
     }
 
@@ -195,15 +222,20 @@ public sealed class ElementVfxPlayer : MonoBehaviour
 
         // 몸 상태(b)와 바닥 장판(f)은 같은 트랜스폼에 공존할 수 있어 키를 분리한다.
         string key = target.GetInstanceID() + "|" + (int)element + (body ? "b" : "f");
+        var prefab = body ? _registry.GetStatusBody(element) : _registry.GetAura(element);
+        return DoAttachPrefab(prefab, target, duration, scale, key);
+    }
+
+    private int DoAttachPrefab(GameObject prefab, Transform target, float duration, float scale, string key)
+    {
+        if (prefab == null || target == null || duration <= 0f) return 0;
+
         if (_auras.TryGetValue(key, out var exist) && exist.go != null && exist.go.activeSelf)
         {
             exist.age  = 0f;                       // 재부여 = 수명 갱신(top-up)
             exist.life = Mathf.Max(exist.life, duration);
             return exist.handle;
         }
-
-        var prefab = body ? _registry.GetStatusBody(element) : _registry.GetAura(element);
-        if (prefab == null) return 0;
 
         var it = Spawn(prefab, target.position, scale);
         if (it == null) return 0;

@@ -11,8 +11,10 @@ namespace RelicFairy.Monster
 ///     광각 3타(피니셔)로 탐욕을 응징한다. 정답은 2타 후 바로 붙지 말고
 ///     피니셔 빨강을 보고 회피 → 그 후 반격(진짜 응징 창은 Recovery).
 ///
-/// 액션별 애니: Sweep1=ScytheCombo1, Sweep2=ScytheCombo2, Finisher=ScytheCombo3
-///             (각각 Anim_Fly_Attack_01/02/03 배선).
+/// 동작(09-19 재작업 — 휘두름 드라이버로 접촉 프레임 = 판정):
+///   1타 = 오른쪽→왼쪽 수평, 2타 = 왼쪽→오른쪽 수평(좁은 부채꼴),
+///   피니셔 = 머리 위 내려찍기 → 앞쪽 원형 충격파(동작과 같은 모양).
+/// 예고: 각 타격 단계 시작부터 진홍 부채꼴/원이 차오르고 판정 0.15초 전 빨강. 빨강이 뜨면 방향 고정(옆으로 피하면 산다).
 /// </summary>
 [CreateAssetMenu(menuName = "RelicFairy/Boss/Lich/Lich_ReaperCadencePattern", fileName = "Lich_ReaperCadencePattern")]
 public class LichReaperCadencePatternSO : BossPatternSO
@@ -50,10 +52,12 @@ public class LichReaperCadencePatternSO : BossPatternSO
     public float sweepRadius = 4f;
     [Tooltip("1·2타 전방 호 반각 (도)")]
     public float sweepHalfAngle = 60f;
-    [Tooltip("피니셔 반경 배율")]
+    [Tooltip("피니셔 충격파 반경 = 1·2타 반경 × 이 값")]
     public float finisherRadiusMult = 1.4f;
-    [Tooltip("피니셔 전방 호 반각 (도)")]
-    public float finisherHalfAngle = 120f;
+    [Tooltip("피니셔 — 낫이 바닥에 닿는 자리(리치 앞 m). 충격파 원의 중심")]
+    public float finisherSlamOffset = 1.5f;
+    [Tooltip("판정 직전 패링 창을 연다(낫이 금빛으로 빛남)")]
+    public bool  parryable = true;
 
     [Header("Reaper Cadence — Damage")]
     [Tooltip("1·2타 데미지 배율")]
@@ -68,14 +72,6 @@ public class LichReaperCadencePatternSO : BossPatternSO
     [Header("Reaper Cadence — Cooldown")]
     [Tooltip("패턴 완료 후 재사용 대기 시간 (초)")]
     public float patternCooldown = 11f;
-
-    [Header("Reaper Cadence — VFX (추후 가이드에 맞춰 적용)")]
-    [Tooltip("1·2타 임팩트 시 보스 위치·전방으로 스폰할 베기 VFX. null이면 미사용.")]
-    public GameObject slashVfxPrefab;
-    [Tooltip("피니셔 임팩트 전용 VFX. null이면 slashVfxPrefab으로 폴백.")]
-    public GameObject finisherVfxPrefab;
-    [Tooltip("스폰한 VFX 자동 파괴 시간 (초)")]
-    public float vfxLifetime = 2f;
 
     // ── 런타임 ───────────────────────────────────────────
     private LichReaperCadenceState _state;
@@ -104,9 +100,16 @@ public class LichReaperCadenceState : UnInterruptibleState<LichReaperCadencePatt
 {
     private enum Phase { Approach, Sweep1, Gap, Sweep2, FeintHold, Finisher, Recovery }
 
+    private const float SignalSeconds = 0.15f;
+
     private Phase      _phase;
     private float      _timer;
+    private float      _lead;       // 이번 예고가 판정까지 차오르는 시간
+    private float      _elapsed;    // 이번 예고가 뜬 뒤 흐른 시간
     private bool       _hitDone;
+    private bool       _signaled;
+    private bool       _parryOpen;
+    private float      _yaw;
     private GameObject _guide;
 
     public LichReaperCadenceState(LichReaperCadencePatternSO data) : base(data) { }
@@ -117,18 +120,16 @@ public class LichReaperCadenceState : UnInterruptibleState<LichReaperCadencePatt
         _timer   = 0f;
         _hitDone = false;
 
-        var mc = (ctx.Monster as LichMonster)?.MovementController;
+        var mc = LichPatternUtil.Mover(ctx);
         mc?.RequestMovementState(LichMovementState.DashClose);
         mc?.SetLocked(true);
-
-        // Approach 시작 시 Telegraph disc — 돌진 중 보스를 따라오며 Active로 전환
-        _guide = PatternGuideHelper.Disc(
-            ctx.Transform.position, Data.sweepRadius, PatternGuideHelper.Telegraph);
     }
 
     public override void Update(MonsterContext ctx)
     {
-        _timer += Time.deltaTime;
+        float dt = Time.deltaTime;
+        _timer   += dt;
+        _elapsed += dt;
         FollowGuide(ctx);
 
         switch (_phase)
@@ -136,56 +137,47 @@ public class LichReaperCadenceState : UnInterruptibleState<LichReaperCadencePatt
             case Phase.Approach:
             {
                 float d = ctx.Runtime.PlayerTarget != null
-                    ? Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position)
+                    ? LichPatternUtil.FlatDistance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position)
                     : 999f;
                 if (d <= Data.approachStopRange || _timer >= Data.approachDuration)
                 {
-                    (ctx.Monster as LichMonster)?.MovementController?
-                        .RequestMovementState(LichMovementState.IdleHover);
-                    BeginSwing(ctx, Phase.Sweep1, "ScytheCombo1");
+                    LichPatternUtil.Mover(ctx)?.RequestMovementState(LichMovementState.IdleHover);
+                    BeginSweep(ctx, Phase.Sweep1, LichSwing.RightToLeft);
                 }
                 break;
             }
 
             case Phase.Sweep1:
-                if (!_hitDone) FaceTracking(ctx, Data.windupTrackSpeed);
-                TrySweepHit(ctx, Data.sweepHitDelay, Data.sweepRadius, Data.sweepHalfAngle,
-                            Data.sweepDamageMult, Data.sweepKnockbackMult, Data.slashVfxPrefab);
+            case Phase.Sweep2:
+                TickWindup(ctx);
+                if (!_hitDone && _timer >= Data.sweepHitDelay)
+                    SweepHit(ctx, _phase == Phase.Sweep1 ? LichSwing.RightToLeft : LichSwing.LeftToRight);
                 if (_timer >= Data.sweepDuration)
                 {
-                    PatternGuideHelper.SetColor(_guide, PatternGuideHelper.Telegraph);
-                    _phase = Phase.Gap;
-                    _timer = 0f;
+                    if (_phase == Phase.Sweep1) Next(Phase.Gap);
+                    else                        EnterFeint(ctx);
                 }
                 break;
 
             case Phase.Gap:
                 if (_timer >= Data.gapDuration)
-                    BeginSwing(ctx, Phase.Sweep2, "ScytheCombo2");
-                break;
-
-            case Phase.Sweep2:
-                if (!_hitDone) FaceTracking(ctx, Data.windupTrackSpeed);
-                TrySweepHit(ctx, Data.sweepHitDelay, Data.sweepRadius, Data.sweepHalfAngle,
-                            Data.sweepDamageMult, Data.sweepKnockbackMult, Data.slashVfxPrefab);
-                if (_timer >= Data.sweepDuration)
-                    EnterFeint(ctx);
+                    BeginSweep(ctx, Phase.Sweep2, LichSwing.LeftToRight);
                 break;
 
             case Phase.FeintHold:
-                FacePlayerSlow(ctx);
-                if (_timer >= Data.feintHoldDuration)
-                    BeginSwing(ctx, Phase.Finisher, "ScytheCombo3");
+                // 한 박자 멈춤 — 피니셔 원이 이미 차오르고 있다(탐욕을 부르면 맞는다).
+                TickWindup(ctx);
+                if (_timer >= Data.feintHoldDuration) Next(Phase.Finisher);
                 break;
 
             case Phase.Finisher:
-                TrySweepHit(ctx, Data.finisherHitDelay, Data.sweepRadius * Data.finisherRadiusMult,
-                            Data.finisherHalfAngle, Data.finisherDamageMult, Data.finisherKnockbackMult,
-                            Data.finisherVfxPrefab != null ? Data.finisherVfxPrefab : Data.slashVfxPrefab);
+                TickWindup(ctx);
+                if (!_hitDone && _timer >= Data.finisherHitDelay) FinisherHit(ctx);
                 if (_timer >= Data.finisherDuration)
                 {
-                    _phase = Phase.Recovery;
-                    _timer = 0f;
+                    PatternGuideHelper.SafeDestroy(ref _guide);
+                    LichPatternUtil.Lich(ctx)?.NotifyVulnerableWindow(Data.recoveryDuration);
+                    Next(Phase.Recovery);
                 }
                 break;
 
@@ -199,9 +191,9 @@ public class LichReaperCadenceState : UnInterruptibleState<LichReaperCadencePatt
     public override void Exit(MonsterContext ctx)
     {
         PatternGuideHelper.SafeDestroy(ref _guide);
-        (ctx.Monster as LichMonster)?.MovementController?.SetLocked(false);
+        LichPatternUtil.Mover(ctx)?.SetLocked(false);
 
-        var lich = ctx.Monster as LichMonster;
+        var lich = LichPatternUtil.Lich(ctx);
         if (lich?.LichBB != null)
             lich.LichBB.ReaperCadenceCooldown = Data.patternCooldown;
     }
@@ -210,92 +202,153 @@ public class LichReaperCadenceState : UnInterruptibleState<LichReaperCadencePatt
     // 헬퍼
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    private void BeginSwing(MonsterContext ctx, Phase phase, string clip)
+    private void Next(Phase phase)
     {
-        _phase   = phase;
-        _timer   = 0f;
-        _hitDone = false;
-        ctx.Animator?.CrossFade(clip, 0.1f);
+        _phase = phase;
+        _timer = 0f;
     }
 
+    /// <summary>수평 베기 하나 — 부채꼴 예고가 판정 크기로 차오르고, 접촉 프레임이 판정 순간에 온다.</summary>
+    private void BeginSweep(MonsterContext ctx, Phase phase, LichSwing swing)
+    {
+        Next(phase);
+        FacePlayerNow(ctx);
+        OpenGuide(ctx, Data.sweepHitDelay,
+                  PatternGuideHelper.Sector(LichPatternUtil.OnFloor(ctx, ctx.Transform.position),
+                                            Data.sweepRadius, Data.sweepHalfAngle * 2f, _yaw, LichPatternUtil.Crimson));
+        LichPatternUtil.Swing(ctx, swing, Data.sweepHitDelay);
+    }
+
+    /// <summary>피니셔 예고 — 멈춤 동안 이미 원이 차오른다. 내려찍기 동작은 피니셔 단계 시작부터.</summary>
     private void EnterFeint(MonsterContext ctx)
     {
-        _phase   = Phase.FeintHold;
-        _timer   = 0f;
-        _hitDone = false;
-        // 피니셔 예고 — 더 큰 노란 disc로 교체해 광각 강타를 미리 알린다.
-        PatternGuideHelper.SafeDestroy(ref _guide);
-        _guide = PatternGuideHelper.Disc(
-            ctx.Transform.position, Data.sweepRadius * Data.finisherRadiusMult,
-            PatternGuideHelper.Telegraph);
+        Next(Phase.FeintHold);
+        FacePlayerNow(ctx);
+        OpenGuide(ctx, Data.feintHoldDuration + Data.finisherHitDelay,
+                  PatternGuideHelper.Disc(SlamPoint(ctx), FinisherRadius, LichPatternUtil.Crimson));
+        LichPatternUtil.Swing(ctx, LichSwing.Overhead, Data.feintHoldDuration + Data.finisherHitDelay, 0.12f);
     }
 
-    private void TrySweepHit(MonsterContext ctx, float hitDelay, float radius, float halfAngle,
-                             float dmgMult, float kbMult, GameObject vfx)
+    private void OpenGuide(MonsterContext ctx, float lead, GameObject guide)
     {
-        if (_hitDone || _timer < hitDelay) return;
-        _hitDone = true;
-        PatternGuideHelper.SetColor(_guide, PatternGuideHelper.Active);
-        DealArc(ctx, radius, halfAngle, dmgMult, kbMult);
+        PatternGuideHelper.SafeDestroy(ref _guide);
+        _guide     = LichPatternUtil.PrepareTelegraph(guide, LichPatternUtil.Crimson);
+        _lead      = Mathf.Max(0.05f, lead);
+        _elapsed   = 0f;
+        _hitDone   = false;
+        _signaled  = false;
+        _parryOpen = false;
+        LichSfx.Play(LichSfxSlot.CastShort, ctx.Transform.position, 0.5f);
+    }
 
-        // 추후 가이드(전방 호)에 맞춰 적용할 임팩트 VFX 훅 — 보스 위치·전방 기준 스폰.
-        if (vfx != null)
+    /// <summary>예고가 차오르는 동안 — 빨강 전까지는 제한 속도로 플레이어를 따라 돈다. 빨강이 뜨면 고정.</summary>
+    private void TickWindup(MonsterContext ctx)
+    {
+        if (_hitDone) return;
+        if (!_signaled)
         {
-            var go = Object.Instantiate(vfx, ctx.Transform.position, ctx.Transform.rotation);
-            if (Data.vfxLifetime > 0f) Object.Destroy(go, Data.vfxLifetime);
+            TrackPlayer(ctx, Data.windupTrackSpeed);
+            if (_guide != null && _phase != Phase.FeintHold && _phase != Phase.Finisher)
+                _guide.transform.rotation = PatternGuideHelper.SectorRotation(_yaw);
+        }
+        if (LichPatternUtil.TickTelegraph(_guide, _elapsed, _lead, SignalSeconds, ref _signaled))
+            LichPatternUtil.HoldFacing(ctx, _yaw);
+
+        if (Data.parryable && !_parryOpen && _lead - _elapsed <= LichPatternUtil.ParryWindow)
+        {
+            _parryOpen = true;
+            LichPatternUtil.OpenParry(ctx);
         }
     }
 
+    private void SweepHit(MonsterContext ctx, LichSwing swing)
+    {
+        _hitDone = true;
+        PatternGuideHelper.SafeDestroy(ref _guide);
+        if (Parried(ctx)) return;
+
+        Vector3 origin = LichPatternUtil.OnFloor(ctx, ctx.Transform.position);
+        Vector3 dir    = Quaternion.Euler(0f, _yaw, 0f) * Vector3.forward;
+        LichPatternUtil.SlashVfx(origin, dir, Data.sweepRadius, swing);
+        LichSfx.Play(LichSfxSlot.ScytheSlash, origin);
+
+        bool hit = InArc(ctx, origin, dir, Data.sweepRadius, Data.sweepHalfAngle)
+                && LichPatternUtil.HitCircle(ctx, origin, Data.sweepRadius, Data.sweepDamageMult, Data.sweepKnockbackMult);
+        LichPatternUtil.Impact(LichImpact.Slash, hit);
+    }
+
+    private void FinisherHit(MonsterContext ctx)
+    {
+        _hitDone = true;
+        PatternGuideHelper.SafeDestroy(ref _guide);
+        if (Parried(ctx)) return;
+
+        Vector3 slam = SlamPoint(ctx);
+        Vector3 dir  = Quaternion.Euler(0f, _yaw, 0f) * Vector3.forward;
+        LichPatternUtil.SlashVfx(slam, dir, Data.finisherSlamOffset * 1.6f, LichSwing.Overhead);
+        LichVfx.Play(LichVfxSlot.SlamImpact, slam, Quaternion.identity, LichPatternUtil.NovaScale(FinisherRadius));
+        LichSfx.Play(LichSfxSlot.SlamImpact, slam);
+        ArenaTileGrid.Active?.Tremble(slam, FinisherRadius, 0.5f);
+
+        bool hit = LichPatternUtil.HitCircle(ctx, slam, FinisherRadius, Data.finisherDamageMult, Data.finisherKnockbackMult);
+        LichPatternUtil.Impact(LichImpact.Heavy, hit);
+    }
+
+    /// <summary>튕겨냈으면 남은 타격을 접고 휘청으로(반격창이 곧 복귀 구간).</summary>
+    private bool Parried(MonsterContext ctx)
+    {
+        _parryOpen = false;
+        float stagger = Data.parryable ? LichPatternUtil.ConsumeParry(ctx) : 0f;
+        if (stagger <= 0f) return false;
+        PatternGuideHelper.SafeDestroy(ref _guide);
+        Next(Phase.Recovery);
+        _timer = -stagger;   // 휘청 동안 복귀를 미룬다
+        return true;
+    }
+
+    private float FinisherRadius => Data.sweepRadius * Data.finisherRadiusMult;
+
+    private Vector3 SlamPoint(MonsterContext ctx)
+        => LichPatternUtil.OnFloor(ctx, ctx.Transform.position)
+         + Quaternion.Euler(0f, _yaw, 0f) * Vector3.forward * Data.finisherSlamOffset;
+
     private void FollowGuide(MonsterContext ctx)
     {
-        if (_guide != null)
-            _guide.transform.position = ctx.Transform.position;
+        if (_guide == null || _signaled) return;
+        Vector3 p = _phase == Phase.FeintHold || _phase == Phase.Finisher
+            ? SlamPoint(ctx)
+            : LichPatternUtil.OnFloor(ctx, ctx.Transform.position);
+        p.y += 0.03f;
+        _guide.transform.position = p;
     }
 
-    private void DealArc(MonsterContext ctx, float radius, float halfAngle, float dmgMult, float kbMult)
+    private static bool InArc(MonsterContext ctx, Vector3 origin, Vector3 dir, float radius, float halfAngle)
     {
-        if (ctx.Config?.stat == null || ctx.Runtime.PlayerTarget == null) return;
-
-        Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
-        if (toPlayer.magnitude > radius) return;
-
-        Vector3 flat = toPlayer;
-        flat.y = 0f;
-        if (flat.sqrMagnitude > 0.001f &&
-            Vector3.Angle(ctx.Transform.forward, flat) > halfAngle)
-            return;
-
-        var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
-        if (player == null) return;
-
-        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * dmgMult));
-        player.TakeDamage(dmg);
-
-        Vector3 dir = toPlayer.normalized;
-        dir.y = 0.3f;
-        if (dir.sqrMagnitude > 0.001f) dir.Normalize();
-        player.ApplyKnockback(dir * ctx.Config.stat.knockbackForce * kbMult);
+        var target = ctx.Runtime.PlayerTarget;
+        if (target == null) return false;
+        Vector3 to = target.position - origin;
+        to.y = 0f;
+        if (to.magnitude > radius) return false;
+        return to.sqrMagnitude <= 0.01f || Vector3.Angle(dir, to) <= halfAngle;
     }
 
-    /// <summary>윈드업 중 각속도 제한 추적 — 타격 시점엔 호출하지 않아 방향이 고정된다.</summary>
-    private static void FaceTracking(MonsterContext ctx, float degPerSec)
+    private void FacePlayerNow(MonsterContext ctx)
+    {
+        LichPatternUtil.FaceInstant(ctx, LichPatternUtil.PlayerFloorPos(ctx));
+        _yaw = ctx.Transform.eulerAngles.y;
+        LichPatternUtil.HoldFacing(ctx, _yaw, Data.windupTrackSpeed);
+    }
+
+    /// <summary>제한 속도로 플레이어 쪽 방위를 튼다 — 몸은 쥔 방향(HoldFacing)으로 따라온다.</summary>
+    private void TrackPlayer(MonsterContext ctx, float degPerSec)
     {
         if (ctx.Runtime.PlayerTarget == null) return;
-        Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
-        dir.y = 0f;
-        if (dir.sqrMagnitude < 0.001f) return;
-        ctx.Transform.rotation = Quaternion.RotateTowards(
-            ctx.Transform.rotation, Quaternion.LookRotation(dir), degPerSec * Time.deltaTime);
-    }
-
-    private static void FacePlayerSlow(MonsterContext ctx)
-    {
-        if (ctx.Runtime.PlayerTarget == null) return;
-        Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
-        dir.y = 0f;
-        if (dir.sqrMagnitude < 0.001f) return;
-        ctx.Transform.rotation = Quaternion.Slerp(
-            ctx.Transform.rotation, Quaternion.LookRotation(dir), 2f * Time.deltaTime);
+        Vector3 to = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+        to.y = 0f;
+        if (to.sqrMagnitude < 0.001f) return;
+        float want = Quaternion.LookRotation(to).eulerAngles.y;
+        _yaw = Mathf.MoveTowardsAngle(_yaw, want, degPerSec * Time.deltaTime);
+        LichPatternUtil.HoldFacing(ctx, _yaw, degPerSec * 2f);
     }
 }
 }

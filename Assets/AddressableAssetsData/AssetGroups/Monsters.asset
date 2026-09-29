@@ -15,8 +15,78 @@ MonoBehaviour:
   m_GroupName: Monsters
   m_GUID: 12bf64871dac4db4f9561b3ca9ee2e40
   m_SerializeEntries:
+  - m_GUID: 07f751a1f5c9f9c48b5fa767509cda9a
+    m_Address: Lich/VFX/SealStoneModel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0acb59c36e3495a43abbde5a801c28d2
+    m_Address: Lich/VFX/DarkOrb
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 17cfcc57fb4d15e498045ccaf7c70bc4
+    m_Address: Lich/VFX/ScytheSpin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1c24a4c46891dd544b15cfba7a45bab7
+    m_Address: Lich/VFX/ScreenSpace
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 26ca230b5e25e7a4394b9883f13f4527
+    m_Address: Lich/VFX/BindRing
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2f0c96fa9be733c49b02f90a5800ef48
+    m_Address: Lich/VFX/ZoneLightning
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 32614a0360ca45044b4436c4f3c5a6a9
+    m_Address: Lich/VFX/ChainReversed
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 34d0599d37e35ac4ebeab64c18d00ccc
+    m_Address: Lich/VFX/SealComplete
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 37ffde710e1caa44d842f936899af19f
+    m_Address: Lich/VFX/CircleLightning
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3ecc26f6d4062be44b0a099e114ff00c
+    m_Address: Lich/VFX/FireBeam
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3f498e4cf53914e48b44a0340f496a52
+    m_Address: Lich/VFX/TeleportVanish
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4092d73b4f103fc4a828c97d6a3b3ded
+    m_Address: Lich/VFX/DeathBurst
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4590cad17e23b5944a25be813b758007
     m_Address: MonsterBase
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 48ef807660893d04cbb013e8e8fc19de
+    m_Address: Lich/VFX/LichVfxSet
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4b780a14d074f2f4cb9b853b6644dce1
+    m_Address: Lich/VFX/IceImpact
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -25,8 +95,113 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5eeaa49a26f1bb7468d756408c7434a4
+    m_Address: Lich/VFX/ArcaneBeam
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 64f8b6f04fb14802a8c829766243f2ab
     m_Address: BlackKnight/BlackKnightConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 66cfb511f8effdc489478be604bab435
+    m_Address: Lich/VFX/SummonGround
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 67ed48999874bbf4bb1a9f7561d653ce
+    m_Address: Lich/SFX/LichSfxSet
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6917c8ff75e3f2c44ad44d8df072e2dd
+    m_Address: Lich/VFX/BoltImpact
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6be92596c1a7ee04893f5af9b1a33bf3
+    m_Address: Lich/VFX/ScreenDebuff
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6c45d61ea68f82b4eb2c7f1ff7fdcb81
+    m_Address: Lich/VFX/BlinkAfterimage
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6fc914f49e5ff664ea5e8a29573adde7
+    m_Address: Lich/VFX/BossAura
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 72643d98a2de9c743b9888ccf1539c80
+    m_Address: Lich/VFX/PhaseBurst
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7297fe0a5e06fb644a731296af23d579
+    m_Address: Lich/VFX/ScreenWind
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 74191c569ba27d14d8023c27caa4bcf9
+    m_Address: Lich/VFX/ZoneFire
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 820581e3054dceb4eb164b48e76144d4
+    m_Address: LichSkeleton/LichSkeletonConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 84a2671b622e73d40b57cbf7db774c2d
+    m_Address: Lich/VFX/LightningStrike
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 86fb4dcd3ac9b8b479b5bae451719ebd
+    m_Address: Lich/VFX/CastFlare
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8b08fc045b6efa84bbe2dd3eeed90fa5
+    m_Address: Lich/VFX/ScreenMagicFlow
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8f2f58d7a42129d4183953d600976851
+    m_Address: Lich/VFX/DarkRainImpact
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 96aacb3c58028424aa3e5f4e5c55f12e
+    m_Address: Lich/VFX/SealArray
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9bd2b17ccd2d70e4890d08479ab9f4a2
+    m_Address: Lich/VFX/ZoneIce
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a566b7c8c7df18c4ba44056226c21053
+    m_Address: Lich/VFX/ZoneDark
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: abc00000000003064275970823802713
+    m_Address: Lich/VFX/MonumentModel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b056e80a15927884a8d19c5ec18a6de9
+    m_Address: Lich/VFX/CircleFire
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b7ccc161176536948b1b274f53795233
+    m_Address: Lich/VFX/SealBurst
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -35,8 +210,63 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 820581e3054dceb4eb164b48e76144d4
-    m_Address: LichSkeleton/LichSkeletonConfig
+  - m_GUID: cd1835015a7136e479b54f5fa9f3993f
+    m_Address: Lich/VFX/TwinCircle
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d3b04768c83040b419f8960119e0bced
+    m_Address: Lich/VFX/IceSpear
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d67be8e74f13e26429aece1e53a117b7
+    m_Address: Lich/VFX/LingerPool
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d7d554880214e644bbbbfc89aa884b26
+    m_Address: Lich/VFX/SlamImpact
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e60d36cff17a1ce4db49ef54f9e72f61
+    m_Address: Lich/VFX/ScytheSlash
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e9f62bf1880228f4eab10427ee363528
+    m_Address: Lich/VFX/BoltMuzzle
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ea2807df7b2a48f4396037f07b37eafe
+    m_Address: Lich/VFX/CircleDark
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ee581131052aa0e4d9dea523e5bacb4a
+    m_Address: Lich/VFX/CircleIce
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: efaca1b73cf772a429555136dcf8766d
+    m_Address: Lich/VFX/SkeletonDeath
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f0d3fa0fecf173a41bae576a89e37923
+    m_Address: Lich/VFX/WardDome
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f2fcfb64ef05e064b8cdab8538cd1c5e
+    m_Address: Lich/VFX/ChainGold
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fabdc41743036b945ade90d43535856b
+    m_Address: Lich/VFX/SealStoneIgnite
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

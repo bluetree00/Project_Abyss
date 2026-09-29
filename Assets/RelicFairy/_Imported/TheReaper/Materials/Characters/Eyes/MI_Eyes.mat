@@ -128,7 +128,7 @@ Material:
     - _DoubleSidedEnable: 0
     - _DoubleSidedNormalMode: 2
     - _DstBlend: 0
-    - _EmissivePower1: 0
+    - _EmissivePower1: 2.5
     - _EmissivePower2: 0
     - _EmissivePower3: 0
     - _EmissivePower4: 0
@@ -183,7 +183,7 @@ Material:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DoubleSidedConstants: {r: 1, g: 1, b: -1, a: 0}
     - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
-    - _EmissiveColor1: {r: 0, g: 0, b: 0, a: 0}
+    - _EmissiveColor1: {r: 0.75, g: 0.3, b: 1, a: 1}
     - _EmissiveColor2: {r: 0, g: 0, b: 0, a: 0}
     - _EmissiveColor3: {r: 0, g: 0, b: 0, a: 0}
     - _EmissiveColor4: {r: 0, g: 0, b: 0, a: 0}

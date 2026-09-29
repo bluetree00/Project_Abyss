@@ -6,7 +6,7 @@ using UnityEngine;
 /// SkillSO.behavior가 있으면 SO에 실행을 위임하고,
 /// 없으면 레거시 애니메이션 재생으로 폴백.
 /// </summary>
-public class ActSkillState : ActSkillStateBase<ActState>
+public class ActSkillState : ActSkillStateBase
 {
     private readonly SkillType _slot;
     private readonly WeaponActionType _actionType;
@@ -44,8 +44,6 @@ public class ActSkillState : ActSkillStateBase<ActState>
 
         // 스킬 진입 시 잔여 공격 입력 제거
         _controller.InputBuffer.TryConsume(Game.Inputs.Command.Light);
-        _controller.InputBuffer.TryConsume(Game.Inputs.Command.Heavy);
-        _controller.InputBuffer.TryConsume(Game.Inputs.Command.Charge);
 
         _ctx = new SkillExecutionContext
         {

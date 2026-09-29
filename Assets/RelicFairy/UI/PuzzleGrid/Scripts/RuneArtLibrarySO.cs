@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -66,6 +67,23 @@ public sealed class RuneArtLibrarySO : ScriptableObject
     /// <para>표가 작아(≤54) 선형 탐색으로 충분하다 — 사전을 만들면 <c>OnValidate</c> 이후
     /// 갱신 시점을 따로 관리해야 해서 오히려 깨지기 쉽다.</para>
     /// </summary>
+    /// <summary>배정에 쓸 수 있는 문양 전부(중복·null 제거). 아이템별 1:1 배정의 풀이 된다.</summary>
+    public List<Sprite> AllIconSprites()
+    {
+        var seen = new HashSet<Sprite>();
+        var list = new List<Sprite>();
+        if (effectIcons != null)
+            foreach (var e in effectIcons)
+                if (e.icon != null && seen.Add(e.icon)) list.Add(e.icon);
+        if (elementArt != null)
+            foreach (var a in elementArt)
+                if (a != null && seen.Add(a)) list.Add(a);
+        if (gradeArt != null)
+            foreach (var a in gradeArt)
+                if (a != null && seen.Add(a)) list.Add(a);
+        return list;
+    }
+
     public Sprite GetIconByEffect(string effectType)
     {
         if (string.IsNullOrEmpty(effectType) || effectIcons == null) return null;

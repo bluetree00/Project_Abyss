@@ -17,6 +17,10 @@ MonoBehaviour:
     \uC9C0\uB098\uAC04 \uB4A4, \uC2A4\uCCD0 \uAC04 \uC801\uC744 \uC5F0\uC774\uC5B4
     \uBCA4\uB2E4. \uAC15\uD654 +5\uBD80\uD130 \uC5F0\uCC38\uC774 \uB298\uACE0 \uACF5\uAC04\uC744
     \uAC00\uB978\uB2E4."
-  icon: {fileID: 21300000, guid: ea5d9aa3689141f4da41f072b5dd4d64, type: 3}
+  icon: {fileID: 21300000, guid: 7c81c294755be9949a8908959b251607, type: 3}
+  iconTier2: {fileID: 21300000, guid: e07a5eaebc139c049879ede475c2570e, type: 3}
+  iconTier3: {fileID: 21300000, guid: 66f9a1f61aa664b4f92ddfcf3adfae39, type: 3}
+  _tier2Change: "\uC5F0\uCC38 +2"
+  _tier3Change: 
   cooldown: 8
   behavior: {fileID: 11400000, guid: 0ab4e4ce9ba1b0e40bf6a8f4b2ff927b, type: 2}

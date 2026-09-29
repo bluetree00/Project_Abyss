@@ -124,6 +124,12 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     /// <summary>현재 충전 가속(0 = 정속, 1 = 2배속). HUD/디버그 표시용.</summary>
     public float ChargeAccel => _chargeAccel;
 
+    /// <summary>[파츠] 영원한 정오가 정오를 붙잡고 있는가.</summary>
+    public bool IsHoldNoon => _holdNoon;
+
+    /// <summary>한 주기(여명 + 정오 + 황혼) 초 — 정오 고정 중 낙일(Q) 재사용 간격.</summary>
+    public float CycleSeconds => _chargeTime + _noonTime + _cooldownTime;
+
     /// <summary>[파츠] 영원한 정오 — on이면 즉시 정오로 진입해 그 구간에서 벗어나지 않는다(황혼·충전 제거).</summary>
     public void SetHoldNoon(bool on)
     {

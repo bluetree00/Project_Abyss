@@ -55,6 +55,9 @@ public class WorldItemDisplay : MonoBehaviour
 
     private void Update()
     {
+        // 시작 때 카메라가 아직 없었으면 다시 잡는다(없으면 라벨이 영영 안 돈다).
+        if (_camTransform == null && Camera.main != null) _camTransform = Camera.main.transform;
+
         // 텍스트 빌보드
         if (_worldText != null && _camTransform != null)
             _worldText.transform.rotation = _camTransform.rotation;
@@ -151,7 +154,18 @@ public class WorldItemDisplay : MonoBehaviour
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
 
-        run?.ItemInventory.AddToStaging(_runtimeData);
+        // 보관함 만차면 <b>월드에 그대로 남긴다</b>. 반환값을 버리면 아래에서 ConfirmPickup이
+        // 오브젝트를 파괴하는데 "획득" 알림은 그대로 떠, 플레이어는 받은 줄 알고 잃는다.
+        // (프로젝트 규약 — 팝업/상점 경로는 이미 같은 이유로 실패를 처리한다.)
+        if (run?.ItemInventory != null && !run.ItemInventory.AddToStaging(_runtimeData))
+        {
+            _pickedUp = false;
+            if (col != null) col.enabled = true;
+            RefreshPrompt();
+            ItemEffectVfxHelper.ShowNotice(
+                $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.StagingCapacity}칸) — 자리를 비우고 다시 주우세요");
+            return;
+        }
 
         // 아이템 효과: OnItemPickup hook
         run?.EffectManager?.OnItemPickup(_runtimeData);
@@ -269,7 +283,7 @@ public class WorldItemDisplay : MonoBehaviour
         _worldText.textWrappingMode = TextWrappingModes.NoWrap;
         _worldText.sortingOrder = UISortingOrder.WorldLabel;
 
-        TMPOutlineHelper.ApplyDefault(_worldText);
+        TMPOutlineHelper.ApplySoftShadow(_worldText);
 
         if (_camTransform != null)
             _worldText.transform.rotation = _camTransform.rotation;
@@ -305,7 +319,7 @@ public class WorldItemDisplay : MonoBehaviour
         _promptText.textWrappingMode = TextWrappingModes.NoWrap;
         _promptText.sortingOrder = UISortingOrder.WorldPrompt;
 
-        TMPOutlineHelper.ApplyDefault(_promptText);
+        TMPOutlineHelper.ApplySoftShadow(_promptText);
 
         _promptGo.SetActive(false);
     }

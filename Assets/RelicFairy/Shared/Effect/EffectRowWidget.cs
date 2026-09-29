@@ -39,7 +39,8 @@ public sealed class EffectRowWidget : MonoBehaviour
 
         var hlg = go.AddComponent<HorizontalLayoutGroup>();
         hlg.spacing = style.spacing;
-        hlg.childAlignment = TextAnchor.MiddleLeft;
+        // 여러 줄로 접히는 행은 위 정렬 — 가운데 정렬이면 색 점이 문단 세로 가운데(둘째 줄)에 붙었다(09-28 UI 전수).
+        hlg.childAlignment = style.wrap ? TextAnchor.UpperLeft : TextAnchor.MiddleLeft;
         hlg.childControlWidth = true;
         hlg.childControlHeight = true;
         hlg.childForceExpandWidth = false;
@@ -90,16 +91,22 @@ public sealed class EffectRowWidget : MonoBehaviour
     public static EffectRowWidget Create(Transform parent, in EffectRowStyle style, ItemEffectSlot slot)
         => Create(parent, style, EffectDescriptionFormatter.Describe(slot), slot.effectType);
 
-    /// <summary>표시 데이터 적용. <paramref name="effectType"/>은 계열 아이콘이 없을 때 룬 기능 문양을 찾는 열쇠.</summary>
+    /// <summary>
+    /// 표시 데이터 적용. <paramref name="effectType"/>은 <b>지금은 쓰지 않는다</b>(아래 주석 참고) —
+    /// 호출부 시그니처를 깨지 않으려고 남겨 둔 자리다.
+    /// </summary>
     public void Bind(in EffectDisplay display, string effectType = null)
     {
         if (_icon != null)
         {
-            // 룬의 기능 문양(RuneArtLibrary effectIcons)이 먼저다 — 획득 팝업·정보판·보관함에서 같은 효과가
-            // 같은 얼굴로 보이게. 계열 아이콘 레지스트리는 아트가 없으면 색 점 플레이스홀더를 돌려주므로
-            // (null이 아니다) 뒤에 둔다 — 색 점은 효과를 구별하지 못한다.
-            var sprite = !string.IsNullOrEmpty(effectType) ? RuneArt.GetIconByEffect(effectType) : null;
-            if (sprite == null) sprite = EffectIconRegistry.GetSprite(display.IconKey);
+            // ⚠️ 효과 줄에 <b>룬 보석 문양</b>을 쓰지 않는다(2026-09-14).
+            //    "공격력 +6%" 앞에 룬 모양이 붙으니 그 룬이 무슨 아이템인지와 효과가 무엇인지가 뒤섞였다.
+            //    효과는 <b>글로 읽는 것</b>이고, 아이콘은 <b>의미가 있을 때만</b> 붙인다.
+            //    계열 아이콘 세트(공격=검·방어=방패 …)가 실제로 들어와 있을 때만 그리고,
+            //    없으면 색 점 플레이스홀더 대신 <b>아이콘 자체를 숨겨</b> 글자만 남긴다.
+            var sprite = EffectIconRegistry.HasIconSet
+                       ? EffectIconRegistry.GetSprite(display.IconKey)
+                       : null;
             _icon.sprite  = sprite;
             _icon.enabled = sprite != null;
             _icon.gameObject.SetActive(sprite != null);

@@ -18,9 +18,11 @@ namespace RelicFairy.UI.Overlay
         // ── Constants ─────────────────────────────────────────────────
         private const int   TextureSize        = 512;
         private const int   LineCount          = 24;     // 방사형 line 수
-        private const float InnerRadius        = 0.18f;  // 완전 투명 영역 반경 (0~1)
+        // 09-21 빛살이 처음 화면에 보이고 나서 조정: 가운데를 넓게 비우고(0.18 → 0.30) 빛살을 얇게(3.5° → 2.5°).
+        // 예전 값은 빛살이 플레이어 위로 모여 정작 봐야 할 캐릭터를 덮었다.
+        private const float InnerRadius        = 0.30f;  // 완전 투명 영역 반경 (0~1)
         private const float OuterRadius        = 0.98f;  // 페이드 끝 반경
-        private const float LineHalfAngleDeg   = 3.5f;   // 각 line 폭 (+/- 각도)
+        private const float LineHalfAngleDeg   = 2.5f;   // 각 line 폭 (+/- 각도)
 
         // ── SerializeField ────────────────────────────────────────────
         [Header("Refs")]
@@ -147,8 +149,10 @@ namespace RelicFairy.UI.Overlay
                     float angleMod   = Mathf.Repeat(angle, angleStepRad);
                     float angleDelta = Mathf.Min(angleMod, angleStepRad - angleMod);
 
-                    // line 내부 여부 — halfAngleRad 이내면 alpha on
-                    float angleFactor = 1f - Mathf.SmoothStep(0f, halfAngleRad, angleDelta);
+                    // line 내부 여부 — halfAngleRad 이내면 alpha on.
+                    // Mathf.SmoothStep(from, to, t)는 from→to 보간이다(GLSL smoothstep 아님) — t를 0~1로 정규화해 넘긴다.
+                    // (예전엔 SmoothStep(0, halfAngleRad, angleDelta)라 값이 0~0.06에 갇혀 빛살 없이 흰 고리로 보였다, 09-20 실측)
+                    float angleFactor = 1f - Mathf.SmoothStep(0f, 1f, angleDelta / halfAngleRad);
 
                     // 반경 페이드 — 중앙 근처부터 페이드 인, 외곽에서 페이드 아웃
                     float radialFactor =

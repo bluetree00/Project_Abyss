@@ -29,24 +29,60 @@ public static class CovenantAssembleService
     private const double RerollGoldCut = 0.50;
     private const double RerollRubyCut = 0.85;
 
-    public static List<CovenantDraftCard> DraftCauses(int count, System.Random rng, bool forceSilver)
-        => DraftCards(CovenantPalette.CauseIds, count, rng, forceSilver);
+    /// <summary>
+    /// 기억의 제단 「서약 카드」 개방 단계. 드래프트·교체·보장이 모두 이 단계까지 열린 카드에서만 뽑는다 —
+    /// 한 곳이라도 전체 목록을 보면 교체 한 번으로 잠긴 카드를 끌어올 수 있다.
+    /// </summary>
+    private static int Step => _stepOverride ?? MemoryAltarService.CovenantPartStep;
+
+    // 검증 도구(에디터 「서약 뽑기 전수 검증」)가 리플렉션으로 넣는 개방 단계. 게임 코드는 쓰지 않는다.
+    private static int? _stepOverride;
+
+    // 원인을 다시 뽑는 최대 횟수 — 제시한 원인 모두와 맞는 효과가 3장이 안 될 때만 돈다.
+    private const int MaxBoardAttempts = 8;
 
     /// <summary>
-    /// 효과 카드 드래프트. 3장 중 최소 1장은 방어축(Survival)을 보장한다 —
-    /// 공격 효과만 뜨는 판이 반복되면 플레이어에게 남는 선택은 "얼마나 세게 때릴까"뿐이고,
-    /// 생존이 필요한 순간에는 서약이 아무 대답도 못 한다.
+    /// 원인·효과 카드를 함께 뽑는다. 제시되는 원인 × 효과 <b>모든 조합</b>이 벼릴 수 있는 짝이 되게 고른다
+    /// (<see cref="CovenantPalette.CanPair"/>) — 고를 수 없는 칸을 보여 주면 그 칸이 낭비된다.
+    /// 원인을 먼저 뽑고, 그 원인들 모두와 맞는 효과만 후보로 둔다. 후보가 모자라거나
+    /// 생존 카드가 후보에서 모두 빠지면(봉인 짝·보유 짝 때문에) 원인을 다시 뽑는다.
     ///
-    /// held(보유 서약)는 <b>페어링</b>에 쓰인다(C4) — 소모형은 그 통화를 걸어 줄 서약이 있을 때만 나온다.
-    /// null을 넘기면 첫 서약과 같은 취급(부여형·중립형만)이 된다.
+    /// 효과 3장 중 최소 1장은 방어축(Survival)을 보장한다 — 공격 효과만 뜨는 판이 반복되면
+    /// 생존이 필요한 순간에 서약이 아무 대답도 못 한다.
+    /// held(보유 서약)는 <b>페어링</b>에도 쓰인다(C4) — 소모형은 그 통화를 걸어 줄 서약이 있을 때만 나온다.
     /// </summary>
-    public static List<CovenantDraftCard> DraftEffects(int count, System.Random rng, bool forceSilver,
-                                                       IReadOnlyList<CovenantBase> held = null)
+    public static void DraftBoard(int count, System.Random rng, bool forceSilver, IReadOnlyList<CovenantBase> held,
+                                  out List<CovenantDraftCard> causes, out List<CovenantDraftCard> effects)
     {
-        var pool  = CovenantPalette.DraftableEffectIds(held);
-        var cards = DraftCards(pool, count, rng, forceSilver);
-        EnsureSurvival(cards, rng);
-        return cards;
+        var causePool  = CovenantPalette.DraftableCauseIds(Step);
+        var effectBase = CovenantPalette.DraftableEffectIds(held, Step);
+        causes  = null;
+        effects = null;
+        for (int attempt = 0; attempt < MaxBoardAttempts; attempt++)
+        {
+            causes = DraftCards(causePool, count, rng, forceSilver);
+            var pool = PairableEffects(effectBase, causes, held);
+            bool shortfall = pool.Count < count || (HasGuaranteedSurvival(effectBase) && !HasGuaranteedSurvival(pool));
+            if (shortfall && attempt < MaxBoardAttempts - 1) continue;
+
+            effects = DraftCards(pool, count, rng, forceSilver);
+            EnsureSurvival(effects, pool, rng);
+            return;
+        }
+    }
+
+    /// <summary>
+    /// 원인 카드 개별 교체 — 개방 단계까지 열린 원인 중, 지금 제시된 효과 카드 전부와 짝이 되는 것만 고른다.
+    /// 후보 없으면 null.
+    /// </summary>
+    public static CovenantDraftCard? RerollCauseCard(ICollection<string> excludeIds, System.Random rng, bool forceSilver,
+                                                     IReadOnlyList<CovenantDraftCard> effects,
+                                                     IReadOnlyList<CovenantBase> held)
+    {
+        var pool = new List<string>();
+        foreach (var id in CovenantPalette.DraftableCauseIds(Step))
+            if (PairsWithAll(id, effects, held, isCause: true)) pool.Add(id);
+        return RerollCard(pool, excludeIds, rng, forceSilver);
     }
 
     /// <summary>제외 목록에 없는 새 카드 1장(개별 리롤, 티어 재굴림). 후보 없으면 null.</summary>
@@ -61,11 +97,13 @@ public static class CovenantAssembleService
     /// <summary>
     /// 효과 카드 개별 리롤. 방어축이 그 한 장뿐이면 방어축으로만 교체된다(axisLock) —
     /// 보장을 리롤 한 번으로 우회할 수 있으면 보장이 아니다.
-    /// 후보 풀도 드래프트와 같은 페어링 규칙을 따른다(C4) — 리롤로 소모형을 끌어올 수 있으면 규칙이 아니다.
+    /// 후보 풀도 드래프트와 같은 페어링 규칙(C4)과 짝 규칙(제시된 원인 전부와 짝)을 따른다 —
+    /// 리롤로 규칙 밖의 카드를 끌어올 수 있으면 규칙이 아니다.
     /// </summary>
     public static CovenantDraftCard? RerollEffectCard(IReadOnlyList<CovenantDraftCard> current, int idx,
                                                       System.Random rng, bool forceSilver,
-                                                      IReadOnlyList<CovenantBase> held = null)
+                                                      IReadOnlyList<CovenantBase> held,
+                                                      IReadOnlyList<CovenantDraftCard> causes)
     {
         if (current == null || idx < 0 || idx >= current.Count) return null;
 
@@ -78,7 +116,8 @@ public static class CovenantAssembleService
         }
 
         bool mustSurvival = guaranteed <= 1 && CovenantPalette.IsGuaranteedSurvivalEffect(current[idx].id);
-        var id = RerollOne(CovenantPalette.DraftableEffectIds(held), exclude, rng, mustSurvival);
+        var pool = PairableEffects(CovenantPalette.DraftableEffectIds(held, Step), causes, held);
+        var id = RerollOne(pool, exclude, rng, mustSurvival);
         if (id == null) return null;
         return new CovenantDraftCard(id, RollRerollTier(rng, forceSilver));
     }
@@ -105,20 +144,54 @@ public static class CovenantAssembleService
     /// 보장을 채울 수 있는 방어축 카드가 한 장도 없으면 아무 한 칸을 그런 카드로 바꾼다(티어는 굴린 그대로).
     /// 소모형 방어(정지)는 보장 자격이 없다 — 통화를 걸어 줄 서약이 없으면 발동조차 하지 않는다.
     /// </summary>
-    private static void EnsureSurvival(List<CovenantDraftCard> cards, System.Random rng)
+    private static void EnsureSurvival(List<CovenantDraftCard> cards, IReadOnlyList<string> draftable, System.Random rng)
     {
-        if (cards == null || cards.Count == 0) return;
+        if (cards == null || cards.Count == 0 || draftable == null) return;
         for (int i = 0; i < cards.Count; i++)
             if (CovenantPalette.IsGuaranteedSurvivalEffect(cards[i].id)) return;
 
+        // 보장 후보도 드래프트와 같은 풀에서 — 전체 목록을 보면 잠긴 방어 카드(성역·결계)가 보장 자리로 새어 나온다.
         var pool = new List<string>();
-        foreach (var id in CovenantPalette.EffectIds)
+        foreach (var id in draftable)
             if (CovenantPalette.IsGuaranteedSurvivalEffect(id)) pool.Add(id);
         if (pool.Count == 0) return;
 
         int slot = Next(rng, cards.Count);
         int pick = Next(rng, pool.Count);
         cards[slot] = new CovenantDraftCard(pool[pick], cards[slot].tier);
+    }
+
+    private static bool HasGuaranteedSurvival(IReadOnlyList<string> ids)
+    {
+        foreach (var id in ids)
+            if (CovenantPalette.IsGuaranteedSurvivalEffect(id)) return true;
+        return false;
+    }
+
+    /// <summary>효과 후보 중 제시된 원인 카드 전부와 짝이 되는 것만.</summary>
+    private static List<string> PairableEffects(IReadOnlyList<string> effectIds,
+                                                IReadOnlyList<CovenantDraftCard> causes,
+                                                IReadOnlyList<CovenantBase> held)
+    {
+        var pool = new List<string>(effectIds.Count);
+        foreach (var id in effectIds)
+            if (PairsWithAll(id, causes, held, isCause: false)) pool.Add(id);
+        return pool;
+    }
+
+    /// <summary>카드 id 하나가 반대쪽 열의 카드 전부와 짝이 되는가.</summary>
+    private static bool PairsWithAll(string id, IReadOnlyList<CovenantDraftCard> others,
+                                     IReadOnlyList<CovenantBase> held, bool isCause)
+    {
+        if (others == null) return true;
+        for (int i = 0; i < others.Count; i++)
+        {
+            bool ok = isCause
+                ? CovenantPalette.CanPair(id, others[i].id, held)
+                : CovenantPalette.CanPair(others[i].id, id, held);
+            if (!ok) return false;
+        }
+        return true;
     }
 
     private static string RerollOne(IReadOnlyList<string> pool, ICollection<string> exclude,

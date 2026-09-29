@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t2_hit_rage
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t2_hit_rage
-  displayName: "\uC5ED\uACBD\uC758 \uB8EC"
+  displayName: "\uB418\uAC1A\uB294 \uBD84\uB178\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 1

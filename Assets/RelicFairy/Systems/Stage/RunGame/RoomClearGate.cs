@@ -23,6 +23,10 @@ public class RoomClearGate : MonoBehaviour
     // 후보 수·원석량은 RoomRewardTable이 방 종류별로 정한다. 챌린지 경로만 후보 수를 고정으로 쓴다.
     /// <summary>이벤트 챌린지 보상 1라운드의 룬 후보 수(3지선다).</summary>
     private const int RuneChoiceCount = 3;
+    /// <summary>첫 장을 보유 계열로 기울일 확률 — 늘 같은 계열만 나오면 두 번째 축을 만날 자리가 없다.</summary>
+    private const float PreferFamilyChance = 0.6f;
+    private static readonly System.Collections.Generic.List<BuildFamily> s_topFamilies = new(2);
+    private static readonly System.Collections.Generic.List<ItemSO>      s_familyPool  = new(16);
 
     // ── [SerializeField] ───────────────────────────────────────
     [Header("클리어 이펙트")]
@@ -273,7 +277,8 @@ public class RoomClearGate : MonoBehaviour
                 ? (result.Count == 0 ? floor : rule.RarityFloor)
                 : floor;
 
-            var (d, s) = PickItemByRolledRarity(effFloor, rule.Weights);
+            // 첫 장은 보유 계열 쪽으로 기울여 굴린다(발동 계열 — 「3장 중 1장은 내 빌드 쪽」, 09-29). 나머지는 넓게.
+            var (d, s) = PickItemByRolledRarity(effFloor, rule.Weights, preferOwnedFamily: result.Count == 0);
             if (d == null || s == null) continue;
             if (!picked.Add(s.itemId)) continue;   // 이미 뽑힌 아이템 → 다시 굴림
             result.Add((d, s));
@@ -287,10 +292,13 @@ public class RoomClearGate : MonoBehaviour
 
     /// <summary>등급을 굴려 아이템 1개를 뽑는다(등급 폴백 포함). 드랍 발생 판정은 호출부가 먼저 통과시킨다.</summary>
     private (RuntimeItemData data, ItemSO so) PickItemByRolledRarity(
-        ItemRarity? floor, in RoomRewardTable.RarityWeights weights)
+        ItemRarity? floor, in RoomRewardTable.RarityWeights weights, bool preferOwnedFamily = false)
     {
         var rarity = RoomRewardTable.RollRarity(weights);
         if (floor.HasValue && rarity < floor.Value) rarity = floor.Value;   // 방 종류·챌린지 등급 rarity 하한
+        // 하한 <b>뒤에</b> 다시 내린다 — RollRarity 안의 클램프만으로는 하한(챌린지 플래티넘=전설 · 골드=영웅)이
+        // 기억의 제단 등급 해금을 도로 뚫는다.
+        rarity = MemoryAltarService.ClampRarity(rarity);
 
         // 등급 폴백 — 굴린 등급에 보유 아이템이 없을 수 있다(예: 아이템 풀이 Common/Rare뿐인데
         // LuckRollTable은 luck 1부터 Epic/Legendary를 굴린다). 드랍을 통째로 날리는 대신 한 단계씩
@@ -313,6 +321,11 @@ public class RoomClearGate : MonoBehaviour
             Debug.Log($"[RoomClearGate] 등급 폴백 {rolledRarity} → {rarity} (해당 등급 풀 비어 하향)");
 
         var so = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+        if (preferOwnedFamily && UnityEngine.Random.value < PreferFamilyChance)
+        {
+            var owned = PickOwnedFamily(candidates);
+            if (owned != null) so = owned;
+        }
         var data = RuntimeItemData.FromSO(so);
         if (data == null)
         {
@@ -322,6 +335,19 @@ public class RoomClearGate : MonoBehaviour
 
         Debug.Log($"[RoomClearGate] 보상 아이템 선택: {so.itemId} (rarity={rarity}, room={RoomKind()})");
         return (data, so);
+    }
+
+    /// <summary>
+    /// 보유 각인 1 · 2위 계열의 룬 하나(없으면 null). 이 등급 풀에 그 계열이 없으면 기울이지 않는다.
+    /// </summary>
+    private static ItemSO PickOwnedFamily(System.Collections.Generic.IReadOnlyList<ItemSO> candidates)
+    {
+        BuildImprint.TopFamilies(2, s_topFamilies);
+        if (s_topFamilies.Count == 0) return null;
+        s_familyPool.Clear();
+        foreach (var c in candidates)
+            if (c != null && s_topFamilies.Contains(BuildFamilyRules.OfItemId(c.itemId))) s_familyPool.Add(c);
+        return s_familyPool.Count > 0 ? s_familyPool[UnityEngine.Random.Range(0, s_familyPool.Count)] : null;
     }
 
     /// <summary>[레거시] 플레이어 행운치. 드롭 굴림에서 분리됐다(RoomRewardTable로 이관). 삭제하지 않고 남긴다.</summary>

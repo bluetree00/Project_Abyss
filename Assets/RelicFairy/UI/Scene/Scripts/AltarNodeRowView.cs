@@ -26,6 +26,10 @@ public class AltarNodeRowView : MonoBehaviour
     private const float MarkSize  = 34f;
     private const float MarkGlyph = 16f;
 
+    // ── 글 칸 폭 ── 왼쪽 글(이름·변화·조건)은 행 폭을 따른다(아래 PutLeft)
+    private const float RightPad    = 12f;   // 행 오른쪽 여백 — 값(cost)의 x와 같다
+    private const float NameCostGap = 8f;    // 이름 끝과 값 글자 사이
+
     // ── 연출 시계 ─────────────────────────────────────────────────────────
     /// <summary>연출 한 프레임의 시간 걸음(초). 0이면 실시간(<see cref="Time.unscaledDeltaTime"/>).
     /// 레이아웃 프로브가 연출 <b>중간 프레임</b>을 재현 가능하게 찍으려고 1/60로 고정한다 — 에디터 프레임 시간은 들쭉날쭉해서
@@ -41,6 +45,9 @@ public class AltarNodeRowView : MonoBehaviour
     ///
     /// <para>Rect는 (x, y, w, h)를 담는 그릇으로만 쓴다 — 좌표는 <b>행 좌상단에서 아래로</b>다
     /// (이름·변화·조건 피벗이 (0,1)이라 그대로 anchoredPosition에 들어간다. 값은 부호를 뒤집어 쓴다).</para>
+    ///
+    /// <para>이름·변화·조건의 <b>폭은 쓰지 않는다</b> — 행 폭을 따른다(09-27, 열 수가 4 → 5로 바뀌어 행 폭이 273 → 252).
+    /// 폭은 값(cost) 칸에만 쓰인다.</para>
     /// </summary>
     [System.Serializable]
     private struct SeatLayout
@@ -190,6 +197,7 @@ public class AltarNodeRowView : MonoBehaviour
         RefreshRail(state, seat, h);
         RefreshTone(state, seat, selected);
         RefreshText(state, node, seat);
+        FitNameToCost(L);
         RefreshReach(state, essence, seat);
 
         _seat = seat;
@@ -376,9 +384,12 @@ public class AltarNodeRowView : MonoBehaviour
         },
         Seat.Ahead => new SeatLayout
         {
-            height = 28f,
-            name   = new Rect(16f, 5f, 300f, 18f),
-            fontSizes = new Vector3(16f, 14f, 14f),
+            height = 54f,
+            name   = new Rect( 16f,  4f, 150f, 22f),
+            cost   = new Rect(-12f,  4f, 100f, 22f),
+            // 상자 높이는 글자 크기 16의 줄 높이(20.6)보다 커야 한다 — Ellipsis는 모자라면 줄을 통째로 지운다.
+            change = new Rect( 16f, 26f, 240f, 24f),
+            fontSizes = new Vector3(17f, 16f, 14f),
         },
         _ => new SeatLayout
         {
@@ -399,19 +410,37 @@ public class AltarNodeRowView : MonoBehaviour
     /// </summary>
     private void LayoutForSeat(Seat seat, SeatLayout L)
     {
-        Put(nameText, L.name, L.fontSizes.x);
+        PutLeft(nameText, L.name, L.fontSizes.x);
 
         if (seat == Seat.Turn)
         {
             Put(costText,      L.cost,      L.fontSizes.x);
-            Put(EnsureChangeText(), L.change, L.fontSizes.y);
-            Put(conditionText, L.condition, L.fontSizes.z);
+            PutLeft(EnsureChangeText(), L.change, L.fontSizes.y);
+            PutLeft(conditionText, L.condition, L.fontSizes.z);
             if (reachRow) reachRow.anchoredPosition = new Vector2(0f, L.reachBottom);
         }
         else if (seat == Seat.Passed)
         {
-            Put(EnsureChangeText(), L.change, L.fontSizes.y);
+            PutLeft(EnsureChangeText(), L.change, L.fontSizes.y);
         }
+        else   // Ahead — 값·변화를 켰으면 자리도 같이 잡아야 한다.
+        {
+            // 자리를 안 잡으면 두 줄이 템플릿 좌표(이름과 같은 y)에 남아 글자가 겹친다(09-21 실측).
+            Put(costText,           L.cost,   L.fontSizes.x);
+            PutLeft(EnsureChangeText(), L.change, L.fontSizes.y);
+        }
+    }
+
+    /// <summary>
+    /// 이름은 값(오른쪽 정렬) <b>앞에서 끝난다</b> — 값의 실제 글 폭만큼 비운다.
+    /// 고정 폭일 땐 긴 이름(「보스 파츠 선택지 +1」)이 「1,400 ◆」와 겹쳤다(09-27 실측). 값이 없는 칸은 PutLeft 폭 그대로.
+    /// </summary>
+    private void FitNameToCost(SeatLayout L)
+    {
+        if (nameText == null || costText == null || !costText.gameObject.activeSelf) return;
+        float costW = costText.GetPreferredValues(costText.text).x;
+        var rt = nameText.rectTransform;
+        rt.sizeDelta = new Vector2(-(L.name.x + Mathf.Abs(L.cost.x) + costW + NameCostGap), rt.sizeDelta.y);
     }
 
     /// <summary>
@@ -527,6 +556,22 @@ public class AltarNodeRowView : MonoBehaviour
         if (t.enableAutoSizing) t.fontSizeMax = size;
     }
 
+    /// <summary>
+    /// 왼쪽 글(이름·변화·조건) — 가로로 행에 걸어 <b>폭 = 행 폭 − x − 오른쪽 여백</b>. Rect의 폭은 쓰지 않는다.
+    /// 고정 폭(240~290)은 4열 행(273) 기준이라 5열에서 변화 줄이 행 밖으로 29px 나갔다(09-27 실측).
+    /// </summary>
+    private static void PutLeft(TMP_Text t, Rect r, float size)
+    {
+        if (t == null) return;
+        Put(t, r, size);
+        var rt = t.rectTransform;
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot     = new Vector2(0f, 1f);
+        rt.anchoredPosition = new Vector2(r.x, -r.y);
+        rt.sizeDelta        = new Vector2(-(r.x + RightPad), r.height);
+    }
+
     public void SetOnSelect(Action callback)
     {
         _onSelect = callback;
@@ -562,7 +607,7 @@ public class AltarNodeRowView : MonoBehaviour
 
     /// <summary>
     /// 글은 <b>세 층</b>이다 — 이름 / 무엇이 얼마에서 얼마로(변화) / 값·조건.
-    /// 자리마다 층이 하나씩 접힌다: 지난 것은 이름+변화, 앞의 것은 이름만.
+    /// 자리마다 층이 하나씩 접힌다: 지난 것은 이름+변화, 앞의 것은 이름+값+변화(조건은 차례에서만).
     /// </summary>
     private void RefreshText(AltarNodeState state, MemoryAltarNode node, Seat seat)
     {
@@ -572,7 +617,7 @@ public class AltarNodeRowView : MonoBehaviour
             nameText.color    = seat switch
             {
                 Seat.Passed => AltarPalette.Essence,
-                Seat.Ahead  => AltarPalette.TextFaint,
+                Seat.Ahead  => AltarPalette.TextDim,
                 _           => AltarPalette.TextPrimary,
             };
 
@@ -582,15 +627,22 @@ public class AltarNodeRowView : MonoBehaviour
         var change = EnsureChangeText();
         if (change != null)
         {
-            change.gameObject.SetActive(seat != Seat.Ahead);
+            change.gameObject.SetActive(true);
             change.text  = node.Description;
-            change.color = seat == Seat.Passed ? AltarPalette.TextDim : AltarPalette.TextPrimary;
+            change.color = seat switch
+            {
+                Seat.Turn   => AltarPalette.TextPrimary,
+                Seat.Passed => AltarPalette.TextDim,
+                _           => AltarPalette.TextFaint,   // 앞선 칸 — 이름(TextDim)보다 한 단 아래
+            };
         }
 
-        // 값은 앞의 칸에서도 감춘다 — 아직 볼 때가 아니고, 가려야 다음이 궁금해진다.
+        // 값은 앞의 칸에서도 보여준다(09-21 결정). 해금은 자물쇠가 아니라 <b>할인</b>이라는 정본대로,
+        // 무엇이 열리고 얼마인지 미리 알아야 정수를 어디에 쓸지 계획이 선다. 가려 두던 시절엔
+        // 잠긴 행 예닐곱 개가 이름만 적힌 같은 상자로 늘어서 목록이 죽어 보였다.
         if (costText)
         {
-            costText.gameObject.SetActive(seat != Seat.Ahead);
+            costText.gameObject.SetActive(seat != Seat.Passed);
             costText.text  = seat == Seat.Passed ? "" : $"{state.Cost:N0} ◆";
             costText.color = state.CanBuy ? AltarPalette.Gold : AltarPalette.TextDim;
         }

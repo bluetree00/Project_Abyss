@@ -82,6 +82,15 @@ public static class HitFeelService
     }
 
     /// <summary>카메라 흔들기. amplitude=흔들 강도(기존 호출 호환), duration=지속(초).</summary>
+    // ── 플레이어가 일으키는 흔들림 상한 (09-25 사용자 기준: 자주 보는 연출 → 「살짝 느껴질 정도」) ──
+    // 받는 쪽 피격 「약」(0.022)이 위 끝이다. 보스 흔들림(베기 0.05 · 강공 0.14)과 섞이면 약한 쪽이 묻힌다(CameraShakeExtension).
+    /// <summary>기본 공격 흔들림 상한.</summary>
+    public const float DealtShakeBasic    = 0.012f;
+    /// <summary>스킬 타격 흔들림 상한.</summary>
+    public const float DealtShakeSkill    = 0.016f;
+    /// <summary>스킬 막타·유물 스킬 마무리·서약 최상위 발동 — 플레이어 흔들림의 최대치.</summary>
+    public const float DealtShakeFinisher = 0.022f;
+
     public static void CameraShake(float amplitude = 0.08f, float duration = 0.12f)
     {
         if (!EnsureShake()) return;
@@ -120,18 +129,22 @@ public static class HitFeelService
     /// (<see cref="GlobalFeelCoalescer"/>) "여러 발 맞췄다"를 셰이크에만 얹기 위한 노브다.
     /// 히트스톱 길이에는 곱하지 않는다 — 스무 발 볼리가 크리 한 방보다 오래 멈추면 답답해진다.
     /// </summary>
-    public static void Hit(float damage, bool isCritical, in WeaponFeel feel, Vector3 hitDirection, float shakeScale)
+    /// <param name="shakeCap">흔들림 진폭 상한. 플레이어가 준 타격은 <see cref="DealtShakeFinisher"/> 이하로 묶는다.</param>
+    /// <param name="longStop">막타 — 흔들림 대신 멈칫을 치명타 길이로 늘려 무게를 준다(깊이는 그대로).</param>
+    public static void Hit(float damage, bool isCritical, in WeaponFeel feel, Vector3 hitDirection, float shakeScale,
+                           float shakeCap = float.PositiveInfinity, bool longStop = false)
     {
         float amp = Mathf.Max(0f, shakeScale);
+        float stopLen = (isCritical || longStop ? CritStopDuration(damage) : HitStopDuration(damage)) * feel.StopDurationMult;
         if (isCritical)
         {
-            HitStop(feel.CritStopScale, CritStopDuration(damage) * feel.StopDurationMult);
-            CameraShakeDirectional(hitDirection, feel.CritShakeAmp * amp, feel.CritShakeDur);
+            HitStop(feel.CritStopScale, stopLen);
+            CameraShakeDirectional(hitDirection, Mathf.Min(feel.CritShakeAmp * amp, shakeCap), feel.CritShakeDur);
         }
         else
         {
-            HitStop(feel.StopScale, HitStopDuration(damage) * feel.StopDurationMult);
-            CameraShakeDirectional(hitDirection, feel.ShakeAmp * amp, feel.ShakeDur);
+            HitStop(feel.StopScale, stopLen);
+            CameraShakeDirectional(hitDirection, Mathf.Min(feel.ShakeAmp * amp, shakeCap), feel.ShakeDur);
         }
     }
 

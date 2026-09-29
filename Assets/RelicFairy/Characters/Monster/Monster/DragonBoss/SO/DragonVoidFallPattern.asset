@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 361a4972f31c65e43a5ab830363e4441, type: 3}
+  m_Name: DragonVoidFallPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.DragonVoidFallPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 14
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: void_fall
+  breakOverride: -1
+  _cooldown: 32
+  _telegraphSeconds: 4
+  _blastRadius: 0
+  _damageMult: 2.4
+  _knockbackMult: 1.2
+  _armLeadSeconds: 0.4
+  _meteorPrefab: {fileID: 5160844894836991264, guid: f6dec892bf19f7641bf928b5799acd28,
+    type: 3}
+  _meteorScale: 3
+  _meteorFallSeconds: 1.2
+  _meteorFallHeight: 30
+  _impactVfxPrefab: {fileID: 1312756255662086, guid: a7cb112e9339d01408d0002aede091cf,
+    type: 3}
+  _impactVfxScale: 4
+  _castSfx: {fileID: 0}
+  _impactSfx: {fileID: 0}
+  _pillarCount: 3
+  _pillarRingMin: 9
+  _pillarRingMax: 12
+  _pillarRadius: 1.4
+  _pillarHeight: 6
+  _pillarRiseSeconds: 0.6
+  _pillarAimJitter: 25
+  _pillarVfxPrefab: {fileID: 6530448752386012335, guid: c3467a660c4fd4f429b33f697302408c,
+    type: 3}
+  _pillarVfxScale: 1
+  _pillarShatterVfxPrefab: {fileID: 1965956805206708, guid: 18923174f2b0caa4d9dbc5fe46052f5b,
+    type: 3}
+  _pillarShatterVfxScale: 1.2
+  _safeHalfAngle: 20
+  _groundStateName: UAttackWindHighStart
+  _airStateName: Airborne_Hover
+  _endPoseSeconds: 0.8

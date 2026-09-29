@@ -47,9 +47,6 @@ public class FGPunchPatternSO : BossPatternSO
     public AudioClip punchSfx;
 
     // ── 경고 장판 ─────────────────────────────────────────
-    [Header("Warning Zone")]
-    [Tooltip("경고 장판 전용 프리팹. null이면 effectPrefab 사용.")]
-    public GameObject warningZonePrefab;
 
     // ── 런타임 ───────────────────────────────────────────
     private FGPunchState _state;
@@ -74,9 +71,6 @@ public class FGPunchPatternSO : BossPatternSO
     }
 
     public override SpecialStateBase GetRuntimeState() => _state;
-
-    internal GameObject ResolveWarningPrefab()
-        => warningZonePrefab != null ? warningZonePrefab : effectPrefab;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -94,7 +88,6 @@ public class FGPunchState : FullLockState<FGPunchPatternSO>
     private bool       _isLeftHand;
     private bool       _attackAnimPlayed;
     private GameObject _warningGO;
-    private Vector3    _warningTargetScale;
 
     public FGPunchState(FGPunchPatternSO data) : base(data) { }
 
@@ -120,17 +113,14 @@ public class FGPunchState : FullLockState<FGPunchPatternSO>
     {
         _timer += Time.deltaTime * SpeedMult(ctx);
 
-        // 경고 장판 서서히 커지기 (보스 기준 부채꼴 → 보스에서부터 서서히 확장)
-        if (_warningGO != null && Data.warningDuration > 0f)
-        {
-            float t = Mathf.Clamp01(_timer / Data.warningDuration);
-            _warningGO.transform.localScale = Vector3.Lerp(Vector3.zero, _warningTargetScale, t);
-        }
+        // 가이드 채우기 — 부채꼴 크기는 처음부터 판정 범위 그대로
+        if (!_attackAnimPlayed && Data.warningDuration > 0f)
+            PatternGuideHelper.SetProgress(_warningGO, _timer / Data.warningDuration);
 
         if (!_attackAnimPlayed && _timer >= Data.warningDuration)
         {
             _attackAnimPlayed = true;
-            DespawnWarning();
+            PatternGuideHelper.Arm(_warningGO);   // 휘두르는 동안 판정 색으로 남긴다
             PlayAnim(ctx, _isLeftHand ? AnimLeft : AnimRight);  // 경고 종료 → 타격 애니메이션
         }
 
@@ -140,6 +130,7 @@ public class FGPunchState : FullLockState<FGPunchPatternSO>
             if (Data.punchSfx != null)
                 Managers.Sound?.PlayEffectAt(Data.punchSfx, ctx.Transform.position);
             DealFanDamage(ctx);
+            DespawnWarning();
         }
 
         if (_timer >= Data.warningDuration + Data.hitTime + Data.recoveryDuration)
@@ -176,22 +167,13 @@ public class FGPunchState : FullLockState<FGPunchPatternSO>
     // ── 경고 장판 ─────────────────────────────────────────
     private void SpawnWarning(MonsterContext ctx)
     {
-        var prefab = Data.ResolveWarningPrefab();
-        if (prefab == null) return;
-
-        Vector3 spawnPos = ctx.Transform.position;
-        spawnPos.y += 0.02f;
-        _warningTargetScale = new Vector3(Data.range, 1f, Data.range);
-        _warningGO = Managers.ObjectPooler.SpawnFromPrefab(prefab, ObjectPoolerManager.PoolType.Effect, spawnPos, ctx.Transform.rotation);
-        _warningGO.transform.localScale = Vector3.zero;  // 처음엔 0 → Update에서 서서히 확장
+        _warningGO = PatternGuideHelper.Prepare(
+            PatternGuideHelper.Sector(ctx.Transform.position, Data.range, Data.arcHalfAngle * 2f, ctx.Transform.eulerAngles.y,
+                                      PatternGuideHelper.Telegraph),
+            ForestGuardianMonster.GuideFlow);
     }
 
-    private void DespawnWarning()
-    {
-        if (_warningGO == null) return;
-        Managers.ObjectPooler.Despawn(_warningGO);
-        _warningGO = null;
-    }
+    private void DespawnWarning() => PatternGuideHelper.SafeDestroy(ref _warningGO);
 
     // ── 부채꼴 데미지 판정 ─────────────────────────────────
     private void DealFanDamage(MonsterContext ctx)
@@ -209,7 +191,7 @@ public class FGPunchState : FullLockState<FGPunchPatternSO>
         if (player == null) return;
 
         int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
-        player.TakeDamage(dmg);
+        player.TakeDamage(dmg, ctx.Monster.gameObject);
 
         Vector3 knockDir = toPlayer.sqrMagnitude > 0.001f
             ? toPlayer.normalized

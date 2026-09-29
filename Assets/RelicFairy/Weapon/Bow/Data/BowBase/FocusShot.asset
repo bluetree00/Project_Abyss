@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   chargeTime: 1
   chargeEffectKey: BowChargeEffect
-  chargeEffectScale: 0.5
+  chargeEffectScale: 0.2
   arrowKey: Basic_Arrow_01
   shotDelay: 0.15
   forwardOffset: 1

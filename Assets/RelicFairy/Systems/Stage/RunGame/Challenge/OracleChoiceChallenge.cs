@@ -25,13 +25,18 @@ public sealed class OracleChoiceChallenge : WorldInteractionChallenge
 
     protected override void PlaceMarkers(Transform player)
     {
-        Vector3 fwd = player.forward, right = player.right, at = player.position;
-        AddMarker(at + fwd * 4.2f - right * 3.4f, "연료문", new Color(0.45f, 0.7f, 0.95f),
-                  "<color=#73B3F2>[F]</color> 원석의 길", TagFuel);
-        AddMarker(at + fwd * 4.6f,                "보물문", new Color(0.95f, 0.82f, 0.4f),
-                  "<color=#F2D26A>[F]</color> 재화의 길", TagItem);
-        AddMarker(at + fwd * 4.2f + right * 3.4f, "운명문", new Color(0.72f, 0.55f, 0.9f),
-                  "<color=#B892E6>[F]</color> 운명의 길", TagFate);
+        // player.forward는 이전 방에서 넘어온 값이라 벽을 향할 수 있다(MovePlayer가 회전을 안 세운다).
+        // 실제로 트인 방향(Inward)을 기준으로 잡고, 세 문 모두 벽을 피해 놓는다.
+        Vector3 at = player.position, fwd = Inward;
+        Vector3 right = Vector3.Cross(Vector3.up, fwd);
+        AddMarker(SafeSpot(at, (fwd * 4.2f - right * 3.4f).normalized, 5.4f), "연료문", new Color(0.45f, 0.7f, 0.95f),
+                  $"<color=#73B3F2>[F]</color> 원석의 길 — 원석 +{FuelBonus} · 실버", TagFuel);
+        AddMarker(SafeSpot(at, fwd, 4.6f),                                    "보물문", new Color(0.95f, 0.82f, 0.4f),
+                  "<color=#F2D26A>[F]</color> 재화의 길 — 골드 확정", TagItem);
+        AddMarker(SafeSpot(at, (fwd * 4.2f + right * 3.4f).normalized, 5.4f), "운명문", new Color(0.72f, 0.55f, 0.9f),
+                  "<color=#B892E6>[F]</color> 운명의 길 — 플래티넘 12% · 실패 12%", TagFate);
+        // 문 이름은 기능 표기라 그대로 두고, 장소 이름만 챕터 테마로 알린다.
+        Notice($"{ChallengeFlavor.OracleName(Run)} — <color=#B892E6>하나만</color> 고를 수 있다");
     }
 
     protected override void OnActivate(int markerIndex)

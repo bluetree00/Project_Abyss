@@ -10,7 +10,11 @@ using UnityEngine;
 /// </summary>
 public sealed class RunItemInventory
 {
-    public const int MaxStagingCapacity = 5;
+    /// <summary>보관함 칸 배열 상한(제단 「룬 보관함 +2」까지). 실제 칸 수는 <see cref="StagingCapacity"/>.</summary>
+    public const int MaxStagingCapacity = 7;
+
+    /// <summary>이번 런 보관함 칸 수 — 기본 5, 기억의 제단 「룬 보관함 +1 · +2」로 6 · 7(09-29).</summary>
+    public static int StagingCapacity => Mathf.Min(MaxStagingCapacity, MemoryAltarService.RuneStorageCapacity);
 
     private readonly List<RuntimeItemData> _placedItems  = new();
     private readonly List<RuntimeItemData> _stagingItems = new();
@@ -23,7 +27,7 @@ public sealed class RunItemInventory
 
     public int  PlacedCount   => _placedItems.Count;
     public int  StagingCount  => _stagingItems.Count;
-    public bool IsStagingFull => _stagingItems.Count >= MaxStagingCapacity;
+    public bool IsStagingFull => _stagingItems.Count >= StagingCapacity;
 
     /// <summary>그리드 배치 기준 변경 시 발생 — ItemEffectManager.Rebuild 트리거.</summary>
     public event System.Action OnPlacedChanged;
@@ -76,9 +80,9 @@ public sealed class RunItemInventory
     public bool AddToStaging(RuntimeItemData item)
     {
         if (item == null) return false;
-        if (_stagingItems.Count >= MaxStagingCapacity)
+        if (_stagingItems.Count >= StagingCapacity)
         {
-            Debug.LogWarning($"[RunItemInventory] 보관함 가득참 ({MaxStagingCapacity}개) — 추가 불가: {item.itemId}");
+            Debug.LogWarning($"[RunItemInventory] 보관함 가득참 ({StagingCapacity}개) — 추가 불가: {item.itemId}");
             return false;
         }
 

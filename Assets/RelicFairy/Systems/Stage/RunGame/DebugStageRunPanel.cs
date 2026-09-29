@@ -53,14 +53,14 @@ public sealed class DebugStageRunPanel : MonoBehaviour
     {
         "item_t1_weight",              // 충격의 룬 — 전체 공격력 +6 (Always)
         "item_t1_swift_charm",         // 쾌속의 룬 — 이동속도 +0.11 (Always)
-        "item_t1_dull_shield",         // 방패의 룬 — 방어력 +8 (Always)
-        "item_t1_crisis_blade",        // 위기의 룬 — 공격력 +18% (HPBelow50)
-        "item_t1_preempt_blade",       // 선제의 룬 — 이동속도 +25% (AfterRoomEnter)
-        "item_t1_threat_armor",        // 위협의 룬 — 방어력 +15% (EnemiesNearby)
-        "item_t1_calm_blade",          // 냉정의 룬 — 치명타 확률 +6% (NoHit)
-        "item_t2_first_strike",        // 선공의 룬 — 첫 타격 +40% (FirstAttackInRoom)
-        "item_t2_forged_hammer",       // 망치의 룬 — 전체 공격력 +10 (Always)
-        "item_t2_travel_bag",          // 여정의 룬 — 최대 체력 +50 (Always)
+        "item_t1_dull_shield",         // 넘치는 수호의 룬 — 방어력 +8 (Always)
+        "item_t2_crisis_sword",        // 결사의 룬 — 공격력 +25% · 치명 +8% (HPBelow40)
+        "item_t2_skill_burst",         // 폭발의 룬 — 모든 피해 +20% (AfterSkill)
+        "item_t2_crowd_rage",          // 광역분노의 룬 — 공격력 +20% (EnemiesNearby)
+        "item_t2_calm_crit",           // 치명의 룬 — 치명타 확률 +12% (NoHit)
+        "item_t2_hit_rage",            // 역경의 룬 — 공격력 +22% (AfterHit)
+        "item_t2_heavy_weight",        // 중력의 룬 — 공격력 +14 (Always)
+        "item_t2_giant_pack",          // 거대함의 룬 — 최대 HP +60 (Always)
     };
     private int _spawnIndex;
     private readonly System.Collections.Generic.HashSet<string> _spawnedIds = new();

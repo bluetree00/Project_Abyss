@@ -150,6 +150,9 @@ public static class BossEffectPool
             return null;
 
         instance.name = prefab.name;
+        // URP는 GrabPass(왜곡)를 지원하지 않는다 — 켜 두면 화면을 덮고 `_GrabTexture` 오류가 매 프레임 쌓인다
+        // (Ch3 죽음의 기사 등장 이펙트, 09-19). 인스턴스를 처음 만들 때 한 번만 왜곡 조각을 끈다.
+        LegendaryRuntime.DisableGrabPassRenderers(instance);
         instance.transform.SetParent(Containers[key], false);
         instance.SetActive(false);
         instance.transform.localPosition = HiddenPosition;
@@ -175,6 +178,8 @@ public static class BossEffectPool
             instance = component.gameObject;
         if (instance == null)
             return null;
+
+        LegendaryRuntime.DisableGrabPassRenderers(instance);   // GrabPass 왜곡 조각 — 위 GetOrCreate와 같은 이유
 
         if (parent != null)
             instance.transform.SetParent(parent, worldPositionStays);

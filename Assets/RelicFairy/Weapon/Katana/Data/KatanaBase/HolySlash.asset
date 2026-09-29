@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 566ea001f695d374aba1d06554c0dac0, type: 3}
   m_Name: HolySlash
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   dashDuration: 0.15
   dashDistance: 5
   detectRadius: 2
@@ -26,20 +26,19 @@ MonoBehaviour:
   explodeEffectKey: FrontAttackHit
   explodeEffectScale: 2
   endDelay: 0.3
-  dashEffectKey:
-  dashTrailKey:
-  slashEffectKey: IasenFinishFlash
+  dashEffectKey: 
+  dashTrailKey: 
+  slashEffectKey: HolySlashFinish
   hitEffectKey: SwordHitImpact
   hitEffectScale: 0.34
   dashLineEffectKey: KatanaDashLine
   dashLineScale: 1.5
   tier2ExtraHitKey: KatanaSlashHit
   tier2ExtraHitScale: 0.5
-  tier2DashMuzzleKey:
+  tier2DashMuzzleKey: 
   tier2DashMuzzleScale: 1.5
   tier3BurstEffectKey: MissileExplosion
   tier3BurstScale: 3
-  tier3DashLineExtraKey:
+  tier3DashLineExtraKey: 
   tier3DashLineExtraScale: 1.5
-  useWeaponTrail: 1
   animationOverride: QSkill_02

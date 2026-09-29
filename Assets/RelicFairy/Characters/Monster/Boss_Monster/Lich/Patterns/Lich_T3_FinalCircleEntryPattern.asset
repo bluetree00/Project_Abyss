@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d43d424736071fb418b34dfc89e8df0e, type: 3}
+  m_Name: Lich_T3_FinalCircleEntryPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichPhase2EntryPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 3802098707266296607, guid: 58c55f68faacae24a840b257e8e54862,
+    type: 3}
+  playerStatusEffect: {fileID: 0}
+  patternTag: page3finalcircle
+  breakOverride: 0.5
+  targetPage: 3
+  form: 3
+  dialogueKey: Lich_Page3
+  speedMultiplier: 1.2
+  attackSpeedMultiplier: 1.2
+  breakDurationMin: 0.5
+  breakDurationMax: 0.9
+  entryDuration: 3
+  recoveryDuration: 0.5
+  blastTiming: 0.85
+  bindChains: 0
+  chainTiming: 0.45
+  blast: 1
+  blastRadius: 10
+  damageMultiplier: 0
+  knockbackMultiplier: 3
+  collapseOuterRing: 0
+  crackOuterRing: 0
+  restoreFloor: 0
+  cinematic: 1
+  stageShift: 0
+  finalCircle: 1
+  refillSeconds: 2.4
+  roarHoldSeconds: 1.1
+  closeUpTiming: 0.08
+  closeUpHold: 0.9
+  slowMoTiming: 0.5
+  slowMoScale: 0.5
+  slowMoSeconds: 0.6

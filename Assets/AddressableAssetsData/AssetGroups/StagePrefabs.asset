@@ -20,6 +20,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 315eef84caf09fb4087d76fc034cdc59
+    m_Address: Plaza_Boss_Ch4
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 388a70aae94b9fc409d14bef2249bcb9
     m_Address: Shop_Custom_Ch3
     m_ReadOnly: 0

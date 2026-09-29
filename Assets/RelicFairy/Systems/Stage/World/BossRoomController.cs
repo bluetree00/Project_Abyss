@@ -10,7 +10,7 @@ using UnityEngine.SceneManagement;
 /// 보스방 입장 감지 + 연출 제어.
 ///
 /// 흐름: 플레이어가 입장 Trigger 통과
-///       → 배리어 닫힘 + BossSpawner.Trigger() 호출
+///       → 배리어 닫힘 + BossSpawner.Trigger() 호출 (+ lockInputOnEnter면 여기서 입력 차단)
 ///       → 보스가 플레이어를 감지(OnEntranceRequested 발행)
 ///       → 플레이어 입력 차단
 ///       → 카메라 클로즈업 팬(보스 방향) + 홀드 + 복귀
@@ -58,12 +58,35 @@ public class BossRoomController : MonoBehaviour
     [Tooltip("true 시 콜라이더 자동 트리거를 무시하고, 외부(연출 디렉터)의 BeginBossFightExternally 호출로만 전투를 시작한다. 인트로 프롤로그용.")]
     [SerializeField] private bool externalTriggerOnly = false;
 
+    [Tooltip("true(기본): 입구를 통과하는 순간 입력을 잠근다.\n" +
+             "false: 입구에서는 배리어만 닫고, 보스가 플레이어를 감지(OnEntranceRequested)할 때 잠근다.\n" +
+             "입구가 보스 감지 반경 밖에 있는 넓은 아레나는 false여야 한다 — true면 감지 반경에 못 들어간 채 잠겨 영구 이동 불가.")]
+    [SerializeField] private bool lockInputOnEnter = true;
+
+    [Header("보스방 공용 연출 스위치 (끄면 일반 방과 같은 흐름)")]
+    [Tooltip("방 진입 안개 베일을 쓰지 않는다 — 조립 디졸브를 가리는 장치인데 커스텀 아레나엔 가릴 조립이 없다.")]
+    [SerializeField] private bool suppressEntryFogVeil = false;
+    [Tooltip("방 입장 대사(BossRoom_ChN_Enter)를 대사창 대신 걸으면서 듣는 자막으로 띄운다.")]
+    [SerializeField] private bool entryDialogueAsBark = false;
+    [Tooltip("입구를 지나는 순간부터 방을 나갈 때까지 전투 자동 줌아웃(CombatCameraFraming)을 멈춘다 — 보스가 자기 구도를 쓴다.")]
+    [SerializeField] private bool suppressCombatFraming = false;
+
     // ── Private ──────────────────────────────────────────────────
     private bool             _triggered;
     private bool             _unbeatable;
     private bool             _playerPassing;
     private Transform        _playerTransform;
     private PlayerController _playerController;
+
+    // ── Properties ───────────────────────────────────────────────
+    public bool SuppressEntryFogVeil => suppressEntryFogVeil;
+    public bool EntryDialogueAsBark  => entryDialogueAsBark;
+
+    // ── Lifecycle ────────────────────────────────────────────────
+    private void OnDestroy()
+    {
+        GameCameraController.Instance?.SetCombatFramingSuppressed(this, false);
+    }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // Trigger
@@ -93,7 +116,9 @@ public class BossRoomController : MonoBehaviour
     {
         _playerTransform  = player.transform;
         _playerController = player;
-        player.SetInputEnabled(false);
+        if (lockInputOnEnter) player.SetInputEnabled(false);
+        if (suppressCombatFraming)
+            GameCameraController.Instance?.SetCombatFramingSuppressed(this, true);
 
         var bossBgmKey = SceneManager.GetActiveScene().name switch
         {

@@ -36,3 +36,13 @@ MonoBehaviour:
   placeNo: {fileID: 21300000, guid: 928254b490531d742b95e927232a2e46, type: 3}
   confirmButton: {fileID: 21300000, guid: 11570f46a78809b46997b72009863858, type: 3}
   skipButton: {fileID: 21300000, guid: caed8cf7fefcdd0449a279e119705243, type: 3}
+  rarityCorner:
+  - {fileID: 21300000, guid: 93a0a8469e5867c48acb0dc2b879ef46, type: 3}
+  - {fileID: 21300000, guid: 32dc81d6f1fab1749aed5552e1837ecc, type: 3}
+  - {fileID: 21300000, guid: 27cdc0e2b0df3c341b0b42dbcbf5dee3, type: 3}
+  - {fileID: 21300000, guid: 9a1c8a82c88707444813259e2fdb78b9, type: 3}
+  rarityBar:
+  - {fileID: 21300000, guid: a8e40da4fed5973429d3ac34ae526dc3, type: 3}
+  - {fileID: 21300000, guid: 5cf7157b3b72d4d42bbe36980a0e6311, type: 3}
+  - {fileID: 21300000, guid: 1ed2f13478da29948b42d899f22955d1, type: 3}
+  - {fileID: 21300000, guid: d0ad440556eff034393ac665acf96287, type: 3}

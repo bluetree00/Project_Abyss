@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ffe175ff533fe244a63cca06b7e791b, type: 3}
+  m_Name: DK_PageTransition
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.BossPageTransitionPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: page_transition
+  breakOverride: -1
+  staggerState: GetHit3
+  chargeState: Idle2
+  roarState: Attack4
+  roarSpeed: 0.8
+  staggerSeconds: 0.8
+  lowShotSeconds: 0.8
+  lowShotHold: 0.5
+  refillSeconds: 2.4
+  roarHoldSeconds: 1.6
+  wideBack: -10
+  wideHeight: 4.5
+  wideLookAhead: -3
+  roarDistance: 6
+  roarHeight: 1.8
+  bodyHeight: 1.4
+  roarVfxPrefab: {fileID: 7230900929259635890, guid: 80eee9b8c7202074fa198fe5e19ff9cb,
+    type: 3}
+  roarVfxScale: 1
+  flashColor: {r: 0.85, g: 0.85, b: 0.92, a: 1}
+  roarSfx: {fileID: 8300000, guid: 3a39861fff5dbef4bbb1fd94e286c037, type: 3}
+  dialogueKey: 
+  fallbackLine: "\u2026\uC655\uB3C4, \uB9F9\uC138\uB3C4. \uC804\uBD80 \uC774 \uAC80
+    \uB05D\uC5D0\uC11C \uB05D\uB0AC\uB2E4."

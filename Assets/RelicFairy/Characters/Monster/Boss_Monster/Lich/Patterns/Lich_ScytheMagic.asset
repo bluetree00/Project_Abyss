@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 29461df5301cc734ba0c0b485429da8a, type: 3}
+  m_Name: Lich_ScytheMagic
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichScytheMagicPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  patternCooldown: 16
+  windupDuration: 1.8
+  signalDuration: 0.2
+  blastDelay: 0.5
+  blastInterval: 0.2
+  endDuration: 1
+  recoveryDuration: 0.4
+  flySpeed: 18
+  maxLength: 34
+  blastRadius: 2
+  damageMultiplier: 1.2
+  hitsToCollapse: 2
+  maxErodedCells: 36

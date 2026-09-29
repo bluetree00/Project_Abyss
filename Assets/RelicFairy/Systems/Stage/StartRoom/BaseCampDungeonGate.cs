@@ -1,12 +1,12 @@
 using UnityEngine;
 
 /// <summary>
-/// 베이스캠프 던전 입장 포탈. 유물(Relic)+무형검(WeaponSlot0)+원거리(WeaponSlot1)가 모두 준비되면
+/// 베이스캠프 던전 입장 포탈. 유물(Relic)+무형검(WeaponSlot0)+원거리(WeaponSlot1)+시작 파츠(StartPartId)가 모두 준비되면
 /// 활성화되고, 활성 상태에서 플레이어가 트리거에 진입하면 던전 씬으로 전환한다(BaseCampBootstrapper.EnterDungeon).
 ///
 /// 순서 강제는 이 게이트 <b>한 곳</b>에서만 한다(스테이션마다 배리어로 막지 않음, 하데스식).
 /// 미준비 상태로 진입하면 <b>부족분 + 획득 위치</b>를 HUD 텍스트로 안내한다.
-/// 무형검은 각성 제단, 원거리는 모루, 유물은 빛나는 제단에서 획득한다.
+/// 무형검은 소환의 방 검 받침(처음 한 번), 원거리는 장비 공방, 파츠는 파츠 공방, 유물은 유물 성소에서 획득한다(베이스캠프 재설계).
 /// (StartRoomGate 스타트 방 모드 게이팅 패턴 기반)
 /// </summary>
 [RequireComponent(typeof(Collider))]
@@ -19,13 +19,15 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
     [SerializeField, Tooltip("차단 안내 재출력 최소 간격(초) — 트리거 머무름 스팸 방지")]
     private float noticeCooldown = 3f;
     [TextArea, SerializeField]
-    private string missingWeaponHint = "무형검이 없다 — 코즈웨이 입구의 <b>각성 제단</b>에서 검을 쥐어라.";
+    private string missingWeaponHint = "무형검이 없다 — <b>소환의 방</b> 받침에서 검을 쥐어라.";
     [TextArea, SerializeField]
-    private string missingRelicHint = "유물이 없다 — <b>빛나는 제단</b>에서 유물을 선택하라.";
+    private string missingRelicHint = "유물이 없다 — <b>유물 성소</b>의 제단에서 유물을 선택하라.";
     [TextArea, SerializeField]
-    private string missingRangedHint = "원거리 장비가 없다 — <b>모루</b>에서 활이나 석궁을 골라라.";
+    private string missingRangedHint = "원거리 장비가 없다 — <b>장비 공방</b>에서 활이나 석궁을 골라라.";
     [TextArea, SerializeField]
-    private string missingBothHint = "준비가 덜 됐다 — <b>각성 제단</b>(무형검) · <b>모루</b>(원거리) · <b>빛나는 제단</b>(유물)을 먼저 들러라.";
+    private string missingPartHint = "원거리 파츠가 없다 — <b>파츠 공방</b>에서 파츠 하나를 골라라.";
+    [TextArea, SerializeField]
+    private string missingBothHint = "준비가 덜 됐다 — <b>장비 공방</b>(원거리) · <b>파츠 공방</b>(파츠) · <b>유물 성소</b>(유물)를 먼저 들러라.";
 
     private bool _entered;
     private HudPresenter _hud;
@@ -57,7 +59,8 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
     private void TryEnter(Collider other)
     {
         if (_entered) return;
-        if (other.GetComponentInParent<PlayerController>() == null) return;
+        var player = other.GetComponentInParent<PlayerController>();
+        if (player == null) return;
 
         if (!IsLoadoutReady())
         {
@@ -66,7 +69,10 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
         }
 
         _entered = true;
-        BaseCampBootstrapper.Instance?.EnterDungeon();
+        // 심연 진입 연출(잉크 와이프 뒤 던전) — 연출 담당이 없는 씬이면 곧장 전환
+        var fx = BaseCampFxDirector.Instance;
+        if (fx != null) fx.EnterAbyssAsync(player).Forget();
+        else BaseCampBootstrapper.Instance?.EnterDungeon();
     }
 
     // ── Private Methods ───────────────────────────────────────
@@ -84,8 +90,9 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
         portalActive.SetActive(ready);
     }
 
-    /// <summary>부족한 전제조건(무형검/유물)과 그 획득 위치를 HUD로 안내. 원거리는 필수 아님 → 제외.</summary>
-    private void ShowMissingNotice()
+    /// <summary>부족한 전제조건(무형검·원거리·파츠·유물)과 그 획득 위치를 HUD로 안내.
+    /// 성문 막(<see cref="BaseCampFxDirector"/>)이 준비 전 통로를 막으므로 막 앞에서도 이것을 부른다(재출력 간격은 여기서).</summary>
+    public void ShowMissingNotice()
     {
         if (Time.unscaledTime - _lastNoticeTime < noticeCooldown) return;
         _lastNoticeTime = Time.unscaledTime;
@@ -96,14 +103,16 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
         bool noWeapon = loadout.WeaponSlot0 == null;
         bool noRanged = loadout.WeaponSlot1 == null;
         bool noRelic  = loadout.Relic == null;
+        bool noPart   = string.IsNullOrEmpty(loadout.StartPartId);
 
-        int missing = (noWeapon ? 1 : 0) + (noRanged ? 1 : 0) + (noRelic ? 1 : 0);
+        int missing = (noWeapon ? 1 : 0) + (noRanged ? 1 : 0) + (noRelic ? 1 : 0) + (noPart ? 1 : 0);
 
         string msg;
         if (missing == 0)   return;   // 준비됐는데 여기 온 건 레이스 — 다음 프레임 Update가 처리
         else if (missing > 1) msg = missingBothHint;   // 둘 이상 부족 — 통합 안내
         else if (noWeapon)    msg = missingWeaponHint;
         else if (noRanged)    msg = missingRangedHint;
+        else if (noPart)      msg = missingPartHint;
         else                  msg = missingRelicHint;
 
         if (_hud == null) _hud = FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
@@ -117,6 +126,7 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
         return loadout != null
             && loadout.Relic != null
             && loadout.WeaponSlot0 != null    // 무형검 — 각성 제단
-            && loadout.WeaponSlot1 != null;   // 원거리 — 모루. [서약 폐기] 서약은 대기방 조립 제단에서 획득 — 게이트 조건서 제외.
+            && loadout.WeaponSlot1 != null    // 원거리 — 장비 공방. [서약 폐기] 서약은 대기방 조립 제단에서 획득 — 게이트 조건서 제외.
+            && !string.IsNullOrEmpty(loadout.StartPartId);   // 시작 파츠 — 파츠 공방(베이스캠프 재설계 §2)
     }
 }

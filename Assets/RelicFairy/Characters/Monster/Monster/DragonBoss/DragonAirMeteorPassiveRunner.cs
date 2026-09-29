@@ -9,7 +9,8 @@ namespace RelicFairy.Monster
 /// <summary>
 /// 드래곤 패시브 메테오 러너.
 /// 전투 시작 시 상시 가동되며, 드래곤 속성에 따라 발동 조건이 달라진다.
-/// Ice: 지상이 아닐 때 / Thunder·Fire: 항상.
+/// Ice: 지상이 아닐 때 / Thunder·Fire·Abyss(2페이지): 항상.
+/// 공허 낙하 · 검은 태양 동안은 쉰다(<see cref="DragonBossBlackboard.PassiveMeteorSuppressed"/>).
 /// </summary>
 public class DragonAirMeteorPassiveRunner
 {
@@ -70,22 +71,22 @@ public class DragonAirMeteorPassiveRunner
     {
         if (_ctx?.Runtime == null || _ctx.Runtime.IsDead) return false;
         if (!((_ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)) return false;
+        if (bb.PassiveMeteorSuppressed) return false;
 
         var element = GetCurrentElement();
         // Ice: 지상 상태만 아니면 발동
         if (element == DragonBossBlackboard.DragonElement.Ice)
             return bb.BodyState != BodyState.Grounded;
-        // Thunder, Fire: 항상 발동
+        // Thunder, Fire, Abyss: 항상 발동
         return true;
     }
 
+    private bool IsSuppressed()
+        => (_ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb && bb.PassiveMeteorSuppressed;
+
+    /// <summary>드래곤이 정하는 지금 원소 — 2페이지는 Abyss(체력 비율로 불을 읽지 않는다).</summary>
     private DragonBossBlackboard.DragonElement GetCurrentElement()
-    {
-        float ratio = (_ctx.Monster as DragonBossMonster)?.HpRatio ?? 1f;
-        if (ratio > 0.7f) return DragonBossBlackboard.DragonElement.Ice;
-        if (ratio > 0.4f) return DragonBossBlackboard.DragonElement.Thunder;
-        return DragonBossBlackboard.DragonElement.Fire;
-    }
+        => (_ctx.Monster as DragonBossMonster)?.CurrentElement ?? DragonBossBlackboard.DragonElement.Ice;
 
     private float GetFloorY(float x, float z)
     {
@@ -108,6 +109,8 @@ public class DragonAirMeteorPassiveRunner
 
         while (Time.time < burstEnd)
         {
+            if (_ctx?.Runtime == null || _ctx.Runtime.IsDead) break;   // 처치 뒤 운석이 계속 떨어지지 않게
+            if (IsSuppressed()) break;                                  // 공허 낙하 · 검은 태양이 시작되면 버스트를 끊는다
             LaunchOneMeteor(ct);
             await UniTask.Delay(TimeSpan.FromSeconds(launchInterval), cancellationToken: ct);
         }
@@ -141,7 +144,11 @@ public class DragonAirMeteorPassiveRunner
         var warnTiles = new List<GameObject>();
         var warnMats  = new List<Material>();
         var warnMrs   = new List<MeshRenderer>();
-        Color fireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
+        // 예고 색 — 1페이지는 예전대로 불, 2페이지는 심연(검보라)
+        Color fireBase = DragonBossVisualHelper.GetElementColor(
+            GetCurrentElement() == DragonBossBlackboard.DragonElement.Abyss
+                ? DragonBossBlackboard.DragonElement.Abyss
+                : DragonBossBlackboard.DragonElement.Fire);
 
         for (int dx = -halfR; dx <= halfR; dx++)
         for (int dz = -halfR; dz <= halfR; dz++)
@@ -241,7 +248,8 @@ public class DragonAirMeteorPassiveRunner
         Vector3 d          = playerPos - landPos;
         if (Mathf.Abs(d.x) <= halfExtent && Mathf.Abs(d.z) <= halfExtent)
             _ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()
-                ?.TakeDamage(Mathf.RoundToInt(_ctx.Config.stat.attackPower * _so.DamageMultiplier));
+                ?.TakeDamage(Mathf.RoundToInt(_ctx.Config.stat.attackPower * _so.DamageMultiplier), _ctx.Monster.gameObject,
+                             false, HitWeight.Light);   // 수동 운석 — 약
     }
 }
 }

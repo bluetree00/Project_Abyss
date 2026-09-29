@@ -31,6 +31,8 @@ public class RelicAltar : MonoBehaviour
     [SerializeField] private TMP_FontAsset worldTextFont;
     [SerializeField] private float textHeight = 1.4f;
     [SerializeField] private float textSize = 3f;
+    [Tooltip("이름표·[F] 안내를 옮긴다(이 오브젝트 로컬) — 베이스캠프 유물 제단은 받침 위 빛기둥 한가운데 떠서 빛에 묻혔다(98 09-28)")]
+    [SerializeField] private Vector3 labelOffset;
 
     private PlayerController _player;
     private bool _claimed;
@@ -46,6 +48,7 @@ public class RelicAltar : MonoBehaviour
         _camTransform = Camera.main != null ? Camera.main.transform : null;
         CreateWorldText();
         CreatePrompt();
+        BaseCampLabelRule.Register(transform);   // 이름표는 가까이 간 곳 하나만(2차 개편 09-29)
     }
 
     private void Update()
@@ -55,6 +58,8 @@ public class RelicAltar : MonoBehaviour
         if (UIInputGate.Blocked) return;
         if (Input.GetKeyDown(KeyCode.F)) OpenInfoPopup();
     }
+
+    private void OnDestroy() => BaseCampLabelRule.Unregister(transform);
 
     private void OnTriggerEnter(Collider other)
     {
@@ -123,6 +128,8 @@ public class RelicAltar : MonoBehaviour
 
         Debug.Log($"[RelicAltar] 유물 선택: {relicClass.DisplayName} ({relicClass.Id})");
 
+        // 얻기 연출 — 석상 눈빛이 번쩍인 뒤 유물 빛이 몸으로 내려앉는다(재스폰된 새 몸을 따라감, 베이스캠프에서만)
+        BaseCampFxDirector.Instance?.PlayAcquire(transform.position + Vector3.up * 3.8f, BaseCampFxDirector.AcquireKind.Relic);
         BaseCampBootstrapper.Instance?.RespawnWithLoadout();
 
         Select();
@@ -152,8 +159,19 @@ public class RelicAltar : MonoBehaviour
 
     private void BillboardTexts()
     {
-        if (_camTransform == null) return;
-        if (_worldText != null) _worldText.transform.rotation = _camTransform.rotation;
+        if (_camTransform == null)
+        {
+            // 시작 때 카메라가 아직 없었으면(테스트 허브 → 베이스캠프 등) 여기서 다시 잡는다 — Start 한 번만 잡으면 라벨이 영영 안 돈다.
+            var cam = Camera.main;
+            if (cam == null) return;
+            _camTransform = cam.transform;
+        }
+        if (_worldText != null)
+        {
+            _worldText.transform.rotation = _camTransform.rotation;
+            bool show = BaseCampLabelRule.IsShown(transform);
+            if (_worldText.enabled != show) _worldText.enabled = show;
+        }
         if (_promptGo != null && _promptGo.activeSelf) _promptGo.transform.rotation = _camTransform.rotation;
     }
 
@@ -161,7 +179,7 @@ public class RelicAltar : MonoBehaviour
     {
         var go = new GameObject("RelicLabel");
         go.transform.SetParent(transform, false);
-        go.transform.localPosition = Vector3.up * textHeight;
+        go.transform.localPosition = Vector3.up * textHeight + labelOffset;
 
         _worldText = go.AddComponent<TextMeshPro>();
         if (worldTextFont != null) _worldText.font = worldTextFont;
@@ -171,14 +189,14 @@ public class RelicAltar : MonoBehaviour
         _worldText.color = new Color(0.9f, 0.7f, 0.2f);
         _worldText.textWrappingMode = TextWrappingModes.NoWrap;
         _worldText.sortingOrder = UISortingOrder.WorldLabel;
-        TMPOutlineHelper.ApplyDefault(_worldText);
+        TMPOutlineHelper.ApplySoftShadow(_worldText);
     }
 
     private void CreatePrompt()
     {
         _promptGo = new GameObject("InteractPrompt");
         _promptGo.transform.SetParent(transform, false);
-        _promptGo.transform.localPosition = Vector3.up * PromptOffsetY;
+        _promptGo.transform.localPosition = Vector3.up * PromptOffsetY + labelOffset;
 
         _promptText = _promptGo.AddComponent<TextMeshPro>();
         if (worldTextFont != null) _promptText.font = worldTextFont;
@@ -187,7 +205,7 @@ public class RelicAltar : MonoBehaviour
         _promptText.color = Color.white;
         _promptText.textWrappingMode = TextWrappingModes.NoWrap;
         _promptText.sortingOrder = UISortingOrder.WorldPrompt;
-        TMPOutlineHelper.ApplyDefault(_promptText);
+        TMPOutlineHelper.ApplySoftShadow(_promptText);
         _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> 유물 선택";
 
         _promptGo.SetActive(false);

@@ -48,6 +48,7 @@ public sealed class FireOrbAgent : LegendaryProjectileBase
             pos.y = hit.point.y + 0.02f;
 
         var t = Instantiate(cat.fireAoeVfx, pos, Quaternion.identity);
+        LegendaryRuntime.DisableGrabPassRenderers(t);   // 궤적마다 띄우는 화염 — 왜곡 조각은 URP에서 화면을 덮는다
         t.transform.localScale = new Vector3(0.15f, 0.01f, 0.15f);
         Destroy(t, 1.5f);
     }

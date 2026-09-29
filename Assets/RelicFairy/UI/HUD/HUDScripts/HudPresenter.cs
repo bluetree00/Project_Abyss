@@ -34,6 +34,7 @@ public sealed class HudPresenter : MonoBehaviour
     // 스킬 슬롯 잠금 판정(HasSkillInSlot)용 — 무기 교체/진화 시 재평가한다.
     private PlayerController     _player;
     private ItemBuffViewSource _itemBuffSource;
+    private NightmareRuleBuffViewSource _nightmareRuleSource;
     private bool _hasDynamicBuffSources;          // 룬/유물 등 폴링 기반 소스 등록 여부
     private float _buffPollAccum;
     private const float BuffPollInterval = 0.25f; // 룬 배지 폴링과 동일 cadence
@@ -44,6 +45,7 @@ public sealed class HudPresenter : MonoBehaviour
     private UserInfo _userInfo;
 
     private MonsterBase _boss;
+    private IBossHudSource _bossHud;   // 보스 HP바 부가 정보(페이지 눈금 · 무적 · 무방비) — 구현한 보스만
     public MonsterBase BoundBoss => _boss;
     public bool HasBoundBoss => _boss != null;
     public CanvasGroup MainCanvasGroup => canvasGroup;
@@ -100,12 +102,6 @@ public sealed class HudPresenter : MonoBehaviour
             _run.OnReviveChanged  -= HandleReviveChanged;
             _run = null;
         }
-        if (_run != null)
-        {
-            _run.OnEssenceChanged -= HandleEssenceChanged;
-            _run.OnReviveChanged  -= HandleReviveChanged;
-            _run = null;
-        }
 
         _provider = provider;
         _state = run?.PlayerState;
@@ -126,6 +122,14 @@ public sealed class HudPresenter : MonoBehaviour
         {
             _itemBuffSource = new ItemBuffViewSource(run.EffectManager);
             _buffAggregator.AddSource(_itemBuffSource);
+            _hasDynamicBuffSources = _buffAggregator.DynamicSourceCount > 0;
+        }
+
+        // 악몽 규칙 — 켜진 규칙만 기여하므로 봉인기엔 아무것도 안 띄운다.
+        if (run != null)
+        {
+            _nightmareRuleSource = new NightmareRuleBuffViewSource();
+            _buffAggregator.AddSource(_nightmareRuleSource);
             _hasDynamicBuffSources = _buffAggregator.DynamicSourceCount > 0;
         }
 
@@ -207,6 +211,8 @@ public sealed class HudPresenter : MonoBehaviour
         _weaponManager.OnEquippedWeaponRefreshed += HandleEquippedWeaponRefreshed;
         _weaponManager.OnSlotsChanged += RefreshWeaponSlots;   // 비활성 슬롯 장착(예비 원거리 지급 등) 반영
         _cooldownTracker.OnCooldownChanged += HandleCooldownChanged;
+        player.SkillSealed   += HandleSkillSealed;     // 보스 기믹 스킬 봉인 → 잠금 표시
+        player.SkillUnsealed += HandleSkillUnsealed;
 
         // 동적 지속 버프 소스(룬 리소스 + 유물 메커닉) 등록 → 버프창 폴링 갱신
         _playerBuffSource = new PlayerBuffViewSource(player);
@@ -218,6 +224,11 @@ public sealed class HudPresenter : MonoBehaviour
 
     public void UnbindPlayer()
     {
+        if (_player != null)
+        {
+            _player.SkillSealed   -= HandleSkillSealed;
+            _player.SkillUnsealed -= HandleSkillUnsealed;
+        }
         _player = null;
         view?.CombatPanel?.SetRelicResource(null);   // 유물 아이덴티티 바 해제
         if (_playerBuffSource != null)
@@ -301,8 +312,10 @@ public sealed class HudPresenter : MonoBehaviour
         _boss = boss;
         _boss.OnHPChanged += HandleBossHPChanged;
 
+        view?.BossPanel?.ResetPageFx();   // 새 보스 — 지난 전투의 체력바 깨짐 연출을 걷는다
         view?.BossPanel?.Init(maxHp, boss.BossName);
         view?.BossPanel?.SetHP(currentHp, maxHp);
+        AttachBossHudSource(boss as IBossHudSource);
 
         // 등장 연출이 있는 보스면 연출 완료(OnBossCombatReady) 후 패널 표시
         if (boss.HasEntranceAnimation)
@@ -332,6 +345,7 @@ public sealed class HudPresenter : MonoBehaviour
         int currentHp = GetBossCurrentHp(_boss);
         int maxHp = GetBossMaxHp(_boss);
         view?.BossPanel?.Init(maxHp, _boss.BossName);
+        view?.BossPanel?.SetPages(_bossHud?.HudPageMarkers, _bossHud?.HudPage ?? 1);
         view?.BossPanel?.SetHP(currentHp, maxHp);
     }
 
@@ -353,9 +367,38 @@ public sealed class HudPresenter : MonoBehaviour
             _boss.OnBossCombatReady -= HandleBossCombatReady;
             _boss = null;
         }
+        AttachBossHudSource(null);
 
         _bossPanelSuppressed = false;
     }
+
+    // ── 보스 HP바 부가 정보(페이지 눈금 · 무적 · 무방비) — 구현한 보스만 ──
+    private void AttachBossHudSource(IBossHudSource src)
+    {
+        if (_bossHud != null)
+        {
+            _bossHud.HudInvulnerableChanged -= HandleBossInvulnerableChanged;
+            _bossHud.HudVulnerableWindow    -= HandleBossVulnerableWindow;
+            _bossHud.HudPageMarkersChanged  -= HandleBossPageMarkersChanged;
+            _bossHud.HudPageRefill          -= HandleBossPageRefill;
+        }
+        _bossHud = src;
+
+        var panel = view?.BossPanel;
+        panel?.SetPages(src?.HudPageMarkers, src?.HudPage ?? 1);
+        panel?.SetInvulnerable(src != null && src.HudInvulnerable);
+        if (src == null) return;
+
+        src.HudInvulnerableChanged += HandleBossInvulnerableChanged;
+        src.HudVulnerableWindow    += HandleBossVulnerableWindow;
+        src.HudPageMarkersChanged  += HandleBossPageMarkersChanged;
+        src.HudPageRefill          += HandleBossPageRefill;
+    }
+
+    private void HandleBossInvulnerableChanged(bool on) => view?.BossPanel?.SetInvulnerable(on);
+    private void HandleBossVulnerableWindow(float seconds) => view?.BossPanel?.FlashVulnerable(seconds);
+    private void HandleBossPageMarkersChanged() => view?.BossPanel?.SetPages(_bossHud?.HudPageMarkers, _bossHud?.HudPage ?? 1);
+    private void HandleBossPageRefill(int page, float seconds) => view?.BossPanel?.PlayPageRefill(page, seconds);
 
     private void HandleHpChanged(int hp, int maxHp) => view?.CombatPanel?.SetHp(hp, maxHp);
     private void HandleGoldChanged(int gold) => view?.SetGold(gold);
@@ -525,16 +568,17 @@ public sealed class HudPresenter : MonoBehaviour
                 info.Attack = slot.runtimeData.baseAttack;
                 info.Defense = slot.runtimeData.baseDefense;
                 info.Type = slot.runtimeData.weaponType;
+                info.EnhanceLevel = slot.runtimeData.enhanceLevel;   // 칸에 +N으로 찍는다
             }
 
             view.CombatPanel.SetWeaponSlot(i, info);
         }
 
-        // 슬롯 모델: Q = 유물 고유(아이콘은 유물 SO에 아직 없어 뷰 폴백), E = 무기 skillE,
+        // 슬롯 모델: Q = 유물 고유(아이콘은 유물 SO — 비면 뷰 폴백), E = 무기 skillE,
         // R = 무기 skillQ(레거시 필드명 — ActSkillState.GetSkillSO와 동일 매핑).
         // 예전엔 Q에 무기 skillQ 아이콘을 띄워 실제 발동(유물)과 어긋났고 R은 늘 비어 있었다.
         var current = _weaponManager.CurrentWeaponData;
-        view.CombatPanel.SetSkillIcon(SkillType.Q, null);
+        view.CombatPanel.SetSkillIcon(SkillType.Q, _player != null && _player.RelicClass != null ? _player.RelicClass.QSkillIcon : null);
         view.CombatPanel.SetSkillIcon(SkillType.E, current?.skillEIcon);
         view.CombatPanel.SetSkillIcon(SkillType.R, current?.skillQIcon);
 
@@ -542,12 +586,22 @@ public sealed class HudPresenter : MonoBehaviour
         // 스킬이 생기면 자동으로 풀린다(별도 해제 처리 불필요).
         if (_player != null)
         {
-            view.CombatPanel.SetSkillLocked(SkillType.Q, !_player.HasSkillInSlot(SkillType.Q));
-            view.CombatPanel.SetSkillLocked(SkillType.E, !_player.HasSkillInSlot(SkillType.E));
-            view.CombatPanel.SetSkillLocked(SkillType.R, !_player.HasSkillInSlot(SkillType.R));
+            RefreshSkillLock(SkillType.Q);
+            RefreshSkillLock(SkillType.E);
+            RefreshSkillLock(SkillType.R);
         }
         view.CombatPanel.SetActiveWeapon(_weaponManager.CurrentSlotIndex);   // 활성 무기 강조
     }
+
+    /// <summary>스킬 칸 잠금 = 스킬 없음(무형검 등) 또는 보스 기믹 봉인 중.</summary>
+    private void RefreshSkillLock(SkillType slot)
+    {
+        if (_player == null || view?.CombatPanel == null) return;
+        view.CombatPanel.SetSkillLocked(slot, !_player.HasSkillInSlot(slot) || _player.IsSkillSealed(slot));
+    }
+
+    private void HandleSkillSealed(SkillType slot, float remaining) => RefreshSkillLock(slot);
+    private void HandleSkillUnsealed(SkillType slot) => RefreshSkillLock(slot);
 
     public void Dispose()
     {
@@ -587,6 +641,11 @@ public sealed class HudPresenter : MonoBehaviour
         {
             _buffAggregator.RemoveSource(_itemBuffSource);
             _itemBuffSource = null;
+        }
+        if (_nightmareRuleSource != null)
+        {
+            _buffAggregator.RemoveSource(_nightmareRuleSource);
+            _nightmareRuleSource = null;
         }
         _hasDynamicBuffSources = _buffAggregator.DynamicSourceCount > 0;
     }
@@ -645,7 +704,7 @@ public sealed class HudPresenter : MonoBehaviour
         if (mode == HUDIds.Mode.Combat || mode == HUDIds.Mode.Boss)
             view.EnsureCombatPanelVisible();
 
-        if (mode == HUDIds.Mode.Boss)
+        if (mode == HUDIds.Mode.Boss || mode == HUDIds.Mode.BossCutscene)
             RefreshBoundBossPanel();
 
         if (_currentMode == mode) return;
@@ -670,7 +729,6 @@ public sealed class HudPresenter : MonoBehaviour
                 return HUDIds.Section.TopBar |
                        HUDIds.Section.CombatPanel |
                        HUDIds.Section.CovenantPanel |
-                       HUDIds.Section.SystemNotices |
                        HUDIds.Section.Minimap;
 
             case HUDIds.Mode.Boss:
@@ -678,20 +736,13 @@ public sealed class HudPresenter : MonoBehaviour
                        HUDIds.Section.CombatPanel |
                        HUDIds.Section.BossPanel |
                        HUDIds.Section.CovenantPanel |
-                       HUDIds.Section.SystemNotices |
                        HUDIds.Section.Minimap;
 
             case HUDIds.Mode.Cutscene:
-                return HUDIds.Section.SystemNotices;
+                return HUDIds.Section.None;
 
-            case HUDIds.Mode.Spectate:
-                return HUDIds.Section.TopBar |
-                       HUDIds.Section.SystemNotices;
-
-            case HUDIds.Mode.Puzzle:
-                return HUDIds.Section.TopBar |
-                       HUDIds.Section.GridPanel |
-                       HUDIds.Section.SystemNotices;
+            case HUDIds.Mode.BossCutscene:
+                return HUDIds.Section.BossPanel;
 
             default:
                 return HUDIds.Section.None;

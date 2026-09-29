@@ -57,7 +57,7 @@ public sealed class GameRunSession
         _chapterRegistry != null ? _chapterRegistry.GetData(CurrentChapter)?.bossSpawnTable : null;
 
     /// <summary>무한 루프 회차(심연 깊이). 0 = 스토리 1회차. 최종 보스 클리어 후 '계속' 선택 시 +1.
-    /// 세션(런) 스코프 인메모리 — 챕터 전환 간 유지되나, 이어하기 저장에는 아직 포함하지 않는다(v1).</summary>
+    /// 세션(런) 스코프 — 챕터 전환 간 유지되고 이어하기 저장(<c>RunSaveData.abyssDepth</c>)으로 복원된다.</summary>
     public int AbyssDepth { get; private set; }
 
     // ── 누적 플레이 시간 ──
@@ -234,6 +234,17 @@ public sealed class GameRunSession
         // 보스방 클리어 = 챕터 완료. 이 챕터를 한 대도 안 맞고 끝냈으면 기행 1회.
         if (!_damagedThisChapter) FlawlessChapters++;
         _damagedThisChapter = false;
+
+        // 보스 클리어 훅(아이템 효과 · 보스 정수 드랍)은 보스를 쓰러뜨린 이 순간에 낸다.
+        // 예전엔 챕터 게이트에 들어설 때(EnterChapterClear) 냈는데, 정수는 줍는 조각이라
+        // 씬 로드 직전에 떨어져 주울 틈 없이 사라졌고, 최종 보스는 그 경로를 아예 타지 않았다.
+        // 보스방은 이어하기에서 항상 전투를 다시 하므로(RunFlowController) 이 알림이 복원으로 두 번 나지 않는다.
+        EffectManager?.OnBossClear();
+        OnRoomCleared?.Invoke(true);
+
+        // 이야기 기록 — 봉인기면 「봉인」, 악몽기면 「처치」. 거점 봉인석·복귀 대사가 이 기록을 본다.
+        StoryProgress.RecordBossDefeat(StoryProgress.BossIdForChapter(CurrentChapter));
+
         OnBossRoomCleared?.Invoke(center);
     }
 
@@ -318,6 +329,14 @@ public sealed class GameRunSession
             // 원거리 파츠는 런 스코프 — 새 런은 빈 상태로 시작한다(직전 런 장착이 새어 나오지 않게).
             RangedPartsState.Current = new RangedPartsState();
             RangedPartsState.ApplyTestCarry();   // 베이스캠프 테스트 제단을 쓴 경우에만 동작(평소 무해)
+
+            // 베이스캠프 파츠 공방에서 고른 시작 파츠 — 매 런 Lv1 하나를 들고 시작한다(베이스캠프 재설계 §2).
+            string startPart = AppBootstrapper.Instance?.Loadout?.StartPartId;
+            if (!string.IsNullOrEmpty(startPart)) RangedPartsState.Current.Equip(startPart, 1);
+            // 기억의 제단 「시작 파츠 둘」 — 둘째 파츠도 Lv1로(09-29). 해금이 없으면 공방이 둘째를 받지 않는다.
+            string startPart2 = AppBootstrapper.Instance?.Loadout?.StartPartId2;
+            if (!string.IsNullOrEmpty(startPart2) && startPart2 != startPart && MemoryAltarService.StartPartSlots >= 2)
+                RangedPartsState.Current.Equip(startPart2, 1);
 
             // 계약 3개 부여. 시드를 챕터에 섞어 런마다 다른 조합이 나오되, 같은 시드는 같은 계약을 준다.
             RunContracts.Current = new RunContracts();
@@ -496,7 +515,9 @@ public sealed class GameRunSession
             bossKills:     BossKillCount,
             shopUses:      ShopUseCount,
             refineUses:    RefineUseCount,
-            maxEnhance:    MaxEnhanceLevel
+            maxEnhance:    MaxEnhanceLevel,
+            // 서약은 런 단위라 핸들러에 남은 수가 곧 이번 런에 맺은 수다(이어하기 복원분도 같은 런).
+            covenants:     CovenantHandler?.Covenants?.Count ?? 0
         );
 
         OnRunEnded?.Invoke(result);
@@ -532,7 +553,10 @@ public sealed class GameRunSession
     {
         UnsubscribePlayerStateSource();
         ItemInventory.OnPlacedChanged -= RebuildItemEffects;
+        CovenantHandler.OnCovenantListChanged -= RebuildItemEffects;
+        UnsubscribeBuildSources();
         EffectManager.Cleanup();
+        BuildImprint.Clear();
         BuffHandler.OnBuffsChanged -= RefreshPlayerRoomBuffs;
         BuffHandler.ClearAll();
         CovenantHandler.Cleanup();
@@ -650,10 +674,7 @@ public sealed class GameRunSession
     {
         if (!IsRunning) return;
 
-        // 아이템 효과: 보스 클리어 hook
-        EffectManager?.OnBossClear();
-        OnRoomCleared?.Invoke(true);
-
+        // 보스 클리어 훅은 NotifyBossRoomCleared가 이미 냈다 — 여기선 상태만 바꾼다.
         ChangeRunState(RunState.ChapterClear);
     }
 
@@ -784,8 +805,10 @@ public sealed class GameRunSession
         // 인벤토리 ↔ 스탯 연동 (추가/제거 시 자동 재계산)
         if (Player?.RuntimeStats != null)
         {
+            // 스탯 재계산은 효과 재구성 <b>뒤</b>에 한다(RebuildItemEffects 끝에서 호출).
+            // 예전엔 둘 다 OnPlacedChanged에 따로 걸려 스탯이 먼저 돌았다 — 재구성 전 효과 목록을 읽어
+            // 방금 놓은 룬 스탯은 빠지고 뺀 룬 스탯은 남았다(09-19 실측: +14 룬을 빼자 근접 11→25).
             ItemInventory.OnPlacedChanged -= RefreshPlayerItemStats;
-            ItemInventory.OnPlacedChanged += RefreshPlayerItemStats;
 
             // 방 버프 ↔ 스탯 연동
             BuffHandler.OnBuffsChanged -= RefreshPlayerRoomBuffs;
@@ -794,6 +817,11 @@ public sealed class GameRunSession
             // ItemEffectManager 초기화
             ItemInventory.OnPlacedChanged -= RebuildItemEffects;
             ItemInventory.OnPlacedChanged += RebuildItemEffects;
+            // 서약을 맺어도 발동 계열 각인이 바뀐다(원인 계열 +1) — 룬 효과 배율을 다시 잡는다(09-29).
+            CovenantHandler.OnCovenantListChanged -= RebuildItemEffects;
+            CovenantHandler.OnCovenantListChanged += RebuildItemEffects;
+            // 무기 승급 · 진화 · 유물 파츠도 각인이다 — 바뀌면 다시 센다(T4, 09-29). 활성 무기 전환(OnWeaponChanged)은 아니다.
+            SubscribeBuildSources();
             EffectManager.Initialize(Player, this, ItemInventory);
 
             // 영구 각성 보너스 적용 (런 시작 시 1회)
@@ -827,6 +855,9 @@ public sealed class GameRunSession
         // BindPlayer 내부가 UnsubscribeWeapon으로 재구독 멱등 처리하므로 중복 호출 안전.
         if (player != null)
             CovenantHandler.BindPlayer(player);
+
+        // 악몽 규칙 — 새 플레이어 인스턴스·세이브 보정이 값을 되돌리므로 바인딩마다 다시 건다.
+        NightmareRules.ApplyOnBind(this);
     }
 
     private void RefreshPlayerItemStats()
@@ -840,11 +871,42 @@ public sealed class GameRunSession
         Player?.RuntimeStats?.RefreshRoomBuffs(BuffHandler);
     }
 
+    private PlayerWeaponManager _buildWeapons;
+    private PlayerLoadout _buildLoadout;
+
+    private void SubscribeBuildSources()
+    {
+        UnsubscribeBuildSources();
+        _buildWeapons = Player != null ? Player.WeaponManager : null;
+        if (_buildWeapons != null)
+        {
+            _buildWeapons.OnSlotsChanged += RebuildItemEffects;
+            _buildWeapons.OnEquippedWeaponRefreshed += OnBuildWeaponRefreshed;
+        }
+        _buildLoadout = AppBootstrapper.Instance != null ? AppBootstrapper.Instance.Loadout : null;
+        if (_buildLoadout != null) _buildLoadout.RelicPartsChanged += RebuildItemEffects;
+    }
+
+    private void UnsubscribeBuildSources()
+    {
+        if (_buildWeapons != null)
+        {
+            _buildWeapons.OnSlotsChanged -= RebuildItemEffects;
+            _buildWeapons.OnEquippedWeaponRefreshed -= OnBuildWeaponRefreshed;
+        }
+        if (_buildLoadout != null) _buildLoadout.RelicPartsChanged -= RebuildItemEffects;
+        _buildWeapons = null;
+        _buildLoadout = null;
+    }
+
+    private void OnBuildWeaponRefreshed(WeaponData _) => RebuildItemEffects();
+
     private void RebuildItemEffects()
     {
         EffectManager.RefreshContext(Player, this);
         EffectManager.Rebuild();
         Debug.Log($"[GridChk] 효과 rebuild (frame {Time.frameCount}) placed={ItemInventory.PlacedCount} → 효과수={EffectManager.ActiveEffects.Count}");
+        RefreshPlayerItemStats();   // 새 효과 목록으로 스탯을 다시 모은다
     }
 
     public bool TryGetPlayerState(out PlayerRunState state)
@@ -880,7 +942,8 @@ public sealed class GameRunSession
         if (amount <= 0) return;
 
         // 고행자의 인장 — 보상을 줄인 대가는 여기서 돌아온다.
-        float gain = AsceticSigilService.ApplyEssence(amount * EssenceDepthMultiplier);
+        // 악몽기 가산 — 규칙에 묶여 싸우는 필수 구간이라 벌칙만 두지 않는다.
+        float gain = AsceticSigilService.ApplyEssence(amount * EssenceDepthMultiplier * NightmareRules.EssenceMultiplier);
         RunDelta.GainedEssence += Mathf.RoundToInt(gain);
         OnEssenceChanged?.Invoke(RunDelta.GainedEssence);
     }
@@ -977,6 +1040,9 @@ public sealed class GameRunSession
         MaxEnhanceLevel  = maxEnhance;
     }
 
+    /// <summary>이어하기 복원 — 순환 중에 저장된 런이면 심연 깊이를 되돌린다(적 배율이 여기에 걸려 있다).</summary>
+    public void RestoreAbyssDepth(int depth) => AbyssDepth = Mathf.Max(0, depth);
+
     public void ReportKill()      => KillCount++;
     public void ReportPotionUsed() => PotionUsedThisRun = true;
     public void ReportEliteKill() => EliteKillCount++;
@@ -1067,7 +1133,11 @@ public sealed class GameRunSession
 
         // 출시 정책: 신규 런은 골드 0에서 시작 — 방 보상/전투 드롭으로만 확보한다.
         const int NewRunStartingGold = 0;
-        return new PlayerRunState(maxHp, NewRunStartingGold);
+        var state = new PlayerRunState(maxHp, NewRunStartingGold);
+        // 기억의 제단 「포션 칸 +1」 — 늘어난 칸을 가득 채워 시작한다(09-29). 악몽 규칙(어스름)은 바인딩 때 다시 줄인다.
+        int potionCap = MemoryAltarService.PotionCapacity;
+        if (potionCap != state.PotionCapacity) state.RestorePotions(potionCap, potionCap);
+        return state;
     }
 
     private void SubscribePlayerStateSource(PlayerController player)

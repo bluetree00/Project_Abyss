@@ -88,9 +88,10 @@ public class GridManager : MonoBehaviour
         var squares = ResolveFootprint(shape, anchor, out bool allValid);
         if (squares == null) return;
 
+        // 미리보기는 타일 위 겹판이다 — 타일 무늬가 비치게 0.55(09-27, 예전 0.85는 타일 밑에 깔려 있을 때 값).
         Color color = allValid
-            ? new Color(0.2f, 0.9f, 0.3f, 0.85f)
-            : new Color(1f, 0.25f, 0.25f, 0.85f);
+            ? new Color(0.2f, 0.9f, 0.3f, 0.55f)
+            : new Color(1f, 0.25f, 0.25f, 0.55f);
 
         foreach (var sq in squares) sq.SetPreviewHighlight(true, color);
         _previewSquares.AddRange(squares);
@@ -111,7 +112,7 @@ public class GridManager : MonoBehaviour
 
         var result = new List<GridSquare>(offsets.Count);
         string element = RuneZoneRule.ElementOf(shape.ItemData);
-        bool isLegendary = shape.ItemData?.rarity == ItemRarity.Legendary;
+        bool isLegendary = RuneZoneRule.NoCenter(shape.ItemData);   // 중앙 금지(레전드리·존핵)
 
         foreach (var off in offsets)
         {
@@ -185,7 +186,7 @@ public class GridManager : MonoBehaviour
         bool allValid = true;
         var targets = new List<GridSquare>();
         string element = RuneZoneRule.ElementOf(shape.ItemData);
-        bool isLegendary = shape.ItemData?.rarity == ItemRarity.Legendary;
+        bool isLegendary = RuneZoneRule.NoCenter(shape.ItemData);   // 중앙 금지(레전드리·존핵)
 
         for (int i = 0; i < shape.transform.childCount; i++)
         {
@@ -212,9 +213,10 @@ public class GridManager : MonoBehaviour
         Vector3 localDelta = shapeParent.InverseTransformVector(worldDelta);
         snapOffset = new Vector2(localDelta.x, localDelta.y);
 
+        // 미리보기는 타일 위 겹판이다 — 타일 무늬가 비치게 0.55(09-27, 예전 0.85는 타일 밑에 깔려 있을 때 값).
         Color color = allValid
-            ? new Color(0.2f, 0.9f, 0.3f, 0.85f)
-            : new Color(1f, 0.25f, 0.25f, 0.85f);
+            ? new Color(0.2f, 0.9f, 0.3f, 0.55f)
+            : new Color(1f, 0.25f, 0.25f, 0.55f);
 
         foreach (var sq in targets)
             sq.SetPreviewHighlight(true, color);
@@ -239,7 +241,7 @@ public class GridManager : MonoBehaviour
         if (shape == null) return false;
 
         string element     = RuneZoneRule.ElementOf(shape.ItemData);
-        bool   isLegendary = shape.ItemData?.rarity == ItemRarity.Legendary;
+        bool   isLegendary = RuneZoneRule.NoCenter(shape.ItemData);   // 중앙 금지(레전드리·존핵)
 
         for (int i = 0; i < shape.transform.childCount; i++)
         {
@@ -258,6 +260,45 @@ public class GridManager : MonoBehaviour
             if (blockers != null && !blockers.Contains(occupier)) blockers.Add(occupier);
         }
         return true;
+    }
+
+    /// <summary>
+    /// 방금 놓기가 <b>왜</b> 실패했는지(토스트 문구). 한 칸이라도 판 위에 걸쳤을 때만 말한다 — 전부 판 밖이면
+    /// 「보관함으로 되돌리기」라 알리지 않는다(null). 판정 순서는 <see cref="TryPlaceShape"/>와 같다.
+    /// </summary>
+    public string DescribeDropFailure(Shape shape)
+    {
+        if (grid == null || shape == null) return null;
+
+        string element  = RuneZoneRule.ElementOf(shape.ItemData);
+        bool   noCenter = RuneZoneRule.NoCenter(shape.ItemData);
+        bool onBoard = false, offBoard = false, occupied = false, zone = false, center = false, reach = false;
+
+        for (int i = 0; i < shape.transform.childCount; i++)
+        {
+            if (shape.transform.GetChild(i) is not RectTransform block) continue;
+            var sq = FindClosestSquare(block);
+            if (sq == null) { offBoard = true; continue; }
+            onBoard = true;
+            if (sq.isOccupied) occupied = true;
+            else if (!RuneZoneRule.Accepts(sq, element, noCenter))
+            {
+                if (sq.zoneCode == ElementDef.CenterCode) center = true; else zone = true;
+            }
+            else if (!sq.isPlaceable) reach = true;
+        }
+
+        if (!onBoard)  return null;
+        if (offBoard)  return "룬 전체가 판 안에 들어가야 합니다";
+        if (center)    return "전설 룬과 핵 룬은 중앙에 놓을 수 없습니다";
+        if (zone)
+        {
+            string n = ElementDef.GetById(element)?.Name ?? element;
+            return $"{n} 룬은 {n} 존에만 놓을 수 있습니다";
+        }
+        if (occupied)  return "이미 룬이 놓인 칸입니다";
+        if (reach)     return "같은 존에 놓인 룬 가까이에만 놓을 수 있습니다";
+        return null;
     }
 
     /// <summary>셰이프 프리뷰를 지운다.</summary>
@@ -295,7 +336,7 @@ public class GridManager : MonoBehaviour
         RectTransform firstBlock = null;
         RectTransform firstTarget = null;
         string element = RuneZoneRule.ElementOf(shape.ItemData);
-        bool isLegendary = shape.ItemData?.rarity == ItemRarity.Legendary;
+        bool isLegendary = RuneZoneRule.NoCenter(shape.ItemData);   // 중앙 금지(레전드리·존핵)
 
         for (int i = 0; i < shape.transform.childCount; i++)
         {

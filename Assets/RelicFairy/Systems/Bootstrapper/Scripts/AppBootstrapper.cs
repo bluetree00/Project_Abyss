@@ -42,6 +42,8 @@ public sealed class AppBootstrapper : MonoBehaviour
 
     [Header("Auto Login (Device ID)")]
     [SerializeField] private bool useAutoLogin = true;
+    [Tooltip("뒤끝이 로그인 콜백을 이 시간 안에 안 주면 로그인 실패와 같은 폴백 경로(Addressables → Lobby)로 넘어간다.")]
+    [SerializeField] private float autoLoginTimeoutSec = 10f;
 
     [Header("Asset Unload (실험적 — 기본 off)")]
     [Tooltip("챕터 전환 시 스코프 에셋 언로드 활성화. ⚠ Memory Profiler로 '사용 중 핸들 미해제(분홍텍스처/NRE 없음)' 검증 후에만 켤 것.")]
@@ -375,6 +377,10 @@ public sealed class AppBootstrapper : MonoBehaviour
             }
         }
 
+        // 유물 파츠(보스 클리어 특전) 복원 — 반드시 유물 뒤다. SetRelic이 파츠를 비우기 때문.
+        // 플레이어에 실제로 붙는 것은 GameRunBootstrapper가 OnPlayerBound에서 하는 재활성화다.
+        Loadout.RestoreRelicParts(save.relicPartIds);
+
         var session = new GameRunSession();
         await session.RestoreFromSaveAsync(save, LoadTextAsset);
 
@@ -389,8 +395,8 @@ public sealed class AppBootstrapper : MonoBehaviour
         var w0 = ws0 != null ? WeaponData.FromSO(ws0) : null;
         var w1 = ws1 != null ? WeaponData.FromSO(ws1) : null;
         // 강화/승급 복원 — 씬 진입 시 ApplyServerOverride가 RecomputeEnhancedStats()로 유효값을 재계산한다.
-        if (w0 != null) { w0.enhanceLevel = Mathf.Max(0, save.weapon0EnhanceLevel); w0.legendId = save.weapon0LegendId; w0.evolutionStage = Mathf.Max(0, save.weapon0EvolutionStage); w0.RecomputeEnhancedStats(); }
-        if (w1 != null) { w1.enhanceLevel = Mathf.Max(0, save.weapon1EnhanceLevel); w1.legendId = save.weapon1LegendId; w1.evolutionStage = Mathf.Max(0, save.weapon1EvolutionStage); w1.RecomputeEnhancedStats(); }
+        if (w0 != null) { w0.enhanceLevel = Mathf.Max(0, save.weapon0EnhanceLevel); w0.legendId = save.weapon0LegendId; w0.evolutionStage = Mathf.Max(0, save.weapon0EvolutionStage); w0.engravings = save.weapon0Engravings ?? ""; w0.RecomputeEnhancedStats(); }
+        if (w1 != null) { w1.enhanceLevel = Mathf.Max(0, save.weapon1EnhanceLevel); w1.legendId = save.weapon1LegendId; w1.evolutionStage = Mathf.Max(0, save.weapon1EvolutionStage); w1.engravings = save.weapon1Engravings ?? ""; w1.RecomputeEnhancedStats(); }
         if (w0 != null || w1 != null)
         {
             // 저장된 현재 슬롯 복원(미설정 시 0). SpawnPlayerAsync가 SwitchToSlotAsync로 적용.
@@ -592,7 +598,13 @@ public sealed class AppBootstrapper : MonoBehaviour
         // 6-b) 디바이스 ID 자동 로그인 (Login 씬 제거 — 성공/실패 모두 Lobby로)
         if (useAutoLogin && !useSteamLogin)
         {
-            bool autoOk = await DeviceAutoLoginAsync();
+            // 콜백이 끝내 안 오면 여기서 멈춰 IsReady에 못 간다 — 시간을 넘기면 실패로 보고 아래 폴백 경로로.
+            // (늦게 온 콜백은 TrySetResult라 무해. 그 판은 오프라인 데이터로 돈다.)
+            var (timedOut, loginOk) = await DeviceAutoLoginAsync()
+                .TimeoutWithoutException(TimeSpan.FromSeconds(autoLoginTimeoutSec), DelayType.Realtime);
+            if (timedOut)
+                Debug.LogWarning($"[AppBootstrapper] 자동 로그인 {autoLoginTimeoutSec:0}초 응답 없음 → 실패로 처리");
+            bool autoOk = !timedOut && loginOk;
             if (autoOk)
             {
                 IsAutoLoggedIn = true;

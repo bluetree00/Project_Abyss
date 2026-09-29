@@ -105,6 +105,8 @@ public sealed class PlayerRuntimeStats
         _roomMoveSpeed = 0f;
         _roomAttackSpeed = 0f;
         _roomProjectile = 0;
+        _roomMaxHp = _roomLuck = 0;
+        _roomCritChance = _roomCritDamage = _roomSkillCdr = 0f;
 
         _bonusAttackSpeed = 0f;
 
@@ -164,6 +166,7 @@ public sealed class PlayerRuntimeStats
         _itemLuck = 0; _itemSkillCdr = 0f; _itemActiveItemCdr = 0f;
         _roomMelee = 0; _roomRanged = 0; _roomDefense = 0;
         _roomMoveSpeed = 0f; _roomAttackSpeed = 0f; _roomProjectile = 0;
+        _roomMaxHp = _roomLuck = 0; _roomCritChance = _roomCritDamage = _roomSkillCdr = 0f;
         _bonusAttackSpeed = 0f;
 
         HeavyChargeThreshold = Mathf.Max(0f, entry.heavy_charge_threshold);
@@ -360,6 +363,12 @@ public sealed class PlayerRuntimeStats
     private float _roomMoveSpeed;      // 퍼센트 가산 (0.1 = +10%)
     private float _roomAttackSpeed;    // 퍼센트 가산
     private int _roomProjectile;       // 투사체 가산
+    // 상점 가호 · 방 버프 중 예전엔 읽지 않던 다섯(09-29 — 체력 · 치명 · 치피 · 쿨감 · 행운 가호가 무효였다)
+    private int   _roomMaxHp;
+    private float _roomCritChance;     // %p (유물 · 버프와 같은 단위)
+    private float _roomCritDamage;     // 비율 가산
+    private float _roomSkillCdr;       // 비율 가산
+    private int   _roomLuck;
 
     // -- Covenant (서약 시스템) --
     private int   _covenantMelee;
@@ -391,9 +400,13 @@ public sealed class PlayerRuntimeStats
     private float _reactionDamageReduction;
 
     /// <summary>치명타 확률 보너스 합(%포인트). 무기 크릿 위에 가산. CombatCalculator.RollCrit이 읽음.</summary>
-    public float CritChanceBonus => _relicCritChance + _buffCritChance + _synergyDynCritChance + _itemDyn.critChance + _itemCritChance + _reactionCritChance;
+    // 치명 확률은 %포인트(0~100)로 굴린다(CombatCalculator: Random.value*100 < chance). 무기·유물은 %p(10 = 10%)로 오지만
+    // 룬(정적·조건부)·속성 시너지·속성 반응은 데이터가 비율(0.05 = 5%)이다 — 그대로 더하면 +5%가 +0.05%p가 되어
+    // 치명 룬 14종과 빛 시너지가 사실상 무효였다(09-19). 비율 원천만 ×100 해서 합친다.
+    public float CritChanceBonus => _relicCritChance + _buffCritChance + _roomCritChance
+        + 100f * (_synergyDynCritChance + _itemDyn.critChance + _itemCritChance + _reactionCritChance);
     /// <summary>치명타 피해 배율 보너스 합(가산). 무기 크릿 배율 위에 가산.</summary>
-    public float CritDamageBonus => _relicCritDamage + _buffCritDamage + _synergyDynCritDamage + _itemDyn.critDamage + _itemCritDamage + _reactionCritDamage;
+    public float CritDamageBonus => _relicCritDamage + _buffCritDamage + _roomCritDamage + _synergyDynCritDamage + _itemDyn.critDamage + _itemCritDamage + _reactionCritDamage;
 
     /// <summary>
     /// 속성 반응 스탯을 한 번에 설정한다. MerlinRuneBridge가 시너지 갱신마다 활성 반응을 합산해 호출.
@@ -612,6 +625,8 @@ public sealed class PlayerRuntimeStats
             _roomMelee = _roomRanged = _roomDefense = 0;
             _roomMoveSpeed = _roomAttackSpeed = 0f;
             _roomProjectile = 0;
+            _roomMaxHp = _roomLuck = 0;
+            _roomCritChance = _roomCritDamage = _roomSkillCdr = 0f;
         }
         else
         {
@@ -635,6 +650,13 @@ public sealed class PlayerRuntimeStats
 
             // Projectile — Flat 가산만
             _roomProjectile = (int)handler.GetFlatTotal(StatType.Projectile);
+
+            // 체력 · 치명 · 치피 · 쿨감 · 행운 — 상점 가호가 여기 들어오는데 아무도 읽지 않았다(09-29).
+            _roomMaxHp      = (int)handler.GetFlatTotal(StatType.MaxHp);
+            _roomCritChance = handler.GetFlatTotal(StatType.CritChance) + 100f * handler.GetPercentTotal(StatType.CritChance);
+            _roomCritDamage = handler.GetFlatTotal(StatType.CritDamage) + handler.GetPercentTotal(StatType.CritDamage);
+            _roomSkillCdr   = handler.GetFlatTotal(StatType.SkillCooldownReduction) + handler.GetPercentTotal(StatType.SkillCooldownReduction);
+            _roomLuck       = (int)handler.GetFlatTotal(StatType.Luck);
         }
 
         Recalculate();
@@ -881,7 +903,7 @@ public sealed class PlayerRuntimeStats
         float baseMeleeSum  = _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _covenantMelee   + _awakeningMelee  + _relicMelee  ;
         float baseRangedSum = _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged + _covenantRanged + _awakeningRanged + _relicRanged ;
         float baseDefSum    = _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense + _covenantDefense + _awakeningDefense + _relicDefense;
-        int baseLuckSum   = _baseLuck + _passiveLuck + _itemLuck + _awakeningLuck + _relicLuck;
+        int baseLuckSum   = _baseLuck + _passiveLuck + _itemLuck + _awakeningLuck + _relicLuck + _roomLuck;
 
         MeleeAttack  = Mathf.Max(0, Mathf.RoundToInt(baseMeleeSum * dmgMul));
         RangedAttack = Mathf.Max(0, Mathf.RoundToInt(baseRangedSum * dmgMulR));
@@ -893,9 +915,9 @@ public sealed class PlayerRuntimeStats
         // (이전 구현은 매 Recalculate마다 _itemMaxHp를 무조건 가산 → 반복 호출 시 MaxHp 폭증 버그였음)
         {
             int othersMax = MaxHp - _maxHpItemContribution;                       // base/passive/awakening/relic/synergy 합
-            int flatTotal = othersMax + _itemMaxHp;                               // % 는 flat 총합 기준
+            int flatTotal = othersMax + _itemMaxHp + _roomMaxHp;                  // % 는 flat 총합 기준(상점 체력 가호 포함)
             float maxHpPct = _itemMaxHpPercent + _itemDyn.maxHpPercent;           // 정적 + 동적
-            int newContribution = _itemMaxHp + Mathf.RoundToInt(flatTotal * maxHpPct);
+            int newContribution = _itemMaxHp + _roomMaxHp + Mathf.RoundToInt(flatTotal * maxHpPct);
             int newMax = Mathf.Max(1, othersMax + newContribution);
             if (newMax != MaxHp)
             {
@@ -910,7 +932,7 @@ public sealed class PlayerRuntimeStats
         // 방 버프 + 아이템 추가 투사체를 합산한다 — 예전엔 방 버프만 반영돼 아이템 멀티샷이 무효였다.
         BonusProjectile       = Mathf.Max(0, _roomProjectile + _itemProjectileCount);
         ProjectilePierceBonus = Mathf.Max(0, _itemProjectilePierce);
-        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _awakeningSkillCdr + _relicSkillCdr + _reactionSkillCdr + _masterySkillCdr);
+        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _awakeningSkillCdr + _relicSkillCdr + _reactionSkillCdr + _masterySkillCdr + _roomSkillCdr);
         ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr);
 
         // 확장 스탯 공개 프로퍼티 갱신

@@ -25,6 +25,8 @@ public enum EffectUnit
     Auto,
     /// <summary>수치 표기 없음(존재만 표시).</summary>
     None,
+    /// <summary>값이 이미 퍼센트(20 → "+20%"). 존핵 증폭처럼 데이터가 %로 들어오는 효과.</summary>
+    Percent,
 }
 
 /// <summary>효과 분류 — 색/아이콘/정렬 힌트(3단계 아이콘 매핑에서 활용).</summary>
@@ -206,6 +208,9 @@ public static class EffectMetaRegistry
         Register("FireExplosionOnSkill",        "스킬 화염 폭발",       EffectCategory.Proc,    EffectUnit.Auto,    "fire");
         Register("LightningOnSkill",            "스킬 번개",            EffectCategory.Proc,    EffectUnit.Auto,    "lightning");
 
+        // ── 발동 룬(언제 × 룬 속성) ───────────────────────────────
+        Register("TriggerBurst",                "속성 발동",            EffectCategory.Proc,    EffectUnit.Ratio,   "dmg");
+
         // ── 특수 ──────────────────────────────────────────────────
         Register("PoisonApple",                 "독사과",               EffectCategory.Special, EffectUnit.Auto,    "poison");
         Register("RandomElement",               "랜덤 속성",            EffectCategory.Special, EffectUnit.None,    "element");
@@ -272,6 +277,9 @@ public static class EffectMetaRegistry
         Register("DarkLegendAoe",         "심연 잠식",       EffectCategory.Special, EffectUnit.None, "special");
         Register("DarkLegendSingle",      "그림자 분신",     EffectCategory.Special, EffectUnit.None, "special");
         Register("DarkLegendProjectile",  "어둠의 낫",       EffectCategory.Special, EffectUnit.None, "special");
+
+        // 정제소 존핵 — 보관함 카드가 「AmplifyZone +20」으로 내부 이름을 그대로 찍었다(09-27).
+        Register("AmplifyZone",           "존 시너지",       EffectCategory.Special, EffectUnit.Percent, "special");
 
         Debug.Log($"[EffectMetaRegistry] {_table.Count}개 effectType 메타 등록 완료");
     }

@@ -47,6 +47,15 @@ public sealed class RuneSelectSkinSO : ScriptableObject
     public Sprite confirmButton;   // 선택
     public Sprite skipButton;      // 넘기기
 
+    [Header("등급 보석 테두리 — ItemRarity 순서(0=Common 1=Rare 2=Epic 3=Legendary)")]
+    [SerializeField, Tooltip("네 귀퉁이 모서리 조각(좌상단 모양). 나머지 셋은 코드가 뒤집어 쓴다. 서약 카드의 철·블루·보라·골드 테두리를 그대로 쓴다.")]
+    private Sprite[] rarityCorner = new Sprite[4];
+    [SerializeField, Tooltip("위·아래 가운데 장식바.")]
+    private Sprite[] rarityBar = new Sprite[4];
+
+    public Sprite RarityCorner(ItemRarity rarity) => Pick(rarityCorner, (int)rarity);
+    public Sprite RarityBar(ItemRarity rarity)    => Pick(rarityBar, (int)rarity);
+
     // ── 조회 (범위 밖·미할당은 null → 색 폴백) ──
 
     public Sprite ElementRibbon(int elementIndex) => Pick(elementRibbon, elementIndex);

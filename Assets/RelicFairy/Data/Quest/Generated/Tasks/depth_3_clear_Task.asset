@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Task
   category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
   codeName: depth_3_clear
-  description: "\uC2EC\uC5F0 \uAE4A\uC774 3 \uD074\uB9AC\uC5B4"
+  description: "\uC2EC\uC5F0 \uAE4A\uC774 3 \uB3C4\uB2EC"
   action: {fileID: 11400000, guid: 7e0a371758dfd2b4789c8d866fb69076, type: 2}
   targets:
   - {fileID: 11400000, guid: 0dc7998a0bc14364ba60fd4f5975a988, type: 2}

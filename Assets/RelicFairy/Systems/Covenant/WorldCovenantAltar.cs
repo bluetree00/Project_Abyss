@@ -119,9 +119,18 @@ public class WorldCovenantAltar : MonoBehaviour
         var run = GameRunBootstrapper.Instance?.Run;
         if (run?.CovenantHandler == null) return;
 
-        if (run.CovenantHandler.Covenants.Count >= CovenantHandler.MaxCovenants)
+        if (NightmareRules.BlocksCovenantAltar)
         {
-            ShowNotice("서약이 가득 찼다");
+            ShowNotice("부서진 맹세 — 이 성채에선 서약을 맺을 수 없다");
+            return;
+        }
+
+        if (run.CovenantHandler.Covenants.Count >= CovenantHandler.Capacity)
+        {
+            // 칸이 아직 늘어날 수 있으면 어디서 늘리는지 한 줄로 알린다 — 막히기만 하면 이유를 모른다.
+            ShowNotice(CovenantHandler.Capacity < CovenantHandler.MaxCovenants
+                ? "서약이 가득 찼다 — 기억의 제단에서 칸을 늘릴 수 있다"
+                : "서약이 가득 찼다");
             return;
         }
 
@@ -227,7 +236,13 @@ public class WorldCovenantAltar : MonoBehaviour
 
     private void BillboardTexts()
     {
-        if (_camTransform == null) return;
+        if (_camTransform == null)
+        {
+            // 시작 때 카메라가 아직 없었으면(테스트 허브 → 베이스캠프 등) 여기서 다시 잡는다 — Start 한 번만 잡으면 라벨이 영영 안 돈다.
+            var cam = Camera.main;
+            if (cam == null) return;
+            _camTransform = cam.transform;
+        }
         if (_worldText != null)
             _worldText.transform.rotation = _camTransform.rotation;
         if (_promptGo != null && _promptGo.activeSelf)
@@ -248,7 +263,7 @@ public class WorldCovenantAltar : MonoBehaviour
         _worldText.color = new Color(0.8f, 0.5f, 1f);
         _worldText.textWrappingMode = TextWrappingModes.NoWrap;
         _worldText.sortingOrder = UISortingOrder.WorldLabel;
-        TMPOutlineHelper.ApplyDefault(_worldText);
+        TMPOutlineHelper.ApplySoftShadow(_worldText);
     }
 
     private void CreatePrompt()
@@ -264,7 +279,7 @@ public class WorldCovenantAltar : MonoBehaviour
         _promptText.color = Color.white;
         _promptText.textWrappingMode = TextWrappingModes.NoWrap;
         _promptText.sortingOrder = UISortingOrder.WorldPrompt;
-        TMPOutlineHelper.ApplyDefault(_promptText);
+        TMPOutlineHelper.ApplySoftShadow(_promptText);
         _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> 서약 조립";
 
         _promptGo.SetActive(false);

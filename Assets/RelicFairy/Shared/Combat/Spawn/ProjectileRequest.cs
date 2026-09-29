@@ -47,6 +47,13 @@ public struct ProjectileRequest
     public int sourceSlot;
     /// <summary>재귀 스폰 깊이. 상한을 넘으면 더 이상 파생시키지 않는다.</summary>
     public int depth;
+    /// <summary>
+    /// 이 투사체가 '무슨 행동'으로 나갔는가(기본 공격 · Q/E/R 스킬). 피해 파이프라인이 스킬 피해 증가를 붙일지 가른다.
+    /// 예전엔 화살이 항상 기본 공격으로 신고해 <b>원거리 스킬만 스킬 피해 증가를 못 받았다</b>(근접 스킬은 받는다, 09-21 수정).
+    /// </summary>
+    public WeaponActionType actionType;
+    /// <summary>스킬 마무리 일격(차지샷 등) — 타격 연출 단계만 바꾼다.</summary>
+    public bool isFinisher;
 
     /// <summary>원본 값만 채운 기본 요청. 변형 필드는 "효과 없음" 상태로 시작한다.</summary>
     public static ProjectileRequest Create(string prefabKey, Vector3 origin, Vector3 direction,
@@ -68,5 +75,6 @@ public struct ProjectileRequest
             sizeMult   = 1f,
             speedMult  = 1f,
             depth      = 0,
+            actionType = WeaponActionType.GroundLight,   // 스킬은 호출부에서 ctx.ActionType으로 덮어쓴다
         };
 }

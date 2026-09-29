@@ -4,7 +4,7 @@ using UnityEngine;
 /// <summary>
 /// 진행 중 런 세이브(이어하기). 로컬 파일(persistentDataPath)이 단독 권위 — 슬롯 3개.
 ///
-/// 저장 시점 : 방 경계(RunFlowController.SaveRunState → SaveRunLocal).
+/// 저장 시점 : 챕터 첫 방 입장 한 번(RunFlowController 챕터 체크포인트 → SaveRunLocal). 챕터 도중엔 저장하지 않는다(09-25).
 /// 삭제 시점 : 사망/런 클리어/슬롯 삭제(ClearLocalRun).
 /// </summary>
 public class RunProgressManager : MonoBehaviour
@@ -102,6 +102,9 @@ public class RunProgressManager : MonoBehaviour
 
         BaseCampOnboardingDirector.ClearForSlot(slot);
         ClearRetryCount(slot);
+        // 베이스캠프 「처음 한 번」 연출 기록(멀린의 공간 생성 · 얻기 · 구역 이름)도 — 안 지우면 새 게임인데 처음 연출이 안 나온다(09-28 검증).
+        BaseCampFxDirector.ClearFirstTimeForSlot(slot);
+        ZoneSign.ClearAllForSlot(slot);
     }
 
     // ── 시도 횟수 (슬롯별) ─────────────────────────────────────
@@ -223,6 +226,7 @@ public class RunProgressManager : MonoBehaviour
         d.shopUseCount    = m.shopUseCount;
         d.refineUseCount  = m.refineUseCount;
         d.maxEnhanceLevel = m.maxEnhanceLevel;
+        d.abyssDepth      = m.abyssDepth;              // 순환 중 이어하기
 
         var cdw = new CooldownListWrapper();
         if (m.cooldowns != null) cdw.items.AddRange(m.cooldowns);
@@ -243,6 +247,12 @@ public class RunProgressManager : MonoBehaviour
 
         var loadout = AppBootstrapper.Instance?.Loadout;
         d.relicKey = loadout?.Relic != null ? loadout.Relic.name : string.Empty;
+
+        // 유물 파츠(보스 클리어 특전) — 런 진행분이라 저장해야 이어하기에서 살아난다.
+        // 저장 안 하면 재시작 후 이어하기에서 그때까지 받은 특전이 통째로 빠진 채 진행된다.
+        d.relicPartIds = loadout != null && loadout.RelicPartIds.Count > 0
+            ? string.Join(",", loadout.RelicPartIds)
+            : string.Empty;
 
         // 서약
         var cov = new CovenantListWrapper();
@@ -311,6 +321,8 @@ public class RunProgressManager : MonoBehaviour
         d.weapon1EvolutionStage = w1?.evolutionStage ?? 0;
         d.weapon0LegendId     = w0?.legendId ?? string.Empty;
         d.weapon1LegendId     = w1?.legendId ?? string.Empty;
+        d.weapon0Engravings   = w0?.engravings ?? string.Empty;
+        d.weapon1Engravings   = w1?.engravings ?? string.Empty;
     }
 
     private static WeaponData SlotFromSaved(GameRunSession s, int slot)

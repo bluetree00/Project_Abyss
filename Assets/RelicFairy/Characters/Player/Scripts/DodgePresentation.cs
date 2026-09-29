@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using INab.Common;
+using RelicFairy.UI.Overlay;
 
 /// <summary>
 /// 회피(닷지) 시각 연출 — 잔상(afterimage) / i-frame 색 틴트 / 대시 먼지·트레일.
@@ -31,6 +32,12 @@ public class DodgePresentation : MonoBehaviour
     private const float  DashTrailFadeIn  = 0.02f;
     private const float  DashTrailFadeOut = 0.1f;
 
+    // 저스트 회피 보상 연출(설계 B안) — 시간은 모두 실제시간(슬로모 중에도 늘어지지 않게)
+    private const float StrikePulseSeconds   = 0.12f;   // 반격 공격마다 몸 발광을 올리는 시간
+    private const float DashGhostBurstSeconds = 0.15f;  // 추격 동안 매 프레임 잔상을 찍는 시간(경로가 잔상으로 남는다)
+    private const float DashZoomIntensity    = 0.28f;   // 추격 속도선 세기(09-21 실측으로 0.6에서 낮춤 — 빛살이 화면을 덮었다)
+    private const float DashZoomDuration     = 0.22f;
+
     // ── Private (refs, Awake 캐싱) ─────────────────────────────────
     private PlayerController     _controller;
     private CharacterData        _data;
@@ -53,6 +60,7 @@ public class DodgePresentation : MonoBehaviour
     private int   _perfectGen;             // 중첩 발동 시 이전 연출 무효화
     private float _ghostIntervalOverride = -1f;  // >0이면 이 간격으로 잔상 스폰
     private bool  _ghostUnscaled;                // 잔상 간격을 실제시간(슬로모 무시)으로 셀지
+    private int   _strikePulseGen;               // 반격 발광 펄스 — 겹치면 마지막 것만 원복
 
     // ── Private (잔상 풀 — 인스턴스 범위) ──────────────────────────
     private sealed class Ghost
@@ -67,6 +75,10 @@ public class DodgePresentation : MonoBehaviour
     private readonly List<Ghost>  _allGhosts = new();   // 풀+활성 전체 — OnDestroy에서 Mesh/GO 파괴
     private bool _ghostSpawnActive;
     private int  _ghostGen;   // 스폰 루프 무효화용 세대 카운터(토글/중단 안전)
+
+    // ── Properties ────────────────────────────────────────────────
+    /// <summary>회피 무적·저스트 회피 틴트가 몸(머티리얼 블록)을 쓰는 중인가 — 피격 번쩍임이 양보·보존하는 기준.</summary>
+    public bool BodyTintActive => _tintActive;
 
     // ── Lifecycle ─────────────────────────────────────────────────
     private void Awake()
@@ -88,6 +100,8 @@ public class DodgePresentation : MonoBehaviour
         _controller.OnDodgeStart  += HandleDodgeStart;
         _controller.OnDodgeEnd    += HandleDodgeEnd;
         _controller.OnPerfectDodge += HandlePerfectDodge;
+        _controller.OnCounterStrike      += HandleCounterStrike;
+        _controller.OnCounterWindowEnded += HandleCounterWindowEnded;
     }
 
     private void OnDisable()
@@ -98,6 +112,8 @@ public class DodgePresentation : MonoBehaviour
             _controller.OnDodgeStart  -= HandleDodgeStart;
             _controller.OnDodgeEnd    -= HandleDodgeEnd;
             _controller.OnPerfectDodge -= HandlePerfectDodge;
+            _controller.OnCounterStrike      -= HandleCounterStrike;
+            _controller.OnCounterWindowEnded -= HandleCounterWindowEnded;
         }
 
         // 저스트 연출이 걸린 채 비활성화되면 화면이 회색으로 남는다 → 반드시 원복.
@@ -157,6 +173,7 @@ public class DodgePresentation : MonoBehaviour
     {
         if (_data == null || duration <= 0f) return;
 
+        PlaySfx(_data.perfectDodgeTriggerSfx);   // E1 — 성공했다는 첫 신호는 소리
         _perfectActive = true;
         int gen = ++_perfectGen;
 
@@ -222,6 +239,72 @@ public class DodgePresentation : MonoBehaviour
         }
     }
 
+    // ── 저스트 회피 보상 연출(설계 B안) ─────────────────────────────
+    // 보상이 설명 없이 일어나면 결함으로 읽힌다 — 반격 공격마다 몸이 번쩍이고(가속의 이유),
+    // 먼 거리 첫 추격은 경로에 잔상·속도선·소리를 남긴다(순간이동이 아니라 '간파 돌진').
+    private void HandleCounterStrike(Vector3 from, Vector3 to, bool isFirst)
+    {
+        if (_data == null) return;
+
+        if (_perfectActive) StrikePulseAsync(++_strikePulseGen).Forget();   // E4
+
+        if (!isFirst) return;
+        Vector3 d = to - from;
+        d.y = 0f;
+        if (d.magnitude < _data.perfectDodgeDashTrailMinDistance) return;
+
+        DashGhostBurstAsync().Forget();                                                      // E3 잔상
+        Managers.UI?.GetOverlayUI<FXLayer>()?.ZoomIn(DashZoomIntensity, DashZoomDuration);   // E3 속도선
+        PlaySfx(_data.perfectDodgeCounterDashSfx);                                           // E3 소리
+    }
+
+    // E6 — 보상이 끝났다는 신호. 화면 색 복귀와 함께 들린다.
+    private void HandleCounterWindowEnded()
+    {
+        if (_data == null) return;
+        PlaySfx(_data.perfectDodgeCounterEndSfx);
+    }
+
+    private async UniTaskVoid StrikePulseAsync(int gen)
+    {
+        ApplyPerfectTint(Mathf.Max(1f, _data.perfectDodgeStrikePulse));
+        try
+        {
+            await UniTask.Delay(TimeSpan.FromSeconds(StrikePulseSeconds), DelayType.UnscaledDeltaTime,
+                cancellationToken: destroyCancellationToken);
+        }
+        catch (OperationCanceledException) { return; }
+
+        // 창이 이미 끝났으면(틴트 원복됨) 다시 칠하지 않는다.
+        if (gen == _strikePulseGen && _perfectActive) ApplyPerfectTint();
+    }
+
+    // 추격 동안 매 프레임 잔상 — 한 프레임에 1.5m씩 옮겨 가는 추격이 경로를 따라 끊김 없이 남는다.
+    private async UniTaskVoid DashGhostBurstAsync()
+    {
+        if (_data.dodgeGhostMaterial == null) return;
+        EnsureRenderers();
+
+        var token = destroyCancellationToken;
+        try
+        {
+            float t = 0f;
+            while (t < DashGhostBurstSeconds)
+            {
+                SpawnGhostSnapshot();
+                await UniTask.Yield(PlayerLoopTiming.Update, token);
+                t += Time.unscaledDeltaTime;
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private static void PlaySfx(string key)
+    {
+        if (string.IsNullOrEmpty(key)) return;
+        Managers.Sound?.PlayEffectAsync(key).Forget();
+    }
+
     // 연출 종료 — 화면/틴트/잔상 전부 원복. 중단(비활성/파괴/중첩 발동) 경로에서도 호출된다.
     private void EndPerfectFx()
     {
@@ -262,7 +345,8 @@ public class DodgePresentation : MonoBehaviour
     }
 
     // 저스트 전용 틴트 — i-frame 틴트와 같은 MPB 경로를 쓰되 색/발광을 더 강하게(회색 대비용).
-    private void ApplyPerfectTint()
+    // emissionScale: 반격 공격 순간 발광을 잠깐 올릴 때 쓴다(평소 1).
+    private void ApplyPerfectTint(float emissionScale = 1f)
     {
         if (_data == null) return;
         EnsureRenderers();
@@ -275,7 +359,7 @@ public class DodgePresentation : MonoBehaviour
         Color tintRgb  = new Color(tint.r, tint.g, tint.b, 1f);
         Color baseC    = Color.Lerp(Color.white, tintRgb, strength);
         baseC.a = 1f;
-        Color emis = tintRgb * (_data.perfectDodgeTintEmission * strength);
+        Color emis = tintRgb * (_data.perfectDodgeTintEmission * strength * emissionScale);
 
         _mpb.Clear();
         _mpb.SetColor(BaseColorId, baseC);

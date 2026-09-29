@@ -33,6 +33,10 @@ public class BackendGameData : MonoBehaviour
     /// <summary>계정의 원래 진행이 사는 슬롯. 서버/레거시 값은 여기로만 흘러든다.</summary>
     private const int PrimarySlot = 0;
 
+    // 서버가 USER_DATA 응답을 끝내 안 주면 부트가 IsReady에 못 갔다(09-22 · 로그인 단계는 09-26 제한).
+    // 넘기면 로드 실패와 같은 경로(로컬 슬롯 권위)로 간다.
+    private const float LoadTimeoutSec = 10f;
+
     /// <summary>현재 Data가 어느 슬롯 것인지. -1 = 아직 슬롯을 안 읽음.</summary>
     private int _loadedSlot = -1;
 
@@ -68,9 +72,27 @@ public class BackendGameData : MonoBehaviour
     public async UniTask LoadAsync()
     {
         var tcs = new UniTaskCompletionSource();
+        bool abandoned = false;   // 시간을 넘겨 포기한 뒤에 온 응답은 진행 중 Data를 건드리지 않는다
 
         Backend.GameData.GetMyData("USER_DATA", new Where(), callback =>
         {
+            if (abandoned)
+            {
+                // 늦은 서버 값으로 진행 중 Data(로컬 슬롯이 권위)를 덮지 않는다. 행 위치만 받아 둔다 —
+                // 없으면 다음 저장이 USER_DATA 행을 또 하나 만든다(Insert 대체).
+                if (callback.IsSuccess())
+                {
+                    try
+                    {
+                        var late = callback.FlattenRows();
+                        if (late.Count > 0 && string.IsNullOrEmpty(_rowInDate)) _rowInDate = late[0]["inDate"].ToString();
+                    }
+                    catch (Exception e) { Debug.LogWarning($"[BackendGameData] 늦은 응답 행 위치 읽기 실패: {e.Message}"); }
+                }
+                Debug.LogWarning("[BackendGameData] 시간을 넘겨 온 Load 응답 — 데이터는 쓰지 않음(행 위치만 기록)");
+                return;
+            }
+
             if (callback.IsSuccess())
             {
                 try
@@ -104,7 +126,12 @@ public class BackendGameData : MonoBehaviour
             tcs.TrySetResult();
         });
 
-        await tcs.Task;
+        bool timedOut = await tcs.Task.TimeoutWithoutException(TimeSpan.FromSeconds(LoadTimeoutSec), DelayType.Realtime);
+        if (timedOut)
+        {
+            abandoned = true;
+            Debug.LogWarning($"[BackendGameData] Load {LoadTimeoutSec:0}초 응답 없음 → 로컬 슬롯으로 진행");
+        }
 
         // 서버에서 읽은 값을 따로 붙잡아 둔다 — 0번 슬롯 최초 생성 때의 시작값이다.
         _serverSnapshot = JsonUtility.FromJson<UserGameData>(JsonUtility.ToJson(Data));

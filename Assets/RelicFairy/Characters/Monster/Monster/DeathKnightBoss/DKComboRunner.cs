@@ -10,6 +10,8 @@ namespace RelicFairy.Monster
 /// BossConfigSO.patternEntries 의 DKComboConfigSO 에서 콤보 횟수를 결정하고,
 /// 별도 attackPool 에서 N개의 공격을 무작위로 선택해 브레이크 없이 연속 실행한다.
 /// 전체 콤보 완료 후에만 정상 브레이크 쿨다운을 적용한다.
+/// 항목에 콤보 SO가 아닌 패턴을 직접 넣으면 풀 없이 한 번씩 낸다 — 2페이지(해방) 풀은 이 방식이다(Page_2 항목).
+/// 2페이지 전환 · 간판은 이 러너가 아니라 보스(DeathKnightBossMonster)가 직접 건다.
 /// </summary>
 public class DKComboRunner
 {
@@ -118,10 +120,10 @@ public class DKComboRunner
                 _wasInPattern = _ctx.Ctx.Monster.IsInSpecialState;
                 return;
             }
-            // 콤보 전체 완료 — 정상 브레이크 설정
+            // 콤보 전체 완료 — 정상 브레이크 설정(2페이지 후반은 −25%, §9)
             _breakCooldown = UnityEngine.Random.Range(
                 _config.patternBreakDurationMin,
-                _config.patternBreakDurationMax);
+                _config.patternBreakDurationMax) * (Pages?.BreakScale ?? 1f);
         }
         _wasInPattern = inPattern;
 
@@ -143,6 +145,21 @@ public class DKComboRunner
     private void TryFireNext()
     {
         if (_config?.patternEntries == null || _config.patternEntries.Count == 0) return;
+
+        // ⓪ 강제 항목(forceExecute) 우선 — 영혼 소환처럼 HP 게이트를 여는 패턴은 조건이 되면 바로 낸다.
+        //    가중치 추첨에 맡기면 50%에서 체력바가 멈춘 채 0.4~30초씩 밀렸다(09-25·26 보스 시뮬 실측).
+        foreach (var entry in _config.patternEntries)
+        {
+            if (entry == null || !entry.forceExecute || entry.patterns == null || !entry.EvaluateConditions(_ctx)) continue;
+            foreach (var p in entry.patterns)
+            {
+                if (p == null || p is DKComboConfigSO || p.GetRuntimeState() == null || !p.CanExecute(_ctx)) continue;
+                _comboQueue.Clear();
+                _comboQueue.Enqueue(p);
+                FireNextFromQueue();
+                return;
+            }
+        }
 
         // ① 전체 가중치 집계
         float total = 0f;
@@ -188,9 +205,18 @@ public class DKComboRunner
                     }
                     else
                     {
-                        // 직접 패턴 — 풀 없이 1회 발동
+                        // 직접 패턴 — 풀 없이 1회 발동. 다음 추첨에서 같은 패턴이 바로 또 나오지 않게 기록한다
+                        // (2페이지 풀은 직접 패턴만 쓴다 — 09-28 규칙 R5 「바로 연속 금지」)
                         _comboQueue.Clear();
                         _comboQueue.Enqueue(p);
+                        _lastPickedInCombo = p;
+                        // 연계(§9) — 2페이지 후반이면 이어 낼 패턴을 콤보 큐에 붙인다(끝나면 쉬지 않고 바로)
+                        if (p.FollowUpActive(_ctx.Ctx.Monster) && p.followUp.GetRuntimeState() != null && p.followUp.CanFollowUp(_ctx)
+                            && Time.time - _lastFollowUpTime >= p.followUpCooldown)
+                        {
+                            _comboQueue.Enqueue(p.followUp);
+                            _lastFollowUpTime = Time.time;
+                        }
                     }
                     FireNextFromQueue();
                     return;
@@ -278,12 +304,16 @@ public class DKComboRunner
         IMonsterState finalState = _stateDecorator != null ? _stateDecorator(state) : state;
 
         _changeState(finalState);
+        Pages?.NotePatternStarted();   // 2페이지 개막 판정(§9)
         _lastFiredAttack = pattern;
         _lastFiredTime   = Time.time;
         IsPatternActive  = true;
         _wasInPattern    = true;
         _onExecuted?.Invoke(pattern);
     }
+
+    private BossPages Pages => (_ctx.Ctx.Monster as IPagedBoss)?.Pages;
+    private float _lastFollowUpTime = float.NegativeInfinity;   // 연계 쿨다운(§9, 09-28 반복 방지)
 
     // ── 반복 패널티 ──────────────────────────────────────────
 

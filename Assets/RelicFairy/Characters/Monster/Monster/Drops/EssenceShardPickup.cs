@@ -34,6 +34,9 @@ public class EssenceShardPickup : MonoBehaviour
     // ── Static ───────────────────────────────────────────────
     private static readonly Color ShardColor = new(0.39f, 0.85f, 0.75f);
 
+    /// <summary>아직 줍지 않은 조각. 씬을 떠나기 직전 <see cref="CollectAll"/>이 쓴다.</summary>
+    private static readonly System.Collections.Generic.List<EssenceShardPickup> s_live = new();
+
     /// <summary>정수 조각 비주얼 프리팹. 비어 있으면 런타임 프리미티브를 쓴다.</summary>
     public static GameObject VisualPrefab { get; set; }
 
@@ -49,6 +52,9 @@ public class EssenceShardPickup : MonoBehaviour
     private Transform _playerTf;
 
     // ── Lifecycle ────────────────────────────────────────────
+    private void OnEnable()  => s_live.Add(this);
+    private void OnDisable() => s_live.Remove(this);
+
     private void Update()
     {
         if (_arcing)
@@ -125,6 +131,26 @@ public class EssenceShardPickup : MonoBehaviour
             var shard = go.AddComponent<EssenceShardPickup>();
             shard.Initialize(startPos, landing, perShard + (i == 0 ? remainder : 0));
         }
+    }
+
+    /// <summary>
+    /// 떨어져 있는 조각을 전부 즉시 적립한다. 챕터 이동·런 클리어처럼 <b>씬을 떠나기 직전</b>에 부른다 —
+    /// 보스 정수는 보스를 쓰러뜨린 자리에 떨어지는데, 드래프트·선택창이 곧바로 시간을 멈추면
+    /// 자석이 끌어오기 전에 씬이 바뀌어 영구 재화가 사라진다. 사망 때는 부르지 않는다(못 주운 건 잃는다).
+    /// </summary>
+    public static void CollectAll()
+    {
+        int count = 0, total = 0;
+        for (int i = s_live.Count - 1; i >= 0; i--)
+        {
+            if (i >= s_live.Count) continue;   // Collect → Destroy → OnDisable로 목록이 줄 수 있다
+            var shard = s_live[i];
+            if (shard == null || shard._collected) continue;
+            total += shard._value;
+            shard.Collect();
+            count++;
+        }
+        if (count > 0) Debug.Log($"[Essence] 떠나기 전 정수 조각 {count}개 회수 (+{total})");
     }
 
     // ── Private Methods ──────────────────────────────────────

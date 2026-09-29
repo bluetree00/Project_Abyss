@@ -6,7 +6,7 @@
       "part_kind": "core",
       "part_id": "gawain_core_eternal_noon",
       "part_name": "영원한 정오",
-      "description": "황혼(쿨다운)을 지워 정오를 상시 유지한다. 주기 관리에서 해방되어 늘 최대 화력으로 싸운다.",
+      "description": "정오가 끝나지 않는다 — 공격속도 +30% · 모든 피해 +20% · 치명타 확률 +10%p · 치명타 피해 +20% 상시. 낙일(Q)은 45초마다 한 번.",
       "effect_key": "gawain_eternal_noon",
       "boss_tier": 3
     },
@@ -16,7 +16,7 @@
       "part_kind": "core",
       "part_id": "gawain_core_solar_calamity",
       "part_name": "태양의 재앙",
-      "description": "화상 걸린 적이 죽으면 쌓인 화상 피해가 주변에 번진다. 이미 준 피해를 재활용해 무리를 태운다.",
+      "description": "화상 걸린 적이 죽으면 반경 6m 적 최대 5체에게 남은 화상(초당 피해 · 남은 시간 그대로)이 옮는다.",
       "effect_key": "gawain_solar_calamity",
       "boss_tier": 3
     },
@@ -26,7 +26,7 @@
       "part_kind": "core",
       "part_id": "gawain_core_judgment_brand",
       "part_name": "심판의 낙인",
-      "description": "화상 쌓인 적을 벨 때 체력 20% 이하면 즉시 처형한다. 보스는 처형되지 않고 화상 1중첩이 추가된다.",
+      "description": "화상 걸린 적을 벨 때 체력 20% 이하면 즉시 처형한다. 보스는 처형 대신 화상 지속 +2초.",
       "effect_key": "gawain_judgment_brand",
       "boss_tier": 3
     },
@@ -36,7 +36,7 @@
       "part_kind": "effect",
       "part_id": "gawain_eff_burn_spread",
       "part_name": "화상 전염",
-      "description": "화상 걸린 적이 죽으면 근처 적 하나에게 화상이 옮는다.",
+      "description": "화상 걸린 적이 죽으면 반경 4m 안 가장 가까운 적 1체에게 남은 화상이 그대로 옮는다.",
       "effect_key": "gawain_burn_spread",
       "boss_tier": 1
     },
@@ -46,7 +46,7 @@
       "part_kind": "behavior",
       "part_id": "gawain_beh_ember_trail",
       "part_name": "잔염의 검흔",
-      "description": "태양의 검흔이 사라진 자리에 불씨 지대가 잠깐 남아 밟는 적에게 화상을 준다.",
+      "description": "적중한 자리에 불씨 지대(반경 1.5m · 2.5초 · 0.4초마다 1개)가 남아 밟은 적에게 화상(초당 공격력 10% · 1.5초). 낙일(Q) 적중은 제외.",
       "effect_key": "gawain_ember_trail",
       "boss_tier": 1
     },
@@ -56,7 +56,7 @@
       "part_kind": "trigger",
       "part_id": "gawain_trg_noon_bloom",
       "part_name": "정오의 개화",
-      "description": "정오에 진입하는 순간 발밑에 화상 지대가 한 번 깔린다.",
+      "description": "정오에 들어서는 순간 발밑에 화상 지대(반경 3m · 4초) — 밟은 적에게 화상(초당 공격력 15% · 2초).",
       "effect_key": "gawain_noon_bloom",
       "boss_tier": 1
     },
@@ -66,7 +66,7 @@
       "part_kind": "behavior",
       "part_id": "gawain_beh_burst_burn",
       "part_name": "불사르기",
-      "description": "화상 입은 적을 직접 공격하면 남은 화상의 절반이 즉시 터진다.",
+      "description": "화상 입은 적을 직접 치면 남은 화상 피해의 50%가 즉시 터진다(남은 시간도 50% 소모).",
       "effect_key": "gawain_burst_burn",
       "boss_tier": 1
     },
@@ -76,7 +76,7 @@
       "part_kind": "core",
       "part_id": "lancelot_core_endless_frenzy",
       "part_name": "끝나지 않는 광란",
-      "description": "광란이 끝날 때 한 번 더 광란을 이어간다.",
+      "description": "광란(4초)이 끝날 때 한 번 더 이어진다 — 총 8초(심판의 일격은 광란당 1회).",
       "effect_key": "lancelot_endless_frenzy",
       "boss_tier": 3
     },
@@ -86,7 +86,7 @@
       "part_kind": "core",
       "part_id": "lancelot_core_blood_feast",
       "part_name": "피의 만찬",
-      "description": "광란 중 적을 처치하면 그 적에 쌓인 출혈이 주변 적들에게 번진다.",
+      "description": "광란 중 적을 처치하면 그 적의 남은 출혈 피해 전부가 반경 5m 적 최대 4체에게 3초에 걸쳐 번진다.",
       "effect_key": "lancelot_blood_feast",
       "boss_tier": 3,
       "requires": "lancelot_eff_bleed_brand"
@@ -97,7 +97,7 @@
       "part_kind": "core",
       "part_id": "lancelot_core_betrayer_brand",
       "part_name": "배신자의 낙인",
-      "description": "심판의 일격에 맞은 적이 체력 25% 이하면 처형한다. 보스는 처형되지 않고 광란이 유지된다.",
+      "description": "심판의 일격에 맞은 적이 체력 25% 이하면 처형한다. 보스는 처형 대신 심판 타격마다 광란 +0.4초.",
       "effect_key": "lancelot_betrayer_brand",
       "boss_tier": 3
     },
@@ -107,7 +107,7 @@
       "part_kind": "effect",
       "part_id": "lancelot_eff_bleed_brand",
       "part_name": "출혈의 낙인",
-      "description": "심판의 일격에 맞은 적은 출혈 상태가 되어 지속 피해를 입는다.",
+      "description": "심판의 일격에 맞은 적은 출혈 — 그 타격 피해의 30%를 초당 4초간 입는다.",
       "effect_key": "lancelot_bleed_brand",
       "boss_tier": 1
     },
@@ -117,7 +117,7 @@
       "part_kind": "trigger",
       "part_id": "lancelot_trg_blood_price",
       "part_name": "피의 대가",
-      "description": "적을 처치하면 광기 스택을 추가로 얻어 광란에 더 빨리 도달한다.",
+      "description": "적을 처치하면 광기 +1스택을 추가로 얻는다(최대 40).",
       "effect_key": "lancelot_blood_price",
       "boss_tier": 1
     },
@@ -127,7 +127,7 @@
       "part_kind": "behavior",
       "part_id": "lancelot_beh_lasting_madness",
       "part_name": "식지 않는 광기",
-      "description": "광란이 끝나도 광기 스택이 절반 남는다.",
+      "description": "광란이 끝나도 광기 스택의 50%(40 중 20)가 남는다.",
       "effect_key": "lancelot_lasting_madness",
       "boss_tier": 1
     },
@@ -137,7 +137,7 @@
       "part_kind": "behavior",
       "part_id": "lancelot_beh_blood_thirst",
       "part_name": "피의 갈증",
-      "description": "광란 중 적을 처치할 때마다 광란 지속시간이 조금 갱신된다.",
+      "description": "광란 중 적을 처치할 때마다 광란 지속 +1.2초.",
       "effect_key": "lancelot_blood_thirst",
       "boss_tier": 1
     }

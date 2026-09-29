@@ -13,7 +13,7 @@ using UnityEngine;
 public class ShopNpcInteraction : MonoBehaviour
 {
     // ── Constants ───────────────────────────────────────────
-    private const float PromptOffsetY = 2.2f;
+    private const float PromptOffsetY = 1.0f;   // 루트(캡슐 가운데 = 바닥 +1) 위 1.0 → 바닥 +2.0, 머리(1.3) 바로 위(09-29)
 
     // ── [SerializeField] ────────────────────────────────────
     [Header("프롬프트")]
@@ -98,7 +98,7 @@ public class ShopNpcInteraction : MonoBehaviour
         _promptTmp.sortingOrder = UISortingOrder.WorldPrompt;
         _promptTmp.text = promptText;
 
-        TMPOutlineHelper.ApplyDefault(_promptTmp);
+        TMPOutlineHelper.ApplySoftShadow(_promptTmp);
 
         _promptGo.SetActive(false);
     }

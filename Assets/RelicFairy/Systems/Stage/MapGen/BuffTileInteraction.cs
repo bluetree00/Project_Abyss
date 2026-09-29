@@ -197,7 +197,7 @@ public class BuffTileInteraction : MonoBehaviour
         var rect = _promptGo.GetComponent<RectTransform>();
         rect.sizeDelta = new Vector2(3f, 1f);
 
-        TMPOutlineHelper.ApplyDefault(_promptText);
+        TMPOutlineHelper.ApplySoftShadow(_promptText);
 
         _promptGo.SetActive(false);
     }

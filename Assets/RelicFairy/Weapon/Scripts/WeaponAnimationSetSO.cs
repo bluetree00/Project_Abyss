@@ -14,12 +14,14 @@ public class WeaponAnimationSetSO : ScriptableObject
         public WeaponActionType actionType;
         public int comboIndex = 0;       // 콤보 인덱스
 
-        [Header("낙하 공격")]
-        [Tooltip("체크 시 이 공격은 낙하 공격으로 동작합니다.")]
+        // [공중 공격 폐기] 아래 3개는 읽는 코드가 없다(ActPlungeState 삭제됨).
+        // 무기 SO 에셋에 이미 직렬화돼 있어 값 보존을 위해 필드만 남긴다 — 복원 시 그대로 다시 쓰면 된다.
+        [Header("낙하 공격 (비활성 — 값만 보존)")]
+        [Tooltip("[비활성] 체크해도 동작하지 않습니다. 공중 공격이 폐기돼 낙하 공격 상태가 제거됐습니다.")]
         public bool isPlunge = false;
-        [Tooltip("낙하 속도. 0이면 기본값(ActPlungeState.DefaultPlungeSpeed) 사용")]
+        [Tooltip("[비활성] 낙하 속도.")]
         public float plungeFallSpeed = 0f;
-        [Range(0f, 1f), Tooltip("하강 시작 normalizedTime. 이 시점 전까지는 공중에 정지 (0 = 즉시 하강)")]
+        [Range(0f, 1f), Tooltip("[비활성] 하강 시작 normalizedTime.")]
         public float plungeDescendAt = 0f;
 
         [Header("콤보 타이밍 Override (0~1 normalized, -1 = AnimSet 기본값 사용)")]

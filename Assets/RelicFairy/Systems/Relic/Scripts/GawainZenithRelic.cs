@@ -20,7 +20,8 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
                       V_MARK_ATK = 8;
     // 기본 패시브 설명(버프창 첫 셀의 호버 툴팁). 태양 게이지/정오/각인 사이클 요약.
     private const string PassiveTip =
-        "정오의 맹세 — 태양 게이지를 채워 '정오'에 들면 공속·치명타·모든 피해가 강화되고, 게이지 80%+ '각인'에서 공격력이 미리 강화된다 (처치 시 충전 가속)";
+        "정오의 맹세 — 여명 20초 → 정오 10초 → 황혼 15초. 정오: 공격속도 +30% · 모든 피해 +20% · 치명타 확률 +10%p · 치명타 피해 +20%. " +
+        "게이지 80% 이상 '각인': 공격력 +10%. 정오가 아닐 때 처치마다 충전 속도 +20%(최대 3배)";
 
     private const string NoonVfxKey = "vfx_gawain_noon";  // 정오 오라(상태 토글). 에셋 배선 후 등록.
 
@@ -30,6 +31,7 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
     private SolarNoonSun     _sun;          // 정오 — 머리 위 태양
     private Action           _onChanged;
     private bool             _skillUsedThisNoon;
+    private float            _skillUsedAt = -999f;   // 정오 고정(영원한 정오) 중 재사용 간격 판정
     private bool             _wasNoon;
     private bool             _wasMarkReady;        // [가이드라인 비주얼] 각인 진입 엣지 검출
     private bool             _markPendingFirstHit; // 각인: 정오 첫 공격 +50%
@@ -52,7 +54,7 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
     public bool TwilightMode => _gauge != null && _gauge.CurrentPhase == ZenithGauge.ZPhase.Cooldown;
 
     /// <summary>태양 강림이 호출 — 정오 구간당 1회 소비.</summary>
-    public void MarkSkillUsed() => _skillUsedThisNoon = true;
+    public void MarkSkillUsed() { _skillUsedThisNoon = true; _skillUsedAt = Time.time; }
 
     /// <summary>각인 첫타(+50%) 보유분 소비. 정오 첫 공격(일반/스킬)이 1회만 가져간다.</summary>
     public bool ConsumeMarkFirstHit()
@@ -96,8 +98,14 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
         => slot == SkillType.Q ? new SolarDescentSkillRuntime(this) : null;
     public float GetSkillCooldown(SkillType slot) => 0f; // 정오 게이팅 + 구간당 1회가 발동 제어
     public bool  CanUseSkill(SkillType slot)
-        => slot == SkillType.Q && _gauge != null && _gauge.IsSkillReady && !_skillUsedThisNoon;
+        => slot == SkillType.Q && _gauge != null && _gauge.IsSkillReady && (!_skillUsedThisNoon || HeldNoonRecharged);
     public int   ModifyIncomingDamage(PlayerController owner, int dmg, GameObject attacker) => dmg;
+
+    /// <summary>
+    /// 정오 고정(영원한 정오) 중엔 정오 진입이 다시 오지 않아 「정오마다 1회」 리셋이 없다 — 첫 낙일 뒤로 런 끝까지 막혔다(09-29).
+    /// 고정 중엔 원래 한 주기(여명 + 정오 + 황혼)가 지나면 다시 쓸 수 있다.
+    /// </summary>
+    private bool HeldNoonRecharged => _gauge != null && _gauge.IsHoldNoon && Time.time - _skillUsedAt >= _gauge.CycleSeconds;
 
     private static float V(int slot, float fallback)
         => Managers.RelicStatData != null ? Managers.RelicStatData.Get(RelicKey, slot, fallback) : fallback;

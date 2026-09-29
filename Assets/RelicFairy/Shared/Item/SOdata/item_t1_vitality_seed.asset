@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t1_vitality_seed
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t1_vitality_seed
-  displayName: "\uC131\uC7A5\uC758 \uB8EC"
+  displayName: "\uCC28\uC624\uB974\uB294 \uC0DD\uBA85\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 0

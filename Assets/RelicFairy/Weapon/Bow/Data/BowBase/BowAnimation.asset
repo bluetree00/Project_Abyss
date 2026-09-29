@@ -67,7 +67,7 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
-    - baseClipName: QSkill_02
+    - baseClipName: QSkill_Iasen
       addressableKey: BowQSkill_02
       actionType: 3
       comboIndex: 1

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t2_guardian_shield
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t2_guardian_shield
-  displayName: "\uB300\uBC29\uD328\uC758 \uB8EC"
+  displayName: "\uAC15\uC778\uD55C \uC218\uD638\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 1

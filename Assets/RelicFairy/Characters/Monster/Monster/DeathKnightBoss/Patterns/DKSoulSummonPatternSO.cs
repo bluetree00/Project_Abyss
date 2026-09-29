@@ -69,7 +69,7 @@ public class DKSoulSummonPatternSO : BossPatternSO
 
 public class DKSoulSummonState : FullLockState<DKSoulSummonPatternSO>
 {
-    private const string AnimWalk  = "Walk1";
+    private const string AnimWalk  = "walk1";   // 애니메이터 상태 이름 그대로(소문자)
     private const string AnimIdle2 = "Idle2";
 
     // 씬에 배치된 기둥 오브젝트 이름 (좌/우 그룹 각 4개)
@@ -270,7 +270,8 @@ public class DKSoulSummonState : FullLockState<DKSoulSummonPatternSO>
 
         if (remaining <= 0) return;
 
-        int totalHeal = Mathf.RoundToInt(boss.EffectiveMaxHp * Data.pillarHealPercentPerPillar * remaining);
+        // 1페이지(= 기존 전투) 체력 기준 — 악몽기엔 최대 체력에 2페이지 몫이 더해져 회복이 1.4배로 부풀던 것을 막는다
+        int totalHeal = Mathf.RoundToInt(boss.PhaseMaxHp * Data.pillarHealPercentPerPillar * remaining);
         boss.SoulPillarHealBossGradual(totalHeal, Data.gradualHealDuration);
         Debug.Log($"[DKSoulSummon] 타임아웃 — 남은 기둥 {remaining}개 × {Data.pillarHealPercentPerPillar * 100f}% = {totalHeal} 회복", ctx.Monster);
     }

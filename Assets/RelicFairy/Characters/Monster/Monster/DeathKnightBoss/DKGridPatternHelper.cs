@@ -440,7 +440,8 @@ public static class DKGridPatternHelper
         if (player == null) return;
 
         int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * damageMult));
-        player.TakeDamage(dmg);
+        // 가해자 = 기사 — null이면 피격 방향 연출·같은 공격자 약 피격 억제·전투 로그가 가해자를 모른다(09-26)
+        player.TakeDamage(dmg, ctx.Monster != null ? ctx.Monster.gameObject : null);
 
         Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
         toPlayer.y = 0.2f;

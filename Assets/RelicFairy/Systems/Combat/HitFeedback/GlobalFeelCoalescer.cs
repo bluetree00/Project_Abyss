@@ -45,6 +45,7 @@ public static class GlobalFeelCoalescer
     private static Vector3    _dirSum;
     private static Vector3    _hitPoint;
     private static WeaponType _weaponType;
+    private static DealtHitTier _tier;
     private static GameObject _attacker;
 
     // 도메인 리로드 OFF: 2회차에 누적치·호스트 참조가 잔류하면 첫 프레임에 유령 버스트가 터진다.
@@ -65,6 +66,8 @@ public static class GlobalFeelCoalescer
         _totalDamage += info.Damage;
         _anyCrit     |= info.IsCritical;
         _dirSum      += info.AttackDirection;
+        var tier = TierOf(info);
+        if (tier > _tier) _tier = tier;   // 잔타가 막타를 가리지 않게 — 단계는 가장 높은 것
 
         // 대표값(무기·공격자·착탄점)은 가장 센 타격에서 가져온다 — 손맛 프로필이 잔타에 끌려가지 않게.
         if (info.Damage >= _maxDamage)
@@ -94,7 +97,8 @@ public static class GlobalFeelCoalescer
             direction:   _dirSum.sqrMagnitude > 0.0001f ? _dirSum.normalized : Vector3.zero,
             hitPoint:    _hitPoint,
             weaponType:  _weaponType,
-            attacker:    _attacker);
+            attacker:    _attacker,
+            tier:        _tier);
 
         ClearAccumulator();
 
@@ -119,6 +123,14 @@ public static class GlobalFeelCoalescer
         _hitPoint    = Vector3.zero;
         _weaponType  = WeaponType.None;
         _attacker    = null;
+        _tier        = DealtHitTier.Basic;
+    }
+
+    private static DealtHitTier TierOf(in HitInfo info)
+    {
+        if (info.IsFinisher) return DealtHitTier.Finisher;
+        return info.ActionType is WeaponActionType.QSkill or WeaponActionType.ESkill or WeaponActionType.RSkill
+            ? DealtHitTier.Skill : DealtHitTier.Basic;
     }
 
     private static void EnsureHost()

@@ -9,6 +9,7 @@ quest,collect_gold_1000,재력가,골드 1000 모으기,Gold,*,SimpleCount,1000,
 quest,hidden_elite_ambush,예기치 못한 습격,제한 시간 내 정예 처치,Kill,*,SimpleCount,3,Gold,300,true,false,0,,Dialogue,Quest_HiddenAmbush_Start,Dialogue,Quest_HiddenAmbush_Clear,20
 achievement,reach_ch2,심연의 문턱,2챕터 도달,Record,maxChapter,SimpleSet,2,Essence,150,false,true,0,,None,,None,,0
 achievement,reach_ch3,더 아래로,3챕터 도달,Record,maxChapter,SimpleSet,3,Essence,300,false,true,0,,None,,None,,0
+achievement,reach_ch4,성소의 가장 안쪽,4챕터 도달,Record,maxChapter,SimpleSet,4,Essence,450,false,true,0,,None,,None,,0
 achievement,first_clear,바닥을 보다,심연을 완주,Record,clears,SimpleSet,1,Essence,600,false,true,0,,None,,None,,0
 achievement,depth_5,되돌아온 자,심연 깊이 5 도달,Record,maxDepth,SimpleSet,5,Essence,1200,false,true,0,,None,,None,,0
 achievement,kill_100_any,백인 학살자,몬스터 100마리 처치,Record,kills,SimpleSet,100,Essence,200,false,true,0,,None,,None,,0
@@ -27,4 +28,4 @@ achievement,shop_5,단골,상점 5회 이용,Record,shopUses,SimpleSet,5,Essence
 achievement,shop_30,행상의 벗,상점 30회 이용,Record,shopUses,SimpleSet,30,Essence,400,false,true,0,,None,,None,,0
 achievement,depth_10,깊이 아는 자,심연 깊이 10 도달,Record,maxDepth,SimpleSet,10,Essence,2000,false,true,0,,None,,None,,0
 achievement,clear_5,반복하는 자,5회 완주,Record,clears,SimpleSet,5,Essence,1000,false,true,0,,None,,None,,0
-achievement,depth_3_clear,심연의 상주자,심연 깊이 3 클리어,Record,maxDepth,SimpleSet,3,Essence,800,false,true,0,,None,,None,,0
+achievement,depth_3_clear,심연의 상주자,심연 깊이 3 도달,Record,maxDepth,SimpleSet,3,Essence,800,false,true,0,,None,,None,,0

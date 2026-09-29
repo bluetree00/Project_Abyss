@@ -46,14 +46,19 @@ public class DialogueDataManager
         {
             // ① 서버(CDN) 우선 — 라이브 대사 수정이 재빌드 없이 반영된다.
             int fromServer = LoadFromServer();
+
+            // ② 프로젝트에 동봉된 CSV — 서버가 없으면 전부, 있으면 <b>서버에 없는 시퀀스만</b> 보충한다.
+            //    새 대사(이야기 비트 등)를 CSV에 추가하면 차트 재업로드 전에도 동작하고,
+            //    서버에 있는 시퀀스는 서버 것이 이긴다(라이브 수정 우선 유지).
+            var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>(AddressableKey);
             if (fromServer > 0)
             {
-                Debug.Log($"[DialogueDataManager] CDN에서 {_sequences.Count}개 시퀀스 로드 ({fromServer}행)");
+                int added = textAsset != null ? MergeMissingFromCsv(textAsset.text) : 0;
+                Debug.Log($"[DialogueDataManager] CDN에서 {_sequences.Count - added}개 시퀀스 로드 ({fromServer}행)" +
+                          (added > 0 ? $" + 로컬 CSV 보충 {added}개" : ""));
                 return;
             }
 
-            // ② 폴백 — 프로젝트에 동봉된 CSV(오프라인 · 차트 미등록 시)
-            var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>(AddressableKey);
             if (textAsset != null)
             {
                 ParseCsv(textAsset.text);
@@ -257,7 +262,27 @@ public class DialogueDataManager
     private void ParseCsv(string csv)
     {
         _sequences.Clear();
+        ParseCsvInto(csv, _sequences);
+    }
 
+    /// <summary>로컬 CSV에서 <see cref="_sequences"/>에 없는 시퀀스만 더한다. 더한 시퀀스 수를 반환.</summary>
+    private int MergeMissingFromCsv(string csv)
+    {
+        var local = new Dictionary<string, List<DialogueLine>>();
+        ParseCsvInto(csv, local);
+
+        int added = 0;
+        foreach (var kv in local)
+        {
+            if (_sequences.ContainsKey(kv.Key)) continue;
+            _sequences[kv.Key] = kv.Value;
+            added++;
+        }
+        return added;
+    }
+
+    private static void ParseCsvInto(string csv, Dictionary<string, List<DialogueLine>> target)
+    {
         var lines = csv.Split('\n');
         for (int i = 1; i < lines.Length; i++) // i=0 헤더 스킵
         {
@@ -275,10 +300,10 @@ public class DialogueDataManager
             if (!Enum.TryParse<DialogueSpeaker>(speaker, ignoreCase: true, out var spkEnum))
                 spkEnum = DialogueSpeaker.None;
 
-            if (!_sequences.ContainsKey(seqId))
-                _sequences[seqId] = new List<DialogueLine>();
+            if (!target.ContainsKey(seqId))
+                target[seqId] = new List<DialogueLine>();
 
-            _sequences[seqId].Add(new DialogueLine
+            target[seqId].Add(new DialogueLine
             {
                 speaker         = spkEnum,
                 illustrationKey = illustrationKey,

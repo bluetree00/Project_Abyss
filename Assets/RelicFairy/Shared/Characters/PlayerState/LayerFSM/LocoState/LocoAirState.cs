@@ -1,21 +1,19 @@
 using UnityEngine;
 
-public class LocoAirState : ILayerState<LocoState>
+public class LocoAirState : LayerStateBase<LocoState>
 {
-    // MinorDrop: 점프 없이 떨어졌고 낙하 높이가 임계 미만 — 추락/착지 애니 생략, 로코모션 유지.
-    private enum AirPhase { Start, MinorDrop, Loop, Landing }
+    // MinorDrop: 낙하 높이가 임계 미만 — 추락/착지 애니 생략, 로코모션 유지.
+    // [점프 폐기] 상승 단계(Start)는 제거됐다 — 공중 진입이 낙하·넉백뿐이라 도달할 수 없었다.
+    private enum AirPhase { MinorDrop, Loop, Landing }
 
     private const float LandingDuration = 0.15f;
 
     // CharacterData.minFallAnimHeight 미설정 시 사용할 기본 임계 높이(m).
     private const float DefaultMinFallAnimHeight = 0.6f;
 
-    // 착지 충격 카메라 셰이크 — 낙하 속도(m/s) 이 범위로 강도 매핑. Min 미만은 셰이크 없음(평범한 점프 착지).
+    // 착지 충격 카메라 셰이크 — 낙하 속도(m/s) 이 범위로 강도 매핑. Min 미만은 셰이크 없음(가벼운 단차 착지).
     private const float LandShakeMinSpeed = 6f;
     private const float LandShakeMaxSpeed = 18f;
-
-    private PlayerController _controller;
-    private ILayerStateChanger<LocoState> _stateChanger;
 
     private AirPhase _phase;
     private float _landingTimer;
@@ -23,59 +21,35 @@ public class LocoAirState : ILayerState<LocoState>
     private float _fallThreshold; // 이번 낙하의 추락 애니 임계 높이
     private float _maxFallSpeed;  // 체공 중 최대 하강 속도(착지 충격 셰이크 강도용)
 
-    public void Init(PlayerController controller, ILayerStateChanger<LocoState> stateChanger)
+    public override void Enter()
     {
-        _controller = controller;
-        _stateChanger = stateChanger;
-    }
-
-    public void Enter()
-    {
-        _phase = AirPhase.Start;
         _landingTimer = 0f;
         _maxFallSpeed = 0f;
 
-        // ProcessJump에서 이미 CrossFade 했으므로, 낙하 진입(점프 없이 떨어진 경우)만 여기서 처리.
-        if (!_controller.IsJumping)
-        {
-            _takeoffY = _controller.transform.position.y;
-            var cd = _controller.CharacterData;
-            _fallThreshold = cd != null && cd.minFallAnimHeight > 0.01f ? cd.minFallAnimHeight : DefaultMinFallAnimHeight;
+        // [점프 폐기] 공중 진입은 낙하·넉백뿐이므로 상승 단계가 없다 — 바로 낙하 판정으로 들어간다.
+        _takeoffY = _controller.transform.position.y;
+        var cd = _controller.CharacterData;
+        _fallThreshold = cd != null && cd.minFallAnimHeight > 0.01f ? cd.minFallAnimHeight : DefaultMinFallAnimHeight;
 
-            // 발밑에 임계 높이 안쪽으로 지면이 있으면 작은 단차 → 추락/착지 애니 생략하고 로코모션 유지.
-            if (HasGroundWithin(_fallThreshold))
-            {
-                _phase = AirPhase.MinorDrop;
-            }
-            else
-            {
-                // 실제 추락 — 추락 루프 애니 재생.
-                _phase = AirPhase.Loop;
-                _controller.Anim.SetFloat("JumpValue", 1f);
-                _controller.Anim.CrossFadeInFixedTime("JumpBlend", 0.10f);
-            }
+        // 발밑에 임계 높이 안쪽으로 지면이 있으면 작은 단차 → 추락/착지 애니 생략하고 로코모션 유지.
+        if (HasGroundWithin(_fallThreshold))
+        {
+            _phase = AirPhase.MinorDrop;
+        }
+        else
+        {
+            // 실제 추락 — 추락 루프 애니 재생.
+            _phase = AirPhase.Loop;
+            _controller.Anim.SetFloat("JumpValue", 1f);
+            _controller.Anim.CrossFadeInFixedTime("JumpBlend", 0.10f);
         }
     }
 
-    public void Update()
+    public override void Update()
     {
         switch (_phase)
         {
-            case AirPhase.Start:
-                if (_controller.Rigid.linearVelocity.y <= 0f)
-                {
-                    _phase = AirPhase.Loop;
-                    _controller.Anim.SetFloat("JumpValue", 1f);
-                }
-                break;
-
             case AirPhase.MinorDrop:
-                // 재점프 → 일반 점프 흐름으로 복귀
-                if (_controller.IsJumping)
-                {
-                    _phase = AirPhase.Start;
-                    break;
-                }
                 // 작은 단차 착지 — 추락/착지 애니 없이 즉시 지상 상태로 복귀
                 if (_controller.IsGrounded())
                 {
@@ -103,14 +77,6 @@ public class LocoAirState : ILayerState<LocoState>
                 break;
 
             case AirPhase.Landing:
-                // 착지 중 재점프 → 즉시 Start 단계로 리셋
-                if (_controller.IsJumping)
-                {
-                    _controller.IsLanding = false;
-                    _phase = AirPhase.Start;
-                    break;
-                }
-
                 _landingTimer -= Time.deltaTime;
                 if (_landingTimer <= 0f)
                 {
@@ -121,7 +87,7 @@ public class LocoAirState : ILayerState<LocoState>
         }
     }
 
-    public void Exit()
+    public override void Exit()
     {
         _controller.IsLanding = false;
     }

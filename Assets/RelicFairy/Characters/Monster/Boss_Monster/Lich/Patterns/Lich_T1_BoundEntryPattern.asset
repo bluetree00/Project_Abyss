@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d43d424736071fb418b34dfc89e8df0e, type: 3}
+  m_Name: Lich_T1_BoundEntryPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichPhase2EntryPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: page2bound
+  breakOverride: 1
+  targetPage: 2
+  form: 4
+  dialogueKey: Lich_Bound_Phase
+  speedMultiplier: 1
+  attackSpeedMultiplier: 1
+  breakDurationMin: 0.4
+  breakDurationMax: 0.8
+  entryDuration: 3.5
+  recoveryDuration: 0.5
+  blastTiming: 0.6
+  bindChains: 1
+  chainTiming: 0.45
+  blast: 0
+  blastRadius: 10
+  damageMultiplier: 0
+  knockbackMultiplier: 3
+  collapseOuterRing: 0
+  crackOuterRing: 1
+  restoreFloor: 1
+  cinematic: 1
+  stageShift: 1
+  refillSeconds: 2.4
+  roarHoldSeconds: 1.1
+  closeUpTiming: 0.08
+  closeUpHold: 0.9
+  slowMoTiming: 0.5
+  slowMoScale: 0.5
+  slowMoSeconds: 0.6

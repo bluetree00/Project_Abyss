@@ -1,5 +1,9 @@
 using UnityEngine;
 
+/// <summary>플레이어가 <b>준</b>타격의 연출 단계. 한 프레임 합산본에서 가장 높은 단계가 대표한다.
+/// 자주 보는 연출이라 단계 차이는 흔들림이 아니라 멈칫 길이·가장자리 신호로 준다(09-25 사용자 기준).</summary>
+public enum DealtHitTier { Basic = 0, Skill = 1, Finisher = 2 }
+
 /// <summary>
 /// 한 프레임에 발생한 타격들을 <b>하나로 합친</b> 화면 연출 페이로드.
 ///
@@ -28,9 +32,12 @@ public readonly struct HitBurst
     public readonly WeaponType WeaponType;
     /// <summary>가장 센 타격의 공격자.</summary>
     public readonly GameObject Attacker;
+    /// <summary>합산된 타격 중 가장 높은 연출 단계(기본 공격 / 스킬 / 스킬 막타).</summary>
+    public readonly DealtHitTier Tier;
 
     public HitBurst(int count, float maxDamage, float totalDamage, bool anyCritical,
-                    Vector3 direction, Vector3 hitPoint, WeaponType weaponType, GameObject attacker)
+                    Vector3 direction, Vector3 hitPoint, WeaponType weaponType, GameObject attacker,
+                    DealtHitTier tier = DealtHitTier.Basic)
     {
         Count       = count;
         MaxDamage   = maxDamage;
@@ -40,5 +47,6 @@ public readonly struct HitBurst
         HitPoint    = hitPoint;
         WeaponType  = weaponType;
         Attacker    = attacker;
+        Tier        = tier;
     }
 }

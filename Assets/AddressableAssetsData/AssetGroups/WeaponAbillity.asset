@@ -13,8 +13,6 @@ MonoBehaviour:
   m_Name: WeaponAbillity
   m_EditorClassIdentifier: 
   m_GroupName: WeaponAbillity
-  m_Data:
-    m_SerializedData: []
   m_GUID: 839b9659ecea42e41944f759125a3bf8
   m_SerializeEntries:
   - m_GUID: cb9aceca967c7da45aae479d66a29df8

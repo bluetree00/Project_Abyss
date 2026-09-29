@@ -4,7 +4,8 @@ using UnityEngine;
 
 namespace Game.Inputs
 {
-    public enum Command { None, Dodge, Heavy, Light, Charge, QSkill, ESkill, RSkill }
+    // [강공격 봉인] Heavy / Charge 제거 — 이 커맨드를 만드는 입력 정책이 더는 없다.
+    public enum Command { None, Dodge, Light, QSkill, ESkill, RSkill }
 
     public interface IClock { float Now { get; } float Delta { get; } }
     public sealed class UnscaledClock : IClock
@@ -72,8 +73,6 @@ namespace Game.Inputs
                 Command.QSkill => 3,
                 Command.ESkill => 3,
                 Command.RSkill => 3,
-                Command.Heavy => 2,
-                Command.Charge => 1,   // <-- 추가: Charge는 낮은 우선순위
                 _ => 0 // Light, None...
             });
 

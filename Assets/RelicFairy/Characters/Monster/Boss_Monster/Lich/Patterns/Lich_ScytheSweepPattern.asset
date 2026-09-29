@@ -16,18 +16,30 @@ MonoBehaviour:
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
-  weight: 1
+  weight: 3
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
-  minTriggerRange: 3
-  maxTriggerRange: 20
-  approachDuration: 0.8
-  sweepDelay: 0.5
-  recoveryDuration: 0.5
-  sweepRadius: 4
-  sweepHalfAngle: 70
-  damageMultiplier: 0
-  knockbackMultiplier: 2
+  minTriggerRange: 0
+  maxTriggerRange: 11
   patternCooldown: 7
+  windupDuration: 0.9
+  signalDuration: 0.15
+  swingActive: 0.5
+  swingCount: 2
+  endDuration: 0.6
+  recoveryDuration: 0.4
+  sweepRadius: 8
+  sweepHalfAngle: 90
+  damageMultiplier: 1.6
+  knockbackMultiplier: 2
+  lungeDistance: 3
+  lungeStopShort: 1.5
+  chainYank: 0
+  parryable: 1
+  followBolts: 0
+  followBoltWarn: 0.8
+  followBoltRadius: 2.2
+  followBoltSpread: 3.5
+  followBoltDamage: 0.6

@@ -20,8 +20,13 @@ using UnityEngine;
 /// 개입하지 않는다.
 ///
 /// PlayerController가 런타임에 자동 부착한다(CombatCameraFraming과 동일 패턴).
+///
+/// 실행 순서를 <b>CinemachineBrain(0)보다 앞</b>으로 둔다. 둘 다 LateUpdate에서 도는데 순서가 같으면
+/// 선후가 보장되지 않아, Brain이 먼저 돌면 카메라가 한 프레임 전 앵커를 따라간다 —
+/// 프레임 시간이 흔들릴 때마다 화면 속 캐릭터 위치가 같이 흔들린다.
 /// </summary>
 [DisallowMultipleComponent]
+[DefaultExecutionOrder(-100)]
 public class CameraRigAnchor : MonoBehaviour
 {
     // ── SerializeField ────────────────────────────────────────────

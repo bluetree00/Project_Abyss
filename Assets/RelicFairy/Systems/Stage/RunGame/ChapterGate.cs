@@ -70,9 +70,10 @@ public sealed class ChapterGate : MonoBehaviour
         var tmp = go.AddComponent<TextMeshProUGUI>();
         tmp.text      = "다음 챕터";
         tmp.fontSize  = 48f;
-        tmp.fontStyle = FontStyles.Bold;
+        tmp.fontStyle = FontStyles.Normal;   // 09-27: 가짜 굵게 해제(기본 폰트가 이미 굵다)
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color     = GateColor;
+        TMPOutlineHelper.ApplySoftShadow(tmp);
     }
 
     private async UniTaskVoid AppearAsync(Transform visual, Renderer rend, CancellationToken ct)

@@ -27,6 +27,7 @@ public class GameCameraController : MonoBehaviour
     [SerializeField] private float startRoomTourHeight   = 6f;    // 천장(약 11.9) 아래 방 내부로
     [SerializeField] private float startRoomTourArc      = 90f; // 좌우 스윕 각도(도)
     [SerializeField] private float startRoomPlayerBlendDuration = 1.2f; // 둘러보기 → 플레이어(CombatGirl) 추적 전환 보간 시간
+    [SerializeField] private float startRoomHandoffTimeout      = 8f;   // 둘러보기 후 인계가 오지 않을 때 카메라를 강제 복귀시키는 한도(비스케일 초)
 
     [Header("Start Room Tour 시네마틱 프레임 (레터박스)")]
     [SerializeField] private float          startRoomTourFrameDuration = 0.5f;  // 바 슬라이드 인/아웃 시간
@@ -67,6 +68,11 @@ public class GameCameraController : MonoBehaviour
     private bool _isPanning;
     private bool _prePanBrainEnabled;
     private bool _prePanCmEnabled;
+
+    // 둘러보기 종료 → 게임플레이 인계 감시. 인계가 오지 않으면 Brain이 꺼진 채 남아 카메라가 얼어붙는다.
+    private bool _handoffPending;
+    private int  _handoffVersion;
+
     private bool _bossOrbitViewActive;
     private Transform _bossOrbitOwner;
     private Transform _savedBossFollow;
@@ -74,6 +80,8 @@ public class GameCameraController : MonoBehaviour
     private CinemachineFreeLook.Orbit[] _savedBossOrbits;
     private CinemachineFreeLook.Orbit[] _savedDKPlayerOrbits;
     private CinemachineFreeLook.Orbit[] _savedProcessionalOrbits;
+    private CinemachineFreeLook.Orbit[] _savedArenaOrbits;
+    private readonly System.Collections.Generic.HashSet<object> _framingSuppressors = new();
 
     // heading 회전 연출(RotateHeadingTo) 중복 실행 방지 — 새 요청이 오면 이전 회전을 취소한다.
     private CancellationTokenSource _headingCts;
@@ -100,7 +108,13 @@ public class GameCameraController : MonoBehaviour
     /// </summary>
     public bool IsOrbitOverridden =>
         _bossOrbitViewActive || _topDownViewActive || _isPanning
-        || _savedDKPlayerOrbits != null || _savedProcessionalOrbits != null;
+        || _savedDKPlayerOrbits != null || _savedProcessionalOrbits != null || _savedArenaOrbits != null;
+
+    /// <summary>
+    /// 전투 자동 줌아웃(<see cref="CombatCameraFraming"/>)을 멈춰 달라는 요청이 있는가 — 보스방이 자기 구도를 쓸 때.
+    /// 궤도를 점유하지는 않는다(점유는 <see cref="IsOrbitOverridden"/>).
+    /// </summary>
+    public bool IsCombatFramingSuppressed => _framingSuppressors.Count > 0;
 
     // ── Events ──
     /// <summary>카메라 인트로 줌인이 완전히 끝난 직후 발생</summary>
@@ -119,6 +133,19 @@ public class GameCameraController : MonoBehaviour
         _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
         _brain = GetComponent<CinemachineBrain>();
         _camera = GetComponent<Camera>();
+
+        // 카메라 갱신은 LateUpdate로 고정한다 — SmartUpdate(에셋 기본값)를 쓰면 안 된다.
+        //
+        // SmartUpdate는 추적 대상이 "물리 스텝 뒤에 움직였나 / LateUpdate에 움직였나"를 세서
+        // 대상별로 갱신 주기를 고른다. 그런데 Follow 대상인 CameraRigAnchor는 LateUpdate에서만
+        // 움직이고, Brain과 실행 순서가 같아(둘 다 0) 선후가 정해져 있지 않다. Anchor가 Brain보다
+        // 늦게 돌면 그 이동이 다음 프레임의 물리 스텝 확인에서 잡혀 'Fixed 이동'으로 집계되고,
+        // 60fps 근처에서는 대부분의 프레임에 물리 스텝이 끼므로 Fixed로 분류된다 →
+        // 카메라가 50Hz로만 갱신돼 60Hz 화면에서 이동·대시 중 끊기듯 떨린다(프레임률 따라 달라짐).
+        //
+        // 플레이어는 Rigidbody Interpolate라 LateUpdate 시점의 위치가 이미 매끄럽다 → LateUpdate가 정답.
+        // 씬마다 에셋 값을 고치는 대신 여기서 일괄 고정한다(이 컴포넌트가 모든 게임플레이 카메라에 붙어 있다).
+        if (_brain != null) _brain.m_UpdateMethod = CinemachineBrain.UpdateMethod.LateUpdate;
 
         // Cinemachine 비활성 (인트로 끝까지)
         if (_brain != null) _brain.enabled = false;
@@ -260,6 +287,7 @@ public class GameCameraController : MonoBehaviour
     private void BindGameplayFollow(Transform follow, bool alignHeadingToTarget)
     {
         _introStarted = true; // 레거시 줌인 인트로(OnPlayerBound) 차단
+        _handoffPending = false;   // 인계가 실제로 시작됐다 — 감시 타이머 해제
 
         if (_cinemachine == null) _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
         if (_brain == null) _brain = GetComponent<CinemachineBrain>();
@@ -284,6 +312,10 @@ public class GameCameraController : MonoBehaviour
     /// </summary>
     public void ApplyZoneOrbit(Vector2 top, Vector2 mid, Vector2 bot, float duration = 1.2f)
     {
+        // 전투 동적 프레이밍이 매 프레임 궤도를 덮어쓰므로 구역 궤도는 그 「베이스」를 바꾼다(09-28 — 직접 바꾸면 한 프레임 만에 지워졌다).
+        var framing = CombatCameraFraming.Active;
+        if (framing != null) { framing.SetZoneBase(top, mid, bot, duration); return; }
+
         EnsureCinemachineRefs();
         if (_cinemachine == null) return;
 
@@ -303,6 +335,9 @@ public class GameCameraController : MonoBehaviour
     /// <summary>구역 이탈 시 기본(구역 진입 전) 오빗으로 복귀. 저장값이 없으면 무시.</summary>
     public void RestoreZoneOrbit(float duration = 1.2f)
     {
+        var framing = CombatCameraFraming.Active;
+        if (framing != null) { framing.ClearZoneBase(duration); return; }
+
         EnsureCinemachineRefs();
         if (_cinemachine == null || _savedZoneOrbits == null) return;
 
@@ -392,6 +427,56 @@ public class GameCameraController : MonoBehaviour
         catch (OperationCanceledException) { }
     }
 
+    /// <summary>
+    /// 둘러보기는 Brain을 끈 채 끝나고, 카메라를 게임플레이로 되돌리는 책임은 뒤따르는
+    /// <see cref="HandToGameplayCamera"/>에 있다. 그런데 그 사이는 전부 비동기다 —
+    /// 플레이어 프리팹 로드·무기 매니저 대기·대사 팝업. 어느 하나가 실패하거나 예외를 던지면
+    /// 인계가 통째로 날아가고, Brain이 꺼진 채 남아 카메라가 둘러보기 포즈에 얼어붙는다
+    /// (= 챕터에 들어섰는데 화면이 안 돌아온 상태. 실패 여부가 로드 타이밍에 달려 "가끔"으로 보인다).
+    /// 한도 안에 인계가 오지 않으면 강제로 되돌리고 원인을 로그로 남긴다.
+    /// </summary>
+    private void BeginHandoffWatchdog()
+    {
+        _handoffPending = true;
+        HandoffWatchdogAsync(++_handoffVersion, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    private async UniTaskVoid HandoffWatchdogAsync(int myVersion, CancellationToken ct)
+    {
+        try
+        {
+            float t = 0f;
+            while (t < startRoomHandoffTimeout)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (this == null) return;
+                // 인계가 왔거나(BindGameplayFollow) 새 둘러보기가 시작됐으면 이 감시는 할 일이 없다.
+                if (!_handoffPending || myVersion != _handoffVersion) return;
+                t += Time.unscaledDeltaTime;   // 대사 팝업이 timeScale을 0으로 잡으므로 비스케일로 센다
+                await UniTask.Yield();
+            }
+        }
+        catch (OperationCanceledException) { return; }
+
+        if (this == null || !_handoffPending || myVersion != _handoffVersion) return;
+        if (_isPanning) return;   // 컷신이 제어권을 쥐고 있다 — 복원은 그쪽 몫
+
+        _handoffPending = false;
+        EnsureCinemachineRefs();
+
+        // Follow 대상이 없으면 되돌려도 카메라가 갈 곳이 없다(원점으로 튄다). 원인만 남기고 손대지 않는다.
+        if (_cinemachine == null || _cinemachine.Follow == null)
+        {
+            Debug.LogWarning($"[GameCameraController] 시작방 인계가 {startRoomHandoffTimeout:0.#}초 안에 오지 않았고 추적 대상도 없다 — 플레이어 스폰이 실패했을 가능성. 카메라는 그대로 둔다.");
+            return;
+        }
+
+        _cinemachine.enabled = true;
+        _cinemachine.PreviousStateIsValid = false;
+        if (_brain != null) _brain.enabled = true;
+        Debug.LogWarning($"[GameCameraController] 시작방 인계가 {startRoomHandoffTimeout:0.#}초 안에 오지 않아 카메라를 강제 복귀시켰다 — HandToGameplayCamera 호출 경로(플레이어 스폰·무기 로드)를 확인할 것.");
+    }
+
     public async UniTask PrepareMapViewAsync(Vector3 mapCenter, float fadeTime, CancellationToken ct)
     {
         if (_introStarted) return;
@@ -450,41 +535,52 @@ public class GameCameraController : MonoBehaviour
         Quaternion fromRot = transform.rotation;
         float dur = Mathf.Max(0.01f, duration);
 
-        float t = 0f;
-        while (t < dur)
+        // ⚠️ 이 블렌드는 <b>중간에 빠져나가더라도</b> Brain을 돌려줘야 한다. 안 돌려주면 카메라가
+        //    수동 포즈에 얼어붙어 플레이어를 따라가지 않는다 — 챕터에 들어섰는데 화면이 안 돌아온
+        //    상태가 그것이다. 그래서 인계(Brain 재활성)를 finally에 둔다.
+        //    단 컷신이 제어권을 가져갔으면(_panVersion 변화) 복원 책임은 그쪽이다 — 건드리지 않는다.
+        try
         {
-            if (this == null) return;
-            if (myVersion != _panVersion) return;   // 컷신이 제어권을 가져갔다
-            ct.ThrowIfCancellationRequested();
-            // ⚠️ <b>unscaled 고정.</b> 이 블렌드는 fire-and-forget으로 돌고, 호출측(대기방 진입)은
-            //    곧바로 대사 팝업을 띄운다. 대사 팝업은 BlocksGameplay라 timeScale을 0으로 잡는다 —
-            //    scaled 시간을 쓰면 t가 한 프레임도 늘지 않아 <b>블렌드가 중간 포즈에서 얼어붙는다.</b>
-            //    카메라가 정면으로 돌아오지 못한 채 대사 내내 비스듬히 고정되던 원인(2026-08-20 QA).
-            //    Brain 재활성·_isPanning 해제도 루프 뒤에 있어 그동안 통째로 보류된다.
-            float dt = Time.unscaledDeltaTime;
-            t += dt;
-            float k    = Mathf.Clamp01(t / dur);
-            float ease = 1f - (1f - k) * (1f - k) * (1f - k); // easeOutCubic
+            float t = 0f;
+            while (t < dur)
+            {
+                if (this == null) return;
+                if (myVersion != _panVersion) return;   // 컷신이 제어권을 가져갔다
+                ct.ThrowIfCancellationRequested();
+                // ⚠️ <b>unscaled 고정.</b> 이 블렌드는 fire-and-forget으로 돌고, 호출측(대기방 진입)은
+                //    곧바로 대사 팝업을 띄운다. 대사 팝업은 BlocksGameplay라 timeScale을 0으로 잡는다 —
+                //    scaled 시간을 쓰면 t가 한 프레임도 늘지 않아 <b>블렌드가 중간 포즈에서 얼어붙는다.</b>
+                //    카메라가 정면으로 돌아오지 못한 채 대사 내내 비스듬히 고정되던 원인(2026-08-20 QA).
+                float dt = Time.unscaledDeltaTime;
+                t += dt;
+                float k    = Mathf.Clamp01(t / dur);
+                float ease = 1f - (1f - k) * (1f - k) * (1f - k); // easeOutCubic
 
-            _cinemachine.InternalUpdateCameraState(Vector3.up, dt);
-            Vector3    toPos = _cinemachine.State.FinalPosition;
-            Quaternion toRot = _cinemachine.State.FinalOrientation;
+                _cinemachine.InternalUpdateCameraState(Vector3.up, dt);
+                Vector3    toPos = _cinemachine.State.FinalPosition;
+                Quaternion toRot = _cinemachine.State.FinalOrientation;
 
-            transform.position = Vector3.Lerp(fromPos, toPos, ease);
-            transform.rotation = Quaternion.Slerp(fromRot, toRot, ease);
-            await UniTask.Yield();
+                transform.position = Vector3.Lerp(fromPos, toPos, ease);
+                transform.rotation = Quaternion.Slerp(fromRot, toRot, ease);
+                await UniTask.Yield();
+            }
         }
+        finally
+        {
+            // Cinemachine에 제어권 인계. 정상 완료면 카메라가 이미 목표 포즈라 스냅해도 끊김이 없고,
+            // 취소로 왔다면 포즈는 중간이지만 PreviousStateIsValid=false로 다음 프레임에 제자리를 잡는다.
+            if (this != null && myVersion == _panVersion && _cinemachine != null)
+            {
+                _cinemachine.PreviousStateIsValid = false;
+                if (_brain != null) _brain.enabled = true;
 
-        if (this == null) return;
-        if (myVersion != _panVersion) return;   // 컷신이 제어권을 가져갔다면 인계하지 않는다
+                // 수동 제어(TakeManualControl) 잠금 해제 — 이게 없으면 _isPanning이 true로 남아
+                // 이후 보스전 오빗 전환·구역 카메라가 전부 무시되고 카메라가 고정된다.
+                _isPanning = false;
 
-        // Cinemachine에 제어권 인계 — 카메라가 이미 목표 포즈에 도달했으므로 스냅해도 끊김 없음
-        _cinemachine.PreviousStateIsValid = false;
-        if (_brain != null) _brain.enabled = true;
-
-        // 수동 제어(TakeManualControl) 잠금 해제 — 이게 없으면 _isPanning이 true로 남아
-        // 이후 보스전 오빗 전환·구역 카메라가 전부 무시되고 카메라가 고정된다.
-        _isPanning = false;
+                _handoffPending = false;   // 인계 완료 — 감시 해제
+            }
+        }
     }
 
     public void ActivateBossOrbitView(Transform bossTarget, Transform lookAtTarget = null)
@@ -823,6 +919,78 @@ public class GameCameraController : MonoBehaviour
         TransitionDKOrbitAsync(top, mid, bot, duration, this.GetCancellationTokenOnDestroy()).Forget();
     }
 
+    // ── Arena Orbit (보스 아레나 전투 구도) ─────────────────────
+    /// <summary>
+    /// 보스 아레나 전투 구도 — 플레이어 추적·수평각은 그대로 두고 오빗(높이, 반경)만 옮긴다.
+    /// 이미 켜져 있으면 새 값으로 옮겨 간다(페이지별 구도). 원래 오빗은 처음 켤 때 한 번 저장한다.
+    /// 켜진 동안 <see cref="IsOrbitOverridden"/> — 전투 자동 줌아웃이 양보한다.
+    /// </summary>
+    public void ActivateArenaOrbit(Vector2 top, Vector2 middle, Vector2 bottom, float duration = 1.0f)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null) return;
+
+        if (_savedArenaOrbits == null)
+        {
+            _savedArenaOrbits = new CinemachineFreeLook.Orbit[]
+            {
+                _cinemachine.m_Orbits[0],
+                _cinemachine.m_Orbits[1],
+                _cinemachine.m_Orbits[2],
+            };
+        }
+
+        TransitionDKOrbitAsync(top, middle, bottom, duration, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>아레나 구도를 끄고 원래 오빗으로 서서히 되돌린다.</summary>
+    public void DeactivateArenaOrbit(float duration = 1.0f)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null || _savedArenaOrbits == null) return;
+
+        var top = new Vector2(_savedArenaOrbits[0].m_Height, _savedArenaOrbits[0].m_Radius);
+        var mid = new Vector2(_savedArenaOrbits[1].m_Height, _savedArenaOrbits[1].m_Radius);
+        var bot = new Vector2(_savedArenaOrbits[2].m_Height, _savedArenaOrbits[2].m_Radius);
+        _savedArenaOrbits = null;
+
+        TransitionDKOrbitAsync(top, mid, bot, duration, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>전투 자동 줌아웃 정지 요청을 걸거나 푼다. 요청자가 하나라도 남아 있으면 정지.</summary>
+    public void SetCombatFramingSuppressed(object owner, bool suppressed)
+    {
+        if (owner == null) return;
+        if (suppressed) _framingSuppressors.Add(owner);
+        else            _framingSuppressors.Remove(owner);
+    }
+
+    /// <summary>
+    /// 수동 제어 중인 카메라를 <paramref name="position"/>으로 옮기며 <paramref name="lookAt"/>을 보게 한다(컷신 샷).
+    /// <see cref="TakeManualControl"/> 뒤에 쓴다. 실시간 기준 — 슬로모·대사창 중에도 움직인다.
+    /// </summary>
+    public async UniTask MoveManualCameraAsync(Vector3 position, Vector3 lookAt, float duration, CancellationToken ct)
+    {
+        if (this == null) return;
+        Vector3    fromP = transform.position;
+        Quaternion fromR = transform.rotation;
+        Vector3    dir   = lookAt - position;
+        Quaternion toR   = dir.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(dir, Vector3.up) : fromR;
+        float      d     = Mathf.Max(0.0001f, duration);
+
+        for (float t = 0f; t < d; )
+        {
+            ct.ThrowIfCancellationRequested();
+            t += Time.unscaledDeltaTime;
+            float k = PanEase(t / d);
+            transform.position = Vector3.Lerp(fromP, position, k);
+            transform.rotation = Quaternion.Slerp(fromR, toR, k);
+            await UniTask.Yield(PlayerLoopTiming.Update, ct);
+        }
+        transform.position = position;
+        transform.rotation = toR;
+    }
+
     /// <summary>
     /// 스타트 방 캐릭터 선택 직후 호출. Cinemachine이 이미 player를 추적 중인 상태에서
     /// Brain을 끄고 현재 위치에서 player 쪽으로 줌인 후 Cinemachine 복귀.
@@ -904,6 +1072,9 @@ public class GameCameraController : MonoBehaviour
             // 취소·완료 모두 레터박스 아웃 (둘러보기 종료 → 조작 복귀 신호)
             await CinematicFrame.HideAsync(startRoomTourFrameDuration, startRoomTourFrameEase);
         }
+
+        // 둘러보기는 Brain을 끈 채 끝난다 — 되돌리는 책임은 뒤따르는 인계에 있다. 그게 오는지 감시한다.
+        BeginHandoffWatchdog();
     }
 
     /// <summary>

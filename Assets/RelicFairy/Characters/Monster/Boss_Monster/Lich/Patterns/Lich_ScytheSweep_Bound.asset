@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7fe233f55407a643ae7cbe70e94d049, type: 3}
+  m_Name: Lich_ScytheSweep_Bound
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichScytheSweepPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 3
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: scythesweep_bound
+  breakOverride: -1
+  minTriggerRange: 0
+  maxTriggerRange: 7
+  patternCooldown: 7
+  windupDuration: 0.9
+  signalDuration: 0.15
+  swingActive: 0.5
+  swingCount: 2
+  endDuration: 0.8
+  recoveryDuration: 0.4
+  sweepRadius: 5
+  sweepHalfAngle: 90
+  damageMultiplier: 1.6
+  knockbackMultiplier: 2
+  lungeDistance: 3
+  lungeStopShort: 1.5
+  chainYank: 1.5
+  parryable: 1
+  followBolts: 3
+  followBoltWarn: 0.8
+  followBoltRadius: 2.2
+  followBoltSpread: 3.5
+  followBoltDamage: 0.6

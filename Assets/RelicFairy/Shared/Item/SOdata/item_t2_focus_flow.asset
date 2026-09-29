@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t2_focus_flow
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t2_focus_flow
-  displayName: "\uBAB0\uC785\uC758 \uB8EC"
+  displayName: "\uB118\uCE58\uB294 \uB9C8\uB825\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 1

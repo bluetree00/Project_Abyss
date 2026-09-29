@@ -168,14 +168,19 @@ public class ShopDataManager
                 continue;
             }
 
+            // 풀은 weapon/item만 담는다. 그 밖의 카테고리(potion 등)는 ShopRoomController가
+            // 고정 슬롯으로 직접 진열하므로 <b>여기서 빠지는 것이 정상</b>이다 — 경고 대상이 아니다.
+            // (경고에 섞이면 "상점 데이터가 깨졌다"는 오진을 부른다.)
+            string cat = NormalizeCategory(entry.category);
+            if (cat != CategoryWeapon && cat != CategoryItem) continue;
+
             if (!TryLookupRarity(entry.category, entry.target_id, out var rarity))
             {
                 skippedIds.Add(entry.shop_entry_id);
                 continue;
             }
 
-            string normCat = NormalizeCategory(entry.category);
-            var key = (normCat, rarity);
+            var key = (cat, rarity);
             if (!_byCatRarity.TryGetValue(key, out var list))
             {
                 list = new List<ShopEntry>();

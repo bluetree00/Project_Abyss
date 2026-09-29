@@ -63,6 +63,7 @@ public class UI_SaveSlotPanel : UI_Base
 
     private int        _pendingDeleteSlot = -1;
     private GameObject _noticeRoot;   // 이어하기 차단 안내 오버레이(코드 생성, 1회)
+    private bool       _opened;       // Open으로 연 적이 있다 — 아니면 닫을 때 페이드 없이 곧바로 끈다
 
     // ─────────────────────────────────────────────────────────
     // Lifecycle
@@ -97,14 +98,19 @@ public class UI_SaveSlotPanel : UI_Base
         HideConfirm();
         HideNotice();
         RefreshAllCards();
-        gameObject.SetActive(true);
+        _opened = true;
+        UIFader.On(gameObject).Show();   // 순간 등장 → 공통 박자(09-28 UI 톤 통일)
     }
 
     public override void Close()
     {
         HideConfirm();
         HideNotice();
-        gameObject.SetActive(false);
+        // 열어 둔 적이 없으면(로비가 켜질 때의 정리) 곧바로 끈다 — 페이드하면 로비 첫 화면에 슬롯이 잠깐 비친다.
+        // 닫는 순간 알린다 — 로비 제목이 슬롯이 걷히는 동안 함께 떠오른다(교차 페이드).
+        if (_opened) UIFader.On(gameObject).Hide();
+        else         gameObject.SetActive(false);
+        _opened = false;
         OnClosed?.Invoke();
     }
 

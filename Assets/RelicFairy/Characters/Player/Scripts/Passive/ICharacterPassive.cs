@@ -1,7 +1,7 @@
 /// <summary>
 /// 캐릭터 고유 패시브 인터페이스.
-/// PlayerController.RegisterPassive()로 등록하고,
-/// FirePassive()가 Trigger 일치 + CanApply 통과 시 Apply()를 호출한다.
+/// PlayerController.RegisterRelicPassive()로 등록하고,
+/// PlayerController.FirePassive()가 Trigger 일치 + CanApply 통과 시 Apply()를 호출한다.
 /// </summary>
 public interface ICharacterPassive
 {

@@ -7,6 +7,7 @@ using UnityEngine;
 /// 동작:
 ///   · Update: 플레이어가 Ground layer 위에 있으면 현재 위치를 _lastSafe 로 갱신
 ///   · transform.position.y &lt; fallThresholdY → 복구 절차 실행
+///     (방이 <see cref="SetFallDepthOverride"/>로 덮어쓰면 '마지막 안전 지점 − 깊이'로 판정)
 ///
 /// 복구 절차:
 ///   1. RuntimeStats.MaxHp × fallDamageRatio 만큼 HP 감소 (passive 트리거 없이 직접)
@@ -16,6 +17,23 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerController))]
 public class FallRecoveryController : MonoBehaviour
 {
+    // ── 상수 ───────────────────────────────────────────────
+    /// <summary>안전 지점의 바닥이 사라졌을 때 바깥으로 넓혀가며 대체 바닥을 찾는 링 반경(m).</summary>
+    private static readonly float[] SearchRadii = { 2f, 4f, 7f, 11f, 16f };
+
+    /// <summary>각 링에서 검사할 8방위 (XZ 단위벡터).</summary>
+    private static readonly Vector2[] SearchDirs =
+    {
+        new( 1f,      0f     ), new( 0.707f,  0.707f), new( 0f,  1f     ), new(-0.707f,  0.707f),
+        new(-1f,      0f     ), new(-0.707f, -0.707f), new( 0f, -1f     ), new( 0.707f, -0.707f),
+    };
+
+    // ── 낙하 깊이 덮어쓰기(방 단위) ─────────────────────────
+    // 절대 높이 판정은 바닥이 y≈0인 방에서 5m만 떨어져도 복구돼 '떨어지는 감각'이 없다(리치 아레나 붕괴 바닥).
+    // 주인은 Unity 객체 — 파괴되면 == null이 되어 덮어쓰기가 저절로 풀린다(해제를 놓쳐도 남지 않는다).
+    private static Object s_depthOwner;
+    private static float  s_depthBelowLastSafe;
+
     [SerializeField, Tooltip("이 Y 이하로 떨어지면 낙사 판정. SafeFloor(=baseY-0.05) 보다 충분히 아래로.")]
     private float fallThresholdY = -5f;
 
@@ -37,11 +55,18 @@ public class FallRecoveryController : MonoBehaviour
     [SerializeField, Min(0f), Tooltip("낙사 복구 직후 무적 시간(초).")]
     private float invincibleSeconds = 1.0f;
 
+    [SerializeField, Min(1f), Tooltip("리스폰 전 바닥 실존 확인용 레이캐스트 시작 높이(m). 밟고 있던 지형이 사라졌는지 판정한다.")]
+    private float groundProbeHeight = 60f;
+
     private PlayerController _pc;
     private Rigidbody _rb;
     private Vector3 _lastSafe;
     private bool _hasSafe;
     private bool _recovering;
+
+    /// <summary>지금 적용되는 낙사 판정 높이 — 덮어쓰기가 있으면 마지막 안전 지점 기준, 없으면 절대 높이.</summary>
+    private float CurrentFallThresholdY =>
+        s_depthOwner != null ? _lastSafe.y - s_depthBelowLastSafe : fallThresholdY;
 
     private void Awake()
     {
@@ -56,7 +81,7 @@ public class FallRecoveryController : MonoBehaviour
         if (_recovering) return;
 
         // 1) 낙사 판정
-        if (transform.position.y < fallThresholdY)
+        if (transform.position.y < CurrentFallThresholdY)
         {
             Recover();
             return;
@@ -79,12 +104,32 @@ public class FallRecoveryController : MonoBehaviour
     /// <summary>PitTrigger 등 외부에서 낙사 복구를 즉시 발동한다.</summary>
     public void ForceRecover() => Recover();
 
+    /// <summary>
+    /// 낙사 판정을 '마지막으로 밟은 안전 지점보다 <paramref name="depthBelowLastSafe"/> m 아래'로 바꾼다.
+    /// 무너지는 전장처럼 떨어지는 감각이 필요한 방이 켜고, 방을 떠날 때 <see cref="ClearFallDepthOverride"/>로 끈다.
+    /// 마지막 호출이 이긴다. <paramref name="owner"/>가 파괴되면 저절로 풀린다.
+    /// </summary>
+    public static void SetFallDepthOverride(Object owner, float depthBelowLastSafe)
+    {
+        if (owner == null) return;
+        s_depthOwner         = owner;
+        s_depthBelowLastSafe = Mathf.Max(0f, depthBelowLastSafe);
+    }
+
+    /// <summary>덮어쓰기를 끈다 — 건 주인만 끌 수 있다(다른 방이 뒤늦게 부른 해제가 지금 방의 설정을 지우지 않게).</summary>
+    public static void ClearFallDepthOverride(Object owner)
+    {
+        if (owner != null && s_depthOwner == owner) s_depthOwner = null;
+    }
+
     private void Recover()
     {
         _recovering = true;
 
-        // HP 차감 — passive 트리거 없이 직접 (낙사는 특수 원인)
-        if (_pc != null && _pc.RuntimeStats != null)
+        // HP 차감 — passive 트리거 없이 직접 (낙사는 특수 원인).
+        // 베이스캠프(허브)에선 깎지 않는다 — 떠 있는 광장은 투명 벽이 막지만, 그래도 떨어지면 벌이 아니라 제자리로(재설계 §4).
+        bool inHub = BaseCampBootstrapper.Instance != null;
+        if (!inHub && _pc != null && _pc.RuntimeStats != null)
         {
             int maxHp = _pc.RuntimeStats.MaxHp;
             int dmg = Mathf.Max(1, Mathf.RoundToInt(maxHp * fallDamageRatio));
@@ -95,10 +140,16 @@ public class FallRecoveryController : MonoBehaviour
             if (_pc.RuntimeStats.Hp <= 0) _pc.NotifyHpDepleted();
         }
 
-        // 리스폰 위치 — 안전 지점이 확보된 상태면 그 위에, 아니면 현재 XZ 유지한 상태에서 Y=0 복귀
-        Vector3 target = _hasSafe
-            ? _lastSafe + new Vector3(0f, respawnOffsetY, 0f)
+        // 리스폰 위치 — 안전 지점 아래에 바닥이 "지금도" 남아 있는지 확인한 뒤 결정한다.
+        Vector3 candidate = _hasSafe
+            ? _lastSafe
             : new Vector3(transform.position.x, respawnOffsetY, transform.position.z);
+
+        if (!TryResolveRespawn(candidate, out Vector3 target))
+        {
+            target = candidate + new Vector3(0f, respawnOffsetY, 0f);
+            Debug.LogWarning($"[FallRecovery] {candidate} 주변에서 바닥을 찾지 못했다 — 원래 좌표로 복구한다.", this);
+        }
 
         transform.position = target;
 
@@ -112,5 +163,53 @@ public class FallRecoveryController : MonoBehaviour
         _pc?.SetInvincible(invincibleSeconds);
 
         _recovering = false;
+    }
+
+    /// <summary>
+    /// 리스폰 좌표를 실제로 남아 있는 바닥 위로 보정한다.
+    ///
+    /// 지형이 전투 중 붕괴하는 전장(리치 보스 아레나 등)에서는 _lastSafe가 이미 사라진 타일의
+    /// 좌표일 수 있다. 그대로 리스폰하면 허공에서 다시 추락 → 또 리스폰이 반복돼
+    /// HP가 바닥날 때까지 빠져나올 수 없다. 바닥이 없으면 주변 링을 넓혀가며 대체 지점을 찾는다.
+    /// </summary>
+    private bool TryResolveRespawn(Vector3 candidate, out Vector3 result)
+    {
+        if (TryFindGroundY(candidate, out float y))
+        {
+            result = new Vector3(candidate.x, y + respawnOffsetY, candidate.z);
+            return true;
+        }
+
+        for (int r = 0; r < SearchRadii.Length; r++)
+        {
+            for (int d = 0; d < SearchDirs.Length; d++)
+            {
+                var probe = new Vector3(candidate.x + SearchDirs[d].x * SearchRadii[r],
+                                        candidate.y,
+                                        candidate.z + SearchDirs[d].y * SearchRadii[r]);
+                if (!TryFindGroundY(probe, out float py)) continue;
+
+                result = new Vector3(probe.x, py + respawnOffsetY, probe.z);
+                return true;
+            }
+        }
+
+        result = candidate;
+        return false;
+    }
+
+    /// <summary>주어진 XZ 아래로 레이를 쏴 실제 바닥이 있으면 true를 반환하고 그 높이를 넘긴다.</summary>
+    private bool TryFindGroundY(Vector3 at, out float groundY)
+    {
+        var origin = new Vector3(at.x, at.y + groundProbeHeight, at.z);
+        if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, groundProbeHeight * 2f,
+                            groundLayer, QueryTriggerInteraction.Ignore))
+        {
+            groundY = hit.point.y;
+            return true;
+        }
+
+        groundY = 0f;
+        return false;
     }
 }

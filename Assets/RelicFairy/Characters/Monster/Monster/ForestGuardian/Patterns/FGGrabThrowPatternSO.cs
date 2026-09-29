@@ -71,11 +71,6 @@ public class FGGrabThrowPatternSO : BossPatternSO
     [Tooltip("플레이어를 던지는 타이밍에 재생할 사운드")]
     public AudioClip throwSfx;
 
-    // ── 비주얼 ────────────────────────────────────────────
-    [Header("GrabThrow — Visual")]
-    [Tooltip("잡기 경고장판 프리팹 (FanMeshWarning 포함, 45°). null이면 effectPrefab 사용.")]
-    public GameObject warningZonePrefab;
-
     // ── 연계 패턴 ─────────────────────────────────────────
     [Header("GrabThrow — Combo Chain")]
     [Tooltip("잡기 성공 후 1페이즈에서 연계할 패턴 SO. null이면 연계 없음.")]
@@ -108,9 +103,6 @@ public class FGGrabThrowPatternSO : BossPatternSO
     }
 
     public override SpecialStateBase GetRuntimeState() => _state;
-
-    internal GameObject ResolveWarningPrefab()
-        => warningZonePrefab != null ? warningZonePrefab : effectPrefab;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -134,7 +126,6 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
     private PlayerController _heldPlayer;
     private Vector3          _bossForward;
     private GameObject       _warningGO;
-    private Vector3          _warningTargetScale;
 
     // Generic 리그 손 본 캐시 (GetBoneTransform은 Humanoid 전용이므로 이름 탐색 사용)
     private Transform _rightHandBone;
@@ -190,12 +181,9 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         switch (_phase)
         {
             case Phase.Windup:
-                // 경고 장판 서서히 커지기 (보스 기준 부채꼴 → 보스에서부터 서서히 확장)
-                if (_warningGO != null && Data.grabTime > 0f)
-                {
-                    float t = Mathf.Clamp01(_timer / Data.grabTime);
-                    _warningGO.transform.localScale = Vector3.Lerp(Vector3.zero, _warningTargetScale, t);
-                }
+                // 가이드 채우기 — 다 차는 순간이 잡기 판정(그 순간 치운다)
+                if (Data.grabTime > 0f)
+                    PatternGuideHelper.SetProgress(_warningGO, _timer / Data.grabTime);
                 if (_timer >= Data.grabTime)
                 {
                     DespawnWarning();
@@ -394,7 +382,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         if (ctx.Config?.stat != null)
         {
             int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.throwDamageMultiplier));
-            _heldPlayer.TakeDamage(dmg);
+            _heldPlayer.TakeDamage(dmg, ctx.Monster.gameObject, false, HitWeight.Heavy);   // 던지기 — 강
         }
 
         // 던지기 피해는 잡힘 해제 <b>후</b> 판정돼야 날아가는 자세가 정상 발동한다 —
@@ -421,7 +409,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         if (_heldPlayer == null || ctx.Config?.stat == null) return;
 
         int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.slamDamageMultiplier));
-        _heldPlayer.TakeDamage(dmg);
+        _heldPlayer.TakeDamage(dmg, ctx.Monster.gameObject);
     }
 
     // ── 플레이어 해제 ─────────────────────────────────────
@@ -445,22 +433,14 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
     // ── 경고장판 (45° 부채꼴) ─────────────────────────────
     private void SpawnWarning(MonsterContext ctx)
     {
-        var prefab = Data.ResolveWarningPrefab();
-        if (prefab == null) return;
-
-        Vector3 pos = ctx.Transform.position;
-        pos.y += 0.02f;
-        _warningTargetScale = new Vector3(Data.range, 1f, Data.range);
-        _warningGO = Managers.ObjectPooler.SpawnFromPrefab(prefab, ObjectPoolerManager.PoolType.Effect, pos, ctx.Transform.rotation);
-        _warningGO.transform.localScale = Vector3.zero;  // 처음엔 0 → Update에서 서서히 확장
+        // 부채꼴 = 잡기 판정(arcHalfAngle × 2) — 예전 경고 메시(45°)는 판정과 폭이 달랐다
+        _warningGO = PatternGuideHelper.Prepare(
+            PatternGuideHelper.Sector(ctx.Transform.position, Data.range, Data.arcHalfAngle * 2f, ctx.Transform.eulerAngles.y,
+                                      PatternGuideHelper.Telegraph),
+            ForestGuardianMonster.GuideFlow);
     }
 
-    private void DespawnWarning()
-    {
-        if (_warningGO == null) return;
-        Managers.ObjectPooler.Despawn(_warningGO);
-        _warningGO = null;
-    }
+    private void DespawnWarning() => PatternGuideHelper.SafeDestroy(ref _warningGO);
 
     // ── 뼈 탐색 (Generic 리그용 — GetBoneTransform 대체) ─
     private static Transform FindBone(Transform root, string boneName)

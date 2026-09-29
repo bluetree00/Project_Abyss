@@ -42,8 +42,9 @@ public class ShopRoomController : MonoBehaviour
 
     // ── Constants ───────────────────────────────────────────
     private const int MaxRarityFallbackAttempts = 4;
+    private const int MaxRerollsPerVisit = 1;   // 새로고침은 방문당 한 번 — 싸지만 무한히 돌려 원하는 걸 뽑는 곳이 아니다
     private const string PotionEntryId = "shop_potion";   // SHOP_DATA의 포션 엔트리 id(가격 원본)
-    private const float NpcStandHeight = 1f; // 앵커 없는 폴백 스폰 시 캡슐 바닥이 지면에 닿도록(캡슐 height=2의 절반).
+    private const float NpcStandHeight = 1f; // 캡슐 바닥(발)이 지면에 닿도록(캡슐 height=2의 절반) — 앵커 · 폴백 모두.
 
     /// <summary>NPC 앞 판매대까지의 거리(m) — 상인이 카운터 뒤에 선 구도.</summary>
     private const float CounterDistance = 2.5f;
@@ -61,6 +62,7 @@ public class ShopRoomController : MonoBehaviour
     private int _weaponSlotFallback;    // 매대 없는 방에서 무기 슬롯 수 폴백
     private bool _rerollEnabled;
     private int _rerollCost;
+    private int _rerollsUsed;
 
     private GameObject _npcInstance;
     private GameObject[] _decorPrefabs;   // [0]=판매대(NPC 정면), 나머지=뒤쪽 소품
@@ -80,6 +82,8 @@ public class ShopRoomController : MonoBehaviour
     public IReadOnlyList<ShopSlot> Slots => _slots;
     public int PlayerGold => _run?.PlayerState?.TempGold ?? 0;
     public bool RerollEnabled => _rerollEnabled;
+    /// <summary>이번 방문에 아직 새로고침을 쓸 수 있는가(켜져 있고 횟수가 남음).</summary>
+    public bool RerollAvailable => _rerollEnabled && _rerollsUsed < MaxRerollsPerVisit;
     public int RerollCost => _rerollCost;
 
     /// <summary>심연의 행상 정규 상품(6칸).</summary>
@@ -239,7 +243,7 @@ public class ShopRoomController : MonoBehaviour
     /// <summary>리롤. 비결정 RNG로 진열을 새로 롤. 피처 off거나 골드 부족이면 false.</summary>
     public bool TryReroll()
     {
-        if (!_rerollEnabled) return false;
+        if (!RerollAvailable) return false;
         var playerState = _run?.PlayerState;
         if (playerState == null) return false;
 
@@ -249,6 +253,7 @@ public class ShopRoomController : MonoBehaviour
             return false;
         }
 
+        _rerollsUsed++;
         _rerollRng ??= new System.Random();
         BuildSlots(_rerollRng); // 의도적 비결정 — 이어하기 복원 대상 아님
         _peddler = AbyssPeddlerCatalog.Build(_rerollRng);   // 상품 돌리기 = 행상 진열도 새로 롤
@@ -372,12 +377,13 @@ public class ShopRoomController : MonoBehaviour
     {
         CollectStalls(out Vector3 stallCenter, out bool hasStalls);
 
+        // 앵커는 바닥 높이 점이고 NPC 루트는 캡슐 한가운데다 — 앵커에도 서는 높이를 더해야 한다(안 더해 1.1 m 박혔다, 09-29).
         var anchor = GetComponentInChildren<ShopNpcAnchor>(true);
         if (anchor != null)
-            return (anchor.transform.position, anchor.transform.rotation);
+            return (ServiceRoomDecorPlacer.NpcStandPoint(anchor.transform.position, NpcStandHeight), anchor.transform.rotation);
 
         Vector3 pos = hasStalls ? stallCenter : transform.position;
-        pos.y += NpcStandHeight; // 앵커가 정확한 높이를 주므로 폴백에서만 보정.
+        pos.y += NpcStandHeight;
 
         // 매대 중심은 방 가장자리(벽)에 붙는 경우가 많다 → 고정 +Z가 아니라 가장 트인 쪽을 보게 한다.
         // (NPC가 벽을 보고 서거나, 카운터가 벽 안에 박히는 것을 방지)
@@ -714,7 +720,7 @@ public class ShopRoomController : MonoBehaviour
             // 비동기 무기 획득 + 교체 팝업. SOLD 확정은 획득 성공 이후로 미룬다.
             slot.Pending = true;
             OnShopChanged?.Invoke();
-            ProcessWeaponAcquisitionAsync(slot, wm, addressableKey, price, entry.target_id).Forget();
+            // [폐기 2026-09-15] 무기 판매 경로 제거 — 진열 데이터가 없어 도달 불가였다(위 429행 주석과 같은 건).
             return ShopPurchaseResult.PendingAsync;
         }
 
@@ -747,50 +753,7 @@ public class ShopRoomController : MonoBehaviour
         return ShopPurchaseResult.Success;
     }
 
-    private async UniTaskVoid ProcessWeaponAcquisitionAsync(ShopSlot slot, PlayerWeaponManager wm, string addressableKey, int price, string targetIdForLog)
-    {
-        var ct = this.GetCancellationTokenOnDestroy();
-        try
-        {
-            bool acquired = await wm.TryAcquireWeaponWithReplaceAsync(addressableKey, ct);
-            if (!acquired)
-            {
-                Debug.Log($"[ShopRoom] 무기 구매 취소/실패 — 환불: {targetIdForLog} ({price}G)");
-                _run?.PlayerState?.AddTempGold(price);
-                slot.Pending = false;
-                OnShopChanged?.Invoke();
-                return;
-            }
-            Debug.Log($"[ShopRoom] 무기 구매 성공: {targetIdForLog} ({price}G)");
-
-            slot.Pending = false;
-            slot.Sold = true;
-            RunFlowController.Active?.SaveNow("shop-purchase");   // S3: 구매 확정 → 즉시 저장
-            OnShopChanged?.Invoke();
-
-            // 다음 방에서 장비 유지되도록 세션에 즉시 저장
-            var slotData = new WeaponData[wm.SlotCount];
-            for (int i = 0; i < wm.SlotCount; i++)
-                slotData[i] = wm.slots[i]?.runtimeData;
-            _run.SaveWeaponSlots(slotData, wm.CurrentSlotIndex);
-        }
-        catch (OperationCanceledException)
-        {
-            _run?.PlayerState?.AddTempGold(price);
-            slot.Pending = false;
-            // 룸 파괴 중일 수 있으므로 이벤트는 안전 호출
-            OnShopChanged?.Invoke();
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"[ShopRoom] 무기 구매 처리 중 예외 — 환불: {ex.Message}");
-            _run?.PlayerState?.AddTempGold(price);
-            slot.Pending = false;
-            OnShopChanged?.Invoke();
-        }
-    }
-
-    private ShopPurchaseResult PurchaseFromLegacy(ShopSlot slot, ShopItemSO shopItem, PlayerRunState playerState)
+        private ShopPurchaseResult PurchaseFromLegacy(ShopSlot slot, ShopItemSO shopItem, PlayerRunState playerState)
     {
         if (shopItem == null || shopItem.Item == null) return ShopPurchaseResult.Unavailable;
 

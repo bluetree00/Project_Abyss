@@ -115,55 +115,46 @@ MonoBehaviour:
   _idleGazeVariance: 22
   _idleGazeInterval: 2.5
   _movementEntries:
+  - state: 8
+    minDist: -1
+    maxDist: -1
+    phase2Only: 0
+    pageMask: 0
+    minDuration: 2
+    maxDuration: 3.5
+    weight: 5
   - state: 0
     minDist: -1
     maxDist: -1
     phase2Only: 0
-    minDuration: 1.5
-    maxDuration: 2.5
-    weight: 1.5
+    pageMask: 0
+    minDuration: 1.2
+    maxDuration: 2
+    weight: 1
+  - state: 3
+    minDist: 5
+    maxDist: 12
+    phase2Only: 0
+    pageMask: 0
+    minDuration: 2
+    maxDuration: 3
+    weight: 1
   - state: 1
     minDist: 7
     maxDist: -1
-    phase2Only: 0
-    minDuration: 2
-    maxDuration: 4
-    weight: 3
-  - state: 3
-    minDist: 3
-    maxDist: 9
-    phase2Only: 0
-    minDuration: 2
-    maxDuration: 4
-    weight: 2.5
-  - state: 2
-    minDist: -1
-    maxDist: 3
-    phase2Only: 0
-    minDuration: 1
-    maxDuration: 2
-    weight: 3
-  - state: 4
-    minDist: 12
-    maxDist: -1
-    phase2Only: 0
-    minDuration: 1.5
-    maxDuration: 2.5
-    weight: 2
-  - state: 1
-    minDist: 5
-    maxDist: -1
     phase2Only: 1
+    pageMask: 0
     minDuration: 1.5
     maxDuration: 3
     weight: 2
-  - state: 3
-    minDist: 2
-    maxDist: 7
+  - state: 4
+    minDist: 11
+    maxDist: -1
     phase2Only: 1
-    minDuration: 2.5
-    maxDuration: 5
-    weight: 2
+    pageMask: 0
+    minDuration: 1.5
+    maxDuration: 2.5
+    weight: 1.5
   _postAttackDuration: 1.8
   _postAttackSpeedMult: 0.3
   _preferredRange: 5.5
@@ -1022,6 +1013,14 @@ MonoBehaviour:
     clothingActive: 0
     skirtSeparateActive: 0
     hoodDownActive: 0
+    hoodUpActive: 0
+  - formName: Phase2_Bound
+    bookActive: 1
+    bookssActive: 0
+    scytheEquipRootActive: 1
+    clothingActive: 1
+    skirtSeparateActive: 0
+    hoodDownActive: 1
     hoodUpActive: 0
   _dissolveInDuration: 1
 --- !u!1 &7659539928225782898 stripped

@@ -10,7 +10,14 @@ using UnityEngine;
 public sealed class CovenantHandler
 {
     // ── 상수 ────────────────────────────────────────────
+    /// <summary>
+    /// 서약 칸의 <b>절대 상한</b>(HUD 칸 수). 지금 맺을 수 있는 수는 <see cref="Capacity"/>다 —
+    /// 기억의 제단 「서약 칸 +1」 전에는 3이다.
+    /// </summary>
     public const int MaxCovenants = 4;
+
+    /// <summary>이번 런에 새로 맺을 수 있는 서약 수(3 → 해금 시 4).</summary>
+    public static int Capacity => MemoryAltarService.CovenantSlots;
 
     // ── 상태 ────────────────────────────────────────────
     private readonly List<CovenantBase> _covenants = new();
@@ -32,6 +39,7 @@ public sealed class CovenantHandler
     {
         _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
         _initialized = true;
+        CovenantFxService.Preload();   // 첫 발동에서 효과 VFX가 빠지지 않게
 
         foreach (var c in _covenants)
             c.Initialize(_ctx);
@@ -100,11 +108,19 @@ public sealed class CovenantHandler
     /// </param>
     private bool TryAdd(string covenantId, bool restoring)
     {
-        if (_covenants.Count >= MaxCovenants) return false;
+        // 복원은 절대 상한까지 받는다 — 칸이 3으로 줄기 전에 4개를 맺어 둔 세이브가 네 번째를 잃지 않게.
+        if (_covenants.Count >= (restoring ? MaxCovenants : Capacity)) return false;
         if (_covenants.Any(c => c.CovenantId == covenantId)) return false;
 
         var covenant = CovenantFactory.Create(covenantId);
         if (covenant == null) return false;
+
+        // 봉인된 짝·이미 가진 짝(등급 무관)은 새로 벼릴 수 없다. 조립 화면은 애초에 그런 조합을 제시하지 않지만
+        // 그것뿐이라, UI 밖 조립 진입점이 하나라도 생기면 그대로 들어온다 — 방어를 서비스단까지 내린다.
+        // 복원(restoring)은 통과시킨다: 이미 이 짝을 저장해 둔 런의 서약이 통째로 사라지기 때문이다.
+        if (!restoring && covenant is AssembledCovenant asm
+            && !CovenantPalette.CanPair(asm.CauseId, asm.EffectId, _covenants))
+            return false;
 
         if (_initialized)
             covenant.Initialize(_ctx);

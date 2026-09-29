@@ -14,6 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SkillSO
   skillName: "\uC131\uAD11\uBCA0\uAE30"
   description: "\uC804\uBC29 5m\uB97C \uBE60\uB974\uAC8C \uBCA0\uACE0 \uC9C0\uB098\uAC04\uB2E4."
-  icon: {fileID: 21300000, guid: 5932011b449ac234197ea8c6600fb8fe, type: 3}
+  icon: {fileID: 21300000, guid: 5126ffe6054592c4faa78505800067d6, type: 3}
+  iconTier2: {fileID: 21300000, guid: 71bde1751d16a0243a60afbf6dbc8755, type: 3}
+  iconTier3: {fileID: 21300000, guid: 62a181ea8cbddc446b0e9524effaa917, type: 3}
+  _tier2Change: "\uCD94\uAC00 \uBCA0\uAE30 3\uD68C(\uAC01 8+\uACF5\uACA9\uB825)"
+  _tier3Change: "\uB9C8\uBB34\uB9AC \uD3ED\uBC1C \uBC18\uACBD 3m(30+\uACF5\uACA9\uB825)"
   cooldown: 5
   behavior: {fileID: 11400000, guid: 0a86107e36f24eafba1e1157fe4ce158, type: 2}

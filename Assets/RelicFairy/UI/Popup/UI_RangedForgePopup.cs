@@ -166,7 +166,7 @@ public class UI_RangedForgePopup : UI_Popup
         _tag.text   = w.tagline ?? string.Empty;
         _tag.color  = e.Locked ? LockColor : SubColor;
 
-        _stats.text = e.Locked ? "<color=#8A6B6B>특전으로 해금되는 무기</color>" : StatBlock(w);
+        _stats.text = e.Locked ? "<color=#8A6B6B>기억의 제단에서 해금하는 무기</color>" : StatBlock(w);
 
         // ⚠️ 코드로 구운 스프라이트(UIProceduralSprites)는 <b>프리팹에 직렬화되지 않는다</b> —
         //    베이크된 프리팹에서는 null로 되살아나 각진 색판으로 보였다(2026-09-10 게임 화면의 초록 판때기).
@@ -178,9 +178,10 @@ public class UI_RangedForgePopup : UI_Popup
         }
 
         // 테마색으로 톤 통일 — 무대 배경 은은하게 물들이고, 확정 버튼도 이 색을 따른다.
+        // 0.08은 선형 색공간에서 어두운 판 위에 초록 상자로 보였다(09-28 UI 전수) — 은은하게.
         _stageGlow.color = e.Locked
-            ? new Color(LockColor.r, LockColor.g, LockColor.b, 0.05f)
-            : new Color(accent.r, accent.g, accent.b, 0.08f);
+            ? new Color(LockColor.r, LockColor.g, LockColor.b, 0.025f)
+            : new Color(accent.r, accent.g, accent.b, 0.035f);
 
         // 화살표 활성/비활성 — 양 끝에서 못 넘어감을 색으로 알린다.
         SetArrow(_prev, i > 0);
@@ -261,7 +262,7 @@ public class UI_RangedForgePopup : UI_Popup
     private void RefreshConfirm(Entry e, Color theme)
     {
         bool ok = !e.Locked;
-        if (_confirm != null) _confirm.interactable = ok;
+        if (_confirm != null) { _confirm.interactable = ok; UIAffordGlow.Set(_confirm, ok); }   // 고를 수 있으면 은은한 불(09-29)
         if (_confirmLabel != null)
             _confirmLabel.color = ok ? TitleColor : new Color(TitleColor.r, TitleColor.g, TitleColor.b, 0.35f);
         // 확정 버튼: 아트가 있으면 테마색을 곱하지 않는다(황동 명판이 파랗게 물든다) — 알파로만 잠금을 알린다.
@@ -469,8 +470,27 @@ public class UI_RangedForgePopup : UI_Popup
         {
             cancel.onClick.RemoveAllListeners();
             cancel.onClick.AddListener(Cancel);
+            FrameCancel(cancel.targetGraphic as Image);
         }
     }
+
+    /// <summary>
+    /// 취소 버튼에 옅은 둥근 테두리 — 틀 없는 회색 상자라 틀 있는 [장착하기] 옆에서 다른 화면 조각처럼 보였다(09-28 UI 전수).
+    /// 코드로 구운 스프라이트는 프리팹에 안 남으므로 쓰는 곳에서 한 번 붙인다.
+    /// </summary>
+    private static void FrameCancel(Image bg)
+    {
+        if (bg == null || bg.transform.Find("Frame") != null) return;
+        bg.sprite = UIProceduralSprites.RoundedRect(radius: 6f, feather: 1f);
+        bg.type   = Image.Type.Sliced;
+        var frame = NewImage("Frame", bg.rectTransform, CancelEdge);
+        Stretch(frame.rectTransform);
+        frame.sprite = UIProceduralSprites.RoundedOutline(radius: 6f, stroke: 1.5f);
+        frame.type   = Image.Type.Sliced;
+        frame.raycastTarget = false;
+    }
+
+    private static readonly Color CancelEdge = new(0.66f, 0.54f, 0.34f, 0.75f);
 
     /// <summary>
     /// 화살표 버튼. 아트가 있으면 판정면(box)은 투명하게 두고 <b>자식 이미지</b>에 아트를 얹는다 —
@@ -578,7 +598,7 @@ public class UI_RangedForgePopup : UI_Popup
         FixHeight(_badge.gameObject, 20f);
 
         // 한 줄 설명
-        _tag = NewText("Tag", stage, 14f, SubColor, FontStyles.Italic, TextAlignmentOptions.Center);
+        _tag = NewText("Tag", stage, 16f, SubColor, FontStyles.Italic, TextAlignmentOptions.Center);   // 글자 하한
         _tag.textWrappingMode = TextWrappingModes.NoWrap;
         _tag.overflowMode     = TextOverflowModes.Ellipsis;
         FixHeight(_tag.gameObject, 22f);
@@ -709,6 +729,7 @@ public class UI_RangedForgePopup : UI_Popup
         var t = NewText("L", cancelBg.rectTransform, skinned ? 18f : 22f, BodyColor, FontStyles.Bold, TextAlignmentOptions.Center);
         t.text = "취소";
         Stretch(t.rectTransform);
+        FrameCancel(cancelBg);
     }
 
     /// <summary>레이아웃 그룹이 늘리지 못하게 폭을 고정한다(min=preferred, flexible=0).</summary>

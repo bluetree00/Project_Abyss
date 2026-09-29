@@ -121,8 +121,8 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         if (_owner == null) return null;
         bool useLeft = data != null
             && (data.weaponType == WeaponType.Bow || data.weaponType == WeaponType.Crossbow)
-            && _owner.handTransformLeft != null;
-        return useLeft ? _owner.handTransformLeft : _owner.handTransform;
+            && _owner.HandTransformLeft != null;
+        return useLeft ? _owner.HandTransformLeft : _owner.HandTransform;
     }
 
     // 활/석궁 장착 방향 보정(도, Y축). <b>0 = 보정 없음이 정상</b>이다.
@@ -238,11 +238,11 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
                 bool useLeftHand = runtimeData.weaponType == WeaponType.Bow
                                 || runtimeData.weaponType == WeaponType.Crossbow;
                 Transform mountPoint = _owner != null
-                    ? (useLeftHand && _owner.handTransformLeft != null
-                        ? _owner.handTransformLeft
-                        : _owner.handTransform)
+                    ? (useLeftHand && _owner.HandTransformLeft != null
+                        ? _owner.HandTransformLeft
+                        : _owner.HandTransform)
                     : null;
-                Debug.Log($"[WeaponManager] Mount: type={runtimeData.weaponType}, useLeft={useLeftHand}, leftHand={_owner?.handTransformLeft?.name ?? "null"}, mount={mountPoint?.name ?? "null"}");
+                Debug.Log($"[WeaponManager] Mount: type={runtimeData.weaponType}, useLeft={useLeftHand}, leftHand={_owner?.HandTransformLeft?.name ?? "null"}, mount={mountPoint?.name ?? "null"}");
                 var instHandle = Addressables.InstantiateAsync(runtimeData.weaponPrefabKey, mountPoint);
                 await instHandle.Task;
                 if (instHandle.Status == AsyncOperationStatus.Succeeded && instHandle.Result != null)
@@ -415,109 +415,15 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     }
 
     // ----------------------
-    // 장비 획득 처리 (픽업 등 외부 호출)
-    // - HandlePickupAsync에서도 풀 초기화를 수행하도록 추가
+    // 장비 획득 처리 — 시작방 모루(WeaponForgeAltar) 경로
     // ----------------------
-    public async UniTask HandlePickupAsync(WeaponData runtimeData, WorldWeaponDisplay source = null)
-    {
-        if (runtimeData == null)
-        {
-            source?.CancelPickup();
-            return;
-        }
-
-        ApplyServerOverride(runtimeData);
-
-        int emptySlot = GetFirstEmptySlotIndex();
-
-        if (emptySlot >= 0)
-        {
-            // 빈 슬롯 있음: 바로 장착
-            _owned.Add(runtimeData);
-            source?.ConfirmPickup();
-            await EquipToSlotAsync(emptySlot, runtimeData, setActive: true);
-            return;
-        }
-
-        // 슬롯 2개 모두 차 있음 → 양쪽 비교 팝업
-        int? chosenSlot = await ShowReplacePromptAsync(runtimeData);
-        if (chosenSlot.HasValue)
-        {
-            _owned.Add(runtimeData);
-            source?.ConfirmPickup();
-            var replaced = await ReplaceSlotAsync(chosenSlot.Value, runtimeData);
-            if (replaced != null) Debug.Log($"Replaced {replaced.displayName}");
-        }
-        else
-        {
-            // 버리기: 월드 아이템 복원
-            source?.CancelPickup();
-            Debug.Log($"Pickup cancelled: {runtimeData.displayName}");
-        }
-    }
-
-    /// <summary>
+        /// <summary>
     /// 무기 획득 + 교체 팝업 통합 진입점.
     /// 빈 슬롯 있으면 자동 장착 → true.
     /// 꽉 차면 교체 팝업 띄우고 사용자 선택 시 교체 → true.
     /// 사용자가 버리기/취소 시 false (호출자가 환불 처리).
     /// </summary>
-    public async UniTask<bool> TryAcquireWeaponWithReplaceAsync(string weaponSOKey, CancellationToken ct = default)
-    {
-        if (string.IsNullOrEmpty(weaponSOKey)) return false;
-
-        AsyncOperationHandle<WeaponSO> handle = default;
-        try
-        {
-            handle = Addressables.LoadAssetAsync<WeaponSO>(weaponSOKey);
-            await handle.Task.AsUniTask().AttachExternalCancellation(ct);
-
-            if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
-                return false;
-
-            var runtime = WeaponData.FromSO(handle.Result);
-            // 차트 마스터 정책: weaponSOKey == weapon_id 컨벤션을 따라 차트 stats 덮어쓰기
-            ApplyServerOverrideIfAvailable(runtime, weaponSOKey);
-
-            await PreloadWeaponClipsAsync(runtime, ct);
-            ct.ThrowIfCancellationRequested();
-
-            int emptySlot = GetFirstEmptySlotIndex();
-            if (emptySlot >= 0)
-            {
-                _owned.Add(runtime);
-                await EquipToSlotAsync(emptySlot, runtime, setActive: true);
-                return true;
-            }
-
-            // 꽉 참 → 교체 팝업
-            int? chosenSlot = await ShowReplacePromptAsync(runtime);
-            ct.ThrowIfCancellationRequested();
-
-            if (!chosenSlot.HasValue)
-            {
-                Debug.Log($"[PlayerWeaponManager] 무기 획득 취소(버리기): {runtime.displayName}");
-                return false;
-            }
-
-            _owned.Add(runtime);
-            var replaced = await ReplaceSlotAsync(chosenSlot.Value, runtime);
-            if (replaced != null) Debug.Log($"[PlayerWeaponManager] Replaced {replaced.displayName}");
-            return true;
-        }
-        catch (OperationCanceledException)
-        {
-            Debug.Log("[PlayerWeaponManager] TryAcquireWeaponWithReplaceAsync 취소됨");
-            return false;
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"[PlayerWeaponManager] TryAcquireWeaponWithReplaceAsync 실패: {ex.Message}");
-            return false;
-        }
-    }
-
-    private static async UniTask PreloadWeaponClipsAsync(WeaponData data, CancellationToken ct)
+        private static async UniTask PreloadWeaponClipsAsync(WeaponData data, CancellationToken ct)
     {
         var animSet = data?.animationSet;
         if (animSet == null || !Managers.AnimationResources.IsInitialized) return;
@@ -533,84 +439,10 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             await Managers.AnimationResources.PreloadClipsAsync(keys).AttachExternalCancellation(ct);
     }
 
-    private async UniTask<int?> ShowReplacePromptAsync(WeaponData newWeapon)
-    {
-        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_WeaponReplacePopup>();
-        if (popup == null)
-        {
-            Debug.LogWarning("[PlayerWeaponManager] UI_WeaponReplacePopup 로드 실패, 자동 교체");
-            return Slot0;
-        }
-
-        popup.Setup(slots[Slot0].runtimeData, slots[Slot1].runtimeData, newWeapon);
-        return await popup.WaitForChoiceAsync();
-    }
-
-    // ----------------------
-    // 슬롯 교체
-    // ----------------------
-    public async UniTask<WeaponData> ReplaceSlotAsync(int slotIndex, WeaponData newRuntime)
-    {
-        if (_isSwitching) return null;
-        _isSwitching = true;
-
-        try
-        {
-            if (slotIndex < 0 || slotIndex >= SlotCount) return null;
-            var slot = slots[slotIndex];
-            var old = slot.runtimeData;
-
-            // ---------- 1) 버린 무기를 월드에 드랍 ----------
-            if (old != null && _owner != null)
-            {
-                var dropPos = _owner.transform.position + _owner.transform.right * 1.5f;
-                WorldWeaponDisplay.SpawnFromData(old, dropPos);
-            }
-            _owned.Remove(old);
-
-            // ---------- 2) 기존 인스턴스 정리 (Addressables 인스턴스는 ReleaseInstance 호출) ----------
-            if (slot.instance != null)
-            {
-                try
-                {
-                    if (slot.isAddressablesInstance)
-                    {
-                        Addressables.ReleaseInstance(slot.instance);
-                    }
-                    else
-                    {
-                        // 런타임 생성된 일반 인스턴스이면 파괴
-                        UnityEngine.Object.Destroy(slot.instance);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"[PlayerWeaponManager] Failed to release/ destroy old weapon instance: {ex.Message}");
-                }
-                finally
-                {
-                    slot.instance = null;
-                    slot.isAddressablesInstance = false;
-                }
-            }
-
-            // ---------- 3) 슬롯 데이터 교체 ----------
-            slot.runtimeData = newRuntime;
-
-            // ---------- 4) 새 장비를 즉시 장착(활성화)하고 애니메이션/이벤트 트리거 발생시키기 ----------
-            // EquipToSlotAsync 내부에서 instance 생성 및 SetCurrentSlotInternalAsync 호출됨
-            await EquipToSlotAsync(slotIndex, newRuntime, true);
-
-            return old;
-        }
-        finally
-        {
-            _isSwitching = false;
-        }
-    }
-
-
-    // ----------------------
+        // [폐기 2026-09-15] 바닥 무기 줍기 갈래 제거 — HandlePickupAsync·TryAcquireWeaponWithReplaceAsync·
+    //   ShowReplacePromptAsync·ReplaceSlotAsync를 걷어냈다. 진입이던 WP(무기 픽업) 토큰이 실전 맵에 0건이고,
+    //   상점 무기 판매도 데이터가 없어 도달 불가였다. 무기 장착은 EquipToSlotAsync(모루 경로)만 남는다.
+        // ----------------------
     // 진화 (파생 분기) — 제자리 교체
     // ----------------------
 
@@ -618,8 +450,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     /// 현재 장착 무기를 진화시킨다. 분기의 target WeaponSO로 <b>통째 교체</b>된다
     /// (외형·무브셋·스킬·아이콘·이름·타입·스탯 전부).
     ///
-    /// ReplaceSlotAsync와 다른 점 — <b>기존 무기를 월드에 떨어뜨리지 않는다.</b>
-    /// 진화는 '교체'가 아니라 '변신'이므로 원본은 사라진다.
+    /// 진화는 '교체'가 아니라 '변신'이므로 원본은 사라진다(월드에 떨어뜨리지 않는다).
     ///
     /// 강화 레벨(enhanceLevel)은 <b>계승</b>하고, 승급(legendId)은 진화가 대체하므로 초기화한다.
     /// </summary>
@@ -650,6 +481,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             //    승급(legendId)은 진화가 대체하므로 넘기지 않는다(빈 값 유지).
             evolved.enhanceLevel   = current.enhanceLevel;
             evolved.evolutionStage = current.evolutionStage + 1;   // 상한이 한 구간 열린다(마스터리 시작)
+            evolved.engravings     = current.engravings;            // 각인도 계승 — id가 스킬 전용이라 다른 스킬에선 무해하다
             evolved.RecomputeEnhancedStats();
 
             // 3) 새 무브셋 클립 프리로드 — 안 하면 진화 직후 첫 공격이 빈 클립으로 나간다.

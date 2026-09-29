@@ -19,8 +19,8 @@ public static class HUDIds
         Combat = 20,    // 일반 전투
         Boss = 30,      // 보스전
         Cutscene = 40,  // 컷씬
-        Spectate = 50,  // 관전
-        Puzzle   = 60,  // 퍼즐 / 그리드 시너지
+        BossCutscene = 45,  // 보스 페이즈 전환 컷신 — 보스 HP바만 남긴다(바가 차오르는 걸 보여 준다)
+        // 50 관전 · 60 퍼즐은 켜는 곳이 없어 걷었다(09-28 HUD 레거시 정리) — 번호는 다시 쓰지 않는다.
     }
 
     // ---------------------------------------------------------
@@ -33,10 +33,10 @@ public static class HUDIds
 
         TopBar          = 1 << 0,
         CombatPanel     = 1 << 1,
-        GridPanel       = 1 << 2,
         BossPanel       = 1 << 3,
-        SystemNotices   = 1 << 4,
         Minimap         = 1 << 5,
         CovenantPanel   = 1 << 6,
+        // 1<<2 GridPanel · 1<<4 SystemNotices는 배선된 판이 없어(0) 켜도 아무 일이 없었다 — 걷음(09-28).
+        // 시스템 알림은 CombatPanelView.ShowBuffNotice 한 칸이 맡는다.
     }
 }

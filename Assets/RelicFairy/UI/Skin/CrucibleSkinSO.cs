@@ -64,4 +64,21 @@ public sealed class CrucibleSkinSO : ScriptableObject
     [Header("재화")]
     public Sprite currencySlot;  // 재화 칸
     public Sprite currencyGem;   // 재화 보석
+
+    // ── 재련소 개편(2026-09-20) ──
+    [Header("개편 — 단계 방패 · 재화 칸(HUD 공용)")]
+    [Tooltip("강화 표기 — 무기 칸 위 단계 방패(266×201).")]
+    [SerializeField] private Sprite levelTag;
+    [Tooltip("HUD 칸_바탕 — 재화 칸을 HUD와 같은 조각으로 그린다.")]
+    [SerializeField] private Sprite currencyInner;
+    [Tooltip("HUD 칸_테두리 — 재화색으로 물든다.")]
+    [SerializeField] private Sprite currencyFrame;
+    [SerializeField] private Sprite materialIcon;   // HUD 아이콘_강화재료
+    [SerializeField] private Sprite oreIcon;        // HUD 아이콘_원석
+
+    public Sprite LevelTag      => levelTag;
+    public Sprite CurrencyInner => currencyInner;
+    public Sprite CurrencyFrame => currencyFrame;
+    public Sprite MaterialIcon  => materialIcon;
+    public Sprite OreIcon       => oreIcon;
 }

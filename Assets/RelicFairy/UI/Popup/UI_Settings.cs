@@ -56,10 +56,11 @@ public sealed class UI_Settings : MonoBehaviour
     private static readonly Color PanelEdge   = new(0.52f, 0.72f, 0.86f, 0.85f);
     private static readonly Color CtrlBg      = new(0.16f, 0.19f, 0.27f, 1f);
     private static readonly Color TrackBg     = new(0.05f, 0.06f, 0.09f, 1f);
-    private static readonly Color TrackFill   = new(0.42f, 0.62f, 0.82f, 1f);
+    // 강조는 금 계열로 — 하늘색 게이지 · 청회색 제목이 이 화면만 따로 놀았다(09-28 UI 톤 통일, 청색은 무기 전용).
+    private static readonly Color TrackFill   = UITheme.CtaTint;
     private static readonly Color HandleColor = new(0.88f, 0.93f, 1f, 1f);
-    private static readonly Color LabelColor  = new(0.94f, 0.96f, 1f, 1f);
-    private static readonly Color SectionColor= new(0.62f, 0.74f, 0.88f, 1f);
+    private static readonly Color LabelColor  = UITheme.Ink;
+    private static readonly Color SectionColor= new(0.86f, 0.74f, 0.50f, 1f);
     private static readonly Color TitleColor  = UIPalette.Gold;
     private static readonly Color ConfirmColor = new(0.20f, 0.34f, 0.50f, 1f);   // 확정 = 강조
     private static readonly Color CancelColor  = new(0.16f, 0.17f, 0.22f, 1f);   // 되돌림 = 보조
@@ -70,6 +71,7 @@ public sealed class UI_Settings : MonoBehaviour
     // ── Private ──────────────────────────────────────────────
     private GameObject _root;
     private bool _builtWithSkin;   // Build() 시점에 UISkin.Settings가 있었는가
+    private RectTransform _panelRt;   // 열고 닫을 때 살짝 커지는 판(UIFader)
 
     private Slider _masterSlider, _bgmSlider, _sfxSlider, _uiSlider;
     private TMP_Text _masterValue, _bgmValue, _sfxValue, _uiValue;
@@ -98,7 +100,7 @@ public sealed class UI_Settings : MonoBehaviour
     private bool _graphicsDirty;       // 렌더 스케일 드래그 중 미뤄 둔 저장이 남아 있는가
 
     // ── Properties ───────────────────────────────────────────
-    public bool IsOpen => _root != null && _root.activeSelf;
+    public bool IsOpen => _root != null && (_root.TryGetComponent<UIFader>(out var f) ? f.Visible : _root.activeSelf);
 
     // ── Lifecycle ────────────────────────────────────────────
 
@@ -189,7 +191,7 @@ public sealed class UI_Settings : MonoBehaviour
         _entryCaptured = true;
 
         RefreshFromSystems();
-        _root.SetActive(true);
+        UIFader.On(_root, _panelRt).Show();   // 순간 등장 → 공통 박자(09-28)
         _root.transform.SetAsLastSibling();
     }
 
@@ -219,7 +221,7 @@ public sealed class UI_Settings : MonoBehaviour
             _entryCaptured = false;
         }
 
-        if (_root != null) _root.SetActive(false);
+        if (_root != null) UIFader.On(_root, _panelRt).Hide();
     }
 
     /// <summary>
@@ -392,6 +394,7 @@ public sealed class UI_Settings : MonoBehaviour
         prt.anchorMin = prt.anchorMax = prt.pivot = new Vector2(0.5f, 0.5f);
         prt.anchoredPosition = Vector2.zero;
         prt.sizeDelta = new Vector2(PanelW, PanelH);
+        _panelRt = prt;
 
         if (skin?.panel != null)
         {
@@ -573,25 +576,27 @@ public sealed class UI_Settings : MonoBehaviour
 
         float cy = -PanelH * 0.5f + BottomPad + H * 0.5f;
         var skin = UISkin.Settings;
-        MakeBottomButton(panel, "Btn_Cancel",  "취소", new Vector2(-(W + Gap) * 0.5f, cy), W, H, CancelColor,  CloseInternal,   skin?.cancelButton);
-        MakeBottomButton(panel, "Btn_Confirm", "완료", new Vector2( (W + Gap) * 0.5f, cy), W, H, ConfirmColor, ConfirmInternal, skin?.applyButton);
+        // 버튼은 전 화면 같은 베벨(금 = 확정 · 먹빛 = 되돌림) — 납품 남색 판 대신(09-28 UI 톤 통일). 베벨이 없으면 스킨 아트.
+        MakeBottomButton(panel, "Btn_Cancel",  "취소", new Vector2(-(W + Gap) * 0.5f, cy), W, H, CancelColor,  CloseInternal,   skin?.cancelButton, UITheme.SecondaryTint);
+        MakeBottomButton(panel, "Btn_Confirm", "완료", new Vector2( (W + Gap) * 0.5f, cy), W, H, ConfirmColor, ConfirmInternal, skin?.applyButton,  UITheme.CtaTint);
     }
 
     private static void MakeBottomButton(Transform panel, string name, string label, Vector2 pos,
                                          float w, float h, Color fill, UnityEngine.Events.UnityAction onClick,
-                                         Sprite art = null)
+                                         Sprite art, Color themeTint)
     {
         var img = NewImage(name, panel, fill);
-        if (art != null)
+        var rt = img.rectTransform;
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = pos;
+        rt.sizeDelta = new Vector2(w, h);
+        if (UITheme.ButtonBevel != null) UITheme.StyleButton(img, themeTint);
+        else if (art != null)
         {
             img.sprite = art;
             img.type   = Image.Type.Sliced;
             img.color  = Color.white;
         }
-        var rt = img.rectTransform;
-        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = pos;
-        rt.sizeDelta = new Vector2(w, h);
 
         var btn = img.gameObject.AddComponent<Button>();
         btn.targetGraphic = img;
@@ -686,9 +691,10 @@ public sealed class UI_Settings : MonoBehaviour
         var fill = NewImage("Fill", fillArea.transform, TrackFill);
         if (skin?.gaugeFill != null)
         {
-            fill.sprite = skin.gaugeFill;
+            // 게이지 아트는 하늘색이 구워져 있다 — 무채색 원본에 금을 입힌다(09-28 UI 톤 통일).
+            fill.sprite = UISpriteMaster.Neutral(skin.gaugeFill);
             fill.type   = Image.Type.Sliced;
-            fill.color  = Color.white;
+            fill.color  = TrackFill;
         }
         var fRt = fill.rectTransform;
         fRt.anchorMin = new Vector2(0f, 0f);

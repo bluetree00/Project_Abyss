@@ -229,8 +229,10 @@ public class DormantPatrolStateSO : MonsterStateOverrideSO
         /// <summary>Rigidbody/Agent 물리 완전 정지.</summary>
         private static void StopPhysics(MonsterContext ctx)
         {
+            // 몬스터 바디는 평소 kinematic(에이전트가 위치를 쥔다) — kinematic에 속도를 넣으면 경고만 나고 효과는 없다.
+            // 잠복 몬스터(선인장·성난 버섯)가 잠복할 때마다 경고 한 쌍이 찍혀 Ch2 방 경고 집계를 오염시켰다(09-24).
             var rb = ctx.Monster.GetComponent<Rigidbody>();
-            if (rb != null)
+            if (rb != null && !rb.isKinematic)
             {
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;

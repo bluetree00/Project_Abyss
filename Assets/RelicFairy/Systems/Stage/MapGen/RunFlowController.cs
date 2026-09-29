@@ -36,8 +36,9 @@ public class RunFlowController : MonoBehaviour
     private int _seed;
 
     [Header("전환 연출 (방 진입 와이프)")]
-    [SerializeField, Tooltip("덮기 시간(초). 텔레포트만 가리게 짧게.")]   private float          _coverDuration  = 0.12f;
-    [SerializeField, Tooltip("드러내기 시간(초). 복귀 후 디졸브로 생성 노출.")] private float          _revealDuration = 0.20f;
+    // 09-26: 0.12/0.20초는 화면이 「갑자기」 덮였다(사용자) — 잉크 와이프가 페이드와 함께 번질 시간을 준다.
+    [SerializeField, Tooltip("덮기 시간(초). 페이드와 함께 번진다 — 너무 짧으면 순간 등장으로 읽힌다.")]   private float          _coverDuration  = 0.30f;
+    [SerializeField, Tooltip("드러내기 시간(초). 복귀 후 디졸브로 생성 노출.")] private float          _revealDuration = 0.45f;
     [SerializeField, Tooltip("디졸브 시작 후 복귀까지 지연(초). 디졸브 진행 중에 들어가게.")] private float _revealDelay = 0.3f;
     [SerializeField] private AnimationCurve _coverCurve  = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
     [SerializeField] private AnimationCurve _revealCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
@@ -68,9 +69,13 @@ public class RunFlowController : MonoBehaviour
     // 반대로 무조건 되살리면 이미 받은 보상까지 다시 줘 이중지급이 된다. 수령 시점에 false로 내린다.
     private bool     _currentRoomRewardPending;
     private bool     _resumedRewardPending; // 이어하기: 저장 당시 미수령 보상이 있었는가(1회성)
-    private DoorPlan _lastPlan;             // 재저장(S2/S3)용 방 정보 캐시
-    private DoorEdge _lastEdge;
-    private int      _lastMirror;
+    // 세이브 규칙(09-25 사용자 결정): <b>챕터 시작 한 번만</b> 저장한다. 챕터 첫 방에 들어서기 직전에 켜고,
+    // 그 방 입장 끝에서 저장하며 끈다. 방마다 저장하던 시절엔 망한 방에서 게임을 껐다 켜 되감을 수 있었다.
+    private bool     _chapterCheckpointPending;
+
+    // 지금 방의 계획. ⚠️ 런 구조 자동 실측(RunStructureAutoPlayEditor)이 <b>리플렉션으로</b> 읽는다 —
+    // 코드 검색에 안 걸리니 이름을 바꾸거나 지우면 그 도구가 매 틱 NRE를 낸다(09-25 실제로 났다).
+    private DoorPlan _lastPlan;
     private bool     _hasLastPlan;
     private readonly List<GateView>      _gates = new();
     private GameObject                   _entranceLock;
@@ -121,8 +126,10 @@ public class RunFlowController : MonoBehaviour
     /// <summary>절차 런 시작 — 풀 로드 → 시퀀서 생성 → 첫 방 진입.
     /// anchor: 방을 빌드할 고정 월드 위치(허브와 겹치지 않게 먼 곳). null이면 _anchor 또는 원점.
     /// poolKeyOverride: 챕터별 룸 풀 키(CHAPTER_N_ROOM_POOL). 비우면 직렬화된 _poolKey 사용.
-    /// structureKeyOverride: 챕터별 레벨 스파인 키(CHAPTER_N_RUN_STRUCTURE). 비우면 _structureConfigKey 공유 기본.</summary>
-    public async UniTask StartRunAsync(Vector3? anchor = null, string poolKeyOverride = null, string structureKeyOverride = null)
+    /// structureKeyOverride: 챕터별 레벨 스파인 키(CHAPTER_N_RUN_STRUCTURE). 비우면 _structureConfigKey 공유 기본.
+    /// startAtBossApproach: 테스트 허브 전용 — 일반 방 없이 보스 대기방(PreBoss)부터 시작한다.</summary>
+    public async UniTask StartRunAsync(Vector3? anchor = null, string poolKeyOverride = null, string structureKeyOverride = null,
+                                       bool startAtBossApproach = false)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
         var ct = _cts.Token;
@@ -147,6 +154,21 @@ public class RunFlowController : MonoBehaviour
         _runPlan    = _sequencer.BuildPlan(); // 시작 시 전체 일정표 1회 산출(시드+config 순수 함수)
         DumpRunPlan(seed);
 
+        if (startAtBossApproach)
+        {
+            // 진입을 문 통과와 똑같이 확정해야 이 방의 출구가 보스방으로 나온다.
+            var approach = _sequencer.BeginBossApproach();
+            if (approach.entry != null)
+            {
+                _sequencer.CommitEntry(approach);
+                Debug.Log($"[RunFlow] 테스트: 보스 대기방 직행 — {approach.entry.pool_key}");
+                _chapterCheckpointPending = true;   // 이 런(챕터)의 첫 방
+                await EnterRoomAsync(approach, DoorEdge.North, ct);
+                return;
+            }
+            Debug.LogWarning("[RunFlow] 테스트: 풀에 보스 대기방이 없다 — 일반 시작으로 진행");
+        }
+
         var startEntry = FindStartEntry();
         if (startEntry == null)
         {
@@ -154,6 +176,7 @@ public class RunFlowController : MonoBehaviour
             return;
         }
 
+        _chapterCheckpointPending = true;   // 챕터 첫 방 — 여기만 저장한다(챕터마다 씬을 새로 여는 경로·무한 루프 회귀 포함)
         await EnterRoomAsync(new DoorPlan { kind = RoomPlanKind.Normal, entry = startEntry }, DoorEdge.North, ct);
     }
 
@@ -194,6 +217,8 @@ public class RunFlowController : MonoBehaviour
             resumeSession.RestoreAltarProgress(meta.metaReviveUsed, meta.killCount, meta.eliteKillCount, meta.bossKillCount,
                                                meta.shopUseCount, meta.refineUseCount, meta.maxEnhanceLevel,
                                                meta.potionUsedThisRun, meta.specialRoomVisits, meta.flawlessChapters);
+            // 순환 중 저장이면 깊이도 되돌린다 — 방을 짓기 전에 해야 몬스터 배율이 맞는다.
+            resumeSession.RestoreAbyssDepth(meta.abyssDepth);
         }
 
         var key = !string.IsNullOrEmpty(poolKey) ? poolKey : _poolKey;
@@ -279,6 +304,7 @@ public class RunFlowController : MonoBehaviour
             return;
         }
 
+        _chapterCheckpointPending = true;   // 다음 챕터 첫 방 — 체크포인트
         await EnterRoomAsync(new DoorPlan { kind = RoomPlanKind.Normal, entry = startEntry }, DoorEdge.North, ct);
         Debug.Log($"[RunFlow] 챕터 {chapterNum} 진행 시작 — pool={key}");
     }
@@ -445,7 +471,12 @@ public class RunFlowController : MonoBehaviour
         // ⚠️ <b>절대 await 하지 않는다.</b> 이 뒤로 입력 잠금 해제(SetPlayerInput(true))까지 이어지므로
         //    기다리면 베일 시간만큼 플레이어가 문 앞에서 못 움직인다. 순수 연출이라 배경에서 흘려보낸다.
         //    (ct에 묶여 있고 finally에서 안개를 원복하므로 방 전환이 끊겨도 정리는 보장된다.)
-        EntranceFogVeil.PlayAsync(FogVeilClearSeconds, ct).Forget();
+        // 보스방은 아레나가 연출 스위치를 가진다 — 커스텀 아레나엔 가릴 조립이 없어 베일을 끌 수 있다.
+        var bossRoom = plan.kind == RoomPlanKind.Boss && result.roomGO != null
+            ? result.roomGO.GetComponentInChildren<BossRoomController>(true)
+            : null;
+        if (bossRoom == null || !bossRoom.SuppressEntryFogVeil)
+            EntranceFogVeil.PlayAsync(FogVeilClearSeconds, ct).Forget();
 
         if (_revealDelay > 0f)
             await UniTask.Delay(TimeSpan.FromSeconds(_revealDelay), ignoreTimeScale: true, cancellationToken: ct);
@@ -456,13 +487,10 @@ public class RunFlowController : MonoBehaviour
         if (this == null || ct.IsCancellationRequested) { SetPlayerInput(true); return; }
 
         // 방 입장 대사 이벤트 — 보스룸 등 특정 방 진입 시 챕터별/방문변형 대사 재생.
-        await PlayRoomEntryDialogueAsync(plan.kind, ct);
+        await PlayRoomEntryDialogueAsync(plan.kind, bossRoom != null && bossRoom.EntryDialogueAsBark, ct);
         if (this == null || ct.IsCancellationRequested) { SetPlayerInput(true); return; }
 
-        // 재저장(S2/S3)용 캐시 — 방 정보를 들고 있어야 임의 시점에 다시 저장할 수 있다.
         _lastPlan    = plan;
-        _lastEdge    = fromEdge;
-        _lastMirror  = mirrorRoll;
         _hasLastPlan = true;
 
         // 새 방 진입 → 방 스코프 상태 리셋. (이어하기 재생성 중에는 복원값을 덮지 않는다)
@@ -472,6 +500,17 @@ public class RunFlowController : MonoBehaviour
             _currentRoomRewardPending = false;
             var s = GameRunBootstrapper.Instance?.Run;
             if (s != null) s.CrucibleRollIndex = 0;   // 방마다 시드가 다르므로 롤 카운터도 새로
+        }
+
+        // 챕터 체크포인트 — 세이브는 챕터 첫 방에서 이 한 번뿐이다(09-25 사용자 결정). 챕터 도중에 끄면 여기로 돌아온다.
+        // 자리가 중요하다: 방 단위 초기화 <b>뒤</b>(앞 방의 cleared가 안 실리게), 클리어 처리 <b>앞</b>(출구를 굴리기 전 상태 —
+        // 비전투 시작 방은 곧바로 클리어되어 출구를 굴리므로, 그 뒤에 저장하면 이어하기에서 한 번 더 굴린다).
+        // 죽으면 세이브는 런 종료 경로(ClearLocalRun)가 지운다. 이어하기 재생성 중에는 생략.
+        if (!_resuming && _chapterCheckpointPending)
+        {
+            _chapterCheckpointPending = false;
+            SaveRunState(plan, fromEdge, mirrorRoll);
+            Debug.Log("[RunFlow] 챕터 체크포인트 저장");
         }
 
         // 이어하기 + '저장 당시 이미 클리어된 방'이면 몬스터를 다시 스폰하지 않고 출구만 연다.
@@ -600,20 +639,13 @@ public class RunFlowController : MonoBehaviour
                 HandleRoomCleared();
             }
         }
-
-        // 방 경계 자동저장 (suspend-on-save). 이어하기 재생성 중에는 생략(동일 상태 재저장 방지).
-        if (!_resuming)
-            SaveRunState(plan, fromEdge, mirrorRoll);
     }
 
-    /// <summary>현재 진행 상태를 즉시 저장한다(S2 클리어 직후 / S3 행동·이벤트 확정 시).
-    /// 방 정보는 마지막 방 빌드 시점 캐시를 재사용하므로 방 경계가 아니어도 안전하다.</summary>
-    public void SaveNow(string reason)
-    {
-        if (_resuming || !_hasLastPlan) return;   // 복원 중 재저장 방지
-        SaveRunState(_lastPlan, _lastEdge, _lastMirror);
-        Debug.Log($"[RunFlow] 자동저장 — {reason}");
-    }
+    /// <summary>
+    /// 챕터 도중 저장 요청(방 클리어·보상·서약·재련소·게임 종료). <b>세이브 규칙 변경(09-25)으로 아무것도 쓰지 않는다</b> —
+    /// 저장은 챕터 첫 방 체크포인트 한 번뿐이고, 챕터 도중에 끄면 그 챕터 처음으로 돌아간다(되감기 차단).
+    /// </summary>
+    public void SaveNow(string reason) { }
 
     /// <summary>클리어 보상 오브젝트가 방에 세워졌다(아직 미수령). RoomClearGate가 호출.
     /// 여기서 한 번 더 저장해야 "클리어 저장(보상 스폰 전) → 종료"에서 보상이 사라지지 않는다.</summary>
@@ -629,7 +661,8 @@ public class RunFlowController : MonoBehaviour
     public void NotifyClearRewardClaimed() => _currentRoomRewardPending = false;
 
     /// <summary>방 입장 대사 이벤트. 현재는 보스룸만 — 챕터별 BossRoom_Ch{N}_Enter를 방문변형(첫/반복)으로 재생.</summary>
-    private async UniTask PlayRoomEntryDialogueAsync(RoomPlanKind kind, CancellationToken ct)
+    /// <param name="asBark">true면 대사창 대신 자막으로 — 입력을 막지 않고 걸으면서 듣는다(보스방 공용 연출 스위치).</param>
+    private async UniTask PlayRoomEntryDialogueAsync(RoomPlanKind kind, bool asBark, CancellationToken ct)
     {
         if (kind != RoomPlanKind.Boss) return;
 
@@ -640,6 +673,21 @@ public class RunFlowController : MonoBehaviour
         var chapter = GameRunBootstrapper.Instance?.Run?.CurrentChapter ?? ChapterId.Chapter1;
         var lines = dlg.GetVisitLines($"BossRoom_Ch{(int)chapter}_Enter");
         if (lines == null || lines.Length == 0) return;
+
+        if (asBark)
+        {
+            var loadingOverlay = UI_SceneLoading.Instance;
+            if (loadingOverlay != null) await loadingOverlay.HideAsync();
+            foreach (var line in lines)
+            {
+                if (line == null || string.IsNullOrEmpty(line.text)) continue;
+                bool narration = line.speaker == DialogueSpeaker.Merlin || line.speaker == DialogueSpeaker.Shadow;
+                RelicFairy.UI.UI_BossBark.Show(line.text,
+                    narration ? RelicFairy.UI.BossBarkType.MerlinNarration : RelicFairy.UI.BossBarkType.Bark,
+                    line.speaker);
+            }
+            return;
+        }
 
         // 선택/편집 UI가 열려있으면 닫힐 때까지 대기 후 대사.
         await Managers.UI.WaitUntilNoBlockingPopupAsync();
@@ -703,6 +751,7 @@ public class RunFlowController : MonoBehaviour
             shopUseCount       = session.ShopUseCount,
             refineUseCount     = session.RefineUseCount,
             maxEnhanceLevel    = session.MaxEnhanceLevel,
+            abyssDepth         = session.AbyssDepth,
             cooldowns          = cooldowns,
         };
 
@@ -1119,6 +1168,9 @@ public class RunFlowController : MonoBehaviour
 
     /// <summary>들어온 입구를 잠금 패널로 막는다 (되돌아가기 차단). 가벼운 잠금 페이드인 연출.</summary>
     // SM_ArchWall_01a 석문 메시 로컬 바운드(m) — 개구부에 맞춰 스케일 계산용.
+    /// <summary>문틀 프리팹을 제작한 기준 개구부(가로·세로). 실제 개구부와의 비로 균등 배율을 낸다.</summary>
+    private const float FrameRefW = 20f;
+    private const float FrameRefH = 12f;
     private const float SealDoorMeshW = 7f;
     private const float SealDoorMeshH = 11.5f;
 
@@ -1140,6 +1192,25 @@ public class RunFlowController : MonoBehaviour
         if (doorTr != null && lockMarker != null) lockMarker.enabled = false;
 
         LockEntranceAsync(_entranceLock, doorTr, oh).Forget();
+    }
+
+    /// <summary>출구 문틀(기둥·상인방·화로)을 개구부에 맞춰 세운다. 프리팹은 20×12 m 기준으로 제작한다.
+    /// 석문·포탈과 달리 <b>항상 보이는</b> 구조물이라, 문이 열린 뒤에도 출구 위치가 읽힌다.
+    /// 세로·가로를 따로 늘이면 기둥이 찌그러지므로 <b>균등 배율</b>만 쓴다.</summary>
+    private void SpawnGateFrame(Transform parent, float ow, float oh)
+    {
+        var framePrefab = _current?.gateFramePrefab;
+        if (framePrefab == null) return;
+
+        var frame = Instantiate(framePrefab, parent);
+        frame.name = "GateFrame";
+        frame.transform.localPosition = Vector3.zero;
+        frame.transform.localRotation = Quaternion.identity;
+        float k = Mathf.Min(ow / FrameRefW, oh / FrameRefH);
+        frame.transform.localScale = new Vector3(k, k, k);
+
+        // 통과 차단은 게이트 blocker가 맡는다 — 문틀 콜라이더는 플레이어를 걸리게만 하므로 제거.
+        foreach (var col in frame.GetComponentsInChildren<Collider>()) Destroy(col);
     }
 
     /// <summary>봉인 석문(Gothic 석재)을 개구부 크기에 맞춰 닫힘 위치에 인스턴스화. 프리팹 없으면 null.</summary>
@@ -1280,6 +1351,10 @@ public class RunFlowController : MonoBehaviour
         // 시각은 석문이 담당 — 색 패널은 통과 차단 콜라이더 역할만, 렌더러는 항상 숨김(레거시 색/글로우 제거).
         marker.enabled = false;
 
+        // 출구 문틀 — 기둥·상인방·화로. 석문이 열려 사라져도 이건 남아서 「여기가 출구」를 알려 준다.
+        // (문틀이 없으면 클리어 뒤 개구부에 아무 시각물도 안 남아 어디로 가야 할지 안 보인다 — 09-21 사용자 지적)
+        SpawnGateFrame(go.transform, openW, openH);
+
         // 게이트 포탈 VFX — 봉인 시 비활성으로 심고, 공개 때 활성화(열림 연출). 실패 시 색 패널만.
         if (withPortal && _gatePortalPrefab != null)
         {
@@ -1312,8 +1387,9 @@ public class RunFlowController : MonoBehaviour
     /// <summary>방 종류 → 전환 커버 색 (전투/정예/상점/보스 단서).</summary>
     private static Color KindColor(RoomPlanKind kind) => kind switch
     {
-        RoomPlanKind.Boss    => new Color(0.55f, 0.08f, 0.08f),
-        RoomPlanKind.PreBoss => new Color(0.45f, 0.10f, 0.14f),
+        // 09-26: 진홍은 전환마다 과했다(사용자) — 보스 쪽은 편안한 황혼 보라. 정예(선명한 보라)보다 어둡고 푸르다.
+        RoomPlanKind.Boss    => new Color(0.22f, 0.17f, 0.38f),
+        RoomPlanKind.PreBoss => new Color(0.18f, 0.16f, 0.30f),
         RoomPlanKind.Elite   => new Color(0.32f, 0.12f, 0.52f),
         RoomPlanKind.Shop    => new Color(0.08f, 0.32f, 0.12f),
         RoomPlanKind.Event   => new Color(0.30f, 0.20f, 0.05f),
@@ -1399,13 +1475,12 @@ public class RunFlowController : MonoBehaviour
         tmp.text      = KindGlyph(kind) + " " + KindKor(kind)
                         + "\n<size=55%><color=#BEC6D6>" + KindSubtitle(kind) + "</color></size>";
         tmp.fontSize  = 62f;
-        tmp.fontStyle = FontStyles.Bold;
+        tmp.fontStyle = FontStyles.Normal;   // 09-27: 기본 폰트가 이미 굵다 — 가짜 굵게 + 테두리 0.22는 획을 뭉갰다
         tmp.alignment = TextAlignmentOptions.Center;
-        // 방 종류별 밝은 색 + 검은 테두리로 어느 배경에서도 읽히게. 알파 0 시작(공개 시 페이드인).
+        // 방 종류별 밝은 색 + 얇은 테두리·부드러운 그림자로 어느 배경에서도 읽히게. 알파 0 시작(공개 시 페이드인).
         var c = KindBrightColor(kind); c.a = 0f;
         tmp.color            = c;
-        tmp.outlineColor     = new Color(0f, 0f, 0f, 1f);
-        tmp.outlineWidth     = 0.22f;
+        TMPOutlineHelper.ApplySoftShadow(tmp);
         return tmp;
     }
 

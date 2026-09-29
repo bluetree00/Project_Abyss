@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a54515551fdbfb4f9d2acd6663f3d0f, type: 3}
+  m_Name: DK_KL4_ThronePull
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.DKThronePullPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: kl4_throne
+  breakOverride: -1
+  pullSeconds: 1.2
+  pullSpeed: 6.5
+  stopDistance: 0.8
+  chainWidth: 0.45
+  knightChainHeight: 1.3
+  playerChainHeight: 1
+  lockSeconds: 0.4
+  frontRows: 3
+  swingLead: 0.35
+  recoveryTime: 0.6
+  slashVfxPrefab: {fileID: 1644958980890870, guid: d0ebac18aae7a7349a6feb3ac42cbccd,
+    type: 3}
+  chainSfx: {fileID: 8300000, guid: d795247655948904fa25373f9ea53606, type: 3}
+  chainBreakSfx: {fileID: 8300000, guid: 9d4c1b34966ce5140815b611bd572b0b, type: 3}
+  bigSlashSfx: {fileID: 8300000, guid: a5b4676a78851ad408e98b3c68202f75, type: 3}
+  damageMultiplier: 1.4
+  knockbackMultiplier: 1.2

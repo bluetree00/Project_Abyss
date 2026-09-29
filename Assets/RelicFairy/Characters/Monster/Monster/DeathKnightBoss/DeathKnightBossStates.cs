@@ -57,9 +57,9 @@ public class DKChaseState : IMonsterState
     private const float StrafeMinTime   = 1.2f;
     private const float StrafeMaxTime   = 2.8f;
 
-    private const string WalkAnim        = "Walk1";
-    private const string StrafeLeftAnim  = "StrafeLeft";
-    private const string StrafeRightAnim = "StrafeRight";
+    private const string WalkAnim        = "walk1";         // 애니메이터 상태 이름 그대로(소문자)
+    private const string StrafeLeftAnim  = "strafeleft";
+    private const string StrafeRightAnim = "straferight";
 
     private enum ChaseMode { Approaching, Strafing }
 
@@ -380,6 +380,7 @@ public class DKDieState : DieState
         GameCameraController.Instance?.DeactivateDKPlayerOrbit(1.5f);
 
         base.Enter(ctx);
+        BossStoryScenes.PlayEnd(ctx, StoryProgress.DeathKnight);   // 봉인기 = 봉인 · 해방기 = 처치
     }
 }
 

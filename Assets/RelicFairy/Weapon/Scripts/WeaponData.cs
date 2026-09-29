@@ -56,6 +56,25 @@ public class WeaponData
     /// </summary>
     public int evolutionStage;
 
+    /// <summary>
+    /// 고른 스킬 각인 id(쉼표 구분). 스킬 단계에 오를 때 둘 중 하나를 고른다 — 자동으로 열리던 단계 분기를 선택으로 바꾼다
+    /// (기획 스킬구성_재련소연결 A안, 09-25 시범: 환영베기). 진화해도 이어진다(같은 스킬을 쓰는 진화가 대부분).
+    /// </summary>
+    public string engravings = "";
+
+    public bool HasEngraving(string id)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(engravings)) return false;
+        foreach (var e in engravings.Split(',')) if (e == id) return true;
+        return false;
+    }
+
+    public void AddEngraving(string id)
+    {
+        if (string.IsNullOrEmpty(id) || HasEngraving(id)) return;
+        engravings = string.IsNullOrEmpty(engravings) ? id : engravings + "," + id;
+    }
+
     public int groundEndCount;
     public int airEndCount;
 
@@ -83,9 +102,13 @@ public class WeaponData
     // ── 하위 호환 편의 접근자 ─────────────────────────────────────────
     public string skillName        => skillQ?.skillName;
     public string skillDescription => skillQ?.description;
-    public Sprite skillQIcon       => skillQ?.icon;
-    public Sprite skillEIcon       => skillE?.icon;
-    public Sprite skillRIcon       => skillR?.icon;
+    // 아이콘은 <b>현재 스킬 단계</b>를 따라간다 — 강화(재련소)·진화로 스킬 기능이 바뀌면 그림도 바뀐다(09-21).
+    // 단계는 이 무기의 강화 수치에서 나온다(SkillTierResolver: 근접 +3·+6, 원거리 파츠 2·10).
+    public Sprite skillQIcon       => skillQ?.IconForTier(SkillTier);
+    public Sprite skillEIcon       => skillE?.IconForTier(SkillTier);
+    public Sprite skillRIcon       => skillR?.IconForTier(SkillTier);
+    /// <summary>이 무기의 현재 스킬 단계(1~3).</summary>
+    public int    SkillTier        => SkillTierResolver.Resolve(this);
     public float  skillQCooldown   => skillQ?.cooldown ?? 0f;
     public float  skillECooldown   => skillE?.cooldown ?? 0f;
     public float  skillRCooldown   => skillR?.cooldown ?? 0f;

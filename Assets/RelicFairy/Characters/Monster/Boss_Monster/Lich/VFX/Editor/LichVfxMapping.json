@@ -1,0 +1,508 @@
+{
+  "chainMaterial": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Materials/Chain1Bbcg.mat",
+  "crackMaterial": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Materials/Crack6bcg.mat",
+  "rows": [
+    {
+      "slot": "CastFlare",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Projectiles/Casting/Casting_Arcane_2_LWRP.prefab",
+      "scale": 1.1,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Spells Pack 비전 시전 소용돌이(반복) — 데모 발사기는 LichVfx가 끈다"
+    },
+    {
+      "slot": "BoltProjectile",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/MasterStylizedProjectiles/Projectiles/LightningExplosion/Prefabs/LightningExplosionBullet.prefab",
+      "scale": 0.6,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "MSP 보라 번개탄(반복)"
+    },
+    {
+      "slot": "BoltMuzzle",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Projectiles/Explosion/Explosion_Arcane_3_LWRP.prefab",
+      "scale": 0.4,
+      "lifetime": 0.6,
+      "offsetY": 0,
+      "note": "Spells Pack 비전 폭발 3 — 작게"
+    },
+    {
+      "slot": "BoltImpact",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Projectiles/Explosion/Explosion_Arcane_LWRP.prefab",
+      "scale": 0.8,
+      "lifetime": 1.5,
+      "offsetY": 0.05,
+      "note": "Spells Pack 비전 폭발 — 고리+구, 반경 약 2 m"
+    },
+    {
+      "slot": "TeleportVanish",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Projectiles/Explosion/Explosion_Arcane_2_LWRP.prefab",
+      "scale": 1.1,
+      "lifetime": 1.5,
+      "offsetY": 1.2,
+      "note": "Spells Pack 비전 폭발 2 — 보라 연기"
+    },
+    {
+      "slot": "TeleportAppear",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Projectiles/Explosion/Explosion_Arcane_LWRP.prefab",
+      "scale": 1.1,
+      "lifetime": 1.2,
+      "offsetY": 0,
+      "note": "Spells Pack 비전 폭발(고공 출현)"
+    },
+    {
+      "slot": "SlamImpact",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/AAA Projectiles Vol 1/Prefabs/Hit 17 nova violet.prefab",
+      "scale": 2.0,
+      "lifetime": 1.5,
+      "offsetY": 0.1,
+      "note": "Hovl 보라 구체 폭발(Hit 17 nova) — 반경 4 m. 09-18 교체(분홍 연기 덩어리였음) · 09-19 판정 대조(Boss Room/11): 판정 반경의 약 30%로 보여 ×2"
+    },
+    {
+      "slot": "PhaseBurst",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_2(ScriptBased)/Effects/Effect_33_DemonicSphere/Effect_33_DemonicPrison.prefab",
+      "scale": 0.3,
+      "lifetime": 2.5,
+      "offsetY": 0.5,
+      "note": "SSEP2 악마의 감옥 — 보라 소용돌이 고리(※ EMP는 GrabPass 왜곡이 URP 화면을 덮어 교체)"
+    },
+    {
+      "slot": "CircleFire",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic circle fire.prefab",
+      "scale": 0.6,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Hovl 불 마법진"
+    },
+    {
+      "slot": "CircleIce",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic circle water.prefab",
+      "scale": 0.6,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Hovl 물(얼음) 마법진"
+    },
+    {
+      "slot": "CircleLightning",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic circle electro.prefab",
+      "scale": 0.6,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Hovl 번개 마법진"
+    },
+    {
+      "slot": "CircleDark",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Projectiles/Casting/Casting_Arcane_LWRP.prefab",
+      "scale": 1.0,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Spells Pack 비전 시전 룬 고리"
+    },
+    {
+      "slot": "IceSpear",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Spells/Spell_Ice_3_LWRP.prefab",
+      "scale": 0.25,
+      "lifetime": 1.5,
+      "offsetY": 0,
+      "note": "Spells Pack 얼음 창"
+    },
+    {
+      "slot": "IceImpact",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/MasterStylizedProjectiles/Projectiles/SmallIceBullet/Prefabs/SmallIceBulletHit.prefab",
+      "scale": 0.4,
+      "lifetime": 1.0,
+      "offsetY": 0.1,
+      "note": "MSP 얼음 결정 착탄"
+    },
+    {
+      "slot": "LightningStrike",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_2(ScriptBased)/Effects/Effect_24_LightningStrike/Effect_24_PowerOfLightning.prefab",
+      "scale": 0.08,
+      "lifetime": 1.5,
+      "offsetY": 0,
+      "note": "SSEP2 낙뢰 기둥"
+    },
+    {
+      "slot": "DarkOrb",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_2(ScriptBased)/Effects/Effect_33_DemonicSphere/Effect_33_DemonicSphere.prefab",
+      "scale": 0.45,
+      "lifetime": 0,
+      "offsetY": 1.0,
+      "note": "SSEP2 악마 구체(작게, 반복 강제)"
+    },
+    {
+      "slot": "DarkOrbImpact",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Projectiles/Explosion/Explosion_Arcane_2_LWRP.prefab",
+      "scale": 0.6,
+      "lifetime": 1.2,
+      "offsetY": 0,
+      "note": "Spells Pack 비전 폭발 2"
+    },
+    {
+      "slot": "ArcaneOrb",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_2(ScriptBased)/Effects/Effect_33_DemonicSphere/Effect_33_DemonicSphere.prefab",
+      "scale": 1.15,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "SSEP2 악마 구체 — 보이는 반경 약 3 m(반복 강제)"
+    },
+    {
+      "slot": "ArcaneOrbBurst",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Projectiles/Explosion/Explosion_Arcane_3_LWRP.prefab",
+      "scale": 2.0,
+      "lifetime": 1.5,
+      "offsetY": 0,
+      "note": "Spells Pack 비전 폭발 3 · 09-19 판정 대조: 판정의 약 15% → ×2(재측정 필요)"
+    },
+    {
+      "slot": "TwinCircle",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Spells/Spell_Arcane_3_LWRP.prefab",
+      "scale": 1.5,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Spells Pack 비전 바닥 주문(반복) — 반경 약 5 m"
+    },
+    {
+      "slot": "TwinBlast",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/AAA Projectiles Vol 1/Prefabs/Hit 17 nova violet.prefab",
+      "scale": 2.5,
+      "lifetime": 1.5,
+      "offsetY": 0.1,
+      "note": "Hovl Hit 17 nova — 반경 5 m. 09-18 교체 · 09-19 판정 대조: 판정의 약 25% → ×2"
+    },
+    {
+      "slot": "SummonGround",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Variations/Spells/Dark/Spell_Dark_4_Purple_LWRP Variant.prefab",
+      "scale": 1.0,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Spells Pack 어둠 4 보라 변형"
+    },
+    {
+      "slot": "ZoneFire",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Spells/Spell_Fire_2_LWRP.prefab",
+      "scale": 0.8,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Spells Pack 불 바닥(반복)"
+    },
+    {
+      "slot": "ZoneIce",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_1(NotScriptBased)/Effects/Effect_25_IceField/Effect_25_IceField.prefab",
+      "scale": 0.2,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "SSEP1 얼음 장판(풀 밖 생성)"
+    },
+    {
+      "slot": "ZoneLightning",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_1(NotScriptBased)/Effects/Effect_52_LightningField/Effect_52_LightningField.prefab",
+      "scale": 0.13,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "SSEP1 번개 장판"
+    },
+    {
+      "slot": "ZoneDark",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_1(NotScriptBased)/Effects/Effect_46_PoisonSmoke/Effect_46_PoisonSmoke.prefab",
+      "scale": 0.25,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "SSEP1 보라 연기 장판"
+    },
+    {
+      "slot": "ScytheSlash",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio 2/Sword slash VFX/Prefabs/Sword Slash 4.prefab",
+      "scale": 1.0,
+      "lifetime": 1.0,
+      "offsetY": 0.0,
+      "note": "Hovl2 큰 베기 — 낫 규약 빨강으로 색 입힘(09-18) · 09-19 오프셋 0(회전에 같이 돌아 뒤집으면 바닥 아래로 감) — 높이는 코드(SlashHeight)",
+      "tint": "#FF3A3AFF"
+    },
+    {
+      "slot": "ChainGold",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/RPG VFX Bundle/Random effect prefabs/Buff chain.prefab",
+      "scale": 0.8,
+      "lifetime": 1.5,
+      "offsetY": 0,
+      "note": "Hovl 금빛 사슬 고리(반복) — 몸에 감긴 봉인 사슬. 09-18 교체"
+    },
+    {
+      "slot": "ChainReversed",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_1(NotScriptBased)/Effects/Effect_43_DarkChainSwamp/Effect_43_DarkChainSwamp.prefab",
+      "scale": 0.2,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "SSEP1 어둠 사슬 늪"
+    },
+    {
+      "slot": "SealStoneIdle",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/RPG VFX Bundle/Prefabs/Magic buffs and hits/Hyperdymension circle.prefab",
+      "scale": 0.14,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Hovl 청록 테두리 원(반복) — 봉인석 바닥(청록 = 칠 수 있음). 09-18 교체(아이템 효과음 루프 제거)"
+    },
+    {
+      "slot": "SealStoneModel",
+      "path": "Assets/RelicFairy/Characters/Monster/Boss_Monster/Lich/Prefabs/Lich_SealStone.prefab",
+      "scale": 1,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "AncientAltar 룬석(RuneRock_1, 높이 2.6 m) + Totems 재질 룬 발광(청록) — 기본 도형 기둥 대체. 09-18"
+    },
+    {
+      "slot": "MonumentModel",
+      "path": "Assets/RelicFairy/_Imported/Gothic_Interior/Environment/Asset/Prefabs/SM_Statue_01a.prefab",
+      "scale": 8.0,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "2페이즈 무대 변화 — 무너진 귀퉁이 심연에서 솟는 거대 석상(두건 쓴 수호상, Gothic SM_Statue_01a). 09-19 실측: ×6은 고딕 첨탑보다 작아 ×8"
+    },
+    {
+      "slot": "SealStoneIgnite",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Vefects/Item Pickup VFX URP/VFX/Particles/VFX_Item_Legendary.prefab",
+      "scale": 1.0,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Vefects 금빛 기둥(반복)"
+    },
+    {
+      "slot": "SealStoneBurst",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/MasterStylizedProjectiles/Projectiles/SmallIceBullet/Prefabs/SmallIceBulletHit.prefab",
+      "scale": 0.8,
+      "lifetime": 1.2,
+      "offsetY": 0.5,
+      "note": "MSP 얼음 결정 파편"
+    },
+    {
+      "slot": "FireBeam",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/PixPlays/ElementalBeams/FireBeam/Version_BuiltIn/FireBeam.prefab",
+      "scale": 1.0,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "PixPlays 화염 광선 — 팩 드라이버(BeamVfx)가 몸통 길이·끝 폭발을 맞춘다",
+      "beamLength": 0
+    },
+    {
+      "slot": "ArcaneBeam",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/PixPlays/ElementalBeams/WindBeam/Version_BuiltIn/WindBeam.prefab",
+      "scale": 1.0,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "원소 격류(악몽기 P2) — 바닥을 쓸고 도는 비전 격류. PixPlays 바람 광선을 보라로(09-19, 렌더링 비교 대기)",
+      "beamLength": 0,
+      "tint": "#B45CFFFF"
+    },
+    {
+      "slot": "ScytheSpin",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_1(NotScriptBased)/Effects/Effect_33_DeathRevolution/Effect_33_DeathRevolution.prefab",
+      "scale": 0.09,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "SSEP1 죽음의 회전 — 날아가는 낫(반복 강제)",
+      "beamLength": 0
+    },
+    {
+      "slot": "DarkRainDrop",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/MasterStylizedProjectiles/Projectiles/LightningExplosion/Prefabs/LightningExplosionBullet.prefab",
+      "scale": 0.8,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "MSP 보라 번개탄 — 떨어지는 줄기",
+      "beamLength": 0
+    },
+    {
+      "slot": "DarkRainImpact",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/MasterStylizedProjectiles/Projectiles/PurpleStar/Prefabs/PurpleStarHit.prefab",
+      "scale": 0.3,
+      "lifetime": 0.8,
+      "offsetY": 0,
+      "note": "MSP 보라 별 착탄 — 반경 1.5 m",
+      "beamLength": 0
+    },
+    {
+      "slot": "DarkCloud",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_1(NotScriptBased)/Effects/Effect_46_PoisonSmoke/Effect_46_PoisonSmoke.prefab",
+      "scale": 0.2,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "SSEP1 보라 연기 — 상공 구름(작게 — 1.2배에서 화면을 덮었다)",
+      "beamLength": 0
+    },
+    {
+      "slot": "WardDome",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Shields/Shield_Arcane_LWRP.prefab",
+      "scale": 2.2,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Spells Pack 비전 방패 — 반경 10 m로(반복)",
+      "beamLength": 0
+    },
+    {
+      "slot": "WardBreak",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/AAA Projectiles Vol 1/Prefabs/Hit 17 nova violet.prefab",
+      "scale": 2.5,
+      "lifetime": 1.8,
+      "offsetY": 0.5,
+      "note": "Hovl Hit 17 nova — 결계 파괴 반경 10 m. 09-18 교체",
+      "beamLength": 0
+    },
+    {
+      "slot": "SealBurst",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_1(NotScriptBased)/Effects/Effect_43_DarkChainSwamp/Effect_43_HolyRedemption.prefab",
+      "scale": 0.3,
+      "lifetime": 1.5,
+      "offsetY": 0,
+      "note": "SSEP1 금빛 사슬 구(HolyRedemption) — 봉인 사슬이 감기는 순간(옛 ChainGold)",
+      "beamLength": 0
+    },
+    {
+      "slot": "BossAura",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Auras/Aura_Arcane_LWRP.prefab",
+      "scale": 1.0,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Spells Pack 비전 룬 원(반복) — 날고 있는 리치의 바닥 표식",
+      "beamLength": 0
+    },
+    {
+      "slot": "BlinkAfterimage",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/AAA Projectiles Vol 1/Prefabs/Flash 17 nova violet.prefab",
+      "scale": 1.0,
+      "lifetime": 1.0,
+      "offsetY": 0,
+      "note": "Hovl 보라 순간이동 섬광 — C4 도착 자리(흰 틴트). 09-20: PhantomShow는 카드가 제단 전체로 흩어져 화면을 덮어 교체",
+      "beamLength": 0
+    },
+    {
+      "slot": "SealArray",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_1(NotScriptBased)/Effects/Effect_18_TimeField/Effect_18_TimeField.prefab",
+      "scale": 0.2,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "SSEP1 시계형 봉인진 — 보라로 색 입힘(F2)",
+      "beamLength": 0,
+      "tint": "#B070FFFF"
+    },
+    {
+      "slot": "DeathBurst",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_1(NotScriptBased)/Effects/Effect_29_LumenCrash/Effect_29_LumenCrash.prefab",
+      "scale": 0.3,
+      "lifetime": 2.0,
+      "offsetY": 0,
+      "note": "SSEP1 흰 수직 파쇄 — 사망(매번 새로 생성)",
+      "beamLength": 0
+    },
+    {
+      "slot": "SealComplete",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_1(NotScriptBased)/Effects/Effect_38_GloryBoundary/Effect_38_GloryBoundary.prefab",
+      "scale": 0.2,
+      "lifetime": 3.0,
+      "offsetY": 0,
+      "note": "SSEP1 금빛 고리 + 빛기둥 — 봉인 완성(금 = 플레이어의 봉인)",
+      "beamLength": 0
+    },
+    {
+      "slot": "ScreenDebuff",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio 3/Fullscreen effects/Prefabs/Screen debuff.prefab",
+      "scale": 1.0,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Hovl 전체 화면 — 보라 가장자리(페이지 전환)",
+      "beamLength": 0
+    },
+    {
+      "slot": "ScreenMagicFlow",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio 3/Fullscreen effects/Prefabs/Screen magic flow.prefab",
+      "scale": 1.0,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Hovl 전체 화면 — 봉인 완성",
+      "beamLength": 0
+    },
+    {
+      "slot": "ScreenSpace",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio 3/Fullscreen effects/Prefabs/Screen space.prefab",
+      "scale": 1.0,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Hovl 전체 화면 — 최후의 대마법",
+      "beamLength": 0
+    },
+    {
+      "slot": "ScreenWind",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio 3/Fullscreen effects/Prefabs/Screen wind.prefab",
+      "scale": 1.0,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "Hovl 전체 화면 — 코어로 끄는 바람",
+      "beamLength": 0
+    },
+    {
+      "slot": "LingerPool",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Auras/Aura_Dark_LWRP.prefab",
+      "scale": 0.25,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "여운 장판(반복) — 호출 배율 = 반경(m). 판정 크기 대조(Boss Room/11)로 맞출 것. 09-18 2차 개편 §12-5 · 09-19 감사: 0.5는 판정의 2~4배 → 0.25"
+    },
+    {
+      "slot": "TileRestore",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic circle water.prefab",
+      "scale": 0.5,
+      "lifetime": 1.5,
+      "offsetY": 0.1,
+      "note": "부서진 바닥이 떠오를 때 청록 원(칸 5 m). §12-4",
+      "tint": "#7FF2FFFF"
+    },
+    {
+      "slot": "ParryGlint",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/RPG VFX Bundle/Prefabs/Magic buffs and hits/Magic Sparks.prefab",
+      "scale": 0.5,
+      "lifetime": 0.6,
+      "offsetY": 0,
+      "note": "패링 창 — 낫(손)의 금빛 섬광. 코드가 금빛으로 색 입힘. §12-3"
+    },
+    {
+      "slot": "ParryClash",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/MasterStylizedProjectiles/Projectiles/YellowSwordBeam/Prefabs/Par_YellowSwordBeam_Hit.prefab",
+      "scale": 1.5,
+      "lifetime": 1.2,
+      "offsetY": 0,
+      "note": "패링 성공 — 튕겨내는 금빛 불꽃. §12-3"
+    },
+    {
+      "slot": "BindRing",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop version/Magic circle sun loop.prefab",
+      "scale": 0.3,
+      "lifetime": 0,
+      "offsetY": 0,
+      "note": "사슬 결박 — 묶인 플레이어 발밑 금빛 고리(반복). §12-5"
+    },
+    {
+      "slot": "SkeletonDeath",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Projectiles/Explosion/Explosion_Dark_2_LWRP.prefab",
+      "scale": 0.8,
+      "lifetime": 2,
+      "offsetY": 0,
+      "note": "낫 해골이 부서지는 뼛가루(보라 폭발). §12-2"
+    },
+    {
+      "slot": "EntranceRise",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Variations/Spells/Dark/Spell_Dark_4_Purple_LWRP Variant.prefab",
+      "scale": 1.0,
+      "lifetime": 3.5,
+      "offsetY": 0,
+      "note": "Spells Pack 어둠 분출(보라 번개 촉수 · 검은 연기) — 리치 등장: 제단 바닥에서 솟아 몸이 디졸브 인(09-20 렌더 비교 01번)"
+    },
+    {
+      "slot": "PageBreak",
+      "path": "Assets/RelicFairy/_Imported/EffectSource/MasterStylizedProjectiles/Projectiles/LightningExplosion/Prefabs/LightningExplosionHit.prefab",
+      "scale": 0.38,
+      "lifetime": 2.0,
+      "offsetY": 1.0,
+      "note": "MSP 보라 섬광 폭발 — 페이지 전환(휘청 · 포효). 등장과 다른 자원으로(09-20 사용자 지적: 등장 · 전환이 같은 이펙트)"
+    }
+  ]
+}

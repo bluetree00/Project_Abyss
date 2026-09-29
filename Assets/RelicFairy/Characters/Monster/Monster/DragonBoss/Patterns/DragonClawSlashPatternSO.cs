@@ -76,7 +76,7 @@ public class DragonClawSlashPatternSO : BossPatternSO
         if (ctx.Ctx.Runtime.PlayerTarget == null) return false;
         return ctx.Blackboard is DragonBossBlackboard bb
                && bb.BodyState == BodyState.Grounded
-               && bb.LeapCooldown <= 0f;
+               && bb.ClawSlashCooldown <= 0f;
     }
 
     public override SpecialStateBase GetRuntimeState() => _runtimeState;
@@ -153,7 +153,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     public override void Exit(MonsterContext ctx)
     {
         if (GetBlackboard(ctx) is DragonBossBlackboard exitBb)
-            exitBb.LeapCooldown = Data.Cooldown;
+            exitBb.ClawSlashCooldown = Data.Cooldown;
         _clawTrail?.StopAll();
         if (ctx.Agent == null) return;
         DragonPatternFloorUtils.EnsureAgentOnNavMesh(ctx);

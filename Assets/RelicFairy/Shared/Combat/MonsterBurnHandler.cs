@@ -18,6 +18,7 @@ public sealed class MonsterBurnHandler : MonoBehaviour
     private float       _remaining;
     private float       _total;        // 게이지 비율용(부여된 최대 지속)
     private float       _tickAccum;
+    private int         _holdRefreshFrame = -1;   // 이 프레임엔 새 부여가 잔여시간을 다시 채우지 못한다
 
     // ── Properties ────────────────────────────────────────────
     /// <summary>남은 화상 시간(초). 디버프 UI가 읽는다.</summary>
@@ -26,6 +27,13 @@ public sealed class MonsterBurnHandler : MonoBehaviour
     public float Remaining01 => _total > 0f ? Mathf.Clamp01(_remaining / _total) : 0f;
 
     // ── Public API ────────────────────────────────────────────
+    /// <summary>
+    /// 이번 프레임 동안 새 부여(Apply)가 잔여시간을 늘리지 못하게 한다 — 「소모」형 효과가 같은 타격의 재부여로 되돌려지지 않게.
+    /// 09-25 실측: 불사르기가 절반을 터뜨린 직후 같은 타격의 기본 패시브(태양의 열기)가 화상을 다시 가득 채워, 매 타 공짜로 터졌다.
+    /// 세기(dps) 갱신은 막지 않는다. 다음 프레임부터는 평소처럼 부여가 잔여를 채운다.
+    /// </summary>
+    public void HoldRefreshThisFrame() => _holdRefreshFrame = Time.frameCount;
+
     /// <summary>대상 GameObject 에 화상을 적용한다. 컴포넌트가 없으면 추가, 있으면 갱신.</summary>
     public static void Apply(GameObject target, float dps, float duration, float tickInterval, GameObject instigator)
     {
@@ -173,7 +181,8 @@ public sealed class MonsterBurnHandler : MonoBehaviour
         _instigator   = instigator;
         _tickInterval = tickInterval;
         _dps          = Mathf.Max(_dps, dps);    // 더 강한 DPS 유지
-        _remaining    = Mathf.Max(_remaining, duration); // 더 긴 지속시간 유지
+        if (_holdRefreshFrame != Time.frameCount)
+            _remaining = Mathf.Max(_remaining, duration); // 더 긴 지속시간 유지
         _total        = Mathf.Max(_total, _remaining);   // 게이지 기준(부여 직후 = 100%)
     }
 }

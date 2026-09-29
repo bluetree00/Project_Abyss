@@ -56,14 +56,19 @@ public sealed class WorldSwordAwakening : MonoBehaviour
         _camTransform = Camera.main != null ? Camera.main.transform : null;
         CreateWorldText();
         CreatePrompt();
+        BaseCampLabelRule.Register(transform);   // 이름표는 가까이 간 곳 하나만(2차 개편 09-29)
         SpawnSwordVisualAsync(this.GetCancellationTokenOnDestroy()).Forget();
+        // 받는 순간(F) 로드 대기가 없게 미리 — 클립 프리로드 · 무기 프리팹 로드로 연출이 F 뒤 3.9초 늦게 시작됐다(ae 09-28).
+        // 소환 연출 · 시작 대사 동안 끝난다.
+        GameRunBootstrapper.PrewarmWeaponAsync(namelessWeapon).Forget();
     }
 
-    /// <summary>이미 주무기(슬롯0)를 보유했는가. 세이브 복원이 늦게 끝나는 경우를 대비해 매 판정 시점에 다시 확인한다.</summary>
+    /// <summary>이미 주무기(슬롯0)를 보유했거나, 이 슬롯이 무형검을 한 번 받은 적이 있는가(베이스캠프 재설계 — 검은 처음 한 번).
+    /// 세이브 복원이 늦게 끝나는 경우를 대비해 매 판정 시점에 다시 확인한다.</summary>
     private static bool AlreadyArmed()
     {
         var lo = AppBootstrapper.Instance?.Loadout;
-        return lo != null && lo.WeaponSlot0 != null;
+        return (lo != null && lo.WeaponSlot0 != null) || BaseCampBootstrapper.HasAwakenedSword();
     }
 
     private void Update()
@@ -74,6 +79,8 @@ public sealed class WorldSwordAwakening : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F))
             AwakenAsync(this.GetCancellationTokenOnDestroy()).Forget();
     }
+
+    private void OnDestroy() => BaseCampLabelRule.Unregister(transform);
 
     private void OnTriggerEnter(Collider other)
     {
@@ -141,6 +148,10 @@ public sealed class WorldSwordAwakening : MonoBehaviour
             var standFade = _swordVisual != null
                 ? MaterialFade.FadeOutAsync(_swordVisual, HandOverDuration, ct)
                 : UniTask.CompletedTask;
+            // 베이스캠프 연출(카메라 다가감 · 천장 별빛 · 금빛 가장자리)은 F와 동시에 — 무기 로드를 기다리면 그동안 조작도 안 막힌 채 반응이 없었다(ae 09-28).
+            // 넘겨받기와 나란히, 입력 막음 ≤ 1.5초.
+            var fx = BaseCampFxDirector.Instance;
+            var fxTask = fx != null && player != null ? fx.PlaySwordReceiveAsync(transform, player, ct) : UniTask.CompletedTask;
 
             MaterialFade.FadeInHandle handIn = null;
             if (player != null)
@@ -151,7 +162,7 @@ public sealed class WorldSwordAwakening : MonoBehaviour
                 ct.ThrowIfCancellationRequested();
             }
             var handFade = handIn != null ? MaterialFade.FadeInAsync(handIn, HandOverDuration, ct) : UniTask.CompletedTask;
-            await UniTask.WhenAll(standFade, handFade);
+            await UniTask.WhenAll(standFade, handFade, fxTask);
             ct.ThrowIfCancellationRequested();
 
             if (_swordVisual != null)
@@ -162,6 +173,9 @@ public sealed class WorldSwordAwakening : MonoBehaviour
             }
 
             _claimed = true;
+
+            // 처음 한 번 — 다음부터는 베이스캠프가 슬롯0에 쥐여 준다(세이브 슬롯 영구 기록).
+            BackendGameData.Instance?.Data?.SetRecordMax(MemoryAltarCatalog.Rec.SwordAwakened, 1);
 
             // 각성 신호 — 온보딩/퀘스트가 다음 단계(원거리 무기대)를 개방.
             QuestEvents.Report(questCategory, namelessWeapon != null ? namelessWeapon.name : "Nameless");
@@ -217,8 +231,20 @@ public sealed class WorldSwordAwakening : MonoBehaviour
 
     private void BillboardTexts()
     {
-        if (_camTransform == null) return;
-        if (_worldText != null) _worldText.transform.rotation = _camTransform.rotation;
+        if (_camTransform == null)
+        {
+            // 시작 때 카메라가 아직 없었으면(테스트 허브 → 베이스캠프 등) 여기서 다시 잡는다 — Start 한 번만 잡으면 라벨이 영영 안 돈다.
+            var cam = Camera.main;
+            if (cam == null) return;
+            _camTransform = cam.transform;
+        }
+        if (_worldText != null)
+        {
+            _worldText.transform.rotation = _camTransform.rotation;
+            // 가까이 간 곳 하나만 — 구역 이름 배너(「소환의 방」)가 떠 있는 동안 숨김도 규칙 안에 있다(ae 09-28 겹침)
+            bool show = BaseCampLabelRule.IsShown(transform);
+            if (_worldText.enabled != show) _worldText.enabled = show;
+        }
         if (_promptGo != null && _promptGo.activeSelf) _promptGo.transform.rotation = _camTransform.rotation;
     }
 
@@ -236,7 +262,7 @@ public sealed class WorldSwordAwakening : MonoBehaviour
         _worldText.color = new Color(0.95f, 0.85f, 0.55f);
         _worldText.textWrappingMode = TextWrappingModes.NoWrap;
         _worldText.sortingOrder = UISortingOrder.WorldLabel;
-        TMPOutlineHelper.ApplyDefault(_worldText);
+        TMPOutlineHelper.ApplySoftShadow(_worldText);
     }
 
     private void CreatePrompt()
@@ -252,7 +278,7 @@ public sealed class WorldSwordAwakening : MonoBehaviour
         tmp.color = Color.white;
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.sortingOrder = UISortingOrder.WorldPrompt;
-        TMPOutlineHelper.ApplyDefault(tmp);
+        TMPOutlineHelper.ApplySoftShadow(tmp);
         tmp.text = $"<color={UIPalette.GoldHex}>[F]</color> 검을 쥔다";
 
         _promptGo.SetActive(false);

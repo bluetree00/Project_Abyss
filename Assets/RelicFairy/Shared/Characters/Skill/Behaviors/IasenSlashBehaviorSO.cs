@@ -206,8 +206,9 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
 
             float dmg = ctx.CalculateDamage(_data.baseDamagePerSlash);
 
+            bool last = _slashIndex >= _slashTotal - 1;   // 증가 전에 불린다 — 마지막 베기가 막타
             foreach (var target in _hitTargets)
-                ctx.DealDamage(target, dmg, _data.knockbackMultiplier);
+                ctx.DealDamage(target, dmg, _data.knockbackMultiplier, last);
 
             // 히트 이펙트
             foreach (var obj in _hitObjects)
@@ -236,7 +237,8 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
                 if (mapping != null) animName = mapping.baseClipName;
             }
 
-            ctx.Animator.CrossFade(animName, 0.05f);
+            // 첫 베기 판정(대시 + 베기 지연)에 발도가 닿게 — 발도 클립은 1.63초에 닿는다(09-25 실측).
+            SkillAnimSync.CrossFadeToContact(ctx.Animator, animName, _data.dashDuration + _data.slashDelay, 0.05f);
         }
 
         // ── Effect Helper ──

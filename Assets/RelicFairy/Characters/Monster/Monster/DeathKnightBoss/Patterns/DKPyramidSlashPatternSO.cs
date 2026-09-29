@@ -481,7 +481,10 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
         Vector3 lookDir = ctx.Transform.position - player.transform.position;
         lookDir.y = 0f;
         if (lookDir.sqrMagnitude > 0.001f)
-            player.transform.rotation = Quaternion.LookRotation(lookDir);
+            // transform.rotation 직접 대입이 아니라 RequestFacing으로 넘긴다 — 회전의 주인은
+            // PlayerController.ApplyFacing 하나다. 직접 쓰면 다음 물리 스텝에 그쪽이 다시 덮어써서
+            // 강제 회전이 한 프레임 만에 풀린다.
+            player.RequestFacing(Quaternion.LookRotation(lookDir));
     }
 
     private Vector2Int FindPlayerSnapCell(MonsterContext ctx, int maxRing)

@@ -31,6 +31,21 @@ public sealed class UIRootBootstrapper : MonoBehaviour
 
         if (hudBootstrapper == null)
             hudBootstrapper = GetComponentInChildren<HudBootstrapper>(true);
+
+        UnifyFallbackFonts();
+    }
+
+    /// <summary>
+    /// 프리팹에 남은 LiberationSans 글자(HUD 키 표시 1·2·3·Q·E 등 14곳)를 기본 글꼴(DNF)로 — 한 화면에 영문 기본 글꼴이
+    /// 섞여 떠 보였다(09-28 UI 톤 진단 D6). 글꼴만 바꾼다(크기·색·테두리는 각 뷰가 정한 그대로).
+    /// </summary>
+    private void UnifyFallbackFonts()
+    {
+        var main = TMPro.TMP_Settings.defaultFontAsset;
+        if (main == null) return;
+        foreach (var t in GetComponentsInChildren<TMPro.TMP_Text>(true))
+            if (t.font != null && t.font != main && t.font.name.StartsWith("LiberationSans"))
+                t.font = main;
     }
 
     public void BindHudToRun(GameRunSession run)
@@ -91,6 +106,13 @@ public sealed class UIRootBootstrapper : MonoBehaviour
     }
 
     public MinimapView GetMinimapView() => hudBootstrapper?.MinimapView;
+
+    /// <summary>게임을 멈추는 팝업이 열려 있는 동안 HUD를 걷는다(UIManager가 차단 상태를 바꿀 때 부른다).</summary>
+    public void SetHudPopupHidden(bool hidden)
+    {
+        if (hudBootstrapper != null) hudBootstrapper.SetPopupHidden(hidden);
+        ExitCompassHud.SetPopupHidden(hidden);   // 출구 배지는 HUD 루트 밖 캔버스라 따로(09-29)
+    }
 
     public void UnbindHud()
     {

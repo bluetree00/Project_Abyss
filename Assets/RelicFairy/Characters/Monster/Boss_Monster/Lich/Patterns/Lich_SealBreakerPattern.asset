@@ -32,4 +32,17 @@ MonoBehaviour:
   additionalSkeletonPrefab: {fileID: 5098245364127042272, guid: 119497b481e20d54f843d3cf322d7234,
     type: 3}
   groundYOffset: 0.05
+  periodicAttackInterval: 2.5
+  periodicZoneCount: 3
+  periodicScatterRadius: 4
+  periodicZoneRadius: 1.5
+  periodicTelegraphDuration: 0.8
+  periodicActiveDuration: 0.5
+  periodicDamageMultiplier: 0.5
+  aimedZoneCount: 1
+  aimedZoneRadius: 1.2
+  aimedDamageMultiplier: 0.7
+  domeRadius: 10
+  groggyDuration: 1.5
+  descendSeconds: 1
   patternCooldown: 35

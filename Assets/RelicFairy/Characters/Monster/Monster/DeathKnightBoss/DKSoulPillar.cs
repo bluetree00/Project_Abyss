@@ -74,7 +74,9 @@ public class DKSoulPillar : MonoBehaviour, IDamageable
         for (int i = 0; i < _visualRenderers.Length; i++)
         {
             if (_visualRenderers[i] == null) continue;
-            _originalLayers[i]                   = _visualRenderers[i].gameObject.layer;
+            _originalLayers[i] = _visualRenderers[i].gameObject.layer;
+            // 루트(콜라이더)는 방금 MonsterHit로 뒀다 — 루트에 렌더러가 있으면 여기서 Monster로 덮어써 근접 판정에서 빠졌다(09-26)
+            if (_visualRenderers[i].gameObject == gameObject) continue;
             _visualRenderers[i].gameObject.layer = monsterLayer;
         }
     }
@@ -151,6 +153,7 @@ public class DKSoulPillar : MonoBehaviour, IDamageable
         for (int i = 0; i < _visualRenderers.Length; i++)
         {
             if (_visualRenderers[i] == null) continue;
+            if (_visualRenderers[i].gameObject == gameObject) continue;   // 루트는 위에서 _originalRootLayer로 되돌렸다
             _visualRenderers[i].gameObject.layer = _originalLayers[i];
         }
     }

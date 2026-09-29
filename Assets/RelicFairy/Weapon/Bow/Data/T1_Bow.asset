@@ -19,7 +19,7 @@ MonoBehaviour:
     \uC99D\uCCCA\uB2E4. \uC548\uC815\uC801\uC778 \uAE30\uBCF8 \uBCF4\uC870\uBB34\uAE30."
   uiThemeColor: {r: 0.42, g: 0.86, b: 0.72, a: 1}
   iconKey: T1_BowIcon
-  icon: {fileID: 21300000, guid: c8fabe273cb5a504f8844f06c5eedcdc, type: 3}
+  icon: {fileID: 21300000, guid: 4756722abbdce364f807736d4d73cec6, type: 3}
   tier: 1
   rarity: 0
   baseAttack: 18

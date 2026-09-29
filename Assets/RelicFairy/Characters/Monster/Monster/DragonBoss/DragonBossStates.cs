@@ -14,9 +14,10 @@ internal sealed class DragonSummonedAtCondition : ICondition
     public bool Evaluate(BossPatternContext ctx)
     {
         if (ctx.Blackboard is not DragonBossBlackboard bb) return false;
-        var rt  = ctx.Ctx.Runtime;
-        var cfg = ctx.Ctx.Config;
-        float hp = cfg?.stat.maxHp > 0 ? (float)rt.CurrentHp / cfg.stat.maxHp : 1f;
+        // 2페이지(전환 포함)엔 새끼 용 소환이 없다(09-28 설계 §4)
+        if (ctx.Ctx.Monster is DragonBossMonster dragon && dragon.IsAbyssPage) return false;
+        // 체력 비율은 보스가 보고하는 값 — 2페이지 보스(악몽기)는 1페이지 기준(1 → 0)이라 70/40/10 경계가 1페이지 안에서 돈다
+        float hp = ctx.Boss?.HpRatio ?? 1f;
         return _phase switch
         {
             DragonSummonPhase.At70 => hp <= 0.7f && !bb.HasSummonedAt70,
@@ -33,7 +34,10 @@ public enum DragonSummonPhase { At70, At40, At10 }
 // DragonBoss 속성 페이즈 조건 (HP 비율 범위)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/// <summary>Ice 100~70% / Thunder 70~40% / Fire 40~0% 속성 페이즈 판정.</summary>
+/// <summary>
+/// Ice 100~70% / Thunder 70~40% / Fire 40~0% 속성 페이즈 판정.
+/// 2페이지(심연)엔 셋 다 거짓 — 원소가 Abyss로 고정돼 1페이지 풀이 다시 켜지지 않는다.
+/// </summary>
 internal sealed class DragonElementPhaseCondition : ICondition
 {
     private readonly DragonElementPhase _phase;
@@ -41,6 +45,18 @@ internal sealed class DragonElementPhaseCondition : ICondition
 
     public bool Evaluate(BossPatternContext ctx)
     {
+        if (ctx.Ctx.Monster is DragonBossMonster dragon)
+        {
+            var element = dragon.CurrentElement;
+            return _phase switch
+            {
+                DragonElementPhase.Ice     => element == DragonBossBlackboard.DragonElement.Ice,
+                DragonElementPhase.Thunder => element == DragonBossBlackboard.DragonElement.Thunder,
+                DragonElementPhase.Fire    => element == DragonBossBlackboard.DragonElement.Fire,
+                _                          => false,
+            };
+        }
+
         var cfg = ctx.Ctx.Config;
         var rt  = ctx.Ctx.Runtime;
         if (cfg?.stat == null || cfg.stat.maxHp == 0) return false;
@@ -804,6 +820,7 @@ public class DragonDieState : DieState
         }
 
         base.Enter(ctx);
+        BossStoryScenes.PlayEnd(ctx, StoryProgress.Dragon);   // 봉인기 = 봉인 · 해방기 = 처치
     }
 }
 

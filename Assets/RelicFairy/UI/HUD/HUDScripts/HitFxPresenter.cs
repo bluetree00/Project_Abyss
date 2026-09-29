@@ -1,11 +1,10 @@
 //============================================================
 // HitFxPresenter.cs
-// - GlobalFeelCoalescer.OnBurst 구독 → FXLayer로 위임 (블로그 UI 화면 연출 3종)
-//   ※ 타격 1건이 아니라 '그 프레임의 타격 전부를 합친 1건'을 받는다. 풀스크린 플래시는
-//     겹칠수록 눈만 아프고 정보가 늘지 않아, 분열 20발도 플래시는 한 번이어야 한다.
-// - 보완(Flash): 모든 히트(합산 1회)
-// - ④ Zoom-In: 크리티컬 포함 시
-// - ⑦ Damage Vignette: 플레이어가 실제 피격(PlayerController.OnDamageTaken)일 때 — HP 비례 강도
+// - 플레이어 피격 화면 연출(붉은 비네트)만 맡는다.
+// - 몬스터 타격 쪽 화면 연출(전체화면 플래시·크리티컬 집중선)은 09-20 사용자 결정으로 뺐다 —
+//   몬스터 타격감은 이미 충분하고, 타격마다 화면 전체가 번쩍이거나 빛살이 치면 눈이 피로하다.
+//   되살릴 땐 GlobalFeelCoalescer.OnBurst를 구독해 FXLayer.Flash / ZoomIn을 부르면 된다.
+// - ⑦ Damage Vignette: 플레이어 피격 연출 신호(PlayerController.OnHitTaken)일 때 — 등급(약·중·강) × 남은 HP
 //   ※ 몬스터 공격은 ColliderInstance/RaiseHit를 타지 않고 player.TakeDamage 직접 호출이므로,
 //     OnHit(info.Target=Player) 경로로는 비네트가 발동되지 않는다 → 실제 피격 이벤트에 연결.
 //
@@ -17,24 +16,16 @@ using UnityEngine;
 public sealed class HitFxPresenter : MonoBehaviour
 {
     // ── Constants ─────────────────────────────────────────────────
-    // Flash
-    private const float FlashPeakNormal   = 0.3f;
-    private const float FlashPeakCritical = 0.55f;
-    private const float FlashDuration     = 0.06f;
-
-    // Zoom-In (크리티컬만)
-    private const float ZoomIntensity     = 0.4f;
-    private const float ZoomDuration      = 0.14f;
-
-    // Damage Vignette (플레이어 피격) — 잔여 HP 낮을수록 강하고 길게 (위험 전달)
-    private const float VignetteIntensityFull = 0.45f;  // HP 가득
-    private const float VignetteIntensityLow  = 0.9f;   // 빈사
-    private const float VignetteDurationFull  = 0.28f;
-    private const float VignetteDurationLow   = 0.45f;
+    // Damage Vignette (플레이어 피격) — 등급별 기준(HP 가득 기준). 잔여 HP가 낮을수록 더 진하고 길게(위험 전달).
+    // 두 번 낮췄다: 09-20 화면 실측(0.22/0.42/0.70 → 강에서 화면이 덮였다), 09-21 사용자 요청(은은하게).
+    // 빈사 상태 자체는 LowHpVolumeService(후처리)가 계속 알리므로, 순간 연출은 약해도 정보가 빠지지 않는다.
+    private const float VignetteLight      = 0.08f, VignetteDurLight  = 0.18f;
+    private const float VignetteMedium     = 0.16f, VignetteDurMedium = 0.26f;
+    private const float VignetteHeavy      = 0.28f, VignetteDurHeavy  = 0.38f;
+    private const float VignetteDangerGain = 1.4f;   // 빈사 배수(세기)
+    private const float VignetteDangerTime = 1.4f;   // 빈사 배수(시간)
 
     // ── Static ────────────────────────────────────────────────────
-    private static readonly Color DefaultFlashColor   = new Color(1f, 1f, 1f, 1f);
-    private static readonly Color CritFlashColor      = new Color(1f, 0.95f, 0.35f, 1f);
     private static readonly Color DamageVignetteColor = new Color(1f, 0.1f, 0.1f, 1f);
 
     // ── Private ───────────────────────────────────────────────────
@@ -51,8 +42,6 @@ public sealed class HitFxPresenter : MonoBehaviour
 
     private void OnEnable()
     {
-        GlobalFeelCoalescer.OnBurst += OnHitBurst;
-
         var pm = Managers.Player;
         if (pm != null)
         {
@@ -63,8 +52,6 @@ public sealed class HitFxPresenter : MonoBehaviour
 
     private void OnDisable()
     {
-        GlobalFeelCoalescer.OnBurst -= OnHitBurst;
-
         var pm = Managers.Player;
         if (pm != null) pm.OnPlayerSpawned -= HandlePlayerSpawned;
         UnhookPlayer();
@@ -86,37 +73,20 @@ public sealed class HitFxPresenter : MonoBehaviour
 
         UnhookPlayer();
         _player = pc;
-        _player.OnDamageTaken += HandlePlayerDamaged;
+        _player.OnHitTaken += HandlePlayerDamaged;
     }
 
     private void UnhookPlayer()
     {
         if (_player == null) return;
-        _player.OnDamageTaken -= HandlePlayerDamaged;
+        _player.OnHitTaken -= HandlePlayerDamaged;
         _player = null;
     }
 
     // ── Event Handlers ────────────────────────────────────────────
-    private void OnHitBurst(HitBurst burst)
-    {
-        var fx = GetLayer();
-        if (fx == null) return;
-
-        // 1) Flash — 프레임당 1회. 세기는 타격 수와 무관하다(겹침 = 시각 노이즈).
-        var   flashColor = burst.AnyCritical ? CritFlashColor : DefaultFlashColor;
-        float flashPeak  = burst.AnyCritical ? FlashPeakCritical : FlashPeakNormal;
-        fx.Flash(flashColor, FlashDuration, flashPeak);
-
-        // 2) Zoom-In 집중선 — 합산분에 크리티컬이 하나라도 있으면 1회.
-        if (burst.AnyCritical)
-            fx.ZoomIn(ZoomIntensity, ZoomDuration);
-
-        // 3) Damage Vignette는 플레이어 실제 피격(HandlePlayerDamaged)에서 처리.
-    }
-
     private void HandlePlayerSpawned(Transform playerTf) => HookPlayer(playerTf);
 
-    private void HandlePlayerDamaged()
+    private void HandlePlayerDamaged(HitWeight weight, Vector3 hitDir, int damage)
     {
         var fx = GetLayer();
         if (fx == null || _player == null) return;
@@ -127,9 +97,11 @@ public sealed class HitFxPresenter : MonoBehaviour
         if (stats != null && stats.MaxHp > 0)
             ratio = Mathf.Clamp01((float)stats.Hp / stats.MaxHp);
 
-        float danger    = 1f - ratio;   // HP 낮을수록 1에 근접
-        float intensity = Mathf.Lerp(VignetteIntensityFull, VignetteIntensityLow, danger);
-        float duration  = Mathf.Lerp(VignetteDurationFull, VignetteDurationLow, danger);
+        float danger = 1f - ratio;   // HP 낮을수록 1에 근접
+        float baseIntensity = weight switch { HitWeight.Heavy => VignetteHeavy, HitWeight.Medium => VignetteMedium, _ => VignetteLight };
+        float baseDuration  = weight switch { HitWeight.Heavy => VignetteDurHeavy, HitWeight.Medium => VignetteDurMedium, _ => VignetteDurLight };
+        float intensity = Mathf.Min(1f, baseIntensity * Mathf.Lerp(1f, VignetteDangerGain, danger));
+        float duration  = baseDuration * Mathf.Lerp(1f, VignetteDangerTime, danger);
 
         fx.Vignette(DamageVignetteColor, intensity, duration);
     }

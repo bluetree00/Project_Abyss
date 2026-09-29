@@ -45,6 +45,13 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     private const string QSwordKey = "Relic/Lancelot/QSword";
 
     /// <summary>
+    /// 전용 검(캐릭터 팩의 검)이 붙는 뼈. 플레이어 모델이 그 팩 모델이라 팩이 잡아 둔 손 뼈·자세를 그대로 쓰면 쥐는 위치가 맞는다.
+    /// 팩 원본 배치: add_weapon_r 아래 X −90°, 위치 0. 뼈를 못 찾으면 무기 소켓(WeaponMount)에 붙인다.
+    /// </summary>
+    private const string QSwordBone = "add_weapon_r";
+    private static readonly Quaternion QSwordBoneRotation = Quaternion.Euler(-90f, 0f, 0f);
+
+    /// <summary>
     /// 마무리 강타 전용 상태. 연타(RelicQ_Slash*)와 <b>다른 모션</b>이라야 "한 방"으로 읽힌다.
     /// 유물 데이터의 단독 모션 상태(RelicQ_Main)를 쓴다 — 예전 QSkill_01은 무기 R 스킬이 덮어쓰는 공용 상태라
     /// 활을 들면 조준 대기 자세로, 대검을 들면 대검 R 모션으로 마무리가 나갔다.
@@ -246,29 +253,42 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
             _hiddenWeapon = equipped;
         }
 
-        // 검 참격 모션은 오른손 기준이라 WeaponMount에 붙인다(활은 왼손이라 여기가 아니다).
-        var socket = ctrl.handTransform;
+        // 검 참격 모션은 오른손 기준이다(활은 왼손이라 무기 소켓이 왼손일 수 있다) — 오른손 뼈 → 오른손 무기 소켓 순.
+        var bone   = FindDeep(ctx.Animator != null ? ctx.Animator.transform : ctrl.transform, QSwordBone);
+        var socket = bone != null ? bone : ctrl.HandTransform;
         if (socket == null) return;
 
-        SpawnQSwordAsync(socket).Forget();
+        SpawnQSwordAsync(socket, bone != null ? QSwordBoneRotation : Quaternion.identity).Forget();
+    }
+
+    private static Transform FindDeep(Transform root, string name)
+    {
+        if (root == null) return null;
+        if (root.name == name) return root;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var hit = FindDeep(root.GetChild(i), name);
+            if (hit != null) return hit;
+        }
+        return null;
     }
 
     /// <summary>
     /// 전용 검 스폰. 로드가 끝났을 때 스킬이 이미 끝났으면 즉시 버린다 —
     /// 안 그러면 검이 손에 남아 다음 전투 내내 따라다닌다.
     /// </summary>
-    private async UniTaskVoid SpawnQSwordAsync(Transform socket)
+    private async UniTaskVoid SpawnQSwordAsync(Transform socket, Quaternion localRotation)
     {
         GameObject go;
         try
         {
             // 키가 없으면 매니저가 경고만 남기고 null을 준다(예외·에러 로그 없음).
-            // 전용 검은 아직 수급 전이라 '없는 게 정상'인 경로다.
+            // 전용 검 = 캐릭터 팩 검(붉은 보석 변형)을 복사한 프리팹(09-25 연결).
             go = await Managers.AddressableManager.InstantiateAsync(QSwordKey, socket);
         }
         catch (System.OperationCanceledException) { return; }
 
-        if (go == null) return;   // 미수급 — 무기를 숨긴 것만으로도 "활로 후려치기"는 사라진다
+        if (go == null) return;   // 키 없음 — 무기를 숨긴 것만으로도 "활로 후려치기"는 사라진다
 
         // 스킬이 이미 끝났거나 무기가 복구된 뒤라면 방금 만든 검은 쓸 데가 없다.
         if (_hiddenWeapon == null && _qSword == null)
@@ -278,7 +298,7 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         }
 
         go.transform.localPosition = Vector3.zero;
-        go.transform.localRotation = Quaternion.identity;
+        go.transform.localRotation = localRotation;
         _qSword = go;
     }
 

@@ -14,9 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MainWeaponSO
   weaponDisplayKey: T3_Greatsword_Display
   weaponPrefabKey: T3_Greatsword_Weapon
-  displayName: 각성한 마르미아도아즈
+  displayName: "\uAC01\uC131\uD55C \uB9C8\uB974\uBBF8\uC544\uB3C4\uC544\uC988"
+  tagline: 
+  uiThemeColor: {r: 0, g: 0, b: 0, a: 0}
   iconKey: T3_GreatswordIcon
-  icon: {fileID: 21300000, guid: 241382dec3ea95c4b9172945626373fb, type: 3}
+  icon: {fileID: 21300000, guid: a37d138eb40c9e4468dea6b2397fb90e, type: 3}
   tier: 3
   rarity: 2
   baseAttack: 55
@@ -33,6 +35,7 @@ MonoBehaviour:
   trailVfxPrefab: {fileID: 6307073716109815289, guid: 8305f6acb8fa3f84296d070e62a8b04d,
     type: 3}
   weaponType: 5
+  evolution: {fileID: 0}
   skillQ: {fileID: 11400000, guid: 711b986f371f6364ab02fc436d44d180, type: 2}
   skillE: {fileID: 11400000, guid: 61bfd2ef1d10aa04786a53d9efdb94a0, type: 2}
   holdThreshold: 3

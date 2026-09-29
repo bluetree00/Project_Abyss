@@ -68,7 +68,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _EmissiveMask1:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 0ad00a06a94fa4b46802416567d03a15, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _EmissivePannerMap:
@@ -76,7 +76,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _EmissivePannerMap1:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: c4109af8e31d944409b5aac964562745, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
@@ -161,7 +161,7 @@ Material:
     - _DoubleSidedNormalMode: 2
     - _DstBlend: 0
     - _EmissiveBoots1: 1
-    - _EmissiveBoots2: 0
+    - _EmissiveBoots2: 2
     - _EmissiveBoots3: 0
     - _EmissiveBoots4: 0
     - _EmissiveBoots5: 0
@@ -225,11 +225,11 @@ Material:
     - _EmissiveColor02: {r: 0, g: 0, b: 0, a: 0}
     - _EmissiveColor03: {r: 0, g: 0, b: 0, a: 0}
     - _EmissiveColor04: {r: 0, g: 0, b: 0, a: 0}
-    - _EmissiveColor2: {r: 0, g: 0, b: 0, a: 0}
+    - _EmissiveColor2: {r: 0.62, g: 0.25, b: 1, a: 1}
     - _EmissiveColor3: {r: 0, g: 0, b: 0, a: 0}
     - _EmissiveColor4: {r: 0, g: 0, b: 0, a: 0}
     - _EmissiveColor5: {r: 0, g: 0, b: 0, a: 0}
     - _PannerProperty: {r: 0.05, g: 0, b: 0, a: 0}
-    - _PannerProperty1: {r: 0, g: 0, b: 0, a: 0}
+    - _PannerProperty1: {r: 0.05, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

@@ -1,15 +1,6 @@
-public class ActNoneState : ILayerState<ActState> //act 상태의 idle의 역활을 수행해야함 
+public class ActNoneState : LayerStateBase<ActState> //act 상태의 idle의 역활을 수행해야함 
 {
-    private PlayerController _controller;
-    private ILayerStateChanger<ActState> _stateChanger;
-
-    public void Init(PlayerController controller, ILayerStateChanger<ActState> stateChanger)
-    {
-        _controller = controller;
-        _stateChanger = stateChanger;
-    }
-
-    public void Enter()
+    public override void Enter()
     {
         // 공격 플래그만 초기화 — LocoSM은 건드리지 않는다.
         // (공중에서 공격이 끝나도 LocoState.Air는 유지되어야 착지 감지가 계속 동작)
@@ -25,7 +16,4 @@ public class ActNoneState : ILayerState<ActState> //act 상태의 idle의 역활
                 anim.CrossFadeInFixedTime("MoveBlend", 0.14f);
         }
     }
-
-    public void Update() { }
-    public void Exit() { }
 }

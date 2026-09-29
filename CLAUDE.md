@@ -161,8 +161,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - `PlayerController.cs` — 플레이어 컨트롤러
 
 ### 씬 — `Assets/RelicFairy/Scenes/`
-- `Logo.unity`, `Lobby.unity`
-- `GameScenes/BaseCamp.unity` — 베이스캠프
-- `GameScenes/Tutorial.unity`
-- `GameScenes/GameScene_Ch1.unity` ~ `GameScene_Ch4.unity` — 챕터별 인게임
-- `GameScenes/GameScene_LichTest.unity` — 리치 보스 테스트씬
+- `Build/` — **빌드 설정에 들어가는 씬만** (Lobby · Tutorial · BaseCamp · Game_Intro · GameScene_Ch1~4). 씬별 라이팅/NavMesh 폴더도 여기
+- `Test/` — 테스트 전용 (빌드 제외)
+  - `BaseCamp_Test.unity` — 테스트 허브: 챕터·시작 지점·보스 아레나를 골라 바로 진입
+  - `GameScene_LichTest.unity` — 리치 보스 테스트씬
+- `Shared/` — 여러 씬이 쓰는 스카이박스·셰이더·포스트프로세스 프로파일
+- `Unused/` — 빌드에서 빠진 씬(Logo)

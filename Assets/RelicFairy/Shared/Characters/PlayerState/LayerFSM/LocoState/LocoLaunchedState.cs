@@ -6,24 +6,18 @@ using UnityEngine;
 /// 착지 후 짧은 회복 경직과 무적(i-frame)을 주고 Idle/Move로 복귀 — 즉시 재피격/무한 저글링 방지.
 /// 진입 방향은 PlayerController.LaunchFrom이 세팅하고 이 상태가 소비한다.
 /// </summary>
-public class LocoLaunchedState : ILayerState<LocoState>
+public class LocoLaunchedState : LayerStateBase<LocoState>
 {
     // 진입 직후엔 아직 발이 지면에 닿아 있어 IsGrounded가 true → 즉시 착지로 오판하는 것을 막는 최소 체공 시간.
     private const float MinAirTime = 0.12f;
     // 물리 이상(끼임 등) 대비 안전 탈출.
     private const float SafetyTimeout = 4f;
 
-    private PlayerController _controller;
-    private ILayerStateChanger<LocoState> _stateChanger;
-
     private float _airElapsed;
     private bool  _landed;
     private float _landRecoveryEnd;
 
-    public void Init(PlayerController controller, ILayerStateChanger<LocoState> stateChanger)
-    { _controller = controller; _stateChanger = stateChanger; }
-
-    public void Enter()
+    public override void Enter()
     {
         var data = _controller.CharacterData;
         _airElapsed = 0f;
@@ -50,7 +44,7 @@ public class LocoLaunchedState : ILayerState<LocoState>
         _controller.Anim.CrossFadeInFixedTime("HitLaunch", 0.06f);
     }
 
-    public void Update()
+    public override void Update()
     {
         // 착지 후 회복 경직 — 끝나면 복귀
         if (_landed)
@@ -77,7 +71,7 @@ public class LocoLaunchedState : ILayerState<LocoState>
             Land();
     }
 
-    public void Exit()
+    public override void Exit()
     {
         _controller.SetMoveScale(1f);
     }

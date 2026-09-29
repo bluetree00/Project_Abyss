@@ -12,6 +12,7 @@ namespace RelicFairy.Monster
         Phase1_Open   = 1,  // 봉인 변형 — HoodDn + Book + Clothing     (Style 2)
         Phase1_Skirt  = 2,  // 봉인 변형 — HoodDn + Book + Clothing + Skirt (Style 3)
         Phase2        = 3,  // 해방 — 로브·책 전체 OFF, 뼈 노출          (Style 4/5)
+        Phase2_Bound  = 4,  // 봉인기 2페이지 — 책 유지 + 낫 + 의복 (사슬 이펙트는 별도)
     }
 
     /// <summary>
@@ -127,6 +128,14 @@ namespace RelicFairy.Monster
             Toggle(_bookEquip,       false);
             Toggle(_bookss,          false);
             Toggle(_scytheEquipRoot, false);
+        }
+
+        /// <summary>낫만 잠시 숨기거나(투척 중) 현재 폼대로 되돌린다.</summary>
+        public void SetScytheVisible(bool visible)
+        {
+            int  idx     = (int)CurrentForm;
+            bool formHas = _presets != null && idx >= 0 && idx < _presets.Length && _presets[idx].scytheEquipRootActive;
+            Toggle(_scytheEquipRoot, visible && formHas);
         }
 
         /// <summary>모든 관리 오브젝트를 즉시 숨긴다. 등장 연출 전 초기 상태에 사용.</summary>
@@ -267,6 +276,17 @@ namespace RelicFairy.Monster
                     clothingActive        = false,
                     skirtSeparateActive   = false,
                     hoodDownActive        = false,
+                    hoodUpActive          = false,
+                },
+                new FormPreset   // [4] Phase2_Bound — 봉인기 2페이지: 책 유지 + 낫 + 의복, 후드 내림
+                {
+                    formName              = "Phase2_Bound",
+                    bookActive            = true,
+                    bookssActive          = false,
+                    scytheEquipRootActive = true,
+                    clothingActive        = true,
+                    skirtSeparateActive   = false,
+                    hoodDownActive        = true,
                     hoodUpActive          = false,
                 },
             };

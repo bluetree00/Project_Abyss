@@ -102,11 +102,12 @@ public sealed class CombatChallengeOverlay : MonoBehaviour
 
     private string ObjectiveText() => _type switch
     {
-        OverlayType.TimeLimit => $"[속공] 제한시간 {_param:0}초 — 빠를수록 높은 등급",
-        OverlayType.Hitless   => $"[무결] 피격 {Mathf.RoundToInt(_param)}회 이하 — 적을수록 높은 등급",
-        OverlayType.Survival  => "[생존] 높은 체력으로 클리어 — 남은 HP가 많을수록 높은 등급",
-        OverlayType.NoHeal    => "[고행] 회복 봉인 — 회복 없이 체력을 지킬수록 높은 등급",
-        OverlayType.Berserk   => "[배수진] 저체력 유지 — 위험할수록 높은 등급",
+        // 등급 기준을 수치로 — 「빠를수록 · 적을수록 높은 등급」은 얼마나 해야 하는지 말하지 않았다(09-29). 기준은 아래 GradeBy* 와 같다.
+        OverlayType.TimeLimit => $"[속공] 제한 {_param:0}초 — {_param * 0.5f:0}초 안 플래티넘 · {_param * 0.75f:0}초 골드 · {_param:0}초 실버",
+        OverlayType.Hitless   => $"[무결] 피격 0회 플래티넘 · 1회 골드 · {Mathf.Max(1, Mathf.RoundToInt(_param))}회 이하 실버",
+        OverlayType.Survival  => "[생존] 클리어 때 HP 85% 이상 플래티넘 · 65% 골드 · 40% 실버",
+        OverlayType.NoHeal    => "[고행] 회복 봉인 — 클리어 때 HP 70% 이상 플래티넘 · 50% 골드 · 28% 실버",
+        OverlayType.Berserk   => "[배수진] 평균 HP 25% 이하 플래티넘 · 40% 골드 · 60% 실버",
         _                     => "챌린지",
     };
 

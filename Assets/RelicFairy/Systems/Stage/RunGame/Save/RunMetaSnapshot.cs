@@ -67,5 +67,8 @@ public struct RunMetaSnapshot
     public int refineUseCount;
     public int maxEnhanceLevel;
 
+    /// <summary>심연 깊이(순환 회차). 저장하지 않으면 순환 중 이어하기가 깊이 0 — 적 배율이 풀린다.</summary>
+    public int abyssDepth;
+
     public List<CooldownKV> cooldowns;  // RunSequencer 쿨다운
 }

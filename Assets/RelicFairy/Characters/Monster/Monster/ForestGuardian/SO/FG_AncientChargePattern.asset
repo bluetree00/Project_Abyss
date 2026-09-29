@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: abcbb9b50d3e9074e95efce93db67fb2, type: 3}
+  m_Name: FG_AncientChargePattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.FGAncientChargePatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: fl2_ancient_charge
+  breakOverride: -1
+  minRange: 8
+  maxRange: 40
+  chargeCount: 3
+  firstWindup: 0.8
+  followWindup: 0.55
+  lockDuration: 0.4
+  windupTurnSpeed: 300
+  recoveryDuration: 0.8
+  chargeSpeed: 17
+  overshoot: 3
+  stopBeforeEdge: 1.5
+  width: 2.6
+  damageMultiplier: 1.2
+  knockbackMultiplier: 1.6
+  hitRadius: 1.8
+  chargeSfx: {fileID: 8300000, guid: 178eb6f2b98fe5345a9b2793ae820c66, type: 3}

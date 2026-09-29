@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: item_t3_elec_static
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
   itemId: item_t3_elec_static
-  displayName: "\uC815\uC804\uC758 \uB8EC"
+  displayName: "\uD718\uAC10\uB294 \uBC88\uAC1C\uC758 \uB8EC"
   icon: {fileID: 0}
   iconKey: 
   rarity: 2

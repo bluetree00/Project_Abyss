@@ -211,7 +211,7 @@ public sealed class RangedPartsState
     }
 
     /// <summary>폭발 피해 = 본체 피해 × 이 비율.</summary>
-    private const float ExplodeDamageRatio = 0.5f;
+    public const float ExplodeDamageRatio = 0.5f;   // 표시(PartValueText)도 이 값을 읽는다
 
     private int IndexOf(string partId)
     {

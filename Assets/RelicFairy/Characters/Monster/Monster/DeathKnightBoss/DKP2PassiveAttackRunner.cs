@@ -228,7 +228,7 @@ public class DKP2PassiveAttackRunner
                     {
                         int dmg = Mathf.Max(1,
                             (int)(_ctx.Config.stat.attackPower * _phantomSO.damageMultiplier));
-                        player.TakeDamage(dmg);
+                        player.TakeDamage(dmg, _ctx.Monster.gameObject, false, HitWeight.Light);   // 수동 공격 — 약
                         Vector3 kb = (_ctx.Runtime.PlayerTarget.position - cellCenter).normalized;
                         kb.y = 0.2f;
                         player.ApplyKnockback(

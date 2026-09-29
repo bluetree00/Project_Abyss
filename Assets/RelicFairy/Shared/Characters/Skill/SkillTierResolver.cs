@@ -8,12 +8,14 @@ using UnityEngine;
 /// 닿고 스킬엔 닿지 않았던 정확한 원인.
 ///
 /// <list type="bullet">
-/// <item>근접(무형검·카타나·대검) — 강화 레벨이 임계(기본 +5 / +10)를 넘을 때마다 한 단계.
+/// <item>근접(무형검·카타나·대검) — 강화 레벨이 임계(기본 +3 / +6)를 넘을 때마다 한 단계.
 ///       진화 시 강화 레벨이 계승되므로 절대값 기준이 자연스럽게 이어진다.</item>
-/// <item>원거리(활·석궁) — 원거리 무기 강화는 폐지됐으므로 파츠 총레벨이 임계(기본 4 / 10)를 넘을 때마다 한 단계.
+/// <item>원거리(활·석궁) — 원거리 무기 강화는 폐지됐으므로 파츠 총레벨이 임계(기본 2 / 10)를 넘을 때마다 한 단계.
 ///       종류가 아니라 총량을 보므로 어떤 파츠를 골랐든 스킬은 같이 자란다.</item>
 /// </list>
 /// 임계는 <see cref="EnhanceTableSO"/>가 소유한다(밸런스 데이터). 테이블 미로드면 내장 기본값.
+/// 09-25 임계를 실제 도달 범위로 당겼다(근접 +5/+10 → +3/+6, 원거리 4/10 → 2/10). 런당 재료 약 100개로 +10은 0.2%만 닿아
+/// 3단계가 사실상 없었다. 지금: 2단계 ≈ 재료 5~6개(매 런 초반), 3단계 ≈ 30개(근접은 +6 유지 확률 약 45%) — 근접·원거리 비용을 맞췄다.
 /// 스킬 Runtime은 매 발동 OnEnter에서 읽으므로 재련소를 나온 다음 발동부터 바로 반영된다.
 /// </summary>
 public static class SkillTierResolver
@@ -21,8 +23,8 @@ public static class SkillTierResolver
     public const int MinTier = 1;
     public const int MaxTier = 3;
 
-    private static readonly int[] DefaultMeleeMilestones  = { 5, 10 };
-    private static readonly int[] DefaultRangedMilestones = { 4, 10 };
+    private static readonly int[] DefaultMeleeMilestones  = { 3, 6 };
+    private static readonly int[] DefaultRangedMilestones = { 2, 10 };
 
     /// <summary>현재 스킬 단계(1~3).</summary>
     public static int Resolve(WeaponData wd)
@@ -33,7 +35,7 @@ public static class SkillTierResolver
     }
 
     /// <summary>
-    /// 다음 단계 정보(표시용). 다음 임계가 <paramref name="reachableMax"/>를 넘으면(무형검 상한 6에서 +10 등)
+    /// 다음 단계 정보(표시용). 다음 임계가 <paramref name="reachableMax"/>를 넘으면(상한에 막힌 무기)
     /// 도달 불가로 보고 false.
     /// </summary>
     public static bool TryGetNext(WeaponData wd, int reachableMax, out int nextTier, out int remaining)

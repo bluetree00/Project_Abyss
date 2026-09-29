@@ -145,9 +145,10 @@ public class DragonSummonPatternSO : BossPatternSO
     public override bool CanExecute(BossPatternContext ctx)
     {
         if (ctx.Blackboard is not DragonBossBlackboard bb) return false;
-        float hp = ctx.Ctx.Config?.stat.maxHp > 0
-            ? (float)ctx.Ctx.Runtime.CurrentHp / ctx.Ctx.Config.stat.maxHp
-            : 1f;
+        // 2페이지(전환 포함)엔 새끼 용 소환이 없다(09-28 설계 §4)
+        if (ctx.Ctx.Monster is DragonBossMonster dragon && dragon.IsAbyssPage) return false;
+        // 보스가 보고하는 비율 — 악몽기엔 1페이지 기준(1 → 0)이라 70/40/10 경계가 1페이지 안에 든다
+        float hp = ctx.Boss?.HpRatio ?? 1f;
         return _summonPhase switch
         {
             DragonSummonPhase.At70 => hp <= 0.7f && !bb.HasSummonedAt70,

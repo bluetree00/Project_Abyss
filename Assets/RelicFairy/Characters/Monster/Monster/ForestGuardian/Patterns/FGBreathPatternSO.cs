@@ -60,8 +60,14 @@ public class FGBreathPatternSO : BossPatternSO
 
     // ── 이동 ──────────────────────────────────────────────
     [Header("Breath — Rotation")]
-    [Tooltip("플레이어 추적 회전 속도 (°/s)")]
+    [Tooltip("경고 중 플레이어 추적 회전 속도 (°/s)")]
     public float rotationSpeed = 60f;
+
+    [Tooltip("경고 끝 이 시간(초) 동안은 조준을 고정한다 — 가이드가 판정 색으로 바뀐 뒤 옆으로 비키면 피한다(09-28 「레이저가 플레이어 위치로 바로 쏴서 못 피한다」)")]
+    public float aimLockTime = 0.4f;
+
+    [Tooltip("뿜는 동안 플레이어를 따라 도는 속도 (°/s) — 달리기로 둘레를 돌면 벗어날 수 있게 느리게")]
+    public float breathTrackSpeed = 22f;
 
     // ── 데미지 ────────────────────────────────────────────
     [Header("Breath — Damage")]
@@ -73,9 +79,6 @@ public class FGBreathPatternSO : BossPatternSO
 
     // ── 비주얼 ────────────────────────────────────────────
     [Header("Breath — Visual")]
-    [Tooltip("직사각형 경고 장판 프리팹 (RectWarning 컴포넌트 포함). null이면 표시 안 함.")]
-    public GameObject warningPrefab;
-
     [Tooltip("브레스 이펙트 프리팹 (EarthBeam 등). 보스 왼손 위치에 배치. null이면 재생 안 함.")]
     public GameObject breathVfxPrefab;
 
@@ -120,11 +123,11 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
     private enum Phase { Warning, BreathStart, Breathing, BreathEnd }
 
     private Phase       _phase;
+    private bool        _aimLocked;
     private float       _timer;
     private float       _damageTimer;
     private float       _currentRange;
     private GameObject  _warningGO;
-    private RectWarning _rectWarning;
     private GameObject  _breathVfxGO;
     private Transform   _beamBody;
     private AudioSource _beamAudioSource;
@@ -138,6 +141,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
 
     public override void Enter(MonsterContext ctx)
     {
+        _aimLocked = false;
         _phase        = Phase.Warning;
         _timer        = 0f;
         _damageTimer  = 0f;
@@ -165,15 +169,23 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
         {
             // ── Warning : 경고장판 서서히 표시, 보스가 플레이어 방향 추적 ──
             case Phase.Warning:
-                RotateTowardPlayer(ctx);
-                UpdateWarningTransform(ctx);
+                if (_timer < Data.warningDuration - Data.aimLockTime)
+                {
+                    RotateTowardPlayer(ctx, Data.rotationSpeed);
+                    UpdateWarningTransform(ctx);
+                }
+                else if (!_aimLocked)
+                {
+                    _aimLocked = true;
+                    PatternGuideHelper.Arm(_warningGO);   // 조준 고정 — 이제 줄이 안 움직인다(피할 때)
+                }
 
-                if (_rectWarning != null && Data.warningDuration > 0f)
-                    _rectWarning.SetFillProgress(_timer / Data.warningDuration);
+                if (Data.warningDuration > 0f)
+                    PatternGuideHelper.SetProgress(_warningGO, _timer / Data.warningDuration);
 
                 if (_timer >= Data.warningDuration)
                 {
-                    DespawnWarning();
+                    PatternGuideHelper.Arm(_warningGO);   // 뿜기 시작까지 판정 색으로 — 브레스가 나오면 이펙트가 대신한다
                     _timer = 0f;
                     _phase = Phase.BreathStart;
                     PlayAnim(ctx, AnimBreathStart, 0.1f);
@@ -187,6 +199,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
                     _timer       = 0f;
                     _damageTimer = 0f;
                     _phase       = Phase.Breathing;
+                    DespawnWarning();
                     SpawnBreathVfx(ctx);
                     PlayAnim(ctx, AnimBreathLoop, 0.05f);
                 }
@@ -206,7 +219,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
                 }
 
                 UpdateCurrentRange(ctx);
-                RotateTowardPlayer(ctx);
+                RotateTowardPlayer(ctx, Data.breathTrackSpeed);
                 UpdateBreathVfxTransform(ctx);
                 SyncBreathEffectScale();
 
@@ -303,7 +316,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
             ctx.Transform.rotation = Quaternion.LookRotation(dir);
     }
 
-    private void RotateTowardPlayer(MonsterContext ctx)
+    private void RotateTowardPlayer(MonsterContext ctx, float degPerSec)
     {
         if (ctx.Runtime.PlayerTarget == null) return;
         Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
@@ -312,7 +325,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
 
         Quaternion target = Quaternion.LookRotation(dir);
         ctx.Transform.rotation = Quaternion.RotateTowards(
-            ctx.Transform.rotation, target, Data.rotationSpeed * Time.deltaTime);
+            ctx.Transform.rotation, target, degPerSec * Time.deltaTime);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -335,7 +348,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
         if (player == null) return;
 
         int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
-        player.TakeDamage(dmg);
+        player.TakeDamage(dmg, ctx.Monster.gameObject, false, HitWeight.Light);   // 브레스 틱 — 약
 
         if (Data.knockbackMultiplier > 0f)
         {
@@ -351,35 +364,17 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
 
     private void SpawnWarning(MonsterContext ctx)
     {
-        if (Data.warningPrefab == null) return;
-
-        Vector3 pos = ctx.Transform.position;
-        pos.y += 0.02f;
-
-        _warningGO = Managers.ObjectPooler.SpawnFromPrefab(Data.warningPrefab, ObjectPoolerManager.PoolType.Effect, pos, ctx.Transform.rotation);
-        // 피벗이 근거리 끝 → scale Z = 사정거리(맵 경계까지), X = 폭
-        _warningGO.transform.localScale = new Vector3(Data.width, 1f, GetFullRange(ctx));
-
-        _rectWarning = _warningGO.GetComponent<RectWarning>();
-        _rectWarning?.SetFillProgress(0f);
+        // 보스 발밑에서 앞으로 사정거리(맵 경계까지) · 폭 width — 예전 직사각형 장판과 같은 자리
+        _warningGO = PatternGuideHelper.Prepare(
+            PatternGuideHelper.Beam(ctx.Transform.position, ctx.Transform.forward, GetFullRange(ctx), Data.width, PatternGuideHelper.Telegraph),
+            ForestGuardianMonster.GuideFlow);
     }
 
-    /// <summary>Warning 중 보스 회전에 따라 경고 장판 위치·회전 갱신.</summary>
+    /// <summary>Warning 중 보스 회전에 따라 가이드 위치·회전 갱신.</summary>
     private void UpdateWarningTransform(MonsterContext ctx)
-    {
-        if (_warningGO == null) return;
-        Vector3 pos = ctx.Transform.position;
-        pos.y += 0.02f;
-        _warningGO.transform.SetPositionAndRotation(pos, ctx.Transform.rotation);
-    }
+        => PatternGuideHelper.PlaceBeam(_warningGO, ctx.Transform.position, ctx.Transform.forward, GetFullRange(ctx), Data.width);
 
-    private void DespawnWarning()
-    {
-        if (_warningGO == null) return;
-        Managers.ObjectPooler.Despawn(_warningGO);
-        _warningGO   = null;
-        _rectWarning = null;
-    }
+    private void DespawnWarning() => PatternGuideHelper.SafeDestroy(ref _warningGO);
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 브레스 VFX

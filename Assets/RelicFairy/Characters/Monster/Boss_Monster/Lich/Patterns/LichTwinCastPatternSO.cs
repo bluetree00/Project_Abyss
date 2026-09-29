@@ -3,57 +3,60 @@ using UnityEngine;
 namespace RelicFairy.Monster
 {
 /// <summary>
-/// 리치 이중 영창 (Twin Cast) 패턴 — Phase 1 심리전(페인트).
+/// M4 「쌍둥이 주문」 — 플레이어 좌우의 마법진 둘 중 진짜 하나만 터진다. 리치 설계서 §3-2 · §13.
 ///
-/// 흐름: 차징(castDuration) → 페이크 점멸(fakeFlashDuration, 빨강이지만 발사 안 함)
-///       → 미끼 구간(feintGapDuration, 노랑 복귀) → 진짜 발사(빨강 + 투사체) → 복귀
-///
-/// UX: 첫 빨강(페이크)에 패닉 회피한 플레이어는 i-frame이 끝난 뒤 진짜 발사에 맞는다.
-///     "진짜 발사 신호(투사체)에 맞춰 회피"를 학습시키는 페인트.
-///     조준은 Enter에 고정 → 텔레그래프 라인은 정직하며, 속임수는 '타이밍'에만 있다.
-///
-/// 애니: MagicBolt 클립 재사용(차징 + 진짜 발사 시 재시전 제스처). 신규 Animator 상태 없음.
+/// O 두 원(castDuration) — 색은 같고 <b>움직임으로</b> 가른다: 진짜는 테두리가 안쪽으로 조여들고, 가짜는 바깥으로 흩어진다.
+///   리치는 플레이어를 축으로 호를 그리며 옆으로 돈다
+/// → S 신호(signalDuration) — 진짜가 빨개지고 가짜는 사라진다
+/// → A 폭발(activeDuration) — 진짜 원 안(겹친 곳 포함)이 맞는다
+/// → E 반격창(endDuration) → R 복귀
+/// 두 원은 플레이어를 가운데 두고 겹친다 — 가짜 쪽으로 반걸음 이상 옮기면 산다.
 /// </summary>
 [CreateAssetMenu(menuName = "RelicFairy/Boss/Lich/Lich_TwinCastPattern", fileName = "Lich_TwinCastPattern")]
 public class LichTwinCastPatternSO : BossPatternSO
 {
-    [Header("Twin Cast — Range")]
-    [Tooltip("유효 사정거리 (m)")]
-    public float maxRange = 25f;
-
-    [Header("Twin Cast — Timing")]
-    [Tooltip("최초 차징(노랑 예고) 시간 (초)")]
-    public float castDuration = 0.7f;
-    [Tooltip("페이크 빨강 점멸 시간 (초) — 발사하지 않는다")]
-    public float fakeFlashDuration = 0.25f;
-    [Tooltip("페이크 후 노랑 복귀(미끼) 시간 (초). 길수록 페인트가 강함.")]
-    public float feintGapDuration = 0.45f;
-    [Tooltip("발사 후 복귀 대기 시간 (초)")]
-    public float recoveryDuration = 0.6f;
-
-    [Header("Twin Cast — Projectile")]
-    [Tooltip("투사체 프리팹 (MonsterProjectile 필요). null이면 즉발 처리.")]
-    public GameObject projectilePrefab;
-    [Tooltip("투사체 비행 속도 (m/s)")]
-    public float projectileSpeed = 14f;
-    [Tooltip("투사체 최대 비행 거리 (m)")]
-    public float projectileRange = 30f;
-
-    [Header("Twin Cast — Damage")]
-    [Tooltip("기본 attackPower에 곱할 배율")]
-    public float damageMultiplier = 1.1f;
-
-    [Header("Twin Cast — Telegraph")]
-    [Tooltip("발사 경로 빔 너비 (m)")]
-    public float trajectoryBeamWidth = 0.12f;
-
-    [Header("Twin Cast — VFX 훅 (추후 가이드에 맞춰 적용)")]
-    [Tooltip("차징~발사 동안 보스 시전 지점에 표시할 VFX. null이면 미사용.")]
-    public GameObject castVfxPrefab;
-
-    [Header("Twin Cast — Cooldown")]
-    [Tooltip("패턴 완료 후 재사용 대기 시간 (초)")]
+    [Header("M4 — 발동")]
+    public float maxRange        = 25f;
     public float patternCooldown = 7f;
+
+    [Header("M4 — 타이밍 (초)")]
+    public float castDuration     = 1.0f;
+    public float signalDuration   = 0.2f;
+    public float activeDuration   = 0.4f;
+    public float endDuration      = 0.5f;
+    public float recoveryDuration = 0.3f;
+
+    [Header("M4 — 원")]
+    public float circleRadius = 5f;
+    [Tooltip("플레이어에서 두 원 중심까지 옆 거리 (m) — 반경보다 작아야 두 원이 플레이어 위에서 겹친다")]
+    public float sideOffset   = 3f;
+    [Tooltip("진짜 원이 이 배율에서 1로 조여든다")]
+    public float realStartScale = 1.3f;
+    [Tooltip("가짜 원이 1에서 이 배율로 흩어진다")]
+    public float fakeEndScale   = 1.35f;
+
+    [Header("M4 — 판정")]
+    public float damageMultiplier    = 1.2f;
+    public float knockbackMultiplier = 0.8f;
+
+    [Header("M4 — 움직임")]
+    [Tooltip("시전하는 동안 플레이어를 축으로 도는 각도 (도)")]
+    public float orbitAngle = 35f;
+    [Tooltip("호의 옆 부풂 (m)")]
+    public float orbitArc   = 2f;
+
+    [Header("M4 — 바닥 파괴 (연출·UX 시나리오 §12-4)")]
+    [Tooltip("진짜 원이 터진 자리의 칸을 잠깐 부순다 — 칸 중심이 이 반경(m) 안. 0이면 없음")]
+    public float breakRadius  = 0f;
+    [Tooltip("붉게 흔들리는 시간(초)")]
+    public float breakWarn    = 0.6f;
+    [Tooltip("부서진 뒤 스스로 복구까지(초). 음수 = 복구 패턴(M8 원소 재편 · T1 전환)까지 구멍으로 남아 누적")]
+    public float breakSeconds = 4f;
+
+    [Header("M4⁺ — 악몽판(완전설계 §4-2): 원 셋 중 진짜 하나")]
+    [Tooltip("가짜 원 수 — 1이면 좌우 둘, 2면 플레이어 둘레 120°마다 셋(악몽판)")]
+    [Range(1, 2)]
+    public int   fakeCount    = 1;
 
     // ── 런타임 ───────────────────────────────────────────
     private LichTwinCastState _state;
@@ -73,20 +76,30 @@ public class LichTwinCastPatternSO : BossPatternSO
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// LichTwinCastState — UnInterruptible (보스 고정, 중단 불가)
+// LichTwinCastState — 중단 불가(피해는 받음)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 public class LichTwinCastState : UnInterruptibleState<LichTwinCastPatternSO>
 {
-    private enum Phase { Cast, Fake, Gap, Recovery }
+    private enum Phase { Cast, Signal, Active, End, Recovery }
 
     private Phase      _phase;
     private float      _timer;
-    private bool       _fired;
-    private Vector3    _lockedTargetPos;
-    private GameObject _castGuide;
-    private GameObject _beamGuide;
-    private GameObject _castVfx;
+    private const int MaxFakes = 2;
+
+    private readonly Vector3[]    _fake          = new Vector3[MaxFakes];
+    private readonly GameObject[] _fakeDisc      = new GameObject[MaxFakes];
+    private readonly GameObject[] _fakeVfx       = new GameObject[MaxFakes];
+    private readonly Vector3[]    _fakeDiscScale = new Vector3[MaxFakes];
+    private readonly Vector3[]    _fakeVfxScale  = new Vector3[MaxFakes];
+
+    private Vector3    _real;
+    private int        _fakes;
+    private GameObject _realDisc;
+    private GameObject _realVfx;
+    private GameObject _castFlare;
+    private Vector3    _realDiscScale;
+    private Vector3    _realVfxScale;
 
     public LichTwinCastState(LichTwinCastPatternSO data) : base(data) { }
 
@@ -94,53 +107,109 @@ public class LichTwinCastState : UnInterruptibleState<LichTwinCastPatternSO>
     {
         _phase = Phase.Cast;
         _timer = 0f;
-        _fired = false;
 
+        Vector3 player = LichPatternUtil.PlayerFloorPos(ctx);
+        LichPatternUtil.FaceInstant(ctx, player);
         ctx.Animator?.CrossFade("MagicBolt", 0.1f);
 
-        var mc = (ctx.Monster as LichMonster)?.MovementController;
-        mc?.RequestMovementState(LichMovementState.IdleHover);
+        // 둘이면 리치 → 플레이어 방향의 옆축(좌우), 셋이면 플레이어 둘레 120°마다. 진짜는 무작위.
+        Vector3 fwd = player - ctx.Transform.position;
+        fwd.y = 0f;
+        fwd = fwd.sqrMagnitude > 0.001f ? fwd.normalized : ctx.Transform.forward;
+        _fakes = Mathf.Clamp(Data.fakeCount, 1, MaxFakes);
+        int   total = _fakes + 1;
+        float step  = 360f / total;
+        float first = total == 2 ? 90f : Random.Range(0f, 360f);
+        int   real  = Random.Range(0, total);
+        for (int i = 0, f = 0; i < total; i++)
+        {
+            Vector3 at = player + Quaternion.Euler(0f, first + step * i, 0f) * fwd * Data.sideOffset;
+            if (i == real) _real = at;
+            else           _fake[f++] = at;
+        }
+
+        // 진짜는 조여들며 안이 차오르고, 가짜는 번지며 옅어진다(색은 같게 — 움직임으로 읽는다).
+        _realDisc = LichPatternUtil.PrepareTelegraph(
+            PatternGuideHelper.Disc(_real, Data.circleRadius * Data.realStartScale, LichPatternUtil.Arcane), LichPatternUtil.Arcane);
+        _realDiscScale = _realDisc != null ? _realDisc.transform.localScale : Vector3.one;
+
+        float vfxScale = Data.circleRadius / 5f;
+        _realVfx = LichVfx.PlayLoop(LichVfxSlot.TwinCircle, _real, Quaternion.identity, vfxScale * Data.realStartScale);
+        _realVfxScale = _realVfx != null ? _realVfx.transform.localScale : Vector3.one;
+        for (int f = 0; f < _fakes; f++)
+        {
+            _fakeDisc[f]      = PatternGuideHelper.Disc(_fake[f], Data.circleRadius, LichPatternUtil.Arcane);
+            _fakeDiscScale[f] = _fakeDisc[f] != null ? _fakeDisc[f].transform.localScale : Vector3.one;
+            _fakeVfx[f]       = LichVfx.PlayLoop(LichVfxSlot.TwinCircle, _fake[f], Quaternion.identity, vfxScale);
+            _fakeVfxScale[f]  = _fakeVfx[f] != null ? _fakeVfx[f].transform.localScale : Vector3.one;
+        }
+
+        var lich = LichPatternUtil.Lich(ctx);
+        Transform hand = lich != null ? lich.CastPoint : ctx.Transform;
+        _castFlare = LichVfx.PlayLoop(LichVfxSlot.CastFlare, hand.position, hand.rotation, 1f, hand);
+        lich?.PulseBook(Data.castDuration);
+        LichSfx.Play(LichSfxSlot.CircleSpawn, player);
+
+        // 플레이어를 축으로 호를 그리며 돈다 — 두 원 중 어느 쪽에서도 치우치지 않게 방향은 무작위.
+        var mc = lich?.MovementController;
         mc?.SetLocked(true);
-
-        FacePlayer(ctx);
-
-        // 조준 위치를 Enter 시점에 고정 — 이후 플레이어 이동과 무관(텔레그래프 라인 정직)
-        _lockedTargetPos = ctx.Runtime.PlayerTarget != null
-            ? ctx.Runtime.PlayerTarget.position
-            : ctx.Transform.position + ctx.Transform.forward * 10f;
-
-        _castGuide = PatternGuideHelper.Disc(_lockedTargetPos, 1.0f, PatternGuideHelper.Telegraph);
-        CreateBeam(ctx);
-
-        if (Data.castVfxPrefab != null && _castVfx == null)
-            _castVfx = Object.Instantiate(Data.castVfxPrefab, CastPoint(ctx), ctx.Transform.rotation);
+        if (mc != null && Data.orbitAngle > 0f)
+        {
+            float   sign = Random.value < 0.5f ? -1f : 1f;
+            Vector3 from = ctx.Transform.position - player;
+            from.y = 0f;
+            Vector3 dest = player + Quaternion.Euler(0f, Data.orbitAngle * sign, 0f) * from;
+            mc.ScriptMove(dest, Data.castDuration + Data.signalDuration + Data.activeDuration, Data.orbitArc * sign, facePlayer: true);
+        }
     }
 
     public override void Update(MonsterContext ctx)
     {
         _timer += Time.deltaTime;
-        UpdateCastVfx(ctx);
 
         switch (_phase)
         {
             case Phase.Cast:
-                FacePlayer(ctx);
-                if (_timer >= Data.castDuration) ToFake();
-                break;
-
-            case Phase.Fake:
-                // 페이크 빨강 — 발사하지 않는다. 패닉 회피 유도.
-                if (_timer >= Data.fakeFlashDuration) ToGap();
-                break;
-
-            case Phase.Gap:
-                // 노랑 복귀(미끼). 끝나는 순간 진짜 발사.
-                if (_timer >= Data.feintGapDuration)
+            {
+                float t = Mathf.Clamp01(_timer / Data.castDuration);
+                // 진짜: 크게 떴다가 판정 반경으로 조여든다. 가짜: 판정 반경에서 바깥으로 번진다.
+                float real = Mathf.Lerp(1f, 1f / Data.realStartScale, t * t);
+                float fake = Mathf.Lerp(1f, Data.fakeEndScale, t);
+                if (_realDisc != null) _realDisc.transform.localScale = LichPatternUtil.ScaleFlat(_realDiscScale, real);
+                if (_realVfx  != null) _realVfx.transform.localScale  = _realVfxScale * real;
+                PatternGuideHelper.SetProgress(_realDisc, t);
+                for (int f = 0; f < _fakes; f++)
                 {
-                    FireNow(ctx);
-                    _phase = Phase.Recovery;
-                    _timer = 0f;
+                    if (_fakeDisc[f] != null) _fakeDisc[f].transform.localScale = LichPatternUtil.ScaleFlat(_fakeDiscScale[f], fake);
+                    if (_fakeVfx[f]  != null) _fakeVfx[f].transform.localScale  = _fakeVfxScale[f] * fake;
+                    PatternGuideHelper.SetIntensity(_fakeDisc[f], Mathf.Lerp(1f, 0.35f, t));
                 }
+
+                if (t >= 1f)
+                {
+                    PatternGuideHelper.SetColor(_realDisc, LichPatternUtil.Lethal);
+                    PatternGuideHelper.SetFlow(_realDisc, LichPatternUtil.Lethal);
+                    PatternGuideHelper.SetIntensity(_realDisc, 2f);
+                    ClearFakes(0.3f);
+                    Next(Phase.Signal);
+                }
+                break;
+            }
+
+            case Phase.Signal:
+                if (_timer >= Data.signalDuration)
+                {
+                    Blast(ctx);
+                    Next(Phase.Active);
+                }
+                break;
+
+            case Phase.Active:
+                if (_timer >= Data.activeDuration) Next(Phase.End);
+                break;
+
+            case Phase.End:
+                if (_timer >= Data.endDuration) Next(Phase.Recovery);
                 break;
 
             case Phase.Recovery:
@@ -152,118 +221,45 @@ public class LichTwinCastState : UnInterruptibleState<LichTwinCastPatternSO>
 
     public override void Exit(MonsterContext ctx)
     {
-        PatternGuideHelper.SafeDestroy(ref _castGuide);
-        PatternGuideHelper.SafeDestroy(ref _beamGuide);
-        DestroyVfx(ref _castVfx);
-        (ctx.Monster as LichMonster)?.MovementController?.SetLocked(false);
+        PatternGuideHelper.SafeDestroy(ref _realDisc);
+        LichVfx.Stop(ref _realVfx);
+        ClearFakes(0f);
+        LichVfx.Stop(ref _castFlare);
 
-        var lich = ctx.Monster as LichMonster;
+        var lich = LichPatternUtil.Lich(ctx);
+        lich?.MovementController?.SetLocked(false);
         if (lich?.LichBB != null)
             lich.LichBB.TwinCastCooldown = Data.patternCooldown;
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 단계 전이
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    private void ToFake()
+    private void Next(Phase phase)
     {
-        _phase = Phase.Fake;
+        _phase = phase;
         _timer = 0f;
-        PatternGuideHelper.SetColor(_castGuide, PatternGuideHelper.Active);
-        PatternGuideHelper.SetColor(_beamGuide, PatternGuideHelper.Active);
     }
 
-    private void ToGap()
+    private void ClearFakes(float fade)
     {
-        _phase = Phase.Gap;
-        _timer = 0f;
-        PatternGuideHelper.SetColor(_castGuide, PatternGuideHelper.Telegraph);
-        PatternGuideHelper.SetColor(_beamGuide, PatternGuideHelper.Telegraph);
-    }
-
-    private void FireNow(MonsterContext ctx)
-    {
-        // 진짜 발사 — 재시전 제스처 + 투사체. 텔레그래프 가이드는 즉시 제거.
-        ctx.Animator?.CrossFade("MagicBolt", 0.05f);
-        PatternGuideHelper.SafeDestroy(ref _castGuide);
-        PatternGuideHelper.SafeDestroy(ref _beamGuide);
-        FireProjectile(ctx);
-    }
-
-    private void FireProjectile(MonsterContext ctx)
-    {
-        if (_fired) return;
-        _fired = true;
-
-        // 착탄 지점 Active 표시 (빨강, 0.4s) — 진짜 발사 신호
-        PatternGuideHelper.Sphere(_lockedTargetPos + Vector3.up * 1f, 0.5f, PatternGuideHelper.Active, lifetime: 0.4f);
-
-        Vector3 origin    = CastPoint(ctx);
-        Vector3 targetPos = _lockedTargetPos + Vector3.up * 1f;
-        Vector3 dir       = (targetPos - origin).normalized;
-
-        if (Data.projectilePrefab != null)
+        for (int f = 0; f < MaxFakes; f++)
         {
-            var go = Object.Instantiate(Data.projectilePrefab, origin, Quaternion.LookRotation(dir));
-            if (go.TryGetComponent<MonsterProjectile>(out var proj))
-            {
-                int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
-                proj.Init(dir, Data.projectileSpeed, Data.projectileRange, dmg, ctx.Config.stat.knockbackForce);
-            }
-        }
-        else
-        {
-            // 즉발 폴백: Enter 조준 라인 사정거리 내였으면 데미지
-            if (ctx.Runtime.PlayerTarget == null) return;
-            float dist = Vector3.Distance(ctx.Transform.position, _lockedTargetPos);
-            if (dist > Data.maxRange) return;
-            var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
-            if (player == null) return;
-            int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
-            player.TakeDamage(dmg);
+            PatternGuideHelper.SafeDestroy(ref _fakeDisc[f]);
+            LichVfx.Stop(ref _fakeVfx[f], fade);
         }
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 헬퍼
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    private void CreateBeam(MonsterContext ctx)
+    private void Blast(MonsterContext ctx)
     {
-        Vector3 origin   = CastPoint(ctx);
-        Vector3 aimPoint = _lockedTargetPos + Vector3.up * 1f;
-        Vector3 toTarget = aimPoint - origin;
-        float   aimDist  = toTarget.magnitude;
-        if (aimDist > 0.1f)
-            _beamGuide = PatternGuideHelper.Beam(
-                origin, toTarget.normalized, aimDist * 0.92f,
-                Data.trajectoryBeamWidth, PatternGuideHelper.Telegraph);
-    }
+        PatternGuideHelper.SafeDestroy(ref _realDisc);
+        LichVfx.Stop(ref _realVfx, 0.2f);
+        LichVfx.Stop(ref _castFlare, 0.2f);
 
-    private static Vector3 CastPoint(MonsterContext ctx) => ctx.Transform.position + Vector3.up * 1.5f;
+        LichVfx.Play(LichVfxSlot.TwinBlast, _real, Quaternion.identity, Data.circleRadius / 5f);
+        LichSfx.Play(LichSfxSlot.SlamImpact, _real, 0.8f);
+        LichCrack.Spawn(_real, Data.circleRadius * 1.6f, 10f);
 
-    private void UpdateCastVfx(MonsterContext ctx)
-    {
-        if (_castVfx == null) return;
-        _castVfx.transform.position = CastPoint(ctx);
-        _castVfx.transform.rotation = ctx.Transform.rotation;
-    }
-
-    private static void DestroyVfx(ref GameObject go)
-    {
-        if (go == null) return;
-        Object.Destroy(go);
-        go = null;
-    }
-
-    private static void FacePlayer(MonsterContext ctx)
-    {
-        if (ctx.Runtime.PlayerTarget == null) return;
-        Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
-        dir.y = 0f;
-        if (dir.sqrMagnitude > 0.001f)
-            ctx.Transform.rotation = Quaternion.LookRotation(dir);
+        bool hit = LichPatternUtil.HitCircle(ctx, _real, Data.circleRadius, Data.damageMultiplier, Data.knockbackMultiplier);
+        LichPatternUtil.Impact(LichImpact.Medium, hit);
+        LichPatternUtil.BreakFloor(_real, Data.breakRadius, Data.breakWarn, Data.breakSeconds);
     }
 }
 }

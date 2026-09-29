@@ -98,6 +98,48 @@ public class CharacterData : ScriptableObject
     [Tooltip("슬로모 동안 플레이어의 '실제 체감' 이동 배율. 1이면 평소와 같은 속도로 움직이고, 1보다 크면 더 빠르다. (내부적으로 시간배율의 역수까지 자동 보정)")]
     public float perfectDodgeSpeedBoost = 1.3f;
 
+    // 저스트 회피 보상(2026-09-18 설계) — 위험(공격 예고 반경 안으로 파고듦)에 맞는 대가.
+    // 슬로모만으로는 노릴 이유가 약했다. 피해 배율이 아니라 게이지·속도·추격 축이라
+    // 아이템 「구르기 후 첫 공격 강화」(첫 타 피해)와 겹치지 않는다.
+    [Header("저스트 회피 보상")]
+    [Tooltip("저스트 회피 성공 시 대시 게이지 환급량. 대시 비용과 같으면 성공한 회피가 공짜가 된다. 악몽 배율은 적용하지 않는다.")]
+    public float perfectDodgeStaminaRefund = 25f;
+    [Tooltip("반격 창(슬로모 동안) 공격 애니 속도 배수. 1이면 가속 없음.")]
+    public float perfectDodgeCounterSpeed = 1.5f;
+    [Tooltip("반격 창 안에서 적중 1회마다 대시 게이지 환급량.")]
+    public float perfectDodgeCounterHitRefund = 5f;
+    [Tooltip("반격 창 첫 공격이 원인 적에게 붙어 들어가는 최대 거리(m).")]
+    public float perfectDodgeCounterLungeReach = 6f;
+
+    // 저스트 회피 보상 연출(2026-09-19 설계 B안) — 보상이 설명 없이 일어나면 결함으로 읽힌다.
+    // 효과음 키는 비우면 소리 없이 넘어간다(리소스 확정 전).
+    [Header("저스트 회피 보상 연출")]
+    [Tooltip("저스트 회피 발동 효과음 키(SoundManager). 비우면 무음.")]
+    public string perfectDodgeTriggerSfx = "";
+    [Tooltip("반격 추격(먼 거리 첫 공격) 효과음 키. 비우면 무음.")]
+    public string perfectDodgeCounterDashSfx = "";
+    [Tooltip("반격 창 종료 효과음 키. 비우면 무음.")]
+    public string perfectDodgeCounterEndSfx = "";
+    [Tooltip("반격 공격마다 몸 발광을 순간적으로 올리는 배수(저스트 틴트 발광 기준).")]
+    public float perfectDodgeStrikePulse = 2.2f;
+    [Tooltip("이 거리(m) 이상 추격하면 경로에 잔상을 남기고 속도선을 띄운다.")]
+    public float perfectDodgeDashTrailMinDistance = 1.5f;
+
+    // 피격 연출 등급별 효과음(PlayerHitPresentation). 비우면 무음.
+    [Header("피격 연출")]
+    [Tooltip("약(기본 공격·틱) 피격음 키.")]
+    public string hitSfxLight  = "";
+    [Tooltip("중 피격음 키.")]
+    public string hitSfxMedium = "";
+    [Tooltip("강(보스 강공·대기술) 피격음 키.")]
+    public string hitSfxHeavy  = "";
+
+    // 대시 게이지 스킨 — HUD 체력바 스킨에서 파생(UI/HUD/Sprites/DashGauge). 비우면 기본 막대.
+    [Header("대시 게이지")]
+    public Sprite dashGaugeBase;
+    public Sprite dashGaugeFill;    // 흰색 — 뷰가 색을 입힌다
+    public Sprite dashGaugeFrame;
+
     // 저스트 회피 연출 — 레퍼런스는 베요네타 Witch Time.
     // 핵심 원칙: "세계는 변하고 플레이어는 안 변한다". 화면 채도를 빼 세계를 회색으로 만들고,
     // 플레이어에게만 발광 틴트를 입혀 회색 속에서 혼자 빛나게 한다.
@@ -176,7 +218,7 @@ public class CharacterData : ScriptableObject
     // floatSpring / floatDamper 는 제거됐다. 스프링-댐퍼는 경사를 따라갈 때 원리적으로
     // '오차 × k / c' 속도까지밖에 못 내서 계단 추종 속도가 모자랐고(하강 약 2.2m/s가 한계),
     // 오차에 비례한 목표 속도를 가속도 상한으로 좇는 위치 서보로 대체했다.
-    // 서보 상수는 밸런스 값이 아니라 캡슐 크기·물리 스텝에 묶인 물리 상수라 DefaultJumpAbility 안에 둔다.
+    // 서보 상수는 밸런스 값이 아니라 캡슐 크기·물리 스텝에 묶인 물리 상수라 DefaultGroundingAbility 안에 둔다.
     [Tooltip("rideHeight 아래로 추가 탐지 거리(m). 단차 하강/리프트 여유.")]
     public float floatProbeExtra = 0.3f;
     [Tooltip("계단 하강 스냅 최대 단차(m). 직전 접지 상태에서 이 이하로 지면이 낮아지면 낙하 대신 접지 유지(스프링이 따라 내려감). 이보다 크게 떨어지면 낙하. 즉 보장되는 최소 단차 처리.")]
