@@ -24,8 +24,8 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     [SerializeField] private float _breathDuration  = 5f;
 
     [Header("회전 속도 (도/초)")]
-    [SerializeField] private float _rotateSpeedPrepare = 100f;
-    [SerializeField] private float _rotateSpeedBreath  = 60f;
+    [SerializeField] private float _rotateSpeedPrepare = 60f;
+    [SerializeField] private float _rotateSpeedBreath  = 30f;
 
     [Header("브레스 데미지")]
     [Tooltip("사거리 최대 한도. 맵 경계가 이보다 가까우면 경계까지만 닿는다 — 맵 끝까지 닿게 하려면 맵 크기보다 크게 설정")]
