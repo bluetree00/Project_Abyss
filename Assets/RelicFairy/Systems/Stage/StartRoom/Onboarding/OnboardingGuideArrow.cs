@@ -63,7 +63,9 @@ public sealed class OnboardingGuideArrow : MonoBehaviour
 
         if (onScreen)
         {
-            ShowWorldArrow(targetPos);
+            // 목표 이름판이 ▼를 달고 목표 위에 떠 있으면 월드 ▼는 두지 않는다 — 같은 자리에 두 벌로 겹쳤다(ae 09-28, 2차 개편 09-29)
+            if (ZoneSign.ObjectivePlateVisible || ZoneSign.ObjectiveReached || ZoneSign.BannerShowing) SetWorldArrowActive(false);
+            else ShowWorldArrow(targetPos);
             SetScreenIndicatorActive(false);
         }
         else

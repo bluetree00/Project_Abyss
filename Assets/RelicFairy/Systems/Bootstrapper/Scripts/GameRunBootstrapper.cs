@@ -2956,7 +2956,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         controller.SetDecorPrefabs(shopDecorPrefabs);   // 판매대 + 뒤쪽 소품(Initialize 전에)
         controller.Initialize(_run, catalog, luckRollTable, shopSlotCount, roomRng,
-                              npcPrefab, shopWeaponSlotFallback, shopRerollEnabled, shopRerollCost);
+                              npcPrefab, shopWeaponSlotFallback,
+                              shopRerollEnabled || MemoryAltarService.IsShopRerollUnlocked,   // 기억의 제단 「상점 새로고침」(09-29)
+                              shopRerollCost);
     }
 
     private async UniTask<ShopCatalogSO> LoadShopCatalogAsync(string roomId)

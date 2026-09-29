@@ -333,6 +333,10 @@ public sealed class GameRunSession
             // 베이스캠프 파츠 공방에서 고른 시작 파츠 — 매 런 Lv1 하나를 들고 시작한다(베이스캠프 재설계 §2).
             string startPart = AppBootstrapper.Instance?.Loadout?.StartPartId;
             if (!string.IsNullOrEmpty(startPart)) RangedPartsState.Current.Equip(startPart, 1);
+            // 기억의 제단 「시작 파츠 둘」 — 둘째 파츠도 Lv1로(09-29). 해금이 없으면 공방이 둘째를 받지 않는다.
+            string startPart2 = AppBootstrapper.Instance?.Loadout?.StartPartId2;
+            if (!string.IsNullOrEmpty(startPart2) && startPart2 != startPart && MemoryAltarService.StartPartSlots >= 2)
+                RangedPartsState.Current.Equip(startPart2, 1);
 
             // 계약 3개 부여. 시드를 챕터에 섞어 런마다 다른 조합이 나오되, 같은 시드는 같은 계약을 준다.
             RunContracts.Current = new RunContracts();
@@ -549,7 +553,10 @@ public sealed class GameRunSession
     {
         UnsubscribePlayerStateSource();
         ItemInventory.OnPlacedChanged -= RebuildItemEffects;
+        CovenantHandler.OnCovenantListChanged -= RebuildItemEffects;
+        UnsubscribeBuildSources();
         EffectManager.Cleanup();
+        BuildImprint.Clear();
         BuffHandler.OnBuffsChanged -= RefreshPlayerRoomBuffs;
         BuffHandler.ClearAll();
         CovenantHandler.Cleanup();
@@ -810,6 +817,11 @@ public sealed class GameRunSession
             // ItemEffectManager 초기화
             ItemInventory.OnPlacedChanged -= RebuildItemEffects;
             ItemInventory.OnPlacedChanged += RebuildItemEffects;
+            // 서약을 맺어도 발동 계열 각인이 바뀐다(원인 계열 +1) — 룬 효과 배율을 다시 잡는다(09-29).
+            CovenantHandler.OnCovenantListChanged -= RebuildItemEffects;
+            CovenantHandler.OnCovenantListChanged += RebuildItemEffects;
+            // 무기 승급 · 진화 · 유물 파츠도 각인이다 — 바뀌면 다시 센다(T4, 09-29). 활성 무기 전환(OnWeaponChanged)은 아니다.
+            SubscribeBuildSources();
             EffectManager.Initialize(Player, this, ItemInventory);
 
             // 영구 각성 보너스 적용 (런 시작 시 1회)
@@ -858,6 +870,36 @@ public sealed class GameRunSession
     {
         Player?.RuntimeStats?.RefreshRoomBuffs(BuffHandler);
     }
+
+    private PlayerWeaponManager _buildWeapons;
+    private PlayerLoadout _buildLoadout;
+
+    private void SubscribeBuildSources()
+    {
+        UnsubscribeBuildSources();
+        _buildWeapons = Player != null ? Player.WeaponManager : null;
+        if (_buildWeapons != null)
+        {
+            _buildWeapons.OnSlotsChanged += RebuildItemEffects;
+            _buildWeapons.OnEquippedWeaponRefreshed += OnBuildWeaponRefreshed;
+        }
+        _buildLoadout = AppBootstrapper.Instance != null ? AppBootstrapper.Instance.Loadout : null;
+        if (_buildLoadout != null) _buildLoadout.RelicPartsChanged += RebuildItemEffects;
+    }
+
+    private void UnsubscribeBuildSources()
+    {
+        if (_buildWeapons != null)
+        {
+            _buildWeapons.OnSlotsChanged -= RebuildItemEffects;
+            _buildWeapons.OnEquippedWeaponRefreshed -= OnBuildWeaponRefreshed;
+        }
+        if (_buildLoadout != null) _buildLoadout.RelicPartsChanged -= RebuildItemEffects;
+        _buildWeapons = null;
+        _buildLoadout = null;
+    }
+
+    private void OnBuildWeaponRefreshed(WeaponData _) => RebuildItemEffects();
 
     private void RebuildItemEffects()
     {
@@ -1091,7 +1133,11 @@ public sealed class GameRunSession
 
         // 출시 정책: 신규 런은 골드 0에서 시작 — 방 보상/전투 드롭으로만 확보한다.
         const int NewRunStartingGold = 0;
-        return new PlayerRunState(maxHp, NewRunStartingGold);
+        var state = new PlayerRunState(maxHp, NewRunStartingGold);
+        // 기억의 제단 「포션 칸 +1」 — 늘어난 칸을 가득 채워 시작한다(09-29). 악몽 규칙(어스름)은 바인딩 때 다시 줄인다.
+        int potionCap = MemoryAltarService.PotionCapacity;
+        if (potionCap != state.PotionCapacity) state.RestorePotions(potionCap, potionCap);
+        return state;
     }
 
     private void SubscribePlayerStateSource(PlayerController player)

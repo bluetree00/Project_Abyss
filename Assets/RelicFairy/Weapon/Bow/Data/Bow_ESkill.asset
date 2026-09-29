@@ -19,6 +19,6 @@ MonoBehaviour:
   iconTier2: {fileID: 21300000, guid: 51f003fd0b9a1834b828d21a9b0210a8, type: 3}
   iconTier3: {fileID: 21300000, guid: a4212b839afecbd4cb2d8853d5c7f875, type: 3}
   _tier2Change: "\uAD00\uD1B5 5"
-  _tier3Change: "\uCC29\uD0C4 \uD3ED\uBC1C"
+  _tier3Change: "\uCC29\uD0C4 \uD3ED\uBC1C \uBC18\uACBD 2m \u00B7 \uD53C\uD574 50%"
   cooldown: 3
   behavior: {fileID: 11400000, guid: caf226cb8345435da2535d948342699e, type: 2}

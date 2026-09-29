@@ -54,6 +54,12 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private const float ChipY       = 218f;
     private const float ChipH       = 24f;
     private const float EffectsY    = 250f;
+    // 발동 계열 칩이 있으면 칩이 두 줄이 된다 — 효과 칸을 아래로 밀면 모양 칸과 겹치므로(09-29 실측) 위에서 자리를 만든다.
+    private const float FamilyLift     = 22f;    // 이름 · 칩 줄을 이만큼 올린다
+    private const float FamilyArtLift  = 8f;     // 문양도 조금 올리고
+    private const float FamilyIconFrac = 0.88f;  // 조금 줄인다
+    private const float FootTop        = CardH - 12f - FootH;   // 모양 칸 윗변(카드 위 기준) — 효과 칸의 바닥
+    private const float MinEffectFont  = 12f;    // 넘칠 때 줄이는 하한
     // 09-25 사용자 「룬 획득 팝업에서 블록 모양도 알 수 있어야」: 모양 칸 44 → 76 · 칸 상한 14 → 22.
     // 효과는 1~2줄이 대부분이라 아래가 비어 있었다 — 그 자리를 모양에 준다(효과 4줄 = 82).
     private const float EffectsH    = 82f;
@@ -93,6 +99,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private const float BobAmp         = 4f;
 
     private static readonly Color SelectBorder  = new(0.88f, 0.72f, 0.32f, 1f);
+    // 청 수정 동굴 바탕을 인디고로 누른다 — 다른 화면(인디고 글래스)과 온도를 맞추고 그림은 남긴다(톤 통일 ④, 09-29).
+    private static readonly Color CaveTint      = new(0.66f, 0.62f, 0.80f, 1f);
     private static readonly Color CardSelected  = new(0.20f, 0.17f, 0.10f, 1f);
     private static readonly Color OkColor       = new(0.47f, 0.84f, 0.60f, 1f);
     private static readonly Color NoColor       = new(0.92f, 0.40f, 0.33f, 1f);
@@ -924,6 +932,10 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
         var rarityCol = ShopUIStyle.Rarity(data.rarity);
         bool legend = data.rarity == ItemRarity.Legendary;
+        bool family = BuildFamilyRules.OfItem(data) != BuildFamily.None;
+        float lift  = family ? FamilyLift : 0f;
+        float artY  = ArtCenterY - (family ? FamilyArtLift : 0f);
+        float iconK = family ? FamilyIconFrac : 1f;
 
         // 문양 칸 — 전설은 광선이 돈다(Update)
         var artAnchor = new Vector2(0.5f, 1f);
@@ -932,7 +944,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             var rays = ShopUIStyle.MakeImage(face, "Rays", WithAlpha(LegendGold, 0.32f));
             rays.sprite = Rays;
             ShopUIStyle.Anchor(rays.rectTransform, artAnchor, artAnchor, new Vector2(0.5f, 0.5f),
-                               new Vector2(0f, -ArtCenterY), Vector2.one * _cardW * RaysFrac);
+                               new Vector2(0f, -artY), Vector2.one * _cardW * RaysFrac);
             view.Rays = rays.rectTransform;
         }
 
@@ -940,7 +952,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             WithAlpha(rarityCol, data.rarity == ItemRarity.Common ? 0.18f : 0.45f));
         glow.sprite = SoftDot;
         ShopUIStyle.Anchor(glow.rectTransform, artAnchor, artAnchor, new Vector2(0.5f, 0.5f),
-                           new Vector2(0f, -ArtCenterY), Vector2.one * _cardW * GlowFrac);
+                           new Vector2(0f, -artY), Vector2.one * _cardW * GlowFrac * iconK);
         view.Glow = glow;
 
         var art = RuneArt.ResolveRuneIcon(data);
@@ -950,7 +962,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             icon.sprite = art;
             icon.preserveAspect = true;
             ShopUIStyle.Anchor(icon.rectTransform, artAnchor, artAnchor, new Vector2(0.5f, 0.5f),
-                               new Vector2(0f, -ArtCenterY), Vector2.one * _cardW * (legend ? LegendIconFrac : IconFrac));
+                               new Vector2(0f, -artY), Vector2.one * _cardW * (legend ? LegendIconFrac : IconFrac) * iconK);
             view.Icon     = icon.rectTransform;
             view.IconBase = icon.rectTransform.anchoredPosition;
         }
@@ -959,16 +971,18 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         var nameText = ShopUIStyle.MakeText(face, "Name", 22f, FontStyles.Bold,
             TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
         ShopUIStyle.Anchor(nameText.rectTransform, artAnchor, artAnchor, new Vector2(0.5f, 1f),
-            new Vector2(0f, -NameY), new Vector2(_cardW - 28f, 28f));
+            new Vector2(0f, -(NameY - lift)), new Vector2(_cardW - 28f, 28f));
         nameText.text = data.displayName ?? data.itemId;
         FitSingleLine(nameText);
 
-        BuildChips(face, data, rarityCol);
+        BuildChips(face, data, rarityCol, lift);
 
-        // 효과 목록
+        // 효과 목록 — 바닥은 모양 칸 윗변. 칩이 두 줄이면 그 아래에서 시작한다.
+        float fxTop = family ? ChipY - lift + ChipH * 2f + 10f : EffectsY;
+        float fxH   = Mathf.Min(EffectsH, FootTop - fxTop);
         var fxRoot = ShopUIStyle.MakeRect(face, "Effects").GetComponent<RectTransform>();
         ShopUIStyle.Anchor(fxRoot, artAnchor, artAnchor, new Vector2(0.5f, 1f),
-            new Vector2(0f, -EffectsY), new Vector2(_cardW - 32f, EffectsH));
+            new Vector2(0f, -fxTop), new Vector2(_cardW - 32f, fxH));
         var vlg = fxRoot.gameObject.AddComponent<VerticalLayoutGroup>();
         vlg.childControlHeight = true;  vlg.childForceExpandHeight = false;   // 줄바꿈된 효과 행이 자기 높이로 서게(2026-09-09)
         vlg.spacing = 2f;
@@ -1001,7 +1015,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     }
 
     /// <summary>등급·칸수 칩과 속성 칩(블록 타일 + 이름)을 한 줄 가운데에 세운다. 속성 없는 룬은 등급 칩만.</summary>
-    private void BuildChips(RectTransform face, RuntimeItemData data, Color rarityCol)
+    /// <param name="lift">칩 줄을 올리는 만큼(계열 칩이 있어 두 줄일 때).</param>
+    private void BuildChips(RectTransform face, RuntimeItemData data, Color rarityCol, float lift)
     {
         int cells = CellCount(data.shapeId);
         string rarityText = RewardPresentation.RarityLabel(data.rarity) + (cells > 0 ? $" · {cells}칸" : string.Empty);
@@ -1025,8 +1040,22 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         }
 
         float x = -total * 0.5f;
-        r.anchoredPosition = new Vector2(x + rw * 0.5f, -ChipY);
-        if (e != null) e.anchoredPosition = new Vector2(x + rw + gap + ew * 0.5f, -ChipY);
+        r.anchoredPosition = new Vector2(x + rw * 0.5f, -(ChipY - lift));
+        if (e != null) e.anchoredPosition = new Vector2(x + rw + gap + ew * 0.5f, -(ChipY - lift));
+
+        // 발동 계열 기여 — 「기동 +1 → 3/4」. 고르는 순간 빌드에 무엇이 되는지(09-29 빌드 컨셉). 칩 줄 아래 한 줄.
+        var fam = BuildFamilyRules.OfItem(data);
+        if (fam != BuildFamily.None)
+        {
+            int now = BuildImprint.Count(fam) + 1;
+            int next = BuildFamilyRules.NextThreshold(now);
+            bool stageUp = BuildFamilyRules.StageOf(now) > BuildImprint.Stage(fam);
+            string tail = stageUp ? $"  <color=#E8BA54>{BuildFamilyRules.StageOf(now)}단계!</color>"
+                        : next > 0 ? $"<color=#8A8594>/{next}</color>" : "";
+            var famCol = BuildFamilyRules.ColorOf(fam);
+            var fc = MakeChip(face, "FamilyChip", $"{BuildFamilyRules.Label(fam)} +1 → {now}{tail}", famCol, WithAlpha(famCol, 0.40f), out _);
+            fc.anchoredPosition = new Vector2(0f, -(ChipY - lift + ChipH + 4f));
+        }
     }
 
     private static RectTransform MakeChip(RectTransform parent, string name, string text, Color textCol, Color lineCol,
@@ -1105,6 +1134,23 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         }
 
         LayoutRebuilder.ForceRebuildLayoutImmediate(parent);
+        FitEffectRows(parent, style.fontSize);
+    }
+
+    /// <summary>
+    /// 효과 줄이 칸을 넘으면 글자를 1px씩 줄여 칸 안에 가둔다(하한 <see cref="MinEffectFont"/>) —
+    /// 줄바꿈된 긴 조건부 효과 두 줄이 아래 모양 칸 · 배지 위로 흘렀다(09-29 사용자).
+    /// </summary>
+    private static void FitEffectRows(RectTransform parent, float startSize)
+    {
+        float avail = parent.rect.height;
+        if (avail <= 1f) return;
+        for (float fs = startSize - 1f; fs >= MinEffectFont && LayoutUtility.GetPreferredHeight(parent) > avail + 0.5f; fs -= 1f)
+        {
+            foreach (var row in parent.GetComponentsInChildren<EffectRowWidget>(true))
+                if (row.Label != null) row.Label.fontSize = fs;
+            LayoutRebuilder.ForceRebuildLayoutImmediate(parent);
+        }
     }
 
     /// <summary>작은 모양 셀을 그리고(판 위 블록과 같은 속성 타일), 지금 판에 놓을 자리가 있는지 반환한다.</summary>
@@ -1271,6 +1317,10 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     /// </summary>
     private void ApplyThemeButtons()
     {
+        // 바탕 일러스트(창 채움) — 빌드 · 구운 경로 둘 다 여기를 지난다.
+        if (transform.Find("Window/Fill") is Transform fill && fill.TryGetComponent<Image>(out var bgImg) && bgImg.sprite != null)
+            bgImg.color = CaveTint;
+
         var skipOuter = ShopUIStyle.FindDeep(transform, "SkipBtn");
         var skipInner = skipOuter != null ? skipOuter.Find("Fill") : null;
         if (!UITheme.StyleFrameButton(_confirmBtnImg, UITheme.CtaTintOff)) return;
@@ -1290,7 +1340,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         if (_counterText == null) return;
         int staged = _inventory?.StagingItems?.Count ?? 0;
         int placed = _inventory?.PlacedItems?.Count ?? 0;
-        _counterText.text = $"보관함 {staged}/{RunItemInventory.MaxStagingCapacity}   ·   배치 {placed}";
+        _counterText.text = $"보관함 {staged}/{RunItemInventory.StagingCapacity}   ·   배치 {placed}";
     }
 
     // ── 버튼 ──
@@ -1325,7 +1375,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         bool added = _inventory != null && _inventory.AddToStaging(item);
         if (!added)
             ItemEffectVfxHelper.ShowNotice(
-                $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.MaxStagingCapacity}칸) — 자리를 비우면 자동으로 추가됩니다");
+                $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.StagingCapacity}칸) — 자리를 비우면 자동으로 추가됩니다");
 
         ConfirmSequenceAsync(item, added).Forget();
     }

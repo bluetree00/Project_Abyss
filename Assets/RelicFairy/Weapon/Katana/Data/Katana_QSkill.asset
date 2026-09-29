@@ -19,14 +19,12 @@ MonoBehaviour:
   iconTier2: {fileID: 21300000, guid: d2b65b7fd1c91e548bf72e7407747e5a, type: 3}
   iconTier3: {fileID: 21300000, guid: fae76247a6a80ed4a8433b753461e38d, type: 3}
   _tier2Change: "\uAC01\uC778 \uD0DD1(\uCD94\uACA9\xB7\uC751\uCD95)"
-  _tier3Change: "\uAC80\uAE30 \uD3ED\uBC1C"
+  _tier3Change: "\uAC80\uAE30 \uD3ED\uBC1C \uBC18\uACBD 3m(25+\uACF5\uACA9\uB825)"
   _engravings:
   - id: phantom_pursuit
     tier: 2
     displayName: "\uC794\uC0C1 \uCD94\uACA9"
-    description: "\uAC80\uAE30\uAC00 \uC55E\uC790\uB9AC \uB300\uC2E0 \uAC00\uAE4C\uC6B4
-      \uC801\uB4E4\uC744 \uD558\uB098\uC529 \uCAD3\uC544\uAC00 \uBCA4\uB2E4. \uD769\uC5B4\uC9C4
-      \uC801\uC5D0\uAC8C."
+    description: "\uAC80\uAE30 3\uBC1C(\uAC01 12+\uACF5\uACA9\uB825)\uC774 8m \uC548 \uAC00\uAE4C\uC6B4 \uC801\uBD80\uD130 \uD558\uB098\uC529 \uCAD3\uC544\uAC00 \uBCA4\uB2E4. \uD769\uC5B4\uC9C4 \uC801\uC5D0\uAC8C."
   - id: phantom_condense
     tier: 2
     displayName: "\uC751\uCD95"

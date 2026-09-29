@@ -309,7 +309,7 @@ public class ClearRewardTrigger : MonoBehaviour
                 _run.EffectManager?.OnItemPickup(fallback);
                 if (!_run.ItemInventory.AddToStaging(fallback))
                     ItemEffectVfxHelper.ShowNotice(
-                        $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.MaxStagingCapacity}칸) — {fallback.displayName} 지급 실패");
+                        $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.StagingCapacity}칸) — {fallback.displayName} 지급 실패");
                 else
                     Debug.LogWarning($"[ClearRewardTrigger] 선택 팝업 로드 실패 — 첫 후보 자동 지급: {fallback.displayName}");
             }

@@ -262,7 +262,7 @@ public class UI_RangedForgePopup : UI_Popup
     private void RefreshConfirm(Entry e, Color theme)
     {
         bool ok = !e.Locked;
-        if (_confirm != null) _confirm.interactable = ok;
+        if (_confirm != null) { _confirm.interactable = ok; UIAffordGlow.Set(_confirm, ok); }   // 고를 수 있으면 은은한 불(09-29)
         if (_confirmLabel != null)
             _confirmLabel.color = ok ? TitleColor : new Color(TitleColor.r, TitleColor.g, TitleColor.b, 0.35f);
         // 확정 버튼: 아트가 있으면 테마색을 곱하지 않는다(황동 명판이 파랗게 물든다) — 알파로만 잠금을 알린다.

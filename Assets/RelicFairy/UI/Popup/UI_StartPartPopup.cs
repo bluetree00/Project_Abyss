@@ -338,6 +338,7 @@ public sealed class UI_StartPartPopup : UI_Popup
         if (_confirmBtnImg != null && !_skinned)
             _confirmBtnImg.color = _themed ? (has && !same ? UITheme.CtaTint : UITheme.CtaTintOff)
                                            : (has && !same ? ShopUIStyle.GoldPillBg : ShopUIStyle.BandFill);
+        UIAffordGlow.Set(_confirmBtnImg, has && !same);   // 바꿀 수 있을 때만 은은한 불(09-29)
     }
 
     private void OnConfirmClicked()

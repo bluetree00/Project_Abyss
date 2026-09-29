@@ -39,9 +39,9 @@ public sealed class StagingAreaView : MonoBehaviour
     private const float HOVER_SCALE   = 1.03f;  // 손을 얹은 카드 — 「잡을 수 있다」
     private const float DRAG_GHOST    = 0.4f;   // 끄는 동안 원래 카드(잔상)
 
-    /// <summary>고정 슬롯을 2열로 깔았을 때 필요한 줄 수.</summary>
+    /// <summary>고정 슬롯을 열 수로 깔았을 때 필요한 줄 수(보이는 칸 기준).</summary>
     private int SlotRows =>
-        (RunItemInventory.MaxStagingCapacity + _columns - 1) / _columns;
+        (_capacity + _columns - 1) / _columns;
 
     private static readonly Color COLOR_NEW_BORDER      = new(1f, 0.92f, 0.3f, 1f);
     private static readonly Color COLOR_NORMAL_BORDER   = new(0.4f, 0.4f, 0.5f, 0.7f);
@@ -74,6 +74,9 @@ public sealed class StagingAreaView : MonoBehaviour
     // ── Private ──
     // 고정 슬롯 구조
     private readonly GameObject[] _slotGOs       = new GameObject[RunItemInventory.MaxStagingCapacity];
+    // 보이는 칸 수와 카드 폭 — 제단 「룬 보관함 +1 · +2」로 5 → 7. 칸은 상한(7)만큼 미리 만들고 이만큼만 켠다(09-29).
+    private int   _capacity  = 5;
+    private float _slotWidth = SLOT_WIDTH;
     private readonly RuntimeItemData[] _slotItems = new RuntimeItemData[RunItemInventory.MaxStagingCapacity];
 
     // Shape 관리
@@ -121,6 +124,32 @@ public sealed class StagingAreaView : MonoBehaviour
     /// <summary>코드로 생성 시 scrollContent를 주입하고 슬롯을 빌드한다. UI_GridPanel에서 AddComponent 직후 호출.</summary>
     /// <summary>슬롯 격자 열 수. <see cref="Init"/> 전에 불러야 한다(슬롯은 Init에서 놓인다).</summary>
     public void SetColumns(int columns) => _columns = Mathf.Max(1, columns);
+
+    /// <summary>지금 보이는 칸 수.</summary>
+    public int Capacity => _capacity;
+
+    /// <summary>
+    /// 보이는 칸 수와 카드 폭을 바꾼다 — 넘는 칸은 끄고, 나머지는 새 폭으로 다시 줄 세운다.
+    /// 카드 안 글자 · 모양은 비율 앵커라 폭을 따라간다. Init 전에도, 뒤에도 불러도 된다.
+    /// </summary>
+    public void ApplyCapacity(int capacity, float slotWidth)
+    {
+        _capacity  = Mathf.Clamp(capacity, 1, RunItemInventory.MaxStagingCapacity);
+        _slotWidth = slotWidth;
+        for (int i = 0; i < _slotGOs.Length; i++)
+        {
+            var go = _slotGOs[i];
+            if (go == null) continue;
+            go.SetActive(i < _capacity);
+            var rt = (RectTransform)go.transform;
+            rt.sizeDelta = new Vector2(_slotWidth, SLOT_HEIGHT);
+            PositionSlot(rt, i);
+        }
+        if (scrollContent != null)
+            scrollContent.sizeDelta = new Vector2(
+                SLOT_SPACING + _columns * (_slotWidth + SLOT_SPACING),
+                SLOT_SPACING + SlotRows * (SLOT_HEIGHT + SLOT_SPACING));
+    }
 
     public void Init(RectTransform content)
     {
@@ -314,8 +343,9 @@ public sealed class StagingAreaView : MonoBehaviour
             var slotGO = new GameObject($"Slot_{i}", typeof(RectTransform));
             slotGO.transform.SetParent(scrollContent, false);
             var rt = slotGO.GetComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(SLOT_WIDTH, SLOT_HEIGHT);
+            rt.sizeDelta = new Vector2(_slotWidth, SLOT_HEIGHT);
             PositionSlot(rt, i);
+            if (i >= _capacity) slotGO.SetActive(false);
 
             // 빈 슬롯 배경 — 테두리선은 여기 붙인다.
             // 예전엔 Border 이미지가 슬롯 전체를 반투명하게 한 번 더 덮어 배경과 두 겹으로 겹쳤고,
@@ -406,7 +436,7 @@ public sealed class StagingAreaView : MonoBehaviour
         // scrollContent 크기 = 2열 그리드 전체 크기. 뷰포트(약 470×630) 안에 들어가므로
         // 실제로는 스크롤이 걸리지 않고 5칸이 모두 보인다.
         scrollContent.sizeDelta = new Vector2(
-            SLOT_SPACING + _columns * (SLOT_WIDTH  + SLOT_SPACING),
+            SLOT_SPACING + _columns * (_slotWidth + SLOT_SPACING),
             SLOT_SPACING + SlotRows     * (SLOT_HEIGHT + SLOT_SPACING));
     }
 
@@ -475,7 +505,7 @@ public sealed class StagingAreaView : MonoBehaviour
             // 배치 전 카드에 shimmer 반짝임 효과 — 전설은 금빛으로 더 자주(획득 카드·판과 같은 광택)
             var shimmer = slotGO.AddComponent<StagingSlotShimmer>();
             if (item.rarity == ItemRarity.Legendary)
-                shimmer.Configure(StagingSlotShimmer.LegendaryTint, 0.55f, 1.6f, SLOT_WIDTH);
+                shimmer.Configure(StagingSlotShimmer.LegendaryTint, 0.55f, 1.6f, _slotWidth);
         }
     }
 
@@ -720,7 +750,7 @@ public sealed class StagingAreaView : MonoBehaviour
         rt.anchorMax        = new Vector2(0f, 1f);
         rt.pivot            = new Vector2(0f, 0.5f);
         rt.sizeDelta        = new Vector2(
-            SLOT_SPACING + _columns * (SLOT_WIDTH + SLOT_SPACING), SLOT_SPACING);
+            SLOT_SPACING + _columns * (_slotWidth + SLOT_SPACING), SLOT_SPACING);
         rt.anchoredPosition = Vector2.zero;
 
         var lineGO = new GameObject("Line", typeof(RectTransform));
@@ -782,7 +812,7 @@ public sealed class StagingAreaView : MonoBehaviour
         int col = index % _columns;
         int row = index / _columns;
         return new Vector2(
-             SLOT_SPACING + col * (SLOT_WIDTH  + SLOT_SPACING),
+             SLOT_SPACING + col * (_slotWidth + SLOT_SPACING),
             -SLOT_SPACING - row * (SLOT_HEIGHT + SLOT_SPACING));
     }
 

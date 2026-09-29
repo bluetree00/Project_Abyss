@@ -21,7 +21,7 @@ public sealed class SacrificeAltarChallenge : WorldInteractionChallenge
         Vector3 at = player.position, fwd = Inward;
         Vector3 right = Vector3.Cross(Vector3.up, fwd);
         AddMarker(SafeSpot(at, (fwd * 3.8f - right * 2.2f).normalized, 4.4f), ChallengeFlavor.AltarName(Run), new Color(0.95f, 0.55f, 0.45f),
-                  "<color=#FF9668>[F]</color> 물약을 바친다", TagAltar);
+                  "<color=#FF9668>[F]</color> 물약 전부 바치기 — 3개 이상 플래티넘 · 2개 골드 · 1개 실버", TagAltar);
         AddMarker(SafeSpot(at, (fwd * 3.8f + right * 2.2f).normalized, 4.4f), "떠난다", new Color(0.7f, 0.72f, 0.78f),
                   "<color=#B8C0CC>[F]</color> 그냥 지나친다", TagLeave);
     }

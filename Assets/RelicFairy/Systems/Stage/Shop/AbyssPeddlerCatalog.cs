@@ -142,6 +142,7 @@ public static class AbyssPeddlerCatalog
     public const int DrawCount    = 7;
     public const int ProductCount = DrawCount - 1;   // 정규 진열 6칸
     private const int BuffRunDuration = 99;          // 상점 버프 = 사실상 런 유지("유지")
+    private const int PotionHealPercent = 40;        // 표시용 — GameRunSession.PotionHealRatio(0.40)와 같게
     private const float SpecialDiscount = 0.5f;      // 특가 50% 할인
 
     public sealed class Result
@@ -246,13 +247,15 @@ public static class AbyssPeddlerCatalog
         if (rows == null || rows.Count == 0) return null;
 
         var row = rows[rng.Next(rows.Count)];
-        var mod = new StatModifier(row.statType, row.value);
-        string gradeLabel = row.tier >= 3 ? "상급" : row.tier == 2 ? "중급" : "하급";
-        string valStr = row.isPercent ? $"+{row.value:0.##}%" : $"+{row.value:0.##}";
+        // 퍼센트 가호는 차트에 「6」(%)로 적혀 있는데 버프 층은 비율(0.1 = +10%)을 읽는다 — 그대로 넣으면 +600%였다(09-29).
+        float value = row.isPercent && row.value > 1f ? row.value / 100f : row.value;
+        var mod = new StatModifier(row.statType, value);
+        // 카드 본문 = 실제 수치(「공격력 +4」). 차트 설명(「공격력 강화(하급)」)은 얼마인지 말하지 않았다.
+        string amount = $"{EffectDescriptionFormatter.StatLabel(row.statType)} {EffectDescriptionFormatter.StatValueText(row.statType, value, row.isPercent)}";
 
         return new ShopProduct(ShopProductCategory.Buff, row.buffName,
-            string.IsNullOrEmpty(row.description) ? $"{StatLabel(row.statType)} 강화({gradeLabel})" : row.description,
-            $"적용  런 유지 버프(버프창) · 값 {valStr}",
+            amount,
+            $"적용  런이 끝날 때까지 유지(버프창) · {amount}",
             row.price, TierRarity(row.tier), EffectIconRegistry.GetSprite(IconBuff),
             s =>
             {
@@ -348,7 +351,7 @@ public static class AbyssPeddlerCatalog
         int amt = 1 + rng.Next(0, 2);   // 1~2
         int price = 60 * amt;
         return new ShopProduct(ShopProductCategory.Potion, $"체력 포션 x{amt}",
-            "즉시 회복 소모품", "적용  퀵슬롯 포션 추가",
+            $"최대 체력 {PotionHealPercent}% 즉시 회복", "적용  퀵슬롯 포션 추가",
             price, ItemRarity.Common, EffectIconRegistry.GetSprite(IconPotion),
             s => { if (s?.PlayerState == null) return false; s.PlayerState.AddPotion(amt); return true; });
     }

@@ -29,7 +29,7 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
     private readonly Channel _channel;
 
     // 타임드 상태
-    private float _windowUntil = -999f;   // 이벤트형(AfterSkill/AfterRoomEnter/AfterHit) 활성 종료 시각
+    private float _windowUntil = -999f;   // 이벤트형(AfterSkill/AfterRoomEnter/AfterHit/AfterDash/AfterCrit/AfterKill) 활성 종료 시각
     private float _lastHitTime = -999f;   // NoHit 판정용 마지막 피격 시각
     private bool  _bossActive;            // DuringBoss
 
@@ -91,6 +91,17 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
         if (_trigger == "AfterHit") _windowUntil = Time.time + Mathf.Max(0f, _duration);
     }
 
+    // 발동 계열 창(09-29) — 대시가 끝나면 · 치명이 터지면 · 쓰러뜨리면 duration초.
+    public override void OnRollEnd(ItemEffectContext ctx)
+    {
+        if (_trigger == "AfterDash") _windowUntil = Time.time + Mathf.Max(0f, _duration);
+    }
+
+    public override void OnKill(ItemEffectContext ctx, GameObject target)
+    {
+        if (_trigger == "AfterKill") _windowUntil = Time.time + Mathf.Max(0f, _duration);
+    }
+
     public override void OnBossEnter(ItemEffectContext ctx) => _bossActive = true;
     public override void OnBossClear(ItemEffectContext ctx) => _bossActive = false;
 
@@ -98,6 +109,8 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
     public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
         float now = Time.time;
+        if (_trigger == "AfterCrit" && report.IsCrit && report.DamageDealt > 0f)
+            _windowUntil = now + Mathf.Max(0f, _duration);
         if (now - _lastDealTime > STREAK_GAP) _streakCount = 0;   // 갭 초과 시 연속 끊김
         _lastDealTime = now;
         _streakCount++;
@@ -140,7 +153,14 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
             case "AfterSkill":
             case "AfterRoomEnter":
             case "AfterHit":
+            case "AfterDash":
+            case "AfterCrit":
+            case "AfterKill":
                 return Time.time < _windowUntil;
+
+            // 원거리 무기(활 · 석궁)를 들고 있는 동안 — 사격 계열.
+            case "WithRangedWeapon":
+                return ctx != null && (ctx.WeaponType == WeaponType.Bow || ctx.WeaponType == WeaponType.Crossbow);
 
             case "NoHit":
                 return Time.time - _lastHitTime >= Mathf.Max(0f, _duration);
@@ -190,6 +210,9 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
         }
     }
 
+    private static bool IsWindowTrigger(string t)
+        => t is "AfterSkill" or "AfterRoomEnter" or "AfterHit" or "AfterDash" or "AfterCrit" or "AfterKill";
+
     private static int CountNearby(ItemEffectContext ctx)
     {
         if (ctx?.Player == null) return 0;
@@ -210,7 +233,7 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
         var d = EffectDescriptionFormatter.Describe(EffectType, _value, _trigger, _slot?.description);
 
         float remaining01 = -1f;
-        if (_duration > 0f && (_trigger == "AfterSkill" || _trigger == "AfterRoomEnter" || _trigger == "AfterHit"))
+        if (_duration > 0f && IsWindowTrigger(_trigger))
             remaining01 = Mathf.Clamp01((_windowUntil - Time.time) / _duration);
 
         item = new BuffViewItem(d.IconKey, d.Combined, 1, remaining01, "", BuffSource.Item, isDebuff: false);

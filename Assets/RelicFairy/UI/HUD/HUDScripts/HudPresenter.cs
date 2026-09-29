@@ -312,6 +312,7 @@ public sealed class HudPresenter : MonoBehaviour
         _boss = boss;
         _boss.OnHPChanged += HandleBossHPChanged;
 
+        view?.BossPanel?.ResetPageFx();   // 새 보스 — 지난 전투의 체력바 깨짐 연출을 걷는다
         view?.BossPanel?.Init(maxHp, boss.BossName);
         view?.BossPanel?.SetHP(currentHp, maxHp);
         AttachBossHudSource(boss as IBossHudSource);
@@ -344,7 +345,7 @@ public sealed class HudPresenter : MonoBehaviour
         int currentHp = GetBossCurrentHp(_boss);
         int maxHp = GetBossMaxHp(_boss);
         view?.BossPanel?.Init(maxHp, _boss.BossName);
-        view?.BossPanel?.SetPages(_bossHud?.HudPageMarkers, _bossHud?.HudPage ?? 1, BossPagesRevealed());
+        view?.BossPanel?.SetPages(_bossHud?.HudPageMarkers, _bossHud?.HudPage ?? 1);
         view?.BossPanel?.SetHP(currentHp, maxHp);
     }
 
@@ -384,7 +385,7 @@ public sealed class HudPresenter : MonoBehaviour
         _bossHud = src;
 
         var panel = view?.BossPanel;
-        panel?.SetPages(src?.HudPageMarkers, src?.HudPage ?? 1, BossPagesRevealed());
+        panel?.SetPages(src?.HudPageMarkers, src?.HudPage ?? 1);
         panel?.SetInvulnerable(src != null && src.HudInvulnerable);
         if (src == null) return;
 
@@ -396,43 +397,8 @@ public sealed class HudPresenter : MonoBehaviour
 
     private void HandleBossInvulnerableChanged(bool on) => view?.BossPanel?.SetInvulnerable(on);
     private void HandleBossVulnerableWindow(float seconds) => view?.BossPanel?.FlashVulnerable(seconds);
-    private void HandleBossPageMarkersChanged() => view?.BossPanel?.SetPages(_bossHud?.HudPageMarkers, _bossHud?.HudPage ?? 1, BossPagesRevealed());
-
-    private void HandleBossPageRefill(int page, float seconds)
-    {
-        // 새 줄에 들어섰다 — 여기까지 봤다고 기록하고, 바가 차오르는 순간 ◆가 하나 더 드러난다
-        NoteBossPageReached(page);
-        view?.BossPanel?.SetRevealedPages(BossPagesRevealed(page));
-        view?.BossPanel?.PlayPageRefill(page, seconds);
-    }
-
-    // ── 발견형 페이지 표시(09-29 사용자 결정 C) ──
-    // ◆ = 체력바 줄 수. 그 보스를 그 시기(봉인기/악몽기)에 처음 만나면 지금 줄까지만 보이고,
-    // 도달한 가장 깊은 페이지를 계정 기록에 남겨 다음 전투부터는 그만큼 처음부터 보인다.
-    private const string PageRevealKeyPrefix = "hudpage_";
-
-    private string BossPageRevealKey()
-        => _boss == null ? null
-         : PageRevealKeyPrefix + _boss.GetType().Name.ToLowerInvariant() + (StoryProgress.IsNightmare ? "_n" : "_s");
-
-    private int BossPagesRevealed(int page = 0)
-    {
-        if (page <= 0) page = _bossHud?.HudPage ?? 1;
-        string key = BossPageRevealKey();
-        int seen = key != null ? (BackendGameData.Instance?.Data?.GetRecord(key) ?? 0) : 0;
-        return Mathf.Max(page, seen);
-    }
-
-    private void NoteBossPageReached(int page)
-    {
-        string key = BossPageRevealKey();
-        if (key == null || page < 2) return;
-#if UNITY_EDITOR
-        if (StoryProgress.DebugNightmareOverride >= 0) return;   // 테스트 오버라이드(가짜 시기) 중엔 진짜 세이브에 남기지 않는다
-#endif
-        if (BackendGameData.Instance?.Data?.SetRecordMax(key, page) == true)
-            BackendGameData.Instance.SaveAsync().Forget();
-    }
+    private void HandleBossPageMarkersChanged() => view?.BossPanel?.SetPages(_bossHud?.HudPageMarkers, _bossHud?.HudPage ?? 1);
+    private void HandleBossPageRefill(int page, float seconds) => view?.BossPanel?.PlayPageRefill(page, seconds);
 
     private void HandleHpChanged(int hp, int maxHp) => view?.CombatPanel?.SetHp(hp, maxHp);
     private void HandleGoldChanged(int gold) => view?.SetGold(gold);

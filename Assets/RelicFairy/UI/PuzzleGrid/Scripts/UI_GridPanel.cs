@@ -522,6 +522,9 @@ public sealed class UI_GridPanel : UI_Base
 
         // 의뢰서 F2: 좌 = 캐릭터 정보(초상·HP·2×3 스탯·활성 효과) 위, 속성 시너지 아래.
         _charInfoView = CharacterInfoPanelView.Create(go.transform);
+        // 「활성 효과」 머리띠 오른쪽 — 이번 런 발동 계열 각인(09-29 빌드 컨셉).
+        var effHdr = ShopUIStyle.FindDeep(_charInfoView.transform, "EffectsHdr");
+        if (effHdr != null && effHdr.GetComponent<BuildImprintStrip>() == null) effHdr.gameObject.AddComponent<BuildImprintStrip>();
         var charRT = (RectTransform)_charInfoView.transform;
         charRT.anchorMin = new Vector2(0f, 0.46f);
         charRT.anchorMax = new Vector2(1f, 1f);
@@ -556,10 +559,11 @@ public sealed class UI_GridPanel : UI_Base
         _hexGridRoot.anchorMax = new Vector2(1f, 1.0f);
         _hexGridRoot.offsetMin = _hexGridRoot.offsetMax = Vector2.zero;
 
-        // 판 배경 그림은 쓰지 않는다 — 속성 존 타일이 판 텍스처에 묻혀 어느 칸이 무슨 속성인지
-        // 읽히지 않았다. 여기는 어두운 단색으로 두고, 색을 갖는 건 존 타일과 룬 블록뿐이다.
+        // 판 뒤는 비운다 — 창 바탕(자연 그림) 위에 판이 놓이고, 경계는 판 외곽선이 준다(09-29 사용자
+        // 「판 뒤 배경은 정리하고 자연 배경에서 룬판을 쓰는 게 좋아 보인다 · 얇고 깔끔한 테두리」).
+        // 이미지는 남긴다(알파 0) — 끌어 놓기 레이캐스트가 이 칸 전체를 받아야 한다.
         var hexBG = hexRootGO.AddComponent<Image>();
-        hexBG.color = new Color(0.055f, 0.065f, 0.095f, 0.98f);
+        hexBG.color = new Color(0f, 0f, 0f, 0f);
 
         _hexGridView = hexRootGO.AddComponent<MerlinRuneHexGridView>();
         _hexGridView.SetZoneTiles(_zoneTiles, _centerTile);   // 타일 미배선 시 기존 색상 방식 유지
@@ -822,8 +826,8 @@ public sealed class UI_GridPanel : UI_Base
         TMPOutlineHelper.ApplySoftShadow(dragGO.GetComponent<TMP_Text>());
 
         // StagingAreaView는 콘텐츠 좌상단 기준으로 슬롯을 놓는다 — 바 가운데보다 60 오른쪽(왼쪽 라벨 자리)에 세운다.
-        float barW = StagingAreaView.SLOT_SPACING
-                   + RunItemInventory.MaxStagingCapacity * (StagingAreaView.SLOT_WIDTH + StagingAreaView.SLOT_SPACING);
+        // 바 폭은 5칸 기준으로 고정 — 칸이 6 · 7이 되면(제단 해금) 카드 폭을 줄여 같은 폭에 넣는다(ApplyStagingCapacity).
+        float barW = StagingBarWidth;
         var contentGO = Go("StagingBar");
         contentGO.transform.SetParent(footerGO.transform, false);
         var contentRT = contentGO.GetComponent<RectTransform>();
@@ -833,8 +837,8 @@ public sealed class UI_GridPanel : UI_Base
         contentRT.anchoredPosition = new Vector2(-barW * 0.5f + 60f, -8f);
         _stagingArea = footerGO.AddComponent<StagingAreaView>();
         _stagingArea.SetSlotSkin(_stagingBgSprite, _stagingBorderSprite);   // 슬롯 빌드 전에 주입
-        _stagingArea.SetColumns(RunItemInventory.MaxStagingCapacity);        // 5열 1행
         _stagingArea.Init(contentRT);
+        ApplyStagingCapacity();                                               // 칸 수만큼 1행
 
         // 예전 푸터 텍스트(활성 시너지·중앙 보너스·셀 카운트)는 시너지 패널이 대신한다 — 만들되 숨긴다(RefreshFooter 참조 유지).
         var actGO = MakeTxt(footerGO.transform, "ActiveSyn", "", 12f, Color.white);
@@ -1002,6 +1006,24 @@ public sealed class UI_GridPanel : UI_Base
         _inventory = run.ItemInventory;
         _inventory.OnStagingChanged += OnStagingChanged;
         _inventory.OnPlacedChanged  += OnPlacedChanged;
+        ApplyStagingCapacity();   // 새 런 — 제단에서 보관함을 넓혔으면 칸 수가 다르다
+    }
+
+    /// <summary>보관함 바 폭(5칸 기준 고정).</summary>
+    private static float StagingBarWidth =>
+        StagingAreaView.SLOT_SPACING + 5 * (StagingAreaView.SLOT_WIDTH + StagingAreaView.SLOT_SPACING);
+
+    /// <summary>
+    /// 보관함 칸 수를 이번 런 값(<see cref="RunItemInventory.StagingCapacity"/>)으로 — 같은 바 폭에 칸 수만큼, 카드 폭을 나눠 넣는다.
+    /// </summary>
+    private void ApplyStagingCapacity()
+    {
+        if (_stagingArea == null) return;
+        int cap = RunItemInventory.StagingCapacity;
+        float w = Mathf.Min(StagingAreaView.SLOT_WIDTH,
+                            (StagingBarWidth - StagingAreaView.SLOT_SPACING) / cap - StagingAreaView.SLOT_SPACING);
+        _stagingArea.SetColumns(cap);
+        _stagingArea.ApplyCapacity(cap, w);
     }
 
     private void UnbindInventory()
@@ -1676,7 +1698,7 @@ public sealed class UI_GridPanel : UI_Base
     /// <summary>머리줄 상태(보관함 N/5 · 배치 M)와 보관함 바 개수. 인벤토리가 바뀔 때마다.</summary>
     private void RefreshHeaderStatus()
     {
-        int cap    = RunItemInventory.MaxStagingCapacity;
+        int cap    = RunItemInventory.StagingCapacity;
         int staged = _inventory?.StagingCount ?? 0;
         int placed = _inventory?.PlacedItems?.Count ?? 0;
         _headerStatusText?.SetText($"보관함 <color=#FFFFFF>{staged}/{cap}</color>    ·    배치 <color=#FFFFFF>{placed}</color>");

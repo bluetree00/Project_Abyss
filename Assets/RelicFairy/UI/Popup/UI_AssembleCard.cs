@@ -38,6 +38,8 @@ public class UI_AssembleCard : MonoBehaviour, IOwnsButtonScale, IPointerEnterHan
     // ── Private ──────────────────────────────────────────
     // 등급 테두리 아트 — 팝업(UI_CovenantAssemble)이 SetSkin으로 주입.
     private Sprite _silverFrame, _goldFrame, _rubyFrame;
+    private string _subRaw;     // 색을 입히기 전 설명(바탕이 바뀌면 다시 입힌다)
+    private bool   _darkBg;
 
     // 개편본 등급 테두리 — 조각 조립식(위·아래 장식바 2 + 모서리 4).
     // 완성 목업(서약 풀샷.png)에서 카드 <b>몸통</b> 223×106 위에 장식바 113×31, 모서리 34×53으로
@@ -304,6 +306,15 @@ public class UI_AssembleCard : MonoBehaviour, IOwnsButtonScale, IPointerEnterHan
         if (_nameText) _nameText.color = darkBg ? InkOnDark    : InkOnParchment;
         if (_subText)  _subText.color  = darkBg ? InkDimOnDark : InkDimOnParchment;
         if (_tierText) _tierText.color = darkBg ? InkDimOnDark : InkDimOnParchment;
+        _darkBg = darkBg;
+        RenderSub();
+    }
+
+    /// <summary>설명 = 어절 줄바꿈 + 수치 색(바탕 명도에 맞춰 금 / 적갈).</summary>
+    private void RenderSub()
+    {
+        if (_subText == null) return;
+        _subText.text = UIKeywordInk.Words(_subRaw ?? string.Empty, _darkBg ? UIKeywordInk.OnDark : UIKeywordInk.OnParchment);
     }
 
     /// <param name="badge">
@@ -315,7 +326,8 @@ public class UI_AssembleCard : MonoBehaviour, IOwnsButtonScale, IPointerEnterHan
     {
         // 이름·설명은 팔레트에서 오는 가변 길이 문자열이라 고정 박스를 넘기기 쉽다.
         // 카드 밖으로 흘러 옆 카드 위에 겹치지 않도록, 여기서 박스 안에 가둔다.
-        if (_subText)  { _subText.text  = UIKoreanWrap.Words(sub); FitInBox(_subText, wrap: true); }
+        _subRaw = sub;
+        if (_subText)  { RenderSub(); FitInBox(_subText, wrap: true); }
 
         // 등급은 테두리(실버·골드·루비 조각)가 말하므로 글자로 다시 적지 않는다 — 그 자리를 통화 배지가 쓴다.
         // 배지는 이름과 한 줄을 나눠 쓴다(이름 왼쪽 · 배지 오른쪽). 이름 상자 오른쪽을 배지 폭만큼 비워
@@ -362,6 +374,14 @@ public class UI_AssembleCard : MonoBehaviour, IOwnsButtonScale, IPointerEnterHan
         ApplyCardBg();
         RefreshVisual(instant: true);
         RevealAsync(tier).Forget();   // 등급별 등장 연출
+    }
+
+    /// <summary>설명 줄만 갈아 끼운다(등장 연출 없이) — 효과 카드의 수치는 고른 원인(계수)에 따라 바뀐다.</summary>
+    public void SetSub(string sub)
+    {
+        if (_subRaw == sub) return;
+        _subRaw = sub;
+        RenderSub();
     }
 
     public void SetSelected(bool on)

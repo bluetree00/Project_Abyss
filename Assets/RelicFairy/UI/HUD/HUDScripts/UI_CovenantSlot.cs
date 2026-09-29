@@ -79,7 +79,7 @@ public sealed class UI_CovenantSlot : MonoBehaviour
             }
 
             bool has = !string.IsNullOrEmpty(text);
-            _descText.text = UIKoreanWrap.Words(text);
+            _descText.text = UIKeywordInk.Words(text, UIKeywordInk.OnDark);   // 수치에 금색(09-29)
             _descText.gameObject.SetActive(has);
         }
 

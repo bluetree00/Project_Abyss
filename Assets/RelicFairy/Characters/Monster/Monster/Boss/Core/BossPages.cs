@@ -6,7 +6,7 @@ namespace RelicFairy.Monster
 /// <summary>
 /// 보스 2페이지(해방 페이지) 공용 부품 — 숲의 수호자 · 화룡 · 죽음의 기사가 들고 있는 일반 객체(09-28 설계 확정 §2).
 ///
-/// 악몽기(<see cref="StoryProgress.IsNightmare"/>)에만 켜진다. 켜지면
+/// 해방기부터(<see cref="StoryProgress.IsLiberated"/>) 켜진다 — 봉인이 풀려야 두 번째 힘이 열린다(09-29 시기별 페이지). 켜지면
 ///   · 총 체력 = 기존 × (1 + <see cref="Page2Share"/>) — 두 줄 체력바. 1페이지 = 기존 체력 · 2페이지 = 기존 × 0.4.
 ///   · 1페이지 동안 체력은 2페이지 몫 아래로 내려가지 않는다(<see cref="HpFloor"/>) → 전환 패턴이 무적으로 연출 → 2페이지.
 ///   · 보스가 스스로 읽는 체력 비율(<see cref="PhaseRatio"/>)은 1페이지에선 1페이지 기준(1→0)이라
@@ -20,6 +20,7 @@ public sealed class BossPages
     public const float DefaultPage2Share = 0.4f;   // 2페이지 체력 = 기존 × 0.4 (D1 더하기)
     public const float SignatureAt       = 0.5f;   // 2페이지 체력 이 비율에서 간판 패턴 한 번
     public const float LateBreakScale    = 0.75f;  // 간판 뒤(후반) 패턴 사이 쉬는 시간 배율 — 2페이지 구성 §9
+    public const float NightmareBreakScale = 0.8f; // 악몽 모드 — 패턴 사이 쉬는 시간 배율(시기별 페이지 §2-1, 강화 1차)
 
     // ── Private ────────────────────────────────────────────────
     private readonly MonsterBase _boss;
@@ -31,8 +32,10 @@ public sealed class BossPages
     private int  _page2Patterns;   // 2페이지에서 시작한 패턴 수 — 개막 판정
 
     // ── Properties ─────────────────────────────────────────────
-    /// <summary>이번 전투에 2페이지가 있는가(악몽기).</summary>
+    /// <summary>이번 전투에 2페이지가 있는가(해방기부터).</summary>
     public bool  Enabled       { get; }
+    /// <summary>악몽 모드 전투 — 쉬는 시간이 짧다.</summary>
+    public bool  NightmareMode { get; }
     public float Page2Share    { get; }
     public int   Page          => _page;
     public bool  IsPage2       => Enabled && _page >= 2;
@@ -42,8 +45,8 @@ public sealed class BossPages
     public bool  OpenerDue     => IsPage2 && !_transitioning && _page2Patterns == 0;
     /// <summary>후반 — 간판을 쓴 뒤(§9: 쉬는 시간 −25% · 컨셉 연계기).</summary>
     public bool  IsLate        => IsPage2 && _signatureDone;
-    /// <summary>러너가 패턴 사이 쉬는 시간에 곱하는 배율.</summary>
-    public float BreakScale    => IsLate ? LateBreakScale : 1f;
+    /// <summary>러너가 패턴 사이 쉬는 시간에 곱하는 배율 — 후반 ×0.75, 악몽 모드 ×0.8(곱).</summary>
+    public float BreakScale    => (IsLate ? LateBreakScale : 1f) * (NightmareMode ? NightmareBreakScale : 1f);
 
     /// <summary>총 체력 배율 — MonsterBase.BossHpScale로 넘긴다.</summary>
     public float HpScale => Enabled ? 1f + Page2Share : 1f;
@@ -65,12 +68,13 @@ public sealed class BossPages
     {
         _boss      = boss;
         Enabled    = enabled && boss != null;
+        NightmareMode = Enabled && StoryProgress.IsNightmareMode;
         Page2Share = Mathf.Max(0.01f, page2Share);
         _markers   = Enabled ? new[] { Page2Share / (1f + Page2Share) } : null;
     }
 
-    /// <summary>이번 전투에 2페이지를 여는가 — 악몽기만.</summary>
-    public static bool ResolveEnabled() => StoryProgress.IsNightmare;
+    /// <summary>이번 전투에 2페이지를 여는가 — 해방기부터(봉인기 1줄 → 해방기 · 악몽 모드 2줄).</summary>
+    public static bool ResolveEnabled() => StoryProgress.IsLiberated;
 
     // ── Public Methods ─────────────────────────────────────────
 
@@ -141,6 +145,9 @@ public sealed class BossPages
 public interface IPagedBoss
 {
     BossPages Pages { get; }
+
+    /// <summary>이야기 보스 id(<see cref="StoryProgress"/> 키) — 시나리오 장면(<see cref="BossStoryScenes"/>)이 본다.</summary>
+    string StoryBossId { get; }
 
     /// <summary>전환 전경 순간 — 무대를 영구히 바꾼다(<paramref name="seconds"/> = 자라나는 시간).</summary>
     void OnPageStageChange(float seconds);

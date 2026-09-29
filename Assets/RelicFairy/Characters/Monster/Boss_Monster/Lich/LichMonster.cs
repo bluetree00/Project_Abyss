@@ -227,7 +227,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
     /// 블랙보드에 고정한다(전투 도중 붕괴가 일어나도 그 전투의 모드는 바뀌지 않는다).
     ///
     /// ── 분기 지점 ───────────────────────────────────────────────────
-    ///  • 출시: <see cref="StoryProgress.IsNightmare"/> — 봉인기에 리치를 봉인하는 순간 붕괴가 일어나 악몽기로.
+    ///  • 출시: <see cref="StoryProgress.IsLiberated"/> — 봉인기에 리치를 봉인하는 순간 붕괴가 일어나 해방기로(악몽 모드 포함).
     ///  • 테스트: 메뉴 RelicFairy/Test Run/Story/Override (저장 안 함). 인스펙터의 옛 조우 횟수 디버그도 남아 있다.
     /// </summary>
     public bool IsPhase2Unlocked
@@ -237,8 +237,8 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
 #if UNITY_EDITOR
             if (_debugOverrideEncounter) return _debugSessionCount >= Phase2UnlockAt;
 #endif
-            // 출시 게이트 — 봉인기에 리치를 봉인하는 순간 붕괴가 일어나고, 악몽기부터 페이즈2가 열린다(메타 영구).
-            return StoryProgress.IsNightmare;
+            // 출시 게이트 — 봉인기에 리치를 봉인하는 순간 붕괴가 일어나고, 해방기부터 해방된 리치(3줄)(메타 영구).
+            return StoryProgress.IsLiberated;
         }
     }
 

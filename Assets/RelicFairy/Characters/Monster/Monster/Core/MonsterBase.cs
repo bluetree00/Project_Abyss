@@ -186,7 +186,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>보스 등장 연출 완료 후 1회 발행. HUD가 보스 패널을 이 시점에 표시.</summary>
     public event System.Action OnBossCombatReady;
-    protected void RaiseBossCombatReady() => OnBossCombatReady?.Invoke();
+    protected void RaiseBossCombatReady()
+    {
+        OnBossCombatReady?.Invoke();
+        // 시나리오 장면 이펙트 미리 읽기 · 악몽 모드 첫 조우 한 줄(09-29 시기별 페이지 §4)
+        if (this is IPagedBoss paged) BossStoryScenes.NoteCombatReady(paged.StoryBossId);
+    }
 
     /// <summary>true면 등장 연출이 끝날 때까지 HUD 보스 패널을 억제한다.</summary>
     public virtual bool HasEntranceAnimation => false;

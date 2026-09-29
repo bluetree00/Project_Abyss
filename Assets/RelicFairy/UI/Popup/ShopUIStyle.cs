@@ -49,6 +49,9 @@ public static class ShopUIStyle
             "crucible_fail"    => (0.80f, 0.65f),
             "crucible_hit"     => (0.90f, 0.55f),   // 망치가 모루에 닿는 순간(낮은 쿵)
             "shop_reject"      => (0.65f, 0.70f),
+            "altar_engrave"    => (0.80f, 1.30f),   // 기억의 제단 — 각인(짧은 금속 울림)
+            "altar_grow"       => (0.50f, 1.60f),   // 빛실이 자란다(오르는 음)
+            "altar_keystone"   => (1.00f, 1.55f),   // 열쇠 노드(종)
             _                  => (0.65f, 1.00f),
         };
 

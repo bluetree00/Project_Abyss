@@ -32,6 +32,14 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     private const float CELL_GAP  = 5f;
     private const float CELL_STEP = CELL_SIZE + CELL_GAP;   // 68f — GridManager.GetGap() 기준값
 
+    // 판 외곽선(09-29) — 칸 모양을 따라 바깥 한 줄. 칸 가장자리에서 반 간격 + pad만큼 떨어진다.
+    // 실측(09-29): 빛 12px · 0.16이면 칸과 선 사이가 금빛 띠로 차 두꺼운 액자로 읽혔다 — 선 한 줄이 주인공, 빛은 옅게.
+    private const float OutlinePad   = 4f;
+    private const float OutlineWidth = 2f;
+    private const float OutlineGlowW = 6f;
+    private const float OutlineGlowA = 0.10f;
+    private static readonly Color OutlineColor = new(0.93f, 0.85f, 0.64f, 0.85f);
+
     /// <summary>판의 칸 간격(px). 브릿지가 존 자산을 만들 때 같은 값을 써야 한다 —
     /// 예전엔 브릿지가 54를 따로 들고 있어 뷰(78)와 어긋난 채 굳어 있었다.</summary>
     public const float CellStep = CELL_STEP;
@@ -210,7 +218,30 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         }
 
         hexGrid.InitFromPrebuiltSquares(_runtimeGridAsset, squares);
+        BuildBoardOutline(globalStartX, startY);
         _isBuilt = true;
+    }
+
+    /// <summary>
+    /// 판 테두리 — 판 뒤 어두운 바탕을 걷고 자연 배경 위에 판을 놓으면서, 「판이 놓여 있다」는 경계를 얇은 선 하나로 준다
+    /// (09-29 사용자). 칸 뒤(첫 자식)에 둬 칸 강조 · 미리보기를 가리지 않는다. ClearGrid가 칸과 함께 지운다.
+    /// </summary>
+    private void BuildBoardOutline(float startX, float startY)
+    {
+        var go = new GameObject("BoardOutline", typeof(RectTransform));
+        go.transform.SetParent(transform, false);
+        go.transform.SetAsFirstSibling();
+        var rt = (RectTransform)go.transform;
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = Vector2.zero;
+        rt.anchoredPosition = Vector2.zero;
+        var line = go.AddComponent<UIRectilinearOutline>();
+        line.raycastTarget = false;   // 테두리가 칸 드롭을 먹으면 배치가 막힌다
+        line.color = OutlineColor;
+        float half = CELL_STEP * 0.5f;
+        line.Build(_cellImages.Keys, (lx, ly) => new Vector2(startX - half + lx * CELL_STEP, startY + half - ly * CELL_STEP),
+                   OutlinePad, OutlineWidth, OutlineGlowW, OutlineGlowA);
+        _cellObjects.Add(go);
     }
 
     /// <summary>

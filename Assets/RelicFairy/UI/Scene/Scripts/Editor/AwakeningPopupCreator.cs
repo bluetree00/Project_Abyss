@@ -327,6 +327,7 @@ public static class AwakeningPopupCreator
     private static void SetArray(SerializedObject so, string field, Object[] values)
     {
         var prop = so.FindProperty(field);
+        if (prop == null) return;   // 09-29 트리 개편으로 걷은 필드(갈래 이름 · 물음 · 진척) — 옛 생성기가 넘어지지 않게
         prop.arraySize = values.Length;
         for (int i = 0; i < values.Length; i++)
             prop.GetArrayElementAtIndex(i).objectReferenceValue = values[i];

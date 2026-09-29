@@ -48,6 +48,7 @@ public class RelicAltar : MonoBehaviour
         _camTransform = Camera.main != null ? Camera.main.transform : null;
         CreateWorldText();
         CreatePrompt();
+        BaseCampLabelRule.Register(transform);   // 이름표는 가까이 간 곳 하나만(2차 개편 09-29)
     }
 
     private void Update()
@@ -57,6 +58,8 @@ public class RelicAltar : MonoBehaviour
         if (UIInputGate.Blocked) return;
         if (Input.GetKeyDown(KeyCode.F)) OpenInfoPopup();
     }
+
+    private void OnDestroy() => BaseCampLabelRule.Unregister(transform);
 
     private void OnTriggerEnter(Collider other)
     {
@@ -163,7 +166,12 @@ public class RelicAltar : MonoBehaviour
             if (cam == null) return;
             _camTransform = cam.transform;
         }
-        if (_worldText != null) _worldText.transform.rotation = _camTransform.rotation;
+        if (_worldText != null)
+        {
+            _worldText.transform.rotation = _camTransform.rotation;
+            bool show = BaseCampLabelRule.IsShown(transform);
+            if (_worldText.enabled != show) _worldText.enabled = show;
+        }
         if (_promptGo != null && _promptGo.activeSelf) _promptGo.transform.rotation = _camTransform.rotation;
     }
 

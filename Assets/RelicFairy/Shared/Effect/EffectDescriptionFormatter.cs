@@ -105,6 +105,23 @@ public static class EffectDescriptionFormatter
     public static string StatLabel(StatType type) => StatTypeLabel(type);
 
     /// <summary>
+    /// 스탯 버프 값 한 토막 — 퍼센트 버프는 비율(0.06 = +6%), 치명 확률은 %p, 치명 피해 · 스킬 쿨감은 비율 스탯이라 %로.
+    /// 예전엔 isPercent만 보고 「치명타 피해 +0.15」 「스킬 쿨다운 감소 +0.08」처럼 적었다(09-29).
+    /// </summary>
+    public static string StatValueText(StatType type, float value, bool isPercent)
+    {
+        if (isPercent) return FormatValue(EffectUnit.Ratio, value);
+        switch (type)
+        {
+            case StatType.CritChance:             return $"{(value >= 0f ? "+" : "")}{value.ToString("0.#", CultureInfo.InvariantCulture)}%p";
+            case StatType.CritDamage:
+            case StatType.SkillCooldownReduction:
+            case StatType.ActiveItemCooldownReduction: return FormatValue(EffectUnit.Ratio, value);
+            default:                              return FormatValue(EffectUnit.Flat, value);
+        }
+    }
+
+    /// <summary>
     /// 상태이상 statusId(GuidelineVisual.StatusApplied 어휘) → 아이콘 키(EffectIconRegistry 어휘).
     /// 두 어휘를 통합하는 단일 진입점. 미매핑은 "unknown"(회색 폴백 — 기능 정상).
     /// </summary>
@@ -284,6 +301,22 @@ public static class EffectDescriptionFormatter
             case "SingleEnemy":        return "단일 적 시";
             case "FirstAttackInRoom":  return "방 첫 공격 시";
             case "WhileSkillCooldown": return "스킬 쿨다운 중";
+
+            // ── 발동 계열(09-29) — TriggerBurstEffect · 창 발동 ──
+            case "AfterDash":          return "대시 후";
+            case "AfterCrit":          return "치명타 후";
+            case "AfterKill":          return "처치 후";
+            case "WithRangedWeapon":   return "원거리 무기";
+            case "OnDash":             return "대시 끝";
+            case "AfterDashHit":       return "대시 후 첫 적중";
+            case "OnPerfectDodge":     return "저스트 회피";
+            case "OnCritCount":        return "치명타 누적";
+            case "OnSkillHit":         return "스킬 적중";
+            case "OnSkillChain":       return "스킬 연속";
+            case "OnSkillUse":         return "스킬 사용";
+            case "OnMultiKill":        return "연속 처치";
+            case "OnExecute":          return "처형";
+            case "OnRangedHit":        return "원거리 명중";
 
             default:              return trigger; // 미지 트리거는 원문 노출(정보 손실 방지)
         }

@@ -72,9 +72,7 @@ public readonly struct BuffViewItem
         float value = buff.Modifier.Value;
 
         string label = EffectDescriptionFormatter.StatLabel(type);
-        string valueStr = buff.IsPercent
-            ? EffectDescriptionFormatter.FormatValue(EffectUnit.Ratio, value)
-            : EffectDescriptionFormatter.FormatValue(EffectUnit.Flat, value);
+        string valueStr = EffectDescriptionFormatter.StatValueText(type, value, buff.IsPercent);
 
         string remainText = buff.RoomsRemaining > 0 ? $"[{buff.RoomsRemaining}방]" : "";
         float remaining01 = buff.BaseDuration > 0

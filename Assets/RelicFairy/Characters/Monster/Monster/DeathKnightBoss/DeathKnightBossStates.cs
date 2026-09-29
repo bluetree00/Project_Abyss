@@ -380,6 +380,7 @@ public class DKDieState : DieState
         GameCameraController.Instance?.DeactivateDKPlayerOrbit(1.5f);
 
         base.Enter(ctx);
+        BossStoryScenes.PlayEnd(ctx, StoryProgress.DeathKnight);   // 봉인기 = 봉인 · 해방기 = 처치
     }
 }
 

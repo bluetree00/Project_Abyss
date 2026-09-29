@@ -303,6 +303,7 @@ public class FGDieState : DieState
             fg.UnbindBossHudIfBoundPublic();
 
         base.Enter(ctx);
+        BossStoryScenes.PlayEnd(ctx, StoryProgress.ForestGuardian);   // 봉인기 = 봉인 · 해방기 = 처치
     }
 }
 }

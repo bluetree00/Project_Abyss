@@ -40,9 +40,14 @@ public sealed class UI_RefineryPanel : UI_Popup
     private const float ColX      = 390f;   // 우측 상태 컬럼 중심
     private const float OddsY     = AltarCy; // 확률 막대 — 피버가 비운 자리로 올려 제단 높이에(09-28)
     private const float FooterY   = -274f;
-    private const float CostX     = -170f;   // 하단 [비용][돌리기] 두 칸 — 재점화가 빠져 가운데로 모은다
-    private const float SpinX     =  170f;
-    private const string IdleHint = "원석을 넣고 돌리면 룬 하나가 나온다";
+    // 하단은 [돌리기  원석 N] 한 버튼 — 따로 있던 [원석 N] 표시판이 버튼처럼 보여 둘로 읽혔다(09-29 사용자).
+    private const float SpinX     =    0f;
+    private const float SpinW     =  380f;
+    private const string CostOkHex    = "#F2E6C8";   // [돌리기] 글의 비용 — 치를 수 있음
+    private const string CostShortHex = "#E07A6E";   //                     모자람
+    private static string IdleHint => MemoryAltarService.IsRefinePickUnlocked
+        ? "원석을 넣고 돌리면 룬 두 장 중 하나를 고른다"
+        : "원석을 넣고 돌리면 룬 하나가 나온다";
 
     /// <summary>걷은 기능(09-28)의 구운 요소 — 피버 · 돌발 배너 · 화살표 · 예약 표시 · 재점화 · 방 특전.</summary>
     private static readonly string[] RetiredNodes =
@@ -52,6 +57,8 @@ public sealed class UI_RefineryPanel : UI_Popup
     private static readonly Vector2 Half = new(0.5f, 0.5f);
 
     private static readonly Color HeatDefault = new(0.92f, 0.64f, 0.29f, 1f);
+    // 청 수정 동굴 바탕을 인디고로 누른다 — 룬 획득 화면과 같은 값(톤 통일 ④, 09-29).
+    private static readonly Color CaveTint    = new(0.66f, 0.62f, 0.80f, 1f);
 
     private RefineryService _svc;
     private bool _busy;
@@ -89,6 +96,7 @@ public sealed class UI_RefineryPanel : UI_Popup
     // ── 좌측 「나올 룬 / 나온 룬」 판 (09-27 · 09-28) ── 프리팹이 구워져 있어 런타임에 짓는다.
     private Image    _infoGem;
     private TMP_Text _infoCaption, _infoName, _infoDesc, _infoFoot;
+    private TMP_Text _spinLabel;   // [돌리기] 글 — 비용을 함께 적는다
 
     // ── Lifecycle ──
 
@@ -241,6 +249,7 @@ public sealed class UI_RefineryPanel : UI_Popup
                  ?? ShopUIStyle.MakeImage(mask, "Bg", Color.white);
         bg.raycastTarget = false;
         ShopUIStyle.Skin(bg, art);
+        bg.color = CaveTint;
 
         // 창과 아트 중 더 좁은 축을 창에 맞추고 다른 축은 비율대로 키운다 → 항상 창을 덮는다.
         float winW = WindowW, winH = WindowH;
@@ -351,16 +360,9 @@ public sealed class UI_RefineryPanel : UI_Popup
         //   좌 (106,653) 298×70 · 중 (428,653) 316×70 · 우 (764,653) 278×70 → 창 중심 기준으로 환산.
         // 아트는 Sprites 세트의 「버튼 우측/중앙」(글자 없는 파란 베벨, 가로 9-slice 200)이라
         // 폭은 자유롭고 높이 70에 맞춘다. 예전 @2x 세트(글자 구워짐)는 라벨과 겹쳐 두 번 읽혔다.
-        _costPlateImg = MakeArtButton("CostPlate", First(skin?.costPlate), null,
-            new Vector2(CostX, FooterY), new Vector2(298f, 70f), null);
-
-        // 완성본 버튼 아트는 글자가 없는 빈 판이다 — 비용 숫자는 판 가운데에 놓는다.
-        _costText = ShopUIStyle.MakeText(_costPlateImg.transform, "Cost", 18f, FontStyles.Bold,
-            TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
-        ShopUIStyle.Stretch(_costText.rectTransform, 10f);
-
+        // 비용은 [돌리기] 글에 함께 적는다(Refresh) — 따로 표시판을 두지 않는다.
         _spinBtnImg = MakeArtButton("SpinBtn", First(skin?.spinButton), "돌리기",
-            new Vector2(SpinX, FooterY), new Vector2(316f, 70f), OnSpinClicked);
+            new Vector2(SpinX, FooterY), new Vector2(SpinW, 70f), OnSpinClicked);
 
         // 안내·거절 사유. 완성본에 상설 문구는 없으므로 할 말이 있을 때만 뜬다.
         _hint = ShopUIStyle.MakeText(_root, "Hint", 16f, FontStyles.Normal,
@@ -474,8 +476,10 @@ public sealed class UI_RefineryPanel : UI_Popup
             var t = _root != null ? _root.Find(gone) : null;
             if (t != null) t.gameObject.SetActive(false);
         }
-        PlaceIfFound("CostPlate", CostX, FooterY, 298f, 70f);
-        PlaceIfFound("SpinBtn",   SpinX, FooterY, 316f, 70f);
+        // 구운 프리팹의 [원석 N] 표시판은 숨긴다 — 비용은 [돌리기] 글에 있다.
+        if (_costPlateImg != null) _costPlateImg.gameObject.SetActive(false);
+        PlaceIfFound("SpinBtn",   SpinX, FooterY, SpinW, 70f);
+        if (_spinBtnImg != null) _spinLabel = _spinBtnImg.transform.Find("Label")?.GetComponent<TMP_Text>();
         // [돌리기] = 전 화면 공통 베벨(금). [원석 N]은 누르는 것이 아니라 표시판인데 돌리기와 똑같은 청색 버튼이라
         // 눌러야 할 것처럼 보였다 → 글래스 판 + 금 가는 선(09-28 UI 톤 통일).
         if (_spinBtnImg != null && UITheme.ButtonBevel != null)
@@ -483,8 +487,6 @@ public sealed class UI_RefineryPanel : UI_Popup
             UITheme.StyleButton(_spinBtnImg, UITheme.CtaTint);
             _themedSpin = true;
         }
-        if (_costPlateImg != null) UITheme.StylePanel(_costPlateImg, UITheme.Band, UITheme.GoldLine, 12f);
-        if (_costText != null) TMPOutlineHelper.ApplySoftShadow(_costText);
         if (_oddsBar != null)
             PlaceProportional((RectTransform)_oddsBar.transform, ColX, OddsY, 310f, 150f, WindowW, WindowH);
         if (_hint != null) _hint.text = IdleHint;   // 구운 글은 옛 안내(「속성 젬을 고르세요」)
@@ -579,7 +581,7 @@ public sealed class UI_RefineryPanel : UI_Popup
             _infoCaption.text = "나올 룬";
             _infoGem.sprite   = RuneArt.GetArt(ItemRarity.Rare);
             _infoGem.enabled  = _infoGem.sprite != null;
-            _infoName.text    = "무작위 룬 하나";
+            _infoName.text    = MemoryAltarService.IsRefinePickUnlocked ? "무작위 룬 두 장 중 하나" : "무작위 룬 하나";
             _infoName.color   = ShopUIStyle.TextPrimary;
             _infoDesc.text    = "희귀 이상 · 효과와 속성,\n모양은 룬마다 다르다";
             _infoFoot.text    = "";
@@ -624,9 +626,9 @@ public sealed class UI_RefineryPanel : UI_Popup
             _rarLine.text = body +
                 $"   <color=#C99C4F>정제 등급 상승 +{RefineryService.QualityUnlockEpic * 100f:F0}%p</color>";
         }
-        // 숫자만 있으면 무엇으로 치르는지 안 읽힌다 — 우상단 보유량(「원석 N」)과 같은 말로 적는다.
-        _costText.text  = $"원석 {_svc.CurrentCost}";
-        _costText.color = _svc.CanAfford ? ShopUIStyle.TextPrimary : ShopUIStyle.RejectRed;
+        // 비용은 버튼 글에 — 우상단 보유량(「원석 N」)과 같은 말로 적고, 모자라면 비용만 붉게.
+        if (_spinLabel != null)
+            _spinLabel.text = $"돌리기   <size=85%><color={(_svc.CanAfford ? CostOkHex : CostShortHex)}>원석 {_svc.CurrentCost}</color></size>";
         CurrencyCounter.Apply(_oreText, _svc.OreOwned, "원석 ");
 
         Tint(_spinBtnImg, _svc.CanAfford && !_busy);
@@ -672,7 +674,40 @@ public sealed class UI_RefineryPanel : UI_Popup
         // 결과를 잠깐 보여 준 뒤 배치 화면으로 넘긴다. <b>잠금은 풀지 않는다</b> — 풀면 넘어가기까지의 900ms 동안
         // [돌리기]가 다시 눌려, 두 번째 굴림은 원석만 빠진 채 결과 연출을 못 보고 화면이 닫힌다.
         Refresh();
+        if (outcome.Alt != null) { await OfferPickAsync(outcome); return; }
         await HandOffToGridAsync(outcome.Rune);
+    }
+
+    /// <summary>
+    /// 「정제 두 장」(기억의 제단) — 좋은 쪽을 방금 공개했다. 잠깐 보여 준 뒤 정제소를 닫고 두 장을 룬 선택 화면에 올린다
+    /// (방 보상과 같은 화면 · 같은 배치 흐름). 넘기면 쓴 원석을 돌려준다.
+    /// </summary>
+    private async UniTask OfferPickAsync(RefineryOutcome outcome)
+    {
+        try { await UniTask.Delay(700, ignoreTimeScale: true, cancellationToken: this.GetCancellationTokenOnDestroy()); }
+        catch (OperationCanceledException) { return; }
+
+        var inv  = GameRunBootstrapper.Instance?.Run?.ItemInventory;
+        var svc  = _svc;
+        var list = new List<(RuntimeItemData data, ItemSO so)> { (outcome.Rune, outcome.RuneSo), (outcome.Alt, outcome.AltSo) };
+        base.ClosePopupUI();   // 정제소를 먼저 닫는다 — 아래는 이 창이 사라진 뒤에도 이어진다
+        OfferPickDetachedAsync(list, inv, svc, outcome.Spent).Forget();
+    }
+
+    private static async UniTaskVoid OfferPickDetachedAsync(List<(RuntimeItemData data, ItemSO so)> candidates,
+                                                            RunItemInventory inv, RefineryService svc, int spent)
+    {
+        var popup = Managers.UI != null ? await Managers.UI.ShowPopupUIAndGetAsync<UI_RuneSelectPopup>() : null;
+        if (popup == null)
+        {
+            // 화면을 못 열면 좋은 쪽을 그대로 넣는다 — 원석만 빠지고 룬이 사라지면 안 된다.
+            if (candidates.Count > 0 && candidates[0].data != null) inv?.AddToStaging(candidates[0].data);
+            return;
+        }
+        var wait = popup.WaitForInteractionAsync(CancellationToken.None);
+        popup.Setup(candidates, inv, 0);
+        await wait;
+        if (popup.Skipped) svc?.Refund(spent);
     }
 
     /// <summary>결과를 잠깐 보여준 뒤(≈0.9초) 정제소를 닫고 그 룬을 판에 올린다.</summary>

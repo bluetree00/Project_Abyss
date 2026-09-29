@@ -19,7 +19,8 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
                       V_FRENZY_MOVE = 8, V_SKILL_BASE = 10,
                       V_SKILL_PER = 11, V_BRAND_DUR = 12, V_BRAND_AMP = 13;
     private const string PassiveTip =
-        "찢긴 서약의 검 — 적중으로 광기를 쌓아 공격력이 오르지만 받는 피해도 늘어난다. 광기 최대치에서 '광란'(이속)에 들며 심판의 일격을 쓸 수 있다";
+        "찢긴 서약의 검 — 적중마다 광기(일반 1 · 정예 2 · 엘리트 3 · 보스 5, 최대 40): 스택당 공격력 +1% · 받는 피해 +0.75%. " +
+        "40스택에서 '광란' 4초(이동속도 +20%) · 심판의 일격 1회";
 
     // VFX Addressable 키(에셋 배선 후 실 프리팹 등록). 미등록 시 무해.
     // 광란 오라는 2겹이다 — 붉은 분노(Rage) 위에 검보라 저주(Cursed)를 얹어

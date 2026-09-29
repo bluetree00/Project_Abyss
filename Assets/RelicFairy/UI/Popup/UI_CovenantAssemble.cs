@@ -214,6 +214,10 @@ public class UI_CovenantAssemble : UI_Popup
         {
             SkinImage(_prismBg, skin.resultScroll);
             if (_prismBorder != null) _prismBorder.enabled = false;
+            // 결과 두루마리는 밝은 종이다 — 구 아트(어두운 프리즘)에 맞춘 상아색 글자가 종이 위에서 사라졌다.
+            _resultOnPaper = true;
+            foreach (var t in new[] { _previewTitle, _previewSentence, _previewCondition, _previewCoef, _previewEffect })
+                if (t != null) t.color = InkOnBook;
         }
 
         // 제목은 종이 위에 먹으로 — 봉은 좌우 세로라 윗가장자리엔 봉이 없고, 상아색은 밝은 종이 위에서 대비가 없었다(09-28 UI 전수).
@@ -248,6 +252,13 @@ public class UI_CovenantAssemble : UI_Popup
     private static readonly Color BtnLabel      = new(0.97f, 0.93f, 0.80f, 1f);
     private static readonly Color InkOnBook     = new(0.20f, 0.14f, 0.08f, 1f);
     private static readonly Color InkOnBookDim  = new(0.36f, 0.28f, 0.19f, 1f);
+    private bool _resultOnPaper;   // 결과 두루마리가 밝은 종이(개편 스킨)인가 — 글자 잉크를 가른다
+    private const string PreviewLabelHex = "#A89A82";   // 중앙 두루마리(어두운 판) — 항목 이름
+    private const string PreviewValueHex = "#F4E7C8";   //                              값
+    private const string PaperLabelHex   = "#7A6448";   // 중앙 두루마리(밝은 종이 — 개편 스킨) — 항목 이름
+    private const string PaperValueHex   = "#2A1C0E";   //                                        값
+    private const float  SummaryLeft     = 0.105f;      // 하단 조합 줄 — 하단 바 안 비율(양피지 테두리 안쪽부터)
+    private const float  SummaryRight    = 0.49f;       //                리롤 표시 앞까지
     /// <summary>
     /// <b>판 크기만</b> 정한다. 그 안의 배치는 <b>프리팹이 정본</b>이다.
     ///
@@ -288,7 +299,19 @@ public class UI_CovenantAssemble : UI_Popup
     {
         ApplyForgeBanner();
 
-        if (_forgeSummary    != null) _forgeSummary.color    = InkOnBook;
+        if (_forgeSummary    != null)
+        {
+            _forgeSummary.color = InkOnBook;
+            // 하단 바는 책 폭의 2~98%라 왼쪽 끝이 두루마리 말린 곳(양피지 밖)에 걸린다 — 테두리 안에서 시작해 리롤 앞에서 끝낸다(09-29).
+            var srt = _forgeSummary.rectTransform;
+            srt.anchorMin = new Vector2(SummaryLeft, srt.anchorMin.y);
+            srt.anchorMax = new Vector2(SummaryRight, srt.anchorMax.y);
+            srt.offsetMin = new Vector2(0f, srt.offsetMin.y);
+            srt.offsetMax = new Vector2(0f, srt.offsetMax.y);
+            _forgeSummary.enableAutoSizing = true;
+            _forgeSummary.fontSizeMax = _forgeSummary.fontSize;
+            _forgeSummary.fontSizeMin = Mathf.Max(11f, _forgeSummary.fontSize * 0.75f);
+        }
         if (_rerollCountText != null) _rerollCountText.color = InkOnBookDim;
         if (_synergyText     != null) _synergyText.color     = InkOnBookDim;
     }
@@ -478,11 +501,18 @@ public class UI_CovenantAssemble : UI_Popup
 
         SetText(_previewTitle,
             $"{p.causeName}[{p.causeTier.DisplayName()}] × {p.effectName}[{p.effectTier.DisplayName()}]");
-        SetText(_previewSentence, UIKoreanWrap.Words($"\"{p.ResultSentence}\""));
-        SetText(_previewCondition, $"발동 조건  {p.causeDesc}");
-        SetText(_previewCoef,      $"봉인 계수  ×{p.coefficient:0.0}");
-        SetText(_previewEffect,    UIKoreanWrap.Words($"효과  {p.EffectAmountLabel()}  ({p.Badge})"));
-        SetText(_forgeSummary,     $"{p.causeName} × {p.effectName}  →  {p.effectDesc}");
+        // 한 색 글자는 「얼마나」가 안 읽힌다 — 항목 이름은 옅게, 값은 진하게, 수치는 색으로(09-29).
+        // 두루마리가 밝은 종이면(개편 스킨) 잉크 · 적갈, 어두운 판이면(구 아트) 상아 · 금.
+        string num   = _resultOnPaper ? UIKeywordInk.OnParchment : UIKeywordInk.OnDark;
+        string label = _resultOnPaper ? PaperLabelHex : PreviewLabelHex;
+        string value = _resultOnPaper ? PaperValueHex : PreviewValueHex;
+        SetText(_previewSentence, UIKeywordInk.Words($"\"{p.ResultSentence}\"", num));
+        SetText(_previewCondition, $"<color={label}>발동 조건</color>  <color={value}>{p.causeDesc}</color>");
+        SetText(_previewCoef,      $"<color={label}>봉인 계수</color>  <color={num}><b>×{p.coefficient:0.0}</b></color>");
+        SetText(_previewEffect,    $"<color={label}>효과</color>  <color={value}>" + UIKeywordInk.Numbers(p.EffectAmountLabel(), num)
+                                   + $"</color>  <color={label}>({p.Badge})</color>");
+        SetText(_forgeSummary,     $"{p.causeName} × {p.effectName}  →  " + UIKeywordInk.Numbers(p.EffectAmountCompact(), UIKeywordInk.OnParchment));
+        RefreshEffectAmounts();
 
         UpdateSynergyLine(p);
 
@@ -494,9 +524,25 @@ public class UI_CovenantAssemble : UI_Popup
             bool owned  = IsOwned(SelectedId());
             bool banned = CovenantPalette.IsBannedPair(cause.id, effect.id);
             _forgeButton.interactable = !owned && !banned;
+            UIAffordGlow.Set(_forgeButton, _forgeButton.interactable);   // 벼릴 수 있으면 은은한 불(09-29)
 
             if (banned)     SetText(_forgeSummary, "봉인된 조합 — 이 원인으로는 이 효과를 벼릴 수 없다");
             else if (owned) SetText(_forgeSummary, "이미 보유한 조합 — 원인이나 효과를 바꿔야 벼릴 수 있다");
+        }
+    }
+
+    /// <summary>
+    /// 효과 카드 설명 = 지금 고른 원인으로 벼렸을 때의 <b>실제 수치</b>(원인 계수가 곱해진다) — 서술형 문구로는 무슨 기능인지 안 읽혔다(09-29).
+    /// </summary>
+    private void RefreshEffectAmounts()
+    {
+        if (_effectCards == null || _causes == null || _selCause >= _causes.Count) return;
+        var cause = _causes[_selCause];
+        for (int i = 0; i < _effectCards.Length && i < _effects.Count; i++)
+        {
+            if (_effectCards[i] == null) continue;
+            var p = CovenantAssemblePreview.Build(cause.id, cause.tier, _effects[i].id, _effects[i].tier);
+            if (p.valid) _effectCards[i].SetSub(p.EffectAmountCompact());
         }
     }
 

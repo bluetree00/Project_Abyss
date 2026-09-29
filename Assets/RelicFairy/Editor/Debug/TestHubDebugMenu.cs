@@ -603,15 +603,20 @@ public static class TestHubDebugMenu
     [MenuItem(StoryRoot + "Override - Seal Era")]
     public static void StorySealEra() => SetStoryOverride(0);
 
-    [MenuItem(StoryRoot + "Override - Nightmare")]
-    public static void StoryNightmare() => SetStoryOverride(1);
+    [MenuItem(StoryRoot + "Override - Liberated")]
+    public static void StoryLiberated() => SetStoryOverride(1);
+
+    [MenuItem(StoryRoot + "Override - Nightmare Mode")]
+    public static void StoryNightmareMode() => SetStoryOverride(2);
 
     [MenuItem(StoryRoot + "Override - Use Saved State", true)]
     private static bool StoryUseSavedCheck()  { Menu.SetChecked(StoryRoot + "Override - Use Saved State", StoryProgress.DebugNightmareOverride < 0);  return true; }
     [MenuItem(StoryRoot + "Override - Seal Era", true)]
     private static bool StorySealEraCheck()   { Menu.SetChecked(StoryRoot + "Override - Seal Era",        StoryProgress.DebugNightmareOverride == 0); return true; }
-    [MenuItem(StoryRoot + "Override - Nightmare", true)]
-    private static bool StoryNightmareCheck() { Menu.SetChecked(StoryRoot + "Override - Nightmare",       StoryProgress.DebugNightmareOverride == 1); return true; }
+    [MenuItem(StoryRoot + "Override - Liberated", true)]
+    private static bool StoryLiberatedCheck() { Menu.SetChecked(StoryRoot + "Override - Liberated",       StoryProgress.DebugNightmareOverride == 1); return true; }
+    [MenuItem(StoryRoot + "Override - Nightmare Mode", true)]
+    private static bool StoryNightmareModeCheck() { Menu.SetChecked(StoryRoot + "Override - Nightmare Mode", StoryProgress.DebugNightmareOverride == 2); return true; }
 
     private static void SetStoryOverride(int value)
     {
@@ -619,13 +624,13 @@ public static class TestHubDebugMenu
         StoryProgress.RefreshDebugOverride();
         Debug.Log(value < 0
             ? "[TestHub] 이야기 상태 — 저장값 사용"
-            : $"[TestHub] 이야기 상태 오버라이드 — {(value == 1 ? "악몽기" : "봉인기")} (이야기 기록은 저장하지 않음)");
+            : $"[TestHub] 이야기 상태 오버라이드 — {(StoryEra)value} (이야기 기록은 저장하지 않음)");
     }
 
     [MenuItem(StoryRoot + "Log Story State")]
     public static void LogStoryState()
     {
-        Debug.Log($"[TestHub] 이야기 — 악몽기={StoryProgress.IsNightmare} 엔딩={StoryProgress.HasEnded} " +
+        Debug.Log($"[TestHub] 이야기 — 시기={StoryProgress.Era} 엔딩={StoryProgress.HasEnded} " +
                   $"리치조우={StoryProgress.HasMetLich} 멀린이름={StoryProgress.IsMerlinNamed} " +
                   $"봉인 {StoryProgress.SealedCount}/4 처치 {StoryProgress.KilledCount}/4 · 오버라이드={StoryProgress.DebugNightmareOverride}");
     }

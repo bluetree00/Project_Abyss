@@ -30,8 +30,8 @@ MonoBehaviour:
   lowShotHold: 0.5
   refillSeconds: 2.4
   roarHoldSeconds: 1.4
-  wideBack: 22
-  wideHeight: 16
+  wideBack: 16
+  wideHeight: 12
   roarDistance: 12
   roarHeight: 3.5
   bodyHeight: 3

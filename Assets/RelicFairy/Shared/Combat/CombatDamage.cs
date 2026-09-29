@@ -240,6 +240,7 @@ public static class CombatDamage
                 IsCrit      = isCrit,
                 HitPosition = hitPoint,
                 ActionType  = actionType,
+                IsRanged    = req.IsRanged,
             });
             return 0f;   // 피해 0 — 막혔다
         }
@@ -266,6 +267,7 @@ public static class CombatDamage
             IsCrit      = isCrit,
             HitPosition = hitPoint,
             ActionType  = actionType,
+            IsRanged    = req.IsRanged,
         };
         mgr?.OnPostDealDamage(report);
 

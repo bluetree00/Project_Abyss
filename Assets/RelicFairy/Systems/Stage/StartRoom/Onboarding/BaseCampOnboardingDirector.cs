@@ -75,6 +75,13 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
     /// <summary>현재 활성 슬롯의 온보딩 완료 여부. 초회 판정(입구 스폰 + 가이드) 근거.</summary>
     public static bool IsCompleted => PlayerPrefs.GetInt(SaveKeyFor(ActiveSlot), 0) == 1;
 
+    /// <summary>첫 판 온보딩이 도는 중인가 — 구역 표지는 이 동안 목표 구역만 알린다(한 순간에 하나만, 2차 개편 09-29).</summary>
+    public static bool InProgress { get; private set; }
+
+    // 도메인 리로드가 꺼져 있으면 정적 값이 이전 플레이에서 남는다
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => InProgress = false;
+
     /// <summary>슬롯 삭제 시 온보딩 기록도 함께 초기화 → 그 슬롯으로 새로 시작하면 초회로 다시 진행된다.</summary>
     public static void ClearForSlot(int slot)
     {
@@ -92,6 +99,7 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
         }
 
         _active = true;
+        InProgress = true;
         _cts = new CancellationTokenSource();
         QuestEvents.OnReported += HandleReport;
         EnsureBarriersLocked();
@@ -128,11 +136,13 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
     {
         _swordPhase = true;
         guideArrow?.SetTarget(swordAwakenTarget);
+        ZoneSign.SetObjective(swordAwakenTarget);
         ShowStepGuideAsync(swordAwakenGuideline, waitDialogue: false, _cts.Token).Forget();
     }
 
     private void OnDestroy()
     {
+        InProgress = false;
         if (_active) QuestEvents.OnReported -= HandleReport;
         _cts?.Cancel();
         _cts?.Dispose();
@@ -157,6 +167,7 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
         }
 
         guideArrow?.SetTarget(steps[i].target);
+        ZoneSign.SetObjective(steps[i].target);
         ShowStepGuideAsync(steps[i].guideline, waitDialogue: !initial, _cts.Token).Forget();
     }
 
@@ -172,8 +183,10 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
         {
             _stepIndex = steps.Length;
             guideArrow?.SetTarget(gateTarget);
+            ZoneSign.SetObjective(gateTarget);
             ShowStepGuideAsync(gateGuideline, waitDialogue: true, _cts.Token).Forget();
             MarkCompleted();
+            InProgress = false;   // 남은 목표는 성문 하나 — 다른 구역 첫 배너는 이제 들어가면 뜬다
         }
     }
 

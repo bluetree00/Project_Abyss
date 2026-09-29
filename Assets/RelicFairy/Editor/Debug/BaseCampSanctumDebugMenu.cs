@@ -120,6 +120,38 @@ public static class BaseCampSanctumDebugMenu
     [MenuItem(Root + "9b 소환 — 사망 복귀 (Play)")] public static void SummonDeath() => PlaySummon(BaseCampFxDirector.SummonKind.Death);
     [MenuItem(Root + "9c 소환 — 클리어 복귀 (Play)")] public static void SummonClear() => PlaySummon(BaseCampFxDirector.SummonKind.Clear);
 
+    // ── 2차 개편(09-29) — 봉인 전망대 · 기억 성소 실측 ──
+    // 좌표 = 생성기 gen_wing.py meta(전망대 가운데에서 섬 쪽 3 m · 성소 책 받침대 앞)
+    [MenuItem(Root + "12 봉인 전망대 (Play)")] public static void ToSealTerrace()   => _ = TeleportLocal(new Vector3(96.4f, 9.3f, -21.3f));
+    [MenuItem(Root + "13 기억 성소 앞 (Play)")] public static void ToMemorySanctum() => _ = TeleportLocal(new Vector3(76.5f, 9.3f, -24.1f));
+
+    /// <summary>봉인 섬 넷의 겉모습만 바꾼다(저장 없음) — 상태 4종 캡처용.</summary>
+    [MenuItem(Root + "14a 봉인 섬 — 풀림 (Play)")]   public static void SealUnsealed() => PreviewSeal(0);
+    [MenuItem(Root + "14b 봉인 섬 — 봉인 (Play)")]   public static void SealSealed()   => PreviewSeal(1);
+    [MenuItem(Root + "14c 봉인 섬 — 깨짐 (Play)")]   public static void SealBroken()   => PreviewSeal(2);
+    [MenuItem(Root + "14d 봉인 섬 — 처치 (Play)")]   public static void SealSlain()    => PreviewSeal(3);
+    [MenuItem(Root + "15 봉인 섬 점등 — Ch1 (Play)")] public static void SealIgnite()  => Shrine()?.DebugIgnite(0);
+    [MenuItem(Root + "16a 기억 수정 — 열 수 있음 켜기 (Play)")] public static void CrystalReadyOn()  => Crystal()?.DebugForceReady(true);
+    [MenuItem(Root + "16b 기억 수정 — 열 수 있음 끄기 (Play)")] public static void CrystalReadyOff() => Crystal()?.DebugForceReady(false);
+
+    private static void PreviewSeal(int state) => Shrine()?.DebugPreview(-1, state);
+
+    private static BaseCampSealShrine Shrine()
+    {
+        if (!Application.isPlaying) { Debug.LogWarning("[SanctumDebug] 플레이 모드에서만 동작한다."); return null; }
+        var s = Object.FindFirstObjectByType<BaseCampSealShrine>();
+        if (s == null) Debug.LogWarning("[SanctumDebug] 봉인 섬(BaseCampSealShrine)이 없다.");
+        return s;
+    }
+
+    private static MemoryAltarCrystal Crystal()
+    {
+        if (!Application.isPlaying) { Debug.LogWarning("[SanctumDebug] 플레이 모드에서만 동작한다."); return null; }
+        var c = Object.FindFirstObjectByType<MemoryAltarCrystal>();
+        if (c == null) Debug.LogWarning("[SanctumDebug] 기억 수정(MemoryAltarCrystal)이 없다.");
+        return c;
+    }
+
     private static void PlaySummon(BaseCampFxDirector.SummonKind kind)
     {
         if (!Application.isPlaying) { Debug.LogWarning("[SanctumDebug] 플레이 모드에서만 동작한다."); return; }

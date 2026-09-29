@@ -4,7 +4,8 @@
 // - 보스 이름 텍스트
 // - 프리팹 연결이 비어 있으면 런타임에 최소 UI를 자동 구성
 // - 페이즈 바(IBossHudSource 보스): 총 체력을 페이즈 경계로 나눠 페이즈마다 한 줄로 보여 준다.
-//   한 줄을 다 깎으면 전환 연출이 PlayPageRefill을 부르고 바가 차오른다. 이름 옆 마름모 = 남은 페이즈.
+//   한 줄을 다 깎으면 바가 깨지고(번쩍 · 흔들림 · 빈 바 붉은 맥동), 전환 연출이 PlayPageRefill을 부르면 다시 차오르고
+//   가득 찬 순간 한 번 더 번쩍인다. 줄 수는 미리 보여 주지 않는다 — 전환을 겪어서 안다(09-29 사용자).
 //============================================================
 using UnityEngine;
 using UnityEngine.UI;
@@ -43,11 +44,9 @@ public sealed class BossPanelView : MonoBehaviour
     private float innerWindowCenterY = 0.37f;
 
     [Header("페이즈 바 (IBossHudSource 보스만)")]
-    [SerializeField] private Color pagePipFullColor  = new Color(1.00f, 0.84f, 0.40f, 1f);
-    [SerializeField] private Color pagePipEmptyColor = new Color(1.00f, 1.00f, 1.00f, 0.22f);
-    [SerializeField] private float pagePipSize       = 14f;
-    [SerializeField] private float pagePipGap        = 8f;
     [SerializeField] private Color refillGlowColor   = new Color(1.00f, 0.95f, 0.80f, 0.65f);
+    [SerializeField] private Color pageFlashColor    = new Color(1.00f, 1.00f, 1.00f, 0.90f);
+    [SerializeField] private Color breakPulseColor   = new Color(0.85f, 0.10f, 0.12f, 0.55f);
 
     [Header("무적 · 무방비 (IBossHudSource 보스만)")]
     [SerializeField] private Color invulnerableColor = new Color(0.55f, 0.62f, 0.80f, 0.72f);
@@ -62,6 +61,14 @@ public sealed class BossPanelView : MonoBehaviour
     private const float NameFontSize = 26f;
     private const float HpFontSize   = 16f;
     private const float NameLift     = 14f;   // 테두리 가운데 장식 위로 올린다(8은 장식 꼭대기에 닿았다)
+
+    // 페이즈 바 연출(09-29) — 줄이 다 깎인 순간 · 다시 가득 찬 순간
+    private const float PageFlashSeconds  = 0.35f;
+    private const float BreakShakeSeconds = 0.35f;
+    private const float BreakShakePixels  = 7f;
+    private const float BreakPulseHz      = 2.5f;
+    private const float FullPunchSeconds  = 0.3f;
+    private const float FullPunchScale    = 0.05f;
     private static readonly Color NameInk = new(0.96f, 0.92f, 0.84f, 1f);
     private static readonly Color HpInk   = new(0.93f, 0.90f, 0.84f, 0.95f);
     private Image _invulnerableOverlay;
@@ -71,26 +78,36 @@ public sealed class BossPanelView : MonoBehaviour
     // 페이즈 바
     private float[] _pageBounds;          // 경계(내림차순). null이면 한 줄
     private int     _page = 1;
-    private int     _revealedPages = int.MaxValue;   // 드러낸 페이지 수(발견형 ◆) — 이보다 많은 줄은 아직 모르는 것으로 숨긴다
     private int     _lastHp;
     private bool    _refilling;
     private float   _refillT;
     private float   _refillSeconds;
     private Image   _refillGlow;
     private float   _shown = 1f;           // 지금 채움 비율 — 덮개·빛이 이만큼만 덮는다
-    private RectTransform _pipRoot;
-    private readonly System.Collections.Generic.List<Image> _pips = new();
+    private Image   _pageFlash;            // 바 창 전체 번쩍임(깨짐 · 가득)
+    private Image   _breakPulseImage;      // 빈 바 붉은 맥동 — 다시 차오를 때까지
+    private bool    _breakPulse;
+    private int     _brokenPage;           // 이 줄은 이미 깨졌다(같은 순간 Init · SetHP가 겹쳐도 한 번만)
+    private bool    _pageArmed;            // 이 줄에서 진짜 체력(가득 미만 · 경계 위)을 봤다 — 연결 순간의 0을 「다 깎임」으로 오인하지 않게
+    private float   _flashT = -1f;         // 음수 = 꺼짐
+    private float   _shakeT = -1f;
+    private float   _punchT = -1f;
+    private Vector2 _shakeBase;
+    private Vector3 _punchBase = Vector3.one;
+    private RectTransform _rect;
 
     private bool HasSkin => bossTrackSprite != null || bossFillSprite != null || bossFrameSprite != null;
 
     private void Awake()
     {
         EnsureWired();
+        _rect = transform as RectTransform;   // 런타임 폴백이 RectTransform을 붙인 뒤에 잡는다
     }
 
     private void Update()
     {
         TickRefill();
+        TickPageFx();
         if (_vulnerableRemaining <= 0f) return;
 
         _vulnerableRemaining -= Time.unscaledDeltaTime;
@@ -110,26 +127,14 @@ public sealed class BossPanelView : MonoBehaviour
     /// 페이즈 바 설정 — <paramref name="bounds"/>(HP 비율 경계, 내림차순)로 총 체력을 나눠 <paramref name="page"/>번째 줄을 보여 준다.
     /// 경계 눈금선은 그리지 않는다(한 줄 = 한 페이즈). null이면 예전처럼 한 줄 전체.
     /// </summary>
-    public void SetPages(float[] bounds, int page, int revealedPages = int.MaxValue)
+    public void SetPages(float[] bounds, int page)
     {
         EnsureWired();
-        _revealedPages = revealedPages;
         _pageBounds = bounds != null && bounds.Length > 0 ? bounds : null;
         int newPage = Mathf.Clamp(page, 1, PageCount);
         if (newPage != _page) _refilling = false;   // 페이즈가 바뀌었으면 진행 중인 차오름은 끝
         _page = newPage;
-        UpdatePips();
         if (!_refilling) Render();
-    }
-
-    /// <summary>
-    /// ◆를 몇 개까지 드러낼지(발견형, 09-29 사용자 결정) — 처음 만난 보스는 지금 페이지까지만,
-    /// 전에 더 깊이 봤으면 그만큼. 1 이하면 ◆를 숨겨 한 줄짜리처럼 보인다.
-    /// </summary>
-    public void SetRevealedPages(int revealedPages)
-    {
-        _revealedPages = revealedPages;
-        UpdatePips();
     }
 
     /// <summary>다음 페이즈 바가 <paramref name="seconds"/> 동안 0에서 가득 차오른다(전환 연출과 함께).</summary>
@@ -140,7 +145,8 @@ public sealed class BossPanelView : MonoBehaviour
         _refilling     = true;
         _refillT       = 0f;
         _refillSeconds = Mathf.Max(0.1f, seconds);
-        UpdatePips();
+        _breakPulse    = false;
+        _pageArmed     = false;
         ShowFill(0f, 0);
 
         // 빛도 채움 자식 — 차오르는 앞머리를 따라간다.
@@ -194,14 +200,33 @@ public sealed class BossPanelView : MonoBehaviour
         _lastHp = _maxHp;
         _pageBounds = null;
         _page       = 1;
-        _revealedPages = int.MaxValue;
         _refilling  = false;
 
         if (nameText != null)
             nameText.text = bossName ?? string.Empty;
         FitNameBand();
-        UpdatePips();
         Render();
+    }
+
+    /// <summary>
+    /// 새 보스 — 지난 전투의 깨짐 · 번쩍임 · 흔들림을 걷는다. 같은 보스를 다시 그리는 <see cref="Init"/>(컷신 모드 전환 등)은
+    /// 이걸 부르지 않는다 — 전환 도중 Init이 깨진 줄을 되살려 한 번 더 터뜨리지 않게.
+    /// </summary>
+    public void ResetPageFx()
+    {
+        _brokenPage = 0;
+        _pageArmed  = false;
+        _breakPulse = false;
+        _flashT     = -1f;
+        if (_pageFlash != null)       _pageFlash.enabled = false;
+        if (_breakPulseImage != null) _breakPulseImage.enabled = false;
+        if (_rect != null)
+        {
+            if (_shakeT >= 0f) _rect.anchoredPosition = _shakeBase;
+            if (_punchT >= 0f) _rect.localScale       = _punchBase;
+        }
+        _shakeT = -1f;
+        _punchT = -1f;
     }
 
     public void SetHP(int hp, int maxHp)
@@ -238,6 +263,112 @@ public sealed class BossPanelView : MonoBehaviour
         float shown  = Mathf.Clamp01((ratio - lo) / (hi - lo));
         int   segMax = Mathf.Max(1, Mathf.RoundToInt((hi - lo) * _maxHp));
         ShowFill(shown, segMax);
+        // 경계에 붙잡힌 체력(페이지 몫 올림)은 경계와 1 미만 차이 — 표시 반올림과 무관하게 「다 깎였다」로 본다
+        NotePageEmpty(_lastHp - lo * _maxHp < 1f);
+    }
+
+    /// <summary>
+    /// 마지막이 아닌 줄이 다 깎였다 — 페이지 경계에서 체력이 붙잡힌 순간. 바를 깨뜨린다(한 줄에 한 번).
+    /// 붉은 맥동은 다시 차오를 때(<see cref="PlayPageRefill"/>) · 새 보스(<see cref="ResetPageFx"/>)에만 끈다 —
+    /// 컷신 진입의 다시 그리기(Init → 가득 찬 값으로 한 번 그림)가 맥동을 꺼 버렸다(09-29 캡처).
+    /// 그 줄에서 진짜 체력(가득 미만 · 경계 위)을 한 번은 봐야 깨진다 — 화룡은 HUD에 붙는 순간 체력이 아직 0이라
+    /// 전투 시작부터 줄이 깨지고 맥동이 켜졌다(09-29 캡처). Init의 자리 채움 값(가득)은 무장시키지 않는다.
+    /// </summary>
+    private void NotePageEmpty(bool empty)
+    {
+        if (_page >= PageCount) return;
+        if (!empty)
+        {
+            if (_lastHp < _maxHp) _pageArmed = true;
+            return;
+        }
+        if (_pageArmed && _brokenPage != _page) PlayPageBreak();
+    }
+
+    /// <summary>줄이 깨지는 순간 — 바 창 전체 번쩍 · 짧은 흔들림 · 빈 바 붉은 맥동(다시 차오를 때까지).</summary>
+    private void PlayPageBreak()
+    {
+        Debug.Log($"[BossPanel] 줄 {_page} 깨짐 — 다시 차오를 때까지 붉은 맥동");
+        _brokenPage = _page;
+        _breakPulse = true;
+        EnsureBarOverlay(ref _breakPulseImage, "BreakPulse", breakPulseColor);
+        StartFlash();
+        if (_rect == null) return;
+        if (_shakeT < 0f) _shakeBase = _rect.anchoredPosition;
+        _shakeT = 0f;
+    }
+
+    private void StartFlash()
+    {
+        if (EnsureBarOverlay(ref _pageFlash, "PageFlash", pageFlashColor) == null) return;
+        _pageFlash.transform.SetAsLastSibling();
+        _flashT = 0f;
+    }
+
+    /// <summary>바 창 전체(Fill Area)를 덮는 판 — 채움 비율과 무관하게 빈 바까지 덮는다.</summary>
+    private Image EnsureBarOverlay(ref Image image, string name, Color color)
+    {
+        if (image != null) return image;
+        var area = hpSlider != null && hpSlider.fillRect != null ? hpSlider.fillRect.parent : null;
+        if (area == null) return null;
+        image = EnsureImage(name, area, color);
+        Stretch((RectTransform)image.transform);
+        image.enabled = false;
+        return image;
+    }
+
+    /// <summary>번쩍임 · 붉은 맥동 · 흔들림 · 가득 찬 순간의 커짐 — 실시간(전환 슬로모와 무관).</summary>
+    private void TickPageFx()
+    {
+        float dt = Time.unscaledDeltaTime;
+
+        if (_flashT >= 0f && _pageFlash != null)
+        {
+            _flashT += dt;
+            float k = Mathf.Clamp01(_flashT / PageFlashSeconds);
+            var c = pageFlashColor;
+            c.a *= (1f - k) * (1f - k);
+            _pageFlash.color   = c;
+            _pageFlash.enabled = k < 1f;
+            if (k >= 1f) _flashT = -1f;
+        }
+
+        if (_breakPulseImage != null)
+        {
+            _breakPulseImage.enabled = _breakPulse;
+            if (_breakPulse)
+            {
+                float s = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * BreakPulseHz * Mathf.PI * 2f);
+                var c = breakPulseColor;
+                c.a *= Mathf.Lerp(0.3f, 1f, s);
+                _breakPulseImage.color = c;
+            }
+        }
+
+        if (_rect == null) return;
+        if (_shakeT >= 0f)
+        {
+            _shakeT += dt;
+            float k   = Mathf.Clamp01(_shakeT / BreakShakeSeconds);
+            float amp = BreakShakePixels * (1f - k);
+            _rect.anchoredPosition = _shakeBase + new Vector2(Mathf.Sin(_shakeT * 95f) * amp, Mathf.Cos(_shakeT * 70f) * amp * 0.4f);
+            if (k >= 1f)
+            {
+                _rect.anchoredPosition = _shakeBase;
+                _shakeT = -1f;
+            }
+        }
+        if (_punchT >= 0f)
+        {
+            _punchT += dt;
+            float k = Mathf.Clamp01(_punchT / FullPunchSeconds);
+            _rect.localScale = _punchBase * (1f + FullPunchScale * Mathf.Sin(k * Mathf.PI));
+            if (k >= 1f)
+            {
+                _rect.localScale = _punchBase;
+                _punchT = -1f;
+            }
+        }
     }
 
     private void ShowFill(float shown, int segMax)
@@ -278,52 +409,12 @@ public sealed class BossPanelView : MonoBehaviour
         _refilling = false;
         if (_refillGlow != null) _refillGlow.enabled = false;
         Render();
-    }
 
-    /// <summary>이름 옆 마름모 — 남은 페이즈(지금 줄 포함)는 금빛, 끝난 페이즈는 옅게. 한 줄 보스는 숨긴다.</summary>
-    private void UpdatePips()
-    {
-        // 발견형: 드러낸 만큼만(지금 페이지는 늘 포함). 전부 드러났으면 전체 줄 수.
-        int count = Mathf.Min(PageCount, Mathf.Max(_revealedPages, _page));
-        if (nameText == null) return;
-        if (_pipRoot == null)
-        {
-            var existing = nameText.transform.Find("PagePips");
-            var go = existing != null ? existing.gameObject : new GameObject("PagePips", typeof(RectTransform));
-            go.transform.SetParent(nameText.transform, false);
-            _pipRoot = (RectTransform)go.transform;
-            _pipRoot.anchorMin = _pipRoot.anchorMax = new Vector2(0.5f, 0.5f);
-            _pipRoot.pivot = new Vector2(0f, 0.5f);
-        }
-
-        _pipRoot.gameObject.SetActive(count > 1);
-        if (count <= 1) return;
-
-        nameText.ForceMeshUpdate();
-        float textHalf = Mathf.Min(nameText.preferredWidth, nameText.rectTransform.rect.width) * 0.5f;
-        _pipRoot.anchoredPosition = new Vector2(textHalf + 18f, 0f);
-        _pipRoot.sizeDelta        = new Vector2(count * (pagePipSize + pagePipGap), pagePipSize);
-
-        while (_pips.Count < count)
-        {
-            var pip = EnsureImage($"Pip{_pips.Count}", _pipRoot, pagePipFullColor);
-            var rt  = (RectTransform)pip.transform;
-            rt.anchorMin = rt.anchorMax = new Vector2(0f, 0.5f);
-            rt.pivot     = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(pagePipSize, pagePipSize);
-            rt.localRotation = Quaternion.Euler(0f, 0f, 45f);
-            _pips.Add(pip);
-        }
-        for (int i = 0; i < _pips.Count; i++)
-        {
-            bool on = i < count;
-            _pips[i].gameObject.SetActive(on);
-            if (!on) continue;
-            var rt = (RectTransform)_pips[i].transform;
-            rt.anchoredPosition = new Vector2(pagePipSize * 0.5f + i * (pagePipSize + pagePipGap), 0f);
-            // 왼쪽부터 지나간 페이즈 → 옅게. 지금 줄과 남은 줄 → 금빛.
-            _pips[i].color = i < _page - 1 ? pagePipEmptyColor : pagePipFullColor;
-        }
+        // 가득 찬 순간 — 바 창 전체 번쩍 + 살짝 커졌다 돌아온다(포효와 같은 박자)
+        StartFlash();
+        if (_rect == null) return;
+        if (_punchT < 0f) _punchBase = _rect.localScale;
+        _punchT = 0f;
     }
 
     private void EnsureWired()

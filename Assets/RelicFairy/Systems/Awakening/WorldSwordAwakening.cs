@@ -56,6 +56,7 @@ public sealed class WorldSwordAwakening : MonoBehaviour
         _camTransform = Camera.main != null ? Camera.main.transform : null;
         CreateWorldText();
         CreatePrompt();
+        BaseCampLabelRule.Register(transform);   // 이름표는 가까이 간 곳 하나만(2차 개편 09-29)
         SpawnSwordVisualAsync(this.GetCancellationTokenOnDestroy()).Forget();
         // 받는 순간(F) 로드 대기가 없게 미리 — 클립 프리로드 · 무기 프리팹 로드로 연출이 F 뒤 3.9초 늦게 시작됐다(ae 09-28).
         // 소환 연출 · 시작 대사 동안 끝난다.
@@ -78,6 +79,8 @@ public sealed class WorldSwordAwakening : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F))
             AwakenAsync(this.GetCancellationTokenOnDestroy()).Forget();
     }
+
+    private void OnDestroy() => BaseCampLabelRule.Unregister(transform);
 
     private void OnTriggerEnter(Collider other)
     {
@@ -238,9 +241,9 @@ public sealed class WorldSwordAwakening : MonoBehaviour
         if (_worldText != null)
         {
             _worldText.transform.rotation = _camTransform.rotation;
-            // 구역 이름 배너(「소환의 방」)가 떠 있는 동안 숨긴다 — 둘이 화면 위 가운데에서 겹쳐 비쳤다(ae 09-28)
-            bool hide = ZoneSign.BannerShowing;
-            if (_worldText.enabled == hide) _worldText.enabled = !hide;
+            // 가까이 간 곳 하나만 — 구역 이름 배너(「소환의 방」)가 떠 있는 동안 숨김도 규칙 안에 있다(ae 09-28 겹침)
+            bool show = BaseCampLabelRule.IsShown(transform);
+            if (_worldText.enabled != show) _worldText.enabled = show;
         }
         if (_promptGo != null && _promptGo.activeSelf) _promptGo.transform.rotation = _camTransform.rotation;
     }

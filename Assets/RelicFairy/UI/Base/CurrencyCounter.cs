@@ -49,6 +49,9 @@ public sealed class CurrencyCounter : MonoBehaviour
     [Tooltip("델타(+120 / −400)를 띄울지. 자리가 좁은 칸에서는 끈다.")]
     [SerializeField] private bool showDelta = true;
 
+    [Tooltip("델타를 글자 아래로 띄운다(내려가며 사라짐). 글자가 창 윗변에 붙은 칸에서 켠다.")]
+    [SerializeField] private bool deltaBelow;
+
     // ── Private ──────────────────────────────────────────────
     private TMP_Text _text;
     private Color    _baseColor;
@@ -192,6 +195,10 @@ public sealed class CurrencyCounter : MonoBehaviour
         label.gameObject.SetActive(true);
 
         var rt = label.rectTransform;
+        // 글자 칸이 숫자보다 넓으면(정렬이 왼쪽 · 오른쪽) 칸 가운데는 빈 곳이다 — 숫자가 실제로 그려진 가로 가운데에 맞춘다.
+        _text.ForceMeshUpdate();
+        var tr = _text.rectTransform;
+        float cx = _text.textBounds.size.x > 0f ? _text.textBounds.center.x + (tr.pivot.x - 0.5f) * tr.rect.width : 0f;
         try
         {
             float t = 0f;
@@ -199,7 +206,8 @@ public sealed class CurrencyCounter : MonoBehaviour
             {
                 t += Time.unscaledDeltaTime;
                 float k = Mathf.Clamp01(t / DeltaTime_);
-                rt.anchoredPosition = new Vector2(0f, Mathf.Lerp(0f, DeltaRise, 1f - (1f - k) * (1f - k)));
+                float rise = Mathf.Lerp(0f, DeltaRise, 1f - (1f - k) * (1f - k));
+                rt.anchoredPosition = new Vector2(cx, deltaBelow ? -rise : rise);
                 var c = label.color; c.a = 1f - k * k;              // 뒤로 갈수록 빨리 사라진다
                 label.color = c;
                 await UniTask.Yield(PlayerLoopTiming.Update, ct);
@@ -221,9 +229,10 @@ public sealed class CurrencyCounter : MonoBehaviour
         var go = new GameObject("Delta", typeof(RectTransform), typeof(CanvasRenderer));
         var rt = (RectTransform)go.transform;
         rt.SetParent(_text.rectTransform, false);
-        rt.anchorMin = new Vector2(0.5f, 1f);
-        rt.anchorMax = new Vector2(0.5f, 1f);
-        rt.pivot     = new Vector2(0.5f, 0f);
+        float ay = deltaBelow ? 0f : 1f;
+        rt.anchorMin = new Vector2(0.5f, ay);
+        rt.anchorMax = new Vector2(0.5f, ay);
+        rt.pivot     = new Vector2(0.5f, deltaBelow ? 1f : 0f);
         rt.sizeDelta = new Vector2(140f, 22f);
         rt.anchoredPosition = Vector2.zero;
 
@@ -251,6 +260,9 @@ public sealed class CurrencyCounter : MonoBehaviour
     /// 텍스트에 카운터를 붙이고 값을 넣는다. 호출부가 <c>null</c> 검사와 컴포넌트 부착을
     /// 매번 쓰지 않도록 이 한 줄로 끝낸다. 이미 붙어 있으면 그대로 쓴다.
     /// </summary>
+    /// <summary>델타를 글자 아래로 띄운다(창 윗변에 붙은 칸 — 기억의 제단 정수). 델타 라벨을 만들기 전에 불러야 한다.</summary>
+    public void PlaceDeltaBelow() => deltaBelow = true;
+
     public static void Apply(TMP_Text text, int value, string prefix = null, bool thousands = true)
     {
         if (text == null) return;

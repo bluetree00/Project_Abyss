@@ -92,6 +92,8 @@ public sealed class AssembledCovenant : CovenantBase
     /// </summary>
     private bool _inEffect;
 
+    private string _effectText;   // 효과 수치 한 줄(표시용 캐시 — 원인·효과·등급이 정해지면 바뀌지 않는다)
+
     /// <param name="causePart">"causeId" 또는 "causeId@tier"</param>
     /// <param name="effectPart">"effectId" 또는 "effectId@tier"</param>
     public AssembledCovenant(string causePart, string effectPart)
@@ -135,7 +137,7 @@ public sealed class AssembledCovenant : CovenantBase
     public override string DisplayName      => _resolved
         ? _cause.name + "[" + _causeTier.DisplayName() + "] × " + _effect.name + "[" + _effectTier.DisplayName() + "]"
         : CovenantId;
-    public override string BasicDescription => _resolved ? _cause.desc + " → " + _effect.desc : string.Empty;
+    public override string BasicDescription => _resolved ? _cause.desc + " → " + EffectText : string.Empty;
 
     // 조립에 쓰인 부품 id. CovenantHandler가 봉인된 짝(IsBannedPair)을 서비스단에서 거르는 데 쓴다 —
     // 조립 화면의 버튼 잠금만으로는 UI 밖 진입점이 하나라도 생기는 순간 뚫린다.
@@ -144,7 +146,10 @@ public sealed class AssembledCovenant : CovenantBase
 
     // 원인/결과를 따로 노출 → HUD가 한 줄로 이어붙이지 않고 줄을 나눠 보여준다.
     public override string CauseText  => _resolved ? _cause.desc  : null;
-    public override string EffectText => _resolved ? _effect.desc : null;
+    // 효과는 서술(「상처가 벌어져 계속 덧난다」)이 아니라 실제 수치로 — 조립 화면과 같은 계산(CovenantMath)을 탄다(09-29).
+    public override string EffectText => _resolved
+        ? _effectText ??= CovenantAssemblePreview.Build(_causeId, _causeTier, _effectId, _effectTier).EffectAmountCompact()
+        : null;
 
     // ── 원인 트리거 → ApplyEffect ─────────────────────────
     public override void OnAttackHit(GameObject target, float dmg)

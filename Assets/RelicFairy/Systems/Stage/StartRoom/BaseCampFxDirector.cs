@@ -35,6 +35,14 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     private const string AcquireKeyPrefix = "basecamp_acquire_seen_v1_slot";
     private const int RingSegments = 40;
     private const int RuneCount = 3;   // 원거리 · 파츠 · 유물(무형검은 소환의 방에서 먼저 받는다)
+    private const float RuneFlashPeak = 4f;       // 준비 룬·파츠 공방이 켜질 때 번쩍임 — 14는 화면이 튀었다(09-29 사용자)
+    private const float PartsPathDraw = 1.0f;     // 공방 → 파츠 공방 바닥 빛 길이 뻗는 시간
+    private const float PartsPathHold = 0.8f;
+    private const float PartsPathFade = 1.2f;
+    private const float PartsGlowFade = 0.9f;     // 파츠 받침 빛이 켜지고 꺼지는 시간
+    private const float PartsRingRadius = 3.2f;   // 파츠 받침(반지름 약 4 m) 안쪽 고리
+    private const float PartsLightMax = 2.5f;
+    private const float PartsMoteRate = 6f;
     private const float LoadingWaitMax = 6f;
     // 성문 막 세로 3단 — 높이 비율과 알파 비율(아래·중간 진하게, 위만 투명)
     private const int VeilRows = 3;
@@ -69,9 +77,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     [SerializeField] private Color summonGold = new(1f, 0.78f, 0.38f);
     [SerializeField] private Color summonViolet = new(0.66f, 0.42f, 1f);
 
-    [Header("④ 얻기 — 원거리 · 파츠 · 유물")]
-    [Tooltip("날아와 스미는 빛 구슬 — Projectile 18 nova orange(transform)")]
-    [SerializeField] private GameObject moteGold;
+    // ④ 얻기 — 원거리 · 파츠 · 유물: 런타임 금빛 입자(runeGlowMaterial). 예전 Projectile 18 nova 구슬은 가까이서 지름 2 m 번개 구로 튀었다(09-29 사용자).
 
     [Header("⑤ 준비 룬 · 포탈 열림 · ⑥ 심연 진입 (매 판)")]
     [Tooltip("성문 앞 마커(GateFront, 정면이 성문) — 아치 등불이 통로 양옆에 서고, 여기서 포탈까지 내려갈수록 어두워진다")]
@@ -104,8 +110,8 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     [Tooltip("준비가 덜 된 채 막 앞에 서면 부족분 안내 — 막이 실제로 통로를 막는다(09-28 사용자)")]
     [SerializeField] private BaseCampDungeonGate dungeonGate;
 
-    [Header("⑧ 장비 → 파츠 — 원거리 무기를 얻으면 옆 파츠 작업대가 깨어난다")]
-    [Tooltip("파츠 작업대 궤도 구슬(프리팹 Dressing/FX/PartsOrbital) — 원거리 무기를 얻기 전엔 꺼 둔다. 공방·작업대 위치는 runeTargets 0·1")]
+    [Header("⑧ 장비 → 파츠 — 원거리 무기를 얻으면 바닥 빛 길이 파츠 공방으로 이어지고 받침이 빛난다")]
+    [Tooltip("옛 파츠 궤도 구슬(프리팹 Dressing/FX/PartsOrbital, Hovl Buff orbital) — 글자 박힌 큰 구슬이 튀고 뜻이 애매해(09-29 사용자) 이제 켜지 않는다. 시작할 때 끈다. 공방·작업대 위치는 runeTargets 0·1")]
     [SerializeField] private GameObject partsOrbital;
     [SerializeField] private float descentExposure = -1.6f;
     [SerializeField] private float descentVignette = 0.4f;
@@ -127,6 +133,11 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     private string _abyssClosedSubtitle;
 
     private bool _partsAwake;
+    private LineRenderer _partsRing;
+    private Light _partsLight;
+    private ParticleSystem _partsMotes;
+    private float _partsGlow;                    // 0 꺼짐 ~ 1 켜짐
+    private CancellationTokenSource _partsGlowCts;
 
     // 성문 막
     private Transform _gateRoot;
@@ -167,7 +178,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     private void Start()
     {
         if (abyssSign != null) _abyssClosedSubtitle = abyssSign.Subtitle;
-        if (partsOrbital != null) partsOrbital.SetActive(false);   // 원거리 무기를 얻으면 깨어난다(UpdateReadyRunes)
+        if (partsOrbital != null) partsOrbital.SetActive(false);   // 옛 궤도 구슬 — 이제 켜지 않는다(파츠 받침 빛이 대신, UpdateReadyRunes)
         BuildReadyRunes();
         BuildGateVeil();
         BuildDescentVolume();
@@ -192,6 +203,8 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     {
         _gateCts?.Cancel();
         _gateCts?.Dispose();
+        _partsGlowCts?.Cancel();
+        _partsGlowCts?.Dispose();
         if (_veilMesh != null) Destroy(_veilMesh);
         if (_descentProfile != null) Destroy(_descentProfile);
         if (ReferenceEquals(Instance, this)) Instance = null;
@@ -452,47 +465,39 @@ public sealed class BaseCampFxDirector : MonoBehaviour
 
     private async UniTaskVoid AcquireAsync(Vector3 from, AcquireKind kind, CancellationToken ct)
     {
-        if (moteGold == null) return;
+        if (runeGlowMaterial == null) return;
         string key = AcquireKeyPrefix + ActiveSlot() + "_" + kind;
         bool first = PlayerPrefs.GetInt(key, 0) == 0;
         if (first) { PlayerPrefs.SetInt(key, 1); PlayerPrefs.Save(); }
         Debug.Log($"[BaseCampFx] 얻기 연출 — {kind}{(first ? " (처음)" : "")}");
 
-        GameObject mote = null;
+        ParticleSystem mote = null;
         _acquireInFlight++;
         try
         {
             if (kind == AcquireKind.Relic)
             {
-                FlashAsync(from, ct).Forget();   // 석상 눈빛
+                FlashAsync(from, ct, RuneFlashPeak).Forget();   // 석상 눈빛
                 await UniTask.Delay(TimeSpan.FromSeconds(0.25f), DelayType.UnscaledDeltaTime, cancellationToken: ct);
             }
-            mote = SpawnFx(moteGold, from, 1f, true);
+            mote = MakeAcquireMote(from);
             var mt = mote.transform;
 
             if (first && kind != AcquireKind.Relic)
             {
-                // 떠오름 → 한 바퀴(설계서: 처음만)
+                // 떠오름(처음만) — 예전의 한 바퀴 돌기는 중심이 옆으로 비껴 있어 튀어 보였다(09-29 사용자) → 떠올라 곧장 날아간다
                 Vector3 top = from + Vector3.up * 1.2f;
-                for (float t = 0f; t < 0.5f; t += Time.unscaledDeltaTime)
+                for (float t = 0f; t < 0.45f; t += Time.unscaledDeltaTime)
                 {
-                    float k = t / 0.5f;
+                    float k = t / 0.45f;
                     mt.position = Vector3.Lerp(from, top, k * (2f - k));
-                    await UniTask.Yield(ct);
-                }
-                const float r = 0.9f;
-                Vector3 center = top - Vector3.right * r;
-                for (float t = 0f; t < 0.7f; t += Time.unscaledDeltaTime)
-                {
-                    float a = t / 0.7f * Mathf.PI * 2f;
-                    mt.position = center + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * r;
                     await UniTask.Yield(ct);
                 }
             }
 
             // 몸으로 — 매 프레임 목표를 다시 본다(움직이거나 재스폰돼도 따라간다). 유물은 위에서 곧게 내려앉는다.
-            float fly = first ? 0.6f : 0.55f;
-            float arc = kind == AcquireKind.Relic ? 0f : 1.0f;
+            float fly = first ? 0.65f : 0.55f;
+            float arc = kind == AcquireKind.Relic ? 0f : 0.8f;
             Vector3 start = mt.position;
             Vector3 end = start;
             for (float t = 0f; t < fly; t += Time.unscaledDeltaTime)
@@ -504,16 +509,34 @@ public sealed class BaseCampFxDirector : MonoBehaviour
             }
             if (TryGetAcquireTarget(kind, out var last)) end = last;
 
-            // 몸에 스미는 작은 빛 — 0.8배는 화면 아래 가운데를 크게 덮고 HUD 위까지 번쩍였다(ae 09-28 캡처)
-            SpawnBurst(burstGold, end, first ? 0.24f : 0.17f);   // 0.35배도 캐릭터를 통째로 덮었다(ae 09-28 D안 캡처)
+            // 몸에 스미는 빛 — 은은한 번짐(입자 몇 개) + 약한 광원. 불티 폭발(Hit nova)은 불똥이 화면 전체로 튀었다(09-29 사용자)
+            mt.position = end;
+            mote.Emit(first ? 16 : 10);
+            FlashAsync(end, ct, 3f).Forget();
             if (first) FinisherEdgeService.Pulse();
         }
         catch (OperationCanceledException) { }
         finally
         {
             _acquireInFlight--;
-            if (mote != null) StopAndDestroy(mote, 1.2f);
+            if (mote != null) StopAndDestroy(mote.gameObject, 1.0f);
         }
+    }
+
+    /// <summary>얻기 빛 — 작은 금빛 입자가 꼬리를 남기며 날아간다(월드 공간 방출) + 주변을 살짝 비추는 광원.</summary>
+    private ParticleSystem MakeAcquireMote(Vector3 at)
+    {
+        var ps = MakeMotes("~AcquireMote", null, at, Vector3.one * 0.08f, 70f, 0.45f, 0.36f, runeLitColor, Vector3.zero, Vector3.zero);
+        var main = ps.main;
+        main.startSize = new ParticleSystem.MinMaxCurve(0.22f, 0.36f);
+        var l = ps.gameObject.AddComponent<Light>();
+        l.type = LightType.Point;
+        l.color = runeLitColor;
+        l.range = 3f;
+        l.intensity = 1.5f;
+        l.shadows = LightShadows.None;
+        ps.Play();
+        return ps;
     }
 
     /// <summary>원거리·파츠는 등(원거리 무기가 걸리는 곳), 유물은 가슴.</summary>
@@ -577,16 +600,16 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         var main = ps.main;
         main.loop = true;
         main.duration = 1f;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(1.2f, 1.8f);
+        main.startLifetime = new ParticleSystem.MinMaxCurve(1.6f, 2.0f);   // 크기·수명이 들쭉날쭉하면 깜빡임으로 보였다(09-29) → 고르게
         main.startSpeed = 0f;
-        main.startSize = new ParticleSystem.MinMaxCurve(size * 0.6f, size);
+        main.startSize = new ParticleSystem.MinMaxCurve(size * 0.85f, size);
         main.startColor = color;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.maxParticles = 24;
         main.playOnAwake = true;
 
         var emission = ps.emission;
-        emission.rateOverTime = 6f;
+        emission.rateOverTime = 9f;
         var shape = ps.shape;
         shape.enabled = true;
         shape.shapeType = ParticleSystemShapeType.Sphere;
@@ -647,7 +670,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         SetRune(0, ranged, loud);
         SetRune(1, part, loud);
         SetRune(2, relic, loud);
-        SetPartsAwake(ranged, loud);
+        SetPartsAwake(ranged && !part, loud);   // 원거리를 얻었고 파츠는 아직 — 파츠 공방이 「다음」
 
         bool open = ranged && part && relic && lo.WeaponSlot0 != null;
         if (open == _archOn) return;
@@ -671,49 +694,149 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         if (_runeLit == null) return;
         _runeDim[i].SetActive(!on);
         _runeLit[i].SetActive(on);
-        if (on && loud) FlashAsync(_runeLit[i].transform.position, _destroyCt).Forget();
+        if (on && loud) FlashAsync(_runeLit[i].transform.position, _destroyCt, RuneFlashPeak).Forget();
     }
 
     // ── ⑧ 장비 → 파츠 ──
 
-    /// <summary>원거리 무기를 얻으면 옆 파츠 작업대가 깨어난다(파츠는 원거리 무기에 끼우는 것 — 09-28 사용자 「원거리 장비를 얻고 파츠를 선택하게」).</summary>
+    /// <summary>
+    /// 원거리 무기를 얻고 파츠는 아직이면 파츠 공방이 「다음」이다(파츠는 원거리 무기에 끼우는 것 — 09-28 사용자).
+    /// 막 얻은 순간(loud)엔 바닥 빛 길이 이어진 뒤 받침이 켜지고, 이미 그런 상태로 들어왔거나 파츠를 고르면 조용히 켜고 끈다.
+    /// </summary>
     private void SetPartsAwake(bool awake, bool loud)
     {
         if (_partsAwake == awake) return;
         _partsAwake = awake;
-        if (partsOrbital == null) return;
         if (awake && loud) PartsWakeAsync(_destroyCt).Forget();
-        else partsOrbital.SetActive(awake);
+        else FadePartsGlow(awake ? 1f : 0f, awake ? 0f : PartsGlowFade);
     }
 
-    /// <summary>원거리 무기가 몸에 스민 뒤 — 공방에서 빛 하나가 옆 파츠 작업대로 건너가 궤도 구슬을 깨운다(「다음은 파츠」). 조작은 막지 않는다.</summary>
+    /// <summary>
+    /// 원거리 무기가 몸에 스민 뒤 — 공방에서 파츠 공방까지 바닥에 금빛 길이 뻗고, 파츠 받침에 빛 고리·약한 광원·오르는 빛이 천천히 켜진다.
+    /// 09-29 사용자 「원거리를 고르면 나오는 이펙트가 튀고 애매하다」 — 불쑥 생겨 날아가던 구슬 · 섬광 14 · 글자 박힌 궤도 구슬(Buff orbital)을 걷었다.
+    /// 바닥 선은 내려다보는 카메라에 가장 잘 읽히고, 길의 끝이 곧 가야 할 곳이다. 조작은 막지 않는다.
+    /// </summary>
     private async UniTaskVoid PartsWakeAsync(CancellationToken ct)
     {
-        GameObject mote = null;
+        LineRenderer path = null;
         try
         {
             await UniTask.WaitUntil(() => _acquireInFlight <= 0, cancellationToken: ct);
             var forge = runeTargets != null && runeTargets.Length > 1 ? runeTargets[0] : null;
             var parts = runeTargets != null && runeTargets.Length > 1 ? runeTargets[1] : null;
-            if (forge != null && parts != null && moteGold != null)
+            if (forge != null && parts != null)
+                path = MakeLine("~PartsPath", 2, false);
+            if (path != null)
             {
-                Vector3 a = forge.position + Vector3.up * 1.5f, b = parts.position + Vector3.up * 1.3f;
-                mote = SpawnFx(moteGold, a, 0.8f, true);
-                for (float t = 0f; t < 0.8f; t += Time.unscaledDeltaTime)
+                Vector3 dir = parts.position - forge.position;
+                dir.y = 0f;
+                dir.Normalize();
+                float y = Mathf.Max(forge.position.y, parts.position.y) + 0.08f;
+                Vector3 a = forge.position + dir * 1.8f, b = parts.position - dir * PartsRingRadius;   // 탁자 앞에서 파츠 고리 가장자리까지
+                a.y = b.y = y;
+                path.transform.rotation = Quaternion.Euler(90f, 0f, 0f);   // 바닥에 눕힌다(고리와 같은 방식)
+                path.alignment = LineAlignment.TransformZ;
+                path.widthMultiplier = 0.22f;
+                path.SetPosition(0, a);
+                for (float t = 0f; t < PartsPathDraw; t += Time.unscaledDeltaTime)
                 {
-                    float k = t / 0.8f;
-                    mote.transform.position = Vector3.Lerp(a, b, k * k * (3f - 2f * k)) + Vector3.up * (Mathf.Sin(k * Mathf.PI) * 1.5f);
+                    float k = Mathf.SmoothStep(0f, 1f, t / PartsPathDraw);
+                    path.SetPosition(1, Vector3.Lerp(a, b, k));
+                    SetPathColor(path, 0.85f);
                     await UniTask.Yield(ct);
                 }
-                FlashAsync(b, ct).Forget();
+                path.SetPosition(1, b);
             }
-            Debug.Log("[BaseCampFx] 파츠 작업대 깨어남");
+            FadePartsGlow(1f, PartsGlowFade);
+            if (parts != null) FlashAsync(parts.position + Vector3.up * 1.2f, ct, RuneFlashPeak).Forget();
+            Debug.Log("[BaseCampFx] 파츠 공방 깨어남 — 바닥 빛 길 + 받침 빛");
+
+            if (path == null) return;
+            await UniTask.Delay(TimeSpan.FromSeconds(PartsPathHold), DelayType.UnscaledDeltaTime, cancellationToken: ct);
+            for (float t = 0f; t < PartsPathFade; t += Time.unscaledDeltaTime)
+            {
+                SetPathColor(path, 0.85f * (1f - t / PartsPathFade));
+                await UniTask.Yield(ct);
+            }
         }
         catch (OperationCanceledException) { }
         finally
         {
-            if (mote != null) StopAndDestroy(mote, 1.2f);
-            if (partsOrbital != null && _partsAwake) partsOrbital.SetActive(true);
+            if (path != null) Destroy(path.gameObject);
+        }
+    }
+
+    /// <summary>길 색 — 뻗는 머리 쪽이 밝고 꼬리(공방 쪽)는 옅다.</summary>
+    private void SetPathColor(LineRenderer lr, float alpha)
+    {
+        var c = runeLitColor;
+        lr.startColor = new Color(c.r, c.g, c.b, alpha * 0.35f);
+        lr.endColor = new Color(c.r, c.g, c.b, alpha);
+    }
+
+    /// <summary>파츠 받침 빛(고리·광원·오르는 빛)을 to까지 천천히 — 번쩍이지 않고 고르게.</summary>
+    private void FadePartsGlow(float to, float duration)
+    {
+        _partsGlowCts?.Cancel();
+        _partsGlowCts?.Dispose();
+        _partsGlowCts = CancellationTokenSource.CreateLinkedTokenSource(_destroyCt);
+        FadePartsGlowAsync(to, duration, _partsGlowCts.Token).Forget();
+    }
+
+    private async UniTaskVoid FadePartsGlowAsync(float to, float duration, CancellationToken ct)
+    {
+        if (!EnsurePartsGlow()) return;
+        float from = _partsGlow;
+        try
+        {
+            for (float t = 0f; t < duration; t += Time.unscaledDeltaTime)
+            {
+                ApplyPartsGlow(Mathf.Lerp(from, to, Mathf.SmoothStep(0f, 1f, t / duration)));
+                await UniTask.Yield(ct);
+            }
+            ApplyPartsGlow(to);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private bool EnsurePartsGlow()
+    {
+        if (_partsRing != null) return true;
+        var parts = runeTargets != null && runeTargets.Length > 1 ? runeTargets[1] : null;
+        if (parts == null) return false;
+        _partsRing = MakeLine("~PartsRing", RingSegments, true);
+        if (_partsRing == null) return false;
+        SetRing(_partsRing, parts.position, PartsRingRadius, runeLitColor, 0f);
+
+        var lightGo = new GameObject("~PartsLight");
+        lightGo.transform.position = parts.position + Vector3.up * 1.6f;
+        _partsLight = lightGo.AddComponent<Light>();
+        _partsLight.type = LightType.Point;
+        _partsLight.color = runeLitColor;
+        _partsLight.range = 7f;
+        _partsLight.shadows = LightShadows.None;
+        _partsLight.intensity = 0f;
+
+        if (runeGlowMaterial != null)
+        {
+            _partsMotes = MakeMotes("~PartsMotes", parts, Vector3.up * 0.2f, new Vector3(4.5f, 0.2f, 4.5f), 0f, 2.6f, 0.3f,
+                                    runeLitColor, new Vector3(-0.05f, 0.35f, -0.05f), new Vector3(0.05f, 0.8f, 0.05f));
+            _partsMotes.Play();
+        }
+        return true;
+    }
+
+    private void ApplyPartsGlow(float k)
+    {
+        _partsGlow = k;
+        var parts = runeTargets[1];
+        SetRing(_partsRing, parts.position, PartsRingRadius, runeLitColor, 0.7f * k);
+        _partsRing.enabled = k > 0.01f;
+        if (_partsLight != null) _partsLight.intensity = PartsLightMax * k;
+        if (_partsMotes != null)
+        {
+            var em = _partsMotes.emission;
+            em.rateOverTime = PartsMoteRate * k;
         }
     }
 

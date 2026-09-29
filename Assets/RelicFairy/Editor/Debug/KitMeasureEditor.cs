@@ -14,10 +14,11 @@ public static class KitMeasureEditor
 {
     private const string OutPath = "Temp/kit_bounds.tsv";
 
-    private static readonly (string pack, string folder)[] Folders =
+    private static readonly (string pack, string folder, string filter)[] Folders =
     {
-        ("gothic", "Assets/RelicFairy/_Imported/Gothic_Interior/Environment/Asset/Prefabs"),
-        ("castle", "Assets/RelicFairy/_Imported/LeartesStudios/FantasyCastle/~HDRP/Art/Prefabs"),
+        ("gothic", "Assets/RelicFairy/_Imported/Gothic_Interior/Environment/Asset/Prefabs", "t:Prefab"),
+        ("castle", "Assets/RelicFairy/_Imported/LeartesStudios/FantasyCastle/~HDRP/Art/Prefabs", "t:Prefab"),
+        ("hovl",   "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Models", "t:Model"),   // 베이스캠프 수정 메시(2차 개편 09-29)
     };
 
     [MenuItem("RelicFairy/Debug/환경 조각 치수 실측 (편집 모드, 읽기 전용)")]
@@ -28,9 +29,9 @@ public static class KitMeasureEditor
         int n = 0;
         try
         {
-            foreach (var (pack, folder) in Folders)
+            foreach (var (pack, folder, filter) in Folders)
             {
-                foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { folder }))
+                foreach (var guid in AssetDatabase.FindAssets(filter, new[] { folder }))
                 {
                     string path = AssetDatabase.GUIDToAssetPath(guid);
                     var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);

@@ -3194,7 +3194,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         RangedPartKind.Split   => $"{Mathf.RoundToInt(v) + 1}발",
         RangedPartKind.Pierce  => $"관통 {Mathf.RoundToInt(v)}",
-        RangedPartKind.Explode => $"반경 {v:F2}",
+        RangedPartKind.Explode => $"반경 {v:0.##}m · 피해 {RangedPartsState.ExplodeDamageRatio * 100f:0}%",
         RangedPartKind.Homing  => $"유도 {v:F0}°/s",
         _                      => $"위력·크기 +{v * 100f:F0}%",
     };

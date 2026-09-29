@@ -24,12 +24,15 @@ public struct AltarNodeState
     public bool BlockedByRequirement;
 
     /// <summary>
-    /// 같은 갈래의 <b>앞 칸</b>이 아직 안 열렸다. 갈래는 사슬이라 위에서부터 차례로 열린다.
-    /// <para>기록 자물쇠와 다르다 — 앞 칸은 정수만으로 항상 넘을 수 있고 방향이 하나뿐이다.</para>
+    /// 선으로 이어진 <b>앞 노드(부모)</b> 중 아직 안 열린 것이 있다(09-29 트리 개편 — 예전엔 같은 갈래의 앞 칸 하나).
+    /// <para>기록 자물쇠와 다르다 — 앞 노드는 정수만으로 항상 넘을 수 있고 선은 가운데에서 바깥으로만 뻗는다.</para>
     /// </summary>
     public bool BlockedByChain;
 
-    /// <summary>이 갈래에서 <b>지금 살 차례</b>인 칸. 갈래마다 정확히 0개 또는 1개다.</summary>
+    /// <summary>안 열린 부모 중 첫 번째(「앞 노드 먼저」 안내). 막히지 않았으면 null.</summary>
+    public MemoryAltarNode MissingParent;
+
+    /// <summary>부모가 전부 열려 <b>지금 살 수 있는 자리</b>에 있다(정수와 무관). 트리에서 선 끝에 켜지는 칸.</summary>
     public bool IsNextInChain;
 }
 
@@ -70,9 +73,9 @@ public static class MemoryAltarService
         state.Cost = state.ConditionMet ? node.DiscountCost : node.BaseCost;
         state.BlockedByRequirement = node.ConditionRequired && !state.ConditionMet;
 
-        // 사슬 — 같은 갈래의 앞 칸이 안 열렸으면 아직 차례가 아니다.
-        var prev = MemoryAltarCatalog.PreviousInBranch(node);
-        state.BlockedByChain = prev != null && !(data?.IsUnlocked(prev.Id) ?? false);
+        // 부모 — 선으로 이어진 앞 노드가 전부 열려야 차례가 온다.
+        state.MissingParent  = MemoryAltarCatalog.FirstLockedParent(node, id => data?.IsUnlocked(id) ?? false);
+        state.BlockedByChain = state.MissingParent != null;
         state.IsNextInChain  = !state.Unlocked && !state.BlockedByChain;
 
         state.CanBuy = !state.Unlocked
@@ -111,6 +114,31 @@ public static class MemoryAltarService
         return n;
     }
 
+    /// <summary>
+    /// 지금 정수로 바로 열 수 있는 칸 수 — 부모가 다 열린 칸만 센다(<see cref="AltarNodeState.CanBuy"/>는 부모 조건을 포함).
+    /// 제단 밖 안내(성소 수정 · 제단 이름표 · 멀린 한 줄)가 쓴다 — 유도설계 A-2 「다음 해금을 제단 밖으로」.
+    /// </summary>
+    public static int AffordableCount()
+    {
+        int n = 0;
+        foreach (var node in MemoryAltarCatalog.All)
+            if (GetState(node).CanBuy) n++;
+        return n;
+    }
+
+    /// <summary>갈래 진척 — (연 칸, 전체 칸). 베이스캠프 기억 성소의 갈래 수정 밝기.</summary>
+    public static (int unlocked, int total) BranchProgress(AltarBranch branch)
+    {
+        int unlocked = 0, total = 0;
+        foreach (var node in MemoryAltarCatalog.All)
+        {
+            if (node.Branch != branch) continue;
+            total++;
+            if (IsUnlocked(node.Id)) unlocked++;
+        }
+        return (unlocked, total);
+    }
+
     // ── 구매 ────────────────────────────────────────────
 
     /// <summary>
@@ -136,8 +164,7 @@ public static class MemoryAltarService
 
         if (state.BlockedByChain)
         {
-            var prev = MemoryAltarCatalog.PreviousInBranch(node);
-            Debug.Log($"[MemoryAltar] 사슬 미도달: {node.DisplayName} — 앞의 「{prev?.DisplayName}」이 먼저다");
+            Debug.Log($"[MemoryAltar] 앞 노드 미해금: {node.DisplayName} — 「{state.MissingParent?.DisplayName}」이 먼저다");
             return false;
         }
 
@@ -234,8 +261,26 @@ public static class MemoryAltarService
         return (rare, epic, legend);
     }
 
+    // ── 판 넓히기(09-29 개편 신설) ──
+    /// <summary>룬 보관함 칸 수 — 기본 5, 「룬 보관함 +1」 6, 「+2」 7.</summary>
+    public static int RuneStorageCapacity =>
+        IsUnlocked(MemoryAltarCatalog.RuneStorage2) ? 7 :
+        IsUnlocked(MemoryAltarCatalog.RuneStorage1) ? 6 : 5;
+
+    /// <summary>정제소가 룬 1개 대신 <b>2장 중 고르기</b>를 주는가.</summary>
+    public static bool IsRefinePickUnlocked => IsUnlocked(MemoryAltarCatalog.RefinePick);
+
+    /// <summary>상점 새로고침이 열렸는가(디자이너 플래그 shopRerollEnabled와 OR).</summary>
+    public static bool IsShopRerollUnlocked => IsUnlocked(MemoryAltarCatalog.ShopReroll);
+
+    /// <summary>베이스캠프 파츠 작업대에서 들고 나가는 시작 파츠 수 — 기본 1, 해금 시 2.</summary>
+    public static int StartPartSlots => IsUnlocked(MemoryAltarCatalog.StartParts2) ? 2 : 1;
+
+    /// <summary>새 런 시작 포션 칸 — 기본 3, 해금 시 4.</summary>
+    public static int PotionCapacity => IsUnlocked(MemoryAltarCatalog.PotionSlot) ? 4 : 3;
+
     /// <summary>
-    /// 서약 카드(원인·효과) 개방 단계 0~3. 사슬이라 앞 단계 없이 뒤 단계가 열려 있을 수 없지만,
+    /// 서약 카드(원인·효과) 개방 단계 0~3. 선으로 이어져 앞 단계 없이 뒤 단계가 열려 있을 수 없지만,
     /// 재정렬 이전 세이브처럼 구멍이 날 수 있어 <b>가장 높은 열린 단계</b>를 그대로 쓴다.
     /// </summary>
     public static int CovenantPartStep =>

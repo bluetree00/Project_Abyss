@@ -10,7 +10,8 @@ namespace RelicFairy.Monster
 /// <summary>
 /// 2페이지 전환 — 숲의 수호자 · 화룡 · 죽음의 기사 공용(09-28 설계 확정 §2).
 /// 1페이지 체력이 다 깎이면(<see cref="BossPages.TransitionDue"/>) 강제 발동:
-///   휘청 → (첫 관람만) 로우 앵글 → 전경 — 두 번째 체력바가 차오르고 무대가 바뀐다(<see cref="IPagedBoss.OnPageStageChange"/>)
+///   휘청 → (첫 관람만) 로우 앵글 — 해방기 첫 전환이면 옛 봉인이 깨지는 각성 장면(<see cref="BossStoryScenes.AwakenAsync"/>)
+///   → 전경 — 두 번째 체력바가 차오르고 무대가 바뀐다(<see cref="IPagedBoss.OnPageStageChange"/>)
 ///   → 포효 · 대사 → 플레이어 카메라로 복귀 → 2페이지(<see cref="IPagedBoss.OnPage2Entered"/>).
 /// 전환 내내 보스는 무적 · 제자리, 플레이어는 입력 잠금 + 잠깐 무적. 리치 전환 연출(LichPhase2EntryPatternSO)을 일반화했다.
 /// 보스마다 다른 것(모션 이름 · 대사 · 이펙트 · 카메라 거리)은 이 SO의 값으로 준다.
@@ -36,6 +37,8 @@ public class BossPageTransitionPatternSO : BossPatternSO
     [Tooltip("전경 샷 — 보스 뒤로 이 거리 · 이 높이에서 아레나를 내려다본다")]
     public float wideBack   = 16f;
     public float wideHeight = 12f;
+    [Tooltip("전경 샷 시선 — 보스에서 플레이어 쪽으로 이 거리(0 = 보스). 보스 뒤가 벽이면 wideBack을 음수(플레이어 쪽)로, 이 값을 0으로")]
+    public float wideLookAhead = 6f;
     [Tooltip("포효 샷 — 보스 앞 이 거리")]
     public float roarDistance = 9f;
     public float roarHeight   = 2.6f;
@@ -118,8 +121,8 @@ public sealed class BossPageTransitionState : SpecialStateBase
         _cts?.Cancel();
     }
 
-    private float TotalSeconds(bool full)
-        => _data.staggerSeconds + (full ? _data.lowShotSeconds + _data.lowShotHold : 0f)
+    private float TotalSeconds(bool full, bool awaken)
+        => _data.staggerSeconds + (full ? _data.lowShotSeconds + (awaken ? BossStoryScenes.AwakenSeconds : _data.lowShotHold) : 0f)
            + _data.refillSeconds + _data.roarHoldSeconds + 0.8f;
 
     private async UniTaskVoid CinematicAsync(MonsterContext ctx, CancellationToken ct)
@@ -127,11 +130,13 @@ public sealed class BossPageTransitionState : SpecialStateBase
         var  paged  = ctx.Monster as IPagedBoss;
         var  pc     = ctx.Runtime.CachedPlayer;
         var  player = ctx.Runtime.PlayerTarget;
-        bool full   = s_seen.Add(_data.name);
+        string bossId = paged?.StoryBossId;
+        bool awaken = BossStoryScenes.IsAwakenDue(bossId);        // 해방기 첫 전환(계정 1회) — 옛 봉인이 깨진다
+        bool full   = s_seen.Add(_data.name) || awaken;
         bool camera = false;
 
         pc?.SetInputEnabled(false);
-        pc?.SetInvincible(TotalSeconds(full) + PlayerSafety);
+        pc?.SetInvincible(TotalSeconds(full, awaken) + PlayerSafety);
         LichCinematics.BossCutsceneHud(true);
 
         try
@@ -160,11 +165,12 @@ public sealed class BossPageTransitionState : SpecialStateBase
             {
                 var (lowPos, lowLook) = ClearShot(look, B + dir * 4.5f + side * 1.2f + Vector3.up * 0.6f, look);
                 await LichCinematics.ShotAsync(lowPos, lowLook, _data.lowShotSeconds, ct);
-                await UniTask.Delay(TimeSpan.FromSeconds(_data.lowShotHold), DelayType.UnscaledDeltaTime, cancellationToken: ct);
+                if (awaken) await BossStoryScenes.AwakenAsync(ctx.Transform, bossId, _data.bodyHeight, ct);
+                else        await UniTask.Delay(TimeSpan.FromSeconds(_data.lowShotHold), DelayType.UnscaledDeltaTime, cancellationToken: ct);
             }
 
             // ③ 전경 — 두 번째 줄이 차오르고 무대가 바뀐다.
-            var (widePos, wideLook) = ClearShot(look, B - dir * _data.wideBack + Vector3.up * _data.wideHeight, B + dir * 6f);
+            var (widePos, wideLook) = ClearShot(look, B - dir * _data.wideBack + Vector3.up * _data.wideHeight, B + dir * _data.wideLookAhead);
             LichCinematics.ShotAsync(widePos, wideLook, 1.2f, ct).Forget();
             paged?.Pages?.BeginRefill(_data.refillSeconds);
             paged?.OnPageStageChange(_data.refillSeconds);
@@ -213,7 +219,7 @@ public sealed class BossPageTransitionState : SpecialStateBase
     /// (시선도 같이 돈다). 어디나 막히면 원래 방향에서 막힌 곳 바로 앞으로 당긴다.
     /// 09-28 실측: 숲이 아레나 가장자리에서 전환하자 전경 카메라(보스 뒤 10 m)가 벽 너머 덤불 속에 들어가 화면 절반을 가렸다.
     /// </summary>
-    private static (Vector3 pos, Vector3 look) ClearShot(Vector3 body, Vector3 desired, Vector3 look)
+    internal static (Vector3 pos, Vector3 look) ClearShot(Vector3 body, Vector3 desired, Vector3 look)
     {
         int mask = ~LayerMask.GetMask("Player", "Monster", "MonsterHit", "UI", "Ignore Raycast");
         Vector3 off = desired - body, lookOff = look - body;

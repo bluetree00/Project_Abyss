@@ -347,7 +347,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         foot.enableWordWrapping = true;
         foot.text = string.IsNullOrEmpty(entry.requires)
             ? KindHintOf(entry.part_kind)
-            : $"선행 · {entry.requires}";
+            : $"선행 · {Managers.RelicParts?.GetById(entry.requires)?.part_name ?? entry.requires}";   // id가 아니라 이름(09-29)
     }
 
     // ── 선택 상태 ──
@@ -381,6 +381,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         if (_confirmBtnImg != null)
             _confirmBtnImg.color = _themed ? (hasSel ? UITheme.CtaTint : UITheme.CtaTintOff)
                                            : (hasSel ? ShopUIStyle.GoldPillBg : ShopUIStyle.BandFill);
+        UIAffordGlow.Set(_confirmBtnImg, hasSel);   // 고르면 장착 버튼에 은은한 불(09-29)
     }
 
     /// <summary>

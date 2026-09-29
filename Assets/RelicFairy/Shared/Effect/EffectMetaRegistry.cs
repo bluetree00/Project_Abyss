@@ -208,6 +208,9 @@ public static class EffectMetaRegistry
         Register("FireExplosionOnSkill",        "스킬 화염 폭발",       EffectCategory.Proc,    EffectUnit.Auto,    "fire");
         Register("LightningOnSkill",            "스킬 번개",            EffectCategory.Proc,    EffectUnit.Auto,    "lightning");
 
+        // ── 발동 룬(언제 × 룬 속성) ───────────────────────────────
+        Register("TriggerBurst",                "속성 발동",            EffectCategory.Proc,    EffectUnit.Ratio,   "dmg");
+
         // ── 특수 ──────────────────────────────────────────────────
         Register("PoisonApple",                 "독사과",               EffectCategory.Special, EffectUnit.Auto,    "poison");
         Register("RandomElement",               "랜덤 속성",            EffectCategory.Special, EffectUnit.None,    "element");

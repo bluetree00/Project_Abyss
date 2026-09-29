@@ -74,6 +74,10 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
     // 납품 행 아트(시너지 바탕·테두리 248×104~106) = 왼쪽 육각 + 알약. 경계가 없어 44px 행에 늘리면 육각이 납작해진다 —
     // 왼쪽 육각(≈104px)을 경계로 준 9-slice 사본을 쓴다. 배율은 원본 높이/행 높이(육각이 행 높이만 한 정사각이 되게).
     private static readonly Vector4 RowArtBorder = new(104f, 10f, 26f, 10f);
+    // 행 아트 안쪽 치수(원본 px, 높이 104) — 육각 폭 91 · 몸통 안쪽 선 위 25 / 아래 80 · 오른쪽 둥근 끝 ≈ 36.
+    // 칸은 안쪽 선 사이 띠에만, 둥근 끝 앞에서 끝낸다(09-29).
+    private const float ArtH = 104f, ArtHexW = 91f, ArtInnerTop = 25f, ArtInnerBottom = 80f, ArtRightInset = 36f;
+    private const float NameW = 64f;   // 「◆ 중앙」 17px 굵게 ≈ 60
     private static Sprite _rowBgSliced, _rowBorderSliced;
 
     // ── Private fields ──
@@ -437,6 +441,8 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             row.tierLabels[b] = lTxt;
         }
 
+        if (rowArt) LayoutOnRowArt(row, crt, nrt);
+
         // 호버 → 툴팁
         var et = row.go.AddComponent<EventTrigger>();
         string capturedId = zoneId;
@@ -458,6 +464,41 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         et.triggers.Add(exit);
 
         return row;
+    }
+
+    /// <summary>
+    /// 행 아트 위 배치 — 칸 수는 육각 한가운데, 이름은 육각 바로 옆, 단계 칸 넷은 알약 몸통의 <b>안쪽 선 사이 띠</b>에
+    /// 둥근 끝 앞까지. 비율이 아니라 아트 치수(행 높이 / 원본 높이 배율)로 잡는다 — 비율은 행 폭이 바뀌면 아트와 어긋난다.
+    /// </summary>
+    private static void LayoutOnRowArt(ZoneRow row, RectTransform count, RectTransform name)
+    {
+        float s       = RowH / ArtH;
+        float hexW    = ArtHexW * s;
+        float bandTop = ArtInnerTop * s + 1.5f;               // 행 위에서
+        float bandBot = (ArtH - ArtInnerBottom) * s + 1.5f;   // 행 아래에서
+
+        count.anchorMin = new Vector2(0f, 0f); count.anchorMax = new Vector2(0f, 1f);
+        count.offsetMin = new Vector2(0f, 0f); count.offsetMax = new Vector2(hexW, 0f);
+
+        name.anchorMin = new Vector2(0f, 0f); name.anchorMax = new Vector2(0f, 1f);
+        name.offsetMin = new Vector2(hexW + 6f, 0f); name.offsetMax = new Vector2(hexW + 6f + NameW, 0f);
+
+        var track = new GameObject("Track", typeof(RectTransform)).GetComponent<RectTransform>();
+        track.SetParent(row.go.transform, false);
+        track.anchorMin = Vector2.zero; track.anchorMax = Vector2.one;
+        track.offsetMin = new Vector2(hexW + 6f + NameW + 4f, bandBot);
+        track.offsetMax = new Vector2(-ArtRightInset * s, -bandTop);
+
+        for (int b = 0; b < row.tierBGs.Length; b++)
+        {
+            if (row.tierBGs[b] == null) continue;
+            var rt = row.tierBGs[b].rectTransform;
+            rt.SetParent(track, false);
+            rt.anchorMin = new Vector2(b / 4f, 0f);
+            rt.anchorMax = new Vector2((b + 1) / 4f, 1f);
+            rt.offsetMin = new Vector2(b == 0 ? 0f : 1.5f, 0f);
+            rt.offsetMax = new Vector2(b == 3 ? 0f : -1.5f, 0f);
+        }
     }
 
     private void RefreshRow(ZoneRow row, string zoneId, int count)

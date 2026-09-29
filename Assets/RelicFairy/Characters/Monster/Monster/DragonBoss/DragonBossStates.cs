@@ -820,6 +820,7 @@ public class DragonDieState : DieState
         }
 
         base.Enter(ctx);
+        BossStoryScenes.PlayEnd(ctx, StoryProgress.Dragon);   // 봉인기 = 봉인 · 해방기 = 처치
     }
 }
 

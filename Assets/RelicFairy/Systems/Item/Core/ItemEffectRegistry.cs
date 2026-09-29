@@ -147,6 +147,9 @@ public static class ItemEffectRegistry
         Register("FireExplosionOnSkill",       s => new FireExplosionOnSkillEffect(s));
         Register("LightningOnSkill",           s => new LightningOnSkillEffect(s));
 
+        // ── 발동 룬: 언제(trigger) × 무엇(룬 속성 탄두) — 빌드 컨셉 「발동 계열」 T2 ──
+        Register("TriggerBurst",               s => new TriggerBurstEffect(s));
+
         // ── 특수 ────────────────────────────────────────────
         Register("PoisonApple",                s => new PoisonAppleEffect(s));
         Register("RandomElement",              s => new RandomElementEffect(s));

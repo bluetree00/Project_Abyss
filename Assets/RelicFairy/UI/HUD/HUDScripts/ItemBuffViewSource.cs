@@ -28,6 +28,9 @@ public sealed class ItemBuffViewSource : IBuffViewSource
         for (int i = 0; i < _scratch.Count; i++)
             if (IsTemporary(_scratch[i]))
                 into.Add(_scratch[i]);
+
+        // 이룬 발동 계열 — 런 동안 이어지지만 「지금 내 빌드가 무엇인가」라 버프 줄에 둔다(빌드 컨셉 §3-3). 칸 수 = 이룬 계열 수(최대 7).
+        BuildImprint.CollectBuffViews(into);
     }
 
     /// <summary>버프창에 올릴 자격 — 잔여 게이지가 있거나(일시적) 스택이 쌓이는 것만.

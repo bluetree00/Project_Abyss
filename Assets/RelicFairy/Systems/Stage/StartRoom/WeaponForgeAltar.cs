@@ -49,6 +49,7 @@ public class WeaponForgeAltar : MonoBehaviour
         _camTransform = Camera.main != null ? Camera.main.transform : null;
         CreateWorldText();
         CreatePrompt();
+        BaseCampLabelRule.Register(transform);   // 이름표는 가까이 간 곳 하나만(2차 개편 09-29)
     }
 
     private void Update()
@@ -59,6 +60,8 @@ public class WeaponForgeAltar : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F))
             ClaimAsync(this.GetCancellationTokenOnDestroy()).Forget();
     }
+
+    private void OnDestroy() => BaseCampLabelRule.Unregister(transform);
 
     private void OnTriggerEnter(Collider other)
     {
@@ -192,7 +195,12 @@ public class WeaponForgeAltar : MonoBehaviour
             if (cam == null) return;
             _camTransform = cam.transform;
         }
-        if (_worldText != null) _worldText.transform.rotation = _camTransform.rotation;
+        if (_worldText != null)
+        {
+            _worldText.transform.rotation = _camTransform.rotation;
+            bool show = BaseCampLabelRule.IsShown(transform);
+            if (_worldText.enabled != show) _worldText.enabled = show;
+        }
         if (_promptGo != null && _promptGo.activeSelf) _promptGo.transform.rotation = _camTransform.rotation;
     }
 
@@ -204,7 +212,7 @@ public class WeaponForgeAltar : MonoBehaviour
 
         _worldText = go.AddComponent<TextMeshPro>();
         if (worldTextFont != null) _worldText.font = worldTextFont;
-        _worldText.text = "무기대";
+        _worldText.text = "장비 공방";   // 구역 이름판은 평소 숨는다(2차 개편) — 가까이서 뜨는 이 이름표가 곳의 이름을 맡는다
         _worldText.fontSize = textSize;
         _worldText.alignment = TextAlignmentOptions.Center;
         _worldText.color = new Color(0.85f, 0.85f, 0.95f);

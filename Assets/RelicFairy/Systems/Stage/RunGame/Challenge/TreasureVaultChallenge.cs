@@ -38,7 +38,7 @@ public sealed class TreasureVaultChallenge : WorldInteractionChallenge
         _timerLabel = MakeText($"{ChallengeFlavor.VaultName(Run)} · {Mathf.CeilToInt(TimeLimit)}초", _center + Vector3.up * 3.2f,
                                4f, UIPalette.Gold, 12);
         _timing = true;
-        Notice($"{ChallengeFlavor.VaultName(Run)}! <color={UIPalette.GoldHex}>{Mathf.CeilToInt(TimeLimit)}초</color> 안에 열어라");
+        Notice($"{ChallengeFlavor.VaultName(Run)}! <color={UIPalette.GoldHex}>{Mathf.CeilToInt(TimeLimit)}초</color> 안에 상자 {ChestCount}개 — 상자마다 강화재료 +{FuelPerChest}");
     }
 
     protected override void Tick()

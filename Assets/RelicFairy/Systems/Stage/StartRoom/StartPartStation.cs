@@ -52,6 +52,7 @@ public sealed class StartPartStation : MonoBehaviour
         _camTransform = Camera.main != null ? Camera.main.transform : null;
         CreateWorldText();
         CreatePrompt();
+        BaseCampLabelRule.Register(transform);   // 이름표는 가까이 간 곳 하나만(2차 개편 09-29)
     }
 
     private void Update()
@@ -62,6 +63,8 @@ public sealed class StartPartStation : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F))
             OpenAsync(this.GetCancellationTokenOnDestroy()).Forget();
     }
+
+    private void OnDestroy() => BaseCampLabelRule.Unregister(transform);
 
     private void OnTriggerEnter(Collider other)
     {
@@ -84,6 +87,36 @@ public sealed class StartPartStation : MonoBehaviour
         => partId == DefaultPartId || (UnlockNode.TryGetValue(partId ?? "", out var node) && MemoryAltarService.IsUnlocked(node));
 
     // ── Private Methods ───────────────────────────────────────
+
+    /// <summary>
+    /// 둘째 시작 파츠 — 첫 파츠 카드는 잠가(「첫 번째로 들고 간다」) 같은 것을 두 번 고를 수 없게 한다.
+    /// 닫으면 둘째 없이 간다(강제 선택이 아니다).
+    /// </summary>
+    private async UniTask PickSecondAsync(PlayerLoadout loadout, List<UI_StartPartPopup.Card> cards, CancellationToken ct)
+    {
+        var second = new List<UI_StartPartPopup.Card>(cards.Count);
+        foreach (var c in cards)
+        {
+            var copy = c;
+            if (c.Part != null && c.Part.part_id == loadout.StartPartId)
+            {
+                copy.Unlocked   = false;
+                copy.UnlockHint = "첫 번째로 들고 간다";
+            }
+            second.Add(copy);
+        }
+        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_StartPartPopup>();
+        if (popup == null) return;
+        var wait = popup.WaitForInteractionAsync(ct);
+        popup.Setup(second, loadout.StartPartId2);
+        await wait;
+        string chosen = popup.ResultPartId;
+        if (string.IsNullOrEmpty(chosen) || chosen == loadout.StartPartId || chosen == loadout.StartPartId2) return;
+        loadout.SetStartPart2(chosen);
+        QuestEvents.Report("Parts", chosen);
+        BaseCampFxDirector.Instance?.PlayAcquire(transform.position + Vector3.up * 1.3f, BaseCampFxDirector.AcquireKind.Part);
+        Debug.Log($"[StartPartStation] 둘째 시작 파츠: {chosen}");
+    }
 
     private async UniTaskVoid OpenAsync(CancellationToken ct)
     {
@@ -127,15 +160,25 @@ public sealed class StartPartStation : MonoBehaviour
             popup.Setup(cards, loadout.StartPartId);
             await wait;
             string chosen = popup.ResultPartId;   // 창은 닫힌 뒤 0.14초 후 파괴 — 바로 읽는다
-            if (string.IsNullOrEmpty(chosen) || chosen == loadout.StartPartId) return;
+            if (string.IsNullOrEmpty(chosen) || chosen == loadout.StartPartId)
+            {
+                // 첫 파츠는 그대로 — 둘째 칸이 열려 있으면 둘째만 다시 고를 수 있게 한다.
+                if (!string.IsNullOrEmpty(loadout.StartPartId) && MemoryAltarService.StartPartSlots >= 2)
+                    await PickSecondAsync(loadout, cards, ct);
+                return;
+            }
 
             loadout.SetStartPart(chosen);
+            if (loadout.StartPartId2 == chosen) loadout.SetStartPart2(null);
             QuestEvents.Report("Parts", chosen);
             // 얻기 연출 — 작업대 궤도 구슬이 원거리 무기(등)로 감겨 들어간다
             BaseCampFxDirector.Instance?.PlayAcquire(transform.position + Vector3.up * 1.3f, BaseCampFxDirector.AcquireKind.Part);
             if (_player != null)
                 GuidelineVisual.Toast(_player.transform.position + Vector3.up * 2.4f, data.GetById(chosen)?.part_name ?? chosen, GuidelineVisual.ToastKind.Relic);
             Debug.Log($"[StartPartStation] 시작 파츠: {chosen}");
+
+            // 기억의 제단 「시작 파츠 둘」 — 첫 파츠를 고른 바로 뒤 같은 창으로 둘째를 고른다(09-29).
+            if (MemoryAltarService.StartPartSlots >= 2) await PickSecondAsync(loadout, cards, ct);
         }
         catch (OperationCanceledException) { }
         finally
@@ -152,8 +195,19 @@ public sealed class StartPartStation : MonoBehaviour
 
     private void BillboardTexts()
     {
-        if (_camTransform == null) return;
-        if (_worldText != null) _worldText.transform.rotation = _camTransform.rotation;
+        if (_camTransform == null)
+        {
+            // 시작 때 카메라가 아직 없었으면 여기서 다시 잡는다(WeaponForgeAltar와 같은 이유) — 못 잡으면 가까이 규칙도 안 돈다
+            var cam = Camera.main;
+            if (cam == null) return;
+            _camTransform = cam.transform;
+        }
+        if (_worldText != null)
+        {
+            _worldText.transform.rotation = _camTransform.rotation;
+            bool show = BaseCampLabelRule.IsShown(transform);
+            if (_worldText.enabled != show) _worldText.enabled = show;
+        }
         if (_promptGo != null && _promptGo.activeSelf) _promptGo.transform.rotation = _camTransform.rotation;
     }
 
@@ -165,7 +219,7 @@ public sealed class StartPartStation : MonoBehaviour
 
         _worldText = go.AddComponent<TextMeshPro>();
         if (worldTextFont != null) _worldText.font = worldTextFont;
-        _worldText.text = "파츠 작업대";   // 구역 이름(「파츠 공방」)은 구역 표지가 — 스테이션 라벨은 물건 이름
+        _worldText.text = "파츠 공방";   // 구역 이름판은 평소 숨는다(2차 개편) — 가까이서 뜨는 이 이름표가 곳의 이름을 맡는다
         _worldText.fontSize = textSize;
         _worldText.alignment = TextAlignmentOptions.Center;
         _worldText.color = new Color(0.72f, 0.66f, 1f);

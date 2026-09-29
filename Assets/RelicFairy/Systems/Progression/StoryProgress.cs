@@ -1,6 +1,14 @@
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
+/// <summary>이야기 시기(09-29 순환 개정 v3) — 보스 페이지 수 · 시나리오 장면이 본다.</summary>
+public enum StoryEra
+{
+    Sealed        = 0,   // 봉인기 — 보스 1줄(리치 2줄′), 끝 = 봉인
+    Liberated     = 1,   // 해방기 — 첫 리치 붕괴 뒤. 보스 2줄(리치 3줄), 끝 = 처치
+    NightmareMode = 2,   // 악몽 모드 — 해금(엔딩) 뒤 켠 판. 2줄 + 악몽 강화
+}
+
 /// <summary>
 /// 이야기 진행(계정 영구) — <b>봉인기 → 붕괴 → 악몽기 → 엔딩</b>.
 ///
@@ -12,6 +20,10 @@ using UnityEngine;
 /// · 봉인·처치·장면 기록 = <see cref="UserGameData.records"/>(<c>seal.lich:1</c> 형식).</para>
 ///
 /// 설계: 바탕화면 기획 「최종장이후_사이클시나리오」 v2 · 「리치보스_완전설계」.
+///
+/// <para><b>시기(09-29 순환 개정 v3)</b> — 봉인기 → 해방기(첫 리치 붕괴) → 악몽 모드(엔딩 뒤 켜는 모드).
+/// 보스 페이지 수 · 시나리오 장면은 <see cref="Era"/> · <see cref="IsLiberated"/> · <see cref="IsNightmareMode"/>를 본다.
+/// 옛 이름 <see cref="IsNightmare"/>는 <see cref="IsLiberated"/>와 같은 값으로 남긴다(악몽 규칙 · 대사 · 거점 사용처가 옮겨 가기 전까지).</para>
 /// </summary>
 public static class StoryProgress
 {
@@ -34,6 +46,7 @@ public static class StoryProgress
         public const string SealPrefix = "seal.";           // 봉인기에 쓰러뜨림
         public const string KillPrefix = "kill.";           // 악몽기에 쓰러뜨림
         public const string SeenPrefix = "seen.";           // 1회성 장면·대사를 봤음
+        public const string NightmareMode = "story.nmMode"; // 악몽 모드 켬(해금 = 엔딩 뒤) — 거점 게이트 토글
     }
 
     // 붕괴를 일으킨 쓰러뜨림은 붕괴 시점에 「봉인」으로 이미 기록했다 — 뒤따르는 방 클리어 알림이
@@ -48,7 +61,7 @@ public static class StoryProgress
     public const string DebugOverridePrefsKey = "RelicFairy.Story.NightmareOverride";
 
     /// <summary>
-    /// 에디터 테스트 전용 — -1 = 저장값, 0 = 봉인기로 보기, 1 = 악몽기로 보기.
+    /// 에디터 테스트 전용 — -1 = 저장값, 0 = 봉인기, 1 = 해방기, 2 = 악몽 모드로 보기.
     /// 플레이 진입(도메인 리로드)을 넘어 유지되도록 에디터 설정에 둔다. <b>켜져 있으면 이야기 기록을 저장하지 않는다</b>
     /// (가짜 상태로 진짜 세이브를 오염시키지 않게).
     /// </summary>
@@ -81,23 +94,39 @@ public static class StoryProgress
 #if UNITY_EDITOR
         s_debugOverride = null;
         if (DebugNightmareOverride >= 0)
-            Debug.LogWarning($"[Story] 테스트 오버라이드 켜짐 — {(DebugNightmareOverride == 1 ? "악몽기" : "봉인기")}로 본다. 이야기 기록은 저장하지 않는다.");
+            Debug.LogWarning($"[Story] 테스트 오버라이드 켜짐 — {Era}로 본다. 이야기 기록은 저장하지 않는다.");
 #endif
     }
 
     // ── 상태 ───────────────────────────────────────────
 
-    /// <summary>붕괴를 거쳐 악몽기에 들어섰는가. 리치의 봉인이 깨졌다 = 붕괴가 일어났다.</summary>
-    public static bool IsNightmare
+    /// <summary>
+    /// 이번 판의 시기 — 봉인기(처음) → 해방기(첫 리치 붕괴 · 계정 영구) → 악몽 모드(엔딩 뒤 해금 · 켠 판만).
+    /// 리치의 봉인이 깨졌다 = 붕괴가 일어났다.
+    /// </summary>
+    public static StoryEra Era
     {
         get
         {
 #if UNITY_EDITOR
-            if (DebugNightmareOverride >= 0) return DebugNightmareOverride == 1;
+            if (DebugNightmareOverride >= 0) return (StoryEra)Mathf.Clamp(DebugNightmareOverride, 0, 2);
 #endif
-            return BossSealService.IsSealBroken(Lich);
+            if (!BossSealService.IsSealBroken(Lich)) return StoryEra.Sealed;
+            return IsNightmareModeUnlocked && Get(Rec.NightmareMode) > 0 ? StoryEra.NightmareMode : StoryEra.Liberated;
         }
     }
+
+    /// <summary>봉인이 풀렸다(해방기 · 악몽 모드) — 보스 2페이지 · 리치 3줄.</summary>
+    public static bool IsLiberated => Era != StoryEra.Sealed;
+
+    /// <summary>악몽 모드로 들어온 판 — 보스 악몽 강화 · 악몽 첫 조우 한 줄.</summary>
+    public static bool IsNightmareMode => Era == StoryEra.NightmareMode;
+
+    /// <summary>악몽 모드를 켤 수 있는가 — 해방기 리치 첫 처치(엔딩) 뒤.</summary>
+    public static bool IsNightmareModeUnlocked => HasEnded;
+
+    /// <summary>옛 이름 — v3에서 뜻이 「봉인이 풀렸다」(= <see cref="IsLiberated"/>)가 됐다. 옛 사용처가 옮겨 가기 전까지 남긴다.</summary>
+    public static bool IsNightmare => IsLiberated;
 
     public static bool HasEnded  => Get(Rec.Ending) > 0;
     public static bool HasMetLich => Get(Rec.LichMet) > 0;
@@ -229,6 +258,20 @@ public static class StoryProgress
         bool pending = s_endingPending;
         s_endingPending = false;
         return pending;
+    }
+
+    /// <summary>악몽 모드 켜고 끄기 — 거점 게이트 토글이 부른다(v3 D3). 해금 전 켜기는 무시.</summary>
+    public static void SetNightmareMode(bool on)
+    {
+        if (on && !IsNightmareModeUnlocked) return;
+        var data = BackendGameData.Instance?.Data;
+        if (data == null || PersistenceSuspended) return;
+        int want = on ? 1 : 0;
+        int cur  = data.GetRecord(Rec.NightmareMode);
+        if (cur == want) return;
+        data.AddRecord(Rec.NightmareMode, want - cur);
+        Save();
+        Debug.Log($"[Story] 악몽 모드 {(on ? "켬" : "끔")}");
     }
 
     /// <summary>1회성 장면·대사를 봤다고 남긴다. 처음이면 true.</summary>

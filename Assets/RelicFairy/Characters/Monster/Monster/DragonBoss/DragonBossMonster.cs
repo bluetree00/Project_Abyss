@@ -268,6 +268,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
     // ── 2페이지 (BossPages) ───────────────────────────────
     /// <summary>체력 두 줄 · 전환 · 간판 시점. 초기화 중 EffectiveMaxHp가 먼저 읽을 수 있어 처음 읽을 때 만든다.</summary>
     public BossPages Pages => _pages ??= CreatePages();
+    public string StoryBossId => StoryProgress.Dragon;
 
     /// <summary>2페이지(전환 포함) — 원소 Abyss 고정 · 소환 없음.</summary>
     public bool IsAbyssPage => Pages.IsPage2 || Pages.Transitioning;
@@ -317,6 +318,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
     private float[]                      _abyssBaseHue;
     private Color[]                      _abyssBaseTint;
     private bool                         _abyssLook;
+    private bool                         _abyssBlending;     // 전환 동안 서서히 바뀌는 중
     private bool                         _lastHudInvulnerable;
     private System.Threading.CancellationTokenSource _pageTransitionCts;
 
@@ -763,18 +765,45 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
     /// </summary>
     private void SetAbyssBodyLook(bool on)
     {
-        if (on == _abyssLook) return;
+        if (on == _abyssLook && !_abyssBlending) return;
         if (on && _abyssMats == null) CacheAbyssMaterials();
         if (_abyssMats == null) return;
+        _abyssBlending = false;   // 서서히 바뀌던 중이면 여기서 끝
         _abyssLook = on;
+        ApplyAbyssBlend(on ? 1f : 0f);
+    }
+
+    /// <summary>0 = 원래 몸 · 1 = 심연(검보라).</summary>
+    private void ApplyAbyssBlend(float k)
+    {
         for (int i = 0; i < _abyssMats.Length; i++)
         {
             var m = _abyssMats[i];
             if (m == null) continue;
             Color t = _abyssBaseTint[i];
-            m.SetFloat(HueId, on ? _abyssBaseHue[i] + _abyssBodyHueShift : _abyssBaseHue[i]);
-            m.SetColor(TintId, on ? new Color(t.r * _abyssBodyTint.r, t.g * _abyssBodyTint.g, t.b * _abyssBodyTint.b, t.a) : t);
+            m.SetFloat(HueId, _abyssBaseHue[i] + _abyssBodyHueShift * k);
+            m.SetColor(TintId, Color.Lerp(t, new Color(t.r * _abyssBodyTint.r, t.g * _abyssBodyTint.g, t.b * _abyssBodyTint.b, t.a), k));
         }
+    }
+
+    /// <summary>전환 — 바가 차오르는 <paramref name="seconds"/> 동안 몸이 서서히 검보라로. 도중에 초기화되면 멈춘다.</summary>
+    private async UniTaskVoid BlendAbyssBodyAsync(float seconds)
+    {
+        if (_abyssLook) return;
+        if (_abyssMats == null) CacheAbyssMaterials();
+        if (_abyssMats == null) return;
+        _abyssBlending = true;
+        var ct = destroyCancellationToken;
+        try
+        {
+            for (float t = 0f; t < seconds && _abyssBlending; t += Time.unscaledDeltaTime)
+            {
+                ApplyAbyssBlend(t / seconds);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException) { return; }
+        if (_abyssBlending) SetAbyssBodyLook(true);
     }
 
     private void CacheAbyssMaterials()
@@ -1037,7 +1066,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
         Color  abyss  = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Abyss);
         _stageHazard = BossStageHazard.CreateEdgeBand(this, arena, floorY, _abyssEdgeBandWidth, seconds,
             new Color(abyss.r, abyss.g, abyss.b, 0.45f), _abyssEdgeVfxPrefab, _abyssEdgeVfxScale, _abyssEdgeDamageMult);
-        SetAbyssBodyLook(true);
+        BlendAbyssBodyAsync(seconds).Forget();   // 바가 차오르는 동안 몸이 서서히 검보라로(09-29)
     }
 
     /// <summary>2페이지 진입 — 소환 흔적을 닫고(새끼 용 없음) 연출 뒤 한숨 돌릴 틈을 준다.</summary>

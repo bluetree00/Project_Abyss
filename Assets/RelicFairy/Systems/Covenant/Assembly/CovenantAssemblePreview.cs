@@ -60,8 +60,19 @@ public readonly struct CovenantAssemblePreview
         return default;
     }
 
-    /// <summary>결과 문장: "OO 할 때 → XX" (중앙 미리보기용).</summary>
-    public string ResultSentence => valid ? causeDesc + " → " + effectDesc : "";
+    /// <summary>결과 문장: "OO 할 때 → 실제 수치" (중앙 미리보기용). 서술형 설명(effectDesc)은 무슨 기능인지 안 읽혀 수치로 쓴다(09-29).</summary>
+    public string ResultSentence => valid ? causeDesc + " → " + EffectAmountLabel() : "";
+
+    /// <summary>카드 · HUD처럼 좁은 칸용 — 괄호 속 부연(최대 중첩 · 상한)을 뺀 수치 한 줄.</summary>
+    public string EffectAmountCompact()
+    {
+        // 정지는 괄호 속이 핵심(기절 시간)이라 줄이면 수치가 사라진다 — 좁은 칸용 문장을 따로 둔다.
+        if (valid && effectKind == EffectKind.Stasis)
+            return $"감전 1중첩당 {effective:0.00}초 기절 · 반경 {radius:0.0}m";
+        string s = EffectAmountLabel();
+        int cut = s.IndexOf(" (", System.StringComparison.Ordinal);
+        return cut > 0 ? s.Substring(0, cut) : s;
+    }
 
     /// <summary>효과 크기 한 줄 표시(효과 종류별 단위). 값은 전부 실제 동작값(effective)이다.</summary>
     public string EffectAmountLabel()
@@ -70,7 +81,7 @@ public readonly struct CovenantAssemblePreview
         return effectKind switch
         {
             EffectKind.DamageBuff => $"피해 +{effective * 100f:0}% · {duration:0}초",
-            EffectKind.AoeBurst   => $"광역 피해 ×{effective:0.0} · 반경 {radius:0.0}",
+            EffectKind.AoeBurst   => $"광역 피해 ×{effective:0.0} · 반경 {radius:0.0}m",
             EffectKind.Shield     => $"보호막 {effective:0}",
             EffectKind.GoldBurst  => $"골드 +{effective:0}",
             EffectKind.Curse      => $"받는 피해 +{effective * 100f:0}% · {duration:0}초",
@@ -81,13 +92,13 @@ public readonly struct CovenantAssemblePreview
             EffectKind.StatBuff   => MomentumLabel(),
             EffectKind.BleedStack => $"출혈 공격력×{effective * 100f:0}% · {duration:0}초 (최대 {CovenantMath.BleedMaxStacks}중첩)",
             EffectKind.Detonate   => causeTargeted
-                ? $"화상·출혈 {CovenantMath.DetonateFraction * 100f:0}% 기폭 · 파편 ×{effective:0.0} · 반경 {radius:0.0}"
-                : $"주변 전체 화상·출혈 {CovenantMath.DetonateFraction * 100f:0}% 분산 기폭 · 반경 {radius:0.0}",
+                ? $"화상·출혈 {CovenantMath.DetonateFraction * 100f:0}% 기폭 · 파편 ×{effective:0.0} · 반경 {radius:0.0}m"
+                : $"주변 전체 화상·출혈 {CovenantMath.DetonateFraction * 100f:0}% 분산 기폭 · 반경 {radius:0.0}m",
             EffectKind.Harvest    => $"화상·출혈 {CovenantMath.HarvestFraction * 100f:0}% 수확 → 쿨감 {effective:0.0}초 · 골드 +{CovenantMath.HarvestGold}",
             EffectKind.Arcflash   => causeClass == CauseClass.Skill
                 ? $"감전 1중첩 · 순차 체인 {effectiveCount + CovenantMath.ArcflashChainBonus + 1}체 (간격 {CovenantMath.ArcflashChainHop:0}m)"
-                : $"감전 1중첩 · 방사형 {effectiveCount + 1}체 · 반경 {radius:0.0}",
-            EffectKind.Stasis     => $"감전 전량 소모 → 반경 {radius:0.0} 기절 (1중첩당 {effective:0.00}초 · 최대 {CovenantMath.StasisStunCap:0.0}초)",
+                : $"감전 1중첩 · 방사형 {effectiveCount + 1}체 · 반경 {radius:0.0}m",
+            EffectKind.Stasis     => $"감전 전량 소모 → 반경 {radius:0.0}m 기절 (1중첩당 {effective:0.00}초 · 최대 {CovenantMath.StasisStunCap:0.0}초)",
             EffectKind.Ward       => $"받는 피해 -{effective * 100f:0}% · {duration:0}초 (상태 걸린 적 1체당 -{CovenantMath.WardPerSteepedEnemy * 100f:0}%p · 최대 -{CovenantMath.WardReductionCap * 100f:0}%)",
             _                     => $"{effective:0.0}",
         };

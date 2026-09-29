@@ -26,6 +26,10 @@ public sealed class RefineryService
 
     private const string ZoneCoreIdPrefix = "special_zonecore_";
 
+    // 정제 두 장의 둘째 장 — 보유 계열 추림(할당 없이 재사용).
+    private static readonly System.Collections.Generic.List<BuildFamily> s_topFamilies = new(2);
+    private static readonly System.Collections.Generic.List<ItemSO>      s_familyPool  = new(16);
+
     // ── 런 상태 ──
     private readonly RunFuelBank      _fuel;
     private readonly RunItemInventory _inventory;
@@ -58,7 +62,11 @@ public sealed class RefineryService
 
     // ── 돌리기 ──
 
-    /// <summary>룬 하나를 뽑아 보관함에 넣는다. 원석 부족/보관함 만차면 실패(Success=false) — 그땐 원석을 쓰지 않는다.</summary>
+    /// <summary>
+    /// 룬 하나를 뽑아 보관함에 넣는다. 원석 부족/보관함 만차면 실패(Success=false) — 그땐 원석을 쓰지 않는다.
+    /// <para>「정제 두 장」(기억의 제단) 해금이면 2장을 굴리고 <b>보관함엔 넣지 않는다</b> — 좋은 쪽을 <see cref="RefineryOutcome.Rune"/>,
+    /// 다른 쪽을 <see cref="RefineryOutcome.Alt"/>로 돌려주고, 고르기는 룬 선택 화면이 맡는다(09-29).</para>
+    /// </summary>
     public RefineryOutcome Craft()
     {
         if (_inventory != null && _inventory.IsStagingFull)
@@ -66,17 +74,41 @@ public sealed class RefineryService
         if (!CanAfford)
             return RefineryOutcome.Fail("원석이 부족합니다");
 
-        var rune = DrawRune(RollRarity());
+        var (rune, so) = DrawRune(RollRarity());
         if (rune == null)
             return RefineryOutcome.Fail("뽑을 룬이 없습니다");
+
+        RuntimeItemData alt = null; ItemSO altSo = null;
+        if (MemoryAltarService.IsRefinePickUnlocked)
+        {
+            // 두 번째 장 — 보유 발동 계열 쪽으로 굴린다(한 장은 넓게 · 한 장은 내 빌드). 같은 룬이면 고르는 의미가 없어 몇 번 다시 굴린다.
+            for (int i = 0; i < 4 && alt == null; i++)
+            {
+                var (a, aso) = DrawRune(RollRarity(), preferOwnedFamily: true);
+                if (a != null && a.itemId != rune.itemId) { alt = a; altSo = aso; }
+            }
+        }
 
         int cost = CurrentCost;
         if (!(_fuel?.TrySpend(FuelKind.RuneOre, cost) ?? false))
             return RefineryOutcome.Fail("원석이 부족합니다");
 
-        _inventory?.AddToStaging(rune);
         CraftCount++;
-        return new RefineryOutcome { Success = true, Rarity = rune.rarity, Rune = rune };
+        if (alt == null)
+        {
+            _inventory?.AddToStaging(rune);
+            return new RefineryOutcome { Success = true, Rarity = rune.rarity, Rune = rune, RuneSo = so, Spent = cost };
+        }
+
+        // 좋은 쪽을 먼저 공개한다(등급이 같으면 먼저 굴린 쪽).
+        if (alt.rarity > rune.rarity) { (rune, alt) = (alt, rune); (so, altSo) = (altSo, so); }
+        return new RefineryOutcome { Success = true, Rarity = rune.rarity, Rune = rune, RuneSo = so, Alt = alt, AltSo = altSo, Spent = cost };
+    }
+
+    /// <summary>「정제 두 장」에서 넘겼을 때 — 쓴 원석을 돌려준다(고른 것이 없으니 값도 없다).</summary>
+    public void Refund(int ore)
+    {
+        if (ore > 0) _fuel?.Add(FuelKind.RuneOre, ore);
     }
 
     /// <summary>정제소가 예전에 만든 존핵인가(아이템 차트에 없는 특수 룬 — id 접두로 가른다). 이어하기 세이브 호환용.</summary>
@@ -96,17 +128,27 @@ public sealed class RefineryService
     }
 
     /// <summary>그 등급 풀에서 하나. 풀이 비면 한 단계씩 내린다(방 보상 RoomClearGate와 같은 폴백) — 희귀 아래로는 내리지 않는다.</summary>
-    private static RuntimeItemData DrawRune(ItemRarity rarity)
+    private static (RuntimeItemData data, ItemSO so) DrawRune(ItemRarity rarity, bool preferOwnedFamily = false)
     {
         for (var r = rarity; r >= ItemRarity.Rare; r--)
         {
             var pool = ItemSORegistry.GetByRarity(r);
             if (pool == null || pool.Count == 0) continue;
-            var rune = RuntimeItemData.FromSO(pool[Random.Range(0, pool.Count)]);
-            if (rune != null) return rune;
+            var so   = pool[Random.Range(0, pool.Count)];
+            if (preferOwnedFamily)
+            {
+                // 보유 각인 1 · 2위 계열의 룬만 남긴다 — 없으면(각인 0 · 그 등급에 그 계열 없음) 넓게 뽑은 그대로.
+                BuildImprint.TopFamilies(2, s_topFamilies);
+                s_familyPool.Clear();
+                foreach (var c in pool)
+                    if (c != null && s_topFamilies.Contains(BuildFamilyRules.OfItemId(c.itemId))) s_familyPool.Add(c);
+                if (s_familyPool.Count > 0) so = s_familyPool[Random.Range(0, s_familyPool.Count)];
+            }
+            var rune = RuntimeItemData.FromSO(so);
+            if (rune != null) return (rune, so);
         }
         Debug.LogWarning($"[Refinery] {rarity} 이하 룬 풀이 비었다 — 뽑기 생략");
-        return null;
+        return (null, null);
     }
 }
 
@@ -117,6 +159,12 @@ public struct RefineryOutcome
     public string          FailReason;
     public ItemRarity      Rarity;
     public RuntimeItemData Rune;
+    public ItemSO          RuneSo;
+    /// <summary>「정제 두 장」의 다른 장(없으면 한 장 정제 — 이미 보관함에 들어갔다).</summary>
+    public RuntimeItemData Alt;
+    public ItemSO          AltSo;
+    /// <summary>쓴 원석(두 장을 넘기면 돌려준다).</summary>
+    public int             Spent;
 
     public static RefineryOutcome Fail(string reason) => new RefineryOutcome { Success = false, FailReason = reason };
 }

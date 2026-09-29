@@ -163,7 +163,7 @@ public class WorldItemDisplay : MonoBehaviour
             if (col != null) col.enabled = true;
             RefreshPrompt();
             ItemEffectVfxHelper.ShowNotice(
-                $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.MaxStagingCapacity}칸) — 자리를 비우고 다시 주우세요");
+                $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.StagingCapacity}칸) — 자리를 비우고 다시 주우세요");
             return;
         }
 

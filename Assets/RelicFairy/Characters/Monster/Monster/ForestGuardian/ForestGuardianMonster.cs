@@ -127,6 +127,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
     // ── 2페이지 (IPagedBoss) ──────────────────────────────────
     /// <summary>페이지 부품 — MonsterBase가 초기화 중 EffectiveMaxHp를 읽을 때 처음 만들어진다(악몽기 여부를 그때 읽는다).</summary>
     public BossPages Pages => _pages ??= CreatePages();
+    public string StoryBossId => StoryProgress.ForestGuardian;
 
     protected override float BossHpScale    => Pages.HpScale;
     protected override int   DamageHpFloor  => Pages.HpFloor(base.DamageHpFloor);
@@ -686,6 +687,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
         EnsureArena();
         _stageHazard = BossStageHazard.CreateEdgeBand(this, _arenaBounds, _arenaFloorY, _thornBandWidth, seconds,
                                                       _thornBandColor, _thornBandVfxPrefab, _thornBandVfxScale, _thornBandDamageMult);
+        TintBodyOverAsync(_page2BodyTint, seconds).Forget();   // 바가 차오르는 동안 몸이 붉게 물든다 — 카메라가 보고 있을 때(09-29)
         Debug.Log($"[FG] 2페이지 무대 — 가시 뿌리 띠 {_thornBandWidth:F1} m · 아레나 {_arenaBounds.size.x:F0}×{_arenaBounds.size.z:F0} m", this);
     }
 
@@ -773,6 +775,39 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
         if (inv == _lastHudInvulnerable) return;
         _lastHudInvulnerable = inv;
         HudInvulnerableChanged?.Invoke(inv);
+    }
+
+    /// <summary>몸 · 팔다리가 <paramref name="seconds"/> 동안 흰색 → <paramref name="to"/>로 물든다(머티리얼은 한 번만 모은다).</summary>
+    private async UniTaskVoid TintBodyOverAsync(Color to, float seconds)
+    {
+        _page2Tinted = true;   // 도중에 2페이즈 머티리얼 로드가 끝나도 붉은 빛으로
+        var mats = new List<Material>();
+        CollectTintMaterials(_bodyRenderers, mats);
+        if (!ReferenceEquals(_limbRenderers, _bodyRenderers)) CollectTintMaterials(_limbRenderers, mats);
+        var ct = destroyCancellationToken;
+        try
+        {
+            for (float t = 0f; t < seconds && _page2Tinted; t += Time.unscaledDeltaTime)
+            {
+                Color c = Color.Lerp(Color.white, to, t / seconds);
+                foreach (var m in mats)
+                    if (m != null) m.SetColor(BaseColorId, c);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (System.OperationCanceledException) { return; }
+        if (_page2Tinted) SetBodyTint(to);
+    }
+
+    private static void CollectTintMaterials(Renderer[] renderers, List<Material> into)
+    {
+        if (renderers == null) return;
+        foreach (var r in renderers)
+        {
+            if (r == null) continue;
+            foreach (var m in r.materials)
+                if (m != null && m.HasProperty(BaseColorId)) into.Add(m);
+        }
     }
 
     private void RestoreBodyTint()

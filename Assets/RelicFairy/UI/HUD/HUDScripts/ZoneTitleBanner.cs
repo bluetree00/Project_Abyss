@@ -8,6 +8,7 @@ using UnityEngine.UI;
 /// <summary>
 /// 화면 위쪽 가운데의 <b>구역 이름</b> — 처음 들어간 구역에서 한 번, 제목 + 한 줄 설명(베이스캠프 「장비 공방」 등).
 /// 월드의 <see cref="ZoneSign"/>가 <see cref="ZoneSign.TitleRequested"/>로 알린다(처음 들어간 구역만 쏜다 — 기록은 ZoneSign 몫).
+/// 그 뒤로는 들어설 때마다 <see cref="ZoneSign.ArrivalRequested"/> → <see cref="ShowSubtle"/>: 제목만 작고 옅게, 느린 페이드(09-29 사용자).
 /// 조작을 막지 않는다(입력·시간 정지 없음 · 레이캐스터 없음). 표시 중에 새 요청이 오면 그 자리에서 교체한다.
 ///
 /// <para>HUD 계층에 붙이지 않는다 — 시작방 대화 중엔 HUD 전체가 숨는데(HudBootstrapper.SetStartRoomSuppressed)
@@ -25,17 +26,28 @@ public sealed class ZoneTitleBanner : MonoBehaviour
     private const float RiseY        = 10f;     // 나타날 때 아래에서 살짝 떠오른다
     private const float TitleSize    = 52f;
     private const float DescSize     = 24f;
+    // 도착 표시(들어설 때마다) — 은은하게: 작은 제목 한 줄 · 옅은 받침 · 끝까지 다 밝히지 않음 · 느린 페이드
+    private const float SubtleTitleSize = 34f;
+    private const float SubtleFadeIn    = 0.6f;
+    private const float SubtleHold      = 1.1f;
+    private const float SubtleFadeOut   = 1.0f;
+    private const float SubtlePeak      = 0.85f;
 
     private static readonly Color TitleInk = new(0.97f, 0.93f, 0.84f, 1f);
     private static readonly Color DescInk  = new(0.82f, 0.85f, 0.92f, 1f);
     private static readonly Color RuleInk  = new(0.91f, 0.73f, 0.33f, 0.80f);
     private static readonly Color BackInk  = new(0.02f, 0.02f, 0.04f, 0.75f);   // 글자 자리 전부 이 값(가장자리 함수 수정 뒤 — 0.85는 무거웠다, 09-28 3차)
+    private static readonly Color SubtleBackInk = new(0.02f, 0.02f, 0.04f, 0.4f);
 
     // ── Private ──
     private CanvasGroup   _group;
     private RectTransform _block;
     private TMP_Text      _title;
     private TMP_Text      _desc;
+    private Image         _back;
+    private Image         _rule;
+    private bool          _fullShowing;   // 처음 배너가 떠 있는 동안 — 도착 표시가 끼어들지 않는다
+    private int           _fullSeq;       // 배너가 배너를 교체하면 앞 것의 끝 처리가 늦게 돌아 표시를 끄지 않게
     private CancellationTokenSource _cts;
 
     // ── Static ──
@@ -51,8 +63,18 @@ public sealed class ZoneTitleBanner : MonoBehaviour
 
     // ── Lifecycle ──
     private void Awake()     => Build();
-    private void OnEnable()  => ZoneSign.TitleRequested += Show;
-    private void OnDisable() { ZoneSign.TitleRequested -= Show; Cancel(); }
+    private void OnEnable()
+    {
+        ZoneSign.TitleRequested   += Show;
+        ZoneSign.ArrivalRequested += ShowSubtle;
+    }
+
+    private void OnDisable()
+    {
+        ZoneSign.TitleRequested   -= Show;
+        ZoneSign.ArrivalRequested -= ShowSubtle;
+        Cancel();
+    }
     private void OnDestroy() => Cancel();
 
     // ── Public Methods ──
@@ -66,14 +88,26 @@ public sealed class ZoneTitleBanner : MonoBehaviour
         PlayAsync(title, description, _cts.Token).Forget();
     }
 
+    /// <summary>도착 표시 — 제목만 작고 옅게. 처음 배너가 떠 있으면 방해하지 않는다.</summary>
+    public void ShowSubtle(string title)
+    {
+        if (string.IsNullOrEmpty(title) || _fullShowing) return;
+        Cancel();
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+        PlaySubtleAsync(title, _cts.Token).Forget();
+    }
+
     // ── Private Methods ──
 
     private async UniTaskVoid PlayAsync(string title, string description, CancellationToken ct)
     {
+        ApplyStyle(subtle: false);
         _title.text = title;
         _desc.text  = description ?? string.Empty;
         _desc.gameObject.SetActive(!string.IsNullOrEmpty(description));
 
+        _fullShowing = true;
+        int seq = ++_fullSeq;
         try
         {
             float from = _group.alpha;   // 교체면 지금 밝기에서 이어 간다(깜빡이지 않게)
@@ -82,6 +116,31 @@ public sealed class ZoneTitleBanner : MonoBehaviour
             await FadeAsync(1f, 0f, FadeOutSec, rise: false, ct);
         }
         catch (OperationCanceledException) { }
+        finally { if (seq == _fullSeq) _fullShowing = false; }
+    }
+
+    private async UniTaskVoid PlaySubtleAsync(string title, CancellationToken ct)
+    {
+        ApplyStyle(subtle: true);
+        _title.text = title;
+        _desc.gameObject.SetActive(false);
+        try
+        {
+            float from = Mathf.Min(_group.alpha, SubtlePeak);
+            await FadeAsync(from, SubtlePeak, SubtleFadeIn * (1f - from / SubtlePeak), rise: true, ct);
+            await UniTask.Delay(TimeSpan.FromSeconds(SubtleHold), ignoreTimeScale: true, cancellationToken: ct);
+            await FadeAsync(SubtlePeak, 0f, SubtleFadeOut, rise: false, ct);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    /// <summary>처음 배너(큰 제목 · 금빛 선 · 짙은 받침) ↔ 도착 표시(작은 제목만 · 옅은 받침).</summary>
+    private void ApplyStyle(bool subtle)
+    {
+        _title.fontSize         = subtle ? SubtleTitleSize : TitleSize;
+        _title.characterSpacing = subtle ? 4f : 6f;
+        _rule.gameObject.SetActive(!subtle);
+        _back.color = subtle ? SubtleBackInk : BackInk;
     }
 
     private async UniTask FadeAsync(float from, float to, float dur, bool rise, CancellationToken ct)
@@ -151,6 +210,7 @@ public sealed class ZoneTitleBanner : MonoBehaviour
         });
         back.color         = BackInk;
         back.raycastTarget = false;
+        _back = back;
 
         _title = MakeText(_block, "Title", TitleSize, TitleInk, 26f, 70f);
         _title.characterSpacing = 6f;
@@ -164,6 +224,7 @@ public sealed class ZoneTitleBanner : MonoBehaviour
         rule.sprite        = UI_RuneSelectPopup.SoftDot;
         rule.color         = RuleInk;
         rule.raycastTarget = false;
+        _rule = rule;
 
         _desc = MakeText(_block, "Desc", DescSize, DescInk, -40f, 34f);
     }

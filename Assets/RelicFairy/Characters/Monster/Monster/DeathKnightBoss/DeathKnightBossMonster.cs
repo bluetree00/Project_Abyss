@@ -42,6 +42,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     private const float PostTransitionBreak     = 1.5f;   // 전환이 끝나고 첫 패턴까지
     private static readonly Color Page2WindowBase     = new Color(0.30f, 0.30f, 0.34f, 0.4f);
     private static readonly Color Page2WindowEmission = new Color(0.32f, 0.32f, 0.36f, 1f);
+    private const float Page2EmissionBoost = 2.5f;   // 2페이지 — 갑옷 발광 배율(검 색 알림은 그대로, 09-29)
 
     // ── Inspector ─────────────────────────────────────────
     [Header("DeathKnight — 표시")]
@@ -137,6 +138,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     /// MonsterBase가 초기화 중 최대 체력(<see cref="MonsterBase.EffectiveMaxHp"/>)을 읽으므로 없으면 바로 만든다.
     /// </summary>
     public BossPages Pages => _pages ??= CreatePages();
+    public string StoryBossId => StoryProgress.DeathKnight;
 
     protected override float BossHpScale    => Pages.HpScale;
     protected override int   DamageHpFloor  => Pages.HpFloor(base.DamageHpFloor);
@@ -180,6 +182,9 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     private bool                      _pendingTriggerEntrance;
     private GameObject                _auraInstance;
     private GameObject                _currentAuraPrefab;
+    private GameObject                _page2AuraInstance;   // 2페이지 — 반대 빛깔 오라를 하나 더(흑백이 함께 피어오른다)
+    private GameObject                _page2AuraPrefab;
+    private float                     _page2Glow;           // 0 = 1페이지 · 1 = 2페이지 갑옷 발광
     private DKP2PassiveAttackRunner   _passiveRunner;
     private CancellationTokenSource   _passiveCts;
     private CancellationTokenSource   _healCts;
@@ -394,9 +399,11 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         _prevPatternActive = false;
         _isStaggered       = false;
         _soulGateCleared   = false;
+        _page2Glow         = 0f;
         if (_dkBB != null) ApplyArmorTint(_dkBB.SwordColor);
         ApplyWindowTint(_dkBB?.SwordColor ?? DKSwordColor.White);
         ApplyAuraColor(_dkBB?.SwordColor ?? DKSwordColor.White);
+        SyncPage2Aura();
         if (_attackPool != null)
             foreach (var p in _attackPool)
                 p?.OnRecycled();
@@ -636,6 +643,53 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
             _auraInstance.transform.localRotation = Quaternion.identity;
         }
         _currentAuraPrefab = auraPrefab;
+        SyncPage2Aura();
+    }
+
+    /// <summary>2페이지 반대 빛깔 오라 — 검 색이 바뀌면 같이 바뀐다(늘 흑백 한 쌍).</summary>
+    private void SyncPage2Aura()
+    {
+        GameObject want = _page2Glow > 0f
+            ? (_currentAuraPrefab == _whiteAuraPrefab ? _blackAuraPrefab : _whiteAuraPrefab)
+            : null;
+        if (want == _page2AuraPrefab && (want == null || _page2AuraInstance != null)) return;
+        if (_page2AuraInstance != null)
+        {
+            BossEffectPool.Release(_page2AuraInstance);
+            _page2AuraInstance = null;
+        }
+        _page2AuraPrefab = want;
+        if (want == null) return;
+
+        Transform anchor = _auraAnchor != null ? _auraAnchor : transform;
+        _page2AuraInstance = BossEffectPool.Spawn(want, anchor.position, Quaternion.identity, anchor);
+        if (_page2AuraInstance != null)
+        {
+            _page2AuraInstance.transform.localPosition = new Vector3(0f, -1.5f, 0f);
+            _page2AuraInstance.transform.localRotation = Quaternion.identity;
+        }
+    }
+
+    /// <summary>전환 — 바가 차오르는 <paramref name="seconds"/> 동안 갑옷 발광이 세지고, 반대 빛깔 오라가 함께 피어오른다(09-29).</summary>
+    private async UniTaskVoid Page2GlowAsync(float seconds)
+    {
+        var ct = destroyCancellationToken;
+        _page2Glow = 0.01f;
+        SyncPage2Aura();
+        try
+        {
+            for (float t = 0f; t < seconds; t += Time.unscaledDeltaTime)
+            {
+                if (_page2Glow <= 0f) return;   // 도중에 초기화(비활성 → 새 전투)
+                _page2Glow = Mathf.Max(0.01f, t / seconds);
+                if (_dkBB != null && _hitBlinkRoutine == null) ApplyArmorTint(_dkBB.SwordColor);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException) { return; }
+        if (_page2Glow <= 0f) return;
+        _page2Glow = 1f;
+        if (_dkBB != null && _hitBlinkRoutine == null) ApplyArmorTint(_dkBB.SwordColor);
     }
 
     private void ApplyBarrierTint(DKSwordColor color)
@@ -670,6 +724,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         Color emission = color == DKSwordColor.White
             ? new Color(0.2f, 0.25f, 0.55f, 1f)
             : new Color(0.5f,  0.0f,  0.6f, 1f);
+        if (_page2Glow > 0f) emission *= 1f + (Page2EmissionBoost - 1f) * _page2Glow;
 
         _propBlock.SetColor("_BaseColor",      baseTint);
         _propBlock.SetColor("_EmissionColor",  emission);
@@ -868,6 +923,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         _stageHazard = BossStageHazard.CreateRect(this, zone.CollapseRect, zone.FloorY, seconds,
                                                   CollapseColor, null, 1f, CollapseDamagePerTick);
         ApplyWindowTint(_dkBB?.SwordColor ?? DKSwordColor.White);
+        Page2GlowAsync(seconds).Forget();
         BossImpactFeedback.TriggerCameraShake(0.14f, Mathf.Max(0.4f, seconds * 0.5f));
         Debug.Log($"[DK] 2페이지 무대 — 가운데 3×3 붕괴 중심={zone.Center} 앞줄={zone.FrontRow} 구역 z={zone.MinZ}~{zone.MaxZ}", this);
     }
