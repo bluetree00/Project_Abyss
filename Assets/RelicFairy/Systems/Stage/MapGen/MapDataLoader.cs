@@ -241,11 +241,12 @@ public static class MapDataLoader
         };
     }
 
-    /// <summary>NPC 자리 토큰 <c>NS</c>(+방향 접미사 n/s/e/w)를 바닥으로 받고, 그 외는 미등록 처리로 넘긴다.
-    /// 접미사가 붙어도 타일은 항상 Floor — 방향은 ServiceNpcAnchorHandler가 RawToken에서 읽는다.</summary>
+    /// <summary>NPC 자리 토큰 <c>NS</c>(+방향 접미사 n/s/e/w) · 번호 붙은 소품 자리 <c>NP1~NP9</c>를 바닥으로 받고,
+    /// 그 외는 미등록 처리로 넘긴다. 접미사 · 번호가 붙어도 타일은 항상 Floor — 뜻은 토큰 핸들러가 RawToken에서 읽는다.</summary>
     private static TileType ServiceAnchorOrUnknown(string s)
     {
         if (s.Length >= 2 && s[0] == 'N' && s[1] == 'S') return TileType.Floor;
+        if (s.Length >= 3 && s[0] == 'N' && s[1] == 'P' && char.IsDigit(s[2])) return TileType.Floor;
         return UnknownToFloor(s);
     }
 

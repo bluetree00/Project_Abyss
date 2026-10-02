@@ -441,6 +441,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7227992635940433738}
+  - component: {fileID: 8865535000748469090}
   m_Layer: 0
   m_Name: '@GameRun'
   m_TagString: Untagged
@@ -469,6 +470,27 @@ Transform:
   - {fileID: 1930501685974639428}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8865535000748469090
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4315083412335307189}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: faf3bd5213470904da7da66a1bf6f718, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyCompassHud
+  bossIcons:
+  - bossId: forestguardian
+    icon: {fileID: 2800000, guid: e55767e818bf1784db57c83a1c3bd877, type: 3}
+  - bossId: dragon
+    icon: {fileID: 2800000, guid: 5b823f4ce67e7e144aa871eeb98ade5d, type: 3}
+  - bossId: deathknight
+    icon: {fileID: 2800000, guid: c03a3158e4070f147957e1670453bc79, type: 3}
+  - bossId: lich
+    icon: {fileID: 2800000, guid: 436a47fac59ff3841ba73ee91093fae7, type: 3}
 --- !u!1 &5356698647556854139
 GameObject:
   m_ObjectHideFlags: 0
@@ -981,6 +1003,8 @@ MonoBehaviour:
   blockBaseY: -0.1
   wallLayers: 12
   procDoorCorridorLength: 12
+  roomBoundaryEdgePrefab: {fileID: 5724855086228971068, guid: 209bc0cf0262e924fa1311bfbfc618e2,
+    type: 3}
   shopSlotCount: 3
   blockShopStallPrefab: {fileID: 5608813811190350905, guid: d3719a5f59ab7214eb3382b0d7490ca8,
     type: 3}
@@ -996,26 +1020,37 @@ MonoBehaviour:
   crucibleNpcAddressableKey: Crucible/CrucibleNpc
   refineryNpcAddressableKey: Refinery/RefineryNpc
   crucibleDecorPrefabs:
-  - {fileID: 1031028762, guid: abc00000000008081074528185519464, type: 3}
-  - {fileID: 1031121775, guid: abc00000000016458457109440764598, type: 3}
+  - {fileID: 1031154280, guid: fc06ea7817163aa478270910e7a62c9b, type: 3}
+  - {fileID: 1031133249, guid: abc00000000015643687227068478607, type: 3}
+  - {fileID: 1031125255, guid: abc00000000016046054027493975012, type: 3}
   - {fileID: 1031121807, guid: abc00000000015621552751496305851, type: 3}
-  - {fileID: 1031120874, guid: abc00000000016499392018549566722, type: 3}
-  - {fileID: 1031121422, guid: abc00000000014108594664492169955, type: 3}
-  - {fileID: 1031125914, guid: abc00000000007992870104272310159, type: 3}
+  - {fileID: 1031121775, guid: abc00000000016458457109440764598, type: 3}
+  - {fileID: 1031125255, guid: abc00000000016046054027493975012, type: 3}
   refineryDecorPrefabs:
   - {fileID: 1031120808, guid: abc00000000006235341517758020108, type: 3}
-  - {fileID: 1031119978, guid: abc00000000012857661513297908409, type: 3}
-  - {fileID: 1111877795530166, guid: 3f122a074538fc646b8821db82fbbbb8, type: 3}
-  - {fileID: 1109459705200030, guid: 70b62e0f3bbfee4409228673d6c15926, type: 3}
-  - {fileID: 1266006545755398, guid: aafb963400638ab46a33e9fe42afa648, type: 3}
-  - {fileID: 1031126677, guid: abc00000000003765560827245543622, type: 3}
-  - {fileID: 1031121356, guid: abc00000000008136434539379879985, type: 3}
+  - {fileID: 1031125168, guid: abc00000000011903491689814018322, type: 3}
+  - {fileID: 1031125168, guid: abc00000000011903491689814018322, type: 3}
+  - {fileID: 1031215750, guid: 4b1a09bb9e920a3498e52069771c6c7d, type: 3}
+  - {fileID: 1031215750, guid: 4b1a09bb9e920a3498e52069771c6c7d, type: 3}
+  - {fileID: 1031193159, guid: abc00000000004296640841299297431, type: 3}
+  - {fileID: 1031193159, guid: abc00000000004296640841299297431, type: 3}
   shopDecorPrefabs:
-  - {fileID: 1031122377, guid: abc00000000007302310710973540387, type: 3}
-  - {fileID: 1031120874, guid: abc00000000016499392018549566722, type: 3}
-  - {fileID: 1031124202, guid: abc00000000002172541701657370729, type: 3}
+  - {fileID: 1031125255, guid: 17230a1d362ad054b861b359a92c85cb, type: 3}
+  - {fileID: 1031133249, guid: abc00000000015643687227068478607, type: 3}
+  - {fileID: 1031122861, guid: abc00000000002614720658100183122, type: 3}
+  - {fileID: 1031125335, guid: abc00000000017571627186857291174, type: 3}
+  - {fileID: 1031121807, guid: abc00000000015621552751496305851, type: 3}
+  - {fileID: 1031125315, guid: abc00000000006124188255983471373, type: 3}
+  - {fileID: 1031125255, guid: abc00000000016046054027493975012, type: 3}
+  restFirePrefab: {fileID: 1031154280, guid: 054b71434243e0f429eba442fc6f2298, type: 3}
+  restDecorPrefabs:
+  - {fileID: 1031046526, guid: 210c7b28c46ae724ba24b0d309e59ff8, type: 3}
+  - {fileID: 1031125255, guid: abc00000000016046054027493975012, type: 3}
+  - {fileID: 1031133249, guid: abc00000000015643687227068478607, type: 3}
+  - {fileID: 1031125315, guid: abc00000000006124188255983471373, type: 3}
   - {fileID: 1031121775, guid: abc00000000016458457109440764598, type: 3}
-  - {fileID: 1031121356, guid: abc00000000008136434539379879985, type: 3}
+  chapterSpringPrefab: {fileID: 1031144379, guid: f32cf65469cd7c3419ce2e9f6ff0ab44,
+    type: 3}
   shopWeaponSlotFallback: 1
   shopRerollEnabled: 1
   shopRerollCost: 10
@@ -1427,7 +1462,10 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 257
   castRadius: 0.3
+  nearDistance: 8
+  nearRadius: 2.5
   hiddenAlpha: 0.15
+  nearHiddenAlpha: 0.06
   fadeSpeed: 8
 --- !u!1 &8306153510566958176
 GameObject:

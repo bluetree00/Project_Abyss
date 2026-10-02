@@ -32,6 +32,13 @@ public sealed class LichSealRitual
     private const float SkeletonDistance        = 6f;
     private const float SealFreezeSeconds       = 1f;
     private const float DoneLineSeconds         = 2.5f;
+    private const float StoneShotMove           = 0.4f;    // 봉인석 차례 비추기(10-03) — 다음 돌로 옮겨 가는 시간
+    private const float StoneShotHold           = 0.25f;   //   · 머무는 시간(돌 하나 약 0.65초)
+    private const float StoneShotBack           = 7f;      //   · 돌 바깥으로 물러선 거리(m) — 낮게 비춰 돌 너머로 무릎 꿇은 리치가 함께 잡힌다
+    private const float StoneShotHeight         = 3f;
+    private const float StoneShotLook           = 1.2f;    //   · 돌 몸통 높이를 본다
+    private const float StoneRevealVfxScale     = 0.6f;    // 솟는 돌 발밑 청록 원(TileRestore 칸)
+    private const float RevealSafety            = 1.5f;    // 카메라가 돌아오는 동안까지 무적
 
     // ── 붕괴 컷신 ─────────────────────────────────────────────────
     private const float PullSeconds        = 0.8f;
@@ -113,20 +120,20 @@ public sealed class LichSealRitual
         UI_BossBark.ShowDialogue(RitualKey);
         _lich.SetRitualCamera(true);
         LichSfx.Play(LichSfxSlot.ZoneHum, _center);
+
+        // 순서(10-03 사용자: 봉인 행동 안내가 없었다 — 돌 넷 · 해골 · 목표가 한꺼번에 떴다):
+        // 봉인석을 하나씩 세우며 카메라가 비춘다 → 목표 띠 → 그다음에 방해 해골 · 주기 공격.
+        float distance = _grid != null ? _grid.RingCenterDistance(StoneRing) : FallbackStoneDistance;
+        await RevealStonesAsync(distance, ct);
+
         _hud = UI_ChallengeHud.Create(BossBarClearance);
         _hud.SetObjective("봉인석을 깨워라 — 세 번씩 쳐서 점화");
         RefreshHud();
 
-        float distance = _grid != null ? _grid.RingCenterDistance(StoneRing) : FallbackStoneDistance;
-        for (int i = 0; i < StoneCount; i++)
-        {
-            Vector3 dir = Quaternion.Euler(0f, 90f * i, 0f) * Vector3.forward;
-            _stones.Add(LichSealStone.Create(_center + dir * distance, _lich.transform, OnStoneIgnited));
-        }
-
         SpawnInterferenceSkeletons();
         Debug.Log($"[LichSeal] 봉인 의식 시작 — 봉인석 {StoneCount}개 (중심에서 {distance:0.#}m)", _lich);
 
+        // 첫 주기 공격은 목표 띠가 뜬 뒤 interval초 — 비추는 동안은 세지 않는다.
         float interval = _ward != null ? _ward.periodicAttackInterval : DefaultAttackInterval;
         float timer    = 0f;
         while (_ignited < StoneCount)
@@ -153,14 +160,60 @@ public sealed class LichSealRitual
         _hud = null;
     }
 
+    /// <summary>
+    /// 봉인석 넷을 북 → 동 → 남 → 서로 하나씩 세우며 카메라가 차례로 비춘다(돌 하나 약 0.65초, 10-03) —
+    /// 돌은 디졸브로 솟고 발밑에 청록 원(칠 수 있음)이 핀다. 리치는 무릎 꿇은 채 · 방해 전이라 입력을 잠그고, 끝나면 플레이어 카메라로.
+    /// </summary>
+    private async UniTask RevealStonesAsync(float distance, CancellationToken ct)
+    {
+        var  player = _ctx.Runtime.CachedPlayer;
+        bool camera = player != null;   // 플레이어가 없으면 비추지 않고 세우기만
+        if (camera)
+        {
+            player.SetInputEnabled(false);
+            player.SetInvincible(StoneCount * (StoneShotMove + StoneShotHold) + RevealSafety);
+            LichCinematics.TakeCamera();
+        }
+        try
+        {
+            for (int i = 0; i < StoneCount; i++)
+            {
+                Vector3 dir = Quaternion.Euler(0f, 90f * i, 0f) * Vector3.forward;
+                Vector3 at  = _center + dir * distance;
+                _stones.Add(LichSealStone.Create(at, _lich.transform, OnStoneIgnited));
+                LichVfx.Play(LichVfxSlot.TileRestore, at + Vector3.up * 0.05f, Quaternion.identity, StoneRevealVfxScale);
+                LichSfx.Play(LichSfxSlot.CircleSpawn, at);
+                if (!camera) continue;
+
+                // 돌 바깥 위에서 안쪽을 본다 — 돌 너머로 무릎 꿇은 리치(제단 중심)가 함께 잡혀 위치가 읽힌다.
+                await LichCinematics.ShotAsync(at + dir * StoneShotBack + Vector3.up * StoneShotHeight,
+                                               at + Vector3.up * StoneShotLook, StoneShotMove, ct);
+                await Wait(StoneShotHold, ct);
+            }
+            if (camera)
+            {
+                await LichCinematics.ReturnToPlayerAsync(player.transform, ct);
+                camera = false;
+            }
+        }
+        finally
+        {
+            if (camera && player != null) LichCinematics.ReturnToPlayerAsync(player.transform, CancellationToken.None).Forget();
+            if (player != null) player.SetInputEnabled(true);
+        }
+    }
+
     private void OnStoneIgnited(LichSealStone stone)
     {
         _ignited++;
         RefreshHud();
         LichSfx.Play(LichSfxSlot.CastCharge, stone.transform.position, 0.7f);
         LichPatternUtil.Impact(LichImpact.Heavy);
+        // 최신 값만 — 빨리 치면 앞 값이 줄 서서 붕괴 컷신 위까지 늦게 나왔다(10-01 f5 전주기 시뮬). 다 켜지면 낡은 값은 걷는다.
         if (_ignited < StoneCount)
-            UI_BossBark.Show($"봉인석 점화 ({_ignited} / {StoneCount})", BossBarkType.PatternAnnounce);
+            UI_BossBark.ShowLatest($"봉인석 점화 ({_ignited} / {StoneCount})", BossBarkType.PatternAnnounce);
+        else
+            UI_BossBark.Dismiss(0f);
         Debug.Log($"[LichSeal] 봉인석 점화 {_ignited}/{StoneCount}", _lich);
     }
 
@@ -230,6 +283,7 @@ public sealed class LichSealRitual
     {
         var player = _ctx.Runtime.CachedPlayer;
         player?.SetInputEnabled(false);
+        UI_BossBark.Dismiss(0f);   // 의식 자막은 여기까지 — 레터박스 위로 따라오지 않게
         LichCinematics.CutsceneHud(true);
         LichCinematics.LetterboxInAsync(ct).Forget();
         LichCinematics.TakeCamera();
@@ -386,7 +440,7 @@ public sealed class LichSealRitual
         LichVfx.Stop(ref _reversedChains);
 
         foreach (var stone in _stones)
-            if (stone != null) UnityEngine.Object.Destroy(stone.gameObject);
+            if (stone != null) stone.Dismiss();   // 디졸브로 스러진다(10-03)
         _stones.Clear();
 
         LichSkeletonMonster.DespawnAll();

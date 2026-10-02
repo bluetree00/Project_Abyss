@@ -46,6 +46,12 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
     // 연타는 훑고, 마무리 한 방이 총 피해의 절반 가까이를 가져간다("몰아치다 마지막에 크게").
     private const float JudgmentFinisherShare = 0.45f;
 
+    /// <summary>
+    /// 연타 없이 한 방으로 떨어지는 심판(광기의 왕관 ③ · 두 번째 심판)의 피해 몫 = 막타 몫.
+    /// 한 방짜리를 몫 1로 치면 11타 심판의 피해 전부가 한 번에 들어가 3.6초 시전 없이 심판 한 번을 통째로 공짜로 얻었다(10-03 예산 실측: 왕관 단독 허브 위 +27%).
+    /// </summary>
+    public const float InstantJudgmentShare = JudgmentFinisherShare;
+
     // 판정 범위 — VFX/가이드라인과 같은 값을 쓰도록 상수화(따로 놀지 않게).
     private const float JudgmentRange     = 6f;
     private const float JudgmentHalfAngle = 45f;
@@ -55,11 +61,35 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
     private RelicStateVfx    _vfx;
     private Action           _onChanged;
     private Action<bool>     _onFrenzy;
-    private bool             _usedThisFrenzy;
+    private int              _judgmentCharges;          // 이번 광란에 남은 심판 횟수(광란 진입 때 1 — 조각이 더 준다)
+    private float            _finisherRangeScale = 1f;  // 이번 막타의 범위 배율(찢는 심판 ③ — 막타 뒤 1로)
+
+    // ── [유물 성장 v2] 랜슬롯 허브가 듣는 사건 ──
+    /// <summary>심판 한 번이 시작됐다(첫 타 직전 — 연타형이든 한 방형이든).</summary>
+    public event Action JudgmentBegan;
+    /// <summary>심판 타격 한 대상(피해 직전). 인자: 대상 · 타 번호 · 막타인가.</summary>
+    public event Action<GameObject, int, bool> JudgmentHit;
+    /// <summary>막타 판정 직전 — 범위 배율(<see cref="FinisherRangeScale"/>)을 정할 기회. 인자: 위치 · 방향.</summary>
+    public event Action<Vector3, Vector3> BeforeFinisher;
+    /// <summary>막타가 끝났다. 인자: 위치 · 방향.</summary>
+    public event Action<Vector3, Vector3> JudgmentFinished;
+    /// <summary>끝의 문턱 — 광기가 가득 찼지만 광란을 미뤘다(<see cref="HoldFrenzyAtMax"/>).</summary>
+    public event Action MaxReachedHeld;
 
     public MadnessStack Madness => _madness;
     public IRelicResource RelicResource => _madness;   // HUD 아이덴티티 바 연결
     public bool  IsFrenzy      => _madness != null && _madness.IsFrenzy;
+    public int   JudgmentCharges => _judgmentCharges;
+    public float FrenzyDuration  => V(V_FRENZY_DUR, 6f);
+    /// <summary>가장 최근 막타의 대상당 피해(원한의 칼날 ① — 화면 안 낙인 적에게 같은 막타를 떨어뜨린다).</summary>
+    public float LastFinisherDamage { get; private set; }
+    /// <summary>끝의 문턱 — 켜져 있으면 광기가 가득 차도 광란에 들지 않고 <see cref="MaxReachedHeld"/>만 알린다.</summary>
+    public bool  HoldFrenzyAtMax { get; set; }
+    public float FinisherRangeScale
+    {
+        get => _finisherRangeScale;
+        set => _finisherRangeScale = Mathf.Max(1f, value);
+    }
 
     public void OnAttach(PlayerController owner)
     {
@@ -101,7 +131,20 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         => slot == SkillType.Q ? new JudgmentStrikeRuntime(this) : null;
     public float GetSkillCooldown(SkillType slot) => 0f; // 광란 게이팅 + 광란당 1회
     public bool  CanUseSkill(SkillType slot)
-        => slot == SkillType.Q && _madness != null && _madness.IsFrenzy && !_usedThisFrenzy;
+        => slot == SkillType.Q && _madness != null && _madness.IsFrenzy && _judgmentCharges > 0;
+
+    /// <summary>심판 횟수를 더한다(두 번째 광란 · 배신자의 걸음 ③ 등). 광란 중이 아니면 다음 광란 진입 때 1로 돌아간다.</summary>
+    public void GrantJudgmentCharge(int n = 1) { if (n > 0) _judgmentCharges += n; }
+
+    /// <summary>심판 런타임이 시전을 시작할 때 1회 쓴다.</summary>
+    public void ConsumeJudgmentCharge() { if (_judgmentCharges > 0) _judgmentCharges--; }
+
+    /// <summary>끝의 문턱 — 미뤘던 광란에 지금 든다(미룬 만큼 길게).</summary>
+    public void EnterFrenzyNow(float bonusSeconds)
+    {
+        if (_madness == null || _madness.IsFrenzy) return;
+        _madness.EnterFrenzy(FrenzyDuration + Mathf.Max(0f, bonusSeconds));
+    }
 
     public int ModifyIncomingDamage(PlayerController owner, int dmg, GameObject attacker)
     {
@@ -127,19 +170,19 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
     /// 매 타마다 콘을 <b>다시 질의</b>하므로 도중에 들어온 적도 맞는다.
     /// 낙인은 1타에서 걸리므로 뒤 타들, 특히 마무리 강타가 증폭된 피해로 꽂힌다(연타의 보상).
     /// </summary>
-    public void PerformJudgmentStrike(Transform origin, int hitIndex, int hitCount)
+    public void PerformJudgmentStrike(Transform origin, int hitIndex, int hitCount, float shareScale = 1f)
     {
-        _usedThisFrenzy = true;
         if (_owner == null || origin == null) return;
 
         hitCount = Mathf.Max(1, hitCount);
         bool isFirst = hitIndex <= 0;
         bool isLast  = hitIndex >= hitCount - 1;
+        if (isFirst) JudgmentBegan?.Invoke();
 
         // 피해 배분 — 마무리가 큰 몫, 앞선 연타가 나머지를 균등 분할.
-        float share = hitCount == 1 ? 1f
-                    : isLast        ? JudgmentFinisherShare
-                                    : (1f - JudgmentFinisherShare) / (hitCount - 1);
+        float share = (hitCount == 1 ? 1f
+                     : isLast        ? JudgmentFinisherShare
+                                     : (1f - JudgmentFinisherShare) / (hitCount - 1)) * Mathf.Max(0f, shareScale);
 
         int   stacks   = _madness != null ? _madness.Stacks : 0;
         float mult     = V(V_SKILL_BASE, 2.0f) + stacks * V(V_SKILL_PER, 0.08f);
@@ -157,6 +200,14 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         if (fwd.sqrMagnitude < 0.001f) return;
         fwd.Normalize();
 
+        // [유물 성장 v2] 막타 직전 — 허브 · 조각이 범위 배율을 정한다(찢는 심판 ③).
+        if (isLast)
+        {
+            BeforeFinisher?.Invoke(pos, fwd);
+            LastFinisherDamage = dmg;
+        }
+        float rangeScale = isLast ? _finisherRangeScale : 1f;
+
         // 판정 가이드라인(바닥 콘 + 스킬명 토스트)은 개발용 임시 표시라 제거했다.
         // 범위는 참격 VFX가 이미 보여주고 있고, 겹쳐 그리면 화면만 지저분해진다.
 
@@ -164,7 +215,8 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         // 마무리는 정면·크게 내리꽂아 한 방임을 읽히게 한다.
         float yaw    = isLast ? 0f : (hitIndex % 2 == 0 ? -14f : 14f);
         float height = isLast ? 0.9f : 0.55f + 0.12f * (hitIndex % 3);
-        float scale  = JudgmentVfxScale * (isLast ? JudgmentFinisherVfx : 1f);
+        // 판정이 2배여도 이펙트는 1.4배까지 — 막타 참격이 화면을 덮으면 무엇이 맞았는지 오히려 안 읽힌다(10-02 실측)
+        float scale  = JudgmentVfxScale * (isLast ? JudgmentFinisherVfx : 1f) * Mathf.Min(rangeScale, 1.4f);
         Vector3 vfxDir = Quaternion.AngleAxis(yaw, Vector3.up) * fwd;
         RelicStateVfx.PlayOneShot(JudgmentVfxKey, pos + vfxDir * 2f + Vector3.up * height, scale, vfxDir,
                                   isLast ? JudgmentFinisherVfxPrewarm : 0f);
@@ -174,7 +226,7 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         var owner  = _owner.gameObject;
         var buffer = new List<GameObject>(16);
         // 몬스터로 좁히지 않고 IDamageable 전체를 잡는다 — 그래야 훈련용 허수아비에도 들어간다.
-        int found  = CombatQuery.GetDamageablesInCone(pos, fwd, JudgmentRange, JudgmentHalfAngle, owner, 32, buffer,
+        int found  = CombatQuery.GetDamageablesInCone(pos, fwd, JudgmentRange * rangeScale, JudgmentHalfAngle, owner, 32, buffer,
                                               showGuide: false);   // 참격 VFX가 범위를 보여준다
 
         RFLog.D($"[랜슬롯Q] {hitIndex + 1}/{hitCount}타{(isLast ? " (마무리)" : "")} | 피해 {dmg:F0} | 적중 {found}");
@@ -182,6 +234,9 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         foreach (var target in buffer)
         {
             if (target == null) continue;
+
+            // [유물 성장 v2] 피해 직전 — 막타면 허브가 낙인을 찢는다(살아 있을 때 세야 한다).
+            JudgmentHit?.Invoke(target, hitIndex, isLast);
 
             // 주 피해 파이프라인 — 직접 TakeDamage를 부르면 크리티컬·아이템·서약·패시브·타격감이 전부 스킵된다.
             // 넉백은 연타 중 대상이 콘 밖으로 밀려나면 뒤 타가 헛치므로, 마무리에만 세게 준다.
@@ -211,14 +266,23 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
                 mb.ApplyDamageTakenAmp(brandAmp, brandDur);
         }
 
-        if (isLast) HitFeelService.CameraShake(0.14f, 0.16f);   // 마무리 임팩트
+        if (isLast)
+        {
+            HitFeelService.CameraShake(0.14f, 0.16f);   // 마무리 임팩트
+            JudgmentFinished?.Invoke(pos, fwd);
+            _finisherRangeScale = 1f;
+        }
     }
 
-    private void HandleMaxReached() => _madness?.EnterFrenzy(V(V_FRENZY_DUR, 6f));
+    private void HandleMaxReached()
+    {
+        if (HoldFrenzyAtMax) { MaxReachedHeld?.Invoke(); return; }   // 끝의 문턱이 진입 시점을 쥔다
+        _madness?.EnterFrenzy(FrenzyDuration);
+    }
 
     private void OnFrenzyChanged(bool on)
     {
-        if (on) _usedThisFrenzy = false;      // 광란 진입 시 심판 1회 재충전
+        if (on) _judgmentCharges = 1;         // 광란 진입 시 심판 1회(조각이 이 뒤에 더한다)
 
         // 광란 오라 2겹 — 분노 + 저주 침식. 광란 내내 함께 유지된다.
         _vfx?.SetActive(FrenzyState, on);

@@ -1,7 +1,5 @@
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
@@ -80,19 +78,12 @@ public static class CovenantQueryProbeEditor
             }
             Physics.SyncTransforms();
 
-            var cov  = new AssembledCovenant("streak", "stasis");
-            var type = typeof(AssembledCovenant);
-            const BindingFlags inst = BindingFlags.Instance | BindingFlags.NonPublic;
-
-            var collect = type.GetMethod("CollectLiveEnemies", inst);
-            var nearest = type.GetMethod("NearestLiveEnemy", inst);
-            var scratch = (IList)type.GetField("_areaScratch", inst).GetValue(cov);
-
-            collect.Invoke(cov, new object[] { center, 5f, null });
+            // 서약 적 탐색은 CovenantQuery 한 곳(10-02 E1 — 예전엔 AssembledCovenant의 private 함수)
+            var scratch = new List<MonsterBase>();
+            CovenantQuery.CollectLiveEnemies(center, 5f, null, scratch);
             int collected = scratch.Count;
-            scratch.Clear();
 
-            var near = nearest.Invoke(cov, new object[] { center, 8f, null }) as GameObject;
+            var near = CovenantQuery.NearestLiveEnemy(center, 8f, null);
 
             sb.Append("{\"floors\":").Append(floors)
               .Append(",\"monsters\":").Append(monsters.Count)

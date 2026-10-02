@@ -56,6 +56,8 @@ public class LichChainCapturePatternSO : BossPatternSO
         var lichBB = (ctx.Boss as LichMonster)?.LichBB;
         if (lichBB == null || !lichBB.IsPhase2) return false;
         if (lichBB.ChainCaptureCooldown > 0f || LichHazards.IsBinding) return false;
+        // 악몽 모드 속박탄이 묶은 직후엔 시작하지 않는다 — 결박이 잇따르지 않게(10-02).
+        if (Time.time - lichBB.LastBindBoltAt < LichBlackboard.CaptureAfterBindBolt) return false;
         return Vector3.Distance(ctx.Ctx.Transform.position, ctx.Ctx.Runtime.PlayerTarget.position) <= maxTriggerRange;
     }
 
@@ -190,7 +192,10 @@ public class LichChainCaptureState : UnInterruptibleState<LichChainCapturePatter
         var lich = LichPatternUtil.Lich(ctx);
         lich?.MovementController?.SetLocked(false);
         if (lich?.LichBB != null)
+        {
             lich.LichBB.ChainCaptureCooldown = Data.patternCooldown;
+            lich.LichBB.LastChainCaptureAt   = Time.time;   // 속박탄(악몽 모드)은 이 뒤 6초 동안 나오지 않는다
+        }
     }
 
     private void Next(Phase phase)

@@ -8,6 +8,12 @@ using UnityEngine;
 
 public sealed class GameRunSession
 {
+    /// <summary>
+    /// 런을 시작할 때의 시기 — 보스 처치를 해방기 · 악몽 기록으로 나눌 때 쓴다(10-02 기억의 제단 할인 조건).
+    /// 시작 시기로 세는 이유: 붕괴 · 엔딩은 그 런의 마지막 처치가 일으킨다 — 끝 시기로 세면 봉인기 런의 처치가 해방기로 들어간다.
+    /// </summary>
+    private readonly StoryEra _startEra = StoryProgress.Era;
+
     public enum RunPhase
     {
         NotRunning = 0,
@@ -84,22 +90,31 @@ public sealed class GameRunSession
     /// <summary>루프 1회당 적 스탯(HP·공격력) 가산 배율. 밸런스 대상(시작값 +25%/회차).</summary>
     private const float LoopScalePerDepth = 0.25f;
 
-    /// <summary>현재 챕터의 몬스터 스탯 배율(HP·공격력). ChapterDataSO.difficultyScale × 루프 깊이 배율. 미주입/미설정 시 1.</summary>
+    /// <summary>
+    /// 현재 챕터의 몬스터 <b>체력</b> 배율 — 챕터(<see cref="ChapterBalance"/>, 10-02 설계서 §2) × 루프 깊이 × 시기(<see cref="EraBalance"/>).
+    /// 보스는 MonsterBase가 배율에서 뺀다.
+    /// </summary>
     public float CurrentDifficultyScale
-    {
-        get
-        {
-            float chapterScale = _chapterRegistry != null
-                ? (_chapterRegistry.GetData(CurrentChapter)?.difficultyScale ?? 1f) : 1f;
-            return chapterScale * (1f + AbyssDepth * LoopScalePerDepth);
-        }
-    }
+        => ChapterBalance.Of(CurrentChapter).Hp * (1f + AbyssDepth * LoopScalePerDepth) * EraBalance.Current.StatScale;
 
-    /// <summary>현재 챕터의 몬스터 수량 배율. ChapterDataSO.monsterCountScale. 미주입/미설정 시 1.</summary>
-    public float CurrentMonsterCountScale =>
-        _chapterRegistry != null ? (_chapterRegistry.GetData(CurrentChapter)?.monsterCountScale ?? 1f) : 1f;
+    /// <summary>현재 챕터의 몬스터 <b>공격</b> 배율 — 체력보다 완만하게(10-02 설계서 §2). 루프 깊이 · 시기는 체력과 같이 곱한다.</summary>
+    public float CurrentAttackScale
+        => ChapterBalance.Of(CurrentChapter).Attack * (1f + AbyssDepth * LoopScalePerDepth) * EraBalance.Current.StatScale;
+
+    /// <summary>현재 챕터의 몬스터 수량 배율 — 챕터 × 시기(해방기 ×1.1 · 악몽 모드 ×1.2).</summary>
+    public float CurrentMonsterCountScale
+        => ChapterBalance.Of(CurrentChapter).Count * EraBalance.Current.CountScale;
 
     private ChapterRegistry _chapterRegistry;
+    // 레지스트리의 최종 챕터만 — 챕터 배율 · 테마는 아직 꽂지 않는다(10-01 결정 D1 ①: 리치까지 가는 길만 먼저).
+    // 05-26 StageMapBootstrapper 삭제 때 BindChapterRegistry 호출이 사라져 최종 챕터가 늘 Ch3였다(Ch4 해금해도 리치 미도달).
+    private ChapterId _registryFinalChapter = ChapterId.Chapter3;
+
+    /// <summary>레지스트리의 최종 챕터만 받는다 — 「챕터 4 개방」 해금 판정은 <see cref="FinalChapter"/>가 그대로 한다.</summary>
+    public void BindFinalChapter(ChapterRegistry registry)
+    {
+        if (registry != null) _registryFinalChapter = registry.FinalChapter;
+    }
 
     /// <summary>챕터 레지스트리 주입. 챕터 변경 시 ActiveTheme 자동 해석에 사용.</summary>
     public void BindChapterRegistry(ChapterRegistry registry)
@@ -127,7 +142,7 @@ public sealed class GameRunSession
     public ItemEffectManager EffectManager { get; private set; } = new ItemEffectManager();
     public CovenantHandler CovenantHandler { get; private set; } = new CovenantHandler();
 
-    private bool _covenantInitialized;
+    private PlayerController _covenantPlayer;   // 서약 문맥이 묶인 플레이어 — 바뀌면 다시 묶는다
 
     /// <summary>존 단위 진행 서비스. startWithZoneLayout 모드에서만 초기화된다.</summary>
     public ZoneProgressionService ZoneProgression { get; private set; }
@@ -260,6 +275,8 @@ public sealed class GameRunSession
     public event Action<RunState> OnRunStateChanged;
 
     public HUDIds.Mode CurrentHudMode { get; private set; } = HUDIds.Mode.None;
+    /// <summary>컷신(끝 장면 · 페이지 전환) 중인가 — 떠오르는 글(피해 숫자 · 발동 토스트)을 숨긴다.</summary>
+    public bool InCutscene => CurrentHudMode == HUDIds.Mode.Cutscene || CurrentHudMode == HUDIds.Mode.BossCutscene;
     private bool _hudModeSet = false;
 
     // =========================================================
@@ -517,7 +534,9 @@ public sealed class GameRunSession
             refineUses:    RefineUseCount,
             maxEnhance:    MaxEnhanceLevel,
             // 서약은 런 단위라 핸들러에 남은 수가 곧 이번 런에 맺은 수다(이어하기 복원분도 같은 런).
-            covenants:     CovenantHandler?.Covenants?.Count ?? 0
+            covenants:     CovenantHandler?.Covenants?.Count ?? 0,
+            libBossKills:  _startEra == StoryEra.Liberated     ? BossKillCount : 0,
+            nmBossKills:   _startEra == StoryEra.NightmareMode ? BossKillCount : 0
         );
 
         OnRunEnded?.Invoke(result);
@@ -560,7 +579,7 @@ public sealed class GameRunSession
         BuffHandler.OnBuffsChanged -= RefreshPlayerRoomBuffs;
         BuffHandler.ClearAll();
         CovenantHandler.Cleanup();
-        _covenantInitialized = false;
+        _covenantPlayer = null;
         Player = null;
         PlayerState = null;
         CurrentRunState = RunState.None;
@@ -686,7 +705,7 @@ public sealed class GameRunSession
     {
         get
         {
-            var registryMax = _chapterRegistry != null ? _chapterRegistry.FinalChapter : ChapterId.Chapter3;
+            var registryMax = _chapterRegistry != null ? _chapterRegistry.FinalChapter : _registryFinalChapter;
             if (!MemoryAltarService.IsChapter4Unlocked && registryMax > ChapterId.Chapter3)
                 return ChapterId.Chapter3;
             return registryMax;
@@ -843,10 +862,12 @@ public sealed class GameRunSession
 
         OnPlayerBound?.Invoke(Player);
 
-        // 서약 핸들러 초기화 — PlayerState + RuntimeStats가 준비된 직후 1회만 수행
-        if (!_covenantInitialized && PlayerState != null && player?.RuntimeStats != null)
+        // 서약 문맥 — 플레이어 인스턴스가 바뀔 때마다 다시 묶는다(PlayerState + RuntimeStats가 준비된 뒤).
+        // 챕터마다 새 플레이어가 생기는데 예전엔 런 첫 바인드에 1회만 묶어, Ch2부터 서약이 파괴된 Ch1 플레이어 · 옛 스탯을 보고
+        // 대부분 조용히 불발했다(초신성 피해 0 · 상시 원인은 적 수 0으로 셈 — 10-02 d6 서약 점검).
+        if (player != _covenantPlayer && PlayerState != null && player?.RuntimeStats != null)
         {
-            _covenantInitialized = true;
+            _covenantPlayer = player;
             var covenantCtx = new CovenantContext(player, player.RuntimeStats, PlayerState, this);
             CovenantHandler.Initialize(covenantCtx);
         }
@@ -928,6 +949,10 @@ public sealed class GameRunSession
         float goldGainRate = EffectManager?.GetAccumulatedStats().GoldGainRate ?? 0f;
         if (goldGainRate > 0f)
             amount = Mathf.Max(0, Mathf.RoundToInt(amount * (1f + goldGainRate)));
+        // 시기 배율(10-01) — 몬스터가 세진 만큼 골드도(해방기 ×1.2 · 악몽 모드 ×1.4)
+        float eraGold = EraBalance.Current.GoldScale;
+        if (!Mathf.Approximately(eraGold, 1f))
+            amount = Mathf.Max(1, Mathf.RoundToInt(amount * eraGold));
 
         RunDelta.GainedGold += amount;
         PlayerState?.AddTempGold(amount);

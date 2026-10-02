@@ -60,7 +60,7 @@ public static class NightmareRules
     // ── 상태 ───────────────────────────────────────────
 
     /// <summary>지금 런이 악몽 규칙 아래에 있는가.</summary>
-    public static bool IsActive => StoryProgress.IsNightmare && CurrentRun != null;
+    public static bool IsActive => StoryProgress.IsNightmareMode && CurrentRun != null;   // 악몽 모드에서만(v3 §5-1 — 해방기엔 없다)
 
     private static GameRunSession CurrentRun => GameRunBootstrapper.Instance?.Run;
 
@@ -94,13 +94,15 @@ public static class NightmareRules
     public static float WeaponSkillCooldownMultiplier => Has(NightmareRuleId.BackflowSpell) ? BackflowCooldownMultiplier : 1f;
     public static bool  BlocksCovenantAltar        => Has(NightmareRuleId.BrokenOath);
     public static float EssenceMultiplier          => IsActive ? NightmareEssenceMultiplier : 1f;
+    /// <summary>악몽 모드로 들어간 판의 정수 배율 — 거점 갈림길 카드에 적는다(켜기 전에도 같은 값).</summary>
+    public static float ModeEssenceMultiplier      => NightmareEssenceMultiplier;
 
     // ── 적용 ───────────────────────────────────────────
 
     /// <summary>플레이어 바인딩 직후(챕터 시작·이어하기) — 값형 규칙을 걸고 켜진 규칙을 알린다.</summary>
     public static void ApplyOnBind(GameRunSession run)
     {
-        if (run == null || !StoryProgress.IsNightmare) return;
+        if (run == null || !StoryProgress.IsNightmareMode) return;
 
         if (Has(NightmareRuleId.DimLight))
             run.PlayerState?.SetPotionCapacity(DimLightPotionCapacity);

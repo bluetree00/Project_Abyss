@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using RelicFairy.UI;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -25,6 +26,7 @@ namespace RelicFairy.Monster
 ///  2페이지에선 수동 공격(영혼 창 · 환영 돌진)과 영혼 소환 회복이 멈춘다.
 ///  2페이지 패턴은 설정 SO의 Page_2 항목(직접 패턴)으로 고른다 — 배치 사본(Arena_Boss_Ch3, 약 250 MB)의 풀은 건드리지 않는다.
 ///  간판 「원탁의 무덤」은 2페이지 50%에서 한 번, 역시 직접 건다.
+///  악몽 모드 2페이지엔 특성 「지휘」 — 환영 기수가 서 있는 동안 쉬는 시간 ×0.85 · 피해 +15%(<see cref="DKCommandTrait"/>).
 /// </summary>
 public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, IBossHudSource
 {
@@ -43,6 +45,16 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     private static readonly Color Page2WindowBase     = new Color(0.30f, 0.30f, 0.34f, 0.4f);
     private static readonly Color Page2WindowEmission = new Color(0.32f, 0.32f, 0.36f, 1f);
     private const float Page2EmissionBoost = 2.5f;   // 2페이지 — 갑옷 발광 배율(검 색 알림은 그대로, 09-29)
+
+    // ── 검 색 규칙 가르치기(10-03 개선 2-2) ───────────────
+    private const float  SwordCueFlashSeconds = 0.35f;  // 갑옷 번쩍 — 잠깐만
+    private const float  SwordCueFlashBoost   = 2f;     // 번쩍 순간 갑옷 발광 배율(2페이지 발광 배율과 곱해진다)
+    private const float  SwordCueRingScale    = 1.6f;   // 발밑 고리(런 공용 Ring) 크기
+    private const string FloorRuleHint        = "검과 같은 색의 바닥이 베인다";
+    private const string FlipToBlackHint      = "검이 검게 물들었다";
+    private const string FlipToWhiteHint      = "검이 하얗게 물들었다";
+    private const string CrossFlipHint        = "색이 뒤집힌다 — 마지막 색의 반대로";
+    private const string TreasonColorHint     = "검과 같은 색의 환영만 벤다 — 다른 색 칸으로";
 
     // ── Inspector ─────────────────────────────────────────
     [Header("DeathKnight — 표시")]
@@ -195,6 +207,12 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     private BossPatternSO             _pageSignature;
     private BossStageHazard           _stageHazard;
     private bool                      _lastHudInvulnerable;
+    private float                     _swordCueGlow;        // 0~1 — 검 색 신호 때 갑옷 발광이 잠깐 세진다(10-03)
+    private bool                      _floorHintShown;      // 규칙 자막 — 전투마다 한 번씩
+    private bool                      _flipHintShown;
+    private bool                      _crossFlipHintShown;
+    private bool                      _treasonHintShown;
+    private DKCommandTrait            _command;             // 악몽 특성 「지휘」 — 환영 기수(10-02)
 
     public bool SoulGateCleared => _soulGateCleared;
 
@@ -295,6 +313,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
             changeState:    s => ChangeState(s),
             onExecuted:     OnPatternExecuted,
             stateDecorator: null);
+        _command = new DKCommandTrait(this);
 
         BindBossHud();
 
@@ -331,6 +350,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         if (_dormantState != null && _dormantState.IsActive) return;
 
         TickHudInvulnerable();
+        _command?.Tick(_ctx);   // 악몽 「지휘」 — 전환 · 간판이 이 프레임을 끊기 전에
 
         // 2페이지 전환 · 간판 — 콤보 러너보다 먼저(러너는 강제 항목도 콤보·휴식이 끝나야 낸다).
         // 둘 다 특수 상태라 도는 동안 러너는 새 패턴을 내지 않는다.
@@ -362,10 +382,8 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
 
         _runner?.Tick(dt);
 
-        // SoulSummon 완료 후 HP가 55% 이상 회복되면 다음 사이클을 위해 플래그 초기화
-        // (기둥을 파괴하지 않아 회복된 경우 → HP 클램프 재활성화 → 재발동 허용)
-        if (_soulGateCleared && !_dkBB.IsPhase2 && HpRatio > 0.55f)
-            _soulGateCleared = false;
+        // 영혼 소환은 한 번만 — 기둥을 못 깨 회복돼도 게이트를 다시 잠그지 않는다(10-01 감사 D3).
+        // 예전엔 55%를 넘으면 다시 잠가 50%에서 또 소환했고, 기둥을 못 깨는 빌드는 실패 → 회복 → 소환을 끝없이 되풀이했다.
 
         // 페이즈 전환 체크: SoulSummon 완료(_soulGateCleared) 후에만 진입 허용
         if (!_dkBB.IsPhase2 && _soulGateCleared && HpRatio <= Phase2HpThreshold && !IsInSpecialState)
@@ -388,18 +406,22 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         InitializeRoomContext();
         _page2Zone = null;
         DestroyStageHazard();
+        _command?.Reset("전투 초기화", true);
         _lastHudInvulnerable = false;
         _passiveCts?.Cancel();
         _passiveCts?.Dispose();
         _passiveCts    = null;
         _passiveRunner = null;
         _runner?.Reset();
+        _runner?.SetBreakRange(-1f, -1f);   // 풀 재사용 — 1페이즈 쉬는 시간(설정 값)으로
         _coreBB?.Reset();
         _dkBB?.Reset();
         _prevPatternActive = false;
         _isStaggered       = false;
         _soulGateCleared   = false;
         _page2Glow         = 0f;
+        _swordCueGlow      = 0f;
+        _floorHintShown    = _flipHintShown = _crossFlipHintShown = _treasonHintShown = false;
         if (_dkBB != null) ApplyArmorTint(_dkBB.SwordColor);
         ApplyWindowTint(_dkBB?.SwordColor ?? DKSwordColor.White);
         ApplyAuraColor(_dkBB?.SwordColor ?? DKSwordColor.White);
@@ -423,6 +445,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     protected override void OnDisable()
     {
         DestroyStageHazard();   // 죽지 않고 비활성(런 종료 등)돼도 붕괴 구역이 남아 플레이어를 치지 않게
+        _command?.Reset("기사 비활성", true);   // 환영 기수도 — 남으면 플레이어 구역에 서 있는다
         _passiveCts?.Cancel();
         _passiveCts?.Dispose();
         _passiveCts    = null;
@@ -450,6 +473,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         _healCts?.Dispose();
         _healCts = null;
         _runner?.Reset();
+        _command?.Reset("기사 쓰러짐", false);   // 환영 기수는 흩어진다
         base.OnFatalDamage();
     }
 
@@ -605,20 +629,76 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     public void NotifySoulSummonCompleted() => _soulGateCleared = true;
 
     /// <summary>
-    /// 검 색상 논리값만 반전한다.
-    /// 실제 머티리얼 교체는 다음 ShowSword() 직전에 이루어지므로 핑크 검이 노출되지 않는다.
+    /// 검 색상을 반전하고 갑옷 · 장벽 · 창문 · 오라를 맞춘다.
+    /// 보이는 검도 지금 바꾼다 — 바뀌는 순간이 검에 보여야 한다(10-03 개선 2-2). 디졸브 중일 때만 다음 ShowSword()에 맡긴다(핑크 검 방지).
+    /// 이번 전투 첫 전환엔 바뀐 색을 자막으로도 알린다.
     /// </summary>
     public void FlipSwordColor()
     {
         if (_dkBB == null) return;
         _dkBB.FlipSwordColor();
-        // 검이 숨겨진 상태일 때는 지금 바로 머티리얼 세팅 (다음 Show 때도 세팅되지만 안전하게)
-        if (!_prevPatternActive)
-            _swordCtrl?.SetSwordColor(_dkBB.SwordColor);
+        _swordCtrl?.ApplySwordColorNow(_dkBB.SwordColor);
         ApplyArmorTint(_dkBB.SwordColor);
         ApplyBarrierTint(_dkBB.SwordColor);
         ApplyWindowTint(_dkBB.SwordColor);
         ApplyAuraColor(_dkBB.SwordColor);
+        SwordCueFlashAsync().Forget();
+
+        if (_flipHintShown) return;
+        _flipHintShown = true;
+        UI_BossBark.Show(_dkBB.SwordColor == DKSwordColor.Black ? FlipToBlackHint : FlipToWhiteHint,
+                         BossBarkType.PatternAnnounce);
+    }
+
+    /// <summary>
+    /// 검 색 바닥 패턴이 타일을 까는 순간(패턴마다 한 번) — 갑옷이 잠깐 번쩍이고 발밑에서 검 색 고리가 퍼진다.
+    /// 「검과 같은 색 바닥이 베인다」를 기사 몸과 바닥으로 잇는다. 이번 전투 첫 번째엔 규칙 자막도(10-03 개선 2-2).
+    /// 검 렌더러는 디졸브가 재질을 갈아 끼우므로 건드리지 않는다 — 검 색 알림은 갑옷 발광이 맡아 왔다.
+    /// </summary>
+    public void CueSwordFloor()
+    {
+        if (_dkBB == null) return;
+        SwordCueFlashAsync().Forget();
+        RunFx.Play(RunFxSlot.Ring, transform.position + Vector3.up * 0.1f, SwordCueRingScale,
+                   _dkBB.SwordColor == DKSwordColor.White ? Color.white : DKGridPatternHelper.DarkReadableTint);
+
+        if (_floorHintShown) return;
+        _floorHintShown = true;
+        UI_BossBark.Show(FloorRuleHint, BossBarkType.PatternAnnounce);
+    }
+
+    /// <summary>2페이지 KL3 「반역의 환영」 — 이번 전투 첫 번째에만 규칙 자막(10-03 S3).</summary>
+    public void HintTreasonColor()
+    {
+        if (_treasonHintShown) return;
+        _treasonHintShown = true;
+        UI_BossBark.Show(TreasonColorHint, BossBarkType.PatternAnnounce);
+    }
+
+    /// <summary>2페이지 KL1 「흑백 교차」 — 이번 전투 첫 번째에만 규칙 자막(10-03 개선 2-2).</summary>
+    public void HintCrossFlip()
+    {
+        if (_crossFlipHintShown) return;
+        _crossFlipHintShown = true;
+        UI_BossBark.Show(CrossFlipHint, BossBarkType.PatternAnnounce);
+    }
+
+    /// <summary>갑옷 발광을 잠깐 세웠다가 되돌린다 — 피격 깜빡임 중엔 그쪽이 끝날 때 복원한다.</summary>
+    private async UniTaskVoid SwordCueFlashAsync()
+    {
+        var ct = destroyCancellationToken;
+        try
+        {
+            for (float t = 0f; t < SwordCueFlashSeconds; t += Time.deltaTime)
+            {
+                _swordCueGlow = 1f - t / SwordCueFlashSeconds;
+                if (_dkBB != null && _hitBlinkRoutine == null) ApplyArmorTint(_dkBB.SwordColor);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException) { return; }
+        _swordCueGlow = 0f;
+        if (_dkBB != null && _hitBlinkRoutine == null) ApplyArmorTint(_dkBB.SwordColor);
     }
 
     /// <summary>전신 오라 프리팹을 검 색상에 맞춰 교체한다 (보스 루트/지정 앵커에 인스턴스화).</summary>
@@ -725,6 +805,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
             ? new Color(0.2f, 0.25f, 0.55f, 1f)
             : new Color(0.5f,  0.0f,  0.6f, 1f);
         if (_page2Glow > 0f) emission *= 1f + (Page2EmissionBoost - 1f) * _page2Glow;
+        if (_swordCueGlow > 0f) emission *= 1f + (SwordCueFlashBoost - 1f) * _swordCueGlow;
 
         _propBlock.SetColor("_BaseColor",      baseTint);
         _propBlock.SetColor("_EmissionColor",  emission);
@@ -871,11 +952,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         _dkBB.SetInvincible(true);
         Phase2InvincibleAsync(this.GetCancellationTokenOnDestroy()).Forget();
 
-        if (_config is BossConfigSO bossConfig)
-        {
-            bossConfig.patternBreakDurationMin = Phase2BreakMin;
-            bossConfig.patternBreakDurationMax = Phase2BreakMax;
-        }
+        _runner?.SetBreakRange(Phase2BreakMin, Phase2BreakMax);   // 공용 설정 SO에 쓰지 않는다(10-01 감사)
 
         // 2페이즈 패시브 공격 루프 시작
         if (_passiveSoulSpear != null || _passivePhantomRush != null)
@@ -942,11 +1019,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         _soulGateCleared = true;    // 50% 클램프 해제
         TryEnrage();                // 1페이지에서 이미 켜졌다 — 2페이지 도중에 켜져 속도가 바뀌지 않게
         _dkBB.SetInvincible(false);
-        if (_config is BossConfigSO bossConfig)
-        {
-            bossConfig.patternBreakDurationMin = Phase2BreakMin;
-            bossConfig.patternBreakDurationMax = Phase2BreakMax;
-        }
+        _runner?.SetBreakRange(Phase2BreakMin, Phase2BreakMax);
     }
 
     /// <summary>전환이 끝나면 패턴 대기 상태로 — 첫 패턴 전에 한숨 돌린다.</summary>
@@ -1110,10 +1183,28 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
                            : transform.position - transform.forward * 10f;
         DKResonanceStone.SpawnSetAsync(this, _entranceEndBarriers, playerSide, destroyCancellationToken).Forget();
 
+        LoadGuideMaterialsAsync(destroyCancellationToken).Forget();   // 예고 데칼 재질 · 검 색 고리(10-03)
         GameCameraController.Instance?.ActivateDKPlayerOrbit(1.0f);
         _runner?.EnsureMinBreakCooldown(3f);
         OnCombatReady?.Invoke();
         RaiseBossCombatReady();
+    }
+
+    /// <summary>
+    /// 예고 데칼 재질(원 · 화살표)을 넣는다 — 다른 보스처럼 정적 주입이지만 기사 프리팹엔 재질 칸이 없어 런 공용 목록(리치와 같은 재질)에서 받는다.
+    /// 안 넣으면 Ch3로 바로 들어올 때 KL2 · KL4 빔 예고가 무늬 없는 판으로, 앞 보스를 거치면 그 보스 재질로 그려졌다(10-03 개선 2-1).
+    /// 같은 목록의 고리 이펙트는 <see cref="CueSwordFloor"/>가 쓴다.
+    /// </summary>
+    private async UniTaskVoid LoadGuideMaterialsAsync(CancellationToken ct)
+    {
+        try
+        {
+            await RunFx.LoadAsync();
+            if (ct.IsCancellationRequested || RunFx.GuideCircle == null) return;
+            PatternGuideHelper.SetMaterials(RunFx.GuideCircle, RunFx.GuideArrow);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception e) { Debug.LogWarning($"[DK] 런 공용 이펙트 목록 로드 예외 — 예고는 기본 도형으로: {e.Message}", this); }
     }
 
     public void TriggerEntrance()

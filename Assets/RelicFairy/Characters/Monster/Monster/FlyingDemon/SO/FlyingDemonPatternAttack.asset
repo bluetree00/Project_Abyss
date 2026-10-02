@@ -45,5 +45,5 @@ MonoBehaviour:
     hitVfxScale: 1
     hitVfxOffset: {x: 0, y: 0, z: 0}
   selectionMode: 0
-  engageDistance: 1.8
+  engageDistance: 1.7
   engageDistanceScale: 0.85

@@ -22,7 +22,7 @@ MonoBehaviour:
     maxHp: 45
     defense: 5
     attackPower: 14
-    moveSpeed: 1.5
+    moveSpeed: 2
     attackRange: 1.5
     attackRadius: 1.5
     attackRate: 0.8
@@ -35,7 +35,7 @@ MonoBehaviour:
   patrol:
     patrolType: 2
     patrolRange: 3
-    patrolSpeed: 1
+    patrolSpeed: 1.2
     waypointWaitTime: 2
   combat:
     damageApplyDelay: 0.4
@@ -44,7 +44,7 @@ MonoBehaviour:
       m_Bits: 64
   animation:
     animatorControllerAddress: 
-    idleStateName: Cactus_IdlePlant
+    idleStateName: Cactus_IdleBattle
     patrolStateName: Cactus_WalkFWD
     chaseStateName: Cactus_RunFWD
     attackReadyStateName: Cactus_IdleBattle

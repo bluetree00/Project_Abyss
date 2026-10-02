@@ -12,7 +12,53 @@ public static class RelicPartEffectFactory
     {
         return effectKey switch
         {
-            // ── 구현 완료 ──
+            // ── 유물 성장 v2(10-02) 가웨인 「해의 궤적」 — 조각 14 + 일광 반응 6(구현 계획 2) ──
+            "g_dawn_sowing"     => new GDawnSowingEffect(),
+            "g_daybreak_mark"   => new GDaybreakMarkEffect(),
+            "g_dawn_oath"       => new GDawnOathEffect(),
+            "g_morning_hunt"    => new GMorningHuntEffect(),
+            "g_zenith"          => new GZenithEffect(),
+            "g_second_sun"      => new GSecondSunEffect(),
+            "g_sundial"         => new GSundialEffect(),
+            "g_noon_bloom"      => new GNoonBloomEffect(),
+            "g_ember_path"      => new GEmberPathEffect(),
+            "g_setting_sun"     => new GSettingSunEffect(),
+            "g_ember_carry"     => new GEmberCarryEffect(),
+            "g_dusk_judgment"   => new GDuskJudgmentEffect(),
+            "g_dawn_to_noon"    => new GDawnToNoonEffect(),
+            "g_noon_to_dusk"    => new GNoonToDuskEffect(),
+            "g_rx_thaw"         => new GRxThawEffect(),
+            "g_rx_overheat"     => new GRxOverheatEffect(),
+            "g_rx_wildfire"     => new GRxWildfireEffect(),
+            "g_rx_twin_sun"     => new GRxTwinSunEffect(),
+            "g_rx_corona"       => new GRxCoronaEffect(),
+            "g_rx_eclipse"      => new GRxEclipseEffect(),
+
+            // ── 랜슬롯 「광기의 계단」 — 조각 16 + 타락 반응 6(구현 계획 3) ──
+            "l_split_oath"        => new LSplitOathEffect(),
+            "l_blood_scent"       => new LBloodScentEffect(),
+            "l_black_afterimage"  => new LBlackAfterimageEffect(),
+            "l_betrayer_step"     => new LBetrayerStepEffect(),
+            "l_torn_oath_blade"   => new LTornOathBladeEffect(),
+            "l_madness_eye"       => new LMadnessEyeEffect(),
+            "l_last_threshold"    => new LLastThresholdEffect(),
+            "l_madness_crown"     => new LMadnessCrownEffect(),
+            "l_endless_frenzy"    => new LEndlessFrenzyEffect(),
+            "l_blood_frenzy"      => new LBloodFrenzyEffect(),
+            "l_frenzy_step"       => new LFrenzyStepEffect(),
+            "l_betrayal_feast"    => new LBetrayalFeastEffect(),
+            "l_tearing_judgment"  => new LTearingJudgmentEffect(),
+            "l_grudge_blade"      => new LGrudgeBladeEffect(),
+            "l_betrayer_brand"    => new LBetrayerBrandEffect(),
+            "l_second_judgment"   => new LSecondJudgmentEffect(),
+            "l_rx_transfer"       => new LRxTransferEffect(),
+            "l_rx_shatter"        => new LRxShatterEffect(),
+            "l_rx_decay"          => new LRxDecayEffect(),
+            "l_rx_brand_iron"     => new LRxBrandIronEffect(),
+            "l_rx_expose"         => new LRxExposeEffect(),
+            "l_rx_corrupt"        => new LRxCorruptEffect(),
+
+            // ── [옛 v1 키] 옛 저장 · 옛 실측 도구 호환 ──
             // 가웨인(화염)
             "gawain_burst_burn"    => new GawainBurstBurnEffect(),     // 화상 적 공격 시 절반 즉발
             "gawain_burn_spread"   => new GawainBurnSpreadEffect(),    // 화상 적 사망 시 1체 전염

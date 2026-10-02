@@ -19,6 +19,12 @@ public interface IRelicPartEffect
     /// <summary>이 효과를 만든 파츠 데이터의 effect_key(1:1). 중복 활성 방지·조회 키.</summary>
     string EffectKey { get; }
 
+    /// <summary>유물 성장 v2 — 이 조각의 등급(드러난 줄 수: 흐릿 1 · 선명 2 · 찬란 3).</summary>
+    RelicMemoryGrade Grade { get; }
+
+    /// <summary>등급을 정한다(획득 직전 · 「선명하게」로 오를 때). 효과는 늘어난 줄을 켠다.</summary>
+    void SetGrade(RelicMemoryGrade grade, PlayerController player);
+
     /// <summary>획득(활성화) 시 1회. 패시브 스탯 부여·상태 초기화에 쓴다.</summary>
     void OnAcquire(PlayerController player);
 

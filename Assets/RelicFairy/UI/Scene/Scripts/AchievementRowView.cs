@@ -182,11 +182,14 @@ public class AchievementRowView : MonoBehaviour
     private void RefreshAction(AchievementRowState s)
     {
         // [받기] 버튼 아트 — 없으면 기존 색 버튼 그대로.
+        // 납품 그림(버튼_받기)에는 「받기」 글자가 구워져 있다. 9-slice로 늘리면 글자가 가로로 늘어나고
+        // 그 위에 코드 글자까지 얹혀 두 겹으로 번져 보였다(10-02 사용자 「텍스트가 겹치고」). 그림이 있으면 비율대로 그리고 코드 글자는 끈다.
         var btnArt = UISkin.Achievement?.claimButton;
         if (btnArt != null && claimButtonImage != null)
         {
             claimButtonImage.sprite = btnArt;
-            claimButtonImage.type   = Image.Type.Sliced;
+            claimButtonImage.type   = Image.Type.Simple;
+            claimButtonImage.preserveAspect = true;
             claimButtonImage.color  = Color.white;
         }
 
@@ -195,9 +198,10 @@ public class AchievementRowView : MonoBehaviour
 
         if (s.Claimable)
         {
-            if (claimButtonImage) claimButtonImage.color = AltarPalette.Gold;
+            if (claimButtonImage && btnArt == null) claimButtonImage.color = AltarPalette.Gold;
             if (claimLabel)
             {
+                claimLabel.gameObject.SetActive(btnArt == null);
                 claimLabel.text  = "받기";
                 claimLabel.color = AltarPalette.OnGold;
             }
@@ -208,8 +212,9 @@ public class AchievementRowView : MonoBehaviour
 
         if (s.Claimed)
         {
-            statusText.text  = "■";
-            statusText.color = AltarPalette.TextFaint;
+            // 「■」는 완료로 읽히지 않았다(10-02 사용자 「완료된 업적이 있다면 표기해줘야」) — 글로 말한다.
+            statusText.text  = "완료";
+            statusText.color = new Color(AltarPalette.Essence.r, AltarPalette.Essence.g, AltarPalette.Essence.b, 0.8f);
         }
         else
         {

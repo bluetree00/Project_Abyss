@@ -1,9 +1,14 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace RelicFairy.Monster
 {
 public sealed class DragonSummonEgg : MonoBehaviour
 {
+    private const float AppearSeconds    = 0.5f;   // 디졸브 등장 · 퇴장(10-03 개선 3-5 — 예전엔 뿅 생기고 4초 뒤 그냥 파괴)
+    private const float DisappearSeconds = 0.8f;
+    private const float LingerSeconds    = 4f;     // 깨진 뒤 사라지기까지(퇴장 디졸브 포함)
+
     private Vector3 _targetPos;
     private float   _dropDuration;
     private float   _crackDelay;
@@ -80,6 +85,8 @@ public sealed class DragonSummonEgg : MonoBehaviour
                 }
             }
         }
+
+        DissolveEffect.PlayAppear(gameObject, AppearSeconds);   // 알 색을 입힌 뒤 — 디졸브가 지금 재질을 원본으로 기억한다
     }
 
     private void Update()
@@ -105,7 +112,7 @@ public sealed class DragonSummonEgg : MonoBehaviour
         if (_animator != null && _animator.HasState(0, EggCrackHash))
             _animator.CrossFade("EggCracking", 0.1f, 0, 0f);
         SpawnMiniDragon();
-        Destroy(gameObject, 4f);
+        VanishAsync(LingerSeconds - DisappearSeconds).Forget();
     }
 
     private void SpawnMiniDragon()
@@ -130,6 +137,19 @@ public sealed class DragonSummonEgg : MonoBehaviour
             orbitIndex:     _orbitIndex);
 
         OnMiniDragonSpawned?.Invoke(mini);
+    }
+
+    /// <summary><paramref name="delay"/>초 뒤 디졸브로 사라진 다음 파괴한다(퇴장은 재질을 되돌리지 않으므로 파괴 직전에만).</summary>
+    private async UniTaskVoid VanishAsync(float delay)
+    {
+        var ct = destroyCancellationToken;
+        try
+        {
+            await UniTask.Delay(System.TimeSpan.FromSeconds(delay), cancellationToken: ct);
+            await DissolveEffect.PlayDisappearAsync(gameObject, DisappearSeconds, ct);
+        }
+        catch (System.OperationCanceledException) { return; }
+        if (this != null) Destroy(gameObject);
     }
 }
 }

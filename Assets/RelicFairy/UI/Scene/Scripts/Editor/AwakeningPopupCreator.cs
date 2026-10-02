@@ -22,7 +22,7 @@ public static class AwakeningPopupCreator
     private const string Address   = "UI/Popup/UI_AwakeningPanel";
 
     private static readonly AltarBranch[] Branches =
-        { AltarBranch.Rune, AltarBranch.Covenant, AltarBranch.Gear, AltarBranch.Journey };
+        { AltarBranch.Rune, AltarBranch.Covenant, AltarBranch.Weapon, AltarBranch.Journey };
 
     // ── 레이아웃 치수 ─────────────────────────────────────────────────────
     // 한 갈래 최대 8노드(장비) = 4열 × 2행이 <b>잘리지 않고</b> 들어가야 한다.

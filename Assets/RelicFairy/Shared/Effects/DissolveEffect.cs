@@ -186,7 +186,7 @@ public static class DissolveEffect
 
             origMats = new Material[renderers.Length][];
             for (int i = 0; i < renderers.Length; i++)
-                origMats[i] = renderers[i].sharedMaterials;
+                origMats[i] = CaptureOriginals(renderers[i]);
 
             instances = ReplaceMaterials(renderers, mat, edgeColor ?? DefaultEdgeColor, pooled: true);
             SetDissolveValue(instances, 1f);
@@ -245,6 +245,21 @@ public static class DissolveEffect
                     if (m != null) ReturnMaterial(m);
         }
     }
+
+    /// <summary>
+    /// 다른 시스템이 이 렌더러에 잠깐 임시 재질을 씌워 두었다면 그 <b>진짜 원본</b>을 돌려준다(없으면 null).
+    /// 카메라 가림 페이더가 등록한다 — 디졸브가 페이더의 반투명 임시 재질을 원본으로 기억하면, 페이더가 그걸 파괴한 뒤
+    /// 디졸브가 되돌릴 때 빈 재질(마젠타)이 된다(10-01 Ch1 상점 · 정제소 벽 기둥 — 프레임 추적으로 확인).
+    /// </summary>
+    public static Func<Renderer, Material[]> OriginalMaterialsResolver;
+
+    private static Material[] CaptureOriginals(Renderer r) => OriginalMaterialsResolver?.Invoke(r) ?? r.sharedMaterials;
+
+    /// <summary>
+    /// 이 렌더러가 지금 디졸브 중인가(임시 재질을 물고 있다). 다른 시스템이 이 순간의 재질을 「원본」으로 기억하면 안 된다 —
+    /// 임시 재질은 끝나면 풀로 돌아가거나 파괴되어, 나중에 그걸 되돌리면 빈 재질(마젠타)이 된다(10-01 Ch1 상점·정제소 벽 기둥).
+    /// </summary>
+    public static bool IsDissolving(Renderer r) => r != null && _dissolving.Contains(r.GetInstanceID());
 
     /// <summary>렌더러 점유 시도 — 하나라도 이미 다른 디졸브가 쓰는 중이면 false(전부 미점유로 롤백).</summary>
     private static bool TryClaimRenderers(Renderer[] renderers, out List<int> claimed)
@@ -349,7 +364,7 @@ public static class DissolveEffect
 
             origMats = new Material[renderers.Length][];
             for (int i = 0; i < renderers.Length; i++)
-                origMats[i] = renderers[i].sharedMaterials;
+                origMats[i] = CaptureOriginals(renderers[i]);
 
             instances = ReplaceMaterials(renderers, mat, DefaultEdgeColor, pooled: true);
             SetDissolveValue(instances, 0f);
@@ -441,7 +456,8 @@ public static class DissolveEffect
         // 머티리얼(불투명 Lit)로 갈아끼우면 파티클 쿼드가 통째로 엣지색 판때기가 된다 —
         // 입자 수만큼 시안 사각형이 흩뿌려져 "오브젝트가 잔뜩 튀어나온" 것처럼 보인다.
         // 디졸브는 메시 표면을 깎는 연출이라 애초에 입자에는 의미가 없다.
-        return r is ParticleSystemRenderer || r is TrailRenderer;
+        // VFX 그래프 렌더러는 재질을 바꿀 수 없다(「It is not allowed to set the material of a VFXRenderer」 경고) — 같은 이유로 제외.
+        return r is ParticleSystemRenderer || r is TrailRenderer || r is UnityEngine.VFX.VFXRenderer;
     }
 
     private static List<Material> ReplaceMaterials(

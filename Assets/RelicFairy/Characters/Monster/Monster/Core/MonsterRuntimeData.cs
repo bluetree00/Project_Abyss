@@ -66,8 +66,15 @@ public class MonsterRuntimeData
     // ── 특수 상태 배율 ─────────────────────────────────────
     /// <summary>이동 속도 배율. 광폭화 등 영구 버프에 사용. 기본값 1.</summary>
     public float SpeedMultiplier  = 1f;
-    /// <summary>공격력 배율. 광폭화 등 영구 버프에 사용. 기본값 1.</summary>
-    public float AttackMultiplier = 1f;
+    /// <summary>공격력 배율. 광폭화 등 영구 버프에 사용. 기본값 1. 읽으면 시기 특성 「지휘」 오라(<see cref="TraitAttackMul"/>)까지 곱해진 값.</summary>
+    public float AttackMultiplier
+    {
+        get => _attackMultiplier * TraitAttackMul;
+        set => _attackMultiplier = value;
+    }
+    private float _attackMultiplier = 1f;
+    /// <summary>시기 특성 「지휘」 오라 배율(10-02) — 광폭화가 <see cref="AttackMultiplier"/>를 덮어써도 따로 곱해진다. 기본값 1.</summary>
+    public float TraitAttackMul = 1f;
     /// <summary>받는 데미지 배율. 방어 상태 등에서 임시 감소에 사용. 기본값 1.</summary>
     public float DamageMultiplier = 1f;
 }

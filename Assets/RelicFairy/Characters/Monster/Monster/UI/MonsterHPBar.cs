@@ -93,11 +93,23 @@ public class MonsterHPBar : MonoBehaviour
     {
         public GameObject      go;
         public Image           icon;
-        public Image           remain;   // 하단 잔여 게이지
+        public Image           ring;     // 계열색 테 = 남은 시간(시계 방향으로 줄어든다) — 칸이 「무슨 계열」인지 먼저 읽히게
         public TMPro.TMP_Text  stack;    // ×N (2중첩 이상일 때만)
     }
 
+    // 상태 칸 — 어두운 원판 위 아이콘 + 지난 시간만큼 시계 방향으로 어두워지는 쓸림(10-02 사용자 「상태이상 표시가 그냥 원 모양」).
+    // 16px 토큰은 머리 위에서 점으로 보였고, 2px 잔여 바는 읽히지 않았다.
+    private const float MinStatusCellSize = 20f;
+    private static readonly Color StatusPlateColor   = new(0.05f, 0.05f, 0.07f, 0.72f);
+    private float StatusCellSize => Mathf.Max(_statusIconSize, MinStatusCellSize);
+
     private RectTransform _statusRow;
+
+    // 시기 특성 배지(10-02 레벨디자인 §4) — 바 왼쪽에 한 줄. 테 = 분류색(공격 붉음 · 방어 청록 · 지원 금 · 방해 보라).
+    private const float TraitBadgeSize = 18f;
+    private const float TraitBadgeGap  = 2f;
+    private RectTransform _traitRow;
+    private readonly System.Collections.Generic.List<StatusCell> _traitCells = new();
     private readonly System.Collections.Generic.List<StatusCell> _statusCells = new();
     private int _statusShown = -1;   // 마지막으로 배치한 개수(개수가 바뀔 때만 재배치)
 
@@ -121,7 +133,14 @@ public class MonsterHPBar : MonoBehaviour
 
     private void Update()
     {
-        if (_monster == null) return;
+        // 이어진 몸이 꺼졌다(풀 반환 · 파괴). 정상 바는 몸이 꺼질 때 먼저 돌려받으므로 여기 오는 건 참조를 잃은 바뿐이다 —
+        // 두면 꺼진 몸 자리에 이름표가 떠서 같은 자리에 지어진 다음 방들에서도 보였다(10-01 f5 전주기 시뮬 「Spider」).
+        if (_monster == null || !_monster.gameObject.activeInHierarchy)
+        {
+            Debug.LogWarning($"[MonsterHPBar] 몸 없는 바를 끈다 — {(_monster != null ? _monster.name : "파괴된 몬스터")}");
+            gameObject.SetActive(false);
+            return;
+        }
 
         if (_fadeT < 1f && _group != null)
         {
@@ -164,6 +183,7 @@ public class MonsterHPBar : MonoBehaviour
 
         EnsureStyle();
         EnsureNameLabel();
+        SetTraitBadges(monster.TryGetComponent<MonsterTraits>(out var traits) && traits.enabled ? traits.Badges : null);
         // 등장 — 머리 위에 툭 나타나지 않고 짧게 번진다
         _fadeT = 0f;
         _flash = 0f;
@@ -180,8 +200,9 @@ public class MonsterHPBar : MonoBehaviour
         _hasLastPosition = false;
         if (_subLabel != null) _subLabel.text = string.Empty;
 
-        // 풀로 돌아가는 바에 이전 몬스터의 디버프가 남지 않게 한다.
+        // 풀로 돌아가는 바에 이전 몬스터의 디버프 · 특성이 남지 않게 한다.
         SetStatuses(null);
+        SetTraitBadges(null);
 
         gameObject.SetActive(false);
     }
@@ -239,7 +260,12 @@ public class MonsterHPBar : MonoBehaviour
 
             var item = items[i];
             cell.icon.sprite = EffectIconRegistry.GetSprite(item.IconKey);
-            cell.remain.fillAmount = Mathf.Clamp01(item.Remaining01);
+            cell.icon.color  = EffectIconRegistry.TintFor(item.IconKey);   // 흰 글리프에 계열색
+            var ringCol = cell.icon.color; ringCol.a = 0.75f;
+            cell.ring.color  = ringCol;
+            // 지난 시간 쓸림 — 남은 비율이 없으면(무기한) 쓸지 않는다
+            // 남은 시간 = 테의 길이(무기한이면 가득). 예전엔 칸 위를 어둡게 덮어 글리프가 반쯤 가려졌다(10-02 실측).
+            cell.ring.fillAmount = item.Remaining01 < 0f ? 1f : Mathf.Clamp01(item.Remaining01);
 
             bool multi = item.Stacks > 1;
             if (cell.stack.gameObject.activeSelf != multi) cell.stack.gameObject.SetActive(multi);
@@ -250,7 +276,7 @@ public class MonsterHPBar : MonoBehaviour
         if (_statusShown != count)
         {
             _statusShown = count;
-            float step = _statusIconSize + _statusSpacing;
+            float step = StatusCellSize + _statusSpacing;
             float startX = -(count - 1) * 0.5f * step;
             for (int i = 0; i < count; i++)
             {
@@ -320,6 +346,72 @@ public class MonsterHPBar : MonoBehaviour
         _ghostFill.color = _ghostColor;
     }
 
+    /// <summary>
+    /// 시기 특성 배지 — 바 왼쪽 끝에서 왼쪽으로 늘어선다(이름 · 상태 행과 자리가 겹치지 않는다). 비면 숨긴다.
+    /// 칸은 상태 행과 같은 모양(어두운 원판 + 테 + 아이콘)이고, 테가 시간 대신 분류색이다.
+    /// </summary>
+    public void SetTraitBadges(System.Collections.Generic.IReadOnlyList<MonsterTraitBadge> badges)
+    {
+        int count = badges != null ? badges.Count : 0;
+        if (count == 0)
+        {
+            if (_traitRow != null && _traitRow.gameObject.activeSelf) _traitRow.gameObject.SetActive(false);
+            return;
+        }
+
+        if (_traitRow == null)
+        {
+            var parentRT = _barRoot != null ? _barRoot : (RectTransform)transform;
+            if (parentRT == null) return;
+            var go = new GameObject("TraitRow", typeof(RectTransform));
+            go.transform.SetParent(parentRT, false);
+            _traitRow = (RectTransform)go.transform;
+            _traitRow.anchorMin = _traitRow.anchorMax = new Vector2(0f, 0.5f);
+            _traitRow.pivot     = new Vector2(1f, 0.5f);
+            _traitRow.anchoredPosition = new Vector2(-4f, 0f);
+            _traitRow.sizeDelta = new Vector2(TraitBadgeSize * 2f + TraitBadgeGap, TraitBadgeSize);
+        }
+        if (!_traitRow.gameObject.activeSelf) _traitRow.gameObject.SetActive(true);
+
+        while (_traitCells.Count < count) _traitCells.Add(CreateBadgeCell(_traitRow, TraitBadgeSize));
+        for (int i = 0; i < _traitCells.Count; i++)
+        {
+            var cell = _traitCells[i];
+            bool on = i < count;
+            if (cell.go.activeSelf != on) cell.go.SetActive(on);
+            if (!on) continue;
+            var b = badges[i];
+            cell.icon.sprite = EffectIconRegistry.GetSprite(b.IconKey);
+            cell.icon.color  = EffectIconRegistry.TintFor(b.IconKey);
+            cell.ring.color  = b.Ring;
+            cell.ring.fillAmount = 1f;
+            // 오른쪽(바 쪽)부터 왼쪽으로
+            ((RectTransform)cell.go.transform).anchoredPosition = new Vector2(-(TraitBadgeSize * 0.5f + i * (TraitBadgeSize + TraitBadgeGap)), 0f);
+        }
+    }
+
+    /// <summary>배지 1칸 — 원판 + 분류색 테 + 아이콘(오른쪽 끝 기준 배치).</summary>
+    private static StatusCell CreateBadgeCell(RectTransform row, float size)
+    {
+        var cell = new StatusCell();
+        cell.go = new GameObject("Trait", typeof(RectTransform));
+        cell.go.transform.SetParent(row, false);
+        var rt = (RectTransform)cell.go.transform;
+        rt.anchorMin = rt.anchorMax = new Vector2(1f, 0.5f);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(size, size);
+        var plate = NewStatusImage("Plate", rt, 0f);
+        plate.sprite = UIProceduralSprites.Circle();
+        plate.color  = StatusPlateColor;
+        cell.ring = NewStatusImage("Ring", rt, 0f);
+        cell.ring.sprite = UIProceduralSprites.Ring(0.13f);
+        cell.ring.type   = Image.Type.Filled;
+        cell.ring.fillMethod = Image.FillMethod.Radial360;
+        cell.icon = NewStatusImage("Icon", rt, 3.5f);
+        cell.icon.preserveAspect = true;
+        return cell;
+    }
+
     /// <summary>디버프 아이콘 행 컨테이너 — HP바 바로 아래.</summary>
     private void EnsureStatusRow()
     {
@@ -336,47 +428,38 @@ public class MonsterHPBar : MonoBehaviour
         _statusRow.anchorMax = new Vector2(0.5f, 0f);
         _statusRow.pivot     = new Vector2(0.5f, 1f);
         _statusRow.anchoredPosition = new Vector2(0f, -2f);
-        _statusRow.sizeDelta = new Vector2(200f, _statusIconSize);
+        _statusRow.sizeDelta = new Vector2(200f, StatusCellSize);
     }
 
-    /// <summary>아이콘 1칸 — 아이콘 + 하단 잔여 게이지 + 중첩 배지.</summary>
+    /// <summary>상태 1칸 — 어두운 원판 + 아이콘 + 지난 시간 쓸림(원형) + 중첩 배지.</summary>
     private StatusCell CreateStatusCell()
     {
         var cell = new StatusCell();
+        float size = StatusCellSize;
 
         cell.go = new GameObject("Status", typeof(RectTransform));
         cell.go.transform.SetParent(_statusRow, false);
         var rt = (RectTransform)cell.go.transform;
         rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot     = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = new Vector2(_statusIconSize, _statusIconSize);
+        rt.sizeDelta = new Vector2(size, size);
 
-        // 아이콘
-        var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(CanvasRenderer));
-        iconGo.transform.SetParent(rt, false);
-        var irt = (RectTransform)iconGo.transform;
-        irt.anchorMin = Vector2.zero; irt.anchorMax = Vector2.one;
-        irt.offsetMin = Vector2.zero; irt.offsetMax = Vector2.zero;
-        cell.icon = iconGo.AddComponent<Image>();
-        cell.icon.raycastTarget = false;
+        // 원판 — 밝은 바닥 위에서도 아이콘 테두리가 서게
+        var plate = NewStatusImage("Plate", rt, 0f);
+        plate.sprite = UIProceduralSprites.Circle();
+        plate.color  = StatusPlateColor;
+
+        // 계열색 테 — 원판 가장자리
+        cell.ring = NewStatusImage("Ring", rt, 0f);
+        cell.ring.sprite        = UIProceduralSprites.Ring(0.11f);
+        cell.ring.type          = Image.Type.Filled;
+        cell.ring.fillMethod    = Image.FillMethod.Radial360;
+        cell.ring.fillOrigin    = (int)Image.Origin360.Top;
+        cell.ring.fillClockwise = false;   // 12시에서 시계 반대로 비워진다 — 남은 쪽이 시계 방향으로 남는다
+
+        // 아이콘 — 원판 안으로 들여(테와 겹치지 않게)
+        cell.icon = NewStatusImage("Icon", rt, 3f);
         cell.icon.preserveAspect = true;
-
-        // 잔여 게이지 — 아이콘 하단의 얇은 바(가로 채우기)
-        var remGo = new GameObject("Remain", typeof(RectTransform), typeof(CanvasRenderer));
-        remGo.transform.SetParent(rt, false);
-        var rrt = (RectTransform)remGo.transform;
-        rrt.anchorMin = new Vector2(0f, 0f);
-        rrt.anchorMax = new Vector2(1f, 0f);
-        rrt.pivot     = new Vector2(0.5f, 0f);
-        rrt.offsetMin = Vector2.zero;
-        rrt.offsetMax = Vector2.zero;
-        rrt.sizeDelta = new Vector2(0f, 2f);
-        cell.remain = remGo.AddComponent<Image>();
-        cell.remain.raycastTarget = false;
-        cell.remain.color = new Color(1f, 1f, 1f, 0.85f);
-        cell.remain.type = Image.Type.Filled;
-        cell.remain.fillMethod = Image.FillMethod.Horizontal;
-        cell.remain.fillOrigin = 0;
 
         // 중첩 배지 — 우하단
         var stGo = new GameObject("Stack", typeof(RectTransform), typeof(CanvasRenderer));
@@ -386,18 +469,30 @@ public class MonsterHPBar : MonoBehaviour
         srt.anchorMax = new Vector2(1f, 0f);
         srt.pivot     = new Vector2(1f, 0f);
         srt.anchoredPosition = new Vector2(1f, 0f);
-        srt.sizeDelta = new Vector2(_statusIconSize, _statusIconSize * 0.6f);
+        srt.sizeDelta = new Vector2(size, size * 0.6f);
         cell.stack = stGo.AddComponent<TMPro.TextMeshProUGUI>();
         cell.stack.alignment      = TMPro.TextAlignmentOptions.BottomRight;
-        cell.stack.fontSize       = _statusIconSize * 0.55f;
+        cell.stack.fontSize       = size * 0.55f;
         cell.stack.color          = Color.white;
         cell.stack.raycastTarget  = false;
         cell.stack.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
         cell.stack.overflowMode   = TMPro.TextOverflowModes.Overflow;
-        TMPOutlineHelper.ApplyDefault(cell.stack);
+        TMPOutlineHelper.ApplySoftShadow(cell.stack);   // 글자 정본 — 두꺼운 테두리 금지
         stGo.SetActive(false);
 
         return cell;
+    }
+
+    private static Image NewStatusImage(string name, RectTransform parent, float inset)
+    {
+        var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer));
+        go.transform.SetParent(parent, false);
+        var r = (RectTransform)go.transform;
+        r.anchorMin = Vector2.zero; r.anchorMax = Vector2.one;
+        r.offsetMin = new Vector2(inset, inset); r.offsetMax = new Vector2(-inset, -inset);
+        var img = go.AddComponent<Image>();
+        img.raycastTarget = false;
+        return img;
     }
 
     private void EnsureSubLabel()
@@ -415,7 +510,7 @@ public class MonsterHPBar : MonoBehaviour
         rt.anchorMax = new Vector2(0.5f, 0f);
         rt.pivot     = new Vector2(0.5f, 1f);
         // 상태 아이콘 행이 바로 아래(y -2)에 오므로 그만큼 내려 겹치지 않게 한다.
-        rt.anchoredPosition = new Vector2(0f, -(_statusIconSize + 8f));
+        rt.anchoredPosition = new Vector2(0f, -(StatusCellSize + 8f));
         rt.sizeDelta = new Vector2(200f, 20f);
 
         _subLabel = go.AddComponent<TMPro.TextMeshProUGUI>();

@@ -10,9 +10,11 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 기억의 제단 트리(09-29 개편) 검증 도구.
-/// <para>① 그래프 · 배치 검증(에디터) — 부모 존재 · 같은 갈래 · 순환 없음 · 가운데에서 닿음 · 자물쇠는 둘뿐 · 값이 깊이를 따라 오름 · 노드 겹침 0.</para>
-/// <para>② 화면 실측(플레이 중) — 새 계정 · 중간 · 전부 세 상태로 창을 열어 여는 연출 · 해금 연출(보통 · 열쇠)을 프레임으로 찍는다.
+/// 기억의 제단 트리(09-29 개편 · 10-02 재설계 「기억을 모시는 제단」) 검증 도구.
+/// <para>① 그래프 · 배치 검증(에디터) — 부모 존재 · 같은 갈래 · 순환 없음 · 자물쇠는 둘뿐 · 값이 부모보다 싸지 않음 ·
+/// 자식 시기가 부모보다 앞서지 않음 · 노드 겹침 0 · 시기별 노드 수.</para>
+/// <para>② 화면 실측(플레이 중) — 봉인기 새 계정 · 봉인기 중간(해금 연출 보통 · 열쇠) · 해방기 고리가 드러나는 순간 · 악몽 고리 · 전부를
+/// 이야기 오버라이드로 바꿔 가며 찍는다(끝나면 오버라이드 원래대로).
 /// <b>세이브를 건드리지 않는다</b> — 정수 · 해금 · 기록을 메모리에서만 바꾸고 끝나면 원래 값으로 되돌린다(저장 호출 0).</para>
 /// 결과: Temp/altar_tree_check.txt · Temp/altar_tree_probe.txt · Temp/ui_shots/Altar_*.png
 /// </summary>
@@ -40,6 +42,7 @@ public static class MemoryAltarTreeProbeEditor
             {
                 var parent = MemoryAltarCatalog.Get(p);
                 if (parent == null) { bad++; sb.AppendLine($"✗ 없는 부모: {n.Id} ← {p}"); continue; }
+                if (parent.Era > n.Era) { bad++; sb.AppendLine($"✗ 자식 시기가 부모보다 앞선다: {n.DisplayName}(시기 {n.Era}) ← {parent.DisplayName}(시기 {parent.Era})"); }
                 if (parent.Branch != n.Branch) { bad++; sb.AppendLine($"✗ 갈래를 넘는 선: {n.Id}({n.Branch}) ← {p}({parent.Branch})"); }
                 if (!n.ConditionRequired && n.BaseCost < parent.BaseCost)
                 { bad++; sb.AppendLine($"✗ 값이 부모보다 싸다: {n.DisplayName} {n.BaseCost} < {parent.DisplayName} {parent.BaseCost}"); }
@@ -72,8 +75,11 @@ public static class MemoryAltarTreeProbeEditor
         }
 
         int maxDepth = 0;
-        foreach (var p in place.Values) maxDepth = Mathf.Max(maxDepth, p.Depth);
-        sb.Insert(0, $"기억의 제단 트리 검증 — 노드 {all.Count} · 갈래 5 · 최대 깊이 {maxDepth} · 자물쇠 {locks} · 가장 가까운 두 노드 {minGap:0}px({pair})\n" +
+        var perEra = new int[4];
+        foreach (var p in place.Values) { maxDepth = Mathf.Max(maxDepth, p.Depth); perEra[p.Era]++; }
+        sb.Insert(0, $"기억의 제단 트리 검증 — 노드 {all.Count}(봉인기 {perEra[1]} · 해방기 {perEra[2]} · 악몽 {perEra[3]}) · 갈래 4 + 가운데 기억 · " +
+                     $"고리 칸 {MemoryAltarLayout.EraRingLevel(1):0.0}/{MemoryAltarLayout.EraRingLevel(2):0.0}/{MemoryAltarLayout.EraRingLevel(3):0.0} · " +
+                     $"최대 깊이 {maxDepth} · 자물쇠 {locks} · 가장 가까운 두 노드 {minGap:0}px({pair})\n" +
                      (bad == 0 ? "결과: 이상 없음\n" : $"결과: 문제 {bad}건\n"));
         Directory.CreateDirectory("Temp");
         File.WriteAllText("Temp/altar_tree_check.txt", sb.ToString());
@@ -96,59 +102,101 @@ public static class MemoryAltarTreeProbeEditor
 
         string keepUnlocked = data.unlockedIds, keepRecords = data.records;
         int    keepEssence  = data.abyssEssence;
+        int    keepOverride = EditorPrefs.GetInt(StoryProgress.DebugOverridePrefsKey, -1);
         var sb = new StringBuilder();
         Invoke("HideTestHubGui");
         try
         {
-            // A — 새 계정: 아무것도 없고 정수 800
+            // A — 봉인기 새 계정: 아무것도 없고 정수 800 · 다음 고리(해방기)는 점선 + 한 줄
+            SetEra(0);
             data.unlockedIds = ""; data.abyssEssence = 800;
             ResetFirstOpen();
             var panel = await OpenAsync();
             await Shots("Altar_A_Open", new[] { 60, 220, 420, 900 });
-            DumpLabels(sb, "A 새 계정", panel);
+            DumpLabels(sb, "A 봉인기 새 계정", panel);
             Managers.UI.CloseAllPopupUI();
             await UniTask.Delay(300, ignoreTimeScale: true);
 
-            // B — 중간: 갈래마다 앞쪽 몇 칸 + 정수 8000 · 첫 완주 기록(영웅 룬 할인)
+            // B — 봉인기 중간: 갈래마다 앞쪽 몇 칸 + 정수 8000
             data.unlockedIds = string.Join(",", new[]
             {
-                MemoryAltarCatalog.RuneChoice4, MemoryAltarCatalog.RuneStorage1,
+                MemoryAltarCatalog.RuneStorage1,
                 MemoryAltarCatalog.CovenantParts1,
-                MemoryAltarCatalog.SigilMerchant, MemoryAltarCatalog.SigilSmith, MemoryAltarCatalog.PartsDraft4,
-                MemoryAltarCatalog.PartPierce, MemoryAltarCatalog.WeaponCrossbow, MemoryAltarCatalog.PartPower,
-                MemoryAltarCatalog.Revive, MemoryAltarCatalog.MaxHpUp,
+                MemoryAltarCatalog.PartPierce, MemoryAltarCatalog.WeaponCrossbow, MemoryAltarCatalog.PartPower, MemoryAltarCatalog.SigilSmith,
+                MemoryAltarCatalog.Revive, MemoryAltarCatalog.SigilMerchant,
             });
             data.abyssEssence = 8000;
             panel = await OpenAsync();
             await Shots("Altar_B_Open", new[] { 60, 300 });
-            DumpLabels(sb, "B 중간", panel);
+            DumpLabels(sb, "B 봉인기 중간", panel);
 
             // B-1 보통 노드 해금(정제 두 장) · B-2 열쇠 해금(영웅 룬) — 저장 없이 연출만
             await UnlockAndShoot(panel, MemoryAltarCatalog.RefinePick, "Altar_B_UnlockNormal", sb);
             await UnlockAndShoot(panel, MemoryAltarCatalog.RuneEpic,   "Altar_B_UnlockKeystone", sb);
+            // 가운데 기억 노드는 유물 성장 개편 전까지 살 수 없어야 한다
+            var mem = MemoryAltarService.GetState(MemoryAltarCatalog.MemRedraw);
+            sb.AppendLine($"가운데 「다시 떠올리기」: 준비 중 {mem.Pending} · 살 수 있음 {mem.CanBuy} (준비 중이면 false여야)");
             await Shots("Altar_B_Idle", new[] { 1500 });
             Managers.UI.CloseAllPopupUI();
             await UniTask.Delay(300, ignoreTimeScale: true);
 
-            // C — 전부 연 계정
+            // C — 해방기로 넘어간 첫 방문: 해방기 고리가 그려지고 그 띠가 스며든다(고리 본 기록 1)
+            SetEra(1);
+            SetRecord(data, MemoryAltarCatalog.Rec.AltarEraSeen, 1);
+            panel = await OpenAsync();
+            await Shots("Altar_C_Liberated", new[] { 300, 900, 1500, 2200, 3000 });
+            DumpLabels(sb, "C 해방기 첫 방문", panel);
+            sb.AppendLine($"C 뒤 고리 본 기록 = {data.GetRecord(MemoryAltarCatalog.Rec.AltarEraSeen)} (2여야)");
+            Managers.UI.CloseAllPopupUI();
+            await UniTask.Delay(300, ignoreTimeScale: true);
+
+            // D — 엔딩 뒤(악몽 고리) 첫 방문
+            SetEra(3);
+            panel = await OpenAsync();
+            await Shots("Altar_D_Ended", new[] { 300, 900, 1500, 2200, 3000 });
+            DumpLabels(sb, "D 엔딩 뒤 첫 방문", panel);
+            Managers.UI.CloseAllPopupUI();
+            await UniTask.Delay(300, ignoreTimeScale: true);
+
+            // E — 전부 연 계정
             var allIds = new List<string>();
             foreach (var n in MemoryAltarCatalog.All) allIds.Add(n.Id);
             data.unlockedIds = string.Join(",", allIds);
             data.abyssEssence = 12000;
             panel = await OpenAsync();
-            await Shots("Altar_C_Full", new[] { 400 });
-            DumpLabels(sb, "C 전부", panel);
+            await Shots("Altar_E_Full", new[] { 400 });
+            DumpLabels(sb, "E 전부", panel);
             Managers.UI.CloseAllPopupUI();
         }
         catch (Exception e) { sb.AppendLine("예외: " + e); }
         finally
         {
-            // 세이브를 건드리지 않는다 — 메모리 값만 되돌린다(이 실측은 저장을 부르지 않는다).
+            // 세이브를 건드리지 않는다 — 메모리 값과 오버라이드만 되돌린다(이 실측은 저장을 부르지 않는다).
             data.unlockedIds = keepUnlocked; data.records = keepRecords; data.abyssEssence = keepEssence;
+            EditorPrefs.SetInt(StoryProgress.DebugOverridePrefsKey, keepOverride);
+            StoryProgress.RefreshDebugOverride();
             Invoke("RestoreTestHubGui");
             File.WriteAllText("Temp/altar_tree_probe.txt", sb.ToString());
             Debug.Log("[AltarTreeProbe] 화면 실측 끝 → Temp/altar_tree_probe.txt · Temp/ui_shots/Altar_*.png (세이브 무변경)");
         }
+    }
+
+    /// <summary>이야기 오버라이드로 시기를 바꾼다 — 0 봉인기 · 1 해방기 · 2 악몽 모드 · 3 엔딩 뒤(악몽 끔).</summary>
+    private static void SetEra(int overrideValue)
+    {
+        EditorPrefs.SetInt(StoryProgress.DebugOverridePrefsKey, overrideValue);
+        StoryProgress.RefreshDebugOverride();
+    }
+
+    /// <summary>기록 한 칸을 메모리에서만 바꾼다(SetRecordMax는 내리지 못한다).</summary>
+    private static void SetRecord(UserGameData data, string key, int value)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(data.records))
+            foreach (var kv in data.records.Split(','))
+                if (!kv.StartsWith(key + ":")) parts.Add(kv);
+        parts.Add($"{key}:{value}");
+        data.records = string.Join(",", parts);
     }
 
     private static async UniTask<UI_AwakeningPanel> OpenAsync()

@@ -358,9 +358,14 @@ public class ActAttackState : LayerStateBase<ActState>
         if (baseDist <= 0f || _controller == null) return 0f;
 
         // 유도 돌진 사거리: 클립에 lungeMaxRange 설정 시 그 값(전진 지능), 아니면 레거시(base + 1.0).
+        // 기준은 <b>클립의 기본 전진</b>이다 — 넘겨받은 baseDist가 아니다. 유도 완료 보너스(TryApplyAimCompleteBonus)가
+        // 「이미 적까지 늘어난 전진 + 보너스」를 다시 넘겨, 사거리가 (늘어난 값 + 보너스 + 1.0)으로 한 번 더 커졌다.
+        // 10-01 실측(무형검 1타, 기본 1.0 m): 적이 4.5~6.5 m에 있으면 3.70 m를 1~2프레임(0.02~0.05초)에 끌려갔다
+        // = 사용자 「멀리서도 몬스터한테 순간이동」. 이제 기본 1.0 → 사거리 2.0 m에서 멈춘다(보너스로 늘지 않음).
+        float clipBase = _currentMapping != null ? _currentMapping.attackStepDistance : baseDist;
         float reach = (_currentMapping != null && _currentMapping.lungeMaxRange > 0f)
             ? _currentMapping.lungeMaxRange
-            : baseDist + LungeBoostExtra;
+            : clipBase + LungeBoostExtra;
         if (_counterFirst && _controller.CharacterData != null)
             reach = Mathf.Max(reach, _controller.CharacterData.perfectDodgeCounterLungeReach);
         float searchRange = reach + LungeCastRadius + LungeSearchMargin;

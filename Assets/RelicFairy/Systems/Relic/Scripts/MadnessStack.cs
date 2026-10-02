@@ -33,6 +33,12 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     private bool  _endlessFrenzy;
     private bool  _endlessUsed;         // 이번 광란에서 재점화를 이미 썼는가(무한 방지)
     private float _lastFrenzyDuration = 6f;
+    private float _endlessRatio = 1f;   // 재점화 길이 = 직전 광란 × 이 값(끝나지 않는 광란 ① 절반 · ② 전체)
+
+    // [유물 성장 v2] 계단 공명 — 받침(감쇠가 이 값 아래로 끌어내리지 않는다) · 두 번째 광란(광란 중에도 다시 차오른다)
+    private int   _floor;
+    private bool  _refillEnabled;
+    private int   _refill;
 
     // 라벨 캐시 — 표시값이 바뀔 때만 문자열을 새로 만든다(매 프레임 alloc 방지).
     private string _label = "광기 0%";
@@ -42,6 +48,10 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     public event Action OnMaxReached;
     /// <summary>광란 진입/종료 시 발행(VFX 상태 토글용).</summary>
     public event Action<bool> OnFrenzyChanged;
+    /// <summary>[파츠] 끝나지 않는 광란 — 광란이 한 번 더 이어졌다.</summary>
+    public event Action OnFrenzyRenewed;
+    /// <summary>[유물 성장 v2] 두 번째 광란 — 광란 중에 광기가 다시 가득 찼다(채움은 0으로 돌아간다).</summary>
+    public event Action OnRefillFull;
 
     public int   Stacks    => _stacks;
     public int   MaxStacks => _maxStacks;
@@ -50,6 +60,19 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
 
     public bool  IsFrenzy        => _frenzy;
     public float FrenzyRemaining => _frenzy ? Mathf.Max(0f, _frenzyEnd - Time.time) : 0f;
+
+    /// <summary>[유물 성장 v2] 받침 — 광기가 이 값 이상이면 감쇠가 이 값 아래로 내리지 않는다(0 = 없음).</summary>
+    public int Floor { get => _floor; set => _floor = Mathf.Clamp(value, 0, _maxStacks); }
+    /// <summary>[유물 성장 v2] 피 냄새 — 이 시각까지 감쇠가 멈춘다.</summary>
+    public float HoldDecayUntil { get; set; }
+    /// <summary>[유물 성장 v2] 두 번째 광란 — 켜져 있으면 광란 중 적중이 「다시 차오름」을 쌓는다.</summary>
+    public bool RefillDuringFrenzy
+    {
+        get => _refillEnabled;
+        set { _refillEnabled = value; if (!value) _refill = 0; }
+    }
+    /// <summary>광란 중 다시 차오른 양(0 ~ MaxStacks).</summary>
+    public int Refill => _refill;
 
     public void Initialize()
     {
@@ -66,7 +89,16 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
 
     public void AddStack(int n)
     {
-        if (_frenzy) return;         // 광란 중엔 스택 동결(MAX 유지)
+        if (_frenzy)                 // 광란 중엔 스택 동결(MAX 유지)
+        {
+            if (!_refillEnabled) return;
+            // 두 번째 광란 — 동결된 스택 대신 「다시 차오름」을 쌓고, 가득 차면 알린다(광란을 잇는 건 듣는 쪽).
+            _lastAttackTime = Time.time;
+            _refill = Mathf.Min(_maxStacks, _refill + Mathf.Max(1, n));
+            OnChanged?.Invoke();
+            if (_refill >= _maxStacks) { _refill = 0; OnRefillFull?.Invoke(); }
+            return;
+        }
         _lastAttackTime = Time.time; // 적중 시 감쇠 리셋
         if (_stacks >= _maxStacks) return;
         _stacks = Mathf.Min(_maxStacks, _stacks + Mathf.Max(1, n));
@@ -89,6 +121,7 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
         _frenzyEnd = Time.time + Mathf.Max(0.1f, duration);
         _lastFrenzyDuration = Mathf.Max(0.1f, duration);
         _endlessUsed = false;          // 새 광란 진입 → 재점화 1회 재충전
+        _refill = 0;
         _decayAccum = 0f;
         OnChanged?.Invoke();
         OnFrenzyChanged?.Invoke(true);
@@ -105,8 +138,12 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     /// <summary>[파츠] 식지 않는 광기 — 광란 종료 시 남길 스택 비율(0~1). 0이면 기존대로 전부 초기화.</summary>
     public void SetRetainRatio(float ratio) => _retainRatio = Mathf.Clamp01(ratio);
 
-    /// <summary>[파츠] 끝나지 않는 광란 — on이면 광란이 끝날 때 1회 자동 재점화(지속을 한 번 더 연장).</summary>
-    public void SetEndlessFrenzy(bool on) => _endlessFrenzy = on;
+    /// <summary>[파츠] 끝나지 않는 광란 — on이면 광란이 끝날 때 1회 자동 재점화(직전 광란 길이 × <paramref name="durationRatio"/>).</summary>
+    public void SetEndlessFrenzy(bool on, float durationRatio = 1f)
+    {
+        _endlessFrenzy = on;
+        _endlessRatio  = Mathf.Clamp(durationRatio, 0.1f, 1f);
+    }
 
     private void ExitFrenzy()
     {
@@ -128,22 +165,26 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
                 if (_endlessFrenzy && !_endlessUsed)
                 {
                     _endlessUsed = true;
-                    _frenzyEnd = Time.time + _lastFrenzyDuration;
+                    _frenzyEnd = Time.time + _lastFrenzyDuration * _endlessRatio;
                     OnChanged?.Invoke();
+                    OnFrenzyRenewed?.Invoke();
                 }
                 else ExitFrenzy();
             }
             return;                 // 광란 중 감쇠 없음
         }
         if (_stacks <= 0) return;
+        if (Time.time < HoldDecayUntil) return;
         if (Time.time - _lastAttackTime < _decayDelay) return;
+        int floor = _stacks >= _floor ? _floor : 0;   // 받침 위에 있을 때만 받친다
+        if (_stacks <= floor) return;
 
         _decayAccum += Time.deltaTime * _decayRate;
         if (_decayAccum >= 1f)
         {
             int dec = Mathf.FloorToInt(_decayAccum);
             _decayAccum -= dec;
-            _stacks = Mathf.Max(0, _stacks - dec);
+            _stacks = Mathf.Max(floor, _stacks - dec);
             OnChanged?.Invoke();
         }
     }

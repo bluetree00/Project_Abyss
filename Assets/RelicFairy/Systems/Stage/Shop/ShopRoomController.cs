@@ -30,14 +30,14 @@ public enum ShopPurchaseResult
 /// </summary>
 public class ShopRoomController : MonoBehaviour
 {
-    /// <summary>상인 잡담 — 월드스페이스 말풍선으로 주기 출력.</summary>
+    /// <summary>행상 잡담 — 웃는 버섯(10-01 NPC 교체). 밝은 반말 장사꾼. 월드스페이스 말풍선으로 주기 출력.</summary>
     private static readonly string[] ShopChatterLines =
     {
-        "천천히 둘러보게. 급할 것 없어.",
-        "심연 아래선 골드보다 목숨이 비싸지.",
-        "오늘 물건은 특별하다네.",
-        "값은 정직하게 받는다네.",
-        "살아서 돌아오면 또 오게나.",
+        "어서 와, 어서 와! 오늘도 살아 있네?",
+        "골드는 무겁잖아. 내가 덜어 줄게.",
+        "심연 바닥에서 주운 거야. 아직 따끈해.",
+        "오늘 특가는 오늘만! 내일 난 다른 데 피어 있을걸.",
+        "살아서 또 와. 단골은 소중하거든.",
     };
 
     // ── Constants ───────────────────────────────────────────
@@ -67,6 +67,8 @@ public class ShopRoomController : MonoBehaviour
     private GameObject _npcInstance;
     private GameObject[] _decorPrefabs;   // [0]=판매대(NPC 정면), 나머지=뒤쪽 소품
     private ShopNpcInteraction _npc;
+    private ServiceNpcReactor _reactor;   // 다가오면 알아보고 · 거래하면 반기는 몸짓(없는 NPC도 있다)
+    private int _goldAtOpen;              // 패널을 열 때 골드 — 닫을 때 줄었으면 거래한 것
 
     private bool _initialized;
     private bool _uiOpen;
@@ -281,10 +283,11 @@ public class ShopRoomController : MonoBehaviour
             _npc.OnInteract += HandleNpcInteract;
         else
             Debug.LogWarning("[ShopRoom] NPC 프리팹에 ShopNpcInteraction 없음");
+        _npcInstance.TryGetComponent(out _reactor);
 
         // 주기적 월드스페이스 잡담 — 상인 컨셉.
         _npcInstance.AddComponent<NpcAmbientChatter>()
-                    .Initialize(ShopChatterLines, 9f, new Color(1f, 0.9f, 0.6f));
+                    .Initialize(ShopChatterLines, 9f, new Color(1f, 0.9f, 0.6f), _npc != null ? _npc.ChatterHeight : null);
     }
 
     /// <summary>Initialize 전에 호출 — [0]=NPC 앞 판매대, 나머지=뒤쪽 소품.</summary>
@@ -349,12 +352,15 @@ public class ShopRoomController : MonoBehaviour
     {
         _uiOpen = true;
         if (_npc != null) _npc.SetInteractable(false);
+        _goldAtOpen = PlayerGold;
+        if (_reactor != null) _reactor.BeginTalk();
 
         var panel = await Managers.UI.ShowPopupUIAndGetAsync<UI_ShopPanel>();
         if (panel == null)
         {
             _uiOpen = false;
             if (_npc != null) _npc.SetInteractable(true);
+            if (_reactor != null) _reactor.EndTalk(false);
             Debug.LogWarning("[ShopRoom] UI_ShopPanel 로드 실패");
             return;
         }
@@ -366,6 +372,7 @@ public class ShopRoomController : MonoBehaviour
     {
         _uiOpen = false;
         if (_npc != null) _npc.SetInteractable(true);
+        if (_reactor != null) _reactor.EndTalk(PlayerGold < _goldAtOpen);   // 골드를 썼으면 반긴다
     }
 
     // ── 슬롯 생성 ───────────────────────────────────────────

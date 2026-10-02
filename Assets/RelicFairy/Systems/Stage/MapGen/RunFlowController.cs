@@ -72,6 +72,14 @@ public class RunFlowController : MonoBehaviour
     // 세이브 규칙(09-25 사용자 결정): <b>챕터 시작 한 번만</b> 저장한다. 챕터 첫 방에 들어서기 직전에 켜고,
     // 그 방 입장 끝에서 저장하며 끈다. 방마다 저장하던 시절엔 망한 방에서 게임을 껐다 켜 되감을 수 있었다.
     private bool     _chapterCheckpointPending;
+    // 이번 챕터에 「방 모양 보여 주기」(부감 팬 · 석문 낙하)를 한 번 했는가 — 그 뒤 전투방은 빠른 입장(10-01 f5 판단).
+    private bool     _chapterCombatIntroShown;
+
+    // 클리어 보상 수령 전 출구 보류(09-30 사용자 결정) — 예전엔 문이 보상보다 먼저 열려 룬을 그냥 지나칠 수 있었다.
+    // 출구는 클리어 시점에 굴려 두고(시퀀서·시드 순서 그대로) <b>공개만</b> 미룬다.
+    // 보류의 주인 = 그 보상을 굴린 RoomClearGate. 주인이 자기 보상 오브젝트가 사라진 것을 보고 푼다.
+    private RoomClearGate  _exitHoldOwner;
+    private List<DoorPlan> _heldExits;
 
     // 지금 방의 계획. ⚠️ 런 구조 자동 실측(RunStructureAutoPlayEditor)이 <b>리플렉션으로</b> 읽는다 —
     // 코드 검색에 안 걸리니 이름을 바꾸거나 지우면 그 도구가 매 틱 NRE를 낸다(09-25 실제로 났다).
@@ -163,6 +171,7 @@ public class RunFlowController : MonoBehaviour
                 _sequencer.CommitEntry(approach);
                 Debug.Log($"[RunFlow] 테스트: 보스 대기방 직행 — {approach.entry.pool_key}");
                 _chapterCheckpointPending = true;   // 이 런(챕터)의 첫 방
+                _chapterCombatIntroShown  = false;
                 await EnterRoomAsync(approach, DoorEdge.North, ct);
                 return;
             }
@@ -177,6 +186,7 @@ public class RunFlowController : MonoBehaviour
         }
 
         _chapterCheckpointPending = true;   // 챕터 첫 방 — 여기만 저장한다(챕터마다 씬을 새로 여는 경로·무한 루프 회귀 포함)
+        _chapterCombatIntroShown  = false;
         await EnterRoomAsync(new DoorPlan { kind = RoomPlanKind.Normal, entry = startEntry }, DoorEdge.North, ct);
     }
 
@@ -189,6 +199,7 @@ public class RunFlowController : MonoBehaviour
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(externalCt, this.GetCancellationTokenOnDestroy());
         var ct = _cts.Token;
+        _chapterCombatIntroShown = false;   // 이어하기 뒤 첫 전투방은 방 모양을 다시 보여 준다
 
         _resolvedStructureKey = structureKeyOverride;
         _baseAnchor   = anchor;
@@ -305,6 +316,7 @@ public class RunFlowController : MonoBehaviour
         }
 
         _chapterCheckpointPending = true;   // 다음 챕터 첫 방 — 체크포인트
+        _chapterCombatIntroShown  = false;
         await EnterRoomAsync(new DoorPlan { kind = RoomPlanKind.Normal, entry = startEntry }, DoorEdge.North, ct);
         Debug.Log($"[RunFlow] 챕터 {chapterNum} 진행 시작 — pool={key}");
     }
@@ -391,6 +403,11 @@ public class RunFlowController : MonoBehaviour
         var grb = GameRunBootstrapper.Instance;
         if (grb == null || plan.entry == null) return;
 
+        // 출구 보류는 방 단위 — 새 방으로 넘어오면 버린다. 이전 방 보상은 방 전환 정리(RoomScopedDrop)로
+        // 뒤늦게 사라지는데, 그때 오는 해제가 새 방 출구를 열지 않게 주인을 먼저 비운다.
+        _exitHoldOwner = null;
+        _heldExits     = null;
+
         // 게이트 포탈 VFX 참조 — 부트스트래퍼 직렬화 참조만 사용. null이면 포탈 없음(석문이 시각 담당).
         // (Addressable 폴백 제거 — 문짝에 안 맞는 대형 스킬 VFX가 되살아나는 문제)
         if (!_gatePortalTried)
@@ -414,7 +431,9 @@ public class RunFlowController : MonoBehaviour
         // (카메라가 heading 0으로 스냅되면 PlayerController가 불연속 스냅을 감지해 이동 기준도 정면으로 재정렬한다.)
         if (plan.kind == RoomPlanKind.Boss) _heading = (int)DoorEdge.North;
 
+        float tStart = Time.realtimeSinceStartup;   // 입장 단계 기록(전투방 한 줄 로그) — 방 체류 압축 실측용
         await ScreenFade.CoverAsync(dir, KindColor(plan.kind), _coverDuration, _coverCurve, ct); // 짧게 덮어 텔레포트 가림
+        float tCovered = Time.realtimeSinceStartup;
 
         var prevRoom = _current?.roomGO; // 새 방 준비까지 이전 방 유지 → 플레이어 발판 보존(추락 방지)
 
@@ -441,6 +460,17 @@ public class RunFlowController : MonoBehaviour
 
         _current = result;
         MovePlayer(result.entryPos);
+        float tBuilt = Time.realtimeSinceStartup;
+
+        // 빠른 입장(10-01 f5 판단 — 방 체류 압축): 챕터 첫 전투방만 부감 팬 · 석문 낙하로 방 모양을 보여 주고,
+        // 그 뒤 일반 · 정예 전투방은 화면이 드러나는 즉시(안개 베일이 걷히는 동안) 문을 닫고 웨이브를 연다.
+        // 디졸브는 기다리지 않는다 — 바닥 콜라이더는 디졸브 시작 때 이미 켜지고, 몬스터는 베일 속에서 나타난다.
+        bool quickEntry = _chapterCombatIntroShown
+                          && plan.kind != RoomPlanKind.Boss
+                          && !(_resuming && _resumedRoomCleared)
+                          && result.roomGO != null && result.roomGO.GetComponent<RoomWaveController>() != null;
+        // 석문은 화면이 덮여 있는 지금 닫힌 채로 세운다 — 드러난 뒤에 세우면 순간 등장한다(순간 등장 금지 규약).
+        if (quickEntry) SealRoom(SealDoorEntry.Closed);
 
         // 방 진입 연출(디졸브·리빌·대사·봉인) 동안 입력 잠금 — 봉인이 리빌/대사 뒤에 서므로,
         // 그 전에 플레이어가 출구로 달려나가면 뒤에서 석문이 떨어져 통로에 갇히는 문제를 막는다.
@@ -481,7 +511,10 @@ public class RunFlowController : MonoBehaviour
         if (_revealDelay > 0f)
             await UniTask.Delay(TimeSpan.FromSeconds(_revealDelay), ignoreTimeScale: true, cancellationToken: ct);
         await ScreenFade.RevealAsync(dir, _revealDuration, _revealCurve, ct);
-        await dissolve;
+        float tRevealed = Time.realtimeSinceStartup;
+        if (quickEntry) dissolve.Forget();
+        else            await dissolve;
+        float tDissolved = Time.realtimeSinceStartup;
 
         // 전환 중 컨트롤러 파괴/취소(플레이 종료 등) 가드 — 이후 transform 접근 시 MissingReferenceException 방지
         if (this == null || ct.IsCancellationRequested) { SetPlayerInput(true); return; }
@@ -489,6 +522,7 @@ public class RunFlowController : MonoBehaviour
         // 방 입장 대사 이벤트 — 보스룸 등 특정 방 진입 시 챕터별/방문변형 대사 재생.
         await PlayRoomEntryDialogueAsync(plan.kind, bossRoom != null && bossRoom.EntryDialogueAsBark, ct);
         if (this == null || ct.IsCancellationRequested) { SetPlayerInput(true); return; }
+        float tDialogue = Time.realtimeSinceStartup;
 
         _lastPlan    = plan;
         _hasLastPlan = true;
@@ -554,9 +588,10 @@ public class RunFlowController : MonoBehaviour
             // 입구 석문 슬램·출구 석문 낙하가 보스 등장 연출을 깨던 문제 제거.
             ClearGates();   // 이전 방 게이트 잔재만 정리 — 새 게이트는 만들지 않는다
         }
-        else if (freshCombat && introCam != null)
+        else if (freshCombat && introCam != null && !quickEntry)
         {
-            // 신규 전투방: 카메라가 방을 넓게 보여주는 동안 문이 잠기고, 그 후에 몬스터가 나온다.
+            _chapterCombatIntroShown = true;
+            // 신규 전투방(챕터 첫 전투방): 카메라가 방을 넓게 보여주는 동안 문이 잠기고, 그 후에 몬스터가 나온다.
             // (몬스터 Activate는 이 await 뒤 웨이브 분기에서 실행 → 연출 종료 전까지 스폰 안 됨)
             //
             // 게이트(통과 차단 콜라이더)는 연출 <b>전</b>에 세운다. 예전엔 onWide에서야 만들어져
@@ -584,12 +619,21 @@ public class RunFlowController : MonoBehaviour
         }
         else if (hasCombat)
         {
-            // 이어하기 클리어 전(재생성) 전투방 — 연출 없이 닫힌 상태로 봉인 (보스방은 위 분기에서 처리)
-            SealRoom(SealDoorEntry.Closed);
+            // 빠른 입장 전투방(위에서 화면이 덮인 동안 이미 봉인) · 이어하기 클리어 전(재생성) 전투방 — 연출 없이 닫힌 상태로 봉인
+            // (보스방은 위 분기에서 처리)
+            if (!quickEntry) SealRoom(SealDoorEntry.Closed);
         }
         else
         {
             OpenGatesOnly();     // 비전투방 — 문은 세우되 봉인하지 않는다
+        }
+
+        if (hasCombat)
+        {
+            float tReady = Time.realtimeSinceStartup;
+            Debug.Log($"[RunFlow] 입장 단계(초) — 덮기 {tCovered - tStart:0.00} · 짓기 {tBuilt - tCovered:0.00} · 드러내기 {tRevealed - tBuilt:0.00} · " +
+                      $"디졸브 대기 {tDissolved - tRevealed:0.00} · 대사 {tDialogue - tDissolved:0.00} · 부감·봉인 {tReady - tDialogue:0.00} · " +
+                      (quickEntry ? "빠른 입장" : "방 모양 보여 주기"));
         }
 
         // 봉인/게이트가 서고 나서야 조작 복원 — 리빌·대사 창 동안 출구로 못 나가게 잠갔던 것을 푼다.
@@ -659,6 +703,31 @@ public class RunFlowController : MonoBehaviour
     /// <summary>클리어 보상을 실제로 받았다. ClearRewardTrigger가 지급 확정 직후 호출(저장은 호출측이 이어서 수행).
     /// 이 플래그가 내려가야 이어하기에서 같은 보상을 다시 주지 않는다(이중지급 차단).</summary>
     public void NotifyClearRewardClaimed() => _currentRoomRewardPending = false;
+
+    /// <summary>
+    /// 이 방에 클리어 보상이 굴려졌다 — 그 보상을 받을 때까지 출구 공개를 미룬다. RoomClearGate가 굴림 직후 호출.
+    /// ⚠️ 클리어 통지(OnRoomCleared · OnResolved)보다 <b>먼저</b> 불려야 한다 — 호출부는 전부 Activate → 통지 순서다.
+    /// </summary>
+    public void HoldExitsForReward(RoomClearGate owner) => _exitHoldOwner = owner;
+
+    /// <summary>지금 이 게이트의 보상 때문에 출구가 실제로 닫혀 있는가 — 「보상을 받으면 길이 열린다」 안내 조건.</summary>
+    public bool IsExitHeldBy(RoomClearGate owner) => _heldExits != null && ReferenceEquals(_exitHoldOwner, owner);
+
+    /// <summary>
+    /// 보상 오브젝트가 사라졌다(수령 · 넘기기 · 지급 실패) — 미뤄 둔 출구를 공개한다.
+    /// 주인이 다르면 무시한다(이전 방 보상의 뒤늦은 해제).
+    /// </summary>
+    public void ReleaseExitsForReward(RoomClearGate owner)
+    {
+        if (!ReferenceEquals(_exitHoldOwner, owner)) return;
+        _exitHoldOwner = null;
+        if (_heldExits == null) return;   // 아직 클리어 통지 전 — HandleRoomCleared가 곧바로 공개한다
+
+        var exits = _heldExits;
+        _heldExits = null;
+        Debug.Log("[RunFlow] 클리어 보상 수령 — 출구 공개");
+        RevealGates(exits);
+    }
 
     /// <summary>방 입장 대사 이벤트. 현재는 보스룸만 — 챕터별 BossRoom_Ch{N}_Enter를 방문변형(첫/반복)으로 재생.</summary>
     /// <param name="asBark">true면 대사창 대신 자막으로 — 입력을 막지 않고 걸으면서 듣는다(보스방 공용 연출 스위치).</param>
@@ -800,7 +869,7 @@ public class RunFlowController : MonoBehaviour
         player?.SetInputEnabled(enabled);
     }
 
-    /// <summary>이전 방을 자식 단위로 몇 프레임에 나눠 파괴해 단발 대량 Destroy 스파이크를 분산한다.
+    /// <summary>이전 방을 바로 끄고, 자식 단위로 몇 프레임에 나눠 파괴해 단발 대량 Destroy 스파이크를 분산한다.
     /// 플레이어는 이미 신규 방으로 이동·이전 방은 화면 밖(리프프로그 앵커)이라 안전하다.</summary>
     private async UniTaskVoid DestroyRoomStaggeredAsync(GameObject room, CancellationToken ct)
     {
@@ -814,6 +883,12 @@ public class RunFlowController : MonoBehaviour
         RoomScopedDrop.ClearAll();
         // 장판(독/빛 등)도 씬 루트 스폰 + 긴 수명이라 방 파괴로 안 지워지고 다음 방 바닥에 남는다.
         GroundFieldBase.DespawnAll();
+
+        // 부수기 전에 먼저 끈다(화면은 아직 덮여 있다). Ch2~4 방은 직속 자식(블록)이 만 개 안팎이라 40개씩 나눠 부수면
+        // 에디터에서 1분 넘게 걸렸고, 그사이 다음 방들이 켜진 채 쌓였다 — 다음 방 NavMesh 굽기(장면 전체 수집)가
+        // 쌓인 방까지 모아 「짓기」가 방마다 ~1초씩 늘고(Ch3 0.9 → 9.4초), 리프프로그 앵커가 같은 두 방이 겹쳤다(10-02 실측).
+        // 꺼진 방은 굽기 · 물리 · 렌더에서 바로 빠진다. 부수기는 그대로 나눠서.
+        room.SetActive(false);
 
         var children = new List<Transform>(room.transform.childCount);
         foreach (Transform c in room.transform) children.Add(c);
@@ -848,6 +923,15 @@ public class RunFlowController : MonoBehaviour
         if (exits == null || exits.Count == 0)
         {
             Debug.Log("[RunFlow] 출구 없음 — 런 종료(보스 처치 등)");
+            return;
+        }
+
+        // 클리어 보상이 굴려진 방은 그 보상을 받을 때까지 출구를 열지 않는다 — ReleaseExitsForReward가 이어받는다.
+        // 보상이 없는 방(보스 · 상점/재련소/정제소 · 보스 전 통로 · 후보 0 · 방 포기)은 보류가 걸리지 않아 지금처럼 바로 열린다.
+        if (_exitHoldOwner != null)
+        {
+            _heldExits = exits;
+            Debug.Log("[RunFlow] 출구 보류 — 클리어 보상 수령 대기");
             return;
         }
         RevealGates(exits);
@@ -950,12 +1034,13 @@ public class RunFlowController : MonoBehaviour
         for (int i = 0; i < n; i++)
         {
             if (_gates[i] == null) continue;
-            RevealGateAsync(_gates[i], exits[i]).Forget();
-            revealed++;
 
             // 카메라가 정면 고정이라 옆쪽 출구는 화면 밖으로 나간다 —
             // 나침반 HUD로 "어느 방향에 어떤 방"인지 항상 보이게 한다.
             var tr = _gates[i].gate != null ? _gates[i].gate.transform : null;
+            // 배지가 붙는 출구는 월드 라벨을 만들지 않는다 — 같은 정보가 두 겹으로 떴다(10-01 전주기 시뮬, f5 판단: 배지 하나로).
+            RevealGateAsync(_gates[i], exits[i], withLabel: tr == null).Forget();
+            revealed++;
             if (tr != null)
                 marks.Add((tr,
                            KindGlyph(exits[i].kind) + " " + KindKor(exits[i].kind),
@@ -982,9 +1067,12 @@ public class RunFlowController : MonoBehaviour
         var go = CreateGatePanel("ProcGate_Sealed", slot, SealedColor, out var marker, out var blocker, withPortal: true);
 
         // 트리거 — 공개 후 통과 감지용 (봉인 중에는 armed=false)
+        // 개구부 선(문 칸 중심)에서 <b>바깥쪽(통로)으로만</b> 둔다. 방 안쪽까지 걸치면 싸우거나 보상을 받는 동안 이미
+        // 트리거 안에 서 있을 수 있고, 그러면 문이 열린 뒤 「들어옴」이 다시 오지 않아 문을 밟아도 넘어가지 않는다(10-01 전주기 시뮬 Ch4).
         var trig = go.AddComponent<BoxCollider>();
         trig.isTrigger = true;
-        trig.size = new Vector3(MarkerW(slot), MarkerH(slot), 3f);
+        trig.size   = new Vector3(MarkerW(slot), MarkerH(slot), GateTriggerDepth);
+        trig.center = new Vector3(0f, 0f, OutwardSign(go.transform, slot) * (GateTriggerDepth * 0.5f + GateTriggerInset));
 
         var gate = go.AddComponent<ProcRoomGate>();
         gate.InitializeSealed(slot.edge, OnGateChosen);
@@ -1077,6 +1165,11 @@ public class RunFlowController : MonoBehaviour
         void Apply(float k)
         {
             k = Mathf.Clamp01(k);
+            // 세로 배율이 0에 가까우면 끈다 — 납작한 뿌리 메시가 바닥에 남아 법선이 깨진 채
+            // 흰 테두리 · 검은 속으로 그려졌다(10-01 f5 전주기 시뮬). 끄면 가림 프록시 콜라이더도 같이 빠진다.
+            bool show = k > 0.01f;
+            if (door.gameObject.activeSelf != show) door.gameObject.SetActive(show);
+            if (!show) return;
             door.localScale = new Vector3(full.x, full.y * k, full.z);
             // 세로 스케일이 줄면 바운즈 중심도 내려온다 → 아래 끝이 항상 지면(-halfH)에 남도록 위치를 보정한다.
             // 유도: 다 자랐을 때(k=1) 바운즈 중심이 개구부 중앙(y=0)이므로 basePos.y = -b.center.y·sy.
@@ -1373,6 +1466,20 @@ public class RunFlowController : MonoBehaviour
     private static float MarkerW(ProcExitSlot slot) => slot.openingWidth  > 0.01f ? slot.openingWidth  : 4f;
     private static float MarkerH(ProcExitSlot slot) => slot.openingHeight > 0.01f ? slot.openingHeight : 3f;
 
+    /// <summary>출구 통과 트리거의 깊이(m) — 개구부 선에서 통로 쪽으로.</summary>
+    private const float GateTriggerDepth = 3f;
+    /// <summary>개구부 선과 트리거 사이 틈(m) — 봉인 패널(두께 0.12)에 붙어 선 플레이어가 공개 전부터 트리거에 걸치지 않게.</summary>
+    private const float GateTriggerInset = 0.25f;
+
+    /// <summary>게이트 로컬 +Z가 방 밖을 향하면 +1, 안을 향하면 −1. 방 루트(=방 중심)에서 문 쪽으로 가는 방향으로 판정한다.</summary>
+    private float OutwardSign(Transform gateTr, ProcExitSlot slot)
+    {
+        Vector3 center = _current?.roomGO != null ? _current.roomGO.transform.position : slot.worldPos;
+        Vector3 toDoor = slot.worldPos - center;
+        toDoor.y = 0f;
+        return Vector3.Dot(gateTr.forward, toDoor) >= 0f ? 1f : -1f;
+    }
+
 
     /// <summary>문 엣지 → 전환 와이프 스크린 방향. 직진=위 / 우턴=오른쪽 / 좌턴=왼쪽.</summary>
     private static Vector2 WipeDir(DoorEdge edge) => edge switch
@@ -1395,6 +1502,7 @@ public class RunFlowController : MonoBehaviour
         RoomPlanKind.Event   => new Color(0.30f, 0.20f, 0.05f),
         RoomPlanKind.Crucible => new Color(0.52f, 0.25f, 0.08f), // 구리톤(대장간)
         RoomPlanKind.Refinery => new Color(0.10f, 0.30f, 0.45f), // 청록톤(정제소)
+        RoomPlanKind.Rest     => new Color(0.30f, 0.18f, 0.08f), // 모닥불 호박빛(쉼터)
         _                    => new Color(0.05f, 0.06f, 0.10f), // Normal
     };
 
@@ -1408,7 +1516,8 @@ public class RunFlowController : MonoBehaviour
     }
 
     /// <summary>봉인 → 공개: 색 전환 + 글로우 펄스, 차단 콜라이더 해제, 통과 가능(arm).</summary>
-    private async UniTaskVoid RevealGateAsync(GateView view, DoorPlan plan)
+    /// <param name="withLabel">게이트 위 월드 라벨을 만들지 — 출구 배지(<see cref="ExitCompassHud"/>)가 붙는 출구는 false.</param>
+    private async UniTaskVoid RevealGateAsync(GateView view, DoorPlan plan, bool withLabel)
     {
         var ct  = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
         var rend = view.marker;
@@ -1425,30 +1534,27 @@ public class RunFlowController : MonoBehaviour
 
         // (통로는 방 빌드 시 MapBuilder.BuildDoorCorridor가 팔레트 블록으로 이미 깔아둔다 — 여기서 만들지 않는다.)
 
-        // 다음 방 정보 라벨 — 봉인 중엔 없다가 공개와 함께 페이드인
-        TextMeshProUGUI label = (rend != null) ? CreateGateLabel(rend.transform.parent, plan.kind, rend.transform.localScale.y) : null;
+        // 다음 방 정보 라벨 — 봉인 중엔 없다가 공개와 함께 페이드인(배지가 없는 출구만)
+        TextMeshProUGUI label = (rend != null && withLabel) ? CreateGateLabel(rend.transform.parent, plan.kind, rend.transform.localScale.y) : null;
 
         // ⚠️ 예전엔 여기서 marker 머티리얼의 색/발광을 애니메이션했는데, marker는 생성 시점에
         //    enabled=false로 꺼져 있어(석문이 시각 담당) <b>화면에 아무것도 나타나지 않았다</b> —
         //    라벨만 떠 있는 것처럼 보인 원인. 이제 연출은 석문 상승 + 통로가 담당하고, 여기선 라벨만 페이드인한다.
-        if (label != null)
+        // 공개 연출 시간 — 라벨이 없어도(배지 출구) 석문이 오르는 동안은 통과를 막아 둔다(예전과 같은 시점에 열린다).
+        float dur = Mathf.Max(0.01f, _gateRevealDuration);
+        try
         {
-            float dur = Mathf.Max(0.01f, _gateRevealDuration);
-            try
+            float t = 0f;
+            while (t < dur)
             {
-                float t = 0f;
-                while (t < dur)
-                {
-                    if (label == null) break;
-                    ct.ThrowIfCancellationRequested();
-                    t += Time.deltaTime;
-                    var lc = label.color; lc.a = Mathf.Clamp01(t / dur); label.color = lc;
-                    await UniTask.Yield();
-                }
+                ct.ThrowIfCancellationRequested();
+                t += Time.deltaTime;
+                if (label != null) { var lc = label.color; lc.a = Mathf.Clamp01(t / dur); label.color = lc; }
+                await UniTask.Yield();
             }
-            catch (OperationCanceledException) { return; }
-            if (label != null) { var lc = label.color; lc.a = 1f; label.color = lc; }
         }
+        catch (OperationCanceledException) { return; }
+        if (label != null) { var lc = label.color; lc.a = 1f; label.color = lc; }
 
         if (view.blocker != null) view.blocker.enabled = false; // 통과 차단 해제
         view.gate?.Reveal(plan);                                 // plan 바인딩 + arm
@@ -1481,6 +1587,8 @@ public class RunFlowController : MonoBehaviour
         var c = KindBrightColor(kind); c.a = 0f;
         tmp.color            = c;
         TMPOutlineHelper.ApplySoftShadow(tmp);
+        // 월드 글이라 게이트 앞에선 화면 가운데를 덮을 만큼 커졌다 — 화면 크기 상한 + 게이트 앞 옅어지기(10-01)
+        go.AddComponent<GateLabelScreenCap>().Init(tmp.fontSize * rt.localScale.y);
         return tmp;
     }
 
@@ -1494,6 +1602,7 @@ public class RunFlowController : MonoBehaviour
         RoomPlanKind.Event    => new Color(1f, 0.85f, 0.35f),
         RoomPlanKind.Crucible => new Color(1f, 0.60f, 0.25f),
         RoomPlanKind.Refinery => new Color(0.45f, 0.85f, 1f),
+        RoomPlanKind.Rest     => new Color(1f, 0.79f, 0.51f),
         _                     => new Color(0.85f, 0.90f, 1f), // 전투(Normal)
     };
 
@@ -1508,6 +1617,7 @@ public class RunFlowController : MonoBehaviour
         // ⚠️ ● ◈ ▪ 는 DNFForgedBlade TTF에 없어 □로 깨진다(폰트 화이트리스트: · × — … ← ↑ → ↓ ↗ ↘ ■ □ ▲ ▶ ▼ ◀ ◆ ◇).
         RoomPlanKind.Crucible => "▼",
         RoomPlanKind.Refinery => "◀",
+        RoomPlanKind.Rest     => "□",
         _                     => "·",
     };
 
@@ -1520,6 +1630,7 @@ public class RunFlowController : MonoBehaviour
             case RoomPlanKind.Shop:     return "물건 구매";
             case RoomPlanKind.Crucible: return "무기 강화 · 승급";
             case RoomPlanKind.Refinery: return "룬 정제";
+            case RoomPlanKind.Rest:     return "쉬거나 · 벼리거나";
             case RoomPlanKind.Event:    return "시험 · 선택";
             case RoomPlanKind.Boss:     return "결전";
             case RoomPlanKind.PreBoss:  return "보스 직전";
@@ -1550,6 +1661,7 @@ public class RunFlowController : MonoBehaviour
         RoomPlanKind.Event   => "이벤트",
         RoomPlanKind.Crucible => "재련소",
         RoomPlanKind.Refinery => "정제소",
+        RoomPlanKind.Rest     => "쉼터",
         _                    => "전투",
     };
 

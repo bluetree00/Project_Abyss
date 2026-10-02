@@ -38,6 +38,10 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
     private const float  ArenaFallbackHalfSize = 14f;     // 바닥 상자를 못 찾을 때 — Ch1 아레나 28×28
     private const float  DirectHitMinInterval  = 0.1f;    // 한 번 휘두름의 다단 판정을 「한 대」로 센다(간판 약점)
     private const string HeartGroggyStatusId   = "fg_heart";
+    private const float  TrailWidth            = 1.5f;    // 악몽 특성 「흔적」 — 돌진이 지나간 길에 남는 가시 줄 폭 (m)
+    private const float  TrailLifetime         = 3f;      // 줄 수명(초) — 자라남 0.25 · 옅어짐 0.4 포함
+    private const float  TrailMinLength        = 1.5f;    // 이보다 짧게 움직였으면 남기지 않는다 (m)
+    private const float  TrailVfxScale         = 0.6f;    // 가시 이펙트 크기 — 띠(3.5 m)보다 좁은 줄이라 작게(화면 확인 전 추정값)
 
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
@@ -179,9 +183,11 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
     private bool            _arenaResolved;
     private bool            _thornWidened;
     private bool            _page2Tinted;
+    private float           _arenaGuardTimer;
     private bool            _lastHudInvulnerable;
     private int             _directHitCount;
     private float           _lastDirectHitTime = -1f;
+    private readonly List<BossStageHazard> _chargeTrails = new();   // 악몽 특성 「흔적」 가시 줄 — 간판 시작 · 풀 반환 때 걷는다
 
     // 목소리 사운드
     private float _voiceSfxTimer;
@@ -348,6 +354,10 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
 
         _runner?.Tick(dt);
 
+        // 패턴이 없을 때 1초마다 — 맵 밖(벽 너머 · 외딴 NavMesh)에 서 있으면 안쪽으로 되돌린다(09-30)
+        if ((_runner == null || !_runner.IsPatternActive) && BossArenaGuard.Due(ref _arenaGuardTimer, dt))
+            BossArenaGuard.ReturnInside(transform, _agent, _runtime?.PlayerTarget, ArenaCenter);
+
         UpdateVoiceSfx();
         UpdateFootstepSound();
 
@@ -440,6 +450,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
     {
         UnbindBossHudIfBound();
         ClearStageHazard();   // 가시 띠는 보스가 죽으면 스스로 사라지지만, 죽지 않고 풀로 돌아가면 남는다
+        ClearChargeTrails();
         base.OnDisable();
     }
 
@@ -716,6 +727,37 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
         if (_thornWidened || _stageHazard == null) return;
         _thornWidened = true;
         _stageHazard.Widen(extra);
+    }
+
+    /// <summary>
+    /// 악몽 특성 「흔적」 — 돌진 한 번이 끝난 순간, 실제로 지나간 길(<paramref name="from"/> → <paramref name="to"/>)에 가시 줄을 남긴다.
+    /// 악몽 모드 전투 · 패턴 중에만(전환 · 장면엔 돌진이 없지만 막아 둔다). 돌진 뒤에 생기므로 예고 · 고정 시간은 그대로다.
+    /// </summary>
+    internal void LeaveChargeTrail(Vector3 from, Vector3 to)
+    {
+        if (IsDead || !Pages.NightmareMode || Pages.Transitioning || !IsInSpecialState) return;
+        float len = Vector2.Distance(new Vector2(from.x, from.z), new Vector2(to.x, to.z));
+        if (len < TrailMinLength) return;
+
+        for (int i = _chargeTrails.Count - 1; i >= 0; i--)
+            if (_chargeTrails[i] == null) _chargeTrails.RemoveAt(i);   // 수명이 다해 스스로 사라진 줄
+        _chargeTrails.Add(BossStageHazard.CreateLine(this, from, to, ArenaFloorY, TrailWidth, TrailLifetime,
+                                                     _thornBandColor, _thornBandVfxPrefab, _thornBandVfxScale * TrailVfxScale, _thornBandDamageMult));
+        Debug.Log($"[BossTrait] 숲 흔적 — 가시 줄 {len:0.0} m", this);
+    }
+
+    /// <summary>「흔적」 가시 줄을 모두 걷는다 — 간판 「숲의 심장」 시작(차오르는 가시 · 약점 원과 겹치지 않게) · 풀 반환.</summary>
+    internal void ClearChargeTrails()
+    {
+        int n = 0;
+        foreach (var t in _chargeTrails)
+        {
+            if (t == null) continue;
+            Destroy(t.gameObject);
+            n++;
+        }
+        _chargeTrails.Clear();
+        if (n > 0) Debug.Log($"[BossTrait] 숲 흔적 — 가시 줄 {n}개 걷음", this);
     }
 
     /// <summary>간판 성공 — 그로기 <paramref name="seconds"/>초 + 받는 피해 증가. HUD에 무방비 창을 알린다.</summary>

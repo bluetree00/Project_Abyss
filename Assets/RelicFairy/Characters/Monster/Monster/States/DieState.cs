@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 
@@ -12,6 +13,9 @@ namespace RelicFairy.Monster
 /// </summary>
 public class DieState : IMonsterState
 {
+    /// <summary>몸 치우기를 끝 장면이 맡은 몬스터 — 봉인기 보스는 봉인된 채 잠시 남았다가 디졸브(10-03, <see cref="BossStoryScenes"/>). 여기선 치우지 않는다.</summary>
+    public static readonly HashSet<MonsterBase> SceneDespawn = new();
+
     public virtual void Enter(MonsterContext ctx)
     {
         ctx.Runtime.IsDead = true;
@@ -169,7 +173,7 @@ public class DieState : IMonsterState
         }
         catch (System.OperationCanceledException) { return; }
 
-        if (monster == null) return;
+        if (monster == null || SceneDespawn.Contains(monster)) return;
 
         if (dissolveDuration > 0f)
         {

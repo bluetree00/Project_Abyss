@@ -146,6 +146,7 @@ public sealed class BuffCell : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _icon.sprite = _iconResolver != null
             ? _iconResolver(item.IconKey)
             : EffectIconRegistry.GetSprite(item.IconKey);
+        _icon.color = EffectIconRegistry.TintFor(item.IconKey);   // 흰 글리프에 계열색(10-02)
 
         bool hasStack = item.Stacks > 1;
         // 끌 때 글자도 비운다 — 재사용 칸이라 HUD 하드 가드가 다시 켜면 앞 버프의 「×N」이 남았다(09-28).

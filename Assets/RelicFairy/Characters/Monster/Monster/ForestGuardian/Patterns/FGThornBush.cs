@@ -9,6 +9,10 @@ namespace RelicFairy.Monster
 /// </summary>
 public sealed class FGThornBush : MonoBehaviour
 {
+    // ── Constants ──────────────────────────────────────────────
+    private const float AppearSeconds = 0.4f;   // 가시가 디졸브로 돋는 시간(10-03)
+    private const float VanishSeconds = 0.6f;   // 가시가 디졸브로 꺼지는 시간(10-03)
+
     // ── Private ────────────────────────────────────────────────
     private MonsterBase _boss;
     private float       _radius;
@@ -16,6 +20,10 @@ public sealed class FGThornBush : MonoBehaviour
     private float       _tickSeconds;
     private float       _tick;
     private int         _damage;
+    private GameObject  _decal;       // 바닥 원 — 반투명이라 디졸브하지 않는다
+    private GameObject  _fx;          // 가시 메시 — 디졸브 대상(루트째 디졸브하면 바닥 원까지 불투명으로 깨진다)
+    private float       _appearEnd;   // 등장 디졸브가 끝나는 시각 — 그 전에 꺼지면 겹치지 않게 바로 없앤다
+    private bool        _vanishing;
 
     // ── Public Methods ─────────────────────────────────────────
     /// <param name="damagePerTick">틱당 피해(시전 시점의 보스 공격력 × 배율).</param>
@@ -36,6 +44,7 @@ public sealed class FGThornBush : MonoBehaviour
         PatternGuideHelper.SetFlow(decal, color);
         PatternGuideHelper.SetProgress(decal, 1f);
         decal.transform.SetParent(go.transform, true);
+        bush._decal = decal;
 
         if (vfxPrefab != null)
         {
@@ -56,18 +65,36 @@ public sealed class FGThornBush : MonoBehaviour
                 mpb.SetColor("_BaseColor", new Color(color.r, color.g, color.b, 1f));
                 foreach (var mr in meshes) mr.SetPropertyBlock(mpb);
             }
+            // 가시가 땅에서 디졸브로 돋는다(10-03) — 루트(~FG_ThornBush)가 아니라 fx만: 부모·자식 동시 디졸브 금지
+            bush._fx        = fx;
+            bush._appearEnd = Time.time + AppearSeconds;
+            DissolveEffect.PlayAppear(fx, AppearSeconds);
         }
         return bush;
+    }
+
+    /// <summary>
+    /// 덤불을 거둔다 — 틱 피해와 바닥 원은 곧바로 멈추고, 가시는 디졸브로 꺼진 뒤 사라진다(10-03).
+    /// 퇴장 디졸브는 원본 재질을 되돌리지 않으므로 끝나자마자 Destroy한다. 등장 디졸브가 아직 돌면 겹치지 않게 바로 없앤다.
+    /// </summary>
+    public void Vanish()
+    {
+        if (_vanishing) return;
+        _vanishing = true;
+        enabled    = false;   // 틱 정지
+        if (_decal != null) Destroy(_decal);
+        if (_fx == null || Time.time < _appearEnd) { Destroy(gameObject); return; }
+        DissolveEffect.PlayDisappear(_fx, VanishSeconds, () => { if (this != null) Destroy(gameObject); });
     }
 
     // ── Lifecycle ──────────────────────────────────────────────
     private void Update()
     {
-        if (_boss == null || _boss.IsDead || !_boss.isActiveAndEnabled) { Destroy(gameObject); return; }
+        if (_boss == null || _boss.IsDead || !_boss.isActiveAndEnabled) { Vanish(); return; }
 
         float dt = Time.deltaTime;
         _life -= dt;
-        if (_life <= 0f) { Destroy(gameObject); return; }
+        if (_life <= 0f) { Vanish(); return; }
 
         _tick -= dt;
         if (_tick > 0f) return;

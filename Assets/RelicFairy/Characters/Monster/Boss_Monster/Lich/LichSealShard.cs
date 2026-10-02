@@ -29,6 +29,8 @@ public sealed class LichSealShard : MonoBehaviour, IDamageable
     private const float  RiseDepth      = 20f;
     private const float  ActiveGlow     = 3f;
     private const float  ChargeGlow     = 7f;
+    private const float  ShatterSeconds = 0.6f;   // 디졸브로 스러진다(10-03)
+    private const float  PipsLift       = 0.7f;   // 남은 타격 표식 — 조각 위(m)
 
     private static readonly int   EmissionId = Shader.PropertyToID("_EmissionColor");
     private static readonly Color OffColor   = new(0.15f, 0.15f, 0.2f);
@@ -45,6 +47,8 @@ public sealed class LichSealShard : MonoBehaviour, IDamageable
     private float         _disabledUntil = -1f;
     private float         _glow = ActiveGlow;
     private bool          _rising = true;   // 솟아오르는 동안은 흔들지 않는다
+    private bool          _gone;            // 스러지는 중 — 멈춘다
+    private LichHitPips   _pips;            // 남은 타격 표식(10-03)
 
     // ── Properties ────────────────────────────────────────────────
     public static IReadOnlyList<LichSealShard> Live => s_live;
@@ -57,29 +61,34 @@ public sealed class LichSealShard : MonoBehaviour, IDamageable
     // ── Lifecycle ─────────────────────────────────────────────────
     private void Update()
     {
-        if (_rising) return;
+        if (_rising || _gone) return;
         // 천천히 떠 있다(꺼지면 가라앉은 채).
         float bob = IsDisabled ? -0.3f : Mathf.Sin(Time.time * 1.7f + _home.x) * BobAmplitude;
         var p = transform.position;
         p.y = _home.y + bob;
         transform.position = p;
-        if (!IsDisabled && _glow <= 0.01f) ApplyLook(PatternGuideHelper.Breakable, ActiveGlow);   // 소등이 끝나면 다시 켠다
+        if (!IsDisabled && _glow <= 0.01f)   // 소등이 끝나면 다시 켠다
+        {
+            ApplyLook(PatternGuideHelper.Breakable, ActiveGlow);
+            if (_pips != null) { _pips.Set(0); _pips.Show(true); }
+        }
     }
 
     private void OnDestroy() => s_live.Remove(this);
 
     // ── Public Methods ────────────────────────────────────────────
-    /// <summary>제단 네 방위에 조각이 없으면 띄운다(이미 있으면 그대로). 심연에서 솟아오른다.</summary>
-    public static void EnsureSpawned(Vector3 center, float distance)
+    /// <summary>제단 네 방위에 조각이 없으면 띄운다(이미 있으면 그대로). 심연에서 솟아오른다. 새로 띄웠으면 true.</summary>
+    public static bool EnsureSpawned(Vector3 center, float distance)
     {
         s_live.RemoveAll(s => s == null);
-        if (s_live.Count > 0) return;
+        if (s_live.Count > 0) return false;
         for (int i = 0; i < 4; i++)
         {
             // 북동 · 남동 · 남서 · 북서 — 시계 방향 순서(광선 순서 = 예고)
             Vector3 dir = Quaternion.Euler(0f, 45f + 90f * i, 0f) * Vector3.forward;
             s_live.Add(Create(center + dir * distance + Vector3.up * FloatHeight, center));
         }
+        return true;
     }
 
     /// <summary>조각을 모두 거둔다 — T3 · 전투 종료.</summary>
@@ -96,6 +105,7 @@ public sealed class LichSealShard : MonoBehaviour, IDamageable
         if (Time.time - _lastHitTime < HitInterval) return;
         _lastHitTime = Time.time;
         _hits++;
+        if (_pips != null) _pips.Set(_hits);
         Vector3 at = transform.position + Vector3.up * (Height * 0.5f);
         LichVfx.Play(LichVfxSlot.SealStoneBurst, at, Quaternion.identity, 0.4f);
         LichSfx.Play(LichSfxSlot.SealStoneHit, at);
@@ -104,6 +114,7 @@ public sealed class LichSealShard : MonoBehaviour, IDamageable
         _hits          = 0;
         _disabledUntil = Time.time + DisableSeconds;
         ApplyLook(OffColor, 0f);
+        if (_pips != null) _pips.Show(false);
         LichVfx.Play(LichVfxSlot.WardBreak, at, Quaternion.identity, 0.5f);
         UI_BossBark.Show("봉인 조각 소등 — 5초", BossBarkType.PatternAnnounce);
     }
@@ -146,6 +157,7 @@ public sealed class LichSealShard : MonoBehaviour, IDamageable
         {
             shard._model.transform.localScale *= ModelScale;
             shard._renderers = shard._model.GetComponentsInChildren<Renderer>(true);
+            DissolveEffect.PlayAppear(shard._model, RiseSeconds);   // 솟는 동안 디졸브로 드러난다(10-03)
         }
         else
         {
@@ -153,6 +165,7 @@ public sealed class LichSealShard : MonoBehaviour, IDamageable
             shard._fallback.transform.SetParent(go.transform, true);
         }
         shard.ApplyLook(PatternGuideHelper.Breakable, ActiveGlow);
+        shard._pips = LichHitPips.Create(go.transform, Height + PipsLift, HitsToDisable);
         shard.RiseAsync(shard.destroyCancellationToken).Forget();
         return shard;
     }
@@ -181,7 +194,12 @@ public sealed class LichSealShard : MonoBehaviour, IDamageable
     {
         Vector3 at = transform.position + Vector3.up * (Height * 0.5f);
         LichVfx.Play(LichVfxSlot.SealStoneBurst, at, Quaternion.identity, 1.2f);
-        Destroy(gameObject);
+        // 디졸브로 스러진 뒤 파괴(10-03 — 툭 꺼지지 않게). 그동안 맞지 않고 표식은 걷는다.
+        _gone = true;
+        if (TryGetComponent<Collider>(out var col)) col.enabled = false;
+        if (_pips != null) _pips.Show(false);
+        if (_fallback != null) PatternGuideHelper.SafeDestroy(ref _fallback);   // 기본 도형(투명 가이드)은 디졸브 대상이 아니다
+        LichPatternUtil.DissolveAndDestroy(_model, gameObject, ShatterSeconds);
     }
 
     private void ApplyLook(Color color, float glow)

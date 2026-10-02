@@ -37,6 +37,7 @@ public class WorldCovenantAltar : MonoBehaviour
     private bool         _playerInRange;
     private bool         _opening;
     private bool         _used;
+    private CovenantWriteBoard _board;   // 이 제단의 서약서 판 — 닫았다 열어도 같은 카드 · 남은 교체(설계서 §3)
     private Transform    _camTransform;
     private TextMeshPro  _worldText;
     private GameObject   _promptGo;
@@ -114,6 +115,21 @@ public class WorldCovenantAltar : MonoBehaviour
         _tomeVisual.position = _tomeBasePos + new Vector3(0f, bob, 0f);
     }
 
+    /// <summary>
+    /// 이 대기방에서 서약서를 쓸 수 <b>없다고 확실한가</b> — 악몽 「부서진 맹세」. 런이 아직 없으면 false(모른다).
+    /// 대기방 문(<see cref="StartRoomGate"/>)은 서약서에 한 줄 새겨야 열리므로, 쓸 수 없을 때는 이 값으로 조건을 푼다(10-02 소프트락).
+    /// 서약서가 가득 차도 고쳐 쓰기는 된다(설계서 §3) — 「가득 참」은 막힘이 아니다.
+    /// </summary>
+    public static bool AssembleBlockedHere
+    {
+        get
+        {
+            var handler = GameRunBootstrapper.Instance?.Run?.CovenantHandler;
+            if (handler == null) return false;
+            return NightmareRules.BlocksCovenantAltar;
+        }
+    }
+
     private async UniTaskVoid OpenAsync(System.Threading.CancellationToken ct)
     {
         var run = GameRunBootstrapper.Instance?.Run;
@@ -125,28 +141,34 @@ public class WorldCovenantAltar : MonoBehaviour
             return;
         }
 
-        if (run.CovenantHandler.Covenants.Count >= CovenantHandler.Capacity)
-        {
-            // 칸이 아직 늘어날 수 있으면 어디서 늘리는지 한 줄로 알린다 — 막히기만 하면 이유를 모른다.
-            ShowNotice(CovenantHandler.Capacity < CovenantHandler.MaxCovenants
-                ? "서약이 가득 찼다 — 기억의 제단에서 칸을 늘릴 수 있다"
-                : "서약이 가득 찼다");
-            return;
-        }
-
         _opening = true;
         ShowPrompt(false);
 
         try
         {
-            bool forceSilver = run.CovenantHandler.Covenants.Count == 0;
-            string id = await CovenantAssembleUI.ChooseAsync(forceSilver, null, ct);
+            // 「한 장의 서약서」(10-02) — 문장이 없으면 첫 쓰기(조건 + 첫 결과), 있으면 이어 쓰기 · 고쳐 쓰기.
+            // 첫 서약 실버 고정은 없앴다(S2 — 한 장뿐이라 첫 절이 기준이 된다).
+            var handler  = run.CovenantHandler;
+            var sentence = handler.Sentence;
+            int before   = sentence != null ? sentence.ResultCount : 0;
+            string id = sentence == null
+                ? await CovenantAssembleUI.ChooseAsync(false, null, ct)
+                : await CovenantAssembleUI.WriteAsync(sentence, _board ??= new CovenantWriteBoard(Environment.TickCount), ct);
 
-            if (id != null && run.CovenantHandler.TryAdd(id))
+            if (id != null && handler.TryWriteSentence(id))
             {
                 _used = true;
-                var covenant = run.CovenantHandler.Find(id);
-                ShowNotice($"<color=#CC88FF>서약</color> {covenant?.DisplayName ?? id} 새김!");
+                int after = handler.Sentence?.ResultCount ?? 0;
+                ShowNotice(sentence == null
+                    ? "<color=#CC88FF>서약서</color> 첫 줄을 새겼다"
+                    : after > before
+                        ? $"<color=#CC88FF>서약서</color> {after}절 — 한 줄을 이어 썼다"
+                        : "<color=#CC88FF>서약서</color> 한 줄을 고쳐 썼다");
+                // 멀린 · 그림자 한 마디(설계서 §6) — 첫 쓰기 · 이어 쓰기 · 고쳐 쓰기 · 가득 참
+                CovenantVoice.Say(sentence == null ? CovenantVoice.FirstWrite
+                                  : after <= before ? CovenantVoice.Rewrite
+                                  : after >= CovenantGrammar.MaxResultsNow ? CovenantVoice.Full
+                                  : CovenantVoice.Append);
                 SetSpentVisual();
                 ClearGuide(markDone: true);   // 첫 서약 완성 → 가이드 종료(영속 기록)
                 OnCovenantAssembled?.Invoke();  // 시작방 게이트 열림 연출 트리거(수신측이 딜레이 적용)

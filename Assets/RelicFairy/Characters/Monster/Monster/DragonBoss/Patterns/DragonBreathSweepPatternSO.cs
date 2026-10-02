@@ -48,11 +48,15 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     [SerializeField] private float _flameBreathBaseWidth = 5f;
     [SerializeField] private float _flameBreathScale = 1f;
     [SerializeField] private float _breathHorizReach = 0f;
+    [Tooltip("Effect_19 원본(배율 1)에서 눈에 보이는 불줄기 반폭(m) — 판정 반폭(경고 행 수 × 셀 ÷ 2)에 맞춰 가로만 늘리는 기준. 에디터에서 실측 후 조정")]
+    [SerializeField] private float _flameBreathVisualHalfWidth = 3.5f;
 
     [Header("Flame Tsunami")]
     [SerializeField] private GameObject _flameTsunamiPrefab;
     [SerializeField] private int _tsunamiColInterval = 3;
     [SerializeField] private float _tsunamiScale = 0.2f;
+    [Tooltip("Effect_51 원본(배율 1)의 불길 원 반경(m, 프리팹 Circle 12.5) — 잔불 가로를 판정 반폭까지 늘리는 기준")]
+    [SerializeField] private float _tsunamiVisualRadius = 12.5f;
     [Tooltip("바닥에 남는 불길 이펙트가 생성될 때 재생할 사운드")]
     [SerializeField] private AudioClip _residualFireSfx;
 
@@ -127,9 +131,11 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     public float BreathPreviewAngle     => _breathPreviewAngle;
     public float BreathHorizReach => _breathHorizReach;
     public float FlameBreathScale => _flameBreathScale;
+    public float FlameBreathVisualHalfWidth => _flameBreathVisualHalfWidth;
     public GameObject FlameTsunamiPrefab => _flameTsunamiPrefab;
     public int TsunamiColInterval => _tsunamiColInterval;
     public float TsunamiScale => _tsunamiScale;
+    public float TsunamiVisualRadius => _tsunamiVisualRadius;
     public AudioClip ResidualFireSfx => _residualFireSfx;
     public int BreathDamage => _breathDamage;
     public float BreathDamageMultiplier => _breathDamageMultiplier;
@@ -232,6 +238,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     private Vector3 _sweepDir   = Vector3.right;
     private Vector3 _sweepRight = Vector3.forward;
     private Vector3 _laneCenter;
+    private Vector3 _sweepRootPos;   // 휩쓸기 가상 경로(레인 기준, 벽 밖에서 시작 · 끝) — 판정은 이 위치로, 몸은 벽 안에 가둔 자리로(10-03)
 
     private bool     _hovering;
     private bool     _animSlowActive;
@@ -361,7 +368,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         UpdateLivingTsunamis(ctx);
         UpdateLivingScorches();
 
-        Vector3 targetPos = GetSweepStartPosition(ctx);
+        Vector3 targetPos = KeepBodyInside(ctx, GetSweepStartPosition(ctx));
         Vector3 toTarget  = targetPos - ctx.Transform.position;
         toTarget.y = 0f;
 
@@ -391,7 +398,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         // 도착 시점의 플레이어 위치로 레인 중심 재계산 → 비행 중 플레이어 이동 반영
         UpdateLaneCenterToPlayer(ctx);
 
-        ctx.Transform.SetPositionAndRotation(GetSweepStartPosition(ctx),
+        ctx.Transform.SetPositionAndRotation(KeepBodyInside(ctx, GetSweepStartPosition(ctx)),
             Quaternion.LookRotation(_sweepDir, Vector3.up));
         SpawnWarnTilesSorted(ctx);
         _revealedTileCount = 0;
@@ -416,7 +423,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         PickSweepLine(ctx);
         // 2번째/3번째 sweep: 텔레포트 후 짧은 경고장판만 표시 (탑뷰·슬로우 없음)
         ctx.Transform.SetPositionAndRotation(
-            GetSweepStartPosition(ctx), Quaternion.LookRotation(_sweepDir, Vector3.up));
+            KeepBodyInside(ctx, GetSweepStartPosition(ctx)), Quaternion.LookRotation(_sweepDir, Vector3.up));
         SpawnWarnTilesSorted(ctx);
         _revealedTileCount = 0;
         _phase = Phase.Warning;
@@ -445,8 +452,9 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         if (_timer < warnDur) return;
 
         CleanupWarn();
+        _sweepRootPos = GetSweepStartPosition(ctx);
         ctx.Transform.SetPositionAndRotation(
-            GetSweepStartPosition(ctx), Quaternion.LookRotation(_sweepDir, Vector3.up));
+            KeepBodyInside(ctx, _sweepRootPos), Quaternion.LookRotation(_sweepDir, Vector3.up));
         PlayAnim(ctx, ResolveAirChaseAnim(ctx));
         CreateFollowLight(ctx);
         SpawnFlameBreath(ctx);
@@ -476,7 +484,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         UpdateLivingTsunamis(ctx);
         UpdateLivingScorches();
 
-        float tipProj = Vector3.Dot(ctx.Transform.position - _laneCenter, _sweepDir) + _horizontalReach;
+        float tipProj = Vector3.Dot(_sweepRootPos - _laneCenter, _sweepDir) + _horizontalReach;
 
         // 첫 sweep 슬로우: 경고장판 1/5 지점 도달 시 드래곤 애니 속도만 복원 (카메라는 패턴 종료 시 복귀)
         if (_sweepIndex == 0 && _animSlowActive && tipProj >= _slowUntilProj)
@@ -668,8 +676,10 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     {
         Vector3 target = _laneCenter + _sweepDir * _flyThroughEndProj;
         target.y = ctx.Runtime.SpawnPosition.y + Data.HideHeight;
-        ctx.Transform.position = Vector3.MoveTowards(
-            ctx.Transform.position, target, Data.FlySpeed * Time.deltaTime);
+        _sweepRootPos = Vector3.MoveTowards(_sweepRootPos, target, Data.FlySpeed * Time.deltaTime);
+        // 레인은 벽 밖(시작 −7 m · 끝 +3 m)까지 지나가지만 몸은 벽 안면 − 몸 반경 안에 머문다 —
+        // 그동안 불줄기가 가상 경로의 끝을 겨눈다(GetBreathRotation)(10-03 개선 1-3)
+        ctx.Transform.position = KeepBodyInside(ctx, _sweepRootPos);
     }
 
     // 마무리(잔불·메테오 소멸 대기) — 아레나 안쪽 가장자리 상공에서 플레이어를 보며 정지 비행한다.
@@ -677,7 +687,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     //         (보스 시뮬: 휩쓸기 중 화룡 거리 중앙 35 m · 근접 사거리 안 38%). 높이는 그대로라 원거리로 친다.
     private void MoveDragonToInnerHover(MonsterContext ctx)
     {
-        Vector3 target = ClampInsideArena(_laneCenter + _sweepDir * _sweepEndProj, InnerHoverMargin);
+        Vector3 target = KeepBodyInside(ctx, ClampInsideArena(_laneCenter + _sweepDir * _sweepEndProj, InnerHoverMargin));
         target.y = ctx.Runtime.SpawnPosition.y + Data.HideHeight;
         ctx.Transform.position = Vector3.MoveTowards(
             ctx.Transform.position, target, Data.FlySpeed * Time.deltaTime);
@@ -699,6 +709,10 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             PlayAnim(ctx, Data.HoverStateName);
         }
     }
+
+    /// <summary>화룡 몸을 벽 안면 − 몸 반경 안으로(10-03 개선 1-3) — 휩쓸기는 일부러 벽 밖에서 시작 · 끝나 머리 · 날개가 벽 너머로 나갔다.</summary>
+    private static Vector3 KeepBodyInside(MonsterContext ctx, Vector3 p)
+        => DragonPatternFloorUtils.ClampInsideWalls(p, DragonPatternFloorUtils.BodyRadiusOf(ctx));
 
     private static Vector3 ClampInsideArena(Vector3 p, float margin)
     {
@@ -723,15 +737,18 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         _flameBreathGo = BossEffectPool.Spawn(
             Data.FlameBreathPrefab,
             ctx.Transform.position,
-            GetBreathRotation());
-        _flameBreathGo.transform.localScale = Vector3.one * Data.FlameBreathScale;
+            GetBreathRotation(ctx));
+        // 판정 반폭(7.5 m)보다 불줄기가 훨씬 가늘었다 — 가로(X)만 판정 폭까지 늘린다. 판정은 그대로(10-03 개선 1-1)
+        float s     = Data.FlameBreathScale;
+        float widen = Mathf.Max(1f, _halfLaneWidth / Mathf.Max(0.1f, Data.FlameBreathVisualHalfWidth * s));
+        _flameBreathGo.transform.localScale = new Vector3(s * widen, s, s);
     }
 
     private void UpdateFlameBreath(MonsterContext ctx)
     {
         if (_flameBreathGo == null) return;
         _flameBreathGo.transform.SetPositionAndRotation(
-            ctx.Transform.position, GetBreathRotation());
+            ctx.Transform.position, GetBreathRotation(ctx));
     }
 
     private void CleanupFlameBreath()
@@ -739,21 +756,18 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         Managers.Sound?.StopEffect(_flameBreathAudioSource, Data.BreathSfx);
 
         if (_flameBreathGo == null) return;
+        _flameBreathGo.transform.localScale = Vector3.one;   // 가로만 늘린 배율을 풀에 남기지 않는다 — 등장 브레스가 같은 프리팹을 배율 없이 꺼낸다(10-03)
         BossEffectPool.Release(_flameBreathGo);
         _flameBreathGo = null;
     }
 
-    private Quaternion GetBreathRotation()
+    // 불줄기 끝 = 가상 경로 앞 _horizontalReach 지점의 바닥 — 몸이 벽 안에 머물러 있어도 판정이 지나는 줄을 겨눈다(10-03 개선 1-3).
+    // 몸이 가둬지지 않았을 땐 예전과 같은 방향이다(BreathHorizReach가 0이면 _horizontalReach · HideHeight가 BreathDownAngle 비율).
+    private Quaternion GetBreathRotation(MonsterContext ctx)
     {
-        Vector3 dir;
-        if (Data.BreathHorizReach > 0f)
-            dir = (_sweepDir * _horizontalReach + Vector3.down * Data.HideHeight).normalized;
-        else
-        {
-            float downRad = Data.BreathDownAngle * Mathf.Deg2Rad;
-            dir = (_sweepDir * Mathf.Cos(downRad) + Vector3.down * Mathf.Sin(downRad)).normalized;
-        }
-        return Quaternion.LookRotation(dir, Vector3.up);
+        Vector3 dir = _sweepRootPos + _sweepDir * _horizontalReach + Vector3.down * Data.HideHeight - ctx.Transform.position;
+        if (dir.sqrMagnitude < 0.0001f) dir = Vector3.down;
+        return Quaternion.LookRotation(dir.normalized, Vector3.up);
     }
 
     private void CreateFollowLight(MonsterContext ctx)
@@ -808,7 +822,9 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         pos.y = GetFloorY(pos, ctx) + 0.05f;
         Quaternion rot = Quaternion.LookRotation(_sweepDir, Vector3.up);
         var go = BossEffectPool.Spawn(Data.FlameTsunamiPrefab, pos, rot);
-        go.transform.localScale = Vector3.one * Data.TsunamiScale;
+        // 잔불 띠 가로를 판정 반폭(7.5 m)까지 — 0.2배면 가운데 5 m만 타 보여 빈 바닥에서 맞았다(10-03 개선 1-1). 판정은 그대로
+        float across = Mathf.Max(Data.TsunamiScale, _halfLaneWidth / Mathf.Max(0.1f, Data.TsunamiVisualRadius));
+        go.transform.localScale = new Vector3(across, Data.TsunamiScale, Data.TsunamiScale);
 
         foreach (var mb in go.GetComponentsInChildren<VariousTranslateMove>(true))
             mb.enabled = false;
@@ -928,8 +944,9 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
+        // 화염 해일(잔불) — 0.25초 틱이라 약. 강으로 두면 틱마다 날아감 → 같은 줄에서 재피격이 되풀이됐다(10-01 감사: 받은 피해의 81%)
         player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.TsunamiDamageMultiplier), ctx.Monster.gameObject,
-                          false, HitWeight.Heavy);   // 화염 해일 — 강
+                          false, HitWeight.Light);
         PlayerStatusEffectVisuals.ApplyScreenEffectTimed(Data.ScreenFireEffectPrefab, 1f, Data.ScreenFireGraceDuration, "StatusEffectScreen_" + StatusEffectType.Slow);
     }
 
@@ -1193,7 +1210,8 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
         Vector3 landBase = DragonBossRoomContext.CellToWorld(cx, cz, 0f);
         Vector3 landPos;
-        if (Physics.Raycast(new Vector3(landBase.x, landBase.y + 50f, landBase.z), Vector3.down, out RaycastHit hit, 100f))
+        if (Physics.Raycast(new Vector3(landBase.x, landBase.y + 50f, landBase.z), Vector3.down, out RaycastHit hit, 100f,
+                            DragonPatternFloorUtils.GroundMask, QueryTriggerInteraction.Ignore))   // 바닥만(10-01 감사 — 화룡 몸 · 트리거 위 착지)
             landPos = hit.point + Vector3.up * 0.05f;
         else
         {

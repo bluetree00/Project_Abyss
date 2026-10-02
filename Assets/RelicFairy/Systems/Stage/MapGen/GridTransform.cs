@@ -11,14 +11,17 @@ using System.Text;
 /// </summary>
 public static class GridTransform
 {
-    /// <summary>좌우 미러(열 반전). 변형 + 턴 좌/우 결정에 사용.</summary>
+    /// <summary>좌우 미러(열 반전). 변형 + 턴 좌/우 결정에 사용. 방향을 가진 토큰(NS 접미사)은 동↔서를 바꾼다.</summary>
     public static string MirrorX(string gridCsv)
     {
         if (string.IsNullOrWhiteSpace(gridCsv)) return gridCsv;
 
         var cells = ParseCells(gridCsv);
         foreach (var row in cells)
+        {
             System.Array.Reverse(row);
+            for (int c = 0; c < row.Length; c++) row[c] = TurnFacing(row[c], mirror: true, quarterTurnsCW: 0);
+        }
         return Serialize(cells);
     }
 
@@ -33,7 +36,26 @@ public static class GridTransform
         var cells = ParseCells(gridCsv);
         for (int t = 0; t < turns; t++)
             cells = Rotate90CW(cells);
+        foreach (var row in cells)
+            for (int c = 0; c < row.Length; c++) row[c] = TurnFacing(row[c], mirror: false, quarterTurnsCW: turns);
         return Serialize(cells);
+    }
+
+    // 방향 접미사 순서(시계 방향) — 북 · 동 · 남 · 서
+    private const string Compass = "nesw";
+
+    /// <summary>
+    /// 방향을 가진 토큰의 접미사를 칸과 함께 돌린다. 지금은 서비스 NPC 자리 <c>NSn/NSe/NSs/NSw</c> 하나.
+    /// 칸만 돌리면 「방 기준 방향」이 어긋나 돌아간 방에서 NPC가 카운터 옆 · 벽을 봤다(10-01).
+    /// </summary>
+    private static string TurnFacing(string token, bool mirror, int quarterTurnsCW)
+    {
+        if (token == null || token.Length != 3 || token[0] != 'N' || token[1] != 'S') return token;
+        int i = Compass.IndexOf(char.ToLowerInvariant(token[2]));
+        if (i < 0) return token;
+        if (mirror && (i == 1 || i == 3)) i = 4 - i;   // 동 ↔ 서
+        i = (i + quarterTurnsCW) % 4;
+        return "NS" + Compass[i];
     }
 
     // ── 내부 ──────────────────────────────────────

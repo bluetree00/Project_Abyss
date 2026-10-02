@@ -27,6 +27,9 @@ public class FGGrabThrowPatternSO : BossPatternSO
     [Tooltip("잡기 판정까지 대기 시간 (초) — 손이 닿는 시점")]
     public float grabTime = 0.3f;
 
+    [Tooltip("손을 뻗기 전 예고 (초) — 준비 자세로 가이드가 이만큼 먼저 차오른다. 잡기 0.18초만으로는 보고 피할 수 없었다(10-01 감사)")]
+    public float grabWarnLead = 0.32f;
+
     [Tooltip("첫 번째 내리찍기 데미지 시점 (grabTime 기준 경과 초)")]
     public float slam1Offset = 1.7f;
 
@@ -111,7 +114,8 @@ public class FGGrabThrowPatternSO : BossPatternSO
 
 public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
 {
-    private const string AnimGrab = "GrabBiteShakeSpit";
+    private const string AnimGrab  = "GrabBiteShakeSpit";
+    private const string AnimReady = "AttackReady";
 
     private enum Phase { Windup, Hold, Recovery }
 
@@ -126,6 +130,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
     private PlayerController _heldPlayer;
     private Vector3          _bossForward;
     private GameObject       _warningGO;
+    private bool             _grabAnimStarted;   // 예고(준비 자세) 뒤 손 뻗기 애니를 틀었나
 
     // Generic 리그 손 본 캐시 (GetBoneTransform은 Humanoid 전용이므로 이름 탐색 사용)
     private Transform _rightHandBone;
@@ -170,7 +175,8 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         SpawnWarning(ctx);
         if (ctx.Animator != null)
             ctx.Animator.speed = SpeedMult(ctx);
-        PlayAnim(ctx, AnimGrab);
+        _grabAnimStarted = Data.grabWarnLead <= 0f;
+        PlayAnim(ctx, _grabAnimStarted ? AnimGrab : AnimReady);   // 예고 동안은 준비 자세 — 손은 예고가 끝나야 뻗는다
     }
 
     public override void Update(MonsterContext ctx)
@@ -181,10 +187,18 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         switch (_phase)
         {
             case Phase.Windup:
-                // 가이드 채우기 — 다 차는 순간이 잡기 판정(그 순간 치운다)
-                if (Data.grabTime > 0f)
-                    PatternGuideHelper.SetProgress(_warningGO, _timer / Data.grabTime);
-                if (_timer >= Data.grabTime)
+            {
+                // 가이드 채우기 — 예고(준비 자세) + 손 뻗기. 다 차는 순간이 잡기 판정(그 순간 치운다)
+                float lead  = Mathf.Max(0f, Data.grabWarnLead);
+                float total = lead + Data.grabTime;
+                if (total > 0f)
+                    PatternGuideHelper.SetProgress(_warningGO, _timer / total);
+                if (!_grabAnimStarted && _timer >= lead)
+                {
+                    _grabAnimStarted = true;
+                    PlayAnim(ctx, AnimGrab);
+                }
+                if (_timer >= total)
                 {
                     DespawnWarning();
                     TryGrab(ctx);
@@ -202,6 +216,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
                     }
                 }
                 break;
+            }
 
             case Phase.Hold:
                 _holdTimer += dt;
@@ -308,6 +323,8 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
 
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
+        // 회피 무적(저스트 회피 창 포함) 중이면 손이 빗나간다 — 다른 공격과 같은 규칙(10-01)
+        if (player.IsInvincible) return;
 
         _grabbed     = true;
         _wasGrabbed  = true;

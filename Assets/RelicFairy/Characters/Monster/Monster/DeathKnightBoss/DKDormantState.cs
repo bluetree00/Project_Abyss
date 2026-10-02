@@ -102,6 +102,7 @@ public class DKDormantState : IMonsterState
 
         var ct  = dk.destroyCancellationToken;
         var cam = GameCameraController.Instance;
+        BossBinding.Attach(dk, StoryProgress.DeathKnight);   // 옛 봉인 사슬(10-03 S2)
 
         try
         {
@@ -146,6 +147,11 @@ public class DKDormantState : IMonsterState
             {
                 if (windVfx != null) BossEffectPool.Release(windVfx);
             }
+
+            // 해방기 — 클로즈업 동안 사슬이 끊어지고 포효(10-03 S2-3)
+            if (StoryProgress.IsLiberated) dk.ShowSwordVisual();   // 마지막 사슬을 검으로 베어 떨쳐낸다
+            await BossStoryScenes.UnbindAsync(dk, StoryProgress.DeathKnight, ct);
+            if (StoryProgress.IsLiberated) dk.HideSwordVisual();
 
             // 플레이어 카메라로 복귀
             if (cam != null)

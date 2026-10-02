@@ -30,6 +30,8 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     // 카드 안 세로 순서(카드 위끝 기준). 아트가 오기 전에 자리를 먼저 굳혀 둔다 —
     // 스프라이트만 꽂으면 되도록, 칸 크기는 납품 명세(문서 §개화 리소스)와 같은 값이다.
     private const float SymbolBox  = 168f;   // 문양 칸 — 계열 문양 또는 파츠 전용 문양
+    private const float MemorySymbolBox = 128f;   // 기억 카드(v2) 문양 칸 — 아래에 기억 한 줄 자리를 낸다
+    private const float MemoryLineH     = 46f;    // 기억 한 줄 칸(이름 위끝 -244까지)
     private const float SymbolTop  = -62f;
     private const float NameTop    = -244f;
     private const float DividerTop = -288f;
@@ -58,6 +60,9 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     private readonly List<GameObject> _lockedRoots = new();   // 잠긴 자리(해금하면 채워질 칸)
     private int _lockedSlots;
     private List<RelicPartEntry> _candidates;
+    private RelicDraft _draft;                 // 유물 성장 v2 — 카드 3장(새 조각 · 선명하게 · 메아리 · 잔향)
+    private GameObject _redrawBtn;
+    private TMP_Text _titleText;
     private int _selected = -1;
     private bool _built;
     private bool _skinned;          // 아트 로드 성공 — 선택 피드백을 색 틴트 대신 밝기로 처리
@@ -73,6 +78,12 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
 
     /// <summary>선택된 파츠. 미선택 종료(취소 경로)는 없다.</summary>
     public RelicPartEntry Result { get; private set; }
+
+    /// <summary>[v2] 고른 카드.</summary>
+    public RelicDraftCard ResultCard { get; private set; }
+
+    /// <summary>[v2] 「다시 떠올리기」를 눌렀다 — 부르는 쪽이 새로 굴려 창을 다시 연다.</summary>
+    public bool RedrawRequested { get; private set; }
 
     private sealed class CardView
     {
@@ -125,6 +136,38 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
 
         BuildCards();
         SetSelected(-1);
+    }
+
+    /// <summary>
+    /// [유물 성장 v2] 굴려 둔 카드 3장으로 「되살아난 기억」 창을 꾸민다. ShowPopupUIAndGetAsync 직후 호출.
+    /// <paramref name="canRedraw"/> = 제단 「다시 떠올리기」가 열려 있고 이번 런에 아직 안 썼다.
+    /// </summary>
+    public void Setup(RelicDraft draft, bool canRedraw, string relicName)
+    {
+        _draft        = draft;
+        _candidates   = null;
+        _lockedSlots  = 0;
+        ResultCard    = null;
+        RedrawRequested = false;
+
+        if (draft == null || draft.Cards.Count == 0)
+        {
+            Debug.LogWarning("[UI_RelicPartDraftPopup] 카드 없음 — 즉시 닫음");
+            _interactionTcs?.TrySetResult();
+            ClosePopupUI();
+            return;
+        }
+
+        // 창 이름 · 부제 — 문구 정본 d6 시나리오 §2-4(「기억을 되찾아간다」)
+        if (_titleText == null) _titleText = ShopUIStyle.FindDeep(transform, "Title")?.GetComponent<TMP_Text>();
+        if (_titleText != null) _titleText.text = "되살아난 기억";
+        if (_subtitle != null)
+            _subtitle.text = $"{(string.IsNullOrEmpty(relicName) ? "유물" : relicName)}이 무엇을 먼저 떠올릴까 — 하나를 붙잡는다";
+
+        BuildCards();
+        EnsureRedrawButton(canRedraw);
+        SetSelected(-1);
+        if (_confirmLabel != null) _confirmLabel.text = "붙잡는다";   // 고르기 전에도 v2 문구(구운 프리팹의 「장착」이 남지 않게)
     }
 
     // ── Build ──
@@ -205,7 +248,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         // 이게 없으면 넓어진 판에 원래 크기 카드가 떠 있게 된다.
         var layer = UIProportional.EnsureScaledLayer(_windowRoot, "CardLayer", WindowW, WindowH) ?? (RectTransform)_windowRoot;
 
-        int n = _candidates.Count;
+        int n = _draft != null ? _draft.Cards.Count : _candidates.Count;
         // 잠긴 자리도 줄의 일부다 — 폭 산출과 중앙 정렬에 함께 넣어야 줄이 흐트러지지 않고,
         // 해금 뒤에 카드가 "그 자리로" 들어오는 것으로 보인다.
         int slots = n + _lockedSlots;
@@ -220,7 +263,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         for (int i = 0; i < n; i++)
         {
             int idx = i;   // 클로저 캡처
-            var entry = _candidates[i];
+            var entry = _draft != null ? _draft.Cards[i].Entry : _candidates[i];
 
             var card = ShopUIStyle.MakeFrame(layer, $"Card{i}",
                 ShopUIStyle.CardBorder, ShopUIStyle.CardFill, 2f, raycast: true);
@@ -245,7 +288,8 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             if (!_skinned) UITheme.RoundFrame(view.Fill, 14f);
             _cards.Add(view);
 
-            BuildCardContent(card.transform, entry);
+            if (_draft != null) BuildMemoryCardContent(card.transform, _draft.Cards[i]);
+            else BuildCardContent(card.transform, entry);
         }
 
         for (int i = 0; i < _lockedSlots; i++)
@@ -350,6 +394,221 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             : $"선행 · {Managers.RelicParts?.GetById(entry.requires)?.part_name ?? entry.requires}";   // id가 아니라 이름(09-29)
     }
 
+    // ── v2 카드(유물 기억) ──
+
+    private static readonly Color GradeFaint   = new(0.62f, 0.64f, 0.72f, 1f);   // 흐릿 — 옅은 회청
+    private static readonly Color GradeClear   = new(0.55f, 0.80f, 0.95f, 1f);   // 선명 — 맑은 하늘
+    private static readonly Color GradeRadiant = new(0.98f, 0.82f, 0.38f, 1f);   // 찬란 — 금
+    private const string LockedLineColor = "#6E6E78";
+    private const string NewLineColor    = "#F2D27A";
+
+    private static Color GradeColor(RelicMemoryGrade g) => g switch
+    {
+        RelicMemoryGrade.Radiant => GradeRadiant,
+        RelicMemoryGrade.Clear   => GradeClear,
+        _                        => GradeFaint,
+    };
+
+    /// <summary>매달리는 자리 기호(카드 문양 자리 임시 — 전용 아트는 계획 4).</summary>
+    private static string AnchorMark(RelicDraftCard c)
+    {
+        if (c.Kind == RelicDraftCardKind.Residue) return "잔";
+        string a = c.Entry != null ? c.Entry.anchor : c.Anchor;
+        if (c.Entry != null && c.Entry.IsReaction)
+            return c.Entry.rune_element switch
+            {
+                "fire" => "화", "ice" => "빙", "electric" => "뇌", "grass" => "독", "light" => "광", "dark" => "암", _ => "응",
+            };
+        return a switch
+        {
+            RelicPartAnchor.Dawn => "새", RelicPartAnchor.Noon => "낮", RelicPartAnchor.Dusk => "놀",
+            RelicPartAnchor.DawnNoon or RelicPartAnchor.NoonDusk => "궤",
+            RelicPartAnchor.R10 => "10", RelicPartAnchor.R20 => "20", RelicPartAnchor.R30 => "30", RelicPartAnchor.R40 => "40",
+            RelicPartAnchor.Frenzy => "광", RelicPartAnchor.Judgment => "심",
+            _ => "·",
+        };
+    }
+
+    private static string RuneElementLabel(string el) => el switch
+    {
+        "fire" => "불", "ice" => "얼음", "electric" => "번개", "grass" => "독", "light" => "빛", "dark" => "어둠", _ => el,
+    };
+
+    private void BuildMemoryCardContent(Transform card, RelicDraftCard c)
+    {
+        var entry = c.Entry;
+        Color tone = GradeColor(c.Grade);
+
+        // 등급 빛줄기(상단)
+        var ribbon = ShopUIStyle.MakeImage(card, "Ribbon", tone);
+        ShopUIStyle.Anchor(ribbon.rectTransform,
+            new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -3f), new Vector2(-28f, 6f));
+        ribbon.sprite = UITheme.SoftBand;
+
+        // 칩 — 등급 · 자리(또는 카드 종류)
+        string chip = c.Kind switch
+        {
+            RelicDraftCardKind.Sharpen => $"선명하게 → {RelicMemoryOdds.Label(c.Grade)}",
+            RelicDraftCardKind.Echo    => $"메아리 · {RelicPartAnchor.Label(c.Anchor)}",
+            RelicDraftCardKind.Residue => "잔향",
+            _                          => $"{RelicMemoryOdds.Label(c.Grade)} · {RelicPartAnchor.Label(entry?.anchor)}",
+        };
+        var chipBox = ShopUIStyle.MakeFrame(card, "KindChip", tone, ShopUIStyle.IconBg, 2f);
+        ShopUIStyle.Anchor((RectTransform)chipBox.transform.parent,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -20f), new Vector2(Mathf.Min(_cardW - 40f, 230f), 36f));
+        var chipLabel = ShopUIStyle.MakeText(chipBox.transform, "KindLabel", 17f, FontStyles.Bold,
+            TextAlignmentOptions.Center, tone);
+        ShopUIStyle.Stretch(chipLabel.rectTransform);
+        chipLabel.text = chip;
+
+        // 문양 자리 — 등급색 원반 + 자리 기호. 기억 카드는 원반을 줄이고(168 → 128) 그 아래에 기억 한 줄을 둔다
+        // (설명 · 꼬리말 칸은 이미 꽉 차 있어 아래에 둘 자리가 없다).
+        var disc = ShopUIStyle.MakeImage(card, "SymbolDisc", new Color(tone.r * 0.22f, tone.g * 0.22f, tone.b * 0.22f, 1f));
+        ShopUIStyle.Anchor(disc.rectTransform,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, SymbolTop), new Vector2(MemorySymbolBox, MemorySymbolBox));
+        disc.sprite = UIProceduralSprites.RoundedRect(radius: 40f, feather: 20f, size: 168);
+        var mark = ShopUIStyle.MakeText(disc.transform, "SymbolMark", 64f, FontStyles.Bold, TextAlignmentOptions.Center, tone);
+        ShopUIStyle.Stretch(mark.rectTransform);
+        mark.text = AnchorMark(c);
+
+        // 기억 한 줄(d6 시나리오 B2 · memory_line) — 등급이 가림을 정한다(흐릿 = 앞 절반 「…」 · 선명 = 한 줄 · 찬란 = 둘째 줄까지)
+        string memory = c.Kind == RelicDraftCardKind.NewFragment || c.Kind == RelicDraftCardKind.Sharpen
+            ? RelicMemoryRecall.MemoryLineFor(entry, c.Grade) : string.Empty;
+        if (!string.IsNullOrEmpty(memory))
+        {
+            var mem = ShopUIStyle.MakeText(card, "MemoryLine", 15f, FontStyles.Italic, TextAlignmentOptions.Center, ShopUIStyle.TextDim);
+            ShopUIStyle.Anchor(mem.rectTransform,
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0f, SymbolTop - MemorySymbolBox - 4f), new Vector2(_cardW - 40f, MemoryLineH));
+            mem.enableWordWrapping = true;
+            mem.enableAutoSizing = true;
+            mem.fontSizeMin = 12f;
+            mem.fontSizeMax = 15f;
+            mem.text = memory;
+        }
+
+        // 이름
+        var name = ShopUIStyle.MakeText(card, "Name", 25f, FontStyles.Bold, TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
+        ShopUIStyle.Anchor(name.rectTransform,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, NameTop), new Vector2(_cardW - 32f, 36f));
+        name.text = c.Kind switch
+        {
+            RelicDraftCardKind.Echo    => "메아리",
+            RelicDraftCardKind.Residue => "잔향",
+            _                          => entry?.part_name ?? entry?.part_id ?? string.Empty,
+        };
+
+        var divider = ShopUIStyle.MakeImage(card, "Divider", ShopUIStyle.BronzeLine);
+        ShopUIStyle.Anchor(divider.rectTransform,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, DividerTop), new Vector2(_cardW - 72f, 2f));
+
+        // 줄 — 드러난 줄은 밝게, 새로 열리는 줄은 금, 잠긴 줄은 흐리게(「더 선명했다면」)
+        var desc = ShopUIStyle.MakeText(card, "Desc", 16f, FontStyles.Normal, TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
+        ShopUIStyle.Anchor(desc.rectTransform,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, DescTop), new Vector2(_cardW - 40f, DescH));
+        desc.enableWordWrapping = true;
+        desc.enableAutoSizing = true;
+        desc.fontSizeMin = 12f;
+        desc.fontSizeMax = 16f;
+        desc.text = MemoryCardBody(c);
+
+        // 꼬리말 — 반응 조건 · 공명 미리 보기 · 메아리 효과 · 잔향 정수
+        var footBand = ShopUIStyle.MakeImage(card, "FootBand", new Color(tone.r * 0.16f, tone.g * 0.16f, tone.b * 0.16f, 1f));
+        ShopUIStyle.Anchor(footBand.rectTransform,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, FootTop), new Vector2(_cardW - 24f, FootH));
+        footBand.sprite = UIProceduralSprites.RoundedRect(radius: 12f, feather: 6f, size: 64);
+        var foot = ShopUIStyle.MakeText(footBand.transform, "Foot", 15f, FontStyles.Normal, TextAlignmentOptions.Center, ShopUIStyle.TextDim);
+        ShopUIStyle.Anchor(foot.rectTransform,
+            new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(-24f, -10f));
+        foot.enableWordWrapping = true;
+        foot.enableAutoSizing = true;
+        foot.fontSizeMin = 12f;
+        foot.fontSizeMax = 15f;
+        foot.text = MemoryCardFoot(c);
+    }
+
+    private static string MemoryCardBody(RelicDraftCard c)
+    {
+        var loadout = AppBootstrapper.Instance?.Loadout;
+        switch (c.Kind)
+        {
+            case RelicDraftCardKind.Echo:
+                return c.Anchor != null && c.Anchor.StartsWith("r")
+                    ? $"계단 「{RelicPartAnchor.Label(c.Anchor)}」에 빈 받침을 놓는다 — 조각 없이도 계단이 이어진 것으로 센다."
+                    : $"「{RelicPartAnchor.Label(c.Anchor)}」 공명을 하나 더 센다.";
+            case RelicDraftCardKind.Residue:
+                return "모든 기억이 선명하다. 남은 빛이 정수가 된다.";
+        }
+        var e = c.Entry;
+        if (e == null) return string.Empty;
+        int shown = (int)c.Grade;
+        int had   = c.Kind == RelicDraftCardKind.Sharpen && loadout != null ? (int)loadout.GetRelicPartGrade(e.part_id) : 0;
+        var sb = new System.Text.StringBuilder();
+        for (int n = 1; n <= 3; n++)
+        {
+            var line = e.Line(n);
+            if (string.IsNullOrEmpty(line)) continue;
+            if (sb.Length > 0) sb.Append('\n');
+            string mark = n == 1 ? "①" : n == 2 ? "②" : "③";
+            if (n > shown)              sb.Append("<color=").Append(LockedLineColor).Append(">◇ ").Append(line).Append("</color>");
+            else if (had > 0 && n > had) sb.Append("<color=").Append(NewLineColor).Append('>').Append(mark).Append(' ').Append(line).Append("</color>");
+            else                        sb.Append(mark).Append(' ').Append(line);
+        }
+        return sb.ToString();
+    }
+
+    private static string MemoryCardFoot(RelicDraftCard c)
+    {
+        var loadout = AppBootstrapper.Instance?.Loadout;
+        string relicId = c.Entry != null ? c.Entry.relic_id : loadout?.Relic != null ? loadout.Relic.Id.ToString().ToLower() : null;
+        switch (c.Kind)
+        {
+            case RelicDraftCardKind.Residue: return $"정수 +{c.ResidueEssence}";
+            case RelicDraftCardKind.Echo:
+                return RelicResonance.PreviewLine(loadout, relicId, c.Anchor) ?? "공명 칸이 하나 찬다";
+        }
+        var e = c.Entry;
+        if (e == null) return string.Empty;
+        if (e.IsReaction) return $"룬 {RuneElementLabel(e.rune_element)} 1단계 ✓ — 반응 조각";
+        if (c.Kind == RelicDraftCardKind.Sharpen) return "다음 줄이 떠오른다";
+        return RelicResonance.PreviewLine(loadout, relicId, e.anchor) ?? $"{RelicPartAnchor.Label(e.anchor)}에 매달린다";
+    }
+
+    /// <summary>「다시 떠올리기」(제단 노드, 런당 1회) — 장착 버튼 왼쪽. 없으면 숨긴다.</summary>
+    private void EnsureRedrawButton(bool show)
+    {
+        if (_redrawBtn == null && show && _windowRoot != null)
+        {
+            var frame = ShopUIStyle.MakeFrame(_windowRoot, "RedrawBtn", ShopUIStyle.BronzeLine, ShopUIStyle.BandFill, 2f, raycast: true);
+            ShopUIStyle.Anchor((RectTransform)frame.transform.parent,
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                new Vector2(-250f, 30f), new Vector2(220f, 56f));
+            UITheme.StyleFrameButton(frame, UITheme.CtaTintOff);
+            var label = ShopUIStyle.MakeText(frame.transform, "Label", 18f, FontStyles.Bold, TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
+            ShopUIStyle.Stretch(label.rectTransform);
+            label.text = "다시 떠올리기";
+            TMPOutlineHelper.ApplySoftShadow(label);
+            _redrawBtn = frame.transform.parent.gameObject;
+            AddClick(_redrawBtn, OnRedrawClicked);
+        }
+        if (_redrawBtn != null) _redrawBtn.SetActive(show);
+    }
+
+    private void OnRedrawClicked()
+    {
+        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        RedrawRequested = true;
+        _interactionTcs?.TrySetResult();
+        ClosePopupUI();
+    }
+
     // ── 선택 상태 ──
 
     private void SetSelected(int index)
@@ -376,7 +635,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         if (_confirmLabel != null)
         {
             _confirmLabel.color = hasSel ? ShopUIStyle.TextPrimary : ShopUIStyle.TextDim;
-            if (hasSel) _confirmLabel.text = "장착";   // 미선택 안내를 띄웠다면 되돌린다
+            if (hasSel) _confirmLabel.text = _draft != null ? "붙잡는다" : "장착";   // 미선택 안내를 띄웠다면 되돌린다
         }
         if (_confirmBtnImg != null)
             _confirmBtnImg.color = _themed ? (hasSel ? UITheme.CtaTint : UITheme.CtaTintOff)
@@ -406,7 +665,8 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
 
     private void OnConfirmClicked()
     {
-        if (_selected < 0 || _candidates == null || _selected >= _candidates.Count)
+        int count = _draft != null ? _draft.Cards.Count : _candidates?.Count ?? 0;
+        if (_selected < 0 || _selected >= count)
         {
             // 미선택. 조용히 return하면 버튼이 죽은 것으로 읽힌다 —
             // 무엇이 빠졌는지 버튼이 직접 말하게 한다(룬 선택 팝업과 같은 규약).
@@ -416,7 +676,12 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         }
 
         Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
-        Result = _candidates[_selected];
+        if (_draft != null)
+        {
+            ResultCard = _draft.Cards[_selected];
+            Result     = ResultCard.Entry;
+        }
+        else Result = _candidates[_selected];
         _interactionTcs?.TrySetResult();
         ClosePopupUI();
     }

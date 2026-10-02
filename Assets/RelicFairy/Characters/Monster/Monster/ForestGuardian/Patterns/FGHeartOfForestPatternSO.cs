@@ -132,6 +132,7 @@ public class FGHeartOfForestState : FullLockState<FGHeartOfForestPatternSO>
 
         var fg = ctx.Monster as ForestGuardianMonster;
         (ctx.Monster as IPagedBoss)?.Pages?.MarkSignatureDone();   // 끊기더라도 다시 쓰지 않는다 — 한 전투에 한 번
+        if (fg != null) fg.ClearChargeTrails();   // 악몽 특성 「흔적」 — 간판은 깨끗한 바닥에서
 
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
         {
@@ -308,9 +309,9 @@ public class FGHeartOfForestState : FullLockState<FGHeartOfForestPatternSO>
         var player = ctx.Runtime.CachedPlayer;
         if (player != null && player.RuntimeStats != null)
         {
-            // 최대 체력 비율 피해 — 체력 1은 남긴다(즉사 없음, 설계 §6)
-            int want = Mathf.CeilToInt(player.RuntimeStats.MaxHp * Data.shockMaxHpRatio);
-            int dmg  = Mathf.Min(want, player.RuntimeStats.Hp - 1);
+            // 최대 체력 비율 피해 — 방어로 다시 깎이지 않게(10-01) · 체력 1은 남긴다(즉사 없음, 설계 §6)
+            int want = BossMaxHpDamage.Raw(player, Data.shockMaxHpRatio);
+            int dmg  = BossMaxHpDamage.NonLethal(player, want);
             if (dmg > 0) player.TakeDamage(dmg, ctx.Monster.gameObject, false, HitWeight.Heavy);
         }
 

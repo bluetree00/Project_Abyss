@@ -250,9 +250,8 @@ public class RunProgressManager : MonoBehaviour
 
         // 유물 파츠(보스 클리어 특전) — 런 진행분이라 저장해야 이어하기에서 살아난다.
         // 저장 안 하면 재시작 후 이어하기에서 그때까지 받은 특전이 통째로 빠진 채 진행된다.
-        d.relicPartIds = loadout != null && loadout.RelicPartIds.Count > 0
-            ? string.Join(",", loadout.RelicPartIds)
-            : string.Empty;
+        d.relicPartIds     = loadout != null ? loadout.SerializeRelicParts() : string.Empty;
+        d.relicMemoryExtra = loadout != null ? loadout.SerializeRelicExtra() : string.Empty;
 
         // 서약
         var cov = new CovenantListWrapper();

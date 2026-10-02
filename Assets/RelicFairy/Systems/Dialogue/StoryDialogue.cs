@@ -5,11 +5,12 @@ using System.Collections.Generic;
 /// 조건은 <see cref="StoryProgress"/> 기록을 보고, 튼 대사는 <c>seen.*</c> 기록으로 남겨 다시 틀지 않는다.
 /// 대사가 CSV에 없으면 기록하지 않고 건너뛴다(대사 추가 전에 조건이 먼저 충족돼도 나중에 나온다).
 ///
-/// 우선순위(설계 v2 §4): 엔딩 에필로그 → 악몽 시작 → 봉인·처치 첫 기록(한 번에 모아서) → 성소의 문.
+/// 우선순위(설계 v2 §4): 엔딩 에필로그(+ 악몽 모드 해금) → 악몽 시작 → 봉인·처치 첫 기록(한 번에 모아서) → 성소의 문.
 /// </summary>
 public static class StoryDialogue
 {
     public const string EpilogueFirst  = "Epilogue_First";
+    public const string NightmareModeUnlock = "NightmareMode_Unlock";   // 엔딩 뒤 첫 귀환 — 그림자가 게이트 곁 갈림길을 알린다(v3 D3)
     public const string NightmareBegin = "Nightmare_Begin";
     public const string MissionSeal    = "Mission_Seal";
     public const string Chapter4Door   = "Story_Chapter4Door";
@@ -23,8 +24,12 @@ public static class StoryDialogue
 
         if (StoryProgress.HasEnded)
         {
-            var epilogue = TakeOnce(dlg, EpilogueFirst);
-            if (epilogue != null) return epilogue;
+            // 에필로그 바로 뒤에 해금 대사를 한 창으로 잇는다(그 뒤 게이트 곁 갈림길이 드러난다 — BaseCampFxDirector).
+            // 에필로그를 이미 본 세이브라도 해금 대사를 아직 못 봤으면 그것만 튼다.
+            var buf0 = new List<DialogueLine>();
+            Append(buf0, TakeOnce(dlg, EpilogueFirst));
+            Append(buf0, TakeOnce(dlg, NightmareModeUnlock));
+            if (buf0.Count > 0) return buf0.ToArray();
         }
 
         if (StoryProgress.IsNightmare)

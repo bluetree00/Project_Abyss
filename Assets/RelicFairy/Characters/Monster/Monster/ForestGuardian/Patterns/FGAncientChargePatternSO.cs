@@ -12,6 +12,7 @@ namespace RelicFairy.Monster
 ///        → 다시 조준(두 번째부터 followWindup으로 짧게) · 돌진 — chargeCount번 → Recovery → ChaseState.
 /// 회피  : 방향이 고정된 뒤 옆으로 비킨다. 고정은 R3대로 돌진 시작 lockDuration(≥0.4초) 전.
 /// 시간  : 실시간(2페이즈 애니 배속과 무관) — 1페이지 돌진은 배속을 따라 2페이즈에서 고정이 0.4초 밑으로 짧아진다.
+/// 악몽  : 돌진 한 번이 끝날 때마다 실제로 지나간 길에 가시 줄(「흔적」 — ForestGuardianMonster.LeaveChargeTrail).
 /// </summary>
 [CreateAssetMenu(menuName = "RelicFairy/Boss/ForestGuardian/FG_AncientChargePattern", fileName = "FG_AncientChargePattern")]
 public class FGAncientChargePatternSO : BossPatternSO
@@ -111,6 +112,7 @@ public class FGAncientChargeState : FullLockState<FGAncientChargePatternSO>
     private Vector3    _dir;
     private float      _length;
     private float      _moved;
+    private Vector3    _chargeFrom;      // 이번 돌진이 실제로 출발한 자리(악몽 특성 「흔적」)
     private GameObject _guideGO;
 
     public FGAncientChargeState(FGAncientChargePatternSO data) : base(data) { }
@@ -155,6 +157,7 @@ public class FGAncientChargeState : FullLockState<FGAncientChargePatternSO>
                 {
                     _phase = Phase.Charge;
                     _timer = 0f;
+                    _chargeFrom = ctx.Transform.position;
                     PlayAnim(ctx, AnimCharge);
                     if (Data.chargeSfx != null)
                         Managers.Sound?.PlayEffectAt(Data.chargeSfx, ctx.Transform.position);
@@ -167,8 +170,8 @@ public class FGAncientChargeState : FullLockState<FGAncientChargePatternSO>
                 float step = Data.chargeSpeed * dt;
                 if (_moved + step > _length) step = Mathf.Max(0f, _length - _moved);
                 Vector3 before = ctx.Transform.position;
+                // NavMesh 밖이면 움직이지 않는다 — 맨 위치 덧셈은 벽을 뚫는다(09-30). 아래 「막힘」 판정이 돌진을 끝내고 아레나 가드가 안쪽으로 되돌린다.
                 if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.Move(_dir * step);
-                else ctx.Transform.position += _dir * step;
                 float actual = Vector3.Distance(Flat(before), Flat(ctx.Transform.position));
                 _moved += step;
 
@@ -178,6 +181,8 @@ public class FGAncientChargeState : FullLockState<FGAncientChargePatternSO>
                 bool blocked = step > 0.05f && actual < step * 0.3f;
                 if (_moved >= _length - 0.01f || blocked)
                 {
+                    // 악몽 특성 「흔적」 — 이번 돌진이 멈춘 자리까지 실제로 지나간 길
+                    (ctx.Monster as ForestGuardianMonster)?.LeaveChargeTrail(_chargeFrom, ctx.Transform.position);
                     _index++;
                     if (_index < Data.chargeCount)
                         BeginWindup(ctx, Data.followWindup);

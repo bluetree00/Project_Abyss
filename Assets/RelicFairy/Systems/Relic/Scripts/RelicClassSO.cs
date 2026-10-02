@@ -115,6 +115,12 @@ public class RelicClassSO : ScriptableObject
     private UltimateCinematicConfig qSkillCinematic;
     [SerializeField, Tooltip("HUD Q 칸 아이콘(흰 선화). 비우면 HUD 폴백 아이콘")]
     private Sprite qSkillIcon;
+    [SerializeField, Tooltip("Q 전용 검(랜슬롯)의 칼날 트레일 — INab Weapon Trail 프리팹. 비우면 트레일 없음")]
+    private GameObject qSwordTrailPrefab;
+    [SerializeField, Tooltip("Q 전용 검 칼날에 붙는 루프 이펙트 Addressables 키. 비우면 없음")]
+    private string qSwordBladeVfxKey;
+    [SerializeField, Tooltip("칼날 이펙트 크기 배율(칼날 길이 기준)")]
+    private float qSwordBladeVfxScale = 0.35f;
 
     [Header("스탯 (공통 CombatGirl 베이스 위에 가산)")]
     [SerializeField] private StatModifier[] stats;
@@ -141,6 +147,11 @@ public class RelicClassSO : ScriptableObject
     public UltimateCinematicConfig QSkillCinematic => qSkillCinematic;
     /// <summary>HUD Q 칸 아이콘. 비면 HUD가 폴백 아이콘을 쓴다.</summary>
     public Sprite QSkillIcon => qSkillIcon;
+    /// <summary>Q 전용 검 칼날 트레일 프리팹(없으면 null).</summary>
+    public GameObject QSwordTrailPrefab => qSwordTrailPrefab;
+    /// <summary>Q 전용 검 칼날 루프 이펙트 키(없으면 빈 문자열).</summary>
+    public string QSwordBladeVfxKey => qSwordBladeVfxKey;
+    public float  QSwordBladeVfxScale => qSwordBladeVfxScale > 0f ? qSwordBladeVfxScale : 0.35f;
     /// <summary>Q 단독 모션 상태(비우면 QSkill_01 폴백). 시퀀스(연타)와 별개 — 캐스트·마무리처럼 한 번 재생하는 모션.</summary>
     public string QSkillMainState => string.IsNullOrEmpty(qSkillMainState) ? DefaultQSkillState : qSkillMainState;
     public string QSkillMainClipKey => qSkillMainClipKey;

@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 두께 있는 꺾은선 — 점 목록을 잇고 <see cref="Progress"/>만큼만 그린다(0~1, 앞에서부터).
-/// 기억의 제단의 「빛실」(부모 → 자식이 자라는 선)과 깊이 고리(닫힌 타원)가 쓴다(09-29).
+/// 기억의 제단의 「빛실」(부모 → 자식이 자라는 선)과 시기 고리(닫힌 타원 — 아직 안 드러난 고리는 점선)가 쓴다(09-29 · 10-02).
 /// <para>레이캐스트는 받지 않는다. 좌표는 이 RectTransform의 로컬(피벗 기준).</para>
 /// </summary>
 [RequireComponent(typeof(CanvasRenderer))]
@@ -19,6 +19,7 @@ public sealed class UIPolylineGraphic : MaskableGraphic
     private float _width    = 3f;
     private float _progress = 1f;
     private bool  _closed;
+    private int   _dash;      // 0 = 실선 · n = 선분 n개씩 그리고 n개 건너뜀
 
     // ── Properties ───────────────────────────────────────
     public float Progress
@@ -31,6 +32,13 @@ public sealed class UIPolylineGraphic : MaskableGraphic
     {
         get => _width;
         set { if (Mathf.Approximately(value, _width)) return; _width = Mathf.Max(0.5f, value); SetVerticesDirty(); }
+    }
+
+    /// <summary>점선 — 선분 n개를 그리고 n개를 건너뛴다(0 = 실선). 타원은 96개로 나뉜다.</summary>
+    public int DashSegments
+    {
+        get => _dash;
+        set { int v = Mathf.Max(0, value); if (v == _dash) return; _dash = v; SetVerticesDirty(); }
     }
 
     /// <summary>그려진 끝점(Progress 위치) — 선을 타고 가는 빛 알갱이 자리.</summary>
@@ -109,6 +117,7 @@ public sealed class UIPolylineGraphic : MaskableGraphic
         for (int i = 1; i < _points.Count; i++)
         {
             if (_cum[i - 1] >= limit) break;
+            if (_dash > 0 && ((i - 1) / _dash) % 2 == 1) continue;
             Vector2 a = _points[i - 1];
             Vector2 b = _points[i];
             if (_cum[i] > limit)

@@ -39,7 +39,7 @@ MonoBehaviour:
   _maxAnchorDistance: 4.2
   _fallbackForwardOffset: 3.49
   _biteDuration: 1.2
-  _warningTime: 0.28
+  _warningTime: 0.08
   _hitTime: 0.62
   _biteAttackHeight: 6
   _biteTriggerDistance: 3.15

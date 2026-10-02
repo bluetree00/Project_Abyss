@@ -19,6 +19,17 @@ public sealed class SceneTransitionManager
 
     private async UniTaskVoid LoadSceneAsync(Define.Scene scene, Action onLoaded)
     {
+        // 층계 회랑이 미리 불러 둔 씬 — 로딩 화면 없이 켠다(회랑 끝 문이 화면을 덮고 들어온다).
+        var pre = ScenePreloader.Take(scene.ToString());
+        if (pre != null)
+        {
+            await UniTask.WaitUntil(() => pre.progress >= 0.9f);
+            pre.allowSceneActivation = true;
+            await UniTask.WaitUntil(() => pre.isDone);
+            onLoaded?.Invoke();
+            return;
+        }
+
         var loading = UI_SceneLoading.Instance;
         if (loading != null) await loading.ShowAsync();
 

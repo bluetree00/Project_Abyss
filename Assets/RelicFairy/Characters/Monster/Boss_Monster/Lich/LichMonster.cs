@@ -35,6 +35,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
     private const float  AuraFloorLift        = 0.05f;
     private const float  ArenaOrbitBlend      = 1.2f;
     private const float  BlockedFxGap         = 0.12f;   // 막힘 표시 최소 간격(연타로 겹치지 않게)
+    private const float  NightmareHpScale     = 1.1f;    // 악몽 모드 총 체력(레벨디자인 설계서 §6) — 이미 3줄 + 최종 마법이라 다른 보스(×1.15)보다 낮게
 
     // 패링(연출·UX 시나리오 §12-3) — 낫이 빛나는 창 안에 맞받아치면 그 공격을 튕겨낸다.
     private const float  ParryRange           = 6f;      // 원거리 저격 패링 방지(수평 거리)
@@ -72,6 +73,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
     protected override string HeadBoneName    => null;
     protected override float  HPBarHeadOffset => 0.25f;
     protected override bool   UseWorldHPBar   => false;
+    protected override float  BossHpScale     => StoryProgress.IsNightmareMode ? NightmareHpScale : 1f;
 
     // ── IBoss ─────────────────────────────────────────────────
     public float HpRatio =>
@@ -696,11 +698,12 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
 
         if (_runtime != null)
             _runtime.SpeedMultiplier = speedMult;
+        _lichBB.MoveSpeedMult   = speedMult;   // 이동 컨트롤러가 읽는다(10-01)
         _lichBB.AttackSpeedMult = attackSpeedMult;
 
-        // 휴식 덮어쓰기는 블랙보드에만 — 공용 BossConfig SO를 건드리지 않는다.
-        if (breakMin >= 0f) _lichBB.BreakDurationMinOverride = breakMin;
-        if (breakMax >= 0f) _lichBB.BreakDurationMaxOverride = breakMax;
+        // 휴식 덮어쓰기는 블랙보드에만 — 공용 BossConfig SO를 건드리지 않는다. 악몽 모드면 ×0.8.
+        if (breakMin >= 0f) _lichBB.BreakDurationMinOverride = breakMin * _lichBB.BreakScale;
+        if (breakMax >= 0f) _lichBB.BreakDurationMaxOverride = breakMax * _lichBB.BreakScale;
 
         // 전환 컷신이 폼을 이미 드러냈으면(포효 순간) 다시 디졸브하지 않는다.
         if (_formController != null && _formController.CurrentForm != form)
@@ -792,7 +795,23 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
     internal void BeginEncounter()
     {
         ResolveMode();
+        ApplyNightmareTempo();
         Debug.Log($"[Lich] 전투 시작 — {BossName} · 페이지 임계 [{string.Join(", ", PageThresholds)}]", this);
+    }
+
+    /// <summary>
+    /// 악몽 모드 — 다른 보스와 같은 쉬는 시간 ×0.8(BossPages.NightmareBreakScale). 리치는 IPagedBoss가 아니라 러너가 페이지 배율을
+    /// 곱하지 않으므로 블랙보드 덮어쓰기로 건다: 1페이지는 설정 값 × 배율, 2 · 3페이지는 전환 에셋 값 × 배율(EnterPageCore).
+    /// </summary>
+    private void ApplyNightmareTempo()
+    {
+        if (_lichBB == null) return;
+        _lichBB.BreakScale = StoryProgress.IsNightmareMode ? BossPages.NightmareBreakScale : 1f;
+        if (_lichBB.Page == 1 && _lichBB.BreakScale < 1f && _config is BossConfigSO boss)
+        {
+            _lichBB.BreakDurationMinOverride = boss.patternBreakDurationMin * _lichBB.BreakScale;
+            _lichBB.BreakDurationMaxOverride = boss.patternBreakDurationMax * _lichBB.BreakScale;
+        }
     }
 
     /// <summary>

@@ -108,6 +108,7 @@ public sealed class EffectRowWidget : MonoBehaviour
                        ? EffectIconRegistry.GetSprite(display.IconKey)
                        : null;
             _icon.sprite  = sprite;
+            _icon.color   = EffectIconRegistry.TintFor(display.IconKey);   // 흰 글리프에 계열색(10-02)
             _icon.enabled = sprite != null;
             _icon.gameObject.SetActive(sprite != null);
         }

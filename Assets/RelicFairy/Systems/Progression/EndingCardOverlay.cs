@@ -21,6 +21,7 @@ public sealed class EndingCardOverlay : MonoBehaviour
     private const float CardLineFade       = 0.6f;
     private const float CreditLineHeight   = 64f;
     private const float CardBodySize       = 44f;
+    private const float HeaderSize         = 40f;   // 크레딧 본문(34)보다 커야 소제목으로 읽힌다
     private const float CreditBodySize     = 34f;
     private const float CreditScrollSpeed  = 80f;    // px/s (1080 기준)
     private const float CreditsTailSeconds = 1.5f;
@@ -103,6 +104,9 @@ public sealed class EndingCardOverlay : MonoBehaviour
                 if (line == null || string.IsNullOrEmpty(line.text)) continue;
                 ApplyStyle(_card, line.illustrationKey, CardBodySize);
                 _card.text  = line.text;
+                // 제목 바로 뒤의 소제목은 한 장면으로 — 따로 띄우면 검은 화면에 작은 금색 글자 하나만 남는다.
+                if (IsTag(line, TitleTag) && i + 1 < cardLines.Length && IsTag(cardLines[i + 1], HeaderTag))
+                    _card.text += $"\n<size={HeaderSize}><color={UIPalette.GoldHex}>{cardLines[++i].text}</color></size>";
                 _card.alpha = 0f;
                 if (await ShowCardLineAsync(ct)) break;   // 건너뛰면 카드 단계 전체를 넘긴다
             }
@@ -173,6 +177,9 @@ public sealed class EndingCardOverlay : MonoBehaviour
             || Input.GetMouseButtonDown(0);
     }
 
+    private static bool IsTag(DialogueLine line, string tag)
+        => line != null && string.Equals(line.illustrationKey, tag, StringComparison.OrdinalIgnoreCase);
+
     private static void ApplyStyle(TextMeshProUGUI text, string tag, float bodySize)
     {
         if (string.Equals(tag, TitleTag, StringComparison.OrdinalIgnoreCase))
@@ -182,7 +189,7 @@ public sealed class EndingCardOverlay : MonoBehaviour
         }
         else if (string.Equals(tag, HeaderTag, StringComparison.OrdinalIgnoreCase))
         {
-            text.fontSize = 28f;
+            text.fontSize = HeaderSize;
             text.color    = UIPalette.Gold;
         }
         else

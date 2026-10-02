@@ -105,6 +105,7 @@ public class DKStrikePatternSO : BossPatternSO
 public class DKStrikeState : FullLockState<DKStrikePatternSO>
 {
     private const string AnimIdle2 = "Idle2";
+    private const float  SwordAheadOfAnchor = 4f;   // 떠 있는 검 — 앵커에서 기사 쪽으로(유리 앞 플레이어 구역)
 
     private enum Phase { TileExpansion, SlashAttack, Recovery }
 
@@ -374,19 +375,29 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         Vector3 dkPos  = ctx.Transform.position;
         var     dkBoss = ctx.Monster as DeathKnightBossMonster;
 
+        // 검은 플레이어 구역 안 — 앵커에서 기사 쪽으로 SwordAheadOfAnchor m. 유리 너머(기사 옆)에 두면 근접은 못 깨
+        // 방패(안전지대)를 못 만들고 전역 강타를 회피 무적 타이밍으로만 버텨야 했다(10-01 감사 D3). 앵커가 없으면 예전 자리.
+        Vector3 basePos = dkPos;
+        if (_anchor != null)
+        {
+            Vector3 toDk = dkPos - _anchor.position;
+            toDk.y = 0f;
+            basePos = _anchor.position + (toDk.sqrMagnitude > 0.01f ? toDk.normalized : Vector3.forward) * SwordAheadOfAnchor;
+        }
+
         bool leftIsWhite = UnityEngine.Random.value > 0.5f;
         bool leftIsSame  = leftIsWhite == (_swordColor == DKSwordColor.White);
 
         // 고정 세계 X축 기준 — 보스 시선 방향에 무관하게 항상 동일한 좌우 2지점에 소환
         SpawnOneSword(
-            dkPos - Vector3.right * Data.swordSideOffset + Vector3.up * Data.swordHeight,
-            dkPos.y, dkBoss,
+            basePos - Vector3.right * Data.swordSideOffset + Vector3.up * Data.swordHeight,
+            basePos.y, dkBoss,
             leftIsWhite ? DKSwordColor.White : DKSwordColor.Black,
             leftIsSame);
 
         SpawnOneSword(
-            dkPos + Vector3.right * Data.swordSideOffset + Vector3.up * Data.swordHeight,
-            dkPos.y, dkBoss,
+            basePos + Vector3.right * Data.swordSideOffset + Vector3.up * Data.swordHeight,
+            basePos.y, dkBoss,
             !leftIsWhite ? DKSwordColor.White : DKSwordColor.Black,
             !leftIsSame);
     }

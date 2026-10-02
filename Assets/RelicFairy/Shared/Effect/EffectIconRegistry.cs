@@ -151,6 +151,20 @@ public static class EffectIconRegistry
         return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
     }
 
+    /// <summary>
+    /// 아이콘에 입힐 색 — 상태 · 버프 아이콘은 <b>흰 글리프</b>(10-02 「상태이상 표시 퀄리티」)라 쓰는 쪽이 Image.color로 계열색을 입힌다.
+    /// 상점 아이콘(<c>shop_*</c>)처럼 원래 색이 있는 그림은 흰색(그대로). 플레이스홀더는 이미 색이 들어 있어 흰색.
+    /// </summary>
+    public static Color TintFor(string iconKey)
+    {
+        if (string.IsNullOrEmpty(iconKey)) iconKey = "unknown";
+        string key = iconKey.ToLowerInvariant();
+        if (key.StartsWith("shop_")) return Color.white;
+        if (_iconSet == null || !_iconSet.TryGet(key, out _)) return Color.white;   // 플레이스홀더 — 색이 이미 칠해져 있다
+        // 글리프는 어두운 판 위에 놓인다 — 계열색을 흰빛 쪽으로 조금 끌어올려 작은 크기에서도 선다
+        return Color.Lerp(KeyColor(key), Color.white, 0.25f);
+    }
+
     /// <summary>IconKey → 플레이스홀더 색. 속성계는 ElementDef 색 재사용, 그 외 다크판타지 팔레트.</summary>
     private static Color KeyColor(string key)
     {
@@ -194,10 +208,14 @@ public static class EffectIconRegistry
 
             // ── 기타 ──
             case "skill":      return new Color(0.65f, 0.45f, 0.90f);
-            case "stun":       return new Color(0.92f, 0.85f, 0.40f);
+            case "stun":       return new Color(0.82f, 0.72f, 1.00f);   // 기절 — 연보라(번개 노랑과 갈리게, 10-02)
             case "allstats":   return new Color(0.90f, 0.78f, 0.45f);
             case "utility":    return new Color(0.60f, 0.58f, 0.72f);
             case "special":    return new Color(0.70f, 0.45f, 0.85f);
+            case "bleed":      return new Color(0.86f, 0.18f, 0.24f);   // 출혈 — 진홍
+            case "slow":       return new Color(0.55f, 0.70f, 0.85f);   // 둔화 — 서늘한 회청
+            case "vulnerable": return new Color(0.95f, 0.52f, 0.30f);   // 취약 — 주황(받는 피해 증가)
+            case "weaken":     return new Color(0.62f, 0.55f, 0.72f);   // 약화 — 바랜 보라
 
             case "unknown":
             default:           return new Color(0.55f, 0.55f, 0.60f);

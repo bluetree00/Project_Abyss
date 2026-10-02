@@ -254,7 +254,8 @@ public static class CovenantPalette
     /// 같은 <b>통화군</b>까지 본다(화상·출혈은 한 군 — 소모형이 둘을 가리지 않고 먹는다).
     /// 화상만 가진 사람에게 감전 소모형(정지)을 내보내면 "부여형은 있는데 안 물리는" 카드가 되기 때문이다.
     /// </summary>
-    public static IReadOnlyList<string> DraftableEffectIds(IReadOnlyList<CovenantBase> held, int step)
+    public static IReadOnlyList<string> DraftableEffectIds(IReadOnlyList<CovenantBase> held, int step,
+                                                           ICollection<StatusCurrency> build = null)
     {
         var result = new List<string>(_effectIds.Count);
         for (int i = 0; i < _effectIds.Count; i++)
@@ -262,10 +263,18 @@ public static class CovenantPalette
             var id = _effectIds[i];
             if (UnlockStep(id) > step) continue;   // 기억의 제단에서 아직 열지 않은 카드
             if (!TryGetEffect(id, out var e)) continue;
-            if (e.role == StatusRole.Consume && !HasApplierFor(e.status, held)) continue;
+            if (e.role == StatusRole.Consume && !HasApplierFor(e.status, held) && !BuildFeeds(e.status, build)) continue;
             result.Add(id);
         }
         return result;
+    }
+
+    /// <summary>빌드(유물)가 같은 통화군을 거는가 — 서약서 첫 쓰기에서 소모형을 열어 준다(설계서 §5).</summary>
+    private static bool BuildFeeds(StatusCurrency status, ICollection<StatusCurrency> build)
+    {
+        if (build == null) return false;
+        foreach (var s in build) if (EffectTaxonomy.SameFamily(status, s)) return true;
+        return false;
     }
 
     /// <summary>보유 서약 중 같은 통화군을 <b>거는</b> 것이 하나라도 있는가.</summary>

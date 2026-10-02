@@ -6,8 +6,8 @@ using Cysharp.Threading.Tasks;
 public sealed partial class PlayerController
 {
     // ── Properties ────────────────────────────────────────────────
-    /// <summary>무적 중 여부 (debugInvincible 포함).</summary>
-    public bool IsInvincible => debugInvincible || Time.time < _invincibleEnd;
+    /// <summary>무적 중 여부 (debugInvincible · 긴급 회피 무적 포함).</summary>
+    public bool IsInvincible => debugInvincible || Time.time < _invincibleEnd || PerfectDodge.IsInvulnerable;
 
     /// <summary>피격 넉백으로 날아가는 중(착지 회복 포함) — 이 동안 모든 조작 불가.</summary>
     private bool IsLaunched => _locoSM?.CurrentId == LocoState.Launched;
@@ -22,6 +22,9 @@ public sealed partial class PlayerController
 
     /// <summary>저스트 회피 반격 창 동안의 공격 애니 속도 배수(평소 1). ActAttackState가 콤보 단계마다 곱한다.</summary>
     public float CounterAttackSpeedMultiplier => PerfectDodge.CounterSpeedMultiplier;
+
+    /// <summary>가장 최근 저스트 회피를 일으킨 적(없으면 null). <see cref="OnPerfectDodge"/> 안에서 읽으면 이번 회피의 적이다.</summary>
+    public Transform PerfectDodgeSource => PerfectDodge.LastSource;
 
     /// <summary>저스트 회피 발동 — 연출(회색 필터/틴트/잔상)이 구독한다. 인자는 총 지속시간(초, 실제시간).</summary>
     public event Action<float> OnPerfectDodge
@@ -53,6 +56,14 @@ public sealed partial class PlayerController
 
         // 저스트 회피 — 회피 초반(퍼펙트 창)에 스친 공격이면 슬로모+이동보너스로 보상하고 피해는 무효.
         if (PerfectDodge.TryTriggerOnHit(attacker))
+        {
+            OnDamageResolved?.Invoke(attacker, rawDmg, 0, DamageOutcome.PerfectDodge);
+            return;
+        }
+
+        // 긴급 회피 무적 — 발동 뒤 창이 닫힐 때까지(피한 공격은 끝날 때까지) 모든 공격을 흘린다.
+        // 대시 무적만으로는 느려진 시간 속에 뒤늦게 들어오는 공격·계속되는 돌진에 맞았다(10-01).
+        if (PerfectDodge.IsInvulnerable)
         {
             OnDamageResolved?.Invoke(attacker, rawDmg, 0, DamageOutcome.PerfectDodge);
             return;
@@ -174,7 +185,11 @@ public sealed partial class PlayerController
         // 스탠스 중이면 포이즈 계산 자체를 건너뛴다. <b>면역이지 무적이 아니다</b> —
         // 피해는 위에서 그대로 들어갔고, 여기서 막는 건 '날아감'뿐이다.
         // 2.75초를 제자리에서 버티는 스킬(랜슬롯 Q 등)은 이게 없으면 성립하지 않는다.
-        if (!_dead && !IsGrabbed && !PoiseImmune && Poise != null && CharacterData != null && RuntimeStats != null)
+        //
+        // 약(Light — 장판 틱 · DoT · 잔불)은 포이즈를 쌓지 않는다. 틱이 쌓여 1초 안에 날아가고, 내려앉으면 같은 장판에서
+        // 다시 날아가는 연쇄가 생겼다(10-01 보스 감사 — 화룡 잔불 · 숲 브레스 · 가시 띠). 확정 날아감(ignorePoise)은 그대로.
+        bool lightTick = weight == HitWeight.Light && !ignorePoise;
+        if (!_dead && !IsGrabbed && !PoiseImmune && !lightTick && Poise != null && CharacterData != null && RuntimeStats != null)
         {
             float maxPoise = RuntimeStats.MaxPoise;
             float immunity = CharacterData.knockbackImmunity;
@@ -315,8 +330,14 @@ public sealed partial class PlayerController
     /// </summary>
     public int AddIceStack(float fullDuration) => Status.AddIceStack(fullDuration);
 
-    /// <summary>외부 힘(넉백)을 가하고 일정 시간 동안 수평 이동 잠금을 스킵한다.</summary>
-    public void ApplyKnockback(Vector3 force, float duration = 0.3f) => Status.ApplyKnockback(force, duration);
+    /// <summary>외부 힘(넉백)을 가하고 일정 시간 동안 수평 이동 잠금을 스킵한다. 무적 중이면 무시한다.</summary>
+    public void ApplyKnockback(Vector3 force, float duration = 0.3f)
+    {
+        // 무적 = 피했다(리치·화룡 패턴의 dodged 판정과 같은 뜻). 몬스터 공격은 TakeDamage 뒤 결과와 무관하게 넉백을 부르므로,
+        // 여기서 거르지 않으면 피해는 막고도 옆으로 떠밀려 「회피했는데 맞았다」로 읽힌다(10-01).
+        if (IsInvincible) return;
+        Status.ApplyKnockback(force, duration);
+    }
 
     // ── Public Methods: 저스트 회피 (PerfectDodgeController 위임) ──
     /// <summary>회피 진입 시 호출(LocoDodgeState.Enter). 퍼펙트 판정을 장전한다.</summary>

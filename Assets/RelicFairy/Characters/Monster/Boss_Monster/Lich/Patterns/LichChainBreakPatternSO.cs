@@ -64,7 +64,8 @@ public class LichChainBreakState : UnInterruptibleState<LichChainBreakPatternSO>
     private const string BarkKey      = "Lich_ChainBreak";
     private const int    RingSegments = 64;
     private const float  RingWidth    = 0.9f;    // 사슬 텍스처 — 보이는 고리 굵기 약 0.3 m (텍스처가 없으면 단색 선)
-    private const float  PulseLead    = 0.3f;    // 사슬이 팽팽해지는 신호 → 링까지
+    private const float  PulseLead    = 0.5f;    // 사슬이 팽팽해지는 신호 → 링까지(0.3 → 0.5, 10-01 — 붙어 있던 근접이 보고 물러날 틈)
+    private const float  NearWarnRadius = 1.75f;  // 링이 생기는 순간 맞는 거리(시작 반경 0.5 + 두께 1.5 절반 + 몸) — 신호 동안 판정 색 원
 
     private static readonly Color RingColor = new Color(1.00f, 0.80f, 0.25f, 1f);   // 금빛 — 플레이어의 봉인 사슬
     // 판정 띠 — 사슬(보이는 굵기 약 0.3 m)보다 판정(ringThickness)이 넓어 「안 닿았는데 맞았다」가 나던 것(09-18 감사).
@@ -219,6 +220,9 @@ public class LichChainBreakState : UnInterruptibleState<LichChainBreakPatternSO>
         // 사슬을 잡아채는 스윙 — 접촉 프레임 = 링이 터져 나가는 순간(PulseLead 뒤). 좌우를 번갈아.
         LichPatternUtil.Swing(ctx, _pulsed % 2 == 0 ? LichSwing.RightToLeft : LichSwing.LeftToRight, PulseLead, 0.05f);
         _pulsed++;
+        // 링이 리치 발밑에서 생겨 바로 곁의 근접은 생기는 순간 맞는다 — 신호 동안 그 거리를 판정 색 원으로 보여 준다(10-01)
+        var near = PatternGuideHelper.Disc(LichPatternUtil.OnFloor(ctx, ctx.Transform.position), NearWarnRadius, PatternGuideHelper.Active, PulseLead + 0.1f);
+        PatternGuideHelper.Arm(near);
         LichHazards.PulseBoundChains();
         LichPatternUtil.Lich(ctx)?.PulseBook(0.3f);
     }

@@ -120,6 +120,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3060c710bea5b02458ff81b0f7bfe3c5
+    m_Address: DungeonSpaceSet
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 33921697d23d94e49b30e02de1aee7e2
     m_Address: VFX_Wet
     m_ReadOnly: 0
@@ -344,6 +349,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bb82163de313d09469f964543a10922a
     m_Address: CircleBombHit
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c0a10ec29a7e09647a6e47bd3474d280
+    m_Address: Run/Fx/RunFxSet
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

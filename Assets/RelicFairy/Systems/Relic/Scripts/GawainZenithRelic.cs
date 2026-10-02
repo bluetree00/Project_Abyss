@@ -37,6 +37,32 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
     private bool             _markPendingFirstHit; // 각인: 정오 첫 공격 +50%
 
     public ZenithGauge Gauge => _gauge;
+
+    // ── 유물 성장 v2(10-02) 접점 ──────────────────────────────
+    private int   _bonusCasts;          // 저무는 해 — 황혼에 쓸 작은 낙일
+    /// <summary>각인(게이지 80%)에 들어섰다 — 서광의 각인.</summary>
+    public event Action MarkReached;
+    /// <summary>낙일 착탄(위치, 맞은 대상, 작은 해인가) — 해시계 · 두 번째 해 · 정점 등.</summary>
+    public event Action<Vector3, List<GameObject>, bool> SunImpact;
+    /// <summary>이 시각까지 낙일이 즉발(정점 ③).</summary>
+    public float InstantCastUntil { get; set; }
+    public bool  InstantCastActive => Time.time < InstantCastUntil;
+    /// <summary>「새벽이 길다」로 여명 끝에서 해를 붙들고 있다 — 낙일 버튼이 정오를 연다.</summary>
+    public bool  IsHoldingDawn => _gauge != null && _gauge.IsHoldingDawn;
+    public int   BonusCasts => _bonusCasts;
+
+    /// <summary>작은 낙일 한 번(황혼에만 쓸 수 있다).</summary>
+    public void GrantBonusCast() => _bonusCasts++;
+    /// <summary>황혼이면 작은 낙일 한 번을 쓴다.</summary>
+    public bool TryConsumeBonusCast()
+    {
+        if (_bonusCasts <= 0 || _gauge == null || _gauge.CurrentPhase != ZenithGauge.ZPhase.Cooldown) return false;
+        _bonusCasts--;
+        return true;
+    }
+    /// <summary>붙든 해를 놓아 정오를 연다.</summary>
+    public void OpenNoon() => _gauge?.OpenNoonNow();
+    public void NotifySunImpact(Vector3 at, List<GameObject> hits, bool small) => SunImpact?.Invoke(at, hits, small);
     public IRelicResource RelicResource => _gauge;   // HUD 아이덴티티 바 연결
 
     // ── 하루의 순환 ────────────────────────────────────────────────
@@ -98,7 +124,10 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
         => slot == SkillType.Q ? new SolarDescentSkillRuntime(this) : null;
     public float GetSkillCooldown(SkillType slot) => 0f; // 정오 게이팅 + 구간당 1회가 발동 제어
     public bool  CanUseSkill(SkillType slot)
-        => slot == SkillType.Q && _gauge != null && _gauge.IsSkillReady && (!_skillUsedThisNoon || HeldNoonRecharged);
+        => slot == SkillType.Q && _gauge != null
+           && ((_gauge.IsSkillReady && (!_skillUsedThisNoon || HeldNoonRecharged))
+               || IsHoldingDawn                                                                  // [v2] 낙일로 정오를 연다
+               || (_bonusCasts > 0 && _gauge.CurrentPhase == ZenithGauge.ZPhase.Cooldown));     // [v2] 저무는 해
     public int   ModifyIncomingDamage(PlayerController owner, int dmg, GameObject attacker) => dmg;
 
     /// <summary>
@@ -131,7 +160,10 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
         // [가이드라인 비주얼] 각인 진입 엣지 토스트(정오 아님 + 각인 준비 상승엣지)
         bool markEntering = _gauge.IsMarkReady && !_gauge.IsNoon;
         if (markEntering && !_wasMarkReady && _owner != null)
+        {
             GuidelineVisual.Toast(_owner.transform.position + Vector3.up * 2.4f, "각인", GuidelineVisual.ToastKind.Relic);
+            MarkReached?.Invoke();
+        }
         _wasMarkReady = markEntering;
 
         if (_gauge.IsNoon)

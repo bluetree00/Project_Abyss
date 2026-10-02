@@ -17,6 +17,7 @@ using UnityEngine.UI;
 ///  - 이름 / 등급·칸수 칩 / 속성 칩 / 효과
 ///  - 아래에 <b>작은 모양</b>과 <b>배치 가능 배지</b> — 인접 제약 때문에 실제로 못 놓는 룬이 생긴다. 경고일 뿐 선택은 막지 않는다.
 ///  - 등급 테두리 = 서약 카드의 보석 테두리(철·블루·보라·골드). 뒷면의 문장 색도 등급이다.
+///  - 카드 줄 오른쪽 = <b>지금 룬판</b>(<see cref="RuneBoardMini"/>). 후보는 3장 고정이라(10-01) 네 번째 자리를 판이 쓴다.
 ///
 /// 공개 연출: 카드가 뒷면으로 내려오고 → 낮은 등급부터 뒤집힌다 → 전설은 한 번 멈췄다가 연다 →
 /// 고른 카드는 보관함 카운터로 날아간다. 전부 unscaled UI 트윈이고(팝업 중 timeScale 0), 아무 입력이나 들어오면 끝 상태로 넘어간다.
@@ -37,6 +38,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private const float CardH   = 420f;   // 의뢰서 380 + 효과 4행분 40
     private const float CardGap = 24f;
     private const float CardSideMargin = 40f;   // 카드 열 좌우 여백(창 안쪽)
+    // 「지금 룬판」 — 카드 줄 오른쪽 끝, 카드와 같은 높이. 13열 판이 칸 13.7px로 들어가는 폭이다(카드는 240으로 준다).
+    private const float BoardPanelW = 228f;
 
     // 등급 확률 막대 — 창 좌하단, [선택]/[넘기기] 좌측 여백에 앉힌다.
     private const float OddsBarW      = 236f;
@@ -113,8 +116,9 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
     // ── 상태 ──
     private readonly List<CardView> _cards = new();
-    private readonly List<GameObject> _lockedRoots = new();   // 잠긴 자리(해금하면 채워질 칸)
-    private int _lockedSlots;
+    private RectTransform _boardPanel;   // 「지금 룬판」 자리(카드 레이어의 자식)
+    private CanvasGroup   _boardGroup;
+    private RuneBoardMini _board;
     private List<(RuntimeItemData data, ItemSO so)> _candidates;
     private RunItemInventory _inventory;
     private const float SelectedCardScale   = 1.05f;   // 선택 카드 확대
@@ -205,16 +209,10 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     }
 
     /// <summary>후보를 주입해 카드를 구성한다. ShowPopupUIAndGetAsync 직후 호출.</summary>
-    /// <param name="lockedSlots">
-    /// 해금하면 <b>실제로 더 열릴 수 있는</b> 칸 수. 빈 자리로 미리 그려 무엇이 늘어나는지 보여준다.
-    /// 이 방의 규칙이 애초에 확장 대상이 아니면 0이다 — 없는 확장을 약속하면 안 된다.
-    /// </param>
-    public void Setup(List<(RuntimeItemData data, ItemSO so)> candidates, RunItemInventory inventory,
-                      int lockedSlots = 0)
+    public void Setup(List<(RuntimeItemData data, ItemSO so)> candidates, RunItemInventory inventory)
     {
         _candidates  = candidates;
         _inventory   = inventory;
-        _lockedSlots = Mathf.Max(0, lockedSlots);
         _closing     = false;
 
         if (candidates == null || candidates.Count == 0)
@@ -262,6 +260,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             bool brief = RewardPresentation.Mode == RewardPresentationMode.Brief;
 
             FadeVeilAsync(0f, VeilBase, VeilInDur, ct).Forget();
+            FadeBoardAsync(ct).Forget();
             await HoldOrSkip(DealDelay, ct);
 
             for (int i = 0; i < _cards.Count && !_revealSkipped; i++)
@@ -306,6 +305,14 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         }
     }
 
+    /// <summary>「지금 룬판」은 막과 함께 떠오른다 — 순간 등장 금지(UI 톤 규약). 스킵하면 <see cref="SnapToRest"/>가 1로 둔다.</summary>
+    private async UniTaskVoid FadeBoardAsync(CancellationToken ct)
+    {
+        if (_boardGroup == null) return;
+        try { await TweenAsync(DealDur, t => { if (_boardGroup != null) _boardGroup.alpha = EaseOutCubic(t); }, ct); }
+        catch (OperationCanceledException) { }
+    }
+
     /// <summary>뒷면인 채로 위에서 내려앉는다.</summary>
     private async UniTaskVoid DealAsync(CardView card, CancellationToken ct)
     {
@@ -348,6 +355,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     {
         foreach (var other in _cards)
             if (other != card && other.Group != null) other.Group.alpha = LegendDim;
+        if (_boardGroup != null) _boardGroup.alpha = LegendDim;
         FadeVeilAsync(VeilBase, LegendVeil, 0.2f, ct).Forget();
         ShowPillar(card);
 
@@ -385,6 +393,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
         foreach (var other in _cards)
             if (other.Group != null) other.Group.alpha = 1f;
+        if (_boardGroup != null) _boardGroup.alpha = 1f;
         FadeVeilAsync(LegendVeil, VeilBase, 0.2f, ct).Forget();
     }
 
@@ -531,6 +540,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             ShowFace(card, true);
         }
         if (_veil != null && _veilAlpha >= 0f) _veil.color = WithAlpha(_veil.color, _veilAlpha);
+        if (_boardGroup != null) _boardGroup.alpha = 1f;
         if (_pillar != null) _pillar.gameObject.SetActive(false);
         if (_cardLayer != null) _cardLayer.anchoredPosition = Vector2.zero;
         if (_screenFlash != null) _screenFlash.color = WithAlpha(_screenFlash.color, 0f);
@@ -737,8 +747,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     {
         foreach (var c in _cards) if (c.Root != null) Destroy(c.Root);
         _cards.Clear();
-        foreach (var g in _lockedRoots) if (g != null) Destroy(g);
-        _lockedRoots.Clear();
+        if (_boardPanel != null) Destroy(_boardPanel.gameObject);
+        _boardPanel = null; _boardGroup = null; _board = null;
         if (_pillar != null) Destroy(_pillar.gameObject);
         if (_fxRoot != null) Destroy(_fxRoot.gameObject);
 
@@ -748,16 +758,16 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         _cardLayer = layer;
 
         int n = _candidates.Count;
-        // 잠긴 자리도 줄의 일부다 — 폭 산출과 중앙 정렬에 함께 넣어야 줄이 흐트러지지 않고,
-        // 해금 뒤에 카드가 "그 자리로" 들어오는 것으로 보인다.
-        int slots = n + _lockedSlots;
+        // 「지금 룬판」도 줄의 일부다 — 카드 오른쪽 끝에 카드 높이로 선다. 폭 산출과 중앙 정렬에 함께 넣는다.
+        bool hasBoard = Managers.RuneData?.GetZoneMapRows() is { Count: > 0 };
+        float boardW  = hasBoard ? BoardPanelW + CardGap : 0f;
 
         // 카드 폭은 칸 수에 맞춰 줄인다. 300 고정이던 시절엔 3장까지만 창에 들어갔고,
         // 정예방 4지선다(RoomRewardTable)에서 카드가 창 밖으로 밀려났다.
-        float avail = WindowW - CardSideMargin * 2f - (slots - 1) * CardGap;
-        _cardW = Mathf.Min(CardW, avail / Mathf.Max(1, slots));
+        float avail = WindowW - CardSideMargin * 2f - (n - 1) * CardGap - boardW;
+        _cardW = Mathf.Min(CardW, avail / Mathf.Max(1, n));
 
-        float totalW = slots * _cardW + (slots - 1) * CardGap;
+        float totalW = n * _cardW + (n - 1) * CardGap + boardW;
         float startX = -totalW * 0.5f + _cardW * 0.5f;
 
         // 전설 기둥은 카드 뒤(레이어 맨 앞 자식), 불티는 카드 위(맨 뒤 자식).
@@ -812,16 +822,26 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             }
         }
 
-        for (int i = 0; i < _lockedSlots; i++)
-        {
-            int slot = n + i;
-            _lockedRoots.Add(UILockedSlot.Build(layer, $"Locked{i}",
-                new Vector2(startX + slot * (_cardW + CardGap), CardY),
-                new Vector2(_cardW, CardH)));
-        }
+        if (hasBoard)
+            BuildBoardPanel(layer, startX - _cardW * 0.5f + n * (_cardW + CardGap) + BoardPanelW * 0.5f, animate);
 
         _fxRoot = ShopUIStyle.MakeRect(layer, "RevealFx").GetComponent<RectTransform>();
         ShopUIStyle.Stretch(_fxRoot);
+    }
+
+    /// <summary>
+    /// 「지금 룬판」 자리 — 카드와 같은 줄 · 같은 높이의 어두운 판에 미니 판을 짓는다(<see cref="RuneBoardMini"/>).
+    /// 카드 레이어의 자식이라 창 배율을 같이 받고, 카드를 다시 지을 때 같이 지워진다.
+    /// </summary>
+    private void BuildBoardPanel(RectTransform layer, float x, bool animate)
+    {
+        var fill = ShopUIStyle.MakeFrame(layer, "BoardPanel", WithAlpha(ShopUIStyle.CardBorder, 0.9f), ChipFill, 1f);
+        _boardPanel = (RectTransform)fill.transform.parent;
+        ShopUIStyle.Anchor(_boardPanel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                           new Vector2(x, CardY), new Vector2(BoardPanelW, CardH));
+        _boardGroup = _boardPanel.gameObject.AddComponent<CanvasGroup>();
+        _boardGroup.alpha = animate ? 0f : 1f;
+        _board = RuneBoardMini.Build(_boardPanel, BoardPanelW, _inventory);
     }
 
     /// <summary>
@@ -1299,6 +1319,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         }
 
         bool hasSel = index >= 0;
+        // 고른 룬이 들어갈 수 있는 빈 칸만 판에서 밝힌다 — 「이걸 고르면 판 어디로 가는가」.
+        _board?.Highlight(hasSel && _candidates != null && index < _candidates.Count ? _candidates[index].data : null);
         if (_confirmLabel != null)
         {
             _confirmLabel.color = hasSel ? ShopUIStyle.TextPrimary : ShopUIStyle.TextDim;
@@ -1371,11 +1393,12 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         Skipped = false;
         _closing = true;
 
-        // 보관함 만차 시 조용히 사라지지 않도록, 실패해도 그리드가 '보류'로 들고 간다.
-        bool added = _inventory != null && _inventory.AddToStaging(item);
-        if (!added)
+        // 보관함이 가득이어도 받는다 — 넘친 칸에 들어가고, 룬판에서 놓거나 분해해야 닫힌다(10-01 「보류」 폐지).
+        bool full  = _inventory != null && _inventory.IsStagingFull;
+        bool added = _inventory != null && _inventory.AddToStagingOverflow(item);
+        if (full)
             ItemEffectVfxHelper.ShowNotice(
-                $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.StagingCapacity}칸) — 자리를 비우면 자동으로 추가됩니다");
+                $"<color=#FFCC44>보관함 가득</color> ({RunItemInventory.StagingCapacity}칸) — 룬판에서 하나를 놓거나 분해한다");
 
         ConfirmSequenceAsync(item, added).Forget();
     }
@@ -1435,8 +1458,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             Managers.UI?.ShowOverlayUI<UI_GridPanel>();
         if (UI_GridPanel.Instance != null)
         {
-            if (added) UI_GridPanel.Instance.ShowWithNewItem(item);
-            else       UI_GridPanel.Instance.ShowWithPendingItem(item);
+            UI_GridPanel.Instance.ShowWithNewItem(item);
         }
 
         _interactionTcs?.TrySetResult();

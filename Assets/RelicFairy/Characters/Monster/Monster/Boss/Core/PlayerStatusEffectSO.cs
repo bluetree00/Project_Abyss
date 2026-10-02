@@ -48,7 +48,9 @@ public class PlayerStatusEffectSO : ScriptableObject
     /// <summary>플레이어에게 상태이상을 적용한다. 이펙트가 이미 활성 중이면 지속시간만 초기화.</summary>
     public void Apply(PlayerController player)
     {
-        if (player == null) return;
+        // 회피 · 무적으로 막은 공격은 상태이상도 없다 — 피해 직후에 부르므로 이때 무적 = 피했다(10-01 넉백과 같은 정책).
+        // 막아도 빙결이 쌓여 얼음 브레스 빔 안에 묶이던 것(10-01 보스 감사)
+        if (player == null || player.IsInvincible) return;
 
         switch (effectType)
         {

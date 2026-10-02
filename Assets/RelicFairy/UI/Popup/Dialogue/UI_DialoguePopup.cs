@@ -256,6 +256,9 @@ public class UI_DialoguePopup : UI_Popup
         var ct = this.GetCancellationTokenOnDestroy();
 
         if (portrait != null) portrait.color = new Color(1f, 1f, 1f, 0f);
+        // 삽화를 읽는 동안에도 창은 떠 있다 — 프리팹의 자리 글(「테스트 테스트」)이 그 사이 보였다(10-01 전주기 시뮬 캡처).
+        if (bodyText != null) bodyText.text = string.Empty;
+        if (speakerNameText != null) speakerNameText.text = string.Empty;
 
         try
         {

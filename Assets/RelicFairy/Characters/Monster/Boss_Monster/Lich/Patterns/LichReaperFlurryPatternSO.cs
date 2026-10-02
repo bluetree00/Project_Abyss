@@ -89,7 +89,7 @@ public class LichReaperFlurryState : UnInterruptibleState<LichReaperFlurryPatter
 {
     private enum Phase { Windup, Gap, End, Recovery }
 
-    private const float SignalSeconds     = 0.15f;
+    private const float SignalSeconds     = 0.35f;   // 방향 고정 → 판정(0.15 → 0.35, 10-02 — 옆으로 피할 실제 창)
     private const float SlamPoint         = 2f;     // 내려찍기 — 낫이 바닥에 닿는 자리(리치 앞 m)
 
     private Phase      _phase;

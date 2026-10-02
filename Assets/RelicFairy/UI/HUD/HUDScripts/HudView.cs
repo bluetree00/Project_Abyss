@@ -31,6 +31,15 @@ public sealed class HudView : MonoBehaviour
     private const string TipRuneOreTitle = "원석";
     private const string TipRuneOreBody  = "정제소에서 무작위 룬을 뽑는다.\n런이 끝나면 사라진다.";
 
+    // 좌하단 세로 쌓기 — 무기 칸(+이름) → 버프 · 패시브 줄 → 서약 칸(10-02 사용자 「장비 · 서약 · 패시브 공간들의 겹침」).
+    // 예전엔 버프 줄 바닥(336)과 서약 칸 바닥(337)이 손으로 박은 같은 높이라, 서약 4칸 · 버프가 있으면 서로 덮었다(실측 74곳).
+    private const float LeftColumnGap    = 10f;    // 위젯 사이(캔버스 단위)
+    private const float LeftColumnTopGap = 12f;    // 서약 칸 ↔ 미니맵
+    private const float CovenantLabelH   = 26f;    // 서약 칸 위 「서약 n/N」 글자 몫
+    private const float CovenantMinScale = 0.72f;  // 짧은 화면비에서 서약 칸을 이만큼까지 줄인다
+    private const float NoticeSideGap    = 16f;    // 왼쪽 기둥 ↔ 발동 알림 줄(10-02 「패시브 텍스트의 가시성」)
+    private static readonly Vector3[] s_corners = new Vector3[4];
+
     [Header("Sections")]
     [SerializeField] private GameObject topBarRoot;
     [SerializeField] private CombatPanelView combatPanel;
@@ -117,6 +126,8 @@ public sealed class HudView : MonoBehaviour
         if (nicknameText != null)
             nicknameText.gameObject.SetActive(false);
     }
+
+    private void LateUpdate() => LayoutLeftColumn();
 
     /// <summary>
     /// 재화 라인 1줄 생성 — 골드 · 강화재료 · 원석이 <b>같은 줄</b>에 <b>같은 배경(골드바 내부)</b>을 공유한다.
@@ -393,6 +404,69 @@ public sealed class HudView : MonoBehaviour
         if (go == null) return;
         if (go.activeSelf == on) return;
         go.SetActive(on);
+    }
+
+    /// <summary>
+    /// 좌하단을 아래에서 위로 한 줄로 쌓는다: 무기 두 칸(칼 · 화살 장식 · 이름 포함) → 버프 · 패시브 줄 → 서약 칸.
+    /// 매 프레임 실제 크기를 읽는다 — 버프가 두 줄이 되거나 서약이 4칸 격자가 돼도 위 위젯을 밀어 올린다.
+    /// 서약 칸 윗변이 미니맵에 닿으면 서약 칸만 줄인다(짧은 화면비).
+    /// </summary>
+    private void LayoutLeftColumn()
+    {
+        if (combatPanel == null || !combatPanel.isActiveAndEnabled) return;
+        float top = combatPanel.WeaponColumnTopWorld();
+        if (float.IsNaN(top)) return;
+        float unit = transform.lossyScale.y;   // 캔버스 단위 → 화면 단위
+        float y = top + LeftColumnGap * unit;
+
+        var buff = combatPanel.BuffGridRect;
+        if (buff != null && buff.gameObject.activeInHierarchy)
+        {
+            PlaceBottomAt(buff, y);
+            float h = buff.rect.height * buff.lossyScale.y;
+            if (h > 1f) y += h + LeftColumnGap * unit;   // 버프가 없으면(높이 0) 서약 칸이 바로 무기 위로
+        }
+
+        // 발동 알림 줄 — 기둥 오른쪽, 바닥 = 버프 · 패시브 줄 바닥(위로 쌓인다). 기둥 위에 얹히면 패시브 칸 · 무기 이름을 덮었다.
+        var notice = combatPanel.ItemNoticeRect;
+        float right = combatPanel.LeftColumnRightWorld();
+        if (notice != null && !float.IsNaN(right))
+            PlaceBottomLeftAt(notice, right + NoticeSideGap * unit, top + LeftColumnGap * unit);
+
+        if (covenantPanel == null || !covenantPanel.isActiveAndEnabled) return;
+        var cov = (RectTransform)covenantPanel.transform;
+        PlaceBottomAt(cov, y);
+
+        float limit = float.PositiveInfinity;
+        if (minimapPanel != null && minimapPanel.activeInHierarchy && minimapPanel.transform is RectTransform map)
+        {
+            map.GetWorldCorners(s_corners);
+            limit = s_corners[0].y - LeftColumnTopGap * unit;
+        }
+        float need  = (cov.rect.height + CovenantLabelH) * unit;   // 배율 1 기준 높이
+        float scale = need > 0f && y + need > limit ? Mathf.Clamp((limit - y) / need, CovenantMinScale, 1f) : 1f;
+        if (Mathf.Abs(cov.localScale.y - scale) > 0.001f) cov.localScale = new Vector3(scale, scale, 1f);
+    }
+
+    /// <summary>점 앵커 위젯의 <b>아랫변</b>을 화면 높이 worldY에 놓는다(가로는 그대로). 피벗 · 배율을 고려한다.</summary>
+    private static void PlaceBottomAt(RectTransform rt, float worldY)
+    {
+        if (!(rt.parent is RectTransform parent) || !Mathf.Approximately(rt.anchorMin.y, rt.anchorMax.y)) return;
+        float localBottom = parent.InverseTransformPoint(new Vector3(0f, worldY, 0f)).y;
+        float anchorY     = parent.rect.yMin + rt.anchorMin.y * parent.rect.height;
+        float anchoredY   = localBottom - anchorY + rt.pivot.y * rt.rect.height * rt.localScale.y;
+        var p = rt.anchoredPosition;
+        if (Mathf.Abs(p.y - anchoredY) > 0.5f) rt.anchoredPosition = new Vector2(p.x, anchoredY);
+    }
+
+    /// <summary>점 앵커 위젯의 <b>왼쪽 아래 모서리</b>를 화면 (worldX, worldY)에 놓는다. 피벗 · 배율을 고려한다.</summary>
+    private static void PlaceBottomLeftAt(RectTransform rt, float worldX, float worldY)
+    {
+        if (!(rt.parent is RectTransform parent) || rt.anchorMin != rt.anchorMax) return;
+        Vector3 local  = parent.InverseTransformPoint(new Vector3(worldX, worldY, 0f));
+        Vector2 anchor = parent.rect.min + Vector2.Scale(rt.anchorMin, parent.rect.size);
+        Vector2 want   = (Vector2)local - anchor + Vector2.Scale(rt.pivot, rt.rect.size) * rt.localScale.x;
+        if ((rt.anchoredPosition - want).sqrMagnitude > 0.25f) rt.anchoredPosition = want;
     }
 
     private static Transform FindChildRecursive(Transform root, string name)

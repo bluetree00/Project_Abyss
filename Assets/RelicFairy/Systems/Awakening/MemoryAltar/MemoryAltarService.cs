@@ -34,6 +34,12 @@ public struct AltarNodeState
 
     /// <summary>부모가 전부 열려 <b>지금 살 수 있는 자리</b>에 있다(정수와 무관). 트리에서 선 끝에 켜지는 칸.</summary>
     public bool IsNextInChain;
+
+    /// <summary>그 시기의 고리가 아직 드러나지 않았다(10-02 — 해방기는 붕괴 뒤, 악몽은 엔딩 뒤). 그리지도 팔지도 않는다.</summary>
+    public bool EraHidden;
+
+    /// <summary>가운데 기억 노드인데 유물 성장 「공명 그물」이 아직 받지 못한다 — 보이지만 살 수 없다(「유물 성장 개편과 함께 열린다」).</summary>
+    public bool Pending;
 }
 
 /// <summary>
@@ -47,7 +53,26 @@ public static class MemoryAltarService
 
     // ── 조회 ────────────────────────────────────────────
 
-    public static bool IsUnlocked(string nodeId) => Data?.IsUnlocked(nodeId) ?? false;
+    /// <summary>
+    /// 해금했는가. <b>카탈로그에 없는 id는 늘 false</b> — 10-02 재설계로 뺀 유물 노드(파츠 선택지 +1 · 코어 2·3종 · 이어받기)를
+    /// 산 옛 세이브도 그 효과가 꺼진다(정수는 <see cref="TryRefundRemovedNodes"/>가 돌려준다).
+    /// </summary>
+    public static bool IsUnlocked(string nodeId) => MemoryAltarCatalog.Get(nodeId) != null && (Data?.IsUnlocked(nodeId) ?? false);
+
+    /// <summary>할인 조건 기록 — 봉인 수(<see cref="MemoryAltarCatalog.Rec.Seals"/>)만 이야기 기록에서 세고, 나머지는 영구 기록.</summary>
+    public static int Record(string key)
+    {
+        if (key == MemoryAltarCatalog.Rec.Seals)
+        {
+            int n = 0;
+            if (StoryProgress.IsSealed(StoryProgress.ForestGuardian)) n++;
+            if (StoryProgress.IsSealed(StoryProgress.Dragon))         n++;
+            if (StoryProgress.IsSealed(StoryProgress.DeathKnight))    n++;
+            if (StoryProgress.IsSealed(StoryProgress.Lich))           n++;
+            return n;
+        }
+        return Data?.GetRecord(key) ?? 0;
+    }
 
     public static int Essence => Data?.abyssEssence ?? 0;
 
@@ -61,7 +86,7 @@ public static class MemoryAltarService
 
         if (node.HasCondition)
         {
-            state.Progress     = data?.GetRecord(node.ConditionKey) ?? 0;
+            state.Progress     = Record(node.ConditionKey);
             state.Target       = node.ConditionTarget;
             state.ConditionMet = state.Progress >= node.ConditionTarget;
         }
@@ -78,7 +103,14 @@ public static class MemoryAltarService
         state.BlockedByChain = state.MissingParent != null;
         state.IsNextInChain  = !state.Unlocked && !state.BlockedByChain;
 
+        // 시기 고리 · 가운데 기억(10-02) — 드러나지 않은 시기는 그리지도 팔지도 않고, 기억 노드는 공명 그물이 받을 때까지 보이기만 한다.
+        state.EraHidden = !MemoryAltarCatalog.IsEraRevealed(node.Era);
+        state.Pending   = node.Branch == AltarBranch.Memory && !MemoryAltarCatalog.MemoryNodesLive;
+        if (state.EraHidden || state.Pending) state.IsNextInChain = false;
+
         state.CanBuy = !state.Unlocked
+                    && !state.EraHidden
+                    && !state.Pending
                     && !state.BlockedByRequirement
                     && !state.BlockedByChain
                     && (data?.abyssEssence ?? 0) >= state.Cost;
@@ -100,7 +132,7 @@ public static class MemoryAltarService
         foreach (var node in MemoryAltarCatalog.All)
         {
             var s = GetState(node);
-            if (s.Unlocked || s.BlockedByRequirement || s.BlockedByChain) continue;
+            if (s.Unlocked || s.BlockedByRequirement || s.BlockedByChain || s.EraHidden || s.Pending) continue;
             if (best == null || s.Cost < best.Value.Cost) best = s;
         }
         return best;
@@ -126,13 +158,16 @@ public static class MemoryAltarService
         return n;
     }
 
-    /// <summary>갈래 진척 — (연 칸, 전체 칸). 베이스캠프 기억 성소의 갈래 수정 밝기.</summary>
+    /// <summary>
+    /// 갈래 진척 — (연 칸, 전체 칸). 베이스캠프 기억 성소의 갈래 수정 밝기 · 제단 갈래 제목.
+    /// <b>드러난 시기의 칸만 센다</b> — 숨은 고리의 칸을 세면 「아직 더 있다」를 숫자가 먼저 말해 버린다(10-02).
+    /// </summary>
     public static (int unlocked, int total) BranchProgress(AltarBranch branch)
     {
         int unlocked = 0, total = 0;
         foreach (var node in MemoryAltarCatalog.All)
         {
-            if (node.Branch != branch) continue;
+            if (node.Branch != branch || !MemoryAltarCatalog.IsEraRevealed(node.Era)) continue;
             total++;
             if (IsUnlocked(node.Id)) unlocked++;
         }
@@ -155,6 +190,12 @@ public static class MemoryAltarService
 
         var state = GetState(node);
         if (state.Unlocked) return false;
+
+        if (state.EraHidden || state.Pending)
+        {
+            Debug.Log($"[MemoryAltar] 아직 열 수 없는 칸: {node.DisplayName} ({(state.EraHidden ? "시기 고리 미공개" : "유물 성장 개편 대기")})");
+            return false;
+        }
 
         if (state.BlockedByRequirement)
         {
@@ -221,6 +262,30 @@ public static class MemoryAltarService
         if (refund > 0)
             Debug.Log($"[MemoryAltar] 각성 6계열 폐기 — 정수 {refund} 환급");
 
+        return refund;
+    }
+
+    // ── 10-02 재설계로 뺀 노드 환급 (1회성) ──────────────
+
+    /// <summary>
+    /// 10-02 재설계로 카탈로그에서 뺀 유물 노드(<see cref="MemoryAltarCatalog.RemovedNodes"/>)를 산 세이브에 정수를 돌려준다 — 옛 기본가.
+    /// <para>제단을 열 때 부른다(각성 환급과 같은 자리). 기록 키 하나로 가드해 <b>몇 번 불러도 한 번만</b>.
+    /// 해금 id는 지우지 않는다 — 카탈로그에 없으니 <see cref="IsUnlocked"/>가 이미 false다.</para>
+    /// </summary>
+    /// <returns>돌려준 정수. 0이면 돌려줄 것이 없었거나 이미 돌려줬다.</returns>
+    public static int TryRefundRemovedNodes()
+    {
+        var data = Data;
+        if (data == null || data.GetRecord(MemoryAltarCatalog.Rec.RemovedNodesRefunded) > 0) return 0;
+
+        int refund = 0;
+        foreach (var (id, cost) in MemoryAltarCatalog.RemovedNodes)
+            if (data.IsUnlocked(id)) refund += cost;
+
+        data.abyssEssence += refund;
+        data.SetRecordMax(MemoryAltarCatalog.Rec.RemovedNodesRefunded, 1);
+        if (refund > 0)
+            Debug.Log($"[MemoryAltar] 10-02 재설계로 뺀 유물 노드 — 정수 {refund} 환급");
         return refund;
     }
 
@@ -295,34 +360,17 @@ public static class MemoryAltarService
     public static bool IsAbyssDepthUnlocked=> IsUnlocked(MemoryAltarCatalog.AbyssDepth);
     public static bool HasRevive           => IsUnlocked(MemoryAltarCatalog.Revive);
 
-    /// <summary>룬 선택지 개수(기본 3, 해금 시 4).</summary>
-    public static int RuneChoiceCount   => IsUnlocked(MemoryAltarCatalog.RuneChoice4) ? 4 : 3;
-
     /// <summary>
-    /// 룬 선택 화면에 그릴 <b>잠긴 자리</b> 수. 3지선다 라운드에서만, 아직 해금 전일 때만 1이다.
-    ///
-    /// <para>3지선다가 아닌 라운드(단일 드랍·이미 4지선다)는 해금해도 넓어지지 않으므로 0이다 —
-    /// 빈 자리는 <b>실제로 열릴 수 있는 칸</b>일 때만 약속이 된다.</para>
+    /// 기억 카드 다시 굴리기(「다시 떠올리기」) — 런당 1회. 유물 성장 「공명 그물」이 읽는다.
+    /// <see cref="MemoryAltarCatalog.MemoryNodesLive"/>가 꺼져 있으면 늘 false(살 수도 없다).
     /// </summary>
-    public static int RuneLockedSlots(int shownCount)
-    {
-        // 고행자의 인장이 켜져 있으면 보이는 수가 한 장 줄어 있다 — 해금이 넓히는 건 <b>인장 전</b> 3지선다 라운드다.
-        // 정예 4지선다가 인장으로 3장이 된 걸 3지선다로 읽어, 해금해도 안 열릴 빈 자리를 보이던 문제(09-26 감사).
-        int before = AsceticSigilService.Active ? shownCount + AsceticSigilService.ChoicePenalty : shownCount;
-        return before == 3 && !IsUnlocked(MemoryAltarCatalog.RuneChoice4) ? 1 : 0;
-    }
+    public static bool HasMemoryRedraw => MemoryAltarCatalog.MemoryNodesLive && IsUnlocked(MemoryAltarCatalog.MemRedraw);
 
-    /// <summary>
-    /// 코어 파츠 후보 수. 미해금 <b>1</b> → 「1차」 2 → 「전체」 3.
-    /// <para>잠그지 않고 <b>넓히는</b> 쪽으로 설계했다 — 정본 §1의 「가능성의 확장」과 같은 결이고,
-    /// 미해금 플레이어에게서 지금 받던 보상을 빼앗지 않는다.</para>
-    /// </summary>
-    public static int CorePartChoiceCount =>
-        IsUnlocked(MemoryAltarCatalog.CorePartsAll)   ? 3 :
-        IsUnlocked(MemoryAltarCatalog.CorePartsTier1) ? 2 : 1;
-
-    /// <summary>보스 파츠 드래프트 개수(기본 3, 해금 시 4).</summary>
-    public static int PartsDraftCount   => IsUnlocked(MemoryAltarCatalog.PartsDraft4) ? 4 : 3;
+    /// <summary>기억 카드 등급 띠 단계 0 · 1(선명한 기억) · 2(찬란한 기억). 확률표는 유물 성장 설계 §3.</summary>
+    public static int MemoryGradeBand =>
+        !MemoryAltarCatalog.MemoryNodesLive ? 0 :
+        IsUnlocked(MemoryAltarCatalog.MemRadiant) ? 2 :
+        IsUnlocked(MemoryAltarCatalog.MemClear)   ? 1 : 0;
 
     /// <summary>
     /// 재련소 승급에서 고를 수 있는 전설 후보 수. 기본 <b>1</b>, 「전설 3종 개방」 시 전부.

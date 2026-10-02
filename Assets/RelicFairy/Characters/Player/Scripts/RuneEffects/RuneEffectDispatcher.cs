@@ -34,6 +34,7 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
         "GrassMistInsight",   // 초당 보호막
         "GrassMistDominion",  // 초당 보호막
         "DarkRelease",        // 받는 피해 감소
+        "DarkAbyss",          // 주변 적 받는 피해 증폭(value3 = 해방 연장 초는 곱하지 않는다)
         "LightField",         // 치명타 피해
     };
 
@@ -85,6 +86,7 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
         _player = player;
         QuestEvents.OnMonsterKilled += HandleKill;
         _subscribed = true;
+        ElementVfxPlayer.Warmup();   // 속성 이펙트 목록을 미리 읽는다 — 첫 이펙트가 버려지지 않게
     }
 
     public IReadOnlyList<IRuneEffect> Active => _active;

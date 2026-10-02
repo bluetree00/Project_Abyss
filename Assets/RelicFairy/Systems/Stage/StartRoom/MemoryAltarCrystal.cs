@@ -21,7 +21,7 @@ public sealed class MemoryAltarCrystal : MonoBehaviour
     private static readonly int BaseColorId     = Shader.PropertyToID("_BaseColor");
     private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
     private static readonly AltarBranch[] Branches =
-        { AltarBranch.Rune, AltarBranch.Covenant, AltarBranch.Gear, AltarBranch.Journey, AltarBranch.Ranged };
+        { AltarBranch.Rune, AltarBranch.Covenant, AltarBranch.Weapon, AltarBranch.Journey, AltarBranch.Memory };   // 10-02 재설계 — 수정 5개 = 바깥 갈래 4 + 가운데 기억
 
     // ── Serialized ────────────────────────────────────────────────
     [Header("재질")]

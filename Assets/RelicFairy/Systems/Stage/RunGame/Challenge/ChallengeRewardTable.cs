@@ -80,8 +80,9 @@ public sealed class ChallengeRewardTable : ScriptableObject
 
     private static GradeReward DefaultFor(ChallengeGrade grade) => grade switch
     {
-        ChallengeGrade.Platinum => Make(grade, ItemRarity.Legendary, 2, 40),
-        ChallengeGrade.Gold     => Make(grade, ItemRarity.Epic,      2, 28),
+        // 룬은 등급과 무관하게 1개 — 2개일 때 같은 선택 창이 연달아 떠 「보상이 두 번 받아진다」로 읽혔다(10-01 사용자). 등급은 희귀도 하한으로 가른다.
+        ChallengeGrade.Platinum => Make(grade, ItemRarity.Legendary, 1, 40),
+        ChallengeGrade.Gold     => Make(grade, ItemRarity.Epic,      1, 28),
         ChallengeGrade.Silver   => Make(grade, ItemRarity.Rare,      1, 18),
         ChallengeGrade.Bronze   => Make(grade, ItemRarity.Common,    1, 10),
         _                       => Make(ChallengeGrade.Fail, ItemRarity.Common, 1, 4),

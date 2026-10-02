@@ -8,6 +8,9 @@ using UnityEngine.UI;
 /// </summary>
 public sealed class UI_ChallengeHud : MonoBehaviour
 {
+    /// <summary>띠 위끝 하한(1080 기준 px) — 오른쪽 위 재화 줄(위 74 · 높이 40) 아래. 위에 두면 띠 오른쪽 끝이 재화 줄과 겹쳤다(10-01 f5 전주기 시뮬).</summary>
+    private const float MinTop = 124f;
+
     private TextMeshProUGUI _objective;
     private TextMeshProUGUI _status;
 
@@ -35,14 +38,15 @@ public sealed class UI_ChallengeHud : MonoBehaviour
         var brt = band.rectTransform;
         brt.anchorMin = brt.anchorMax = new Vector2(0.5f, 1f);
         brt.pivot     = new Vector2(0.5f, 1f);
-        brt.anchoredPosition = new Vector2(0f, -30f - topOffset);
+        float top = Mathf.Max(30f + topOffset, MinTop);
+        brt.anchoredPosition = new Vector2(0f, -top);
         brt.sizeDelta        = new Vector2(1300f, 110f);
         band.sprite        = UITheme.SoftBand;
         band.color         = new Color(0.02f, 0.02f, 0.04f, 0.72f);
         band.raycastTarget = false;
 
-        hud._objective = hud.MakeText(canvasGO.transform, new Vector2(0f, -44f - topOffset), 30f, UIPalette.Gold);
-        hud._status    = hud.MakeText(canvasGO.transform, new Vector2(0f, -82f - topOffset), 25f, UITheme.Ink);
+        hud._objective = hud.MakeText(canvasGO.transform, new Vector2(0f, -top - 14f), 30f, UIPalette.Gold);
+        hud._status    = hud.MakeText(canvasGO.transform, new Vector2(0f, -top - 52f), 25f, UITheme.Ink);
         return hud;
     }
 

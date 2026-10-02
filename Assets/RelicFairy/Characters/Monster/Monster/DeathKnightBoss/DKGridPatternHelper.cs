@@ -28,6 +28,9 @@ public static class DKGridPatternHelper
     // 검정 계열 VFX 틴트 — 순수 black(0,0,0)은 파티클에 곱해져 소멸하므로 어두운 보라로 대체
     public static readonly Color DarkTint = new Color(0.05f, 0f, 0.12f, 1f);
 
+    // 가산 파트가 주된 이펙트용 검정 틴트 — DarkTint는 가산 파트를 지워 영혼 창 빔이 안 보였다(10-03). DarkTint는 다른 패턴이 그대로 쓴다
+    public static readonly Color DarkReadableTint = new Color(0.55f, 0.15f, 0.85f, 1f);
+
     // ── 타일 스폰/제거 ──────────────────────────────────────
 
     /// <summary>colorRule(x, z) 결과에 따라 내부 셀 전체에 타일 프리팹을 스폰한다.</summary>
@@ -242,12 +245,13 @@ public static class DKGridPatternHelper
     /// <summary>
     /// Effect_09 계열 셰이더(_TintColor HDR)를 사용하는 방패 VFX 색상을 일괄 변경한다.
     /// TintVfx의 _BaseColor/_Color 경로가 무효인 셰이더에 사용.
+    /// <paramref name="readableDark"/>면 검정을 읽히는 보라로 — 가산 블렌드의 남색은 거의 안 보인다(흑백 전환 순간처럼 꼭 보여야 할 때, 10-03).
     /// </summary>
-    public static void TintShieldVfx(GameObject go, DKSwordColor swordColor)
+    public static void TintShieldVfx(GameObject go, DKSwordColor swordColor, bool readableDark = false)
     {
         if (go == null) return;
 
-        Color particleTint = swordColor == DKSwordColor.White ? Color.white : DarkTint;
+        Color particleTint = swordColor == DKSwordColor.White ? Color.white : readableDark ? DarkReadableTint : DarkTint;
         foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
         {
             var main = ps.main;
@@ -257,7 +261,7 @@ public static class DKGridPatternHelper
         // _TintColor HDR: White → 밝은 흰색, Black → 어두운 남색(additive blend에서 거의 검정)
         Color hdrTint = swordColor == DKSwordColor.White
             ? new Color(5f, 5.5f, 6f, 1f)
-            : new Color(0.1f, 0.0f, 0.3f, 1f);
+            : readableDark ? new Color(1.6f, 0.4f, 2.6f, 1f) : new Color(0.1f, 0.0f, 0.3f, 1f);
         foreach (var rend in go.GetComponentsInChildren<Renderer>(true))
             foreach (var mat in rend.materials)
                 if (mat.HasProperty("_TintColor"))
@@ -356,7 +360,8 @@ public static class DKGridPatternHelper
         List<DKTileInfo> tiles,
         GameObject edgePrefab,
         float thickness = 0.13333334f,
-        float yOffset   = 0.12f)
+        float yOffset   = 0.12f,
+        Color? colorOverride = null)   // 줄 예고처럼 바닥색과 상관없이 밝게 읽혀야 할 때(10-03)
     {
         var result = new List<GameObject>();
         if (edgePrefab == null || tiles == null || tiles.Count == 0) return result;
@@ -412,7 +417,7 @@ public static class DKGridPatternHelper
                 if (go == null) continue;
 
                 go.transform.localScale = new Vector3(cs, thickness, cs);
-                ApplyEdgeStyle(go, tile.Color);
+                ApplyEdgeStyle(go, tile.Color, colorOverride);
 
                 result.Add(go);
             }
@@ -439,7 +444,8 @@ public static class DKGridPatternHelper
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
-        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * damageMult));
+        // 악몽 「지휘」 — 환영 기수가 서 있는 동안 +15%
+        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * damageMult * DKStandardBearer.DamageScale(ctx.Monster)));
         // 가해자 = 기사 — null이면 피격 방향 연출·같은 공격자 약 피격 억제·전투 로그가 가해자를 모른다(09-26)
         player.TakeDamage(dmg, ctx.Monster != null ? ctx.Monster.gameObject : null);
 
@@ -449,16 +455,16 @@ public static class DKGridPatternHelper
         player.ApplyKnockback(knockDir * ctx.Config.stat.knockbackForce * knockbackMult);
     }
 
-    private static void ApplyEdgeStyle(GameObject go, DKSwordColor tileColor)
+    private static void ApplyEdgeStyle(GameObject go, DKSwordColor tileColor, Color? colorOverride = null)
     {
         if (go == null) return;
 
-        Color baseColor = tileColor == DKSwordColor.White
+        Color baseColor = colorOverride ?? (tileColor == DKSwordColor.White
             ? new Color(0.95f, 0.96f, 0.98f, 0.92f)
-            : new Color(0.14f, 0.15f, 0.18f, 0.92f);
-        Color emission = tileColor == DKSwordColor.White
+            : new Color(0.14f, 0.15f, 0.18f, 0.92f));
+        Color emission = colorOverride ?? (tileColor == DKSwordColor.White
             ? new Color(0.08f, 0.08f, 0.10f, 1f)
-            : new Color(0.02f, 0.02f, 0.03f, 1f);
+            : new Color(0.02f, 0.02f, 0.03f, 1f));
 
         var block = new MaterialPropertyBlock();
         foreach (var renderer in go.GetComponentsInChildren<Renderer>(true))

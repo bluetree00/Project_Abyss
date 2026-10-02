@@ -113,6 +113,7 @@ public static class GuidelineVisual
             case "vulnerable":            c = Grass;    label = "취약"; break;
             case "item_mark":             c = Dark;     label = "표식"; break;
             case "shock": case "static":  c = Electric; label = "감전"; break;
+            case "shocked":               c = Electric; label = "감전 취약"; break;
             case "stun":                  c = Electric; label = "기절"; break;
             case "brand":                 c = Dark;     label = "낙인"; break;
             default:                      c = Neutral; c.a = 0.9f; label = statusId; break;
@@ -167,6 +168,7 @@ public static class GuidelineVisual
     public static void Toast(Vector3 pos, string label, ToastKind kind)
     {
         if (!s_enabled || string.IsNullOrEmpty(label)) return;
+        if (GameRunBootstrapper.Instance?.Run?.InCutscene == true) return;   // 끝 장면 보스 몸 위에 떴다(10-01 f5)
         var r = GuidelineVisualRunner.Instance; if (r == null) return;
         r.SpawnToast(pos, label, TintColor(kind), 1.1f);
     }

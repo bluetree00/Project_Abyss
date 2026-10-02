@@ -36,13 +36,31 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
     private readonly GawainZenithRelic _relic;
     private float _elapsed;
     private bool  _hitDone;
+    private bool  _openNoonOnly;   // [v2 새벽이 길다] 낙일 버튼 = 정오 열기(해는 안 떨어진다)
+    private bool  _small;          // [v2 저무는 해] 황혼의 작은 낙일
+    private float _castTime;
+
+    private const float SmallScale = 0.5f;   // 작은 낙일 — 반경 · 피해 절반
 
     public SolarDescentSkillRuntime(GawainZenithRelic relic) { _relic = relic; }
 
     public void OnEnter(SkillExecutionContext ctx)
     {
-        _elapsed = 0f; _hitDone = false;
-        _relic?.MarkSkillUsed(); // 구간당 1회 소비
+        _elapsed = 0f; _hitDone = false; _openNoonOnly = false; _small = false;
+        _castTime = _relic != null && _relic.InstantCastActive ? 0f : CastTime;   // [v2 정점 ③] 즉발
+
+        // [v2 새벽이 길다] 붙든 해 — 낙일 버튼이 정오를 연다(해는 안 떨어진다)
+        if (_relic != null && _relic.IsHoldingDawn)
+        {
+            _openNoonOnly = true;
+            _relic.OpenNoon();
+            if (ctx.PlayerTransform != null)
+                GuidelineVisual.Toast(ctx.PlayerTransform.position + Vector3.up * 2.4f, "정오", GuidelineVisual.ToastKind.Relic);
+            return;
+        }
+        // [v2 저무는 해] 황혼의 작은 낙일 — 정오 1회 소비와 따로 센다
+        if (_relic != null && !_relic.Gauge.IsNoon && _relic.TryConsumeBonusCast()) _small = true;
+        else _relic?.MarkSkillUsed(); // 구간당 1회 소비
 
         if (ctx.PlayerTransform != null)
             GuidelineVisual.Toast(ctx.PlayerTransform.position + Vector3.up * 2.4f, "낙일", GuidelineVisual.ToastKind.Relic);
@@ -60,10 +78,11 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
 
     public void OnUpdate(SkillExecutionContext ctx)
     {
+        if (_openNoonOnly) { ctx.RequestEnd?.Invoke(); return; }
         _elapsed += Time.deltaTime;
         // 캐스트 순간 태양을 부른다 → 불덩이가 하늘에서 떨어지기 시작 → MeteorFallTime 뒤 착탄.
-        if (!_hitDone && _elapsed >= CastTime) { _hitDone = true; CallMeteor(ctx); }
-        if (_elapsed >= AnimDuration) ctx.RequestEnd?.Invoke();
+        if (!_hitDone && _elapsed >= _castTime) { _hitDone = true; CallMeteor(ctx); }
+        if (_elapsed >= _castTime + MeteorFallTime + 0.25f) ctx.RequestEnd?.Invoke();
     }
 
     public void OnExit(SkillExecutionContext ctx) => ctx.SetMoveScale(1f);
@@ -87,15 +106,35 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
         float total   = effAtk * V(V_SKILL_MULT, 3.5f) * markMul;
 
         // 낙하가 총 피해의 30%를 여러 틱으로, 착탄이 70%를 한 방에.
-        float impactDmg = total * (1f - FallDamageShare);
-        float fallDmg   = total * FallDamageShare;
+        float scale     = _small ? SmallScale : 1f;
+        float impactDmg = total * (1f - FallDamageShare) * scale;
+        float fallDmg   = total * FallDamageShare * scale;
 
         var owner = ctx.Controller.gameObject;
+        var relic = _relic;
+        bool small = _small;
 
         Managers.Sound?.PlayEvent(SoundEvent.RelicSunFall);   // 떨어지는 태양 — 착탄(0.6초 뒤)에 맞춰 차오르는 소리
-        SolarMeteor.Strike(impact, MeteorFallHeight, MeteorFallTime, ImpactVfxScale, ImpactRadius,
+        SolarMeteor.Strike(impact, MeteorFallHeight, MeteorFallTime, ImpactVfxScale * scale, ImpactRadius * scale,
                            onGroundContact: sunPos => OnMeteorFallTick(sunPos, fallDmg, owner),
-                           onImpact:        ()      => OnMeteorImpact(impact, effAtk, impactDmg, owner));
+                           onImpact:        ()      => OnMeteorImpact(impact, effAtk, impactDmg, owner, scale, relic, small));
+    }
+
+    /// <summary>
+    /// [유물 성장 v2] 플레이어 손 밖에서 작은 해 하나를 떨어뜨린다(두 번째 해 · 서광의 각인 ③ · 한낮에서 노을로 ③ · 들불 ③).
+    /// <paramref name="damageFraction"/> = 낙일 총 피해 대비 몫, <paramref name="radiusScale"/> = 낙일 반경 대비.
+    /// </summary>
+    public static void StrikeSmallSun(PlayerController player, GawainZenithRelic relic, Vector3 at, float damageFraction, float radiusScale)
+    {
+        if (player == null) return;
+        int   effAtk = player.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee);
+        float total  = effAtk * V(V_SKILL_MULT, 3.5f) * Mathf.Max(0f, damageFraction);
+        var   owner  = player.gameObject;
+        var   runner = new SolarDescentSkillRuntime(relic);
+        Managers.Sound?.PlayEvent(SoundEvent.RelicSunFall);
+        SolarMeteor.Strike(at, MeteorFallHeight * 0.6f, MeteorFallTime, ImpactVfxScale * radiusScale, ImpactRadius * radiusScale,
+                           onGroundContact: _ => { },
+                           onImpact:        () => runner.OnMeteorImpact(at, effAtk, total, owner, radiusScale, relic, true));
     }
 
     /// <summary>
@@ -116,7 +155,8 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
     }
 
     /// <summary>착탄 순간 — 폭발 여파(피해·화상·장판·타격감)를 낸다.</summary>
-    private void OnMeteorImpact(Vector3 impact, int effAtk, float dmg, GameObject owner)
+    private void OnMeteorImpact(Vector3 impact, int effAtk, float dmg, GameObject owner,
+                                float scale = 1f, GawainZenithRelic relic = null, bool small = false)
     {
         float burnDps = effAtk * V(V_BURN_TICK_RATIO, 0.15f);
         float burnDur = V(V_BURN_DURATION, 6f);
@@ -128,7 +168,7 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
 
         var buffer = new List<GameObject>(32);
         // 몬스터로 좁히지 않고 IDamageable 전체를 잡는다 — 그래야 훈련용 허수아비에도 들어간다.
-        int found = CombatQuery.GetNearbyDamageables(impact, ImpactRadius, owner, 32, buffer);
+        int found = CombatQuery.GetNearbyDamageables(impact, ImpactRadius * scale, owner, 32, buffer);
 
         RFLog.D($"[가웨인Q] 착탄 | dmg={dmg:F0} | 반경({ImpactRadius}m) 적중 {found}");
 
@@ -156,8 +196,11 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
         }
 
         // 작열 지대 — 착탄 지점에 지속 화염 장판(틱 피해 + 화상)
-        SolarZone.Spawn(impact, ZoneRadius, ZoneDuration,
-                        tickDamage: effAtk * 0.10f, burnDps: burnDps, tickInterval: ZoneTickInterval, instigator: owner);
+        SolarZone.Spawn(impact, ZoneRadius * scale, ZoneDuration,
+                        tickDamage: effAtk * 0.10f * scale, burnDps: burnDps, tickInterval: ZoneTickInterval, instigator: owner);
+
+        // [유물 성장 v2] 착탄 통지 — 해시계(3체 이상) · 두 번째 해 · 정점 · 태양 흑점 등이 듣는다
+        relic?.NotifySunImpact(impact, buffer, small);
     }
 
     private static float V(int slot, float fallback)

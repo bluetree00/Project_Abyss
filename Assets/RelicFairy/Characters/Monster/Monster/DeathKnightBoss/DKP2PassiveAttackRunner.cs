@@ -72,47 +72,35 @@ public class DKP2PassiveAttackRunner
 
         var          playerCell   = DKBossRoomContext.WorldToCell(_ctx.Runtime.PlayerTarget.position);
         int          rowZ         = playerCell.y;
-        float        spawnWorldX  = _ctx.Runtime.PlayerTarget.position.x - DKBossRoomContext.CellSize;
         DKSwordColor sc           = GetSwordColor();
 
-        var tileGos   = new List<GameObject>();
-        var tilePrefab = sc == DKSwordColor.White ? _spearSO.whiteTilePrefab : _spearSO.blackTilePrefab;
-        if (tilePrefab != null)
-        {
-            for (int x = 1; x <= DKBossRoomContext.Width - 2; x++)
-            {
-                if (!DKBossRoomContext.IsInterior(x, rowZ)) continue;
-                var go = BossEffectPool.Spawn(tilePrefab,
-                    DKBossRoomContext.CellToWorld(x, rowZ, 0.05f),
-                    Quaternion.Euler(-90f, 0f, 0f));
-                if (go == null) continue;
-                go.transform.localScale = Vector3.one * DKBossRoomContext.CellSize;
-                tileGos.Add(go);
-            }
-        }
+        // 줄 예고(이웃 줄 반대 색 + 경계 테두리)는 판정 순간까지 남긴다 — 예전엔 빔이 뜰 때 지워 회피 창 0.4초를 기억에 맡겼다(10-03)
+        var tiles = new List<DKTileInfo>();
+        var edges = new List<GameObject>();
+        DKSoulSpearState.SpawnRowGuide(_spearSO, rowZ, sc, tiles, edges);
 
         try
         {
             await UniTask.Delay(TimeSpan.FromSeconds(_spearSO.passiveWarningDuration),
                 cancellationToken: ct);
+
+            DKSoulSpearState.SpawnRowBeam(_spearSO.impactVfxPrefab, rowZ, sc);
+            Managers.Sound?.PlayEffectAt(_spearSO.beamSfx,
+                DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, rowZ, 0.1f));
+
+            await UniTask.Delay(TimeSpan.FromSeconds(_spearSO.passiveBeamHitDelay), cancellationToken: ct);
+
+            if (!IsPlayerInGuardianShield())
+                DKGridPatternHelper.TriggerSingleRowDamage(
+                    _ctx, rowZ,
+                    _spearSO.damageMultiplier * 0.9f,
+                    _spearSO.knockbackMultiplier);
         }
         finally
         {
-            foreach (var go in tileGos) BossEffectPool.Release(go);
-            tileGos.Clear();
+            DKGridPatternHelper.DestroyEdges(edges);
+            DKGridPatternHelper.DestroyTiles(tiles);
         }
-
-        DKSoulSpearState.SpawnRowBeam(_spearSO.impactVfxPrefab, rowZ, sc, spawnWorldX);
-        Managers.Sound?.PlayEffectAt(_spearSO.beamSfx,
-            DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, rowZ, 0.1f));
-
-        await UniTask.Delay(TimeSpan.FromSeconds(_spearSO.passiveBeamHitDelay), cancellationToken: ct);
-
-        if (!IsPlayerInGuardianShield())
-            DKGridPatternHelper.TriggerSingleRowDamage(
-                _ctx, rowZ,
-                _spearSO.damageMultiplier * 0.9f,
-                _spearSO.knockbackMultiplier);
     }
 
     // ── PhantomRush 루프 ──────────────────────────────────────
@@ -228,7 +216,8 @@ public class DKP2PassiveAttackRunner
                     {
                         int dmg = Mathf.Max(1,
                             (int)(_ctx.Config.stat.attackPower * _phantomSO.damageMultiplier));
-                        player.TakeDamage(dmg, _ctx.Monster.gameObject, false, HitWeight.Light);   // 수동 공격 — 약
+                        // 수동 공격 — 약. 예고 0.45초짜리 상시 견제라 날리지 않는다(약은 포이즈를 안 쌓음 — 10-01, 콤보와 겹쳐 연쇄 피격이 되지 않게)
+                        player.TakeDamage(dmg, _ctx.Monster.gameObject, false, HitWeight.Light);
                         Vector3 kb = (_ctx.Runtime.PlayerTarget.position - cellCenter).normalized;
                         kb.y = 0.2f;
                         player.ApplyKnockback(

@@ -28,6 +28,7 @@ public sealed class NpcAmbientChatter : MonoBehaviour
     private Transform   _camT;
     private Transform   _player;
     private Color       _baseColor = new Color(0.94f, 0.92f, 0.85f);
+    private float       _headOffsetY = HeadOffsetY;
 
     // ── Lifecycle ────────────────────────────────────────
     private void Start()
@@ -66,12 +67,13 @@ public sealed class NpcAmbientChatter : MonoBehaviour
     }
 
     // ── Public Methods ───────────────────────────────────
-    /// <summary>대사 목록·간격 주입. 컨트롤러가 NPC 스폰 직후 호출한다.</summary>
-    public void Initialize(string[] lines, float interval = DefaultInterval, Color? tint = null)
+    /// <summary>대사 목록·간격 주입. 컨트롤러가 NPC 스폰 직후 호출한다. headOffsetY = 말풍선 높이(NPC 몸 크기마다, 비우면 기본).</summary>
+    public void Initialize(string[] lines, float interval = DefaultInterval, Color? tint = null, float? headOffsetY = null)
     {
         _lines    = lines;
         _interval = Mathf.Max(2f, interval);
         if (tint.HasValue) _baseColor = tint.Value;
+        if (headOffsetY.HasValue) _headOffsetY = headOffsetY.Value;
 
         if (_text == null) CreateText();
         HideNow();
@@ -82,7 +84,7 @@ public sealed class NpcAmbientChatter : MonoBehaviour
     {
         var go = new GameObject("NpcChatter");
         go.transform.SetParent(transform, false);
-        go.transform.localPosition = new Vector3(0f, HeadOffsetY, 0f);
+        go.transform.localPosition = new Vector3(0f, _headOffsetY, 0f);
 
         _text = go.AddComponent<TextMeshPro>();
         _text.fontSize  = 3.2f;

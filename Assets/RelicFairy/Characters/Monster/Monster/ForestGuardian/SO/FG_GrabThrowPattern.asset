@@ -21,9 +21,11 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
+  liberatedOnly: 1
   range: 2.5
   arcHalfAngle: 40
   grabTime: 0.18
+  grabWarnLead: 0.32
   slam1Offset: 2.0
   slam2Offset: 3.0
   throwOffset: 5.0

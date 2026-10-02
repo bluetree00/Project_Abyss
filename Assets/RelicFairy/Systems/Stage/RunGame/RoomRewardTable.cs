@@ -68,11 +68,29 @@ public static class RoomRewardTable
 
     // ── Public Methods ───────────────────────────────────────────
 
-    /// <summary>방 종류별 보상 규칙. 미등록 종류는 일반방 규칙으로 폴백한다.</summary>
-    public static Rule For(RoomPlanKind kind) => kind switch
+    /// <summary>
+    /// 방 종류별 보상 규칙. 미등록 종류는 일반방 규칙으로 폴백한다.
+    /// 시기(해방기 · 악몽 모드)가 올라가면 몬스터가 세지는 만큼 룬 등급 가중을 위로 옮기고 연료를 늘린다(<see cref="EraBalance"/>, 10-01).
+    /// </summary>
+    public static Rule For(RoomPlanKind kind) => WithEra(BaseFor(kind));
+
+    /// <summary>시기 배율 — 봉인기는 그대로.</summary>
+    private static Rule WithEra(in Rule r)
     {
-        // 정예 — 확정 드롭 + Rare 하한 + 후보 4 + 연료 증량 + 강화재료(§3-2 개편표).
-        RoomPlanKind.Elite => new Rule(1f, 4, ItemRarity.Rare, EliteWeights, ore: 6, enhanceMaterial: 2),
+        var era = EraBalance.Current;
+        if (era.RarityStep <= 0 && Mathf.Approximately(era.FuelScale, 1f)) return r;
+        var w = r.Weights;
+        var (c, ra, e, l) = EraBalance.ShiftRarity(w.Common, w.Rare, w.Epic, w.Legendary, era.RarityStep);
+        return new Rule(r.DropChance, r.ChoiceCount, r.RarityFloor, new RarityWeights(c, ra, e, l),
+                        ore: Mathf.RoundToInt(r.Ore * era.FuelScale),
+                        enhanceMaterial: Mathf.RoundToInt(r.EnhanceMaterial * era.FuelScale));
+    }
+
+    private static Rule BaseFor(RoomPlanKind kind) => kind switch
+    {
+        // 정예 — 확정 드롭 + Rare 하한 + 연료 증량 + 강화재료(§3-2 개편표).
+        // 후보는 다른 방과 같은 3장이다 — 룬 선택지를 3장으로 고정했다(10-01 사용자 결정, 예전 4장).
+        RoomPlanKind.Elite => new Rule(1f, 3, ItemRarity.Rare, EliteWeights, ore: 6, enhanceMaterial: 2),
 
         // [제거됨 2026-08-12] PreBoss 규칙 —
         // 보스 전 통로는 전 챕터 grid_csv에 스포너가 0개다. 그래서 AttachRoomClearController가

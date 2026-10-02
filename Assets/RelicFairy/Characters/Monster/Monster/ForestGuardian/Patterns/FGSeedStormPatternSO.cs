@@ -132,6 +132,8 @@ public class FGSeedStormState : FullLockState<FGSeedStormPatternSO>
     private const string AnimThrow  = "MagicAttackE";
     private const float  FaceSpeed  = 360f;
     private const float  VfxLifetime = 2.5f;
+    private const float  SeedAppearSeconds = 0.25f;   // 씨앗이 디졸브로 맺히는 시간(10-03)
+    private const float  SeedVanishSeconds = 0.3f;    // 떨어진 씨앗이 디졸브로 꺼지는 시간(10-03)
 
     private enum Phase { Gather, Flight, Recovery }
 
@@ -139,6 +141,7 @@ public class FGSeedStormState : FullLockState<FGSeedStormPatternSO>
     private float   _timer;
     private bool    _armed;
     private Vector3 _origin;
+    private float   _seedsShownAt;   // 씨앗 등장 디졸브 시작 시각 — 끝나기 전에 치우면 디졸브 없이 없앤다
     private readonly int          _count;
     private readonly Vector3[]    _targets;
     private readonly GameObject[] _discs;
@@ -256,6 +259,8 @@ public class FGSeedStormState : FullLockState<FGSeedStormPatternSO>
             {
                 _seeds[i] = Object.Instantiate(Data.seedPrefab, _origin, Quaternion.identity);
                 _seeds[i].transform.localScale = Vector3.one * Data.seedScale;
+                _seedsShownAt = Time.time;
+                DissolveEffect.PlayAppear(_seeds[i], SeedAppearSeconds);   // 던지는 손끝에서 맺힌다(10-03)
             }
         }
     }
@@ -303,7 +308,7 @@ public class FGSeedStormState : FullLockState<FGSeedStormPatternSO>
         int max = Mathf.Max(1, Data.maxBushes);
         while (_bushes.Count >= max)
         {
-            if (_bushes[0] != null) Object.Destroy(_bushes[0].gameObject);
+            if (_bushes[0] != null) _bushes[0].Vanish();   // 디졸브로 꺼진 뒤 스스로 사라진다(10-03)
             _bushes.RemoveAt(0);
         }
         _bushes.Add(bush);
@@ -311,12 +316,21 @@ public class FGSeedStormState : FullLockState<FGSeedStormPatternSO>
 
     private void ClearFlight()
     {
+        // 등장 디졸브가 끝난 뒤에만 퇴장 디졸브 — 겹치면 등장 쪽이 끝나며 원본 재질을 되살린다
+        bool dissolve = Time.time - _seedsShownAt >= SeedAppearSeconds;
         for (int i = 0; i < _count; i++)
         {
             PatternGuideHelper.SafeDestroy(ref _discs[i]);
-            if (_seeds[i] != null) Object.Destroy(_seeds[i]);
+            if (_seeds[i] != null) VanishSeed(_seeds[i], dissolve);
             _seeds[i] = null;
         }
+    }
+
+    /// <summary>씨앗은 떨어진(또는 끊긴) 자리에서 디졸브로 꺼진 뒤 사라진다(10-03). 퇴장 디졸브는 재질을 되돌리지 않아 끝나자마자 Destroy.</summary>
+    private static void VanishSeed(GameObject seed, bool dissolve)
+    {
+        if (!dissolve) { Object.Destroy(seed); return; }
+        DissolveEffect.PlayDisappear(seed, SeedVanishSeconds, () => { if (seed != null) Object.Destroy(seed); });
     }
 
     private static void SpawnOneShot(GameObject prefab, Vector3 pos, float scale)

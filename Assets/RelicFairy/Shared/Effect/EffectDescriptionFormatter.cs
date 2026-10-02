@@ -130,15 +130,21 @@ public static class EffectDescriptionFormatter
         switch (statusId)
         {
             case "ignite": case "burn":                       return "fire";
-            // 출혈은 속성이 없다 — 아이콘 어휘에 전용 키가 없어 피해계(적색) 키로 보낸다.
-            // 라벨("출혈")은 LabelForStatus가 이미 갖고 있어, 없던 건 아이콘 한 칸뿐이었다.
-            case "bleed":                                     return "dmg";
+            // 출혈 — 전용 키(핏방울). 예전엔 피해계 「dmg」를 빌렸는데 그 키는 「모든 피해」 같은 아이템 효과도 써서 그림을 줄 수 없었다(10-02).
+            case "bleed":                                     return "bleed";
             case "frost":  case "freeze": case "shatter":     return "freeze";
             case "poison": case "item_poison":
-            case "poison_atk": case "vulnerable":             return "poison";
-            case "shock":  case "static":                     return "lightning";
+            case "poison_atk":                                return "weaken";       // 약화 — 독 그림을 빌리던 것을 나눔(10-02)
+            case "vulnerable":                                return "vulnerable";   // 취약(받는 피해 증가)
+            case "ice_zone_slow":                             return "slow";         // 얼음 장판 둔화 — 그림 없던 칸
+            case "shock":  case "static": case "shocked":     return "lightning";
             case "stun":   case "petrify":                    return "stun";
             case "brand":  case "item_mark": case "cov_curse": return "dark";
+            // 유물 성장 v2 — 태양흔(가웨인) · 흑점(일식) · 배신의 낙인(랜슬롯). 전용 아이콘은 구현 계획 4(아트)
+            case RelicMarkStatus.SunmarkId:                   return "light";
+            case RelicMarkStatus.BlackspotId:                 return "dark";
+            // 배신의 낙인 — 흑색(f7 10-02). 「bleed」는 피의 광란 · 부패가 같은 적에 출혈을 걸어 같은 그림 둘이 된다 · 「dark」(흑점)는 가웨인 전용이라 한 런에 안 겹친다.
+            case RelicMarkStatus.BrandId:                     return "dark";
             default:                                           return "unknown";
         }
     }
@@ -163,12 +169,18 @@ public static class EffectDescriptionFormatter
             case "poison": case "item_poison": return "중독";
             case "poison_atk":                return "약화";
             case "vulnerable":                return "취약";
+            case "ice_zone_slow":             return "둔화";   // 얼음 장판 — 예전엔 원문 id가 그대로 떴다
             case "item_mark":                 return "표식";
             case "shock": case "static":      return "감전";
+            // 전기 3단계 시너지가 거는 받는 피해 증폭(10-01). 서약 통화 「감전」(shock)과 다른 것이라 이름을 가른다.
+            case "shocked":                   return "감전 취약";
             case "stun":                      return "기절";
             case "petrify":                   return "석화";
             case "brand":                     return "낙인";
             case "cov_curse":                 return "저주";
+            case RelicMarkStatus.SunmarkId:   return "태양흔";
+            case RelicMarkStatus.BlackspotId: return "흑점";
+            case RelicMarkStatus.BrandId:     return "배신의 낙인";
             default:                          return statusId;
         }
     }

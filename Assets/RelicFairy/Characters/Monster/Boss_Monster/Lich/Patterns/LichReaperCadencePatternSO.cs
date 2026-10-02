@@ -100,7 +100,7 @@ public class LichReaperCadenceState : UnInterruptibleState<LichReaperCadencePatt
 {
     private enum Phase { Approach, Sweep1, Gap, Sweep2, FeintHold, Finisher, Recovery }
 
-    private const float SignalSeconds = 0.15f;
+    private const float SignalSeconds = 0.35f;   // 방향 고정 → 판정(0.15 → 0.35, 10-02 — 옆으로 피할 실제 창)
 
     private Phase      _phase;
     private float      _timer;

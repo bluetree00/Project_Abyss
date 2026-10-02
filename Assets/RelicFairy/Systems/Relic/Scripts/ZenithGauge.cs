@@ -27,11 +27,25 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     private bool   _markActiveLast;
     private bool   _holdNoon;     // [파츠] 영원한 정오 — true면 정오 구간에 고정(황혼·충전 제거)
 
+    // 유물 성장 v2(10-02) — 하루를 손대는 손잡이. 아무것도 켜지 않으면 기존 순환 그대로다.
+    private const float HoldDawnMax = 10f;   // 「새벽이 길다」 — 여명 끝에서 해를 붙드는 최대 시간
+    private bool   _holdDawn;     // 여명 공명 4가 켰다
+    private bool   _holding;      // 지금 여명 끝에서 붙들고 있다
+    private float  _holdTimer;
+    private float  _noonExtra;    // 이번 정오에 더해진 초(해시계)
+    private bool   _shortNoonPending;   // 「밤이 오지 않는다」 — 황혼 끝에 짧은 정오 예약
+    private bool   _shortNoon;          // 지금 정오가 짧은 정오
+    private float  _shortNoonTime = 3f;
+    private bool   _paused;       // 일식 — 해의 시간이 멈춘다
+
     // 라벨 캐시 — 표시값이 바뀔 때만 문자열을 새로 만든다.
     private string _label = "여명";
     private int    _labelKey = int.MinValue;
 
     public event Action OnChanged;
+
+    /// <summary>구간이 바뀌었다(이전, 새). 유물 성장 v2 허브가 시간대 사건(여명 · 정오 · 정오 끝 · 황혼)으로 쓴다.</summary>
+    public event Action<ZPhase, ZPhase> PhaseChanged;
 
     // ── 타입 접근(유물 로직용) ──
     public ZPhase CurrentPhase => _phase;
@@ -67,8 +81,21 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
         // [파츠] 영원한 정오 — 정오에 고정하고 사이클을 멈춘다.
         if (_holdNoon)
         {
-            if (_phase != ZPhase.Noon) { _phase = ZPhase.Noon; _timer = 0f; _markActiveLast = false; OnChanged?.Invoke(); }
+            if (_phase != ZPhase.Noon) { var old = _phase; _phase = ZPhase.Noon; _timer = 0f; _markActiveLast = false; OnChanged?.Invoke(); PhaseChanged?.Invoke(old, _phase); }
             else _timer = 0f;
+            return;
+        }
+
+        // [v2 일식] 해의 시간이 멈춘다
+        if (_paused) return;
+
+        // [v2 새벽이 길다] 여명 끝에서 해를 붙든다 — 낙일로 정오를 열거나, 최대 시간이 지나면 저절로 열린다
+        if (_holding)
+        {
+            _holdTimer += Time.deltaTime;
+            if (_holdTimer < HoldDawnMax) return;
+            _holding = false;
+            _timer = 0f; Advance(); OnChanged?.Invoke();
             return;
         }
 
@@ -76,7 +103,16 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
         _timer += Time.deltaTime * (1f + accel);
 
         bool changed = false;
-        if (_timer >= CurrentDuration()) { _timer = 0f; Advance(); changed = true; }
+        if (_timer >= CurrentDuration())
+        {
+            if (_phase == ZPhase.Charging && _holdDawn)
+            {
+                _holding = true; _holdTimer = 0f; _timer = _chargeTime;
+                OnChanged?.Invoke();
+                return;
+            }
+            _timer = 0f; Advance(); changed = true;
+        }
 
         bool markNow = IsMarkReady;
         if (markNow != _markActiveLast) { _markActiveLast = markNow; changed = true; }
@@ -91,25 +127,98 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     private float CurrentDuration() => _phase switch
     {
         ZPhase.Charging => _chargeTime,
-        ZPhase.Noon     => _noonTime,
+        ZPhase.Noon     => (_shortNoon ? _shortNoonTime : _noonTime) + _noonExtra,
         _               => _cooldownTime,
     };
 
     private void Advance()
     {
+        var old = _phase;
+        bool wasShort = _shortNoon;
+        _shortNoon = false;
         _phase = _phase switch
         {
             ZPhase.Charging => ZPhase.Noon,
-            ZPhase.Noon     => ZPhase.Cooldown,
-            _               => ZPhase.Charging,
+            ZPhase.Noon     => wasShort ? ZPhase.Charging : ZPhase.Cooldown,   // 짧은 정오 뒤엔 황혼 없이 새벽
+            _               => _shortNoonPending ? ZPhase.Noon : ZPhase.Charging,
         };
+        if (old == ZPhase.Cooldown && _phase == ZPhase.Noon) { _shortNoon = true; _shortNoonPending = false; }
+        if (_phase == ZPhase.Noon) _noonExtra = 0f;
 
         // ⚠️ 예전엔 여기서 Charging 진입 시 _chargeAccel을 0으로 지웠다.
         //    가속은 <b>충전 구간에서만</b> 쓰이는데 충전에 들어가는 순간 지워버렸으니,
         //    황혼에서 아무리 처치해도 단 1%도 반영되지 않았다 — 잔열 패시브가 100% 무효였다.
         //    가속은 '해를 앞당기는' 적립이므로 정오에 도달했을 때(=보상을 받았을 때) 소진한다.
         if (_phase == ZPhase.Noon) _chargeAccel = 0f;
+        PhaseChanged?.Invoke(old, _phase);
     }
+
+    // ── 유물 성장 v2 손잡이 ─────────────────────────────────
+
+    /// <summary>「새벽이 길다」(여명 공명 4) — 여명 끝에서 해를 붙든다. 끄면 붙들고 있던 해를 바로 놓는다.</summary>
+    public bool HoldDawn
+    {
+        get => _holdDawn;
+        set
+        {
+            _holdDawn = value;
+            if (!value && _holding) { _holding = false; _timer = 0f; Advance(); OnChanged?.Invoke(); }
+        }
+    }
+
+    /// <summary>지금 여명 끝에서 해를 붙들고 있는가(낙일 버튼이 정오를 연다).</summary>
+    public bool IsHoldingDawn => _holding;
+
+    /// <summary>여명이면 즉시 정오를 연다(붙듦 해제 · 여명의 맹세 ③ 축열 가득). 그 밖엔 아무것도 안 한다.</summary>
+    public void OpenNoonNow()
+    {
+        if (_phase != ZPhase.Charging) return;
+        _holding = false;
+        _timer = 0f; Advance(); OnChanged?.Invoke();
+    }
+
+    /// <summary>정오면 이번 정오를 늘린다(해시계).</summary>
+    public void ExtendNoon(float seconds)
+    {
+        if (_phase != ZPhase.Noon || seconds <= 0f) return;
+        _noonExtra += seconds;
+        OnChanged?.Invoke();
+    }
+
+    /// <summary>해를 앞당긴다 — 여명 · 황혼의 남은 시간을 줄인다(아침 사냥 · 저무는 해 ③ · 노을로). 끝나면 다음 프레임에 넘어간다.</summary>
+    public void AdvanceTime(float seconds)
+    {
+        if (seconds <= 0f || _holding) return;
+        if (_phase == ZPhase.Charging || _phase == ZPhase.Cooldown)
+            _timer = Mathf.Min(_timer + seconds, CurrentDuration());
+    }
+
+    /// <summary>「밤이 오지 않는다」(황혼 공명 4) — 이번 황혼이 끝나면 짧은 정오를 한 번 더.</summary>
+    public void QueueShortNoon(float seconds)
+    {
+        _shortNoonPending = true;
+        _shortNoonTime = Mathf.Max(0.5f, seconds);
+    }
+
+    /// <summary>지금 정오가 「밤이 오지 않는다」의 짧은 정오인가.</summary>
+    public bool IsShortNoon => _phase == ZPhase.Noon && _shortNoon;
+
+    /// <summary>일식 — 해의 시간이 멈춘다.</summary>
+    public bool Paused { get => _paused; set => _paused = value; }
+
+    /// <summary>구간 기본 길이(초) — HUD 해시계 호의 크기. 정오는 늘어난 몫 · 짧은 정오를 뺀 기본 길이.</summary>
+    public float DurationOf(ZPhase p) => p switch
+    {
+        ZPhase.Charging => _chargeTime,
+        ZPhase.Noon     => _noonTime,
+        _               => _cooldownTime,
+    };
+
+    /// <summary>지금 구간의 진행 0~1(붙듦 중엔 1) — HUD 해시계 바늘.</summary>
+    public float PhaseProgress01 => _holding ? 1f : Mathf.Clamp01(_timer / Mathf.Max(0.01f, CurrentDuration()));
+
+    /// <summary>지금 구간의 남은 초(붙듦 중엔 0).</summary>
+    public float PhaseRemaining => _holding ? 0f : Mathf.Max(0f, CurrentDuration() - _timer);
 
     /// <summary>
     /// 잔열 — 처치로 <b>다음 해를 앞당긴다</b>. 황혼·충전 중 적립되고, 충전 속도에 곱해진다.
@@ -135,15 +244,17 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     {
         if (_holdNoon == on) return;
         _holdNoon = on;
+        var old = _phase;
         if (on) { _phase = ZPhase.Noon; _timer = 0f; _markActiveLast = false; }
         OnChanged?.Invoke();
+        if (old != _phase) PhaseChanged?.Invoke(old, _phase);
     }
 
     // ── IRelicResource ──
     public float Fill => _phase switch
     {
         ZPhase.Charging => ChargeFill,
-        ZPhase.Noon     => 1f - Mathf.Clamp01(_timer / Mathf.Max(0.01f, _noonTime)),
+        ZPhase.Noon     => 1f - Mathf.Clamp01(_timer / Mathf.Max(0.01f, CurrentDuration())),
         _               => Mathf.Clamp01(_timer / Mathf.Max(0.01f, _cooldownTime)),
     };
     /// <summary>

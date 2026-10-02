@@ -64,7 +64,7 @@ public static class UiFeedback0929bProbeEditor
                 cands.Add((d, ItemSORegistry.Find(id)));
             }
             var pick = await Managers.UI.ShowPopupUIAndGetAsync<UI_RuneSelectPopup>();
-            pick.Setup(cands, run.ItemInventory, 0);
+            pick.Setup(cands, run.ItemInventory);
             await UniTask.Delay(2200, ignoreTimeScale: true);   // 뒤집기 연출이 끝나게
             await Shot("FB_RuneSelect");
             foreach (var fx in pick.GetComponentsInChildren<RectTransform>(true))

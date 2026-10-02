@@ -81,6 +81,11 @@ public class ZoneLayoutManager
     /// 룸 풀 CSV(zone_pool)를 로드/파싱해 ZonePoolEntry 리스트를 반환한다.
     /// 절차적 생성(RunSequencer)에서 슬롯 병합 없이 풀만 필요할 때 사용. 결과는 _poolCache에 캐시.
     /// </summary>
+#if UNITY_EDITOR
+    /// <summary>에디터 확인 전용 — 켜면 방 풀을 CDN 대신 로컬 Addressables CSV에서 읽는다(메뉴 RelicFairy/Minigame/Force Next Door가 같이 켠다).</summary>
+    public const string PreferLocalPoolPrefsKey = "RelicFairy.Run.PreferLocalRoomPool";
+#endif
+
     public async UniTask<List<ZonePoolEntry>> LoadPoolAsync(string poolKey)
     {
         if (string.IsNullOrEmpty(poolKey)) return new List<ZonePoolEntry>();
@@ -90,6 +95,13 @@ public class ZoneLayoutManager
         var chartName = poolKey.ToUpper(); // 뒤끝 차트명은 대문자
 
         // 1) 서버(뒤끝 CDN) 차트 우선 — 존 레이아웃과 동일 경로
+        //    (에디터 확인 전용: 「로컬 방 풀 우선」이 켜져 있으면 건너뛴다 — CDN에 아직 안 올린 새 방을 시험할 때)
+        bool preferLocal = false;
+#if UNITY_EDITOR
+        preferLocal = UnityEditor.EditorPrefs.GetBool(PreferLocalPoolPrefsKey, false);
+        if (preferLocal) Debug.Log($"[ZoneLayoutManager] (에디터) 로컬 방 풀 우선 — '{chartName}' CDN 건너뜀");
+#endif
+        if (!preferLocal)
         try
         {
             int loaded = ChartLoader.Load(chartName, row =>

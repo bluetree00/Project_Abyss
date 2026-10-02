@@ -81,6 +81,7 @@ public class AchievementListView : MonoBehaviour
     private AchCategory _filter = AchCategory.All;
     private readonly List<Image>    _chipBg    = new();
     private readonly List<TMP_Text> _chipLabel = new();
+    private TMP_Text _summary;   // 칩 줄 오른쪽 「달성 n / 전체」 — 받은 업적은 접혀 있어 첫 화면에 달성이 안 보였다(10-02)
     private bool _chipsBuilt;
 
     private bool PassFilter(Quest q) => _filter == AchCategory.All || CategoryOf(q) == _filter;
@@ -140,6 +141,20 @@ public class AchievementListView : MonoBehaviour
             var picked = cat;
             btn.onClick.AddListener(() => { _filter = picked; Refresh(); });
         }
+
+        // 달성 요약 — 칩 줄 오른쪽 끝. 「받음」 구간은 접어 두므로(할 일을 가리지 않게) 달성 수는 여기서 늘 보인다.
+        var sum = new GameObject("Summary", typeof(RectTransform)).GetComponent<RectTransform>();
+        sum.SetParent(bar, false);
+        sum.anchorMin = sum.anchorMax = new Vector2(1f, 0.5f);
+        sum.pivot     = new Vector2(1f, 0.5f);
+        sum.sizeDelta = new Vector2(420f, 32f);
+        sum.anchoredPosition = Vector2.zero;
+        _summary = sum.gameObject.AddComponent<TextMeshProUGUI>();
+        _summary.fontSize      = 18f;
+        _summary.alignment     = TextAlignmentOptions.Right;
+        _summary.raycastTarget = false;
+        _summary.color         = AltarPalette.TextDim;
+        TMPOutlineHelper.ApplySoftShadow(_summary);
     }
 
     /// <summary>칩 색과 개수를 갱신한다. 「전체」에만 총 개수를 붙여 목록 규모를 알린다.</summary>
@@ -149,11 +164,16 @@ public class AchievementListView : MonoBehaviour
         if (_chipBg.Count == 0) return;
 
         var mgr = Managers.Quest;
-        int total = 0;
+        int total = 0, achieved = 0, waiting = 0;
         if (mgr != null)
         {
-            total = mgr.ActiveAchievements.Count + mgr.CompletedAchievements.Count;
+            total    = mgr.ActiveAchievements.Count + mgr.CompletedAchievements.Count;
+            waiting  = mgr.WaitingAchievementCount();
+            achieved = mgr.CompletedAchievements.Count + waiting;   // 받은 것 + 달성했지만 아직 안 받은 것
         }
+        if (_summary != null)
+            _summary.text = $"달성 <color=#E8BA54>{achieved}</color> / {total}" +
+                            (waiting > 0 ? $"   <color=#63D9BF>받을 것 {waiting}</color>" : "");
 
         for (int i = 0; i < _chipBg.Count && i < Categories.Length; i++)
         {
@@ -283,6 +303,26 @@ public class AchievementListView : MonoBehaviour
         FillSection(_progress,  progressRows,  running,   isClaimable: false, isClaimed: false);
         FillSection(_claimed,   claimedRows,
                     _claimedExpanded ? claimed : new List<Quest>(), isClaimable: false, isClaimed: true);
+        RebuildLayout();
+    }
+
+    /// <summary>
+    /// 구간(행 컨테이너)은 각자 ContentSizeFitter를 단 <b>중첩</b> 레이아웃이라, 행을 켜고 끈 같은 프레임에 바깥 목록이 옛 높이로 줄을 세운다 —
+    /// 「받음」을 펼치면 받은 행이 진행 중 행 위에 겹쳐 그려졌다(10-02 실측 6건, 사용자 「텍스트가 겹치고 레이아웃이 이상해지는」).
+    /// 안쪽 구간부터 바깥 목록까지 바로 다시 잰다.
+    /// </summary>
+    private void RebuildLayout()
+    {
+        RebuildIfActive(claimableRows);
+        RebuildIfActive(progressRows);
+        RebuildIfActive(claimedRows);
+        var content = claimedRows != null ? claimedRows.parent as RectTransform : null;
+        if (content != null) LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+    }
+
+    private static void RebuildIfActive(Transform t)
+    {
+        if (t is RectTransform rt && rt.gameObject.activeInHierarchy) LayoutRebuilder.ForceRebuildLayoutImmediate(rt);
     }
 
     /// <summary>구간 하나를 채운다. 행은 재사용하고 남는 것은 끈다 — 여닫을 때마다 Instantiate 하면 GC가 튄다.</summary>

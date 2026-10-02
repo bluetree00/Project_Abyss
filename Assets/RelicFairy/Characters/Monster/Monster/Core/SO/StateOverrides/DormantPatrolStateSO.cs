@@ -33,6 +33,10 @@ public class DormantPatrolStateSO : MonsterStateOverrideSO
              "어떤 모드든 피격 시에는 항상 해제된다.")]
     public DormantWakeUpMode wakeUpMode = DormantWakeUpMode.OnAttackedOnly;
 
+    [Tooltip("잠복을 푸는 거리(m). 0이면 모드 기본값(인식 거리 / 공격 사거리). OnAttackedOnly에서는 쓰지 않는다.\n" +
+             "인식 거리는 감지 배율(×3)이 곱해진 값이라 위장 몬스터에게는 너무 멀고, 공격 사거리는 너무 가깝다 — 둘 사이를 여기서 정한다.")]
+    public float wakeRadius = 0f;
+
     public override void RegisterOverrides(MonsterFSM fsm, MonsterBase monster)
     {
         fsm.RegisterAs<PatrolState>(new DormantPatrolState(this));
@@ -51,14 +55,27 @@ public class DormantPatrolStateSO : MonsterStateOverrideSO
         /// <summary>스폰 위치 도착 판정 거리(m).</summary>
         private const float ReturnArrivalThreshold = 0.5f;
 
+        /// <summary>이 상태에 들어올 때의 HP — 줄면(룬 · 지속 피해처럼 피격 플래그를 안 세우는 피해 포함) 깬다.</summary>
+        private int _hpMark;
+
         public DormantPatrolState(DormantPatrolStateSO data)
         {
             _data = data;
         }
 
+        /// <summary>거리 기반 잠복 해제 문턱.</summary>
+        private float WakeThreshold(MonsterContext ctx)
+        {
+            if (_data.wakeRadius > 0f) return _data.wakeRadius;
+            return _data.wakeUpMode == DormantWakeUpMode.OnDetectionRange
+                ? ctx.Detection.detectionRange
+                : ctx.Stat.attackRange;
+        }
+
         public void Enter(MonsterContext ctx)
         {
             // 내부 상태 초기화 — 이전 사이클 잔여 플래그 제거
+            _hpMark = ctx.Runtime.CurrentHp;
             _isReturning = false;
             _waitingForSettle = false;
             _waitingForDormantTransition = false;
@@ -72,13 +89,18 @@ public class DormantPatrolStateSO : MonsterStateOverrideSO
             else
             {
                 EnterDormant(ctx);
+                // 제자리 잠복(막 태어남) — 이미 문턱 안에 선 플레이어에게도 깬다. 「한 번 벗어났다 다시 들어와야 깬다」는
+                // 쫓다 포기하고 돌아온 자리에서 곧바로 다시 깨는 왕복을 막는 장치라 귀환 뒤 잠복에만 건다.
+                // 이게 없으면 플레이어 곁에 태어난 선인장 · 성난 버섯이 맞기 전까지 영영 잠복했다(10-01 실측).
+                ctx.Runtime.TargetCleared = true;
             }
         }
 
         public void Update(MonsterContext ctx)
         {
             // 피격 감지 — 귀환 중이든 잠복 중이든, TargetCleared 무관하게 항상 허용
-            if (ctx.Runtime.HasBeenAttacked)
+            // 룬 · 지속 피해(TakeSynergyDamage)는 피격 플래그를 세우지 않는다 — 체력이 줄었으면 맞은 것으로 본다.
+            if (ctx.Runtime.HasBeenAttacked || ctx.Runtime.CurrentHp < _hpMark)
             {
                 ctx.Monster.ChangeState<ChaseState>();
                 return;
@@ -98,9 +120,7 @@ public class DormantPatrolStateSO : MonsterStateOverrideSO
             if (!ctx.Runtime.TargetCleared
                 && _data.wakeUpMode != DormantWakeUpMode.OnAttackedOnly)
             {
-                float threshold = _data.wakeUpMode == DormantWakeUpMode.OnDetectionRange
-                    ? ctx.Detection.detectionRange
-                    : ctx.Stat.attackRange;
+                float threshold = WakeThreshold(ctx);
 
                 if (ctx.Runtime.PlayerTarget == null
                     || ctx.Monster.IsPlayerDead()
@@ -116,9 +136,7 @@ public class DormantPatrolStateSO : MonsterStateOverrideSO
                 && ctx.Runtime.PlayerTarget != null
                 && !ctx.Monster.IsPlayerDead())
             {
-                float threshold = _data.wakeUpMode == DormantWakeUpMode.OnDetectionRange
-                    ? ctx.Detection.detectionRange
-                    : ctx.Stat.attackRange;
+                float threshold = WakeThreshold(ctx);
 
                 if (ctx.Runtime.DistToPlayer <= threshold)
                     ctx.Monster.ChangeState<ChaseState>();

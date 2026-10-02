@@ -9,6 +9,7 @@ namespace RelicFairy.Monster
 ///  Enter  → 플레이어가 선 칸을 가운데로 잡고, 네 방향(기사 쪽 · 오른쪽 · 뒤 · 왼쪽) 이웃 칸 바깥에 환영 넷이 선다(페이드인)
 ///  차례로 → 시작 방향은 무작위, 시계 방향으로 strikeInterval(0.45)초마다 환영 하나가 제 앞 칸을 벤다
 ///  마지막 → 환영 넷이 한꺼번에 가운데 칸을 벤다(기사도 같은 박자에 검을 내린다)
+///  흑백 규칙(10-03 S3) → 환영 넷은 흰 / 검 번갈아 선다. 지금 검 색과 같은 환영만 제 앞 칸을 벤다 — 다른 색 환영 앞 칸이 안전.
 ///
 /// 칸 예고: 각 칸은 베기 cellTelegraph초 전에 회색으로 차오르고, lockLead(0.4)초 전에 판정 색으로 굳는다.
 /// 칸은 시작 때 한 번 정해지고 따라오지 않는다(R3 — 판정 0.6초 전부터 고정).
@@ -81,6 +82,7 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
     private readonly Animator[]       _phantomAnims = new Animator[Sides];
     private readonly DKPhantomClone[] _phantomFx   = new DKPhantomClone[Sides];
     private readonly int[]            _cutOfPhantom = new int[Sides];
+    private DKSwordColor _sword;   // 이번 시전의 검 색 — 같은 색 환영만 벤다
     private DKPage2Zone _zone;
     private float       _timer;
     private float       _endTime;
@@ -99,7 +101,11 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
         if (_zone == null) { _endTime = 0f; return; }
 
         Vector2Int center = DKPage2Zone.TryPlayerCell(ctx, out var pc) && _zone.Contains(pc) ? pc : _zone.Center;
+        var dk = ctx.Monster as DeathKnightBossMonster;
+        _sword = dk?.DKBlackboard != null ? dk.DKBlackboard.SwordColor : DKSwordColor.White;
+        dk?.HintTreasonColor();
         int start = Random.Range(0, Sides);
+        int first = Random.Range(0, 2);               // 첫 환영 색 — 이웃끼리 번갈아 선다(검 색 2 · 다른 색 2)
         int slot  = 0;
         for (int k = 0; k < Sides; k++)
         {
@@ -109,9 +115,12 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
             _cutOfPhantom[k] = -1;
             if (!_zone.Contains(target)) continue;     // 구역 밖(유리벽 너머 등)은 건너뛴다
 
+            DKSwordColor color = ((side + first) % 2 == 0) ? _sword : Opposite(_sword);
+            SpawnPhantom(ctx, k, target, d, color);
+            if (color != _sword) continue;             // 다른 색 환영은 서 있기만 한다 — 그 칸이 안전
+
             _cuts[slot] = new Cut { Active = true, Cell = target, HitTime = Data.firstStrikeTime + slot * Data.strikeInterval };
             _cutOfPhantom[k] = slot;
-            SpawnPhantom(ctx, k, target, d);
             slot++;
         }
         _cuts[Sides] = new Cut { Active = true, Cell = center, HitTime = Data.firstStrikeTime + slot * Data.strikeInterval };
@@ -130,9 +139,9 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
             if (!cut.Shown && _timer >= cut.HitTime - Data.cellTelegraph)
             {
                 cut.Shown = true;
+                Color c = SwordTint(_sword);   // 예고는 검 색 — 「같은 색이 벤다」
                 cut.Guide = PatternGuideHelper.Prepare(
-                    PatternGuideHelper.Disc(_zone.CellCenter(cut.Cell), DKBossRoomContext.CellSize * 0.55f, DKPage2Zone.Grey),
-                    DKPage2Zone.Grey);
+                    PatternGuideHelper.Disc(_zone.CellCenter(cut.Cell), DKBossRoomContext.CellSize * 0.55f, c), c);
             }
             if (cut.Shown && !cut.Locked)
             {
@@ -206,7 +215,7 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
             if (fx != null)
             {
                 fx.transform.localScale = Vector3.one * Data.slashVfxScale;
-                DKGridPatternHelper.TintVfx(fx, DKPage2Zone.GreyVfx);
+                DKGridPatternHelper.TintVfx(fx, center ? DKPage2Zone.GreyVfx : SwordTint(_sword));
             }
         }
         if (Data.slashSfx != null) Managers.Sound?.PlayEffectAt(Data.slashSfx, pos);
@@ -226,7 +235,12 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
     // ── 환영 ───────────────────────────────────────────────
 
     /// <summary>이웃 칸 바깥쪽 가장자리에 서서 그 칸(가운데 쪽)을 본다. 충돌체는 끈다.</summary>
-    private void SpawnPhantom(MonsterContext ctx, int k, Vector2Int target, Vector2Int outward)
+    private static DKSwordColor Opposite(DKSwordColor c) => c == DKSwordColor.White ? DKSwordColor.Black : DKSwordColor.White;
+
+    /// <summary>흰 = 흰빛, 검 = 읽히는 보라(순수 검정은 바닥에 묻힌다).</summary>
+    private static Color SwordTint(DKSwordColor c) => c == DKSwordColor.White ? Color.white : DKGridPatternHelper.DarkReadableTint;
+
+    private void SpawnPhantom(MonsterContext ctx, int k, Vector2Int target, Vector2Int outward, DKSwordColor color)
     {
         if (ctx.Animator == null || ctx.Animator.gameObject == ctx.Monster.gameObject) return;
 
@@ -239,6 +253,9 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
 
         var fx = go.AddComponent<DKPhantomClone>();
         fx.Initialize();
+        // 제 색으로 빛난다 — 흰 환영 / 검은(보라) 환영
+        if (color == DKSwordColor.White) fx.SetTint(new Color(0.95f, 0.95f, 1f, 1f), new Color(1.4f, 1.4f, 1.6f, 1f));
+        else                             fx.SetTint(new Color(0.25f, 0.08f, 0.4f, 1f), new Color(0.9f, 0.25f, 1.5f, 1f));
         fx.StartFadeIn(Data.phantomFadeIn);
 
         _phantoms[k]     = go;

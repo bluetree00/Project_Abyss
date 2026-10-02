@@ -6,6 +6,7 @@ using UnityEngine;
 /// 투명 경계벽(낙하 방지)이 <b>왜 거기 있는지</b>를 보여주는 겉모습일 뿐 충돌은 없다.
 /// 경로(<see cref="path"/>)는 이 오브젝트 로컬 좌표 — 프리팹 배율을 그대로 따른다. 시작할 때 한 번 메시를 만들고,
 /// 입자는 매 프레임 <see cref="ParticleSystem.Emit(ParticleSystem.EmitParams,int)"/>로 할당 없이 뿌린다.
+/// 스테이지 방의 막힌 경계(10-01)는 경로를 비운 프리팹을 찍어 <see cref="SetPath"/>로 방마다 잰 경로를 넣는다.
 /// </summary>
 public sealed class ArcaneEdge : MonoBehaviour
 {
@@ -33,6 +34,15 @@ public sealed class ArcaneEdge : MonoBehaviour
     [SerializeField] private float moteSize = 0.18f;
     [SerializeField] private Color moteColor = new(0.7f, 0.8f, 1f, 0.8f);
 
+    [Header("등장 — 0이면 바로 보인다(방 경계: 방 조립이 끝날 즈음 은은히 떠오르게)")]
+    [SerializeField] private float fadeInDelay;
+    [SerializeField] private float fadeInSeconds;
+
+    private LineRenderer _band;
+    private Mesh _veilMesh;
+    private Color[] _veilColors;       // 짝수 = 아래 줄(알파 있음), 홀수 = 위 줄(알파 0)
+    private bool _fading;
+    private float _fadeClock;
     private Vector3[] _world;          // 경로 월드 좌표(시작 시 한 번)
     private float[] _cumLen;           // 누적 길이 — 길이에 비례해 입자를 고르게
     private float _totalLen;
@@ -40,20 +50,27 @@ public sealed class ArcaneEdge : MonoBehaviour
     private ParticleSystem.EmitParams _emit;
     private float _emitDebt;
 
+    // ── Properties ────────────────────────────────────────────
+    public Color BandColor => bandColor;
+    public Color VeilColor => veilColor;
+    public Color MoteColor => moteColor;
+
     // ── Lifecycle ─────────────────────────────────────────────
 
     private void Awake()
     {
         if (path == null || path.Length < 2) { enabled = false; return; }
-        BuildWorldPath();
-        if (bandMaterial != null) BuildBand();
-        if (veilMaterial != null) BuildVeil();
-        if (moteMaterial != null) BuildMotes();
+        Build();
     }
 
     private void Update()
     {
-        if (_motes == null || _totalLen <= 0f) return;
+        if (_fading) TickFadeIn();
+        if (_motes == null || _totalLen <= 0f)
+        {
+            if (!_fading) enabled = false;   // 입자가 없으면 등장이 끝난 뒤 할 일이 없다
+            return;
+        }
         _emitDebt += motesPerMeterPerSecond * _totalLen * Time.deltaTime;
         int n = (int)_emitDebt;
         if (n <= 0) return;
@@ -65,7 +82,72 @@ public sealed class ArcaneEdge : MonoBehaviour
         }
     }
 
+    private void OnDestroy()
+    {
+        if (_veilMesh != null) Destroy(_veilMesh);   // 방마다 새로 만드는 메시 — 방과 함께 치운다
+    }
+
+    // ── Public Methods ────────────────────────────────────────
+
+    /// <summary>
+    /// 런타임 생성용 — 경로(이 오브젝트 로컬)를 받아 바로 만든다. 프리팹은 경로를 비워 두고 겉모습 값만 가진다.
+    /// 만든 뒤 한 번만 부를 것(다시 부르면 띠·막이 겹친다).
+    /// </summary>
+    public void SetPath(Vector3[] localPath, bool isLoop)
+    {
+        if (localPath == null || localPath.Length < 2) return;
+        path = localPath;
+        loop = isLoop;
+        Build();
+    }
+
+    /// <summary>띠 · 막 · 입자 색을 바꾼다 — 거점 포탈이 악몽 모드에서 물든다(10-01). 등장 중이면 등장이 새 색으로 이어 간다.</summary>
+    public void SetColors(Color band, Color veil, Color mote)
+    {
+        bandColor = band;
+        veilColor = veil;
+        moteColor = mote;
+        if (_motes != null) { var m = _motes.main; m.startColor = mote; }
+        if (!_fading) ApplyAlpha(1f);
+    }
+
     // ── Private Methods ───────────────────────────────────────
+
+    private void Build()
+    {
+        BuildWorldPath();
+        if (bandMaterial != null) BuildBand();
+        if (veilMaterial != null) BuildVeil();
+        if (moteMaterial != null) BuildMotes();
+
+        _fading = fadeInSeconds > 0f;
+        if (_fading) ApplyAlpha(0f);
+        enabled = _fading || _motes != null;
+    }
+
+    private void TickFadeIn()
+    {
+        _fadeClock += Time.deltaTime;
+        float k = Mathf.Clamp01((_fadeClock - fadeInDelay) / fadeInSeconds);
+        ApplyAlpha(k * k * (3f - 2f * k));
+        if (k >= 1f) _fading = false;
+    }
+
+    /// <summary>
+    /// 띠·막의 세기를 설정값의 k배로 — 둘 다 정점 색이라 재질을 건드리지 않는다.
+    /// 색과 알파를 같이 줄인다(가산 혼합 재질은 알파만 줄여서는 안 어두워질 수 있다).
+    /// </summary>
+    private void ApplyAlpha(float k)
+    {
+        if (_band != null) _band.startColor = _band.endColor = bandColor * k;
+        if (_veilMesh != null)
+        {
+            Color low = veilColor * k;
+            Color top = new(low.r, low.g, low.b, 0f);   // 위 줄 — 색이 바뀌어도 옛 색이 섞이지 않게 같이 바꾼다
+            for (int i = 0; i < _veilColors.Length; i += 2) { _veilColors[i] = low; _veilColors[i + 1] = top; }
+            _veilMesh.SetColors(_veilColors);
+        }
+    }
 
     private void BuildWorldPath()
     {
@@ -111,6 +193,7 @@ public sealed class ArcaneEdge : MonoBehaviour
         for (int i = 0; i < pts.Length; i++) pts[i] = _world[i] + Vector3.up * bandLift * transform.lossyScale.y;
         lr.positionCount = pts.Length;
         lr.SetPositions(pts);
+        _band = lr;
     }
 
     /// <summary>막 — 경로를 따라 세운 양면 띠(아래 v=0 → 위 v=1). 색은 정점 색으로(위로 갈수록 알파 0).</summary>
@@ -144,6 +227,8 @@ public sealed class ArcaneEdge : MonoBehaviour
         var mesh = new Mesh { name = "ArcaneVeil" };
         mesh.vertices = v; mesh.uv = uv; mesh.colors = col; mesh.triangles = tris;
         mesh.RecalculateBounds();
+        _veilMesh = mesh;
+        _veilColors = col;
         go.AddComponent<MeshFilter>().sharedMesh = mesh;
         var mr = go.AddComponent<MeshRenderer>();
         mr.sharedMaterial = veilMaterial;

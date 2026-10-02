@@ -59,12 +59,14 @@ public class AttackState : IMonsterState
             if (_damageTimer <= 0f)
             {
                 _damageDealt = true;
-                ctx.Runtime.AttackHitDealt = true;
                 // 아이템 섬광의 순간: windup 중 적중당해 취소되었으면 데미지 스킵.
                 bool canceled = ctx.Monster.ConsumeAttackCancel();
                 ctx.Monster.EndAttackTelegraph();
                 if (!canceled)
                     ctx.Monster.DealDamageToPlayer();
+                // 판정이 끝난 <b>뒤에</b> 세운다 — DealDamageToPlayer는 이 플래그가 서 있으면 곧바로 돌아가므로(애니 이벤트 중복 방지),
+                // 먼저 세우면 타이머 경로의 피해가 한 번도 나가지 않았다(07-10 ~ 10-01: 달팽이 · 리치 해골 등 기본 공격 상태를 쓰는 몬스터 피해 0).
+                ctx.Runtime.AttackHitDealt = true;
             }
         }
 

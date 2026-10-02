@@ -24,9 +24,9 @@ public sealed class FireField : GroundFieldBase
     private float _reapplyTimer;
 
     /// <summary>불씨 지대 생성. dps = 화상 초당 피해, burnDuration = 부여 화상의 지속(초). 최대 개수 초과 시 가장 오래된 것 Despawn.</summary>
-    public static void SpawnAt(GameObject instigator, Vector3 pos, float radius, float life, float dps, float burnDuration)
+    public static FireField SpawnAt(GameObject instigator, Vector3 pos, float radius, float life, float dps, float burnDuration)
     {
-        if (dps <= 0f) return;
+        if (dps <= 0f) return null;
         var f = GroundFieldPool.Spawn<FireField>();
         f._dps          = dps;
         f._burnDuration = Mathf.Max(BURN_TICK, burnDuration);
@@ -38,6 +38,7 @@ public sealed class FireField : GroundFieldBase
 
         if (!s_fields.Contains(f)) s_fields.Add(f);
         while (s_fields.Count > MAX_FIELDS) s_fields[0].Despawn();
+        return f;
     }
 
     protected override void OnDisable()

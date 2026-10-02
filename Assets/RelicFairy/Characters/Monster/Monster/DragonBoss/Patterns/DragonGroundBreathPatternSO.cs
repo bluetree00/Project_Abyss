@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -109,6 +110,8 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 {
     private enum Phase { Back, Prepare, Breathing, EndPose, Done }
 
+    private const float PrepareAimLock = 0.5f;   // 발사 전 조준 고정(초) — 설계 규칙 R3(조준형은 판정 전 0.4초 이상 멈춘다)
+
     private Phase      _phase;
     private float      _timer;
     private float      _damageTick;
@@ -122,6 +125,8 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
     private float        _currentRange;
     private readonly System.Collections.Generic.List<ParticleSystem> _breathParticles = new();
     private readonly System.Collections.Generic.List<SpeedBase>      _breathBaseSpeed  = new();
+    private int  _breathSpawnId;    // 시전마다 +1 — 늦게 끝난 반납 대기가 다음 불줄기를 거두지 않게(10-03)
+    private bool _breathFading;     // 방출만 멈추고 반납을 기다리는 중 — Exit가 끊지 않는다(10-03)
 
     /// <summary>스케일 1(=VfxReferenceLength) 기준 startSpeed 원본값. mode와 무관하게 4개 필드 모두 캐싱 후 동일 배율로 스케일.</summary>
     private struct SpeedBase
@@ -130,9 +135,13 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         public float ConstantMin;
         public float ConstantMax;
         public float CurveMultiplier;
+        public float RateMultiplier;                       // 방출량(rateOverTime) 원본 — 속도와 같은 배율(10-03)
+        public ParticleSystemSimulationSpace Space;         // 시전 동안 Local — 반납 때 되돌린다(10-03)
+        public LayerMask CollidesWith;                     // 시전 동안 바닥만 — 반납 때 되돌린다(10-03)
     }
 
-    private const float DamageTick = 0.15f;
+    private const float DamageTick    = 0.15f;
+    private const float BreathFadeOut = 0.5f;   // 끝날 때 방출만 멈추고 이만큼 뒤 반납(10-03 개선 1-1 ⑥)
 
     internal DragonGroundBreathState(DragonGroundBreathPatternSO data) : base(data) { }
 
@@ -140,10 +149,8 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
     {
         _phase = Phase.Done;
         _currentRange = 0f;
-        _breathParticles.Clear();
-        _breathBaseSpeed.Clear();
         StopBreathSfx();
-        ReleasePooledEffect(ref _breathEffect);
+        ReleaseBreathEffect();   // 원본 복원 뒤 목록을 비운다 — 예전엔 먼저 비워 복원을 건너뛰었다(10-03)
         ReleasePooledEffect(ref _warningEffect);
         DestroyEffect(ref _rangeIndicator);
     }
@@ -208,7 +215,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
             bb.GroundBreathCooldown = Data.Cooldown;
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.isStopped = false;
         StopBreathSfx();
-        ReleasePooledEffect(ref _breathEffect);
+        if (!_breathFading) ReleaseBreathEffect();   // 끝 흩어짐(0.5초)은 반납 대기가 마저 거둔다(10-03)
         ReleasePooledEffect(ref _warningEffect);
         DestroyEffect(ref _rangeIndicator);
     }
@@ -217,7 +224,9 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
     private void UpdatePrepare(MonsterContext ctx)
     {
-        RotateToPlayer(ctx, Data.RotateSpeedPrepare);
+        // 마지막 PrepareAimLock초는 돌지 않는다 — 예전엔 발사 순간까지 70°/s로 따라와 옆으로 피할 틈이 없었다(10-02)
+        if (_timer < Data.PrepareDuration - PrepareAimLock)
+            RotateToPlayer(ctx, Data.RotateSpeedPrepare);
         SyncEffect(_warningEffect, ctx);
         SyncRangeIndicator(ctx);
         if (Data.PrepareDuration > 0f)
@@ -257,7 +266,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         if (_timer >= Data.BreathDuration)
         {
             StopBreathSfx();
-            ReleasePooledEffect(ref _breathEffect);
+            FadeOutBreathEffect(ctx);
             DestroyEffect(ref _rangeIndicator);
             _phase = Phase.EndPose;
             _timer = 0f;
@@ -301,10 +310,66 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
             speed.constantMax     = baseSpeed.ConstantMax * factor;
             speed.curveMultiplier = baseSpeed.CurveMultiplier * factor;
             main.startSpeed = speed;
+
+            // 속도만 늘리면 1 m당 입자가 1/배율로 듬성해진다 — 방출량도 같은 배율로(10-03 개선 1-1 ②)
+            var emission = ps.emission;
+            emission.rateOverTimeMultiplier = baseSpeed.RateMultiplier * factor;
         }
     }
 
-    /// <summary>SpawnBreath 시점 (스케일 1) 의 startSpeed 원본값을 캐싱 — 이후 매 프레임 이 값을 기준으로 배율 적용.</summary>
+    /// <summary>풀에 돌려주기 전에 startSpeed를 캐싱한 원본으로 되돌린다 — 안 하면 다음 시전이 늘린 값을 원본으로 캐싱해 속도가 누적된다(10-02).</summary>
+    private void ReleaseBreathEffect()
+    {
+        for (int i = 0; i < _breathParticles.Count; i++)
+        {
+            var ps = _breathParticles[i];
+            if (ps == null) continue;
+            var main  = ps.main;
+            var speed = main.startSpeed;
+            var b     = _breathBaseSpeed[i];
+            speed.constant        = b.Constant;
+            speed.constantMin     = b.ConstantMin;
+            speed.constantMax     = b.ConstantMax;
+            speed.curveMultiplier = b.CurveMultiplier;
+            main.startSpeed = speed;
+            main.simulationSpace = b.Space;
+            var emission = ps.emission;
+            emission.rateOverTimeMultiplier = b.RateMultiplier;
+            var collision = ps.collision;
+            collision.collidesWith = b.CollidesWith;
+        }
+        _breathParticles.Clear();
+        _breathBaseSpeed.Clear();
+        _breathFading = false;
+        ReleasePooledEffect(ref _breathEffect);
+    }
+
+    /// <summary>
+    /// 끝날 때 방출만 멈추고 <see cref="BreathFadeOut"/>초 뒤 반납 — 한 프레임에 사라지던 불줄기가 흩어지며 끝난다(10-03 개선 1-1 ⑥).
+    /// 반납 · 원본 복원은 <see cref="ReleaseBreathEffect"/> 그대로 — 그 사이 Reset이 먼저 거두면 대기는 할 일이 없다.
+    /// </summary>
+    private void FadeOutBreathEffect(MonsterContext ctx)
+    {
+        if (_breathEffect == null) return;
+        for (int i = 0; i < _breathParticles.Count; i++)
+            if (_breathParticles[i] != null)
+                _breathParticles[i].Stop(false, ParticleSystemStopBehavior.StopEmitting);
+        _breathFading = true;
+        ReleaseBreathAfterFadeAsync(_breathSpawnId, ctx.Monster.destroyCancellationToken).Forget();
+    }
+
+    private async UniTaskVoid ReleaseBreathAfterFadeAsync(int spawnId, System.Threading.CancellationToken ct)
+    {
+        try
+        {
+            await UniTask.Delay(System.TimeSpan.FromSeconds(BreathFadeOut), cancellationToken: ct);
+        }
+        catch (System.OperationCanceledException) { }   // 보스가 사라져도 아래 반납 · 원본 복원은 한다
+        if (spawnId == _breathSpawnId) ReleaseBreathEffect();
+    }
+
+    /// <summary>SpawnBreath 시점 (스케일 1) 의 startSpeed 원본값을 캐싱 — 이후 매 프레임 이 값을 기준으로 배율 적용.
+    /// 방출량 · 시뮬레이션 공간 · 충돌 레이어 원본도 캐싱하고, 시전 동안의 설정(Local · 바닥만 충돌)을 건다(10-03).</summary>
     private void CacheBreathParticleBaseSpeeds(GameObject go)
     {
         _breathParticles.Clear();
@@ -313,7 +378,9 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
         foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
         {
-            var speed = ps.main.startSpeed;
+            var main      = ps.main;
+            var speed     = main.startSpeed;
+            var collision = ps.collision;
             _breathParticles.Add(ps);
             _breathBaseSpeed.Add(new SpeedBase
             {
@@ -321,7 +388,15 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
                 ConstantMin     = speed.constantMin,
                 ConstantMax     = speed.constantMax,
                 CurveMultiplier = speed.curveMultiplier,
+                RateMultiplier  = ps.emission.rateOverTimeMultiplier,
+                Space           = main.simulationSpace,
+                CollidesWith    = collision.collidesWith,
             });
+
+            // 불줄기를 보스 기준(Local)으로 — 월드 기준이면 보스가 돌 때 휘어 뒤처져 판정선(정면 직선)과 어긋났다(10-03 개선 1-1 ④)
+            main.simulationSpace = ParticleSystemSimulationSpace.Local;
+            // 충돌은 바닥만 — 플레이어 · 벽 · 장식에 닿은 입자가 그 자리에 섰다(⑤)
+            collision.collidesWith = DragonPatternFloorUtils.GroundMask;
         }
     }
 
@@ -343,6 +418,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         _breathAudioSource = Managers.Sound?.PlayEffectAt(Data.BreathSfx, GetMouthPos(ctx));
 
         if (Data.BreathEffectPrefab == null) return;
+        _breathSpawnId++;
         _breathEffect = BossEffectPool.Spawn(Data.BreathEffectPrefab, GetMouthPos(ctx), ctx.Transform.rotation);
         TintEffect(_breathEffect, Data.BreathColor);
         CacheBreathParticleBaseSpeeds(_breathEffect);
@@ -398,12 +474,11 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         }
 
         // Particles/Additive: output = 2 × _TintColor × particleColor × texture
-        // 불꽃 텍스처에 blue 채널이 없어 얼음/번개 색이 묻힌다.
-        // 텍스처를 white로 교체하면 순수하게 tint 색상만 표현된다.
+        // 불꽃 텍스처는 그대로 둔다 — 예전엔 얼음/번개 색을 살리려 흰 텍스처로 바꿨지만 불꽃 모양이 사라져
+        // 흰 사각 입자가 됐다(10-03 개선 1-1 ③). 원소 색은 색상(틴트)으로만 입힌다.
         foreach (var rend in go.GetComponentsInChildren<ParticleSystemRenderer>(true))
         {
             var mat = rend.material; // 이미 인스턴스
-            mat.mainTexture = Texture2D.whiteTexture;
             // 셰이더가 2× 곱하므로 0.5 스케일로 입력해 적정 밝기 유지
             if (mat.HasProperty("_TintColor"))
                 mat.SetColor("_TintColor", new Color(tint.r * 0.5f, tint.g * 0.5f, tint.b * 0.5f, tint.a * 0.5f));

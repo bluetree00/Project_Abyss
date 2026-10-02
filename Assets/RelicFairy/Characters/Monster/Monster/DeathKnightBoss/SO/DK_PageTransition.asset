@@ -38,7 +38,8 @@ MonoBehaviour:
   bodyHeight: 1.4
   roarVfxPrefab: {fileID: 7230900929259635890, guid: 80eee9b8c7202074fa198fe5e19ff9cb,
     type: 3}
-  roarVfxScale: 1
+  roarVfxScale: 0.5
+  roarVfxTint: {r: 0.4, g: 0.45, b: 0.9, a: 0.5}
   flashColor: {r: 0.85, g: 0.85, b: 0.92, a: 1}
   roarSfx: {fileID: 8300000, guid: 3a39861fff5dbef4bbb1fd94e286c037, type: 3}
   dialogueKey: 

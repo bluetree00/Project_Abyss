@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d00e0d020a8e8bf46bb4a82a22a4e9d6, type: 3}
+  m_Name: DungeonSpaceSet
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonSpaceSetSO
+  entries:
+  - chapter: 1
+    voidColor: {r: 0.02, g: 0.045, b: 0.045, a: 1}
+    shellTint: {r: 0.22, g: 0.3, b: 0.28, a: 1}
+    pitTint: {r: 0.06, g: 0.09, b: 0.08, a: 1}
+    shaftColor: {r: 0.62, g: 0.92, b: 0.62, a: 1}
+    spawnMark: {fileID: 1838261207787406, guid: ab872fa9fd895d44d8a5fa026496a8c3,
+      type: 3}
+    spawnMarkScale: 0.55
+  - chapter: 2
+    voidColor: {r: 0.05, g: 0.025, b: 0.02, a: 1}
+    shellTint: {r: 0.3, g: 0.2, b: 0.17, a: 1}
+    pitTint: {r: 0.1, g: 0.05, b: 0.04, a: 1}
+    shaftColor: {r: 1, g: 0.5, b: 0.28, a: 1}
+    spawnMark: {fileID: 1797740254408388, guid: 651015d990cb813499103b1670630c10,
+      type: 3}
+    spawnMarkScale: 0.55
+  - chapter: 3
+    voidColor: {r: 0.025, g: 0.03, b: 0.05, a: 1}
+    shellTint: {r: 0.22, g: 0.24, b: 0.3, a: 1}
+    pitTint: {r: 0.06, g: 0.07, b: 0.1, a: 1}
+    shaftColor: {r: 0.8, g: 0.86, b: 1, a: 1}
+    spawnMark: {fileID: 1228060220772394, guid: 26ca230b5e25e7a4394b9883f13f4527,
+      type: 3}
+    spawnMarkScale: 0.55
+  - chapter: 4
+    voidColor: {r: 0.035, g: 0.02, b: 0.055, a: 1}
+    shellTint: {r: 0.24, g: 0.2, b: 0.3, a: 1}
+    pitTint: {r: 0.08, g: 0.05, b: 0.11, a: 1}
+    shaftColor: {r: 1, g: 0.9, b: 0.66, a: 1}
+    spawnMark: {fileID: 1501320978331502, guid: e11e0bfa702caed41bff71e9ac30de1c,
+      type: 3}
+    spawnMarkScale: 0.55
+  shaftMaterial: {fileID: 2100000, guid: 44bb5e8b7e0594f49973f71eb6ab1e7d, type: 2}

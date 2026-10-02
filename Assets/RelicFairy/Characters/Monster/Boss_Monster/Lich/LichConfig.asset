@@ -75,8 +75,8 @@ MonoBehaviour:
     killHitStopDuration: 0.09
   specialStates: []
   stateOverrides: []
-  patternBreakDurationMin: 2.5
-  patternBreakDurationMax: 5
+  patternBreakDurationMin: 0.7
+  patternBreakDurationMax: 1.2
   patternRepeatPenaltyDuration: 20
   patternRepeatPenaltyMult: 0.1
   condPhase2HpThreshold: 0.4

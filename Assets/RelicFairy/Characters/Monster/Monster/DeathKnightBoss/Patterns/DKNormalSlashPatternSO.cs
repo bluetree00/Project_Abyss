@@ -103,6 +103,7 @@ public class DKNormalSlashState : FullLockState<DKNormalSlashPatternSO>
                 (x, z) => z % 2 == 1 ? _swordColor : Opposite(_swordColor),
                 Data.whiteTilePrefab, Data.blackTilePrefab);
             _edges = DKGridPatternHelper.SpawnBoundaryEdges(_tiles, Data.edgePrefab);
+            (ctx.Monster as DeathKnightBossMonster)?.CueSwordFloor();   // 검 색 ↔ 바닥 신호(10-03 개선 2-2)
 
             // 매칭 행 목록 사전 계산 (z=27,25,...,1 — 내림차순 = 위→아래)
             for (int z = DKBossRoomContext.Height - 2; z >= 1; z--)

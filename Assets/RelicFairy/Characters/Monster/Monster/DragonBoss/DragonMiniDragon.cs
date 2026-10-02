@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -47,6 +48,9 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
     private const float SideStepMax      = 7f;
     private const float SideStepDuration = 0.65f;
     private const float SideStepDist     = 2.5f;
+    private const float AppearSeconds    = 0.5f;   // 디졸브 등장 · 퇴장(10-03 개선 3-5 — 예전엔 뿅 생기고 그냥 파괴)
+    private const float DisappearSeconds = 0.8f;
+    private const float DeathLinger      = 3f;     // 사망 애니 뒤 사라지기까지(퇴장 디졸브 포함)
 
     private static readonly int WalkChaseHash     = Animator.StringToHash("WalkChase");
     private static readonly int AttackReadyHash   = Animator.StringToHash("AttackReady");
@@ -101,6 +105,8 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
         // 기본 상태(Idle_Normal)는 모션 없음 → 스폰 직후 WalkChase로 즉시 전환해 메쉬 정지 방지
         if (_animator != null && _animator.HasState(0, WalkChaseHash))
             _animator.Play("WalkChase", 0, 0f);
+
+        DissolveEffect.PlayAppear(gameObject, AppearSeconds);   // 틴트(ApplyTint)를 입힌 뒤
     }
 
     private void Awake()
@@ -150,14 +156,14 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
         }
     }
 
-    /// <summary>보스 사망 시 소환수를 즉시 처리한다. 사망 애니메이션 없이 OnDied만 발행하고 오브젝트를 파괴.</summary>
+    /// <summary>보스 사망 시 소환수를 즉시 처리한다. 사망 애니메이션 없이 OnDied만 발행하고 디졸브로 사라진다(10-03).</summary>
     public void ForceKill()
     {
         if (IsDead) return;
         IsDead = true;
         if (_agent != null) _agent.enabled = false;
         OnDied?.Invoke(this);
-        Destroy(gameObject);
+        VanishAsync(0f).Forget();
     }
 
     // ── IDamageable ──────────────────────────────────────────────────────────
@@ -280,7 +286,21 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
         if (_animator != null && _animator.HasState(0, DeathHash))
             _animator.CrossFade("Death", 0.15f);
         OnDied?.Invoke(this);
-        Destroy(gameObject, 3f);
+        VanishAsync(DeathLinger - DisappearSeconds).Forget();
+    }
+
+    /// <summary><paramref name="delay"/>초 뒤 디졸브로 사라진 다음 파괴한다(퇴장은 재질을 되돌리지 않으므로 파괴 직전에만).</summary>
+    private async UniTaskVoid VanishAsync(float delay)
+    {
+        var ct = destroyCancellationToken;
+        try
+        {
+            if (delay > 0f)
+                await UniTask.Delay(System.TimeSpan.FromSeconds(delay), cancellationToken: ct);
+            await DissolveEffect.PlayDisappearAsync(gameObject, DisappearSeconds, ct);
+        }
+        catch (System.OperationCanceledException) { return; }
+        if (this != null) Destroy(gameObject);
     }
 
     private void FaceTarget()

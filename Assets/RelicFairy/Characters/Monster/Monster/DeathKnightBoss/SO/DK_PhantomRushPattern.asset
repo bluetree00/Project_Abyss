@@ -31,7 +31,7 @@ MonoBehaviour:
   phantomFadeInDuration: 0.25
   phantomFadeOutDuration: 0.3
   windupDuration: 0.6
-  warningDuration: 0.3
+  warningDuration: 0.45
   hitDelay: 0.15
   roundIntervalMin: 0.5
   roundIntervalMax: 0.7
@@ -40,6 +40,6 @@ MonoBehaviour:
   hitRadius: 0.9
   damageMultiplier: 1
   knockbackMultiplier: 1
-  passiveWarningDuration: 0.3
+  passiveWarningDuration: 0.45
   passiveCooldownMin: 8
   passiveCooldownMax: 12

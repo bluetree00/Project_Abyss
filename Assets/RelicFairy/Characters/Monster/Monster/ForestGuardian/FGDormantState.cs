@@ -55,6 +55,7 @@ public class FGDormantState : IMonsterState
 
         var cam = GameCameraController.Instance;
         var ct  = fg.destroyCancellationToken;
+        BossBinding.Attach(fg, StoryProgress.ForestGuardian);   // 옛 봉인 사슬(10-03 S2) — 해방기엔 아래에서 끊어진다
 
         if (cam == null || ctx.Runtime.PlayerTarget == null)
         {
@@ -97,6 +98,9 @@ public class FGDormantState : IMonsterState
             }
             else
                 await UniTask.Delay(TimeSpan.FromSeconds(BossIntroFallbackDuration), cancellationToken: ct);
+
+            // 해방기 — 카메라가 보스를 비추는 동안 사슬이 끊어지고 포효(10-03 S2-3)
+            await BossStoryScenes.UnbindAsync(fg, StoryProgress.ForestGuardian, ct);
 
             // ③ 플레이어 카메라 복귀(이동2) — 내부에서 ①의 팬을 캔슬하고 이어받음
             await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, 0f, ct);

@@ -94,6 +94,7 @@ public class DKCrossFlipState : FullLockState<DKCrossFlipPatternSO>
         DKPage2Zone.FacePlayer(ctx);
         DKPage2Zone.PlayAnim(ctx, ChannelAnim);
         ShowLayout(inverted: false);
+        (ctx.Monster as DeathKnightBossMonster)?.HintCrossFlip();   // 첫 번째에만 규칙 자막(10-03 개선 2-2)
     }
 
     public override void Update(MonsterContext ctx)

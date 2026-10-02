@@ -12,12 +12,15 @@ using UnityEngine;
 /// </summary>
 public class ShopNpcInteraction : MonoBehaviour
 {
-    // ── Constants ───────────────────────────────────────────
-    private const float PromptOffsetY = 1.0f;   // 루트(캡슐 가운데 = 바닥 +1) 위 1.0 → 바닥 +2.0, 머리(1.3) 바로 위(09-29)
-
     // ── [SerializeField] ────────────────────────────────────
     [Header("프롬프트")]
     [SerializeField] private string promptText = "<color=#FFD700>[F]</color> 상점";
+
+    [Header("머리 위 높이 — 루트(바닥 +1) 기준. NPC 몸 크기마다 다르다")]
+    [Tooltip("[F] 프롬프트 — 기본 1.0 → 바닥 +2.0, 사람형(키 1.3) 머리 바로 위(09-29)")]
+    [SerializeField] private float promptHeight  = 1.0f;
+    [Tooltip("잡담 말풍선 — 기본 2.35")]
+    [SerializeField] private float chatterHeight = 2.35f;
 
     // ── Private ─────────────────────────────────────────────
     private bool _playerInRange;
@@ -28,6 +31,8 @@ public class ShopNpcInteraction : MonoBehaviour
     // ── Properties ──────────────────────────────────────────
     /// <summary>플레이어가 F로 상호작용했을 때 발생.</summary>
     public event Action OnInteract;
+    /// <summary>잡담 말풍선 높이(루트 기준) — 방 컨트롤러가 <see cref="NpcAmbientChatter"/>에 넘긴다.</summary>
+    public float ChatterHeight => chatterHeight;
 
     // ── Lifecycle ───────────────────────────────────────────
 
@@ -66,6 +71,15 @@ public class ShopNpcInteraction : MonoBehaviour
 
     // ── Public Methods ──────────────────────────────────────
 
+    /// <summary>코드로 세운 상호작용(쉼터 모닥불 · 모루 · 요정의 샘)의 문구 · 높이. 프롬프트가 이미 떴으면 바로 바꾼다.</summary>
+    public void Configure(string text, float height)
+    {
+        promptText   = text;
+        promptHeight = height;
+        if (_promptTmp != null) _promptTmp.text = text;
+        if (_promptGo  != null) _promptGo.transform.localPosition = Vector3.up * height;
+    }
+
     /// <summary>패널이 열려 있는 동안 등 입력을 잠그고 싶을 때 사용.</summary>
     public void SetInteractable(bool value)
     {
@@ -88,7 +102,7 @@ public class ShopNpcInteraction : MonoBehaviour
     {
         _promptGo = new GameObject("ShopNpcPrompt");
         _promptGo.transform.SetParent(transform, false);
-        _promptGo.transform.localPosition = Vector3.up * PromptOffsetY;
+        _promptGo.transform.localPosition = Vector3.up * promptHeight;
 
         _promptTmp = _promptGo.AddComponent<TextMeshPro>();
         _promptTmp.fontSize = 4f;

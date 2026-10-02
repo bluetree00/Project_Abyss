@@ -205,7 +205,7 @@ MonoBehaviour:
   groundCheckCenterY: 0.3
   respawnOffsetY: 0.5
   fallDamageRatio: 0.1
-  invincibleSeconds: 1
+  invincibleSeconds: 1.5
   groundProbeHeight: 60
 --- !u!114 &1627041588284324856
 MonoBehaviour:

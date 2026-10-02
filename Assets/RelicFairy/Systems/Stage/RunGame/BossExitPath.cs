@@ -34,6 +34,23 @@ public static class BossExitPath
         return pos;
     }
 
+    /// <summary>
+    /// S5 층계 회랑용 — 게이트를 세우지 않고 출구 자리(바닥에 맞춤)와 <b>아레나 밖 쪽</b>(마커 방향)만 돌려준다.
+    /// 마커가 없으면 아레나 중심에서 출구 자리로 향하는 방향.
+    /// </summary>
+    public static Vector3 ResolveExit(Vector3 roomCenter, Transform arena, out Vector3 outward)
+    {
+        Vector3 pos = ResolveGatePosition(roomCenter, arena);
+        pos.y = SnapToGroundY(pos, arena);
+        Transform marker = arena != null ? (FindMarker(arena, "Next_Ch") ?? FindMarker(arena, "Exit")) : null;
+        outward = marker != null ? Flatten(marker.position - pos)
+                : arena != null  ? Flatten(pos - arena.position)
+                                 : Vector3.forward;
+        if (outward.sqrMagnitude < 0.01f) outward = Vector3.forward;
+        outward.Normalize();
+        return pos;
+    }
+
     // ── Private Methods ────────────────────────────────────────
     private static Vector3 ResolveGatePosition(Vector3 roomCenter, Transform arena)
     {

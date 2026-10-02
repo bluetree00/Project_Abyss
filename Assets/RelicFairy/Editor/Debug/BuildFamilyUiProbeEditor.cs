@@ -63,7 +63,7 @@ public static class BuildFamilyUiProbeEditor
                 cands.Add((d, ItemSORegistry.Find(id)));
             }
             var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_RuneSelectPopup>();
-            popup.Setup(cands, inv, 0);
+            popup.Setup(cands, inv);
             await UniTask.Delay(900, ignoreTimeScale: true);
             await Shot("Build_RuneSelect");
             foreach (var tr in popup.GetComponentsInChildren<Transform>(true))

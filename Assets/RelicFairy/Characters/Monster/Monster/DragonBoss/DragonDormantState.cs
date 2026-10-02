@@ -150,6 +150,7 @@ public class DragonDormantState : IMonsterState
         if (dragon == null) return;
 
         var ct = dragon.destroyCancellationToken;
+        BossBinding.Attach(dragon, StoryProgress.Dragon);   // 옛 봉인 사슬(10-03 S2) — 날아 내려오는 동안에도 바닥 봉인진까지 이어진다
 
         try
         {
@@ -189,6 +190,9 @@ public class DragonDormantState : IMonsterState
             {
                 if (windVfx != null) BossEffectPool.Release(windVfx);
             }
+
+            // 해방기 — 착지 클로즈업 동안 사슬이 끊어지고 포효(10-03 S2-3)
+            await BossStoryScenes.UnbindAsync(dragon, StoryProgress.Dragon, ct);
 
             // 3단계: HUD 소멸 → 플레이어 카메라로 복귀
             if (cam != null)

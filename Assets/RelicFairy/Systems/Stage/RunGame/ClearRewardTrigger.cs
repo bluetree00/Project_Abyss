@@ -258,10 +258,8 @@ public class ClearRewardTrigger : MonoBehaviour
         {
             if (data == null) continue;
 
-            // 후보 1장 = 선택의 여지가 없는 지급. 확장 자리(잠긴 칸)는 3지선다에만 의미가 있으므로
-            // 끈다 — 고를 게 없는 화면에 "해금하면 칸이 는다"를 그리면 거짓 약속이 된다.
-            await ShowOneRuneChoiceAsync(
-                new List<(RuntimeItemData data, ItemSO so)> { (data, so) }, ct, offerLockedSlots: false);
+            // 후보 1장 = 선택의 여지가 없는 지급.
+            await ShowOneRuneChoiceAsync(new List<(RuntimeItemData data, ItemSO so)> { (data, so) }, ct);
         }
     }
 
@@ -291,12 +289,8 @@ public class ClearRewardTrigger : MonoBehaviour
     /// 3지선다 1회. 넘기면 원석으로 환원한다.
     /// 팝업 로드 실패 시 첫 후보를 자동 지급해 보상이 증발하지 않게 한다.
     /// </summary>
-    /// <param name="offerLockedSlots">
-    /// 해금하면 열릴 빈 자리를 함께 그릴지. 단일 지급 경로는 false — 늘어날 선택지가 애초에 없다.
-    /// </param>
     private async UniTask ShowOneRuneChoiceAsync(
-        List<(RuntimeItemData data, ItemSO so)> candidates, System.Threading.CancellationToken ct,
-        bool offerLockedSlots = true)
+        List<(RuntimeItemData data, ItemSO so)> candidates, System.Threading.CancellationToken ct)
     {
         if (candidates == null || candidates.Count == 0) return;
 
@@ -307,19 +301,14 @@ public class ClearRewardTrigger : MonoBehaviour
             if (fallback != null)
             {
                 _run.EffectManager?.OnItemPickup(fallback);
-                if (!_run.ItemInventory.AddToStaging(fallback))
-                    ItemEffectVfxHelper.ShowNotice(
-                        $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.StagingCapacity}칸) — {fallback.displayName} 지급 실패");
-                else
-                    Debug.LogWarning($"[ClearRewardTrigger] 선택 팝업 로드 실패 — 첫 후보 자동 지급: {fallback.displayName}");
+                _run.ItemInventory.AddToStagingOverflow(fallback);   // 가득이어도 잃지 않게 — 다음에 룬판을 열면 정리한다
+                Debug.LogWarning($"[ClearRewardTrigger] 선택 팝업 로드 실패 — 첫 후보 자동 지급: {fallback.displayName}");
             }
             return;
         }
 
         var interactionTask = popup.WaitForInteractionAsync(ct);
-        // 해금하면 열릴 자리를 빈 칸으로 미리 보여준다 — 해금 뒤 "그 자리가 채워지는" 것으로 읽힌다.
-        popup.Setup(candidates, _run.ItemInventory,
-                    offerLockedSlots ? MemoryAltarService.RuneLockedSlots(candidates.Count) : 0);
+        popup.Setup(candidates, _run.ItemInventory);
         await interactionTask;
 
         if (popup.Skipped)

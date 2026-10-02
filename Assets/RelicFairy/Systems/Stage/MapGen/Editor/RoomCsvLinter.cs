@@ -42,6 +42,7 @@ public static class RoomCsvLinter
     private static readonly Regex DoorRegex    = new Regex(@"^DR[0-9]*$", RegexOptions.Compiled);
     private static readonly Regex PickupRegex  = new Regex(@"^(WP|CP)[0-9]+$", RegexOptions.Compiled);
     private static readonly Regex NpcAnchorRegex = new Regex(@"^NS[nsewNSEW]?$", RegexOptions.Compiled);
+    private static readonly Regex PropAnchorRegex = new Regex(@"^NP[1-9]$", RegexOptions.Compiled);   // 번호 붙은 소품 자리
 
     private const string DocsRelative = "RelicFairy/Docs";
     private static readonly string[] CsvNames =
@@ -303,6 +304,7 @@ public static class RoomCsvLinter
         if (DoorRegex.IsMatch(t)) return true;
         if (PickupRegex.IsMatch(t)) return true;
         if (NpcAnchorRegex.IsMatch(t)) return true;    // 서비스 NPC 자리 NS(+방향)
+        if (PropAnchorRegex.IsMatch(t)) return true;   // 소품 자리 NP<n>
         if (t.Length >= 2 && t[0] == 'd') return true; // 장식 d<code>
         return false;
     }

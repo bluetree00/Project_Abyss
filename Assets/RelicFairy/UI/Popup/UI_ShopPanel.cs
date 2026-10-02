@@ -597,7 +597,7 @@ public sealed class UI_ShopPanel : UI_Popup
 
         _dialogText = ShopUIStyle.MakeText(w, "Dialog", 16f, FontStyles.Normal,
                                            TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextPrimary);
-        _dialogText.text = "어서 오게, 빛이여";
+        _dialogText.text = Greeting;
         Place(_dialogText, TitleTextX, TitleY + 58f, TitleTextW, 30f);
 
         // 골드 — 코인 + 수치. 상단 띠 중앙 우측.
@@ -921,7 +921,7 @@ public sealed class UI_ShopPanel : UI_Popup
         FitLine(_selFlavor);
 
         // 구매버튼 아트는 <b>빈 명판</b>이다 — 라벨을 반드시 그려야 글자가 생긴다.
-        _buyBtn = MakeButton(s, "Buy", "사겠네", _skin?.buyButton, out _buyLabel);
+        _buyBtn = MakeButton(s, "Buy", BuyLabel, _skin?.buyButton, out _buyLabel);
         // 목업의 [사겠네]는 종이 기준 437~497에 보인다. 아트에 투명 여백이 있어 451에 86을 놓으면
         // 그 자리에 정확히 앉는다.
         PlaceIn(s, _buyBtn, 12f, 451f, 235f, 86f, SelDW, SelDH);
@@ -1226,7 +1226,7 @@ public sealed class UI_ShopPanel : UI_Popup
             _buyBtn.interactable = has && p.Purchasable && _controller.PlayerGold >= p.Price;
             UIAffordGlow.Set(_buyBtn, _buyBtn.interactable);   // 살 수 있을 때만 은은한 불(09-29)
         }
-        if (_buyLabel != null) _buyLabel.text = has && p.Sold ? "품절" : "사겠네";
+        if (_buyLabel != null) _buyLabel.text = has && p.Sold ? "품절" : BuyLabel;
 
         if (_selNamePlate != null) _selNamePlate.gameObject.SetActive(has);
         if (_selPreview != null)   _selPreview.gameObject.SetActive(has);
@@ -1243,7 +1243,7 @@ public sealed class UI_ShopPanel : UI_Popup
         {
             SetText(_selName, "");    SetText(_selCat, "");
             SetText(_selEffect, "");
-            SetText(_selFlavor, "물건을 골라 보게.");
+            SetText(_selFlavor, "마음에 드는 걸 골라 봐.");
             return;
         }
 
@@ -1337,9 +1337,15 @@ public sealed class UI_ShopPanel : UI_Popup
     private void OnRerollClicked()
     {
         if (_controller == null) return;
-        if (_controller.TryReroll()) { ShopUIStyle.PlaySfx("shop_reroll"); _selectedIndex = -1; }
+        bool ok = _controller.TryReroll();
+        if (ok) { ShopUIStyle.PlaySfx("shop_reroll"); _selectedIndex = -1; }
         else ShopUIStyle.PlaySfx("shop_reject");
         RefreshAll();
+        if (!ok) return;
+        // 새로고침도 골드를 쓴다 — 동전이 빠지고 새 물건이 좌판에 다시 깔린다(예전엔 소리 · 숫자뿐이라 진열이 순간 바뀌었다).
+        // 10-01 사용자 「소모할 수 있는 재화가 있는 버튼은 연출이 있어야」.
+        SpendCoinsAsync().Forget();
+        PlayOpenFxAsync().Forget();
     }
 
     // ── 구매 연출 (기획_상점개편 「거래의 손맛」) ──────────────────────────────
@@ -1504,16 +1510,20 @@ public sealed class UI_ShopPanel : UI_Popup
     /// 상인 반응 — 무엇을 어디에 넣었는지 말로 알린다. 받는 칸(HUD)은 암막 뒤라 도착지가 안 보인다.
     /// 잠깐 뒤 인사말로 돌아간다.
     /// </summary>
+    // 행상 = 웃는 버섯(10-01 NPC 교체) — 밝은 반말 장사꾼. 예전 「어서 오게, 빛이여 · ~네」는 사람 상인 몸이었을 때 말투.
+    private const string Greeting = "어서 와! 오늘도 살아 있네?";
+    private const string BuyLabel = "산다";   // 재련소 「벼린다」 · 쉼터 「쉰다」와 같은 결
+
     private void SetMerchantReaction(ShopProduct p)
     {
         if (_dialogText == null) return;
         _dialogText.text = p.Category switch
         {
-            ShopProductCategory.Buff     => $"{p.DisplayName} — 몸에 스몄네. 버프 칸을 보게.",
-            ShopProductCategory.Rune     => $"{p.DisplayName} — 보관함에 넣어 두었네.",
-            ShopProductCategory.Material => $"{p.DisplayName} — 주머니에 챙겼네.",
-            ShopProductCategory.Potion   => $"{p.DisplayName} — 포션 칸에 넣었네.",
-            _                            => "고맙네. 잘 쓰게.",
+            ShopProductCategory.Buff     => $"{p.DisplayName} — 몸에 스몄어. 버프 칸을 봐.",
+            ShopProductCategory.Rune     => $"{p.DisplayName} — 보관함에 넣어 뒀어.",
+            ShopProductCategory.Material => $"{p.DisplayName} — 주머니에 챙겼어.",
+            ShopProductCategory.Potion   => $"{p.DisplayName} — 포션 칸에 넣었어.",
+            _                            => "고마워! 잘 써.",
         };
         RestoreGreetingAsync(++_reactionGen).Forget();
     }
@@ -1523,7 +1533,7 @@ public sealed class UI_ShopPanel : UI_Popup
         try { await UniTask.Delay(ReactionMs, ignoreTimeScale: true, cancellationToken: destroyCancellationToken); }
         catch (OperationCanceledException) { return; }
         if (gen != _reactionGen || _dialogText == null) return;
-        _dialogText.text = "어서 오게, 빛이여";
+        _dialogText.text = Greeting;
     }
 
     /// <summary>특가 — 「1개 남음」이 「품절」로 바뀌고 도장이 찍힌 뒤 좌판에서 사라진다.</summary>

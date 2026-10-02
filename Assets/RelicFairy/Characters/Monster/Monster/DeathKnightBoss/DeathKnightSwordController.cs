@@ -165,6 +165,20 @@ public class DeathKnightSwordController : MonoBehaviour
     }
 
     /// <summary>
+    /// 보이는 검의 색을 지금 바꾼다 — 흑백 전환 베기가 끝나는 순간(10-03 개선 2-2).
+    /// 디졸브 중이면 건너뛴다: 디졸브가 물고 있는 임시 재질 위에 갈아 끼우면 끝날 때 옛 재질로 돌아가거나 마젠타가 된다 — 다음 ShowSword가 세팅한다.
+    /// 트레일 프리팹 교체는 궤적을 멈추므로 보이는 중이면 다시 켠다.
+    /// </summary>
+    public void ApplySwordColorNow(DKSwordColor color)
+    {
+        if (_swordRenderer != null && DissolveEffect.IsDissolving(_swordRenderer)) return;
+        GameObject trailBefore = _loadedTrailPrefab;
+        SetSwordColor(color);
+        if (_isVisible && _trail != null && _loadedTrailPrefab != trailBefore)
+            _trail.StartTrailWithLength(_trailFadeIn, _trailLength);
+    }
+
+    /// <summary>
     /// 디졸브 효과와 함께 검을 소멸시킨다.
     /// 디졸브 완료 후 SetActive(false) 처리.
     /// </summary>

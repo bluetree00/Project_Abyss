@@ -34,4 +34,29 @@ public static class CovenantAssembleUI
         try { return await popup.WaitForResultAsync().AttachExternalCancellation(ct); }
         catch (OperationCanceledException) { return null; }
     }
+
+    /// <summary>
+    /// 서약서 쓰기 판(이어 쓰기 · 고쳐 쓰기)을 띄우고 새 문장 id를 반환 — 「한 장의 서약서」(10-02).
+    /// 판(<paramref name="board"/>)은 제단이 쥔다(다시 열어도 같은 카드). 로드 실패 · 취소 시 null.
+    /// </summary>
+    public static async UniTask<string> WriteAsync(CovenantSentence sentence, CovenantWriteBoard board, CancellationToken ct)
+    {
+        if (sentence == null || board == null) return null;
+        UI_CovenantAssemble popup;
+        try
+        {
+            popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_CovenantAssemble>();
+        }
+        catch (OperationCanceledException) { return null; }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[CovenantAssembleUI] 팝업 로드 실패: {e.Message}");
+            return null;
+        }
+        if (popup == null) return null;
+
+        popup.SetupWrite(sentence, board);
+        try { return await popup.WaitForResultAsync().AttachExternalCancellation(ct); }
+        catch (OperationCanceledException) { return null; }
+    }
 }

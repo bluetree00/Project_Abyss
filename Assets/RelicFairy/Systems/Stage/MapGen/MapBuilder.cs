@@ -70,7 +70,8 @@ public class MapBuilder
                                   || type == TileType.ShopStallItem;
                 bool isMonsterSpawnTile = type == TileType.MonsterSpawn || type == TileType.MonsterSpawnCandidate;
                 bool isBossSpawnTile   = type == TileType.BossSpawn;
-                bool isOverlayTile = isBuffTile || isShopTile || isMonsterSpawnTile || isBossSpawnTile;
+                bool isPlayerSpawnTile = type == TileType.PlayerSpawn;
+                bool isOverlayTile = isBuffTile || isShopTile || isMonsterSpawnTile || isBossSpawnTile || isPlayerSpawnTile;
 
                 // 오버레이 타일(버프/상점/몬스터스폰): 바닥 블록을 먼저 깔고 그 위에 기능 오브젝트 배치
                 var renderType = isOverlayTile ? TileType.Floor : type;
@@ -125,6 +126,16 @@ public class MapBuilder
                             cell            = new Vector2Int(x, z),
                         });
                     }
+                }
+
+                // 플레이어 스폰 — 바닥만 깔고 자리는 빈 표식(~PlayerSpawnMark)으로 남긴다. 챕터 도착 마법진은
+                // DungeonSpaceDirector가 이 표식에 붙인다(10-02 사용자 「스폰 타일 오브젝트 변경」 — 공용 회색 구 · 무늬 없는 판이었다).
+                if (isPlayerSpawnTile)
+                {
+                    var mark = new GameObject("~PlayerSpawnMark").transform;
+                    mark.SetParent(parent, false);
+                    var fr = go.GetComponentInChildren<Renderer>();
+                    mark.position = new Vector3(worldPos.x, fr != null ? fr.bounds.max.y + 0.02f : worldPos.y, worldPos.z);
                 }
 
                 // 버프 타일: 전용 프리팹이 있으면 사용, 없으면 기본 트리거 오브젝트 생성
@@ -880,6 +891,172 @@ public class MapBuilder
             main.startColor = new ParticleSystem.MinMaxGradient(new Color(c.r, c.g, c.b, sc.a));
         }
     }
+
+    // ── S5 층계 회랑(10-02 d6) ─────────────────────────────────────
+
+    private const int   StairHalf       = 2;      // 폭 = 2*2+1 = 5칸
+    private const float StairRise       = 0.25f;  // 한 칸 오름 — 플레이어 StepClimb 상한(0.35 m) 아래
+    private const int   StairBack       = 8;      // 들어선 자리 뒤 평지 — 카메라가 플레이어 뒤 ~7 m라 뒷벽이 바로 붙으면 벽 밖에서 비췄다(10-02 4차 실측)
+    private const int   StairFlatA      = 3;      // 들어선 자리 평지
+    private const int   StairRunA       = 14;     // 첫 계단
+    private const int   StairLanding    = 5;      // 꺾이는 층계참(정사각)
+    private const int   StairRunB       = 14;     // 둘째 계단(오른쪽으로 꺾여)
+    private const int   StairFlatB      = 4;      // 끝 층계참
+    private const float StairCeilAbove  = 8f;     // 낮은 천장 — 카메라가 플레이어 위 ~5 m · 뒤 ~7 m라 계단에선 카메라 밑 바닥이 1.7 m 낮다 → 6.5면 천장 위로 나갔다
+    private const int   StairLightEvery = 4;    // 양쪽 벽에 4칸마다 — 6칸 · 한쪽이면 회랑 입구가 조명 없이 회색이었다(10-02 2차 실측)
+    private const int   StairLightMax   = 12;
+
+    /// <summary>
+    /// S5 층계 회랑 — 곧은 계단 → 꺾이는 층계참(오른쪽) → 곧은 계단 → 끝 층계참과 문. 한 칸 0.25 m씩 7 m를 오른다.
+    /// 재료는 길이를 따라 <paramref name="lower"/>(아래층) → <paramref name="upper"/>(위층)로 섞인다(앞 1/3 · 가운데 칸마다 섞임 · 뒤 1/3).
+    /// 들어서는 곳 = 루트 원점(+Z를 본다). 문은 끝 층계참의 +X 벽 가운데(3칸 열림).
+    /// </summary>
+    public static Transform BuildStairCorridor(BlockPalette lower, BlockPalette upper, Vector3 originWorld, float cellSize,
+                                               System.Random rng, out Vector3 doorCenterWorld, out Vector3 doorForwardWorld)
+    {
+        rng ??= new System.Random();
+        upper ??= lower;
+        var root = new GameObject("@StairCorridor").transform;
+        root.position = originWorld;
+        doorCenterWorld = originWorld;
+        doorForwardWorld = Vector3.right;
+        if (lower == null) return root;
+
+        // 칸 목록 — (칸, 바닥 높이, 길 따라 진행 0~1)
+        var cells = new List<(Vector2Int c, float h, float t)>();
+        int zL0 = StairFlatA + StairRunA;
+        int pathLen = StairFlatA + StairRunA + StairLanding + StairRunB + StairFlatB;
+        int step = 0;
+        void Row(int z, float h, int idx)       { for (int x = -StairHalf; x <= StairHalf; x++) cells.Add((new Vector2Int(x, z), h, idx / (float)pathLen)); }
+        void Col(int x, float h, int idx)       { for (int z = zL0; z <= zL0 + 2 * StairHalf; z++) cells.Add((new Vector2Int(x, z), h, idx / (float)pathLen)); }
+        for (int k = -StairBack; k < 0; k++) Row(k, 0f, 0);   // 뒤 평지(진행 0 — 아래층 재료)
+        for (int k = 0; k < StairFlatA; k++) Row(k, 0f, step++);
+        for (int k = 0; k < StairRunA; k++)  Row(StairFlatA + k, (k + 1) * StairRise, step++);
+        float hLand = StairRunA * StairRise;
+        for (int k = 0; k < StairLanding; k++) Row(zL0 + k, hLand, step++);
+        for (int j = 0; j < StairRunB; j++) Col(StairHalf + 1 + j, hLand + (j + 1) * StairRise, step++);
+        float hEnd = hLand + StairRunB * StairRise;
+        int xEnd0 = StairHalf + 1 + StairRunB;
+        for (int j = 0; j < StairFlatB; j++) Col(xEnd0 + j, hEnd, step++);
+        int xDoor = xEnd0 + StairFlatB;
+        var door = new HashSet<Vector2Int> { new(xDoor, zL0 + 1), new(xDoor, zL0 + 2), new(xDoor, zL0 + 3) };
+
+        BlockPalette PaletteAt(float t)
+        {
+            if (t < 1f / 3f) return lower;
+            if (t > 2f / 3f) return upper;
+            return rng.NextDouble() < (t - 1f / 3f) * 3f ? upper : lower;
+        }
+
+        var placed = new List<PlacedBlock>();
+        var floorSet = new Dictionary<Vector2Int, (float h, float t)>();
+        foreach (var (c, h, t) in cells) floorSet[c] = (h, t);
+
+        foreach (var (c, h, t) in cells)
+        {
+            var p = PaletteAt(t);
+            var floorDef = p.Pick(TileType.Floor, rng);
+            var riserDef = RiserDef(p, floorDef, rng);
+            var ceilDef  = p.Pick(TileType.Ceiling, rng);
+            Vector3 local = new Vector3(c.x * cellSize, h, c.y * cellSize);
+            if (floorDef?.prefab != null)
+                Place(floorDef, root, local, Quaternion.identity, 3, $"Stair_F_{c.x}_{c.y}", TileType.Floor, placed);
+            // 계단 앞면 — 바닥 바로 밑에 한 칸(바닥 윗면과 겹치지 않게 살짝 내림). 걷는 면이라 Ground 레이어.
+            if (riserDef?.prefab != null && h > 0f)
+                Place(riserDef, root, local + Vector3.down * (cellSize + 0.02f), Quaternion.identity, 3, $"Stair_R_{c.x}_{c.y}", TileType.Wall, placed);
+            var ceilUse = ceilDef ?? floorDef;
+            if (ceilUse?.prefab != null)
+                Place(ceilUse, root, local + Vector3.up * StairCeilAbove, ceilDef == null ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity,
+                      3, $"Stair_C_{c.x}_{c.y}", TileType.Ceiling, placed);
+        }
+
+        // 벽 — 바닥 칸의 이웃 중 바닥이 아닌 칸(문 자리 제외)에 계단 높이를 따라 세운다
+        var walls = new Dictionary<Vector2Int, (float minH, float maxH, float t)>();
+        var dirs = new[] { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
+        foreach (var (c, h, t) in cells)
+            foreach (var d in dirs)
+            {
+                var n = c + d;
+                if (floorSet.ContainsKey(n) || door.Contains(n)) continue;
+                walls[n] = walls.TryGetValue(n, out var w) ? (Mathf.Min(w.minH, h), Mathf.Max(w.maxH, h), Mathf.Max(w.t, t)) : (h, h, t);
+            }
+        int lights = 0;
+        foreach (var kv in walls)
+        {
+            var p = PaletteAt(kv.Value.t);
+            var wallDef = p.Pick(TileType.Wall, rng);
+            if (wallDef?.prefab == null) continue;
+            float baseY = kv.Value.minH - cellSize;
+            // 쌓는 간격 = 벽 조각 높이 — Stacked는 1 m 큐브, Single(숲 · 심연 절벽)은 조각 하나가 wallHeight를 가진다.
+            float pieceH = p.WallMode == WallBuildMode.Single ? Mathf.Max(cellSize, p.WallHeight) : cellSize;
+            int layers = Mathf.CeilToInt((kv.Value.maxH + StairCeilAbove + cellSize - baseY) / pieceH);
+            StackWall(wallDef, root, new Vector3(kv.Key.x * cellSize, 0f, kv.Key.y * cellSize), baseY, pieceH, layers,
+                      $"Stair_W_{kv.Key.x}_{kv.Key.y}", placed);
+        }
+
+        // 횃불 — 길 따라 일정 간격, 옆벽 안쪽(팔레트 조명 설정 그대로)
+        foreach (var (c, h, t) in cells)
+        {
+            if (lights >= StairLightMax) break;
+            bool alongZ = c.y < zL0;                                // 첫 계단 구간은 +Z로, 나머지는 +X로 걷는다
+            int along = alongZ ? c.y : c.x + zL0;
+            if (along % StairLightEvery != 1) continue;
+            bool edgePos = alongZ ? c.x == StairHalf  : c.y == zL0 + 2 * StairHalf;
+            bool edgeNeg = alongZ ? c.x == -StairHalf : c.y == zL0;
+            if (!edgePos && !edgeNeg) continue;
+            if (!alongZ && c.x < StairHalf + 1) continue;   // 층계참은 첫 계단 구간이 이미 밝힌다
+            var cfg = PaletteAt(t).Lighting;
+            if (cfg == null || cfg.wallLightPrefab == null) continue;
+            Vector3 outward = (alongZ ? Vector3.right : Vector3.forward) * (edgePos ? 1f : -1f);
+            Vector3 pos = new Vector3(c.x * cellSize, h + StairCeilAbove * cfg.wallLightHeightRatio, c.y * cellSize) + outward * (cellSize * 0.55f);
+            var go = Object.Instantiate(cfg.wallLightPrefab, root.TransformPoint(pos), Quaternion.LookRotation(-outward), root);
+            cfg.wallLightTint?.ApplyTo(go);
+            lights++;
+        }
+
+        doorCenterWorld  = root.TransformPoint(new Vector3((xDoor - 0.5f) * cellSize, hEnd, (zL0 + 2) * cellSize));
+        doorForwardWorld = root.TransformDirection(Vector3.right);
+        return root;
+    }
+
+    /// <summary>
+    /// 아레나 안 첫 계단(S5) — <paramref name="originWorld"/>에서 <paramref name="forward"/> 쪽으로 <paramref name="steps"/>칸 오르는 계단.
+    /// 폭 <paramref name="widthCells"/>칸. 바닥 위에 쌓아 올린다(아래는 아레나 바닥).
+    /// </summary>
+    public static Transform BuildEntrySteps(BlockPalette palette, Vector3 originWorld, Vector3 forward, int steps, int widthCells,
+                                            float cellSize, System.Random rng = null)
+    {
+        var root = new GameObject("@StairEntry").transform;
+        root.position = originWorld;
+        forward.y = 0f;
+        root.rotation = Quaternion.LookRotation(forward.sqrMagnitude > 0.001f ? forward.normalized : Vector3.forward, Vector3.up);
+        if (palette == null) return root;
+        rng ??= new System.Random();
+        var placed = new List<PlacedBlock>();
+        int half = widthCells / 2;
+        for (int s = 0; s < steps; s++)
+        {
+            float h = (s + 1) * StairRise;
+            for (int x = -half; x <= half; x++)
+            {
+                var floorDef = palette.Pick(TileType.Floor, rng);
+                var riserDef = RiserDef(palette, floorDef, rng);
+                Vector3 local = new Vector3(x * cellSize, h, (s + 1) * cellSize);
+                if (riserDef?.prefab != null)
+                    Place(riserDef, root, local + Vector3.down * (cellSize + 0.02f), Quaternion.identity, 3, $"Entry_R_{s}_{x}", TileType.Wall, placed);
+                if (floorDef?.prefab != null)
+                    Place(floorDef, root, local, Quaternion.identity, 3, $"Entry_F_{s}_{x}", TileType.Floor, placed);
+            }
+        }
+        return root;
+    }
+
+    /// <summary>
+    /// 계단 앞면(한 칸 높이) 블록 — Stacked 팔레트는 1 m 벽 큐브, Single(숲 · 심연)은 벽 조각이 8 m 절벽이라 바닥 블록으로 메운다.
+    /// 숲에서 벽 조각을 쓰면 첫 계단이 아레나 한가운데 기둥처럼 솟았다(10-02 4차 실측).
+    /// </summary>
+    private static BlockDef RiserDef(BlockPalette palette, BlockDef floorDef, System.Random rng)
+        => palette.WallMode == WallBuildMode.Stacked ? palette.Pick(TileType.Wall, rng) ?? floorDef : floorDef;
 
     /// <summary>local 위치에 블록 1개 인스턴스화 후 placed에 기록.</summary>
     private static void Place(

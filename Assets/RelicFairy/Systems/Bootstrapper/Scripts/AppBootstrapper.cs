@@ -111,7 +111,7 @@ public sealed class AppBootstrapper : MonoBehaviour
     {
         // 계승 파츠는 <b>여기서 동기로</b> 확정한다 — 아래 저장은 비동기라,
         // 그 사이에 EndRun()이 Loadout.Clear()를 부르면 고를 대상이 사라진다.
-        PartInheritanceService.CaptureFromRun(Instance?.Loadout);
+        // 「파츠 영구 계승」 캡처는 10-02 제단 재설계로 없어졌다(유물 성장 v2 — 힘은 런 안에서만).
         HandleRunEndedAsync(result).Forget();
     }
 
@@ -147,6 +147,16 @@ public sealed class AppBootstrapper : MonoBehaviour
     private async UniTaskVoid LoadSceneNoFlowAsync(Define.Scene scene)
     {
         Managers.Sound?.StopBgm();
+
+        // 층계 회랑이 미리 불러 둔 씬 — 로딩 화면 없이 켠다(SceneTransitionManager와 같은 규칙).
+        var pre = ScenePreloader.Take(scene.ToString());
+        if (pre != null)
+        {
+            await UniTask.WaitUntil(() => pre.progress >= 0.9f);
+            pre.allowSceneActivation = true;
+            await UniTask.WaitUntil(() => pre.isDone);
+            return;
+        }
 
         var loading = UI_SceneLoading.Instance;
         if (loading != null) await loading.ShowAsync();
@@ -379,7 +389,7 @@ public sealed class AppBootstrapper : MonoBehaviour
 
         // 유물 파츠(보스 클리어 특전) 복원 — 반드시 유물 뒤다. SetRelic이 파츠를 비우기 때문.
         // 플레이어에 실제로 붙는 것은 GameRunBootstrapper가 OnPlayerBound에서 하는 재활성화다.
-        Loadout.RestoreRelicParts(save.relicPartIds);
+        Loadout.RestoreRelicParts(save.relicPartIds, save.relicMemoryExtra);
 
         var session = new GameRunSession();
         await session.RestoreFromSaveAsync(save, LoadTextAsset);

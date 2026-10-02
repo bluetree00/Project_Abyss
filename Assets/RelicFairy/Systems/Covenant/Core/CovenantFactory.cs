@@ -9,6 +9,15 @@ public static class CovenantFactory
     /// <summary>"asm:&lt;cause&gt;@&lt;tier&gt;|&lt;effect&gt;@&lt;tier&gt;" = 조립 서약. 그 외/미등록 ID는 null.</summary>
     public static CovenantBase Create(string covenantId)
     {
+        // 서약서(문장) — 「한 장의 서약서」(10-02). 하나라도 못 읽으면 통째로 해석 실패(껍데기가 칸을 차지하지 않게).
+        if (!string.IsNullOrEmpty(covenantId) && covenantId.StartsWith(CovenantSentence.Prefix))
+        {
+            var sentence = new CovenantSentence(covenantId.Substring(CovenantSentence.Prefix.Length));
+            if (sentence.Resolved) return sentence;
+            UnityEngine.Debug.LogWarning($"[CovenantFactory] 해석 못 한 서약서 ID: {covenantId}");
+            return null;
+        }
+
         if (!string.IsNullOrEmpty(covenantId) && covenantId.StartsWith(AssembledCovenant.Prefix))
         {
             var body = covenantId.Substring(AssembledCovenant.Prefix.Length);

@@ -184562,7 +184562,10 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 257
   castRadius: 0.3
+  nearDistance: 0
+  nearRadius: 2.5
   hiddenAlpha: 0.15
+  nearHiddenAlpha: 0.06
   fadeSpeed: 8
 --- !u!114 &1151107691
 MonoBehaviour:
@@ -256034,7 +256037,6 @@ MonoBehaviour:
     type: 3}
   summonGold: {r: 1, g: 0.78, b: 0.38, a: 1}
   summonViolet: {r: 0.66, g: 0.42, b: 1, a: 1}
-  moteGold: {fileID: 1531814124222292, guid: bc1c406e8debe27419da2b3a80a1ef99, type: 3}
   gateFront: {fileID: 2141747609}
   portalCenter: {fileID: 2141747608}
   runeGlowMaterial: {fileID: 2100000, guid: 12fb1d84a82a2de4f8b3e8b1f2747b43, type: 2}
@@ -256059,10 +256061,25 @@ MonoBehaviour:
   gateOpenDuration: 1.2
   dungeonGate: {fileID: 1155803281}
   partsOrbital: {fileID: 54033467}
+  partsCirclePrefab: {fileID: 1850189845468026, guid: aafb963400638ab46a33e9fe42afa648,
+    type: 3}
+  partsCircleScale: 1.8
+  partsGlowColor: {r: 0.6, g: 0.8, b: 1, a: 1}
   descentExposure: -1.6
   descentVignette: 0.4
   abyssWipeColor: {r: 0.16, g: 0.08, b: 0.26, a: 1}
   abyssWipeDuration: 0.7
+  nightmarePedestalPrefab: {fileID: 1031122804, guid: abc00000000003962722002797152819,
+    type: 3}
+  nightmareCrystalPrefab: {fileID: 100000, guid: 3e7e92633d750d440b9551f9f4bf95aa,
+    type: 3}
+  nightmareCrystalMaterial: {fileID: 2100000, guid: 3b544d1ec74b01b49b6459655c1efddf,
+    type: 2}
+  nightmareStationLocal: {x: -7.6, y: 0, z: -1.3}
+  nightmarePedestalScale: 0.6
+  nightmareCrystalScale: 1.2
+  nightmareColor: {r: 0.56, g: 0.22, b: 0.48, a: 1}
+  nightmareTextColor: {r: 0.7, g: 0.3, b: 0.6, a: 1}
 --- !u!65 &1616862837
 BoxCollider:
   m_ObjectHideFlags: 0

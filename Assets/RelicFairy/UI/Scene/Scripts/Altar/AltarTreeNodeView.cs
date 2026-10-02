@@ -273,7 +273,7 @@ public sealed class AltarTreeNodeView : MonoBehaviour, ISelectHandler, IPointerE
 
     private void Paint(AltarNodeVisual v)
     {
-        bool hidden = v == AltarNodeVisual.Hidden;
+        bool hidden = v == AltarNodeVisual.Hidden || v == AltarNodeVisual.EraHidden;
         _rim.enabled  = !hidden;
         _mark.enabled = !hidden;
         _label.gameObject.SetActive(!hidden);

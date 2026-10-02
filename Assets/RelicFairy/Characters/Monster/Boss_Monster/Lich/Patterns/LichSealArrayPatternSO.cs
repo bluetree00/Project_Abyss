@@ -117,7 +117,7 @@ public class LichSealArrayState : UnInterruptibleState<LichSealArrayPatternSO>
         LichPatternUtil.CastBeat(ctx, LichCast.ArcaneOrb, Data.openDuration, 2f, 0.12f);
         LichPatternUtil.Lich(ctx)?.PulseBook(Data.openDuration + Data.activeDuration);
         LichSfx.Play(LichSfxSlot.ZoneHum, _center);
-        UI_BossBark.Show("…작은 빛. 이리 오렴.", BossBarkType.PatternAnnounce);
+        UI_BossBark.Show("…작은 빛. 이쪽이야, 이리 와.", BossBarkType.PatternAnnounce);   // 멀린 말투 흉내(대사 CSV Lich_MerlinVoice와 같은 문구)
     }
 
     public override void Update(MonsterContext ctx)

@@ -244,7 +244,7 @@ public class DKRoundTableTombState : FullLockState<DKRoundTableTombPatternSO>
         var player = ctx.Runtime.CachedPlayer;
         if (player != null && player.RuntimeStats != null && !InSafeSpot(player.transform.position))
         {
-            int dmg = Mathf.Max(1, Mathf.RoundToInt(player.RuntimeStats.MaxHp * Data.failDamageRatio));
+            int dmg = BossMaxHpDamage.Raw(player, Data.failDamageRatio);   // 최대 체력 비율 — 방어로 다시 깎이지 않게(10-01)
             player.TakeDamage(dmg, ctx.Monster.gameObject, false, HitWeight.Heavy);
             Vector3 away = player.transform.position - _zone.CenterWorld;
             away.y = 0f;

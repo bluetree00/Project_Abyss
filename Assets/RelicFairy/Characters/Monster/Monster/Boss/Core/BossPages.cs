@@ -21,6 +21,7 @@ public sealed class BossPages
     public const float SignatureAt       = 0.5f;   // 2페이지 체력 이 비율에서 간판 패턴 한 번
     public const float LateBreakScale    = 0.75f;  // 간판 뒤(후반) 패턴 사이 쉬는 시간 배율 — 2페이지 구성 §9
     public const float NightmareBreakScale = 0.8f; // 악몽 모드 — 패턴 사이 쉬는 시간 배율(시기별 페이지 §2-1, 강화 1차)
+    public const float NightmareHpScale    = 1.15f; // 악몽 모드 — 총 체력 배율(레벨디자인 설계서 §6). 보스는 시기 스탯 배율(×1.4)에서 빠져 있다
 
     // ── Private ────────────────────────────────────────────────
     private readonly MonsterBase _boss;
@@ -48,8 +49,8 @@ public sealed class BossPages
     /// <summary>러너가 패턴 사이 쉬는 시간에 곱하는 배율 — 후반 ×0.75, 악몽 모드 ×0.8(곱).</summary>
     public float BreakScale    => (IsLate ? LateBreakScale : 1f) * (NightmareMode ? NightmareBreakScale : 1f);
 
-    /// <summary>총 체력 배율 — MonsterBase.BossHpScale로 넘긴다.</summary>
-    public float HpScale => Enabled ? 1f + Page2Share : 1f;
+    /// <summary>총 체력 배율 — MonsterBase.BossHpScale로 넘긴다. 악몽 모드는 ×<see cref="NightmareHpScale"/>(페이지 몫 비율은 그대로).</summary>
+    public float HpScale => Enabled ? (1f + Page2Share) * (NightmareMode ? NightmareHpScale : 1f) : 1f;
 
     /// <summary>2페이지 몫 체력(HP 수치).</summary>
     public int Page2Hp => Enabled ? Mathf.CeilToInt(_boss.EffectiveMaxHp * Page2Share / (1f + Page2Share)) : 0;

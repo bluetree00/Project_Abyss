@@ -121,6 +121,12 @@ public abstract class GroundFieldBase : MonoBehaviour
     /// <summary>플레이어 등 대상을 추적하는 장판으로 전환(빛 4단계 빛장판).</summary>
     public void SetFollow(Transform target) => _followTarget = target;
 
+    /// <summary>남은 수명을 늘린다(유물 성장 v2 들불 — 불안개 지속 2배).</summary>
+    public void ExtendLife(float seconds) { if (seconds > 0f) _lifetime += seconds; }
+
+    /// <summary>남은 수명(초).</summary>
+    public float Remaining => Mathf.Max(0f, _lifetime - _age);
+
     protected virtual void Update()
     {
         if (!_active) return;

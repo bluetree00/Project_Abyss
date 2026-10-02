@@ -88,6 +88,8 @@ public class FGPunchState : FullLockState<FGPunchPatternSO>
     private bool       _isLeftHand;
     private bool       _attackAnimPlayed;
     private GameObject _warningGO;
+    private Vector3    _origin;   // 가이드를 깐 자리 · 방향 — 판정도 여기서(가이드 = 판정)
+    private Vector3    _aim;
 
     public FGPunchState(FGPunchPatternSO data) : base(data) { }
 
@@ -167,6 +169,8 @@ public class FGPunchState : FullLockState<FGPunchPatternSO>
     // ── 경고 장판 ─────────────────────────────────────────
     private void SpawnWarning(MonsterContext ctx)
     {
+        _origin = ctx.Transform.position;
+        _aim    = ctx.Transform.forward;
         _warningGO = PatternGuideHelper.Prepare(
             PatternGuideHelper.Sector(ctx.Transform.position, Data.range, Data.arcHalfAngle * 2f, ctx.Transform.eulerAngles.y,
                                       PatternGuideHelper.Telegraph),
@@ -180,12 +184,15 @@ public class FGPunchState : FullLockState<FGPunchPatternSO>
     {
         if (ctx.Config?.stat == null || ctx.Runtime.PlayerTarget == null) return;
 
-        Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+        // 가이드를 깐 자리 기준 — 예고 동안 보스가 미끄러져도 판정은 가이드 그대로(10-01 실측: ~0.6 m 앞으로 밀려 가이드 밖을 쳤다)
+        Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - _origin;
         toPlayer.y = 0f;
+        Vector3 aim = _aim;
+        aim.y = 0f;
 
         if (toPlayer.sqrMagnitude > Data.range * Data.range) return;
         if (toPlayer.sqrMagnitude > 0.001f &&
-            Vector3.Angle(ctx.Transform.forward, toPlayer) > Data.arcHalfAngle) return;
+            Vector3.Angle(aim, toPlayer) > Data.arcHalfAngle) return;
 
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;

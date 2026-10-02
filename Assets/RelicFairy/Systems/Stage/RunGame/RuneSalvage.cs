@@ -13,39 +13,25 @@ using UnityEngine;
 /// </summary>
 public static class RuneSalvage
 {
-    // ── 환원 공식 ────────────────────────────────────────
-    // 투자량 = 칸 수(판을 얼마나 썼나) × 등급(얼마나 귀한가).
-    // 전액을 돌려주면 배치가 무료 실험이 되어 고민이 사라지므로 일부만 돌려준다.
+    // ── 환원 값(10-01 개편) ───────────────────────────────
+    // 등급마다 고정. 예전 「칸 수 × 3 × 등급 배수 × 0.65」는 전설이 평균 128(최대 176)이라,
+    // 정제소에서 뽑자마자 분해하는 기대값(31.9)이 뽑기 비용(12 · 12 · 20 · 20 · 28)보다 커서 「뽑기 → 분해」가 돈 버는 고리였다.
+    // 지금 값의 정제소 기대 환원 = 희귀 45% × 3 + 영웅 40% × 6 + 전설 15% × 40 = 9.75 < 첫 비용 12 — 되풀이해도 줄어든다.
+    // 전설 40 = 첫 비용 기준 뽑기 세 번 남짓(키운 판을 갈아엎을 때 빈손이 아니게).
 
-    /// <summary>칸당 기본 환원량.</summary>
-    private const int PerCell = 3;
-
-    /// <summary>환원율. 1.0이면 전액 — 배치가 무료 실험이 되므로 낮춰 둔다.</summary>
-    private const float RecoveryRate = 0.65f;
-
-    /// <summary>
-    /// 등급 배수. <b>Legendary를 후하게</b> 잡았다 —
-    /// 지금 문제가 "레전더리가 나와서 손해 본다"인데 부술 때도 박하면 어느 쪽으로도 못 간다.
-    /// </summary>
-    private static float GradeMultiplier(ItemRarity rarity) => rarity switch
+    /// <summary>등급별 분해 원석.</summary>
+    private static int OreFor(ItemRarity rarity) => rarity switch
     {
-        ItemRarity.Legendary => 6f,
-        ItemRarity.Epic      => 3f,
-        ItemRarity.Rare      => 1.6f,
-        _                    => 1f,
+        ItemRarity.Legendary => 40,
+        ItemRarity.Epic      => 6,
+        ItemRarity.Rare      => 3,
+        _                    => 1,
     };
 
     // ── Public Methods ───────────────────────────────────
 
-    /// <summary>이 룬을 폐기하면 나오는 원석량. UI가 폐기 전에 미리 보여주는 용도로도 쓴다.</summary>
-    public static int OreValueOf(RuntimeItemData item)
-    {
-        if (item == null) return 0;
-
-        int cells = CellCountOf(item);
-        float raw = cells * PerCell * GradeMultiplier(item.rarity) * RecoveryRate;
-        return Mathf.Max(1, Mathf.RoundToInt(raw));   // 무엇을 버리든 최소 1은 나온다
-    }
+    /// <summary>이 룬을 분해하면 나오는 원석량. UI가 분해 전에 미리 보여주는 용도로도 쓴다.</summary>
+    public static int OreValueOf(RuntimeItemData item) => item == null ? 0 : OreFor(item.rarity);
 
     /// <summary>
     /// 폐기분을 원석으로 지급한다. <b>인벤토리에서 빼는 것은 호출부가 한다</b> —

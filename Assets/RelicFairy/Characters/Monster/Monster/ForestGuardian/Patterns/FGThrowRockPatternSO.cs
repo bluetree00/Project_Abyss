@@ -121,6 +121,8 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     private enum Phase { Windup, PostThrow, Fragment, Recovery }
 
     private const int FragmentCount = 3;
+    private const float RockVanishSeconds = 0.5f;   // 던지기 전에 끊긴 바위가 디졸브로 꺼지는 시간(10-03)
+    private const float PreLaunchWarn = 0.4f;   // 던지기 전에 착지 원을 먼저 깐다(초, 2페이즈 배속 적용 전)
 
     private Phase              _phase;
     private float              _timer;
@@ -137,6 +139,7 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     private float              _warningGrowTimer;
     private Transform          _handBone;
     private bool               _grabbed;
+    private bool               _landingWarned;   // 착지 원을 던지기 전에 깔았다 — 그 자리로 던진다
     private readonly GameObject[] _fragmentWarnings  = new GameObject[FragmentCount];
     private readonly Vector3[]    _fragmentPositions = new Vector3[FragmentCount];
     private float                 _fragmentTimer;
@@ -151,6 +154,7 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
         _timer    = 0f;
         _proj     = null;
         _grabbed  = false;
+        _landingWarned = false;
         _handBone = FindBoneRecursive(ctx.Transform, Data.throwHandBoneName);
 
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
@@ -190,6 +194,19 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
                 if (!_grabbed && _timer >= _grabDuration)
                     ForceGrabRock();  // grabNormalizedTime 도달 시 거리 무관하게 강제 부착
                 FacePlayer(ctx);
+
+                // 착지 원은 던지기 PreLaunchWarn초 전에 — 가까우면 비행이 0.2초라 던지는 순간 깔면 보고 피할 수 없었다(10-02)
+                if (!_landingWarned && _timer >= _windupDuration - PreLaunchWarn && ctx.Runtime.PlayerTarget != null)
+                {
+                    _landingWarned = true;
+                    _landingPos    = ctx.Runtime.PlayerTarget.position;
+                    SpawnWarning(ctx, _landingPos, Mathf.Max(0f, _windupDuration - _timer));
+                }
+                if (_warningGO != null && _warningGrowDuration > 0f)
+                {
+                    _warningGrowTimer += Time.deltaTime * SpeedMult(ctx);
+                    PatternGuideHelper.SetProgress(_warningGO, _warningGrowTimer / _warningGrowDuration);
+                }
 
                 if (_timer >= _windupDuration)
                 {
@@ -334,8 +351,11 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     {
         if (ctx.Runtime.PlayerTarget == null) return;
 
-        _landingPos = ctx.Runtime.PlayerTarget.position;
-        SpawnWarning(_landingPos);
+        if (!_landingWarned)
+        {
+            _landingPos = ctx.Runtime.PlayerTarget.position;
+            SpawnWarning(ctx, _landingPos, 0f);
+        }
 
         if (_rockGO == null) return;
 
@@ -360,11 +380,14 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     }
 
     // ── 경고장판 ─────────────────────────────────────────
-    private void SpawnWarning(Vector3 landPos)
+    private void SpawnWarning(MonsterContext ctx, Vector3 landPos, float leadSeconds)
     {
         _warningGrowTimer    = 0f;
-        // 비행 시간만큼 가이드가 차오르도록 (최소 0.3s)
-        _warningGrowDuration = Mathf.Max(0.3f, Data.projectileSpeed > 0f ? _launchDist / Data.projectileSpeed : 0.5f);
+        // 던지기까지 남은 시간 + 비행 시간만큼 차오른다(최소 0.3s). 거리는 지금 손(바위) 위치에서 잰다 —
+        // 예전엔 _launchDist를 계산하기 전에 불러 직전 던지기 거리로 찼다
+        Vector3 from = _rockGO != null ? _rockGO.transform.position : ctx.Transform.position;
+        float   dist = Vector3.Distance(from, landPos);
+        _warningGrowDuration = Mathf.Max(0.3f, leadSeconds + (Data.projectileSpeed > 0f ? dist / Data.projectileSpeed : 0.5f));
         PatternGuideHelper.SafeDestroy(ref _warningGO);
         _warningGO = PatternGuideHelper.Prepare(
             PatternGuideHelper.Disc(landPos, Data.warningRadius, PatternGuideHelper.Telegraph), ForestGuardianMonster.GuideFlow);
@@ -375,8 +398,12 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     private void DespawnRock()
     {
         if (_rockGO == null) return;
-        Object.Destroy(_rockGO);
+        // 던지기 전에 끊기면(사망 · 페이지 전환) 디졸브로 꺼진 뒤 사라진다(10-03).
+        // 손 뼈에서 먼저 뗀다 — 보스 몸 디졸브가 같은 렌더러를 겹쳐 잡지 않게(부모·자식 동시 디졸브 금지).
+        var rock = _rockGO;
         _rockGO = null;
+        rock.transform.SetParent(null, true);
+        DissolveEffect.PlayDisappear(rock, RockVanishSeconds, () => { if (rock != null) Object.Destroy(rock); });
     }
 
     // ── 파편 경고장판 ────────────────────────────────────

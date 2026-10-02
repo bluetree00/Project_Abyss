@@ -167,6 +167,21 @@ public static class LichPatternUtil
     public static LichMonster Lich(MonsterContext ctx) => ctx.Monster as LichMonster;
 
     /// <summary>
+    /// 디졸브로 스러진 뒤 <paramref name="root"/>를 파괴한다(10-03 — 리치가 쓰는 물체가 툭 꺼지지 않게). 디졸브는 <paramref name="visual"/>(메시)에만 —
+    /// 부모와 자식을 겹쳐 디졸브하면 마젠타, 투명 가이드 · 입자는 대상이 아니다. 메시가 없거나 앱 종료 중(매니저 해제 — 디졸브 재질을 못 부른다)이면 바로 파괴.
+    /// </summary>
+    public static void DissolveAndDestroy(GameObject visual, GameObject root, float seconds)
+    {
+        if (root == null) return;
+        if (visual == null || Managers.Instance == null)
+        {
+            Object.Destroy(root);
+            return;
+        }
+        DissolveEffect.PlayDisappear(visual, seconds, () => { if (root != null) Object.Destroy(root); });
+    }
+
+    /// <summary>
     /// 바닥을 부순다(1페이지 지형 — 연출·UX 시나리오 §12-4). <paramref name="center"/> 수평 반경 안 칸이 붉게 흔들리다 가라앉는다.
     /// <paramref name="downSeconds"/>가 음수면 복구 패턴(<see cref="RestoreFloor"/>)까지 구멍으로 남아 누적된다(상한은 아레나가 정한다).
     /// <paramref name="keepCenterCell"/>면 중심이 선 칸은 남긴다(리치가 선 자리). 붕괴형 아레나가 아니면 아무 일도 없다. 실제로 부순 칸 수.

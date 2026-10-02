@@ -95,6 +95,12 @@ public class DragonAirDashPatternSO : BossPatternSO
 
 internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
 {
+    // 벽 안면(바닥 상자 −1 m) + 머리 · 몸 앞 길이 — 돌진이 여기서 끝나 벽에 박히지 않는다(10-03 개선 1-2: 매번 벽 충돌 → 사망 클립 낙하)
+    private const float WallBodyMargin = 4.5f;
+    private const float YankFraction   = 0.5f;   // 봉인기: 첫 돌진의 이만큼에서 사슬이 끌어내린다(10-03 S2)
+    private const float YankStagger    = 1.2f;
+    private const float FallCrossFade  = 0.2f;   // 낙하 · 회복 클립 전환(0.05초는 자세가 튀었다)
+
     private enum Phase
     {
         Takeoff,
@@ -123,6 +129,10 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
     private int _recoverHash;
     private int _landingHash;
     private DragonBossWarningZone _warningZone;
+    private bool  _yankPlanned;
+    private bool  _yanked;
+    private float _yankStagger;
+    private float _yankWait;
 
     internal DragonAirDashState(DragonAirDashPatternSO data) : base(data) { }
 
@@ -147,6 +157,10 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         _playerHit = false;
         _selfDamageApplied = false;
         _dashCount = 0;
+        _yankPlanned = false;
+        _yanked = false;
+        _yankStagger = 0f;
+        _yankWait = 0f;
         _takeoffStartPos = ctx.Transform.position;
         _hoverPos = _takeoffStartPos;
         _hoverPos.y = Mathf.Max(ctx.Transform.position.y, ctx.Runtime.SpawnPosition.y + Data.WarningHoverHeight);
@@ -298,20 +312,39 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
 
     private void UpdateLanding(MonsterContext ctx)
     {
+        float groundY = DragonPatternFloorUtils.GetFloorY(ctx.Transform.position, ctx.Runtime.SpawnPosition.y);
         Vector3 pos = ctx.Transform.position;
-        pos.y = Mathf.MoveTowards(pos.y, ctx.Runtime.SpawnPosition.y, Data.DashSpeed * 0.45f * Time.deltaTime);
+        pos.y = Mathf.MoveTowards(pos.y, groundY, Data.DashSpeed * 0.45f * Time.deltaTime);
         ctx.Transform.position = pos;
         FacePlayer(ctx, Data.RotationSpeed);
 
-        if (!IsAnimNearEnd(ctx, _landingHash) || pos.y > ctx.Runtime.SpawnPosition.y + 0.05f)
+        if (!IsAnimNearEnd(ctx, _landingHash) || pos.y > groundY + 0.05f)
             return;
 
+        // 사슬에 끌려 내려왔으면 그 자리에서 휘청
+        if (_yankWait < _yankStagger)
+        {
+            _yankWait += Time.deltaTime;
+            return;
+        }
+
         RestoreAgent(ctx);
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
+            bb.BodyState = BodyState.Grounded;
         ReturnToGroundCombat(ctx);
     }
 
     private void FinishDash(MonsterContext ctx)
     {
+        // 봉인기 — 옛 봉인 사슬이 날개를 끌어내린다: 착지 클립으로 내려와 휘청(10-03 S2)
+        if (_yankPlanned && !_yanked)
+        {
+            _yanked      = true;
+            _yankStagger = BossBinding.Of(ctx.Monster)?.Yank(YankStagger) ?? 0f;
+            StartLanding(ctx);
+            return;
+        }
+
         _dashCount++;
         if (_dashCount < Data.DashRepeatCount)
         {
@@ -371,7 +404,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
     {
         _phase = Phase.Fall;
         _phaseTimer = 0f;
-        PlayAnim(ctx, Data.FallStateName, 0.05f);
+        PlayAnim(ctx, Data.FallStateName, FallCrossFade);
     }
 
     private void StartRecover(MonsterContext ctx)
@@ -381,7 +414,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         Vector3 pos = ctx.Transform.position;
         pos.y = DragonPatternFloorUtils.GetFloorY(pos, ctx.Runtime.SpawnPosition.y);
         ctx.Transform.position = pos;
-        PlayAnim(ctx, Data.RecoverStateName, 0.05f);
+        PlayAnim(ctx, Data.RecoverStateName, FallCrossFade);
     }
 
     private void StartLanding(MonsterContext ctx)
@@ -397,8 +430,16 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         Vector3 origin = new Vector3(_hoverPos.x, groundY, _hoverPos.z);
         // 경고장판이 항상 바닥 끝까지 닿도록 fallback을 룸 최대 크기로 보정 — 드래곤이 경고장판 경로 끝까지 돌진한다
         float maxDistance = Mathf.Max(Data.DashDistance, DragonPatternFloorUtils.GetRoomMaxExtent());
-        _effectiveDashDistance = DragonPatternFloorUtils.DistanceToFloorEdge(origin, _dashDirection, maxDistance);
-        Vector3 center = origin + _dashDirection * (_effectiveDashDistance * 0.5f);
+        _effectiveDashDistance = Mathf.Max(2f, DragonPatternFloorUtils.DistanceToFloorEdge(origin, _dashDirection, maxDistance) - WallBodyMargin);
+        // 봉인기 첫 돌진 — 사슬이 닿는 데까지만(예고도 이 길이)
+        if (_dashCount == 0 && !StoryProgress.IsLiberated && BossBinding.Of(ctx.Monster)?.IsBound == true)
+        {
+            _yankPlanned = true;
+            _effectiveDashDistance *= YankFraction;
+        }
+        // 예고는 돌진 거리 + 몸 판정 반경 — 멈춘 자리에서도 판정 캡슐이 반경만큼 앞으로 닿는다(10-03)
+        float guideLength = _effectiveDashDistance + Data.DashHitRadius;
+        Vector3 center = origin + _dashDirection * (guideLength * 0.5f);
         // 2페이지(심연)엔 검은 불 색으로 — 알파는 에셋 값 유지
         Color lineColor = Data.WarningLineColor;
         if (ctx.Monster is DragonBossMonster dragon && dragon.IsAbyssPage)
@@ -411,7 +452,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
             center,
             Quaternion.LookRotation(_dashDirection, Vector3.up),
             Data.DashHitRadius * 2f,
-            _effectiveDashDistance,
+            guideLength,
             lineColor,
             Data.WarningDuration + 0.5f,
             Data.WarningMarkerHeightOffset);

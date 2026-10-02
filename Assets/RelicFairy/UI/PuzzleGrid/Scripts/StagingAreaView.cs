@@ -45,6 +45,7 @@ public sealed class StagingAreaView : MonoBehaviour
 
     private static readonly Color COLOR_NEW_BORDER      = new(1f, 0.92f, 0.3f, 1f);
     private static readonly Color COLOR_NORMAL_BORDER   = new(0.4f, 0.4f, 0.5f, 0.7f);
+    private static readonly Color COLOR_OVERFLOW_BORDER = new(1f, 0.48f, 0.42f, 1f);   // 상한을 넘친 룬 — 놓거나 분해해야 닫힌다
     private static readonly Color COLOR_SELECTED_BORDER = new(0.3f, 0.85f, 1f, 1f);
     private static readonly Color HoverGlowColor        = new(1f, 0.84f, 0.45f, 0.85f);
     private static readonly Color COLOR_EMPTY_BG        = new(0.14f, 0.14f, 0.20f, 0.7f);
@@ -73,11 +74,14 @@ public sealed class StagingAreaView : MonoBehaviour
 
     // ── Private ──
     // 고정 슬롯 구조
-    private readonly GameObject[] _slotGOs       = new GameObject[RunItemInventory.MaxStagingCapacity];
+    private readonly GameObject[] _slotGOs       = new GameObject[RunItemInventory.MaxStagingView];
     // 보이는 칸 수와 카드 폭 — 제단 「룬 보관함 +1 · +2」로 5 → 7. 칸은 상한(7)만큼 미리 만들고 이만큼만 켠다(09-29).
     private int   _capacity  = 5;
     private float _slotWidth = SLOT_WIDTH;
-    private readonly RuntimeItemData[] _slotItems = new RuntimeItemData[RunItemInventory.MaxStagingCapacity];
+    private readonly RuntimeItemData[] _slotItems = new RuntimeItemData[RunItemInventory.MaxStagingView];
+
+    // 상한을 넘친 룬(가장 나중에 들어온 것부터) — 붉은 테두리
+    private readonly HashSet<string> _overflowIds = new();
 
     // Shape 관리
     private readonly Dictionary<string, Shape> _shapeByInstanceId = new();
@@ -134,7 +138,7 @@ public sealed class StagingAreaView : MonoBehaviour
     /// </summary>
     public void ApplyCapacity(int capacity, float slotWidth)
     {
-        _capacity  = Mathf.Clamp(capacity, 1, RunItemInventory.MaxStagingCapacity);
+        _capacity  = Mathf.Clamp(capacity, 1, RunItemInventory.MaxStagingView);
         _slotWidth = slotWidth;
         for (int i = 0; i < _slotGOs.Length; i++)
         {
@@ -149,6 +153,15 @@ public sealed class StagingAreaView : MonoBehaviour
             scrollContent.sizeDelta = new Vector2(
                 SLOT_SPACING + _columns * (_slotWidth + SLOT_SPACING),
                 SLOT_SPACING + SlotRows * (SLOT_HEIGHT + SLOT_SPACING));
+    }
+
+    /// <summary>넘친 룬을 알려 준다(붉은 테두리). 비우면 해제.</summary>
+    public void SetOverflowItems(IEnumerable<RuntimeItemData> items)
+    {
+        _overflowIds.Clear();
+        if (items != null)
+            foreach (var it in items) if (it != null) _overflowIds.Add(it.instanceId);
+        for (int i = 0; i < _slotItems.Length; i++) ApplySlotBorderColor(i, _slotItems[i]);
     }
 
     public void Init(RectTransform content)
@@ -180,7 +193,7 @@ public sealed class StagingAreaView : MonoBehaviour
         {
             if (item == null || _newItemIds.Contains(item.instanceId)) continue;
             bool wasKnown = false;
-            for (int j = 0; j < RunItemInventory.MaxStagingCapacity; j++)
+            for (int j = 0; j < RunItemInventory.MaxStagingView; j++)
                 if (_slotItems[j] == item) { wasKnown = true; break; }
             if (!wasKnown) _newItemIds.Add(item.instanceId);
         }
@@ -197,7 +210,7 @@ public sealed class StagingAreaView : MonoBehaviour
         var sorted = new List<RuntimeItemData>(nonNew);
         sorted.AddRange(newList);
 
-        for (int i = 0; i < RunItemInventory.MaxStagingCapacity; i++)
+        for (int i = 0; i < RunItemInventory.MaxStagingView; i++)
         {
             RuntimeItemData item = i < sorted.Count ? sorted[i] : null;
             _slotItems[i] = item;
@@ -253,7 +266,7 @@ public sealed class StagingAreaView : MonoBehaviour
         _dealCts?.Dispose();
         _dealCts = new System.Threading.CancellationTokenSource();
         int order = 0;
-        for (int i = 0; i < RunItemInventory.MaxStagingCapacity; i++)
+        for (int i = 0; i < RunItemInventory.MaxStagingView; i++)
         {
             if (_slotItems[i] == null || _slotGOs[i] == null) continue;
             DealSlotAsync(i, delay + order * DEAL_STAGGER, _dealCts.Token).Forget();
@@ -338,7 +351,7 @@ public sealed class StagingAreaView : MonoBehaviour
     {
         if (scrollContent == null) return;
 
-        for (int i = 0; i < RunItemInventory.MaxStagingCapacity; i++)
+        for (int i = 0; i < RunItemInventory.MaxStagingView; i++)
         {
             var slotGO = new GameObject($"Slot_{i}", typeof(RectTransform));
             slotGO.transform.SetParent(scrollContent, false);
@@ -442,7 +455,7 @@ public sealed class StagingAreaView : MonoBehaviour
 
     private void RefreshSlotDisplay(int index, RuntimeItemData item)
     {
-        if (index < 0 || index >= RunItemInventory.MaxStagingCapacity) return;
+        if (index < 0 || index >= RunItemInventory.MaxStagingView) return;
         var slotGO = _slotGOs[index];
         if (slotGO == null) return;
 
@@ -883,7 +896,7 @@ public sealed class StagingAreaView : MonoBehaviour
     private int FindSlotIndex(RuntimeItemData item)
     {
         if (item == null) return -1;
-        for (int i = 0; i < RunItemInventory.MaxStagingCapacity; i++)
+        for (int i = 0; i < RunItemInventory.MaxStagingView; i++)
             if (_slotItems[i] == item) return i;
         return -1;
     }
@@ -894,13 +907,14 @@ public sealed class StagingAreaView : MonoBehaviour
     /// </summary>
     private void ApplySlotBorderColor(int index, RuntimeItemData item)
     {
-        if (index < 0 || index >= RunItemInventory.MaxStagingCapacity) return;
+        if (index < 0 || index >= RunItemInventory.MaxStagingView) return;
         var slotGO = _slotGOs[index];
         if (slotGO == null) return;
 
         Color color = item == null
             ? COLOR_EMPTY_BORDER
             : (_highlightedItem == item ? COLOR_SELECTED_BORDER
+               : _overflowIds.Contains(item.instanceId) ? COLOR_OVERFLOW_BORDER
                : _newItemIds.Contains(item.instanceId) ? COLOR_NEW_BORDER : COLOR_NORMAL_BORDER);
 
         SetSlotOutline(slotGO, color);
@@ -1089,7 +1103,7 @@ public sealed class StagingAreaView : MonoBehaviour
 
         BuildDialogButton(panelGO, "YesBtn",
             new Vector2(0.08f, 0.08f), new Vector2(0.45f, 0.34f),
-            new Color(0.75f, 0.18f, 0.18f, 1f), "폐기", OnDiscardConfirm);
+            new Color(0.75f, 0.18f, 0.18f, 1f), "분해", OnDiscardConfirm);
 
         BuildDialogButton(panelGO, "NoBtn",
             new Vector2(0.55f, 0.08f), new Vector2(0.92f, 0.34f),
@@ -1137,7 +1151,7 @@ public sealed class StagingAreaView : MonoBehaviour
             // 「폐기 → 원석 → 정제소」 순환을 플레이어가 인지하지 못한다.
             int ore = RuneSalvage.OreValueOf(item);
             _discardDialogText.text =
-                $"\"{item.displayName ?? item.itemId}\"\n폐기하시겠습니까?\n\n" +
+                $"\"{item.displayName ?? item.itemId}\"\n분해합니까?\n\n" +
                 $"<color=#63D9C0>원석 +{ore}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
         }
         if (_discardDialog != null)

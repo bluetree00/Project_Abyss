@@ -9,7 +9,7 @@ using UnityEngine;
 ///   · Open Test Hub        — 허브 씬을 연다(편집 모드)
 ///   · Launch Current Selection (Play) — 허브 화면의 「시작」과 같다(현재 선택 그대로)
 ///   · Select/… (Play)         — 챕터·시작점 선택(허브 화면의 툴바·토글과 같다)
-///   · Enter Open Exit (Play)  — 현재 방의 열린 출구로 순간이동(다음 방으로 넘어간다)
+///   · Enter Open Exit (Play)  — 현재 방의 열린 출구로 순간이동(다음 방으로 넘어간다). 보상을 안 받아 닫혀 있으면 보상 자리로
 ///   · Boss Room/1~3 (Play)    — 입구 트리거 안 → 트리거 너머 → 보스 12m 앞 (걸어 들어가는 흐름 재현)
 ///   · Boss Room/4~8 (Play)    — 보스 HP 절반 / 처치(페이지 보스는 다음 페이지) / 리치 상태 로그 / 봉인석 타격 / 리치 이동 표본
 ///   · Boss Room/9 (Play)      — 리치 패턴 강제 실행(P1 M1~M8 · 2페이지 C1~C5/R1·R2·R4·R5) · 자동 선택 끄기
@@ -96,6 +96,23 @@ public static class TestHubDebugMenu
         var player = GameRunBootstrapper.Instance?.Run?.Player;
         if (player == null) { Debug.LogWarning("[TestHub] 런 플레이어가 없다."); return; }
 
+        // 층계 회랑(S5) — 회랑 안이면 끝 문, 아레나면 계단 꼭대기
+        var stairway = GameObject.Find("@ChapterStairway");
+        if (stairway != null)
+        {
+            var corridor = GameObject.Find("@StairCorridor");
+            bool inCorridor = corridor != null && player.transform.position.y > stairway.transform.position.y + 100f;
+            var t = inCorridor ? corridor.transform.Find("DoorTrigger") : stairway.transform.Find("TopTrigger");
+            if (t != null && t.TryGetComponent<Collider>(out var sc))
+            {
+                var b = sc.bounds; var p = new Vector3(b.center.x, b.min.y + 0.3f, b.center.z);
+                player.transform.position = p;
+                if (player.TryGetComponent<Rigidbody>(out var srb)) { srb.position = p; srb.linearVelocity = Vector3.zero; }
+                Debug.Log($"[TestHub] 층계 → {(inCorridor ? "회랑 끝 문" : "계단 꼭대기")} ({p})");
+                return;
+            }
+        }
+
         foreach (var gate in Object.FindObjectsByType<ProcRoomGate>(FindObjectsSortMode.None))
         {
             if (!gate.IsArmed || !gate.TryGetComponent<Collider>(out var col)) continue;
@@ -109,6 +126,21 @@ public static class TestHubDebugMenu
                 rb.linearVelocity = Vector3.zero;
             }
             Debug.Log($"[TestHub] 열린 출구로 이동 → {gate.Kind} ({pos})");
+            return;
+        }
+
+        // 클리어 보상을 받아야 출구가 열린다(09-30) — 보상이 남아 있으면 그 자리로 옮겨 준다([F]는 직접 누른다).
+        var reward = Object.FindFirstObjectByType<ClearRewardTrigger>();
+        if (reward != null)
+        {
+            var pos = reward.transform.position;
+            player.transform.position = pos;
+            if (player.TryGetComponent<Rigidbody>(out var rb))
+            {
+                rb.position       = pos;
+                rb.linearVelocity = Vector3.zero;
+            }
+            Debug.LogWarning($"[TestHub] 출구가 아직 닫혀 있다 — 클리어 보상을 받아야 열린다. 보상 자리로 이동 ({pos}) → [F]");
             return;
         }
         Debug.LogWarning("[TestHub] 열린 출구가 없다(방을 아직 클리어하지 않았거나 출구가 없는 방).");
@@ -609,6 +641,17 @@ public static class TestHubDebugMenu
     [MenuItem(StoryRoot + "Override - Nightmare Mode")]
     public static void StoryNightmareMode() => SetStoryOverride(2);
 
+    /// <summary>엔딩을 본 뒤 악몽 모드를 끈 판 — 해방기 규칙 그대로, 리치를 쓰러뜨려도 엔딩이 다시 나오지 않는다.</summary>
+    [MenuItem(StoryRoot + "Override - Ended (Nightmare Off)")]
+    public static void StoryEnded() => SetStoryOverride(3);
+
+    // 런 중 테스트 패널(TestRunOverlay)과 같은 동작 — 자동 확인용
+    [MenuItem(StoryRoot + "Boss - Next Page Boundary (Play)")]
+    public static void BossNextPage() => Debug.Log("[TestHub] " + TestRunOverlay.JumpBossToNextPage());
+
+    [MenuItem(StoryRoot + "Boss - Near Death (Play)")]
+    public static void BossNearDeath() => Debug.Log("[TestHub] " + TestRunOverlay.JumpBossNearDeath());
+
     [MenuItem(StoryRoot + "Override - Use Saved State", true)]
     private static bool StoryUseSavedCheck()  { Menu.SetChecked(StoryRoot + "Override - Use Saved State", StoryProgress.DebugNightmareOverride < 0);  return true; }
     [MenuItem(StoryRoot + "Override - Seal Era", true)]
@@ -617,6 +660,8 @@ public static class TestHubDebugMenu
     private static bool StoryLiberatedCheck() { Menu.SetChecked(StoryRoot + "Override - Liberated",       StoryProgress.DebugNightmareOverride == 1); return true; }
     [MenuItem(StoryRoot + "Override - Nightmare Mode", true)]
     private static bool StoryNightmareModeCheck() { Menu.SetChecked(StoryRoot + "Override - Nightmare Mode", StoryProgress.DebugNightmareOverride == 2); return true; }
+    [MenuItem(StoryRoot + "Override - Ended (Nightmare Off)", true)]
+    private static bool StoryEndedCheck() { Menu.SetChecked(StoryRoot + "Override - Ended (Nightmare Off)", StoryProgress.DebugNightmareOverride == 3); return true; }
 
     private static void SetStoryOverride(int value)
     {
@@ -624,7 +669,7 @@ public static class TestHubDebugMenu
         StoryProgress.RefreshDebugOverride();
         Debug.Log(value < 0
             ? "[TestHub] 이야기 상태 — 저장값 사용"
-            : $"[TestHub] 이야기 상태 오버라이드 — {(StoryEra)value} (이야기 기록은 저장하지 않음)");
+            : $"[TestHub] 이야기 상태 오버라이드 — {StoryProgress.Era}{(StoryProgress.HasEnded ? " · 엔딩 뒤" : "")} (이야기 기록은 저장하지 않음) · {EraBalance.Describe(StoryProgress.Era)}");
     }
 
     [MenuItem(StoryRoot + "Log Story State")]

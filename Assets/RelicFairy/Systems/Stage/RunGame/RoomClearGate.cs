@@ -1,6 +1,7 @@
 using System;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.AI;
 
 /// <summary>
 /// 룸 클리어 게이트 — 클리어 시점에 이펙트 시퀀스를 재생하고 <b>방 종류에 따라</b> 보상 오브젝트를 스폰한다.
@@ -12,6 +13,7 @@ using UnityEngine;
 /// Activate가 수행하는 일:
 ///   · roomCenter 위치에 EndEffect 재생
 ///   · 딜레이 후 EndEffect2 스폰 + ClearRewardTrigger 부착 (F키 보상 상호작용)
+///   · 보상을 세운 방은 그 보상이 사라질 때까지(수령·넘기기) 출구 공개를 묶는다 — 룬을 지나칠 수 없다
 ///
 /// 드롭 확률·등급 분포·후보 수·연료는 <see cref="RoomRewardTable"/>(방 종류 기반)가 정한다.
 /// 예전엔 행운(Luck) 테이블 하나가 전부를 정했는데, Luck이 사실상 움직이지 않아 정예방이 일반방과
@@ -25,6 +27,18 @@ public class RoomClearGate : MonoBehaviour
     private const int RuneChoiceCount = 3;
     /// <summary>첫 장을 보유 계열로 기울일 확률 — 늘 같은 계열만 나오면 두 번째 축을 만날 자리가 없다.</summary>
     private const float PreferFamilyChance = 0.6f;
+    /// <summary>
+    /// 보상 자리에서 걸을 수 있는 면을 찾는 반경(m). 보상 획득 반경(4.5 m)보다 작게 둔다 —
+    /// 이 안에서 찾은 면이면 보상을 그리 옮겨도 원래 자리에서 멀지 않다. 못 찾으면 플레이어 자리로 간다.
+    /// </summary>
+    private const float RewardSnapRadius = 4f;
+    // NavMesh 질의 조건 — 에이전트 종류를 밝힌다. 방 NavMesh는 에이전트 종류마다 따로 굽는데(BuildMapNavMeshAsync, 2종),
+    // 종류를 안 밝힌 질의(areaMask 오버로드)는 다른 종류의 면을 집어 발밑 면까지도 길이 끊긴 것(PathPartial)으로 나온다(10-01 실측).
+    private static readonly NavMeshQueryFilter s_walkFilter = new() { agentTypeID = 0, areaMask = NavMesh.AllAreas };
+    /// <summary>보상을 안 받은 채 이만큼(초) 지나면 「보상을 받으면 길이 열린다」를 띄운다 — 문이 왜 안 열리는지 알려 준다.</summary>
+    private const float ExitHintDelay  = 6f;
+    /// <summary>그 뒤로도 안 받으면 되풀이하는 간격(초). 알림이 2.5초 떠 있으니 도배가 되지 않게 넉넉히.</summary>
+    private const float ExitHintRepeat = 12f;
     private static readonly System.Collections.Generic.List<BuildFamily> s_topFamilies = new(2);
     private static readonly System.Collections.Generic.List<ItemSO>      s_familyPool  = new(16);
 
@@ -36,7 +50,7 @@ public class RoomClearGate : MonoBehaviour
     [SerializeField, Tooltip("EndEffect 후 스폰되는 보상 오브젝트 이펙트 프리팹 (EndEffect2). ClearRewardTrigger가 자동 부착됨.")]
     private GameObject endEffect2Prefab;
 
-    [SerializeField, Tooltip("EndEffect 스폰 후 EndEffect2 스폰까지의 딜레이(초)."), Min(0f)]
+    [SerializeField, Tooltip("보상이 없는 방(보스방 등)의 클리어 뒤 대기(초). 보상이 있는 방은 등급 예고 길이(RewardPresentation.World)가 대신한다."), Min(0f)]
     private float endEffect2SpawnDelay = 2f;
 
     [SerializeField, Tooltip("클리어 이펙트/보상 오브젝트를 바닥(사망 위치)에서 위로 띄우는 높이(m)."), Min(0f)]
@@ -53,6 +67,7 @@ public class RoomClearGate : MonoBehaviour
     private bool _isBossRoom;
     private ChallengeGrade? _challengeGrade;   // 이벤트 챌린지 성과(있으면 보상 스케일·연료 지급)
     private bool _isInteraction;               // 상호작용 챌린지 보상이면 천장 클램프(§6-3)
+    private float _fuelScale = 1f;             // 챌린지 연료 배율(이벤트방 놀이 — 욕심의 상자 4단계 ×1.5)
     private bool _restoreMode;                 // 이어하기 복원 굴림(연료 재지급 금지 + 후보 결정적 고정)
     private int  _restoreSeed;
 
@@ -73,6 +88,9 @@ public class RoomClearGate : MonoBehaviour
 
     /// <summary>상호작용 챌린지 보상 여부 — true면 개수/연료를 천장 비율로 클램프(§6-3). Activate 전에 호출.</summary>
     public void SetInteractionReward(bool isInteraction) => _isInteraction = isInteraction;
+
+    /// <summary>챌린지 연료 배율 — Activate 전에 호출.</summary>
+    public void SetFuelScale(float scale) => _fuelScale = Mathf.Max(0f, scale);
 
     /// <summary>방 클리어 시점에 호출. 이펙트 시퀀스 시작.</summary>
     public void Activate(Vector3 roomCenterWorld)
@@ -131,6 +149,7 @@ public class RoomClearGate : MonoBehaviour
             // 보상 '개수'는 그대로 두고, 각 개수를 3지선다 <b>라운드</b>로 바꾼다 —
             // 경제는 유지하면서 획득 경험만 통일된다.
             var cr = ChallengeRewardTable.DefaultReward(_challengeGrade.Value, ChapterNum(), _isInteraction);
+            cr.fuelAmount = Mathf.RoundToInt(cr.fuelAmount * _fuelScale);
             int count = Mathf.Max(1, cr.rewardCount);
             for (int i = 0; i < count; i++)
                 rewards.AddRange(RollRewardChoices(RuneChoiceCount, cr.baseRarity, floorGuaranteesOneOnly: true));
@@ -185,20 +204,120 @@ public class RoomClearGate : MonoBehaviour
         //     }
         // }
 
+        // 보상이 있는 방은 그 보상을 받을 때까지 출구를 묶는다(09-30) — 예전엔 문이 먼저 열려 룬을 지나칠 수 있었다.
+        // ⚠️ 첫 await <b>앞</b>이어야 한다. 호출부가 Activate 직후 같은 프레임에 클리어를 통지하고
+        //    (OnRoomCleared · OnResolved), 그때 RunFlowController가 이 보류를 보고 출구 공개를 미룬다.
+        // 보스방 · 후보 0(풀이 비었다)은 rewards가 비어 보류가 걸리지 않는다 — 지금처럼 바로 열린다.
+        if (rewards.Count > 0)
+            RunFlowController.Active?.HoldExitsForReward(this);
+
+        // 등급 예고(10-01) — 후보는 위에서 이미 정해졌다. 최고 등급이 예고의 길이 · 빛깔 · 크기를 정한다
+        // (일반 0.6초 ~ 전설 2.0초 — 낮은 등급은 빨리 서고, 높은 등급은 기다림 자체가 예고다).
+        // 자리 · 등급 계산은 동기로 끝낸다 — 위 보류 호출과 아래 첫 await 사이에 다른 await를 끼우지 않는다.
+        ItemRarity topRarity = RewardPresentation.MaxRarity(rewards);
+        Vector3    spot      = rewards.Count > 0 ? ResolveReachablePosition(center) : center;
+        float      floorY    = spot.y - effectHeightOffset;
+        RewardAura aura      = null;
+
         try
         {
-            await UniTask.Delay(TimeSpan.FromSeconds(endEffect2SpawnDelay), cancellationToken: ct);
+            if (rewards.Count > 0)
+                aura = await RewardObjectPresenter.ForetellAsync(spot, floorY, topRarity, ct);
+            else
+                await UniTask.Delay(TimeSpan.FromSeconds(endEffect2SpawnDelay), cancellationToken: ct);
         }
         catch (OperationCanceledException) { return; }
+        catch (Exception e)
+        {
+            // 예고는 연출이다 — 실패해도 아래에서 보상을 세우고, 받으면 출구가 풀린다(10-01 e0 검토)
+            Debug.LogError($"[RoomClearGate] 등급 예고 실패 — 보상은 그대로 세운다: {e}");
+            aura = null;
+        }
 
         // 보스방은 룬 보상이 없고(위에서 미굴림) 클리어 후처리(드래프트·런클리어·길)를
         // GameRunBootstrapper.OnBossRoomClearedHandler가 전담하므로 트리거를 스폰하지 않는다.
-        if (rewards.Count > 0)
-            SpawnRewardObject(center, rewards, isChoice, choiceRounds);
         // 일반 방에서 아이템이 없으면 별도 처리 불필요 — 출구 게이트는 RunFlowController가 담당한다.
+        if (rewards.Count == 0) return;
+
+        try
+        {
+            var rewardGO = SpawnRewardObject(spot, rewards, isChoice, choiceRounds);
+            // 등장 · 놓여 있는 빛 — 보상 오브젝트는 건드리지 않는다(이 오브젝트의 수명이 곧 출구 보류다)
+            RewardObjectPresenter.Arrive(rewardGO, aura, floorY, topRarity);
+            // 보상 오브젝트는 수령 · 넘기기 · 지급 실패 어느 길로 끝나든 스스로 파괴된다 — 사라지면 출구를 푼다.
+            // 그때까지 문이 닫혀 있는 까닭을 가끔 알려 준다. Time.time 기준이라 보상 화면(시간 정지)이 떠 있는 동안에는 세지 않는다.
+            float hintAt = Time.time + ExitHintDelay;
+            while (rewardGO != null)
+            {
+                if (Time.time >= hintAt)
+                {
+                    hintAt = Time.time + ExitHintRepeat;
+                    ShowExitHint();
+                }
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException) { return; }   // 방이 먼저 사라졌다 — 풀 출구도 없다
+        catch (Exception e)
+        {
+            // 보상을 못 세웠어도 방에 가두지는 않는다.
+            Debug.LogError($"[RoomClearGate] 보상 오브젝트 생성 실패 — 출구는 연다: {e}");
+        }
+        RunFlowController.Active?.ReleaseExitsForReward(this);
     }
 
-    private void SpawnRewardObject(Vector3 center, System.Collections.Generic.List<(RuntimeItemData, ItemSO)> rewards, bool isChoice, int choiceRounds)
+    /// <summary>
+    /// 보상 자리를 <b>걸어서 닿는 곳</b>으로 고른다. 보상은 마지막 처치 위치에 서는데, 막타가 넉백으로
+    /// 맵 밖 · 구멍 위 · 벽 속 · 공중에서 나면 닿을 수 없는 자리가 된다 — 보상을 받아야 출구가 열리므로 그대로 두면 방에 갇힌다.
+    ///
+    /// 가까운 NavMesh로 당기되, 플레이어 자리에서 길이 이어지는 면만 받는다(벽 위 같은 외딴 면 제외).
+    /// 그런 면이 없으면 플레이어가 서 있는 자리에 세운다 — 방 중심은 구멍이나 기둥일 수 있지만 이 자리는 확실히 닿는다.
+    /// </summary>
+    private Vector3 ResolveReachablePosition(Vector3 pos)
+    {
+        Vector3 lift   = Vector3.up * effectHeightOffset;   // pos는 바닥에서 이만큼 띄운 값이다
+        var     player = _run?.Player;
+
+        if (NavMesh.SamplePosition(pos - lift, out var hit, RewardSnapRadius, s_walkFilter)
+            && IsConnectedToPlayer(hit.position, player))
+        {
+            Vector3 snapped = hit.position + lift;
+            if ((snapped - pos).sqrMagnitude > 1f)
+                Debug.Log($"[RoomClearGate] 보상 자리 보정 {pos} → {snapped} (가까운 걸을 수 있는 면)");
+            return snapped;
+        }
+
+        if (player == null) return pos;
+
+        Vector3 moved = player.transform.position + lift;
+        Debug.LogWarning($"[RoomClearGate] 보상 자리 {pos}에 닿을 수 없다 — 플레이어 자리 {moved}로 옮긴다");
+        return moved;
+    }
+
+    /// <summary>출구가 이 보상 때문에 닫혀 있을 때만 안내한다(절차 진행이 아닌 방 · 출구 없는 방에서는 말하지 않는다).</summary>
+    private void ShowExitHint()
+    {
+        var flow = RunFlowController.Active;
+        if (flow == null || !flow.IsExitHeldBy(this)) return;
+
+        var hud = UnityEngine.Object.FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
+        hud?.ShowBuffNotice($"<color={UIPalette.GoldHex}>보상</color>을 받으면 길이 열린다");
+        Debug.Log("[RoomClearGate] 출구 안내 — 보상을 받으면 길이 열린다");
+    }
+
+    /// <summary>플레이어 자리에서 그 면까지 NavMesh 길이 이어지는가. 잴 수 없으면(플레이어 없음 · NavMesh 밖) 이어진 것으로 본다.</summary>
+    private static bool IsConnectedToPlayer(Vector3 navPos, PlayerController player)
+    {
+        if (player == null
+            || !NavMesh.SamplePosition(player.transform.position, out var start, RewardSnapRadius, s_walkFilter))
+            return true;
+
+        var path = new NavMeshPath();
+        return NavMesh.CalculatePath(start.position, navPos, s_walkFilter, path)
+               && path.status == NavMeshPathStatus.PathComplete;
+    }
+
+    private GameObject SpawnRewardObject(Vector3 center, System.Collections.Generic.List<(RuntimeItemData, ItemSO)> rewards, bool isChoice, int choiceRounds)
     {
         var rewardGO = endEffect2Prefab != null
             ? Instantiate(endEffect2Prefab, center, Quaternion.identity)
@@ -211,6 +330,7 @@ public class RoomClearGate : MonoBehaviour
 
         // "보상은 떠 있는데 아직 안 받았다"를 세이브에 남긴다 — 이 상태로 종료해도 이어하기에서 되살아난다.
         RunFlowController.Active?.NotifyClearRewardSpawned();
+        return rewardGO;
     }
 
     /// <summary>방 클리어 연료 지급 — 정제소 원석 + (정예방) 재련소 강화재료. 드랍 판정과 무관하게 확정 지급.</summary>
@@ -255,11 +375,8 @@ public class RoomClearGate : MonoBehaviour
     private System.Collections.Generic.List<(RuntimeItemData data, ItemSO so)> RollRewardChoices(
         int count, ItemRarity? floor = null, bool floorGuaranteesOneOnly = false)
     {
-        // 「룬 4지선다」 해금 — <b>3지선다 라운드만</b> 넓힌다.
-        // 단일 드랍(count 1) 규칙까지 늘리면 선택의 폭이 아니라 획득량이 바뀌어 경제가 어긋난다.
-        if (count == 3) count = MemoryAltarService.RuneChoiceCount;
-
-        // 고행자의 인장 — 해금 확장 뒤에 건다. 켜져 있으면 늘어난 폭에서 한 칸을 도로 내놓는 셈이다.
+        // 룬 선택지는 3장 고정이다(10-01 — 제단 「룬 선택지 +1」 · 정예 4장 폐지).
+        // 고행자의 인장이 켜져 있으면 한 장을 내놓는다.
         count = AsceticSigilService.ApplyChoiceCount(count);
 
         var result = new System.Collections.Generic.List<(RuntimeItemData, ItemSO)>(count);

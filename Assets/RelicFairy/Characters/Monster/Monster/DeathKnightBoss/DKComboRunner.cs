@@ -37,6 +37,7 @@ public class DKComboRunner
     private float                         _lastFiredTime;
     private bool                          _currentComboUsePhase1Position;
     private BossPatternSO                 _lastPickedInCombo;
+    private float                         _breakMin = -1f, _breakMax = -1f;   // 2페이즈 쉬는 시간 — 공용 설정 SO에 쓰지 않는다
 
     public bool  IsPatternActive               { get; private set; }
     public float PatternBreakCooldown          => _breakCooldown;
@@ -73,6 +74,19 @@ public class DKComboRunner
 
     // ── 풀 재사용 ────────────────────────────────────────────
 
+    /// <summary>
+    /// 쉬는 시간 범위를 이 러너에만 정한다(음수 = 설정 SO 값). 예전엔 보스가 공용 설정 SO에 직접 써서
+    /// 에디터에서 에셋까지 바뀌었다(06-17 커밋에 2/4 → 1/2.5로 섞여 들어감, 10-01 감사).
+    /// </summary>
+    public void SetBreakRange(float min, float max)
+    {
+        _breakMin = min;
+        _breakMax = max;
+    }
+
+    private float BreakMin => _breakMin >= 0f ? _breakMin : _config.patternBreakDurationMin;
+    private float BreakMax => _breakMax >= 0f ? _breakMax : _config.patternBreakDurationMax;
+
     /// <summary>현재 break cooldown이 minDuration보다 짧으면 늘린다.</summary>
     public void EnsureMinBreakCooldown(float minDuration)
     {
@@ -107,9 +121,7 @@ public class DKComboRunner
             {
                 _comboQueue.Clear();
                 _wasInPattern    = false;
-                _breakCooldown   = UnityEngine.Random.Range(
-                    _config.patternBreakDurationMin,
-                    _config.patternBreakDurationMax);
+                _breakCooldown   = UnityEngine.Random.Range(BreakMin, BreakMax);
                 return;
             }
 
@@ -120,10 +132,9 @@ public class DKComboRunner
                 _wasInPattern = _ctx.Ctx.Monster.IsInSpecialState;
                 return;
             }
-            // 콤보 전체 완료 — 정상 브레이크 설정(2페이지 후반은 −25%, §9)
-            _breakCooldown = UnityEngine.Random.Range(
-                _config.patternBreakDurationMin,
-                _config.patternBreakDurationMax) * (Pages?.BreakScale ?? 1f);
+            // 콤보 전체 완료 — 정상 브레이크 설정(2페이지 후반은 −25%, §9 · 악몽 「지휘」 기수가 서 있으면 ×0.85)
+            _breakCooldown = UnityEngine.Random.Range(BreakMin, BreakMax) * (Pages?.BreakScale ?? 1f)
+                           * DKStandardBearer.RestScale(_ctx.Ctx.Monster);
         }
         _wasInPattern = inPattern;
 
@@ -153,7 +164,7 @@ public class DKComboRunner
             if (entry == null || !entry.forceExecute || entry.patterns == null || !entry.EvaluateConditions(_ctx)) continue;
             foreach (var p in entry.patterns)
             {
-                if (p == null || p is DKComboConfigSO || p.GetRuntimeState() == null || !p.CanExecute(_ctx)) continue;
+                if (p == null || p is DKComboConfigSO || p.GetRuntimeState() == null || !p.Available(_ctx)) continue;
                 _comboQueue.Clear();
                 _comboQueue.Enqueue(p);
                 FireNextFromQueue();
@@ -168,7 +179,7 @@ public class DKComboRunner
             if (entry?.patterns == null || !entry.EvaluateConditions(_ctx)) continue;
             foreach (var p in entry.patterns)
             {
-                if (p == null || !p.CanExecute(_ctx)) continue;
+                if (p == null || !p.Available(_ctx)) continue;
                 if (p is DKComboConfigSO c)
                     total += Mathf.Max(0f, c.weight);
                 else if (p.GetRuntimeState() != null)
@@ -185,7 +196,7 @@ public class DKComboRunner
             if (entry?.patterns == null || !entry.EvaluateConditions(_ctx)) continue;
             foreach (var p in entry.patterns)
             {
-                if (p == null || !p.CanExecute(_ctx)) continue;
+                if (p == null || !p.Available(_ctx)) continue;
 
                 float w;
                 if (p is DKComboConfigSO c)
@@ -267,16 +278,16 @@ public class DKComboRunner
         float total = 0f;
         foreach (var p in pool)
         {
-            if (p == null || !p.CanExecute(_ctx)) continue;
+            if (p == null || !p.Available(_ctx)) continue;
             total += ApplyRepeatPenalty(p);
         }
 
         if (total <= 0f)
         {
             foreach (var p in pool)
-                if (p != null && p.CanExecute(_ctx) && p != _lastPickedInCombo) return p;
+                if (p != null && p.Available(_ctx) && p != _lastPickedInCombo) return p;
             foreach (var p in pool)
-                if (p != null && p.CanExecute(_ctx)) return p;
+                if (p != null && p.Available(_ctx)) return p;
             return null;
         }
 
@@ -284,7 +295,7 @@ public class DKComboRunner
         float acc  = 0f;
         foreach (var p in pool)
         {
-            if (p == null || !p.CanExecute(_ctx)) continue;
+            if (p == null || !p.Available(_ctx)) continue;
             acc += ApplyRepeatPenalty(p);
             if (roll <= acc) return p;
         }

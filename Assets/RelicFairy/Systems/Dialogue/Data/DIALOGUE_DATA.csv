@@ -1,83 +1,77 @@
 sequence_id,line_order,speaker,illustration_key,text
-StartRoom,0,Merlin,Illust_God_Default,"깨어났구나. …네 영혼은, 내가 붙들고 있었어."
-StartRoom,1,Merlin,Illust_God_Default,여긴 어디에도 없는 곳이야. 널 붙잡아 두려고… <b>내가 불러낸 자리</b>지.
-StartRoom,2,Merlin,Illust_God_Default,"그때 받으려던 무형검, 잃지 않았어. <b>다시 네 손에 쥐어줄게.</b>"
+StartRoom,0,Merlin,Illust_God_Default,"눈 떴어. …쓰러지던 순간, 네 영혼은 내가 붙잡았어."
+StartRoom,1,Merlin,Illust_God_Default,여긴 어디에도 없는 곳이야. 너를 붙잡아 두려고 <b>내가 만든 자리</b>지.
+StartRoom,2,Merlin,Illust_God_Default,"그날 받으려던 무형검, 잃지 않았어. <b>다시 네 손에 쥐여 줄게.</b>"
 StartRoom,3,Shadow,Illust_Shadow_Default,…또 하나. 이번엔 얼마나 버틸까.
-StartRoom,4,Merlin,Illust_God_Default,검 하나론 심연에 닿지 못해. 스러진 기사들의 의지… <b>유물</b>의 힘도 함께 쥐어야 해.
-StartRoom,5,Merlin,Illust_God_Default,준비가 되면… 네가 무릎 꿇었던 <b>그날의 자리로 돌아가렴.</b>
-StartRoom_R1,0,Shadow,Illust_Shadow_Default,...또 돌아왔군. 유물도 무기도 늘 같은 자리에서 널 기다려.
-StartRoom_R1,1,Merlin,Illust_God_Default,"채비를 갖추렴, 작은 빛. 문은 언제든 열려 있어."
-StartRoom_R2,0,Merlin,Illust_God_Default,"다시 깨어났구나. 유물도, 무기도 네 손길을 기다리고 있어."
-StartRoom_R2,1,Shadow,Illust_Shadow_Default,순환은 지치지 않아. ...너는 어떨지 모르겠지만.
-SwordAwaken,0,Merlin,Illust_God_Default,"원탁 앞에 무릎 꿇던 순간, 기억하니. 검이 어깨에 닿기도 전에… 너는 스러졌어."
-SwordAwaken,1,Merlin,Illust_God_Default,"그 검은 끝내 형(形)을 얻지 못했어. 어떤 검이 될지, 정해지지 않은 채로."
-SwordAwaken,2,Merlin,Illust_God_Default,그래서 아직… 무엇이든 될 수 있어. <b>무한의 가능성</b>만이 깃든 검이야.
-SwordAwaken,3,Merlin,Illust_God_Default,"이번 생에선, 그 형(形)을 네 손으로 직접 벼려 보렴."
-SwordAwaken,4,Merlin,Illust_God_Default,하지만 지금은 아직 빛일 뿐이야. 심연의 화로가… 비로소 그 형을 벼려줄 거야.
+StartRoom,4,Merlin,Illust_God_Default,검 하나로는 심연에 못 닿아. 스러진 기사들의 의지 — <b>유물</b>의 힘도 같이 쥐어야 해.
+StartRoom,5,Merlin,Illust_God_Default,준비되면 가자. 네가 무릎 꿇었던 <b>그날의 자리로.</b>
+StartRoom_R1,0,Shadow,Illust_Shadow_Default,…또 돌아왔군. 유물도 무기도 늘 같은 자리에서 널 기다려.
+StartRoom_R1,1,Merlin,Illust_God_Default,채비부터 해. 문은 열려 있어.
+StartRoom_R2,0,Merlin,Illust_God_Default,"다시 왔네. 유물도, 무기도 그대로야."
+StartRoom_R2,1,Shadow,Illust_Shadow_Default,순환은 지치지 않아. …너는 어떨지 모르겠지만.
+SwordAwaken,0,Merlin,Illust_God_Default,"원탁 앞에 무릎 꿇던 순간, 기억해? 검이 어깨에 닿기도 전에… 너는 스러졌어."
+SwordAwaken,1,Merlin,Illust_God_Default,그 검은 끝내 형(形)을 얻지 못했어. 어떤 검이 될지 정해지지 않은 채로.
+SwordAwaken,2,Merlin,Illust_God_Default,그래서 아직 무엇이든 될 수 있어. <b>무한의 가능성</b>만 깃든 검이야.
+SwordAwaken,3,Merlin,Illust_God_Default,이번엔 그 형(形)을 네 손으로 벼려.
+SwordAwaken,4,Merlin,Illust_God_Default,지금은 아직 빛일 뿐이야. 심연의 화로가 그 형을 벼려 줄 거야.
 BossRoom,0,Shadow,Illust_Shadow_Default,"이 기운… 오래됐어. 조심해, 영혼."
-BossRoom,1,Merlin,Illust_God_Default,두려워하지 마. 너는 신성한 빛을 품고 있어.
-RunClear,0,Merlin,Illust_God_Default,"해냈어. 잘했어, 나의 영혼."
+BossRoom,1,Merlin,Illust_God_Default,물러서지 마. 네 안엔 신성한 빛이 있어.
+RunClear,0,Merlin,Illust_God_Default,해냈어. 잘 싸웠어.
 RunClear,1,Shadow,Illust_Shadow_Default,순환이 한 바퀴 돌았군. 하지만 심연은 끝이 없어.
-RunClear,2,Merlin,Illust_God_Default,"잠시 쉬어. 유물도, 영혼도 지쳐 있을 테니."
-RunClear_First,0,Merlin,Illust_God_Default,"네가... 정말로 끝까지 갔구나. 이런 날이 오리라 믿었지만, 이렇게 빨리는 아니었어."
-RunClear_First,1,Shadow,Illust_Shadow_Default,심연이 처음으로 제 바닥을 보였다. ...그건 축하할 일이 아니야.
+RunClear,2,Merlin,Illust_God_Default,잠깐 쉬어. 유물도 너도 지쳤을 테니까.
+RunClear_First,0,Merlin,Illust_God_Default,"정말로… 끝까지 갔네. 이런 날이 올 줄은 알았지만, 이렇게 빠를 줄은 몰랐어."
+RunClear_First,1,Shadow,Illust_Shadow_Default,심연이 처음으로 제 바닥을 보였어. …그건 축하할 일이 아니야.
 RunClear_First,2,Merlin,Illust_God_Default,무슨 뜻이지.
-RunClear_First,3,Shadow,Illust_Shadow_Default,"바닥을 본 자는 그 아래가 궁금해지는 법이거든. ...또 갈 거잖아, 너."
-RunClear_R1,0,Merlin,Illust_God_Default,돌아왔구나. 이번엔 제 발로. ...그게 얼마나 드문 일인지 아니?
+RunClear_First,3,Shadow,Illust_Shadow_Default,"바닥을 본 자는 그 아래가 궁금해지는 법이거든. …또 갈 거잖아, 너."
+RunClear_R1,0,Merlin,Illust_God_Default,돌아왔어. 이번엔 제 발로. …그게 얼마나 드문 일인지 알아?
 RunClear_R1,1,Shadow,Illust_Shadow_Default,심연은 네가 나간 걸 눈치채지 못했어. 그저 잠깐 조용해졌을 뿐이지.
 RunClear_R2,0,Shadow,Illust_Shadow_Default,또 살아 나왔군. ...슬슬 재미없어지는데.
 RunClear_R2,1,Merlin,Illust_God_Default,"재미로 하는 게 아니야. 하나씩, 되찾고 있는 거지."
 RunClear_R3,0,Merlin,Illust_God_Default,유물이 따뜻해. 네가 잘 써줬다는 뜻이야.
 RunClear_R3,1,Shadow,Illust_Shadow_Default,따뜻한 건 잠깐이야. 식으면 또 아래가 그리워질 테니.
-RunFail_First,0,Merlin,Illust_God_Default,...돌아왔구나. 처음이지? 많이 놀랐을 거야.
-RunFail_First,1,Merlin,Illust_God_Default,괜찮아. 영혼은 죽지 않아. 그저 유물을 떠나 내게 돌아온 것뿐이야.
-RunFail_First,2,Shadow,Illust_Shadow_Default,...벌써 한 번. 심연은 이제 막 네 이름을 외우기 시작했어.
-RunFail_R1,0,Shadow,Illust_Shadow_Default,"...또 돌아왔군, 작은 빛."
-RunFail_R1,1,Merlin,Illust_God_Default,다시 깃들면 돼. 유물은 아직 널 기다려.
-RunFail_R2,0,Merlin,Illust_God_Default,아파했겠구나. 하지만 넌 다시 여기 있어.
+RunFail_First,0,Merlin,Illust_God_Default,돌아왔어. …처음이지. 많이 놀랐을 거야.
+RunFail_First,1,Merlin,Illust_God_Default,영혼은 죽지 않아. 유물을 떠나 나한테 돌아온 것뿐이야.
+RunFail_First,2,Shadow,Illust_Shadow_Default,…벌써 한 번. 심연은 이제 막 네 이름을 외우기 시작했어.
+RunFail_R1,0,Shadow,Illust_Shadow_Default,"…또 돌아왔군, 작은 빛."
+RunFail_R1,1,Merlin,Illust_God_Default,다시 깃들면 돼. 유물은 그대로야.
+RunFail_R2,0,Merlin,Illust_God_Default,깊게 베였어. 그래도 넌 다시 여기 있어.
 RunFail_R2,1,Shadow,Illust_Shadow_Default,"순환은 그런 거야. 익숙해지든지, 부서지든지."
-RunFail_R3,0,Merlin,Illust_God_Default,숨을 골라. 심연은 어디 가지 않아.
-RunFail_R4,0,Shadow,Illust_Shadow_Default,몇 번째였더라. ...세는 걸 그만둔 지 오래야.
-RunFail_R4,1,Merlin,Illust_God_Default,숫자는 중요하지 않아. 네가 다시 일어선다는 것만 중요해.
-RunFail_R5,0,Merlin,Illust_God_Default,"돌아온 걸 환영해, 나의 영혼."
+RunFail_R3,0,Merlin,Illust_God_Default,숨 골라. 심연은 어디 안 가.
+RunFail_R4,0,Shadow,Illust_Shadow_Default,몇 번째였더라. …세는 걸 그만둔 지 오래야.
+RunFail_R4,1,Merlin,Illust_God_Default,숫자는 중요하지 않아. 다시 일어서는 게 중요해.
+RunFail_R5,0,Merlin,Illust_God_Default,돌아왔네. 다음 판 가자.
 RunFail_R6,0,Shadow,Illust_Shadow_Default,"그 상처, 유물에는 남지 않아. 하지만 너는... 기억하겠지."
-RunFail_R7,0,Merlin,Illust_God_Default,실패가 아니야. 그저 한 걸음 물러선 것뿐.
-RunFail_R7,1,Shadow,Illust_Shadow_Default,...위로가 참 한결같군.
+RunFail_R7,0,Merlin,Illust_God_Default,실패가 아니야. 한 걸음 물러선 거지.
+RunFail_R7,1,Shadow,Illust_Shadow_Default,…위로가 참 한결같군.
 RunFail_R8,0,Shadow,Illust_Shadow_Default,또 너야. 심연도 슬슬 지겨워할 텐데.
-RunFail_R9,0,Merlin,Illust_God_Default,다시 채비를 갖추렴. 이번엔 조금 더 멀리 갈 수 있을 거야.
+RunFail_R9,0,Merlin,Illust_God_Default,다시 채비해. 이번엔 조금 더 멀리 갈 수 있어.
 RunFail_R10,0,Shadow,Illust_Shadow_Default,죽음은 문이야. 넌 그저 자꾸 되돌아오는 열쇠고.
-RunFail_R11,0,Merlin,Illust_God_Default,두렵니? ...두려워도 괜찮아. 두려움도 빛의 일부야.
-RunFail_R12,0,Shadow,Illust_Shadow_Default,유물은 흠집 하나 없어. ...참 편리한 몸이지.
+RunFail_R11,0,Merlin,Illust_God_Default,두려워? …그래도 돼. 두려운 채로 가면 돼.
+RunFail_R12,0,Shadow,Illust_Shadow_Default,유물은 흠집 하나 없어. …참 편리한 몸이지.
 RunFail_R12,1,Merlin,Illust_God_Default,"그러니 다시 깃들어. 처음부터, 몇 번이고."
-RunFail_T10_R1,0,Shadow,Illust_Shadow_Default,열 번을 넘겼군. 이쯤 되면 순환도 너를 손님이 아니라 주민으로 여길 거야.
-RunFail_T10_R1,1,Merlin,Illust_God_Default,...그래도 넌 매번 돌아와. 그게 답이야.
-RunFail_T10_R2,0,Merlin,Illust_God_Default,지쳤지. 알아. 나도... 이 반복이 마냥 편치만은 않아.
+RunFail_T10_R1,0,Shadow,Illust_Shadow_Default,이쯤 되면 순환도 너를 손님이 아니라 주민으로 여길 거야.
+RunFail_T10_R1,1,Merlin,Illust_God_Default,…그래도 넌 매번 돌아와. 그게 답이야.
+RunFail_T10_R2,0,Merlin,Illust_God_Default,지쳤지. 알아. 나도… 이 반복이 편하지만은 않아.
 RunFail_T10_R3,0,Shadow,Illust_Shadow_Default,너는 왜 자꾸 돌아오는 걸까. ...누가 널 이렇게까지 부르는 걸까.
-RunFail_T10_R4,0,Merlin,Illust_God_Default,유물은 여전히 널 기다려. 하지만 나는... 가끔 궁금해. 이게 정말 구원인지.
+RunFail_T10_R4,0,Merlin,Illust_God_Default,유물은 여전히 너를 기다려. 그런데 가끔… 이게 정말 구원인지 모르겠어.
 RunFail_T10_R5,0,Shadow,Illust_Shadow_Default,"이 정도 반복했으면 뭔가 이상하다는 걸 눈치챘을 텐데. ...아니면, 모르는 편이 나을지도."
-RunFail_T10_R6,0,Merlin,Illust_God_Default,다시 일어서. 몇 번이든. 내가 널 부른 이유가 분명 있으니까.
-RunFail_T10_R6,1,Shadow,Illust_Shadow_Default,"...그 '이유'라는 거, 정말 네 것이 맞긴 할까."
-RunFail_T25_R1,0,Shadow,Illust_Shadow_Default,"스물다섯 번. ...멀린이 부른 영혼치고는, 참 오래도 버티는군."
-RunFail_T25_R1,1,Merlin,Illust_God_Default,그 이름을... 네가 어떻게.
-RunFail_T25_R2,0,Shadow,Illust_Shadow_Default,"너 이전에도 영혼은 있었어. 전부 이 자리에 서서, 똑같은 위로를 들었지."
-RunFail_T25_R3,0,Merlin,Illust_God_Default,...미안해. 나는 너에게 다 말해주지 못했어.
-RunFail_T25_R3,1,Shadow,Illust_Shadow_Default,이제야 양심이 찔리나 보군.
-RunFail_T25_R4,0,Shadow,Illust_Shadow_Default,"이 순환을 누가 설계했는지, 슬슬 묻고 싶지 않아?"
-RunFail_M5,0,Merlin,Illust_God_Default,다섯 번째로구나. ...너는 참 강해. 어떤 영혼은 두 번째를 넘기지 못했는데.
-RunFail_M5,1,Shadow,Illust_Shadow_Default,"그건 강한 게 아니라 벗어나지 못하는 거야. ...하지만 인정하지, 끈질기긴 해."
-RunFail_M10,0,Shadow,Illust_Shadow_Default,열 번. ...나는 이 숫자를 기억해. 이쯤에서 대부분의 영혼이 무너졌거든.
-RunFail_M10,1,Merlin,Illust_God_Default,"하지만 너는 여기 서 있어, 나의 빛."
-RunFail_M10,2,Shadow,Illust_Shadow_Default,"...그래, 서 있군. 그게 축복인지 저주인지는 아직 모르겠지만."
-RunFail_M20,0,Merlin,Illust_God_Default,스무 번이야. 나조차 이 순환이 어디로 향하는지 확신이 흐려져.
-RunFail_M20,1,Shadow,Illust_Shadow_Default,확신이 흐려진다라. ...신이 그런 말을 할 줄이야.
-RunFail_M20,2,Merlin,Illust_God_Default,...그래도 나는 너를 구하려 불렀어. 그건 변하지 않아.
+RunFail_T10_R6,0,Merlin,Illust_God_Default,다시 일어서. 몇 번이든. 너를 부른 이유가 분명히 있으니까.
+RunFail_T10_R6,1,Shadow,Illust_Shadow_Default,"…그 '이유'라는 거, 정말 네 것이 맞긴 할까."
+RunFail_M5,0,Merlin,Illust_God_Default,다섯 번째야. …너는 강해. 두 번째를 못 넘긴 영혼도 있었어.
+RunFail_M5,1,Shadow,Illust_Shadow_Default,"그건 강한 게 아니라 벗어나지 못하는 거야. …하지만 인정하지, 끈질기긴 해."
+RunFail_M10,0,Shadow,Illust_Shadow_Default,열 번. …나는 이 숫자를 기억해. 이쯤에서 대부분의 영혼이 무너졌거든.
+RunFail_M10,1,Merlin,Illust_God_Default,그래도 넌 여기 서 있어.
+RunFail_M10,2,Shadow,Illust_Shadow_Default,"…그래, 서 있군. 그게 축복인지 저주인지는 아직 모르겠지만."
+RunFail_M20,0,Merlin,Illust_God_Default,스무 번. 나조차 이 순환이 어디로 가는지 흐려져.
+RunFail_M20,1,Shadow,Illust_Shadow_Default,확신이 흐려진다라. …신이 그런 말을 할 줄이야.
+RunFail_M20,2,Merlin,Illust_God_Default,…그래도 너를 구하려고 불렀어. 그건 변하지 않아.
 RunFail_M30,0,Shadow,Illust_Shadow_Default,"서른 번. 너는 이제 이 심연의 일부야. 흉터가 아니라, 뼈대지."
-RunFail_M30,1,Merlin,Illust_God_Default,그만두고 싶니? ...그래도 돼. 나는 널 원망하지 않아.
-RunFail_M30,2,Shadow,Illust_Shadow_Default,봐. 신도 지쳤어. ...하지만 너는? 너는 아직 눈이 살아있군.
-RunFail_M50,0,Shadow,Illust_Shadow_Default,쉰 번. ...이제 인정해야겠어. 너는 실험체가 아니야. 너는 예외야.
+RunFail_M30,1,Merlin,Illust_God_Default,그만두고 싶어? …그래도 돼. 원망하지 않아.
+RunFail_M30,2,Shadow,Illust_Shadow_Default,봐. 신도 지쳤어. …하지만 너는? 너는 아직 눈이 살아 있군.
+RunFail_M50,0,Shadow,Illust_Shadow_Default,쉰 번. …이제 인정해야겠어. 너는 실험체가 아니야. 너는 예외야.
 RunFail_M50,1,Merlin,Illust_God_Default,예외?
-RunFail_M50,2,Shadow,Illust_Shadow_Default,"설계를 벗어난 영혼. 누군가는 이걸 두려워할 거야. ...그 누군가가 누군지는, 너도 곧 알게 될 테고."
-RunFail_M50,3,Merlin,Illust_God_Default,"...작은 빛. 네가 여기까지 온 건, 내가 부른 힘 때문만은 아닐지도 몰라."
+RunFail_M50,2,Shadow,Illust_Shadow_Default,"설계를 벗어난 영혼. 누군가는 이걸 두려워할 거야. …그 누군가가 누군지는, 너도 곧 알게 될 테고."
+RunFail_M50,3,Merlin,Illust_God_Default,"…작은 빛. 네가 여기까지 온 건, 내가 부른 힘 때문만은 아닐지도 몰라."
 Lich_Intro,0,Lich,Lich_Portrait,알고 있었어.
 Lich_Intro,1,Lich,Lich_Portrait,언젠간 올 거라고. 멀린이 그렇게 만들었으니까.
 Lich_Intro,2,Lich,Lich_Portrait,그 얼굴. 그 눈. 나는 알아. 네가 무엇인지.
@@ -91,12 +85,12 @@ Lich_Phase2,0,Lich,Lich_Portrait_Calm,...흥미롭군.
 Lich_Phase2,1,Lich,Lich_Portrait_Calm,멀린조차 이 정도의 영혼은 소환할 수 없었을 텐데.
 Lich_Phase2,2,Lich,Lich_Portrait_Rage,멀린의 껍데기는 이제 필요 없어.
 Lich_Phase2,3,Lich,Lich_Portrait_Rage,이것이 — 진짜 나다.
-Lich_Death,0,Lich,Lich_Portrait_Dying,...이상하군.
+Lich_Death,0,Lich,Lich_Portrait_Dying,…이상하군.
 Lich_Death,1,Lich,Lich_Portrait_Dying,이렇게 되면... 안 되는 건데.
 Lich_Death,2,Lich,Lich_Portrait_Dying,나는... 단순한 도구였던 건가.
 Lich_Death,3,Lich,Lich_Portrait_Dying,처음부터... 이 결말을 위해...
-Lich_Death,4,Merlin,Illust_God_Default,영혼이여...
-Lich_Death,5,Merlin,Illust_God_Default,...고마워.
+Lich_Death,4,Merlin,Illust_God_Default,…작은 빛.
+Lich_Death,5,Merlin,Illust_God_Default,…고마워.
 Morgana_Reveal,0,Shadow,Illust_Shadow_Default,잘했어.
 Morgana_Reveal,1,Shadow,Illust_Shadow_Default,실험은 완벽하게 끝났으니까.
 Morgana_Reveal,2,Shadow,Illust_Shadow_Default,너도. 멀린도. 저 리치도 — 전부 내 계획의 한 부분이었어.
@@ -104,49 +98,49 @@ Morgana_Reveal,3,Merlin,Illust_God_Default,모르가나...
 Morgana_Reveal,4,Merlin,Illust_God_Default,역시 그녀였군.
 Morgana_Reveal,5,Merlin,Illust_God_Default,아직...
 Morgana_Reveal,6,Merlin,Illust_God_Default,...끝나지 않았어.
-Quest_TutEquip_Complete,0,Merlin,Illust_God_Default,무기가 손에 익는구나. 이제 너는 싸울 수 있어.
-Quest_TutEquip_Complete,1,Shadow,Illust_Shadow_Default,...겉모습만 그럴듯하군. 심연은 칼날 따위로 무너지지 않아.
-Quest_TutEquip_Complete,2,Merlin,Illust_God_Default,채비는 갖췄어. 저 문을 지나렴 — 너를 지킬 서약은 심연 안에서 맺게 될 거야.
-Quest_TutCovenant_Complete,0,Merlin,Illust_God_Default,서약을 받아들였구나. 그 맹세가 너의 빛을 더 멀리 비출 거야.
-Quest_TutCovenant_Complete,1,Shadow,Illust_Shadow_Default,"서약이라... 대가 없는 힘은 없어. 잊지 마, 작은 빛."
-Quest_TutCovenant_Complete,2,Merlin,Illust_God_Default,"이제 정말 준비됐어. 앞의 문을 지나, 심연 깊이 나아가렴."
-Quest_HiddenAmbush_Start,0,Shadow,Illust_Shadow_Default,"...멈춰. 이 기운, 평범한 적이 아니야."
-Quest_HiddenAmbush_Start,1,Merlin,Illust_God_Default,"갑작스러운 시련이구나. 영혼이여, 정신을 가다듬어."
-Quest_HiddenAmbush_Clear,0,Merlin,Illust_God_Default,"위협을 떨쳐냈어. 역시 너야, 작은 빛."
-Quest_HiddenAmbush_Clear,1,Shadow,Illust_Shadow_Default,...이번엔 운이 좋았군. 심연은 더 많은 걸 숨기고 있어.
-Chapter1_Enter_First,0,Merlin,Illust_God_Default,숲의 초입이야. 저 안은 한때 생명이 넘쳤지만... 지금은 깊이 뒤틀려 있어.
+Quest_TutEquip_Complete,0,Merlin,Illust_God_Default,무기가 손에 익었네. 이제 싸울 수 있어.
+Quest_TutEquip_Complete,1,Shadow,Illust_Shadow_Default,…겉모습만 그럴듯하군. 심연은 칼날 따위로 무너지지 않아.
+Quest_TutEquip_Complete,2,Merlin,Illust_God_Default,채비는 끝났어. 저 문을 지나 — 너를 지킬 서약은 심연 안에서 맺게 될 거야.
+Quest_TutCovenant_Complete,0,Merlin,Illust_God_Default,서약을 받아들였어. 그 맹세가 네 빛을 더 멀리 비출 거야.
+Quest_TutCovenant_Complete,1,Shadow,Illust_Shadow_Default,"서약이라… 대가 없는 힘은 없어. 잊지 마, 작은 빛."
+Quest_TutCovenant_Complete,2,Merlin,Illust_God_Default,이제 정말 준비됐어. 앞의 문을 지나 깊이 들어가.
+Quest_HiddenAmbush_Start,0,Shadow,Illust_Shadow_Default,"…멈춰. 이 기운, 평범한 적이 아니야."
+Quest_HiddenAmbush_Start,1,Merlin,Illust_God_Default,갑작스러운 시련이야. 정신 차려.
+Quest_HiddenAmbush_Clear,0,Merlin,Illust_God_Default,떨쳐냈어. 역시 너야.
+Quest_HiddenAmbush_Clear,1,Shadow,Illust_Shadow_Default,…이번엔 운이 좋았군. 심연은 더 많은 걸 숨기고 있어.
+Chapter1_Enter_First,0,Merlin,Illust_God_Default,숲의 초입이야. 한때 생명이 넘치던 곳인데… 지금은 깊이 뒤틀렸어.
 Chapter1_Enter_First,1,Shadow,Illust_Shadow_Default,서두를 것 없어. 들어가기 전에 채비부터 갖춰.
-Chapter1_Enter_First,2,Merlin,Illust_God_Default,준비가 되면 게이트를 지나렴. 나는 늘 함께야.
-Chapter1_Enter_R1,0,Shadow,Illust_Shadow_Default,또 이 숲 앞이군. ...몇 번째인지 세는 것도 지쳤어.
-Chapter1_Enter_R1,1,Merlin,Illust_God_Default,익숙해도 방심은 금물. 채비는 늘 새로 갖추렴.
-Chapter1_Enter_R2,0,Merlin,Illust_God_Default,"다시 왔구나. 숨을 고르고, 필요한 걸 챙겨."
-Chapter1_Enter_R2,1,Shadow,Illust_Shadow_Default,...준비됐으면 들어가. 숲은 기다려주지 않아.
+Chapter1_Enter_First,2,Merlin,Illust_God_Default,준비되면 게이트로. 나도 같이 가.
+Chapter1_Enter_R1,0,Shadow,Illust_Shadow_Default,또 이 숲 앞이군. …몇 번째인지 세는 것도 지쳤어.
+Chapter1_Enter_R1,1,Merlin,Illust_God_Default,익숙해도 방심하지 마. 채비는 매번 새로 해.
+Chapter1_Enter_R2,0,Merlin,Illust_God_Default,다시 왔네. 숨 고르고 필요한 것부터 챙겨.
+Chapter1_Enter_R2,1,Shadow,Illust_Shadow_Default,…준비됐으면 들어가. 숲은 기다려 주지 않아.
 Chapter1_Enter_R3,0,Shadow,Illust_Shadow_Default,또 너군. 이 숲도 네 얼굴을 외웠겠어.
 Chapter2_Enter_First,0,Shadow,Illust_Shadow_Default,...열기가 밀려온다. 저 너머는 용암 대지야. 숲과는 차원이 달라.
 Chapter2_Enter_First,1,Merlin,Illust_God_Default,여기서 단단히 준비해. 한 번 들어가면 쉴 곳은 없어.
 Chapter2_Enter_R1,0,Shadow,Illust_Shadow_Default,또 이 불바다 앞이군. 익숙해질 법도 한데.
-Chapter2_Enter_R1,1,Merlin,Illust_God_Default,채비를 갖추고 가자. 너라면 견딜 수 있어.
-Chapter2_Enter_R2,0,Merlin,Illust_God_Default,다시 왔구나. 장비를 점검하고 들어가렴.
+Chapter2_Enter_R1,1,Merlin,Illust_God_Default,채비하고 가자. 너라면 버텨.
+Chapter2_Enter_R2,0,Merlin,Illust_God_Default,다시 왔네. 장비부터 점검해.
 Chapter3_Enter_First,0,Merlin,Illust_God_Default,무너진 성소의 어귀야. 가장 성스러웠던 땅이... 이렇게 됐어.
 Chapter3_Enter_First,1,Shadow,Illust_Shadow_Default,여기서부턴 한 치도 방심 마. 준비를 마치고 들어가.
-Chapter3_Enter_R1,0,Shadow,Illust_Shadow_Default,또 이 폐허 앞이군. ...너도 참 끈질겨.
-Chapter3_Enter_R1,1,Merlin,Illust_God_Default,숨을 고르고 채비를 갖춰. 멀린의 핵심이 가까워.
-Chapter3_Enter_R2,0,Merlin,Illust_God_Default,다시 섰구나. 준비됐으면 망설이지 마.
+Chapter3_Enter_R1,0,Shadow,Illust_Shadow_Default,또 이 폐허 앞이군. …너도 참 끈질겨.
+Chapter3_Enter_R1,1,Merlin,Illust_God_Default,숨 고르고 채비해. 여기서부터는 그의 기운이 짙어.
+Chapter3_Enter_R2,0,Merlin,Illust_God_Default,다시 섰네. 준비됐으면 망설이지 마.
 Chapter4_Enter_First,0,Merlin,Illust_God_Default,성소의 가장 깊은 곳. 그 앞은 안개와 어둠뿐이야.
 Chapter4_Enter_First,1,Shadow,Illust_Shadow_Default,마지막 채비야. 안개 너머엔... 그것이 기다려.
 Chapter4_Enter_R1,0,Shadow,Illust_Shadow_Default,또 이 안개 앞이군. 끝을 보러 왔나?
-Chapter4_Enter_R1,1,Merlin,Illust_God_Default,준비를 마치고 들어가자. 이번엔 다를 거야.
+Chapter4_Enter_R1,1,Merlin,Illust_God_Default,준비 끝내고 들어가자. 이번엔 다를 거야.
 Lich_Encounter_First,0,Lich,Lich_Portrait,드디어 왔군. …멀린이 부른 빛이여.
 Lich_Encounter_R1,0,Lich,Lich_Portrait,또 너인가. 몇 번을 쓰러져도 다시 일어서는군.
 Lich_Encounter_R2,0,Lich,Lich_Portrait,또 도전하러 왔나? ...그 끈기만은 인정하지.
 Lich_Encounter_R3,0,Lich,Lich_Portrait_Rage,질리지도 않는군. 이번에야말로 끝내주마.
 Lich_Encounter_R4,0,Lich,Lich_Portrait_Calm,"...너의 얼굴을 외울 지경이야. 다시, 시작하지."
-BossRoom_Ch1_Enter_First,0,Shadow,Illust_Shadow_Default,...나무들이 침묵했어. 이 숲의 주인이 가까이 있어.
-BossRoom_Ch1_Enter_First,1,Merlin,Illust_God_Default,"준비됐지? 숨을 고르고, 들어가자."
+BossRoom_Ch1_Enter_First,0,Shadow,Illust_Shadow_Default,…나무들이 침묵했어. 이 숲의 주인이 가까이 있어.
+BossRoom_Ch1_Enter_First,1,Merlin,Illust_God_Default,숨 고르고 들어가자.
 BossRoom_Ch1_Enter_R1,0,Shadow,Illust_Shadow_Default,또 이 숲의 끝이군. 이번엔 다를까?
-BossRoom_Ch1_Enter_R2,0,Merlin,Illust_God_Default,망설이지 마. 너는 이미 답을 알고 있어.
+BossRoom_Ch1_Enter_R2,0,Merlin,Illust_God_Default,망설이지 마. 답은 이미 알잖아.
 BossRoom_Ch2_Enter_First,0,Shadow,Illust_Shadow_Default,용암이 들끓는다. 이 대지의 지배자가 깨어났어.
-BossRoom_Ch2_Enter_R1,0,Merlin,Illust_God_Default,이 불길 너머는 이제 익숙하지? 할 수 있어.
+BossRoom_Ch2_Enter_R1,0,Merlin,Illust_God_Default,이 불길 너머는 이제 익숙하잖아. 가자.
 BossRoom_Ch3_Enter_First,0,Merlin,Illust_God_Default,"무너진 제단 위에 무언가 있어. 조심해, 작은 빛."
 BossRoom_Ch3_Enter_R1,0,Shadow,Illust_Shadow_Default,...또 이 폐허군. 끈질긴 영혼이야.
 BossRoom_Ch4_Enter_First,0,Merlin,Illust_God_Default,안개가 걷힌다. 마지막 문이야. 모든 것이 여기서 결정돼.
@@ -194,20 +188,32 @@ Nightmare_Begin,1,Shadow,Illust_Shadow_Default,말했잖아. 돌아가라고. �
 Nightmare_Begin,2,Merlin,Illust_God_Default,"이제 봉인이 아니야, 작은 빛. 끝을 내야 해."
 Nightmare_Begin,3,Shadow,Illust_Shadow_Default,"걱정 마. 그 녀석, 이제 그럴 만큼 자랐으니까."
 Chapter1_Enter_Nightmare_First,0,Shadow,Illust_Shadow_Default,같은 숲이 아니야. 뿌리가 발목을 노려.
-Chapter1_Enter_Nightmare_First,1,Merlin,Illust_God_Default,봉인은 없어. 이번엔 베어 넘어가.
+Chapter1_Enter_Nightmare_First,1,Merlin,Illust_God_Default,한 번 넘어선 숲이야. 꿈속에서도 넘어가.
 Chapter1_Enter_Nightmare_R1,0,Shadow,Illust_Shadow_Default,뿌리가 또 발을 붙잡겠지. 가볍게 굴러.
-Chapter2_Enter_Nightmare_First,0,Shadow,Illust_Shadow_Default,불길이 사슬을 녹였어. 방패도 오래 못 버텨.
+Chapter2_Enter_Nightmare_First,0,Shadow,Illust_Shadow_Default,악몽의 불길이야. 방패도 오래 못 버텨.
 Chapter2_Enter_Nightmare_First,1,Merlin,Illust_God_Default,막기보다 먼저 끝내. 그게 이 땅의 방식이야.
 Chapter2_Enter_Nightmare_R1,0,Merlin,Illust_God_Default,방패는 금방 녹아. 먼저 베어.
 Chapter3_Enter_Nightmare_First,0,Shadow,Illust_Shadow_Default,맹세가 부서진 성채야. 여기선 서약도 다 붙들 수 없어.
-Chapter3_Enter_Nightmare_First,1,Merlin,Illust_God_Default,…모르드레드가 기다려. 이번엔 쉬게 해주자.
+Chapter3_Enter_Nightmare_First,1,Merlin,Illust_God_Default,…쉬게 해 준 검이 꿈속에서 다시 들렸어.
 Chapter3_Enter_Nightmare_R1,0,Shadow,Illust_Shadow_Default,부서진 맹세 위에선 손이 모자라지. 고를 걸 골라.
-Chapter4_Enter_Nightmare_First,0,Merlin,Illust_God_Default,그가 내 술식을 쥐고 있어. 기술이 쉽게 돌아오지 않을 거야.
-Chapter4_Enter_Nightmare_First,1,Shadow,Illust_Shadow_Default,"사슬도, 봉인도 없는 제단이야. 끝을 보러 가."
+Chapter4_Enter_Nightmare_First,0,Merlin,Illust_God_Default,꿈속의 그가 아직 내 술식을 쥐고 있어. 기술이 쉽게 돌아오지 않을 거야.
+Chapter4_Enter_Nightmare_First,1,Shadow,Illust_Shadow_Default,한 번 끝을 본 제단이야. …악몽에서도 끝까지 가.
 Chapter4_Enter_Nightmare_R1,0,Shadow,Illust_Shadow_Default,술식이 거꾸로 흐르는 곳이야. 기술을 아껴.
+Chapter1_Enter_Liberation_First,0,Merlin,Illust_God_Default,봉인이 풀린 숲이야. 수호자도… 이제 한 번 쓰러뜨려선 끝나지 않을 거야.
+Chapter1_Enter_Liberation_First,1,Shadow,Illust_Shadow_Default,이번엔 봉인이 아니야. 베어 넘어가.
+Chapter1_Enter_Liberation_R1,0,Shadow,Illust_Shadow_Default,풀려난 숲이군. 두 번 쓰러뜨릴 숨은 남겨 둬.
+Chapter2_Enter_Liberation_First,0,Shadow,Illust_Shadow_Default,사슬이 녹아 없어졌어. 화룡이 제 불을 전부 되찾았지.
+Chapter2_Enter_Liberation_First,1,Merlin,Illust_God_Default,쓰러뜨려도 한 번 더 타오를 거야. 끝까지 방심하지 마.
+Chapter2_Enter_Liberation_R1,0,Merlin,Illust_God_Default,두 번째 불길까지야. 숨 아껴 둬.
+Chapter3_Enter_Liberation_First,0,Merlin,Illust_God_Default,…봉인이 붙들던 검이 풀렸어. 모르드레드가 기다려.
+Chapter3_Enter_Liberation_First,1,Shadow,Illust_Shadow_Default,검이 둘로 갈라질 거야. 첫 검에 다 쏟지 마.
+Chapter3_Enter_Liberation_R1,0,Merlin,Illust_God_Default,이번엔 쉬게 해 주자. …두 번째 검까지.
+Chapter4_Enter_Liberation_First,0,Shadow,Illust_Shadow_Default,"사슬도, 봉인도 없는 제단이야. 이번엔 제단이 너를 기다려."
+Chapter4_Enter_Liberation_First,1,Merlin,Illust_God_Default,"봉인이 아니라 끝이야, 작은 빛. 끝을 보러 가자."
+Chapter4_Enter_Liberation_R1,0,Shadow,Illust_Shadow_Default,또 저 제단이군. 이번엔 끝을 봐.
 Kill_Ch1_First,0,Merlin,Illust_God_Default,숲의 수호자가 쓰러졌어. 이번엔 봉인이 아니라 — 끝이야.
 Kill_Ch2_First,0,Merlin,Illust_God_Default,화룡의 불이 꺼졌어. 다시는 사슬을 녹이지 못해.
-Kill_Ch3_First,0,Merlin,Illust_God_Default,…모르드레드. 이제야 네 검을 내려놓는구나.
+Kill_Ch3_First,0,Merlin,Illust_God_Default,…모르드레드. 이제야 검을 내려놓았어.
 Lich_Intro_Sealed,0,Lich,Lich_Portrait,알고 있었어.
 Lich_Intro_Sealed,1,Lich,Lich_Portrait,언젠간 올 거라고. 멀린이 그렇게 만들었으니까.
 Lich_Intro_Sealed,2,Lich,Lich_Portrait,그 얼굴. 그 눈. 나는 알아. 네가 무엇인지.
@@ -237,7 +243,7 @@ Lich_Page2_Nightmare,2,Lich,Lich_Portrait_Rage,좋다. 이 제단째 — 무너�
 Lich_Page3,0,Lich,Lich_Portrait_Rage,여기가 마지막 땅이다.
 Lich_Page3,1,Lich,Lich_Portrait_Rage,…영혼이여. 너도 결국 복사될 것이다.
 Lich_ReverseSeal,0,Lich,Lich_Portrait_Calm,네 봉인술이다. 돌려주지.
-Lich_MerlinVoice,0,Lich,Lich_Portrait_Calm,…작은 빛. 이리 오렴.
+Lich_MerlinVoice,0,Lich,Lich_Portrait_Calm,"…작은 빛. 이쪽이야, 이리 와."
 Lich_MerlinVoice,1,Merlin,Illust_God_Default,그건 내가 아니야!
 Lich_FinalSpell,0,Lich,Lich_Portrait_Rage,제단째 떨어져라!
 Lich_FinalSpell,1,Merlin,Illust_God_Default,봉인석 조각이 아직 빛나! 저걸로 끌어내려!
@@ -250,13 +256,13 @@ Ending_Morgana,4,Merlin,Illust_God_Default,모르가나...
 Ending_Morgana,5,Merlin,Illust_God_Default,역시 그녀였군.
 Ending_Morgana,6,Merlin,Illust_God_Default,아직...
 Ending_Morgana,7,Merlin,Illust_God_Default,...끝나지 않았어.
-Epilogue_First,0,Merlin,Illust_God_Default,"…돌아왔구나. 목소리가 잘 나오지 않아. 그 안의 나는, 정말로 사라졌나 봐."
+Epilogue_First,0,Merlin,Illust_God_Default,"…돌아왔어. 목소리가 잘 안 나와. 그 안의 나는, 정말로 사라졌나 봐."
 Epilogue_First,1,Merlin,Illust_God_Default,그래도 너를 붙든 이 손은 남았어.
 Epilogue_First,2,Shadow,Illust_Shadow_Default,"감동적이네. …작은 빛, 너는 완성됐어. 이제 아래로 와."
-Epilogue_First,3,Merlin,Illust_God_Default,가지 말라곤 못 하겠구나. …그래도 네 발로 가. 그녀의 설계가 아니라.
+Epilogue_First,3,Merlin,Illust_God_Default,가지 말라고는 못 하겠어. …그래도 네 발로 가. 그녀의 설계가 아니라.
 Ending_Card,0,None,title,랠릭페어리
 Ending_Card,1,None,header,봉인이 무너진 뒤
-Ending_Card,2,None,,"리치는 쓰러졌고, 멀린의 목소리는 더는 들리지 않는다."
+Ending_Card,2,None,,"리치는 쓰러졌고, 그 안에 갇혀 있던 멀린의 반쪽도 함께 스러졌다."
 Ending_Card,3,None,,봉인은 처음부터 버티지 못하게 설계되어 있었다.
 Ending_Card,4,None,,작은 빛은 이제 — 제 발로 심연을 향한다.
 Ending_Credits,0,None,title,랠릭페어리
@@ -272,3 +278,193 @@ Lich_Ward_Timeout,0,Lich,Lich_Portrait_Calm,늦었군. 결계는 이미 완성�
 Lich_Realign,0,Lich,Lich_Portrait_Rage,불과 얼음과 번개와 어둠 — 이 제단을 넷으로 나눈다.
 Lich_ChainBreak,0,Lich,Lich_Portrait_Rage,끊어라… 끊어져라…!
 Lich_DarkRain,0,Lich,Lich_Portrait_Rage,암흑이여 — 쏟아져라.
+NightmareMode_Unlock,0,Shadow,Illust_Shadow_Default,아래가 아직 이르다면 — 문 곁에 다른 길도 열어 뒀어.
+NightmareMode_Unlock,1,Shadow,Illust_Shadow_Default,"네가 쓰러뜨린 것들의 악몽이야. 더 거칠고, 그만큼 더 많이 줘."
+NightmareMode_Unlock,2,Merlin,Illust_God_Default,…고르는 건 너야. 어느 쪽이든 네 발로 가.
+NM_Awaken_Ch1,0,Merlin,Illust_God_Default,꿈속에서도… 뿌리가 다시 일어나.
+NM_Awaken_Ch2,0,Merlin,Illust_God_Default,악몽의 불이야… 한 번 더 타올라!
+NM_Awaken_Ch3,0,Merlin,Illust_God_Default,꿈속의 검도… 둘로 갈라져!
+StartRoom_R3,0,Merlin,Illust_God_Default,숨 돌렸으면 움직이자. 묶어야 할 것들이 아직 남았어.
+StartRoom_T10_R1,0,Shadow,Illust_Shadow_Default,"이 자리, 이제 네 방 같군."
+StartRoom_T10_R1,1,Merlin,Illust_God_Default,오래 머물 곳은 아니야. 가자.
+StartRoom_T10_R2,0,Merlin,Illust_God_Default,손에 익은 것부터 챙겨. 처음보다 훨씬 빨라졌어.
+StartRoom_T10_R3,0,Shadow,Illust_Shadow_Default,몇 번째 깨어난 건지 세고는 있어?
+StartRoom_T10_R3,1,Merlin,Illust_God_Default,…세고 있어. 전부.
+StartRoom_T30_R1,0,Shadow,Illust_Shadow_Default,"같은 문, 같은 검, 같은 위로. 질리지도 않아?"
+StartRoom_T30_R1,1,Merlin,Illust_God_Default,같은 건 문뿐이야. 너는 매번 달라져.
+StartRoom_T30_R2,0,Merlin,Illust_God_Default,…가끔 생각해. 너를 부르지 않았다면 어땠을지.
+StartRoom_T30_R2,1,Shadow,Illust_Shadow_Default,후회는 늦게 와서 오래 머물지.
+StartRoom_T50_R1,0,Shadow,Illust_Shadow_Default,또 이 자리. 이젠 놀랍지도 않아.
+StartRoom_T50_R2,0,Merlin,Illust_God_Default,"가자. 말은 줄이고, 걸음은 늘리자."
+StartRoom_T50_R3,0,Shadow,Illust_Shadow_Default,네가 깨어날 때마다 심연이 조금씩 얕아져. …재미있는 일이지.
+StartRoom_T50_R4,0,Merlin,Illust_God_Default,여기서 기다리는 건 나 하나야. 그거면 충분해.
+StartRoom_Liberation_R1,0,Merlin,Illust_God_Default,봉인은 무너졌어. 이제는 끝을 내러 가는 길이야.
+StartRoom_Liberation_R1,1,Shadow,Illust_Shadow_Default,말했잖아. 사슬은 녹는다고.
+StartRoom_Liberation_R2,0,Merlin,Illust_God_Default,풀려난 것들이 기다려. 이번엔 쓰러뜨려.
+StartRoom_Liberation_R3,0,Shadow,Illust_Shadow_Default,봉인이 깨진 뒤로 눈빛이 달라졌군. …마음에 들어.
+StartRoom_Liberation_T10_R1,0,Merlin,Illust_God_Default,"내 술식이 그 손에 있는 한, 이 싸움은 내 몫이기도 해. 같이 가."
+StartRoom_Liberation_T10_R2,0,Shadow,Illust_Shadow_Default,사슬로 묶던 시절이 그립지 않아? …아니겠지.
+StartRoom_Ended_R1,0,Shadow,Illust_Shadow_Default,"왔네, 완성품. 아래는 오늘도 너를 기다려."
+StartRoom_Ended_R1,1,Merlin,Illust_God_Default,…네 발로 가. 그녀 말 말고.
+StartRoom_Ended_R2,0,Merlin,Illust_God_Default,…목소리가 멀어. 그래도 여기 있어.
+StartRoom_Ended_R3,0,Shadow,Illust_Shadow_Default,"멀린의 목소리, 아직 들려? 나한텐 이제 바람 소리 같은데."
+StartRoom_Ended_T10_R1,0,Shadow,Illust_Shadow_Default,설계는 끝났어. 이제 남은 건 네가 어디까지 가는지 보는 일뿐이지.
+StartRoom_Ended_T10_R2,0,Merlin,Illust_God_Default,"…끝이 아니라면, 끝까지 같이 가."
+RunClear_T10_R1,0,Shadow,Illust_Shadow_Default,살아 나오는 게 버릇이 됐군.
+RunClear_T10_R1,1,Merlin,Illust_God_Default,좋은 버릇이야. 버리지 마.
+RunClear_T10_R2,0,Merlin,Illust_God_Default,처음 끝까지 갔을 때보다 숨이 고르네. 강해졌어.
+RunClear_T30_R1,0,Shadow,Illust_Shadow_Default,심연을 산책로처럼 다니는군. …그 아래는 산책로가 아니야.
+RunClear_T50_R1,0,Merlin,Illust_God_Default,또 끝까지 갔어. 매번 처음처럼 반가워.
+RunClear_T50_R2,0,Shadow,Illust_Shadow_Default,이쯤 되면 심연이 너를 피해 다니겠어.
+RunClear_Liberation_R1,0,Merlin,Illust_God_Default,하나씩 끝내고 있어. 봉인으로는 못 하던 일이야.
+RunClear_Liberation_R2,0,Shadow,Illust_Shadow_Default,풀려난 것들을 도로 눕혔군. 사슬보다 네 검이 낫네.
+RunClear_Ended_R1,0,Shadow,Illust_Shadow_Default,"또 바닥까지. 깊이는 아직 남았어, 완성품."
+RunClear_Ended_R1,1,Merlin,Illust_God_Default,…잘 다녀왔어.
+RunClear_Ended_R2,0,Merlin,Illust_God_Default,…돌아왔네. 다음 걸음도 네가 정해.
+RunFail_T30_R1,0,Shadow,Illust_Shadow_Default,"너 이전에도 영혼은 있었어. 전부 이 자리에 서서, 똑같은 위로를 들었지."
+RunFail_T30_R2,0,Merlin,Illust_God_Default,…미안해. 다 말해 주지 못했어.
+RunFail_T30_R2,1,Shadow,Illust_Shadow_Default,이제야 양심이 찔리나 보군.
+RunFail_T30_R3,0,Shadow,Illust_Shadow_Default,"이 순환을 누가 설계했는지, 슬슬 묻고 싶지 않아?"
+RunFail_T30_R4,0,Shadow,Illust_Shadow_Default,멀린은 널 구하려고 불렀대. …구원치고는 참 오래 걸리네.
+RunFail_T30_R4,1,Merlin,Illust_God_Default,오래 걸려도 끝은 낼 거야.
+RunFail_T50_R1,0,Shadow,Illust_Shadow_Default,또 너야. 이젠 너 없는 순환이 상상이 안 되는군.
+RunFail_T50_R2,0,Merlin,Illust_God_Default,넘어진 만큼 길을 알게 됐어. 이번엔 그 길로 가.
+RunFail_T50_R3,0,Shadow,Illust_Shadow_Default,"설계도에 없는 선을 계속 긋고 있어, 너. …누군가는 그게 거슬리겠지."
+RunFail_T50_R4,0,Merlin,Illust_God_Default,말은 됐어. 가자.
+RunFail_T50_R5,0,Shadow,Illust_Shadow_Default,몇 번을 돌아와도 같은 눈이군. 그게 제일 무섭다니까.
+RunFail_M25,0,Shadow,Illust_Shadow_Default,"스물다섯 번. …멀린이 부른 영혼치고는, 참 오래도 버티는군."
+RunFail_M25,1,Merlin,Illust_God_Default,그 이름을… 네가 어떻게.
+RunFail_Liberation_R1,0,Merlin,Illust_God_Default,봉인 없이 맞서는 싸움이야. 쓰러져도 다시 가면 돼.
+RunFail_Liberation_R2,0,Shadow,Illust_Shadow_Default,풀려난 것들이 그렇게 아팠어? …그 녀석들도 자유가 반가운가 봐.
+RunFail_Liberation_R3,0,Merlin,Illust_God_Default,내 술식으로 묶었던 것들이야. 끝내는 것도 내 몫이야. 같이 가.
+RunFail_Liberation_T10_R1,0,Shadow,Illust_Shadow_Default,사슬이 녹은 뒤로 더 자주 돌아오는군.
+RunFail_Liberation_T10_R1,1,Merlin,Illust_God_Default,그만큼 더 깊이 들어가고 있다는 뜻이야.
+RunFail_Liberation_T10_R2,0,Merlin,Illust_God_Default,그가 내 목소리로 불러도 따라가지 마. 그건 내가 아니야.
+RunFail_Liberation_T30_R1,0,Shadow,Illust_Shadow_Default,"봉인이 무너진 게 누구 탓인지, 아직도 모르겠어?"
+RunFail_Ended_R1,0,Merlin,Illust_God_Default,"…돌아왔어. 목소리는 작아도, 손은 그대로야."
+RunFail_Ended_R2,0,Shadow,Illust_Shadow_Default,완성품이 넘어지는 것도 보기 나쁘지 않네. 다시 내려가.
+RunFail_Ended_R3,0,Shadow,Illust_Shadow_Default,멀린이 아무리 붙잡아도 너는 결국 아래로 가. 그게 설계야.
+RunFail_Ended_R3,1,Merlin,Illust_God_Default,"…설계가 아니라, 네 걸음으로."
+RunFail_Ended_T10_R1,0,Merlin,Illust_God_Default,…쉬어 가도 돼. 나는 여기 있어.
+RunFail_Ended_T10_R2,0,Shadow,Illust_Shadow_Default,악몽은 마음에 들어? 네가 쓰러뜨린 것들이 그렇게 돌아오는 거야.
+Chapter1_Enter_T10_R1,0,Shadow,Illust_Shadow_Default,이 숲의 나무 수를 세도 되겠어.
+Chapter1_Enter_T10_R1,1,Merlin,Illust_God_Default,세지 말고 베. 길은 알잖아.
+Chapter1_Enter_T10_R2,0,Merlin,Illust_God_Default,뿌리 소리가 달라졌어. 숲도 너를 알아보는 거야.
+Chapter1_Enter_T30_R1,0,Shadow,Illust_Shadow_Default,숲의 수호자도 네 발소리를 외웠을걸.
+Chapter1_Enter_T30_R1,1,Merlin,Illust_God_Default,그럼 더 빨리 끝나겠네.
+Chapter1_Enter_T50_R1,0,Merlin,Illust_God_Default,숲이야. 가자.
+Chapter1_Enter_T50_R2,0,Shadow,Illust_Shadow_Default,또 이 숲. 질릴 법도 한데 넌 늘 진지하군.
+Chapter2_Enter_T10_R1,0,Merlin,Illust_God_Default,열기에 익숙해졌다고 불이 약해진 건 아니야. 거리 지켜.
+Chapter2_Enter_T30_R1,0,Shadow,Illust_Shadow_Default,화룡도 슬슬 너를 반가워할지 몰라. …먹잇감으로.
+Chapter3_Enter_T10_R1,0,Merlin,Illust_God_Default,성소의 돌이 아직 기도를 기억해. …우리 편은 아니지만.
+Chapter3_Enter_T30_R1,0,Shadow,Illust_Shadow_Default,모르드레드는 아직도 그날의 검을 쥐고 있을까.
+Chapter3_Enter_T30_R1,1,Merlin,Illust_God_Default,"쥐고 있다면, 내려놓게 해 주자."
+Chapter4_Enter_T10_R1,0,Merlin,Illust_God_Default,안개 너머에 그가 있어. 내 기억을 쥔 채로.
+Chapter4_Enter_T30_R1,0,Shadow,Illust_Shadow_Default,마지막 문 앞에 이렇게 자주 서는 영혼은 처음이야.
+BossRoom_Ch1_Enter_Liberation_First,0,Shadow,Illust_Shadow_Default,숲의 주인이 사슬 없이 기다려.
+BossRoom_Ch1_Enter_Liberation_First,1,Merlin,Illust_God_Default,한 번 쓰러뜨려도 다시 일어설 거야. 끝까지 봐.
+BossRoom_Ch1_Enter_Liberation_R1,0,Merlin,Illust_God_Default,두 번째로 일어서는 순간을 노려.
+BossRoom_Ch2_Enter_Liberation_First,0,Shadow,Illust_Shadow_Default,화룡이 제 불을 전부 되찾았어.
+BossRoom_Ch2_Enter_Liberation_First,1,Merlin,Illust_God_Default,불이 두 번 타올라. 두 번째가 진짜야.
+BossRoom_Ch2_Enter_Liberation_R1,0,Shadow,Illust_Shadow_Default,또 그 불 앞이군. 이번엔 꺼질 때까지 서 있어.
+BossRoom_Ch3_Enter_Liberation_First,0,Merlin,Illust_God_Default,"…모르드레드. 이번엔 봉인이 아니라, 쉬게 해 주러 왔어."
+BossRoom_Ch3_Enter_Liberation_First,1,Shadow,Illust_Shadow_Default,검이 둘로 갈라질 거야. 놓치지 마.
+BossRoom_Ch3_Enter_Liberation_R1,0,Merlin,Illust_God_Default,두 번째 검까지 버텨. 그다음은 우리 차례야.
+BossRoom_Ch4_Enter_Liberation_First,0,Shadow,Illust_Shadow_Default,사슬도 봉인도 없는 그 녀석이야.
+BossRoom_Ch4_Enter_Liberation_First,1,Merlin,Illust_God_Default,내 술식으로 덤빌 거야. …이번엔 끝을 내자.
+BossRoom_Ch4_Enter_Liberation_R1,0,Merlin,Illust_God_Default,그가 내 목소리를 흉내 내도 흔들리지 마.
+BossRoom_Ch4_Enter_Ended_First,0,Shadow,Illust_Shadow_Default,한 번 쓰러진 리치야. 심연은 그것도 다시 세워 놓지.
+BossRoom_Ch4_Enter_Ended_First,1,Merlin,Illust_God_Default,…몇 번이든 끝내.
+BossRoom_Ch1_Enter_Nightmare_First,0,Shadow,Illust_Shadow_Default,네가 쓰러뜨린 숲이 꿈속에서 다시 자랐어.
+BossRoom_Ch2_Enter_Nightmare_First,0,Shadow,Illust_Shadow_Default,꺼진 불이 악몽으로 다시 타올라.
+BossRoom_Ch3_Enter_Nightmare_First,0,Merlin,Illust_God_Default,…꿈속에서도 그 검은 무거워.
+BossRoom_Ch4_Enter_Nightmare_First,0,Shadow,Illust_Shadow_Default,악몽 속 제단이야. 끝을 본 자리라고 쉬울 거라 생각하지 마.
+Kill_Ch3_Scene,0,Merlin,Illust_God_Default,…모르드레드. 이제야 검을 내려놓았어.
+RunClear_T30_R2,0,Merlin,Illust_God_Default,이젠 네가 먼저 길을 알아. 나는 뒤를 볼게.
+Chapter1_Enter_T30_R2,0,Merlin,Illust_God_Default,숲이 길을 바꿔도 넌 금방 찾아. 그걸 믿고 가.
+Chapter2_Enter_T10_R2,0,Shadow,Illust_Shadow_Default,불길이 너를 기억해. 반갑진 않겠지만.
+Chapter2_Enter_T30_R2,0,Merlin,Illust_God_Default,이 열기 속에서도 손이 안 떨리네. 가자.
+Chapter3_Enter_T10_R2,0,Shadow,Illust_Shadow_Default,성소가 기도 대신 비명을 기억하고 있어. …여기선 귀를 막아.
+Chapter3_Enter_T30_R2,0,Merlin,Illust_God_Default,성소의 길은 이제 네가 더 잘 알아.
+Chapter4_Enter_T10_R2,0,Shadow,Illust_Shadow_Default,안개가 짙을수록 그 녀석은 가까워. 알지?
+Chapter4_Enter_T30_R2,0,Merlin,Illust_God_Default,"마지막 문이 익숙해졌다는 건, 그만큼 멀리 왔다는 뜻이야."
+Chapter1_Enter_Liberation_R2,0,Merlin,Illust_God_Default,수호자는 두 번 일어서. 첫 번째에 다 쏟지 마.
+Chapter1_Enter_Liberation_T10_R1,0,Shadow,Illust_Shadow_Default,풀려난 숲도 이젠 네 발소리에 익숙하겠어.
+Chapter1_Enter_Liberation_T10_R2,0,Merlin,Illust_God_Default,뿌리가 더 깊어졌어. 그래도 길은 같아.
+Chapter2_Enter_Liberation_R2,0,Shadow,Illust_Shadow_Default,사슬 없는 불이야. 데지 않게 조심해.
+Chapter3_Enter_Liberation_R2,0,Shadow,Illust_Shadow_Default,갈라진 검은 두 번 벤다. 두 번 피해.
+Chapter4_Enter_Liberation_R2,0,Merlin,Illust_God_Default,이번엔 묶지 않아. 끝을 내러 가.
+Chapter1_Enter_Nightmare_R2,0,Shadow,Illust_Shadow_Default,꿈속 뿌리는 더 질겨. 발을 가볍게.
+Chapter1_Enter_Nightmare_T10_R1,0,Shadow,Illust_Shadow_Default,악몽도 반복되면 일상이 되지. …그게 제일 무서운 거야.
+Chapter1_Enter_Nightmare_T10_R2,0,Merlin,Illust_God_Default,꿈이라도 아픈 건 진짜야. 조심해.
+Chapter2_Enter_Nightmare_R2,0,Merlin,Illust_God_Default,막지 말고 끝내. 꿈속에선 그게 맞아.
+Chapter3_Enter_Nightmare_R2,0,Shadow,Illust_Shadow_Default,맹세가 부서진 곳이야. 가진 것만으로 싸워.
+Chapter4_Enter_Nightmare_R2,0,Merlin,Illust_God_Default,술식이 거꾸로 흘러. 기술은 아껴 써.
+RunFail_Liberation_R4,0,Shadow,Illust_Shadow_Default,"봉인이 없으니 겁도 없어졌군. 좋아, 그래야 재밌지."
+RunFail_Liberation_R5,0,Merlin,Illust_God_Default,다시 가자. 풀려난 것들은 기다려 주지 않아.
+RunFail_Liberation_T10_R3,0,Shadow,Illust_Shadow_Default,해방은 네 몫이 아니었는데. 다들 자유롭게 날뛰는군.
+RunFail_Liberation_T30_R2,0,Merlin,Illust_God_Default,…봉인이 무너진 건 내 탓이야. 그러니 끝까지 같이 가.
+RunFail_Liberation_T50_R1,0,Shadow,Illust_Shadow_Default,"몇 번을 넘어져도 끝내러 가는군. 그 고집, 그 녀석이 제일 싫어할 거야."
+RunFail_Liberation_T50_R2,0,Merlin,Illust_God_Default,말은 됐어. 끝내러 가자.
+RunFail_Liberation_T50_R3,0,Shadow,Illust_Shadow_Default,풀려난 것들보다 네가 더 자유로워 보여.
+RunFail_Ended_R4,0,Merlin,Illust_God_Default,…다시 걸으면 돼. 천천히.
+RunFail_Ended_T10_R3,0,Shadow,Illust_Shadow_Default,이제 넘어지는 것도 연습처럼 보이네.
+RunFail_Ended_T30_R1,0,Shadow,Illust_Shadow_Default,설계자 앞에서 계속 넘어지는 완성품이라. 흥미로운 결함이야.
+RunFail_Ended_T30_R2,0,Merlin,Illust_God_Default,"…목소리가 줄어도, 너를 붙드는 건 그대로야."
+RunFail_Ended_T50_R1,0,Shadow,Illust_Shadow_Default,아래는 아직 깊어. 넌 아직 닿지 않았고.
+RunFail_Ended_T50_R2,0,Merlin,Illust_God_Default,…가자.
+RunFail_Ended_T50_R3,0,Shadow,Illust_Shadow_Default,끝난 이야기 위를 계속 걷는군. 마음에 들어.
+StartRoom_Liberation_T30_R1,0,Merlin,Illust_God_Default,봉인이 아니라 끝. 그 말은 몇 번이고 지킬 거야.
+StartRoom_Liberation_T30_R2,0,Shadow,Illust_Shadow_Default,풀려난 세계가 네 놀이터 같군.
+StartRoom_Liberation_T50_R1,0,Shadow,Illust_Shadow_Default,오늘은 누구를 눕히러 가지?
+StartRoom_Liberation_T50_R2,0,Merlin,Illust_God_Default,가자. 끝은 아직 남았어.
+StartRoom_Ended_T30_R1,0,Shadow,Illust_Shadow_Default,"아래가 부르는 소리, 너도 들리잖아."
+StartRoom_Ended_T30_R2,0,Merlin,Illust_God_Default,"…나는 작아졌어도, 네 길은 커졌어."
+StartRoom_Ended_T50_R1,0,Shadow,Illust_Shadow_Default,완성품은 쉬지 않는군. 좋아.
+StartRoom_Ended_T50_R2,0,Merlin,Illust_God_Default,…다녀와.
+RunClear_Liberation_T10_R1,0,Merlin,Illust_God_Default,풀려난 것들이 하나씩 조용해져. 이게 맞아.
+RunClear_Liberation_T10_R2,0,Shadow,Illust_Shadow_Default,끝까지 가는 게 일이 됐군.
+RunClear_Liberation_T50_R1,0,Shadow,Illust_Shadow_Default,해방된 세계의 주인은 이제 너 같군.
+RunClear_Liberation_T50_R2,0,Merlin,Illust_God_Default,또 끝냈어. 고마워.
+RunClear_Ended_T10_R1,0,Shadow,Illust_Shadow_Default,바닥에서 돌아오는 길이 익숙하지? 아래는 더 있어.
+RunClear_Ended_T10_R2,0,Merlin,Illust_God_Default,…무사해서 다행이야.
+RunClear_Ended_T50_R1,0,Shadow,Illust_Shadow_Default,끝없는 깊이를 산책하는 완성품. 내 작품 중 최고야.
+RunClear_Ended_T50_R2,0,Merlin,Illust_God_Default,…또 돌아왔네. 다행이야.
+RelicMemory_Recall_gawain,0,None,,"…정오의 해 아래서, 나는 지지 않았다."
+RelicMemory_Recall_gawain,1,None,,녹색 기사의 도끼 앞에서도 고개를 숙이지 않았다.
+RelicMemory_Recall_gawain,2,None,,왕께서 내 어깨에 검을 얹으셨다. 그날 해가 높았다.
+RelicMemory_Recall_gawain_Liberation,0,None,,가레스… 가헤리스… 내 아우들이 그날 쓰러졌다.
+RelicMemory_Recall_gawain_Liberation,1,None,,해가 기울면 내 힘도 기운다. 그날은 너무 일찍 저물었다.
+RelicMemory_Recall_gawain_Liberation,2,None,,원탁이 갈라지던 소리를 기억한다.
+RelicMemory_Recall_gawain_Nightmare,0,None,,"용서하지 않겠다, 랜슬롯. 마지막 숨까지."
+RelicMemory_Recall_gawain_Nightmare,1,None,,"왕을 지키는 대신, 복수를 붙들었다."
+RelicMemory_Recall_gawain_Nightmare,2,None,,오래된 상처가 다시 터졌다. 그래도 칼을 놓지 않았다.
+RelicMemory_Recall_lancelot,0,None,,호수의 기사. 그 이름에 부끄럽지 않으려 했다.
+RelicMemory_Recall_lancelot,1,None,,그 검은 왕을 위해 뽑은 것이었다.
+RelicMemory_Recall_lancelot,2,None,,원탁에서 나를 이긴 자는 없었다.
+RelicMemory_Recall_lancelot_Liberation,0,None,,"왕비를 구하러 달려간 밤, 형제들을 베었다."
+RelicMemory_Recall_lancelot_Liberation,1,None,,"모든 것을 가졌고, 모든 것을 잃었다."
+RelicMemory_Recall_lancelot_Liberation,2,None,,그 숲에서 나는 내 이름마저 잊었다.
+RelicMemory_Recall_lancelot_Nightmare,0,None,,왕을 사랑했다. 그리고 왕을 배신했다.
+RelicMemory_Recall_lancelot_Nightmare,1,None,,광기는 핑계였다. 나는 알고 있었다.
+RelicMemory_Recall_lancelot_Nightmare,2,None,,내가 지킨다던 것은 결국 나 자신이었다.
+RelicMemory_Return_First,0,Merlin,Illust_God_Default,돌아왔어? 조금씩이라도 괜찮아.
+RelicMemory_Return_R1,0,Merlin,Illust_God_Default,"그 기억, 네 거야. 놓치지 마."
+RelicMemory_Return_R2,0,Shadow,Illust_Shadow_Default,하나 더 기억했군.
+RelicMemory_Return_Liberation_First,0,Merlin,Illust_God_Default,…이번 건 아팠겠다. 그래도 붙잡아.
+RelicMemory_Return_Liberation_R1,0,Shadow,Illust_Shadow_Default,무너진 날을 기억해 내는 건 고문이지.
+RelicMemory_Return_Liberation_R2,0,Merlin,Illust_God_Default,잃은 날까지 기억해야 온전해져.
+RelicMemory_Return_Nightmare_First,0,Merlin,Illust_God_Default,버리고 싶은 기억도 네 힘이야.
+RelicMemory_Return_Nightmare_R1,0,Shadow,Illust_Shadow_Default,기억이 늘수록 무거워지지. 그게 좋은 거야.
+RelicMemory_Return_Nightmare_R2,0,Merlin,Illust_God_Default,…괜찮아. 그것도 너였어.
+Covenant_FirstWrite_First,0,Merlin,Illust_God_Default,한 줄이면 돼. 네가 지킬 수 있는 걸 써.
+Covenant_FirstWrite_R1,0,Merlin,Illust_God_Default,짧아도 괜찮아. 맹세는 이어 쓰는 거니까.
+Covenant_FirstWrite_R2,0,Shadow,Illust_Shadow_Default,또 한 장. 이번엔 어디까지 쓸 셈이지?
+Covenant_Append_First,0,Merlin,Illust_God_Default,앞에 쓴 게 다음을 부른다. 잘 이어 봐.
+Covenant_Append_R1,0,Merlin,Illust_God_Default,한 줄 더. 길어질수록 단단해져.
+Covenant_Append_R2,0,Shadow,Illust_Shadow_Default,쓴 만큼 묶이는 거야. 알고 쓰는 거지?
+Covenant_Rewrite_First,0,Merlin,Illust_God_Default,고쳐 쓰는 것도 맹세야. 지운 줄은 잊지 마.
+Covenant_Rewrite_R1,0,Shadow,Illust_Shadow_Default,지운다고 없던 일이 되진 않아.
+Covenant_Full_First,0,Merlin,Illust_God_Default,다 썼네. 이제 고쳐 쓰는 것만 남았어.
+Covenant_ChainEnd_First,0,Merlin,Illust_God_Default,끝까지 이어졌어. 그게 네 맹세의 모양이야.
+Covenant_ChainEnd_R1,0,Shadow,Illust_Shadow_Default,"끝까지 갔군. 그 문장, 이제 너를 따라다닐 거야."

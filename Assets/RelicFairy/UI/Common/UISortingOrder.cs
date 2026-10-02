@@ -45,6 +45,8 @@ public static class UISortingOrder
     public const int MetaFlash    = 210;
     /// <summary>집중선 등 속도감 효과.</summary>
     public const int MetaSpeed    = 220;
+    /// <summary>보스 처치 뒤 「되찾은 기억」 회상 한 줄 — 화면 효과 위, 팝업 아래(이어서 뜨는 기억 고르기 창이 덮는다).</summary>
+    public const int MetaRecall   = 230;
 
     // ── 300~399 : 씬(전체 화면 페이지) ─────────────────────
     /// <summary>로비·로고 등 전체 화면 페이지. HUD를 덮는다.</summary>

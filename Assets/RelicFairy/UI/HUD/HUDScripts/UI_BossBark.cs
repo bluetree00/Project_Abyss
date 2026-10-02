@@ -28,6 +28,9 @@ namespace RelicFairy.UI
     /// </summary>
     public sealed class UI_BossBark : MonoBehaviour
     {
+        /// <summary>걷기 요청(<see cref="Dismiss"/>)이 와도 막 뜬 줄은 이만큼은 읽히게 둔다(초).</summary>
+        private const float DismissMinShown = 2f;
+
         public static UI_BossBark Instance { get; private set; }
 
         [Header("References")]
@@ -78,6 +81,8 @@ namespace RelicFairy.UI
         private readonly Queue<(string text, BossBarkType type, DialogueSpeaker speaker, UniTaskCompletionSource tcs)> _queue = new();
         private CancellationTokenSource _cts;
         private bool _showing;
+        private bool  _dismissRequested;   // 장면이 끝났다 — 지금 줄을 일찍 내린다
+        private float _dismissMinShown;
 
         private void Awake()
         {
@@ -111,6 +116,9 @@ namespace RelicFairy.UI
         }
 
         // ─── Public API ───────────────────────────────────────────────
+
+        /// <summary>자막이 떠 있거나 대기 중인가 — 보스 끝 장면 대사가 끝나길 기다리는 쪽이 읽는다(10-02 되찾은 기억 연출).</summary>
+        public static bool IsShowing => Instance != null && Instance._showing;
 
         /// <summary>speaker를 넘기면 본문 위에 화자줄이 붙는다. 생략하면 기존 동작 그대로.</summary>
         public static void Show(string text, BossBarkType type = BossBarkType.Bark,
@@ -179,6 +187,32 @@ namespace RelicFairy.UI
             return tcs.Task;
         }
 
+        /// <summary>
+        /// 대기열을 비우고 지금 줄을 끊고 바로 띄운다 — 카운터처럼 최신 값만 의미 있는 알림용
+        /// (10-01 f5 전주기 시뮬: 봉인석 점화 2/4 · 3/4가 줄을 서서 붕괴 컷신 위에 늦게 나왔다).
+        /// </summary>
+        public static void ShowLatest(string text, BossBarkType type = BossBarkType.Bark,
+                                      DialogueSpeaker speaker = DialogueSpeaker.None)
+        {
+            if (Instance == null) return;
+            Instance.DropQueued();
+            Instance.InterruptCurrent();
+            Instance.Enqueue(text, type, speaker, null);
+        }
+
+        /// <summary>
+        /// 대기열을 비우고 지금 자막을 페이드아웃시킨다 — 장면이 끝나면 그 장면의 대사도 같이 걷는다
+        /// (10-01 f5 전주기 시뮬: 봉인 장면 대사가 6초 넘게 남아 포탈 화면까지 따라왔다). 막 뜬 줄은 <paramref name="minShown"/>초는 보여 준다.
+        /// </summary>
+        public static void Dismiss(float minShown = DismissMinShown)
+        {
+            if (Instance == null) return;
+            Instance.DropQueued();
+            if (!Instance._showing) return;
+            Instance._dismissRequested = true;
+            Instance._dismissMinShown  = minShown;
+        }
+
         // ─── Internal ─────────────────────────────────────────────────
 
         private void Enqueue(string text, BossBarkType type, DialogueSpeaker speaker, UniTaskCompletionSource tcs)
@@ -205,6 +239,13 @@ namespace RelicFairy.UI
         /// 취소된 루프는 자기 while로 돌아와 새로 들어온 항목을 그대로 이어 처리한다.
         /// </summary>
         private void InterruptCurrent() => _cts?.Cancel();
+
+        /// <summary>대기 중인 줄을 버린다 — 기다리던 쪽(<see cref="ShowAndWaitAsync"/>)은 끝난 것으로 풀어 준다.</summary>
+        private void DropQueued()
+        {
+            while (_queue.Count > 0)
+                _queue.Dequeue().tcs?.TrySetResult();
+        }
 
         private async UniTaskVoid RunQueue(CancellationToken lifetimeToken)
         {
@@ -254,13 +295,15 @@ namespace RelicFairy.UI
                 _                            => _barkDuration,
             };
 
+            _dismissRequested = false;
+            float shownAt = Time.unscaledTime;
             await FadeTo(1f, _fadeInDuration, ct);
-            // UnscaledDeltaTime 필수 — 기본(스케일드)이면 timeScale=0(일시정지·차단 팝업) 동안
-            // 유지 시간이 흐르지 않아 자막이 화면에 굳는다. 페이드(FadeTo)도 이미 unscaled다.
-            await UniTask.Delay(
-                System.TimeSpan.FromSeconds(holdDuration),
-                DelayType.UnscaledDeltaTime,
-                cancellationToken: ct);
+            // unscaled 필수 — 스케일드면 timeScale=0(일시정지·차단 팝업) 동안 유지 시간이 흐르지 않아
+            // 자막이 화면에 굳는다. 페이드(FadeTo)도 이미 unscaled다. 걷기 요청이 오면 최소 표시 시간만 채우고 내린다.
+            float hideAt = Time.unscaledTime + holdDuration;
+            while (Time.unscaledTime < hideAt
+                   && !(_dismissRequested && Time.unscaledTime - shownAt >= _dismissMinShown))
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
             await FadeTo(0f, _fadeOutDuration, ct);
         }
 

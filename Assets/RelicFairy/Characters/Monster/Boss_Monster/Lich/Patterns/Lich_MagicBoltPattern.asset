@@ -25,8 +25,8 @@ MonoBehaviour:
   patternCooldown: 4
   castDuration: 0.72
   boltCount: 4
-  boltInterval: 0.35
-  flightTime: 0.5
+  boltInterval: 0.5
+  flightTime: 0.6
   endDuration: 0.5
   recoveryDuration: 0.3
   impactRadius: 2
@@ -35,7 +35,7 @@ MonoBehaviour:
   arcHeight: 1.5
   driftDistance: 2
   lastBoltLead: 1
-  lastBoltLeadMax: 4
+  lastBoltLeadMax: 2
   lingerRadius: 1.6
   lingerSeconds: 1.6
   lingerDamage: 0.12

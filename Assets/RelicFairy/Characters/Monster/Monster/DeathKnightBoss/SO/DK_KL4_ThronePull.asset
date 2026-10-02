@@ -27,7 +27,7 @@ MonoBehaviour:
   chainWidth: 0.45
   knightChainHeight: 1.3
   playerChainHeight: 1
-  lockSeconds: 0.4
+  lockSeconds: 0.75
   frontRows: 3
   swingLead: 0.35
   recoveryTime: 0.6

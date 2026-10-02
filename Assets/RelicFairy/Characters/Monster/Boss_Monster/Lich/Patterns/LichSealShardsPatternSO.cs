@@ -63,10 +63,13 @@ public class LichSealShardsState : UnInterruptibleState<LichSealShardsPatternSO>
     private const int   ShardCount    = 4;
     private const float SignalSeconds = 0.2f;
     private const float BeamSpeed     = 70f;   // 광선 앞머리가 뻗는 속도(맞는 순간 = 보이는 순간)
+    private const string ShardHintKey  = "Lich_Shard_Hint";   // 처음 솟을 때 멀린 — 끊는 법(10-03). CSV에 없으면 아래 줄
+    private const string ShardHintLine = "청록 조각은 두 번 치면 잠시 꺼져!";
 
     private readonly GameObject[] _guides   = new GameObject[ShardCount];
     private readonly bool[]       _signaled = new bool[ShardCount];
     private readonly bool[]       _fired    = new bool[ShardCount];
+    private readonly float[]      _guideEnd = new float[ShardCount];   // 쏜 뒤 예고를 지울 시각(Time.time) — 앞머리가 끝까지 지난 뒤
 
     private Phase   _phase;
     private float   _timer;
@@ -90,18 +93,22 @@ public class LichSealShardsState : UnInterruptibleState<LichSealShardsPatternSO>
         if (grid == null || !grid.TryGetWorldCenter(out _center))
             _center = mc != null ? mc.ArenaCenter : LichPatternUtil.OnFloor(ctx, ctx.Transform.position);
 
-        LichSealShard.EnsureSpawned(_center, Data.shardDistance);
+        bool risen = LichSealShard.EnsureSpawned(_center, Data.shardDistance);
         _first = Random.Range(0, ShardCount);
 
         LichPatternUtil.CastBeat(ctx, LichCast.ArcaneOrb, Data.openDuration + Data.beamWarn, 2f, 0.1f);
         lich?.PulseBook(Data.openDuration + ShardCount * Data.beamInterval);
         LichSfx.Play(LichSfxSlot.CastCharge, ctx.Transform.position);
         UI_BossBark.Show("네 봉인의 잔해다 — 이제 내 것이지.", BossBarkType.PatternAnnounce);
+        // 처음 솟을 때 한 번(조각은 T3까지 남는다 = 전투당 한 번) — 끄고 나서야 칠 수 있다는 걸 알았다(10-03).
+        if (risen && !UI_BossBark.ShowDialogue(ShardHintKey))
+            UI_BossBark.Show(ShardHintLine, BossBarkType.MerlinNarration, DialogueSpeaker.Merlin);
     }
 
     public override void Update(MonsterContext ctx)
     {
         _timer += Time.deltaTime;
+        ReleaseSpentGuides();
 
         switch (_phase)
         {
@@ -146,6 +153,13 @@ public class LichSealShardsState : UnInterruptibleState<LichSealShardsPatternSO>
         _timer = 0f;
     }
 
+    private void ReleaseSpentGuides()
+    {
+        for (int k = 0; k < ShardCount; k++)
+            if (_fired[k] && _guides[k] != null && Time.time >= _guideEnd[k])
+                PatternGuideHelper.SafeDestroy(ref _guides[k]);
+    }
+
     /// <summary>k번째 광선(시계 방향 순서) — 예고가 차오르고, 신호, 발사. 조각이 꺼져 있으면 예고가 스러지고 쏘지 않는다.</summary>
     private void TickShard(MonsterContext ctx, int k)
     {
@@ -174,14 +188,16 @@ public class LichSealShardsState : UnInterruptibleState<LichSealShardsPatternSO>
 
         if (_timer < fireAt) return;
         _fired[k] = true;
-        PatternGuideHelper.SafeDestroy(ref _guides[k]);
 
         if (shard.IsDisabled)
         {
+            PatternGuideHelper.SafeDestroy(ref _guides[k]);
             // 꺼진 조각 — 불발(연기만)
             LichVfx.Play(LichVfxSlot.TeleportVanish, shard.BeamOrigin, Quaternion.identity, 0.4f);
             return;
         }
+
+        _guideEnd[k] = Time.time + length / BeamSpeed;   // 예고는 광선 앞머리가 끝까지 지날 때 지운다
 
         Vector3 from = shard.BeamOrigin;
         Vector3 to   = origin + dir * length + Vector3.up * 0.4f;

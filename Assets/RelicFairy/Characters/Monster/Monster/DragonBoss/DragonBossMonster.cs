@@ -222,7 +222,15 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
     public float  AirChaseSpeedMult   => _airChaseSpeedMult;
     public float  AirTurnAngleThreshold => _airTurnAngleThreshold;
     // Floor에 내접하는 원의 반지름(짧은 변 기준) * 비율 = 선회 반경 — 비율이 1보다 작으면 카메라 안쪽으로 들어옴
-    public float  AirOrbitRadius      => Mathf.Min(DragonBossRoomContext.Width, DragonBossRoomContext.Height) * DragonBossRoomContext.CellSize * 0.5f * _airOrbitRadiusRatio;
+    // 「벽 안면 − 몸 반경」은 넘지 않는다 — 선회 중심은 맵 중앙(10-03 개선 1-3)
+    public float  AirOrbitRadius
+    {
+        get
+        {
+            float half = Mathf.Min(DragonBossRoomContext.Width, DragonBossRoomContext.Height) * DragonBossRoomContext.CellSize * 0.5f;
+            return Mathf.Min(half * _airOrbitRadiusRatio, Mathf.Max(1f, half - DragonPatternFloorUtils.WallInset - _bodyRadius));
+        }
+    }
     public float  AirOrbitAngularSpeed => _airOrbitAngularSpeed;
     public float  AirOrbitCatchUpSpeedMult => _airOrbitCatchUpSpeedMult;
     public float  AirOrbitRadiusTolerance => _airOrbitRadiusTolerance;
@@ -319,6 +327,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
     private Color[]                      _abyssBaseTint;
     private bool                         _abyssLook;
     private bool                         _abyssBlending;     // 전환 동안 서서히 바뀌는 중
+    private float                        _arenaGuardTimer;
     private bool                         _lastHudInvulnerable;
     private System.Threading.CancellationTokenSource _pageTransitionCts;
 
@@ -344,10 +353,13 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
     private float            _normalSfxNextInterval;
     private float            _airOrbitCurrentLockDegrees;
     private BodyState        _prevBodyState;
+    private float            _bodyRadius = 3f;   // 몸 반경(m) — OnInitialized에서 렌더러 크기로 잰다(10-03 개선 1-3)
 
     // ── 외부 접근 ─────────────────────────────────────────
     public DragonBossBlackboard DragonBlackboard => _dragonBB;
     public DragonClawTrailController ClawTrailController => _clawTrailCtrl;
+    /// <summary>몸 반경(m) — 공중 위치를 「벽 안면 − 이 값」 안에 둔다(<see cref="DragonPatternFloorUtils.ClampInsideWalls"/>).</summary>
+    public float BodyRadius => _bodyRadius;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // MonsterBase 추상 멤버
@@ -429,6 +441,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
             // 프리팹 저장 상태와 무관하게 지상 히트박스로 초기화
             _airborneHitboxActive = true;           // 다음 SyncAirborneHitbox 호출 시 else(지상) 분기 강제 진입
         }
+        _bodyRadius = MeasureBodyRadius();
         // 초기 상태: Ice 페이즈 (HP 100%) 색상
         DragonBossVisualHelper.ApplyBodyTint(transform,
             DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice));
@@ -494,10 +507,19 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
         if (!airPatternLocked || pageUrgent)
             _runner?.Tick(Time.deltaTime);
 
+        TickArenaGuard();
         SyncAirborneHitbox();
         UpdateWingFlapSound();
         UpdateFootstepSound();
         UpdateNormalSfx();
+    }
+
+    /// <summary>지상에서 패턴이 없을 때 1초마다 — 맵 밖(벽 너머 · 외딴 NavMesh)에 서 있으면 안쪽으로 되돌린다(09-30).</summary>
+    private void TickArenaGuard()
+    {
+        if (_dragonBB.BodyState != BodyState.Grounded || (_runner != null && _runner.IsPatternActive)) return;
+        if (!BossArenaGuard.Due(ref _arenaGuardTimer, Time.deltaTime)) return;
+        BossArenaGuard.ReturnInside(transform, _agent, _runtime.PlayerTarget, DragonBossRoomContext.WorldCenter);
     }
 
     /// <summary>평시(지상 + 패턴 비활성) 상태에서 랜덤 간격으로 Normal 사운드를 재생해 "살아있는 보스" 느낌을 준다.</summary>
@@ -892,6 +914,32 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
         int height = Mathf.Max(2, Mathf.RoundToInt(floorBounds.size.z));
         Vector3 worldCenter = new Vector3(floorBounds.center.x, _runtime.SpawnPosition.y, floorBounds.center.z);
         DragonBossRoomContext.Initialize(width, height, 1f, worldCenter);
+    }
+
+    /// <summary>
+    /// 몸 반경(m) — 스킨 메시 경계 상자(루트 본 기준)를 화룡 루트 기준으로 옮겨(방향 무관) 가로 · 세로 반폭 중 큰 값 × 0.6, 2~6 m(10-03 개선 1-3).
+    /// 날개 끝 · 꼬리 끝까지 다 넣으면 너무 커서 0.6을 곱한다. 스킨 메시가 없으면 기본값을 그대로 둔다.
+    /// </summary>
+    private float MeasureBodyRadius()
+    {
+        const float Scale = 0.6f, Min = 2f, Max = 6f;
+        Matrix4x4 toRoot = transform.worldToLocalMatrix;
+        float minX = float.MaxValue, maxX = float.MinValue, minZ = float.MaxValue, maxZ = float.MinValue;
+        foreach (var smr in GetComponentsInChildren<SkinnedMeshRenderer>(true))
+        {
+            Bounds    lb = smr.localBounds;
+            Matrix4x4 m  = toRoot * (smr.rootBone != null ? smr.rootBone : smr.transform).localToWorldMatrix;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 corner = lb.center + Vector3.Scale(lb.extents, new Vector3(
+                    (i & 1) == 0 ? -1f : 1f, (i & 2) == 0 ? -1f : 1f, (i & 4) == 0 ? -1f : 1f));
+                Vector3 p = m.MultiplyPoint3x4(corner);
+                minX = Mathf.Min(minX, p.x); maxX = Mathf.Max(maxX, p.x);
+                minZ = Mathf.Min(minZ, p.z); maxZ = Mathf.Max(maxZ, p.z);
+            }
+        }
+        if (minX > maxX) return _bodyRadius;
+        return Mathf.Clamp(Mathf.Max(maxX - minX, maxZ - minZ) * 0.5f * Scale, Min, Max);
     }
 
     private bool IsInEngagementRange()

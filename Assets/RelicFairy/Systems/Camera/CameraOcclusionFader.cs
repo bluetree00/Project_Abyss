@@ -15,6 +15,8 @@ public class CameraOcclusionFader : MonoBehaviour
 {
     // ── Constants ─────────────────────────────────────────────────────────
     private const int MaxHits = 32;
+    private const float NearMinHeight = 1.5f;    // 근거리 판정은 이만큼 높은 구조물만(촛대 · 잔해 · 보상 오브젝트 같은 작은 것은 빼고)
+    private const float NearHoldSeconds = 0.35f; // 근거리로 흐린 것은 이만큼 붙잡는다 — 캡슐 경계에서 들락날락 깜박이지 않게
     private static readonly int BaseColorID = Shader.PropertyToID("_BaseColor");
     private static readonly int BaseMapID   = Shader.PropertyToID("_BaseMap");
     private static readonly int BumpMapID   = Shader.PropertyToID("_BumpMap");
@@ -33,9 +35,15 @@ public class CameraOcclusionFader : MonoBehaviour
     [Header("Detection")]
     [SerializeField] private LayerMask occlusionMask = ~0;
     [SerializeField] private float     castRadius    = 0.3f;
+    [Tooltip("카메라 앞 근거리 판정 — 카메라에서 플레이어 쪽으로 이 거리(m)까지(플레이어까지의 절반을 넘지 않음). 0 = 끔")]
+    [SerializeField] private float     nearDistance  = 0f;
+    [Tooltip("카메라 앞 근거리 판정 반경(m) — 카메라→플레이어 선 위가 아니어도 카메라 바로 옆 큰 구조물(회랑 기둥)을 잡는다")]
+    [SerializeField] private float     nearRadius    = 2.5f;
 
     [Header("Fade")]
     [SerializeField, Range(0f, 1f)] private float hiddenAlpha = 0.15f;
+    [Tooltip("카메라 앞 근거리로 흐린 것의 알파 — 화면 가장자리를 크게 덮는 구조물이라 더 옅게(밝게 떠서 눈을 끌지 않게)")]
+    [SerializeField, Range(0f, 1f)] private float nearHiddenAlpha = 0.06f;
     [SerializeField]                private float fadeSpeed    = 8f;
 
     // ── Private fields ────────────────────────────────────────────────────
@@ -43,6 +51,8 @@ public class CameraOcclusionFader : MonoBehaviour
 
     // NonAlloc 물리 버퍼 — 고정 크기, 재사용
     private readonly RaycastHit[] _hitBuffer = new RaycastHit[MaxHits];
+    private readonly Collider[]   _nearBuffer = new Collider[MaxHits];
+    private readonly Dictionary<Renderer, float> _nearHoldUntil = new();
 
     // 콜라이더 → 렌더러 배열 캐시 (GetComponentsInChildren 반복 방지)
     private readonly Dictionary<Collider, Renderer[]> _rendererCache = new();
@@ -76,6 +86,18 @@ public class CameraOcclusionFader : MonoBehaviour
     {
         _mpb = new MaterialPropertyBlock();
         _fadeShader = Shader.Find("Universal Render Pipeline/Lit");
+    }
+
+    private void OnEnable()
+    {
+        // 디졸브가 원본을 기억할 때 이 페이더가 씌운 임시 재질 대신 진짜 원본을 받게 한다(10-01)
+        DissolveEffect.OriginalMaterialsResolver = ResolveOriginals;
+    }
+
+    private void OnDisable()
+    {
+        if (DissolveEffect.OriginalMaterialsResolver == (System.Func<Renderer, Material[]>)ResolveOriginals)
+            DissolveEffect.OriginalMaterialsResolver = null;
     }
 
     private void Start()
@@ -147,25 +169,48 @@ public class CameraOcclusionFader : MonoBehaviour
             occlusionMask, QueryTriggerInteraction.Ignore);
 
         for (int i = 0; i < count; i++)
+            MarkOccluder(_hitBuffer[i].collider);
+
+        // 카메라 앞 근거리 — 카메라 바로 옆 큰 구조물은 플레이어와 한 줄이 아니어도 화면 한쪽을 통째로 가린다
+        // (10-01 f5 · 09-25 G21: 기사 아레나 가장자리에서 회랑 기둥이 화면 35~40%). 플레이어까지의 절반에서 멈춰 바닥은 안 닿는다.
+        if (nearDistance > 0f)
         {
-            var col = _hitBuffer[i].collider;
-            if (col == null) continue;
-            if (col.gameObject == _playerTransform.gameObject) continue;
-
-            // 렌더러 캐시 조회 (최초 1회만 GetComponentsInChildren 호출)
-            if (!_rendererCache.TryGetValue(col, out var renderers))
+            float   reach = Mathf.Min(nearDistance, dist * 0.5f);
+            Vector3 end   = camPos + dir / dist * reach;
+            int near = Physics.OverlapCapsuleNonAlloc(camPos, end, nearRadius, _nearBuffer, occlusionMask, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < near; i++)
             {
-                renderers = col.GetComponentsInChildren<Renderer>();
-                _rendererCache[col] = renderers;
+                var col = _nearBuffer[i];
+                // 움직이는 것(리지드바디) · 낮은 것은 빼고 큰 고정 구조물(기둥 · 벽)만
+                if (col == null || col.attachedRigidbody != null || col.bounds.size.y < NearMinHeight) continue;
+                MarkOccluder(col, true);
             }
+        }
+    }
 
-            foreach (var r in renderers)
-            {
-                if (r == null) continue;
-                _hitThisFrame.Add(r);
-                if (!_fading.ContainsKey(r))
-                    BeginFade(r);
-            }
+    private void MarkOccluder(Collider col, bool near = false)
+    {
+        if (col == null) return;
+        if (col.gameObject == _playerTransform.gameObject) return;
+
+        // 렌더러 캐시 조회 (최초 1회만 GetComponentsInChildren 호출)
+        if (!_rendererCache.TryGetValue(col, out var renderers))
+        {
+            renderers = col.GetComponentsInChildren<Renderer>();
+            _rendererCache[col] = renderers;
+        }
+
+        foreach (var r in renderers)
+        {
+            if (r == null) continue;
+            // 꺼진 렌더러(방을 짓는 동안 숨긴 블록) · 디졸브 중인 렌더러는 잡지 않는다 — 그 순간의 재질(디졸브 임시 재질)을
+            // 원본으로 기억하거나, 곧 시작할 입장 디졸브가 이 페이더의 임시 재질을 원본으로 기억하면 되돌릴 때 빈 재질(마젠타)이 된다.
+            // (10-01 Ch1 상점·정제소 — 입장 연출이 없어 벽이 숨김 · 디졸브 중일 때 카메라와 플레이어 사이에 들었다)
+            if (!r.enabled || DissolveEffect.IsDissolving(r)) continue;
+            _hitThisFrame.Add(r);
+            if (near) _nearHoldUntil[r] = Time.unscaledTime + NearHoldSeconds;
+            if (!_fading.ContainsKey(r))
+                BeginFade(r);
         }
     }
 
@@ -179,8 +224,18 @@ public class CameraOcclusionFader : MonoBehaviour
             if (r == null) { _toRemove.Add(r); continue; }
 
             var   data       = kv.Value;
-            bool  shouldHide = _hitThisFrame.Contains(r);
-            float target     = shouldHide ? hiddenAlpha : 1f;
+
+            // 디졸브가 이 렌더러를 잡아 갔다 — 디졸브는 우리 원본(ResolveOriginals)을 기억했으니 되돌리지 않고 손을 뗀다
+            if (DissolveEffect.IsDissolving(r))
+            {
+                foreach (var m in data.faded) if (m != null) Object.Destroy(m);
+                _toRemove.Add(r);
+                continue;
+            }
+
+            bool  shouldHide = _hitThisFrame.Contains(r)
+                            || (_nearHoldUntil.TryGetValue(r, out float holdUntil) && Time.unscaledTime < holdUntil);
+            float target     = shouldHide ? (_nearHoldUntil.ContainsKey(r) ? nearHiddenAlpha : hiddenAlpha) : 1f;
             data.currentAlpha = Mathf.MoveTowards(data.currentAlpha, target, fadeSpeed * Time.deltaTime);
 
             ApplyAlpha(r, data.faded, data.currentAlpha);
@@ -193,7 +248,10 @@ public class CameraOcclusionFader : MonoBehaviour
         }
 
         for (int i = 0; i < _toRemove.Count; i++)
+        {
             _fading.Remove(_toRemove[i]);
+            _nearHoldUntil.Remove(_toRemove[i]);
+        }
     }
 
     private void BeginFade(Renderer r)
@@ -294,7 +352,15 @@ public class CameraOcclusionFader : MonoBehaviour
         m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
         m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
         m.SetInt("_ZWrite",   0);
+
+        // 새 URP Lit의 기본 매끄러움 0.5가 직사광을 되비춰 흐린 기둥이 번들거렸다(10-01 f5) — 거칠게.
+        // 키워드(정반사 · 환경 반사 끄기)는 쓰지 않는다: 새 변형이라 에디터에선 컴파일 동안 청록 대체 셰이더로 뜨고, 빌드에선 걸러질 수 있다.
+        m.SetFloat("_Smoothness", 0f);
     }
+
+    /// <summary>디졸브가 묻는다 — 이 페이더가 임시 재질을 씌운 렌더러면 그 원본, 아니면 null.</summary>
+    private Material[] ResolveOriginals(Renderer r)
+        => r != null && _fading.TryGetValue(r, out var data) ? data.originals : null;
 
     private static void RestoreRenderer(Renderer r, FadeState data)
     {

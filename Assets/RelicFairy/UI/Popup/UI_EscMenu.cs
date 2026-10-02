@@ -16,9 +16,9 @@ public sealed class UI_EscMenu : MonoBehaviour
 {
     // ── Constants ────────────────────────────────────────────
     private const int   SortingOrder = UISortingOrder.SystemModal;
-    // 버튼 4개 기준 높이. 타이틀(중심 -52, 높이 48) 아래 17px, 마지막 버튼 아래 17px가 되도록 계산한 값이다.
+    // 버튼 5개 기준 높이(4개 422 + 「되찾은 기억」 82). 타이틀(중심 -52, 높이 48) 아래 17px, 마지막 버튼 아래 17px가 되도록 계산한 값이다.
     // 버튼을 늘리거나 줄이면 PanelH도 ±(BtnH + BtnGap) 해야 여백 대칭이 유지된다.
-    private const float PanelW = 420f, PanelH = 422f;
+    private const float PanelW = 420f, PanelH = 504f;
     private const float BtnW   = 320f, BtnH   = 66f, BtnGap = 16f;
 
     private static readonly Color Backdrop   = new(0f, 0f, 0f, 0.72f);
@@ -30,6 +30,7 @@ public sealed class UI_EscMenu : MonoBehaviour
     private GameObject    _root;
     private RectTransform _panel;
     private bool          _quitting;
+    private UI_RelicMemoryPage _memoryPage;   // 「되찾은 기억」 — 보유 유물 조각 보기(유물 성장 v2 §6-5)
 
     // ── Properties ───────────────────────────────────────────
     public bool IsOpen => _root != null && (_root.TryGetComponent<UIFader>(out var f) ? f.Visible : _root.activeSelf);
@@ -53,6 +54,7 @@ public sealed class UI_EscMenu : MonoBehaviour
 
     public void Close()
     {
+        CloseMemoryPage();
         if (_root != null) UIFader.On(_root, _panel).Hide();
         TimeScaleArbiter.Release(this);
     }
@@ -98,9 +100,10 @@ public sealed class UI_EscMenu : MonoBehaviour
         float top  = PanelH * 0.5f - 126f;
         float step = BtnH + BtnGap;
         NewButton(panel.transform, "계속하기",   new Vector2(0f, top),            UITheme.CtaTint,       OnResume);
-        NewButton(panel.transform, "설정",       new Vector2(0f, top - step),     UITheme.SecondaryTint, OnSettings);
-        NewButton(panel.transform, "로비로 가기", new Vector2(0f, top - step * 2f), UITheme.SecondaryTint, OnLobby);
-        NewButton(panel.transform, "게임 종료",   new Vector2(0f, top - step * 3f), UITheme.DangerTint,    OnQuit);
+        NewButton(panel.transform, "되찾은 기억", new Vector2(0f, top - step),     UITheme.SecondaryTint, OnMemory);
+        NewButton(panel.transform, "설정",       new Vector2(0f, top - step * 2f), UITheme.SecondaryTint, OnSettings);
+        NewButton(panel.transform, "로비로 가기", new Vector2(0f, top - step * 3f), UITheme.SecondaryTint, OnLobby);
+        NewButton(panel.transform, "게임 종료",   new Vector2(0f, top - step * 4f), UITheme.DangerTint,    OnQuit);
     }
 
     private static void Stretch(RectTransform rt)
@@ -163,8 +166,24 @@ public sealed class UI_EscMenu : MonoBehaviour
         UITheme.StyleText(NewLabel("Label", img.transform, label, 26f, LabelColor, Vector2.zero, new Vector2(BtnW, BtnH)), LabelColor);
     }
 
+    private void CloseMemoryPage()
+    {
+        if (_memoryPage == null || !_memoryPage.gameObject.activeSelf) return;
+        _memoryPage.Close();
+        if (_panel != null) _panel.gameObject.SetActive(true);
+    }
+
     // ── Event Handlers ───────────────────────────────────────
     private void OnResume() => Close();
+
+    // 일시정지 패널 자리에 「되찾은 기억」 쪽을 연다(같은 캔버스 · 같은 정지). 돌아가기로 패널이 돌아온다.
+    private void OnMemory()
+    {
+        if (_root == null) return;
+        _memoryPage ??= UI_RelicMemoryPage.Create(_root.transform, CloseMemoryPage);
+        _panel.gameObject.SetActive(false);
+        _memoryPage.Open();
+    }
 
     // 설정은 이 메뉴를 닫지 않고 위에 겹쳐 연다(sortingOrder SystemModalTop).
     // 닫으면 시간 정지가 풀려 설정을 만지는 동안 게임이 다시 돈다.

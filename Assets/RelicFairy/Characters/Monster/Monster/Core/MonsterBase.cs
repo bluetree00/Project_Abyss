@@ -121,7 +121,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     private float                  _baseAgentSpeed;
     private float                  _baseDefense;
     // 챕터 난이도 배율(ChapterDataSO.difficultyScale) — HP/공격력 스케일. 보스는 1 고정. 스폰/풀재사용마다 갱신.
-    private float                  _difficultyScale = 1f;
+    private float                  _difficultyScale = 1f;   // 체력 배율(챕터 × 루프 × 시기)
+    private float                  _attackScale     = 1f;   // 공격 배율(10-02 — 체력보다 완만하게)
+    private float                  _traitHpScale    = 1f;   // 시기 특성 「분열」 분신 = 작은 체력(10-02)
+    private MonsterTraits          _traits;                 // 시기 특성(없으면 null) — 받는 피해 훅
     private float                  _incomingDamageMulti = 1f;
     // 받는 피해 증폭 디버프(낙인/취약/분쇄 등) — statusId별 다중 슬롯. 시한부, 만료 시 슬롯 무시.
     // 과거 단일 float 1슬롯이라 서로 다른 출처(룬 분쇄/유물 낙인/아이템 취약)가 덮어써 1개만 유효했다.
@@ -166,7 +169,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     public float EffectiveAttackPower => _config != null ? _config.stat.attackPower : 0f;
 
     /// <summary>유효 최대 HP. 챕터 난이도 배율(difficultyScale) 반영.</summary>
-    public int EffectiveMaxHp => _config != null ? Mathf.RoundToInt(_config.stat.maxHp * _difficultyScale * BossHpScale) : 0;
+    public int EffectiveMaxHp => _config != null ? Mathf.RoundToInt(_config.stat.maxHp * _difficultyScale * BossHpScale * _traitHpScale) : 0;
 
     /// <summary>보스 총 체력 배율 — 2페이지 보스(악몽기)는 1 + 2페이지 몫(BossPages.HpScale). 공격력(AttackMultiplier)엔 영향 없음.</summary>
     protected virtual float BossHpScale => 1f;
@@ -217,6 +220,41 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>파생 클래스가 HP바 부가 표기에 접근하기 위한 읽기 전용 핸들(허수아비 DPS 분석 등). 아직 없으면 null.</summary>
     protected MonsterHPBar HpBar => _hpBar;
+
+    // ── 시기 특성(10-02 레벨디자인 설계서 §4) — 붙이고 떼는 건 MonsterTraits, 여기엔 훅만 ──
+    /// <summary>시기 특성 붙이기 · 떼기(<see cref="MonsterTraits"/>가 부른다). 받는 피해가 이 특성을 거친다.</summary>
+    public void BindTraits(MonsterTraits traits) => _traits = traits;
+
+    /// <summary>머리 위 체력바(없으면 null) — 특성 배지 갱신용.</summary>
+    public MonsterHPBar WorldHPBar => _hpBar;
+
+    /// <summary>공격 준비 거리(m) — 잠복 특성이 드러나는 거리를 정할 때 쓴다.</summary>
+    public float AttackRange => _config != null ? _config.stat.attackRange : 2f;
+
+    /// <summary>지금 공격 배율(챕터 · 광폭화 · 지휘 포함).</summary>
+    public float AttackMultiplierNow => _runtime != null ? _runtime.AttackMultiplier : 1f;
+
+    /// <summary>지휘 특성 오라 배율 — 광폭화가 공격 배율을 덮어써도 따로 곱해진다.</summary>
+    public void SetTraitAttackMul(float mul)
+    {
+        if (_runtime != null) _runtime.TraitAttackMul = mul;
+    }
+
+    /// <summary>분열 분신 — 체력 배율을 줄이고 그 체력으로 가득 채운다.</summary>
+    public void MakeTraitSplitChild(float hpScale)
+    {
+        _traitHpScale = hpScale;
+        if (_runtime == null) return;
+        _runtime.CurrentHp = EffectiveMaxHp;
+        NotifyHPChanged();
+    }
+
+    /// <summary>살아 있는 몬스터 장부를 <paramref name="into"/>에 옮겨 담는다(목록을 재사용 — 할당 없음).</summary>
+    public static void CopyActive(List<MonsterBase> into)
+    {
+        into.Clear();
+        foreach (var m in _activeMonsters) if (m != null) into.Add(m);
+    }
 
     /// <summary>
     /// 머리 위에 띄울 이름 — <b>영문</b>(09-27 사용자 「다시 영문으로」). 설정 이름(Orc·RatAssassin)을 단어로 띄운다(「Rat Assassin」).
@@ -405,7 +443,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _runtime = new MonsterRuntimeData
         {
             CurrentHp        = EffectiveMaxHp,
-            AttackMultiplier = _difficultyScale,
+            AttackMultiplier = _attackScale,
             SpawnPosition    = transform.position,
             PatrolDirection  = 1,
         };
@@ -434,8 +472,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         // 9. HP 바 요청 (보스 등 UseWorldHPBar == false면 건너뜀)
         if (UseWorldHPBar && gameObject.activeInHierarchy && !_worldHPBarSuppressed)
         {
-            _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, EffectiveMaxHp, _hpBarAnchor != null ? _hpBarAnchor : _headBone, HPBarHeadOffset);
-            _hpBar?.SetMonsterInfo(DisplayName);
+            var bar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, EffectiveMaxHp, _hpBarAnchor != null ? _hpBarAnchor : _headBone, HPBarHeadOffset);
+            if (AdoptHPBar(bar)) _hpBar.SetMonsterInfo(DisplayName);
         }
 
         OnInitialized();
@@ -501,9 +539,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// 인스턴스별 적용이라 공유 config를 오염시키지 않으며, 멀티챕터 런에서 OnEnable마다 재호출된다.</summary>
     private void ResolveDifficultyScale()
     {
-        if (_config != null && _config.grade == MonsterGrade.Boss) { _difficultyScale = 1f; return; }
+        if (_config != null && _config.grade == MonsterGrade.Boss) { _difficultyScale = 1f; _attackScale = 1f; return; }
         var run = AppBootstrapper.Instance?.CurrentRun;
         _difficultyScale = run != null ? run.CurrentDifficultyScale : 1f;
+        _attackScale     = run != null ? run.CurrentAttackScale     : 1f;
     }
 
     /// <summary>
@@ -902,10 +941,17 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         // 화상 — MonsterStatusReceiver를 타지 않는 독립 계통(가웨인 태양)
         if (TryGetComponent<MonsterBurnHandler>(out var burn) && burn.Remaining > 0f)
             into.Add(MonsterStatusReceiver.MakeItem("burn", 1, burn.Remaining01, burn.Remaining));
+
+        // 유물 전용 이상 상태(태양흔 · 흑점 · 배신의 낙인, 유물 성장 v2) — 스택 수로 보인다
+        if (TryGetComponent<RelicMarkStatus>(out var marks)) marks.Collect(into);
     }
 
     /// <summary>지금 '취약'(받피증폭)이 하나라도 걸려 있는지. 서약 「처형」이 상태 통화 종수를 셀 때 쓴다.</summary>
     public bool HasDamageTakenAmp => CurrentDamageTakenMult() > 1.0001f;
+
+    /// <summary>이름 있는 받피증폭 슬롯이 살아 있는가(감전 「shocked」 등 — 유물 성장 v2 전이 ③).</summary>
+    public bool HasDamageTakenAmpSlot(string statusId)
+        => statusId != null && _dmgTakenAmpSlots.TryGetValue(statusId, out var s) && s.expire > Time.time;
 
     /// <summary>활성 받피증폭의 합(0.2 = 받는 피해 +20%). 서약 환전소가 '취약' 통화 잔고를 읽는다.</summary>
     public float DamageTakenAmpTotal => CurrentDamageTakenMult() - 1f;
@@ -952,6 +998,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         float defense = _baseDefense * _defenseMulti * Mathf.Clamp01(1f - defenseIgnore);
         float actual  = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
+        if (_traits != null) actual = _traits.ModifyIncoming(actual, element);   // 시기 특성 — 수호막 · 속성 저항
         _runtime.CurrentHp -= (int)actual;
         int hpFloor = DamageHpFloor;   // [인트로] 이길 수 없는 연출 · 페이지 보스의 전환 임계
         if (_runtime.CurrentHp < hpFloor) _runtime.CurrentHp = hpFloor;
@@ -1043,6 +1090,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         // 방어력 + 데미지 배율 + 받는 데미지 배율 + 디버프 증폭(statusId별 합연산) (최소 1 데미지)
         float defense = _baseDefense * _defenseMulti;
         float actual = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
+        if (_traits != null) actual = _traits.ModifyIncoming(actual, null);   // 시기 특성 — 수호막
         _runtime.CurrentHp -= (int)actual;
         int hpFloor = DamageHpFloor;   // [인트로] 이길 수 없는 연출 · 페이지 보스의 전환 임계
         if (_runtime.CurrentHp < hpFloor) _runtime.CurrentHp = hpFloor;
@@ -1373,6 +1421,27 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _activeMonsters.Clear();
     }
 
+    /// <summary>
+    /// 적 나침반 HUD용 — <paramref name="from"/>에서 가장 가까운 살아 있는 몬스터(보스 제외)와 살아 있는 보스를 찾는다.
+    /// 장부(HashSet)를 직접 훑어 할당이 없다. 없으면 null.
+    /// </summary>
+    public static void FindCompassTargets(Vector3 from, out MonsterBase nearest, out float nearestDist, out MonsterBase boss)
+    {
+        nearest = null;
+        boss = null;
+        float bestSqr = float.MaxValue;
+        foreach (var m in _activeMonsters)
+        {
+            if (m == null || m.IsDead || !m.isActiveAndEnabled) continue;
+            if (m.Grade == MonsterGrade.Boss) { boss = m; continue; }
+            Vector3 d = m.transform.position - from;
+            d.y = 0f;
+            float sqr = d.sqrMagnitude;
+            if (sqr < bestSqr) { bestSqr = sqr; nearest = m; }
+        }
+        nearestDist = nearest != null ? Mathf.Sqrt(bestSqr) : 0f;
+    }
+
     protected virtual void OnEnable()
     {
         // 세대 카운터는 _config 유무와 무관하게 먼저 증가 — 아직 InitAsync 미완 상태에서도
@@ -1401,6 +1470,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         // 풀 재사용 시 현재 챕터의 난이도 배율 재적용(멀티챕터 런 대응).
         ResolveDifficultyScale();
+        _traitHpScale = 1f;   // 분열 분신이었던 몸도 풀에서 다시 나오면 제 체력으로
 
         _runtime.CurrentHp           = EffectiveMaxHp;
         _runtime.IsDead              = false;
@@ -1416,8 +1486,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _runtime.IsReturning         = false;
         _runtime.TargetCleared       = true;
         _runtime.SpeedMultiplier     = 1f;
-        _runtime.AttackMultiplier    = _difficultyScale;
+        _runtime.AttackMultiplier    = _attackScale;
         _runtime.DamageMultiplier    = 1f;
+        _runtime.TraitAttackMul      = 1f;
 
         if (_agent != null)
         {
@@ -1533,15 +1604,26 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             Managers.MonsterHPBar.ReturnHPBar(_hpBar);
             _hpBar = null;
         }
-        _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, EffectiveMaxHp, _hpBarAnchor != null ? _hpBarAnchor : _headBone, HPBarHeadOffset);
-        if (_worldHPBarSuppressed && _hpBar != null)
-        {
-            Managers.MonsterHPBar.ReturnHPBar(_hpBar);
-            _hpBar = null;
-        }
-        if (_config != null)
-            _hpBar?.SetMonsterInfo(DisplayName);
+        var bar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, EffectiveMaxHp, _hpBarAnchor != null ? _hpBarAnchor : _headBone, HPBarHeadOffset);
+        if (AdoptHPBar(bar) && _config != null)
+            _hpBar.SetMonsterInfo(DisplayName);
         _hpBarRequesting = false;
+    }
+
+    /// <summary>
+    /// 받은 바를 단다. 기다리는 사이 풀로 돌아갔거나(꺼짐 · 파괴) 숨김이 걸렸거나 다른 요청(초기화 · 재활성)이 먼저 바를 달았으면 돌려준다.
+    /// 그냥 덮어쓰면 참조를 잃은 바가 꺼진 몸을 따라다니며 허공에 이름표로 남았다(10-01 f5 전주기 시뮬 「Spider」 — 다음 방들까지 보였다).
+    /// </summary>
+    private bool AdoptHPBar(MonsterHPBar bar)
+    {
+        if (bar == null) return false;
+        if (this == null || !gameObject.activeInHierarchy || _worldHPBarSuppressed || _hpBar != null)
+        {
+            Managers.MonsterHPBar?.ReturnHPBar(bar);
+            return false;
+        }
+        _hpBar = bar;
+        return true;
     }
 
     /// <summary>

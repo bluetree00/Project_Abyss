@@ -77,6 +77,7 @@ public static class BossCombatLog
         s_shotDir = System.IO.Path.Combine(dir, "shots");
         s_shots.Clear();
         s_guideSeen.Clear(); s_guideShots.Clear(); s_nextGuideScan = 0f;
+        BossGuideShapes.Reset();
 
         s_player = null; s_boss = null; s_spawner = null;
         s_bossDeadLogged = s_bossImmune = s_playerInv = false;
@@ -132,7 +133,7 @@ public static class BossCombatLog
         TickBoss(now);
         TickPlayer();
         TickShots(now);
-        if (Time.realtimeSinceStartup >= s_nextGuideScan) { s_nextGuideScan = Time.realtimeSinceStartup + 0.1f; ScanGuides(now); }
+        if (Time.realtimeSinceStartup >= s_nextGuideScan) { s_nextGuideScan = Time.realtimeSinceStartup + 0.1f; ScanGuides(now); BossGuideShapes.Scan(); }   // 가이드가 뜬 시각을 잡아 둔다(맞은 순간 예고 길이)
         if (now >= s_nextSnap) { s_nextSnap = now + SnapshotInterval; Snapshot(); }
     }
 
@@ -319,12 +320,30 @@ public static class BossCombatLog
         var pp = s_player != null ? s_player.transform.position : Vector3.zero;
         var bp = s_boss != null ? s_boss.transform.position : Vector3.zero;
         string boss = s_boss != null
-            ? $"보스 HP {HpPct(s_boss)} · {s_bossState} · 패턴 {s_pattern}{(s_bossImmune ? " · 면역" : "")} · 위치 ({bp.x:0.0}, {bp.y:0.0}, {bp.z:0.0})"
+            ? $"보스 HP {HpPct(s_boss)} · {s_bossState}{StateDetail(s_boss)} · 패턴 {s_pattern}{(s_bossImmune ? " · 면역" : "")} · 위치 ({bp.x:0.0}, {bp.y:0.0}, {bp.z:0.0})"
             : "보스 없음";
         string player = s_player != null
             ? $"플레이어 HP {ps?.Hp}/{ps?.MaxHp} · {s_playerAct}/{s_playerLoco}{(s_playerInv ? " · 무적" : "")} · 위치 ({pp.x:0.0}, {pp.y:0.0}, {pp.z:0.0})"
             : "플레이어 없음";
         Write($"[스냅숏] {boss} || {player} · 거리 {Dist():0.0} m", false);
+    }
+
+    /// <summary>상태 내부 단계(_phase) · 애니메이터(상태 해시 · 진행 · 전환 중) · CC — 패턴이 어디서 멈췄는지 가르는 진단(10-01 화룡 N1).</summary>
+    private static string StateDetail(MonsterBase boss)
+    {
+        var sb  = new StringBuilder();
+        var fsm = FindField(typeof(MonsterBase), "_fsm")?.GetValue(boss);
+        var cur = fsm != null ? FindField(fsm.GetType(), "_current")?.GetValue(fsm) : null;
+        var phase = cur != null ? FindField(cur.GetType(), "_phase")?.GetValue(cur) : null;
+        if (phase != null) sb.Append($"[{phase}]");
+        var anim = boss.GetComponentInChildren<Animator>();
+        if (anim != null && anim.isActiveAndEnabled)
+        {
+            var info = anim.GetCurrentAnimatorStateInfo(0);
+            sb.Append($" 애니 {info.shortNameHash} {info.normalizedTime:0.00}{(anim.IsInTransition(0) ? " 전환중" : "")} 속도 {anim.speed:0.00}");
+        }
+        if (boss.Status != null && boss.Status.IsCcActive) sb.Append(" · CC");
+        return sb.ToString();
     }
 
     private static void FlushPattern()
@@ -346,6 +365,17 @@ public static class BossCombatLog
         string text = $"[{Time.time - s_t0,7:0.00}] {line}";
         s_file?.WriteLine(text);
         if (console) Debug.Log("[BossLog] " + text);
+    }
+
+    /// <summary>보스 정면과 플레이어 방향 사이 각 — 판정이 보스 정면 기준인 부채꼴 패턴 진단용.</summary>
+    private static float BossFacingAngle()
+    {
+        if (s_player == null || s_boss == null) return -1f;
+        Vector3 d = s_player.transform.position - s_boss.transform.position;
+        d.y = 0f;
+        Vector3 f = s_boss.transform.forward;
+        f.y = 0f;
+        return Vector3.Angle(f, d);
     }
 
     private static float Dist()
@@ -425,7 +455,11 @@ public static class BossCombatLog
         var ps = s_player != null ? s_player.RuntimeStats : null;
         string since = s_patternAt >= 0f ? $"+{Time.time - s_patternAt:0.00}초" : "";
         string res = applied && final == 0 ? "명중(실드가 전부 흡수)" : OutcomeText(outcome);
-        Write($"[공격] {res} · {Attacker(attacker)} · 패턴 {s_pattern} {since} · 피해 {raw} → {final} · 플레이어 HP {ps?.Hp}/{ps?.MaxHp} · 거리 {Dist():0.0} m", true);
+        // 맞은 자리를 덮던 예고 가이드와 그 가이드가 떠 있던 시간 — 「가이드 밖」이면 예고 없이 맞았거나 가이드와 판정이 어긋났다
+        string guide = s_player != null && BossGuideShapes.Covering(BossGuideShapes.Scan(), s_player.transform.position, 0.4f, out var cov)
+            ? $"가이드 {BossGuideShapes.Describe(cov)} {cov.Age:0.00}초"
+            : s_player != null ? $"가이드 밖({BossGuideShapes.NearestMiss(BossGuideShapes.Scan(), s_player.transform.position)} · 보스 정면에서 {BossFacingAngle():0}°)" : "가이드 밖";
+        Write($"[공격] {res} · {Attacker(attacker)} · 패턴 {s_pattern} {since} · 피해 {raw} → {final} · {guide} · 플레이어 HP {ps?.Hp}/{ps?.MaxHp} · 거리 {Dist():0.0} m", true);
     }
 
     private static void OnHitTaken(HitWeight weight, Vector3 dir, int dmg)

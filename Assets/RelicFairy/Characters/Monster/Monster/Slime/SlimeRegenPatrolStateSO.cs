@@ -64,7 +64,7 @@ public class SlimeRegenPatrolStateSO : MonsterStateOverrideSO
             {
                 _cooldown = _data.interval;
 
-                int   maxHp   = ctx.Stat.maxHp;
+                int   maxHp   = ctx.Monster.EffectiveMaxHp;   // 난이도 배율 반영
                 float hpRatio = maxHp > 0 ? (float)ctx.Runtime.CurrentHp / maxHp : 1f;
                 if (hpRatio <= _data.regenHpThreshold)
                 {

@@ -16,7 +16,7 @@ MonoBehaviour:
   - displayName: FairyBatMonster
     addressableKey: FairyBat/FairyBat
     grade: 0
-    poolTags: 03000000
+    poolTags: 04000000
     weight: 1
     enabled: 1
   - displayName: GolemMonster
@@ -34,25 +34,25 @@ MonoBehaviour:
   - displayName: SlimeMonster
     addressableKey: Slime/Slime
     grade: 0
-    poolTags: 0100000002000000
+    poolTags: 010000000200000004000000
     weight: 1
     enabled: 1
   - displayName: SnailMonster
     addressableKey: Snail/Snail
     grade: 0
-    poolTags: 0200000004000000
+    poolTags: 
     weight: 1
     enabled: 1
   - displayName: SpiderMonster
     addressableKey: Spider/Spider
     grade: 0
-    poolTags: 01000000
+    poolTags: 010000000200000003000000
     weight: 1
     enabled: 1
   - displayName: MonsterPlantMonster
     addressableKey: MonsterPlant/MonsterPlant
     grade: 1
-    poolTags: 0100000003000000
+    poolTags: 0100000002000000
     weight: 1
     enabled: 1
   - displayName: EvilMageMonster
@@ -64,7 +64,7 @@ MonoBehaviour:
   - displayName: OrcMonster
     addressableKey: Orc/Orc
     grade: 1
-    poolTags: 020000000300000004000000
+    poolTags: 0200000003000000
     weight: 1
     enabled: 1
   - displayName: DragonMonster
@@ -106,7 +106,7 @@ MonoBehaviour:
   - displayName: RatAssassinMonster
     addressableKey: RatAssassin/RatAssassin
     grade: 0
-    poolTags: 0300000004000000
+    poolTags: 0200000003000000
     weight: 1
     enabled: 1
   - displayName: SpecterMonster
@@ -136,7 +136,7 @@ MonoBehaviour:
   - displayName: BishopKnightMonster
     addressableKey: BishopKnight/BishopKnight
     grade: 2
-    poolTags: 03000000
+    poolTags: 0300000004000000
     weight: 1
     enabled: 1
   - displayName: BlackKnightMonster
@@ -148,7 +148,7 @@ MonoBehaviour:
   - displayName: CactusMonster
     addressableKey: Cactus/Cactus
     grade: 1
-    poolTags: 0200000004000000
+    poolTags: 
     weight: 1
     enabled: 1
   - displayName: CyclopsMonster
@@ -172,7 +172,7 @@ MonoBehaviour:
   - displayName: MushroomAngryMonster
     addressableKey: MushroomAngry/MushroomAngry
     grade: 0
-    poolTags: 02000000
+    poolTags: 01000000
     weight: 1
     enabled: 1
   - displayName: MushroomSmileMonster
@@ -184,7 +184,7 @@ MonoBehaviour:
   - displayName: NagaWizardMonster
     addressableKey: NagaWizard/NagaWizard
     grade: 2
-    poolTags: 04000000
+    poolTags: 
     weight: 1
     enabled: 1
   - displayName: SalamanderMonster
@@ -238,6 +238,6 @@ MonoBehaviour:
   - displayName: LichSkeletonMonster
     addressableKey: LichSkeleton/LichSkeleton
     grade: 1
-    poolTags: 
+    poolTags: 04000000
     weight: 1
     enabled: 1

@@ -16,34 +16,74 @@ MonoBehaviour:
   - element: 0
     statusAura: {fileID: 5869229029559480062, guid: 330064799c16df14cbc20619b3bf90e8,
       type: 3}
+    auraRadius: 2.3
     statusBody: {fileID: 100004, guid: f9b8345316bce4b4eb5a6944fdbb0209, type: 3}
     burst: {fileID: 7812585453298936655, guid: 4da2216bfcbd6764c9dee834c281d43d, type: 3}
+    impact: {fileID: 6981941031284743971, guid: edbcd3b3c18ccf44db5b7031741faf88,
+      type: 3}
+    impactHeight: 1
+    area: {fileID: 1953714657109559461, guid: 247bb6dac5e3cbd408b243d6cb32f46a, type: 3}
+    areaRadius: 2.2
+    areaLife: 1.6
   - element: 1
     statusAura: {fileID: 1814480919851174754, guid: f2a5aea27a74c6042a7394e7e68f3790,
       type: 3}
-    statusBody: {fileID: 3317504816819617755, guid: 3b8254cffe7d654418b77c0f62d117a7,
+    auraRadius: 2.3
+    statusBody: {fileID: 6146425452966005824, guid: ec68d45bfa3d18847a43e937b136049e,
       type: 3}
     burst: {fileID: 3317504816819617755, guid: 3b8254cffe7d654418b77c0f62d117a7, type: 3}
+    impact: {fileID: 101492313709125170, guid: 09293f3ca582a1e4b8438d520cddecf9, type: 3}
+    impactHeight: 1
+    area: {fileID: 534280799920659046, guid: b885061ef6d615947aeac189777647a9, type: 3}
+    areaRadius: 2.2
+    areaLife: 1.5
   - element: 2
     statusAura: {fileID: 282865943274501379, guid: 43ef130d1023d7e4695fe417f4dd035f,
       type: 3}
+    auraRadius: 2.3
     statusBody: {fileID: 100000, guid: e517b3f9449d945ac97bf9897d01e434, type: 3}
     burst: {fileID: 3594099513468408576, guid: 68df5f4680898db4a87fcead70933ca1, type: 3}
+    impact: {fileID: 100004, guid: 6e118df29b95b41b984ec16039c1f2e3, type: 3}
+    impactHeight: 1
+    area: {fileID: 3144161684805450049, guid: e43e54105055b48408331d31eec1cf6a, type: 3}
+    areaRadius: 2
+    areaLife: 1.1
   - element: 3
-    statusAura: {fileID: 5149745296654590901, guid: b354441b8b822074f8e52d84f17bad97,
+    statusAura: {fileID: 3784051288199953718, guid: 4a238f94894ecd4499ac9a27e1803fcf,
       type: 3}
-    statusBody: {fileID: 3036939298300616702, guid: da69781804b66944c97da1ac8d69234b,
+    auraRadius: 2.4
+    statusBody: {fileID: 815897628672023783, guid: c1937f972ff9beb43a6c954f5a39a304,
       type: 3}
     burst: {fileID: 3036939298300616702, guid: da69781804b66944c97da1ac8d69234b, type: 3}
+    impact: {fileID: 7593753326982843609, guid: 29ba84524175fa94484f37073cb12c8a,
+      type: 3}
+    impactHeight: 1
+    area: {fileID: 7593753326982843609, guid: 29ba84524175fa94484f37073cb12c8a, type: 3}
+    areaRadius: 1.5
+    areaLife: 1.5
   - element: 4
     statusAura: {fileID: 174211133732289389, guid: 6f33d5b0319dbdf4e95edc7a2c267e53,
       type: 3}
+    auraRadius: 2.3
     statusBody: {fileID: 6476038097601970992, guid: 1a406f3dc6fc66740a860063ae7cc6eb,
       type: 3}
     burst: {fileID: 6476038097601970992, guid: 1a406f3dc6fc66740a860063ae7cc6eb, type: 3}
-  - element: 5
-    statusAura: {fileID: 4832121135125949560, guid: d67be8e74f13e26429aece1e53a117b7,
+    impact: {fileID: 4020421568969601508, guid: 0ced40189347d054588156810ea36d23,
       type: 3}
+    impactHeight: 1
+    area: {fileID: 4737006685481212167, guid: ce94fa18ce556f048a60fc674737907b, type: 3}
+    areaRadius: 2.3
+    areaLife: 1.5
+  - element: 5
+    statusAura: {fileID: 3594149076506533137, guid: 6fc914f49e5ff664ea5e8a29573adde7,
+      type: 3}
+    auraRadius: 2.3
     statusBody: {fileID: 1327569613689390, guid: 13a7c7a8d1bb29943ae2fda15a8f1e5c,
       type: 3}
-    burst: {fileID: 5778512669574036082, guid: 9c4a250767dd5724db010a9bfa40e0c3, type: 3}
+    burst: {fileID: 1171235918528847832, guid: 6911adf50f0ad8749aca0b6969b56e9a, type: 3}
+    impact: {fileID: 3470175545269027477, guid: 3f498e4cf53914e48b44a0340f496a52,
+      type: 3}
+    impactHeight: 1
+    area: {fileID: 3470175545269027477, guid: 3f498e4cf53914e48b44a0340f496a52, type: 3}
+    areaRadius: 1.3
+    areaLife: 2

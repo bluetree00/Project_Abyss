@@ -27,6 +27,7 @@ MonoBehaviour:
     type: 3}
   swingVfxPrefab: {fileID: 1105761162065845526, guid: 28668731d069e9444b9b61a080a17947,
     type: 3}
+  flipVfxPrefab: {fileID: 1586059801500780, guid: ac8484e80858b3c48925e94eb1014dc4, type: 3}
   warningDuration: 0.4
   hitTime: 1.2
   hitDuration: 0.4

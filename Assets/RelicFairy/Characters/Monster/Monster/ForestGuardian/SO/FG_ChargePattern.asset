@@ -24,13 +24,13 @@ MonoBehaviour:
   minRange: 6
   maxRange: 40
   windupDuration: 1
-  lockDuration: 0.45
+  lockDuration: 0.5
   windupTurnSpeed: 240
   recoveryDuration: 0.7
   chargeSpeed: 16
   overshoot: 3
   stopBeforeEdge: 1.5
-  width: 2.6
+  width: 3.6
   damageMultiplier: 1.3
   knockbackMultiplier: 1.6
   hitRadius: 1.8

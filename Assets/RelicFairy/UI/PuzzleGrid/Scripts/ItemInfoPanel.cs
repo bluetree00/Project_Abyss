@@ -61,6 +61,10 @@ public sealed class ItemInfoPanel : MonoBehaviour
 
     // ── Private ──
     private RuntimeItemData _currentItem;
+
+    /// <summary>보여 주는 룬이 바뀌었다(없으면 null) — 룬판의 [분해]가 대상을 따라간다.</summary>
+    public event System.Action<RuntimeItemData> OnItemShown;
+    public RuntimeItemData CurrentItem => _currentItem;
     private CancellationTokenSource _flipCts;
     private readonly List<GameObject> _effectRows = new();
     private readonly List<GameObject> _shapeCells = new();
@@ -87,6 +91,7 @@ public sealed class ItemInfoPanel : MonoBehaviour
         // 다른 룬으로 바뀔 때만 뒤집는다 — 같은 룬을 다시 그리는 갱신(배치·호버 복귀)마다 돌면 화면이 들썩인다.
         bool changed = item != _currentItem;
         _currentItem = item;
+        OnItemShown?.Invoke(item);
 
         if (emptyRoot != null) emptyRoot.SetActive(false);
         if (itemRoot  != null) itemRoot.SetActive(true);
@@ -152,6 +157,7 @@ public sealed class ItemInfoPanel : MonoBehaviour
         // 코드로 조립된 패널엔 itemRoot가 없어 아이콘이 그대로 남는다 — 스프라이트 없는 Image는 흰 사각형으로 보인다(2026-09-09 실측).
         if (itemIcon != null) itemIcon.enabled = false;
         _currentItem = null;
+        OnItemShown?.Invoke(null);
         if (itemRoot  != null) itemRoot.SetActive(false);
         if (emptyRoot != null) emptyRoot.SetActive(true);
         if (newBadge  != null) newBadge.SetActive(false);

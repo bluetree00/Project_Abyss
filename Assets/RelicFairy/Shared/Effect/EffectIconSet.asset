@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0ca4d9ca6be8e0342a127f2b7d1af2b3, type: 3}
   m_Name: EffectIconSet
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   entries:
   - key: shop_potion
     sprite: {fileID: 21300000, guid: 96731947b25dde741bf74c9ce434647a, type: 3}
@@ -21,3 +21,69 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: 12a834d637ad2334db37c6745ae4ac59, type: 3}
   - key: shop_buff_offense
     sprite: {fileID: 21300000, guid: 7a19c11671fd1684185b115c0d8dc414, type: 3}
+  - key: fire
+    sprite: {fileID: 21300000, guid: 6b43c35a483b0ec4a9027dcc2004c729, type: 3}
+  - key: lightning
+    sprite: {fileID: 21300000, guid: 06cb89aa7a2ebf843a7710d7b344da37, type: 3}
+  - key: freeze
+    sprite: {fileID: 21300000, guid: afb3ac0dcadbb9e49aeeccc3840ac28d, type: 3}
+  - key: poison
+    sprite: {fileID: 21300000, guid: 31e6fe1414fe2d847bba68ffa1d8cfe9, type: 3}
+  - key: dark
+    sprite: {fileID: 21300000, guid: 8bf20b3978bbf4843b14df3a06905283, type: 3}
+  - key: light
+    sprite: {fileID: 21300000, guid: 0f01185f9119db349999ec375c46116f, type: 3}
+  - key: bleed
+    sprite: {fileID: 21300000, guid: f52ce93ea90454743942fdb55f854f9d, type: 3}
+  - key: stun
+    sprite: {fileID: 21300000, guid: c658fd0c6e635e84d90113c30dc128e9, type: 3}
+  - key: slow
+    sprite: {fileID: 21300000, guid: 054b781019a793f40aa55c5f49ac170c, type: 3}
+  - key: vulnerable
+    sprite: {fileID: 21300000, guid: 038d1e3b083e1a74cb114cdf3113e77d, type: 3}
+  - key: weaken
+    sprite: {fileID: 21300000, guid: ac9a5e821e4a9ce44a4ea2feee25aa1a, type: 3}
+  - key: dmg
+    sprite: {fileID: 21300000, guid: 4140c633d13ac9a419deb66af6735d93, type: 3}
+  - key: crit
+    sprite: {fileID: 21300000, guid: e0b8a1b3e07c7de449d28af61c9d548c, type: 3}
+  - key: critdmg
+    sprite: {fileID: 21300000, guid: f6990e3c56169b44584bcf42e1e45bd7, type: 3}
+  - key: hp
+    sprite: {fileID: 21300000, guid: d4b71ac137734d94d858046efc42f7eb, type: 3}
+  - key: shield
+    sprite: {fileID: 21300000, guid: c559fee6cd7c63a4ca23d1fd3068d3af, type: 3}
+  - key: atkspeed
+    sprite: {fileID: 21300000, guid: a22acd70f52ba1c43a8378ecc460b50b, type: 3}
+  - key: gold
+    sprite: {fileID: 21300000, guid: 9bd3d999ff6f2e240aa0f9c738e2bf07, type: 3}
+  - key: skill
+    sprite: {fileID: 21300000, guid: 057418d4b55fe2f44a73e34cc556cb6a, type: 3}
+  - key: special
+    sprite: {fileID: 21300000, guid: 63d6f07af5440d4449124d686db4a19b, type: 3}
+  - key: projectile
+    sprite: {fileID: 21300000, guid: c476c50f594d77a459a9bed9d510c700, type: 3}
+  - key: range
+    sprite: {fileID: 21300000, guid: cdb1a6ba87edd114a9edd6927c9c989c, type: 3}
+  - key: roll
+    sprite: {fileID: 21300000, guid: f8a0d11d8a0b6bd40a04fe5590e27d28, type: 3}
+  - key: element
+    sprite: {fileID: 21300000, guid: eaccfb0fd748da64e8a55b64979a13e8, type: 3}
+  - key: allstats
+    sprite: {fileID: 21300000, guid: c1cff1ca1d1adc64e8c3d8f750f92038, type: 3}
+  - key: utility
+    sprite: {fileID: 21300000, guid: 399f947688a47d244b4145d1e46a6047, type: 3}
+  - key: unknown
+    sprite: {fileID: 21300000, guid: 4cb9bd6cd3e96a74c95f33e71f1ace13, type: 3}
+  - key: atk
+    sprite: {fileID: 21300000, guid: 4c92631cfe61a2d4db7ee2c882ac530a, type: 3}
+  - key: def
+    sprite: {fileID: 21300000, guid: 95f39b57d10c89b44a36cd530526df69, type: 3}
+  - key: speed
+    sprite: {fileID: 21300000, guid: 317ace83867279d42a986801d9b90669, type: 3}
+  - key: cooldown
+    sprite: {fileID: 21300000, guid: bb0965a5e9d3c08448c7ce84a353d15f, type: 3}
+  - key: heal
+    sprite: {fileID: 21300000, guid: 9b1007c36b7171544b0b385349ecedc5, type: 3}
+  - key: luck
+    sprite: {fileID: 21300000, guid: 4a05495a7de2e96479cc031f418d243e, type: 3}

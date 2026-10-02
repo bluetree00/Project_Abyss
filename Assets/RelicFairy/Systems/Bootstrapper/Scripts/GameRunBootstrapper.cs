@@ -96,6 +96,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
              "문 너머가 허공(절벽)으로 보이지 않게 '뒤로 이어지는 통로' 느낌을 준다. 0이면 비활성.")]
     private int procDoorCorridorLength = 6;
 
+    [SerializeField, Tooltip("절차 방의 막힌 경계를 따라 두르는 결계 띠(ArcaneEdge — 베이스캠프 난간과 같은 표현). " +
+             "경로는 방을 지을 때 물리로 잰다(RoomBoundaryTracer). 비우면 표시 없음.")]
+    private ArcaneEdge roomBoundaryEdgePrefab;
+
 
     [Header("Shop Room")]
     [SerializeField, Min(0)] private int shopSlotCount = 3;
@@ -144,6 +148,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [SerializeField] private GameObject[] refineryDecorPrefabs;
     [Tooltip("상점 소품 — 첫 항목이 NPC 앞 판매대가 되고 나머지는 뒤쪽에 배치된다.")]
     [SerializeField] private GameObject[] shopDecorPrefabs;
+
+    [Header("쉼터 · 요정의 샘 (10-01 휴게 공간)")]
+    [Tooltip("쉼터 모닥불(NS 자리) — 「쉰다」")]
+    [SerializeField] private GameObject restFirePrefab;
+    [Tooltip("쉼터 소품 — [0] = 모루(NC 자리, 「벼린다」) · [1~] = NP<n> 자리 소품")]
+    [SerializeField] private GameObject[] restDecorPrefabs;
+    [Tooltip("챕터 시작 대기방의 요정의 샘 비주얼")]
+    [SerializeField] private GameObject chapterSpringPrefab;
 
     public GameObject[] CrucibleDecorPrefabs => crucibleDecorPrefabs;
     public GameObject[] RefineryDecorPrefabs => refineryDecorPrefabs;
@@ -197,6 +209,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// 늘 월드 아이덴티티라, 방 방향과 무관하게 +Z를 보고 시작하던 문제를 시작방 한정으로 보정한다.
     /// </summary>
     private Vector3? _startRoomExitWorldPos;
+    /// <summary>
+    /// 시작방 스폰 때 잡은 「출구를 정면에 둔 yaw」 — 카메라 인계가 이 값을 헤딩으로 쓴다(한 번 쓰고 비움).
+    /// 인계는 스폰보다 늦다(무기 매니저 대기·무기 로드 — 비동기 여러 프레임~수 초, 입력은 열려 있음). 그 사이 플레이어가
+    /// 이동·클릭으로 돌면 「지금 플레이어 yaw」를 헤딩으로 쓰던 인계가 그 각을 물려받아 문이 화면 옆으로 갔다(10-01, 「가끔」의 원인).
+    /// </summary>
+    private float? _startRoomCameraYaw;
     private bool _isSpawning;
 
     private GameRunSession _run;
@@ -217,6 +235,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
         Instance = this;
+        // S4 「하늘 → 탑 안」 — 런 씬마다 하늘을 끄고 탑 벽 · 구덩이를 세운다(10-02 d6).
+        if (!TryGetComponent<DungeonSpaceDirector>(out _)) gameObject.AddComponent<DungeonSpaceDirector>();
 
         var app = AppBootstrapper.Instance;
         if (app != null && app.CurrentRun != null)
@@ -229,11 +249,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             if (app != null)
             {
                 app.BeginRun(_run);
-                // 「파츠 영구 계승」 — 새 런에서만 얹는다. 챕터 전환·이어하기는 CurrentRun이 살아 있어
-                // 이 갈래로 오지 않으므로 파츠가 두 번 붙지 않는다.
-                PartInheritanceService.ApplyToRun(app.Loadout);
+                // 「파츠 영구 계승」 노드는 10-02 기억의 제단 재설계로 없어졌다(유물 성장 v2 — 힘은 런 안에서만).
             }
         }
+        _run.BindFinalChapter(chapterRegistry);   // 새 런 · 이어하기 · 챕터 전환 모두 — 「챕터 4 개방」 뒤 리치까지(10-01 D1)
 
         var uiRoot = UIRootBootstrapper.Instance;
         if (uiRoot != null)
@@ -264,12 +283,35 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         //    예외 하나에 런 진행이 통째로 막힌다(포탈이 안 생기는 소프트락). 보상은 잃어도 길은 열린다.
         if (!isFinal)
         {
-            try { await ShowRelicPartDraftAsync(ct); }
+            // 되찾은 기억(10-02 시나리오 「기억을 되찾아간다」) — 끝 장면을 끝까지 보여 주고, 쓰러진 자리에서 빛이 유물로 스며든 뒤
+            // 회상 한 줄 → 고르기 창 → 한 마디. 연출이 깨져도 창과 출구는 열린다.
+            // 유물 성장 v2 — 카드를 <b>먼저 한 번</b> 굴린다. 기억의 빛(d6)이 그 최고 등급으로 세기를 정하고,
+            // 창은 같은 드래프트를 그대로 보여 준다(다시 굴리면 빛과 카드가 어긋난다).
+            RelicDraft draft = null;
+            try { draft = PrepareRelicDraft(); }
+            catch (System.Exception e) { Debug.LogError($"[BossClear] 유물 기억 카드 생성 예외 — 창 없이 진행: {e}"); }
+
+            try
+            {
+                await RelicMemoryRecall.WaitBossEndSceneAsync(_run, ct);
+                var boss = Object.FindFirstObjectByType<BossSpawner>()?.SpawnedBoss;
+                Vector3 fallAt = boss != null ? boss.transform.position : center;
+                // 기억의 빛 세기 · 색은 그 드래프트 최고 등급이 정한다(흐릿 바랜 빛 0.8 · 선명 1.0 · 찬란 금빛 1.35 — d6 RelicMemoryRecall)
+                await RelicMemoryRecall.PlayAsync(fallAt, _run?.Player, AppBootstrapper.Instance?.Loadout?.Relic,
+                                                  draft?.TopGrade ?? RelicMemoryGrade.Clear, ct);
+            }
+            catch (System.OperationCanceledException) { return; }
+            catch (System.Exception e) { Debug.LogWarning($"[BossClear] 되찾은 기억 연출 예외(건너뜀): {e.Message}"); }
+
+            // 처치 · 봉인 대사가 드래프트 창 위에 겹쳐 남았다(10-01 f5 전주기 시뮬) — 창을 열기 전에 걷는다(대기 상한을 넘긴 경우).
+            RelicFairy.UI.UI_BossBark.Dismiss(0f);
+            try { await ShowRelicPartDraftAsync(draft, ct); }
             catch (System.OperationCanceledException) { return; }
             catch (System.Exception e)
             {
                 Debug.LogError($"[BossClear] 파츠 드래프트 예외 — 건너뛰고 출구를 연다: {e}");
             }
+            RelicMemoryRecall.SayReturn();
         }
 
         // 2) 최종 보스: 무한 루프 갈림길(계속=심연 회귀 / 귀환=런 종료). 비최종: 이어지는 길로 다음 챕터.
@@ -310,8 +352,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             Vector3 exitPos = center;
             try
             {
-                exitPos = BossExitPath.Spawn(center, _currentArena);
-                Debug.Log($"[BossClear] Spawn 완료. exitPos={exitPos}");
+                // S5 층계 회랑(10-02 d6) — 게이트 대신 오르는 계단. 계단이 못 서면 예전 게이트로.
+                exitPos = SpawnStairwayOrGate(center);
+                Debug.Log($"[BossClear] 출구 완료. exitPos={exitPos}");
             }
             catch (System.Exception e)
             {
@@ -323,6 +366,24 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             catch (System.OperationCanceledException) { }
             catch (System.Exception e) { Debug.LogWarning($"[BossClear] 카메라 연출 예외(무시): {e.Message}"); }
         }
+    }
+
+    /// <summary>
+    /// S5 — 출구 자리에 층계(<see cref="ChapterStairway"/>)를 세운다. 다음 챕터 정보 · 팔레트를 못 구하면 예전 게이트(<see cref="BossExitPath.Spawn"/>).
+    /// </summary>
+    private Vector3 SpawnStairwayOrGate(Vector3 center)
+    {
+        var next = _run != null ? _run.CurrentChapter + 1 : ChapterId.Chapter2;
+        // 아래층 = 지금 방을 지은 팔레트. ResolveRoomTheme(null)은 챕터 테마가 비면(레지스트리 미연결) 기본 「*」 팔레트(회색 블록)로 떨어져
+        // 첫 계단 · 회랑 앞 1/3이 무늬 없는 회색이었다(10-02 3차 실측).
+        var lower = _currentMapPalette
+                    ?? PickBlockPalette(ResolveRoomTheme(chapterRegistry?.GetData(_run != null ? _run.CurrentChapter : ChapterId.Chapter1)?.theme));
+        var upper = PickBlockPalette(chapterRegistry?.GetData(next)?.theme);
+        if (_run == null || !_run.HasNextChapter() || lower == null)
+            return BossExitPath.Spawn(center, _currentArena);
+        Vector3 pos = BossExitPath.ResolveExit(center, _currentArena, out var outward);
+        ChapterStairway.Spawn(pos, outward, lower, upper ?? lower, AppBootstrapper.GetSceneForChapter(next).ToString());
+        return pos;
     }
 
     /// <summary>
@@ -369,112 +430,127 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         Debug.Log($"[GameRunBootstrapper] 무한 루프 진입 — 심연 깊이 {run.AbyssDepth}, Ch1 회귀");
     }
 
-    /// <summary>보스 클리어 드래프트 — 현재 유물의 파츠 후보 3개를 제시하고 택1해 이번 런 로드아웃에 추가한다.</summary>
-    private async UniTask ShowRelicPartDraftAsync(CancellationToken ct)
+    /// <summary>
+    /// 유물 기억 드래프트 카드 3장을 굴린다(유물 성장 v2) — 유물 · 시기 · 제단 등급 띠 · 켜진 룬 속성으로.
+    /// 유물이 없거나 데이터가 없으면 null(드래프트를 건너뛰고 출구는 열린다).
+    /// </summary>
+    private RelicDraft PrepareRelicDraft()
     {
         var loadout = AppBootstrapper.Instance?.Loadout;
         var relic   = loadout?.Relic;
-        if (loadout == null || relic == null || relic.Id == RelicId.None)
-        {
-            Debug.Log("[GameRunBootstrapper] 유물 없음 — 파츠 드래프트 스킵");
-            return;
-        }
+        if (loadout == null || relic == null || relic.Id == RelicId.None) return null;
 
         string relicId = relic.Id.ToString().ToLower();   // Gawain → "gawain"
-
-        // 드래프트 티어: 최종 직전 챕터 클리어 = 코어 진화(3), 그 외 = 기능 파츠(1). 설계서 §1-6.
-        // (현재 최종=Ch3이므로 Ch1=기능·Ch2=코어·Ch3=승리. 최종이 바뀌어도 자동으로 따라간다.)
-        int bossTier = (_run != null && _run.IsNextChapterFinal()) ? 3 : 1;
-
-        var pool = Managers.RelicParts?.GetDraftPool(relicId, bossTier, loadout.RelicPartIds);
-
-        // 코어 파츠(tier 3)는 해금에 따라 <b>후보 수만</b> 줄인다 — 잠그지 않는다.
-        //   미해금 1종 · 「코어 파츠 1차」 2종 · 「코어 파츠 전체」 3종.
-        // 잠가 버리면 최종 직전 보스가 보상 없는 보스가 되고, 지금까지 받던 것을 빼앗는 모양이 된다.
-        // ⚠️ 자르는 곳은 여기다. GetDraftPool 안이 아니다 — 그 풀은 초행 보너스·선행 파츠 판정도 쓰는 공용 경로다.
-        // 자르기 전 풀 크기를 남긴다 — 해금해도 <b>실제로</b> 더 나올 수 있는지 판정하는 근거다.
-        int poolBeforeTrim = pool?.Count ?? 0;
-        if (bossTier == 3) pool = TrimCoreParts(pool);
-
-        if (pool == null || pool.Count == 0)
+        var all = Managers.RelicParts?.GetByRelic(relicId);
+        if (all == null || all.Count == 0)
         {
-            Debug.Log($"[GameRunBootstrapper] 파츠 드래프트 후보 없음 (relic={relicId}, tier={bossTier}) — 스킵");
-            return;
+            Debug.LogWarning($"[GameRunBootstrapper] 유물 기억 데이터 없음(relic={relicId}) — 드래프트 건너뜀");
+            return null;
         }
 
-        // 「파츠 드래프트 4」 해금 시 후보가 3 → 4로 늘어난다(정본 Ⅱ 등장).
-        var candidates = PickRandomParts(pool, MemoryAltarService.PartsDraftCount);
-
-        // 해금하면 열릴 자리를 빈 칸으로 미리 보여준다.
-        // 코어는 1→2→3(최대 3), 기능 파츠는 3→4(최대 4)까지 넓어진다.
-        // 풀이 모자라면 해금해도 안 늘어나므로 min을 취한다 — 없는 확장을 약속하지 않는다.
-        int maxSlots    = bossTier == 3 ? 3 : 4;
-        int lockedSlots = Mathf.Max(0, Mathf.Min(maxSlots, poolBeforeTrim) - candidates.Count);
-
-        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_RelicPartDraftPopup>();
-        if (popup == null)
+        var runes = _run?.Player != null ? _run.Player.RuneEffectsOrNull : null;
+        System.Func<string, bool> runeTier1 = element =>
         {
-            // 팝업 로드 실패 — 보상이 조용히 증발하지 않도록 첫 후보를 자동 지급한다.
-            loadout.AddRelicPart(candidates[0].part_id);
-            ActivateRelicParts(_run?.Player);
-            Debug.LogWarning("[GameRunBootstrapper] 파츠 드래프트 팝업 로드 실패 — 첫 후보 자동 지급");
-            return;
-        }
+            var key = RelicDraftComposer.RuneTier1Key(element);
+            return key != null && runes != null && runes.IsActive(key);
+        };
+        int era  = RelicMemoryOdds.EraIndex(StoryProgress.Era);
+        int band = MemoryAltarService.MemoryGradeBand;
+        var rng  = new System.Random(Random.Range(int.MinValue, int.MaxValue));
+        var draft = RelicDraftComposer.Compose(relicId, all, loadout, era, band, runeTier1, rng);
+        Debug.Log($"[GameRunBootstrapper] 유물 기억 카드 — 시기 {era} · 띠 {band} · 최고 {draft.TopGrade}{(draft.PityApplied ? " · 천장" : "")} · " +
+                  $"{DescribeCards(draft)}");
+        return draft;
+    }
 
-        var interactionTask = popup.WaitForInteractionAsync(ct);
-        popup.Setup(candidates, lockedSlots);
-        await interactionTask;
-
-        if (popup.Result != null)
+    private static string DescribeCards(RelicDraft d)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var c in d.Cards)
         {
-            loadout.AddRelicPart(popup.Result.part_id);
-            ActivateRelicParts(_run?.Player);
-            Debug.Log($"[GameRunBootstrapper] 파츠 획득: {popup.Result.part_id} ({popup.Result.part_name})");
+            if (sb.Length > 0) sb.Append(" / ");
+            sb.Append(c.Kind).Append(':').Append(c.Entry != null ? c.Entry.part_id : c.Anchor).Append('(').Append(c.Grade).Append(')');
         }
+        return sb.ToString();
     }
 
     /// <summary>
-    /// 로드아웃의 파츠를 플레이어 효과 허브에 동기화(idempotent — 이미 활성인 key는 무시).
-    /// 호출 경로 둘: (1) 보스 드래프트 획득 직후 살아있는 플레이어에, (2) OnPlayerBound로
-    /// 새 챕터/이어하기의 새 플레이어에 런 고정 파츠 재활성.
+    /// 「되살아난 기억」 창 — 굴려 둔 카드 3장을 보여 주고 고른 카드를 적용한다(새 조각 · 선명하게 · 메아리 · 잔향).
+    /// 다시 떠올리기(제단 노드, 런당 1회)를 누르면 새로 굴려 창을 다시 연다.
     /// </summary>
-    /// <summary>
-    /// 코어 파츠 후보를 해금 단계만큼만 남긴다(1 → 2 → 3종).
-    /// <para>앞에서부터 자른다 — <c>GetDraftPool</c>이 CSV 정의 순서를 지키므로,
-    /// 미해금 플레이어는 <b>항상 같은 첫 코어</b>를 본다. 무작위로 자르면 "이번엔 뭐가 나올까"가
-    /// 해금이 아니라 운의 문제가 되어, 해금이 무엇을 넓히는지 읽히지 않는다.</para>
-    /// </summary>
-    private static List<RelicPartEntry> TrimCoreParts(List<RelicPartEntry> pool)
+    private async UniTask ShowRelicPartDraftAsync(RelicDraft draft, CancellationToken ct)
     {
-        if (pool == null || pool.Count == 0) return pool;
+        var loadout = AppBootstrapper.Instance?.Loadout;
+        if (loadout == null || draft == null || draft.Cards.Count == 0)
+        {
+            Debug.Log("[GameRunBootstrapper] 유물 기억 카드 없음 — 드래프트 스킵");
+            return;
+        }
+        string relicName = loadout.Relic != null ? loadout.Relic.DisplayName : "유물";
 
-        int allowed = MemoryAltarService.CorePartChoiceCount;
-        if (pool.Count <= allowed) return pool;
+        while (true)
+        {
+            var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_RelicPartDraftPopup>();
+            if (popup == null)
+            {
+                // 팝업 로드 실패 — 보상이 조용히 증발하지 않도록 첫 카드를 자동 적용한다.
+                ApplyRelicDraftCard(draft.Cards[0], loadout);
+                loadout.NoteRelicDraft(draft.HasRadiant);
+                ActivateRelicParts(_run?.Player);
+                Debug.LogWarning("[GameRunBootstrapper] 유물 기억 팝업 로드 실패 — 첫 카드 자동 적용");
+                return;
+            }
 
-        return pool.GetRange(0, allowed);
+            bool canRedraw = MemoryAltarService.HasMemoryRedraw && !loadout.RelicRedrawUsed;
+            var interactionTask = popup.WaitForInteractionAsync(ct);
+            popup.Setup(draft, canRedraw, relicName);
+            await interactionTask;
+
+            if (popup.RedrawRequested && canRedraw)
+            {
+                loadout.MarkRelicRedrawUsed();
+                var again = PrepareRelicDraft();
+                if (again != null && again.Cards.Count > 0) { again.Redrawn = true; draft = again; continue; }
+            }
+
+            var card = popup.ResultCard ?? draft.Cards[0];
+            ApplyRelicDraftCard(card, loadout);
+            loadout.NoteRelicDraft(draft.HasRadiant);
+            ActivateRelicParts(_run?.Player);
+            return;
+        }
+    }
+
+    /// <summary>고른 카드를 로드아웃에 적용한다.</summary>
+    private void ApplyRelicDraftCard(RelicDraftCard card, PlayerLoadout loadout)
+    {
+        if (card == null || loadout == null) return;
+        switch (card.Kind)
+        {
+            case RelicDraftCardKind.NewFragment:
+                loadout.AddRelicPart(card.PartId, card.Grade);
+                Debug.Log($"[GameRunBootstrapper] 되찾은 기억: {card.PartId} ({card.Entry?.part_name}) · {RelicMemoryOdds.Label(card.Grade)}");
+                break;
+            case RelicDraftCardKind.Sharpen:
+                loadout.RaiseRelicPartGrade(card.PartId);
+                Debug.Log($"[GameRunBootstrapper] 기억이 선명해졌다: {card.PartId} → {RelicMemoryOdds.Label(loadout.GetRelicPartGrade(card.PartId))}");
+                break;
+            case RelicDraftCardKind.Echo:
+                loadout.AddRelicEcho(card.Anchor);
+                Debug.Log($"[GameRunBootstrapper] 메아리: {card.Anchor}");
+                break;
+            case RelicDraftCardKind.Residue:
+                _run?.AddEssence(card.ResidueEssence);
+                Debug.Log($"[GameRunBootstrapper] 잔향: 정수 +{card.ResidueEssence}");
+                break;
+        }
     }
 
     private void ActivateRelicParts(PlayerController player)
     {
         var loadout = AppBootstrapper.Instance?.Loadout;
         if (player == null || loadout == null || loadout.RelicPartIds.Count == 0) return;
-        player.RuneEffects.Parts.SyncFromLoadout(loadout.RelicPartIds);
-    }
-
-    /// <summary>풀에서 중복 없이 count개를 무작위로 뽑는다(풀이 작으면 있는 만큼).</summary>
-    private static System.Collections.Generic.List<RelicPartEntry> PickRandomParts(
-        System.Collections.Generic.List<RelicPartEntry> pool, int count)
-    {
-        var copy   = new System.Collections.Generic.List<RelicPartEntry>(pool);
-        var result = new System.Collections.Generic.List<RelicPartEntry>(count);
-        int n = Mathf.Min(count, copy.Count);
-        for (int i = 0; i < n; i++)
-        {
-            int idx = Random.Range(0, copy.Count);
-            result.Add(copy[idx]);
-            copy.RemoveAt(idx);
-        }
-        return result;
+        player.RuneEffects.Parts.SyncFromLoadout(loadout);   // 등급(드러난 줄)까지 맞춘다
     }
 
     private async void Start()
@@ -806,6 +882,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             var chapterTheme = _run?.ActiveTheme;
             if (string.IsNullOrEmpty(chapterTheme))
                 chapterTheme = zones.Find(z => !string.IsNullOrEmpty(z.theme))?.theme ?? string.Empty;
+            if (string.IsNullOrEmpty(chapterTheme))   // 구역 줄에도 없으면 챕터 데이터의 테마(10-03 — Ch2 대기방이 기본 회색 팔레트였다)
+                chapterTheme = ChapterDataTheme();
             zonePalette = PickBlockPalette(chapterTheme);
         }
 
@@ -952,8 +1030,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         BlockPalette zonePalette = null;
         if (!string.IsNullOrEmpty(zone.palette))
             zonePalette = await Managers.AddressableManager.TryLoadAssetAsync<BlockPalette>(zone.palette);
+        // 구역 줄 테마가 비면 챕터 데이터의 테마 — Ch2 대기방(구역 0)이 기본 「*」 회색 팔레트로 지어졌다(10-03 실측)
+        string zoneTheme = !string.IsNullOrEmpty(zone.theme) ? zone.theme : ChapterDataTheme();
         if (zonePalette == null)
-            zonePalette = PickBlockPalette(!string.IsNullOrEmpty(zone.theme) ? zone.theme : string.Empty);
+            zonePalette = PickBlockPalette(zoneTheme);
 
         // 그리드 파싱 (스폰 정보 포함)
         var spawnInfos = new System.Collections.Generic.Dictionary<Vector2Int, MapDataLoader.CellSpawnInfo>();
@@ -991,7 +1071,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             Parent             = zoneGO.transform,
             CellSize           = blockCellSize,
             BaseY              = blockBaseY,
-            Theme              = !string.IsNullOrEmpty(zone.theme) ? zone.theme : string.Empty,
+            Theme              = zoneTheme,
             DecorationCatalogs = decorationCatalogs,
             ActivePalette      = zonePalette,
             Grid               = grid,
@@ -1122,6 +1202,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             var run = Run;
             if (run == null) return;
 
+            BossStoryScenes.FlushSealed();      // 봉인된 채 남은 보스 — 보스방을 떠나기 전에 디졸브로 치운다(다음 챕터 · 런 클리어 둘 다)
             run.EnterChapterClear();
             if (!run.AdvanceToNextChapter())
             {
@@ -1789,6 +1870,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await BuildMapNavMeshAsync(roomGO);
         if (!useCustomArena) TokenParser.Execute(csv, w, h, tokenCtx, TokenPhase.PostBuild);
 
+        // S4-3 넓은 곳 — 천장 틈 빛줄기 · 먼지(서비스방 · 쉼터는 「낮은 곳」이라 없음)
+        if (!IsLowPlace(entry.category))
+            DungeonLightShafts.Build(grid, roomGO.transform, blockCellSize, blockBaseY, effWallLayers * blockCellSize, quarterTurns, visualRng);
+
         InitializeMinimapForRoom(roomGO, w, h);
         AttachRoomClearController(roomGO);
 
@@ -1796,7 +1881,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 전투방에서는 나무·기둥이 엄폐·회피 지형으로 의미가 있지만, 볼일만 보고 나가는 방에서는
         // 걸리적거리기만 한다. 방 셋업(NPC·매대) 호출 '전'에 돌려서 이후 생성물엔 영향이 없다.
         if (IsShopCategory(entry.category) || IsEventCategory(entry.category)
-            || IsCrucibleCategory(entry.category) || IsRefineryCategory(entry.category))
+            || IsCrucibleCategory(entry.category) || IsRefineryCategory(entry.category) || IsRestCategory(entry.category))
             DisableDecorationBlocking(roomGO);
 
         // 상점 방이면 ShopRoomController 부착 — 진열 롤에 roomRng를 넘겨 결정적(이어하기 재현) 추첨.
@@ -1809,6 +1894,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             await SetupCrucibleRoomAsync(roomGO, roomRng);
         else if (IsRefineryCategory(entry.category))
             await SetupRefineryRoomAsync(roomGO, roomRng);
+        else if (IsRestCategory(entry.category))
+            await SetupRestRoomAsync(roomGO);
 
         // 스포너 활성화 (Start 준비). 웨이브 Activate는 플레이어 배치 후 호출자가 수행.
         for (int i = 0; i < deferredSpawners.Count; i++)
@@ -1867,8 +1954,54 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             }
         }
 
+        // 10. 막힌 경계 표시 — 장식·NPC까지 다 놓인 지금 재야 「실제로 못 가는 선」이 나온다.
+        BuildRoomBoundaryEdges(roomGO, result.entryPos, anchor, w, h, useCustomArena, _currentArena);
+
         Debug.Log($"[GameRunBootstrapper] ProcRoom '{entry.pool_key}' 빌드 완료 @ {anchor} (출구 {result.exits.Count})");
         return result;
+    }
+
+    /// <summary>
+    /// 막힌 경계 표시 — 진입 지점에서 걸어서 닿는 영역의 바깥 테두리를 따라 결계 띠를 두른다
+    /// (10-01 사용자: 「방이 오브젝트로 막히는데 실제 막힌 경계도 이펙트로 — 베이스캠프 난간처럼」).
+    /// 벽·장식·낭떠러지 어느 것으로 막혔든 물리로 잰 선이다. 문(개구부)은 비워 「여기로 나간다」가 그대로 읽힌다.
+    /// </summary>
+    private void BuildRoomBoundaryEdges(GameObject roomGO, Vector3 entryPos, Vector3 anchor, int w, int h,
+                                        bool customArena, Transform arena)
+    {
+        if (roomBoundaryEdgePrefab == null || roomGO == null) return;
+
+        // 잴 범위 — 격자 방은 격자 사각형(그 밖은 문 너머 통로라 「열린 곳」), 손맵 아레나는 프리팹 바닥 전체.
+        var limit = new Bounds(anchor, new Vector3(w * blockCellSize, 0f, h * blockCellSize));
+        if (customArena)
+        {
+            if (arena == null) return;
+            int groundLayer = LayerMask.NameToLayer("Ground");
+            var cols = arena.GetComponentsInChildren<Collider>(false);
+            bool any = false;
+            for (int i = 0; i < cols.Length; i++)
+            {
+                var c = cols[i];
+                if (c.isTrigger || !c.enabled || c.gameObject.layer != groundLayer) continue;
+                if (any) limit.Encapsulate(c.bounds);
+                else { limit = c.bounds; any = true; }
+            }
+            if (!any) return;
+            limit.Expand(new Vector3(2f, 0f, 2f));
+        }
+
+        var lines = RoomBoundaryTracer.Trace(entryPos, limit);
+        float total = 0f;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var edge = Instantiate(roomBoundaryEdgePrefab, roomGO.transform);
+            edge.name = $"BoundaryEdge_{i}";
+            var pts = lines[i].points;
+            for (int k = 0; k < pts.Length; k++) pts[k] = edge.transform.InverseTransformPoint(pts[k]);
+            edge.SetPath(pts, lines[i].loop);
+            total += lines[i].length;
+        }
+        Debug.Log($"[GameRunBootstrapper] 막힌 경계 표시 — {roomGO.name} 선 {lines.Count}개 · {total:0} m");
     }
 
     /// <summary>셀(x, z) → 바닥 표면(Y=anchor.y) 월드 좌표. MapBuilder의 중앙 오프셋과 동일.</summary>
@@ -1935,6 +2068,31 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// 겹칠 만큼 가까우면 <paramref name="fallback"/>을 그대로 돌려준다.
     /// 기준은 한 번만 쓰고 비우므로 이후 방들은 기존 동작(월드 아이덴티티)을 유지한다.
     /// </summary>
+    /// <summary>
+    /// 시작방(대기방) 카메라 인계 — 스폰 때 잡은 출구 방향(<see cref="_startRoomCameraYaw"/>)을 헤딩으로 쓴다.
+    /// 그 값이 없으면(출구 없는 방) 예전처럼 플레이어가 보는 방향을 따른다.
+    /// </summary>
+    private void HandStartRoomCamera(PlayerController player)
+    {
+        var cam = GameCameraController.Instance;
+        if (cam == null || player == null) return;
+
+        if (!_startRoomCameraYaw.HasValue)
+        {
+            cam.HandToGameplayCamera(player.transform);
+            return;
+        }
+
+        float yaw = _startRoomCameraYaw.Value;
+        _startRoomCameraYaw = null;
+        float playerYaw = player.transform.eulerAngles.y;
+        cam.HandToGameplayCamera(player.transform, alignHeadingToTarget: false);
+        cam.SetHeadingImmediate(yaw);
+        // 어긋남이 있었으면 남긴다 — 「카메라가 문 쪽이 아니다」 재발 시 이 줄로 원인(인계 전 회전)을 바로 가른다.
+        if (Mathf.Abs(Mathf.DeltaAngle(playerYaw, yaw)) > 1f)
+            Debug.Log($"[GameRunBootstrapper] 시작방 카메라 인계 — 출구 yaw {yaw:0}° · 인계 시점 플레이어 yaw {playerYaw:0}°(스폰 뒤 돌았다) → 출구 기준으로 맞춤");
+    }
+
     private Quaternion FaceStartRoomExit(Vector3 spawnPos, Quaternion fallback)
     {
         if (!_startRoomExitWorldPos.HasValue) return fallback;
@@ -2235,16 +2393,20 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var safeFloor = MapBuilder.CreateSafeFloor(w, h, blockCellSize, 0f, mapGO.transform);
 
         // 블록 생성 — blockBaseY로 피봇 보정 (센터 피봇 큐브는 -0.5로 top을 Y=0에 맞춤)
-        // 팔레트 우선순위: 챕터 ActiveTheme → roomEntry.palette → roomEntry.theme → Inspector 배열 폴백
+        // 팔레트 우선순위: 챕터 ActiveTheme → roomEntry.palette → roomEntry.theme → 챕터 데이터 테마 → Inspector 배열 폴백
         BlockPalette activePalette = null;
         var activeTheme = _run?.ActiveTheme;
+        // 방 줄에 테마가 없으면 챕터 데이터의 테마로 짓는다 — Ch2 대기방이 기본 「*」 회색 팔레트로 지어졌다(10-02 실측).
+        // 런이 챕터 레지스트리를 묶지 않아(BindChapterRegistry 호출 0) ActiveTheme이 늘 비어 있다. 여기선 그 테마만 빌린다.
+        string roomTheme = !string.IsNullOrEmpty(roomEntry.theme) ? roomEntry.theme
+            : chapterRegistry?.GetData(_run != null ? _run.CurrentChapter : ChapterId.Chapter1)?.theme;
         string paletteKey = !string.IsNullOrEmpty(activeTheme) ? activeTheme
             : !string.IsNullOrEmpty(roomEntry.palette) ? roomEntry.palette
             : roomEntry.theme;
         if (!string.IsNullOrEmpty(paletteKey))
             activePalette = await Managers.AddressableManager.TryLoadAssetAsync<BlockPalette>(paletteKey);
         if (activePalette == null)
-            activePalette = PickBlockPalette(!string.IsNullOrEmpty(activeTheme) ? activeTheme : roomEntry.theme);
+            activePalette = PickBlockPalette(!string.IsNullOrEmpty(activeTheme) ? activeTheme : roomTheme);
         _currentMapPalette = activePalette; // CreateStartRoomGates가 통로를 같은 팔레트로 짓도록 보관
         var blocks = MapBuilder.Build(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
         MapBuilder.BuildCeiling(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
@@ -2258,7 +2420,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             Parent                 = mapGO.transform,
             CellSize               = blockCellSize,
             BaseY                  = blockBaseY,
-            Theme                  = ResolveRoomTheme(roomEntry.theme),
+            Theme                  = ResolveRoomTheme(roomTheme),
             RoomEntry              = roomEntry,
             DecorationCatalogs     = decorationCatalogs,
             ActivePalette          = activePalette,
@@ -2462,6 +2624,29 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         return category.Trim().Equals("Refinery", System.StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsRestCategory(string category)
+    {
+        if (string.IsNullOrEmpty(category)) return false;
+        return category.Trim().Equals("Rest", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>쉼터 방 셋업 — 모닥불(쉰다) · 모루(벼린다) · 소품. 「벼린다」가 강화 표를 보므로 먼저 읽어 둔다.</summary>
+    private async UniTask SetupRestRoomAsync(GameObject roomGO)
+    {
+        if (roomGO == null || _run == null) return;
+        await WeaponEnhanceService.EnsureLoadedAsync();
+        roomGO.AddComponent<RestRoomController>().Initialize(_run, restFirePrefab, restDecorPrefabs);
+    }
+
+    /// <summary>챕터 시작 대기방의 요정의 샘 — 서약 제단(−4, +2)과 마주 보는 앞 오른쪽(+4, +2).
+    /// 예전엔 이 자리에 기억의 제단이 서서 오른쪽 뒤(−2.5)로 비켰는데, 시작 화면 밖이라 안 보였다(전주기 시뮬 2회차).
+    /// 대기방 기억의 제단을 뺀 뒤(10-02) 이 자리로 돌아왔다.</summary>
+    private void SpawnChapterSpring(Vector3 basePos)
+    {
+        if (Object.FindFirstObjectByType<ChapterSpring>(FindObjectsInactive.Include) != null) return;
+        ChapterSpring.SpawnAt(basePos + new Vector3(4f, 0f, 2f), chapterSpringPrefab);
+    }
+
     /// <summary>정제소 방 셋업 — 비전투 스테이션(재련소와 동일 흐름). NPC 상호작용 → 룬판(UI_GridPanel).</summary>
     private async UniTask SetupRefineryRoomAsync(GameObject roomGO, System.Random roomRng = null)
     {
@@ -2512,6 +2697,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 비전투 — pool_key 키워드로 상호작용 챌린지 선택. 그 외(서약 sanctum 등)는 무동작(즉시 클리어).
         string kh = typeHint?.ToLowerInvariant() ?? string.Empty;
         int seed = roomRng?.Next() ?? Mathf.Abs((typeHint ?? "event").GetHashCode());
+        // 이벤트방 놀이(10-01) — 열쇠말 barrage · memory · greed …(서약 sanctum · 보물고 vault와 겹치지 않게 골랐다)
+        if (EventMinigame.TryAttach(roomGO, kh, _run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab, seed, out var game))
+        {
+            Debug.Log($"[GameRunBootstrapper] 이벤트방 놀이 부착: {game.Id} (seed={seed}) — {typeHint}");
+            return;
+        }
         if (kh.Contains("gamble"))
         {
             var gamble = roomGO.AddComponent<GambleBoxChallenge>();
@@ -2843,6 +3034,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         return !string.IsNullOrEmpty(chapterTheme) ? chapterTheme : roomTheme;
     }
 
+    /// <summary>「낮은 곳」 — 서비스방(상점 · 재련소 · 정제소) · 쉼터. 천장 틈 빛줄기(S4-3)를 두지 않는 곳.</summary>
+    private static bool IsLowPlace(string category)
+        => IsShopCategory(category) || IsCrucibleCategory(category) || IsRefineryCategory(category) || IsRestCategory(category);
+
+    /// <summary>
+    /// 지금 챕터 데이터(ChapterDataSO)의 테마 — 방 · 구역 줄에 테마가 없을 때의 폴백. 없으면 빈 문자열.
+    /// 런이 챕터 레지스트리를 묶지 않아(BindChapterRegistry 호출 0) ActiveTheme이 늘 비어 있어 여기서 직접 읽는다.
+    /// </summary>
+    private string ChapterDataTheme()
+        => chapterRegistry?.GetData(_run != null ? _run.CurrentChapter : ChapterId.Chapter1)?.theme ?? string.Empty;
+
     /// <summary>방 테마에 맞는 BlockPalette 선택. 정확한 매칭 우선, 범용 "*" 폴백, 최후엔 단일 blockPalette.</summary>
     private BlockPalette PickBlockPalette(string theme)
     {
@@ -3151,14 +3353,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         _run?.BindPlayer(player);
         _run?.RequestHudMode(HUDIds.Mode.Combat);
-        // 카메라를 플레이어 등 뒤로 정렬한다(alignHeadingToTarget 기본 true).
-        // 시작방은 <b>문을 정면에 두고 시작</b>하는 것이 의도된 구도다 — FaceStartRoomExit가
-        // 플레이어를 출구 쪽으로 돌리고, 카메라가 그 각을 물려받아 문이 화면 정면에 온다.
-        // ⚠️ 헤딩을 0°로 고정하면 이 구도가 깨진다(문이 화면 옆으로 밀려남). 고정하지 말 것.
-        GameCameraController.Instance?.HandToGameplayCamera(player.transform);
+        // 시작방은 <b>문을 정면에 두고 시작</b>하는 것이 의도된 구도다 — 스폰 때 잡은 출구 방향을 카메라 헤딩으로 쓴다.
+        // (예전엔 「인계 시점의 플레이어 yaw」를 물려받아, 스폰~인계 사이에 플레이어가 돌면 문이 화면 옆으로 갔다.)
+        // ⚠️ 헤딩을 0°로 고정하면 이 구도가 깨진다(출구가 북쪽이 아닌 방). 고정하지 말 것.
+        HandStartRoomCamera(player);
 
         // 챕터 시작 대기방: 조립 서약 제단 배치(선택 픽업은 억제해도 서약 제단은 항상 제공)
         SpawnCovenantAltar(player.transform.position);
+        SpawnChapterSpring(player.transform.position);   // 요정의 샘 — 챕터 시작 회복(10-01)
 
         // 대기방 도착 대사(방문 변형 — 첫 도착/재도착 다른 스크립트)
         await ShowWaitingRoomDialogueAsync(ResolveCurrentChapter());
@@ -3224,8 +3426,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         else
             await ScreenFade.In(0.4f); // 둘러보기 미실행 시에도 검정 해제 보장
 
-        // 각성 제단: 플레이어 스폰 지점 옆에 배치 (_pendingPlayerSpawnPos가 소비되기 전)
-        SpawnAwakeningAltar();
+        // 서약 제단: 플레이어 스폰 지점 옆에 배치 (_pendingPlayerSpawnPos가 소비되기 전).
+        // 기억의 제단은 대기방에 두지 않는다 — 베이스캠프 기억 성소가 정본(10-02 사용자 결정).
         SpawnCovenantAltar(_pendingPlayerSpawnPos ?? Vector3.zero);
 
         await ShowStartRoomDialogueAsync();
@@ -3236,12 +3438,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         Vector3 startSpawnPos = _pendingPlayerSpawnPos ?? Vector3.zero;
         _pendingPlayerSpawnPos = null;
         SpawnCharacterInStartRoomAsync(startBodyKey, startSpawnPos, Quaternion.identity).Forget();
-    }
-
-    private void SpawnAwakeningAltar()
-    {
-        var basePos = _pendingPlayerSpawnPos ?? Vector3.zero;
-        WorldAwakeningAltar.SpawnAt(basePos + new Vector3(4f, 0f, 2f));
     }
 
     /// <summary>
@@ -3277,13 +3473,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (dlg == null) return;
         if (!dlg.IsInitialized) await dlg.InitializeAsync();
 
-        // 악몽기엔 악몽판 대사(규칙 암시)가 있으면 그것을 — 없으면 평소 대사로.
-        string key = $"Chapter{(int)chapter}_Enter";
-        string nightmareKey = key + "_Nightmare";
-        if (StoryProgress.IsNightmare && (dlg.HasSequence(nightmareKey + "_First") || dlg.HasSequence(nightmareKey)))
-            key = nightmareKey;
-
-        var lines = dlg.GetVisitLines(key);
+        // 시기판(해방기 _Liberation · 악몽 모드 _Nightmare)과 반복 단계는 GetVisitLines가 고른다.
+        var lines = dlg.GetVisitLines($"Chapter{(int)chapter}_Enter");
         if (lines == null || lines.Length == 0) return;
 
         // 선택/편집 UI가 열려있으면 닫힐 때까지 대기 후 대사(대사끼리도 큐잉).
@@ -3468,10 +3659,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 새 챕터의 Zone0를 대기 방으로 빌드 (StartRoomGate 포함). 준비 픽업은 우선 억제(스테이션은 후속).
         await SpawnStartZoneFromLayoutAsync(ct, suppressInteractables: true);
 
-        if (_currentMapGO != null && GameCameraController.Instance != null)
+        // 층계 회랑으로 걸어 올라왔다(S5) — 이미 걸어 들어온 연출이라 둘러보기를 건너뛰고, 플레이어를 세운 뒤 와이프를 걷는다.
+        bool byStairs = ChapterStairway.ConsumeArrivedByStairs();
+        if (!byStairs && _currentMapGO != null && GameCameraController.Instance != null)
             await GameCameraController.Instance.PlayStartRoomTourAsync(_currentMapGO.transform.position, ct);
         else
-            await ScreenFade.In(0.4f);
+            await ScreenFade.In(byStairs ? 0f : 0.4f);
 
         // 로드아웃 기반 스폰 + 라이브 세션 복원(BindPlayer가 아이템/버프/서약/시너지 이월 처리).
         var player = await SpawnPlayerAsync(startBodyKey);
@@ -3482,14 +3675,19 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
         _run?.BindPlayer(player);
         _run?.RequestHudMode(HUDIds.Mode.Combat);
-        // 카메라를 플레이어 등 뒤로 정렬한다(alignHeadingToTarget 기본 true).
-        // 시작방은 <b>문을 정면에 두고 시작</b>하는 것이 의도된 구도다 — FaceStartRoomExit가
-        // 플레이어를 출구 쪽으로 돌리고, 카메라가 그 각을 물려받아 문이 화면 정면에 온다.
-        // ⚠️ 헤딩을 0°로 고정하면 이 구도가 깨진다(문이 화면 옆으로 밀려남). 고정하지 말 것.
-        GameCameraController.Instance?.HandToGameplayCamera(player.transform);
+        // 시작방은 <b>문을 정면에 두고 시작</b>하는 것이 의도된 구도다 — 스폰 때 잡은 출구 방향을 카메라 헤딩으로 쓴다.
+        // (예전엔 「인계 시점의 플레이어 yaw」를 물려받아, 스폰~인계 사이에 플레이어가 돌면 문이 화면 옆으로 갔다.)
+        // ⚠️ 헤딩을 0°로 고정하면 이 구도가 깨진다(출구가 북쪽이 아닌 방). 고정하지 말 것.
+        HandStartRoomCamera(player);
+        if (byStairs)
+        {
+            try { await ScreenFade.RevealAsync(Vector2.right, 0.35f, AnimationCurve.EaseInOut(0f, 0f, 1f, 1f), ct); }
+            catch (System.OperationCanceledException) { return; }
+        }
 
         // 챕터 시작 대기방: 조립 서약 제단 배치(챕터마다 서약 획득 기회)
         SpawnCovenantAltar(player.transform.position);
+        SpawnChapterSpring(player.transform.position);   // 요정의 샘 — 직전 챕터에서 깎인 체력을 여기서 챙긴다(10-01)
 
         // 대기방 도착 대사(방문 변형 — 첫 도착/재도착 다른 스크립트)
         await ShowWaitingRoomDialogueAsync(ResolveCurrentChapter());
@@ -3761,10 +3959,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             _pendingPlayerSpawnPos = null;
             rot = playerSpawnPoint != null ? playerSpawnPoint.rotation : Quaternion.identity;
 
-            // 시작방 한정 — 출구를 정면에 두고 시작한다.
-            // 카메라 인계(HandToGameplayCamera)가 alignHeadingToTarget:true라
-            // 플레이어 정면이 그대로 카메라 기준 헤딩이 된다. 별도 카메라 조작이 필요 없다.
+            // 시작방 한정 — 출구를 정면에 두고 시작한다. 카메라 인계(HandStartRoomCamera)가 같은 yaw를 헤딩으로 쓴다.
+            bool hasExit = _startRoomExitWorldPos.HasValue;
             rot = FaceStartRoomExit(pos, rot);
+            if (hasExit) _startRoomCameraYaw = rot.eulerAngles.y;
         }
         else
         {

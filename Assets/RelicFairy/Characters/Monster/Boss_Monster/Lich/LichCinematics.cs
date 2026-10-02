@@ -82,6 +82,20 @@ public static class LichCinematics
             run.RequestHudMode(HUDIds.Mode.Boss);
     }
 
+    /// <summary>
+    /// 보스 끝 장면(봉인 · 처치) 동안 전투 HUD를 모두 걷는다. 끝나면 보스 전투 HUD로 — 그사이 런이 다른 모드로 바꿨으면 건드리지 않는다.
+    /// <see cref="CutsceneHud"/>(false)는 런 상태를 지도로 바꾸므로(거점으로 돌아가는 리치 의식 전용) 보스방 안에서는 이쪽을 쓴다.
+    /// </summary>
+    public static void EndSceneHud(bool on)
+    {
+        var run = GameRunBootstrapper.Instance?.Run;
+        if (run == null) return;
+        if (on)
+            run.RequestHudMode(HUDIds.Mode.Cutscene);
+        else if (run.CurrentHudMode == HUDIds.Mode.Cutscene)
+            run.RequestHudMode(HUDIds.Mode.Boss);
+    }
+
     // ── 카메라 ──────────────────────────────────────────────
 
     /// <summary>카메라 수동 제어를 잡는다(Cinemachine 정지). 끝은 <see cref="ReturnToPlayerAsync"/>.</summary>

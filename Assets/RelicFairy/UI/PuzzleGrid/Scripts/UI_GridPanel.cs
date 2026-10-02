@@ -93,7 +93,7 @@ public sealed class UI_GridPanel : UI_Base
 
     // ── Private: 룬 선택 규격 크롬(09-25) ──
     private const float HeaderH      = 80f;    // 제목 띠(룬 선택 팝업과 같은 아트)
-    private const float ActionAreaH  = 140f;   // 오른쪽 아래 안내 두 줄 + [초기화][완료]
+    private const float ActionAreaH  = 190f;   // 오른쪽 아래 안내 두 줄 + [분해] + [초기화][완료]
     private const float OpenSlideDur = 0.28f;
     private Image    _headerBandImg;
     private TMP_Text _headerStatusText;
@@ -115,7 +115,10 @@ public sealed class UI_GridPanel : UI_Base
     // ── Private: State ──
     private RunItemInventory _inventory;
     private RuntimeItemData  _pendingNewItem;
-    private RuntimeItemData  _pendingAddItem;   // 보관함이 가득 차 아직 못 넣은 획득 아이템(자리 나면 자동 추가)
+    // [분해] — 정보판에 떠 있는 룬(보관함 · 판)을 원석으로(10-01 룬 보유 상한)
+    private Button          _salvageButton;
+    private TMP_Text        _salvageBtnLabel;
+    private RuntimeItemData _salvageTarget;
     private bool             _isOpen;
     private bool             _layoutBuilt;
     private bool             _raisedAbovePopups;   // 팝업(상점) 위로 올려 연 상태 — 닫을 때 원래 순서로
@@ -187,7 +190,7 @@ public sealed class UI_GridPanel : UI_Base
         if (_confirmButton != null) _confirmButton.onClick.AddListener(OnConfirmClicked);
 
         if (_confirmDialogKeepBtn    != null) _confirmDialogKeepBtn.onClick.AddListener(OnDialogKeep);
-        if (_confirmDialogDiscardBtn != null) _confirmDialogDiscardBtn.onClick.AddListener(OnDialogDiscardAll);
+        RestoreConfirmDialogDefault();
     }
 
     private void OnDisable()
@@ -227,7 +230,7 @@ public sealed class UI_GridPanel : UI_Base
         if (_confirmButton != null) _confirmButton.onClick.RemoveListener(OnConfirmClicked);
 
         if (_confirmDialogKeepBtn    != null) _confirmDialogKeepBtn.onClick.RemoveListener(OnDialogKeep);
-        if (_confirmDialogDiscardBtn != null) _confirmDialogDiscardBtn.onClick.RemoveListener(OnDialogDiscardAll);
+        if (_confirmDialogDiscardBtn != null) _confirmDialogDiscardBtn.onClick.RemoveAllListeners();
 
         HideConfirmDialog();
     }
@@ -250,17 +253,6 @@ public sealed class UI_GridPanel : UI_Base
     {
         _pendingNewItem = newItem;
         OpenPanel();
-    }
-
-    /// <summary>
-    /// 보관함이 가득 차 <b>추가에 실패한</b> 아이템을 들고 패널을 연다.
-    /// 플레이어가 배치/폐기로 자리를 비우면 <see cref="TryFlushPendingAdd"/>가 자동으로 넣어준다.
-    /// </summary>
-    public void ShowWithPendingItem(RuntimeItemData item)
-    {
-        _pendingAddItem = item;
-        OpenPanel();
-        TryFlushPendingAdd();   // 여는 사이에 자리가 났을 수도 있다
     }
 
     /// <summary>
@@ -771,7 +763,7 @@ public sealed class UI_GridPanel : UI_Base
         hintRT.anchorMax        = new Vector2(1f, 0f);
         hintRT.pivot            = new Vector2(0.5f, 0f);
         hintRT.sizeDelta        = new Vector2(0f, 48f);
-        hintRT.anchoredPosition = new Vector2(0f, 80f);
+        hintRT.anchoredPosition = new Vector2(0f, 132f);
         var hintTxt = hintGO.GetComponent<TMP_Text>();
         hintTxt.alignment        = TextAlignmentOptions.Center;
         hintTxt.textWrappingMode = TextWrappingModes.Normal;
@@ -779,6 +771,16 @@ public sealed class UI_GridPanel : UI_Base
         // [초기화](보조 — 넘기기 아트) · [완료](주 — 선택 아트). 아트는 열 때 입힌다(EnsureChromeSkin).
         _resetButton   = MakeActionButton(infoRootGO.transform, "ResetBtn",   "초기화", 0f,    0.36f, primary: false, out _resetBtnImg);
         _confirmButton = MakeActionButton(infoRootGO.transform, "ConfirmBtn", "완료",   0.39f, 1f,    primary: true,  out _confirmBtnImg);
+
+        // [분해 · 원석 +N] — 정보판에 보관함 · 판의 룬이 떠 있을 때만(OnInfoItemShown). 안내 줄과 버튼 줄 사이.
+        _salvageButton = MakeActionButton(infoRootGO.transform, "SalvageBtn", "분해", 0.14f, 0.86f, primary: false, out _);
+        var salRT = (RectTransform)_salvageButton.transform;
+        salRT.sizeDelta        = new Vector2(0f, 46f);
+        salRT.anchoredPosition = new Vector2(0f, 80f);
+        _salvageBtnLabel = _salvageButton.GetComponentInChildren<TMP_Text>(true);
+        _salvageButton.onClick.AddListener(OnSalvageClicked);
+        _salvageButton.gameObject.SetActive(false);
+        _itemInfoPanel.OnItemShown += OnInfoItemShown;
     }
 
     // Footer (180px, 하단) — 보관함 바. 카드 272폭 5칸(09-25: 220 → 272, 바 오른쪽 빈 공간을 글자에 준다).
@@ -1019,11 +1021,13 @@ public sealed class UI_GridPanel : UI_Base
     private void ApplyStagingCapacity()
     {
         if (_stagingArea == null) return;
-        int cap = RunItemInventory.StagingCapacity;
+        // 넘친 룬(상한 초과)도 칸이 있어야 보인다 — 예전엔 꺼진 칸에 들어가 화면에서 사라졌다. 같은 바 폭에 칸 수만큼 나눈다.
+        int cap     = RunItemInventory.StagingCapacity;
+        int visible = Mathf.Clamp(Mathf.Max(cap, _inventory?.StagingCount ?? 0), 1, RunItemInventory.MaxStagingView);
         float w = Mathf.Min(StagingAreaView.SLOT_WIDTH,
-                            (StagingBarWidth - StagingAreaView.SLOT_SPACING) / cap - StagingAreaView.SLOT_SPACING);
-        _stagingArea.SetColumns(cap);
-        _stagingArea.ApplyCapacity(cap, w);
+                            (StagingBarWidth - StagingAreaView.SLOT_SPACING) / visible - StagingAreaView.SLOT_SPACING);
+        _stagingArea.SetColumns(visible);
+        _stagingArea.ApplyCapacity(visible, w);
     }
 
     private void UnbindInventory()
@@ -1036,33 +1040,119 @@ public sealed class UI_GridPanel : UI_Base
 
     private void OnStagingChanged()
     {
-        TryFlushPendingAdd();   // 보관함에 자리가 나면 대기 중이던 획득 아이템을 넣는다
-
+        ApplyStagingCapacity();   // 넘친 룬도 칸이 있어야 보인다
         _stagingArea?.Refresh(_inventory);
+        RefreshOverflowMarks();
+        RefreshSalvageButton();
         RefreshInfoPanelDefault();
         RefreshFooter();
         RefreshHeaderStatus();
     }
 
-    /// <summary>
-    /// 보관함이 가득 찬 상태에서 획득한 아이템을 보류했다가, 자리가 나면 자동으로 추가한다.
-    /// (과거엔 AddToStaging 실패를 호출부가 무시해 <b>아이템이 조용히 사라졌다</b>.)
-    /// </summary>
-    private void TryFlushPendingAdd()
+    /// <summary>넘친 룬 = 상한을 넘는 만큼, <b>가장 나중에 들어온 것부터</b>. 정리 확인창이 분해할 대상도 이것.</summary>
+    private List<RuntimeItemData> OverflowItems()
     {
-        if (_pendingAddItem == null || _inventory == null) return;
-        if (_inventory.StagingCount >= RunItemInventory.MaxStagingCapacity) return;
+        var list = new List<RuntimeItemData>();
+        if (_inventory == null) return list;
+        int over = _inventory.OverflowCount;
+        var items = _inventory.StagingItems;
+        for (int i = items.Count - over; i < items.Count; i++)
+            if (i >= 0 && items[i] != null) list.Add(items[i]);
+        return list;
+    }
 
-        var item = _pendingAddItem;
-        _pendingAddItem = null;                 // 재진입 방지 — AddToStaging이 OnStagingChanged를 다시 부른다
-        if (!_inventory.AddToStaging(item))
+    private void RefreshOverflowMarks() => _stagingArea?.SetOverflowItems(OverflowItems());
+
+    // ── 분해 ──
+
+    private void OnInfoItemShown(RuntimeItemData item)
+    {
+        _salvageTarget = item;
+        RefreshSalvageButton();
+    }
+
+    /// <summary>[분해]는 정보판의 룬이 보관함이나 판에 있을 때만 보인다(룬 선택 미리보기 등은 아님).</summary>
+    private void RefreshSalvageButton()
+    {
+        if (_salvageButton == null) return;
+        var item = _salvageTarget;
+        bool owned = item != null && _inventory != null
+                     && (_inventory.IsPlaced(item.instanceId) || _inventory.IsStaging(item.instanceId));
+        _salvageButton.gameObject.SetActive(owned);
+        if (owned && _salvageBtnLabel != null)
+            _salvageBtnLabel.text = $"분해  <color=#63D9C0>원석 +{RuneSalvage.OreValueOf(item)}</color>";
+    }
+
+    private void OnSalvageClicked()
+    {
+        var item = _salvageTarget;
+        if (item == null || _inventory == null) return;
+        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        bool placed = _inventory.IsPlaced(item.instanceId);
+        if (_confirmDialogText != null)
+            _confirmDialogText.text =
+                $"「{item.displayName ?? item.itemId}」을(를) 분해한다{(placed ? " — 판에서 빠지고 효과도 사라진다" : "")}.\n\n" +
+                $"<color=#63D9C0>원석 +{RuneSalvage.OreValueOf(item)}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
+        RebindConfirmDialog(OnSalvageConfirm, OnDialogKeep, "분해", "취소");
+        ShowConfirmDialog();
+    }
+
+    private void OnSalvageConfirm()
+    {
+        HideConfirmDialog();
+        var item = _salvageTarget;
+        if (item == null) return;
+        int ore = SalvageItem(item);
+        ShowToast($"분해 — 원석 +{ore}");
+        RefreshInfoPanelDefault();
+    }
+
+    /// <summary>룬 하나를 분해한다 — 판에 있으면 판에서 내리고(효과 해제), 보관함에서 없애고, 원석을 준다. 지급량을 돌려준다.</summary>
+    private int SalvageItem(RuntimeItemData item)
+    {
+        if (item == null || _inventory == null) return 0;
+        if (_inventory.IsPlaced(item.instanceId)) RemovePlacedItem(item);   // 판 → 보관함(드래그로 빼낼 때와 같은 경로)
+        if (_inventory.IsPlaced(item.instanceId))
         {
-            _pendingAddItem = item;             // 실패하면 다시 보류
-            return;
+            Debug.LogWarning($"[GridPanel] 판에서 내리지 못해 분해하지 않음: {item.displayName}");   // 원석만 주고 룬이 남는 일이 없게
+            return 0;
         }
+        _stagingArea?.RemoveShapeForItem(item);
+        _inventory.DiscardFromStaging(item);
+        return RuneSalvage.Refund(item);
+    }
 
-        ItemEffectVfxHelper.ShowNotice($"<color=#7FE7FF>보관함에 추가</color> {item.displayName}");
-        _itemInfoPanel?.ShowItem(item, isNew: true);
+    /// <summary>
+    /// 상한을 넘친 채로 닫으려 할 때 — 정리하러 돌아가거나, 넘친 룬(가장 나중 것부터)을 분해하고 닫는다.
+    /// 닫기를 그냥 막기만 하면 막힌 길이 된다(넘친 룬이 칸 밖이면 고를 수도 없다).
+    /// </summary>
+    private void OfferOverflowResolve()
+    {
+        var over = OverflowItems();
+        int ore = 0;
+        var names = new System.Text.StringBuilder();
+        foreach (var it in over)
+        {
+            ore += RuneSalvage.OreValueOf(it);
+            if (names.Length > 0) names.Append(" · ");
+            names.Append(it.displayName ?? it.itemId);
+        }
+        if (_confirmDialogText != null)
+            _confirmDialogText.text =
+                $"보관함은 {RunItemInventory.StagingCapacity}칸이다 — {over.Count}개가 넘쳤다.\n" +
+                $"<size=85%>{names}</size>\n" +
+                $"판에 놓거나 분해해야 닫힌다.\n<color=#63D9C0>넘친 룬 분해 시 원석 +{ore}</color>";
+        RebindConfirmDialog(OnOverflowSalvageAndClose, OnDialogKeep, "분해하고 닫기", "정리하러 돌아가기");
+        ShowConfirmDialog();
+    }
+
+    private void OnOverflowSalvageAndClose()
+    {
+        HideConfirmDialog();
+        int ore = 0;
+        foreach (var it in OverflowItems()) ore += SalvageItem(it);
+        if (ore > 0) Debug.Log($"[GridPanel] 넘친 룬 분해 → 원석 +{ore}");
+        ClosePanel();
     }
 
     private void OnPlacedChanged()
@@ -1235,35 +1325,40 @@ public sealed class UI_GridPanel : UI_Base
         _salvagePendingShape = shape;
         if (_confirmDialogText != null)
             _confirmDialogText.text =
-                $"이 자리의 룬 {_salvageBlockers.Count}개를 폐기하고 배치합니다.\n\n" +
+                $"이 자리의 룬 {_salvageBlockers.Count}개를 분해하고 배치합니다.\n\n" +
                 $"<color=#63D9C0>원석 +{ore}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
 
         // 확인창을 <b>보관함 전량 폐기</b>와 공유하므로 버튼 동작을 이번 용도로 갈아끼운다.
         // 안 갈아끼우면 [폐기]가 보관함을 통째로 비운다.
-        RebindConfirmDialog(OnSalvagePlacementConfirm, OnSalvagePlacementCancel);
+        RebindConfirmDialog(OnSalvagePlacementConfirm, OnSalvagePlacementCancel, "분해하고 배치", "취소");
         ShowConfirmDialog();
         return true;
     }
 
-    /// <summary>확인창 버튼의 동작을 교체한다. 다이얼로그가 두 용도(전량 폐기 / 자리 비우고 배치)를 공유한다.</summary>
+    /// <summary>확인창 버튼의 동작과 글자를 바꾼다. 다이얼로그 하나를 여러 용도(분해 · 자리 비우고 배치 · 넘침 정리)가 쓴다.</summary>
     private void RebindConfirmDialog(UnityEngine.Events.UnityAction onConfirm,
-                                     UnityEngine.Events.UnityAction onCancel)
+                                     UnityEngine.Events.UnityAction onCancel,
+                                     string confirmLabel = "확인", string cancelLabel = "취소")
     {
         if (_confirmDialogDiscardBtn != null)
         {
             _confirmDialogDiscardBtn.onClick.RemoveAllListeners();
             _confirmDialogDiscardBtn.onClick.AddListener(onConfirm);
+            var l = _confirmDialogDiscardBtn.GetComponentInChildren<TMP_Text>(true);
+            if (l != null) l.text = confirmLabel;
         }
         if (_confirmDialogKeepBtn != null)
         {
             _confirmDialogKeepBtn.onClick.RemoveAllListeners();
             _confirmDialogKeepBtn.onClick.AddListener(onCancel);
+            var l = _confirmDialogKeepBtn.GetComponentInChildren<TMP_Text>(true);
+            if (l != null) l.text = cancelLabel;
         }
     }
 
-    /// <summary>확인창을 원래 용도(보관함 전량 폐기)로 되돌린다.</summary>
+    /// <summary>확인창을 쉬는 상태로 — 두 버튼 모두 닫기만.</summary>
     private void RestoreConfirmDialogDefault()
-        => RebindConfirmDialog(OnDialogDiscardAll, OnDialogKeep);
+        => RebindConfirmDialog(OnDialogKeep, OnDialogKeep);
 
     /// <summary>확인 — 막고 있던 룬을 전부 폐기(원석 환원)하고 그 자리에 배치한다.</summary>
     private void OnSalvagePlacementConfirm()
@@ -1279,7 +1374,7 @@ public sealed class UI_GridPanel : UI_Base
         foreach (var item in _salvageBlockers)
         {
             RemovePlacedItem(item);                    // 판에서 내리고
-            _inventory?.DiscardFromStaging(item);      // 보관함에서도 없앤다(진짜 폐기)
+            _inventory?.DiscardFromStaging(item);      // 보관함에서도 없앤다(분해)
             _stagingArea?.RemoveShapeForItem(item);
             ore += RuneSalvage.Refund(item);
         }
@@ -1313,7 +1408,10 @@ public sealed class UI_GridPanel : UI_Base
     /// <summary>판에서 룬을 회수해 보관함으로 되돌린다. 드래그로 빼낼 때와 같은 경로.</summary>
     private void RemovePlacedItem(RuntimeItemData item)
     {
-        var shape = _stagingArea?.GetShapeForItem(item);
+        // 판에 놓인 룬의 모양은 판 쪽(BoardManager)이 들고 있다 — 보관함은 보관함 룬의 모양만 추적한다(Refresh가 놓인 룬을 지운다).
+        // 예전엔 보관함에서만 찾아 놓인 룬은 늘 못 찾았다(칸 눌러 회수 · 자리 비우고 배치 · 판 룬 분해가 조용히 실패, 10-01 실측).
+        var shape = item != null ? BoardManager.Instance?.GetSharedShapeByItem(item.instanceId) : null;
+        if (shape == null) shape = _stagingArea?.GetShapeForItem(item);
         if (shape == null) return;
 
         BoardManager.Instance?.OnShapePickedUp(shape);
@@ -1378,7 +1476,6 @@ public sealed class UI_GridPanel : UI_Base
         if (_hexGridView == null) return;
 
         var target = _pendingNewItem
-                  ?? _pendingAddItem
                   ?? _stagingArea?.HighlightedItem
                   ?? (_inventory != null && _inventory.StagingCount > 0 ? _inventory.StagingItems[0] : null);
 
@@ -1469,6 +1566,7 @@ public sealed class UI_GridPanel : UI_Base
     private void OnBackClicked()
     {
         Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        if (_inventory != null && _inventory.IsOverCapacity) { OfferOverflowResolve(); return; }
         ClosePanel();
     }
 
@@ -1526,53 +1624,20 @@ public sealed class UI_GridPanel : UI_Base
         _stagingArea?.Refresh(_inventory);
     }
 
+    /// <summary>
+    /// [완료] — 그냥 닫는다. 보관함 룬은 들고 다닌다(10-01 — 예전엔 미배치 룬을 전부 폐기해, 얻을 때마다 「지금 안 놓으면 사라지나」가 애매했다).
+    /// 상한을 넘쳤으면 정리부터(<see cref="OfferOverflowResolve"/>).
+    /// </summary>
     private void OnConfirmClicked()
     {
         Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
-
-        if (_inventory == null || _inventory.StagingCount == 0)
-        {
-            ClosePanel();
-            return;
-        }
-
-        int remaining = _inventory.StagingCount;
-        if (_confirmDialogText != null)
-        {
-            // 합계 환원량을 먼저 보여준다 — "버려진다"만 있으면 손실로만 읽힌다.
-            int ore = 0;
-            foreach (var it in _inventory.StagingItems) ore += RuneSalvage.OreValueOf(it);
-
-            _confirmDialogText.text =
-                $"보관함에 아이템 {remaining}개가 있습니다.\n미배치 아이템은 폐기됩니다.\n\n" +
-                $"<color=#63D9C0>원석 +{ore}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
-        }
-
-        RestoreConfirmDialogDefault();   // 직전이 「자리 비우고 배치」였을 수 있다
-        ShowConfirmDialog();
+        if (_inventory != null && _inventory.IsOverCapacity) { OfferOverflowResolve(); return; }
+        ClosePanel();
     }
 
     private void OnDialogKeep()
     {
         HideConfirmDialog();
-    }
-
-    private void OnDialogDiscardAll()
-    {
-        HideConfirmDialog();
-        if (_inventory == null) { ClosePanel(); return; }
-
-        var toDiscard = new List<RuntimeItemData>(_inventory.StagingItems);
-        int ore = 0;
-        foreach (var item in toDiscard)
-        {
-            _stagingArea?.RemoveShapeForItem(item);
-            _inventory.DiscardFromStaging(item);
-            ore += RuneSalvage.Refund(item);   // 전량 폐기도 원석으로 환원된다
-        }
-        if (ore > 0) Debug.Log($"[GridPanel] 보관함 전량 폐기 → 원석 +{ore}");
-
-        ClosePanel();
     }
 
     // ── Reset Confirm Dialog ──
@@ -1701,8 +1766,10 @@ public sealed class UI_GridPanel : UI_Base
         int cap    = RunItemInventory.StagingCapacity;
         int staged = _inventory?.StagingCount ?? 0;
         int placed = _inventory?.PlacedItems?.Count ?? 0;
-        _headerStatusText?.SetText($"보관함 <color=#FFFFFF>{staged}/{cap}</color>    ·    배치 <color=#FFFFFF>{placed}</color>");
-        _stagingCountText?.SetText($"{staged} / {cap}");
+        bool over = staged > cap;
+        string box = over ? $"<color=#FF7A6A>{staged}/{cap} 넘침</color>" : $"<color=#FFFFFF>{staged}/{cap}</color>";
+        _headerStatusText?.SetText($"보관함 {box}    ·    배치 <color=#FFFFFF>{placed}</color>");
+        _stagingCountText?.SetText(over ? $"<color=#FF7A6A>{staged} / {cap}  넘침 — 놓거나 분해</color>" : $"{staged} / {cap}");
     }
 
     /// <summary>

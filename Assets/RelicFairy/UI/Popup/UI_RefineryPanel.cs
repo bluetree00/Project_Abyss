@@ -665,6 +665,8 @@ public sealed class UI_RefineryPanel : UI_Popup
 
         var outcome = _svc.Craft();
         if (!outcome.Success) { _hint.text = outcome.FailReason; _busy = false; Refresh(); return; }
+        // 쓴 원석은 누른 순간 빠져나간다 — 예전엔 결과 공개 뒤(약 1초 늦게) 줄어 무엇을 치렀는지가 흐렸다(10-01).
+        CurrencyCounter.Apply(_oreText, _svc.OreOwned, "원석 ");
 
         // 「정제 품질」 할인 조건 집계. RefineryService는 런 참조가 없어 호출부에서 센다.
         GameRunBootstrapper.Instance?.Run?.ReportRefineUse();
@@ -705,7 +707,7 @@ public sealed class UI_RefineryPanel : UI_Popup
             return;
         }
         var wait = popup.WaitForInteractionAsync(CancellationToken.None);
-        popup.Setup(candidates, inv, 0);
+        popup.Setup(candidates, inv);
         await wait;
         if (popup.Skipped) svc?.Refund(spent);
     }

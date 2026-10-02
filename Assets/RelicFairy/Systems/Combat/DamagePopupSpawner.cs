@@ -79,6 +79,7 @@ public static class DamagePopupSpawner
                              bool merge = true)
     {
         if (damage <= 0f) return;
+        if (GameRunBootstrapper.Instance?.Run?.InCutscene == true) return;   // 컷신 동안 떠오르는 글은 숨긴다(10-01 f5)
 
         // 같은 대상에 연달아 꽂히면 이미 떠 있는 숫자를 키운다 — 새 팝업을 만들지 않는다.
         if (merge && targetId != 0 && TryMerge(targetId, damage, isCrit, kind, element)) return;

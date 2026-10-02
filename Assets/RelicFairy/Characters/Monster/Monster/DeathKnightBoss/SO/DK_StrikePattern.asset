@@ -21,6 +21,7 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: pyramidslash
   breakOverride: -1
+  liberatedOnly: 1
   whiteTilePrefab: {fileID: 1700000001, guid: 36c704cc48b1a834ba1cff41dbe566e4, type: 3}
   blackTilePrefab: {fileID: 1800000001, guid: 85eb3de68405a0b4f989b56efc491cda, type: 3}
   impactVfxPrefab: {fileID: 1644958980890870, guid: d0ebac18aae7a7349a6feb3ac42cbccd,

@@ -13,6 +13,7 @@ public enum RoomPlanKind
     Boss,
     Crucible,   // 재련소(무기 강화/승급 + 도박) — PRD 확률 등장, 챕터당 1회
     Refinery,   // 정제소(룬 지급/룬판) — PRD 확률 등장, 챕터당 1회
+    Rest,       // 쉼터(10-01) — 챕터 중간 한 번, 외길. 모닥불에서 쉬거나 모루에서 벼린다. ⚠️ 저장은 int라 맨 끝에만 덧붙인다
 }
 
 /// <summary>한 출구 문의 계획. 종류 + 선택된 방 템플릿(entry).</summary>
@@ -61,6 +62,14 @@ public class RunSequencer
 {
     private const float DifficultyTolerance = 0.35f;
 
+#if UNITY_EDITOR
+    /// <summary>
+    /// 에디터 확인 전용 — 비어 있지 않으면 일반 페이즈의 출구 두 문을 이 방(pool_key)으로 고정한다(특수방 캡 무시).
+    /// 메뉴 RelicFairy/Minigame/Force Next Door. 풀에 없는 열쇠면 무시한다.
+    /// </summary>
+    public const string DebugForceDoorPrefsKey = "RelicFairy.Run.ForceDoorKey";
+#endif
+
     // ── 특수방 등장 확률(PRD) ────────────────────────────────
     // 재련소·정제소는 런 구조 데이터(CSV/SO)에 확률 컬럼이 없다 — 여기 상수가 튜닝 노브다.
     // 상점·이벤트는 기존 config의 ShopChance/EventChance를 baseline으로 그대로 쓴다.
@@ -96,6 +105,7 @@ public class RunSequencer
     private int   _eventUsed;
     private int   _crucibleUsed;   // 챕터당 1
     private int   _refineryUsed;   // 챕터당 1
+    private bool  _restUsed;       // 쉼터 — 챕터당 1(이어하기는 챕터 시작 체크포인트라 따로 저장하지 않는다)
 
     // PRD(의사난수분포) 미출현 누적 — 해당 특수방을 '방문하지 않은' 방 수.
     // 확률 = baseline × (miss+1) 이므로, 안 만나거나 그냥 지나칠수록 다음 방에서 뜰 확률이 올라간다.
@@ -150,6 +160,9 @@ public class RunSequencer
         => _bossThresholdOverride > 0
             ? _bossThresholdOverride
             : (_config != null ? Mathf.Max(1, _config.BossThreshold) : int.MaxValue);
+
+    /// <summary>쉼터가 나오는 보스 진행 수 — 보스까지 전투방의 절반(5 → 3 · 6 → 3). 「챕터 중간」의 정의.</summary>
+    private int RestMilestone => Mathf.Max(1, (EffectiveBossThreshold + 1) / 2);
 
     /// <summary>이어하기: 저장된 시퀀서 진행 상태를 복원한다.
     /// 재련/정제 캡과 PRD 미출현 누적은 구 세이브에 없으므로 기본값 0(=만량·미출현 없음)으로 폴백한다.</summary>
@@ -230,6 +243,14 @@ public class RunSequencer
         // 방별 자식 RNG — 같은 (시드, visitCount)면 동일 출구 (이어하기 재현)
         var rng = new System.Random(Combine(_seed, _visitCount));
 
+        // 쉼터 — 챕터 중간에 한 번, 외길로(10-01 사용자 「챕터 중간 중간 휴게 공간 스테이지가 필요」).
+        // 고르는 문이 아니라 들르는 박자다 — 보스 앞에 숨 고를 자리를 모든 런에 보장한다. 풀에 쉼터 방이 없으면 건너뛴다.
+        if (!_restUsed && _bossProgress >= RestMilestone && FirstByCategory(CategoryName(RoomPlanKind.Rest)) != null)
+        {
+            result.Add(MakeDoor(rng, RoomPlanKind.Rest));
+            return result;
+        }
+
         // 특수방 타이밍은 <b>고정 마일스톤이 아니라 PRD 확률</b>이 정한다(§방구조 개편).
         // 예외는 하나뿐 — 보스까지 남은 전투방이 모자라면 아직 못 만난 특수방을 강제 배치한다(하드 피티).
         int forcedCount = CollectPitySpecials(rng);
@@ -265,8 +286,42 @@ public class RunSequencer
             string exclude = i > 0 ? result[0].entry?.pool_key : null;
             result.Add(MakeDoor(rng, kind, exclude));
         }
+#if UNITY_EDITOR
+        ApplyDebugForcedDoor(result);
+#endif
         return result;
     }
+
+#if UNITY_EDITOR
+    private void ApplyDebugForcedDoor(List<DoorPlan> doors)
+    {
+        string key = UnityEditor.EditorPrefs.GetString(DebugForceDoorPrefsKey, "");
+        if (string.IsNullOrEmpty(key)) return;
+        var entry = FindByKey(key);
+        if (entry == null)
+        {
+            Debug.LogWarning($"[RunSequencer] (에디터) 다음 문 고정 — 풀에 없는 방 '{key}'(CDN 풀에 아직 없으면 로컬 방 풀 우선을 켠 뒤 새 판)");
+            return;
+        }
+        var kind = KindOfCategory(entry.category);
+        for (int i = 0; i < doors.Count; i++) doors[i] = new DoorPlan { kind = kind, entry = entry };
+        // 런 계획 시뮬레이션이 출구를 수십 번 굴린다 — 열쇠가 바뀔 때만 한 줄
+        if (s_lastForcedLog != key)
+        {
+            s_lastForcedLog = key;
+            Debug.Log($"[RunSequencer] (에디터) 다음 문 고정 — {key} ({kind})");
+        }
+    }
+
+    private static string s_lastForcedLog;
+
+    private static RoomPlanKind KindOfCategory(string category)
+    {
+        foreach (RoomPlanKind k in Enum.GetValues(typeof(RoomPlanKind)))
+            if (string.Equals(CategoryName(k), category, StringComparison.OrdinalIgnoreCase)) return k;
+        return RoomPlanKind.Normal;
+    }
+#endif
 
     /// <summary>
     /// 테스트 허브 전용 — 일반 방을 건너뛰고 보스 전방 문 계획을 만든다(페이즈를 PreBoss로 전환).
@@ -288,7 +343,8 @@ public class RunSequencer
         // (특수방을 다 들르면 전투방이 절반 이하). 이제 특수방은 '깊이'를 소모하지 않는다.
         // 런이 무한정 길어지지 않는 근거: 특수방은 챕터 캡(ShopMaxPerChapter/EventMaxPerChapter,
         // 재련·정제 각 1회)이 있어 한 챕터의 최대 방 수는 BossThreshold + 캡 합으로 묶인다.
-        if (!IsSpecialKind(chosen.kind)) _bossProgress++;
+        if (!IsSpecialKind(chosen.kind) && chosen.kind != RoomPlanKind.Rest) _bossProgress++;   // 쉼터도 깊이를 소모하지 않는다
+        if (chosen.kind == RoomPlanKind.Rest) _restUsed = true;
 
         TickCooldowns();
 
@@ -499,7 +555,8 @@ public class RunSequencer
             }
         }
 
-        if (Roll(rng, _config.EliteChance)) return RoomPlanKind.Elite;
+        // 시기 가산(10-01) — 해방기 +5% · 악몽 모드 +10%(EraBalance)
+        if (Roll(rng, _config.EliteChance + EraBalance.Current.EliteBonus)) return RoomPlanKind.Elite;
         return RoomPlanKind.Normal;
     }
 
@@ -520,6 +577,12 @@ public class RunSequencer
         // 쿨다운 미적용 우선
         var available = byCategory.FindAll(p => !IsOnCooldown(p.pool_key));
         if (available.Count == 0) available = byCategory;
+
+        // 이벤트방은 난이도 윈도를 쓰지 않는다(10-01 f5 판단) — 다양성 콘텐츠라 챕터 이벤트 풀에서 고르게 뽑는다.
+        // 윈도로 거르면 난이도 0인 상호작용 5종(도박·신탁·희생·금고·성역)은 한 번도 못 뽑혔고(곡선이 0.4부터),
+        // 뒤 챕터에선 곡선을 벗어난 전투형까지 빠졌다. difficulty_scale은 방 선택에만 쓰이고 체력엔 곱해지지 않는다 —
+        // 난이도 곡선은 일반·정예방이 맡는다.
+        if (kind == RoomPlanKind.Event) return available[rng.Next(available.Count)];
 
         // 난이도 윈도로 추가 좁히기 (충족 후보 없으면 무시)
         // 곡선의 정의역은 0~BossThreshold(= 보스까지의 거리)이므로 축은 _visitCount가 아니라 _bossProgress다.
@@ -547,6 +610,7 @@ public class RunSequencer
         RoomPlanKind.Boss    => "Boss",
         RoomPlanKind.Crucible => "Crucible",
         RoomPlanKind.Refinery => "Refinery",
+        RoomPlanKind.Rest     => "Rest",
         _                    => "Normal",
     };
 

@@ -22,7 +22,7 @@ MonoBehaviour:
     maxHp: 15
     defense: 5
     attackPower: 15
-    moveSpeed: 1
+    moveSpeed: 1.6
     attackRange: 2
     attackRadius: 1
     attackRate: 1
@@ -35,7 +35,7 @@ MonoBehaviour:
   patrol:
     patrolType: 0
     patrolRange: 3
-    patrolSpeed: 0.8
+    patrolSpeed: 1
     waypointWaitTime: 0.5
   combat:
     damageApplyDelay: 0.4

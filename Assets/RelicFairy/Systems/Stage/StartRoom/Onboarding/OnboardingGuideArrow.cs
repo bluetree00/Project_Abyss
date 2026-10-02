@@ -48,7 +48,7 @@ public sealed class OnboardingGuideArrow : MonoBehaviour
     private void LateUpdate()
     {
         if (_target == null) return;
-        if (Suppressed)
+        if (Suppressed || BaseCampObjectiveGuide.Active)   // 목표 길잡이(◆ + 거리)가 돌면 이 ▼는 쉰다 — 같은 곳을 두 벌로 가리키지 않게(09-30)
         {
             SetWorldArrowActive(false);
             SetScreenIndicatorActive(false);

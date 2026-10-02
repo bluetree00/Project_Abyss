@@ -9,11 +9,13 @@ namespace RelicFairy.Monster
 /// 바닥에 눕힌 쿼드 + 균열 재질(<see cref="LichVfx.CrackMaterial"/>). 보라로 빛나다가(<see cref="GlowSeconds"/>)
 /// 어두운 금으로 식고, 수명 끝에 옅어져 사라진다. 제단은 평평한 타일이라 투영 데칼 대신 쿼드로 충분하다(전 품질 단계 동작).
 /// 동시에 <see cref="MaxCracks"/>개까지 — 넘치면 가장 오래된 것부터 거둔다.
+/// (10-03) 바닥 칸에 붙는 균열(무너진 구멍 가장자리)은 따로 <see cref="MaxAttached"/>개까지.
 /// </summary>
 public sealed class LichCrack : MonoBehaviour
 {
     // ── Constants ─────────────────────────────────────────────────
     private const int   MaxCracks    = 48;
+    private const int   MaxAttached  = 128;   // (10-03) 칸에 붙는 가장자리 균열 — 오래 남아 마법 자국을 밀어내지 않게 따로 센다
     private const float GlowSeconds  = 0.6f;
     private const float FadeSeconds  = 1.5f;
     private const float FloorLift    = 0.035f;
@@ -23,6 +25,7 @@ public sealed class LichCrack : MonoBehaviour
     private static readonly Color RestColor = new Color(0.35f, 0.18f, 0.45f, 0.85f);
 
     private static readonly Queue<LichCrack> s_live = new();
+    private static readonly Queue<LichCrack> s_attached = new();
     private static Mesh                  s_quad;
     private static MaterialPropertyBlock s_mpb;
 
@@ -35,6 +38,7 @@ public sealed class LichCrack : MonoBehaviour
     private static void ResetStatics()
     {
         s_live.Clear();
+        s_attached.Clear();
         s_quad = null;
         s_mpb  = null;
     }
@@ -64,15 +68,17 @@ public sealed class LichCrack : MonoBehaviour
     /// <summary>
     /// <paramref name="floorPos"/>(바닥 높이)에 지름 <paramref name="size"/> m 균열. <paramref name="seconds"/> 뒤 사라진다.
     /// 재질이 없으면 아무것도 하지 않는다.
+    /// (10-03) <paramref name="parent"/>를 주면 그 밑에 붙는다 — 무너진 바닥 가장자리 흔적이 그 칸과 함께 흔들리고 떨어진다.
     /// </summary>
-    public static void Spawn(Vector3 floorPos, float size, float seconds = 8f)
+    public static void Spawn(Vector3 floorPos, float size, float seconds = 8f, Transform parent = null)
     {
         var mat = LichVfx.CrackMaterial;
         if (mat == null || size <= 0f) return;
 
-        while (s_live.Count >= MaxCracks)
+        var live = parent != null ? s_attached : s_live;
+        while (live.Count >= (parent != null ? MaxAttached : MaxCracks))
         {
-            var old = s_live.Dequeue();
+            var old = live.Dequeue();
             if (old != null) Destroy(old.gameObject);
         }
 
@@ -80,6 +86,7 @@ public sealed class LichCrack : MonoBehaviour
         go.transform.SetPositionAndRotation(floorPos + Vector3.up * (FloorLift + Random.value * 0.005f),
                                             Quaternion.Euler(90f, Random.Range(0f, 360f), 0f));
         go.transform.localScale = new Vector3(size, size, 1f);
+        if (parent != null) go.transform.SetParent(parent, true);
         go.AddComponent<MeshFilter>().sharedMesh = Quad;
 
         var mr = go.AddComponent<MeshRenderer>();
@@ -91,7 +98,7 @@ public sealed class LichCrack : MonoBehaviour
         crack._renderer = mr;
         crack._life     = Mathf.Max(FadeSeconds + GlowSeconds, seconds);
         crack.Apply(GlowColor);
-        s_live.Enqueue(crack);
+        live.Enqueue(crack);
     }
 
     /// <summary>선을 따라 균열을 늘어놓는다(구체·광선이 지나간 줄).</summary>
@@ -112,6 +119,11 @@ public sealed class LichCrack : MonoBehaviour
         while (s_live.Count > 0)
         {
             var c = s_live.Dequeue();
+            if (c != null) Destroy(c.gameObject);
+        }
+        while (s_attached.Count > 0)
+        {
+            var c = s_attached.Dequeue();
             if (c != null) Destroy(c.gameObject);
         }
     }

@@ -16,6 +16,8 @@ public enum AltarNodeVisual
     OpenLocked,
     /// <summary>산 노드.</summary>
     Bought,
+    /// <summary>그 시기의 고리가 아직 드러나지 않았다(10-02 — 해방기는 붕괴 뒤, 악몽은 엔딩 뒤). 점도 그리지 않는다.</summary>
+    EraHidden,
 }
 
 /// <summary>노드 하나의 화면 값.</summary>
@@ -77,7 +79,7 @@ public sealed class AltarTreePresenter
         foreach (var node in all)
         {
             var m = _models[node.Id];
-            if (m.Visual != AltarNodeVisual.Hidden) continue;
+            if (m.Visual != AltarNodeVisual.Hidden) continue;   // EraHidden은 끝까지 숨는다
             bool near = true;
             foreach (var p in node.Parents)
             {
@@ -136,7 +138,7 @@ public sealed class AltarTreePresenter
         if (node == null) return d;
         var s = MemoryAltarService.GetState(node);
 
-        d.Header    = $"{MemoryAltarCatalog.BranchLabel(node.Branch)} · {MemoryAltarCatalog.RingLabel(MemoryAltarCatalog.Depth(node))}";
+        d.Header    = $"{MemoryAltarCatalog.BranchLabel(node.Branch)} · {MemoryAltarCatalog.RingLabel(node.Era)}";
         d.Name      = node.DisplayName;
         d.SizeBadge = node.Size switch { AltarNodeSize.Keystone => "열쇠", AltarNodeSize.Small => "작은 넓힘", _ => "" };
         d.Effect    = node.Description;
@@ -153,12 +155,6 @@ public sealed class AltarTreePresenter
                 d.ButtonEnabled = !readOnly;
                 d.Reason        = on ? "지금 착용 중 · 보상 -1개 / 정수 ×1.6" : "켜면 다음 런부터 적용된다";
             }
-            else if (node.Id == MemoryAltarCatalog.PartsInherit)
-            {
-                string part = PartInheritanceService.InheritedPartName;
-                d.ButtonLabel = "해금됨";
-                d.Reason      = string.IsNullOrEmpty(part) ? "런을 마치면 마지막에 고른 파츠가 이어진다" : $"지금 이어받는 파츠 · {part}";
-            }
             else
             {
                 d.ButtonLabel = "해금됨";
@@ -167,7 +163,12 @@ public sealed class AltarTreePresenter
             return d;
         }
 
-        if (s.BlockedByChain)
+        if (s.Pending)
+        {
+            d.ButtonLabel = "준비 중";
+            d.Reason      = "유물 성장 개편과 함께 열린다";
+        }
+        else if (s.BlockedByChain)
         {
             d.ButtonLabel = "앞 노드 먼저";
             d.Reason      = s.MissingParent != null ? $"선으로 이어진 「{s.MissingParent.DisplayName}」을 먼저 연다" : "";
@@ -200,6 +201,8 @@ public sealed class AltarTreePresenter
     private static AltarNodeVisual BaseVisual(in AltarNodeState s)
     {
         if (s.Unlocked)             return AltarNodeVisual.Bought;
+        if (s.EraHidden)            return AltarNodeVisual.EraHidden;
+        if (s.Pending)              return AltarNodeVisual.OpenLocked;   // 보이지만 살 수 없다(유물 성장 개편 대기)
         if (s.BlockedByChain)       return AltarNodeVisual.Hidden;   // 2차에서 Next로 올라갈 수 있다
         if (s.BlockedByRequirement) return AltarNodeVisual.OpenLocked;
         return s.CanBuy ? AltarNodeVisual.Affordable : AltarNodeVisual.Open;

@@ -31,9 +31,12 @@ public sealed class ExitCompassHud : MonoBehaviour
 
     // 가장자리로 밀린 배지가 비키는 띠(1920×1080 기준). 위 가운데는 보스 체력바 · 패턴 예고 · 챌린지 목표(44~126) ·
     // 퀘스트 알림 자리, 아래는 무기 칸(이름 포함) · 체력바 · 스킬 칸 자리다 — 배지가 그 위에 얹혀 글이 섞였다(09-28 UI 전수).
-    private const float TopCenterBand  = 190f;   // 퀘스트 완료 알림이 80~175를 쓴다(2차 실측)
+    // 퀘스트 완료 알림이 80~175를 쓴다(2차 실측). 10-01: 챌린지 띠·놀이 띠가 재화 줄 아래(124~약 240)로 내려와 250으로.
+    private const float TopCenterBand  = 250f;
     private const float TopCenterHalfW = 520f;
     private const float BottomHudBand  = 380f;   // 버프 아이콘 줄이 무기 이름 위(336~372)로 올라갔다(09-28)
+    // 위 양옆 = 미니맵(왼쪽 위 ~150)과 재화 줄(오른쪽 위 ~125) 자리 — 위로 밀린 배지가 재화 칸 위에 얹혔다(10-01 전주기 시뮬).
+    private const float TopSideBand    = 160f;
 
     private static readonly Color SubColor   = UITheme.Ink;
     private const float AppearSec = 0.25f;   // 배지가 순간 등장하지 않게(09-28 UI 톤 통일)
@@ -296,9 +299,11 @@ public sealed class ExitCompassHud : MonoBehaviour
         }
     }
 
-    /// <summary>가장자리로 밀린 배지를 위 가운데 띠 아래 · 아래 HUD 띠 위로 옮긴다(스크린 좌표, y는 아래에서 위).</summary>
+    /// <summary>가장자리로 밀린 배지를 위 띠(가운데는 더 깊게) 아래 · 아래 HUD 띠 위로 옮긴다(스크린 좌표, y는 아래에서 위).</summary>
     private static Vector2 AvoidHudBands(Vector2 pos, float halfW, float halfH, float scale, float w, float h)
     {
+        float sideLimit = h - TopSideBand * scale - halfH;
+        if (pos.y > sideLimit) pos.y = sideLimit;
         float topLimit = h - TopCenterBand * scale - halfH;
         if (pos.y > topLimit && Mathf.Abs(pos.x - w * 0.5f) < TopCenterHalfW * scale + halfW) pos.y = topLimit;
         float bottomLimit = BottomHudBand * scale + halfH;

@@ -139,7 +139,8 @@ public sealed class ZoneSign : MonoBehaviour
         }
 
         // 2차 개편(09-29): 이름판은 온보딩 목표 하나만 — 목표 위에 떠서 ▼로 가리킨다. 나머지는 늘 숨는다.
-        bool objective = s_objective == this && s_objectiveTarget != null;
+        // 목표 이름판은 목표 길잡이(BaseCampObjectiveGuide)가 돌면 쉰다 — 표식 + 할 일 줄이 대신한다(09-30)
+        bool objective = s_objective == this && s_objectiveTarget != null && !BaseCampObjectiveGuide.Active;
         if (objective != _composedObjective)
         {
             _composedObjective = objective;

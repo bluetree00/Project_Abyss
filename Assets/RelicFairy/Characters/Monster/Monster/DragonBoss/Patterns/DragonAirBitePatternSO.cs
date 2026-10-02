@@ -254,7 +254,9 @@ internal sealed class DragonAirBreathState : FullLockState<DragonAirBreathPatter
         }
 
         Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
-        Vector3 target = new Vector3(playerPos.x, ctx.Transform.position.y, playerPos.z);
+        // 벽가의 플레이어에게 곧장 붙으면 몸이 벽 너머로 나갔다 — 벽 안면 − 몸 반경까지만(10-03 개선 1-3)
+        Vector3 target = DragonPatternFloorUtils.ClampInsideWalls(
+            new Vector3(playerPos.x, ctx.Transform.position.y, playerPos.z), DragonPatternFloorUtils.BodyRadiusOf(ctx));
         ctx.Transform.position = Vector3.MoveTowards(
             ctx.Transform.position,
             target,
@@ -494,7 +496,9 @@ internal sealed class DragonAirBreathState : FullLockState<DragonAirBreathPatter
             horizontal = ctx.Transform.forward * Data.MinAnchorDistance;
         }
 
-        anchor = playerPos + horizontal;
+        // 플레이어가 벽가에 있으면 앵커가 벽 너머 8 m까지 나가 화룡이 맵 밖에 떠 있었다(09-30)
+        // 바닥 상자 −2 m로는 벽 안 1 m라 몸이 벽에 걸렸다 → 벽 안면 − 몸 반경(10-03 개선 1-3)
+        anchor = DragonPatternFloorUtils.ClampInsideWalls(playerPos + horizontal, DragonPatternFloorUtils.BodyRadiusOf(ctx));
         anchor.y = _lockedAttackY;
         return anchor;
     }

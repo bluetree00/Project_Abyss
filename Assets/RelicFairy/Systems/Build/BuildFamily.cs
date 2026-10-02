@@ -140,7 +140,19 @@ public static class BuildFamilyRules
     }
 
     /// <summary>유물 파츠(RELIC_PARTS_DATA part_id)의 계열 — 파츠가 언제 움직이는가.</summary>
-    public static BuildFamily OfRelicPart(string partId) => partId switch
+    /// <summary>
+    /// 유물 조각의 발동 계열 — 유물 성장 v2(10-02)부터는 데이터 칸 <c>build_family</c>가 정본이다.
+    /// 칸이 비었거나 데이터를 못 읽으면 옛 v1 id 표로 떨어진다.
+    /// </summary>
+    public static BuildFamily OfRelicPart(string partId)
+    {
+        var e = Application.isPlaying ? Managers.RelicParts?.GetById(partId) : null;
+        if (e != null && !string.IsNullOrEmpty(e.build_family)
+            && System.Enum.TryParse<BuildFamily>(e.build_family, out var fam)) return fam;
+        return OfLegacyRelicPart(partId);
+    }
+
+    private static BuildFamily OfLegacyRelicPart(string partId) => partId switch
     {
         "gawain_core_solar_calamity" or "gawain_core_judgment_brand" or "gawain_eff_burn_spread"
             or "lancelot_core_blood_feast" or "lancelot_core_betrayer_brand"

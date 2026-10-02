@@ -188,7 +188,9 @@ public class UI_AwakeningPanel : UI_Popup
             ShopUIStyle.Skin(actionBarImage, UISkin.Achievement?.bottomBar, sliced: true);
 
         // 폐기된 각성 6계열에 쓴 정수를 되돌린다(1회성). 제단을 여는 시점엔 비용표 로드가 끝나 있다.
-        if (!readOnly && MemoryAltarService.TryRefundLegacyAwakening() > 0)
+        // 10-02 재설계로 뺀 유물 노드 4개(파츠 선택지 +1 · 코어 2·3종 · 이어받기)에 쓴 정수도 돌려준다(1회성).
+        int refunded = readOnly ? 0 : MemoryAltarService.TryRefundLegacyAwakening() + MemoryAltarService.TryRefundRemovedNodes();
+        if (refunded > 0)
             SaveAsync().Forget();
 
         // 받아갈 것이 있으면 업적을 먼저 연다 — 받는 쪽을 먼저 보여야
@@ -532,7 +534,22 @@ public class UI_AwakeningPanel : UI_Popup
 
     private async UniTaskVoid PlayOpenAsync()
     {
-        try { await _tree.PlayOpenAsync(this.GetCancellationTokenOnDestroy()); }
+        var ct = this.GetCancellationTokenOnDestroy();
+        try
+        {
+            await _tree.PlayOpenAsync(ct);
+
+            // 새 시기 고리가 처음 드러났다(붕괴 · 엔딩 뒤 첫 방문) — 고리가 그려지고 그 띠의 노드가 스며든다(10-02). 봉인기는 처음부터라 연출 없음.
+            var data = BackendGameData.Instance?.Data;
+            int era  = MemoryAltarCatalog.RevealedEra;
+            int seen = Mathf.Max(1, data?.GetRecord(MemoryAltarCatalog.Rec.AltarEraSeen) ?? 1);
+            if (data != null && era > seen)
+            {
+                for (int e = seen + 1; e <= era; e++) await _tree.PlayEraRevealAsync(e, ct);
+                data.SetRecordMax(MemoryAltarCatalog.Rec.AltarEraSeen, era);
+                if (!readOnly) SaveAsync().Forget();
+            }
+        }
         catch (OperationCanceledException) { }
     }
 

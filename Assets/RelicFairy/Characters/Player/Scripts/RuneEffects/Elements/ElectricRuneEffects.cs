@@ -67,6 +67,7 @@ public sealed class ElecStaticEffect : ElectricRuneEffectBase
 public sealed class ElecDischargeEffect : ElectricRuneEffectBase
 {
     private const float DISCHARGE_RANGE = 14f;
+    private const float DISCHARGE_VFX_RADIUS = 2f;   // 방전은 스택을 몰아 쏘는 큰 한 방 — 낙뢰를 크게 보인다(판정은 대상 하나)
     private readonly List<MonsterBase> _buf = new();
 
     public override void OnSkillUsed(PlayerController player)
@@ -90,7 +91,7 @@ public sealed class ElecDischargeEffect : ElectricRuneEffectBase
 
         // [실제 VFX] 방전 볼트(플레이어→대상) 번개 아크 + 대상 임팩트
         ElementVfxPlayer.PlayBeam(RuneElement.Electric, player.transform.position + Vector3.up, target.transform.position + Vector3.up);
-        ElementVfxPlayer.PlayBurst(RuneElement.Electric, target.transform.position);
+        ElementVfxPlayer.PlayBurst(RuneElement.Electric, target.transform.position, DISCHARGE_VFX_RADIUS);
         // [가이드라인 비주얼] 방전 볼트(개발 전용)
         GuidelineVisual.Chain(player.transform.position + Vector3.up, target.transform.position + Vector3.up);
     }

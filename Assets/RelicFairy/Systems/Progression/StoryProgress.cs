@@ -61,7 +61,7 @@ public static class StoryProgress
     public const string DebugOverridePrefsKey = "RelicFairy.Story.NightmareOverride";
 
     /// <summary>
-    /// 에디터 테스트 전용 — -1 = 저장값, 0 = 봉인기, 1 = 해방기, 2 = 악몽 모드로 보기.
+    /// 에디터 테스트 전용 — -1 = 저장값, 0 = 봉인기, 1 = 해방기(엔딩 전), 2 = 악몽 모드, 3 = 엔딩 뒤(악몽 끔)로 보기.
     /// 플레이 진입(도메인 리로드)을 넘어 유지되도록 에디터 설정에 둔다. <b>켜져 있으면 이야기 기록을 저장하지 않는다</b>
     /// (가짜 상태로 진짜 세이브를 오염시키지 않게).
     /// </summary>
@@ -71,6 +71,10 @@ public static class StoryProgress
     public static int DebugNightmareOverride => s_debugOverride ??= UnityEditor.EditorPrefs.GetInt(DebugOverridePrefsKey, -1);
 
     public static void RefreshDebugOverride() => s_debugOverride = null;
+
+    // 오버라이드 「엔딩 뒤 · 악몽 끔」(3)에서 거점 갈림길로 켠 악몽 모드 — 이 플레이 동안만(저장하지 않는다).
+    // 이게 없으면 오버라이드 중엔 갈림길을 눌러도 시기가 그대로라 켠 판을 확인할 수 없었다.
+    private static bool s_debugModeOn;
 #endif
 
     /// <summary>테스트 오버라이드가 켜져 있으면 기록을 남기지 않는다.</summary>
@@ -93,6 +97,7 @@ public static class StoryProgress
         s_endingPending    = false;
 #if UNITY_EDITOR
         s_debugOverride = null;
+        s_debugModeOn   = false;
         if (DebugNightmareOverride >= 0)
             Debug.LogWarning($"[Story] 테스트 오버라이드 켜짐 — {Era}로 본다. 이야기 기록은 저장하지 않는다.");
 #endif
@@ -109,7 +114,9 @@ public static class StoryProgress
         get
         {
 #if UNITY_EDITOR
-            if (DebugNightmareOverride >= 0) return (StoryEra)Mathf.Clamp(DebugNightmareOverride, 0, 2);
+            if (DebugNightmareOverride >= 0)
+                return DebugNightmareOverride == 3 ? (s_debugModeOn ? StoryEra.NightmareMode : StoryEra.Liberated)
+                                                   : (StoryEra)Mathf.Clamp(DebugNightmareOverride, 0, 2);
 #endif
             if (!BossSealService.IsSealBroken(Lich)) return StoryEra.Sealed;
             return IsNightmareModeUnlocked && Get(Rec.NightmareMode) > 0 ? StoryEra.NightmareMode : StoryEra.Liberated;
@@ -128,7 +135,17 @@ public static class StoryProgress
     /// <summary>옛 이름 — v3에서 뜻이 「봉인이 풀렸다」(= <see cref="IsLiberated"/>)가 됐다. 옛 사용처가 옮겨 가기 전까지 남긴다.</summary>
     public static bool IsNightmare => IsLiberated;
 
-    public static bool HasEnded  => Get(Rec.Ending) > 0;
+    public static bool HasEnded
+    {
+        get
+        {
+#if UNITY_EDITOR
+            // 테스트 오버라이드 — 악몽 모드(2) · 엔딩 뒤(3)는 엔딩을 본 판, 봉인기(0) · 해방기(1)는 아직
+            if (DebugNightmareOverride >= 0) return DebugNightmareOverride >= 2;
+#endif
+            return Get(Rec.Ending) > 0;
+        }
+    }
     public static bool HasMetLich => Get(Rec.LichMet) > 0;
 
     /// <summary>대사창에 멀린의 이름을 보여도 되는가 — 리치가 이름을 부른 뒤, 또는 그림자가 이름을 부르는 사망 횟수 이후.</summary>
@@ -264,6 +281,14 @@ public static class StoryProgress
     public static void SetNightmareMode(bool on)
     {
         if (on && !IsNightmareModeUnlocked) return;
+#if UNITY_EDITOR
+        if (DebugNightmareOverride == 3)
+        {
+            s_debugModeOn = on;
+            Debug.Log($"[Story] 악몽 모드 {(on ? "켬" : "끔")} (테스트 오버라이드 — 이 플레이 동안만, 저장 안 함)");
+            return;
+        }
+#endif
         var data = BackendGameData.Instance?.Data;
         if (data == null || PersistenceSuspended) return;
         int want = on ? 1 : 0;

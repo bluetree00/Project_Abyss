@@ -7,14 +7,15 @@ using UnityEngine.UI;
 /// <summary>
 /// 조립 서약 팝업 — 원인(Ⅰ) × 효과(Ⅲ)를 골라 서약을 벼려낸다. 중앙(Ⅱ)은 완성 미리보기.
 /// 카드 티어(실버/골드/루비)가 조건·계수·효과를 함께 내장 — 슬라이더 없이 ↻ 리롤로 굴린다.
-/// 첫 서약(forceSilver)은 모든 카드가 실버로 고정. 결과 = "asm:cause@tier|effect@tier" id.
+/// 결과 = 서약서 첫 문장 id "sen:cause@tier&gt;effect@tier"(10-02 「한 장의 서약서」 — 조건 + 첫 결과).
+/// 문장이 이미 있으면 같은 판을 「서약서 쓰기」로 연다(<c>UI_CovenantAssemble.Write.cs</c>).
 ///
 /// 사용법:
 ///   var popup = await Managers.UI.ShowPopupUIAndGetAsync&lt;UI_CovenantAssemble&gt;();
 ///   popup.Setup(forceSilver, rng);
 ///   string id = await popup.WaitForResultAsync();   // null = 취소
 /// </summary>
-public class UI_CovenantAssemble : UI_Popup
+public partial class UI_CovenantAssemble : UI_Popup
 {
     // ── Constants ────────────────────────────────────────
     private const int DraftCount     = 3;
@@ -130,7 +131,7 @@ public class UI_CovenantAssemble : UI_Popup
 
         // 보유 서약을 넘겨 페어링을 건다(C4) — 걸어 줄 서약이 없는데 먹는 서약만 손에 쥐면
         // 벼린 서약이 한 번도 터지지 않는 런이 된다. 원인 × 효과 9칸은 전부 벼릴 수 있는 짝으로만 제시된다.
-        CovenantAssembleService.DraftBoard(DraftCount, _rng, _forceSilver, HeldCovenants, out _causes, out _effects);
+        CovenantAssembleService.DraftBoard(DraftCount, _rng, _forceSilver, HeldCovenants, out _causes, out _effects, BuildStatus);
         _selCause = 0;
         _selEffect = 0;
 
@@ -416,7 +417,7 @@ public class UI_CovenantAssemble : UI_Popup
         else
         {
             // 효과는 방어축 보장·페어링·짝 규칙을 리롤로 우회할 수 없다(axisLock + C4) — 서비스가 판정한다.
-            rolled = CovenantAssembleService.RerollEffectCard(data, idx, _rng, _forceSilver, HeldCovenants, _causes);
+            rolled = CovenantAssembleService.RerollEffectCard(data, idx, _rng, _forceSilver, HeldCovenants, _causes, BuildStatus);
         }
         if (rolled == null) return;
 
@@ -439,6 +440,10 @@ public class UI_CovenantAssemble : UI_Popup
         UpdatePreview();
         UpdateConnectors();
     }
+
+    /// <summary>빌드(유물)가 거는 상태 — 소모형 카드의 먹이로 친다(서약서 설계서 §5).</summary>
+    private static HashSet<StatusCurrency> BuildStatus
+        => CovenantBuildStatus.Collect(GameRunBootstrapper.Instance?.Run);
 
     /// <summary>보유 서약(런 중 조립 서약만). 시너지 판정의 상대편.</summary>
     private static IReadOnlyList<CovenantBase> HeldCovenants
@@ -589,7 +594,8 @@ public class UI_CovenantAssemble : UI_Popup
     {
         var cause  = _causes[_selCause];
         var effect = _effects[_selEffect];
-        return AssembledCovenant.MakeId(cause.id, cause.tier, effect.id, effect.tier);
+        return CovenantSentence.MakeId(cause.id, cause.tier,
+            new List<(string, CovenantTier, ClauseLink)> { (effect.id, effect.tier, ClauseLink.Immediate) });
     }
 
     private static bool IsOwned(string id)

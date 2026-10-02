@@ -153,6 +153,7 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
             DKGridPatternHelper.DestroyTiles(_tiles);
             _tiles = SpawnRingTiles(Pattern1(), maxRing);
             _edges = DKGridPatternHelper.SpawnBoundaryEdges(_tiles, Data.edgePrefab);
+            (ctx.Monster as DeathKnightBossMonster)?.CueSwordFloor();   // 첫 배치에만 — 검 색 ↔ 바닥 신호(10-03 개선 2-2)
         }
         if (!_shown2 && _timer >= Data.hitTime2)
         {

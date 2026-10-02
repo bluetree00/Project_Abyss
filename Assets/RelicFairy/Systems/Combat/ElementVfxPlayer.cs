@@ -19,6 +19,7 @@ public sealed class ElementVfxPlayer : MonoBehaviour
 {
     private const string RegistryKey = "ElementVfxRegistry";
     private const float  BurstTtl    = 2.0f;   // 버스트 프리팹 자동 회수(초)
+    private const float  AreaFrom    = 1.01f;  // 이 반경을 넘으면 「광역」 칸을 쓴다(그 아래는 점 타격)
 
     private sealed class VfxItem
     {
@@ -73,16 +74,36 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     /// <summary>공명 재구성 등 대량 재활성 중 발동 버스트 스팸을 막는 가드(RuneEffectDispatcher가 제어).</summary>
     public static bool SuppressBursts { get; set; }
 
+    /// <summary>
+    /// 재생기를 미리 만들어 목록 로드를 시작한다. 재생기는 처음 불릴 때 생기고 목록을 비동기로 읽으므로,
+    /// 그 전에 부른 <b>첫 이펙트는 목록이 없어 버려졌다</b>(10-01 실측) — 런이 시작될 때 한 번 불러 둔다.
+    /// </summary>
+    public static void Warmup() { _ = Instance; }
+
     // ── 정적 파사드 ─────────────────────────────────────
-    /// <summary>속성 즉발 버스트를 위치에 1회 재생. radiusScale=실제 판정 반경(광역이면 그 반경으로 크기 일치). 기본 1=점 타격.</summary>
-    public static void PlayBurst(RuneElement element, Vector3 pos, float radiusScale = 1f)
+    /// <summary>
+    /// 속성 즉발 이펙트를 위치에 1회 재생. radiusScale = 실제 판정 반경(m).
+    /// 반경이 1을 넘으면 <b>광역</b> 칸을 그 반경에 맞춰 키워 쓰고(보이는 범위 = 맞는 범위), 1 이하면 <b>점 타격</b> 칸을 쓴다.
+    /// atFeet = 넘긴 위치가 발밑(대상 transform)인가 — 참이면 타격 이펙트를 몸 높이로 올린다. 맞은 점을 넘길 땐 false.
+    /// </summary>
+    public static void PlayBurst(RuneElement element, Vector3 pos, float radiusScale = 1f, bool atFeet = true)
     {
         if (SuppressBursts) return;
         var inst = Instance; if (inst == null) return;
-        inst.DoPlayBurst(element, pos, radiusScale);
+        inst.DoPlayBurst(element, pos, radiusScale, atFeet);
     }
 
-    /// <summary>장판(GroundField)에 바닥 원반 오라를 부착. scale=장판 반경. 반환=해제 핸들(0=실패).</summary>
+    /// <summary>단계 발동 표시 — 플레이어 자리에 속성 문장 1회.</summary>
+    public static void PlayActivation(RuneElement element, Vector3 pos)
+    {
+        if (SuppressBursts) return;
+        var inst = Instance; if (inst == null) return;
+        if (inst._registry == null) return;
+        var prefab = inst._registry.GetBurst(element);
+        if (prefab != null) inst.DoPlayPrefab(prefab, pos, 1f, BurstTtl);
+    }
+
+    /// <summary>장판(GroundField)에 영역 이펙트를 부착. scale = 장판 반경(m). 반환=해제 핸들(0=실패).</summary>
     public static int AttachAura(RuneElement element, Transform target, float duration, float scale = 1f)
     {
         var inst = Instance; if (inst == null) return 0;
@@ -198,12 +219,23 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     }
 
     // ── 구현 ────────────────────────────────────────────
-    private void DoPlayBurst(RuneElement element, Vector3 pos, float radiusScale)
+    private void DoPlayBurst(RuneElement element, Vector3 pos, float radiusScale, bool atFeet)
     {
         if (_registry == null) return;
-        var prefab = _registry.GetBurst(element);
-        if (prefab == null) return;
 
+        if (radiusScale > AreaFrom)
+        {
+            var area = _registry.GetArea(element, out float nominal, out float life);
+            if (area != null)
+            {
+                DoPlayPrefab(area, pos, radiusScale / nominal, life > 0f ? life : BurstTtl);
+                return;
+            }
+        }
+
+        var prefab = _registry.GetImpact(element, out float lift);
+        if (prefab == null) return;
+        if (atFeet) pos.y += lift;
         DoPlayPrefab(prefab, pos, Mathf.Max(0.1f, radiusScale), BurstTtl);
     }
 
@@ -222,11 +254,16 @@ public sealed class ElementVfxPlayer : MonoBehaviour
 
         // 몸 상태(b)와 바닥 장판(f)은 같은 트랜스폼에 공존할 수 있어 키를 분리한다.
         string key = target.GetInstanceID() + "|" + (int)element + (body ? "b" : "f");
-        var prefab = body ? _registry.GetStatusBody(element) : _registry.GetAura(element);
-        return DoAttachPrefab(prefab, target, duration, scale, key);
+        // 몸 상태는 몸 한가운데에 — 발밑(루트)에 두면 나는 몬스터 아래 바닥에서 탔다(10-01 실측).
+        if (body) return DoAttachPrefab(_registry.GetStatusBody(element), target, duration, scale, key, BodyCenterOffset(target));
+
+        // 장판: scale = 장판 반경(m) → 프리팹 공칭 반경으로 나눠 배율을 낸다.
+        var aura = _registry.GetAura(element, out float nominal);
+        return DoAttachPrefab(aura, target, duration, scale / nominal, key);
     }
 
-    private int DoAttachPrefab(GameObject prefab, Transform target, float duration, float scale, string key)
+    private int DoAttachPrefab(GameObject prefab, Transform target, float duration, float scale, string key,
+                               Vector3 followOffset = default)
     {
         if (prefab == null || target == null || duration <= 0f) return 0;
 
@@ -237,10 +274,10 @@ public sealed class ElementVfxPlayer : MonoBehaviour
             return exist.handle;
         }
 
-        var it = Spawn(prefab, target.position, scale);
+        var it = Spawn(prefab, target.position + followOffset, scale);
         if (it == null) return 0;
         it.follow       = target;
-        it.followOffset = Vector3.zero;
+        it.followOffset = followOffset;
         it.life         = duration;
         it.age          = 0f;
         it.handle       = _handleSeq++;
@@ -248,6 +285,20 @@ public sealed class ElementVfxPlayer : MonoBehaviour
         _handles[it.handle] = it;
         _auras[key]         = it;
         return it.handle;
+    }
+
+    /// <summary>
+    /// 루트(발밑) → 몸 한가운데 높이. 몸 콜라이더(트리거 아님)의 중심 높이를 쓴다 — 나는 몬스터는 몸이 루트보다 높이 떠 있다.
+    /// 부착할 때 한 번만 부른다(프레임마다 아님).
+    /// </summary>
+    private static Vector3 BodyCenterOffset(Transform target)
+    {
+        foreach (var col in target.GetComponentsInChildren<Collider>())
+        {
+            if (col == null || col.isTrigger || !col.enabled) continue;
+            return new Vector3(0f, Mathf.Clamp(col.bounds.center.y - target.position.y, 0f, 3f), 0f);
+        }
+        return Vector3.zero;
     }
 
     private void DoReleaseAura(int handle)
@@ -268,6 +319,7 @@ public sealed class ElementVfxPlayer : MonoBehaviour
         {
             var go = Instantiate(prefab, transform);
             it = new VfxItem { go = go, tf = go.transform, prefab = prefab };
+            UseHierarchyScale(go.transform);
         }
 
         it.tf.SetPositionAndRotation(pos, prefab.transform.rotation);
@@ -384,6 +436,23 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     private static Color BeamColor(RuneElement e) => ElementPalette.Core(e);
 
     private static readonly List<ParticleSystem> s_psBuf = new();
+
+    /// <summary>
+    /// 뿌리 크기(판정 반경)를 입자까지 전달한다. 속성 이펙트 프리팹의 입자계는 전부 「자기 트랜스폼 크기만」 따르는 설정이라
+    /// 뿌리를 키워도 입자는 그대로고 <b>자식 자리만 배율만큼 벌어져 조각이 흩어졌다</b>(10-01 실측: 작열 · 빙하 · 광폭발 · 장판).
+    /// 프리팹 안 트랜스폼 크기가 전부 1이라 배율 1에서는 모습이 달라지지 않는다. 인스턴스에만 건다(프리팹 에셋은 그대로).
+    /// </summary>
+    private static void UseHierarchyScale(Transform root)
+    {
+        root.GetComponentsInChildren(true, s_psBuf);
+        for (int i = 0; i < s_psBuf.Count; i++)
+        {
+            var main = s_psBuf[i].main;
+            main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+        }
+        s_psBuf.Clear();
+    }
+
     private static void RestartParticles(Transform root)
     {
         root.GetComponentsInChildren(true, s_psBuf);

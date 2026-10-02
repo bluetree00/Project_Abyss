@@ -94,6 +94,10 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
 {
     private enum Phase { Jumping, Attacking, EndPose, Done }
 
+    private const float GuideLead     = 0.4f;   // 판정 이만큼 전에 발밑 원 예고(10-03 개선 1-4 · 설계 규칙 R3)
+    private const float GuideHitFlash = 0.15f;  // 판정 순간 판정 색으로 잠깐 남았다 사라진다
+    private static readonly Color GuideColor = new Color(1f, 0.28f, 0.18f, 0.85f);   // 공중 물기 예고와 같은 색
+
     private Phase   _phase;
     private Vector3 _startPos;
     private Vector3 _targetPos;
@@ -103,6 +107,8 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     private int     _totalSwings;
     private bool    _hitApplied;
     private bool    _swingSfxPlayed;
+    private bool    _guideShown;
+    private DragonBossWarningZone _guide;
     private DragonClawTrailController _clawTrail;
 
     internal DragonClawSlashState(DragonClawSlashPatternSO data) : base(data) { }
@@ -114,6 +120,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         _timer      = 0f;
         _arcHeight  = 0f;
         _clawTrail  = null;
+        _guide      = null;   // 남은 예고는 수명이 다하면 스스로 사라진다
     }
 
     public override void Enter(MonsterContext ctx)
@@ -209,6 +216,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         _totalSwings    = Data.ClawCount * 2;
         _hitApplied     = false;
         _swingSfxPlayed = false;
+        _guideShown     = false;
 
         PlayCurrentSwingAnim(ctx);
     }
@@ -225,9 +233,18 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
             Managers.Sound?.PlayEffectAt(Data.ClawSfx, ctx.Transform.position);
         }
 
+        // 판정 GuideLead초 전 발밑 원 예고 — 바닥 가이드 없는 근접 2타라 해방기 2페이지에서 3번 중 2번 다 맞았다(10-03 개선 1-4)
+        if (!_guideShown && _timer >= Data.HitTime - GuideLead)
+        {
+            _guideShown = true;
+            ShowGuide(ctx);
+        }
+
         if (!_hitApplied && _timer >= Data.HitTime)
         {
             _hitApplied = true;
+            if (_guide != null) _guide.TransitionToHitPhase(GuideHitFlash);
+            _guide = null;
             ApplyHit(ctx);
         }
 
@@ -238,6 +255,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
             _timer          = 0f;
             _hitApplied     = false;
             _swingSfxPlayed = false;
+            _guideShown     = false;
 
             if (_swingIndex < _totalSwings)
                 PlayCurrentSwingAnim(ctx);
@@ -270,9 +288,19 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
             var player = col.GetComponent<PlayerController>()
                       ?? col.GetComponentInParent<PlayerController>();
             if (player == null) continue;
-            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier));
+            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier), ctx.Monster.gameObject);
             break;
         }
+    }
+
+    /// <summary>판정과 같은 원(화룡 발밑 · AttackRadius) — 다 차는 순간이 판정. 공중 물기 예고와 같은 화룡 가이드.</summary>
+    private void ShowGuide(MonsterContext ctx)
+    {
+        Vector3 pos = ctx.Transform.position;
+        pos.y = DragonPatternFloorUtils.GetFloorY(pos, ctx.Runtime.SpawnPosition.y);
+        _guide = DragonBossWarningZone.CreateCircle(
+            "DragonClawSlashWarning", pos, Data.AttackRadius, GuideColor, GuideLead + 0.3f);
+        _guide.BeginFill(Mathf.Max(0.05f, Data.HitTime - _timer));
     }
 
     private void StartEndPose()

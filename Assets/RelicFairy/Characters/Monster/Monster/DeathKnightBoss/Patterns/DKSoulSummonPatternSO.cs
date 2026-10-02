@@ -59,7 +59,7 @@ public class DKSoulSummonPatternSO : BossPatternSO
     {
         var dk = ctx.Ctx.Monster as DeathKnightBossMonster;
         if (dk == null) return false;
-        // _soulGateCleared=true: 기둥 성공 파괴 → HP 55% 이상 회복 전까지 재발동 불가
+        // _soulGateCleared=true: 이번 전투에 이미 소환했다(성공 · 실패 무관, 한 번만 — 10-01)
         if (dk.SoulGateCleared) return false;
         return dk.HpRatio <= 0.5f && !dk.DKBlackboard.IsPhase2;
     }

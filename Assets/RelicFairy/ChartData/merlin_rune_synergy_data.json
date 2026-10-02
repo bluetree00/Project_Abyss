@@ -34,12 +34,12 @@
       "threshold": 13,
       "effect_type": "FireBlaze",
       "trigger": "Always",
-      "value": 0.35,
+      "value": 0.45,
       "value2": 0.0,
       "value3": 0.0,
       "max_stack": 1,
       "duration": 0,
-      "description": "3단계 폭염: 점화 상태 적 공격 시 화염 피해 +35%",
+      "description": "3단계 폭염: 점화 상태 적 공격 시 화염 피해 +45%",
       "stat_version": 1
     },
     {
@@ -104,12 +104,12 @@
       "threshold": 19,
       "effect_type": "IceGlacier",
       "trigger": "Always",
-      "value": 1.5,
+      "value": 2.0,
       "value2": 0.0,
       "value3": 0.0,
       "max_stack": 1,
       "duration": 0,
-      "description": "4단계 빙하 연쇄: 빙결 해제 시 빙하 낙하 공격력 150% 광역 + 서리 1중첩",
+      "description": "4단계 빙하 연쇄: 빙결 해제 시 빙하 낙하 공격력 200% 광역 + 서리 1중첩",
       "stat_version": 1
     },
     {
@@ -151,7 +151,7 @@
       "value3": 0.08,
       "max_stack": 1,
       "duration": 0,
-      "description": "3단계 감전: 방전 시 감전(마비 1~3초) 감전 중 공속 +8%",
+      "description": "3단계 감전: 방전 시 감전(마비 1~3초) 감전 중 받는 피해 +8%",
       "stat_version": 1
     },
     {
@@ -161,11 +161,11 @@
       "effect_type": "ElecOverload",
       "trigger": "OnHit",
       "value": 0.5,
-      "value2": 2.0,
+      "value2": 3.0,
       "value3": 0.0,
       "max_stack": 1,
       "duration": 0,
-      "description": "4단계 과부하: 공격 시 체인 라이트닝 주변 최대 2명 50% 피해",
+      "description": "4단계 과부하: 공격 시 체인 라이트닝 주변 최대 3명 50% 피해",
       "stat_version": 1
     },
     {
@@ -207,7 +207,7 @@
       "value3": 0.2,
       "max_stack": 1,
       "duration": 0,
-      "description": "3단계 독안개 간파: 크기 +50% 독피해시 0.1% 회복 겹침3초 공격력 -20%",
+      "description": "3단계 독안개 간파: 크기 +50% 안개 안에서 초당 보호막 0.1% 겹침3초 공격력 -20%",
       "stat_version": 1
     },
     {
@@ -217,11 +217,11 @@
       "effect_type": "GrassMistDominion",
       "trigger": "Always",
       "value": 2.0,
-      "value2": 0.002,
+      "value2": 0.003,
       "value3": 0.15,
       "max_stack": 1,
       "duration": 0,
-      "description": "4단계 독무 지배: 장판 닿으면 전체 겹침판정 독피해 ×2 회복0.2% 보스받뎀 +15%",
+      "description": "4단계 독무 지배: 장판 닿으면 전체 겹침판정 독피해 ×2 안개 안에서 초당 보호막 0.3% 보스받뎀 +15%",
       "stat_version": 1
     },
     {
@@ -273,11 +273,11 @@
       "effect_type": "LightField",
       "trigger": "Always",
       "value": 0.2,
-      "value2": 0.3,
+      "value2": 0.4,
       "value3": 0.0,
       "max_stack": 1,
       "duration": 0,
-      "description": "4단계 빛의 장판: 장판 추종 장판 위 공격 치확 +20% 치피 +30%",
+      "description": "4단계 빛의 장판: 장판 추종 장판 위 공격 치확 +20% 치피 +40%",
       "stat_version": 1
     },
     {
@@ -328,12 +328,12 @@
       "threshold": 19,
       "effect_type": "DarkAbyss",
       "trigger": "Always",
-      "value": 0.0,
-      "value2": 0.0,
-      "value3": 0.0,
+      "value": 0.25,
+      "value2": 0.2,
+      "value3": 2.0,
       "max_stack": 1,
       "duration": 0,
-      "description": "4단계 심연 각성: 게이지 달성 시 랜덤 버프 부여",
+      "description": "4단계 심연 각성: 게이지 달성 시 공격력 +25% · 주변 적 받뎀 +20% · 암흑 해방 +2초",
       "stat_version": 1
     },
     {

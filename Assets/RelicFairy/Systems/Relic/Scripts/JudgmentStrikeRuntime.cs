@@ -45,10 +45,12 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     private const string QSwordKey = "Relic/Lancelot/QSword";
 
     /// <summary>
-    /// 전용 검(캐릭터 팩의 검)이 붙는 뼈. 플레이어 모델이 그 팩 모델이라 팩이 잡아 둔 손 뼈·자세를 그대로 쓰면 쥐는 위치가 맞는다.
-    /// 팩 원본 배치: add_weapon_r 아래 X −90°, 위치 0. 뼈를 못 찾으면 무기 소켓(WeaponMount)에 붙인다.
+    /// 전용 검(캐릭터 팩의 검)이 붙는 뼈 = 오른손 뼈 hand_r. 팩 원본 배치는 add_weapon_r 아래 X −90°이고, 기본 자세에서 add_weapon_r은
+    /// hand_r과 위치 · 회전이 정확히 같다(10-03 실측 0 m · 0°). 그런데 add_weapon_r은 root 아래 뼈라 <b>우리 휴머노이드 클립이 움직이지 않는다</b> —
+    /// 손이 휘두르는 동안 검은 기본 자세 자리에 남아 몸 옆에 떠 있었다(무기와 무관하게 전부, 10-03 사용자 「검이 제대로 나와야」).
+    /// 같은 자세를 손뼈에 직접 붙이면 팩이 의도한 쥐는 모양 그대로 손을 따라간다. 뼈를 못 찾으면 무기 소켓(WeaponMount)에 붙인다.
     /// </summary>
-    private const string QSwordBone = "add_weapon_r";
+    private const string QSwordBone = "hand_r";
     private static readonly Quaternion QSwordBoneRotation = Quaternion.Euler(-90f, 0f, 0f);
 
     /// <summary>
@@ -95,6 +97,11 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     // 활을 든 채 검을 휘두르면 활로 후려치는 그림이 나온다 — 시전 동안만 바꿔 낀다.
     private GameObject _hiddenWeapon;   // 숨긴 장착 무기(복구 대상)
     private GameObject _qSword;         // 띄운 전용 검
+    private GameObject _bladeVfx;       // 칼날 루프 이펙트(유물 데이터 키)
+    private PlayerWeaponTrailVfx _trailVfx;   // 칼날 트레일 — 장착 무기 대신 전용 검에 묶는다(10-03 사용자 「Q 검에 트레일 · 이펙트」)
+
+    /// <summary>칼밑 = 손잡이 원점에서 칼끝 쪽으로 이 비율(가드 · 손잡이를 트레일에서 뺀다).</summary>
+    private const float BladeRootRatio = 0.22f;
 
     private float _elapsed;
     private int   _hitsDone;
@@ -116,6 +123,7 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     public void OnEnter(SkillExecutionContext ctx)
     {
         _elapsed = 0f; _hitsDone = 0; _finisherAnimPlayed = false; _holdingPose = false;
+        _relic?.ConsumeJudgmentCharge();   // 광란당 심판 횟수 — 조각이 늘리면 다시 쓸 수 있다
 
         // Q 모션의 주인은 무기가 아니라 유물이다 — 상태 이름을 유물 데이터에서 읽는다.
         _relicClass = ctx.Controller != null ? ctx.Controller.RelicClass : null;
@@ -300,11 +308,64 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         go.transform.localPosition = Vector3.zero;
         go.transform.localRotation = localRotation;
         _qSword = go;
+        AttachBladeFx(go);
+    }
+
+    /// <summary>
+    /// 전용 검에 칼날 트레일 · 칼날 이펙트를 붙인다. 앵커(칼끝 · 칼밑)는 메시의 긴 축에서 잡는다 — 손잡이 원점에서 먼 끝이 칼끝.
+    /// 트레일 프리팹 · 이펙트 키는 유물 데이터(RelicClassSO)가 정한다. 없으면 아무것도 안 한다.
+    /// </summary>
+    private void AttachBladeFx(GameObject sword)
+    {
+        var mf = sword.GetComponentInChildren<MeshFilter>();
+        if (mf == null || mf.sharedMesh == null) return;
+        var b = mf.sharedMesh.bounds;
+        Vector3 axis = b.size.x >= b.size.y && b.size.x >= b.size.z ? Vector3.right : b.size.y >= b.size.z ? Vector3.up : Vector3.forward;
+        float half = Vector3.Dot(b.extents, axis);
+        Vector3 endA = b.center + axis * half, endB = b.center - axis * half;
+        Vector3 tipLocal = endA.sqrMagnitude > endB.sqrMagnitude ? endA : endB;
+
+        var tip = new GameObject("QSwordTip").transform;
+        tip.SetParent(mf.transform, false);
+        tip.localPosition = tipLocal;
+        var root = new GameObject("QSwordRoot").transform;
+        root.SetParent(mf.transform, false);
+        root.localPosition = tipLocal * BladeRootRatio;
+
+        var owner = _relicClass;
+        if (owner != null && owner.QSwordTrailPrefab != null)
+        {
+            var ctrl = sword.GetComponentInParent<PlayerController>();
+            if (ctrl != null && ctrl.TryGetComponent(out _trailVfx))
+                _trailVfx.BeginOverride(tip, root, owner.QSwordTrailPrefab);
+        }
+        if (owner != null && !string.IsNullOrEmpty(owner.QSwordBladeVfxKey))
+            SpawnBladeVfxAsync(owner.QSwordBladeVfxKey, mf.transform, (tip.localPosition + root.localPosition) * 0.5f,
+                               tipLocal.magnitude * owner.QSwordBladeVfxScale).Forget();
+    }
+
+    private async UniTaskVoid SpawnBladeVfxAsync(string key, Transform parent, Vector3 localPos, float scale)
+    {
+        GameObject go;
+        try { go = await Managers.AddressableManager.InstantiateAsync(key, parent); }
+        catch (System.OperationCanceledException) { return; }
+        if (go == null) return;
+        if (_qSword == null || parent == null) { Managers.AddressableManager?.ReleaseInstance(go); return; }   // 스킬이 먼저 끝났다
+        go.transform.localPosition = localPos;
+        go.transform.localRotation = Quaternion.identity;
+        go.transform.localScale    = Vector3.one * scale;
+        _bladeVfx = go;
     }
 
     /// <summary>전용 검 회수 + 장착 무기 복구. 중단·사망 경로에서도 반드시 지나야 한다.</summary>
     private void RestoreWeapon()
     {
+        if (_trailVfx != null) { _trailVfx.EndOverride(); _trailVfx = null; }
+        if (_bladeVfx != null)
+        {
+            Managers.AddressableManager?.ReleaseInstance(_bladeVfx);
+            _bladeVfx = null;
+        }
         if (_qSword != null)
         {
             Managers.AddressableManager?.ReleaseInstance(_qSword);

@@ -5,7 +5,7 @@
     "maxHp": 15,
     "defense": 5.0,
     "attackPower": 15.0,
-    "moveSpeed": 1.0,
+    "moveSpeed": 1.6,
     "attackRange": 2.0,
     "attackRadius": 1.0,
     "attackRate": 1.0,

@@ -48,6 +48,8 @@ public class CrucibleRoomController : MonoBehaviour
 
     private GameObject _npcInstance;
     private ShopNpcInteraction _npc;
+    private ServiceNpcReactor _reactor;   // 혼자면 망치질 · 다가오면 알아봄 · 벼리고 나가면 반김
+    private int _fuelAtOpen;              // 패널을 열 때 재료 — 닫을 때 달라졌으면 일을 맡긴 것
 
     private int  _streak;          // 연속 성공 수
     private bool _lastJackpot;     // 직전 시도가 잭팟이었나(UI 연출용)
@@ -340,7 +342,17 @@ public class CrucibleRoomController : MonoBehaviour
         var state = RangedPartsState.Current;
         if (def == null || state == null) return 0;
 
-        int raw = def.CostAt(state.LevelOf(partId));
+        return PartCostFor(def, state.LevelOf(partId));
+    }
+
+    /// <summary>
+    /// 파츠를 <paramref name="level"/>에서 한 단계 올리는 비용(할인 이벤트 반영). 상한이면 0.
+    /// 재련소 첫 화면이 「지금 재료로 몇 번 올릴 수 있나」를 셀 때 앞 레벨의 비용도 봐야 해서 따로 연다.
+    /// </summary>
+    public int PartCostFor(WeaponPartEntry def, int level)
+    {
+        if (def == null) return 0;
+        int raw = def.CostAt(level);
         return raw <= 0 ? 0 : Mathf.Max(1, Mathf.CeilToInt(raw * CostMult));
     }
 
@@ -460,10 +472,11 @@ public class CrucibleRoomController : MonoBehaviour
 
         if (_npc != null) _npc.OnInteract += HandleNpcInteract;
         else Debug.LogWarning("[Crucible] NPC 프리팹에 ShopNpcInteraction 없음");
+        _npcInstance.TryGetComponent(out _reactor);
 
         // 주기적 월드스페이스 잡담 — 방이 '사람이 일하는 장소'로 읽히게.
         _npcInstance.AddComponent<NpcAmbientChatter>()
-                    .Initialize(ChatterLines, 9f, new Color(1f, 0.82f, 0.55f));
+                    .Initialize(ChatterLines, 9f, new Color(1f, 0.82f, 0.55f), _npc != null ? _npc.ChatterHeight : null);
     }
 
     private void HandleNpcInteract()
@@ -476,12 +489,15 @@ public class CrucibleRoomController : MonoBehaviour
     {
         _uiOpen = true;
         if (_npc != null) _npc.SetInteractable(false);
+        _fuelAtOpen = FuelAmount;
+        if (_reactor != null) _reactor.BeginTalk();
 
         var panel = await Managers.UI.ShowPopupUIAndGetAsync<UI_CruciblePanel>();
         if (panel == null)
         {
             _uiOpen = false;
             if (_npc != null) _npc.SetInteractable(true);
+            if (_reactor != null) _reactor.EndTalk(false);
             Debug.LogWarning("[Crucible] UI_CruciblePanel 로드 실패");
             return;
         }
@@ -493,6 +509,8 @@ public class CrucibleRoomController : MonoBehaviour
     {
         _uiOpen = false;
         if (_npc != null) _npc.SetInteractable(true);
+        // 강화 · 진화 · 파츠는 모두 강화 재료를 쓴다(잭팟은 돌려준다) — 달라졌으면 일을 맡긴 것
+        if (_reactor != null) _reactor.EndTalk(FuelAmount != _fuelAtOpen);
     }
 
     // ── 배치 ────────────────────────────────────────────────

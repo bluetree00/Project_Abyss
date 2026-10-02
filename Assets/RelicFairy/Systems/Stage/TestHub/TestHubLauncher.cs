@@ -14,11 +14,16 @@ public class TestHubLauncher : MonoBehaviour
 {
     // ── Constants ─────────────────────────────────────────────────
     private const float PanelWidth  = 560f;
-    private const float PanelHeight = 700f;
+    private const float PanelHeight = 790f;
 
     // ── Static ────────────────────────────────────────────────────
     private static readonly string[] ChapterLabels = { "Ch1", "Ch2", "Ch3", "Ch4" };
     private static readonly string[] StartLabels   = { "대기방 (정상 흐름)", "보스 대기방 직행" };
+#if UNITY_EDITOR
+    // 이야기 시기(에디터 테스트 오버라이드 — 저장을 건드리지 않는다). 값 = StoryProgress 오버라이드
+    private static readonly string[] EraLabels = { "저장값", "봉인기", "해방기", "엔딩 뒤", "악몽 모드" };
+    private static readonly int[]    EraValues = { -1, 0, 1, 3, 2 };
+#endif
 
     // ── Serialized ────────────────────────────────────────────────
     [Header("로드아웃")]
@@ -82,6 +87,10 @@ public class TestHubLauncher : MonoBehaviour
 
         GUILayout.Label("시작 지점", _header);
         _bossApproach = GUILayout.Toolbar(_bossApproach ? 1 : 0, StartLabels) == 1;
+
+#if UNITY_EDITOR
+        DrawEra();
+#endif
 
         GUILayout.Label("유물", _header);
         _relicIndex = DrawChoice(_relicLabels, _relicIndex, allowNone: false);
@@ -152,10 +161,32 @@ public class TestHubLauncher : MonoBehaviour
 
         // 보스 아레나는 룸풀 그대로 — Ch4 Arena_Boss_Ch4가 천공의 대제단이다(09-17 A안 적용).
         TestRunRequest.Set(chapter, _bossApproach, null, gameObject.scene.path);
+#if UNITY_EDITOR
+        TestRunOverlay.Ensure();   // 런 중 오른쪽 위 작은 패널 — 보스 페이지 점프 · 시기 확인
+        Debug.Log($"[TestHub] 시작 — {chapter} · 시기 {TestRunOverlay.EraLabel()} · {EraBalance.Describe(StoryProgress.Era)}");
+#endif
 
         app.MarkNewRunPending();
         app.RequestLoad(AppBootstrapper.GetSceneForChapter(chapter));
     }
+
+#if UNITY_EDITOR
+    /// <summary>이야기 시기 줄 — 고르면 에디터 오버라이드를 바꾼다(저장값은 그대로). 아래 한 줄은 그 시기 보스 · 리치가 싸우는 방식.</summary>
+    private void DrawEra()
+    {
+        GUILayout.Label("이야기 시기 (테스트 — 저장 안 함)", _header);
+        int cur = StoryProgress.DebugNightmareOverride;
+        int idx = Mathf.Max(0, System.Array.IndexOf(EraValues, cur));
+        int sel = GUILayout.Toolbar(idx, EraLabels);
+        if (sel != idx)
+        {
+            UnityEditor.EditorPrefs.SetInt(StoryProgress.DebugOverridePrefsKey, EraValues[sel]);
+            StoryProgress.RefreshDebugOverride();
+            Debug.Log($"[TestHub] 이야기 시기 — {TestRunOverlay.EraLabel()} · {EraBalance.Describe(StoryProgress.Era)}");
+        }
+        GUILayout.Label($"{TestRunOverlay.EraLabel()} · {TestRunOverlay.EraRule()}");
+    }
+#endif
 
     /// <summary>선택 그리드. 인덱스는 후보 배열 기준(allowNone이면 -1 = 없음).</summary>
     private static int DrawChoice(string[] labels, int index, bool allowNone)

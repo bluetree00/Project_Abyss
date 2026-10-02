@@ -189,13 +189,10 @@ public class DragonAirMeteorPassiveRunner
                 await UniTask.Yield(ct);
             }
         }
-        finally
+        catch
         {
-            for (int i = 0; i < warnTiles.Count; i++)
-                QuadTilePool.Return(warnTiles[i], warnMrs[i], warnMats[i]);
-            warnTiles.Clear();
-            warnMats.Clear();
-            warnMrs.Clear();
+            ReturnWarnTiles();   // 취소 · 예외 — 착탄 정리까지 못 가니 여기서 돌려준다
+            throw;
         }
 
         // ── 낙하 VFX + 사운드 ─────────────────────────────────
@@ -214,6 +211,7 @@ public class DragonAirMeteorPassiveRunner
             await UniTask.Delay(TimeSpan.FromSeconds(_so.ImpactDelay), cancellationToken: ct);
 
             ApplyImpact(landPos, halfR);
+            ReturnWarnTiles();   // 예고는 착탄 순간까지 남긴다(10-02 — 예전엔 낙하 0.6초 동안 바닥 예고가 비어 있었다)
 
             if (projectile != null)
                 foreach (var ps in projectile.GetComponentsInChildren<ParticleSystem>(true))
@@ -225,7 +223,17 @@ public class DragonAirMeteorPassiveRunner
         }
         finally
         {
+            ReturnWarnTiles();
             if (projectile != null) BossEffectPool.Release(projectile);
+        }
+
+        void ReturnWarnTiles()
+        {
+            for (int i = 0; i < warnTiles.Count; i++)
+                QuadTilePool.Return(warnTiles[i], warnMrs[i], warnMats[i]);
+            warnTiles.Clear();
+            warnMats.Clear();
+            warnMrs.Clear();
         }
     }
 
@@ -249,7 +257,7 @@ public class DragonAirMeteorPassiveRunner
         if (Mathf.Abs(d.x) <= halfExtent && Mathf.Abs(d.z) <= halfExtent)
             _ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()
                 ?.TakeDamage(Mathf.RoundToInt(_ctx.Config.stat.attackPower * _so.DamageMultiplier), _ctx.Monster.gameObject,
-                             false, HitWeight.Light);   // 수동 운석 — 약
+                             false, HitWeight.Auto);   // 수동 운석 — 직격(293)이라 약이 아니다: 피격 연출 · 날아감은 피해량대로(10-01)
     }
 }
 }

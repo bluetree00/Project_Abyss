@@ -100,6 +100,12 @@ public class StartRoomGate : MonoBehaviour
     private bool _covenantDone;        // 시작방 서약 제단 완료 여부(통과 조건)
     private bool _sealDoorPrefabWarned;
 
+    /// <summary>
+    /// 서약을 새겨야 문이 열리는가 — 기본은 그렇다. 다만 이 대기방에서 서약을 더 맺을 수 없으면(칸이 가득 참 · 악몽 「부서진 맹세」)
+    /// 조건을 푼다. 예전엔 「새겼다」 신호만 기다려 문이 영영 안 열렸다(10-02: 기본 3칸으로 Ch4 첫 진입 · 성소에서 이미 맺음 · 악몽 Ch3).
+    /// </summary>
+    private bool CovenantRequiredNow => requireCovenantForGate && !WorldCovenantAltar.AssembleBlockedHere;
+
     // ── Init ──────────────────────────────────────────────────────
 
     private void Awake()
@@ -156,7 +162,12 @@ public class StartRoomGate : MonoBehaviour
         EnsureStartCorridor();     // 게이트 너머 복도+방 보장(최초 1회)
 
         bool ready = IsLoadoutReady();
-        if (ready == _gateOpen) return;
+        if (ready == _gateOpen)
+        {
+            // 서약을 맺을 수 없는 대기방 — 그 사실이 늦게 확정돼도(악몽 규칙 · 서약 복원 순서) 문을 연다. 연출은 1회만 돈다.
+            if (ready && !_covenantDone && !CovenantRequiredNow) TriggerGateReveal();
+            return;
+        }
         _gateOpen = ready;
         if (portalActive != null) portalActive.SetActive(ready);
 
@@ -164,7 +175,7 @@ public class StartRoomGate : MonoBehaviour
         // 서약 불필요 모드: 기존처럼 로드아웃 준비되면 바로 연출.
         if (ready)
         {
-            if (!requireCovenantForGate) TriggerGateReveal();
+            if (!CovenantRequiredNow) TriggerGateReveal();
         }
         else
         {
@@ -475,7 +486,7 @@ public class StartRoomGate : MonoBehaviour
                 return;
             }
             // 서약 제단을 완료해야 문이 열리고 통과 가능(문이 닫힌 채 지나가는 것 방지).
-            if (requireCovenantForGate && !_covenantDone)
+            if (CovenantRequiredNow && !_covenantDone)
             {
                 if (notReadyIndicator != null) notReadyIndicator.SetActive(true);
                 Debug.LogWarning("[StartRoomGate] 서약 미완료 — 게이트 통과 불가");

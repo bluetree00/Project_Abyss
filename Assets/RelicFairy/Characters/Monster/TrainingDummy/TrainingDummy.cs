@@ -148,6 +148,7 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
         if (TryGetComponent<MonsterBurnHandler>(out var burn) && burn.Remaining > 0f)
             _statusUiBuf.Add(RelicFairy.Monster.MonsterStatusReceiver.MakeItem(
                 "burn", 1, burn.Remaining01, burn.Remaining));
+        if (TryGetComponent<RelicMarkStatus>(out var marks)) marks.Collect(_statusUiBuf);   // 유물 성장 v2 실측용
 
         if (_statusUiBuf.Count == 0 && _statusUiWasEmpty) return;
         _statusUiWasEmpty = _statusUiBuf.Count == 0;

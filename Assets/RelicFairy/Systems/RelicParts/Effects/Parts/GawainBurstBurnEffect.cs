@@ -21,6 +21,6 @@ public sealed class GawainBurstBurnEffect : RelicPartEffect
 
         burn.Detonate(BurstFraction);
         burn.HoldRefreshThisFrame();
-        ElementVfxPlayer.PlayBurst(RuneElement.Fire, hit.HitPoint, 1f);
+        ElementVfxPlayer.PlayBurst(RuneElement.Fire, hit.HitPoint, 1f, atFeet: false);   // 맞은 점 그대로
     }
 }

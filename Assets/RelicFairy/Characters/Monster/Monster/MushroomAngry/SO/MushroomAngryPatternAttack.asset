@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: MushroomAngryPatternAttack
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PatternAttackOverrideSO
   selectionMode: 0
-  engageDistance: 2
+  engageDistance: 1.75
   patterns:
   - name: BasicAttack
     animationStateName: Mushroom_Attack01Angry

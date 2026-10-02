@@ -137,8 +137,8 @@ public static class ServiceRoomDecorPlacer
     /// 앵커가 하나도 없으면 <c>false</c>를 돌려 호출부가 기존 탐색 배치로 폴백하게 한다(회귀 0).
     ///
     /// 매칭 규칙 — <c>Counter</c> 앵커 = <paramref name="prefabs"/>[0],
-    /// <c>Prop</c> 앵커 = [1] 이후를 <b>배치 순서대로</b>. 앵커가 남으면 소품을 순환시키지 않고 비운다
-    /// (같은 소품이 두 번 서는 것보다 빈 자리가 낫다).
+    /// 번호 있는 <c>Prop</c> 앵커(NP&lt;n&gt;) = [n], 번호 없는 <c>Prop</c> 앵커 = 번호가 안 쓴 [1] 이후를 <b>배치 순서대로</b>.
+    /// 앵커가 남으면 소품을 순환시키지 않고 비운다(같은 소품이 두 번 서는 것보다 빈 자리가 낫다).
     /// 소품은 모두 NPC를 바라본다 — 무대의 중심이 NPC라는 것을 형태로 알린다.
     /// </summary>
     public static bool TryPlaceFromAnchors(Transform room, GameObject[] prefabs,
@@ -148,6 +148,12 @@ public static class ServiceRoomDecorPlacer
 
         var anchors = room.GetComponentsInChildren<ServiceDecorAnchor>(true);
         if (anchors == null || anchors.Length == 0) return false;
+
+        // 번호 있는 자리가 쓴 칸 — 번호 없는 자리는 이 칸들을 건너뛰고 채운다(같은 소품이 두 번 서지 않게).
+        ulong taken = 0;
+        foreach (var a in anchors)
+            if (a != null && a.Kind == ServiceDecorAnchor.Slot.Prop && a.PropIndex > 0 && a.PropIndex < 64)
+                taken |= 1UL << a.PropIndex;
 
         int propIndex = 1;   // [0]은 카운터 몫
         for (int i = 0; i < anchors.Length; i++)
@@ -162,8 +168,14 @@ public static class ServiceRoomDecorPlacer
                 prefab = prefabs[0];
                 name = counterName;
             }
+            else if (a.PropIndex > 0)
+            {
+                if (a.PropIndex >= prefabs.Length) continue;   // 배열에 없는 번호면 그 자리는 비운다
+                prefab = prefabs[a.PropIndex];
+            }
             else
             {
+                while (propIndex < prefabs.Length && propIndex < 64 && (taken & (1UL << propIndex)) != 0) propIndex++;
                 if (propIndex >= prefabs.Length) continue;   // 소품이 모자라면 그 자리는 비운다
                 prefab = prefabs[propIndex++];
             }

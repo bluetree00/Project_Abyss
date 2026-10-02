@@ -198,6 +198,22 @@ public static class LichVfx
         => Spawn(slot, position, rotation, scale, null, true, tint, out _);
 
     /// <summary>
+    /// 목록 밖 칸을 직접 재생 — 런 공용 목록(RunFx)처럼 다른 목록이 같은 재생기(풀 · 색 입히기 · 크기 보정)를 쓴다.
+    /// 한 번 재생이면 수명 뒤 거두고, 반복이면 <see cref="Stop"/>할 때까지 남는다.
+    /// </summary>
+    public static GameObject PlayEntry(in LichVfxEntry entry, Vector3 position, Quaternion rotation,
+                                       float scale, Color? tint, bool loop, Transform parent = null)
+    {
+        if (entry.prefab == null) return null;
+        var go = SpawnEntry(entry, position, rotation, scale, parent, loop, tint);
+        if (go == null || loop) return go;
+
+        float life = entry.lifetime > 0f ? entry.lifetime : BossEffectPool.CalculateLifetime(entry.prefab, 2f);
+        ReleaseAfter(go, life);
+        return go;
+    }
+
+    /// <summary>
     /// 거둔다. <paramref name="fadeSeconds"/> &gt; 0이면 방출만 멈추고 남은 입자가 사라진 뒤 거둔다.
     /// </summary>
     public static void Stop(ref GameObject instance, float fadeSeconds = 0f)
@@ -235,7 +251,12 @@ public static class LichVfx
     {
         entry = default;
         if (s_set == null || !s_set.TryGet(slot, out entry)) return null;
+        return SpawnEntry(entry, position, rotation, scale, parent, loop, tint);
+    }
 
+    private static GameObject SpawnEntry(in LichVfxEntry entry, Vector3 position, Quaternion rotation,
+                                         float scale, Transform parent, bool loop, Color? tint)
+    {
         Vector3 pos = position + rotation * entry.offset;
         var go = IsFreshOnly(entry.prefab)
             ? Object.Instantiate(entry.prefab, pos, rotation, parent)

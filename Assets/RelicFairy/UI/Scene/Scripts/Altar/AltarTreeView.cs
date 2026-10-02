@@ -40,8 +40,8 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
     {
         AltarBranch.Rune     => new Color(0.66f, 0.56f, 0.90f),
         AltarBranch.Covenant => new Color(0.44f, 0.78f, 0.72f),
-        AltarBranch.Gear     => new Color(0.90f, 0.65f, 0.38f),
-        AltarBranch.Ranged   => new Color(0.52f, 0.71f, 0.92f),
+        AltarBranch.Weapon   => new Color(0.90f, 0.65f, 0.38f),
+        AltarBranch.Memory   => new Color(0.91f, 0.73f, 0.33f),
         _                    => new Color(0.86f, 0.52f, 0.54f),
     };
 
@@ -72,7 +72,7 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
     private readonly Dictionary<AltarBranch, TMP_Text> _branchLabels = new(5);
     private readonly Image[] _moteImgs = new Image[MotePool];
     private readonly Mote[]  _motes    = new Mote[MotePool];
-    private readonly float[] _moteTimer = new float[5];
+    private readonly float[] _moteTimer = new float[MemoryAltarLayout.BranchOrder.Length];   // 갈래마다 하나(10-02 재설계로 5 → 4)
     private IReadOnlyDictionary<string, AltarNodeViewModel> _models;
     private Image    _centerDisc, _centerTrack, _centerFill, _centerGlyph;
     private TMP_Text _centerTitle, _centerName, _centerStatus;
@@ -81,7 +81,6 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
     private Vector2  _pan;
     private AltarTreeNodeView _focused;
     private string   _hoverId;
-    private int      _visibleDepth;
     private bool     _playing;
 
     // ── Properties ───────────────────────────────────────
@@ -126,14 +125,17 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
     {
         _models = models;
         foreach (var kv in _nodes)
-            if (models.TryGetValue(kv.Key, out var m)) kv.Value.Apply(m, instant);
+            if (models.TryGetValue(kv.Key, out var m))
+            {
+                kv.Value.gameObject.SetActive(m.Visual != AltarNodeVisual.EraHidden);   // 드러나지 않은 시기 — 그리지 않는다(10-02)
+                kv.Value.Apply(m, instant);
+            }
 
         PlaceLabels();
         StyleEdges();
         ApplyCenter(center);
         ApplyBranchLabels();
-        _visibleDepth = VisibleDepth();
-        ApplyRings(_visibleDepth, animate: false);
+        ApplyRings();
     }
 
     /// <summary>노드에 초점을 둔다. <paramref name="select"/>면 이벤트 시스템 선택도 옮긴다(게임패드).</summary>
@@ -215,7 +217,7 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
     /// <summary>
     /// 해금 연출 — <paramref name="before"/>(해금 전 화면 상태)와 지금 상태를 비교해 새로 열린 것만 움직인다.
     /// 각인 → 점화(열쇠면 파문 두 겹 + 갈래를 훑는 빛) → 자식 쪽으로 빛실이 자라며 빛 알갱이가 앞서 가고 → 자식이 돋는다 →
-    /// 그 너머 한 칸이 스며든다 → 새 깊이면 고리가 그려진다.
+    /// 그 너머 한 칸이 스며든다. (고리는 시기 — 해금이 아니라 이야기가 드러낸다, <see cref="PlayEraRevealAsync"/>.)
     /// </summary>
     public async UniTask PlayUnlockAsync(MemoryAltarNode node, IReadOnlyDictionary<string, AltarNodeVisual> before, CancellationToken ct)
     {
@@ -234,8 +236,6 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
             else if (old == AltarNodeVisual.Hidden && now == AltarNodeVisual.Next)
                 reveal.Add(kv.Key);
         }
-        int oldDepth = _visibleDepth;
-
         try
         {
             // 준비 — 새로 열린 것은 걷어 두고 연출이 보인다
@@ -270,31 +270,41 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
 
             if (reveal.Count > 0)
                 await Tween(0.25f, k => { foreach (var id in reveal) { _nodes[id].SetAlpha(k); SetEdgeProgress(id, k); } }, ct);
-
-            int depth = VisibleDepth();
-            if (depth > oldDepth)
-            {
-                _visibleDepth = depth;
-                await RevealRingAsync(depth, ct);
-            }
         }
         finally
         {
             _playing = false;
             foreach (var id in bloom)  if (_nodes.TryGetValue(id, out var v) && v != null) { v.SetAlpha(1f); SetEdgeProgress(id, 1f); }
             foreach (var id in reveal) if (_nodes.TryGetValue(id, out var v) && v != null) { v.SetAlpha(1f); SetEdgeProgress(id, 1f); }
-            if (this != null) { StyleEdges(); ApplyRings(VisibleDepth(), animate: false); }
+            if (this != null) { StyleEdges(); ApplyRings(); }
         }
     }
 
-    /// <summary>지금 화면에 드러난 가장 깊은 고리(가려진 점 제외).</summary>
-    public int VisibleDepth()
+    /// <summary>
+    /// 새 시기 고리가 드러나는 연출(10-02) — 그 시기 고리가 가운데에서부터 그려지고, 그 띠의 노드 · 선이 차례로 스며든다.
+    /// 붕괴 · 엔딩 뒤 처음 제단을 열 때 한 번(패널이 <see cref="MemoryAltarCatalog.Rec.AltarEraSeen"/>로 가드한다).
+    /// </summary>
+    public async UniTask PlayEraRevealAsync(int era, CancellationToken ct)
     {
-        int d = 1;
-        if (_models == null || _place == null) return d;
-        foreach (var kv in _models)
-            if (kv.Value.Visual != AltarNodeVisual.Hidden && _place.TryGetValue(kv.Key, out var p)) d = Mathf.Max(d, p.Depth);
-        return d;
+        int i = era - 1;
+        if (i < 0 || i >= _rings.Count) return;
+        _playing = true;
+        var ids = new List<string>(12);
+        foreach (var kv in _place)
+            if (kv.Value.Era == era && _nodes.ContainsKey(kv.Key) && _nodes[kv.Key].gameObject.activeSelf) ids.Add(kv.Key);
+        try
+        {
+            foreach (var id in ids) { _nodes[id].SetAlpha(0f); SetEdgeProgress(id, 0f); }
+            ShopUIStyle.PlaySfx("altar_keystone");
+            await RevealRingAsync(era, ct);
+            await Tween(0.45f, k => { foreach (var id in ids) { _nodes[id].SetAlpha(k); SetEdgeProgress(id, k); } }, ct);
+        }
+        finally
+        {
+            _playing = false;
+            foreach (var id in ids) if (_nodes.TryGetValue(id, out var v) && v != null) { v.SetAlpha(1f); SetEdgeProgress(id, 1f); }
+            if (this != null) ApplyRings();
+        }
     }
 
     // ── Private Methods ──────────────────────────────────
@@ -312,26 +322,28 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
         var nodes = MemoryAltarCatalog.All;
         _place = MemoryAltarLayout.Compute(nodes);
 
-        // 깊이 고리
+        // 시기 고리(10-02) — 띠 바깥 경계에 하나씩: 1 봉인기 · 2 해방기 · 3 악몽. 보이기는 ApplyRings가 정한다.
         int maxDepth = 1;
         foreach (var p in _place.Values) maxDepth = Mathf.Max(maxDepth, p.Depth);
-        for (int d = 1; d <= maxDepth; d++)
+        for (int era = 1; era <= 3; era++)
         {
-            var ring = Line($"Ring{d}", _ringsRoot, 1.5f, RingColor);
-            var radii = MemoryAltarLayout.RingRadii(d);
+            var ring = Line($"Ring{era}", _ringsRoot, 1.5f, RingColor);
+            var radii = MemoryAltarLayout.RingRadii(MemoryAltarLayout.EraRingLevel(era));
             ring.SetEllipse(radii.x, radii.y);
             _rings.Add(ring);
-            var lab = Text($"RingLabel{d}", _ringsRoot, 16f, FontStyles.Normal, TextAlignmentOptions.Center, RingInk);
-            lab.text = MemoryAltarCatalog.RingLabel(d);
+            var lab = Text($"RingLabel{era}", _ringsRoot, 16f, FontStyles.Normal, TextAlignmentOptions.Center, RingInk);
+            lab.rectTransform.sizeDelta = new Vector2(320f, 30f);
+            lab.text = MemoryAltarCatalog.RingLabel(era);
             float a = 126f * Mathf.Deg2Rad;
             lab.rectTransform.anchoredPosition = new Vector2(Mathf.Cos(a) * radii.x, Mathf.Sin(a) * radii.y);
             _ringLabels.Add(lab);
         }
 
-        // 빛실 — 가운데 → 뿌리, 부모 → 자식
+        // 빛실 — 가운데 → 뿌리, 부모 → 자식. 가운데 기억 노드는 셋 다 가운데에서 바로 잇는다(갈래 사이 대각선이라 서로 이으면 갈래 뿌리 선을 가로지른다).
         foreach (var n in nodes)
         {
             if (!_place.TryGetValue(n.Id, out var p)) continue;
+            if (n.Branch == AltarBranch.Memory) { AddEdge(null, n.Id, Vector2.zero, p.Position); continue; }
             if (n.IsRoot) AddEdge(null, n.Id, Vector2.zero, p.Position);
             foreach (var par in n.Parents)
                 if (_place.TryGetValue(par, out var pp)) AddEdge(par, n.Id, pp.Position, p.Position);
@@ -399,7 +411,8 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
             foreach (var kv in _place)
             {
                 var n = MemoryAltarCatalog.Get(kv.Key);
-                if (n != null && n.Branch == b) deepest = Mathf.Max(deepest, kv.Value.Depth);
+                // 드러난 시기의 노드만 — 숨은 띠 너머에 제목을 두면 빈 띠 건너편에 떠 있었다(10-02)
+                if (n != null && n.Branch == b && MemoryAltarCatalog.IsEraRevealed(n.Era)) deepest = Mathf.Max(deepest, kv.Value.Depth);
             }
             var t = Text($"Branch_{b}", _labelsRoot, 20f, FontStyles.Bold, TextAlignmentOptions.Center, BranchColor(b));
             t.rectTransform.sizeDelta = new Vector2(240f, 50f);
@@ -466,20 +479,28 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
         }
     }
 
-    private void ApplyRings(int depth, bool animate)
+    /// <summary>
+    /// 시기 고리 — 드러난 시기는 실선 + 시기 이름, <b>다음 시기 하나만</b> 점선 + 「이야기가 이어지면 드러난다」(이름은 숨긴다 —
+    /// 붕괴 · 엔딩 스포일러 금지, 사용자 결정 10-02). 그 너머 고리는 그리지 않는다.
+    /// </summary>
+    private void ApplyRings()
     {
+        int revealed = MemoryAltarCatalog.RevealedEra;
         for (int i = 0; i < _rings.Count; i++)
         {
-            bool on = i + 1 <= depth;
-            _rings[i].gameObject.SetActive(on);
-            _ringLabels[i].gameObject.SetActive(on);
-            if (on && !animate) _rings[i].Progress = 1f;
+            int  era   = i + 1;
+            bool shown = era <= revealed, next = era == revealed + 1;
+            _rings[i].gameObject.SetActive(shown || next);
+            _ringLabels[i].gameObject.SetActive(shown || next);
+            _rings[i].DashSegments = next ? 2 : 0;
+            _ringLabels[i].text    = next ? "이야기가 이어지면 드러난다" : MemoryAltarCatalog.RingLabel(era);
+            if (!_playing) _rings[i].Progress = 1f;
         }
     }
 
-    private async UniTask RevealRingAsync(int depth, CancellationToken ct)
+    private async UniTask RevealRingAsync(int era, CancellationToken ct)
     {
-        int i = depth - 1;
+        int i = era - 1;
         if (i < 0 || i >= _rings.Count) return;
         var ring = _rings[i]; var lab = _ringLabels[i];
         ring.gameObject.SetActive(true); lab.gameObject.SetActive(true);
@@ -501,6 +522,7 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
         foreach (var e in _edges)
         {
             _models.TryGetValue(e.Child, out var cm);
+            e.Line.gameObject.SetActive(cm.Visual != AltarNodeVisual.EraHidden);   // 드러나지 않은 시기의 선은 없다(10-02)
             bool parentBought = e.Parent == null || IsBought(e.Parent);
             Color col; float w;
             switch (cm.Visual)
@@ -575,8 +597,15 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
     private void ComputeBounds()
     {
         float xMin = -90f, xMax = 90f, yMin = -90f, yMax = 90f;
+        // 드러난 시기만 담는다 — 숨은 띠까지 담으면 트리가 쓸데없이 작아진다. 다음 시기 점선 고리는 담지 않는다:
+        // 가장자리에 걸쳐 보이는 것만으로 「더 있다」가 읽힌다(10-02 실측: 점선 고리까지 담으면 해방기 트리가 절반 크기였다).
+        int revealed = MemoryAltarCatalog.RevealedEra;
+        var ring = MemoryAltarLayout.RingRadii(MemoryAltarLayout.EraRingLevel(revealed));
+        xMin = Mathf.Min(xMin, -ring.x - 20f); xMax = Mathf.Max(xMax, ring.x + 20f);
+        yMin = Mathf.Min(yMin, -ring.y - 20f); yMax = Mathf.Max(yMax, ring.y + 20f);
         foreach (var p in _place.Values)
         {
+            if (p.Era > revealed) continue;
             float r = p.Diameter * 0.5f + LabelAllowance;
             xMin = Mathf.Min(xMin, p.Position.x - r - 60f); xMax = Mathf.Max(xMax, p.Position.x + r + 60f);
             yMin = Mathf.Min(yMin, p.Position.y - r);       yMax = Mathf.Max(yMax, p.Position.y + r);

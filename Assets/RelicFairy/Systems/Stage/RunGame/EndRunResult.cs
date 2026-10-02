@@ -29,11 +29,16 @@ public readonly struct EndRunResult
     public readonly int RefineUses;
     public readonly int MaxEnhance;
     public readonly int Covenants;   // 이번 런에 맺은 서약 수(기억의 제단 「서약」 갈래 할인 조건)
+    /// <summary>해방기에 시작한 런의 보스 처치 수 — 기억의 제단 해방기 고리 할인 조건(10-02).</summary>
+    public readonly int LibBossKills;
+    /// <summary>악몽 모드로 시작한 런의 보스 처치 수 — 기억의 제단 악몽 고리 할인 조건(10-02).</summary>
+    public readonly int NmBossKills;
 
     public EndRunResult(bool isCleared, ChapterId chapter, int gainedGold, int gainedEssence, ItemStack[] gainedItems, string reason,
                         int abyssDepth = 0, int roomClears = 0, int kills = 0, int eliteKills = 0, int bossKills = 0,
                         int shopUses = 0, int refineUses = 0, int maxEnhance = 0,
-                        bool potionUsed = false, int specialVisits = 0, int flawless = 0, int covenants = 0)
+                        bool potionUsed = false, int specialVisits = 0, int flawless = 0, int covenants = 0,
+                        int libBossKills = 0, int nmBossKills = 0)
     {
         IsCleared     = isCleared;
         Chapter       = chapter;
@@ -54,5 +59,7 @@ public readonly struct EndRunResult
         RefineUses    = refineUses;
         MaxEnhance    = maxEnhance;
         Covenants     = covenants;
+        LibBossKills  = libBossKills;
+        NmBossKills   = nmBossKills;
     }
 }

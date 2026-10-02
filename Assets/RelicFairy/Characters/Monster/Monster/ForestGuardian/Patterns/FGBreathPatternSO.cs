@@ -199,7 +199,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
                     _timer       = 0f;
                     _damageTimer = 0f;
                     _phase       = Phase.Breathing;
-                    DespawnWarning();
+                    // 가이드는 지우지 않는다 — 뿜는 동안 판정 줄을 보스와 함께 돌려 보여 준다(10-01: 이펙트만으로는 줄 폭 · 끝이 안 읽혔다)
                     SpawnBreathVfx(ctx);
                     PlayAnim(ctx, AnimBreathLoop, 0.05f);
                 }
@@ -220,6 +220,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
 
                 UpdateCurrentRange(ctx);
                 RotateTowardPlayer(ctx, Data.breathTrackSpeed);
+                UpdateWarningTransform(ctx);   // 판정 줄이 보스를 따라 돈다
                 UpdateBreathVfxTransform(ctx);
                 SyncBreathEffectScale();
 
@@ -234,6 +235,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
                 {
                     _timer = 0f;
                     _phase = Phase.BreathEnd;
+                    DespawnWarning();
                     StopBreathVfx();
                     PlayAnim(ctx, AnimBreathEnd, 0.1f);
                 }

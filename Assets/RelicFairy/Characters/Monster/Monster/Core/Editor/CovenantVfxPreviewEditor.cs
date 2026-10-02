@@ -8,7 +8,7 @@ using UnityEngine;
 /// [실측 도구] VFX 후보 프리팹을 미리보기 전용 씬(PreviewRenderUtility)에 띄워 세 시점으로 렌더링하고,
 /// 파티클이 실제로 퍼진 반경(살아 있는 파티클 위치 + 크기 절반)을 잰다. 활성 씬은 건드리지 않는다.
 /// 카메라는 고정이다(화면 폭 약 ±3.9m) — 바닥의 흰 점은 반경 1m, 노란 점은 반경 3m 눈금.
-/// 입력: Temp/vfx_candidates.txt (한 줄에 "프리팹 경로[|배율[|hier]]" — hier면 모든 파티클의 배율 모드를 Hierarchy로 바꿔 띄운다)
+/// 입력: Temp/vfx_candidates.txt (한 줄에 "프리팹 경로[|배율[|hier[|t=0.5;2;5]]]" — hier면 모든 파티클의 배율 모드를 Hierarchy로 바꿔 띄운다, t=는 찍는 시각 셋)
 /// 출력: Temp/vfx_preview/NN_t.png · Temp/vfx_preview/index.json
 /// </summary>
 public static class CovenantVfxPreviewEditor
@@ -49,6 +49,13 @@ public static class CovenantVfxPreviewEditor
                 if (path.Length == 0) continue;
                 float scale = parts.Length > 1 ? float.Parse(parts[1], CultureInfo.InvariantCulture) : 1f;
                 bool  hier  = parts.Length > 2 && parts[2] == "hier";
+                float[] times = Times;
+                if (parts.Length > 3 && parts[3].StartsWith("t="))
+                {
+                    string[] ts = parts[3].Substring(2).Split(';');
+                    times = new float[ts.Length];
+                    for (int k = 0; k < ts.Length; k++) times[k] = float.Parse(ts[k], CultureInfo.InvariantCulture);
+                }
                 var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                 if (i > 0) sb.Append(',');
                 sb.Append("{\"i\":").Append(i + 1).Append(",\"path\":\"").Append(path.Replace("\\", "/")).Append('"')
@@ -81,11 +88,11 @@ public static class CovenantVfxPreviewEditor
                   .Append(",\"notHierarchy\":").Append(notHierarchy)
                   .Append(",\"frames\":[");
 
-                for (int k = 0; k < Times.Length; k++)
+                for (int k = 0; k < times.Length; k++)
                 {
                     foreach (var ps in systems)
                         if (ps.transform.parent == null || ps.transform.parent.GetComponentInParent<ParticleSystem>() == null)
-                            ps.Simulate(Times[k], true, true, true);
+                            ps.Simulate(times[k], true, true, true);
 
                     ParticleExtent(systems, out float radius, out float top, out int alive);
 
@@ -96,7 +103,7 @@ public static class CovenantVfxPreviewEditor
                     Object.DestroyImmediate(tex);
 
                     if (k > 0) sb.Append(',');
-                    sb.Append("{\"t\":").Append(F(Times[k]))
+                    sb.Append("{\"t\":").Append(F(times[k]))
                       .Append(",\"radiusXZ\":").Append(F(radius))
                       .Append(",\"top\":").Append(F(top))
                       .Append(",\"alive\":").Append(alive).Append('}');

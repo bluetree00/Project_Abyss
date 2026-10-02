@@ -31,6 +31,19 @@ public sealed class CovenantHandler
 
     public IReadOnlyList<CovenantBase> Covenants => _covenants;
 
+    /// <summary>이번 런에 연쇄가 처음 끝 절까지 닿았다는 한 마디를 했는가(설계서 §4 — 런당 1회).</summary>
+    public bool ChainEndSaid { get; set; }
+
+    /// <summary>서약서(문장) — 「한 장의 서약서」에선 런마다 한 장. 없으면 null.</summary>
+    public CovenantSentence Sentence
+    {
+        get
+        {
+            foreach (var c in _covenants) if (c is CovenantSentence s) return s;
+            return null;
+        }
+    }
+
     // ── 이벤트 ──────────────────────────────────────────
     public event Action OnCovenantListChanged;
 
@@ -43,6 +56,7 @@ public sealed class CovenantHandler
 
         foreach (var c in _covenants)
             c.Initialize(_ctx);
+        RefreshStats();   // 다시 묶을 때(새 챕터의 새 플레이어) 서약 스탯 기여를 새 스탯에 다시 얹는다
     }
 
     // 무기 교체 어댑터 상태 (OnWeaponSwap 디스패치용)
@@ -50,14 +64,11 @@ public sealed class CovenantHandler
     private WeaponData _lastWeapon;
     private Action<WeaponData, GameObject> _onWeaponChanged;
 
-    // [가이드라인 비주얼] 발동 토스트 위치/스로틀(매 적중·매 프레임 spam 방지)
     private PlayerController _player;
-    private readonly Dictionary<string, float> _procThrottle = new();
-    private const float ProcThrottle = 0.4f;
 
     public void BindPlayer(PlayerController player)
     {
-        _player = player;   // [가이드라인 비주얼] 토스트 위치
+        _player = player;
         foreach (var c in _covenants)
             c.OnBoundToPlayer(player);
 
@@ -136,10 +147,32 @@ public sealed class CovenantHandler
 
         // S3: 서약 획득 확정 → 즉시 저장(방 경계 전에 종료해도 보존)
         RunFlowController.Active?.SaveNow("covenant-add");
+        return true;
+    }
 
-        // [가이드라인 비주얼] 서약 획득 토스트
-        if (_player != null)
-            GuidelineVisual.Toast(_player.transform.position + Vector3.up * 2.8f, "서약 획득: " + covenant.DisplayName, GuidelineVisual.ToastKind.Covenant);
+    /// <summary>
+    /// 서약서를 쓰거나 바꾼다(첫 쓰기 · 이어 쓰기 · 고쳐 쓰기 = 새 문장 id) — 대기방 제단에서만(설계서 §3).
+    /// 옛 문장은 내려놓고 새 문장을 맺는다(귀 · 창 · 충전이 새로 시작). 남아 있는 옛 조립 서약도 함께 걷는다 — 칸 개념은 끝났다.
+    /// </summary>
+    public bool TryWriteSentence(string sentenceId)
+    {
+        if (CovenantFactory.Create(sentenceId) is not CovenantSentence made) return false;
+
+        for (int i = _covenants.Count - 1; i >= 0; i--)
+        {
+            if (_covenants[i] is not CovenantSentence && _covenants[i] is not AssembledCovenant) continue;
+            _covenants[i].Dispose();
+            _covenants.RemoveAt(i);
+        }
+
+        if (_initialized) made.Initialize(_ctx);
+        if (_player != null) made.OnBoundToPlayer(_player);
+        _covenants.Add(made);
+        RefreshStats();
+        OnCovenantListChanged?.Invoke();
+
+        QuestEvents.Report("Covenant", sentenceId);
+        RunFlowController.Active?.SaveNow("covenant-write");
         return true;
     }
 
@@ -171,7 +204,21 @@ public sealed class CovenantHandler
     public void RestoreSelections(IEnumerable<CovenantSaveEntry> entries)
     {
         if (entries == null) return;
-        foreach (var e in entries)
+
+        // 옛 조립 서약(asm: 여러 개) → 서약서 한 장(sen:) — 「한 장의 서약서」 이행(10-02)
+        var list = new List<CovenantSaveEntry>(entries);
+        var asmIds = new List<string>();
+        foreach (var e in list) if (e != null && e.id != null && e.id.StartsWith(AssembledCovenant.Prefix)) asmIds.Add(e.id);
+        if (asmIds.Count > 0)
+        {
+            string migrated = CovenantSentenceMigration.FromAssembled(asmIds);
+            list.RemoveAll(e => e != null && e.id != null && e.id.StartsWith(AssembledCovenant.Prefix));
+            if (migrated != null && !list.Exists(e => e != null && e.id != null && e.id.StartsWith(CovenantSentence.Prefix)))
+                list.Insert(0, new CovenantSaveEntry { id = migrated, stage = 0 });
+            Debug.Log($"[CovenantHandler] 옛 조립 서약 {asmIds.Count}개 → 서약서 {migrated ?? "(없음)"}");
+        }
+
+        foreach (var e in list)
         {
             if (e == null || string.IsNullOrEmpty(e.id)) continue;
             if (!TryAdd(e.id, restoring: true))
@@ -247,35 +294,12 @@ public sealed class CovenantHandler
     // ── 피해 파이프라인 ──────────────────────────────────
     public void ModifyOutgoingDamage(ref float damage, CombatContext ctx)
     {
-        foreach (var c in _covenants)
-        {
-            float before = damage;
-            c.ModifyOutgoingDamage(ref damage, ctx);
-            // [가이드라인 비주얼] 실제 피해 변조한 서약만 통지(스로틀)
-            if (ctx.Target != null && !Mathf.Approximately(before, damage))
-                ProcToast(c.CovenantId + "_out", c.DisplayName, ctx.Target.transform.position + Vector3.up * 1.8f, GuidelineVisual.ToastKind.Covenant);
-        }
+        foreach (var c in _covenants) c.ModifyOutgoingDamage(ref damage, ctx);
     }
 
     public void ModifyIncomingDamage(ref float damage, CombatContext ctx)
     {
-        foreach (var c in _covenants)
-        {
-            float before = damage;
-            c.ModifyIncomingDamage(ref damage, ctx);
-            // [가이드라인 비주얼] 받피 변조한 서약만 통지(스로틀)
-            if (_player != null && !Mathf.Approximately(before, damage))
-                ProcToast(c.CovenantId + "_in", c.DisplayName, _player.transform.position + Vector3.up * 2.4f, GuidelineVisual.ToastKind.Covenant);
-        }
-    }
-
-    // [가이드라인 비주얼] 스로틀 토스트 헬퍼
-    private void ProcToast(string throttleKey, string name, Vector3 pos, GuidelineVisual.ToastKind kind)
-    {
-        float now = UnityEngine.Time.unscaledTime;
-        if (_procThrottle.TryGetValue(throttleKey, out var last) && now - last < ProcThrottle) return;
-        _procThrottle[throttleKey] = now;
-        GuidelineVisual.Toast(pos, name, kind);
+        foreach (var c in _covenants) c.ModifyIncomingDamage(ref damage, ctx);
     }
 
     /// <summary>통보 한 줄용 float 반환 래퍼 — 호출부: dmg = handler?.ModifyIncoming(dmg, ctx) ?? dmg;</summary>
@@ -308,13 +332,7 @@ public sealed class CovenantHandler
         foreach (var c in _covenants)
         {
             if (c.TryProvideCritOverride(weapon, out forceCrit, out minFloorRatio))
-            {
-                // [가이드라인 비주얼] 치명 오버라이드 통지(스로틀)
-                if (_player != null)
-                    ProcToast(c.CovenantId + "_crit", c.DisplayName + (forceCrit ? " 확정치명" : " 치명보정"),
-                              _player.transform.position + Vector3.up * 2.6f, GuidelineVisual.ToastKind.Crit);
                 return true;
-            }
         }
         forceCrit = false; minFloorRatio = 0f; return false;
     }

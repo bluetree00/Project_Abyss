@@ -300,7 +300,11 @@ public class FGDieState : DieState
     {
         // 보스 HUD 해제
         if (ctx.Monster is ForestGuardianMonster fg)
+        {
             fg.UnbindBossHudIfBoundPublic();
+            // 맵 밖에서 쓰러졌으면 안쪽으로(09-30) — 시체 · 끝 장면이 벽 너머에 남지 않게
+            BossArenaGuard.ReturnInside(ctx.Transform, ctx.Agent, ctx.Runtime.PlayerTarget, fg.ArenaCenter);
+        }
 
         base.Enter(ctx);
         BossStoryScenes.PlayEnd(ctx, StoryProgress.ForestGuardian);   // 봉인기 = 봉인 · 해방기 = 처치

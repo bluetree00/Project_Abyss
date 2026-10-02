@@ -1,4 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -11,7 +14,7 @@ namespace RelicFairy.Monster
 ///  warningDuration → 경고 타일 생성 (검이 휘두르는 중)
 ///  hitTime        → 타일 제거 + Sword Slash 15 VFX 스폰 (검이 내리치는 순간)
 ///  hitTime+hitDuration → 피격 (VFX 재생 완료 후)
-///  hitTime+hitDuration+recoveryTime → FlipSwordColor → AttackReadyState
+///  hitTime+hitDuration+recoveryTime → FlipSwordColor(+ 전환 연출: 태극 이펙트 · 화면 번쩍 · 바닥 0.3초 새 색, 10-03) → AttackReadyState
 /// </summary>
 [CreateAssetMenu(menuName = "RelicFairy/Boss/DeathKnight/DK_ChangeSlashPattern", fileName = "DK_ChangeSlashPattern")]
 public class DKChangeSlashPatternSO : BossPatternSO
@@ -25,6 +28,8 @@ public class DKChangeSlashPatternSO : BossPatternSO
     public GameObject impactVfxPrefab;
     [Tooltip("스윙 이펙트 (Sword Slash mirror)")]
     public GameObject swingVfxPrefab;
+    [Tooltip("흑백 전환 순간 기사 발밑 태극 이펙트 (Magic shield yingyang, 10-03)")]
+    public GameObject flipVfxPrefab;
 
     [Header("Timing")]
     [Tooltip("Attack 애니메이션 시작 후 경고 타일이 생성되는 시점")]
@@ -64,6 +69,14 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
 
     private const float VfxDelay = 0.05f; // 타일 제거 확정 후 VFX 스폰까지 최소 대기
 
+    // 흑백 전환 연출(10-03 개선 2-2)
+    private const float FlipVfxScale     = 0.6f;   // 태극 이펙트 — 원래 지름 약 7.5 m
+    private const float FlipVfxSeconds   = 1.2f;   // 원래 6초짜리 — 전환 순간만 쓴다
+    private const float FlipFlashSeconds = 0.12f;
+    private const float FlipFloorSeconds = 0.3f;   // 바닥 전체를 새 색으로 덮는 시간
+    private static readonly Color FlipFlashWhite = new Color(1f, 1f, 1f, 0.35f);
+    private static readonly Color FlipFlashBlack = new Color(0.3f, 0.05f, 0.45f, 0.4f);
+
     private float            _timer;
     private bool             _tilesSpawned;
     private bool             _tilesDestroyed;
@@ -102,6 +115,7 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
                 (x, z) => x % 2 == 1 ? sc : Opposite(sc),
                 Data.whiteTilePrefab, Data.blackTilePrefab);
             _edges = DKGridPatternHelper.SpawnBoundaryEdges(_tiles, Data.edgePrefab);
+            (ctx.Monster as DeathKnightBossMonster)?.CueSwordFloor();   // 검 색 ↔ 바닥 신호(10-03 개선 2-2)
         }
 
         // hitTime: 타일 제거
@@ -139,7 +153,12 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
 
         if (_timer >= Data.hitTime + Data.hitDuration + Data.recoveryTime)
         {
-            (ctx.Monster as DeathKnightBossMonster)?.FlipSwordColor();
+            var dk = ctx.Monster as DeathKnightBossMonster;
+            if (dk != null)
+            {
+                dk.FlipSwordColor();
+                PlayFlipFx(dk);
+            }
             ctx.Monster.ChangeState<AttackReadyState>();
         }
     }
@@ -149,6 +168,42 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
         DKGridPatternHelper.DestroyEdges(_edges);
         DKGridPatternHelper.DestroyTiles(_tiles);
         RestoreAgent(ctx);
+    }
+
+    /// <summary>
+    /// 흑백 전환 순간 — 기사 발밑 태극 이펙트 · 화면 번쩍 · 바닥 전체를 새 색으로 잠깐 덮는다(10-03 개선 2-2).
+    /// 예전엔 갑옷 · 오라만 조용히 바뀌어 「검 색이 바뀌었다」를 놓쳤다.
+    /// </summary>
+    private void PlayFlipFx(DeathKnightBossMonster dk)
+    {
+        DKSwordColor sc = dk.DKBlackboard.SwordColor;   // 뒤집힌 뒤의 색
+        if (Data.flipVfxPrefab != null)
+        {
+            var vfx = BossEffectPool.Spawn(Data.flipVfxPrefab, dk.transform.position, Quaternion.identity);
+            if (vfx != null)
+            {
+                vfx.transform.localScale = Vector3.one * FlipVfxScale;   // 풀 인스턴스는 피라미드가 바꾼 크기로 돌아올 수 있다
+                DKGridPatternHelper.TintShieldVfx(vfx, sc, readableDark: true);
+                BossEffectPool.ScheduleRelease(vfx, FlipVfxSeconds);
+            }
+        }
+        BossImpactFeedback.TriggerScreenFlash(sc == DKSwordColor.White ? FlipFlashWhite : FlipFlashBlack, FlipFlashSeconds);
+        FlipFloorAsync(sc, dk.destroyCancellationToken).Forget();
+    }
+
+    /// <summary>바닥 전체를 새 색 타일로 잠깐 덮었다 걷는다.</summary>
+    private async UniTaskVoid FlipFloorAsync(DKSwordColor sc, CancellationToken ct)
+    {
+        var floor = DKGridPatternHelper.SpawnTiles((x, z) => sc, Data.whiteTilePrefab, Data.blackTilePrefab);
+        try
+        {
+            await UniTask.Delay(TimeSpan.FromSeconds(FlipFloorSeconds), cancellationToken: ct);
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            DKGridPatternHelper.DestroyTiles(floor);
+        }
     }
 
     private static DKSwordColor GetSwordColor(MonsterContext ctx)

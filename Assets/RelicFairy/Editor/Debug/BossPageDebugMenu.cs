@@ -89,6 +89,7 @@ public static class BossPageDebugMenu
     private static readonly float[] TransitionShots = { 0.1f, 0.35f, 1.5f, 2.2f, 2.65f, 4.0f, 5.3f, 6.0f };
     private static readonly float[] EndShots        = { 0.3f, 0.7f, 1.0f, 1.4f, 2.0f, 2.8f };
     private static CancellationTokenSource s_captureCts;
+    private static CancellationTokenSource s_guardCts;   // 아레나 가드 확인(캡처와 따로 — 서로 취소하지 않게)
 
     [MenuItem(Root + "Arm Transition Captures (Play)")]
     public static void ArmTransitionCaptures()
@@ -161,5 +162,106 @@ public static class BossPageDebugMenu
             Debug.Log($"[StoryCapture] {label} 완료 — {dir}");
         }
         catch (OperationCanceledException) { }
+    }
+
+    // ── 아레나 가드 확인(09-30) — 보스가 맵 밖에 서면 안쪽으로 돌아오는가 ──
+
+    /// <summary>보스를 플레이어 반대쪽으로 40 m 밀어 맵 밖에 세운다. 1초 남짓 안에 「[BossArenaGuard] … → 안쪽」 로그와 함께 돌아와야 한다.</summary>
+    [MenuItem(Root + "Arena Guard - Push Boss Outside (Play)")]
+    public static void PushBossOutside() => PushOutside(kill: false);
+
+    /// <summary>맵 밖으로 민 직후 쓰러뜨린다 — 시체가 벽 너머에 남지 않고 안쪽에서 끝 장면이 나와야 한다.</summary>
+    [MenuItem(Root + "Arena Guard - Push Outside And Kill (Play)")]
+    public static void PushOutsideAndKill() => PushOutside(kill: true);
+
+    /// <summary>보스가 공중(스폰 높이 +6 m 이상 — 선회 높이)에 오르는 순간 쓰러뜨린다 — 떠 있는 채 남지 않고 바닥으로 떨어져야 한다(화룡).
+    /// 낮은 높이(2 m)에선 에이전트가 켜지며 바닥에 붙어 버려 낙하 처리를 재지 못한다.</summary>
+    [MenuItem(Root + "Arena Guard - Kill When Airborne (Play)")]
+    public static void KillWhenAirborne()
+    {
+        var boss = FindStoryBoss();
+        if (boss == null) { Debug.LogWarning("[Page2Debug] 살아 있는 보스가 없다"); return; }
+        var runtime = typeof(MonsterBase).GetField("_runtime", Inst)?.GetValue(boss);
+        var spawn   = runtime?.GetType().GetField("SpawnPosition", Inst)?.GetValue(runtime);
+        float floorY = spawn is Vector3 v ? v.y : boss.transform.position.y;
+
+        KillWhenAirborneAsync(boss, floorY, NewGuardToken()).Forget();
+        Debug.Log($"[Page2Debug] 공중에 오르면 쓰러뜨린다 — 바닥 y {floorY:0.0}");
+    }
+
+    private static async UniTaskVoid KillWhenAirborneAsync(MonsterBase boss, float floorY, CancellationToken ct)
+    {
+        try
+        {
+            float armed = Time.realtimeSinceStartup;
+            while (boss != null && !boss.IsDead && boss.transform.position.y < floorY + 6f)
+            {
+                if (!Application.isPlaying || Time.realtimeSinceStartup - armed > 300f) { Debug.LogWarning("[Page2Debug] 공중에 오르지 않았다"); return; }
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+            if (boss == null || boss.IsDead) return;
+            Vector3 at = boss.transform.position;
+            TestHubDebugMenu.ForceKillBoss();
+            Debug.Log($"[Page2Debug] 공중 처치 — 위치 {at} (바닥 y {floorY:0.0})");
+            await UniTask.Delay(TimeSpan.FromSeconds(1.0), DelayType.Realtime, cancellationToken: ct);
+            if (boss != null) Debug.Log($"[Page2Debug] 공중 처치 1초 뒤 — 위치 {boss.transform.position}");
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    /// <summary>보스가 지상에서 쉬는 순간(패턴 없음)을 기다렸다가 맵 밖으로 민다 — 화룡처럼 곧바로 패턴 · 이륙으로 넘어가는 보스용.</summary>
+    [MenuItem(Root + "Arena Guard - Push Outside When Idle (Play)")]
+    public static void PushOutsideWhenIdle()
+    {
+        var boss = FindStoryBoss();
+        if (boss == null) { Debug.LogWarning("[Page2Debug] 살아 있는 보스가 없다"); return; }
+        var runtime = typeof(MonsterBase).GetField("_runtime", Inst)?.GetValue(boss);
+        var spawn   = runtime?.GetType().GetField("SpawnPosition", Inst)?.GetValue(runtime);
+        float floorY = spawn is Vector3 v ? v.y : boss.transform.position.y;
+        PushWhenIdleAsync(boss, floorY, NewGuardToken()).Forget();
+        Debug.Log("[Page2Debug] 지상에서 쉬는 순간 맵 밖으로 민다");
+    }
+
+    private static async UniTaskVoid PushWhenIdleAsync(MonsterBase boss, float floorY, CancellationToken ct)
+    {
+        try
+        {
+            float armed = Time.realtimeSinceStartup;
+            while (boss != null && !boss.IsDead && (boss.IsInSpecialState || boss.transform.position.y > floorY + 0.5f))
+            {
+                if (!Application.isPlaying || Time.realtimeSinceStartup - armed > 300f) { Debug.LogWarning("[Page2Debug] 쉬는 순간이 오지 않았다"); return; }
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+            if (boss == null || boss.IsDead) return;
+            PushOutside(kill: false);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private static CancellationToken NewGuardToken()
+    {
+        s_guardCts?.Cancel();
+        s_guardCts?.Dispose();
+        s_guardCts = new CancellationTokenSource();
+        return s_guardCts.Token;
+    }
+
+    private static void PushOutside(bool kill)
+    {
+        var boss = FindStoryBoss();
+        if (boss == null) { Debug.LogWarning("[Page2Debug] 살아 있는 보스가 없다"); return; }
+        var player = UnityEngine.Object.FindFirstObjectByType<PlayerController>();
+        Vector3 from = boss.transform.position;
+        Vector3 away = player != null ? from - player.transform.position : boss.transform.forward;
+        away.y = 0f;
+        away = away.sqrMagnitude > 0.01f ? away.normalized : Vector3.forward;
+
+        var agent = boss.GetComponent<UnityEngine.AI.NavMeshAgent>();
+        bool was = agent != null && agent.enabled;
+        if (was) agent.enabled = false;
+        boss.transform.position = from + away * 40f;
+        if (was) agent.enabled = true;
+        Debug.Log($"[Page2Debug] 보스를 맵 밖으로 — {from} → {boss.transform.position}{(kill ? " · 곧바로 처치" : "")}");
+        if (kill) TestHubDebugMenu.ForceKillBoss();
     }
 }

@@ -245,8 +245,11 @@ internal sealed class DragonAbyssDiveState : FullLockState<DragonAbyssDivePatter
 
     private void UpdateDive(MonsterContext ctx)
     {
+        // 몸은 벽 안면 − 몸 반경 안에 내려앉는다 — 예고 원 · 판정은 그대로 플레이어 발밑(_target)
+        // (10-03 개선 1-3: 벽 안 0.5 m에 꽂혀 몸 절반이 벽 너머였다)
+        Vector3 land = DragonPatternFloorUtils.ClampInsideWalls(_target, DragonPatternFloorUtils.BodyRadiusOf(ctx));
         Vector3 pos  = ctx.Transform.position;
-        Vector3 to   = _target - pos;
+        Vector3 to   = land - pos;
         float   step = Data.DiveSpeed * Time.deltaTime;
         if (to.sqrMagnitude > 0.01f) ctx.Transform.rotation = Quaternion.LookRotation(to.normalized);   // 머리부터 내리꽂는다
 
@@ -255,7 +258,7 @@ internal sealed class DragonAbyssDiveState : FullLockState<DragonAbyssDivePatter
             ctx.Transform.position = pos + to.normalized * step;
             return;
         }
-        ctx.Transform.position = _target;
+        ctx.Transform.position = land;
         Impact(ctx);
     }
 

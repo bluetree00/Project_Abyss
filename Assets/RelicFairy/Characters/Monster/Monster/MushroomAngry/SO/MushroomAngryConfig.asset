@@ -44,7 +44,7 @@ MonoBehaviour:
       m_Bits: 64
   animation:
     animatorControllerAddress: 
-    idleStateName: Mushroom_IdlePlant
+    idleStateName: Mushroom_IdleBattleAngry
     patrolStateName: Mushroom_walkFWDAngry
     chaseStateName: Mushroom_runFWDAngry
     attackReadyStateName: Mushroom_IdleBattleAngry

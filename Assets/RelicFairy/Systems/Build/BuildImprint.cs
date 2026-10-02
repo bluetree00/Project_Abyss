@@ -46,8 +46,9 @@ public static class BuildImprint
             if (held != null)
                 foreach (var c in held)
                 {
-                    if (c is not AssembledCovenant a) continue;
-                    if (!CovenantPalette.TryGetCause(a.CauseId, out var def)) continue;
+                    // 조건(원인) 형상 = 계열 1칸 — 서약서(문장)는 조건절 하나(설계서 §5)
+                    string causeId = c is AssembledCovenant a ? a.CauseId : c is CovenantSentence s ? s.CauseId : null;
+                    if (causeId == null || !CovenantPalette.TryGetCause(causeId, out var def)) continue;
                     var f = BuildFamilyRules.FromCause(def.cls);
                     if (f != BuildFamily.None) s_counts[(int)f]++;
                 }

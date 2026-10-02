@@ -23,6 +23,7 @@ MonoBehaviour:
   breakOverride: -1
   whiteTilePrefab: {fileID: 1700000001, guid: 36c704cc48b1a834ba1cff41dbe566e4, type: 3}
   blackTilePrefab: {fileID: 1800000001, guid: 85eb3de68405a0b4f989b56efc491cda, type: 3}
+  edgePrefab: {fileID: 2020822494038853150, guid: e9d86af1f0802464394b7405ba5e804e, type: 3}
   impactVfxPrefab: {fileID: 7699698589382392644, guid: 1fce1cd62fb86ed45865a6a14af30ec1,
     type: 3}
   beamSfx: {fileID: 8300000, guid: 63bebc3cef4f5d94ca240156706febee, type: 3}

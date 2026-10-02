@@ -54,7 +54,8 @@ public class RunSaveData
     public string weapon1Engravings;      // WeaponData.engravings (슬롯 1)
 
     public string relicKey;               // PlayerLoadout.Relic SO 이름(Addressables 키)
-    public string relicPartIds = "";      // 보스 클리어 특전으로 얻은 유물 파츠 part_id(쉼표) — 런 진행분
+    public string relicPartIds = "";      // 보스 클리어로 되찾은 유물 기억 조각 — `id:등급`(쉼표) · 옛 저장은 id만(흐릿) — 런 진행분
+    public string relicMemoryExtra = "";  // 유물 성장 v2 덤 칸 — `echo.dawn=1;pity=2;redraw=1`
     public string covenantsJson;          // CovenantListWrapper JSON
     public string runeCellsJson;          // Vector2IntListWrapper JSON — 룬 보드 점유 셀(시너지 권위)
     public string runePlacementsJson;     // RunePlacementListWrapper JSON — Shape 재구성(재편집)용

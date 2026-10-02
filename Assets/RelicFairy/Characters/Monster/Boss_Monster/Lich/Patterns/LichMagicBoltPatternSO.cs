@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using RelicFairy.UI;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -11,6 +12,8 @@ namespace RelicFairy.Monster
 ///   비행 시간(flightTime)만큼 먼저 뜨고, 닿는 순간 빨강으로 바뀌며 원 판정
 /// → E 반격창(endDuration) — 책을 닫는다 → R 복귀
 /// 좌우로 한 번 크게 움직이면 셋 다 피한다.
+/// 악몽 모드(엔딩 뒤) 특성 「속박탄」 — 연발의 마지막 한 발이 금빛이 되고, 맞으면 0.4초 결박(<see cref="LichHazards.ChainBind"/>).
+/// 사슬 포박과 쿨다운을 나누고 바닥이 무너지는 중이면 평소 탄으로 쏜다. 묶인 채 다른 공격이 닿을 자리면 맞아도 묶지 않는다(10-02).
 /// </summary>
 [CreateAssetMenu(menuName = "RelicFairy/Boss/Lich/Lich_MagicBoltPattern", fileName = "Lich_MagicBoltPattern")]
 public class LichMagicBoltPatternSO : BossPatternSO
@@ -95,12 +98,22 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
         public Vector3    To;
         public float      Time;
         public bool       Signaled;
+        public GameObject Gild;       // 속박탄 — 탄을 감는 금빛 사슬 고리
+        public bool       Bind;       // 속박탄(악몽 모드 · 마지막 한 발)
     }
 
     private const float DiscFlashSeconds = 0.12f;
     private const float SignalSeconds    = 0.15f;
     private const float CrackScale       = 1.4f;   // 착탄 반경 대비 균열 지름
     private const float CrackSeconds     = 8f;
+
+    // 속박탄(악몽 모드 특성 · 10-02) — 마지막 한 발이 금빛이 되어 맞으면 잠깐 묶는다
+    private const float  BindSeconds         = 0.4f;   // 결박 — 사슬 포박(0.9초)보다 짧게
+    private const float  BindBoltScale       = 1.3f;   // 투사체가 곧 예고 — 금빛 + 조금 크게
+    private const float  BindGildScale       = 0.5f;   // 탄을 감는 금빛 사슬 고리
+    private const float  BindThreatSeconds   = 0.8f;   // 묶인 뒤 이 시간 안에 다른 공격이 닿을 자리면 묶지 않는다
+    private const float  SkeletonGuardRadius = 4.5f;   // 해골 낫 사거리(약 2.4 m) + 다가오는 거리
+    private const string BindHint            = "금빛 마법탄은 묶는다 — 피해라";
 
     private readonly List<Bolt> _bolts = new(4);
 
@@ -197,6 +210,7 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
         {
             var b = _bolts[i];
             LichVfx.Stop(ref b.Vfx);
+            LichVfx.Stop(ref b.Gild);
             PatternGuideHelper.SafeDestroy(ref b.Disc);
         }
         _bolts.Clear();
@@ -228,17 +242,24 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
         Vector3 dir  = target - from;
         var rot = dir.sqrMagnitude > 0.001f ? Quaternion.LookRotation(dir) : ctx.Transform.rotation;
 
+        // 악몽 모드 — 마지막 한 발만 속박탄(같은 연발의 다음 탄이 뒤따르지 않게). 조건이 안 되면 평소 탄.
+        bool bind = _fired == Data.boltCount && BindBoltReady(ctx);
+
         LichVfx.Play(LichVfxSlot.BoltMuzzle, from, rot);
         LichSfx.Play(LichSfxSlot.BoltFire, from);
+        if (bind) AnnounceBindBolt(ctx, from);
         _bolts.Add(new Bolt
         {
-            Vfx  = LichVfx.PlayLoop(LichVfxSlot.BoltProjectile, from, rot),
+            Vfx  = bind ? LichVfx.PlayLoopTinted(LichVfxSlot.BoltProjectile, from, rot, BindBoltScale, PatternGuideHelper.PlayerSeal)
+                        : LichVfx.PlayLoop(LichVfxSlot.BoltProjectile, from, rot),
+            Gild = bind ? LichVfx.PlayLoop(LichVfxSlot.ChainGold, from, Quaternion.identity, BindGildScale) : null,
             // 착탄 원은 비행 시간 동안 차오르고, 닿기 직전 빨강(예고 = 바닥 + 날아오는 탄).
             Disc = LichPatternUtil.PrepareTelegraph(
                 PatternGuideHelper.Disc(target, Data.impactRadius, LichPatternUtil.Arcane), LichPatternUtil.Arcane),
             From = from,
             To   = target,
             Time = 0f,
+            Bind = bind,
         });
     }
 
@@ -256,6 +277,7 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
                 Vector3 pos  = Vector3.Lerp(b.From, b.To, t) + Vector3.up * (Data.arcHeight * 4f * t * (1f - t));
                 Vector3 next = Vector3.Lerp(b.From, b.To, Mathf.Min(1f, t + 0.05f));
                 b.Vfx.transform.position = pos;
+                if (b.Gild != null) b.Gild.transform.position = pos;
                 if ((next - pos).sqrMagnitude > 0.0001f)
                     b.Vfx.transform.rotation = Quaternion.LookRotation(next - pos);
             }
@@ -273,6 +295,7 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
     private void Impact(MonsterContext ctx, Bolt b)
     {
         LichVfx.Stop(ref b.Vfx);
+        LichVfx.Stop(ref b.Gild, 0.2f);
         LichVfx.Play(LichVfxSlot.BoltImpact, b.To, Quaternion.identity, Data.impactRadius / 2f);
         LichSfx.Play(LichSfxSlot.BoltImpact, b.To);
         LichCrack.Spawn(b.To, Data.impactRadius * CrackScale, CrackSeconds);
@@ -280,8 +303,19 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
         PatternGuideHelper.SetColor(b.Disc, LichPatternUtil.Lethal);
         if (b.Disc != null) Object.Destroy(b.Disc, DiscFlashSeconds);
 
-        bool hit = LichPatternUtil.HitCircle(ctx, b.To, Data.impactRadius, Data.damageMultiplier, Data.knockbackMultiplier);
+        // 속박탄 — 착탄 순간 다시 본다(상태 + 묶인 채 다른 공격이 닿을 자리). 묶을 때는 넉백 없이 선 자리에서.
+        string blocked = b.Bind ? BindBlocker(ctx) ?? ThreatBlocker(LichPatternUtil.PlayerFloorPos(ctx)) : null;
+        bool   binding = b.Bind && blocked == null;
+        bool hit = LichPatternUtil.HitCircle(ctx, b.To, Data.impactRadius, Data.damageMultiplier,
+                                             binding ? 0f : Data.knockbackMultiplier);
         LichPatternUtil.Impact(LichImpact.Light, hit);
+        if (b.Bind)
+        {
+            if (!hit)                 Debug.Log("[BossTrait] 리치 속박탄 — 건너뜀(빗나감)");
+            else if (blocked != null) Debug.Log($"[BossTrait] 리치 속박탄 — 건너뜀(착탄 · {blocked})");
+            else                      BindPlayer(ctx);
+            return;   // 속박탄은 여운 장판 · 갈라짐을 남기지 않는다(묶인 채 피할 수 없는 추가타)
+        }
         if (Data.lingerRadius > 0f)
             LichHazards.LingerPool(ctx, b.To, Data.lingerRadius, Data.lingerSeconds, Data.lingerDamage);
         if (Data.splitCount > 0)
@@ -302,6 +336,58 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
             LichHazards.DelayedBlast(ctx, at, Data.splitRadius, Data.splitWarn, Data.splitDamage,
                                      LichVfxSlot.BoltImpact, LichPatternUtil.BoltScale(Data.splitRadius), crack: false);
         }
+    }
+
+    /// <summary>속박탄을 쏠 수 있는가 — 악몽 모드에서만. 막히면 사유를 남기고 평소 탄.</summary>
+    private static bool BindBoltReady(MonsterContext ctx)
+    {
+        if (!StoryProgress.IsNightmareMode) return false;
+        string blocked = BindBlocker(ctx);
+        if (blocked != null) Debug.Log($"[BossTrait] 리치 속박탄 — 건너뜀({blocked})");
+        return blocked == null;
+    }
+
+    /// <summary>속박탄을 막는 상태(없으면 null) — 사슬 포박 직후 · 결박 대기(<see cref="LichHazards.CanBind"/>) · 바닥 붕괴 예고/낙하 중.</summary>
+    private static string BindBlocker(MonsterContext ctx)
+    {
+        var bb = LichPatternUtil.Lich(ctx)?.LichBB;
+        if (bb == null) return "블랙보드 없음";
+        if (Time.time - bb.LastChainCaptureAt < LichBlackboard.BindBoltAfterCapture) return "사슬 포박 직후";
+        if (!LichHazards.CanBind) return "결박 대기";
+        if (bb.FloorUnstable) return "바닥 붕괴 중";
+        return null;
+    }
+
+    /// <summary>묶인 뒤 <see cref="BindThreatSeconds"/>초 안에 다른 공격이 닿을 자리인가(아니면 null) — 남은 장판 · 투사체 · 해골. 착탄 순간에만 본다.</summary>
+    private static string ThreatBlocker(Vector3 at)
+    {
+        if (LichHazards.ThreatNear(at, BindThreatSeconds)) return "장판·투사체";
+        if (LichSkeletonMonster.AnyNear(at, SkeletonGuardRadius)) return "해골 근접";
+        return null;
+    }
+
+    /// <summary>속박탄 발사 — 사슬 소리 한 번, 전투 첫 발엔 안내 한 줄.</summary>
+    private static void AnnounceBindBolt(MonsterContext ctx, Vector3 from)
+    {
+        LichSfx.Play(LichSfxSlot.ChainPulse, from, 0.6f);
+        Debug.Log("[BossTrait] 리치 속박탄 — 발사");
+        var bb = LichPatternUtil.Lich(ctx)?.LichBB;
+        if (bb == null || bb.BindBoltHinted) return;
+        bb.BindBoltHinted = true;
+        UI_BossBark.Show(BindHint, BossBarkType.PatternAnnounce);
+    }
+
+    /// <summary>속박탄 결박 — 사슬 포박과 같은 결박(이동·회피 불가 · 리치 손에서 금빛 사슬). 사슬 포박은 이 뒤 4초 동안 시작하지 않는다.</summary>
+    private static void BindPlayer(MonsterContext ctx)
+    {
+        var lich = LichPatternUtil.Lich(ctx);
+        if (!LichHazards.ChainBind(ctx, lich != null ? lich.CastPoint : ctx.Transform, BindSeconds))
+        {
+            Debug.Log("[BossTrait] 리치 속박탄 — 건너뜀(결박 실패)");
+            return;
+        }
+        if (lich?.LichBB != null) lich.LichBB.LastBindBoltAt = Time.time;
+        Debug.Log($"[BossTrait] 리치 속박탄 — 결박 {BindSeconds:0.0}초");
     }
 
     /// <summary>플레이어 수평 속도를 부드럽게 잰다(순간 회피 한 번에 끌려가지 않게).</summary>

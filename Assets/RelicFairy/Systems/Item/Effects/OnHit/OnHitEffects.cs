@@ -97,6 +97,8 @@ public sealed class TeleportSwapEffect : ItemEffectBase
     {
         if (Random.value >= _value) return;
         if (ctx.Player == null || report.Target == null) return;
+        // 보스와는 바꾸지 않는다 — 제자리 보스(죽음의 기사)가 플레이어 구역으로 넘어오고 플레이어는 유리벽 너머에 남는다(09-30)
+        if (report.Target.TryGetComponent<RelicFairy.Monster.IBoss>(out _)) return;
 
         var playerPos = ctx.Player.transform.position;
         var targetPos = report.Target.transform.position;

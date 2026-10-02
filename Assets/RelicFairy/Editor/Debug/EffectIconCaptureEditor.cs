@@ -58,6 +58,8 @@ public static class EffectIconCaptureEditor
     private static int CaptureJob(Job job, GameObject prefab)
     {
         Scene scene = EditorSceneManager.NewPreviewScene();
+        // RenderSettings는 활성 씬 것이다 — 조명용으로 바꾼 주변광을 되돌리지 않으면 열려 있던 씬에 남아 저장된다(10-01 BaseCamp에 샜다).
+        Color savedAmbient = RenderSettings.ambientLight;
         var rt = new RenderTexture(Size, Size, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
         var tex = new Texture2D(Size, Size, TextureFormat.RGBA32, false);
         int shots = 0;
@@ -70,6 +72,8 @@ public static class EffectIconCaptureEditor
             // 스크립트가 빠진 컴포넌트는 null로 나온다 — 건너뛴다.
             foreach (var mb in go.GetComponentsInChildren<MonoBehaviour>(true))
                 if (mb != null) mb.enabled = false;
+            // 꺼진 채 저장된 프리팹(화룡 — 스폰 때 켠다)은 켜야 보인다. 스크립트는 위에서 껐다.
+            if (!go.activeSelf) go.SetActive(true);
 
             var camGo = new GameObject("CaptureCam");
             SceneManager.MoveGameObjectToScene(camGo, scene);
@@ -125,6 +129,7 @@ public static class EffectIconCaptureEditor
         }
         finally
         {
+            RenderSettings.ambientLight = savedAmbient;
             Object.DestroyImmediate(tex);
             rt.Release();
             Object.DestroyImmediate(rt);

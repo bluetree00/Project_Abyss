@@ -139,6 +139,8 @@ public class LichPhase2EntryState : FullLockState<LichPhase2EntryPatternSO>
     private const float RoarShotSeconds = 0.5f;
     private const float RoarSwingContact = 0.22f;   // 포효 휘두름 — 접촉(멈칫)까지
     private const float PlayerSafety    = 1.5f;   // 컷신이 끝난 뒤에도 잠깐 무적
+    private const string BoundHintKey  = "Lich_Bound_Hint";   // 봉인기 T1 뒤 멀린 — 이 페이지에서 할 일(10-03). CSV에 없으면 아래 줄
+    private const string BoundHintLine = "사슬이 버티는 동안 쓰러뜨려! 그러면 봉인석이 깨어날 거야.";
 
     private static readonly HashSet<string> s_seen = new();
 
@@ -313,7 +315,13 @@ public class LichPhase2EntryState : FullLockState<LichPhase2EntryPatternSO>
         {
             var grid = ArenaTileGrid.Active;
             if (grid != null && grid.TryGetCell(ctx.Transform.position, out _))
+            {
+                // 입력이 잠긴 컷신 중에 바깥 링이 무너진다 — 그 위 플레이어는 피할 수 없어 무적을 무시하는 낙사를 맞았다(10-01 감사).
+                // T3 「최후의 원」처럼 안쪽 링으로 옮겨 둔다(컷신 카메라가 리치를 보는 동안).
+                if (grid.TryGetWorldCenter(out Vector3 gridCenter))
+                    MoveInside(ctx.Runtime.PlayerTarget, gridCenter, grid.RingCenterDistance(grid.OuterRing) - grid.CellSize * 0.5f);
                 grid.CollapseRing(grid.OuterRing, CinematicSeconds(!s_seen.Contains(Data.name)) - Data.roarHoldSeconds);
+            }
         }
 
         _cinematicCts = lich != null
@@ -321,6 +329,36 @@ public class LichPhase2EntryState : FullLockState<LichPhase2EntryPatternSO>
             : new CancellationTokenSource();
         CinematicAsync(ctx, _cinematicCts.Token).Forget();
         Debug.Log($"[Lich] 페이즈 전환 컷신 시작 → {Data.targetPage}페이즈 ({Data.name})", ctx.Monster);
+    }
+
+    /// <summary>
+    /// 플레이어가 중심에서 <paramref name="innerEdge"/> − 1.5 m 밖이면 <paramref name="innerEdge"/> − 2.5 m 지점의 발판으로 옮긴다.
+    /// 같은 방위부터 좌우 20°씩 — 1페이지에 부서져 아직 안 돌아온 칸(구멍)은 건너뛴다(T2는 바닥을 복구하지 않는다).
+    /// </summary>
+    private static void MoveInside(Transform player, Vector3 center, float innerEdge)
+    {
+        if (player == null) return;
+        Vector3 flat = player.position - center;
+        flat.y = 0f;
+        if (flat.magnitude <= innerEdge - 1.5f) return;
+
+        Vector3 baseDir = flat.sqrMagnitude > 0.01f ? flat.normalized : Vector3.back;
+        Vector3 dest    = center + baseDir * (innerEdge - 2.5f) + Vector3.up * 0.3f;
+        for (int k = 0; k < 18; k++)
+        {
+            float   yaw = (k % 2 == 0 ? 1f : -1f) * ((k + 1) / 2) * 20f;
+            Vector3 at  = center + Quaternion.Euler(0f, yaw, 0f) * baseDir * (innerEdge - 2.5f);
+            if (!Physics.Raycast(at + Vector3.up * 3f, Vector3.down, out var floor, 6f, ~0, QueryTriggerInteraction.Ignore)) continue;
+            dest = floor.point + Vector3.up * 0.1f;
+            break;
+        }
+        player.position = dest;
+        if (player.TryGetComponent<Rigidbody>(out var rb))
+        {
+            rb.position       = dest;
+            rb.linearVelocity = Vector3.zero;
+        }
+        Debug.Log($"[Lich] 바깥 링 붕괴 전 플레이어를 안쪽으로 — 중심에서 {flat.magnitude:0.0} m → {innerEdge - 2.5f:0.0} m");
     }
 
     /// <summary>
@@ -515,6 +553,10 @@ public class LichPhase2EntryState : FullLockState<LichPhase2EntryPatternSO>
             LichCinematics.LetterboxOutAsync(ct).Forget();
             if (player != null) await LichCinematics.ReturnToPlayerAsync(player, ct);
             camera = false;
+
+            // ⑥ 봉인기 T1(사슬) — 이 페이지에서 무엇을 해야 하는지 멀린이 짚는다(10-03 사용자: 2페이지 봉인 행동 안내가 없었다).
+            if (Data.bindChains && !UI_BossBark.ShowDialogue(BoundHintKey))
+                UI_BossBark.Show(BoundHintLine, BossBarkType.MerlinNarration, DialogueSpeaker.Merlin);
         }
         catch (OperationCanceledException)
         {

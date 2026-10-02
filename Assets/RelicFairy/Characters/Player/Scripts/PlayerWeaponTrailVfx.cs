@@ -40,6 +40,10 @@ public class PlayerWeaponTrailVfx : MonoBehaviour
     private string _swingSfxEvent;            // 휘두름 소리 이벤트(원거리 무기는 null) — 무기 교체 때 정한다
     private bool _subscribed;
 
+    // 임시 칼날(랜슬롯 Q 전용 검 등) — 장착 무기가 숨은 동안 트레일을 그 칼날에 묶는다
+    private bool  _overriding;
+    private float _restoreAt = -1f;           // 덮어쓰기가 끝난 뒤 무기 트레일로 되돌릴 시각(페이드가 끝난 뒤 — 즉시 바꾸면 페이드가 잘린다)
+
     // ── Lifecycle ─────────────────────────────────────────────────
     private void Awake()
     {
@@ -78,6 +82,15 @@ public class PlayerWeaponTrailVfx : MonoBehaviour
             HandleWeaponChanged(_weaponMgr.CurrentWeaponData, _weaponMgr.CurrentWeaponInstance);
     }
 
+    private void Update()
+    {
+        if (_restoreAt < 0f || Time.time < _restoreAt) return;
+        _restoreAt = -1f;
+        // 안전 컨텍스트(Update) — 장착 무기의 트레일 프리팹 · 앵커로 다시 묶는다
+        if (_weaponMgr != null && _weaponMgr.HasWeapon)
+            HandleWeaponChanged(_weaponMgr.CurrentWeaponData, _weaponMgr.CurrentWeaponInstance);
+    }
+
     private void OnDisable()
     {
         if (_weaponMgr != null)
@@ -96,6 +109,32 @@ public class PlayerWeaponTrailVfx : MonoBehaviour
             _trail.SetProperty_EffectActive(false);
             _trail.SetProperty_EffectAlive(0f);
         }
+    }
+
+    // ── Public Methods ────────────────────────────────────────────
+    /// <summary>
+    /// 장착 무기 대신 임시 칼날(<paramref name="tip"/> · <paramref name="root"/>)에 트레일을 묶고 켠다 — 랜슬롯 Q 전용 검.
+    /// 애니 이벤트 콜백 안에서 부르지 말 것(프리팹 인스턴스화). 스킬 OnEnter · Update 계열은 안전하다.
+    /// </summary>
+    public void BeginOverride(Transform tip, Transform root, GameObject prefab, float fadeIn = 0.05f, float trailLength = 0.3f)
+    {
+        if (_trail == null || prefab == null || tip == null || root == null) return;
+        _overriding = true;
+        _restoreAt  = -1f;
+        _trail.lineTipTransform    = tip;
+        _trail.lineBottomTransform = root;
+        _trail.SetNewTrailPrefab(prefab);
+        _loadedPrefab = prefab;
+        _trail.StartTrailWithLength(fadeIn, trailLength);
+    }
+
+    /// <summary>임시 칼날 트레일을 끄고, 페이드가 끝나면 장착 무기의 트레일로 되돌린다.</summary>
+    public void EndOverride(float fadeOut = 0.2f)
+    {
+        if (!_overriding) return;
+        _overriding = false;
+        if (_trail != null && isActiveAndEnabled) _trail.StopTrail(fadeOut);
+        _restoreAt = Time.time + fadeOut + 0.05f;
     }
 
     // ── Private Methods ───────────────────────────────────────────
@@ -141,6 +180,7 @@ public class PlayerWeaponTrailVfx : MonoBehaviour
         if (_swingSfxEvent != null) Managers.Sound?.PlayEvent(_swingSfxEvent);
 
         // 애니 이벤트 — 인스턴스화 금지. 무기 프리팹이 선로딩돼 있을 때만 시작.
+        if (_overriding) return;   // 임시 칼날(Q 전용 검)이 트레일을 쓰는 중
         if (_trail == null || _weaponTrailPrefab == null) return;
         if (_loadedPrefab != _weaponTrailPrefab) return;
         _trail.StartTrailWithLength(attackFadeIn, attackTrailLength);
@@ -148,6 +188,7 @@ public class PlayerWeaponTrailVfx : MonoBehaviour
 
     private void HandleEndAttackTrail()
     {
+        if (_overriding) return;
         if (_trail != null) _trail.StopTrail(attackFadeOut);
     }
 }

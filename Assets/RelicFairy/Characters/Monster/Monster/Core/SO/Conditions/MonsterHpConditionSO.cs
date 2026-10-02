@@ -16,8 +16,10 @@ public class MonsterHpConditionSO : MonsterConditionSO
 
     public override bool Evaluate(MonsterContext ctx)
     {
-        if (ctx.Stat.maxHp <= 0) return false;
-        float hpRatio = (float)ctx.Runtime.CurrentHp / ctx.Stat.maxHp;
+        // 챕터 난이도 배율이 곱해진 유효 최대 HP 기준 — 기본 maxHp로 나누면 Ch2(×1.5)에서 「50%」가 실제 33%에 걸렸다.
+        int maxHp = ctx.Monster.EffectiveMaxHp;
+        if (maxHp <= 0) return false;
+        float hpRatio = (float)ctx.Runtime.CurrentHp / maxHp;
         return hpRatio <= threshold;
     }
 }

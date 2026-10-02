@@ -9,6 +9,7 @@ using UnityEngine;
 /// 보상(2026-09-18 설계 「저스트 회피 보상」 A+B1):
 ///   · 대시 게이지 환급 — 발동 즉시 대시 1회분을 돌려주고 회복 지연을 푼다(악몽 배율 미적용).
 ///   · 반격 창 — 슬로모 동안 모든 공격이 원인 적을 겨냥(첫 공격은 추격 돌진), 공격 애니 가속, 적중마다 게이지 환급.
+///   · 긴급 회피 무적(10-01) — 창이 닫힐 때까지, 예고를 보고 피한 공격은 그 공격이 끝날 때까지 맞지 않는다(<see cref="IsInvulnerable"/>).
 ///
 /// 시간 배율 요청의 주인은 <b>PlayerController(Unity 객체)</b>다. TimeScaleArbiter는 파괴된 Unity 객체의 요청을
 /// 스스로 치우므로, 해제 경로를 놓쳐도 시간이 느린 채로 남지 않는다 — 이 클래스(순수 C# 객체)를 주인으로 쓰면
@@ -20,6 +21,10 @@ public sealed class PerfectDodgeController
     // 발동 순간 프레임 스톱에 쓰는 시간 배율(완전 0은 물리/애니가 죽어 복귀가 튈 수 있어 아주 작은 값).
     private const float FreezeScale = 0.02f;
     private const int   SenseMax    = 8;   // windup 감지 시 훑을 적 수 상한
+    // 피한 공격의 예고가 끝난 뒤에도 무적을 이만큼 더 둔다(실시간 초) — 예고가 끝나는 바로 그 프레임에 피해가 들어온다.
+    private const float DodgedAttackMargin    = 0.25f;
+    // 피한 공격을 따라가는 상한(실시간 초) — 풀로 돌아간 적의 예고 표시가 남아 무적이 끝없이 늘지 않게.
+    private const float DodgedAttackFollowMax = 2.5f;
 
     // ── Private ───────────────────────────────────────────────────
     private readonly PlayerController _owner;
@@ -39,12 +44,27 @@ public sealed class PerfectDodgeController
     private Transform _counterSource;        // 저스트 회피를 일으킨 적(추격 대상)
     private Transform _pendingSource;        // Arm~Trigger 사이 원인 적 후보
 
+    // 긴급 회피 무적
+    private float _invulnEnd;                                  // 무적 종료 시각(unscaled)
+    private float _followUntil;                                // 피한 공격을 따라가는 상한 시각(unscaled)
+    private RelicFairy.Monster.MonsterBase _dodgedAttacker;    // 예고를 보고 피한 적 — 그 공격이 끝날 때까지 무적을 늘린다
+
     // ── Properties ────────────────────────────────────────────────
     /// <summary>저스트 회피 슬로모 동안의 이동 배율(평소 1). DefaultMoveAbility가 최고속에 곱한다.</summary>
     public float BonusMoveMultiplier { get; private set; } = 1f;
 
+    /// <summary>가장 최근 저스트 회피를 일으킨 적(없으면 null) — 유물 성장 v2 배신자의 걸음.</summary>
+    public Transform LastSource => _counterSource;
+
     /// <summary>반격 창이 열려 있는가 — 저스트 회피 발동부터 슬로모 종료까지.</summary>
     public bool IsCounterWindow => _counterActive && Time.unscaledTime < _end;
+
+    /// <summary>
+    /// 긴급 회피 무적 — 발동부터 슬로모가 끝날 때까지, 예고를 보고 피한 공격은 그 공격이 끝날 때까지.
+    /// 대시 무적(대시 길이 0.18초)은 느려진 시간 안에서도 금방 끝나, 뒤늦게 들어오는 공격·돌진에 그대로 맞았다
+    /// (10-01 사용자 「긴급회피가 되었어도 돌진을 유지해 뚫고 지나간다」).
+    /// </summary>
+    public bool IsInvulnerable => Time.unscaledTime < _invulnEnd;
 
     /// <summary>반격 창 동안의 공격 애니 속도 배수(평소 1). ActAttackState가 콤보 단계마다 곱한다.</summary>
     public float CounterSpeedMultiplier
@@ -136,6 +156,16 @@ public sealed class PerfectDodgeController
         // 반격 창은 시간 배율 보유 여부와 무관하게 종료 시각에 닫는다(다른 경로가 먼저 해제해도 창이 남지 않게).
         if (_counterActive && Time.unscaledTime >= _end) EndCounterWindow();
 
+        // 피한 공격이 아직 예고 중이면 무적을 늘린다. 예고는 피해를 넣기 바로 전에 꺼지므로(AttackState)
+        // 직전 프레임에 늘려 둔 여유가 피해가 들어오는 프레임을 덮는다. 한 번 끝나면 다음 공격까지 잇지 않는다.
+        if (_dodgedAttacker != null)
+        {
+            bool stillWinding = _dodgedAttacker.isActiveAndEnabled && _dodgedAttacker.IsTelegraphingAttack
+                                && _dodgedAttacker.CurrentHp > 0 && Time.unscaledTime < _followUntil;
+            if (stillWinding) _invulnEnd = Mathf.Max(_invulnEnd, Time.unscaledTime + DodgedAttackMargin);
+            else              _dodgedAttacker = null;
+        }
+
         if (!TimeScaleArbiter.IsHeldBy(_owner)) return;
 
         // 프레임 스톱 종료 → 같은 owner로 슬로모 배율로 덮어쓴다.
@@ -160,6 +190,8 @@ public sealed class PerfectDodgeController
         BonusMoveMultiplier = 1f;
         _armed  = false;
         _frozen = false;
+        _invulnEnd      = 0f;
+        _dodgedAttacker = null;
         EndCounterWindow();
         if (_owner.Anim != null) _owner.Anim.updateMode = AnimatorUpdateMode.Normal;
     }
@@ -212,6 +244,12 @@ public sealed class PerfectDodgeController
         _freezeEnd = Time.unscaledTime + freeze;
         _end       = Time.unscaledTime + freeze + duration;
 
+        // 보상 ⓪ 긴급 회피 무적 — 창이 닫힐 때까지 모든 공격을 흘린다. 예고를 보고 피한 공격은 끝날 때까지(Tick에서 연장).
+        _invulnEnd = _end;
+        var sourceMonster = source != null ? source.GetComponentInParent<RelicFairy.Monster.MonsterBase>() : null;
+        _dodgedAttacker = sourceMonster != null && sourceMonster.IsTelegraphingAttack ? sourceMonster : null;
+        _followUntil    = Time.unscaledTime + DodgedAttackFollowMax;
+
         // 세계는 느려지는데 플레이어는 빨라야 한다.
         // 물리는 스케일된 시간으로 적분되므로, 시간배율의 역수(1/scale)만큼 되돌리고 그 위에 부스트를 얹는다.
         BonusMoveMultiplier = (1f / scale) * boost;
@@ -233,7 +271,7 @@ public sealed class PerfectDodgeController
         HitFeelService.CameraShake(0.1f, 0.12f);
 
         Triggered?.Invoke(freeze + duration);
-        Debug.Log($"[저스트회피] 발동 ({trigger}) | 슬로모 {scale:F2}배 {duration:F1}초 · 이동 {BonusMoveMultiplier:F1}배 · 추격 대상 {(source != null ? source.name : "없음")}");
+        Debug.Log($"[저스트회피] 발동 ({trigger}) | 슬로모 {scale:F2}배 {duration:F1}초 · 이동 {BonusMoveMultiplier:F1}배 · 추격 대상 {(source != null ? source.name : "없음")} · 무적 {freeze + duration:F2}초{(_dodgedAttacker != null ? " + 피한 공격 끝까지" : "")}");
     }
 
     private void RefundStamina(float amount)

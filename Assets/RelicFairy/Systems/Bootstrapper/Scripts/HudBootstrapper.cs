@@ -7,6 +7,8 @@ using RelicFairy.Monster;
 
 public sealed class HudBootstrapper : MonoBehaviour
 {
+    private const float CutsceneReturnFade = 0.35f;   // 컷신(HUD 모두 걷음)에서 돌아올 때 페이드
+
     [SerializeField] private HudPresenter presenter;
     [SerializeField] private Transform hudVisualRoot;
 
@@ -18,6 +20,8 @@ public sealed class HudBootstrapper : MonoBehaviour
     private float _fadeAlpha = 1f;     // 시작방 페이드가 정한 알파(팝업이 닫히면 이 값으로 돌아간다)
     private float _popupDim  = 1f;     // 1 = 보임, 0 = 팝업에 걷힘 — 사이 값은 걷히는/돌아오는 중(0.12/0.16초)
     private CancellationTokenSource _popupDimCts;
+    private HUDIds.Mode _lastRunMode;                  // 런이 마지막으로 요청한 모드 — 컷신에서 돌아오는 순간을 안다
+    private CancellationTokenSource _cutsceneFadeCts;
 
     public MinimapView MinimapView => presenter != null ? presenter.MinimapView : null;
 
@@ -366,9 +370,43 @@ public sealed class HudBootstrapper : MonoBehaviour
 
     private void HandleHudModeChanged(HUDIds.Mode mode)
     {
+        // 보스 HP바만 남기는 페이즈 전환(BossCutscene)은 바가 떠 있으므로 페이드하지 않는다 — 전부 걷었던 컷신만.
+        bool fromCutscene = _lastRunMode == HUDIds.Mode.Cutscene && mode != HUDIds.Mode.Cutscene;
+        _lastRunMode = mode;
         if (_startRoomSuppressed) return;   // 억제 중엔 모드 전환으로도 HUD를 켜지 않는다
         EnsureHudHierarchyVisible();
         presenter.SetMode(ResolveMode(mode));
+        if (fromCutscene) FadeBackFromCutsceneAsync().Forget();
+    }
+
+    /// <summary>
+    /// 컷신에서 돌아올 때 알파 0→1 — 무기 · 스킬 칸이 한 프레임에 튀어나오지 않게(「원색 · 순간 등장 금지」, 10-01 f5 전주기 시뮬).
+    /// 알파는 <see cref="ApplyHudAlpha"/>로 건다 — 0.2초마다 도는 하드 가드가 <c>_fadeAlpha</c>를 보고 다시 건다.
+    /// </summary>
+    private async UniTaskVoid FadeBackFromCutsceneAsync()
+    {
+        var cg = HudGroup();
+        if (cg == null) return;
+
+        _cutsceneFadeCts?.Cancel();
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+        _cutsceneFadeCts = cts;
+        try
+        {
+            for (float e = 0f; e < CutsceneReturnFade; e += Time.unscaledDeltaTime)
+            {
+                if (cg == null) return;
+                ApplyHudAlpha(cg, e / CutsceneReturnFade);
+                await UniTask.Yield(PlayerLoopTiming.Update, cts.Token);
+            }
+            if (cg != null) ApplyHudAlpha(cg, 1f);
+        }
+        catch (System.OperationCanceledException) { }
+        finally
+        {
+            if (_cutsceneFadeCts == cts) _cutsceneFadeCts = null;
+            cts.Dispose();
+        }
     }
 
     private void HandlePlayerBound(PlayerController player)
@@ -463,8 +501,8 @@ public sealed class HudBootstrapper : MonoBehaviour
         }
 
         // 위 하드 가드는 전투 패널 부모의 CanvasGroup 알파를 전부 1로 되돌린다 — 차단 팝업이 떠 있으면 숨김을 다시 건다
-        // (런 안에서만 0.2초마다 돌아, 팝업 동안 걷은 HUD가 되살아났다 — 09-28 UI 전수).
-        if (_popupHidden || _popupDim < 1f)
+        // (런 안에서만 0.2초마다 돌아, 팝업 동안 걷은 HUD가 되살아났다 — 09-28 UI 전수). 페이드 중(컷신 복귀 · 시작방)도 같다.
+        if (_popupHidden || _popupDim < 1f || _fadeAlpha < 1f)
         {
             var cg = HudGroup();
             if (cg != null) { cg.alpha = _fadeAlpha * _popupDim; cg.blocksRaycasts = !_popupHidden; }

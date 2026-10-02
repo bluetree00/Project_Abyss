@@ -12,6 +12,8 @@ public sealed class RunItemInventory
 {
     /// <summary>보관함 칸 배열 상한(제단 「룬 보관함 +2」까지). 실제 칸 수는 <see cref="StagingCapacity"/>.</summary>
     public const int MaxStagingCapacity = 7;
+    /// <summary>보관함 바가 그릴 수 있는 칸 상한 — 상한을 넘친 룬(획득 · 판에서 끌어냄)까지 보이게 넉넉히. 넘친 룬은 정리해야 판이 닫힌다.</summary>
+    public const int MaxStagingView = 16;
 
     /// <summary>이번 런 보관함 칸 수 — 기본 5, 기억의 제단 「룬 보관함 +1 · +2」로 6 · 7(09-29).</summary>
     public static int StagingCapacity => Mathf.Min(MaxStagingCapacity, MemoryAltarService.RuneStorageCapacity);
@@ -28,6 +30,9 @@ public sealed class RunItemInventory
     public int  PlacedCount   => _placedItems.Count;
     public int  StagingCount  => _stagingItems.Count;
     public bool IsStagingFull => _stagingItems.Count >= StagingCapacity;
+    /// <summary>상한을 넘었다 — 룬판이 닫히기 전에 놓거나 분해해야 한다.</summary>
+    public bool IsOverCapacity => _stagingItems.Count > StagingCapacity;
+    public int  OverflowCount  => Mathf.Max(0, _stagingItems.Count - StagingCapacity);
 
     /// <summary>그리드 배치 기준 변경 시 발생 — ItemEffectManager.Rebuild 트리거.</summary>
     public event System.Action OnPlacedChanged;
@@ -86,6 +91,21 @@ public sealed class RunItemInventory
             return false;
         }
 
+        _stagingItems.Add(item);
+        QuestEvents.ReportItemCollect(item.itemId ?? "Unknown");
+        Managers.Sound?.PlayEvent(SoundEvent.ItemPickup);
+        OnStagingChanged?.Invoke();
+        return true;
+    }
+
+    /// <summary>
+    /// 받은 룬(룬 보상 · 행상 구매)을 상한을 넘겨서라도 넣는다 — 넘친 만큼은 룬판에서 놓거나 분해해야 닫힌다.
+    /// 예전엔 가득이면 「보류」 한 칸에 들고 다녀, 연달아 받으면 앞의 것을 덮어쓸 수 있었고 받은 건지도 애매했다(10-01).
+    /// 상점 · 정제소처럼 <b>값을 치르기 전에 막을 수 있는 곳</b>은 그대로 <see cref="AddToStaging"/>(가득이면 거절)을 쓴다.
+    /// </summary>
+    public bool AddToStagingOverflow(RuntimeItemData item)
+    {
+        if (item == null) return false;
         _stagingItems.Add(item);
         QuestEvents.ReportItemCollect(item.itemId ?? "Unknown");
         Managers.Sound?.PlayEvent(SoundEvent.ItemPickup);

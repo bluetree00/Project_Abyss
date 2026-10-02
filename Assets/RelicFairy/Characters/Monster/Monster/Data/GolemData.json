@@ -5,7 +5,7 @@
     "maxHp": 30,
     "defense": 7.0,
     "attackPower": 20.0,
-    "moveSpeed": 1.0,
+    "moveSpeed": 1.8,
     "attackRange": 2.0,
     "attackRadius": 2.0,
     "attackRate": 0.5,
@@ -19,7 +19,7 @@
   "patrol": {
     "patrolType": "Random",
     "patrolRange": 3.0,
-    "patrolSpeed": 1.0,
+    "patrolSpeed": 1.2,
     "waypointWaitTime": 0.5
   },
   "combat": {

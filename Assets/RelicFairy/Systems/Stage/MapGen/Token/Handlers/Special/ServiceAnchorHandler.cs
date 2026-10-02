@@ -10,7 +10,8 @@ using UnityEngine;
 /// 이 토큰이 ①을 CSV로 만들어 준다 — 컨트롤러 코드는 그대로 두고 앵커만 심는다.
 ///
 /// 방향: 기본은 방 중심을 본다. 접미사로 고정할 수 있다 — <c>NSn/NSs/NSe/NSw</c>(북/남/동/서).
-/// 방 회전(heading)·미러는 부모 트랜스폼에 걸리므로 접미사 방향은 방 기준으로 유지된다.
+/// 방 회전(heading)·미러는 grid_csv 문자열에서 일어난다 — <see cref="GridTransform"/>가 칸과 함께 접미사도 돌려
+/// 방 기준 방향이 유지된다(10-01 전엔 접미사가 그대로라 돌아간 방에서 NPC가 옆 · 벽을 봤다).
 /// </summary>
 [TokenHandler("NS", TokenCategory.Special,
     "서비스 NPC 자리 — 상인/재련공/정제사가 여기 선다. 기본은 방 중심을 봄",
@@ -68,25 +69,33 @@ public sealed class ServiceCounterAnchorHandler : ITokenHandler
 }
 
 /// <summary>
-/// NP 토큰 — 배경 소품 자리(여러 개 가능). <c>decorPrefabs[1]</c> 이후가 배치 순서대로 채운다.
+/// NP 토큰 — 배경 소품 자리(여러 개 가능). <c>NP3</c>처럼 번호를 붙이면 <c>decorPrefabs[3]</c>이 그 자리에 선다.
+/// 번호가 없으면 남은 소품이 배치 순서대로 채운다 — 그 순서는 격자 행 순서라 방이 돌면 바뀐다(번호를 권장).
 /// </summary>
 [TokenHandler("NP", TokenCategory.Special,
-    "배경 소품 자리 — 서비스 방 decorPrefabs[1] 이후가 순서대로 배치됨",
-    phase: TokenPhase.PostBuild,
-    csvExample: "NP\n(여러 개 놓을 수 있다. 셀 순서대로 소품이 채워진다)")]
+    "배경 소품 자리 — NP<n>이면 서비스 방 decorPrefabs[n], 번호 없으면 [1] 이후를 순서대로",
+    isPrefix: true, phase: TokenPhase.PostBuild,
+    csvExample: "NP1 / NP2 … NP9\n(번호 = 소품 배열 칸. 방이 돌아도 같은 칸에 같은 소품)")]
 public sealed class ServicePropAnchorHandler : ITokenHandler
 {
-    public void Execute(TokenContext ctx) =>
-        ServiceAnchorUtil.Spawn(ctx, ServiceDecorAnchor.Slot.Prop, "ServicePropAnchor");
+    public void Execute(TokenContext ctx)
+    {
+        var anchor = ServiceAnchorUtil.Spawn(ctx, ServiceDecorAnchor.Slot.Prop, "ServicePropAnchor");
+        string tok = ctx.RawToken ?? string.Empty;
+        if (tok.Length > 2 && int.TryParse(tok.Substring(2), out int index) && index > 0)
+            anchor.SetPropIndex(index);
+    }
 }
 
 internal static class ServiceAnchorUtil
 {
-    public static void Spawn(TokenContext ctx, ServiceDecorAnchor.Slot kind, string namePrefix)
+    public static ServiceDecorAnchor Spawn(TokenContext ctx, ServiceDecorAnchor.Slot kind, string namePrefix)
     {
         var go = new GameObject($"{namePrefix}_{ctx.Cell.x}_{ctx.Cell.y}");
         go.transform.SetParent(ctx.Parent, false);
         go.transform.position = new Vector3(ctx.WorldPos.x, ctx.BaseY, ctx.WorldPos.z);
-        go.AddComponent<ServiceDecorAnchor>().SetKind(kind);
+        var anchor = go.AddComponent<ServiceDecorAnchor>();
+        anchor.SetKind(kind);
+        return anchor;
     }
 }

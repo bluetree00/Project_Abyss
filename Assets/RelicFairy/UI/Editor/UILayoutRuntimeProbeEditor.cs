@@ -1474,7 +1474,7 @@ public static class UILayoutRuntimeProbeEditor
                      {
                          ("Extra_Bark_Pattern", "하늘이 불탄다 — 운석이 떨어진다!", RelicFairy.UI.BossBarkType.PatternAnnounce),
                          ("Extra_Bark_Line",    "네놈의 검이 여기까지 닿을 줄은 몰랐다. 하지만 이 불꽃은 꺼지지 않는다.", RelicFairy.UI.BossBarkType.Bark),
-                         ("Extra_Bark_Merlin",  "숨을 고르렴. 저 문 너머가 첫 번째 시련이란다.", RelicFairy.UI.BossBarkType.MerlinNarration),
+                         ("Extra_Bark_Merlin",  "숨 골라. 저 문 너머가 첫 번째 시련이야.", RelicFairy.UI.BossBarkType.MerlinNarration),
                      })
             {
                 RelicFairy.UI.UI_BossBark.Show(text, type);

@@ -1,3 +1,5 @@
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -11,8 +13,10 @@ using UnityEngine;
 ///
 /// 복구 절차:
 ///   1. RuntimeStats.MaxHp × fallDamageRatio 만큼 HP 감소 (passive 트리거 없이 직접)
-///   2. PlayerController.SetInvincible(invincibleSeconds) 로 리스폰 직후 짧게 무적
+///   2. (10-03) 화면을 짧게 가린다(검은 암전) — 낙사로 죽었으면 가리지 않는다(사망 연출이 화면을 맡는다)
 ///   3. 위치를 _lastSafe + respawnOffsetY 로 이동, 속도 리셋
+///      — 붕괴형 아레나면 아레나가 고른 온전한 칸 가운데(<see cref="ArenaTileGrid.TryGetSafeRespawn"/>)
+///   4. PlayerController.SetInvincible(invincibleSeconds) 로 리스폰 직후 짧게 무적(오라로 보이게) → 카메라 스냅 → 화면을 연다
 /// </summary>
 [RequireComponent(typeof(PlayerController))]
 public class FallRecoveryController : MonoBehaviour
@@ -27,6 +31,13 @@ public class FallRecoveryController : MonoBehaviour
         new( 1f,      0f     ), new( 0.707f,  0.707f), new( 0f,  1f     ), new(-0.707f,  0.707f),
         new(-1f,      0f     ), new(-0.707f, -0.707f), new( 0f, -1f     ), new( 0.707f, -0.707f),
     };
+
+    /// <summary>(10-03) 낙사 가림 — 떨어지는 순간 화면을 덮는 시간 · 옮긴 뒤 여는 시간(초, 실시간).</summary>
+    private const float CoverSeconds  = 0.3f;
+    private const float RevealSeconds = 0.35f;
+
+    /// <summary>(10-03) 복구 무적이 보이게 — 사망 무효와 같은 오라(Addressables).</summary>
+    private const string InvincibleVfxKey = "VFX_DeathNegateAura";
 
     // ── 낙하 깊이 덮어쓰기(방 단위) ─────────────────────────
     // 절대 높이 판정은 바닥이 y≈0인 방에서 5m만 떨어져도 복구돼 '떨어지는 감각'이 없다(리치 아레나 붕괴 바닥).
@@ -53,7 +64,7 @@ public class FallRecoveryController : MonoBehaviour
     private float fallDamageRatio = 0.1f;
 
     [SerializeField, Min(0f), Tooltip("낙사 복구 직후 무적 시간(초).")]
-    private float invincibleSeconds = 1.0f;
+    private float invincibleSeconds = 1.5f;
 
     [SerializeField, Min(1f), Tooltip("리스폰 전 바닥 실존 확인용 레이캐스트 시작 높이(m). 밟고 있던 지형이 사라졌는지 판정한다.")]
     private float groundProbeHeight = 60f;
@@ -124,6 +135,7 @@ public class FallRecoveryController : MonoBehaviour
 
     private void Recover()
     {
+        if (_recovering) return;   // (10-03) 가리는 동안 PitTrigger가 다시 불러도 한 번만
         _recovering = true;
 
         // HP 차감 — passive 트리거 없이 직접 (낙사는 특수 원인).
@@ -140,12 +152,49 @@ public class FallRecoveryController : MonoBehaviour
             if (_pc.RuntimeStats.Hp <= 0) _pc.NotifyHpDepleted();
         }
 
+        // (10-03) 떨어지는 순간 화면을 짧게 가리고 그 사이 옮긴다 — 순간이동 · 카메라가 끌려오는 모습이 보이지 않게.
+        // 낙사로 죽었으면 가리지 않는다 — 사망 연출(붉은 비네트 → 암전)이 화면을 맡는다.
+        bool died = _pc != null && _pc.RuntimeStats != null && _pc.RuntimeStats.Hp <= 0;
+        if (died)
+        {
+            Respawn();
+            _recovering = false;
+            return;
+        }
+        RecoverAsync(destroyCancellationToken).Forget();
+    }
+
+    /// <summary>(10-03) 가림 → 옮김(무적 · 오라) → 카메라 스냅 → 열림. 가려진 동안에도 맞지 않는다(낙사 피해는 이미 들어갔다).</summary>
+    private async UniTaskVoid RecoverAsync(CancellationToken ct)
+    {
+        try
+        {
+            _pc?.SetInvincible(CoverSeconds + invincibleSeconds);
+            await ScreenFade.Out(CoverSeconds, ct);
+            Respawn();
+            if (_pc != null) ItemEffectVfxHelper.AttachLoopVfx(InvincibleVfxKey, transform, invincibleSeconds).Forget();
+            GameCameraController.Instance?.SnapToTarget();   // 댐핑으로 끌려오지 않게 — 열리는 화면은 이미 제자리
+            await ScreenFade.In(RevealSeconds, ct);
+        }
+        catch (System.OperationCanceledException)
+        {
+            // 플레이어가 파괴됨(씬 전환) — 다음 씬 부트가 화면을 연다.
+        }
+        finally
+        {
+            _recovering = false;
+        }
+    }
+
+    /// <summary>바닥이 남아 있는 자리로 옮기고 속도를 지운 뒤 짧게 무적.</summary>
+    private void Respawn()
+    {
         // 리스폰 위치 — 안전 지점 아래에 바닥이 "지금도" 남아 있는지 확인한 뒤 결정한다.
         Vector3 candidate = _hasSafe
             ? _lastSafe
             : new Vector3(transform.position.x, respawnOffsetY, transform.position.z);
 
-        if (!TryResolveRespawn(candidate, out Vector3 target))
+        if (!TryArenaRespawn(candidate, out Vector3 target) && !TryResolveRespawn(candidate, out target))
         {
             target = candidate + new Vector3(0f, respawnOffsetY, 0f);
             Debug.LogWarning($"[FallRecovery] {candidate} 주변에서 바닥을 찾지 못했다 — 원래 좌표로 복구한다.", this);
@@ -161,8 +210,19 @@ public class FallRecoveryController : MonoBehaviour
 
         // 짧은 무적
         _pc?.SetInvincible(invincibleSeconds);
+    }
 
-        _recovering = false;
+    /// <summary>
+    /// (10-03) 무너지는 아레나 — 마지막 안전 지점이 흔들리던(곧 무너질) 칸이거나 구멍 가장자리면 되살아나자마자 또 떨어진다.
+    /// 아레나가 고른 칸(무너질 예정이 아니고 코어 쪽인 온전한 칸) 윗면 가운데로. 아레나가 없거나 그 위가 아니면 false.
+    /// </summary>
+    private bool TryArenaRespawn(Vector3 from, out Vector3 result)
+    {
+        result = from;
+        var grid = ArenaTileGrid.Active;
+        if (grid == null || !grid.TryGetSafeRespawn(from, out Vector3 top)) return false;
+        result = top + new Vector3(0f, respawnOffsetY, 0f);
+        return true;
     }
 
     /// <summary>

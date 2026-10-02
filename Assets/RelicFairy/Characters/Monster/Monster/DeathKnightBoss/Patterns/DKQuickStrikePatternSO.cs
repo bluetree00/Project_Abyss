@@ -104,17 +104,14 @@ public class DKQuickStrikeState : FullLockState<DKQuickStrikePatternSO>
             _tiles = DKGridPatternHelper.SpawnTiles(
                 ColorRule(sc), Data.whiteTilePrefab, Data.blackTilePrefab);
             _edges = DKGridPatternHelper.SpawnBoundaryEdges(_tiles, Data.edgePrefab);
+            (ctx.Monster as DeathKnightBossMonster)?.CueSwordFloor();   // 검 색 ↔ 바닥 신호(10-03 개선 2-2)
         }
 
-        // hitTime: 타일 제거
+        // hitTime: 휘두름 시작 — 타일은 판정 순간까지 남긴다(예전엔 여기서 지워 판정까지 0.4초를 기억에 맡겼다, 10-02)
         if (!_tilesDestroyed && _timer >= Data.hitTime)
-        {
             _tilesDestroyed = true;
-            DKGridPatternHelper.DestroyEdges(_edges);
-            DKGridPatternHelper.DestroyTiles(_tiles);
-        }
 
-        // hitTime + 0.05s: 타일 제거 확인 후 십자가에만 VFX (1회)
+        // hitTime + 0.05s: 십자가에만 VFX (1회)
         if (_tilesDestroyed && !_crossVfxSpawned && _timer >= Data.hitTime + 0.05f)
         {
             _crossVfxSpawned = true;
@@ -129,6 +126,8 @@ public class DKQuickStrikeState : FullLockState<DKQuickStrikePatternSO>
         if (!_hitDone && _timer >= Data.hitTime + Data.hitDuration)
         {
             _hitDone = true;
+            DKGridPatternHelper.DestroyEdges(_edges);   // 타일은 판정 순간에 걷는다
+            DKGridPatternHelper.DestroyTiles(_tiles);
             DKSwordColor sc = GetSwordColor(ctx);
             DKGridPatternHelper.TriggerDamage(
                 ctx, ColorRule(sc), sc,

@@ -311,22 +311,21 @@ public static class AbyssPeddlerCatalog
                 if (shown != null) data.element = shown.element;   // 진열에 보인 속성 그대로
 
                 // 사자마자 바로 조합(배치)할 수 있게 룬판을 열어준다 — 룬 획득 보상과 같은 흐름.
-                bool added = s.ItemInventory.AddToStaging(data);
-                OpenGridForRune(data, added);
-                return true;   // 보관함 만차여도 '보류'로 판이 들고 가므로 구매는 성립
+                s.ItemInventory.AddToStagingOverflow(data);   // 가득이면 넘친 칸으로 — 룬판에서 놓거나 분해해야 닫힌다
+                OpenGridForRune(data);
+                return true;
             },
             rune: shown);   // 표시 전용 사본 — 효과 전부·속성·칸 수·놓을 자리(받는 룬과 같은 속성)
     }
 
-    /// <summary>구매한 룬을 즉시 배치할 수 있도록 룬판을 연다(만차면 보류 아이템으로).</summary>
-    private static void OpenGridForRune(RuntimeItemData data, bool added)
+    /// <summary>구매한 룬을 즉시 배치할 수 있도록 룬판을 연다.</summary>
+    private static void OpenGridForRune(RuntimeItemData data)
     {
         if (UI_GridPanel.Instance == null)
             Managers.UI?.ShowOverlayUI<UI_GridPanel>();
         if (UI_GridPanel.Instance == null) return;
 
-        if (added) UI_GridPanel.Instance.ShowWithNewItem(data);
-        else       UI_GridPanel.Instance.ShowWithPendingItem(data);
+        UI_GridPanel.Instance.ShowWithNewItem(data);
         // 상점 팝업은 열린 채다 — 판을 그 위로 올려야 보이고 눌린다. 판을 닫으면 상점으로 돌아온다.
         UI_GridPanel.Instance.RaiseAbovePopups();
     }

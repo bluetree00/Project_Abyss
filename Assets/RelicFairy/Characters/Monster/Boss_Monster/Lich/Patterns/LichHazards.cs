@@ -10,6 +10,7 @@ namespace RelicFairy.Monster
 public static class LichHazards
 {
     private const float BindCooldown = 4f;   // 결박이 풀린 뒤 다시 묶일 수 있을 때까지(연속 결박 방지)
+    private const float ThreatMargin = 0.5f; // ThreatNear — 몸 반경 + 조금
 
     private static LichHazardHost s_host;
     private static BoundChainsHazard s_bound;
@@ -104,6 +105,15 @@ public static class LichHazards
     /// <summary>지금 사슬에 묶여 있는가.</summary>
     public static bool IsBinding => s_bind != null;
 
+    /// <summary>지금 묶을 수 있는가 — <see cref="ChainBind"/>와 같은 조건(묶여 있지 않고, 풀린 지 <see cref="BindCooldown"/>초가 지났다).</summary>
+    public static bool CanBind => s_bind == null && Time.time >= s_nextBindAt;
+
+    /// <summary>
+    /// <paramref name="pos"/>에 선 채로 <paramref name="seconds"/>초 안에 남은 장판 · 투사체에 맞을 수 있는가 — 묶는 공격(속박탄)이
+    /// 「묶인 채 피할 수 없이 맞는」 자리를 피한다. 여운 장판 안 · 곧 터질 지연 폭발 안 · 그 시간 안에 닿을 추적 구체 · 불/번개 사분면.
+    /// </summary>
+    public static bool ThreatNear(Vector3 pos, float seconds) => s_host != null && s_host.AnyThreat(pos, seconds);
+
     /// <summary>
     /// 사슬 결박 — <paramref name="seconds"/> 동안 이동·회피·공격 불가(입력 차단). <paramref name="from"/>(리치 손)에서 금빛 사슬이 이어진다.
     /// 이미 묶여 있거나 풀린 지 <see cref="BindCooldown"/>초가 안 됐으면 묶지 않고 false.
@@ -135,6 +145,8 @@ public static class LichHazards
         /// <summary>false를 돌려주면 끝.</summary>
         public abstract bool Tick(float dt);
         public abstract void Dispose();
+        /// <summary><paramref name="pos"/>가 <paramref name="seconds"/>초 안에 이것에 맞을 수 있는가(<see cref="ThreatNear"/>). 기본 = 아니다.</summary>
+        public virtual bool Threatens(Vector3 pos, float seconds) => false;
     }
 
     private sealed class SlowZoneHazard : Hazard
@@ -250,6 +262,9 @@ public static class LichHazards
             LichVfx.Stop(ref _vfx, 0.3f);
             PatternGuideHelper.SafeDestroy(ref _marker);
         }
+
+        public override bool Threatens(Vector3 pos, float seconds)
+            => LichPatternUtil.FlatDistance(_pos, pos) <= _radius + _speed * seconds + ThreatMargin;
     }
 
     private sealed class BoundChainsHazard : Hazard
@@ -449,6 +464,14 @@ public static class LichHazards
             PatternGuideHelper.SafeDestroy(ref _chainDisc);
         }
 
+        /// <summary>불 사분면(틱) · 번개 사분면(맞으면 낙뢰가 따라온다) · 곧 떨어질 낙뢰 자리.</summary>
+        public override bool Threatens(Vector3 pos, float seconds)
+        {
+            if (_chainTimer >= 0f && LichPatternUtil.FlatDistance(_chainPos, pos) <= _s.ChainRadius + ThreatMargin) return true;
+            var q = QuadrantAt(pos);
+            return q == QuadrantElement.Fire || q == QuadrantElement.Lightning;
+        }
+
         /// <summary>플레이어가 선 사분면. 제단 밖이면 -1(원소 없음).</summary>
         private QuadrantElement PlayerQuadrant(out Vector3 target)
         {
@@ -456,8 +479,13 @@ public static class LichHazards
             var t = _ctx.Runtime.PlayerTarget;
             if (t == null) return (QuadrantElement)(-1);
             target = t.position;
+            return QuadrantAt(target);
+        }
 
-            Vector3 d = target - _s.Center;
+        /// <summary><paramref name="p"/>가 선 사분면. 제단 밖이면 -1(원소 없음).</summary>
+        private QuadrantElement QuadrantAt(Vector3 p)
+        {
+            Vector3 d = p - _s.Center;
             d.y = 0f;
             if (d.sqrMagnitude > _s.Radius * _s.Radius) return (QuadrantElement)(-1);
 
@@ -579,6 +607,9 @@ public static class LichHazards
             LichVfx.Stop(ref _vfx, 0.4f);
             PatternGuideHelper.SafeDestroy(ref _rim);
         }
+
+        public override bool Threatens(Vector3 pos, float seconds)
+            => LichPatternUtil.FlatDistance(_center, pos) <= _radius + ThreatMargin;
     }
 
     private sealed class DelayedBlastHazard : Hazard
@@ -626,6 +657,9 @@ public static class LichHazards
         }
 
         public override void Dispose() => PatternGuideHelper.SafeDestroy(ref _disc);
+
+        public override bool Threatens(Vector3 pos, float seconds)
+            => _warn - _t <= seconds && LichPatternUtil.FlatDistance(_center, pos) <= _radius + ThreatMargin;
     }
 
     /// <summary>
@@ -703,6 +737,13 @@ public sealed class LichHazardHost : MonoBehaviour
     private void OnDestroy() => ClearAll();
 
     internal void Add(LichHazards.Hazard hazard) => _hazards.Add(hazard);
+
+    internal bool AnyThreat(Vector3 pos, float seconds)
+    {
+        for (int i = 0; i < _hazards.Count; i++)
+            if (_hazards[i].Threatens(pos, seconds)) return true;
+        return false;
+    }
 
     public void ClearAll()
     {

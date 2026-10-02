@@ -285,7 +285,7 @@ public class BossPatternRunner
         float total = 0f;
         foreach (var p in entry.patterns)
         {
-            if (p == null || !p.CanExecute(_ctx) || p == _lastPatternSO) continue;
+            if (p == null || !p.Available(_ctx) || p == _lastPatternSO) continue;
             total += WeightOf(p);
         }
         if (total > 0f)
@@ -294,7 +294,7 @@ public class BossPatternRunner
             float acc  = 0f;
             foreach (var p in entry.patterns)
             {
-                if (p == null || !p.CanExecute(_ctx) || p == _lastPatternSO) continue;
+                if (p == null || !p.Available(_ctx) || p == _lastPatternSO) continue;
                 acc += WeightOf(p);
                 if (roll <= acc) return p;
             }
@@ -305,7 +305,7 @@ public class BossPatternRunner
         total = 0f;
         foreach (var p in entry.patterns)
         {
-            if (p == null || !p.CanExecute(_ctx)) continue;
+            if (p == null || !p.Available(_ctx)) continue;
             total += ApplyRepeatPenalty(p);
         }
         if (total <= 0f) return null;
@@ -314,7 +314,7 @@ public class BossPatternRunner
         float a  = 0f;
         foreach (var p in entry.patterns)
         {
-            if (p == null || !p.CanExecute(_ctx)) continue;
+            if (p == null || !p.Available(_ctx)) continue;
             a += ApplyRepeatPenalty(p);
             if (r <= a) return p;
         }
@@ -372,7 +372,7 @@ public class BossPatternRunner
             int realIdx = (idx + i) % count;
             var p = entry.patterns[realIdx];
             if (p == null) continue;
-            if (checkCanExecute && !p.CanExecute(_ctx)) continue;
+            if (checkCanExecute && !p.Available(_ctx)) continue;
             _seqIndex[entry] = (realIdx + 1) % count;
             return p;
         }
@@ -386,7 +386,7 @@ public class BossPatternRunner
         foreach (var p in entry.patterns)
         {
             if (p == null || p == _lastPatternSO) continue;
-            if (checkCanExecute && !p.CanExecute(_ctx)) continue;
+            if (checkCanExecute && !p.Available(_ctx)) continue;
             _randomCandidates.Add(p);
         }
         if (_randomCandidates.Count > 0)
@@ -398,7 +398,7 @@ public class BossPatternRunner
         foreach (var p in entry.patterns)
         {
             if (p == null) continue;
-            if (checkCanExecute && !p.CanExecute(_ctx)) continue;
+            if (checkCanExecute && !p.Available(_ctx)) continue;
             _randomCandidates.Add(p);
         }
         if (_randomCandidates.Count == 0) return null;

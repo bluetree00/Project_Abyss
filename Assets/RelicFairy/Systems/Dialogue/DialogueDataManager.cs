@@ -91,26 +91,41 @@ public class DialogueDataManager
 
     /// <summary>
     /// 방문 횟수 기반 변형 대사 선택(로그라이크 반복 재미). 호출 시 방문 횟수를 1 증가(PlayerPrefs 영속).
-    /// 첫 방문(count 0) → <c>{baseKey}_First</c>(없으면 baseKey), 재방문 → <c>{baseKey}_R*</c> 중 랜덤(없으면 First/base).
+    /// 시기판 키(<see cref="EraKey"/>)가 있으면 그 키로 고르고 횟수도 그 키로 센다 — 시기가 바뀌면 그 시기의 첫 대사부터.
+    /// 첫 방문(count 0) → <c>{key}_First</c>(없으면 key), 재방문 → 횟수 단계 풀(<see cref="PickRepeat"/>).
     /// 예: GetVisitLines("Chapter1_Enter"), GetVisitLines("Lich_Encounter").
     /// </summary>
     public DialogueLine[] GetVisitLines(string baseKey)
     {
         if (string.IsNullOrEmpty(baseKey)) return null;
 
-        string prefsKey = VisitPrefix + baseKey;
+        string key = EraKey(baseKey);
+        string prefsKey = VisitPrefix + key;
         int count = PlayerPrefs.GetInt(prefsKey, 0);
         PlayerPrefs.SetInt(prefsKey, count + 1);
-        RememberVisitKey(baseKey); // 새 게임 시 일괄 초기화할 수 있도록 키를 인덱스에 남긴다
+        RememberVisitKey(key); // 새 게임 시 일괄 초기화할 수 있도록 키를 인덱스에 남긴다
 
         if (count == 0)
-            return GetLines(baseKey + "_First") ?? GetLines(baseKey);
+        {
+            var first = GetLines(key + "_First") ?? GetLines(key);
+            if (first != null) return first;
+        }
+        return PickRepeat(key, count) ?? GetLines(key + "_First") ?? GetLines(key);
+    }
 
-        var variants = CollectVariantKeys(baseKey + "_R");
-        if (variants.Count > 0)
-            return GetLines(variants[UnityEngine.Random.Range(0, variants.Count)]);
-
-        return GetLines(baseKey + "_First") ?? GetLines(baseKey);
+    /// <summary>
+    /// 시기판 키 — 같은 자리라도 시기마다 맞는 대사가 다르다(봉인기 → 해방기 → 엔딩 뒤 → 악몽 모드).
+    /// <c>{baseKey}{꼬리}</c>에 대사가 하나라도 있으면 그 키를, 없으면 다음 꼬리 → 평소 키. 꼬리를 안 쓴 자리는 그대로다.
+    /// </summary>
+    public string EraKey(string baseKey)
+    {
+        foreach (var suffix in EraSuffixes())
+        {
+            string k = baseKey + suffix;
+            if (HasSequence(k) || HasSequence(k + "_First") || HasSequence(k + "_R1") || HasSequence(k + "_T10_R1"))
+                return k;
+        }
+        return baseKey;
     }
 
     /// <summary>
@@ -159,42 +174,69 @@ public class DialogueDataManager
         PlayerPrefs.Save();
     }
 
-    // 복귀 대사 티어 임계(내림차순). count가 이 값 이상이면 해당 티어 풀({base}_T{n}_R*)에서 뽑는다.
-    private static readonly int[] _tierThresholds = { 25, 10 };
+    // 반복 대사 단계(방문 · 횟수 공용, 내림차순) — 그 횟수 이상이면 {key}_T{n}_R* 풀.
+    // 사용자(10-01): 「초회 · 10~20회 · 30~40회 · 그 뒤 무한 뒷부분 랜덤」. 50부터는 끝없는 구간이라 뒤쪽 풀을 모두 섞는다.
+    private static readonly int[] _tierThresholds = { 50, 30, 10 };
+    private const int EndlessFrom = 50;
+
+    private static readonly string[] SuffixNightmare = { "_Nightmare", "_Ended", "_Liberation" };
+    private static readonly string[] SuffixEnded     = { "_Ended", "_Liberation" };
+    private static readonly string[] SuffixLiberated = { "_Liberation" };
 
     /// <summary>
-    /// 카운트 기반 대사(사망/클리어 복귀 등). 반복 지루함 방지용 랜덤 풀 + 특정 횟수 특별 대사.
-    /// 선택 우선순위: 첫 회 <c>{base}_First</c> → 정확 마일스톤 <c>{base}_M{count}</c> →
-    /// count가 넘긴 최고 티어 풀 <c>{base}_T{n}_R*</c> 랜덤 → 기본 풀 <c>{base}_R*</c> 랜덤 → base.
+    /// 카운트 기반 대사(사망/클리어 복귀 등). 반복 지루함 방지용 랜덤 풀 + 특정 횟수 특별 대사. 시기판 키가 있으면 그 키로.
+    /// 선택 우선순위: 첫 회 <c>{key}_First</c> → 정확 마일스톤 <c>{key}_M{count}</c>(엔딩 전엔 평소 키의 마일스톤도) →
+    /// 횟수 단계 풀(<see cref="PickRepeat"/>) → key.
     /// (호출측이 count 관리 — RunReturnTracker.)
     /// </summary>
     public DialogueLine[] GetCountLines(string baseKey, int count)
     {
         if (string.IsNullOrEmpty(baseKey)) return null;
+        string key = EraKey(baseKey);
 
         if (count <= 1)
         {
-            var first = GetLines(baseKey + "_First");
+            var first = GetLines(key + "_First");
             if (first != null) return first;
         }
 
-        var exact = GetLines(baseKey + "_M" + count);   // 특정 횟수 딱 그때만 나오는 특별 대사
+        // 특정 횟수 딱 그때만 나오는 특별 대사. 평소 키의 마일스톤은 설계를 흘리는 떡밥이라 정체가 드러난(엔딩) 뒤엔 낡는다.
+        var exact = GetLines(key + "_M" + count)
+                 ?? (key != baseKey && !StoryProgress.HasEnded ? GetLines(baseKey + "_M" + count) : null);
         if (exact != null) return exact;
 
-        foreach (int t in _tierThresholds)              // count가 넘긴 최고 티어 풀
-        {
-            if (count < t) continue;
-            var tierVariants = CollectVariantKeys(baseKey + "_T" + t + "_R");
-            if (tierVariants.Count > 0)
-                return GetLines(tierVariants[UnityEngine.Random.Range(0, tierVariants.Count)]);
-        }
-
-        var variants = CollectVariantKeys(baseKey + "_R");   // 기본 랜덤 풀
-        if (variants.Count > 0)
-            return GetLines(variants[UnityEngine.Random.Range(0, variants.Count)]);
-
-        return GetLines(baseKey + "_First") ?? GetLines(baseKey);
+        return PickRepeat(key, count) ?? GetLines(key + "_First") ?? GetLines(key);
     }
+
+    /// <summary>
+    /// 반복 대사 하나 — count(지난 횟수)가 넘긴 가장 높은 단계 풀(<c>{key}_T{n}_R*</c>)에서, 없으면 아래 단계 → 기본 풀 <c>{key}_R*</c>.
+    /// 끝없는 구간(50~)은 뒤쪽 단계 풀(T10 · T30 · T50)을 모두 섞어 고른다. 풀 대사에는 횟수를 적지 않는다(마일스톤 몫).
+    /// </summary>
+    private DialogueLine[] PickRepeat(string key, int count)
+    {
+        List<string> pool = null;
+        if (count >= EndlessFrom)
+        {
+            pool = new List<string>();
+            foreach (int t in _tierThresholds) pool.AddRange(CollectVariantKeys(key + "_T" + t + "_R"));
+        }
+        else
+        {
+            foreach (int t in _tierThresholds)
+            {
+                if (count < t) continue;
+                var tier = CollectVariantKeys(key + "_T" + t + "_R");
+                if (tier.Count > 0) { pool = tier; break; }
+            }
+        }
+        if (pool == null || pool.Count == 0) pool = CollectVariantKeys(key + "_R");
+        return pool.Count > 0 ? GetLines(pool[UnityEngine.Random.Range(0, pool.Count)]) : null;
+    }
+
+    private static string[] EraSuffixes() =>
+        StoryProgress.IsNightmareMode ? SuffixNightmare
+      : StoryProgress.IsLiberated     ? (StoryProgress.HasEnded ? SuffixEnded : SuffixLiberated)
+      : Array.Empty<string>();
 
     private List<string> CollectVariantKeys(string prefix)
     {

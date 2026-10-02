@@ -153,8 +153,30 @@ public class MonsterSpawner : MonoBehaviour
     /// 방 클리어 카운터가 Σ로 합산해 킬 목표 수를 계산할 때 사용.</summary>
     public int MaxTotalSpawns => maxTotalSpawns;
 
-    /// <summary>이 스포너가 현재 살려두고 있는 몬스터 수. MonsterBudget이 전역 동시 상한을 계산할 때 합산한다.</summary>
-    public int AliveCount => _spawnedMonsters.Count;
+    /// <summary>
+    /// 이 스포너가 현재 <b>살려 두고 있는</b> 몬스터 수 — 죽은 몸(IsDead · 사망 연출과 풀 반환 대기 약 3초)과 풀에 돌아간 것은 세지 않는다.
+    /// 예전엔 목록 길이를 그대로 써서 시체가 동시 상한 칸을 차지했고, 스폰을 끝낸 스포너는 목록을 더 비우지 않아
+    /// 반환된 몹까지 산 것으로 남았다(10-01 방 시간표 — Ch3 정예 스폰 12.6초 중 10.3초가 상한 막힘).
+    /// </summary>
+    public int AliveCount
+    {
+        get
+        {
+            int n = 0;
+            for (int i = 0; i < _spawnedMonsters.Count; i++)
+                if (IsAlive(_spawnedMonsters[i])) n++;
+            return n;
+        }
+    }
+
+    /// <summary>살아 있는 몬스터를 set에 담는다 — 풀에서 다른 스포너가 다시 꺼낸 몹이 옛 목록에 남아 있어도 두 번 세지 않게.</summary>
+    public void CollectAlive(HashSet<MonsterBase> into)
+    {
+        for (int i = 0; i < _spawnedMonsters.Count; i++)
+            if (IsAlive(_spawnedMonsters[i])) into.Add(_spawnedMonsters[i]);
+    }
+
+    private static bool IsAlive(MonsterBase m) => m != null && m.gameObject.activeInHierarchy && !m.IsDead;
 
     /// <summary>웨이브 모드 여부(단일 웨이브). 그룹이 하나라도 있으면 1, 없으면 0(자동 루프 모드).
     /// _waveEntries의 모든 그룹을 하나의 웨이브로 합쳐 연속 스폰한다.</summary>
@@ -179,6 +201,9 @@ public class MonsterSpawner : MonoBehaviour
     /// <summary>몬스터가 실제로 스폰된 직후 발행. (풀에서 꺼낸 MonsterBase 인스턴스 전달)
     /// RoomClearController가 몬스터 OnDied를 체이닝하는 데 사용.</summary>
     public event System.Action<MonsterBase> OnMonsterSpawned;
+
+    // 시기 특성(10-02 설계서 §4) — 이 스포너(≈ 방)에서 나온 특성 종류. 종류 2까지만(한 방에 특성이 난무하지 않게).
+    private readonly HashSet<MonsterTraitKind> _roomTraits = new();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 초기화
@@ -367,14 +392,16 @@ public class MonsterSpawner : MonoBehaviour
             float countScale = AppBootstrapper.Instance?.CurrentRun?.CurrentMonsterCountScale ?? 1f;
 
             // 총 스폰 대상 수 — 마지막 한 마리 뒤에는 대기하지 않도록 카운트다운에 사용.
+            // 묶음별 마릿수는 한 번만 굴린다 — 확률 반올림이라 두 번 굴리면 남은 수 세기와 실제 스폰이 어긋난다.
+            var counts = new int[_waveEntries.Length];
             int remaining = 0;
-            foreach (var g in _waveEntries) remaining += ScaleCount(g.spawnCount, countScale);
+            for (int gi = 0; gi < _waveEntries.Length; gi++) remaining += counts[gi] = ScaleCount(_waveEntries[gi].spawnCount, countScale);
 
             int spawned = 0;
             for (int g = 0; g < _waveEntries.Length; g++)
             {
                 targetGrade = _waveEntries[g].maxGrade; // 이 그룹의 등급 상한(AtMost)
-                int count   = ScaleCount(_waveEntries[g].spawnCount, countScale);
+                int count   = counts[g];
 
                 for (int i = 0; i < count; i++)
                 {
@@ -494,6 +521,14 @@ public class MonsterSpawner : MonoBehaviour
         _spawnedMonsters.Add(monster);
         _totalSpawned++;
 
+        // 시기 특성 — 해방기 · 악몽 모드만(봉인기 · 보스는 없음). 통지 전에 붙여 방 컨트롤러가 처음부터 특성 붙은 몸을 본다.
+        var traits = MonsterTraitTable.Roll(entry.grade, StoryProgress.Era, _roomTraits);
+        if (traits.Count > 0)
+        {
+            var splitFrom = entry;
+            MonsterTraits.Attach(monster, traits, pos => SpawnSplitChildAsync(splitFrom, pos));
+        }
+
         // 외부 수명주기 구독자(RoomWaveController 등)에게 통지 — OnDied 체이닝 기회 제공
         OnMonsterSpawned?.Invoke(monster);
 
@@ -510,6 +545,35 @@ public class MonsterSpawner : MonoBehaviour
                 edgeColor: spawnOutlineColor);
         }
         return true;
+    }
+
+    /// <summary>
+    /// 분열 분신 하나 — 같은 몬스터를 그 자리에 세우고 작게 만든다. 스폰 통지를 거쳐 방 생존 수에 들어간다(분신까지 잡아야 방이 끝난다).
+    /// 그 사이 방이 끝나 스포너가 사라졌으면 바로 풀로 돌려보낸다.
+    /// </summary>
+    private async UniTask SpawnSplitChildAsync(SpawnEntry entry, Vector3 pos)
+    {
+        MonsterBase child;
+        try
+        {
+            child = await Managers.ObjectPooler.SpawnAsync<MonsterBase>(
+                entry.addressableKey, ObjectPoolerManager.PoolType.Monster, pos, Quaternion.identity);
+        }
+        catch (System.OperationCanceledException) { return; }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"[MonsterSpawner] 분열 분신 스폰 실패 '{entry.addressableKey}': {ex.Message}", this);
+            return;
+        }
+        if (child == null) return;
+        if (this == null)
+        {
+            Managers.ObjectPooler?.Despawn(child.gameObject);
+            return;
+        }
+        _spawnedMonsters.Add(child);
+        MonsterTraits.MakeSplitChild(child);
+        OnMonsterSpawned?.Invoke(child);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -668,9 +732,18 @@ public class MonsterSpawner : MonoBehaviour
     private static bool ContainsXZ(Bounds b, Vector3 p)
         => p.x >= b.min.x && p.x <= b.max.x && p.z >= b.min.z && p.z <= b.max.z;
 
-    /// <summary>챕터 수량 배율을 적용한 스폰 마릿수. baseCount>0이면 최소 1 보장(반올림).</summary>
+    /// <summary>
+    /// 수량 배율을 적용한 스폰 마릿수 — <b>확률 반올림</b>(기댓값 = baseCount × scale). baseCount>0이면 최소 1.
+    /// 예전 반올림은 1~2마리 묶음(일반방 대부분)에서 ×1.1 · ×1.2가 늘 0이 됐다(10-02 점검) — 2 × 1.1 = 2.2면 20%로 3마리.
+    /// </summary>
     private static int ScaleCount(int baseCount, float scale)
-        => baseCount <= 0 ? 0 : Mathf.Max(1, Mathf.RoundToInt(baseCount * scale));
+    {
+        if (baseCount <= 0) return 0;
+        float want = baseCount * scale;
+        int n = Mathf.FloorToInt(want);
+        if (Random.value < want - n) n++;
+        return Mathf.Max(1, n);
+    }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 에디터 Gizmo

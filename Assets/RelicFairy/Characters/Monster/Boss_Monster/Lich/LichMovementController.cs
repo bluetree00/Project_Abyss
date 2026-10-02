@@ -455,7 +455,8 @@ public class LichMovementController : MonoBehaviour
                 SelectNextMovement();
         }
 
-        float speedMult = _postAttackTimer > 0f ? _postAttackSpeedMult : 1f;
+        float speedMult = (_postAttackTimer > 0f ? _postAttackSpeedMult : 1f)
+                        * (_bb != null ? _bb.MoveSpeedMult : 1f);   // 페이지 이동 배율(T2/T3 ×1.2 — 10-01 연결)
         Vector3 before  = _transform.position;
         ExecuteMovement(dt, playerTarget, speedMult);
 

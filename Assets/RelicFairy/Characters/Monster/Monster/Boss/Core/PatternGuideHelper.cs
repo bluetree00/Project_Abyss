@@ -57,6 +57,10 @@ public static class PatternGuideHelper
     private static Material              _unlitShared; // 프리미티브 폴백 공유 머티리얼
     private static MaterialPropertyBlock _mpb;         // 재사용 — 매 스폰 alloc 회피
 
+    /// <summary>지금 주입된 원 · 화살표 재질(없으면 null) — 잠깐 바꿔 쓰는 쪽이 끝나고 돌려놓을 때 읽는다(이벤트방 놀이).</summary>
+    public static Material CircleMaterial => _circleSource;
+    public static Material ArrowMaterial  => _arrowSource;
+
     /// <summary>SkillIndicator 머티리얼을 주입한다. null 전달 시 프리미티브 폴백으로 동작.</summary>
     public static void SetMaterials(Material circle, Material arrow)
     {

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -20,6 +21,7 @@ public class LichSkeletonMonster : MonsterBase
     private const float RiseSeconds   = 0.8f;  // 바닥에서 떠오르는 시간 — 그동안 이동·공격 없음
     private const float RiseDepth     = 1.8f;  // 바닥 아래 이만큼에서 시작
     private const float DefaultReach  = 2.4f;  // 공격 모양이 부채꼴이 아닐 때 베기 이펙트 반경
+    private const float DespawnDissolve = 0.6f; // 정리(전환 · 수명 · 상한 · 전투 끝)도 디졸브로 — 툭 꺼지지 않게(10-03)
 
     // ── MonsterBase 추상 멤버 ─────────────────────────────
     protected override string ConfigAddress   => "LichSkeleton/LichSkeletonConfig";
@@ -48,6 +50,7 @@ public class LichSkeletonMonster : MonsterBase
     private float _riseTimer;
     private bool  _hitWasDealt;   // 공격 판정 순간 감지(이번 공격의 판정이 났는가)
     private bool  _nameCleared;   // 머리 위 이름을 지웠다(스폰마다 한 번)
+    private bool  _leaving;       // 디졸브로 사라지는 중 — 멈춰 선다(10-03)
 
     // ── 수명주기 ──────────────────────────────────────────
 
@@ -62,10 +65,13 @@ public class LichSkeletonMonster : MonsterBase
         _riseTimer       = RiseSeconds;
         _hitWasDealt     = false;
         _nameCleared     = false;
+        _leaving         = false;
         transform.position += Vector3.down * RiseDepth;   // 바닥 아래에서 떠오른다
         Live.Add(this);
         EnforceCap();
         OnDied += HandleDied;
+        // 바닥에서 솟으며 디졸브로 드러난다(10-03 — 몬스터도 툭 생기지 않게). 풀 반환 시 ActivationToken이 복원 레이스를 막는다.
+        DissolveEffect.PlayAppear(gameObject, RiseSeconds, null, ActivationToken);
     }
 
     protected override void OnDisable()
@@ -77,6 +83,7 @@ public class LichSkeletonMonster : MonsterBase
 
     protected override void Update()
     {
+        if (_leaving) return;   // 디졸브로 사라지는 중 — 이동 · 공격 없음
         if (_riseTimer > 0f)
         {
             TickRise();
@@ -206,13 +213,31 @@ public class LichSkeletonMonster : MonsterBase
 
     // ── 정적 관리 ──────────────────────────────────────────
 
+    /// <summary>
+    /// 살아 있는 해골이 <paramref name="p"/> 수평 <paramref name="radius"/> 안에 있는가(사라지는 중 · 죽은 해골 제외)
+    /// — 리치 속박탄이 「묶인 채 해골에 맞는」 자리를 피한다(10-02).
+    /// </summary>
+    public static bool AnyNear(Vector3 p, float radius)
+    {
+        float r2 = radius * radius;
+        for (int i = 0; i < Live.Count; i++)
+        {
+            var s = Live[i];
+            if (s == null || s._leaving || s.IsDead) continue;
+            Vector3 d = s.transform.position - p;
+            d.y = 0f;
+            if (d.sqrMagnitude <= r2) return true;
+        }
+        return false;
+    }
+
     /// <summary>전투 종료(보스 퇴각·사망) 시 생존 해골을 모두 정리한다.</summary>
     public static void DespawnAll()
     {
         for (int i = Live.Count - 1; i >= 0; i--)
         {
             var s = Live[i];
-            if (s != null) Managers.ObjectPooler.Despawn(s.gameObject);
+            if (s != null) s.DissolveOut();
         }
         Live.Clear();
     }
@@ -233,7 +258,18 @@ public class LichSkeletonMonster : MonsterBase
     private static void Cull(LichSkeletonMonster s)
     {
         Live.Remove(s);
-        if (s != null) Managers.ObjectPooler.Despawn(s.gameObject);
+        if (s != null) s.DissolveOut();
+    }
+
+    /// <summary>디졸브로 사라진 뒤 풀에 돌려준다 — 그동안 멈춰 선다. 처치 디졸브와 같은 경로(재질 복원 · 겹침 차단). 앱 종료 중이면 바로.</summary>
+    private void DissolveOut()
+    {
+        if (_leaving) return;
+        _leaving = true;
+        var go = gameObject;
+        if (Managers.Instance == null) { Destroy(go); return; }
+        DissolveEffect.PlayDeathDissolveAsync(go, DespawnDissolve,
+            () => { if (go != null) Managers.ObjectPooler.Despawn(go); }, ActivationToken).Forget();
     }
 }
 

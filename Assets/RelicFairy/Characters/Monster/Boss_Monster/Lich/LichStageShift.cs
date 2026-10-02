@@ -26,6 +26,7 @@ public static class LichStageShift
     private const float LightIntensity = 30f;
     private const float LightHeight    = 11f;    // 석상 가슴~두건 높이(m) — ×8 석상은 두건이 어두웠다(09-19)
     private const float LightForward   = 5f;     // 석상 앞(제단 쪽)으로
+    private const float VanishSeconds  = 1.5f;   // 전투가 끝나면 디졸브로 스러진다(10-03 — 툭 꺼졌다)
     private static readonly Color LightColor = new(1f, 0.25f, 0.3f);
 
     private static readonly List<GameObject> s_monuments = new();
@@ -76,14 +77,14 @@ public static class LichStageShift
         return collapsed;
     }
 
-    /// <summary>석상을 걷는다 — 전투가 끝나거나 리치가 꺼질 때.</summary>
+    /// <summary>석상을 걷는다 — 전투가 끝나거나 리치가 꺼질 때. 디졸브로 스러진 뒤 파괴된다.</summary>
     public static void Clear()
     {
         s_cts?.Cancel();
         s_cts?.Dispose();
         s_cts = null;
         for (int i = 0; i < s_monuments.Count; i++)
-            if (s_monuments[i] != null) Object.Destroy(s_monuments[i]);
+            LichPatternUtil.DissolveAndDestroy(s_monuments[i], s_monuments[i], VanishSeconds);
         s_monuments.Clear();
     }
 

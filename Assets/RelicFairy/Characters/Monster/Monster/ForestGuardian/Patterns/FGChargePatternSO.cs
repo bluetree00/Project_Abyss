@@ -13,6 +13,7 @@ namespace RelicFairy.Monster
 ///        → Recovery → ChaseState.
 /// 회피  : 방향이 고정된 뒤 옆으로 비키면 피한다(돌진 중 추적 없음).
 /// 이동  : FullLock — 경직·중단 불가. 이동은 이 상태가 NavMeshAgent.Move로 직접 한다.
+/// 악몽  : 돌진이 끝나면 실제로 지나간 길에 가시 줄(「흔적」 — ForestGuardianMonster.LeaveChargeTrail).
 /// </summary>
 [CreateAssetMenu(menuName = "RelicFairy/Boss/ForestGuardian/FG_ChargePattern", fileName = "FG_ChargePattern")]
 public class FGChargePatternSO : BossPatternSO
@@ -90,6 +91,10 @@ public class FGChargeState : FullLockState<FGChargePatternSO>
 {
     private const string AnimReady  = "AttackReady";
     private const string AnimCharge = "Charge";
+    private const float  YankFraction = 0.6f;   // 봉인기: 돌진 길이의 이만큼에서 사슬이 당긴다(10-03 S2)
+    private const float  YankStagger  = 1.0f;
+    private const float  YankPullTime = 0.18f;  // 사슬에 끌려 뒤로 밀리는 시간
+    private const float  YankPullSpeed = 3f;
 
     private enum Phase { Windup, Charge, Recovery }
 
@@ -101,6 +106,12 @@ public class FGChargeState : FullLockState<FGChargePatternSO>
     private float      _length;
     private float      _moved;
     private GameObject _guideGO;
+    private bool       _yanked;
+    private float      _extraRecovery;
+    private Vector3    _chargeFrom;      // 이번 돌진이 실제로 출발한 자리(악몽 특성 「흔적」)
+
+    // 가이드 = 돌진 거리 + 몸 판정 반경 — 멈춘 자리에서도 hitRadius만큼 닿는다(10-02 시뮬: 가이드 끝 1.25 m 앞에서 피격)
+    private float GuideLength => _length + Data.hitRadius;
 
     public FGChargeState(FGChargePatternSO data) : base(data) { }
 
@@ -111,6 +122,8 @@ public class FGChargeState : FullLockState<FGChargePatternSO>
         _locked = false;
         _hasHit = false;
         _moved  = 0f;
+        _yanked = false;
+        _extraRecovery = 0f;
 
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
         {
@@ -121,7 +134,7 @@ public class FGChargeState : FullLockState<FGChargePatternSO>
         FacePlayer(ctx, 360f);
         Aim(ctx);
         _guideGO = PatternGuideHelper.Prepare(
-            PatternGuideHelper.Beam(ctx.Transform.position, _dir, _length, Data.width, PatternGuideHelper.Telegraph),
+            PatternGuideHelper.Beam(ctx.Transform.position, _dir, GuideLength, Data.width, PatternGuideHelper.Telegraph),
             ForestGuardianMonster.GuideFlow);
         PlayAnim(ctx, AnimReady);
     }
@@ -139,7 +152,7 @@ public class FGChargeState : FullLockState<FGChargePatternSO>
                 {
                     FacePlayer(ctx, Data.windupTurnSpeed * Time.deltaTime);
                     Aim(ctx);
-                    PatternGuideHelper.PlaceBeam(_guideGO, ctx.Transform.position, _dir, _length, Data.width);
+                    PatternGuideHelper.PlaceBeam(_guideGO, ctx.Transform.position, _dir, GuideLength, Data.width);
                     if (_timer >= Data.windupDuration - Data.lockDuration)
                     {
                         _locked = true;
@@ -153,6 +166,7 @@ public class FGChargeState : FullLockState<FGChargePatternSO>
                 {
                     _phase = Phase.Charge;
                     _timer = 0f;
+                    _chargeFrom = ctx.Transform.position;
                     PlayAnim(ctx, AnimCharge);
                 }
                 break;
@@ -163,8 +177,8 @@ public class FGChargeState : FullLockState<FGChargePatternSO>
                 float step = Data.chargeSpeed * dt;
                 if (_moved + step > _length) step = Mathf.Max(0f, _length - _moved);
                 Vector3 before = ctx.Transform.position;
+                // NavMesh 밖이면 움직이지 않는다 — 맨 위치 덧셈은 벽을 뚫는다(09-30). 아래 「막힘」 판정이 돌진을 끝내고 아레나 가드가 안쪽으로 되돌린다.
                 if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.Move(_dir * step);
-                else ctx.Transform.position += _dir * step;
                 float actual = Vector3.Distance(Flat(before), Flat(ctx.Transform.position));
                 _moved += step;
 
@@ -174,6 +188,14 @@ public class FGChargeState : FullLockState<FGChargePatternSO>
                 bool blocked = step > 0.05f && actual < step * 0.3f;
                 if (_moved >= _length - 0.01f || blocked)
                 {
+                    // 악몽 특성 「흔적」 — 멈춘 자리까지 실제로 지나간 길(사슬에 끌려 물러나기 전)
+                    (ctx.Monster as ForestGuardianMonster)?.LeaveChargeTrail(_chargeFrom, ctx.Transform.position);
+                    // 봉인기 — 옛 봉인 사슬이 당겨 돌진이 끊긴다(가이드도 이 길이로 그렸다)
+                    if (!blocked && IsBound(ctx))
+                    {
+                        _yanked        = true;
+                        _extraRecovery = BossBinding.Of(ctx.Monster).Yank(YankStagger);
+                    }
                     _phase = Phase.Recovery;
                     _timer = 0f;
                     PatternGuideHelper.SafeDestroy(ref _guideGO);
@@ -184,7 +206,9 @@ public class FGChargeState : FullLockState<FGChargePatternSO>
 
             // ── Recovery ──
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_yanked && _timer < YankPullTime && ctx.Agent != null && ctx.Agent.isOnNavMesh)
+                    ctx.Agent.Move(-_dir * YankPullSpeed * dt);   // 사슬에 끌려 뒤로
+                if (_timer >= Data.recoveryDuration + _extraRecovery)
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -211,6 +235,7 @@ public class FGChargeState : FullLockState<FGChargePatternSO>
 
         if (NavMesh.Raycast(from, from + _dir * _length, out var hit, NavMesh.AllAreas))
             _length = Mathf.Max(0f, hit.distance - Data.stopBeforeEdge);
+        if (IsBound(ctx)) _length *= YankFraction;   // 봉인기 — 사슬이 닿는 데까지만
     }
 
     private void TryHit(MonsterContext ctx)
@@ -243,6 +268,10 @@ public class FGChargeState : FullLockState<FGChargePatternSO>
     }
 
     private static Vector3 Flat(Vector3 v) { v.y = 0f; return v; }
+
+    /// <summary>봉인기에 옛 봉인 사슬이 감겨 있는가(10-03 S2).</summary>
+    private static bool IsBound(MonsterContext ctx)
+        => !StoryProgress.IsLiberated && BossBinding.Of(ctx.Monster)?.IsBound == true;
 
     private static void PlayAnim(MonsterContext ctx, string stateName)
     {

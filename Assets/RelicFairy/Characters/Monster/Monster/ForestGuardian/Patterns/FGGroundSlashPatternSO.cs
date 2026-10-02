@@ -110,6 +110,7 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
     private int        _hitIndex;
     private bool       _vfxFired;
     private GameObject _warningGO;
+    private Vector3    _origin;   // 이번 타 가이드를 깐 자리 — 판정도 여기서(가이드 = 판정)
 
     public FGGroundSlashState(FGGroundSlashPatternSO data) : base(data) { }
 
@@ -210,7 +211,8 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
         if (ctx.Config?.stat == null || ctx.Runtime.PlayerTarget == null) return;
 
         // XZ 평면 거리로 판정 — 공중에 뜬 플레이어의 Y가 링 범위를 벗어나는 문제 방지
-        Vector3 bossPos   = ctx.Transform.position;
+        // 중심 = 가이드를 깐 자리(예고 동안 보스가 미끄러져도 가이드 그대로, 10-01 실측)
+        Vector3 bossPos   = _origin;
         Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
         float   dx        = playerPos.x - bossPos.x;
         float   dz        = playerPos.z - bossPos.z;
@@ -241,8 +243,9 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
     {
         // 1~3타 모두 0~판정 반경 전체 — 가이드 = 피격 범위 일치
         PatternGuideHelper.SafeDestroy(ref _warningGO);
+        _origin    = ctx.Transform.position;
         _warningGO = PatternGuideHelper.Prepare(
-            PatternGuideHelper.Disc(ctx.Transform.position, Data.GetHitRange(hitIndex), PatternGuideHelper.Telegraph),
+            PatternGuideHelper.Disc(_origin, Data.GetHitRange(hitIndex), PatternGuideHelper.Telegraph),
             ForestGuardianMonster.GuideFlow);
     }
 

@@ -48,6 +48,8 @@ public class BossPageTransitionPatternSO : BossPatternSO
     [Header("이펙트")]
     public GameObject roarVfxPrefab;
     public float      roarVfxScale = 1f;
+    [Tooltip("포효 이펙트 빛깔(입자 시작색에 곱한다) — 알파 0이면 원래 빛깔. 알파를 낮추면 흐려진다")]
+    public Color      roarVfxTint  = Color.clear;
     public Color      flashColor   = new Color(1f, 0.9f, 0.8f);
     public AudioClip  roarSfx;
 
@@ -163,7 +165,10 @@ public sealed class BossPageTransitionState : SpecialStateBase
             // ② 로우 앵글 — 첫 관람만.
             if (full)
             {
-                var (lowPos, lowLook) = ClearShot(look, B + dir * 4.5f + side * 1.2f + Vector3.up * 0.6f, look);
+                // 각성이면 보스 몸 전체를 잡는다(로우 앵글 4.5 m는 큰 보스를 잘랐다 — 10-01)
+                var (lowPos, lowLook) = awaken
+                    ? BossStoryScenes.AwakenShot(bossId, B, dir)
+                    : ClearShot(look, B + dir * 4.5f + side * 1.2f + Vector3.up * 0.6f, look);
                 await LichCinematics.ShotAsync(lowPos, lowLook, _data.lowShotSeconds, ct);
                 if (awaken) await BossStoryScenes.AwakenAsync(ctx.Transform, bossId, _data.bodyHeight, ct);
                 else        await UniTask.Delay(TimeSpan.FromSeconds(_data.lowShotHold), DelayType.UnscaledDeltaTime, cancellationToken: ct);
@@ -186,6 +191,7 @@ public sealed class BossPageTransitionState : SpecialStateBase
             {
                 var fx = UnityEngine.Object.Instantiate(_data.roarVfxPrefab, R, Quaternion.identity);
                 fx.transform.localScale = Vector3.one * _data.roarVfxScale;
+                ToneRoarVfx(fx, _data.roarVfxTint);
                 UnityEngine.Object.Destroy(fx, 5f);
             }
             if (_data.roarSfx != null) Managers.Sound?.PlayEffectAt(_data.roarSfx, R);
@@ -233,6 +239,24 @@ public sealed class BossPageTransitionState : SpecialStateBase
         return Physics.Linecast(body, desired, out var hit, mask, QueryTriggerInteraction.Ignore)
             ? (hit.point - off.normalized * 0.6f, look)
             : (desired, look);
+    }
+
+    /// <summary>
+    /// 포효 이펙트 톤 — 굴절층(URP에서 흰 덩어리로 뜬다)을 끄고, 빛깔이 있으면 입힌다.
+    /// 10-01 f5 전주기 시뮬: 기사 포효(SSEP 27)의 자홍 칼날 조각이 화면을 덮고 가운데가 흰 빛 덩어리로 날았다.
+    /// </summary>
+    private static void ToneRoarVfx(GameObject fx, Color tint)
+    {
+        foreach (var r in fx.GetComponentsInChildren<Renderer>(true))
+        {
+            var m = r.sharedMaterial;
+            if (m != null && m.shader != null && m.shader.name.IndexOf("Distortion", StringComparison.OrdinalIgnoreCase) >= 0)
+                r.enabled = false;
+        }
+        if (tint.a <= 0f) return;
+        var cache = fx.AddComponent<LichVfxScaleCache>();
+        cache.Prepare(false);
+        cache.ApplyTint(tint);
     }
 
     private static void Play(MonsterContext ctx, string state, float speed)

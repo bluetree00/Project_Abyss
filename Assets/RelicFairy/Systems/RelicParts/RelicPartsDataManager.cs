@@ -6,13 +6,14 @@ using LitJson;
 using UnityEngine;
 
 /// <summary>
-/// 뒤끝 CDN에서 RELIC_PARTS_DATA 차트를 로드한다.
-/// relic_id + part_kind + boss_tier로 드래프트 후보 풀을 제공한다.
+/// 뒤끝 CDN에서 RELIC_PARTS_DATA 차트를 로드한다(유물 기억 조각 — 유물 성장 v2).
 ///
 /// 로드 우선순위: 로컬 캐시 JSON → CDN → Addressables 폴백(오프라인).
 /// RelicAwakeningDataManager와 동일한 패턴.
 ///
-/// CSV 컬럼: index | relic_id | part_kind | part_id | part_name | description | effect_key | boss_tier
+/// <b>스키마 문(10-02 v2)</b>: 매달리는 자리(<c>anchor</c>)가 없는 행은 v1 파츠라 버린다.
+/// CDN에 옛 14행 차트가 그대로 남아 있어도 프로젝트 JSON(42행)으로 떨어지게 하려는 것 — 새 CSV를 올리면 그때부터 CDN이 이긴다.
+/// 컬럼은 <see cref="RelicPartEntry"/> 머리말.
 /// </summary>
 public sealed class RelicPartsDataManager
 {
@@ -27,6 +28,9 @@ public sealed class RelicPartsDataManager
     private readonly Dictionary<string, List<RelicPartEntry>> _byRelic = new();
 
     public bool IsInitialized { get; private set; }
+
+    /// <summary>스키마 문이 버린 옛(v1) 행 수 — 실측 · 로그용.</summary>
+    public int RejectedLegacyRows { get; private set; }
 
     // ── 초기화 ──────────────────────────────────────────────────────────────
 
@@ -62,8 +66,13 @@ public sealed class RelicPartsDataManager
         return _byId.TryGetValue(partId, out var e) ? e : null;
     }
 
+    /// <summary>유물 하나의 조각 전부(데이터 순서). 없으면 빈 목록.</summary>
+    public IReadOnlyList<RelicPartEntry> GetByRelic(string relicId)
+        => !string.IsNullOrEmpty(relicId) && _byRelic.TryGetValue(relicId, out var list) ? list : (IReadOnlyList<RelicPartEntry>)System.Array.Empty<RelicPartEntry>();
+
     /// <summary>
-    /// 드래프트 후보 풀 — 해당 유물의 파츠 중 boss_tier가 일치하고, 이미 보유하지 않았으며,
+    /// [옛 v1] 드래프트 후보 풀 — v2 카드는 <see cref="RelicDraftComposer"/>가 만든다. 실측 도구 호환으로만 남는다.
+    /// 해당 유물의 파츠 중 boss_tier가 일치하고, 이미 보유하지 않았으며,
     /// 선행 파츠(requires) 요구를 충족한 것. bossTier 1 = 기능 파츠, 3 = 코어 진화(데이터 boss_tier).
     /// requires는 CSV 컬럼 — 값이 있으면 그 part_id를 보유해야 후보에 오른다(죽은 픽 방지).
     /// </summary>
@@ -96,6 +105,7 @@ public sealed class RelicPartsDataManager
     private void Register(RelicPartEntry entry)
     {
         if (entry == null || string.IsNullOrEmpty(entry.part_id) || string.IsNullOrEmpty(entry.relic_id)) return;
+        if (!entry.IsV2) { RejectedLegacyRows++; return; }   // 스키마 문 — v1 행은 버린다
 
         _byId[entry.part_id] = entry;
 
@@ -111,6 +121,7 @@ public sealed class RelicPartsDataManager
     {
         _byId.Clear();
         _byRelic.Clear();
+        RejectedLegacyRows = 0;
     }
 
     private void LoadFromJson()
@@ -138,13 +149,16 @@ public sealed class RelicPartsDataManager
     {
         ClearAll();
 
-        int loaded = ChartLoader.Load(ChartName, row =>
+        ChartLoader.Load(ChartName, row =>
         {
             var entry = ParseRow(row);
             if (entry != null) Register(entry);
         });
 
-        if (loaded > 0) SaveToJson();
+        // v2 행이 하나라도 들어왔을 때만 캐시를 갈아 끼운다 — 옛 CDN만 있으면 v2 캐시를 지우지 않는다.
+        if (_byId.Count > 0) SaveToJson();
+        else if (RejectedLegacyRows > 0)
+            Debug.Log($"[RelicPartsDataManager] CDN 행 {RejectedLegacyRows}개가 옛 스키마(anchor 없음) — 프로젝트 JSON으로 간다");
 
         await UniTask.CompletedTask;
     }
@@ -167,6 +181,14 @@ public sealed class RelicPartsDataManager
                 effect_key  = row.TryGetString("effect_key"),
                 boss_tier   = row.TryGetInt("boss_tier"),
                 requires    = row.TryGetString("requires"),   // 컬럼 없으면 빈 문자열(선행조건 없음)
+                anchor              = row.TryGetString("anchor"),
+                rune_element        = row.TryGetString("rune_element"),
+                line1               = row.TryGetString("line1"),
+                line2               = row.TryGetString("line2"),
+                line3               = row.TryGetString("line3"),
+                memory_line         = row.TryGetString("memory_line"),
+                memory_line_radiant = row.TryGetString("memory_line_radiant"),
+                build_family        = row.TryGetString("build_family"),
             };
         }
         catch { return null; }

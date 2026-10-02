@@ -378,9 +378,9 @@ internal sealed class DragonBlackSunState : FullLockState<DragonBlackSunPatternS
         var stats  = player != null ? player.RuntimeStats : null;
         if (stats != null)
         {
-            // 즉사하지 않음 — 남은 체력 − 1로 자른다(방어력 · 피해 감소는 더 깎을 뿐이다)
-            int raw = Mathf.RoundToInt(stats.MaxHp * Data.FailMaxHpRatio);
-            int dmg = Mathf.Min(raw, stats.Hp - 1);
+            // 최대 체력 비율 — 방어로 다시 깎이지 않게(10-01) · 즉사하지 않음(방어 뒤 남은 체력 − 1로 자른다)
+            int raw = BossMaxHpDamage.Raw(player, Data.FailMaxHpRatio);
+            int dmg = BossMaxHpDamage.NonLethal(player, raw);
             bool dodged = player.IsInvincible;
             if (dmg > 0) player.TakeDamage(dmg, ctx.Monster.gameObject, true, HitWeight.Heavy);
             if (!dodged) DragonAbyssFx.Knockback(ctx, player, new Vector3(at.x, _floorY, at.z), Data.FailKnockbackMult);

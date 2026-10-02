@@ -26,13 +26,13 @@ MonoBehaviour:
   chargeCount: 3
   firstWindup: 0.8
   followWindup: 0.55
-  lockDuration: 0.4
+  lockDuration: 0.5
   windupTurnSpeed: 300
   recoveryDuration: 0.8
   chargeSpeed: 17
   overshoot: 3
   stopBeforeEdge: 1.5
-  width: 2.6
+  width: 3.6
   damageMultiplier: 1.2
   knockbackMultiplier: 1.6
   hitRadius: 1.8

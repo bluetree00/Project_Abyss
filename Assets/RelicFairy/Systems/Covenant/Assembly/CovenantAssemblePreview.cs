@@ -30,7 +30,7 @@ public readonly struct CovenantAssemblePreview
 
     private CovenantAssemblePreview(
         CovenantPalette.CauseDef c, CovenantTier ct,
-        CovenantPalette.EffectDef e, CovenantTier et)
+        CovenantPalette.EffectDef e, CovenantTier et, float posMult = 1f)
     {
         valid       = true;
         category    = c.category;
@@ -39,8 +39,11 @@ public readonly struct CovenantAssemblePreview
         effectName  = e.name; effectDesc = e.desc; effectTag = e.tag; effectTier = et;
         effectKind  = e.kind;
         magnitude   = CovenantMath.RawMag(e, et);
-        effective   = CovenantMath.Effective(e, et, c, ct);
-        effectiveCount = CovenantMath.EffectiveCount(e, et, c, ct);
+        // 서약서 절 위치 배율(결과 1 = 1 · 2 = 0.85 …) — 런타임 CovenantClause와 같은 식
+        effective   = CovenantMath.Effective(e, et, c, ct) * posMult;
+        effectiveCount = posMult >= 1f
+            ? CovenantMath.EffectiveCount(e, et, c, ct)
+            : UnityEngine.Mathf.Max(1, UnityEngine.Mathf.FloorToInt(CovenantMath.EffectiveCount(e, et, c, ct) * posMult));
         radius      = CovenantMath.EffectiveRadius(e);
         duration    = e.duration;
         axis        = e.axis;
@@ -57,6 +60,16 @@ public readonly struct CovenantAssemblePreview
         if (CovenantPalette.TryGetCause(causeId, out var c) &&
             CovenantPalette.TryGetEffect(effectId, out var e))
             return new CovenantAssemblePreview(c, causeTier, e, effectTier);
+        return default;
+    }
+
+    /// <summary>서약서 절의 유효 수치 미리보기 — 절 위치 배율(<see cref="CovenantGrammar.PositionMult"/>)을 곱한다.</summary>
+    public static CovenantAssemblePreview Build(string causeId, CovenantTier causeTier,
+                                                string effectId, CovenantTier effectTier, float posMult)
+    {
+        if (CovenantPalette.TryGetCause(causeId, out var c) &&
+            CovenantPalette.TryGetEffect(effectId, out var e))
+            return new CovenantAssemblePreview(c, causeTier, e, effectTier, posMult);
         return default;
     }
 

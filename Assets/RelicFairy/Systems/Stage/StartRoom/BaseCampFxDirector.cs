@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -44,6 +45,15 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     private const float PartsLightMax = 2.5f;
     private const float PartsMoteRate = 6f;
     private const float LoadingWaitMax = 6f;
+    private const float NightmareLookSeconds   = 1.2f;   // 갈림길에서 고를 때 게이트가 물드는 시간
+    private const float NightmareRevealSeconds = 1.2f;   // 갈림길이 드러나는 디졸브
+    private const float NightmareCrystalLift   = 0.85f;  // 받침 윗면에서 수정 중심까지 — 받침 테두리에 가려지지 않게
+    private const float NightmarePlateHeight   = 3.3f;   // 성문 앞 마커 위 「악몽」 이름판 — 카메라는 발 +4.8 m 위를 못 잡는다
+    private const float NightmareCrystalGlow   = 2.2f;   // 수정 발광 배율
+    private const string PortalEdgeName = "Arcane_Portal";
+    private static readonly string[] PortalLightNames = { "PortalLight", "GateInnerLight" };
+    private static readonly int BaseColorId     = Shader.PropertyToID("_BaseColor");
+    private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
     // 성문 막 세로 3단 — 높이 비율과 알파 비율(아래·중간 진하게, 위만 투명)
     private const int VeilRows = 3;
     private static readonly float[] VeilRowHeights = { 0f, 0.55f, 1f };
@@ -113,10 +123,31 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     [Header("⑧ 장비 → 파츠 — 원거리 무기를 얻으면 바닥 빛 길이 파츠 공방으로 이어지고 받침이 빛난다")]
     [Tooltip("옛 파츠 궤도 구슬(프리팹 Dressing/FX/PartsOrbital, Hovl Buff orbital) — 글자 박힌 큰 구슬이 튀고 뜻이 애매해(09-29 사용자) 이제 켜지 않는다. 시작할 때 끈다. 공방·작업대 위치는 runeTargets 0·1")]
     [SerializeField] private GameObject partsOrbital;
+    [Tooltip("파츠 공방 바닥 마법진 — Hovl Magic circle electro loop(푸른빛 룬 고리). 09-30: 처음 고른 금빛 circle 9는 게임 화면에서 불꽃처럼 솟아 대장간 불과 겹쳤다(사용자) → 후보 24개를 파츠 자리에 세워 게임 화면으로 비교해 고름. 비면 빛 고리 선으로 대신한다")]
+    [SerializeField] private GameObject partsCirclePrefab;
+    [SerializeField] private float partsCircleScale = 1.8f;
+    [Tooltip("파츠 공방 빛(바닥 길·광원·오르는 빛) — 공방 = 주황 불, 유물 = 금·보라 기둥과 갈리게 푸른빛")]
+    [SerializeField] private Color partsGlowColor = new(0.6f, 0.8f, 1f, 1f);
     [SerializeField] private float descentExposure = -1.6f;
     [SerializeField] private float descentVignette = 0.4f;
     [SerializeField] private Color abyssWipeColor = new(0.16f, 0.08f, 0.26f);
     [SerializeField] private float abyssWipeDuration = 0.7f;
+
+    [Header("⑨ 악몽 모드 갈림길 — 엔딩 뒤 출발 게이트 곁(순환 개정 v3 D3)")]
+    [Tooltip("받침 — 성소와 같은 석재(Leartes SM_Statue_Base_1)")]
+    [SerializeField] private GameObject nightmarePedestalPrefab;
+    [Tooltip("수정 — 기억 성소와 같은 결(Hovl HOVLCrystalPiese)")]
+    [SerializeField] private GameObject nightmareCrystalPrefab;
+    [Tooltip("수정 재질 — 발광 Lit(SanctumCrystal). 색은 MaterialPropertyBlock으로")]
+    [SerializeField] private Material nightmareCrystalMaterial;
+    [Tooltip("성문 앞 마커(GateFront) 로컬 — 통로 옆, 걷는 길 밖")]
+    [SerializeField] private Vector3 nightmareStationLocal = new(-4.6f, 0f, -2.4f);
+    [SerializeField] private float nightmarePedestalScale = 1f;
+    [SerializeField] private float nightmareCrystalScale = 0.6f;
+    [Tooltip("빛 색(등불 · 통로 빛 · 포탈 · 수정) — 황혼 보라~진홍, 원색 빨강 금지. 블룸을 받으니 금빛 등불과 밝기를 맞춰 깊게(10-01 f5 검토)")]
+    [SerializeField] private Color nightmareColor = new(0.56f, 0.22f, 0.48f, 1f);
+    [Tooltip("글자 색(성문 위 「악몽」 · 갈림길 창 강조) — 빛보다 밝아야 읽힌다")]
+    [SerializeField] private Color nightmareTextColor = new(0.70f, 0.30f, 0.60f, 1f);
 
     private bool _conjurePending;
     private bool _conjuring;
@@ -134,6 +165,8 @@ public sealed class BaseCampFxDirector : MonoBehaviour
 
     private bool _partsAwake;
     private LineRenderer _partsRing;
+    private GameObject _partsCircle;
+    private ParticleSystem[] _partsCircleSystems;
     private Light _partsLight;
     private ParticleSystem _partsMotes;
     private float _partsGlow;                    // 0 꺼짐 ~ 1 켜짐
@@ -155,6 +188,20 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     private bool _enteringAbyss;
     private int _acquireInFlight;
 
+    // 악몽 모드 겉모습 — 열린 성문 빛 · 포탈(결계 띠 · 빛)을 물들인다
+    private Color _openColor;                     // 열린 성문 빛(평소 runeLitColor, 악몽이면 nightmareColor)
+    private float _nightmareK;                    // 0 평소 ~ 1 악몽
+    private CancellationTokenSource _nightmareCts;
+    private ArcaneEdge _portalEdge;
+    private Color _portalBand, _portalVeil, _portalMote;
+    private Light[] _portalLights;
+    private Color[] _portalLightColors;
+    private readonly ParticleSystem[] _archLitPs = new ParticleSystem[2];
+    private readonly ParticleSystem[] _archDimPs = new ParticleSystem[2];
+    private readonly Light[] _archLitLight = new Light[2];
+    private TextMeshPro _nightmarePlate;          // 성문 위 「악몽」 한 줄(켠 상태에서만 보임)
+    private Transform _camT;
+
     private Volume _descentVolume;
     private VolumeProfile _descentProfile;
     private float _descentWeight = -1f;
@@ -173,6 +220,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
 
         _conjurePending = PlayerPrefs.GetInt(ConjureKey(), 0) == 0;
         if (_conjurePending) SetStationsActive(false);
+        _openColor = runeLitColor;
     }
 
     private void Start()
@@ -180,13 +228,21 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         if (abyssSign != null) _abyssClosedSubtitle = abyssSign.Subtitle;
         if (partsOrbital != null) partsOrbital.SetActive(false);   // 옛 궤도 구슬 — 이제 켜지 않는다(파츠 받침 빛이 대신, UpdateReadyRunes)
         BuildReadyRunes();
+        // 목표 길잡이(미완료 구간 표식 + 할 일 줄) — 공방·파츠 공방·성문 자리는 준비 룬과 같은 자리를 쓴다
+        gameObject.AddComponent<BaseCampObjectiveGuide>().Setup(this,
+            runeTargets != null && runeTargets.Length > 0 ? runeTargets[0] : null,
+            runeTargets != null && runeTargets.Length > 1 ? runeTargets[1] : null, gateFront);
         BuildGateVeil();
         BuildDescentVolume();
+        CacheNightmareTargets();
+        ApplyNightmareLook(StoryProgress.IsNightmareMode, animate: false);
+        BuildNightmareStation();
         if (_conjurePending) WaitForPlazaSpawnAsync(_destroyCt).Forget();
     }
 
     private void Update()
     {
+        BillboardNightmarePlate();
         UpdateReadyRunes();
         UpdateGateNotice();
         UpdateDescentDarkness();
@@ -205,6 +261,8 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         _gateCts?.Dispose();
         _partsGlowCts?.Cancel();
         _partsGlowCts?.Dispose();
+        _nightmareCts?.Cancel();
+        _nightmareCts?.Dispose();
         if (_veilMesh != null) Destroy(_veilMesh);
         if (_descentProfile != null) Destroy(_descentProfile);
         if (ReferenceEquals(Instance, this)) Instance = null;
@@ -219,6 +277,20 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         foreach (AcquireKind k in Enum.GetValues(typeof(AcquireKind)))
             PlayerPrefs.DeleteKey(AcquireKeyPrefix + slot + "_" + k);
         PlayerPrefs.Save();
+    }
+
+    /// <summary>
+    /// 악몽 모드 겉모습 — 켜져 있으면 열린 성문의 빛(아치 등불 · 통로 빛 · 빨려 드는 빛)과 포탈(결계 띠 · 빛)을
+    /// 황혼 보라~진홍으로 물들이고 성문 위에 「악몽」 한 줄을 띄운다. 시작할 때와 갈림길에서 고를 때(animate) 부른다.
+    /// </summary>
+    public void ApplyNightmareLook(bool on, bool animate)
+    {
+        _nightmareCts?.Cancel();
+        _nightmareCts?.Dispose();
+        _nightmareCts = CancellationTokenSource.CreateLinkedTokenSource(_destroyCt);
+        float target = on ? 1f : 0f;
+        if (animate) NightmareLookAsync(target, _nightmareCts.Token).Forget();
+        else PaintNightmare(target);
     }
 
     /// <summary>무형검 받기 연출 — <see cref="WorldSwordAwakening"/>이 넘겨받기와 <b>나란히</b> 돌린다. 입력 막음 ≤ 1.5초.</summary>
@@ -748,7 +820,6 @@ public sealed class BaseCampFxDirector : MonoBehaviour
                 path.SetPosition(1, b);
             }
             FadePartsGlow(1f, PartsGlowFade);
-            if (parts != null) FlashAsync(parts.position + Vector3.up * 1.2f, ct, RuneFlashPeak).Forget();
             Debug.Log("[BaseCampFx] 파츠 공방 깨어남 — 바닥 빛 길 + 받침 빛");
 
             if (path == null) return;
@@ -769,7 +840,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     /// <summary>길 색 — 뻗는 머리 쪽이 밝고 꼬리(공방 쪽)는 옅다.</summary>
     private void SetPathColor(LineRenderer lr, float alpha)
     {
-        var c = runeLitColor;
+        var c = partsGlowColor;
         lr.startColor = new Color(c.r, c.g, c.b, alpha * 0.35f);
         lr.endColor = new Color(c.r, c.g, c.b, alpha);
     }
@@ -806,13 +877,22 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         if (parts == null) return false;
         _partsRing = MakeLine("~PartsRing", RingSegments, true);
         if (_partsRing == null) return false;
-        SetRing(_partsRing, parts.position, PartsRingRadius, runeLitColor, 0f);
+        SetRing(_partsRing, parts.position, PartsRingRadius, partsGlowColor, 0f);
+        if (partsCirclePrefab != null)
+        {
+            // 바닥 마법진 — 받침 윗면 바로 위. 꺼 둔 채 만들고 켜질 때 재생한다
+            _partsCircle = Instantiate(partsCirclePrefab, parts.position + Vector3.up * 0.1f, Quaternion.identity);
+            _partsCircle.name = "~PartsCircle";
+            _partsCircle.transform.localScale = Vector3.one * partsCircleScale;
+            _partsCircleSystems = _partsCircle.GetComponentsInChildren<ParticleSystem>(true);
+            _partsCircle.SetActive(false);
+        }
 
         var lightGo = new GameObject("~PartsLight");
         lightGo.transform.position = parts.position + Vector3.up * 1.6f;
         _partsLight = lightGo.AddComponent<Light>();
         _partsLight.type = LightType.Point;
-        _partsLight.color = runeLitColor;
+        _partsLight.color = partsGlowColor;
         _partsLight.range = 7f;
         _partsLight.shadows = LightShadows.None;
         _partsLight.intensity = 0f;
@@ -820,7 +900,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         if (runeGlowMaterial != null)
         {
             _partsMotes = MakeMotes("~PartsMotes", parts, Vector3.up * 0.2f, new Vector3(4.5f, 0.2f, 4.5f), 0f, 2.6f, 0.3f,
-                                    runeLitColor, new Vector3(-0.05f, 0.35f, -0.05f), new Vector3(0.05f, 0.8f, 0.05f));
+                                    partsGlowColor, new Vector3(-0.05f, 0.35f, -0.05f), new Vector3(0.05f, 0.8f, 0.05f));
             _partsMotes.Play();
         }
         return true;
@@ -828,10 +908,28 @@ public sealed class BaseCampFxDirector : MonoBehaviour
 
     private void ApplyPartsGlow(float k)
     {
-        _partsGlow = k;
         var parts = runeTargets[1];
-        SetRing(_partsRing, parts.position, PartsRingRadius, runeLitColor, 0.7f * k);
-        _partsRing.enabled = k > 0.01f;
+        bool on = k > 0.01f;
+        if (_partsCircle != null)
+        {
+            // 마법진이 있으면 선 고리는 쓰지 않는다. 켜질 때 재생, 꺼질 때는 방출만 멈춰 남은 빛이 사그라든 뒤(k = 0) 끈다
+            _partsRing.enabled = false;
+            if (on && !_partsCircle.activeSelf)
+            {
+                _partsCircle.SetActive(true);
+                foreach (var ps in _partsCircleSystems) ps.Play(false);
+            }
+            else if (!on && _partsCircle.activeSelf) _partsCircle.SetActive(false);
+            else if (k < _partsGlow && k < 0.5f)
+                foreach (var ps in _partsCircleSystems)
+                    if (ps.isEmitting) ps.Stop(false, ParticleSystemStopBehavior.StopEmitting);
+        }
+        else
+        {
+            SetRing(_partsRing, parts.position, PartsRingRadius, partsGlowColor, 0.7f * k);
+            _partsRing.enabled = on;
+        }
+        _partsGlow = k;
         if (_partsLight != null) _partsLight.intensity = PartsLightMax * k;
         if (_partsMotes != null)
         {
@@ -1012,10 +1110,10 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         else ApplyGateState(open ? 1f : 0f);
     }
 
-    /// <summary>k 0 = 닫힘, 1 = 열림 — 막 색 보랏빛 → 금빛 · 알파 → 0, 입자 교대, 통로 안 금빛.</summary>
+    /// <summary>k 0 = 닫힘, 1 = 열림 — 막 색 보랏빛 → 금빛(악몽 모드면 악몽 색) · 알파 → 0, 입자 교대, 통로 안 빛.</summary>
     private void ApplyGateState(float k)
     {
-        var c = Color.Lerp(gateVeilColor, runeLitColor, Mathf.Clamp01(k * 1.6f));
+        var c = Color.Lerp(gateVeilColor, _openColor, Mathf.Clamp01(k * 1.6f));
         c.a = gateVeilColor.a * (1f - k);
         PaintVeil(c);
         bool shown = k < 0.999f;
@@ -1052,6 +1150,184 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     }
 
     /// <summary>상자 안에서 자동 방출되는 빛 입자(Glow1cg). 속도는 부모 기준(성문 막은 +Z가 심연 쪽).</summary>
+    // ── ⑨ 악몽 모드 갈림길 ──
+
+    /// <summary>물들일 것들을 한 번 잡아 둔다 — 아치 등불(이 연출이 만든 것) · 포탈 결계 띠와 빛(성소 프리팹, 이름으로).</summary>
+    private void CacheNightmareTargets()
+    {
+        for (int s = 0; s < 2; s++)
+        {
+            if (_archLit[s] != null) { _archLit[s].TryGetComponent(out _archLitPs[s]); _archLit[s].TryGetComponent(out _archLitLight[s]); }
+            if (_archDim[s] != null) _archDim[s].TryGetComponent(out _archDimPs[s]);
+        }
+        if (StoryProgress.IsNightmareModeUnlocked && gateFront != null) BuildNightmarePlate();
+        foreach (var e in FindObjectsByType<ArcaneEdge>(FindObjectsSortMode.None))
+        {
+            if (e.name != PortalEdgeName) continue;
+            _portalEdge = e;
+            _portalBand = e.BandColor;
+            _portalVeil = e.VeilColor;
+            _portalMote = e.MoteColor;
+            break;
+        }
+        _portalLights = new Light[PortalLightNames.Length];
+        _portalLightColors = new Color[PortalLightNames.Length];
+        for (int i = 0; i < PortalLightNames.Length; i++)
+        {
+            var go = GameObject.Find(PortalLightNames[i]);
+            var l = go != null ? go.GetComponentInChildren<Light>() : null;
+            _portalLights[i] = l;
+            if (l != null) _portalLightColors[i] = l.color;
+        }
+    }
+
+    private async UniTaskVoid NightmareLookAsync(float target, CancellationToken ct)
+    {
+        float from = _nightmareK;
+        try
+        {
+            for (float t = 0f; t < NightmareLookSeconds; t += Time.unscaledDeltaTime)
+            {
+                float k = t / NightmareLookSeconds;
+                PaintNightmare(Mathf.Lerp(from, target, k * k * (3f - 2f * k)));
+                await UniTask.Yield(ct);
+            }
+            PaintNightmare(target);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    /// <summary>k 0 = 평소(금빛 성문 · 푸른 포탈) ~ 1 = 악몽(황혼 보라~진홍).</summary>
+    private void PaintNightmare(float k)
+    {
+        _nightmareK = k;
+        _openColor = Color.Lerp(runeLitColor, nightmareColor, k);
+        var dimNm = new Color(nightmareColor.r * 0.8f, nightmareColor.g * 0.8f, nightmareColor.b * 0.8f, runeDimColor.a);
+        Color dim = Color.Lerp(runeDimColor, dimNm, k);
+        for (int s = 0; s < 2; s++)
+        {
+            if (_archLitPs[s] != null) { var m = _archLitPs[s].main; m.startColor = _openColor; }
+            if (_archLitLight[s] != null) _archLitLight[s].color = _openColor;
+            if (_archDimPs[s] != null) { var m = _archDimPs[s].main; m.startColor = dim; }
+        }
+        if (_abyssDraw != null) { var m = _abyssDraw.main; m.startColor = _openColor; }
+        if (_gateLight != null) _gateLight.color = _openColor;
+        if (_portalEdge != null)
+        {
+            var veilNm = new Color(nightmareColor.r, nightmareColor.g, nightmareColor.b, _portalVeil.a);
+            _portalEdge.SetColors(Color.Lerp(_portalBand, nightmareColor, k), Color.Lerp(_portalVeil, veilNm, k), Color.Lerp(_portalMote, nightmareColor, k));
+        }
+        if (_nightmarePlate != null)
+        {
+            var c = nightmareTextColor; c.a = k;
+            _nightmarePlate.color = c;
+            _nightmarePlate.enabled = k > 0.01f;
+        }
+        if (_portalLights == null) return;
+        for (int i = 0; i < _portalLights.Length; i++)
+            if (_portalLights[i] != null) _portalLights[i].color = Color.Lerp(_portalLightColors[i], nightmareColor, k);
+    }
+
+    /// <summary>성문 위 「악몽」 한 줄 — 구역 이름판(심연의 문)은 2차 개편 뒤 평소 숨어 있어 거기 붙이면 보이지 않았다(10-01 실측).</summary>
+    private void BuildNightmarePlate()
+    {
+        var go = new GameObject("~NightmarePlate");
+        go.transform.position = gateFront.position + Vector3.up * NightmarePlateHeight;
+        _nightmarePlate = go.AddComponent<TextMeshPro>();   // transform은 AddComponent 뒤에 잡는다(RectTransform 교체)
+        _nightmarePlate.text             = "악몽";
+        _nightmarePlate.fontSize         = 5f;
+        _nightmarePlate.alignment        = TextAlignmentOptions.Center;
+        _nightmarePlate.textWrappingMode = TextWrappingModes.NoWrap;
+        _nightmarePlate.sortingOrder     = UISortingOrder.WorldLabel;
+        TMPOutlineHelper.ApplySoftShadow(_nightmarePlate);
+        _nightmarePlate.enabled = false;
+    }
+
+    private void BillboardNightmarePlate()
+    {
+        if (_nightmarePlate == null || !_nightmarePlate.enabled) return;
+        if (_camT == null) { var cam = Camera.main; if (cam == null) return; _camT = cam.transform; }
+        _nightmarePlate.transform.rotation = _camT.rotation;
+    }
+
+    /// <summary>
+    /// 엔딩 뒤에만 — 출발 게이트 곁에 받침 + 떠도는 수정 + 빛을 세우고 갈림길(<see cref="BaseCampNightmareToggle"/>)을 붙인다.
+    /// 귀환 대사가 끝난 뒤 디졸브로 드러난다(순간 등장 금지).
+    /// </summary>
+    private void BuildNightmareStation()
+    {
+        if (!StoryProgress.IsNightmareModeUnlocked || gateFront == null) return;
+
+        Vector3 pos = gateFront.TransformPoint(nightmareStationLocal);
+        if (Physics.Raycast(pos + Vector3.up * 4f, Vector3.down, out var hit, 10f, LayerMask.GetMask("Ground"), QueryTriggerInteraction.Ignore))
+            pos.y = hit.point.y;
+        var root = new GameObject("~NightmareCrossroad");
+        root.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(Vector3.ProjectOnPlane(-gateFront.forward, Vector3.up), Vector3.up));
+
+        float top = 1.1f;   // 받침이 없으면 이 높이에 수정
+        if (nightmarePedestalPrefab != null)
+        {
+            var ped = Instantiate(nightmarePedestalPrefab, root.transform);
+            ped.transform.localPosition = Vector3.zero;
+            ped.transform.localScale *= nightmarePedestalScale;
+            float max = pos.y;
+            foreach (var r in ped.GetComponentsInChildren<Renderer>()) max = Mathf.Max(max, r.bounds.max.y);
+            if (max > pos.y + 0.05f) top = max - pos.y;
+        }
+        float crystalY = top + NightmareCrystalLift;
+
+        Transform crystal = null;
+        if (nightmareCrystalPrefab != null)
+        {
+            var c = Instantiate(nightmareCrystalPrefab, root.transform);
+            c.transform.localPosition = Vector3.up * crystalY;
+            c.transform.localScale = Vector3.one * nightmareCrystalScale;
+            foreach (var col in c.GetComponentsInChildren<Collider>()) col.enabled = false;
+            var mpb = new MaterialPropertyBlock();
+            foreach (var r in c.GetComponentsInChildren<Renderer>())
+            {
+                if (nightmareCrystalMaterial != null) r.sharedMaterial = nightmareCrystalMaterial;
+                r.GetPropertyBlock(mpb);
+                mpb.SetColor(BaseColorId, nightmareColor);
+                mpb.SetColor(EmissionColorId, nightmareColor * NightmareCrystalGlow);
+                r.SetPropertyBlock(mpb);
+                r.shadowCastingMode = ShadowCastingMode.Off;
+            }
+            crystal = c.transform;
+        }
+        var glow = MakeRuneGlow("Glow", pos + Vector3.up * crystalY, 1.1f, nightmareColor, true);
+        glow.transform.SetParent(root.transform, true);
+
+        var toggle = root.AddComponent<BaseCampNightmareToggle>();   // 트리거 구는 RequireComponent로 붙는다
+        var trigger = root.GetComponent<SphereCollider>();
+        trigger.radius = 2.4f;
+        trigger.center = Vector3.up;
+        toggle.Setup(this, crystal, nightmareTextColor, crystalY);
+
+        root.SetActive(false);
+        RevealNightmareStationAsync(root, toggle, _destroyCt).Forget();
+    }
+
+    private async UniTaskVoid RevealNightmareStationAsync(GameObject root, BaseCampNightmareToggle toggle, CancellationToken ct)
+    {
+        try
+        {
+            // 귀환 대사(엔딩 에필로그 → 그림자의 「다른 길」)가 끝나고 조작이 풀린 뒤 은은히 드러난다
+            await UniTask.WaitUntil(() => !_conjurePending && !UIInputGate.Blocked
+                                          && (BaseCampBootstrapper.Instance == null || BaseCampBootstrapper.Instance.IsReady),
+                                    cancellationToken: ct);
+            await UniTask.Delay(TimeSpan.FromSeconds(0.8f), DelayType.UnscaledDeltaTime, cancellationToken: ct);
+            if (root == null) return;
+            root.SetActive(true);
+            DissolveEffect.PlayAppear(root, NightmareRevealSeconds, null, default, nightmareColor);
+            FlashAsync(root.transform.position + Vector3.up * 1.6f, ct, RuneFlashPeak).Forget();
+            await UniTask.Delay(TimeSpan.FromSeconds(NightmareRevealSeconds), DelayType.UnscaledDeltaTime, cancellationToken: ct);
+            if (toggle != null) toggle.MarkReady();
+            Debug.Log("[BaseCampFx] 악몽 모드 갈림길 드러남");
+        }
+        catch (OperationCanceledException) { }
+    }
+
     private ParticleSystem MakeMotes(string name, Transform parent, Vector3 localPos, Vector3 box, float rate, float lifetime, float size,
                                      Color color, Vector3 velMin, Vector3 velMax)
     {

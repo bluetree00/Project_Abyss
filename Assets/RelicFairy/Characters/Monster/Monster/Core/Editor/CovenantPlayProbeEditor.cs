@@ -466,11 +466,13 @@ public static class CovenantPlayProbeEditor
             case "march":
             {
                 // 12m를 걷는 대신 누적을 문턱 바로 아래로 두고 한 걸음만 옮긴 것처럼 만든다.
-                var t = typeof(AssembledCovenant);
+                // 원인 상태는 추적기가 쥔다(10-02 E1)
+                var tracker = typeof(AssembledCovenant).GetField("_tracker", Inst).GetValue(cov);
+                var t = typeof(CovenantCauseTracker);
                 var player = GameRunBootstrapper.Instance.Run.Player;
-                t.GetField("_movePrimed", Inst).SetValue(cov, true);
-                t.GetField("_moveAccum", Inst).SetValue(cov, 11.8f);
-                t.GetField("_lastPos", Inst).SetValue(cov, player.transform.position + new Vector3(0.5f, 0f, 0f));
+                t.GetField("_movePrimed", Inst).SetValue(tracker, true);
+                t.GetField("_moveAccum", Inst).SetValue(tracker, 11.8f);
+                t.GetField("_lastPos", Inst).SetValue(tracker, player.transform.position + new Vector3(0.5f, 0f, 0f));
                 cov.Tick(0.6f);
                 break;
             }
@@ -727,8 +729,10 @@ public static class CovenantPlayProbeEditor
         for (int i = 0; i < s_covs.Count && i < s_gateOpen.Length; i++)
         {
             var c = s_covs[i];
-            if ((float)type.GetField("_gateOpenUntil", Inst).GetValue(c) > Time.time) s_gateOpen[i]++;
-            if ((float)type.GetField("_icdEnd", Inst).GetValue(c) > Time.time) Mark("icd:" + c.EffectId, t);
+            var tracker = type.GetField("_tracker", Inst).GetValue(c) as CovenantCauseTracker;
+            var clause  = type.GetField("_clause", Inst).GetValue(c) as CovenantClause;
+            if (tracker != null && tracker.GateOpenUntil > Time.time) s_gateOpen[i]++;
+            if (clause != null && clause.IcdEnd > Time.time) Mark("icd:" + c.EffectId, t);
         }
 
         if (now >= s_end)

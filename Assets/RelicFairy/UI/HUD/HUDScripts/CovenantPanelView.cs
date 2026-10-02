@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -271,9 +272,71 @@ public sealed class CovenantPanelView : MonoBehaviour
         else       rt.SetAsFirstSibling();
     }
 
+    // ── 서약서(문장) — 좌하단 서약 칸 4장 → 서약서 한 장(10-02 설계서 §4) ──
+    private const float LineHeight    = 19f;   // 설명 한 줄 높이(15px 글자 · 줄 간격 -5 기준)
+    private const float ChainStagger  = 0.08f; // 연쇄 표식이 차례로 켜지는 간격
+    private const float ChainPitchUp  = 0.12f; // 절마다 소리가 한 음씩 올라간다
+    private CovenantSentence _sentence;
+    private float _chainBase;                  // 지금 연쇄의 첫 표식 시각(같은 순간 들어온 절들을 차례로 펼친다)
+    private int   _chainLast = -1;
+
+    private void OnDisable() => BindSentenceEvents(null);
+
+    /// <summary>문장이 바뀌면(이어 쓰기 · 고쳐 쓰기 = 새 인스턴스) 절 사건을 다시 듣는다.</summary>
+    private void BindSentenceEvents(CovenantSentence s)
+    {
+        if (_sentence == s) return;
+        if (_sentence != null) _sentence.ClauseFired -= OnClauseFired;
+        _sentence = s;
+        if (_sentence != null) _sentence.ClauseFired += OnClauseFired;
+    }
+
+    private void OnClauseFired(int index)
+    {
+        if (_slots == null || _slots.Length == 0 || _slots[0] == null) return;
+        float now = Time.unscaledTime;
+        // 한 연쇄 안(앞 표식보다 뒤 절) = 같은 박자에 이어 붙임 · 아니면 새 연쇄
+        if (index <= _chainLast || now - _chainBase > 0.6f) _chainBase = now - index * ChainStagger;
+        _chainLast = index;
+        float delay = Mathf.Max(0f, _chainBase + index * ChainStagger - now);
+        _slots[0].FlashPip(index, delay);
+
+        // 처음 끝 절까지 닿은 순간 — 런당 한 번, 그 맹세의 모양을 한 마디로(설계서 §4)
+        var handler = GameRunBootstrapper.Instance?.Run?.CovenantHandler;
+        if (_sentence != null && _sentence.ResultCount >= 2 && index == _sentence.ResultCount - 1
+            && handler != null && !handler.ChainEndSaid)
+        {
+            handler.ChainEndSaid = true;
+            CovenantVoice.Say(CovenantVoice.ChainEnd);
+        }
+        Managers.Sound.PlayUiAsync(SoundKey.Sfx.ItemPickup, 0.45f, 1f + ChainPitchUp * index).Forget();
+    }
+
     public void Refresh(IReadOnlyList<CovenantBase> covenants)
     {
         if (_slots == null) return;
+
+        // 서약서가 있으면 한 장으로 — 칸 개념(서약 n/N)은 끝났다
+        CovenantSentence sentence = null;
+        if (covenants != null)
+            foreach (var c in covenants) if (c is CovenantSentence s) { sentence = s; break; }
+        BindSentenceEvents(sentence);
+        if (sentence != null)
+        {
+            if (_countLabel != null)
+            {
+                _countLabel.gameObject.SetActive(true);
+                _countLabel.text = $"서약서 {sentence.ResultCount}절";
+            }
+            int lines = _slots[0] != null ? _slots[0].BindSentence(sentence) : 0;
+            float h = Mathf.Max(slotSize.y, 64f + LineHeight * lines);
+            if (_grid != null) { _grid.constraintCount = 1; _grid.cellSize = new Vector2(slotSize.x, h); }
+            if (_slots[0] != null && _slots[0].TryGetComponent<LayoutElement>(out var le)) { le.preferredHeight = h; le.minHeight = h; }
+            for (int i = 1; i < _slots.Length; i++) _slots[i]?.SetEmpty();
+            return;
+        }
+        if (_grid != null) _grid.cellSize = slotSize;
+        if (_slots[0] != null && _slots[0].TryGetComponent<LayoutElement>(out var le0)) { le0.preferredHeight = slotSize.y; le0.minHeight = slotSize.y; }
 
         int count = covenants != null ? covenants.Count : 0;
         if (_grid != null) _grid.constraintCount = count > 3 ? 2 : 1;

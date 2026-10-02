@@ -237,6 +237,66 @@ public sealed class CombatPanelView : MonoBehaviour
 
     // 툴팁 화면 클램프용 코너 버퍼(재사용 — 호버 시 GC 억제).
     private static readonly Vector3[] _tooltipCorners = new Vector3[4];
+    private static readonly Vector3[] _columnCorners  = new Vector3[4];   // 좌하단 쌓기(HudView) — 무기 칸 윗변
+
+    /// <summary>좌하단 세로 쌓기(<see cref="HudView"/>)용 — 버프 · 패시브 칸 줄. 아직 안 만들어졌으면 null.</summary>
+    public RectTransform BuffGridRect => buffListRoot as RectTransform;
+
+    /// <summary>발동 알림 줄(왼쪽 기둥 오른쪽에 <see cref="HudView"/>가 놓는다). 아직 안 만들어졌으면 null.</summary>
+    public RectTransform ItemNoticeRect => _itemNoticeRoot as RectTransform;
+
+    private static readonly List<Graphic> s_columnGraphics = new();
+
+    /// <summary>
+    /// 왼쪽 기둥(무기 두 칸의 그림 · 글자 + 버프 · 패시브 줄)의 화면 오른쪽 끝(월드 x). 없으면 NaN.
+    /// 무기 칸 테두리는 칸보다 오른쪽으로 길게 그려진다(칼 장식) — 칸 사각형이 아니라 보이는 그림 전부로 잰다.
+    /// </summary>
+    public float LeftColumnRightWorld()
+    {
+        float right = float.NaN;
+        for (int i = 0; i < _weaponSlotRoot.Length; i++)
+        {
+            var root = _weaponSlotRoot[i];
+            if (root == null || !root.gameObject.activeInHierarchy) continue;
+            root.GetComponentsInChildren(false, s_columnGraphics);
+            foreach (var g in s_columnGraphics)
+            {
+                g.rectTransform.GetWorldCorners(_columnCorners);
+                right = float.IsNaN(right) ? _columnCorners[2].x : Mathf.Max(right, _columnCorners[2].x);
+            }
+        }
+        if (buffListRoot is RectTransform grid && grid.gameObject.activeInHierarchy && grid.rect.height > 1f)
+        {
+            grid.GetWorldCorners(_columnCorners);
+            right = float.IsNaN(right) ? _columnCorners[2].x : Mathf.Max(right, _columnCorners[2].x);
+        }
+        return right;
+    }
+
+    /// <summary>
+    /// 무기 두 칸의 화면 윗변(월드 y) — 칸 · 칸 위 이름 글자 중 가장 높은 곳. 칸이 아직 없으면 NaN.
+    /// 활성 칸(1.15배) 기준으로 잰다 — 교체 순간 칸이 튀어도(<see cref="WeaponPopDur"/>) 위 위젯이 따라 흔들리지 않게.
+    /// </summary>
+    public float WeaponColumnTopWorld()
+    {
+        float top = float.NaN;
+        for (int i = 0; i < _weaponSlotRoot.Length; i++)
+        {
+            var root = _weaponSlotRoot[i];
+            if (root == null || !root.gameObject.activeInHierarchy || root.localScale.y <= 0f) continue;
+            float k  = ActiveSlotScale / root.localScale.y;   // 지금 배율 → 활성 배율로 환산
+            float py = root.position.y;                         // 피벗(배율 중심)
+            root.GetWorldCorners(_columnCorners);
+            float t = py + (_columnCorners[1].y - py) * k;
+            if (_weaponName[i] != null && _weaponName[i].gameObject.activeInHierarchy)
+            {
+                _weaponName[i].rectTransform.GetWorldCorners(_columnCorners);
+                t = Mathf.Max(t, py + (_columnCorners[1].y - py) * k);
+            }
+            top = float.IsNaN(top) ? t : Mathf.Max(top, t);
+        }
+        return top;
+    }
 
     // ─────────────────────────────────────────────────────────
     // HP
@@ -1598,6 +1658,9 @@ public sealed class CombatPanelView : MonoBehaviour
         // 태양형(가웨인)이고 스프라이트가 있으면 태양 위젯, 아니면 수평 바 — 종류를 몰라도 형태만 분기.
         _useSunGauge = res != null && res.Style == RelicGaugeStyle.Sun && _sunRoot != null;
 
+        // [유물 성장 v2] 조각이 어디서 켜지는지 — 해시계 세 호 · 광기 눈금 넷(설계 v2 §6-1). 리소스가 없으면 숨긴다.
+        RelicMemoryHudPresenter.Bind(this, res == null ? null : (_useSunGauge ? _sunRoot : _relicBar), res);
+
         if (res == null)
         {
             _relicBar.gameObject.SetActive(false);
@@ -1711,6 +1774,7 @@ public sealed class CombatPanelView : MonoBehaviour
     // 예전에는 타입 아이콘 하나뿐이라 「무명의 형상」과 「카타나」가 같은 그림이었고, 활성 칸은 알파 0.5로만
     // 갈라져 어느 쪽을 들고 있는지 흐렸다. 이름·강화 단계를 칸에 붙이고 활성 강조를 의뢰서대로 되돌린다.
     private const  float WeaponNameSize  = 16f;
+    private const  float WeaponNameMinSize = 12f;
     private const  float WeaponLevelSize = 17f;
     private const  float WeaponLabelGap  = 26f;   // 칸 위 칼·화살 장식을 넘기는 높이 — 16은 활성 칸(1.15배)의 칼 손잡이가 첫 글자에 닿았다(09-28)
     private const  float ActiveSlotScale = 1.15f;
@@ -1748,6 +1812,12 @@ public sealed class CombatPanelView : MonoBehaviour
                                                 new Vector2(0f, FrameBelow(root) + WeaponLabelGap),
                                                 new Vector2(root.sizeDelta.x + 30f, 22f));
                 _weaponName[i].color = WeaponNameIdle;
+                // 이름 상자는 넘쳐도 그대로 그려져(Overflow) 긴 이름이 옆 칸 이름 · 칸까지 밀고 들어갔다
+                // (10-02 사용자 「장비 근접과 원거리의 겹침」) — 상자 안에서 줄이고, 그래도 길면 말줄임.
+                _weaponName[i].enableAutoSizing = true;
+                _weaponName[i].fontSizeMax      = WeaponNameSize;
+                _weaponName[i].fontSizeMin      = WeaponNameMinSize;
+                _weaponName[i].overflowMode     = TextOverflowModes.Ellipsis;
             }
             if (_weaponLevel[i] == null)
             {
@@ -2173,13 +2243,20 @@ public sealed class CombatPanelView : MonoBehaviour
     private const float ItemNoticeFadeTime = 0.5f;
     private const int MaxItemNotices = 5;
 
+    // 10-02 「패시브 텍스트의 가시성」 — 13px 금빛 + 1px 테두리는 밝은 바닥(숲 · 대제단)에서 묻혔다.
+    // 줄마다 어두운 받침을 깔고 글자는 16px(UI 최소 기준) · 부드러운 그림자(TMPOutlineHelper 정본).
+    private const float ItemNoticeFontSize = 16f;
+    private static readonly Color   ItemNoticePlate   = new(0.03f, 0.03f, 0.06f, 0.68f);
+    private const float BuffTooltipFontSize = 15f;   // 유물 패시브 설명 툴팁(예전 13)
+    private const float BuffTooltipWidth    = 260f;  // 패시브 설명이 길다(예전 220)
+
     private Transform _itemNoticeRoot;
     private readonly List<ItemNoticeEntry> _itemNotices = new();
 
     private struct ItemNoticeEntry
     {
-        public GameObject go;
-        public TMP_Text text;
+        public GameObject  go;
+        public CanvasGroup group;   // 받침 · 글자를 함께 흐린다
         public float hideAt;   // Time.unscaledTime 기준 만료 시각(버프 알림과 동일 규칙)
     }
 
@@ -2197,27 +2274,35 @@ public sealed class CombatPanelView : MonoBehaviour
             _itemNotices.RemoveAt(0);
         }
 
+        // 줄 = 어두운 받침(글자 폭에 맞춤) + 글자. 최신 줄이 맨 아래(버프 줄 곁)에 붙고 위로 밀려 올라간다.
         var go = new GameObject($"ItemNotice_{_itemNotices.Count}", typeof(RectTransform));
         go.transform.SetParent(_itemNoticeRoot, false);
+        var plate = go.AddComponent<Image>();
+        plate.color = ItemNoticePlate;
+        plate.raycastTarget = false;
+        var row = go.AddComponent<HorizontalLayoutGroup>();
+        row.padding = new RectOffset(10, 12, 3, 4);
+        row.childControlWidth = row.childControlHeight = true;
+        row.childForceExpandWidth = row.childForceExpandHeight = false;
+        var group = go.AddComponent<CanvasGroup>();
+        group.blocksRaycasts = group.interactable = false;
 
-        var rect = go.GetComponent<RectTransform>();
-        rect.sizeDelta = new Vector2(280f, 22f);
-
-        var text = go.AddComponent<TextMeshProUGUI>();
+        var txtGo = new GameObject("Text", typeof(RectTransform));
+        txtGo.transform.SetParent(go.transform, false);
+        var text = txtGo.AddComponent<TextMeshProUGUI>();
         AssignSafeFont(text);
         text.text = message;
-        text.fontSize = 13f;
+        text.fontSize = ItemNoticeFontSize;
         text.color = new Color(1f, 0.85f, 0.4f);
         text.alignment = TextAlignmentOptions.MidlineLeft;
-
-        var outline = go.AddComponent<Outline>();
-        outline.effectColor = new Color(0f, 0f, 0f, 0.8f);
-        outline.effectDistance = new Vector2(1f, -1f);
+        text.textWrappingMode = TextWrappingModes.NoWrap;
+        text.raycastTarget = false;
+        TMPOutlineHelper.ApplySoftShadow(text);
 
         _itemNotices.Add(new ItemNoticeEntry
         {
             go = go,
-            text = text,
+            group = group,
             hideAt = Time.unscaledTime + ItemNoticeDuration + ItemNoticeFadeTime,
         });
     }
@@ -2238,11 +2323,9 @@ public sealed class CombatPanelView : MonoBehaviour
                 if (entry.go != null) Destroy(entry.go);
                 _itemNotices.RemoveAt(i);
             }
-            else if (remain < ItemNoticeFadeTime && entry.text != null)
+            else if (remain < ItemNoticeFadeTime && entry.group != null)
             {
-                var c = entry.text.color;
-                c.a = remain / ItemNoticeFadeTime;
-                entry.text.color = c;
+                entry.group.alpha = remain / ItemNoticeFadeTime;
             }
         }
     }
@@ -2262,20 +2345,22 @@ public sealed class CombatPanelView : MonoBehaviour
         var go = new GameObject("ItemNoticeRoot", typeof(RectTransform));
         go.transform.SetParent(transform, false);
 
+        // 왼쪽 기둥(무기 → 버프 · 패시브 줄 → 서약) <b>오른쪽</b>, 바닥 = 버프 줄 바닥. 실제 자리는 HudView가 매 프레임 맞춘다
+        // (예전 화면 30% 고정 = 알림이 패시브 칸 · 무기 이름 위에 겹쳤다, 10-02). 아래 값은 HudView가 없을 때의 기본 자리.
         var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 0.3f);
-        rect.anchorMax = new Vector2(0f, 0.3f);
-        rect.pivot = new Vector2(0f, 1f);
-        rect.anchoredPosition = new Vector2(10f, 0f);
-        rect.sizeDelta = new Vector2(290f, 200f);
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(0f, 0f);
+        rect.pivot = new Vector2(0f, 0f);
+        rect.anchoredPosition = new Vector2(430f, 337f);
+        rect.sizeDelta = new Vector2(420f, 0f);
 
         var layout = go.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 2f;
+        layout.spacing = 4f;
         layout.childAlignment = TextAnchor.LowerLeft;
-        layout.childForceExpandWidth = true;
+        layout.childForceExpandWidth = false;   // 받침은 글자 폭만큼
         layout.childForceExpandHeight = false;
         layout.childControlWidth = true;
-        layout.childControlHeight = false;
+        layout.childControlHeight = true;
 
         var fitter = go.AddComponent<ContentSizeFitter>();
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -2536,7 +2621,7 @@ public sealed class CombatPanelView : MonoBehaviour
 
         var rt = go.GetComponent<RectTransform>();
         rt.pivot     = new Vector2(0f, 1f);
-        rt.sizeDelta = new Vector2(220f, 64f);
+        rt.sizeDelta = new Vector2(BuffTooltipWidth, 64f);
 
         var bg = go.AddComponent<Image>();
         bg.color = new Color(0.05f, 0.05f, 0.08f, 0.92f);
@@ -2552,7 +2637,7 @@ public sealed class CombatPanelView : MonoBehaviour
 
         _buffTooltipText = txtGo.AddComponent<TextMeshProUGUI>();
         AssignSafeFont(_buffTooltipText);
-        _buffTooltipText.fontSize = 13f;
+        _buffTooltipText.fontSize = BuffTooltipFontSize;
         _buffTooltipText.color = Color.white;
         _buffTooltipText.alignment = TextAlignmentOptions.TopLeft;
         _buffTooltipText.textWrappingMode = TextWrappingModes.Normal;

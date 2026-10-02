@@ -27,6 +27,8 @@ using UnityEngine;
 ///   P 저스트 회피 보상 — 게이지 환급 · 반격 창(가속·추격 1회·적중 환급) · 창 종료 복구
 ///   Q 반격 실동작 — 실제 입력 경로: 적을 등진 회피 → 공격 연타 → 창 안 첫 타가 돌아서 붙어 들어가고 빨라지는가
 ///     + 보상 연출 신호(환급·반격 공격·창 종료)와 대시 게이지(칸·번쩍임·스킨)
+///   X 긴급 회피 무적 — 예고 중인 적 옆에서 회피 → 대시 무적이 끝난 뒤에도 창이 닫힐 때까지 피해·넉백 무효,
+///     피한 공격의 예고가 창보다 길면 그 공격이 끝날 때까지 이어지고, 끝나면 풀린다
 ///   I 검증 중 콘솔 에러 0
 /// 플레이어 상태를 실제로 바꾼다(유물 적용·회피 이동·HP 변화 가능) — 검증용 런에서만 쓴다.
 /// </summary>
@@ -64,6 +66,8 @@ public static class PlayerStructureProbeEditor
     private static int  s_rangedHp0;
     private static bool s_rangedFired;
     private static CounterRun s_counterRun;
+    private static Vector3    s_home;       // 검증 시작 자리 — 앞 단계(추격·회피)로 밀려나 발판 끝에서 떨어지지 않게 되돌아올 곳
+    private static Quaternion s_homeRot;
     private static SlashRun   s_slashRun;
 
     /// <summary>S 시나리오 측정값.</summary>
@@ -223,6 +227,7 @@ public static class PlayerStructureProbeEditor
         if (s_steps.Count > 0) { Debug.LogWarning("[PlayerProbe] 이미 실행 중이다."); return; }
 
         s_player = FindRunPlayer();
+        if (s_player != null) { s_home = s_player.transform.position; s_homeRot = s_player.transform.rotation; }
         if (s_player == null) { Debug.LogWarning("[PlayerProbe] 런 플레이어가 없다 — 런을 시작한 뒤 실행한다."); return; }
 
         s_results.Clear(); s_errors.Clear(); s_warnings.Clear();
@@ -661,6 +666,90 @@ public static class PlayerStructureProbeEditor
             p.SkillUnsealed -= onUnseal;
         });
 
+        // 긴급 회피 무적(10-01) — 예전엔 대시 무적(대시 길이)이 느려진 시간 안에서 금방 끝나 뒤늦은 공격·돌진에 맞았다.
+        // 과녁은 기절시켜 AI가 예고 표시를 건드리지 않게 하고, 예고의 시작·끝을 이쪽이 쥔다.
+        var dodgeOutcomes = new List<PlayerController.DamageOutcome>();
+        Action<GameObject, int, int, PlayerController.DamageOutcome> onResolved = (_, _, _, o) => dodgeOutcomes.Add(o);
+        float dodgeAt = 0f;
+        int   hpBeforeX = 0;
+        Add("X 긴급 회피 무적", 0.3f, () =>
+        {
+            // 앞 단계(Q 추격 등)가 몸을 수 m씩 밀어 둔다 — 시작 자리로 되돌려야 회피 4m가 발판 끝을 넘지 않는다
+            // (10-01 첫 실측: 떨어져 낙하 복구 무적이 X8을 가렸다).
+            p.transform.SetPositionAndRotation(s_home, s_homeRot);
+            if (p.TryGetComponent<Rigidbody>(out var rb)) { rb.position = s_home; rb.rotation = s_homeRot; rb.linearVelocity = Vector3.zero; }
+            p.RequestFacing(s_homeRot);   // 유휴 분기가 예전 방향으로 되돌리지 않게 facing 시스템에도 알린다
+            s_rangedTarget = null;
+            SpawnRangedTargetAsync(p, 2.5f).Forget();   // 예고 감지 반경(4m) 안
+        });
+        Add("X 긴급 회피 무적", 1.5f, () =>
+        {
+            Check("X0 원인 적 스폰", s_rangedTarget != null);
+            if (s_rangedTarget == null) return;
+            var cd = p.CharacterData;
+            s_perfectDodgeTotal = Mathf.Max(0f, cd.perfectDodgeFreeze) + Mathf.Max(0f, cd.perfectDodgeDuration);
+            s_rangedTarget.ApplyStun(30f);
+            s_rangedTarget.BeginAttackTelegraph();
+            s_perfectDodgeCount = 0;
+            p.OnPerfectDodge   += OnPerfectDodge;
+            p.OnDamageResolved += onResolved;
+            hpBeforeX = p.RuntimeStats.Hp;
+            p.LocoSM.Change(LocoState.Dodge);            // 회피 진입 → 예고 감지로 긴급 회피
+            dodgeAt = Time.unscaledTime;
+            Check("X1 예고 감지로 발동", s_perfectDodgeCount == 1,
+                  $"{s_perfectDodgeCount}회 · 과녁까지 {FlatDist(p.transform.position, s_rangedTarget.transform.position):F1}m");
+        });
+        Add("X 긴급 회피 무적", 0.9f, () =>
+        {
+            if (s_rangedTarget == null) return;
+            float iframeEnd = GetField<float>(p, "_invincibleEnd");
+            Check("X2 대시 무적은 이미 끝남(검사 전제)", Time.time >= iframeEnd, $"time {Time.time:F2} · 대시 무적 끝 {iframeEnd:F2}");
+            dodgeOutcomes.Clear();
+            p.TakeDamage(50, s_rangedTarget.gameObject);
+            Check("X3 창 안 피해 무효(긴급 회피 무적)",
+                  dodgeOutcomes.Count == 1 && dodgeOutcomes[0] == PlayerController.DamageOutcome.PerfectDodge && p.RuntimeStats.Hp == hpBeforeX,
+                  $"{string.Join(",", dodgeOutcomes)} · hp {hpBeforeX}→{p.RuntimeStats.Hp}");
+            float kbBefore = GetField<float>(s_status, "_knockbackTimer");
+            p.ApplyKnockback(Vector3.forward * 30f, 1f);
+            float kbAfter = GetField<float>(s_status, "_knockbackTimer");
+            Check("X4 창 안 넉백 무시", Approx(kbAfter, kbBefore), $"넉백 타이머 {kbBefore:F2}→{kbAfter:F2}");
+        });
+        // 창은 닫혔지만 피한 공격이 아직 예고 중 — 그 공격이 끝날 때까지 무적
+        Add("X 긴급 회피 무적", () => Mathf.Max(0.1f, dodgeAt + s_perfectDodgeTotal + 0.3f - Time.unscaledTime), () =>
+        {
+            if (s_rangedTarget == null) return;
+            Check("X5 반격 창 닫힘(검사 전제)", Approx(p.CounterAttackSpeedMultiplier, 1f), $"x{p.CounterAttackSpeedMultiplier:F2}");
+            dodgeOutcomes.Clear();
+            p.TakeDamage(50, s_rangedTarget.gameObject);
+            Check("X6 창 뒤 · 피한 공격 예고 중 → 무효", dodgeOutcomes.Count == 1 && dodgeOutcomes[0] == PlayerController.DamageOutcome.PerfectDodge,
+                  string.Join(",", dodgeOutcomes));
+            s_rangedTarget.EndAttackTelegraph();          // 예고 끝 = 피해가 들어오는 프레임(AttackState 순서)
+            dodgeOutcomes.Clear();
+            p.TakeDamage(50, s_rangedTarget.gameObject);
+            Check("X7 예고가 끝나는 프레임의 피해도 무효", dodgeOutcomes.Count == 1 && dodgeOutcomes[0] == PlayerController.DamageOutcome.PerfectDodge,
+                  $"{string.Join(",", dodgeOutcomes)} · hp {hpBeforeX}→{p.RuntimeStats.Hp}");
+        });
+        Add("X 긴급 회피 무적", 0.6f, () =>
+        {
+            if (s_rangedTarget != null)
+            {
+                dodgeOutcomes.Clear();
+                p.TakeDamage(1, s_rangedTarget.gameObject);
+                bool blocked = dodgeOutcomes.Count == 1 && (dodgeOutcomes[0] == PlayerController.DamageOutcome.PerfectDodge
+                                                            || dodgeOutcomes[0] == PlayerController.DamageOutcome.Invincible);
+                Check("X8 피한 공격이 끝나면 무적 해제", dodgeOutcomes.Count == 1 && !blocked, string.Join(",", dodgeOutcomes));
+                float kbBefore = GetField<float>(s_status, "_knockbackTimer");
+                p.ApplyKnockback(Vector3.zero, 0.2f);
+                Check("X9 무적이 풀리면 넉백이 다시 들어감", GetField<float>(s_status, "_knockbackTimer") > kbBefore + 0.1f,
+                      $"넉백 타이머 {kbBefore:F2}→{GetField<float>(s_status, "_knockbackTimer"):F2}");
+                Managers.ObjectPooler?.Despawn(s_rangedTarget.gameObject);
+                s_rangedTarget = null;
+            }
+            p.OnPerfectDodge   -= OnPerfectDodge;
+            p.OnDamageResolved -= onResolved;
+            if (hpBeforeX > 0) p.RuntimeStats.SetHp(hpBeforeX);
+        });
+
         Add("I 콘솔", 0.5f, () =>
             Check("I1 검증 중 에러·예외 0", s_errors.Count == 0, s_errors.Count > 0 ? s_errors[0] : ""));
     }
@@ -760,14 +849,13 @@ public static class PlayerStructureProbeEditor
     /// <summary>수평 거리(m). <see cref="Flat"/>은 방향을 정규화해 돌려주므로 거리에 쓰면 늘 1이 나온다.</summary>
     private static float FlatDist(Vector3 a, Vector3 b) { Vector3 d = a - b; d.y = 0f; return d.magnitude; }
 
-    /// <summary>원거리 과녁 — 플레이어 정면(벽이 있으면 그 앞) 2~5m에 세운다.</summary>
-    private static async UniTaskVoid SpawnRangedTargetAsync(PlayerController p)
+    /// <summary>원거리 과녁 — 플레이어 정면(벽이 있으면 그 앞) 2~<paramref name="dist"/>m에 세운다.</summary>
+    private static async UniTaskVoid SpawnRangedTargetAsync(PlayerController p, float dist = 5f)
     {
         try
         {
             Vector3 fwd    = Flat(p.transform.forward);
             Vector3 origin = p.transform.position + Vector3.up;
-            float   dist   = 5f;
             if (Physics.Raycast(origin, fwd, out var wall, dist, ~0, QueryTriggerInteraction.Ignore))
                 dist = Mathf.Max(2f, wall.distance - 1f);
             Vector3 pos = p.transform.position + fwd * dist;

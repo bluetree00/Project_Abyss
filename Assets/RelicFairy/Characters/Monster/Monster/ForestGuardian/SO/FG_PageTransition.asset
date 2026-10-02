@@ -41,4 +41,4 @@ MonoBehaviour:
   flashColor: {r: 1, g: 0.7, b: 0.55, a: 1}
   roarSfx: {fileID: 8300000, guid: 7f0d41ccc31864540a18d071e7651837, type: 3}
   dialogueKey: 
-  fallbackLine: "\uC232\uC774\u2026 \uAE68\uC5B4\uB09C\uB2E4."
+  fallbackLine: "\u2026\uC774\uBC88\uC5D4, \uC7A0\uB4E4\uC9C0 \uC54A\uB294\uB2E4."

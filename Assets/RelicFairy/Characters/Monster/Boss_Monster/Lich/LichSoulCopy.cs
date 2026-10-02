@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -137,13 +139,14 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
     private const float  Lifetime     = 10f;
     private const int    HitsToBreak  = 2;
     private const float  HitInterval  = 0.15f;
-    private const float  AttackWarn   = 0.4f;
+    private const float  AttackWarn   = 0.5f;   // 0.4 → 0.5(10-02 — 짧은 예고 늘리기)
     private const float  AttackGap    = 0.55f;   // 콤보 연타는 이 간격 안이면 한 번으로
     private const float  SlashLength  = 7f;
     private const float  SlashWidth   = 2.4f;
     private const float  SlashSpeed   = 45f;
     private const float  SlashDamage  = 0.8f;
     private const float  TurnSpeed    = 540f;
+    private const float  FadeSeconds  = 0.35f;   // 떠오르고 흐려진다(10-03) — 반투명 그림자라 디졸브 대신 알파(MaterialFade)
 
     private static readonly int   BaseColorId = Shader.PropertyToID("_BaseColor");
     private static readonly int   ColorId     = Shader.PropertyToID("_Color");
@@ -168,6 +171,7 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
     private float          _strikeAt = -1f;
     private GameObject     _aura;
     private bool           _gone;
+    private MaterialFade.FadeInHandle _fadeIn;   // 페이드가 렌더러마다 복제한 재질 — 파괴 때 거둔다
 
     // ── Properties ────────────────────────────────────────────────
     public static IReadOnlyList<LichSoulCopy> Live => s_live;
@@ -196,6 +200,9 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
         s_live.Remove(this);
         PatternGuideHelper.SafeDestroy(ref _telegraph);
         LichVfx.Stop(ref _aura);
+        // 복제 재질은 오브젝트와 함께 사라지지 않는다 — 직접 거둔다(10-03)
+        if (_fadeIn != null)
+            foreach (var m in _fadeIn.Mats) if (m != null) Destroy(m);
     }
 
     // ── Public Methods ────────────────────────────────────────────
@@ -239,6 +246,7 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
         copyC._nextAttack = tape.AttackCount;
         copyC.RewindAttacks();
         copyC.Tint(player);
+        copyC._fadeIn = MaterialFade.BeginFadeIn(go);   // 그려지기 전에 투명으로 — 툭 나타나지 않게(10-03)
         go.transform.SetParent(null, false);
         go.transform.SetPositionAndRotation(anchor, player.transform.rotation);
         Destroy(holder);
@@ -247,6 +255,7 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
         // 잔상(PhantomShow)은 카드가 제단 전체로 흩어져 화면을 덮는다(09-19 실측) — 나타남 연기로.
         LichVfx.Play(LichVfxSlot.TeleportAppear, anchor, Quaternion.identity, 0.7f);
         s_live.Add(copyC);
+        MaterialFade.FadeInAsync(copyC._fadeIn, FadeSeconds, copyC.destroyCancellationToken).Forget();
         return copyC;
     }
 
@@ -445,8 +454,17 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
         if (_gone) return;
         _gone = true;
         s_live.Remove(this);
+        PatternGuideHelper.SafeDestroy(ref _telegraph);   // 예고는 바로 — 흐려지는 동안 베지 않는다
+        LichVfx.Stop(ref _aura);   // 붙은 오라는 먼저 풀로 — 페이드가 자식 입자를 끄면 풀 인스턴스가 꺼진 채 돌아간다
         LichVfx.Play(LichVfxSlot.TeleportVanish, transform.position + Vector3.up * 0.9f, Quaternion.identity, 0.6f);
-        Destroy(gameObject);
+        FadeOutAndDestroyAsync(destroyCancellationToken).Forget();
+    }
+
+    /// <summary>흐려지며 사라진다(10-03).</summary>
+    private async UniTaskVoid FadeOutAndDestroyAsync(CancellationToken ct)
+    {
+        await MaterialFade.FadeOutAsync(gameObject, FadeSeconds, ct);   // 취소는 안에서 삼킨다
+        if (this != null) Destroy(gameObject);
     }
 }
 }

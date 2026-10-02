@@ -33,7 +33,8 @@ public static class EffectIconView
         rt.anchoredPosition = new Vector2(0f, 0f);
 
         var img = iconGO.GetComponent<Image>();
-        img.sprite        = sprite;          // 플레이스홀더는 이미 색이 입혀져 있어 흰색 틴트 유지
+        img.sprite        = sprite;
+        img.color         = EffectIconRegistry.TintFor(iconKey);   // 흰 글리프엔 계열색 · 플레이스홀더 · 상점 그림은 흰색(그대로)
         img.preserveAspect = true;
         img.raycastTarget = false;
 

@@ -732,8 +732,8 @@ public sealed class HudPresenter : MonoBehaviour
                        HUDIds.Section.Minimap;
 
             case HUDIds.Mode.Boss:
-                return HUDIds.Section.TopBar |
-                       HUDIds.Section.CombatPanel |
+                // 재화 줄(TopBar)은 걷는다 — 오른쪽 위 재화 줄이 보스바 오른쪽 끝 · 보스전 목표 띠와 같은 높이라 겹쳤다(10-01 f5 전주기 시뮬).
+                return HUDIds.Section.CombatPanel |
                        HUDIds.Section.BossPanel |
                        HUDIds.Section.CovenantPanel |
                        HUDIds.Section.Minimap;

@@ -296,7 +296,9 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
         if (_minionsSpawned >= _totalMinions && _totalMinions > 0)
         {
             _phase = Phase.WaitMinions;
-            _timer = Data.AirPatternInterval; // 진입 즉시 BreathSweep 발동
+            // 첫 휩쓸기는 AirPatternInterval 뒤 — 그 안에 새끼 용을 다 잡으면 휩쓸기 없이 바로 착지한다.
+            // 예전엔 진입 즉시 휩쓸기를 걸어 새끼 용을 몇 초 만에 잡아도 휩쓸기(≈25초)가 끝나야 내려왔다 — 소환마다 무적 28~45초(10-01 감사)
+            _timer = 0f;
         }
     }
 
@@ -324,8 +326,9 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
     /// <summary>BreathSweep(메테오 통합)으로 핸드오프하고, 종료 후 WaitMinions로 복귀하도록 예약한다.</summary>
     private void TriggerAirPattern(MonsterContext ctx)
     {
-        // BreathSweep에 메테오가 통합되었으므로 항상 BreathSweep만 사용
+        // BreathSweep에 메테오가 통합되었으므로 항상 BreathSweep만 사용 — 봉인기엔 휩쓸기가 사슬에 막혀(해방기 전용) 화염구 비로(10-03 S2)
         BossPatternSO pattern = Data.BreathSweepPattern;
+        if (pattern == null || pattern.EraLocked) pattern = Data.FireballRainPattern;
         if (pattern == null) return;
 
         var runtimeState = pattern.GetRuntimeState();
@@ -376,7 +379,9 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
             int cz = Random.Range(2, DragonBossRoomContext.Height - 2);
             Vector3 landBase = DragonBossRoomContext.CellToWorld(cx, cz, 0f);
             Vector3 ground;
-            if (Physics.Raycast(new Vector3(landBase.x, landBase.y + 50f, landBase.z), Vector3.down, out RaycastHit hit, 100f))
+            // 바닥만 — 마스크가 없으면 호버 중인 화룡 캡슐(지면 +15 m) 위에 알이 앉아 새끼 용을 못 잡고 소환 게이트가 영영 안 풀렸다(10-01 감사)
+            if (Physics.Raycast(new Vector3(landBase.x, landBase.y + 50f, landBase.z), Vector3.down, out RaycastHit hit, 100f,
+                                DragonPatternFloorUtils.GroundMask, QueryTriggerInteraction.Ignore))
                 ground = hit.point + Vector3.up * 0.05f;
             else
             {

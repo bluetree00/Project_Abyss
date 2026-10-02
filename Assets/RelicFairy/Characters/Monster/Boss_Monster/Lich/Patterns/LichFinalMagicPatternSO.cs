@@ -163,7 +163,7 @@ public class LichFinalMagicState : UnInterruptibleState<LichFinalMagicPatternSO>
 
     public override void Exit(MonsterContext ctx)
     {
-        foreach (var s in _stones) if (s != null) Object.Destroy(s.gameObject);
+        foreach (var s in _stones) if (s != null) s.Dismiss();   // 디졸브로 스러진다(10-03)
         _stones.Clear();
         LichVfx.Stop(ref _channelVfx);
         _hud?.Close();
@@ -188,7 +188,7 @@ public class LichFinalMagicState : UnInterruptibleState<LichFinalMagicPatternSO>
     /// <summary>채널링(다시) 시작 — 봉인석 넷이 코어 모서리에 내려앉는다.</summary>
     private void BeginChannel(MonsterContext ctx)
     {
-        foreach (var s in _stones) if (s != null) Object.Destroy(s.gameObject);
+        foreach (var s in _stones) if (s != null) s.Dismiss();
         _stones.Clear();
         _ignited     = 0;
         _debrisTimer = 0f;
@@ -273,7 +273,7 @@ public class LichFinalMagicState : UnInterruptibleState<LichFinalMagicPatternSO>
 
         var player = ctx.Runtime.CachedPlayer;
         if (player != null && player.RuntimeStats != null)
-            player.TakeDamage(Mathf.Max(1, Mathf.RoundToInt(player.RuntimeStats.MaxHp * Data.failDamageRatio)), ctx.Monster.gameObject,
+            player.TakeDamage(BossMaxHpDamage.Raw(player, Data.failDamageRatio), ctx.Monster.gameObject,   // 방어로 다시 깎이지 않게(10-01)
                               false, HitWeight.Heavy);
 
         UI_BossBark.Show("아직 끝나지 않았다 — 다시!", BossBarkType.PatternAnnounce);

@@ -20,12 +20,14 @@ public static class MonsterBudget
     public static int AliveCap { get; set; } = 25;
 
     private static readonly List<MonsterSpawner> s_spawners = new();
+    private static readonly HashSet<RelicFairy.Monster.MonsterBase> s_alive = new();
 
     /// <summary>도메인 리로드 OFF 대비 — 플레이 시작마다 초기화.</summary>
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
         s_spawners.Clear();
+        s_alive.Clear();
         AliveCap = 25;
     }
 
@@ -39,19 +41,22 @@ public static class MonsterBudget
         if (s != null) s_spawners.Remove(s);
     }
 
-    /// <summary>현재 살아있는 총 적 수(전 스포너 합산). 스포너 수가 적어 매번 합산해도 부담 없다.</summary>
+    /// <summary>
+    /// 현재 살아있는 총 적 수(전 스포너 합산). 죽은 몸은 세지 않고(MonsterSpawner.IsAlive),
+    /// 풀 재사용으로 두 스포너 목록에 같이 남은 몹은 한 번만 센다. 스포너 수가 적어 매번 합산해도 부담 없다.
+    /// </summary>
     public static int TotalAlive
     {
         get
         {
-            int n = 0;
+            s_alive.Clear();
             for (int i = s_spawners.Count - 1; i >= 0; i--)
             {
                 var s = s_spawners[i];
                 if (s == null) { s_spawners.RemoveAt(i); continue; }   // 파괴된 스포너 정리
-                n += s.AliveCount;
+                s.CollectAlive(s_alive);
             }
-            return n;
+            return s_alive.Count;
         }
     }
 

@@ -138,7 +138,8 @@ public sealed class DKPage2Zone
         var player = ctx?.Runtime?.CachedPlayer;
         if (player == null || ctx.Config?.stat == null) return;
 
-        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * damageMult));
+        // 악몽 「지휘」 — 환영 기수가 서 있는 동안 +15%
+        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * damageMult * DKStandardBearer.DamageScale(ctx.Monster)));
         player.TakeDamage(dmg, ctx.Monster != null ? ctx.Monster.gameObject : null, false, weight);
 
         Vector3 away = player.transform.position - from;

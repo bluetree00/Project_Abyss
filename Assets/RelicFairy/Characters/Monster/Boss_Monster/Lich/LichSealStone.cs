@@ -30,6 +30,11 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
     private const float  StepGlow     = 1.4f;    // 타격마다 더해지는 룬 밝기
     private const float  IgniteGlow   = 4.5f;
     private const float  FlashGlow    = 6f;
+    private const float  IgniteVfxAlpha  = 0.5f;    // 점화 기둥(전설 아이템 기둥, 반복) 입자 알파 — 원본은 광선 · 빛구가 화면을 3초 넘게 희게 덮었다(10-01 f5)
+    private const float  IgniteMaxScreen = 0.12f;   // 화면을 보는 입자 한 장의 크기 상한(화면 높이 비율) — 넷이 같이 켜져도 화면을 덮지 않게
+    private const float  AppearSeconds   = 0.6f;    // 디졸브로 솟는다 · 스러진다(10-03 — 툭 생기고 툭 꺼졌다)
+    private const float  VanishSeconds   = 0.6f;
+    private const float  PipsLift        = 0.8f;    // 남은 타격 표식 — 돌 꼭대기 위(m)
 
     private static readonly int   EmissionId = Shader.PropertyToID("_EmissionColor");
     private static readonly Color DarkColor  = new Color(0.12f, 0.12f, 0.16f);
@@ -49,6 +54,9 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
     private float _lastHitTime = float.NegativeInfinity;
     private Color _currentColor;
     private float _currentGlow;
+    private Collider    _collider;
+    private LichHitPips _pips;       // 남은 타격 표식(10-03)
+    private bool        _leaving;    // 디졸브로 스러지는 중
 
     // ── Properties ────────────────────────────────────────────────
     public bool IsIgnited { get; private set; }
@@ -63,6 +71,7 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
         _chain = null;
         LichVfx.Stop(ref _base);
         LichVfx.Stop(ref _igniteVfx);
+        EnemyCompassHud.RemoveGoal(transform);
     }
 
     // ── Public Methods ────────────────────────────────────────────
@@ -83,6 +92,7 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
         stone._onIgnited    = onIgnited;
         stone._currentColor = PatternGuideHelper.Breakable;
         stone._currentGlow  = IdleGlow;
+        stone._collider     = col;
 
         // 제단 중심(리치)을 등지고 바깥을 보게 세운다.
         Vector3 outward = anchor != null ? groundPos - anchor.position : Vector3.forward;
@@ -93,6 +103,7 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
         if (stone._model != null)
         {
             stone._modelRenderers = stone._model.GetComponentsInChildren<Renderer>(true);
+            DissolveEffect.PlayAppear(stone._model, AppearSeconds);   // 디졸브로 솟는다(10-03) — 룬 발광은 디졸브 동안 꺼졌다 돌아온다
         }
         else
         {
@@ -108,6 +119,10 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
             stone._marker.transform.SetParent(go.transform, true);
         }
 
+        // 남은 타격 표식 · 화면 밖 방향(적 나침반 목표) — 게임 거리에선 룬 밝기로 몇 번 남았는지 · 어디 있는지 안 읽혔다(10-03).
+        stone._pips = LichHitPips.Create(go.transform, Height + PipsLift, HitsToIgnite);
+        EnemyCompassHud.AddGoal(go.transform);
+
         stone.ApplyLook();
         return stone;
     }
@@ -119,6 +134,7 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
         _lastHitTime = Time.time;
 
         _hits++;
+        if (_pips != null) _pips.Set(_hits);
         Vector3 hitPos = transform.position + Vector3.up * (Height * 0.6f);
         LichVfx.Play(LichVfxSlot.SealStoneBurst, hitPos, Quaternion.identity, 0.5f);
         LichSfx.Play(LichSfxSlot.SealStoneHit, hitPos);
@@ -162,7 +178,7 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
         _chain = null;
     }
 
-    /// <summary>터진다 — 섬광 후 사라진다.</summary>
+    /// <summary>터진다 — 섬광 후 디졸브로 스러진다.</summary>
     public void Explode()
     {
         Vector3 mid = transform.position + Vector3.up * (Height * 0.5f);
@@ -170,7 +186,23 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
         LichVfx.Play(LichVfxSlot.PhaseBurst, mid, Quaternion.identity, 0.5f);
         if (!LichVfx.Has(LichVfxSlot.SealStoneBurst))
             PatternGuideHelper.Sphere(mid, 2.2f, PatternGuideHelper.Reversed, lifetime: 0.35f);
-        Destroy(gameObject);
+        Dismiss();
+    }
+
+    /// <summary>디졸브로 스러진 뒤 파괴된다(10-03 — 툭 꺼지지 않게). 사슬 · 바닥 이펙트 · 표식은 바로 걷고, 그동안 맞지 않는다.</summary>
+    public void Dismiss()
+    {
+        if (_leaving) return;
+        _leaving = true;
+        if (_collider != null) _collider.enabled = false;
+        if (_pips != null) _pips.Show(false);
+        EnemyCompassHud.RemoveGoal(transform);
+        BreakChain();
+        LichVfx.Stop(ref _base, 0.3f);
+        LichVfx.Stop(ref _igniteVfx, 0.3f);
+        PatternGuideHelper.SafeDestroy(ref _marker);
+        PatternGuideHelper.SafeDestroy(ref _visual);   // 기본 도형(투명 가이드)은 디졸브 대상이 아니다
+        LichPatternUtil.DissolveAndDestroy(_model, gameObject, VanishSeconds);
     }
 
     // ── Private Methods ───────────────────────────────────────────
@@ -183,7 +215,11 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
 
         PatternGuideHelper.SafeDestroy(ref _marker);
         LichVfx.Stop(ref _base, 0.3f);
-        _igniteVfx = LichVfx.PlayLoop(LichVfxSlot.SealStoneIgnite, transform.position, Quaternion.identity);
+        if (_pips != null) _pips.Show(false);
+        EnemyCompassHud.RemoveGoal(transform);   // 점화 — 더는 가리키지 않는다
+        _igniteVfx = LichVfx.PlayLoopTinted(LichVfxSlot.SealStoneIgnite, transform.position, Quaternion.identity, 1f,
+                                            new Color(1f, 1f, 1f, IgniteVfxAlpha));
+        CapBillboards(_igniteVfx, IgniteMaxScreen);
 
         if (_anchor != null)
         {
@@ -195,6 +231,14 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
         }
 
         _onIgnited?.Invoke(this);
+    }
+
+    /// <summary>화면을 보는 입자(빌보드)의 화면 크기 상한 — 카메라 가까이 선 봉인석의 빛구가 화면을 덮지 않게.</summary>
+    private static void CapBillboards(GameObject vfx, float maxScreen)
+    {
+        if (vfx == null) return;
+        foreach (var r in vfx.GetComponentsInChildren<ParticleSystemRenderer>(true))
+            if (r.renderMode == ParticleSystemRenderMode.Billboard) r.maxParticleSize = maxScreen;
     }
 
     private void ApplyLook() => ApplyLook(_currentColor, _currentGlow);

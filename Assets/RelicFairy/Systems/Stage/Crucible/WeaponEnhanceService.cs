@@ -83,6 +83,17 @@ public static class WeaponEnhanceService
     /// 안전장치 A(제물 흡수) + B(하한 0·파괴 없음). rng·fuel 은 호출측 소유.
     /// costMult/successBonus: 돌발 이벤트(할인/성공부스트) 반영. 기본 1/0(무보정).
     /// </summary>
+    /// <summary>재료 · 확률 없이 한 단계 올린다(쉼터 「벼린다」). 이미 최대면 false.</summary>
+    public static bool GrantLevel(WeaponData target, EnhanceTableSO t)
+    {
+        if (target == null || t == null) return false;
+        int max = MaxEnhance(target, t);
+        if (target.enhanceLevel >= max) return false;
+        target.enhanceLevel++;
+        target.RecomputeEnhancedStats();
+        return true;
+    }
+
     public static EnhanceResult TryEnhance(WeaponData target,
                                            EnhanceTableSO t, System.Random rng, RunFuelBank fuel,
                                            float costMult = 1f, float successBonus = 0f)

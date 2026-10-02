@@ -23,10 +23,16 @@ public class ServiceDecorAnchor : MonoBehaviour
     }
 
     [SerializeField] private Slot slot = Slot.Prop;
+    [Tooltip("소품 배열 칸 번호(NP<n>) — 0이면 남은 소품을 배치 순서대로")]
+    [SerializeField] private int propIndex;
 
     /// <summary>이 앵커가 받을 소품 종류.</summary>
     public Slot Kind => slot;
+    /// <summary>소품 배열 칸 번호 — 0이면 순서대로.</summary>
+    public int PropIndex => propIndex;
 
     /// <summary>토큰 핸들러가 스폰 직후 종류를 지정한다.</summary>
     public void SetKind(Slot kind) => slot = kind;
+    /// <summary>토큰 핸들러가 NP 번호를 지정한다.</summary>
+    public void SetPropIndex(int index) => propIndex = index;
 }

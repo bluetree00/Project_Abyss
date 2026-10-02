@@ -52,10 +52,11 @@ public static class CovenantAssembleService
     /// held(보유 서약)는 <b>페어링</b>에도 쓰인다(C4) — 소모형은 그 통화를 걸어 줄 서약이 있을 때만 나온다.
     /// </summary>
     public static void DraftBoard(int count, System.Random rng, bool forceSilver, IReadOnlyList<CovenantBase> held,
-                                  out List<CovenantDraftCard> causes, out List<CovenantDraftCard> effects)
+                                  out List<CovenantDraftCard> causes, out List<CovenantDraftCard> effects,
+                                  ICollection<StatusCurrency> build = null)
     {
         var causePool  = CovenantPalette.DraftableCauseIds(Step);
-        var effectBase = CovenantPalette.DraftableEffectIds(held, Step);
+        var effectBase = CovenantPalette.DraftableEffectIds(held, Step, build);
         causes  = null;
         effects = null;
         for (int attempt = 0; attempt < MaxBoardAttempts; attempt++)
@@ -103,7 +104,8 @@ public static class CovenantAssembleService
     public static CovenantDraftCard? RerollEffectCard(IReadOnlyList<CovenantDraftCard> current, int idx,
                                                       System.Random rng, bool forceSilver,
                                                       IReadOnlyList<CovenantBase> held,
-                                                      IReadOnlyList<CovenantDraftCard> causes)
+                                                      IReadOnlyList<CovenantDraftCard> causes,
+                                                      ICollection<StatusCurrency> build = null)
     {
         if (current == null || idx < 0 || idx >= current.Count) return null;
 
@@ -116,7 +118,7 @@ public static class CovenantAssembleService
         }
 
         bool mustSurvival = guaranteed <= 1 && CovenantPalette.IsGuaranteedSurvivalEffect(current[idx].id);
-        var pool = PairableEffects(CovenantPalette.DraftableEffectIds(held, Step), causes, held);
+        var pool = PairableEffects(CovenantPalette.DraftableEffectIds(held, Step, build), causes, held);
         var id = RerollOne(pool, exclude, rng, mustSurvival);
         if (id == null) return null;
         return new CovenantDraftCard(id, RollRerollTier(rng, forceSilver));

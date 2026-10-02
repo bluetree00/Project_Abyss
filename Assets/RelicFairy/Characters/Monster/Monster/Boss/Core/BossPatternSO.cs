@@ -51,6 +51,16 @@ public abstract class BossPatternSO : SpecialStateDataBase
     [Tooltip("연계 쿨다운(초) — 이 안에 같은 연계가 다시 오면 이어 내지 않는다(09-28: 쿨다운이 없어 후반이 두 패턴 되풀이로 굳었다)")]
     public float followUpCooldown = 14f;
 
+    [Header("시기")]
+    [Tooltip("해방기부터만 쓴다 — 봉인기엔 옛 봉인 사슬이 이 기술을 막고 있다(10-03 봉인 해방 설계 S2)")]
+    public bool liberatedOnly = false;
+
+    /// <summary>시기 때문에 지금 못 쓰는가 — 봉인기의 해방기 전용 기술.</summary>
+    public bool EraLocked => liberatedOnly && !StoryProgress.IsLiberated;
+
+    /// <summary>실행기가 고를 수 있는가 = 시기 잠금이 아니고 <see cref="CanExecute"/>.</summary>
+    public bool Available(BossPatternContext ctx) => !EraLocked && CanExecute(ctx);
+
     /// <summary>지금 <see cref="followUp"/>을 이어 낼 때인가 — 후반 전용이면 2페이지 간판 뒤에만.</summary>
     public bool FollowUpActive(MonsterBase monster)
         => followUp != null && (!followUpLateOnly || (monster as IPagedBoss)?.Pages?.IsLate == true);

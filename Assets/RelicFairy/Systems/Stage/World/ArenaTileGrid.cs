@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using RelicFairy.Monster;
 using UnityEngine;
 
 /// <summary>
@@ -20,6 +21,8 @@ using UnityEngine;
 ///     (시간을 주면 그 뒤 스스로 복구). 영구 붕괴 예산과 별개이고, 동시에 부서져 있을 수 있는 칸 수에 한도가 있다(누적 상한).
 ///     부서진 동안 영구 붕괴가 오면 복구하지 않고 그대로 사라진다.
 ///   · 복구는 구멍 기둥 안에 플레이어가 있으면(떨어지는 중) 기다린다 — 떠오르는 발판에 끼지 않게.
+///   · (10-03) 칸이 꺼지는 순간(붕괴 낙하 시작 · 일시 파괴) 먼지 · 파편이 일고, 맞닿은 온전한 칸 가장자리에 균열이 붙는다
+///     — 영구 붕괴는 전투 끝까지, 일시 파괴는 복구될 무렵까지. 빈 메시가 아니라 부서진 바닥으로 보이게(사용자 피드백).
 ///
 /// NavMesh는 다시 굽지 않는다 — 리치·플레이어·리치 해골 모두 NavMesh에 의존하지 않는다(대마법사 기획 §4-4 ①).
 /// </summary>
@@ -30,6 +33,21 @@ public class ArenaTileGrid : MonoBehaviour
 
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorId     = Shader.PropertyToID("_Color");
+
+    // (10-03) 부서지는 느낌 — 칸이 꺼질 때 먼지 · 파편, 남은 이웃 가장자리에 균열(「메시가 그냥 비어 있는 느낌」 사용자 피드백)
+    private const float DustScale            = 0.9f;   // SummonGround 배율 1 ≈ 반경 2.2 m(해골 소환 표식) — 칸(5 m)을 거의 덮는다
+    private const int   MaxDustPerFrame      = 12;     // 링 통째 붕괴(40여 칸)가 한 프레임에 다 뿜지 않게
+    private const int   DebrisPerCell        = 3;
+    private const int   MaxLiveDebris        = 90;
+    private const float DebrisSeconds        = 1.4f;
+    private const float DebrisGravity        = 22f;
+    private const float EdgeCrackSize        = 2.2f;   // 가장자리 균열 지름(m) — 한 변(5 m)에 둘
+    private const int   EdgeCracksPerSide    = 2;
+    private const float CollapseCrackSeconds = 900f;   // 영구 붕괴 — 전투가 끝날 때(LichCrack.ClearAll)까지 남는다
+    private const float BreakCrackSeconds    = 12f;    // 복구 시각을 모르는 일시 파괴(복구 패턴이 부를 때까지)
+    private const float BreakShrink          = 0.85f;  // 일시 파괴 — 가라앉으며 이만큼 오그라든다
+
+    private static readonly Vector2Int[] Sides = { new(1, 0), new(-1, 0), new(0, 1), new(0, -1) };
 
     // ── Static ────────────────────────────────────────────────────
     /// <summary>현재 활성인 붕괴형 아레나. 없으면 null — 보스 패턴은 지형 변화 없이 동작한다.</summary>
@@ -107,6 +125,9 @@ public class ArenaTileGrid : MonoBehaviour
     private int     _outerRing;
     private int     _broken;        // 지금 일시 파괴 중인 칸 수
     private Transform _player;       // 복구를 막는 것 — 구멍에 떨어지는 중인 플레이어(태그로 한 번 찾아 둔다)
+    private int       _dustFrame = -1;  // (10-03) 프레임당 먼지 수 — 링 통째 붕괴 상한
+    private int       _dustThisFrame;
+    private int       _liveDebris;      // (10-03) 떨어지는 중인 파편 수
 
     private sealed class Cell
     {
@@ -121,6 +142,17 @@ public class ArenaTileGrid : MonoBehaviour
         public bool       Broken;   // 일시 파괴 중 — 복구된다(그사이 Doomed가 되면 복구하지 않는다)
         public float      RestoreAt = -1f;   // 복구 시작 시각(-1 = 아직 요청 없음)
         public float      TopLocalY;         // 발판 윗면 높이(floorRoot 로컬)
+        public Vector3    HomeScale;         // (10-03) 일시 파괴 — 오그라들었다 되돌린다
+        public Mesh       DebrisMesh;        // (10-03) 파편 — 칸 자신의 가장 가벼운 LOD 메시(없으면 파편 없음)
+        public Material[] DebrisMaterials;
+    }
+
+    /// <summary>(10-03) 떨어지는 파편 하나.</summary>
+    private struct Chunk
+    {
+        public Transform  Tf;
+        public Vector3    Pos, Vel, Spin, Scale, MeshCenter;
+        public Quaternion Rot;
     }
 
     // ── Properties ────────────────────────────────────────────────
@@ -315,6 +347,46 @@ public class ArenaTileGrid : MonoBehaviour
         return best < float.MaxValue;
     }
 
+    /// <summary>
+    /// (10-03) 낙사 복구 자리 — <paramref name="from"/>(마지막으로 밟은 곳)에서 가까운 온전한 칸의 윗면 가운데.
+    /// 무너질 예정(흔들리는 중 포함)·부서진 칸은 빼고, 지금 링보다 바깥 칸은 안쪽 칸이 하나도 없을 때만 고른다.
+    /// 구멍(없음·무너짐·부서짐)과 맞닿은 변마다 한 칸 거리만큼 덜 반긴다 — 가장자리에서 되살아나 또 떨어지지 않게.
+    /// <paramref name="from"/>이 이 격자 위가 아니면 false(낙사 복구가 원래 방식으로 찾는다).
+    /// </summary>
+    public bool TryGetSafeRespawn(Vector3 from, out Vector3 top)
+    {
+        top = default;
+        if (!_hasOrigin) return false;
+
+        Vector3 local = floorRoot.InverseTransformPoint(from) - _originLocal;
+        float   fx    = local.x / cellSize;
+        float   fz    = local.z / cellSize;
+        if (fx < -1f || fz < -1f || fx > gridSize || fz > gridSize) return false;
+
+        float c       = (gridSize - 1) * 0.5f;
+        int   ringNow = (int)Mathf.Max(Mathf.Abs(Mathf.Round(fx) - c), Mathf.Abs(Mathf.Round(fz) - c));
+        Cell  best    = null;
+        float bestScore  = float.MaxValue;
+        bool  bestInside = false;
+        foreach (var cell in _cells.Values)
+        {
+            if (cell.Doomed || cell.Broken || !cell.Tf.gameObject.activeInHierarchy) continue;
+            bool inside = cell.Ring <= ringNow;
+            if (bestInside && !inside) continue;
+            float dx    = cell.Index.x - fx;
+            float dz    = cell.Index.y - fz;
+            float score = dx * dx + dz * dz + HoleSides(cell);
+            if (inside == bestInside && score >= bestScore) continue;
+            best       = cell;
+            bestScore  = score;
+            bestInside = inside;
+        }
+        if (best == null) return false;
+
+        top = CellTopWorld(best, best.Index.x, best.Index.y);
+        return true;
+    }
+
     /// <summary>수평 거리로 <paramref name="worldPos"/>에서 칸 중심까지 <paramref name="radius"/> 이내인 칸들을 담는다.</summary>
     public void CellsInRadius(Vector3 worldPos, float radius, List<Vector2Int> result)
     {
@@ -406,11 +478,21 @@ public class ArenaTileGrid : MonoBehaviour
                 Colliders     = child.GetComponentsInChildren<Collider>(true),
                 Renderers     = child.GetComponentsInChildren<Renderer>(true),
                 HomeLocal     = child.localPosition,
+                HomeScale     = child.localScale,
                 Ring          = (int)Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dz)),
                 CenterDistSqr = dx * dx + dz * dz,
             };
             _cells[idx] = cell;
             _outerRing  = Mathf.Max(_outerRing, cell.Ring);
+
+            // (10-03) 파편 — 칸 자신의 가장 가벼운 LOD 메시를 돌덩이 크기로 줄여 쓴다(새 에셋 참조 없이 같은 돌 재질).
+            var filters = child.GetComponentsInChildren<MeshFilter>(true);
+            for (int f = filters.Length - 1; f >= 0 && cell.DebrisMesh == null; f--)
+            {
+                if (filters[f].sharedMesh == null || !filters[f].TryGetComponent<MeshRenderer>(out var mr)) continue;
+                cell.DebrisMesh      = filters[f].sharedMesh;
+                cell.DebrisMaterials = mr.sharedMaterials;
+            }
             if (cell.Colliders.Length > 0)
                 cell.TopLocalY = floorRoot.InverseTransformPoint(cell.Colliders[0].bounds.max).y;
 
@@ -469,6 +551,7 @@ public class ArenaTileGrid : MonoBehaviour
             // 발판 제거와 동시에 낙하 — 콜라이더가 남아 있는 동안 떨어지면 플레이어가 함께 끌려 내려간다.
             for (int i = 0; i < cell.Colliders.Length; i++)
                 if (cell.Colliders[i] != null) cell.Colliders[i].enabled = false;
+            PlayBreakFx(cell, CollapseCrackSeconds, ct);   // (10-03) 먼지 · 파편 · 남은 이웃 가장자리 균열(전투 끝까지)
 
             Quaternion startRot = tf.localRotation;
             Vector3    tiltAxis = new Vector3(UnityEngine.Random.Range(-1f, 1f), 0f, UnityEngine.Random.Range(-1f, 1f));
@@ -509,17 +592,26 @@ public class ArenaTileGrid : MonoBehaviour
                 await UniTask.Yield(PlayerLoopTiming.Update, ct);
             }
 
-            // 발판 제거와 동시에 가라앉는다.
+            // 발판 제거와 동시에 부서져 가라앉는다 — 먼지 · 파편 · 이웃 가장자리 균열, 조금 오그라들며 꺼진다
+            // (10-03 「메시가 그냥 비어 있는 느낌이 아니라 부서져 있는 느낌」).
             SetColliders(cell, false);
+            bool scarred = cell.Doomed;   // 영구 흔적을 이미 남겼나 — 구멍인 사이 영구 붕괴가 오면 그때 남긴다
+            PlayBreakFx(cell, scarred ? CollapseCrackSeconds
+                            : down >= 0f ? breakSinkSeconds + down + restoreRiseSeconds : BreakCrackSeconds, ct);
+            Vector3 toCenter = PivotToCenter(cell);
             t = 0f;
             while (t < breakSinkSeconds)
             {
                 t += Time.deltaTime;
                 float k = Mathf.Clamp01(t / breakSinkSeconds);
-                tf.localPosition = cell.HomeLocal + Vector3.down * (breakSinkDistance * k * k);
+                float s = Mathf.Lerp(1f, BreakShrink, k);
+                tf.localScale    = cell.HomeScale * s;
+                tf.localPosition = cell.HomeLocal + toCenter * (1f - s) + Vector3.down * (breakSinkDistance * k * k);
                 await UniTask.Yield(PlayerLoopTiming.Update, ct);
             }
             SetRenderers(cell, false);
+            tf.localScale = cell.HomeScale;
+            DropAttachedCracks(tf);   // 이 칸에 붙어 있던 이웃 구멍의 균열 — 구멍 아래에 떠 보이지 않게
 
             // 구멍으로 남는다 — 시간을 줬으면 그 뒤, 아니면 복구 패턴(RestoreBroken)이 부를 때까지.
             if (down >= 0f) cell.RestoreAt = Time.time + down;
@@ -527,6 +619,7 @@ public class ArenaTileGrid : MonoBehaviour
                 await UniTask.Yield(PlayerLoopTiming.Update, ct);
             if (cell.Doomed)
             {
+                if (!scarred) SpawnEdgeCracks(cell, CollapseCrackSeconds);   // (10-03) 영구 구멍이 됐다 — 가장자리 흔적도 남긴다
                 tf.gameObject.SetActive(false);   // 부서진 사이 영구 붕괴가 왔다 — 그대로 사라진다
                 return;
             }
@@ -536,6 +629,7 @@ public class ArenaTileGrid : MonoBehaviour
                 await UniTask.Yield(PlayerLoopTiming.Update, ct);
             if (cell.Doomed)
             {
+                if (!scarred) SpawnEdgeCracks(cell, CollapseCrackSeconds);
                 tf.gameObject.SetActive(false);
                 return;
             }
@@ -597,6 +691,149 @@ public class ArenaTileGrid : MonoBehaviour
         if (Mathf.Abs(local.z - cell.Index.y * cellSize) > half) return false;
         float top = cell.TopLocalY - (_originLocal.y);
         return local.y < top - 0.2f && local.y > top - Depth;
+    }
+
+    /// <summary>
+    /// (10-03) 칸이 꺼지는 순간 — 먼지 한 번, 가장자리에서 떨어져 나가는 파편, 남은 이웃 가장자리 균열(<paramref name="crackSeconds"/>초).
+    /// 이펙트 목록 · 균열 재질(리치가 읽는다)이 없으면 파편만.
+    /// </summary>
+    private void PlayBreakFx(Cell cell, float crackSeconds, CancellationToken ct)
+    {
+        if (_dustFrame != Time.frameCount)
+        {
+            _dustFrame     = Time.frameCount;
+            _dustThisFrame = 0;
+        }
+        if (_dustThisFrame++ < MaxDustPerFrame)
+            LichVfx.Play(LichVfxSlot.SummonGround, CellTopWorld(cell, cell.Index.x, cell.Index.y), Quaternion.identity, DustScale);
+
+        SpawnEdgeCracks(cell, crackSeconds);
+        if (cell.DebrisMesh != null && _liveDebris + DebrisPerCell <= MaxLiveDebris)
+            DebrisAsync(cell, ct).Forget();
+    }
+
+    /// <summary>
+    /// 꺼진 칸과 맞닿은 온전한 이웃 칸 가장자리에 균열을 깐다 — 이웃 칸에 붙여, 이웃이 흔들리거나 떨어지면 함께 간다.
+    /// 쿼드가 구멍 위로 삐져나오지 않게 이웃 안쪽으로 조금 들인다.
+    /// </summary>
+    private void SpawnEdgeCracks(Cell cell, float seconds)
+    {
+        if (LichVfx.CrackMaterial == null) return;
+        float inset = EdgeCrackSize * 0.55f / cellSize;
+        for (int s = 0; s < Sides.Length; s++)
+        {
+            var d = Sides[s];
+            if (!_cells.TryGetValue(cell.Index + d, out var nb) || nb.Doomed || nb.Broken) continue;
+            for (int i = 0; i < EdgeCracksPerSide; i++)
+            {
+                float along = (i + 0.5f) / EdgeCracksPerSide - 0.5f;
+                float ix    = cell.Index.x + d.x * (0.5f + inset) - d.y * along;
+                float iz    = cell.Index.y + d.y * (0.5f + inset) + d.x * along;
+                LichCrack.Spawn(CellTopWorld(nb, ix, iz), EdgeCrackSize * UnityEngine.Random.Range(0.85f, 1.1f), seconds, nb.Tf);
+            }
+        }
+    }
+
+    /// <summary>칸에 붙은 균열(이웃 구멍의 가장자리 흔적)을 걷는다 — 이 칸이 부서져 숨을 때.</summary>
+    private static void DropAttachedCracks(Transform tile)
+    {
+        foreach (var crack in tile.GetComponentsInChildren<LichCrack>(true))
+            Destroy(crack.gameObject);
+    }
+
+    /// <summary>(10-03) 파편 — 칸 메시를 줄인 돌덩이 몇 개가 가장자리에서 떨어져 나가 구르며 떨어진다.</summary>
+    private async UniTaskVoid DebrisAsync(Cell cell, CancellationToken ct)
+    {
+        var chunks = new Chunk[DebrisPerCell];
+        _liveDebris += chunks.Length;
+        try
+        {
+            Vector3 center = CellTopWorld(cell, cell.Index.x, cell.Index.y);
+            for (int i = 0; i < chunks.Length; i++)
+                chunks[i] = MakeChunk(cell, center);
+
+            float t = 0f;
+            while (t < DebrisSeconds)
+            {
+                float dt = Time.deltaTime;
+                t += dt;
+                // 끝에서 오그라들어 사라진다 — 구멍 아래서 툭 꺼지지 않게.
+                float shrink = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(DebrisSeconds * 0.6f, DebrisSeconds, t));
+                for (int i = 0; i < chunks.Length; i++)
+                    StepChunk(ref chunks[i], dt, shrink);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 방이 파괴됨 — 아래에서 파편을 거둔다.
+        }
+        finally
+        {
+            for (int i = 0; i < chunks.Length; i++)
+                if (chunks[i].Tf != null) Destroy(chunks[i].Tf.gameObject);
+            _liveDebris -= chunks.Length;
+        }
+    }
+
+    /// <summary>칸 네 변 중 한 곳에서 떨어져 나와 구멍 안쪽으로 튀는 돌덩이 하나(크기는 메시 크기와 무관하게 0.3~0.9 m).</summary>
+    private Chunk MakeChunk(Cell cell, Vector3 center)
+    {
+        var     d      = Sides[UnityEngine.Random.Range(0, Sides.Length)];
+        float   along  = UnityEngine.Random.Range(-0.4f, 0.4f);
+        Vector3 at     = CellTopWorld(cell, cell.Index.x + d.x * 0.42f - d.y * along, cell.Index.y + d.y * 0.42f + d.x * along);
+        Vector3 inward = center - at;
+        inward.y = 0f;
+
+        var go = new GameObject("TileDebris");
+        go.AddComponent<MeshFilter>().sharedMesh = cell.DebrisMesh;
+        var mr = go.AddComponent<MeshRenderer>();
+        mr.sharedMaterials   = cell.DebrisMaterials;
+        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+        Bounds b = cell.DebrisMesh.bounds;
+        var chunk = new Chunk
+        {
+            Tf         = go.transform,
+            Pos        = at,
+            Vel        = inward.normalized * UnityEngine.Random.Range(0.6f, 1.8f) + Vector3.up * UnityEngine.Random.Range(0.8f, 2.4f),
+            Spin       = UnityEngine.Random.insideUnitSphere * 360f,
+            Scale      = new Vector3(UnityEngine.Random.Range(0.5f, 0.9f)  / Mathf.Max(0.01f, b.size.x),
+                                     UnityEngine.Random.Range(0.3f, 0.55f) / Mathf.Max(0.01f, b.size.y),
+                                     UnityEngine.Random.Range(0.5f, 0.9f)  / Mathf.Max(0.01f, b.size.z)),
+            MeshCenter = b.center,
+            Rot        = UnityEngine.Random.rotation,
+        };
+        StepChunk(ref chunk, 0f, 1f);   // 첫 프레임부터 제자리 · 제 크기
+        return chunk;
+    }
+
+    private static void StepChunk(ref Chunk c, float dt, float shrink)
+    {
+        c.Vel += Vector3.down * (DebrisGravity * dt);
+        c.Pos += c.Vel * dt;
+        c.Rot  = Quaternion.Euler(c.Spin * dt) * c.Rot;
+        Vector3 s = c.Scale * shrink;
+        c.Tf.localScale = s;
+        c.Tf.SetPositionAndRotation(c.Pos - c.Rot * Vector3.Scale(c.MeshCenter, s), c.Rot);   // 메시 피벗이 모서리 — 가운데를 축으로 돈다
+    }
+
+    /// <summary>격자 좌표(칸 번호, 소수 가능)의 <paramref name="basis"/> 칸 윗면 높이 월드 위치.</summary>
+    private Vector3 CellTopWorld(Cell basis, float ix, float iz)
+        => floorRoot.TransformPoint(new Vector3(_originLocal.x + ix * cellSize, basis.TopLocalY, _originLocal.z + iz * cellSize));
+
+    /// <summary>칸 피벗(원본 타일은 모서리)에서 칸 가운데까지(floorRoot 로컬, 수평) — 가운데를 두고 오그라들게.</summary>
+    private Vector3 PivotToCenter(Cell cell)
+        => new Vector3(_originLocal.x + cell.Index.x * cellSize - cell.HomeLocal.x, 0f,
+                       _originLocal.z + cell.Index.y * cellSize - cell.HomeLocal.z);
+
+    /// <summary>맞닿은 네 칸 중 구멍(없음 · 무너짐 · 부서짐)인 수.</summary>
+    private int HoleSides(Cell cell)
+    {
+        int n = 0;
+        for (int s = 0; s < Sides.Length; s++)
+            if (!_cells.TryGetValue(cell.Index + Sides[s], out var nb) || nb.Doomed || nb.Broken) n++;
+        return n;
     }
 
     private static void SetColliders(Cell cell, bool on)

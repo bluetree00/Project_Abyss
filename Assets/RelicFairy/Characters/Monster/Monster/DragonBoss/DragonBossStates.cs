@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -820,7 +821,41 @@ public class DragonDieState : DieState
         }
 
         base.Enter(ctx);
-        BossStoryScenes.PlayEnd(ctx, StoryProgress.Dragon);   // 봉인기 = 봉인 · 해방기 = 처치
+        FallInsideThenEndSceneAsync(ctx).Forget();
+    }
+
+    private const float CorpseFallSeconds = 0.35f;
+
+    /// <summary>
+    /// 공중 · 맵 밖에서 쓰러지면 그 자리에 떠 있거나 벽 너머에 남았다(키네마틱이라 떨어지지 않는다) —
+    /// 아레나 안 바닥으로 떨어뜨린 뒤 끝 장면(봉인기 = 봉인 · 해방기 = 처치)을 튼다(09-30).
+    /// </summary>
+    private static async UniTaskVoid FallInsideThenEndSceneAsync(MonsterContext ctx)
+    {
+        var     body = ctx.Transform;
+        Vector3 from = body.position;
+        Vector3 to   = from;
+        to.y = ctx.Runtime.SpawnPosition.y;
+        to   = DragonPatternFloorUtils.PullInsideArena(ctx, to);
+
+        if ((to - from).sqrMagnitude > 0.04f)
+        {
+            var ct = ctx.Monster.GetCancellationTokenOnDestroy();
+            try
+            {
+                // 실시간 기준 — 막타 히트스톱(시간 배율 ↓) 동안 떨어지다 멈춰 있지 않게
+                for (float t = 0f; t < CorpseFallSeconds; t += Time.unscaledDeltaTime)
+                {
+                    float k = t / CorpseFallSeconds;
+                    body.position = Vector3.Lerp(from, to, k * k);   // 떨어지듯 가속
+                    await UniTask.Yield(PlayerLoopTiming.Update, ct);
+                }
+            }
+            catch (System.OperationCanceledException) { return; }
+            body.position = to;
+            Debug.Log($"[DragonBoss] 쓰러진 자리 {from} → 아레나 안 바닥 {to}", ctx.Monster);
+        }
+        BossStoryScenes.PlayEnd(ctx, StoryProgress.Dragon);
     }
 }
 

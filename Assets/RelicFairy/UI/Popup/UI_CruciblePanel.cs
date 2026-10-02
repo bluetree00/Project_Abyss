@@ -179,6 +179,19 @@ public sealed class UI_CruciblePanel : UI_Popup
     private static readonly Color HammerShine  = new(0.91f, 0.93f, 0.95f, 0.9f);
     private static readonly Color EvolveReady  = new(0.40f, 0.28f, 0.62f, 1f);
     private static readonly Color EvolveLocked = new(0.12f, 0.10f, 0.13f, 0.9f);
+    // 진화 갈래 성격 — 원색을 피한 두 결: 서늘한 강철빛(빠른 검) · 화로의 잉걸빛(묵직한 검)
+    private static readonly Color FastTint  = new(0.62f, 0.80f, 0.95f, 1f);
+    private static readonly Color HeavyTint = new(0.95f, 0.62f, 0.32f, 1f);
+    private static readonly string[] EvStatNames = { "공격력", "공격 속도", "사거리", "범위" };
+    // 고르기 화면 · 카드 바탕은 불투명 — 반투명이면 뒤 무대 글자가 비치고, 고른 카드의 금빛 테두리가 바탕째 물든다(10-01 실측)
+    private static readonly Color ChooserVeil = new(0.035f, 0.024f, 0.018f, 1f);
+    private static readonly Color CardSolid   = new(0.10f, 0.07f, 0.05f, 1f);
+
+    // 진화 선택 · 연출(10-01 개편)
+    private const float EvCardW = 640f, EvCardH = 640f, EvCardY = 176f, EvCardGap = 64f;
+    private const float EvolveStrikeGap = 0.12f;   // 망치 두 번 사이
+    private const float EvolvePopDur    = 0.42f;   // 새 형태가 맺혔다 부푸는 시간
+    private const float EvolveStampSize = 60f;
 
     private static Sprite _vignette;   // 코드로 그린 비네트(한 번 만들어 계속 쓴다)
 
@@ -222,6 +235,29 @@ public sealed class UI_CruciblePanel : UI_Popup
     // 전설 승급 택1 — 진화가 끝난 검이 최대 강화에 닿으면 연다(09-27 복원: 승급 줄이 숨겨져 아무도 닿지 못했다).
     private GameObject _legendPanel;
     private readonly List<GameObject> _legendCards = new();
+    // 진화 선택(10-01 개편) — 카드 두 장 · 고른 뒤 확정. 구운 프리팹엔 없고 처음 열 때 _evolvePanel 안에 짓는다.
+    private RectTransform _evolveContent;
+    private TMP_Text      _evolveTitle, _evolveSub, _evolveConfirmLbl;
+    private Button        _evolveConfirm;
+    private readonly EvolveCard[] _evolveCards = new EvolveCard[2];
+    private int           _evolvePick = -1;
+
+    private sealed class EvolveCard
+    {
+        public RectTransform root;
+        public CanvasGroup   group;
+        public Image         border, tagBack, glow, icon;
+        public Button        button;
+        public TMP_Text      tag, name, line, skills, foot;
+        public readonly TMP_Text[] statValue = new TMP_Text[4], statDelta = new TMP_Text[4];
+    }
+
+    // 들어올 때 고르기(10-01) — 근거리 무기와 원거리 파츠 중 무엇을 벼릴지 먼저 고른다. 구운 프리팹에 없고 처음 필요할 때 만든다.
+    private GameObject _chooser;
+    private TMP_Text   _chooserSub;
+    private readonly Button[]   _chooseCard  = new Button[2];
+    private readonly TMP_Text[] _chooseName  = new TMP_Text[2], _chooseBig   = new TMP_Text[2];
+    private readonly TMP_Text[] _chooseLine1 = new TMP_Text[2], _chooseLine2 = new TMP_Text[2], _chooseLine3 = new TMP_Text[2];
     [SerializeField] private Image          _tabWeaponImg, _tabRangedImg;
     private int            _activeTab;   // 0=무기강화 1=원거리 파츠
 
@@ -235,8 +271,6 @@ public sealed class UI_CruciblePanel : UI_Popup
     [SerializeField] private TMP_Text   _eventBannerText;
     [SerializeField] private GameObject _evolvePanel;
     [SerializeField] private Button     _evolveBtn;
-    [SerializeField] private TMP_Text   _branchAName, _branchBName;
-    [SerializeField] private Button     _branchABtn,  _branchBBtn;
 
     // 디테일 콘텐츠 — 무기 타입·티어 라인 + "다음 강화 상세"(성공/실패/잭팟) + 정보 잭팟·이벤트효과
     [SerializeField] private TMP_Text _focusTypeText;
@@ -349,8 +383,9 @@ public sealed class UI_CruciblePanel : UI_Popup
         _targetSlot = PlayerWeaponManager.Slot0;
         BuildLegendButtons();
         _dialogText.text = _controller.GetDialogue(CrucibleMood.Idle);   // 이벤트는 이제 전용 배너로 표시
+        ShowChooser();           // 근거리 · 원거리 중 무엇을 벼릴지 먼저 — 두 쪽 비용을 한눈에 비교한다
         RefreshAll();
-        TryShowEngraveOffer();   // 전 방문에 올라 두고 안 고른 각인이 있으면 먼저 묻는다
+        TryShowEngraveOffer();   // 전 방문에 올라 두고 안 고른 각인이 있으면 먼저 묻는다(선택 화면 위로 뜬다)
     }
 
     public override void ClosePopupUI()
@@ -492,10 +527,7 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         Rewire(_enhanceBtn, OnEnhanceClicked);
         Rewire(_evolveBtn,  ShowEvolvePanel);
-        Rewire(_branchABtn, () => OnBranchClicked(0));
-        Rewire(_branchBBtn, () => OnBranchClicked(1));
         Rewire(FindDeep("Exit")?.GetComponent<Button>(),          ClosePopupUI);
-        Rewire(FindDeep("EvolveCancel")?.GetComponent<Button>(),  HideEvolvePanel);
 
         // 탭 클릭은 람다로 건 <b>비영속 리스너</b>라 프리팹에 저장되지 않는다 —
         // 다시 걸지 않으면 구운 화면에서 원거리 파츠 탭으로 갈 길 자체가 없다.
@@ -612,6 +644,8 @@ public sealed class UI_CruciblePanel : UI_Popup
     /// <summary>탭 전환 — 스테이지 표시 토글 + 대상 슬롯 전환 + 탭 아트 갱신 + 갱신.</summary>
     private void SelectTab(int tab)
     {
+        // 탭을 고르면(첫 화면 카드든 머리줄 탭이든) 선택 화면을 걷는다.
+        if (_chooser != null) _chooser.SetActive(false);
         _activeTab = tab;
         if (_meleeStage != null)  _meleeStage.gameObject.SetActive(tab == 0);
         if (_rangedStage != null) _rangedStage.gameObject.SetActive(tab == 1);
@@ -1594,61 +1628,104 @@ public sealed class UI_CruciblePanel : UI_Popup
         _eventBanner.SetActive(false);
     }
 
-    // ── 진화 선택 패널 (선택 연출 오버레이) ──────────────────
+    // ── 진화 (10-01 개편 — 사용자 「장비에도 이름이 있고 성능이 묵직한 검 · 빠른 검이라, 진화 연출과 선택지가 제대로 만들어져야 해」) ──
+
+    /// <summary>창 전체 암막 호스트만 만든다 — 카드 · 버튼은 처음 열 때 <see cref="EnsureEvolveContent"/>가 짓는다(구운 화면과 같은 경로).</summary>
     private void BuildEvolvePanel(Transform w)
     {
-        var dim = ShopUIStyle.MakeImage(w, "EvolveDim", new Color(0.02f, 0.02f, 0.04f, 0.90f), raycast: true);
+        var dim = ShopUIStyle.MakeImage(w, "EvolveDim", ChooserVeil, raycast: true);
         ShopUIStyle.Stretch(dim.rectTransform);
         _evolvePanel = dim.gameObject;
-        var d = dim.transform;
-
-        var title = ShopUIStyle.MakeText(d, "EvolveTitle", 28f, FontStyles.Bold,
-                                         TextAlignmentOptions.Center, ShopUIStyle.Gold);
-        title.text = "무기가 형태를 선택한다";
-        ShopUIStyle.Anchor(title.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-                           new Vector2(0, -120), new Vector2(760, 48));
-
-        var sub = ShopUIStyle.MakeText(d, "EvolveSub", 15f, FontStyles.Italic,
-                                       TextAlignmentOptions.Center, ShopUIStyle.TextDim);
-        sub.text = "◇ 되돌릴 수 없는 선택 ◇";
-        ShopUIStyle.Anchor(sub.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-                           new Vector2(0, -172), new Vector2(760, 28));
-
-        _branchABtn = BuildBranchCard(d, -200f, out _branchAName);
-        _branchBBtn = BuildBranchCard(d,  200f, out _branchBName);
-        _branchABtn.onClick.AddListener(() => OnBranchClicked(0));
-        _branchBBtn.onClick.AddListener(() => OnBranchClicked(1));
-
-        var cancel = MakeStyledButton(d, "EvolveCancel", "취소", out _);
-        ShopUIStyle.Anchor((RectTransform)cancel.transform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                           new Vector2(0, 56), new Vector2(200, 50));
-        cancel.onClick.AddListener(HideEvolvePanel);
-
         _evolvePanel.SetActive(false);
     }
 
-    private Button BuildBranchCard(Transform d, float xCenter, out TMP_Text nameText)
+    /// <summary>
+    /// 진화 선택 화면 — 제목 · 카드 두 장 · [취소] [「○○」로 벼린다]. 되돌릴 수 없는 선택이라 카드는 고르기만 하고 확정은 버튼이 한다.
+    /// 구운 화면의 옛 내용(이름만 있던 카드 두 장 · 취소)은 끄고 같은 암막 안에 새로 짓는다.
+    /// </summary>
+    private void EnsureEvolveContent()
     {
-        var card = ShopUIStyle.MakeFrame(d, "Branch", ShopUIStyle.CardBorder, ShopUIStyle.CardFill, 3f, raycast: true);
-        var rt = (RectTransform)card.transform.parent;
-        ShopUIStyle.Anchor(rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                           new Vector2(xCenter, 10f), new Vector2(340, 300));
-        var c = card.transform;
+        if (_evolveContent != null || _evolvePanel == null) return;
+        foreach (Transform c in _evolvePanel.transform) c.gameObject.SetActive(false);
+        // 구운 화면의 암막은 옛 반투명(0.90) 그대로다 — 새 내용 밑에서 무대 글자가 비치지 않게 덮어쓴다.
+        if (_evolvePanel.TryGetComponent<Image>(out var veil)) veil.color = ChooserVeil;
 
-        nameText = ShopUIStyle.MakeText(c, "Name", 24f, FontStyles.Bold,
-                                        TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
-        ShopUIStyle.Anchor(nameText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1),
-                           new Vector2(0, -110), new Vector2(-24, 70));
+        _evolveContent = (RectTransform)ShopUIStyle.MakeRect(_evolvePanel.transform, "EvolveContent").transform;
+        ShopUIStyle.Stretch(_evolveContent);
+        var d = _evolveContent;   // 창(1600×1000)과 같은 크기 — 목업 좌표로 앉힌다
 
-        var hint = ShopUIStyle.MakeText(c, "Hint", 14f, FontStyles.Normal,
-                                        TextAlignmentOptions.Center, ShopUIStyle.TextDim);
-        hint.text = "클릭하여 이 형태로 진화";
-        ShopUIStyle.Anchor(hint.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0),
-                           new Vector2(0, 30), new Vector2(-24, 24));
+        _evolveTitle = MakeLabel(d, "Title", 34f, FontStyles.Bold, TextAlignmentOptions.Center, ShopUIStyle.Gold);
+        Place(_evolveTitle.rectTransform, 0f, 64f, MockW, 52f);
+        _evolveSub = MakeLabel(d, "Sub", 20f, FontStyles.Normal, TextAlignmentOptions.Center, TextMuted);
+        Place(_evolveSub.rectTransform, 0f, 120f, MockW, 30f);
 
-        var pick = card.transform.parent.gameObject.AddComponent<Button>();
-        ShopUIStyle.ApplyButtonColors(pick);
-        return pick;
+        for (int k = 0; k < _evolveCards.Length; k++) _evolveCards[k] = BuildEvolveCard(d, k);
+
+        var cancel = MakeStyledButton(d, "EvolveCancel", "취소", out var cancelLbl);
+        Place((RectTransform)cancel.transform, 468f, 846f, 200f, 64f);
+        cancelLbl.fontSize = 22f;
+        cancel.onClick.AddListener(HideEvolvePanel);
+
+        _evolveConfirm = MakeStyledButton(d, "EvolveConfirm", "", out _evolveConfirmLbl);
+        Place((RectTransform)_evolveConfirm.transform, 692f, 846f, 440f, 64f);
+        _evolveConfirmLbl.fontSize = 24f;
+        _evolveConfirm.onClick.AddListener(() => { if (_evolvePick >= 0) OnBranchClicked(_evolvePick); });
+
+        var hint = MakeLabel(d, "Hint", 16f, FontStyles.Normal, TextAlignmentOptions.Center, ShopUIStyle.TextDim);
+        hint.text = "카드를 골라 비교하고, 벼리기를 눌러야 바뀐다";
+        Place(hint.rectTransform, 0f, 922f, MockW, 26f);
+    }
+
+    /// <summary>카드 하나 — 성격 표식 · 무기 그림 · 이름 · 한 줄 · 수치 4줄(지금 대비) · 스킬 · 비용/잠금.</summary>
+    private EvolveCard BuildEvolveCard(Transform d, int k)
+    {
+        var card = new EvolveCard();
+        var fill = ShopUIStyle.MakeFrame(d, k == 0 ? "EvolveA" : "EvolveB", BronzeEdge, CardSolid, 3f, raycast: true);
+        card.root   = (RectTransform)fill.transform.parent;
+        card.border = card.root.GetComponent<Image>();
+        Place(card.root, 128f + k * (EvCardW + EvCardGap), EvCardY, EvCardW, EvCardH);
+        card.group  = card.root.gameObject.AddComponent<CanvasGroup>();
+        var c = fill.transform;
+
+        card.tagBack = ShopUIStyle.MakeImage(c, "TagBack", Color.clear);
+        PlaceIn(card.tagBack.rectTransform, 200f, 28f, 240f, 44f, EvCardW, EvCardH);
+        card.tagBack.sprite = UIProceduralSprites.RoundedRect(22f, 4f);
+        card.tagBack.type   = Image.Type.Sliced;
+        card.tag = MakeLabel(card.tagBack.transform, "Tag", 24f, FontStyles.Bold, TextAlignmentOptions.Center, Color.white);
+        ShopUIStyle.Stretch(card.tag.rectTransform);
+
+        card.glow = ShopUIStyle.MakeImage(c, "Glow", Color.clear);
+        card.glow.sprite = UI_RuneSelectPopup.SoftDot;
+        PlaceIn(card.glow.rectTransform, 160f, 64f, 320f, 260f, EvCardW, EvCardH);
+        card.icon = ShopUIStyle.MakeImage(c, "Icon", Color.white);
+        card.icon.preserveAspect = true;
+        PlaceIn(card.icon.rectTransform, 210f, 84f, 220f, 220f, EvCardW, EvCardH);
+
+        card.name = ChooserLine(c, "Name", 40f, FontStyles.Bold, LevelGold, 0f, 316f, EvCardW, 52f, EvCardW, EvCardH);
+        card.line = ChooserLine(c, "Line", 20f, FontStyles.Normal, TextMuted, 0f, 370f, EvCardW, 30f, EvCardW, EvCardH);
+        // ▲▼가 무엇과 견준 값인지 — 없으면 「빠른 검」의 속도 ▼(지금 무기보다 0.1 느림)가 모순처럼 읽혔다(10-01 실측).
+        var vs = MakeLabel(c, "VsNow", 16f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextDim);
+        vs.text = "지금 무기 대비";
+        PlaceIn(vs.rectTransform, 412f, 398f, 150f, 20f, EvCardW, EvCardH);
+        for (int i = 0; i < EvStatNames.Length; i++)
+        {
+            float y = 418f + i * 34f;
+            var label = MakeLabel(c, $"StatL{i}", 22f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft, TextMuted);
+            label.text = EvStatNames[i];
+            PlaceIn(label.rectTransform, 96f, y, 170f, 32f, EvCardW, EvCardH);
+            card.statValue[i] = MakeLabel(c, $"StatV{i}", 22f, FontStyles.Bold, TextAlignmentOptions.MidlineRight, ShopUIStyle.TextPrimary);
+            PlaceIn(card.statValue[i].rectTransform, 266f, y, 130f, 32f, EvCardW, EvCardH);
+            card.statDelta[i] = MakeLabel(c, $"StatD{i}", 20f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft, TextMuted);
+            PlaceIn(card.statDelta[i].rectTransform, 412f, y, 150f, 32f, EvCardW, EvCardH);
+        }
+        card.skills = ChooserLine(c, "Skills", 18f, FontStyles.Normal, ShopUIStyle.TextPrimary, 24f, 562f, EvCardW - 48f, 30f, EvCardW, EvCardH);
+        card.foot   = ChooserLine(c, "Foot", 16f, FontStyles.Normal, ShopUIStyle.TextDim, 24f, 598f, EvCardW - 48f, 26f, EvCardW, EvCardH);
+
+        card.button = card.root.gameObject.AddComponent<Button>();
+        ShopUIStyle.ApplyButtonColors(card.button);
+        int pick = k;
+        card.button.onClick.AddListener(() => PickEvolveCard(pick));
+        return card;
     }
 
     /// <summary>현재 장착 무기의 진화 분기(WeaponEvolutionSO). 진화 불가면 빈 목록.</summary>
@@ -1676,27 +1753,134 @@ public sealed class UI_CruciblePanel : UI_Popup
             return;
         }
 
+        EnsureEvolveContent();
         int lv = wd?.enhanceLevel ?? 0;
-        SetBranchLabel(_branchAName, branches.Count > 0 ? branches[0] : null, lv);
-        SetBranchLabel(_branchBName, branches.Count > 1 ? branches[1] : null, lv);
+        _evolveTitle.text = $"{wd?.displayName ?? "무기"} — 형(形)을 고른다";
+        _evolveSub.text   = $"되돌릴 수 없다 · 강화 +{lv}와 각인은 새 형태로 그대로 이어진다";
+        for (int k = 0; k < _evolveCards.Length; k++)
+            FillEvolveCard(_evolveCards[k], k < branches.Count ? branches[k] : null, wd);
+        PickEvolveCard(-1);
 
+        _evolvePanel.transform.SetAsLastSibling();
         _evolvePanel.SetActive(true);
         ShopUIStyle.PlaySfx("shop_open");
     }
 
-    /// <summary>분기 라벨 — 진화 후 이름 + 잠금 조건(강화 레벨 미달 시 회색 안내).</summary>
-    private static void SetBranchLabel(TMP_Text label, WeaponEvolutionSO.Branch b, int enhanceLevel)
+    private void FillEvolveCard(EvolveCard card, WeaponEvolutionSO.Branch b, WeaponData current)
     {
-        if (label == null) return;
-        if (b == null || !b.IsValid) { label.text = "—"; return; }
+        bool valid = b != null && b.IsValid;
+        card.root.gameObject.SetActive(valid);
+        if (!valid) return;
 
-        string name = b.target != null && !string.IsNullOrEmpty(b.target.displayName)
-            ? b.target.displayName : b.branchId;
+        var so = b.target;
+        var (tag, tint, line) = Persona(so);
+        card.tag.text  = tag;
+        card.tag.color = tint;
+        card.tagBack.color = new Color(tint.r, tint.g, tint.b, 0.16f);
+        card.glow.color    = new Color(tint.r, tint.g, tint.b, 0.22f);
+        card.icon.sprite  = so.icon;
+        card.icon.enabled = so.icon != null;
+        card.name.text = so.displayName;
+        card.line.text = line;
 
-        if (!WeaponEvolutionSO.IsUnlocked(b, enhanceLevel))
-            label.text = $"<color=#7A7290>{name}\n<size=70%>강화 {b.requiredEnhanceLevel} 필요</size></color>";
-        else
-            label.text = $"{name}\n<size=70%>{(b.cost > 0 ? $"재료 {b.cost}" : "진화 가능")}</size>";
+        int level = current?.enhanceLevel ?? 0;
+        var next = PreviewStats(so, level);
+        var now  = current != null ? new[] { current.baseAttack, current.attackSpeed, current.attackRange, current.areaOfEffect } : null;
+        for (int i = 0; i < EvStatNames.Length; i++)
+        {
+            card.statValue[i].text = StatText(i, next[i]);
+            card.statDelta[i].text = now != null ? DeltaText(i, next[i] - now[i]) : "";
+        }
+
+        string q = so.skillQ != null ? so.skillQ.skillName : null;
+        string e = so.skillE != null ? so.skillE.skillName : null;
+        card.skills.text = q != null || e != null ? $"스킬  Q 「{q ?? "—"}」 · E 「{e ?? "—"}」" : "";
+
+        bool unlocked = WeaponEvolutionSO.IsUnlocked(b, level);
+        card.foot.text = !unlocked ? $"<color=#FF7A6A>강화 +{b.requiredEnhanceLevel}에서 열린다</color>"
+                       : b.cost > 0 ? $"진화 비용  강화재료 <color=#FFD24A>{b.cost}</color>" : "진화 비용 없음";
+        card.button.interactable = unlocked;
+    }
+
+    /// <summary>카드 고르기 — 고른 카드는 금빛 테두리, 다른 카드는 옅게. 확정 버튼은 고른 뒤 · 재료가 되면 열리고 불이 켜진다.</summary>
+    private void PickEvolveCard(int k)
+    {
+        var branches = CurrentBranches;
+        bool ok = k >= 0 && k < branches.Count && branches[k] != null && branches[k].IsValid;
+        _evolvePick = ok ? k : -1;
+        for (int i = 0; i < _evolveCards.Length; i++)
+        {
+            var card = _evolveCards[i];
+            if (card == null) continue;
+            bool picked = i == _evolvePick;
+            card.border.color = picked ? ShopUIStyle.Gold : BronzeEdge;
+            card.group.alpha  = _evolvePick < 0 || picked ? 1f : 0.55f;
+        }
+
+        var b = ok ? branches[k] : null;
+        int fuel = _controller != null ? _controller.FuelAmount : 0;
+        bool affordable = b != null && (b.cost <= 0 || fuel >= b.cost);
+        if (_evolveConfirm == null) return;
+        _evolveConfirm.interactable = affordable;
+        string name = b?.target != null ? b.target.displayName : "";
+        string cost = b == null || b.cost <= 0 ? ""
+                    : affordable ? $"  <size=80%>재료 {b.cost}</size>" : $"  <size=80%><color=#FF5250>재료 {b.cost}</color></size>";
+        _evolveConfirmLbl.text = b == null ? "<color=#9A98A0>형태를 고른다</color>" : $"「{name}」{Ro(name)} 벼린다{cost}";
+        UIAffordGlow.Set(_evolveConfirm, affordable);
+    }
+
+    /// <summary>진화 갈래의 성격 — 표식 · 색 · 한 줄. 한 줄은 무기 데이터(tagline)가 있으면 그것을.</summary>
+    private static (string tag, Color tint, string line) Persona(WeaponSO so)
+    {
+        var (tag, tint, line) = so.weaponType switch
+        {
+            WeaponType.Katana     => ("빠른 검",   FastTint,  "짧고 빠른 연격으로 몰아친다"),
+            WeaponType.Greatsword => ("묵직한 검", HeavyTint, "느리지만 넓고 무겁게 내려친다"),
+            _                     => ("새 형(形)",  ShopUIStyle.Gold, ""),
+        };
+        return (tag, tint, string.IsNullOrEmpty(so.tagline) ? line : so.tagline);
+    }
+
+    /// <summary>
+    /// 진화 뒤 수치 미리 보기 — 진화와 같은 규칙(차트 값으로 덮은 뒤 강화 단계 계승, PlayerWeaponManager.EvolveCurrentWeaponAsync).
+    /// 무기 데이터를 실제로 만들지는 않는다 — 차트 덮어쓰기가 애니메이션 세트 사본을 만들어서.
+    /// </summary>
+    private static float[] PreviewStats(WeaponSO so, int enhanceLevel)
+    {
+        var entry = Managers.ServerEquipment?.GetById(so.name);
+        float raw = entry != null ? entry.base_attack : so.baseAttack;
+        return new[]
+        {
+            WeaponEnhanceCurve.Evaluate(raw, enhanceLevel, null),
+            entry != null ? entry.attack_speed   : so.attackSpeed,
+            entry != null ? entry.attack_range   : so.attackRange,
+            entry != null ? entry.area_of_effect : so.areaOfEffect,
+        };
+    }
+
+    private static string StatText(int i, float v) => i switch
+    {
+        0 => $"{v:0}",
+        1 => $"{v:0.0#}/초",
+        _ => $"{v:0.0#} m",
+    };
+
+    /// <summary>지금 무기 대비 — 네 수치 모두 클수록 좋다(빠르게 · 멀리 · 넓게).</summary>
+    private static string DeltaText(int i, float d)
+    {
+        if (Mathf.Abs(d) < 0.005f) return "<color=#9A98A0>그대로</color>";
+        string num = i == 0 ? $"{Mathf.Abs(d):0}" : $"{Mathf.Abs(d):0.0#}";
+        return d > 0f ? $"<color=#7AD46E>▲ {num}</color>" : $"<color=#FF7A6A>▼ {num}</color>";
+    }
+
+    /// <summary>「~로 / ~으로」 — 받침이 있으면(ㄹ 받침 제외) 「으로」.</summary>
+    private static string Ro(string word)
+    {
+        if (string.IsNullOrEmpty(word)) return "로";
+        char c = word[word.Length - 1];
+        if (c < 0xAC00 || c > 0xD7A3) return "로";
+        int jong = (c - 0xAC00) % 28;
+        return jong == 0 || jong == 8 ? "로" : "으로";
     }
 
     private void HideEvolvePanel()
@@ -1706,7 +1890,11 @@ public sealed class UI_CruciblePanel : UI_Popup
 
     private void OnBranchClicked(int branch) => EvolveAsync(branch).Forget();
 
-    /// <summary>진화 실행 — 무기를 통째로 교체하고 강화 레벨은 계승된다(PlayerWeaponManager가 처리).</summary>
+    /// <summary>
+    /// 진화 실행 + 연출 — 포커스 → 무기가 달아오름 → 망치 두 번 → 금빛 판정 빛 아래 새 형태로 바뀌며 부풂 → 「성격 / 이름」 도장.
+    /// 무기 교체(새 무브셋 클립 미리 읽기 포함)는 망치질과 겹쳐 돌리고, 공개는 판정 빛 아래에서 한다(새 그림이 순간 등장하지 않게).
+    /// 강화 레벨 · 각인은 계승된다(PlayerWeaponManager가 처리).
+    /// </summary>
     private async UniTaskVoid EvolveAsync(int branchIndex)
     {
         var branches = CurrentBranches;
@@ -1746,16 +1934,32 @@ public sealed class UI_CruciblePanel : UI_Popup
         }
 
         HideEvolvePanel();
+        if (_activeTab != 0) SelectTab(0);   // 무대는 근접 탭에 있다
+        _animating = true;
+        HideStageResult();
 
         bool ok;
-        try { ok = await wm.EvolveCurrentWeaponAsync(b, this.GetCancellationTokenOnDestroy()); }
+        try
+        {
+            var evolving = wm.EvolveCurrentWeaponAsync(b, this.GetCancellationTokenOnDestroy());
+            _heatLevel01 = 1f;   // 무기가 끝까지 달아오른다(앰비언트 루프가 천천히 따라간다)
+            await ForgeStrikeAsync();
+            await Hold(EvolveStrikeGap);
+            await ForgeStrikeAsync();
+            ok = await evolving;
+            if (ok) await EvolveRevealAsync(b);
+        }
         catch (System.OperationCanceledException) { return; }
+
+        ApplyFocus(0f);
+        HideHammer();
+        _animating = false;
+        _skipAnim  = false;
 
         if (ok)
         {
-            string name = b.target != null ? b.target.displayName : b.branchId;
-            if (_resultText != null) _resultText.text = $"<color=#9D7EE6>진화 — {name}</color>";
-            ShopUIStyle.PlaySfx("enhance_success");
+            var (tag, _, _) = Persona(b.target);
+            if (_resultText != null) _resultText.text = $"<color=#9D7EE6>진화 — {b.target.displayName} · {tag}</color>";
         }
         else
         {
@@ -1766,7 +1970,214 @@ public sealed class UI_CruciblePanel : UI_Popup
         }
 
         RefreshAll();
-        if (ok) TryShowEngraveOffer();   // 진화한 무기의 스킬에 고를 거리가 생길 수 있다
+        if (ok && TryShowEngraveOffer()) { _queued = null; return; }   // 진화한 무기의 스킬에 고를 거리가 생길 수 있다
+
+        // 연출 중 눌린 강화는 진화가 반영된 뒤에 이어 실행한다(강화 연출과 같은 규칙).
+        var next = _queued;
+        _queued = null;
+        next?.Invoke();
+    }
+
+    /// <summary>공개 — 금빛 판정 빛 아래에서 새 그림 · 이름 · 공격력으로 바뀌고, 불꽃과 「성격 / 이름」 도장.</summary>
+    private async UniTask EvolveRevealAsync(WeaponEvolutionSO.Branch b)
+    {
+        var (tag, tint, _) = Persona(b.target);
+        ShopUIStyle.PlaySfx("crucible_success");
+        HitFeelService.HitStop(0.6f, 0.05f);
+        FlashStage(StageFlashSuccess);
+        RefreshAll();
+        BurstSparks(JackpotSparks, SparkJackpot, StrikeX, StrikeY);
+        ShowStageResult($"<size=55%><color=#{ColorUtility.ToHtmlStringRGB(tint)}>{tag}</color></size>\n{b.target.displayName}",
+                        EvolveStampSize, SuccessPopScale);
+        await UniTask.WhenAll(PopWeaponAsync(), FocusAsync(false));
+        await Hold(SettleDur * 2f);
+    }
+
+    /// <summary>새 형태가 작게 맺혔다가 한 번 부풀고 제자리 — 판정 빛이 걷히는 동안(순간 등장 없이).</summary>
+    private async UniTask PopWeaponAsync()
+    {
+        if (_weaponImg == null) return;
+        var rt = _weaponImg.rectTransform;
+        float t = 0f;
+        while (t < EvolvePopDur)
+        {
+            if (_skipAnim) break;
+            t += Time.unscaledDeltaTime;
+            float k = Mathf.Clamp01(t / EvolvePopDur);
+            float s = k < 0.6f ? Mathf.Lerp(0.72f, 1.10f, k / 0.6f) : Mathf.Lerp(1.10f, 1f, (k - 0.6f) / 0.4f);
+            rt.localScale = Vector3.one * s;
+            await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
+        }
+        rt.localScale = Vector3.one;
+    }
+
+    // ── 들어올 때 고르기 (10-01 사용자 「근거리 페이즈를 처음에 고정하기보다 선택을 주는 게 좋아 보여」) ──
+
+    /// <summary>
+    /// 재련소에 들어오면 먼저 무엇을 벼릴지 고른다. 예전엔 늘 근거리 탭으로 열려, 같은 강화재료를 근거리에 쓰는 동안
+    /// 다음 페이지의 원거리 파츠 비용을 모른 채 재료가 떨어졌다. 매 방문 뜬다 — 재료 · 비용이 방문마다 달라 두 쪽 비교를 겸한다.
+    /// 머리줄(재화 · 탭 · 나가기)과 대사 밴드는 덮지 않는다. 카드나 탭을 누르면 걷히고, ESC는 지금처럼 재련소를 나간다.
+    /// </summary>
+    private void ShowChooser()
+    {
+        EnsureChooser();
+        _chooser.transform.SetAsLastSibling();
+        _chooser.SetActive(true);
+    }
+
+    private void EnsureChooser()
+    {
+        if (_chooser != null) return;
+        var host = _window != null ? (Transform)_window : transform;
+        const float bodyW = InfoX + InfoW - StageX, bodyH = StagePanelH;   // 무대 + 정보창 자리(1552×748)
+        var dim = ShopUIStyle.MakeImage(host, "ForgeChooser", ChooserVeil, raycast: true);
+        Place(dim.rectTransform, StageX, StageY, bodyW, bodyH);
+        _chooser = dim.gameObject;
+        var d = dim.transform;
+
+        var title = MakeLabel(d, "ChooserTitle", 36f, FontStyles.Bold, TextAlignmentOptions.Center, ShopUIStyle.Gold);
+        title.text = "무엇을 벼릴까";
+        PlaceIn(title.rectTransform, 0f, 40f, bodyW, 50f, bodyW, bodyH);
+
+        _chooserSub = MakeLabel(d, "ChooserSub", 20f, FontStyles.Normal, TextAlignmentOptions.Center, TextMuted);
+        PlaceIn(_chooserSub.rectTransform, 0f, 96f, bodyW, 30f, bodyW, bodyH);
+
+        const float cardW = 640f, cardH = 520f, gap = 64f;
+        float left = (bodyW - cardW * 2f - gap) * 0.5f;
+        for (int k = 0; k < 2; k++)
+        {
+            int tab = k;
+            var fill = ShopUIStyle.MakeFrame(d, k == 0 ? "ChooseMelee" : "ChooseRanged", BronzeEdge, CardSolid, 3f, raycast: true);
+            var rt = (RectTransform)fill.transform.parent;
+            PlaceIn(rt, left + k * (cardW + gap), 160f, cardW, cardH, bodyW, bodyH);
+            var c = fill.transform;
+
+            var head = ChooserLine(c, "Head", 30f, FontStyles.Bold, ShopUIStyle.Gold, 0f, 28f, cardW, 44f, cardW, cardH);
+            head.text = k == 0 ? "근거리 · 무기 강화" : "원거리 · 파츠 강화";
+            _chooseName[k]  = ChooserLine(c, "Name",  22f, FontStyles.Normal, TextMuted, 0f, 82f, cardW, 36f, cardW, cardH);
+            _chooseBig[k]   = ChooserLine(c, "Big",   52f, FontStyles.Bold, LevelGold, 0f, 140f, cardW, 80f, cardW, cardH);
+            _chooseLine1[k] = ChooserLine(c, "Line1", 24f, FontStyles.Normal, ShopUIStyle.TextPrimary, 40f, 250f, cardW - 80f, 36f, cardW, cardH);
+            _chooseLine2[k] = ChooserLine(c, "Line2", 24f, FontStyles.Normal, ShopUIStyle.TextPrimary, 40f, 300f, cardW - 80f, 36f, cardW, cardH);
+            _chooseLine3[k] = ChooserLine(c, "Line3", 22f, FontStyles.Normal, TextMuted, 40f, 350f, cardW - 80f, 34f, cardW, cardH);
+            var hint = ChooserLine(c, "Hint", 18f, FontStyles.Normal, ShopUIStyle.TextDim, 0f, 452f, cardW, 30f, cardW, cardH);
+            hint.text = "눌러서 들어간다";
+
+            var btn = rt.gameObject.AddComponent<Button>();
+            ShopUIStyle.ApplyButtonColors(btn);
+            btn.onClick.AddListener(() => SelectTab(tab));
+            _chooseCard[k] = btn;
+        }
+        _chooser.SetActive(false);
+    }
+
+    private static TMP_Text ChooserLine(Transform c, string name, float size, FontStyles style, Color color,
+                                        float x, float y, float w, float h, float pw, float ph)
+    {
+        var t = MakeLabel(c, name, size, style, TextAlignmentOptions.Center, color);
+        t.textWrappingMode = TextWrappingModes.NoWrap;
+        PlaceIn(t.rectTransform, x, y, w, h, pw, ph);
+        return t;
+    }
+
+    /// <summary>카드 두 장 — 근거리는 다음 단계 · 성공률 · 비용, 원거리는 켠 파츠 · 가장 싼 강화. 할 수 있는 쪽에 불.</summary>
+    private void RefreshChooser()
+    {
+        if (_chooser == null || !_chooser.activeSelf || _controller == null) return;
+        int fuel = _controller.FuelAmount;
+        string ev = _controller.HasEvent ? $" · 화로: {_controller.EventEffectDesc}" : "";
+        _chooserSub.text = $"두 쪽이 같은 강화재료를 쓴다 · 보유 <color=#FFD24A>{fuel}</color>{ev}";
+
+        int m = PlayerWeaponManager.Slot0;
+        var w = _controller.GetSlot(m);
+        if (w == null)
+        {
+            _chooseName[0].text = "근거리 무기 없음";
+            _chooseBig[0].text  = "—";
+            _chooseLine1[0].text = _chooseLine2[0].text = _chooseLine3[0].text = "";
+        }
+        else if (!_controller.CanEnhance(m))
+        {
+            _chooseName[0].text  = w.displayName;
+            _chooseBig[0].text   = $"+{w.enhanceLevel} <size=60%>최대</size>";
+            _chooseLine1[0].text = _controller.CanPromote(m) ? "<color=#B49AF0>◆ 진화 · 승급을 고를 수 있다</color>" : "더 올릴 수 없다";
+            _chooseLine2[0].text = _chooseLine3[0].text = "";
+        }
+        else
+        {
+            int cost = _controller.CostAt(m);
+            _chooseName[0].text  = w.displayName;
+            _chooseBig[0].text   = $"+{w.enhanceLevel} <color=#7AD46E>→ +{w.enhanceLevel + 1}</color>";
+            _chooseLine1[0].text = $"성공률 {_controller.SuccessChanceAt(m) * 100f:0}%"
+                                 + (_controller.DropAt(m) > 0 ? " · <color=#FF7A6A>실패하면 하락</color>" : " · 실패해도 그대로");
+            _chooseLine2[0].text = CostLine("다음 강화", cost, fuel);
+            _chooseLine3[0].text = cost > 0 ? $"지금 재료로 {fuel / cost}번 시도" : "";
+        }
+
+        var (cheap, cheapName, count) = RangedOutlook();
+        var rw    = _controller.GetSlot(PlayerWeaponManager.Slot1);
+        var state = RangedPartsState.Current;
+        _chooseName[1].text  = rw != null ? rw.displayName : "원거리 무기";
+        _chooseBig[1].text   = $"파츠 {state.ActiveCount} <size=60%>/ {Managers.WeaponParts?.All?.Count ?? 0} 켬</size>";
+        _chooseLine1[1].text = $"레벨 합 {state.TotalLevel} · <color=#7AD46E>실패 없음</color>";
+        _chooseLine2[1].text = cheap > 0 ? CostLine($"가장 싼 강화({cheapName})", cheap, fuel) : "<color=#8AB0D5>모든 파츠가 최대</color>";
+        _chooseLine3[1].text = cheap > 0 ? $"지금 재료로 {count}번 올릴 수 있다" : "";
+
+        UIAffordGlow.Set(_chooseCard[0], MeleeActionable());
+        UIAffordGlow.Set(_chooseCard[1], count > 0);
+    }
+
+    private static string CostLine(string label, int cost, int have)
+        => have >= cost ? $"{label}  강화재료 <color=#FFD24A>{cost}</color>"
+                        : $"{label}  <color=#FF5250>강화재료 {cost}</color>";
+
+    /// <summary>탭 안에서도 반대쪽에 할 수 있는 강화가 남았으면 그 탭에 불 — 한쪽만 올리다 다른 쪽을 놓치지 않게.</summary>
+    private void RefreshTabGlow()
+    {
+        bool choosing = _chooser != null && _chooser.activeSelf;
+        UIAffordGlow.Set(_tabWeaponImg, !choosing && _activeTab != 0 && MeleeActionable());
+        UIAffordGlow.Set(_tabRangedImg, !choosing && _activeTab != 1 && RangedOutlook().count > 0);
+    }
+
+    /// <summary>근거리 — 지금 재료로 강화하거나, 진화 · 승급을 고를 수 있는가.</summary>
+    private bool MeleeActionable()
+    {
+        int m = PlayerWeaponManager.Slot0;
+        if (_controller == null || _controller.GetSlot(m) == null) return false;
+        if (_controller.CanPromote(m)) return true;
+        return _controller.CanEnhance(m) && _controller.FuelAmount >= _controller.CostAt(m);
+    }
+
+    /// <summary>
+    /// 원거리 파츠 — 가장 싼 다음 강화와, 지금 재료로 싼 것부터 몇 번 올릴 수 있는지.
+    /// 파츠 비용은 레벨마다 복리로 오르므로 한 번 올릴 때마다 그 파츠의 다음 비용으로 다시 고른다.
+    /// </summary>
+    private (int cheapest, string cheapestName, int count) RangedOutlook()
+    {
+        var all = Managers.WeaponParts?.All;
+        if (all == null || all.Count == 0 || _controller == null) return (0, null, 0);
+
+        var state  = RangedPartsState.Current;
+        var levels = new int[all.Count];
+        for (int i = 0; i < all.Count; i++) levels[i] = state.LevelOf(all[i].part_id);
+
+        int fuel = _controller.FuelAmount, count = 0, cheapest = 0;
+        string cheapestName = null;
+        for (int step = 0; step < 200; step++)
+        {
+            int best = -1, bestCost = int.MaxValue;
+            for (int i = 0; i < all.Count; i++)
+            {
+                int cost = _controller.PartCostFor(all[i], levels[i]);
+                if (cost > 0 && cost < bestCost) { best = i; bestCost = cost; }
+            }
+            if (best < 0) break;
+            if (step == 0) { cheapest = bestCost; cheapestName = all[best].part_name; }
+            if (bestCost > fuel) break;
+            fuel -= bestCost;
+            levels[best]++;
+            count++;
+        }
+        return (cheapest, cheapestName, count);
     }
 
     // ── 스킬 각인 (기획 스킬구성_재련소연결 A안 · 09-26 시범: 환영베기 2단계) ──
@@ -1933,6 +2344,7 @@ public sealed class UI_CruciblePanel : UI_Popup
             descText.text = $"공격력 +{(legend.attackBonusMult - 1f) * 100f:0}%\n승급 재료 "
                           + $"<color={(afford ? "#E8D9B0" : "#FF7A6E")}>{legend.promoteCost}</color>  (보유 {have})";
             pick.onClick.AddListener(() => { HideLegendPanel(); OnPromoteClicked(id); });
+            UIAffordGlow.Set(pick, afford);   // 재료가 되면 은은한 불 — 재화를 쓰는 버튼 공통(10-01)
             _legendCards.Add(pick.gameObject);
         }
         _legendPanel.transform.SetAsLastSibling();
@@ -2104,7 +2516,51 @@ public sealed class UI_CruciblePanel : UI_Popup
     private void OnPromoteClicked(string legendId)
     {
         if (_controller == null || _animating) return;
+        PromoteAsync(legendId).Forget();
+    }
+
+    /// <summary>
+    /// 전설 승급 + 연출 — 진화와 같은 결: 포커스 → 망치 두 번 → 금빛 판정 빛 아래 「전설 / 이름」 도장 · 무기가 한 번 부풂.
+    /// 예전엔 패널 여는 소리 한 번과 결과 글자뿐이라, 가장 비싼 재료 소비가 가장 밋밋했다(10-01 사용자 「소모할 수 있는 재화가 있는 버튼은 연출이 있어야」).
+    /// 결과(재료 차감 · 승급)는 누른 순간 확정되고 여기선 그것을 보여 줄 뿐이다.
+    /// </summary>
+    private async UniTaskVoid PromoteAsync(string legendId)
+    {
         var result = _controller.TryPromote(_targetSlot, legendId);
+        if (!result.IsSuccess)
+        {
+            ShowPromoteResult(result);
+            RefreshAll();
+            return;
+        }
+
+        string name = legendId;
+        foreach (var l in _controller.Legends) if (l.legendId == legendId) { name = l.displayName; break; }
+
+        if (_activeTab != 0) SelectTab(0);   // 무대는 근접 탭에 있다
+        _animating = true;
+        HideStageResult();
+        try
+        {
+            _heatLevel01 = 1f;
+            await ForgeStrikeAsync();
+            await Hold(EvolveStrikeGap);
+            await ForgeStrikeAsync();
+            ShopUIStyle.PlaySfx("crucible_success");
+            HitFeelService.HitStop(0.6f, 0.05f);
+            FlashStage(StageFlashSuccess);
+            RefreshAll();
+            BurstSparks(JackpotSparks, SparkJackpot, StrikeX, StrikeY);
+            ShowStageResult($"<size=55%><color=#FFD24A>전설</color></size>\n{name}", EvolveStampSize, SuccessPopScale);
+            await UniTask.WhenAll(PopWeaponAsync(), FocusAsync(false));
+            await Hold(SettleDur * 2f);
+        }
+        catch (OperationCanceledException) { return; }
+
+        ApplyFocus(0f);
+        HideHammer();
+        _animating = false;
+        _skipAnim  = false;
         ShowPromoteResult(result);
         RefreshAll();
     }
@@ -2494,8 +2950,7 @@ public sealed class UI_CruciblePanel : UI_Popup
             PromoteOutcome.RejectAlreadyLegend => "<color=#8AB0D5>이미 승급됨</color>",
             _                                  => "<color=#FF5250>승급 불가</color>",
         };
-        if (r.IsSuccess) ShopUIStyle.PlaySfx("shop_open");
-        else ShopUIStyle.PlaySfx("shop_reject");
+        if (!r.IsSuccess) ShopUIStyle.PlaySfx("shop_reject");   // 성공 소리는 승급 연출(판정 빛)이 낸다
     }
 
     // ── 무대 연출 층 (개편 09-20; 표시층 전용 — 결과/데이터/세이브 불변) ──────────
@@ -3017,6 +3472,21 @@ public sealed class UI_CruciblePanel : UI_Popup
         RefreshInfo();
         RefreshBandBadge();
         RefreshPromoteRow();
+        RefreshChooser();
+        RefreshTabGlow();
+    }
+
+    /// <summary>진화 · 승급 중 지금 재료로 고를 수 있는 것이 있는가 — 여는 버튼의 불은 「할 수 있다」일 때만.</summary>
+    private bool CanAffordNextForm(bool promote)
+    {
+        int have = _controller.FuelAmount;
+        if (promote)
+        {
+            foreach (var l in _controller.Legends) if (have >= l.promoteCost) return true;
+            return false;
+        }
+        foreach (var b in CurrentBranches) if (b != null && have >= b.cost) return true;
+        return false;
     }
 
     /// <summary>
@@ -3032,7 +3502,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         // 열렸을 때만 보인다 — 잠긴 「◆ 진화 — +6에서 열림」은 게이지 끝 눈금(◆)과 같은 말이라 읽을 거리만 늘렸다(09-29).
         bool show = _activeTab == 0 && (CurrentBranches.Count > 0 || promote) && ready;
         _evolveBtn.gameObject.SetActive(show);
-        UIAffordGlow.Set(_evolveBtn, show);
+        UIAffordGlow.Set(_evolveBtn, show && CanAffordNextForm(promote));   // 조건만 채워도 켜져, 재료가 모자란 갈래만 있을 때도 불이 들어왔다(10-01)
         if (!show) return;
 
         _evolveBtn.interactable = ready;

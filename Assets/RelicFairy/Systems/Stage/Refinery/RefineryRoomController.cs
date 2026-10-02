@@ -17,13 +17,13 @@ public sealed class RefineryRoomController : MonoBehaviour
     /// <summary>NPC 앞 정제대까지의 거리(m) — NPC가 제단 뒤에 선 구도.</summary>
     private const float CounterDistance = 2.5f;
 
-    /// <summary>정제사 잡담 — 원석에서 무엇이 나올지 모르는 뽑기 컨셉.</summary>
+    /// <summary>정제사 잡담 — 수정 정령(10-01 NPC 교체). 짧고 멀리서 울리는 말. 원석에서 무엇이 나올지 모르는 뽑기 컨셉.</summary>
     private static readonly string[] ChatterLines =
     {
-        "원석 속에 무엇이 잠들었는지는 돌려 봐야 알지.",
-        "판을 채우면… 힘이 공명한다.",
-        "같은 돌에서 같은 룬이 두 번 나오는 법은 없어.",
-        "한 번 더? 다음 돌은 다를지도 모르지.",
+        "…원석 속에서 무언가 울린다.",
+        "응축은 기다림이다. 빛은 서두르지 않는다.",
+        "같은 돌에서 같은 룬은 두 번 나오지 않는다.",
+        "판을 채워라. 힘은 서로를 부른다.",
         "돌은 거짓말을 하지 않는다.",
     };
 
@@ -32,6 +32,8 @@ public sealed class RefineryRoomController : MonoBehaviour
     private GameObject[]   _decorPrefabs;
     private GameObject     _npcInstance;
     private ShopNpcInteraction _npc;
+    private ServiceNpcReactor _reactor;   // 다가오면 빛이 오르고 · 정제하고 나가면 응축으로 답한다
+    private int _craftsAtOpen;            // 패널을 열 때 정제 횟수 — 닫을 때 늘었으면 정제한 것
     private bool _initialized;
     private bool _uiOpen;
 
@@ -87,10 +89,11 @@ public sealed class RefineryRoomController : MonoBehaviour
 
         if (_npc != null) _npc.OnInteract += HandleNpcInteract;
         else Debug.LogWarning("[Refinery] NPC 프리팹에 ShopNpcInteraction 없음");
+        _npcInstance.TryGetComponent(out _reactor);
 
         // 주기적 월드스페이스 잡담 — 정제소 컨셉(원석·속성 응축).
         _npcInstance.AddComponent<NpcAmbientChatter>()
-                    .Initialize(ChatterLines, 9f, new Color(0.62f, 0.85f, 1f));
+                    .Initialize(ChatterLines, 9f, new Color(0.62f, 0.85f, 1f), _npc != null ? _npc.ChatterHeight : null);
     }
 
     private void HandleNpcInteract()
@@ -107,6 +110,8 @@ public sealed class RefineryRoomController : MonoBehaviour
 
         _uiOpen = true;
         if (_npc != null) _npc.SetInteractable(false);
+        _craftsAtOpen = svc.CraftCount;
+        if (_reactor != null) _reactor.BeginTalk();
 
         try
         {
@@ -131,6 +136,7 @@ public sealed class RefineryRoomController : MonoBehaviour
 
         _uiOpen = false;
         if (_npc != null) _npc.SetInteractable(true);
+        if (_reactor != null) _reactor.EndTalk((_run?.Refinery?.CraftCount ?? 0) > _craftsAtOpen);
     }
 
     // ── 소품 배치 (재련소와 동일 규약: 첫 소품=정제대(정면), 나머지=NPC 뒤 반원) ───────

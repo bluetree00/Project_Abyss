@@ -154,6 +154,8 @@ public class UserGameData
         AddRecord(MemoryAltarCatalog.Rec.ShopUses,    result.ShopUses);
         AddRecord(MemoryAltarCatalog.Rec.RefineCount, result.RefineUses);
         AddRecord(MemoryAltarCatalog.Rec.Covenants,   result.Covenants);
+        AddRecord(MemoryAltarCatalog.Rec.LibKills,    result.LibBossKills);   // 기억의 제단 해방기 · 악몽 고리 할인 조건(10-02)
+        AddRecord(MemoryAltarCatalog.Rec.NmKills,     result.NmBossKills);
 
         // 완주 횟수는 totalClears가 정본이지만, 조건 판정이 records 한 곳만 보도록 같이 적어둔다.
         SetRecordMax(MemoryAltarCatalog.Rec.Clears, totalClears);

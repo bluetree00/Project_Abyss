@@ -21,6 +21,7 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
+  liberatedOnly: 1
   _airChaseLeftStateName: AirChaseLeft
   _airChaseRightStateName: AirChaseRight
   _hideHeight: 8

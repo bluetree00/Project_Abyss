@@ -30,7 +30,7 @@ public class SlimeRegenState : MovementLockedState<SlimeRegenData>
         {
             ctx.Runtime.CurrentHp = Mathf.Min(
                 ctx.Runtime.CurrentHp + Data.healPerSec,
-                ctx.Config.stat.maxHp);
+                ctx.Monster.EffectiveMaxHp);   // 난이도 배율이 곱해진 최대 HP까지
             _healAccum -= 1f;
             ctx.Monster.NotifyHPChanged();
         }
