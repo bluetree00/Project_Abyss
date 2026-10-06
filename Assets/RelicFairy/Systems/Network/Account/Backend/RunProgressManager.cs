@@ -322,6 +322,10 @@ public class RunProgressManager : MonoBehaviour
         d.weapon1LegendId     = w1?.legendId ?? string.Empty;
         d.weapon0Engravings   = w0?.engravings ?? string.Empty;
         d.weapon1Engravings   = w1?.engravings ?? string.Empty;
+        d.weapon0FormTier     = w0?.formTier ?? 0;
+        d.weapon1FormTier     = w1?.formTier ?? 0;
+        d.weapon0FormVariants = w0?.formVariants ?? string.Empty;
+        d.weapon1FormVariants = w1?.formVariants ?? string.Empty;
     }
 
     private static WeaponData SlotFromSaved(GameRunSession s, int slot)

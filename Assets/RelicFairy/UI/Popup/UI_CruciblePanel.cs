@@ -232,6 +232,12 @@ public sealed class UI_CruciblePanel : UI_Popup
     private readonly List<SkillSO.EngravingDef> _engraveOptions = new();
     private WeaponData _engraveWeapon;
     private SkillSO    _engraveSkill;
+    // 형 단련 택1(장비 개선 Part A — Part B에서 시안 03으로 다시 그린다). 처음 필요할 때 만든다.
+    private GameObject _temperPanel;
+    private TMP_Text   _temperTitle, _temperSub;
+    private readonly TMP_Text[] _temperName = new TMP_Text[2], _temperDesc = new TMP_Text[2];
+    private readonly List<WeaponFormSO.VariantDef> _temperOptions = new(2);
+    private int _temperTierShown, _temperCostShown;
     // 전설 승급 택1 — 진화가 끝난 검이 최대 강화에 닿으면 연다(09-27 복원: 승급 줄이 숨겨져 아무도 닿지 못했다).
     private GameObject _legendPanel;
     private readonly List<GameObject> _legendCards = new();
@@ -1733,7 +1739,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         get
         {
-            var wd = _controller?.Run?.Player?.WeaponManager?.CurrentWeaponData;
+            var wd = _controller?.GetSlot(PlayerWeaponManager.Slot0);   // 진화는 근접 칸 무기 — 원거리를 들고 있어도(10-06)
             return wd?.evolution != null ? wd.evolution.Branches : System.Array.Empty<WeaponEvolutionSO.Branch>();
         }
     }
@@ -1747,6 +1753,7 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         if (branches.Count == 0)
         {
+            if (_controller.CanTemperForm(PlayerWeaponManager.Slot0, out _, out _)) { ShowTemperPanel(); return; }
             if (IsPromoteRoute(_controller.GetSlot(PlayerWeaponManager.Slot0))) { ShowLegendPanel(); return; }
             if (_resultText != null) _resultText.text = "<color=#9A8FB5>이 무기는 더 진화하지 않는다</color>";
             ShopUIStyle.PlaySfx("shop_reject");
@@ -1908,6 +1915,8 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         var b  = branches[branchIndex];
         var wm = _controller?.Run?.Player?.WeaponManager;
+        if (wm != null && wm.CurrentSlotIndex != PlayerWeaponManager.Slot0)
+            await wm.SwitchToSlotAsync(PlayerWeaponManager.Slot0);   // 진화는 근접 칸 — EvolveCurrentWeaponAsync가 들고 있는 칸을 바꾸므로 먼저 쥔다
         var wd = wm?.CurrentWeaponData;
         if (wm == null || wd == null) { HideEvolvePanel(); return; }
 
@@ -2099,7 +2108,8 @@ public sealed class UI_CruciblePanel : UI_Popup
         {
             _chooseName[0].text  = w.displayName;
             _chooseBig[0].text   = $"+{w.enhanceLevel} <size=60%>최대</size>";
-            _chooseLine1[0].text = _controller.CanPromote(m) ? "<color=#B49AF0>◆ 진화 · 승급을 고를 수 있다</color>" : "더 올릴 수 없다";
+            _chooseLine1[0].text = _controller.CanPromote(m) || _controller.CanEvolve(m) || _controller.CanTemperForm(m, out _, out _)
+                                 ? "<color=#B49AF0>◆ 진화 · 단련 · 승급을 고를 수 있다</color>" : "더 올릴 수 없다";
             _chooseLine2[0].text = _chooseLine3[0].text = "";
         }
         else
@@ -2143,7 +2153,8 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         int m = PlayerWeaponManager.Slot0;
         if (_controller == null || _controller.GetSlot(m) == null) return false;
-        if (_controller.CanPromote(m)) return true;
+        if (_controller.CanPromote(m) || _controller.CanEvolve(m)) return true;
+        if (_controller.CanTemperForm(m, out _, out int temperCost) && _controller.FuelAmount >= temperCost) return true;
         return _controller.CanEnhance(m) && _controller.FuelAmount >= _controller.CostAt(m);
     }
 
@@ -2259,6 +2270,71 @@ public sealed class UI_CruciblePanel : UI_Popup
         }
         _engravePanel.SetActive(false);
     }
+
+    /// <summary>형 단련 — 다음 단계 변주 두 장 중 하나를 고른다. 확정 성공 · 하락 없음 · 되돌릴 수 없다. 「다음에」를 누르면 다음 방문에 다시 고른다.</summary>
+    private void ShowTemperPanel()
+    {
+        int m = PlayerWeaponManager.Slot0;
+        var w = _controller?.GetSlot(m);
+        if (w == null || !_controller.CanTemperForm(m, out int tier, out int cost)) return;
+        w.form.GetVariants(tier, _temperOptions);
+        if (_temperOptions.Count < 2) return;
+        EnsureTemperPanel();
+        _temperTitle.text = $"{w.displayName} · 형 「{w.form.DisplayName}」 — 단련 {RomanTier(tier)}";
+        string costText = _controller.FuelAmount >= cost ? cost.ToString() : $"<color=#FF5250>{cost}</color>";
+        _temperSub.text = $"변주 둘 중 하나 · 확정 성공(실패 · 하락 없음) · 되돌릴 수 없다 · 강화재료 {costText}";
+        for (int k = 0; k < 2; k++)
+        {
+            _temperName[k].text = $"{_temperOptions[k].displayName}  <size=70%><color=#B49AF0>{_temperOptions[k].traitTag}</color></size>";
+            _temperDesc[k].text = _temperOptions[k].line;
+        }
+        _temperPanel.transform.SetAsLastSibling();
+        _temperPanel.SetActive(true);
+        ShopUIStyle.PlaySfx("shop_open");
+    }
+
+    private void OnTemperPicked(int k)
+    {
+        if (k < 0 || k >= _temperOptions.Count) return;
+        var def = _temperOptions[k];
+        bool ok = _controller != null && _controller.TryTemperForm(PlayerWeaponManager.Slot0, def.id);
+        _temperPanel.SetActive(false);
+        if (_resultText != null)
+            _resultText.text = ok ? $"<color=#9D7EE6>형 단련 — {def.displayName}</color>" : "<color=#FF7A6A>강화재료가 모자란다</color>";
+        ShopUIStyle.PlaySfx(ok ? "enhance_success" : "shop_reject");
+        RefreshAll();
+    }
+
+    private void EnsureTemperPanel()
+    {
+        if (_temperPanel != null) return;
+        var host = _window != null ? (Transform)_window : transform;
+        var dim = ShopUIStyle.MakeImage(host, "TemperDim", new Color(0.02f, 0.02f, 0.04f, 0.90f), raycast: true);
+        ShopUIStyle.Stretch(dim.rectTransform);
+        _temperPanel = dim.gameObject;
+        var d = dim.transform;
+
+        _temperTitle = MakeLabel(d, "TemperTitle", 30f, FontStyles.Bold, TextAlignmentOptions.Center, ShopUIStyle.Gold);
+        ShopUIStyle.Anchor(_temperTitle.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
+                           new Vector2(0, -150), new Vector2(1000, 50));
+        _temperSub = MakeLabel(d, "TemperSub", 18f, FontStyles.Normal, TextAlignmentOptions.Center, ShopUIStyle.TextDim);
+        ShopUIStyle.Anchor(_temperSub.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
+                           new Vector2(0, -206), new Vector2(1200, 30));
+
+        for (int k = 0; k < 2; k++)
+        {
+            int captured = k;
+            var pick = BuildEngraveCard(d, k == 0 ? -230f : 230f, out _temperName[k], out _temperDesc[k], "눌러서 벼린다");
+            pick.onClick.AddListener(() => OnTemperPicked(captured));
+        }
+        var later = MakeStyledButton(d, "TemperLater", "다음에", out _);
+        ShopUIStyle.Anchor((RectTransform)later.transform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0),
+                           new Vector2(0, 110), new Vector2(200, 56));
+        later.onClick.AddListener(() => _temperPanel.SetActive(false));
+        _temperPanel.SetActive(false);
+    }
+
+    private static string RomanTier(int t) => t switch { 2 => "Ⅱ", 3 => "Ⅲ", _ => "Ⅰ" };
 
     private static Button BuildEngraveCard(Transform d, float xCenter, out TMP_Text nameText, out TMP_Text descText,
                                            string hintText = "눌러서 새긴다")
@@ -3497,12 +3573,16 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         if (_evolveBtn == null) return;
         // 진화 분기가 남았으면 진화, 마지막 형태의 검이면 같은 자리에서 전설 승급.
-        bool promote = IsPromoteRoute(_controller.GetSlot(PlayerWeaponManager.Slot0));
-        bool ready = _controller.CanPromote(PlayerWeaponManager.Slot0);
+        int  m       = PlayerWeaponManager.Slot0;
+        bool evolve  = CurrentBranches.Count > 0;
+        bool temper  = !evolve && _controller.CanTemperForm(m, out _temperTierShown, out _temperCostShown);
+        bool promote = !evolve && !temper && IsPromoteRoute(_controller.GetSlot(m));
+        // D6(10-06): 진화는 갈래 조건(+5), 승급은 최대 강화, 단련은 형이 있고 Ⅲ 전이면 늘 열린다.
         // 열렸을 때만 보인다 — 잠긴 「◆ 진화 — +6에서 열림」은 게이지 끝 눈금(◆)과 같은 말이라 읽을 거리만 늘렸다(09-29).
-        bool show = _activeTab == 0 && (CurrentBranches.Count > 0 || promote) && ready;
+        bool ready = evolve ? _controller.CanEvolve(m) : temper || (promote && _controller.CanPromote(m));
+        bool show  = _activeTab == 0 && (evolve || temper || promote) && ready;
         _evolveBtn.gameObject.SetActive(show);
-        UIAffordGlow.Set(_evolveBtn, show && CanAffordNextForm(promote));   // 조건만 채워도 켜져, 재료가 모자란 갈래만 있을 때도 불이 들어왔다(10-01)
+        UIAffordGlow.Set(_evolveBtn, show && (temper ? _controller.FuelAmount >= _temperCostShown : CanAffordNextForm(promote)));   // 조건만 채워도 켜져, 재료가 모자란 갈래만 있을 때도 불이 들어왔다(10-01)
         if (!show) return;
 
         _evolveBtn.interactable = ready;
@@ -3510,8 +3590,9 @@ public sealed class UI_CruciblePanel : UI_Popup
         if (_evolveLabel != null)
         {
             string verb = promote ? "승급" : "진화";
-            _evolveLabel.text  = ready ? (promote ? "◆ 승급 — 전설을 고른다" : "◆ 진화 — 형태를 고른다")
-                                       : $"◆ {verb} — +{_controller.MaxAt(PlayerWeaponManager.Slot0)}에서 열림";
+            _evolveLabel.text  = temper ? $"◆ 형 단련 {RomanTier(_temperTierShown)} — 변주를 고른다 · 강화재료 {_temperCostShown}"
+                               : ready  ? (promote ? "◆ 승급 — 전설을 고른다" : "◆ 진화 — 형을 고른다")
+                                        : $"◆ {verb} — +{_controller.MaxAt(PlayerWeaponManager.Slot0)}에서 열림";
             _evolveLabel.color = ready ? Color.white : TextMuted;
         }
     }

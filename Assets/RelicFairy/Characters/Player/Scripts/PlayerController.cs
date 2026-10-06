@@ -506,6 +506,8 @@ public sealed partial class PlayerController : CharacterBase
             gameObject.AddComponent<CameraRigAnchor>();
         if (!TryGetComponent<PlayerWeaponTrailVfx>(out _))
             gameObject.AddComponent<PlayerWeaponTrailVfx>();
+        if (!TryGetComponent<WeaponFormRuntime>(out _))
+            gameObject.AddComponent<WeaponFormRuntime>();   // 진화 무기 「형」 구동기(장비 개선 10-06)
         if (!TryGetComponent<AimTargetIndicator>(out _))
             gameObject.AddComponent<AimTargetIndicator>();
     }

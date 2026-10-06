@@ -227,6 +227,30 @@ public class CrucibleRoomController : MonoBehaviour
         return w.weaponType == WeaponType.Katana || w.weaponType == WeaponType.Greatsword;
     }
 
+    /// <summary>진화 가능 — 갈래 하나라도 강화 조건(requiredEnhanceLevel)을 채웠다. D6: +5. 승급(CanPromote · 최대 강화)과 다르다.</summary>
+    public bool CanEvolve(int slot)
+    {
+        var w = GetSlot(slot);
+        if (w?.evolution == null) return false;
+        foreach (var b in w.evolution.Branches)
+            if (WeaponEvolutionSO.IsUnlocked(b, w.enhanceLevel)) return true;
+        return false;
+    }
+
+    /// <summary>다음 형 단련 단계와 비용(강화재료). 형이 없거나 Ⅲ까지 벼렸으면 false.</summary>
+    public bool CanTemperForm(int slot, out int nextTier, out int cost)
+        => WeaponFormService.CanTemper(GetSlot(slot), out nextTier, out cost);
+
+    /// <summary>형 단련 — 확정 성공 · 하락 없음. 다음 단계 변주가 아니거나 재료가 모자라면 false.</summary>
+    public bool TryTemperForm(int slot, string variantId)
+    {
+        if (!WeaponFormService.TryTemper(GetSlot(slot), _run?.FuelBank, variantId)) return false;
+        SaveNow("crucible-temper");
+        OnCrucibleChanged?.Invoke();
+        RefreshEquippedIfCurrent(slot);
+        return true;
+    }
+
     // ── 강화 / 승급 (UI가 호출) ─────────────────────────────
 
     /// <summary>강화 시도(대상 슬롯 단일). 실패 시 대상 단계 하락(하한 0).</summary>

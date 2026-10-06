@@ -75,6 +75,28 @@ public class WeaponData
         engravings = string.IsNullOrEmpty(engravings) ? id : engravings + "," + id;
     }
 
+    /// <summary>진화 무기의 고유 능력 「형」 — SO 소유 참조(서버 차트가 덮지 않는다). 없으면 null.</summary>
+    public WeaponFormSO form;
+    /// <summary>형 단련 단계: 0 = 형 없음 · 1 = 깨어남 · 2 · 3 = 단련. 진화 · 승급해도 이어진다.</summary>
+    public int formTier;
+    /// <summary>고른 단련 변주 id(쉼표 구분) — Ⅱ · Ⅲ에서 하나씩.</summary>
+    public string formVariants = "";
+
+    public bool HasForm => form != null && formTier > 0;
+
+    public bool HasFormVariant(string id)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(formVariants)) return false;
+        foreach (var v in formVariants.Split(',')) if (v == id) return true;
+        return false;
+    }
+
+    public void AddFormVariant(string id)
+    {
+        if (string.IsNullOrEmpty(id) || HasFormVariant(id)) return;
+        formVariants = string.IsNullOrEmpty(formVariants) ? id : formVariants + "," + id;
+    }
+
     public int groundEndCount;
     public int airEndCount;
 
@@ -150,6 +172,8 @@ public class WeaponData
         abilitySet   = so.abilitySet;
         trailVfxPrefab = so.trailVfxPrefab;
         evolution    = so.evolution;   // 진화 분기 — 서버 차트가 덮지 않는 SO 소유 참조
+        form         = so.Form;
+        formTier     = form != null ? 1 : 0;   // 형이 있는 무기 = 진화한 무기 — 깨어난 채로 쥔다(테스트 허브 직접 장착 · 세이브 복원도 같다)
 
         baseAttackRaw = baseAttack;   // 강화 재계산의 기준(마스터)
     }

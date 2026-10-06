@@ -52,6 +52,10 @@ public class RunSaveData
     public string weapon1LegendId;        // WeaponData.legendId (슬롯 1 승급 분기)
     public string weapon0Engravings;      // WeaponData.engravings (슬롯 0 스킬 각인, 쉼표 구분) — 09-25
     public string weapon1Engravings;      // WeaponData.engravings (슬롯 1)
+    public int    weapon0FormTier;          // 형 단련 단계 0~3 — 10-06 장비 개선
+    public int    weapon1FormTier;
+    public string weapon0FormVariants;      // 고른 단련 변주 id(쉼표 구분)
+    public string weapon1FormVariants;
 
     public string relicKey;               // PlayerLoadout.Relic SO 이름(Addressables 키)
     public string relicPartIds = "";      // 보스 클리어로 되찾은 유물 기억 조각 — `id:등급`(쉼표) · 옛 저장은 id만(흐릿) — 런 진행분

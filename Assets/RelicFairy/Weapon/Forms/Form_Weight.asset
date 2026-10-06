@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2211c700bf510cc46a9386530ae8a35b, type: 3}
+  m_Name: Form_Weight
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponFormSO
+  formId: weight
+  displayName: "\uBB34\uAC8C"
+  triggerName: "\uB0B4\uB824\uCC0D\uAE30"
+  line: "\uB290\uB9AC\uC9C0\uB9CC, \uB137\uC9F8 \uD718\uB450\uB984\uB9C8\uB2E4 \uD655\uC2E4\uD55C
+    \uD55C \uBC29\uC774 \uC628\uB2E4"
+  tint: {r: 0.95, g: 0.62, b: 0.32, a: 1}
+  maxStacks: 4
+  triggerAtkRatio: 0.6
+  triggerRange: 3.5
+  idleSeconds: 5
+  temperCosts: 0c00000014000000
+  variants:
+  - id: fissure
+    tier: 2
+    displayName: "\uADE0\uC5F4"
+    traitTag: "\uC790\uB9AC \uC7A5\uC545"
+    line: "\uCDA9\uACA9\uD30C \uC790\uB9AC\uC5D0 2\uCD08\uAC04 \uAC08\uB77C\uC9C4
+      \uB545\uC774 \uB0A8\uB294\uB2E4(0.5\uCD08\uB9C8\uB2E4 \uACF5\uACA9\uB825 30%)"
+  - id: aftershock
+    tier: 2
+    displayName: "\uC5EC\uC9C4"
+    traitTag: "\uB113\uAC8C"
+    line: "0.4\uCD08 \uB4A4 \uB354 \uD070 \uCDA9\uACA9\uD30C(\uBC18\uACBD \xD71.4
+      \xB7 \uD53C\uD574 \uC808\uBC18)\uAC00 \uD55C \uBC88 \uB354 \uD37C\uC9C4\uB2E4"
+  - id: heavy_hand
+    tier: 3
+    displayName: "\uBB34\uAC70\uC6B4 \uC190"
+    traitTag: "\uC2A4\uD0AC\uACFC \uC5EE\uC784"
+    line: "\uBB34\uAC8C 4\uC77C \uB54C E \xB7 R \uC801\uC911\uC774 \uCE58\uBA85\uD0C0\uAC00
+      \uB41C\uB2E4"
+  - id: crush
+    tier: 3
+    displayName: "\uC9D3\uB204\uB984"
+    traitTag: "\uBAB0\uC544 \uC7A1\uAE30"
+    line: "\uACBD\uC9C1\uB41C \uC801\uC740 2\uCD08 \uB3D9\uC548 \uBC1B\uB294 \uD53C\uD574
+      +12%"
+  triggerVfxKey: NovaOrangeHit
+  triggerVfxScale: 2
+  fullTrailPrefab: {fileID: 4274544991885015352, guid: c75fd1a0eb944484880cbd9ea7944d49,
+    type: 3}

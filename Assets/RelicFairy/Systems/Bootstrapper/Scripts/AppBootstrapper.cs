@@ -407,6 +407,9 @@ public sealed class AppBootstrapper : MonoBehaviour
         // 강화/승급 복원 — 씬 진입 시 ApplyServerOverride가 RecomputeEnhancedStats()로 유효값을 재계산한다.
         if (w0 != null) { w0.enhanceLevel = Mathf.Max(0, save.weapon0EnhanceLevel); w0.legendId = save.weapon0LegendId; w0.evolutionStage = Mathf.Max(0, save.weapon0EvolutionStage); w0.engravings = save.weapon0Engravings ?? ""; w0.RecomputeEnhancedStats(); }
         if (w1 != null) { w1.enhanceLevel = Mathf.Max(0, save.weapon1EnhanceLevel); w1.legendId = save.weapon1LegendId; w1.evolutionStage = Mathf.Max(0, save.weapon1EvolutionStage); w1.engravings = save.weapon1Engravings ?? ""; w1.RecomputeEnhancedStats(); }
+        // 형 — 형이 있는 무기는 최소 1(옛 세이브에 칸이 없으면 0으로 와도 깨어난 채로).
+        if (w0 != null) { w0.formTier = w0.form != null ? Mathf.Clamp(save.weapon0FormTier, 1, 3) : 0; w0.formVariants = save.weapon0FormVariants ?? ""; }
+        if (w1 != null) { w1.formTier = w1.form != null ? Mathf.Clamp(save.weapon1FormTier, 1, 3) : 0; w1.formVariants = save.weapon1FormVariants ?? ""; }
         if (w0 != null || w1 != null)
         {
             // 저장된 현재 슬롯 복원(미설정 시 0). SpawnPlayerAsync가 SwitchToSlotAsync로 적용.

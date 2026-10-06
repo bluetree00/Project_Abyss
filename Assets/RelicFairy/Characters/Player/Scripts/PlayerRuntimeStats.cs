@@ -874,6 +874,9 @@ public sealed class PlayerRuntimeStats
         return true;
     }
 
+    /// <summary>강제 크릿 1타 무장 여부 — 다른 장치가 건 확정 치명을 덮거나 지우지 않게 확인한다(장비 형 「무게」).</summary>
+    public bool ForceCritArmed => _forceNextCrit;
+
     /// <summary>다음 일반공격 1타를 방어무시로 예약(광기의 파동). ColliderInstance가 소비.</summary>
     public void ArmPenetrateNextHit() => _penetrateNextHit = true;
 

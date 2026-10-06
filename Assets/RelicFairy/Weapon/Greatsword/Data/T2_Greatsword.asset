@@ -36,6 +36,7 @@ MonoBehaviour:
     type: 3}
   weaponType: 5
   evolution: {fileID: 0}
+  form: {fileID: 11400000, guid: 399e6edf0220c374f965999aa7dd4877, type: 2}
   skillQ: {fileID: 11400000, guid: 711b986f371f6364ab02fc436d44d180, type: 2}
   skillE: {fileID: 11400000, guid: 61bfd2ef1d10aa04786a53d9efdb94a0, type: 2}
   holdThreshold: 3

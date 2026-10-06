@@ -55,6 +55,11 @@ public class WeaponSO : ScriptableObject
              "진화하면 대상 WeaponSO로 통째 교체된다 — 외형·무브셋·스킬·아이콘·이름·타입·스탯 전부.")]
     public WeaponEvolutionSO evolution;
 
+    [Header("형 (진화 무기 고유 능력)")]
+    [SerializeField, Tooltip("진화 무기의 고유 능력 「형」. 비우면 형 없음(무형검 · 원거리). 기획 장비개선 §4")]
+    private WeaponFormSO form;
+    public WeaponFormSO Form => form;
+
     [Header("스킬")]
     public SkillSO skillQ;
     public SkillSO skillE;

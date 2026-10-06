@@ -362,6 +362,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: caec623dd0dc32042b8a7be0b3e5d1af
+    m_Address: vfx_form_windcut
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: cfe0c511fa8d1cf4abf31f2f48dfe4f9
     m_Address: IasenHitRedLaser
     m_ReadOnly: 0
