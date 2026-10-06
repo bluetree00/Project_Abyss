@@ -143,16 +143,27 @@ public static class CovenantPlayProbeEditor
         "ember", "hemorrhage", "harvest", "ember", "hemorrhage", "arcflash", "detonate", "arcflash",
         "execute", "stasis", "supernova", "bloodmark", "aegis", "ward", "lastbreath", "ruby",
     };
+    // 10-06 연출이 없던 4종(격노 · 박차 · 저주 · 출혈)에 붙인 이펙트 확인 + 이미 있던 잔불 · 방전 비교용. 실행 동안 플레이어 무적(10-03엔 도중에 죽어 대부분 「no player/target」).
+    private static readonly string[] VfxStepsNew = { "fury", "momentum", "curse", "hemorrhage", "ember", "arcflash" };
+    private static string[] s_vfxSteps = VfxSteps;
     private const double VfxStepGap = 0.6, VfxShotDelay = 0.35;
     private static int s_vfxStep;
     private static double s_vfxNext, s_vfxShotAt;
     private static string s_vfxShotName;
+    private static Transform s_vfxShotTarget;   // 3c — 게임 화면 대신 이 대상을 가까이서 찍는다(빛줄기 · 이름표에 묻혀 판별이 안 됐다, 10-06)
     private static readonly StringBuilder s_vfxLog = new();
 
     [MenuItem(Root + "3 효과별 VFX 발동 기록 (전투방에서)")]
-    private static void VfxRun()
+    private static void VfxRun() => VfxStart(VfxSteps);
+
+    [MenuItem(Root + "3c 연출 없던 4종 확인 (전투방에서 · 무적)")]
+    private static void VfxRunNew() => VfxStart(VfxStepsNew);
+
+    private static void VfxStart(string[] steps)
     {
         if (!Application.isPlaying) return;
+        s_vfxSteps    = steps;
+        GameRunBootstrapper.Instance?.Run?.Player?.SetInvincible(30f);   // 기록 도중 죽지 않게
         s_vfxStep     = 0;
         s_vfxNext     = 0;
         s_vfxShotName = null;
@@ -168,13 +179,15 @@ public static class CovenantPlayProbeEditor
         double now = EditorApplication.timeSinceStartup;
         if (s_vfxShotName != null && now >= s_vfxShotAt)
         {
-            ScreenCapture.CaptureScreenshot(Path.Combine("Temp", "vfx_shots", s_vfxShotName));
+            string shot = Path.Combine("Temp", "vfx_shots", s_vfxShotName);
+            if (s_vfxSteps == VfxStepsNew && s_vfxShotTarget != null) CaptureCloseUp(s_vfxShotTarget, shot);
+            else ScreenCapture.CaptureScreenshot(shot);
             s_vfxShotName = null;
         }
         if (now < s_vfxNext) return;
         s_vfxNext = now + VfxStepGap;
 
-        if (s_vfxStep >= VfxSteps.Length)
+        if (s_vfxStep >= s_vfxSteps.Length)
         {
             EditorApplication.update -= VfxTick;
             s_vfxLog.Append(']');
@@ -183,12 +196,16 @@ public static class CovenantPlayProbeEditor
             return;
         }
 
-        string effect = VfxSteps[s_vfxStep++];
+        string effect = s_vfxSteps[s_vfxStep++];
         s_vfxShotName = $"{s_vfxStep:00}_{effect}.png";
         s_vfxShotAt   = now + VfxShotDelay;
         var run    = GameRunBootstrapper.Instance?.Run;
         var player = run?.Player;
         var target = NearestMonster(player);
+        // 나에게 붙는 효과(격노 · 박차)는 플레이어를, 나머지는 맞은 적을 가까이서 찍는다
+        s_vfxShotTarget = effect == "fury" || effect == "momentum"
+            ? (player != null ? player.transform : null)
+            : (target != null ? target.transform : null);
         var before = ActiveVfxNames();
         int beamsBefore = ActiveBeams();
         string note = "";

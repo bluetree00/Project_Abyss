@@ -13,10 +13,8 @@ using UnityEngine;
 public static class RewardObjectPresenter
 {
     // ── Constants ──────────────────────────────────────────────
-    private const float GlyphScale   = 0.35f;   // 바닥 문양 — 소용돌이 크기에 곱한다
-    private const float BeaconScale  = 0.6f;    // 표지 기둥 — 등장 기둥 배율에 곱한다
-    private const float BeaconHold   = 2.5f;    // 표지 기둥이 등장 뒤 제 높이로 서 있는 시간(초, 실시간)
-    private const float BeaconSettle = 0.45f;   // 그 뒤 낮아지는 크기 — 금빛 고리 + 짧은 기둥(반대편 시야를 가리지 않게, 10-01 f5)
+    private const float LootScale    = 1.8f;    // 등급 기둥 크기(Vefects 원래 크기 × 1.8) — 원래 크기(레어 기둥 ~3 m · 밑 부채꼴 ~1 m)는 0.6 m 위에 뜬 보상 구체에
+                                                // 밑동이 가려 놓여 있는 동안 등급이 안 읽혔다(10-06 실측). 가늘어 시야를 가리지 않아 낮추지 않는다.
     private const float RingStagger  = 0.15f;   // 빛 박자 · 음 사이 간격(초, 실시간)
     private const float RingGrowth   = 0.35f;   // 박자마다 커지는 비율
     private const float PulseSeconds = 0.25f;
@@ -92,11 +90,7 @@ public static class RewardObjectPresenter
             // 놓여 있는 빛은 레어 이상 — 매 방 보는 일반은 등장과 함께 흩어진다
             if (aura != null)
             {
-                if (spec.IdleAura)
-                {
-                    aura.Follow(rewardGO, spec.IdlePulseHz);
-                    aura.SettleBeaconAfter(BeaconHold, BeaconSettle);
-                }
+                if (spec.IdleAura) aura.Follow(rewardGO, spec.IdlePulseHz);
                 else aura.Dissolve();
             }
 
@@ -120,11 +114,10 @@ public static class RewardObjectPresenter
             Color color = LightColor(rarity);
             var   aura  = RewardAura.Create(spot);
             aura.AddLoop(RunFx.PlayLoop(RunFxSlot.Swirl, spot, spec.SwirlScale, color));
-            if (spec.Glyph)
-                aura.AddLoop(RunFx.PlayLoop(RunFxSlot.Glyph, OnFloor(spot, floorY), GlyphScale * spec.SwirlScale, color));
-            // 전설 — 금빛 표지 기둥이 서기 전부터 솟는다(원래 금빛이라 색을 입히지 않는다)
+            // 등급 기둥 — 서기 전부터 솟는다. 원래 빛깔에 등급색이 들어 있어 색을 입히지 않는다(10-05).
+            // 예전 바닥 문양 · 금빛 표지 기둥은 리치 봉인진 · 봉인 완성과 같은 프리팹이라 「봉인」으로 읽혔다(사용자 10-03).
             if (spec.IdlePillar)
-                aura.SetBeacon(RunFx.PlayLoop(RunFxSlot.Beacon, OnFloor(spot, floorY), spec.PillarScale * BeaconScale, Color.clear));
+                aura.AddLoop(RunFx.PlayLoop(LootSlot(rarity), OnFloor(spot, floorY), LootScale, Color.clear));
             aura.Grow(spec.Foretell);
 
             Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton, 0.45f, RewardPresentation.For(rarity).SfxPitch).Forget();
@@ -185,6 +178,14 @@ public static class RewardObjectPresenter
             if (slowed) TimeScaleArbiter.Release(s_slowOwner);
         }
     }
+
+    private static RunFxSlot LootSlot(ItemRarity rarity) => rarity switch
+    {
+        ItemRarity.Legendary => RunFxSlot.LootLegendary,
+        ItemRarity.Epic      => RunFxSlot.LootEpic,
+        ItemRarity.Rare      => RunFxSlot.LootRare,
+        _                    => RunFxSlot.LootCommon,
+    };
 
     private static Vector3 OnFloor(Vector3 p, float floorY)
     {

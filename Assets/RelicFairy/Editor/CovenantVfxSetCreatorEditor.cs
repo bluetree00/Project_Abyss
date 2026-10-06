@@ -16,6 +16,7 @@ public static class CovenantVfxSetCreatorEditor
     private const string HovlRpg   = "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/RPG VFX Bundle/";
     private const string HovlMagic = "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/Magic circles/Prefabs/";
     private const string HovlAoe   = "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/AOE Magic spells Vol.1/Prefabs/";
+    private const string Ssep1     = "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_1(NotScriptBased)/Effects/";
 
     // key, 프리팹, 배율, 반경 맞춤 기준(0=맞추지 않음), 수명/기본 지속
     private static readonly (string key, string path, float scale, float nativeRadius, float life)[] Table =
@@ -35,6 +36,11 @@ public static class CovenantVfxSetCreatorEditor
         ("aegis",        HovlMagic + "Magic shield holy.prefab",                  0.6f, 0f,   0.5f),
         ("ward",         HovlRpg + "Random effect prefabs/Mountains shield.prefab", 0.6f, 0f, 4.0f),
         ("lastbreath",   HovlRpg + "Prefabs/Magic buffs and hits/Lvl up.prefab",  0.5f, 0f,   1.5f),
+        // 10-06 연출이 없던 4종 — 다른 시스템이 안 쓰는 것만(룬 속성 불 · 폭풍 · Debuff 1 · 리치 Aura_Dark · 칼 타격 VolumetricBlood 제외)
+        ("fury",       HovlRpg + "Prefabs/Magic buffs and hits/Dragon punch.prefab", 0.6f,   0f, 1.0f),   // 나 — 몸에서 주황 불꽃이 터진다(날이 선다)
+        ("momentum",   HovlRpg + "Prefabs/Magic buffs and hits/Buff 2.prefab",      0.6f,   0f, 1.2f),   // 나 — 발밑에서 먼지 고리가 차고 나간다(박차) — Fast wind는 게임 화면에서 거의 안 보였다(10-06 근접 실측)
+        ("curse",      HovlRpg + "Prefabs/Magic buffs and hits/Debuff 2.prefab",     0.6f,   0f, 1.5f),   // 적 — 몸을 감는 문양 고리(받는 피해 증가 동안)
+        ("hemorrhage", Ssep1 + "Effect_06_BloodFlood/Effect_06_BloodFlood.prefab",   0.028f, 0f, 1.2f),   // 적 — 발치에 번지는 피(원래 반경 ~3.4 m → 몸 둘레만, 10-06 근접 실측)
         // 루비 등급 발동
         (CovenantFxService.RubyKey, HovlRpg + "Prefabs/Magic buffs and hits/Buff 7.prefab", 1.5f, 0f, 1.0f),
     };

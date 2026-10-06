@@ -920,8 +920,22 @@ public static class BossFightSimEditor
         ScreenCapture.CaptureScreenshot(path);
     }
 
+    private static double s_nextAdvance;
+    private static readonly MethodInfo s_advanceDialogue =
+        typeof(UI_DialoguePopup).GetMethod("OnAdvanceClicked", BindingFlags.Instance | BindingFlags.NonPublic);
+
+    /// <summary>대사창(시간 정지 · 입력 대기)을 사람처럼 0.6초마다 넘긴다 — 리치 악몽 등장 대사가 시뮬을 300초 붙잡았다(10-06).</summary>
+    private static void AdvanceDialogue()
+    {
+        if (!EditorApplication.isPlaying || EditorApplication.timeSinceStartup < s_nextAdvance) return;
+        s_nextAdvance = EditorApplication.timeSinceStartup + 0.6;
+        var popup = UnityEngine.Object.FindFirstObjectByType<UI_DialoguePopup>(FindObjectsInactive.Exclude);
+        if (popup != null && popup.isActiveAndEnabled) s_advanceDialogue?.Invoke(popup, null);
+    }
+
     private static void OnEditorUpdate()
     {
+        AdvanceDialogue();
         if (!EditorApplication.isPlaying || !EditorApplication.isPaused) return;
         EditorApplication.isPaused = false;
         s_unpauseCount++;

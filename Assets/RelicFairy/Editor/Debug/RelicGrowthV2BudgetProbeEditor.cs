@@ -41,6 +41,8 @@ public static class RelicGrowthV2BudgetProbeEditor
     private static string s_relic;
     private static bool   s_armed;
     private static bool   s_short;   // 짧게 — 기본 · 허브 · 옛3 · 새4 · 기본(끝)만(단독 칸 생략)
+    private static bool   s_ablate;  // 이상치 분해 — 랜슬롯 #4 조합에서 조각을 하나씩 뺀다
+    private const string  Combo4 = "l_blood_frenzy:2,l_black_afterimage:1,l_tearing_judgment:1,l_grudge_blade:2";   // 10-03 세 회차 내내 최상위(+72~119%)
 
     [MenuItem("RelicFairy/Debug/유물 성장 v2/7 예산 실측 — 가웨인 (테스트 허브, 플레이 중, 약 20분)")]
     private static void BeginGawain() => Begin("Gawain");
@@ -51,7 +53,10 @@ public static class RelicGrowthV2BudgetProbeEditor
     [MenuItem("RelicFairy/Debug/유물 성장 v2/8s 예산 실측 짧게 — 랜슬롯 (단독 칸 생략, 플레이 중, 약 11분)")]
     private static void BeginLancelotShort() => Begin("Lancelot", true);
 
-    private static void Begin(string relic, bool shortRun = false)
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/8x 예산 이상치 분해 — 랜슬롯 #4 (6칸, 플레이 중, 약 5분)")]
+    private static void BeginLancelotAblate() => Begin("Lancelot", false, true);
+
+    private static void Begin(string relic, bool shortRun = false, bool ablate = false)
     {
         if (!Application.isPlaying) { Debug.LogWarning("[RGV2예산] 플레이 모드에서만 동작한다."); return; }
         var launcher = UnityEngine.Object.FindFirstObjectByType<TestHubLauncher>();
@@ -62,6 +67,7 @@ public static class RelicGrowthV2BudgetProbeEditor
         typeof(TestHubLauncher).GetField("_relicIndex", Inst)?.SetValue(launcher, idx);
         s_relic = relic;
         s_short = shortRun;
+        s_ablate = ablate;
         s_armed = true;
         Application.logMessageReceived -= OnLog;
         Application.logMessageReceived += OnLog;
@@ -131,6 +137,7 @@ public static class RelicGrowthV2BudgetProbeEditor
 
     private static List<Case> BuildCases(bool gawain)
     {
+        if (s_ablate) return BuildAblation();
         var rng = new System.Random(gawain ? 7 : 11);
         var list = new List<Case>
         {
@@ -160,6 +167,20 @@ public static class RelicGrowthV2BudgetProbeEditor
             list.Add(new Case { Label = "단독 " + id + " 찬란", Kind = "단독", Ids = id + ":3" });
         list.Add(new Case { Label = "기본(끝)", Kind = "기본2" });
         list.Add(new Case { Label = "허브만(끝)", Kind = "허브" });
+        return list;
+    }
+
+    /// <summary>이상치 분해 — 기본 · #4 전체 · 조각 하나씩 뺀 4칸. 뺐을 때 가장 많이 떨어지는 조각이 증폭원이다.</summary>
+    private static List<Case> BuildAblation()
+    {
+        var parts = Combo4.Split(',');
+        var list = new List<Case>
+        {
+            new() { Label = "기본(조각 0)", Kind = "기본" },
+            new() { Label = "#4 전체 " + Combo4, Kind = "새4", Ids = Combo4 },
+        };
+        foreach (var drop in parts)
+            list.Add(new Case { Label = "#4 − " + drop.Split(':')[0], Kind = "뺌", Ids = string.Join(",", parts.Where(x => x != drop)) });
         return list;
     }
 

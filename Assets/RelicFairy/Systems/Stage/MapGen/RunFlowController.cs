@@ -110,7 +110,18 @@ public class RunFlowController : MonoBehaviour
         public bool         grows;
         /// <summary>다 자란 상태의 스케일 — Grow 연출의 목표값.</summary>
         public Vector3      fullScale;
+
+        /// <summary>젖힘 문(10-06 · 나무문) 경첩. null이면 젖힘이 아니다.</summary>
+        public Transform[]  hinges;
+        /// <summary>바깥(통로 쪽)이 문 로컬 +z면 +1(<see cref="OutwardSign"/>).</summary>
+        public float        outward = 1f;
+        /// <summary>지금 젖혀진 정도(0 닫힘 · 1 열림) — 도중에 반대 연출이 와도 이 각도에서 이어받는다.</summary>
+        public float        swingK;
     }
+
+    /// <summary>젖힘 문 — 열림은 감속해 멎고(무거운 문), 닫힘은 가속해 쾅.</summary>
+    private const float SwingOpenSeconds  = 0.9f;
+    private const float SwingCloseSeconds = 0.32f;
 
     /// <summary>방 진입 안개 베일이 걷히는 시간(초). 디졸브 조립 구간을 덮을 만큼은 길어야 한다.</summary>
     private const float FogVeilClearSeconds = 1.6f;
@@ -1093,10 +1104,18 @@ public class RunFlowController : MonoBehaviour
             sealedLocalPos = door != null ? door.localPosition : Vector3.zero,
             grows          = _current != null && _current.sealDoorMotion == SealDoorMotion.Grow,
             fullScale      = door != null ? door.localScale : Vector3.one,
+            hinges         = _current != null && _current.sealDoorMotion == SealDoorMotion.Swing && SealDoorFit.IsFitted(door)
+                                 ? SealDoorFit.BuildHinges(door) : null,
+            outward        = OutwardSign(go.transform, slot),
         };
 
         // 통과 차단 콜라이더(blocker)는 이 시점에 이미 서 있다 — 석문이 언제 내려오든 방 밖으로 못 나간다.
-        if (door != null && entry == SealDoorEntry.Parked)
+        if (door != null && entry == SealDoorEntry.Parked && view.hinges != null)
+        {
+            view.swingK = 1f;   // 젖힘 문은 열린 채 기다리다 일제히 쾅 닫힌다
+            SealDoorFit.SetSwing(view.hinges, view.outward, 1f);
+        }
+        else if (door != null && entry == SealDoorEntry.Parked)
             door.localPosition = view.sealedLocalPos + Vector3.up * Mathf.Max(1f, oh);   // 낙하 대기 위치
         else if (door != null && entry == SealDoorEntry.Drop)
             SealDoorDropAsync(view, primary: _gates.Count == 0).Forget(); // 첫 문에서만 흔들림·사운드
@@ -1120,6 +1139,8 @@ public class RunFlowController : MonoBehaviour
 
         // 유기물 문(뿌리·덩굴)은 하늘에서 떨어지면 컨셉이 깨진다 — 바닥에 붙은 채 자라오른다.
         if (view.grows) { SealDoorGrowAsync(view, grow: true, primary).Forget(); return; }
+        // 나무문은 떨어지지 않는다 — 열린 자리에서 쾅 닫힌다(10-06).
+        if (view.hinges != null) { SealDoorSwingAsync(view, open: false, primary).Forget(); return; }
 
         door.localPosition = upPos;
         try
@@ -1199,6 +1220,46 @@ public class RunFlowController : MonoBehaviour
         if (grow) PlayDoorImpact(door, view.openH, primary);   // 뿌리가 박히는 충격
     }
 
+    /// <summary>
+    /// 젖힘 문(10-06 · 나무문) — 경첩을 축으로 바깥(통로 쪽)으로 젖혀 열리고, 봉인 때는 열린 자리에서 쾅 닫힌다.
+    /// 바깥으로 젖히므로 방 안 카메라에서 문짝 앞면이 내내 보이고, 다 열린 문짝은 통로 벽 쪽에 붙어 길을 막지 않는다.
+    /// 도중에 반대 연출이 오면 지금 각도(<see cref="GateView.swingK"/>)에서 이어받는다.
+    /// </summary>
+    private async UniTaskVoid SealDoorSwingAsync(GateView view, bool open, bool primary)
+    {
+        var ct = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
+        if (view?.hinges == null) return;
+
+        float from = open ? view.swingK : (view.swingK > 0f ? view.swingK : 1f);   // 닫힘은 열린 자리에서 시작
+        float to   = open ? 1f : 0f;
+        float dur  = open ? SwingOpenSeconds : SwingCloseSeconds;
+        view.swingK = from;
+        SealDoorFit.SetSwing(view.hinges, view.outward, from);
+        try
+        {
+            if (!open) await UniTask.Delay(TimeSpan.FromSeconds(0.08), ignoreTimeScale: true, cancellationToken: ct);   // 예비 동작
+            float t = 0f;
+            while (t < dur)
+            {
+                if (view.door == null) return;
+                if (!open && view.opening) return;   // 클리어로 이미 열리기 시작했으면 닫힘은 물러난다
+                ct.ThrowIfCancellationRequested();
+                t += Time.deltaTime;
+                float u = Mathf.Clamp01(t / dur);
+                float e = open ? 1f - (1f - u) * (1f - u) * (1f - u) : u * u;
+                view.swingK = Mathf.Lerp(from, to, e);
+                SealDoorFit.SetSwing(view.hinges, view.outward, view.swingK);
+                await UniTask.Yield();
+            }
+            if (!open && view.opening) return;
+            view.swingK = to;
+            SealDoorFit.SetSwing(view.hinges, view.outward, to);
+        }
+        catch (OperationCanceledException) { return; }
+
+        if (!open) PlayDoorImpact(view.door, view.openH, primary);   // 쾅 — 먼지 · (대표 문) 흔들림 · 사운드
+    }
+
     /// <summary>석문 착지 임팩트 — 먼지 VFX(모든 문) + 카메라 흔들림·봉인 사운드(대표 문 1회). 리소스 없으면 해당 요소 생략.</summary>
     private void PlayDoorImpact(Transform door, float openH, bool primary)
     {
@@ -1236,6 +1297,8 @@ public class RunFlowController : MonoBehaviour
 
         // 유기물 문은 위로 솟아 열리지 않는다 — 자란 뿌리가 시들어 지면으로 잦아든다.
         if (view.grows) { SealDoorGrowAsync(view, grow: false, primary: false).Forget(); return; }
+        // 나무문은 경첩을 축으로 바깥으로 젖혀 열린다 — 방 안 카메라에서 문짝 앞면이 내내 보인다(10-06).
+        if (view.hinges != null) { SealDoorSwingAsync(view, open: true, primary: false).Forget(); return; }
 
         var     door      = view.door;
         Vector3 sealedPos = door.localPosition;              // 시작 = 지금 있는 자리(중간에서 이어받기)
@@ -1264,6 +1327,8 @@ public class RunFlowController : MonoBehaviour
     /// <summary>문틀 프리팹을 제작한 기준 개구부(가로·세로). 실제 개구부와의 비로 균등 배율을 낸다.</summary>
     private const float FrameRefW = 20f;
     private const float FrameRefH = 12f;
+    private const float GateTorchIntensity = 2.5f;                                   // 방 벽 횃불과 같은 줄
+    private static readonly Color GateTorchColor = new Color(1f, 0.72f, 0.45f);      // 횃불 불빛
     private const float SealDoorMeshW = 7f;
     private const float SealDoorMeshH = 11.5f;
 
@@ -1284,6 +1349,20 @@ public class RunFlowController : MonoBehaviour
         Transform doorTr = SpawnSealDoor(_entranceLock.transform, MarkerW(slot), oh);
         if (doorTr != null && lockMarker != null) lockMarker.enabled = false;
 
+        // 나무문 — 지나온 입구가 등 뒤에서 젖혀 닫힌다(10-06). 바깥 = 지나온 통로 쪽.
+        if (_current != null && _current.sealDoorMotion == SealDoorMotion.Swing && SealDoorFit.IsFitted(doorTr))
+        {
+            var view = new GateView
+            {
+                door = doorTr, openH = oh, sealedLocalPos = doorTr.localPosition,
+                hinges = SealDoorFit.BuildHinges(doorTr), outward = OutwardSign(_entranceLock.transform, slot),
+                swingK = 1f,
+            };
+            SealDoorFit.SetSwing(view.hinges, view.outward, 1f);   // 들어올 땐 열려 있다
+            SealDoorSwingAsync(view, open: false, primary: true).Forget();
+            return;
+        }
+
         LockEntranceAsync(_entranceLock, doorTr, oh).Forget();
     }
 
@@ -1302,44 +1381,49 @@ public class RunFlowController : MonoBehaviour
         float k = Mathf.Min(ow / FrameRefW, oh / FrameRefH);
         frame.transform.localScale = new Vector3(k, k, k);
 
+        // 문틀 횃불 — HDRP 원본(SM_Standtorch)의 물리 단위 세기(51.7)가 URP에선 배율 그대로라, 방에 들어선 카메라 3 m 옆에서
+        // 통로 벽을 하얗게 태웠다(10-06 실측 — 방 벽 횃불은 0.9~2.5). 방 횃불 수준으로 낮추고 불빛 색을 입힌다.
+        foreach (var torch in frame.GetComponentsInChildren<Light>(true))
+        {
+            torch.intensity = Mathf.Min(torch.intensity, GateTorchIntensity);
+            torch.color     = GateTorchColor;
+        }
+
         // 통과 차단은 게이트 blocker가 맡는다 — 문틀 콜라이더는 플레이어를 걸리게만 하므로 제거.
         foreach (var col in frame.GetComponentsInChildren<Collider>()) Destroy(col);
     }
 
-    /// <summary>봉인 석문(Gothic 석재)을 개구부 크기에 맞춰 닫힘 위치에 인스턴스화. 프리팹 없으면 null.</summary>
+    /// <summary>봉인 문을 개구부에 세워 닫힘 위치에 둔다(테마 문). 프리팹 없으면 null.</summary>
     private Transform SpawnSealDoor(Transform parent, float ow, float oh)
     {
         // 테마 문 우선 — 문·통로·벽이 같은 팔레트에서 나와야 컨셉이 어긋나지 않는다(숲 방에 고딕 석문 방지).
         var doorPrefab = _current?.sealDoorPrefab ?? GameRunBootstrapper.Instance?.GateSealDoorPrefab;
         if (doorPrefab == null) return null;
+
+        // 10-05 — 실제 문 모델로 세운다(SealDoorFit: 면이 개구부를 보게 · 높이에 맞춘 균등 배율 · 좁으면 쌍문).
+        // 예전엔 가로 · 세로를 따로 늘려(깊이 그대로) 누운 뿌리 · 옆으로 놓인 문짝이 얇은 판으로 늘어났다(사용자 「얇은 판」).
+        // 문짝들은 「SealDoor」 아래에 앉고, 낙하 · 열림 · 자라기 연출은 이 뿌리 하나를 움직인다.
+        var root = new GameObject("SealDoor");
+        root.transform.SetParent(parent, false);
+        if (SealDoorFit.Place(root.transform, doorPrefab, ow, oh, out var b, out _))
+        {
+            SetLayerRecursive(root, 8); // Wall 레이어
+            // 문 메시의 콜라이더(MeshCollider 등)는 불필요 — 게이트 blocker가 통과 차단 담당. 제거로 인스턴스화·물리 비용 절감.
+            foreach (var col in root.GetComponentsInChildren<Collider>()) Destroy(col);
+            AddOcclusionProxyCollider(root, true, b);
+            return root.transform;
+        }
+        Destroy(root);
+
+        // 메시가 없는 특수 프리팹 — 기존 규약(코너 피벗 7×11.5)으로 폴백.
         var door = Instantiate(doorPrefab, parent);
         door.name = "SealDoor";
         door.transform.localRotation = Quaternion.identity;
-        door.transform.localScale    = Vector3.one;
-
-        // 프리팹마다 메시 치수·피벗이 달라 상수(7×11.5)로는 테마 문을 못 맞춘다.
-        // 실제 렌더러 바운즈를 재서 개구부에 맞추면 어떤 자산을 꽂아도 정확히 들어찬다.
-        bool measured = TryMeasureLocalBounds(door, out var b);
-        if (measured)
-        {
-            float sx = ow / Mathf.Max(0.01f, b.size.x);
-            float sy = oh / Mathf.Max(0.01f, b.size.y);
-            door.transform.localScale = new Vector3(sx, sy, 1f);
-            // 바운즈 중심을 개구부 중앙(게이트 원점)에 맞춘다 — 피벗이 코너든 중앙이든 무관.
-            // 게이트 원점은 개구부 '중앙'이므로, 바닥은 로컬 y = -oh/2 지점이다.
-            door.transform.localPosition = new Vector3(-b.center.x * sx, -b.center.y * sy, -0.25f);
-        }
-        else
-        {
-            // 렌더러가 없는 특수 프리팹 — 기존 규약(코너 피벗 7×11.5)으로 폴백.
-            door.transform.localScale    = new Vector3(ow / SealDoorMeshW, oh / SealDoorMeshH, 1f);
-            door.transform.localPosition = new Vector3(-ow * 0.5f, -oh * 0.5f, -0.25f);
-        }
-
-        SetLayerRecursive(door, 8); // Wall 레이어
-        // 문 메시의 콜라이더(MeshCollider 등)는 불필요 — 게이트 blocker가 통과 차단 담당. 제거로 인스턴스화·물리 비용 절감.
+        door.transform.localScale    = new Vector3(ow / SealDoorMeshW, oh / SealDoorMeshH, 1f);
+        door.transform.localPosition = new Vector3(-ow * 0.5f, -oh * 0.5f, -0.25f);
+        SetLayerRecursive(door, 8);
         foreach (var col in door.GetComponentsInChildren<Collider>()) Destroy(col);
-        AddOcclusionProxyCollider(door, measured, b);
+        AddOcclusionProxyCollider(door, false, default);
         return door.transform;
     }
 
@@ -1373,45 +1457,6 @@ public class RunFlowController : MonoBehaviour
 
     /// <summary>문 프록시 콜라이더의 최소 두께(로컬). 판형 메시라도 SphereCast에 안정적으로 걸리게.</summary>
     private const float MinDoorProxyThickness = 0.2f;
-
-    /// <summary>
-    /// 인스턴스의 렌더러 바운즈를 <b>자기 로컬 공간</b>에서 합산한다(스케일 1 상태에서 호출).
-    /// 문 프리팹마다 메시 크기·피벗이 제각각이라, 상수 대신 이 값으로 개구부에 맞춘다.
-    /// </summary>
-    private static bool TryMeasureLocalBounds(GameObject go, out Bounds local)
-    {
-        local = default;
-        var rends = go.GetComponentsInChildren<Renderer>(true);
-        if (rends.Length == 0) return false;
-
-        bool has = false;
-        var root = go.transform;
-        for (int i = 0; i < rends.Length; i++)
-        {
-            var mf = rends[i].GetComponent<MeshFilter>();
-            var mesh = mf != null ? mf.sharedMesh : null;
-            if (mesh == null) continue;
-
-            // 메시 바운즈의 8개 꼭짓점을 루트 로컬로 옮겨 감싼다.
-            // ⚠️ extents에 스케일 벡터를 곱하는 방식은 자식이 회전돼 있으면(FBX 임포트에서 흔하다) 축이 섞여
-            //    치수가 어긋난다 — 문이 엉뚱한 크기·위치로 앉는 원인. 꼭짓점 변환은 회전에 무관하게 정확하다.
-            var mb = mesh.bounds;
-            var t  = rends[i].transform;
-            var c  = mb.center;
-            var e  = mb.extents;
-
-            for (int sx = -1; sx <= 1; sx += 2)
-            for (int sy = -1; sy <= 1; sy += 2)
-            for (int sz = -1; sz <= 1; sz += 2)
-            {
-                var corner = c + new Vector3(e.x * sx, e.y * sy, e.z * sz);
-                var p      = root.InverseTransformPoint(t.TransformPoint(corner));
-                if (!has) { local = new Bounds(p, Vector3.zero); has = true; }
-                else        local.Encapsulate(p);
-            }
-        }
-        return has && local.size.x > 0.01f && local.size.y > 0.01f;
-    }
 
     private static void SetLayerRecursive(GameObject go, int layer)
     {

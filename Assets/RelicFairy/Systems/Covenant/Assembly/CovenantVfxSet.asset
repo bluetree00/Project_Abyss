@@ -69,6 +69,27 @@ MonoBehaviour:
     scale: 0.5
     nativeRadius: 0
     life: 1.5
+  - key: fury
+    prefab: {fileID: 1873886433987638, guid: fb2df51e77abde1429eb83c0317784af, type: 3}
+    scale: 0.6
+    nativeRadius: 0
+    life: 1
+  - key: momentum
+    prefab: {fileID: 1171190231128718, guid: d9467a10b94fb3b428cc539326c9579b, type: 3}
+    scale: 0.6
+    nativeRadius: 0
+    life: 1.2
+  - key: curse
+    prefab: {fileID: 1775157058538326, guid: 53cc67d1559f30f45945995c620b82df, type: 3}
+    scale: 0.6
+    nativeRadius: 0
+    life: 1.5
+  - key: hemorrhage
+    prefab: {fileID: 6714037650790324515, guid: 4a476f63e4da5ca4fa476ddfbad3ace2,
+      type: 3}
+    scale: 0.028
+    nativeRadius: 0
+    life: 1.2
   - key: ruby
     prefab: {fileID: 1761614549529672, guid: 7ee7aea814e67034c991de25882a040b, type: 3}
     scale: 1.5

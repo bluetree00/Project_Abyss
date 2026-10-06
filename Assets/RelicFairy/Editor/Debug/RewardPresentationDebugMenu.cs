@@ -41,11 +41,10 @@ public static partial class RewardPresentationDebugMenu
             fail += Expect("전체 · 전설 색수차 약하게",  RewardPresentation.World(ItemRarity.Legendary).PulsePeak, 0.15f);
             fail += Expect("전체 · 에픽 슬로모 없음",    RewardPresentation.World(ItemRarity.Epic).SlowScale,      1f);
             fail += Expect("전체 · 전설 음 3",           RewardPresentation.World(ItemRarity.Legendary).Notes,     3);
-            fail += Expect("전체 · 에픽 바닥 문양",      RewardPresentation.World(ItemRarity.Epic).Glyph ? 1 : 0,  1);
-            fail += Expect("전체 · 레어 바닥 문양",      RewardPresentation.World(ItemRarity.Rare).Glyph ? 1 : 0,  1);
-            fail += Expect("전체 · 일반 바닥 문양 없음", RewardPresentation.World(ItemRarity.Common).Glyph ? 1 : 0, 0);
-            fail += Expect("전체 · 전설 문양 대신 표지", RewardPresentation.World(ItemRarity.Legendary).Glyph ? 1 : 0, 0);
-            fail += Expect("전체 · 전설 표지 기둥",      RewardPresentation.World(ItemRarity.Legendary).IdlePillar ? 1 : 0, 1);
+            fail += Expect("전체 · 일반 등급 기둥 없음", RewardPresentation.World(ItemRarity.Common).IdlePillar ? 1 : 0,    0);
+            fail += Expect("전체 · 레어 등급 기둥",      RewardPresentation.World(ItemRarity.Rare).IdlePillar ? 1 : 0,      1);
+            fail += Expect("전체 · 에픽 등급 기둥",      RewardPresentation.World(ItemRarity.Epic).IdlePillar ? 1 : 0,      1);
+            fail += Expect("전체 · 전설 등급 기둥",      RewardPresentation.World(ItemRarity.Legendary).IdlePillar ? 1 : 0, 1);
             fail += Expect("전체 · 일반 빛 흩어짐",      RewardPresentation.World(ItemRarity.Common).IdleAura ? 1 : 0, 0);
             fail += Expect("전체 · 레어 빛 남음",        RewardPresentation.World(ItemRarity.Rare).IdleAura ? 1 : 0,   1);
 

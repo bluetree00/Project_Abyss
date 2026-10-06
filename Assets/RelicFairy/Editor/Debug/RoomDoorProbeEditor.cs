@@ -28,7 +28,7 @@ public static class RoomDoorProbeEditor
         int n = 0;
         foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
         {
-            if (t.name != "SealDoor" || !t.gameObject.activeInHierarchy) continue;
+            if ((t.name != "SealDoor" && t.name != "StartSealDoor") || !t.gameObject.activeInHierarchy) continue;   // 대기방 시작 문도(10-06)
             var gate = t.parent;
             var rs = t.GetComponentsInChildren<Renderer>();
             if (rs.Length == 0) continue;

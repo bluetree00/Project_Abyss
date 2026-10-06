@@ -181,6 +181,7 @@ public sealed class ElementVfxPlayer : MonoBehaviour
         for (int i = _active.Count - 1; i >= 0; i--)
         {
             var it = _active[i];
+            if (it.tf == null) { DropDestroyedAt(i); continue; }   // 팩 자체 스크립트 · StopAction이 스스로 파괴했다(10-06)
 
             if (it.follow != null)
             {
@@ -312,8 +313,12 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     private VfxItem Spawn(GameObject prefab, Vector3 pos, float scale)
     {
         VfxItem it = null;
-        if (_pools.TryGetValue(prefab, out var stack) && stack.Count > 0)
-            it = stack.Pop();
+        if (_pools.TryGetValue(prefab, out var stack))
+            while (it == null && stack.Count > 0)
+            {
+                it = stack.Pop();
+                if (it.tf == null) it = null;   // 풀에 있는 동안 파괴된 것 — 버린다
+            }
 
         if (it == null)
         {
@@ -330,6 +335,15 @@ public sealed class ElementVfxPlayer : MonoBehaviour
         RestartParticles(it.tf);
         _active.Add(it);
         return it;
+    }
+
+    /// <summary>스스로 파괴된 인스턴스 — 장부(핸들 · 오라)에서만 빼고 풀에는 넣지 않는다.</summary>
+    private void DropDestroyedAt(int index)
+    {
+        var it = _active[index];
+        _active.RemoveAt(index);
+        if (it.handle != 0) _handles.Remove(it.handle);
+        if (!string.IsNullOrEmpty(it.auraKey) && _auras.TryGetValue(it.auraKey, out var a) && a == it) _auras.Remove(it.auraKey);
     }
 
     private void ReleaseAt(int index)

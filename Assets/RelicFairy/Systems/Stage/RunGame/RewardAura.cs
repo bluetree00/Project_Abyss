@@ -13,7 +13,6 @@ public sealed class RewardAura : MonoBehaviour
     private const float GrowFrom   = 0.3f;    // 예고 시작 크기(목표 크기 대비)
     private const float PulseDepth = 0.12f;   // 맥동 진폭
     private const float FadeOut    = 0.4f;    // 사라질 때 남은 입자가 흩어지는 시간
-    private const float BeaconSettleSeconds = 0.8f;
 
     // ── Private ────────────────────────────────────────────────
     private readonly List<GameObject> _loops      = new(3);
@@ -24,9 +23,6 @@ public sealed class RewardAura : MonoBehaviour
     private float      _growStart;
     private float      _pulseHz;
     private bool       _dissolved;
-    private GameObject _beacon;
-    private float      _beaconSettleAt = -1f;   // 이 시각부터 표지 기둥이 낮아진다(실시간)
-    private float      _beaconSettleTo = 1f;
 
     // ── Lifecycle ──────────────────────────────────────────────
     private void Update()
@@ -44,13 +40,8 @@ public sealed class RewardAura : MonoBehaviour
         if (_pulseHz > 0f)
             k *= 1f + PulseDepth * Mathf.Sin(Time.unscaledTime * _pulseHz * Mathf.PI * 2f);
 
-        // 표지 기둥 — 등장 뒤 잠시 서 있다가 낮게 가라앉는다(바닥 금빛 고리 + 짧은 기둥만 남는다)
-        float beaconK = 1f;
-        if (_beaconSettleAt > 0f && Time.unscaledTime >= _beaconSettleAt)
-            beaconK = Mathf.Lerp(1f, _beaconSettleTo, Mathf.Clamp01((Time.unscaledTime - _beaconSettleAt) / BeaconSettleSeconds));
-
         for (int i = 0; i < _loops.Count; i++)
-            if (_loops[i] != null) _loops[i].transform.localScale = _baseScales[i] * (k * (_loops[i] == _beacon ? beaconK : 1f));
+            if (_loops[i] != null) _loops[i].transform.localScale = _baseScales[i] * k;
     }
 
     private void OnDestroy() => ReleaseLoops(0f);   // 방 전환 등으로 먼저 사라질 때 — 반복 이펙트를 남기지 않는다
@@ -70,22 +61,6 @@ public sealed class RewardAura : MonoBehaviour
         if (loop == null) return;
         _loops.Add(loop);
         _baseScales.Add(loop.transform.localScale);
-    }
-
-    /// <summary>표지 기둥 — 다른 빛처럼 자라고 맥동하고, <see cref="SettleBeaconAfter"/>로 따로 낮출 수 있다.</summary>
-    public void SetBeacon(GameObject beacon)
-    {
-        if (beacon == null) return;
-        _beacon = beacon;
-        AddLoop(beacon);
-    }
-
-    /// <summary>표지 기둥을 <paramref name="seconds"/>(실시간) 뒤 제 크기의 <paramref name="factor"/>배로 낮춘다 — 반대편 시야를 계속 가리지 않게.</summary>
-    public void SettleBeaconAfter(float seconds, float factor)
-    {
-        if (_beacon == null) return;
-        _beaconSettleAt = Time.unscaledTime + Mathf.Max(0f, seconds);
-        _beaconSettleTo = Mathf.Clamp(factor, 0.1f, 1f);
     }
 
     /// <summary>지금부터 <paramref name="seconds"/> 동안 작게 시작해 제 크기로 자란다(예고).</summary>

@@ -17,10 +17,10 @@ public static class DungeonLightShafts
     // ── Constants ─────────────────────────────────────────────────
     private const float Tilt          = 25f;    // 수직에서 해 쪽으로 기우는 각
     private const float Width         = 2.6f;
-    private const float AboveWall     = 12f;    // 벽 윗변 위로 더 뻗는다(틈이 벽 너머 높은 곳에 있는 듯)
+    private const float AboveWall     = 5f;     // 벽 윗변 위로 더 뻗는다(틈이 벽 너머 높은 곳에 있는 듯) — 12 m는 높은 카메라 위까지 덮어 화면이 하얗게 번졌다(10-06)
     private const float EdgeInset     = 2.5f;   // 벽에서 안쪽으로(칸)
     private const float MinSpacing    = 6f;
-    private const float ShaftAlpha    = 0.30f;
+    private const float ShaftAlpha    = 0.22f;   // 0.30은 여러 줄이 겹치는 입구 쪽 화면에서 하얗게 번졌다(10-06)
     private const int   DustMax       = 28;
     private const int   Tries         = 24;
 
@@ -47,7 +47,7 @@ public static class DungeonLightShafts
         float halfWidth = (Mathf.Abs(fwd.z) > 0.5f ? w : h) * 0.5f * cellSize - EdgeInset * cellSize;
         if (halfDepth <= 1f || halfWidth <= 1f) return;
 
-        Vector3 axis = ShaftAxis();
+        Vector3 axis = ShaftAxis(fwd);
         float length = (wallTop + AboveWall) / Mathf.Max(0.3f, axis.y);
         int want = 2 + rng.Next(3);   // 2~4
         var picked = new List<Vector3>(want);
@@ -74,12 +74,13 @@ public static class DungeonLightShafts
     }
 
     // ── Private Methods ───────────────────────────────────────────
-    /// <summary>빛줄기 축(바닥 → 위) — 해가 있는 쪽으로 <see cref="Tilt"/>° 기운다. 해가 없으면 고정 방향.</summary>
-    private static Vector3 ShaftAxis()
+    /// <summary>
+    /// 빛줄기 축(바닥 → 위) — 진행 방향(<paramref name="away"/> = 카메라에서 먼 쪽)으로 <see cref="Tilt"/>° 기운다.
+    /// 예전엔 해 쪽으로 기울여, 해가 카메라 쪽이면 위끝이 카메라 위를 덮어 전투방 입구 화면이 하얗게 번졌다(10-06 실측).
+    /// </summary>
+    private static Vector3 ShaftAxis(Vector3 away)
     {
-        var sun = RenderSettings.sun;
-        Vector3 toSun = sun != null ? -sun.transform.forward : new Vector3(0.4f, 1f, 0.3f);
-        Vector3 hz = new Vector3(toSun.x, 0f, toSun.z);
+        Vector3 hz = new Vector3(away.x, 0f, away.z);
         if (hz.sqrMagnitude < 0.001f) hz = Vector3.forward;
         hz.Normalize();
         float t = Tilt * Mathf.Deg2Rad;

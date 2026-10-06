@@ -314,12 +314,12 @@ MonoBehaviour:
     beamLength: 0
     tint: {r: 0, g: 0, b: 0, a: 0}
   - slot: 53
-    prefab: {fileID: 8697400331180497108, guid: fabdc41743036b945ade90d43535856b,
+    prefab: {fileID: 8001687956726767954, guid: a17e70a02f8d081468e767010cf9643f,
       type: 3}
     scale: 1
     offset: {x: 0, y: 0, z: 0}
     lifetime: 0
-    note: "Vefects \uAE08\uBE5B \uAE30\uB465(\uBC18\uBCF5)"
+    note: "SSEP2 \uAE08\uBE5B \uACB0\uACC4 \uAD6C(HolyShield, \uBC18\uACBD 2.8 m \u00B7 \uBC18\uBCF5) \u2014 \uBD09\uC778\uC11D \uC810\uD654. \uC61B Vefects \uAE08\uBE5B \uAE30\uB465\uC740 \uBCF4\uC0C1 \uC804\uC124 \uB4F1\uAE09 \uAE30\uB465\uACFC \uACB9\uCCD0 \uAD50\uCCB4(10-06)"
     beamLength: 0
     tint: {r: 0, g: 0, b: 0, a: 0}
   - slot: 54

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -97,11 +98,17 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     // 활을 든 채 검을 휘두르면 활로 후려치는 그림이 나온다 — 시전 동안만 바꿔 낀다.
     private GameObject _hiddenWeapon;   // 숨긴 장착 무기(복구 대상)
     private GameObject _qSword;         // 띄운 전용 검
+    private readonly List<RelicFairy.Monster.MonsterBase> _aimBuf = new(4);
     private GameObject _bladeVfx;       // 칼날 루프 이펙트(유물 데이터 키)
     private PlayerWeaponTrailVfx _trailVfx;   // 칼날 트레일 — 장착 무기 대신 전용 검에 묶는다(10-03 사용자 「Q 검에 트레일 · 이펙트」)
 
     /// <summary>칼밑 = 손잡이 원점에서 칼끝 쪽으로 이 비율(가드 · 손잡이를 트레일에서 뺀다).</summary>
     private const float BladeRootRatio = 0.22f;
+    /// <summary>막타 다시 겨눔 — 막타 모션이 시작될 때 이 반경 안 가장 가까운 적 쪽으로 돈다(사용자 10-06).</summary>
+    private const float FinisherReaimRadius = 10f;
+    // Q 검 재질(Unity Toon Shader) 발광 · 테두리 빛 — 인스턴스 재질을 만들지 않게 프로퍼티 블록으로 준다
+    private static readonly int EmissiveColorId  = Shader.PropertyToID("_Emissive_Color");
+    private static readonly int RimLightColorId  = Shader.PropertyToID("_RimLightColor");
 
     private float _elapsed;
     private int   _hitsDone;
@@ -189,6 +196,7 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         if (!_finisherAnimPlayed && _elapsed >= FinisherAnimAt)
         {
             _finisherAnimPlayed = true;
+            FaceNearestEnemy(ctx);   // 시작 때 마우스 방향 그대로면 막타가 엉뚱한 쪽으로 나갔다(10-06 사용자)
 
             // 마무리는 <b>연타와 다른 모션</b>이어야 한 방임이 읽힌다.
             // 예전엔 시퀀스의 마지막 참격을 한 번 더 걸어서, 앞선 연타와 구분이 안 됐다.
@@ -217,6 +225,22 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
 
         var state = anim.GetCurrentAnimatorStateInfo(0);
         if (!state.IsName(StateName(_stepIndex))) PlayStep(ctx, _stepIndex);
+    }
+
+    /// <summary>
+    /// 막타 직전 다시 겨눔 — 반경 <see cref="FinisherReaimRadius"/> 안 가장 가까운 적 쪽으로 몸을 돌린다.
+    /// 회전은 다음 물리 프레임에 적용되고, 막타 판정(<see cref="FinisherHitAt"/>)은 그 뒤라 참격 · 판정 콘이 그 적을 향한다. 적이 없으면 그대로.
+    /// </summary>
+    private void FaceNearestEnemy(SkillExecutionContext ctx)
+    {
+        var ctrl = ctx.Controller;
+        if (ctrl == null) return;
+        Vector3 me = ctrl.transform.position;
+        if (CombatQuery.GetNearbyEnemies(me, FinisherReaimRadius, ctrl.gameObject, 1, _aimBuf) == 0) return;
+        Vector3 dir = _aimBuf[0].transform.position - me;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.01f) return;
+        ctrl.RequestFacing(Quaternion.LookRotation(dir.normalized, Vector3.up));
     }
 
     /// <summary>막타 순간의 시간 정지. 실시간으로 잰 뒤 풀며, 스킬이 먼저 끊기면 OnExit이 푼다.</summary>
@@ -333,6 +357,14 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         root.localPosition = tipLocal * BladeRootRatio;
 
         var owner = _relicClass;
+        if (owner != null && owner.QSwordGlowColor.maxColorComponent > 0f && mf.TryGetComponent<Renderer>(out var blade))
+        {
+            var block = new MaterialPropertyBlock();
+            blade.GetPropertyBlock(block);
+            block.SetColor(EmissiveColorId, owner.QSwordGlowColor);
+            block.SetColor(RimLightColorId, owner.QSwordGlowColor);
+            blade.SetPropertyBlock(block);   // 검은 Q 끝에 회수(파괴)되므로 되돌릴 필요가 없다
+        }
         if (owner != null && owner.QSwordTrailPrefab != null)
         {
             var ctrl = sword.GetComponentInParent<PlayerController>();
@@ -354,6 +386,17 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         go.transform.localPosition = localPos;
         go.transform.localRotation = Quaternion.identity;
         go.transform.localScale    = Vector3.one * scale;
+        // 캐릭터 이펙트(VFX Graph)는 감쌀 볼륨을 바인더 Target으로 받는다 — 비어 있으면 월드 원점에 뜬다(RelicStateVfx.BindToHost와 같은 이유)
+        var binders = go.GetComponentsInChildren<INab.CommonVFX.VFXLossyTransformBinder>(true);
+        for (int i = 0; i < binders.Length; i++)
+            if (binders[i].Target == null) binders[i].Target = parent;
+        // 시작 이벤트가 비어 있게 저작된 이펙트(INab Character Effects)는 켜기만 하면 한 톨도 안 나온다 — 재생 · 활성 값을 직접 켠다(RelicStateVfx.ApplyPlayState와 같은 이유)
+        var graphs = go.GetComponentsInChildren<UnityEngine.VFX.VisualEffect>(true);
+        for (int i = 0; i < graphs.Length; i++)
+        {
+            if (graphs[i].HasBool("Effect Active")) graphs[i].SetBool("Effect Active", true);
+            graphs[i].Play();
+        }
         _bladeVfx = go;
     }
 

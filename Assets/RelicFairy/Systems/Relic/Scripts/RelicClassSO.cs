@@ -121,6 +121,8 @@ public class RelicClassSO : ScriptableObject
     private string qSwordBladeVfxKey;
     [SerializeField, Tooltip("칼날 이펙트 크기 배율(칼날 길이 기준)")]
     private float qSwordBladeVfxScale = 0.35f;
+    [SerializeField, ColorUsage(false, true), Tooltip("Q 전용 검이 시전 동안 빛나는 색(HDR — 툰 셰이더 발광 · 테두리 빛). 검정이면 끔")]
+    private Color qSwordGlowColor = Color.black;
 
     [Header("스탯 (공통 CombatGirl 베이스 위에 가산)")]
     [SerializeField] private StatModifier[] stats;
@@ -152,6 +154,8 @@ public class RelicClassSO : ScriptableObject
     /// <summary>Q 전용 검 칼날 루프 이펙트 키(없으면 빈 문자열).</summary>
     public string QSwordBladeVfxKey => qSwordBladeVfxKey;
     public float  QSwordBladeVfxScale => qSwordBladeVfxScale > 0f ? qSwordBladeVfxScale : 0.35f;
+    /// <summary>Q 전용 검 발광 색(HDR). 검정이면 발광 없음.</summary>
+    public Color  QSwordGlowColor => qSwordGlowColor;
     /// <summary>Q 단독 모션 상태(비우면 QSkill_01 폴백). 시퀀스(연타)와 별개 — 캐스트·마무리처럼 한 번 재생하는 모션.</summary>
     public string QSkillMainState => string.IsNullOrEmpty(qSkillMainState) ? DefaultQSkillState : qSkillMainState;
     public string QSkillMainClipKey => qSkillMainClipKey;

@@ -295,7 +295,25 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
     }
 
     protected override float BossHpScale   => Pages.HpScale;
-    protected override int   DamageHpFloor => Pages.HpFloor(base.DamageHpFloor);
+    protected override int   DamageHpFloor => Mathf.Max(Pages.HpFloor(base.DamageHpFloor), SummonFloorHp);
+
+    /// <summary>
+    /// 다음 소환 기준선(70 · 40 · 10%, 아직 안 한 것 중 가장 높은 것)의 체력 — 소환 패턴이 시작할 때까지 그 아래로 안 내려간다(10-06).
+    /// 예전엔 기준선을 넘는 순간 무적을 켜 소환이 시작될 때까지(실측 7.2초) 잡을 새끼 용도 없이 화살이 막혔고, 룬 시너지는 그 무적을 지나쳤다.
+    /// 내림이라 소환 조건(HpRatio ≤ 기준선)을 언제나 만족한다. 2페이지엔 소환이 없다.
+    /// </summary>
+    private int SummonFloorHp
+    {
+        get
+        {
+            if (_dragonBB == null || IsAbyssPage) return 0;
+            float t = !_dragonBB.HasSummonedAt70 ? 0.7f : !_dragonBB.HasSummonedAt40 ? 0.4f : !_dragonBB.HasSummonedAt10 ? 0.1f : -1f;
+            return t < 0f ? 0 : Pages.Page2Hp + Mathf.FloorToInt(Pages.Page1Hp * t);
+        }
+    }
+
+    /// <summary>소환 기준선 하한에 닿았다 — 소환 패턴이 시작할 때까지 「막힘」(피해 숫자 없이 막힘 표시).</summary>
+    private bool SummonHolding => _runtime != null && SummonFloorHp > 0 && _runtime.CurrentHp <= SummonFloorHp;
 
     // ── IBossHudSource ────────────────────────────────────
     public float[] HudPageMarkers  => Pages.HudPageMarkers;
@@ -708,7 +726,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     /// <summary>소환 게이트(무적) 구간도 「막힘」으로 읽히게 한다(공용 규약).</summary>
-    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || (_dragonBB != null && _dragonBB.IsSummonGated);
+    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || (_dragonBB != null && _dragonBB.IsSummonGated) || SummonHolding;
 
     public override void TakeDamage(float amount, GameObject instigator,
         float knockbackMultiplier = 1f,
@@ -720,18 +738,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
             _dragonBB.SetHitDirection(dir, transform.forward);
         }
 
-        // HP가 소환 임계값에 이미 도달해 있고 해당 소환이 미발동이면 데미지 전 즉시 무적
-        // (2페이지엔 소환이 없다 — 비율이 0.4 → 0으로 다시 내려가도 게이트를 걸지 않는다)
-        if (_dragonBB != null && _config != null && _runtime != null && _config.stat.maxHp > 0 && !IsAbyssPage)
-        {
-            float ratio = HpRatio;
-            if ((!_dragonBB.HasSummonedAt70 && ratio <= 0.7f) ||
-                (!_dragonBB.HasSummonedAt40 && ratio <= 0.4f) ||
-                (!_dragonBB.HasSummonedAt10 && ratio <= 0.1f))
-                _dragonBB.SetSummonGated(true);
-        }
-
-        if (_dragonBB != null && _dragonBB.IsSummonGated) return;
+        // 소환 무적(소환 패턴 중) · 기준선 하한에 닿음(소환 대기) — 막힘. 무적은 소환 패턴이 시작할 때만 건다(10-06).
+        if (_dragonBB != null && (_dragonBB.IsSummonGated || SummonHolding)) return;
 
         base.TakeDamage(amount, instigator, knockbackMultiplier, isCrit);
 
@@ -749,15 +757,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
     {
         if (_dragonBB == null) return;
 
-        // 소환 임계값 돌파 시 무적 게이트 설정 — 소환 패턴 완료까지 이후 데미지 차단 (2페이지엔 소환 없음)
-        float ratio = HpRatio;
-        if (!IsAbyssPage &&
-            ((!_dragonBB.HasSummonedAt70 && ratio <= 0.7f) ||
-             (!_dragonBB.HasSummonedAt40 && ratio <= 0.4f) ||
-             (!_dragonBB.HasSummonedAt10 && ratio <= 0.1f)))
-        {
-            _dragonBB.SetSummonGated(true);
-        }
+        // 소환 기준선은 체력 하한(SummonFloorHp)이 지킨다 — 무적은 소환 패턴이 시작할 때 건다(10-06).
 
         // 공중 상태 또는 쉴드가 이미 파괴된 상태에서는 GetHit 스킵
         if (_dragonBB.BodyState == BodyState.Airborne)

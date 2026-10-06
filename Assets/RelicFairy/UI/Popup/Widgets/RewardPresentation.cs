@@ -161,8 +161,6 @@ public static class RewardPresentation
         public readonly float Foretell;
         /// <summary>예고 · 놓여 있는 소용돌이의 크기 배율. 0이면 빛 없음(끔).</summary>
         public readonly float SwirlScale;
-        /// <summary>예고부터 바닥 문양을 그리는가(레어 · 에픽 — 전설은 표지 기둥의 금빛 고리가 대신한다).</summary>
-        public readonly bool  Glyph;
         /// <summary>등장 빛기둥 크기 배율. 0이면 빛기둥 없음.</summary>
         public readonly float PillarScale;
         /// <summary>등장 뒤 이어지는 빛 박자(빛줄기 + 바닥 불꽃) 수.</summary>
@@ -179,16 +177,16 @@ public static class RewardPresentation
         public readonly float IdlePulseHz;
         /// <summary>예고 빛이 등장 뒤에도 보상 곁에 남는가(레어 이상 — 일반은 매 방 보는 등급이라 흩어진다).</summary>
         public readonly bool  IdleAura;
-        /// <summary>금빛 표지 기둥이 예고부터 서는가(전설 — 서기 전부터 보인다). 등장 뒤 잠시 남았다가 흩어진다(반대편 시야를 가리지 않게).</summary>
+        /// <summary>등급 기둥이 예고부터 서는가(레어 이상 — 서기 전부터 등급이 보인다). 등장 뒤 잠시 제 높이로 섰다가 낮아진다(반대편 시야를 가리지 않게).</summary>
         public readonly bool  IdlePillar;
         /// <summary>등장음 수 — 0 = 없음, 1 = 한 음, 3 = 상승 3음.</summary>
         public readonly int   Notes;
 
-        public WorldSpec(float foretell, float swirlScale, bool glyph, float pillarScale, int rings,
+        public WorldSpec(float foretell, float swirlScale, float pillarScale, int rings,
                          float slowScale, float slowSeconds, float pulsePeak, bool edgeGlow,
                          float idlePulseHz, bool idleAura, bool idlePillar, int notes)
         {
-            Foretell = foretell; SwirlScale = swirlScale; Glyph = glyph; PillarScale = pillarScale; Rings = rings;
+            Foretell = foretell; SwirlScale = swirlScale; PillarScale = pillarScale; Rings = rings;
             SlowScale = slowScale; SlowSeconds = slowSeconds; PulsePeak = pulsePeak; EdgeGlow = edgeGlow;
             IdlePulseHz = idlePulseHz; IdleAura = idleAura; IdlePillar = idlePillar; Notes = notes;
         }
@@ -200,22 +198,22 @@ public static class RewardPresentation
     // 가로로 읽으면 "빛 몇 가닥 → 빛기둥 → 문양+기둥+빛 박자 → 표지 기둥(예고부터)+빛 박자 2+슬로모+금빛 가장자리"로 채널이 계단진다(카드 표와 같은 원칙).
     // 낮은 등급은 빨리 서고(런 템포), 높은 등급은 기다림 자체가 예고다.
     private static readonly WorldSpec WorldCommon = new(
-        foretell: 0.6f,  swirlScale: 0.5f,  glyph: false, pillarScale: 0f,    rings: 0,
+        foretell: 0.6f,  swirlScale: 0.5f,  pillarScale: 0f,    rings: 0,
         slowScale: 1f,   slowSeconds: 0f,   pulsePeak: 0f,    edgeGlow: false,
         idlePulseHz: 0f,   idleAura: false, idlePillar: false, notes: 1);
 
     private static readonly WorldSpec WorldRare = new(
-        foretell: 1.0f,  swirlScale: 0.8f,  glyph: true,  pillarScale: 0.6f,  rings: 0,
+        foretell: 1.0f,  swirlScale: 0.8f,  pillarScale: 0.6f,  rings: 0,
         slowScale: 1f,   slowSeconds: 0f,   pulsePeak: 0f,    edgeGlow: false,
-        idlePulseHz: 0f,   idleAura: true,  idlePillar: false, notes: 1);
+        idlePulseHz: 0f,   idleAura: true,  idlePillar: true,  notes: 1);
 
     private static readonly WorldSpec WorldEpic = new(
-        foretell: 1.5f,  swirlScale: 1.1f,  glyph: true,  pillarScale: 0.85f, rings: 1,
+        foretell: 1.5f,  swirlScale: 1.1f,  pillarScale: 0.85f, rings: 1,
         slowScale: 1f,   slowSeconds: 0f,   pulsePeak: 0f,    edgeGlow: false,
-        idlePulseHz: 0.8f, idleAura: true,  idlePillar: false, notes: 1);
+        idlePulseHz: 0.8f, idleAura: true,  idlePillar: true,  notes: 1);
 
     private static readonly WorldSpec WorldLegendary = new(
-        foretell: 2.0f,  swirlScale: 1.6f,  glyph: false, pillarScale: 1.15f, rings: 2,
+        foretell: 2.0f,  swirlScale: 1.6f,  pillarScale: 1.15f, rings: 2,
         slowScale: 0.5f, slowSeconds: 0.3f, pulsePeak: 0.15f, edgeGlow: true,
         idlePulseHz: 0.6f, idleAura: true,  idlePillar: true,  notes: 3);
 
@@ -234,11 +232,11 @@ public static class RewardPresentation
         {
             // 축약 — 예고 절반 · 슬로모 · 화면 효과 없음 · 고리 1겹 · 한 음. 빛깔과 놓여 있는 모습은 남긴다.
             RewardPresentationMode.Brief => new WorldSpec(
-                spec.Foretell * 0.5f, spec.SwirlScale, spec.Glyph, spec.PillarScale, Mathf.Min(spec.Rings, 1),
+                spec.Foretell * 0.5f, spec.SwirlScale, spec.PillarScale, Mathf.Min(spec.Rings, 1),
                 1f, 0f, 0f, false, spec.IdlePulseHz, spec.IdleAura, spec.IdlePillar, 1),
             // 끔 — 빛도 소리도 없이 짧게 기다렸다 선다.
             RewardPresentationMode.Off => new WorldSpec(
-                WorldOffDelay, 0f, false, 0f, 0, 1f, 0f, 0f, false, 0f, false, false, 0),
+                WorldOffDelay, 0f, 0f, 0, 1f, 0f, 0f, false, 0f, false, false, 0),
             _ => spec,
         };
     }

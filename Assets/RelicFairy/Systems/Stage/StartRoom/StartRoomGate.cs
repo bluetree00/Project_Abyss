@@ -211,12 +211,16 @@ public class StartRoomGate : MonoBehaviour
     }
 
     // ── 봉인 석문 (스타트 방 모드) ──────────────────────────────────
-    private Vector3 SealDoorClosedPos => new Vector3(-_gateWidth * 0.5f, 0f, -0.25f); // 개구부 덮음(코너 피벗 중앙정렬)
+    private Vector3 _sealDoorClosedPos;   // 닫힌 자리 — 문을 세운 방식에 따라 다르다(SealDoorFit = 개구부 중앙 · 옛 규약 = 코너 피벗)
+    private Transform[] _sealHinges;      // 젖힘 문(10-06 · 나무문 팔레트) 경첩 — null이면 위로 걷힌다
 
     private void EnsureSealDoor()
     {
         if (_sealDoor != null) return;
-        var prefab = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.GateSealDoorPrefab : null;
+        // 챕터 팔레트의 봉인 문 우선(10-06) — 전투방 출구 문과 같은 문이 대기방 출구에도 선다. 없으면 전역 기본.
+        var prefab = _injectedCorridorPalette != null && _injectedCorridorPalette.SealDoorPrefab != null
+            ? _injectedCorridorPalette.SealDoorPrefab
+            : GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.GateSealDoorPrefab : null;
         if (prefab == null)
         {
             // 석문이 없으면 개구부가 그대로 보여 '문이 처음부터 열린' 것처럼 보인다 — 원인 추적용 1회 경고.
@@ -227,11 +231,27 @@ public class StartRoomGate : MonoBehaviour
             }
             return;
         }
-        var door = Instantiate(prefab, transform);
-        door.name = "StartSealDoor";
-        door.transform.localRotation = Quaternion.identity;
-        door.transform.localScale    = new Vector3(_gateWidth / SealDoorMeshW, _gateHeight / SealDoorMeshH, 1f);
-        door.transform.localPosition = SealDoorClosedPos; // 닫힘으로 시작
+        // 실제 문 모델로 세운다(SealDoorFit) — 예전엔 벽 조각을 개구부 크기로 가로 · 세로 따로 늘려 얇은 판이 됐다(사용자 10-02).
+        // 게이트 원점은 개구부 바닥 가운데라, 문 뿌리를 개구부 중앙 높이에 둔다.
+        var door = new GameObject("StartSealDoor");
+        door.transform.SetParent(transform, false);
+        if (SealDoorFit.Place(door.transform, prefab, _gateWidth, _gateHeight, out _, out _))
+        {
+            _sealDoorClosedPos = new Vector3(0f, _gateHeight * 0.5f, 0f);
+            if (_injectedCorridorPalette != null && _injectedCorridorPalette.SealDoorMotion == SealDoorMotion.Swing)
+                _sealHinges = SealDoorFit.BuildHinges(door.transform);
+        }
+        else
+        {
+            // 메시가 없는 특수 프리팹 — 옛 규약(코너 피벗 7×11.5)
+            Destroy(door);
+            door = Instantiate(prefab, transform);
+            door.name = "StartSealDoor";
+            door.transform.localRotation = Quaternion.identity;
+            door.transform.localScale    = new Vector3(_gateWidth / SealDoorMeshW, _gateHeight / SealDoorMeshH, 1f);
+            _sealDoorClosedPos = new Vector3(-_gateWidth * 0.5f, 0f, -0.25f);
+        }
+        door.transform.localPosition = _sealDoorClosedPos; // 닫힘으로 시작
         SetSealDoorLayer(door, 8);
         foreach (var col in door.GetComponentsInChildren<Collider>()) Destroy(col); // 콜라이더 불필요(게이트가 차단) — 비용 절감
         _sealDoor = door.transform;
@@ -244,14 +264,18 @@ public class StartRoomGate : MonoBehaviour
 
     private void SetSealDoorClosed()
     {
-        if (_sealDoor != null) _sealDoor.localPosition = SealDoorClosedPos;
+        if (_sealDoor != null) _sealDoor.localPosition = _sealDoorClosedPos;
+        SealDoorFit.SetSwing(_sealHinges, 1f, 0f);
     }
 
     private async UniTaskVoid OpenSealDoorAsync()
     {
         if (_sealDoor == null) return;
-        Vector3 closed = SealDoorClosedPos;
+        Vector3 closed = _sealDoorClosedPos;
         Vector3 open   = closed + Vector3.up * _gateHeight;
+        // 나무문은 바깥(플레이어 반대쪽)으로 젖혀 열린다(10-06) — 바깥은 지금 플레이어 자리로 정한다
+        var   pt      = Managers.Player != null ? Managers.Player.PlayerTransform : null;
+        float outward = pt != null && Vector3.Dot(transform.forward, transform.position - pt.position) < 0f ? -1f : 1f;
 
         // 열림 임팩트 — 먼지 + 문 열림 사운드
         var dust = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.GateSealDustVfx : null;
@@ -269,10 +293,12 @@ public class StartRoomGate : MonoBehaviour
                 t += Time.deltaTime;
                 float k = Mathf.Clamp01(t / dur);
                 float e = 1f - (1f - k) * (1f - k); // ease-out
-                _sealDoor.localPosition = Vector3.Lerp(closed, open, e);
+                if (_sealHinges != null) SealDoorFit.SetSwing(_sealHinges, outward, e);
+                else _sealDoor.localPosition = Vector3.Lerp(closed, open, e);
                 await UniTask.Yield();
             }
-            _sealDoor.localPosition = open;
+            if (_sealHinges != null) SealDoorFit.SetSwing(_sealHinges, outward, 1f);
+            else _sealDoor.localPosition = open;
         }
         catch (System.OperationCanceledException) { }
     }

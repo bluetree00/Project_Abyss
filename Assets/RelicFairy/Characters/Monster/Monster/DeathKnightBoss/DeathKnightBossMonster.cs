@@ -153,7 +153,14 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     public string StoryBossId => StoryProgress.DeathKnight;
 
     protected override float BossHpScale    => Pages.HpScale;
-    protected override int   DamageHpFloor  => Pages.HpFloor(base.DamageHpFloor);
+    protected override int   DamageHpFloor  => Mathf.Max(Pages.HpFloor(base.DamageHpFloor), SoulGatePending ? SoulGateHp : 0);
+
+    /// <summary>영혼 소환 전 — 체력이 1페이지 50%(<see cref="SoulGateHp"/>) 아래로 안 내려간다(일반 · 시너지 · 지속 피해 모두 하한으로).</summary>
+    private bool SoulGatePending => _dkBB != null && !_dkBB.IsPhase2 && !_soulGateCleared;
+    /// <summary>영혼 소환 하한 — 내림이라 소환 조건(HpRatio ≤ 0.5)을 언제나 만족한다.</summary>
+    private int  SoulGateHp      => Pages.Page2Hp + Mathf.FloorToInt(Pages.Page1Hp * SoulGateRatio);
+    /// <summary>하한에 닿았다 — 영혼 소환까지 「막힘」(피해 숫자 · 피격 경직 없음 → 지금 공격이 끝나면 바로 소환, 10-06 실측 10초 → 짧게).</summary>
+    private bool SoulGateHolding => SoulGatePending && _runtime != null && _runtime.CurrentHp <= SoulGateHp;
 
     /// <summary>1페이지(= 기존 전투) 최대 체력 — 영혼 소환 회복량 등 기존 비율의 기준. 봉인기엔 최대 체력 그대로.</summary>
     public int PhaseMaxHp => Pages.Page1Hp;
@@ -605,25 +612,15 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     /// <summary>영혼 소환·방패 구간의 자체 무적도 「막힘」으로 읽히게 한다(공용 규약).</summary>
-    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || (_dkBB != null && _dkBB.IsInvincible);
+    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || (_dkBB != null && _dkBB.IsInvincible) || SoulGateHolding;
 
     public override void TakeDamage(float amount, UnityEngine.GameObject instigator,
                                     float knockbackMultiplier = 1f,
                                     bool isCrit = false)
     {
         if (_dkBB != null && _dkBB.IsInvincible) return;
+        if (SoulGateHolding) return;   // 영혼 소환 대기 — 막힘(CombatDamage가 막힘 표시를 띄운다). 하한은 DamageHpFloor가 지킨다
         base.TakeDamage(amount, instigator, knockbackMultiplier, isCrit);
-
-        // SoulSummon 완료 전까지 HP를 50%에서 클램프 — 1페이지 기준 50%(봉인기엔 Page2Hp=0 · Page1Hp=최대 체력이라 기존 값 그대로)
-        if (_dkBB != null && !_dkBB.IsPhase2 && !_soulGateCleared && _runtime != null)
-        {
-            int minHp = Pages.Page2Hp + Mathf.CeilToInt(Pages.Page1Hp * SoulGateRatio);
-            if (_runtime.CurrentHp < minHp)
-            {
-                _runtime.CurrentHp = minHp;
-                NotifyHpChanged();
-            }
-        }
     }
 
     public void NotifySoulSummonCompleted() => _soulGateCleared = true;

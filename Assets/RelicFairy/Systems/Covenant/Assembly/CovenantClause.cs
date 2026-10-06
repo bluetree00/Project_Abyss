@@ -296,6 +296,7 @@ public sealed class CovenantClause
             }
             case EffectKind.DamageBuff:
                 _buffActive = true; _buffEnd = Time.time + _effect.duration;
+                if (Ctx?.Player != null) CovenantFxService.Attach(_effect.id, Ctx.Player.transform, _effect.duration);   // 격노 — 연출이 없었다(10-06)
                 return true;
 
             case EffectKind.Shield:
@@ -347,6 +348,7 @@ public sealed class CovenantClause
                 _momentumStacks = Mathf.Min(_momentumStacks + 1, CovenantMath.MomentumStackCap(_cause.cls));
                 _momentumEnd    = Time.time + MomentumDuration;
                 _host.RequestStatRefresh();
+                if (Ctx?.Player != null) CovenantFxService.Attach(_effect.id, Ctx.Player.transform, MomentumDuration);   // 박차 — 연출이 없었다(10-06)
                 return true;
 
             // 「마지막 숨결」은 상시 대기하는 충전이라 원인 발동으로는 아무 일도 하지 않는다
@@ -376,6 +378,7 @@ public sealed class CovenantClause
         var mb = CovenantQuery.Live(target);
         if (mb == null) return false;
         CovenantStatus.Apply(target, StatusCurrency.Vulnerable, Eff, _effect.duration, Ctx?.Player?.gameObject);
+        CovenantFxService.Attach(_effect.id, mb.transform, _effect.duration);   // 저주가 걸린 동안 몸에 문양(10-06 — 연출이 없었다)
         Touch(mb);
         return true;
     }
@@ -402,7 +405,9 @@ public sealed class CovenantClause
         if (dps <= 0f) return false;
 
         CovenantStatus.Amplify(target, StatusCurrency.Bleed, dps, _effect.duration, Ctx.Player.gameObject);
-        Touch(CovenantQuery.Live(target));
+        var bled = CovenantQuery.Live(target);
+        if (bled != null) CovenantFxService.Burst(_effect.id, bled.transform.position);   // 출혈 — 발치에 피(10-06 — 연출이 없었다)
+        Touch(bled);
         return true;
     }
 

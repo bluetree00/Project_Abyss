@@ -44,10 +44,10 @@ MonoBehaviour:
   veilScale: 0.45
   veilTint: {r: 0, g: 0, b: 0, a: 0}
   veilRadianceIntensity: 6
-  sealDoorPrefab: {fileID: 1031144939, guid: abc00000000014045476076057746752, type: 3}
+  sealDoorPrefab: {fileID: 1030991781, guid: abc00000000004569356096877460945, type: 3}
   gateFramePrefab: {fileID: 6812090675127939861, guid: c3d38e03b620d21419252181a127a644,
     type: 3}
-  sealDoorMotion: 1
+  sealDoorMotion: 2
   blocks:
   - {fileID: 11400000, guid: 6bfba40b082f66549bb9192b1f434331, type: 2}
   - {fileID: 11400000, guid: 6210a5df7c32f604e86b821372770ad1, type: 2}

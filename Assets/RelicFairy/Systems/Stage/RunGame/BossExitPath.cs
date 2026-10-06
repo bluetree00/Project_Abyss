@@ -1,4 +1,5 @@
 using System;
+using RelicFairy.Monster;
 using UnityEngine;
 
 /// <summary>
@@ -12,6 +13,8 @@ using UnityEngine;
 ///   3) 마커 없음                     : 아레나 중심에서 입구(PlayerSpawn) 반대편으로 <see cref="FallbackDist"/>
 ///   4) 아레나 없음(격자 보스방)       : 방 중심(호출측이 방 루트 위치를 넘긴다 — 보스 위치가 아니다)
 /// Y는 Ground 레이캐스트로 바닥에 스냅한다. 벽은 건드리지 않는다 — 구멍 뒤는 허공이라 떨어진다.
+/// 마지막으로 그 자리가 플레이어와 걸어서 이어지는지 본다 — 마커가 막힌 구조 너머면(Ch3 기사 단상 뒤 제단, 10-03 소프트락)
+/// 플레이어와 이어진 가장 가까운 바닥으로 당긴다(<see cref="KeepReachable"/>).
 /// </summary>
 public static class BossExitPath
 {
@@ -29,6 +32,7 @@ public static class BossExitPath
     {
         Vector3 pos = ResolveGatePosition(roomCenter, arena);
         pos.y = SnapToGroundY(pos, arena);
+        pos = KeepReachable(pos);
         ChapterGate.Spawn(pos);
         Debug.Log($"[BossExitPath] 챕터 게이트 배치 {pos} (arena={(arena != null ? arena.name : "없음")})");
         return pos;
@@ -42,6 +46,7 @@ public static class BossExitPath
     {
         Vector3 pos = ResolveGatePosition(roomCenter, arena);
         pos.y = SnapToGroundY(pos, arena);
+        pos = KeepReachable(pos);
         Transform marker = arena != null ? (FindMarker(arena, "Next_Ch") ?? FindMarker(arena, "Exit")) : null;
         outward = marker != null ? Flatten(marker.position - pos)
                 : arena != null  ? Flatten(pos - arena.position)
@@ -73,6 +78,22 @@ public static class BossExitPath
         if (dir.sqrMagnitude < 0.01f) dir = Vector3.forward;
         Debug.LogWarning("[BossExitPath] 출구 마커(Next_Ch/Exit) 없음 — 입구 반대편에 게이트를 세운다");
         return center + dir.normalized * FallbackDist;
+    }
+
+    /// <summary>
+    /// 출구 자리가 플레이어와 걸어서 이어지는가 — 안 이어지면 플레이어와 이어진 가장 가까운 바닥(가까운 면 3 · 6 · 12 m →
+    /// 없으면 플레이어에서 출구 쪽으로 곧게 가다 이어진 면이 끝나는 자리에서 1.5 m 안쪽). 플레이어 · NavMesh가 없으면 그대로.
+    /// 계단은 이 자리에서 마커 쪽으로 오르므로(4칸 · 안쪽으로 4 m) 가장자리에서 물린 자리면 계단 발치가 플레이어 쪽 바닥에 놓인다.
+    /// </summary>
+    private static Vector3 KeepReachable(Vector3 pos)
+    {
+        var player = GameRunBootstrapper.Instance?.Run?.Player;
+        if (player == null) return pos;
+        Vector3 at = player.transform.position;
+        // 기준점 둘 다 플레이어 — 아레나 중심이 단상 위일 수 있다(기사)
+        if (!BossArenaGuard.TryPullInside(pos, pos.y, player.transform, at, null, out var inside)) return pos;
+        Debug.LogWarning($"[BossExitPath] 출구 자리 {pos}가 플레이어 {at}와 걸어서 이어지지 않음 — 이어진 바닥 {inside}로 당긴다");
+        return inside;
     }
 
     /// <summary>이름이 prefix로 시작하는 자식(비활성 포함)을 찾는다.</summary>

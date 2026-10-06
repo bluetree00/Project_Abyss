@@ -68,6 +68,8 @@ public enum SealDoorMotion
     Drop,
     /// <summary>바닥에 붙은 채 아래에서 자라오른다 — 뿌리·덩굴 등 유기물.</summary>
     Grow,
+    /// <summary>경첩을 축으로 바깥(통로 쪽)으로 젖혀 열리고 봉인 때 쾅 닫힌다 — 나무문(10-06). 문짝은 <see cref="SealDoorFit"/>가 세운다.</summary>
+    Swing,
 }
 
 /// <summary>통로 끝 '다음 방'을 가리는 방식. 챕터 컨셉에 맞춰 팔레트가 고른다.</summary>
@@ -159,6 +161,7 @@ public class BlockPalette : ScriptableObject
     [Tooltip("봉인 문 등장 방식.\n" +
              "Drop = 개구부 위에서 내리닫이처럼 떨어진다(석문·철문).\n" +
              "Grow = 바닥에 붙은 채 아래에서 자라오른다(뿌리·덩굴 등 유기물).\n" +
+             "Swing = 경첩을 축으로 바깥으로 젖혀 열린다(나무문).\n" +
              "뿌리가 하늘에서 떨어지면 컨셉이 깨지므로 자연물은 반드시 Grow.")]
     [SerializeField] private SealDoorMotion sealDoorMotion = SealDoorMotion.Drop;
 

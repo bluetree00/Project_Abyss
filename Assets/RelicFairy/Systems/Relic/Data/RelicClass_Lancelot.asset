@@ -14,7 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RelicClassSO
   id: 3
   displayName: "\uB79C\uC2AC\uB86F"
-  loreDesc: "\uC6D0\uD0C1\uC758 \uB9F9\uC138\uB97C \uC800\uBC84\uB9B0 \uAE30\uC0AC\uC758 \uC794\uC0C1. \uADF8\uB97C \uC0BC\uD0A8 \uAD11\uAE30\uAC00 \uACE7 \uADF8\uC758 \uAC80\uC774 \uB410\uB2E4."
+  loreDesc: "\uC6D0\uD0C1\uC758 \uB9F9\uC138\uB97C \uC800\uBC84\uB9B0 \uAE30\uC0AC\uC758
+    \uC794\uC0C1. \uADF8\uB97C \uC0BC\uD0A8 \uAD11\uAE30\uAC00 \uACE7 \uADF8\uC758
+    \uAC80\uC774 \uB410\uB2E4."
   tagline: "\uCC22\uAE34 \uC11C\uC57D\uC758 \uAC80"
   tags:
   - "\uC2A4\uD0DD\uD615"
@@ -65,6 +67,11 @@ MonoBehaviour:
   qSkillMainClipKey: 
   qSkillCinematic: {fileID: 0}
   qSkillIcon: {fileID: 21300000, guid: 88fc936be507b3843968dc7a9deaead7, type: 3}
+  qSwordTrailPrefab: {fileID: 211711048654108181, guid: 9a1b2e700070e9140a1249cbf0ab8fc6,
+    type: 3}
+  qSwordBladeVfxKey: 
+  qSwordBladeVfxScale: 0.35
+  qSwordGlowColor: {r: 1.275, g: 0.12, b: 0.09, a: 1}
   stats: []
   auraVfxKey: 
   auraSocket: 

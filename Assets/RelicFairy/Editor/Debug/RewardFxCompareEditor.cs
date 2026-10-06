@@ -9,30 +9,33 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// 10-02 사용자 「룬 보상 등급 표기 이펙트가 봉인 이펙트랑 겹친다 · 빛기둥 표기 이펙트를 찾아봐」.
 /// 지금 보상 문양(SSEP 18 TimeField = 리치 봉인진) · 표지 기둥(SSEP 38 GloryBoundary = 리치 봉인 완성)과
-/// _Imported 빛기둥 후보(Hovl 지도 표지 팩)를 등급색(레어 · 에픽 · 전설)으로 칠해 같은 각도에서 찍는다(편집 모드 · 미리보기 씬).
+/// _Imported 등급 표시 후보(10-05: Vefects 「Item Pickup VFX URP」 등급별 4종)를 지금 것과 같은 각도에서 찍는다(편집 모드 · 미리보기 씬).
 /// 결과: Temp/rewardfx_cmp/{후보}_{등급}_{게임|옆}.png · report.txt · 로그 「[RewardFxCmp] 끝」.
 /// </summary>
 public static class RewardFxCompareEditor
 {
     private const string Dir = "Temp/rewardfx_cmp";
     private const int    W = 480, H = 480;
-    private const string Hovl = "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/Map track markers VFX/Prefabs/";
     private const string Ssep = "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_1(NotScriptBased)/Effects/";
+    private const string Vef  = "Assets/RelicFairy/_Imported/EffectSource/Vefects/Item Pickup VFX URP/VFX/Particles/";
 
-    // (이름, 경로, 크기, 재채색 = 빛깔 갈아 끼우기 · 아니면 곱하기)
-    private static readonly (string name, string path, float scale, bool recolor)[] Candidates =
+    private enum Tint { Multiply, Recolor, Raw }
+
+    // (이름, 경로, 크기, 색 입히기, 이 등급에서만(null = 전부))
+    // 10-05 2차: Hovl 지도 표지는 탈락(10-03 — 질감 없는 납작한 판). Vefects 등급 팩은 원래 빛깔 그대로(Raw) 제 등급에서만 찍는다.
+    private static readonly (string name, string path, float scale, Tint tint, ItemRarity? only)[] Candidates =
     {
-        ("A_Pillar",   Hovl + "Marker 4 Pillar Loop.prefab",  1f,   true),
-        ("B_Circle",   Hovl + "Marker 5 Circle Loop.prefab",  1f,   true),
-        ("C_Zone",     Hovl + "Marker 3 Zone Loop.prefab",    1f,   true),
-        ("D_Pointer",  Hovl + "Marker 2 Pointer Loop.prefab", 1f,   true),
-        ("E_NowGlyph", Ssep + "Effect_18_TimeField/Effect_18_TimeField.prefab",       0.2f * 0.35f, false),
-        ("F_NowBeacon",Ssep + "Effect_38_GloryBoundary/Effect_38_GloryBoundary.prefab", 0.2f * 0.6f, false),
+        ("V_Common",   Vef + "VFX_Item_Common.prefab",    1f, Tint.Raw, ItemRarity.Common),
+        ("V_Rare",     Vef + "VFX_Item_Rare.prefab",      1f, Tint.Raw, ItemRarity.Rare),
+        ("V_Epic",     Vef + "VFX_Item_Epic.prefab",      1f, Tint.Raw, ItemRarity.Epic),
+        ("V_Legend",   Vef + "VFX_Item_Legendary.prefab", 1f, Tint.Raw, ItemRarity.Legendary),
+        ("E_NowGlyph", Ssep + "Effect_18_TimeField/Effect_18_TimeField.prefab",         0.2f * 0.35f, Tint.Multiply, null),
+        ("F_NowBeacon",Ssep + "Effect_38_GloryBoundary/Effect_38_GloryBoundary.prefab", 0.2f * 0.6f,  Tint.Raw, ItemRarity.Legendary),
     };
 
     private static readonly (string name, ItemRarity rarity)[] Grades =
     {
-        ("Rare", ItemRarity.Rare), ("Epic", ItemRarity.Epic), ("Legend", ItemRarity.Legendary),
+        ("Common", ItemRarity.Common), ("Rare", ItemRarity.Rare), ("Epic", ItemRarity.Epic), ("Legend", ItemRarity.Legendary),
     };
 
     [MenuItem("RelicFairy/Debug/10-02 보상 등급 빛기둥 후보 비교 (편집 모드)")]
@@ -76,6 +79,7 @@ public static class RewardFxCompareEditor
             if (prefab == null) { sb.AppendLine($"{c.name}: 없음 {c.path}"); continue; }
             foreach (var g in Grades)
             {
+                if (c.only.HasValue && c.only.Value != g.rarity) continue;
                 var go = Object.Instantiate(prefab);
                 SceneManager.MoveGameObjectToScene(go, scene);
                 go.transform.position = new Vector3(0f, 0.05f, 0f);
@@ -95,13 +99,13 @@ public static class RewardFxCompareEditor
                         r.enabled = false;
                 }
                 Color tint = RewardObjectPresenter.LightColor(g.rarity);
-                if (c.recolor) RunFxRecolor.Apply(go, tint);
-                else if (c.name != "F_NowBeacon")
+                if (c.tint == Tint.Recolor) RunFxRecolor.Apply(go, tint);
+                else if (c.tint == Tint.Multiply)
                     foreach (var ps in systems) { var m = ps.main; m.startColor = Mul(m.startColor, tint); }
 
                 foreach (var ps in systems) ps.Simulate(1.6f, false, true, true);
                 var b = Bounds(go);
-                if (shots == 0 || g.rarity == ItemRarity.Rare)
+                if (c.only.HasValue || g.rarity == ItemRarity.Rare)
                     sb.AppendLine($"{c.name}: 입자계 {systems.Length} · 크기 {b.size} · 중심 {b.center}");
 
                 // 게임 카메라(뒤 · 위 비스듬히) · 옆(높이 확인)

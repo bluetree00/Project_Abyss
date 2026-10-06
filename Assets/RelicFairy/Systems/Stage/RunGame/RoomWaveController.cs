@@ -15,6 +15,9 @@ using UnityEngine;
 /// 레거시 모드 (WaveEntry[]가 없는 경우):
 ///   · 기존 RoomClearController와 동일 — 스포너 MaxTotalSpawns 합산 킬 목표
 ///
+/// 시기 두 번째 파도(10-02 설계서 §5 · <see cref="EraBalance.RollExtraWave"/>): 해방기 · 악몽 전투방은 토큰 파도를 다 잡은 뒤
+///   정예가 이끄는 무리가 한 번 더 온다 — 스포너를 돌아가며 한 마리씩 맡긴다. 보스방 · 이벤트방은 없음.
+///
 /// 외부 이벤트: OnWaveStarted(currentWave, totalWaves) — HUD 웨이브 표시 연동용.
 /// </summary>
 public sealed class RoomWaveController : MonoBehaviour
@@ -39,6 +42,9 @@ public sealed class RoomWaveController : MonoBehaviour
     // ── 웨이브 모드 ───────────────────────────────────────
     private bool _waveMode;
     private int  _totalWaves;
+    private int  _baseWaves;          // 방 토큰이 정한 파도 수 — 그 뒤 하나가 시기 두 번째 파도(굴렸으면)
+    private int  _eraElites;
+    private int  _eraCommons;
     private int  _currentWave      = -1;
     private int  _currentWaveAlive;
     private bool _waveSpawningDone;  // 현재 웨이브 스폰이 모두 완료됐는지 (조기 사망 레이스 방지)
@@ -103,6 +109,7 @@ public sealed class RoomWaveController : MonoBehaviour
 
         _waveMode   = anyWave;
         _totalWaves = _waveMode && minWaves != int.MaxValue ? minWaves : 0;
+        _baseWaves  = _totalWaves;
 
         if (_waveMode)
             InitWaveMode();
@@ -173,6 +180,7 @@ public sealed class RoomWaveController : MonoBehaviour
         if (_waveMode)
         {
             Debug.Log($"[RoomWave] 웨이브 모드 활성화", this);
+            RollEraWave();
             StartWaveAsync(0).Forget();
         }
         else
@@ -228,15 +236,23 @@ public sealed class RoomWaveController : MonoBehaviour
         OnWaveStarted?.Invoke(waveIndex, _totalWaves);
 
         var ct = this.GetCancellationTokenOnDestroy();
+        bool eraWave = waveIndex >= _baseWaves;
+        if (eraWave)
+            FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include)?.ShowBuffNotice(
+                _eraElites > 1 ? "두 번째 파도 — 정예 둘이 함께 온다" : "두 번째 파도 — 정예가 무리를 이끌고 온다");
 
-        // 모든 스포너를 병렬로 스폰 — 실제 스폰 수는 OnMonsterSpawned 이벤트로 추적
-        var tasks = new UniTask<int>[_spawners.Count];
-        for (int i = 0; i < _spawners.Count; i++)
+        // 모든 스포너를 병렬로 스폰 — 실제 스폰 수는 OnMonsterSpawned 이벤트로 추적.
+        // 두 번째 파도는 한 마리씩 스포너를 돌아가며 맡긴다(시작 무작위 · 정예 먼저) — 한 곳에서 몰려 나오지 않게.
+        int n     = _spawners.Count;
+        int start = eraWave ? UnityEngine.Random.Range(0, Mathf.Max(1, n)) : 0;
+        var tasks = new UniTask<int>[n];
+        for (int i = 0; i < n; i++)
         {
             var s = _spawners[i];
-            tasks[i] = (s != null && s.WaveCount > waveIndex)
-                ? s.SpawnWaveAsync(waveIndex, ct)
-                : UniTask.FromResult(0);
+            if (s == null)                    tasks[i] = UniTask.FromResult(0);
+            else if (eraWave)                 tasks[i] = s.SpawnExtraAsync(Share(_eraElites, i, start, n), Share(_eraCommons, i, start + _eraElites, n), ct);
+            else if (s.WaveCount > waveIndex) tasks[i] = s.SpawnWaveAsync(waveIndex, ct);
+            else                              tasks[i] = UniTask.FromResult(0);
         }
 
         int totalSpawned = 0;
@@ -248,6 +264,14 @@ public sealed class RoomWaveController : MonoBehaviour
         catch (OperationCanceledException) { return; }
 
         _waveSpawningDone = true;
+
+        // 두 번째 파도는 덤이다 — 못 세웠다고 첫 파도까지 이긴 방(보상)을 포기하지 않는다.
+        if (totalSpawned == 0 && eraWave)
+        {
+            Debug.LogWarning("[RoomWave] 시기 두 번째 파도 소환 0마리 — 그대로 클리어", this);
+            ClearRoomAsync().Forget();
+            return;
+        }
 
         // 스폰 0마리: 스폰 테이블 등급 필터·NavMesh 설정 문제로 모든 시도가 실패한 경우.
         // 예전엔 "거짓 클리어 차단"을 이유로 그냥 return 했는데, 그러면 CheckWaveComplete가
@@ -268,6 +292,20 @@ public sealed class RoomWaveController : MonoBehaviour
         // 스폰 완료 — 이미 죽은 몬스터가 있어도 안전하게 체크
         CheckWaveComplete(waveIndex);
     }
+
+    /// <summary>시기 두 번째 파도를 굴린다 — 보스방은 빼고 방 종류(일반 · 정예)와 시기로. 오면 파도 수 +1.</summary>
+    private void RollEraWave()
+    {
+        if (_bossSpawner != null || _baseWaves == 0) return;
+        (_eraElites, _eraCommons) = EraBalance.RollExtraWave(_run?.CurrentRoomKind ?? RoomPlanKind.Normal, StoryProgress.Era);
+        if (_eraElites + _eraCommons == 0) return;
+        _totalWaves = _baseWaves + 1;
+        Debug.Log($"[RoomWave] 시기 두 번째 파도 — 정예 {_eraElites} · 일반 {_eraCommons} ({StoryProgress.Era})", this);
+    }
+
+    /// <summary>count마리를 start 스포너부터 한 마리씩 돌릴 때 spawnerIndex 스포너가 맡는 수.</summary>
+    private static int Share(int count, int spawnerIndex, int start, int n)
+        => n <= 0 ? 0 : count / n + (((spawnerIndex - start) % n + n) % n < count % n ? 1 : 0);
 
     private void HandleWaveMonsterSpawned(MonsterBase monster)
     {

@@ -367,14 +367,36 @@ public class MonsterSpawner : MonoBehaviour
     /// <summary>단일 웨이브 스폰. _waveEntries의 모든 그룹(등급 상한 × 마릿수)을 하나의 웨이브로 합쳐
     /// 한 마리씩 랜덤 간격으로 연속 스폰한다. waveIndex는 항상 0(단일 웨이브)이며 무시된다.
     /// 그룹별 maxGrade를 유지하며 ct가 취소되면 즉시 중단. 실제 스폰된 수를 반환.</summary>
-    public async UniTask<int> SpawnWaveAsync(int waveIndex, CancellationToken ct)
+    public UniTask<int> SpawnWaveAsync(int waveIndex, CancellationToken ct)
     {
         if (_waveEntries == null || _waveEntries.Length == 0)
         {
             Debug.LogWarning($"[MonsterSpawner:{name}] SpawnWaveAsync: 웨이브 그룹이 비어 있음", this);
-            return 0;
+            return UniTask.FromResult(0);
         }
+        return SpawnGroupsAsync(_waveEntries, ct);
+    }
 
+    /// <summary>
+    /// 시기 두 번째 파도(<see cref="RoomWaveController"/> · <see cref="EraBalance.RollExtraWave"/>) — 정예 · 일반을 정확히 그 등급으로
+    /// 이 스포너 둘레에 세운다. 방 토큰 묶음과 무관해 단일 묶음(레거시) 스포너도 받는다. 실제 스폰 수를 반환.
+    /// </summary>
+    public async UniTask<int> SpawnExtraAsync(int elites, int commons, CancellationToken ct)
+    {
+        var groups = new List<WaveEntry>(2);
+        if (elites  > 0) groups.Add(new WaveEntry { spawnCount = elites,  maxGrade = MonsterGrade.Elite });
+        if (commons > 0) groups.Add(new WaveEntry { spawnCount = commons, maxGrade = MonsterGrade.Common });
+        if (groups.Count == 0) return 0;
+
+        var prevMode = gradeMode;
+        gradeMode = GradeMatchMode.Exact;
+        try { return await SpawnGroupsAsync(groups.ToArray(), ct, keepEliteCount: true); }
+        finally { gradeMode = prevMode; }
+    }
+
+    /// <param name="keepEliteCount">정예 묶음은 수량 배율을 받지 않는다 — 두 번째 파도의 정예 수(1 · 악몽 정예 방 2)는 설계 그대로.</param>
+    private async UniTask<int> SpawnGroupsAsync(WaveEntry[] groups, CancellationToken ct, bool keepEliteCount = false)
+    {
         // 스폰 여유 검사(IsSpawnSpotClear)가 쓰는 물리 쿼리를 위해 트랜스폼을 1회 동기화한다.
         // 프로젝트 설정이 autoSyncTransforms=0이라, PostBuild에서 갓 생성된 장식 콜라이더가
         // 동기화 전에는 쿼리에 안 잡힌다(장식은 움직이지 않으므로 웨이브당 1회면 충분).
@@ -393,14 +415,17 @@ public class MonsterSpawner : MonoBehaviour
 
             // 총 스폰 대상 수 — 마지막 한 마리 뒤에는 대기하지 않도록 카운트다운에 사용.
             // 묶음별 마릿수는 한 번만 굴린다 — 확률 반올림이라 두 번 굴리면 남은 수 세기와 실제 스폰이 어긋난다.
-            var counts = new int[_waveEntries.Length];
+            var counts = new int[groups.Length];
             int remaining = 0;
-            for (int gi = 0; gi < _waveEntries.Length; gi++) remaining += counts[gi] = ScaleCount(_waveEntries[gi].spawnCount, countScale);
+            for (int gi = 0; gi < groups.Length; gi++)
+                remaining += counts[gi] = keepEliteCount && groups[gi].maxGrade == MonsterGrade.Elite
+                    ? groups[gi].spawnCount
+                    : ScaleCount(groups[gi].spawnCount, countScale);
 
             int spawned = 0;
-            for (int g = 0; g < _waveEntries.Length; g++)
+            for (int g = 0; g < groups.Length; g++)
             {
-                targetGrade = _waveEntries[g].maxGrade; // 이 그룹의 등급 상한(AtMost)
+                targetGrade = groups[g].maxGrade; // 이 그룹의 등급 상한(AtMost)
                 int count   = counts[g];
 
                 for (int i = 0; i < count; i++)

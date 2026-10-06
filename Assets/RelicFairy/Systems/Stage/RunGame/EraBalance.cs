@@ -7,7 +7,7 @@ using UnityEngine;
 ///
 /// 꽂히는 곳: 몬스터 스탯 = <c>GameRunSession.CurrentDifficultyScale</c> · 수량 = <c>CurrentMonsterCountScale</c> ·
 /// 정예 확률 = <c>RunSequencer.RollKind</c> · 룬 등급 가중 · 연료 = <c>RoomRewardTable.For</c> · 골드 = <c>GameRunSession.AddGold</c> ·
-/// 이벤트방 놀이 제한 시간 = <c>EventMinigame</c>.
+/// 이벤트방 놀이 제한 시간 = <c>EventMinigame</c> · 두 번째 파도 = <c>RoomWaveController</c>(10-02 설계서 §5).
 /// 몬스터 특성(v3 §4-3)은 다음 단계 — 여기엔 숫자만 있다.
 /// </summary>
 public static class EraBalance
@@ -28,18 +28,23 @@ public static class EraBalance
         public readonly float GoldScale;
         /// <summary>이벤트방 놀이 제한 시간.</summary>
         public readonly float EventTimeScale;
+        /// <summary>전투방(일반 · 정예)이 두 번째 파도를 받을 확률.</summary>
+        public readonly float ExtraWaveChance;
 
-        public Spec(float stat, float count, float elite, int rarityStep, float fuel, float gold, float eventTime)
+        public Spec(float stat, float count, float elite, int rarityStep, float fuel, float gold, float eventTime, float extraWave)
         {
             StatScale = stat; CountScale = count; EliteBonus = elite; RarityStep = rarityStep;
-            FuelScale = fuel; GoldScale = gold; EventTimeScale = eventTime;
+            FuelScale = fuel; GoldScale = gold; EventTimeScale = eventTime; ExtraWaveChance = extraWave;
         }
     }
 
     // 가로로 읽으면 봉인기(지금 그대로) → 해방기(같은 빌드로 한 번 더 오를 수 있는 선) → 악몽(성장이 받쳐 주는 도전).
-    private static readonly Spec SealedSpec    = new(stat: 1.0f, count: 1.0f, elite: 0.00f, rarityStep: 0, fuel: 1.00f, gold: 1.0f, eventTime: 1.00f);
-    private static readonly Spec LiberatedSpec = new(stat: 1.2f, count: 1.1f, elite: 0.05f, rarityStep: 1, fuel: 1.25f, gold: 1.2f, eventTime: 1.00f);
-    private static readonly Spec NightmareSpec = new(stat: 1.4f, count: 1.2f, elite: 0.10f, rarityStep: 2, fuel: 1.50f, gold: 1.4f, eventTime: 0.85f);
+    private static readonly Spec SealedSpec    = new(stat: 1.0f, count: 1.0f, elite: 0.00f, rarityStep: 0, fuel: 1.00f, gold: 1.0f, eventTime: 1.00f, extraWave: 0.0f);
+    private static readonly Spec LiberatedSpec = new(stat: 1.2f, count: 1.1f, elite: 0.05f, rarityStep: 1, fuel: 1.25f, gold: 1.2f, eventTime: 1.00f, extraWave: 0.3f);
+    private static readonly Spec NightmareSpec = new(stat: 1.4f, count: 1.2f, elite: 0.10f, rarityStep: 2, fuel: 1.50f, gold: 1.4f, eventTime: 0.85f, extraWave: 1.0f);
+
+    // 두 번째 파도 구성 — 정예가 이끄는 작은 무리(첫 파도의 3~4할). 마릿수는 챕터 · 시기 수량 배율을 그대로 받는다.
+    private const int ExtraWaveCommons = 3;
 
     // 룬 등급 가중 옮기기 — 단계마다 일반에서 9점을 떼어 레어 45% · 에픽 40% · 전설 15%로,
     // 일반이 없는 표(정예)는 레어에서 8점을 떼어 에픽 · 전설 반반으로.
@@ -54,6 +59,19 @@ public static class EraBalance
         StoryEra.NightmareMode => NightmareSpec,
         _                      => SealedSpec,
     };
+
+    /// <summary>
+    /// 두 번째 파도(10-02 설계서 §5) — 일반 · 정예 전투방만. 첫 파도를 다 잡으면 정예가 이끄는 무리가 한 번 더 온다.
+    /// 해방기 30% · 악몽 전부. 악몽 정예 방은 정예 둘이 함께 온다. 안 오면 (0, 0).
+    /// </summary>
+    public static (int elites, int commons) RollExtraWave(RoomPlanKind kind, StoryEra era)
+    {
+        if (kind != RoomPlanKind.Normal && kind != RoomPlanKind.Elite) return (0, 0);
+        float chance = For(era).ExtraWaveChance;
+        if (chance <= 0f || (chance < 1f && Random.value >= chance)) return (0, 0);
+        int elites = kind == RoomPlanKind.Elite && era == StoryEra.NightmareMode ? 2 : 1;
+        return (elites, ExtraWaveCommons);
+    }
 
     /// <summary>룬 등급 가중(일반 · 레어 · 에픽 · 전설)을 시기 단계만큼 위로 옮긴다. 합은 그대로.</summary>
     public static (float common, float rare, float epic, float legendary) ShiftRarity(float common, float rare, float epic, float legendary, int step)
@@ -72,6 +90,6 @@ public static class EraBalance
     public static string Describe(StoryEra era)
     {
         var s = For(era);
-        return $"{era} — 스탯×{s.StatScale:0.##} · 수량×{s.CountScale:0.##} · 정예+{s.EliteBonus:0.##} · 룬 등급 +{s.RarityStep}단 · 연료×{s.FuelScale:0.##} · 골드×{s.GoldScale:0.##} · 놀이 시간×{s.EventTimeScale:0.##}";
+        return $"{era} — 스탯×{s.StatScale:0.##} · 수량×{s.CountScale:0.##} · 정예+{s.EliteBonus:0.##} · 룬 등급 +{s.RarityStep}단 · 연료×{s.FuelScale:0.##} · 골드×{s.GoldScale:0.##} · 놀이 시간×{s.EventTimeScale:0.##} · 두 번째 파도 {s.ExtraWaveChance:P0}";
     }
 }

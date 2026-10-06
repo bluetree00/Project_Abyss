@@ -196,7 +196,8 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         float brandAmp = V(V_BRAND_AMP, 0.20f);
 
         Vector3 pos = origin.position;
-        Vector3 fwd = origin.forward; fwd.y = 0f;
+        // 방향은 '명령된' 정면(AimForward) — 막타 다시 겨눔(10-06)처럼 회전을 막 요청한 직후엔 transform.forward가 옛 방향이다
+        Vector3 fwd = _owner != null && origin == _owner.transform ? _owner.AimForward : origin.forward; fwd.y = 0f;
         if (fwd.sqrMagnitude < 0.001f) return;
         fwd.Normalize();
 

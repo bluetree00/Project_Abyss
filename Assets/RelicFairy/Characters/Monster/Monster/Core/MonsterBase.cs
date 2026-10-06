@@ -991,8 +991,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     {
         if (_runtime == null || _runtime.IsDead || amount <= 0f) return;
 
-        var constraints = _fsm?.CurrentConstraints ?? SpecialStateConstraint.None;
-        if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
+        // 특수 상태 무적 + 보스가 스스로 거는 무적 · 단계 게이트(화룡 소환 · 기사 영혼 소환 대기)까지 — 주 피해 경로와 같은 판정(10-06).
+        // 일반 몬스터는 IsDamageImmuneNow = 특수 상태 무적이라 예전과 같다.
+        if (IsDamageImmuneNow) return;
 
         _lastDamageKind = kind;
 
