@@ -84,6 +84,7 @@ public sealed partial class PlayerController : CharacterBase
     private PerfectDodgeController _perfectDodge;   // this가 필요해 지연 생성(→ PerfectDodge)
     private PlayerStatusEffects    _status;         // 직렬화 값이 필요해 지연 생성(→ Status)
     private RuneEffectDispatcher   _runeEffects;    // 멀린 룬 속성 단계 효과(→ RuneEffects)
+    private PlayerCostume          _costume;        // 유물별 · 기억 등급별 의상(10-08) — 프리팹에 붙어 있다
 
     private AnimatorOverrideService      _animSvc;
     private IAttackInputPolicy           _attackPolicy;   // 입력 정책(무기 타입별: 소드/활 등)
@@ -142,7 +143,11 @@ public sealed partial class PlayerController : CharacterBase
     //
     // 소유자 토큰을 두는 이유 — 스탠스가 겹치면 방어 가산이 누적되고, 먼저 끝난 스킬이
     // 나중 스킬의 스탠스를 꺼버린다. 한 번에 하나만 유효하게 만든다.
+    // 장비 스킬 조준 보조(10-08 A1) — 마우스 콘 안 가장 가까운 적으로 최대 이 각도까지
+    private const float SkillAimRadius        = 10f;
+    private const float SkillAimConeHalfAngle = 15f;
     private object _stanceOwner;
+    private PlayerWeaponTrailVfx _trailVfx;
     private float  _stanceDefenseAdd;
 
     // ── Properties: 데이터 · 소유 객체 ─────────────────────────────
@@ -186,6 +191,8 @@ public sealed partial class PlayerController : CharacterBase
     /// <summary>스태미너 게이지 — 대시(회피)의 자원 게이트. 쿨타임을 대체한다.</summary>
     public StaminaController    Stamina         { get; private set; }
     public SkillCooldownTracker CooldownTracker { get; private set; } = new SkillCooldownTracker();
+    /// <summary>칼날 트레일 — 장비 스킬이 스킬 동안 켠다(10-08 A7).</summary>
+    public PlayerWeaponTrailVfx TrailVfx => _trailVfx;
 
     public LayerStateMachine<LocoState> LocoSM => _locoSM;
 
@@ -212,6 +219,9 @@ public sealed partial class PlayerController : CharacterBase
 
     public Vector3 MoveDirection => _moveDirection;
 
+    /// <summary>Q · E · R 스킬 상태인가. 이동 상태 전환이 스킬 동작을 이동 동작으로 덮지 않게 본다(10-09 출시 점검).</summary>
+    public bool IsInSkillAction => IsInSkillState();
+
     /// <summary>보스 잡기 패턴에 붙들려 있는 중인가. 이 동안은 포이즈 브레이크(날아감)를 발동하지 않는다(→ SetGrabbed).</summary>
     private bool IsGrabbed    { get; set; }
     /// <summary>분신(ShadowClone)으로 동작 중인 경우. 카메라/입력/PlayerManager 등록 생략.</summary>
@@ -236,6 +246,10 @@ public sealed partial class PlayerController : CharacterBase
     public event Action<SkillType, float> SkillSealed;
     /// <summary>스킬 봉인이 풀렸다.</summary>
     public event Action<SkillType> SkillUnsealed;
+    /// <summary>재사용 대기 중인 스킬을 눌렀다 — HUD 칸을 살짝 흔드는 거절 표시용(10-08 A9).</summary>
+    public event Action<SkillType> SkillRejected;
+    /// <summary>스킬 자기 강화가 걸렸다(슬롯, 지속 초) — HUD 남은 시간 막대용(석궁 빨리쏘기 · 더 빨리쏘기, 10-08 A9).</summary>
+    public event Action<SkillType, float> SkillBuffStarted;
 
     // ── Lifecycle ─────────────────────────────────────────────────
     protected override async UniTask InitAsync(CancellationToken ct)
@@ -262,6 +276,8 @@ public sealed partial class PlayerController : CharacterBase
         InitAbilities();
         InitWeaponManager();
         SetupCamera();
+        // 런 공용 이펙트 목록(스킬 범위 고리 재질 · 몬스터 반짝임) — 첫 스킬의 범위 고리가 목록이 아직 없어 빠졌다(10-08 실측)
+        RunFx.LoadAsync().Forget();
 
         _locoSM = new LayerStateMachine<LocoState>(this);
         _actSM  = new LayerStateMachine<ActState>(this);
@@ -274,6 +290,9 @@ public sealed partial class PlayerController : CharacterBase
 
         // 캐릭터 데이터에 지정된 애니메이션 클립으로 오버라이드 (Q스킬 등)
         ApplyCharacterAnimationOverrides();
+        // 오버라이드 컨트롤러를 끼우면 애니메이터가 기본 상태로 돌아가 위의 Idle 진입 크로스페이드가 사라진다 —
+        // 첫 등장이 컨트롤러 기본 상태(늘어진 대기 자세)로 서 있다가 첫 이동에서야 바뀌었다(10-09 출시 점검)
+        anim.Play("MoveBlend", 0, 0f);
 
         // 이펙트 핸들러 초기화
         EffectHandler = new WeaponEffectHandler(this);
@@ -321,8 +340,11 @@ public sealed partial class PlayerController : CharacterBase
         GameRunBootstrapper.Instance?.Run?.EffectManager?.OnTick(Time.deltaTime);   // 아이템 타임드/동적 효과 구동
         TickSkillSeals();   // 빙결 중에도 흘러야 하므로 빙결 조기 반환보다 앞
 
+        // 일시정지(룬판 Tab · ESC · 막는 팝업) 동안엔 실시간 타이머도 멈춘다 — 쿨다운 · 둔화 · 빙결이 멈춘 화면 뒤에서 흘렀다(10-09 출시 점검)
+        bool paused = TimeScaleArbiter.HasRequestAtOrAbove(TimeScaleArbiter.Priority.Pause);
+
         // 상태이상 타이머(넉백·슬로우·얼음·빙결). 빙결 중이면 이번 프레임 입력·행동을 멈춘다.
-        if (Status.Tick(Time.deltaTime, Time.unscaledDeltaTime))
+        if (Status.Tick(Time.deltaTime, paused ? 0f : Time.unscaledDeltaTime))
         {
             _moveDirection = Vector3.zero;
             return;
@@ -355,7 +377,7 @@ public sealed partial class PlayerController : CharacterBase
         if (_locoSM != null) locoStateDebug = _locoSM.CurrentId;
         if (_actSM != null) actStateDebug = _actSM.CurrentId;
 
-        CooldownTracker.Tick(Time.unscaledDeltaTime);
+        if (!paused) CooldownTracker.Tick(Time.unscaledDeltaTime);
 
     }
 
@@ -437,6 +459,7 @@ public sealed partial class PlayerController : CharacterBase
             Managers.Player.SetPlayer(transform);
 
         TryGetComponent(out _capsule);   // 벽/계단 접촉 높이 판정 기준
+        TryGetComponent(out _costume);
         HandTransform = Util.FindDeepChild(transform, "WeaponMount")
                      ?? Util.FindDeepChild(transform, "WeaponSocket");
         HandTransformLeft = Util.FindDeepChild(transform, "WeaponMountLeft")
@@ -504,8 +527,8 @@ public sealed partial class PlayerController : CharacterBase
             gameObject.AddComponent<CombatCameraFraming>();
         if (!TryGetComponent<CameraRigAnchor>(out _))
             gameObject.AddComponent<CameraRigAnchor>();
-        if (!TryGetComponent<PlayerWeaponTrailVfx>(out _))
-            gameObject.AddComponent<PlayerWeaponTrailVfx>();
+        if (!TryGetComponent(out _trailVfx))
+            _trailVfx = gameObject.AddComponent<PlayerWeaponTrailVfx>();
         if (!TryGetComponent<WeaponFormRuntime>(out _))
             gameObject.AddComponent<WeaponFormRuntime>();   // 진화 무기 「형」 구동기(장비 개선 10-06)
         if (!TryGetComponent<AimTargetIndicator>(out _))

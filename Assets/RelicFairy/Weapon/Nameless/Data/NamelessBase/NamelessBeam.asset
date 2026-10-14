@@ -23,13 +23,13 @@ MonoBehaviour:
   explodeRadius: 2
   explodeDamageRatio: 0.5
   explodeEffectKey: NamelessBeamHit
-  explodeEffectScale: 1
+  explodeEffectScale: 0.19
   projectileEffectKey: NamelessBeam
   projectileEffectScale: 1
   tier2ExtraMuzzleKey: NamelessBeamMuzzle
   tier2ExtraMuzzleScale: 1.3
   tier3ExtraHitKey: NamelessBeamHit
-  tier3ExtraHitScale: 1.5
+  tier3ExtraHitScale: 0.22
   muzzleEffectKey: NamelessBeamMuzzle
   muzzleEffectScale: 1
   endDelay: 0.5

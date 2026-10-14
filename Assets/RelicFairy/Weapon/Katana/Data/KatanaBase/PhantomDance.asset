@@ -25,17 +25,30 @@ MonoBehaviour:
   slashProjectileRadius: 1.5
   slashProjectileEffectKey: ShinySlash
   slashProjectileEffectScale: 1
+  pursuitRadius: 8
+  pursuitHitRadius: 1.2
+  condenseDamageMult: 1.2
+  condenseRadiusMult: 1.6
+  condenseEffectScaleMult: 2
   slashExplodeDelay: 0.3
   slashExplodeRadius: 3
   slashExplodeDamage: 25
   slashExplodeEffectKey: DoubleSlash
-  slashExplodeEffectScale: 3
+  slashExplodeEffectScale: 0.9
   endDelay: 0.3
   attackEffectKey: SlashAttack
   attackEffectScale: 1
   hitEffectKey: SwordHitImpact
-  hitEffectScale: 0.42
+  hitEffectScale: 0.23
   finishEffectKey: PhantomDanceFinish
   finishEffectScale: 1
   animationOverride: QSkill_01
   flurryAnimStates: []
+  flurryState: QSkill_03
+  flurryStartNormalized: 0.25263157
+  flurryHitTimes:
+  - 0.12
+  - 0.21
+  - 0.3
+  - 0.395
+  - 0.955

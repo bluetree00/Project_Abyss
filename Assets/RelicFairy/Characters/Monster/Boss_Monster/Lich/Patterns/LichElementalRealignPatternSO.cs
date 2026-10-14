@@ -161,7 +161,7 @@ public class LichElementalRealignState : UnInterruptibleState<LichElementalReali
             return;
         }
 
-        if (_timer >= Data.recoveryDuration)
+        if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
             ctx.Monster.ChangeState<ChaseState>();
     }
 

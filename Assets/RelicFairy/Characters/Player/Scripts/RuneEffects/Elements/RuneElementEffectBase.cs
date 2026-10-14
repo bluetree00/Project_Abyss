@@ -11,9 +11,8 @@ public abstract class RuneElementEffectBase : RuneEffect
     public override void OnActivate(PlayerController player)
     {
         CachedPlayer = player;
-        // [실제 VFX] 단계 도달 시 속성 문장 1회 — 6속성 자기연출(빛/전기/어둠 자기강화 포함).
-        if (player != null && RuneElementMap.FromEffectType(EffectType, out var element))
-            ElementVfxPlayer.PlayActivation(element, player.transform.position);
+        // 단계 도달 문장(속성 버스트)은 뺐다 — 단계는 룬판(시간 정지)에서 켜져 입자가 멈춘 채 회수돼 거의 안 보였고,
+        // 같은 순간 판 터짐 · 「시너지 활성화」 알림이 이미 말한다(10-11 이펙트 톤 2차 D-3).
     }
 
     /// <summary>플레이어 공유 리소스 컨테이너(스택/게이지/레지스터).</summary>

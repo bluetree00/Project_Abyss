@@ -66,8 +66,9 @@ public sealed class QuestNotifierPresenter : MonoBehaviour
     private void HandleQuestCompleted(Quest quest)
         => Enqueue(quest, "퀘스트 완료");
 
+    // 받는 곳까지 말한다 — 「업적 달성」만으로는 정수를 어디서 받는지 몰랐다(10-14 사용자 「해금 장소가 잘 알 수 있게」)
     private void HandleAchievementCompleted(Quest achievement)
-        => Enqueue(achievement, "업적 달성");
+        => Enqueue(achievement, "업적 달성 · 기억의 제단에서 받기");
 
     private void Enqueue(Quest quest, string label)
     {

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -46,6 +46,10 @@ public static class RunStructureAutoPlayEditor
         // 입장 하위 단계(RunFlowController 「입장 단계」 로그) — 덮기 · 짓기 · 드러내기 · 디졸브 대기 · 대사 · 부감·봉인. 없으면 null
         public double[] entry;
         public bool     quickEntry;
+        // 피해 모사(10-11) — 무적 플레이어가 「맞았다면 받았을 피해」(원래 피해 × 방어식 × 피해 감소). 끄면 0.
+        public float simTaken, simMax;
+        public int   simHits, simRefills, simMaxHp;
+        public readonly Dictionary<string, float> simSrc = new();
     }
 
     private static readonly List<RoomRec> s_rooms = new();
@@ -63,6 +67,21 @@ public static class RunStructureAutoPlayEditor
     private static ProcRoomGate s_exitGate;   // 지금 밟은 출구
     private static double  s_exitAt = -1;     // 출구를 밟은 시각(안 넘어가면 다시 밟는다)
     private static bool    s_timeline;        // 방 시간표 모드 — 정예 문 우선 · 로컬 방 풀 우선(끝나면 원래 값으로)
+
+    // ── 피해 모사(10-11 일반방 긴장감 · 79) ──
+    // 즉사 대신 초당 DPS를 타격 단위로 깎고, 무적 플레이어가 받았을 피해를 방마다 적는다(서 있기만 하므로 최악값).
+    // DPS = EditorPrefs 「RunAuto.SimDpsByChapter」(예 "60,120,250,500" — 챕터 순) · 없으면 「RunAuto.SimDps」(기본 80).
+    public  const string SimDpsPrefsKey          = "RunAuto.SimDps";
+    public  const string SimDpsByChapterPrefsKey = "RunAuto.SimDpsByChapter";
+    private const double SimHitGap     = 1.0 / 3.0;   // 초당 3타
+    private const float  SimReach      = 5f;           // 이 안의 가장 가까운 적을 친다
+    private const double SimChaseAfter = 2.0;          // 이만큼 못 치면 가장 가까운 적을 친다(쫓아가 치는 셈)
+    private const float  SimRefillAt   = 0.3f;         // 모사 체력이 최대의 30% 밑이면 다시 채우고 센다(포션 · 사망 대신)
+    private static bool    s_sim;
+    private static float[] s_simDps = { 80f };
+    private static double  s_simNextHit, s_simFarSince = -1;
+    private static float   s_simHp;
+    private static PlayerController s_simPlayer;
     private static bool    s_prevPreferLocal; // 시간표 모드가 켜기 전 「로컬 방 풀 우선」 값
     private static MinigameDemo s_prevDemo;   // 시간표 모드가 켜기 전 놀이 자동 시연 값(로컬 풀엔 새 놀이 방이 섞인다)
     // 방 시간표 — 매 에디터 프레임 이벤트로 찍는다(틱 0.25초로는 스폰 간격 0.15~0.4초를 못 가른다)
@@ -108,6 +127,12 @@ public static class RunStructureAutoPlayEditor
     /// 결과: Temp/room_timeline.txt(챕터 × 일반·정예·이벤트 단계 중앙값) + 평소 json(방마다 tl 필드).
     /// ⚠️ 새 플레이에서 시작할 것 — 방 풀은 한 번 읽으면 캐시되어 도중에 켠 「로컬 우선」이 안 먹는다.
     /// </summary>
+    [MenuItem(Root + "시작 — 피해 모사 Ch1부터 (DPS = EditorPrefs RunAuto.SimDpsByChapter · 없으면 RunAuto.SimDps 80)")]
+    private static void BeginDamageSim() => BeginWith(false, 1, sim: true);
+
+    [MenuItem(Root + "시작 — 피해 모사 Ch4부터 (DPS = EditorPrefs RunAuto.SimDpsByChapter · 없으면 RunAuto.SimDps 80)")]
+    private static void BeginDamageSimCh4() => BeginWith(false, 4, sim: true);
+
     [MenuItem(Root + "시작 — 방 시간표 (정예 우선 · 로컬 방 풀)")]
     private static void BeginTimeline() => BeginWith(false, 1, timeline: true);
 
@@ -115,7 +140,7 @@ public static class RunStructureAutoPlayEditor
     [MenuItem(Root + "시작 — 방 시간표 Ch4부터 (정예 우선 · 로컬 방 풀)")]
     private static void BeginTimelineCh4() => BeginWith(false, 4, timeline: true);
 
-    private static void BeginWith(bool bossApproach, int chapter, bool holdProbe = false, bool timeline = false)
+    private static void BeginWith(bool bossApproach, int chapter, bool holdProbe = false, bool timeline = false, bool sim = false)
     {
         if (!Application.isPlaying) { Debug.LogWarning("[RunAuto] 플레이 모드에서만"); return; }
         var launcher = Object.FindFirstObjectByType<TestHubLauncher>();
@@ -146,6 +171,14 @@ public static class RunStructureAutoPlayEditor
         s_rewardAt = -1;
         s_holdProbe = holdProbe;
         s_timeline = timeline;
+        s_sim = sim;
+        if (sim)
+        {
+            s_simDps = ParseSimDps();
+            s_simNextHit = 0;
+            s_simFarSince = -1;
+            UnhookSim();
+        }
         if (timeline)
         {
             // 로컬 방 풀엔 새 놀이 3종이 섞인다 — 자동 실측은 놀이를 못 하므로 「완벽」 시연으로 돌게 한다(끝나면 원래 값으로).
@@ -167,7 +200,8 @@ public static class RunStructureAutoPlayEditor
         Application.logMessageReceived += OnLog;
         EditorApplication.update -= Tick;
         EditorApplication.update += Tick;
-        Log($"시작 ch{chapter}" + (bossApproach ? " (보스 대기방부터)" : "") + (holdProbe ? " (출구 보류 확인)" : "") + (timeline ? " (방 시간표 · 정예 우선 · 로컬 방 풀)" : ""));
+        Log($"시작 ch{chapter}" + (bossApproach ? " (보스 대기방부터)" : "") + (holdProbe ? " (출구 보류 확인)" : "") + (timeline ? " (방 시간표 · 정예 우선 · 로컬 방 풀)" : "")
+            + (sim ? $" (피해 모사 · DPS {string.Join("/", s_simDps)})" : ""));
     }
 
     /// <summary>
@@ -290,6 +324,9 @@ public static class RunStructureAutoPlayEditor
         if (run == null || player == null)   // 씬 전환 중
         {
             if (s_noRunSince < 0) s_noRunSince = now;
+            // 런이 끝나 결과 화면 — 허브로 돌아가기는 사람이 누르는 버튼이라 여기서 끝낸다(챕터 전환 대기는 3~4초).
+            // 10-09 3회차: 리치 붕괴 뒤 결과 화면에서 17분을 기다렸다.
+            if (s_rooms.Count > 0 && now - s_noRunSince > 60) Finish("run-ended");
             return;
         }
         if (s_noRunSince >= 0)
@@ -601,7 +638,15 @@ public static class RunStructureAutoPlayEditor
             Vector3 to = bp + dir * 3f;
             player.transform.position = to;
             if (player.TryGetComponent<Rigidbody>(out var rb)) { rb.position = to; rb.linearVelocity = Vector3.zero; }
-            Log("보스 피해 없음 8초 — 플레이어를 보스 3m 앞으로");
+            // 화룡 소환 중엔 새끼 용이 다 죽어야 내려온다(그동안 보스 무적) — 새끼 용은 MonsterBase가 아니라 방 처치에 안 걸렸다(10-09 3회차 Ch2 막힘)
+            int whelps = 0;
+            foreach (var w in Object.FindObjectsByType<RelicFairy.Monster.DragonMiniDragon>(FindObjectsSortMode.None))
+            {
+                if (w.IsDead) continue;
+                w.TakeDamage(100000f, player.gameObject, 0f);
+                whelps++;
+            }
+            Log("보스 피해 없음 8초 — 플레이어를 보스 3m 앞으로" + (whelps > 0 ? $" · 새끼 용 {whelps} 처치" : ""));
         }
     }
 
@@ -854,6 +899,7 @@ public static class RunStructureAutoPlayEditor
         Application.logMessageReceived -= OnLog;
         EditorApplication.update -= Tick;
         UnsubscribeTimeline();
+        if (s_sim) { WriteSimSummary(reason); UnhookSim(); s_sim = false; }
         if (s_timeline)
         {
             EditorPrefs.SetBool(ZoneLayoutManager.PreferLocalPoolPrefsKey, s_prevPreferLocal);
@@ -904,6 +950,9 @@ public static class RunStructureAutoPlayEditor
               .Append(",\"hpKill\":").Append(r.hpKill)
               .Append(",\"hpEff\":").Append(r.hpEff)
               .Append(",\"tl\":").Append(TimelineJson(r))
+              .Append(",\"simTaken\":").Append(r.simTaken.ToString("0")).Append(",\"simHits\":").Append(r.simHits)
+              .Append(",\"simMax\":").Append(r.simMax.ToString("0")).Append(",\"simRefills\":").Append(r.simRefills)
+              .Append(",\"simMaxHp\":").Append(r.simMaxHp)
               .Append(",\"species\":\"").Append(sp)
               .Append("\",\"offered\":\"").Append(r.offered)
               .Append("\",\"chosen\":\"").Append(r.chosen)
@@ -935,6 +984,126 @@ public static class RunStructureAutoPlayEditor
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 방 시간표
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 피해 모사(10-11)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private static float[] ParseSimDps()
+    {
+        string list = EditorPrefs.GetString(SimDpsByChapterPrefsKey, "");
+        var vals = new List<float>();
+        foreach (var part in list.Split(','))
+            if (float.TryParse(part.Trim(), out float v) && v > 0f) vals.Add(v);
+        if (vals.Count == 0) vals.Add(Mathf.Max(1f, EditorPrefs.GetFloat(SimDpsPrefsKey, 80f)));
+        return vals.ToArray();
+    }
+
+    private static float SimDpsFor(int chapter) => s_simDps[Mathf.Clamp(chapter - 1, 0, s_simDps.Length - 1)];
+
+    /// <summary>
+    /// 즉사 대신 초당 DPS를 타격 단위(초당 3타)로 깎는다 — 5 m 안의 가장 가까운 적부터. 5 m 안에 없으면 2초(다가가는 시간)를 기다리고,
+    /// 그 뒤엔 가장 가까운 적을 초당 3타 그대로 친다(쫓아가 치는 셈 — 예전엔 2초마다 한 대라 원거리 · 날짐승 방이 3~8배 길었다 · 10-14 5회차).
+    /// 보스는 기존 보스 절차(6)가 맡는다.
+    /// </summary>
+    private static void SimFrame(PlayerController player, double now, MonsterBase boss, int chapter)
+    {
+        HookSim(player);
+        if (now < s_simNextHit) return;
+        s_simNextHit = now + SimHitGap;
+        MonsterBase best = null;
+        float bestD = float.MaxValue;
+        Vector3 pp = player.transform.position;
+        foreach (var mb in Object.FindObjectsByType<MonsterBase>(FindObjectsSortMode.None))
+        {
+            if (mb.IsDead || !mb.isActiveAndEnabled || mb == boss || mb.Grade == MonsterGrade.Boss || mb.CurrentHp <= 0 || mb.IsDamageImmuneNow) continue;
+            float d = (mb.transform.position - pp).sqrMagnitude;
+            if (d < bestD) { bestD = d; best = mb; }
+        }
+        if (best == null) { s_simFarSince = -1; return; }
+        if (bestD > SimReach * SimReach)
+        {
+            if (s_simFarSince < 0) s_simFarSince = now;
+            if (now - s_simFarSince < SimChaseAfter) return;   // 다가가는 중
+        }
+        else s_simFarSince = -1;
+        best.TakeDamage(SimDpsFor(chapter) * (float)SimHitGap, player.gameObject, 0f);
+    }
+
+    private static void HookSim(PlayerController p)
+    {
+        if (s_simPlayer == p || p == null) return;
+        UnhookSim();
+        s_simPlayer = p;
+        p.OnDamageResolved += OnSimDamage;
+        s_simHp = p.RuntimeStats.MaxHp;
+    }
+
+    private static void UnhookSim()
+    {
+        if (s_simPlayer != null) s_simPlayer.OnDamageResolved -= OnSimDamage;
+        s_simPlayer = null;
+    }
+
+    /// <summary>무적이라 0으로 끝난 피해를 「맞았다면」으로 환산한다 — 원래 피해 × 방어식(100 / (100 + 방어)) × (1 − 피해 감소). 보호막 · 서약 변조는 빼고 본다.</summary>
+    private static void OnSimDamage(GameObject attacker, int raw, int final, PlayerController.DamageOutcome outcome)
+    {
+        if (s_cur == null || s_simPlayer == null || raw <= 0) return;
+        var rs = s_simPlayer.RuntimeStats;
+        float est = outcome == PlayerController.DamageOutcome.Applied
+            ? final
+            : raw * (100f / (100f + Mathf.Max(0, rs.Defense))) * (1f - Mathf.Clamp(rs.DamageReduction, 0f, PlayerRuntimeStats.MaxDamageReduction));
+        s_cur.simTaken += est;
+        s_cur.simHits++;
+        if (est > s_cur.simMax) s_cur.simMax = est;
+        s_cur.simMaxHp = rs.MaxHp;
+        var srcMb  = attacker != null ? attacker.GetComponentInParent<MonsterBase>() : null;   // 몬스터는 @Pools 아래 — root 이름은 전부 「@Pools」였다
+        string src = attacker == null ? "?" : Clean(srcMb != null ? srcMb.name : attacker.name);
+        s_cur.simSrc[src] = (s_cur.simSrc.TryGetValue(src, out float v) ? v : 0f) + est;
+        s_simHp -= est;
+        if (s_simHp < rs.MaxHp * SimRefillAt) { s_cur.simRefills++; s_simHp = rs.MaxHp; }
+    }
+
+    /// <summary>Temp/damage_sim.txt — 챕터별 · 방 종류별 받은 피해(최대 체력 대비) · 방 길이 · 출처 상위.</summary>
+    private static void WriteSimSummary(string reason)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"피해 모사 — {reason} · DPS {string.Join("/", s_simDps)} · 방 {s_rooms.Count} · {System.DateTime.Now:yyyy-MM-dd HH:mm}");
+        sb.AppendLine("받은 피해 = 무적 플레이어가 맞았다면 받았을 피해(서 있기만 함 = 최악값). 방 길이 = 입장 → 클리어.");
+        for (int ch = 1; ch <= 4; ch++)
+        {
+            float taken = 0f; int rooms = 0, refills = 0, maxHp = 0; double len = 0; int lenN = 0;
+            var byKind = new Dictionary<string, (float t, int n, double len, int lenN)>();
+            var src = new Dictionary<string, float>();
+            foreach (var r in s_rooms)
+            {
+                if (r.chapter != ch || r.hpKill <= 0) continue;
+                rooms++; taken += r.simTaken; refills += r.simRefills;
+                if (r.simMaxHp > 0) maxHp = r.simMaxHp;
+                double l = r.clearT >= 0 ? r.clearT - r.enterT : -1;
+                if (l >= 0) { len += l; lenN++; }
+                (float t, int n, double len, int lenN) k = byKind.TryGetValue(r.kind, out var e) ? e : default;
+                byKind[r.kind] = (k.t + r.simTaken, k.n + 1, k.len + (l >= 0 ? l : 0), k.lenN + (l >= 0 ? 1 : 0));
+                foreach (var kv in r.simSrc) src[kv.Key] = (src.TryGetValue(kv.Key, out float x) ? x : 0f) + kv.Value;
+            }
+            if (rooms == 0) continue;
+            float pct = maxHp > 0 ? taken / maxHp * 100f : 0f;
+            sb.AppendLine($"Ch{ch} · DPS {SimDpsFor(ch)} · 전투 방 {rooms} · 받은 피해 {taken:0}(최대 체력 {maxHp}의 {pct:0}%) · 다시 채움 {refills} · 평균 방 길이 {(lenN > 0 ? len / lenN : 0):0.0}초");
+            foreach (var kv in byKind)
+            {
+                float kp = maxHp > 0 ? kv.Value.t / kv.Value.n / maxHp * 100f : 0f;
+                sb.AppendLine($"   {kv.Key}: {kv.Value.n}방 · 방당 {kv.Value.t / kv.Value.n:0}({kp:0.0}%) · 방 길이 {(kv.Value.lenN > 0 ? kv.Value.len / kv.Value.lenN : 0):0.0}초");
+            }
+            var top = new List<KeyValuePair<string, float>>(src);
+            top.Sort((a, b) => b.Value.CompareTo(a.Value));
+            var line = new StringBuilder("   출처 상위: ");
+            for (int i = 0; i < top.Count && i < 5; i++) line.Append($"{top[i].Key} {top[i].Value:0} · ");
+            sb.AppendLine(line.ToString());
+        }
+        File.WriteAllText(Path.Combine("Temp", "damage_sim.txt"), sb.ToString());
+        File.WriteAllText(Path.Combine("Temp", $"damage_sim_{System.DateTime.Now:yyyyMMdd_HHmmss}.txt"), sb.ToString());
+        Debug.Log("[RunAuto] 피해 모사 요약 → Temp/damage_sim.txt\n" + sb);
+    }
 
     /// <summary>(챕터, 방문 순번)이 바뀌었으면 새 방 기록을 연다. 매 프레임(TimelineFrame)과 틱 양쪽에서 부른다.</summary>
     private static string SyncRoomKey(GameRunSession run, RunFlowController rfc, double now)
@@ -995,8 +1164,10 @@ public static class RunStructureAutoPlayEditor
             int hp = mb.CurrentHp;
             if (hp <= 0) continue;                                  // 아직 초기화 중
             if (s_tlKilled.Add(id)) { s_cur.hpKill += hp; s_cur.hpEff += mb.EffectiveMaxHp; }
+            if (s_sim) continue;                                    // 피해 모사 — 처치는 SimFrame이 타격 단위로
             mb.TakeDamage(hp * 10f + 100000f, run.Player.gameObject, 0f);
         }
+        if (s_sim) SimFrame(run.Player, now, boss, (int)run.CurrentChapter);
 
         // 사망 → 풀 반환(비활성). 그 사이 시체는 MonsterBudget 한 칸을 차지한다(스포너 AliveCount는 활성 여부로 센다).
         if (s_tlDead.Count > 0)

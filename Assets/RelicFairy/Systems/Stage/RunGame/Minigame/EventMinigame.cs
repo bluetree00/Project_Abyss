@@ -221,7 +221,7 @@ public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
 
             // ① 입장 — 놀이 빛깔로 화면 한 번 · 낮은 울림 · 소품이 솟는다
             MinigameFx.Flash(Theme, 0.4f, 0.1f);
-            MinigameFx.Sound(SoundKey.Sfx.RoomClear, 0.7f, 0.6f);
+            MinigameFx.Cue(SoundEvent.MgStart);   // 예전 키 sfx_room_clear는 주소가 없어 무음이었다(10-12 E4)
             await BuildStageAsync(ct);
 
             // ② 규칙 카드(처음 보는 놀이면 길게)
@@ -251,7 +251,7 @@ public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
             // ⑤ 결말
             var grade = CurrentGrade;
             OnPlayEnd();
-            MinigameFx.Sound(SoundKey.Sfx.RoomClear, 0.9f, 0.85f);
+            MinigameFx.Cue(SoundEvent.RoomClear);   // 놀이 끝 = 방을 해결했다는 같은 뜻(10-12 E5)
             await MinigameFx.FinaleSlowAsync(ct);
 
             // ⑥ 등급 도장

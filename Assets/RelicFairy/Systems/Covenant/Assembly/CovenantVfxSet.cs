@@ -24,12 +24,20 @@ public sealed class CovenantVfxSet : ScriptableObject
         [Min(0f)] public float nativeRadius;
         [Tooltip("즉발 회수 시각 / 부착 기본 지속(초)")]
         [Min(0.05f)] public float life;
+        [Tooltip("입자 시작 색에 곱할 색(알파 0 = 원래 색 · 알파로 옅게) — 흰빛 원본을 효과 빛깔로(10-11 톤 2차)")]
+        public Color tint;
+        [Tooltip("끌 자식 이름(쉼표) — 큰 섬광 등. 같은 프리팹을 다른 칸이 끄지 않고 쓰면 안 된다(풀에 꺼진 채 남는다)")]
+        public string mute;
     }
 
     [SerializeField] private Entry[] entries = new Entry[0];
 
     /// <summary>키의 프리팹과 재생 배율·수명. radius>0이고 반경 맞춤 항목이면 배율에 반경비를 곱한다.</summary>
     public bool TryGet(string key, float radius, out GameObject prefab, out float scale, out float life)
+        => TryGet(key, radius, out prefab, out scale, out life, out _, out _);
+
+    /// <summary><see cref="TryGet(string, float, out GameObject, out float, out float)"/> + 색 곱 · 끌 자식.</summary>
+    public bool TryGet(string key, float radius, out GameObject prefab, out float scale, out float life, out Color tint, out string mute)
     {
         for (int i = 0; i < entries.Length; i++)
         {
@@ -38,11 +46,15 @@ public sealed class CovenantVfxSet : ScriptableObject
             prefab = e.prefab;
             scale  = e.scale * (radius > 0f && e.nativeRadius > 0f ? radius / e.nativeRadius : 1f);
             life   = e.life;
+            tint   = e.tint;
+            mute   = e.mute;
             return true;
         }
         prefab = null;
         scale  = 1f;
         life   = 0f;
+        tint   = Color.clear;
+        mute   = null;
         return false;
     }
 }

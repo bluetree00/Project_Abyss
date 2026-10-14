@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: reach_ch2
   m_EditorClassIdentifier: Assembly-CSharp::Achievement
   category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 7a552f2a77e278246a5a2b370f6ffa2c, type: 3}
   codeName: reach_ch2
   displayName: "\uC2EC\uC5F0\uC758 \uBB38\uD131"
   description: "2\uCC55\uD130 \uB3C4\uB2EC"

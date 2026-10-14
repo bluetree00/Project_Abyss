@@ -28,13 +28,13 @@ public static class WeaponFormSetup
                  V("still_wind",  3, "무풍",        "회피가 공격",   "칼바람 5인 채 회피하면 지나간 길의 적을 벤다"),
                  V("storm_eye",   3, "폭풍의 눈",   "무리 속 연쇄",  "풍절에 맞은 적 하나당 칼바람 +1을 돌려받는다(최대 3)"),
              });
-        Fill(weight, "weight", "무게", "내려찍기", "느리지만, 넷째 휘두름마다 확실한 한 방이 온다",
+        Fill(weight, "weight", "무게", "내려찍기", "느리지만, 무게 4가 찬 뒤 콤보 마지막 타가 맞으면 확실한 한 방이 온다",
              new Color(0.95f, 0.62f, 0.32f), maxStacks: 4, atk: 0.6f, range: 3.5f, idle: 5f, new[]   // 10-07 예산 실측(단일 표적 · 유물 없음): 0.8 → Ⅰ +18% · 0.5 → +8%(확정 치명 +6% 포함) → 0.6. 범위 가치는 예산 밖
              {
                  V("fissure",    2, "균열",      "자리 장악",   "충격파 자리에 2초간 갈라진 땅이 남는다(0.5초마다 공격력 30%)"),
                  V("aftershock", 2, "여진",      "넓게",        "0.4초 뒤 더 큰 충격파(반경 ×1.4 · 피해 절반)가 한 번 더 퍼진다"),
                  V("heavy_hand", 3, "무거운 손", "스킬과 엮임", "무게 4일 때 E · R 적중이 치명타가 된다"),
-                 V("crush",      3, "짓누름",    "몰아 잡기",   "경직된 적은 2초 동안 받는 피해 +12%"),
+                 V("crush",      3, "짓누름",    "몰아 잡기",   "경직된 적은 2초 동안 받는 피해 +6%"),
              });
 
         foreach (var t in new[] { "T1", "T2", "T3" })
@@ -60,8 +60,8 @@ public static class WeaponFormSetup
         const string slamTrailPath = "Assets/RelicFairy/_Imported/EffectSource/INab Studio/Vfx Assets/Weapon FX Series/Weapon Trails FX/Trail Prefabs/Fire 2.prefab";
         Register(windVfxPath, "vfx_form_windcut");
         Register(slamVfxPath, "NovaOrangeHit");
-        SetFx(WindPath, "vfx_form_windcut", 1.6f, windTrailPath);
-        SetFx(WeightPath, "NovaOrangeHit", 2f, slamTrailPath);
+        SetFx(WindPath, "vfx_form_windcut", 1.3f, windTrailPath);   // 10-13 이펙트 = 판정: 앞 8 m에 1.6은 9.4 m · 옆은 판정 띠를 바닥 외곽선으로
+        SetFx(WeightPath, "NovaOrangeHit", 3f, slamTrailPath);       // 10-13 이펙트 = 판정: 3.5 m 판정에 2는 2.3 m
         AssetDatabase.SaveAssets();
         Debug.Log("[WeaponFormSetup] 형 연출 배정 끝");
     }
@@ -74,7 +74,11 @@ public static class WeaponFormSetup
                  ?? settings.CreateOrMoveEntry(guid, settings.FindGroup("Effects") ?? settings.DefaultGroup, false, false);
         if (entry.address == address) return;
         if (!string.IsNullOrEmpty(entry.address) && entry.address != path)
-            Debug.LogWarning($"[WeaponFormSetup] 기존 주소 「{entry.address}」 → 「{address}」 — 옛 키를 쓰는 곳이 있으면 깨진다");
+        {
+            // 이미 다른 주소로 쓰이는 에셋 — 옮기면 옛 키가 깨진다(10-07 NovaOrangeHit). 형 SO에는 그 주소를 넣어야 한다
+            Debug.LogWarning($"[WeaponFormSetup] 「{path}」은 이미 주소 「{entry.address}」 — 「{address}」로 옮기지 않는다");
+            return;
+        }
         entry.address = address;
         settings.SetDirty(UnityEditor.AddressableAssets.Settings.AddressableAssetSettings.ModificationEvent.EntryModified, entry, true);
     }

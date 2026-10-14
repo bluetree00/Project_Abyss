@@ -75,6 +75,7 @@ public class LichSkeletonSummonState : UnInterruptibleState<LichSkeletonSummonPa
 
     private const int    Sides         = 4;
     private const string LegionBarkKey = "Lich_Legion";   // 대사 CSV — 없으면 조용히 넘어간다
+    private const float  BoltSignalSeconds = 0.15f;       // 마력탄 착탄 전 빨강 — 리치 예고 규약(10-08 점검)
 
     private readonly List<Vector3>     _spawnPoints = new(8);
     private readonly List<GameObject>  _marks       = new(4);
@@ -88,6 +89,7 @@ public class LichSkeletonSummonState : UnInterruptibleState<LichSkeletonSummonPa
     private int        _orbitStep;
     private bool       _boltFired;
     private bool       _boltLanded;
+    private bool       _boltSignaled;
     private Vector3    _boltTarget;
     private GameObject _boltDisc;
     private GameObject _boltVfx;
@@ -103,6 +105,7 @@ public class LichSkeletonSummonState : UnInterruptibleState<LichSkeletonSummonPa
         _orbitStep  = 0;
         _boltFired  = false;
         _boltLanded = false;
+        _boltSignaled = false;
         _spawnPoints.Clear();
         _spawned.Clear();
         _aliveCount = 0;
@@ -173,7 +176,7 @@ public class LichSkeletonSummonState : UnInterruptibleState<LichSkeletonSummonPa
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -280,7 +283,8 @@ public class LichSkeletonSummonState : UnInterruptibleState<LichSkeletonSummonPa
         if (!_boltFired || _boltLanded) return;
 
         float t = Mathf.Clamp01((_timer - Data.boltAt) / Mathf.Max(0.05f, Data.boltWarn));
-        PatternGuideHelper.SetProgress(_boltDisc, t);
+        // 차오르다 착탄 직전 빨강(신호) — 다른 리치 예고와 같은 단계(10-08 점검).
+        LichPatternUtil.TickTelegraph(_boltDisc, _timer - Data.boltAt, Data.boltWarn, BoltSignalSeconds, ref _boltSignaled);
         if (_boltVfx != null)
             _boltVfx.transform.position = Vector3.Lerp(_boltFrom, _boltTarget, t) + Vector3.up * (4f * t * (1f - t));
         if (t < 1f) return;
@@ -290,7 +294,7 @@ public class LichSkeletonSummonState : UnInterruptibleState<LichSkeletonSummonPa
         PatternGuideHelper.SetColor(_boltDisc, LichPatternUtil.Lethal);
         if (_boltDisc != null) Object.Destroy(_boltDisc, 0.12f);
         _boltDisc = null;
-        LichVfx.Play(LichVfxSlot.BoltImpact, _boltTarget, Quaternion.identity, Data.boltRadius / 2f);
+        LichVfx.Play(LichVfxSlot.BoltImpact, _boltTarget, Quaternion.identity, LichPatternUtil.BoltScale(Data.boltRadius));   // r/2는 판정의 1.5배(10-08 점검)
         LichSfx.Play(LichSfxSlot.BoltImpact, _boltTarget);
         LichPatternUtil.Impact(LichImpact.Light, LichPatternUtil.HitCircle(ctx, _boltTarget, Data.boltRadius, Data.boltDamage));
     }

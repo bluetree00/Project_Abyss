@@ -1,5 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using RelicFairy.Monster;
 using UnityEngine;
 
@@ -34,7 +36,9 @@ public sealed class LancelotMemoryHub : MonoBehaviour
     // X자 겹침 상한. 24였을 때 원한의 칼날 ②(원한 × 낙인)가 오래 싸우면 매 심판 상한에 붙어(원한은 늘 차 있다)
     // 「둘 다 높을 때 쏜다」는 판단 없이 고정 +22 DPS였다(10-03 예산 실측: 단독 +31% · 다른 조각 +2~8%) → 12.
     public const int   MaxXPerTear      = 12;
+    private const float SwingResetSeconds = 3f;   // 「맞힌 평타 3번마다 · 4번마다」 — 3초 쉬면 처음부터 센다(10-12 D2)
     private const int  MaxTearVfx       = 3;
+    private const float TearShowDelay   = 0.12f;   // 심판 찢기 X자 · 소리 · 글은 막타 뒤에 — 같은 순간에 묻혔다(10-12 S3)
     private const float RestartRatio    = 0.75f;   // 재출발 = 광기 30(최대 40 기준)
     public const string SlashVfxKey     = "vfx_lancelot_judgment";
 
@@ -53,6 +57,7 @@ public sealed class LancelotMemoryHub : MonoBehaviour
     public event Action<Vector3, Vector3, int> JudgmentFinished;       // (위치, 방향, 이번 심판이 찢은 낙인)
     public event Action<int> GrudgeSaved;                              // 원한이 쌓였다(실제로 더한 수)
     public event Action<int> GrudgeSpent;                              // 원한을 썼다(참격파 줄 수)
+    public event Action<bool> CrossLightChanged;                       // 엇갈린 빛 켜짐(true) · 써서 꺼짐(false) — HUD · 기억 쪽(10-12 A3)
 
     /// <summary>허브가 플레이어에 새로 묶였다(첫 조각) — 유물 HUD가 이때 깨어난다.</summary>
     public static event Action<LancelotMemoryHub> Bound;
@@ -99,6 +104,8 @@ public sealed class LancelotMemoryHub : MonoBehaviour
     public bool HoldingThreshold { get; set; }
     /// <summary>두 번째 심판 ② — 이번 심판은 원한을 쓰지 않는다(심판이 시작될 때마다 false로).</summary>
     public bool SkipGrudgeThisJudgment { get; set; }
+    /// <summary>광기의 왕관 ③ — 다음 심판 하나는 원한을 쓰지 않는다(왕관이 원한 2개를 먼저 쓴다). 심판이 시작될 때 이번 심판 칸으로 옮겨진다.</summary>
+    public bool SkipGrudgeNextJudgment { get; set; }
 
     public PlayerController     Player  => _player;
     public LancelotMadnessRelic Relic   => _relic;
@@ -111,7 +118,7 @@ public sealed class LancelotMemoryHub : MonoBehaviour
     public int  GrudgeAtFinisher => _grudgeAtFinisher;
     public bool HasCrossLight => _crossLight;
     public IReadOnlyList<MonsterBase> TornTargets => _tornTargets;
-    public float Atk => _player != null ? _player.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee) : 0f;
+    public float Atk => _player != null ? _player.RuntimeStats.AttackPower : 0f;   // 근접 · 원거리 중 큰 값(10-14 A5)
 
     /// <summary>계단 k(1~4)의 광기 값 — 최대 40이면 10 · 20 · 30 · 40.</summary>
     public int Rung(int k) => _madness != null ? Mathf.RoundToInt(_madness.MaxStacks * k / 4f) : k * 10;
@@ -139,6 +146,9 @@ public sealed class LancelotMemoryHub : MonoBehaviour
 
     public static LancelotMemoryHub Of(PlayerController player)
         => player != null && player.TryGetComponent<LancelotMemoryHub>(out var h) ? h : null;
+
+    /// <summary>UI용 — 지금 낙인 상한(광기의 눈 · 폭로가 바꾼다 · 허브가 없으면 기본 3). 몬스터 체력바 스택 칸이 읽는다(10-12 A1).</summary>
+    public static int BrandCapOf(PlayerController player) => Of(player)?.BrandCap ?? BaseBrandCap;
 
     private void Bind(PlayerController player)
     {
@@ -300,6 +310,7 @@ public sealed class LancelotMemoryHub : MonoBehaviour
 
         if (hit.ActionType == WeaponActionType.GroundLight && Time.time - _lastSwingAt > 0.12f)
         {
+            if (Time.time - _lastSwingAt > SwingResetSeconds) _swingNo = 0;
             _lastSwingAt = Time.time;
             _swingNo++;
             Swing?.Invoke(hit, _swingNo);
@@ -331,6 +342,8 @@ public sealed class LancelotMemoryHub : MonoBehaviour
         else if (cause != TearCause.Judgment)
         {
             _crossLight = false;
+            Say(_player.transform.position + Vector3.up * 0.4f, "낙인 유지");   // 엇갈린 빛을 썼다(10-12 S5)
+            CrossLightChanged?.Invoke(false);
             Debug.Log("[LancelotMemory] 엇갈린 빛 — 이번 찢기는 낙인을 남겼다");
         }
 
@@ -350,11 +363,28 @@ public sealed class LancelotMemoryHub : MonoBehaviour
         {
             float dmg = Atk * TearAtkRatio * x;
             if (!mb.IsDead) CombatQuery.DealSynergyDamage(mb, dmg, _player.gameObject, 1f, false, RuneElement.Dark);
-            PlayX(at, Mathf.Min(x, MaxTearVfx));
+            if (cause == TearCause.Judgment) PlayXLaterAsync(at, Mathf.Min(x, MaxTearVfx), this.GetCancellationTokenOnDestroy()).Forget();
+            else PlayX(at, Mathf.Min(x, MaxTearVfx));
             Debug.Log($"[LancelotMemory] 찢기 {mb.name} 낙인 {stacks}(센 {counted}) · X자 {x} · 피해 {dmg:0} ({cause}){(keep ? " · 남김" : "")}");
         }
         Torn?.Invoke(mb, counted, cause);
         return counted;
+    }
+
+    private async UniTaskVoid PlayXLaterAsync(Vector3 at, int count, CancellationToken ct)
+    {
+        try { await UniTask.Delay(TimeSpan.FromSeconds(TearShowDelay), cancellationToken: ct); }
+        catch (OperationCanceledException) { return; }
+        PlayX(at, count);
+    }
+
+    /// <summary>심판이 찢은 낙인 — 막타 0.12초 뒤 소리 1 · 「찢기 ×N」 1회(10-12 S3).</summary>
+    private async UniTaskVoid TearCueLaterAsync(Vector3 at, int torn, CancellationToken ct)
+    {
+        try { await UniTask.Delay(TimeSpan.FromSeconds(TearShowDelay), cancellationToken: ct); }
+        catch (OperationCanceledException) { return; }
+        Managers.Sound?.PlayEvent(SoundEvent.RelicRend);
+        Say(at + Vector3.up * 0.4f, $"찢기 ×{torn}");
     }
 
     /// <summary>X자 참격 이펙트 — 막타 참격을 작게 엇갈려 두 번(× 겹침 수).</summary>
@@ -376,7 +406,8 @@ public sealed class LancelotMemoryHub : MonoBehaviour
         _tornThisJudgment = 0;
         _tornTargets.Clear();
         _finisherHits.Clear();
-        SkipGrudgeThisJudgment = false;
+        SkipGrudgeThisJudgment = SkipGrudgeNextJudgment;
+        SkipGrudgeNextJudgment = false;
         _keepThisJudgment = _crossLight;
         JudgmentBegan?.Invoke();
     }
@@ -407,10 +438,13 @@ public sealed class LancelotMemoryHub : MonoBehaviour
         if (_keepThisJudgment && _tornThisJudgment > 0)
         {
             _crossLight = false;
+            Say(pos + Vector3.up * 0.8f, "낙인 유지");   // 10-12 S5
+            CrossLightChanged?.Invoke(false);
             Debug.Log("[LancelotMemory] 엇갈린 빛 — 이번 심판은 낙인을 남겼다");
         }
         _keepThisJudgment = false;
         Debug.Log($"[LancelotMemory] 심판 {_judgmentIndex}번째 — 찢은 낙인 {_tornThisJudgment} · 대상 {_tornTargets.Count} · 원한 {(_grudge != null ? _grudge.Value : 0)}{(SkipGrudgeThisJudgment ? " (쓰지 않음)" : "")}");
+        if (_tornThisJudgment > 0) TearCueLaterAsync(pos, _tornThisJudgment, this.GetCancellationTokenOnDestroy()).Forget();
         if (!SkipGrudgeThisJudgment) SpendGrudge(pos, fwd);
     }
 
@@ -424,23 +458,28 @@ public sealed class LancelotMemoryHub : MonoBehaviour
         for (int i = 0; i < n; i++)
         {
             float yaw = (i - (n - 1) * 0.5f) * WaveSpreadDeg;
-            hits += Wave(pos, Quaternion.AngleAxis(yaw, Vector3.up) * fwd, WaveLength, Atk * WaveAtkRatio);
+            hits += Wave(pos, Quaternion.AngleAxis(yaw, Vector3.up) * fwd, WaveLength, Atk * WaveAtkRatio, RuneElement.Fire);
         }
+        Managers.Sound?.PlayEvent(SoundEvent.RelicGrudgeWave);   // 원한 참격파(10-12 S4)
         GrudgeSpent?.Invoke(n);
-        Debug.Log($"[LancelotMemory] 원한 {n} → 참격파 {n}줄 · 적중 {hits} · 1줄 {Atk * WaveAtkRatio:0}");
+        RFLog.D($"[LancelotMemory] 원한 {n} → 참격파 {n}줄 · 적중 {hits} · 1줄 {Atk * WaveAtkRatio:0}");
     }
 
     /// <summary>
     /// 직선 참격파 — <paramref name="from"/>에서 <paramref name="dir"/>로 <paramref name="length"/> m, 폭 ±0.9 m 안의 적에게 상태 피해.
     /// 맞힌 적 수를 돌려준다(광란의 걸음 ③ 궤적 베기도 같은 판정).
     /// </summary>
-    public int Wave(Vector3 from, Vector3 dir, float length, float damage)
+    /// <param name="beam">빔 속성 색 — 원한 참격파는 불(주황)로 다른 조각 6종의 어둠 빔과 가른다(10-12 S4).</param>
+    /// <param name="hitOut">맞힌 적을 받아 갈 목록(멀리서 내리는 심판 ② 낙인 · 10-14) — 없으면 null.</param>
+    public int Wave(Vector3 from, Vector3 dir, float length, float damage, RuneElement beam = RuneElement.Dark, List<MonsterBase> hitOut = null)
     {
         dir.y = 0f;
         if (dir.sqrMagnitude < 0.0001f || length <= 0f) return 0;
         dir.Normalize();
         Vector3 to = from + dir * length;
-        ElementVfxPlayer.PlayBeam(RuneElement.Dark, from + Vector3.up * 0.8f, to + Vector3.up * 0.8f, 0.3f);
+        ElementVfxPlayer.PlayBeam(beam, from + Vector3.up * 0.8f, to + Vector3.up * 0.8f, 0.3f);
+        // 판정 폭(반폭 0.9 + 여유 0.4)을 바닥 띠로 — 0.14 m 줄만으로는 약 2.6 m 폭이 안 보였다(10-13 이펙트 = 판정)
+        FormStrike.GroundStrip(from, dir, length, WaveHalfWidth + 0.4f, 0.35f, beam == RuneElement.Fire ? new Color(1f, 0.55f, 0.25f) : LancelotColor);
         Vector3 mid = (from + to) * 0.5f;
         int n = CombatQuery.GetNearbyEnemies(mid, length * 0.5f + WaveHalfWidth + 0.5f, _player.gameObject, 32, _buf);
         var hit = new List<MonsterBase>(n);
@@ -450,6 +489,7 @@ public sealed class LancelotMemoryHub : MonoBehaviour
             if (e != null && !e.IsDead && DistToSegmentXZ(e.transform.position, from, to) <= WaveHalfWidth + 0.4f) hit.Add(e);
         }
         foreach (var e in hit) CombatQuery.DealSynergyDamage(e, damage, _player.gameObject, 1f, false, RuneElement.Dark);
+        hitOut?.AddRange(hit);
         return hit.Count;
     }
 
@@ -475,6 +515,8 @@ public sealed class LancelotMemoryHub : MonoBehaviour
             if (now - kv.Value <= CrossLightWindow)
             {
                 _crossLight = true;
+                if (_player != null) Say(_player.transform.position, "엇갈린 빛");   // 10-12 S5 — 다음 찢기가 낙인을 남긴다
+                CrossLightChanged?.Invoke(true);
                 Debug.Log($"[LancelotMemory] 엇갈린 빛 — {kv.Key} + {reactionKey}");
                 break;
             }

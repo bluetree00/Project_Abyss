@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.AI;
@@ -196,6 +196,24 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Tooltip("런 중 심연의 정수를 추적하는 컴포넌트. 없으면 자동 생성.")]
     [SerializeField] private EssenceTracker essenceTracker;
 
+    [Header("리치 추방 · 추락 (10-11) — 비우면 코드 기본값")]
+    [Tooltip("추락 자세(반복). 비우면 플레이어 컨트롤러의 점프 루프(GhostSamurai_APose_Jump_Loop_Inplace). " +
+             "후보: _ThirdParty/GhostSamurai_Animset/Animation/Bow/Hit/Inplace 「GhostSamurai_Bow_Hit_Air_ DownLoop_Inplace」(_Imported로 옮긴 뒤)")]
+    [SerializeField] private AnimationClip exileFallClip;
+    [Tooltip("Ch1 착지 — 엎드린 자세(마지막 프레임을 잡는다). 비우면 큰 피격(Large_Hit) 뒤 Idle. 후보: Bow_Hit_Falldown_F_End")]
+    [SerializeField] private AnimationClip exileDownClip;
+    [Tooltip("Ch1 착지 — 일어나는 동작. 비우면 엎드림 뒤 바로 Idle로 섞는다. 후보: Bow_Hit_Up_GetUP")]
+    [SerializeField] private AnimationClip exileGetUpClip;
+    [Tooltip("층마다 봉인이 깨질 때 포효 — [0] Ch3 기사 · [1] Ch2 화룡 · [2] Ch1 숲. 빈 칸은 리치 결계 깨짐 소리")]
+    [SerializeField] private AudioClip[] exileRoars = new AudioClip[3];
+
+    public AnimationClip ExileFallClip  => exileFallClip;
+    public AnimationClip ExileDownClip  => exileDownClip;
+    public AnimationClip ExileGetUpClip => exileGetUpClip;
+    /// <summary>층 포효 칸(0 기사 · 1 화룡 · 2 숲). 없으면 null.</summary>
+    public AudioClip ExileRoar(int index)
+        => exileRoars != null && index >= 0 && index < exileRoars.Length ? exileRoars[index] : null;
+
     private GameObject _currentMapGO;
     // SpawnBlockMapAsync가 해석한 챕터 팔레트. StartRoomGate 통로를 같은 팔레트로 짓기 위해 보관.
     private BlockPalette _currentMapPalette;
@@ -223,6 +241,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// 커스텀 아레나가 아닌 방에서는 null — 그 경우 기존 챕터 게이트로 폴백한다.</summary>
     private Transform _currentArena;
     public GameRunSession Run => _run;
+    /// <summary>챕터 레지스트리(결과창 챕터 이름 등 읽기 전용 조회).</summary>
+    public ChapterRegistry ChapterRegistry => chapterRegistry;
 
     // 미니맵 스포너 이벤트 구독 추적 (새 방 진입 시 해제)
     private readonly System.Collections.Generic.List<MonsterSpawner> _minimapSpawnerSubs = new();
@@ -276,6 +296,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     private async UniTaskVoid BossClearSequenceAsync(Vector3 center)
     {
         var ct = this.GetCancellationTokenOnDestroy();
+
+        // 리치의 추방(10-11) — 봉인기 첫 붕괴 뒤엔 런 클리어 · 유물 드래프트 대신 추락 → 같은 런으로 Ch1(심연 깊이 그대로).
+        if (_exileEntering) return;
+        if (ExileFallSequence.IsActive)
+        {
+            await EnterExileFallAsync(ct);
+            return;
+        }
+
         bool isFinal = !(_run?.HasNextChapter() ?? false);
 
         // 1) 유물 파츠 드래프트 — 설계서 §1-6: Ch1·Ch2·Ch3 클리어에 픽, Ch4(최종)는 픽 없음(승리).
@@ -402,10 +431,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         try
         {
+            // 머무름 3.2초 — 카메라가 닿은 뒤 돌계단이 한 단씩 솟고 아치 · 포탈이 열리는 것까지 본다(ChapterStairway, 10-10)
             await cam.PanToZoneAndReturnAsync(
                 exitPos,
                 moveDuration:   2.5f,
-                holdDuration:   1.5f,
+                holdDuration:   3.2f,
                 returnDuration: 2.0f,
                 playerTransform,
                 ct,
@@ -428,6 +458,56 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         AppBootstrapper.Instance?.MarkChapterAdvance();
         AppBootstrapper.Instance?.RequestLoad(AppBootstrapper.GetSceneForChapter(ChapterId.Chapter1));
         Debug.Log($"[GameRunBootstrapper] 무한 루프 진입 — 심연 깊이 {run.AbyssDepth}, Ch1 회귀");
+    }
+
+    // 리치의 추방 — 전환은 한 번만(보스방 클리어 · 추락 쪽 직접 부르기 어느 쪽이 먼저 와도).
+    private bool _exileEntering;
+
+    /// <summary>
+    /// 리치의 추방(10-11 「챕터를 가로지르는 추락」) — 봉인기 첫 붕괴 뒤 런 클리어 대신 같은 런 · 같은 빌드로 Ch1에 떨어진다.
+    /// 보스방 클리어(<see cref="BossClearSequenceAsync"/>)가 부르고, 그 신호가 끝내 오지 않으면 착지 뒤 추락 쪽(<see cref="ExileFallSequence"/>)이 부른다.
+    /// </summary>
+    public void EnterExileFall() => EnterExileFallAsync(this.GetCancellationTokenOnDestroy()).Forget();
+
+    /// <summary>
+    /// 깊이 그대로 Ch1(<see cref="GameRunSession.BeginExileFall"/>) · 보스 클리어처럼 저장(추락 중에 꺼도 Ch1 대기방부터) →
+    /// 착지 와이프가 화면을 덮으면 챕터 전환 기계(MarkChapterAdvance + RequestLoad)로 Ch1을 새로 연다. 로드아웃 · 서약 · 파츠 · 아이템은 세션에 남는다.
+    /// 런이 없으면 화면 · 몸을 돌려주고 끝낸다(추락이 덮인 화면에 갇히지 않게).
+    /// </summary>
+    private async UniTask EnterExileFallAsync(CancellationToken ct)
+    {
+        if (_exileEntering) return;
+        _exileEntering = true;
+        ExileFallSequence.Claim();
+
+        var  run   = _run;
+        bool began = false;
+        try
+        {
+            EssenceShardPickup.CollectAll();   // 리치 정수 조각 — 씬이 바뀌기 전에(챕터 전환과 같다)
+            began = run != null && run.BeginExileFall();
+            if (began) RunFlowController.Active?.SaveChapterAdvance();
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[GameRunBootstrapper] 추방 런 상태 전환 예외 — 그대로 Ch1로: {e}");
+        }
+
+        try { await ExileFallSequence.WaitLandedAsync(ct); }
+        catch (System.OperationCanceledException) { return; }
+
+        var app = AppBootstrapper.Instance;
+        if (!began || app == null)
+        {
+            Debug.LogWarning($"[GameRunBootstrapper] 추방 — 런 없음(began={began}) · 전환 없이 화면을 돌려준다");
+            ExileFallSequence.Abandon();
+            return;
+        }
+
+        ExileFallSequence.MarkLanding();
+        app.MarkChapterAdvance();
+        app.RequestLoad(AppBootstrapper.GetSceneForChapter(ChapterId.Chapter1));
+        Debug.Log($"[GameRunBootstrapper] 리치의 추방 — 심연 깊이 {run.AbyssDepth} 그대로 Ch1 · 시기 {StoryProgress.Era}");
     }
 
     /// <summary>
@@ -517,6 +597,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             ApplyRelicDraftCard(card, loadout);
             loadout.NoteRelicDraft(draft.HasRadiant);
             ActivateRelicParts(_run?.Player);
+            // 몸에 유물 메인 이펙트(10-06) — 끝날 때까지 기다린다(출구 길 연출이 화면을 가져가기 전에 보이게).
+            try { await RelicMemoryRecall.PlayAcquiredAsync(card, _run?.Player, loadout.Relic, ct); }
+            catch (System.OperationCanceledException) { throw; }
+            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] 몸 이펙트 예외(건너뜀): {e.Message}"); }
             return;
         }
     }
@@ -542,6 +626,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             case RelicDraftCardKind.Residue:
                 _run?.AddEssence(card.ResidueEssence);
                 Debug.Log($"[GameRunBootstrapper] 잔향: 정수 +{card.ResidueEssence}");
+                break;
+            case RelicDraftCardKind.Evolution:
+                loadout.SetRelicEvolution(card.EvolutionId);
+                _run?.EffectManager?.Rebuild();   // 진화 계열 각인 +2를 바로 다시 센다
+                Debug.Log($"[GameRunBootstrapper] 유물 진화: {card.EvolutionId}");
                 break;
         }
     }
@@ -1183,6 +1272,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// <summary>플레이어 사망 시 PlayerController가 호출. 사망 연출 후 메타 저장·세이브 폐기·베이스캠프 복귀.</summary>
     public void HandlePlayerDeath() => HandleRunEndAsync(false).Forget();
 
+    // 잠긴 세이브(전투 중 종료)를 이어할 때 띄우는 문구 — 사망 정산의 이유를 알린다(10-10 Hades식).
+    private const string AbandonedRunMessage = "전투 중에 멈춘 여정은 이어갈 수 없다\n<size=30>영혼이 거두어졌다…</size>";
+
     /// <summary>최종 챕터 보스 클리어 시 ClearRewardTrigger가 호출. 클리어 연출 후 메타 저장·세이브 폐기·베이스캠프 복귀.</summary>
     public void HandleRunClear() => HandleRunEndAsync(true).Forget();
 
@@ -1216,6 +1308,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             // 감지해 저장 이어하기가 아니라 새 챕터를 처음부터 시작한다(StartNextChapterInSceneAsync).
             // 화면 전환 가림은 RequestLoad의 로딩 오버레이가 담당한다.
             EssenceShardPickup.CollectAll();   // 보스방에 남은 정수 조각 — 씬이 바뀌면 사라진다
+            // 보스 클리어 뒤 저장(10-10 · D4) — 정수 조각까지 주운 뒤. 예전엔 다음 챕터 첫 방까지 저장이 없어
+            // 계단 · 대기방에서 끄면 보스를 포함한 직전 챕터 전체를 다시 했다. 이어하면 다음 챕터 대기방부터 연다.
+            RunFlowController.Active?.SaveChapterAdvance();
             AppBootstrapper.Instance?.MarkChapterAdvance();
             AppBootstrapper.Instance?.RequestLoad(AppBootstrapper.GetSceneForChapter(chapter));
             Debug.Log($"[GameRunBootstrapper] 챕터 전환 → Chapter {(int)chapter} 씬 로드 요청");
@@ -1228,10 +1323,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     /// <summary>
     /// 런 종료 공용 시퀀스. isCleared=false(사망)/true(클리어) 분기.
-    /// 사망 모먼트(슬로우모션·쉐이크) → 화면 처리(비네트·암전) → 메시지 → 메타 저장 → 세이브 폐기 → BaseCamp 복귀.
+    /// 사망 모먼트(슬로우모션·쉐이크) → 화면 처리(비네트·암전) → 정산 · 결과창 → 종료 연출 → 정리 → BaseCamp 복귀.
     /// 사망=HandlePlayerDeath, 클리어=HandleRunClear가 진입점.
+    /// abandoned=true — 잠긴 세이브(전투 중 종료)를 이어한 경우(10-10). 사망 모먼트 없이 덮인 화면에서 이유를 알리고 사망으로 정산한다.
     /// </summary>
-    private async UniTaskVoid HandleRunEndAsync(bool isCleared)
+    private async UniTaskVoid HandleRunEndAsync(bool isCleared, bool abandoned = false)
     {
         if (_runEnding) return;
         _runEnding = true;
@@ -1240,7 +1336,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         try
         {
             // 1) 사망 모먼트: 카메라 쉐이크 + 슬로우모션 (realtime 대기, finally로 timeScale 복원 보장)
-            if (!isCleared)
+            if (!isCleared && !abandoned)
             {
                 HitFeelService.CameraShake(0.15f, 0.4f);
                 TimeScaleArbiter.Acquire(this, 0.25f, TimeScaleArbiter.Priority.SlowMotion);
@@ -1249,24 +1345,46 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             }
 
             // 2) 화면 처리: 사망만 빨간 비네트(피격감) — 클리어(승리)는 비네트 없이 암전만 적용해 사망 연출과 구분.
-            if (!isCleared)
+            if (!isCleared && !abandoned)
             {
                 var fx = Managers.UI?.GetOverlayUI<RelicFairy.UI.Overlay.FXLayer>();
                 fx?.Vignette(new Color(0.5f, 0f, 0f), 1f, 1.5f);
             }
-            await ScreenFade.Out(1.0f, ct);
+            await ScreenFade.Out(abandoned ? 0f : 1.0f, ct);
+            if (abandoned)
+            {
+                // 씬 로딩 오버레이가 문구를 가리지 않게 먼저 내린다(덮인 검은 화면 위에 문구만 뜬다).
+                var loading = UI_SceneLoading.Instance;
+                if (loading != null) await loading.HideAsync();
+                await ShowRunEndMessageAsync(false, ct, AbandonedRunMessage);
+            }
 
-            // 3) 종료 연출
-            //    · 클리어 = 종료 메시지(다음 회차 암시)
-            //    · 사망   = 멀린이 영혼을 다시 엮는 부활 빌드업(바로 베이스캠프로 끊지 않는다)
+            // 3) 정산 → 결과창(10-07) — 정산된 정수를 보여 주려고 EndRun(메타 저장 · 정산)을 종료 연출 앞으로 당겼다.
+            //    빌드(룬판 · 서약 · 무기)는 EndRun이 비우기 전에 떠 두고, 정산 값은 EndRun 뒤에 채운다.
+            //    클리어면 최종 보스 정수 조각을 정산 전에 적립한다(사망은 못 주운 만큼 잃는다).
+            if (isCleared) EssenceShardPickup.CollectAll();
+            RunResultSnapshot snap = null;
+            try { if (_run != null) snap = RunResultProvider.Capture(_run, AppBootstrapper.Instance?.Loadout, isCleared); }
+            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] 결과 사본 예외(결과창 건너뜀): {e}"); }   // 런 종료는 계속 — 암전에 멈추지 않게
+            var result = _run != null ? _run.EndRun(isCleared, isCleared ? "clear" : "death") : default;
+            // 정산(메타 저장)을 했으니 런 세이브도 지금 지운다 — 결과창 · 부활 연출 중에 꺼도 죽은 런이 이어하기로 살아나
+            // 정수가 두 번 들어오지 않게(10-08 리뷰 C1). AppBootstrapper.EndRun이 나중에 또 지워도 무해하다.
+            var rpm = RunProgressManager.Instance;
+            rpm?.ClearLocalRun(rpm.ActiveSlotIndex);
+            RunReturnTracker.RecordRunEnd(isCleared);   // BaseCamp 복귀 대사(사망/클리어 카운트) 기록
+            if (snap != null)
+            {
+                RunResultProvider.Settle(snap, result);
+                try { await RunResultView.ShowAsync(snap, ct); }
+                catch (System.OperationCanceledException) { throw; }
+                catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] 결과창 예외(건너뜀): {e}"); }
+            }
+
+            // 4) 종료 연출 — 클리어 = 종료 메시지(다음 회차 암시) · 사망 = 멀린이 영혼을 다시 엮는 부활 빌드업
             if (isCleared) await ShowRunEndMessageAsync(true, ct);
             else           await ShowMerlinRevivalAsync(ct);
 
-            // 4) 메타 저장(OnRunEnded) 먼저 → 정리(ClearLocalRun+Loadout.Clear) → 허브 복귀
-            //    클리어면 최종 보스 정수 조각을 정산 전에 적립한다(사망은 못 주운 만큼 잃는다).
-            if (isCleared) EssenceShardPickup.CollectAll();
-            _run?.EndRun(isCleared, isCleared ? "clear" : "death");
-            RunReturnTracker.RecordRunEnd(isCleared);   // BaseCamp 복귀 대사(사망/클리어 카운트) 기록
+            // 5) 정리(ClearLocalRun + Loadout.Clear) → 허브 복귀
             AppBootstrapper.Instance?.EndRun();
             if (!TestRunRequest.TryReturnToHub())   // 테스트 허브에서 시작한 런은 허브로 돌아간다
                 AppBootstrapper.Instance?.RequestLoad(Define.Scene.BaseCamp);
@@ -1275,9 +1393,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     }
 
     /// <summary>종료 메시지 경량 오버레이(코드 생성). 입력 시 즉시 스킵, 아니면 홀드 후 자동 진행.</summary>
-    private async UniTask ShowRunEndMessageAsync(bool isCleared, CancellationToken ct)
+    private async UniTask ShowRunEndMessageAsync(bool isCleared, CancellationToken ct, string message = null)
     {
-        string msg = isCleared ? "그대의 여정이 끝났다" : "그대의 영혼이 회수되었다...";
+        string msg = message ?? (isCleared ? "여정이 끝났다" : "영혼이 거두어졌다…");
 
         var go = new GameObject("@RunEndMessage");
         var canvas = go.AddComponent<Canvas>();
@@ -1334,7 +1452,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
 
         // 클리어는 여운 문구를 읽을 시간을 조금 더 준다.
-        float hold = isCleared ? 3.5f : 2.0f;
+        float hold = isCleared ? 3.5f : message != null ? 3.0f : 2.0f;   // 이유 문구(전투 중 종료)는 두 줄이라 조금 더
         float t = 0f;
         try
         {
@@ -1487,13 +1605,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             // 사망 문구(상단) — 암전 위에 먼저 홀로 뜨고, 일러스트가 차오르는 동안 물러난다.
             // 이 자리(y 380)는 일러스트 룬 고리 안쪽·멀린 두건 위라, 남겨 두면 어두운 빨강이 보라 두건에 묻혀 안 읽혔다(09-19 캡처).
             // 고리 위 여백은 푸시인(×1.08)으로 고리가 올라와 결국 겹친다 — 자리를 옮기는 대신 교대로 보여준다.
-            var deadTxt = MakeCenterText(go.transform, "그대의 영혼이 흩어졌다...",
+            var deadTxt = MakeCenterText(go.transform, "영혼이 흩어졌다…",
                 34f, new Color(0.75f, 0.35f, 0.35f), new Vector2(0f, 380f), 44f);
             deadTxt.color = new Color(0.75f, 0.35f, 0.35f, 0f);
 
-            // 멀린 대사(하단)
+            // 멀린 대사(하단) — 멀린 말투(해체). 이름은 대사창과 같은 규칙(이름 공개 전엔 「???」)
             var merlinTxt = MakeCenterText(go.transform,
-                "멀린 —  「일어나라. 그대의 이야기는 아직 끝나지 않았다.」",
+                $"{(StoryProgress.IsMerlinNamed ? "멀린" : "???")} —  「일어나. 네 이야기는 아직 안 끝났어.」",
                 26f, new Color(0.78f, 0.74f, 0.92f), new Vector2(0f, -400f), 40f);
             merlinTxt.fontStyle = FontStyles.Italic;
             merlinTxt.color = new Color(0.78f, 0.74f, 0.92f, 0f);
@@ -1778,6 +1896,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             {
                 arena.transform.localPosition = Vector3.zero;
                 arena.transform.localRotation = Quaternion.Euler(0f, 90f * quarterTurns, 0f);
+                BrokenLodGuard.Apply(arena);   // 깨진 하위 LOD(벽 촛대 · 10-12 D11) — LOD0 고정
 
                 // 진입 위치: 프리팹의 PlayerSpawn 마커(디자이너 지정)를 우선 사용. 없으면 grid 입구로 폴백.
                 // 회전 적용 후의 월드 좌표라 heading 회전이 자동 반영된다 — 프리팹 바닥을 격자 입구에 맞출 필요가 없다.
@@ -1955,7 +2074,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
 
         // 10. 막힌 경계 표시 — 장식·NPC까지 다 놓인 지금 재야 「실제로 못 가는 선」이 나온다.
-        BuildRoomBoundaryEdges(roomGO, result.entryPos, anchor, w, h, useCustomArena, _currentArena);
+        BuildRoomBoundaryEdges(roomGO, result.entryPos, anchor, w, h, useCustomArena, _currentArena,
+                               result.exits, result.hasEntrance ? result.entrance : (ProcExitSlot?)null);
 
         Debug.Log($"[GameRunBootstrapper] ProcRoom '{entry.pool_key}' 빌드 완료 @ {anchor} (출구 {result.exits.Count})");
         return result;
@@ -1967,7 +2087,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// 벽·장식·낭떠러지 어느 것으로 막혔든 물리로 잰 선이다. 문(개구부)은 비워 「여기로 나간다」가 그대로 읽힌다.
     /// </summary>
     private void BuildRoomBoundaryEdges(GameObject roomGO, Vector3 entryPos, Vector3 anchor, int w, int h,
-                                        bool customArena, Transform arena)
+                                        bool customArena, Transform arena,
+                                        System.Collections.Generic.List<ProcExitSlot> exits, ProcExitSlot? entrance)
     {
         if (roomBoundaryEdgePrefab == null || roomGO == null) return;
 
@@ -1990,7 +2111,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             limit.Expand(new Vector3(2f, 0f, 2f));
         }
 
-        var lines = RoomBoundaryTracer.Trace(entryPos, limit);
+        // 문 자리 — 출구 · 입구는 막혔어도 띠를 비운다. 손맵 대기방은 출구 너머를 장식 벽으로 막아 두어
+        // 띠가 보스 입구를 가로질렀다(10-10 사용자 「보스 입구가 입구처럼 보이지 않아」).
+        var openings = new System.Collections.Generic.List<RoomBoundaryTracer.Opening>();
+        if (exits != null) foreach (var x in exits) openings.Add(ToOpening(x));
+        if (entrance.HasValue) openings.Add(ToOpening(entrance.Value));
+
+        var lines = RoomBoundaryTracer.Trace(entryPos, limit, openings);
         float total = 0f;
         for (int i = 0; i < lines.Count; i++)
         {
@@ -2002,6 +2129,20 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             total += lines[i].length;
         }
         Debug.Log($"[GameRunBootstrapper] 막힌 경계 표시 — {roomGO.name} 선 {lines.Count}개 · {total:0} m");
+    }
+
+    /// <summary>출구 슬롯 → 경계 추적기의 문 자리. 폭이 비었으면 게이트 폭.</summary>
+    private RoomBoundaryTracer.Opening ToOpening(ProcExitSlot slot)
+    {
+        Vector3 outward = slot.edge switch
+        {
+            DoorEdge.North => Vector3.forward,
+            DoorEdge.South => Vector3.back,
+            DoorEdge.East  => Vector3.right,
+            _              => Vector3.left,
+        };
+        float width = slot.openingWidth > 0.01f ? slot.openingWidth : GateWidth * blockCellSize;
+        return new RoomBoundaryTracer.Opening { center = slot.worldPos, outward = outward, halfWidth = width * 0.5f };
     }
 
     /// <summary>셀(x, z) → 바닥 표면(Y=anchor.y) 월드 좌표. MapBuilder의 중앙 오프셋과 동일.</summary>
@@ -3045,7 +3186,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     private string ChapterDataTheme()
         => chapterRegistry?.GetData(_run != null ? _run.CurrentChapter : ChapterId.Chapter1)?.theme ?? string.Empty;
 
-    /// <summary>방 테마에 맞는 BlockPalette 선택. 정확한 매칭 우선, 범용 "*" 폴백, 최후엔 단일 blockPalette.</summary>
+    /// <summary>방 테마에 맞는 BlockPalette 선택. 정확한 매칭 우선, 범용 "*" 폴백, 최후엔 단일 blockPalette.
+    /// 테마가 있는데 어느 팔레트와도 안 맞으면 챕터 데이터의 테마로 한 번 더 찾는다 — 서버 차트 · 로컬 캐시의 Ch2 구역 테마가
+    /// 옛 이름 「Lava」(sv 1)로 남아 대기방이 기본 「*」(무늬 없는 회색 블록)로 지어졌다(10-09 전주기 시뮬 · 레포 CSV는 07-20에 「Ruins」).</summary>
     private BlockPalette PickBlockPalette(string theme)
     {
         if (blockPalettes != null)
@@ -3059,6 +3202,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                     return p; // 정확 매칭 우선
                 if (p.ThemeMatch == "*" || string.IsNullOrEmpty(p.ThemeMatch))
                     wildcard = p;
+            }
+            string chapterTheme = ChapterDataTheme();
+            if (!string.IsNullOrEmpty(theme) && !string.IsNullOrEmpty(chapterTheme)
+                && !string.Equals(theme.Trim(), chapterTheme.Trim(), System.StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.LogWarning($"[GameRunBootstrapper] 테마 「{theme}」에 맞는 팔레트가 없다 → 챕터 테마 「{chapterTheme}」");
+                return PickBlockPalette(chapterTheme);
             }
             if (wildcard != null) return wildcard;
         }
@@ -3228,6 +3378,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 에디터 직접 실행 시 Phase를 Running으로 설정 (Tab 등 입력 활성화)
         _run?.ForceRunningForTest();
+        UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);   // 남은 시작방 숨김이 전투 HUD를 막지 않게(10-09 출시 점검)
 
         // UIRoot가 아직 로드 안 됐으면 대기
         if (UIRootBootstrapper.Instance == null)
@@ -3279,7 +3430,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 {
                     var wd1 = WeaponData.FromSO(slot1SO);
                     await PreloadWeaponClipsAsync(wd1);
-                    await player.WeaponManager.AcquireWeaponAsync(wd1);
+                    await player.WeaponManager.AcquireWeaponToSlotAsync(wd1, PlayerWeaponManager.Slot1,
+                                                                        setActive: player.WeaponManager.CurrentSlotIndex < 0);   // 원거리는 끈 채(10-14)
                     Debug.Log($"[GameRunBootstrapper] 테스트: 로드아웃 슬롯1 무기 장착 ({slot1SO.displayName})");
                 }
                 else if (!string.IsNullOrEmpty(debugDefaultWeaponSlot1Key))
@@ -3290,7 +3442,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                     {
                         var wd1 = WeaponData.FromSO(h1.Result);
                         await PreloadWeaponClipsAsync(wd1);
-                        await player.WeaponManager.AcquireWeaponAsync(wd1);
+                        await player.WeaponManager.AcquireWeaponToSlotAsync(wd1, PlayerWeaponManager.Slot1,
+                                                                            setActive: player.WeaponManager.CurrentSlotIndex < 0);   // 원거리는 끈 채(10-14)
                         Debug.Log($"[GameRunBootstrapper] 테스트: 기본 슬롯1 무기 장착 ({debugDefaultWeaponSlot1Key})");
                     }
                 }
@@ -3466,8 +3619,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         WorldCovenantAltar.SpawnAt(basePos + new Vector3(-4f, 0f, 2f));
     }
 
-    /// <summary>챕터 시작 대기방 도착 시 대사 재생(방문 변형). Chapter{N}_Enter: 첫 도착=컨셉 소개+준비, 재도착=지겨움/준비 변형.</summary>
-    private async UniTask ShowWaitingRoomDialogueAsync(ChapterId chapter)
+    /// <summary>챕터 시작 대기방 도착 시 대사 재생(방문 변형). Chapter{N}_Enter: 첫 도착=컨셉 소개+준비, 재도착=지겨움/준비 변형.
+    /// <paramref name="exileLanding"/> — 리치의 추방으로 떨어져 왔다(10-11): 멀린의 착지 한 줄(Seal_Exile 3)을 맨 앞에 붙인다.</summary>
+    private async UniTask ShowWaitingRoomDialogueAsync(ChapterId chapter, bool exileLanding = false)
     {
         var dlg = Managers.DialogueData;
         if (dlg == null) return;
@@ -3475,6 +3629,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 시기판(해방기 _Liberation · 악몽 모드 _Nightmare)과 반복 단계는 GetVisitLines가 고른다.
         var lines = dlg.GetVisitLines($"Chapter{(int)chapter}_Enter");
+        if (exileLanding)
+        {
+            var visit = lines ?? System.Array.Empty<DialogueLine>();
+            lines = new DialogueLine[visit.Length + 1];
+            lines[0] = ExileFallSequence.LandingLine();
+            System.Array.Copy(visit, 0, lines, 1, visit.Length);
+        }
         if (lines == null || lines.Length == 0) return;
 
         // 선택/편집 UI가 열려있으면 닫힐 때까지 대기 후 대사(대사끼리도 큐잉).
@@ -3605,6 +3766,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
 
+        // 보스 클리어 뒤 저장(10-10 · D4) — 보스방이 아니라 다음 챕터 대기방부터 연다(챕터 전환과 같은 길 + 서약 · 룬판 복원).
+        if (save.chapterStartPending && !save.combatLocked)
+        {
+            Debug.Log($"[GameRunBootstrapper] 보스 클리어 뒤 저장 — 다음 챕터 대기방부터 이어하기(챕터 {save.chapter})");
+            RestoreRunCountersFromSave(save);
+            await StartNextChapterInSceneAsync(ct, save);
+            return;
+        }
+
         // 룸 풀 키: 서버 → SO → 규칙 폴백 (StartProcGenRunAsync와 동일)
         var chapter     = ResolveCurrentChapter();
         var serverEntry = Managers.ChapterData?.Get(chapter);
@@ -3614,6 +3784,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (string.IsNullOrEmpty(poolKey)) poolKey = $"CHAPTER_{(int)chapter}_ROOM_POOL";
 
         // HUD + 플레이어 (절차 재개 전에 바인드 — MovePlayer/시너지 재계산이 Player를 참조)
+        // 시작방 HUD 숨김은 여기서 푼다 — 다른 슬롯의 프롤로그 · 거점 · 대기방에서 ESC→로비로 나오면 숨김이 남아,
+        // 이어한 런 내내 체력 · 스킬 · 보스 바가 안 보였다(10-09 출시 점검).
+        UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
         UIRootBootstrapper.Instance?.BindHudToRun(_run);
         _run?.RequestHudMode(HUDIds.Mode.Combat);
 
@@ -3631,6 +3804,22 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 룬 보드 복원 (점유 셀 기반 — 시너지 스탯/메커닉 재계산)
         RestoreRuneBoardFromSave(save);
 
+        // Hades식(10-10) — 피해를 받은 뒤 다음 저장 전에 끈 런(죽기 직전 · 사망 연출 중 종료 포함)은 이어가지 않고 사망으로 정산한다.
+        // 빌드(서약 · 룬판)를 복원한 뒤라 결과창이 맞게 나온다. 방은 짓지 않으니 플레이어를 묶어 두고 덮인 화면에서 끝낸다.
+        if (save.combatLocked)
+        {
+            if (player != null)
+            {
+                player.SetInputEnabled(false);
+                if (player.TryGetComponent<Rigidbody>(out var body)) body.isKinematic = true;   // 바닥이 없어 떨어지지 않게
+            }
+            await ScreenFade.Out(0f);
+            RestoreRunCountersFromSave(save);   // 결과창 · 해금 조건(처치 · 보스 · 깊이)이 0으로 정산되지 않게
+            Debug.Log("[GameRunBootstrapper] 잠긴 세이브(전투 중 종료) — 이어하지 않고 사망으로 정산");
+            HandleRunEndAsync(false, abandoned: true).Forget();
+            return;
+        }
+
         // 절차 흐름 재개 — 저장된 방을 동일 시드로 재생성, 입구에서 시작
         var flow = runFlowController != null ? runFlowController : gameObject.AddComponent<RunFlowController>();
         flow.SetBossThresholdOverride(debugBossThresholdOverride);
@@ -3645,8 +3834,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// 챕터 전환으로 다음 챕터 씬을 로드한 직후 진입. 저장 이어하기와 달리 "새 챕터를 처음부터" 시작한다.
     /// 런 상태(아이템/버프/서약/시너지)는 DDOL 세션에 유지되며, 새 플레이어 인스턴스에 BindPlayer가 복원한다.
     /// 흐름: HUD 바인드 → 대기방(Zone0) 빌드 → 플레이어 스폰 → BindPlayer → 출구 게이트 통과 시 던전(StartProcGenRunAsync).
+    /// restoreFrom — 보스 클리어 뒤 저장으로 이어할 때(10-10). DDOL 세션에 없는 서약 · 룬판을 세이브에서 되살린다.
     /// </summary>
-    private async UniTask StartNextChapterInSceneAsync(CancellationToken ct)
+    private async UniTask StartNextChapterInSceneAsync(CancellationToken ct, RunSaveData restoreFrom = null)
     {
         // 챕터 전환도 첫 챕터와 동일하게 "대기 방"을 띄운 뒤 출구 게이트로 던전에 진입한다.
         // (이전엔 곧장 던전으로 들어가 챕터별 대기방이 없었음 — 우선 방 구조만, 준비 스테이션은 후속.)
@@ -3661,39 +3851,72 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 층계 회랑으로 걸어 올라왔다(S5) — 이미 걸어 들어온 연출이라 둘러보기를 건너뛰고, 플레이어를 세운 뒤 와이프를 걷는다.
         bool byStairs = ChapterStairway.ConsumeArrivedByStairs();
-        if (!byStairs && _currentMapGO != null && GameCameraController.Instance != null)
+        // 리치의 추방(10-11) — 챕터를 가로질러 떨어져 왔다. 계단처럼 덮인 채 세우고 걷되, 엎드린 채 드러나 일어나고 멀린 한 줄.
+        bool byExile  = ExileFallSequence.ConsumeLanding();
+        bool covered  = byStairs || byExile;
+        if (!covered && _currentMapGO != null && GameCameraController.Instance != null)
             await GameCameraController.Instance.PlayStartRoomTourAsync(_currentMapGO.transform.position, ct);
-        else
-            await ScreenFade.In(byStairs ? 0f : 0.4f);
+        else if (!covered)
+            await ScreenFade.In(0.4f);
+        // 계단으로 왔으면 덮은 채로 플레이어를 세우고 카메라를 맞춘 뒤 아래 RevealAsync가 걷는다(10-10).
+        // 예전엔 In(0)이 먼저 열어 스폰 동안 플레이어 없는 대기방이 엉뚱한 구도로 보였고, 이미 열린 화면에
+        // RevealAsync가 검은 판을 다시 씌웠다 밀어내 한 번 튀었다.
 
         // 로드아웃 기반 스폰 + 라이브 세션 복원(BindPlayer가 아이템/버프/서약/시너지 이월 처리).
         var player = await SpawnPlayerAsync(startBodyKey);
         if (player == null)
         {
             Debug.LogError("[GameRunBootstrapper] StartNextChapterInSceneAsync: 플레이어 스폰 실패");
+            if (covered) await ScreenFade.In(0f);   // 덮인 채로 남지 않게
             return;
         }
         _run?.BindPlayer(player);
+        if (restoreFrom != null)
+        {
+            RestoreCovenantsFromSave(restoreFrom);   // BindPlayer가 CovenantHandler를 세운 직후(이어하기와 같은 순서)
+            RestoreRuneBoardFromSave(restoreFrom);
+        }
         _run?.RequestHudMode(HUDIds.Mode.Combat);
         // 시작방은 <b>문을 정면에 두고 시작</b>하는 것이 의도된 구도다 — 스폰 때 잡은 출구 방향을 카메라 헤딩으로 쓴다.
         // (예전엔 「인계 시점의 플레이어 yaw」를 물려받아, 스폰~인계 사이에 플레이어가 돌면 문이 화면 옆으로 갔다.)
         // ⚠️ 헤딩을 0°로 고정하면 이 구도가 깨진다(출구가 북쪽이 아닌 방). 고정하지 말 것.
         HandStartRoomCamera(player);
-        if (byStairs)
+        if (byExile) ExileFallSequence.BeginLandingPose(player);   // 엎드린 채 드러난다
+        if (covered)
         {
-            try { await ScreenFade.RevealAsync(Vector2.right, 0.35f, AnimationCurve.EaseInOut(0f, 0f, 1f, 1f), ct); }
+            try { await ScreenFade.RevealAsync(byExile ? Vector2.up : Vector2.right, 0.35f, AnimationCurve.EaseInOut(0f, 0f, 1f, 1f), ct); }
             catch (System.OperationCanceledException) { return; }
+        }
+        if (byExile)
+        {
+            try { await ExileFallSequence.PlayLandingAsync(player, ct); }   // 일어난다
+            catch (System.OperationCanceledException) { return; }
+            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] 추방 착지 연출 예외(건너뜀): {e.Message}"); }
         }
 
         // 챕터 시작 대기방: 조립 서약 제단 배치(챕터마다 서약 획득 기회)
         SpawnCovenantAltar(player.transform.position);
         SpawnChapterSpring(player.transform.position);   // 요정의 샘 — 직전 챕터에서 깎인 체력을 여기서 챙긴다(10-01)
 
-        // 대기방 도착 대사(방문 변형 — 첫 도착/재도착 다른 스크립트)
-        await ShowWaitingRoomDialogueAsync(ResolveCurrentChapter());
+        // 대기방 도착 대사(방문 변형 — 첫 도착/재도착 다른 스크립트). 추방 착지면 멀린의 한 줄(Seal_Exile 3)이 맨 앞.
+        await ShowWaitingRoomDialogueAsync(ResolveCurrentChapter(), byExile);
 
         // 던전(StartProcGenRunAsync)은 대기방 출구 게이트(StartRoomGate) 통과 시 시작된다.
         Debug.Log($"[GameRunBootstrapper] 챕터 {(int)ResolveCurrentChapter()} 대기방 진입");
+    }
+
+    /// <summary>
+    /// 방 이어하기(RunFlowController.ResumeAsync)가 되살리는 런 집계 — 방을 짓지 않는 이어하기(보스 클리어 뒤 · 잠긴 세이브 정산)도 같이 되살린다(10-10).
+    /// 안 하면 부활 1회가 되살아나고, 심연 깊이가 0이 되어 몬스터 배율이 풀리고, 결과 · 해금 집계가 0으로 정산된다.
+    /// </summary>
+    private void RestoreRunCountersFromSave(RunSaveData save)
+    {
+        if (_run == null) return;
+        var m = BuildMetaFromSave(save);
+        _run.RestoreAltarProgress(m.metaReviveUsed, m.killCount, m.eliteKillCount, m.bossKillCount,
+                                  m.shopUseCount, m.refineUseCount, m.maxEnhanceLevel,
+                                  m.potionUsedThisRun, m.specialRoomVisits, m.flawlessChapters);
+        _run.RestoreAbyssDepth(m.abyssDepth);
     }
 
     private static RunMetaSnapshot BuildMetaFromSave(RunSaveData save)
@@ -4004,11 +4227,16 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                     {
                         PlayerWeaponManager.ApplyServerOverride(run.SavedWeaponSlots[i]);
                         await PreloadWeaponClipsAsync(run.SavedWeaponSlots[i]);
-                        await wm.AcquireWeaponAsync(run.SavedWeaponSlots[i], autoEquip: true);
+                        // 저장된 칸 그대로 · 들고 있던 칸만 켠다(10-14) — 예전엔 칸마다 켜서 근접 → 원거리 → (든 칸) 순으로 손의 무기가 오갔고,
+                        // 빈 칸 뒤 무기([빈 칸, 활])는 첫 빈 칸(0)으로 들어가 저장된 칸이 어긋났다
+                        await wm.AcquireWeaponToSlotAsync(run.SavedWeaponSlots[i], i, setActive: i == run.SavedCurrentSlotIndex);
                     }
                 }
                 if (run.SavedCurrentSlotIndex >= 0)
                     await wm.SwitchToSlotAsync(run.SavedCurrentSlotIndex);
+                if (wm.CurrentSlotIndex < 0)   // 든 칸 기록이 없거나 비었으면 첫 무기를 든다
+                    for (int i = 0; i < wm.SlotCount; i++)
+                        if (wm.slots[i] != null && !wm.slots[i].IsEmpty) { await wm.SwitchToSlotAsync(i); break; }
                 Debug.Log($"[GameRunBootstrapper] 무기 슬롯 복원: currentSlot={run.SavedCurrentSlotIndex}");
             }
             else
@@ -4029,7 +4257,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                     var subData = new WeaponData(loadout.WeaponSlot1);
                     PlayerWeaponManager.ApplyServerOverride(subData);
                     await PreloadWeaponClipsAsync(subData);
-                    await wm.AcquireWeaponAsync(subData, autoEquip: true);
+                    // 원거리는 예비 칸(Slot1)에 끈 채로 — 거점(BaseCampBootstrapper)과 같은 원칙(10-14). 예전엔 켜서 런이 활을 든 채 시작했다
+                    // (빌드 로그: 시작하자마자 1로 되돌림). 근접이 없을 때만 든다.
+                    await wm.AcquireWeaponToSlotAsync(subData, PlayerWeaponManager.Slot1, setActive: wm.CurrentSlotIndex < 0);
                     Debug.Log($"[GameRunBootstrapper] 서브 장비 장착: {loadout.WeaponSlot1.displayName}");
                 }
             }

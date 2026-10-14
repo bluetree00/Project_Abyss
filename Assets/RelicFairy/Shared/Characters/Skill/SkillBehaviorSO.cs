@@ -9,6 +9,9 @@ public abstract class SkillBehaviorSO : ScriptableObject
 {
     /// <summary>매 스킬 사용 시 새 Runtime 인스턴스 생성</summary>
     public abstract ISkillRuntime CreateRuntime();
+
+    /// <summary>스킬 시작음(SoundEventTable 이벤트). 기본은 공용 시작음 — 모으기 · 자기 강화는 따로(10-08 A6).</summary>
+    public virtual string StartSoundEvent => SoundEvent.PlayerSkill;
 }
 
 /// <summary>

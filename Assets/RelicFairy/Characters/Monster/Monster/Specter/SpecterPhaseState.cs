@@ -13,6 +13,8 @@ public class SpecterPhaseState : InvincibleState<SpecterPhaseData>
     private static readonly int Color08Id = Shader.PropertyToID("_Color08");
     private static readonly Color GhostColor = new Color(0.5f, 0.8f, 1.0f);
 
+    private const float PhaseFlank = 3.5f;   // 위상 중 플레이어 옆으로 돌아 들어간다 — 예전엔 길을 지우고 제자리에서 달렸다(10-14 정예 애니 점검)
+
     private float      _timer;
     private Renderer[] _renderers;
 
@@ -23,7 +25,7 @@ public class SpecterPhaseState : InvincibleState<SpecterPhaseData>
         _timer     = Data.phaseDuration;
         _renderers = ctx.Transform.GetComponentsInChildren<Renderer>(true);
 
-        ctx.Agent.ResetPath();
+        PickFlank(ctx);
         ctx.Animator?.CrossFade(Data.phaseStateName, 0.1f);
         Data.SpawnVFX(ctx.Transform);
         ApplyTint(ctx.Transform, GhostColor);
@@ -36,7 +38,29 @@ public class SpecterPhaseState : InvincibleState<SpecterPhaseData>
         {
             ClearTint(_renderers);
             ctx.Monster.ChangeState<ChaseState>();
+            return;
         }
+        if (ctx.Agent.isOnNavMesh && !ctx.Agent.pathPending && ctx.Agent.remainingDistance < 0.4f) PickFlank(ctx);
+    }
+
+    // 플레이어를 축으로 90° 옆(3.5 m) — 닿으면 반대편으로
+    private static void PickFlank(MonsterContext ctx)
+    {
+        if (!ctx.Agent.isOnNavMesh) return;
+        var target = ctx.Runtime.PlayerTarget;
+        if (target == null) { ctx.Agent.ResetPath(); return; }
+        Vector3 p = target.position;
+        Vector3 from = ctx.Transform.position - p; from.y = 0f;
+        if (from.sqrMagnitude < 0.01f) from = -ctx.Transform.forward;
+        float side = Random.value < 0.5f ? 90f : -90f;
+        Vector3 want = p + Quaternion.Euler(0f, side, 0f) * from.normalized * PhaseFlank;
+        if (!UnityEngine.AI.NavMesh.SamplePosition(want, out var hit, 2f, ctx.Agent.areaMask))
+        {
+            want = p + Quaternion.Euler(0f, -side, 0f) * from.normalized * PhaseFlank;
+            if (!UnityEngine.AI.NavMesh.SamplePosition(want, out hit, 2f, ctx.Agent.areaMask)) { ctx.Agent.ResetPath(); return; }
+        }
+        ctx.Agent.isStopped = false;
+        ctx.Agent.SetDestination(hit.position);
     }
 
     public override void Exit(MonsterContext ctx)

@@ -38,7 +38,8 @@ public static class SaveSanitizer
         d.runEssence      = ClampMin(d.runEssence,      0, ref changed);
         d.fuelEnhanceMaterial = ClampMin(d.fuelEnhanceMaterial, 0, ref changed);
         d.fuelRuneOre         = ClampMin(d.fuelRuneOre,         0, ref changed);
-        d.potionCapacity      = ClampMin(d.potionCapacity, PlayerRunState.DefaultPotionCapacity, ref changed);
+        // 0 이하 = 구 세이브(미기록) → 기본값. 기본보다 적은 칸(악몽 「어스름」 2칸)은 정상값이라 끌어올리지 않는다.
+        if (d.potionCapacity <= 0) { d.potionCapacity = PlayerRunState.DefaultPotionCapacity; changed = true; }
         d.potionCount         = Mathf.Clamp(d.potionCount, 0, d.potionCapacity);
         d.maxHp           = ClampMin(d.maxHp,           MinMaxHp, ref changed);
         // currentHp: [0, maxHp] — 0(사망 상태)도 허용해 정상값을 끌어올리지 않는다.

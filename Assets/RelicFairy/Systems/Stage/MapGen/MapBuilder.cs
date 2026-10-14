@@ -1020,38 +1020,6 @@ public class MapBuilder
     }
 
     /// <summary>
-    /// 아레나 안 첫 계단(S5) — <paramref name="originWorld"/>에서 <paramref name="forward"/> 쪽으로 <paramref name="steps"/>칸 오르는 계단.
-    /// 폭 <paramref name="widthCells"/>칸. 바닥 위에 쌓아 올린다(아래는 아레나 바닥).
-    /// </summary>
-    public static Transform BuildEntrySteps(BlockPalette palette, Vector3 originWorld, Vector3 forward, int steps, int widthCells,
-                                            float cellSize, System.Random rng = null)
-    {
-        var root = new GameObject("@StairEntry").transform;
-        root.position = originWorld;
-        forward.y = 0f;
-        root.rotation = Quaternion.LookRotation(forward.sqrMagnitude > 0.001f ? forward.normalized : Vector3.forward, Vector3.up);
-        if (palette == null) return root;
-        rng ??= new System.Random();
-        var placed = new List<PlacedBlock>();
-        int half = widthCells / 2;
-        for (int s = 0; s < steps; s++)
-        {
-            float h = (s + 1) * StairRise;
-            for (int x = -half; x <= half; x++)
-            {
-                var floorDef = palette.Pick(TileType.Floor, rng);
-                var riserDef = RiserDef(palette, floorDef, rng);
-                Vector3 local = new Vector3(x * cellSize, h, (s + 1) * cellSize);
-                if (riserDef?.prefab != null)
-                    Place(riserDef, root, local + Vector3.down * (cellSize + 0.02f), Quaternion.identity, 3, $"Entry_R_{s}_{x}", TileType.Wall, placed);
-                if (floorDef?.prefab != null)
-                    Place(floorDef, root, local, Quaternion.identity, 3, $"Entry_F_{s}_{x}", TileType.Floor, placed);
-            }
-        }
-        return root;
-    }
-
-    /// <summary>
     /// 계단 앞면(한 칸 높이) 블록 — Stacked 팔레트는 1 m 벽 큐브, Single(숲 · 심연)은 벽 조각이 8 m 절벽이라 바닥 블록으로 메운다.
     /// 숲에서 벽 조각을 쓰면 첫 계단이 아레나 한가운데 기둥처럼 솟았다(10-02 4차 실측).
     /// </summary>

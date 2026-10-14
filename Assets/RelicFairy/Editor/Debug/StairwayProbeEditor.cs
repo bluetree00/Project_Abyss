@@ -79,16 +79,69 @@ public static class StairwayProbeEditor
                 return;
             }
             sb.AppendLine($"{Ts()} 계단 등장(처치 +{Time.realtimeSinceStartup - killed:0.0}초) · 자리 {stair.transform.position}");
-            await UniTask.Delay(4500, ignoreTimeScale: true);   // 출구 카메라 연출 · 디졸브
+            // 10-10 — 계단 등장부터 회랑 도착까지 프레임 끊김(100 ms 넘는 프레임) · 회랑 짓기 시각
+            float stairAt = Time.realtimeSinceStartup;
+            s_hitches.Clear();
+            s_shotAt.Clear();
+            s_corridorBuiltAt = -1f;
+            s_sampling = true;
+            Application.logMessageReceived -= OnLog;
+            Application.logMessageReceived += OnLog;
+            SampleFramesAsync().Forget();
+            // 10-10 돌계단 — 카메라가 닿고(2.4초) 한 단씩 솟는 중 · 다 지어진 뒤(아치 · 포탈)
+            await UniTask.Delay(3000, ignoreTimeScale: true);
+            await Shot("Stair_0_Rising");
+            await UniTask.Delay(3200, ignoreTimeScale: true);
             await Shot("Stair_1_Arena");
+            var entry = stair.transform.Find("@StairEntry");
+            int steps = 0, risen = 0;
+            bool landingUp = false;
+            if (entry != null)
+                foreach (Transform c in entry)
+                {
+                    bool up = Mathf.Abs(c.localPosition.y) < 0.01f;
+                    if (c.name.StartsWith("Step_")) { steps++; if (up) risen++; }
+                    else if (c.name == "Landing") landingUp = up;
+                }
+            bool arch = false;
+            foreach (Transform c in stair.transform) if (c.name.Contains("StoneArch")) arch = true;
+            var portal = typeof(ChapterStairway).GetField("_doorFx", Inst)?.GetValue(stair) as GameObject;
+            sb.AppendLine($"{Ts()} CHECK 돌계단 단 {steps}/8 · 제자리 {risen} · 층계참 {landingUp} · 아치 {arch} · 포탈 {portal != null} · 꼭대기 문 {stair.transform.Find("TopTrigger") != null}");
+            // 디딤판이 층계참보다 카메라 쪽에 있어야 보인다(10-10 — 층계참 뒤에 가려 「돌벽 위 아치」로만 보였다)
+            var s0 = entry != null ? entry.Find("Step_0") : null;
+            var ld = entry != null ? entry.Find("Landing") : null;
+            var camMain = Camera.main;
+            if (s0 != null && ld != null && camMain != null)
+            {
+                var fwd = Vector3.ProjectOnPlane(camMain.transform.forward, Vector3.up).normalized;
+                float near = Vector3.Dot(s0.position - ld.position, fwd);
+                sb.AppendLine($"{Ts()} CHECK 계단이 카메라 쪽(보임): {near < 0f} (디딤판 − 층계참 · 카메라 정면 성분 {near:0.0} m)");
+            }
 
-            // 계단 꼭대기로
+            // 층계참 위에 서 본다 — 2 m 위에 머무르는가(콜라이더)
             var run = GameRunBootstrapper.Instance.Run;
-            var top = stair.transform.Find("TopTrigger");
             float arenaY = run.Player.transform.position.y;
+            var landing = entry != null ? entry.Find("Landing") : null;
+            if (landing != null)
+            {
+                Teleport(run.Player, landing.position + Vector3.up * 2.3f);
+                await UniTask.Delay(900, ignoreTimeScale: true);
+                float dy = run.Player.transform.position.y - arenaY;
+                sb.AppendLine($"{Ts()} CHECK 층계참 위 높이 {dy:0.00} m(2 m 근처면 통과)");
+                await Shot("Stair_1b_OnLanding");
+            }
+
+            // 계단 꼭대기(포탈)로
+            var top = stair.transform.Find("TopTrigger");
             if (top != null) Teleport(run.Player, top.position + Vector3.down * 0.8f);
             bool inCorridor = await WaitAsync(() => run.Player != null && run.Player.transform.position.y > arenaY + 100f, 10f, 200);
             sb.AppendLine($"{Ts()} 회랑 {(inCorridor ? "도착" : "못 감")} · 높이 {run.Player.transform.position.y:0}");
+            s_sampling = false;
+            Application.logMessageReceived -= OnLog;
+            float worst = 0f, worstAt = 0f;
+            foreach (var (at, ms) in s_hitches) if (ms > worst) { worst = ms; worstAt = at - stairAt; }
+            sb.AppendLine($"{Ts()} CHECK 프레임 끊김(계단 등장 → 회랑): 100 ms 넘는 프레임 {s_hitches.Count}개 · 가장 긴 {worst:0} ms(+{worstAt:0.0}초)" +
+                          $" · 회랑 짓기 +{(s_corridorBuiltAt > 0f ? s_corridorBuiltAt - stairAt : -1f):0.0}초");
             if (!inCorridor) return;
             await UniTask.Delay(1200, ignoreTimeScale: true);
             await Shot("Stair_2_CorridorStart");
@@ -110,9 +163,13 @@ public static class StairwayProbeEditor
             float doorAt = Time.realtimeSinceStartup;
             sb.AppendLine($"{Ts()} 끝 문 — 미리 로드 중 {ScenePreloader.IsPending}({ScenePreloader.PendingScene})");
             if (door != null) Teleport(run.Player, door.position + Vector3.down * 0.6f);
+            // 10-10 — 도착 화면: 덮개가 걷혔는데 플레이어가 없는 프레임(빈 대기방 노출) · 걷힌 뒤 다시 덮이는 횟수(튐)
+            var arrival = WatchArrivalAsync(45f);
             bool arrived = await WaitAsync(() => GameRunBootstrapper.Instance != null && GameRunBootstrapper.Instance.Run?.CurrentChapter == ChapterId.Chapter2
                                                   && GameRunBootstrapper.Instance.Run.Player != null, 40f, 200);
             sb.AppendLine($"{Ts()} 다음 챕터 {(arrived ? "도착" : "대기 초과")}(문 +{Time.realtimeSinceStartup - doorAt:0.0}초)");
+            var (bare, recover) = await arrival;
+            sb.AppendLine($"{Ts()} CHECK 도착 화면 — 빈 대기방 노출 {bare}프레임 · 다시 덮임 {recover}회(둘 다 0이면 통과)");
             await UniTask.Delay(2500, ignoreTimeScale: true);
             await Shot("Stair_5_NextWaitingRoom");
         }
@@ -122,6 +179,67 @@ public static class StairwayProbeEditor
             File.WriteAllText("Temp/stairway_probe.txt", sb.ToString());
             Debug.Log("[StairProbe] 끝");
         }
+    }
+
+    // ── 10-10 프레임 끊김 · 도착 화면 ──
+    private static readonly System.Collections.Generic.List<(float at, float ms)> s_hitches = new();
+    private static readonly System.Collections.Generic.List<float> s_shotAt = new();
+    private static float s_corridorBuiltAt = -1f;
+    private static bool  s_sampling;
+
+    private static void OnLog(string msg, string stack, LogType type)
+    {
+        if (msg.StartsWith("[ChapterStairway] 계단 · 회랑 준비")) s_corridorBuiltAt = Time.realtimeSinceStartup;
+    }
+
+    /// <summary>100 ms 넘는 프레임을 적는다 — 촬영(ScreenCapture) 0.3초 안은 사진 탓이라 뺀다.</summary>
+    private static async UniTaskVoid SampleFramesAsync()
+    {
+        while (s_sampling)
+        {
+            await UniTask.Yield(PlayerLoopTiming.Update);
+            float dt = Time.unscaledDeltaTime, now = Time.realtimeSinceStartup;
+            if (dt <= 0.1f) continue;
+            bool shot = false;
+            foreach (var s in s_shotAt) if (Mathf.Abs(now - s) < 0.3f) shot = true;
+            if (!shot) s_hitches.Add((now, dt * 1000f));
+        }
+    }
+
+    /// <summary>
+    /// 다음 챕터 씬으로 바뀐 뒤 — 덮개가 걷혔는데 플레이어가 없는 프레임 · 걷힌 뒤 다시 덮인 횟수.
+    /// 걷힘 = 덮개 판이 꺼졌거나 알파가 낮거나 판이 화면 가운데를 벗어남(밀어내기 와이프).
+    /// </summary>
+    private static async UniTask<(int bare, int recover)> WatchArrivalAsync(float seconds)
+    {
+        const BindingFlags SAll = BindingFlags.Static | BindingFlags.NonPublic;
+        var cgF  = typeof(ScreenFade).GetField("_cg", SAll);
+        var imgF = typeof(ScreenFade).GetField("_img", SAll);
+        string from = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        float t0 = Time.realtimeSinceStartup, openSince = -1f;
+        int bare = 0, recover = 0;
+        bool switched = false, wasOpen = false;
+        while (Time.realtimeSinceStartup - t0 < seconds)
+        {
+            await UniTask.Yield(PlayerLoopTiming.PostLateUpdate);
+            if (!switched)
+            {
+                if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == from) continue;
+                switched = true;
+            }
+            var cg  = cgF?.GetValue(null) as CanvasGroup;
+            var img = imgF?.GetValue(null) as UnityEngine.UI.Image;
+            bool covered = cg != null && img != null && img.enabled && cg.alpha > 0.5f
+                           && img.rectTransform.anchorMin.x < 0.5f && img.rectTransform.anchorMax.x > 0.5f
+                           && img.rectTransform.anchorMin.y < 0.5f && img.rectTransform.anchorMax.y > 0.5f;
+            bool hasPlayer = GameRunBootstrapper.Instance != null && GameRunBootstrapper.Instance.Run?.Player != null;
+            if (!covered && !hasPlayer) bare++;
+            if (covered && wasOpen) recover++;
+            if (!covered) { if (!wasOpen) openSince = Time.realtimeSinceStartup; wasOpen = true; }
+            else wasOpen = false;
+            if (hasPlayer && !covered && openSince > 0f && Time.realtimeSinceStartup - openSince > 1.5f) break;
+        }
+        return (bare, recover);
     }
 
     private static async UniTask<bool> WaitAsync(Func<bool> cond, float seconds, int stepMs = 500)
@@ -153,6 +271,7 @@ public static class StairwayProbeEditor
 
     private static UniTask Shot(string name)
     {
+        s_shotAt.Add(Time.realtimeSinceStartup);
         var m = typeof(UILayoutRuntimeProbeEditor).GetMethod("ShotAsync", SNonPub);
         return m != null ? (UniTask)m.Invoke(null, new object[] { name, 0 }) : UniTask.CompletedTask;
     }

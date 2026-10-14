@@ -113,14 +113,16 @@ public static class RewardObjectPresenter
 
             Color color = LightColor(rarity);
             var   aura  = RewardAura.Create(spot);
-            aura.AddLoop(RunFx.PlayLoop(RunFxSlot.Swirl, spot, spec.SwirlScale, color));
+            // 모이는 빛은 예고만 — 등급 기둥이 서는 등급(레어 이상)은 보상이 서면 흩고 기둥 하나만 남긴다.
+            // 놓여 있는 동안 소용돌이(등급색 곱) · 등급 기둥 두 반복 이펙트가 같은 말을 했다(10-11 이펙트 톤 점검)
+            aura.AddLoop(RunFx.PlayLoop(RunFxSlot.Swirl, spot, spec.SwirlScale, color), keepWhenIdle: !spec.IdlePillar);
             // 등급 기둥 — 서기 전부터 솟는다. 원래 빛깔에 등급색이 들어 있어 색을 입히지 않는다(10-05).
             // 예전 바닥 문양 · 금빛 표지 기둥은 리치 봉인진 · 봉인 완성과 같은 프리팹이라 「봉인」으로 읽혔다(사용자 10-03).
             if (spec.IdlePillar)
                 aura.AddLoop(RunFx.PlayLoop(LootSlot(rarity), OnFloor(spot, floorY), LootScale, Color.clear));
             aura.Grow(spec.Foretell);
 
-            Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton, 0.45f, RewardPresentation.For(rarity).SfxPitch).Forget();
+            Managers.Sound?.PlayUiEvent(SoundEvent.RewardGrade, RewardPresentation.For(rarity).SfxPitch);
             return aura;
         }
         catch (Exception e)
@@ -155,7 +157,7 @@ public static class RewardObjectPresenter
                 {
                     float pitch = spec.Notes > 1 ? NotePitches[Mathf.Min(i, NotePitches.Length - 1)]
                                                  : RewardPresentation.For(rarity).SfxPitch;
-                    Managers.Sound?.PlayUiAsync(SoundKey.Sfx.ItemPickup, 0.7f, pitch).Forget();
+                    Managers.Sound?.PlayUiEvent(SoundEvent.RewardArrive, pitch);
                 }
                 if (i < beats - 1)
                 {

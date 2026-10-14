@@ -128,6 +128,7 @@ public class DKPhantomRushState : FullLockState<DKPhantomRushPatternSO>
         float speed = AnimSpeed(ctx);
         _timer    += Time.deltaTime * speed;
         _subTimer += Time.deltaTime * speed;
+        DKPage2Zone.SettleAfterSwing(ctx, AnimName);   // 휘두른 끝 자세로 서 있지 않게 — 남은 라운드는 기본 자세로
 
         switch (_phase)
         {
@@ -154,9 +155,10 @@ public class DKPhantomRushState : FullLockState<DKPhantomRushPatternSO>
         switch (_subPhase)
         {
             case SubPhase.Warning:
+                if (_subTimer >= Data.warningDuration + Data.hitDelay - DKGridPatternHelper.ArmLead) DKGridPatternHelper.ArmTile(_warningTileGo);   // 판정 0.25초 전 위험 칸을 붉게(10-11)
                 if (_subTimer >= Data.warningDuration)
                 {
-                    ReleaseTile();
+                    // 칸은 판정까지 둔다(10-13 검증)
                     // 경고 종료 후 분신 등장 + VFX + 사운드
                     SpawnPhantom(ctx);
                     if (Data.phantomVfxPrefab != null)
@@ -177,10 +179,12 @@ public class DKPhantomRushState : FullLockState<DKPhantomRushPatternSO>
                 break;
 
             case SubPhase.PostWarning:
+                if (_subTimer >= Data.hitDelay - DKGridPatternHelper.ArmLead) DKGridPatternHelper.ArmTile(_warningTileGo);
                 if (!_hitApplied && _subTimer >= Data.hitDelay)
                 {
                     _hitApplied = true;
                     ApplyPhantomDamage(ctx);
+                    ReleaseTile();
                     DestroyPhantom();   // 피격 후 즉시 페이드아웃 시작
                     _subPhase = SubPhase.WaitInterval;
                     _subTimer = 0f;
@@ -270,6 +274,7 @@ public class DKPhantomRushState : FullLockState<DKPhantomRushPatternSO>
     private void ReleaseTile()
     {
         if (_warningTileGo == null) return;
+        DKGridPatternHelper.Disarm(_warningTileGo);   // 칠한 색을 지우고 풀로(10-11)
         BossEffectPool.Release(_warningTileGo);
         _warningTileGo = null;
     }
@@ -301,6 +306,7 @@ public class DKPhantomRushState : FullLockState<DKPhantomRushPatternSO>
         Vector2Int playerCell = DKBossRoomContext.WorldToCell(ctx.Runtime.PlayerTarget.position);
         Vector2Int tileCell   = DKBossRoomContext.WorldToCell(_capturedCellCenter);
         if (playerCell != tileCell) return;
+        if (!DKBossRoomContext.IsInterior(tileCell.x, tileCell.y)) return;   // 테두리 칸엔 경고 타일을 안 그렸다(10-08 점검)
 
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;

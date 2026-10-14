@@ -48,6 +48,7 @@ public sealed class OracleChoiceChallenge : WorldInteractionChallenge
         // 나머지 문 봉인 표시
         for (int i = 0; i < AllMarkers.Count; i++)
             if (i != markerIndex) SetLabel(i, "봉인됨", new Color(0.45f, 0.47f, 0.52f));
+        Managers.Sound?.PlayEvent(SoundEvent.OracleChoose);
 
         ChallengeGrade grade;
         if (tag == TagFuel)

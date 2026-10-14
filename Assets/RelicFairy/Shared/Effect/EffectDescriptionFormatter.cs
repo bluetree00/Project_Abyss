@@ -129,16 +129,18 @@ public static class EffectDescriptionFormatter
     {
         switch (statusId)
         {
-            case "ignite": case "burn":                       return "fire";
+            case "ignite": case "burn": case "item_burn":     return "fire";
             // 출혈 — 전용 키(핏방울). 예전엔 피해계 「dmg」를 빌렸는데 그 키는 「모든 피해」 같은 아이템 효과도 써서 그림을 줄 수 없었다(10-02).
             case "bleed":                                     return "bleed";
             case "frost":  case "freeze": case "shatter":     return "freeze";
             case "poison": case "item_poison":
             case "poison_atk":                                return "weaken";       // 약화 — 독 그림을 빌리던 것을 나눔(10-02)
             case "vulnerable":                                return "vulnerable";   // 취약(받는 피해 증가)
+            case "poise_break":                               return "vulnerable";   // 정예 포이즈 깨짐 — 받는 피해 +25%(10-11)
+            case "form_crush":                                return "vulnerable";   // 대검 형 「짓누름」 — 받는 피해 +6% · 2초(10-12 D4)
             case "ice_zone_slow":                             return "slow";         // 얼음 장판 둔화 — 그림 없던 칸
             case "shock":  case "static": case "shocked":     return "lightning";
-            case "stun":   case "petrify":                    return "stun";
+            case "stun":   case "petrify": case "bind":       return "stun";   // bind = 전설 포박 · 구속(10-14)
             case "brand":  case "item_mark": case "cov_curse": return "dark";
             // 유물 성장 v2 — 태양흔(가웨인) · 흑점(일식) · 배신의 낙인(랜슬롯). 전용 아이콘은 구현 계획 4(아트)
             case RelicMarkStatus.SunmarkId:                   return "light";
@@ -161,7 +163,7 @@ public static class EffectDescriptionFormatter
         switch (statusId)
         {
             case "ignite":                    return "점화";
-            case "burn":                      return "화상";
+            case "burn": case "item_burn":    return "화상";   // item_burn = 불 속성 룬의 적중 화상(「스며드는 화염의 룬」, 10-11)
             case "frost":                     return "서리";
             case "freeze":                    return "빙결";
             case "shatter":                   return "분쇄";
@@ -169,6 +171,8 @@ public static class EffectDescriptionFormatter
             case "poison": case "item_poison": return "중독";
             case "poison_atk":                return "약화";
             case "vulnerable":                return "취약";
+            case "poise_break":               return "휘청";
+            case "form_crush":                return "짓누름";
             case "ice_zone_slow":             return "둔화";   // 얼음 장판 — 예전엔 원문 id가 그대로 떴다
             case "item_mark":                 return "표식";
             case "shock": case "static":      return "감전";
@@ -176,6 +180,7 @@ public static class EffectDescriptionFormatter
             case "shocked":                   return "감전 취약";
             case "stun":                      return "기절";
             case "petrify":                   return "석화";
+            case "bind":                      return "속박";
             case "brand":                     return "낙인";
             case "cov_curse":                 return "저주";
             case RelicMarkStatus.SunmarkId:   return "태양흔";

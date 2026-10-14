@@ -1,0 +1,30 @@
+fileFormatVersion: 2
+guid: 164d95bb13c89480a9e40e667cb4f9a3
+AssetOrigin:
+  serializedVersion: 1
+  productId: 272919
+  packageName: Fantasy User Interface Sounds - Lite Edition
+  packageVersion: 2.0
+  assetPath: Assets/Fantasy UI SFX - Lite Edition/Potion Item 1-2.wav
+  uploadId: 706705
+AudioImporter:
+  externalObjects: {}
+  serializedVersion: 8
+  defaultSettings:
+    serializedVersion: 2
+    loadType: 0
+    sampleRateSetting: 0
+    sampleRateOverride: 44100
+    compressionFormat: 2
+    quality: 1
+    conversionMode: 0
+    preloadAudioData: 1
+  platformSettingOverrides: {}
+  forceToMono: 0
+  normalize: 1
+  loadInBackground: 0
+  ambisonic: 0
+  3D: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

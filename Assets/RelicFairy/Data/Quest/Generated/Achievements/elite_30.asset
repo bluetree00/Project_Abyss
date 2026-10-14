@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: elite_30
   m_EditorClassIdentifier: Assembly-CSharp::Achievement
   category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 23d8700f9cbe8df4c847c3a86da66aba, type: 3}
   codeName: elite_30
   displayName: "\uC815\uC608 \uC0AC\uB0E5\uAFBC"
   description: "\uC815\uC608 30 \uCC98\uCE58"

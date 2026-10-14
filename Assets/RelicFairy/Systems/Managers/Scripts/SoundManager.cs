@@ -23,6 +23,11 @@ public sealed class SoundManager
     private const string kMixerResourcePath = "GameAudioMixer";
     private const float MinVolumeDb = -80f;
 
+#if UNITY_EDITOR
+    /// <summary>편집기 전용 — 이벤트 소리 요청을 확인 도구(UiSfxProbeEditor)에 알린다. (eventId, 표가 고른 주소 · 표에 없으면 null)</summary>
+    public static event System.Action<string, string> EditorEventRequested;
+#endif
+
     private readonly AudioSource[] _audioSources = new AudioSource[(int)Define.Sound.MaxCount];
     private readonly Dictionary<string, AudioClip> _audioClips = new();
     private readonly Queue<PooledAudioSource> _availableEffects = new();
@@ -48,6 +53,8 @@ public sealed class SoundManager
     public float EffectVolume => _effectVolume;
     public float MasterVolume => _masterVolume;
     public float UiVolume     => _uiVolume;
+    /// <summary>믹서(Resources/GameAudioMixer)가 연결됐는가 — false면 채널 볼륨은 폴백(곱셈)으로 간다.</summary>
+    public bool  HasMixer     => _mixer != null;
 
     private sealed class PooledAudioSource
     {
@@ -147,9 +154,32 @@ public sealed class SoundManager
 
     public void PlayEvent(string eventId)
     {
-        if (_eventTable == null || !_eventTable.TryGet(eventId, out var sfxKey, out var volume, out var jitter)) return;
+        if (_eventTable == null || !_eventTable.TryGet(eventId, out var sfxKey, out var volume, out var jitter))
+        {
+            TraceEditor(eventId, null);
+            return;
+        }
         float pitch = jitter > 0f ? 1f + Random.Range(-jitter, jitter) : 1f;
+        TraceEditor(eventId, sfxKey);
         PlayEffectAsync(sfxKey, volume, pitch).Forget();
+    }
+
+    /// <summary>
+    /// UI 조작음을 효과음 표(SoundEventTable)로 낸다(10-12) — 주소 · 볼륨 · 피치 흔들림은 표가, 출력은 UI 채널(<see cref="PlayUiAsync"/>)이 맡는다.
+    /// <paramref name="pitchMul"/> · <paramref name="volumeMul"/>은 표 값에 곱한다(등급 · 연속 피치처럼 그 순간에만 다른 몫).
+    /// 표에 없는 이벤트면 아무것도 내지 않고 false를 돌려준다 — 호출 측이 폴백을 고른다(<see cref="ShopUIStyle"/>).
+    /// </summary>
+    public bool PlayUiEvent(string eventId, float pitchMul = 1f, float volumeMul = 1f)
+    {
+        if (_eventTable == null || !_eventTable.TryGet(eventId, out var sfxKey, out var volume, out var jitter))
+        {
+            TraceEditor(eventId, null);
+            return false;
+        }
+        float pitch = (jitter > 0f ? 1f + Random.Range(-jitter, jitter) : 1f) * pitchMul;
+        TraceEditor(eventId, sfxKey);
+        PlayUiAsync(sfxKey, volume * volumeMul, pitch).Forget();
+        return true;
     }
 
     public void Init()
@@ -158,8 +188,8 @@ public sealed class SoundManager
             return;
 
         _bgmVolume    = PlayerPrefs.GetFloat(kBgmVolKey,    0.25f);
-        // 효과음 기본값 — 전투 타격음이 체감상 과했다. 믹서 에셋이 아직 없어 마스터 볼륨이
-        // 폴백 경로에서 적용되지 않으므로, 실질적인 조절 레버는 이 채널 값이다.
+        // 효과음 기본값 0.6 — 전투 타격음이 체감상 과했다. 믹서(Resources/GameAudioMixer)가 연결돼 있으면
+        // 이 값은 Master/SFX 그룹 볼륨으로, 못 잡았으면 폴백 곱셈(ChannelScale)으로 걸린다 — 어느 쪽이든 같은 레버다.
         _effectVolume = PlayerPrefs.GetFloat(kEffectVolKey, 0.6f);
         _masterVolume = PlayerPrefs.GetFloat(kMasterVolKey, 1f);
         _uiVolume     = PlayerPrefs.GetFloat(kUiVolKey,     1f);
@@ -173,12 +203,15 @@ public sealed class SoundManager
         EnsureAudioSource(root.transform, Define.Sound.Effect, loop: false);
         EnsureEffectPool(root.transform);
 
-        // 믹서는 Resources에서 직접 집는다. AppBootstrapper의 Addressable 경로("GameAudioMixer")는
-        // 아직 엔트리가 등록돼 있지 않아 항상 null을 돌려주고, 그 경로만 믿으면 마스터·UI 채널이
-        // 영원히 폴백(= 죽은 노브)으로 남는다. Addressable이 나중에 등록되면 SetMixer가 같은 에셋으로
-        // 한 번 더 불릴 뿐이라 멱등하다.
+        // 믹서는 Resources에서 집는다 — 정본은 Resources/GameAudioMixer 하나다. Addressables에는 올리지 않는다
+        // (번들에 한 벌 더 들어가 인스턴스가 둘이 된다). 예전 AppBootstrapper의 Addressables 조회는 늘 null이라
+        // 「믹서 없음」 거짓 경보만 찍었다(10-12 지움). 잡았는지는 여기서 한 번 남긴다(빌드 증거용).
         if (_mixer == null)
+        {
             SetMixer(Resources.Load<AudioMixer>(kMixerResourcePath));
+            if (_mixer != null) Debug.Log($"[SoundManager] 믹서 연결됨 — Resources/{kMixerResourcePath}");
+            else                Debug.LogWarning($"[SoundManager] 믹서 없음 — Resources/{kMixerResourcePath} 로드 실패, 폴백 볼륨(곱셈) 사용");
+        }
 
         var bgmSrc = GetAudioSource(Define.Sound.Bgm);
         if (bgmSrc != null) bgmSrc.volume = ChannelScale(Define.Sound.Bgm);
@@ -458,9 +491,8 @@ public sealed class SoundManager
     }
 
     // 믹서가 있으면 채널 음량은 믹서가 처리 → 소스엔 per-clip 상대볼륨(1f)만.
-    // 믹서가 없으면(폴백) 소스 볼륨에 채널 음량을 곱한다.
-    // ⚠️ 마스터도 여기서 곱한다. 프로젝트에 AudioMixer 에셋(GameAudioMixer)이 아직 없어
-    //    실행 경로는 항상 이 폴백인데, 예전엔 마스터가 믹서 파라미터로만 나가서
+    // 믹서가 없으면(폴백 — Resources/GameAudioMixer를 못 잡았을 때) 소스 볼륨에 채널 음량을 곱한다.
+    // ⚠️ 마스터도 여기서 곱한다. 예전엔 마스터가 믹서 파라미터로만 나가서, 믹서가 없을 때
     //    마스터 볼륨을 어떻게 움직여도 소리가 그대로였다(설정 화면의 죽은 노브).
     private float ChannelScale(Define.Sound type)
     {
@@ -477,6 +509,15 @@ public sealed class SoundManager
     {
         var src = GetAudioSource(Define.Sound.Bgm);
         if (src != null) src.volume = ChannelScale(Define.Sound.Bgm);
+    }
+
+    /// <summary>편집기에서만 — 이벤트 요청을 확인 도구에 알린다. 빌드에선 호출째 빠진다.</summary>
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private static void TraceEditor(string eventId, string sfxKey)
+    {
+#if UNITY_EDITOR
+        EditorEventRequested?.Invoke(eventId, sfxKey);
+#endif
     }
 
     private static float LinearToDb(float linear)

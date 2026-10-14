@@ -1,8 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
-using UnityEngine.Audio;
 using UnityEngine.SceneManagement;
 using Cysharp.Threading.Tasks;
 using BackEnd;
@@ -169,18 +168,19 @@ public sealed class AppBootstrapper : MonoBehaviour
         while (op.progress < 0.9f)
         {
             display = Mathf.MoveTowards(display, op.progress / 0.9f, Time.unscaledDeltaTime * speed);
-            loading?.SetProgress(display);
+            loading?.SetProgress(display * UI_SceneLoading.LoadShare);
             await UniTask.Yield(PlayerLoopTiming.Update);
         }
         // 표시 진행도를 1까지 천천히 채운 뒤 씬 활성화
         while (display < 1f)
         {
             display = Mathf.MoveTowards(display, 1f, Time.unscaledDeltaTime * speed);
-            loading?.SetProgress(display);
+            loading?.SetProgress(display * UI_SceneLoading.LoadShare);
             await UniTask.Yield(PlayerLoopTiming.Update);
         }
         op.allowSceneActivation = true;
         await UniTask.WaitUntil(() => op.isDone);
+        loading?.CreepUntilReadyAsync().Forget();   // 씬 준비(NotifySceneReady)까지 90 → 99%
     }
 
     public void NotifySceneReady()
@@ -202,6 +202,8 @@ public sealed class AppBootstrapper : MonoBehaviour
             // 여기만 초회를 재현하는 경로다. 사망/클리어 복귀는 ClearLocalRun(세이브만)을 탄다.
             var rpm = RunProgressManager.Instance;
             rpm?.ResetSlot(rpm.ActiveSlotIndex);
+            // 로드아웃도 비운다 — 안 비우면 직전 슬롯의 유물 · 무기 · 시작 파츠가 새 슬롯 거점에 따라와 해금 조건을 건너뛰었다(10-09 출시 점검)
+            Loadout.Clear();
             // "새 게임"은 처음부터다 — 인트로 완료 플래그와 대사 진행도(방문 횟수·복귀 사유)를 함께 초기화한다.
             // 이게 없으면 이전 플레이의 카운트가 남아 첫 진입부터 반복(_R*) 대사가 나온다.
             // (이어하기는 이 경로를 타지 않으므로 영향 없음)
@@ -303,6 +305,9 @@ public sealed class AppBootstrapper : MonoBehaviour
         var rpm = RunProgressManager.Instance;
         if (rpm == null) return;
 
+        // 다른 슬롯의 로드아웃이 남지 않게 — 세이브에 유물 · 무기 키가 비거나 로드가 실패하면 직전 값이 그대로 쓰였다(10-09 출시 점검)
+        Loadout.Clear();
+
         // PR1: 진행 중 런은 로컬 파일이 권위(뒤끝 USER_RUN_PROGRESS 아님). 선택 슬롯에서 로드.
         int slot = rpm.ActiveSlotIndex;
         var save = rpm.HasLocalRun(slot) ? rpm.LoadLocalRun(slot) : null;
@@ -372,7 +377,8 @@ public sealed class AppBootstrapper : MonoBehaviour
             }
         }
 
-        // 유물(Relic) 로드 — 휴면 경로(보통 null). 실패해도 복원은 계속.
+        // 유물(Relic) 로드 — 주소 = 유물 SO 이름(Characters 그룹 · RelicClassAddressSetup, 10-08). 실패해도 복원은 계속.
+        // 예전엔 주소가 없어 늘 실패했고 @GameRun의 debugDefaultRelic(가웨인)으로 바뀌었다(랜슬롯 런이 가웨인으로 이어짐).
         if (!string.IsNullOrEmpty(save.relicKey))
         {
             try
@@ -408,8 +414,8 @@ public sealed class AppBootstrapper : MonoBehaviour
         if (w0 != null) { w0.enhanceLevel = Mathf.Max(0, save.weapon0EnhanceLevel); w0.legendId = save.weapon0LegendId; w0.evolutionStage = Mathf.Max(0, save.weapon0EvolutionStage); w0.engravings = save.weapon0Engravings ?? ""; w0.RecomputeEnhancedStats(); }
         if (w1 != null) { w1.enhanceLevel = Mathf.Max(0, save.weapon1EnhanceLevel); w1.legendId = save.weapon1LegendId; w1.evolutionStage = Mathf.Max(0, save.weapon1EvolutionStage); w1.engravings = save.weapon1Engravings ?? ""; w1.RecomputeEnhancedStats(); }
         // 형 — 형이 있는 무기는 최소 1(옛 세이브에 칸이 없으면 0으로 와도 깨어난 채로).
-        if (w0 != null) { w0.formTier = w0.form != null ? Mathf.Clamp(save.weapon0FormTier, 1, 3) : 0; w0.formVariants = save.weapon0FormVariants ?? ""; }
-        if (w1 != null) { w1.formTier = w1.form != null ? Mathf.Clamp(save.weapon1FormTier, 1, 3) : 0; w1.formVariants = save.weapon1FormVariants ?? ""; }
+        if (w0 != null) { w0.formTier = w0.form != null ? Mathf.Clamp(save.weapon0FormTier, 1, 3) : 0; w0.formVariants = save.weapon0FormVariants ?? ""; w0.SanitizeFormVariants(); }
+        if (w1 != null) { w1.formTier = w1.form != null ? Mathf.Clamp(save.weapon1FormTier, 1, 3) : 0; w1.formVariants = save.weapon1FormVariants ?? ""; w1.SanitizeFormVariants(); }
         if (w0 != null || w1 != null)
         {
             // 저장된 현재 슬롯 복원(미설정 시 0). SpawnPlayerAsync가 SwitchToSlotAsync로 적용.
@@ -585,11 +591,15 @@ public sealed class AppBootstrapper : MonoBehaviour
                 Debug.LogWarning("[AppBootstrapper] UIRootBootstrapper not found. UIManager will use legacy root.");
         }
 
+        // 6-0) Steam API는 로그인 방식과 따로 늘 켠다 — 로그인은 기기 ID(뒤끝)여도 오버레이 · Steam 기능엔 API 초기화가 필요하다.
+        //      예전엔 Steam 로그인일 때만 만들어 릴리스에서 SteamAPI.Init이 한 번도 불리지 않았다(10-09 출시 점검).
+        //      Steam이 꺼져 있으면 SteamManager가 오류만 남기고 게임은 그대로 간다.
+        if (SteamManager.Instance == null)
+            new GameObject("@SteamManager").AddComponent<SteamManager>();
+
         // 6) (선택) Steam 로그인 → Lobby로 직행
         if (useSteamLogin)
         {
-            var steamGo = new GameObject("@SteamManager");
-            steamGo.AddComponent<SteamManager>();
 
             bool steamOk = await SteamLoginService.LoginAsync();
             if (!steamOk)
@@ -808,18 +818,11 @@ public sealed class AppBootstrapper : MonoBehaviour
             Debug.LogWarning($"[AppBootstrapper] SoundEventTable 로드 실패: {e.Message}");
         }
 
-        try
-        {
-            var mixer = await addr.TryLoadAssetAsync<AudioMixer>("GameAudioMixer");
-            if (mixer != null)
-                Managers.Sound?.SetMixer(mixer);
-            else
-                Debug.Log("[AppBootstrapper] GameAudioMixer 없음 — 믹서 비활성(폴백 볼륨 사용)");
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[AppBootstrapper] GameAudioMixer 로드 실패: {e.Message}");
-        }
+        // 믹서는 SoundManager.Init이 Resources/GameAudioMixer로 잡는다(정본 하나). 예전 Addressables 조회는 키가 없어 늘 null이라
+        // 「믹서 없음」 거짓 경보만 찍었다(10-12 지움). 실제 상태만 한 줄 남긴다.
+        Debug.Log(Managers.Sound != null && Managers.Sound.HasMixer
+            ? "[AppBootstrapper] 믹서 연결됨(Resources/GameAudioMixer)"
+            : "[AppBootstrapper] 믹서 없음 — 폴백 볼륨(곱셈) 사용");
     }
 
     private async UniTask InitQuestManagerAsync()

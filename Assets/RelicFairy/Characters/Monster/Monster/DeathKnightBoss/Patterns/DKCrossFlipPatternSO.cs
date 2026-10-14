@@ -117,6 +117,7 @@ public class DKCrossFlipState : FullLockState<DKCrossFlipPatternSO>
             DKPage2Zone.PlayAnim(ctx, StrikeAnim);
         }
 
+        if (_shownFlips == Data.flipCount) DKGridPatternHelper.ArmBefore(_timer, StrikeTime, _tiles, _swordColor);   // 판정 0.25초 전 위험 칸을 붉게(10-11) — 마지막 배치만
         if (!_struck && _timer >= StrikeTime)
         {
             _struck = true;

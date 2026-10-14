@@ -26,6 +26,7 @@ public class LightTint
         var lt = go.GetComponentInChildren<Light>();   // 자기 자신 포함 — WallTorch는 Light가 자식에 있다
         if (lt == null) return;
         if (color.a > 0f) lt.color = color;
+        DungeonSpaceDirector.TintRoomLight(lt);   // 10-12 시기 색(해방기 · 악몽) — 봉인기면 그대로
         if (!Mathf.Approximately(intensityMul, 1f)) lt.intensity *= intensityMul;
         if (!Mathf.Approximately(rangeMul, 1f))     lt.range     *= rangeMul;
     }
@@ -70,6 +71,8 @@ public enum SealDoorMotion
     Grow,
     /// <summary>경첩을 축으로 바깥(통로 쪽)으로 젖혀 열리고 봉인 때 쾅 닫힌다 — 나무문(10-06). 문짝은 <see cref="SealDoorFit"/>가 세운다.</summary>
     Swing,
+    /// <summary>봉인 때 개구부에 디졸브로 나타나고, 열릴 때 디졸브로 사라진다(10-06 사용자 「문 연출은 애매 — 디졸브로 사라지면서 열리게」). 모든 테마 기본.</summary>
+    Dissolve,
 }
 
 /// <summary>통로 끝 '다음 방'을 가리는 방식. 챕터 컨셉에 맞춰 팔레트가 고른다.</summary>

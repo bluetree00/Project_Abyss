@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using RelicFairy.UI;
@@ -11,7 +11,7 @@ namespace RelicFairy.Monster
 ///
 /// 흐름: Enter → NavMesh 비활성 + OnEntranceRequested 발행
 ///       → BossRoomController 카메라 팬 완료 후 TriggerEntrance() 호출
-///       → 보스 클로즈업 + "Death Knight" HUD(Idle 재생) + 바람 이펙트
+///       → 보스 클로즈업 + 보스 이름 자막(Idle 재생) + 바람 이펙트
 ///       → 플레이어 카메라 복귀 + 입력 복구 + OnCombatReady 발행
 /// </summary>
 public class DKDormantState : IMonsterState
@@ -29,12 +29,13 @@ public class DKDormantState : IMonsterState
     private const float AttackHitDelay    = 0.7f; // Attack1 hitTime (슬래시 사운드 타이밍)
     private const float StageGapDelay     = 0.4f; // 슬래시 → 이펙트+프롭 사이 간격
     private const float PropsFlyViewDelay = 1.5f; // 프롭 날아가는 모습 오버뷰 카메라로 보여주는 시간
+    private const float RepeatPropsFlyViewDelay = 0.6f;   // 반복 관람 — 베기 · 소품만 짧게(10-14)
 
     private float _reFireTimer;
     private float _waitTimer;
     private bool  _triggered;
     private bool  _cameraTriggered;
-    private bool  _hasBossRoomController; // BossRoomController가 씬에 있으면 폴백 비활성
+    private BossRoomController _room;     // 씬에 있으면 폴백 비활성 · 등장 이름(EntranceTitle)을 읽는다
 
     public bool IsActive { get; private set; } = true;
 
@@ -49,7 +50,7 @@ public class DKDormantState : IMonsterState
         _triggered            = false;
         _cameraTriggered      = false;
         IsActive              = true;
-        _hasBossRoomController = UnityEngine.Object.FindFirstObjectByType<BossRoomController>() != null;
+        _room                 = UnityEngine.Object.FindFirstObjectByType<BossRoomController>();
 
         if (ctx.Agent != null) ctx.Agent.enabled = false;
 
@@ -71,7 +72,7 @@ public class DKDormantState : IMonsterState
         }
 
         // BossRoomController가 씬에 있으면 폴백 발동 안 함 — 트리거로만 시작
-        if (!_cameraTriggered && !_hasBossRoomController && _waitTimer >= AutoTriggerTimeout)
+        if (!_cameraTriggered && _room == null && _waitTimer >= AutoTriggerTimeout)
         {
             _cameraTriggered = true;
             DoFallbackCameraAsync(ctx).Forget();
@@ -102,7 +103,11 @@ public class DKDormantState : IMonsterState
 
         var ct  = dk.destroyCancellationToken;
         var cam = GameCameraController.Instance;
-        BossBinding.Attach(dk, StoryProgress.DeathKnight);   // 옛 봉인 사슬(10-03 S2)
+        // 해방기도 묶임 없이 — 봉인은 리치에게 떨어질 때 이미 깨졌다(10-13 사용자 「봉인 상태에서 시작은 레거시」)
+        // 방이 정한 이름(인트로)은 체력바에도 — 옛 이름이 「타락한 모르드레드」 위에 떴다(10-09 전주기 시뮬 · 10-13 칭호 통일)
+        if (_room != null && !string.IsNullOrEmpty(_room.EntranceTitle)) dk.SetDisplayName(_room.EntranceTitle);
+        bool cine  = BossStoryScenes.BeginEntrance(StoryProgress.DeathKnight, ct);   // 레터박스 · 전투 HUD 걷기 — 이야기 전투만(인트로는 그대로, 10-14)
+        bool first = BossStoryScenes.IsFirstEntrance(StoryProgress.DeathKnight);
 
         try
         {
@@ -116,7 +121,7 @@ public class DKDormantState : IMonsterState
             SwapAndFlyProps(dk); // 물리는 백그라운드에서 계속 날아감
 
             // 오버뷰 카메라로 프롭 날아가는 모습 노출 후 클로즈업 전환
-            await UniTask.Delay(TimeSpan.FromSeconds(PropsFlyViewDelay), cancellationToken: ct);
+            await UniTask.Delay(TimeSpan.FromSeconds(first ? PropsFlyViewDelay : RepeatPropsFlyViewDelay), cancellationToken: ct);
 
             // ② 클로즈업으로 전환
             if (cam != null)
@@ -132,34 +137,39 @@ public class DKDormantState : IMonsterState
             GameObject windVfx = dk.SpawnEntranceWindVfx();
             try
             {
-                if (UI_BossBark.Instance != null)
+                // 방이 정한 이름(인트로 「타락한 모르드레드」) > 인카운터 대사(방문 변형) > 「타락한 모르드레드」(10-13 칭호 통일)
+                // + 이름 · 칭호 · 반복 관람은 짧게(10-14 — 인트로는 예전 그대로)
+                string bark = _room != null ? _room.EntranceTitle : null;
+                if (string.IsNullOrEmpty(bark))
                 {
-                    // 인카운터 대사(방문 변형) — 미로드 시 "Death Knight" 폴백
-                    string bark = "Death Knight";
+                    bark = "타락한 모르드레드";
                     var encounterLines = Managers.DialogueData?.GetBossEncounterLines("DeathKnight_Encounter");
                     if (encounterLines != null && encounterLines.Length > 0) bark = encounterLines[0].text;
-                    await UI_BossBark.ShowAndWaitAsync(bark, BossBarkType.BossIntro);
                 }
-                else
-                    await UniTask.Delay(TimeSpan.FromSeconds(BossIntroFallbackDuration), cancellationToken: ct);
+                await BossStoryScenes.IntroLineAsync(dk, StoryProgress.DeathKnight, bark, ct);
             }
             finally
             {
                 if (windVfx != null) BossEffectPool.Release(windVfx);
             }
 
-            // 해방기 — 클로즈업 동안 사슬이 끊어지고 포효(10-03 S2-3)
-            if (StoryProgress.IsLiberated) dk.ShowSwordVisual();   // 마지막 사슬을 검으로 베어 떨쳐낸다
-            await BossStoryScenes.UnbindAsync(dk, StoryProgress.DeathKnight, ct);
+            // 해방기 — 클로즈업 동안 옛 봉인 자국을 검으로 베어 떨쳐내며 포효(10-13 재조우)
+            if (StoryProgress.IsLiberated) dk.ShowSwordVisual();
+            await BossStoryScenes.ReturnAsync(dk, StoryProgress.DeathKnight, ct);
             if (StoryProgress.IsLiberated) dk.HideSwordVisual();
 
             // 플레이어 카메라로 복귀
             if (cam != null)
-                await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, 0f, ct);
+                await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, 1.0f, ct);   // 블렌드 — 복귀 목표가 게임 카메라 자세로 고쳐져(10-14) 덜컥 넘어가지 않게 · 유리벽 너머라 약 18 m를 오니 0.6초는 첫 0.1초에 7 m가 휙(실측)
+            if (cine) { BossStoryScenes.EndEntrance(StoryProgress.DeathKnight, completed: true); cine = false; }
         }
         catch (OperationCanceledException)
         {
             return;
+        }
+        finally
+        {
+            if (cine) BossStoryScenes.EndEntrance(StoryProgress.DeathKnight, completed: false);
         }
 
         // NavMesh 복구

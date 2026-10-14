@@ -22,6 +22,7 @@ public static class UISkin
     private const string SettingsAddress    = "UI/SettingsSkin";
     private const string RelicPartDraftAddress = "UI/RelicPartDraftSkin";
     public  const string ScreenWipeAddress  = "UI/ScreenWipeSkin";   // 에디터 생성기(ScreenWipeSkinCreator)도 이 주소로 등록
+    public  const string ThemeFontsAddress  = "UI/ThemeFonts";       // 에디터 생성기(UIThemeFontBuilder)도 이 주소로 등록
 
     private static RefinerySkinSO    _refinery;
     private static RuneSelectSkinSO  _runeSelect;
@@ -35,6 +36,7 @@ public static class UISkin
     private static SettingsSkinSO    _settings;
     private static RelicPartDraftSkinSO _relicPartDraft;
     private static ScreenWipeSkinSO  _screenWipe;
+    private static UIThemeFontsSO    _themeFonts;
     private static bool _tried;
 
     /// <summary>정제소 스킨. 미로드/미등록이면 null → 코드로 그린 색 박스가 그대로 보인다.</summary>
@@ -73,6 +75,9 @@ public static class UISkin
     /// <summary>방 전환 와이프 스킨. 미로드/미등록이면 null → ScreenFade가 단색 판으로 동작.</summary>
     public static ScreenWipeSkinSO ScreenWipe => _screenWipe;
 
+    /// <summary>톤 v2 글꼴(Noto 300 · 400 · 500). 미로드/미등록이면 null → <see cref="UITheme.Font"/>가 기본 글꼴로 폴백.</summary>
+    public static UIThemeFontsSO ThemeFonts => _themeFonts;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
@@ -96,6 +101,8 @@ public static class UISkin
     {
         if (_tried) return;
         _tried = true;
+
+        _themeFonts  = await LoadOrNull<UIThemeFontsSO>(ThemeFontsAddress, "톤 v2 글꼴");   // 맨 먼저 — HUD가 일찍 쓴다
 
         _refinery    = await LoadOrNull<RefinerySkinSO>(RefineryAddress, "정제소");
         _runeSelect  = await LoadOrNull<RuneSelectSkinSO>(RuneSelectAddress, "룬 획득");

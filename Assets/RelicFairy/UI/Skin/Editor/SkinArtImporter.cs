@@ -24,6 +24,10 @@ public static class SkinArtImporter
     private const string AchievementFolder  = "Assets/RelicFairy/UI/Skin/Achievement/Sprites";
     private const string BamaoFolder        = "Assets/RelicFairy/Prefabs/UI/Bamao/BamaoUIPack/Sprites/Button";
     private const string CrucibleFolder     = "Assets/RelicFairy/UI/Skin/Crucible/Art";
+    // 10-13 Artsystack 팩(분석 문서 §6-1) — 쓰는 것만 _Imported로 옮긴 부품 · 재색칠 PNG · 흰 아이콘 128
+    private const string ArtsystackFolder        = "Assets/RelicFairy/_Imported/Artsystack/Sprites/components";
+    private const string ArtsystackIconFolder    = "Assets/RelicFairy/_Imported/Artsystack/Sprites/flaticon/white/128";
+    private const string ArtsystackRecolorFolder = "Assets/RelicFairy/_Imported/Artsystack/Recolor";
 
     /// <summary>파일 1장의 목표 설정. border는 9-slice(L,B,R,T) — 0이면 Simple로 쓰는 아트.</summary>
     private readonly struct Rule
@@ -59,6 +63,8 @@ public static class SkinArtImporter
         new("구매버튼.png",             256, 110, 0, 110, 0),        // 빈 명판 — 라벨은 코드가 얹는다
         new("새로고침 버튼.png",         256),                        // "새로고침 ⟳ 10"이 아트에 구워짐 → 늘리면 글자가 깨진다
         new("버프바탕.png",              64,  24, 0, 24, 0),
+        new("룬바탕.png",                64,  24, 0, 24, 0),   // 10-13 룬 배지 — 버프바탕 보라 재색칠
+        new("재료바탕.png",              64,  24, 0, 24, 0),   // 10-13 재료 배지 — 버프바탕 주황 재색칠
         new("포션바탕.png",              64,  24, 0, 24, 0),
         new("버프.png",                  64),
         new("포션.png",                  64),
@@ -238,6 +244,59 @@ public static class SkinArtImporter
         new("Popup_wood_title.png", 1024, 200, 0, 200, 0),
     };
 
+    // ── Artsystack(10-13) — 재색칠 PNG는 1x(원본 ÷ 2) 기준 경계 · 원본을 그대로 쓰는 것은 원본 px ──
+    private static readonly Rule[] ArtsystackRecolorRules =
+    {
+        new("InfoBox_navy.png",             1024, 12, 12, 12, 12),
+        new("description_box_05_navy.png",  1024,  4,  8,  4,  8),
+        new("mission_slot_01_navy.png",     2048, 20, 13, 20, 13),
+        new("mission_slot_02_navy.png",     2048, 20, 13, 20, 13),
+        new("mission_slot_02_navy_dim.png", 2048, 20, 13, 20, 13),
+        new("slot_short_inactive_navy.png",  512, 11,  6, 11,  6),
+        new("header_box_navy.png",          1024, 65,  7, 65,  7),
+        new("store_item_frame_03_navy.png", 1024,  4,  4,  4,  4),
+        new("skill_bg_navy.png",            2048),
+        new("Hexagon_02_navy.png",           128, 21,  0, 21,  0),
+    };
+
+    private static readonly Rule[] ArtsystackRules =
+    {
+        new("slot_short_active.png",   1024, 24, 20, 24, 20),
+        new("slot_short_inactive.png", 1024, 22, 12, 22, 12),
+        new("placeholder.png",          512, 150, 0, 150, 0),
+        new("Hexagon_01.png",           256, 45,  0, 45,  0),
+        new("Rectangle_active.png",     128, 22,  0, 22,  0),
+        new("Rectangle_locked.png",     128, 22,  0, 22,  0),
+        new("stats_slider_bg.png",     1024,  2,  0,  2,  0),
+        new("stats_slider_top.png",    1024,  2,  0,  2,  0),
+        new("splitt_divider.png",      2048,  0,  0, 60,  0),
+        new("selected_line.png",       1024),
+        new("Line_1.png",              1024),
+        new("direction_line.png",      2048),
+        new("message_slot_1.png",      2048),
+        new("heart_bg_frame.png",      1024),
+        new("icon_slot_active.png",     256),
+        new("skill_slot.png",           256),
+        new("Glow_Circle.png",          256),
+        new("slider_scroller.png",      128),
+        new("Design_01.png",           1024),
+    };
+
+    /// <summary>Artsystack 반입분 임포트 설정 — 부품 · 재색칠(9-slice는 메시 Full Rect) · 흰 아이콘 128 전부(128 · 크런치 없음). 바꾼 장 수.</summary>
+    public static int ImportArtsystack()
+    {
+        int changed = Apply(ArtsystackRecolorFolder, ArtsystackRecolorRules, fullRect: true)
+                    + Apply(ArtsystackFolder, ArtsystackRules, fullRect: true);
+        var icons = new System.Collections.Generic.List<Rule>();
+        if (AssetDatabase.IsValidFolder(ArtsystackIconFolder))
+            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { ArtsystackIconFolder }))
+                icons.Add(new Rule(System.IO.Path.GetFileName(AssetDatabase.GUIDToAssetPath(guid)), 128));
+        changed += Apply(ArtsystackIconFolder, icons.ToArray());
+        AssetDatabase.Refresh();
+        Debug.Log($"[SkinArtImporter] Artsystack {changed}장 임포트 설정");
+        return changed;
+    }
+
     [MenuItem("RelicFairy/UI/Import Skin Art (All Screens)")]
     public static void ImportAll()
     {
@@ -254,6 +313,7 @@ public static class SkinArtImporter
         changed += Apply(AchievementFolder, AchievementRules);
         changed += Apply(BamaoFolder,       BamaoRules);
         changed += Apply(CrucibleFolder,    CrucibleRules);
+        changed += ImportArtsystack();
 
         AssetDatabase.Refresh();
         Debug.Log($"[SkinArtImporter] {changed}장 재임포트 완료.");
@@ -262,7 +322,8 @@ public static class SkinArtImporter
         Debug.Log($"[SkinArtImporter] 스킨 아트 {changed}장의 임포트 설정을 적용했습니다.");
     }
 
-    private static int Apply(string folder, Rule[] rules)
+    /// <param name="fullRect">9-slice 판은 메시를 Full Rect로 — 팩 원본은 Tight라 슬라이스 경고가 난다(Artsystack 10-13).</param>
+    private static int Apply(string folder, Rule[] rules, bool fullRect = false)
     {
         int changed = 0;
 
@@ -283,6 +344,13 @@ public static class SkinArtImporter
             importer.filterMode          = FilterMode.Bilinear;
             importer.wrapMode            = TextureWrapMode.Clamp;
             importer.spriteBorder        = rule.Border;
+            if (fullRect)
+            {
+                var ts = new TextureImporterSettings();
+                importer.ReadTextureSettings(ts);
+                ts.spriteMeshType = SpriteMeshType.FullRect;
+                importer.SetTextureSettings(ts);
+            }
 
             // maxTextureSize는 importer 프로퍼티로 주면 플랫폼 설정에 반영되지 않는다(2048 그대로 남는다).
             // 기본 플랫폼 설정을 통째로 읽어 고쳐 되돌려야 한다.

@@ -42,6 +42,12 @@ public class UI_AwakeningPanel : UI_Popup
     private const float TreeSide     = 36f;
     private const float TreeBottom   = 24f;
     private const float DetailWidth  = 380f;
+    // 10-13 Artsystack 판 그림(분석 문서 §3-1)
+    private const float RuleArtH     = 16f;    // 머리 구분선(splitt_divider 67px 원본을 이 높이로 — 끝 마름모가 납작해지지 않게 경계도 같은 비로 줄인다)
+    private static readonly Vector2 TabUnderlineSize = new(104f, 15f);   // selected_line 320×46 비 그대로
+    private const float NewsDotSize  = 12f;
+    private const float BannerBadge  = 30f;
+    private const float BannerTextLeft = 70f;  // 배지 오른쪽부터 글자
 
     // ── 직렬화 필드 ────────────────────────────────────────────────────────
     [Header("헤더")]
@@ -87,7 +93,7 @@ public class UI_AwakeningPanel : UI_Popup
 
     // ── 비공개 필드 ────────────────────────────────────────────────────────
     private static readonly Color BannerFill = new(0.09f, 0.08f, 0.07f, 0.94f);
-    private const float BannerY = -18f;
+    private const float BannerY = -106f;   // 10-13 ②c2 사진 — -18이면 위 「심연의 정수」 숫자를 덮었다 → 머리 줄(정수 · 탭 · 닫기) 아래 빈 띠로
 
     private RectTransform _banner;
     private CanvasGroup   _bannerGroup;
@@ -96,6 +102,10 @@ public class UI_AwakeningPanel : UI_Popup
     private readonly AltarTreePresenter _presenter = new();
     private AltarTreeView    _tree;
     private AltarDetailPanel _detail;
+    private AltarConfirmCard _confirm;
+    private MemoryAltarNode  _confirmNode;
+    private Button   _viewLink;        // 탭 대신 — 다른 화면으로 건너가는 버튼(10-14)
+    private TMP_Text _viewLinkLabel;
     private CancellationTokenSource _fxCts;
     private bool _achievementMode;
     private bool _openPlayed;
@@ -129,6 +139,7 @@ public class UI_AwakeningPanel : UI_Popup
     public override void Init()
     {
         base.Init();
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);
 
         // 판 폭을 먼저 정한다 — 아래 창 맞춤(UIWindowFitter)은 붙는 순간의 판 크기를 기준으로 잡는다.
         if (transform.Find("Panel_Main") is RectTransform widen) widen.sizeDelta = new Vector2(PanelWidth, widen.sizeDelta.y);
@@ -168,6 +179,7 @@ public class UI_AwakeningPanel : UI_Popup
                 closeImg.color  = new Color(0.16f, 0.16f, 0.18f, 1f);
             }
         }
+        ApplyAltarArt();
         if (actionButton != null) actionButton.onClick.AddListener(OnActionClicked);
 
         if (achievementTab != null) achievementTab.onClick.AddListener(() => { PlayClickSfx(); SetMode(true); });
@@ -190,12 +202,74 @@ public class UI_AwakeningPanel : UI_Popup
         // 폐기된 각성 6계열에 쓴 정수를 되돌린다(1회성). 제단을 여는 시점엔 비용표 로드가 끝나 있다.
         // 10-02 재설계로 뺀 유물 노드 4개(파츠 선택지 +1 · 코어 2·3종 · 이어받기)에 쓴 정수도 돌려준다(1회성).
         int refunded = readOnly ? 0 : MemoryAltarService.TryRefundLegacyAwakening() + MemoryAltarService.TryRefundRemovedNodes();
-        if (refunded > 0)
+        // 10-14 강화형 전환 리셋(1회 · 옛 칸 환급)은 단계를 처음 읽을 때(위 BuildTree) 이미 했다 — 저장은 여기서
+        if (refunded > 0 | (!readOnly && MemoryAltarService.TakeResetPendingSave()))
             SaveAsync().Forget();
 
-        // 받아갈 것이 있으면 업적을 먼저 연다 — 받는 쪽을 먼저 보여야
-        // 「받았다 → 이제 열 수 있다」가 한 화면에서 이어진다.
-        SetMode(WaitingAchievements() > 0);
+        // 제단은 해금하러 오는 곳 — 늘 해금 화면부터(10-14 사용자 「업적과 해금이 같은 팝업이라 보기 힘들다」).
+        // 예전엔 받을 업적이 있으면 업적이 먼저 열려, 해금하러 와서 업적 목록을 마주했다.
+        // 작은 탭 두 개 대신 화면마다 이름(제목)을 따로 두고, 다른 화면으로는 머리의 버튼 하나로 건너간다(받을 업적 수를 버튼이 말한다).
+        ShowOnly(achievements: false);
+    }
+
+    /// <summary>
+    /// 업적만 보는 화면으로 연다(ESC 메뉴 · 10-14) — 해금 탭 · 트리 없이 제목 「업적」. 거점 밖이면 조회 전용(받기는 기억의 제단에서).
+    /// </summary>
+    public static async UniTaskVoid OpenAchievementsAsync(bool readOnlyView)
+    {
+        var panel = Managers.UI != null ? await Managers.UI.ShowPopupUIAndGetAsync<UI_AwakeningPanel>() : null;
+        if (panel == null) return;
+        panel.ReadOnly = readOnlyView;
+        panel.ShowOnly(achievements: true);
+    }
+
+    /// <summary>한 화면만 보이게 — 탭 줄을 걷고 제목을 그 화면 이름으로(업적 / 기억의 제단), 머리에 다른 화면으로 건너가는 버튼.</summary>
+    public void ShowOnly(bool achievements)
+    {
+        if (achievementTab != null) achievementTab.gameObject.SetActive(false);
+        if (unlockTab      != null) unlockTab.gameObject.SetActive(false);
+        if (transform.Find("Panel_Main/Txt_Title") is Transform title && title.TryGetComponent<TMP_Text>(out var titleText))
+            titleText.text = achievements ? "업적" : "기억의 제단";
+        EnsureViewLink();
+        SetMode(achievements);
+    }
+
+    /// <summary>
+    /// 다른 화면으로 건너가는 버튼(옛 탭 자리 · 왼쪽 위 제목 아래) — 해금 화면이면 「업적 · 받을 것 N →」(받을 것이 있으면 금),
+    /// 업적 화면이면 「← 기억의 제단 · 해금」. 글은 <see cref="RefreshBadge"/>가 매번 맞춘다.
+    /// </summary>
+    private void EnsureViewLink()
+    {
+        if (_viewLink != null || achievementTab == null) return;
+        var src = (RectTransform)achievementTab.transform;
+        var go  = new GameObject("Btn_ViewLink", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        var rt  = (RectTransform)go.transform;
+        rt.SetParent(src.parent, false);
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot     = new Vector2(0f, 0.5f);
+        rt.sizeDelta = new Vector2(300f, 42f);
+        var r = src.rect;
+        rt.localPosition = src.localPosition + new Vector3(r.xMin, r.center.y, 0f);   // 옛 「업적」 탭 왼끝 · 가운데 높이
+
+        var img = go.GetComponent<Image>();
+        img.sprite = UIProceduralSprites.RoundedRect(radius: 8f, feather: 2f);
+        img.type   = Image.Type.Sliced;
+        img.color  = new Color(0.16f, 0.16f, 0.18f, 1f);
+        _viewLink = go.GetComponent<Button>();
+        _viewLink.targetGraphic = img;
+        ShopUIStyle.ApplyButtonColors(_viewLink, img);
+        _viewLink.onClick.AddListener(() => { PlayClickSfx(); ShowOnly(!_achievementMode); });
+
+        var lgo = new GameObject("Label", typeof(RectTransform));
+        lgo.transform.SetParent(rt, false);
+        _viewLinkLabel = lgo.AddComponent<TextMeshProUGUI>();
+        var lrt = _viewLinkLabel.rectTransform;
+        lrt.anchorMin = Vector2.zero; lrt.anchorMax = Vector2.one;
+        lrt.offsetMin = new Vector2(16f, 0f); lrt.offsetMax = new Vector2(-16f, 0f);
+        UITheme.StyleThinText(_viewLinkLabel, UIWeight.Medium, 20f, AltarPalette.TextPrimary, shadow: true);
+        _viewLinkLabel.alignment = TextAlignmentOptions.MidlineLeft;
+        _viewLinkLabel.textWrappingMode = TextWrappingModes.NoWrap;
+        _viewLinkLabel.raycastTarget = false;
     }
 
     protected override void OnDestroy()
@@ -210,6 +284,77 @@ public class UI_AwakeningPanel : UI_Popup
     }
 
     // ── Private Methods ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// 판 그림(10-13 Artsystack, 분석 문서 §3-1) — 창 판 · 머리 구분선 · 탭 밑줄 · 새 소식 점 · 닫기 판. 저작 프리팹이라 여기서 덧칠한다.
+    /// 그림이 비면 그 칸만 지금 코드 모양. 장식(머리 덩굴 heart_bg_frame)은 넣지 않는다 — 한 화면 장식 한 곳은 가운데 제단 문양이다.
+    /// </summary>
+    private void ApplyAltarArt()
+    {
+        var skin = UISkin.Achievement;
+        if (skin == null) return;
+
+        // 창 판 — InfoBox 재색칠은 안쪽 알파가 0.53이라 판에 바로 입히면 뒤가 비친다. 코드 판(불투명)은 두고 맨 뒤 자식으로 덮는다.
+        // 금 가는 테(StylePanel의 Edge)는 그대로 맨 위에 남는다.
+        if (skin.AltarWindow != null && transform.Find("Panel_Main") is RectTransform main)
+        {
+            var art = new GameObject("Art_Window", typeof(RectTransform), typeof(CanvasRenderer)).AddComponent<Image>();
+            var rt  = art.rectTransform;
+            rt.SetParent(main, false);
+            rt.SetAsFirstSibling();
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.offsetMin = rt.offsetMax = Vector2.zero;
+            art.raycastTarget = false;
+            ShopUIStyle.Skin(art, skin.AltarWindow, sliced: true);
+        }
+
+        // 머리 구분선 — 프리팹의 2px 선 자리에 splitt_divider(1px 회선 + 오른쪽 끝 마름모). 높이 16에 맞춰 경계도 같은 비로 줄인다.
+        if (skin.AltarHeaderRule != null && transform.Find("Panel_Main/Rule") is RectTransform rule && rule.TryGetComponent<Image>(out var ruleImg))
+        {
+            var sprite = UISpriteMaster.Neutral(skin.AltarHeaderRule);
+            float y = rule.anchoredPosition.y + rule.rect.height * (0.5f - rule.pivot.y);   // 지금 선의 가운데(위에서 220)
+            rule.pivot = new Vector2(0.5f, 0.5f);
+            rule.sizeDelta = new Vector2(rule.sizeDelta.x, RuleArtH);
+            rule.anchoredPosition = new Vector2(rule.anchoredPosition.x, y);
+            ruleImg.sprite = sprite;
+            ruleImg.type   = Image.Type.Sliced;
+            ruleImg.pixelsPerUnitMultiplier = Mathf.Max(1f, sprite.rect.height / RuleArtH);
+            ruleImg.color  = UITheme.Thin.InkA(0.30f);
+        }
+
+        // 탭 선택 밑줄 — 글자 아래 가운데 104×15(가운데 마름모가 늘지 않게 Simple). 비선택은 밑줄 없음(SetMode).
+        foreach (var underline in new[] { achievementTabUnderline, unlockTabUnderline })
+        {
+            if (underline == null || skin.AltarTabUnderline == null) continue;
+            var urt = underline.rectTransform;
+            urt.anchorMin = urt.anchorMax = new Vector2(0.5f, 0f);
+            urt.pivot = new Vector2(0.5f, 0.5f);
+            urt.anchoredPosition = Vector2.zero;
+            urt.sizeDelta = TabUnderlineSize;
+            underline.sprite = UISpriteMaster.Neutral(skin.AltarTabUnderline);
+            underline.type   = Image.Type.Simple;
+            underline.preserveAspect = true;
+            underline.color  = UITheme.Thin.Gold;
+        }
+
+        // 새 소식 점 — 금 마름모(원색). 지금 점 자리 가운데에 12×12.
+        if (achievementBadge != null && skin.AltarNewsDot != null)
+        {
+            var brt = achievementBadge.rectTransform;
+            var c = (brt.anchorMin + brt.anchorMax) * 0.5f;
+            brt.anchorMin = brt.anchorMax = c;
+            brt.pivot = new Vector2(0.5f, 0.5f);
+            brt.anchoredPosition = Vector2.zero;
+            brt.sizeDelta = new Vector2(NewsDotSize, NewsDotSize);
+            achievementBadge.sprite = skin.AltarNewsDot;
+            achievementBadge.type   = Image.Type.Simple;
+            achievementBadge.preserveAspect = true;
+            achievementBadge.color  = Color.white;
+        }
+
+        // 닫기 판 — 둥근 회색 판 → 남색 짧은 칸(재색칠 · 9-slice)
+        if (closeButton != null && skin.AltarCloseButton != null && closeButton.TryGetComponent<Image>(out var closeArt))
+            ShopUIStyle.Skin(closeArt, skin.AltarCloseButton, sliced: true);
+    }
 
     /// <summary>
     /// 해금 탭을 트리로 — 예전 5열 목록은 숨기고, 헤더 가로줄 아래 영역에 트리(왼쪽)와 상세 패널(오른쪽)을 세운다.
@@ -235,6 +380,39 @@ public class UI_AwakeningPanel : UI_Popup
         _tree.NodeFocused   += OnTreeFocused;
         _tree.NodeSubmitted += OnTreeSubmitted;
         _detail.ActionClicked += OnDetailAction;
+
+        // 해금 확인 카드(10-14) — 트리 · 상세 · 배너 위. [해금한다]만 산다.
+        _confirm = AltarConfirmCard.Create(root);
+        _confirm.Confirmed += OnConfirmUnlock;
+        _confirm.Cancelled += OnConfirmCancelled;
+    }
+
+    /// <summary>
+    /// 해금 요청(상세 [해금] · 고른 노드 다시 누름) — 바로 사지 않고 확인 카드를 띄운다. 살 수 없는 노드면 거절 소리만(이유는 상세 패널에 있다).
+    /// 고행자의 인장(이미 연 것)은 착용 스위치라 되돌릴 수 있어 확인 없이 바로.
+    /// </summary>
+    private void RequestUnlock(MemoryAltarNode node)
+    {
+        if (readOnly || node == null || _confirm == null) return;
+        if (node.Id == MemoryAltarCatalog.SigilAscetic && MemoryAltarService.IsUnlocked(node.Id)) { PurchaseNode(node); return; }
+        var model = _presenter.Detail(node, MemoryAltarService.Essence, readOnly);
+        if (!model.ButtonEnabled) { ShopUIStyle.PlaySfx("shop_reject"); return; }
+        _confirmNode = node;
+        PlayClickSfx();
+        _confirm.Show(model, MemoryAltarService.Essence);
+    }
+
+    private void OnConfirmUnlock()
+    {
+        var node = _confirmNode;
+        _confirmNode = null;
+        PurchaseNode(node);
+    }
+
+    private void OnConfirmCancelled()
+    {
+        _confirmNode = null;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);
     }
 
     private void SetMode(bool achievements)
@@ -376,13 +554,25 @@ public class UI_AwakeningPanel : UI_Popup
         dst.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
     }
 
-    /// <summary>미수령 업적이 있으면 탭에 ●를 켠다 — 이 점 하나가 업적을 열게 만든다.</summary>
+    /// <summary>미수령 업적이 있으면 탭에 ●를 켠다 — 이 점 하나가 업적을 열게 만든다. 건너가는 버튼(10-14)도 같은 수를 말한다.</summary>
     private void RefreshBadge()
     {
         int waiting = WaitingAchievements();
         if (achievementBadge) achievementBadge.gameObject.SetActive(waiting > 0);
         if (achievementTabLabel)
             achievementTabLabel.text = waiting > 0 ? $"업적  {waiting}" : "업적";
+        if (_viewLinkLabel == null) return;
+        if (_achievementMode)
+        {
+            _viewLinkLabel.text  = "←  기억의 제단 · 해금";
+            _viewLinkLabel.color = AltarPalette.TextPrimary;
+        }
+        else
+        {
+            _viewLinkLabel.text  = waiting > 0 ? $"업적  ·  받을 것 {waiting}  →" : "업적 보기  →";
+            _viewLinkLabel.color = waiting > 0 ? AltarPalette.Gold : AltarPalette.TextPrimary;
+        }
+        UIAffordGlow.Set(_viewLink.targetGraphic, !_achievementMode && waiting > 0);
     }
 
     /// <summary>
@@ -480,11 +670,11 @@ public class UI_AwakeningPanel : UI_Popup
         if (node.Id == MemoryAltarCatalog.SigilAscetic && MemoryAltarService.IsUnlocked(node.Id))
         {
             AsceticSigilService.Toggle();
-            ShopUIStyle.PlaySfx("shop_click");
+            ShopUIStyle.PlaySfx("altar_buy");
             SaveAndRefreshAsync().Forget();
             return;
         }
-        if (MemoryAltarService.IsUnlocked(node.Id)) return;
+        if (MemoryAltarService.GetState(node).Maxed) return;   // 10-14 강화형 — 다 올린 것만 막는다
 
         // 연출은 「해금 전 → 뒤」를 비교해 새로 열린 것만 움직인다 — 사기 전 화면 상태를 떠 둔다.
         _before.Clear();
@@ -538,17 +728,7 @@ public class UI_AwakeningPanel : UI_Popup
         try
         {
             await _tree.PlayOpenAsync(ct);
-
-            // 새 시기 고리가 처음 드러났다(붕괴 · 엔딩 뒤 첫 방문) — 고리가 그려지고 그 띠의 노드가 스며든다(10-02). 봉인기는 처음부터라 연출 없음.
-            var data = BackendGameData.Instance?.Data;
-            int era  = MemoryAltarCatalog.RevealedEra;
-            int seen = Mathf.Max(1, data?.GetRecord(MemoryAltarCatalog.Rec.AltarEraSeen) ?? 1);
-            if (data != null && era > seen)
-            {
-                for (int e = seen + 1; e <= era; e++) await _tree.PlayEraRevealAsync(e, ct);
-                data.SetRecordMax(MemoryAltarCatalog.Rec.AltarEraSeen, era);
-                if (!readOnly) SaveAsync().Forget();
-            }
+            // 시기 고리 공개 연출(10-02)은 10-14에 걷었다 — 처음부터 모든 칸이 보인다(사용자 「시기에 따라 늘어나는 것은 불편」).
         }
         catch (OperationCanceledException) { }
     }
@@ -564,7 +744,10 @@ public class UI_AwakeningPanel : UI_Popup
         EnsureBanner();
         if (_banner == null) return;
 
-        if (_bannerTitle != null) _bannerTitle.text = $"열렸다 — {node.DisplayName}";
+        if (_bannerTitle != null)
+            _bannerTitle.text = node.IsLeveled
+                ? $"강화 — {node.DisplayName}  Lv {MemoryAltarService.Level(node.Id)}"
+                : $"열렸다 — {node.DisplayName}";
         if (_bannerDesc  != null) _bannerDesc.text  = node.Description;
 
         _banner.gameObject.SetActive(true);
@@ -604,7 +787,11 @@ public class UI_AwakeningPanel : UI_Popup
         }
     }
 
-    /// <summary>배너를 1회 만든다. 프리팹에 없는 요소라 런타임에 세운다. 공통 글래스 판(09-29).</summary>
+    /// <summary>
+    /// 배너를 1회 만든다. 프리팹에 없는 요소라 런타임에 세운다. 공통 글래스 판(09-29).
+    /// <para>10-13 Artsystack — 글래스 위에 빛 띠(message_slot_1 무채 + 금 45%)와 왼쪽 열림 배지(lock_3 금). 제단 화면의 후광은 이 띠 한 곳이다.
+    /// 띠 위아래 선이 테를 대신해 금 테는 걷는다. 그림이 없으면 예전 판 + 가운데 글자.</para>
+    /// </summary>
     private void EnsureBanner()
     {
         if (_banner != null) return;
@@ -619,21 +806,58 @@ public class UI_AwakeningPanel : UI_Popup
         _banner.sizeDelta = new Vector2(560f, 76f);
         _banner.anchoredPosition = new Vector2(0f, BannerY);
 
+        var skin  = UISkin.Achievement;
+        var strip = skin != null ? skin.AltarBannerStrip : null;
+        var badge = skin != null ? skin.AltarUnlock : null;
+
         var bg = go.AddComponent<Image>();
-        UITheme.StylePanel(bg, BannerFill, UITheme.GoldLine, 12f);
+        UITheme.StylePanel(bg, strip != null ? UITheme.Glass : BannerFill, UITheme.GoldLine, 12f);
         bg.raycastTarget = false;                 // 통보일 뿐 — 아래 조작을 막으면 안 된다
         _bannerGroup     = go.AddComponent<CanvasGroup>();
         _bannerGroup.blocksRaycasts = false;
         _bannerGroup.interactable   = false;
 
-        _bannerTitle = MakeBannerText("Title", 22f, FontStyles.Bold,   AltarPalette.Gold,   new Vector2(0f, -12f), 28f);
-        _bannerDesc  = MakeBannerText("Desc",  16f, FontStyles.Normal, AltarPalette.Essence, new Vector2(0f, -42f), 24f);
+        if (strip != null)
+        {
+            var band = MakeBannerImage("Strip", UISpriteMaster.Neutral(strip), UITheme.Thin.WithA(UITheme.Thin.Gold, 0.45f));
+            var brt  = band.rectTransform;
+            brt.anchorMin = Vector2.zero; brt.anchorMax = Vector2.one; brt.offsetMin = brt.offsetMax = Vector2.zero;
+            var edge = bg.transform.Find("Edge");
+            if (edge != null) edge.gameObject.SetActive(false);
+        }
+        float textLeft = 14f;
+        var   align    = TextAlignmentOptions.Center;
+        if (badge != null)
+        {
+            var icon = MakeBannerImage("Badge", badge, UITheme.Thin.Gold);
+            var irt  = icon.rectTransform;
+            irt.anchorMin = irt.anchorMax = new Vector2(0f, 0.5f);
+            irt.sizeDelta = new Vector2(BannerBadge, BannerBadge);
+            irt.anchoredPosition = new Vector2(24f + BannerBadge * 0.5f, 0f);
+            icon.preserveAspect = true;
+            textLeft = BannerTextLeft;
+            align    = TextAlignmentOptions.Left;
+        }
+
+        _bannerTitle = MakeBannerText("Title", 22f, FontStyles.Bold,   AltarPalette.Gold,   -12f, 28f, textLeft, align);
+        _bannerDesc  = MakeBannerText("Desc",  16f, FontStyles.Normal, AltarPalette.Essence, -42f, 24f, textLeft, align);
 
         go.SetActive(false);
     }
 
+    private Image MakeBannerImage(string name, Sprite sprite, Color color)
+    {
+        var img = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer)).AddComponent<Image>();
+        img.rectTransform.SetParent(_banner, false);
+        img.sprite = sprite;
+        img.color  = color;
+        img.raycastTarget = false;
+        return img;
+    }
+
+    /// <summary>배너 글자 한 줄 — 위에서 <paramref name="top"/>(음수)부터 <paramref name="height"/>. 왼쪽은 배지가 있으면 그 오른쪽부터.</summary>
     private TMP_Text MakeBannerText(string name, float size, FontStyles style, Color color,
-                                    Vector2 pos, float height)
+                                    float top, float height, float left, TextAlignmentOptions align)
     {
         var go = new GameObject(name, typeof(RectTransform));
         var rt = (RectTransform)go.transform;
@@ -641,10 +865,8 @@ public class UI_AwakeningPanel : UI_Popup
         rt.anchorMin = new Vector2(0f, 1f);
         rt.anchorMax = new Vector2(1f, 1f);
         rt.pivot     = new Vector2(0.5f, 1f);
-        rt.offsetMin = new Vector2(14f, rt.offsetMin.y);
-        rt.offsetMax = new Vector2(-14f, rt.offsetMax.y);
-        rt.anchoredPosition = pos;
-        rt.sizeDelta = new Vector2(rt.sizeDelta.x, height);
+        rt.offsetMin = new Vector2(left, top - height);
+        rt.offsetMax = new Vector2(-14f, top);
 
         var txt = go.AddComponent<TextMeshProUGUI>();
         txt.fontSize      = size;
@@ -654,7 +876,7 @@ public class UI_AwakeningPanel : UI_Popup
         txt.fontSizeMin      = Mathf.Max(9f, size * 0.55f);
         txt.fontStyle     = style;
         txt.color         = color;
-        txt.alignment     = TextAlignmentOptions.Center;
+        txt.alignment     = align;
         txt.raycastTarget = false;
         txt.textWrappingMode = TextWrappingModes.NoWrap;
         txt.overflowMode  = TextOverflowModes.Ellipsis;
@@ -677,16 +899,20 @@ public class UI_AwakeningPanel : UI_Popup
 
     private static int WaitingAchievements() => Managers.Quest?.WaitingAchievementCount() ?? 0;
 
-    private static void PlayClickSfx() => Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+    private static void PlayClickSfx() => Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
 
     private void HandleClaimed() => Refresh();
 
     // ── Event Handlers ────────────────────────────────────────────────────
 
-    private void OnCloseClicked()
+    private void OnCloseClicked() => ClosePopupUI();
+
+    /// <summary>닫기 버튼 · ESC 같은 길 — 닫기 소리는 여기서 한 번. 해금 확인 카드가 떠 있으면 그것만 닫는다(제단은 그대로).</summary>
+    public override void ClosePopupUI()
     {
-        PlayClickSfx();
-        ClosePopupUI();
+        if (_confirm != null && _confirm.IsOpen) { _confirm.Hide(); OnConfirmCancelled(); return; }
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);
+        base.ClosePopupUI();
     }
 
     /// <summary>하단 행동 바 = 업적 탭의 [모두 받기]. 스태거 연출·저장은 목록 뷰가 소유하므로 위임한다.</summary>
@@ -698,11 +924,11 @@ public class UI_AwakeningPanel : UI_Popup
 
     private void OnTreeFocused(MemoryAltarNode node)
     {
-        if (!_refreshing) ShopUIStyle.PlaySfx("shop_select");
+        if (!_refreshing) ShopUIStyle.PlaySfx(SoundEvent.UiSelect);   // 제단 포커스 — 상점 좌판 소리(shop_select)와 나눈다
         _detail?.Show(_presenter.Detail(node, MemoryAltarService.Essence, readOnly));
     }
 
-    private void OnTreeSubmitted(MemoryAltarNode node) => PurchaseNode(node);
+    private void OnTreeSubmitted(MemoryAltarNode node) => RequestUnlock(node);
 
-    private void OnDetailAction() => PurchaseNode(_tree != null ? _tree.FocusedNode : null);
+    private void OnDetailAction() => RequestUnlock(_tree != null ? _tree.FocusedNode : null);
 }

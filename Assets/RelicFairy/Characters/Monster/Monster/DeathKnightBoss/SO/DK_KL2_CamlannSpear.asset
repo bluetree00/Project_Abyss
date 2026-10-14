@@ -25,7 +25,7 @@ MonoBehaviour:
   lineAim: 0.2
   lineTelegraph: 0.5
   crossDelay: 0.9
-  lockLead: 0.4
+  lockLead: 0.45
   recoveryTime: 0.5
   crossRadius: 2.2
   lineVfxPrefab: {fileID: 1644958980890870, guid: d0ebac18aae7a7349a6feb3ac42cbccd,

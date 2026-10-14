@@ -35,7 +35,7 @@ MonoBehaviour:
   _cameraReturnDuration: 1.2
   _slowReleaseRatio: 0.15
   _lightHeightOffset: 9
-  _lightIntensity: 4
+  _lightIntensity: 2
   _lightRange: 60
   _lightSpotAngle: 55
   _lightColor: {r: 1, g: 0.85, b: 0.6, a: 1}
@@ -70,7 +70,7 @@ MonoBehaviour:
   _scorchScaleMin: 1.8
   _scorchScaleMax: 4.95
   _scorchPerpJitter: 0.8
-  _fireVisualCount: 3
+  _fireVisualCount: 0
   _fireScaleMin: 0.13
   _fireScaleMax: 0.27
   _cooldown: 26

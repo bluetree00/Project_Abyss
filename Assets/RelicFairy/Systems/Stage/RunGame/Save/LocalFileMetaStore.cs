@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 /// <summary>
@@ -25,7 +25,8 @@ public sealed class LocalFileMetaStore
     /// <summary>슬롯 메타를 로드한다(없거나 손상 시 null → 호출측이 시작값을 정한다).</summary>
     public UserGameData Load(int slot)
     {
-        string json = SaveFileIO.ReadWithBackup(FilePath(slot), Tag);
+        string json = SaveFileIO.ReadWithBackup(FilePath(slot), Tag,
+                                                j => JsonUtility.FromJson<UserGameData>(j) != null);
         if (string.IsNullOrWhiteSpace(json)) return null;
 
         try

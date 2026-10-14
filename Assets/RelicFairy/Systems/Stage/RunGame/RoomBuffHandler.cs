@@ -202,7 +202,15 @@ public sealed class RoomBuffHandler
 
     private void EnforceSlotLimit()
     {
+        // 가장 오래된 버프부터 지우되, 런 유지 버프(상점 축복 — 99방)는 남긴다. 예전엔 한 룬의 피격 버프(1방)가 쌓여
+        // 돈 주고 산 축복을 밀어냈다(10-09 출시 점검)
         while (_activeBuffs.Count > _maxSlots)
-            _activeBuffs.RemoveAt(0); // 가장 오래된 버프 삭제
+        {
+            int victim = _activeBuffs.FindIndex(b => b.BaseDuration < RunLongRooms);
+            _activeBuffs.RemoveAt(victim >= 0 ? victim : 0);
+        }
     }
+
+    /// <summary>이 방 수 이상이면 「런 유지」 버프로 본다(상점 축복 99방).</summary>
+    private const int RunLongRooms = 50;
 }

@@ -15,7 +15,8 @@ using UnityEngine.UI;
 /// </summary>
 public sealed class BuffCell : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
-    private static readonly Color BuffBg   = new(0.10f, 0.12f, 0.16f, 0.85f);
+    // 톤 v2(10-11)면 바탕 = HUD 원형 칸과 같은 글래스(검은 띠로 읽히지 않게) · 디버프는 붉은 바탕 그대로
+    private static readonly Color BuffBg   = CombatPanelView.ThinHud ? new(0.063f, 0.059f, 0.086f, 0.65f) : new(0.10f, 0.12f, 0.16f, 0.85f);
     private static readonly Color DebuffBg = new(0.35f, 0.12f, 0.12f, 0.88f);
 
     // 스킨 모드: 배경 아트를 유지한 채 디버프만 붉게 틴트(디버프 신호 보존).
@@ -102,13 +103,14 @@ public sealed class BuffCell : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _sweep.fillAmount     = 0f;
         _sweep.gameObject.SetActive(false);
 
-        // 테두리 오버레이(아이콘 위) — 스킨 시에만 생성
+        // 테두리 오버레이(아이콘 위) — 스킨 시에만 생성. 톤 v2 = 1px 사각 테(평소 선 잉크 18%, 10-11 선 굵기 세 가지)
         if (frameSprite != null)
         {
             var frame = CreateChildImage("Frame", Vector2.zero, Vector2.one);
             frame.sprite        = frameSprite;
             frame.type          = Image.Type.Sliced;
             frame.raycastTarget = false;
+            if (CombatPanelView.ThinHud) frame.color = UITheme.Thin.LineIdle;
         }
 
         // 스택 숫자(칸 우하단)
@@ -123,7 +125,7 @@ public sealed class BuffCell : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _stack = stackGo.AddComponent<TextMeshProUGUI>();
         if (font != null) _stack.font = font;
         _stack.fontSize  = 13f;
-        _stack.fontStyle = FontStyles.Bold;
+        _stack.fontStyle = CombatPanelView.ThinHud ? FontStyles.Normal : FontStyles.Bold;   // 톤 v2 — 가짜 굵게 없음
         _stack.color     = new Color(1f, 0.95f, 0.7f, 1f);
         _stack.alignment = TextAlignmentOptions.BottomRight;
         _stack.raycastTarget = false;

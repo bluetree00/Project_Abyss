@@ -94,6 +94,7 @@ public class DKNormalSlashState : FullLockState<DKNormalSlashPatternSO>
     public override void Update(MonsterContext ctx)
     {
         _timer += Time.deltaTime * AnimSpeed(ctx);
+        DKPage2Zone.SettleAfterSwing(ctx, AnimName);   // 휘두른 끝 자세로 서 있지 않게 — 남은 라운드는 기본 자세로
 
         // 경고 타일 생성
         if (!_tilesSpawned && _timer >= Data.warningDuration)
@@ -110,13 +111,12 @@ public class DKNormalSlashState : FullLockState<DKNormalSlashPatternSO>
                 if (z % 2 == 1) _matchingRows.Add(z);
         }
 
-        // hitTime: 타일 제거
+        // hitTime: 줄 베기 시작 — 칸은 마지막 줄을 벨 때까지 남긴다(플레이어 쪽 줄은 1~2초 뒤에 베인다 · 10-08 점검,
+        // QuickStrike · SoulSpear의 「판정까지 예고 유지」와 같게)
         if (!_tilesDestroyed && _timer >= Data.hitTime)
-        {
             _tilesDestroyed = true;
-            DKGridPatternHelper.DestroyEdges(_edges);
-            DKGridPatternHelper.DestroyTiles(_tiles);
-        }
+
+        DKGridPatternHelper.ArmBefore(_timer, Data.hitTime + VfxDelay, _tiles, _swordColor);   // 판정 0.25초 전 위험 칸을 붉게(10-11) — 첫 줄 기준, 칸은 마지막 줄까지 남는다
 
         // hitTime + VfxDelay + n*hitStep: 줄마다 VFX + 피격
         if (_tilesDestroyed && _rowIndex < _matchingRows.Count)
@@ -137,6 +137,11 @@ public class DKNormalSlashState : FullLockState<DKNormalSlashPatternSO>
                     BossImpactFeedback.TriggerHitStop(0.08f);
                 BossImpactFeedback.TriggerCameraShake(0.1f, 0.2f);
                 _rowIndex++;
+                if (_rowIndex >= _matchingRows.Count)
+                {
+                    DKGridPatternHelper.DestroyEdges(_edges);
+                    DKGridPatternHelper.DestroyTiles(_tiles);
+                }
             }
         }
 

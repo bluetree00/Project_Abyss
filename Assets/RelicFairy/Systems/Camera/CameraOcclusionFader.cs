@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -26,10 +26,12 @@ public class CameraOcclusionFader : MonoBehaviour
     // 이 프로젝트의 석재·목재는 대부분 커스텀 ShaderGraph라 URP 표준 이름을 쓰지 않는다:
     //   · Gothic_Interior(봉인 석문 4종) = _BaseColorMap / _BaseColor
     //   · Leartes S_Masking(숲 봉인문 뿌리) = _Base, 색 프로퍼티 없음
+    //   · Gothic_Interior 셰이더그래프(S_OpaqueORM · WorldAlign · TransparentORM — 방 벽 · 철창 · 나무문) = Texture2D_2A1A8040(「Material 01 Base Map」) /
+    //     Texture2D_7EA392D1(「Material 01 Normal」) — 10-09 전주기 시뮬
     // _BaseMap만 보면 전부 실패해 텍스처 없는 흰 판으로 페이드된다.
-    private static readonly string[] TextureProps = { "_BaseMap", "_BaseColorMap", "_MainTex", "_Base", "_Albedo" };
+    private static readonly string[] TextureProps = { "_BaseMap", "_BaseColorMap", "_MainTex", "_Base", "_Albedo", "Texture2D_2A1A8040" };
     private static readonly string[] ColorProps   = { "_BaseColor", "_Color", "_BaseTintColor", "_MainColor" };
-    private static readonly string[] NormalProps  = { "_BumpMap", "_NormalMap", "_Normal" };
+    private static readonly string[] NormalProps  = { "_BumpMap", "_NormalMap", "_Normal", "Texture2D_7EA392D1" };
 
     // ── SerializeField ────────────────────────────────────────────────────
     [Header("Detection")]

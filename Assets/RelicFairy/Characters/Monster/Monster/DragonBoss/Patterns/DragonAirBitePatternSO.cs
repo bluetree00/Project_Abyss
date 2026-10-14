@@ -443,7 +443,7 @@ internal sealed class DragonAirBreathState : FullLockState<DragonAirBreathPatter
             if (player == null)
                 continue;
 
-            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier));
+            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier), ctx.Monster.gameObject);   // 공격자 = 화룡(10-08 점검)
             Data.playerStatusEffect?.Apply(player);
             break;
         }
@@ -519,10 +519,26 @@ internal sealed class DragonAirBreathState : FullLockState<DragonAirBreathPatter
         return forward.normalized;
     }
 
+    private const float BiteMaxReach = 6f;   // 착탄점은 화룡 발밑에서 이만큼 안
+
     private Vector3 GetGroundTarget(MonsterContext ctx)
     {
         Vector3 origin = ctx.Transform.position;
         origin.y = ctx.Runtime.SpawnPosition.y;
+
+        // 10-14 화룡 위협 — 자기 정면 1.35 m가 아니라 물기 판정 순간 플레이어가 있을 자리(지금 속도 · 6 m 안)
+        if (ctx.Runtime.PlayerTarget != null)
+        {
+            Vector3 aim = DragonThreat.PredictPlayer(ctx, Data.HitTime) - origin;
+            aim.y = 0f;
+            if (aim.sqrMagnitude > 0.01f)
+            {
+                float reach = Mathf.Clamp(aim.magnitude, Data.AttackCenterForwardOffset, BiteMaxReach);
+                Vector3 hitPos = origin + aim.normalized * reach;
+                hitPos.y = ctx.Runtime.SpawnPosition.y;
+                return hitPos;
+            }
+        }
 
         Vector3 forward = ctx.Transform.forward;
         forward.y = 0f;

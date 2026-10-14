@@ -74,6 +74,7 @@ public sealed class IntroArenaLoader : MonoBehaviour
             go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
             go.transform.localScale = Vector3.one;
             _arena = go.transform;
+            BrokenLodGuard.Apply(go);   // 깨진 하위 LOD(벽 촛대 · 10-12 D11) — LOD0 고정
 
             Rebind(_arena);
         }

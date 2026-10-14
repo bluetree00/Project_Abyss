@@ -24,7 +24,7 @@ MonoBehaviour:
   _cooldown: 16
   _lineCount: 2
   _aimSeconds: 1.2
-  _lockSeconds: 0.4
+  _lockSeconds: 0.5
   _trackDegPerSec: 120
   _lineGap: 0.35
   _lineWidth: 3
@@ -36,7 +36,7 @@ MonoBehaviour:
     type: 3}
   _waveVfxScale: 1.4
   _waveSpacing: 3
-  _waveSpeed: 45
+  _waveSpeed: 150
   _mouthVfxPrefab: {fileID: 1766868900565162, guid: f82a1a892a042c1438f8f4704a37e11b,
     type: 3}
   _mouthVfxScale: 1.5

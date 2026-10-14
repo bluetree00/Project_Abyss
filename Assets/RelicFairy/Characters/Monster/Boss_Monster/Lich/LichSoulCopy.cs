@@ -141,6 +141,7 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
     private const float  HitInterval  = 0.15f;
     private const float  AttackWarn   = 0.5f;   // 0.4 → 0.5(10-02 — 짧은 예고 늘리기)
     private const float  AttackGap    = 0.55f;   // 콤보 연타는 이 간격 안이면 한 번으로
+    private const float  CatchUpSpeed = 18f;     // 벤 뒤 녹화 자리로 따라붙는 속도(m/s) — 예고 동안 멈췄던 만큼
     private const float  SlashLength  = 7f;
     private const float  SlashWidth   = 2.4f;
     private const float  SlashSpeed   = 45f;
@@ -169,7 +170,7 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
     private GameObject     _telegraph;
     private Vector3        _telegraphDir;
     private float          _strikeAt = -1f;
-    private GameObject     _aura;
+    private bool           _catchUp;   // 벤 뒤 녹화 자리로 따라붙는 중
     private bool           _gone;
     private MaterialFade.FadeInHandle _fadeIn;   // 페이드가 렌더러마다 복제한 재질 — 파괴 때 거둔다
 
@@ -199,7 +200,6 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
     {
         s_live.Remove(this);
         PatternGuideHelper.SafeDestroy(ref _telegraph);
-        LichVfx.Stop(ref _aura);
         // 복제 재질은 오브젝트와 함께 사라지지 않는다 — 직접 거둔다(10-03)
         if (_fadeIn != null)
             foreach (var m in _fadeIn.Mats) if (m != null) Destroy(m);
@@ -251,7 +251,7 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
         go.transform.SetPositionAndRotation(anchor, player.transform.rotation);
         Destroy(holder);
 
-        copyC._aura = LichVfx.PlayLoop(LichVfxSlot.BossAura, anchor + Vector3.up * 0.05f, Quaternion.identity, 0.45f, go.transform);
+        // 바닥 위치 표식(BossAura 반복)은 공중 리치용 — 바닥에 선 복제체에는 붙이지 않는다(10-11 이펙트 톤 점검)
         // 잔상(PhantomShow)은 카드가 제단 전체로 흩어져 화면을 덮는다(09-19 실측) — 나타남 연기로.
         LichVfx.Play(LichVfxSlot.TeleportAppear, anchor, Quaternion.identity, 0.7f);
         s_live.Add(copyC);
@@ -381,6 +381,14 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
         Vector3 flat = p - _center;
         flat.y = 0f;
         if (flat.magnitude > _coreRadius) p = _center + flat.normalized * _coreRadius + Vector3.up * (p.y - _center.y);
+        // 예고 동안은 제자리 — 예고선 · 베기 원점이 굳는다(10-13 검증: 예고가 복제체를 따라가 굳힘 0초). 벤 뒤엔 녹화 자리로 빠르게 따라붙는다
+        if (_strikeAt > 0f) p = transform.position;
+        else if (_catchUp)
+        {
+            Vector3 to = Vector3.MoveTowards(transform.position, p, CatchUpSpeed * Time.deltaTime);
+            _catchUp = (to - p).sqrMagnitude > 0.0025f;
+            p = to;
+        }
         transform.position = p;
 
         var target = _tape.Player.transform.position - p;
@@ -403,6 +411,7 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
         if (_strikeAt > 0f)
         {
             float k = 1f - (_strikeAt - Time.time) / AttackWarn;
+            // 예고 동안 복제체가 제자리라 예고선도 그대로 — 베기는 같은 자리에서 나간다
             PatternGuideHelper.SetProgress(_telegraph, k);
             if (Time.time < _strikeAt) return;
             Strike();
@@ -415,7 +424,7 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
             if (ta - AttackWarn > replayTime) return;   // 아직 예고 전
             _nextAttack++;
             float strikeAt = ta + LichSoulTape.Delay;
-            if (strikeAt - _lastStrike < AttackGap || strikeAt < Time.time) continue;
+            if (strikeAt - _lastStrike < AttackGap || strikeAt - Time.time < LichPatternUtil.MinLead) continue;   // 예고가 0.45초도 못 서면 건너뛴다
             BeginTelegraph(strikeAt);
             return;
         }
@@ -437,6 +446,7 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
         PatternGuideHelper.SafeDestroy(ref _telegraph);
         _strikeAt   = -1f;
         _lastStrike = Time.time;
+        _catchUp    = true;
         Vector3 origin = FloorPos();
         LichHazards.BeamFront(_ctx, origin, _telegraphDir, SlashLength, SlashWidth * 0.5f, SlashSpeed, SlashDamage, 0.5f);
         LichPatternUtil.SlashVfx(origin, _telegraphDir, SlashLength * 0.6f, LichSwing.RightToLeft, LichPatternUtil.Arcane);
@@ -455,7 +465,6 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
         _gone = true;
         s_live.Remove(this);
         PatternGuideHelper.SafeDestroy(ref _telegraph);   // 예고는 바로 — 흐려지는 동안 베지 않는다
-        LichVfx.Stop(ref _aura);   // 붙은 오라는 먼저 풀로 — 페이드가 자식 입자를 끄면 풀 인스턴스가 꺼진 채 돌아간다
         LichVfx.Play(LichVfxSlot.TeleportVanish, transform.position + Vector3.up * 0.9f, Quaternion.identity, 0.6f);
         FadeOutAndDestroyAsync(destroyCancellationToken).Forget();
     }

@@ -24,6 +24,7 @@ public class WorldItemDisplay : MonoBehaviour
 
     // ── 비공개 필드 ─────────────────────────────────────────
     private const float VfxAudioVolume = 0.15f;
+    private const float DroppedLootScale = 1f;   // 버린 룬의 등급 기둥 — 방 보상(× 1.8)보다 작게
     private const float PromptOffsetY = 1.4f;
 
     private RuntimeItemData _runtimeData;
@@ -34,6 +35,7 @@ public class WorldItemDisplay : MonoBehaviour
     private GameObject _promptGo;
     private TextMeshPro _promptText;
     private GameObject _vfxInstance;
+    private GameObject _lootFx;   // 런 공용 등급 기둥(설정이 없을 때) — 풀 인스턴스라 OnDestroy에서 돌려준다
     private float _spawnTime;
 
     // ── Lifecycle ───────────────────────────────────────────
@@ -75,6 +77,7 @@ public class WorldItemDisplay : MonoBehaviour
     private void OnDestroy()
     {
         if (_promptGo != null) Destroy(_promptGo);
+        RunFx.Stop(ref _lootFx, 0.2f);
     }
 
     // ── Public Methods ──────────────────────────────────────
@@ -209,7 +212,18 @@ public class WorldItemDisplay : MonoBehaviour
     {
         if (_runtimeData == null) return;
 
-        string vfxKey = ResolveVfxKey(_runtimeData.rarity);
+        // 설정이 없으면(인벤토리에서 버린 룬 등) 런 공용 보상 등급 기둥을 쓴다 — 예전 기본 키(VFX_Item_Common/Rare/Epic)는
+        // Addressables에 없어 버린 룬이 안 보이고 콜라이더만 남았다(10-11 이펙트 톤 2차 D-5).
+        if (vfxConfig == null)
+        {
+            try { await RunFx.LoadAsync(); }
+            catch (System.Exception e) { Debug.LogWarning($"[WorldItemDisplay] 런 공용 이펙트 목록 로드 실패: {e.Message}"); }
+            if (this == null || _pickedUp || _lootFx != null) return;
+            _lootFx = RunFx.PlayLoop(LootSlot(_runtimeData.rarity), transform.position, DroppedLootScale, Color.clear);
+            return;
+        }
+
+        string vfxKey = vfxConfig.GetDisplayVfxKey(_runtimeData.rarity);
 
         if (!string.IsNullOrEmpty(vfxKey))
         {
@@ -234,19 +248,13 @@ public class WorldItemDisplay : MonoBehaviour
         // VFX 로드 실패 시 빈 오브젝트 (시각 없음, 콜라이더만 남음)
     }
 
-    private string ResolveVfxKey(ItemRarity rarity)
+    private static RunFxSlot LootSlot(ItemRarity rarity) => rarity switch
     {
-        if (vfxConfig != null)
-            return vfxConfig.GetDisplayVfxKey(rarity);
-
-        return rarity switch
-        {
-            ItemRarity.Common => "VFX_Item_Common",
-            ItemRarity.Rare   => "VFX_Item_Rare",
-            ItemRarity.Epic   => "VFX_Item_Epic",
-            _                 => "VFX_Item_Common",
-        };
-    }
+        ItemRarity.Legendary => RunFxSlot.LootLegendary,
+        ItemRarity.Epic      => RunFxSlot.LootEpic,
+        ItemRarity.Rare      => RunFxSlot.LootRare,
+        _                    => RunFxSlot.LootCommon,
+    };
 
     private static void ReduceAudioVolume(GameObject vfx)
     {

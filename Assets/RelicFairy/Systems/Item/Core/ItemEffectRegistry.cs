@@ -150,6 +150,24 @@ public static class ItemEffectRegistry
         // ── 발동 룬: 언제(trigger) × 무엇(룬 속성 탄두) — 빌드 컨셉 「발동 계열」 T2 ──
         Register("TriggerBurst",               s => new TriggerBurstEffect(s));
 
+        // ── 룬 재설계 R1 · R2(10-14 빌드 시너지 3-R) — Conditional/BuildRuneEffects.cs ──
+        Register("TargetGradeBonus",           s => new TargetGradeBonusEffect(s));
+        Register("FarHitBonus",                s => new FarHitBonusEffect(s));
+        Register("MoveChargeNextHit",          s => new MoveChargeNextHitEffect(s));
+        Register("CalmNextCrit",               s => new CalmNextCritEffect(s));
+        Register("CritDamageStack",            s => new CritDamageStackEffect(s));
+        Register("KillBurstRadius",            s => new KillBurstRadiusEffect(s));
+        Register("HeavyBreakVulnerable",       s => new HeavyBreakVulnerableEffect(s));
+        Register("FirstHeavyInRoom",           s => new FirstHeavyInRoomEffect(s));
+        Register("FrostOnHit",                 s => new FrostOnHitEffect(s));
+        Register("HurtGuardFrost",             s => new HurtGuardEffect(s, shadow: false));
+        Register("HurtGuardShadow",            s => new HurtGuardEffect(s, shadow: true));
+        Register("RoomShieldBurst",            s => new RoomShieldBurstEffect(s));
+        Register("PoisonSpreadOnKill",         s => new PoisonSpreadOnKillEffect(s));
+        Register("DashAfterimage",             s => new DashAfterimageEffect(s));
+        Register("PierceChainBonus",           s => new PierceChainBonusEffect(s));
+        Register("CondDamageReduction",        s => new ConditionalStatBuffEffect(s));
+
         // ── 특수 ────────────────────────────────────────────
         Register("PoisonApple",                s => new PoisonAppleEffect(s));
         Register("RandomElement",              s => new RandomElementEffect(s));

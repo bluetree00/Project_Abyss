@@ -139,6 +139,7 @@ public class BossPatternRunner
         if (_wasInPattern && !inPattern && _config != null)
         {
             _lastPatternEndTime = Time.time;
+            bool forced = false;
             if (_pendingForce.pattern != null)
             {
                 var pending = _pendingForce;
@@ -150,9 +151,12 @@ public class BossPatternRunner
                 {
                     _patternBreakCooldown = 0f;
                     ExecutePattern(pending.pattern);
+                    forced = true;
                 }
             }
-            else
+            // 버린 보류 패턴 뒤에도 평소처럼 쉰다 — 리치 전환이 실행 중 자기 자신을 보류로 걸었다가 끝에서 버리면서
+            // 쉬는 시간 없이 다음 패턴이 바로 나갔다(10-06 연출 점검: 컷신 끝 0.6초 뒤 공격)
+            if (!forced)
             {
                 _patternBreakCooldown = (_lastPatternSO != null && _lastPatternSO.breakOverride >= 0f)
                     ? _lastPatternSO.breakOverride

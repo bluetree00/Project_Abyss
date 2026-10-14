@@ -60,6 +60,7 @@ public sealed class ItemEffectManager
                     ? Scaled(slot, BuildImprint.EffectMultiplier(fam), fam, stage) : slot);
                 if (effect == null) continue;
                 if (effect is TriggerBurstEffect burst) burst.SetElement(item.element);   // 탄두 = 이 룬의 속성
+                else if (effect is PoisonOnHitEffect dot) dot.SetElement(item.element);  // 불 룬 = 화상(10-11)
 
                 _activeEffects.Add(effect);
                 effect.OnActivate(_ctx);
@@ -69,13 +70,16 @@ public sealed class ItemEffectManager
 
     /// <summary>
     /// 각인 단계를 입힌 슬롯 사본 — 원본(인벤토리 룬)은 건드리지 않는다. 주 수치(value)는 배율로 키우고,
-    /// 연격은 연타 요구 수(value2)를 단계만큼 줄이고(최소 2), 처치 발동 룬은 폭발 반경(value3)을 단계마다 15% 넓힌다.
+    /// 연격은 연타 요구 수(value2)를 단계만큼 줄이고(최소 2), 필살은 「치명 N회」 요구를 단계만큼 줄이고(최소 3 · 10-14 A2),
+    /// 처치 발동 룬은 폭발 반경(value3)을 단계마다 15% 넓힌다.
     /// </summary>
     private static ItemEffectSlot Scaled(ItemEffectSlot s, float mult, BuildFamily fam, int stage)
     {
         float v2 = s.value2, v3 = s.value3;
         if (fam == BuildFamily.Combo && (s.trigger == "SameTarget" || s.trigger == "OnHitCount") && v2 > 2f)
             v2 = UnityEngine.Mathf.Max(2f, v2 - stage);
+        if (fam == BuildFamily.Crit && s.trigger == "OnCritCount" && v2 > 3f)
+            v2 = UnityEngine.Mathf.Max(3f, v2 - stage);
         if (fam == BuildFamily.Kill && s.effectType == "TriggerBurst" && v3 > 0f)
             v3 *= 1f + 0.15f * stage;
         return new ItemEffectSlot

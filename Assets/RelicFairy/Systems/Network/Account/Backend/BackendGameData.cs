@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using BackEnd;
 using Cysharp.Threading.Tasks;
 using LitJson;
@@ -45,6 +45,7 @@ public class BackendGameData : MonoBehaviour
     /// 한 번 쓰고 버리는 이유: 이게 남아 있으면 0번 슬롯에서 "새 게임"을 눌러도 서버 진행이 되살아난다.
     /// </summary>
     private UserGameData _serverSnapshot;
+    private bool _needsInsert;   // 로드가 「행 없음」을 확인한 새 계정 — 이때만 Insert한다
 
     private static int ActiveSlot => RunProgressManager.Instance?.ActiveSlotIndex ?? 0;
 
@@ -102,6 +103,8 @@ public class BackendGameData : MonoBehaviour
                     if (json.Count <= 0)
                     {
                         Debug.Log("[BackendGameData] USER_DATA 없음 — Insert 실행");
+                        Data.Reset();   // 새 계정의 시작값 — Insert 안에서 비우면 저장 대체 경로까지 메타를 지운다(10-09 출시 점검)
+                        _needsInsert = true;
                         InsertAsync().Forget();
                     }
                     else
@@ -157,6 +160,9 @@ public class BackendGameData : MonoBehaviour
     /// </summary>
     public void InvalidateSlot(int slot)
     {
+        // 지운 슬롯은 처음부터 — 서버 사본(어느 슬롯이든 마지막 저장 값)으로 되살리지 않는다(10-09 출시 점검:
+        // 0번 슬롯 「새 게임」 · 삭제가 다른 슬롯의 진행을 안고 시작했다).
+        _serverSnapshot = null;
         if (_loadedSlot != slot) return;
         _loadedSlot = -1;
         LoadLocalMeta(slot);
@@ -172,7 +178,7 @@ public class BackendGameData : MonoBehaviour
         {
             Data = local;
         }
-        else if (slot == PrimarySlot && _serverSnapshot != null)
+        else if (slot == PrimarySlot && _serverSnapshot != null && !AnySlotMeta())
         {
             // 계정의 원래 진행을 0번 슬롯이 물려받는다(기존 플레이어 이관). 딱 한 번만.
             Data = _serverSnapshot;
@@ -187,13 +193,24 @@ public class BackendGameData : MonoBehaviour
         }
 
         _loadedSlot = slot;
+        RelicMemoryHints.ForgetSession();   // 기록 원본이 바뀌었다 — 첫 경험 자막 캐시도 버린다
+        WeaponFormHints.ForgetSession();
         OnDataLoaded?.Invoke();
     }
 
-    /// <summary>회원가입 완료 시 호출. USER_DATA 테이블에 초기 row를 삽입한다.</summary>
+    /// <summary>슬롯 메타 파일이 하나라도 있으면 이미 로컬 시대 계정 — 서버 사본은 옛(로컬 이전) 플레이어 이관에만 쓴다.</summary>
+    private bool AnySlotMeta()
+    {
+        for (int i = 0; i < RunProgressManager.SlotCount; i++)
+            if (_metaStore.HasSave(i)) return true;
+        return false;
+    }
+
+    /// <summary>회원가입 완료 시 호출. USER_DATA 테이블에 지금 Data로 row를 삽입한다.
+    /// 여기서 Data를 비우지 않는다 — 예전엔 첫 줄이 Data.Reset()이라, 오프라인 · 로드 실패 세션의 SaveAsync가
+    /// 로컬 저장 직후 이 경로로 와서 메모리 메타를 0으로 만들고 다음 저장이 0을 디스크에 덮어썼다(10-09 출시 점검).</summary>
     public async UniTask InsertAsync()
     {
-        Data.Reset();
         var param = BuildParam();
 
         var tcs = new UniTaskCompletionSource();
@@ -202,7 +219,8 @@ public class BackendGameData : MonoBehaviour
         {
             if (callback.IsSuccess())
             {
-                _rowInDate = callback.GetInDate();
+                _rowInDate   = callback.GetInDate();
+                _needsInsert = false;
                 Debug.Log($"[BackendGameData] Insert 성공: rowInDate={_rowInDate}");
                 OnDataLoaded?.Invoke();
             }
@@ -227,8 +245,10 @@ public class BackendGameData : MonoBehaviour
 
         if (string.IsNullOrEmpty(_rowInDate))
         {
-            Debug.LogWarning("[BackendGameData] SaveAsync: rowInDate 없음 — Insert로 대체");
-            await InsertAsync();
+            // 서버 행이 없다고 확인된 새 계정만 Insert — 오프라인 · 로드 실패면 서버는 건너뛴다(로컬이 권위, 서버는 백업 · 텔레메트리).
+            // 로드가 실패한 세션에서 Insert하면 행이 하나 더 생겼다.
+            if (_needsInsert) await InsertAsync();
+            else Debug.LogWarning("[BackendGameData] SaveAsync: 서버 행 없음(오프라인 · 로드 실패) — 로컬에만 저장");
             return;
         }
 

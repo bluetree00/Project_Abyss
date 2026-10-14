@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>이야기 시기(09-29 순환 개정 v3) — 보스 페이지 수 · 시나리오 장면이 본다.</summary>
@@ -88,6 +88,14 @@ public static class StoryProgress
             return false;
 #endif
         }
+    }
+
+    /// <summary>런 시작(새 런 · 이어하기) — 앞 런에서 소비되지 않은 1회성 표식(처치 건너뛰기 · 엔딩 대기)을 버린다.
+    /// 런이 그 사이에 끝나면 남아, 다음 리치 처치가 기록되지 않거나 엔딩이 다시 재생될 수 있었다(10-09 출시 점검).</summary>
+    public static void ClearRunFlags()
+    {
+        s_skipNextDefeatOf = null;
+        s_endingPending    = false;
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]

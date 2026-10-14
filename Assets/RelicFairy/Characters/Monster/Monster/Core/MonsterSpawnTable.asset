@@ -171,7 +171,7 @@ MonoBehaviour:
     enabled: 1
   - displayName: MushroomAngryMonster
     addressableKey: MushroomAngry/MushroomAngry
-    grade: 0
+    grade: 1
     poolTags: 01000000
     weight: 1
     enabled: 1
@@ -196,7 +196,7 @@ MonoBehaviour:
   - displayName: StingRayMonster
     addressableKey: StingRay/StingRay
     grade: 1
-    poolTags: 01000000
+    poolTags: 0100000004000000
     weight: 1
     enabled: 1
   - displayName: DragonBossMonster
@@ -238,6 +238,6 @@ MonoBehaviour:
   - displayName: LichSkeletonMonster
     addressableKey: LichSkeleton/LichSkeleton
     grade: 1
-    poolTags: 04000000
+    poolTags: 
     weight: 1
     enabled: 1

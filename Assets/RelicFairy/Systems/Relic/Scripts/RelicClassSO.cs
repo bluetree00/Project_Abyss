@@ -46,6 +46,12 @@ public class RelicAbilityInfo
              "  ✗ \"공격력 증가|쌓을수록 올라 최대 +40%\"\n" +
              "세로줄이 없으면 한 줄 그대로 나간다. 숫자는 UI가 금색으로 강조한다. 2~4개 권장.")]
     public string[] stats;
+
+    [Tooltip("한눈 요약 한 줄(유물 고르기 팝업 · 10-13) — 20자 안팎. 비우면 summary 첫 문장.")]
+    public string glance;
+
+    [Tooltip("한눈 수치 1~2개(유물 고르기 팝업) — 형식 \"라벨|값\", 값은 짧게(예: \"공격 속도|+30%\"). 비우면 stats 앞 2개.")]
+    public string[] glanceStats;
 }
 
 /// <summary>
@@ -63,6 +69,9 @@ public class RelicQAnimStep
 
     [Tooltip("이 상태에 물릴 클립의 Addressables 키. 비우면 컨트롤러 기본 클립을 그대로 쓴다.")]
     public string clipKey;
+
+    [Range(0f, 0.9f), Tooltip("재생 시작 지점(정규화). 앞 칸의 끝 자세와 이어지는 곳부터 튼다(10-09 동작 연결 — 장비 형/27 실측).")]
+    public float startNormalized;
 }
 
 /// <summary>
@@ -97,6 +106,7 @@ public class RelicClassSO : ScriptableObject
     private Color themeColor = new Color(0f, 0f, 0f, 0f);
     [SerializeField] private Sprite portrait;
     [SerializeField, Tooltip("유물 선택 팝업 전신 일러스트")] private Sprite rosterIllust;
+    [SerializeField, Tooltip("유물 문장 — 흰 선 그림(코드가 유물 색으로 물들인다). 되찾은 기억 쪽 제목 양옆(10-13 힉스필드)")] private Sprite crest;
 
     [Header("패시브 (순수 데이터). 코드형 패시브는 RelicId 팩토리에서 등록")]
     [SerializeField] private PassiveSO[] passives;
@@ -132,6 +142,8 @@ public class RelicClassSO : ScriptableObject
     private string auraVfxKey;
     [SerializeField, Tooltip("오라를 붙일 본/소켓 이름 (비우면 루트)")]
     private string auraSocket;
+    [SerializeField, Tooltip("유물 의상(10-08) — 견습 기사 옷 위에 기억 등급에 따라 이 기사의 갑옷을 덧입는다. 비우면 견습 옷 그대로")]
+    private RelicCostumeSO costume;
 
     public RelicId Id => id;
     public string DisplayName => displayName;
@@ -143,6 +155,7 @@ public class RelicClassSO : ScriptableObject
     public Color ThemeColor(Color fallback) => themeColor.a > 0.01f ? themeColor : fallback;
     public Sprite Portrait => portrait;
     public Sprite RosterIllust => rosterIllust;
+    public Sprite Crest => crest;
     public PassiveSO[] Passives => passives;
     public StatModifier[] Stats => stats;
     public string QSkillClipKey => qSkillClipKey;
@@ -182,6 +195,11 @@ public class RelicClassSO : ScriptableObject
         if (!HasQSequence) return i == 0 ? qSkillClipKey : null;
         return qSkillClipSequence[Mathf.Clamp(i, 0, qSkillClipSequence.Length - 1)]?.clipKey;
     }
+
+    /// <summary>i번째 단계의 재생 시작 지점(정규화). 시퀀스가 없으면 0.</summary>
+    public float QSkillStartAt(int i)
+        => HasQSequence ? (qSkillClipSequence[Mathf.Clamp(i, 0, qSkillClipSequence.Length - 1)]?.startNormalized ?? 0f) : 0f;
     public string AuraVfxKey => auraVfxKey;
     public string AuraSocket => auraSocket;
+    public RelicCostumeSO Costume => costume;
 }

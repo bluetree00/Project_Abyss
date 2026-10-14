@@ -29,6 +29,9 @@ MonoBehaviour:
     attackDelay: 0.4
     knockbackForce: 4
     attackShape: {fileID: 0}
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
   detection:
     detectionRange: 6
     chaseGiveUpRange: 10
@@ -39,6 +42,7 @@ MonoBehaviour:
     waypointWaitTime: 2
   combat:
     damageApplyDelay: 0.4
+    maxHitsPerAttack: 0
     targetLayer:
       serializedVersion: 2
       m_Bits: 64
@@ -48,6 +52,9 @@ MonoBehaviour:
     patrolStateName: Mushroom_walkFWDSmile
     chaseStateName: Mushroom_runFWDSmile
     attackReadyStateName: Mushroom_IdleBattleSmile
+    attackStateName: Attack
+    getHitStateName: GetHit
+    dieStateName: Die
     attackTrigger: Mushroom_Attack01Smile
     getHitTrigger: Mushroom_GetHitSmile
     dieTrigger: Mushroom_DieSmile
@@ -55,23 +62,19 @@ MonoBehaviour:
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15
-  elemental:
-    accumulationThreshold: 100
-    lightning:
-      resistance: 1
-      overrideState: {fileID: 0}
-    water:
-      resistance: 1
-      overrideState: {fileID: 0}
-    fire:
-      resistance: 1
-      overrideState: {fileID: 0}
-    grass:
-      resistance: 1
-      overrideState: {fileID: 0}
-    earth:
-      resistance: 1
-      overrideState: {fileID: 0}
+  drop:
+    coinMin: 5
+    coinMax: 8
+    coinValue: 1
+  death:
+    despawnDelay: 0.5
+    dissolveDuration: 0.35
+    deathVfxKey: MonsterDeathBurst
+    deathVfxScale: 1.01
+    deathVfxHeight: 0.58
+    deathVfxUnscaled: 1
+    killHitStopScale: 0.04
+    killHitStopDuration: 0.09
   specialStates:
   - conditions: []
     state: {fileID: 11400000, guid: 420afed3bf97ea1419c20fe9ea4f3646, type: 2}

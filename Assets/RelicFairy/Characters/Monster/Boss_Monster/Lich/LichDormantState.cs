@@ -34,8 +34,11 @@ public class LichDormantState : IMonsterState
 
     // ── 등장 샷 ─────────────────────────────────────────────
     private const float WideShotSeconds     = 1.6f;
-    private const float WideBack            = 10f;    // 플레이어 뒤로
-    private const float WideHeight          = 16f;
+    // 제단 전경 — 리치 앞(플레이어 쪽) · 옆으로 비껴 · 바닥 가까이 살짝 올려다보며 리치와 제단이 함께(10-13 사용자 「시작 연출 카메라가 너무 높다」 · 전: 플레이어 뒤 10 m · 위 16 m)
+    private const float WideDistance        = 9f;
+    private const float WideSide            = 3f;
+    private const float WideHeight          = 2.4f;
+    private const float WideLookLift        = 2f;
     private const float LowShotSeconds      = 1.2f;
     private const float LowShotDistance     = 4.5f;   // 리치 앞(플레이어 쪽) — 6.5 m는 리치가 화면에 작았다(09-18 실측)
     private const float LowShotHeight       = 0.6f;   // 바닥 위 — 올려다본다
@@ -44,6 +47,7 @@ public class LichDormantState : IMonsterState
     private const float ShoulderShotSeconds = 1.0f;
     private const float ShoulderBack        = 3.5f;
     private const float ShoulderHeight      = 2.6f;
+    private const float PlayerClearance     = 1.2f;   // 카메라 → 리치 시선에서 플레이어(가슴)까지 이만큼은 떨어져야 리치가 안 가린다(10-14 전주기 5회차)
 
     /// <summary>false가 되면 Exit()가 호출됐음을 의미 — LichMonster가 패턴 러너 차단 해제에 사용.</summary>
     public bool IsActive { get; private set; } = true;
@@ -87,6 +91,8 @@ public class LichDormantState : IMonsterState
 
     public void Update(MonsterContext ctx)
     {
+        if (_triggered) SettleAfterAppear(ctx);
+
         // 등장 전까지 플레이어 방향으로 자연스럽게 회전
         if (!_triggered && ctx.Runtime.PlayerTarget != null)
             (ctx.Monster as LichMonster)?.MovementController?.FaceTowards(
@@ -130,6 +136,17 @@ public class LichDormantState : IMonsterState
         (ctx.Monster as LichMonster)?.MovementController?.SetLocked(false);
     }
 
+    /// <summary>
+    /// 등장 동작(Appear · 루프 아님)이 끝나면 떠 있는 기본 자세(Idle 루프)로 — 이름 자막 · 로우 앵글 내내 끝 자세로 4초 굳어 있었다(10-06 연출 점검).
+    /// </summary>
+    private static void SettleAfterAppear(MonsterContext ctx)
+    {
+        var anim = ctx.Animator;
+        if (anim == null || anim.IsInTransition(0)) return;
+        var si = anim.GetCurrentAnimatorStateInfo(0);
+        if (si.normalizedTime >= 1f && si.IsName("Appear")) anim.CrossFade("Idle", 0.3f);
+    }
+
     // ── 등장 연출 ───────────────────────────────────────────────
 
     private async UniTaskVoid EntranceCinematicAsync(MonsterContext ctx)
@@ -147,6 +164,8 @@ public class LichDormantState : IMonsterState
         bool returned = false;
 
         LichCinematics.TakeCamera();
+        bool cine  = BossStoryScenes.BeginEntrance(StoryProgress.Lich, ct);   // 레터박스 · 전투 HUD 걷기(10-14)
+        bool first = BossStoryScenes.IsFirstEntrance(StoryProgress.Lich);
         try
         {
             Vector3 L     = lich.transform.position;
@@ -161,18 +180,23 @@ public class LichDormantState : IMonsterState
             // 등장 = 제단 바닥에서 어둠이 솟으며 몸이 맺힌다(전환 폭발과 다른 이펙트 — 09-20 사용자 지적).
             LichVfx.Play(LichVfxSlot.EntranceRise, floorL, Quaternion.identity);
             LichSfx.Play(LichSfxSlot.ZoneHum, L);
-            await LichCinematics.ShotAsync(P + dir * WideBack + Vector3.up * WideHeight,
-                                           Vector3.Lerp(P, floorL, 0.65f) + Vector3.up * 2f,
-                                           WideShotSeconds, ct);
+            Vector3 side = Vector3.Cross(Vector3.up, dir);
+            if (first)   // 반복 관람은 제단 전경을 건너뛴다(10-14)
+            {
+                Vector3 wideLook = L + Vector3.up * WideLookLift;
+                await LichCinematics.ShotAsync(AvoidPlayer(floorL + dir * WideDistance + side * WideSide + Vector3.up * WideHeight, floorL, wideLook, player),
+                                               wideLook, WideShotSeconds, ct);
+            }
 
             // ② 리치 로우 앵글 — 이름 자막을 끝까지 보고, 첫 조우면 대사도 이 샷에서.
             lich.PulseBook(1.2f);
             LichSfx.Play(LichSfxSlot.Appear, L);
-            var shot = LichCinematics.ShotAsync(floorL + dir * LowShotDistance + Vector3.up * LowShotHeight,
-                                                L + Vector3.up * LowShotLookLift, LowShotSeconds, ct);
-            var bark = UI_BossBark.ShowAndWaitAsync(IntroBark(lich), BossBarkType.BossIntro);
+            Vector3 lowLook = L + Vector3.up * LowShotLookLift;
+            var shot = LichCinematics.ShotAsync(AvoidPlayer(floorL + dir * LowShotDistance + Vector3.up * LowShotHeight, floorL, lowLook, player),
+                                                lowLook, LowShotSeconds, ct);
+            var bark = BossStoryScenes.IntroLineAsync(lich, StoryProgress.Lich, IntroBark(lich), ct);   // + 이름 · 칭호 · 반복은 짧게(10-14)
             await UniTask.WhenAll(shot, bark,
-                                  UniTask.Delay(TimeSpan.FromSeconds(LowShotSeconds + MinLowShotHold),
+                                  UniTask.Delay(TimeSpan.FromSeconds(LowShotSeconds + (first ? MinLowShotHold : 0f)),
                                                 DelayType.UnscaledDeltaTime, cancellationToken: ct));
 
             var lines = StoryDialogue.TakeLichIntro(Managers.DialogueData, lich.LichBB?.IsNightmare ?? false);
@@ -190,6 +214,7 @@ public class LichDormantState : IMonsterState
             lich.PrepareArenaCamera();
             returned = true;
             await LichCinematics.ReturnToPlayerAsync(player, ct);
+            if (cine) { BossStoryScenes.EndEntrance(StoryProgress.Lich, completed: true); cine = false; }
         }
         catch (OperationCanceledException)
         {
@@ -200,11 +225,37 @@ public class LichDormantState : IMonsterState
             // 중간에 끊겨도 카메라가 수동 포즈에 얼어붙지 않게 돌려준다.
             if (!returned && player != null)
                 LichCinematics.ReturnToPlayerAsync(player, CancellationToken.None).Forget();
+            if (cine) BossStoryScenes.EndEntrance(StoryProgress.Lich, completed: false);
         }
 
         if (!IsActive) return;
         lich.FireCombatReady();
         ctx.Monster.ChangeState<ChaseState>();
+    }
+
+    /// <summary>
+    /// 카메라 → 리치 시선에 플레이어가 서 있으면(가슴 높이가 시선에서 <see cref="PlayerClearance"/> 안) 리치 둘레로 30°씩 돌려 트인 자리를 고른다
+    /// (0, +30, −30, … ±90 · 높이 그대로). 다 막히면 원래 자리(10-14 전주기 5회차: 플레이어가 리치 앞에 서면 낮은 샷이 플레이어 등 뒤였다).
+    /// </summary>
+    private static Vector3 AvoidPlayer(Vector3 cam, Vector3 pivot, Vector3 look, Transform player)
+    {
+        if (player == null) return cam;
+        Vector3 chest = player.position + Vector3.up * 1f;
+        Vector3 off   = cam - pivot;
+        for (int i = 0; i < 7; i++)
+        {
+            float   yaw = (i % 2 == 1 ? 1f : -1f) * 30f * ((i + 1) / 2);
+            Vector3 c   = pivot + Quaternion.Euler(0f, yaw, 0f) * off;
+            if (DistanceToSegment(chest, c, look) > PlayerClearance) return c;
+        }
+        return cam;
+    }
+
+    private static float DistanceToSegment(Vector3 p, Vector3 a, Vector3 b)
+    {
+        Vector3 ab = b - a;
+        float   t  = ab.sqrMagnitude > 1e-4f ? Mathf.Clamp01(Vector3.Dot(p - a, ab) / ab.sqrMagnitude) : 0f;
+        return Vector3.Distance(p, a + ab * t);
     }
 
     /// <summary>재도전 변형 대사 — 첫 조우/재도전마다 다른 대사("또 왔냐" 컨셉). 모드별 키, 없으면 보스 이름.</summary>

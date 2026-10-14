@@ -149,6 +149,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     // 공격 windup(예고) 노출 — 아이템 저스트가드/공격캔슬(ColliderInstance가 소비).
     private bool                   _telegraphing;
     private bool                   _attackCanceled;
+    // 공격 예고 반짝임(10-07) — 맞히기 이 초 전에 한 번 반짝인다(회피 신호). 공격 한 번에 한 번.
+    private const float            AttackGlintLeadSeconds = 0.45f;
+    private bool                   _attackGlintShown;
     // 풀 재사용 race 방어용 lifecycle 카운터 — OnEnable마다 증가하여 외부 콜백(dissolve onComplete 등)이
     // 자기 세대 값과 비교해 이전 인스턴스에 대한 호출을 무시할 수 있도록 한다.
     // 기존 _worldHPBarSuppressed/_hpBarRequesting과 계층이 달라(외부 vs 내부 UI) 겹치지 않음.
@@ -214,6 +217,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>보스 HP 바 초기화용. Config 로드 후 유효.</summary>
     public int CurrentHp => _runtime != null ? _runtime.CurrentHp : 0;
+    /// <summary>지금 방어력(감산) — 받는 피해에서 빠지는 양. 분열 무게가 방어를 뺀 몫에 곱하려고 읽는다(10-14).</summary>
+    public float CurrentDefense => _baseDefense * _defenseMulti;
     /// <summary>사망 처리됨(런타임). 서약 등 외부 타겟팅에서 시체 제외용.</summary>
     public bool IsDead => _runtime != null && _runtime.IsDead;
     public int    BossMaxHp => EffectiveMaxHp;
@@ -239,6 +244,13 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     {
         if (_runtime != null) _runtime.TraitAttackMul = mul;
     }
+
+    private float _traitAttackSpeedMul = 1f;
+    /// <summary>
+    /// 시기 특성 · 정예 접두어의 공격 속도 배율(10-11 P2-③) — 패턴 공격의 준비 · 피해 시점 · 쿨다운과 애니 속도를 함께 당긴다. 1 = 그대로.
+    /// 상태이상 공격 둔화(풀 간파 · 지배)와 곱해져 <see cref="AttackSpeedMultiplier"/>가 된다.
+    /// </summary>
+    public void SetTraitAttackSpeedMul(float mul) => _traitAttackSpeedMul = Mathf.Max(0.1f, mul);
 
     /// <summary>분열 분신 — 체력 배율을 줄이고 그 체력으로 가득 채운다.</summary>
     public void MakeTraitSplitChild(float hpScale)
@@ -266,7 +278,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         {
             string own = _config != null ? _config.monsterName : string.Empty;
             string id  = ServerStatId;
-            return SpaceWords(IsLatinName(own) ? own : IsLatinName(id) ? id : own);
+            string n   = SpaceWords(IsLatinName(own) ? own : IsLatinName(id) ? id : own);
+            return _traits != null ? _traits.DecorateName(n) : n;   // 정예 접두어(영문 · 분류색 — 10-11 정예 접두어)
         }
     }
 
@@ -296,6 +309,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>보스 HUD 이름. 전투 모드에 따라 이름이 바뀌는 보스(리치 봉인/해방)가 오버라이드한다.</summary>
     public virtual string BossName => _config != null ? _config.monsterName : string.Empty;
 
+    /// <summary>중간 엘리트 보스(황소 탱크 등) — 상단 체력바에 「정예 보스」 꼬리표를 켠다(10-12 중간 보스 · HUD는 83).</summary>
+    public virtual bool IsEliteBoss => false;
+
+    /// <summary>휘청(포이즈 깨짐) 동작 상태 이름 — 비우면 팩의 어지러움(Dizzy). 팩 밖 컨트롤러(황소)가 고른다(10-14 정예 애니 점검).</summary>
+    protected virtual string StaggerStateName => null;
+
     // ── 특수 상태 인스턴스 (SO 데이터로 자동 생성) ────────
     private readonly List<SpecialStateBase> _specialStates = new();
 
@@ -311,6 +330,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     // ── GetHit 억제 플래그 (파생 클래스에서 OnDamageTaken 안에 true 설정 → GetHitState 전환 스킵) ─
     protected bool _suppressGetHitThisHit;
+
+    // ── 정예 포이즈(10-11 일반방 긴장감 P2-①) — 정예만 만든다. 풀 재사용 때 OnEnable에서 되돌린다.
+    private MonsterPoise _poise;
+    /// <summary>정예 포이즈(경직 저항). 정예가 아니면 null — 정예 접두어가 MaxScale · Exposed를 쓴다.</summary>
+    public MonsterPoise Poise => Grade == MonsterGrade.Elite ? (_poise ??= new MonsterPoise()) : null;
 
     /// <summary>풀 재사용(OnEnable) 시 호출할 콜백을 등록한다. StateOverrideSO.RegisterOverrides() 에서 사용.</summary>
     public void RegisterOnEnabledCallback(System.Action callback) => _onEnabledCallbacks.Add(callback);
@@ -469,6 +493,15 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         RegisterStates();
         _fsm.ChangeState<PatrolState>();
 
+        // 8-1. 처치 섬광 풀 · 공격 예고 반짝임 목록을 미리 — 런 첫 처치 섬광이 막타 정지(0.09초)가 끝난 뒤에야 떴고(10-08 실측 0.2~0.5초 늦음)
+        //      목록이 없으면 첫 반짝임은 건너뛴다. 이미 있으면 바로 돌아온다.
+        if (_config.grade != MonsterGrade.Boss)
+        {
+            if (!string.IsNullOrEmpty(_config.death?.deathVfxKey))
+                Managers.ObjectPooler.PrewarmAsync(_config.death.deathVfxKey, ObjectPoolerManager.PoolType.Effect, 2).Forget();
+            RunFx.LoadAsync().Forget();
+        }
+
         // 9. HP 바 요청 (보스 등 UseWorldHPBar == false면 건너뜀)
         if (UseWorldHPBar && gameObject.activeInHierarchy && !_worldHPBarSuppressed)
         {
@@ -513,7 +546,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>현재 월드 스케일이 반영된 모델 실루엣 높이(m). 파티클/트레일은 크기가 들쭉날쭉해 제외한다.
     /// SkinnedMeshRenderer.bounds는 메시에 구워진 로컬 바운즈 기반이라 애니메이션 포즈와 무관하게 안정적이다.</summary>
-    private float MeasureModelHeight()
+    public float MeasureModelHeight()
     {
         var renderers = GetComponentsInChildren<Renderer>(true);
         bool  any = false;
@@ -536,12 +569,13 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     }
 
     /// <summary>현재 런/챕터의 난이도 배율을 _difficultyScale에 반영. 보스는 1 고정(자체 밸런스 유지).
+    /// 체력 배율은 등급(= 층)으로 고른다(10-11 — 잡몹 · 위협 · 정예가 챕터마다 다르게 단단해진다).
     /// 인스턴스별 적용이라 공유 config를 오염시키지 않으며, 멀티챕터 런에서 OnEnable마다 재호출된다.</summary>
     private void ResolveDifficultyScale()
     {
         if (_config != null && _config.grade == MonsterGrade.Boss) { _difficultyScale = 1f; _attackScale = 1f; return; }
         var run = AppBootstrapper.Instance?.CurrentRun;
-        _difficultyScale = run != null ? run.CurrentDifficultyScale : 1f;
+        _difficultyScale = run != null ? run.CurrentDifficultyScaleFor(Grade) : 1f;
         _attackScale     = run != null ? run.CurrentAttackScale     : 1f;
     }
 
@@ -595,7 +629,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (_runtime.IsDead) return;
 
         RefreshStatusUi();   // HP바 아래 디버프 아이콘 행(저주기 갱신)
-        _attackSpeedMulti = _status.AttackSpeedMultiplier;   // 풀 간파/지배 적 공격 디버프
+        _attackSpeedMulti = _status.AttackSpeedMultiplier * _traitAttackSpeedMul;   // 풀 간파/지배 적 공격 디버프 × 특성 · 접두어
 
         // CC(스턴/빙결): 이동·FSM 정지. 해제 시 1회 복원.
         if (_status.IsCcActive)
@@ -657,6 +691,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>공용 상태 전환 — 타입으로 조회.</summary>
     public void ChangeState<T>() where T : IMonsterState => _fsm?.ChangeState<T>();
+    /// <summary>지금 T(등록 키)로 등록된 상태에 있는가 — 오버라이드 상태도 맞게 답한다.</summary>
+    public bool IsInState<T>() where T : IMonsterState => _fsm != null && _fsm.IsIn<T>();
 
     /// <summary>특수 상태 전환 — 인스턴스 직접 전달.</summary>
     public void ChangeState(IMonsterState state) => _fsm?.ChangeState(state);
@@ -664,6 +700,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>현재 FullLockState 등 특수 상태(Constraints != None)가 실행 중이면 true.</summary>
     public bool IsInSpecialState
         => _fsm != null && _fsm.CurrentConstraints != SpecialStateConstraint.None;
+
+    /// <summary>스턴 · 빙결로 FSM이 멈춰 있는가.</summary>
+    public bool IsCcActive => _statusCcActive;
 
     /// <summary>
     /// 지금 피해를 통째로 무시하는가(특수 상태 무적). 자체 무적 플래그를 쓰는 보스는 오버라이드한다.
@@ -733,6 +772,16 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// </summary>
     /// <summary>HP가 0 이하가 됐을 때 호출. 기본 동작은 DieState 전환. 보스에서 퇴각 등으로 오버라이드 가능.</summary>
     protected virtual void OnFatalDamage() => ChangeState<DieState>();
+
+    /// <summary>휘청 1.5초 = 어지러움 — 예전엔 0.6~0.8초 피격 동작이 두 번 넘게 되풀이됐고 황소는 동작이 없었다(10-14 정예 애니 점검).</summary>
+    private void PlayStaggerAnim()
+    {
+        if (_animator == null) return;
+        string custom = StaggerStateName;
+        int h = !string.IsNullOrEmpty(custom) ? Animator.StringToHash(custom)
+              : MonsterAnimStates.Of(_animator, _config != null ? _config.animation : null).Dizzy;
+        if (h != 0 && _animator.HasState(0, h)) _animator.CrossFade(h, 0.12f, 0, 0f);
+    }
 
     /// <summary>파생 클래스에서 _runtime.CurrentHp를 직접 수정한 후 HP바·이벤트를 갱신한다.</summary>
     protected void NotifyHpChanged()
@@ -875,6 +924,13 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     // IDamageable — 플레이어 공격에 맞을 때 호출됨
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+    /// <summary>결과창 피해 비중(10-07) — 플레이어가 준 피해만, <b>실제로 깎인 체력</b>으로 센다(처형의 「남은 체력 ×10」 · 하한에 막힌 양 제외). 출처는 <see cref="DamageSourceScope"/>.</summary>
+    private static void ReportDamageDealt(GameObject instigator, DamageKind kind, int removed)
+    {
+        if (removed <= 0 || !IsPlayerInstigator(instigator)) return;
+        GameRunBootstrapper.Instance?.Run?.RunStats?.RecordDamage(DamageSourceScope.Resolve(kind), removed);
+    }
+
     /// <summary>피해 출처가 플레이어(또는 그 자식 무기/투사체)인지. 서약 통보를 플레이어발 피해로 한정.</summary>
     private static bool IsPlayerInstigator(GameObject g)
         => g != null && g.GetComponentInParent<PlayerController>() != null;
@@ -997,12 +1053,18 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         _lastDamageKind = kind;
 
+        // 모든 속성 피해(룬 · 아이템 AllElementBonus) — 예전엔 합산만 되고 읽는 전투 코드가 없었다(10-14 K6). 플레이어가 낸 속성 피해에만.
+        if (element.HasValue && instigator != null && instigator.TryGetComponent<PlayerController>(out var elemOwner) && elemOwner.RuntimeStats != null)
+            amount *= 1f + Mathf.Max(0f, elemOwner.RuntimeStats.AllElementBonus);
+
         float defense = _baseDefense * _defenseMulti * Mathf.Clamp01(1f - defenseIgnore);
         float actual  = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
         if (_traits != null) actual = _traits.ModifyIncoming(actual, element);   // 시기 특성 — 수호막 · 속성 저항
+        int hpBefore = _runtime.CurrentHp;
         _runtime.CurrentHp -= (int)actual;
         int hpFloor = DamageHpFloor;   // [인트로] 이길 수 없는 연출 · 페이지 보스의 전환 임계
         if (_runtime.CurrentHp < hpFloor) _runtime.CurrentHp = hpFloor;
+        ReportDamageDealt(instigator, kind, hpBefore - Mathf.Max(0, _runtime.CurrentHp));   // 결과창 — 실제로 깎인 체력(오버킬 · 하한 제외)
 
         DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID(), kind, element);
 
@@ -1055,6 +1117,20 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     public bool ConsumeAttackCancel() { bool c = _attackCanceled; _attackCanceled = false; return c; }
 
     /// <summary>
+    /// 공격 준비 · 공격 상태가 매 프레임 「맞히기까지 남은 초」를 알린다 — 예고 시간(<see cref="AttackGlintLeadSeconds"/>) 안에 들면 한 번 반짝인다.
+    /// 사용자(10-07): 「일반 몬스터가 언제 공격하는지 전혀 알 수 없다 — 공격 전에 작은 반짝임, 회피를 위해」. 보스는 자기 예고가 따로 있다.
+    /// </summary>
+    public void NotifyAttackIncoming(float secondsUntilHit)
+    {
+        if (_attackGlintShown || secondsUntilHit > AttackGlintLeadSeconds || Grade == MonsterGrade.Boss) return;
+        _attackGlintShown = true;
+        MonsterAttackGlint.Play(this, _headBone);
+    }
+
+    /// <summary>새 공격 준비에 들어가거나 공격 상태를 벗어날 때 — 다음 공격이 다시 반짝이게.</summary>
+    public void ResetAttackGlint() => _attackGlintShown = false;
+
+    /// <summary>
     /// 시너지 상태이상: 감전/마비(CC) — duration초간 이동·FSM 정지. 누적 시 더 긴 만료 시각 유지.
     /// (아이템 Stun 효과도 이 경로를 공유. 일반 진입점은 Status.ApplyCc.)
     /// </summary>
@@ -1091,10 +1167,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         // 방어력 + 데미지 배율 + 받는 데미지 배율 + 디버프 증폭(statusId별 합연산) (최소 1 데미지)
         float defense = _baseDefense * _defenseMulti;
         float actual = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
-        if (_traits != null) actual = _traits.ModifyIncoming(actual, null);   // 시기 특성 — 수호막
+        if (_traits != null) actual = _traits.ModifyIncoming(actual, null, instigator, direct: true);   // 시기 특성 — 수호막 · 정예 접두어(강철 · 가시, 10-11 정예 접두어)
+        int hpBefore = _runtime.CurrentHp;
         _runtime.CurrentHp -= (int)actual;
         int hpFloor = DamageHpFloor;   // [인트로] 이길 수 없는 연출 · 페이지 보스의 전환 임계
         if (_runtime.CurrentHp < hpFloor) _runtime.CurrentHp = hpFloor;
+        ReportDamageDealt(instigator, DamageKind.Normal, hpBefore - Mathf.Max(0, _runtime.CurrentHp));   // 결과창 — 실제로 깎인 체력
 
         // 데미지 팝업 — 모든 데미지 소스에 일관 표시 (각 호출처에서 별도 호출 불필요)
         DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID());
@@ -1140,17 +1218,36 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
                 return;
             }
 
+            // 공격 확약 · 정예 포이즈(10-11 일반방 긴장감 P2-①).
+            //  - 위협(희귀) · 정예는 공격 상태에 들어가면 맞아도 끊기지 않는다(피해는 들어간다).
+            //    예전엔 보스 말고 모든 등급이 매 타 0.4초 경직 · 넉백 · 공격 취소라, 때리는 동안 반격이 없었다.
+            //  - 정예는 그 밖에도 포이즈가 깨지기 전엔 경직 · 넉백이 없고, 깨지면 1.5초 휘청(받는 피해 +25%).
+            bool committed = _fsm != null && _fsm.IsIn<AttackState>();
+            bool broke = false;
+            var poise = Poise;
+            if (poise != null)
+            {
+                broke = poise.Hit(MonsterPoise.PendingHitWeight, canBreak: !committed);
+                if (!broke) return;
+                ApplyDamageTakenAmp(MonsterPoise.BreakDamageAmp, MonsterPoise.BreakDuration, MonsterPoise.BreakStatusId);
+            }
+            else if (committed && Grade == MonsterGrade.Rare) return;
+
             // 먼저 GetHitState로 전환해 NavMeshAgent를 끈 뒤 Rigidbody 넉백을 적용한다.
             // Agent 활성 중에는 Agent가 위치를 제어해 임펄스가 무효화되고
             // "Setting linear velocity of kinematic body" 경고가 발생하므로, 전환→임펄스 순서가 필수.
             ChangeState<GetHitState>();
+            if (broke) _runtime.StateTimer = MonsterPoise.BreakDuration;   // 휘청 — 경직 0.4초 대신 1.5초
+            if (broke) PlayStaggerAnim();
 
             if (instigator != null && _rb != null && (_agent == null || !_agent.isActiveAndEnabled)
                 && Grade != MonsterGrade.Boss)
             {
                 _rb.isKinematic = false;
                 Vector3 dir = (transform.position - instigator.transform.position).normalized;
-                _rb.AddForce(dir * 3f * knockbackMultiplier, ForceMode.Impulse);
+                // 넉백 층별 — 위협은 절반만 밀린다(정예는 포이즈가 깨질 때만 여기 온다)
+                float tier = Grade == MonsterGrade.Rare ? 0.5f : 1f;
+                _rb.AddForce(dir * 3f * knockbackMultiplier * tier, ForceMode.Impulse);
             }
         }
     }
@@ -1450,6 +1547,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _generationId++;
 
         _activeMonsters.Add(this);
+        _poise?.Reset();   // 풀 재사용 — 이전 몸의 포이즈 · 접두어 배율이 남지 않게
 
         // 죽지 않고 풀로 돌아간 인스턴스에는 이전 방 컨트롤러의 OnDied 구독이 그대로 남는다
         // (구독 해제는 사망 콜백 안에서만 이뤄지므로). 그대로 재사용하면 이번 사망이
@@ -1517,6 +1615,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _dmgTakenAmpSlots.Clear();
         _defenseMulti        = 1f;
         _attackSpeedMulti    = 1f;
+        _traitAttackSpeedMul = 1f;
         _lastDamageKind      = DamageKind.Normal;
         _status.Reset();
 
@@ -1531,6 +1630,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _statusSlowActive    = false;
         _telegraphing        = false;
         _attackCanceled      = false;
+        _attackGlintShown    = false;
         if (_agent != null) _agent.speed = _baseAgentSpeed;
 
         // 풀 재사용 시 이전 Die에서 설정된 HP바 숨김 플래그/요청중 플래그를 리셋 —

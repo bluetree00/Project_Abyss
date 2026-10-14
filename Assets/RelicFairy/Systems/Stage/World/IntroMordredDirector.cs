@@ -1,28 +1,35 @@
-using System;
+﻿using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
-/// 인트로 조우 컷신 — 구간 진입 즉시 발동(1회).
+/// 인트로 조우 컷신 — 무형검을 F로 집는 순간 발동(1회).
 ///
 /// 원칙: <b>행동이 먼저, 대사는 나중</b>. 각 대사 앞에 그 대사를 정당화하는 화면 사건을 배치한다.
 ///
-/// 비트 구성
-///  ① 즉위식        : 모르드레드가 무형검을 들어 내민다 → Intro_Mordred (차단형 팝업 + 초상화)
-///  ② 촛불이 꺼진다 : 부분 감광 → 리치 목소리(화면 밖)
-///  ③ 리치 강림     : 디졸브 인 + Appear + 오라 → 리치 대사 2줄
-///  ④ 모르드레드 경계: AttackReady로 검을 겨눔 → 저항 대사
-///  ⑤ ★광선 연결   : DeathRayStart→Loop + 소울드레인 빔이 가슴에 꽂혀 유지 → 리치 선언
-///  ⑥ 저항→붕괴    : GetHit1→2→3 연쇄 + 무형검 변색 → 신음 2줄
-///  ⑦ 완성          : DeathRayEnd + 리치 소멸 + 기립 → 웅장한 배경 전환 → 보스전
+/// 쇼트 구성(설계 문서 §2-2 S2~S15) — 대화는 컷, 강림 · 공개만 카메라 이동
+///  서임   : 검에 손을 뻗음(S2) → 투샷 · 어깨 너머(S3) → 검을 든 모르드레드(S5) → 검이 손으로(S4)
+///  전조   : 빛이 줄고 음악이 끊김(S6) → 화면 밖 리치 목소리 · 모르드레드 경계(S7)
+///  강림   : 세 인물 와이드(S8) → 리치 로우앵글 푸시인(S9)
+///  타락   : 사슬 강타 와이드(S10) → 저항하는 모르드레드(S12) → 리치 소멸 · 어둠 · 침묵(S13)
+///  배신   : S5와 같은 구도로 검이 내려온다(S14) → 암전 → 아레나 · 보스 등장(S15)
 ///
-/// 타락 구간 대사는 <b>비차단 UI_BossBark(화자줄 포함)</b>로 출력한다 —
-/// 차단형 팝업은 timeScale=0이라 광선·애니메이션이 멈춰 인과가 보이지 않는다.
-/// 대사 원본은 DIALOGUE_DATA.csv의 corruptSequenceId 시퀀스(라인 순서 = 비트 순서).
+/// 쇼트 좌표는 「플레이어 → 모르드레드」 축 기준이고, 카메라는 축 오른쪽에만 선다(180도 규칙).
+/// 벽 · 기둥에 박히거나 대상을 가리면 <see cref="Unblock"/>이 자리를 고친다.
+/// 대사는 전부 <b>비차단 UI_BossBark(화자줄 포함)</b> — 차단형 팝업은 timeScale=0이라 광선 · 애니메이션이 멈춘다.
 /// </summary>
 public sealed class IntroMordredDirector : MonoBehaviour
 {
+    // ── Constants ────────────────────────────────────────────────────
+    private const float CamRadius = 0.25f;
+    private const float StateBlend = 0.2f;   // 인물 동작 바꿈 섞기(초) — 뚝 바뀌면 동작을 건너뛴 듯 보였다(10-13 실측 12번 모두 섞임 없음)
+    private const int   EnvMask   = 1 << 0 | 1 << 3 | 1 << 8;   // Default · Ground · Wall — 인물 레이어는 빼 둔다
+
+    // ── Static ───────────────────────────────────────────────────────
+    /// <summary>지금 쇼트 이름(S2~S14). 컷신 밖이면 null — 실측 도구가 쇼트마다 화면을 찍을 때 읽는다.</summary>
+    public static string CurrentShot { get; private set; }
+
     // ── [SerializeField] ─────────────────────────────────────────────
     [Header("발동 — 무형검 F키 픽업")]
     [Tooltip("플레이어가 무형검을 F로 획득하면 시퀀스가 시작된다. 비우면 Start에서 씬의 IntroSwordPickup을 자동 탐색.")]
@@ -33,7 +40,7 @@ public sealed class IntroMordredDirector : MonoBehaviour
     [Tooltip("타락 대사 — 라인 순서가 곧 비트 순서다(0:예고 1,2:강림 3:저항 4:선언 5,6:신음).")]
     [SerializeField] private string corruptSequenceId     = "Intro_LichCorrupt";
     [SerializeField] private string combatStartSequenceId = "Mordred_Corrupted";
-    [Tooltip("보스전 개시 시 UI_BossBark(BossIntro)로 띄울 보스 이름.")]
+    [Tooltip("보스 등장 클로즈업에 띄울 보스 이름(BossRoomController.EntranceTitle로 넘긴다).")]
     [SerializeField] private string bossIntroName = "타락한 모르드레드";
 
     [Header("리치 카메오")]
@@ -51,8 +58,6 @@ public sealed class IntroMordredDirector : MonoBehaviour
     [Header("모르드레드 연출 액터")]
     [SerializeField] private Transform  mordredTransform;    // 타락 VFX 부착 지점
     [SerializeField] private GameObject mordredActor;        // 컷신용 액터 — 전투 보스 등장 시 숨김
-    [Tooltip("광선이 꽂힐 가슴 위치. 비우면 액터 위치 + 1.4m를 쓴다.")]
-    [SerializeField] private Transform  mordredChestPoint;
 
     [Header("어둠 이펙트")]
     [Tooltip("리치 강림 — 어둠의 포탈이 열리며 등장(Effect_43_DarkPortal 등). 리치 위치에 생성.")]
@@ -63,16 +68,12 @@ public sealed class IntroMordredDirector : MonoBehaviour
     [SerializeField] private GameObject lichCastVfxPrefab;
     [Tooltip("★타락 1단 — 모르드레드를 덮치는 사슬 공격(Effect_43_DarkChainSwamp 등). 원샷 이펙트.")]
     [SerializeField] private GameObject chainStrikeVfxPrefab;
-    [Tooltip("사슬이 덮친 뒤 잠식이 시작되기까지의 간격(초).")]
-    [SerializeField, Min(0.1f)] private float chainToCorruptGap = 1.2f;
     [Tooltip("★타락 2단 — 모르드레드를 잠식하는 어둠. 몸에 부착되므로 루프 이펙트여야 한다(Aura_Dark_LWRP 등).")]
     [SerializeField] private GameObject bindChainVfxPrefab;
 
-    [Header("무형검 변색")]
-    [Tooltip("타락과 함께 흰빛→검은빛으로 물드는 무형검 렌더러.")]
+    [Header("무형검")]
+    [Tooltip("제단 위 무형검 렌더러 — 받는 순간 안개로 흩어지고 손의 검이 맺힌다.")]
     [SerializeField] private Renderer swordRenderer;
-    [SerializeField] private Color    swordCorruptedColor = new Color(0.18f, 0.06f, 0.24f);
-    [SerializeField, Min(0.1f)] private float swordCorruptDuration = 2.0f;
 
     [Header("분위기 / 전환")]
     [SerializeField] private IntroAtmosphereSwitch atmosphere;
@@ -81,11 +82,9 @@ public sealed class IntroMordredDirector : MonoBehaviour
     [SerializeField] private float fadeDuration    = 1.0f;
     [Tooltip("타락→전투 전환 시 밝은 성당이 어둠으로 뒤집히는 웅장한 배경 전환 시간(초).")]
     [SerializeField] private float grandTransitionDuration = 2.5f;
-    [Tooltip("컷신 카메라 샷 전환 시간(초).")]
-    [SerializeField] private float camMoveDuration = 1.6f;
 
     [Header("시네마틱 레터박스")]
-    [Tooltip("카메라 연출 구간(컷신 샷)에만 위아래 검은 바를 넣는다. 기본 카메라 복귀 시 걷힌다.")]
+    [Tooltip("입력 차단 구간과 같다 — 검을 받는 순간 걸리고, 전투 직전 암전 속에서 걷힌다.")]
     [SerializeField] private bool  useLetterbox = true;
     [Tooltip("레터박스 슬라이드 인/아웃 시간(초).")]
     [SerializeField] private float letterboxDuration = 0.5f;
@@ -95,8 +94,6 @@ public sealed class IntroMordredDirector : MonoBehaviour
     [SerializeField] private int   letterboxSortingOrder = UISortingOrder.Letterbox;
     [Tooltip("전투 진입 시 HUD 페이드 인 시간(초).")]
     [SerializeField] private float hudFadeDuration = 0.8f;
-    [Tooltip("보스 등장 연출(카메라 팬)이 끝나 조작이 돌아온 뒤 HUD를 띄우기까지의 대기(초).")]
-    [SerializeField] private float hudFadeDelay = 6f;
 
     [Header("무형검 하사")]
     [Tooltip("검이 모르드레드에게서 플레이어에게 건너가는 시간(초).")]
@@ -112,7 +109,7 @@ public sealed class IntroMordredDirector : MonoBehaviour
     [Tooltip("전투 진입 시 순서대로 표시할 튜토리얼 안내(비차단 자막). 실제 키 매핑에 맞춰 문구 수정.")]
     [SerializeField, TextArea] private string[] rangedTutorialLines =
     {
-        "타락한 기사는 검이 닿지 않는다. — 원거리 무기로 맞서라.",
+        "타락한 모르드레드에겐 검이 닿지 않는다. — 원거리 무기로 맞서라.",
         "[2] 키로 원거리 무기를 들고, 조준해 공격하라.",
     };
     [Tooltip("튜토리얼 각 줄 사이 간격(초).")]
@@ -139,6 +136,10 @@ public sealed class IntroMordredDirector : MonoBehaviour
     private PlayerController _player;
     private Animator         _mordredAnim;
     private Animator         _lichAnim;
+    // 쇼트 축(SetupAxis) — 플레이어 발 · 모르드레드 발 · 앞 · 오른쪽, 그리고 몸 범위로 잰 머리 · 가슴
+    private Vector3          _p, _m, _f, _r;
+    private Vector3          _pHead, _pChest, _mHead, _mChest;
+    private float            _baseFov;
 
     // ── Lifecycle ────────────────────────────────────────────────────
     private void Awake()
@@ -173,154 +174,175 @@ public sealed class IntroMordredDirector : MonoBehaviour
     }
 
     // ── 연출 시퀀스 ──────────────────────────────────────────────────
+    // 쇼트 번호(S2~S15)는 설계 문서 「인트로연출·대사텍스트_개선설계_20261010」 §2-2를 따른다.
+    // 카메라는 서임부터 배신의 일격까지 연출이 계속 쥔다(10-10 — 예전엔 리치 강림 직후 평소 추적 카메라로 넘겨
+    // 타락 · 붕괴를 플레이어 뒤 높은 시점으로 보여 줬다). 레터박스는 입력 차단과 같은 구간에만 걸린다.
     private async UniTaskVoid RunAsync(CancellationToken ct)
     {
         if (_started) return;
         _started = true;
         var player = _player;
+        var cam    = GameCameraController.Instance;
+        var view   = Camera.main;
+        _baseFov   = view != null ? view.fieldOfView : 60f;
 
         try
         {
             // 보스룸은 런타임 생성 아레나에서 주입된다 — 주입 전에 시퀀스가 진행되면 전투가 시작되지 않는다.
             await IntroArenaLoader.ReadyAsync();
 
-            // 무형검을 집는 순간 BGM을 Game_Intro_play로 전환
-            Managers.Sound.CrossfadeBgmAsync("Game_Intro_play").Forget();
-
             // 플레이어 통제 — 컷신 동안 입력 차단 + 남은 관성 제거 + 카메라 수동 제어 인계.
             player?.SetInputEnabled(false);
             FreezePlayerGrounded(player);
             PrepareTorches();   // 목표 밝기를 기억하고 전부 소등(점등은 보스전 개시 후)
             // HUD 억제 재확인 — 부팅 타이밍으로 억제가 누락됐어도 컷신 중엔 확실히 숨긴다.
-            // (전투 진입 시 FadeInHudAsync가 억제를 풀고 페이드로 띄운다)
             UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
-            var cam = GameCameraController.Instance;
             cam?.TakeManualControl();
-
-            // 카메라 연출 구간 진입 — 시네마틱 레터박스 인(기본 카메라 복귀 시 걷힌다).
             if (useLetterbox)
                 CinematicFrame.ShowAsync(letterboxDuration, null, ct, letterboxAspect, 0f,
                                          title: null, sortingOrder: letterboxSortingOrder).Forget();
 
-            var lines = Managers.DialogueData?.GetLines(corruptSequenceId);
+            var dlg = Managers.DialogueData;
+            if (dlg != null && !dlg.IsInitialized) await dlg.InitializeAsync();
+            var vows   = dlg?.GetLines(mordredSequenceId);       // 서임 — 고개를 들어라 · 무엇이 될지는 · 받아라
+            var lines  = dlg?.GetLines(corruptSequenceId);       // 타락 — 0 예고 · 1,2 강림 · 3 경계 · 4 선언 · 5,6 신음
+            var strike = dlg?.GetLines(combatStartSequenceId);   // 배신의 일격
 
-            Vector3 mordredPos = mordredTransform != null ? mordredTransform.position : new Vector3(0f, 1f, 2.26f);
-            Vector3 lichPos    = lichActor != null ? lichActor.transform.position : mordredPos + new Vector3(3f, 2f, 5f);
+            SetupAxis(player);
+            Vector3 chest = _mChest;
+            Vector3 sword = swordRenderer != null ? swordRenderer.transform.position : _p + _f * 1.2f + Vector3.up;
 
-            // ── ① 무형검 획득 — 검과 플레이어 손을 한 화면에 담고, 그 샷이 끝난 뒤 획득 연출.
-            //     (샷을 Forget으로 던지면 다음 즉위식 샷과 겹쳐 카메라가 뒤엉킨다 → 반드시 await)
-            {
-                Vector3 swordPos = swordRenderer != null ? swordRenderer.transform.position : mordredPos;
-                Vector3 handPos  = player != null ? player.transform.position + Vector3.up * 1.2f : swordPos;
-                Vector3 mid      = Vector3.Lerp(swordPos, handPos, 0.5f);
-                await FrameCameraAsync(mid + new Vector3(2.2f, 1.0f, -2.6f), mid, camMoveDuration * 0.8f, ct);
-            }
+            // S2 — 검에 손을 뻗는 순간: 플레이어와 검을 낮게, 옆에서
+            Cut("S2 검", At(sword, 0.7f, sword.y + 0.35f, -0.5f), sword + Vector3.up * 0.1f, 30f);
+            await Hold(0.8f, ct);
+
+            // S3 — 축 한쪽 눈높이 투샷 → 플레이어 어깨 너머 모르드레드(대화는 컷으로 넘긴다)
+            Cut("S3 투샷", Ax(_p, 1.2f, 2.0f, -3.0f), Vector3.Lerp(_pChest, chest, 0.5f), 42f);
+            await SayAsync(vows, 0, ct);
+            Cut("S3 기사", At(_m, 1.1f, chest.y, -2.8f), _mHead - Vector3.up * 0.25f, 34f);
+            await SayAsync(vows, 1, ct);
+
+            // S5 — 검을 든 모르드레드를 아래에서(모티프). S14에서 같은 구도 · 같은 화각으로 돌아온다.
+            PlayMordred("AttackReady");
+            BladeShot("S5 검을 든 기사");
+            await SayAsync(vows, 2, ct);
+
+            // S4 — 「받아라」에 답해 검이 손으로 건너온다
+            Cut("S4 검을 받다", At(_p, 1.4f, _pChest.y, 1.6f), _pChest, 40f);
             await AbsorbSwordAsync(player, ct);
 
-            // ── ①-b 즉위식 대사 — 검을 쥔 직후, 모르드레드가 이를 인정한다.
-            await FrameCameraAsync(mordredPos + new Vector3(3.5f, 2.2f, -6f), mordredPos + new Vector3(0f, 1.6f, 0f), camMoveDuration, ct);
+            // S6 — 전조: 빛이 줄고 음악이 끊긴다(소리를 비워 다음 목소리가 들리게)
+            PlayMordred("Idle2");
+            Cut("S6 전조", Ax(_p, 1.2f, 3.4f, -4.5f), Vector3.Lerp(_p, _m, 0.6f) + Vector3.up * 1.3f, 46f);
+            Managers.Sound.FadeOutBgmAsync(1.2f, ct).Forget();
+            if (atmosphere != null) atmosphere.DimStepAsync(preDimAmount, 1.4f, ct).Forget();
+            await Hold(1.6f, ct);
+
+            // S7 — 소리가 먼저, 형체는 나중: 화면 밖 목소리 → 모르드레드가 검을 겨눈다
+            Cut("S7 목소리", At(_p, 0.7f, _pHead.y + 0.25f, -1.3f), chest, 24f);
+            await SayAsync(lines, 0, ct);
             PlayMordred("AttackReady");
-            await PlaySequenceAsync(mordredSequenceId);
+            await SayAsync(lines, 3, ct);
 
-            // ── ② 촛불이 꺼진다 — 부분 감광 후 화면 밖 목소리
-            if (atmosphere != null)
-                atmosphere.DimStepAsync(preDimAmount, 1.4f, ct).Forget();
-            await FrameCameraAsync(mordredPos + new Vector3(1.2f, 2.6f, -5.2f), mordredPos + new Vector3(0f, 3.5f, 2f), camMoveDuration, ct);
-            await BarkAsync(lines, 0, 2.0f, ct);
-
-            // ── ③ 리치 강림 — 디졸브 인 + Appear + 로우앵글 푸시인
+            // S8 — 강림: 세 인물의 자리가 한 화면에 보이는 높은 와이드(버퍼샷) — 공개는 카메라 이동으로
+            Managers.Sound.CrossfadeBgmAsync("Game_Intro_play").Forget();
+            Vector3 lichAt = lichActor != null ? lichActor.transform.position : _m + _f * 5f + _r * 3f;
+            Vector3 trio   = Vector3.Lerp(chest, lichAt + Vector3.up * 1.5f, 0.5f);
+            Cut("S8 강림 와이드", Ax(_p, -1.8f, 4.6f, -3.0f), trio, 52f);
             await AwakenLichAsync(ct);
+            await MoveAsync("S8 강림 와이드", Ax(_p, -1.4f, 4.2f, -1.6f), trio, 48f, 2.2f, ct);
 
-            // 강림 샷 ①: 리치 <b>정면 상단</b>에서 잡는다 — 얼굴이 보여야 강림이 읽힌다.
-            // ShotAwayFrom은 +Z가 리치 뒤이므로 정면은 −Z. 정면이면 모르드레드가 카메라와 리치
-            // 사이에 낄 수 있는데, Y를 충분히 올려 그의 머리 위를 넘어가는 각으로 피한다.
-            await FrameCameraAsync(ShotAwayFrom(lichPos, mordredPos, new Vector3(-2.2f, 3.4f, -6.2f)),
-                                   lichPos + new Vector3(0f, 1.0f, 0f), camMoveDuration, ct);
-            await BarkAsync(lines, 1, 2.6f, ct);
-            // 강림 샷 ②: 정면을 유지한 채 반대쪽으로 돌며 다가간다(존재감 유지).
-            await FrameCameraAsync(ShotAwayFrom(lichPos, mordredPos, new Vector3(2.4f, 2.6f, -4.4f)),
-                                   lichPos + new Vector3(0f, 0.8f, 0f), camMoveDuration * 1.2f, ct);
-            await BarkAsync(lines, 2, 2.4f, ct);
+            // S9 — 리치 로우앵글 푸시인(이 구간만 카메라가 계속 움직인다)
+            Vector3 lichHead = LichHead(lichAt);
+            Vector3 lf = lichActor != null ? Flat(lichActor.transform.forward, -_f) : -_f;
+            Vector3 lr = Vector3.Cross(Vector3.up, lf);   // 리치의 오른쪽 — 반대(-lr)가 축의 카메라 쪽(+_r)이다
+            Vector3 lichGround = new Vector3(lichAt.x, _p.y, lichAt.z);
+            Cut("S9 리치", lichGround + lf * 4.6f - lr * 1.4f + Vector3.up * 1.0f, lichHead, 38f);
+            var push = MoveAsync("S9 리치", lichGround + lf * 3.4f - lr * 1.0f + Vector3.up * 0.9f, lichHead, 32f, 5.2f, ct);
+            await SayAsync(lines, 1, ct);
+            await SayAsync(lines, 2, ct);
+            await push;
 
-            // ── ④ 카메라 연출은 여기까지 — 리치를 보여줬으니 <b>기본 플레이어 카메라</b>로 되돌린다.
-            //     이후 저항·타락·붕괴는 전부 평소 조작 시점에서 진행된다. 레터박스도 함께 걷는다.
-            if (useLetterbox)
-                CinematicFrame.HideAsync(letterboxDuration, null, ct).Forget();
-            // 인계 완료를 실제로 기다린다 — 예전엔 fire-and-forget + 고정 딜레이라
-            // 카메라가 아직 블렌드 중인데 아래 대사가 먼저 나갔다.
-            if (player != null && cam != null)
-                await cam.HandToGameplayCameraAsync(player.transform, ct: ct);
-
-            // 모르드레드 경계 — 검을 겨눈 뒤 저항 대사
-            PlayMordred("AttackReady");
-            await BarkAsync(lines, 3, 2.2f, ct);
-
-            // ── ⑤ ★타락 — 리치가 손에 어둠을 모으고, 사슬이 모르드레드를 휘감아 속박한다.
+            // S10 — 사슬 강타 와이드: 리치의 손과 모르드레드가 한 화면에
+            Cut("S10 사슬", Ax(_m, 2.0f, 1.8f, -4.2f), Vector3.Lerp(chest, lichHead, 0.2f), 56f);
             PlayLich("DeathRayStart");
             var castVfx = SpawnAttached(lichCastVfxPrefab, lichCastPoint != null ? lichCastPoint : lichActor?.transform);
-            await DelaySafe(0.5f, ct);
-
-            // 1단 — 사슬이 모르드레드를 덮친다(원샷). 리치 선언 대사가 이 순간에 얹힌다.
+            await WaitStateAsync(_lichAnim, "DeathRayStart", 0.55f, 1.4f, ct);
             PlayLich("DeathRayLoop");
             SpawnChainStrike();
-            await BarkAsync(lines, 4, chainToCorruptGap, ct);
+            await SayAsync(lines, 4, ct);
 
-            // 2단 — 사슬이 걷힌 자리에서 어둠이 몸을 잠식하기 시작한다(루프). 이펙트는 하나만.
+            // S12 — 저항하는 모르드레드(미디엄): 어둠이 몸을 잠식한다
             var bindVfx = SpawnCorruptionAura();
-            await DelaySafe(0.5f, ct);
-
-            // ── ⑥ 저항 → 붕괴 (카메라는 이미 기본 시점으로 복귀한 상태)
+            Cut("S12 저항", At(_m, 1.3f, chest.y, -2.4f), chest, 40f);
             PlayMordred("GetHit1");
-            await DelaySafe(0.9f, ct);
+            await WaitStateAsync(_mordredAnim, "GetHit1", 0.85f, 1.6f, ct);
             PlayMordred("GetHit2");
-            CorruptSwordAsync(ct).Forget();
-            await BarkAsync(lines, 5, 1.4f, ct);
+            await SayAsync(lines, 5, ct);
+            await WaitStateAsync(_mordredAnim, "GetHit2", 0.85f, 1.2f, ct);
             PlayMordred("GetHit3");
-            await BarkAsync(lines, 6, 1.6f, ct);
+            await SayAsync(lines, 6, ct);
 
-            // ── ⑦ 완성 — 속박 해제 + 리치 소멸 + 기립
+            // S13 — 리치가 거둬지고 성당이 어둠으로 뒤집힌다 → 짧은 침묵
+            Cut("S13 소멸", Ax(_m, 2.0f, 1.8f, -4.2f), Vector3.Lerp(chest, lichHead, 0.2f), 56f);
             PlayLich("DeathRayEnd");
             if (castVfx != null) Destroy(castVfx);
-            await DelaySafe(lichLingerAfter, ct);
-            // 리치는 등장과 대칭으로 사라진다 — 어둠 포탈이 다시 열리고, 몸이 디졸브로 삼켜진다.
+            await Hold(lichLingerAfter, ct);
             await VanishLichAsync(bindVfx, ct);
             PlayMordred("Idle2");
-            await DelaySafe(0.8f, ct);
-
-            // ── ⑧ 웅장한 배경 전환 — 밝은 성당이 어둠 + 핵심 라이팅으로 뒤집힘
+            Cut("S13 어둠", At(_p, 0.7f, _pHead.y + 0.25f, -1.3f), chest, 30f);
             if (atmosphere != null)
                 await atmosphere.SwitchToDarkAsync(grandTransitionDuration, ct);
-            else
-            {
-                await ScreenFade.Out(fadeDuration, ct);
-                await ScreenFade.In(fadeDuration, ct);
-            }
+            await Hold(0.8f, ct);
 
-            // ── ⑨ 보스전 개시 — 암전 중 플레이어를 아레나로 옮긴다(보스는 아레나 원위치).
-            await ScreenFade.Out(fadeDuration, ct);
+            // S14 — 배신의 일격: S5와 같은 구도 · 같은 화각. 이번엔 검이 내려온다.
+            //     어둠으로 뒤집힌 뒤라 인물이 묻힌다 — 카메라 쪽 낮은 붉은 빛 하나로 윤곽만 세운다(일격과 함께 걷는다).
+            PlayMordred("AttackReady");
+            BladeShot("S14 배신의 일격");
+            var keyLight = SpawnKeyLight(Ax(_m, 0.8f, 0.9f, -1.6f));
+            await SayAsync(strike, 0, ct);
+            await SayAsync(strike, 1, ct);
+            PlayMordred("Attack1");
+            await WaitStateAsync(_mordredAnim, "Attack1", 0.5f, 1.5f, ct);
+            RelicFairy.UI.UI_BossBark.Dismiss(0f);
+            await ScreenFade.Out(0f, ct);
+            if (keyLight != null) Destroy(keyLight);
+            Managers.Sound.PlayEffectAsync(SoundKey.Sfx.PlayerHitMedium).Forget();   // 예전 키 sfx_player_hit는 주소가 없어 무음이었다(10-12)
 
+            // S15 — 암전 속에서 아레나로 옮기고, 레터박스를 걷은 채 밝힌다(조작은 보스 등장 연출이 끝나면 돌아온다).
+            if (useLetterbox) CinematicFrame.HideAsync(0f, null, ct).Forget();
             if (mordredActor != null) mordredActor.SetActive(false);
             if (player != null && arenaEntryPoint != null)
+            {
                 player.transform.SetPositionAndRotation(arenaEntryPoint.position, arenaEntryPoint.rotation);
+                player.RequestFacing(arenaEntryPoint.rotation);   // 방향 목표도 — 안 하면 다음 물리 프레임에 옛 방향으로 돌아갔다(10-09 출시 점검)
+            }
 
             // 컷신 종료 — 물리 복구(접지 후 kinematic 해제). 전투 중엔 정상 중력이 필요하다.
             UnfreezePlayer(player);
-
+            if (view != null) view.fieldOfView = _baseFov;
+            CurrentShot = null;
             if (player != null) cam?.HandToGameplayCamera(player.transform);
+            await Hold(0.6f, ct);
 
             await ScreenFade.In(fadeDuration, ct);
 
             if (bossRoom != null && player != null)
+            {
+                // 보스 이름은 등장 클로즈업이 띄운다(데스나이트 등장의 이름 자리) — 이름이 두 번 뜨지 않게.
+                bossRoom.EntranceTitle = bossIntroName;
                 bossRoom.BeginBossFightExternally(player, bossUnbeatable);
+            }
 
-            // ── ⑩ 전투 개시 대사 — 보스 등장 연출과 함께 흐른다(비차단 자막).
-            ShowCombatBarks();
             // 어둠 속에서 횃불이 하나씩 켜지며 전장이 드러난다(공격 판정 가시성 확보).
             IgniteTorchesAsync(ct).Forget();
 
-            // ── ⑪ 보스 등장 연출이 끝나 조작이 돌아온 뒤에야 HUD를 페이드로 띄운다.
-            //     (등장 카메라 팬 중에 HUD가 떠 있으면 연출을 깬다)
-            await DelaySafe(hudFadeDelay, ct);
+            // 보스 등장 연출(팬 · 클로즈업 · 이름)이 끝나 조작이 돌아온 뒤 HUD를 띄운다.
+            // (등장 카메라 중에 HUD가 떠 있으면 연출을 깬다 — 10-09 전 6초 고정이라 클로즈업 위에 떴다)
+            float readyBy = Time.unscaledTime + 20f;
+            while (bossRoom != null && !bossRoom.IsCombatReady && Time.unscaledTime < readyBy)
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+
             UIRootBootstrapper.Instance?.FadeInHudAsync(hudFadeDuration).Forget();
             // 활 지급 — 슬롯1(원거리). 들고 있는 무형검(슬롯0)은 유지하고 소지만 시킨다.
             await EquipToSlotAsync(player, rangedWeaponKey, RangedSlot, setActive: false);
@@ -333,9 +355,174 @@ public sealed class IntroMordredDirector : MonoBehaviour
         catch (OperationCanceledException)
         {
             UnfreezePlayer(player); // 컷신이 끊겨도 플레이어가 kinematic으로 굳지 않게
+            if (view != null) view.fieldOfView = _baseFov;
+            CurrentShot = null;
             if (useLetterbox) CinematicFrame.HideAsync(0f, null).Forget(); // 레터박스가 화면에 남지 않게
         }
     }
+
+    // ── 쇼트(주인공 ↔ 모르드레드 축 기준) ─────────────────────────────
+    /// <summary>쇼트 축을 잡는다 — 플레이어 → 모르드레드가 앞(+_f), 그 오른쪽(+_r)이 카메라가 머무는 쪽(180도 규칙).</summary>
+    private void SetupAxis(PlayerController player)
+    {
+        // 높이는 피벗이 아니라 몸(스킨드 메시) 범위로 잰다 — 모르드레드 액터 피벗은 바닥 아래(-0.58)라
+        // 피벗 기준 오프셋은 카메라가 그의 머리 위 하늘만 잡았다(10-10 첫 실측).
+        Vector3 mPos = mordredTransform != null ? mordredTransform.position : new Vector3(0.25f, 0f, 2.26f);
+        Vector3 pPos = player != null ? player.transform.position : mPos - Vector3.forward * 7f;
+        var mb = BodyBounds(mordredActor, mPos, 2.3f);
+        var pb = BodyBounds(player != null ? player.gameObject : null, pPos, 1.6f);
+        _m = new Vector3(mPos.x, mb.min.y, mPos.z);
+        _p = new Vector3(pPos.x, pb.min.y, pPos.z);
+        _f = Flat(_m - _p, Vector3.forward);
+        _r = Vector3.Cross(Vector3.up, _f);
+        _mHead  = new Vector3(_m.x, mb.max.y - 0.15f, _m.z);
+        _mChest = new Vector3(_m.x, mb.min.y + mb.size.y * 0.68f, _m.z);
+        _pHead  = new Vector3(_p.x, pb.max.y - 0.1f, _p.z);
+        _pChest = new Vector3(_p.x, pb.min.y + pb.size.y * 0.7f, _p.z);
+    }
+
+    /// <summary>인물의 몸 범위(스킨드 메시만 — 무기 궤적 · 이펙트는 뺀다). 없으면 피벗에서 키만큼.</summary>
+    private static Bounds BodyBounds(GameObject go, Vector3 pivot, float height)
+    {
+        if (go != null)
+        {
+            bool any = false;
+            var b = new Bounds();
+            foreach (var r in go.GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                if (!r.enabled) continue;
+                if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds);
+            }
+            if (any && b.size.y > 0.5f) return b;
+        }
+        return new Bounds(pivot + Vector3.up * height * 0.5f, new Vector3(0.6f, height, 0.6f));
+    }
+
+    /// <summary>축 기준 오프셋(높이는 발 기준).</summary>
+    private Vector3 Ax(Vector3 origin, float right, float up, float forward)
+        => origin + _r * right + Vector3.up * up + _f * forward;
+
+    /// <summary>축 기준 오프셋(높이는 월드 절대값 — 가슴 · 머리 높이에 맞출 때).</summary>
+    private Vector3 At(Vector3 origin, float right, float worldY, float forward)
+    {
+        Vector3 p = origin + _r * right + _f * forward;
+        p.y = worldY;
+        return p;
+    }
+
+    /// <summary>
+    /// 검을 든 모르드레드를 낮은 곳에서 올려다보는 구도 — S5(서임)와 S14(배신)가 같은 값을 쓴다.
+    /// 머리가 아니라 가슴을 겨눈다 — AttackReady는 몸을 숙인 자세라 머리를 겨누면 그가 화면 아래로 빠졌다(10-10 2차 실측).
+    /// </summary>
+    private void BladeShot(string label)
+        => Cut(label, Ax(_m, 1.0f, 1.2f, -2.8f), _mChest, 46f);
+
+    /// <summary>배신의 일격 쇼트에만 쓰는 낮은 붉은 키 라이트 — 어둠 속에서 기사의 윤곽을 세운다.</summary>
+    private GameObject SpawnKeyLight(Vector3 at)
+    {
+        var go = new GameObject("@IntroKeyLight");
+        go.transform.position = at;
+        var light = go.AddComponent<Light>();
+        light.type      = LightType.Point;
+        light.color     = new Color(0.95f, 0.28f, 0.22f);
+        light.intensity = 6f;
+        light.range     = 7f;
+        light.shadows   = LightShadows.None;
+        return go;
+    }
+
+    /// <summary>리치 머리 높이 — 켜진 뒤라면 렌더러 범위로, 아니면 피벗 + 1.8 m.</summary>
+    private Vector3 LichHead(Vector3 lichAt)
+    {
+        if (lichActor != null)
+        {
+            var rends = lichActor.GetComponentsInChildren<Renderer>();
+            bool any = false;
+            var b = new Bounds();
+            foreach (var r in rends)
+            {
+                if (r is ParticleSystemRenderer || !r.enabled) continue;
+                if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds);
+            }
+            if (any && b.size.y > 0.5f) return new Vector3(b.center.x, b.center.y + b.extents.y * 0.6f, b.center.z);
+        }
+        return lichAt + Vector3.up * 1.8f;
+    }
+
+    /// <summary>컷 — 카메라를 그 자리에 바로 세운다. 벽 · 기둥 안이거나 대상을 가리면 대상 쪽으로 당겨 세운다.</summary>
+    private static void Cut(string label, Vector3 pos, Vector3 lookAt, float fov)
+    {
+        var view = Camera.main;
+        if (view == null) return;
+        CurrentShot = label;
+        pos = Unblock(pos, lookAt);
+        view.transform.SetPositionAndRotation(pos, LookRot(pos, lookAt, view.transform.rotation));
+        view.fieldOfView = fov;
+    }
+
+    /// <summary>이동 — 공개 · 강림처럼 카메라가 움직여야 하는 쇼트만 쓴다(대화는 컷).</summary>
+    private static async UniTask MoveAsync(string label, Vector3 pos, Vector3 lookAt, float fov, float dur, CancellationToken ct)
+    {
+        var view = Camera.main;
+        if (view == null) return;
+        CurrentShot = label;
+        pos = Unblock(pos, lookAt);
+        var t = view.transform;
+        Vector3 fromPos = t.position;
+        Quaternion fromRot = t.rotation, toRot = LookRot(pos, lookAt, t.rotation);
+        float fromFov = view.fieldOfView;
+        float e = 0f;
+        while (e < dur)
+        {
+            e += Time.deltaTime;
+            float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(e / dur));
+            t.SetPositionAndRotation(Vector3.Lerp(fromPos, pos, k), Quaternion.Slerp(fromRot, toRot, k));
+            view.fieldOfView = Mathf.Lerp(fromFov, fov, k);
+            try { await UniTask.Yield(PlayerLoopTiming.Update, ct); }
+            catch (OperationCanceledException) { return; }
+        }
+        t.SetPositionAndRotation(pos, toRot);
+        view.fieldOfView = fov;
+    }
+
+    /// <summary>
+    /// 카메라 자리 검사 — 벽 · 의자 · 기둥 속이면 위로 올리고, 대상과의 사이를 막으면 막힌 곳 앞으로 당긴다.
+    /// 인물(플레이어 · 몬스터 레이어)은 막는 것으로 치지 않는다(어깨 너머 구도는 의도된 가림이다).
+    /// </summary>
+    private static Vector3 Unblock(Vector3 pos, Vector3 lookAt)
+    {
+        for (int i = 0; i < 6 && Physics.CheckSphere(pos, CamRadius, EnvMask, QueryTriggerInteraction.Ignore); i++)
+            pos += Vector3.up * 0.4f;
+        Vector3 toCam = pos - lookAt;
+        float dist = toCam.magnitude;
+        if (dist > 0.5f && Physics.SphereCast(lookAt, CamRadius, toCam / dist, out var hit, dist - 0.3f, EnvMask, QueryTriggerInteraction.Ignore))
+            pos = lookAt + toCam / dist * Mathf.Max(0.8f, hit.distance - 0.2f);
+        return pos;
+    }
+
+    private static Quaternion LookRot(Vector3 pos, Vector3 lookAt, Quaternion fallback)
+    {
+        Vector3 dir = lookAt - pos;
+        return dir.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(dir.normalized, Vector3.up) : fallback;
+    }
+
+    private static Vector3 Flat(Vector3 v, Vector3 fallback)
+    {
+        v.y = 0f;
+        return v.sqrMagnitude > 0.0001f ? v.normalized : fallback;
+    }
+
+    /// <summary>자막 한 줄 — 쇼트에 맞춰 앞 줄을 걷고 바로 띄운 뒤, 읽을 시간만큼 머문다(초당 12자 + 0.8초).</summary>
+    private static async UniTask SayAsync(DialogueLine[] lines, int index, CancellationToken ct)
+    {
+        if (lines == null || index < 0 || index >= lines.Length || lines[index] == null) return;
+        var l = lines[index];
+        RelicFairy.UI.UI_BossBark.ShowLatest(l.text, RelicFairy.UI.BossBarkType.Bark, l.speaker);
+        int chars = System.Text.RegularExpressions.Regex.Replace(l.text ?? "", "<[^>]+>", "").Length;
+        await Hold(Mathf.Clamp(chars / 12f + 0.8f, 1.8f, 4.5f), ct);
+    }
+
+    private static UniTask Hold(float seconds, CancellationToken ct) => DelaySafe(seconds, ct);
 
     // ── 헬퍼 ─────────────────────────────────────────────────────────
     /// <summary>리치 등장 — 로브 디졸브 인 + 등장 애니메이션. 전체 프리팹을 쓰지 않아 보스 AI가 컷신을 강탈하지 않는다.</summary>
@@ -438,9 +625,6 @@ public sealed class IntroMordredDirector : MonoBehaviour
         sword.SetActive(false);
         await DelaySafe(0.3f, ct);
     }
-
-    private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
-    private static readonly int ColorId     = Shader.PropertyToID("_Color");
 
     // 무기 슬롯 규약 — 무형검(근접)=0, 원거리=1. PlayerWeaponManager 주석의 스테이션 규약과 동일.
     private const int MeleeSlot  = 0;
@@ -605,32 +789,6 @@ public sealed class IntroMordredDirector : MonoBehaviour
         if (found) player.transform.position = point;
     }
 
-    /// <summary>무형검이 흰빛에서 검은빛으로 물든다. 머티리얼은 인스턴스로 복제해 원본을 오염시키지 않는다.</summary>
-    private async UniTaskVoid CorruptSwordAsync(CancellationToken ct)
-    {
-        if (swordRenderer == null) return;
-
-        var mat = swordRenderer.material; // 접근 시점에 인스턴스 복제됨
-        if (mat == null) return;
-
-        Color from = mat.HasProperty(BaseColorId) ? mat.GetColor(BaseColorId) : Color.white;
-
-        float t = 0f;
-        try
-        {
-            while (t < swordCorruptDuration)
-            {
-                t += Time.deltaTime;
-                float k = Mathf.Clamp01(t / swordCorruptDuration);
-                var c = Color.Lerp(from, swordCorruptedColor, k);
-                if (mat.HasProperty(BaseColorId)) mat.SetColor(BaseColorId, c);
-                if (mat.HasProperty(ColorId))     mat.SetColor(ColorId, c);
-                await UniTask.Yield(PlayerLoopTiming.Update, ct);
-            }
-        }
-        catch (OperationCanceledException) { }
-    }
-
     private void PlayMordred(string state)
     {
         PlayAnimatorState(_mordredAnim, state);
@@ -654,19 +812,39 @@ public sealed class IntroMordredDirector : MonoBehaviour
         {
             anim.Rebind();
             anim.Update(0f);
+            anim.Play(state, 0, 0f);   // 켠 같은 프레임 — 섞기가 무시되므로 확정 재생
+            return;
         }
-        anim.Play(state, 0, 0f);
+        anim.CrossFadeInFixedTime(state, StateBlend, 0, 0f);   // 앞 동작에서 섞어 넘긴다
     }
 
-    /// <summary>비차단 자막 1줄 — 화자줄 포함. 표시 직후 hold만큼 기다려 다음 비트로 넘어간다.</summary>
-    private async UniTask BarkAsync(DialogueLine[] lines, int index, float hold, CancellationToken ct)
+    /// <summary>
+    /// 그 상태가 <paramref name="frac"/>(정규화 시간)까지 재생될 때까지 기다린다 — 다음 동작이 앞 동작을 중간에 자르지 않게.
+    /// 다른 상태로 넘어갔거나 <paramref name="maxWait"/>초가 지나면 끝. 취소는 삼킨다(다른 대기와 같게 — 끝맺음은 호출부 취소 검사).
+    /// </summary>
+    private static async UniTask WaitStateAsync(Animator anim, string state, float frac, float maxWait, CancellationToken ct)
     {
-        if (lines != null && index >= 0 && index < lines.Length)
+        if (anim == null) return;
+        int   hash  = Animator.StringToHash(state);
+        float start = Time.time, until = start + maxWait;
+        bool  seen  = false;
+        try
         {
-            var l = lines[index];
-            RelicFairy.UI.UI_BossBark.Show(l.text, RelicFairy.UI.BossBarkType.Bark, l.speaker);
+            while (Time.time < until)
+            {
+                // 섞기 요청은 다음 프레임부터 반영된다 — 같은 프레임에 보면 아직 앞 동작이라 바로 빠졌다(10-13 재측정: 동작 셋이 통째로 건너뜀)
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+                bool blending = anim.IsInTransition(0);
+                var  info     = blending ? anim.GetNextAnimatorStateInfo(0) : anim.GetCurrentAnimatorStateInfo(0);
+                if (info.shortNameHash == hash)
+                {
+                    seen = true;
+                    if (info.normalizedTime >= frac) return;
+                }
+                else if (seen || Time.time - start > 0.3f) return;   // 다른 동작으로 넘어갔거나, 시작조차 안 됐다
+            }
         }
-        await DelaySafe(hold, ct);
+        catch (OperationCanceledException) { }
     }
 
     /// <summary>
@@ -703,77 +881,9 @@ public sealed class IntroMordredDirector : MonoBehaviour
             if (string.IsNullOrEmpty(line)) continue;
             RelicFairy.UI.UI_BossBark.Show(line, RelicFairy.UI.BossBarkType.MerlinNarration);
             await DelaySafe(rangedTutorialGap, ct);
+            // DelaySafe는 취소를 삼킨다 — 씬이 바뀌어(디렉터 파괴) 취소되면 남은 줄을 다음 씬(거점)에 띄우지 않고 끝낸다(10-13 시뮬 4회차 S0)
+            if (ct.IsCancellationRequested) return;
         }
-    }
-
-    /// <summary>전투 개시 후 보스 이름 + 전투 대사를 화자줄 포함 비차단 자막으로 표시.</summary>
-    private void ShowCombatBarks()
-    {
-        if (!string.IsNullOrEmpty(bossIntroName))
-            RelicFairy.UI.UI_BossBark.Show(bossIntroName, RelicFairy.UI.BossBarkType.BossIntro);
-
-        if (string.IsNullOrEmpty(combatStartSequenceId)) return;
-        var lines = Managers.DialogueData?.GetLines(combatStartSequenceId);
-        if (lines == null) return;
-        foreach (var l in lines)
-            RelicFairy.UI.UI_BossBark.Show(l.text, RelicFairy.UI.BossBarkType.Bark, l.speaker);
-    }
-
-    /// <summary>
-    /// 차폐물(<paramref name="blocker"/>) 반대편에서 대상을 잡는 카메라 위치를 구한다.
-    ///
-    /// <paramref name="localOffset"/>은 "blocker→target 수평 방향"을 앞(+Z)으로 삼는 로컬 오프셋이다.
-    /// +Z를 주면 대상 너머(차폐물 반대편)에 서게 되어, 두 앵커를 씬에서 어떻게 옮기든
-    /// 차폐물이 카메라와 대상 사이에 끼지 않는다.
-    /// </summary>
-    private static Vector3 ShotAwayFrom(Vector3 target, Vector3 blocker, Vector3 localOffset)
-    {
-        Vector3 dir = target - blocker;
-        dir.y = 0f;
-        Quaternion yaw = dir.sqrMagnitude > 0.0001f
-            ? Quaternion.LookRotation(dir.normalized, Vector3.up)
-            : Quaternion.identity;
-        return target + yaw * localOffset;
-    }
-
-    /// <summary>컷신 카메라를 지정 위치/시선으로 부드럽게 이동(TakeManualControl 전제).</summary>
-    private static async UniTask FrameCameraAsync(Vector3 pos, Vector3 lookAt, float dur, CancellationToken ct)
-    {
-        var cam = Camera.main;
-        if (cam == null) return;
-        var t = cam.transform;
-        Vector3 startPos = t.position;
-        Quaternion startRot = t.rotation;
-        Vector3 dir = lookAt - pos;
-        Quaternion endRot = dir.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(dir.normalized, Vector3.up) : t.rotation;
-        if (dur <= 0f) { t.SetPositionAndRotation(pos, endRot); return; }
-
-        float e = 0f;
-        while (e < dur)
-        {
-            e += Time.deltaTime;
-            float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(e / dur));
-            t.SetPositionAndRotation(Vector3.Lerp(startPos, pos, k), Quaternion.Slerp(startRot, endRot, k));
-            try { await UniTask.Yield(PlayerLoopTiming.Update, ct); }
-            catch (OperationCanceledException) { return; }
-        }
-        t.SetPositionAndRotation(pos, endRot);
-    }
-
-    private static async UniTask PlaySequenceAsync(string seqId)
-    {
-        if (string.IsNullOrEmpty(seqId)) return;
-
-        var dlg = Managers.DialogueData;
-        if (dlg == null) return;
-        if (!dlg.IsInitialized) await dlg.InitializeAsync();
-
-        var lines = dlg.GetLines(seqId);
-        if (lines == null || lines.Length == 0) return;
-
-        await Managers.UI.WaitUntilNoBlockingPopupAsync();
-        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
-        if (popup != null) await popup.ShowAsync(lines);
     }
 
     private static async UniTask DelaySafe(float seconds, CancellationToken ct)

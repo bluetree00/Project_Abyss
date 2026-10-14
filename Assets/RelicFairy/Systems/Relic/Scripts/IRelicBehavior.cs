@@ -24,6 +24,12 @@ public interface IRelicBehavior
     /// </summary>
     bool CanUseSkill(SkillType slot);
 
+    /// <summary>
+    /// UI용 — 지금 Q를 몇 번 더 쓸 수 있나(못 쓰면 0). HUD Q칸의 잠김 · 「×N」은 이 값과 <see cref="CanUseSkill"/>을 읽는다(10-12 A4).
+    /// 정오 · 광란만 보던 IRelicResource.IsSkillReady는 실제 문과 달랐다(가웨인 붙든 새벽 · 황혼 사용권 · 정오에 쓴 뒤, 랜슬롯 심판 소진).
+    /// </summary>
+    int QUsesLeft { get; }
+
     /// <summary>피격 데미지 보정(갈라하드 방패 감소 등). 그대로면 dmg 반환.</summary>
     int ModifyIncomingDamage(PlayerController owner, int dmg, GameObject attacker);
 }

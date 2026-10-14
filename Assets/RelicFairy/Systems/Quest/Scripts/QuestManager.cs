@@ -32,6 +32,12 @@ public class QuestManager
 
     /// <summary>QuestDatabase 주입(Initialize) 완료 시 1회 발행. 비동기 부트스트랩 이후 등록을 거는 소비자용.</summary>
     public event Action onInitialized;
+
+    /// <summary>
+    /// 슬롯 진행도를 통째로 갈아끼웠다(슬롯 전환 · 새 게임 · 삭제). 갈아끼우기는 등장 이벤트 없이 조용히 돌아,
+    /// 늘 켜져 있는 트래커가 직전 슬롯 목록을 그대로 띄웠다 — 목록을 보여주는 쪽은 이때 다시 읽는다(10-09 출시 점검).
+    /// </summary>
+    public event Action onReloaded;
     #endregion
 
     // Singleton accessor — routed through Managers service locator
@@ -109,6 +115,8 @@ public class QuestManager
         // 슬롯 전환은 메뉴 동작이다 — 등장 이벤트를 쏘면 로비에서 업적 알림이 우수수 뜬다.
         if (!Load())
             SeedFreshSlot(notify: false);
+
+        onReloaded?.Invoke();   // ClearSlot(활성 슬롯)도 이 경로로 온다
     }
 
     /// <summary>슬롯 삭제/새 게임 — 그 슬롯의 퀘스트 진행도를 버린다. 활성 슬롯이면 즉시 다시 세운다.</summary>

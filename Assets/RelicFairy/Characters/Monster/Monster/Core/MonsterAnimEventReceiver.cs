@@ -8,6 +8,8 @@ using UnityEngine;
 /// </summary>
 public class MonsterAnimEventReceiver : MonoBehaviour
 {
+    private const string WingFlapKey = "Wing Flap";
+
     private MonsterBase _monster;
 
     private void Awake()
@@ -59,8 +61,10 @@ public class MonsterAnimEventReceiver : MonoBehaviour
     // Third-party clips (Malbers) fire this event with a string key.
     public void PlaySound(string key)
     {
-        if (!string.IsNullOrEmpty(key))
-            Managers.Sound?.PlayEffectAsync(key).Forget();
+        if (string.IsNullOrEmpty(key)) return;
+        // 화룡 에셋 날개 클립의 「Wing Flap」은 주소가 없다 — 화룡 자기 날개 소리로(10-12 · 경고만 나고 소리 0이었다)
+        if (key == WingFlapKey && _monster is DragonBossMonster dragon) { dragon.OnClipWingFlap(); return; }
+        Managers.Sound?.PlayEffectAsync(key).Forget();
     }
 
     // Malbers: no-arg or index-based overloads — no key, silently ignore.

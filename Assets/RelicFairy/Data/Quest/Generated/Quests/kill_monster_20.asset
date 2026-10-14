@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: kill_monster_20
   m_EditorClassIdentifier: Assembly-CSharp::Quest
   category: {fileID: 11400000, guid: e80ec1002c6239a42977fb8300370ba5, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: b0bbe8d0799605841bdbde5417d88303, type: 3}
   codeName: kill_monster_20
   displayName: "\uC0AC\uB0E5 \uC2DC\uC791"
   description: "\uBAAC\uC2A4\uD130 20\uB9C8\uB9AC \uCC98\uCE58"

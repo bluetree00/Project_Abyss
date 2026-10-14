@@ -29,6 +29,9 @@ MonoBehaviour:
     attackDelay: 0.5
     knockbackForce: 5
     attackShape: {fileID: 0}
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
   detection:
     detectionRange: 5
     chaseGiveUpRange: 8
@@ -39,6 +42,7 @@ MonoBehaviour:
     waypointWaitTime: 0.5
   combat:
     damageApplyDelay: 0.4
+    maxHitsPerAttack: 0
     targetLayer:
       serializedVersion: 2
       m_Bits: 64
@@ -48,6 +52,9 @@ MonoBehaviour:
     patrolStateName: MoveBlend
     chaseStateName: MoveBlend
     attackReadyStateName: AttackReady
+    attackStateName: Attack
+    getHitStateName: GetHit
+    dieStateName: Die
     attackTrigger: Attack
     getHitTrigger: GetHit
     dieTrigger: Die
@@ -55,32 +62,22 @@ MonoBehaviour:
     speedParam: Blend
     speedDampTime: 0.1
     crossFadeDuration: 0.15
-  elemental:
-    accumulationThreshold: 100
-    lightning:
-      resistance: 1
-      overrideState: {fileID: 0}
-    water:
-      resistance: 1
-      overrideState: {fileID: 0}
-    fire:
-      resistance: 1
-      overrideState: {fileID: 0}
-    grass:
-      resistance: 1
-      overrideState: {fileID: 0}
-    earth:
-      resistance: 1
-      overrideState: {fileID: 0}
+  drop:
+    coinMin: 5
+    coinMax: 8
+    coinValue: 1
+  death:
+    despawnDelay: 0.5
+    dissolveDuration: 0.35
+    deathVfxKey: MonsterDeathBurst
+    deathVfxScale: 1.06
+    deathVfxHeight: 0.6
+    deathVfxUnscaled: 1
+    killHitStopScale: 0.04
+    killHitStopDuration: 0.09
   specialStates:
   - conditions: []
     state: {fileID: 11400000, guid: c78d01e84bab0ac4d9a5ae44c5b8012e, type: 2}
     oneShot: 1
-  chaseState: {fileID: 0}
-  patrolState: {fileID: 0}
-  attackReadyState: {fileID: 0}
-  attackState: {fileID: 0}
-  getHitState: {fileID: 0}
-  dieState: {fileID: 0}
   stateOverrides:
   - {fileID: 11400000, guid: 0dde25472b7d91b489e2287bf3e0a943, type: 2}

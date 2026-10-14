@@ -105,6 +105,8 @@ public sealed class UI_ShopPanel : UI_Popup
         public Image IconFrame, IconGlow, Tag0Bg, Tag1Bg, PricePill;
         public TMP_Text Tag0, Tag1;
         public Vector2 Base;   // 쉬는 자리(고르면 CardLift만큼 들린다)
+        public CanvasGroup SelEdge;   // 고른 카드 2px 금 테(10-11, 런타임 생성 — 구운 프리팹에 없다)
+        public bool EdgeOn;
     }
     private const float CardLift   = 6f;
     private const float DealStagger = 0.06f, DealDur = 0.26f, DealRise = 22f;
@@ -161,6 +163,8 @@ public sealed class UI_ShopPanel : UI_Popup
         EnsureWindowFrame();
         FitCardTags();
         StyleRuntime();
+        ApplyThinStyle();
+        SkinCardPlates();   // 가격 알약 · 룬 태그 판 — 자리(ApplyThinStyle · FitCardTags)가 잡힌 뒤라야 두께가 칸에 맞는다
     }
 
     protected override void OnDestroy()
@@ -309,18 +313,29 @@ public sealed class UI_ShopPanel : UI_Popup
     /// <summary>
     /// 구운 프리팹에도 입히는 모양 — 코드로 그린 스프라이트는 프리팹에 저장되지 않는다(09-29).
     /// 이름 명판 = 양끝이 파인 띠(목업의 붉은 리본) · 나가기 = 새로고침과 같은 짙은 명판 · 인사말은 간판 쇠띠 앞까지 · 인장 할인 줄.
+    /// 10-13: 명판 · 나가기는 Artsystack 부품(placeholder · slot_short_inactive, 원색)이 있으면 그것으로 — 없으면 위 코드 판.
     /// </summary>
     private void StyleRuntime()
     {
         if (_selNamePlate != null)
         {
-            var rib = RibbonSprite();
-            _selNamePlate.sprite = rib;
-            _selNamePlate.type   = Image.Type.Sliced;
-            if (_selNamePlate.transform.Find("Fill") is RectTransform f && f.TryGetComponent<Image>(out var fill))
+            Image fill = null;
+            if (_selNamePlate.transform.Find("Fill") is RectTransform f) f.TryGetComponent(out fill);
+            if (SkinArtPanel(_selNamePlate, _skin != null ? _skin.NamePlate : null, Color.white))
             {
-                fill.sprite = rib;
-                fill.type   = Image.Type.Sliced;
+                // 판 한 장(금 테 + 먹 채움)이 2겹을 맡는다 — 채움 그림만 끈다(이름 글자는 Fill 아래라 오브젝트는 남긴다).
+                if (fill != null) fill.enabled = false;
+            }
+            else
+            {
+                var rib = RibbonSprite();
+                _selNamePlate.sprite = rib;
+                _selNamePlate.type   = Image.Type.Sliced;
+                if (fill != null)
+                {
+                    fill.sprite = rib;
+                    fill.type   = Image.Type.Sliced;
+                }
             }
             if (_selName != null) _selName.margin = new Vector4(RibbonNotch, 0f, RibbonNotch, 0f);
         }
@@ -328,7 +343,9 @@ public sealed class UI_ShopPanel : UI_Popup
         if (transform.Find("Window/Exit") is RectTransform exitRt && exitRt.TryGetComponent<Image>(out var exitImg))
         {
             // 새로고침 아트(짙은 먹 판 + 금빛 테)와 같은 말투 — 붉은 네모가 이 화면에서만 따로 놀았다.
-            UITheme.StylePanel(exitImg, new Color(0.11f, 0.085f, 0.07f, 0.96f), new Color(0.80f, 0.62f, 0.32f, 0.75f), 6f);
+            // 10-13: Artsystack slot_short_inactive 원색(먹갈 = 나무 톤 — 보조 버튼이라 금 테 없이, 금 테는 새로고침 · 산다 쪽).
+            if (!SkinArtPanel(exitImg, _skin != null ? _skin.ExitPanel : null, Color.white))
+                UITheme.StylePanel(exitImg, new Color(0.11f, 0.085f, 0.07f, 0.96f), new Color(0.80f, 0.62f, 0.32f, 0.75f), 6f);
             var lbl = exitRt.GetComponentInChildren<TMP_Text>(true);
             if (lbl != null) lbl.color = new Color(0.93f, 0.86f, 0.70f, 1f);
         }
@@ -353,6 +370,39 @@ public sealed class UI_ShopPanel : UI_Popup
             _sigilText.raycastTarget    = false;
             _sigilText.text = string.Empty;
         }
+    }
+
+    /// <summary>
+    /// 가격 알약 · 룬 태그 판(10-13) — Artsystack Rectangle_locked를 무채로 바꿔 고동(60,44,28)으로 칠한다. 글자는 그대로(가격 금 · 등급색).
+    /// 구운 프리팹엔 단색 판으로 굳어 있어 열 때마다 입힌다. 그림이 없으면 지금 단색 판 그대로.
+    /// </summary>
+    private void SkinCardPlates()
+    {
+        var pill = UISpriteMaster.Neutral(_skin != null ? _skin.PricePill : null);
+        if (pill == null) return;
+        foreach (var c in _cards)
+        {
+            SkinArtPanel(c.PricePill, pill, PillBrown);
+            SkinArtPanel(c.Tag0Bg,    pill, PillBrown);
+            SkinArtPanel(c.Tag1Bg,    pill, PillBrown);
+        }
+    }
+
+    /// <summary>
+    /// Artsystack 판 한 장(9-slice)을 입힌다 — 두께는 아트 높이를 칸 높이에 맞춘 배율(원본 높이(단위) ÷ 칸 높이, <see cref="FitCardArt"/>와 같은 셈).
+    /// 공용 SliceScale은 장식을 칸의 12%로 묶어 팩의 얇은 테가 1px 아래로 깎인다. 코드 판(StylePanel)이 달아 둔 금 선(Edge)은 아트 테와 겹쳐 끈다.
+    /// 그림이 없으면 아무것도 하지 않고 false — 호출측이 지금 판으로 폴백한다.
+    /// </summary>
+    private static bool SkinArtPanel(Image img, Sprite art, Color tint)
+    {
+        if (img == null || art == null) return false;
+        ShopUIStyle.Skin(img, art, sliced: true, tint: tint);
+        float h = img.rectTransform.rect.height;
+        float refPpu = img.canvas != null ? img.canvas.referencePixelsPerUnit : 100f;
+        if (h > 1f) img.pixelsPerUnitMultiplier = Mathf.Max(1f, art.rect.height / art.pixelsPerUnit * refPpu / h);
+        var edge = img.transform.Find("Edge");
+        if (edge != null) edge.gameObject.SetActive(false);
+        return true;
     }
 
     /// <summary>이름 명판 — 양끝이 제비꼬리로 파인 띠(목업의 붉은 리본). 전용 아트가 납품되지 않아 한 번 굽는다.</summary>
@@ -844,16 +894,18 @@ public sealed class UI_ShopPanel : UI_Popup
 
     // 등급·칸 수 태그 자리(카드 목업 px). 등급 태그는 「★ Legendary」까지 들어가게 종이 오른쪽 안(186)까지 — 76이던 때
     // 「□ Common」(16px)이 칸을 넘어 종이 밖으로 번졌다(09-28 캡처).
-    private const float TagX = 98f, Tag0Y = 48f, Tag0W = 88f, Tag1Y = 71f, Tag1W = 48f;   // 아이콘 칸(22~96) 옆
+    // 10-11: 등급 이름 17 · 칸 수 15(v2 — 등급 영문 유지 · 크기만 키움) — 높이 20 → 24, 두 태그가 아이콘 칸(22~96) 안에 든다.
+    private const float TagX = 98f, Tag0Y = 46f, Tag0W = 88f, Tag1Y = 73f, Tag1W = 48f, TagH = 24f;   // 아이콘 칸(22~96) 옆
 
     private static readonly Color PriceInk   = new(0.98f, 0.84f, 0.45f, 1f);   // 알약 위 금색
     private static readonly Color PriceShort = new(0.95f, 0.52f, 0.45f, 1f);   // 골드 모자람(색만으로 알리지 않게 상세에 사유 문장)
+    private static readonly Color PillBrown  = new(60f / 255f, 44f / 255f, 28f / 255f, 1f);   // 가격 알약 · 룬 태그 판(10-13 Rectangle_locked 무채 + 고동)
 
     /// <summary>작은 태그(짙은 판 + 16px 글자). 룬 카드에서만 켠다.</summary>
     private static (Image bg, TMP_Text label) MakeTag(Transform card, string name, float mx, float my, float mw)
     {
         var bg = ShopUIStyle.MakeImage(card, name, new Color(0.16f, 0.11f, 0.07f, 0.92f));
-        PlaceIn(card, bg, mx, my, mw, 20f, CardW, CardH);
+        PlaceIn(card, bg, mx, my, mw, TagH, CardW, CardH);
         bg.raycastTarget = false;
         var label = ShopUIStyle.MakeText(bg.transform, "Label", 16f, FontStyles.Bold, TextAlignmentOptions.Center, Color.white);
         FitTagLabel(label);
@@ -914,7 +966,7 @@ public sealed class UI_ShopPanel : UI_Popup
         _selEffect.lineSpacing      = -6f;
 
         // 상인의 말 — 버튼 바로 위 한 줄
-        _selFlavor = ShopUIStyle.MakeText(s, "Flavor", 16f, FontStyles.Italic,
+        _selFlavor = ShopUIStyle.MakeText(s, "Flavor", 16f, FontStyles.Normal,
                                           TextAlignmentOptions.Top, new Color(0.42f, 0.30f, 0.18f, 1f));
         PlaceIn(s, _selFlavor, 18f, 426f, 222f, 22f, SelDW, SelDH);
         _selFlavor.enableAutoSizing = false;
@@ -972,6 +1024,7 @@ public sealed class UI_ShopPanel : UI_Popup
             // 아트가 거짓이 되는 때(골드 부족 · 이미 돌림 · 가격 불일치)는 나가기와 같은 짙은 명판 — 예전 금색 판은
             // 「누를 수 있음」(금빛 · 불)으로 읽혔다(09-29). 크기도 아트가 보이는 폭·높이(rect 안 6~44)에 맞춘다.
             float rx = GridX + (GridCols * CardStepX - CardStepX + CardW - RerollW) * 0.5f;
+            bool panelArt = false;
             if (artTruthful)
             {
                 Place(_rerollBtn, rx, RerollY, RerollW, RerollH);
@@ -982,10 +1035,13 @@ public sealed class UI_ShopPanel : UI_Popup
             else
             {
                 Place(_rerollBtn, rx + 10f, RerollY + 6f, RerollW - 20f, 38f);
-                UITheme.StylePanel(_rerollImg, new Color(0.11f, 0.085f, 0.07f, 0.96f), new Color(0.80f, 0.62f, 0.32f, 0.75f), 6f);
+                // 10-13: Artsystack slot_short_active 원색(먹 + 금 테). 못 누를 때는 버튼 틴트(비활성 알파 0.45)가 같은 판을 반투명으로 누른다.
+                panelArt = SkinArtPanel(_rerollImg, _skin != null ? _skin.RerollPanel : null, Color.white);
+                if (!panelArt)
+                    UITheme.StylePanel(_rerollImg, new Color(0.11f, 0.085f, 0.07f, 0.96f), new Color(0.80f, 0.62f, 0.32f, 0.75f), 6f);
             }
             var edge = _rerollImg.transform.Find("Edge");
-            if (edge != null) edge.gameObject.SetActive(!artTruthful);
+            if (edge != null) edge.gameObject.SetActive(!artTruthful && !panelArt);
         }
         if (_rerollLabel != null)
         {
@@ -1053,7 +1109,8 @@ public sealed class UI_ShopPanel : UI_Popup
         if (_dealStock != null) { _dealStock.text = "1개 남음"; _dealStock.color = DealStockInk; }
         if (_dealStamp != null) { _dealStamp.gameObject.SetActive(false); _dealStamp.rectTransform.localScale = Vector3.one; }
 
-        if (_dealCat != null)   _dealCat.text   = $"{deal.CategoryLabel} · {deal.EffectText}";
+        // 룬은 효과 글이 길어 한 줄에 넘쳐 깨졌다 — 눌러서 오른쪽 상세 열에서 본다(10-14 사용자). 다른 상품은 짧은 요약 그대로.
+        if (_dealCat != null)   _dealCat.text   = deal.Category == ShopProductCategory.Rune ? deal.CategoryLabel : $"{deal.CategoryLabel} · {deal.EffectText}";
         if (_dealName != null)  _dealName.text  = deal.DisplayName;
         if (_dealDesc != null)  _dealDesc.text  = deal.DetailText;
         if (_dealPrice != null) _dealPrice.text = deal.Price.ToString();
@@ -1088,27 +1145,23 @@ public sealed class UI_ShopPanel : UI_Popup
 
             // 배지 — 아트가 있으면 바탕+글리프, 없으면 색 알약 + 코드 라벨.
             var badgeBg    = _skin?.CategoryBadgeBg(cat);
-            var badgeGlyph = _skin?.CategoryBadge(cat);
             if (c.BadgeBg != null)
             {
                 if (badgeBg != null) ShopUIStyle.Skin(c.BadgeBg, badgeBg, sliced: true);
                 else                 c.BadgeBg.color = col;
             }
-            if (c.BadgeGlyph != null)
-            {
-                bool hasGlyph = badgeGlyph != null;
-                c.BadgeGlyph.gameObject.SetActive(hasGlyph);
-                if (hasGlyph) ShopUIStyle.Skin(c.BadgeGlyph, badgeGlyph);
-            }
+            // 10-11: 배지 글자는 넷 다 같은 Noto 15(500) — 아트 글리프(버프 · 포션, 굵은 외곽선 글자 잉크 19)는 끈다(리서치 C §3 P2).
+            //        바탕(띠 아트 · 색)이 범주 색 하나를 맡는다. 바탕 아트 위는 밝은 글자, 색 알약 위는 짙은 글자.
+            if (c.BadgeGlyph != null) c.BadgeGlyph.gameObject.SetActive(false);
             if (c.BadgeText != null)
             {
-                // 글리프 아트가 있으면 글자가 겹치므로 끈다.
-                c.BadgeText.gameObject.SetActive(badgeGlyph == null);
-                c.BadgeText.text = p.CategoryLabel;
+                c.BadgeText.gameObject.SetActive(true);
+                c.BadgeText.text  = p.CategoryLabel;
+                c.BadgeText.color = badgeBg != null ? BadgeInkOnArt : BadgeInkOnPill;
             }
 
             if (c.Name != null)   c.Name.text   = p.DisplayName;
-            if (c.Effect != null) c.Effect.text = p.EffectText;
+            if (c.Effect != null) c.Effect.text = p.Category == ShopProductCategory.Rune ? string.Empty : p.EffectText;   // 룬 효과는 눌러서 상세 열에서(10-14)
             if (c.Price != null)
             {
                 c.Price.text  = p.Sold ? "품절" : p.Price.ToString();
@@ -1118,12 +1171,12 @@ public sealed class UI_ShopPanel : UI_Popup
             if (c.PriceCoin != null) c.PriceCoin.gameObject.SetActive(!p.Sold);
             if (c.Icon != null && p.Icon != null) ShopUIStyle.Skin(c.Icon, p.Icon);
 
-            // 룬 — 룬 선택 카드와 같은 말: 등급색 테두리·빛, 등급·칸 수 태그
+            // 룬 — 등급은 「등급 태그 한 곳」에만 등급색(v2 강조색). 아이콘 테 틴트 · 등급빛은 끈다(10-11 — 카드 한 장에
+            //       범주 색 · 등급 글자 · 테 색 · 빛 · 이름 색이 겹쳐 강조가 다섯이었다, 리서치 C §3 P2 · 후광은 화면 1곳).
             var rune = p.Rune;
             var rc   = rune != null ? ShopUIStyle.Rarity(rune.rarity) : Color.white;
-            if (c.IconFrame != null) c.IconFrame.color = rune != null ? rc : Color.white;
-            if (c.IconGlow  != null) c.IconGlow.color  = rune != null
-                ? new Color(rc.r, rc.g, rc.b, rune.rarity == ItemRarity.Common ? 0.28f : 0.55f) : Color.clear;
+            if (c.IconFrame != null) c.IconFrame.color = Color.white;
+            if (c.IconGlow  != null) c.IconGlow.color  = Color.clear;
             SetTag(c.Tag0Bg, c.Tag0, rune != null ? RewardPresentation.RarityLabel(rune.rarity) : null, rc);
             int cells = rune != null ? RuneCardKit.CellCount(rune) : 0;
             SetTag(c.Tag1Bg, c.Tag1, cells > 0 ? $"{cells}칸" : null, new Color(0.96f, 0.90f, 0.78f, 1f));
@@ -1155,10 +1208,198 @@ public sealed class UI_ShopPanel : UI_Popup
             if (c.SoldStamp != null)
                 c.SoldStamp.gameObject.SetActive(p.Sold && _skin?.soldStamp != null);
 
-            if (c.Name != null)
-                c.Name.color = selected ? new Color(0.52f, 0.20f, 0.05f, 1f)
-                                        : new Color(0.18f, 0.12f, 0.06f, 1f);
+            // 고른 카드 = 들림 + 2px 금 테(85%, P1). 이름 색은 바꾸지 않는다 — 고른 표시는 테 하나가 맡는다.
+            if (c.Name != null) c.Name.color = InkMain;
+            SetSelEdge(c, selected);
         }
+    }
+
+    // ── 10-11 위계 · 가독성(리서치 C §3 「고칠 값」 · 설계 v2 보강) ──────────────────────
+    // 양피지 위 잉크 셋 — 이름 · 본문 #2A1C0E / 효과 · 보조 #4A3820 / 수치 #5E1A0A(가장 얼룩진 종이 위 4.5:1 이상, v2-0).
+    //   리서치 P2의 보조 #6B5238은 얼룩진 종이 위 2.9:1이라 v2 대비 기준(#4A3820)을 따른다.
+    private static readonly Color InkMain  = new(0.165f, 0.110f, 0.055f, 1f);   // #2A1C0E
+    private static readonly Color InkLabel = new(0.290f, 0.220f, 0.125f, 1f);   // #4A3820
+    private static readonly Color InkNum   = new(0.369f, 0.102f, 0.039f, 1f);   // #5E1A0A
+    private static readonly Color BadgeInkOnArt  = new(0.98f, 0.96f, 0.92f, 1f);
+    private static readonly Color BadgeInkOnPill = new(0.10f, 0.09f, 0.12f, 1f);
+    private static readonly Color SelEdgeColor   = UITheme.Thin.WithA(UITheme.Thin.Gold, 0.85f);
+    private const float SelEdgePx = 2f;   // v2 선 굵기 — 고른 것 2px
+
+    /// <summary>
+    /// 글자를 톤 v2로 — 카드 이름 · 가격 20(가격 금 500) · 효과 18 한 줄 · 범주 태그 15(500) · 등급 태그 17 · 플레이버 정자 15 등(리서치 C §3).
+    /// 구운 프리팹은 DNF · 가짜 굵게 · 기울임으로 굳어 있어 열 때마다(Init) 입힌다. 글자가 커진 칸은 자리도 다시 잡는다(비율 앵커라 재굽기 불필요).
+    /// 크기는 설계 단위 × 창 맞춤이 이미 먹인 배율(UIFontScaleMemo) — 맞춤이 뒤에 돌아도 차이만 곱하므로 겹치지 않는다.
+    /// </summary>
+    private void ApplyThinStyle()
+    {
+        var win = transform.Find("Window");
+        float k = win != null && win.TryGetComponent<UIFontScaleMemo>(out var memo) ? memo.Applied : 1f;
+
+        // 머리 — 가게 이름(제목 한 줄 = DNF, 가짜 굵게만 없앤다) · 인사 · 골드 · 인장
+        if (win != null && win.Find("Name") is Transform nameTf && nameTf.TryGetComponent<TMP_Text>(out var shopName))
+        {
+            shopName.fontStyle = FontStyles.Normal;
+            SetSize(shopName, 24f * k);
+        }
+        if (_dialogText != null)
+        {
+            Thin(_dialogText, UIWeight.Regular, 15f * k, _dialogText.color);
+            AutoSize(_dialogText, 13f * k, 15f * k);   // 간판 쇠띠 앞 좁은 칸 — 긴 상인 반응만 13까지 줄인다
+        }
+        if (_goldText  != null) Thin(_goldText,  UIWeight.Medium, 20f * k, _goldText.color);
+        if (_sigilText != null) Thin(_sigilText, UIWeight.Medium, 15f * k, _sigilText.color);
+
+        // 특가 띠
+        if (_dealRoot != null)
+        {
+            var d = _dealRoot.transform;
+            if (_dealCat != null)  { Thin(_dealCat,  UIWeight.Medium,  15f * k, InkLabel); PlaceIn(d, _dealCat, 147f, 42f + DealInY, 268f, 20f, DealW, DealH); }
+            if (_dealName != null) { Thin(_dealName, UIWeight.Medium,  24f * k, InkMain);  PlaceIn(d, _dealName, 147f, 60f + DealInY, 268f, 34f, DealW, DealH); FitLine(_dealName); }
+            if (_dealDesc != null) { Thin(_dealDesc, UIWeight.Regular, 17f * k, InkLabel); PlaceIn(d, _dealDesc, 147f, 96f + DealInY, 268f, 26f, DealW, DealH); FitLine(_dealDesc); }
+            if (_dealOldPrice != null)
+            {
+                Thin(_dealOldPrice, UIWeight.Regular, 15f * k, InkLabel);
+                _dealOldPrice.fontStyle = FontStyles.Strikethrough;   // 깎이기 전 값(가짜 굵게가 아니라 취소선)
+            }
+            if (_dealPrice != null) Thin(_dealPrice, UIWeight.Medium, 24f * k, InkNum);
+            if (_dealStock != null) Thin(_dealStock, UIWeight.Medium, 15f * k, _dealStock.color);
+        }
+
+        // 상품 카드
+        foreach (var c in _cards)
+        {
+            if (c.Root == null) continue;
+            var card = c.Root.transform;
+            if (c.Name != null)
+            {
+                Thin(c.Name, UIWeight.Medium, 20f * k, InkMain);
+                PlaceIn(card, c.Name, 20f, 98f, 166f, 28f, CardW, CardH);
+                FitLine(c.Name);
+                AutoSize(c.Name, 17f * k, 20f * k);   // 긴 룬 이름만 17까지(단계 안) — 그래도 넘치면 말줄임
+            }
+            if (c.Effect != null)
+            {
+                Thin(c.Effect, UIWeight.Regular, 18f * k, InkLabel);
+                PlaceIn(card, c.Effect, 20f, 127f, 166f, 24f, CardW, CardH);
+                FitLine(c.Effect);   // 한 줄 — 넘치면 말줄임(전부는 오른쪽 상세 열)
+            }
+            if (c.PricePill != null) PlaceIn(card, c.PricePill, 90f, 154f, 90f, 28f, CardW, CardH);
+            if (c.PriceCoin != null) PlaceIn(card, c.PriceCoin, 95f, 159f, 18f, 18f, CardW, CardH);
+            if (c.Price != null)
+            {
+                Thin(c.Price, UIWeight.Medium, 20f * k, c.Price.color);
+                PlaceIn(card, c.Price, 116f, 154f, 62f, 28f, CardW, CardH);
+            }
+            if (c.BadgeText != null)
+            {
+                Thin(c.BadgeText, UIWeight.Medium, 15f * k, c.BadgeText.color);
+                c.BadgeText.textWrappingMode = TextWrappingModes.NoWrap;
+            }
+            if (c.Tag0 != null)
+            {
+                Thin(c.Tag0, UIWeight.Medium, 17f * k, c.Tag0.color);
+                AutoSize(c.Tag0, 15f * k, 17f * k);   // 「★ Legendary」만 15까지 줄인다(등급 영문 유지)
+            }
+            if (c.Tag1 != null) Thin(c.Tag1, UIWeight.Medium, 15f * k, c.Tag1.color);
+        }
+
+        // 고른 물건 열
+        if (_selName != null)
+        {
+            Thin(_selName, UIWeight.Medium, 24f * k, _selName.color);
+            AutoSize(_selName, 20f * k, 24f * k);   // 명판 한 줄 — 긴 이름만 20까지
+        }
+        if (_selCat    != null) Thin(_selCat,    UIWeight.Medium,  17f * k, _selCat.color);
+        if (_selEffect != null) Thin(_selEffect, UIWeight.Regular, 17f * k, InkMain);
+        if (_selFlavor != null) Thin(_selFlavor, UIWeight.Regular, 15f * k, InkLabel);   // 정자(P2) — 알파 0.6은 얼룩진 종이 위 3.2:1이라 #4A3820
+        if (_buyLabel  != null) Thin(_buyLabel,  UIWeight.Medium,  24f * k, _buyLabel.color);
+
+        // 아래 버튼
+        if (_rerollLabel != null) Thin(_rerollLabel, UIWeight.Medium, 17f * k, _rerollLabel.color);
+        if (win != null && win.Find("Exit") is Transform exitTf)
+        {
+            var exitLabel = exitTf.GetComponentInChildren<TMP_Text>(true);
+            if (exitLabel != null) Thin(exitLabel, UIWeight.Medium, 17f * k, exitLabel.color);
+        }
+    }
+
+    /// <summary>톤 v2 글자 한 칸 — Noto 굵기 · 가짜 굵게/기울임 없음 · 크기 고정(자동 축소 끔, 넘치면 말줄임).</summary>
+    private static void Thin(TMP_Text t, UIWeight weight, float size, Color color)
+    {
+        t.enableAutoSizing = false;
+        UITheme.StyleThinText(t, weight, size, color);
+    }
+
+    /// <summary>자동 축소를 단계 안(min~max)으로만 — 넘치는 긴 글자만 줄어든다.</summary>
+    private static void AutoSize(TMP_Text t, float min, float max)
+    {
+        t.enableAutoSizing = true;
+        t.fontSizeMin = min;
+        t.fontSizeMax = max;
+    }
+
+    private static void SetSize(TMP_Text t, float size)
+    {
+        t.fontSize = size;
+        if (t.enableAutoSizing) t.fontSizeMax = size;
+    }
+
+    /// <summary>
+    /// 고른 카드의 2px 금 테 — 보이는 종이(아트 투명 여백: 좌 2.1% · 우 4.9% · 위 2.2% · 아래 5.2%) 둘레에 네 변을 깐다.
+    /// 처음 쓸 때 만들고, 켜질 때 0.14초에 걸쳐 스민다(실시간 — 팝업은 시간정지).
+    /// </summary>
+    private void SetSelEdge(Card c, bool on)
+    {
+        if (!on)
+        {
+            if (c.SelEdge != null) c.SelEdge.gameObject.SetActive(false);
+            c.EdgeOn = false;
+            return;
+        }
+        if (c.SelEdge == null)
+        {
+            var found = c.Root.transform.Find("SelEdge");
+            c.SelEdge = found != null && found.TryGetComponent<CanvasGroup>(out var g) ? g : BuildSelEdge(c.Root.transform);
+        }
+        c.SelEdge.transform.SetAsLastSibling();
+        c.SelEdge.gameObject.SetActive(true);
+        if (c.EdgeOn) return;
+        c.EdgeOn = true;
+        FadeEdgeAsync(c.SelEdge).Forget();
+    }
+
+    private static CanvasGroup BuildSelEdge(Transform card)
+    {
+        var go = ShopUIStyle.MakeRect(card, "SelEdge", typeof(CanvasGroup));
+        var rt = (RectTransform)go.transform;
+        rt.anchorMin = new Vector2(0.021f, 0.052f);
+        rt.anchorMax = new Vector2(1f - 0.049f, 1f - 0.022f);
+        rt.offsetMin = rt.offsetMax = Vector2.zero;
+        var g = go.GetComponent<CanvasGroup>();
+        g.blocksRaycasts = false;
+        g.interactable   = false;
+        EdgeSide(rt, "Top",    new Vector2(0f, 1f), Vector2.one,         new Vector2(0.5f, 1f), new Vector2(0f, SelEdgePx));
+        EdgeSide(rt, "Bottom", Vector2.zero,        new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, SelEdgePx));
+        EdgeSide(rt, "Left",   Vector2.zero,        new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(SelEdgePx, 0f));
+        EdgeSide(rt, "Right",  new Vector2(1f, 0f), Vector2.one,         new Vector2(1f, 0.5f), new Vector2(SelEdgePx, 0f));
+        return g;
+    }
+
+    private static void EdgeSide(RectTransform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 size)
+    {
+        var img = ShopUIStyle.MakeImage(parent, name, SelEdgeColor);
+        var rt = img.rectTransform;
+        rt.anchorMin = anchorMin;
+        rt.anchorMax = anchorMax;
+        rt.pivot     = pivot;
+        rt.sizeDelta = size;
+        rt.anchoredPosition = Vector2.zero;
+    }
+
+    private async UniTaskVoid FadeEdgeAsync(CanvasGroup g)
+    {
+        try { await UIMotion.Tween(UIMotion.Quick, k => { if (g != null) g.alpha = k; }, destroyCancellationToken); }
+        catch (OperationCanceledException) { }
     }
 
     /// <summary>태그 글자 — 16이 기본, 칸을 넘을 때만 14까지 줄인다(「★ Legendary」).</summary>
@@ -1176,8 +1417,8 @@ public sealed class UI_ShopPanel : UI_Popup
         {
             if (c.Root == null) continue;
             var card = c.Root.transform;
-            if (c.Tag0Bg != null) PlaceIn(card, c.Tag0Bg, TagX, Tag0Y, Tag0W, 20f, CardW, CardH);
-            if (c.Tag1Bg != null) PlaceIn(card, c.Tag1Bg, TagX, Tag1Y, Tag1W, 20f, CardW, CardH);
+            if (c.Tag0Bg != null) PlaceIn(card, c.Tag0Bg, TagX, Tag0Y, Tag0W, TagH, CardW, CardH);
+            if (c.Tag1Bg != null) PlaceIn(card, c.Tag1Bg, TagX, Tag1Y, Tag1W, TagH, CardW, CardH);
             if (c.Tag0 != null) FitTagLabel(c.Tag0);
             if (c.Tag1 != null) FitTagLabel(c.Tag1);
         }
@@ -1247,7 +1488,6 @@ public sealed class UI_ShopPanel : UI_Popup
             return;
         }
 
-        int cat = Mathf.Clamp((int)p.Category, 0, CatColor.Length - 1);
         int gold = _controller.PlayerGold;
         var rune = p.Rune;
         SetText(_selName, p.DisplayName);
@@ -1255,14 +1495,14 @@ public sealed class UI_ShopPanel : UI_Popup
         var sb = new System.Text.StringBuilder();
         if (rune != null)
         {
-            // 룬 선택 카드와 같은 내용 — 등급·칸 수·속성 / 효과 전부 / 놓을 자리
+            // 룬 선택 카드와 같은 내용 — 등급·칸 수·속성 / 효과 전부 / 블록 예산
             var rc = ShopUIStyle.Rarity(rune.rarity);
             if (_selCat != null)
             {
                 var elem = ElementDef.GetById(rune.element);
                 _selCat.text  = RuneCardKit.RarityChipText(rune) + (elem != null ? $" · {elem.Name}" : "");
                 // 양피지 위 잉크 — 밝은 등급색은 종이에 묻힌다. 평범(흰색)은 눌러도 회색이라 짙은 갈색 잉크로.
-                _selCat.color = rune.rarity == ItemRarity.Common ? new Color(0.30f, 0.22f, 0.14f, 1f)
+                _selCat.color = rune.rarity == ItemRarity.Common ? InkLabel
                                                                  : new Color(rc.r * 0.55f, rc.g * 0.55f, rc.b * 0.55f, 1f);
             }
             if (_selGlow != null) _selGlow.color = new Color(rc.r, rc.g, rc.b, rune.rarity == ItemRarity.Common ? 0.25f : 0.5f);
@@ -1272,33 +1512,33 @@ public sealed class UI_ShopPanel : UI_Popup
                     if (!string.IsNullOrEmpty(slot.effectType))
                         sb.Append("▲ ").Append(EffectDescriptionFormatter.Describe(slot).Combined).Append('\n');
 
-            bool fit = RuneCardKit.CanPlace(rune);
-            // 블록 모양 — 판 위 블록과 같은 속성 타일. 놓을 자리가 없으면 어둡게(룬 선택 카드와 같은 규칙).
+            bool fit = RuneBlockBudget.Fits(RuneBlockBudget.Used) && RuneBlockBudget.FitsSame(rune);   // + 같은 룬 상한(10-14)
+            // 블록 모양 — 판 위 블록과 같은 속성 타일. 룬 수 상한을 넘으면 어둡게(룬 선택 카드와 같은 규칙, 10-10 칸 → 개수).
             if (_selShape != null) RuneCardKit.BuildShape(_selShape, rune, 30f, 3f, dim: !fit);
-            sb.Append(fit ? "<color=#2F7A48><b>놓을 자리 있음</b></color>" : "<color=#9C2A1C><b>놓을 자리 없음</b></color>")
-              .Append("  <color=#6B5842>사면 판이 열린다</color>\n");
+            sb.Append(fit ? "<color=#2F7A48>" : "<color=#9C2A1C>").Append(RuneBlockBudget.SameLabel(rune) ?? RuneBlockBudget.Label()).Append("</color>")
+              .Append("  <color=#4A3820>사면 판이 열린다</color>\n");
         }
         else
         {
-            // 카테고리 색은 어두운 배지 바탕용이다 — 양피지 위 글자로 그대로 쓰면 종이에 묻힌다. 절반 밝기로 눌러 잉크처럼 쓴다.
+            // 범주 이름은 보조 잉크 — 범주 색은 카드 배지 한 곳이 맡는다(10-11, 카드 한 장 · 화면 한 곳에 뜻 하나).
             if (_selCat != null)
             {
-                var ink = CatColor[cat];
                 _selCat.text  = p.CategoryLabel;
-                _selCat.color = new Color(ink.r * 0.5f, ink.g * 0.5f, ink.b * 0.5f, 1f);
+                _selCat.color = InkLabel;
             }
             sb.Append("▲ ").Append(p.EffectText).Append('\n');
-            if (!string.IsNullOrEmpty(p.DetailText)) sb.Append("<color=#6B5842>").Append(p.DetailText).Append("</color>\n");
+            if (!string.IsNullOrEmpty(p.DetailText)) sb.Append("<color=#4A3820>").Append(p.DetailText).Append("</color>\n");
         }
 
         // 값과 모자람은 두 줄 — 한 줄에 붙이면 「값 81   54 골드 모자람」이 숫자 둘로 읽혔다(09-29).
-        sb.Append("값 <b>").Append(p.Price).Append(" 골드</b>");
-        if (gold < p.Price) sb.Append("\n<color=#9C2A1C><b>").Append(p.Price - gold).Append(" 골드 모자람</b></color>");
-        else                sb.Append("   <color=#6B5842>(잔액 ").Append(gold - p.Price).Append(")</color>");
+        // 10-11: <b>(가짜 굵게) 대신 수치 잉크 #5E1A0A — 굵기는 글꼴(Noto)이 정한다.
+        sb.Append("값 <color=#5E1A0A>").Append(p.Price).Append(" 골드</color>");
+        if (gold < p.Price) sb.Append("\n<color=#9C2A1C>").Append(p.Price - gold).Append(" 골드 모자람</color>");
+        else                sb.Append("   <color=#4A3820>(잔액 ").Append(gold - p.Price).Append(")</color>");
 
         var deal = _controller.SpecialDeal;
         if (deal != null && deal != p && gold >= p.Price && gold - p.Price < deal.Price)
-            sb.Append("\n<color=#8A4A1C>사면 특가 ").Append(deal.DisplayName).Append("(").Append(deal.Price).Append(")는 못 산다</color>");
+            sb.Append("\n<color=#4A3820>사면 특가 ").Append(deal.DisplayName).Append("(").Append(deal.Price).Append(")는 못 산다</color>");
 
         SetText(_selEffect, sb.ToString());
         SetText(_selFlavor, gold < p.Price ? "골드가 모자라는군." : "힘을 살 텐가, 특가를 챙길 텐가.");   // 16px에 한 줄(예전 문장은 말줄임됐다)
@@ -1354,7 +1594,7 @@ public sealed class UI_ShopPanel : UI_Popup
     // 전부 표시층이다 — 골드 차감·지급·품절은 컨트롤러가 이미 확정했고, 여기서는 그 사실을 눈에 보이게만 한다.
     // 팝업은 시간이 멈춰 있어 모든 시간은 unscaled다.
 
-    private static readonly Color DealStockInk = new(0.55f, 0.24f, 0.10f, 1f);
+    private static readonly Color DealStockInk = new(0.369f, 0.102f, 0.039f, 1f);   // #5E1A0A(10-11 — 주황 갈색은 얼룩진 종이 위 3:1)
     private static readonly Color SoldInk      = new(0.45f, 0.38f, 0.30f, 1f);
 
     /// <summary>구매 직후 한 벌 — 동전이 떨어지고, 상인이 반응하고, 산 물건이 받는 곳으로 날아간다.</summary>

@@ -26,6 +26,7 @@ public sealed class IceZoneField : MonoBehaviour
     private const float VfxScale = 0.4f;
 
     private readonly List<GameObject> _buf = new(8);
+    private readonly HashSet<GameObject> _hitShown = new();   // 틱 타격 이펙트를 이미 띄운 대상(빙판 하나에 한 번)
     public object Owner { get; private set; }
 
     public void Init(object owner, ItemEffectContext ctx, float dps, float radius, float lifetime, float attackPower)
@@ -61,6 +62,21 @@ public sealed class IceZoneField : MonoBehaviour
         LegendaryRuntime.Instance?.RemoveAgent(gameObject);
     }
 
+    /// <summary>지금 빙판 위 적을 빙결한다(보스 제외) — 영구 빙판의 저스트 회피 보상(10-14 R3). 얼린 수를 돌려준다.</summary>
+    public int FreezeInside(float seconds)
+    {
+        int n = CombatQuery.GetNearbyDamageables(transform.position, _radius, _ctx?.Player?.gameObject, 10, _buf);
+        int frozen = 0;
+        for (int i = 0; i < n; i++)
+        {
+            var mb = _buf[i] != null ? _buf[i].GetComponentInParent<MonsterBase>() : null;
+            if (mb == null || mb.IsDead || mb.Grade == MonsterGrade.Boss) continue;
+            mb.Status.ApplyCc("freeze", seconds);
+            frozen++;
+        }
+        return frozen;
+    }
+
     private void Update()
     {
         _timer += Time.deltaTime;
@@ -79,22 +95,29 @@ public sealed class IceZoneField : MonoBehaviour
         {
             var go = _buf[i];
             CombatQuery.DealSynergyDamage(go, tickDmg, instigator, element: RuneElement.Ice);
-            LegendaryRuntime.SpawnVfx(LegendaryRuntime.Catalog?.iceFieldHitVfx, go.transform.position, Quaternion.identity, 1.5f, 0.8f);
 
+            // 파편이 터지는 틱엔 파편 폭발 하나로 — 같은 점 · 같은 프레임에 틱 타격 이펙트가 겹쳤다(10-11 이펙트 톤 점검)
+            bool shard = false;
             var mb = go.GetComponentInParent<MonsterBase>();
-            if (mb == null) continue;
-
-            mb.Status.ApplySlow("ice_zone_slow", SlowMagnitude, SlowDuration);
-
-            if (mb.Status.HasCc("freeze") && !mb.Status.IsOnCooldown("ice_zone_shard"))
+            if (mb != null)
             {
-                mb.Status.SetCooldown("ice_zone_shard", ShardCooldown);
-                float shardDmg = _attackPower * ShardMult;
-                CombatQuery.DealSynergyDamage(go, shardDmg, instigator, element: RuneElement.Ice);
+                mb.Status.ApplySlow("ice_zone_slow", SlowMagnitude, SlowDuration);
 
-                var cat = LegendaryRuntime.Catalog;
-                LegendaryRuntime.SpawnVfx(cat?.iceAoeVfx, go.transform.position, Quaternion.identity, 1.5f, 0.8f);
+                if (mb.Status.HasCc("freeze") && !mb.Status.IsOnCooldown("ice_zone_shard"))
+                {
+                    shard = true;
+                    mb.Status.SetCooldown("ice_zone_shard", ShardCooldown);
+                    float shardDmg = _attackPower * ShardMult;
+                    CombatQuery.DealSynergyDamage(go, shardDmg, instigator, element: RuneElement.Ice);
+
+                    var cat = LegendaryRuntime.Catalog;
+                    // 파편 — 빙하기(SSEP IceAge · 입자 크기 모드 Hierarchy라 배율이 먹는다) 0.8은 빙판보다 컸다 → 0.5(10-11 톤 2차 V-10)
+                    LegendaryRuntime.SpawnVfx(cat?.iceAoeVfx, go.transform.position, Quaternion.identity, 1.5f, 0.5f);
+                }
             }
+            // 틱(0.5초)마다 대상마다 뜨던 타격 이펙트는 들어온 첫 틱에 한 번만 — 피해 숫자가 틱을 알린다(10-11 톤 2차 V-10)
+            if (!shard && _hitShown.Add(go))
+                LegendaryRuntime.SpawnVfx(LegendaryRuntime.Catalog?.iceFieldHitVfx, go.transform.position, Quaternion.identity, 1.5f, 0.8f);
         }
 
         if (n > 0)

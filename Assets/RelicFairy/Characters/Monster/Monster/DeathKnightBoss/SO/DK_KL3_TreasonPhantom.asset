@@ -28,7 +28,7 @@ MonoBehaviour:
   firstStrikeTime: 1
   strikeInterval: 0.45
   cellTelegraph: 0.6
-  lockLead: 0.4
+  lockLead: 0.45
   recoveryTime: 0.5
   slashVfxPrefab: {fileID: 1105761162065845526, guid: 28668731d069e9444b9b61a080a17947,
     type: 3}

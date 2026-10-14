@@ -179,6 +179,33 @@ public sealed class DKPage2Zone
         ctx.Animator.CrossFade(state, fade, 0, 0f);
     }
 
+    /// <summary>
+    /// 휘두른 모션이 끝났는데 패턴이 아직 이어지면(창 · 분신 · 링 · 줄이 남은 라운드) 기본 자세(Idle)로 돌아간다 —
+    /// 끝 자세로 1.6~3.6초 서 있었다(10-06 연출 점검 · 10-07 사용자 「진행하자」). 다른 모션(피격 등)으로 넘어갔으면 손대지 않는다.
+    /// </summary>
+    public static void SettleAfterSwing(MonsterContext ctx, string swingState, float fadeSeconds = 0.25f)
+    {
+        var anim = ctx?.Animator;
+        if (anim == null || anim.IsInTransition(0)) return;
+        var si = anim.GetCurrentAnimatorStateInfo(0);
+        if (si.normalizedTime < 1f || !si.IsName(swingState)) return;
+        string rest = ctx.Animation?.idleStateName;
+        if (string.IsNullOrEmpty(rest) || !anim.HasState(0, Animator.StringToHash(rest))) return;
+        anim.CrossFadeInFixedTime(rest, fadeSeconds);
+    }
+
+    /// <summary>
+    /// 루프가 아닌 클립(Idle2 등)을 채널링 동안 되풀이한다 — 끝 자세로 굳어 석상처럼 보였다(10-06 연출 점검: Strike 4.7초 · 원탁의 무덤 5.4초).
+    /// 지금 그 상태가 끝까지 돌았을 때만 처음부터 다시(다른 모션으로 넘어갔으면 손대지 않는다).
+    /// </summary>
+    public static void KeepLooping(MonsterContext ctx, string state)
+    {
+        var anim = ctx?.Animator;
+        if (anim == null || anim.IsInTransition(0)) return;
+        var si = anim.GetCurrentAnimatorStateInfo(0);
+        if (si.normalizedTime >= 1f && si.IsName(state)) anim.Play(state, 0, 0f);
+    }
+
     public static void StopAgent(MonsterContext ctx)
     {
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh)

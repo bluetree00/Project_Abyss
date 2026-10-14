@@ -175,6 +175,9 @@ public static class QuestSOGenerator
         ApplyAddressableLabels();
         AssetDatabase.SaveAssets();
 
+        // 아이콘은 코드 표가 정본이다 — 전체 생성은 에셋을 새로 만들어 icon이 비므로 다시 건다(10-13 Artsystack).
+        QuestIconAssigner.Apply();
+
         Debug.Log($"[QuestSOGenerator] 완료 — 새로 만듦 Quest {quests}, Achievement {achievements} · " +
                   $"문구만 갱신 {kept} · 건너뜀 {skipped} → {kOutputRoot}");
     }

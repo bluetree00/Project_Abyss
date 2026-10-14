@@ -25,16 +25,23 @@ MonoBehaviour:
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: 610e7d37366c8ac48b57b1d0e382f47d,
       type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
     castVfxPrefab: {fileID: 0}
     castVfxDuration: 0
+    castVfxDelay: 0
+    castVfxLeadTime: 0.15
+    castVfxXRotationOffset: 0
+    castVfxYRotationOffset: 0
+    castVfxZRotationOffset: 0
     castVfxForwardOffset: 0
+    castVfxRightOffset: 0
     castVfxVerticalOffset: 0.8
     castVfxScale: 1
     castVfxAttachToMonster: 1
+    castVfxAtPlayerPosition: 0
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
     proceduralBeamWidth: 0.16
@@ -45,27 +52,34 @@ MonoBehaviour:
     hitVfxScale: 1
     hitVfxOffset: {x: 0, y: 0, z: 0}
   - name: Burst
-    animationStateName: Attack01
+    animationStateName: Attack02
     minDistance: 0
     maxDistance: 8
     priority: 0
     cooldown: 1.5
-    damageDelay: 0.8
-    attackDuration: 1
+    damageDelay: 0.57
+    attackDuration: 1.1
     damageMultiplier: 1.15
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: 0d17a360f9cc4a12b2a15ac7812e3104,
       type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
     castVfxPrefab: {fileID: 0}
     castVfxDuration: 0
+    castVfxDelay: 0
+    castVfxLeadTime: 0.15
+    castVfxXRotationOffset: 0
+    castVfxYRotationOffset: 0
+    castVfxZRotationOffset: 0
     castVfxForwardOffset: 0
+    castVfxRightOffset: 0
     castVfxVerticalOffset: 0.8
     castVfxScale: 1
     castVfxAttachToMonster: 1
+    castVfxAtPlayerPosition: 0
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
     proceduralBeamWidth: 0.16

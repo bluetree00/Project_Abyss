@@ -145,14 +145,14 @@ public class LichSoulCopyState : UnInterruptibleState<LichSoulCopyPatternSO>
                 if (LichSoulCopy.Live.Count == 0 || _timer >= Data.activeDuration)
                 {
                     LichSoulCopy.ClearAll();
-                    LichPatternUtil.Lich(ctx)?.NotifyVulnerableWindow(Data.recoveryDuration + 0.4f);
+                    LichPatternUtil.Lich(ctx)?.NotifyVulnerableWindow(LichPatternUtil.Recovery(ctx, Data.recoveryDuration) + 0.4f);   // 빈틈 = 실제 회복 시간(10-08)
                     _phase = Phase.Recovery;
                     _timer = 0f;
                 }
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }

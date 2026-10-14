@@ -104,6 +104,7 @@ public class FGRootWhirlState : FullLockState<FGRootWhirlPatternSO>
     private float      _timer;
     private bool       _innerArmed;
     private bool       _outerArmed;
+    private bool       _innerPushed;   // 안쪽 원에 맞아 밀려났다 — 바깥 고리는 이 플레이어를 다시 치지 않는다(10-08 점검)
     private Vector3    _center;
     private GameObject _outerGO;
     private GameObject _innerGO;
@@ -117,6 +118,7 @@ public class FGRootWhirlState : FullLockState<FGRootWhirlPatternSO>
         _timer      = 0f;
         _innerArmed = false;
         _outerArmed = false;
+        _innerPushed = false;
 
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
         {
@@ -172,7 +174,7 @@ public class FGRootWhirlState : FullLockState<FGRootWhirlPatternSO>
                 if (_timer >= innerAt)
                 {
                     SpawnOneShot(Data.innerVfxPrefab, _center, Data.innerVfxScale);
-                    TryHit(ctx, 0f, Data.innerRadius, Data.innerDamageMultiplier);
+                    _innerPushed = TryHit(ctx, 0f, Data.innerRadius, Data.innerDamageMultiplier);
 
                     PatternGuideHelper.SafeDestroy(ref _innerGO);
                     _safeGO = PatternGuideHelper.Disc(_center + Vector3.up * LayerLift, Data.innerRadius, ForestGuardianMonster.GuideSafe);
@@ -189,7 +191,10 @@ public class FGRootWhirlState : FullLockState<FGRootWhirlPatternSO>
                     SpawnOuterVfx();
                     if (Data.outerSfx != null)
                         Managers.Sound?.PlayEffectAt(Data.outerSfx, _center);
-                    TryHit(ctx, Data.innerRadius, Data.outerRadius, Data.outerDamageMultiplier);
+                    // 안쪽에 맞은 플레이어는 건너뛴다 — 맞는 순간 포이즈 날아감(약 1.2초 조작 불가)과 넉백이 바깥으로 밀어
+                    // 0.6초 뒤 바깥 고리 위에 떨어뜨렸다. 흰 원으로 갈 수 없는 확정 두 대째였다(10-08 점검)
+                    if (!_innerPushed)
+                        TryHit(ctx, Data.innerRadius, Data.outerRadius, Data.outerDamageMultiplier);
 
                     DestroyGuides();
                     PlayAnim(ctx, AnimReady);
@@ -219,16 +224,16 @@ public class FGRootWhirlState : FullLockState<FGRootWhirlPatternSO>
         PatternGuideHelper.SafeDestroy(ref _safeGO);
     }
 
-    /// <summary>수평 거리가 (min, max] — 안쪽 원은 min 0부터(보스 몸 위 포함).</summary>
-    private void TryHit(MonsterContext ctx, float minRadius, float maxRadius, float damageMult)
+    /// <summary>수평 거리가 (min, max] — 안쪽 원은 min 0부터(보스 몸 위 포함). 맞아서 밀려났으면 true.</summary>
+    private bool TryHit(MonsterContext ctx, float minRadius, float maxRadius, float damageMult)
     {
         var player = ctx.Runtime.CachedPlayer;
-        if (ctx.Config?.stat == null || player == null || ctx.Runtime.PlayerTarget == null) return;
+        if (ctx.Config?.stat == null || player == null || ctx.Runtime.PlayerTarget == null) return false;
 
         Vector3 d = ctx.Runtime.PlayerTarget.position - _center;
         d.y = 0f;
         float dist = d.magnitude;
-        if (dist > maxRadius || (minRadius > 0f && dist <= minRadius)) return;
+        if (dist > maxRadius || (minRadius > 0f && dist <= minRadius)) return false;
 
         int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * damageMult));
         player.TakeDamage(dmg, ctx.Monster.gameObject, false, HitWeight.Heavy);
@@ -236,6 +241,7 @@ public class FGRootWhirlState : FullLockState<FGRootWhirlPatternSO>
         Vector3 knock = dist > 0.001f ? d / dist : ctx.Transform.forward;
         knock.y = 0.3f;
         player.ApplyKnockback(knock.normalized * ctx.Config.stat.knockbackForce * Data.knockbackMultiplier);
+        return !player.IsInvincible;   // ApplyKnockback과 같은 기준 — 무적(피함)이면 밀리지 않았다(10-08 점검)
     }
 
     private void SpawnOuterVfx()
@@ -257,6 +263,11 @@ public class FGRootWhirlState : FullLockState<FGRootWhirlPatternSO>
         if (prefab == null) return;
         var go = Managers.ObjectPooler.SpawnFromPrefab(prefab, ObjectPoolerManager.PoolType.Effect, pos, rot);
         go.transform.localScale = Vector3.one * scale;
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var main = ps.main;
+            main.loop = false;   // 한 번만 — 반복 가시가 판정 뒤 다시 솟아 두 번째 공격처럼 보였다(10-11 이펙트 톤 점검)
+        }
         if (!go.TryGetComponent<PooledOneShotVfx>(out var vfx)) vfx = go.AddComponent<PooledOneShotVfx>();
         vfx.Play(VfxLifetime);
     }

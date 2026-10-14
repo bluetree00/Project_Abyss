@@ -23,8 +23,15 @@ public class MonsterFSM
     private IMonsterState   _current;
     private readonly MonsterContext _ctx;
 
-    /// <summary>현재 상태 타입 (디버그용).</summary>
+    /// <summary>현재 상태 타입 (디버그용). 오버라이드 상태면 등록 키가 아니라 실제 클래스다 — 상태 판정은 <see cref="IsIn{TKey}"/>로.</summary>
     public Type CurrentType { get; private set; }
+
+    /// <summary>
+    /// 지금 TKey로 등록된 상태에 있는가 — 오버라이드(RegisterAs)여도 맞게 답한다.
+    /// 패턴 몬스터의 공격 상태는 AttackState를 상속하지 않는 PatternAttackState라 CurrentType 비교로는 늘 거짓이었다(10-11 실측).
+    /// </summary>
+    public bool IsIn<TKey>() where TKey : IMonsterState
+        => _current != null && _states.TryGetValue(typeof(TKey), out var s) && ReferenceEquals(s, _current);
 
     /// <summary>
     /// 현재 특수 상태의 제약 플래그.

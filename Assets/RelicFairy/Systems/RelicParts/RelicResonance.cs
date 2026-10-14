@@ -97,9 +97,9 @@ public static class RelicResonance
     {
         (RelicPartAnchor.Dawn, 2) => "태양흔 상한 3 → 5",
         (RelicPartAnchor.Dawn, 4) => "새벽이 길다 — 여명 끝에 해를 붙들고, 낙일로 원하는 순간 정오를 연다",
-        (RelicPartAnchor.Noon, 2) => "개화가 2m 안 다른 태양흔 적에게 튄다",
-        (RelicPartAnchor.Noon, 4) => "한낮이 길다 — 정오에도 태양흔이 쌓이고 3스택이면 그 자리에서 개화",
-        (RelicPartAnchor.Dusk, 2) => "황혼의 화상이 다음 여명까지 이어진다",
+        (RelicPartAnchor.Noon, 2) => "개화하면 2m 안 다른 태양흔 적의 태양흔 +1(상한까지)",
+        (RelicPartAnchor.Noon, 4) => "한낮이 길다 — 정오에도 태양흔이 쌓이고 상한에 차면 그 자리에서 개화",
+        (RelicPartAnchor.Dusk, 2) => "황혼의 화상이 여명 시작 +1초까지 이어진다",
         (RelicPartAnchor.Dusk, 4) => "밤이 오지 않는다 — 황혼 끝에 3초짜리 짧은 정오가 한 번 더",
         _ => string.Empty,
     };
@@ -113,7 +113,8 @@ public static class RelicResonance
         _ => string.Empty,
     };
 
-    private static int LadderIfFilled(PlayerLoadout l, string extraRung, System.Func<string, RelicPartEntry> lookup)
+    /// <summary>이 계단 칸을 채우면 이어진 계단이 몇이 되나 — 드래프트 카드 「지금 → 고른 뒤」 숫자(10-12 A5). 가웨인은 GawainCount + 1.</summary>
+    public static int LadderIfFilled(PlayerLoadout l, string extraRung, System.Func<string, RelicPartEntry> lookup)
     {
         int n = 0;
         foreach (var rung in RelicPartAnchor.LancelotRungs)

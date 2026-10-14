@@ -119,6 +119,8 @@ public class MonsterRangedAttackSO : MonsterAttackShapeSO
 
                 if (ctx.Monster == null || !ctx.Monster.gameObject.activeInHierarchy) return;
                 if (ctx.Runtime?.PlayerTarget == null) return;
+                // 휘청 · 기절 · 사망 중엔 남은 발을 쏘지 않는다 — 비틀거리거나 쓰러지는 동작에서 화살이 나갔다(10-14 정예 애니 점검)
+                if (ctx.Monster.IsDead || ctx.Monster.IsCcActive || ctx.Monster.IsInState<GetHitState>()) return;
 
                 FireSingle(ctx, damage, knockbackForce);
             }
@@ -159,11 +161,13 @@ public class MonsterRangedAttackSO : MonsterAttackShapeSO
                 damage, knockbackForce, slowScale, slowDuration,
                 vfxProjectileHitRadius, ctx.Runtime.PlayerTarget,
                 vfxHitEffectPrefab, vfxHitEffectScale);
+            vfxProj.Owner = ctx.Transform.gameObject;
             return;
         }
 
         if (projectilePrefab == null) return;
         var proj = UnityEngine.Object.Instantiate(projectilePrefab, origin, Quaternion.LookRotation(direction));
         proj.Init(direction, projectileSpeed, projectileMaxRange, damage, knockbackForce, slowScale, slowDuration);
+        proj.Owner = ctx.Transform.gameObject;
     }
 }

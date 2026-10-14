@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: clear_5
   m_EditorClassIdentifier: Assembly-CSharp::Achievement
   category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: e9d8f5a9d906ec84ca7af4c2463237d6, type: 3}
   codeName: clear_5
   displayName: "\uBC18\uBCF5\uD558\uB294 \uC790"
   description: "5\uD68C \uC644\uC8FC"

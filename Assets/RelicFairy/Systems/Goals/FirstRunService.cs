@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// 「초행 初行」 — 아직 안 해본 조합에 표식과 보너스를 붙여 탐색을 유도한다.
@@ -79,6 +79,20 @@ public static class FirstRunService
         Data?.SetRecordMax(key, 1);
         Debug.Log($"[초행] 코어 파츠 {partId} — 정수 +{CorePartBonus}");
     }
+
+    /// <summary>이어하기용 — 이번 런의 초행 조합 키(초행이 아니면 null).</summary>
+    public static string PendingComboKeyIfFirst => RunIsFirst ? _pendingComboKey : null;
+
+    /// <summary>이어하기 — 세이브의 초행 상태를 되살린다. 앱을 다시 켜면 정적 값이 비어 초행 배율 · 코어 파츠 +200을 잃었다(10-09 출시 점검).</summary>
+    public static void Restore(string comboKey, int corePartFirsts)
+    {
+        _pendingComboKey  = comboKey;
+        RunIsFirst        = !string.IsNullOrEmpty(comboKey) && IsFirst(comboKey);
+        RunCorePartFirsts = Mathf.Max(0, corePartFirsts);
+    }
+
+    /// <summary>포기한 런 — 보상이 없으니 조합 기록도 소모하지 않는다(다음 런이 초행 그대로).</summary>
+    public static void DiscardRun() => BeginRun();
 
     /// <summary>
     /// 런 종료 정산. 조합 기록을 확정하고, 배율 적용분과 고정 보너스를 합쳐 돌려준다.

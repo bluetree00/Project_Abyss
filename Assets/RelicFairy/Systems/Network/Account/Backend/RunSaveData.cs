@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -39,6 +39,7 @@ public class RunSaveData
     // ── 로컬 세이브 확장 (PR1: 하데스식 절차생성 이어하기) ──
     public int    saveVersion;            // 마이그레이션용. 현재 1.
     public int    runEssence;             // RunDelta.GainedEssence 중간 적립
+    public string runStatsJson;           // 결과창 집계(RunStats) — 10-07 · 구 세이브는 빈 값
     public int    fuelEnhanceMaterial;    // RunFuelBank 강화재료 잔량(이벤트방 연료)
     public int    fuelRuneOre;            // RunFuelBank 원석 잔량(이벤트방 연료)
     public int    potionCount;            // 퀵슬롯 포션 개수
@@ -68,6 +69,13 @@ public class RunSaveData
     // (구버전) rangedInvested / rangedGrantedTier — 슬롯 지급형의 흔적. 내장형 전환으로 제거했다.
     //   구 세이브에 남아 있어도 JsonUtility가 모르는 키를 조용히 버리므로 이어하기는 깨지지 않는다.
     public string contractIds = "";       // 이번 런의 계약 id(쉼표) — 진척은 세션 카운터가 정본이라 저장하지 않는다
+    // 10-09 출시 점검 — 이어하기에서 빠지던 런 상태: 상점 「런 유지」 버프(골드는 빠진 채 버프만 사라졌다) · 누진 단계 · 골드 통계
+    public string roomBuffsJson;          // RoomBuffListWrapper JSON
+    public int    runeExtractCount;       // 룬 제거 누진 가격 단계
+    public int    refineryCraftCount;     // 정제 비용 단계
+    public int    runGoldGained;          // RunDelta.GainedGold(결과 · 누적 골드 통계)
+    public string firstRunComboKey;       // 초행 조합 키(초행 런일 때만) — 이어하기에서 초행 배율 유지
+    public int    firstRunCoreParts;      // 이번 런에 새로 밟은 코어 파츠 초행 수(+200씩)
 
     // 절차생성 진행 상태 (RunFlowController/RunSequencer)
     public int    masterSeed;
@@ -105,6 +113,11 @@ public class RunSaveData
     public int    abyssDepth;             // 심연 깊이(순환 회차) — 구버전 세이브는 0
 
     public string cooldownsJson;          // CooldownListWrapper JSON
+
+    // 10-10 Hades식 세이브 — 피해를 받은 뒤 다음 저장 전에 끈 런은 이어하지 않고 사망으로 정산한다(죽기 직전 끄기 재시도 차단)
+    public bool   combatLocked;
+    // 10-10 보스 클리어 뒤 저장 — 이어하면 보스방이 아니라 다음 챕터 대기방부터 연다(chapter = 다음 챕터)
+    public bool   chapterStartPending;
 }
 
 // ── 로컬 세이브 확장용 래퍼/엔트리 ──
@@ -176,5 +189,25 @@ public sealed class ItemListWrapper
 public sealed class IntListWrapper
 {
     public List<int> items = new();
+}
+
+/// <summary>활성 방 버프 하나(이어하기 복원용) — ActiveRoomBuff의 직렬화 사본.</summary>
+[Serializable]
+public sealed class RoomBuffSave
+{
+    public int    statType;
+    public float  value;
+    public int    roomsRemaining;
+    public int    baseDuration;
+    public bool   isPercent;
+    public bool   isDebuff;
+    public string buffType;
+    public int    tier;
+}
+
+[Serializable]
+public sealed class RoomBuffListWrapper
+{
+    public List<RoomBuffSave> items = new();
 }
 

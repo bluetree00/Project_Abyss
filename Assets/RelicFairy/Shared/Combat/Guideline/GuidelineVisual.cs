@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>
 /// 가이드라인 비주얼(플레이스홀더) 정적 파사드 — 룬/서약/유물 효과를 단순 도형+색+라벨로 인게임 표시.
 ///
-/// • 전역 토글 <see cref="Enabled"/>(에디터·개발빌드만 기본 ON, 출시 빌드는 OFF).
+/// • 전역 토글 <see cref="Enabled"/>(10-11부터 어디서나 기본 OFF — 켜기는 Debug 메뉴).
 ///   OFF면 모든 호출이 즉시 무동작(분기 1개) — 회귀 0.
 /// • 효과 발생 지점에서 이 파사드의 메서드를 "통지"로 1줄 호출한다(효과 로직은 변경하지 않음).
 /// • 카테고리(즉발/상태/장판/원뿔/체인/토스트) → 색/도형/수명 스펙은 여기 한 곳에 모았다.
@@ -14,13 +14,10 @@ using UnityEngine;
 public static class GuidelineVisual
 {
     // ── 토글 ────────────────────────────────────────────
-    // 개발용 플레이스홀더라 출시 빌드에는 나가면 안 된다. Enabled/Toggle 호출처가 0이라
-    // 기본값이 곧 유일한 스위치 — 에디터·개발빌드만 ON으로 둔다.
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-    private static bool s_enabled = true;
-#else
+    // 개발용 플레이스홀더라 출시 빌드에는 나가면 안 된다. 10-11 이펙트 톤 2차(D-1): 에디터 · 개발 빌드에서도 기본 OFF —
+    // 시너지 피해마다 구체 · 「CRIT」 · 연쇄 선 · 장판 원반이 진짜 이펙트와 같은 순간에 겹쳐, 사용자가 보는 에디터 플레이 화면이 어지러웠다.
+    // 켜기: 메뉴 RelicFairy/Debug/가이드라인 표시 켜기·끄기 (플레이 중) 또는 Enabled/Toggle.
     private static bool s_enabled = false;
-#endif
 
     /// <summary>전역 디버그 표시 토글. OFF로 바꾸면 기존 표시도 즉시 정리된다.</summary>
     public static bool Enabled
@@ -92,7 +89,9 @@ public static class GuidelineVisual
     {
         // [실제 VFX] 속성 상태 이펙트 — 개발 토글과 무관하게 항상(릴리스 포함). 모든 상태부여 지점의 단일 choke.
         // 적 '몸'에 붙인다(바닥 원반 아님) — 장판으로 오독되면 전투 판단을 흐린다.
-        if (target != null && duration > 0f && RuneElementMap.FromStatusId(statusId, out var element))
+        // 서리(둔화 -12%)는 몸 이펙트를 붙이지 않는다 — 매 타격 얼음 방패 거품이 떠 「막았다」로 읽혔다(10-11 톤 2차 D-4).
+        // 상태는 HP바 디버프 아이콘이 보여 준다. 빙결 · 분쇄는 그대로.
+        if (target != null && duration > 0f && statusId != "frost" && RuneElementMap.FromStatusId(statusId, out var element))
             ElementVfxPlayer.AttachStatus(element, target, duration);
 
         // 이하 개발용 플레이스홀더 마커(기본 OFF)
@@ -103,7 +102,7 @@ public static class GuidelineVisual
         Color c; string label;
         switch (statusId)
         {
-            case "ignite": case "burn":   c = Fire;     label = "점화"; break;
+            case "ignite": case "burn": case "item_burn": c = Fire; label = "점화"; break;
             case "frost":                 c = Ice;      label = "서리"; break;
             case "freeze":                c = IceDeep;  label = "빙결"; break;
             case "shatter":               c = IceDeep;  label = "분쇄"; break;

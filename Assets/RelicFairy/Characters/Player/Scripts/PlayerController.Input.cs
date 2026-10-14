@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.EventSystems;
 using Cysharp.Threading.Tasks;
 using Game.Inputs;
@@ -45,7 +45,7 @@ public sealed partial class PlayerController
     /// <summary>두 차단 사유(컷신/UI)를 합쳐 실제 InputAction 활성 상태에 반영한다.</summary>
     private void ApplyInputState()
     {
-        bool enabled = !_inputDisabledExternally && !_inputBlockedByUI;
+        bool enabled = !_dead && !_inputDisabledExternally && !_inputBlockedByUI;   // 사망 뒤엔 누가 다시 켜도 막는다(10-09 출시 점검)
 
         // 입력을 끊으면 이동 방향 갱신도 멈춘다 → 마지막 입력값이 그대로 남아
         // 컷신 내내 달리는 자세로 이동한다. 차단 시 즉시 0으로 비운다.
@@ -70,6 +70,19 @@ public sealed partial class PlayerController
         // 초기화 이전에 컷신/UI가 걸어둔 차단을 존중한다(이게 없으면 컷신 중 조작이 되살아난다).
         if (_inputDisabledExternally || _inputBlockedByUI) _inputActions.Player.Disable();
         _inputInitialized = true;
+    }
+
+    /// <summary>스킬 키를 누르고 있는가 — 누르고 있기 차지(궁수의 집중, 10-08 C4 · 결정 S4).</summary>
+    public bool IsSkillButtonHeld(SkillType slot)
+    {
+        if (_inputActions == null) return false;
+        return slot switch
+        {
+            SkillType.Q => _inputActions.Player.QSkill.IsPressed(),
+            SkillType.E => _inputActions.Player.ESkill.IsPressed(),
+            SkillType.R => _inputActions.Player.RSkill.IsPressed(),
+            _           => false,
+        };
     }
 
     private void BindInputActions()
@@ -145,6 +158,10 @@ public sealed partial class PlayerController
 
     private void ChangeWeapon(int index)
     {
+        // 스킬 중 교체 금지 — 쿨다운 · 피해 · 동작 · 파츠가 바뀐 무기 것으로 섞였다(10-09 출시 점검)
+        if (_dead || IsGrabbed || IsInSkillState()) return;
+        // 시간 정지(팝업 · 룬판) 중엔 무시 — 포션과 같다(10-14). 멈춘 동안 HUD만 바뀌고 손의 무기 디졸브는 멈춰 서로 달라 보였다.
+        if (Time.timeScale <= 0f) return;
         if (WeaponManager != null)
             WeaponManager.SwitchToSlotAsync(index).Forget();
     }
@@ -155,28 +172,38 @@ public sealed partial class PlayerController
     /// </summary>
     private void RouteInputs()
     {
-        bool isInSkill = _actSM.CurrentId == ActState.QSkill ||
-                         _actSM.CurrentId == ActState.ESkill ||
-                         _actSM.CurrentId == ActState.RSkill;
+        // 사망 · 컷신/UI 입력 차단 · 잡힘 동안엔 명령을 실행하지 않고 버린다 — 막히기 직전 0.4초에 누른 입력이 잠금 시작에 터졌고,
+        // 사망 뒤 다른 코드가 입력을 다시 켜면 죽은 몸으로 움직였다(10-09 출시 점검)
+        if (_dead || _inputDisabledExternally || _inputBlockedByUI || IsGrabbed)
+        {
+            InputBuffer.Clear();
+            return;
+        }
+        bool isInSkill = IsInSkillState();
         bool isDodging = _locoSM.CurrentId == LocoState.Dodge;
         bool isInAct   = _actSM.CurrentId != ActState.None || isDodging;
 
         // 빈 슬롯(예: 무형검은 skillE/skillQ 모두 없음)으로 전환하면 스킬 없는 상태에 들어가
         // 진행 중이던 공격 모션만 끊기고 아무것도 안 나간다 → HasSkillInSlot으로 입력 자체를 막는다.
-        if (InputBuffer.TryConsume(Command.QSkill))
+        // 스킬 중 누른 다음 스킬은 버리지 않고 버퍼(0.4초)에 남긴다 — 지금 스킬이 끝나면 바로 이어진다(10-08 A2).
+        // 회피 중 누른 스킬은 버퍼(0.4초)에 남겼다가 회피가 끝나면 나간다 — 회피 중에 시작하면 회피 종료가 이동 잠금을 풀고
+        // 대기 동작으로 덮어 스킬 동작이 끊긴 채 걸어 다녔다(10-09 출시 점검)
+        if (!isInSkill && !isDodging && InputBuffer.TryConsume(Command.QSkill))
         {
-            Debug.Log($"[Input] Q pressed: CanAttack={CanAttack()}, isInSkill={isInSkill}, actState={_actSM.CurrentId}");
+            RFLog.D($"[Input] Q pressed: CanAttack={CanAttack()}, isInSkill={isInSkill}, actState={_actSM.CurrentId}");
             if (CanAttack() && !isInSkill && CanUseSkillNow(SkillType.Q)) _actSM.Change(ActState.QSkill);
             return;
         }
-        if (InputBuffer.TryConsume(Command.ESkill))
+        if (!isInSkill && !isDodging && InputBuffer.TryConsume(Command.ESkill))
         {
             if (CanAttack() && !isInSkill && CanUseSkillNow(SkillType.E)) _actSM.Change(ActState.ESkill);
+            else if (!CooldownTracker.IsReady(SkillType.E)) SkillRejected?.Invoke(SkillType.E);   // HUD 거절 표시(A9)
             return;
         }
-        if (InputBuffer.TryConsume(Command.RSkill))
+        if (!isInSkill && !isDodging && InputBuffer.TryConsume(Command.RSkill))
         {
             if (CanAttack() && !isInSkill && CanUseSkillNow(SkillType.R)) _actSM.Change(ActState.RSkill);
+            else if (!CooldownTracker.IsReady(SkillType.R)) SkillRejected?.Invoke(SkillType.R);
             return;
         }
 
@@ -184,9 +211,10 @@ public sealed partial class PlayerController
         if (isInSkill)
             InputBuffer.TryConsume(Command.Light);
 
+        // 스킬 중 회피: 후딜(피해 뒤)이면 끊고 회피, 그 전이면 버퍼(0.4초)에 남긴다 — 예전엔 버렸다(10-08 A2 · 결정 S2)
+        if (isInSkill && !SkillRecovering) return;
         if (InputBuffer.TryConsume(Command.Dodge))
         {
-            if (isInSkill) return;  // 스킬 중에는 회피로 캔슬 불가
             if (IsLaunched) return; // 날아가는 중엔 회피로 탈출 불가
 
             // 대시 게이트 3중:

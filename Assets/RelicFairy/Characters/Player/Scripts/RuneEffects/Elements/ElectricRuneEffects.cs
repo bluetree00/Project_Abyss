@@ -37,7 +37,8 @@ public sealed class ElecStaticEffect : ElectricRuneEffectBase
     {
         var res = Res(player);
         if (res == null) return;
-        int max = Entry.max_stack > 0 ? Entry.max_stack : 10;
+        // 상한 10 + 연격 각인 단계마다 5(10-14 A3) — 연타 빌드에 투자할수록 공속이 더 오른다
+        int max = (Entry.max_stack > 0 ? Entry.max_stack : 10) + 5 * BuildImprint.Stage(BuildFamily.Combo);
         float dur = Entry.duration > 0f ? Entry.duration : 10f;
         res.AddStack(KEY_STACK, max, dur);
     }
@@ -67,7 +68,7 @@ public sealed class ElecStaticEffect : ElectricRuneEffectBase
 public sealed class ElecDischargeEffect : ElectricRuneEffectBase
 {
     private const float DISCHARGE_RANGE = 14f;
-    private const float DISCHARGE_VFX_RADIUS = 2f;   // 방전은 스택을 몰아 쏘는 큰 한 방 — 낙뢰를 크게 보인다(판정은 대상 하나)
+    private const float DISCHARGE_VFX_RADIUS = 1f;   // 판정은 대상 하나 — 2 m 면적 낙뢰가 광역으로 읽혀 맞힘 크기로(10-13 이펙트 = 판정 · 큰 한 방은 빔과 소리가 맡는다)
     private readonly List<MonsterBase> _buf = new();
 
     public override void OnSkillUsed(PlayerController player)
@@ -153,9 +154,8 @@ public sealed class ElecOverloadEffect : ElectricRuneEffectBase
             for (int i = 0; i < _buf.Count; i++)
             {
                 CombatQuery.DealSynergyDamage(_buf[i], dmg, player.gameObject, element: RuneElement.Electric);
-                // [실제 VFX] 원점→대상 번개 아크 + 대상 임팩트 버스트
+                // [실제 VFX] 원점→대상 번개 아크 — 아크 끝이 곧 맞은 자리다. 대상마다 임팩트 폭발을 또 얹으면 타격마다 (체인 수)개가 겹쳤다(10-11 이펙트 톤 점검)
                 ElementVfxPlayer.PlayBeam(RuneElement.Electric, origin + Vector3.up, _buf[i].transform.position + Vector3.up);
-                ElementVfxPlayer.PlayBurst(RuneElement.Electric, _buf[i].transform.position);
                 // [가이드라인 비주얼] 체인 라이트닝(개발 전용)
                 GuidelineVisual.Chain(origin + Vector3.up, _buf[i].transform.position + Vector3.up);
             }

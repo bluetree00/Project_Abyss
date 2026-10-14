@@ -29,6 +29,9 @@ MonoBehaviour:
     attackDelay: 0.4
     knockbackForce: 4
     attackShape: {fileID: 0}
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
   detection:
     detectionRange: 5
     chaseGiveUpRange: 9
@@ -39,6 +42,7 @@ MonoBehaviour:
     waypointWaitTime: 2
   combat:
     damageApplyDelay: 0.4
+    maxHitsPerAttack: 0
     targetLayer:
       serializedVersion: 2
       m_Bits: 64
@@ -48,6 +52,9 @@ MonoBehaviour:
     patrolStateName: Cactus_WalkFWD
     chaseStateName: Cactus_RunFWD
     attackReadyStateName: Cactus_IdleBattle
+    attackStateName: Attack
+    getHitStateName: GetHit
+    dieStateName: Die
     attackTrigger: Cactus_Attack01
     getHitTrigger: Cactus_GetHit
     dieTrigger: Cactus_Die
@@ -55,23 +62,19 @@ MonoBehaviour:
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15
-  elemental:
-    accumulationThreshold: 100
-    lightning:
-      resistance: 1
-      overrideState: {fileID: 0}
-    water:
-      resistance: 1
-      overrideState: {fileID: 0}
-    fire:
-      resistance: 1
-      overrideState: {fileID: 0}
-    grass:
-      resistance: 1
-      overrideState: {fileID: 0}
-    earth:
-      resistance: 1
-      overrideState: {fileID: 0}
+  drop:
+    coinMin: 5
+    coinMax: 8
+    coinValue: 1
+  death:
+    despawnDelay: 0.5
+    dissolveDuration: 0.35
+    deathVfxKey: MonsterDeathBurst
+    deathVfxScale: 1.04
+    deathVfxHeight: 0.59
+    deathVfxUnscaled: 1
+    killHitStopScale: 0.04
+    killHitStopDuration: 0.09
   specialStates:
   - conditions: []
     state: {fileID: 11400000, guid: b14cdafe07a637d4daf4326d5ec38ff9, type: 2}

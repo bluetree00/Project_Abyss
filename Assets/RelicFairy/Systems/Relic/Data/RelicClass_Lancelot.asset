@@ -34,12 +34,20 @@ MonoBehaviour:
     - "\uBC1B\uB294 \uD53C\uD574|\uC2A4\uD0DD\uB2F9 +0.75% (\uCD5C\uB300 +30%)"
     - "\uC2A4\uD0DD \uD68D\uB4DD|\uC77C\uBC18 1 \xB7 \uC815\uC608 2 \xB7 \uC5D8\uB9AC\uD2B8
       3 \xB7 \uBCF4\uC2A4 5"
+    glance: "\uB9DE\uD790\uC218\uB85D \uC138\uC9C0\uACE0, \uADF8\uB9CC\uD07C \uC57D\uD574\uC9C4\uB2E4"
+    glanceStats:
+    - "\uACF5\uACA9\uB825 \uCD5C\uB300|+40%"
+    - "\uBC1B\uB294 \uD53C\uD574 \uCD5C\uB300|+30%"
   - name: "\uAD11\uB780"
     kind: 1
     badge: "40\uC2A4\uD0DD \uB3C4\uB2EC \xB7 4\uCD08"
     summary: "\uAD11\uAE30 40\uC2A4\uD0DD \uB3C4\uB2EC \uC2DC 4\uCD08\uAC04 \uBC1C\uB3D9.
       \uC885\uB8CC \uC2DC \uC2A4\uD0DD 0\uC73C\uB85C \uCD08\uAE30\uD654\uB41C\uB2E4."
     stats:
+    - "\uC774\uB3D9 \uC18D\uB3C4|+20%"
+    glance: "40\uC2A4\uD0DD\uC5D0 4\uCD08 \uD3ED\uC8FC \u2014 \uB05D\uB098\uBA74
+      0\uC73C\uB85C"
+    glanceStats:
     - "\uC774\uB3D9 \uC18D\uB3C4|+20%"
   - name: "\uC2EC\uD310\uC758 \uC77C\uACA9"
     kind: 2
@@ -51,19 +59,27 @@ MonoBehaviour:
     - "\uD53C\uD574|\uACF5\uACA9\uB825\uC758 520% (40\uC2A4\uD0DD \uAE30\uC900)"
     - "\uB099\uC778|\uB300\uC0C1\uC758 \uBC1B\uB294 \uD53C\uD574 +20% \xB7 4\uCD08"
     - "\uBC94\uC704|\uC804\uBC29 \uBD80\uCC44\uAF34 6m"
+    glance: "\uBD80\uCC44\uAF34 \uC5F0\uD0C0 \uB4A4 \uB9C8\uBB34\uB9AC \uAC15\uD0C0"
+    glanceStats:
+    - "\uD53C\uD574|520%"
+    - "\uB099\uC778 \uBC1B\uB294 \uD53C\uD574|+20%"
   themeColor: {r: 0.86, g: 0.24, b: 0.24, a: 1}
-  portrait: {fileID: 0}
+  portrait: {fileID: 21300000, guid: 1801b21ca5a94b64fa35a6cc17271128, type: 3}
   rosterIllust: {fileID: 0}
+  crest: {fileID: 21300000, guid: f871956b040b76e44a42b07f65a406d3, type: 3}
   passives: []
   qSkillClipKey: 
   qSkillClipSequence:
   - stateName: RelicQ_Slash1
     clipKey: RelicQ_Slash1
+    startNormalized: 0
   - stateName: RelicQ_Slash2
     clipKey: RelicQ_Slash2
+    startNormalized: 0.04
   - stateName: RelicQ_Slash3
     clipKey: RelicQ_Slash3
-  qSkillMainState: RelicQ_Main
+    startNormalized: 0
+  qSkillMainState: RelicQ_Finish
   qSkillMainClipKey: 
   qSkillCinematic: {fileID: 0}
   qSkillIcon: {fileID: 21300000, guid: 88fc936be507b3843968dc7a9deaead7, type: 3}
@@ -75,3 +91,4 @@ MonoBehaviour:
   stats: []
   auraVfxKey: 
   auraSocket: 
+  costume: {fileID: 11400000, guid: 7daf6198e36253f4598f94d5bf8d0e29, type: 2}

@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 890061d857d3108408730b9b2966024e, type: 3}
+  m_Name: CurrencyVisualSet
+  m_EditorClassIdentifier: Assembly-CSharp::CurrencyVisualSetSO
+  gold: {fileID: 7723764342209122845, guid: 1da691bae2b53774b9f7c4bdfd01758b, type: 3}
+  essence: {fileID: 8831917708088115935, guid: 122cb7538e8a3d74dbac7c719ab43bb8, type: 3}
+  runeOre: {fileID: 4613987384236621300, guid: 45ec77250e7eaaf40950e096372fbc75, type: 3}
+  enhanceMaterial: {fileID: 5279983281926870562, guid: f058f22f015a88848885304476f39e71,
+    type: 3}

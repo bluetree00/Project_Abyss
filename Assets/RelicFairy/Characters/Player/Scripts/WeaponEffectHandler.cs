@@ -119,6 +119,7 @@ public class WeaponEffectHandler
                         e.payloadKey, firePos, fireDir, dmg, _player.gameObject,
                         _player.WeaponManager != null ? _player.WeaponManager.CurrentSlotIndex : 0,
                         e.scaleMultiplier);
+                    req.actionType = actionType;   // 무슨 행동으로 쐈는지 — 추가탄 · 스킬 피해 증가가 이걸로 가른다(10-08)
 
                     CombatSpawner.SpawnProjectile(ref req, arrow, execution != null ? execution.RegisterEffect : null);
                     execution?.RegisterEffect(effectObj);

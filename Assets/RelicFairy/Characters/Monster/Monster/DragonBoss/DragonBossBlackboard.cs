@@ -20,7 +20,7 @@ public enum BodyState
 public class DragonBossBlackboard : BossAttackBlackboard
 {
     /// <summary>
-    /// 드래곤 브레스 원소 종류. BossColumnHazard 에서 사용.
+    /// 드래곤 브레스 원소 종류.
     /// Abyss = 2페이지 「심연의 화룡」 동안 고정되는 네 번째 원소(검은 불). 직렬화 값이라 맨 뒤에 붙인다.
     /// </summary>
     public enum DragonElement { Fire, Ice, Thunder, Abyss }

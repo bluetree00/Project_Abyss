@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 
 /// <summary>
@@ -79,13 +79,20 @@ public sealed class RelicFloatText : MonoBehaviour
         tmp.fontSize           = FontSize;
         tmp.textWrappingMode   = TextWrappingModes.NoWrap;
         tmp.rectTransform.sizeDelta = new Vector2(8f, 2f);
-        tmp.fontStyle          = FontStyles.Normal;
+        ApplyThin(tmp);
+        go.SetActive(false);
+        return new Item { Tmp = tmp, Tf = go.transform };
+    }
+
+    /// <summary>3D 인게임 글자 서식 — 얇은 본문체(NotoSansKR) · Bold 없음 · 부드러운 그림자 · 획 살짝(10-02 사용자 「기존 글자 연출은 레거시, 더 얇게」).
+    /// GuidelineVisual 토스트 · 배지도 같이 쓴다(10-09).</summary>
+    internal static void ApplyThin(TextMeshPro tmp)
+    {
+        tmp.fontStyle = FontStyles.Normal;
         var thin = ThinFont();
         if (thin != null) tmp.font = thin;
         TMPOutlineHelper.ApplySoftShadow(tmp);
         if (thin != null) tmp.fontSharedMaterial = ThinMaterial(tmp.fontSharedMaterial);
-        go.SetActive(false);
-        return new Item { Tmp = tmp, Tf = go.transform };
     }
 
     /// <summary>얇은 본문체 — 기본 폰트의 폴백 목록에 이미 들어 있어(DnfFontAssetGenerator가 NotoSansKR를 폴백으로 건다) 따로 불러오지 않는다.</summary>

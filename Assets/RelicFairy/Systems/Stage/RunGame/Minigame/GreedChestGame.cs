@@ -216,7 +216,8 @@ public sealed class GreedChestGame : EventMinigame
     {
         _stage++;
         MinigameFx.Success(_stage);
-        RunFx.Play(RunFxSlot.Ring, _chestPos, 0.5f + 0.15f * _stage, GoldLight);
+        // 4단계는 아래 빛기둥 하나로 — 같은 자리 · 같은 순간 단계 고리 · 빛기둥 · 챙기기 고리 셋이 겹쳤다(10-11 이펙트 톤 점검)
+        if (_stage < MaxStage) RunFx.Play(RunFxSlot.Ring, _chestPos, 0.5f + 0.15f * _stage, GoldLight);
         // 금빛 더미가 한 단 넓어진다
         if (_glow != null) Disown(_glow);
         _glow = Own(PatternGuideHelper.Disc(_chestPos, 1f + 0.35f * _stage, GoldLight));
@@ -257,7 +258,7 @@ public sealed class GreedChestGame : EventMinigame
         _state  = State.Done;
         if (_stage >= MaxStage) SetFuelScale(TopFuelScale);
         MinigameFx.Sound(SoundKey.Sfx.GoldPickup, 0.9f, 1f + 0.08f * _stage);
-        RunFx.Play(RunFxSlot.Ring, _bankPos, 0.6f, GoldLight);
+        if (_stage < MaxStage) RunFx.Play(RunFxSlot.Ring, _bankPos, 0.6f, GoldLight);   // 4단계 자동 챙기기는 상자 빛기둥이 맡는다
         if (_chance != null) { _chance.text = "챙겼다"; _chance.color = Theme; }
     }
 

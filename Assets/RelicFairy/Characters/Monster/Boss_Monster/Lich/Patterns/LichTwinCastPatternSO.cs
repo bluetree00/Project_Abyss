@@ -213,7 +213,7 @@ public class LichTwinCastState : UnInterruptibleState<LichTwinCastPatternSO>
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -253,7 +253,8 @@ public class LichTwinCastState : UnInterruptibleState<LichTwinCastPatternSO>
         LichVfx.Stop(ref _realVfx, 0.2f);
         LichVfx.Stop(ref _castFlare, 0.2f);
 
-        LichVfx.Play(LichVfxSlot.TwinBlast, _real, Quaternion.identity, Data.circleRadius / 5f);
+        // 보이는 반경 = 판정 반경(r/5는 판정의 약 60%로 작았다, 10-08 점검).
+        LichVfx.Play(LichVfxSlot.TwinBlast, _real, Quaternion.identity, LichPatternUtil.TwinBlastScale(Data.circleRadius));
         LichSfx.Play(LichSfxSlot.SlamImpact, _real, 0.8f);
         LichCrack.Spawn(_real, Data.circleRadius * 1.6f, 10f);
 

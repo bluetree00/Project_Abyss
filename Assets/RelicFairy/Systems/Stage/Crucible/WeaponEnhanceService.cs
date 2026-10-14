@@ -62,11 +62,15 @@ public static class WeaponEnhanceService
 
     /// <summary>강화/승급 반영된 유효 공격력(연출/미리보기용).</summary>
     public static float EffectiveAttack(WeaponData w, EnhanceTableSO t)
+        => w == null ? 0f : EffectiveAttackAt(w, t, w.enhanceLevel);
+
+    /// <summary>강화 레벨 <paramref name="level"/>일 때의 유효 공격력 — 재련소 강화 줄 「공격 5.0 → 5.4 (+8%)」 전후(10-12 UI 요청).</summary>
+    public static float EffectiveAttackAt(WeaponData w, EnhanceTableSO t, int level)
     {
         if (w == null) return 0f;
         float raw = w.baseAttackRaw > 0f ? w.baseAttackRaw : w.baseAttack;
-        if (t == null) return WeaponEnhanceCurve.Evaluate(raw, w.enhanceLevel, w.legendId);
-        return raw * t.AttackMult(w.enhanceLevel, w.legendId);
+        if (t == null) return WeaponEnhanceCurve.Evaluate(raw, level, w.legendId);
+        return raw * t.AttackMult(level, w.legendId);
     }
 
     private static bool IsSword(WeaponType type)

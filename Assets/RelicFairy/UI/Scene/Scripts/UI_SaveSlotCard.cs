@@ -10,6 +10,15 @@ using UnityEngine.UI;
 public class UI_SaveSlotCard : MonoBehaviour
 {
     // ─────────────────────────────────────────────────────────
+    // Constants
+    // ─────────────────────────────────────────────────────────
+
+    // 카드 글 두 줄(10-11 리서치 C §6) — DNF 36 + 가짜 굵게(잉크 32) → Noto 400 · 24. 줄 간격 ≈ 1.4em:
+    // 세로 그룹이 각 줄을 글자 높이(Noto 줄높이 ≈ 1.45em)로 잡으므로 간격 -1이면 줄과 줄 사이가 24 × 1.4 남짓이다.
+    private const float InfoSize    = 24f;
+    private const float InfoSpacing = -1f;
+
+    // ─────────────────────────────────────────────────────────
     // SerializeField
     // ─────────────────────────────────────────────────────────
 
@@ -86,17 +95,20 @@ public class UI_SaveSlotCard : MonoBehaviour
                 ? "베이스캠프"
                 : FormatPlayTime(data.playSeconds);
         if (retryText    != null) retryText.text    = $"시도 {Mathf.Max(1, data.retryCount)}회";
+        UITheme.StyleThinText(progressText, UIWeight.Regular, InfoSize, progressText != null ? progressText.color : Color.white);
+        UITheme.StyleThinText(retryText,    UIWeight.Regular, InfoSize, retryText != null ? retryText.color : Color.white);
 
         // 남는 슬롯은 숨겨 카드가 비대해지지 않게 한다.
         if (nameText    != null) nameText.gameObject.SetActive(false);
         if (savedAtText != null) savedAtText.gameObject.SetActive(false);
 
         // 두 줄만 남으면 세로 그룹의 「늘려 채우기」가 카드 높이를 반씩 나눠 두 줄이 멀리 떨어졌다 — 가운데로 모은다(09-28 UI 전수).
+        // 간격은 18 → 줄 간격 1.4em(10-11) — 한 덩어리 정보로 읽히게.
         if (filledRoot.TryGetComponent<VerticalLayoutGroup>(out var vlg))
         {
             vlg.childForceExpandHeight = false;
             vlg.childAlignment         = TextAnchor.MiddleCenter;
-            vlg.spacing                = 18f;
+            vlg.spacing                = InfoSpacing;
         }
     }
 

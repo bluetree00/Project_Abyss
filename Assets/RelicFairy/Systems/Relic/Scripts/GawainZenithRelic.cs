@@ -24,11 +24,12 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
         "게이지 80% 이상 '각인': 공격력 +10%. 정오가 아닐 때 처치마다 충전 속도 +20%(최대 3배)";
 
     private const string NoonVfxKey = "vfx_gawain_noon";  // 정오 오라(상태 토글). 에셋 배선 후 등록.
+    // 정오 수확 불꽃 크기(10-11) — 허브 개화(2 m)와 같은 룬 불 버스트를 작게. 화상이 실제로 터진 적에게만.
+    private const float HarvestBurstScale = 1.2f;
 
     private PlayerController _owner;
     private ZenithGauge      _gauge;
     private RelicStateVfx    _vfx;
-    private SolarNoonSun     _sun;          // 정오 — 머리 위 태양
     private Action           _onChanged;
     private bool             _skillUsedThisNoon;
     private float            _skillUsedAt = -999f;   // 정오 고정(영원한 정오) 중 재사용 간격 판정
@@ -98,8 +99,8 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
         _vfx   = owner.gameObject.AddComponent<RelicStateVfx>();
         _vfx.Register("noon", NoonVfxKey);
 
-        _sun   = owner.gameObject.AddComponent<SolarNoonSun>();   // 정오 머리 위 태양
-        _sun.Bind(owner.transform);
+        // 머리 위 정오 해(SolarNoonSun)는 띄우지 않는다(10-11) — 어깨 뒤 카메라에선 해가 카메라 뒤에 있어 보이지 않았고(실측 보이는 입자 0),
+        // 탑다운 보스 시점에선 플레이어를 가릴 수 있다. 정오는 발밑 오라와 HUD 유물 바가 알린다.
 
         // 패시브: 각인 첫타(+50%) · 황혼 처치 충전 가속(잔열)
         owner.RegisterRelicPassive(new GawainSolarMarkPassive());
@@ -116,7 +117,6 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
         if (_gauge != null) _gauge.OnChanged -= _onChanged;
         ClearBuffs();
         if (_vfx != null) { UnityEngine.Object.Destroy(_vfx); _vfx = null; }
-        if (_sun != null) { UnityEngine.Object.Destroy(_sun); _sun = null; }
         GuidelineVisual.ClearBadge("gawain"); // [가이드라인 비주얼]
     }
 
@@ -128,6 +128,8 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
            && ((_gauge.IsSkillReady && (!_skillUsedThisNoon || HeldNoonRecharged))
                || IsHoldingDawn                                                                  // [v2] 낙일로 정오를 연다
                || (_bonusCasts > 0 && _gauge.CurrentPhase == ZenithGauge.ZPhase.Cooldown));     // [v2] 저무는 해
+    public int   QUsesLeft => !CanUseSkill(SkillType.Q) ? 0
+                            : _gauge.CurrentPhase == ZenithGauge.ZPhase.Cooldown ? _bonusCasts : 1;          // 정오 · 붙든 새벽은 1번 · 황혼은 사용권 수
     public int   ModifyIncomingDamage(PlayerController owner, int dmg, GameObject attacker) => dmg;
 
     /// <summary>
@@ -146,7 +148,6 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
         if (rs == null || _gauge == null) return;
 
         _vfx?.SetActive("noon", _gauge.IsNoon);   // 정오 오라 활성/비활성
-        _sun?.SetActive(_gauge.IsNoon);           // 정오 — 머리 위 태양 등장/퇴장
 
         // 정오 진입 시: 스킬 1회 리셋 + 각인 첫타(+50%) 적립(충전 100%→정오라 각인 항상 발동)
         if (_gauge.IsNoon && !_wasNoon)
@@ -168,7 +169,7 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
 
         if (_gauge.IsNoon)
         {
-            rs.SetBonusAttackSpeed(V(V_NOON_ATKSPD, 0.30f));
+            rs.SetZenithAttackSpeed(V(V_NOON_ATKSPD, 0.30f));
             rs.SetRelicCritBuff(V(V_NOON_CRITCH, 10f), V(V_NOON_CRITDMG, 0.20f));
             float allMul = 1f + V(V_NOON_ALLDMG, 0.20f);
             rs.SetCharacterAttackMultiplier(allMul, allMul);
@@ -177,7 +178,7 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
         else if (_gauge.IsMarkReady)
         {
             // 각인 선행 강화(충전 80%+): 공격력만. 첫타 +50%·이동속도는 후속.
-            rs.SetBonusAttackSpeed(0f);
+            rs.SetZenithAttackSpeed(0f);
             rs.SetRelicCritBuff(0f, 0f);
             float atkMul = 1f + V(V_MARK_ATK, 0.10f);
             rs.SetCharacterAttackMultiplier(atkMul, atkMul);
@@ -194,19 +195,29 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
     {
         var rs = _owner != null ? _owner.RuntimeStats : null;
         if (rs == null) return;
-        rs.SetBonusAttackSpeed(0f);
+        rs.SetZenithAttackSpeed(0f);
         rs.SetRelicCritBuff(0f, 0f);
         rs.SetCharacterAttackMultiplier(1f, 1f);
     }
 
-    /// <summary>정오 진입 시 주변 화상 몬스터 전부 즉발(폭발) — 여명에 심은 화상을 정오에 터뜨린다.</summary>
+    /// <summary>
+    /// 정오 진입 시 주변 화상 몬스터 전부 즉발(폭발) — 여명에 심은 화상을 정오에 터뜨린다.
+    /// 터지는 적마다 작은 불꽃을 띄운다 — 예전엔 숫자만 떠 정체성 순간(수확)이 보이지 않았다(10-11).
+    /// 기억 조각 허브가 있으면 허브의 정오 수확(개화)이 같은 순간을 그리므로 띄우지 않는다(겹침 방지).
+    /// </summary>
     private void DetonateBurns()
     {
         if (_owner == null) return;
+        bool hubDraws = GawainMemoryHub.Of(_owner) != null;
         var buffer = new List<MonsterBase>(32);
         CombatQuery.GetNearbyEnemies(_owner.transform.position, 15f, _owner.gameObject, 32, buffer);
         foreach (var mb in buffer)
-            if (mb != null) MonsterBurnHandler.DetonateOn(mb.gameObject);
+        {
+            if (mb == null) continue;
+            if (!hubDraws && mb.TryGetComponent<MonsterBurnHandler>(out var burn) && burn.Remaining > 0f)
+                ElementVfxPlayer.PlayBurst(RuneElement.Fire, mb.transform.position, HarvestBurstScale);
+            MonsterBurnHandler.DetonateOn(mb.gameObject);
+        }
     }
 
     // ── 버프창 수집(IBuffViewSource) ────────────────────────

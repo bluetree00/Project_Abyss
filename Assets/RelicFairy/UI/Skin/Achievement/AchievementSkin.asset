@@ -11,18 +11,113 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 691fe55b550edf543a41bfec3700b041, type: 3}
   m_Name: AchievementSkin
-  m_EditorClassIdentifier:
-  rowClaimable: {fileID: 21300000, guid: 6ee5d0735ae519c43a98732302b3f3dd, type: 3}
-  rowProgress: {fileID: 21300000, guid: f04491144e8bd14479fa7102383d1fd4, type: 3}
-  rowClaimed: {fileID: 21300000, guid: f69c5ef0852ead34da32b0b776994e5e, type: 3}
-  markClaimable: {fileID: 21300000, guid: e9742eaa0e572d847ab9233f83d57db7, type: 3}
-  markProgress: {fileID: 21300000, guid: f87e78d1214691f4cbe5cb8fc1020011, type: 3}
-  markClaimed: {fileID: 21300000, guid: 2dac00b6fc696ed49bc2fe12f4bf4518, type: 3}
+  m_EditorClassIdentifier: 
+  rowClaimable: {fileID: 21300000, guid: 5859d325f53e8924788fdf464069aade, type: 3}
+  rowProgress: {fileID: 21300000, guid: c40cb1bd91692de458af93bf81125fb4, type: 3}
+  rowClaimed: {fileID: 21300000, guid: 58734ac69cbc4374bb068c1f92b00d2c, type: 3}
+  markClaimable: {fileID: 21300000, guid: 893ced31f12a88b4c9ec7152f7a14378, type: 3}
+  markProgress: {fileID: 21300000, guid: d256ffd77eb91d44db5b67e4f5687298, type: 3}
+  markClaimed: {fileID: 21300000, guid: e1a71636b73af2046a9154ead3386e13, type: 3}
   gaugeFrame: {fileID: 21300000, guid: 2cd53cdfe57578244a358fba7b76e815, type: 3}
-  gaugeTrack: {fileID: 21300000, guid: 51af18316794ec442a95e1d2d50409a5, type: 3}
-  gaugeFill: {fileID: 21300000, guid: 3d73a751d5a6ddf46a74128e7a642354, type: 3}
-  claimButton: {fileID: 21300000, guid: c56cc33fd5772e1449d1558c3f35dae5, type: 3}
+  gaugeTrack: {fileID: 21300000, guid: 4d123642c8a61e547bc8d3fe061a2dfe, type: 3}
+  gaugeFill: {fileID: 21300000, guid: f3e11c62f35e096418c57282ff49aa65, type: 3}
+  claimButton: {fileID: 21300000, guid: 696e1f6400f36744f95e951f96a55f37, type: 3}
   claimAllButton: {fileID: 21300000, guid: 71b24a06e749433439c918d46d7e5977, type: 3}
-  bottomBar: {fileID: 21300000, guid: f59a6cdc9cacc9a4392d696f5c891719, type: 3}
+  iconRing: {fileID: 21300000, guid: 24cc452544c393741baba0cbb828cd1b, type: 3}
+  bottomBar: {fileID: 21300000, guid: 6726a993a9c7c6141bd72e28a508a279, type: 3}
   chipOn: {fileID: 21300000, guid: af4deb698e70a4b44b4719707db31bc0, type: 3}
   chipOff: {fileID: 21300000, guid: f2ba795e4bb16fe468a1224e85ac1fe3, type: 3}
+  altarWindow: {fileID: 21300000, guid: 22855146f27251c4589d17146af2096e, type: 3}
+  altarHeaderRule: {fileID: 21300000, guid: cdc0ea93f8fcdff448eb51d8985b838b, type: 3}
+  altarTabUnderline: {fileID: 21300000, guid: 68a5cb80be942d34eb4e91080c07b606, type: 3}
+  altarNewsDot: {fileID: 21300000, guid: 22bc1f52f9bb4de4cb5c050064939414, type: 3}
+  altarCloseButton: {fileID: 21300000, guid: 35dd86f1e45580444bf9a2d806c2204b, type: 3}
+  altarNodeRing: {fileID: 21300000, guid: 24cc452544c393741baba0cbb828cd1b, type: 3}
+  altarKeyRing: {fileID: 21300000, guid: 77d951bf85d41b046b261f5152c76f94, type: 3}
+  altarLock: {fileID: 21300000, guid: 78d4c61716537e54aaa3e194a6602288, type: 3}
+  altarUnlock: {fileID: 21300000, guid: 0012ad2292bfd514baf9a794188ee4d4, type: 3}
+  altarNext: {fileID: 21300000, guid: 893ced31f12a88b4c9ec7152f7a14378, type: 3}
+  altarDetailPanel: {fileID: 21300000, guid: 9ac52ac185fb86f429f87013cbb57907, type: 3}
+  altarDetailRule: {fileID: 21300000, guid: 7903bd1dd10846e4cb49c9cd709abf8f, type: 3}
+  altarBannerStrip: {fileID: 21300000, guid: 1b8e191969c144242b012de815e03a10, type: 3}
+  zoneTitleRule: {fileID: 21300000, guid: b05ffe5cf7962884282f3d427e66f7bc, type: 3}
+  emblemRune: {fileID: 21300000, guid: c62ea0b7f5a80be479cae771d03ee1d3, type: 3}
+  emblemCovenant: {fileID: 21300000, guid: 5cae86ec0a853b943aad1887bb82c51d, type: 3}
+  emblemWeapon: {fileID: 21300000, guid: 91c00731ff01bf343b04af2490e729cd, type: 3}
+  emblemJourney: {fileID: 21300000, guid: 0591cb0ccbb84794ea510816e6ea329c, type: 3}
+  emblemMemory: {fileID: 21300000, guid: 038566cdf64d8cd4d982940c18f2c301, type: 3}
+  altarNodeIcons:
+  - id: mem_redraw
+    icon: {fileID: 21300000, guid: 18768ae2be03c05469c6696e002854a9, type: 3}
+  - id: mem_clear
+    icon: {fileID: 21300000, guid: 010f6b0aa899f434a8af29a92065f9fa, type: 3}
+  - id: mem_radiant
+    icon: {fileID: 21300000, guid: dcb0864196d6d574090fea9196750356, type: 3}
+  - id: rune_storage_1
+    icon: {fileID: 21300000, guid: 2e0435fe0a1adf54d8b5d4599729ad50, type: 3}
+  - id: rune_storage_2
+    icon: {fileID: 21300000, guid: 2e0435fe0a1adf54d8b5d4599729ad50, type: 3}
+  - id: refine_pick
+    icon: {fileID: 21300000, guid: 0e1da88322dba164f83388f25f9634e1, type: 3}
+  - id: refine_quality
+    icon: {fileID: 21300000, guid: 872f5a32a24178146ba583f930016aa9, type: 3}
+  - id: rune_epic
+    icon: {fileID: 21300000, guid: c62ea0b7f5a80be479cae771d03ee1d3, type: 3}
+  - id: rune_legendary
+    icon: {fileID: 21300000, guid: fcc89c21e651080419e046a7f6cef604, type: 3}
+  - id: covenant_parts_1
+    icon: {fileID: 21300000, guid: e2928bf3509fcd345b279dd57590b0ca, type: 3}
+  - id: covenant_parts_2
+    icon: {fileID: 21300000, guid: 1fc6abdced5732949831f7ce73a1ac09, type: 3}
+  - id: covenant_parts_3
+    icon: {fileID: 21300000, guid: aa6240ecc21b1a24ab1013e8f2d56d97, type: 3}
+  - id: covenant_slot
+    icon: {fileID: 21300000, guid: 5290e58b850c3c545b3e84f8ff56fea6, type: 3}
+  - id: part_pierce_unlock
+    icon: {fileID: 21300000, guid: 3b425f71db6279e49821f172c1b20893, type: 3}
+  - id: weapon_crossbow
+    icon: {fileID: 21300000, guid: 23d8700f9cbe8df4c847c3a86da66aba, type: 3}
+  - id: part_power_unlock
+    icon: {fileID: 21300000, guid: aa05dd8c57b02314db69752f3d592840, type: 3}
+  - id: sigil_smith
+    icon: {fileID: 21300000, guid: c90a3c993ee41e14ba11ed24cf02445d, type: 3}
+  - id: part_homing_unlock
+    icon: {fileID: 21300000, guid: 3be4ddf00fd074345997873688a91f27, type: 3}
+  - id: start_parts_2
+    icon: {fileID: 21300000, guid: 08bae4badf0c4a444b9e3fcd398158f7, type: 3}
+  - id: weapon_evolve
+    icon: {fileID: 21300000, guid: 7a6ed292350c7e4438f60d470ef58bc1, type: 3}
+  - id: part_explode_unlock
+    icon: {fileID: 21300000, guid: 30eb452fba93c0343ac6bedaa4d83e8e, type: 3}
+  - id: revive_once
+    icon: {fileID: 21300000, guid: c5489b9a08e52cd438b3ad33de939b16, type: 3}
+  - id: sigil_merchant
+    icon: {fileID: 21300000, guid: 8347bdee5e9cd8440b1121cfd7394113, type: 3}
+  - id: shop_reroll
+    icon: {fileID: 21300000, guid: a4013a85ef39d174da3bca5ea1a7cc66, type: 3}
+  - id: max_hp_up
+    icon: {fileID: 21300000, guid: 5ecb0ede350d568409436466eb1b31a0, type: 3}
+  - id: potion_slot
+    icon: {fileID: 21300000, guid: c3996fb4b7fc34447bc57bf1da1d194c, type: 3}
+  - id: abyss_depth
+    icon: {fileID: 21300000, guid: 43376f61d496196448f66a5e2a86d05e, type: 3}
+  - id: depth_reward
+    icon: {fileID: 21300000, guid: 466ea6827d856ef43ade6415dde161fb, type: 3}
+  - id: sigil_ascetic
+    icon: {fileID: 21300000, guid: 54ac7f42dad768242a290aa6ede9ae65, type: 3}
+  - id: rune_rare_odds
+    icon: {fileID: 21300000, guid: 893ced31f12a88b4c9ec7152f7a14378, type: 3}
+  - id: rune_epic_odds
+    icon: {fileID: 21300000, guid: 4146fbfcd4c326040aee36414697eb33, type: 3}
+  - id: rune_legend_odds
+    icon: {fileID: 21300000, guid: 3363da811ba11be479fad6a8753bf89f, type: 3}
+  - id: ore_gain
+    icon: {fileID: 21300000, guid: e0b7983842a02174a8d2e08d3477a000, type: 3}
+  - id: enhance_gain
+    icon: {fileID: 21300000, guid: fd21d352de151ff42a7fe39803f41aae, type: 3}
+  - id: gold_gain
+    icon: {fileID: 21300000, guid: dc453e2470715c149a0b134d69ff7c26, type: 3}
+  - id: essence_gain
+    icon: {fileID: 21300000, guid: e0e9fb2d6e2b75c4cb16b80d6d114478, type: 3}
+  - id: potion_heal
+    icon: {fileID: 21300000, guid: 380ffb9e982c93e478b868e2c1a4c5fd, type: 3}

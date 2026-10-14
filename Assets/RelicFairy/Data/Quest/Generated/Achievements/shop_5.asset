@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: shop_5
   m_EditorClassIdentifier: Assembly-CSharp::Achievement
   category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 9662e5011541646448cac727ea3b3a88, type: 3}
   codeName: shop_5
   displayName: "\uB2E8\uACE8"
   description: "\uC0C1\uC810 5\uD68C \uC774\uC6A9"

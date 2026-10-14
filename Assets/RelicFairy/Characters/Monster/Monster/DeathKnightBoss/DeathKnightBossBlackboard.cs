@@ -131,5 +131,11 @@ public class DeathKnightBossBlackboard
         AnimSpeedMult = EnrageAnimSpeedMult;
         return true;
     }
+
+    /// <summary>
+    /// 2페이지 — 광폭(이동 속도 · 광폭 조건)은 그대로 두고 애니 · 패턴 타이머 배율만 설계값(1)으로(10-08 점검).
+    /// 2페이지가 다시 쓰는 1페이지 패턴(바뀌는 베기 · 피라미드 · 3연속 십자)은 이 배율로 타이머를 돌려 예고가 1/1.4로 줄었다.
+    /// </summary>
+    public void UseDesignTiming() => AnimSpeedMult = 1f;
 }
 }

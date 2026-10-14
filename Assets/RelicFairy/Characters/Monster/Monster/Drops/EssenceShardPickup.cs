@@ -8,9 +8,8 @@ using UnityEngine;
 /// 그러면 "런을 다시 하는 이유"인 재화가 화면에 한 번도 안 보인다. 골드는 주우러 가는 물건인데
 /// 정수는 존재조차 모르는 상태였다. 주우러 가는 행위가 있어야 재화가 인식된다.</para>
 ///
-/// <para><b>아트 교체 지점</b> — <see cref="VisualPrefab"/>에 프리팹을 넣으면 그것으로 스폰하고,
-/// 비어 있으면 런타임 프리미티브로 떨어진다(골드와 동일한 임시 비주얼 규약).
-/// 정수 아트가 나오면 코드 수정 없이 프리팹만 물리면 된다.</para>
+/// <para><b>모양</b> — 재화 오브젝트 목록(<see cref="CurrencyVisualSetSO"/>의 정수 칸, 10-12)에서 꺼낸다.
+/// 목록이 아직 없거나 칸이 비면 예전 임시 비주얼(청록 정육면체)로 떨어진다. 나타나기 · 사라지기는 디졸브(<see cref="CurrencyVisuals"/>).</para>
 /// </summary>
 public class EssenceShardPickup : MonoBehaviour
 {
@@ -22,23 +21,26 @@ public class EssenceShardPickup : MonoBehaviour
     private const float MagnetSpeed   = 13f;
     private const float PickupRadius  = 0.6f;
     private const float ScatterRadius = 1.3f;
-    private const float ShardSize     = 0.3f;
+    private const float ShardSize     = 0.3f;    // 임시 정육면체 한 변
+    private const float RestHeight    = 0.32f;   // 내려앉은 자리(가운데) 높이 — 캡슐(0.36 m)이 출렁여도 바닥에 묻히지 않게
+    private const float RestTilt      = 12f;     // 캡슐을 살짝 기울여 둔다 — 곧게 서 있으면 도는 것이 안 보인다
     private const float LifeTime      = 30f;
     private const float SpinSpeed     = 300f;
     private const float BobAmplitude  = 0.12f;
     private const float BobSpeed      = 3f;
+    private const float AppearSeconds = 0.35f;   // 날아가는 동안(0.5초) 끝난다. 줍기 대기(0.4초)보다 짧게
+    private const float CollectVanishSeconds = 0.2f;
+    private const float ExpireVanishSeconds  = 0.6f;
 
     /// <summary>한 번에 흩뿌릴 조각 수 상한. 보스 120정수가 조각 120개가 되면 안 된다.</summary>
     private const int MaxShards = 8;
 
     // ── Static ───────────────────────────────────────────────
     private static readonly Color ShardColor = new(0.39f, 0.85f, 0.75f);
+    private static readonly Color ShardEdge  = new(1.6f, 0.9f, 3.0f, 1f);   // 디졸브 테두리(HDR) — 기억의 보랏빛
 
     /// <summary>아직 줍지 않은 조각. 씬을 떠나기 직전 <see cref="CollectAll"/>이 쓴다.</summary>
     private static readonly System.Collections.Generic.List<EssenceShardPickup> s_live = new();
-
-    /// <summary>정수 조각 비주얼 프리팹. 비어 있으면 런타임 프리미티브를 쓴다.</summary>
-    public static GameObject VisualPrefab { get; set; }
 
     // ── Private Fields ───────────────────────────────────────
     private int       _value;
@@ -49,6 +51,7 @@ public class EssenceShardPickup : MonoBehaviour
     private Vector3   _restPos;
     private bool      _arcing;
     private bool      _collected;
+    private bool      _vanishing;
     private Transform _playerTf;
 
     // ── Lifecycle ────────────────────────────────────────────
@@ -57,6 +60,13 @@ public class EssenceShardPickup : MonoBehaviour
 
     private void Update()
     {
+        if (_vanishing)
+        {
+            // 주운 조각은 녹는 동안 몸으로 따라 들어간다 — 제자리에서 녹으면 「안 주워졌다」로 읽힌다
+            if (_collected) FollowPlayer();
+            return;
+        }
+
         if (_arcing)
         {
             _arcTimer += Time.deltaTime;
@@ -78,7 +88,7 @@ public class EssenceShardPickup : MonoBehaviour
                 Vector3 delta = player.position - transform.position;
                 float dist = delta.magnitude;
 
-                if (dist <= PickupRadius) { Collect(); return; }
+                if (dist <= PickupRadius) { Collect(false); return; }
 
                 if (dist <= MagnetRange)
                 {
@@ -99,7 +109,10 @@ public class EssenceShardPickup : MonoBehaviour
         }
 
         if (Time.time - _spawnTime >= LifeTime)
-            Destroy(gameObject);
+        {
+            _vanishing = true;
+            CurrencyVisuals.Vanish(gameObject, CurrencyVisualKind.Essence, ExpireVanishSeconds);
+        }
     }
 
     // ── Public Methods ───────────────────────────────────────
@@ -122,7 +135,7 @@ public class EssenceShardPickup : MonoBehaviour
         {
             float angle = Random.Range(0f, Mathf.PI * 2f);
             float r     = Random.Range(0.35f, ScatterRadius);
-            Vector3 landing = origin + new Vector3(Mathf.Cos(angle) * r, 0.25f, Mathf.Sin(angle) * r);
+            Vector3 landing = origin + new Vector3(Mathf.Cos(angle) * r, RestHeight, Mathf.Sin(angle) * r);
 
             var go = CreateShardVisual();
             go.transform.position = startPos;
@@ -130,6 +143,7 @@ public class EssenceShardPickup : MonoBehaviour
 
             var shard = go.AddComponent<EssenceShardPickup>();
             shard.Initialize(startPos, landing, perShard + (i == 0 ? remainder : 0));
+            CurrencyVisuals.Appear(go, CurrencyVisualKind.Essence, AppearSeconds, ShardEdge);
         }
     }
 
@@ -145,9 +159,9 @@ public class EssenceShardPickup : MonoBehaviour
         {
             if (i >= s_live.Count) continue;   // Collect → Destroy → OnDisable로 목록이 줄 수 있다
             var shard = s_live[i];
-            if (shard == null || shard._collected) continue;
+            if (shard == null || shard._collected || shard._vanishing) continue;   // 수명이 다해 녹는 중인 조각은 이미 잃은 것
             total += shard._value;
-            shard.Collect();
+            shard.Collect(true);   // 씬을 떠나는 순간 — 녹는 연출 없이 바로 거둔다
             count++;
         }
         if (count > 0) Debug.Log($"[Essence] 떠나기 전 정수 조각 {count}개 회수 (+{total})");
@@ -165,14 +179,24 @@ public class EssenceShardPickup : MonoBehaviour
         _arcing    = true;
     }
 
-    private void Collect()
+    private void Collect(bool instant)
     {
         if (_collected) return;
         _collected = true;
+        _vanishing = true;
 
         // 깊이 보상 배율은 AddEssence 안에서 걸린다 — 여기서 또 곱하면 이중 적용이 된다.
         GameRunBootstrapper.Instance?.Run?.AddEssence(_value);
-        Destroy(gameObject);
+        Managers.Sound?.PlayEvent(SoundEvent.EssencePickup);
+        if (instant) Destroy(gameObject);
+        else CurrencyVisuals.Vanish(gameObject, CurrencyVisualKind.Essence, CollectVanishSeconds);
+    }
+
+    private void FollowPlayer()
+    {
+        Transform player = ResolvePlayer();
+        if (player == null) return;
+        transform.position = Vector3.MoveTowards(transform.position, player.position, MagnetSpeed * Time.deltaTime);
     }
 
     private Transform ResolvePlayer()
@@ -186,14 +210,21 @@ public class EssenceShardPickup : MonoBehaviour
 
     private static GameObject CreateShardVisual()
     {
-        if (VisualPrefab != null)
+        // 기억을 담은 캡슐(10-12) — 목록이 없거나 칸이 비면 임시 정육면체
+        var art = CurrencyVisuals.TryCreate(CurrencyVisualKind.Essence);
+        if (art != null)
         {
-            var art = Instantiate(VisualPrefab);
             art.name = "EssenceShard";
+            art.transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), RestTilt);
             return art;
         }
+        return CreatePlaceholder();
+    }
 
-        // 골드와 같은 임시 비주얼 규약. 형태(정육면체·회전)와 색(청록)으로 골드와 구분한다.
+    /// <summary>예전 임시 비주얼(청록 정육면체). 목록이 없을 때의 폴백 · 비교 도구의 「지금」 사진.</summary>
+    private static GameObject CreatePlaceholder()
+    {
+        // 형태(정육면체·회전)와 색(청록)으로 골드와 구분한다.
         var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
         go.name = "EssenceShard";
         go.transform.localScale = Vector3.one * ShardSize;

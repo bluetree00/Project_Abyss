@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -65,11 +67,15 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         public Image[]    tierBGs    = new Image[4];
         public TMP_Text[] tierLabels = new TMP_Text[4];
         public int        zoneIdx;
+        public int        shownTier = int.MinValue;   // 톤 v2 — 금 테를 단 단계(아직 없음 = MinValue)
+        public UIThinFrame tierFrame;
     }
 
     private const float RowH = 42f;   // 7행이 영역(≈321)에 들어가는 높이 — 44면 13px 넘쳐 중앙 행이 잘렸다(09-27)
     private static readonly Color CountInk = new(0.92f, 0.96f, 1.00f, 1f);
     private static readonly Color AmpInk   = new(1.00f, 0.80f, 0.35f, 1f);   // 정제소 핵이 키우는 존의 칸 수
+    // 아직 못 닿은 단계 「6칸 · 10칸」 — 10-11 v2 (.46,.49,.62) → (.58,.60,.70) · 어두운 칸 바탕 위 대비 4.5:1 이상(리서치 B §3).
+    private static readonly Color TierMissInk = new(0.58f, 0.60f, 0.70f, 1f);
     private IReadOnlyDictionary<string, float> _amps;   // 존별 핵 증폭 배수(SetZoneAmplifiers)
     // 납품 행 아트(시너지 바탕·테두리 248×104~106) = 왼쪽 육각 + 알약. 경계가 없어 44px 행에 늘리면 육각이 납작해진다 —
     // 왼쪽 육각(≈104px)을 경계로 준 9-slice 사본을 쓴다. 배율은 원본 높이/행 높이(육각이 행 높이만 한 정사각이 되게).
@@ -86,6 +92,10 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
     private Transform   _rowContainer;
     private GameObject  _emptyLabelGO;
     private TMP_Text    _reactionText;   // 활성 속성 반응 배너(행 목록 최상단)
+    private TMP_Text    _guideDesc;      // 머리띠 오른쪽 — 톤 v2는 「룬 n / 20」(10-10 칸 → 개수)
+    private bool        _thin;           // 톤 v2(SetThin)
+    private int         _blockShown = -1;
+    private CancellationTokenSource _blockCts;
 
     // ── Tooltip ──
     private GameObject _tooltipGO;
@@ -102,7 +112,41 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         BuildTooltip();
     }
 
+    private void OnDestroy()
+    {
+        _blockCts?.Cancel();
+        _blockCts?.Dispose();
+    }
+
     // ── Public API ──
+
+    /// <summary>
+    /// 톤 v2(10-08) — 줄은 바탕 · 테 없이 평평하게(사용자 「시너지 UI 강조를 줄인 건 좋다」, 묶음은 룬판의 구획 테),
+    /// 지금 단계 칸에 얇은 금 테, 머리띠 오른쪽은 룬 수. 줄을 짓기 전(첫 Refresh 전)에 부른다.
+    /// </summary>
+    public void SetThin()
+    {
+        _thin = true;
+        if (_guideDesc != null) _guideDesc.text = string.Empty;
+    }
+
+    /// <summary>머리띠 「룬 n / 최대」 — 바뀌면 금빛에서 가라앉고, 가득 차면 금빛으로 남는다.</summary>
+    public void SetBlockCount(int used, int max)
+    {
+        if (!_thin || _guideDesc == null) return;
+        _guideDesc.SetText($"룬 {used} / {max}");
+        var rest = used >= max ? UITheme.Thin.Gold : UITheme.Thin.Ink;
+        if (_blockShown >= 0 && used != _blockShown && isActiveAndEnabled) FadeBlockAsync(UITheme.Thin.Gold, rest, 1).Forget();
+        else _guideDesc.color = rest;   // 도는 깜빡임이 있으면 그쪽이 다음 프레임부터 덮는다
+        _blockShown = used;
+    }
+
+    /// <summary>룬 수 상한 때문에 놓기가 막혔다 — 룬 수가 붉게 두 번 깜빡인다.</summary>
+    public void FlashBlockFull()
+    {
+        if (!_thin || _guideDesc == null || !isActiveAndEnabled) return;
+        FadeBlockAsync(UITheme.Thin.Danger, _blockShown >= RuneBlockBudget.Max ? UITheme.Thin.Gold : UITheme.Thin.Ink, 2).Forget();
+    }
 
     public void Refresh(IReadOnlyDictionary<string, int> zoneCounts)
     {
@@ -208,6 +252,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         // 띠가 한 줄 높이(32)라 줄바꿈하면 잘린다 — 칸을 0.45부터로 넓혀 한 줄에 넣는다(09-28).
         descTxt.textWrappingMode = TextWrappingModes.NoWrap;
         descTxt.raycastTarget      = false;
+        _guideDesc = descTxt;
     }
 
     /// <summary>브릿지의 활성 반응 목록을 한 줄 배너로 표시. 반응 없으면 숨긴다.</summary>
@@ -332,16 +377,16 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         // VLG가 높이를 잡지 않으므로(childControlHeight=false) 높이는 직접 준다 — 안 주면 RectTransform 기본값 100으로 선다.
         ((RectTransform)row.go.transform).sizeDelta = new Vector2(0f, RowH);
         var rowBg = row.go.AddComponent<Image>();
-        rowBg.color = COLOR_ROW_BG_ACTIVE;
+        rowBg.color = _thin ? Color.clear : COLOR_ROW_BG_ACTIVE;   // 톤 v2 — 줄 판 없음(배치는 아트 기준 그대로)
         _rowBgSliced     ??= ShopUIStyle.SlicedCopy(_rowBgSkin,     RowArtBorder);
         _rowBorderSliced ??= ShopUIStyle.SlicedCopy(_rowBorderSkin, RowArtBorder);
         bool rowArt = _rowBgSliced != null;
-        if (rowArt)   // 시너지 바탕
+        if (rowArt && !_thin)   // 시너지 바탕
         {
             rowBg.sprite = _rowBgSliced; rowBg.type = Image.Type.Sliced; rowBg.color = Color.white;
             rowBg.pixelsPerUnitMultiplier = _rowBgSkin.rect.height / RowH;
         }
-        if (_rowBorderSliced != null)   // 시너지 테두리 — 위에 얹는 프레임
+        if (_rowBorderSliced != null && !_thin)   // 시너지 테두리 — 위에 얹는 프레임
         {
             var bd = new GameObject("Border", typeof(RectTransform), typeof(Image));
             bd.transform.SetParent(row.go.transform, false);
@@ -381,7 +426,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         nrt.offsetMax = Vector2.zero;
         var nameTxt = nameGO.AddComponent<TextMeshProUGUI>();
         nameTxt.text               = $"{ZONE_ICONS[idx]} {ZONE_NAMES[idx]}";
-        nameTxt.fontSize           = 17f;
+        nameTxt.fontSize           = 18f;   // 10-11 v2 17 → 18(리서치 B §3 — 숫자를 읽는 화면인데 글자가 가장 작았다)
         nameTxt.fontStyle          = FontStyles.Bold;
         nameTxt.color              = zoneColor;
         nameTxt.alignment          = TextAlignmentOptions.MidlineLeft;
@@ -433,8 +478,8 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             lrt.offsetMax = new Vector2(-2f, 0f);
             var lTxt = lblGO.AddComponent<TextMeshProUGUI>();
             lTxt.text               = $"{b + 1}단계";
-            lTxt.fontSize           = 16f;   // 14 → 16(하한). 한 줄만 — 단계 이름(최대 6자)은 활성 효과 목록·툴팁에
-            lTxt.color              = new Color(0.50f, 0.53f, 0.66f, 1f);
+            lTxt.fontSize           = 17f;   // 14 → 16(하한) → 17(10-11 v2 보조). 한 줄만 — 단계 이름(최대 6자)은 활성 효과 목록·툴팁에
+            lTxt.color              = TierMissInk;
             lTxt.alignment          = TextAlignmentOptions.Center;
             lTxt.textWrappingMode = TextWrappingModes.NoWrap;
             lTxt.raycastTarget      = false;
@@ -539,15 +584,63 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             {
                 // 도달: 「N단계」가 켜진다 / 미도달: 필요 칸 수. 한 줄(16px) — 단계 이름은 6자까지라 칸(≈60px)에 안 든다.
                 row.tierLabels[b].text      = !hasData ? "—" : (met ? $"{b + 1}단계" : $"{sorted[b].threshold}칸");
-                row.tierLabels[b].fontStyle = isCur ? FontStyles.Bold : FontStyles.Normal;
+                row.tierLabels[b].fontStyle = isCur && !_thin ? FontStyles.Bold : FontStyles.Normal;   // 톤 v2는 금 테가 지금 단계를 말한다
                 row.tierLabels[b].color     = met
                     ? new Color(
                         Mathf.Clamp01(zoneColor.r * 1.55f),
                         Mathf.Clamp01(zoneColor.g * 1.55f),
                         Mathf.Clamp01(zoneColor.b * 1.55f), 1f)
-                    : new Color(0.46f, 0.49f, 0.62f, 1f);
+                    : TierMissInk;
             }
         }
+
+        if (_thin) ShowTierFrame(row, curTier);
+    }
+
+    /// <summary>
+    /// 톤 v2 — 지금 단계 칸에 얇은 금 테. 단계가 <b>오르는 순간</b> 테가 시계 방향으로 그려지며 번쩍인다(UIThinFrame 켜짐 연출).
+    /// 처음 그릴 때 · 내려갈 때는 연출 없이 옮긴다. 칸 크기가 아직 0이면(레이아웃 전) 다음 갱신에 단다.
+    /// </summary>
+    private void ShowTierFrame(ZoneRow row, int curTier)
+    {
+        if (row.shownTier == curTier) return;
+        if (curTier < 0)
+        {
+            if (row.tierFrame != null) row.tierFrame.gameObject.SetActive(false);
+            row.shownTier = curTier;
+            return;
+        }
+        var seg  = (RectTransform)row.tierBGs[curTier].transform;
+        var size = seg.rect.size;
+        if (size.x < 2f || size.y < 2f) return;
+
+        bool rose = row.shownTier != int.MinValue && curTier > row.shownTier;
+        row.shownTier = curTier;
+        if (row.tierFrame == null) row.tierFrame = UIThinFrame.Create(seg, ThinShape.Square, size);
+        else
+        {
+            var frt = (RectTransform)row.tierFrame.transform;
+            frt.SetParent(seg, false);
+            frt.anchoredPosition = Vector2.zero;
+            frt.SetAsLastSibling();
+            row.tierFrame.gameObject.SetActive(true);
+        }
+        row.tierFrame.SetState(ThinFrameState.Idle, animate: false);
+        row.tierFrame.SetState(ThinFrameState.Ready, animate: rose && isActiveAndEnabled);
+    }
+
+    private async UniTaskVoid FadeBlockAsync(Color from, Color to, int pulses)
+    {
+        _blockCts?.Cancel();
+        _blockCts?.Dispose();
+        _blockCts = new CancellationTokenSource();
+        var ct = _blockCts.Token;
+        try
+        {
+            for (int i = 0; i < pulses; i++)
+                await UIMotion.Tween(UIMotion.Settle, k => _guideDesc.color = Color.Lerp(from, to, k), ct);
+        }
+        catch (System.OperationCanceledException) { }
     }
 
     // ── Tooltip ──

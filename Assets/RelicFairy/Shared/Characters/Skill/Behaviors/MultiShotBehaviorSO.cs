@@ -30,16 +30,20 @@ public class MultiShotBehaviorSO : SkillBehaviorSO
 
     public override ISkillRuntime CreateRuntime() => new Runtime(this);
 
+    public override string StartSoundEvent => SoundEvent.SkillBuff;   // 시작음(10-08 A6)
+
     private class Runtime : ISkillRuntime
     {
         private readonly MultiShotBehaviorSO _data;
+        private float _castLeft;   // 서서 쓴 시전 자세 남은 시간
 
-        private float _castEndTime;
 
         public Runtime(MultiShotBehaviorSO data) => _data = data;
 
         public void OnEnter(SkillExecutionContext ctx)
         {
+            ctx.EnterRecovery();   // 자기 강화 — 피해가 없으니 처음부터 회피로 끊을 수 있다(10-08 A2)
+            ctx.Controller.RaiseSkillBuffStarted(ctx.Slot, _data.buffDuration);   // HUD 남은 시간 막대(A9)
             int tier = ctx.SkillTier;
 
             int extraShots = tier switch
@@ -51,6 +55,7 @@ public class MultiShotBehaviorSO : SkillBehaviorSO
 
             // 추가 발사 버프 적용
             ctx.Controller.ExtraShotCount = extraShots;
+            int gen = ++s_buffGen;   // 다시 쓰면 앞 시전의 해제가 새 버프를 끊지 않게(10-09 출시 점검)
 
             // 단계별 버프 이펙트
             string effectKey = tier switch
@@ -66,23 +71,29 @@ public class MultiShotBehaviorSO : SkillBehaviorSO
                 SpawnBuffEffect(ctx, _data.tier1EffectKey);
 
             // 비동기로 버프 해제 예약
-            ScheduleRemoveBuff(ctx).Forget();
+            ScheduleRemoveBuff(ctx, gen).Forget();
 
             // 09-21: 예전엔 여기서 바로 끝내 <b>동작이 하나도 안 나왔다</b>(가만히 선 채 버프만 걸렸다).
-            // 짧은 시전 자세를 보여 준 뒤 끝낸다 — 클립은 무기 애니 세트가 석궁용으로 덮어쓴다.
+            // C5(10-08 · 결정 S5): 자기 강화는 움직이며 쓴다 — 이동은 묶지 않는다.
+            // 10-09 출시 점검: C5에서 바로 끝내자 끝(대기 진입)이 같은 프레임에 시전 자세를 이동 블렌드로 덮어 다시 동작이 사라졌다.
+            // 서 있으면 시전 자세를 castTime 동안 보여 주고(움직이기 시작하면 바로 끝낸다), 움직이는 중이면 이동 동작 그대로 바로 끝낸다.
+            ctx.SetMoveScale(1f);
+            if (IsMoving(ctx))
+            {
+                ctx.RequestEnd();
+                return;
+            }
             PlayCastAnimation(ctx);
-            _castEndTime = Time.time + Mathf.Max(0f, _data.castTime);
-            if (_data.castTime <= 0f) ctx.RequestEnd();
+            _castLeft = _data.castTime;
         }
 
         public void OnUpdate(SkillExecutionContext ctx)
         {
-            if (_castEndTime > 0f && Time.time >= _castEndTime)
-            {
-                _castEndTime = 0f;
-                ctx.RequestEnd();
-            }
+            _castLeft -= ctx.DeltaTime;
+            if (_castLeft <= 0f || IsMoving(ctx)) ctx.RequestEnd();
         }
+
+        private static bool IsMoving(SkillExecutionContext ctx) => ctx.Controller.MoveDirection.sqrMagnitude > 0.0025f;
 
         private void PlayCastAnimation(SkillExecutionContext ctx)
         {
@@ -93,14 +104,16 @@ public class MultiShotBehaviorSO : SkillBehaviorSO
         }
         public void OnExit(SkillExecutionContext ctx) { }
 
-        private async UniTaskVoid ScheduleRemoveBuff(SkillExecutionContext ctx)
+        private static int s_buffGen;
+
+        private async UniTaskVoid ScheduleRemoveBuff(SkillExecutionContext ctx, int gen)
         {
             try
             {
                 var token = ctx.Controller.gameObject.GetCancellationTokenOnDestroy();
                 await UniTask.Delay((int)(_data.buffDuration * 1000), cancellationToken: token);
 
-                if (ctx.Controller != null)
+                if (ctx.Controller != null && gen == s_buffGen)
                     ctx.Controller.ExtraShotCount = 0;
             }
             catch (System.OperationCanceledException) { }

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -52,6 +52,8 @@ public class MerlinRuneBridge : MonoBehaviour
     private readonly Dictionary<string, int>           _zoneOccupiedCounts  = new();
     private readonly List<int>                         _downgradeScratch  = new();   // 하강 해제 임계값(루프 중 수정 방지)
     private bool _centerBonusActive;
+    private IReadOnlyDictionary<string, float> _lastZoneAmps;   // 새 플레이어에 다시 넘길 존핵 증폭(ReapplyToCurrentPlayer)
+    private bool _reapplying;                                   // 다시 붙이는 중 — 판 터짐 · 활성 알림은 내지 않는다
 
     private void Awake()
     {
@@ -343,26 +345,6 @@ public class MerlinRuneBridge : MonoBehaviour
         view.RestoreOccupiedCells(cells);
     }
 
-    // ── 배치 가능 조회 (선택 팝업용) ──
-
-    /// <summary>
-    /// 해당 모양을 지금 판에 놓을 자리가 있는지. <b>읽기 전용</b>이며 배치 화면이 닫혀 있어도 동작한다.
-    /// 룬 선택 팝업이 후보마다 "배치 가능/자리 없음"을 표시하는 데 쓴다.
-    /// </summary>
-    public bool CanPlaceShape(IReadOnlyList<Vector2Int> cellOffsets, string elementId = null, bool isLegendary = false)
-    {
-        if (cellOffsets == null || cellOffsets.Count == 0) return false;
-
-        var view = Object.FindFirstObjectByType<MerlinRuneHexGridView>(FindObjectsInactive.Include);
-        if (view == null)
-        {
-            // 보드가 아직 구성 전이면 판정 불가 — 막지 말고 통과시킨다(선택 자체는 허용).
-            Debug.LogWarning("[MerlinRuneBridge] CanPlaceShape: HexGridView 없음 — 배치 가능으로 간주");
-            return true;
-        }
-        return view.CanPlaceAnywhere(cellOffsets, elementId, isLegendary);
-    }
-
     /// <summary>현재 배치된 Shape 스냅샷(재구성용). 점유 셀(CaptureRuneCells)과 별개.</summary>
     public IReadOnlyList<RunePlacementEntry> CaptureRunePlacements()
         => boardManager != null ? boardManager.CapturePlacements() : null;
@@ -464,6 +446,31 @@ public class MerlinRuneBridge : MonoBehaviour
         // 반응 스탯도 0으로 되돌린다(플레이어가 살아 있으면).
         AppBootstrapper.Instance?.CurrentRun?.Player?.RuntimeStats?
             .SetReactionBonuses(0f, 0f, 0f, 0f, 0f, 0f);
+    }
+
+    /// <summary>
+    /// 새 플레이어(챕터 전환 · 심연 루프)에 지금 점유 기준 효과를 다시 붙인다 — 디스패처는 플레이어마다 새로 생기는데
+    /// 적용 기록(_appliedThresholds)이 남아 같은 단계를 건너뛰어, Ch2부터 속성 단계 효과 · 반응 보너스 · 중앙 · 존핵 증폭이 빠졌다(10-09 출시 점검).
+    /// 이미 켜진 단계라 판 터짐 · 활성 알림은 다시 내지 않는다.
+    /// </summary>
+    public void ReapplyToCurrentPlayer()
+    {
+        var counts = new Dictionary<string, int>(_zoneOccupiedCounts);
+        var amps   = _lastZoneAmps;
+        ResetSynergyState();
+        _reapplying = true;
+        // 단계 발동 문장(속성 버스트)도 다시 내지 않는다 — 챕터 첫 자리에서 켜진 단계 수만큼 한꺼번에 터져 새로 켜진 것처럼 보였다(10-11 이펙트 톤 점검)
+        ElementVfxPlayer.SuppressBursts = true;
+        try
+        {
+            OnZoneCellsUpdated(counts);
+            if (amps != null) OnZoneAmplifiersUpdated(amps);
+        }
+        finally
+        {
+            _reapplying = false;
+            ElementVfxPlayer.SuppressBursts = false;
+        }
     }
 
     /// <summary>
@@ -594,6 +601,7 @@ public class MerlinRuneBridge : MonoBehaviour
                 // 그 원장은 복원 시 구 '플랫 스탯' 스위치로 흘러가 신 속성 효과가 전부 no-op이 됐다.
                 // 시너지의 진실원본은 룬 보드 점유 셀(runeCellsJson)이고, 복원도 그쪽이 담당한다.
 
+                if (_reapplying) continue;
                 OnSynergyActivated?.Invoke($"{zoneId}: {entry.effect_type}");
                 OnZoneSynergyBurst?.Invoke(zoneId);   // 판 연출: 해당 속성 존 터짐
             }
@@ -691,6 +699,7 @@ public class MerlinRuneBridge : MonoBehaviour
     /// </summary>
     public void OnZoneAmplifiersUpdated(IReadOnlyDictionary<string, float> zoneAmps)
     {
+        _lastZoneAmps = zoneAmps != null ? new Dictionary<string, float>(zoneAmps) : null;
         var player = AppBootstrapper.Instance?.CurrentRun?.Player;
         player?.RuneEffects?.SetZoneAmplifiers(zoneAmps);
     }

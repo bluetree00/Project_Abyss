@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 /// <summary>
 /// 진행 중 런 세이브(이어하기). 로컬 파일(persistentDataPath)이 단독 권위 — 슬롯 3개.
 ///
-/// 저장 시점 : 챕터 첫 방 입장 한 번(RunFlowController 챕터 체크포인트 → SaveRunLocal). 챕터 도중엔 저장하지 않는다(09-25).
+/// 저장 시점 : Hades식(10-10) — 방 입장 · 방 클리어 · 보상 · 상점 · 재련소 · 서약 · 보스 클리어 뒤(RunFlowController → SaveRunLocal).
+///            피해를 받으면 잠금 표시(SetCombatLock)만 켜고, 다음 저장이 풀 때까지 끄면 이어하기에서 사망으로 정산한다.
 /// 삭제 시점 : 사망/런 클리어/슬롯 삭제(ClearLocalRun).
 /// </summary>
 public class RunProgressManager : MonoBehaviour
@@ -71,17 +72,32 @@ public class RunProgressManager : MonoBehaviour
     /// <summary>지정 슬롯의 로컬 런 세이브를 로드한다(없으면 null).</summary>
     public RunSaveData LoadLocalRun(int slot) => _localStore.Load(slot);
 
-    /// <summary>지정 슬롯의 로컬 런 세이브를 삭제한다(사망/클리어/새 런 시작 시). 다른 슬롯 무영향.</summary>
-    /// <summary>슬롯 삭제 — 런 세이브와 함께 <b>온보딩 완료 기록</b>도 초기화한다.
-    /// (안 지우면 슬롯을 지우고 새로 시작해도 초회 온보딩이 스킵된다)</summary>
     /// <summary>
-    /// 진행 중이던 런 세이브만 버린다. <b>초회 여부(온보딩)는 건드리지 않는다.</b>
-    /// 런 종료(사망/클리어)와 "스타트룸 미퇴장 세이브 폐기"가 이 경로다 —
-    /// 튜토리얼을 이미 마친 플레이어를 매번 초회로 되돌리면 안 된다.
+    /// 진행 중이던 런 세이브를 끝낸다 — 런 종료(사망 · 클리어 · 포기)가 이 경로다. <b>초회 여부(온보딩)는 건드리지 않는다.</b>
+    ///
+    /// 파일을 지우지 않고 <b>허브 기록(isInStartRoom)으로 바꿔 쓴다</b>. 예전엔 지워서, 로비 카드가 그 슬롯을 「새 게임」으로
+    /// 보였고 누르면 ResetSlot이 정수 · 해금 · 봉인 · 업적까지 지웠다(10-09 출시 점검: 런 도중 「로비로 가기」 · 사망 결과창에서 종료).
+    /// 프롤로그를 아직 안 끝낸 슬롯은 허브로 보낼 수 없어 예전처럼 지운다(다음엔 프롤로그부터).
     /// </summary>
     public void ClearLocalRun(int slot)
     {
-        _localStore.Delete(slot);
+        if (!IntroCompletionTracker.IsCompletedForSlot(slot))
+        {
+            _localStore.Delete(slot);
+            return;
+        }
+        WriteHubRecord(slot, _localStore.Load(slot));
+    }
+
+    /// <summary>
+    /// 로비 카드용 — 런 기록이 없는데 프롤로그를 끝낸 슬롯이면 허브 기록을 다시 세운다.
+    /// 이전 판에서 런 종료로 기록이 지워진 슬롯(위 ClearLocalRun 수정 전)이 「새 게임」으로 보여 메타가 지워지지 않게.
+    /// </summary>
+    public void RepairHubRecord(int slot)
+    {
+        if (_localStore.HasSave(slot) || !IntroCompletionTracker.IsCompletedForSlot(slot)) return;
+        WriteHubRecord(slot, null);
+        Debug.Log($"[RunProgressManager] 슬롯{slot}: 런 기록 없음 + 프롤로그 완료 → 허브 기록 복구");
     }
 
     /// <summary>
@@ -101,10 +117,14 @@ public class RunProgressManager : MonoBehaviour
         BackendGameData.Instance?.InvalidateSlot(slot);
 
         BaseCampOnboardingDirector.ClearForSlot(slot);
+        // 인트로 완료 플래그도 — 안 지우면 슬롯 삭제 직후 카드 새로고침(RepairHubRecord)이 「프롤로그 끝낸 슬롯인데 기록 없음」으로 보고
+        // 허브 기록을 다시 세워, 지운 슬롯이 이어하기로 되살아나 인트로를 건너뛰었다(10-14 사용자).
+        IntroCompletionTracker.ClearForSlot(slot);
         ClearRetryCount(slot);
         // 베이스캠프 「처음 한 번」 연출 기록(멀린의 공간 생성 · 얻기 · 구역 이름)도 — 안 지우면 새 게임인데 처음 연출이 안 나온다(09-28 검증).
         BaseCampFxDirector.ClearFirstTimeForSlot(slot);
         ZoneSign.ClearAllForSlot(slot);
+        MemoryAltarCrystal.ClearForSlot(slot);
     }
 
     // ── 시도 횟수 (슬롯별) ─────────────────────────────────────
@@ -147,6 +167,12 @@ public class RunProgressManager : MonoBehaviour
         // 순서가 꼬여도 실제 진행이 날아가지 않게 막는다.
         if (prev != null && prev.hasActiveRun && !prev.isInStartRoom) return;
 
+        WriteHubRecord(slot, prev);
+    }
+
+    /// <summary>「이 슬롯은 허브까지 왔다」 기록을 쓴다 — 직전 기록에서 챕터 · 누적 시간은 잇는다.</summary>
+    private void WriteHubRecord(int slot, RunSaveData prev)
+    {
         var d = new RunSaveData
         {
             slotIndex         = slot,
@@ -189,6 +215,19 @@ public class RunProgressManager : MonoBehaviour
         _localStore.Save(slot, data);
     }
 
+    /// <summary>
+    /// Hades식 잠금 표시만 바꾼다(10-10) — 내용은 직전 저장 그대로 둔다.
+    /// 피해를 받으면 켜고(이 상태로 끄면 이어하기에서 사망 정산), 전투가 끝나면 끈다. 다음 SaveRunLocal은 새로 쓰므로 꺼진 채다.
+    /// </summary>
+    public void SetCombatLock(bool locked)
+    {
+        int slot = ActiveSlotIndex;
+        var d = _localStore.Load(slot);
+        if (d == null || !d.hasActiveRun || d.isInStartRoom || d.combatLocked == locked) return;
+        d.combatLocked = locked;
+        _localStore.Save(slot, d);
+    }
+
     /// <summary>로컬 세이브 전용 확장 필드 채움. BuildSaveData 공통 필드와 별개.</summary>
     private static void ApplyExtendedFields(RunSaveData d, GameRunSession s, in RunMetaSnapshot m, RunSaveData prev)
     {
@@ -227,6 +266,7 @@ public class RunProgressManager : MonoBehaviour
         d.refineUseCount  = m.refineUseCount;
         d.maxEnhanceLevel = m.maxEnhanceLevel;
         d.abyssDepth      = m.abyssDepth;              // 순환 중 이어하기
+        d.chapterStartPending = m.chapterStartPending; // 보스 클리어 뒤 저장 → 다음 챕터 대기방부터(10-10)
 
         var cdw = new CooldownListWrapper();
         if (m.cooldowns != null) cdw.items.AddRange(m.cooldowns);
@@ -234,10 +274,25 @@ public class RunProgressManager : MonoBehaviour
 
         // 런 상태 확장
         d.runEssence       = s.RunDelta?.GainedEssence ?? 0;
+        d.runStatsJson     = s.RunStats != null ? s.RunStats.ToJson() : string.Empty;   // 결과창 집계(이어하기 유지)
         d.fuelEnhanceMaterial = s.FuelBank?.EnhanceMaterial ?? 0;   // 이벤트방 연료 은행
         d.fuelRuneOre         = s.FuelBank?.RuneOre ?? 0;
         d.potionCount         = s.PlayerState?.PotionCount ?? 0;
         d.potionCapacity      = s.PlayerState?.PotionCapacity ?? PlayerRunState.DefaultPotionCapacity;
+        d.runeExtractCount    = s.RuneExtractCount;
+        d.refineryCraftCount  = s.Refinery?.CraftCount ?? 0;
+        d.runGoldGained       = s.RunDelta?.GainedGold ?? 0;
+        d.firstRunComboKey    = FirstRunService.PendingComboKeyIfFirst;
+        d.firstRunCoreParts   = FirstRunService.RunCorePartFirsts;
+        var bw = new RoomBuffListWrapper();
+        if (s.BuffHandler != null)
+            foreach (var b in s.BuffHandler.ActiveBuffs)
+                bw.items.Add(new RoomBuffSave
+                {
+                    statType = (int)b.Modifier.Type, value = b.Modifier.Value, roomsRemaining = b.RoomsRemaining,
+                    baseDuration = b.BaseDuration, isPercent = b.IsPercent, isDebuff = b.IsDebuff, buffType = b.BuffType, tier = b.Tier,
+                });
+        d.roomBuffsJson       = JsonUtility.ToJson(bw);
         // 현재 슬롯: 라이브 WeaponManager 우선(첫 방 -1 케이스 해결), 없으면 씬 전환 시 저장값
         int liveSlot       = s.Player?.WeaponManager?.CurrentSlotIndex ?? -1;
         d.weaponCurrentSlot = liveSlot >= 0 ? liveSlot : s.SavedCurrentSlotIndex;

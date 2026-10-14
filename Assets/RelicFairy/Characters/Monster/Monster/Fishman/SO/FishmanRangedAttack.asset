@@ -27,6 +27,10 @@ MonoBehaviour:
   vfxProjectileHitRadius: 0.6
   vfxHitEffectPrefab: {fileID: 6085527230289597312, guid: 56e26746bbd218543bee3498fb4ac520,
     type: 3}
-  vfxHitEffectScale: 1
+  vfxHitEffectScale: 0.14
+  projectileCount: 1
+  postFireWait: 0
+  projectileInterval: 0.15
+  returnToIdleBetweenShots: 0
   slowScale: 0
   slowDuration: 0

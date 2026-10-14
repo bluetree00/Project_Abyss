@@ -219,7 +219,9 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
                 }
 
                 UpdateCurrentRange(ctx);
-                RotateTowardPlayer(ctx, Data.breathTrackSpeed);
+                // 뿜기 시작 0.45초는 굳힌 방향 그대로 — 뿜자마자 다시 따라 돌아 첫 틱이 예고 밖이었다(10-13 검증)
+                if (_timer >= PatternGuideHelper.MinLead * SpeedMult(ctx))
+                    RotateTowardPlayer(ctx, Data.breathTrackSpeed);
                 UpdateWarningTransform(ctx);   // 판정 줄이 보스를 따라 돈다
                 UpdateBreathVfxTransform(ctx);
                 SyncBreathEffectScale();
@@ -354,9 +356,12 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
 
         if (Data.knockbackMultiplier > 0f)
         {
-            Vector3 knock = new Vector3(
-                ctx.Transform.forward.x, 0.1f, ctx.Transform.forward.z).normalized;
-            player.ApplyKnockback(knock * ctx.Config.stat.knockbackForce * Data.knockbackMultiplier);
+            // 빔 옆(플레이어가 있는 쪽)으로 밀고 이동은 잠그지 않는다 — 틱마다 0.3초씩 잠그고 빔 방향으로 밀어
+            // 한 번 맞으면 걸어서 못 빠져나왔다(10-08 점검: 최대 11틱)
+            Vector3 right = Vector3.Cross(Vector3.up, ctx.Transform.forward);
+            float   side  = Vector3.Dot(toPlayer, right) >= 0f ? 1f : -1f;
+            Vector3 knock = (right * side + Vector3.up * 0.1f).normalized;
+            player.ApplyKnockback(knock * ctx.Config.stat.knockbackForce * Data.knockbackMultiplier, 0f);
         }
     }
 

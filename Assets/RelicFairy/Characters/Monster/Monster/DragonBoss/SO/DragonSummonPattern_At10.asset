@@ -38,8 +38,8 @@ MonoBehaviour:
   _miniBreathRange: 8
   _miniBreathCooldown: 6
   _miniBreathDamage: 15
-  _miniBreathSpeed: 6
-  _iceBreathPrefab: {fileID: 1427661989262336, guid: 1d47296c0c34abd4c9bf1e6335b22dcc,
+  _miniBreathSpeed: 20
+  _iceBreathPrefab: {fileID: 8357042805450777661, guid: c4b03b6b9df7efe4b906db6e285d7c65,
     type: 3}
   _thunderBreathPrefab: {fileID: 1012013889074000, guid: 39893baea49e18a4187b715724396e90,
     type: 3}

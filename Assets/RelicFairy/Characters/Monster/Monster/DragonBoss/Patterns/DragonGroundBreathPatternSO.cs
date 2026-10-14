@@ -249,7 +249,8 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
     private void UpdateBreathing(MonsterContext ctx)
     {
-        RotateToPlayer(ctx, Data.RotateSpeedBreath);
+        // 뿜기 시작 0.45초는 굳힌 방향 그대로 — 뿜자마자 다시 따라 돌았다(10-13 검증)
+        if (_timer >= PatternGuideHelper.MinLead) RotateToPlayer(ctx, Data.RotateSpeedBreath);
 
         UpdateCurrentRange(ctx);
         SyncEffect(_breathEffect, ctx);
@@ -259,7 +260,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         _damageTick += Time.deltaTime;
         if (_damageTick >= DamageTick)
         {
-            _damageTick = 0f;
+            _damageTick -= DamageTick;   // 나머지는 넘긴다 — 0으로 되돌리면 틱 간격이 프레임만큼 늘어 피해가 프레임률을 탔다(10-08 점검)
             ApplyDamage(ctx);
         }
 

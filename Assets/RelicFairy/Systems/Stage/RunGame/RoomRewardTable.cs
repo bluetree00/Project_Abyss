@@ -68,22 +68,98 @@ public static class RoomRewardTable
 
     // ── Public Methods ───────────────────────────────────────────
 
+    /// <summary>챕터 단계 상한 — Ch1 0 · Ch2 1 · Ch3 2 · Ch4 3.</summary>
+    public const int ChapterStepMax = 3;
+
+    /// <summary>
+    /// 지금 챕터의 등급 단계 — 사용자 10-10 「좋은 룬의 등장 확률이 진행될수록 적절히 올라가야」. 예전엔 한 런 안에서
+    /// Ch1과 Ch4의 일반방 분포가 같았다(시기 · 방 종류만 반영). 런이 없으면 0.
+    /// </summary>
+    public static int ChapterStep =>
+        Mathf.Clamp((int)(GameRunBootstrapper.Instance?.Run?.CurrentChapter ?? ChapterId.Chapter1) - 1, 0, ChapterStepMax);
+
     /// <summary>
     /// 방 종류별 보상 규칙. 미등록 종류는 일반방 규칙으로 폴백한다.
-    /// 시기(해방기 · 악몽 모드)가 올라가면 몬스터가 세지는 만큼 룬 등급 가중을 위로 옮기고 연료를 늘린다(<see cref="EraBalance"/>, 10-01).
+    /// 챕터(<see cref="ChapterStep"/>)와 시기(해방기 · 악몽 모드, <see cref="EraBalance"/>)가 올라가면 그 단계 합만큼
+    /// 룬 등급 가중을 위로 옮긴다(같은 <see cref="EraBalance.ShiftRarity"/>). 연료는 시기만 늘린다(10-01).
     /// </summary>
-    public static Rule For(RoomPlanKind kind) => WithEra(BaseFor(kind));
+    public static Rule For(RoomPlanKind kind) => WithAltar(For(kind, ChapterStep, EraBalance.Current, PrefixStep(kind)));
 
-    /// <summary>시기 배율 — 봉인기는 그대로.</summary>
-    private static Rule WithEra(in Rule r)
+    /// <summary>
+    /// 기억의 제단 강화(10-14) — 룬 등급 가중 더하기(Rare · Epic · Legendary %p — 가중 1 = 1%p, 합 100 유지)와 원석 · 강화재료 배율.
+    /// Rare 몫은 Common에서, Epic · Legendary 몫은 Common에서 먼저 · 모자라면 Rare에서 옮긴다(정예방은 Common이 0).
+    /// Epic · Legendary는 그 등급을 연 뒤에만 몫이 있다(<see cref="MemoryAltarService.EpicOddsBonus"/>). 표시(확률 막대)와 굴림이 같은 값을 본다.
+    /// 순수 계산 오버로드(<see cref="For(RoomPlanKind,int,in EraBalance.Spec,int)"/>)엔 넣지 않는다 — 확률 표 도구가 제단 없이 부른다.
+    /// </summary>
+    private static Rule WithAltar(in Rule r)
     {
-        var era = EraBalance.Current;
-        if (era.RarityStep <= 0 && Mathf.Approximately(era.FuelScale, 1f)) return r;
+        float ra = MemoryAltarService.RareOddsBonus, ep = MemoryAltarService.EpicOddsBonus, lg = MemoryAltarService.LegendOddsBonus;
+        float om = MemoryAltarService.OreGainMult, em = MemoryAltarService.EnhanceGainMult;
+        if (ra <= 0f && ep <= 0f && lg <= 0f && om <= 1f && em <= 1f) return r;
+
         var w = r.Weights;
-        var (c, ra, e, l) = EraBalance.ShiftRarity(w.Common, w.Rare, w.Epic, w.Legendary, era.RarityStep);
+        float c = w.Common, rare = w.Rare, epic = w.Epic, leg = w.Legendary;
+        float toRare = Mathf.Min(ra, c);
+        c -= toRare; rare += toRare;
+        float up = ep + lg;
+        if (up > 0f)
+        {
+            float fromC = Mathf.Min(up, c);
+            float fromR = Mathf.Min(up - fromC, rare);
+            c -= fromC; rare -= fromR;
+            float k = (fromC + fromR) / up;
+            epic += ep * k; leg += lg * k;
+        }
+        return new Rule(r.DropChance, r.ChoiceCount, r.RarityFloor, new RarityWeights(c, rare, epic, leg),
+                        ore: Mathf.RoundToInt(r.Ore * om), enhanceMaterial: Mathf.RoundToInt(r.EnhanceMaterial * em));
+    }
+
+    /// <summary>접두어 정예가 나온 일반방 = 등급 +1단(방당 최대 1 · 정예방은 이미 Rare 하한이라 없음 — 10-11 정예 접두어).</summary>
+    public static int PrefixStep(RoomPlanKind kind)
+        => kind == RoomPlanKind.Normal && MonsterRoomLedger.HadPrefixedElite ? 1 : 0;
+
+    /// <summary>순수 계산 — 확률 표 · 시뮬 도구가 챕터 단계 · 시기를 넘겨 부른다(런 상태를 읽지 않는다). <paramref name="bonusStep"/> = 챕터 상한 밖에서 더하는 단계(접두어 정예).</summary>
+    public static Rule For(RoomPlanKind kind, int chapterStep, in EraBalance.Spec era, int bonusStep = 0)
+    {
+        var r    = BaseFor(kind);
+        int step = Mathf.Clamp(chapterStep, 0, ChapterStepMax) + era.RarityStep + Mathf.Max(0, bonusStep);
+        if (step <= 0 && Mathf.Approximately(era.FuelScale, 1f)) return r;
+        var w = r.Weights;
+        var (c, ra, e, l) = EraBalance.ShiftRarity(w.Common, w.Rare, w.Epic, w.Legendary, step);
         return new Rule(r.DropChance, r.ChoiceCount, r.RarityFloor, new RarityWeights(c, ra, e, l),
                         ore: Mathf.RoundToInt(r.Ore * era.FuelScale),
                         enhanceMaterial: Mathf.RoundToInt(r.EnhanceMaterial * era.FuelScale));
+    }
+
+    /// <summary>확률 막대 머리 오른쪽 한 줄 — 무엇이 등급을 올렸나(「Ch3 +2 · 해방 +1 · 정예」). 없으면 빈 문자열.</summary>
+    public static string DescribeBoost(RoomPlanKind kind)
+    {
+        var sb = new System.Text.StringBuilder();
+        int ch = ChapterStep;
+        if (ch > 0) sb.Append("Ch").Append(ch + 1).Append(" +").Append(ch);
+        int es = EraBalance.Current.RarityStep;
+        if (es > 0)
+        {
+            if (sb.Length > 0) sb.Append(" · ");
+            sb.Append(StoryProgress.Era == StoryEra.NightmareMode ? "악몽" : "해방").Append(" +").Append(es);
+        }
+        if (kind == RoomPlanKind.Elite || kind == RoomPlanKind.MidBoss)
+        {
+            if (sb.Length > 0) sb.Append(" · ");
+            sb.Append(kind == RoomPlanKind.MidBoss ? "정예 보스" : "정예");
+        }
+        if (PrefixStep(kind) > 0)
+        {
+            if (sb.Length > 0) sb.Append(" · ");
+            sb.Append("접두어 정예 +1");
+        }
+        float altar = MemoryAltarService.RareOddsBonus + MemoryAltarService.EpicOddsBonus + MemoryAltarService.LegendOddsBonus;
+        if (altar > 0f)
+        {
+            if (sb.Length > 0) sb.Append(" · ");
+            sb.Append("제단 +").Append(Mathf.RoundToInt(altar)).Append("%p");
+        }
+        return sb.ToString();
     }
 
     private static Rule BaseFor(RoomPlanKind kind) => kind switch
@@ -91,6 +167,10 @@ public static class RoomRewardTable
         // 정예 — 확정 드롭 + Rare 하한 + 연료 증량 + 강화재료(§3-2 개편표).
         // 후보는 다른 방과 같은 3장이다 — 룬 선택지를 3장으로 고정했다(10-01 사용자 결정, 예전 4장).
         RoomPlanKind.Elite => new Rule(1f, 3, ItemRarity.Rare, EliteWeights, ore: 6, enhanceMaterial: 2),
+
+        // 정예 보스(10-12 「관문지기」) — 정예방 위 · 보스방 아래. Epic 하한 · 원석 12(= 정제 한 번) · 강화재료 4.
+        // 그 챕터에서 빠진 전투 두 방 + 정예방 몫을 돌려주는 값이다(배치 설계 §5-2). 골드 · 정수는 처치 · 정수 적립이 맡는다.
+        RoomPlanKind.MidBoss => new Rule(1f, 3, ItemRarity.Epic, EliteWeights, ore: 12, enhanceMaterial: 4),
 
         // [제거됨 2026-08-12] PreBoss 규칙 —
         // 보스 전 통로는 전 챕터 grid_csv에 스포너가 0개다. 그래서 AttachRoomClearController가

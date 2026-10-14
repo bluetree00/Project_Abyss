@@ -127,6 +127,9 @@ public class DodgePresentation : MonoBehaviour
 
     private void OnDestroy()
     {
+        // 회색 필터 Volume · 프로필 — HideAndDontSave라 씬을 넘어 남았다(10-09 출시 점검)
+        if (_pdVolume != null) Destroy(_pdVolume.gameObject);
+        if (_pdProfile != null) Destroy(_pdProfile);
         _ghostSpawnActive = false;
         for (int i = 0; i < _allGhosts.Count; i++)
         {

@@ -238,7 +238,7 @@ public class LichElementalBarrageState : UnInterruptibleState<LichElementalBarra
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -348,7 +348,8 @@ public class LichElementalBarrageState : UnInterruptibleState<LichElementalBarra
             {
                 case StrikeKind.FireBeam:
                 {
-                    PatternGuideHelper.SafeDestroy(ref s.Guide);
+                    // 예고 줄은 광선 앞머리가 끝에 닿을 때까지 둔다(10-13 검증 — 발사 순간 지워 앞머리가 0.6초 더 나아가며 판정했다)
+                    if (s.Guide != null) { UnityEngine.Object.Destroy(s.Guide, Data.fireLength / BeamGrowSpeed + 0.05f); s.Guide = null; }
                     var       lich = LichPatternUtil.Lich(ctx);
                     Transform hand = lich != null ? lich.CastPoint : ctx.Transform;
                     LichVfx.PlayBeam(LichVfxSlot.FireBeam, hand.position, s.Pos + s.Dir * Data.fireLength, Data.fireWidth / 3f, Data.fireBeamSeconds);   // 목록 배율은 굵기 3 m 기준
@@ -365,7 +366,6 @@ public class LichElementalBarrageState : UnInterruptibleState<LichElementalBarra
                 case StrikeKind.IceSpear:
                     PatternGuideHelper.SafeDestroy(ref s.Guide);
                     LichVfx.Play(LichVfxSlot.IceSpear, s.Pos, Quaternion.Euler(0f, Random.Range(0f, 360f), 0f), Data.iceRadius / 1.5f);
-                    LichVfx.Play(LichVfxSlot.IceImpact, s.Pos, Quaternion.identity, Data.iceRadius / 1.5f);
                     LichSfx.Play(LichSfxSlot.BoltImpact, s.Pos, 0.5f);
                     LichPatternUtil.Impact(LichImpact.Light, LichPatternUtil.HitCircle(ctx, s.Pos, Data.iceRadius, Data.iceDamage));
                     LichHazards.SlowZone(ctx, s.Pos, Data.iceRadius, Data.iceSlowSeconds, Data.iceSlowScale, LichVfxSlot.ZoneIce);

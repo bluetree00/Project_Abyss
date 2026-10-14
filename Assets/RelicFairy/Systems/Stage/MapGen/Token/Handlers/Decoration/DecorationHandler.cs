@@ -38,7 +38,7 @@ public sealed class DecorationHandler : ITokenHandler
             inwardDir = FindInwardDirection(ctx.Grid, ctx.Cell);
 
         float rotY = (entry.faceNearestWall && inwardDir != Vector3.zero)
-            ? Mathf.Atan2(inwardDir.x, inwardDir.z) * Mathf.Rad2Deg
+            ? Mathf.Atan2(inwardDir.x, inwardDir.z) * Mathf.Rad2Deg + entry.WallYawOffset
             : (entry.randomYRotation
                 ? (ctx.Rng != null ? (float)ctx.Rng.NextDouble() * 360f : Random.Range(0f, 360f))
                 : 0f);
@@ -65,9 +65,18 @@ public sealed class DecorationHandler : ITokenHandler
         // ⚠️토큰 기준 Y(baseY + 0.5)는 1m 큐브 바닥을 가정한 역사적 상수인데, 실제 바닥 블록은
         //   Cube × scale.y(0.2)라 진짜 윗면은 baseY + 0.1 — pos.y로 스냅하면 전부 0.4m 떠버린다.
         //   그래서 팔레트에서 실제 윗면을 계산해 목표로 삼는다(ResolveFloorTopY).
-        // 벽부착(횃불 등)·명시 오프셋(yOffset≠0)만 제외(의도 배치). 그 외 바닥 소품은 항상 스냅.
-        if (!entry.faceNearestWall && Mathf.Approximately(entry.yOffset, 0f))
+        // 명시 오프셋(yOffset≠0 — 횃불 · 창 등 벽 높이에 거는 것)만 제외(의도 배치). 그 외는 항상 스냅.
+        // 벽에 붙여 바닥에 세우는 것(아치 · 쇠창살 문 · 장 — yOffset 0)도 스냅한다: 예전엔 벽부착이면 건너뛰어
+        // 아치가 0.36 m 뜨고 쇠창살 문이 0.64 m 묻혔다(10-12 Ch3 점검 D7).
+        if (Mathf.Approximately(entry.yOffset, 0f))
             SnapBottomToY(go, ResolveFloorTopY(ctx));
+
+        if (entry.DisableColliders)
+            DisableSolidColliders(go);
+
+        // 하위 LOD 메시가 깨진 프리팹 — LOD0에 고정(먼 거리에서 깨진 삼각형이 방을 가로지르지 않게)
+        if (entry.ForceLod0 && go.TryGetComponent<LODGroup>(out var lod))
+            lod.ForceLOD(0);
 
         AttachNavMeshIgnore(go);
         DissolveEffect.PlayAppearAsync(go, 0.6f, ctx.Ct).Forget();
@@ -142,6 +151,15 @@ public sealed class DecorationHandler : ITokenHandler
             if (fallback == null) fallback = cat;
         }
         return fallback;
+    }
+
+    /// <summary>인스턴스의 트리거 아닌 콜라이더를 끈다(프리팹은 그대로) — 비전투 방의 DisableDecorationBlocking과 같은 기준.</summary>
+    private static void DisableSolidColliders(GameObject root)
+    {
+        var cols = root.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < cols.Length; i++)
+            if (cols[i] != null && !cols[i].isTrigger)
+                cols[i].enabled = false;
     }
 
     private static void AttachNavMeshIgnore(GameObject root)

@@ -14,9 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CactusThornData
   _vfxPrefab: {fileID: 4186470608034871016, guid: 496fe676ddca2ac45b235024c3dff808,
     type: 3}
-  _vfxScale: 0.5
+  _vfxScale: 0.69
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
+  _vfxFaceForward: 0
   thornRadius: 2.5
   thornDamage: 6
   thornStateName: Cactus_GetHit

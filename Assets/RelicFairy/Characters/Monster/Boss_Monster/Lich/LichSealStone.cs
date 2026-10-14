@@ -183,7 +183,6 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
     {
         Vector3 mid = transform.position + Vector3.up * (Height * 0.5f);
         LichVfx.Play(LichVfxSlot.SealStoneBurst, mid, Quaternion.identity, 1.6f);
-        LichVfx.Play(LichVfxSlot.PhaseBurst, mid, Quaternion.identity, 0.5f);
         if (!LichVfx.Has(LichVfxSlot.SealStoneBurst))
             PatternGuideHelper.Sphere(mid, 2.2f, PatternGuideHelper.Reversed, lifetime: 0.35f);
         Dismiss();

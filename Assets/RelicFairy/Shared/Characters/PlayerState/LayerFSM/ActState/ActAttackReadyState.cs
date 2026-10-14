@@ -1,4 +1,4 @@
-// ActAttackReadyState.cs
+﻿// ActAttackReadyState.cs
 using UnityEngine;
 
 /// <summary>
@@ -14,7 +14,7 @@ public class ActAttackReadyState : LayerStateBase<ActState>
     {
         if (_controller.Combo.IsAttacking)
         {
-            Debug.Log("[ActAttackReadyState] Already attacking, aborting Enter.");
+            RFLog.D("[ActAttackReadyState] Already attacking, aborting Enter.");
             _stateChanger.Change(ActState.None); // 공격 중이면 바로 None으로
             return;
         }

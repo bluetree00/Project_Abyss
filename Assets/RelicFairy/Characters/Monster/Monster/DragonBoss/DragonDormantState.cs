@@ -32,10 +32,16 @@ public class DragonDormantState : IMonsterState
     private const float FallbackReturnDuration = 1.5f;
     private static readonly Vector3 FallbackCamOffset  = new Vector3(30f, 35f, -50f);
     private static readonly Vector3 FallbackLookOffset = new Vector3(0f, 25f, 0f);
+    // 하강 추적 카메라 높이 — 바닥 가까이(벽보다 낮게)에서 내려오는 화룡을 올려다본다(10-13 사용자 「시작 연출 카메라가 너무 높다」 · 전: 화룡 등 뒤 10 m 위에서 내려다봄)
+    private const float DescentCamMinAboveFloor = 1.2f;
+    private const float DescentCamMaxAboveFloor = 4f;
 
     // UI_BossBark.Instance가 없는 씬(예: 단독 테스트 씬)에서도 동일한 페이싱을 유지하기 위한 폴백 대기 시간.
     // UI_BossBark의 BossIntro 표시 시간(fadeIn 0.15 + hold 4.0 + fadeOut 0.45)과 동일하게 맞춘다.
     private const float BossIntroFallbackDuration = 4.6f;
+
+    // 반복 관람 — 비행을 건너뛰고 이 높이에서 바로 내려온다(10-14 · 등장 약 12초 → 약 5초)
+    private const float RepeatDescendHeight = 14f;
 
     private readonly float _detectionRange;
 
@@ -150,7 +156,8 @@ public class DragonDormantState : IMonsterState
         if (dragon == null) return;
 
         var ct = dragon.destroyCancellationToken;
-        BossBinding.Attach(dragon, StoryProgress.Dragon);   // 옛 봉인 사슬(10-03 S2) — 날아 내려오는 동안에도 바닥 봉인진까지 이어진다
+        // 해방기도 묶임 없이 — 봉인은 리치에게 떨어질 때 이미 깨졌다(10-13 사용자 「봉인 상태에서 시작은 레거시」)
+        bool cine = false;
 
         try
         {
@@ -158,9 +165,13 @@ public class DragonDormantState : IMonsterState
 
             // PanToZoneAndReturnAsync의 복귀 단계가 시퀀스 도중 Cinemachine을 재활성화하는 것을 방지
             cam?.TakeManualControl();
+            cine = BossStoryScenes.BeginEntrance(StoryProgress.Dragon, ct);   // 레터박스 · 전투 HUD 걷기(10-14)
 
-            // 브레스를 뿜으며 착지 지점 위까지 비행
-            await FlyInWithBreathAsync(ctx, dragon, cam, ct);
+            // 브레스를 뿜으며 착지 지점 위까지 비행 — 이번 시기 첫 관람만(반복은 낮은 하늘에서 바로 내려온다)
+            if (BossStoryScenes.IsFirstEntrance(StoryProgress.Dragon))
+                await FlyInWithBreathAsync(ctx, dragon, cam, ct);
+            else
+                PlaceForRepeatDescent(ctx, dragon, cam);
 
             // FlyInWithBreathAsync 완료 시점에 카메라가 이미 하강 추적 위치에 도달 → 별도 아크 불필요
 
@@ -175,32 +186,33 @@ public class DragonDormantState : IMonsterState
             GameObject windVfx = dragon.SpawnEntranceWindVfx();
             try
             {
-                if (UI_BossBark.Instance != null)
-                {
-                    // 인카운터 대사(방문 변형) — 미로드 시 "Dragon Boss" 폴백
-                    string bark = "Dragon Boss";
-                    var encounterLines = Managers.DialogueData?.GetBossEncounterLines("Dragon_Encounter");
-                    if (encounterLines != null && encounterLines.Length > 0) bark = encounterLines[0].text;
-                    await UI_BossBark.ShowAndWaitAsync(bark, BossBarkType.BossIntro);
-                }
-                else
-                    await UniTask.Delay(TimeSpan.FromSeconds(BossIntroFallbackDuration), cancellationToken: ct);
+                // 인카운터 대사(방문 변형) + 이름 · 칭호 — 미로드 시 "Dragon Boss" 폴백 · 반복 관람은 짧게(10-14)
+                string bark = "Dragon Boss";
+                var encounterLines = Managers.DialogueData?.GetBossEncounterLines("Dragon_Encounter");
+                if (encounterLines != null && encounterLines.Length > 0) bark = encounterLines[0].text;
+                await BossStoryScenes.IntroLineAsync(dragon, StoryProgress.Dragon, bark, ct);
             }
             finally
             {
                 if (windVfx != null) BossEffectPool.Release(windVfx);
             }
 
-            // 해방기 — 착지 클로즈업 동안 사슬이 끊어지고 포효(10-03 S2-3)
-            await BossStoryScenes.UnbindAsync(dragon, StoryProgress.Dragon, ct);
+            // 해방기 — 착지 클로즈업 동안 옛 봉인 자국이 깨지며 포효(10-13 재조우)
+            await BossStoryScenes.ReturnAsync(dragon, StoryProgress.Dragon, ct);
 
             // 3단계: HUD 소멸 → 플레이어 카메라로 복귀
+            // 숲 · 기사와 같은 짧은 블렌드 — 복귀 목표가 「플레이어 + 카메라 처음 월드 위치」라 약 24 m 위로 솟던 결함은 83이 게임 카메라 자세로 고침(10-14)
             if (cam != null)
-                await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, 1.5f, ct);
+                await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, 1.0f, ct);   // 플레이어가 멀어(약 15 m) 기사처럼 1초
+            if (cine) { BossStoryScenes.EndEntrance(StoryProgress.Dragon, completed: true); cine = false; }
         }
         catch (OperationCanceledException)
         {
             return;
+        }
+        finally
+        {
+            if (cine) BossStoryScenes.EndEntrance(StoryProgress.Dragon, completed: false);
         }
 
         DragonPatternFloorUtils.EnsureAgentOnNavMesh(ctx);
@@ -245,7 +257,8 @@ public class DragonDormantState : IMonsterState
         Vector3 camStart = playerPos
             + rightDir   * dragon.EntranceBreathCamRightShift
             + Vector3.up * dragon.EntranceBreathCamHeight;
-        Vector3 camEnd   = targetPos + dragonEndRot * dragon.EntranceDescentCamOffset;
+        float   floorY   = DragonPatternFloorUtils.GetFloorY(targetPos, ctx.Runtime.SpawnPosition.y);
+        Vector3 camEnd   = ClampAboveFloor(targetPos + dragonEndRot * dragon.EntranceDescentCamOffset, floorY);
         Vector3 lookEnd  = targetPos + dragonEndRot * dragon.EntranceDescentCamLookOffset;
         // 컨트롤 포인트: 드래곤 로컬 오프셋 → 월드 변환 (음수 X = 좌측 스윙 → U자)
         Vector3 ctrlPos  = Vector3.Lerp(camStart, camEnd, 0.5f) + dragonEndRot * dragon.EntranceArcCtrlOffset;
@@ -316,7 +329,7 @@ public class DragonDormantState : IMonsterState
         // [하강 추적] U-아크가 이미 추적 위치에 도달했으므로 블렌드 없이 즉시 추적 시작
         using var descentTrackCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         if (cam != null)
-            TrackCameraAsync(cam, ctx.Transform, dragon.EntranceDescentCamOffset, dragon.EntranceDescentCamLookOffset, 0f, descentTrackCts.Token)
+            TrackCameraAsync(cam, ctx.Transform, dragon.EntranceDescentCamOffset, dragon.EntranceDescentCamLookOffset, targetY, 0f, descentTrackCts.Token)
                 .SuppressCancellationThrow().Forget();
 
         while (true)
@@ -406,7 +419,28 @@ public class DragonDormantState : IMonsterState
     }
 
     /// <summary>보간 진입 후 ct가 취소될 때까지 드래곤 위치 + 로컬 오프셋을 매 프레임 추적한다.</summary>
-    private static async UniTask TrackCameraAsync(GameCameraController cam, Transform target, Vector3 localOffset, Vector3 localLookOffset, float blendDuration, CancellationToken ct)
+    /// <summary>반복 관람 — 비행 없이 착지 지점 <see cref="RepeatDescendHeight"/> m 위에서 하강 자세로 시작, 카메라는 바닥 가까이 앞쪽(하강 추적과 같은 자리).</summary>
+    private static void PlaceForRepeatDescent(MonsterContext ctx, DragonBossMonster dragon, GameCameraController cam)
+    {
+        Vector3 target = ctx.Runtime.SpawnPosition + Vector3.up * RepeatDescendHeight;
+        ctx.Transform.position = target;
+        PlayAnim(ctx, DescendStateName, 0.2f);
+        if (cam == null) return;
+        float   floorY = DragonPatternFloorUtils.GetFloorY(target, ctx.Runtime.SpawnPosition.y);
+        Vector3 camPos = ClampAboveFloor(target + ctx.Transform.rotation * dragon.EntranceDescentCamOffset, floorY);
+        Vector3 look   = target + ctx.Transform.rotation * dragon.EntranceDescentCamLookOffset;
+        cam.transform.position = camPos;
+        Vector3 d = look - camPos;
+        if (d.sqrMagnitude > 0.01f) cam.transform.rotation = Quaternion.LookRotation(d, Vector3.up);
+    }
+
+    private static Vector3 ClampAboveFloor(Vector3 p, float floorY)
+    {
+        p.y = Mathf.Clamp(p.y, floorY + DescentCamMinAboveFloor, floorY + DescentCamMaxAboveFloor);
+        return p;
+    }
+
+    private static async UniTask TrackCameraAsync(GameCameraController cam, Transform target, Vector3 localOffset, Vector3 localLookOffset, float floorY, float blendDuration, CancellationToken ct)
     {
         Vector3    fromPos = cam.transform.position;
         Quaternion fromRot = cam.transform.rotation;
@@ -416,7 +450,7 @@ public class DragonDormantState : IMonsterState
         {
             ct.ThrowIfCancellationRequested();
             float      k      = Mathf.Clamp01(t / blendDuration);
-            Vector3    toPos   = target.position + target.rotation * localOffset;
+            Vector3    toPos   = ClampAboveFloor(target.position + target.rotation * localOffset, floorY);
             Vector3    lookAt  = target.position + target.rotation * localLookOffset;
             Vector3    lookDir = lookAt - toPos;
             Quaternion toRot   = lookDir.sqrMagnitude > 0.01f ? Quaternion.LookRotation(lookDir, Vector3.up) : fromRot;
@@ -429,7 +463,7 @@ public class DragonDormantState : IMonsterState
         while (true)
         {
             ct.ThrowIfCancellationRequested();
-            Vector3 trackPos = target.position + target.rotation * localOffset;
+            Vector3 trackPos = ClampAboveFloor(target.position + target.rotation * localOffset, floorY);
             Vector3 lookAt   = target.position + target.rotation * localLookOffset;
             Vector3 lookDir  = lookAt - trackPos;
             cam.transform.position = trackPos;

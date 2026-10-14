@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// 6속성 실제 VFX 재생 단일 진입점(정적 파사드 + DDOL 런타임).
@@ -20,6 +21,8 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     private const string RegistryKey = "ElementVfxRegistry";
     private const float  BurstTtl    = 2.0f;   // 버스트 프리팹 자동 회수(초)
     private const float  AreaFrom    = 1.01f;  // 이 반경을 넘으면 「광역」 칸을 쓴다(그 아래는 점 타격)
+    private const float  FadeTail    = 0.5f;   // 수명이 다하면 방출만 멈추고 남은 입자가 이만큼 사그라든 뒤 거둔다(10-11 톤 2차 — 툭 끊김)
+    private const float  LightDim    = 0.4f;   // 팩 이펙트 점광원 세기 배율 — 빛 오라(세기 3 · 5 m)가 바닥을 덮었다(10-11 톤 2차)
 
     private sealed class VfxItem
     {
@@ -32,6 +35,9 @@ public sealed class ElementVfxPlayer : MonoBehaviour
         public float      life;        // <0 이면 영속(명시 해제까지)
         public int        handle;
         public string     auraKey;     // (targetId|element) — 대상별 1개 갱신용
+        public bool       following;   // 대상을 따라가는 중(대상이 파괴되면 바로 거둔다)
+        public bool       fading;      // 방출을 멈추고 사그라드는 중
+        public float      fadeEnd;     // fading일 때 거둘 나이
     }
 
     /// <summary>체인/빔 — 프리팹이 아닌 절차적 지그재그 LineRenderer(두 점 연결). 짧은 수명 후 페이드.</summary>
@@ -86,21 +92,25 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     /// 반경이 1을 넘으면 <b>광역</b> 칸을 그 반경에 맞춰 키워 쓰고(보이는 범위 = 맞는 범위), 1 이하면 <b>점 타격</b> 칸을 쓴다.
     /// atFeet = 넘긴 위치가 발밑(대상 transform)인가 — 참이면 타격 이펙트를 몸 높이로 올린다. 맞은 점을 넘길 땐 false.
     /// </summary>
-    public static void PlayBurst(RuneElement element, Vector3 pos, float radiusScale = 1f, bool atFeet = true)
+    public static void PlayBurst(RuneElement element, Vector3 pos, float radiusScale = 1f, bool atFeet = true, Color tint = default)
     {
         if (SuppressBursts) return;
         var inst = Instance; if (inst == null) return;
-        inst.DoPlayBurst(element, pos, radiusScale, atFeet);
+        inst.DoPlayBurst(element, pos, radiusScale, atFeet, tint);
     }
 
-    /// <summary>단계 발동 표시 — 플레이어 자리에 속성 문장 1회.</summary>
+    /// <summary>
+    /// 속성 문장 1회(자기 강화 표시) — 플레이어 자리. 룬 단계가 켜질 때는 더 부르지 않는다(룬판이 시간을 멈춰 거의 안 보였고
+    /// 판 터짐 · 알림이 이미 말한다 — 10-11 톤 2차 D-3). 지금은 심연 각성처럼 「내가 강해졌다」를 한 번 보일 때 쓴다.
+    /// </summary>
     public static void PlayActivation(RuneElement element, Vector3 pos)
     {
         if (SuppressBursts) return;
         var inst = Instance; if (inst == null) return;
         if (inst._registry == null) return;
         var prefab = inst._registry.GetBurst(element);
-        if (prefab != null) inst.DoPlayPrefab(prefab, pos, 1f, BurstTtl);
+        // 문장은 Spells Pack 원래 빛깔(어둠 = 진한 자홍)이 그대로 진했다(10-11 2차 촬영 VFX2_11) → 그 속성의 짙은 색(ElementPalette.Deep)을 곱한다
+        if (prefab != null) inst.DoPlayPrefab(prefab, pos, 1f, BurstTtl, ElementPalette.Deep(element));
     }
 
     /// <summary>장판(GroundField)에 영역 이펙트를 부착. scale = 장판 반경(m). 반환=해제 핸들(0=실패).</summary>
@@ -125,21 +135,32 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     /// scale = 프리팹 배율, life = 회수 시각(초, unscaled).
     /// </summary>
     public static void PlayPrefab(GameObject prefab, Vector3 pos, float scale = 1f, float life = BurstTtl)
+        => PlayPrefab(prefab, pos, scale, life, Color.clear, null);
+
+    /// <summary>
+    /// <see cref="PlayPrefab(GameObject, Vector3, float, float)"/> + 색 곱(<paramref name="tint"/>, 알파 0 = 원래 색 · 알파로 옅게) ·
+    /// 끌 자식 이름(쉼표, <paramref name="mute"/>). 끈 자식은 풀에 그대로 남으므로 같은 프리팹을 다른 칸이 끄지 않고 쓰면 안 된다.
+    /// </summary>
+    public static void PlayPrefab(GameObject prefab, Vector3 pos, float scale, float life, Color tint, string mute)
     {
         if (prefab == null) return;
         var inst = Instance; if (inst == null) return;
-        inst.DoPlayPrefab(prefab, pos, scale, life);
+        inst.DoPlayPrefab(prefab, pos, scale, life, tint, mute);
     }
 
     /// <summary>
     /// 속성과 무관한 프리팹을 대상에 부착(대상+프리팹별 1개, 재부착 시 수명 갱신). 반환=해제 핸들(0=실패).
     /// </summary>
     public static int AttachPrefab(GameObject prefab, Transform target, float duration, float scale = 1f)
+        => AttachPrefab(prefab, target, duration, scale, Color.clear, null);
+
+    /// <summary><see cref="AttachPrefab(GameObject, Transform, float, float)"/> + 색 곱 · 끌 자식(<see cref="PlayPrefab(GameObject, Vector3, float, float, Color, string)"/>와 같다).</summary>
+    public static int AttachPrefab(GameObject prefab, Transform target, float duration, float scale, Color tint, string mute)
     {
         if (prefab == null || target == null) return 0;
         var inst = Instance; if (inst == null) return 0;
         return inst.DoAttachPrefab(prefab, target, duration, scale,
-                                   target.GetInstanceID() + "|p" + prefab.GetInstanceID());
+                                   target.GetInstanceID() + "|p" + prefab.GetInstanceID(), default, tint, mute);
     }
 
     /// <summary>핸들로 오라 즉시 해제(만료 전 상태 소멸 시).</summary>
@@ -164,6 +185,7 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     private readonly Dictionary<GameObject, Stack<VfxItem>> _pools = new();
     private readonly Dictionary<int, VfxItem>    _handles = new();
     private readonly Dictionary<string, VfxItem> _auras   = new();
+    private readonly Dictionary<GameObject, bool> _freshOnly = new();   // 프리팹 → 풀에 넣지 않는가(IsFreshOnly)
     private int _handleSeq = 1;
 
     private readonly List<Beam>  _activeBeams = new();
@@ -171,7 +193,14 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     private Material _beamMat;
 
     // ── 생명주기 ────────────────────────────────────────
-    private void Awake() => EnsureRegistryAsync().Forget();
+    private void Awake()
+    {
+        EnsureRegistryAsync().Forget();
+        // 씬이 바뀌면 남은 이펙트를 거둔다 — DDOL 풀이라 옛 씬 자리(대상이 사라진 마지막 자리)에 수명만큼 남았다(10-11 톤 2차 V-17)
+        SceneManager.activeSceneChanged += OnActiveSceneChanged;
+    }
+
+    private void OnDestroy() => SceneManager.activeSceneChanged -= OnActiveSceneChanged;
 
     private void OnApplicationQuit() => s_appQuitting = true;
 
@@ -183,14 +212,19 @@ public sealed class ElementVfxPlayer : MonoBehaviour
             var it = _active[i];
             if (it.tf == null) { DropDestroyedAt(i); continue; }   // 팩 자체 스크립트 · StopAction이 스스로 파괴했다(10-06)
 
-            if (it.follow != null)
+            if (it.following)
             {
-                if (!it.follow.gameObject.activeInHierarchy) { ReleaseAt(i); continue; }
+                // 대상이 파괴되면(유니티 null) 예전엔 추적만 멈추고 마지막 자리에 수명만큼 남았다(V-17)
+                if (it.follow == null || !it.follow.gameObject.activeInHierarchy) { ReleaseAt(i); continue; }
                 it.tf.position = it.follow.position + it.followOffset;
             }
 
             it.age += dt;
-            if (it.life >= 0f && it.age >= it.life) ReleaseAt(i);
+            if (it.fading)
+            {
+                if (it.age >= it.fadeEnd) ReleaseAt(i);
+            }
+            else if (it.life >= 0f && it.age >= it.life) BeginFade(it);
         }
 
         // 빔(체인 아크) — 수명 동안 페이드 후 회수
@@ -220,7 +254,7 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     }
 
     // ── 구현 ────────────────────────────────────────────
-    private void DoPlayBurst(RuneElement element, Vector3 pos, float radiusScale, bool atFeet)
+    private void DoPlayBurst(RuneElement element, Vector3 pos, float radiusScale, bool atFeet, Color tint = default)
     {
         if (_registry == null) return;
 
@@ -229,7 +263,7 @@ public sealed class ElementVfxPlayer : MonoBehaviour
             var area = _registry.GetArea(element, out float nominal, out float life);
             if (area != null)
             {
-                DoPlayPrefab(area, pos, radiusScale / nominal, life > 0f ? life : BurstTtl);
+                DoPlayPrefab(area, pos, radiusScale / nominal, life > 0f ? life : BurstTtl, tint);
                 return;
             }
         }
@@ -237,12 +271,12 @@ public sealed class ElementVfxPlayer : MonoBehaviour
         var prefab = _registry.GetImpact(element, out float lift);
         if (prefab == null) return;
         if (atFeet) pos.y += lift;
-        DoPlayPrefab(prefab, pos, Mathf.Max(0.1f, radiusScale), BurstTtl);
+        DoPlayPrefab(prefab, pos, Mathf.Max(0.1f, radiusScale), BurstTtl, tint);
     }
 
-    private void DoPlayPrefab(GameObject prefab, Vector3 pos, float scale, float life)
+    private void DoPlayPrefab(GameObject prefab, Vector3 pos, float scale, float life, Color tint = default, string mute = null)
     {
-        var it = Spawn(prefab, pos, Mathf.Max(0.05f, scale));
+        var it = Spawn(prefab, pos, Mathf.Max(0.05f, scale), tint, mute);
         if (it == null) return;
         it.follow = null;
         it.life   = life;
@@ -256,7 +290,11 @@ public sealed class ElementVfxPlayer : MonoBehaviour
         // 몸 상태(b)와 바닥 장판(f)은 같은 트랜스폼에 공존할 수 있어 키를 분리한다.
         string key = target.GetInstanceID() + "|" + (int)element + (body ? "b" : "f");
         // 몸 상태는 몸 한가운데에 — 발밑(루트)에 두면 나는 몬스터 아래 바닥에서 탔다(10-01 실측).
-        if (body) return DoAttachPrefab(_registry.GetStatusBody(element), target, duration, scale, key, BodyCenterOffset(target));
+        if (body)
+        {
+            var bodyFx = _registry.GetStatusBody(element, out float bodyScale, out Color bodyTint);
+            return DoAttachPrefab(bodyFx, target, duration, scale * bodyScale, key, BodyCenterOffset(target), bodyTint);
+        }
 
         // 장판: scale = 장판 반경(m) → 프리팹 공칭 반경으로 나눠 배율을 낸다.
         var aura = _registry.GetAura(element, out float nominal);
@@ -264,20 +302,24 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     }
 
     private int DoAttachPrefab(GameObject prefab, Transform target, float duration, float scale, string key,
-                               Vector3 followOffset = default)
+                               Vector3 followOffset = default, Color tint = default, string mute = null)
     {
         if (prefab == null || target == null || duration <= 0f) return 0;
 
         if (_auras.TryGetValue(key, out var exist) && exist.go != null && exist.go.activeSelf)
         {
-            exist.age  = 0f;                       // 재부여 = 수명 갱신(top-up)
-            exist.life = Mathf.Max(exist.life, duration);
+            if (exist.fading) { exist.fading = false; ResumeEmission(exist.tf); }   // 사그라들던 중에 다시 걸렸다 — 다시 뿜는다
+            // 재부여 = 남은 수명과 새 지속 중 긴 쪽(top-up). 예전엔 처음 받은 긴 지속을 매번 통째로 다시 줘
+            // 상태가 끝난 뒤에도 몸에 남았다(10-11 이펙트 톤 점검).
+            exist.life = Mathf.Max(exist.life - exist.age, duration);
+            exist.age  = 0f;
             return exist.handle;
         }
 
-        var it = Spawn(prefab, target.position + followOffset, scale);
+        var it = Spawn(prefab, target.position + followOffset, scale, tint, mute);
         if (it == null) return 0;
         it.follow       = target;
+        it.following    = true;
         it.followOffset = followOffset;
         it.life         = duration;
         it.age          = 0f;
@@ -310,7 +352,7 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     }
 
     // ── 풀 ──────────────────────────────────────────────
-    private VfxItem Spawn(GameObject prefab, Vector3 pos, float scale)
+    private VfxItem Spawn(GameObject prefab, Vector3 pos, float scale, Color tint = default, string mute = null)
     {
         VfxItem it = null;
         if (_pools.TryGetValue(prefab, out var stack))
@@ -325,16 +367,112 @@ public sealed class ElementVfxPlayer : MonoBehaviour
             var go = Instantiate(prefab, transform);
             it = new VfxItem { go = go, tf = go.transform, prefab = prefab };
             UseHierarchyScale(go.transform);
+            StripGameplay(go);
         }
 
         it.tf.SetPositionAndRotation(pos, prefab.transform.rotation);
         it.tf.localScale = prefab.transform.localScale * scale;   // 장판 반경 대응(버스트=1)
-        it.handle  = 0;
-        it.auraKey = null;
+        it.handle    = 0;
+        it.auraKey   = null;
+        it.following = false;
+        it.fading    = false;
+        ApplyTint(it.go, tint);
+        if (!string.IsNullOrEmpty(mute)) Mute(it.tf, mute);
         it.go.SetActive(true);
         RestartParticles(it.tf);
         _active.Add(it);
         return it;
+    }
+
+    /// <summary>
+    /// 보이기만 하는 인스턴스로 만든다 — 무기 페이로드를 겸하는 프리팹(서약 격노 = Hovl Dragon punch: EffectBehaviour 1초 자가 회수 ·
+    /// ColliderInstance · 반경 2 m 트리거)이 1초 만에 스스로 파괴돼 수명 · 풀을 무시했고 트리거가 따라다녔다(10-11 이펙트 톤 점검).
+    /// </summary>
+    private static void StripGameplay(GameObject go)
+    {
+        foreach (var c in go.GetComponentsInChildren<Collider>(true)) c.enabled = false;
+        foreach (var b in go.GetComponentsInChildren<EffectBehaviour>(true)) b.enabled = false;
+        foreach (var c in go.GetComponentsInChildren<ColliderInstance>(true)) c.enabled = false;
+
+        // 10-11 톤 2차 — 런 공용 이펙트(RunFx.StripRefraction · 10-01 f5)와 같은 규칙: 굴절층(배경을 탁한 유리처럼 비튼다)을 끄고,
+        // 팩 점광원은 낮춘다(만들 때 한 번 — 풀 재사용에서 다시 곱하지 않는다). 곡선 스크립트가 세기를 덮어쓰는 빛은 그대로다.
+        foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+        {
+            var m = r.sharedMaterial;
+            if (m == null || m.shader == null) continue;
+            string s = m.shader.name;
+            if (s.IndexOf("Distortion", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || s.IndexOf("ShockWave", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                r.enabled = false;
+        }
+        foreach (var l in go.GetComponentsInChildren<Light>(true)) l.intensity *= LightDim;
+    }
+
+    /// <summary>
+    /// 색 곱 — 알파가 있으면 입자 시작 색에 곱하고(알파로 옅게도), 없으면 앞 사용이 남긴 색을 되돌린다.
+    /// 원래 색 기억 · 곱하기는 리치 재생기의 손질 표식(<see cref="RelicFairy.Monster.LichVfxScaleCache"/>)을 그대로 쓴다.
+    /// </summary>
+    private static void ApplyTint(GameObject go, Color tint)
+    {
+        if (tint.a > 0f)
+        {
+            if (!go.TryGetComponent<RelicFairy.Monster.LichVfxScaleCache>(out var cache))
+                cache = go.AddComponent<RelicFairy.Monster.LichVfxScaleCache>();
+            cache.Prepare(false);   // 반복 설정은 원래대로 · 처음이면 원래 색을 기억한다
+            cache.ApplyTint(tint);
+        }
+        else if (go.TryGetComponent<RelicFairy.Monster.LichVfxScaleCache>(out var used))
+        {
+            used.ApplyTint(Color.clear);
+        }
+    }
+
+    /// <summary>끌 자식(이름 목록, 쉼표) — 스폰마다 다시 꺼도 같다.</summary>
+    private static void Mute(Transform root, string names)
+    {
+        var all = root.GetComponentsInChildren<Transform>(true);
+        foreach (var raw in names.Split(','))
+        {
+            string n = raw.Trim();
+            if (n.Length == 0) continue;
+            for (int i = 0; i < all.Length; i++)
+                if (all[i] != root && all[i].name == n) all[i].gameObject.SetActive(false);
+        }
+    }
+
+    /// <summary>수명이 다했다 — 방출만 멈추고 남은 입자가 사그라든 뒤(<see cref="FadeTail"/>) 거둔다. 0.5초 수명 성역이 툭 끊겼다(V-7).</summary>
+    private static void BeginFade(VfxItem it)
+    {
+        it.fading  = true;
+        it.fadeEnd = it.age + FadeTail;
+        it.tf.GetComponentsInChildren(true, s_psBuf);
+        for (int i = 0; i < s_psBuf.Count; i++)
+            s_psBuf[i].Stop(false, ParticleSystemStopBehavior.StopEmitting);
+        s_psBuf.Clear();
+    }
+
+    private static void ResumeEmission(Transform root)
+    {
+        root.GetComponentsInChildren(true, s_psBuf);
+        for (int i = 0; i < s_psBuf.Count; i++) s_psBuf[i].Play(false);
+        s_psBuf.Clear();
+    }
+
+    /// <summary>
+    /// 재사용하면 그림이 달라지는 팩 스크립트가 든 프리팹인가(프리팹당 한 번 검사) — SSEP <c>DelayActive</c>는 Start에서 한 번 잰 시각으로
+    /// 둘째 사용부터 자식을 바로 켜고, <c>NewMaterialChange</c>는 켜진 시간이 쌓여 데칼을 흐리다 지운다(서약 출혈 BloodFlood, 10-11 톤 점검).
+    /// 풀의 재시작은 입자만 되감으므로 이런 것은 매번 새로 만들고 다 쓰면 지운다(<c>LichVfx.IsFreshOnly</c>와 같은 판단).
+    /// </summary>
+    private bool IsFreshOnly(GameObject prefab)
+    {
+        if (prefab == null) return false;
+        if (!_freshOnly.TryGetValue(prefab, out bool fresh))
+        {
+            fresh = prefab.GetComponentInChildren<global::NewMaterialChange>(true) != null
+                 || prefab.GetComponentInChildren<global::DelayActive>(true) != null;
+            _freshOnly[prefab] = fresh;
+        }
+        return fresh;
     }
 
     /// <summary>스스로 파괴된 인스턴스 — 장부(핸들 · 오라)에서만 빼고 풀에는 넣지 않는다.</summary>
@@ -359,6 +497,11 @@ public sealed class ElementVfxPlayer : MonoBehaviour
             it.auraKey = null;
         }
         it.follow = null;
+        if (IsFreshOnly(it.prefab))
+        {
+            if (it.go != null) Destroy(it.go);   // 팩 스크립트 상태가 남는 프리팹은 풀에 넣지 않는다
+            return;
+        }
         if (it.go != null) it.go.SetActive(false);
 
         if (!_pools.TryGetValue(it.prefab, out var stack))
@@ -477,5 +620,15 @@ public sealed class ElementVfxPlayer : MonoBehaviour
             ps.Play(true);
         }
         s_psBuf.Clear();
+    }
+
+    // ── 이벤트 ──────────────────────────────────────────
+    private void OnActiveSceneChanged(Scene from, Scene to)
+    {
+        for (int i = _active.Count - 1; i >= 0; i--)
+        {
+            if (_active[i].tf == null) DropDestroyedAt(i);
+            else ReleaseAt(i);
+        }
     }
 }

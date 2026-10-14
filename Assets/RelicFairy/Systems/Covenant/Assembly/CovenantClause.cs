@@ -18,6 +18,8 @@ public sealed class CovenantClause
 
     // 기폭이 대상 하나를 터뜨릴 때의 VFX 키(범위 폭발은 효과 id 그대로).
     private const string DetonateHitVfx = "detonate_hit";
+    private const string LastBreathSaveVfx = "lastbreath_save";   // 쓰러짐을 막은 순간(모을 때 「lastbreath」와 다른 그림 — 10-11 톤 2차)
+    private const string CurseSlotId    = "cov_curse";   // CovenantStatus.VulnerableSlotId와 같은 값(저주가 새로 걸리는지 볼 때만)
 
     private readonly ICovenantClauseHost       _host;
     private readonly string                    _effectId;     // 저장된 id 그대로(별칭이면 옛 id) — 연출 키
@@ -38,7 +40,7 @@ public sealed class CovenantClause
     // 효과 내부 쿨다운 — 값은 팔레트(EffectDef.icd)가 쥔다. 0이면 쿨다운 없음.
     private float _icdEnd;
 
-    // 「마지막 숨결」 남은 충전(치명 피해 생존 횟수). 생성 시 유효 횟수로 채운다.
+    // 「마지막 숨결」 모인 쓰러짐 막기. 빈 채로 시작해 원인이 터질 때마다 하나씩(상한 = 유효 횟수).
     private int _deathSaveCharges;
 
     // 「박차」 중첩 상태
@@ -71,8 +73,8 @@ public sealed class CovenantClause
         _causeTier  = causeTier;
         _posMult    = posMult;
 
-        if (_effect.kind == EffectKind.DeathSave)
-            _deathSaveCharges = EffCount;
+        // 「마지막 숨결」은 빈 채로 시작해 원인이 터질 때마다 하나씩 모은다(설계서 §1-2 「발동마다 충전 +1」).
+        // 예전엔 생성 때 충전을 가득 채워 원인이 아무 일도 하지 않았다 — 「연격 × 마지막 숨결」이 말이 안 되게 읽혔다(10-10 사용자).
     }
 
     // 티어·계수·스케일 모드가 모두 반영된 유효 수치 × 절 위치 배율. 미리보기 UI가 쓰는 것과 같은 함수다.
@@ -224,7 +226,8 @@ public sealed class CovenantClause
 
         _deathSaveCharges--;
         CovenantFxService.Play(_effectTier, _effectId, Vector3.zero);
-        if (Ctx?.Player != null) CovenantFxService.Burst(_effect.id, PlayerPos);
+        // 막은 순간 = 성역 방패(1초 무적과 같은 뜻). 모을 때(「lastbreath」)와 같은 레벨업 그림이라 두 뜻이 섞였다(10-11 톤 2차 V-7)
+        if (Ctx?.Player != null) CovenantFxService.Burst(LastBreathSaveVfx, PlayerPos);
         return true;
     }
 
@@ -295,9 +298,14 @@ public sealed class CovenantClause
                 return true;
             }
             case EffectKind.DamageBuff:
+            {
+                bool opened = !_buffActive;
                 _buffActive = true; _buffEnd = Time.time + _effect.duration;
-                if (Ctx?.Player != null) CovenantFxService.Attach(_effect.id, Ctx.Player.transform, _effect.duration);   // 격노 — 연출이 없었다(10-06)
+                // 격노 — 창이 새로 열릴 때만 한 번(세트 기본 수명). 남은 시간은 버프 칸이 보여 준다.
+                // 창 길이만큼 붙이면 2초 반복 몸 불꽃이 다시 터졌다(10-11 이펙트 톤 점검 · 연출 연결 10-06)
+                if (opened && Ctx?.Player != null) CovenantFxService.Attach(_effect.id, Ctx.Player.transform);
                 return true;
+            }
 
             case EffectKind.Shield:
                 if (Ctx.Player?.RuntimeStats == null) return false;
@@ -351,22 +359,27 @@ public sealed class CovenantClause
                 if (Ctx?.Player != null) CovenantFxService.Attach(_effect.id, Ctx.Player.transform, MomentumDuration);   // 박차 — 연출이 없었다(10-06)
                 return true;
 
-            // 「마지막 숨결」은 상시 대기하는 충전이라 원인 발동으로는 아무 일도 하지 않는다
-            // (원인 계수는 생성 시 충전 횟수로 이미 환산됐다).
+            // 「마지막 숨결」 — 원인이 터질 때마다 쓰러짐 막기를 하나 모은다(상한 = 원인 계수로 환산한 횟수).
+            // 가득 차 있으면 발동으로 치지 않는다(HUD 표식 · 「서약 발동」 글자가 헛돌지 않게).
             case EffectKind.DeathSave:
+                if (_deathSaveCharges >= EffCount) return false;
+                _deathSaveCharges++;
+                if (Ctx?.Player != null) CovenantFxService.Attach(_effect.id, Ctx.Player.transform);
+                return true;
+
             default:
                 return false;
         }
     }
 
-    /// <summary>티어 도파민 연출 — 루비만 VFX까지 얹는다.</summary>
+    /// <summary>
+    /// 티어 도파민 연출(정지 · 흔들림 · 펄스 · 소리). 루비에 얹던 VFX(Buff 7)는 뺐다 — 같은 순간 정지 · 방향 흔들림 · HUD 펄스 · 낮은 소리가
+    /// 이미 「루비」를 말한다(10-11 이펙트 톤 2차 V-7 · 기준 ①).
+    /// </summary>
     private void PlayTierFx(GameObject target)
     {
         Vector3 pos = target != null ? target.transform.position : PlayerPos;
-        Vector3 dir = pos - PlayerPos;
-
-        if (CovenantFxService.Play(_effectTier, _effectId, dir) && _effectTier == CovenantTier.Ruby)
-            CovenantFxService.Burst(CovenantFxService.RubyKey, pos);
+        CovenantFxService.Play(_effectTier, _effectId, pos - PlayerPos);
     }
 
     // ── 효과 헬퍼 ─────────────────────────────────────────
@@ -377,8 +390,11 @@ public sealed class CovenantClause
     {
         var mb = CovenantQuery.Live(target);
         if (mb == null) return false;
+        bool fresh = !mb.HasDamageTakenAmpSlot(CurseSlotId);
         CovenantStatus.Apply(target, StatusCurrency.Vulnerable, Eff, _effect.duration, Ctx?.Player?.gameObject);
-        CovenantFxService.Attach(_effect.id, mb.transform, _effect.duration);   // 저주가 걸린 동안 몸에 문양(10-06 — 연출이 없었다)
+        // 새로 걸릴 때만 몸에 문양 한 번(세트 기본 1.5초) — 남은 시간은 HP바 저주 아이콘이 보여 준다.
+        // 걸린 동안 내내 붙이면 4.2초마다 다시 번쩍여 새로 걸린 것처럼 보였다(10-11 이펙트 톤 점검 · 연출 연결 10-06)
+        if (fresh) CovenantFxService.Attach(_effect.id, mb.transform);
         Touch(mb);
         return true;
     }
@@ -514,7 +530,8 @@ public sealed class CovenantClause
         _wardReduction = Mathf.Min(Eff + CovenantMath.WardPerSteepedEnemy * steeped,
                                    CovenantMath.WardReductionCap);
         _wardEnd = Time.time + _effect.duration;
-        CovenantFxService.Attach(_effect.id, Ctx.Player.transform, _effect.duration);
+        // 켜질 때 한 번(세트 기본 수명) — 결계 길이만큼 붙이면 1초마다 다시 번쩍여 여러 번 막는 것처럼 보였다(10-11 이펙트 톤 점검)
+        CovenantFxService.Attach(_effect.id, Ctx.Player.transform);
         _place = PlayerPos;
         return true;
     }
@@ -584,11 +601,12 @@ public sealed class CovenantClause
         Vector3 at = mb.transform.position;
         float total = ConsumeDots(mb.gameObject, CovenantMath.DetonateFraction, asDamage: true);
         if (total <= 0f) return false;
-        CovenantFxService.Burst(DetonateHitVfx, at);
         Touch(mb);
         if (_touched.Count == 1) _place = at;
 
-        if (spread) SpreadBurst(mb, total * Eff);
+        // 파편 폭발이 터지면 그 폭발이 같은 자리 · 같은 프레임의 기폭 표시를 겸한다 — 두 겹으로 내지 않는다(10-11 이펙트 톤 점검)
+        bool spreadFx = spread && SpreadBurst(mb, total * Eff);
+        if (!spreadFx) CovenantFxService.Burst(DetonateHitVfx, at);
         return true;
     }
 
@@ -613,21 +631,22 @@ public sealed class CovenantClause
         return any;
     }
 
-    /// <summary>터뜨린 가치의 일부를 주변 적에게 파편 피해로 흩는다(기폭 원점 제외).</summary>
-    private void SpreadBurst(MonsterBase origin, float amount)
+    /// <summary>터뜨린 가치의 일부를 주변 적에게 파편 피해로 흩는다(기폭 원점 제외). 반환 = 파편 폭발을 냈는가.</summary>
+    private bool SpreadBurst(MonsterBase origin, float amount)
     {
-        if (amount <= 0f) return;
+        if (amount <= 0f) return false;
 
         float radius = CovenantMath.EffectiveRadius(_effect);
         Vector3 center = origin.transform.position;
         CovenantQuery.CollectLiveEnemies(center, radius, origin, _areaScratch);
-        if (_areaScratch.Count == 0) return;
+        if (_areaScratch.Count == 0) return false;
 
         CovenantFxService.Burst(_effect.id, center, radius);
         for (int i = 0; i < _areaScratch.Count; i++) Touch(_areaScratch[i]);   // 피해 전에 기록(「터진 적들」)
         for (int i = 0; i < _areaScratch.Count; i++)
             _areaScratch[i]?.TakeSynergyDamage(amount, Ctx.Player.gameObject, 1f, false, DamageKind.Synergy);
         _areaScratch.Clear();
+        return true;
     }
 
     /// <summary>

@@ -3,164 +3,242 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 정제소 등급 확률 막대 3단 — 의뢰서 R7.
+/// 등급 확률 막대 — 룬 선택 팝업 · 정제소 공용.
 ///
-/// Rare / Epic / Legendary 비율을 <b>길이로</b> 보여준다. 예전엔 "Rare 57% / Epic 33% ..." 텍스트라
-/// 피버가 쌓여 확률이 오르는 것이 눈에 안 들어왔다. 과열(다음 회 2배)이 걸리면 상위 두 줄이 눈에 띄게 늘어난다.
+/// 10-10 톤 v2(사용자 「확률 UI가 부실하다 — 얇고 간단하면서도 모던하고 깔끔하게」 · 「진행될수록 오르는 확률이 UI에도 반영」):
+///  · 머리 한 줄 — 왼쪽 「등급 확률」, 오른쪽 금빛으로 무엇이 등급을 올렸나(「Ch3 +2 · 해방기 +1 · 정예」, <see cref="SetBoost"/>).
+///  · 등급색 구간을 이어 붙인 얇은 누적 막대 한 줄 — 비율이 길이로 바로 읽힌다.
+///  · 아래 등급별 이름 + %. 제단에서 아직 안 연 등급은 흐리게 「잠김」. 과열(정제소 다음 1회 상위 2배)은 상위 두 등급을 금빛으로.
+/// 두 팝업 프리팹에 옛 막대 3줄(L · T · P)이 구워져 있다 — 처음 갱신 때 옛 자식을 걷고 그 자리(같은 크기)에 새로 짓는다.
+/// 10-11 v2(비교 리서치 C §2) — 넓은 판(정제소)만: 등급 이름 17 · % 24 · 머리 15(영문 이름 유지 · 크기만), 테는 1px 금 30%(눈금 없음).
+/// 좁은 판(룬 선택 236×78)은 예전 그대로다.
 /// </summary>
 public sealed class OddsBarView : MonoBehaviour
 {
-    private const int Tiers = 3;                 // 0=Rare 1=Epic 2=Legendary
-    private const float TopPad = 12f;            // 완성본엔 제목이 없다 — 막대 3줄이 패널을 채운다
-    private const float RowGap = 6f;
-    private const float LabelW = 74f;
-    private const float PctW   = 46f;
+    // ── Constants ──
+    private const int   Tiers   = 4;   // 0=Common 1=Rare 2=Epic 3=Legendary
+    private const float PadX    = 12f;
+    private const float SegGap  = 1f;  // 구간 사이 틈 — 바탕이 비쳐 칸이 갈린다
 
     private static readonly ItemRarity[] TierRarity =
-        { ItemRarity.Rare, ItemRarity.Epic, ItemRarity.Legendary };
-    private static readonly string[] TierName = { "Rare", "Epic", "Legend" };
-    private static readonly Color TrackColor = new(0.09f, 0.09f, 0.12f, 1f);
+        { ItemRarity.Common, ItemRarity.Rare, ItemRarity.Epic, ItemRarity.Legendary };
+    private static readonly string[] TierName = { "Common", "Rare", "Epic", "Legend" };   // 룬 팝업 막대는 칸이 53px — 「Legendary」는 넘친다(카드 · 상점은 Legendary)
+    private static readonly Color TrackColor = new(0.03f, 0.03f, 0.05f, 0.67f);
 
-    [SerializeField] private RectTransform[] _fillRT;
-    [SerializeField] private Image[]   _fillImg;
-    [SerializeField] private TMP_Text[] _pct;
-    // 막대 폭은 Create에서 한 번 계산된다 — 직렬화하지 않으면 구운 프리팹에서 0으로
-    // 되살아나 모든 확률 막대가 폭 0이 된다(막대가 아예 안 보인다).
-    [SerializeField] private float _trackW;
+    // ── Private ──
+    private bool _built;
+    private bool _showCommon;
+    private string _boost = string.Empty;
+    private readonly float[] _p = new float[Tiers];
+    private bool _heated;
+    private float _padX = PadX;   // 넓은 판은 창 맞춤 배율만큼 커진다(LayoutColumns도 같은 값)
+
+    private RectTransform _track;
+    private readonly Image[]    _seg  = new Image[Tiers];
+    private readonly TMP_Text[] _name = new TMP_Text[Tiers];
+    private readonly TMP_Text[] _pct  = new TMP_Text[Tiers];
+    private readonly RectTransform[] _col = new RectTransform[Tiers];
+    private TMP_Text _boostText;
+
+    // ── Properties ──
+    /// <summary>Common 칸도 보이는가 — 룬 선택(방 보상은 Common부터)은 켜고, 정제소(Rare부터)는 끈다.</summary>
+    public bool ShowCommon
+    {
+        get => _showCommon;
+        set { if (_showCommon == value) return; _showCommon = value; if (_built) { LayoutColumns(); Apply(); } }
+    }
+
+    /// <summary>
+    /// 창 맞춤 배율 — 판이 비율 앵커로 창을 따라 커졌으면(정제소 ×1.2 안팎) 넓은 판의 글자 · 간격도 같은 배율로 짓는다.
+    /// 처음 지을 때(첫 <see cref="SetOdds"/>)만 쓴다. 좁은 판(룬 선택)은 쓰지 않는다.
+    /// </summary>
+    public float LayoutScale { get; set; } = 1f;
+
+    // ── Public Methods ──
 
     public static OddsBarView Create(Transform parent, Vector2 anchorMin, Vector2 anchorMax,
                                      Vector2 pivot, Vector2 pos, Vector2 size)
     {
-        var skin = UISkin.Refinery;
-
-        var frame = ShopUIStyle.MakeFrame(parent, "OddsBar",
-            ShopUIStyle.CardBorder, ShopUIStyle.CardFill, 2f);
-        var rootRT = (RectTransform)frame.transform.parent;
-        ShopUIStyle.Anchor(rootRT, anchorMin, anchorMax, pivot, pos, size);
-        // 확률막대 바탕 — 패널 전체 배경 아트
-        if (rootRT.TryGetComponent<Image>(out var oddsBg))
-            ShopUIStyle.Skin(oddsBg, skin != null ? skin.oddsPanel : null, sliced: true);
-
-        // 바탕 아트는 바깥 프레임에 깔린다 — 안쪽 채움을 비워야 아트가 가려지지 않는다.
-        if (oddsBg != null && oddsBg.sprite != null) frame.color = Color.clear;
-
-        var view = rootRT.gameObject.AddComponent<OddsBarView>();
-        var inner = frame.transform;
-
-        float padX  = 14f;
-        float rowH  = Mathf.Max(16f, (size.y - TopPad * 2f - RowGap * (Tiers - 1)) / Tiers);
-        view._trackW = size.x - padX * 2f - LabelW - PctW;
-
-        view._fillRT  = new RectTransform[Tiers];
-        view._fillImg = new Image[Tiers];
-        view._pct     = new TMP_Text[Tiers];
-
-        for (int i = 0; i < Tiers; i++)
-        {
-            float y = -(TopPad + i * (rowH + RowGap));
-            var rar = TierRarity[i];
-
-            var lbl = ShopUIStyle.MakeText(inner, $"L{i}", 16f, FontStyles.Bold,
-                TextAlignmentOptions.Left, ShopUIStyle.Rarity(rar));   // 글로우색(알파 0.26~0.42)은 글자로 못 쓴다 — 정색
-            // 글상자는 행보다 6px 높게(창 배율 뒤 16px 줄높이 ≈ 20.6이 rowH 16에 안 들어가 15로 줄었다). 중심은 막대와 같다.
-            ShopUIStyle.Anchor(lbl.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(padX, y + 3f), new Vector2(LabelW, rowH + 6f));
-            lbl.text = TierName[i];
-
-            var track = ShopUIStyle.MakeImage(inner, $"T{i}", TrackColor);
-            ShopUIStyle.Anchor(track.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(padX + LabelW, y - 2f), new Vector2(view._trackW, rowH - 6f));
-            ShopUIStyle.Skin(track, skin != null ? skin.barTrack : null, sliced: true);
-
-            // 채움 — 좌측 기준으로 폭만 바꾼다(스케일 X, 아트가 늘어나지 않게).
-            var fill = ShopUIStyle.MakeImage(track.transform, "Fill", ShopUIStyle.RarityGlow(rar));
-            ShopUIStyle.Anchor(fill.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f),
-                Vector2.zero, new Vector2(0f, 0f));
-            view._fillRT[i]  = fill.rectTransform;
-            view._fillImg[i] = fill;
-
-            // 확률 막대 테두리 — 채움 위에 얹는 칸별 프레임(테두리가 항상 보이게)
-            if (skin != null && skin.barFrame != null)
-            {
-                var bf = ShopUIStyle.MakeImage(track.transform, "BarFrame", Color.white);
-                ShopUIStyle.Stretch(bf.rectTransform);
-                bf.raycastTarget = false;
-                ShopUIStyle.Skin(bf, skin.barFrame, sliced: true);
-            }
-
-            var pct = ShopUIStyle.MakeText(inner, $"P{i}", 16f, FontStyles.Bold,
-                TextAlignmentOptions.Right, ShopUIStyle.TextPrimary);
-            ShopUIStyle.Anchor(pct.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(padX + LabelW + view._trackW, y + 3f), new Vector2(PctW, rowH + 6f));
-            view._pct[i] = pct;
-        }
-
+        var root = ShopUIStyle.MakeImage(parent, "OddsBar", UITheme.Thin.GlassFill).rectTransform;
+        ShopUIStyle.Anchor(root, anchorMin, anchorMax, pivot, pos, size);
+        var view = root.gameObject.AddComponent<OddsBarView>();
         view.SetOdds(1f, 0f, 0f, heated: false);
         return view;
     }
 
-    // ── Public Methods ──
-
-    /// <summary>확률 갱신. heated=과열(다음 1회 상위 등급 2배)이면 상위 두 줄을 강조한다.</summary>
+    /// <summary>확률 갱신(0~1, Common = 나머지). heated = 과열(다음 1회 상위 등급 2배)이면 상위 두 등급을 금빛으로.</summary>
     public void SetOdds(float rare, float epic, float legendary, bool heated)
     {
-        var skin = UISkin.Refinery;
-        float[] v = { rare, epic, legendary };
+        _p[1] = Mathf.Clamp01(rare);
+        _p[2] = Mathf.Clamp01(epic);
+        _p[3] = Mathf.Clamp01(legendary);
+        _p[0] = Mathf.Clamp01(1f - _p[1] - _p[2] - _p[3]);
+        _heated = heated;
+        EnsureBuilt();
+        Apply();
+    }
+
+    /// <summary>머리 오른쪽 한 줄 — 등급을 올린 것(챕터 · 시기 · 정예). 빈 문자열이면 비운다.</summary>
+    public void SetBoost(string text)
+    {
+        _boost = text ?? string.Empty;
+        if (_boostText != null) _boostText.text = _boost;
+    }
+
+    // ── Private Methods ──
+
+    /// <summary>한 번 — 옛(구운) 자식을 걷고 얇은 막대를 짓는다. 크기는 지금 자리 그대로.</summary>
+    private void EnsureBuilt()
+    {
+        if (_built) return;
+        _built = true;
+
+        var root = (RectTransform)transform;
+        for (int i = root.childCount - 1; i >= 0; i--) Destroy(root.GetChild(i).gameObject);
+        if (TryGetComponent<Image>(out var bg))
+        {
+            bg.sprite = null;
+            bg.type   = Image.Type.Simple;
+            bg.color  = UITheme.Thin.GlassFill;
+        }
+        var size  = root.rect.size;
+        bool roomy = size.y >= 110f;   // 정제소(150) · 룬 선택(78)
+        // 넓은 판(정제소) 테는 1px 금 30% 한 겹(10-11 v2) — 회색 선 + 노란 꺾쇠가 확률판을 장식처럼 보이게 했다.
+        UIThinBox.Create(root, "ThinFrame", Vector2.zero, Vector2.one, 0f,
+                         roomy ? UITheme.Thin.LineGold : UITheme.Thin.InkA(0.30f),
+                         roomy ? Color.clear : UITheme.Thin.WithA(UITheme.Thin.Gold, 0.7f), Color.clear);
+
+        // 넓은 판은 창 맞춤 배율(s)을 글자 · 간격에 곱한다 — 판만 커지고 글자는 1배라 「Rare」가 화면에서 가장 작은 글(잉크 9.8)이었다.
+        float s = roomy ? Mathf.Max(1f, LayoutScale) : 1f;
+        _padX = PadX * s;
+        // 좁은 자리(룬 선택 236×78)는 간격을 줄이고 숫자를 키운다 — 10-10 실측 사진에서 % 글자가 작았다.
+        float titleY = (roomy ? 14f : 6f) * s, titleH = (roomy ? 20f : 16f) * s;
+        float barY   = titleY + titleH + (roomy ? 12f : 5f) * s, barH = (roomy ? 8f : 7f) * s;
+        float colY   = barY + barH + (roomy ? 14f : 5f) * s;
+        float nameH  = (roomy ? 22f : 14f) * s, pctH = (roomy ? 32f : 22f) * s;
+
+        var title = Text(root, "Title", roomy ? 15f * s : 13f, UITheme.Thin.InkA(0.7f), TextAlignmentOptions.MidlineLeft);
+        PlaceTop(title.rectTransform, _padX, titleY, size.x * 0.45f, titleH);
+        title.text = "등급 확률";
+
+        _boostText = Text(root, "Boost", roomy ? 15f * s : 12f, UITheme.Thin.Gold, TextAlignmentOptions.MidlineRight);
+        PlaceTop(_boostText.rectTransform, size.x * 0.40f, titleY, size.x * 0.60f - _padX, titleH);
+        _boostText.text = _boost;
+
+        _track = ShopUIStyle.MakeImage(root, "Track", TrackColor).rectTransform;
+        PlaceTop(_track, _padX, barY, size.x - _padX * 2f, barH);
+        for (int i = 0; i < Tiers; i++)
+        {
+            _seg[i] = ShopUIStyle.MakeImage(_track, $"Seg{i}", ShopUIStyle.Rarity(TierRarity[i]));
+            _seg[i].raycastTarget = false;
+        }
 
         for (int i = 0; i < Tiers; i++)
         {
-            float p = Mathf.Clamp01(v[i]);
+            var col = ShopUIStyle.MakeRect(root, $"Col{i}").GetComponent<RectTransform>();
+            col.anchorMin = col.anchorMax = new Vector2(0f, 1f);
+            col.pivot     = new Vector2(0f, 1f);
+            col.sizeDelta = new Vector2(0f, nameH + pctH);
+            col.anchoredPosition = new Vector2(0f, -colY);
+            _col[i] = col;
 
-            var sprite = skin != null ? skin.BarFill(i, heated) : null;
-
-            var f = _fillRT[i];
-            if (f != null)
-            {
-                // 앵커를 매번 좌측 기준으로 되돌린다 — 비율 앵커로 구워지면 sizeDelta가
-                // '더해지는 값'이 되어 폭 계산이 통째로 무너진다(굳은 비율 + 준 폭).
-                f.anchorMin        = new Vector2(0f, 0f);
-                f.anchorMax        = new Vector2(sprite != null ? 1f : 0f, 1f);
-                f.pivot            = new Vector2(0f, 0.5f);
-                f.anchoredPosition = Vector2.zero;
-
-                if (sprite != null)
-                {
-                    // 아트가 있으면 폭은 트랙에 꽉 채우고 잘라내기는 fillAmount가 한다.
-                    // 폭 자체를 줄이면 막대 아트가 가로로 눌린다(30%에서 1.78배 왜곡).
-                    f.sizeDelta = Vector2.zero;
-                }
-                else
-                {
-                    // 폴백(단색)은 잘라낼 무늬가 없으니 예전처럼 폭으로 표현한다.
-                    // 트랙은 매번 실측한다 — 베이크 상수만 믿으면 창이 커졌을 때 100%가 다 못 찬다.
-                    float trackW = f.parent is RectTransform tr && tr.rect.width > 1f
-                                 ? tr.rect.width : _trackW;
-                    f.sizeDelta = new Vector2(trackW * p, 0f);
-                }
-            }
-
-            if (_fillImg[i] != null)
-            {
-                if (sprite != null)
-                {
-                    ShopUIStyle.Skin(_fillImg[i], sprite, sliced: true);
-                    _fillImg[i].type       = Image.Type.Filled;
-                    _fillImg[i].fillMethod = Image.FillMethod.Horizontal;
-                    _fillImg[i].fillOrigin = (int)Image.OriginHorizontal.Left;
-                    _fillImg[i].fillAmount = p;
-                }
-                else
-                {
-                    // 폴백: 등급색. 과열이면 상위 두 줄만 밝게 띄워 "지금 유리하다"를 알린다.
-                    var c = ShopUIStyle.RarityGlow(TierRarity[i]);
-                    _fillImg[i].sprite = null;
-                    _fillImg[i].type   = Image.Type.Simple;   // 아트가 있다 없어지면 Filled가 남는다
-                    _fillImg[i].color  = (heated && i > 0) ? Color.Lerp(c, Color.white, 0.35f) : c;
-                }
-            }
-
-            if (_pct[i] != null)
-                _pct[i].text = $"{Mathf.RoundToInt(p * 100f)}%";
+            _name[i] = Text(col, "Name", roomy ? 17f * s : 13f, ShopUIStyle.Rarity(TierRarity[i]), TextAlignmentOptions.BottomLeft);
+            Stretch(_name[i].rectTransform, 1f - nameH / (nameH + pctH), 1f);
+            _name[i].text = TierName[i];
+            _pct[i] = Text(col, "Pct", roomy ? 24f * s : 20f, UITheme.Thin.Ink, TextAlignmentOptions.TopLeft);
+            Stretch(_pct[i].rectTransform, 0f, 1f - nameH / (nameH + pctH));
         }
+        LayoutColumns();
+    }
+
+    /// <summary>보이는 등급 수에 맞춰 칸을 고르게 나눈다(Common을 끄면 3칸).</summary>
+    private void LayoutColumns()
+    {
+        var root = (RectTransform)transform;
+        int first = _showCommon ? 0 : 1, n = Tiers - first;
+        float w = (root.rect.width - _padX * 2f) / n;
+        for (int i = 0; i < Tiers; i++)
+        {
+            if (_col[i] == null) continue;
+            bool on = i >= first;
+            _col[i].gameObject.SetActive(on);
+            if (!on) continue;
+            _col[i].sizeDelta        = new Vector2(w, _col[i].sizeDelta.y);
+            _col[i].anchoredPosition = new Vector2(_padX + (i - first) * w, _col[i].anchoredPosition.y);
+        }
+    }
+
+    private void Apply()
+    {
+        if (_track == null) return;
+        bool epicLocked = !MemoryAltarService.IsEpicUnlocked;
+        bool legLocked  = !MemoryAltarService.IsLegendaryUnlocked;
+
+        int first = _showCommon ? 0 : 1;
+        float shown = 0f;
+        for (int i = first; i < Tiers; i++) shown += _p[i];
+        if (shown <= 0f) shown = 1f;
+
+        float x = 0f;
+        for (int i = 0; i < Tiers; i++)
+        {
+            bool on = i >= first && _p[i] > 0f;
+            float f = on ? _p[i] / shown : 0f;
+            var rt = _seg[i].rectTransform;
+            rt.anchorMin = new Vector2(x, 0f);
+            rt.anchorMax = new Vector2(x + f, 1f);
+            rt.offsetMin = new Vector2(x > 0f ? SegGap : 0f, 0f);
+            rt.offsetMax = Vector2.zero;
+            _seg[i].enabled = on;
+            var c = ShopUIStyle.Rarity(TierRarity[i]);
+            _seg[i].color = _heated && i >= 2 ? Color.Lerp(c, UITheme.Thin.Gold, 0.35f) : c;
+            x += f;
+
+            bool locked = (i == 2 && epicLocked) || (i == 3 && legLocked);
+            if (_name[i] != null)
+                _name[i].color = locked ? UITheme.Thin.InkA(0.35f) : ShopUIStyle.Rarity(TierRarity[i]);
+            if (_pct[i] != null)
+            {
+                _pct[i].text  = locked ? "잠김" : Percent(_p[i]);
+                _pct[i].color = locked ? UITheme.Thin.InkA(0.35f)
+                              : _heated && i >= 2 ? UITheme.Thin.Gold
+                              : UITheme.Thin.Ink;
+            }
+        }
+    }
+
+    /// <summary>정수 %, 0보다 크고 1% 미만이면 「&lt;1%」.</summary>
+    private static string Percent(float p)
+    {
+        if (p <= 0f) return "0%";
+        int v = Mathf.RoundToInt(p * 100f);
+        return v < 1 ? "<1%" : v + "%";
+    }
+
+    private static TMP_Text Text(Transform parent, string name, float size, Color color, TextAlignmentOptions align)
+    {
+        var t = ShopUIStyle.MakeText(parent, name, size, FontStyles.Normal, align, color);
+        UITheme.StyleThinText(t, UIWeight.Medium, size, color, shadow: true);
+        t.alignment        = align;
+        t.textWrappingMode = TextWrappingModes.NoWrap;
+        t.overflowMode     = TextOverflowModes.Overflow;
+        t.raycastTarget    = false;
+        return t;
+    }
+
+    /// <summary>위에서 y만큼 내려온 자리(왼쪽 위 기준).</summary>
+    private static void PlaceTop(RectTransform rt, float x, float y, float w, float h)
+    {
+        rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
+        rt.pivot            = new Vector2(0f, 1f);
+        rt.anchoredPosition = new Vector2(x, -y);
+        rt.sizeDelta        = new Vector2(w, h);
+    }
+
+    private static void Stretch(RectTransform rt, float yMin, float yMax)
+    {
+        rt.anchorMin = new Vector2(0f, yMin);
+        rt.anchorMax = new Vector2(1f, yMax);
+        rt.offsetMin = rt.offsetMax = Vector2.zero;
     }
 }

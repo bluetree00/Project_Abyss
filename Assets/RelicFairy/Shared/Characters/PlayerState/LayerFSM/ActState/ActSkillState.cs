@@ -24,6 +24,8 @@ public class ActSkillState : ActSkillStateBase
 
     protected override SkillType Slot => _slot;
 
+    protected override string StartSoundEvent => GetSkillSO()?.behavior?.StartSoundEvent ?? SoundEvent.PlayerSkill;
+
     protected override float GetCooldown()
     {
         float charCd = _controller.GetCharacterSkillCooldown(_slot);
@@ -38,8 +40,11 @@ public class ActSkillState : ActSkillStateBase
 
         _execution = new AbilityExecution();
         _controller.ActiveExecution = _execution;
-        _controller.RotateTowardsMousePosition();
+        // 장비 스킬(E · R)은 조준 보조(A1) — 유물 Q는 각자 겨눈다
+        if (_slot == SkillType.Q) _controller.RotateTowardsMousePosition();
+        else                      _controller.RotateTowardsSkillAim();
         _controller.SetMoveScale(0f);
+        _controller.SkillRecovering = false;
         _ended = false;
 
         // 스킬 진입 시 잔여 공격 입력 제거
@@ -54,6 +59,15 @@ public class ActSkillState : ActSkillStateBase
             ActionType = _actionType,
             RequestEnd = () => _ended = true,
         };
+
+        if (_slot != SkillType.Q) SkillTierCue.OnUse(_controller, _ctx.WeaponData, _slot, GetSkillSO());   // 단계가 오른 뒤 첫 사용 1회(10-12 S6)
+
+        // 시전 스탠스(A4 · 결정 S3 경직 면역만): 시전 ~ 후딜 전까지 맞아도 끊기지 않는다. 피해 감소는 없다(유물 Q와 차이).
+        // 유물 Q는 자기 스탠스(랜슬롯 피해 30% 감소)를 켜므로 여기서 먼저 잡지 않는다.
+        if (_slot != SkillType.Q) _controller.BeginStance(_ctx, 0f);
+
+        // 근접 장비 스킬 동안 칼날 트레일(A7) — 후딜 진입(EnterRecovery) · 종료에서 끈다
+        if (_slot != SkillType.Q && !SkillTierResolver.IsRanged(_ctx.WeaponData)) _controller.TrailVfx?.BeginSkillTrail();
 
         // 캐릭터 고유 스킬 우선 확인
         var charRuntime = _controller.CreateCharacterSkillRuntime(_slot);
@@ -102,6 +116,9 @@ public class ActSkillState : ActSkillStateBase
 
     protected override void OnExit()
     {
+        if (_ctx != null) _controller.EndStance(_ctx);
+        _controller.SkillRecovering = false;
+        if (_slot != SkillType.Q) _controller.TrailVfx?.EndSkillTrail();
         _runtime?.OnExit(_ctx);
         _runtime = null;
         _ctx = null;

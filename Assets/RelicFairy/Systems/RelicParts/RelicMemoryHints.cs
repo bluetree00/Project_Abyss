@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using RelicFairy.UI;
 
@@ -11,6 +11,10 @@ public static class RelicMemoryHints
 {
     private const string Prefix = "seen.rm.";
     private static readonly HashSet<string> s_checked = new();   // 이번 실행에서 이미 본 키 — 기록 조회를 되풀이하지 않는다
+
+    /// <summary>슬롯 메타를 다시 읽으면(슬롯 전환 · 새 게임) 「이번 실행에서 본 것」도 버린다 — 같은 실행에서 새 게임을 하면
+    /// 첫 경험 자막이 안 나왔다(10-09 출시 점검).</summary>
+    public static void ForgetSession() => s_checked.Clear();
 
     /// <summary>그 조각을 처음 겪는 순간이면 자막 한 줄을 띄우고 기록한다.</summary>
     public static void TryShowOnce(string partId)

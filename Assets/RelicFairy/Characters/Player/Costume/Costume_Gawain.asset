@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6770d494f612c84d91f103f80910880, type: 3}
+  m_Name: Costume_Gawain
+  m_EditorClassIdentifier: Assembly-CSharp::RelicCostumeSO
+  squireMaterial: {fileID: 2100000, guid: 7e77fd263943da64da63caf3e235e480, type: 2}
+  armorMaterial: {fileID: 2100000, guid: fa5332508f8ac4943b27ab70f82d0a38, type: 2}
+  hairMaterial: {fileID: 0}

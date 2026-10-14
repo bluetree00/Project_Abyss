@@ -11,9 +11,15 @@ using UnityEngine;
 /// </summary>
 public sealed class QuestTrackerEntry : MonoBehaviour
 {
+    // 톤 v2(10-11) — 프리팹 글꼴이 Noto 가변(Thin 마스터로 구워져 작은 글자가 끊긴다) 22 / 16이었다 →
+    // 퀘스트 이름 Noto Medium 20 · 진행 Regular 17. 판 없이 3D 위에 뜨므로 부드러운 그림자. 색: 이름 잉크 · 완료 금(지금 일어남) · 실패 빨강.
+    private const float TitleFontSize    = UITheme.Thin.Lead;   // 20
+    private const float ProgressFontSize = UITheme.Thin.Body;   // 17
     private static readonly StringBuilder Sb = new StringBuilder(64);
-    private static readonly Color ClearColor = new Color(1f, 0.85f, 0.3f, 1f);
-    private static readonly Color FailColor  = new Color(1f, 0.4f, 0.4f, 1f);
+    private static readonly Color TitleInk    = UITheme.Thin.Ink;
+    private static readonly Color ProgressInk = UITheme.Thin.InkA(0.78f);
+    private static readonly Color ClearColor  = UITheme.Thin.Gold;
+    private static readonly Color FailColor   = UITheme.Thin.Danger;
 
     [SerializeField] private CanvasGroup canvasGroup;
     [SerializeField] private TMP_Text titleText;
@@ -25,7 +31,6 @@ public sealed class QuestTrackerEntry : MonoBehaviour
     [SerializeField] private float fadeOutDuration   = 0.35f;
 
     private Quest _quest;
-    private Color _titleBaseColor = Color.white;
     private string _baseProgress = string.Empty;
     private int _lastShownSec = -1;
 
@@ -37,8 +42,6 @@ public sealed class QuestTrackerEntry : MonoBehaviour
             canvasGroup = GetComponent<CanvasGroup>();
         if (canvasGroup == null)
             canvasGroup = gameObject.AddComponent<CanvasGroup>();
-        if (titleText != null)
-            _titleBaseColor = titleText.color;
     }
 
     private void Update()
@@ -68,6 +71,9 @@ public sealed class QuestTrackerEntry : MonoBehaviour
         _quest.onNewTaskGroup       += HandleNewTaskGroup;
 
         _lastShownSec = -1;
+        // 묶을 때마다 바른다 — 템플릿은 앱 부트 때 생겨 Awake엔 톤 v2 글꼴(Addressables)이 아직 없다.
+        UITheme.StyleThinText(titleText, UIWeight.Medium, TitleFontSize, TitleInk, shadow: true);
+        UITheme.StyleThinText(progressText, UIWeight.Regular, ProgressFontSize, ProgressInk, shadow: true);
         ResetVisual();
         Refresh();
     }
@@ -84,7 +90,7 @@ public sealed class QuestTrackerEntry : MonoBehaviour
     /// <summary>알파 0 + 기본 색으로 초기화(페이드 인 전 상태).</summary>
     public void ResetVisual()
     {
-        if (titleText != null) titleText.color = _titleBaseColor;
+        if (titleText != null) titleText.color = TitleInk;
         if (canvasGroup != null) canvasGroup.alpha = 0f;
     }
 

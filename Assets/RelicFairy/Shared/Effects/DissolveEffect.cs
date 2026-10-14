@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
@@ -24,10 +24,15 @@ public static class DissolveEffect
     // 텍스처 이름도 제각각이다. 이 프로젝트 석재·목재는 커스텀 ShaderGraph라 URP 표준 _BaseMap을 안 쓴다
     // (Gothic_Interior=_BaseColorMap, Leartes S_Masking=_Base). _BaseMap만 보면 복사가 실패해
     // 텍스처 없는 단색 몸체 + 시안 엣지로 디졸브된다 — "청록색으로 깨져 보이는" 증상의 다른 축.
+    // Gothic_Interior 셰이더그래프(S_OpaqueORM · WorldAlign · TransparentORM)의 「Material 01 Base Map」 = Texture2D_2A1A8040 —
+    // 없으면 Ch2 · Ch3 방 벽이 조립 디졸브 동안 무늬 없는 흰 판이 됐다(10-09 전주기 시뮬).
     private static readonly string[] FallbackTextureProps =
-        { "_BaseColorMap", "_MainTex", "_Base", "_Albedo", "_AlbedoMap" };
+        { "_BaseColorMap", "_MainTex", "_Base", "_Albedo", "_AlbedoMap", "Texture2D_2A1A8040" };
 
     private const float EdgeFadePortion = 0.25f;
+    private const float OutClaimWaitSeconds = 1.5f;   // 퇴장이 등장 디졸브 끝을 기다리는 최대 시간(10-12 디졸브 원칙)
+    private const float OutSettleSeconds    = 0.5f;   // 퇴장 뒤 호출부가 숨기거나 파괴하기를 기다리는 시간
+    private const int   RevertWaitFrames    = 10;     // 등장이 되돌린 퇴장의 점유 해제를 기다리는 최대 프레임
     private const float MaxEdgeWidth    = 0.12f;
 
     // PR4: MPB 전환은 ShaderGraph+SRP Batcher 런타임 시각 검증이 이 환경에서 불가하여 보류.
@@ -46,6 +51,8 @@ public static class DissolveEffect
     {
         _matPool.Clear();
         _dissolving.Clear();
+        s_pendingOriginals.Clear();
+        s_outs.Clear();
     }
 
     // ─────────────────── 공개 API ───────────────────
@@ -173,6 +180,11 @@ public static class DissolveEffect
                 return;
             }
 
+            // 같은 대상의 퇴장이 돌고 있으면 되돌리고(원본 복원 · 완료 콜백 없음) 점유가 풀리길 잠깐 기다린다(10-12 디졸브 원칙)
+            if (CancelDisappear(target))
+                for (int f = 0; f < RevertWaitFrames && AnyClaimed(renderers); f++)
+                    await UniTask.Yield(ct);
+
             // 중첩/재진입 차단 — 같은 렌더러가 두 디졸브에 동시에 걸리면 뒤늦은 쪽이 "원본"으로
             // 앞선 쪽의 디졸브 머티리얼을 캡처해 복원이 오염된다(→ 풀 재사용 시 마젠타).
             // 부모(아레나·필드구조물·타일)와 자식(보스)처럼 계층이 겹치는 경우까지 잡으려면
@@ -253,7 +265,36 @@ public static class DissolveEffect
     /// </summary>
     public static Func<Renderer, Material[]> OriginalMaterialsResolver;
 
-    private static Material[] CaptureOriginals(Renderer r) => OriginalMaterialsResolver?.Invoke(r) ?? r.sharedMaterials;
+    // 사라진 채 남겨 둔 물체의 진짜 원본 — 다음 등장이 투명한 임시 재질을 원본으로 잡지 않게(10-12 디졸브 원칙)
+    private static readonly Dictionary<int, Material[]> s_pendingOriginals = new();
+
+    // 진행 중인 퇴장(대상 GameObject → 손잡이) — 같은 대상에 등장이 오면 되돌린다
+    private sealed class OutHandle { public CancellationTokenSource Cts; public bool Reverted; }
+    private static readonly Dictionary<int, OutHandle> s_outs = new();
+
+    private static Material[] CaptureOriginals(Renderer r)
+    {
+        if (s_pendingOriginals.Remove(r.GetInstanceID(), out var pending)) return pending;
+        return OriginalMaterialsResolver?.Invoke(r) ?? r.sharedMaterials;
+    }
+
+    /// <summary>
+    /// 이 대상에 도는 퇴장 디졸브를 되돌린다 — 원본 재질 복원 · 점유 해제 · 완료 콜백은 부르지 않는다(퇴장 도중 다시 꺼낸 무기 등, 10-12 디졸브 원칙).
+    /// 등장(PlayAppear)은 스스로 부르므로 보통은 부를 일이 없다. 되돌린 퇴장이 있었으면 true.
+    /// </summary>
+    public static bool CancelDisappear(GameObject target)
+    {
+        if (target == null || !s_outs.TryGetValue(target.GetInstanceID(), out var h)) return false;
+        h.Reverted = true;
+        h.Cts.Cancel();
+        return true;
+    }
+
+    private static bool AnyClaimed(Renderer[] renderers)
+    {
+        foreach (var r in renderers) if (r != null && _dissolving.Contains(r.GetInstanceID())) return true;
+        return false;
+    }
 
     /// <summary>
     /// 이 렌더러가 지금 디졸브 중인가(임시 재질을 물고 있다). 다른 시스템이 이 순간의 재질을 「원본」으로 기억하면 안 된다 —
@@ -291,7 +332,16 @@ public static class DissolveEffect
     private static async UniTask DissolveOutAsync(
         GameObject target, float duration, CancellationToken ct, Action onComplete)
     {
+        if (target == null) { onComplete?.Invoke(); return; }
+        int key = target.GetInstanceID();
+        var handle = new OutHandle { Cts = CancellationTokenSource.CreateLinkedTokenSource(ct) };
+        s_outs[key] = handle;
+        ct = handle.Cts.Token;
+
         List<Material> instances = null;
+        Renderer[]     renderers = null;
+        Material[][]   origMats  = null;
+        List<int>      claimed   = null;
         try
         {
             var mat = await Managers.AddressableManager.TryLoadAssetAsync<Material>(MaterialKey);
@@ -304,8 +354,22 @@ public static class DissolveEffect
             }
 
             if (target == null) return;
-            var renderers = CollectDissolveRenderers(target);
+            renderers = CollectDissolveRenderers(target);
             if (renderers.Length == 0) { onComplete?.Invoke(); return; }
+
+            // 점유 — 등장 디졸브가 아직 돌고 있으면 끝날 때까지 기다린다. 겹치면 등장이 끝나며 원본을 덮어써
+            // 퇴장 도중 툭 돌아왔다(10-12 디졸브 원칙 · 리치 봉인석 · 봉인 조각 · 새끼 용 ForceKill). 너무 오래면 디졸브 없이 넘긴다.
+            float waitUntil = Time.realtimeSinceStartup + OutClaimWaitSeconds;
+            while (!TryClaimRenderers(renderers, out claimed))
+            {
+                if (Time.realtimeSinceStartup >= waitUntil) { renderers = null; onComplete?.Invoke(); return; }
+                await UniTask.Yield(ct);
+                if (target == null) return;
+            }
+
+            origMats = new Material[renderers.Length][];
+            for (int i = 0; i < renderers.Length; i++)
+                origMats[i] = renderers[i] != null ? CaptureOriginals(renderers[i]) : null;
 
             instances = ReplaceMaterials(renderers, mat, new Color(0f, 2.4f, 3f, 1f), pooled: false);
             SetDissolveValue(instances, 0f);
@@ -325,10 +389,60 @@ public static class DissolveEffect
         catch (OperationCanceledException) { }
         finally
         {
-            if (instances != null)
-                foreach (var m in instances)
-                    if (m != null) UnityEngine.Object.Destroy(m);
+            if (s_outs.TryGetValue(key, out var cur) && cur == handle) s_outs.Remove(key);
+            if (handle.Reverted)
+            {
+                // 등장이 되돌렸다 — 바로 원본으로(완료 콜백은 부르지 않았다)
+                if (target != null && renderers != null && origMats != null)
+                    for (int i = 0; i < renderers.Length && i < origMats.Length; i++)
+                        if (renderers[i] != null && origMats[i] != null) renderers[i].sharedMaterials = origMats[i];
+                if (instances != null) foreach (var m in instances) if (m != null) UnityEngine.Object.Destroy(m);
+                ReleaseRenderers(claimed);
+            }
+            else FinishOutAsync(target, renderers, origMats, instances, claimed).Forget();
+            handle.Cts.Dispose();
         }
+    }
+
+    /// <summary>
+    /// 퇴장 디졸브 뒤처리 — 완료 콜백 · await 뒤 호출부가 숨기거나 파괴할 틈(최대 <see cref="OutSettleSeconds"/>)을 기다린 뒤:
+    /// 숨겨졌으면(꺼짐 · 렌더러 전부 끔) 원본 재질로 되돌리고, 파괴됐으면 임시 재질만 정리하고, 계속 보이면(사라진 채 남겨 둔 것)
+    /// 투명한 임시 재질을 그대로 두고 원본을 기록해 다음 등장이 진짜 원본을 쓰게 한다. 점유는 그 뒤에 푼다.
+    /// 예전엔 원본을 되돌리지 않고 임시 재질만 파괴해, 숨겼다 다시 보이는 물체(리치 의상 · 기사 검)가 다음 등장 때
+    /// 파괴된 재질을 「원본」으로 잡아 마젠타가 됐다(10-12 디졸브 원칙).
+    /// </summary>
+    private static async UniTaskVoid FinishOutAsync(GameObject target, Renderer[] renderers, Material[][] origMats,
+                                                    List<Material> instances, List<int> claimed)
+    {
+        try
+        {
+            if (instances == null) return;
+            float until = Time.realtimeSinceStartup + OutSettleSeconds;
+            do { await UniTask.Yield(PlayerLoopTiming.PostLateUpdate); }
+            while (target != null && Shown(target, renderers) && Time.realtimeSinceStartup < until);
+
+            if (target != null && Shown(target, renderers))
+            {
+                if (renderers != null && origMats != null)
+                    for (int i = 0; i < renderers.Length && i < origMats.Length; i++)
+                        if (renderers[i] != null && origMats[i] != null) s_pendingOriginals[renderers[i].GetInstanceID()] = origMats[i];
+                return;   // 사라진 채 남겨 둔 것 — 임시 재질(투명)을 파괴하면 빈 재질(마젠타)이 된다
+            }
+            if (target != null && renderers != null && origMats != null)
+                for (int i = 0; i < renderers.Length && i < origMats.Length; i++)
+                    if (renderers[i] != null && origMats[i] != null) renderers[i].sharedMaterials = origMats[i];
+            foreach (var m in instances)
+                if (m != null) UnityEngine.Object.Destroy(m);
+        }
+        finally { ReleaseRenderers(claimed); }
+    }
+
+    private static bool Shown(GameObject target, Renderer[] renderers)
+    {
+        if (!target.activeInHierarchy) return false;
+        if (renderers == null) return true;
+        foreach (var r in renderers) if (r != null && r.enabled) return true;
+        return false;
     }
 
     // 처치 전용 소멸 디졸브 — 풀 머티리얼 사용 + origMats 복원(재스폰 잔상 방지).
@@ -460,6 +574,28 @@ public static class DissolveEffect
         return r is ParticleSystemRenderer || r is TrailRenderer || r is UnityEngine.VFX.VFXRenderer;
     }
 
+    /// <summary>
+    /// 셰이더 그래프가 자동 이름(Texture2D_xxxx)을 쓰는 재질 — 표시 이름(Base Colour · Albedo · Diffuse)으로 색 텍스처를 찾는다.
+    /// 10-06 Gothic 문(S_TransparentORM)은 「Material 01 Base Colour」= Texture2D_2A1A8040이라 위 이름표로는 못 찾아 디졸브 동안 하얀 문이 됐다.
+    /// </summary>
+    private static Texture FindBaseTextureByDescription(Material m)
+    {
+        var sh = m.shader;
+        if (sh == null) return null;
+        int n = sh.GetPropertyCount();
+        for (int i = 0; i < n; i++)
+        {
+            if (sh.GetPropertyType(i) != UnityEngine.Rendering.ShaderPropertyType.Texture) continue;
+            string desc = sh.GetPropertyDescription(i);
+            if (desc.IndexOf("Base Colo", StringComparison.OrdinalIgnoreCase) < 0
+                && desc.IndexOf("Albedo", StringComparison.OrdinalIgnoreCase) < 0
+                && desc.IndexOf("Diffuse", StringComparison.OrdinalIgnoreCase) < 0) continue;
+            var t = m.GetTexture(sh.GetPropertyNameId(i));
+            if (t != null) return t;
+        }
+        return null;
+    }
+
     private static List<Material> ReplaceMaterials(
         Renderer[] renderers, Material dissolveMat, Color edgeColor, bool pooled)
     {
@@ -487,6 +623,7 @@ public static class DissolveEffect
                                 if (tex != null) break;
                             }
                         }
+                        if (tex == null) tex = FindBaseTextureByDescription(orig);
                         if (tex != null) inst.SetTexture(BaseMapID, tex);
                     }
                     if (orig.HasProperty(BaseColorID) && inst.HasProperty(BaseColorID))

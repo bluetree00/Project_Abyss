@@ -51,7 +51,7 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
     [SerializeField] private Transform  swordAwakenTarget;
     [Tooltip("각성 완료 시 해제할 다음 구역 배리어(무기대 등, 선택).")]
     [SerializeField] private GameObject swordAwakenBarrier;
-    [TextArea, SerializeField] private string swordAwakenGuideline = "제단의 검을 쥐어라 — [F]";
+    [TextArea, SerializeField] private string swordAwakenGuideline = "무형검을 쥐어라 — [F]";
 
     [Header("게이트 (장비 완료 후 목표)")]
     [SerializeField] private Transform gateTarget;

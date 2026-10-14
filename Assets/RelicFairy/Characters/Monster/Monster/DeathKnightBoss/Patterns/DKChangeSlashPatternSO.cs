@@ -118,16 +118,18 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
             (ctx.Monster as DeathKnightBossMonster)?.CueSwordFloor();   // 검 색 ↔ 바닥 신호(10-03 개선 2-2)
         }
 
-        // hitTime: 타일 제거
-        if (!_tilesDestroyed && _timer >= Data.hitTime)
+        DKGridPatternHelper.ArmBefore(_timer, Data.hitTime + Data.hitDuration, _tiles, GetSwordColor(ctx));   // 판정 0.25초 전 위험 칸을 붉게(10-11)
+
+        // 칸은 판정 순간까지 둔다(10-13 검증 — hitTime에 걷어 판정까지 0.4초 빈 바닥이었다)
+        if (!_tilesDestroyed && _timer >= Data.hitTime + Data.hitDuration)
         {
             _tilesDestroyed = true;
             DKGridPatternHelper.DestroyEdges(_edges);
             DKGridPatternHelper.DestroyTiles(_tiles);
         }
 
-        // hitTime + VfxDelay: 타일이 확실히 사라진 후 VFX 스폰
-        if (_tilesDestroyed && !_vfxSpawned && _timer >= Data.hitTime + VfxDelay)
+        // hitTime + VfxDelay: 휘두름 이펙트(칸 위에 겹쳐 재생 — 칸은 판정에 걷힌다)
+        if (!_vfxSpawned && _timer >= Data.hitTime + VfxDelay)
         {
             _vfxSpawned = true;
             // Sword Slash 15 이펙트가 스폰되는 시점에 맞춰 재생. 클립 앞 무음 구간은 건너뛰어 0.5초부터 재생

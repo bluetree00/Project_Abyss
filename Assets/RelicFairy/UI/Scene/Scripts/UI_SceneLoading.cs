@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Video;
 using TMPro;
@@ -13,6 +13,13 @@ using Cysharp.Threading.Tasks;
 /// </summary>
 public sealed class UI_SceneLoading : MonoBehaviour
 {
+    /// <summary>씬 파일 읽기가 막대에서 차지하는 몫 — 나머지는 그 씬의 준비(NotifySceneReady)까지.</summary>
+    public const float LoadShare = 0.9f;
+    private const float CreepCeiling = 0.99f;   // 준비를 기다리는 동안 다가가는 끝(100%는 준비가 끝났을 때만)
+    private const float CreepRate    = 0.35f;   // 1/초 — 9초 기다리면 ≈ 99%
+    private const float FullHold     = 0.15f;   // 100%를 보여 주고 걷기까지
+    private const float ReadyTimeout = 45f;     // 씬 준비 신호를 이만큼 못 받으면 걷는다(시작 처리 예외로 신호가 안 오는 경우)
+
     public static UI_SceneLoading Instance { get; private set; }
 
     [Header("References")]
@@ -49,6 +56,7 @@ public sealed class UI_SceneLoading : MonoBehaviour
     private RawImage _sigil;
     private TMP_Text _label, _pct;
     private float    _progress;
+    private bool     _thinFonts;   // 톤 v2 글꼴을 입혔는가 — Awake(부트 직후)엔 글꼴이 아직 안 올라와 열 때 입힌다
 
     private float _showStartTime;
     private RenderTexture _rt;
@@ -141,6 +149,7 @@ public sealed class UI_SceneLoading : MonoBehaviour
         await UniTask.Yield(PlayerLoopTiming.Update);
 
         SetProgress(0f);
+        ApplyThinFonts();
         // 마법진 문양은 방 전환 스킨이 갖는다 — 첫 로딩(부트 직후)엔 아직 안 왔을 수 있어 열 때마다 확인한다.
         if (_sigil != null && _sigil.texture == null)
         {
@@ -177,27 +186,58 @@ public sealed class UI_SceneLoading : MonoBehaviour
         if (!_shown) return;
         _shown = false;
 
-        if (_videoPlayer != null)
-        {
-            _videoPlayer.Stop();
-            _videoPlayer.time = 0;
-            ClearRenderTexture();   // 다음 Show 시 이전 프레임 잔상 방지
-        }
-
         // 최소 표시 시간 보장
         float elapsed = Time.realtimeSinceStartup - _showStartTime;
         float remain  = minDisplayTime - elapsed;
         if (remain > 0f)
             await UniTask.Delay(System.TimeSpan.FromSeconds(remain), ignoreTimeScale: true);
 
+        // 준비가 끝났다 — 100%를 잠깐 보여 주고 걷는다.
+        SetProgress(1f);
+        await UniTask.Delay(System.TimeSpan.FromSeconds(FullHold), ignoreTimeScale: true);
+
         // 막대·글자는 걷히기 전에 먼저 끈다 — 어둠이 걷히는 0.5초 동안 「100%」 막대가 드러난 HUD 체력바에 겹쳤다(09-28 실측).
         if (_bar != null) _bar.gameObject.SetActive(false);
         await FadeAsync(0f, fadeOutDuration);
+
+        // 영상은 다 걷힌 뒤에 멈춘다 — 걷기 전에 멈추면 최소 표시 시간 · 100% 동안 배경이 검게 비었다(10-09 전주기 시뮬).
+        if (_videoPlayer != null && !_shown)
+        {
+            _videoPlayer.Stop();
+            _videoPlayer.time = 0;
+            ClearRenderTexture();   // 다음 Show 시 이전 프레임 잔상 방지
+        }
 
         if (canvasGroup != null)
             canvasGroup.blocksRaycasts = false;
 
         gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// 씬은 켜졌고 그 씬이 준비를 마칠(NotifySceneReady → HideAsync) 때까지 — 막대가 99%를 향해 천천히 찬다.
+    /// 예전엔 파일 읽기만으로 100%가 되어 프롤로그 준비 ≈9초 동안 100%에 멈춘 듯 보였다(10-09 전주기 시뮬).
+    /// </summary>
+    public async UniTaskVoid CreepUntilReadyAsync()
+    {
+        var ct = this.GetCancellationTokenOnDestroy();
+        float since = Time.realtimeSinceStartup;
+        try
+        {
+            while (_shown)
+            {
+                SetProgress(_progress + (CreepCeiling - _progress) * Mathf.Min(1f, Time.unscaledDeltaTime * CreepRate));
+                // 씬 시작 처리가 예외로 끊겨 NotifySceneReady가 안 오면 99%에서 영원히 멈췄다 — 걷어서 ESC로라도 빠질 수 있게(10-09 출시 점검)
+                if (Time.realtimeSinceStartup - since > ReadyTimeout)
+                {
+                    Debug.LogError($"[UI_SceneLoading] 씬 준비 신호가 {ReadyTimeout:0}초 동안 없다 — 로딩 화면을 걷는다");
+                    HideAsync().Forget();
+                    break;
+                }
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (System.OperationCanceledException) { }
     }
 
     /// <param name="progress">0~1</param>
@@ -296,6 +336,18 @@ public sealed class UI_SceneLoading : MonoBehaviour
         prt.anchorMin = prt.anchorMax = new Vector2(1f, 1f); prt.pivot = new Vector2(1f, 0f);
         prt.anchoredPosition = new Vector2(0f, 10f); prt.sizeDelta = new Vector2(160f, 28f);
         _pct.text = "<mspace=0.62em>0</mspace>%";
+    }
+
+    /// <summary>
+    /// 라벨 「불러오는 중」 = Noto 500 · 퍼센트 = Noto 400(크기 20 · 자간 · 그림자 그대로). DNF는 제목 한 줄에만(톤 v2, 10-11).
+    /// 글꼴(UISkin.ThemeFonts)은 부트 뒤에 올라온다 — 올라온 뒤 첫 열기에서 한 번 입힌다.
+    /// </summary>
+    private void ApplyThinFonts()
+    {
+        if (_thinFonts || UISkin.ThemeFonts == null) return;
+        _thinFonts = true;
+        if (_label != null) UITheme.StyleThinText(_label, UIWeight.Medium,  20f, BarInk,  shadow: true);
+        if (_pct   != null) UITheme.StyleThinText(_pct,   UIWeight.Regular, 20f, BarFill, shadow: true);
     }
 
     private static Image NewImage(string name, Transform parent, Color color)

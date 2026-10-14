@@ -19,26 +19,30 @@ MonoBehaviour:
     maxDistance: 1.3
     priority: 0
     cooldown: 0.9
-    damageDelay: 0.7
+    damageDelay: 0.36
     attackDuration: 0.75
     damageMultiplier: 1
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: 8a87deef4ca24f1192c20d1f0f6f49a9,
       type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
-    castVfxPrefab: {fileID: 1893723492503102, guid: 5b92155bedf0f5147813621296d08179,
+    castVfxPrefab: {fileID: 1893723492503102, guid: 224e415794fc7cd4a82e700eb6415c35,
       type: 3}
     castVfxDuration: 0.65
-    castVfxDelay: 0.1
+    castVfxDelay: 0
+    castVfxLeadTime: 0.15
+    castVfxXRotationOffset: 0
     castVfxYRotationOffset: -90
+    castVfxZRotationOffset: 0
     castVfxForwardOffset: 0.5
-    castVfxRightOffset: 0.25
+    castVfxRightOffset: 0.1
     castVfxVerticalOffset: 0.9
-    castVfxScale: 1
+    castVfxScale: 0.34
     castVfxAttachToMonster: 1
+    castVfxAtPlayerPosition: 0
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
     proceduralBeamWidth: 0.16
@@ -49,31 +53,35 @@ MonoBehaviour:
     hitVfxScale: 1
     hitVfxOffset: {x: 0, y: 0, z: 0}
   - name: Thrust
-    animationStateName: BishopKnight_Attack01
+    animationStateName: BishopKnight_Attack02
     minDistance: 1
     maxDistance: 2.3
     priority: 1
     cooldown: 1.2
-    damageDelay: 1.1
+    damageDelay: 0.34
     attackDuration: 1.15
     damageMultiplier: 1.1
     knockbackMultiplier: 1.1
     attackShapeOverride: {fileID: 11400000, guid: 35f1c3ca1c8d4a33a99730ca2fc30427,
       type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
-    castVfxPrefab: {fileID: 1893723492503102, guid: 5b92155bedf0f5147813621296d08179,
+    castVfxPrefab: {fileID: 1893723492503102, guid: 224e415794fc7cd4a82e700eb6415c35,
       type: 3}
     castVfxDuration: 1.05
-    castVfxDelay: 0.1
+    castVfxDelay: 0
+    castVfxLeadTime: 0.15
+    castVfxXRotationOffset: 0
     castVfxYRotationOffset: -90
+    castVfxZRotationOffset: 0
     castVfxForwardOffset: 0.7
-    castVfxRightOffset: 0.2
+    castVfxRightOffset: 0.1
     castVfxVerticalOffset: 0.9
-    castVfxScale: 1.2
+    castVfxScale: 0.45
     castVfxAttachToMonster: 1
+    castVfxAtPlayerPosition: 0
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
     proceduralBeamWidth: 0.16

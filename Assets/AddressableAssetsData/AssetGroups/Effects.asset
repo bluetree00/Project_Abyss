@@ -65,6 +65,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1977fc844cb969a44866c4dcd32996d1
+    m_Address: MonsterDeathBurst
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 198865771bd44f0408d1f9021987908c
     m_Address: vfx_lancelot_cursed
     m_ReadOnly: 0
@@ -225,6 +230,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6e37f362b49b90549898b339f0cd3101
+    m_Address: Run/StairwaySet
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 74c549d1b06b6b140a1fd9536eea637f
     m_Address: BasicSlashBlue
     m_ReadOnly: 0
@@ -242,6 +252,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7729da45929289440920f837ba94356b
     m_Address: vfx_gawain_noon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 79087d5297e6a6646841e30ff21f351d
+    m_Address: Run/Drops/CurrencyVisualSet
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -364,6 +379,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: caec623dd0dc32042b8a7be0b3e5d1af
     m_Address: vfx_form_windcut
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cd5def2bb4f6b4e4ab15ba0b6f35b29d
+    m_Address: GawainSolarHit
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

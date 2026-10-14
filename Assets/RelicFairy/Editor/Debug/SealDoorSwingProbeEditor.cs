@@ -8,9 +8,9 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 10-06 봉인 문 젖힘 실측(사용자 「문짝 연출이 잘 보여 주는 구도가 된다면 좋긴 해」).
-/// 전투방(나무문 팔레트)에서 출구 문을 닫힌 상태로 맞춘 뒤 젖혀 열고(클리어 연출과 같은 함수), 게임 카메라 화면과 방 안 근접 화면을
-/// 0 · 0.3 · 0.6 · 1.0초에 찍는다. 이어 다시 쾅 닫히는 장면도 찍는다. 실행 동안 플레이어 무적.
+/// 10-06 봉인 문 열림 · 닫힘 실측 — 젖힘(나무문)으로 시작해 디졸브(사용자 「문 연출은 애매 — 디졸브로 사라지면서 열리게」)도 같은 도구로 본다.
+/// 전투방에서 출구 문을 닫힌 상태로 맞춘 뒤 열고(클리어 연출과 같은 함수), 게임 카메라 화면과 방 안 근접 화면을
+/// 0 · 0.3 · 0.6 · 1.0초에 찍는다. 이어 다시 닫히는(봉인) 장면도 찍는다. 실행 동안 플레이어 무적.
 /// 결과: Temp/ui_shots/Swing_{game|close}_{open|close}_{t}.png · Temp/seal_door_swing.txt · 로그 「[DoorSwing] 끝」.
 /// </summary>
 public static class SealDoorSwingProbeEditor
@@ -18,7 +18,7 @@ public static class SealDoorSwingProbeEditor
     private const BindingFlags Inst = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
     private const int W = 960, H = 540;
 
-    [MenuItem("RelicFairy/Debug/10-06 봉인 문 젖힘 실측 (전투방, 플레이 중)")]
+    [MenuItem("RelicFairy/Debug/10-06 봉인 문 열림·닫힘 실측 (전투방, 플레이 중)")]
     private static void Run()
     {
         if (!EditorApplication.isPlaying) return;
@@ -40,16 +40,16 @@ public static class SealDoorSwingProbeEditor
             foreach (var g in gates)
             {
                 if (g == null) continue;
-                var hinges = g.GetType().GetField("hinges").GetValue(g) as Transform[];
-                if (hinges != null) { view = g; break; }
+                if (g.GetType().GetField("door").GetValue(g) is Transform) { view = g; break; }
             }
-            if (view == null) { sb.AppendLine("젖힘 문 없음(이 방 팔레트가 Swing이 아니다)"); return; }
+            if (view == null) { sb.AppendLine("봉인 문 없음"); return; }
 
             var vt     = view.GetType();
             var door   = (Transform)vt.GetField("door").GetValue(view);
             float outw = (float)vt.GetField("outward").GetValue(view);
             var hs     = (Transform[])vt.GetField("hinges").GetValue(view);
-            sb.AppendLine($"문 {door.parent?.name}/{door.name} · 경첩 {hs.Length} · 바깥 {outw}");
+            bool dis   = (bool)vt.GetField("dissolves").GetValue(view);
+            sb.AppendLine($"문 {door.parent?.name}/{door.name} · 경첩 {hs?.Length ?? 0} · 디졸브 {dis} · 바깥 {outw}");
 
             // 방 안 근접 카메라 자리 — 문 앞 방 안쪽 9 m · 위 4.5 m
             Vector3 outWorld = door.parent != null ? door.parent.forward * outw : door.forward;
@@ -62,6 +62,7 @@ public static class SealDoorSwingProbeEditor
             vt.GetField("swingK").SetValue(view, 0f);
             vt.GetField("opening").SetValue(view, false);
             SealDoorFit.SetSwing(hs, outw, 0f);
+            door.gameObject.SetActive(true);
             await UniTask.Delay(300, ignoreTimeScale: true);
             vt.GetField("opening").SetValue(view, true);
             raise.Invoke(flow, new[] { view });
@@ -90,9 +91,15 @@ public static class SealDoorSwingProbeEditor
             if (wait > 0f) await UniTask.Delay(System.TimeSpan.FromSeconds(wait), ignoreTimeScale: true);
             ScreenCapture.CaptureScreenshot($"Temp/ui_shots/Swing_game_{tag}_{t:0.0}.png");
             Close(door, eye, $"Temp/ui_shots/Swing_close_{tag}_{t:0.0}.png");
-            sb.AppendLine($"{tag} {t:0.0}초: 경첩 각 {LeafAngles(door)}");
+            sb.AppendLine($"{tag} {t:0.0}초: 보임 {door.gameObject.activeInHierarchy} · 디졸브 중 {Dissolving(door)} · 경첩 각 {LeafAngles(door)}");
         }
         await UniTask.Delay(400, ignoreTimeScale: true);
+    }
+
+    private static bool Dissolving(Transform door)
+    {
+        foreach (var r in door.GetComponentsInChildren<Renderer>(true)) if (DissolveEffect.IsDissolving(r)) return true;
+        return false;
     }
 
     private static string LeafAngles(Transform door)

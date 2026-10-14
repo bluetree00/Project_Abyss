@@ -19,27 +19,30 @@ MonoBehaviour:
     maxDistance: 1.8
     priority: 0
     cooldown: 1
-    damageDelay: 0.9
+    damageDelay: 0.26
     attackDuration: 0.95
     damageMultiplier: 1
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: 35f1c3ca1c8d4a33a99730ca2fc30427,
       type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
-    castVfxPrefab: {fileID: 1893723492503102, guid: c63c1518f4a013747aaf8a73a1850ce1,
+    castVfxPrefab: {fileID: 1893723492503102, guid: 224e415794fc7cd4a82e700eb6415c35,
       type: 3}
     castVfxDuration: 0.85
-    castVfxDelay: 0.1
-    castVfxXRotationOffset: 90
+    castVfxDelay: 0
+    castVfxLeadTime: 0.15
+    castVfxXRotationOffset: 0
     castVfxYRotationOffset: -90
-    castVfxForwardOffset: 0.5
-    castVfxRightOffset: 0.3
+    castVfxZRotationOffset: 0
+    castVfxForwardOffset: 1.25
+    castVfxRightOffset: 0.1
     castVfxVerticalOffset: 0.9
-    castVfxScale: 1
+    castVfxScale: 0.3
     castVfxAttachToMonster: 1
+    castVfxAtPlayerPosition: 0
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
     proceduralBeamWidth: 0.16
@@ -50,31 +53,34 @@ MonoBehaviour:
     hitVfxScale: 1
     hitVfxOffset: {x: 0, y: 0, z: 0}
   - name: HeavySwipe
-    animationStateName: Attack01
+    animationStateName: Attack02
     minDistance: 0
-    maxDistance: 2.2
+    maxDistance: 1.5
     priority: 1
     cooldown: 2.3
-    damageDelay: 1.15
+    damageDelay: 0.59
     attackDuration: 1.2
     damageMultiplier: 1.2
     knockbackMultiplier: 1.25
     attackShapeOverride: {fileID: 0}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
-    warningShape: 0
-    castVfxPrefab: {fileID: 1893723492503102, guid: c63c1518f4a013747aaf8a73a1850ce1,
+    warningShape: 4
+    castVfxPrefab: {fileID: 1893723492503102, guid: 224e415794fc7cd4a82e700eb6415c35,
       type: 3}
     castVfxDuration: 1.1
-    castVfxDelay: 0.1
+    castVfxDelay: 0
+    castVfxLeadTime: 0.15
     castVfxXRotationOffset: 90
     castVfxYRotationOffset: -90
+    castVfxZRotationOffset: 0
     castVfxForwardOffset: 0.5
     castVfxRightOffset: 0.25
     castVfxVerticalOffset: 0.9
-    castVfxScale: 1.1
+    castVfxScale: 0.44
     castVfxAttachToMonster: 1
+    castVfxAtPlayerPosition: 0
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
     proceduralBeamWidth: 0.16

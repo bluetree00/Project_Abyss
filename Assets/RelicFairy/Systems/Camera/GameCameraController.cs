@@ -1363,8 +1363,9 @@ public class GameCameraController : MonoBehaviour
 
         Vector3    fromPos = transform.position;
         Quaternion fromRot = transform.rotation;
-        Vector3    toPos   = playerTransform != null ? playerTransform.position + _originalPosition : fromPos;
-        Quaternion toRot   = _originalRotation;
+        Vector3    toPos   = fromPos;
+        Quaternion toRot   = fromRot;
+        if (playerTransform != null) GameplayPose(playerTransform, out toPos, out toRot);
 
         try
         {
@@ -1385,8 +1386,8 @@ public class GameCameraController : MonoBehaviour
                 _isPanning = false;
                 if (playerTransform != null)
                 {
-                    transform.position = playerTransform.position + _originalPosition;
-                    transform.rotation = _originalRotation;
+                    GameplayPose(playerTransform, out var endPos, out var endRot);
+                    transform.SetPositionAndRotation(endPos, endRot);
                 }
                 if (_brain != null && _prePanBrainEnabled) _brain.enabled = true;
                 if (_cinemachine != null && _prePanCmEnabled) _cinemachine.enabled = true;
@@ -1395,6 +1396,22 @@ public class GameCameraController : MonoBehaviour
     }
 
     private static float PanEase(float t) => 1f - Mathf.Pow(1f - Mathf.Clamp01(t), 3f);
+
+    /// <summary>
+    /// 게임플레이 카메라(FreeLook)가 지금 플레이어를 따라 잡을 자세 — 감쇠 없이 한 번 계산한다.
+    /// 예전 목표 「플레이어 + Awake 때 카메라 월드 위치」는 씬 카메라 높이(약 24 m)라, 보간하면 위로 솟았다가 FreeLook이 잡으며 끊겼다(10-14 84 알림).
+    /// FreeLook이 없거나 따라갈 대상이 없으면 예전 오프셋.
+    /// </summary>
+    private void GameplayPose(Transform player, out Vector3 pos, out Quaternion rot)
+    {
+        pos = player.position + _originalPosition;
+        rot = _originalRotation;
+        if (_cinemachine == null || _cinemachine.Follow == null) return;
+        _cinemachine.InternalUpdateCameraState(Vector3.up, -1f);
+        var state = _cinemachine.State;
+        pos = state.FinalPosition;
+        rot = state.FinalOrientation;
+    }
 
     // ── Event Handlers ──
 
@@ -1418,6 +1435,14 @@ public class GameCameraController : MonoBehaviour
 
         Vector3 offset = _originalPosition;
         Quaternion endRot = _originalRotation;
+
+        // 이 줌인이 도는 2.5초 안에 컷신이 TakeManualControl()로 제어권을 가져가면 카메라는 놓는다(블렌드와 같은 규칙).
+        // 플레이어 바인드(OnPlayerBound)가 인계(HandStartRoomCamera)보다 먼저 와서 이 줌인이 시작되는 흐름이 있다 —
+        // 리치 추방 착지는 곧바로 가까운 카메라를 걸었는데, 이 루프가 매 프레임 「플레이어 + 씬 기본 카메라 높이」로 끌어
+        // 착지가 32 → 49 m 부감으로 찍혔다(10-13 83 실측). 평소엔 Brain이 LateUpdate에서 덮어써 드러나지 않았다.
+        // 물러나도 오버레이 정리 · OnIntroComplete(플레이어 등장 연출)는 그대로 한다.
+        int  myVersion = _panVersion;
+        bool yielded   = false;
 
         // _fadeOverlay가 이미 투명(PrepareMapViewAsync 완료)이면 페이드 재실행 없이 줌만 수행
         bool needFade = _fadeOverlay != null && _fadeOverlay.color.a > 0.01f;
@@ -1446,6 +1471,7 @@ public class GameCameraController : MonoBehaviour
         while (elapsed < introDuration)
         {
             if (this == null || target == null) break;
+            if (myVersion != _panVersion) { yielded = true; break; }   // 컷신이 제어권을 가져갔다
             elapsed += Time.deltaTime;
             float t = Mathf.Clamp01(elapsed / introDuration);
             float ease = 1f - (1f - t) * (1f - t) * (1f - t);
@@ -1466,9 +1492,10 @@ public class GameCameraController : MonoBehaviour
         }
 
         if (this == null) return;
+        yielded |= myVersion != _panVersion;
 
-        // 완료
-        if (target != null)
+        // 완료 — 제어권을 넘겼으면 카메라는 건드리지 않는다
+        if (!yielded && target != null)
         {
             transform.position = target.position + offset;
             transform.rotation = endRot;
@@ -1489,7 +1516,8 @@ public class GameCameraController : MonoBehaviour
         OnIntroComplete?.Invoke();
 
         // 탑다운 활성 중이면 Cinemachine 복귀 스킵 — 이후 DeactivateDragonTopDownView가 복원
-        if (!_topDownViewActive)
+        // 컷신이 제어권을 가져갔으면 복원도 그쪽 몫이다(Brain을 여기서 켜면 컷신 카메라가 덮인다)
+        if (!_topDownViewActive && !yielded)
         {
             if (_cinemachine != null) _cinemachine.enabled = true;
             if (_brain != null)       _brain.enabled       = true;

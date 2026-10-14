@@ -13,6 +13,9 @@ public sealed class RunFuelBank
     /// <summary>연료 잔량 변경 시 발행(HUD 연동).</summary>
     public event Action OnFuelChanged;
 
+    /// <summary>연료가 <b>들어왔을</b> 때만(양수) 발행 — 결과창 「얻은 양」 집계(10-07).</summary>
+    public event Action<FuelKind, int> OnGained;
+
     public int Get(FuelKind kind) => _amounts.TryGetValue(kind, out var v) ? v : 0;
 
     /// <summary>연료 추가(음수는 감산, 0 미만으로는 안 내려감).</summary>
@@ -21,6 +24,7 @@ public sealed class RunFuelBank
         if (amount == 0) return;
         _amounts[kind] = Math.Max(0, Get(kind) + amount);
         OnFuelChanged?.Invoke();
+        if (amount > 0) OnGained?.Invoke(kind, amount);
     }
 
     /// <summary>차감 시도 — 잔량 부족이면 false(무변경). #1/#2 소비처가 호출.</summary>

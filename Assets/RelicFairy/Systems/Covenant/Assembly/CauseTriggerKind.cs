@@ -14,6 +14,7 @@ public enum CauseTriggerKind
     OnFirstHitInRoom,       // 선제: 방 진입 후 첫 타격 (OnRoomEnter 무장 + OnAttackHit)
     OnProximity,            // 포위: 인접 적 N+ 유지 시 주기 발동 (Tick + 근접 카운트)
     OnMoveDistance,         // 행군: 누적 이동 거리 N마다 (Tick + 이동량)
+    OnRangedStreakSameTarget, // 겨눔: 원거리로 같은 적 N번 (OnAttackHit + 원거리 적중 · 10-14)
 }
 
 /// <summary>
@@ -34,4 +35,5 @@ public enum CauseClass
     Skill,      // 스킬 사용(연주)
     Kill,       // 처치 그 자체(사냥 개시·학살)
     Danger,     // 위험에 둘러싸인 상태(포위)
+    Ranged,     // 원거리로 겨눠 맞히기(겨눔 · 10-14 빌드 시너지 A5)
 }

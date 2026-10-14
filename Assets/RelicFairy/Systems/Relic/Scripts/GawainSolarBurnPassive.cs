@@ -31,7 +31,7 @@ public sealed class GawainSolarBurnPassive : CharacterPassiveBase
     {
         if (ctrl.RelicBehavior is not GawainZenithRelic g) return;
 
-        float effAtk = ctrl.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee);
+        float effAtk = ctrl.RuntimeStats.AttackPower * RelicEvolution.BurnMul(ctrl);   // 유물 피해 = 근접 · 원거리 중 큰 값(10-14 A5) · 타오르는 정오 진화면 넘친 공속만큼(C)
 
         float ratio, dur;
         if      (g.FlameMode)    { ratio = NoonDps; dur = NoonDur; }

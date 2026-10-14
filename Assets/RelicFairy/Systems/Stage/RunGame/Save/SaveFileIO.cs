@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using UnityEngine;
 
@@ -68,6 +68,29 @@ public static class SaveFileIO
         return bak;
     }
 
+    /// <summary>
+    /// 본파일 → .bak 폴백, 단 <paramref name="isValid"/>로 <b>읽을 수 있는지</b>까지 본다.
+    /// 위 판은 비어 있지 않으면 성공으로 넘겨, 깨진 메타 · 퀘스트 본파일을 호출측이 시작값으로 덮고 그 깨진 본파일이
+    /// 정상 .bak을 덮어썼다(10-09 출시 점검). 읽을 수 없는 본파일은 <c>.corrupt</c>로 보관해 다음 쓰기가 .bak을 지키게 한다.
+    /// </summary>
+    public static string ReadWithBackup(string mainPath, string tag, Func<string, bool> isValid)
+    {
+        var json = TryRead(mainPath, tag);
+        if (json != null && !Passes(json, isValid))
+        {
+            Debug.LogWarning($"[{tag}] 본 세이브를 읽을 수 없다 — .corrupt로 보관하고 .bak을 본다 ({Path.GetFileName(mainPath)})");
+            Quarantine(mainPath, tag);
+            json = null;
+        }
+        if (json != null) return json;
+
+        var bak = TryRead(BakPathOf(mainPath), tag);
+        if (bak != null && !Passes(bak, isValid)) bak = null;
+        if (bak != null)
+            Debug.LogWarning($"[{tag}] 본 세이브 손상 — .bak에서 복구 ({Path.GetFileName(mainPath)})");
+        return bak;
+    }
+
     /// <summary>본파일 · tmp · bak · 사이드카를 모두 정리한다.</summary>
     public static void Delete(string mainPath)
     {
@@ -95,6 +118,25 @@ public static class SaveFileIO
     }
 
     // ── Private ──────────────────────────────────────────────
+
+    private static bool Passes(string json, Func<string, bool> isValid)
+    {
+        try { return isValid == null || isValid(json); }
+        catch { return false; }
+    }
+
+    /// <summary>읽을 수 없는 본파일을 <c>.corrupt</c>로 옮긴다(지우지 않음 — 손으로 살릴 여지).</summary>
+    private static void Quarantine(string mainPath, string tag)
+    {
+        try
+        {
+            string dst = Path.ChangeExtension(mainPath, ".corrupt");
+            if (File.Exists(dst)) File.Delete(dst);
+            File.Move(mainPath, dst);
+            SaveIntegrity.DeleteSidecar(mainPath);
+        }
+        catch (Exception e) { Debug.LogWarning($"[{tag}] 손상본 보관 실패 ({Path.GetFileName(mainPath)}): {e.Message}"); }
+    }
 
     private static string TryRead(string path, string tag)
     {

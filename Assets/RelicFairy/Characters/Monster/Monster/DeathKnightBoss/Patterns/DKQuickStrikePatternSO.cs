@@ -122,6 +122,8 @@ public class DKQuickStrikeState : FullLockState<DKQuickStrikePatternSO>
             DKGridPatternHelper.SpawnCrossVfx(Data.impactVfxPrefab, _playerCell, sc);
         }
 
+        DKGridPatternHelper.ArmBefore(_timer, Data.hitTime + Data.hitDuration, _tiles, GetSwordColor(ctx));   // 판정 0.25초 전 위험 칸을 붉게(10-11)
+
         // hitTime + hitDuration: 피격
         if (!_hitDone && _timer >= Data.hitTime + Data.hitDuration)
         {

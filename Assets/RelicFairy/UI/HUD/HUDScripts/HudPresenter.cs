@@ -1,4 +1,4 @@
-//============================================================
+﻿//============================================================
 // HudPresenter.cs
 // - Mode/Section 제어 + CanvasGroup Fade
 // - PlayerRunState 이벤트 구독 (HP, Gold)
@@ -33,6 +33,9 @@ public sealed class HudPresenter : MonoBehaviour
     private PlayerBuffViewSource _playerBuffSource;
     // 스킬 슬롯 잠금 판정(HasSkillInSlot)용 — 무기 교체/진화 시 재평가한다.
     private PlayerController     _player;
+    private WeaponFormRuntime    _formRuntime;   // 진화 무기 「형」 — HUD 형 게이지(10-08)
+    private WeaponFormBase       _form;
+    private bool                 _formReadyShown;   // 형 게이지 「다음 타에 발동」 테가 켜져 있나(10-12 A7)
     private ItemBuffViewSource _itemBuffSource;
     private NightmareRuleBuffViewSource _nightmareRuleSource;
     private bool _hasDynamicBuffSources;          // 룬/유물 등 폴링 기반 소스 등록 여부
@@ -49,12 +52,27 @@ public sealed class HudPresenter : MonoBehaviour
     public MonsterBase BoundBoss => _boss;
     public bool HasBoundBoss => _boss != null;
     public CanvasGroup MainCanvasGroup => canvasGroup;
+    /// <summary>HUD 숨김(시작방 · 프롤로그 컷신) 중 — 켜기 요청이 루트를 다시 켜지 못하게 한다(HudBootstrapper가 건다).
+    /// canvasGroup이 비면 SetVisible이 SetActive로 켜는데, 보스가 나타나며 부른 SetMode(Boss)가 숨김을 뚫고 HUD를 띄웠다(10-09 전주기 시뮬 · 프롤로그 보스 등장).</summary>
+    public bool ActivationHeld { get; set; }
     public MinimapView  MinimapView => view != null ? view.MinimapView : null;
 
     private bool _bossPanelSuppressed;
 
     private int _fadeToken = 0;
     private HUDIds.Mode _currentMode = HUDIds.Mode.None;
+
+    // ── 빌드 완성 신호 · 유물 진화(10-14 빌드 시너지 · 83 UI 요청 2 · 3) ──
+    private const int MaxPendingBuild = 4;
+    private readonly List<BuildNotice> _pendingBuild = new();   // 다음 프레임(또는 HUD가 다시 보일 때) 보인다 — 같은 프레임 신호는 진화 → 각인 → 존 순
+    private PlayerLoadout _loadout;
+    private string _evolutionShown;      // Q 칸에 그려 둔 진화
+    private string _pendingMomentId;     // 보여 줄 진화 순간(차단 팝업 · 룬판이 걷히면)
+    /// <summary>이번 런에 알린 진화 — 챕터 · 이어하기마다 새 플레이어가 진화 효과를 다시 묶어도(RelicEvolutionNotice) 한 줄만.</summary>
+    private static string s_evolutionAnnounced;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => s_evolutionAnnounced = null;
 
     private void Awake()
     {
@@ -73,6 +91,9 @@ public sealed class HudPresenter : MonoBehaviour
 
     private void Update()
     {
+        TickFormReadyNext();
+        TickBuildNotices();
+
         // 동적 지속 버프(룬/유물)는 이벤트가 아니라 상태가 매 프레임 변하므로 저빈도 폴링으로 반영.
         // 방버프는 OnBuffsChanged 이벤트로 즉시 갱신되므로 동적 소스가 없으면 폴링 불필요.
         if (!_hasDynamicBuffSources) return;
@@ -204,7 +225,8 @@ public sealed class HudPresenter : MonoBehaviour
         RefreshStats();
         RefreshWeaponSlots();
         // 유물 전용 아이덴티티 바(체력바 아래) 연결 — 활성 유물이 IRelicResourceProvider면
-        view?.CombatPanel?.SetRelicResource((player.RelicBehavior as IRelicResourceProvider)?.RelicResource);
+        view?.CombatPanel?.SetRelicResource((player.RelicBehavior as IRelicResourceProvider)?.RelicResource, player);   // player = Q 문 · 남은 횟수(10-12 A4)
+        BindLoadout(AppBootstrapper.Instance != null ? AppBootstrapper.Instance.Loadout : null);   // Q 칸 진화 표시(10-14 C)
 
         _runtimeStats.OnChanged += RefreshStats;
         _weaponManager.OnWeaponChanged += HandleWeaponChanged;
@@ -213,6 +235,15 @@ public sealed class HudPresenter : MonoBehaviour
         _cooldownTracker.OnCooldownChanged += HandleCooldownChanged;
         player.SkillSealed   += HandleSkillSealed;     // 보스 기믹 스킬 봉인 → 잠금 표시
         player.SkillUnsealed += HandleSkillUnsealed;
+        player.SkillRejected    += HandleSkillRejected;      // 재사용 대기 중 누름 → 칸 흔들림(A9)
+        player.SkillBuffStarted += HandleSkillBuffStarted;   // 석궁 강화 → 남은 시간 막대(A9)
+        _formRuntime = WeaponFormRuntime.Of(player);          // 형이 새로 만들어지면(진화 · 무기 교체) 게이지를 다시 붙인다
+        if (_formRuntime != null)
+        {
+            _formRuntime.Changed   += HandleFormChanged;
+            _formRuntime.ReadyNext += HandleFormReadyNext;   // 「다음 타에 발동」 — 형 게이지 테가 한 번 밝아진다(10-12 A7)
+        }
+        HandleFormChanged();
 
         // 동적 지속 버프 소스(룬 리소스 + 유물 메커닉) 등록 → 버프창 폴링 갱신
         _playerBuffSource = new PlayerBuffViewSource(player);
@@ -220,6 +251,14 @@ public sealed class HudPresenter : MonoBehaviour
         _hasDynamicBuffSources = _buffAggregator.DynamicSourceCount > 0;
         _buffPollAccum = 0f;
         RefreshBuffWindow();   // 즉시 1회 반영
+
+        // 새 플레이어(챕터 전환 · 부활)의 현재 상태를 바로 그린다 — 쿨다운은 도는 동안에만 사건이 와서
+        // 앞 플레이어의 어두운 칸 · 멈춘 숫자가 스킬을 쓸 때까지 남았다(10-09 출시 점검).
+        PushCooldown(SkillType.Q);
+        PushCooldown(SkillType.E);
+        PushCooldown(SkillType.R);
+        if (_state != null) HandlePotionChanged(_state.PotionCount, _state.PotionCapacity);
+        if (_run != null) HandleReviveChanged(_run.HasReviveCharge);
     }
 
     public void UnbindPlayer()
@@ -228,8 +267,20 @@ public sealed class HudPresenter : MonoBehaviour
         {
             _player.SkillSealed   -= HandleSkillSealed;
             _player.SkillUnsealed -= HandleSkillUnsealed;
+            _player.SkillRejected    -= HandleSkillRejected;
+            _player.SkillBuffStarted -= HandleSkillBuffStarted;
         }
+        if (_formRuntime != null)
+        {
+            _formRuntime.Changed   -= HandleFormChanged;
+            _formRuntime.ReadyNext -= HandleFormReadyNext;
+        }
+        _formRuntime = null;
+        BindForm(null);
+        _formReadyShown = false;
+        view?.CombatPanel?.SetFormReadyNext(false, flash: false);
         _player = null;
+        UnbindLoadout();
         view?.CombatPanel?.SetRelicResource(null);   // 유물 아이덴티티 바 해제
         if (_playerBuffSource != null)
         {
@@ -525,8 +576,125 @@ public sealed class HudPresenter : MonoBehaviour
         catch (System.OperationCanceledException) { }
         finally { _flushingNotices = false; }
     }
+
+    // ── 빌드 완성 신호 · 유물 진화(10-14 빌드 시너지 · 83 UI 요청 2 · 3) ──
+
+    /// <summary>
+    /// 각인 단계 · 유물 진화 · 속성 존 단계 알림 한 줄(<see cref="ItemEffectVfxHelper.ShowBuildNotice"/>). 바로 그리지 않고 모아 두었다가
+    /// HUD가 보일 때(컷신 · 차단 팝업 · 룬판이 걷힌 다음 프레임) 진화 → 각인 → 존 순으로 보인다 — 룬판에서 단계가 오르면 판이 HUD를 덮어
+    /// 알림이 안 보인 채 만료됐다. 보류 중 같은 열쇠는 높은 단계 하나로 합치고, 보일 때 아직 참인 것만 낸다(놓았다 뺀 단계는 버린다).
+    /// </summary>
+    public void ShowBuildNotice(in BuildNotice notice)
+    {
+        if (notice.What == BuildNotice.Kind.Evolution)
+        {
+            // 진화 알림은 이 HUD가 진화 순간(HandleRelicPartsChanged)에 직접 낸다 — 효과가 새 플레이어에 다시 묶일 때 오는 것은 거른다.
+            if (notice.EvolutionId == s_evolutionAnnounced || !IsLiveRunPlayer) return;
+            s_evolutionAnnounced = notice.EvolutionId;
+        }
+        QueueBuildNotice(notice);
+    }
+
+    private void QueueBuildNotice(in BuildNotice notice)
+    {
+        if (string.IsNullOrEmpty(notice.Key)) return;
+        for (int i = 0; i < _pendingBuild.Count; i++)
+        {
+            if (_pendingBuild[i].Key != notice.Key) continue;
+            if (notice.Tier >= _pendingBuild[i].Tier) _pendingBuild[i] = notice;
+            return;
+        }
+        if (_pendingBuild.Count >= MaxPendingBuild) _pendingBuild.RemoveAt(0);
+        _pendingBuild.Add(notice);
+    }
+
+    /// <summary>지금 런 플레이어에 묶여 있나 — 이어하기 복원(허브 · 타이틀에서 로드아웃이 채워짐)은 진화 「순간」이 아니다.</summary>
+    private bool IsLiveRunPlayer
+        => _player != null && GameRunBootstrapper.Instance != null
+        && ReferenceEquals(GameRunBootstrapper.Instance.Run?.Player, _player);
+
+    /// <summary>HUD가 가려져 알림 · 순간 연출이 보이지 않는 동안 — 전투 패널이 없는 모드(컷신 등) · 차단 팝업(HUD를 걷는다) · 룬판(화면을 덮는다).</summary>
+    private bool BuildNoticeHeld
+        => (_currentMode != HUDIds.Mode.Combat && _currentMode != HUDIds.Mode.Boss)
+        || (UI_GridPanel.Instance != null && UI_GridPanel.Instance.IsOpen)
+        || Managers.UI.IsGameplayBlocked;
+
+    private void TickBuildNotices()
+    {
+        if (_pendingBuild.Count == 0 && _pendingMomentId == null) return;
+        var panel = view != null ? view.CombatPanel : null;
+        if (panel == null || BuildNoticeHeld) return;
+
+        if (_pendingMomentId != null)
+        {
+            string id = _pendingMomentId;
+            _pendingMomentId = null;
+            if (_loadout != null && _loadout.RelicEvolutionId == id)
+                panel.SetRelicEvolution(RelicEvolution.ById(id), CrestOf(_loadout), playMoment: true);
+        }
+        for (int kind = (int)BuildNotice.Kind.Evolution; kind <= (int)BuildNotice.Kind.Zone; kind++)
+            for (int i = 0; i < _pendingBuild.Count; i++)
+                if ((int)_pendingBuild[i].What == kind && _pendingBuild[i].StillHolds())
+                    panel.ShowBuildNotice(_pendingBuild[i]);
+        _pendingBuild.Clear();
+    }
+
+    /// <summary>로드아웃을 묶고 Q 칸 진화 표시를 지금 상태로 그린다(연출 없음) — 챕터 전환 · 이어하기에 이미 얻은 진화는 다시 알리지 않는다.</summary>
+    private void BindLoadout(PlayerLoadout loadout)
+    {
+        UnbindLoadout();
+        _loadout = loadout;
+        if (_loadout == null) return;
+        string id = _loadout.RelicEvolutionId;
+        s_evolutionAnnounced = string.IsNullOrEmpty(id) ? null : id;   // 비었으면 새 런 — 알림 기억도 비운다
+        _evolutionShown = id;
+        view?.CombatPanel?.SetRelicEvolution(RelicEvolution.ById(id), CrestOf(_loadout), playMoment: false);
+        _loadout.RelicPartsChanged += HandleRelicPartsChanged;
+    }
+
+    private void UnbindLoadout()
+    {
+        if (_loadout != null) _loadout.RelicPartsChanged -= HandleRelicPartsChanged;
+        _loadout = null;
+        _evolutionShown = null;
+        _pendingMomentId = null;
+        view?.CombatPanel?.SetRelicEvolution(null, null, playMoment: false);
+    }
+
+    /// <summary>
+    /// 유물 기억이 바뀌었다 — 진화가 <b>런 중 이 플레이어에게 새로</b> 생겼으면(기억 카드에서 「진화」를 고름) 순간 연출 + 알림,
+    /// 그 밖(새 런으로 비움 · 복원)은 표시만 맞춘다.
+    /// </summary>
+    private void HandleRelicPartsChanged()
+    {
+        string id = _loadout != null ? _loadout.RelicEvolutionId : null;
+        if (id == _evolutionShown) return;
+        bool moment = !string.IsNullOrEmpty(id) && string.IsNullOrEmpty(_evolutionShown) && IsLiveRunPlayer;
+        _evolutionShown = id;
+        if (!moment)
+        {
+            if (string.IsNullOrEmpty(id)) s_evolutionAnnounced = null;   // 기억을 비웠다(유물 교체 · 새 런) — 알림 기억도
+            view?.CombatPanel?.SetRelicEvolution(RelicEvolution.ById(id), CrestOf(_loadout), playMoment: false);
+            return;
+        }
+        _pendingMomentId = id;
+        s_evolutionAnnounced = id;
+        QueueBuildNotice(BuildNotice.Evolution(RelicEvolution.ById(id)));
+    }
+
+    private static Sprite CrestOf(PlayerLoadout loadout) => loadout != null && loadout.Relic != null ? loadout.Relic.Crest : null;
+
     private void HandleCooldownChanged(SkillType skill, float remaining, float total)
         => view?.CombatPanel?.SetSkillCooldown(skill, remaining, total);
+
+    /// <summary>추적기의 지금 쿨다운을 사건 경로로 한 번 흘린다. 전체 시간은 남은 시간 ÷ 진행률로 되돌린다(추적기엔 전체 시간 조회가 없다).</summary>
+    private void PushCooldown(SkillType skill)
+    {
+        if (_cooldownTracker == null) return;
+        float remaining = _cooldownTracker.GetRemaining(skill);
+        float progress  = _cooldownTracker.GetProgress(skill);
+        HandleCooldownChanged(skill, remaining, progress > 0f ? remaining / progress : 0f);
+    }
 
     private void HandleBossHPChanged(int hp, int maxHp)
     {
@@ -602,6 +770,54 @@ public sealed class HudPresenter : MonoBehaviour
 
     private void HandleSkillSealed(SkillType slot, float remaining) => RefreshSkillLock(slot);
     private void HandleSkillUnsealed(SkillType slot) => RefreshSkillLock(slot);
+    private void HandleSkillRejected(SkillType slot) => view?.CombatPanel?.PlaySkillRejected(slot);
+    private void HandleSkillBuffStarted(SkillType slot, float duration) => view?.CombatPanel?.ShowSkillBuff(slot, duration);
+
+    // ── 형 게이지(10-08) — 근접 칸 무기의 형(쌓인 수 · 발동)을 HUD 무기 원 위 알약으로 ──
+    private void HandleFormChanged() => BindForm(_formRuntime != null ? _formRuntime.Current : null);
+
+    private void BindForm(WeaponFormBase form)
+    {
+        if (_form != null)
+        {
+            _form.StacksChanged -= HandleFormStacks;
+            _form.Triggered     -= HandleFormTriggered;
+        }
+        _form = form;
+        if (_form != null)
+        {
+            _form.StacksChanged += HandleFormStacks;
+            _form.Triggered     += HandleFormTriggered;
+        }
+        var panel = view?.CombatPanel;
+        if (panel == null) return;
+        panel.SetFormGauge(_form?.Form);
+        panel.SetFormStacks(_form?.Stacks ?? 0);
+    }
+
+    /// <summary>쌓인 수 + 줄어든 까닭(맞음 · 시간 · 발동 · 돌려받음) — 사건 안에서 읽어 넘긴다(10-12 A7 · S9).</summary>
+    private void HandleFormStacks(int stacks, int max)
+    {
+        if (_form == null) { view?.CombatPanel?.SetFormStacks(stacks); return; }
+        view?.CombatPanel?.SetFormStacks(stacks, _form.LastReason, _form.LastRefund);
+    }
+
+    private void HandleFormReadyNext()
+    {
+        _formReadyShown = true;
+        view?.CombatPanel?.SetFormReadyNext(true, flash: true);
+    }
+
+    /// <summary>「다음 타에 발동」이 풀렸나 — 오르는 순간은 ReadyNext 사건이 알리고, 풀림(마지막 타 휘두름 · 쌓임 변화 · 무기 교체)은 사건이 없어 매 프레임 본다(bool 하나).</summary>
+    private void TickFormReadyNext()
+    {
+        bool on = _formRuntime != null && _formRuntime.IsReadyNext;
+        if (on == _formReadyShown) return;
+        _formReadyShown = on;
+        view?.CombatPanel?.SetFormReadyNext(on, flash: false);
+    }
+
+    private void HandleFormTriggered(string _) => view?.CombatPanel?.PlayFormTriggered();
 
     public void Dispose()
     {
@@ -617,6 +833,16 @@ public sealed class HudPresenter : MonoBehaviour
             _fuelBank.OnFuelChanged -= HandleFuelChanged;
             _fuelBank = null;
         }
+        // 정수 · 부활도 뗀다 — 끝난 런이 다음 HUD에 값을 밀어 넣지 않게(10-09 출시 점검)
+        if (_run != null)
+        {
+            _run.OnEssenceChanged -= HandleEssenceChanged;
+            _run.OnReviveChanged  -= HandleReviveChanged;
+            _run = null;
+        }
+        _deferredNotices.Clear();   // 컷신 중 보류한 알림이 다음 런 첫 컷신 뒤에 뜨지 않게
+        _pendingBuild.Clear();
+        _pendingMomentId = null;
 
         _provider = null;
         // @UIRoot는 DDOL이라 씬 전환으로 파괴되지 않는다 — 여기서 보스를 떼지 않으면
@@ -753,6 +979,7 @@ public sealed class HudPresenter : MonoBehaviour
     {
         if (canvasGroup == null)
         {
+            if (visible && ActivationHeld) return;
             gameObject.SetActive(visible);
             return;
         }

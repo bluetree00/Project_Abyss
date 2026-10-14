@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: clear_50_rooms
   m_EditorClassIdentifier: Assembly-CSharp::Achievement
   category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 35b08f8c84a0da344b24ab9bb50afc33, type: 3}
   codeName: clear_50_rooms
   displayName: "\uBC29 \uD0D0\uD5D8\uAC00"
   description: "\uBC29 50\uAC1C \uD074\uB9AC\uC5B4"

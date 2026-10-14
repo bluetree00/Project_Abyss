@@ -20,6 +20,13 @@ using UnityEngine.UI;
 /// </summary>
 public sealed class MinimapView : MonoBehaviour
 {
+    // ── Constants ────────────────────────────────────────────
+    private const float PlateRadius = 12f;   // 판 모서리(공통 글래스 판과 같은 값)
+    private const float EdgeInset   = 4f;    // 테 바깥 끝 ↔ 판 가장자리(공통 테 RoundedOutline과 같은 자리)
+
+    // ── Static ───────────────────────────────────────────────
+    private static Sprite s_edge;
+
     // ── SerializeField ───────────────────────────────────────
     [Header("Settings")]
     [SerializeField] private Vector2 mapDisplayHalfSize = new(55f, 55f);
@@ -161,7 +168,11 @@ public sealed class MinimapView : MonoBehaviour
     /// </summary>
     private void ApplyTheme()
     {
-        if (TryGetComponent<Image>(out var plate)) UITheme.StylePanel(plate, UITheme.Glass, UITheme.GoldLine, 12f);
+        if (TryGetComponent<Image>(out var plate))
+        {
+            UITheme.StylePanel(plate, UITheme.Glass, UITheme.GoldLine, PlateRadius);
+            ThinEdge(plate);
+        }
 
         var frame = FindChildRecursive(transform, "Img_Frame");
         if (frame != null) frame.gameObject.SetActive(false);
@@ -178,6 +189,41 @@ public sealed class MinimapView : MonoBehaviour
         if (bg != null && bg.TryGetComponent<Image>(out var bgImg)) bgImg.color = new Color(0.02f, 0.02f, 0.04f, 0.35f);
 
         if (_playerMarkerRect != null && _playerMarkerRect.TryGetComponent<Image>(out var dot)) dot.color = UITheme.Ink;
+    }
+
+    /// <summary>
+    /// 톤 v2 HUD(10-11) — 판 테(공통 글래스의 금 1.5px, 안티에일리어싱까지 화면에서 약 3px)를 1px 잉크 18%로.
+    /// 금은 「준비됨 · 누를 것」에만 남기고(미니맵은 둘 다 아니다), 선 굵기는 평소 1px 한 벌로 맞춘다. 판 크기 그대로 한 장을 굽는다(늘리지 않는다).
+    /// </summary>
+    private void ThinEdge(Image plate)
+    {
+        if (!CombatPanelView.ThinHud) return;
+        var edge = plate.transform.Find("Edge");
+        if (edge == null || !edge.TryGetComponent<Image>(out var line)) return;
+        var size = plate.rectTransform.rect.size;
+        if (size.x < 4f || size.y < 4f) return;   // 아직 레이아웃 전이면 공통 테 그대로
+        line.sprite = RoundedLine(size, PlateRadius);
+        line.type   = Image.Type.Simple;
+        line.color  = UITheme.Thin.LineIdle;
+    }
+
+    /// <summary>둥근 사각 1px 테 — 2배 해상도 · 가장자리 1px 안티에일리어싱(UIThinShapes와 같은 방식). 크기마다 한 번만 굽는다.</summary>
+    private static Sprite RoundedLine(Vector2 size, float radius)
+    {
+        const int k = UIThinShapes.Oversample;
+        int tw = Mathf.Max(4, Mathf.RoundToInt(size.x * k)), th = Mathf.Max(4, Mathf.RoundToInt(size.y * k));
+        if (s_edge != null && s_edge.texture.width == tw && s_edge.texture.height == th) return s_edge;
+        float s  = UITheme.Thin.Stroke * k;
+        float r  = (radius - UITheme.Thin.Stroke * 0.5f) * k;                       // 선 가운데가 지나는 모서리 반지름(바깥 끝 = radius)
+        float hx = tw * 0.5f - (EdgeInset + radius) * k, hy = th * 0.5f - (EdgeInset + radius) * k;   // 모서리 원 중심
+        s_edge = UI_RuneSelectPopup.MakeProcSprite("ThinMinimapEdge", tw, th, (u, v) =>
+        {
+            float qx = Mathf.Abs((u - 0.5f) * tw) - hx, qy = Mathf.Abs((v - 0.5f) * th) - hy;
+            float outside = new Vector2(Mathf.Max(qx, 0f), Mathf.Max(qy, 0f)).magnitude;
+            float d = outside + Mathf.Min(Mathf.Max(qx, qy), 0f) - r;               // 둥근 사각 선까지 부호 거리
+            return Mathf.Clamp01(s * 0.5f + 0.5f - Mathf.Abs(d));
+        });
+        return s_edge;
     }
     /// <summary>범위가 없으면 판 전체(테두리 포함)를 투명하게. 켜기/끄기는 HudView 섹션이 하므로 활성 상태는 두고 알파만 쓴다.</summary>
     private void ApplyVisible()

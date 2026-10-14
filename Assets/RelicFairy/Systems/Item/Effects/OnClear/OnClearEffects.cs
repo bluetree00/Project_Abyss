@@ -188,7 +188,7 @@ public sealed class MaxHPDecreasePerRoomEffect : ItemEffectBase
         if (decrease <= 0) return;
 
         stats.DecreaseMaxHp(decrease);
-        ItemGuide.Toast(ctx.Player.transform.position, $"최대 HP -{decrease}");
+        ItemGuide.Toast(ctx.Player.transform.position, $"최대 체력 -{decrease}");
         Debug.Log($"[MaxHPDecreasePerRoom] 최대 체력 -{decrease} (남은 {stats.MaxHp}, 하한 {floor})");
     }
 }

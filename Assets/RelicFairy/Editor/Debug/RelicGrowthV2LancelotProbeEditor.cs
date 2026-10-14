@@ -27,6 +27,11 @@ public static class RelicGrowthV2LancelotProbeEditor
     private const BindingFlags Inst = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
     private const string OutPath = "Temp/relic_growth_v2_lancelot.txt";
     private static bool s_armed;
+    private static string s_mode = "full";
+    private const string FixOutPath = "Temp/lancelot_fix_probe.txt";   // 6b ① 결함 전 · 후(10-12)
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/6b 랜슬롯 ① 결함 전 · 후 — 피 냄새 · 왕관 ③ (10-12, 테스트 허브, 플레이 중)")]
+    private static void BeginFix() { s_mode = "fix"; Begin(); }
 
     [MenuItem("RelicFairy/Debug/유물 성장 v2/6 랜슬롯 실측 (테스트 허브, 플레이 중)")]
     private static void Begin()
@@ -100,6 +105,7 @@ public static class RelicGrowthV2LancelotProbeEditor
             SetDecay(c, 999f, 1f);   // 실측 동안 광기는 맞춰 둔 값에 머문다
             c.Hub = LancelotMemoryHub.Ensure(player);
             FaceOpen(player, c.Park);
+            if (s_mode == "fix") { await LancelotFixAsync(c, ct); return; }
             c.Runes = typeof(RuneSynergyFullProbeEditor).GetMethod("LoadCsv", BindingFlags.Static | BindingFlags.NonPublic)
                 ?.Invoke(null, null) as Dictionary<string, RuneSynergyEntry>;
             await BaseAsync(c, ct);
@@ -114,9 +120,54 @@ public static class RelicGrowthV2LancelotProbeEditor
         {
             Application.logMessageReceived -= OnAnyLog;
             c.Sb.Insert(0, $"통과 {c.Pass} · 실패 {c.Fail}\n");
-            System.IO.File.WriteAllText(OutPath, c.Sb.ToString());
-            Debug.Log($"[RGV2랜슬롯] 끝 — 통과 {c.Pass} · 실패 {c.Fail} → {OutPath}");
+            string outPath = s_mode == "fix" ? FixOutPath : OutPath;
+            s_mode = "full";
+            System.IO.File.WriteAllText(outPath, c.Sb.ToString());
+            Debug.Log($"[RGV2랜슬롯] 끝 — 통과 {c.Pass} · 실패 {c.Fail} → {outPath}");
         }
+    }
+
+    // ── 6b ① 결함 전 · 후 (10-12 · 유물 · 장비 기능 확장 설계 §2 · B1 · D3) ─────
+    private static async UniTask LancelotFixAsync(Ctx c, CancellationToken ct)
+    {
+        c.Sb.AppendLine("■ ① 결함 전 · 후 (「전」 = 고치기 전 코드의 기대값)");
+
+        // B1 피 냄새 ① — 감쇠를 실제 규칙(마지막 적중 3초 뒤 · 초당 4)으로 돌려, 몰린 적 처치 뒤 광기가 처음 줄기까지 잰다
+        AddPart(c, "l_blood_scent");
+        c.Madness.Floor = 0;
+        c.Madness.SetStacks(15);
+        var b1 = Take(c);
+        Place(c, b1, 2f, 0f);
+        await Wait(0.3f, ct);
+        SetHpRatio(b1, 0.25f);
+        Notify(c, b1, WeaponActionType.GroundLight);   // 「30% 이하에서 맞음」
+        SetHp(b1, 1);
+        SetDecay(c, 3f, 4f);
+        await Hit(c, b1, ct);
+        float killAt = Time.time - 0.05f;   // Hit은 피해 뒤 0.05초 기다린다
+        int m0 = c.Madness.Stacks;
+        float firstDrop = -1f;
+        while (Time.time - killAt < 7f)
+        {
+            await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            if (c.Madness.Stacks < m0) { firstDrop = Time.time - killAt; break; }
+        }
+        SetDecay(c, 999f, 1f);
+        c.Line(b1.IsDead && firstDrop >= 4.8f, $"B1 피 냄새 ① 몰린 적 처치 뒤 광기가 처음 줄기까지 {firstDrop:0.00}초 (전: 약 3.3 = 감쇠 유예와 같음 · 후: 약 5.3)");
+
+        // D3 광기의 왕관 ③ — 원한 5에서 광란 진입 → 왕관의 심판 뒤 남은 원한
+        AddPart(c, "l_madness_crown");
+        c.Madness.SetStacks(10);
+        var k = Take(c);
+        Place(c, k, 2f, 0f);
+        await Wait(0.3f, ct);
+        SetBrand(c, k, 0);
+        c.Hub.Grudge.TakeAll(); c.Hub.Grudge.Add(5);
+        int from = c.Log.Count;
+        EnterFrenzy(c, 60f);
+        await Wait(0.5f, ct);
+        c.Line(LogHas(c, from, "번째 — 찢은 낙인") && c.Grudge == 3, $"D3 왕관 ③ 원한 5 → 왕관의 심판 뒤 {c.Grudge} (전: 0 = 원한을 다 씀 · 후: 3 = 2개만) · {LogLine(c, from, "번째 — 찢은 낙인")}");
+        await EndFrenzy(c, ct);
     }
 
     // ── 1 허브 기본 규칙 ─────────────────────────────────────────

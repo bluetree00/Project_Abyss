@@ -23,7 +23,7 @@ MonoBehaviour:
       socket: 0
       space: 0
       positionOffset: {x: 0, y: 1, z: 0.2}
-      rotationEuler: {x: 0, y: 0, z: 48}
+      rotationEuler: {x: 0, y: 0, z: 62}
       scaleMultiplier: 0.8
       lifeTimeMultiplier: 1
       behavior: {fileID: 0}
@@ -53,7 +53,7 @@ MonoBehaviour:
       socket: 0
       space: 0
       positionOffset: {x: -0.2, y: 1, z: 0.2}
-      rotationEuler: {x: 0, y: 0, z: -172}
+      rotationEuler: {x: 0, y: 0, z: -132}
       scaleMultiplier: 0.8
       lifeTimeMultiplier: 1
       behavior: {fileID: 0}
@@ -83,7 +83,7 @@ MonoBehaviour:
       socket: 0
       space: 0
       positionOffset: {x: 0.2, y: 1, z: 0.2}
-      rotationEuler: {x: 0, y: 0, z: 95}
+      rotationEuler: {x: 0, y: 0, z: 0}
       scaleMultiplier: 1
       lifeTimeMultiplier: 1
       behavior: {fileID: 0}

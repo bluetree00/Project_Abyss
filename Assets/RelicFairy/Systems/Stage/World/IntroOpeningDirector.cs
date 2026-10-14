@@ -17,7 +17,7 @@ public sealed class IntroOpeningDirector : MonoBehaviour
     [SerializeField] private string prologueSequenceId = "Intro_Prologue";
 
     [Header("연출 앵커")]
-    [Tooltip("제단/천사상 — 스테인드글라스를 올려다보는 기준점.")]
+    [Tooltip("제단/천사상 — 제단 쇼트의 기준점.")]
     [SerializeField] private Transform altarAnchor;
     [Tooltip("무형검 — 클로즈업 대상.")]
     [SerializeField] private Transform swordAnchor;
@@ -80,13 +80,14 @@ public sealed class IntroOpeningDirector : MonoBehaviour
             Vector3 sword   = swordAnchor   != null ? swordAnchor.position   : new Vector3(0.2f, 1f, -2.4f);
             Vector3 mordred = mordredAnchor != null ? mordredAnchor.position : new Vector3(0.25f, 0f, 2.26f);
 
-            // ② 페이지 안으로 — 마지막 삽화가 확대되며 사라지고, 같은 구도의 3D 성당이 드러난다.
+            // ② 페이지 안으로 — 마지막 삽화가 확대되며 사라지고, 성당 전경(붉은 길 · 기다리는 기사 · 제단)이 드러난다.
             //    페이지가 녹는 동안 카메라도 이미 밀고 들어가는 중이라 "그림 속으로 들어간" 것처럼 이어진다.
-            SetCamera(altar + new Vector3(0f, 2.0f, -12f), altar + new Vector3(0f, 13f, 4f));
+            //    예전엔 석상 · 스테인드글라스만 6초 올려다봐서 공간도 인물도 소개되지 않았다(10-10).
+            SetCamera(mordred + new Vector3(0f, 6.5f, -15f), mordred + new Vector3(0f, 1.0f, 8f));
             IntroPageBook.DissolveIntoSceneAsync(pageIntoScene, ct).Forget();
-            await MoveCameraAsync(altar + new Vector3(0f, 3.4f, -8.5f), altar + new Vector3(0f, 10f, 3f), shotGlass, ct);
+            await MoveCameraAsync(mordred + new Vector3(0f, 4.8f, -10.5f), mordred + new Vector3(0f, 1.6f, 8f), shotGlass, ct);
 
-            // ③ 하강 — 시선이 빛에서 원탁으로 내려온다
+            // ③ 제단으로 — 붉은 길을 따라 기사 머리 위를 지나 제단 · 석상에 닿는다
             await MoveCameraAsync(altar + new Vector3(-2.8f, 2.2f, -13f), altar + new Vector3(0f, 1.4f, 0f), shotAltar, ct);
 
             // ④ 무형검 — 곁을 돌며 다가간다

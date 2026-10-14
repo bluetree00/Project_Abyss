@@ -17,7 +17,7 @@ MonoBehaviour:
   knockbackMultiplier: 1.5
   castInterval: 0.5
   expandDamage: 20
-  expandRadius: 4
+  expandRadius: 6.5
   expandDelay: 0.15
   expandEffectKey: GreatswordEFinish
   expandEffectScale: 2

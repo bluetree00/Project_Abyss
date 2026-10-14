@@ -1,30 +1,36 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using RelicFairy.Monster;
 using UnityEngine;
-using UnityEngine.AI;
 
-// ── I-1. 빙하 파동 (광역기) ───────────────────────────────────────────
+// ── 얼음 전설 3종 — 「몇 초마다」를 없애고 빌드 행동으로 발동(10-14 룬 재설계 R3) ──────────
+// 빙하 파동 = 주문 · 얼음 창 폭격 = 필살 · 영구 빙판 = 기동. 존 단계마다 피해 +15% — LegendaryTuning.
+
+// ── I-1. 빙하 파동 (주문) ─────────────────────────────────────────────
+/// <summary>
+/// E · R 스킬을 쓰면(쿨 value2 = 4초) 플레이어 둘레 3.5 m(value3)에 냉기 파동 4번(공격력 × value = 40%) — 첫 파동이 서리 2중첩을 건다.
+/// </summary>
 public sealed class IceLegendAoeEffect : ItemCombatEffectBase
 {
     private static readonly string[] s_hitSfx = { SoundKey.Sfx.MonsterHit1, SoundKey.Sfx.MonsterHit2, SoundKey.Sfx.MonsterHit3 };
-
-    private const int WaveTicks = 4;
+    private const int   WaveTicks = 4;
+    private const string FrostId = "frost";
+    private const float FrostSlow = 0.25f, FrostSeconds = 2.5f;
 
     private readonly List<GameObject> _buf = new();
-    private float _timer;
-    private int _baseTier;
-    private bool _baseSet;
+    private float _readyAt;
     private CancellationTokenSource _cts;
+
+    /// <summary>새 행(발동 「OnSkillUse」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
+    private bool NewRow => _trigger == "OnSkillUse";
 
     public IceLegendAoeEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnActivate(ItemEffectContext ctx)
     {
         LegendaryRuntime.EnsureExists();
-        _timer    = 0f;
-        _baseTier = 0;
-        _baseSet  = false;
+        _readyAt = 0f;
         _cts = new CancellationTokenSource();
     }
 
@@ -35,22 +41,17 @@ public sealed class IceLegendAoeEffect : ItemCombatEffectBase
         _cts = null;
     }
 
-    public override void OnTick(ItemEffectContext ctx, float deltaTime)
+    public override void OnSkillUse(ItemEffectContext ctx, SkillType skill)
     {
-        if (!_baseSet) { _baseTier = MerlinRuneBridge.Instance?.GetZoneTier("ICE") ?? 0; _baseSet = true; }
-        _timer += deltaTime;
-        if (_timer < _value2) return;
-        _timer -= _value2;
-        if (ctx?.Player == null || _cts == null) return;
+        if (skill != SkillType.E && skill != SkillType.R) return;   // 유물 Q는 제 몫이 따로 있다
+        if (ctx?.Player == null || _cts == null || Time.time < _readyAt) return;
+        _readyAt = Time.time + LegendaryTuning.Pick(NewRow, _value2, 4f);
 
-        int extra = ExtraTiers();
-        float radius   = 3f + extra * 0.4f;
-        float vfxScale = 0.4f + extra * 0.15f;
-
-        Vector3 pos = ctx.Player.transform.position;
+        float radius = LegendaryTuning.Pick(NewRow, _value3, 3.5f);
+        Vector3 pos  = ctx.Player.transform.position;
         var cat = LegendaryRuntime.Catalog;
-        LegendaryRuntime.SpawnVfx(cat?.iceAoeVfx, pos, Quaternion.identity, 4f, vfxScale, alpha: 0.18f, yScale: 0.1f);
-
+        if (CombatQuery.GetNearbyDamageables(pos, radius, Self(ctx), 1, _buf) > 0)
+            LegendaryRuntime.SpawnVfx(cat?.iceAoeVfx, pos, Quaternion.identity, 4f, radius * 0.0488f, alpha: 0.18f, yScale: 0.1f, follow: ctx.Player.transform);
         WaveTickAsync(ctx, radius, _cts.Token).Forget();
     }
 
@@ -62,48 +63,47 @@ public sealed class IceLegendAoeEffect : ItemCombatEffectBase
             for (int t = 0; t < WaveTicks; t++)
             {
                 if (ct.IsCancellationRequested || ctx.Player == null) break;
-
+                float dmg = LegendaryTuning.Atk(ctx) * LegendaryTuning.Pick(NewRow, _value, 0.4f) * LegendaryTuning.TierMul("ICE");
                 Vector3 pos = ctx.Player.transform.position;
                 int n = CombatQuery.GetNearbyDamageables(pos, radius, Self(ctx), 30, _buf);
                 for (int i = 0; i < n; i++)
                 {
-                    CombatQuery.DealSynergyDamage(_buf[i], EffAtk(ctx) * 0.5f, Self(ctx), element: RuneElement.Ice);
+                    CombatQuery.DealSynergyDamage(_buf[i], dmg, Self(ctx), element: RuneElement.Ice);
+                    if (t != 0) continue;
+                    // 첫 파동 — 서리 2중첩(얼음 존의 빙결 조건과 같은 통화) · 타격 이펙트는 첫 틱만(10-11 톤 2차 V-10)
+                    var mb = _buf[i] != null ? _buf[i].GetComponentInParent<MonsterBase>() : null;
+                    if (mb != null) { mb.Status.ApplySlow(FrostId, FrostSlow, FrostSeconds, 2); mb.Status.ApplySlow(FrostId, FrostSlow, FrostSeconds, 2); }
                     LegendaryRuntime.SpawnVfx(cat?.iceAoeHitVfx, _buf[i].transform.position, Quaternion.identity, 1.5f, 0.8f);
                 }
-                if (n > 0)
-                    Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
-
-                float atkMult = ctx.Player?.RuntimeStats?.AttackSpeedMultiplier ?? 1f;
-                await UniTask.Delay(Mathf.RoundToInt(1000f / atkMult), cancellationToken: ct);
+                if (n > 0) Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
+                await UniTask.Delay(400, cancellationToken: ct);
             }
         }
         catch (System.OperationCanceledException) { }
     }
-
-    private int ExtraTiers() =>
-        Mathf.Max(0, (MerlinRuneBridge.Instance?.GetZoneTier("ICE") ?? 0) - _baseTier);
 }
 
-// ── I-2. 얼음 창 폭격 (단일기) ────────────────────────────────────────
+// ── I-2. 얼음 창 폭격 (필살) ──────────────────────────────────────────
+/// <summary>
+/// 치명 또는 강타가 터지면(쿨 value2 = 5초) 그 대상에게 얼음 창 5발 — 합계 = 그 타격 피해 × value(150%).
+/// </summary>
 public sealed class IceLegendSingleEffect : ItemCombatEffectBase
 {
     private static readonly string[] s_hitSfx = { SoundKey.Sfx.MonsterHit1, SoundKey.Sfx.MonsterHit2, SoundKey.Sfx.MonsterHit3 };
+    private const int Spears = 5;
 
-    private readonly List<GameObject> _buf = new();
-    private float _timer;
-    private int _baseTier;
-    private bool _baseSet;
-    private const int BaseSpears = 5;
+    private float _readyAt;
     private CancellationTokenSource _cts;
+
+    /// <summary>새 행(발동 「OnCrit」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
+    private bool NewRow => _trigger == "OnCrit";
 
     public IceLegendSingleEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnActivate(ItemEffectContext ctx)
     {
         LegendaryRuntime.EnsureExists();
-        _timer    = 0f;
-        _baseTier = 0;
-        _baseSet  = false;
+        _readyAt = 0f;
         _cts = new CancellationTokenSource();
     }
 
@@ -114,33 +114,25 @@ public sealed class IceLegendSingleEffect : ItemCombatEffectBase
         _cts = null;
     }
 
-    public override void OnTick(ItemEffectContext ctx, float deltaTime)
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
-        if (!_baseSet) { _baseTier = MerlinRuneBridge.Instance?.GetZoneTier("ICE") ?? 0; _baseSet = true; }
-        _timer += deltaTime;
-        if (_timer < _value2) return;
-        _timer -= _value2;
-        if (ctx?.Player == null || _cts == null) return;
-
-        int n = CombatQuery.GetNearbyDamageables(ctx.Player.transform.position, 20f, Self(ctx), 10, _buf);
-        if (n == 0) return;
-
-        StrikeAsync(ctx, _buf[0], BaseSpears + ExtraTiers(), _cts.Token).Forget();
+        if (!(report.IsCrit || report.IsHeavy) || report.DamageDealt <= 0f || report.Target == null) return;
+        if (ctx?.Player == null || _cts == null || Time.time < _readyAt) return;
+        _readyAt = Time.time + LegendaryTuning.Pick(NewRow, _value2, 5f);
+        float total = report.DamageDealt * LegendaryTuning.Pick(NewRow, _value, 1.5f) * LegendaryTuning.TierMul("ICE");
+        StrikeAsync(ctx, report.Target, total / Spears, _cts.Token).Forget();
     }
 
-    private async UniTaskVoid StrikeAsync(ItemEffectContext ctx, GameObject target, int count, CancellationToken ct)
+    private async UniTaskVoid StrikeAsync(ItemEffectContext ctx, GameObject target, float spearDmg, CancellationToken ct)
     {
         try
         {
             var cat = LegendaryRuntime.Catalog;
-            float spearDmg = EffAtk(ctx) * _value;
-            float finalDmg = EffAtk(ctx) * _value3;
-
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < Spears; i++)
             {
                 if (ct.IsCancellationRequested || target == null) break;
 
-                float yaw   = i * 360f / count + Random.Range(-20f, 20f);
+                float yaw   = i * 360f / Spears + Random.Range(-20f, 20f);
                 float pitch = Random.Range(-60f, -20f);
                 Vector3 tPos   = target.transform.position;
                 Vector3 spawn  = tPos + Quaternion.Euler(pitch, yaw, 0) * Vector3.forward * 1.2f;
@@ -154,129 +146,70 @@ public sealed class IceLegendSingleEffect : ItemCombatEffectBase
 
                 await UniTask.Delay(150, cancellationToken: ct);
             }
-
-            if (target != null)
-            {
-                CombatQuery.DealSynergyDamage(target, finalDmg, ctx?.Player?.gameObject, element: RuneElement.Ice);
-                Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
-            }
         }
         catch (System.OperationCanceledException) { }
     }
-
-    private int ExtraTiers() =>
-        Mathf.Max(0, (MerlinRuneBridge.Instance?.GetZoneTier("ICE") ?? 0) - _baseTier);
 }
 
-// ── I-3. 영구 빙판 (필드 지속기) ─────────────────────────────────────
+// ── I-3. 영구 빙판 (기동) ─────────────────────────────────────────────
+/// <summary>
+/// 대시가 끝난 자리에 반경 2 m 빙판 4초(초당 공격력 × value = 30% · 둔화). 최대 3개.
+/// 저스트 회피를 하면 지금 빙판 위의 적이 모두 빙결(1.5초).
+/// </summary>
 public sealed class IceLegendFieldEffect : ItemCombatEffectBase
 {
-    private int _baseTier;
-    private int _lastExtra = -1;
-    private bool _baseSet;
-    private ItemEffectContext _savedCtx;
+    private const float FieldRadius = 2f, FieldSeconds = 4f, FreezeSeconds = 1.5f;
+    private const int   MaxFields = 3;
+
+    private readonly List<IceZoneField> _fields = new();
+    private PlayerController _dodgeSource;
+
+    /// <summary>새 행(발동 「OnDash」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
+    private bool NewRow => _trigger == "OnDash";
 
     public IceLegendFieldEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnActivate(ItemEffectContext ctx)
     {
         LegendaryRuntime.EnsureExists();
-        _baseTier  = 0;
-        _lastExtra = -1;
-        _baseSet   = false;
-        _savedCtx  = ctx;
+        if (ctx?.Player == null) return;
+        _dodgeSource = ctx.Player;
+        _dodgeSource.OnPerfectDodge += HandlePerfectDodge;
     }
 
-    public override void OnDeactivate() => LegendaryRuntime.Instance?.ClearAgentsOf(this);
+    public override void OnDeactivate()
+    {
+        if (_dodgeSource != null) _dodgeSource.OnPerfectDodge -= HandlePerfectDodge;
+        _dodgeSource = null;
+        LegendaryRuntime.Instance?.ClearAgentsOf(this);
+        _fields.Clear();
+    }
 
     public override void OnRoomEnter(ItemEffectContext ctx)
     {
         LegendaryRuntime.Instance?.ClearAgentsOf(this);
-        _savedCtx = ctx;
-        _baseSet  = false;
+        _fields.Clear();
     }
 
-    public override void OnTick(ItemEffectContext ctx, float deltaTime)
-    {
-        _savedCtx = ctx;
-        if (!_baseSet)
-        {
-            _baseTier  = MerlinRuneBridge.Instance?.GetZoneTier("ICE") ?? 0;
-            _lastExtra = ExtraTiers();
-            _baseSet   = true;
-            SpawnFields(ctx);
-            return;
-        }
-        int extra = ExtraTiers();
-        if (extra == _lastExtra) return;
-        _lastExtra = extra;
-        LegendaryRuntime.Instance?.ClearAgentsOf(this);
-        SpawnFields(ctx);
-    }
-
-    private void SpawnFields(ItemEffectContext ctx)
+    public override void OnRollEnd(ItemEffectContext ctx)
     {
         if (ctx?.Player == null) return;
+        _fields.RemoveAll(f => f == null);
+        while (_fields.Count >= MaxFields) { if (_fields[0] != null) Object.Destroy(_fields[0].gameObject); _fields.RemoveAt(0); }
 
-        int extra = ExtraTiers();
-        int count = Mathf.RoundToInt(_value2) + extra;
-        float dps = EffAtk(ctx) * _value;
-        float atk = EffAtk(ctx);
-        float groundY = ctx.Player.transform.position.y;
-
-        var (mapCenter, mapExtents) = CalcNavMeshBounds(groundY);
-        float spreadRadius = Mathf.Max(mapExtents.x, mapExtents.z) * 0.55f;
-
-        Debug.Log($"[IceField] SpawnFields start: count={count} value2={_value2} extra={extra} spreadRadius={spreadRadius:F2} center={mapCenter} extents={mapExtents}");
-
-        // 맵을 count 등분 → 각 구역에 1개 확정 스폰
-        for (int i = 0; i < count; i++)
-        {
-            float angle = i * 360f / count + Random.Range(-25f, 25f);
-            float rad   = angle * Mathf.Deg2Rad;
-            float x     = mapCenter.x + Mathf.Cos(rad) * spreadRadius;
-            float z     = mapCenter.z + Mathf.Sin(rad) * spreadRadius;
-            var pos = new Vector3(x, groundY, z);
-
-            bool sampled = NavMesh.SamplePosition(pos, out NavMeshHit hit, 5f, NavMesh.AllAreas);
-            if (sampled)
-                pos = new Vector3(hit.position.x, groundY, hit.position.z);
-
-            Debug.Log($"[IceField] Zone {i}: angle={angle:F1} sampled={sampled} pos={pos}");
-            SpawnZone(this, ctx, pos, dps, atk);
-            Debug.Log($"[IceField] Zone {i}: spawned OK");
-        }
-
-        Debug.Log($"[IceField] SpawnFields end: {count} zones created");
-    }
-
-    private static (Vector3 center, Vector3 extents) CalcNavMeshBounds(float y)
-    {
-        var tri = NavMesh.CalculateTriangulation();
-        if (tri.vertices.Length == 0)
-            return (new Vector3(0f, y, 0f), new Vector3(6f, 0f, 6f));
-
-        float minX = tri.vertices[0].x, maxX = tri.vertices[0].x;
-        float minZ = tri.vertices[0].z, maxZ = tri.vertices[0].z;
-        foreach (var v in tri.vertices)
-        {
-            if (v.x < minX) minX = v.x;
-            if (v.x > maxX) maxX = v.x;
-            if (v.z < minZ) minZ = v.z;
-            if (v.z > maxZ) maxZ = v.z;
-        }
-        return (new Vector3((minX + maxX) * 0.5f, y, (minZ + maxZ) * 0.5f),
-                new Vector3((maxX - minX) * 0.5f, 0f, (maxZ - minZ) * 0.5f));
-    }
-
-    private static void SpawnZone(object owner, ItemEffectContext ctx, Vector3 pos, float dps, float atk)
-    {
+        float atk = LegendaryTuning.Atk(ctx);
+        float dps = atk * LegendaryTuning.Pick(NewRow, _value, 0.3f) * LegendaryTuning.TierMul("ICE");
         var go = new GameObject("IceZone");
-        go.transform.position = pos;
+        go.transform.position = ctx.Player.transform.position;
         var zone = go.AddComponent<IceZoneField>();
-        zone.Init(owner, ctx, dps, 1.2f, -1f, atk);
+        zone.Init(this, ctx, dps, FieldRadius, FieldSeconds, atk);
+        _fields.Add(zone);
+        SkillRangeRing.Circle(go.transform.position, FieldRadius);
     }
 
-    private int ExtraTiers() =>
-        Mathf.Max(0, (MerlinRuneBridge.Instance?.GetZoneTier("ICE") ?? 0) - _baseTier);
+    private void HandlePerfectDodge(float _)
+    {
+        _fields.RemoveAll(f => f == null);
+        foreach (var f in _fields) f.FreezeInside(FreezeSeconds);
+    }
 }

@@ -197,6 +197,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
     [Tooltip("띠를 따라 늘어놓는 검은 불 이펙트 — 비우면 바닥 띠만")]
     [SerializeField] private GameObject _abyssEdgeVfxPrefab;
     [SerializeField] private float _abyssEdgeVfxScale = 1f;
+    [Tooltip("띠 이펙트 간격(m) — 반복 검은 불이라 넓게(10-11 이펙트 톤 2차 · 3.5 m에 최대 56개였다)")]
+    [SerializeField] private float _abyssEdgeVfxSpacing = 7f;
     [Tooltip("2페이지 몸 색상 회전(셰이더 _Hue, 1 = 한 바퀴) — 붉은 몸을 검보라로. 셰이더에 _BaseColor가 없어 원소 틴트(MPB)는 보이지 않는다")]
     [SerializeField] private float _abyssBodyHueShift = -0.2f;
     [Tooltip("2페이지 몸 색 곱(셰이더 _Tint) — 조금 어둡게")]
@@ -616,6 +618,16 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
         if (_wingFlapClips == null || _wingFlapClips.Length == 0) return;
         var clip = _wingFlapClips[UnityEngine.Random.Range(0, _wingFlapClips.Length)];
         Managers.Sound?.PlayEffectAt(clip, transform.position);
+    }
+
+    /// <summary>
+    /// 날개 클립의 「Wing Flap」 애니 이벤트(에셋 기본 · <see cref="MonsterAnimEventReceiver"/>가 넘긴다) — 떠오름 · 맴돎 · 바람 공격의 날갯짓.
+    /// 공중 추격 중엔 <see cref="UpdateWingFlapSound"/>가 다운스트로크마다 이미 내므로 건너뛴다.
+    /// </summary>
+    public void OnClipWingFlap()
+    {
+        if (_wingFlapStateHash != 0) return;
+        PlayWingFlapSfxOnce();
     }
 
     /// <summary>AirChase/AirChaseLeft/AirChaseRight 재생 중, UPFly 클립의 다운스트로크 프레임(normalizedTime)을
@@ -1113,7 +1125,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
         float  floorY = DragonPatternFloorUtils.GetFloorY(arena.center, _runtime.SpawnPosition.y);
         Color  abyss  = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Abyss);
         _stageHazard = BossStageHazard.CreateEdgeBand(this, arena, floorY, _abyssEdgeBandWidth, seconds,
-            new Color(abyss.r, abyss.g, abyss.b, 0.45f), _abyssEdgeVfxPrefab, _abyssEdgeVfxScale, _abyssEdgeDamageMult);
+            new Color(abyss.r, abyss.g, abyss.b, 0.45f), _abyssEdgeVfxPrefab, _abyssEdgeVfxScale, _abyssEdgeDamageMult,
+            _abyssEdgeVfxSpacing);
         BlendAbyssBodyAsync(seconds).Forget();   // 바가 차오르는 동안 몸이 서서히 검보라로(09-29)
     }
 
@@ -1209,7 +1222,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
 
     private void DestroyStageHazard()
     {
-        if (_stageHazard != null) Destroy(_stageHazard.gameObject);
+        if (_stageHazard != null) _stageHazard.Dismiss();   // 물러난 뒤 스스로 지운다(10-12 디졸브 원칙)
         _stageHazard = null;
     }
 

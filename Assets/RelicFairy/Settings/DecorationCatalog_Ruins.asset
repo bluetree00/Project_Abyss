@@ -40,7 +40,8 @@ MonoBehaviour:
     sizeX: 2
     sizeZ: 1
     faceNearestWall: 1
-    wallInset: 0
+    wallInset: -0.22
+    wallYawOffset: -90
   - code: arc2
     prefab: {fileID: 1030992890, guid: abc00000000013661936042940892723, type: 3}
     yOffset: 0
@@ -49,7 +50,8 @@ MonoBehaviour:
     sizeX: 2
     sizeZ: 1
     faceNearestWall: 1
-    wallInset: 0
+    wallInset: -0.4
+    wallYawOffset: -90
   - code: r1
     prefab: {fileID: 1031125266, guid: abc00000000006981315685590065739, type: 3}
     yOffset: 0

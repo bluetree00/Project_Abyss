@@ -42,6 +42,7 @@ public class WormPatrolOverrideSO : MonsterStateOverrideSO
 
     private sealed class BurrowVisualController
     {
+        private const float EmergeDissolveSeconds = 0.25f;   // 출현 — 렌더러만 켜 툭 나타났다(10-12 디졸브 ②)
         private readonly MonsterBase _monster;
         private readonly Transform _monsterRoot;
         private readonly WormPatrolOverrideSO _so;
@@ -87,6 +88,8 @@ public class WormPatrolOverrideSO : MonsterStateOverrideSO
             _moveEffectTimer = 0f;
             _monster.ShowWorldHPBar();
             SpawnEffect(_so.emergeEffectPrefab, ctx.Transform.position);
+            if (_so.hideRenderersWhileBurrowed)
+                DissolveEffect.PlayAppear(_monster.gameObject, EmergeDissolveSeconds, activationToken: _monster.ActivationToken);
         }
 
         public void ResetToSurface()

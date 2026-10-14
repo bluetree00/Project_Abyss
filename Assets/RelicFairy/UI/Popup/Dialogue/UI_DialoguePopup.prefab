@@ -176,16 +176,30 @@ MonoBehaviour:
   portrait: {fileID: 4857557610000743720}
   speakerNameText: {fileID: 2493154929372295143}
   bodyText: {fileID: 7026891823231694902}
+  roleTagText: {fileID: 0}
   advanceButton: {fileID: 2181653436244156933}
   merlinName: ???
+  merlinRevealedName: "\uBA40\uB9B0"
   shadowName: "\uADF8\uB9BC\uC790"
+  shadowRevealedName: "\uBAA8\uB974\uAC00\uB098"
   lichName: "\uB9AC\uCE58"
   mordredName: "\uBAA8\uB974\uB4DC\uB808\uB4DC"
   arthurName: "\uC544\uC11C\uC655"
   knightName: "\uAE30\uC0AC"
   forestGuardianName: "\uC232\uC758 \uC218\uD638\uC790"
   dragonName: "\uD654\uB8E1"
-  deathKnightName: "\uC8FD\uC74C\uC758 \uAE30\uC0AC"
+  deathKnightName: "\uBAA8\uB974\uB4DC\uB808\uB4DC"
+  speakerTitles:
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
   charDelay: 0.03
   illustFadeIn: 0.25
 --- !u!1 &3334954979854555215

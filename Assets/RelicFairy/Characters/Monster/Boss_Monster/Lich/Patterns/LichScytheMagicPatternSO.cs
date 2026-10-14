@@ -7,9 +7,10 @@ namespace RelicFairy.Monster
 /// <summary>
 /// R8 「낫의 대마법」 — 악몽기 2페이지(완전설계 §4-4, 0913 N-3 계승).
 ///
-/// O 충전(windupDuration) — 책이 펼쳐져 떠오르고 리치가 낫을 뒤로 크게 당긴다. 플레이어를 지나 제단 끝까지 궤적 예고선이 차오른다.
+/// O 충전(windupDuration) — 책이 펼쳐져 떠오르고 리치가 낫을 뒤로 크게 당긴다. 플레이어를 지나 제단 끝까지 폭발 자리 원(판정 그대로)이 차오른다.
 /// → A 투척 — 낫이 궤적을 따라 날아가고(초속 flySpeed), 지나간 자리가 <b>0.4초 뒤 연쇄 폭발</b>(반경 blastRadius).
 ///   낫을 피해도 폭발이 따라온다 — 궤적 밖으로 빠져야 산다. 폭발이 겹친 칸은 두 번 맞아 영구히 무너진다(누적 한계 안에서).
+///   플레이어는 한 줄에서 한 번만 맞는다(원이 겹친 띠에서 두 번 맞던 것, 10-08 점검).
 /// → E 무방비 — 낫이 돌아올 때까지 빈손(endDuration) → R 복귀
 /// </summary>
 [CreateAssetMenu(menuName = "RelicFairy/Boss/Lich/Lich_ScytheMagicPattern", fileName = "Lich_ScytheMagicPattern")]
@@ -31,7 +32,7 @@ public class LichScytheMagicPatternSO : BossPatternSO
     [Header("낫의 대마법 — 궤적 · 판정")]
     public float flySpeed         = 18f;
     public float maxLength        = 34f;
-    [Tooltip("예고선 폭 = 폭발 지름")]
+    [Tooltip("폭발 반경 = 예고 원 반경")]
     public float blastRadius      = 2f;
     public float damageMultiplier = 1.2f;
     [Tooltip("겹친 폭발에 두 번 맞은 칸은 영구히 무너진다(0이면 안 무너진다)")]
@@ -69,17 +70,22 @@ public class LichScytheMagicState : UnInterruptibleState<LichScytheMagicPatternS
     private readonly Dictionary<Vector2Int, int> _cellHits = new();
     private readonly List<Vector2Int>            _cells    = new();
     private readonly List<Vector2Int>            _doomed   = new();
+    // 폭발 자리마다 판정 크기 원 — 직선 예고(폭 = 지름)는 원 사이 빈 귀퉁이까지 위험해 보였다(10-08 점검).
+    private readonly List<GameObject>            _dots     = new();
 
     private Phase      _phase;
     private float      _timer;
-    private bool       _signaled;
     private Vector3    _start;
     private Vector3    _dir;
     private float      _length;
     private float      _travelled;
     private float      _nextBlast;
-    private GameObject _guide;
+    private int        _blastIndex;   // 다음 폭발 = _dots 순번
     private GameObject _spin;
+    private LichHazards.BlastRow _row;   // 이번 투척의 폭발 묶음 — 한 줄에서 한 번만 맞는다(10-08 점검)
+
+    /// <summary>폭발 간격(m) — 낫이 blastInterval초 동안 나는 거리.</summary>
+    private float BlastStep => Mathf.Max(0.5f, Data.flySpeed * Data.blastInterval);
 
     public LichScytheMagicState(LichScytheMagicPatternSO data) : base(data) { }
 
@@ -87,9 +93,9 @@ public class LichScytheMagicState : UnInterruptibleState<LichScytheMagicPatternS
     {
         _phase     = Phase.Windup;
         _timer     = 0f;
-        _signaled  = false;
         _travelled = 0f;
         _nextBlast = 0f;
+        _blastIndex = 0;
         _cellHits.Clear();
 
         var lich = LichPatternUtil.Lich(ctx);
@@ -108,9 +114,13 @@ public class LichScytheMagicState : UnInterruptibleState<LichScytheMagicPatternS
         // 뒤로 크게 당겼다가 가로로 내던진다 — 접촉 프레임 = 낫이 손을 떠나는 순간.
         LichPatternUtil.Swing(ctx, LichSwing.RightToLeft, Data.windupDuration + Data.signalDuration, 0.1f);
 
-        _guide = LichPatternUtil.PrepareTelegraph(
-            PatternGuideHelper.Beam(_start, _dir, _length, Data.blastRadius * 2f, LichPatternUtil.Arcane),
-            LichPatternUtil.Arcane);
+        // 예고 = 실제로 터질 원들(Fly와 같은 간격 · 같은 자리).
+        ClearDots();
+        for (float d = 0f; d <= _length; d += BlastStep)
+            _dots.Add(LichPatternUtil.PrepareTelegraph(
+                PatternGuideHelper.Disc(LichPatternUtil.OnFloor(ctx, _start + _dir * d), Data.blastRadius, LichPatternUtil.Arcane),
+                LichPatternUtil.Arcane));
+        _row = new LichHazards.BlastRow();
 
         lich?.PulseBook(Data.windupDuration + Data.signalDuration);
         LichVfx.Play(LichVfxSlot.CastFlare, ctx.Transform.position + Vector3.up * 1.4f, Quaternion.identity, 1.2f);
@@ -126,14 +136,13 @@ public class LichScytheMagicState : UnInterruptibleState<LichScytheMagicPatternS
         switch (_phase)
         {
             case Phase.Windup:
-                LichPatternUtil.TickTelegraph(_guide, _timer, Data.windupDuration, 0f, ref _signaled);
-                if (_timer >= Data.windupDuration)
+                // 원들이 함께 차오르고 다 차는 순간 빨강(신호).
+                for (int i = 0; i < _dots.Count; i++)
                 {
-                    PatternGuideHelper.SetColor(_guide, LichPatternUtil.Lethal);
-                    PatternGuideHelper.SetFlow(_guide, LichPatternUtil.Lethal);
-                    LichPatternProbe.Signal();
-                    Next(Phase.Signal);
+                    bool signaled = false;
+                    LichPatternUtil.TickTelegraph(_dots[i], _timer, Data.windupDuration, 0f, ref signaled);
                 }
+                if (_timer >= Data.windupDuration) Next(Phase.Signal);
                 break;
 
             case Phase.Signal:
@@ -154,7 +163,7 @@ public class LichScytheMagicState : UnInterruptibleState<LichScytheMagicPatternS
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -162,7 +171,7 @@ public class LichScytheMagicState : UnInterruptibleState<LichScytheMagicPatternS
 
     public override void Exit(MonsterContext ctx)
     {
-        PatternGuideHelper.SafeDestroy(ref _guide);
+        ClearDots();
         LichVfx.Stop(ref _spin);
         var lich = LichPatternUtil.Lich(ctx);
         lich?.SetScytheVisible(true);
@@ -194,22 +203,39 @@ public class LichScytheMagicState : UnInterruptibleState<LichScytheMagicPatternS
         float along = Mathf.Min(_travelled, _length);
         if (_spin != null) _spin.transform.position = _start + _dir * along + Vector3.up * SpinHeight;
 
-        float step = Data.flySpeed * Data.blastInterval;
         while (_nextBlast <= along)
         {
             Vector3 at = LichPatternUtil.OnFloor(ctx, _start + _dir * _nextBlast);
             LichHazards.DelayedBlast(ctx, at, Data.blastRadius, Data.blastDelay, Data.damageMultiplier,
-                                     LichVfxSlot.BoltImpact, LichPatternUtil.BoltScale(Data.blastRadius));
+                                     LichVfxSlot.BoltImpact, LichPatternUtil.BoltScale(Data.blastRadius), row: _row, armed: true);
+            // 이 자리 예고 원은 폭발이 제 원(차오름 → 빨강)으로 이어받는다.
+            if (_blastIndex < _dots.Count)
+            {
+                var dot = _dots[_blastIndex];
+                PatternGuideHelper.SafeDestroy(ref dot);
+                _dots[_blastIndex] = null;
+            }
+            _blastIndex++;
             CountCells(ctx, at);
-            _nextBlast += step;
+            _nextBlast += BlastStep;
         }
 
         if (_travelled < _length) return;
-        PatternGuideHelper.SafeDestroy(ref _guide);
+        ClearDots();
         LichVfx.Stop(ref _spin, 0.3f);
         CollapseDoubleHit(ctx);
         LichPatternUtil.Lich(ctx)?.NotifyVulnerableWindow(Data.endDuration);
         Next(Phase.End);
+    }
+
+    private void ClearDots()
+    {
+        for (int i = 0; i < _dots.Count; i++)
+        {
+            var dot = _dots[i];
+            PatternGuideHelper.SafeDestroy(ref dot);
+        }
+        _dots.Clear();
     }
 
     /// <summary>폭발이 덮는 칸마다 맞은 횟수를 센다.</summary>

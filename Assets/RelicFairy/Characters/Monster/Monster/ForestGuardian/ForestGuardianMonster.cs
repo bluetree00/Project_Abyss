@@ -164,6 +164,8 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
     internal Vector3 ArenaCenter         { get { EnsureArena(); return new Vector3(_arenaBounds.center.x, _arenaFloorY, _arenaBounds.center.z); } }
     internal Color   ThornBandColor      => _thornBandColor;
     internal float   ThornBandDamageMult => _thornBandDamageMult;
+    /// <summary>영구 가시 띠(2페이지 무대) — 간판의 임시 띠가 겹친 자리에서 두 번 찌르지 않게 읽는다(10-08 점검).</summary>
+    internal BossStageHazard ThornBand => _stageHazard;
 
     /// <summary>플레이어의 직접 타격(실제로 체력이 깎인 것) 누적 수 — 간판 「숲의 심장」이 시작 값과의 차로 센다.</summary>
     internal int DirectHitCount => _directHitCount;
@@ -743,7 +745,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
             if (_chargeTrails[i] == null) _chargeTrails.RemoveAt(i);   // 수명이 다해 스스로 사라진 줄
         _chargeTrails.Add(BossStageHazard.CreateLine(this, from, to, ArenaFloorY, TrailWidth, TrailLifetime,
                                                      _thornBandColor, _thornBandVfxPrefab, _thornBandVfxScale * TrailVfxScale, _thornBandDamageMult));
-        Debug.Log($"[BossTrait] 숲 흔적 — 가시 줄 {len:0.0} m", this);
+        RFLog.D($"[BossTrait] 숲 흔적 — 가시 줄 {len:0.0} m", this);
     }
 
     /// <summary>「흔적」 가시 줄을 모두 걷는다 — 간판 「숲의 심장」 시작(차오르는 가시 · 약점 원과 겹치지 않게) · 풀 반환.</summary>
@@ -753,7 +755,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
         foreach (var t in _chargeTrails)
         {
             if (t == null) continue;
-            Destroy(t.gameObject);
+            t.Dismiss();   // 원래 옅어짐을 지금 시작
             n++;
         }
         _chargeTrails.Clear();
@@ -799,7 +801,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
 
     private void ClearStageHazard()
     {
-        if (_stageHazard != null) Destroy(_stageHazard.gameObject);
+        if (_stageHazard != null) _stageHazard.Dismiss();   // 물러난 뒤 스스로 지운다(10-12 디졸브 원칙)
         _stageHazard = null;
     }
 

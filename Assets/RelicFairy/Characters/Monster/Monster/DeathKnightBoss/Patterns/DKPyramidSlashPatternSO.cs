@@ -100,6 +100,7 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
     private List<RingEntry> _ringList;
     private int             _ringIdx;
     private float           _hitPhaseEnd;
+    private float           _armAt = -1f;   // 지금 깔린 세트의 첫 링 시각 — 판정 0.25초 전 붉게
 
     private Vector2Int   _bossCell;
     private DKSwordColor _swordColor;
@@ -108,6 +109,7 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
 
     public override void Enter(MonsterContext ctx)
     {
+        (ctx.Monster as DeathKnightBossMonster)?.AnnounceBigSkill(DeathKnightBossMonster.BigSkill.Pyramid);   // 기술 이름 + 처음이면 멀린 요령(10-11)
         _phase           = Phase.Tiles;
         _timer           = 0f;
         _tiles           = new List<DKTileInfo>();
@@ -117,6 +119,7 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
         _shown1 = _shown2 = _shown3 = _cleared = false;
         _ringList        = null;
         _ringIdx         = 0;
+        _armAt           = -1f;
 
         var anchor = (ctx.Monster as DeathKnightBossMonster)?.PyramidStrikeAnchor;
         _bossCell   = DKBossRoomContext.WorldToCell(anchor != null ? anchor.position : ctx.Transform.position);
@@ -135,6 +138,7 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
     public override void Update(MonsterContext ctx)
     {
         _timer += Time.deltaTime * AnimSpeed(ctx);
+        DKPage2Zone.SettleAfterSwing(ctx, AnimName);   // 휘두른 끝 자세로 서 있지 않게 — 남은 라운드는 기본 자세로
 
         if (_phase == Phase.Tiles) UpdateTilePhase(ctx);
         else if (_phase == Phase.Hits) UpdateHitPhase(ctx);
@@ -171,11 +175,11 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
             _tiles = SpawnRingTiles(Pattern1(), maxRing);
             _edges = DKGridPatternHelper.SpawnBoundaryEdges(_tiles, Data.edgePrefab);
         }
+        if (_shown3) DKGridPatternHelper.ArmBefore(_timer, Data.hitTime3 + Data.holdDuration, _tiles, _swordColor);   // 판정 0.25초 전 위험 칸을 붉게(10-11) — 첫 세트(패턴 1) 칸
         if (_shown3 && !_cleared && _timer >= Data.hitTime3 + Data.holdDuration)
         {
             _cleared = true;
-            DKGridPatternHelper.DestroyEdges(_edges);
-            DKGridPatternHelper.DestroyTiles(_tiles);
+            // 첫 세트(패턴 1) 칸은 그 세트 마지막 링까지 둔다 — 예고 = 판정(10-13 검증: 칸을 걷은 뒤 세 세트가 바닥 표시 없이 터졌다)
             _timer  = 0f;
             BuildRingList();
             _phase  = Phase.Hits;
@@ -217,6 +221,7 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
 
     private void UpdateHitPhase(MonsterContext ctx)
     {
+        if (_armAt >= 0f) DKGridPatternHelper.ArmBefore(_timer, _armAt, _tiles, _swordColor);   // 다음 세트 첫 링 0.25초 전 붉게
         while (_ringIdx < _ringList.Count && _timer >= _ringList[_ringIdx].fireTime)
         {
             var e = _ringList[_ringIdx];
@@ -233,6 +238,21 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
                 BossImpactFeedback.TriggerHitStop(0.1f);
             BossImpactFeedback.TriggerCameraShake(0.12f, 0.28f);
             _ringIdx++;
+            // 세트가 끝났다 — 다음 세트 칸을 깐다(다음 첫 링까지 ringStep + hitGap 앞섬). 다 끝나면 걷는다
+            bool lastOfSet = _ringIdx >= _ringList.Count || _ringList[_ringIdx].setIndex != e.setIndex;
+            if (lastOfSet)
+            {
+                DKGridPatternHelper.DestroyEdges(_edges);
+                DKGridPatternHelper.DestroyTiles(_tiles);
+                _armAt = -1f;
+                if (_ringIdx < _ringList.Count)
+                {
+                    var next = _ringList[_ringIdx];
+                    _tiles = SpawnRingTiles(next.isPattern2 ? Pattern2() : Pattern1(), Data.ringCount - 1);
+                    _edges = DKGridPatternHelper.SpawnBoundaryEdges(_tiles, Data.edgePrefab);
+                    _armAt = next.fireTime;
+                }
+            }
         }
 
         if (_ringIdx >= _ringList.Count && _timer >= _hitPhaseEnd)
@@ -301,7 +321,7 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
     {
         if (_barrierVfx != null)
         {
-            BossEffectPool.Release(_barrierVfx);
+            UnityEngine.Object.Destroy(_barrierVfx);
             _barrierVfx = null;
         }
         ReleaseBarrier();
@@ -375,7 +395,8 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
             DKBossRoomContext.WorldCenter.y,
             (minWorld.z + maxWorld.z) * 0.5f);
 
-        _barrierVfx = BossEffectPool.Spawn(
+        // 풀에서 꺼내지 않는다 — 자식 끄기 · 재생 속도 · 반투명을 바꾸므로 같은 태극 이펙트를 쓰는 다른 패턴에 남았다(10-11 이펙트 톤 점검)
+        _barrierVfx = UnityEngine.Object.Instantiate(
             Data.barrierPrefab,
             center + Vector3.up * Data.barrierVfxYOffset,
             Quaternion.identity);

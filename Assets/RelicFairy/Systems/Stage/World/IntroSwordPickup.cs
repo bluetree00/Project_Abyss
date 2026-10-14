@@ -51,6 +51,7 @@ public sealed class IntroSwordPickup : MonoBehaviour
         {
             _consumed = true;
             ShowPrompt(false);
+            Managers.Sound?.PlayEvent(SoundEvent.SwordPickup);
             OnPickup?.Invoke(_player);
         }
     }

@@ -40,7 +40,9 @@ public static class BossFightSimEditor
     private const float  StallSeconds    = 15f;
     private const float  StallGiveUp     = 35f;
     private const float  ReactStallGiveUp = 90f;   // 반응 모드 — 화룡 소환 게이트(휩쓸기 강제)가 35초를 넘는다
-    private const int    MaxShots        = 24;
+    private const int    MaxShots        = 40;    // 버티기는 패턴별 첫 피격 사진까지(10-13)
+    private const int    HitShotDelayMs  = 120;   // 맞은 뒤 이만큼 — 터지는 이펙트가 판정 자리를 얼마나 덮는지 본다
+    private const float  MinLead         = 0.45f; // 굳힘 → 판정 기준(공용 예고 규칙)
     private const float  RealDps         = 45f;    // 09-18 실측: 45분 런에 필요한 DPS 44 — 「현실 처치 시간」 계산용
     private const float  TargetFightSecs = 60f;    // 시뮬 DPS는 이 안에 끝나게 올린다(10-02 180 → 60 — 빠른 테스트)
     private const float  SimDpsFloor     = 135f;   // 시뮬 DPS 하한(10-02 45 → 135) — RealDps는 「현실 처치 시간」 계산에만 쓴다
@@ -67,6 +69,8 @@ public static class BossFightSimEditor
         public float  FirstHitMin = float.MaxValue;
         public int    NoGuide;                       // 가이드 밖에서 맞음(예고 없이 · 가이드와 판정이 어긋남)
         public float  GuideAgeMin = float.MaxValue;  // 맞은 순간 덮던 가이드가 떠 있던 시간(최소) = 실제 예고 길이
+        public float  LockMin     = float.MaxValue;  // 맞은 순간 덮던 가이드가 마지막으로 움직인 뒤 시간(최소) = 굳힘 → 판정(10-13)
+        public int    Ticks;                         // 무대 · 지속 틱(가이드 밖 · 굳힘 셈에서 뺐다)
         public int    MaxHit;                        // 가장 큰 한 방
     }
 
@@ -84,6 +88,19 @@ public static class BossFightSimEditor
     // ── Static ─────────────────────────────────────────────────
     private static CancellationTokenSource s_cts;
     private static readonly List<string> s_errors = new();
+    private static bool s_tank;   // 버티기 — 미발동 패턴은 강제하되 피하지 않는다(10-08 피해량 · 판정 전수)
+    private static bool s_long;   // 긴 버티기 — 전투 4배(미발동 패턴까지 · 10-13)
+    private static bool s_longRun;   // 이번 판이 긴 버티기
+    private static bool s_entranceOnly;   // 등장 구도만 찍고 끝(10-13 「시작 연출 카메라가 너무 높다」 전후 비교)
+    private static bool s_entranceRun;
+    private const  float LongFightMul = 4f;
+    private const  float TickMaxHpRatio = 0.05f;   // 약하고 이 비율 이하인 피격 = 무대 · 지속 틱(가이드 밖 · 굳힘 열에서 뺀다)
+    private static readonly HashSet<int> s_fxBefore = new();   // 패턴 시작 때 이미 켜져 있던 입자계 — 이펙트 크기 측정에서 뺀다
+    private static float s_whelpGrace;   // 새끼 용 지켜보기 — 처음 본 새끼 용은 이 시간 동안 소환물 처치에서 뺀다(10-08 새끼 용 점검)
+    private static readonly StringBuilder s_fx = new();   // 이펙트 크기(첫 피격 0.12초 뒤 · 10-13)
+    private static readonly List<Vector2> s_fxWeights = new();
+    private static ParticleSystem.Particle[] s_fxBuf = new ParticleSystem.Particle[256];
+    private static readonly Dictionary<int, float> s_addSeen = new();
     private static readonly StringBuilder s_escapeCsv = new();   // 가이드 보고 피하기 이동(시각 · 거리) — 2페이지 체감 점검(10-03 S3)
     private static BossStageHazard[] s_hazards = Array.Empty<BossStageHazard>();   // 무대 위험(가시 띠 · 흑염 띠 · 무대 붕괴) — 피할 곳(10-03)
     private static float s_hazardScanAt = -1f;
@@ -96,10 +113,16 @@ public static class BossFightSimEditor
     // 봉인 · 해방 장면 박자 촬영(10-03 봉인 연출 v2 점검) — 장면 시작 로그를 보고 정해진 박자에 게임 화면을 찍는다
     private static readonly (string tag, float at)[] SealBeats =
         { ("seal_1_cast", 0.9f), ("seal_2_chain3", 1.9f), ("seal_3_collapse", 2.9f), ("seal_4_bound", 4.6f), ("seal_5_dissolve", 6.3f), ("seal_6_gone", 7.5f) };
-    private static readonly (string tag, float at)[] UnbindBeats =
-        { ("unbind_1", 0.15f), ("unbind_2", 0.6f), ("unbind_3", 1.0f), ("unbind_4", 1.4f), ("unbind_5", 2.1f), ("unbind_6", 2.8f) };
     private static readonly (string tag, float at)[] FlushBeats =
         { ("flush_1", 0.1f), ("flush_2", 0.6f) };
+    // 10-13 새 장면 — 해방기 재조우(옛 봉인 자국이 깨짐 · 포효) · 1페이지 끝 다시 봉인 → 보스가 끊고 깬다
+    private static readonly (string tag, float at)[] ReturnBeats =
+        { ("return_1_trace", 0.3f), ("return_2_break", 0.75f), ("return_3_roar", 1.6f) };
+    private static readonly (string tag, float at)[] ResealBeats =
+        { ("reseal_1_cast", 0.35f), ("reseal_2_chains", 0.7f), ("reseal_3_snap", 1.1f), ("reseal_4_break", 1.4f), ("reseal_5_after", 1.9f) };
+    // 등장 연출 구도(10-13 사용자 「시작 연출 카메라가 너무 높다」) — 보스를 깨운 순간부터. 길이가 보스마다 달라(화룡 비행이 길다) 넉넉히
+    private static readonly (string tag, float at)[] EntranceBeats =
+        { ("entr_01", 1f), ("entr_02", 2.5f), ("entr_03", 4f), ("entr_04", 5.5f), ("entr_05", 7f), ("entr_06", 9f), ("entr_07", 11.5f), ("entr_08", 14f) };
 
     // ── Public Methods ─────────────────────────────────────────
     [MenuItem(Root + "Melee 3m (Play)")] public static void RunMelee() => Begin(Mode.Melee);
@@ -108,12 +131,32 @@ public static class BossFightSimEditor
     [MenuItem(Root + "React Close 2m (Play)")] public static void RunReactClose() => Begin(Mode.Close, react: true);   // 숲 잡기처럼 2.5 m 안에서만 나오는 패턴
     [MenuItem(Root + "React Melee 3m (Play)")] public static void RunReactMelee() => Begin(Mode.Melee, react: true);
     [MenuItem(Root + "React Mid 7m (Play)")]   public static void RunReactMid()   => Begin(Mode.Mid,   react: true);
+    // 버티기 — 반응 모드처럼 미발동 패턴을 강제하되 피하지 않는다: 모든 패턴의 피해량 · 맞은 순간 가이드(판정) 전수(10-08)
+    [MenuItem(Root + "Tank Melee 3m (Play)")]  public static void RunTankMelee()  => Begin(Mode.Melee, react: true, tank: true);
+    [MenuItem(Root + "Tank Mid 7m (Play)")]    public static void RunTankMid()    => Begin(Mode.Mid,   react: true, tank: true);
+    // 새끼 용 지켜보기 — 버티기 중거리 + 새끼 용을 20초 살려 둔다(첫 브레스는 재사용 6초 뒤 · 10-08 새끼 용 점검)
+    [MenuItem(Root + "Tank Mid 7m - Watch Whelps (Play)")] public static void RunTankWatch() => Begin(Mode.Mid, react: true, tank: true, whelpGrace: 20f);
+    [MenuItem(Root + "Tank Mid 7m - Long (Play)")] public static void RunTankLong() { s_long = true; Begin(Mode.Mid, react: true, tank: true); }
+    [MenuItem(Root + "Mid 7m - Long (Play)")] public static void RunMidLong() { s_long = true; Begin(Mode.Mid); }   // 피하지 않고 오래 — 노림 · 예측 패턴이 실제로 맞히는지(10-14 화룡)
+    [MenuItem(Root + "Tank Melee 3m - Long (Play)")] public static void RunTankMeleeLong() { s_long = true; Begin(Mode.Melee, react: true, tank: true); }   // 3 m 안 패턴까지(10-13)
+    [MenuItem(Root + "Entrance Shots (Play)")] public static void RunEntranceShots() { BossStoryScenes.DebugForceRepeat = false; s_entranceOnly = true; Begin(Mode.Mid, react: true, tank: true); }   // 등장 구도 사진 · 카메라 수치만(10-13)
+    [MenuItem(Root + "Entrance Shots - Repeat (Play)")] public static void RunEntranceShotsRepeat() { BossStoryScenes.DebugForceRepeat = true; s_entranceOnly = true; Begin(Mode.Mid, react: true, tank: true); }   // 반복 관람 판(10-14 · 판이 끝나면 되돌린다)
+    [MenuItem(Root + "Tank Close 2m - Long (Play)")] public static void RunTankCloseLong() { s_long = true; Begin(Mode.Close, react: true, tank: true); }   // 숲 잡기(2.5 m 안 · 1페이지 앞부분)까지(10-13)
     // 봉인된 채 남은 보스를 「방을 나간다」로 치운다 — 챕터 게이트가 부르는 것과 같은 길(씬 로드 · 저장 없이 그 부분만)
     [MenuItem(Root + "Flush Sealed Boss (Play)")] public static void FlushSealed() => BossStoryScenes.FlushSealed();
 
     // ── Private Methods ────────────────────────────────────────
-    private static void Begin(Mode mode, bool react = false)
+    private static void Begin(Mode mode, bool react = false, bool tank = false, float whelpGrace = 0f)
     {
+        bool longRun = s_long;
+        s_long = false;
+        s_tank = tank;
+        s_longRun = longRun;
+        s_entranceRun = s_entranceOnly;
+        s_entranceOnly = false;
+        s_whelpGrace = whelpGrace;
+        s_fx.Clear();
+        s_addSeen.Clear();
         if (!Application.isPlaying) { Debug.LogWarning("[FightSim] 플레이 모드에서만 동작한다."); return; }
         s_cts?.Cancel();
         s_cts?.Dispose();
@@ -157,7 +200,7 @@ public static class BossFightSimEditor
             string bossName = boss != null ? Clean(boss.name) : "boss";
             string dir = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "boss_fight_sim",   // Temp는 에디터 재시작 때 지워진다
                                      
-                                      $"{bossName}_{mode}{(react ? "React" : "")}_{DateTime.Now:MMdd_HHmmss}");
+                                      $"{bossName}_{mode}{(s_tank ? "Tank" : react ? "React" : "")}_{DateTime.Now:MMdd_HHmmss}");
             Directory.CreateDirectory(dir);
             s_dir = dir;
 
@@ -179,12 +222,25 @@ public static class BossFightSimEditor
                 float t = Time.time;
                 float since = curPatternAt >= 0f ? t - curPatternAt : -1f;
                 // 맞은 자리를 덮던 가이드 — 없으면 예고 없이 맞았거나 가이드와 판정이 어긋난 것
-                bool covered = BossGuideShapes.Covering(BossGuideShapes.Scan(), player.transform.position, BodyRadius, out var cov);
+                var shapes = BossGuideShapes.Scan();
+                bool covered = BossGuideShapes.Covering(shapes, player.transform.position, BodyRadius, out var cov);
                 hits.Add((t, w, dmg, curPattern, since, covered ? BossGuideShapes.Describe(cov) : "-", covered ? cov.Age : -1f));
                 if (!patterns.TryGetValue(curPattern, out var ps)) patterns[curPattern] = ps = new PatternStat();
                 ps.Hits++; ps.Damage += dmg;
                 ps.MaxHit = Mathf.Max(ps.MaxHit, dmg);
-                if (covered) ps.GuideAgeMin = Mathf.Min(ps.GuideAgeMin, cov.Age); else ps.NoGuide++;
+                // 무대 · 지속 틱(약하고 최대 HP 5% 이하 — 가시 띠 · 덤불 · 흑염 띠 · 브레스 틱)은 따로 센다 — 그 순간 패턴 몫으로 잡혀 판정 열을 흐렸다(10-13)
+                bool tick = w == HitWeight.Light && dmg <= Mathf.Max(1, player.RuntimeStats?.MaxHp ?? 1) * TickMaxHpRatio;
+                if (tick) ps.Ticks++;
+                else
+                {
+                    if (covered) ps.GuideAgeMin = Mathf.Min(ps.GuideAgeMin, cov.Age); else ps.NoGuide++;
+                    if (BossGuideShapes.CoveringStill(shapes, player.transform.position, BodyRadius, out float still)) ps.LockMin = Mathf.Min(ps.LockMin, still);
+                }
+                if (s_tank && ps.Hits == 1)
+                {
+                    ShotLater(Shot, "hit_" + curPattern, HitShotDelayMs, ct);   // 첫 피격 — 이펙트 크기 · 판정 자리 사진
+                    if (covered) MeasureFxLater(cov, curPattern, ct);
+                }
                 if (w == HitWeight.Light) ps.Light++; else if (w == HitWeight.Heavy) ps.Heavy++; else ps.Medium++;
                 if (!curPatternHit && since >= 0f)
                 {
@@ -216,6 +272,7 @@ public static class BossFightSimEditor
             await UniTask.Delay(600, ignoreTimeScale: true, cancellationToken: ct);
             TestHubDebugMenu.StepPastBossEntrance();
             float wakeStart = Time.unscaledTime;
+            foreach (var (tag, at) in EntranceBeats) EntranceShotAsync(dir, tag, at, player.transform, () => spawner.SpawnedBoss, Event, ct).Forget();
             while ((boss = spawner.SpawnedBoss) == null || !boss.gameObject.activeInHierarchy)
             {
                 if (Time.unscaledTime - wakeStart > 20f) { Event("보스가 20초 안에 나타나지 않음"); break; }
@@ -229,9 +286,44 @@ public static class BossFightSimEditor
             Event($"보스 등장 {bossName} · HP {boss.CurrentHp}/{boss.EffectiveMaxHp} · 행동 {mode}({radius} m)");
             await UniTask.Delay(1500, ignoreTimeScale: true, cancellationToken: ct);
             await Shot("entrance");
+            if (s_entranceRun)
+            {
+                // 등장 구도만 — 마지막 박자까지 기다렸다 수치를 남기고 끝(싸우지 않는다)
+                if (boss is LichMonster)
+                {
+                    // 리치는 플레이어가 감지 반경 안으로 와야 깬다 — 4 m 앞으로 옮기고 그 순간부터 박자를 다시 잰다
+                    // (실제 런은 Ch4가 입력을 안 잠가 어두워지는 동안 리치 바로 앞까지 걸어 들어온다 — 10-14 전주기 5회차: 9 m에선 가림이 안 보였다)
+                    Vector3 away = player.transform.position - boss.transform.position;
+                    away.y = 0f;
+                    away = away.sqrMagnitude > 0.01f ? away.normalized : -boss.transform.forward;
+                    Vector3 to = boss.transform.position + away * 4f;
+                    to.y = player.transform.position.y;
+                    MovePlayer(player, to);
+                    wakeStart = Time.unscaledTime;
+                    foreach (var (tag, at) in EntranceBeats) EntranceShotAsync(dir, "lich_" + tag, at, player.transform, () => spawner.SpawnedBoss, Event, ct).Forget();
+                }
+                float until = wakeStart + EntranceBeats[EntranceBeats.Length - 1].at + 1.5f;
+                // 0.1초마다 카메라 — 가장 높은 자리 · 한 번에 가장 크게 움직인 거리(컷 · 튐 판별, 블렌드는 작게 여러 번)
+                float topY = float.MinValue, bigStep = 0f, bigStepAt = 0f;
+                Vector3 prevCam = cam.transform.position;
+                while (Time.unscaledTime < until)
+                {
+                    await UniTask.Delay(100, ignoreTimeScale: true, cancellationToken: ct);
+                    Vector3 c = cam.transform.position;
+                    topY = Mathf.Max(topY, c.y - player.transform.position.y);
+                    float step = Vector3.Distance(c, prevCam);
+                    if (step > bigStep) { bigStep = step; bigStepAt = Time.unscaledTime - wakeStart; }
+                    prevCam = c;
+                }
+                Event($"등장 카메라 0.1초 기록 — 가장 높은 자리 {topY:0.0} m · 한 번에 가장 큰 이동 {bigStep:0.0} m(+{bigStepAt:0.0}초)");
+                File.WriteAllText(Path.Combine(dir, "summary.txt"), $"등장 구도 — {bossName}{(BossStoryScenes.DebugForceRepeat ? " · 반복 관람" : "")}" + Environment.NewLine + events, Encoding.UTF8);
+                BossStoryScenes.DebugForceRepeat = false;
+                Debug.Log($"[FightSim] 완료 — {dir}");
+                return;
+            }
 
             int   maxHp     = Mathf.Max(1, boss.EffectiveMaxHp);
-            float simDps    = Mathf.Max(SimDpsFloor, maxHp / TargetFightSecs);
+            float simDps    = Mathf.Max(s_longRun ? SimDpsFloor / LongFightMul : SimDpsFloor, maxHp / (TargetFightSecs * (s_longRun ? LongFightMul : 1f)));
             Event($"시뮬 DPS {simDps:0} (현실 DPS {RealDps} 기준 처치 시간 {maxHp / RealDps:0}초)");
             // 보스 피해식 = max(1, 한 방 × 보스 배율 − 방어) — 시뮬은 방어·배율을 보정해 넣고, 실제 한 방이 얼마나 남는지만 기록한다.
             float bossDef   = ReadFloat(boss, "_baseDefense", 0f) * ReadFloat(boss, "_defenseMulti", 1f);
@@ -243,7 +335,8 @@ public static class BossFightSimEditor
             bool halfShot  = false;
             float t0          = Time.time;
             float startUnscaled = Time.unscaledTime;
-            float nextLogic = 0f, nextCam = 0f, nextAttack = 0f;
+            var   pres          = new BossPresentationProbe(boss, dir);   // 연출 점검 — 페이지 전환 · 패턴 뒤 공백 · 블렌드 없는 애니 · 튐(10-06)
+            float nextLogic = 0f, nextCam = 0f, nextAttack = 0f, nextFloat = 0f;
             float theta     = 180f;                      // 남쪽(카메라 쪽)에서 시작
             int   lastHp    = boss.CurrentHp;
             float lastHpDropAt = Time.time, lastDamageAt = -99f;
@@ -251,6 +344,8 @@ public static class BossFightSimEditor
             float deathAt   = -1f, deathAtUnscaled = -1f, nextDeathCheck = 0f;
             bool  popupSeen = false;
             string lastState = "";
+            float  floatStart = -1f, floatMax = 0f;   // 몸이 바닥에서 뜬 구간(10-14 「챕터3 보스 몸이 공중에 뜬다」)
+            string floatState = "";
             int camSamples = 0, offScreen = 0, bossOcc = 0, playerOcc = 0;
             int occMask = LayerMask.GetMask("Wall", "Default");
             var shake   = new ShakeTracker();
@@ -294,7 +389,7 @@ public static class BossFightSimEditor
                     if (!grounded) target.y = player.transform.position.y;
                     Vector3 cur  = player.transform.position;
                     Vector3 next = Vector3.MoveTowards(cur, target, MoveSpeed * Time.deltaTime);
-                    if (react)
+                    if (react && !s_tank)
                     {
                         // 반응 모드 — 본 가이드(0.3초 넘게 떠 있던 것) 안이면 걸어서 가장 가까운 밖으로 · 안전지대가 뜨면 그 안으로.
                         // 빙결 · 넉백 · 띄움 중엔 못 움직인다(실제 플레이어처럼).
@@ -358,6 +453,13 @@ public static class BossFightSimEditor
                 {
                     nextLogic = now + LogicStep;
 
+                    // 10-14 사용자 「챕터3 보스가 필드보다 떠 있다」 — 2초마다 보스 · 몸 아래가 발밑 바닥보다 얼마나 위인가
+                    if (Time.time >= nextFloat && boss != null && !boss.IsDead)
+                    {
+                        nextFloat = Time.time + 2f;
+                        Event($"높이 — {BossGap(boss)}{PathInfo(boss, player.transform)}");
+                    }
+
                     // HP 유지(무적 대신)
                     var stats = player.RuntimeStats;
                     if (stats != null && stats.Hp <= 0) { Event($"⚠️ 플레이어 사망 — 한 번에 최대 HP의 {100f * (1f - HealBelow):0}% 넘게 들어왔다"); break; }
@@ -373,6 +475,7 @@ public static class BossFightSimEditor
                         if (lastPatternTime > 0f) patternGaps.Add(ptime - lastPatternTime);
                         lastPatternTime = ptime;
                         curPattern = pname; curPatternAt = now; curPatternHit = false;
+                        SnapshotFx();
                         if (!patterns.TryGetValue(pname, out var ps)) patterns[pname] = ps = new PatternStat();
                         ps.Count++;
                         if (ps.Count == 1) { Event($"패턴 첫 실행 {pname}"); ShotLater(Shot, "pattern_" + pname, 450, ct); }
@@ -396,6 +499,19 @@ public static class BossFightSimEditor
                     {
                         if (IsPhaseLike(state)) { Event($"상태 {lastState} → {state}"); ShotLater(Shot, "state_" + state, 600, ct); }
                         lastState = state;
+                    }
+
+                    // 몸이 바닥에서 0.3 m 넘게 뜬 구간 — 시작에 사진 한 장 · 끝에 길이 · 최대 · 상태
+                    float gap = BodyGap(boss);
+                    if (gap > 0.3f)
+                    {
+                        if (floatStart < 0f) { floatStart = Time.time; floatMax = 0f; floatState = state; ShotLater(Shot, "float_" + state, 100, ct); }
+                        floatMax = Mathf.Max(floatMax, gap);
+                    }
+                    else if (floatStart >= 0f)
+                    {
+                        Event($"⚠보스 몸 뜸 {Time.time - floatStart:0.0}초 · 최대 {floatMax:0.00} m · 상태 {floatState} → {state}");
+                        floatStart = -1f;
                     }
                     if (hud != null && hud.HudPage != lastPage)
                     {
@@ -459,6 +575,8 @@ public static class BossFightSimEditor
                     if (Time.unscaledTime - deathAtUnscaled > 20f) break;   // 처치 뒤 끝 장면(상한 10초) · 기억의 빛 · 회상 뒤에 창이 뜬다 — 기사 ~14초(10-03 d6)
                 }
 
+                if (boss != null && !boss.IsDead) pres.Tick(now - t0, curPattern, GameRunBootstrapper.Instance?.Run?.InCutscene ?? false);
+
                 // ── 카메라: 보스가 화면에 있나 · 가렸나 · 플레이어가 가렸나
                 if (now >= nextCam && boss != null && !boss.IsDead)
                 {
@@ -482,6 +600,7 @@ public static class BossFightSimEditor
             }
 
             // ── 보고서
+            pres.Write();
             WriteReports(dir, bossName, mode, radius, maxHp, simDps, t0, deathAt, popupSeen, heals, hits, patterns,
                          patternGaps, camSamples, offScreen, bossOcc, playerOcc, timeline, events, forced, shake,
                          react, escapes, forcedNames, NotRun(runnerObj, patterns), playerMaxHp);
@@ -528,19 +647,26 @@ public static class BossFightSimEditor
         sb.AppendLine($"클리어  사망 {(deathAt > 0f ? "예" : "아니오")} · 유물 개화 팝업 {(popupSeen ? "뜸" : "안 뜸")}");
         if (shake.Count > 0)
             sb.AppendLine($"흔들림  {shake.Count}회 · 실제/계산 길이 평균 {shake.RatioSum / shake.Count:0.00} · 계산의 60% 미만으로 끝남 {shake.Short}회 (shakes.csv)");
-        if (react) sb.AppendLine($"반응 모드  가이드 보고 피하기 {escapes}회 · 미발동 패턴 강제 {forcedNames.Count}종 · 가이드 밖 피격 {hits.Count(h => h.guide == "-")}회");
+        if (react) sb.AppendLine($"{(s_tank ? "버티기 모드(안 피함)" : "반응 모드")}  가이드 보고 피하기 {escapes}회 · 미발동 패턴 강제 {forcedNames.Count}종 · 가이드 밖 피격 {hits.Count(h => h.guide == "-")}회");
         sb.AppendLine($"예외·오류 {s_errorCount}건");
         if (s_unpauseCount > 0) sb.AppendLine($"   ⚠️ Error Pause {s_unpauseCount}회 해제 — 직전 에러: {s_lastError}");
         foreach (var e in s_errors.Take(10)) sb.AppendLine("   " + e);
         sb.AppendLine();
-        sb.AppendLine("패턴                                   실행  피격  피해   약/중/강   첫 피격(평균·최소)  가이드밖  예고(최소)  최대 한 방");
+        sb.AppendLine("패턴                                   실행  피격  피해   약/중/강   첫 피격(평균·최소)  가이드밖  예고(최소)  굳힘→판정  최대 한 방  (틱 = 약 · 최대 HP 5% 이하 지속 피해, 가이드밖 · 굳힘에서 뺌)");
         foreach (var kv in patterns.OrderByDescending(p => p.Value.Count))
         {
             var p = kv.Value;
             string fh = p.FirstHitSamples > 0 ? $"{p.FirstHitSum / p.FirstHitSamples:0.00} · {p.FirstHitMin:0.00}" : "-";
             string ga = p.GuideAgeMin < float.MaxValue ? $"{p.GuideAgeMin:0.00}" : "-";
+            string lk = p.LockMin < float.MaxValue ? $"{p.LockMin:0.00}{(p.LockMin < MinLead ? "⚠" : "")}" : "-";
             string mx = p.MaxHit > 0 ? $"{p.MaxHit}({100f * p.MaxHit / playerMaxHp:0}%)" : "-";
-            sb.AppendLine($"{kv.Key,-38} {p.Count,4} {p.Hits,5} {p.Damage,6}   {p.Light}/{p.Medium}/{p.Heavy,-6} {fh,-18} {p.NoGuide,6}  {ga,9}  {mx}{(forcedNames.Contains(kv.Key) ? "  (강제)" : "")}");
+            sb.AppendLine($"{kv.Key,-38} {p.Count,4} {p.Hits,5} {p.Damage,6}   {p.Light}/{p.Medium}/{p.Heavy,-6} {fh,-18} {p.NoGuide,6}  {ga,9}  {lk,9}  {mx}{(p.Ticks > 0 ? $"  틱 {p.Ticks}" : "")}{(forcedNames.Contains(kv.Key) ? "  (강제)" : "")}");
+        }
+        if (s_fx.Length > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("이펙트 크기 — 첫 피격 0.12초 뒤 · 판정 중심 둘레 막 재생된 입자의 보이는 양 90% 도달 ÷ 판정(원 = 반경 · 줄 = 반폭) · 0.8~1.25 기준");
+            sb.Append(s_fx);
         }
         if (notRun.Count > 0)
         {
@@ -749,6 +875,12 @@ public static class BossFightSimEditor
             if (c.transform.IsChildOf(player.transform) || (boss != null && c.transform.IsChildOf(boss.transform))) continue;
             if (c is DKResonanceStone) continue;   // 공명석은 소환물이 아니라 기사에게 피해를 넘기는 통로 — 10만을 넣으면 기사가 한 번에 죽는다(09-28 2페이지 바닥 0)
             if (c is DKStandardBearer) continue;   // 환영 기수(악몽 「지휘」)는 타격 수로 쓰러진다 — 공격 박자에서 따로 친다
+            if (c is DragonMiniDragon && s_whelpGrace > 0f)   // 새끼 용 지켜보기 — 처음 본 뒤 s_whelpGrace초 동안은 살려 둔다
+            {
+                int id = c.GetInstanceID();
+                if (!s_addSeen.TryGetValue(id, out float seenAt)) s_addSeen[id] = seenAt = Time.unscaledTime;
+                if (Time.unscaledTime - seenAt < s_whelpGrace) continue;
+            }
             for (int i = 0; i < 3; i++) d.TakeDamage(100000f, player.gameObject, 0f);
             n++;
         }
@@ -849,6 +981,71 @@ public static class BossFightSimEditor
         }
     }
 
+    private static void SnapshotFx()
+    {
+        s_fxBefore.Clear();
+        foreach (var ps in UnityEngine.Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None))
+            if (ps != null && ps.isPlaying) s_fxBefore.Add(ps.GetInstanceID());
+    }
+
+    private static void MeasureFxLater(BossGuideShapes.Shape g, string pattern, CancellationToken ct)
+        => MeasureFxAsync(g, pattern, ct).Forget();
+
+    private static async UniTaskVoid MeasureFxAsync(BossGuideShapes.Shape g, string pattern, CancellationToken ct)
+    {
+        try { await UniTask.Delay(HitShotDelayMs, ignoreTimeScale: true, cancellationToken: ct); }
+        catch (OperationCanceledException) { return; }
+        bool rect = g.Kind == BossGuideShapes.Kind.Rect;
+        float size = rect ? g.HalfWidth : g.Radius;
+        if (size <= 0.05f) return;
+        float range = (rect ? g.HalfLength + g.HalfWidth : g.Radius) + 6f;
+        s_fxWeights.Clear();
+        float total = 0f;
+        int systems = 0;
+        foreach (var ps in UnityEngine.Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None))
+        {
+            if (ps == null || !ps.isPlaying || ps.time > 1.2f) continue;   // 막 재생된 것만 — 늘 도는 무대 이펙트는 뺀다
+            if (s_fxBefore.Contains(ps.GetInstanceID())) continue;          // 패턴 시작 때 이미 켜져 있던 것(무대 · 앞 패턴)
+            if (!ps.TryGetComponent(out ParticleSystemRenderer pr) || !pr.enabled) continue;
+            var mat = pr.sharedMaterial;
+            if (mat != null && mat.shader != null && mat.shader.name.IndexOf("Distortion", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+            Vector3 d0 = ps.transform.position - g.Center; d0.y = 0f;
+            if (d0.magnitude > range) continue;
+            int n = ps.particleCount;
+            if (n == 0) continue;
+            if (s_fxBuf.Length < n) s_fxBuf = new ParticleSystem.Particle[Mathf.NextPowerOfTwo(n)];
+            n = ps.GetParticles(s_fxBuf, n);
+            bool local = ps.main.simulationSpace == ParticleSystemSimulationSpace.Local;
+            float sc = Mathf.Abs(ps.transform.lossyScale.x);
+            systems++;
+            for (int k = 0; k < n; k++)
+            {
+                Vector3 p = local ? ps.transform.TransformPoint(s_fxBuf[k].position) : s_fxBuf[k].position;
+                float s = s_fxBuf[k].GetCurrentSize(ps) * sc;
+                float a = s_fxBuf[k].GetCurrentColor(ps).a / 255f;
+                float w = a * s * s;
+                if (w <= 0f) continue;
+                Vector3 d = p - g.Center; d.y = 0f;
+                float dist = rect ? Mathf.Abs(Vector3.Dot(d, Vector3.Cross(Vector3.up, g.Axis))) : d.magnitude;
+                if (dist > size * 2.5f + 1f) continue;                                                  // 다른 원 · 줄의 입자는 뺀다
+                if (rect && Mathf.Abs(Vector3.Dot(d, g.Axis)) > g.HalfLength + 1f) continue;
+                s_fxWeights.Add(new Vector2(dist + s * 0.5f, w));
+                total += w;
+            }
+        }
+        if (total <= 0f) { s_fx.AppendLine($"  {pattern,-38} 입자 0(이펙트 없음 · 메시 · 늦게 뜸)"); return; }
+        s_fxWeights.Sort((a, b) => a.x.CompareTo(b.x));
+        float acc = 0f, reach = s_fxWeights[s_fxWeights.Count - 1].x;
+        for (int i = 0; i < s_fxWeights.Count; i++)
+        {
+            acc += s_fxWeights[i].y;
+            if (acc >= total * 0.9f) { reach = s_fxWeights[i].x; break; }
+        }
+        float ratio = reach / size;
+        string flag = ratio < 0.8f ? "  ⚠ 작다" : ratio > 1.25f ? "  ⚠ 크다" : "";
+        s_fx.AppendLine($"  {pattern,-38} {(rect ? "줄 반폭" : "원 반경")} {size:0.0} m · 도달 {reach:0.0} m · ×{ratio:0.00} · 입자계 {systems}{flag}");
+    }
+
     private static void ShotLater(Func<string, UniTask> shot, string name, int delayMs, CancellationToken ct)
         => ShotLaterAsync(shot, name, delayMs, ct).Forget();
 
@@ -907,10 +1104,97 @@ public static class BossFightSimEditor
     private static void SceneBeats(string line)
     {
         var beats = line.StartsWith("[BossStory] 봉인 장면")   ? SealBeats
-                  : line.StartsWith("[BossStory] 해방기 등장") ? UnbindBeats
+                  : line.StartsWith("[BossStory] 해방기 재조우") ? ReturnBeats
+                  : line.StartsWith("[BossStory] 다시 봉인") ? ResealBeats
                   : line.StartsWith("[BossStory] 방을 나간다") ? FlushBeats : null;
         if (beats == null || s_dir == null || s_cts == null) return;
         foreach (var (tag, at) in beats) BeatShotAsync(Path.Combine(s_dir, $"scene_{tag}.png"), at, s_cts.Token).Forget();
+    }
+
+    /// <summary>등장 구도 한 장 — 사진 + 카메라 높이(플레이어 바닥 기준) · 내려다보는 각 · 보스까지 수평 거리 · 보스 높이.</summary>
+    private static async UniTaskVoid EntranceShotAsync(string dir, string tag, float at, Transform player, Func<MonsterBase> boss,
+                                                       Action<string> log, CancellationToken ct)
+    {
+        try { await UniTask.Delay(TimeSpan.FromSeconds(at), ignoreTimeScale: true, cancellationToken: ct); }
+        catch (OperationCanceledException) { return; }
+        ScreenCapture.CaptureScreenshot(Path.Combine(dir, $"{tag}.png"));
+        var cam = Camera.main;
+        if (cam == null) return;
+        Vector3 c      = cam.transform.position;
+        float   floorY = player != null ? player.position.y : 0f;
+        float   pitch  = Mathf.DeltaAngle(0f, cam.transform.eulerAngles.x);
+        var     b      = boss();
+        string  toBoss = b != null
+            ? $" · 보스까지 {Vector2.Distance(new Vector2(c.x, c.z), new Vector2(b.transform.position.x, b.transform.position.z)):0.0} m · 보스 높이 {b.transform.position.y - floorY:0.0} m{BossFloorInfo(b, floorY)}"
+            : " · 보스 아직";
+        log($"등장 구도 {tag}(+{at:0.0}초) — 카메라 높이 {c.y - floorY:0.0} m · 내려다봄 {pitch:0}° · FOV {cam.fieldOfView:0}{toBoss}");
+    }
+
+    // 몸(렌더) 아래 − 발밑 바닥(충돌체 · 보스 몸 제외) — 바닥이 없으면 0
+    private static float BodyGap(MonsterBase b)
+    {
+        Vector3 p = b.transform.position;
+        float best = float.MaxValue, y0 = float.NaN;
+        foreach (var h in Physics.RaycastAll(p + Vector3.up * 3f, Vector3.down, 30f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            if (h.collider.transform.IsChildOf(b.transform) || h.distance >= best) continue;
+            best = h.distance; y0 = h.point.y;
+        }
+        if (float.IsNaN(y0)) return 0f;
+        float low = float.MaxValue;
+        foreach (var r in b.GetComponentsInChildren<SkinnedMeshRenderer>()) low = Mathf.Min(low, r.bounds.min.y);
+        return low < float.MaxValue ? low - y0 : 0f;
+    }
+
+    // 보스 → 플레이어 내비 경로(단상이 아래 바닥과 끊긴 섬인지) · 플레이어 발 높이(보스 발밑 바닥 기준)
+    private static string PathInfo(MonsterBase b, Transform player)
+    {
+        if (player == null) return "";
+        var path = new UnityEngine.AI.NavMeshPath();
+        var filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = b.TryGetComponent<UnityEngine.AI.NavMeshAgent>(out var a) ? a.agentTypeID : 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
+        string st = "?";
+        if (UnityEngine.AI.NavMesh.SamplePosition(b.transform.position, out var bh, 2f, filter) && UnityEngine.AI.NavMesh.SamplePosition(player.position, out var ph, 2f, filter))
+            st = UnityEngine.AI.NavMesh.CalculatePath(bh.position, ph.position, filter, path) ? path.status.ToString() : "실패";
+        else st = "플레이어 자리 내비 없음";
+        float dist = Vector3.Distance(new Vector3(b.transform.position.x, 0f, b.transform.position.z), new Vector3(player.position.x, 0f, player.position.z));
+        return $" · 플레이어 발 {player.position.y - b.transform.position.y:+0.00;-0.00}(보스 기준) · 거리 {dist:0.0} m · 경로 {st}";
+    }
+
+    // 보스 발밑 바닥(충돌체 · 보스 몸 제외) 기준 — 보스 위치 · 몸 아래 · 내비메시 높이 차
+    private static string BossGap(MonsterBase b)
+    {
+        Vector3 p = b.transform.position;
+        float best = float.MaxValue, y0 = float.NaN; string col = "없음";
+        foreach (var h in Physics.RaycastAll(p + Vector3.up * 3f, Vector3.down, 12f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            if (h.collider.transform.IsChildOf(b.transform) || h.distance >= best) continue;
+            best = h.distance; y0 = h.point.y; col = h.collider.name;
+        }
+        if (float.IsNaN(y0)) return "발밑 바닥 없음";
+        float low = float.MaxValue;
+        foreach (var r in b.GetComponentsInChildren<SkinnedMeshRenderer>()) low = Mathf.Min(low, r.bounds.min.y);
+        string nav = UnityEngine.AI.NavMesh.SamplePosition(p, out var nh, 3f, UnityEngine.AI.NavMesh.AllAreas) ? $"{nh.position.y - y0:0.00}" : "없음";
+        return $"보스 {p.y - y0:0.00} · 몸 아래 {low - y0:0.00} · 내비 {nav} m(발밑 {col} 기준 · 바닥 y {y0:0.00})";
+    }
+
+    // 10-14 사용자 「챕터3 보스가 필드보다 떠 있다」 — 보스 발밑 바닥(충돌체) · 내비메시 · 몸(렌더) 아래 높이 · 에이전트(플레이어 발 기준)
+    private static string BossFloorInfo(MonsterBase b, float floorY)
+    {
+        Vector3 p = b.transform.position;
+        string hitTxt = "없음";
+        float best = float.MaxValue;
+        foreach (var h in Physics.RaycastAll(p + Vector3.up * 3f, Vector3.down, 12f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            if (h.collider.transform.IsChildOf(b.transform) || h.distance >= best) continue;
+            best = h.distance;
+            hitTxt = $"{h.point.y - floorY:0.00}({h.collider.name})";
+        }
+        string nav = UnityEngine.AI.NavMesh.SamplePosition(p, out var nh, 3f, UnityEngine.AI.NavMesh.AllAreas) ? $"{nh.position.y - floorY:0.00}" : "없음";
+        float low = float.MaxValue;
+        foreach (var r in b.GetComponentsInChildren<SkinnedMeshRenderer>()) low = Mathf.Min(low, r.bounds.min.y);
+        string ag = b.TryGetComponent<UnityEngine.AI.NavMeshAgent>(out var a)
+            ? $"{(a.enabled ? "켬" : "끔")} 기준 {a.baseOffset:0.00} · 다음 {a.nextPosition.y - floorY:0.00} · 위치갱신 {a.updatePosition}" : "없음";
+        return $" · 발밑 바닥 {hitTxt} · 내비 {nav} · 몸 아래 {(low < float.MaxValue ? (low - floorY).ToString("0.00") : "?")} · 에이전트 {ag}";
     }
 
     private static async UniTaskVoid BeatShotAsync(string path, float at, CancellationToken ct)

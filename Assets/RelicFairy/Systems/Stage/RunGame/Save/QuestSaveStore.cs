@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// 퀘스트/업적 진행도 저장소. 슬롯별 파일(<c>quest_save_{slot}.json</c>).
@@ -16,13 +16,15 @@ public sealed class QuestSaveStore
     /// <summary>슬롯 도입 이전의 전역 키. 마이그레이션 후에도 <b>지우지 않는다</b>
     /// (구버전 빌드로 되돌아가도 진행이 남아야 한다).</summary>
     private const string LegacyPrefsKey = "questSystem";
+    private const string LegacyMigratedKey = "questSystem_migrated";
 
     private static string FilePath(int slot) => SaveFileIO.PathFor($"quest_save_{slot}.json");
 
     public bool HasSave(int slot) => SaveFileIO.Exists(FilePath(slot));
 
     /// <summary>저장된 퀘스트 JSON 원문(없으면 null).</summary>
-    public string Load(int slot) => SaveFileIO.ReadWithBackup(FilePath(slot), Tag);
+    public string Load(int slot) => SaveFileIO.ReadWithBackup(FilePath(slot), Tag,
+                                                               j => Newtonsoft.Json.Linq.JToken.Parse(j) != null);
 
     public void Save(int slot, string json) => SaveFileIO.WriteAtomic(FilePath(slot), json, Tag);
 
@@ -36,11 +38,15 @@ public sealed class QuestSaveStore
     {
         if (HasSave(slot)) return;
         if (!PlayerPrefs.HasKey(LegacyPrefsKey)) return;
+        // 한 번만 — 예전엔 새로 만들거나 지운 슬롯마다 다시 이전돼, 「새 게임」에 옛 퀘스트 완료가 붙었다(10-09 출시 점검)
+        if (PlayerPrefs.GetInt(LegacyMigratedKey, 0) == 1) return;
 
         string json = PlayerPrefs.GetString(LegacyPrefsKey);
         if (string.IsNullOrWhiteSpace(json)) return;
 
         Save(slot, json);
+        PlayerPrefs.SetInt(LegacyMigratedKey, 1);
+        PlayerPrefs.Save();
         Debug.Log($"[{Tag}] 레거시 PlayerPrefs 퀘스트 → 슬롯{slot} 파일 이전 완료(원본 보존)");
     }
 }

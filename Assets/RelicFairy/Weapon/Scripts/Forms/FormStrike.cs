@@ -1,4 +1,7 @@
+using System;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using RelicFairy.Monster;
 using UnityEngine;
 
@@ -8,6 +11,9 @@ using UnityEngine;
 /// </summary>
 public static class FormStrike
 {
+    private const int   RingSegments = 48;
+    private const float RingWidth = 0.08f, RingLift = 0.06f, RingAlpha = 0.55f, RingFade = 0.3f;
+
     /// <summary>from에서 dir로 length m, 폭 ±halfWidth 안의 살아 있는 적에게 damage.</summary>
     public static int Line(PlayerController p, Vector3 from, Vector3 dir, float length, float halfWidth, float damage, List<MonsterBase> buf)
     {
@@ -70,6 +76,86 @@ public static class FormStrike
     public static void PlayVfx(string key, Vector3 at, Vector3 forward, float scale = 1f)
     {
         if (!string.IsNullOrEmpty(key)) RelicStateVfx.PlayOneShot(key, at, scale, forward);
+    }
+
+    /// <summary>
+    /// 바닥에 얇은 고리를 seconds 동안 남긴다(형 색) — 남아 있는 판정 자리의 경계를 보인다(균열 · 10-12 B9).
+    /// 마지막 0.3초에 옅어지며 사라진다. 방이 바뀌어 오브젝트가 사라지면 그대로 끝난다.
+    /// </summary>
+    public static void GroundRing(Vector3 center, float radius, float seconds, Color color)
+    {
+        if (radius <= 0f || seconds <= 0f) return;
+        var go = new GameObject("FormGroundRing");
+        go.transform.position = center + Vector3.up * RingLift;
+        var lr = go.AddComponent<LineRenderer>();
+        lr.useWorldSpace     = false;
+        lr.loop              = true;
+        lr.positionCount     = RingSegments;
+        lr.widthMultiplier   = RingWidth;
+        lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        lr.receiveShadows    = false;
+        var mat = new Material(Shader.Find("Sprites/Default"));
+        lr.sharedMaterial = mat;
+        for (int i = 0; i < RingSegments; i++)
+        {
+            float a = i * Mathf.PI * 2f / RingSegments;
+            lr.SetPosition(i, new Vector3(Mathf.Cos(a) * radius, 0f, Mathf.Sin(a) * radius));
+        }
+        color.a = RingAlpha;
+        lr.startColor = lr.endColor = color;
+        FadeRingAsync(lr, mat, seconds, color, go.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>
+    /// 바닥에 얇은 띠(직사각형) 외곽선을 seconds 동안 — 직선 판정(참격파 · 궤적 베기)의 폭을 보인다(10-13 이펙트 = 판정).
+    /// 끝은 판정처럼 반폭만큼 둥글게 넘는 몫을 포함해 길이 + 반폭 × 2로 그린다.
+    /// </summary>
+    public static void GroundStrip(Vector3 from, Vector3 dir, float length, float halfWidth, float seconds, Color color)
+    {
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 1e-4f || length <= 0f || halfWidth <= 0f || seconds <= 0f) return;
+        dir.Normalize();
+        Vector3 right = Vector3.Cross(Vector3.up, dir) * halfWidth;
+        Vector3 a = from - dir * halfWidth, b = from + dir * (length + halfWidth);
+        var go = new GameObject("FormGroundStrip");
+        go.transform.position = new Vector3(0f, from.y + RingLift, 0f);
+        var lr = go.AddComponent<LineRenderer>();
+        lr.useWorldSpace     = true;
+        lr.loop              = true;
+        lr.positionCount     = 4;
+        lr.widthMultiplier   = RingWidth;
+        lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        lr.receiveShadows    = false;
+        var mat = new Material(Shader.Find("Sprites/Default"));
+        lr.sharedMaterial = mat;
+        float y = from.y + RingLift;
+        lr.SetPosition(0, new Vector3((a - right).x, y, (a - right).z));
+        lr.SetPosition(1, new Vector3((b - right).x, y, (b - right).z));
+        lr.SetPosition(2, new Vector3((b + right).x, y, (b + right).z));
+        lr.SetPosition(3, new Vector3((a + right).x, y, (a + right).z));
+        color.a = RingAlpha;
+        lr.startColor = lr.endColor = color;
+        FadeRingAsync(lr, mat, seconds, color, go.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    private static async UniTaskVoid FadeRingAsync(LineRenderer lr, Material mat, float seconds, Color color, CancellationToken ct)
+    {
+        try
+        {
+            for (float t = 0f; t < seconds; t += Time.deltaTime)
+            {
+                Color c = color;
+                c.a = color.a * Mathf.Clamp01((seconds - t) / RingFade);
+                lr.startColor = lr.endColor = c;
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (lr != null) UnityEngine.Object.Destroy(lr.gameObject);
+            if (mat != null) UnityEngine.Object.Destroy(mat);
+        }
     }
 
     public static float DistToSegmentXZ(Vector3 p, Vector3 a, Vector3 b)

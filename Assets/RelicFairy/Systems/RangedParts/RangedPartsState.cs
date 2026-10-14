@@ -132,6 +132,13 @@ public sealed class RangedPartsState
     /// 내장형에는 "장착"이라는 별도 단계가 없어, 첫 강화가 곧 활성화다.
     /// 상한은 정의의 max_level.
     /// </summary>
+    /// <summary>무기별 성향(10-14 빌드 시너지 A5) — 활은 분열(다발) +1, 석궁은 거력(한 발) +1. 새 런 시작에 한 번.</summary>
+    public void ApplyWeaponBias(WeaponType rangedType)
+    {
+        if (rangedType == WeaponType.Bow) LevelUp("part_split", 1);
+        else if (rangedType == WeaponType.Crossbow) LevelUp("part_power", 1);
+    }
+
     public bool LevelUp(string partId, int delta = 1)
     {
         int i = IndexOf(partId);

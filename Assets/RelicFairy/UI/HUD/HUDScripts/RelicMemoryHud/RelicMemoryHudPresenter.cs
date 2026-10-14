@@ -7,7 +7,7 @@ using UnityEngine;
 /// <item>View: <see cref="RelicMemoryHudView"/> — 게이지 루트 아래에 코드로 짓는 위젯(해시계 세 호 / 광기 눈금 넷 · 원한 불씨).</item>
 /// </list>
 /// 허브는 첫 조각과 함께 생기므로 그 전엔 숨긴다(<c>Bound</c> 사건으로 깨어난다).
-/// 갱신은 사건으로(조각 · 원한 · 시간대 · 계단 넘기) — 해시계 바늘과 광기 막대 떨림만 매 프레임 읽는다.
+/// 갱신은 사건으로(조각 · 원한 · 시간대 · 계단 넘기 · 엇갈린 빛) — 해시계 바늘 · 광기 막대 떨림 · 멈춤(피 냄새 남은 초)만 매 프레임 읽는다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class RelicMemoryHudPresenter : MonoBehaviour
@@ -39,6 +39,12 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
     {
         GawainMemoryHub.Bound   += OnGawainHub;
         LancelotMemoryHub.Bound += OnLancelotHub;
+
+        // 꺼져 있는 동안 허브가 생기면 Bound를 놓친다 — Ch2 · 심연 루프는 @HUD가 꺼진 채 첫 조각이 붙고
+        // Bound는 다시 오지 않아 유물 HUD가 끝까지 안 떴다. 켜질 때 지금 허브를 다시 묻는다(10-09 출시 점검).
+        var player = GameRunBootstrapper.Instance?.Run?.Player;
+        if (GawainMemoryHub.Of(player) is { } g && g != _gHub) OnGawainHub(g);
+        if (LancelotMemoryHub.Of(player) is { } l && l != _lHub) OnLancelotHub(l);
     }
 
     private void Update()
@@ -49,7 +55,13 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
             var g = _gHub.Gauge;
             if (g != null) _view.TickDial(g.CurrentPhase, g.PhaseProgress01, g.IsHoldingDawn);
         }
-        else if (_lHub != null) _view.TickLadder(_lHub.HoldingThreshold);
+        else if (_lHub != null)
+        {
+            // 멈춤 — 피 냄새(MadnessStack.HoldDecayUntil까지 감쇠 멈춤 · 광란 중엔 감쇠가 없어 뜻이 없다) · 끝의 문턱(HoldingThreshold)
+            var m = _lHub.Madness;
+            float holdLeft = m != null && !m.IsFrenzy ? m.HoldDecayUntil - Time.time : 0f;
+            _view.TickLadder(_lHub.HoldingThreshold, holdLeft, _res != null ? _res.Fill : 0f);
+        }
     }
 
     private void OnDisable()
@@ -94,11 +106,13 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
             _gHub.DawnStarted -= OnDawn;
             _gHub.NoonStarted -= OnNoon;
             _gHub.DuskStarted -= OnDusk;
+            _gHub.CrossLightChanged -= OnCrossLight;
             _gHub = null;
         }
         if (_lHub != null)
         {
             _lHub.RungCrossed -= OnRung;
+            _lHub.CrossLightChanged -= OnCrossLight;
             _lHub = null;
         }
         if (_grudge != null) _grudge.Changed -= RefreshGrudge;
@@ -113,6 +127,7 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
         hub.DawnStarted += OnDawn;
         hub.NoonStarted += OnNoon;
         hub.DuskStarted += OnDusk;
+        hub.CrossLightChanged += OnCrossLight;
         _view.BuildDial(_root, hub.Gauge);
         RefreshAll();
     }
@@ -124,6 +139,7 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
         _lHub   = hub;
         _grudge = hub.Grudge;
         hub.RungCrossed += OnRung;
+        hub.CrossLightChanged += OnCrossLight;
         if (_grudge != null) _grudge.Changed += RefreshGrudge;
         _view.BuildLadder(_root);
         RefreshAll();
@@ -140,6 +156,7 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
             _view.SetArcs(RelicResonance.GawainCount(_loadout, RelicPartAnchor.Dawn),
                           RelicResonance.GawainCount(_loadout, RelicPartAnchor.Noon),
                           RelicResonance.GawainCount(_loadout, RelicPartAnchor.Dusk));
+            _view.SetCrossLight(CrossLightPossible("gawain"), _gHub.HasCrossLight, animate: false);
         }
         else if (_lHub != null)
         {
@@ -148,12 +165,36 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
                 _rungs[i] = RelicResonance.LancelotRungFilled(_loadout, rungs[i]);
             _view.SetRungs(_rungs, RelicResonance.LancelotTier(RelicResonance.LancelotLadder(_loadout)));
             RefreshGrudge();
+            _view.SetCrossLight(CrossLightPossible("lancelot"), _lHub.HasCrossLight, animate: false);
         }
     }
 
     private void RefreshGrudge()
     {
-        if (_view != null && _grudge != null) _view.SetGrudge(_grudge.Value, _grudge.Cap);
+        if (_view != null && _grudge != null) _view.SetGrudge(_grudge.Value, _grudge.Cap, _grudge.IsFull);
+    }
+
+    /// <summary>엇갈린 빛이 켜지거나(true) 써서 꺼졌다(false) — 별이 밝아지거나 빈 별로 돌아간다.</summary>
+    private void OnCrossLight(bool on)
+    {
+        if (_view == null) return;
+        if (_gHub != null) _view.SetCrossLight(CrossLightPossible("gawain"), on, animate: true);
+        else if (_lHub != null) _view.SetCrossLight(CrossLightPossible("lancelot"), on, animate: true);
+    }
+
+    /// <summary>엇갈린 빛이 가능한가 = 그 유물의 반응 조각 2개 이상(허브의 판정과 같은 셈). 아니면 대기 별을 띄우지 않는다.</summary>
+    private bool CrossLightPossible(string relicId)
+    {
+        var data = Managers.RelicParts;
+        if (_loadout == null || data == null) return false;
+        var ids = _loadout.RelicPartIds;
+        int n = 0;
+        for (int i = 0; i < ids.Count; i++)
+        {
+            var e = data.GetById(ids[i]);
+            if (e != null && e.relic_id == relicId && e.IsReaction && ++n >= 2) return true;
+        }
+        return false;
     }
 
     private void OnDawn()             => _view?.FlashArc(0);

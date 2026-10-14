@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
@@ -37,6 +37,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     private const float EnrageSpeedMult    = 1.3f;
     private const float Phase2HpThreshold  = 0.4f;
     private const float SoulGateRatio      = 0.5f;   // 영혼 소환 전까지 HP를 붙잡는 1페이지 비율
+    private const int   MaxGridGrow        = 2;      // 격자 바깥 줄이 걸어 다니는 바닥이면 넓히는 최대 횟수
 
     // ── 2페이지 무대(가운데 3×3 붕괴) ─────────────────────
     private static readonly Color CollapseColor = new Color(0.22f, 0.20f, 0.26f, 0.62f);
@@ -55,11 +56,22 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     private const string FlipToWhiteHint      = "검이 하얗게 물들었다";
     private const string CrossFlipHint        = "색이 뒤집힌다 — 마지막 색의 반대로";
     private const string TreasonColorHint     = "검과 같은 색의 환영만 벤다 — 다른 색 칸으로";
+    private static readonly Color EntranceRadialTint = new Color(0.4f, 0.45f, 0.9f, 0.5f);   // 2페이지 포효(DK_PageTransition)와 같은 색(10-11 이펙트 톤 점검)
+    private const float EntranceRadialSeconds = 3f;
+
+    // 큰 기술 알림(10-11 사용자 「어떤 공격이 위험한지 더 알려줘야」) — 기술 이름은 매번(패턴 예고 자리), 멀린 요령은 전투마다 처음 한 번.
+    // 대사 CSV 키가 먼저, 없으면 폴백 문구 — 문구는 대사 담당(b0) 확정본(멀린 요령 32자 이하 · 해체 · 봉인기에도 나와 「기사」를 넣지 않는다)
+    private static readonly (string nameKey, string name, string hintKey, string hint)[] BigSkillLines =
+    {
+        ("DK_Skill_Strike",  "검의 심판",     "DK_Hint_Strike",  "떠 있는 검 중 같은 색을 베. 방패 안이 안전해."),
+        ("DK_Skill_Pyramid", "무너지는 원탁", "DK_Hint_Pyramid", "안쪽 고리부터 터져. 터지면 옆 고리로!"),
+        ("DK_Skill_QuickP2", "세 번의 십자",  "DK_Hint_QuickP2", "네가 선 줄이 세 번 베여. 대각선으로!"),
+    };
 
     // ── Inspector ─────────────────────────────────────────
     [Header("DeathKnight — 표시")]
     [Tooltip("보스 체력바 이름. config.monsterName은 퀘스트 처치 키라 바꾸지 않는다")]
-    [SerializeField] private string _bossDisplayName = "죽음의 기사";
+    [SerializeField] private string _bossDisplayName = "타락한 모르드레드";   // 인트로 · Ch3 같은 칭호(10-13 이름 통일 — 「죽음의 기사」 · 「데스나이트」는 화면에서 뺌)
 
     [Header("DeathKnight — 렌더러")]
     [SerializeField] private Renderer[] _bodyRenderers;
@@ -182,8 +194,6 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     public DeathKnightBossBlackboard DKBlackboard => _dkBB;
     public Transform SwordTransform          => _swordCtrl?.SwordTransform;
     public Transform PyramidStrikeAnchor     => _pyramidStrikeAnchor;
-    public GameObject WhiteAuraPrefab        => _whiteAuraPrefab;
-    public GameObject BlackAuraPrefab        => _blackAuraPrefab;
     public Vector3 EntranceCameraOffset          => _entranceCameraOffset;
     public Vector3 EntranceCameraLookOffset      => _entranceCameraLookOffset;
     public float   EntranceCameraCloseUpDuration => _entranceCameraCloseUpDuration;
@@ -219,6 +229,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     private bool                      _flipHintShown;
     private bool                      _crossFlipHintShown;
     private bool                      _treasonHintShown;
+    private readonly bool[]           _bigSkillHintShown = new bool[3];   // 큰 기술 멀린 요령 — 전투마다 한 번씩(10-11)
     private DKCommandTrait            _command;             // 악몽 특성 「지휘」 — 환영 기수(10-02)
 
     public bool SoulGateCleared => _soulGateCleared;
@@ -429,6 +440,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         _page2Glow         = 0f;
         _swordCueGlow      = 0f;
         _floorHintShown    = _flipHintShown = _crossFlipHintShown = _treasonHintShown = false;
+        System.Array.Clear(_bigSkillHintShown, 0, _bigSkillHintShown.Length);
         if (_dkBB != null) ApplyArmorTint(_dkBB.SwordColor);
         ApplyWindowTint(_dkBB?.SwordColor ?? DKSwordColor.White);
         ApplyAuraColor(_dkBB?.SwordColor ?? DKSwordColor.White);
@@ -657,11 +669,28 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         if (_dkBB == null) return;
         SwordCueFlashAsync().Forget();
         RunFx.Play(RunFxSlot.Ring, transform.position + Vector3.up * 0.1f, SwordCueRingScale,
-                   _dkBB.SwordColor == DKSwordColor.White ? Color.white : DKGridPatternHelper.DarkReadableTint);
+                   _dkBB.SwordColor == DKSwordColor.White ? Color.white : DKGridPatternHelper.DarkReadableTint, vivid: false);
 
         if (_floorHintShown) return;
         _floorHintShown = true;
         UI_BossBark.Show(FloorRuleHint, BossBarkType.PatternAnnounce);
+    }
+
+    /// <summary>큰 기술 — 검 소환 · 피라미드 베기 · 2페이지 빠른 찌르기(10-11).</summary>
+    public enum BigSkill { Strike = 0, Pyramid = 1, QuickP2 = 2 }
+
+    /// <summary>
+    /// 큰 기술 시작 — 기술 이름을 패턴 예고 자리에(매번), 이 전투에서 처음이면 멀린이 피하는 법 한 줄(10-11 사용자 「어떤 공격이 위험한지 더 알려줘야」).
+    /// </summary>
+    public void AnnounceBigSkill(BigSkill skill)
+    {
+        var line = BigSkillLines[(int)skill];
+        if (!UI_BossBark.ShowDialogue(line.nameKey, BossBarkType.PatternAnnounce))
+            UI_BossBark.Show(line.name, BossBarkType.PatternAnnounce);
+        if (_bigSkillHintShown[(int)skill]) return;
+        _bigSkillHintShown[(int)skill] = true;
+        if (!UI_BossBark.ShowDialogue(line.hintKey, BossBarkType.MerlinNarration))
+            UI_BossBark.Show(line.hint, BossBarkType.MerlinNarration, DialogueSpeaker.Merlin);
     }
 
     /// <summary>2페이지 KL3 「반역의 환영」 — 이번 전투 첫 번째에만 규칙 자막(10-03 S3).</summary>
@@ -864,6 +893,45 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         int height = Mathf.Max(2, Mathf.RoundToInt(floorBounds.size.z / 2f));
         Vector3 worldCenter = new Vector3(floorBounds.center.x, 0f, floorBounds.center.z);
         DKBossRoomContext.Initialize(width, height, 2f, worldCenter);
+        GrowPastWalkableBorder();
+    }
+
+    /// <summary>
+    /// 기사 격자는 맨 바깥 줄을 벽으로 보고 안쪽 칸만 깔고 판정한다(색 칸 패턴 · 줄 베기 · 2페이지 구역 모두).
+    /// Ch3 아레나는 플레이어 뒤 바깥 줄이 걸어 다니는 바닥이라 벽에 붙으면 칸도 피해도 없었다(10-13 실측 15칸) —
+    /// 플레이어 쪽에서 걸어갈 수 있는 칸이 바깥 줄에 있으면 그쪽으로 한 줄씩 넓혀 바깥 줄이 실제 벽에 오게 한다(기존 칸 자리는 그대로).
+    /// </summary>
+    private void GrowPastWalkableBorder()
+    {
+        Vector3 from = _pyramidStrikeAnchor != null ? _pyramidStrikeAnchor.position : _runtime.SpawnPosition;
+        for (int i = 0; i < MaxGridGrow; i++)
+        {
+            int w = DKBossRoomContext.Width, h = DKBossRoomContext.Height;
+            int left  = AnyReachable(from, 0, 0, 0, h - 1)         ? 1 : 0;
+            int right = AnyReachable(from, w - 1, w - 1, 0, h - 1) ? 1 : 0;
+            int back  = AnyReachable(from, 0, w - 1, 0, 0)         ? 1 : 0;
+            int front = AnyReachable(from, 0, w - 1, h - 1, h - 1) ? 1 : 0;
+            if (left + right + back + front == 0) return;
+
+            float   s = DKBossRoomContext.CellSize;
+            Vector3 c = DKBossRoomContext.WorldCenter;
+            c.x += (right - left) * s * 0.5f;   // 한쪽만 늘려도 기존 칸 중심이 그대로 있게
+            c.z += (front - back) * s * 0.5f;
+            DKBossRoomContext.Initialize(w + left + right, h + back + front, s, c);
+            Debug.Log($"[DeathKnight] 격자 넓힘 — 바깥 줄이 걸어 다니는 바닥(좌 {left} · 우 {right} · 뒤 {back} · 앞 {front}) → {DKBossRoomContext.Width}×{DKBossRoomContext.Height}", this);
+        }
+    }
+
+    private static bool AnyReachable(Vector3 from, int x0, int x1, int z0, int z1)
+    {
+        for (int z = z0; z <= z1; z++)
+        for (int x = x0; x <= x1; x++)
+        {
+            Vector3 p = DKBossRoomContext.CellToWorld(x, z, 0f);
+            p.y = from.y;
+            if (DKGridPatternHelper.IsReachable(from, p)) return true;
+        }
+        return false;
     }
 
     private void InitializePatterns(BossConfigSO config)
@@ -1015,6 +1083,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         _dkBB.SetPhase2();          // 페이즈 2 진입 · 영혼 소환 · 55% 재개 모두 닫힘
         _soulGateCleared = true;    // 50% 클램프 해제
         TryEnrage();                // 1페이지에서 이미 켜졌다 — 2페이지 도중에 켜져 속도가 바뀌지 않게
+        _dkBB.UseDesignTiming();    // 2페이지는 설계 타이밍 — 다시 쓰는 1페이지 패턴도 예고를 1/1.4로 줄이지 않는다(10-08 점검)
         _dkBB.SetInvincible(false);
         _runner?.SetBreakRange(Phase2BreakMin, Phase2BreakMax);
     }
@@ -1147,7 +1216,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     private void DestroyStageHazard()
     {
         if (_stageHazard == null) return;
-        Destroy(_stageHazard.gameObject);
+        _stageHazard.Dismiss();   // 물러난 뒤 스스로 지운다(10-12 디졸브 원칙)
         _stageHazard = null;
     }
 
@@ -1162,6 +1231,13 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
 
     public override string BossName => _bossDisplayName;
 
+    /// <summary>방이 정한 이름으로 바꾼다(인트로 「타락한 모르드레드」) — 체력바 이름도 다시 묶는다.</summary>
+    internal void SetDisplayName(string displayName)
+    {
+        _bossDisplayName = displayName;
+        BindBossHud();
+    }
+
     public event Action OnEntranceRequested;
     public event Action OnCombatReady;
 
@@ -1172,6 +1248,13 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         foreach (var b in _entranceEndBarriers)
             if (b != null) b.SetActive(true);
         ApplyBarrierTint(_dkBB?.SwordColor ?? DKSwordColor.White);
+        // 인트로 전투 — 카메라가 결계 바깥이라 반투명 결계 유리(20×20 m)가 화면 위쪽을 안개처럼 덮었다(10-10 16 실측: 위쪽 밝기 0.25, 유리를 끄면 0.04).
+        // 막는 콜라이더 · SoftBarrier는 그대로 두고 유리만 그리지 않는다. 본편은 그대로
+        if (IntroBootstrapper.Instance != null)
+            foreach (var b in _entranceEndBarriers)
+                if (b != null)
+                    foreach (var r in b.GetComponentsInChildren<Renderer>())
+                        r.enabled = false;
 
         // [근접 기회 A안] 유리 앞 공명 성흔석 — 유리 너머 기사를 근접 빌드도 칠 수 있게(유리가 켜진 뒤에 거리를 잰다)
         var playerT = GameRunBootstrapper.Instance?.Run?.Player?.transform;
@@ -1232,7 +1315,10 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         {
             float floorY = DKBossRoomContext.CellToWorld(0, 0, 0f).y;
             Vector3 spawnPos = new Vector3(transform.position.x, floorY, transform.position.z);
-            BossEffectPool.SpawnOneShot(_entranceRadialVfxPrefab, spawnPos, Quaternion.identity, fallbackLifetime: 3f);
+            // 2페이지 포효와 같게 왜곡 층을 끄고 색을 입힌다 — 원색 · 왜곡 그대로면 화면을 덮었다(10-11 이펙트 톤 점검). 색을 바꾸므로 풀에서 꺼내지 않는다
+            var fx = Instantiate(_entranceRadialVfxPrefab, spawnPos, Quaternion.identity);
+            BossPageTransitionState.ToneRoarVfx(fx, EntranceRadialTint);
+            Destroy(fx, EntranceRadialSeconds);
         }
         Managers.Sound?.PlayEffect(_entranceZoneSfx);
     }

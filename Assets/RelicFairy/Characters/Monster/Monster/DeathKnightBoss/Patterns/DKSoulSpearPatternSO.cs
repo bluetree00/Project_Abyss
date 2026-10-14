@@ -80,8 +80,6 @@ public class DKSoulSpearPatternSO : BossPatternSO
 public class DKSoulSpearState : FullLockState<DKSoulSpearPatternSO>
 {
     private const string AnimName = "Attack2";
-    private const int    BoundStrikes = 2;      // 봉인기: 사슬이 2타 뒤 검을 붙잡는다(10-03 S2)
-    private const float  YankStagger  = 0.8f;
     private const float  RowTileY     = 0.2f;   // 줄 예고 높이 — 예고 높이 규칙(0.2). 0.05는 바닥 잔해에 묻혔다(10-03)
     private const float  RowEdgeY     = 0.27f;  // 경계 테두리는 예고 타일 위로(기본 0.12는 타일 0.05 기준)
     private const float  BeamY        = 0.4f;   // 빔은 예고 타일 위로 — 타일이 판정 순간까지 남는다
@@ -97,7 +95,6 @@ public class DKSoulSpearState : FullLockState<DKSoulSpearPatternSO>
     private List<GameObject> _edges;
     private int              _currentRowZ;
     private DKSwordColor     _swordColor;
-    private float            _extraRecovery;
 
     public DKSoulSpearState(DKSoulSpearPatternSO data) : base(data) { }
 
@@ -108,7 +105,6 @@ public class DKSoulSpearState : FullLockState<DKSoulSpearPatternSO>
         _strikeIndex  = 0;
         _beamVisible  = false;
         _strikeApplied = false;
-        _extraRecovery = 0f;
         _tiles        = new List<DKTileInfo>();
         _edges        = new List<GameObject>();
         _swordColor   = GetSwordColor(ctx);
@@ -121,6 +117,7 @@ public class DKSoulSpearState : FullLockState<DKSoulSpearPatternSO>
     public override void Update(MonsterContext ctx)
     {
         _timer += Time.deltaTime * AnimSpeed(ctx);
+        DKPage2Zone.SettleAfterSwing(ctx, AnimName);   // 휘두른 끝 자세로 서 있지 않게 — 남은 라운드는 기본 자세로
 
         switch (_phase)
         {
@@ -141,6 +138,7 @@ public class DKSoulSpearState : FullLockState<DKSoulSpearPatternSO>
                     SpawnRowBeam(Data.impactVfxPrefab, _currentRowZ, _swordColor);   // 경고 타일은 판정 순간까지 남긴다(10-03)
                     Managers.Sound?.PlayEffectAt(Data.beamSfx, DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, _currentRowZ, 0.1f));
                 }
+                DKGridPatternHelper.ArmBefore(_timer, Data.warningDuration + Data.beamHitDelay, _tiles, _swordColor);   // 판정 0.25초 전 위험 칸을 붉게(10-11) — 노린 줄만(이웃 줄은 반대 색)
                 // Stage 2: 빔 출현 → 피격 (회피 창)
                 if (_beamVisible && !_strikeApplied && _timer >= Data.warningDuration + Data.beamHitDelay)
                 {
@@ -154,15 +152,8 @@ public class DKSoulSpearState : FullLockState<DKSoulSpearPatternSO>
                 if (_strikeApplied && _timer >= Data.warningDuration + Data.beamHitDelay + Data.nextRoundDelay)
                 {
                     _strikeIndex++;
-                    int strikes = IsBound(ctx) ? Mathf.Min(BoundStrikes, Data.strikeCount) : Data.strikeCount;
-                    if (_strikeIndex >= strikes)
+                    if (_strikeIndex >= Data.strikeCount)
                     {
-                        if (strikes < Data.strikeCount)
-                        {
-                            // 봉인기 — 옛 봉인 사슬이 검을 붙잡는다
-                            _extraRecovery = BossBinding.Of(ctx.Monster).Yank(YankStagger);
-                            PlayAnim(ctx, "GetHit");
-                        }
                         _phase = Phase.Recovery;
                         _timer = 0f;
                     }
@@ -175,7 +166,7 @@ public class DKSoulSpearState : FullLockState<DKSoulSpearPatternSO>
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryTime + _extraRecovery)
+                if (_timer >= Data.recoveryTime)
                     ctx.Monster.ChangeState<AttackReadyState>();
                 break;
         }
@@ -218,12 +209,15 @@ public class DKSoulSpearState : FullLockState<DKSoulSpearPatternSO>
     private const float RowEdgeThickness = 0.25f;   // 기본 0.133의 약 2배 — 원근으로 납작해지는 가로줄에서도 선이 보이게
 
     public static void SpawnRowGuide(DKSoulSpearPatternSO data, int rowZ, DKSwordColor sc,
-                                     List<DKTileInfo> tiles, List<GameObject> edges)
+                                     List<DKTileInfo> tiles, List<GameObject> edges, bool neighbours = true)
     {
         DKSwordColor other = sc == DKSwordColor.White ? DKSwordColor.Black : DKSwordColor.White;
         SpawnRowTiles(data, rowZ,     sc,    tiles);   // 노리는 줄 먼저 — 공유 경계 테두리가 이 줄 색을 따른다
-        SpawnRowTiles(data, rowZ - 1, other, tiles);
-        SpawnRowTiles(data, rowZ + 1, other, tiles);
+        if (neighbours)   // false = 노리는 줄만 — 본 패턴 타일 위에 반대 색 이웃 줄을 덮으면 그 위험 칸이 안전해 보였다(10-08 점검)
+        {
+            SpawnRowTiles(data, rowZ - 1, other, tiles);
+            SpawnRowTiles(data, rowZ + 1, other, tiles);
+        }
         // 테두리는 바닥색과 상관없이 밝게 — 흰 검 = 흰색, 검은 검 = 밝은 보라(10-03 실측: 어두운 테두리라 줄이 안 갈렸다)
         Color edge = sc == DKSwordColor.White ? new Color(1f, 1f, 1f, 0.95f) : new Color(0.8f, 0.45f, 1f, 0.95f);
         edges.AddRange(DKGridPatternHelper.SpawnBoundaryEdges(tiles, data.edgePrefab, RowEdgeThickness, RowEdgeY, edge));
@@ -265,10 +259,6 @@ public class DKSoulSpearState : FullLockState<DKSoulSpearPatternSO>
 
     private static DKSwordColor GetSwordColor(MonsterContext ctx)
         => (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SwordColor ?? DKSwordColor.White;
-
-    /// <summary>봉인기에 옛 봉인 사슬이 감겨 있는가(10-03 S2).</summary>
-    private static bool IsBound(MonsterContext ctx)
-        => !StoryProgress.IsLiberated && BossBinding.Of(ctx.Monster)?.IsBound == true;
 
     private static float AnimSpeed(MonsterContext ctx)
         => (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.AnimSpeedMult ?? 1f;

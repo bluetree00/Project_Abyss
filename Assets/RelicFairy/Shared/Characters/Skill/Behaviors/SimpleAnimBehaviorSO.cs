@@ -51,7 +51,7 @@ public class SimpleAnimBehaviorSO : SkillBehaviorSO
         {
             if (_data.duration > 0f)
             {
-                _timer += Time.deltaTime;
+                _timer += ctx.DeltaTime;   // 애니메이터와 같은 시계(슬로모 — 10-09)
                 if (_timer >= _data.duration)
                     ctx.RequestEnd();
             }

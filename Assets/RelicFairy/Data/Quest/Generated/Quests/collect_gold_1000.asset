@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: collect_gold_1000
   m_EditorClassIdentifier: Assembly-CSharp::Quest
   category: {fileID: 11400000, guid: 02738821a9744954bbe92d3d366f9c96, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: dc453e2470715c149a0b134d69ff7c26, type: 3}
   codeName: collect_gold_1000
   displayName: "\uC7AC\uB825\uAC00"
   description: "\uACE8\uB4DC 1000 \uBAA8\uC73C\uAE30"

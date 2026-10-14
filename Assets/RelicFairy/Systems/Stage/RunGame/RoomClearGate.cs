@@ -127,9 +127,6 @@ public class RoomClearGate : MonoBehaviour
         // 바닥(사망 위치)에서 살짝 띄워 이펙트/보상이 지면에 파묻히지 않게 한다.
         center += Vector3.up * effectHeightOffset;
 
-        if (endEffectPrefab != null)
-            Instantiate(endEffectPrefab, center, Quaternion.identity);
-
         var rewards = new System.Collections.Generic.List<(RuntimeItemData, ItemSO)>();
         bool isChoice = false;      // 룬 보상은 전부 선택형(3지선다). 보스방은 룬 자체가 없음.
         int  choiceRounds = 1;      // 3지선다를 몇 번 반복할지(챌린지 다중 보상 = 라운드 수)
@@ -180,7 +177,12 @@ public class RoomClearGate : MonoBehaviour
             }
             else
             {
+                // 첫 굴림도 복원과 같은 방 시드로(10-11) — 시드 없이 굴리면 보상을 보고 끈 뒤 이어할 때 복원 굴림이 다른 후보를 냈다.
+                int? seed = RunFlowController.Active?.CurrentRewardSeed;
+                var prevState = UnityEngine.Random.state;
+                if (seed.HasValue) UnityEngine.Random.InitState(seed.Value);
                 rewards.AddRange(RollRewardChoices(rule.ChoiceCount, rule.RarityFloor));
+                if (seed.HasValue) UnityEngine.Random.state = prevState;
 
                 // 정제소 연료 — 방 클리어마다 원석 지급(설계 §2.8: 40방 × 4 ≈ 160).
                 // 원석은 정제소의 유일한 정규 소비처이므로, 생산이 없으면 정제소 자체가 죽는다.
@@ -210,6 +212,11 @@ public class RoomClearGate : MonoBehaviour
         // 보스방 · 후보 0(풀이 비었다)은 rewards가 비어 보류가 걸리지 않는다 — 지금처럼 바로 열린다.
         if (rewards.Count > 0)
             RunFlowController.Active?.HoldExitsForReward(this);
+
+        // 방 클리어 이펙트는 보상이 없는 방(보스방 · 후보 0)에서만 — 보상이 있으면 같은 자리 · 같은 프레임에 등급 예고(소용돌이)가 선다.
+        // 둘이 겹쳐 파란 원색 폭발 위에 등급 빛이 섞였다(10-11 이펙트 톤 2차 V-5). 위 보류와 아래 첫 await 사이에 await를 넣지 않는다.
+        if (endEffectPrefab != null && rewards.Count == 0)
+            Instantiate(endEffectPrefab, center, Quaternion.identity);
 
         // 등급 예고(10-01) — 후보는 위에서 이미 정해졌다. 최고 등급이 예고의 길이 · 빛깔 · 크기를 정한다
         // (일반 0.6초 ~ 전설 2.0초 — 낮은 등급은 빨리 서고, 높은 등급은 기다림 자체가 예고다).
@@ -342,13 +349,13 @@ public class RoomClearGate : MonoBehaviour
         if (rule.Ore > 0)
         {
             bank.Add(FuelKind.RuneOre, rule.Ore);
-            ItemEffectVfxHelper.ShowNotice($"<color=#7FD0FF>원석 +{rule.Ore}</color>  (정제소 연료)");
+            ItemEffectVfxHelper.ShowNotice($"<color={UIPalette.RuneOreHex}>원석 +{rule.Ore}</color>  (정제소 연료)");
         }
 
         if (rule.EnhanceMaterial > 0)
         {
             bank.Add(FuelKind.EnhanceMaterial, rule.EnhanceMaterial);
-            ItemEffectVfxHelper.ShowNotice($"<color=#FFB466>강화재료 +{rule.EnhanceMaterial}</color>  (재련소 연료)");
+            ItemEffectVfxHelper.ShowNotice($"<color={UIPalette.EnhanceHex}>강화재료 +{rule.EnhanceMaterial}</color>  (재련소 연료)");
         }
     }
 
@@ -398,6 +405,9 @@ public class RoomClearGate : MonoBehaviour
             var (d, s) = PickItemByRolledRarity(effFloor, rule.Weights, preferOwnedFamily: result.Count == 0);
             if (d == null || s == null) continue;
             if (!picked.Add(s.itemId)) continue;   // 이미 뽑힌 아이템 → 다시 굴림
+            // 둘째 장은 절반 확률로 판에 가장 많은 속성(10-14 빌드 시너지 A4 · 보유 우대) — 속성 존을 키우는 쪽으로 기운다.
+            // 속성을 무작위로 받는 등급(일반 · 희귀)만 — 영웅 · 전설은 속성이 데이터로 정해져 있다.
+            if (result.Count == 1) BiasOwnedElement(d);
             result.Add((d, s));
         }
 
@@ -405,6 +415,15 @@ public class RoomClearGate : MonoBehaviour
             Debug.LogWarning($"[RoomClearGate] 후보 부족 — 요청 {count} / 확보 {result.Count} (아이템 풀 크기 확인 필요)");
 
         return result;
+    }
+
+    private static readonly System.Collections.Generic.List<ItemSO> s_obtainable = new(32);
+
+    private static System.Collections.Generic.IReadOnlyList<ItemSO> Obtainable(System.Collections.Generic.List<ItemSO> pool, RunItemInventory inv)
+    {
+        if (inv == null || pool == null) return pool;
+        inv.FilterObtainable(pool, s_obtainable);
+        return s_obtainable;
     }
 
     /// <summary>등급을 굴려 아이템 1개를 뽑는다(등급 폴백 포함). 드랍 발생 판정은 호출부가 먼저 통과시킨다.</summary>
@@ -421,11 +440,13 @@ public class RoomClearGate : MonoBehaviour
         // LuckRollTable은 luck 1부터 Epic/Legendary를 굴린다). 드랍을 통째로 날리는 대신 한 단계씩
         // 낮춰 실제 보유한 등급을 찾는다. 상위 등급 아이템이 추가되면 폴백 없이 자연히 그 등급이 나온다.
         var rolledRarity = rarity;
-        var candidates = ItemSORegistry.GetByRarity(rarity);
+        // 이미 가진 룬(상한 1)은 후보에서 뺀다 — 예전엔 한 번에 뽑는 3장 안의 중복만 걸러 같은 룬이 또 나왔다(10-09 출시 점검)
+        var rewardInv = GameRunBootstrapper.Instance?.Run?.ItemInventory;
+        System.Collections.Generic.IReadOnlyList<ItemSO> candidates = Obtainable(ItemSORegistry.GetByRarity(rarity), rewardInv);
         while ((candidates == null || candidates.Count == 0) && rarity > ItemRarity.Common)
         {
             rarity--;
-            candidates = ItemSORegistry.GetByRarity(rarity);
+            candidates = Obtainable(ItemSORegistry.GetByRarity(rarity), rewardInv);
         }
 
         if (candidates == null || candidates.Count == 0)
@@ -453,6 +474,38 @@ public class RoomClearGate : MonoBehaviour
         Debug.Log($"[RoomClearGate] 보상 아이템 선택: {so.itemId} (rarity={rarity}, room={RoomKind()})");
         return (data, so);
     }
+
+    /// <summary>
+    /// 둘째 장 속성 기울임(10-14 A4) — 일반 · 희귀 룬이면 절반 확률로 판에 가장 많은 속성으로 바꾼다. 바꿨으면 true.
+    /// </summary>
+    public static bool BiasOwnedElement(RuntimeItemData d)
+    {
+        if (d == null || d.rarity > ItemRarity.Rare || UnityEngine.Random.value >= PreferElementChance) return false;
+        string top = TopOwnedElement();
+        if (top == null) return false;
+        d.element = top;
+        return true;
+    }
+
+    /// <summary>판에 놓인 룬 중 가장 많은 속성(ElementDef id) — 없으면 null. 같으면 먼저 센 쪽.</summary>
+    private static string TopOwnedElement()
+    {
+        var placed = GameRunBootstrapper.Instance?.Run?.ItemInventory?.PlacedItems;
+        if (placed == null) return null;
+        s_elementCount.Clear();
+        string best = null; int bestN = 0;
+        foreach (var item in placed)
+        {
+            if (item == null || string.IsNullOrEmpty(item.element)) continue;
+            s_elementCount.TryGetValue(item.element, out int n);
+            s_elementCount[item.element] = ++n;
+            if (n > bestN) { best = item.element; bestN = n; }
+        }
+        return best;
+    }
+
+    private static readonly System.Collections.Generic.Dictionary<string, int> s_elementCount = new();
+    private const float PreferElementChance = 0.5f;   // 룬 보상 둘째 장 — 보유 1위 속성으로 기울 확률(10-14 A4)
 
     /// <summary>
     /// 보유 각인 1 · 2위 계열의 룬 하나(없으면 null). 이 등급 풀에 그 계열이 없으면 기울이지 않는다.

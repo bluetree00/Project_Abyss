@@ -141,6 +141,10 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
         public bool  ImpactApplied;
         public bool  Landed;
         public int   Batch;   // 악몽 2연 묶음(0부터, 무장 뒤 묶음마다 0.1초씩 늦게 낙하) — 1연은 -1
+        public List<Vector2Int> Cells;   // 10-14 모양 판정 칸(없으면 예전 3×3 사각)
+        public float Scale;              // 이펙트 배율(0 = 1)
+        public float DmgMul;             // 피해 배율(0 = 1)
+        public float WarnDur;            // 예고 시간(0 = 설정값)
         public bool  Second => Batch >= 0;
     }
 
@@ -193,6 +197,8 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
         _secondSfxBatch = -1;
 
         if (ctx.Agent != null) ctx.Agent.enabled = false;
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
+            bb.PassiveMeteorSuppressed = true;   // 화염구 비에 수동 운석까지 겹쳐 초당 20개 가까이 떨어졌다 — Exit에서 푼다(10-08 점검)
 
         PlayAnim(ctx, Data.HoverStateName);
     }
@@ -210,7 +216,10 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
     public override void Exit(MonsterContext ctx)
     {
         if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard exitBb)
-            exitBb.LeapCooldown = Data.Cooldown;
+        {
+            exitBb.LeapCooldown            = Data.Cooldown;
+            exitBb.PassiveMeteorSuppressed = false;
+        }
         CleanupAll();
         CleanupAllScorches();
     }
@@ -272,8 +281,9 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
 
             if (!e.Falling)
             {
+                float warnDur = e.WarnDur > 0f ? e.WarnDur : Data.WarningDuration;   // 노림 · 큰 메테오 · 흩뿌림마다 다르다(10-14)
                 e.WarnTimer += Time.deltaTime;
-                float t = Mathf.Clamp01(e.WarnTimer / Data.WarningDuration);
+                float t = Mathf.Clamp01(e.WarnTimer / warnDur);
                 foreach (var mat in e.WarnMats)
                 {
                     if (mat == null) continue;
@@ -282,7 +292,7 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
                     mat.color = c;
                 }
 
-                if (e.WarnTimer >= Data.WarningDuration)
+                if (e.WarnTimer >= warnDur)
                 {
                     e.Falling  = true;
                     e.FallTimer = 0f;   // 예고 타일은 착탄 때 지운다(10-02 — 낙하 중에도 바닥 예고 유지)
@@ -290,7 +300,8 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
                     {
                         // LandPos에 직접 스폰 — 파티클 시뮬레이션이 낙하~폭발 전체를 재생
                         e.Projectile = BossEffectPool.Spawn(Data.FireballPrefab, e.LandPos, Quaternion.identity);
-                        e.Projectile.transform.localScale = Vector3.one * Data.FireballScale;
+                        e.Projectile.transform.localScale = Vector3.one * Data.FireballScale * (e.Scale > 0f ? e.Scale : DragonThreat.MeteorScale(1));   // 이펙트 = 판정 크기(10-14 · 예전 3×3도 반경 1칸 배율)
+                        BossPageTransitionState.ToneRoarVfx(e.Projectile, Color.clear);   // 굴절층 끔 — 100발이 화면을 일그러뜨렸다(10-11 이펙트 톤 2차)
                     }
                     if (!e.Second || e.Batch != _secondSfxBatch)   // 2연은 묶음마다 한 소리
                     {
@@ -351,11 +362,49 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
 
     // ── 화염구 스폰 ──────────────────────────────────────────────────────────
 
+    // 10-14 화룡 위협 — 같은 3×3을 방 전체에 고르게 뿌려 가만히 서 있어도 100발 중 0.24발이 맞았다(맞을 확률 21%)
+    private const float RainScatterWarn = 1.0f;   // 예고(착탄까지 + 낙하 0.6) — 예전 1.5
+    private const float RainAimedWarn   = 0.6f;
+    private const float RainBigWarn     = 1.3f;
+    private const float RainAimLead     = 0.35f;
+    private const float RainNearShare   = 0.25f;  // 흩뿌림 중 플레이어 둘레(8 m)에 떨어지는 몫(0.4는 둘레가 빈틈없이 덮였다 — 10-14 실측)
+    private const float RainNearRadius  = 8f;
+
     private void SpawnFireball(MonsterContext ctx)
     {
-        // 악몽 2연이면 1연 자리는 비 시작 때 미리 뽑아 둔 것(2연 칸이 그 자리를 피해 깔렸다)
-        Vector2Int c = _spawnedCount < _firstPlan.Count ? _firstPlan[_spawnedCount] : RollCenter();
-        SpawnFireball(ctx, c.x, c.y, -1);
+        // 악몽 2연이면 1연 자리는 비 시작 때 미리 뽑아 둔 것(2연 칸이 그 자리를 피해 깔렸다) — 그때는 예전 3×3 그대로
+        if (_spawnedCount < _firstPlan.Count) { var p = _firstPlan[_spawnedCount]; SpawnFireball(ctx, p.x, p.y, -1); return; }
+        // 여덟 발마다 노림(움직이는 쪽 조금 앞) · 스물다섯 발마다 큰 메테오(지금 자리) · 나머지는 크기 셋 + 넷 중 하나 남짓 플레이어 둘레
+        int n = _spawnedCount;
+        if (n % 25 == 12)
+            SpawnShaped(ctx, AimCenter(ctx, 0f), DragonThreat.BigRadius, DragonThreat.BigDamage, RainBigWarn, DragonThreat.EdgeDrop * 0.5f);
+        else if (n % 8 == 4)
+            SpawnShaped(ctx, AimCenter(ctx, RainAimLead), DragonThreat.AimedRadius, DragonThreat.AimedDamage, RainAimedWarn, DragonThreat.EdgeDrop);
+        else
+        {
+            int r = DragonThreat.PickScatterRadius(out int tier);
+            SpawnShaped(ctx, ScatterCenter(ctx), r, DragonThreat.ScatterDamage[tier], RainScatterWarn, DragonThreat.EdgeDrop);
+        }
+    }
+
+    private static Vector2Int AimCenter(MonsterContext ctx, float lead)
+        => ctx?.Runtime?.PlayerTarget != null
+            ? DragonThreat.ClampInterior(DragonBossRoomContext.WorldToCell(DragonThreat.PredictPlayer(ctx, lead)))
+            : RollCenter();
+
+    private static Vector2Int ScatterCenter(MonsterContext ctx)
+    {
+        var t = ctx?.Runtime?.PlayerTarget;
+        if (t == null || Random.value >= RainNearShare) return RollCenter();
+        Vector2 r = Random.insideUnitCircle * RainNearRadius;
+        return DragonThreat.ClampInterior(DragonBossRoomContext.WorldToCell(t.position + new Vector3(r.x, 0f, r.y)));
+    }
+
+    private void SpawnShaped(MonsterContext ctx, Vector2Int c, int radius, float dmgMul, float warn, float drop)
+    {
+        var cells = DragonThreat.Footprint(c, radius, drop);
+        if (cells.Count == 0) { SpawnFireball(ctx, c.x, c.y, -1); return; }
+        SpawnFireball(ctx, c.x, c.y, -1, cells, DragonThreat.MeteorScale(radius), dmgMul, warn);
     }
 
     // 랜덤 중심 셀 (경계 2칸 안쪽: 3×3 영역이 맵 안에 들어오게)
@@ -369,7 +418,8 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
     }
 
     /// <param name="batch">악몽 2연 묶음(0부터) — 1연은 -1.</param>
-    private void SpawnFireball(MonsterContext ctx, int cx, int cz, int batch)
+    private void SpawnFireball(MonsterContext ctx, int cx, int cz, int batch,
+                               List<Vector2Int> cells = null, float scale = 0f, float dmgMul = 0f, float warn = 0f)
     {
         Vector3 landBase = DragonBossRoomContext.CellToWorld(cx, cz, 0f);
         Vector3 landPos;
@@ -392,6 +442,10 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
             Falling    = false,
             Landed     = false,
             Batch      = batch,
+            Cells      = cells,
+            Scale      = scale,
+            DmgMul     = dmgMul,
+            WarnDur    = warn,
         };
 
         // 3×3 경고 타일 생성
@@ -402,23 +456,30 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
             tileColor   = Color.Lerp(fireBase, Color.white, SecondFaintWhiten);
             tileColor.a = Data.WarningColor.a * SecondFaintAlpha;
         }
-        for (int dx = -1; dx <= 1; dx++)
-        for (int dz = -1; dz <= 1; dz++)
-        {
-            int tx = cx + dx, tz = cz + dz;
-            if (!DragonBossRoomContext.IsInterior(tx, tz)) continue;
-
-            var (go, _, mat) = QuadTilePool.Rent();
-            go.name = "FireballWarn";
-            go.transform.position   = DragonBossRoomContext.CellToWorld(tx, tz, 0.1f);
-            go.transform.rotation   = Quaternion.Euler(90f, 0f, 0f);
-            go.transform.localScale = Vector3.one;
-            mat.color = tileColor;
-            entry.WarnTiles.Add(go);
-            entry.WarnMats.Add(mat);
-        }
+        if (cells != null)   // 모양 칸(10-14)
+            foreach (var cell in cells) AddWarnTile(ref entry, cell.x, cell.y, tileColor);
+        else
+            for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -1; dz <= 1; dz++)
+            {
+                int tx = cx + dx, tz = cz + dz;
+                if (!DragonBossRoomContext.IsInterior(tx, tz)) continue;
+                AddWarnTile(ref entry, tx, tz, tileColor);
+            }
 
         _entries.Add(entry);
+    }
+
+    private static void AddWarnTile(ref FireballEntry entry, int tx, int tz, Color tileColor)
+    {
+        var (go, _, mat) = QuadTilePool.Rent();
+        go.name = "FireballWarn";
+        go.transform.position   = DragonBossRoomContext.CellToWorld(tx, tz, 0.1f);
+        go.transform.rotation   = Quaternion.Euler(90f, 0f, 0f);
+        go.transform.localScale = Vector3.one;
+        mat.color = tileColor;
+        entry.WarnTiles.Add(go);
+        entry.WarnMats.Add(mat);
     }
 
     // ── 악몽 특성 「연사」 ───────────────────────────────────────────────────
@@ -509,15 +570,22 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
         if (Data.ExplosionPrefab != null)
         {
             var expGo = BossEffectPool.SpawnOneShot(Data.ExplosionPrefab, e.LandPos, Quaternion.identity, fallbackLifetime: 3f);
-            if (expGo != null) expGo.transform.localScale = Vector3.one * Data.ExplosionScale;
+            if (expGo != null) expGo.transform.localScale = Vector3.one * Data.ExplosionScale * (e.Scale > 0f ? e.Scale : DragonThreat.MeteorScale(1));
         }
 
         if (ctx?.Runtime?.PlayerTarget != null)
         {
             Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
             playerPos.y = e.LandPos.y;
-            if (Vector3.Distance(playerPos, e.LandPos) <= Data.DamageRadius)
-                ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()?.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier));
+            // 판정 = 예고 3×3 칸(사각) — 원(r 1.5)이면 칸 모서리가 예고 안인데 안전했다. 수동 운석 · 휩쓸기 메테오와 같은 사각(10-08 점검)
+            float   halfExtent = 1.5f * DragonBossRoomContext.CellSize;
+            Vector3 d          = playerPos - e.LandPos;
+            bool inside = e.Cells != null   // 모양 칸(10-14) — 예고 칸 그대로
+                ? e.Cells.Contains(DragonBossRoomContext.WorldToCell(playerPos))
+                : Mathf.Abs(d.x) <= halfExtent && Mathf.Abs(d.z) <= halfExtent;
+            if (inside && DragonThreat.TryMeteorHit())   // 겹친 운석 한꺼번에 여러 대 막기(10-14)
+                ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()?.TakeDamage(
+                    Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier * (e.DmgMul > 0f ? e.DmgMul : 1f)), ctx.Monster.gameObject);
         }
 
         SpawnScorchCluster(e.LandPos, ctx);

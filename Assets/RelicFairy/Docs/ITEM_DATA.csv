@@ -1,56 +1,50 @@
 ﻿passive_id,item_name,slot,effect_type,trigger,value,value2,value3,max_stack,duration,description,stat_version,shape_id,grade,element
-item_t1_weight,넘치는 파괴의 룬,1,AllDamage,Always,6,0,0,0,0,공격력 +6,1,1,Common,
-item_t1_traveler_pack,넘치는 생명의 룬,1,MaxHP,Always,35,0,0,0,0,최대 HP +35,1,2,Common,
+item_t1_weight,넘치는 파괴의 룬,1,AllDamage,Always,0.08,0,0,0,0,공격력 +8%,2,1,Common,
+item_t1_traveler_pack,넘치는 생명의 룬,1,MaxHP,Always,100,0,0,0,0,최대 체력 +100,2,2,Common,
 item_t1_dull_shield,넘치는 수호의 룬,1,Defense,Always,8,0,0,0,0,방어력 +8,1,1,Common,
 item_t1_keen_eye,정확한 필살의 룬,1,CritChance,Always,0.05,0,0,0,0,치명타 확률 +5%,1,2,Common,
 item_t1_training_stone,신비로운 마력의 룬,1,SkillDamage,Always,0.07,0,0,0,0,스킬 피해 +7%,1,1,Common,
-item_t1_vitality_seed,차오르는 생명의 룬,1,MaxHPPercent,Always,0.12,0,0,0,0,최대 HP +12%,1,3,Common,
+item_t1_vitality_seed,차오르는 생명의 룬,1,MaxHPPercent,Always,0.12,0,0,0,0,최대 체력 +12%,1,3,Common,
 item_t1_swift_charm,날랜 질풍의 룬,1,MoveSpeed,Always,0.11,0,0,0,0,이동속도 +11%,1,1,Common,
 item_t1_destruction_sigil,무자비한 필살의 룬,1,CritDamage,Always,0.15,0,0,0,0,치명타 피해 +15%,1,1,Common,
 item_t1_sharp_blade,차오르는 파괴의 룬,1,AllDamage,Always,0.07,0,0,0,0,공격력 +7%,1,3,Common,
-item_t1_leather_armor,차오르는 수호의 룬,1,DefensePercent,Always,0.08,0,0,0,0,방어력 +8%,1,1,Common,
+item_t1_leather_armor,차오르는 수호의 룬,1,CondDamageReduction,AfterHit,0.15,0,0,0,3,피격 후 3초간 받는 피해 -15%,2,1,Common,
 item_t1_enhanced_tendon,예리한 질풍의 룬,1,AttackSpeed,Always,0.09,0,0,0,0,공격속도 +9%,1,2,Common,
 item_t1_light_shard,흐르는 마력의 룬,1,SkillCooldownReduction,Always,0.11,0,0,0,0,스킬 쿨타임 -11%,1,1,Common,
-item_t2_heavy_weight,범람하는 파괴의 룬,1,AllDamage,Always,14,0,0,0,0,공격력 +14,1,4,Rare,
+item_t2_heavy_weight,범람하는 파괴의 룬,1,TriggerBurst,OnHeavyHit,1.2,0,2.5,0,0,강타 때 대상 자리에 속성 폭발 — 반경 2.5m · 공격력 120%,2,4,Rare,
 item_t2_iron_armor,범람하는 수호의 룬,1,Defense,Always,15,0,0,0,0,방어력 +15,1,5,Rare,
-item_t2_giant_pack,범람하는 생명의 룬,1,MaxHP,Always,60,0,0,0,0,최대 HP +60,1,6,Rare,
-item_t2_solid_core,단단한 파괴의 룬,1,AllDamage,Always,9,0,0,0,0,공격력 +9,1,7,Rare,
-item_t2_solid_core,단단한 파괴의 룬,2,Defense,Always,9,0,0,0,0,방어력 +9,1,7,Rare,
-item_t2_heavy_armor_piece,굳건한 수호의 룬,1,Defense,Always,10,0,0,0,0,방어력 +10,1,9,Rare,
-item_t2_heavy_armor_piece,굳건한 수호의 룬,2,MaxHP,Always,40,0,0,0,0,최대 HP +40,1,9,Rare,
-item_t2_iron_bracelet,견고한 파괴의 룬,1,AllDamage,Always,0.14,0,0,0,0,공격력 +14%,1,4,Rare,
-item_t2_iron_bracelet,견고한 파괴의 룬,2,DefensePercent,Always,0.08,0,0,0,0,방어력 +8%,1,4,Rare,
+item_t2_giant_pack,범람하는 생명의 룬,1,MaxHP,Always,180,0,0,0,0,최대 체력 +180,2,6,Rare,
+item_t2_solid_core,단단한 파괴의 룬,1,TriggerBurst,SameTarget,0.45,3,0,0,0,같은 적 3번째 적중마다 속성 일격 — 공격력 45%,2,7,Rare,
+item_t2_heavy_armor_piece,굳건한 수호의 룬,1,CondDamageReduction,HPBelow50,0.15,0,0,0,0,체력 50% 아래에서 받는 피해 -15%,2,9,Rare,
+item_t2_heavy_armor_piece,굳건한 수호의 룬,2,MaxHP,Always,40,0,0,0,0,최대 체력 +40,2,9,Rare,
+item_t2_iron_bracelet,견고한 파괴의 룬,1,FirstHeavyInRoom,OnHeavyHit,1,0,0,0,0,이 방 첫 강타 피해 +100%,2,4,Rare,
 item_t2_dash_ankle,넘치는 질풍의 룬,1,MoveSpeed,Always,0.2,0,0,0,0,이동속도 +20%,1,6,Rare,
 item_t2_dash_ankle,넘치는 질풍의 룬,2,AttackSpeed,Always,0.08,0,0,0,0,공격속도 +8%,1,6,Rare,
 item_t2_fierce_blade,넘치는 필살의 룬,1,CritChance,Always,0.1,0,0,0,0,치명타 확률 +10%,1,7,Rare,
 item_t2_fierce_blade,넘치는 필살의 룬,2,CritDamage,Always,0.18,0,0,0,0,치명타 피해 +18%,1,7,Rare,
 item_t2_focus_flow,넘치는 마력의 룬,1,SkillCooldownReduction,Always,0.16,0,0,0,0,스킬 쿨타임 -16%,1,8,Rare,
 item_t2_focus_flow,넘치는 마력의 룬,2,SkillDamage,Always,0.12,0,0,0,0,스킬 피해 +12%,1,8,Rare,
-item_t2_steel_heart,벅차오르는 생명의 룬,1,MaxHPPercent,Always,0.24,0,0,0,0,최대 HP +24%,1,9,Rare,
+item_t2_steel_heart,벅차오르는 생명의 룬,1,MaxHPPercent,Always,0.24,0,0,0,0,최대 체력 +24%,1,9,Rare,
 item_t2_guardian_shield,강인한 수호의 룬,1,DefensePercent,Always,0.2,0,0,0,0,방어력 +20%,1,5,Rare,
-item_t2_guardian_shield,강인한 수호의 룬,2,MaxHPPercent,Always,0.08,0,0,0,0,최대 HP +8%,1,5,Rare,
+item_t2_guardian_shield,강인한 수호의 룬,2,MaxHPPercent,Always,0.08,0,0,0,0,최대 체력 +8%,1,5,Rare,
 item_t2_sharp_instinct,정확한 질풍의 룬,1,AttackSpeed,Always,0.16,0,0,0,0,공격속도 +16%,1,8,Rare,
 item_t2_sharp_instinct,정확한 질풍의 룬,2,CritChance,Always,0.06,0,0,0,0,치명타 확률 +6%,1,8,Rare,
 item_t2_destruction_pattern,잔혹한 필살의 룬,1,CritDamage,Always,0.28,0,0,0,0,치명타 피해 +28%,1,9,Rare,
 item_t2_warrior_legacy,불굴의 파괴의 룬,1,AllDamage,Always,0.2,0,0,0,0,공격력 +20%,1,4,Rare,
-item_t2_warrior_legacy,불굴의 파괴의 룬,2,DefensePercent,Always,0.06,0,0,0,0,방어력 +6%,1,4,Rare,
 item_t2_strike_ring,무자비한 파괴의 룬,1,AllDamage,Always,0.15,0,0,0,0,공격력 +15%,1,5,Rare,
 item_t2_strike_ring,무자비한 파괴의 룬,2,CritDamage,Always,0.15,0,0,0,0,치명타 피해 +15%,1,5,Rare,
 item_t2_crisis_sword,벼랑 끝 분노의 룬,1,CondAllDamage,HPBelow40,0.25,0,0,0,0,HP 40% 이하 시 공격력 +25%,1,7,Rare,
 item_t2_crisis_sword,벼랑 끝 분노의 룬,2,CondCritChance,HPBelow40,0.08,0,0,0,0,HP 40% 이하 시 치명타 확률 +8%,1,7,Rare,
-item_t2_skill_burst,주문 깃든 분노의 룬,1,CondAllDamage,AfterSkill,0.2,0,0,0,4,스킬 사용 직후 4초간 모든 피해 +20%,1,9,Rare,
+item_t2_skill_burst,주문 깃든 분노의 룬,1,CondAllDamage,AfterSkillChain,0.3,0,0,0,3,서로 다른 스킬을 4초 안에 이어 쓰면 3초간 모든 피해 +30%,2,9,Rare,
 item_t2_consecutive_power,집요한 분노의 룬,1,CondAllDamage,SameTarget,0.2,5,0,0,0,같은 적 5회 연속 적중 시 공격력 +20%,1,4,Rare,
 item_t2_consecutive_power,집요한 분노의 룬,2,CondCritDamage,SameTarget,0.2,5,0,0,0,같은 적 5회 연속 적중 시 치명타 피해 +20%,1,4,Rare,
-item_t2_dash_blade,질주하는 분노의 룬,1,CondAllDamage,WhileMoving,0.18,0,0,0,0,이동 중 공격력 +18%,1,5,Rare,
-item_t2_dash_blade,질주하는 분노의 룬,2,CondCritChance,WhileMoving,0.06,0,0,0,0,이동 중 치명타 확률 +6%,1,5,Rare,
-item_t2_calm_crit,고요한 집중의 룬,1,CondCritChance,NoHit,0.12,0,0,0,4,피격받지 않은 상태 4초 유지 시 치명타 확률 +12%,1,9,Rare,
-item_t2_calm_crit,고요한 집중의 룬,2,CondCritDamage,NoHit,0.2,0,0,0,4,피격받지 않은 상태 4초 유지 시 치명타 피해 +20%,1,9,Rare,
-item_t2_crowd_rage,포위된 분노의 룬,1,CondAllDamage,EnemiesNearby,0.2,3,0,0,0,주변 3m 내 적 3체 이상일 때 공격력 +20%,1,5,Rare,
-item_t2_boss_focus,맞서는 분노의 룬,1,CondAllDamage,DuringBoss,0.18,0,0,0,0,보스 전투 중 공격력 +18%,1,6,Rare,
-item_t2_boss_focus,맞서는 분노의 룬,2,CondSkillDamage,DuringBoss,0.12,0,0,0,0,보스 전투 중 스킬 피해 +12%,1,6,Rare,
+item_t2_dash_blade,질주하는 분노의 룬,1,MoveChargeNextHit,WhileMoving,0.6,6,0,0,0,6m 움직일 때마다 다음 일격 피해 +60%,2,5,Rare,
+item_t2_calm_crit,고요한 집중의 룬,1,CalmNextCrit,NoHit,1,0,0,0,4,4초 동안 맞지 않으면 다음 치명 피해 +100%(1회),2,9,Rare,
+item_t2_crowd_rage,포위된 분노의 룬,1,CondAllDamage,EnemiesNearby,0.2,3,0,0,0,주변 3m 내 적 3마리 이상일 때 공격력 +20%,1,5,Rare,
+item_t2_boss_focus,맞서는 분노의 룬,1,TargetGradeBonus,DuringBoss,0.15,0,0,0,0,정예 · 보스에게 주는 피해 +15%,2,6,Rare,
 item_t2_hit_rage,되갚는 분노의 룬,1,CondAllDamage,AfterHit,0.22,0,0,0,3,피격 직후 3초간 공격력 +22%,1,9,Rare,
 item_t2_hit_rage,되갚는 분노의 룬,2,CondAttackSpeed,AfterHit,0.12,0,0,0,3,피격 직후 3초간 공격속도 +12%,1,9,Rare,
-item_t2_battlefield_rule,결투하는 분노의 룬,1,CondAllDamage,SingleEnemy,0.25,0,0,0,0,방 내 적이 1체만 남았을 때 모든 피해 +25%,1,4,Rare,
+item_t2_battlefield_rule,결투하는 분노의 룬,1,CondAllDamage,SingleEnemy,0.25,0,0,0,0,방 내 적이 1마리만 남았을 때 모든 피해 +25%,1,4,Rare,
 item_t2_trig_dash,내닫는 격발의 룬,1,TriggerBurst,OnDash,0.9,0,2.5,0,0,대시가 끝난 자리에 속성 폭발 — 반경 2.5m · 공격력 90%,1,4,Rare,
 item_t2_trig_dash_strike,파고드는 격발의 룬,1,TriggerBurst,AfterDashHit,1.4,0,0,0,1.5,대시 후 1.5초 안 첫 적중에 속성 일격 — 공격력 140%,1,5,Rare,
 item_t2_trig_perfect,흘려내는 격발의 룬,1,TriggerBurst,OnPerfectDodge,3,0,4,0,0,저스트 회피 때 주변에 속성 파동 — 반경 4m · 공격력 300%,1,6,Rare,
@@ -67,60 +61,55 @@ item_t2_trig_same,집요한 격발의 룬,1,TriggerBurst,SameTarget,1.6,5,0,0,0,
 item_t2_trig_retaliate,되갚는 격발의 룬,1,TriggerBurst,AfterHit,1.8,0,3.5,0,0,맞으면 주변에 속성 반격 — 반경 3.5m · 공격력 180%,1,5,Rare,
 item_t2_dash_fury,내닫는 분노의 룬,1,CondAllDamage,AfterDash,0.2,0,0,0,3,대시 후 3초간 공격력 +20%,1,6,Rare,
 item_t2_dash_fury,내닫는 분노의 룬,2,CondCritChance,AfterDash,0.06,0,0,0,3,대시 후 3초간 치명타 확률 +6%,1,6,Rare,
-item_t2_crit_gale,꿰찌르는 질풍의 룬,1,CondAttackSpeed,AfterCrit,0.15,0,0,0,2,치명타 후 2초간 공격속도 +15%,1,7,Rare,
-item_t2_crit_gale,꿰찌르는 질풍의 룬,2,CondMoveSpeed,AfterCrit,0.1,0,0,0,2,치명타 후 2초간 이동속도 +10%,1,7,Rare,
-item_t2_kill_gale,사냥하는 질풍의 룬,1,CondMoveSpeed,AfterKill,0.15,0,0,0,3,처치 후 3초간 이동속도 +15%,1,8,Rare,
-item_t2_kill_gale,사냥하는 질풍의 룬,2,CondAllDamage,AfterKill,0.12,0,0,0,3,처치 후 3초간 공격력 +12%,1,8,Rare,
-item_t2_aim_fury,겨누는 분노의 룬,1,CondAllDamage,WithRangedWeapon,0.18,0,0,0,0,원거리 무기를 들면 공격력 +18%,1,9,Rare,
-item_t2_aim_fury,겨누는 분노의 룬,2,CondCritChance,WithRangedWeapon,0.05,0,0,0,0,원거리 무기를 들면 치명타 확률 +5%,1,9,Rare,
-item_t3_fire_ember,스며드는 화염의 룬,3,AllDamage,Always,14,0,0,0,0,공격력 +14,1,39,Epic,FIRE
-item_t3_fire_ember,스며드는 화염의 룬,3,PoisonOnHit,OnHit,0.2,0.12,0,0,3,"적중 시 20% 화상(공격력 12%/틱, 3초)",1,39,Epic,FIRE
-item_t3_fire_scar,되받아치는 화염의 룬,4,MaxHP,Always,70,0,0,0,0,최대 체력 +70,1,45,Epic,FIRE
-item_t3_fire_scar,되받아치는 화염의 룬,4,DamageReflect,OnHit,0.25,0,0,0,0,받은 피해의 25% 반사,1,45,Epic,FIRE
+item_t2_crit_gale,꿰찌르는 질풍의 룬,1,CritDamageStack,AfterCrit,0.25,3,0,0,3,치명마다 3초간 치명 피해 +25%(최대 3중첩),2,7,Rare,
+item_t2_kill_gale,사냥하는 질풍의 룬,1,KillBurstRadius,OnKill,0.2,0,0,0,0,처치 폭발(격발 룬) 반경 +20%,2,8,Rare,
+item_t2_kill_gale,사냥하는 질풍의 룬,2,CondAllDamage,AfterKill,0.12,0,0,0,3,처치 후 3초간 공격력 +12%,2,8,Rare,
+item_t2_aim_fury,겨누는 분노의 룬,1,FarHitBonus,OnRangedHit,0.25,5,0,0,0,5m 밖의 적을 맞히면 피해 +25%,2,9,Rare,
+item_t3_fire_ember,스며드는 화염의 룬,3,AllDamage,Always,0.08,0,0,0,0,공격력 +8%,2,46,Epic,FIRE
+item_t3_fire_ember,스며드는 화염의 룬,3,PoisonOnHit,OnCrit,1,0.083,1,0,3,적중 시 화상 — 그 타격 피해 25%를 3초에 걸쳐 · 가장 센 화상 하나만 남는다(한 방일수록 세다),2,46,Epic,FIRE
+item_t3_fire_scar,되받아치는 화염의 룬,4,CondAttackPercent,AfterHit,0.25,0,0,0,4,피격 뒤 4초간 공격력 +25%,2,45,Epic,FIRE
+item_t3_fire_scar,되받아치는 화염의 룬,4,PoisonOnHit,AfterHit,1,0.083,1,0,4,그 4초 동안 적중이 화상(그 타격 피해 비례 · 6초에 한 번 열린다),2,45,Epic,FIRE
 item_t3_fire_spark,터지는 화염의 룬,4,CritDamage,Always,0.2,0,0,0,0,치명타 피해 +20%,1,46,Epic,FIRE
 item_t3_fire_spark,터지는 화염의 룬,4,ExtraAttack,OnHit,0.12,0,0,0,0,적중 시 12% 추가타,1,46,Epic,FIRE
-item_t3_ice_frost,굳히는 얼음의 룬,4,AllDamage,Always,12,0,0,0,0,공격력 +12,1,47,Epic,ICE
-item_t3_ice_frost,굳히는 얼음의 룬,4,Freeze,OnHit,0.1,0,0,0,1.2,적중 시 10% 빙결 1.2초,1,47,Epic,ICE
-item_t3_ice_congeal,막아서는 얼음의 룬,4,Defense,Always,16,0,0,0,0,방어력 +16,1,48,Epic,ICE
-item_t3_ice_congeal,막아서는 얼음의 룬,4,DamageReduction,Always,0.1,0,0,0,0,받는 피해 -10%,1,48,Epic,ICE
-item_t3_ice_crystal,꿰뚫는 얼음의 룬,3,CritChance,Always,0.07,0,0,0,0,치명타 확률 +7%,1,40,Epic,ICE
-item_t3_ice_crystal,꿰뚫는 얼음의 룬,3,ProjectilePierce,Always,1,0,0,0,0,투사체 관통 +1,1,40,Epic,ICE
-item_t3_elec_static,휘감는 번개의 룬,3,AttackSpeed,Always,0.1,0,0,0,0,공격속도 +10%,1,41,Epic,ELECTRIC
-item_t3_elec_static,휘감는 번개의 룬,3,Stun,OnHit,0.08,0,0,0,0.8,적중 시 8% 기절 0.8초,1,41,Epic,ELECTRIC
-item_t3_elec_rod,버티는 번개의 룬,4,Defense,Always,14,0,0,0,0,방어력 +14,1,49,Epic,ELECTRIC
-item_t3_elec_rod,버티는 번개의 룬,4,DefenseOnHit,OnHit,2,0,0,10,0,피격 시 방어 +2 누적(최대 10),1,49,Epic,ELECTRIC
+item_t3_ice_frost,굳히는 얼음의 룬,4,FrostOnHit,OnHit,0.15,0,0,0,0,적중 시 서리 1중첩(같은 적 0.5초에 한 번) · 서리 2중첩 적에게 피해 +15%,2,47,Epic,ICE
+item_t3_ice_congeal,막아서는 얼음의 룬,4,HurtGuardFrost,AfterHit,0.2,0,6,0,3,피격 시(6초에 한 번) 둘레 3m 적 서리 2중첩 + 3초간 받는 피해 -20%,2,48,Epic,ICE
+item_t3_ice_crystal,꿰뚫는 얼음의 룬,3,PierceChainBonus,OnRangedHit,0.15,0,0,0,0,관통할 때마다 다음 대상 피해 +15%,2,47,Epic,ICE
+item_t3_ice_crystal,꿰뚫는 얼음의 룬,3,ProjectilePierce,Always,1,0,0,0,0,투사체 관통 +1,2,47,Epic,ICE
+item_t3_elec_static,휘감는 번개의 룬,3,AttackSpeed,Always,0.1,0,0,0,0,공격속도 +10%,2,54,Epic,ELECTRIC
+item_t3_elec_static,휘감는 번개의 룬,3,TriggerBurst,SameTarget,0.3,5,0,0,0,같은 적 5번마다 번개 일격 공격력 30% + 2명 연쇄,2,54,Epic,ELECTRIC
+item_t3_elec_rod,버티는 번개의 룬,4,CondAttackSpeed,AfterSkill,0.2,0,0,0,3,스킬 뒤 3초간 공격속도 +20%,2,49,Epic,ELECTRIC
+item_t3_elec_rod,버티는 번개의 룬,4,TriggerBurst,OnSkillHit,0.25,0,0,10,0,스킬이 맞힌 적에게 번개 일격 공격력 25% + 연쇄,2,49,Epic,ELECTRIC
 item_t3_elec_arc,갈라지는 번개의 룬,4,CritChance,Always,0.08,0,0,0,0,치명타 확률 +8%,1,50,Epic,ELECTRIC
 item_t3_elec_arc,갈라지는 번개의 룬,4,ProjectileCount,Always,1,0,0,0,0,투사체 수 +1,1,50,Epic,ELECTRIC
-item_t3_grass_venom,스며드는 숲의 룬,3,CritChance,Always,0.06,0,0,0,0,치명타 확률 +6%,1,42,Epic,GRASS
-item_t3_grass_venom,스며드는 숲의 룬,3,PoisonOnHit,OnHit,0.2,0.12,0,0,4,"적중 시 20% 중독(공격력 12%/틱, 4초)",1,42,Epic,GRASS
-item_t3_grass_bloom,감싸는 숲의 룬,4,MaxHP,Always,80,0,0,0,0,최대 체력 +80,1,51,Epic,GRASS
-item_t3_grass_bloom,감싸는 숲의 룬,4,HPRegenOnHit,OnHit,1,0,0,0,0,적중 시 보호막 +1 (0.5초마다),1,51,Epic,GRASS
-item_t3_grass_spore,단단한 숲의 룬,4,Defense,Always,12,0,0,0,0,방어력 +12,1,52,Epic,GRASS
-item_t3_light_radiance,결투하는 성광의 룬,3,CritChance,Always,0.09,0,0,0,0,치명타 확률 +9%,1,43,Epic,LIGHT
-item_t3_light_radiance,결투하는 성광의 룬,3,CondAllDamage,SingleEnemy,0.18,0,0,0,0,단일 대상 피해 +18%,1,43,Epic,LIGHT
-item_t3_light_grace,굳건한 성광의 룬,4,MaxHP,Always,70,0,0,0,0,최대 체력 +70,1,53,Epic,LIGHT
-item_t3_light_sanctum,감싸는 성광의 룬,5,CritDamage,Always,0.24,0,0,0,0,치명타 피해 +24%,1,56,Epic,LIGHT
-item_t3_light_sanctum,감싸는 성광의 룬,5,HPRegenOnClear,OnRoomClear,0.05,0,0,0,0,방 클리어 시 최대 체력 5% 보호막,1,56,Epic,LIGHT
-item_t3_dark_erode,덮치는 그림자의 룬,4,AllDamage,Always,16,0,0,0,0,공격력 +16,1,54,Epic,DARK
-item_t3_dark_erode,덮치는 그림자의 룬,4,FirstAttackAfterRoll,Always,0.4,0,0,0,0,구르기 직후 첫 공격 +40%,1,54,Epic,DARK
-item_t3_dark_shade,단단한 그림자의 룬,4,Defense,Always,15,0,0,0,0,방어력 +15,1,55,Epic,DARK
-item_t3_dark_afterimage,가벼운 그림자의 룬,3,MoveSpeed,Always,0.08,0,0,0,0,이동속도 +8%,1,44,Epic,DARK
-item_t3_dark_afterimage,가벼운 그림자의 룬,3,RollDistance,Always,0.25,0,0,0,0,구르기 거리 +25%,1,44,Epic,DARK
-item_t4_fire_aoe,마그마 분출,14,FireLegendAoe,OnTimer,0.65,6.0,5.0,1,0,마그마 광역: 6초마다 반경 5m 화염 폭발 공격력 65%,1,21,Legendary,FIRE
-item_t4_fire_single,불사조 강타,11,FireLegendSingle,OnHitCount,3.5,12.0,0.5,1,0,불사조 단일기: 12회 적중마다 공격력 350% 강타(6타 나눠) + 마지막 타 반경 2m 공격력 50%,1,22,Legendary,FIRE
-item_t4_fire_proj,화염 오브,9,FireLegendProjectile,OnActivate,0.8,0.1,5.0,1,0,화염 오브: 전투 중 오브 5개가 떠다니며 닿은 적에게 공격력 80%,1,23,Legendary,FIRE
-item_t4_ice_aoe,빙하 파동,9,IceLegendAoe,OnTimer,0.5,10.0,2.0,1,0,냉기 파동: 10초마다 전 필드 공격력 50% + 빙결,1,24,Legendary,ICE
-item_t4_ice_single,얼음 창 폭격,11,IceLegendSingle,OnTimer,0.6,8.0,1.0,1,0,얼음 창: 8초마다 20m 안 가장 가까운 적에게 창 5발(각 공격력 60%) + 폭파 공격력 100%,1,25,Legendary,ICE
-item_t4_ice_field,영구 빙판,9,IceLegendField,OnActivate,0.15,3.0,0.5,1,0,빙판 설치: 방 진입 시 빙판 3개(반경 1.2m) — 초당 공격력 15% · 이동속도 -60% · 빙결된 적 +50%,1,26,Legendary,ICE
-item_t4_elec_aoe,천둥 폭격,11,ElecLegendAoe,OnTimer,0.7,10.0,3.0,1,0,번개 낙뢰: 10초마다 랜덤 3적 공격력 70%,1,27,Legendary,ELECTRIC
-item_t4_elec_single,과전류 포박,11,ElecLegendSingle,OnTimer,0.4,15.0,2.0,1,0,과전류: 15초마다 가장 가까운 적에게 3초간 0.5초마다 공격력 20% + 끝날 때 반경 3m 공격력 200%,1,28,Legendary,ELECTRIC
-item_t4_elec_proj,전자기 구체,9,ElecLegendProjectile,OnActivate,0.6,3.0,1.2,1,0,전자기 구체: 구체 3개 — 닿으면 공격력 60%(반경 2m 72%) · 3초마다 번개 공격력 60%,1,29,Legendary,ELECTRIC
-item_t4_grass_aoe,포자 폭발,14,GrassLegendAoe,OnTimer,0.4,10.0,0.12,1,0,독 포자: 10초마다 전 필드 독 40% + DoT,1,30,Legendary,GRASS
-item_t4_grass_single,덩굴 구속,11,GrassLegendSingle,OnTimer,0.8,15.0,2.4,1,0,덩굴: 15초마다 20m 안 가장 먼 적에게 1.5초간 3회 합계 공격력 240%,1,31,Legendary,GRASS
-item_t4_grass_proj,사방 독 화살,9,GrassLegendProjectile,OnActivate,0.7,3.0,1.0,1,0,독 화살: 3초마다 4방향으로 관통 화살 2발씩(공격력 70%),1,32,Legendary,GRASS
-item_t4_light_aoe,신성 폭발,15,LightLegendAoe,OnTimer,0.8,12.0,0.4,1,0,신성 폭발: 12초마다 반경 6m 공격력 80%,1,33,Legendary,LIGHT
-item_t4_light_single,성스러운 심판,13,LightLegendSingle,OnCritCount,1.5,15.0,5.0,1,0,빛의 심판: 치명타 15회마다 집중 광선 5타 150%,1,34,Legendary,LIGHT
-item_t4_light_proj,영원의 성검,9,LightLegendProjectile,OnActivate,1.0,5.0,0.0,1,0,빛의 성검: 전투 중 반사하는 성검 5개가 닿은 적에게 공격력 100%,1,35,Legendary,LIGHT
-item_t4_dark_aoe,심연 잠식,14,DarkLegendAoe,OnTimer,0.6,8.0,5.0,1,0,어둠 잠식: 8초마다 전 필드 공격력 60%,1,36,Legendary,DARK
-item_t4_dark_single,그림자 분신,10,DarkLegendSingle,OnTimer,1.5,30.0,5.0,1,0,분신 강타: 30초마다 분신 5체 공격력 150% 추가타,1,37,Legendary,DARK
-item_t4_dark_proj,어둠의 낫,9,DarkLegendProjectile,OnActivate,0.9,5.0,3.0,1,0,어둠 낫: 전투 중 곡선으로 관통하는 낫 5개가 닿은 적에게 공격력 90%,1,38,Legendary,DARK
+item_t3_grass_venom,스며드는 숲의 룬,3,AttackSpeed,Always,0.08,0,0,0,0,공격속도 +8%,2,55,Epic,GRASS
+item_t3_grass_venom,스며드는 숲의 룬,3,PoisonOnHit,OnHit,0.5,0.04,1,0,4,적중 시 독 1중첩(최대 8 · 중첩당 초당 공격력 4% · 4초),2,55,Epic,GRASS
+item_t3_grass_bloom,감싸는 숲의 룬,4,RoomShieldBurst,AfterHit,0.08,1.5,0,0,0,방에 들어서면 보호막(최대 체력 8%) · 깨지면 둘레 3m 독 폭발 공격력 150%,2,51,Epic,GRASS
+item_t3_grass_spore,단단한 숲의 룬,4,PoisonSpreadOnKill,OnKill,0.04,2,0,0,0,중독된 적을 쓰러뜨리면 그 독을 가까운 적 2명에게 옮긴다(+1중첩),2,52,Epic,GRASS
+item_t3_light_radiance,결투하는 성광의 룬,3,CritChance,Always,0.09,0,0,0,0,치명타 확률 +9%,2,51,Epic,LIGHT
+item_t3_light_radiance,결투하는 성광의 룬,3,CondCritDamage,AfterHeavyHit,0.3,0,0,0,3,강타 뒤 3초간 치명 피해 +30%,2,51,Epic,LIGHT
+item_t3_light_grace,굳건한 성광의 룬,4,HeavyBreakVulnerable,OnHeavyHit,0.2,0,0,0,2,강타가 정예 포이즈를 깨면 2초간 취약(받는 피해 +20%),2,53,Epic,LIGHT
+item_t3_light_sanctum,감싸는 성광의 룬,5,CritDamage,Always,0.24,0,0,0,0,치명타 피해 +24%,2,56,Epic,LIGHT
+item_t3_light_sanctum,감싸는 성광의 룬,5,TriggerBurst,OnCritKill,1,0,2.5,0,0,치명으로 쓰러뜨리면 그 자리 빛 폭발 — 반경 2.5m · 공격력 100%,2,56,Epic,LIGHT
+item_t3_dark_erode,덮치는 그림자의 룬,4,AllDamage,Always,0.08,0,0,0,0,공격력 +8%,2,54,Epic,DARK
+item_t3_dark_erode,덮치는 그림자의 룬,4,FirstAttackAfterRoll,Always,0.8,0,1,0,0,구르기 직후 첫 공격 +80% · 그 타는 강타,2,54,Epic,DARK
+item_t3_dark_shade,단단한 그림자의 룬,4,HurtGuardShadow,AfterHit,0.2,0.25,6,0,4,피격 시(6초에 한 번) 4초간 받는 피해 -20% · 그동안 적중마다 그림자 추가타 25%,2,55,Epic,DARK
+item_t3_dark_afterimage,가벼운 그림자의 룬,3,MoveSpeed,Always,0.08,0,0,0,0,이동속도 +8%,2,52,Epic,DARK
+item_t3_dark_afterimage,가벼운 그림자의 룬,3,DashAfterimage,OnDash,0.8,0,0,0,0,구르기 길에 잔상 — 0.5초 뒤 지나간 적에게 공격력 80%,2,52,Epic,DARK
+item_t4_fire_aoe,마그마 분출,14,FireLegendAoe,OnKill,1,0,3,1,0,처치: 쓰러뜨린 자리 반경 3m 폭발 공격력 100% — 폭발이 쓰러뜨리면 또 터진다(3겹까지) · 불 존 단계마다 피해 +15%,2,21,Legendary,FIRE
+item_t4_fire_single,불사조 강타,11,FireLegendSingle,OnHitCount,3.5,12,0.5,1,0,연격: 12번 맞힐 때마다 불사조 6연타 합계 공격력 350% · 공속 +1%마다 피해 +1% · 마지막 타 반경 2m 공격력 50%,2,22,Legendary,FIRE
+item_t4_fire_proj,화염 오브,9,FireLegendProjectile,OnDash,0.5,0,0,1,0,기동: 둘레를 도는 화염 오브 3개(불 존 단계마다 +1) — 닿으면 공격력 50% × 이동속도 · 대시 뒤 1초 ×2,2,23,Legendary,FIRE
+item_t4_ice_aoe,빙하 파동,9,IceLegendAoe,OnSkillUse,0.4,4,3.5,1,0,주문: E·R 사용 시(쿨 4초) 반경 3.5m 냉기 파동 4번 공격력 40% · 첫 파동 서리 2중첩 · 얼음 존 단계마다 +15%,2,24,Legendary,ICE
+item_t4_ice_single,얼음 창 폭격,11,IceLegendSingle,OnCrit,1.5,5,0,1,0,필살: 치명 또는 강타 시(쿨 5초) 얼음 창 5발 — 합계 그 타격 피해 150% · 얼음 존 단계마다 +15%,2,25,Legendary,ICE
+item_t4_ice_field,영구 빙판,9,IceLegendField,OnDash,0.3,0,0,1,0,기동: 대시 끝 자리에 반경 2m 빙판 4초(초당 공격력 30% · 둔화) · 저스트 회피면 빙판 위 적 빙결,2,26,Legendary,ICE
+item_t4_elec_aoe,천둥 폭격,11,ElecLegendAoe,OnHitCount,1,15,3,1,0,연격: 15번 맞힐 때마다 적 3명에게 낙뢰 공격력 100% + 다음 3명 50% 연쇄 · 번개 존 단계마다 +15%,2,27,Legendary,ELECTRIC
+item_t4_elec_single,과전류 포박,11,ElecLegendSingle,OnCrit,1.5,6,0,1,0,필살: 치명 또는 강타 시(쿨 6초) 대상 1.5초 속박 뒤 대상 포함 반경 3m 폭발 — 그 타격 피해 150%,2,28,Legendary,ELECTRIC
+item_t4_elec_proj,전자기 구체,9,ElecLegendProjectile,OnSkillUse,0.6,0,1.2,1,0,주문: E·R 사용 시 전자기 구체 +1(최대 3 · 번개 존 단계마다 +1 · 12초) — 닿으면 공격력 60% · 스킬 적중 때 구체마다 볼트,2,29,Legendary,ELECTRIC
+item_t4_grass_aoe,포자 폭발,14,GrassLegendAoe,OnHit,0.4,0.04,3,1,0,연격: 맞힐 때마다 독 1중첩(최대 8 · 중첩당 초당 공격력 4%) — 8중첩 적 자리에서 포자 폭발 반경 3m 4번 공격력 40%,2,30,Legendary,GRASS
+item_t4_grass_single,덩굴 구속,11,GrassLegendSingle,OnRangedHit,0,10,2.4,1,0,사격: 원거리 명중 10번마다 대상 1.5초 덩굴 속박 + 합계 공격력 240% · 숲 존 단계마다 +15%,2,31,Legendary,GRASS
+item_t4_grass_proj,사방 독 화살,9,GrassLegendProjectile,OnRangedHit,0.25,6,0,1,0,사격: 원거리 명중 6번마다 대상 둘레에서 독 화살 8발이 모인다 — 한 발 공격력 25%,2,32,Legendary,GRASS
+item_t4_light_aoe,신성 폭발,15,LightLegendAoe,AfterHit,0.5,6,3.5,1,0,위기: 맞으면(쿨 6초) 반경 3.5m 빛 파동 4번 공격력 50% + 밀어내기 · 체력 40% 아래면 맞지 않아도 6초마다,2,33,Legendary,LIGHT
+item_t4_light_single,성스러운 심판,13,LightLegendSingle,OnHeavyHit,3,10,0,1,0,필살: 치명 또는 강타 10번마다(필살 각인 단계마다 -1 · 최소 5) 빛 광선 5번 — 합계 그 타격 피해 300%,2,34,Legendary,LIGHT
+item_t4_light_proj,영원의 성검,9,LightLegendProjectile,OnRangedHit,0.6,8,0,1,0,사격: 방 시작 성검 2자루(빛 존 단계마다 +1) · 원거리 명중 8번마다 +1(최대 6) — 닿으면 공격력 60%,2,35,Legendary,LIGHT
+item_t4_dark_aoe,심연 잠식,14,DarkLegendAoe,HPBelow40,0.5,8,0,1,0,위기: 체력이 낮을수록 자주(가득 8초 → 체력 30%에서 3초) 반경 3m 어둠 파동 4번 공격력 50%,2,36,Legendary,DARK
+item_t4_dark_single,그림자 분신,10,DarkLegendSingle,OnPerfectDodge,1.5,8,0,1,0,기동: 저스트 회피 시(쿨 8초) 피한 적 둘레에 분신 3체 — 한 체 공격력 150%,2,37,Legendary,DARK
+item_t4_dark_proj,어둠의 낫,9,DarkLegendProjectile,OnKill,0.5,0,0,1,0,처치: 방 시작 낫 2자루(어둠 존 단계마다 +1) · 쓰러뜨릴 때마다 +1(최대 7) — 닿으면 공격력 50%,2,38,Legendary,DARK

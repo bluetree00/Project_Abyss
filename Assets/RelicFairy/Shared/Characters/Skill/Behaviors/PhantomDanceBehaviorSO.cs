@@ -69,6 +69,12 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
     public string animationOverride;
     [Tooltip("난무 시 번갈아 사용할 공격 상태들 (비어있으면 GroundLightAttack_01~03 사용)")]
     public string[] flurryAnimStates;
+    [Tooltip("전용 연타 상태(10-08 C2). 있으면 한 번 틀고 타격은 flurryHitTimes에 맞춘다 — 비어 있으면 위 상태들을 타격마다 갈아 끼우는 예전 방식")]
+    public string flurryState;
+    [Tooltip("전용 연타 상태를 어디서부터 틀지(정규화 0~1) — 앞 예비 동작을 건너뛴다")]
+    public float flurryStartNormalized;
+    [Tooltip("타격 순간(스킬 시작부터 초) — hitCount개. 클립의 휘두름에 맞춘다(실측 장비 형/18)")]
+    public float[] flurryHitTimes;
 
     public const string EngravePursuit  = "phantom_pursuit";    // 잔상 추격
     public const string EngraveCondense = "phantom_condense";   // 응축
@@ -81,6 +87,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
         private enum Phase { Attack, SlashProjectile, SlashExplode, End }
         private Phase _phase;
         private float _timer;
+        private float _attackTime;   // 난무 단계 경과(전용 연타의 타격 순간 기준)
         private int _hitIndex;
         private int _slashIndex;
         private int _skillTier;
@@ -91,6 +98,10 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
         private Vector3 _slashCenter;
 
         public Runtime(PhantomDanceBehaviorSO data) => _data = data;
+
+        // 전용 연타(C2) — 상태와 타격 순간이 다 있을 때만. 아니면 예전 「평타 갈아 끼우기」
+        private bool Dedicated => !string.IsNullOrEmpty(_data.flurryState)
+                                  && _data.flurryHitTimes != null && _data.flurryHitTimes.Length >= _data.hitCount;
 
         public void OnEnter(SkillExecutionContext ctx)
         {
@@ -107,6 +118,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
             _hitIndex = 0;
             _slashIndex = 0;
             _timer = 0f;
+            _attackTime = 0f;
             _phase = Phase.Attack;
 
             DetectEnemies(ctx);
@@ -117,7 +129,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
 
         public void OnUpdate(SkillExecutionContext ctx)
         {
-            _timer += Time.deltaTime;
+            _timer += ctx.DeltaTime;   // 애니메이터와 같은 시계(슬로모 — 10-09)
             switch (_phase)
             {
                 case Phase.Attack:          UpdateAttack(ctx);          break;
@@ -137,14 +149,19 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
         // ── Phase: Attack (5회 타격) ──
         private void UpdateAttack(SkillExecutionContext ctx)
         {
-            if (_timer >= _data.hitDelay)
+            _attackTime += ctx.DeltaTime;
+            bool dedicated = Dedicated;
+            // 전용 연타는 클립의 휘두름 순간에, 예전 방식은 hitDelay마다
+            if (dedicated ? _attackTime >= _data.flurryHitTimes[_hitIndex] : _timer >= _data.hitDelay)
             {
                 _timer = 0f;
                 DetectEnemies(ctx);
-                ApplyHit(ctx);
+                // 1단계는 난무 마지막 타가 마무리(2단계+는 뒤 검기 · 폭발이 마무리) — A5
+                ApplyHit(ctx, finisher: _skillTier < 2 && _hitIndex >= _data.hitCount - 1);
 
-                // 난무 애니메이션 번갈아 재생
-                PlayFlurryAnim(ctx, _hitIndex);
+                // 난무 애니메이션 번갈아 재생 — 전용 연타는 처음 튼 동작이 이어진다
+                if (!dedicated) PlayFlurryAnim(ctx, _hitIndex);
+                Managers.Sound?.PlayEvent(SoundEvent.PlayerSwing);   // 난무마다 휘두름(A6)
 
                 // 공격 이펙트 — 전방에서 좌우 교차하며 중앙 타격
                 var fwd = ctx.PlayerTransform.forward;
@@ -308,7 +325,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
                     if (col.gameObject == ctx.Controller.gameObject) continue;
                     if (col.TryGetComponent<IDamageable>(out var d))
                     {
-                        ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f, isFinisher: true);   // 검기 폭발
+                        ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f, isFinisher: true, skipHitVfx: true);   // 검기 폭발 · 타격 이펙트는 아래에서 직접
 
                         // 피격 이펙트
                         var hitOffset = new Vector3(
@@ -336,6 +353,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
         // ── Phase: End ──
         private void UpdateEnd(SkillExecutionContext ctx)
         {
+            ctx.EnterRecovery();   // 후딜 — 회피로 끊을 수 있다 · 스탠스 해제(10-08 A2 · A4)
             if (_timer >= _data.endDelay)
                 ctx.RequestEnd();
         }
@@ -358,12 +376,12 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
         }
 
         // ── Damage ──
-        private void ApplyHit(SkillExecutionContext ctx)
+        private void ApplyHit(SkillExecutionContext ctx, bool finisher = false)
         {
             if (_hitTargets.Count == 0) return;
             float dmg = ctx.CalculateDamage(_data.baseDamagePerHit);
             foreach (var target in _hitTargets)
-                ctx.DealDamage(target, dmg, _data.knockbackMultiplier);
+                ctx.DealDamage(target, dmg, _data.knockbackMultiplier, finisher, skipHitVfx: true);   // 타격 이펙트는 아래에서 직접
 
             foreach (var obj in _hitObjects)
             {
@@ -381,6 +399,12 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
 
         private void PlayAnimation(SkillExecutionContext ctx)
         {
+            if (Dedicated)
+            {
+                // 시작 지점은 정규화로 — CrossFadeInFixedTime의 시간은 상태 속도가 곱해진 초라 클립 0.8초를 넘기면 1.6초부터 틀었다(실측 18 1회차)
+                ctx.Animator.CrossFade(_data.flurryState, 0.05f, -1, _data.flurryStartNormalized);
+                return;
+            }
             PlayFlurryAnim(ctx, 0);
         }
 

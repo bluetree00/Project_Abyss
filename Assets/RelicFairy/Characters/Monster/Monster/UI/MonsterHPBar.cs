@@ -25,6 +25,24 @@ public class MonsterHPBar : MonoBehaviour
     private static readonly Color NameInk      = new(0.93f, 0.91f, 0.87f, 0.95f);
     private static readonly Color FlashColor   = new(1f, 0.90f, 0.82f, 1f);
 
+    // 유물 스택 칸(10-12 A1) — 아이콘 ×N 대신 원판 오른쪽에 빈칸 · 찬칸 줄(▮▮▯, 상한 = 허브). 상한이면 은은히 맥동,
+    // 정오를 기다리는 태양흔은 흐리게. 흑점은 상한이 없어 「흑점 N」.
+    private const float MarkPipW = 4f, MarkPipH = 9f, MarkPipGap = 2f, MarkPad = 2f, MarkGap = 3f;
+    private const int   MarkPipMax = 10;
+    private const float MarkPulseHz = 0.9f, MarkPulseScale = 0.08f, MarkPulseGlow = 0.25f;
+    private const float MarkDim = 0.45f;
+    private const float BlackspotTextW = 36f;
+    private static readonly Color MarkPipEmpty = new(0.93f, 0.91f, 0.87f, 0.22f);   // 빈 칸 — 잉크 22%(어두운 판 위)
+    private static readonly string SunmarkLabel   = EffectDescriptionFormatter.LabelForStatus(RelicMarkStatus.SunmarkId);
+    private static readonly string BrandLabel     = EffectDescriptionFormatter.LabelForStatus(RelicMarkStatus.BrandId);
+    private static readonly string BlackspotLabel = EffectDescriptionFormatter.LabelForStatus(RelicMarkStatus.BlackspotId);
+
+    // 상한 · 정오는 플레이어 쪽 값 — 바가 여럿이어도 한 프레임에 한 번만 묻는다
+    private static int  s_relicFrame = -1;
+    private static int  s_sunCap   = RelicMarkStatus.DefaultSunmarkCap;
+    private static int  s_brandCap = RelicMarkStatus.DefaultBrandCap;
+    private static bool s_noon;
+
     // ─────────────────────────────────────────────────────────────
     // SerializeField
     // ─────────────────────────────────────────────────────────────
@@ -88,6 +106,11 @@ public class MonsterHPBar : MonoBehaviour
     private float         _fadeT = 1f;
     private float         _flash;
 
+    // 정예 포이즈 줄(10-11) — 체력바 바로 아래 얇은 금선. 정예만 보인다.
+    private RectTransform _poiseRoot;
+    private Image         _poiseFill;
+    private bool          _poiseShown;
+
     // 디버프 아이콘 행 — 프리팹에 앵커가 없어 _subLabel/_nameLabel과 같은 절차 생성 패턴으로 만든다.
     private sealed class StatusCell
     {
@@ -95,7 +118,18 @@ public class MonsterHPBar : MonoBehaviour
         public Image           icon;
         public Image           ring;     // 계열색 테 = 남은 시간(시계 방향으로 줄어든다) — 칸이 「무슨 계열」인지 먼저 읽히게
         public TMPro.TMP_Text  stack;    // ×N (2중첩 이상일 때만)
+        // 유물 스택(태양흔 · 낙인 · 흑점) — 지연 생성
+        public RectTransform   marks;    // 빈칸 · 찬칸 줄(원판 오른쪽)
+        public readonly System.Collections.Generic.List<Image> pips = new();
+        public TMPro.TMP_Text  count;    // 「흑점 N」
+        public float           extra;    // 원판 오른쪽에 붙인 폭(가로 배치용)
+        public bool            atCap;    // 상한 참 — 맥동
+        public int             filled;
+        public Color           tint;
+        public float           dim = 1f; // 1 = 또렷 · MarkDim = 정오를 기다리는 태양흔
     }
+
+    private enum RelicKind { None, Sunmark, Brand, Blackspot }
 
     // 상태 칸 — 어두운 원판 위 아이콘 + 지난 시간만큼 시계 방향으로 어두워지는 쓸림(10-02 사용자 「상태이상 표시가 그냥 원 모양」).
     // 16px 토큰은 머리 위에서 점으로 보였고, 2px 잔여 바는 읽히지 않았다.
@@ -111,7 +145,9 @@ public class MonsterHPBar : MonoBehaviour
     private RectTransform _traitRow;
     private readonly System.Collections.Generic.List<StatusCell> _traitCells = new();
     private readonly System.Collections.Generic.List<StatusCell> _statusCells = new();
-    private int _statusShown = -1;   // 마지막으로 배치한 개수(개수가 바뀔 때만 재배치)
+    private int _statusShown = -1;   // 마지막으로 배치한 개수(개수 · 칸 폭이 바뀔 때만 재배치)
+    private RelicMarkStatus _marks;  // 이 몸의 유물 스택 그릇 — 유물 칸이 처음 보일 때 한 번 찾는다
+    private int _markPulseCells;     // 상한 찬 유물 칸 수(0이면 맥동을 돌지 않는다)
 
     private MonoBehaviour _monster;
     private Transform _anchor;
@@ -148,6 +184,8 @@ public class MonsterHPBar : MonoBehaviour
             _group.alpha = _fadeT;
         }
         UpdateHpAnimation();
+        UpdatePoiseLine();
+        TickMarkPulse();
         UpdatePosition();
     }
 
@@ -164,6 +202,7 @@ public class MonsterHPBar : MonoBehaviour
         _renderers = monster.GetComponentsInChildren<Renderer>(true);
         _colliders = monster.GetComponentsInChildren<Collider>(true);
         _hasLastPosition = false;
+        _marks = null;
 
         var cap = monster.GetComponentInChildren<CapsuleCollider>();
         _colliderTopY = cap != null ? cap.center.y + cap.height * 0.5f : 1.5f;
@@ -198,11 +237,13 @@ public class MonsterHPBar : MonoBehaviour
         _renderers = null;
         _colliders = null;
         _hasLastPosition = false;
+        _marks = null;
         if (_subLabel != null) _subLabel.text = string.Empty;
 
         // 풀로 돌아가는 바에 이전 몬스터의 디버프 · 특성이 남지 않게 한다.
         SetStatuses(null);
         SetTraitBadges(null);
+        SetPoiseShown(false);
 
         gameObject.SetActive(false);
     }
@@ -243,6 +284,7 @@ public class MonsterHPBar : MonoBehaviour
         {
             if (_statusRow != null && _statusRow.gameObject.activeSelf) _statusRow.gameObject.SetActive(false);
             _statusShown = 0;
+            _markPulseCells = 0;
             return;
         }
 
@@ -252,6 +294,8 @@ public class MonsterHPBar : MonoBehaviour
 
         while (_statusCells.Count < count) _statusCells.Add(CreateStatusCell());
 
+        bool relayout = _statusShown != count;
+        int pulse = 0;
         for (int i = 0; i < _statusCells.Count; i++)
         {
             var cell = _statusCells[i];
@@ -259,29 +303,38 @@ public class MonsterHPBar : MonoBehaviour
             if (!cell.go.activeSelf) cell.go.SetActive(true);
 
             var item = items[i];
+            var kind = RelicKindOf(item);
             cell.icon.sprite = EffectIconRegistry.GetSprite(item.IconKey);
             cell.icon.color  = EffectIconRegistry.TintFor(item.IconKey);   // 흰 글리프에 계열색
             var ringCol = cell.icon.color; ringCol.a = 0.75f;
             cell.ring.color  = ringCol;
             // 지난 시간 쓸림 — 남은 비율이 없으면(무기한) 쓸지 않는다
             // 남은 시간 = 테의 길이(무기한이면 가득). 예전엔 칸 위를 어둡게 덮어 글리프가 반쯤 가려졌다(10-02 실측).
-            cell.ring.fillAmount = item.Remaining01 < 0f ? 1f : Mathf.Clamp01(item.Remaining01);
+            // 유물 스택은 시간이 없다 — 테는 가득, 수는 옆 줄이 말한다.
+            cell.ring.fillAmount = kind != RelicKind.None || item.Remaining01 < 0f ? 1f : Mathf.Clamp01(item.Remaining01);
 
-            bool multi = item.Stacks > 1;
+            bool multi = item.Stacks > 1 && kind == RelicKind.None;
             if (cell.stack.gameObject.activeSelf != multi) cell.stack.gameObject.SetActive(multi);
             if (multi) cell.stack.text = "×" + item.Stacks;
-        }
 
-        // 개수가 바뀔 때만 가로 배치를 다시 계산한다(매 갱신마다 레이아웃을 흔들지 않는다).
-        if (_statusShown != count)
+            float extra = ApplyRelicMark(cell, kind, item);
+            if (!Mathf.Approximately(cell.extra, extra)) { cell.extra = extra; relayout = true; }
+            if (cell.atCap) pulse++;
+        }
+        _markPulseCells = pulse;
+
+        // 개수 · 칸 폭이 바뀔 때만 가로 배치를 다시 계산한다(매 갱신마다 레이아웃을 흔들지 않는다). 유물 칸은 원판 오른쪽 줄만큼 넓다.
+        if (relayout)
         {
             _statusShown = count;
-            float step = StatusCellSize + _statusSpacing;
-            float startX = -(count - 1) * 0.5f * step;
+            float total = (count - 1) * _statusSpacing;
+            for (int i = 0; i < count; i++) total += StatusCellSize + _statusCells[i].extra;
+            float x = -total * 0.5f;
             for (int i = 0; i < count; i++)
             {
-                var rt = (RectTransform)_statusCells[i].go.transform;
-                rt.anchoredPosition = new Vector2(startX + i * step, 0f);
+                var c = _statusCells[i];
+                ((RectTransform)c.go.transform).anchoredPosition = new Vector2(x + StatusCellSize * 0.5f, 0f);
+                x += StatusCellSize + c.extra + _statusSpacing;
             }
         }
     }
@@ -413,6 +466,64 @@ public class MonsterHPBar : MonoBehaviour
     }
 
     /// <summary>디버프 아이콘 행 컨테이너 — HP바 바로 아래.</summary>
+    private static readonly Color PoiseColor      = new(1f, 0.86f, 0.55f, 0.95f);   // 얇은 금선 — 정예 UI 톤
+    private static readonly Color PoiseTrackColor = new(0f, 0f, 0f, 0.55f);
+    private const float PoiseHeight = 2f;
+
+    /// <summary>정예 포이즈 줄 — 가득 = 경직 저항 중, 비면 휘청(받는 피해 +25%). 정예가 아니면 숨긴다.</summary>
+    private void UpdatePoiseLine()
+    {
+        var poise = _monster is RelicFairy.Monster.MonsterBase mb ? mb.Poise : null;
+        if (poise == null) { SetPoiseShown(false); return; }
+        EnsurePoiseLine();
+        if (_poiseFill == null) return;
+        SetPoiseShown(true);
+        _poiseFill.fillAmount = poise.Fill01;
+    }
+
+    private void SetPoiseShown(bool on)
+    {
+        if (_poiseRoot != null && _poiseShown != on) _poiseRoot.gameObject.SetActive(on);
+        _poiseShown = on && _poiseRoot != null;
+        // 상태 아이콘 행은 줄 아래로 내린다(행은 나중에 만들어질 수 있어 매번 맞춘다)
+        if (_statusRow != null)
+        {
+            float y = _poiseShown ? -2f - PoiseHeight - 2f : -2f;
+            if (!Mathf.Approximately(_statusRow.anchoredPosition.y, y)) _statusRow.anchoredPosition = new Vector2(0f, y);
+        }
+    }
+
+    private void EnsurePoiseLine()
+    {
+        if (_poiseRoot != null || _barRoot == null) return;
+        var go = new GameObject("PoiseLine", typeof(RectTransform), typeof(CanvasRenderer));
+        go.transform.SetParent(_barRoot, false);
+        _poiseRoot = (RectTransform)go.transform;
+        _poiseRoot.anchorMin = new Vector2(0f, 0f);
+        _poiseRoot.anchorMax = new Vector2(1f, 0f);
+        _poiseRoot.pivot     = new Vector2(0.5f, 1f);
+        _poiseRoot.anchoredPosition = new Vector2(0f, -2f);
+        _poiseRoot.sizeDelta = new Vector2(0f, PoiseHeight);
+        var track = go.AddComponent<Image>();
+        track.color = PoiseTrackColor;
+        track.raycastTarget = false;
+
+        var fillGo = new GameObject("Fill", typeof(RectTransform), typeof(CanvasRenderer));
+        fillGo.transform.SetParent(_poiseRoot, false);
+        var frt = (RectTransform)fillGo.transform;
+        frt.anchorMin = Vector2.zero; frt.anchorMax = Vector2.one;
+        frt.offsetMin = Vector2.zero; frt.offsetMax = Vector2.zero;
+        _poiseFill = fillGo.AddComponent<Image>();
+        _poiseFill.sprite = UIProceduralSprites.RoundedRect(radius: 1f, feather: 0.5f, size: 8);
+        _poiseFill.type = Image.Type.Filled;
+        _poiseFill.fillMethod = Image.FillMethod.Horizontal;
+        _poiseFill.fillOrigin = (int)Image.OriginHorizontal.Left;
+        _poiseFill.color = PoiseColor;
+        _poiseFill.raycastTarget = false;
+        go.SetActive(false);
+        _poiseShown = false;
+    }
+
     private void EnsureStatusRow()
     {
         if (_statusRow != null) return;
@@ -481,6 +592,156 @@ public class MonsterHPBar : MonoBehaviour
         stGo.SetActive(false);
 
         return cell;
+    }
+
+    private static RelicKind RelicKindOf(in BuffViewItem item)
+    {
+        string l = item.Label;
+        if (string.Equals(l, SunmarkLabel))   return RelicKind.Sunmark;
+        if (string.Equals(l, BrandLabel))     return RelicKind.Brand;
+        if (string.Equals(l, BlackspotLabel)) return RelicKind.Blackspot;
+        return RelicKind.None;
+    }
+
+    /// <summary>
+    /// 유물 스택 칸(10-12 A1) — 태양흔 · 낙인 = 원판 오른쪽 빈칸 · 찬칸 줄(상한 = <see cref="GawainMemoryHub.SunmarkCapOf"/> · <see cref="LancelotMemoryHub.BrandCapOf"/>),
+    /// 흑점 = 「흑점 N」(상한 없음). 정오가 아닐 때 태양흔은 흐리게(다음 정오를 기다린다). 원판 오른쪽에 붙인 폭을 돌려준다.
+    /// </summary>
+    private float ApplyRelicMark(StatusCell cell, RelicKind kind, in BuffViewItem item)
+    {
+        bool pips = kind == RelicKind.Sunmark || kind == RelicKind.Brand;
+        bool text = kind == RelicKind.Blackspot;
+        cell.atCap = false;
+        if (cell.marks != null && cell.marks.gameObject.activeSelf != pips) cell.marks.gameObject.SetActive(pips);
+        if (cell.count != null && cell.count.gameObject.activeSelf != text) cell.count.gameObject.SetActive(text);
+        if (kind == RelicKind.None) { cell.dim = 1f; return 0f; }
+
+        if (_marks == null && _monster != null) _monster.TryGetComponent(out _marks);
+        RefreshRelicContext();
+        cell.dim = kind == RelicKind.Sunmark && !s_noon ? MarkDim : 1f;
+        if (cell.dim < 1f)
+        {
+            var ic = cell.icon.color; ic.a *= cell.dim; cell.icon.color = ic;
+            var rc = cell.ring.color; rc.a *= cell.dim; cell.ring.color = rc;
+        }
+
+        if (text)
+        {
+            EnsureMarkCount(cell);
+            cell.count.SetText("흑점 {0}", _marks != null ? _marks.Blackspot : item.Stacks);
+            return MarkGap + BlackspotTextW;
+        }
+
+        bool sun = kind == RelicKind.Sunmark;
+        int value = _marks != null ? (sun ? _marks.Sunmark : _marks.Brand) : item.Stacks;
+        int cap = sun ? s_sunCap : s_brandCap;
+        if (!sun && _marks != null && _marks.IsExposed) cap = Mathf.Max(cap, _marks.BrandCap);   // 폭로 — 이 적만 상한이 잠시 늘었다
+        cap = Mathf.Clamp(Mathf.Max(cap, value), 1, MarkPipMax);
+        EnsureMarkPips(cell, cap);
+        cell.tint   = EffectIconRegistry.TintFor(item.IconKey);
+        cell.filled = Mathf.Min(value, cap);
+        cell.atCap  = cell.filled >= cap;
+        if (!cell.atCap) cell.marks.localScale = Vector3.one;
+        PaintMarkPips(cell, 0f);
+        return MarkGap + MarkRowWidth(cap);
+    }
+
+    private static float MarkRowWidth(int cap) => MarkPad * 2f + cap * MarkPipW + (cap - 1) * MarkPipGap;
+
+    /// <summary>빈칸 · 찬칸 줄 — 어두운 판 위 세로 막대 <paramref name="cap"/>개(넘는 칸은 끈다).</summary>
+    private static void EnsureMarkPips(StatusCell cell, int cap)
+    {
+        if (cell.marks == null)
+        {
+            var go = new GameObject("Marks", typeof(RectTransform), typeof(CanvasRenderer));
+            go.transform.SetParent(cell.go.transform, false);
+            cell.marks = (RectTransform)go.transform;
+            cell.marks.anchorMin = cell.marks.anchorMax = new Vector2(1f, 0.5f);
+            cell.marks.pivot = new Vector2(0f, 0.5f);
+            cell.marks.anchoredPosition = new Vector2(MarkGap, 0f);
+            var plate = go.AddComponent<Image>();
+            plate.sprite = UIProceduralSprites.RoundedRect(radius: BarRadius, feather: 1f, size: 32);
+            plate.type   = Image.Type.Sliced;
+            plate.pixelsPerUnitMultiplier = 2.2f;
+            plate.color  = StatusPlateColor;
+            plate.raycastTarget = false;
+        }
+        cell.marks.sizeDelta = new Vector2(MarkRowWidth(cap), MarkPipH + MarkPad * 2f);
+        while (cell.pips.Count < cap)
+        {
+            int i = cell.pips.Count;
+            var pgo = new GameObject("Pip" + i, typeof(RectTransform), typeof(CanvasRenderer));
+            pgo.transform.SetParent(cell.marks, false);
+            var rt = (RectTransform)pgo.transform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0f, 0.5f);
+            rt.pivot = new Vector2(0f, 0.5f);
+            rt.anchoredPosition = new Vector2(MarkPad + i * (MarkPipW + MarkPipGap), 0f);
+            rt.sizeDelta = new Vector2(MarkPipW, MarkPipH);
+            var img = pgo.AddComponent<Image>();   // 스프라이트 없음 = 곧은 막대(▮)
+            img.raycastTarget = false;
+            cell.pips.Add(img);
+        }
+        for (int i = 0; i < cell.pips.Count; i++)
+        {
+            bool on = i < cap;
+            if (cell.pips[i].gameObject.activeSelf != on) cell.pips[i].gameObject.SetActive(on);
+        }
+    }
+
+    /// <summary>찬 칸 = 계열색(<paramref name="glow"/>만큼 흰빛) · 빈 칸 = 옅은 잉크 · 흐림이면 둘 다 알파를 줄인다.</summary>
+    private static void PaintMarkPips(StatusCell cell, float glow)
+    {
+        var on  = Color.Lerp(cell.tint, Color.white, glow); on.a = cell.dim;
+        var off = MarkPipEmpty; off.a *= cell.dim;
+        for (int i = 0; i < cell.pips.Count; i++) cell.pips[i].color = i < cell.filled ? on : off;
+    }
+
+    /// <summary>「흑점 N」 — 원판 오른쪽 글자(중첩 배지와 같은 글자 규격 · 그림자).</summary>
+    private void EnsureMarkCount(StatusCell cell)
+    {
+        if (cell.count != null) return;
+        float size = StatusCellSize;
+        var go = new GameObject("MarkCount", typeof(RectTransform), typeof(CanvasRenderer));
+        go.transform.SetParent(cell.go.transform, false);
+        var rt = (RectTransform)go.transform;
+        rt.anchorMin = rt.anchorMax = new Vector2(1f, 0.5f);
+        rt.pivot = new Vector2(0f, 0.5f);
+        rt.anchoredPosition = new Vector2(MarkGap, 0f);
+        rt.sizeDelta = new Vector2(BlackspotTextW, size);
+        cell.count = go.AddComponent<TMPro.TextMeshProUGUI>();
+        cell.count.alignment        = TMPro.TextAlignmentOptions.MidlineLeft;
+        cell.count.fontSize         = size * 0.55f;
+        cell.count.color            = NameInk;
+        cell.count.raycastTarget    = false;
+        cell.count.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+        cell.count.overflowMode     = TMPro.TextOverflowModes.Overflow;
+        TMPOutlineHelper.ApplySoftShadow(cell.count);   // 글자 정본 — 두꺼운 테두리 금지
+    }
+
+    /// <summary>상한 찬 유물 칸 — 줄이 은은히 숨쉰다(배율 ±8% · 흰빛 25%까지). 상한 찬 칸이 없으면 바로 돌아간다.</summary>
+    private void TickMarkPulse()
+    {
+        if (_markPulseCells <= 0) return;
+        float k = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * MarkPulseHz * 2f * Mathf.PI);
+        for (int i = 0; i < _statusCells.Count; i++)
+        {
+            var c = _statusCells[i];
+            if (!c.atCap || c.marks == null || !c.go.activeSelf) continue;
+            c.marks.localScale = Vector3.one * (1f + MarkPulseScale * k);
+            PaintMarkPips(c, MarkPulseGlow * k);
+        }
+    }
+
+    /// <summary>태양흔 · 낙인 상한(허브) · 정오 — 한 프레임에 한 번만 묻는다(바마다 플레이어를 찾지 않게).</summary>
+    private static void RefreshRelicContext()
+    {
+        if (s_relicFrame == Time.frameCount) return;
+        s_relicFrame = Time.frameCount;
+        var p = GameRunBootstrapper.Instance?.Run?.Player;
+        s_sunCap   = GawainMemoryHub.SunmarkCapOf(p);
+        s_brandCap = LancelotMemoryHub.BrandCapOf(p);
+        var g = GawainMemoryHub.Of(p);
+        s_noon = g != null && g.IsNoon;
     }
 
     private static Image NewStatusImage(string name, RectTransform parent, float inset)

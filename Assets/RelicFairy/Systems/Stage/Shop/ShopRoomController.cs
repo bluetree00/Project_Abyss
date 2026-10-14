@@ -85,7 +85,8 @@ public class ShopRoomController : MonoBehaviour
     public int PlayerGold => _run?.PlayerState?.TempGold ?? 0;
     public bool RerollEnabled => _rerollEnabled;
     /// <summary>이번 방문에 아직 새로고침을 쓸 수 있는가(켜져 있고 횟수가 남음).</summary>
-    public bool RerollAvailable => _rerollEnabled && _rerollsUsed < MaxRerollsPerVisit;
+    // 10-14 강화형 — 방문당 횟수 = 제단 「상점 새로고침」 단계(디자이너 플래그로만 켜졌으면 1)
+    public bool RerollAvailable => _rerollEnabled && _rerollsUsed < Mathf.Max(MaxRerollsPerVisit, MemoryAltarService.ShopRerollCount);
     public int RerollCost => _rerollCost;
 
     /// <summary>심연의 행상 정규 상품(6칸).</summary>
@@ -242,7 +243,7 @@ public class ShopRoomController : MonoBehaviour
         }
     }
 
-    /// <summary>리롤. 비결정 RNG로 진열을 새로 롤. 피처 off거나 골드 부족이면 false.</summary>
+    /// <summary>리롤. 방 시드에서 이어지는 RNG로 진열을 새로 롤. 피처 off거나 골드 부족이면 false.</summary>
     public bool TryReroll()
     {
         if (!RerollAvailable) return false;
@@ -256,8 +257,10 @@ public class ShopRoomController : MonoBehaviour
         }
 
         _rerollsUsed++;
-        _rerollRng ??= new System.Random();
-        BuildSlots(_rerollRng); // 의도적 비결정 — 이어하기 복원 대상 아님
+        // 방 시드에서 이어 굴린다(10-11) — 시드가 없으면 강제 종료(저장 전)로 골드를 되돌리고 다시 굴려 진열을 골라낼 수 있었다.
+        // 진열 자체는 여전히 저장하지 않는다(이어하면 처음 진열) — 다시 굴리면 같은 순서로 같은 진열이 나온다.
+        _rerollRng ??= new System.Random(_roomRng != null ? _roomRng.Next() : System.Environment.TickCount);
+        BuildSlots(_rerollRng);
         _peddler = AbyssPeddlerCatalog.Build(_rerollRng);   // 상품 돌리기 = 행상 진열도 새로 롤
         RefreshOwnership();
         OnShopChanged?.Invoke();
@@ -494,7 +497,7 @@ public class ShopRoomController : MonoBehaviour
         int price = shopData.ResolvePrice(entry);   // price_override 우선
         _slots.Add(new ShopSlot(entry, null, ShopCategory.Potion, price,
                                 "체력 포션", ItemRarity.Common, null,
-                                "즉시 최대 체력의 40%를 회복한다. 퀵슬롯(H)에 충전."));
+                                $"즉시 최대 체력의 {Mathf.RoundToInt((0.40f + MemoryAltarService.PotionHealBonus) * 100f)}%를 회복한다. 퀵슬롯(H)에 충전."));
     }
 
     private void BuildSlotsFromChart(System.Random rng)
@@ -586,10 +589,10 @@ public class ShopRoomController : MonoBehaviour
     {
         string r = rarity switch
         {
-            ItemRarity.Rare => "레어",
-            ItemRarity.Epic => "에픽",
-            ItemRarity.Legendary => "전설",
-            _ => "일반",
+            ItemRarity.Rare => "Rare",
+            ItemRarity.Epic => "Epic",
+            ItemRarity.Legendary => "Legendary",
+            _ => "Common",
         };
         return cat == ShopCategory.Weapon ? $"{r} 무기" : $"{r} 아이템";
     }

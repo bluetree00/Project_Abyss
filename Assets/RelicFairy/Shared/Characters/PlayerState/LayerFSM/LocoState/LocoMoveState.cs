@@ -28,8 +28,9 @@ public class LocoMoveState : LayerStateBase<LocoState>
     {
         // 공격/스킬 중이면 CrossFade 생략 (공격 애니메이션 덮어쓰기 방지)
         // 회피 종료처럼 자세 차이가 큰 복귀는 RequestLocoBlend로 더 긴 블렌드를 예약해 스냅을 없앤다.
-        if (!_controller.Combo.IsAttacking)
-            _controller.Anim.CrossFadeInFixedTime("MoveBlend", _controller.ConsumeLocoBlend(0.14f));
+        // 스킬 중에도 생략 — 스킬은 공격 플래그를 세우지 않아, 움직이며 쓴 스킬이 이동 입력 유예(0.12초) 뒤 대기 진입에서 덮였다(10-09 출시 점검)
+        if (!_controller.Combo.IsAttacking && !_controller.IsInSkillAction)
+            _controller.CrossFadeMoveBlend(_controller.ConsumeLocoBlend(0.14f));
 
         _runCharge01 = 0f;
         _animFloor = 0f;

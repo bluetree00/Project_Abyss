@@ -31,7 +31,47 @@ public static class DKGridPatternHelper
     // 가산 파트가 주된 이펙트용 검정 틴트 — DarkTint는 가산 파트를 지워 영혼 창 빔이 안 보였다(10-03). DarkTint는 다른 패턴이 그대로 쓴다
     public static readonly Color DarkReadableTint = new Color(0.55f, 0.15f, 0.85f, 1f);
 
+    /// <summary>판정 이만큼 전부터 위험 칸(검 색 칸)을 붉게 — 예고 시간 · 판정은 그대로(10-11 사용자 「어떤 공격이 위험한지 더 알려줘야」).</summary>
+    public const float ArmLead = 0.25f;
+    // 베기 이펙트 최대 수명 — 반복 Sword Slash 15가 2.75초 남아 판정 뒤에도 위험한 줄로 읽혔다. 검 소환은 베기 1.2초 뒤 판정이라 그보다 길게(10-11 이펙트 톤 2차)
+    private const float SlashVfxMaxSeconds = 1.6f;
+    private static readonly Color ArmColor = new Color(1f, 0.12f, 0.1f, 0.8f);
+    private const float ArmEmission = 1.5f;
+    private static readonly int   BaseMapId = Shader.PropertyToID("_BaseMap");
+    private static readonly int   MainTexId = Shader.PropertyToID("_MainTex");
+    // 칠한 칸 → (렌더러, 원래 재질). 검은 칸은 바탕 그림이 어두워 색을 곱해도 붉어지지 않았다(10-11 실측) → 바탕 그림 없는 붉은 재질로 잠깐 바꾼다
+    private static readonly Dictionary<GameObject, (Renderer renderer, Material original)> s_armed = new();
+    private static readonly Dictionary<Material, Material> s_armMaterials = new();   // 원래 재질마다 한 번 만든다
+
+    private const float ReachSampleRadius   = 0.75f;   // 칸(2 m) 중심에서 — 칸 안쪽 바닥만 잡는다
+    private const float ReachFloorTolerance = 0.6f;
+
     // ── 타일 스폰/제거 ──────────────────────────────────────
+
+    /// <summary>
+    /// <paramref name="from"/>에서 걸어서 갈 수 있는 칸인가 — 칸 중심 가까이 같은 바닥 높이에 NavMesh가 있고 길이 끝까지 이어진다
+    /// (에이전트 2종을 따로 굽는다 → 어느 쪽이든). NavMesh만 보면 벽 너머 · 끊긴 바닥까지 잡혔다(10-13 실측).
+    /// </summary>
+    public static bool IsReachable(Vector3 from, Vector3 cellCenter)
+    {
+        var path = new UnityEngine.AI.NavMeshPath();
+        int n = UnityEngine.AI.NavMesh.GetSettingsCount();
+        for (int i = 0; i < n; i++)
+        {
+            var filter = new UnityEngine.AI.NavMeshQueryFilter
+            {
+                agentTypeID = UnityEngine.AI.NavMesh.GetSettingsByIndex(i).agentTypeID,
+                areaMask    = UnityEngine.AI.NavMesh.AllAreas,
+            };
+            if (!UnityEngine.AI.NavMesh.SamplePosition(cellCenter, out var to, ReachSampleRadius, filter)
+                || Mathf.Abs(to.position.y - cellCenter.y) > ReachFloorTolerance) continue;
+            if (!UnityEngine.AI.NavMesh.SamplePosition(from, out var start, 2f, filter)) continue;
+            if (UnityEngine.AI.NavMesh.CalculatePath(start.position, to.position, filter, path)
+                && path.status == UnityEngine.AI.NavMeshPathStatus.PathComplete)
+                return true;
+        }
+        return false;
+    }
 
     /// <summary>colorRule(x, z) 결과에 따라 내부 셀 전체에 타일 프리팹을 스폰한다.</summary>
     public static List<DKTileInfo> SpawnTiles(
@@ -66,8 +106,56 @@ public static class DKGridPatternHelper
         if (tiles == null) return;
         foreach (var tile in tiles)
             if (tile.GO != null)
+            {
+                Disarm(tile.GO);   // 칠한 색을 지우고 풀로 — 다음에 꺼낼 때 붉게 남지 않게
                 BossEffectPool.Release(tile.GO);
+            }
         tiles.Clear();
+    }
+
+    // ── 판정 직전 위험 칸(10-11) ────────────────────────────
+
+    /// <summary><paramref name="hitAt"/> − <see cref="ArmLead"/>가 지나면 검 색 칸을 붉게 칠한다 — 같은 칸은 다시 칠하지 않아 매 프레임 불러도 된다(새로 깔린 칸만 더 칠한다).</summary>
+    public static void ArmBefore(float timer, float hitAt, List<DKTileInfo> tiles, DKSwordColor swordColor)
+    {
+        if (tiles == null || tiles.Count == 0 || timer < hitAt - ArmLead) return;
+        foreach (var t in tiles)
+            if (t.Color == swordColor) ArmTile(t.GO);
+    }
+
+    /// <summary>이 칸을 붉게(한 번만) — 바탕 그림 없는 붉은 재질로 바꾼다. 풀로 돌려보내기 전에 <see cref="Disarm"/>.</summary>
+    public static void ArmTile(GameObject go)
+    {
+        if (go == null || s_armed.ContainsKey(go)) return;
+        var r = go.TryGetComponent<Renderer>(out var own) ? own : go.GetComponentInChildren<Renderer>();
+        if (r == null || r.sharedMaterial == null) return;
+        Material original = r.sharedMaterial;
+        if (!s_armMaterials.TryGetValue(original, out var arm))
+        {
+            arm = new Material(original) { name = original.name + " (판정 직전)" };
+            if (arm.HasProperty(BaseMapId)) arm.SetTexture(BaseMapId, null);
+            if (arm.HasProperty(MainTexId)) arm.SetTexture(MainTexId, null);
+            if (arm.HasProperty(BaseColorId)) arm.SetColor(BaseColorId, ArmColor);
+            if (arm.HasProperty(ColorId))     arm.SetColor(ColorId, ArmColor);
+            // 칸 재질은 조명을 받는다(URP Lit) — 기사 아레나의 푸른 조명 아래 붉은 바탕은 검게 보였다(10-11 실측) → 발광으로 조명과 무관하게 붉게
+            if (arm.HasProperty(EmissionColorId))
+            {
+                arm.EnableKeyword("_EMISSION");
+                arm.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                arm.SetColor(EmissionColorId, new Color(ArmColor.r, ArmColor.g, ArmColor.b) * ArmEmission);
+            }
+            s_armMaterials[original] = arm;
+        }
+        r.sharedMaterial = arm;
+        s_armed[go] = (r, original);
+    }
+
+    /// <summary>원래 재질로 되돌린다(칠하지 않은 칸은 그대로).</summary>
+    public static void Disarm(GameObject go)
+    {
+        if (go == null || !s_armed.TryGetValue(go, out var e)) return;
+        s_armed.Remove(go);
+        if (e.renderer != null) e.renderer.sharedMaterial = e.original;
     }
 
     // ── VFX 스폰 (피격과 분리) ──────────────────────────────
@@ -120,13 +208,16 @@ public static class DKGridPatternHelper
     /// <summary>
     /// NormalSlash 전용: 플레이어가 단일 행(rowZ) 에 있으면 피격.
     /// </summary>
+    /// <param name="weight">피격 등급 — 2페이즈 수동 영혼 창은 약(포이즈를 쌓지 않음, 10-08 점검). 기본 = 피해량으로 판정.</param>
     public static void TriggerSingleRowDamage(MonsterContext ctx, int rowZ,
-                                              float damageMult, float knockbackMult)
+                                              float damageMult, float knockbackMult,
+                                              HitWeight weight = HitWeight.Auto)
     {
         if (ctx?.Runtime?.PlayerTarget == null) return;
         Vector2Int playerCell = DKBossRoomContext.WorldToCell(ctx.Runtime.PlayerTarget.position);
+        if (!DKBossRoomContext.IsInterior(playerCell.x, playerCell.y)) return;   // 테두리 칸엔 줄 타일 · 빔을 안 그린다(10-08 점검)
         if (playerCell.y == rowZ)
-            ApplyDamageToPlayer(ctx, damageMult, knockbackMult);
+            ApplyDamageToPlayer(ctx, damageMult, knockbackMult, weight);
     }
 
     /// <summary>
@@ -210,6 +301,7 @@ public static class DKGridPatternHelper
     {
         if (ctx?.Runtime?.PlayerTarget == null) return;
         Vector2Int pc = DKBossRoomContext.WorldToCell(ctx.Runtime.PlayerTarget.position);
+        if (!DKBossRoomContext.IsInterior(pc.x, pc.y)) return;   // 테두리 칸엔 링 타일을 안 그린다(10-08 점검)
         int playerRing = Mathf.Max(
             Mathf.Abs(pc.x - bossCell.x),
             Mathf.Abs(pc.y - bossCell.y));
@@ -336,7 +428,7 @@ public static class DKGridPatternHelper
                                          float lineLength, Color tint)
     {
         if (prefab == null) return;
-        var go = BossEffectPool.SpawnOneShot(prefab, worldPos, rot, fallbackLifetime: 2.5f);
+        var go = SpawnSlashVfx(prefab, worldPos, rot);
         if (go == null) return;
         go.transform.localScale = new Vector3(1f, 1f, lineLength);
         TintVfx(go, tint);
@@ -345,8 +437,19 @@ public static class DKGridPatternHelper
     private static void SpawnVfxAt(GameObject prefab, int x, int z, Color tint, Quaternion rot)
     {
         Vector3 pos = DKBossRoomContext.CellToWorld(x, z, 0.1f);
-        var go = BossEffectPool.SpawnOneShot(prefab, pos, rot, fallbackLifetime: 2.5f);
+        var go = SpawnSlashVfx(prefab, pos, rot);
         if (go != null) TintVfx(go, tint);
+    }
+
+    private static GameObject SpawnSlashVfx(GameObject prefab, Vector3 pos, Quaternion rot)
+    {
+        var go = BossEffectPool.Spawn(prefab, pos, rot);
+        if (go != null)
+        {
+            BossPageTransitionState.ToneRoarVfx(go, Color.clear);   // 굴절층 끔 — 줄마다 흰 일그러짐이 겹쳤다(10-13 검증)
+            BossEffectPool.ScheduleRelease(go, Mathf.Min(BossEffectPool.CalculateLifetime(prefab, 2.5f), SlashVfxMaxSeconds));
+        }
+        return go;
     }
 
     // ── 경계 테두리 엣지 스폰/제거 ────────────────────────────
@@ -437,7 +540,8 @@ public static class DKGridPatternHelper
 
     // ───────────────────────────────────────────────────────
 
-    private static void ApplyDamageToPlayer(MonsterContext ctx, float damageMult, float knockbackMult)
+    private static void ApplyDamageToPlayer(MonsterContext ctx, float damageMult, float knockbackMult,
+                                            HitWeight weight = HitWeight.Auto)
     {
         if (ctx.Config?.stat == null || ctx.Runtime.PlayerTarget == null) return;
 
@@ -447,7 +551,7 @@ public static class DKGridPatternHelper
         // 악몽 「지휘」 — 환영 기수가 서 있는 동안 +15%
         int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * damageMult * DKStandardBearer.DamageScale(ctx.Monster)));
         // 가해자 = 기사 — null이면 피격 방향 연출·같은 공격자 약 피격 억제·전투 로그가 가해자를 모른다(09-26)
-        player.TakeDamage(dmg, ctx.Monster != null ? ctx.Monster.gameObject : null);
+        player.TakeDamage(dmg, ctx.Monster != null ? ctx.Monster.gameObject : null, false, weight);
 
         Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
         toPlayer.y = 0.2f;

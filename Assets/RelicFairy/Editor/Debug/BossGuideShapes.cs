@@ -28,11 +28,13 @@ public static class BossGuideShapes
         public float     HalfLength, HalfWidth; // 직사각형
         public Vector3[] Poly;                  // 다각형(월드, 높이 무시)
         public float     Age;                   // 처음 본 뒤 경과(초, Time.time)
+        public float     Still;                 // 자리 · 방향 · 크기가 마지막으로 바뀐 뒤 경과 = 굳힌 뒤 시간(10-13)
         public bool      Safe;                  // 안전 표시(판정 아님)
     }
 
     // ── Static ─────────────────────────────────────────────────
     private static readonly Dictionary<int, float> s_firstSeen = new();
+    private static readonly Dictionary<int, (Vector3 p, Quaternion r, Vector3 s, float at)> s_pose = new();
     private static readonly List<Shape>            s_shapes    = new();
     private static readonly List<GameObject>       s_roots     = new();
     private static readonly MaterialPropertyBlock  s_mpb       = new();
@@ -46,6 +48,12 @@ public static class BossGuideShapes
         new Color(0.95f, 0.95f, 0.90f), Color.white,
     };
     private static readonly Vector3[] s_line = new Vector3[64];
+    // 기사 격자 — 본 칸을 잠깐 기억한다(칸은 피해 0.4초 전에 걷힌다: ChangeSlash 걷힘 1.2초 → 피해 1.6초)
+    private const  float DkMemory   = 0.6f;
+    private const  string DkPoolPath = "@Pools/EffectPool/BossEffects";
+    private static readonly Dictionary<Vector2Int, (Shape s, float first, float seen)> s_dkSeen = new();
+    private static readonly List<Vector2Int> s_dkDrop = new();
+    private static readonly List<Transform>  s_dkTiles = new();
     private static Scene s_ddol;
 
     private static Scene DdolScene()
@@ -62,6 +70,8 @@ public static class BossGuideShapes
     public static void Reset()
     {
         s_firstSeen.Clear();
+        s_pose.Clear();
+        s_dkSeen.Clear();
         s_ddol = default;
     }
 
@@ -86,6 +96,7 @@ public static class BossGuideShapes
             foreach (var go in s_roots)
                 if (go.activeInHierarchy && go.name == "@QuadTilePool") Visit(go.transform, 0, now);
         }
+        ScanDkTiles(now);
         foreach (var w in Object.FindObjectsByType<MonsterGroundWarning>(FindObjectsSortMode.None))
             if (w != null && w.isActiveAndEnabled) AddGroundWarning(w, now);
         return s_shapes;
@@ -129,6 +140,15 @@ public static class BossGuideShapes
             if (!found || s.Age > best.Age) { best = s; found = true; }
         }
         return found;
+    }
+
+    /// <summary>점을 덮는 (판정) 가이드 중 가장 오래 굳어 있던 것의 굳은 시간(<see cref="Shape.Still"/>). 없으면 false.</summary>
+    public static bool CoveringStill(List<Shape> shapes, Vector3 p, float margin, out float still)
+    {
+        still = -1f;
+        foreach (var s in shapes)
+            if (!s.Safe && Contains(s, p, margin)) still = Mathf.Max(still, s.Still);
+        return still >= 0f;
     }
 
     /// <summary><paramref name="minAge"/>초 넘게 떠 있던 가이드 중 하나라도 점을 덮는가 — 플레이어가 「본」 가이드만 피한다.</summary>
@@ -208,7 +228,7 @@ public static class BossGuideShapes
     {
         string n = t.name;
         if (n.StartsWith("Guide_Pillar") || n.StartsWith("Guide_Link")) return;   // 시각 전용(판정 없음)
-        var s = new Shape { Name = n, Center = t.position, Age = AgeOf(t.gameObject, now), Safe = IsSafe(GuideColor(t)) };
+        var s = new Shape { Name = n, Center = t.position, Age = AgeOf(t.gameObject, now), Still = StillOf(t, now), Safe = IsSafe(GuideColor(t)) };
         Vector3 sc = t.lossyScale;
         bool decal = t.TryGetComponent<MeshFilter>(out var mf) && mf.sharedMesh != null && mf.sharedMesh.name == "Quad";
 
@@ -258,10 +278,65 @@ public static class BossGuideShapes
         Vector3 sc = t.lossyScale;
         s_shapes.Add(new Shape
         {
-            Kind = Kind.Rect, Name = t.name, Center = t.position, Age = AgeOf(t.gameObject, now),
+            Kind = Kind.Rect, Name = t.name, Center = t.position, Age = AgeOf(t.gameObject, now), Still = StillOf(t, now),
             Axis = FlatDir(t.up), HalfWidth = Mathf.Abs(sc.x) * 0.5f, HalfLength = Mathf.Abs(sc.y) * 0.5f,
         });
     }
+
+    /// <summary>
+    /// 기사 격자 — 흑/백 칸(DK_WarningTile_White/Black)이 바닥을 덮고 <b>검과 같은 색 칸만</b> 베인다
+    /// (DKGridPatternHelper.TriggerDamage · DKCrossFlip · 영혼 창 노리는 줄 · 환영 돌진 한 칸 · 2페이지 패시브).
+    /// 풀(@Pools/EffectPool/BossEffects/&lt;프리팹 이름&gt;/칸)은 MaxDepth 밖이라 따로 훑는다. 검 색이 바뀐 순간 바닥 전체를 새 색으로
+    /// 0.3초 깔아 알리는 신호(ChangeSlash 끝)는 반대 색이 하나도 없고 칸 대부분을 덮으니 판정에서 뺀다.
+    /// </summary>
+    private static void ScanDkTiles(float now)
+    {
+        var dk = Object.FindFirstObjectByType<DeathKnightBossMonster>();
+        if (dk == null || dk.DKBlackboard == null) { s_dkSeen.Clear(); return; }
+        bool white = dk.DKBlackboard.SwordColor == DKSwordColor.White;
+        string hitName   = white ? "DK_WarningTile_White" : "DK_WarningTile_Black";
+        string otherName = white ? "DK_WarningTile_Black" : "DK_WarningTile_White";
+        // 켜진 칸은 BossEffects 바로 밑(BossEffectPool.Spawn — 부모 없이 부르면 효과 루트에 붙는다). 같은 이름의 풀 상자(꺼진 칸 보관)는 렌더러가 없다
+        var root  = GameObject.Find(DkPoolPath);
+        int other = 0;
+        s_dkTiles.Clear();
+        if (root != null)
+            for (int i = 0; i < root.transform.childCount; i++)
+            {
+                var c = root.transform.GetChild(i);
+                if (!Shown(c)) continue;
+                if (c.name == hitName) s_dkTiles.Add(c);
+                else if (c.name == otherName) other++;
+            }
+        int cells = Mathf.Max(1, (DKBossRoomContext.Width - 2) * (DKBossRoomContext.Height - 2));
+        if (s_dkTiles.Count > 0 && !(other == 0 && s_dkTiles.Count >= cells * 0.6f))
+        {
+            foreach (var c in s_dkTiles)
+            {
+                var key = new Vector2Int(Mathf.RoundToInt(c.position.x * 4f), Mathf.RoundToInt(c.position.z * 4f));
+                Vector3 sc = c.lossyScale;
+                var s = new Shape
+                {
+                    Kind = Kind.Rect, Name = c.name, Center = c.position,
+                    Axis = FlatDir(c.up), HalfWidth = Mathf.Abs(sc.x) * 0.5f, HalfLength = Mathf.Abs(sc.y) * 0.5f,
+                };
+                float first = s_dkSeen.TryGetValue(key, out var was) && now - was.seen <= DkMemory ? was.first : now;
+                s_dkSeen[key] = (s, first, now);
+            }
+        }
+        s_dkDrop.Clear();
+        foreach (var kv in s_dkSeen)
+        {
+            if (now - kv.Value.seen > DkMemory) { s_dkDrop.Add(kv.Key); continue; }
+            var s = kv.Value.s;
+            s.Age = s.Still = now - kv.Value.first;   // 칸은 자리로 기억한다 — 움직이지 않는다
+            s_shapes.Add(s);
+        }
+        foreach (var k in s_dkDrop) s_dkSeen.Remove(k);
+    }
+
+    private static bool Shown(Transform t)
+        => t.gameObject.activeInHierarchy && t.TryGetComponent<MeshRenderer>(out var r) && r.enabled;
 
     private static bool IsSector(Transform t, out float angle)
     {
@@ -287,7 +362,7 @@ public static class BossGuideShapes
             {
                 var poly = new Vector3[4];
                 for (int i = 0; i < 4; i++) poly[i] = lr.useWorldSpace ? s_line[i] : lr.transform.TransformPoint(s_line[i]);
-                s_shapes.Add(new Shape { Kind = Kind.Poly, Name = w.name, Center = w.transform.position, Poly = poly, Age = age, Safe = IsSafe(lr.startColor) });
+                s_shapes.Add(new Shape { Kind = Kind.Poly, Name = w.name, Center = w.transform.position, Poly = poly, Age = age, Still = age, Safe = IsSafe(lr.startColor) });
             }
             else if (count >= 8)
             {
@@ -299,7 +374,7 @@ public static class BossGuideShapes
             }
         }
         if (circleR > 0.01f)   // 채움 원은 바깥 고정선 반경 = 판정 반경
-            s_shapes.Add(new Shape { Kind = Kind.Circle, Name = w.name, Center = w.transform.position, Radius = circleR, Age = age, Safe = safe });
+            s_shapes.Add(new Shape { Kind = Kind.Circle, Name = w.name, Center = w.transform.position, Radius = circleR, Age = age, Still = age, Safe = safe });
     }
 
     private static float AgeOf(GameObject go, float now)
@@ -308,6 +383,24 @@ public static class BossGuideShapes
         if (!s_firstSeen.TryGetValue(id, out float at)) s_firstSeen[id] = at = now;
         return now - at;
     }
+
+    // 자리 · 방향 · 크기가 바뀌면 시계를 다시 맞춘다(채움은 MPB라 여기 안 잡힌다 — 따라 도는 예고 · 늘어나는 줄만)
+    private static float StillOf(Transform t, float now)
+    {
+        int id = t.gameObject.GetInstanceID();
+        Vector3 p = t.position, s = t.lossyScale;
+        Quaternion r = t.rotation;
+        if (!s_pose.TryGetValue(id, out var was)
+            || (was.p - p).sqrMagnitude > 0.0225f || Quaternion.Angle(was.r, r) > 3f || (was.s - s).sqrMagnitude > 0.0025f)   // 15 cm · 3° · 5 cm 안 흔들림은 굳은 것
+        {
+            float at = s_pose.ContainsKey(id) ? now : AgeStart(id, now);
+            s_pose[id] = (p, r, s, at);
+            return now - at;
+        }
+        return now - was.at;
+    }
+
+    private static float AgeStart(int id, float now) => s_firstSeen.TryGetValue(id, out float at) ? at : now;
 
     private static bool InsidePoly(Vector3[] poly, Vector3 p, float margin)
     {

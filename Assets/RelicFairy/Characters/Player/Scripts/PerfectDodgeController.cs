@@ -168,6 +168,14 @@ public sealed class PerfectDodgeController
 
         if (!TimeScaleArbiter.IsHeldBy(_owner)) return;
 
+        // 일시정지(Pause 이상) 동안엔 플레이어 애니메이터도 게임 시간으로 — 실제 시간이면 멈춘 세상에서 혼자 움직이고
+        // 스킬 타이머(ctx.DeltaTime)와 슬래시 이벤트가 흘렀다(10-09 출시 점검)
+        if (_owner.Anim != null)
+        {
+            var want = TimeScaleArbiter.HasRequestAtOrAbove(TimeScaleArbiter.Priority.Pause) ? AnimatorUpdateMode.Normal : AnimatorUpdateMode.UnscaledTime;
+            if (_owner.Anim.updateMode != want) _owner.Anim.updateMode = want;
+        }
+
         // 프레임 스톱 종료 → 같은 owner로 슬로모 배율로 덮어쓴다.
         if (_frozen && Time.unscaledTime >= _freezeEnd)
         {

@@ -31,7 +31,7 @@ public abstract class LancelotReaction : LancelotFragment
         _textGate = Time.time + _textGap;
         RelicFloatText.Show(at, _label, ElementPalette.Bright(_element));   // 반응 이름 = 룬 속성색
         RelicMemoryHints.TryShowOnce(EffectKey);
-        ElementVfxPlayer.PlayBurst(_element, at, 1.2f);
+        ElementVfxPlayer.PlayBurst(_element, at, 1f);   // 반응 표시는 피해가 없다 — 1.2 m 면적 폭발이 광역 피해로 읽혔다(10-13 · 반경 1 이하 = 맞힘 이펙트)
     }
 }
 

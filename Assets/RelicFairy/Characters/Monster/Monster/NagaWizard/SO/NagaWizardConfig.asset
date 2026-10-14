@@ -19,9 +19,9 @@ MonoBehaviour:
     m_Bits: 64
   visualHeightMeters: 1.84
   stat:
-    maxHp: 10
+    maxHp: 120
     defense: 2
-    attackPower: 18
+    attackPower: 70
     moveSpeed: 2.5
     attackRange: 8
     attackRadius: 0.5
@@ -29,6 +29,9 @@ MonoBehaviour:
     attackDelay: 0.6
     knockbackForce: 5
     attackShape: {fileID: 11400000, guid: 18dba196672cb624e970d1917d721fa8, type: 2}
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
   detection:
     detectionRange: 10
     chaseGiveUpRange: 14
@@ -39,6 +42,7 @@ MonoBehaviour:
     waypointWaitTime: 1
   combat:
     damageApplyDelay: 0.6
+    maxHitsPerAttack: 0
     targetLayer:
       serializedVersion: 2
       m_Bits: 64
@@ -48,6 +52,9 @@ MonoBehaviour:
     patrolStateName: NagaWizard_WalkFWD
     chaseStateName: NagaWizard_RunFWD
     attackReadyStateName: NagaWizard_IdleBattle
+    attackStateName: Attack
+    getHitStateName: GetHit
+    dieStateName: Die
     attackTrigger: NagaWizard_Attack01
     getHitTrigger: NagaWizard_GetHit
     dieTrigger: NagaWizard_Die
@@ -55,23 +62,19 @@ MonoBehaviour:
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15
-  elemental:
-    accumulationThreshold: 100
-    lightning:
-      resistance: 1
-      overrideState: {fileID: 0}
-    water:
-      resistance: 1
-      overrideState: {fileID: 0}
-    fire:
-      resistance: 1
-      overrideState: {fileID: 0}
-    grass:
-      resistance: 1
-      overrideState: {fileID: 0}
-    earth:
-      resistance: 1
-      overrideState: {fileID: 0}
+  drop:
+    coinMin: 5
+    coinMax: 8
+    coinValue: 1
+  death:
+    despawnDelay: 0.5
+    dissolveDuration: 0.35
+    deathVfxKey: MonsterDeathBurst
+    deathVfxScale: 1.62
+    deathVfxHeight: 0.92
+    deathVfxUnscaled: 1
+    killHitStopScale: 0.04
+    killHitStopDuration: 0.09
   specialStates: []
   stateOverrides:
   - {fileID: 11400000, guid: 7f36c3bb865d4792b55cdaf07b9b8b05, type: 2}

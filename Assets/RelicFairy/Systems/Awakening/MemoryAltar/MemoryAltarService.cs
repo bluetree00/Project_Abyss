@@ -5,7 +5,18 @@ using UnityEngine;
 public struct AltarNodeState
 {
     public MemoryAltarNode Node;
+    /// <summary>1단계 이상 샀다(해금 노드면 「열었다」).</summary>
     public bool Unlocked;
+
+    /// <summary>산 단계 · 최대 단계(10-14 강화형). 해금 노드는 0/1.</summary>
+    public int Level, MaxLevel;
+    /// <summary>끝까지 샀다 — 더 살 것이 없다(해금 노드면 Unlocked와 같다).</summary>
+    public bool Maxed;
+
+    /// <summary>그 갈래 포인트가 모자라 아직 안 열렸다(10-14 세피리아식 — 깊이 대신 「갈래에 쓴 포인트」).</summary>
+    public bool BlockedByPoints;
+    /// <summary>이 노드가 열리는 갈래 포인트 · 지금 그 갈래 포인트.</summary>
+    public int RequiredPoints, BranchPoints;
 
     /// <summary>할인 조건을 만족했는가.</summary>
     public bool ConditionMet;
@@ -57,7 +68,28 @@ public static class MemoryAltarService
     /// 해금했는가. <b>카탈로그에 없는 id는 늘 false</b> — 10-02 재설계로 뺀 유물 노드(파츠 선택지 +1 · 코어 2·3종 · 이어받기)를
     /// 산 옛 세이브도 그 효과가 꺼진다(정수는 <see cref="TryRefundRemovedNodes"/>가 돌려준다).
     /// </summary>
-    public static bool IsUnlocked(string nodeId) => MemoryAltarCatalog.Get(nodeId) != null && (Data?.IsUnlocked(nodeId) ?? false);
+    public static bool IsUnlocked(string nodeId) => Level(nodeId) > 0;
+
+    /// <summary>노드 단계(0 = 안 삼 · 10-14 강화형). 카탈로그에 없는 id는 0 · 최대 단계를 넘지 않는다.</summary>
+    public static int Level(string nodeId)
+    {
+        var node = MemoryAltarCatalog.Get(nodeId);
+        var data = Data;
+        if (node == null || data == null) return 0;
+        EnsureLevelsReset(data);
+        return Mathf.Min(data.GetLevel(nodeId), node.MaxLevel);
+    }
+
+    /// <summary>
+    /// 갈래 포인트(10-14 세피리아식) — 그 갈래에서 산 단계 수의 합(해금 노드는 1). 노드의 <see cref="MemoryAltarNode.RequiredPoints"/>와 견준다.
+    /// </summary>
+    public static int BranchPoints(AltarBranch branch)
+    {
+        int n = 0;
+        foreach (var node in MemoryAltarCatalog.All)
+            if (node.Branch == branch) n += Level(node.Id);
+        return n;
+    }
 
     /// <summary>할인 조건 기록 — 봉인 수(<see cref="MemoryAltarCatalog.Rec.Seals"/>)만 이야기 기록에서 세고, 나머지는 영구 기록.</summary>
     public static int Record(string key)
@@ -82,7 +114,10 @@ public static class MemoryAltarService
         if (node == null) return state;
 
         var data = Data;
-        state.Unlocked = data?.IsUnlocked(node.Id) ?? false;
+        state.Level    = Level(node.Id);
+        state.MaxLevel = node.MaxLevel;
+        state.Unlocked = state.Level > 0;
+        state.Maxed    = state.Level >= node.MaxLevel;
 
         if (node.HasCondition)
         {
@@ -95,24 +130,30 @@ public static class MemoryAltarService
             state.ConditionMet = true;
         }
 
-        state.Cost = state.ConditionMet ? node.DiscountCost : node.BaseCost;
+        // 다음 단계 값 — 할인 조건은 첫 단계만 깎는다(10-14 강화형)
+        state.Cost = node.CostForLevel(state.Level + 1, state.ConditionMet && state.Level == 0);
         state.BlockedByRequirement = node.ConditionRequired && !state.ConditionMet;
 
-        // 부모 — 선으로 이어진 앞 노드가 전부 열려야 차례가 온다.
-        state.MissingParent  = MemoryAltarCatalog.FirstLockedParent(node, id => data?.IsUnlocked(id) ?? false);
+        // 뜻으로 묶인 앞 노드(Epic 확률 ← Epic 등장 등) — 그것만 먼저. 깊이(트리 사슬)로 막지 않는다(10-14 사용자 「깊이에 따라 해금은 폐기」).
+        state.MissingParent  = MemoryAltarCatalog.FirstLockedParent(node, IsUnlocked);
         state.BlockedByChain = state.MissingParent != null;
-        state.IsNextInChain  = !state.Unlocked && !state.BlockedByChain;
+        // 갈래 포인트 — 그 갈래에서 산 단계 수가 모자라면 아직 안 열렸다(세피리아 재능 5 · 10 · 20 투자 지점의 결)
+        state.RequiredPoints  = node.RequiredPoints;
+        state.BranchPoints    = node.RequiredPoints > 0 ? BranchPoints(node.Branch) : 0;
+        state.BlockedByPoints = state.BranchPoints < state.RequiredPoints;
+        state.IsNextInChain   = !state.Maxed && !state.BlockedByChain && !state.BlockedByPoints;
 
         // 시기 고리 · 가운데 기억(10-02) — 드러나지 않은 시기는 그리지도 팔지도 않고, 기억 노드는 공명 그물이 받을 때까지 보이기만 한다.
         state.EraHidden = !MemoryAltarCatalog.IsEraRevealed(node.Era);
         state.Pending   = node.Branch == AltarBranch.Memory && !MemoryAltarCatalog.MemoryNodesLive;
         if (state.EraHidden || state.Pending) state.IsNextInChain = false;
 
-        state.CanBuy = !state.Unlocked
+        state.CanBuy = !state.Maxed
                     && !state.EraHidden
                     && !state.Pending
                     && !state.BlockedByRequirement
                     && !state.BlockedByChain
+                    && !state.BlockedByPoints
                     && (data?.abyssEssence ?? 0) >= state.Cost;
 
         return state;
@@ -132,7 +173,7 @@ public static class MemoryAltarService
         foreach (var node in MemoryAltarCatalog.All)
         {
             var s = GetState(node);
-            if (s.Unlocked || s.BlockedByRequirement || s.BlockedByChain || s.EraHidden || s.Pending) continue;
+            if (s.Maxed || s.BlockedByRequirement || s.BlockedByChain || s.BlockedByPoints || s.EraHidden || s.Pending) continue;
             if (best == null || s.Cost < best.Value.Cost) best = s;
         }
         return best;
@@ -160,16 +201,17 @@ public static class MemoryAltarService
 
     /// <summary>
     /// 갈래 진척 — (연 칸, 전체 칸). 베이스캠프 기억 성소의 갈래 수정 밝기 · 제단 갈래 제목.
-    /// <b>드러난 시기의 칸만 센다</b> — 숨은 고리의 칸을 세면 「아직 더 있다」를 숫자가 먼저 말해 버린다(10-02).
+    /// 10-14부터 시기 드러남이 없어 모든 칸을 센다(10-02엔 드러난 시기의 칸만 셌다).
     /// </summary>
     public static (int unlocked, int total) BranchProgress(AltarBranch branch)
     {
+        // 10-14 강화형 — (산 단계 = 갈래 포인트, 드러난 노드의 최대 단계 합)
         int unlocked = 0, total = 0;
         foreach (var node in MemoryAltarCatalog.All)
         {
             if (node.Branch != branch || !MemoryAltarCatalog.IsEraRevealed(node.Era)) continue;
-            total++;
-            if (IsUnlocked(node.Id)) unlocked++;
+            total    += node.MaxLevel;
+            unlocked += Level(node.Id);
         }
         return (unlocked, total);
     }
@@ -189,7 +231,7 @@ public static class MemoryAltarService
         if (data == null) return false;
 
         var state = GetState(node);
-        if (state.Unlocked) return false;
+        if (state.Maxed) return false;
 
         if (state.EraHidden || state.Pending)
         {
@@ -209,7 +251,13 @@ public static class MemoryAltarService
             return false;
         }
 
-        if (!data.TryUnlock(node.Id, state.Cost))
+        if (state.BlockedByPoints)
+        {
+            Debug.Log($"[MemoryAltar] 갈래 포인트 부족: {node.DisplayName} — {state.RequiredPoints} 필요, {state.BranchPoints}");
+            return false;
+        }
+
+        if (!data.TryBuyLevel(node.Id, state.Cost, node.MaxLevel))
         {
             Debug.Log($"[MemoryAltar] 정수 부족: {node.DisplayName} — {state.Cost} 필요, {data.abyssEssence} 보유");
             return false;
@@ -265,6 +313,46 @@ public static class MemoryAltarService
         return refund;
     }
 
+    // ── 10-14 강화형 전환 리셋 (1회성) ─────────────────
+
+    private static UserGameData s_levelsResetFor;   // 이 데이터(로그인 한 번)에 대해 이미 확인했다 — 단계를 읽을 때마다 기록을 다시 읽지 않게
+    private static bool s_levelsResetUnsaved;        // 리셋했는데 아직 저장 안 함 — 제단을 열 때 저장한다(TakeResetPendingSave)
+
+    /// <summary>강화형 전환 리셋을 막 했으면 true를 한 번 돌려준다 — 제단 패널이 저장을 맡는다.</summary>
+    public static bool TakeResetPendingSave()
+    {
+        bool v = s_levelsResetUnsaved;
+        s_levelsResetUnsaved = false;
+        return v;
+    }
+
+    /// <summary>
+    /// 강화형 전환 — 사용자 10-14 「아직 출시 전이니 리셋」. 옛 노드(한 번 사는 칸)에 쓴 정수를 옛 기본가로 돌려주고 산 칸을 비운다.
+    /// 앞선 환급 묶음(10-02 · 10-14 「챕터 4」)을 먼저 끝낸 뒤 비운다 — 비운 뒤엔 그 환급이 산 칸을 못 본다.
+    /// 처음 단계를 읽을 때 한 번(기록 키 가드) — 저장은 그 뒤의 평소 저장(제단 열기 · 런 끝)이 맡는다.
+    /// </summary>
+    /// <returns>돌려준 정수(이번에 리셋했으면). 이미 했거나 데이터가 없으면 0.</returns>
+    public static int EnsureLevelsReset(UserGameData data)
+    {
+        if (data == null || ReferenceEquals(s_levelsResetFor, data)) return 0;
+        s_levelsResetFor = data;
+        if (data.GetRecord(MemoryAltarCatalog.Rec.LevelsReset1014) > 0) return 0;
+
+        // 앞 묶음 환급(각자 정수를 더한다) → 옛 칸 환급 → 비우기
+        int refund = RefundBatch(data, MemoryAltarCatalog.RemovedNodes, MemoryAltarCatalog.Rec.RemovedNodesRefunded)
+                   + RefundBatch(data, MemoryAltarCatalog.RemovedNodes1014, MemoryAltarCatalog.Rec.RemovedNodesRefunded1014);
+        int legacy = 0;
+        foreach (var (id, cost) in MemoryAltarCatalog.LegacyNodes1014)
+            if (data.GetLevel(id) > 0) legacy += cost;
+        data.unlockedIds   = "";
+        data.abyssEssence += legacy;
+        data.SetRecordMax(MemoryAltarCatalog.Rec.LevelsReset1014, 1);
+        s_levelsResetUnsaved = true;
+        refund += legacy;
+        if (refund > 0) Debug.Log($"[MemoryAltar] 강화형 전환 리셋 — 산 칸을 비우고 정수 {refund} 환급");
+        return refund;
+    }
+
     // ── 10-02 재설계로 뺀 노드 환급 (1회성) ──────────────
 
     /// <summary>
@@ -276,16 +364,23 @@ public static class MemoryAltarService
     public static int TryRefundRemovedNodes()
     {
         var data = Data;
-        if (data == null || data.GetRecord(MemoryAltarCatalog.Rec.RemovedNodesRefunded) > 0) return 0;
-
-        int refund = 0;
-        foreach (var (id, cost) in MemoryAltarCatalog.RemovedNodes)
-            if (data.IsUnlocked(id)) refund += cost;
-
-        data.abyssEssence += refund;
-        data.SetRecordMax(MemoryAltarCatalog.Rec.RemovedNodesRefunded, 1);
+        if (data == null) return 0;
+        // 묶음마다 기록 키가 따로다 — 10-02 환급을 이미 받은 세이브도 10-14(「챕터 4 개방」) 몫은 받는다.
+        int refund = RefundBatch(data, MemoryAltarCatalog.RemovedNodes, MemoryAltarCatalog.Rec.RemovedNodesRefunded)
+                   + RefundBatch(data, MemoryAltarCatalog.RemovedNodes1014, MemoryAltarCatalog.Rec.RemovedNodesRefunded1014);
         if (refund > 0)
-            Debug.Log($"[MemoryAltar] 10-02 재설계로 뺀 유물 노드 — 정수 {refund} 환급");
+            Debug.Log($"[MemoryAltar] 카탈로그에서 뺀 노드 — 정수 {refund} 환급");
+        return refund;
+    }
+
+    private static int RefundBatch(UserGameData data, (string id, int refund)[] batch, string recordKey)
+    {
+        if (data.GetRecord(recordKey) > 0) return 0;
+        int refund = 0;
+        foreach (var (id, cost) in batch)
+            if (data.IsUnlocked(id)) refund += cost;
+        data.abyssEssence += refund;
+        data.SetRecordMax(recordKey, 1);
         return refund;
     }
 
@@ -327,10 +422,8 @@ public static class MemoryAltarService
     }
 
     // ── 판 넓히기(09-29 개편 신설) ──
-    /// <summary>룬 보관함 칸 수 — 기본 5, 「룬 보관함 +1」 6, 「+2」 7.</summary>
-    public static int RuneStorageCapacity =>
-        IsUnlocked(MemoryAltarCatalog.RuneStorage2) ? 7 :
-        IsUnlocked(MemoryAltarCatalog.RuneStorage1) ? 6 : 5;
+    /// <summary>룬 보관함 칸 수 — 기본 5 + 「룬 보관함」 단계(최대 7).</summary>
+    public static int RuneStorageCapacity => 5 + Level(MemoryAltarCatalog.RuneStorage1);
 
     /// <summary>정제소가 룬 1개 대신 <b>2장 중 고르기</b>를 주는가.</summary>
     public static bool IsRefinePickUnlocked => IsUnlocked(MemoryAltarCatalog.RefinePick);
@@ -338,25 +431,47 @@ public static class MemoryAltarService
     /// <summary>상점 새로고침이 열렸는가(디자이너 플래그 shopRerollEnabled와 OR).</summary>
     public static bool IsShopRerollUnlocked => IsUnlocked(MemoryAltarCatalog.ShopReroll);
 
+    /// <summary>상점마다 새로고침 횟수 = 「상점 새로고침」 단계(10-14 강화형 · 0이면 없음).</summary>
+    public static int ShopRerollCount => Level(MemoryAltarCatalog.ShopReroll);
+
     /// <summary>베이스캠프 파츠 작업대에서 들고 나가는 시작 파츠 수 — 기본 1, 해금 시 2.</summary>
     public static int StartPartSlots => IsUnlocked(MemoryAltarCatalog.StartParts2) ? 2 : 1;
 
-    /// <summary>새 런 시작 포션 칸 — 기본 3, 해금 시 4.</summary>
-    public static int PotionCapacity => IsUnlocked(MemoryAltarCatalog.PotionSlot) ? 4 : 3;
+    /// <summary>새 런 시작 포션 칸 — 기본 3 + 「포션 칸」 단계(최대 5).</summary>
+    public static int PotionCapacity => 3 + Level(MemoryAltarCatalog.PotionSlot);
+
+    // ── 강화형(10-14) 효과 — 노드 글(<see cref="MemoryAltarNode.ValueText"/>)과 같은 몫을 읽는다 ──
+    /// <summary>최대 체력 배율 몫(+4%/단계) — 제단에 남은 유일한 영구 스탯.</summary>
+    public static float MaxHpPct          => MemoryAltarCatalog.MaxHpPctPerLevel * Level(MemoryAltarCatalog.MaxHpUp);
+    /// <summary>방 보상 룬 등급 가중 더하기(%p) — Rare · Epic(등장 연 뒤) · Legendary(등장 연 뒤).</summary>
+    public static float RareOddsBonus     => MemoryAltarCatalog.RareOddsPerLevel * Level(MemoryAltarCatalog.RuneRareOdds);
+    public static float EpicOddsBonus     => IsEpicUnlocked ? MemoryAltarCatalog.EpicOddsPerLevel * Level(MemoryAltarCatalog.RuneEpicOdds) : 0f;
+    public static float LegendOddsBonus   => IsLegendaryUnlocked ? MemoryAltarCatalog.LegendOddsPerLevel * Level(MemoryAltarCatalog.RuneLegendOdds) : 0f;
+    /// <summary>정제소 Epic 더하기(0 ~ 0.15).</summary>
+    public static float RefineEpicBonus   => MemoryAltarCatalog.RefineEpicPerLevel * Level(MemoryAltarCatalog.RefineQuality);
+    /// <summary>재련 강화 성공률 더하기(0 ~ 0.09).</summary>
+    public static float SmithBonus        => MemoryAltarCatalog.SmithPerLevel * Level(MemoryAltarCatalog.SigilSmith);
+    /// <summary>획득 배율(1 = 그대로) — 원석 · 강화재료 · 골드 · 정수.</summary>
+    public static float OreGainMult       => 1f + MemoryAltarCatalog.OreGainPerLevel * Level(MemoryAltarCatalog.OreGain);
+    public static float EnhanceGainMult   => 1f + MemoryAltarCatalog.EnhanceGainPerLevel * Level(MemoryAltarCatalog.EnhanceGain);
+    public static float GoldGainMult      => 1f + MemoryAltarCatalog.GoldGainPerLevel * Level(MemoryAltarCatalog.GoldGain);
+    public static float EssenceGainMult   => 1f + MemoryAltarCatalog.EssenceGainPerLevel * Level(MemoryAltarCatalog.EssenceGain);
+    /// <summary>상점 할인(0 ~ 0.15).</summary>
+    public static float ShopDiscount      => MemoryAltarCatalog.ShopDiscountPerLevel * Level(MemoryAltarCatalog.SigilMerchant);
+    /// <summary>포션 회복 더하기(최대 체력 비 · 0 ~ 0.12) — 기본 0.40에 더한다.</summary>
+    public static float PotionHealBonus   => MemoryAltarCatalog.PotionHealPerLevel * Level(MemoryAltarCatalog.PotionHeal);
+    /// <summary>심연 깊이 하나당 정수 더하기(0 ~ 0.15).</summary>
+    public static float DepthRewardPerDepth => MemoryAltarCatalog.DepthRewardPerLevel * Level(MemoryAltarCatalog.DepthReward);
 
     /// <summary>
     /// 서약 카드(원인·효과) 개방 단계 0~3. 선으로 이어져 앞 단계 없이 뒤 단계가 열려 있을 수 없지만,
     /// 재정렬 이전 세이브처럼 구멍이 날 수 있어 <b>가장 높은 열린 단계</b>를 그대로 쓴다.
     /// </summary>
-    public static int CovenantPartStep =>
-        IsUnlocked(MemoryAltarCatalog.CovenantParts3) ? 3 :
-        IsUnlocked(MemoryAltarCatalog.CovenantParts2) ? 2 :
-        IsUnlocked(MemoryAltarCatalog.CovenantParts1) ? 1 : 0;
+    public static int CovenantPartStep => Level(MemoryAltarCatalog.CovenantParts1);   // 10-14 강화형 — 「서약 카드」 단계 0 ~ 3
 
     /// <summary>한 런에 맺을 수 있는 서약 수(기본 3, 「서약 칸 +1」 해금 시 4).</summary>
     public static int CovenantSlots => IsUnlocked(MemoryAltarCatalog.CovenantSlot) ? 4 : 3;
 
-    public static bool IsChapter4Unlocked  => IsUnlocked(MemoryAltarCatalog.Chapter4);
     public static bool IsAbyssDepthUnlocked=> IsUnlocked(MemoryAltarCatalog.AbyssDepth);
     public static bool HasRevive           => IsUnlocked(MemoryAltarCatalog.Revive);
 
@@ -368,9 +483,7 @@ public static class MemoryAltarService
 
     /// <summary>기억 카드 등급 띠 단계 0 · 1(선명한 기억) · 2(찬란한 기억). 확률표는 유물 성장 설계 §3.</summary>
     public static int MemoryGradeBand =>
-        !MemoryAltarCatalog.MemoryNodesLive ? 0 :
-        IsUnlocked(MemoryAltarCatalog.MemRadiant) ? 2 :
-        IsUnlocked(MemoryAltarCatalog.MemClear)   ? 1 : 0;
+        !MemoryAltarCatalog.MemoryNodesLive ? 0 : Mathf.Clamp(Level(MemoryAltarCatalog.MemClear), 0, 2);   // 10-14 강화형 — 「기억 카드 등급」 2단계
 
     /// <summary>
     /// 재련소 승급에서 고를 수 있는 전설 후보 수. 기본 <b>1</b>, 「전설 3종 개방」 시 전부.

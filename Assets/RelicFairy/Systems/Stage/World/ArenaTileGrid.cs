@@ -190,10 +190,11 @@ public class ArenaTileGrid : MonoBehaviour
     /// <summary>
     /// 링 하나를 통째로 무너뜨린다. 코어 링은 무시. 실제로 무너뜨린 칸 수를 돌려준다.
     /// <paramref name="ignoreCap"/>는 연출 전용(리치 붕괴 컷신·최후의 원) — 플레이어를 코어에 둔 채로만 쓴다.
+    /// <paramref name="includeCore"/>는 리치 추방 컷신 전용(10-11) — 코어까지 무너뜨려 플레이어를 떨어뜨린다(전투가 끝난 뒤에만).
     /// </summary>
-    public int CollapseRing(int ring, float warnSeconds = -1f, bool ignoreCap = false)
+    public int CollapseRing(int ring, float warnSeconds = -1f, bool ignoreCap = false, bool includeCore = false)
     {
-        if (ring <= permanentRingMax) return 0;
+        if (ring <= permanentRingMax && !includeCore) return 0;
 
         _buffer.Clear();
         foreach (var cell in _cells.Values)

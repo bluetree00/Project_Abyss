@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: enhance_6
   m_EditorClassIdentifier: Assembly-CSharp::Achievement
   category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 5c6dfd8bf7206704abc2d019da0da510, type: 3}
   codeName: enhance_6
   displayName: "\uBCBC\uB824\uB0B8 \uAC83"
   description: "\uBB34\uAE30 +6 \uB3C4\uB2EC"

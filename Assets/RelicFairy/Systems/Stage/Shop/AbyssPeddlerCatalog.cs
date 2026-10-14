@@ -142,7 +142,8 @@ public static class AbyssPeddlerCatalog
     public const int DrawCount    = 7;
     public const int ProductCount = DrawCount - 1;   // 정규 진열 6칸
     private const int BuffRunDuration = 99;          // 상점 버프 = 사실상 런 유지("유지")
-    private const int PotionHealPercent = 40;        // 표시용 — GameRunSession.PotionHealRatio(0.40)와 같게
+    // 표시용 — GameRunSession.PotionHealRatio(0.40) + 제단 「포션 회복량」(10-14)과 같게
+    private static int PotionHealPercent => Mathf.RoundToInt((0.40f + MemoryAltarService.PotionHealBonus) * 100f);
     private const float SpecialDiscount = 0.5f;      // 특가 50% 할인
 
     public sealed class Result
@@ -201,9 +202,10 @@ public static class AbyssPeddlerCatalog
     /// </summary>
     public static class MerchantSigil
     {
-        public const float Discount = 0.15f;
+        /// <summary>10-14 강화형 — 「상점 가격」 단계마다 -5%(3단계 -15%).</summary>
+        public static float Discount => MemoryAltarService.ShopDiscount;
 
-        public static bool Active => MemoryAltarService.IsUnlocked(MemoryAltarCatalog.SigilMerchant);
+        public static bool Active => Discount > 0f;
 
         public static int Apply(int price)
             => Active ? Mathf.Max(1, Mathf.RoundToInt(price * (1f - Discount))) : price;
@@ -278,8 +280,10 @@ public static class AbyssPeddlerCatalog
         // 진열 룬은 등급이 정해진 채로 고르므로 후보에서 뺀다 — 안 그러면 320골드짜리 전설 룬이
         // 제단의 「영웅·전설 룬 등장」(수천 정수)을 건너뛴다.
         var maxRarity = MemoryAltarService.MaxRuneRarity;
+        var peddlerInv = GameRunBootstrapper.Instance?.Run?.ItemInventory;   // 이미 가진 룬(상한 1)은 진열하지 않는다(10-09 출시 점검)
         var runeIds = all.Where(kv => kv.Value != null && kv.Value.Count > 0 && kv.Value[0].shape_id > 0
-                                      && ParseRarity(kv.Value[0].ResolvedRarity) <= maxRarity)
+                                      && ParseRarity(kv.Value[0].ResolvedRarity) <= maxRarity
+                                      && (peddlerInv == null || !peddlerInv.IsAtMaxStack(kv.Key)))
                          .Select(kv => kv.Key).ToList();
         if (runeIds.Count == 0) return null;
 
@@ -361,7 +365,7 @@ public static class AbyssPeddlerCatalog
         int amt = 6 + rng.Next(0, 4);   // 6~9
         return new ShopProduct(ShopProductCategory.Material, $"원석 x{amt}",
             "정제소 룬 재련 연료", "적용  원석 은행에 적립",
-            10 * amt, ItemRarity.Common, EffectIconRegistry.GetSprite(IconMaterial),
+            10 * amt, ItemRarity.Common, EffectIconRegistry.GetSprite(IconOre),
             s => { s?.FuelBank?.Add(FuelKind.RuneOre, amt); return s?.FuelBank != null; });
     }
 
@@ -370,7 +374,8 @@ public static class AbyssPeddlerCatalog
     // 상점 전용 키를 쓰는 이유: heal/atk 같은 기존 어휘에 얹으면 HUD 버프칸 아이콘까지 같이 바뀐다.
     // 미등록 키는 조용히 색 토큰 플레이스홀더로 떨어진다(룬이 현재 그렇다 — 아트 재납품 예정).
     private const string IconPotion   = "shop_potion";     // 체력 물약 (확정 아트)
-    private const string IconMaterial = "shop_material";   // 무기강화 재료 (임시 아트 — 원석과 공용)
+    private const string IconMaterial = "shop_material";   // 무기강화 재료 (임시 아트)
+    private const string IconOre      = "shop_ore";        // 원석 — HUD 재화 아이콘_원석과 같은 얼굴(10-13)
     private const string IconBuff     = "shop_buff";       // 생명가호 (임시 아트 — 버프 전종 공용)
     private const string IconRune     = "shop_rune";       // 미납품 → 플레이스홀더
 

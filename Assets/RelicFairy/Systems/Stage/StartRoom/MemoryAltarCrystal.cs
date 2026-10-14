@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -126,13 +126,20 @@ public sealed class MemoryAltarCrystal : MonoBehaviour
         {
             SetColor(_core, idleColor * 0.6f, idleColor * 0.9f);
             if (_light != null) { _light.color = idleColor; _light.intensity = _lightMax * 0.6f; }
-            BaseCampParticles.Retint(_motes, idleColor, 1.5f);
+            BaseCampParticles.Retint(_motes, idleColor, 0f);   // 열 것이 없으면 입자 0 — 아무 일 없는 상태가 가장 조용하게(10-11 톤 2차 V-13)
         }
         else
         {
             if (_light != null) _light.color = readyColor;
             BaseCampParticles.Retint(_motes, readyColor, 9f);
         }
+    }
+
+    /// <summary>슬롯 초기화(새 게임 · 삭제) — 「지난번 열 수 있던 수」 기록도 지운다(10-09 출시 점검: 새 슬롯에 남아 첫 한 줄이 안 나왔다).</summary>
+    public static void ClearForSlot(int slot)
+    {
+        PlayerPrefs.DeleteKey(AffordableKey + slot);
+        PlayerPrefs.Save();
     }
 
     /// <summary>복귀 판 — 열 수 있는 수가 지난번보다 늘었으면 멀린 한 줄. 첫 판 온보딩 중에는 말하지 않는다.</summary>

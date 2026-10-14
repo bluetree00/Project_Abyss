@@ -65,6 +65,9 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
     private const string KnightSwing = "Attack2";
     private const int    Sides       = 4;
     private const float  GuideLinger = 0.15f;
+    private const float  SquareY     = 0.15f;   // 판정 칸 사각 — 원 예고(0.2) 아래 · 바닥 잔해(≈0.1) 위(10-08 점검)
+    private const float  SquareAlpha = 0.35f;
+    private static readonly Color ArmedSquare = new Color(1f, 0.1f, 0.1f, 0.5f);   // 굳은 판정 색(PatternGuideHelper.Active)
 
     // 한 번의 베기(0~3 = 네 이웃 칸, 4 = 가운데)
     private struct Cut
@@ -75,6 +78,9 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
         public bool          Shown, Locked, Swung, Fired;
         public GameObject    Guide;
         public float         KillAt;
+        public GameObject    Square;      // 판정 칸 그대로의 사각(10-08 점검)
+        public MeshRenderer  SquareMr;
+        public Material      SquareMat;
     }
 
     private readonly Cut[]            _cuts        = new Cut[Sides + 1];
@@ -140,8 +146,11 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
             {
                 cut.Shown = true;
                 Color c = SwordTint(_sword);   // 예고는 검 색 — 「같은 색이 벤다」
+                // 판정은 칸 전체(2 m 사각)다 — 예전 원(반지름 1.1)은 칸 모서리를 못 덮고 이웃 칸으로 0.1 m 삐져나갔다.
+                // 사각 = 판정 칸 그대로, 원은 그 안에서 차오르는 박자만 보인다(10-08 점검)
                 cut.Guide = PatternGuideHelper.Prepare(
-                    PatternGuideHelper.Disc(_zone.CellCenter(cut.Cell), DKBossRoomContext.CellSize * 0.55f, c), c);
+                    PatternGuideHelper.Disc(_zone.CellCenter(cut.Cell), DKBossRoomContext.CellSize * 0.5f, c), c);
+                ShowSquare(ref cut, new Color(c.r, c.g, c.b, SquareAlpha));
             }
             if (cut.Shown && !cut.Locked)
             {
@@ -151,6 +160,7 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
                 {
                     cut.Locked = true;
                     PatternGuideHelper.Arm(cut.Guide);
+                    if (cut.SquareMat != null) cut.SquareMat.color = ArmedSquare;   // 사각도 원과 같이 판정 색으로 굳는다
                 }
             }
             if (!cut.Swung && _timer >= cut.HitTime - Data.swingLead)
@@ -159,7 +169,11 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
                 Swing(ctx, i);
             }
             if (!cut.Fired && _timer >= cut.HitTime) Fire(ctx, ref cut, i == Sides);
-            if (cut.Fired && cut.Guide != null && _timer >= cut.KillAt) PatternGuideHelper.SafeDestroy(ref cut.Guide);
+            if (cut.Fired && _timer >= cut.KillAt)
+            {
+                PatternGuideHelper.SafeDestroy(ref cut.Guide);
+                HideSquare(ref cut);
+            }
         }
 
         if (_timer >= _endTime)
@@ -168,7 +182,11 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
 
     public override void Exit(MonsterContext ctx)
     {
-        for (int i = 0; i < _cuts.Length; i++) PatternGuideHelper.SafeDestroy(ref _cuts[i].Guide);
+        for (int i = 0; i < _cuts.Length; i++)
+        {
+            PatternGuideHelper.SafeDestroy(ref _cuts[i].Guide);
+            HideSquare(ref _cuts[i]);
+        }
         for (int k = 0; k < Sides; k++) DismissPhantom(k);
         DKPage2Zone.RestoreAgent(ctx);
     }
@@ -230,6 +248,28 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
             BossImpactFeedback.TriggerCameraShake(0.12f, 0.25f);
             for (int k = 0; k < Sides; k++) DismissPhantom(k);   // 마지막 베기 뒤 흩어진다
         }
+    }
+
+    /// <summary>판정 칸 그대로의 사각을 깐다 — 판정(<see cref="DKPage2Zone.TryPlayerCell"/> == 칸)과 같은 넓이(10-08 점검).</summary>
+    private void ShowSquare(ref Cut cut, Color color)
+    {
+        var (go, mr, mat) = QuadTilePool.Rent();
+        go.name = "DK_TreasonCell";
+        go.transform.SetPositionAndRotation(_zone.CellCenter(cut.Cell) + Vector3.up * SquareY, Quaternion.Euler(90f, 0f, 0f));
+        go.transform.localScale = Vector3.one * DKBossRoomContext.CellSize;
+        mat.color     = color;
+        cut.Square    = go;
+        cut.SquareMr  = mr;
+        cut.SquareMat = mat;
+    }
+
+    private static void HideSquare(ref Cut cut)
+    {
+        if (cut.Square == null) return;
+        QuadTilePool.Return(cut.Square, cut.SquareMr, cut.SquareMat);
+        cut.Square    = null;
+        cut.SquareMr  = null;
+        cut.SquareMat = null;
     }
 
     // ── 환영 ───────────────────────────────────────────────

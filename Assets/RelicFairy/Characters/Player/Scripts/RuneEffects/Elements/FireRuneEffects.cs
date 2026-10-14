@@ -36,11 +36,14 @@ public sealed class FireEmberEffect : FireRuneEffectBase
 /// <summary>
 /// 2단계 점화 — 잔불 N회(value3=5)마다 적중 대상에 점화 DoT 부여.
 /// 점화 = 지속(duration=3)초간 초당 공격력 16%(value) × 3틱(max_stack). ST DoT 사용.
-/// 작열(4단계) 활성 시, 점화 만료 콜백으로 광역 폭발을 예약한다.
+/// 작열(4단계) 활성 시, 같은 적에게 점화가 <see cref="ScorchAt"/>번 쌓이면 그 자리에서 광역 폭발한다(10-14 A3).
+/// 예전엔 점화 「만료」에 터졌는데 연타할수록 점화가 갱신돼 만료가 늦어졌다 — 많이 칠수록 늦게 터지는 역효과.
 /// </summary>
 public sealed class FireIgniteEffect : FireRuneEffectBase
 {
+    private const int ScorchAt = 3;
     private int _emberCount;
+    private readonly Dictionary<int, int> _igniteCount = new();   // 적별 점화 횟수(작열까지)
 
     public override void OnHit(in HitInfo hit, PlayerController player)
     {
@@ -58,20 +61,17 @@ public sealed class FireIgniteEffect : FireRuneEffectBase
         float dur      = Entry.duration > 0f ? Entry.duration : 3f;
         float interval = dur / tickCount;                               // 3/3 = 1초
 
-        // 4단계 작열 활성 시 만료 폭발 예약 (누적형 — 작열 활성이면 점화도 활성)
-        Action onExpire = null;
-        var disp = player.RuneEffects;
-        if (disp != null && disp.IsActive("FireScorch"))
-        {
-            float scorchMul = disp.GetActive("FireScorch")?.Entry?.value ?? 1.5f;
-            float boom      = scorchMul * atk;                          // 공150% 광역
-            var   targetGo  = mb.gameObject;
-            Vector3 snapPos = mb.transform.position;
-            var   instigator = player.gameObject;
-            onExpire = () => FireScorchEffect.Explode(targetGo, snapPos, boom, instigator);
-        }
+        mb.Status.ApplyDot(IGNITE_ID, perTick, interval, tickCount, player.gameObject, 1f);
 
-        mb.Status.ApplyDot(IGNITE_ID, perTick, interval, tickCount, player.gameObject, 1f, onExpire);
+        // 4단계 작열 — 같은 적에게 점화가 세 번 쌓이면 지금 터진다(누적형 — 작열 활성이면 점화도 활성)
+        var disp = player.RuneEffects;
+        if (disp == null || !disp.IsActive("FireScorch")) return;
+        int id = mb.GetInstanceID();
+        _igniteCount.TryGetValue(id, out int n);
+        if (++n < ScorchAt) { _igniteCount[id] = n; return; }
+        _igniteCount.Remove(id);
+        float scorchMul = disp.GetActive("FireScorch")?.Entry?.value ?? 1.5f;
+        FireScorchEffect.Explode(mb.gameObject, mb.transform.position, scorchMul * atk, player.gameObject);   // 공150% 광역
     }
 }
 
@@ -93,8 +93,8 @@ public sealed class FireBlazeEffect : FireRuneEffectBase
 }
 
 /// <summary>
-/// 4단계 작열 — 점화 "만료" 시 공격력 150% 광역 폭발(+남은 DoT 합산).
-/// 본 효과는 마커(IsActive/Entry 제공)이고, 실제 폭발은 점화(2단계)의 만료 콜백이 Explode를 호출한다.
+/// 4단계 작열 — 같은 적에 점화가 세 번 쌓이면 공격력 150% 광역 폭발(10-14 A3 — 예전 「만료 시」).
+/// 본 효과는 마커(IsActive/Entry 제공)이고, 실제 폭발은 점화(2단계)가 Explode를 호출한다.
 /// value=폭발 배율(1.5).
 /// </summary>
 public sealed class FireScorchEffect : FireRuneEffectBase

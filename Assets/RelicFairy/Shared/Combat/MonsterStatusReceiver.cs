@@ -33,6 +33,7 @@ namespace RelicFairy.Monster
             public float      defenseIgnore;
             public Action     onExpire;
             public Action     onTick;        // 틱마다(피해 직후) 발화 — 풀 독피해 회복 등.
+            public int        stacks = 1;    // 중첩형(독 · 10-14 A3) — 틱 피해 = 중첩당 × 중첩 수
         }
 
         private readonly Dictionary<string, CcSlot>     _cc        = new();
@@ -139,10 +140,57 @@ namespace RelicFairy.Monster
             d.defenseIgnore  = defenseIgnore;
             d.onExpire       = onExpire;
             d.onTick         = onTick;
+            d.stacks         = 1;
             d.remainingTicks = Mathf.Max(d.remainingTicks, tickCount);   // top-up(보존 타이머)
             d.totalTicks     = Mathf.Max(d.totalTicks, d.remainingTicks); // 게이지 기준
             GuidelineVisual.StatusApplied(OwnerTf, id, tickInterval * d.remainingTicks);
         }
+
+        /// <summary>
+        /// 중첩형 지속피해(독 · 10-14 빌드 시너지 A3) — 걸 때마다 중첩 +1(최대 <paramref name="maxStacks"/>) · 틱 피해 = 중첩당 × 중첩 수 · 잔여 틱은 다시 채운다.
+        /// 연타 무기가 빨리 쌓아 키우는 축이다(PoE · Dead Cells의 독). 진행 중 타이머는 보존한다(연타 preempt 방지 — ApplyDot과 같은 규칙).
+        /// </summary>
+        public void ApplyStackingDot(string id, float damagePerStack, float tickInterval, int tickCount, int maxStacks, GameObject instigator)
+        {
+            if (string.IsNullOrEmpty(id) || damagePerStack <= 0f || tickInterval <= 0f || tickCount <= 0) return;
+            bool isNew = !_dot.TryGetValue(id, out var d) || d.remainingTicks <= 0;
+            if (d == null) { d = new DotSlot(); _dot[id] = d; }
+            if (isNew) { d.timer = tickInterval; d.stacks = 0; d.totalTicks = 0; }
+            d.stacks         = Mathf.Clamp(d.stacks + 1, 1, Mathf.Max(1, maxStacks));
+            d.damagePerTick  = damagePerStack * d.stacks;
+            d.interval       = tickInterval;
+            d.instigator     = instigator;
+            d.defenseIgnore  = 1f;
+            d.onExpire       = null;
+            d.onTick         = null;
+            d.remainingTicks = tickCount;
+            d.totalTicks     = tickCount;
+            GuidelineVisual.StatusApplied(OwnerTf, id, tickInterval * tickCount);
+        }
+
+        /// <summary>
+        /// 가장 센 1개 지속피해(화상 · 10-14 A3) — 새로 걸리는 틱 피해가 지금보다 세면 갈아 끼우고(잔여 틱 처음부터), 약하면 무시한다.
+        /// 「그 타격 피해의 비율」로 세기가 정해져 큰 한 방이 화상을 키운다(PoE의 점화 규칙).
+        /// </summary>
+        public void ApplyStrongestDot(string id, float damagePerTick, float tickInterval, int tickCount, GameObject instigator)
+        {
+            if (string.IsNullOrEmpty(id) || damagePerTick <= 0f || tickInterval <= 0f || tickCount <= 0) return;
+            if (_dot.TryGetValue(id, out var cur) && cur.remainingTicks > 0 && cur.damagePerTick > damagePerTick) return;
+            if (cur == null) { cur = new DotSlot(); _dot[id] = cur; cur.timer = tickInterval; }
+            cur.damagePerTick  = damagePerTick;
+            cur.interval       = tickInterval;
+            cur.instigator     = instigator;
+            cur.defenseIgnore  = 1f;
+            cur.onExpire       = null;
+            cur.onTick         = null;
+            cur.stacks         = 1;
+            cur.remainingTicks = tickCount;
+            cur.totalTicks     = tickCount;
+            GuidelineVisual.StatusApplied(OwnerTf, id, tickInterval * tickCount);
+        }
+
+        /// <summary>지금 중첩 수(없으면 0).</summary>
+        public int GetDotStacks(string id) => _dot.TryGetValue(id, out var d) && d.remainingTicks > 0 ? d.stacks : 0;
 
         /// <summary>적 공격 디버프(공격속도 배율 감소 → 공격력 근사). magnitude=0.2 → 공격속도 -20%. 같은 id 갱신.</summary>
         public void ApplyAttackSlow(string id, float magnitudePct, float duration)
@@ -228,7 +276,7 @@ namespace RelicFairy.Monster
                 var d = kv.Value;
                 if (d.remainingTicks <= 0) continue;
                 float left = d.remainingTicks * d.interval;
-                into.Add(MakeItem(kv.Key, 1, (float)d.remainingTicks / Mathf.Max(1, d.totalTicks), left));
+                into.Add(MakeItem(kv.Key, Mathf.Max(1, d.stacks), (float)d.remainingTicks / Mathf.Max(1, d.totalTicks), left));
             }
         }
 

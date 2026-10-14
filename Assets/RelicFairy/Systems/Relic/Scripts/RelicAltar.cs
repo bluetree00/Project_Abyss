@@ -13,6 +13,7 @@ using UnityEngine;
 public class RelicAltar : MonoBehaviour
 {
     private const float PromptOffsetY = 1.8f;
+    private const float AltarOutSeconds = 0.6f;   // 고른 제단이 툭 꺼지지 않게(10-12 디졸브 ②)
 
     // 현재 선택된 유물 제단(단 하나). 다른 제단 선택 시 이전 것을 복귀시키기 위한 공유 상태.
     private static RelicAltar s_selected;
@@ -46,6 +47,9 @@ public class RelicAltar : MonoBehaviour
     private void Start()
     {
         _camTransform = Camera.main != null ? Camera.main.transform : null;
+        // 유물 표현 이펙트(Vefects 아이템 기둥 — 가웨인 금 · 랜슬롯 보라)는 끈다: 런의 보상 등급 기둥과 같은 자원이라
+        // 「가웨인 = 전설 · 랜슬롯 = 에픽」으로 읽혔다(10-11 이펙트 톤 2차 V-13). 제단 광원 · 석상 · 이름표가 유물 자리를 말한다.
+        if (relicVfx != null) relicVfx.SetActive(false);
         CreateWorldText();
         CreatePrompt();
         BaseCampLabelRule.Register(transform);   // 이름표는 가까이 간 곳 하나만(2차 개편 09-29)
@@ -142,7 +146,8 @@ public class RelicAltar : MonoBehaviour
         _player = null;
         ShowPrompt(false);
         if (relicVfx != null) relicVfx.SetActive(false);   // 유물 표현 이펙트도 함께 숨김
-        gameObject.SetActive(false);
+        // 디졸브로 사라진 뒤 끈다 — 끄면 원본 재질로 돌아간다(84 공용 수정). 그새 다시 열리면(Deselect) 등장이 되돌린다
+        DissolveEffect.PlayDisappear(gameObject, AltarOutSeconds, () => { if (this != null && _claimed) gameObject.SetActive(false); });
     }
 
     /// <summary>선택 해제 — 제단을 디졸브로 다시 등장시켜 재선택 가능하게 한다.</summary>
@@ -151,7 +156,7 @@ public class RelicAltar : MonoBehaviour
         _claimed = false;
         _player = null;
         ShowPrompt(false);
-        if (relicVfx != null) relicVfx.SetActive(true);    // 복귀 시 유물 표현 이펙트 재등장
+        // 유물 표현 이펙트(Vefects 아이템 기둥)는 다시 켜지 않는다 — Start에서 끈 채 둔다(10-11 톤 2차 V-13)
         DissolveEffect.PlayAppear(gameObject, 0.5f);
     }
 

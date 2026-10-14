@@ -116,6 +116,14 @@ public sealed class CovenantSentence : CovenantBase, ICovenantClauseHost
     public CovenantTier ResultTier(int i)  => _specs[i].tier;
     public ClauseLink ResultLink(int i)    => _specs[i].link;
 
+    /// <summary>원인 진척(HUD) — <see cref="CovenantCauseTracker.Progress"/>.</summary>
+    public (CovenantProgressKind kind, int cur, int max, float seconds) CauseProgress
+        => _tracker != null ? _tracker.Progress : (CovenantProgressKind.None, 0, 0, 0f);
+
+    /// <summary>절 <paramref name="i"/>의 내부 쿨다운이 남은 초(0 = 바로 일어날 수 있다) — HUD 표식이 어두워진다.</summary>
+    public float ResultCooldownLeft(int i)
+        => i >= 0 && i < _clauses.Count ? Mathf.Max(0f, _clauses[i].IcdEnd - Time.time) : 0f;
+
     /// <summary>문장 안에서 <paramref name="status"/> 계열을 <b>거는</b> 결과가 있는가(소모형 페어링 · 빌드 계열).</summary>
     public bool Applies(StatusCurrency status)
     {
@@ -292,6 +300,7 @@ public sealed class CovenantSentence : CovenantBase, ICovenantClauseHost
         if (Ctx == null) return;
         if (Time.time - _lastChainStart < ChainMinInterval) return;
         _lastChainStart = Time.time;
+        Ctx.Session?.RunStats?.ReportCovenantFire();   // 결과창 「발동 N회」 — 연쇄가 시작된 횟수
         int serial = ++_serial;
         _chainCounts[serial] = new int[_specs.Count];
         PruneChainCounts();
@@ -308,6 +317,7 @@ public sealed class CovenantSentence : CovenantBase, ICovenantClauseHost
         _inChain = true;
         try
         {
+            using var covenantScope = DamageSourceScope.Enter(DamageSource.Covenant);   // 결과창 피해 비중 — 연쇄 안 피해는 서약
             RunCore(p);
             int guard = 0;
             while (_pending.Count > 0 && guard++ < 64) RunCore(_pending.Dequeue());

@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using System.Collections.Generic;
 using System.Threading;
 using TMPro;
@@ -14,7 +14,7 @@ using UnityEngine.UI;
 /// ■ GridManager.OnItemPlaced/Removed ↔ RunItemInventory.PlaceItem/UnplaceItem 브리지.
 /// ■ [초기화] 버튼: 배치 전체 초기화. [완료] 버튼: 잔여 아이템 경고 후 닫힘.
 /// </summary>
-public sealed class UI_GridPanel : UI_Base
+public sealed partial class UI_GridPanel : UI_Base
 {
     // ── Static ──
     public static UI_GridPanel Instance { get; private set; }
@@ -22,7 +22,9 @@ public sealed class UI_GridPanel : UI_Base
     /// <summary>드래그 놓기가 거절된 이유를 토스트로 알린다(Shape.OnEndDrag). 룬판이 없으면 아무 일도 없다.</summary>
     public static void NotifyDropRejected(string reason)
     {
-        if (Instance != null && !string.IsNullOrEmpty(reason)) Instance.ShowToast(reason, warn: true);
+        if (Instance == null || string.IsNullOrEmpty(reason)) return;
+        Instance.ShowToast(reason, warn: true);
+        if (reason.StartsWith(RuneBlockBudget.FullPrefix)) Instance._synergyStatusView?.FlashBlockFull();   // 블록 수가 붉게 깜빡
     }
 
     // ── Properties ──
@@ -62,6 +64,7 @@ public sealed class UI_GridPanel : UI_Base
     // 센터: 상단 그리드 / 하단 존 시너지
     private RectTransform _hexGridRoot;
     private RectTransform _synergyStatusRoot;
+    private RectTransform _effectsRoot;   // 톤 v2 왼쪽 열 맨 아래 — 활성 효과(캐릭터 정보에서 떼어 옴, 10-10)
 
     // 우측: 상단 스테이징(스크롤) / 하단 아이템정보 + 배치버튼
     private RectTransform _itemInfoRoot;
@@ -93,6 +96,9 @@ public sealed class UI_GridPanel : UI_Base
 
     // ── Private: 룬 선택 규격 크롬(09-25) ──
     private const float HeaderH      = 80f;    // 제목 띠(룬 선택 팝업과 같은 아트)
+    // 톤 v2 왼쪽 열 경계(아래에서 비율, 10-10) — 위 캐릭터 정보 · 가운데 속성 시너지 · 아래 활성 효과
+    private const float LeftInfoBottom = 0.672f;
+    private const float LeftEffectsTop = 0.212f;
     private const float ActionAreaH  = 190f;   // 오른쪽 아래 안내 두 줄 + [분해] + [초기화][완료]
     private const float OpenSlideDur = 0.28f;
     private Image    _headerBandImg;
@@ -281,12 +287,14 @@ public sealed class UI_GridPanel : UI_Base
 
     private void OpenPanel()
     {
+        if (!_isOpen) Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);
         _isOpen = true;
         _closeFadeCts?.Cancel();   // 닫히는 페이드 중에 다시 열면 끄지 않는다
         TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
         gameObject.SetActive(true);
         BringToFront();
         EnsureChromeSkin();
+        if (ThinGrid) ApplyThinChrome();   // 톤 v2(10-08) — 스킨 뒤에 한 번
         FadeInAsync().Forget();
 
         var run   = GameRunBootstrapper.Instance?.Run;
@@ -466,7 +474,8 @@ public sealed class UI_GridPanel : UI_Base
 
         // 제목 — 이 화면의 이름과 할 일을 한 줄로
         var titleGO = MakeTxt(headerGO.transform, "Title",
-            "<b>룬판</b>   <size=22><color=#C9D0E4>보관함의 룬을 판에 놓으세요</color></size>", 32f,
+            ThinGrid ? "룬판   <size=22><color=#C9D0E4>보관함의 룬을 판에 놓으세요</color></size>"   // 톤 v2 — 굵게 없음
+                     : "<b>룬판</b>   <size=22><color=#C9D0E4>보관함의 룬을 판에 놓으세요</color></size>", 32f,
             new Color(0.97f, 0.94f, 0.85f, 1f));
         var titleRT = titleGO.GetComponent<RectTransform>();
         titleRT.anchorMin        = new Vector2(0f, 0f);
@@ -513,22 +522,35 @@ public sealed class UI_GridPanel : UI_Base
         _leftPanelRT.offsetMin = _leftPanelRT.offsetMax = Vector2.zero;
 
         // 의뢰서 F2: 좌 = 캐릭터 정보(초상·HP·2×3 스탯·활성 효과) 위, 속성 시너지 아래.
+        // 톤 v2(10-08): 속성 시너지가 맨 위였다 → 10-10 사용자 「시너지가 오히려 너무 높아졌다 — 맨 위 정보 · 가운데 시너지 · 아래 총합 구성」:
+        // 위 = 캐릭터 정보(머리 · HP · 스탯) · 가운데 = 속성 시너지 · 아래 = 활성 효과(캐릭터 정보에서 떼어 옴). 높이는 예전 그대로 33 · 46 · 21%.
         _charInfoView = CharacterInfoPanelView.Create(go.transform);
         // 「활성 효과」 머리띠 오른쪽 — 이번 런 발동 계열 각인(09-29 빌드 컨셉).
         var effHdr = ShopUIStyle.FindDeep(_charInfoView.transform, "EffectsHdr");
         if (effHdr != null && effHdr.GetComponent<BuildImprintStrip>() == null) effHdr.gameObject.AddComponent<BuildImprintStrip>();
         var charRT = (RectTransform)_charInfoView.transform;
-        charRT.anchorMin = new Vector2(0f, 0.46f);
-        charRT.anchorMax = new Vector2(1f, 1f);
+        if (ThinGrid)
+        {
+            var effGO = Go("EffectsRoot");
+            effGO.transform.SetParent(go.transform, false);
+            _effectsRoot = effGO.GetComponent<RectTransform>();
+            _effectsRoot.anchorMin = Vector2.zero;
+            _effectsRoot.anchorMax = new Vector2(1f, LeftEffectsTop);
+            _effectsRoot.offsetMin = _effectsRoot.offsetMax = Vector2.zero;
+            _charInfoView.DetachEffects(_effectsRoot);
+        }
+        charRT.anchorMin = new Vector2(0f, ThinGrid ? LeftInfoBottom : 0.46f);
+        charRT.anchorMax = Vector2.one;
         charRT.offsetMin = charRT.offsetMax = Vector2.zero;
         var synGO = Go("SynergyStatusRoot");
         synGO.transform.SetParent(go.transform, false);
         _synergyStatusRoot = synGO.GetComponent<RectTransform>();
-        _synergyStatusRoot.anchorMin = Vector2.zero;
-        _synergyStatusRoot.anchorMax = new Vector2(1f, 0.46f);
+        _synergyStatusRoot.anchorMin = ThinGrid ? new Vector2(0f, LeftEffectsTop) : Vector2.zero;
+        _synergyStatusRoot.anchorMax = new Vector2(1f, ThinGrid ? LeftInfoBottom : 0.46f);
         _synergyStatusRoot.offsetMin = _synergyStatusRoot.offsetMax = Vector2.zero;
         _synergyStatusView = synGO.AddComponent<MerlinRuneSynergyStatusView>();
         _synergyStatusView.SetSkin(_synergyBgSprite, _synergyBorderSprite);   // 시너지 바탕/테두리
+        if (ThinGrid) _synergyStatusView.SetThin();                           // 줄 판 · 테 없이 · 머리띠 = 블록 수
         _leftRest = _leftPanelRT.anchoredPosition;
     }
 
@@ -672,22 +694,12 @@ public sealed class UI_GridPanel : UI_Base
         vlg.childForceExpandHeight = false;
         Inject("effectListRoot", fxRT);
 
-        // 모양(왼쪽 아래) + 놓을 자리(오른쪽 아래) — 모양이 "놓을 수 있는가"의 근거라 같은 줄에 둔다
+        // 모양(왼쪽 아래). 「놓을 자리」 배지는 10-08에 뺐다 — 블록 수는 속성 시너지 머리띠(RuneBlockBudget).
         var shapeGO = Go("ShapePreview");
         shapeGO.transform.SetParent(cardRT, false);
         var shapeRT = shapeGO.GetComponent<RectTransform>();
         ShopUIStyle.Anchor(shapeRT, Vector2.zero, Vector2.zero, Vector2.zero, new Vector2(24f, 24f), new Vector2(170f, 110f));
         Inject("shapePreviewRoot", shapeRT);
-
-        var fitFill = ShopUIStyle.MakeFrame(cardRT, "FitBadge", Color.clear, Color.clear, 1.5f);
-        var fitRT = (RectTransform)fitFill.transform.parent;
-        ShopUIStyle.Anchor(fitRT, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-24f, 40f), new Vector2(190f, 34f));
-        var fitLbl = ShopUIStyle.MakeText(fitFill.transform, "Label", 17f, FontStyles.Bold, TextAlignmentOptions.Center, Color.white);
-        fitLbl.enableAutoSizing = false;
-        ShopUIStyle.Stretch(fitLbl.rectTransform);
-        Inject("fitBorder", fitRT.GetComponent<Image>());
-        Inject("fitFill", fitFill);
-        Inject("fitLabel", fitLbl);
 
         // NEW — 카드 위 끝에 걸터앉는 금빛 칩(16px). 예전 10px 빨강 글자는 읽히지 않았다.
         var newGO = Go("NewBadge");
@@ -756,13 +768,13 @@ public sealed class UI_GridPanel : UI_Base
 
         // 안내 두 줄 — 예전 「가짜 버튼」 자리. 배치는 드래그·칸 누르기로만 일어나므로 버튼이 아니라 문장이다.
         var hintGO = MakeTxt(infoRootGO.transform, "PlaceHint",
-            "카드를 끌어 놓거나, 골라서 칸을 누른다\n놓인 룬은 판 밖으로 끌면 보관함으로", 17f,
+            "카드를 끌어 놓거나, 골라서 칸을 누른다\n놓인 룬은 판 밖으로 끌면 보관함으로", 17f,   // 10-11 v2 보조 17(톤 v2 15는 하한 아래) — 두 줄 50px가 카드 영역(위 190) 아래에 든다
             new Color(0.74f, 0.79f, 0.90f, 0.95f));
         var hintRT = hintGO.GetComponent<RectTransform>();
         hintRT.anchorMin        = new Vector2(0f, 0f);
         hintRT.anchorMax        = new Vector2(1f, 0f);
         hintRT.pivot            = new Vector2(0.5f, 0f);
-        hintRT.sizeDelta        = new Vector2(0f, 48f);
+        hintRT.sizeDelta        = new Vector2(0f, 50f);
         hintRT.anchoredPosition = new Vector2(0f, 132f);
         var hintTxt = hintGO.GetComponent<TMP_Text>();
         hintTxt.alignment        = TextAlignmentOptions.Center;
@@ -948,6 +960,15 @@ public sealed class UI_GridPanel : UI_Base
 
     private void ShowSynergyActivated(string description)
     {
+        // 브릿지가 넘기는 글은 「FIRE: 효과 내부 이름」이라 그대로 보이면 안 된다(10-14) — HUD 알림 줄과 같은 존 이름 · 단계 글로 바꾼다
+        int    colon  = description != null ? description.IndexOf(':') : -1;
+        string zoneId = colon > 0 ? description.Substring(0, colon).Trim() : null;
+        int    tier   = zoneId != null && MerlinRuneBridge.Instance != null ? MerlinRuneBridge.Instance.GetZoneTier(zoneId) : 0;
+        if (tier > 0)
+        {
+            var notice = BuildNotice.Zone(zoneId, tier);
+            description = $"{notice.Chip} {notice.Head}";
+        }
         ShowSynergyToastAsync(description).Forget();
     }
 
@@ -955,6 +976,9 @@ public sealed class UI_GridPanel : UI_Base
     private void HandleZoneSynergyBurst(string zoneId)
     {
         _hexGridView?.PlayZoneSynergyBurst(zoneId);
+        // 속성 존 단계 오름 — HUD 알림 줄(판이 HUD를 덮으므로 판을 닫으면 보인다 · 83 UI 10-14). 복원 · 재부착은 이 패널이 꺼져 있어 오지 않는다.
+        int tier = MerlinRuneBridge.Instance != null ? MerlinRuneBridge.Instance.GetZoneTier(zoneId) : 0;
+        if (tier > 0) ItemEffectVfxHelper.ShowBuildNotice(BuildNotice.Zone(zoneId, tier));
     }
 
     /// <summary>짧은 안내 문구(배치 실패 사유 등). 시너지 토스트와 같은 자리를 쓴다. <paramref name="warn"/>면 붉은 띠.</summary>
@@ -1069,6 +1093,9 @@ public sealed class UI_GridPanel : UI_Base
     {
         _salvageTarget = item;
         RefreshSalvageButton();
+        // 정보판에 뜬 룬이 판에 놓인 것이면 그 조각만 외곽선이 금(10-11 v2 — 나머지 조각은 채도 반).
+        bool placed = item != null && _inventory != null && _inventory.IsPlaced(item.instanceId);
+        _hexGridView?.SetSelectedPiece(placed ? item.instanceId : null);
     }
 
     /// <summary>[분해]는 정보판의 룬이 보관함이나 판에 있을 때만 보인다(룬 선택 미리보기 등은 아님).</summary>
@@ -1080,19 +1107,19 @@ public sealed class UI_GridPanel : UI_Base
                      && (_inventory.IsPlaced(item.instanceId) || _inventory.IsStaging(item.instanceId));
         _salvageButton.gameObject.SetActive(owned);
         if (owned && _salvageBtnLabel != null)
-            _salvageBtnLabel.text = $"분해  <color=#63D9C0>원석 +{RuneSalvage.OreValueOf(item)}</color>";
+            _salvageBtnLabel.text = $"분해  <color={UIPalette.RuneOreHex}>원석 +{RuneSalvage.OreValueOf(item)}</color>";
     }
 
     private void OnSalvageClicked()
     {
         var item = _salvageTarget;
         if (item == null || _inventory == null) return;
-        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiEvent(SoundEvent.RuneSalvage);
         bool placed = _inventory.IsPlaced(item.instanceId);
         if (_confirmDialogText != null)
             _confirmDialogText.text =
                 $"「{item.displayName ?? item.itemId}」을(를) 분해한다{(placed ? " — 판에서 빠지고 효과도 사라진다" : "")}.\n\n" +
-                $"<color=#63D9C0>원석 +{RuneSalvage.OreValueOf(item)}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
+                $"<color={UIPalette.RuneOreHex}>원석 +{RuneSalvage.OreValueOf(item)}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
         RebindConfirmDialog(OnSalvageConfirm, OnDialogKeep, "분해", "취소");
         ShowConfirmDialog();
     }
@@ -1141,7 +1168,7 @@ public sealed class UI_GridPanel : UI_Base
             _confirmDialogText.text =
                 $"보관함은 {RunItemInventory.StagingCapacity}칸이다 — {over.Count}개가 넘쳤다.\n" +
                 $"<size=85%>{names}</size>\n" +
-                $"판에 놓거나 분해해야 닫힌다.\n<color=#63D9C0>넘친 룬 분해 시 원석 +{ore}</color>";
+                $"판에 놓거나 분해해야 닫힌다.\n<color={UIPalette.RuneOreHex}>넘친 룬 분해 시 원석 +{ore}</color>";
         RebindConfirmDialog(OnOverflowSalvageAndClose, OnDialogKeep, "분해하고 닫기", "정리하러 돌아가기");
         ShowConfirmDialog();
     }
@@ -1166,7 +1193,7 @@ public sealed class UI_GridPanel : UI_Base
 
     private void HandleItemPlaced(RuntimeItemData item)
     {
-        Debug.Log($"[GridChk] 배치 수신: {item?.instanceId} (frame {Time.frameCount})");
+        RFLog.D($"[GridChk] 배치 수신: {item?.instanceId} (frame {Time.frameCount})");
         _inventory?.PlaceItem(item);
         _itemInfoPanel?.ShowItem(item, isNew: false);
         _totalPlacedCells += GetItemCellCount(item);
@@ -1213,7 +1240,7 @@ public sealed class UI_GridPanel : UI_Base
 
     private void HandleItemRemoved(RuntimeItemData item)
     {
-        Debug.Log($"[GridChk] 해제 수신: {item?.instanceId} (frame {Time.frameCount})");
+        RFLog.D($"[GridChk] 해제 수신: {item?.instanceId} (frame {Time.frameCount})");
         _inventory?.UnplaceItem(item);
         _totalPlacedCells = Mathf.Max(0, _totalPlacedCells - GetItemCellCount(item));
 
@@ -1294,6 +1321,18 @@ public sealed class UI_GridPanel : UI_Base
             if (TryOfferSalvagePlacement(shape)) return;
 
             BoardManager.Instance?.ReSlotAndReturn(shape);   // 주차 구역으로 되돌린다
+            int used = RuneBlockBudget.UsedExcept(item);
+            if (!RuneBlockBudget.Fits(used))
+            {
+                ShowToast(RuneBlockBudget.FullMessage(used), warn: true);
+                _synergyStatusView?.FlashBlockFull();
+                return;
+            }
+            if (!RuneBlockBudget.FitsSame(item))
+            {
+                ShowToast(RuneBlockBudget.SameMessage(item), warn: true);
+                return;
+            }
             ShowToast("여기엔 놓을 수 없습니다", warn: true);
             return;
         }
@@ -1319,6 +1358,13 @@ public sealed class UI_GridPanel : UI_Base
         if (!GridManager.Instance.TryGetBlockingItems(shape, _salvageBlockers)) return false;
         if (_salvageBlockers.Count == 0) return false;
 
+        // 룬 수 상한 — 치운 뒤에도 상한을 넘으면 묻지 않는다(헛되이 분해시키지 않게). 치우는 룬 하나 = 1.
+        if (!RuneBlockBudget.Fits(RuneBlockBudget.UsedExcept(shape.ItemData), 1, _salvageBlockers.Count)) return false;
+        // 같은 룬 상한(10-14) — 치우는 룬 가운데 같은 룬만큼 빼고도 넘치면 묻지 않는다
+        int freedSame = 0;
+        foreach (var b in _salvageBlockers) if (b != null && shape.ItemData != null && b.itemId == shape.ItemData.itemId) freedSame++;
+        if (!RuneBlockBudget.FitsSame(shape.ItemData, freedSame)) return false;
+
         int ore = 0;
         foreach (var it in _salvageBlockers) ore += RuneSalvage.OreValueOf(it);
 
@@ -1326,7 +1372,7 @@ public sealed class UI_GridPanel : UI_Base
         if (_confirmDialogText != null)
             _confirmDialogText.text =
                 $"이 자리의 룬 {_salvageBlockers.Count}개를 분해하고 배치합니다.\n\n" +
-                $"<color=#63D9C0>원석 +{ore}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
+                $"<color={UIPalette.RuneOreHex}>원석 +{ore}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
 
         // 확인창을 <b>보관함 전량 폐기</b>와 공유하므로 버튼 동작을 이번 용도로 갈아끼운다.
         // 안 갈아끼우면 [폐기]가 보관함을 통째로 비운다.
@@ -1509,6 +1555,7 @@ public sealed class UI_GridPanel : UI_Base
         _hexGridView?.RefreshOccupiedCells();
         _synergyStatusView?.SetZoneAmplifiers(_hexGridView?.GetZoneAmplifiers());   // 정제소 핵이 키우는 존 표시
         _synergyStatusView?.Refresh(MerlinRuneBridge.Instance?.GetZoneOccupiedCounts());
+        _synergyStatusView?.SetBlockCount(RuneBlockBudget.Used, RuneBlockBudget.Max);
     }
 
     // ── Footer Refresh ──
@@ -1565,7 +1612,7 @@ public sealed class UI_GridPanel : UI_Base
 
     private void OnBackClicked()
     {
-        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);
         if (_inventory != null && _inventory.IsOverCapacity) { OfferOverflowResolve(); return; }
         ClosePanel();
     }
@@ -1597,7 +1644,7 @@ public sealed class UI_GridPanel : UI_Base
             ShowToast("배치된 룬이 없습니다", warn: true);
             return;
         }
-        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiEvent(SoundEvent.RuneReset);
         ShowResetConfirmDialog();
     }
 
@@ -1630,7 +1677,7 @@ public sealed class UI_GridPanel : UI_Base
     /// </summary>
     private void OnConfirmClicked()
     {
-        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiConfirm);
         if (_inventory != null && _inventory.IsOverCapacity) { OfferOverflowResolve(); return; }
         ClosePanel();
     }
@@ -1752,11 +1799,14 @@ public sealed class UI_GridPanel : UI_Base
         if (skin == null) return;
         _chromeSkinned = true;
 
-        ShopUIStyle.Skin(_headerBandImg, skin.titleBar,      sliced: true);
-        // 행동 버튼 = 전 화면 공통 베벨(금 = 완료 · 먹빛 = 초기화). 예전엔 룬 획득의 선택/넘기기 아트를 빌렸는데
-        // 거기 글자가 구워져 있어 「완료」「초기화」 밑에 「선택」「넘기기」가 비쳤다(09-28 UI 톤 진단).
-        UITheme.StyleButton(_confirmBtnImg, UITheme.CtaTint);
-        UITheme.StyleButton(_resetBtnImg,   UITheme.SecondaryTint);
+        if (!ThinGrid)   // 톤 v2는 머리띠 · 버튼을 글래스 + 얇은 테로(ApplyThinChrome) — 스킨이 늦게 와도 덮지 않게
+        {
+            ShopUIStyle.Skin(_headerBandImg, skin.titleBar,      sliced: true);
+            // 행동 버튼 = 전 화면 공통 베벨(금 = 완료 · 먹빛 = 초기화). 예전엔 룬 획득의 선택/넘기기 아트를 빌렸는데
+            // 거기 글자가 구워져 있어 「완료」「초기화」 밑에 「선택」「넘기기」가 비쳤다(09-28 UI 톤 진단).
+            UITheme.StyleButton(_confirmBtnImg, UITheme.CtaTint);
+            UITheme.StyleButton(_resetBtnImg,   UITheme.SecondaryTint);
+        }
         ShopUIStyle.Skin(_cardBgImg,     skin.cardFill,      sliced: true);
     }
 

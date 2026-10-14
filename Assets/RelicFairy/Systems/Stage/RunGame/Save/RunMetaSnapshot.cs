@@ -71,4 +71,7 @@ public struct RunMetaSnapshot
     public int abyssDepth;
 
     public List<CooldownKV> cooldowns;  // RunSequencer 쿨다운
+
+    /// <summary>보스 클리어 뒤 저장(10-10) — 이어하면 다음 챕터 대기방부터 연다.</summary>
+    public bool chapterStartPending;
 }

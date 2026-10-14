@@ -24,6 +24,10 @@ public sealed class ElementVfxRegistry : ScriptableObject
         public float auraRadius;
         [Tooltip("적 몸에 붙는 상태 이펙트 — 화상/독/빙결 등. 비우면 장판 칸으로 폴백")]
         public GameObject statusBody;
+        [Tooltip("몸 이펙트 배율(0이면 1) — 전기 구슬(원래 크기 2)처럼 몸을 덮는 것을 줄인다")]
+        public float bodyScale;
+        [Tooltip("몸 이펙트 색 곱(알파 0 = 원래 색) — 흰 기본 불꽃에 불빛 · 얼음 거품을 옅게(알파)")]
+        public Color bodyTint;
         [Tooltip("단계 발동 표시 — 플레이어 몸에 1회(버프 문장)")]
         public GameObject burst;
         [Tooltip("타격 1회 — 맞은 적 자리(체인 · 표식 폭발 등 점 타격)")]
@@ -61,10 +65,17 @@ public sealed class ElementVfxRegistry : ScriptableObject
     public GameObject GetAura(RuneElement element) => GetAura(element, out _);
 
     /// <summary>적 몸에 붙는 상태 이펙트. 미지정이면 장판 칸으로 폴백.</summary>
-    public GameObject GetStatusBody(RuneElement element)
+    public GameObject GetStatusBody(RuneElement element) => GetStatusBody(element, out _, out _);
+
+    /// <summary>적 몸에 붙는 상태 이펙트와 배율 · 색 곱(몸 칸일 때만 — 장판 폴백은 배율 1 · 원래 색).</summary>
+    public GameObject GetStatusBody(RuneElement element, out float scale, out Color tint)
     {
+        scale = 1f; tint = Color.clear;
         if (!Find(element, out var e)) return null;
-        return e.statusBody != null ? e.statusBody : e.statusAura;
+        if (e.statusBody == null) return e.statusAura;
+        if (e.bodyScale > 0.01f) scale = e.bodyScale;
+        tint = e.bodyTint;
+        return e.statusBody;
     }
 
     /// <summary>단계 발동 표시(플레이어 몸). 없으면 null.</summary>

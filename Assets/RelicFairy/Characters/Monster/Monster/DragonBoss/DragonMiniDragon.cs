@@ -38,6 +38,13 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
     // 브레스 발사 애니메이션 제어
     private bool  _isFiring;
     private float _fireMinTimer; // CrossFade 시작 최소 대기시간
+
+    // 브레스 예고(10-08 점검)
+    private bool       _telegraphing;
+    private float      _telegraphTimer;
+    private Vector3    _aimPoint;
+    private GameObject _breathGuide;
+    private Color      _tint;
     private const float FireMinGuard = 0.25f;
 
     public bool IsDead { get; private set; }
@@ -51,6 +58,8 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
     private const float AppearSeconds    = 0.5f;   // 디졸브 등장 · 퇴장(10-03 개선 3-5 — 예전엔 뿅 생기고 그냥 파괴)
     private const float DisappearSeconds = 0.8f;
     private const float DeathLinger      = 3f;     // 사망 애니 뒤 사라지기까지(퇴장 디졸브 포함)
+    private const float BreathTelegraph  = 0.6f;   // 브레스 예고 — 바닥 화살표가 다 차면 그 줄로 쏜다(10-08 점검: 예고 없이 바로 쐈다)
+    private const float BreathGuideWidth = 1.6f;   // 탄 판정(반경 0.4) + 플레이어 몸
 
     private static readonly int WalkChaseHash     = Animator.StringToHash("WalkChase");
     private static readonly int AttackReadyHash   = Animator.StringToHash("AttackReady");
@@ -89,6 +98,7 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
         _nextSideStepTime = Random.Range(SideStepMin, SideStepMax);
         _sideStepTimer    = Random.Range(0f, SideStepMin);
 
+        _tint = tintColor;
         ApplyTint(tintColor);
 
         if (_agent != null)
@@ -145,7 +155,7 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
         UpdateSideStep();
         if (_isSideStepping) return;
 
-        if (inBreathRange)
+        if (inBreathRange || _telegraphing)   // 예고를 깔았으면 사거리를 벗어나도 그 줄로 쏜다(10-08 점검)
         {
             StopAndFace();
             UpdateFiring();
@@ -156,12 +166,15 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
         }
     }
 
+    private void OnDestroy() => CancelBreathTelegraph();
+
     /// <summary>보스 사망 시 소환수를 즉시 처리한다. 사망 애니메이션 없이 OnDied만 발행하고 디졸브로 사라진다(10-03).</summary>
     public void ForceKill()
     {
         if (IsDead) return;
         IsDead = true;
         if (_agent != null) _agent.enabled = false;
+        CancelBreathTelegraph();
         OnDied?.Invoke(this);
         VanishAsync(0f).Forget();
     }
@@ -194,7 +207,7 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
             return;
         }
 
-        if (_sideStepTimer >= _nextSideStepTime && !_isFiring)
+        if (_sideStepTimer >= _nextSideStepTime && !_isFiring && !_telegraphing)   // 예고 중엔 자리를 지킨다(예고 줄이 어긋난다)
             BeginSideStep();
     }
 
@@ -265,16 +278,27 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
             return;
         }
 
+        if (_telegraphing)
+        {
+            _telegraphTimer += Time.deltaTime;
+            PatternGuideHelper.SetProgress(_breathGuide, _telegraphTimer / BreathTelegraph);
+            if (_telegraphTimer < BreathTelegraph) return;
+
+            _telegraphing = false;
+            _isFiring     = true;
+            _fireMinTimer = FireMinGuard;
+
+            if (_animator != null && _animator.HasState(0, FireBallHash))
+                _animator.CrossFade("U Attack Fire Ball", 0.1f);
+
+            FireBreath();
+            return;
+        }
+
         if (_breathTimer < _breathCooldown) return;
 
-        _breathTimer  = 0f;
-        _isFiring     = true;
-        _fireMinTimer = FireMinGuard;
-
-        if (_animator != null && _animator.HasState(0, FireBallHash))
-            _animator.CrossFade("U Attack Fire Ball", 0.1f);
-
-        FireBreath();
+        _breathTimer = 0f;
+        BeginBreathTelegraph();
     }
 
     // ── 내부 ────────────────────────────────────────────────────────────────
@@ -285,6 +309,7 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
         if (_agent != null) _agent.enabled = false;
         if (_animator != null && _animator.HasState(0, DeathHash))
             _animator.CrossFade("Death", 0.15f);
+        CancelBreathTelegraph();
         OnDied?.Invoke(this);
         VanishAsync(DeathLinger - DisappearSeconds).Forget();
     }
@@ -305,7 +330,7 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
 
     private void FaceTarget()
     {
-        Vector3 dir = _playerTarget.position - transform.position;
+        Vector3 dir = (_telegraphing ? _aimPoint : _playerTarget.position) - transform.position;   // 예고 중엔 겨눈 자리를 본다
         dir.y = 0f;
         if (dir.sqrMagnitude > 0.01f)
             transform.rotation = Quaternion.RotateTowards(
@@ -314,20 +339,44 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
                 FaceRotateSpeed * Time.deltaTime);
     }
 
+    /// <summary>쏠 자리를 정하고 바닥에 예고 화살표(속성 색)를 깐다 — 다 차면 그 자리로 쏜다(10-08 점검).</summary>
+    private void BeginBreathTelegraph()
+    {
+        _telegraphing   = true;
+        _telegraphTimer = 0f;
+        _aimPoint       = _playerTarget.position + Vector3.up * 1f;
+
+        Vector3 mouth  = MouthPos();
+        Vector3 flat   = _aimPoint - mouth;
+        Vector3 origin = new Vector3(mouth.x, transform.position.y, mouth.z);
+        Color   c      = new Color(_tint.r, _tint.g, _tint.b, 0.85f);
+        PatternGuideHelper.SafeDestroy(ref _breathGuide);
+        _breathGuide = PatternGuideHelper.Prepare(
+            PatternGuideHelper.Beam(origin, flat, _breathRange * 1.5f, BreathGuideWidth, c), c);
+    }
+
+    private void CancelBreathTelegraph()
+    {
+        _telegraphing = false;
+        PatternGuideHelper.SafeDestroy(ref _breathGuide);
+    }
+
+    private Vector3 MouthPos() => _mouthBone != null
+        ? _mouthBone.position
+        : transform.position + Vector3.up * (transform.localScale.y * 1.8f);
+
     private void FireBreath()
     {
-        if (_breathPrefab == null) return;
+        if (_breathPrefab == null) { CancelBreathTelegraph(); return; }
 
-        Vector3 spawnPos = _mouthBone != null
-            ? _mouthBone.position
-            : transform.position + Vector3.up * (transform.localScale.y * 1.8f);
-
-        Vector3 tgt = _playerTarget.position + Vector3.up * 1f;
-        Vector3 dir = (tgt - spawnPos).normalized;
+        Vector3 spawnPos = MouthPos();
+        Vector3 dir = (_aimPoint - spawnPos).normalized;   // 예고 때 겨눈 자리로
 
         var go   = Instantiate(_breathPrefab, spawnPos, Quaternion.LookRotation(dir));
         var shot = go.AddComponent<DragonBreathShot>();
-        shot.Init(dir, _breathSpeed, _breathRange * 1.5f, _breathDamage, _statusEffect);
+        PatternGuideHelper.Arm(_breathGuide);   // 날아가는 동안 판정 색 — 탄이 맞거나 사거리 끝에 닿으면 탄이 치운다
+        shot.Init(dir, _breathSpeed, _breathRange * 1.5f, _breathDamage, _statusEffect, gameObject, _breathGuide);
+        _breathGuide = null;
     }
 
     private Transform FindDeepChild(string boneName)

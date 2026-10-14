@@ -38,6 +38,8 @@ public sealed partial class PlayerController
     /// <summary>지금 <b>겨냥한</b> 정면(수평). 투사체·판정은 이 값을 써야 한다(<see cref="PlayerFacing.AimForward"/>).</summary>
     public Vector3 AimForward => _facing.AimForward(transform);
 
+    private static readonly int MoveBlendHash = Animator.StringToHash("MoveBlend");
+
     // ── Public Methods: 이동 배율 · 공유 값 ───────────────────────
     /// <summary>행동 잠금 채널(공격·스킬·잡기)의 이동 배율을 지정한다. 0=정지, 1=평소.</summary>
     public void SetMoveScale(float s) => _actionMoveScale = Mathf.Clamp01(s);
@@ -61,6 +63,17 @@ public sealed partial class PlayerController
         return d;
     }
 
+    /// <summary>
+    /// 이동 블렌드 트리로 크로스페이드한다. 이미 이동 블렌드에 머물러 있으면(전환 중이 아님) 건너뛴다 —
+    /// 대기 ↔ 이동 상태가 바뀔 때마다 같은 상태로 다시 크로스페이드해 보행 주기가 처음으로 돌아가 발이 툭 튀었다(10-09 출시 점검).
+    /// </summary>
+    public void CrossFadeMoveBlend(float duration)
+    {
+        if (Anim == null) return;
+        if (!Anim.IsInTransition(0) && Anim.GetCurrentAnimatorStateInfo(0).shortNameHash == MoveBlendHash) return;
+        Anim.CrossFadeInFixedTime(MoveBlendHash, duration);
+    }
+
     /// <summary>접지 여부 — 접지 모듈(<see cref="IGroundingAbility"/>)이 관리하는 상태를 위임한다.</summary>
     public bool IsGrounded() => Grounding?.IsGrounded ?? true;
 
@@ -74,6 +87,38 @@ public sealed partial class PlayerController
 
     /// <summary>수평 이동 목표에서 접촉 중인 벽으로 파고드는 성분만 제거한다(<see cref="PlayerWallContact.Clip"/>).</summary>
     public Vector2 ClipMoveTargetToWalls(Vector2 target) => _wallContact.Clip(target);
+
+    // 앞길 재기 — 캡슐(반경 0.27)보다 가는 구(0.2)로 몸 가운데 높이를 훑는다. 가늘게 훑어야 벽에 붙어 선 채 반대쪽으로 갈 때
+    // 시작부터 겹친 벽(거리 0)에 막히지 않는다. 멈출 자리 = 구가 닿은 곳 − (캡슐 반경 − 구 반경) − 틈.
+    private const float ClearCastRadius = 0.2f, ClearCastHeight = 0.6f, ClearBodyRadius = 0.27f, ClearWallGap = 0.05f;
+    private static readonly RaycastHit[] s_clearHits = new RaycastHit[16];
+
+    /// <summary>
+    /// <paramref name="from"/>에서 <paramref name="dir"/>로 막힘 없이 갈 수 있는 거리(m, 최대 <paramref name="max"/>) — 첫 벽 앞까지.
+    /// 바닥 · 트리거 · 맞을 수 있는 적 · 자기 자신은 벽이 아니다(돌진은 적을 꿰뚫는다). 돌진 스킬 끝점 · 회피 대시가 함께 쓴다
+    /// (10-14 사용자 「무형검 R · 대시 스킬이 벽을 뚫는다」 — 끝점 Lerp · 22 m/s 대시가 벽을 넘었다).
+    /// </summary>
+    public float ClearDistanceAhead(Vector3 from, Vector3 dir, float max)
+    {
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f || max <= 0f) return 0f;
+        dir.Normalize();
+        int ground = CharacterData != null ? CharacterData.groundLayer.value : 0;
+        int n = Physics.SphereCastNonAlloc(from + Vector3.up * ClearCastHeight, ClearCastRadius, dir, s_clearHits,
+                                           max + ClearBodyRadius, ~ground, QueryTriggerInteraction.Ignore);
+        float stop = max;
+        for (int i = 0; i < n; i++)
+        {
+            var h = s_clearHits[i];
+            if (h.collider == null || h.distance <= 0f) continue;   // 거리 0 = 시작부터 겹침(가는 구라 벽에 붙어 선 경우가 아니다)
+            var t = h.collider.transform;
+            if (t == transform || t.IsChildOf(transform)) continue;
+            if (h.collider.GetComponentInParent<IDamageable>() != null) continue;
+            float s = h.distance - (ClearBodyRadius - ClearCastRadius) - ClearWallGap;
+            if (s < stop) stop = s;
+        }
+        return Mathf.Max(0f, stop);
+    }
 
     // ── Public Methods: 회전 · 조준 ───────────────────────────────
     /// <summary>즉시(1회) 회전 지정. 스킬/회피/조준 등 한 프레임 스냅 또는 자체 보간 writer용. 진행 중인 이동 회전 슬루를 취소한다.
@@ -95,11 +140,23 @@ public sealed partial class PlayerController
         RequestFacing(Quaternion.LookRotation(_moveDirection));
     }
 
+    /// <summary>
+    /// 장비 스킬(E · R) 조준(10-08 A1): 마우스 방향 + 마우스 콘 <see cref="SkillAimConeHalfAngle"/>° 안 가장 가까운 적으로 스냅(반경 <see cref="SkillAimRadius"/> m).
+    /// 「겨눈 곳으로 간다」 — 회전은 요청만 하므로 같은 프레임의 방향은 <see cref="AimForward"/>로 읽는다.
+    /// </summary>
+    public Quaternion ComputeSkillAimRotation() => ComputeMouseAimAssistRotation(SkillAimRadius, SkillAimConeHalfAngle, 1f);
+
+    /// <summary>장비 스킬 조준으로 즉시 회전(<see cref="ComputeSkillAimRotation"/>).</summary>
+    public void RotateTowardsSkillAim() => RequestFacing(ComputeSkillAimRotation());
+
     public void RotateTowardsMousePosition()
     {
         if (_aim.TryComputeLookDir(transform, out var lookDir))
             RequestFacing(Quaternion.LookRotation(lookDir));
     }
+
+    /// <summary>마우스가 가리키는 수평 방향만 읽는다(적용하지 않음) — 스킬 도중 천천히 다시 겨눌 때(랜슬롯 Q 연타 · 10-10).</summary>
+    public bool TryGetMouseLookDir(out Vector3 dir) => _aim.TryComputeLookDir(transform, out dir);
 
     /// <summary>
     /// 마우스 + 에임 어시스트 적용 후의 최종 목표 회전을 "계산만" 해서 반환한다.

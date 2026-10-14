@@ -56,7 +56,7 @@ public static class RelicGrowthV2ProbeEditor
     {
         var all = LoadEntries();
         sb.AppendLine("== 1 데이터 집계 ==");
-        bool ok = all.Count == 42;
+        bool ok = all.Count == 46;   // 42 + 사격 조각 4(10-14 빌드 시너지 A5)
         var count = new SortedDictionary<string, int>();
         int missing = 0;
         foreach (var e in all)

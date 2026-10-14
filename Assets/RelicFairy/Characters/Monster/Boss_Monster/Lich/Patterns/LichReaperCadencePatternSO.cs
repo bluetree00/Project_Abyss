@@ -100,7 +100,7 @@ public class LichReaperCadenceState : UnInterruptibleState<LichReaperCadencePatt
 {
     private enum Phase { Approach, Sweep1, Gap, Sweep2, FeintHold, Finisher, Recovery }
 
-    private const float SignalSeconds = 0.35f;   // 방향 고정 → 판정(0.15 → 0.35, 10-02 — 옆으로 피할 실제 창)
+    private const float SignalSeconds = LichPatternUtil.MinLead;   // 방향 고정 → 판정(0.15 → 0.35 → 0.45, 10-13 검증)
 
     private Phase      _phase;
     private float      _timer;
@@ -111,6 +111,8 @@ public class LichReaperCadenceState : UnInterruptibleState<LichReaperCadencePatt
     private bool       _parryOpen;
     private float      _yaw;
     private GameObject _guide;
+    private Vector3    _lockPoint;   // 신호 순간의 예고 자리 — 판정 원점
+    private bool       _locked;
 
     public LichReaperCadenceState(LichReaperCadencePatternSO data) : base(data) { }
 
@@ -176,13 +178,13 @@ public class LichReaperCadenceState : UnInterruptibleState<LichReaperCadencePatt
                 if (_timer >= Data.finisherDuration)
                 {
                     PatternGuideHelper.SafeDestroy(ref _guide);
-                    LichPatternUtil.Lich(ctx)?.NotifyVulnerableWindow(Data.recoveryDuration);
+                    LichPatternUtil.Lich(ctx)?.NotifyVulnerableWindow(LichPatternUtil.Recovery(ctx, Data.recoveryDuration));   // 빈틈 = 실제 회복 시간(10-08)
                     Next(Phase.Recovery);
                 }
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -237,6 +239,7 @@ public class LichReaperCadenceState : UnInterruptibleState<LichReaperCadencePatt
         _elapsed   = 0f;
         _hitDone   = false;
         _signaled  = false;
+        _locked    = false;
         _parryOpen = false;
         LichSfx.Play(LichSfxSlot.CastShort, ctx.Transform.position, 0.5f);
     }
@@ -252,7 +255,14 @@ public class LichReaperCadenceState : UnInterruptibleState<LichReaperCadencePatt
                 _guide.transform.rotation = PatternGuideHelper.SectorRotation(_yaw);
         }
         if (LichPatternUtil.TickTelegraph(_guide, _elapsed, _lead, SignalSeconds, ref _signaled))
+        {
             LichPatternUtil.HoldFacing(ctx, _yaw);
+            // 판정은 신호 순간의 자리에서(10-13 검증 — 신호 뒤 미끄러지면 예고와 어긋났다)
+            _lockPoint = _phase == Phase.FeintHold || _phase == Phase.Finisher
+                ? SlamPoint(ctx)
+                : LichPatternUtil.OnFloor(ctx, ctx.Transform.position);
+            _locked = true;
+        }
 
         if (Data.parryable && !_parryOpen && _lead - _elapsed <= LichPatternUtil.ParryWindow)
         {
@@ -267,7 +277,7 @@ public class LichReaperCadenceState : UnInterruptibleState<LichReaperCadencePatt
         PatternGuideHelper.SafeDestroy(ref _guide);
         if (Parried(ctx)) return;
 
-        Vector3 origin = LichPatternUtil.OnFloor(ctx, ctx.Transform.position);
+        Vector3 origin = _locked ? _lockPoint : LichPatternUtil.OnFloor(ctx, ctx.Transform.position);
         Vector3 dir    = Quaternion.Euler(0f, _yaw, 0f) * Vector3.forward;
         LichPatternUtil.SlashVfx(origin, dir, Data.sweepRadius, swing);
         LichSfx.Play(LichSfxSlot.ScytheSlash, origin);
@@ -283,7 +293,7 @@ public class LichReaperCadenceState : UnInterruptibleState<LichReaperCadencePatt
         PatternGuideHelper.SafeDestroy(ref _guide);
         if (Parried(ctx)) return;
 
-        Vector3 slam = SlamPoint(ctx);
+        Vector3 slam = _locked ? _lockPoint : SlamPoint(ctx);
         Vector3 dir  = Quaternion.Euler(0f, _yaw, 0f) * Vector3.forward;
         LichPatternUtil.SlashVfx(slam, dir, Data.finisherSlamOffset * 1.6f, LichSwing.Overhead);
         LichVfx.Play(LichVfxSlot.SlamImpact, slam, Quaternion.identity, LichPatternUtil.NovaScale(FinisherRadius));

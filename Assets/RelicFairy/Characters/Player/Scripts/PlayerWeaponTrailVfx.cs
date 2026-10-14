@@ -44,6 +44,12 @@ public class PlayerWeaponTrailVfx : MonoBehaviour
     private bool  _overriding;
     private float _restoreAt = -1f;           // 덮어쓰기가 끝난 뒤 무기 트레일로 되돌릴 시각(페이드가 끝난 뒤 — 즉시 바꾸면 페이드가 잘린다)
 
+    // ── Properties ────────────────────────────────────────────────
+    /// <summary>임시 트레일이 켜져 있다(주인: 랜슬롯 Q 검 · 장비 형). 형은 남이 쓰는 동안 기다린다(10-07 검토 I4).</summary>
+    public bool       IsOverriding   => _overriding;
+    /// <summary>지금 덮어쓴 트레일 프리팹 — 끄기 전에 「내 것인가」를 본다.</summary>
+    public GameObject OverridePrefab => _overriding ? _loadedPrefab : null;
+
     // ── Lifecycle ─────────────────────────────────────────────────
     private void Awake()
     {
@@ -127,6 +133,19 @@ public class PlayerWeaponTrailVfx : MonoBehaviour
         _loadedPrefab = prefab;
         _trail.StartTrailWithLength(fadeIn, trailLength);
     }
+
+    /// <summary>
+    /// 장비 스킬(근접 E · R) 동안 장착 무기의 트레일을 켠다(10-08 A7). 스킬 전용 클립엔 애니 이벤트가 없어 트레일이 한 번도 안 떴다(C8).
+    /// 휘두름 소리는 내지 않는다(모으는 스킬은 시작이 휘두름이 아니다). 임시 칼날(Q 검) · 형 가득 트레일이 쓰는 중이면 그대로 둔다.
+    /// </summary>
+    public void BeginSkillTrail()
+    {
+        if (_overriding || _trail == null || _weaponTrailPrefab == null || _loadedPrefab != _weaponTrailPrefab) return;
+        _trail.StartTrailWithLength(attackFadeIn, attackTrailLength);
+    }
+
+    /// <summary>장비 스킬 트레일을 끈다(후딜 진입 · 스킬 종료). 임시 칼날 트레일은 건드리지 않는다.</summary>
+    public void EndSkillTrail() => HandleEndAttackTrail();
 
     /// <summary>임시 칼날 트레일을 끄고, 페이드가 끝나면 장착 무기의 트레일로 되돌린다.</summary>
     public void EndOverride(float fadeOut = 0.2f)

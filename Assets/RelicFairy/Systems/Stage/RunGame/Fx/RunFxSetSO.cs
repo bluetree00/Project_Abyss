@@ -19,6 +19,7 @@ public enum RunFxSlot
     LootRare      = 10,
     LootEpic      = 11,
     LootLegendary = 12,
+    AttackGlint   = 13,   // 일반 몬스터 공격 예고 반짝임(10-07) — 맞히기 0.45초 전, 머리에서 한 번
 }
 
 [Serializable]
@@ -36,6 +37,11 @@ public struct RunFxEntry
     public string     note;
     [Tooltip("빛깔 갈아 끼우기 — 원색이 진한 단색인 팩(Hovl 지도 표지 = 빨강)은 곱하기 틴트로 등급색이 안 나온다. 켜면 밝기는 두고 빛깔만 바꾼다(RunFxRecolor)")]
     public bool       recolor;
+    [Tooltip("끌 자식 이름(쉼표로) — 팩 이펙트의 번짐 · 빛 덩어리 하위만 끈다(10-11 톤 2차). 이 칸 프리팹은 런 공용 풀에서만 꺼내므로 꺼 둔 채 풀에 돌아가도 된다")]
+    public string     mute;
+    [Tooltip("빛깔을 진하게 — 받은 색의 채도를 올리고 밝기를 낮춰 입힌다. Hovl 「…cg」 재질은 _Emission 2~8이라 옅은 색(쉼터 주황 · 샘 하늘)을 그대로 곱하면 " +
+             "톤매핑에서 흰빛으로 바랬다(10-11 2차 촬영 VFX2_01). 흰 색(채도 낮음)은 그대로 흰빛")]
+    public bool       vividTint;
 }
 
 /// <summary>

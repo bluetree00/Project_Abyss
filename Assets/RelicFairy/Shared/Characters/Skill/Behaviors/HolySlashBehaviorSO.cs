@@ -90,9 +90,9 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
 
             _skillTier = ctx.SkillTier;
 
-            var dir = ctx.PlayerTransform.forward;
+            var dir = ctx.AimForward;   // 방금 요청한 회전(B1 — transform.forward는 옛 방향)
             _dashStart = ctx.PlayerTransform.position;
-            _dashEnd = _dashStart + dir * _data.dashDistance;
+            _dashEnd = ctx.DashEndBeforeWall(_dashStart, dir, _data.dashDistance);   // 벽 앞에서 멈춘다(10-14 — 끝점 Lerp가 벽을 뚫었다)
 
             if (ctx.Rigidbody != null)
                 ctx.Rigidbody.linearVelocity = Vector3.zero;
@@ -108,12 +108,12 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
 
             // 대시 라인 이펙트 (전 티어)
             if (!string.IsNullOrEmpty(_data.dashLineEffectKey))
-                SpawnDashLine(ctx, ctx.PlayerTransform.position + dir * (_data.dashDistance * 0.5f) + Vector3.up * 0.5f);
+                SpawnDashLine(ctx, Vector3.Lerp(_dashStart, _dashEnd, 0.5f) + Vector3.up * 0.5f);
 
             // 3단계: 대시 라인에 번개 이펙트 추가
             if (_skillTier >= 3 && !string.IsNullOrEmpty(_data.tier3DashLineExtraKey))
                 SpawnEffectScaled(ctx, _data.tier3DashLineExtraKey,
-                    ctx.PlayerTransform.position + dir * (_data.dashDistance * 0.5f) + Vector3.up * 0.5f,
+                    Vector3.Lerp(_dashStart, _dashEnd, 0.5f) + Vector3.up * 0.5f,
                     _data.tier3DashLineExtraScale, 2f);
 
             // 2단계 이상: 대시 머즐 이펙트
@@ -125,7 +125,7 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
 
         public void OnUpdate(SkillExecutionContext ctx)
         {
-            _timer += Time.deltaTime;
+            _timer += ctx.DeltaTime;   // 애니메이터와 같은 시계(슬로모 — 10-09)
             switch (_phase)
             {
                 case Phase.Dash:     UpdateDash(ctx);     break;
@@ -186,9 +186,10 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
                     ctx.PlayerTransform.position + Vector3.up * 0.5f, 1f);
                 SpawnEffect(ctx, _data.slashEffectKey,
                     ctx.PlayerTransform.position + Vector3.up * 1f, 0.6f);
+                Managers.Sound?.PlayEvent(SoundEvent.PlayerSwing);   // 베는 소리(A6 · C8 — 스킬 클립엔 이벤트가 없다)
 
-                // 대시 데미지 적용 (1단계)
-                ApplyDamageToAll(ctx, _data.baseDashDamage);
+                // 대시 데미지 적용 (1단계) — 뒤에 추가타가 없으면 이 타가 마무리(A5)
+                ApplyDamageToAll(ctx, _data.baseDashDamage, finisher: _skillTier < 2);
                 SpawnHitEffects(ctx);
 
                 // 티어별 분기
@@ -209,7 +210,8 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
             if (_timer >= _data.extraHitDelay)
             {
                 _timer = 0f;
-                ApplyDamageToAll(ctx, _data.extraHitDamage);
+                // 2단계 마지막 추가타가 마무리(3단계는 뒤 폭발이 마무리) — A5
+                ApplyDamageToAll(ctx, _data.extraHitDamage, finisher: _skillTier < 3 && _extraHitIndex + 1 >= _data.extraHitCount);
                 SpawnHitEffects(ctx);
                 _extraHitIndex++;
 
@@ -263,6 +265,7 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
 
         private void UpdateEnd(SkillExecutionContext ctx)
         {
+            ctx.EnterRecovery();   // 후딜 — 회피로 끊을 수 있다 · 스탠스 해제(10-08 A2 · A4)
             if (_timer >= _data.endDelay)
                 ctx.RequestEnd();
         }
@@ -279,12 +282,12 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
             }
         }
 
-        private void ApplyDamageToAll(SkillExecutionContext ctx, float baseDmg)
+        private void ApplyDamageToAll(SkillExecutionContext ctx, float baseDmg, bool finisher = false)
         {
             if (_hitTargets.Count == 0) return;
             float dmg = ctx.CalculateDamage(baseDmg);
             foreach (var target in _hitTargets)
-                ctx.DealDamage(target, dmg, _data.knockbackMultiplier);
+                ctx.DealDamage(target, dmg, _data.knockbackMultiplier, finisher, skipHitVfx: true);   // 타격 이펙트는 아래에서 직접
         }
 
         private void SpawnHitEffects(SkillExecutionContext ctx)
@@ -296,7 +299,8 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
                     Random.Range(-0.4f, 0.4f),
                     Random.Range(0.3f, 1.5f),
                     Random.Range(-0.4f, 0.4f));
-                SpawnEffect(ctx, _data.hitEffectKey, obj.transform.position + offset, _data.hitEffectScale);
+                // hitEffectScale이 수명 자리로 들어가 크기는 늘 1이었다(10-08 수정) — 크기로 넘기고 수명은 칼 타격 이펙트 길이(0.5초)
+                SpawnEffectScaled(ctx, _data.hitEffectKey, obj.transform.position + offset, _data.hitEffectScale, 0.5f);
 
                 // 2단계 이상: 추가 히트 이펙트
                 if (_skillTier >= 2 && !string.IsNullOrEmpty(_data.tier2ExtraHitKey))
@@ -339,7 +343,7 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
         {
             if (string.IsNullOrEmpty(_data.dashLineEffectKey)) return;
             var obj = await Managers.ObjectPooler.SpawnAsync(
-                _data.dashLineEffectKey, ObjectPoolerManager.PoolType.Effect, pos, ctx.PlayerTransform.rotation);
+                _data.dashLineEffectKey, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.LookRotation(ctx.AimForward));   // 돌진 방향(10-13)
             if (obj == null) return;
             obj.transform.localScale = Vector3.one * _data.dashLineScale;
 

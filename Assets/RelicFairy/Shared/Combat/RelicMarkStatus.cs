@@ -21,6 +21,10 @@ public sealed class RelicMarkStatus : MonoBehaviour
     public const int   DefaultSunmarkCap = 3;
     public const int   DefaultBrandCap   = 3;
     public const float DefaultApplyGap   = 0.5f;   // 같은 종류를 같은 대상에 다시 쌓을 수 있는 최소 간격(초)
+    public const float ComboApplyGap     = 0.3f;   // 연격 각인 3단계 — 공속을 올린 만큼 보스에게도 표식이 쌓이게(10-14 A6)
+
+    /// <summary>지금 대상당 표식 간격 — 연격 각인 3단계면 0.3초, 아니면 0.5초.</summary>
+    public static float ApplyGap => BuildImprint.Stage(BuildFamily.Combo) >= 3 ? ComboApplyGap : DefaultApplyGap;
 
     /// <summary>어느 적이든 수가 바뀌었다(연출 · HUD · 실측 도구).</summary>
     public static event Action<RelicMarkStatus> Changed;
@@ -53,7 +57,7 @@ public sealed class RelicMarkStatus : MonoBehaviour
 
     /// <summary>
     /// 태양흔 <paramref name="n"/>을 쌓는다(상한 <paramref name="cap"/> — 가웨인 공명이 정한다). 실제로 쌓인 수를 돌려준다.
-    /// <paramref name="ignoreGap"/>이 아니면 대상당 <see cref="DefaultApplyGap"/>초에 한 번만.
+    /// <paramref name="ignoreGap"/>이 아니면 대상당 <see cref="ApplyGap"/>초에 한 번만(연격 각인 3단계면 0.3초).
     /// </summary>
     public int AddSunmark(int n, int cap, bool ignoreGap = false)
     {
@@ -61,7 +65,7 @@ public sealed class RelicMarkStatus : MonoBehaviour
         if (!ignoreGap)
         {
             if (Time.time < _nextSunmarkAt) return 0;
-            _nextSunmarkAt = Time.time + DefaultApplyGap;
+            _nextSunmarkAt = Time.time + ApplyGap;
         }
         _sunmarkCap = Mathf.Max(1, cap);
         int before = _sunmark;
@@ -97,7 +101,7 @@ public sealed class RelicMarkStatus : MonoBehaviour
         if (!ignoreGap)
         {
             if (Time.time < _nextSunmarkAt) return 0;
-            _nextSunmarkAt = Time.time + DefaultApplyGap;
+            _nextSunmarkAt = Time.time + ApplyGap;
         }
         _blackspot += n;
         Changed?.Invoke(this);
@@ -126,7 +130,7 @@ public sealed class RelicMarkStatus : MonoBehaviour
         if (!ignoreGap)
         {
             if (Time.time < _nextBrandAt) return 0;
-            _nextBrandAt = Time.time + DefaultApplyGap;
+            _nextBrandAt = Time.time + ApplyGap;
         }
         _brandCap = Mathf.Max(1, cap);
         int room  = Mathf.Max(0, BrandCap - _brand);

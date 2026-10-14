@@ -25,16 +25,23 @@ MonoBehaviour:
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: 8a87deef4ca24f1192c20d1f0f6f49a9,
       type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
-    castVfxPrefab: {fileID: 1200950891393156, guid: 6d95f8e1f658e06458865bbaf44e04fd, type: 3}
+    castVfxPrefab: {fileID: 0}
     castVfxDuration: 0.5
+    castVfxDelay: 0
+    castVfxLeadTime: 0.15
+    castVfxXRotationOffset: 0
+    castVfxYRotationOffset: 0
+    castVfxZRotationOffset: 0
     castVfxForwardOffset: 0.4
+    castVfxRightOffset: 0
     castVfxVerticalOffset: 0.8
     castVfxScale: 0.9
     castVfxAttachToMonster: 1
+    castVfxAtPlayerPosition: 0
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
     proceduralBeamWidth: 0.16
@@ -56,16 +63,23 @@ MonoBehaviour:
     knockbackMultiplier: 1.2
     attackShapeOverride: {fileID: 11400000, guid: 8a87deef4ca24f1192c20d1f0f6f49a9,
       type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
-    castVfxPrefab: {fileID: 1200950891393156, guid: 6d95f8e1f658e06458865bbaf44e04fd, type: 3}
+    castVfxPrefab: {fileID: 0}
     castVfxDuration: 0.5
+    castVfxDelay: 0
+    castVfxLeadTime: 0.15
+    castVfxXRotationOffset: 0
+    castVfxYRotationOffset: 0
+    castVfxZRotationOffset: 0
     castVfxForwardOffset: 0.4
+    castVfxRightOffset: 0
     castVfxVerticalOffset: 0.8
     castVfxScale: 0.9
     castVfxAttachToMonster: 1
+    castVfxAtPlayerPosition: 0
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
     proceduralBeamWidth: 0.16
@@ -80,23 +94,30 @@ MonoBehaviour:
     minDistance: 0
     maxDistance: 2.6
     priority: 2
-    cooldown: 3.0
+    cooldown: 3
     damageDelay: 0.48
     attackDuration: 1.15
     damageMultiplier: 1
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: e680df75a2ae4d8890c0d1fe4c19c80f,
       type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
     castVfxPrefab: {fileID: 0}
     castVfxDuration: 0
+    castVfxDelay: 0
+    castVfxLeadTime: 0.15
+    castVfxXRotationOffset: 0
+    castVfxYRotationOffset: 0
+    castVfxZRotationOffset: 0
     castVfxForwardOffset: 0
+    castVfxRightOffset: 0
     castVfxVerticalOffset: 0.8
     castVfxScale: 1
     castVfxAttachToMonster: 1
+    castVfxAtPlayerPosition: 0
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
     proceduralBeamWidth: 0.16

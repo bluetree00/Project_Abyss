@@ -59,6 +59,7 @@ public class LichSkyDebrisState : UnInterruptibleState<LichSkyDebrisPatternSO>
     private const float RockFallSeconds = 0.45f;   // 예고 끝 이만큼 동안 떨어진다
     private const float RockLinger      = 2.5f;    // 떨어진 뒤 남아 있는 시간
     private const float RockScale       = 0.9f;
+    private const float RockFadeSeconds = 0.5f;    // 남았다가 디졸브로 사라진다(10-12 디졸브 원칙)
 
     private readonly List<Vector3>    _points = new();
     private readonly List<GameObject> _safe   = new();
@@ -115,7 +116,7 @@ public class LichSkyDebrisState : UnInterruptibleState<LichSkyDebrisPatternSO>
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -137,6 +138,16 @@ public class LichSkyDebrisState : UnInterruptibleState<LichSkyDebrisPatternSO>
     }
 
     /// <summary>한 파 — 첫 낙하점은 플레이어 자리. 마지막 파는 안전 칸을 남기고 코어를 덮는다.</summary>
+    private static bool NearAny(Vector3 p, List<Vector3> centers, float radius)
+    {
+        foreach (var c in centers)
+        {
+            float dx = p.x - c.x, dz = p.z - c.z;
+            if (dx * dx + dz * dz < radius * radius) return true;
+        }
+        return false;
+    }
+
     private void DropWave(MonsterContext ctx, int wave, bool last)
     {
         int count = Mathf.Max(1, Data.waveCounts[wave]);
@@ -147,21 +158,29 @@ public class LichSkyDebrisState : UnInterruptibleState<LichSkyDebrisPatternSO>
         {
             // 코어를 고리처럼 덮되 안전 칸 방위는 비운다.
             ClearSafe();
-            var safeYaws = new List<float>();
+            var   safeYaws = new List<float>();
+            var   safeAt   = new List<Vector3>();
+            float safeR    = Data.debrisRadius * 0.9f;
             for (int i = 0; i < Data.safeSpots; i++)
             {
                 float yaw = Random.Range(0f, 360f);
                 safeYaws.Add(yaw);
                 Vector3 at = LichPatternUtil.OnFloor(ctx, _center + Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * (Data.coreRadius * 0.6f));
-                _safe.Add(PatternGuideHelper.Disc(at + Vector3.up * 0.03f, Data.debrisRadius * 0.9f, LichPatternUtil.SafeWhite));
+                safeAt.Add(at);
+                _safe.Add(PatternGuideHelper.Disc(at + Vector3.up * 0.03f, safeR, LichPatternUtil.SafeWhite));
             }
+            // 흰 안전 칸은 안전해야 한다 — 플레이어가 안전 칸에 서 있으면 그 자리엔 안 떨어뜨리고,
+            // 다른 낙하점도 낙하 반경이 안전 칸에 닿으면 뺀다(방위 ±40°만으로는 가운데 쪽 낙하점이 안전 칸을 쳤다 · 10-08 점검)
+            if (NearAny(_points[0], safeAt, safeR + Data.debrisRadius)) _points.RemoveAt(0);   // 낙하 원이 안전 칸에 닿으면 빼기 — 다른 낙하점과 같은 조건(10-13 검증)
             for (int i = 0; _points.Count < count + 3 && i < 40; i++)
             {
                 float yaw  = Random.Range(0f, 360f);
                 bool  near = false;
                 foreach (float s in safeYaws) if (Mathf.Abs(Mathf.DeltaAngle(s, yaw)) < 40f) near = true;
                 if (near) continue;
-                _points.Add(_center + Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * Random.Range(0f, Data.coreRadius));
+                Vector3 p = _center + Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * Random.Range(0f, Data.coreRadius);
+                if (NearAny(p, safeAt, safeR + Data.debrisRadius)) continue;
+                _points.Add(p);
             }
         }
         else
@@ -209,7 +228,12 @@ public class LichSkyDebrisState : UnInterruptibleState<LichSkyDebrisPatternSO>
         catch (System.OperationCanceledException) { }
         finally
         {
-            if (rock != null) Object.Destroy(rock);
+            // 잔해는 디졸브로 거둔다 — 예전엔 RockLinger 뒤 그냥 사라졌다
+            if (rock != null)
+            {
+                var r = rock;
+                DissolveEffect.PlayDisappear(r, RockFadeSeconds, () => { if (r != null) Object.Destroy(r); });
+            }
         }
     }
 

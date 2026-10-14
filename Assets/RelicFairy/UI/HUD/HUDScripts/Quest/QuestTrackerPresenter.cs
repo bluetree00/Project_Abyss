@@ -27,6 +27,7 @@ public sealed class QuestTrackerPresenter : MonoBehaviour
             _quest.onQuestCompleted  += HandleCompleted;
             _quest.onQuestFailed     += HandleFailed;
             _quest.onQuestCanceled   += HandleCanceled;
+            _quest.onReloaded        += HandleReloaded;   // 슬롯 전환 · 새 게임 · 삭제(10-09 출시 점검)
         }
 
         view?.SetQuestsInstant(_quest?.ActiveQuests);
@@ -40,6 +41,7 @@ public sealed class QuestTrackerPresenter : MonoBehaviour
             _quest.onQuestCompleted  -= HandleCompleted;
             _quest.onQuestFailed     -= HandleFailed;
             _quest.onQuestCanceled   -= HandleCanceled;
+            _quest.onReloaded        -= HandleReloaded;
             _quest = null;
         }
 
@@ -50,4 +52,5 @@ public sealed class QuestTrackerPresenter : MonoBehaviour
     private void HandleCompleted(Quest quest)  => view?.RemoveQuest(quest, QuestRemoveKind.Clear);
     private void HandleFailed(Quest quest)     => view?.RemoveQuest(quest, QuestRemoveKind.Fail);
     private void HandleCanceled(Quest quest)   => view?.RemoveQuest(quest, QuestRemoveKind.Instant);
+    private void HandleReloaded()              => view?.SetQuestsInstant(_quest?.ActiveQuests);
 }

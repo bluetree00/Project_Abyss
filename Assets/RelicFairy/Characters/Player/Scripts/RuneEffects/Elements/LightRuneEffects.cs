@@ -102,6 +102,7 @@ public sealed class LightBurstEffect : LightRuneEffectBase
 
         // [실제 VFX] 광폭발 — 원뿔(range=7,half=50°) 판정을 근사. 전방 중앙에 배치하고 원뿔 길이 절반으로 스케일.
         ElementVfxPlayer.PlayBurst(RuneElement.Light, origin + fwd * (CONE_RANGE * 0.4f), CONE_RANGE * 0.5f);
+        SkillRangeRing.Fan(origin, fwd, CONE_RANGE, CONE_HALF_ANGLE * 2f);   // 판정 부채꼴 그대로 — 원 폭발이 부채꼴 끝을 못 덮었다(10-13 이펙트 = 판정)
 
         int n = CombatQuery.GetEnemiesInCone(origin, fwd, CONE_RANGE, CONE_HALF_ANGLE, 16, _buf);
         for (int i = 0; i < n; i++)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -9,6 +10,8 @@ namespace RelicFairy.Monster
 /// </summary>
 public class DKFloatingSword : MonoBehaviour, IDamageable
 {
+    private const float DismissSeconds = 0.5f;   // 부서짐 · 패턴 끝 — 디졸브로 거두고 풀에 돌려준다
+
     // ── 상태 ─────────────────────────────────────────────────
     public bool IsSameColorAsDK { get; private set; }
 
@@ -19,6 +22,8 @@ public class DKFloatingSword : MonoBehaviour, IDamageable
     private Vector3               _basePosition;
     private Action<bool, Vector3> _onDestroyed;
     private bool                  _destroyed;
+    private bool                  _dismissing;
+    private readonly List<Collider> _offColliders = new();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 초기화
@@ -38,6 +43,9 @@ public class DKFloatingSword : MonoBehaviour, IDamageable
         _basePosition   = transform.position;
         _bobTimer       = UnityEngine.Random.Range(0f, Mathf.PI * 2f); // 두 검 위상 차이
         _destroyed      = false;
+        _dismissing     = false;
+        foreach (var c in _offColliders) if (c != null) c.enabled = true;   // 풀 재사용 — 거둘 때 끈 판정을 되살린다
+        _offColliders.Clear();
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -64,7 +72,23 @@ public class DKFloatingSword : MonoBehaviour, IDamageable
 
         _destroyed = true;
         _onDestroyed?.Invoke(IsSameColorAsDK, _basePosition);
-        Destroy(gameObject);
+        Dismiss();
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 거두기
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>디졸브로 거두고 풀에 돌려준다 — 부서질 때 · 패턴이 끝날 때(10-12 디졸브 원칙 — 예전엔 바로 사라졌다). 그동안 맞지 않는다.</summary>
+    public void Dismiss()
+    {
+        if (_dismissing) return;
+        _dismissing = true;
+        _destroyed  = true;
+        foreach (var c in GetComponents<Collider>())
+            if (c.enabled) { c.enabled = false; _offColliders.Add(c); }
+        var go = gameObject;
+        DissolveEffect.PlayDisappear(go, DismissSeconds, () => { if (this != null && _dismissing) BossEffectPool.Release(go); });
     }
 }
 }

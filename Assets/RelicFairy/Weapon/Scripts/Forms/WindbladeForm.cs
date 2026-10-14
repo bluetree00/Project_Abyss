@@ -13,6 +13,7 @@ public sealed class WindbladeForm : WeaponFormBase
 {
     public const string TwinWind = "twin_wind", ReturnWind = "return_wind", StillWind = "still_wind", StormEye = "storm_eye";
     private const float HalfWidth = 0.9f, DecayPerSecond = 1f;
+    private const float StripBody = 0.4f, StripSeconds = 0.35f;   // 판정 띠 외곽선 — 반폭 + 몸 반경(FormStrike.Line과 같은 셈) · 10-13 이펙트 = 판정
 
     private const float TwinSpreadDeg = 12f, ReturnDelay = 0.35f, StillWindRatio = 1f;
     private const int   StormEyeCap = 3;
@@ -34,7 +35,7 @@ public sealed class WindbladeForm : WeaponFormBase
         SetStacks(Stacks + 1);
     }
 
-    public override void OnDamaged() => SetStacks(0);
+    public override void OnDamaged() => SetStacks(0, StackReason.Damaged);
 
     public override void OnDodgeStart()
     {
@@ -49,8 +50,10 @@ public sealed class WindbladeForm : WeaponFormBase
         Vector3 to = Player.transform.position;
         float len = Vector3.Distance(_dodgeFrom, to);
         int n = FormStrike.Line(Player, _dodgeFrom, to - _dodgeFrom, len, HalfWidth, Atk * StillWindRatio, _buf);
-        if (len > 0.3f) FormStrike.PlayVfx(Def.TriggerVfxKey, _dodgeFrom + Vector3.up, to - _dodgeFrom, Def.TriggerVfxScale);   // 지나간 길을 벤다 — 보이게
-        Debug.Log($"[WeaponForm] 무풍 — 맞힘 {n}");
+        if (len > 0.3f) FormStrike.PlayVfx(Def.TriggerVfxKey, _dodgeFrom + Vector3.up, to - _dodgeFrom,
+                                           Def.TriggerVfxScale * Mathf.Clamp(len / Mathf.Max(0.1f, Def.TriggerRange), 0.25f, 1f));   // 지나간 길 길이만큼(풍절 8 m 배율 기준 · 10-13)
+        if (len > 0.3f) FormStrike.GroundStrip(_dodgeFrom, to - _dodgeFrom, len, HalfWidth + StripBody, StripSeconds, Def.Tint);
+        Log($"무풍 — 맞힘 {n}");
         if (n > 0) RaiseTriggered("무풍");
     }
 
@@ -62,11 +65,13 @@ public sealed class WindbladeForm : WeaponFormBase
             Vector3 end = _returnFrom + _returnDir * Def.TriggerRange;
             int n = FormStrike.Line(Player, end, -_returnDir, Def.TriggerRange, HalfWidth, Atk * Def.TriggerAtkRatio, _buf);
             FormStrike.PlayVfx(Def.TriggerVfxKey, end + Vector3.up, -_returnDir, Def.TriggerVfxScale);
-            Debug.Log($"[WeaponForm] 되감는 바람 — 맞힘 {n}");
+            FormStrike.GroundStrip(end, -_returnDir, Def.TriggerRange, HalfWidth + StripBody, StripSeconds, Def.Tint);
+            Log($"되감는 바람 — 맞힘 {n}");
         }
+        if (!Holding) { _lastHitAt += dt; return; }   // 원거리를 든 동안 쉬는 시간을 세지 않는다
         if (Stacks <= 0 || Time.time - _lastHitAt <= Def.IdleSeconds) return;
         _decay += dt * DecayPerSecond;
-        while (_decay >= 1f && Stacks > 0) { _decay -= 1f; SetStacks(Stacks - 1); }
+        while (_decay >= 1f && Stacks > 0) { _decay -= 1f; SetStacks(Stacks - 1, StackReason.Idle); }
     }
 
     private void Release()
@@ -82,18 +87,21 @@ public sealed class WindbladeForm : WeaponFormBase
             hits = FormStrike.Lines(Player, from, left, right, Def.TriggerRange, HalfWidth, dmg, _buf);
             FormStrike.PlayVfx(Def.TriggerVfxKey, from + Vector3.up, left,  Def.TriggerVfxScale);
             FormStrike.PlayVfx(Def.TriggerVfxKey, from + Vector3.up, right, Def.TriggerVfxScale);
-            Debug.Log($"[WeaponForm] 쌍풍 — 맞힘 {hits}");
+            FormStrike.GroundStrip(from, left,  Def.TriggerRange, HalfWidth + StripBody, StripSeconds, Def.Tint);
+            FormStrike.GroundStrip(from, right, Def.TriggerRange, HalfWidth + StripBody, StripSeconds, Def.Tint);
+            Log($"쌍풍 — 맞힘 {hits}");
         }
         else
         {
             hits = FormStrike.Line(Player, from, dir, Def.TriggerRange, HalfWidth, dmg, _buf);
             FormStrike.PlayVfx(Def.TriggerVfxKey, from + Vector3.up, dir, Def.TriggerVfxScale);
+            FormStrike.GroundStrip(from, dir, Def.TriggerRange, HalfWidth + StripBody, StripSeconds, Def.Tint);
         }
         if (Has(ReturnWind)) { _returnAt = Time.time + ReturnDelay; _returnFrom = from; _returnDir = dir; }
         int back = Has(StormEye) ? Mathf.Min(StormEyeCap, hits) : 0;
-        SetStacks(back);
-        if (back > 0) Debug.Log($"[WeaponForm] 폭풍의 눈 — 칼바람 +{back}");
-        Debug.Log($"[WeaponForm] 풍절 — 맞힘 {hits} · 피해 {dmg:0}");
+        SetStacks(back, back > 0 ? StackReason.Refund : StackReason.Trigger);
+        if (back > 0) Log($"폭풍의 눈 — 칼바람 +{back}");
+        Log($"풍절 — 맞힘 {hits} · 피해 {dmg:0}");
         RaiseTriggered(Def.TriggerName);
     }
 }

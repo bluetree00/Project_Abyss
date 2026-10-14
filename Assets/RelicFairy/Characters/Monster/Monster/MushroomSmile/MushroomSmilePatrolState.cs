@@ -41,6 +41,8 @@ public class MushroomSmilePatrolState : PatrolState
                 ctx.Animator?.CrossFade(_data.burstStateName, 0.1f);
                 _triggered  = true;
                 _delayTimer = _data.burstDelay;
+                // 폭발 원 예고 — 앞줄이 터지는 순간 끝에 닿는다(10-13 이펙트 = 판정 · 예고 없던 4 m 폭발)
+                MonsterTelegraph.Circle(ctx.Transform.position, _data.burstRadius, Mathf.Max(0.05f, _data.burstDelay), MonsterTelegraph.Heavy, face: true);
             }
         }
         else
@@ -65,8 +67,15 @@ public class MushroomSmilePatrolState : PatrolState
 
         var obj = Object.Instantiate(_data.explosionEffectPrefab,
                                      ctx.Transform.position, Quaternion.identity);
+        // 데이터 배율을 쓰고 입자에도 먹게 — 예전엔 배율을 안 써 4 m 폭발이 약 1.5 ~ 2 m로 보였다(10-13 이펙트 = 판정)
+        obj.transform.localScale = Vector3.one * Mathf.Max(0.01f, _data.explosionEffectScale);
+        foreach (var p in obj.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var m = p.main;
+            m.scalingMode = ParticleSystemScalingMode.Hierarchy;
+        }
         var ps = obj.GetComponent<ParticleSystem>() ?? obj.GetComponentInChildren<ParticleSystem>();
-        float lifetime = ps != null ? ps.main.duration + 0.5f : 3f;
+        float lifetime = ps != null ? ps.main.duration + ps.main.startLifetimeMultiplier + 0.3f : 3f;
         Object.Destroy(obj, lifetime);
     }
 
@@ -83,7 +92,7 @@ public class MushroomSmilePatrolState : PatrolState
                       ?? col.GetComponentInParent<PlayerController>();
             if (player != null)
             {
-                player.TakeDamage((int)damage);
+                player.TakeDamage((int)damage, ctx.Transform.gameObject);
                 player.ApplyKnockback(
                     (player.transform.position - ctx.Transform.position).normalized * 4f, 0.4f);
                 continue;

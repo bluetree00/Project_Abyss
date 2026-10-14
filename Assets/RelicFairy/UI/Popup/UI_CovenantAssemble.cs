@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -9,6 +10,10 @@ using UnityEngine.UI;
 /// 카드 티어(실버/골드/루비)가 조건·계수·효과를 함께 내장 — 슬라이더 없이 ↻ 리롤로 굴린다.
 /// 결과 = 서약서 첫 문장 id "sen:cause@tier&gt;effect@tier"(10-02 「한 장의 서약서」 — 조건 + 첫 결과).
 /// 문장이 이미 있으면 같은 판을 「서약서 쓰기」로 연다(<c>UI_CovenantAssemble.Write.cs</c>).
+///
+/// 10-11 개편(설계서 UI4종 1장 · v2 보강 / 리서치 B §4-4): 아무것도 고르지 않은 채 열고, 가운데 두루마리가
+/// 「원인 → 효과」 한 문장을 조립해 보인다(안 고른 쪽은 점선 칸). 글자는 톤 v2(Noto · 가짜 굵게 · 기울임 0, 제목만 DNF),
+/// 양피지 위 잉크는 4.5:1 이상, 열 머리는 판 모양 칩 대신 글자 라벨 + 1px 선. 규칙 · 수치 · 선택 결과는 그대로다.
 ///
 /// 사용법:
 ///   var popup = await Managers.UI.ShowPopupUIAndGetAsync&lt;UI_CovenantAssemble&gt;();
@@ -26,7 +31,7 @@ public partial class UI_CovenantAssemble : UI_Popup
     private static readonly Color SilverColor = new(0.80f, 0.82f, 0.88f);
     private static readonly Color GoldColor   = new(0.95f, 0.74f, 0.28f);
     private static readonly Color RubyColor   = new(0.92f, 0.28f, 0.40f);   // 루비 = 진홍
-    private static readonly Color SynergyColor = new(0.35f, 0.90f, 0.80f);  // 시너지 = 청록(등급색과 안 겹치게)
+    private static Sprite s_dashBox, s_thinBox;   // 코드로 굽는 1px 테 — 점선(자리표시) · 실선(줄 판)
 
     // ── [SerializeField] ─────────────────────────────────
     [Header("제목")]
@@ -76,6 +81,7 @@ public partial class UI_CovenantAssemble : UI_Popup
     private System.Random _rng;
     private bool _forceSilver;
     private int  _rerollsLeft;
+    private bool _forged;   // 맺기로 닫히는 중 — 닫기 소리를 내지 않는다(맺기 소리가 맡는다)
     private bool _titleDropped;
     private List<CovenantDraftCard> _causes;
     private List<CovenantDraftCard> _effects;
@@ -85,8 +91,10 @@ public partial class UI_CovenantAssemble : UI_Popup
     // 개편(양피지) 스킨에선 연결선을 긋지 않는다 — ApplyPanelSkin 주석 참조.
     private bool _connectorsOff;
 
-    // 시너지 힌트 — 프리팹에 자리가 없어 효과 줄을 복제해 그 아래 한 줄을 만든다.
-    private TMP_Text _synergyText;
+    // 두루마리 자리표시(점선 칸) — 원인 · 효과를 아직 안 고른 쪽 절에 켠다. 효과 열 머리 밑줄은 쓰기 판이 껐다 켠다.
+    private Image _causeSlot, _effectSlot;
+    private Image _effectHeadRule;
+    private CancellationTokenSource _fadeCts;   // 두루마리 글이 바뀌는 순간의 스밈(0.18초)
 
     // ── Public Properties ────────────────────────────────
     public override bool BlocksGameplay => true;
@@ -104,12 +112,16 @@ public partial class UI_CovenantAssemble : UI_Popup
     {
         base.OnDestroy();   // 차단 잠금 누수 방지(UI_Popup)
         _tcs?.TrySetResult(null);
+        _fadeCts?.Cancel();
+        _fadeCts?.Dispose();
+        _fadeCts = null;
     }
 
     // ── Public Methods ───────────────────────────────────
     /// <summary>드래프트를 굴려 팝업을 구성한다. forceSilver=true면 첫 서약(실버 고정).</summary>
     public void Setup(bool forceSilver, System.Random rng)
     {
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);
         _forceSilver = forceSilver;
         _rng         = rng;
         _rerollsLeft = DefaultRerolls;
@@ -132,8 +144,10 @@ public partial class UI_CovenantAssemble : UI_Popup
         // 보유 서약을 넘겨 페어링을 건다(C4) — 걸어 줄 서약이 없는데 먹는 서약만 손에 쥐면
         // 벼린 서약이 한 번도 터지지 않는 런이 된다. 원인 × 효과 9칸은 전부 벼릴 수 있는 짝으로만 제시된다.
         CovenantAssembleService.DraftBoard(DraftCount, _rng, _forceSilver, HeldCovenants, out _causes, out _effects, BuildStatus);
-        _selCause = 0;
-        _selEffect = 0;
+        // 10-11: 아무것도 고르지 않은 채 연다 — 두루마리 점선 칸이 「무엇을 고를지」를 말하고,
+        // 둘 다 골라야 [서약 새기기]가 켜진다(설계서 1장 3 · 4). 고를 수 있는 카드 · 새겨지는 결과는 그대로다.
+        _selCause  = -1;
+        _selEffect = -1;
 
         WireColumn(_causeCards,  _causes,  true);
         WireColumn(_effectCards, _effects, false);
@@ -153,6 +167,13 @@ public partial class UI_CovenantAssemble : UI_Popup
 
     /// <summary>결과 대기. 반환 = 조립된 서약 id(취소 시 null).</summary>
     public UniTask<string> WaitForResultAsync() => _tcs.Task;
+
+    /// <summary>ESC(취소)로 닫힐 때만 닫기 소리 — 맺기로 닫히면 맺기 소리가 이미 났다.</summary>
+    public override void ClosePopupUI()
+    {
+        if (!_forged) Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);
+        base.ClosePopupUI();
+    }
 
     // ── Private Methods ──────────────────────────────────
     private void WireColumn(UI_AssembleCard[] cards, List<CovenantDraftCard> data, bool isCause)
@@ -219,6 +240,7 @@ public partial class UI_CovenantAssemble : UI_Popup
             _resultOnPaper = true;
             foreach (var t in new[] { _previewTitle, _previewSentence, _previewCondition, _previewCoef, _previewEffect })
                 if (t != null) t.color = InkOnBook;
+            ApplyScrollLayout();
         }
 
         // 제목은 종이 위에 먹으로 — 봉은 좌우 세로라 윗가장자리엔 봉이 없고, 상아색은 밝은 종이 위에서 대비가 없었다(09-28 UI 전수).
@@ -231,7 +253,7 @@ public partial class UI_CovenantAssemble : UI_Popup
         if (_connectorLeft)  _connectorLeft.gameObject.SetActive(false);
         if (_connectorRight) _connectorRight.gameObject.SetActive(false);
 
-        ApplyHeaderChips(skin);
+        ApplyHeaderLabels();
         ApplyMockupLayout();
         ApplyBottomBarSkin();
     }
@@ -251,15 +273,22 @@ public partial class UI_CovenantAssemble : UI_Popup
     // 흰 글자)이라 양피지 위에서 튀거나 날아간다. 아트 재납품에 따라 바뀌는 값이라 한곳에 모아 둔다.
     private static readonly Color ForgeFill     = new(0.36f, 0.26f, 0.13f, 1f);   // 청동
     private static readonly Color BtnLabel      = new(0.97f, 0.93f, 0.80f, 1f);
-    private static readonly Color InkOnBook     = new(0.20f, 0.14f, 0.08f, 1f);
-    private static readonly Color InkOnBookDim  = new(0.36f, 0.28f, 0.19f, 1f);
+    // 10-11: 양피지(밝기 170) 위 잉크는 가장 얼룩진 곳 기준 4.5:1 이상(v2-0) — 본문 #2A1C0E 7:1 · 라벨 #4A3820 4.6:1 · 수치 #5E1A0A 5.3:1.
+    private static readonly Color InkOnBook     = new(0.165f, 0.110f, 0.055f, 1f);   // #2A1C0E
+    private static readonly Color LabelInk      = new(0.290f, 0.220f, 0.125f, 1f);   // #4A3820
+    private static readonly Color NumInk        = new(0.369f, 0.102f, 0.039f, 1f);   // #5E1A0A
     private bool _resultOnPaper;   // 결과 두루마리가 밝은 종이(개편 스킨)인가 — 글자 잉크를 가른다
     private const string PreviewLabelHex = "#A89A82";   // 중앙 두루마리(어두운 판) — 항목 이름
     private const string PreviewValueHex = "#F4E7C8";   //                              값
-    private const string PaperLabelHex   = "#7A6448";   // 중앙 두루마리(밝은 종이 — 개편 스킨) — 항목 이름
+    private const string PaperLabelHex   = "#4A3820";   // 중앙 두루마리(밝은 종이 — 개편 스킨) — 항목 이름(예전 #7A6448 2.3:1)
     private const string PaperValueHex   = "#2A1C0E";   //                                        값
     private const float  SummaryLeft     = 0.105f;      // 하단 조합 줄 — 하단 바 안 비율(양피지 테두리 안쪽부터)
     private const float  SummaryRight    = 0.49f;       //                리롤 표시 앞까지
+
+    // 글자 단계(1080 기준 px, v2-0 「화면당 5단계」) — 15 꼬리표 · 17 보조 · 20 본문 · 22 이름/문장 줄 · 28 제목(DNF).
+    private const float LabelSize  = 17f;   // 열 머리 · 두루마리 수치 줄 · 리롤 표시 · 경고
+    private const float ButtonSize = 20f;   // [서약 새기기] · [새긴다]
+    private const float ChipSize   = 16f;   // 카드 옆 [리롤] · [교체] · 줄 [고치기] — 15는 글자 하한(16) 아래였다(10-14)
     /// <summary>
     /// <b>판 크기만</b> 정한다. 그 안의 배치는 <b>프리팹이 정본</b>이다.
     ///
@@ -295,6 +324,9 @@ public partial class UI_CovenantAssemble : UI_Popup
     /// <summary>
     /// 하단 바 <b>톤만</b> 맞춘다 — 위치는 프리팹 앵커(0.082~0.158)가 갖는다.
     /// 프리팹 버튼은 형광 보라라 양피지 위에서 혼자 튀고, 요약·리롤 글자는 흰색이라 날아간다.
+    ///
+    /// <para>10-11: 요약 문장(「연격 × 마지막 숨결 → …」)은 지웠다 — 가운데 두루마리와 같은 말이었다(설계서 1장 4).
+    /// 이 칸은 이제 「왜 새길 수 없나」(봉인된 조합 · 이미 보유)만 수치색으로 쓴다. 띠에는 「리롤 n」과 버튼만 남는다.</para>
     /// </summary>
     private void ApplyBottomBarSkin()
     {
@@ -302,19 +334,31 @@ public partial class UI_CovenantAssemble : UI_Popup
 
         if (_forgeSummary    != null)
         {
-            _forgeSummary.color = InkOnBook;
+            _forgeSummary.enableAutoSizing = true;
+            UITheme.StyleThinText(_forgeSummary, UIWeight.Regular, LabelSize, NumInk);
             // 하단 바는 책 폭의 2~98%라 왼쪽 끝이 두루마리 말린 곳(양피지 밖)에 걸린다 — 테두리 안에서 시작해 리롤 앞에서 끝낸다(09-29).
             var srt = _forgeSummary.rectTransform;
             srt.anchorMin = new Vector2(SummaryLeft, srt.anchorMin.y);
             srt.anchorMax = new Vector2(SummaryRight, srt.anchorMax.y);
             srt.offsetMin = new Vector2(0f, srt.offsetMin.y);
             srt.offsetMax = new Vector2(0f, srt.offsetMax.y);
-            _forgeSummary.enableAutoSizing = true;
-            _forgeSummary.fontSizeMax = _forgeSummary.fontSize;
-            _forgeSummary.fontSizeMin = Mathf.Max(11f, _forgeSummary.fontSize * 0.75f);
+            _forgeSummary.fontSizeMax = LabelSize;
+            _forgeSummary.fontSizeMin = 15f;
         }
-        if (_rerollCountText != null) _rerollCountText.color = InkOnBookDim;
-        if (_synergyText     != null) _synergyText.color     = InkOnBookDim;
+        if (_rerollCountText != null) UITheme.StyleThinText(_rerollCountText, UIWeight.Medium, LabelSize, LabelInk);
+    }
+
+    /// <summary>
+    /// [서약 새기기] · [새긴다] 켜고 끄기 + 후광(이 화면의 후광은 이것 하나 — v2-0).
+    /// 누를 수 없을 땐 글자도 흐린다 — 배너만 회색이 되고 먹 글자는 그대로 진해 「눌러도 된다」로 읽혔다.
+    /// </summary>
+    private void SetForgeReady(bool ready)
+    {
+        if (_forgeButton == null) return;
+        _forgeButton.interactable = ready;
+        UIAffordGlow.Set(_forgeButton, ready);   // 벼릴 수 있으면 은은한 불(09-29)
+        foreach (var lbl in _forgeButton.GetComponentsInChildren<TMP_Text>(true))
+            lbl.alpha = ready ? 1f : 0.45f;
     }
 
     /// <summary>
@@ -350,8 +394,9 @@ public partial class UI_CovenantAssemble : UI_Popup
             rt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, h * aspect);
         }
 
+        // 10-11: 배너 가운데(#C8A272) 위 크림 글자는 2.0:1이라 「누를 것」이 안 보였다 → 먹 #2A1C0E 7:1 · Noto 500(리서치 B §4-4 P1).
         foreach (var lbl in _forgeButton.GetComponentsInChildren<TMP_Text>(true))
-            lbl.color = BtnLabel;
+            UITheme.StyleThinText(lbl, UIWeight.Medium, ButtonSize, InkOnBook);
     }
 
     private static void TintButton(Button btn, Color fill)
@@ -367,21 +412,220 @@ public partial class UI_CovenantAssemble : UI_Popup
             t.color = BtnLabel;
     }
 
-    /// <summary>열 머리표(원인·결과·효과) 교체. 아트에 글자가 구워져 있어 코드 라벨은 끈다.</summary>
-    private void ApplyHeaderChips(CovenantSkinSO skin)
+    // ── 열 머리 ─────────────────────────────────────────
+    // 칩 아트(글자가 구워진 판)는 눌리지 않는데 버튼처럼 보였고, 첫 카드와 77~94px 떨어져 카드 묶음의 머리로 안 읽혔다(리서치 B §4-3).
+    // 글자 라벨(17 · 500 · 자간) + 아래 1px 선으로 바꾸고 첫 카드 윗변 바로 위로 내린다(설계서 1장 1 · 리서치 P2 「24px」).
+    // 값은 열(Column) 세로 비율 — 열 높이 761(1080 기준)에서 첫 카드 윗변 0.728.
+    private const float HeadTracking = 12f;      // 자간(em/100)
+    private const float HeadLabelMin = 0.758f;   // 라벨 — 첫 카드 윗변에서 약 23~51px 위
+    private const float HeadLabelMax = 0.795f;
+    private const float HeadRuleY    = 0.752f;   // 밑줄 — 첫 카드 윗변에서 약 18px 위
+    private static readonly Color HeadRuleInk = new(0.165f, 0.110f, 0.055f, 0.35f);
+
+    /// <summary>열 머리(원인 · 결과 · 효과)를 글자 라벨 + 밑줄로. 칩 아트는 끈다(스킨 슬롯은 그대로 둔다).</summary>
+    private void ApplyHeaderLabels()
     {
-        SkinHeader(_causeHeaderChip,  _causeHeaderText,  skin.headerCause);
-        SkinHeader(_resultHeaderChip, _resultHeaderText, skin.headerResult);
-        SkinHeader(_effectHeaderChip, _effectHeaderText, skin.headerEffect);
+        StyleHeader(_causeHeaderChip,  _causeHeaderText,  "원인");
+        StyleHeader(_resultHeaderChip, _resultHeaderText, "결과");
+        _effectHeadRule = StyleHeader(_effectHeaderChip, _effectHeaderText, "효과");
     }
 
-    private static void SkinHeader(Image chip, TMP_Text label, Sprite art)
+    /// <summary>머리 한 칸 — 칩을 끄고 라벨을 켠 뒤 밑줄을 단다. 밑줄 Image를 돌려준다(쓰기 판이 껐다 켠다).</summary>
+    private static Image StyleHeader(Image chip, TMP_Text label, string text)
     {
-        if (chip == null || art == null) return;
-        chip.sprite = art;
-        chip.type   = Image.Type.Simple;   // 글자가 구워져 있어 9-slice로 늘리면 깨진다
-        chip.color  = Color.white;
-        if (label != null) label.gameObject.SetActive(false);
+        if (chip != null) chip.enabled = false;
+        if (label == null) return null;
+        label.gameObject.SetActive(true);
+        label.text = text;
+        label.enableAutoSizing = false;
+        UITheme.StyleThinText(label, UIWeight.Medium, LabelSize, LabelInk);
+        label.characterSpacing = HeadTracking;
+        label.alignment        = TextAlignmentOptions.Bottom;
+        label.raycastTarget    = false;
+        var rt = label.rectTransform;
+        rt.anchorMin = new Vector2(0f, HeadLabelMin);
+        rt.anchorMax = new Vector2(1f, HeadLabelMax);
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+        return EnsureLine(rt.parent as RectTransform, "HeadRule(Runtime)", HeadRuleY, 0.08f, 0.92f, HeadRuleInk);
+    }
+
+    /// <summary>가로 1px 선 한 줄(없으면 만든다 · 있으면 다시 앉힌다) — 열 머리 밑줄 · 두루마리 구분선.</summary>
+    private static Image EnsureLine(RectTransform parent, string name, float y, float xMin, float xMax, Color color)
+    {
+        if (parent == null) return null;
+        var found = parent.Find(name);
+        Image img;
+        if (found != null) img = found.GetComponent<Image>();
+        else
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            go.transform.SetParent(parent, false);
+            img = go.GetComponent<Image>();
+            img.raycastTarget = false;
+        }
+        var rt = img.rectTransform;
+        rt.anchorMin = new Vector2(xMin, y);
+        rt.anchorMax = new Vector2(xMax, y);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(0f, UITheme.Thin.Stroke);
+        rt.anchoredPosition = Vector2.zero;
+        img.color = color;
+        return img;
+    }
+
+    // ── 가운데 두루마리 = 문장 조립 ───────────────────────
+    // 종이 안쪽 장식선 ≈ 열 x 0.133~0.865 · y 0.195~0.625(28.png 실측). 글은 그 안에 좌우 대칭으로 앉힌다
+    // (예전 0.159~0.788 — 열 가운데에서 10.7px 왼쪽으로 치우쳤다). 위에서부터
+    // 등급 줄(17 · 500) → 문장 앞절 = 원인(20) → 「→ 뒷절」 = 효과(20) → 가는 선 → 봉인 계수(17) → 효과 수치 · 시너지(17).
+    private const float ScrollL = 0.16f, ScrollR = 0.84f;
+    private static readonly Vector2 PlateMin = new(0.14f, 0.200f);
+    private static readonly Vector2 PlateMax = new(0.86f, 0.622f);
+    private static readonly Vector2 TitleY   = new(0.566f, 0.602f);
+    private static readonly Vector2 CauseY   = new(0.492f, 0.560f);   // 두 절 사이 약 8px — 점선 칸 둘이 겹치지 않게
+    private static readonly Vector2 VerbY    = new(0.418f, 0.482f);
+    private const float ScrollRuleY = 0.405f;
+    private static readonly Vector2 CoefY    = new(0.360f, 0.396f);
+    private static readonly Vector2 EffectY  = new(0.212f, 0.356f);
+    private const float  SentenceSize = 20f;   // 문장(리서치 「Regular 18」 · 설계서 22 → v2 단계 20)
+    private const float  SentenceMin  = 17f;
+    private const float  RowMin       = 15f;
+    private const float  LabelCol     = 90f;   // 항목 이름 열 폭(px) — 값은 그 오른쪽에서 시작하고 줄바꿈해도 같은 자리로
+    private const string HintSizePct  = "85%"; // 자리표시 글자 = 20의 85% ≈ 17
+    private const float  SlotPad      = 10f;   // 자리표시 글자의 왼쪽 여백(점선 안쪽)
+    // 두루마리 안쪽은 종이 결이 글 밑에 깔려 대비가 들쭉날쭉했다 — 평평한 밝은 양피지 판을 깐다(설계서 1장 3).
+    private static readonly Color PlateInk = new(0.94f, 0.90f, 0.81f, 0.72f);
+    private static readonly Color SlotInk  = new(0.165f, 0.110f, 0.055f, 0.45f);
+    private static readonly Color RuleInk  = new(0.165f, 0.110f, 0.055f, 0.22f);
+
+    /// <summary>
+    /// 두루마리 글 자리 · 서체 · 밝은 판 · 자리표시 칸. 개편 스킨(밝은 종이)일 때 Setup마다 한 번 돈다 — 만드는 것은 이름으로 찾아 한 번만.
+    /// 저작 프리팹의 rect를 런타임에 다시 쓴다(프리팹 무수술).
+    /// </summary>
+    private void ApplyScrollLayout()
+    {
+        var column = _previewTitle != null ? _previewTitle.rectTransform.parent as RectTransform : null;
+        if (column == null) return;
+
+        EnsurePlate(column);
+        EnsureLine(column, "ScrollRule(Runtime)", ScrollRuleY, ScrollL, ScrollR, RuleInk);
+
+        StyleScrollText(_previewTitle,     TitleY,  UIWeight.Medium,  LabelSize,    RowMin,      false, TextAlignmentOptions.MidlineLeft);
+        StyleScrollText(_previewCondition, CauseY,  UIWeight.Regular, SentenceSize, SentenceMin, true,  TextAlignmentOptions.BottomLeft);
+        StyleScrollText(_previewSentence,  VerbY,   UIWeight.Regular, SentenceSize, SentenceMin, true,  TextAlignmentOptions.TopLeft);
+        StyleScrollText(_previewCoef,      CoefY,   UIWeight.Regular, LabelSize,    RowMin,      false, TextAlignmentOptions.MidlineLeft);
+        StyleScrollText(_previewEffect,    EffectY, UIWeight.Regular, LabelSize,    RowMin,      true,  TextAlignmentOptions.TopLeft);
+
+        _causeSlot  = EnsureSlot(_previewCondition);
+        _effectSlot = EnsureSlot(_previewSentence);
+    }
+
+    /// <summary>두루마리 글 한 칸 — 자리 · Noto 굵기 · 크기(자동 크기는 줄이기만) · 기울임/가짜 굵게 0.</summary>
+    private static void StyleScrollText(TMP_Text t, Vector2 y, UIWeight weight, float size, float min, bool wrap, TextAlignmentOptions align)
+    {
+        if (t == null) return;
+        var rt = t.rectTransform;
+        rt.anchorMin = new Vector2(ScrollL, y.x);
+        rt.anchorMax = new Vector2(ScrollR, y.y);
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        t.enableAutoSizing = true;
+        UITheme.StyleThinText(t, weight, size, InkOnBook);
+        t.fontSizeMax      = size;
+        t.fontSizeMin      = min;
+        t.textWrappingMode = wrap ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
+        t.overflowMode     = TextOverflowModes.Ellipsis;
+        t.alignment        = align;
+        t.characterSpacing = 0f;
+        t.margin           = Vector4.zero;
+    }
+
+    /// <summary>두루마리 안쪽 밝은 판 — 두루마리 아트 바로 위 · 글 아래에 한 번 깐다.</summary>
+    private void EnsurePlate(RectTransform column)
+    {
+        const string name = "PaperPlate(Runtime)";
+        if (column.Find(name) != null) return;
+        var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(column, false);
+        int above = -1;
+        if (_prismBg     != null && _prismBg.transform.parent     == column) above = Mathf.Max(above, _prismBg.transform.GetSiblingIndex());
+        if (_prismBorder != null && _prismBorder.transform.parent == column) above = Mathf.Max(above, _prismBorder.transform.GetSiblingIndex());
+        rt.SetSiblingIndex(above + 1);
+        rt.anchorMin = PlateMin;
+        rt.anchorMax = PlateMax;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+        var img = go.GetComponent<Image>();
+        img.sprite        = UIProceduralSprites.RoundedRect(radius: 6f, feather: 10f);   // 가장자리가 종이에 스며든다
+        img.type          = Image.Type.Sliced;
+        img.color         = PlateInk;
+        img.raycastTarget = false;
+    }
+
+    /// <summary>자리표시 점선 칸 — 글 상자보다 사방으로 조금 크게. 처음엔 꺼 둔다.</summary>
+    private static Image EnsureSlot(TMP_Text host)
+    {
+        if (host == null) return null;
+        const string name = "Slot(Runtime)";
+        var found = host.transform.Find(name);
+        if (found != null) return found.GetComponent<Image>();
+        var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(host.transform, false);
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = new Vector2(-6f, -2f);
+        rt.offsetMax = new Vector2(6f, 2f);
+        var img = go.GetComponent<Image>();
+        StyleBox(img, DashBox, SlotInk);
+        img.enabled = false;
+        return img;
+    }
+
+    /// <summary>1px 테 Image — 점선은 변을 되풀이(Tiled), 실선은 늘림(Sliced). 안쪽은 비운다.</summary>
+    private static void StyleBox(Image img, Sprite box, Color color)
+    {
+        img.sprite        = box;
+        img.type          = box == DashBox ? Image.Type.Tiled : Image.Type.Sliced;
+        img.fillCenter    = false;
+        img.color         = color;
+        img.raycastTarget = false;
+    }
+
+    /// <summary>1px 점선 테 — 변 가운데 8px를 4px 선 · 4px 틈으로 되풀이한다(Tiled). 자리표시 칸.</summary>
+    private static Sprite DashBox => s_dashBox != null ? s_dashBox : (s_dashBox = BakeBox("CovDashBox", dashed: true));
+
+    /// <summary>1px 실선 테 — 9-slice라 늘려도 선은 1px로 남는다. 쓰기 판 줄 · [고쳐] 라벨.</summary>
+    private static Sprite ThinBox => s_thinBox != null ? s_thinBox : (s_thinBox = BakeBox("CovThinBox", dashed: false));
+
+    /// <summary>16×16 흰 테(바깥 1px) · 9-slice 경계 4. 점선이면 변 가운데 칸(4~11)의 뒤 절반을 비운다.</summary>
+    private static Sprite BakeBox(string name, bool dashed)
+    {
+        const int n = 16, b = 4;
+        var tex = new Texture2D(n, n, TextureFormat.RGBA32, false)
+        {
+            name = name, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, hideFlags = HideFlags.HideAndDontSave,
+        };
+        var px = new Color32[n * n];
+        for (int y = 0; y < n; y++)
+        {
+            for (int x = 0; x < n; x++)
+            {
+                bool edge  = x == 0 || y == 0 || x == n - 1 || y == n - 1;
+                int  along = (x == 0 || x == n - 1) ? y : x;
+                bool gap   = dashed && along >= b && along < n - b && ((along - b) / 4) % 2 == 1;
+                px[y * n + x] = new Color32(255, 255, 255, (byte)(edge && !gap ? 255 : 0));
+            }
+        }
+        tex.SetPixels32(px);
+        tex.Apply(false, true);
+        var s = Sprite.Create(tex, new Rect(0f, 0f, n, n), new Vector2(0.5f, 0.5f), 100f, 0,
+                              SpriteMeshType.FullRect, new Vector4(b, b, b, b));
+        s.name      = name;
+        s.hideFlags = HideFlags.HideAndDontSave;
+        return s;
     }
 
     private static void SkinImage(Image img, Sprite sprite)
@@ -394,7 +638,7 @@ public partial class UI_CovenantAssemble : UI_Popup
 
     private void Select(bool isCause, int idx)
     {
-        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiEvent(SoundEvent.CovenantPick);
         if (isCause) _selCause = idx;
         else         _selEffect = idx;
         RefreshSelection();
@@ -402,8 +646,8 @@ public partial class UI_CovenantAssemble : UI_Popup
 
     private void Reroll(bool isCause, int idx)
     {
-        if (_rerollsLeft <= 0) return;
-        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        if (_rerollsLeft <= 0) { Managers.Sound?.PlayUiEvent(SoundEvent.UiReject); return; }   // 리롤 소진
+        Managers.Sound?.PlayUiEvent(SoundEvent.CovenantReroll);
 
         var data = isCause ? _causes : _effects;
 
@@ -467,12 +711,12 @@ public partial class UI_CovenantAssemble : UI_Popup
     {
         if (_connectorsOff || _bookRect == null || _prismRect == null) return;
 
-        if (_connectorLeft && _causeCards != null && _selCause < _causeCards.Length && _causeCards[_selCause])
+        if (_connectorLeft && _causeCards != null && _selCause >= 0 && _selCause < _causeCards.Length && _causeCards[_selCause])
             DrawLine(_connectorLeft,
                      EdgeInBook((RectTransform)_causeCards[_selCause].transform, +1f),  // 카드 우측 중앙
                      EdgeInBook(_prismRect, -1f));                                       // 프리즘 좌측 중앙
 
-        if (_connectorRight && _effectCards != null && _selEffect < _effectCards.Length && _effectCards[_selEffect])
+        if (_connectorRight && _effectCards != null && _selEffect >= 0 && _selEffect < _effectCards.Length && _effectCards[_selEffect])
             DrawLine(_connectorRight,
                      EdgeInBook((RectTransform)_effectCards[_selEffect].transform, -1f), // 카드 좌측 중앙
                      EdgeInBook(_prismRect, +1f));                                        // 프리즘 우측 중앙
@@ -497,51 +741,138 @@ public partial class UI_CovenantAssemble : UI_Popup
         if (!line.gameObject.activeSelf) line.gameObject.SetActive(true);
     }
 
+    /// <summary>
+    /// 가운데 두루마리 = 문장 조립(설계서 1장 3). 등급 줄 → 「원인 조건 → 효과 동사구」 한 문장 → 수치 두 줄(봉인 계수 · 효과).
+    /// 안 고른 쪽은 점선 칸 「원인을 고른다」 / 「효과를 고른다」. 따옴표 · 기울임 없이, 수치만 적갈 + Noto 500.
+    /// 「발동 조건」 줄은 문장 앞절과 같은 말이라 없앴고, 아래 띠 요약도 같은 말이라 지웠다(경고만 남긴다).
+    /// </summary>
     private void UpdatePreview()
     {
-        var cause  = _causes[_selCause];
-        var effect = _effects[_selEffect];
-        var p = CovenantAssemblePreview.Build(cause.id, cause.tier, effect.id, effect.tier);
-        if (!p.valid) return;
+        bool hasCause  = _causes  != null && _selCause  >= 0 && _selCause  < _causes.Count;
+        bool hasEffect = _effects != null && _selEffect >= 0 && _selEffect < _effects.Count;
+        CovenantPalette.CauseDef  cd = default;
+        CovenantPalette.EffectDef ed = default;
+        hasCause  = hasCause  && CovenantPalette.TryGetCause(_causes[_selCause].id, out cd);
+        hasEffect = hasEffect && CovenantPalette.TryGetEffect(_effects[_selEffect].id, out ed);
 
-        SetText(_previewTitle,
-            $"{p.causeName}[{p.causeTier.DisplayName()}] × {p.effectName}[{p.effectTier.DisplayName()}]");
-        // 한 색 글자는 「얼마나」가 안 읽힌다 — 항목 이름은 옅게, 값은 진하게, 수치는 색으로(09-29).
         // 두루마리가 밝은 종이면(개편 스킨) 잉크 · 적갈, 어두운 판이면(구 아트) 상아 · 금.
-        string num   = _resultOnPaper ? UIKeywordInk.OnParchment : UIKeywordInk.OnDark;
+        string num   = _resultOnPaper ? UI_AssembleCard.NumOnParchment : UIKeywordInk.OnDark;
         string label = _resultOnPaper ? PaperLabelHex : PreviewLabelHex;
-        string value = _resultOnPaper ? PaperValueHex : PreviewValueHex;
-        SetText(_previewSentence, UIKeywordInk.Words($"\"{p.ResultSentence}\"", num));
-        SetText(_previewCondition, $"<color={label}>발동 조건</color>  <color={value}>{p.causeDesc}</color>");
-        SetText(_previewCoef,      $"<color={label}>봉인 계수</color>  <color={num}><b>×{p.coefficient:0.0}</b></color>");
-        SetText(_previewEffect,    $"<color={label}>효과</color>  <color={value}>" + UIKeywordInk.Numbers(p.EffectAmountLabel(), num)
-                                   + $"</color>  <color={label}>({p.Badge})</color>");
-        SetText(_forgeSummary,     $"{p.causeName} × {p.effectName}  →  " + UIKeywordInk.Numbers(p.EffectAmountCompact(), UIKeywordInk.OnParchment));
-        RefreshEffectAmounts();
+        RestartFades();
 
-        UpdateSynergyLine(p);
+        // 등급 줄 — 「◆ 연격 · ◆ 마지막 숨결」. 등급은 「[골드]」 날글자 대신 등급색 마름모(설계서 1장 3). 안 고른 쪽은 흐린 자리 이름.
+        string causeHead  = hasCause  ? $"{TierMark(_causes[_selCause].tier)} {cd.name}"   : $"<color={label}>원인</color>";
+        string effectHead = hasEffect ? $"{TierMark(_effects[_selEffect].tier)} {ed.name}" : $"<color={label}>효과</color>";
+        SetText(_previewTitle, $"{causeHead}  <color={label}>·</color>  {effectHead}");
+
+        // 문장 — 앞절(원인 조건) → 뒷절(첫 결과는 「곧바로」 이음이라 머리말 없는 동사구).
+        SetClause(_previewCondition, _causeSlot, hasCause ? UI_AssembleCard.InkNumbers(cd.desc, num) : null,
+                  string.Empty, "원인을 고른다", label, TextAlignmentOptions.BottomLeft);
+        SetClause(_previewSentence, _effectSlot, hasEffect ? "→ " + CovenantGrammar.Line(ed.id, ClauseLink.Immediate, null) : null,
+                  "→ ", "효과를 고른다", label, TextAlignmentOptions.TopLeft);
+
+        // 수치 두 줄 — 항목 이름 왼쪽 열(90) + 값 오른쪽 열(리서치 B §4-4 P2 「하데스 계약서 2열」).
+        string coef = hasCause
+            ? UI_AssembleCard.InkNumbers($"×{CovenantMath.RawCoef(cd, _causes[_selCause].tier):0.0}", num)
+            : $"<color={label}>—</color>";
+        SetTextFading(_previewCoef, Row("봉인 계수", coef, label));
+
+        var p = hasCause && hasEffect
+            ? CovenantAssemblePreview.Build(_causes[_selCause].id, _causes[_selCause].tier, _effects[_selEffect].id, _effects[_selEffect].tier)
+            : default;
+        // 원인을 고르기 전엔 효과 크기가 정해지지 않는다(원인 계수가 곱해진다) — 무슨 효과인지만 흐리게 적는다.
+        string amount = p.valid    ? UI_AssembleCard.InkNumbers(p.EffectAmountLabel(), num)
+                      : hasEffect  ? $"<color={label}>{ed.desc}</color>"
+                      :              $"<color={label}>—</color>";
+        string rows = Row("효과", amount, label);
+        // 보유 서약과 물리면 한 줄 더 — 시너지는 청록 대신 수치색 + 「시너지」 글자로(리서치 P3), 종이 안에 앉는다(예전엔 아래로 삐져나갔다).
+        string hint = p.valid ? p.SynergyHint(HeldCovenants) : null;
+        if (!string.IsNullOrEmpty(hint))
+            rows += "\n" + Row("시너지", $"<color={num}>{SynergyBody(hint)}</color>", label);
+        SetTextFading(_previewEffect, rows);
+
+        RefreshEffectAmounts();
 
         // 이미 가진 조합은 TryAdd가 조용히 거절해 "벼렸는데 아무 일도 없는" 상태가 된다.
         // 금지 조합은 TryAdd 자체는 통과하지만 밸런스가 무너지는 짝이라 팔레트가 막는다.
-        // 둘 다 누르기 전에 잠가서 헛손질과 사고를 없앤다.
-        if (_forgeButton)
-        {
-            bool owned  = IsOwned(SelectedId());
-            bool banned = CovenantPalette.IsBannedPair(cause.id, effect.id);
-            _forgeButton.interactable = !owned && !banned;
-            UIAffordGlow.Set(_forgeButton, _forgeButton.interactable);   // 벼릴 수 있으면 은은한 불(09-29)
+        // 둘 다 누르기 전에 잠가서 헛손질과 사고를 없앤다. 원인 · 효과를 다 고르기 전에도 잠근다(10-11).
+        bool both   = hasCause && hasEffect;
+        bool owned  = both && IsOwned(SelectedId());
+        bool banned = both && CovenantPalette.IsBannedPair(_causes[_selCause].id, _effects[_selEffect].id);
+        SetForgeReady(both && !owned && !banned);
+        SetText(_forgeSummary, banned ? "봉인된 조합 — 이 원인으로는 이 효과를 벼릴 수 없다"
+                             : owned  ? "이미 보유한 조합 — 원인이나 효과를 바꿔야 벼릴 수 있다"
+                             :          string.Empty);
+    }
 
-            if (banned)     SetText(_forgeSummary, "봉인된 조합 — 이 원인으로는 이 효과를 벼릴 수 없다");
-            else if (owned) SetText(_forgeSummary, "이미 보유한 조합 — 원인이나 효과를 바꿔야 벼릴 수 있다");
+    /// <summary>문장 한 절 — 고른 말이면 그대로, 아니면 점선 칸 안에 흐린 안내(85% ≈ 17).</summary>
+    private void SetClause(TMP_Text t, Image slot, string filled, string lead, string hint, string label, TextAlignmentOptions align)
+    {
+        if (t == null) return;
+        bool empty = filled == null;
+        t.alignment = empty ? TextAlignmentOptions.MidlineLeft : align;
+        t.margin    = empty ? new Vector4(SlotPad, 0f, 0f, 0f) : Vector4.zero;
+        if (slot != null) slot.enabled = empty;
+        SetTextFading(t, empty ? $"{lead}<size={HintSizePct}><color={label}>{hint}</color></size>" : filled);
+    }
+
+    /// <summary>항목 이름(왼쪽 열) + 값(오른쪽 열). 값이 줄바꿈해도 같은 열에서 이어진다(&lt;indent&gt;).</summary>
+    private static string Row(string name, string value, string label)
+        => $"<color={label}>{name}</color><indent={LabelCol}>{value}</indent>";
+
+    /// <summary>시너지 힌트 앞의 「시너지」 머리말을 뗀다 — 왼쪽 열 이름이 같은 말을 한다.</summary>
+    private static string SynergyBody(string hint)
+    {
+        const string head = "시너지";
+        return hint.StartsWith(head, System.StringComparison.Ordinal) ? hint.Substring(head.Length).TrimStart() : hint;
+    }
+
+    /// <summary>양피지 위 등급 마름모. 등급색은 등급 표기에만 쓴다(v2-0). 실버의 밝은 은색은 종이 위에서 사라져 강철빛으로 눌렀다.</summary>
+    private static string TierMark(CovenantTier t) => $"<color={TierInkHex(t)}>◆</color>";
+
+    private static string TierInkHex(CovenantTier t) => t switch
+    {
+        CovenantTier.Gold => "#8C6412",
+        CovenantTier.Ruby => "#9C2238",
+        _                 => "#5B6170",
+    };
+
+    // ── 바뀌는 순간 스밈 ─────────────────────────────────
+    /// <summary>이번 갱신의 스밈을 새로 시작한다 — 앞 스밈이 덜 끝났으면 끊고 그 글은 다 보이게 둔다.</summary>
+    private void RestartFades()
+    {
+        _fadeCts?.Cancel();
+        _fadeCts?.Dispose();
+        _fadeCts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+    }
+
+    /// <summary>글이 바뀌었을 때만 갈아 끼우고 0.18초 스며들게 한다(톤 v2 「상태가 바뀌는 순간은 실시간 연출」). 같으면 그대로.</summary>
+    private void SetTextFading(TMP_Text t, string v)
+    {
+        if (t == null || t.text == v) return;
+        t.text = v;
+        if (_fadeCts != null && isActiveAndEnabled) FadeInAsync(t, _fadeCts.Token).Forget();
+    }
+
+    private static async UniTaskVoid FadeInAsync(TMP_Text t, CancellationToken ct)
+    {
+        try
+        {
+            await UIMotion.Tween(UIMotion.Swap, k => { if (t != null) t.alpha = k; }, ct);
+        }
+        catch (System.OperationCanceledException)
+        {
+            if (t != null) t.alpha = 1f;   // 끊긴 스밈은 다 보이게 — 반쯤 흐린 채 남지 않는다
         }
     }
 
     /// <summary>
     /// 효과 카드 설명 = 지금 고른 원인으로 벼렸을 때의 <b>실제 수치</b>(원인 계수가 곱해진다) — 서술형 문구로는 무슨 기능인지 안 읽혔다(09-29).
+    /// 원인을 고르기 전엔 카드가 서술형 설명 그대로다(수치가 아직 정해지지 않는다).
     /// </summary>
     private void RefreshEffectAmounts()
     {
-        if (_effectCards == null || _causes == null || _selCause >= _causes.Count) return;
+        if (_effectCards == null || _causes == null || _selCause < 0 || _selCause >= _causes.Count) return;
         var cause = _causes[_selCause];
         for (int i = 0; i < _effectCards.Length && i < _effects.Count; i++)
         {
@@ -549,45 +880,6 @@ public partial class UI_CovenantAssemble : UI_Popup
             var p = CovenantAssemblePreview.Build(cause.id, cause.tier, _effects[i].id, _effects[i].tier);
             if (p.valid) _effectCards[i].SetSub(p.EffectAmountCompact());
         }
-    }
-
-    /// <summary>선택된 조합이 보유 서약과 물리면 한 줄로 알려준다. 없으면 줄을 감춘다.</summary>
-    private void UpdateSynergyLine(CovenantAssemblePreview p)
-    {
-        EnsureSynergyText();
-        if (_synergyText == null) return;
-
-        string hint = p.SynergyHint(HeldCovenants);
-        _synergyText.gameObject.SetActive(!string.IsNullOrEmpty(hint));
-        if (!string.IsNullOrEmpty(hint)) _synergyText.text = UIKoreanWrap.Words(hint);
-    }
-
-    /// <summary>
-    /// 시너지 줄을 효과 줄 바로 아래에 만든다(프리팹 무수술).
-    /// 효과 줄을 복제하는 이유: 폰트·정렬·자동축소 설정이 이미 이 팝업에 맞게 저작돼 있다.
-    /// </summary>
-    private void EnsureSynergyText()
-    {
-        if (_synergyText != null || _previewEffect == null) return;
-
-        var src   = (RectTransform)_previewEffect.transform;
-        var clone = Instantiate(_previewEffect, src.parent);
-        clone.name  = "SynergyText(Runtime)";
-        clone.color = SynergyColor;
-
-        // 자리는 앵커로만 잡는다 — 팝업이 막 생성된 시점엔 rect.height가 아직 0이라
-        // 픽셀로 내리면 효과 줄과 완전히 겹친다.
-        var rt = (RectTransform)clone.transform;
-        float h = src.anchorMax.y - src.anchorMin.y;
-        rt.anchorMin        = src.anchorMin - new Vector2(0f, h);
-        rt.anchorMax        = src.anchorMax - new Vector2(0f, h);
-        rt.pivot            = src.pivot;
-        rt.sizeDelta        = src.sizeDelta;
-        rt.localScale       = src.localScale;
-        rt.anchoredPosition = src.anchoredPosition;
-
-        FitSingleLine(clone);
-        _synergyText = clone;
     }
 
     private string SelectedId()
@@ -626,10 +918,12 @@ public partial class UI_CovenantAssemble : UI_Popup
     /// <summary>고른 원인·효과 한 쌍을 확정하고 팝업을 닫는다.</summary>
     private void OnForge()
     {
+        if (_selCause < 0 || _selEffect < 0) return;   // 둘 다 고르기 전(버튼 잠금이 뚫린 경로 대비)
         string id = SelectedId();
         if (IsOwned(id)) return;   // 잠금이 뚫린 경로(키보드 등) 대비 최종 방어
 
-        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiEvent(SoundEvent.CovenantForge);
+        _forged = true;
 
         // 닫기가 먼저다. TrySetResult가 대기 측(WorldCovenantAltar.OpenAsync) 후속을 동기로 재개시킬 수 있어,
         // 순서를 뒤집으면 팝업이 열린 채(=HUD 차단/timeScale 0) 획득 안내가 떠 안내가 화면에 눌어붙는다.
@@ -649,21 +943,21 @@ public partial class UI_CovenantAssemble : UI_Popup
     /// <summary>
     /// 리롤 버튼 라벨. 프리팹은 ↻(U+21BB)로 authoring 돼 있는데 본문 폰트(DNFForgedBlade)에
     /// 그 글리프가 없어 화면에는 빈 네모(□)만 나온다 — 폰트에 있는 글자로 바꿔 준다.
+    /// 10-11: DNF Bold + 가짜 굵게 16 → Noto 500 15(리서치 B §4-4 P3). 칩은 56×32로 커졌다(<see cref="UI_AssembleCard.DockReroll"/>).
     /// </summary>
     private static void FixRerollLabel(Button btn)
     {
         var lbl = btn.GetComponentInChildren<TMP_Text>(true);
         if (lbl == null) return;
-        lbl.text     = "리롤";
-        lbl.fontSize = 16f;
+        lbl.text = "리롤";
 
         // 버튼이 카드 비율을 따라가면서 카드가 작을 땐 22px까지 좁아진다 — 14pt 두 글자가 넘친다.
         // 다른 라벨과 같은 규칙으로 박스 안에 가둔다(키우지는 않는다).
         lbl.textWrappingMode = TextWrappingModes.NoWrap;
         lbl.overflowMode     = TextOverflowModes.Ellipsis;
         lbl.enableAutoSizing = true;
-        lbl.fontSizeMax      = 16f;   // 가독성 하한 — 14였을 땐 위의 16이 여기서 다시 눌렸다
-        lbl.fontSizeMin      = 8f;
+        UITheme.StyleThinText(lbl, UIWeight.Medium, ChipSize, lbl.color);   // 색은 카드가 칠한 청동 위 잉크 그대로
+        lbl.fontSizeMin      = 12f;
     }
 
     /// <summary>
@@ -675,9 +969,13 @@ public partial class UI_CovenantAssemble : UI_Popup
     ///
     /// 한 줄짜리 라벨은 줄바꿈 없이 말줄임(…), 중앙 결과 문장은 줄바꿈 + 자동 축소로 박스 안에 가둔다.
     /// 프리팹을 고쳐도 되지만, 값이 코드에서 오는 이상 제약도 코드가 쥐고 있어야 다시 깨지지 않는다.
+    /// 개편 스킨(밝은 종이)이면 두루마리 글은 <see cref="ApplyScrollLayout"/>이 자리 · 서체째 다시 잡는다.
     /// </summary>
     private void ConfigureTextFitting()
     {
+        // 제목은 DNF 한 줄만 남긴다(유물 콘셉트) — 프리팹은 DNF Bold 위에 가짜 굵게(Bold 스타일)를 또 걸어 두었다(v2-0 금지).
+        if (_titleText) _titleText.fontStyle = FontStyles.Normal;
+
         // 한 줄 라벨 — 넘치면 말줄임(레이아웃을 밀지 않는다)
         FitSingleLine(_previewTitle);
         FitSingleLine(_previewCondition);

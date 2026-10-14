@@ -21,8 +21,8 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
-  _jumpDuration: 2
-  _jumpArcHeight: -1
+  _jumpDuration: 0.9
+  _jumpArcHeight: 3
   _clawCount: 1
   _clawAnimDuration: 1.1
   _warnDuration: 0.15

@@ -31,6 +31,7 @@ public static class PlayerResourceHookupEditor
     private const string TablePath    = "Assets/RelicFairy/Systems/Sound/SoundEventTable.asset";
     private const string TableAddress = "SoundEventTable";
     private const string AttackSfx    = "Assets/RelicFairy/Characters/Player/Sound/Attack/";
+    private const string HovlSfx      = "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/HSFiles/Sounds/";
     private const string RelicSfx     = "Assets/RelicFairy/Systems/Relic/Sound/";
     private const string UiSfx        = "Assets/RelicFairy/Prefabs/UI/Bamao/BamaoUIPack/Sound/SoundFx/UI/";
 
@@ -41,6 +42,9 @@ public static class PlayerResourceHookupEditor
         ("sfx_player_shot",        AttackSfx + "sfx_player_shot.wav"),
         ("sfx_player_skill",       AttackSfx + "sfx_player_skill.wav"),
         ("sfx_player_finisher",    AttackSfx + "sfx_player_finisher.wav"),
+        ("sfx_skill_charge",       HovlSfx   + "Skill 3.wav"),    // 10-08 A6 — 조용히 모았다가 0.85초에 밝게 터짐
+        ("sfx_skill_buff",         HovlSfx   + "Skill 1.wav"),    // 잔잔한 반짝임(−22 dB라 볼륨을 올린다)
+        ("sfx_skill_heavy_impact", HovlSfx   + "Skill 10.wav"),   // 0.15초 정점 낮은 쿵
         ("sfx_relic_sun_fall",     RelicSfx  + "sfx_relic_sun_fall.wav"),
         ("sfx_relic_sun_impact",   RelicSfx  + "sfx_relic_sun_impact.wav"),
         (SoundKey.Sfx.GoldPickup,  UiSfx     + "Coin Pop.wav"),
@@ -55,6 +59,9 @@ public static class PlayerResourceHookupEditor
         (SoundEvent.PlayerShot,       "sfx_player_shot",        0.30f, 0.10f),
         (SoundEvent.PlayerSkill,      "sfx_player_skill",       0.50f, 0.05f),
         (SoundEvent.PlayerFinisher,   "sfx_player_finisher",    0.55f, 0.04f),
+        (SoundEvent.SkillCharge,      "sfx_skill_charge",       0.45f, 0.04f),
+        (SoundEvent.SkillBuff,        "sfx_skill_buff",         0.80f, 0.05f),
+        (SoundEvent.SkillHeavyImpact, "sfx_skill_heavy_impact", 0.55f, 0.04f),
         (SoundEvent.RelicSunFall,     "sfx_relic_sun_fall",     0.70f, 0f),
         (SoundEvent.RelicSunImpact,   "sfx_relic_sun_impact",   0.85f, 0f),
         (SoundEvent.DoorOpen,         SoundKey.Sfx.OpenDoor,    0.55f, 0f),   // 이미 등록된 문 열림 소리

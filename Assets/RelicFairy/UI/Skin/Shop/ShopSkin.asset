@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 22a89dda1e0945949b62f5a47a0c3992, type: 3}
   m_Name: ShopSkin
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   background: {fileID: 21300000, guid: 17567518a306c0442bb0a3e97ad8b27f, type: 3}
   topBand: {fileID: 21300000, guid: 54f6d09e5c2e5554faddd7b26609dfd1, type: 3}
   titleBoard: {fileID: 21300000, guid: 58841303fb848c643b5646772b5d08da, type: 3}
@@ -29,8 +29,8 @@ MonoBehaviour:
   iconFrame: {fileID: 21300000, guid: 2627f424c11abf3428df3c4274c0e8a7, type: 3}
   categoryBadgeBg:
   - {fileID: 21300000, guid: ba820f0ce31aedf46bb86c78766455c1, type: 3}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 21300000, guid: 5b187b3788d854e459b8cc43df355a26, type: 3}
+  - {fileID: 21300000, guid: 037f1ca8c38cb594085f343ef1fa28d4, type: 3}
   - {fileID: 21300000, guid: 140249897a1adf74e8dcf80a81edf647, type: 3}
   categoryBadge:
   - {fileID: 21300000, guid: 97f12512d8d77c5429b1539d3ccd0f6e, type: 3}
@@ -40,3 +40,7 @@ MonoBehaviour:
   selectedPanel: {fileID: 21300000, guid: 6417c1742a201984b8701b263a6363b5, type: 3}
   buyButton: {fileID: 21300000, guid: 8fb4232830ecf1046afa747a6d7f663a, type: 3}
   rerollButton: {fileID: 21300000, guid: 5e559ce32c408fa4ea62c04a1e95e351, type: 3}
+  exitPanel: {fileID: 21300000, guid: 0c7717984ddb5774a9130d9829f70ad4, type: 3}
+  rerollPanel: {fileID: 21300000, guid: 1540b8f7ae825be4ea229cabfc87d329, type: 3}
+  namePlate: {fileID: 21300000, guid: 16bfa79c69596934392cd371ffc2ace5, type: 3}
+  pricePill: {fileID: 21300000, guid: 78fa1954c76a52943a234f3b987e5ede, type: 3}

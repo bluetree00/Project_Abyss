@@ -31,7 +31,8 @@ MonoBehaviour:
     sizeX: 1
     sizeZ: 1
     faceNearestWall: 1
-    wallInset: 0.2
+    wallInset: -0.45
+    wallYawOffset: -90
   - code: skl
     prefab: {fileID: 1031124622, guid: abc00000000004599608608191042394, type: 3}
     yOffset: 0

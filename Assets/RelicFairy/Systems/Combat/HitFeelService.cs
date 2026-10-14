@@ -131,19 +131,20 @@ public static class HitFeelService
     /// </summary>
     /// <param name="shakeCap">흔들림 진폭 상한. 플레이어가 준 타격은 <see cref="DealtShakeFinisher"/> 이하로 묶는다.</param>
     /// <param name="longStop">막타 — 흔들림 대신 멈칫을 치명타 길이로 늘려 무게를 준다(깊이는 그대로).</param>
+    /// <param name="stop">false면 흔들림만 — 원거리 잔타(화살마다 멈추면 연사가 끊겨 렉처럼 보였다 · 10-14).</param>
     public static void Hit(float damage, bool isCritical, in WeaponFeel feel, Vector3 hitDirection, float shakeScale,
-                           float shakeCap = float.PositiveInfinity, bool longStop = false)
+                           float shakeCap = float.PositiveInfinity, bool longStop = false, bool stop = true)
     {
         float amp = Mathf.Max(0f, shakeScale);
         float stopLen = (isCritical || longStop ? CritStopDuration(damage) : HitStopDuration(damage)) * feel.StopDurationMult;
         if (isCritical)
         {
-            HitStop(feel.CritStopScale, stopLen);
+            if (stop) HitStop(feel.CritStopScale, stopLen);
             CameraShakeDirectional(hitDirection, Mathf.Min(feel.CritShakeAmp * amp, shakeCap), feel.CritShakeDur);
         }
         else
         {
-            HitStop(feel.StopScale, stopLen);
+            if (stop) HitStop(feel.StopScale, stopLen);
             CameraShakeDirectional(hitDirection, Mathf.Min(feel.ShakeAmp * amp, shakeCap), feel.ShakeDur);
         }
     }

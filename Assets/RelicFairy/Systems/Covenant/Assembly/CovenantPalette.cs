@@ -53,6 +53,7 @@ public static class CovenantPalette
         ["hunt"]     = new CauseDef { id="hunt",     name="사냥 개시", desc="처치 직후 3초 내 공격 시", tag="처치", trigger=CauseTriggerKind.OnKillThenHitWindow, category=CovenantCategory.ActionConditional, coefficient=2.0f, thresholdF=3f,  cls=CauseClass.Kill,     targeted=true  },
         ["opener"]   = new CauseDef { id="opener",   name="선제",     desc="방 진입 후 첫 타격 시",     tag="개전", trigger=CauseTriggerKind.OnFirstHitInRoom,    category=CovenantCategory.RunStructure,     coefficient=1.5f,                 cls=CauseClass.Boundary, targeted=true  },
         ["besiege"]  = new CauseDef { id="besiege",  name="포위",     desc="인접한 적이 3 이상일 때",   tag="위험", trigger=CauseTriggerKind.OnProximity,         category=CovenantCategory.ActionConditional, coefficient=3.0f, thresholdInt=3, thresholdF=2f, cls=CauseClass.Danger, targeted=false },
+        ["aim"]      = new CauseDef { id="aim",      name="겨눔",     desc="원거리로 같은 적을 3번 맞힐 때마다", tag="사격", trigger=CauseTriggerKind.OnRangedStreakSameTarget, category=CovenantCategory.ActionConditional, coefficient=1.5f, thresholdInt=3, cls=CauseClass.Ranged, targeted=true },
         ["march"]    = new CauseDef { id="march",    name="행군",     desc="12m 이동할 때마다",         tag="기동", trigger=CauseTriggerKind.OnMoveDistance,      category=CovenantCategory.CombatRhythm,     coefficient=1.5f, thresholdF=12f, cls=CauseClass.Mobility, targeted=false },
     };
 
@@ -125,7 +126,7 @@ public static class CovenantPalette
 
         // 원인 계수가 '충전 횟수'가 된다 — 위험한 조건일수록 더 여러 번 버틴다.
         // 사망 시 HP 복구는 <b>사망 방지</b>지 흡혈이 아니다 — 적에게서 빨아 오는 것이 없다.
-        ["lastbreath"]= new EffectDef { id="lastbreath",name="마지막 숨결", desc="치명적인 피해를 한 번 견딘다", tag="생존",
+        ["lastbreath"]= new EffectDef { id="lastbreath",name="마지막 숨결", desc="터질 때마다 쓰러짐 막기를 하나 모은다", tag="생존",
             kind=EffectKind.DeathSave,  magnitude=1f,
             mode=CovenantScaleMode.Count,  cap=3f,   axis=EffectAxis.Survival, status=StatusCurrency.None },
 
@@ -186,8 +187,8 @@ public static class CovenantPalette
     //
     // 0단(원인 5 · 효과 7) = 서약이 무엇인지 <b>가르치는</b> 카드. 원인은 시간·행동·경계·전투를 한 번씩
     //   (심장박동·연주·선제·학살·연격), 효과는 공격·생존·지속(초신성·격노·피의 보호막·마지막 숨결·박차·잔불·출혈).
-    //   마지막 숨결이 0단인 이유(09-17): 어떤 원인과도 봉인되지 않는 유일한 생존 카드다. 피의 보호막만 있으면
-    //   심장박동이 제시된 판(봉인 짝)에는 생존 카드를 함께 보여 줄 수 없어 「생존 카드 한 장 보장」이 깨졌다.
+    //   생존 카드 보장(10-10 갱신): 마지막 숨결이 학살 · 포위하고만 묶이게 되면서, 심장박동이 든 판의 생존 카드는
+    //   피의 보호막이 맡는다(심장박동 × 피의 보호막 금지를 풀었다).
     //   (개선은 09-17 뽑기에서 뺐다 — _draftExcludedCauses)
     //   잔불·출혈은 유물 정체성(가웨인=화상 · 랜슬롯=출혈)과 곧바로 맞물린다.
     // 1단(+3·+2)  원인: 전환·사냥 개시·포위 / 효과: 저주·성역 — 혼자서도 서는 것
@@ -294,14 +295,20 @@ public static class CovenantPalette
     /// 이 짝으로는 조립을 막는다 — 두 부류다:
     ///  • 발동 조건이 사실상 상시라 방어 효과가 "무적 상시화"가 되는 것(심장박동·행군·포위 × 성역/보호막)
     ///  • 처치가 원인인데 결과가 처형이라, 처형이 다시 처치를 만들어 스스로를 먹이는 것(사냥/학살 × 처형)
+    ///  • 마지막 숨결 × 자주 터지는 원인 — 발동마다 쓰러짐 막기를 모으므로 늘 가득 차 사실상 불사가 된다.
+    ///    학살(5연속 처치) · 포위(둘러싸였을 때)처럼 「위험을 넘긴 대가」로 읽히는 원인만 남긴다(10-10 사용자 「저런 매치가 되면 안 된다」).
+    ///    대신 심장박동 × 피의 보호막 · 행군 × 결계를 풀어, 심장박동 · 행군이 든 판에도 생존 카드가 남게 했다
+    ///    (DraftBoard 이식 시뮬 4만 판 × 단계 0·1·3 — 생존 카드 보장 100%, 0 · 1단 원인 분포 그대로).
     ///
     /// 런타임(<see cref="AssembledCovenant"/>)에서는 <b>막지 않는다</b> — 이미 이 짝을 저장해 둔 런이
     /// 있으면 서약이 통째로 사라진다. 새로 만드는 것만 막는 게 옳다.
     /// </summary>
     private static readonly HashSet<string> _bannedPairs = new()
     {
-        "heartbeat|aegis", "heartbeat|ward", "heartbeat|bloodmark",
-        "march|aegis", "march|bloodmark", "march|execute", "march|ward",
+        "heartbeat|aegis", "heartbeat|ward",
+        "march|aegis", "march|bloodmark", "march|execute",
+        "streak|lastbreath", "aim|lastbreath", "heartbeat|lastbreath", "march|lastbreath", "swap|lastbreath",
+        "concerto|lastbreath", "hunt|lastbreath", "opener|lastbreath", "clear|lastbreath",
         "besiege|aegis",
         "hunt|execute", "slaughter|execute",
 

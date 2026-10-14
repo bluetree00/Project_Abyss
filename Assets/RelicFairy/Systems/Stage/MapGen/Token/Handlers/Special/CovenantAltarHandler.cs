@@ -13,7 +13,10 @@ public sealed class CovenantAltarHandler : ITokenHandler
     {
         var pos = new Vector3(ctx.WorldPos.x, ctx.BaseY, ctx.WorldPos.z);
         var altar = WorldCovenantAltar.SpawnAt(pos);
-        if (altar != null)
-            altar.name = $"CovenantAltar_{ctx.Cell.x}_{ctx.Cell.y}";
+        if (altar == null) return;
+        altar.name = $"CovenantAltar_{ctx.Cell.x}_{ctx.Cell.y}";
+        // 방에 묶는다 — 루트로 두면 방을 떠나 방이 걷혀도 제단만 남아, 같은 앵커에 나중에 지어지는 방(리치 아레나 등)에
+        // 안 쓴 성소 제단 「[F] 서약 조립」이 그대로 떠 있었다(10-14 5회차 재확인). 다른 토큰(몬스터 · 보스 · 앵커)처럼 ctx.Parent 아래로.
+        if (ctx.Parent != null) altar.transform.SetParent(ctx.Parent, true);
     }
 }

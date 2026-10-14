@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -32,6 +32,7 @@ public sealed class HudBootstrapper : MonoBehaviour
     public void SetStartRoomSuppressed(bool suppress)
     {
         _startRoomSuppressed = suppress;
+        if (presenter != null) presenter.ActivationHeld = suppress;
         if (suppress)
         {
             var target = hudVisualRoot != null ? hudVisualRoot : presenter?.transform;
@@ -78,6 +79,7 @@ public sealed class HudBootstrapper : MonoBehaviour
     public async Cysharp.Threading.Tasks.UniTask FadeInStartRoomAsync(float duration)
     {
         _startRoomSuppressed = false;
+        if (presenter != null) presenter.ActivationHeld = false;
         EnsureHudHierarchyVisible();
 
         // 억제 중에는 SetMode를 막아뒀으므로, 해제 시 전투 패널을 여기서 켜준다.

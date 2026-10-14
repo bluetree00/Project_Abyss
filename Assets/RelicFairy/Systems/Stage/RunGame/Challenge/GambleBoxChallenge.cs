@@ -76,6 +76,7 @@ public sealed class GambleBoxChallenge : MonoBehaviour, IInteractionChallenge
     private void Resolve()
     {
         _resolved = true;
+        Managers.Sound?.PlayEvent(SoundEvent.GambleOpen);
         if (_prompt != null) _prompt.gameObject.SetActive(false);
         if (_label != null) { _label.text = "개봉!"; _label.color = new Color(1f, 0.85f, 0.3f); }
 

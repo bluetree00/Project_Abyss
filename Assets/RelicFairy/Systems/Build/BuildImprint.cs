@@ -10,6 +10,7 @@ public static class BuildImprint
 {
     // ── Static ───────────────────────────────────────────
     private static readonly int[] s_counts = new int[8];
+    private static readonly int[] s_halves = new int[8];   // 반 단위 셈 — 룬 · 서약 · 무기 · 조각 2, 스탯 룬 1(10-14 R0)
     private static readonly int[] s_stages = new int[8];
     private static bool s_primed;   // 런 첫 셈은 기준만 잡는다(불러오기 · 시작 때 알림이 쏟아지지 않게)
 
@@ -25,21 +26,24 @@ public static class BuildImprint
     /// <summary>그 계열 룬 효과 배율 — 1, 1.2, 1.4, 1.6.</summary>
     public static float EffectMultiplier(BuildFamily f) => 1f + BuildFamilyRules.BonusPerStage * Stage(f);
 
+    /// <summary>각인 반 단위 수(스탯 룬 하나 = 1 · 그 밖 = 2) — 룬 선택 카드가 「+0.5」를 보일 때 쓴다.</summary>
+    public static int Halves(BuildFamily f) => f == BuildFamily.None ? 0 : s_halves[(int)f];
+
     /// <summary>
-    /// 다시 센다 — 판에 놓인 룬(룬 하나 = 계열 하나) + 맺은 서약의 원인 계열 + 무기 두 자루(승급 · 진화) + 유물 파츠.
+    /// 다시 센다 — 판에 놓인 룬(룬 하나 = 계열 하나 · 스탯 룬은 절반) + 맺은 서약의 원인 계열 + 무기 두 자루(승급 · 진화) + 유물 파츠.
     /// 효과 재구성(Rebuild) 바로 앞에서 부른다.
     /// </summary>
     public static void Recount(GameRunSession run)
     {
-        Array.Clear(s_counts, 0, s_counts.Length);
+        Array.Clear(s_halves, 0, s_halves.Length);
         if (run != null)
         {
             var placed = run.ItemInventory?.PlacedItems;
             if (placed != null)
                 foreach (var item in placed)
                 {
-                    var f = BuildFamilyRules.OfItem(item);
-                    if (f != BuildFamily.None) s_counts[(int)f]++;
+                    var f = BuildFamilyRules.OfItem(item, out bool statOnly);
+                    if (f != BuildFamily.None) s_halves[(int)f] += statOnly ? 1 : 2;
                 }
 
             var held = run.CovenantHandler?.Covenants;
@@ -49,8 +53,7 @@ public static class BuildImprint
                     // 조건(원인) 형상 = 계열 1칸 — 서약서(문장)는 조건절 하나(설계서 §5)
                     string causeId = c is AssembledCovenant a ? a.CauseId : c is CovenantSentence s ? s.CauseId : null;
                     if (causeId == null || !CovenantPalette.TryGetCause(causeId, out var def)) continue;
-                    var f = BuildFamilyRules.FromCause(def.cls);
-                    if (f != BuildFamily.None) s_counts[(int)f]++;
+                    Add(BuildFamilyRules.FromCause(def.cls));
                 }
 
             var wm = run.Player != null ? run.Player.WeaponManager : null;
@@ -63,15 +66,20 @@ public static class BuildImprint
             var parts = AppBootstrapper.Instance != null ? AppBootstrapper.Instance.Loadout?.RelicPartIds : null;
             if (parts != null)
                 foreach (var id in parts) Add(BuildFamilyRules.OfRelicPart(id));
+
+            // 유물 진화 — 그 계열 각인 +2(진화가 빌드를 한 단계 밀어 줌 · 10-14 C)
+            var evo = RelicEvolution.ById(AppBootstrapper.Instance != null ? AppBootstrapper.Instance.Loadout?.RelicEvolutionId : null);
+            if (evo != null)
+                for (int k = 0; k < RelicEvolution.ImprintBonus; k++) Add(evo.Family);
         }
+        for (int i = 0; i < s_counts.Length; i++) s_counts[i] = s_halves[i] / 2;
 
         // 단계가 오른 계열은 한 줄 알림 — 「이걸 모았더니 세졌다」가 그 순간 보여야 빌드가 된다.
         foreach (var f in BuildFamilyRules.All)
         {
             int i = (int)f, stage = BuildFamilyRules.StageOf(s_counts[i]);
             if (s_primed && stage > s_stages[i])
-                ItemEffectVfxHelper.ShowNotice(
-                    $"<color={BuildFamilyRules.Hex(f)}>{BuildFamilyRules.Label(f)}</color> 각인 {stage}단계 — {BuildFamilyRules.StageBonusText(f, stage)}");
+                ItemEffectVfxHelper.ShowBuildNotice(BuildNotice.Imprint(f, stage));   // 계열 칩 + 단계 눈금(83 UI · 10-14) — 글은 같다
             s_stages[i] = stage;
         }
         s_primed = run != null;
@@ -80,13 +88,14 @@ public static class BuildImprint
 
     private static void Add(BuildFamily f)
     {
-        if (f != BuildFamily.None) s_counts[(int)f]++;
+        if (f != BuildFamily.None) s_halves[(int)f] += 2;
     }
 
     /// <summary>새 런 · 런 끝 — 비운다.</summary>
     public static void Clear()
     {
         Array.Clear(s_counts, 0, s_counts.Length);
+        Array.Clear(s_halves, 0, s_halves.Length);
         Array.Clear(s_stages, 0, s_stages.Length);
         s_primed = false;
         Changed?.Invoke();

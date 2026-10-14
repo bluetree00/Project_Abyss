@@ -16,6 +16,8 @@ public class LocoDodgeState : LayerStateBase<LocoState>
     private const float MaxDashRiseSpeed = 3f;
 
     private Vector3 _dodgeDir;
+    private Vector3 _dodgeStart;    // 회피 시작 자리 — 벽 앞 멈춤 기준
+    private float   _dodgeClear;    // 시작 때 잰 앞길(벽 앞까지 · 10-14)
     private Vector3 _entryHorizVel; // 회피 진입 시점의 수평 속도(모멘텀 블렌드/방향 폴백용)
     private float _moveEndTime;
     private float _recoveryEndTime; // 대시 종료 후 무적 없는 회복창 종료 시각(=moveEndTime+recoveryWindow). window 0이면 moveEndTime과 동일.
@@ -57,6 +59,10 @@ public class LocoDodgeState : LayerStateBase<LocoState>
         float distBonus = _controller.RuntimeStats?.RollDistanceBonus ?? 0f;
         float bonusDuration = baseSpeed > 0f ? distBonus / baseSpeed : 0f;
         _moveEndTime = Time.time + baseDuration + bonusDuration;
+
+        // 벽 앞 멈춤(10-14) — 22 m/s 대시는 벽 클립이 닿은 뒤에야 작동해 벽면을 0.4 m까지 넘었다. 갈 수 있는 길을 시작 때 잰다.
+        _dodgeStart = _controller.transform.position;
+        _dodgeClear = _controller.ClearDistanceAhead(_dodgeStart, _dodgeDir, baseSpeed * (baseDuration + bonusDuration) + 0.5f);
 
         // i-frame 창 계산 — 회피 총 길이를 넘지 않게 클램프(넘으면 회복 구간이 사라질 뿐, 안전).
         float totalDuration = _moveEndTime - Time.time;
@@ -123,6 +129,16 @@ public class LocoDodgeState : LayerStateBase<LocoState>
             // 대시는 매 프레임 속도를 통째로 덮어쓰므로, 벽으로 대시하면 파고듦↔되밀림 진동이 그대로 나온다.
             // 벽을 따라 미끄러지는 성분은 남아 벽을 스치는 대시는 그대로 된다.
             Vector2 dashHoriz = _controller.ClipMoveTargetToWalls(new Vector2(dashVel.x, dashVel.z));
+
+            // [벽 앞 멈춤] 시작 때 잰 앞길을 이번 프레임에 넘지 않게 회피 방향 성분을 자른다(10-14 — 닿기 전에 멈춘다).
+            Vector2 along = new Vector2(_dodgeDir.x, _dodgeDir.z);
+            float vAlong = Vector2.Dot(dashHoriz, along);
+            if (vAlong > 0f)
+            {
+                float room = _dodgeClear - Vector3.Dot(_controller.transform.position - _dodgeStart, _dodgeDir);
+                float vMax = Mathf.Max(0f, room) / Mathf.Max(Time.deltaTime, 0.001f);
+                if (vAlong > vMax) dashHoriz -= along * (vAlong - vMax);
+            }
 
             _controller.Rigid.linearVelocity = new Vector3(dashHoriz.x, vy, dashHoriz.y);
         }

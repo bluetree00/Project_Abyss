@@ -36,7 +36,7 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
     // 심판 참격 VFX 배율 — 원본 프리팹이 실제 판정(콘 6m/±45°)보다 훨씬 커서 축소.
     // 이펙트가 판정보다 크면 "닿았는데 안 맞는다"는 체감이 생긴다.
     private const float JudgmentVfxScale     = 0.42f;   // 연타 1타분(작고 빠르게)
-    private const float JudgmentFinisherVfx  = 1.5f;    // 마무리 강타 배수 → 0.63
+    private const float JudgmentFinisherVfx  = 0.45f;   // 마무리 강타 배수 → 0.2 — prewarm 1.2가 미리 퍼뜨려 연타보다 작은 배율이 같은 크기(10-13 실측: ×0.44 → 11.6 m)
     /// <summary>
     /// 막타 이펙트를 이만큼 미리 돌려놓고 켠다. Effect_36은 스폰 1.5초 뒤에 클라이맥스 버스트가 터지는데,
     /// 막타는 '지금' 꽂히므로 그대로 두면 캐릭터가 자세를 푼 뒤에야 터진다(그리고 3초 소멸에 잘린다).
@@ -132,6 +132,7 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
     public float GetSkillCooldown(SkillType slot) => 0f; // 광란 게이팅 + 광란당 1회
     public bool  CanUseSkill(SkillType slot)
         => slot == SkillType.Q && _madness != null && _madness.IsFrenzy && _judgmentCharges > 0;
+    public int   QUsesLeft => CanUseSkill(SkillType.Q) ? _judgmentCharges : 0;   // 이번 광란에 남은 심판
 
     /// <summary>심판 횟수를 더한다(두 번째 광란 · 배신자의 걸음 ③ 등). 광란 중이 아니면 다음 광란 진입 때 1로 돌아간다.</summary>
     public void GrantJudgmentCharge(int n = 1) { if (n > 0) _judgmentCharges += n; }
@@ -186,7 +187,7 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
 
         int   stacks   = _madness != null ? _madness.Stacks : 0;
         float mult     = V(V_SKILL_BASE, 2.0f) + stacks * V(V_SKILL_PER, 0.08f);
-        int   effAtk   = _owner.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee);
+        int   effAtk   = _owner.RuntimeStats.AttackPower;   // 유물 피해 = 근접 · 원거리 중 큰 값(10-14 A5)
 
         // ⚠️ DamageFormula.Calculate(a, b)는 <b>a + b</b>다 — '어빌리티 기본 피해 + 공격 스탯'용 가산 헬퍼.
         //    여기에 배율(2.0~5.2)을 넘기면 "공격력 + 5"가 되어 평타보다도 약해진다(실제로 그랬다).
@@ -221,6 +222,8 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         Vector3 vfxDir = Quaternion.AngleAxis(yaw, Vector3.up) * fwd;
         RelicStateVfx.PlayOneShot(JudgmentVfxKey, pos + vfxDir * 2f + Vector3.up * height, scale, vfxDir,
                                   isLast ? JudgmentFinisherVfxPrewarm : 0f);
+        if (isLast && rangeScale > 1.4f)   // 이펙트가 상한에 걸렸다 — 넓어진 판정은 얇은 부채꼴로(10-13 이펙트 = 판정)
+            SkillRangeRing.Fan(pos, fwd, JudgmentRange * rangeScale, JudgmentHalfAngle * 2f);
         // 참격마다 휘두름 소리 — 마무리는 무거운 쪽. 적중 소리(막타음)는 타격 단계가 따로 낸다.
         Managers.Sound?.PlayEvent(isLast ? SoundEvent.PlayerSwingHeavy : SoundEvent.PlayerSwing);
 
@@ -260,6 +263,11 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
                 SourcePosition      = pos,
                 ComboStep           = hitIndex,
                 IsFinisher          = isLast,   // 마무리 한 방만 막타 연출
+                ProcCoef            = isLast ? 2.5f : 0.3f,   // 연타 조각은 가볍게 · 마무리는 한 방(10-14 A1)
+                // 피격 이펙트 = 붉은 베기(광란 · 원한의 붉은빛). 공용 노란 베기 HitEffect_02 대신(10-08 「공격 종류에 맞춘다」)
+                HitEffectKey        = "KatanaSlashHit",
+                // 연타 10타는 작게(10-11 이펙트 톤 점검 — 0.5는 붉은 폭발 · 불티가 매 타 나와 화면이 어지러웠다) · 마무리 한 방만 0.5
+                HitEffectScale      = isLast ? 0.5f : 0.3f,
             });
 
             // 심판 낙인(매 타 갱신 → 지속시간은 마무리 기준). 몬스터 전용 상태라 더미는 건너뛴다.

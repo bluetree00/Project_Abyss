@@ -21,6 +21,31 @@ public class ActAttackState : LayerStateBase<ActState>
     private float _stateElapsed;
     private const float StateTimeout = 1f;
 
+    // 연결 지점(attackEndAt)에 닿았는데 아직 다음 입력이 없으면 그 자세에서 느리게 흘리며 입력을 기다린다(10-10 동작 연결).
+    // 다음 조각은 끊는 지점 자세에서 시작하므로, 늦게 눌러도 맞는 자세에서 넘어간다 — 그대로 흘려보내면 회수 자세(무형검 0.48 = 72점)에서 넘어가 튀었다.
+    // 창이 닫히거나(입력 없음) 움직이면 원래 속도로 돌려 회수를 재생한다.
+    // 10-11 사용자 「애니가 다 끊겨 나오고 연결된 느낌이 없다」 — 0.15는 거의 정지라 보통 박자로 누르면 타마다 멈췄다 움직였다 → 0.5.
+    // 10-12 점검: 0.5는 절대값이라 평소 3배속(상태 속도 2.5 × 템포)인 무형검 · 카타나는 대기 중 40% 속도가 됐고, 대기가 창 닫힘(클립 진행)까지
+    // 이어져 카타나 1타는 약 0.4초 「슬로모션」으로 보였다. 이제 이 타 배속의 60%로, 실제 시간 0.18초만 느리게 흘린다.
+    // 그 뒤엔 원래 속도로 돌리되 창이 닫힐 때까지는 늦은 입력을 계속 받는다(콤보는 끊지 않는다).
+    private const float ComboHoldSpeedRatio = 0.6f;
+    private const float ComboHoldMaxSeconds = 0.18f;
+    private float _holdUntil;   // 느린 대기가 끝나는 실제 시각(0 = 느린 대기 아님)
+    // 타 사이 크로스페이드(실제 초). 0.06은 자세가 한 번에 바뀌어 끊겨 보였다(10-11) — 다음 조각이 이음 자세에서 시작하므로 길게 섞어도 흐트러지지 않는다.
+    private const float AttackBlendSeconds = 0.12f;
+    private float _stepAnimSpeed = 1f;
+
+    // 콤보 창은 실제 시간으로 최소 이만큼 열어 둔다(10-10 사용자 「무형검 연타 시 1타만 빠르게 반복」).
+    // 평타 상태 속도 2.5 × 무기 템포 × 애니 보정이 곱해져 무형검 · 카타나는 5~6배속이라, 진행 비율(0.30)로만 닫으면
+    // 공격 시작 0.1초 만에 닫혀 사람이 누르는 간격(0.15~0.3초)으로는 콤보가 이어지지 않고 회수를 끊어 1타가 다시 나갔다.
+    // 연결 지점 전에 누르면 끊는 지점에서 넘어가고, 그 뒤 이 시간 안에 누르면 끊는 지점 자세로 기다렸다가(ComboHoldSpeedRatio · ComboHoldMaxSeconds) 잇는다.
+    private const float MinComboWindowSeconds = 0.32f;
+
+    // 한 타 최소 시간(실시간 · 공속 반영) — 연결 지점이 일러(카타나 1타 0.2초) 연타하면 피해 프레임 전에 다음 타로 넘어가
+    // 「누른 만큼 빠르게 휘두르는데 맞지 않는」 그림이 됐다(10-14 사용자 · 「장비 형/35」 0.1초 연타: 무형검 11번 휘둘러 4번 맞힘).
+    // 이 시간 ÷ (공속 × 반격 가속)을 지나야 다음 타로 잇는다 — 공속 빌드는 그만큼 빨라진다.
+    private const float MinSwingSeconds = 0.32f;
+
     // ── 회수(recovery) 상태 ─────────────────────────────────────────────────
     // attackEndAt 은 "다음 콤보가 발사되는 체인 지점"이라 그대로 올리면 콤보가 그만큼 느려진다.
     // 그래서 체인 지점은 두고, 후속 입력이 없을 때만 recoveryEndAt 까지 클립을 마저 재생해
@@ -113,7 +138,12 @@ public class ActAttackState : LayerStateBase<ActState>
     {
         _stateElapsed += Time.deltaTime;
 
-        if (_currentStateHash == 0) return;
+        if (_currentStateHash == 0)
+        {
+            // 재생할 상태를 못 찾았다(콤보 중 무기 교체로 칸이 비는 등) — 예전엔 여기서 돌아가 공격 상태에 갇혔다(10-09 출시 점검)
+            if (_stateElapsed >= StateTimeout) _stateChanger.Change(ActState.None);
+            return;
+        }
 
         var anim      = _controller.Anim;
         var stateInfo = anim.IsInTransition(0)
@@ -141,14 +171,14 @@ public class ActAttackState : LayerStateBase<ActState>
         }
 
         // 콤보 창 닫기
-        if (_comboWindowOpened && !_comboWindowClosed && t >= _comboClose)
+        if (_comboWindowOpened && !_comboWindowClosed && t >= _comboClose && _stateElapsed >= MinComboWindowSeconds)
         {
             _comboWindowClosed = true;
             _controller.Combo.CloseWindow();
         }
 
         // 공격 종료 (다음 스텝 판단)
-        if (!_attackEndFired && t >= _attackEnd)
+        if (!_attackEndFired && t >= _attackEnd && _stateElapsed >= MinSwingNow())
         {
             _attackEndFired = true;
             OnAttackEnd();
@@ -447,13 +477,22 @@ public class ActAttackState : LayerStateBase<ActState>
     {
         if (!_controller.Combo.ComboWindowOpen)
         {
-            if (_waitingForComboInput)
-            {
-                _waitingForComboInput = false;
-                if (!TryEnterRecovery())
-                    _stateChanger.Change(ActState.None);
-            }
+            if (_waitingForComboInput) StopComboHold();
             return;
+        }
+
+        // 기다리는 동안 움직이면 기다림을 끝낸다(회수 중 이동과 같은 반응)
+        if (_waitingForComboInput && _controller.MoveDirection.sqrMagnitude > 0.0001f)
+        {
+            StopComboHold();
+            return;
+        }
+
+        // 느린 대기는 짧게 — 지나면 원래 속도로 흘리며 창이 닫힐 때까지 늦은 입력을 받는다
+        if (_waitingForComboInput && _holdUntil > 0f && Time.unscaledTime >= _holdUntil)
+        {
+            _holdUntil = 0f;
+            if (_controller.Anim != null) _controller.Anim.speed = _stepAnimSpeed;
         }
 
         if (_controller.InputBuffer.TryConsume(Command.Light))
@@ -461,7 +500,8 @@ public class ActAttackState : LayerStateBase<ActState>
             if (_waitingForComboInput)
             {
                 _waitingForComboInput = false;
-                PlayCurrentComboAnimation();
+                _holdUntil = 0f;
+                PlayCurrentComboAnimation();   // 거의 멈춘 끊는 지점 자세에서 넘어간다 — 속도는 다음 타가 다시 정한다
             }
             else
             {
@@ -474,6 +514,7 @@ public class ActAttackState : LayerStateBase<ActState>
     public override void Exit()
     {
         _waitingForComboInput = false;
+        _holdUntil            = 0f;
         _inRecovery           = false;
         _recoveryEnd          = 0f;
         _currentStateHash     = 0;
@@ -511,9 +552,19 @@ public class ActAttackState : LayerStateBase<ActState>
         if (_controller.Combo.CurrentComboStep >= _maxCombo)
         {
             int finalStep = _controller.Combo.CurrentComboStep;
+            bool chainNext = _controller.Combo.NextComboQueued;   // 마지막 타의 콤보 창에서 이미 누른 공격
             _controller.Combo.ResetStep();
             _controller.Combo.CloseWindow();
             _controller.NotifyComboFinished(finalStep);
+            if (chainNext)
+            {
+                // 회수를 끊고 1타로 잇는다 — 예전엔 예약을 소비한 채 버려 한 번 더 눌러야 했다(카타나 약 0.3초 빈틈 · 출시 점검 D3 · 10-10).
+                // 회수 중 입력과 같은 길: 상태를 빠져나가면 평소 입력 경로가 버퍼의 공격을 1타로 받는다.
+                _controller.Combo.SetNextComboQueued(false);
+                _controller.InputBuffer.Push(Command.Light);
+                _stateChanger.Change(ActState.None);
+                return;
+            }
             // 콤보 마지막 타 — 회수를 재생한다(TryEnterRecovery가 공중이면 스스로 거른다).
             if (TryEnterRecovery()) return;
             _stateChanger.Change(ActState.None);
@@ -536,7 +587,19 @@ public class ActAttackState : LayerStateBase<ActState>
         else
         {
             _waitingForComboInput = true;
+            _holdUntil = Time.unscaledTime + ComboHoldMaxSeconds;
+            _controller.Anim.speed = _stepAnimSpeed * ComboHoldSpeedRatio;   // 끊는 지점 자세 근처에서 잠깐 느리게 입력을 기다린다
         }
+    }
+
+    /// <summary>입력 없이 기다림이 끝났다 — 원래 속도로 돌려 회수를 재생한다(회수가 없으면 대기로).</summary>
+    private void StopComboHold()
+    {
+        _waitingForComboInput = false;
+        _holdUntil = 0f;
+        if (_controller.Anim != null) _controller.Anim.speed = _stepAnimSpeed;
+        if (!TryEnterRecovery())
+            _stateChanger.Change(ActState.None);
     }
 
     // ── 회수(recovery) ───────────────────────────────────────────────────────
@@ -691,7 +754,7 @@ public class ActAttackState : LayerStateBase<ActState>
 
         if (anim.HasState(layerIndex, stateHash))
         {
-            anim.CrossFadeInFixedTime(stateHash, 0.06f);
+            anim.CrossFadeInFixedTime(stateHash, AttackBlendSeconds);
             playedHash = stateHash;
             playedName = stateToPlay;
         }
@@ -700,7 +763,7 @@ public class ActAttackState : LayerStateBase<ActState>
             int fbHash = Animator.StringToHash(fallbackStateName);
             if (anim.HasState(layerIndex, fbHash))
             {
-                anim.CrossFadeInFixedTime(fbHash, 0.06f);
+                anim.CrossFadeInFixedTime(fbHash, AttackBlendSeconds);
                 playedHash = fbHash;
                 playedName = fallbackStateName;
                 Debug.Log($"[ActAttackState] Fallback to ground state: {fallbackStateName}");
@@ -735,6 +798,7 @@ public class ActAttackState : LayerStateBase<ActState>
                    * baseSpeed
                    * WeaponTempo(_controller)
                    * _controller.CounterAttackSpeedMultiplier;   // 저스트 회피 반격 창 가속(평소 1)
+        _stepAnimSpeed = anim.speed;
     }
 
     /// <summary>
@@ -768,6 +832,13 @@ public class ActAttackState : LayerStateBase<ActState>
     /// 데이터가 어긋나도 동작이 무너지지 않도록 여기서 순서를 강제한다 — 창을 줄이는 대신
     /// 공격 종료를 창 끝까지 미룬다(카타나 0.45/0.80/0.85, 대검 0.25/0.35/0.35과 같은 형태).
     /// </summary>
+    /// <summary>이번 타의 최소 시간(실시간) — <see cref="MinSwingSeconds"/> ÷ (공속 × 반격 가속).</summary>
+    private float MinSwingNow()
+    {
+        float aspd = (_controller.RuntimeStats?.AttackSpeedMultiplier ?? 1f) * _controller.CounterAttackSpeedMultiplier;
+        return MinSwingSeconds / Mathf.Max(0.5f, aspd);
+    }
+
     private static (float open, float close, float end) ResolveTiming(
         WeaponAnimationSetSO.ClipMapping mapping,
         WeaponAnimationSetSO             animSet)
@@ -781,7 +852,9 @@ public class ActAttackState : LayerStateBase<ActState>
         float end   = (mapping != null && mapping.attackEndAt      >= 0f) ? mapping.attackEndAt      : defEnd;
 
         if (close < open) close = open;   // 창 자체가 뒤집힌 경우
-        if (end   < close) end   = close; // 공격 종료가 창보다 앞선 경우
+        // 10-09 동작 연결: 창이 연결 지점보다 늦게 닫히는 칸(close > end)은 「늦은 입력 허용」이다 — 연결 지점에서 입력이 없으면
+        // 끊는 지점 자세로 기다렸다가(_waitingForComboInput · ComboHoldSpeedRatio) 누르는 순간 잇는다. 사무라이 연속기는 끊는 지점이 일러(카타나 1타 0.2초)
+        // 연결 지점만 받으면 박자 맞춰 누르는 플레이어는 콤보가 1타로 되돌아갔다. 예전 데이터(close ≤ end)는 그대로다.
 
         return (open, close, end);
     }

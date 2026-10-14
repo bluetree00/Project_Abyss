@@ -136,7 +136,7 @@ public class LichFallingStarsState : UnInterruptibleState<LichFallingStarsPatter
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }

@@ -2,9 +2,9 @@
   "monsterName": "외눈슬라임",
   "grade": "Normal",
   "stat": {
-    "maxHp": 10,
+    "maxHp": 16,
     "defense": 1.0,
-    "attackPower": 10.0,
+    "attackPower": 20.0,
     "moveSpeed": 2.0,
     "attackRange": 2.0,
     "attackRadius": 1.0,

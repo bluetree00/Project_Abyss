@@ -62,6 +62,7 @@ public static class CovenantAssembleService
         for (int attempt = 0; attempt < MaxBoardAttempts; attempt++)
         {
             causes = DraftCards(causePool, count, rng, forceSilver);
+            EnsureOwnedFamilyCause(causes, causePool, rng);
             var pool = PairableEffects(effectBase, causes, held);
             bool shortfall = pool.Count < count || (HasGuaranteedSurvival(effectBase) && !HasGuaranteedSurvival(pool));
             if (shortfall && attempt < MaxBoardAttempts - 1) continue;
@@ -219,6 +220,31 @@ public static class CovenantAssembleService
         foreach (var id in ids)
             cards.Add(new CovenantDraftCard(id, RollTier(rng, forceSilver)));
         return cards;
+    }
+
+    /// <summary>
+    /// 원인 카드 중 한 장은 보유 각인 1위 계열(10-14 빌드 시너지 A4 · 보유 우대) — 이미 있으면 그대로, 없으면 마지막 장을 그 계열 원인으로 바꾼다.
+    /// 그 계열 원인이 제시 가능한 풀에 없으면(해금 전) 건드리지 않는다.
+    /// </summary>
+    private static void EnsureOwnedFamilyCause(List<CovenantDraftCard> causes, IReadOnlyList<string> pool, System.Random rng)
+    {
+        if (causes == null || causes.Count == 0 || pool == null) return;
+        var top = new List<BuildFamily>(1);
+        BuildImprint.TopFamilies(1, top);
+        if (top.Count == 0) return;
+        foreach (var c in causes)
+            if (CovenantPalette.TryGetCause(c.id, out var d) && BuildFamilyRules.FromCause(d.cls) == top[0]) return;
+        var match = new List<string>();
+        foreach (var id in pool)
+        {
+            if (!CovenantPalette.TryGetCause(id, out var d) || BuildFamilyRules.FromCause(d.cls) != top[0]) continue;
+            bool taken = false;
+            foreach (var c in causes) if (c.id == id) { taken = true; break; }
+            if (!taken) match.Add(id);
+        }
+        if (match.Count == 0) return;
+        int last = causes.Count - 1;
+        causes[last] = new CovenantDraftCard(match[Next(rng, match.Count)], causes[last].tier);
     }
 
     private static List<string> Draft(IReadOnlyList<string> pool, int count, System.Random rng)

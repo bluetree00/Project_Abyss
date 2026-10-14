@@ -101,9 +101,10 @@ public class LichFinalMagicState : UnInterruptibleState<LichFinalMagicPatternSO>
         LichHazards.Clear();
         LichCinematics.Flash(new Color(0.7f, 0.4f, 1f), 0.3f, 0.15f);  // 보라는 채도가 높아 0.12에서도 화면 전체가 물든다(09-20 실측)
         LichPatternUtil.Impact(LichImpact.Transition);
-        LichVfx.PlayScreen(LichVfxSlot.ScreenSpace, Data.channelSeconds);
+        // 화면 전체 우주(시전 12초 내내)는 뺀다 — 시작은 보라 번쩍, 시전 중은 리치 시전 이펙트 · 바닥 원이 보여 준다(10-11 이펙트 톤 2차)
         LichSfx.Play(LichSfxSlot.CastCharge, ctx.Transform.position);
-        UI_BossBark.Show("제단째 떨어져라!", BossBarkType.PhaseAnnounce);
+        if (!UI_BossBark.ShowDialogueLine("Lich_FinalSpell", 0, BossBarkType.PhaseAnnounce))   // 대사 CSV 먼저(멀린 줄은 아래 목표 칸이 맡는다)
+            UI_BossBark.Show("제단째 떨어져라!", BossBarkType.PhaseAnnounce);
         lich?.SetRitualCamera(true);   // 떠오른 리치 · 네 봉인석 · 사슬을 한 화면에
 
         _hud = UI_ChallengeHud.Create(BossBarClearance);
@@ -155,7 +156,7 @@ public class LichFinalMagicState : UnInterruptibleState<LichFinalMagicPatternSO>
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -238,7 +239,7 @@ public class LichFinalMagicState : UnInterruptibleState<LichFinalMagicPatternSO>
         ctx.Animator?.CrossFade("GetHit", 0.05f);
         LichCinematics.Flash(new Color(1f, 0.9f, 0.6f), 0.3f, 0.25f);  // 끌어내림 성공 — 이 패턴의 절정이라 금빛 중 가장 세게
         LichCinematics.SlowMo(0.4f, 0.6f);
-        LichVfx.Play(LichVfxSlot.SealComplete, _center + Vector3.up * 0.05f, Quaternion.identity);
+        LichPatternUtil.PlaySealComplete(_center + Vector3.up * 0.05f);   // 금빛 고리만 남긴 판(10-14)
         LichSfx.Play(LichSfxSlot.ChainPulse, ctx.Transform.position);
         UI_BossBark.Show("이, 이 사슬은…!", BossBarkType.PhaseAnnounce);
         Next(Phase.PullDown);
@@ -267,13 +268,13 @@ public class LichFinalMagicState : UnInterruptibleState<LichFinalMagicPatternSO>
     {
         LichCinematics.Flash(Color.white, 0.2f, FailFlash);
         LichPatternUtil.Impact(LichImpact.Transition);
-        LichVfx.Play(LichVfxSlot.PhaseBurst, _center + Vector3.up, Quaternion.identity, 3f);
-        LichVfx.Play(LichVfxSlot.SlamImpact, _center, Quaternion.identity, LichPatternUtil.NovaScale(14f));
+        LichVfx.Play(LichVfxSlot.SlamImpact, _center, Quaternion.identity, LichPatternUtil.NovaScale(14f));   // 같은 자리 감옥 폭발(PhaseBurst ×3)은 뺐다 — 판정 반경에 맞춘 노바 하나(10-11 이펙트 톤 2차)
         LichSfx.Play(LichSfxSlot.SlamImpact, _center);
 
         var player = ctx.Runtime.CachedPlayer;
         if (player != null && player.RuntimeStats != null)
-            player.TakeDamage(BossMaxHpDamage.Raw(player, Data.failDamageRatio), ctx.Monster.gameObject,   // 방어로 다시 깎이지 않게(10-01)
+            // 방어로 다시 깎이지 않게(10-01) · 즉사 없음(툴팁 — 잔해에 깎인 뒤 60%가 들어가면 죽었다 · 10-08 점검)
+            player.TakeDamage(BossMaxHpDamage.NonLethal(player, BossMaxHpDamage.Raw(player, Data.failDamageRatio)), ctx.Monster.gameObject,
                               false, HitWeight.Heavy);
 
         UI_BossBark.Show("아직 끝나지 않았다 — 다시!", BossBarkType.PatternAnnounce);

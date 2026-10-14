@@ -156,6 +156,10 @@ public sealed class IntroPageBook : MonoBehaviour
         _scale = 1f;
         _pageRoot.localScale = Vector3.one;
 
+        // 첫 페이지엔 앞면이 비어 있다 — 그림 없는 Image는 흰 사각형이라, 1에서 0으로 페이드하면
+        // 프롤로그 첫 화면이 하얗게 덮였다가 걷혔다(10-10 실측). 빈 앞면은 투명한 채로 둔다.
+        bool frontHasPage = _pages[_front].sprite != null;
+
         float t = 0f;
         try
         {
@@ -165,7 +169,7 @@ public sealed class IntroPageBook : MonoBehaviour
                 t += Time.unscaledDeltaTime;
                 float k = Mathf.Clamp01(t / CrossFade);
                 _pages[back].color   = new Color(1f, 1f, 1f, k);
-                _pages[_front].color = new Color(1f, 1f, 1f, 1f - k);
+                _pages[_front].color = new Color(1f, 1f, 1f, frontHasPage ? 1f - k : 0f);
                 await UniTask.Yield(PlayerLoopTiming.Update, ct);
             }
         }

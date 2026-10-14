@@ -36,4 +36,6 @@ public struct DamageReport
     public Vector3 HitPosition;
     public WeaponActionType ActionType;   // 공격 종류(스킬 특화 파츠가 심판의 일격 등 식별에 사용)
     public bool IsRanged;          // 원거리 명중(화살 · 볼트) — 사격 계열 발동이 센다
+    public float ProcCoef;         // 발동 계수(10-14 A1) — 확률 · 상태 지속 · 포이즈에 곱한다. 0 = 옛 경로(1로 본다)
+    public bool IsHeavy;           // 강타(발동 계수 ≥ 문턱 · 10-14 A2) — 강타 발동 룬이 센다
 }

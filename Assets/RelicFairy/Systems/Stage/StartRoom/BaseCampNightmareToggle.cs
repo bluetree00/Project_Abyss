@@ -154,7 +154,7 @@ public sealed class BaseCampNightmareToggle : MonoBehaviour
             NewText(go.transform, "어느 세계로 내려가는가", 34f, UITheme.Gold, new Vector2(0f, 220f), new Vector2(900f, 46f));
             NewText(go.transform, "고른 것은 기억된다 · 거점에서만 바꿀 수 있다", 20f, UITheme.Mute, new Vector2(0f, 168f), new Vector2(900f, 30f));
 
-            NewCard(go.transform, new Vector2(-(CardW * 0.5f + 20f), -10f), "해방된 세계로", "지금 그대로 — 해방기 규칙",
+            NewCard(go.transform, new Vector2(-(CardW * 0.5f + 20f), -10f), "해방된 세계로", "지금 그대로 — 해방된 세계의 규칙",
                     UITheme.Ink, !currentOn, () => _picked = PickLiberated);
             NewCard(go.transform, new Vector2(CardW * 0.5f + 20f, -10f), "악몽으로 들어간다",
                     $"챕터마다 악몽 규칙 · 보스 악몽 강화\n정수 ×{NightmareRules.ModeEssenceMultiplier:0.0#}",

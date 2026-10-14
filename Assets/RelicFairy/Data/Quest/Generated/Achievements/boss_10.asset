@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: boss_10
   m_EditorClassIdentifier: Assembly-CSharp::Achievement
   category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 0c3bcc5ee66855949b1178231eb8cd50, type: 3}
   codeName: boss_10
   displayName: "\uC655\uC744 \uBCA0\uB294 \uC790"
   description: "\uBCF4\uC2A4 10\uD68C \uCC98\uCE58"

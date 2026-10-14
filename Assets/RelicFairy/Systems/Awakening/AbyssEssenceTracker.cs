@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -24,6 +25,8 @@ public sealed class EssenceTracker : MonoBehaviour
     [Header("방 클리어 적립")]
     [SerializeField] private int essencePerRoom   = 16;
     [SerializeField] private int essencePerBoss   = 132;
+    // 정예 보스 방(10-12) — 그 챕터에서 빠지는 전투 두 방 + 정예방 몫의 정수(처치 · 방 클리어) 평균 75를 한 번에(배치 설계 §5-2).
+    [SerializeField] private int essencePerMidBoss = 75;
 
     // ── 상태 ────────────────────────────────────────────────────────────
     private GameRunSession _session;
@@ -44,6 +47,10 @@ public sealed class EssenceTracker : MonoBehaviour
             _session.OnRoomCleared += HandleRoomCleared;
 
         QuestEvents.OnMonsterKilled += HandleMonsterKilled;
+
+        // 줍는 재화의 모양(골드 · 정수 — 10-12 재화 오브젝트)을 런 시작에 미리 읽는다.
+        // 안 읽어 두면 첫 처치 드롭이 임시 도형으로 떨어진다. 이미 읽었으면 바로 돌아온다.
+        CurrencyVisuals.LoadAsync().Forget();
     }
 
     private void Unbind()
@@ -82,7 +89,9 @@ public sealed class EssenceTracker : MonoBehaviour
     {
         if (_session == null) return;
 
-        int amount = isBossRoom ? essencePerBoss : essencePerRoom;
+        int amount = isBossRoom ? essencePerBoss
+                   : _session.CurrentRoomKind == RoomPlanKind.MidBoss ? essencePerMidBoss
+                   : essencePerRoom;
         DropEssence(amount, PlayerPos());
     }
 

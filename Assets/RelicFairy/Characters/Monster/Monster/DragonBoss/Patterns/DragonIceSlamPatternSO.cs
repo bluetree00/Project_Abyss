@@ -102,6 +102,8 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
 {
     private enum Phase { Takeoff, MoveToCenter, Warning, FlyDown, Landing, Done }
 
+    private const float LandSnap = 0.1f;   // 바닥 이만큼 위면 닿은 것으로 — 이 순간이 강타 판정
+
     private Phase                  _phase;
     private float                  _phaseTimer;
     private float                  _targetY;
@@ -253,7 +255,7 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         float newPitch = Mathf.MoveTowardsAngle(euler.x, targetPitch, 270f * Time.deltaTime);
         ctx.Transform.rotation = Quaternion.Euler(newPitch, euler.y, euler.z);
 
-        if (pos.y > groundY + 0.1f) return;
+        if (pos.y > groundY + LandSnap) return;
 
         StartLanding(ctx);
     }
@@ -327,7 +329,9 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
             Data.DangerZoneHeightOffset,
             Data.WarningOutlineWidth,
             startEmpty: true);
-        _warningZone.BeginFill(Data.WarningDuration);
+        // 채움은 몸이 바닥에 닿는 순간(= 판정)에 끝난다 — 예고 + 내려꽂기(남은 높이 ÷ 낙하 속도)(10-08 점검: 다 찬 뒤 0.57초에 맞았다)
+        float descent = Mathf.Max(0f, ctx.Transform.position.y - groundY - LandSnap) / Mathf.Max(0.01f, Data.FlyDownSpeed);
+        _warningZone.BeginFill(Data.WarningDuration + descent);
     }
 
     private void SpawnIcePillars(MonsterContext ctx)

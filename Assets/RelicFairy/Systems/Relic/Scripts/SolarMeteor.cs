@@ -31,6 +31,9 @@ public sealed class SolarMeteor : MonoBehaviour
     private const float  RingLift     = 0.06f;   // 지면 z-파이팅 방지용 살짝 띄움
     private static readonly Color RingColor       = new(1f, 0.72f, 0.20f, 0.85f);   // 태양빛 주황금
     private static readonly Color RingImpactColor = new(1f, 0.95f, 0.55f, 1f);      // 착탄 순간 백열
+    // 작열 지대 테두리(10-11) — 지대는 그림 없이 4초 동안 피해만 줘 「보이지 않는 불」이었다. 조준 링을 지대 반경으로 줄여 남긴다.
+    private const float  ZoneRingWidth = 0.1f;
+    private const float  ZoneRingAlpha = 0.45f;
 
     private LineRenderer _ring;
 
@@ -40,19 +43,21 @@ public sealed class SolarMeteor : MonoBehaviour
     /// onGroundContact: 태양이 지면 근처로 오면 매 틱 현재 위치로 호출(낙하 피해).
     /// onImpact: 착탄 순간 1회(대폭발).
     /// </summary>
+    /// zoneRadius · zoneDuration: 작열 지대 — 0보다 크면 착탄 뒤 링이 그 반경의 테두리로 남아 지대 수명 동안 옅어진다.
     public static void Strike(Vector3 impact, float fromHeight, float fallTime, float impactScale,
-                              float blastRadius, Action<Vector3> onGroundContact, Action onImpact)
+                              float blastRadius, Action<Vector3> onGroundContact, Action onImpact,
+                              float zoneRadius = 0f, float zoneDuration = 0f)
     {
         var go = new GameObject("SolarMeteor");
         go.transform.position = impact + Vector3.up * fromHeight;
         var m = go.AddComponent<SolarMeteor>();
         m.RunAsync(impact, fromHeight, fallTime, impactScale, blastRadius, onGroundContact, onImpact,
-                   go.GetCancellationTokenOnDestroy()).Forget();
+                   zoneRadius, zoneDuration, go.GetCancellationTokenOnDestroy()).Forget();
     }
 
     private async UniTaskVoid RunAsync(Vector3 impact, float fromHeight, float fallTime, float impactScale,
                                        float blastRadius, Action<Vector3> onGroundContact, Action onImpact,
-                                       CancellationToken ct)
+                                       float zoneRadius, float zoneDuration, CancellationToken ct)
     {
         try
         {
@@ -103,11 +108,24 @@ public sealed class SolarMeteor : MonoBehaviour
             onImpact?.Invoke();
             SetRingColor(RingImpactColor);
 
-            await FadeRingOutAsync(0.2f, ct);
+            if (zoneDuration > 0f && zoneRadius > 0f)
+            {
+                await FadeRingOutAsync(0.2f, ct);   // 착탄 백열은 그대로 꺼지고
+                SetRingRadius(zoneRadius);          // 지대 테두리로 다시 — 얇고 옅게, 지대 수명 동안 사라진다
+                if (_ring != null) _ring.widthMultiplier = ZoneRingWidth;
+                var c = RingColor; c.a = ZoneRingAlpha;
+                SetRingColor(c);
+                // 지대가 끝까지 같은 피해를 주므로 테두리도 끝까지 — 마지막 0.3초에만 옅어진다(10-13 이펙트 = 판정)
+                await UniTask.Delay(Mathf.RoundToInt(Mathf.Max(0f, zoneDuration - 0.3f) * 1000f), cancellationToken: ct);
+                await FadeRingOutAsync(Mathf.Min(0.3f, zoneDuration), ct);
+            }
+            else await FadeRingOutAsync(0.2f, ct);
         }
         catch (OperationCanceledException) { }
         finally
         {
+            // 링은 운석의 자식이 아니다(낙하하는 운석을 따라 내려오지 않게) — 따로 지운다. 예전엔 Q마다 투명한 링과 머티리얼이 남았다(10-11).
+            if (_ring != null) { Destroy(_ring.material); Destroy(_ring.gameObject); }
             if (this != null) Destroy(gameObject);
         }
     }
@@ -129,12 +147,18 @@ public sealed class SolarMeteor : MonoBehaviour
         // 항상 또렷하게 — 조명 무관 가산 발광 머티리얼.
         _ring.material = new Material(Shader.Find("Sprites/Default"));
 
+        SetRingRadius(radius);
+        SetRingColor(RingColor);
+    }
+
+    private void SetRingRadius(float radius)
+    {
+        if (_ring == null) return;
         for (int i = 0; i < RingSegments; i++)
         {
             float a = (i / (float)RingSegments) * Mathf.PI * 2f;
             _ring.SetPosition(i, new Vector3(Mathf.Cos(a) * radius, 0f, Mathf.Sin(a) * radius));
         }
-        SetRingColor(RingColor);
     }
 
     private void SetRingColor(Color c)

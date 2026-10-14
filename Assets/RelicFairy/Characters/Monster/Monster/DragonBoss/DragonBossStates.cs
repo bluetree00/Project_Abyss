@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -443,12 +443,12 @@ public class DragonBossAttackReadyState : IMonsterState
     public void Enter(MonsterContext ctx)
     {
         var bbRaw = (ctx.Monster as IBoss)?.Blackboard as DragonBossBlackboard;
-        Debug.Log($"[DragonAttackReady.Enter] BodyState={bbRaw?.BodyState} GCC={GameCameraController.Instance != null}");
+        RFLog.D($"[DragonAttackReady.Enter] BodyState={bbRaw?.BodyState} GCC={GameCameraController.Instance != null}");
 
         // 지상 상태 진입 시 Agent 가 이전 공중 패턴으로 disabled 되어 있으면 복구한다.
         if (bbRaw != null && bbRaw.BodyState == BodyState.Grounded)
         {
-            Debug.Log("[DragonAttackReady.Enter] → Grounded 분기, DeactivateTopDown");
+            RFLog.D("[DragonAttackReady.Enter] → Grounded 분기, DeactivateTopDown");
             GameCameraController.Instance?.DeactivateDragonTopDownView();
             RestoreGroundAgent(ctx);
             if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
@@ -456,7 +456,7 @@ public class DragonBossAttackReadyState : IMonsterState
             return;
         }
 
-        Debug.Log($"[DragonAttackReady.Enter] → Airborne 분기, SpawnPos={ctx.Runtime.SpawnPosition}");
+        RFLog.D($"[DragonAttackReady.Enter] → Airborne 분기, SpawnPos={ctx.Runtime.SpawnPosition}");
         if (ctx.Agent != null && ctx.Agent.enabled) ctx.Agent.enabled = false;
         _currentAirAnim = null;
         _orbitDirection = ResolveOrbitDirection(ctx);

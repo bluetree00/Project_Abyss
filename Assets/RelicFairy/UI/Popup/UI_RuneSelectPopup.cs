@@ -12,12 +12,16 @@ using UnityEngine.UI;
 /// 룬 획득 = <b>후보 N개 중 1개 선택</b>. 예전 단일 알림 팝업(09-21 폐기)은
 /// "고르는" 결정이 없었다 — 이 팝업이 매 방 보상을 결정으로 바꾼다.
 ///
-/// 카드 구성(시안 「룬 픽업」 2026-09-19):
-///  - <b>룬 문양</b> — 카드 위쪽 43%. 컨셉별 문양(<see cref="RuneArt.ResolveRuneIcon"/>) 뒤에 등급색 빛.
-///  - 이름 / 등급·칸수 칩 / 속성 칩 / 효과
-///  - 아래에 <b>작은 모양</b>과 <b>배치 가능 배지</b> — 인접 제약 때문에 실제로 못 놓는 룬이 생긴다. 경고일 뿐 선택은 막지 않는다.
-///  - 등급 테두리 = 서약 카드의 보석 테두리(철·블루·보라·골드). 뒷면의 문장 색도 등급이다.
+/// 카드 구성(10-06 개편 — 의뢰서 N3~N9 「모양이 1순위」 · 시안 바탕화면 기획/룬획득·유물기억_팝업개편_시안_20261006):
+///  - 맨 위 <b>속성 리본</b> · 등급 글자 + 속성 칩
+///  - <b>룬 실물 판</b> — 납품 속성 조각으로 모양을 크게(빈 자리는 옅은 테). 뒤집히는 순간 칸이 하나씩 끼워진다.
+///  - 이름 / (발동 계열 칩) / 효과 칸(숫자 금색) / <b>룬 수 한 줄</b>(글자만) — 상한을 넘으면 붉게. 경고일 뿐 선택은 막지 않는다.
+///  - <b>테 = 등급</b>: 등급색 선(두께 1~2) + 영웅 이상만 서약 카드의 보석 테두리(얇게 깎아 0.5배) + 전설만 바깥 빛. 뒷면의 문장 색도 등급이다.
 ///  - 카드 줄 오른쪽 = <b>지금 룬판</b>(<see cref="RuneBoardMini"/>). 후보는 3장 고정이라(10-01) 네 번째 자리를 판이 쓴다.
+///  - 고른 카드 = 금 1px 테 + 모서리 눈금(<see cref="UIThinFrame"/> 켜짐 연출) + 1.03배 — 표시는 이것 하나다(10-11 v2).
+///
+/// 10-11 v2(비교 리서치 B §2): 창 맞춤 상한 1.3(화면 88% → 약 55%) · 글자 Noto(가짜 굵게 · 기울임 없음).
+/// 구운 프리팹이라 창 · 제목 · 버튼은 <see cref="ApplyThinChrome"/>가 쓰는 곳에서 덮어쓴다(재굽기 없이 반영).
 ///
 /// 공개 연출: 카드가 뒷면으로 내려오고 → 낮은 등급부터 뒤집힌다 → 전설은 한 번 멈췄다가 연다 →
 /// 고른 카드는 보관함 카운터로 날아간다. 전부 unscaled UI 트윈이고(팝업 중 timeScale 0), 아무 입력이나 들어오면 끝 상태로 넘어간다.
@@ -40,6 +44,23 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private const float CardSideMargin = 40f;   // 카드 열 좌우 여백(창 안쪽)
     // 「지금 룬판」 — 카드 줄 오른쪽 끝, 카드와 같은 높이. 13열 판이 칸 13.7px로 들어가는 폭이다(카드는 240으로 준다).
     private const float BoardPanelW = 228f;
+    // 「셋 중 하나」 팝업 창 맞춤 상한(10-11 v2) — 컨텐츠 화면 상한(3)이면 1.64배로 커져 화면 88%를 덮었다. 1.3 = 약 55%(유물 진화와 같다).
+    private const float FitMaxScale = 1.3f;
+    // [선택] · [넘기기] — 목업 px(창 아래 가운데 기준). 선택 220×44(리서치 B §2 P3) · 넘기기도 같은 높이 · 두 버튼 사이 23.
+    private static readonly Vector2 ConfirmBtnSize = new(220f, 44f);
+    private static readonly Vector2 SkipBtnSize    = new(180f, 44f);
+    private const float BtnBottom = 44f;
+    private const float BtnGap    = 23f;
+
+    // 글자(10-11 v2 — Noto · 가짜 굵게 없음, 목업 px): 제목 300 24 · 이름 500 22 · 효과 400 18 · 버튼 500 20 · 보조 17 · 라벨 15.
+    private const float TitleSize  = 24f;
+    private const float NameSize   = 22f;
+    private const float NameH      = 32f;    // Noto 줄 높이(≈1.45em) — DNF에 맞춘 28이면 자동 크기가 글자를 줄인다
+    private const float EffectSize = 18f;
+    private const float EffectRowH = 26f;
+    private const float ButtonSize = 20f;
+    private const float SubSize    = 17f;
+    private const float LabelSize  = 15f;
 
     // 등급 확률 막대 — 창 좌하단, [선택]/[넘기기] 좌측 여백에 앉힌다.
     private const float OddsBarW      = 236f;
@@ -47,33 +68,37 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private const float OddsBarMargin = 8f;
     private const float CardY   = 32f;    // 카드 위 68 / 아래 132(버튼 줄 56 + 여백) — 창 중심 기준
 
-    // 카드 안 배치(카드 위에서부터, 폭 300 기준 — 좁은 카드는 폭 비율로 줄인다)
-    private const float ArtCenterY  = 92f;    // 문양 칸(위 43% = 180) 한가운데
-    private const float IconFrac    = 0.48f;  // 문양 = 카드 폭의 48%
-    private const float LegendIconFrac = 0.56f;
-    private const float GlowFrac    = 0.78f;
-    private const float RaysFrac    = 1.30f;
-    private const float NameY       = 184f;
-    private const float ChipY       = 218f;
-    private const float ChipH       = 24f;
-    private const float EffectsY    = 250f;
-    // 발동 계열 칩이 있으면 칩이 두 줄이 된다 — 효과 칸을 아래로 밀면 모양 칸과 겹치므로(09-29 실측) 위에서 자리를 만든다.
-    private const float FamilyLift     = 22f;    // 이름 · 칩 줄을 이만큼 올린다
-    private const float FamilyArtLift  = 8f;     // 문양도 조금 올리고
-    private const float FamilyIconFrac = 0.88f;  // 조금 줄인다
-    private const float FootTop        = CardH - 12f - FootH;   // 모양 칸 윗변(카드 위 기준) — 효과 칸의 바닥
-    private const float MinEffectFont  = 12f;    // 넘칠 때 줄이는 하한
-    // 09-25 사용자 「룬 획득 팝업에서 블록 모양도 알 수 있어야」: 모양 칸 44 → 76 · 칸 상한 14 → 22.
-    // 효과는 1~2줄이 대부분이라 아래가 비어 있었다 — 그 자리를 모양에 준다(효과 4줄 = 82).
-    private const float EffectsH    = 82f;
-    private const float FootH       = 76f;    // 모양 칸 높이 — 3줄 모양(전설 12칸)이 22px 칸으로 들어간다
-    private const float FootW       = 0.5f;   // 모양 칸 폭(카드 폭 비율)
-    private const float MiniCellMax = 22f;
-    private const float MiniGap     = 3f;
-    // 서약 보석 테두리 조각(모서리 53×88 · 장식바 187×52)을 폭 300 카드에 0.8~0.93배로 얹는다.
-    private const float GemCornerW  = 42f;
-    private const float GemBarW     = 174f;
+    // 카드 앞면 배치(카드 위에서부터 — 10-06 개편: 리본 / 등급 · 속성 / 룬 실물 판 / 이름 / (계열) / 효과 칸 / 배지)
+    private const float RaysFrac        = 1.15f;  // 전설 광선 = 판 폭의 배수
+    private const float RibbonY         = 9f;     // 속성 리본(카드 맨 위 한 줄)
+    private const float RibbonH         = 8f;
+    private const float HeadY           = 22f;    // 등급 글자 · 속성 칩 줄
+    private const float ChipH           = 24f;
+    private const float PanelY          = 52f;    // 룬 실물 판 — 카드의 3분의 1 남짓(의뢰서 「모양이 1순위」)
+    private const float PanelH          = 146f;
+    private const float PanelInset      = 12f;
+    private const float CountRowH       = 18f;    // 판 아래 「N칸」 글자 자리
+    private const float CellMax         = 46f;    // 한 칸 상한 — 1칸 룬이 판을 다 먹지 않게
+    private const float CellGap         = 5f;
+    private const float NameY           = 206f;
+    private const float NameIcon        = 34f;    // 이름 왼쪽 룬 그림(10-10)
+    private const float NameIconGap     = 6f;
+    private const float FamilyY         = 238f;   // 발동 계열 칩(있을 때만)
+    private const float FamilyRowH      = 28f;
+    private const float EffectsTop      = 240f;
+    private const float BadgeH          = 24f;
+    private const float BadgeBottom     = 12f;
+    private const float MinEffectFont   = 12f;    // 넘칠 때 줄이는 하한
+    private const float AssembleStagger = 0.035f; // 뒤집히는 순간 칸이 하나씩 끼워진다
+    private const float AssembleDur     = 0.14f;
+    private const float HaloPad         = 8f;     // 전설 바깥 빛이 카드 밖으로 번지는 폭(10-11 v2 「후광 8px 안팎」)
+    private const float HaloRingEdge    = 24f;    // 고리 스프라이트 경계 px — HaloPad로 줄여 그린다(pixelsPerUnitMultiplier)
+    private const float HaloAlpha       = 0.5f;   // 전설만(10-11 v2 — 희귀 0.55 · 영웅 0.70 후광은 걷었다)
+    // 서약 보석 테두리 조각(모서리 53×88 · 장식바 187×52)을 0.5배로, 영웅 이상만 — 선은 얇게 깎은 사본(10-11 v2 「장식은 남기되 얇게」).
+    private const float GemCornerW  = 26.5f;
+    private const float GemBarW     = 93.5f;
     private const float GemOutset   = 3f;     // 모서리가 카드 모서리를 살짝 감싼다
+    private const float SelectGap   = 4f;     // 고른 표시 금 테는 카드 밖 4px — 등급색 선과 겹치지 않게
 
     // ── 공개 연출(시안 타임라인) ──
     private const float VeilInDur      = 0.25f;
@@ -101,18 +126,16 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private const float BobPeriod      = 3.2f;
     private const float BobAmp         = 4f;
 
-    private static readonly Color SelectBorder  = new(0.88f, 0.72f, 0.32f, 1f);
     // 청 수정 동굴 바탕을 인디고로 누른다 — 다른 화면(인디고 글래스)과 온도를 맞추고 그림은 남긴다(톤 통일 ④, 09-29).
     private static readonly Color CaveTint      = new(0.66f, 0.62f, 0.80f, 1f);
-    private static readonly Color CardSelected  = new(0.20f, 0.17f, 0.10f, 1f);
-    private static readonly Color OkColor       = new(0.47f, 0.84f, 0.60f, 1f);
+    private static readonly Color CardBorderArt = new(0.62f, 0.62f, 0.66f, 1f);   // 카드 테 아트 — 고름과 무관하게 한 색(고른 표시는 금 테 하나)
     private static readonly Color NoColor       = new(0.92f, 0.40f, 0.33f, 1f);
     private static readonly Color ChipFill      = new(0.05f, 0.06f, 0.10f, 0.72f);
     private static readonly Color BackFill      = new(0.045f, 0.055f, 0.09f, 1f);
     private static readonly Color LegendGold    = new(1f, 0.84f, 0.47f, 1f);
 
     // 코드로 그리는 빛 — 부드러운 원·회전 광선·기둥. 아트 없이 한 번 만들어 모든 팝업이 같이 쓴다.
-    private static Sprite _softDot, _rays, _beam;
+    private static Sprite _softDot, _rays, _beam, _haloRing;
 
     // ── 상태 ──
     private readonly List<CardView> _cards = new();
@@ -121,7 +144,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private RuneBoardMini _board;
     private List<(RuntimeItemData data, ItemSO so)> _candidates;
     private RunItemInventory _inventory;
-    private const float SelectedCardScale   = 1.05f;   // 선택 카드 확대
+    private const float SelectedCardScale   = 1.03f;   // 선택 카드 확대(10-11 v2 1.05 → 1.03 — 금 테가 주인공)
     private const float UnselectedCardAlpha = 0.55f;   // 비선택 카드 감광
 
     private int _selected = -1;
@@ -166,9 +189,11 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         public GameObject    Face;
         public GameObject    Back;
         public Image         Glow;
-        public RectTransform Icon;
+        public RectTransform Icon;       // 전설은 이게 떠오른다(Update) — 지금은 모양 묶음
         public Vector2       IconBase;
         public RectTransform Rays;
+        public readonly List<RectTransform> Cells = new();   // 뒤집힐 때 하나씩 끼워지는 모양 칸
+        public UIThinFrame   Select;     // 고른 표시 — 금 1px 테 + 모서리 눈금(평소 꺼 둔다)
     }
 
     // ── Lifecycle ──
@@ -236,6 +261,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         SetSelected(-1);
         BuildCards();
         RefreshCounter();
+        RefreshOdds();   // 열 때마다 — 챕터 · 방 종류가 바뀌었다(창을 다시 쓰면 지난 값이 남는다, 10-10)
 
         // 선택은 이 시점부터 이미 가능하다 — 시퀀스가 끝나야 고를 수 있는 게 아니다(§C-1 스킵 규칙).
         PlayRevealSequenceAsync().Forget();
@@ -335,11 +361,12 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         try
         {
             var spec = RewardPresentation.For(card.Rarity);
-            Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton, 0.55f, spec.SfxPitch).Forget();
+            Managers.Sound?.PlayUiEvent(SoundEvent.RuneFlip, spec.SfxPitch);   // 등급 피치는 그대로
 
             await TweenAsync(FlipHalf, t => SetFlipScale(card, 1f - EaseInQuad(t), lift), ct);
             ShowFace(card, true);
             if (card.Glow != null) PulseGlowAsync(card.Glow, ct).Forget();
+            AssembleShapeAsync(card, ct).Forget();
             await TweenAsync(FlipHalf, t => SetFlipScale(card, EaseOutCubic(t), lift), ct);
 
             if (spec.PulsePeak > 0f) VolumePulseService.Pulse(spec.PulsePeak, spec.PulseDuration);
@@ -359,7 +386,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         FadeVeilAsync(VeilBase, LegendVeil, 0.2f, ct).Forget();
         ShowPillar(card);
 
-        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton, 0.45f, 0.8f).Forget();
+        Managers.Sound?.PlayUiEvent(SoundEvent.RuneLegend);
         await TweenAsync(0.3f, t =>
         {
             float e = EaseOutCubic(t);
@@ -614,9 +641,9 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             Vector2.zero, new Vector2(WindowW, WindowH));
         _windowRoot = window.transform;
         // 화면 맞춤은 빌더가 붙인다 — 프리팹에만 붙이면 재굽기 때 사라진다.
-        // 크기를 가진 것은 테두리(부모)라 거기에 붙인다.
+        // 크기를 가진 것은 테두리(부모)라 거기에 붙인다. 상한은 「셋 중 하나」 팝업 값(구운 프리팹은 ApplyThinChrome이 덮어쓴다).
         window.transform.parent.gameObject.AddComponent<UIWindowFitter>()
-              .Configure(maxScale: UIWindowFitter.ContentScreen);
+              .Configure(maxScale: FitMaxScale);
 
         var skin = UISkin.RuneSelect;
         _skinned = skin != null;
@@ -634,7 +661,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         }
 
         // 제목
-        var title = ShopUIStyle.MakeText(_windowRoot, "Title", 26f, FontStyles.Bold,
+        var title = ShopUIStyle.MakeText(_windowRoot, "Title", TitleSize, FontStyles.Normal,
             TextAlignmentOptions.Left, ShopUIStyle.TextPrimary);
         ShopUIStyle.Anchor(title.rectTransform,
             new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
@@ -655,6 +682,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         _screenFlash = ShopUIStyle.MakeImage(transform, "ScreenFlash", new Color(1f, 1f, 1f, 0f));
         ShopUIStyle.Stretch(_screenFlash.rectTransform);
         _screenFlash.raycastTarget = false;
+
+        ApplyThinChrome();
     }
 
     [SerializeField] private Transform _windowRoot;
@@ -675,7 +704,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         ShopUIStyle.Skin(_confirmBtnImg, skin?.confirmButton, sliced: true);
         AddClick(confirm.transform.parent.gameObject, OnConfirmClicked);
 
-        _confirmLabel = ShopUIStyle.MakeText(confirm.transform, "Label", 20f, FontStyles.Bold,
+        _confirmLabel = ShopUIStyle.MakeText(confirm.transform, "Label", ButtonSize, FontStyles.Normal,
             TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
         ShopUIStyle.Stretch(_confirmLabel.rectTransform);
         _confirmLabel.text = "선택";
@@ -740,6 +769,9 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         // 굴림은 제단에서 안 연 등급을 한 단계씩 내린다(ClampRarity) — 표시도 같은 규칙으로 접는다(정제소와 동일).
         // 안 접으면 영웅·전설이 잠긴 세이브에서도 「Epic 9% · Legend 2%」가 뜬다.
         (rare, epic, legendary) = MemoryAltarService.FoldOdds(rare, epic, legendary);
+        // 방 보상은 Common부터 — 네 등급을 다 보이고, 무엇이 등급을 올렸는지(챕터 · 시기 · 정예) 머리 오른쪽에(10-10).
+        bar.ShowCommon = true;
+        bar.SetBoost(RoomRewardTable.DescribeBoost(kind));
         bar.SetOdds(rare, epic, legendary, heated: false);
     }
 
@@ -811,6 +843,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             BuildBack(card.transform, data.rarity, view);
             // 등급 테두리는 앞뒤 공통 — 채움 위, 카드 밖으로 살짝 걸친다(얼굴의 클리핑 밖).
             BuildGemFrame(cardRT, data.rarity);
+            BuildHalo(cardRT, data.rarity);
+            view.Select = BuildSelectFrame(cardRT);
             _cards.Add(view);
 
             // 연출이 켜져 있으면 숨은 뒷면에서 시작한다(공개는 PlayRevealSequenceAsync가 담당).
@@ -848,13 +882,17 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     /// 등급 보석 테두리 — 서약 카드의 철·블루·보라·골드 조각을 그대로 쓴다(새 아트 0).
     /// 좌상단 모서리 하나를 축 반전해 네 귀퉁이로, 장식바는 위·아래 가운데에 걸터앉힌다.
     /// 조각이 없으면 예전 색 막대 테두리로 떨어진다.
+    /// 10-11 v2: 영웅 이상만 · 0.5배 · 선을 1텍셀 깎은 사본(색은 그대로) — 「유물 콘셉트는 남기되 얇게」. 일반 · 희귀는 등급색 선 하나.
     /// </summary>
     private void BuildGemFrame(RectTransform cardRT, ItemRarity rarity)
     {
+        // 테 = 등급(10-06) — 등급색 선은 늘 두르고, 보석 조각이 있으면 그 위에 얹는다.
+        BuildRarityFrame(cardRT, rarity);
+        if (rarity < ItemRarity.Epic) return;
         var skin   = UISkin.RuneSelect;
-        var corner = skin?.RarityCorner(rarity);
-        var bar    = skin?.RarityBar(rarity);
-        if (corner == null || bar == null) { BuildRarityFrame(cardRT, rarity); return; }
+        var corner = UISpriteMaster.Thinned(skin?.RarityCorner(rarity), keepColor: true);
+        var bar    = UISpriteMaster.Thinned(skin?.RarityBar(rarity), keepColor: true);
+        if (corner == null || bar == null) return;
 
         float k  = _cardW / CardW;
         float cw = GemCornerW * k;
@@ -886,10 +924,10 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         img.rectTransform.localScale = new Vector3(flip.x, flip.y, 1f);
     }
 
-    /// <summary>폴백 — 등급 색 프레임 4조각(상·하·좌·우). 두께는 등급이 올라갈수록 두꺼워진다.</summary>
+    /// <summary>등급 색 프레임 4조각(상·하·좌·우). 두께는 1 / 1 / 1.5 / 2(10-11 v2 — 예전 1.5~4.5는 화면에서 4~7px 띠였다).</summary>
     private static void BuildRarityFrame(RectTransform cardRT, ItemRarity rarity)
     {
-        float th = ShopUIStyle.RarityBorder(rarity);
+        float th = rarity switch { ItemRarity.Legendary => 2f, ItemRarity.Epic => 1.5f, _ => 1f };
         var col  = RewardPresentation.FrameColor(rarity);
 
         // (anchorMin, anchorMax, pivot, pos, size) — 두께 방향만 고정하고 나머지는 늘린다.
@@ -934,99 +972,81 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         var core = ShopUIStyle.MakeImage(sigil.transform, "Core", WithAlpha(col, 0.85f));
         ShopUIStyle.Stretch(core.rectTransform, s * 0.24f);
 
-        var word = ShopUIStyle.MakeText(back.transform, "RarityWord", 16f, FontStyles.Bold,
+        var word = ShopUIStyle.MakeText(back.transform, "RarityWord", SubSize, FontStyles.Normal,
             TextAlignmentOptions.Center, col);
         ShopUIStyle.Anchor(word.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                           new Vector2(0f, CardH * 0.15f), new Vector2(_cardW - 24f, 22f));
+                           new Vector2(0f, CardH * 0.15f), new Vector2(_cardW - 24f, 26f));
+        UITheme.StyleThinText(word, UIWeight.Medium, SubSize, col, shadow: true);
         word.characterSpacing = 18f;
         word.text = rarity.ToString().ToUpperInvariant();
         FitSingleLine(word);
     }
 
-    /// <summary>앞면 — 문양(빛·광선) / 이름 / 칩 / 효과 / 작은 모양 + 배치 배지.</summary>
+    /// <summary>
+    /// 앞면(10-06 개편 — 사용자 「레어도 · 룬 색상 · 룬 모양 · 텍스트 가시성」 · 의뢰서 N3~N9 「모양이 1순위」):
+    /// 속성 리본 / 등급 글자 · 속성 칩 / <b>룬 실물 판</b>(속성 조각으로 모양을 크게) / 이름 / (계열 칩) / 효과 칸 / 룬 수 한 줄.
+    /// 규칙: 테 = 등급(<see cref="BuildRarityFrame"/> · <see cref="BuildGemFrame"/> · <see cref="BuildHalo"/>) · 리본 · 칸 색 = 속성.
+    /// 예전 가운데 문양(효과 개념 그림)은 속성과 색이 어긋나(「어둠」 칩인데 파란 보석) 앞면에서 뺐다.
+    /// 10-11 v2: 글자 Noto(이름 500 22 · 효과 400 18 · 라벨 500 15) · 테 두른 상자는 카드 테 + 룬 판 + 효과 칸 셋.
+    /// </summary>
     private void BuildFace(Transform card, RuntimeItemData data, CardView view)
     {
         var face = ShopUIStyle.MakeRect(card, "Face", typeof(RectMask2D)).GetComponent<RectTransform>();
         ShopUIStyle.Stretch(face);
         view.Face = face.gameObject;
 
+        var skin      = UISkin.RuneSelect;
         var rarityCol = ShopUIStyle.Rarity(data.rarity);
-        bool legend = data.rarity == ItemRarity.Legendary;
-        bool family = BuildFamilyRules.OfItem(data) != BuildFamily.None;
-        float lift  = family ? FamilyLift : 0f;
-        float artY  = ArtCenterY - (family ? FamilyArtLift : 0f);
-        float iconK = family ? FamilyIconFrac : 1f;
+        var elemCol   = ElementDef.IdColor(data.element, ShopUIStyle.TextDim);
+        int elemIdx   = ElementIndex(data.element);
+        bool legend   = data.rarity == ItemRarity.Legendary;
+        bool family   = BuildFamilyRules.OfItem(data) != BuildFamily.None;
+        var top       = new Vector2(0.5f, 1f);
 
-        // 문양 칸 — 전설은 광선이 돈다(Update)
-        var artAnchor = new Vector2(0.5f, 1f);
-        if (legend)
-        {
-            var rays = ShopUIStyle.MakeImage(face, "Rays", WithAlpha(LegendGold, 0.32f));
-            rays.sprite = Rays;
-            ShopUIStyle.Anchor(rays.rectTransform, artAnchor, artAnchor, new Vector2(0.5f, 0.5f),
-                               new Vector2(0f, -artY), Vector2.one * _cardW * RaysFrac);
-            view.Rays = rays.rectTransform;
-        }
+        // 속성 리본 — 카드 맨 위 한 줄
+        var ribbonArt = skin?.ElementRibbon(elemIdx);
+        var ribbon = ShopUIStyle.MakeImage(face, "ElementRibbon", ribbonArt != null ? Color.white : elemCol);
+        if (ribbonArt != null) ribbon.sprite = ribbonArt;
+        ShopUIStyle.Anchor(ribbon.rectTransform, top, top, top, new Vector2(0f, -RibbonY), new Vector2(_cardW - 28f, RibbonH));
 
-        var glow = ShopUIStyle.MakeImage(face, "Glow",
-            WithAlpha(rarityCol, data.rarity == ItemRarity.Common ? 0.18f : 0.45f));
-        glow.sprite = SoftDot;
-        ShopUIStyle.Anchor(glow.rectTransform, artAnchor, artAnchor, new Vector2(0.5f, 0.5f),
-                           new Vector2(0f, -artY), Vector2.one * _cardW * GlowFrac * iconK);
-        view.Glow = glow;
-
-        var art = RuneArt.ResolveRuneIcon(data);
-        if (art != null)
-        {
-            var icon = ShopUIStyle.MakeImage(face, "RuneIcon", Color.white);
-            icon.sprite = art;
-            icon.preserveAspect = true;
-            ShopUIStyle.Anchor(icon.rectTransform, artAnchor, artAnchor, new Vector2(0.5f, 0.5f),
-                               new Vector2(0f, -artY), Vector2.one * _cardW * (legend ? LegendIconFrac : IconFrac) * iconK);
-            view.Icon     = icon.rectTransform;
-            view.IconBase = icon.rectTransform.anchoredPosition;
-        }
+        BuildHeader(face, data, rarityCol, elemCol);
+        bool canPlace = BuildShapePanel(face, data, view, rarityCol, elemCol, elemIdx, legend);
 
         // 이름
-        var nameText = ShopUIStyle.MakeText(face, "Name", 22f, FontStyles.Bold,
+        var nameText = ShopUIStyle.MakeText(face, "Name", NameSize, FontStyles.Normal,
             TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
-        ShopUIStyle.Anchor(nameText.rectTransform, artAnchor, artAnchor, new Vector2(0.5f, 1f),
-            new Vector2(0f, -(NameY - lift)), new Vector2(_cardW - 28f, 28f));
+        ShopUIStyle.Anchor(nameText.rectTransform, top, top, top, new Vector2(0f, -NameY), new Vector2(_cardW - 24f, NameH));
+        UITheme.StyleThinText(nameText, UIWeight.Medium, NameSize, ShopUIStyle.TextPrimary, shadow: true);
         nameText.text = data.displayName ?? data.itemId;
         FitSingleLine(nameText);
+        PlaceRuneIcon(face, nameText, data);
 
-        BuildChips(face, data, rarityCol, lift);
+        if (family) BuildFamilyChip(face, data);
 
-        // 효과 목록 — 바닥은 모양 칸 윗변. 칩이 두 줄이면 그 아래에서 시작한다.
-        float fxTop = family ? ChipY - lift + ChipH * 2f + 10f : EffectsY;
-        float fxH   = Mathf.Min(EffectsH, FootTop - fxTop);
-        var fxRoot = ShopUIStyle.MakeRect(face, "Effects").GetComponent<RectTransform>();
-        ShopUIStyle.Anchor(fxRoot, artAnchor, artAnchor, new Vector2(0.5f, 1f),
-            new Vector2(0f, -fxTop), new Vector2(_cardW - 32f, fxH));
+        // 효과 칸 — 납품 「효과 칸」 판 위에 줄. 바닥은 배지 위.
+        float fxTop = EffectsTop + (family ? FamilyRowH : 0f);
+        float fxH   = CardH - fxTop - BadgeBottom - BadgeH - 8f;
+        var box = ShopUIStyle.MakeImage(face, "EffectBox", ChipFill);
+        ShopUIStyle.Skin(box, skin?.effectBox, sliced: true);
+        ShopUIStyle.Anchor(box.rectTransform, top, top, top, new Vector2(0f, -fxTop), new Vector2(_cardW - 24f, fxH));
+        var fxRoot = ShopUIStyle.MakeRect(box.transform, "Effects").GetComponent<RectTransform>();
+        ShopUIStyle.Stretch(fxRoot, 8f);
         var vlg = fxRoot.gameObject.AddComponent<VerticalLayoutGroup>();
         vlg.childControlHeight = true;  vlg.childForceExpandHeight = false;   // 줄바꿈된 효과 행이 자기 높이로 서게(2026-09-09)
         vlg.spacing = 2f;
         BuildEffectRows(fxRoot, data);
 
-        // 작은 모양 + 배치 배지 — 모양은 "놓을 수 있는가"의 근거라 배지 옆에 붙인다.
-        var shapeRoot = ShopUIStyle.MakeRect(face, "MiniShape").GetComponent<RectTransform>();
-        // 폭은 오른쪽 아래 배지 자리를 뺀 만큼까지 — 좁은 카드(4지선다)에서 5칸 모양이 배지와 겹쳤다.
-        float badgeW = Mathf.Min(128f, _cardW * 0.46f);
-        float footW  = Mathf.Min(_cardW * FootW, _cardW - 32f - badgeW - 8f);
-        ShopUIStyle.Anchor(shapeRoot, Vector2.zero, Vector2.zero, Vector2.zero,
-                           new Vector2(16f, 12f), new Vector2(footW, FootH));
-        bool canPlace = BuildMiniShape(shapeRoot, data);
-
-        var badgeCol = canPlace ? OkColor : NoColor;
-        var badge = ShopUIStyle.MakeFrame(face, "PlaceBadge", WithAlpha(badgeCol, 0.55f),
-                                          new Color(badgeCol.r * 0.12f, badgeCol.g * 0.14f, badgeCol.b * 0.12f, 0.85f), 1f);
-        ShopUIStyle.Anchor((RectTransform)badge.transform.parent, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
-                           new Vector2(-16f, 16f), new Vector2(badgeW, 24f));
-        var badgeText = ShopUIStyle.MakeText(badge.transform, "Label", 16f, FontStyles.Bold,   // 가독성 하한 16
-            TextAlignmentOptions.Center, badgeCol);
-        ShopUIStyle.Stretch(badgeText.rectTransform);
-        badgeText.text = canPlace ? "놓을 자리 있음" : "놓을 자리 없음";
+        // 룬 수 — 아래 가운데 글자 한 줄. 「룬 지금 + 1 / 상한」, 넘치면 붉게 — 경고일 뿐 선택은 막지 않는다(10-08 · 10-10 칸 → 룬 개수).
+        // 10-11 v2: 초록 칠 바(테 1px)를 걷었다 — 세 카드에 같은 내용이라 초록이 「차이」가 아니라 「공통」을 강조했다. 색은 모자랄 때만.
+        var badgeCol  = canPlace ? ShopUIStyle.TextDim : NoColor;
+        var bottom    = new Vector2(0.5f, 0f);
+        var badgeText = ShopUIStyle.MakeText(face, "PlaceBadge", LabelSize, FontStyles.Normal, TextAlignmentOptions.Center, badgeCol);
+        ShopUIStyle.Anchor(badgeText.rectTransform, bottom, bottom, bottom,
+                           new Vector2(0f, BadgeBottom), new Vector2(_cardW - 40f, BadgeH));
+        UITheme.StyleThinText(badgeText, UIWeight.Regular, LabelSize, badgeCol, shadow: true);
+        badgeText.text = RuneBlockBudget.SameLabel(data) ?? RuneBlockBudget.Label();   // 같은 룬이 이미 2개면 그 말이 먼저(10-14)
         FitSingleLine(badgeText);
+        BuildProcChip(face, data, badgeText);
 
         // 전설 광택 — 판·보관함과 같은 금빛 줄기가 카드를 가로지른다.
         if (legend)
@@ -1034,58 +1054,327 @@ public sealed class UI_RuneSelectPopup : UI_Popup
                 .Configure(StagingSlotShimmer.LegendaryTint, 0.22f, 3.6f, _cardW, phase: 0f);
     }
 
-    /// <summary>등급·칸수 칩과 속성 칩(블록 타일 + 이름)을 한 줄 가운데에 세운다. 속성 없는 룬은 등급 칩만.</summary>
-    /// <param name="lift">칩 줄을 올리는 만큼(계열 칩이 있어 두 줄일 때).</param>
-    private void BuildChips(RectTransform face, RuntimeItemData data, Color rarityCol, float lift)
+    /// <summary>
+    /// 머리줄 — 왼쪽 등급 글자(등급색 · 등급 표기는 이 한 곳), 오른쪽 속성 = 블록 타일 + 이름.
+    /// 10-11 v2: 속성 칩의 테 · 채움을 걷었다(카드 안 테 두른 상자 5 → 3) — 타일 그림이 속성색을 맡는다.
+    /// </summary>
+    private void BuildHeader(RectTransform face, RuntimeItemData data, Color rarityCol, Color elemCol)
     {
-        int cells = CellCount(data.shapeId);
-        string rarityText = RewardPresentation.RarityLabel(data.rarity) + (cells > 0 ? $" · {cells}칸" : string.Empty);
+        var tl = new Vector2(0f, 1f);
+        var word = ShopUIStyle.MakeText(face, "RarityWord", SubSize, FontStyles.Normal, TextAlignmentOptions.MidlineLeft, rarityCol);
+        ShopUIStyle.Anchor(word.rectTransform, tl, tl, tl, new Vector2(14f, -HeadY), new Vector2(_cardW * 0.6f, ChipH + 2f));
+        UITheme.StyleThinText(word, UIWeight.Medium, SubSize, rarityCol, shadow: true);
+        word.text = RewardPresentation.RarityLabel(data.rarity);
+        FitSingleLine(word);
 
         var elem = ElementDef.GetById(data.element);
-        const float pad = 9f, gap = 6f, tile = 14f;
+        if (elem == null) return;
+        const float pad = 9f, tile = 14f;
+        var chip = MakeChip(face, "ElementChip", elem.Name, UITheme.Thin.Ink, Color.clear, out float ew, tile + 4f);
+        if (chip.Find("Fill") is Transform fill && fill.TryGetComponent<Image>(out var fillImg))
+            fillImg.color = Color.clear;
+        var tileArt = RuneArt.GetBlockTile(data.element);
+        var dot = ShopUIStyle.MakeImage(chip, "Tile", tileArt != null ? Color.white : elemCol);
+        if (tileArt != null) { dot.sprite = tileArt; dot.preserveAspect = true; }
+        ShopUIStyle.Anchor(dot.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+                           new Vector2(pad, 0f), Vector2.one * tile);
+        chip.anchoredPosition = new Vector2(_cardW * 0.5f - 12f - ew * 0.5f, -HeadY);
+    }
 
-        var r = MakeChip(face, "RarityChip", rarityText, rarityCol, WithAlpha(rarityCol, 0.45f), out float rw);
-        float total = rw;
-        RectTransform e = null; float ew = 0f;
-        if (elem != null)
+    /// <summary>
+    /// 이름 왼쪽에 룬 그림을 작게 — 사용자 10-10 「어떤 룬인지 조그만 크기라도 보여주면」. 보관함 · 룬판 오른쪽 카드와 같은 그림
+    /// (<see cref="RuneArt.ResolveRuneIcon"/>). 그림 + 이름을 한 묶음으로 가운데 맞춘다 — 이름이 길면 말줄임.
+    /// </summary>
+    private void PlaceRuneIcon(RectTransform face, TMP_Text nameText, RuntimeItemData data)
+    {
+        var art = RuneArt.ResolveRuneIcon(data) ?? data.icon;
+        if (art == null || nameText == null) return;
+
+        var top   = new Vector2(0.5f, 1f);
+        float maxW = _cardW - 24f - NameIcon - NameIconGap;
+        float tw   = Mathf.Min(maxW, nameText.GetPreferredValues(nameText.text, maxW, NameH).x + 2f);
+        float left = -(NameIcon + NameIconGap + tw) * 0.5f;
+
+        var nrt = nameText.rectTransform;
+        nrt.sizeDelta        = new Vector2(tw, NameH);
+        nrt.anchoredPosition = new Vector2(left + NameIcon + NameIconGap + tw * 0.5f, -NameY);
+
+        var icon = ShopUIStyle.MakeImage(face, "RuneIcon", Color.white);
+        icon.sprite         = art;
+        icon.preserveAspect = true;
+        icon.raycastTarget  = false;
+        ShopUIStyle.Anchor(icon.rectTransform, top, top, new Vector2(0.5f, 0.5f),
+                           new Vector2(left + NameIcon * 0.5f, -NameY - NameH * 0.5f), Vector2.one * NameIcon);
+    }
+
+    /// <summary>
+    /// 룬 실물 판 — 판 · 보관함과 같은 속성 타일을 판에 놓일 모양 그대로 크게 세운다(빈 자리는 옅은 테로 모양 윤곽).
+    /// 뒤에 속성색 빛 · 전설만 등급색 빛(10-11 v2 — 등급색은 등급 글자 · 테에만). 룬 수 상한을 넘으면 칸을 어둡게 하고 false.
+    /// </summary>
+    private bool BuildShapePanel(RectTransform face, RuntimeItemData data, CardView view,
+                                 Color rarityCol, Color elemCol, int elemIdx, bool legend)
+    {
+        var skin = UISkin.RuneSelect;
+        var top  = new Vector2(0.5f, 1f);
+        var mid  = new Vector2(0.5f, 0.5f);
+        float pw = _cardW - 24f;
+
+        var panel = ShopUIStyle.MakeImage(face, "ShapePanel", ChipFill);
+        if (skin?.runeTile != null) { panel.sprite = skin.runeTile; panel.color = Color.white; }
+        ShopUIStyle.Anchor(panel.rectTransform, top, top, top, new Vector2(0f, -PanelY), new Vector2(pw, PanelH));
+        var prt = panel.rectTransform;
+
+        if (legend)
         {
-            var elemCol = ElementDef.IdColor(data.element, ShopUIStyle.TextDim);
-            e = MakeChip(face, "ElementChip", elem.Name, elemCol, WithAlpha(elemCol, 0.35f), out ew, tile + 4f);
-            var tileArt = RuneArt.GetBlockTile(data.element);
-            var dot = ShopUIStyle.MakeImage(e, "Tile", tileArt != null ? Color.white : elemCol);
-            if (tileArt != null) { dot.sprite = tileArt; dot.preserveAspect = true; }
-            ShopUIStyle.Anchor(dot.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                               new Vector2(pad, 0f), Vector2.one * tile);
-            total += gap + ew;
+            var rays = ShopUIStyle.MakeImage(prt, "Rays", WithAlpha(LegendGold, 0.32f));
+            rays.sprite = Rays;
+            ShopUIStyle.Anchor(rays.rectTransform, mid, mid, mid, Vector2.zero, Vector2.one * pw * RaysFrac);
+            view.Rays = rays.rectTransform;
+        }
+        // 판 안 등급색 빛 — 전설만(뒤집힐 때 한 번 부푼다). 희귀 · 영웅의 하늘 · 보라 빛은 카드 안 강조색 면적의 큰 몫이었다.
+        if (legend)
+        {
+            var glow = ShopUIStyle.MakeImage(prt, "Glow", WithAlpha(rarityCol, 0.42f));
+            glow.sprite = SoftDot;
+            ShopUIStyle.Anchor(glow.rectTransform, mid, mid, mid, Vector2.zero, new Vector2(pw * 0.95f, PanelH * 1.1f));
+            view.Glow = glow;
         }
 
-        float x = -total * 0.5f;
-        r.anchoredPosition = new Vector2(x + rw * 0.5f, -(ChipY - lift));
-        if (e != null) e.anchoredPosition = new Vector2(x + rw + gap + ew * 0.5f, -(ChipY - lift));
+        var shape = ShopUIStyle.MakeRect(prt, "Shape").GetComponent<RectTransform>();
+        ShopUIStyle.Anchor(shape, mid, mid, mid, Vector2.zero, new Vector2(pw, PanelH));
+        view.Icon = shape;
+        view.IconBase = shape.anchoredPosition;
 
-        // 발동 계열 기여 — 「기동 +1 → 3/4」. 고르는 순간 빌드에 무엇이 되는지(09-29 빌드 컨셉). 칩 줄 아래 한 줄.
-        var fam = BuildFamilyRules.OfItem(data);
-        if (fam != BuildFamily.None)
+        var entry   = Managers.RuneData?.GetShape(data.shapeId);
+        var offsets = entry != null ? RuneDataManager.ParseCellOffsets(entry) : null;
+        if (offsets == null || offsets.Length == 0) return true;   // 판정 불가 → 막지 않는다
+
+        // 룬 수 상한(10-08 · 10-10 칸 → 룬 개수) — 판 자리 판정은 뺐다(사용자: 판을 완벽히 배치하지 않는 한 맞히기 어렵다). 넘치면 칸을 어둡게.
+        bool canPlace = RuneBlockBudget.Fits(RuneBlockBudget.Used) && RuneBlockBudget.FitsSame(data);   // + 같은 룬 상한(10-14)
+
+        int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
+        foreach (var o in offsets)
         {
-            int now = BuildImprint.Count(fam) + 1;
-            int next = BuildFamilyRules.NextThreshold(now);
-            bool stageUp = BuildFamilyRules.StageOf(now) > BuildImprint.Stage(fam);
-            string tail = stageUp ? $"  <color=#E8BA54>{BuildFamilyRules.StageOf(now)}단계!</color>"
-                        : next > 0 ? $"<color=#8A8594>/{next}</color>" : "";
-            var famCol = BuildFamilyRules.ColorOf(fam);
-            var fc = MakeChip(face, "FamilyChip", $"{BuildFamilyRules.Label(fam)} +1 → {now}{tail}", famCol, WithAlpha(famCol, 0.40f), out _);
-            fc.anchoredPosition = new Vector2(0f, -(ChipY - lift + ChipH + 4f));
+            if (o.x < minX) minX = o.x;  if (o.x > maxX) maxX = o.x;
+            if (o.y < minY) minY = o.y;  if (o.y > maxY) maxY = o.y;
         }
+        int cols = maxX - minX + 1, rows = maxY - minY + 1;
+        float cell = Mathf.Min(CellMax,
+            (pw - PanelInset * 2f - (cols - 1) * CellGap) / cols,
+            (PanelH - PanelInset * 2f - CountRowH - (rows - 1) * CellGap) / rows);
+        float w = cols * cell + (cols - 1) * CellGap, h = rows * cell + (rows - 1) * CellGap;
+        var origin = new Vector2(-w * 0.5f + cell * 0.5f, h * 0.5f - cell * 0.5f + CountRowH * 0.5f);
+
+        var eg = ShopUIStyle.MakeImage(shape, "ElementGlow", WithAlpha(elemCol, canPlace ? 0.38f : 0.15f));
+        eg.sprite = SoftDot;
+        ShopUIStyle.Anchor(eg.rectTransform, mid, mid, mid, new Vector2(0f, CountRowH * 0.5f), new Vector2(w * 1.7f + 24f, h * 1.7f + 24f));
+
+        var filled = new HashSet<Vector2Int>();
+        foreach (var o in offsets) filled.Add(new Vector2Int(o.x - minX, maxY - o.y));   // 위에서부터 줄(판과 같은 방향)
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
+            {
+                if (filled.Contains(new Vector2Int(c, r))) continue;
+                var slot = ShopUIStyle.MakeFrame(shape, $"Slot{c}_{r}", new Color(1f, 1f, 1f, 0.14f), new Color(1f, 1f, 1f, 0.02f), 1.5f);
+                ShopUIStyle.Anchor((RectTransform)slot.transform.parent, mid, mid, mid,
+                                   origin + new Vector2(c * (cell + CellGap), -r * (cell + CellGap)), Vector2.one * cell);
+            }
+
+        // 판 · 보관함과 같은 속성 타일(문양 있는 칸) — 납품 「룬조각」(무늬 없는 색 칸)은 타일이 없을 때만(10-10 사용자 「룬 그리드처럼」).
+        var piece = RuneArt.GetBlockTile(data.element) ?? skin?.ElementPiece(elemIdx);
+        var tint  = piece != null ? Color.white : elemCol;
+        if (!canPlace) tint = new Color(tint.r * 0.5f, tint.g * 0.5f, tint.b * 0.5f, 0.75f);
+        foreach (var p in filled)
+        {
+            var img = ShopUIStyle.MakeImage(shape, $"C{p.x}_{p.y}", tint);
+            if (piece != null) { img.sprite = piece; img.preserveAspect = true; }
+            ShopUIStyle.Anchor(img.rectTransform, mid, mid, mid,
+                               origin + new Vector2(p.x * (cell + CellGap), -p.y * (cell + CellGap)), Vector2.one * cell);
+            view.Cells.Add(img.rectTransform);
+        }
+
+        var count = ShopUIStyle.MakeText(prt, "CellCount", LabelSize, FontStyles.Normal, TextAlignmentOptions.MidlineRight, ShopUIStyle.TextDim);
+        var br = new Vector2(1f, 0f);
+        ShopUIStyle.Anchor(count.rectTransform, br, br, br, new Vector2(-10f, 2f), new Vector2(80f, CountRowH + 4f));
+        UITheme.StyleThinText(count, UIWeight.Medium, LabelSize, ShopUIStyle.TextDim, shadow: true);
+        count.text = $"{offsets.Length}칸";
+        return canPlace;
+    }
+
+    /// <summary>발동 계열 기여 — 「기동 +1 → 3/4」. 고르는 순간 빌드에 무엇이 되는지(09-29 빌드 컨셉). 이름 아래 한 줄.</summary>
+    private void BuildFamilyChip(RectTransform face, RuntimeItemData data)
+    {
+        var fam = BuildFamilyRules.OfItem(data, out bool statOnly);
+        int now = (BuildImprint.Halves(fam) + (statOnly ? 1 : 2)) / 2;   // 스탯 룬은 절반(10-14 R0)
+        int next = BuildFamilyRules.NextThreshold(now);
+        bool stageUp = BuildFamilyRules.StageOf(now) > BuildImprint.Stage(fam);
+        string tail = stageUp ? $"  <color=#E8BA54>{BuildFamilyRules.StageOf(now)}단계!</color>"
+                    : next > 0 ? $"<color=#8A8594>/{next}</color>" : "";
+        var famCol = BuildFamilyRules.ColorOf(fam);
+        var fc = MakeChip(face, "FamilyChip", $"{BuildFamilyRules.Label(fam)} {(statOnly ? "+0.5" : "+1")} → {now}{tail}", famCol, WithAlpha(famCol, 0.40f), out _);
+        fc.anchoredPosition = new Vector2(0f, -FamilyY);
+    }
+
+    // ── 발동 계수 칩(10-14 빌드 시너지 A1 · 83 UI 요청 4) ──
+    // 카드 맨 아래 줄 왼쪽(룬 수 글은 오른쪽으로 비킨다) — 효과 칸 바로 밑이라 「위 효과가 어떤 타격을 키우나」로 읽힌다. 계열 칩 줄은 계열 칩 몫으로 둔다.
+    //  · 한 방형 — 확률 · 지속에 그 적중의 발동 계수를 곱하는 효과(OnHitProc.Roll · Coef: 화상 · 빙결 · 추가 타격 · 순간이동 · 석화 · 기절)
+    //             · 강타(계수가 문턱 이상)일 때만 터지는 발동(OnHeavyHit · AfterHeavyHit)
+    //  · 연타형 — 타수를 세는 발동(OnHitCount · SameTarget) · 걸 때마다 쌓이는 독(불 아닌 PoisonOnHit — 최대 8중첩)
+    // 계수가 곱해지는 룬은 지금 든 무기 평타 계수를 「확률 ×0.7」로 붙인다(ProcCoefficient.Of). 폭이 모자라면 짧게 → 이름만.
+    private const float ProcChipSize = 16f;
+    private const float ProcChipPad  = 9f;
+    private const float ProcChipGap  = 8f;
+    private const float ProcChipEdge = 12f;
+
+    private enum ProcDetail { None, Coef, Heavy, Count, Stack }
+
+    /// <summary>룬 하나의 타격 성격 — 효과 칸 순서대로 처음 걸리는 것. 해당 없으면 false(칩 없음).</summary>
+    private static bool ProcStyleOf(RuntimeItemData data, out bool heavy, out ProcDetail detail)
+    {
+        heavy = false; detail = ProcDetail.None;
+        if (data?.effects == null) return false;
+        foreach (var s in data.effects)
+        {
+            if (s == null) continue;
+            switch (s.trigger)
+            {
+                case "OnHeavyHit": case "AfterHeavyHit": heavy = true;  detail = ProcDetail.Heavy; return true;
+                case "OnHitCount": case "SameTarget":    heavy = false; detail = ProcDetail.Count; return true;
+            }
+            switch (s.effectType)
+            {
+                case "Freeze": case "Stun": case "Petrify": case "ExtraAttack": case "TeleportSwap":
+                    heavy = true; detail = ProcDetail.Coef; return true;
+                case "PoisonOnHit":   // 불 룬 = 화상(그 타격 피해 비례 · 가장 센 하나) · 그 밖 = 독(걸 때마다 +1중첩) — OnHitEffects
+                    heavy = data.element == "FIRE"; detail = ProcDetail.Coef; return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>지금 든 무기 평타의 발동 계수(없으면 -1).</summary>
+    private static float CurrentBasicCoef()
+    {
+        var wd = GameRunBootstrapper.Instance?.Run?.Player?.WeaponManager?.CurrentWeaponData;
+        if (wd == null) return -1f;
+        return ProcCoefficient.Of(wd.weaponType, WeaponActionType.GroundLight, SkillTierResolver.IsRanged(wd));
+    }
+
+    /// <summary>룬 수 짧은 꼴 — 「룬 (지금 + 1)/상한」 · 넘치면 「넘침」(RuneBlockBudget.Label과 같은 판정).</summary>
+    private static string CompactBudgetLabel()
+    {
+        int used = RuneBlockBudget.Used;
+        string s = $"룬 {used + 1}/{RuneBlockBudget.Max}";
+        return RuneBlockBudget.Fits(used) ? s : s + " 넘침";
+    }
+
+    /// <summary>맨 아래 줄 왼쪽 칩. 칩이 서면 룬 수 글을 오른쪽 끝으로 옮긴다. 폭이 모자라면 짧은 글 → 그래도 모자라면 칩을 내지 않는다.</summary>
+    private void BuildProcChip(RectTransform face, RuntimeItemData data, TMP_Text badge)
+    {
+        if (!ProcStyleOf(data, out bool heavy, out var detail)) return;
+        string name = heavy ? "한 방형" : "연타형";
+        float coef  = detail == ProcDetail.Coef ? CurrentBasicCoef() : -1f;
+        string tail = detail switch
+        {
+            ProcDetail.Coef  => coef > 0f ? $"확률 ×{coef:0.#}" : null,
+            ProcDetail.Heavy => "강타 때",
+            ProcDetail.Count => "타수로",
+            _                => null,
+        };
+        string full = tail != null ? $"{name} · {tail}" : name;
+        string mid  = detail == ProcDetail.Coef && coef > 0f ? $"{name} ×{coef:0.#}" : name;
+
+        var col  = BuildFamilyRules.ColorOf(heavy ? BuildFamily.Crit : BuildFamily.Combo);
+
+        var fill = ShopUIStyle.MakeFrame(face, "ProcChip", WithAlpha(col, 0.40f), ChipFill, 1f);
+        var rt   = (RectTransform)fill.transform.parent;
+        var label = ShopUIStyle.MakeText(fill.transform, "Label", ProcChipSize, FontStyles.Normal, TextAlignmentOptions.Center, col);
+        UITheme.StyleThinText(label, UIWeight.Medium, ProcChipSize, col);
+        label.enableAutoSizing = false;
+        label.textWrappingMode = TextWrappingModes.NoWrap;
+        ShopUIStyle.Stretch(label.rectTransform);
+
+        // 룬 수 글은 긴 꼴(「룬 0 + 1 / 20」) → 좁은 카드(4장 · 174px)면 짧은 꼴(「룬 1/20」 — 고른 뒤 수)로 줄여 칩 자리를 낸다(10-14 SYN_6b)
+        string badgeText = badge != null ? badge.text : null;
+        string[] badges  = badge != null ? new[] { badgeText, RuneBlockBudget.FitsSame(data) ? CompactBudgetLabel() : $"같은 룬 {RuneBlockBudget.SameExcept(data)}/{RuneBlockBudget.MaxSame}" } : new string[] { null };
+        string pick = null; float w = 0f, badgeW = 0f;
+        foreach (var bt in badges)
+        {
+            badgeW = bt != null ? Mathf.Ceil(badge.GetPreferredValues(bt).x) + 2f : 0f;
+            float avail = _cardW - ProcChipEdge * 2f - badgeW - ProcChipGap;
+            foreach (var cand in new[] { full, mid, name })
+            {
+                w = Mathf.Ceil(label.GetPreferredValues(cand, 999f, ChipH).x + ProcChipPad * 2f);
+                if (w <= avail) { pick = cand; break; }
+            }
+            if (pick != null) { badgeText = bt; break; }
+        }
+        if (pick == null) { Destroy(rt.gameObject); return; }
+        label.text = pick;
+        if (badge != null) badge.text = badgeText;
+
+        var bl = new Vector2(0f, 0f);
+        ShopUIStyle.Anchor(rt, bl, bl, bl, new Vector2(ProcChipEdge, BadgeBottom), new Vector2(w, ChipH));
+
+        if (badge == null) return;
+        var br = new Vector2(1f, 0f);
+        ShopUIStyle.Anchor(badge.rectTransform, br, br, br, new Vector2(-ProcChipEdge, BadgeBottom), new Vector2(badgeW, BadgeH));
+        badge.alignment = TextAlignmentOptions.MidlineRight;
+    }
+
+    /// <summary>
+    /// 등급 바깥 빛 — <b>전설만</b>(10-11 v2 「후광은 한 화면 한 곳 · 최고 등급 하나」). 고를 때 더 밝히지 않는다(고른 표시는 금 테).
+    /// 카드의 첫 자식이라 카드 몸체가 안쪽을 덮고 가장자리 밖으로만 번진다. 고리 경계(24px)를 8px로 줄여 그린다.
+    /// </summary>
+    private static void BuildHalo(RectTransform cardRT, ItemRarity rarity)
+    {
+        if (rarity != ItemRarity.Legendary) return;
+        var img = ShopUIStyle.MakeImage(cardRT, "RarityHalo", WithAlpha(RewardPresentation.FrameColor(rarity), HaloAlpha));
+        img.sprite = HaloRing;
+        img.type   = Image.Type.Sliced;
+        img.pixelsPerUnitMultiplier = HaloRingEdge / HaloPad;
+        ShopUIStyle.Stretch(img.rectTransform, -HaloPad);
+        img.transform.SetAsFirstSibling();
+    }
+
+    /// <summary>
+    /// 고른 표시 — 카드 밖 4px에 금 85% 1px 테 + 모서리 눈금 8px(<see cref="UIThinFrame"/> Ready). 평소엔 꺼 두고, 고르는 순간 켜며
+    /// 테가 시계 방향으로 그려진다(0.25초). 후광 다음 · 카드 몸체 앞에 깐다 — 영웅 이상 보석 모서리가 테 위에 앉는다.
+    /// </summary>
+    private UIThinFrame BuildSelectFrame(RectTransform cardRT)
+    {
+        var frame = UIThinFrame.Create(cardRT, ThinShape.Square, new Vector2(_cardW, CardH) + Vector2.one * (SelectGap * 2f));
+        frame.transform.SetSiblingIndex(cardRT.Find("RarityHalo") != null ? 1 : 0);
+        frame.gameObject.SetActive(false);
+        return frame;
+    }
+
+    /// <summary>ElementDef.Order 안 자리(납품 리본 · 조각 배열 순서) — 없으면 -1.</summary>
+    private static int ElementIndex(string elementId)
+    {
+        var order = ElementDef.Order;
+        for (int i = 0; i < order.Count; i++)
+            if (order[i] == elementId) return i;
+        return -1;
+    }
+
+    /// <summary>효과 줄의 수치를 금색으로(10-06) — 위험 줄(▼)은 그대로. 색 태그 안 숫자(#E8BA54 · =80%)는 건드리지 않는다.</summary>
+    private static void GildNumbers(TMP_Text label)
+    {
+        if (label == null || string.IsNullOrEmpty(label.text) || label.text.StartsWith("▼")) return;
+        label.text = System.Text.RegularExpressions.Regex.Replace(label.text,
+            @"(?<![<#=\w.])([+\-−]?\d+(?:\.\d+)?%?)", "<color=#FFD54A>$1</color>");
     }
 
     private static RectTransform MakeChip(RectTransform parent, string name, string text, Color textCol, Color lineCol,
                                           out float width, float leading = 0f)
     {
-        const float pad = 9f, size = 16f;   // 가독성 하한 16 — 칩 높이 24에 한 줄로 들어간다
+        const float pad = 9f;   // 글자 = 라벨 Noto 500 15(10-11 v2) — 칩 높이 24에 한 줄로 들어간다
         var fill = ShopUIStyle.MakeFrame(parent, name, lineCol, ChipFill, 1f);
         var rt = (RectTransform)fill.transform.parent;
 
-        var label = ShopUIStyle.MakeText(fill.transform, "Label", size, FontStyles.Normal, TextAlignmentOptions.Left, textCol);
+        var label = ShopUIStyle.MakeText(fill.transform, "Label", LabelSize, FontStyles.Normal, TextAlignmentOptions.MidlineLeft, textCol);
+        UITheme.StyleThinText(label, UIWeight.Medium, LabelSize, textCol);
         label.enableAutoSizing = false;
         label.textWrappingMode = TextWrappingModes.NoWrap;
         label.text = text;
@@ -1123,9 +1412,10 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
         style.wrap = true;   // 카드 폭(≈300px)에 '▲ 불 존에 놓으면 그 존의 시너지 효과 +20%'가 한 줄로 안 들어간다 — 실측 스크린샷에서 상자 밖으로 흘렀음
 
-        style.fontSize        = 16f;   // 가독성 하한
-        style.iconSize        = 20f;   // 룬의 얼굴은 위의 큰 문양 — 행 아이콘은 기능 표식만
-        style.rowHeight       = 22f;
+        style.fontAsset       = UITheme.Font(UIWeight.Regular);   // 10-11 v2 — 본문 Noto 400(DNF 굵은 글꼴 → 굵기 비 0.17에서 0.10대로)
+        style.fontSize        = EffectSize;   // 10-06 16 → 17 · 10-11 18
+        style.iconSize        = 20f;
+        style.rowHeight       = EffectRowH;   // Noto 줄 높이
         style.usePrefixArrows = true;
 
         // 효과가 많은 룬은 행이 박스를 넘어 아래 배지·카드 밖까지 밀고 나갔다(레이아웃이 뭉개진 주범).
@@ -1135,7 +1425,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         {
             if (string.IsNullOrEmpty(slot.effectType)) continue;
             if (shown >= MaxEffectRows) { hidden++; continue; }
-            EffectRowWidget.Create(parent, style, slot);
+            GildNumbers(EffectRowWidget.Create(parent, style, slot).Label);
             shown++;
         }
 
@@ -1145,8 +1435,9 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             var last = parent.GetChild(parent.childCount - 1);
             if (last != null) Destroy(last.gameObject);
 
-            var more = ShopUIStyle.MakeText(parent, "MoreEffects", 13f, FontStyles.Italic,
+            var more = ShopUIStyle.MakeText(parent, "MoreEffects", LabelSize, FontStyles.Normal,   // 기울임 없음(10-11 v2)
                 TextAlignmentOptions.Center, ShopUIStyle.TextDim);
+            UITheme.StyleThinText(more, UIWeight.Regular, LabelSize, ShopUIStyle.TextDim);
             more.text = $"+{hidden + 1}개 더";
             FitSingleLine(more);
             var le = more.gameObject.AddComponent<LayoutElement>();
@@ -1173,56 +1464,60 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         }
     }
 
-    /// <summary>작은 모양 셀을 그리고(판 위 블록과 같은 속성 타일), 지금 판에 놓을 자리가 있는지 반환한다.</summary>
-    private bool BuildMiniShape(RectTransform root, RuntimeItemData data)
+    /// <summary>뒤집힌 순간 모양 칸이 하나씩 끼워진다(작게 → 살짝 넘침 → 제자리). 스킵되면 그 자리에서 1로.</summary>
+    private async UniTaskVoid AssembleShapeAsync(CardView card, CancellationToken ct)
     {
-        var entry = Managers.RuneData?.GetShape(data.shapeId);
-        if (entry == null) return true;   // 판정 불가 → 막지 않는다
-
-        var offsets = RuneDataManager.ParseCellOffsets(entry);
-        if (offsets == null || offsets.Length == 0) return true;
-
-        // 속성까지 넘긴다 — 룬은 자기 속성 존(레전드리는 중앙 제외)에만 놓이므로,
-        // 모양만 보고 판정하면 "자리 있음"으로 뜬 룬이 막상 판에서는 들어갈 곳이 없다.
-        bool canPlace = MerlinRuneBridge.Instance == null
-            || MerlinRuneBridge.Instance.CanPlaceShape(offsets, data.element, RuneZoneRule.NoCenter(data));
-
-        int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
-        foreach (var o in offsets)
+        var cells = card.Cells;
+        if (cells.Count == 0) return;
+        foreach (var c in cells) if (c != null) c.localScale = Vector3.zero;
+        float total = AssembleDur + AssembleStagger * (cells.Count - 1);
+        try
         {
-            if (o.x < minX) minX = o.x;  if (o.x > maxX) maxX = o.x;
-            if (o.y < minY) minY = o.y;  if (o.y > maxY) maxY = o.y;
+            await TweenAsync(total, t =>
+            {
+                float now = t * total;
+                for (int i = 0; i < cells.Count; i++)
+                    if (cells[i] != null)
+                        cells[i].localScale = Vector3.one * EaseOutBack(Mathf.Clamp01((now - i * AssembleStagger) / AssembleDur));
+            }, ct);
         }
-        int cols = maxX - minX + 1, rows = maxY - minY + 1;
+        catch (OperationCanceledException) { }
+        finally { foreach (var c in cells) if (c != null) c.localScale = Vector3.one; }
+    }
 
-        float boxW = root.sizeDelta.x, boxH = root.sizeDelta.y;
-        float fitW = (boxW - (cols - 1) * MiniGap) / Mathf.Max(1, cols);
-        float fitH = (boxH - (rows - 1) * MiniGap) / Mathf.Max(1, rows);
-        float cellSize = Mathf.Min(MiniCellMax, fitW, fitH);
+    private static float EaseOutBack(float t) { const float c1 = 1.70158f, c3 = c1 + 1f; float p = t - 1f; return 1f + c3 * p * p * p + c1 * p * p; }
 
-        // 스프라이트/틴트 규칙은 RuneArt.ResolveRuneCell 한곳에서 정한다(네 경로 동일 규칙).
-        // 판 위 블록과 <b>같은 속성 타일</b>이 있으면 그걸 쓴다 — 미리보기는 "판에서 어떻게 보일지"다.
-        RuneArt.ResolveRuneCell(data.element, data.rarity, new Color(0.7f, 0.7f, 0.75f),
-            out Sprite art, out Color tint);
-        if (art == null) art = UISkin.RuneSelect?.runeTile;
-        var blockTile = RuneArt.GetBlockTile(data.element);
-        if (blockTile != null) { art = blockTile; tint = Color.white; }
-        Color dimTint = new Color(tint.r * 0.5f, tint.g * 0.5f, tint.b * 0.5f, 0.7f);
-
-        // 왼쪽 아래 기준으로 쌓는다 — 배지와 밑줄을 맞춘다.
-        foreach (var o in offsets)
+    /// <summary>등급 바깥 빛 고리 — 가운데가 빈 9-slice(경계 24px = <see cref="HaloPad"/>). 카드 가장자리에서 바깥으로 옅어진다.
+    /// 되살아난 기억 창(<see cref="UI_RelicPartDraftPopup"/>)도 같이 쓴다.</summary>
+    internal static Sprite HaloRing
+    {
+        get
         {
-            int col = o.x - minX;
-            int row = maxY - o.y;
-
-            var cell = ShopUIStyle.MakeImage(root, $"C{o.x}_{o.y}", canPlace ? tint : dimTint);
-            if (art != null) { cell.sprite = art; cell.preserveAspect = true; }
-            ShopUIStyle.Anchor(cell.rectTransform, Vector2.zero, Vector2.zero, Vector2.zero,
-                new Vector2(col * (cellSize + MiniGap), (rows - 1 - row) * (cellSize + MiniGap)),
-                Vector2.one * cellSize);
+            if (_haloRing != null) return _haloRing;
+            const int S = 64, B = 24;
+            var tex = new Texture2D(S, S, TextureFormat.RGBA32, false)
+            {
+                name = "RuneSelect_HaloRing", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave,
+            };
+            var px = new Color32[S * S];
+            for (int y = 0; y < S; y++)
+                for (int x = 0; x < S; x++)
+                {
+                    float dx = Mathf.Max(0f, Mathf.Max(B - (x + 0.5f), (x + 0.5f) - (S - B)));
+                    float dy = Mathf.Max(0f, Mathf.Max(B - (y + 0.5f), (y + 0.5f) - (S - B)));
+                    float d  = Mathf.Sqrt(dx * dx + dy * dy) / B;   // 0 = 카드 가장자리 · 1 = 바깥 끝
+                    float a  = d <= 0f ? 0f : Mathf.Pow(Mathf.Clamp01(1f - d), 2f);
+                    px[y * S + x] = new Color32(255, 255, 255, (byte)(a * 255f));
+                }
+            tex.SetPixels32(px);
+            tex.Apply(false, true);
+            _haloRing = Sprite.Create(tex, new Rect(0f, 0f, S, S), new Vector2(0.5f, 0.5f), 100f, 0,
+                                      SpriteMeshType.FullRect, new Vector4(B, B, B, B));
+            _haloRing.name = "RuneSelect_HaloRing";
+            _haloRing.hideFlags = HideFlags.HideAndDontSave;
+            return _haloRing;
         }
-
-        return canPlace;
     }
 
     // ── 코드로 그리는 빛 ── (재련소 무대 연출도 같은 스프라이트를 쓴다 — internal)
@@ -1287,35 +1582,47 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private void SetSelected(int index)
     {
         SkipReveal();
-        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiSelect);
         _selected = index;
         ApplySelectionVisual(index);
     }
 
     /// <summary>
-    /// 선택 강조(테두리색·배율·명암)만 다시 입힌다 — 소리도, 상태 변경도 하지 않는다.
+    /// 선택 강조(금 테 · 배율 · 명암)만 다시 입힌다 — 소리도, 상태 변경도 하지 않는다.
     /// 공개 연출의 마무리(<see cref="SnapToRest"/>)가 카드 배율·투명도를 되돌리므로,
     /// 연출 도중에 고른 카드가 있으면 연출이 끝난 뒤 이걸 한 번 더 불러야 강조가 살아남는다.
+    /// 10-11 v2: 고른 표시는 금 85% 1px 테 + 모서리 눈금 + 1.03배 하나 — 테 아트 밝힘 · 채움 색 · 후광 키움(×1.4)은 걷었다(두 겹 표시 금지).
     /// </summary>
     private void ApplySelectionVisual(int index)
     {
         for (int i = 0; i < _cards.Count; i++)
         {
             bool on = (i == index);
-            // 스킨 시: 아트를 물들이지 않도록 선택=흰색·비선택=살짝 어둡게(밝기)로 피드백.
+            // 테 아트 · 채움은 고름과 무관하게 한 색 — 고른 표시가 금 테 하나로 읽히게.
             if (_cards[i].Border != null)
-                _cards[i].Border.color = _skinned ? (on ? Color.white : new Color(0.62f, 0.62f, 0.66f))
-                                                  : (on ? SelectBorder : ShopUIStyle.CardBorder);
+                _cards[i].Border.color = _skinned ? CardBorderArt : ShopUIStyle.CardBorder;
             if (_cards[i].Fill != null)
-                _cards[i].Fill.color = _skinned ? Color.white
-                                                : (on ? CardSelected : ShopUIStyle.CardFill);
+                _cards[i].Fill.color = _skinned ? Color.white : ShopUIStyle.CardFill;
 
             // 등급 테두리가 모든 카드에 깔려 있어, 같은 등급 후보가 늘어서면 네 장이 똑같이 빛나 보였다.
-            // 등급색과 충돌하지 않는 축인 <b>크기와 명암</b>으로 표시한다.
+            // 등급색과 충돌하지 않는 금 테 · 크기 · 명암으로 표시한다.
             if (_cards[i].Rt != null)
                 _cards[i].Rt.localScale = Vector3.one * (on ? SelectedCardScale : 1f);
             if (_cards[i].Group != null)
                 _cards[i].Group.alpha = (index < 0 || on) ? 1f : UnselectedCardAlpha;
+
+            var select = _cards[i].Select;
+            if (select == null) continue;
+            if (on)
+            {
+                select.gameObject.SetActive(true);
+                select.SetState(ThinFrameState.Ready, animate: true);   // 이미 Ready면 그대로(연출이 다시 돌지 않는다)
+            }
+            else
+            {
+                select.SetState(ThinFrameState.Idle, animate: false);
+                select.gameObject.SetActive(false);
+            }
         }
 
         bool hasSel = index >= 0;
@@ -1357,6 +1664,63 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         }
     }
 
+    /// <summary>
+    /// 창 · 제목 · 카운터 · 버튼을 톤 v2(10-11, 비교 리서치 B §2)로 — 빌드 · 구운 경로 둘 다 마지막에 한 번.
+    /// 구운 프리팹은 맞춤 상한 · 글꼴 · 버튼 크기가 굳어 있어 빌더만 고치면 게임에 반영되지 않는다 — 그래서 쓰는 곳에서 덮어쓴다(재굽기 불필요).
+    /// ① 창 맞춤 상한 1.64 → 1.3(화면 88% → 약 55%) ② 글자 Noto · 가짜 굵게 없음 ③ [선택] 220×44 · [넘기기] 같은 높이로 가운데 묶음.
+    /// </summary>
+    private void ApplyThinChrome()
+    {
+        if (_windowRoot == null) return;
+        var windowRT = _windowRoot.parent as RectTransform;
+        if (windowRT != null && windowRT.TryGetComponent<UIWindowFitter>(out var fitter))
+        {
+            fitter.Configure(maxScale: FitMaxScale);   // 구운 값은 컨텐츠 화면 상한(3) — 여백 0.94 · 글꼴 배율 켬은 기본값 그대로
+            fitter.Fit();
+        }
+        // 창 글자는 맞춤 배율만큼 이미 커져 있다(UIProportional.ScaleFonts) — 목업 크기에 같은 배율을 곱한다.
+        float k = windowRT != null && windowRT.TryGetComponent<UIFontScaleMemo>(out var memo) ? memo.Applied : 1f;
+
+        // 창 바로 아래 자식만 찾는다 — 확률 막대(OddsBarView)도 「Title」 자식을 가진다.
+        if (_windowRoot.Find("Title") is Transform titleT && titleT.TryGetComponent<TMP_Text>(out var title))
+        {
+            UITheme.StyleThinText(title, UIWeight.Light, TitleSize * k, ShopUIStyle.TextPrimary, shadow: true);
+            title.enableAutoSizing = false;   // Noto 줄 높이(≈1.45em)가 칸(32)을 넘어 자동 크기가 글자를 줄인다 — 고정 문구라 끈다
+            title.alignment        = TextAlignmentOptions.MidlineLeft;
+        }
+        if (_counterText != null)
+        {
+            UITheme.StyleThinText(_counterText, UIWeight.Regular, SubSize * k, ShopUIStyle.TextDim, shadow: true);
+            _counterText.alignment = TextAlignmentOptions.MidlineRight;
+        }
+
+        // 버튼 — 목업 px를 비율 앵커로(구운 계층과 같은 방식이라 창 맞춤을 그대로 따라간다).
+        float left = -(ConfirmBtnSize.x + BtnGap + SkipBtnSize.x) * 0.5f;
+        float confirmX = left + ConfirmBtnSize.x * 0.5f;
+        float skipX    = left + ConfirmBtnSize.x + BtnGap + SkipBtnSize.x * 0.5f;
+        var skipOuter = _windowRoot.Find("SkipBtn") as RectTransform;
+        var hintRT    = _windowRoot.Find("SkipHint") as RectTransform;
+        PlaceBottom(_windowRoot.Find("ConfirmBtn") as RectTransform, confirmX, BtnBottom, ConfirmBtnSize);
+        PlaceBottom(skipOuter, skipX, BtnBottom, SkipBtnSize);
+        PlaceBottom(hintRT,    skipX, 18f, new Vector2(SkipBtnSize.x, 22f));
+
+        if (_confirmLabel != null)
+            UITheme.StyleThinText(_confirmLabel, UIWeight.Medium, ButtonSize * k, _confirmLabel.color, shadow: true);
+        if (skipOuter != null && skipOuter.Find("Fill/Label") is Transform skipLblT && skipLblT.TryGetComponent<TMP_Text>(out var skipLbl))
+            UITheme.StyleThinText(skipLbl, UIWeight.Medium, SubSize * k, ShopUIStyle.TextDim, shadow: true);
+        if (hintRT != null && hintRT.TryGetComponent<TMP_Text>(out var hint))
+            UITheme.StyleThinText(hint, UIWeight.Regular, LabelSize * k, ShopUIStyle.TextDim, shadow: true);
+    }
+
+    /// <summary>창(목업 <see cref="WindowW"/>×<see cref="WindowH"/>) 아래 가운데 기준 사각형 — 가운데 x · 바닥 y · 크기를 비율 앵커로 굳힌다.</summary>
+    private static void PlaceBottom(RectTransform rt, float centerX, float bottom, Vector2 size)
+    {
+        if (rt == null) return;
+        rt.anchorMin = new Vector2(0.5f + (centerX - size.x * 0.5f) / WindowW, bottom / WindowH);
+        rt.anchorMax = new Vector2(0.5f + (centerX + size.x * 0.5f) / WindowW, (bottom + size.y) / WindowH);
+        rt.offsetMin = rt.offsetMax = Vector2.zero;
+    }
+
     private void RefreshCounter()
     {
         if (_counterText == null) return;
@@ -1387,7 +1751,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             return;
         }
 
-        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiEvent(SoundEvent.RuneTake);
         var item = _candidates[_selected].data;
         Result  = item;
         Skipped = false;
@@ -1467,7 +1831,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private void OnSkipClicked()
     {
         if (_closing) return;
-        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);   // 넘기기
         Result  = null;
         Skipped = true;
         _closing = true;
@@ -1491,6 +1855,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         // 스프라이트에 곱해져 「선택」 버튼과 카드 테두리가 검게 보인다.
         _skinned = _confirmBtnImg != null && _confirmBtnImg.sprite != null;
         ApplyThemeButtons();
+        // 창을 1.3으로 다시 맞춘 <b>뒤에</b> 확률 막대를 짓는다 — 막대는 처음 지을 때의 크기(px)로 한 번만 배치한다.
+        ApplyThinChrome();
 
         RefreshOdds();
 

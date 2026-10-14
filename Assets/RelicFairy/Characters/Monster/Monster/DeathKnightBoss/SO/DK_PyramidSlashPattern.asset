@@ -30,7 +30,7 @@ MonoBehaviour:
   hitTime1: 0.5
   hitTime2: 1.2
   hitTime3: 1.9
-  holdDuration: 0.3
+  holdDuration: 0.65
   ringStep: 0.2
   hitGap: 0.8
   recoveryTime: 0.5

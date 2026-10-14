@@ -31,6 +31,7 @@ public struct AltarNodeViewModel
 /// <summary>오른쪽 상세 패널의 글.</summary>
 public struct AltarDetailModel
 {
+    public string NodeId;       // 빈 가운데 큰 아이콘(10-13)
     public string Header;       // 「룬 · 확장」
     public string Name;
     public string SizeBadge;    // 「열쇠」 / 「작은 넓힘」 / ""
@@ -41,12 +42,16 @@ public struct AltarDetailModel
     public bool   ReasonInfo;   // 안내(해금된 노드 — 이어지는 노드 · 인장 상태)면 경고색이 아니다
     public string ButtonLabel;
     public bool   ButtonEnabled;
+    public int    Cost;         // 확인 카드(10-14) — 쓰는 정수
+    public string NextNames;    // 확인 카드 — 이 노드를 열면 이어서 열 수 있는 것(「A」 「B」)
+    public string LevelLine;    // 강화 노드(10-14 강화형) — 「Lv 2 → 3」(해금 노드는 빈칸)
 }
 
 /// <summary>가운데 제단 문양의 「다음 목표」.</summary>
 public struct AltarCenterModel
 {
     public string Title;     // 「다음」 / 「모두 열었다」
+    public string GoalId;    // 다음 목표 노드(별 배지, 10-13) — 모두 열었으면 null
     public string GoalName;
     public string Status;    // 「해금 가능」 / 「-432」
     public float  Fill;      // 정수 / 값
@@ -116,6 +121,7 @@ public sealed class AltarTreePresenter
         return new AltarCenterModel
         {
             Title    = "다음",
+            GoalId   = g.Node.Id,
             GoalName = g.Node.DisplayName,
             Status   = left <= 0 ? "해금 가능" : $"-{left:N0}",
             Fill     = g.Cost > 0 ? Mathf.Clamp01((float)essence / g.Cost) : 1f,
@@ -126,10 +132,16 @@ public sealed class AltarTreePresenter
     /// <summary>해금된 노드에서 이어지는 아직 안 연 노드 — 「다음에 무엇이 열리나」를 선이 아니라 글로도(09-29 실측: 상세 칸이 비었다).</summary>
     private static string NextLine(MemoryAltarNode node)
     {
+        string names = NextNames(node);
+        return names.Length > 0 ? "이어서 열 수 있다 · " + names : "";
+    }
+
+    private static string NextNames(MemoryAltarNode node)
+    {
         var names = new System.Collections.Generic.List<string>();
         foreach (var c in MemoryAltarCatalog.Children(node))
             if (!MemoryAltarService.IsUnlocked(c.Id)) names.Add($"「{c.DisplayName}」");
-        return names.Count > 0 ? "이어서 열 수 있다 · " + string.Join(" ", names) : "";
+        return string.Join(" ", names);
     }
 
     public AltarDetailModel Detail(MemoryAltarNode node, int essence, bool readOnly)
@@ -138,14 +150,21 @@ public sealed class AltarTreePresenter
         if (node == null) return d;
         var s = MemoryAltarService.GetState(node);
 
-        d.Header    = $"{MemoryAltarCatalog.BranchLabel(node.Branch)} · {MemoryAltarCatalog.RingLabel(node.Era)}";
-        d.Name      = node.DisplayName;
-        d.SizeBadge = node.Size switch { AltarNodeSize.Keystone => "열쇠", AltarNodeSize.Small => "작은 넓힘", _ => "" };
-        d.Effect    = node.Description;
+        d.NodeId    = node.Id;
+        d.Header    = node.RequiredPoints > 0
+            ? $"{MemoryAltarCatalog.BranchLabel(node.Branch)} · {node.RequiredPoints}포인트 고리"
+            : $"{MemoryAltarCatalog.BranchLabel(node.Branch)} · 첫 고리";
+        d.Name      = node.IsLeveled ? $"{node.DisplayName}   Lv {s.Level}/{s.MaxLevel}" : node.DisplayName;
+        d.SizeBadge = node.IsLeveled ? "강화" : node.Size switch { AltarNodeSize.Keystone => "열쇠", AltarNodeSize.Small => "작은 넓힘", _ => "" };
+        // 강화 노드 = 「지금 → 다음」(10-14 강화형) · 다 올렸으면 지금 값만
+        d.Effect    = !node.IsLeveled ? node.Description
+                    : s.Maxed ? node.ValueText(s.Level)
+                    : $"{node.ValueText(s.Level)}   →   {node.ValueText(s.Level + 1)}";
         d.CostLine  = CostLine(node, s);
-        d.Condition = ConditionLine(node, s);
+        d.Condition = s.Level > 0 ? "" : ConditionLine(node, s);   // 할인 조건은 첫 단계만
+        if (node.IsLeveled && !s.Maxed) d.LevelLine = $"Lv {s.Level} → {s.Level + 1}";
 
-        if (s.Unlocked)
+        if (s.Maxed)
         {
             d.ReasonInfo = true;
             if (node.Id == MemoryAltarCatalog.SigilAscetic)
@@ -157,7 +176,7 @@ public sealed class AltarTreePresenter
             }
             else
             {
-                d.ButtonLabel = "해금됨";
+                d.ButtonLabel = node.IsLeveled ? "최대 단계" : "해금됨";
                 d.Reason      = NextLine(node);
             }
             return d;
@@ -171,7 +190,14 @@ public sealed class AltarTreePresenter
         else if (s.BlockedByChain)
         {
             d.ButtonLabel = "앞 노드 먼저";
-            d.Reason      = s.MissingParent != null ? $"선으로 이어진 「{s.MissingParent.DisplayName}」을 먼저 연다" : "";
+            d.Reason      = s.MissingParent != null ? $"「{s.MissingParent.DisplayName}」을 먼저 연다" : "";
+        }
+        else if (s.BlockedByPoints)
+        {
+            // 10-14 세피리아식 — 그 갈래에 포인트(산 단계 수)를 더 쓰면 열린다
+            string branch = MemoryAltarCatalog.BranchLabel(node.Branch);
+            d.ButtonLabel = $"{branch} {s.RequiredPoints}포인트부터";
+            d.Reason      = $"{branch} 갈래에 {s.RequiredPoints}포인트를 쓰면 열린다 — 지금 {s.BranchPoints}포인트";
         }
         else if (s.BlockedByRequirement)
         {
@@ -180,9 +206,13 @@ public sealed class AltarTreePresenter
         }
         else if (s.CanBuy)
         {
-            d.ButtonLabel   = readOnly ? "제단에서 해금" : $"해금   {s.Cost:N0} ◆";
+            d.ButtonLabel   = readOnly ? "제단에서 해금"
+                            : node.IsLeveled ? $"강화  Lv {s.Level + 1}   {s.Cost:N0} ◆"
+                            : $"해금   {s.Cost:N0} ◆";
             d.ButtonEnabled = !readOnly;
             d.Reason        = readOnly ? "로비에서는 볼 수만 있다" : "";
+            d.Cost          = s.Cost;
+            d.NextNames     = NextNames(node);
         }
         else
         {
@@ -193,24 +223,33 @@ public sealed class AltarTreePresenter
     }
 
     /// <summary>노드 아래 값 칩 — 열린 노드만(산 · 가려진 · 한 칸 앞은 없음).</summary>
-    public static string CostChip(in AltarNodeViewModel m) =>
-        m.Visual == AltarNodeVisual.Affordable || m.Visual == AltarNodeVisual.Open ? $"{m.State.Cost:N0}◆" : "";
+    public static string CostChip(in AltarNodeViewModel m)
+    {
+        // 강화 노드(10-14) — 산 단계를 함께(「Lv2 · 530◆」) · 다 올렸으면 「MAX」 · 일부만 샀고 지금 못 사면 「Lv2/5」
+        bool leveled = m.Node != null && m.Node.IsLeveled;
+        if (leveled && m.State.Maxed) return "MAX";
+        if (m.Visual == AltarNodeVisual.Affordable || m.Visual == AltarNodeVisual.Open)
+            return leveled && m.State.Level > 0 ? $"Lv{m.State.Level} · {m.State.Cost:N0}◆" : $"{m.State.Cost:N0}◆";
+        return leveled && m.State.Level > 0 ? $"Lv{m.State.Level}/{m.State.MaxLevel}" : "";
+    }
 
     // ── Private Methods ──────────────────────────────────
 
     private static AltarNodeVisual BaseVisual(in AltarNodeState s)
     {
-        if (s.Unlocked)             return AltarNodeVisual.Bought;
+        if (s.Maxed)                return AltarNodeVisual.Bought;
         if (s.EraHidden)            return AltarNodeVisual.EraHidden;
         if (s.Pending)              return AltarNodeVisual.OpenLocked;   // 보이지만 살 수 없다(유물 성장 개편 대기)
-        if (s.BlockedByChain)       return AltarNodeVisual.Hidden;   // 2차에서 Next로 올라갈 수 있다
-        if (s.BlockedByRequirement) return AltarNodeVisual.OpenLocked;
+        if (s.Unlocked)             return s.CanBuy ? AltarNodeVisual.Affordable : AltarNodeVisual.Bought;   // 강화 중(일부 단계 · 10-14)
+        // 10-14 — 앞 칸이 필요한 칸도 숨기지 않는다(사용자 「해금 내용이 늘어나는 것은 불편」) · 포인트 고리 · 자물쇠와 같이 보이되 잠김
+        if (s.BlockedByChain || s.BlockedByRequirement || s.BlockedByPoints) return AltarNodeVisual.OpenLocked;
         return s.CanBuy ? AltarNodeVisual.Affordable : AltarNodeVisual.Open;
     }
 
     private static string CostLine(MemoryAltarNode node, in AltarNodeState s)
     {
-        if (s.Unlocked) return "<color=#63D9BF>해금됨</color>";
+        if (s.Maxed) return node.IsLeveled ? "<color=#63D9BF>최대 단계</color>" : "<color=#63D9BF>해금됨</color>";
+        if (s.Level > 0) return $"다음 단계  {s.Cost:N0} ◆";
         if (!node.HasCondition || node.ConditionRequired || node.DiscountCost == node.BaseCost)
             return $"{s.Cost:N0} ◆";
         return s.ConditionMet
@@ -221,7 +260,7 @@ public sealed class AltarTreePresenter
     private static string ConditionLine(MemoryAltarNode node, in AltarNodeState s)
     {
         if (s.Unlocked) return "";
-        if (!node.HasCondition) return "<color=#8A8594>조건 없음 — 언제든 열 수 있다</color>";
+        if (!node.HasCondition) return node.RequiredPoints > 0 ? "" : "<color=#8A8594>조건 없음 — 언제든 열 수 있다</color>";
         if (node.ConditionRequired)
             return s.ConditionMet
                 ? $"<color=#63D9BF>◆</color> 선행 조건 · {node.ConditionLabel}"

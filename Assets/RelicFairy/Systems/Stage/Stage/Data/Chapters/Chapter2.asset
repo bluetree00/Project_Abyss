@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Chapter2
   m_EditorClassIdentifier: Assembly-CSharp::ChapterDataSO
   chapterId: 2
-  chapterName: "\uC5B4\uB460\uC774 \uB4DC\uB9AC\uC6B4 \uC232"
+  chapterName: "\uC6A9\uC554 \uC9C0\uB300"
   description: "\uAE4A\uC740 \uACF3\uC5D0 \uC6B8\uB9AC\uB294 \uBA54\uC544\uB9AC"
   mapBackground: {fileID: 0}
   mapBackgroundTint: {r: 1, g: 1, b: 1, a: 1}

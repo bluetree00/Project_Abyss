@@ -49,11 +49,14 @@ public static class BuildFamilyRules
     /// <para>OnActivate(전설 투사체 · 장판 — 전투 내내 도는 것)는 스킬과 무관해 「바탕」이다.</para></summary>
     public static BuildFamily FromTrigger(string trigger) => trigger switch
     {
-        "OnHit" or "OnHitCount" or "SameTarget" or "SingleEnemy"                         => BuildFamily.Combo,
-        "OnKill" or "OnRoomClear" or "OnExecute" or "OnMultiKill" or "AfterKill"         => BuildFamily.Kill,
+        "OnHit" or "OnHitCount" or "SameTarget"                                          => BuildFamily.Combo,
+        "OnKill" or "OnRoomClear" or "OnExecute" or "OnMultiKill" or "AfterKill"
+            or "OnCritKill"                                                              => BuildFamily.Kill,
         "WhileMoving" or "OnDash" or "OnPerfectDodge" or "AfterDashHit" or "AfterDash"   => BuildFamily.Mobility,
-        "AfterSkill" or "OnSkillUse" or "OnSkillHit" or "OnSkillChain"                   => BuildFamily.Spell,
-        "OnCritCount" or "NoHit" or "OnCrit" or "AfterCrit"                              => BuildFamily.Crit,
+        "AfterSkill" or "OnSkillUse" or "OnSkillHit" or "OnSkillChain" or "AfterSkillChain" => BuildFamily.Spell,
+        "OnCritCount" or "NoHit" or "OnCrit" or "AfterCrit"
+            or "OnHeavyHit" or "AfterHeavyHit"                                           => BuildFamily.Crit,   // 강타(발동 계수 1.5 이상 · 10-14 A2)
+        "SingleEnemy"                                                                    => BuildFamily.Crit,   // 결투 — 한 적에 집중하는 한 방(10-14 R1 · 예전 연격)
         "OnRangedHit" or "WithRangedWeapon" or "WithBowWeapon"                           => BuildFamily.Ranged,
         "HPBelow40" or "AfterHit" or "EnemiesNearby" or "DuringBoss" or "HPBelow50"      => BuildFamily.Danger,
         _                                                                                 => BuildFamily.None,
@@ -68,7 +71,22 @@ public static class BuildFamilyRules
         "ProjectilePierce" or "ProjectileCount"  => BuildFamily.Ranged,
         "FirstAttackAfterRoll"                   => BuildFamily.Mobility,
         "DamageReflect" or "DefenseOnHit"        => BuildFamily.Danger,
+        _ when trigger == "Always"               => FromStat(effectType),
         _                                        => FromTrigger(trigger),
+    };
+
+    /// <summary>
+    /// 상시 스탯 효과의 계열(10-14 K3 · 룬 재설계 R0) — 이름이 「질풍 · 필살 · 마력」인 스탯 룬이 바탕으로 세지던 것.
+    /// 공격속도 = 연격(몰아칠수록) · 치명 = 필살 · 스킬 = 주문 · 이동속도 = 기동. 공격력 · 방어 · 체력 같은 범용 스탯은 바탕.
+    /// 스탯 룬은 각인에 절반만 센다(<see cref="BuildImprint"/>) — 계열이 붙은 룬이 27종 늘어도 각인이 너무 쉬워지지 않게.
+    /// </summary>
+    public static BuildFamily FromStat(string effectType) => effectType switch
+    {
+        "AttackSpeed" or "CondAttackSpeed"          => BuildFamily.Combo,
+        "CritChance" or "CritDamage"                => BuildFamily.Crit,
+        "SkillDamage" or "SkillCooldownReduction"   => BuildFamily.Spell,
+        "MoveSpeed"                                 => BuildFamily.Mobility,
+        _                                           => BuildFamily.None,
     };
 
     /// <summary>각인 배율을 곱해도 되는 효과인가 — 개수(관통 · 투사체 수)는 소수로 키우면 뜻이 없다.</summary>
@@ -82,20 +100,32 @@ public static class BuildFamilyRules
         CauseClass.Mobility => BuildFamily.Mobility,
         CauseClass.Skill    => BuildFamily.Spell,
         CauseClass.Danger   => BuildFamily.Danger,
+        CauseClass.Ranged   => BuildFamily.Ranged,
         _                   => BuildFamily.None,
     };
 
     /// <summary>룬 하나의 계열 — 효과 슬롯 중 처음으로 계열이 있는 발동. 없으면 None(바탕 룬).</summary>
-    public static BuildFamily OfItem(RuntimeItemData item)
+    public static BuildFamily OfItem(RuntimeItemData item) => OfItem(item, out _);
+
+    /// <summary>
+    /// 룬 하나의 계열 + 스탯 룬인가. 발동으로 계열이 붙는 슬롯이 먼저(그 룬은 발동 룬), 없으면 상시 스탯 슬롯의 계열(스탯 룬 · <paramref name="statOnly"/> true).
+    /// </summary>
+    public static BuildFamily OfItem(RuntimeItemData item, out bool statOnly)
     {
+        statOnly = false;
         if (item?.effects == null) return BuildFamily.None;
+        var stat = BuildFamily.None;
         foreach (var slot in item.effects)
         {
             if (slot == null) continue;
             var f = FromSlot(slot.effectType, slot.trigger);
-            if (f != BuildFamily.None) return f;
+            if (f == BuildFamily.None) continue;
+            bool viaStat = slot.trigger == "Always" && FromStat(slot.effectType) != BuildFamily.None;
+            if (!viaStat) return f;
+            if (stat == BuildFamily.None) stat = f;
         }
-        return BuildFamily.None;
+        statOnly = stat != BuildFamily.None;
+        return stat;
     }
 
     /// <summary>아이템 id의 계열(차트 기준, 캐시) — 제시 가중처럼 아직 룬을 만들기 전에 쓴다.</summary>
@@ -130,6 +160,8 @@ public static class BuildFamilyRules
             case "galatine":  return BuildFamily.Combo;
             case "arondight": return BuildFamily.Kill;
         }
+        // 활 · 석궁은 진화 전에도 사격 — 원거리 무기가 사격 각인 1칸(10-14 빌드 시너지 A5)
+        if (w.weaponType == WeaponType.Bow || w.weaponType == WeaponType.Crossbow) return BuildFamily.Ranged;
         if (w.evolutionStage <= 0) return BuildFamily.None;
         return w.weaponType switch
         {

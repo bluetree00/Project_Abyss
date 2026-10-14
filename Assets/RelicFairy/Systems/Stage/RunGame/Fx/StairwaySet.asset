@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7aa4b09648d39904f9fd829f52ec441f, type: 3}
+  m_Name: StairwaySet
+  m_EditorClassIdentifier: Assembly-CSharp::StairwaySetSO
+  _stepSlabs:
+  - {fileID: 1030974413, guid: abc00000000002182416436784438614, type: 3}
+  - {fileID: 1030974448, guid: abc00000000015512077019049817661, type: 3}
+  - {fileID: 1030974483, guid: abc00000000012979331847051092628, type: 3}
+  _arch: {fileID: 1031046492, guid: abc00000000015657245601655267910, type: 3}
+  _archScale: 1.2
+  _chapterCircles:
+  - {fileID: 1838261207787406, guid: ab872fa9fd895d44d8a5fa026496a8c3, type: 3}
+  - {fileID: 1797740254408388, guid: 651015d990cb813499103b1670630c10, type: 3}
+  - {fileID: 1228060220772394, guid: 26ca230b5e25e7a4394b9883f13f4527, type: 3}
+  - {fileID: 1501320978331502, guid: e11e0bfa702caed41bff71e9ac30de1c, type: 3}
+  _circleScale: 0.5

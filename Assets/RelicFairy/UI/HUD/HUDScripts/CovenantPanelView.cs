@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using TMPro;
@@ -32,17 +33,20 @@ public sealed class CovenantPanelView : MonoBehaviour
     [SerializeField] private Vector4 slotContentPadding = new Vector4(14f, 12f, 14f, 12f);
     [Tooltip("제목/설명 사이 간격")]
     [SerializeField] private float contentSpacing = 6f;
-    // 하한 16px 기준([[project_ui_improvement_pass_20260909]])에 맞춘 값.
-    // 09-09 가독성 패스가 조립 팝업만 올리고 이 패널을 빠뜨려 11px로 남아 있었다 —
-    // 런 내내 화면에 떠 있는 표시라 체감은 여기가 가장 크다.
-    // 실측(DNFForgedBlade 줄높이 1.286): 설명 상자 209×88에서 가장 긴 조합
-    // (「심장박동 × 결계」 4줄)이 15px에 82%를 쓴다. 16px은 넘친다.
-    [Tooltip("제목(서약 이름) 폰트 크기 — 이름이 길면 두 줄로 접힌다")]
-    [SerializeField] private float titleFontSize = 16f;
-    [Tooltip("설명 폰트 크기")]
-    [SerializeField] private float descFontSize = 15f;
+
+    // 톤 v2 글자(10-11 비교 리서치 A §3-4) — DNF 16 / 15(제목은 가짜 굵게까지) → 제목 Noto Medium 17 · 설명 Regular 15 · 칸 수 Medium 15.
+    // 크기는 코드가 정한다: @UIRoot 프리팹에 옛 titleFontSize 16이 직렬화돼 있어 필드 기본값을 바꿔도 프리팹 값이 이겼다
+    // → 직렬화 필드를 걷고 상수로 둔다(프리팹에 남은 옛 키는 더 읽히지 않는다).
+    // 설명 상자 209×88에서 가장 긴 조합(「심장박동 × 결계」 4줄)이 DNF 15px로 82%를 썼다 — Noto는 줄높이가 1.448(DNF 1.286)라
+    // 같은 15px로 약 92%를 쓴다. 넘치는 조합만 자동 축소(×0.75)가 받는다.
+    private const float TitleFontSize = UITheme.Thin.Body;    // 17
+    private const float DescFontSize  = UITheme.Thin.Small;   // 15
+    private const float CountFontSize = UITheme.Thin.Small;   // 15
+    private static readonly Color DescInk  = UITheme.Thin.InkA(0.85f);   // 설명 = 제목(잉크)보다 한 단 옅게
+    private static readonly Color CountInk = UITheme.Thin.InkA(0.80f);
 
     private bool HasSkin => covenantFrameSprite != null || covenantInnerSprite != null;
+    private bool _thinFontsApplied;   // 톤 v2 글꼴로 한 번 다 발랐는가(패널은 앱 부트 때 생겨 Awake엔 글꼴이 아직 없다)
 
     private void Awake()
     {
@@ -148,22 +152,22 @@ public sealed class CovenantPanelView : MonoBehaviour
         if (slot.Icon       != null) slot.Icon.gameObject.SetActive(false);
         if (slot.StageBadge != null) slot.StageBadge.gameObject.SetActive(false);
 
-        // 제목 — 굵게, 가운데. 이름이 길면(조립 서약: "원인[티어] × 결과[티어]") 줄바꿈 + 자동 축소로 잘리지 않게.
+        // 제목 — 가운데(굵기는 글꼴 Medium이 맡는다 · 가짜 굵게 없음). 이름이 길면(조립 서약: "원인[티어] × 결과[티어]") 줄바꿈 + 자동 축소로 잘리지 않게.
         var name = slot.NameText;
         if (name != null)
         {
             name.alignment = TextAlignmentOptions.Center;
-            name.fontStyle = FontStyles.Bold;
+            name.fontStyle = FontStyles.Normal;
             name.enableWordWrapping = true;
-            name.fontSize    = titleFontSize;                 // 기준값 — 자동축소가 안 걸려도 이 크기로 나온다
+            name.fontSize    = TitleFontSize;                 // 기준값 — 자동축소가 안 걸려도 이 크기로 나온다
             name.enableAutoSizing = true;
-            name.fontSizeMin = titleFontSize * 0.75f;
-            name.fontSizeMax = titleFontSize;
-            SetTextLayout(name.gameObject, titleFontSize * 2.4f, 0f);   // 두 줄까지 허용한 고정 높이
+            name.fontSizeMin = TitleFontSize * 0.75f;
+            name.fontSizeMax = TitleFontSize;
+            SetTextLayout(name.gameObject, TitleFontSize * 2.4f, 0f);   // 두 줄까지 허용한 고정 높이
             name.transform.SetSiblingIndex(0);
         }
 
-        // 설명 — 없으면 생성(제목 스타일 복제), 이탤릭·가운데
+        // 설명 — 없으면 생성(제목 스타일 복제), 가운데
         var descT = slotT.Find("DescText");
         TMP_Text desc;
         if (descT != null) desc = descT.GetComponent<TMP_Text>();
@@ -175,19 +179,31 @@ public sealed class CovenantPanelView : MonoBehaviour
             if (name != null) desc.font = name.font;
         }
         desc.alignment = TextAlignmentOptions.Center;
-        desc.color     = new Color(0.88f, 0.86f, 0.80f, 1f);
+        desc.color     = DescInk;
         desc.enableWordWrapping = true;
         // 원인/결과 2줄 + 화살표라 문구가 길어질 수 있다 → 칸을 넘기지 않도록 자동 축소(하한까지 줄바꿈으로 흡수).
-        desc.fontSize    = descFontSize;                      // 기준값 — 자동축소가 안 걸려도 이 크기로 나온다
+        desc.fontSize    = DescFontSize;                      // 기준값 — 자동축소가 안 걸려도 이 크기로 나온다
         desc.enableAutoSizing = true;
-        desc.fontSizeMin = descFontSize * 0.75f;
-        desc.fontSizeMax = descFontSize;
+        desc.fontSizeMin = DescFontSize * 0.75f;
+        desc.fontSizeMax = DescFontSize;
         desc.lineSpacing = -5f;                               // 원인/↓/결과 3줄이 세로로 뜨지 않게 살짝 조임
         SetTextLayout(desc.gameObject, 0f, 1f);               // 제목을 뺀 남은 높이를 전부 차지(TMP에게 묻지 않음)
         desc.transform.SetSiblingIndex(1);
-        // fontStyle(인용체 여부)은 UI_CovenantSlot.Bind가 내용에 따라 정한다.
 
         slot.AttachDescText(desc);
+    }
+
+    /// <summary>
+    /// 톤 v2 글꼴(제목 Medium 17 · 설명 Regular 15 · 칸 수 Medium 15) — 패널은 앱 부트 때 생겨 Awake엔 글꼴(Addressables)이 아직 없다.
+    /// Refresh마다 보고, 글꼴이 올라온 뒤 한 번만 바른다.
+    /// </summary>
+    private void EnsureThinFonts()
+    {
+        if (_thinFontsApplied || UISkin.ThemeFonts == null || _slots == null) return;
+        _thinFontsApplied = true;
+        foreach (var slot in _slots)
+            slot?.StyleThin(TitleFontSize, UITheme.Thin.Ink, DescFontSize, DescInk);
+        if (_countLabel != null) UITheme.StyleThinText(_countLabel, UIWeight.Medium, CountFontSize, CountInk, shadow: true);
     }
 
     /// <summary>
@@ -273,13 +289,32 @@ public sealed class CovenantPanelView : MonoBehaviour
     }
 
     // ── 서약서(문장) — 좌하단 서약 칸 4장 → 서약서 한 장(10-02 설계서 §4) ──
-    private const float LineHeight    = 19f;   // 설명 한 줄 높이(15px 글자 · 줄 간격 -5 기준)
+    private const float LineHeight    = 21f;   // 설명 한 줄 높이(Noto 15px 글자 · 줄 간격 -5 기준 — 15 × 1.448 − 0.75. DNF일 땐 19)
+    private const float SentenceBase  = 71f;   // 설명 밖 몫 = 위아래 여백 24 + 제목 두 줄 칸(17 × 2.4 ≈ 41) + 간격 6
     private const float ChainStagger  = 0.08f; // 연쇄 표식이 차례로 켜지는 간격
     private const float ChainPitchUp  = 0.12f; // 절마다 소리가 한 음씩 올라간다
+    // 등급 소리(10-07 U2 · 개편기획 ① — 실버 맑은 종 · 골드 겹종 · 루비 낮은 울림 + 짧은 화면 효과). 흔들림은 늘리지 않는다.
+    private const float GoldEchoSec    = 0.07f;
+    private const float GoldEchoVolume = 0.7f;   // 메아리는 본음의 0.7배(예전 0.32 / 0.45)
+    private const float RubyPulsePeak  = 0.22f;
+    private const float RubyPulseSec   = 0.25f;
+    // 출시용 발동 글자 — 이 서약서의 첫 발동 · 끝 절까지 이어진 연쇄(너무 잦지 않게 간격)
+    private const float ChainTextGap   = 2.5f;
+    private static readonly Color TriggerTextColor = new(1f, 0.84f, 0.45f, 1f);
+    private bool  _firstFireShown;
+    private float _lastChainTextAt = -99f;
     private CovenantSentence _sentence;
+    // Refresh가 마지막으로 넘긴 서약서 — 컷신 · 보스 페이지 전환으로 꺼졌다 켜지면 다시 듣는다.
+    // 다시 묶는 곳이 Refresh뿐이라 서약이 바뀔 때까지 연쇄 표식 · 등급 소리 · 「발동」 글자가 멎었다(10-09 출시 점검).
+    private CovenantSentence _lastSentence;
     private float _chainBase;                  // 지금 연쇄의 첫 표식 시각(같은 순간 들어온 절들을 차례로 펼친다)
     private int   _chainLast = -1;
 
+    private void OnEnable()
+    {
+        EnsureThinFonts();
+        BindSentenceEvents(_lastSentence);
+    }
     private void OnDisable() => BindSentenceEvents(null);
 
     /// <summary>문장이 바뀌면(이어 쓰기 · 고쳐 쓰기 = 새 인스턴스) 절 사건을 다시 듣는다.</summary>
@@ -309,17 +344,69 @@ public sealed class CovenantPanelView : MonoBehaviour
             handler.ChainEndSaid = true;
             CovenantVoice.Say(CovenantVoice.ChainEnd);
         }
-        Managers.Sound.PlayUiAsync(SoundKey.Sfx.ItemPickup, 0.45f, 1f + ChainPitchUp * index).Forget();
+        PlayClauseSound(index);
+        ShowTriggerText(index);
+    }
+
+    /// <summary>등급마다 다른 소리 — 실버 = 높고 맑게 한 번 · 골드 = 겹종(한 번 더 높게) · 루비 = 낮게 + 짧은 화면 효과. 절이 이어질수록 한 음씩 오른다.</summary>
+    private void PlayClauseSound(int index)
+    {
+        var tier = _sentence != null && index < _sentence.ResultCount ? _sentence.ResultTier(index) : CovenantTier.Silver;
+        float step = ChainPitchUp * index;
+        switch (tier)
+        {
+            case CovenantTier.Ruby:
+                Managers.Sound?.PlayUiEvent(SoundEvent.ClauseRuby, 1f + step);
+                VolumePulseService.Pulse(RubyPulsePeak, RubyPulseSec);
+                break;
+            case CovenantTier.Gold:
+                Managers.Sound?.PlayUiEvent(SoundEvent.ClauseGold, 1f + step);
+                GoldEchoAsync(1.25f + step).Forget();
+                break;
+            default:
+                Managers.Sound?.PlayUiEvent(SoundEvent.ClauseSilver, 1f + step);
+                break;
+        }
+    }
+
+    private async UniTaskVoid GoldEchoAsync(float pitch)
+    {
+        try { await UniTask.Delay(TimeSpan.FromSeconds(GoldEchoSec), DelayType.UnscaledDeltaTime, cancellationToken: destroyCancellationToken); }
+        catch (OperationCanceledException) { return; }
+        Managers.Sound?.PlayUiEvent(SoundEvent.ClauseGold, pitch, GoldEchoVolume);   // 메아리 = 같은 파일을 높게 · 작게
+    }
+
+    /// <summary>
+    /// 출시용 발동 글자(개편기획 ① — 개발 빌드 전용 토스트가 걷힌 뒤 출시 빌드에선 발동이 글자로 보이지 않았다):
+    /// 이 서약서의 첫 발동 「서약 발동」 · 끝 절까지 이어진 연쇄 「연쇄 ×N」(<see cref="ChainTextGap"/>초 간격). 플레이어 머리 위 얇은 글자.
+    /// </summary>
+    private void ShowTriggerText(int index)
+    {
+        var player = GameRunBootstrapper.Instance?.Run?.Player;
+        if (player == null || _sentence == null) return;
+        string text = null;
+        if (!_firstFireShown) { _firstFireShown = true; text = "서약 발동"; }
+        else if (_sentence.ResultCount >= 2 && index == _sentence.ResultCount - 1
+                 && Time.unscaledTime - _lastChainTextAt >= ChainTextGap)
+        {
+            _lastChainTextAt = Time.unscaledTime;
+            text = "연쇄 ×" + _sentence.ResultCount;
+        }
+        if (text != null) RelicFloatText.Show(player.transform.position, text, TriggerTextColor);   // 발밑 — 높이는 RelicFloatText가 더한다
     }
 
     public void Refresh(IReadOnlyList<CovenantBase> covenants)
     {
         if (_slots == null) return;
+        EnsureThinFonts();
 
         // 서약서가 있으면 한 장으로 — 칸 개념(서약 n/N)은 끝났다
         CovenantSentence sentence = null;
         if (covenants != null)
             foreach (var c in covenants) if (c is CovenantSentence s) { sentence = s; break; }
+        // 새 서약서(이어 쓰기 · 고쳐 쓰기)의 첫 발동을 다시 알린다 — 꺼졌다 켜진 것만으론 되풀이하지 않는다(10-09 출시 점검)
+        if (sentence != _lastSentence) _firstFireShown = false;
+        _lastSentence = sentence;
         BindSentenceEvents(sentence);
         if (sentence != null)
         {
@@ -329,7 +416,7 @@ public sealed class CovenantPanelView : MonoBehaviour
                 _countLabel.text = $"서약서 {sentence.ResultCount}절";
             }
             int lines = _slots[0] != null ? _slots[0].BindSentence(sentence) : 0;
-            float h = Mathf.Max(slotSize.y, 64f + LineHeight * lines);
+            float h = Mathf.Max(slotSize.y, SentenceBase + LineHeight * lines);
             if (_grid != null) { _grid.constraintCount = 1; _grid.cellSize = new Vector2(slotSize.x, h); }
             if (_slots[0] != null && _slots[0].TryGetComponent<LayoutElement>(out var le)) { le.preferredHeight = h; le.minHeight = h; }
             for (int i = 1; i < _slots.Length; i++) _slots[i]?.SetEmpty();
@@ -370,10 +457,10 @@ public sealed class CovenantPanelView : MonoBehaviour
         rt.anchoredPosition = new Vector2(6f, 2f);
         rt.sizeDelta = new Vector2(200f, 22f);
         _countLabel = go.AddComponent<TextMeshProUGUI>();
-        _countLabel.fontSize = 16f;
+        _countLabel.fontSize = CountFontSize;
         _countLabel.fontStyle = FontStyles.Normal;
         _countLabel.alignment = TextAlignmentOptions.BottomLeft;
-        _countLabel.color = new Color(0.93f, 0.88f, 0.76f, 0.95f);
+        _countLabel.color = CountInk;   // 글꼴(Medium)은 EnsureThinFonts가 글꼴이 올라온 뒤 바른다
         _countLabel.raycastTarget = false;
         TMPOutlineHelper.ApplySoftShadow(_countLabel);
         go.SetActive(false);
@@ -381,6 +468,8 @@ public sealed class CovenantPanelView : MonoBehaviour
 
     public void Clear()
     {
+        _lastSentence = null;   // 런이 끝난 서약서를 다시 켜질 때 붙잡지 않게(10-09 출시 점검)
+        BindSentenceEvents(null);
         if (_countLabel != null) _countLabel.gameObject.SetActive(false);
         if (_slots == null) return;
         foreach (var slot in _slots)

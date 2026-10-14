@@ -1,3 +1,5 @@
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -104,6 +106,7 @@ public class FGRootPrisonState : FullLockState<FGRootPrisonPatternSO>
     private const string AnimReady = "AttackReady";
     private const int    GapCount  = 2;
     private const float  VfxLifetime = 3f;
+    private const float  WallSinkSeconds = 0.5f;   // 벽이 가라앉듯 오그라드는 시간(10-12 디졸브 원칙 — 예전엔 바로 사라졌다)
 
     private enum Phase { Cast, Trapped, Linger, Recovery }
 
@@ -134,7 +137,12 @@ public class FGRootPrisonState : FullLockState<FGRootPrisonPatternSO>
 
         // 감옥 중심은 시전 순간의 플레이어 자리 — 이후 따라가지 않는다
         _center = ctx.Runtime.PlayerTarget != null ? ctx.Runtime.PlayerTarget.position : ctx.Transform.position + ctx.Transform.forward * 3f;
-        _gapYaw[0] = Random.Range(0f, 360f);
+        // 첫 틈은 아레나 가운데 쪽 ±60° — 무작위면 벽 · 모서리 곁에서 두 틈이 다 막혀 못 피했다(10-13 검증)
+        var fgm = ctx.Monster as ForestGuardianMonster;
+        Vector3 toMid = fgm != null ? fgm.ArenaCenter - _center : -ctx.Transform.forward;
+        toMid.y = 0f;
+        float midYaw = toMid.sqrMagnitude > 0.01f ? Mathf.Atan2(toMid.x, toMid.z) * Mathf.Rad2Deg : Random.Range(0f, 360f);
+        _gapYaw[0] = midYaw + Random.Range(-60f, 60f);
         _gapYaw[1] = _gapYaw[0] + 180f + Random.Range(-Data.gapJitterDegrees, Data.gapJitterDegrees);
 
         _insideGO = PatternGuideHelper.Prepare(
@@ -259,6 +267,7 @@ public class FGRootPrisonState : FullLockState<FGRootPrisonPatternSO>
                 var fx = Object.Instantiate(Data.wallVfxPrefab, _center + dir * r, rot, _wallsRoot.transform);
                 fx.transform.localScale = Vector3.one * Data.wallVfxScale;
                 foreach (var col in fx.GetComponentsInChildren<Collider>()) col.enabled = false;   // 시각 전용
+                BossPageTransitionState.ToneRoarVfx(fx, Color.clear);   // 굴절층 끔 — 토막마다 흰 일그러짐(10-11 이펙트 톤 2차)
             }
         }
         Physics.SyncTransforms();
@@ -277,8 +286,35 @@ public class FGRootPrisonState : FullLockState<FGRootPrisonPatternSO>
     private void DestroyWalls()
     {
         if (_wallsRoot == null) return;
-        Object.Destroy(_wallsRoot);
+        var root = _wallsRoot;
         _wallsRoot = null;
+        // 막는 판정은 지금 풀고(틈 밖으로 나가던 플레이어가 걸리지 않게) 모습만 오그라든 뒤 지운다
+        foreach (var c in root.GetComponentsInChildren<Collider>()) c.enabled = false;
+        foreach (var ps in root.GetComponentsInChildren<ParticleSystem>()) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        SinkWallsAsync(root, root.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    private static async UniTaskVoid SinkWallsAsync(GameObject root, CancellationToken ct)
+    {
+        var t      = root.transform;
+        int n      = t.childCount;
+        var parts  = new Transform[n];
+        var scales = new Vector3[n];
+        for (int i = 0; i < n; i++) { parts[i] = t.GetChild(i); scales[i] = parts[i].localScale; }
+        try
+        {
+            for (float e = 0f; e < WallSinkSeconds; e += Time.deltaTime)
+            {
+                float k = 1f - e / WallSinkSeconds;
+                for (int i = 0; i < n; i++) if (parts[i] != null) parts[i].localScale = scales[i] * k;
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (System.OperationCanceledException) { }
+        finally
+        {
+            if (root != null) Object.Destroy(root);
+        }
     }
 
     // ── 내려찍기 ─────────────────────────────────────────

@@ -19,6 +19,7 @@ public sealed class BossStageHazard : MonoBehaviour
     private const int   MaxVfx      = 56;
     private const float FloorLift   = 0.2f;    // 가이드와 같은 높이 — 바닥 타일 위(09-28 R4)
     private const float RebuildStep = 0.25f;   // 자라는 동안 이만큼 넓어질 때마다 다시 깐다
+    private const float RetreatSeconds = 0.8f; // 거둘 때 — 바닥 판은 옅어지고 가시는 오그라들며 파티클은 방출을 멈춘다(10-12 디졸브 원칙)
     // 흔적 줄(Line)
     private const float LineGrowIn     = 0.25f;  // 시작 → 끝으로 자라나는 시간(알파도 함께 차오름)
     private const float LineFadeOut    = 0.4f;   // 수명 끝에 옅어지는 시간 — 이 동안은 피해 없음
@@ -42,12 +43,18 @@ public sealed class BossStageHazard : MonoBehaviour
     private Color       _color;
     private GameObject  _vfxPrefab;
     private float       _vfxScale = 1f;
+    private float       _vfxSpacing = VfxSpacing;
     private MonsterBase _boss;
     private float       _damageMult;
     private float       tickSeconds = 0.5f;
     private float       _tick;
+    private BossStageHazard _coveredBy;   // 이 구역이 덮는 자리에선 틱 피해를 주지 않는다(겹친 띠 이중 틱 방지 · 10-08 점검)
     private readonly List<GameObject> _strips = new();
     private readonly List<GameObject> _vfx    = new();
+    private readonly List<MeshRenderer>   _stripRenderers = new();
+    private readonly List<ParticleSystem> _vfxParticles   = new();
+    private float _retreat = -1f;   // 0 이상 = 거두는 중(1 → 0)
+    private MaterialPropertyBlock _retreatMpb;
 
     // Line(흔적 줄) — 시작점 · 방향(XZ 단위) · 길이 · 드러난 길이
     private Vector3     _lineFrom;
@@ -81,10 +88,12 @@ public sealed class BossStageHazard : MonoBehaviour
 
     /// <summary>아레나 가장자리 띠. <paramref name="arenaXZ"/> = 아레나 바닥 XZ 경계(y는 무시).</summary>
     public static BossStageHazard CreateEdgeBand(MonsterBase boss, Bounds arenaXZ, float floorY, float bandWidth, float growSeconds,
-                                                 Color color, GameObject vfxPrefab, float vfxScale, float damageMultPerTick)
+                                                 Color color, GameObject vfxPrefab, float vfxScale, float damageMultPerTick,
+                                                 float vfxSpacing = VfxSpacing)
     {
         var h = Create("~BossStageHazard_Edge", boss, color, vfxPrefab, vfxScale, damageMultPerTick);
         h._shape     = Shape.EdgeBand;
+        h._vfxSpacing = Mathf.Max(1f, vfxSpacing);   // 반복 이펙트 간격 — 화룡 흑염은 넓게(10-11 이펙트 톤 2차)
         h._arena     = arenaXZ;
         h._floorY    = floorY;
         h._band      = Mathf.Max(0.5f, bandWidth);
@@ -128,7 +137,7 @@ public sealed class BossStageHazard : MonoBehaviour
         h._lineHalfWidth = Mathf.Max(0.05f, width * 0.5f);
         h._lifetime      = Mathf.Max(LineGrowIn + LineFadeOut, lifetime);
         h._shownBand     = 1f;           // 띠 · 구역의 자라기 경로는 건너뛴다 — 줄은 TickLine이 키운다
-        h._tick          = LineGrowIn;   // 첫 피해 판정은 다 드러난 뒤
+        h._tick          = Mathf.Max(LineGrowIn, PatternGuideHelper.MinLead);   // 첫 피해 판정은 다 드러나고 0.45초 뒤(10-13 검증 — 대시로 지난 발밑에 0.25초 만에 박혔다)
         h.BuildLine();
         return h;
     }
@@ -138,6 +147,25 @@ public sealed class BossStageHazard : MonoBehaviour
     {
         if (_shape != Shape.EdgeBand || extra <= 0f) return;
         _band += extra;
+    }
+
+    /// <summary>
+    /// <paramref name="other"/>가 덮는 자리에선 이 구역이 틱 피해를 주지 않는다 — 같은 피해의 임시 띠가 영구 띠 위에 겹칠 때
+    /// 두 구역이 따로 틱을 돌아 주기마다 두 번 맞았다(10-08 점검). null이면 해제.
+    /// </summary>
+    public void SkipWhereCovered(BossStageHazard other) => _coveredBy = other;
+
+    /// <summary>
+    /// 거둔다 — 피해는 지금 멈추고 <see cref="RetreatSeconds"/> 동안 물러난 뒤 스스로 지운다(흔적 줄은 원래 옅어짐을 지금 시작).
+    /// 보스가 쓰러지면 저절로 부른다. 여러 번 불러도 한 번.
+    /// </summary>
+    public void Dismiss()
+    {
+        if (_retreat >= 0f) return;
+        _retreat = 1f;
+        if (_shape == Shape.Line) { _lifetime = Mathf.Min(_lifetime, _age + LineFadeOut); return; }
+        foreach (var ps in _vfxParticles)
+            if (ps != null) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
     }
 
     /// <summary>이 점이 위험 구역 안인가(XZ).</summary>
@@ -156,8 +184,13 @@ public sealed class BossStageHazard : MonoBehaviour
     // ── Lifecycle ──────────────────────────────────────────────
     private void Update()
     {
-        if (_boss == null || _boss.IsDead) { Destroy(gameObject); return; }
-        if (_shape == Shape.Line && !TickLine()) return;   // 흔적 줄 — 수명이 다해 치웠다
+        if (_retreat < 0f && (_boss == null || _boss.IsDead)) Dismiss();
+        if (_shape == Shape.Line)
+        {
+            if (!TickLine()) return;      // 흔적 줄 — 수명이 다해 치웠다
+            if (_retreat >= 0f) return;   // 거두는 중 — 피해 없음
+        }
+        else if (_retreat >= 0f) { TickRetreat(); return; }
 
         float target = _shape == Shape.EdgeBand ? _band : 1f;
         if (_shownBand < target)
@@ -172,6 +205,7 @@ public sealed class BossStageHazard : MonoBehaviour
         _tick = tickSeconds;
         var player = GameRunBootstrapper.Instance?.Run?.Player;
         if (player == null || !Contains(player.transform.position)) return;
+        if (_coveredBy != null && _coveredBy.Contains(player.transform.position)) return;   // 겹친 자리는 덮은 쪽만 찌른다(10-08 점검)
         float atk = _boss.EffectiveAttackPower;
         int dmg = Mathf.Max(1, Mathf.RoundToInt((atk > 0f ? atk : 10f) * _damageMult));
         player.TakeDamage(dmg, _boss.gameObject, false, HitWeight.Light);
@@ -196,12 +230,24 @@ public sealed class BossStageHazard : MonoBehaviour
         return h;
     }
 
+    /// <summary>거두는 한 프레임(띠 · 구역) — 바닥 판 알파와 이펙트 크기를 함께 줄이고, 다 줄면 지운다.</summary>
+    private void TickRetreat()
+    {
+        _retreat = Mathf.MoveTowards(_retreat, 0f, Time.deltaTime / RetreatSeconds);
+        if (_retreat <= 0f) { Destroy(gameObject); return; }
+        _retreatMpb ??= new MaterialPropertyBlock();
+        _retreatMpb.SetColor(BaseColorId, new Color(_color.r, _color.g, _color.b, _color.a * _retreat));
+        foreach (var mr in _stripRenderers) if (mr != null) mr.SetPropertyBlock(_retreatMpb);
+        foreach (var v in _vfx) if (v != null) v.transform.localScale = Vector3.one * (_vfxScale * _retreat);
+    }
+
     /// <summary>바닥 띠(반투명 사각 판)와 이펙트를 지금 폭에 맞춰 다시 깐다.</summary>
     private void RebuildVisuals()
     {
         _builtBand = _shownBand;
         foreach (var st in _strips) if (st != null) Destroy(st);
         _strips.Clear();
+        _stripRenderers.Clear();
 
         if (_shape == Shape.Rect)
         {
@@ -313,6 +359,7 @@ public sealed class BossStageHazard : MonoBehaviour
         mpb.SetColor("_BaseColor", _color);
         mr.SetPropertyBlock(mpb);
         _strips.Add(q);
+        _stripRenderers.Add(mr);
     }
 
     /// <summary>URP Unlit 반투명 공유 재질(색은 MPB).</summary>
@@ -339,15 +386,16 @@ public sealed class BossStageHazard : MonoBehaviour
     {
         foreach (var v in _vfx) if (v != null) Destroy(v);
         _vfx.Clear();
+        _vfxParticles.Clear();
         var a = _arena;
         float inset = b * 0.5f;
         var pts = new List<Vector3>();
-        for (float x = a.min.x + inset; x <= a.max.x - inset && pts.Count < MaxVfx; x += VfxSpacing)
+        for (float x = a.min.x + inset; x <= a.max.x - inset && pts.Count < MaxVfx; x += _vfxSpacing)
         {
             pts.Add(new Vector3(x, _floorY, a.max.z - inset));
             pts.Add(new Vector3(x, _floorY, a.min.z + inset));
         }
-        for (float z = a.min.z + b + VfxSpacing * 0.5f; z <= a.max.z - b && pts.Count < MaxVfx; z += VfxSpacing)
+        for (float z = a.min.z + b + _vfxSpacing * 0.5f; z <= a.max.z - b && pts.Count < MaxVfx; z += _vfxSpacing)
         {
             pts.Add(new Vector3(a.min.x + inset, _floorY, z));
             pts.Add(new Vector3(a.max.x - inset, _floorY, z));
@@ -372,6 +420,7 @@ public sealed class BossStageHazard : MonoBehaviour
             var main = ps.main;
             main.loop = true;   // 영구 무대 — 한 번 터지고 끝나는 이펙트도 계속 돌게
             if (!ps.isPlaying) ps.Play();
+            _vfxParticles.Add(ps);
         }
         foreach (var col in fx.GetComponentsInChildren<Collider>()) col.enabled = false;   // 시각 전용
         // 메시 이펙트(숲 가시 spike_mesh — 원래 흰 원뿔)는 띠 색으로 칠한다. 파티클은 그대로.

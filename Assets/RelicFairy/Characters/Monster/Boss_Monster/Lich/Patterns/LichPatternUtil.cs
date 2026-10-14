@@ -29,12 +29,18 @@ public static class LichPatternUtil
     public static readonly Color SafeWhite = new Color(0.95f, 0.95f, 0.90f);
     /// <summary>판정 순간(빨강) — 「지금 피하라」.</summary>
     public static Color Lethal => PatternGuideHelper.Active;
+    /// <summary>예고의 자리 · 방향이 굳은 뒤 판정까지 최소(공용 예고 규칙 · 10-13).</summary>
+    public const float MinLead = PatternGuideHelper.MinLead;
 
     /// <summary>판정 직전 신호(S) 구간 밝기 배율.</summary>
     private const float SignalIntensity = 2f;
 
     /// <summary>패링 창 길이(초) — 낫 판정 직전. 판정 전 이만큼 먼저 <see cref="OpenParry"/>를 부른다.</summary>
     public const float ParryWindow = 0.25f;
+
+    /// <summary>봉인 완성 이펙트(Effect_38 GloryBoundary)에서 끄는 자식 — 연기 장(흰 파편 구름) · 긴 빛기둥(늘인 입자 길이 25) · 빛가루 비 둘(초당 1000 · 500).</summary>
+    private static readonly string[] SealCompleteHeavyParts =
+        { "Effect_38_SmokeField", "Effect_38_ParticlesField_3", "Effect_38_ParticlesField", "Effect_38_ParticlesField_2" };
 
     private static readonly List<Vector2Int> s_cells = new(32);
 
@@ -59,10 +65,15 @@ public static class LichPatternUtil
     public const float SlashNativeRadius = 3.4f;
 
     /// <summary>
-    /// 노바(SlamImpact · TwinBlast = Hit 17 nova) 호출 배율 — 보이는 반경이 <paramref name="radius"/>가 되게.
+    /// 노바(SlamImpact = Hit 17 nova) 호출 배율 — 보이는 반경이 <paramref name="radius"/>가 되게.
     /// 체감 반경 ≈ 1.2 m × 매핑 배율(2.0) × 호출 배율(09-19 Boss Room/11 실측 + 감사).
     /// </summary>
     public static float NovaScale(float radius) => radius / 2.4f;
+
+    /// <summary>
+    /// 쌍둥이 폭발(TwinBlast) 호출 배율 — SlamImpact와 같은 노바 프리팹이지만 매핑 배율이 ×2.5라 1.2 m × 2.5 × r/3 = r(10-08 점검).
+    /// </summary>
+    public static float TwinBlastScale(float radius) => radius / 3f;
 
     /// <summary>보라탄 착탄(BoltImpact) 호출 배율 — 퍼지는 고리 평균 반경이 <paramref name="radius"/>가 되게(감사: r/2는 1~2배로 컸다).</summary>
     public static float BoltScale(float radius) => radius / 3f;
@@ -106,6 +117,21 @@ public static class LichPatternUtil
 
     public static void HoldFacing(MonsterContext ctx, float yaw, float turnDegPerSec = 720f)
         => Mover(ctx)?.HoldFacing(yaw, turnDegPerSec);
+
+    /// <summary>
+    /// 봉인 완성(금빛 고리 · <see cref="LichVfxSlot.SealComplete"/>) — 고리 넷만 남기고 나머지 자식(<see cref="SealCompleteHeavyParts"/>)은 끈다
+    /// (10-14 전주기 5회차 재확인: 사슬 구를 뺀 뒤에도 흰 빛줄기 여섯 갈래 · 파편 구름이 화면 절반 이상을 2~3초 덮었다 · 이펙트 절제.
+    /// 허브 비교 촬영 — 연기 · 빛기둥을 꺼도 빛가루 비가 고리보다 넓게 흰 줄로 내렸다. 「감긴다」는 금빛 번쩍 · 봉인석 사슬 번쩍이 알린다).
+    /// 칸 프리팹은 이 칸만 쓴다 — 풀로 돌아간 인스턴스가 꺼진 채 남아도 된다.
+    /// </summary>
+    public static GameObject PlaySealComplete(Vector3 at)
+    {
+        var go = LichVfx.Play(LichVfxSlot.SealComplete, at, Quaternion.identity);
+        if (go == null) return null;
+        foreach (var t in go.GetComponentsInChildren<Transform>(true))
+            if (System.Array.IndexOf(SealCompleteHeavyParts, t.name) >= 0) t.gameObject.SetActive(false);
+        return go;
+    }
 
     public static void Impact(LichImpact grade, bool hitPlayer = false)
     {
@@ -165,6 +191,16 @@ public static class LichPatternUtil
     }
 
     public static LichMonster Lich(MonsterContext ctx) => ctx.Monster as LichMonster;
+
+    /// <summary>
+    /// 공격 뒤 회복 시간 — 2·3페이지 공격 속도 배율(<see cref="BossAttackBlackboard.AttackSpeedMult"/>, 전환 패턴이 1.2를 건다)만큼 짧게(10-08 사용자 결정).
+    /// 예고 · 판정 시간은 그대로 둔다 — 피할 수 있는 정도는 같고, 공격을 더 촘촘히 잇는다.
+    /// </summary>
+    public static float Recovery(MonsterContext ctx, float seconds)
+    {
+        float mult = Lich(ctx)?.LichBB?.AttackSpeedMult ?? 1f;
+        return mult > 0f ? seconds / mult : seconds;
+    }
 
     /// <summary>
     /// 디졸브로 스러진 뒤 <paramref name="root"/>를 파괴한다(10-03 — 리치가 쓰는 물체가 툭 꺼지지 않게). 디졸브는 <paramref name="visual"/>(메시)에만 —
@@ -293,11 +329,21 @@ public static class LichPatternUtil
     /// <summary>원 판정 — 맞았으면 true.</summary>
     public static bool HitCircle(MonsterContext ctx, Vector3 center, float radius, float damageMult,
                                  float knockbackMult = 0f, bool ignorePoise = false)
+        => HitCircle(ctx, center, radius, damageMult, out _, knockbackMult, ignorePoise);
+
+    /// <summary>
+    /// 원 판정 — 맞았으면 true. <paramref name="contact"/> = 무적이 아니던 플레이어에게 닿았다(무효화 · 저스트 회피 · 부활로 피해가 0이어도).
+    /// 닿을 때까지 매 프레임 판정하는 투사체 · 광선은 contact로 「쓰였다」를 정한다 — 피해 0이라고 다시 판정하면 무효화 확률을
+    /// 매 프레임 다시 굴리고 피격 패시브가 매 프레임 터졌다(10-08 점검). 결박 · 추격 · 히트스톱은 반환값(실제 피해)으로 건다.
+    /// </summary>
+    public static bool HitCircle(MonsterContext ctx, Vector3 center, float radius, float damageMult, out bool contact,
+                                 float knockbackMult = 0f, bool ignorePoise = false)
     {
+        contact = false;
         var target = ctx.Runtime.PlayerTarget;
         if (target == null || FlatDistance(center, target.position) > radius) return false;
         LichPatternProbe.Inside();
-        return Apply(ctx, center, damageMult, knockbackMult, ignorePoise);
+        return Apply(ctx, center, damageMult, knockbackMult, ignorePoise, out contact);
     }
 
     /// <summary>
@@ -305,7 +351,16 @@ public static class LichPatternUtil
     /// </summary>
     public static bool HitBeam(MonsterContext ctx, Vector3 origin, Vector3 dir, float length, float halfWidth,
                                float damageMult, float knockbackMult = 0f)
+        => HitBeam(ctx, origin, dir, length, halfWidth, damageMult, out _, knockbackMult);
+
+    /// <summary>
+    /// 직선 판정 — 반환값 · <paramref name="contact"/>는 원 판정(HitCircle)과 같다(실제 피해 · 닿음).
+    /// 넉백은 광선 옆으로(축에서 플레이어 쪽, <paramref name="pushSide"/>가 있으면 그쪽) — 광선을 따라 밀면 그 안에 남았다(10-08 점검).
+    /// </summary>
+    public static bool HitBeam(MonsterContext ctx, Vector3 origin, Vector3 dir, float length, float halfWidth,
+                               float damageMult, out bool contact, float knockbackMult = 0f, Vector3 pushSide = default)
     {
+        contact = false;
         var target = ctx.Runtime.PlayerTarget;
         if (target == null) return false;
 
@@ -317,19 +372,27 @@ public static class LichPatternUtil
         to.y          = 0f;
         float   along = Vector3.Dot(to, dir);
         if (along < 0f || along > length) return false;
-        float   side  = (to - dir * along).magnitude;
-        if (side > halfWidth) return false;
+        Vector3 side  = to - dir * along;
+        if (side.magnitude > halfWidth) return false;
 
         LichPatternProbe.Inside();
-        return Apply(ctx, target.position - dir, damageMult, knockbackMult, false);
+        if (pushSide.sqrMagnitude > 0.0001f)  side = pushSide;
+        else if (side.sqrMagnitude < 0.0001f) side = Vector3.Cross(Vector3.up, dir);   // 축 위 — 어느 옆이든
+        side.y = 0f;
+        return Apply(ctx, target.position - side.normalized, damageMult, knockbackMult, false, out contact);
     }
 
     /// <summary>모양 판정을 패턴이 직접 한 뒤 피해만 넣는다(부채꼴 · 쐐기 등). 실제로 맞았을 때만 true.</summary>
     public static bool HitPlayer(MonsterContext ctx, Vector3 from, float damageMult, float knockbackMult = 0f)
+        => HitPlayer(ctx, from, damageMult, out _, knockbackMult);
+
+    /// <summary>모양 판정 뒤 피해만 — <paramref name="contact"/>는 닿음(무효화 · 저스트 회피로 흘렸어도, 10-08 점검).</summary>
+    public static bool HitPlayer(MonsterContext ctx, Vector3 from, float damageMult, out bool contact, float knockbackMult = 0f)
     {
+        contact = false;
         if (ctx.Runtime.PlayerTarget == null) return false;
         LichPatternProbe.Inside();
-        return Apply(ctx, from, damageMult, knockbackMult, false);
+        return Apply(ctx, from, damageMult, knockbackMult, false, out contact);
     }
 
     /// <summary>
@@ -345,8 +408,10 @@ public static class LichPatternUtil
          : damageMult >= 1.0f                ? HitWeight.Medium
          :                                     HitWeight.Light;
 
-    private static bool Apply(MonsterContext ctx, Vector3 from, float damageMult, float knockbackMult, bool ignorePoise)
+    private static bool Apply(MonsterContext ctx, Vector3 from, float damageMult, float knockbackMult, bool ignorePoise,
+                              out bool contact)
     {
+        contact = false;
         var player = ctx.Runtime.CachedPlayer;
         if (player == null && ctx.Runtime.PlayerTarget != null)
             ctx.Runtime.PlayerTarget.TryGetComponent(out player);
@@ -359,6 +424,8 @@ public static class LichPatternUtil
 
         player.TakeDamage(Damage(ctx, damageMult), ctx.Monster.gameObject, ignorePoise, WeightOf(damageMult, ignorePoise));
 
+        // 무적이 아니던 플레이어에게 닿았다 — 무효화 · 저스트 회피 · 부활로 HP가 안 줄었어도 이 판정은 쓰였다(10-08 점검).
+        contact = !dodged;
         bool landed = !dodged && stats != null && (stats.Hp < hp || stats.Shield < shield);
         if (!landed) return false;
 

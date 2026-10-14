@@ -10,8 +10,11 @@ using UnityEngine.UI;
 ///       공명이 깊을수록 띠가 밝다(4 = 금빛). 바늘이 지금 시간을 따라간다. 구간에 들어서면 그 띠가 한 번 빛난다. 「새벽이 길다」 붙듦 중엔 안내 한 줄.
 ///       (설계는 태양을 두른 고리였으나 태양이 화면 맨 아래 · 체력바 뒤라 고리가 가려져 띠로 폈다 — 10-02 실측)</item>
 /// <item><b>랜슬롯 광기 눈금</b> — 막대 10 · 20 · 30 · 40에 눈금과 계단 표식(빈 칸 회색 · 조각 진홍 · 이어진 계단 금빛 + 금선).
-///       광기가 눈금을 넘으면 표식이 빛난다. 막대 오른쪽에 원한 불씨. 끝의 문턱 버팀 중엔 막대가 떤다(±1.5 px).</item>
+///       광기가 눈금을 넘으면 표식이 빛난다. 막대 오른쪽에 원한 불씨 + 「3/5」(가득 = 금 테 · 금 숫자).
+///       막대가 안 줄어드는 동안(피 냄새 · 끝의 문턱) 채움 끝에 얇은 멈춤 선 + 막대 왼쪽 끝 위(계단 표식 줄)에 「멈춤 N초」. 끝의 문턱 버팀 중엔 막대가 떤다(±1.5 px).</item>
+/// <item><b>엇갈린 빛</b>(두 유물) — 띠 · 원한 숫자 오른쪽 작은 네 갈래 별. 대기 = 빈 별(반응 조각 2개 이상일 때만) · 켜짐 = 금 별(켜지는 순간 한 번 커진다 · 은은히 숨쉰다).</item>
 /// </list>
+/// 이 위젯은 전투 패널 아래라 HUD 하드 가드가 0.2초마다 글자를 켜고 알파를 1로 되돌린다 — 글자는 끄지 않고 비운다 · 흐림은 색으로.
 /// </summary>
 public sealed class RelicMemoryHudView : MonoBehaviour
 {
@@ -45,8 +48,15 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     private const float EmberGap     = 11f;
     private const float FlashDecay   = 2.5f;   // 초당
     private const float ShakePx      = 1.5f;
+    private const float GrudgeLabelGap = 6f;   // 불씨 끝 → 「3/5」
+    private const float GrudgeRimPad   = 3f;   // 가득 금 테가 불씨 줄을 두르는 여백
+    private const float StarSize     = 14f;
+    private const float StarGap      = 8f;
+    private const float StarPopSec   = 0.3f;
+    private const float HoldTickW    = 2f;
 
     private static Sprite s_dot;
+    private static Sprite s_starFill, s_starLine;
 
     private RectTransform _host;
     private RectTransform _overlay;
@@ -72,6 +82,18 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     private readonly float[]   _arcFlash = new float[3];
     private RectTransform   _needle;
     private TextMeshProUGUI _holdLabel;
+
+    // 원한 숫자 · 가득 금 테(10-12 A2)
+    private TextMeshProUGUI _grudgeLabel;
+    private RectTransform   _grudgeRim;
+    // 광기 멈춤(10-12 S11)
+    private RectTransform   _holdTick;
+    private TextMeshProUGUI _holdSec;
+    private int             _holdKey = -1;   // 표시 중인 남은 0.1초 단위(-2 = 문턱 · 0 = 없음) — 바뀔 때만 쓴다
+    // 엇갈린 빛 별(10-12 A3)
+    private Image _star;
+    private bool  _starOn;
+    private float _starPop;   // 켜지는 순간 1 → 0
 
     public bool Visible => _visible;
 
@@ -115,6 +137,29 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         _emberRow.pivot = new Vector2(0f, 0.5f);
         _emberRow.anchoredPosition = new Vector2(10f, 0f);
         _emberRow.sizeDelta = new Vector2(EmberGap * 11f, EmberSize);
+
+        // 가득 금 테 — 불씨 줄을 두르는 1px 테(크기는 SetGrudge가 상한에 맞춘다)
+        _grudgeRim = UIThinBox.Create(_emberRow, "GrudgeRim", Vector2.zero, Vector2.one, 0f, UITheme.Thin.LineReady, Color.clear, Color.clear);
+        _grudgeRim.anchorMin = _grudgeRim.anchorMax = new Vector2(0f, 0.5f);
+        _grudgeRim.pivot = new Vector2(0f, 0.5f);
+        _grudgeRim.anchoredPosition = new Vector2(-GrudgeRimPad, 0f);
+        _grudgeRim.gameObject.SetActive(false);
+        _grudgeLabel = NewLabel("GrudgeCount", _emberRow, UITheme.Thin.Small, TextAlignmentOptions.MidlineLeft);
+        _grudgeLabel.rectTransform.anchorMin = _grudgeLabel.rectTransform.anchorMax = new Vector2(0f, 0.5f);
+        _grudgeLabel.rectTransform.pivot = new Vector2(0f, 0.5f);
+        _grudgeLabel.rectTransform.sizeDelta = new Vector2(48f, 20f);
+        _star = NewStar(_emberRow);
+
+        // 멈춤 — 채움 끝의 얇은 선(가로 위치는 TickLadder가 채움을 따라 옮긴다) · 남은 초는 막대 왼쪽 끝 위, 계단 표식 줄 높이
+        // (10-13 ②d 사진 — 막대 왼쪽 바깥은 「광기 N%」 자리라 두 글이 겹쳐 읽히지 않았다. 첫 계단 표식(¼ 지점) 앞까지만 쓴다)
+        _holdTick = NewImage("HoldTick", _overlay, null, UITheme.Thin.Ink).rectTransform;
+        _holdTick.pivot = new Vector2(0.5f, 0.5f);
+        Anchor(_holdTick, new Vector2(0f, 0.2f), new Vector2(0f, 0.8f), new Vector2(-HoldTickW * 0.5f, 0f), new Vector2(HoldTickW * 0.5f, 0f));
+        _holdTick.gameObject.SetActive(false);
+        _holdSec = NewLabel("HoldSeconds", _overlay, UITheme.Thin.Caption, TextAlignmentOptions.MidlineLeft);
+        Anchor(_holdSec.rectTransform, new Vector2(0f, 1f), new Vector2(0.25f, 1f),
+               new Vector2(0f, RungIconY - 10f), new Vector2(-RungIconSize, RungIconY + 10f));
+
         _barBasePos = bar.anchoredPosition;
         Show();
     }
@@ -136,8 +181,8 @@ public sealed class RelicMemoryHudView : MonoBehaviour
             Anchor(_link, new Vector2(0.25f, 1f), new Vector2(ladderTier / 4f, 1f), new Vector2(0f, RungIconY - 1f), new Vector2(ladderTier == 4 ? -RungIconSize * 0.5f : 0f, RungIconY + 1f));
     }
 
-    /// <summary>원한 불씨 — 상한만큼 칸, 찬 만큼 불.</summary>
-    public void SetGrudge(int value, int cap)
+    /// <summary>원한 불씨 — 상한만큼 칸, 찬 만큼 불. 옆에 「3/5」, 가득(<paramref name="full"/>)이면 줄에 금 테 · 숫자 금.</summary>
+    public void SetGrudge(int value, int cap, bool full)
     {
         if (_dial || _emberRow == null) return;
         cap = Mathf.Clamp(cap, 0, 11);
@@ -156,6 +201,41 @@ public sealed class RelicMemoryHudView : MonoBehaviour
             _embers[i].gameObject.SetActive(i < cap);
             _embers[i].color = i < value ? EmberOn : EmberOff;
         }
+
+        float rowW = cap > 0 ? (cap - 1) * EmberGap + EmberSize : 0f;
+        bool  rim  = full && cap > 0;
+        if (_grudgeRim != null)
+        {
+            _grudgeRim.sizeDelta = new Vector2(rowW + GrudgeRimPad * 2f, EmberSize + GrudgeRimPad * 2f);
+            if (_grudgeRim.gameObject.activeSelf != rim) _grudgeRim.gameObject.SetActive(rim);
+        }
+        float starX = rowW + GrudgeLabelGap;
+        if (_grudgeLabel != null)
+        {
+            _grudgeLabel.rectTransform.anchoredPosition = new Vector2(rowW + GrudgeLabelGap, 0f);
+            _grudgeLabel.color = rim ? UITheme.Thin.Gold : UITheme.Thin.Ink;
+            if (cap > 0) _grudgeLabel.SetText("{0}/{1}", Mathf.Min(value, cap), cap);
+            else _grudgeLabel.text = string.Empty;
+            starX += cap > 0 ? _grudgeLabel.preferredWidth : 0f;
+        }
+        if (_star != null) _star.rectTransform.anchoredPosition = new Vector2(starX + StarGap + StarSize * 0.5f, 0f);
+    }
+
+    /// <summary>
+    /// 엇갈린 빛 — 켜짐 = 금 별(<paramref name="animate"/>면 켜지는 순간 한 번 커졌다 자리 잡는다) · 대기 = 빈 별(<paramref name="possible"/> = 반응 조각 2개 이상) · 아니면 별 없음.
+    /// </summary>
+    public void SetCrossLight(bool possible, bool on, bool animate)
+    {
+        if (_star == null) return;
+        bool show = on || possible;
+        if (_star.gameObject.activeSelf != show) _star.gameObject.SetActive(show);
+        if (on && !_starOn && animate) _starPop = 1f;
+        _starOn = on;
+        _star.sprite = on ? StarFill() : StarLine();
+        _star.color  = on ? UITheme.Thin.Gold : UITheme.Thin.InkA(0.45f);
+        if (on) return;
+        _starPop = 0f;
+        _star.rectTransform.localScale = Vector3.one;
     }
 
     /// <summary>광기가 계단 i(0~3)를 넘었다 — 표식이 한 번 빛난다.</summary>
@@ -164,10 +244,15 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         if (i >= 0 && i < 4) _rungFlash[i] = 1f;
     }
 
-    /// <summary>매 프레임 — 표식 빛 · 끝의 문턱 떨림.</summary>
-    public void TickLadder(bool holding)
+    /// <summary>
+    /// 매 프레임 — 표식 빛 · 멈춤 · 끝의 문턱 떨림 · 별.
+    /// <paramref name="holdLeft"/> = 피 냄새 남은 초(0 이하 = 없음) · <paramref name="fill01"/> = 막대 채움(멈춤 선 자리).
+    /// </summary>
+    public void TickLadder(bool holding, float holdLeft, float fill01)
     {
         float dt = Time.unscaledDeltaTime;
+        TickHold(holding, holdLeft, fill01);
+        TickStar(dt);
         for (int i = 0; i < 4; i++)
         {
             if (_rungFlash[i] <= 0f || _rungIcon[i] == null) continue;
@@ -247,6 +332,10 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         _holdLabel.raycastTarget = false;
         TMPOutlineHelper.ApplySoftShadow(_holdLabel);
         _holdLabel.gameObject.SetActive(false);
+
+        // 엇갈린 빛 별 — 하루 띠 오른쪽 끝
+        _star = NewStar(_overlay);
+        _star.rectTransform.anchoredPosition = new Vector2(StripW + StarGap + StarSize * 0.5f, 0f);
         Show();
     }
 
@@ -285,6 +374,7 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         }
         if (_needle != null) _needle.anchoredPosition = new Vector2(_arcStart[cur] + _arcSpan[cur] * Mathf.Clamp01(progress), 0f);
         if (_holdLabel != null && _holdLabel.gameObject.activeSelf != holdingDawn) _holdLabel.gameObject.SetActive(holdingDawn);
+        TickStar(dt);
     }
 
     // ── Private ──────────────────────────────────────────────────
@@ -299,6 +389,8 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         for (int i = 0; i < 4; i++) { _rungIcon[i] = null; _rungFlash[i] = 0f; }
         for (int i = 0; i < 3; i++) { _arc[i] = null; _arcFlash[i] = 0f; }
         _link = null; _emberRow = null; _needle = null; _holdLabel = null;
+        _grudgeLabel = null; _grudgeRim = null; _holdTick = null; _holdSec = null; _holdKey = -1;
+        _star = null; _starOn = false; _starPop = 0f;
         _host = host;
         _dial = dial;
         _overlay = NewRect(dial ? "RelicMemoryDial" : "RelicMemoryLadder", host);
@@ -310,6 +402,40 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     {
         if (_overlay != null) _overlay.gameObject.SetActive(true);
         _visible = _overlay != null;
+    }
+
+    /// <summary>멈춤 — 피 냄새(남은 초) · 끝의 문턱(「멈춤」만, 막대는 떤다)이면 채움 끝에 얇은 선. 글자는 0.1초 단위가 바뀔 때만 쓴다.</summary>
+    private void TickHold(bool holding, float holdLeft, float fill01)
+    {
+        bool hold = holding || holdLeft > 0f;
+        if (_holdTick != null)
+        {
+            if (_holdTick.gameObject.activeSelf != hold) _holdTick.gameObject.SetActive(hold);
+            float x = Mathf.Clamp01(fill01);
+            if (hold && !Mathf.Approximately(_holdTick.anchorMin.x, x))
+            {
+                _holdTick.anchorMin = new Vector2(x, 0.2f);
+                _holdTick.anchorMax = new Vector2(x, 0.8f);
+            }
+        }
+        if (_holdSec == null) return;
+        int key = holdLeft > 0f ? Mathf.CeilToInt(holdLeft * 10f) : holding ? -2 : 0;
+        if (key == _holdKey) return;
+        _holdKey = key;
+        if (key > 0) _holdSec.SetText("멈춤 {0:1}초", key * 0.1f);
+        else _holdSec.text = key == -2 ? "멈춤" : string.Empty;
+    }
+
+    /// <summary>켜진 별 — 켜지는 순간 1.5배에서 자리 잡고, 그 뒤 은은히 숨쉰다(배율 ±6% · 알파 0.88~1).</summary>
+    private void TickStar(float dt)
+    {
+        if (_star == null || !_starOn) return;
+        if (_starPop > 0f) _starPop = Mathf.Max(0f, _starPop - dt / StarPopSec);
+        float breathe = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 2.4f);
+        _star.rectTransform.localScale = Vector3.one * (1f + 0.5f * _starPop * _starPop + 0.06f * breathe);
+        var c = UITheme.Thin.Gold;
+        c.a = 0.88f + 0.12f * breathe;
+        _star.color = c;
     }
 
     private void StopShake()
@@ -336,6 +462,29 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         return img;
     }
 
+    /// <summary>톤 v2 글자(Medium · 그림자) — 빈 글자로 시작한다.</summary>
+    private static TextMeshProUGUI NewLabel(string name, Transform parent, float size, TextAlignmentOptions align)
+    {
+        var t = NewRect(name, parent).gameObject.AddComponent<TextMeshProUGUI>();
+        UITheme.StyleThinText(t, UIWeight.Medium, size, UITheme.Thin.Ink, shadow: true);
+        t.alignment        = align;
+        t.textWrappingMode = TextWrappingModes.NoWrap;
+        t.raycastTarget    = false;
+        t.text             = string.Empty;
+        return t;
+    }
+
+    private static Image NewStar(Transform parent)
+    {
+        var star = NewImage("CrossLight", parent, StarLine(), UITheme.Thin.InkA(0.45f));
+        var rt = star.rectTransform;
+        rt.anchorMin = rt.anchorMax = new Vector2(0f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(StarSize, StarSize);
+        star.gameObject.SetActive(false);
+        return star;
+    }
+
     private static void Anchor(RectTransform rt, Vector2 min, Vector2 max, Vector2 offMin, Vector2 offMax)
     {
         rt.anchorMin = min;
@@ -345,6 +494,50 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     }
 
     private static Sprite Dot()  => s_dot  != null ? s_dot  : s_dot  = MakeCircle(32, 0f);
+    private static Sprite StarFill() => s_starFill != null ? s_starFill : s_starFill = MakeStar(32, outline: false);
+    private static Sprite StarLine() => s_starLine != null ? s_starLine : s_starLine = MakeStar(32, outline: true);
+
+    /// <summary>
+    /// 네 갈래 별(엇갈린 빛 — 십자로 엇갈린 빛살) — 아트 없이 굽는다. 모양 = |u|^p + |v|^p ≤ r^p(p &lt; 1이면 끝이 뾰족한 별).
+    /// outline이면 속이 빈 별: 안쪽으로 2.7px 깎은 모양을 뺀다(작게 그려도 선이 1px 남짓). 화소마다 4×4 표본으로 가장자리를 고른다.
+    /// </summary>
+    private static Sprite MakeStar(int size, bool outline)
+    {
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+        {
+            name = outline ? "RelicHudStarLine" : "RelicHudStar",
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Bilinear,
+        };
+        const int ss = 4;
+        float c = size * 0.5f, w = 2.7f / c;
+        var px = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            int hit = 0;
+            for (int sy = 0; sy < ss; sy++)
+            for (int sx = 0; sx < ss; sx++)
+            {
+                float u = (x + (sx + 0.5f) / ss - c) / c, v = (y + (sy + 0.5f) / ss - c) / c;
+                if (!InStar(u, v)) continue;
+                if (outline && InStar(u + w, v) && InStar(u - w, v) && InStar(u, v + w) && InStar(u, v - w)
+                    && InStar(u + w * 0.7f, v + w * 0.7f) && InStar(u - w * 0.7f, v - w * 0.7f)
+                    && InStar(u + w * 0.7f, v - w * 0.7f) && InStar(u - w * 0.7f, v + w * 0.7f)) continue;   // 안쪽 — 테만 남긴다
+                hit++;
+            }
+            px[y * size + x] = new Color32(255, 255, 255, (byte)(255 * hit / (ss * ss)));
+        }
+        tex.SetPixels32(px);
+        tex.Apply(false, true);
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+    }
+
+    private static bool InStar(float u, float v)
+    {
+        const float p = 0.66f, r = 0.94f;
+        return Mathf.Pow(Mathf.Abs(u), p) + Mathf.Pow(Mathf.Abs(v), p) <= Mathf.Pow(r, p);
+    }
 
     /// <summary>흰 원(inner &gt; 0이면 고리) — 아트 없이 HUD 점을 그린다. 한 번 만들어 돌려 쓴다.</summary>
     private static Sprite MakeCircle(int size, float inner)

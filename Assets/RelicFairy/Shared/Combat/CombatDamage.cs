@@ -38,6 +38,7 @@ public static class CombatDamage
     // 현재 Deal() 중첩 깊이. 전투는 메인 스레드 전용이라 static 카운터로 충분하다.
     private static int s_depth;
     private static bool s_depthWarned;   // 폭주 시 콘솔이 같은 경고로 뒤덮이지 않게 1회만 경고
+    private static float s_splitCarry;   // 분열 효과 몫 — 무게를 쌓아 1이 찰 때마다 효과 한 번(⑨~⑪)
 
     // 도메인 리로드 OFF: 2회차 진입 시 예외로 남은 깊이/경고 플래그가 잔류해 Deal이 통째로 막힌다.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -45,6 +46,7 @@ public static class CombatDamage
     {
         s_depth = 0;
         s_depthWarned = false;
+        s_splitCarry = 0f;
     }
 
     // 아이템 형태변형 추가타 질의 버퍼(재사용 — alloc 방지)
@@ -96,6 +98,18 @@ public static class CombatDamage
         public bool SkipHitVfx;
         /// <summary>스킬의 마무리 일격. 타격 연출 단계(막타)만 바꾼다 — 피해 계산과는 무관(09-25).</summary>
         public bool IsFinisher;
+
+        /// <summary>
+        /// 발동 계수(10-14 빌드 시너지 A1) — 확률 효과 · 상태 지속 · 포이즈 · 강타 판정의 무게. 0이면 무기 × 공격 종류 표
+        /// (<see cref="ProcCoefficient.Of"/>). 한 방(태양 낙하 · 무게 내려찍기)이나 연타 조각(심판 연타)처럼 표와 다른 것만 정한다.
+        /// </summary>
+        public float ProcCoef;
+
+        /// <summary>
+        /// 분열 무게(10-14 사용자 「분열은 룬 타격 · 시너지 효과가 화살마다 붙어 너무 세다 — 마지막 계산식에 반감」). 0 = 1(한 발 · 근접).
+        /// 갈래 화살 = <see cref="CombatSpawner.SplitExtraWeight"/>(2발 50% · 3발 45% …) — 방어를 뺀 최종 피해 · 포이즈가 이만큼이고, 적중 효과(⑨~⑪)는 이 비율로만 붙는다.
+        /// </summary>
+        public float SplitWeight;
     }
 
     public static bool IsMeleeAction(WeaponActionType a) =>
@@ -127,7 +141,12 @@ public static class CombatDamage
         }
 
         s_depth++;
-        try     { return DealInternal(in req); }
+        try
+        {
+            // 결과창 피해 비중(10-07) — 액션 종류로 출처를 건다(평타 · 스킬 E·R · 유물 Q).
+            using (DamageSourceScope.Enter(DamageSourceScope.FromAction(req.ActionType)))
+                return DealInternal(in req);
+        }
         finally { s_depth--; }   // 중간에 예외가 나도 깊이가 새지 않게 보장
     }
 
@@ -163,6 +182,13 @@ public static class CombatDamage
 
         bool isPlayerAtk = owner != null && owner.TryGetComponent<PlayerController>(out _);
 
+        // 발동 계수 — 비어 있으면 무기 × 공격 종류 표. 플레이어가 아닌 공격(시험 · 몬스터)은 1.
+        float procCoef = req.ProcCoef > 0f ? req.ProcCoef
+                       : isPlayerAtk ? ProcCoefficient.Of(weaponData != null ? weaponData.weaponType : WeaponType.None, actionType, req.IsRanged)
+                       : 1f;
+        if (isPlayerAtk && ProcCoefficient.ConsumeHeavyNext()) procCoef = Mathf.Max(procCoef, ProcCoefficient.HeavyThreshold());   // 예약된 강타(덮치는 그림자)
+        bool isHeavy = isPlayerAtk && ProcCoefficient.IsHeavy(procCoef);
+
         // ③ 서약: 출력 피해 변형(아서 등). 플레이어 공격만, 크리티컬 전에 적용.
         if (baseFinal > 0f && isPlayerAtk)
         {
@@ -192,6 +218,14 @@ public static class CombatDamage
         float finalDmg = CombatCalculator.RollCrit(weaponData, baseFinal, out bool isCrit, isMeleeAtk);
         pkt.IsCrit = isCrit;
 
+        // ⑤-b 분열 무게 — 크리티컬까지 끝난 피해의 「방어를 뺀 몫」에 곱한다(방어는 감산이라 빼기 전에 곱하면 1로 뭉개진다).
+        float splitW = req.SplitWeight > 0f && req.SplitWeight < 1f ? req.SplitWeight : 1f;
+        if (splitW < 1f)
+        {
+            float def = tgtMb != null ? tgtMb.CurrentDefense : 0f;
+            finalDmg = finalDmg > def ? def + (finalDmg - def) * splitW : finalDmg;
+        }
+
         // ⑥ 아이템 광기의 파동: 무장된 일반(근접) 공격 1타를 실제 방어무시로 적용.
         bool penetrated = false;
         if (isPlayerAtk && tgtMb != null && finalDmg > 0f && isMeleeAtk)
@@ -215,9 +249,13 @@ public static class CombatDamage
             penetrated = true;
         }
 
-        // ⑦ 실제 피해 적용
+        // ⑦ 실제 피해 적용 — 정예 포이즈를 발동 계수만큼 깎는다(10-14 A2 · 예전 「1타 = 1 · 스킬 2.5」). 정적 값이라 호출 직후 되돌린다.
         if (!penetrated)
-            damageable.TakeDamage(finalDmg, owner, req.KnockbackMultiplier, isCrit);
+        {
+            MonsterPoise.PendingHitWeight = procCoef * splitW;
+            try { damageable.TakeDamage(finalDmg, owner, req.KnockbackMultiplier, isCrit); }
+            finally { MonsterPoise.PendingHitWeight = MonsterPoise.RestingWeight; }
+        }
 
         // ⑧ 타격감 (HitFeedbackService 허브 경유 → 구독자 전파)
         Vector3 hitPoint = req.HitPoint.sqrMagnitude > 0.0001f ? req.HitPoint : target.transform.position;
@@ -241,6 +279,8 @@ public static class CombatDamage
                 HitPosition = hitPoint,
                 ActionType  = actionType,
                 IsRanged    = req.IsRanged,
+                ProcCoef    = procCoef,
+                IsHeavy     = false,   // 막힌 타격은 강타로 세지 않는다
             });
             return 0f;   // 피해 0 — 막혔다
         }
@@ -268,14 +308,18 @@ public static class CombatDamage
             HitPosition = hitPoint,
             ActionType  = actionType,
             IsRanged    = req.IsRanged,
+            ProcCoef    = procCoef,
+            IsHeavy     = isHeavy && finalDmg > 0f,
         };
-        mgr?.OnPostDealDamage(report);
+        // 분열 갈래는 적중 효과(⑨~⑪)가 무게만큼만 붙는다 — 50%면 갈래 두 발에 한 번. 가운데 화살 · 근접은 늘.
+        bool effects = SplitEffectTurn(splitW);
+        if (effects) mgr?.OnPostDealDamage(report);
 
         // ⑩ 아이템 형태변형: 다단히트·원형 충격파·스킬 추가 투사체(2차 피해 경로 사용 → 재귀 없음)
-        ApplyItemShapeExtras(target, owner, actionType, isMeleeAtk, finalDmg, in mods);
+        if (effects) ApplyItemShapeExtras(target, owner, actionType, isMeleeAtk, finalDmg, in mods);
 
         // ⑪ 캐릭터 패시브 + 서약: 실제 적중 시점
-        if (owner != null && owner.TryGetComponent<PlayerController>(out var ownerCtrl) && finalDmg > 0f)
+        if (effects && owner != null && owner.TryGetComponent<PlayerController>(out var ownerCtrl) && finalDmg > 0f)
         {
             ownerCtrl.FirePassive(PassiveTrigger.OnAttackHit, new PassiveContext
             {
@@ -286,7 +330,10 @@ public static class CombatDamage
             });
 
             // 서약: 실제 적중 디스패치. 서약이 주는 2차 피해는 이 경로를 안 타므로 재귀 없음.
-            GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnAttackHit(target, finalDmg);
+            // 원거리 적중이면 디스패치 동안만 표시 — 사격 원인 「겨눔」이 센다(10-14 A5)
+            CovenantCauseTracker.CurrentHitRanged = req.IsRanged;
+            try { GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnAttackHit(target, finalDmg); }
+            finally { CovenantCauseTracker.CurrentHitRanged = false; }
         }
 
         // ⑫ 히트 VFX (호출자가 자체 VFX를 띄우면 스킵 — 이중 스폰 방지)
@@ -298,6 +345,16 @@ public static class CombatDamage
         }
 
         return finalDmg;
+    }
+
+    /// <summary>분열 화살이 적중 효과를 낼 차례인가 — 무게를 쌓아 1이 찰 때마다 한 번. 무게 1(한 발 · 근접)은 늘 낸다.</summary>
+    private static bool SplitEffectTurn(float weight)
+    {
+        if (weight >= 1f) return true;
+        s_splitCarry += weight;
+        if (s_splitCarry < 0.999f) return false;
+        s_splitCarry -= 1f;
+        return true;
     }
 
     /// <summary>
@@ -335,6 +392,20 @@ public static class CombatDamage
         }
     }
 
+    /// <summary>
+    /// 맞힘 이펙트 배율이 자식 입자까지 듣게 한다(10-11 이펙트 톤 점검). SwordHitImpact · KatanaSlashHit 등 팩 프리팹 입자가
+    /// scalingMode Local이라 localScale(hitEffectScale)이 맨 위 입자에만 걸렸다 — 무형검 0.29에도 붉은 리본이 2 m 넘게 퍼졌다.
+    /// 몬스터 이펙트(PatternAttackOverrideSO.ApplyVfxHierarchyScaling)와 같은 처리. 풀 인스턴스라 한 번 바꾸면 그대로 남는다.
+    /// </summary>
+    private static void ScaleWholeHierarchy(GameObject effectObj)
+    {
+        foreach (var ps in effectObj.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var main = ps.main;
+            if (main.scalingMode != ParticleSystemScalingMode.Hierarchy) main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+        }
+    }
+
     // 비동기 로드 도중 공격자가 파괴되면 후속 처리를 안전하게 취소(수명 토큰은 owner에 건다).
     private static async UniTaskVoid SpawnHitEffectAsync(GameObject owner, Vector3 hitPoint,
                                                          string fxKey, float scale)
@@ -361,10 +432,12 @@ public static class CombatDamage
             // Initialize가 behaviorSO.startScale로 localScale을 덮어쓰기 때문에,
             // 먼저 적용하면 hitEffectScale이 통째로 무시되고 SO 기본 크기로 나온다.
             effectObj.transform.localScale = Vector3.one * scale;
+            ScaleWholeHierarchy(effectObj);
             return;
         }
 
         effectObj.transform.localScale = Vector3.one * scale;
+        ScaleWholeHierarchy(effectObj);
 
         // EffectBehaviour가 없는 프리팹은 <b>스스로 사라지지 못한다</b> — 풀에 반환되지 않고 월드에 영원히 남는다.
         // 히트 이펙트 프리팹이 교체되면서 실제로 이 경로를 타는 이펙트가 필드에 계속 쌓였다.

@@ -12,6 +12,13 @@ public sealed class FGThornBush : MonoBehaviour
     // ── Constants ──────────────────────────────────────────────
     private const float AppearSeconds = 0.4f;   // 가시가 디졸브로 돋는 시간(10-03)
     private const float VanishSeconds = 0.6f;   // 가시가 디졸브로 꺼지는 시간(10-03)
+    private const float OverlapSlack  = 0.05f;  // 한 덤불의 연속 틱이 프레임 오차로 막히지 않게 두는 여유(초)
+
+    // ── Static ─────────────────────────────────────────────────
+    private static float s_lastHitAt = float.NegativeInfinity;   // 모든 덤불이 함께 쓰는 마지막 틱 시각(10-08 점검)
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => s_lastHitAt = float.NegativeInfinity;
 
     // ── Private ────────────────────────────────────────────────
     private MonsterBase _boss;
@@ -104,6 +111,9 @@ public sealed class FGThornBush : MonoBehaviour
         if (player == null) return;
         Vector3 d = player.transform.position - transform.position;
         if (d.x * d.x + d.z * d.z > _radius * _radius) return;
+        // 겹친 덤불 — 다른 덤불이 이번 주기에 이미 찔렀으면 건너뛴다(겹친 자리에서 주기마다 두 번 맞았다 · 10-08 점검)
+        if (Time.time - s_lastHitAt < _tickSeconds - OverlapSlack) return;
+        s_lastHitAt = Time.time;
         player.TakeDamage(_damage, _boss.gameObject, false, HitWeight.Light);   // 장판 틱 — 약
     }
 }

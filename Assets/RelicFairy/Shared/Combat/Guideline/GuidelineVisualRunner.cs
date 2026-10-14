@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
@@ -473,6 +473,8 @@ public sealed class GuidelineVisualRunner : MonoBehaviour
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.fontSize  = 4f;
         tmp.rectTransform.sizeDelta = new Vector2(6f, 2f);
+        // 3D 인게임 글자는 얇게 — 굵은 기본 폰트(DNF Bold) 토스트는 레거시(10-02 사용자). 10-09 전주기 시뮬: 「정오 진입」 · 「태양의 잔열」이 방마다 굵게 떴다.
+        RelicFloatText.ApplyThin(tmp);
         go.SetActive(false);
         return new GVItem { kind = ItemKind.Label, go = go, tf = go.transform, label = tmp, mpb = new MaterialPropertyBlock() };
     }
@@ -500,6 +502,7 @@ public sealed class GuidelineVisualRunner : MonoBehaviour
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.fontSize  = 3f;
         tmp.rectTransform.sizeDelta = new Vector2(6f, 2f);
+        RelicFloatText.ApplyThin(tmp);
         labelGo.transform.localPosition = new Vector3(0f, 0.6f, 0f);
 
         go.SetActive(false);

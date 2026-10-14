@@ -33,6 +33,8 @@ public static class RelicPartEffectFactory
             "g_rx_twin_sun"     => new GRxTwinSunEffect(),
             "g_rx_corona"       => new GRxCoronaEffect(),
             "g_rx_eclipse"      => new GRxEclipseEffect(),
+            "g_sun_arrow"       => new GSunArrowEffect(),     // 사격 조각(10-14 A5)
+            "g_dusk_hunter"     => new GDuskHunterEffect(),
 
             // ── 랜슬롯 「광기의 계단」 — 조각 16 + 타락 반응 6(구현 계획 3) ──
             "l_split_oath"        => new LSplitOathEffect(),
@@ -57,6 +59,8 @@ public static class RelicPartEffectFactory
             "l_rx_brand_iron"     => new LRxBrandIronEffect(),
             "l_rx_expose"         => new LRxExposeEffect(),
             "l_rx_corrupt"        => new LRxCorruptEffect(),
+            "l_quarry_brand"      => new LQuarryBrandEffect(),       // 사격 조각(10-14 A5)
+            "l_distant_judgment"  => new LDistantJudgmentEffect(),
 
             // ── [옛 v1 키] 옛 저장 · 옛 실측 도구 호환 ──
             // 가웨인(화염)

@@ -34,6 +34,9 @@ public static class PatternGuideHelper
     public static readonly Color Breakable = new Color(0.20f, 0.90f, 0.95f); // 청록 — 공격해서 끊을·깨울 수 있음
     public static readonly Color PlayerSeal = new Color(1.00f, 0.80f, 0.25f); // 금색 — 플레이어의 봉인(판정 색으로 쓰지 않는다)
     public static readonly Color Reversed  = new Color(0.60f, 0.15f, 0.95f); // 보라 — 역류한 봉인
+    /// <summary>예고의 자리 · 방향이 굳은 뒤 판정까지 최소(공용 예고 규칙 — 일반 몬스터 MonsterTelegraph.MinLead와 같다 · 10-13).</summary>
+    public const float MinLead = 0.45f;
+    private static readonly int TailFadeId = Shader.PropertyToID("_TailFade");
 
     private static readonly int SectorId = Shader.PropertyToID("_Sector");
     private static readonly int ColorId  = Shader.PropertyToID("_Color");
@@ -137,6 +140,12 @@ public static class PatternGuideHelper
             ? CreateDecal("Guide_Beam", _arrowSource, color, setSector: false, sector: 0f)
             : CreatePrimitiveGuide(PrimitiveType.Cube, "Guide_Beam", color);
         PlaceBeam(go, origin, direction, range, width);
+        if (TryDecal(go, out var mr))
+        {
+            mr.GetPropertyBlock(_mpb);
+            _mpb.SetFloat(TailFadeId, 0f);   // 판정 줄 — 시전 쪽 끝도 다 보이게(셰이더 기본은 30%를 흐리게 · 10-13 검증)
+            mr.SetPropertyBlock(_mpb);
+        }
         AutoDestroy(go, lifetime);
         return go;
     }

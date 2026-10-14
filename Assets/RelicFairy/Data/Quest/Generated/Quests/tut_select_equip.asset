@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: tut_select_equip
   m_EditorClassIdentifier: Assembly-CSharp::Quest
   category: {fileID: 11400000, guid: 564abeb724975a94b832adfb9253b91c, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: fe1db9f034f624749acc4ecf6b7f3254, type: 3}
   codeName: tut_select_equip
   displayName: "\uBB34\uC7A5"
   description: "\uBAA8\uB8E8\uC5D0\uC11C \uC7A5\uBE44 \uC120\uD0DD"

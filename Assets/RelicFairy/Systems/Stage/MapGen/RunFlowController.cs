@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
@@ -69,9 +69,10 @@ public class RunFlowController : MonoBehaviour
     // 반대로 무조건 되살리면 이미 받은 보상까지 다시 줘 이중지급이 된다. 수령 시점에 false로 내린다.
     private bool     _currentRoomRewardPending;
     private bool     _resumedRewardPending; // 이어하기: 저장 당시 미수령 보상이 있었는가(1회성)
-    // 세이브 규칙(09-25 사용자 결정): <b>챕터 시작 한 번만</b> 저장한다. 챕터 첫 방에 들어서기 직전에 켜고,
-    // 그 방 입장 끝에서 저장하며 끈다. 방마다 저장하던 시절엔 망한 방에서 게임을 껐다 켜 되감을 수 있었다.
-    private bool     _chapterCheckpointPending;
+    // 세이브 규칙(10-10 사용자 결정 · Hades식): 방 입장 · 클리어 · 보상 · 상점 · 재련소마다 저장하고,
+    // 피해를 받으면 잠근다 — 다음 저장(클리어 · 다음 방 입장)이 풀기 전에 끄면 이어하기에서 그 런은 사망으로 정산된다.
+    // 09-25의 「챕터 시작만 저장」은 망한 방을 되감는 구멍을 막으려던 것인데, 죽기 직전에 끄면 챕터째 무한히 다시 할 수 있었다.
+    private bool     _combatLocked;
     // 이번 챕터에 「방 모양 보여 주기」(부감 팬 · 석문 낙하)를 한 번 했는가 — 그 뒤 전투방은 빠른 입장(10-01 f5 판단).
     private bool     _chapterCombatIntroShown;
 
@@ -85,6 +86,8 @@ public class RunFlowController : MonoBehaviour
     // 코드 검색에 안 걸리니 이름을 바꾸거나 지우면 그 도구가 매 틱 NRE를 낸다(09-25 실제로 났다).
     private DoorPlan _lastPlan;
     private bool     _hasLastPlan;
+    private DoorEdge _lastEdge;     // 방 도중 저장(SaveNow)이 쓰는 입장 방향 · 미러 — 입장 저장과 같은 값
+    private int      _lastMirror;
     private readonly List<GateView>      _gates = new();
     private GameObject                   _entranceLock;
     private CancellationTokenSource      _cts;
@@ -117,11 +120,17 @@ public class RunFlowController : MonoBehaviour
         public float        outward = 1f;
         /// <summary>지금 젖혀진 정도(0 닫힘 · 1 열림) — 도중에 반대 연출이 와도 이 각도에서 이어받는다.</summary>
         public float        swingK;
+        /// <summary>디졸브 문(10-06) — 봉인 때 나타나고 열릴 때 사라진다.</summary>
+        public bool         dissolves;
     }
 
     /// <summary>젖힘 문 — 열림은 감속해 멎고(무거운 문), 닫힘은 가속해 쾅.</summary>
     private const float SwingOpenSeconds  = 0.9f;
     private const float SwingCloseSeconds = 0.32f;
+    /// <summary>디졸브 문 — 지나온 입구가 등 뒤로 나타나기 전 잠깐 열어 두는 시간(통로를 지나온 게 읽히게).</summary>
+    private const float EntranceDissolveDelay = 0.6f;
+    /// <summary>디졸브 문 — 카메라가 입구 평면에서 방 안쪽으로 이만큼(m) 들어온 뒤에 나타난다.</summary>
+    private const float EntranceCameraClear = 1f;
 
     /// <summary>방 진입 안개 베일이 걷히는 시간(초). 디졸브 조립 구간을 덮을 만큼은 길어야 한다.</summary>
     private const float FogVeilClearSeconds = 1.6f;
@@ -141,6 +150,15 @@ public class RunFlowController : MonoBehaviour
 
     /// <summary>이번 런의 명시적 일정표(깊이별 출구 종류). 맵 미리보기 UI 등의 데이터 소스. 시작 전엔 null.</summary>
     public RunPlan RunPlan => _runPlan;
+
+    /// <summary>피해를 받은 뒤 아직 저장으로 풀리지 않았다 — 지금 끄면 그 런은 이어하기에서 사망 정산(ESC 「게임 종료」 확인용).</summary>
+    public bool IsCombatLocked => _combatLocked;
+
+    /// <summary>
+    /// 지금 방의 클리어 보상 굴림 시드 — 첫 굴림(RoomClearGate)과 이어하기 복원 굴림이 같은 후보를 내게 한다(10-11).
+    /// 예전엔 첫 굴림이 시드 없이 돌아, 보상을 보고 끈 뒤 이어하면 복원 굴림이 다른 후보를 냈다.
+    /// </summary>
+    public int? CurrentRewardSeed => _sequencer != null ? RunSequencer.Combine(_chapterSeed ^ 0x2C1A, _sequencer.VisitCount) : (int?)null;
 
     /// <summary>절차 런 시작 — 풀 로드 → 시퀀서 생성 → 첫 방 진입.
     /// anchor: 방을 빌드할 고정 월드 위치(허브와 겹치지 않게 먼 곳). null이면 _anchor 또는 원점.
@@ -169,7 +187,12 @@ public class RunFlowController : MonoBehaviour
         _masterSeed  = seed;
         _chapterSeed = seed;   // Ch1(런 시작) = 마스터 시드
         _rng        = new System.Random(seed);
-        _sequencer  = new RunSequencer(_pool, _resolvedStructure, seed, _bossThresholdOverride);
+        _sequencer  = new RunSequencer(_pool, _resolvedStructure, seed, _bossThresholdOverride)
+        {
+            // 런의 첫 챕터 — 재화 방 횟수 문턱(테스트 허브가 Ch2+에서 시작하면 걸지 않는다)
+            GateCurrencyRooms = (GameRunBootstrapper.Instance?.Run?.CurrentChapter ?? ChapterId.Chapter1) == ChapterId.Chapter1,
+            MidBossPlanned    = MidBossPlannedNow(),
+        };
         _runPlan    = _sequencer.BuildPlan(); // 시작 시 전체 일정표 1회 산출(시드+config 순수 함수)
         DumpRunPlan(seed);
 
@@ -181,7 +204,6 @@ public class RunFlowController : MonoBehaviour
             {
                 _sequencer.CommitEntry(approach);
                 Debug.Log($"[RunFlow] 테스트: 보스 대기방 직행 — {approach.entry.pool_key}");
-                _chapterCheckpointPending = true;   // 이 런(챕터)의 첫 방
                 _chapterCombatIntroShown  = false;
                 await EnterRoomAsync(approach, DoorEdge.North, ct);
                 return;
@@ -196,7 +218,6 @@ public class RunFlowController : MonoBehaviour
             return;
         }
 
-        _chapterCheckpointPending = true;   // 챕터 첫 방 — 여기만 저장한다(챕터마다 씬을 새로 여는 경로·무한 루프 회귀 포함)
         _chapterCombatIntroShown  = false;
         await EnterRoomAsync(new DoorPlan { kind = RoomPlanKind.Normal, entry = startEntry }, DoorEdge.North, ct);
     }
@@ -254,7 +275,11 @@ public class RunFlowController : MonoBehaviour
         await EnsureStructureConfigAsync();
 
         _rng       = new System.Random(_chapterSeed);
-        _sequencer = new RunSequencer(_pool, _resolvedStructure, _chapterSeed, _bossThresholdOverride);
+        _sequencer = new RunSequencer(_pool, _resolvedStructure, _chapterSeed, _bossThresholdOverride)
+        {
+            GateCurrencyRooms = resumeChapter == (int)ChapterId.Chapter1,
+            MidBossPlanned    = MidBossPlannedNow(),
+        };
         _sequencer.RestoreState(meta.visitCount, meta.seqPhase, meta.shopUsed, meta.eventUsed, meta.cooldowns,
                                 meta.crucibleUsed, meta.refineryUsed,
                                 meta.shopMiss, meta.eventMiss, meta.crucibleMiss, meta.refineryMiss,
@@ -313,7 +338,10 @@ public class RunFlowController : MonoBehaviour
         int seed       = ChapterSeed(_masterSeed, chapterNum); // 챕터별 결정적 시드
         _chapterSeed   = seed;                                 // 세이브로 넘겨 이어하기에서 같은 시드로 복원
         _rng           = new System.Random(seed);
-        _sequencer     = new RunSequencer(_pool, _resolvedStructure, seed, _bossThresholdOverride);
+        _sequencer     = new RunSequencer(_pool, _resolvedStructure, seed, _bossThresholdOverride)
+        {
+            MidBossPlanned = MidBossPlannedNow(),
+        };
         _runPlan       = _sequencer.BuildPlan();
         DumpRunPlan(seed);
 
@@ -326,7 +354,6 @@ public class RunFlowController : MonoBehaviour
             return;
         }
 
-        _chapterCheckpointPending = true;   // 다음 챕터 첫 방 — 체크포인트
         _chapterCombatIntroShown  = false;
         await EnterRoomAsync(new DoorPlan { kind = RoomPlanKind.Normal, entry = startEntry }, DoorEdge.North, ct);
         Debug.Log($"[RunFlow] 챕터 {chapterNum} 진행 시작 — pool={key}");
@@ -338,6 +365,19 @@ public class RunFlowController : MonoBehaviour
     /// 진행(StartNextChapterAsync)과 이어하기 폴백이 같은 공식을 쓰도록 한 곳에 둔다.</summary>
     private static int ChapterSeed(int masterSeed, int chapterNum)
         => chapterNum <= 1 ? masterSeed : RunSequencer.Combine(masterSeed, 7000 + chapterNum);
+
+    /// <summary>이 챕터에 정예 보스가 예정됐나(10-12 번갈이) — 런 시드 + 런 안 챕터 순번(= 마친 챕터 수). 둘 다 RunStats라 세이브에 실린다.
+    /// 챕터 번호가 아니라 순번이라 리치 추방 · 심연 루프로 Ch1에 돌아가도 번갈이가 이어진다.
+    /// 마스터 시드는 챕터 씬마다 새로 뽑혀 쓰면 안 된다(10-14 5회차 — Ch1 · Ch2 연속 없음). 세션이 없을 때(디버그 패널)만 마스터 시드.</summary>
+    private bool MidBossPlannedNow()
+    {
+        var stats   = GameRunBootstrapper.Instance?.Run?.RunStats;
+        int seed    = stats != null ? stats.MidBossSeed : _masterSeed;
+        int ordinal = stats?.ChapterEndCount ?? 0;
+        bool planned = RunSequencer.MidBossScheduled(seed, ordinal);
+        Debug.Log($"[RunFlow] 정예 보스 번갈이 — 런 시드 {seed} · 챕터 순번 {ordinal} → {(planned ? "예정" : "없음")}");
+        return planned;
+    }
 
     /// <summary>런 구조(IRunStructure)를 해석한다. 우선순위: 인스펙터 SO(명시 오버라이드)
     /// → CSV 정본(RUN_STRUCTURE, 서버 CDN) → SO 오프라인 폴백(Addressables) → null(전 방 Normal 안전동작).
@@ -536,6 +576,8 @@ public class RunFlowController : MonoBehaviour
         float tDialogue = Time.realtimeSinceStartup;
 
         _lastPlan    = plan;
+        _lastEdge    = fromEdge;
+        _lastMirror  = mirrorRoll;
         _hasLastPlan = true;
 
         // 새 방 진입 → 방 스코프 상태 리셋. (이어하기 재생성 중에는 복원값을 덮지 않는다)
@@ -547,15 +589,14 @@ public class RunFlowController : MonoBehaviour
             if (s != null) s.CrucibleRollIndex = 0;   // 방마다 시드가 다르므로 롤 카운터도 새로
         }
 
-        // 챕터 체크포인트 — 세이브는 챕터 첫 방에서 이 한 번뿐이다(09-25 사용자 결정). 챕터 도중에 끄면 여기로 돌아온다.
+        // 방 입장 저장(10-10 Hades식) — 방마다 여기서 저장하고 잠금을 푼다. 전투방에서 피해를 받기 전에 끄면 이 방 입구로 돌아온다.
         // 자리가 중요하다: 방 단위 초기화 <b>뒤</b>(앞 방의 cleared가 안 실리게), 클리어 처리 <b>앞</b>(출구를 굴리기 전 상태 —
-        // 비전투 시작 방은 곧바로 클리어되어 출구를 굴리므로, 그 뒤에 저장하면 이어하기에서 한 번 더 굴린다).
+        // 비전투 방은 곧바로 클리어되어 출구를 굴리므로, 그 뒤에 저장하면 이어하기에서 한 번 더 굴린다).
         // 죽으면 세이브는 런 종료 경로(ClearLocalRun)가 지운다. 이어하기 재생성 중에는 생략.
-        if (!_resuming && _chapterCheckpointPending)
+        if (!_resuming)
         {
-            _chapterCheckpointPending = false;
             SaveRunState(plan, fromEdge, mirrorRoll);
-            Debug.Log("[RunFlow] 챕터 체크포인트 저장");
+            Debug.Log("[RunFlow] 방 입장 저장");
         }
 
         // 이어하기 + '저장 당시 이미 클리어된 방'이면 몬스터를 다시 스폰하지 않고 출구만 연다.
@@ -663,9 +704,7 @@ public class RunFlowController : MonoBehaviour
                 // 연료(원석/강화재료)는 클리어 시점에 이미 은행에 들어가 저장됐으므로 재지급하지 않는다.
                 // 후보 굴림은 방 시드로 고정 — 재접속을 반복해도 같은 3지선다가 나와 save-scum이 막힌다.
                 if (restoreReward)
-                    clearedWave.SpawnPendingClearReward(
-                        result.roomGO.transform.position,
-                        RunSequencer.Combine(_chapterSeed ^ 0x2C1A, _sequencer.VisitCount));
+                    clearedWave.SpawnPendingClearReward(result.roomGO.transform.position, CurrentRewardSeed ?? 0);
             }
             _currentWave = null;
             // 정상 클리어 경로를 그대로 탄다: 저장은 _resuming 가드로 무시되고,
@@ -697,10 +736,65 @@ public class RunFlowController : MonoBehaviour
     }
 
     /// <summary>
-    /// 챕터 도중 저장 요청(방 클리어·보상·서약·재련소·게임 종료). <b>세이브 규칙 변경(09-25)으로 아무것도 쓰지 않는다</b> —
-    /// 저장은 챕터 첫 방 체크포인트 한 번뿐이고, 챕터 도중에 끄면 그 챕터 처음으로 돌아간다(되감기 차단).
+    /// 방 도중 저장(방 클리어 · 보상 · 서약 · 상점 · 재련소 · 게임 종료) — 10-10 Hades식으로 되살렸다.
+    /// 쓰지 않는 때:
+    ///  · 잠금 중(피해를 받은 뒤) — 잠금이 남아야 끄면 사망 정산이 된다. 게임 종료(app-quit) 저장이 잠금을 덮으면 구멍이 다시 열린다.
+    ///  · 클리어 전 방 — 전투 도중 상태를 쓰면 이어하기에서 몬스터가 되살아나 처치 드랍을 다시 줍는다. 입장 저장이 정본이다.
+    ///  · 보스방 — 클리어 뒤 저장하면 이어하기가 보스전을 다시 열어(보스방은 늘 다시 싸운다) 정수를 또 얻는다. 보스 뒤는 SaveChapterAdvance.
     /// </summary>
-    public void SaveNow(string reason) { }
+    public void SaveNow(string reason)
+    {
+        if (!_resuming && !_hasLastPlan) { SaveWaitingRoomIfChapterStart(reason); return; }
+        if (_resuming || !_hasLastPlan || _combatLocked || !_currentRoomCleared || _lastPlan.kind == RoomPlanKind.Boss) return;
+        SaveRunState(_lastPlan, _lastEdge, _lastMirror);
+        Debug.Log($"[RunFlow] 자동저장 — {reason}");
+    }
+
+    /// <summary>
+    /// 대기방(방 정보 없음)에서의 저장(10-11) — 지금 세이브가 「다음 챕터 대기방부터」(보스 뒤 저장)면 지금 상태로 다시 쓴다.
+    /// 대기방 서약 제단에서 고른 뒤 끄면 보스 뒤 저장으로 돌아가 다시 고를 수 있었다(세이브 남은 구멍). 첫 챕터 대기방은 런 세이브가 없어 해당 없음.
+    /// </summary>
+    private void SaveWaitingRoomIfChapterStart(string reason)
+    {
+        var pm   = RunProgressManager.Instance;
+        var prev = pm != null ? pm.LoadLocalRun(pm.ActiveSlotIndex) : null;
+        if (prev == null || !prev.chapterStartPending || prev.combatLocked) return;
+        SaveRunState(default, DoorEdge.North, 0, chapterStart: true);
+        Debug.Log($"[RunFlow] 대기방 저장(다음 챕터 대기방부터) — {reason}");
+    }
+
+    /// <summary>
+    /// 플레이어가 실제로 피해를 받았다(PlayerController) — 다음 저장 전까지 잠근다(10-10 Hades식).
+    /// 잠긴 채 끄면(강제 종료 · 사망 연출 중 종료 포함) 이어하기에서 그 런을 사망으로 정산한다. 방마다 첫 피해에 한 번만 쓴다.
+    /// </summary>
+    public void NotifyPlayerDamaged()
+    {
+        if (_combatLocked || _resuming || !_hasLastPlan) return;
+        var session = GameRunBootstrapper.Instance?.Run;
+        if (session == null || !session.IsRunning) return;
+        _combatLocked = true;
+        RunProgressManager.Instance?.SetCombatLock(true);
+        Debug.Log("[RunFlow] 피해 — 이어하기 잠금(전투가 끝나기 전에 끄면 사망 정산)");
+    }
+
+    /// <summary>
+    /// 보스 클리어 뒤 저장(10-10 · D4) — 보상을 받고 다음 챕터로 넘어가는 순간. 이어하면 다음 챕터 대기방부터 연다.
+    /// GameRunBootstrapper.AdvanceChapter가 챕터를 올린 뒤(정수 조각까지 주운 뒤) 부른다.
+    /// </summary>
+    public void SaveChapterAdvance()
+    {
+        if (_resuming || !_hasLastPlan) return;
+        SaveRunState(_lastPlan, _lastEdge, _lastMirror, chapterStart: true);
+        Debug.Log("[RunFlow] 보스 클리어 저장 — 이어하면 다음 챕터 대기방부터");
+    }
+
+    /// <summary>전투가 끝났다 — 잠금을 푼다. 보스방은 저장하지 않으므로 세이브의 표시만 내린다(이어하면 입장 저장으로 돌아가 보스를 다시 잡는다).</summary>
+    private void UnlockCombat()
+    {
+        if (!_combatLocked) return;
+        _combatLocked = false;
+        RunProgressManager.Instance?.SetCombatLock(false);
+    }
 
     /// <summary>클리어 보상 오브젝트가 방에 세워졌다(아직 미수령). RoomClearGate가 호출.
     /// 여기서 한 번 더 저장해야 "클리어 저장(보상 스폰 전) → 종료"에서 보상이 사라지지 않는다.</summary>
@@ -786,33 +880,35 @@ public class RunFlowController : MonoBehaviour
         catch (System.OperationCanceledException) { }
     }
 
-    /// <summary>현재 방 진입 시점의 런 전체 상태를 로컬에 직렬화한다. 전투 도중이 아닌 방 경계 1회.</summary>
-    private void SaveRunState(DoorPlan plan, DoorEdge fromEdge, int mirror)
+    /// <summary>현재 런 전체 상태를 로컬에 직렬화한다(방 입장 · 클리어 뒤 · 보스 클리어 뒤). 새로 쓰므로 잠금은 풀린 채다.</summary>
+    private void SaveRunState(DoorPlan plan, DoorEdge fromEdge, int mirror, bool chapterStart = false)
     {
         var pm      = RunProgressManager.Instance;
         var session = GameRunBootstrapper.Instance?.Run;
-        if (pm == null || session == null || !session.IsRunning || _sequencer == null) return;
+        // 대기방 저장(chapterStart)은 시퀀서가 아직 없다 — 절차 칸은 0으로 둔다(다음 챕터 대기방 이어하기는 절차 칸을 쓰지 않는다).
+        if (pm == null || session == null || !session.IsRunning || (_sequencer == null && !chapterStart)) return;
 
         var cooldowns = new List<CooldownKV>();
-        foreach (var kv in _sequencer.Cooldowns)
-            cooldowns.Add(new CooldownKV { key = kv.Key, turns = kv.Value });
+        if (_sequencer != null)
+            foreach (var kv in _sequencer.Cooldowns)
+                cooldowns.Add(new CooldownKV { key = kv.Key, turns = kv.Value });
 
         var meta = new RunMetaSnapshot
         {
             masterSeed         = _masterSeed,
             chapterSeed        = _chapterSeed,
-            visitCount         = _sequencer.VisitCount,
-            bossProgress       = _sequencer.BossProgress,
+            visitCount         = _sequencer?.VisitCount ?? 0,
+            bossProgress       = _sequencer?.BossProgress ?? 0,
             hasBossProgress    = true,
-            seqPhase           = _sequencer.PhaseInt,
-            shopUsed           = _sequencer.ShopUsed,
-            eventUsed          = _sequencer.EventUsed,
-            crucibleUsed       = _sequencer.CrucibleUsed,
-            refineryUsed       = _sequencer.RefineryUsed,
-            shopMiss           = _sequencer.ShopMiss,
-            eventMiss          = _sequencer.EventMiss,
-            crucibleMiss       = _sequencer.CrucibleMiss,
-            refineryMiss       = _sequencer.RefineryMiss,
+            seqPhase           = _sequencer?.PhaseInt ?? 0,
+            shopUsed           = _sequencer?.ShopUsed ?? 0,
+            eventUsed          = _sequencer?.EventUsed ?? 0,
+            crucibleUsed       = _sequencer?.CrucibleUsed ?? 0,
+            refineryUsed       = _sequencer?.RefineryUsed ?? 0,
+            shopMiss           = _sequencer?.ShopMiss ?? 0,
+            eventMiss          = _sequencer?.EventMiss ?? 0,
+            crucibleMiss       = _sequencer?.CrucibleMiss ?? 0,
+            refineryMiss       = _sequencer?.RefineryMiss ?? 0,
             heading            = (int)fromEdge,
             anchorToggle       = _anchorToggle,
             currentRoomPoolKey = plan.entry?.pool_key,
@@ -833,9 +929,11 @@ public class RunFlowController : MonoBehaviour
             maxEnhanceLevel    = session.MaxEnhanceLevel,
             abyssDepth         = session.AbyssDepth,
             cooldowns          = cooldowns,
+            chapterStartPending = chapterStart,
         };
 
         pm.SaveRunLocal(session, meta);
+        _combatLocked = false;
     }
 
     private void MovePlayer(Vector3 pos)
@@ -927,6 +1025,7 @@ public class RunFlowController : MonoBehaviour
         //    이미 진행된 상태로 기록되고, 복원 시 RollExits가 한 번 더 돌아 '이중 반영'된다.
         //    롤 전 상태로 저장해두면 복원 때 같은 시드로 다시 굴려 동일한 출구가 재현된다.
         _currentRoomCleared = true;
+        UnlockCombat();            // 전투가 끝났다 — 이제 꺼도 사망이 아니다(보스방은 표시만 내리고 저장은 SaveChapterAdvance)
         SaveNow("room-cleared");   // 복원 중(_resuming)이면 내부에서 무시
 
         var exits = _sequencer.RollExits();
@@ -1107,10 +1206,13 @@ public class RunFlowController : MonoBehaviour
             hinges         = _current != null && _current.sealDoorMotion == SealDoorMotion.Swing && SealDoorFit.IsFitted(door)
                                  ? SealDoorFit.BuildHinges(door) : null,
             outward        = OutwardSign(go.transform, slot),
+            dissolves      = _current != null && _current.sealDoorMotion == SealDoorMotion.Dissolve,
         };
 
         // 통과 차단 콜라이더(blocker)는 이 시점에 이미 서 있다 — 석문이 언제 내려오든 방 밖으로 못 나간다.
-        if (door != null && entry == SealDoorEntry.Parked && view.hinges != null)
+        if (door != null && entry == SealDoorEntry.Parked && view.dissolves)
+            door.gameObject.SetActive(false);   // 디졸브 문은 숨어 기다리다 일제히 나타난다
+        else if (door != null && entry == SealDoorEntry.Parked && view.hinges != null)
         {
             view.swingK = 1f;   // 젖힘 문은 열린 채 기다리다 일제히 쾅 닫힌다
             SealDoorFit.SetSwing(view.hinges, view.outward, 1f);
@@ -1141,6 +1243,8 @@ public class RunFlowController : MonoBehaviour
         if (view.grows) { SealDoorGrowAsync(view, grow: true, primary).Forget(); return; }
         // 나무문은 떨어지지 않는다 — 열린 자리에서 쾅 닫힌다(10-06).
         if (view.hinges != null) { SealDoorSwingAsync(view, open: false, primary).Forget(); return; }
+        // 디졸브 문은 개구부에 나타난다(10-06).
+        if (view.dissolves) { SealDoorDissolveAsync(view, primary).Forget(); return; }
 
         door.localPosition = upPos;
         try
@@ -1260,6 +1364,17 @@ public class RunFlowController : MonoBehaviour
         if (!open) PlayDoorImpact(view.door, view.openH, primary);   // 쾅 — 먼지 · (대표 문) 흔들림 · 사운드
     }
 
+    /// <summary>디졸브 문 봉인(10-06) — 개구부에 나타나며 닫힌다. 대표 문만 봉인 사운드(먼지 · 흔들림은 떨어지는 문 몫).</summary>
+    private async UniTaskVoid SealDoorDissolveAsync(GateView view, bool primary)
+    {
+        var ct = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
+        if (view?.door == null || view.opening) return;
+        view.door.localPosition = view.sealedLocalPos;
+        await SealDoorFit.DissolveCloseAsync(view.door.gameObject, ct);
+        if (!primary || view.door == null || view.opening) return;
+        PlayGateSealSfx(GameRunBootstrapper.Instance);
+    }
+
     /// <summary>석문 착지 임팩트 — 먼지 VFX(모든 문) + 카메라 흔들림·봉인 사운드(대표 문 1회). 리소스 없으면 해당 요소 생략.</summary>
     private void PlayDoorImpact(Transform door, float openH, bool primary)
     {
@@ -1282,8 +1397,17 @@ public class RunFlowController : MonoBehaviour
         if (!primary) return;   // 흔들림·사운드만 대표 문 1회 — 중복 재생 방지
 
         HitFeelService.CameraShake(0.30f, 0.32f);              // 웅장한 착지 임팩트
-        if (grb != null && grb.GateSealSfx != null)
-            Managers.Sound?.Play(grb.GateSealSfx);              // 봉인 사운드(사용자 클립)
+        PlayGateSealSfx(grb);                                  // 봉인 사운드(사용자 클립 · 없으면 표 이벤트)
+    }
+
+    /// <summary>
+    /// 봉인 사운드 — @GameRun 슬롯(GateSealSfx)에 클립이 있으면 그것, 비어 있으면 표 이벤트 gate_seal(10-12 D5).
+    /// 빌드에 들어가는 @GameRun 프리팹의 슬롯이 비어 있어 석문이 소리 없이 내려앉았다. 프리팹은 고치지 않는다.
+    /// </summary>
+    private static void PlayGateSealSfx(GameRunBootstrapper grb)
+    {
+        if (grb != null && grb.GateSealSfx != null) Managers.Sound?.Play(grb.GateSealSfx);
+        else Managers.Sound?.PlayEvent(SoundEvent.GateSeal);
     }
 
     /// <summary>봉인 석문이 위로 올라가며 열림(클리어 공개). 감속 정착.</summary>
@@ -1299,6 +1423,8 @@ public class RunFlowController : MonoBehaviour
         if (view.grows) { SealDoorGrowAsync(view, grow: false, primary: false).Forget(); return; }
         // 나무문은 경첩을 축으로 바깥으로 젖혀 열린다 — 방 안 카메라에서 문짝 앞면이 내내 보인다(10-06).
         if (view.hinges != null) { SealDoorSwingAsync(view, open: true, primary: false).Forget(); return; }
+        // 디졸브 문은 사라지며 열린다(10-06).
+        if (view.dissolves) { SealDoorFit.DissolveOpenAsync(view.door.gameObject, ct).Forget(); return; }
 
         var     door      = view.door;
         Vector3 sealedPos = door.localPosition;              // 시작 = 지금 있는 자리(중간에서 이어받기)
@@ -1348,6 +1474,13 @@ public class RunFlowController : MonoBehaviour
         float oh = MarkerH(slot);
         Transform doorTr = SpawnSealDoor(_entranceLock.transform, MarkerW(slot), oh);
         if (doorTr != null && lockMarker != null) lockMarker.enabled = false;
+
+        // 디졸브 문 — 지나온 입구에 등 뒤로 나타나며 잠긴다(10-06). 통과 차단은 hardBlock이 이미 맡았다.
+        if (_current != null && _current.sealDoorMotion == SealDoorMotion.Dissolve && doorTr != null)
+        {
+            LockEntranceDissolveAsync(doorTr, _entranceLock.transform, OutwardSign(_entranceLock.transform, slot)).Forget();
+            return;
+        }
 
         // 나무문 — 지나온 입구가 등 뒤에서 젖혀 닫힌다(10-06). 바깥 = 지나온 통로 쪽.
         if (_current != null && _current.sealDoorMotion == SealDoorMotion.Swing && SealDoorFit.IsFitted(doorTr))
@@ -1548,6 +1681,7 @@ public class RunFlowController : MonoBehaviour
         RoomPlanKind.Crucible => new Color(0.52f, 0.25f, 0.08f), // 구리톤(대장간)
         RoomPlanKind.Refinery => new Color(0.10f, 0.30f, 0.45f), // 청록톤(정제소)
         RoomPlanKind.Rest     => new Color(0.30f, 0.18f, 0.08f), // 모닥불 호박빛(쉼터)
+        RoomPlanKind.MidBoss  => new Color(0.40f, 0.10f, 0.26f), // 장밋빛 진홍(정예 보스 — 정예 보라와 보스 황혼 사이)
         _                    => new Color(0.05f, 0.06f, 0.10f), // Normal
     };
 
@@ -1648,6 +1782,7 @@ public class RunFlowController : MonoBehaviour
         RoomPlanKind.Crucible => new Color(1f, 0.60f, 0.25f),
         RoomPlanKind.Refinery => new Color(0.45f, 0.85f, 1f),
         RoomPlanKind.Rest     => new Color(1f, 0.79f, 0.51f),
+        RoomPlanKind.MidBoss  => new Color(1f, 0.48f, 0.72f),
         _                     => new Color(0.85f, 0.90f, 1f), // 전투(Normal)
     };
 
@@ -1663,6 +1798,7 @@ public class RunFlowController : MonoBehaviour
         RoomPlanKind.Crucible => "▼",
         RoomPlanKind.Refinery => "◀",
         RoomPlanKind.Rest     => "□",
+        RoomPlanKind.MidBoss  => "◆",   // 설계의 ◈는 폰트에 없다 — 정예와 같은 기호를 이름 · 색으로 가른다
         _                     => "·",
     };
 
@@ -1679,6 +1815,7 @@ public class RunFlowController : MonoBehaviour
             case RoomPlanKind.Event:    return "시험 · 선택";
             case RoomPlanKind.Boss:     return "결전";
             case RoomPlanKind.PreBoss:  return "보스 직전";
+            case RoomPlanKind.MidBoss:  return "강적 하나 · " + RarityKor(ItemRarity.Epic) + " 보상";
         }
 
         var rule  = RoomRewardTable.For(kind);
@@ -1690,10 +1827,10 @@ public class RunFlowController : MonoBehaviour
 
     private static string RarityKor(ItemRarity r) => r switch
     {
-        ItemRarity.Rare      => "희귀",
-        ItemRarity.Epic      => "영웅",
-        ItemRarity.Legendary => "전설",
-        _                    => "일반",
+        ItemRarity.Rare      => "Rare",
+        ItemRarity.Epic      => "Epic",
+        ItemRarity.Legendary => "Legendary",
+        _                    => "Common",
     };
 
     /// <summary>방 종류 → 표시용 한글 라벨.</summary>
@@ -1707,11 +1844,34 @@ public class RunFlowController : MonoBehaviour
         RoomPlanKind.Crucible => "재련소",
         RoomPlanKind.Refinery => "정제소",
         RoomPlanKind.Rest     => "쉼터",
+        RoomPlanKind.MidBoss  => "정예 보스",
         _                    => "전투",
     };
 
     /// <summary>입구를 봉인 — 무거운 석문이 개구부 위에서 가속 낙하해 "쿵" 닫히고 카메라가 흔들린다(임팩트).
     /// 통과 차단은 EntranceHardBlocker 정적 콜라이더가 처음부터 담당하므로 낙하 중 갇힘이 없다.</summary>
+    /// <summary>디졸브 문 입구 잠금(10-06) — 들어올 땐 열려 있다가 잠깐 뒤 나타나며 닫힌다.</summary>
+    private async UniTaskVoid LockEntranceDissolveAsync(Transform door, Transform gate, float outward)
+    {
+        var ct = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
+        door.gameObject.SetActive(false);
+        var cam = Camera.main;
+        try
+        {
+            await UniTask.Delay(TimeSpan.FromSeconds(EntranceDissolveDelay), ignoreTimeScale: true, cancellationToken: ct);
+            // 카메라가 입구 안쪽으로 들어온 뒤에 나타난다 — 입장 직후 카메라는 입구 밖 ≈2 m라, 0.6초 뒤 문이 렌즈 바로 앞에
+            // 나타나 화면을 덮었다(10-09 전주기 시뮬 · 디졸브 중엔 가림 페이드도 손대지 않는다). 통과 차단은 EntranceHardBlocker가 처음부터 맡는다.
+            if (cam != null)
+                await UniTask.WaitUntil(() => door == null || gate == null || cam == null
+                    || Vector3.Dot(cam.transform.position - gate.position, gate.forward) * outward < -EntranceCameraClear,
+                    cancellationToken: ct);
+        }
+        catch (OperationCanceledException) { return; }
+        if (door == null) return;
+        await SealDoorFit.DissolveCloseAsync(door.gameObject, ct);
+        if (door != null) PlayGateSealSfx(GameRunBootstrapper.Instance);
+    }
+
     private async UniTaskVoid LockEntranceAsync(GameObject lockGo, Transform door, float openH)
     {
         var ct = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
@@ -1796,6 +1956,7 @@ public class RunFlowController : MonoBehaviour
     /// SaveRunLocal은 라이브 세션에서 무기 슬롯·룬 셀을 다시 캡처하므로 여기 한 번이면 전부 잡힌다.
     ///
     /// ※ "로비로 가기"는 여기 오지 않는다 — 그 경로는 EndRun()으로 세이브를 의도적으로 폐기한다(런 포기).
+    /// ※ 잠금 중(피해를 받은 뒤)이나 클리어 전 전투방이면 SaveNow가 쓰지 않는다 — 잠긴 세이브가 남아 이어하기에서 사망 정산된다(10-10).
     /// </summary>
     private void OnApplicationQuit() => SaveNow("app-quit");
 

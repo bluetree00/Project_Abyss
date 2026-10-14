@@ -403,7 +403,7 @@ public class CharacterInfoPageView : MonoBehaviour
             icon.sprite = null;
             icon.color = new Color(0.3f, 0.25f, 0.2f, 0.8f);
             if (fallback != null)
-                fallback.text = w != null ? w.weaponType.ToString().Substring(0, 1) : "?";
+                fallback.text = w != null && !string.IsNullOrEmpty(w.displayName) ? w.displayName.Substring(0, 1) : "?";
         }
     }
 
@@ -411,15 +411,17 @@ public class CharacterInfoPageView : MonoBehaviour
     {
         if (w == null) return "<color=#998877>없음</color>";
 
+        // 이름은 한글 표시 이름만 — 옆의 영어 enum(Katana)은 걷었다(무형검도 「Katana」로 보였다 · 10-12 요청 8)
         string s = "";
-        s += $"<color=#3D2B1F><b>{w.displayName}</b></color>  ";
-        s += $"<color=#665544>{w.weaponType}</color>\n";
+        s += $"<color=#3D2B1F><b>{w.displayName}</b></color>\n";
+        s += GrowthLine(w) + "\n";
         s += $"공격력 <color=#8B4513>{w.baseAttack}</color>  ";
         s += $"공속 <color=#8B4513>x{w.attackSpeed:F1}</color>\n";
+        s += SkillTierTable(w) + "\n";
 
         if (w.skillQ != null)
         {
-            s += $"\n<color=#4A6741><b>[Q] {w.skillQ.skillName}</b></color>";
+            s += $"\n<color=#4A6741><b>[R] {w.skillQ.skillName}</b></color>";   // R 스킬(필드명 skillQ는 레거시) — Q는 유물 칸
             s += $"  <color=#807060>({w.skillQCooldown:F1}s)</color>\n";
             if (!string.IsNullOrEmpty(w.skillQ.description))
                 s += $"<color=#555544>{w.skillQ.description}</color>\n";
@@ -434,6 +436,38 @@ public class CharacterInfoPageView : MonoBehaviour
         }
 
         return s.TrimEnd('\n');
+    }
+
+    /// <summary>강화 · 형 한 줄. 원거리는 강화가 없고 파츠 레벨 합이 스킬 단계를 올린다.</summary>
+    private static string GrowthLine(WeaponData w)
+    {
+        if (SkillTierResolver.IsRanged(w))
+            return $"<color=#665544>파츠 합</color> <color=#8B4513>{RangedPartsState.Current?.TotalLevel ?? 0}</color>";
+        string form = w.HasForm ? $"<color=#8B4513>「{w.form.DisplayName}」</color>" : "<color=#998877>없음</color>";
+        return $"<color=#665544>강화</color> <color=#8B4513>+{w.enhanceLevel}</color>  <color=#665544>형</color> {form}";
+    }
+
+    /// <summary>
+    /// 스킬 단계 1 · 2 · 3 표 — 지금 칸은 ◆ · 진한 글 · 「지금」, 지난 칸은 ◆, 아직은 ◇ · 옅게(10-12 요청 8).
+    /// 단계 = 강화 단계(근접) · 파츠 레벨 합(원거리) — 재련소와 같은 <see cref="SkillTierResolver"/> · 같은 변화 글.
+    /// </summary>
+    private static string SkillTierTable(WeaponData w)
+    {
+        int now = SkillTierResolver.Resolve(w);
+        var ms  = SkillTierResolver.Milestones(w);
+        bool ranged = SkillTierResolver.IsRanged(w);
+        string s = "<color=#665544>스킬 단계</color>";
+        for (int tier = SkillTierResolver.MinTier; tier <= SkillTierResolver.MaxTier; tier++)
+        {
+            int idx = tier - SkillTierResolver.MinTier - 1;
+            string cond = idx < 0 ? "기본" : idx < ms.Length ? (ranged ? $"파츠 합 {ms[idx]}" : $"+{ms[idx]}") : "—";
+            string body = idx < 0 ? null : UI_CruciblePanel.TierChangeBody(w, tier);
+            string row  = $"{tier}단계  {cond}{(body != null ? $" — {body}" : "")}";
+            s += tier == now ? $"\n<color=#8B4513>◆ {row}  · 지금</color>"
+               : tier < now  ? $"\n<color=#665544>◆ {row}</color>"
+                             : $"\n<color=#998877>◇ {row}</color>";
+        }
+        return s;
     }
 
     // ── Event Handlers ──

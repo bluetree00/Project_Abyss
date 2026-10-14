@@ -35,10 +35,12 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     // 판 외곽선(09-29) — 칸 모양을 따라 바깥 한 줄. 칸 가장자리에서 반 간격 + pad만큼 떨어진다.
     // 실측(09-29): 빛 12px · 0.16이면 칸과 선 사이가 금빛 띠로 차 두꺼운 액자로 읽혔다 — 선 한 줄이 주인공, 빛은 옅게.
     private const float OutlinePad   = 4f;
-    private const float OutlineWidth = 2f;
-    private const float OutlineGlowW = 6f;
-    private const float OutlineGlowA = 0.10f;
-    private static readonly Color OutlineColor = new(0.93f, 0.85f, 0.64f, 0.85f);
+    // 톤 v2(10-08): 1px 금선 한 줄 — 2px 선 + 6px 빛이 두 줄 액자로 읽혔다.
+    private static readonly float OutlineWidth = UI_GridPanel.ThinGrid ? 1f : 2f;
+    private static readonly float OutlineGlowW = UI_GridPanel.ThinGrid ? 0f : 6f;
+    private static readonly float OutlineGlowA = UI_GridPanel.ThinGrid ? 0f : 0.10f;
+    private static readonly Color OutlineColor = UI_GridPanel.ThinGrid ? UITheme.Thin.WithA(UITheme.Thin.Gold, 0.55f)
+                                                                       : new Color(0.93f, 0.85f, 0.64f, 0.85f);
 
     /// <summary>판의 칸 간격(px). 브릿지가 존 자산을 만들 때 같은 값을 써야 한다 —
     /// 예전엔 브릿지가 54를 따로 들고 있어 뷰(78)와 어긋난 채 굳어 있었다.</summary>
@@ -48,8 +50,8 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     // 값 = 최대 블록 선형 길이(5셀) → 5셀짜리 블록도 한 끝만 닿으면 배치 가능
     private const int ADJACENCY_REACH = 5;
 
-    /// <summary>조각 외곽선 두께(px). 칸이 63이라 3px면 축소돼도 남는다.</summary>
-    private const float EdgeThickness = 3f;
+    /// <summary>조각 외곽선 두께(px). 10-11 v2 3 → 2 — 타일 베벨(약 4px)과 겹쳐 칸 사이 선이 두 겹으로 보였다.</summary>
+    private const float EdgeThickness = 2f;
     private static readonly string[] EdgeNames = { "EdgeTop", "EdgeRight", "EdgeBottom", "EdgeLeft" };
     private static readonly Vector2Int[] EdgeDirs =
     {
@@ -63,6 +65,12 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     private const float HIGHLIGHT_ALPHA = 1.0f;
     private const float NORMAL_ALPHA    = 0.75f;
 
+    // 빈 칸 = 문양 없는 코드 타일(10-11 v2, 리서치 B §3 P1) — 바탕 존 색 ×0.30 · 알파 0.35 + 1px 테 ×0.45 · 0.5.
+    // 놓인 칸 · 「놓을 수 있음」 힌트 칸 · 드래그 미리보기는 타일 그림 그대로다. 색과 문양은 채워진 칸에만 싣는다(배낭 게임 · Last Epoch).
+    private const float EmptyFillMul = 0.30f, EmptyFillA = 0.35f;
+    private const float EmptyLineMul = 0.45f, EmptyLineA = 0.50f;
+    private const float EmptyFaceRadius = 3f;
+
     // ── Private fields ──
     private readonly List<GameObject>              _cellObjects       = new();
     private readonly Dictionary<Vector2Int, Image> _cellImages        = new();
@@ -70,11 +78,14 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     private readonly Dictionary<Vector2Int, Image> _cellGlowImages    = new();   // 배치 유도 맥박(고른 룬의 속성 존)
     private readonly Dictionary<Vector2Int, Image> _cellPreviewImages = new();   // 드래그 미리보기 — 타일 위
     private readonly Dictionary<Vector2Int, Image> _cellBorderImages  = new();   // 점유 셀 상시 테두리
+    private readonly Dictionary<Vector2Int, Image> _cellEmptyFaces    = new();   // 빈 칸 코드 타일(바탕 · 자식 1px 테)
+    private readonly Dictionary<Vector2Int, Image> _cellInnerImages   = new();   // 타일 위 흰 겹판(0.08) — 빈 칸에선 끈다
     // 조각(룬 하나) 단위 외곽선 — 칸마다 상/우/하/좌 4개. 같은 조각끼리 맞닿은 변은 끄고
     // 바깥으로 향한 변만 켜서, 조각 하나가 <b>하나의 윤곽</b>으로 읽히게 한다.
     private readonly Dictionary<Vector2Int, Image[]> _cellEdgeImages = new();
     // 칸 → 조각 식별자(룬 instanceId). 같은 모양이 붙어 있어도 서로 다른 조각임을 이걸로 가른다.
     private readonly Dictionary<Vector2Int, string> _cellPieceId = new();
+    private string _selectedPieceId;   // 오른쪽 정보판에 뜬 놓인 룬 — 그 조각만 외곽선이 금(SetSelectedPiece)
     private readonly Dictionary<Vector2Int, Color>  _cellBaseColors    = new();
     private readonly HashSet<Vector2Int>             _occupiedPositions = new();
     private readonly Dictionary<Vector2Int, char>    _cellZones         = new();
@@ -84,8 +95,9 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     private bool _hintNoCenter;   // 그 룬이 중앙에 못 놓이면(레전드리·존핵) 중앙을 밝히지 않는다
 
     // 배치 유도 맥박 — 고른 룬이 놓일 속성 존 칸이 은은하게 숨 쉰다(흰 겹판 알파).
+    // 10-11 v2 상한 0.20 → 0.12 — 맥박 정점에서 빈 칸이 놓인 룬보다 밝아져 놓은 룬이 묻혔다.
     private const float GlowMin   = 0.04f;
-    private const float GlowMax   = 0.20f;
+    private const float GlowMax   = 0.12f;
     private const float GlowSpeed = 3.2f;
     private readonly List<Image> _pulseImages = new();
     private CancellationTokenSource _pulseCts;
@@ -257,11 +269,11 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             if (!_cellImages.TryGetValue(pos, out var img)) continue;
             if (!_cellBaseColors.TryGetValue(pos, out var bc)) continue;
             if (highlight)
-                img.color = NormalColor(bc);
+                PaintTile(pos, img, NormalColor(bc));
             else
             {
-                bool occupied = _occupiedPositions.Contains(pos);
-                img.color = occupied ? OccupiedColor(bc) : EmptyColor(bc);
+                if (_occupiedPositions.Contains(pos)) PaintTile(pos, img, OccupiedColor(bc));
+                else                                  PaintEmpty(pos, img, bc);
             }
         }
     }
@@ -325,17 +337,18 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             _cellGlowImages.TryGetValue(kvp.Key, out var glow);
 
             bool pulse = false;
-            if (_occupiedPositions.Contains(kvp.Key)) kvp.Value.color = OccupiedColor(bc);
+            if (_occupiedPositions.Contains(kvp.Key)) PaintTile(kvp.Key, kvp.Value, OccupiedColor(bc));
             else
             {
                 _cellZones.TryGetValue(kvp.Key, out var zc);
                 bool canPlace = placeable.Contains(kvp.Key) && RuneZoneRule.Accepts(zc, hintZone, _hintNoCenter);
                 bool match    = hintOn && zc == _hintElementCode;
 
-                if (canPlace && match)      { kvp.Value.color = MatchHighlightColor(bc); pulse = true; }   // 매칭 속성칸 — 강조 + 맥박
-                else if (canPlace)          kvp.Value.color = hintOn ? DimPlaceable(bc)   // 중앙(중립 허브) — 한 단계 낮춤
-                                                                     : PlaceableColor(bc);
-                else                        kvp.Value.color = EmptyColor(bc);
+                if (canPlace && match)       { PaintTile(kvp.Key, kvp.Value, MatchHighlightColor(bc)); pulse = true; }   // 매칭 속성칸 — 강조 + 맥박
+                else if (canPlace && hintOn) PaintTile(kvp.Key, kvp.Value, DimPlaceable(bc));   // 중앙(중립 허브) — 한 단계 낮춤
+                // 놓을 룬이 없을 때(보관함이 빔)의 빈 칸도 빈 칸 색 — 예전엔 판 전체가 「놓을 수 있음」 밝기(×1.05 · 0.85)라
+                // 룬 0개인 판이 차 있는 것처럼 보였다(10-11 v2, 리서치 B §3). 놓을 룬이 있으면 힌트가 늘 켜져 있어 안내는 그대로다.
+                else                         PaintEmpty(kvp.Key, kvp.Value, bc);
             }
 
             if (glow == null) continue;
@@ -431,7 +444,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             }
 
             _cellPieceId.TryGetValue(pos, out string mine);
-            var line = PieceOutlineColor(mine);
+            var line = EdgeColor(mine);
 
             for (int e = 0; e < edges.Length; e++)
             {
@@ -449,12 +462,28 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     }
 
     /// <summary>
+    /// 오른쪽 정보판에 뜬 놓인 룬 — 그 조각만 외곽선을 금 85%로(10-11 v2). null이면 금 조각 없음.
+    /// UI_GridPanel이 정보판이 바뀔 때마다 부른다(놓인 룬이 아니면 null).
+    /// </summary>
+    public void SetSelectedPiece(string pieceId)
+    {
+        if (_selectedPieceId == pieceId) return;
+        _selectedPieceId = pieceId;
+        RefreshOccupiedBorders();
+    }
+
+    /// <summary>조각 외곽선 색 — 고른 조각은 금 85%, 나머지는 채도를 반으로 내린 조각 색.</summary>
+    private Color EdgeColor(string pieceId)
+        => !string.IsNullOrEmpty(pieceId) && pieceId == _selectedPieceId ? UITheme.Thin.LineReady : PieceOutlineColor(pieceId);
+
+    /// <summary>
     /// 조각 외곽선 색. 같은 식별자는 항상 같은 색이고, 이웃한 다른 조각과는 색이 갈린다 —
     /// 모양이 같아도 "이건 다른 룬"이 한눈에 보이게 하는 장치다. 어두운 판 위에서 읽히는 밝은 색만 쓴다.
+    /// 10-11 v2: 채도를 반으로 — 판 위 색이 존 6색 + 외곽선 6색 = 12색이었다. 금은 고른 조각에만.
     /// </summary>
     private static Color PieceOutlineColor(string pieceId)
     {
-        if (string.IsNullOrEmpty(pieceId)) return new Color(1f, 0.86f, 0.42f, 0.95f);   // 식별자 없음 = 기본 금색
+        if (string.IsNullOrEmpty(pieceId)) return PieceLineColors[0];   // 식별자 없음 = 첫 색
 
         int h = 0;
         for (int i = 0; i < pieceId.Length; i++) h = h * 31 + pieceId[i];
@@ -463,13 +492,20 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
 
     private static readonly Color[] PieceLineColors =
     {
-        new(1.00f, 0.86f, 0.42f, 0.95f),   // 금
-        new(0.55f, 0.92f, 1.00f, 0.95f),   // 하늘
-        new(1.00f, 0.66f, 0.86f, 0.95f),   // 분홍
-        new(0.70f, 1.00f, 0.62f, 0.95f),   // 연두
-        new(1.00f, 0.74f, 0.52f, 0.95f),   // 살구
-        new(0.82f, 0.76f, 1.00f, 0.95f),   // 연보라
+        HalfSaturated(new Color(1.00f, 0.86f, 0.42f, 0.95f)),   // 금
+        HalfSaturated(new Color(0.55f, 0.92f, 1.00f, 0.95f)),   // 하늘
+        HalfSaturated(new Color(1.00f, 0.66f, 0.86f, 0.95f)),   // 분홍
+        HalfSaturated(new Color(0.70f, 1.00f, 0.62f, 0.95f)),   // 연두
+        HalfSaturated(new Color(1.00f, 0.74f, 0.52f, 0.95f)),   // 살구
+        HalfSaturated(new Color(0.82f, 0.76f, 1.00f, 0.95f)),   // 연보라
     };
+
+    /// <summary>밝기(휘도)는 두고 채도만 반으로 — 같은 밝기의 회색과 반반 섞는다.</summary>
+    private static Color HalfSaturated(Color c)
+    {
+        float l = 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+        return new Color((c.r + l) * 0.5f, (c.g + l) * 0.5f, (c.b + l) * 0.5f, c.a);
+    }
 
     /// <summary>배치할 룬의 속성 힌트를 설정하고 판을 갱신한다. null/빈값이면 힌트 해제.</summary>
     /// <param name="noCenter">그 룬이 중앙에 못 놓이는가(<see cref="RuneZoneRule.NoCenter"/>) — 예전엔 전설 룬을 골라도 중앙이 밝았다.</param>
@@ -489,48 +525,6 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         if (!_cellZones.ContainsKey(n)) return;
         if (reachable.Add(n))
             frontier.Enqueue((n, depth + 1));
-    }
-
-    /// <summary>
-    /// 주어진 모양(셀 오프셋)을 판 어딘가에 놓을 수 있는지 조회한다. <b>읽기 전용 · 부작용 없음.</b>
-    /// <para>
-    /// GridSquare가 아니라 <see cref="_occupiedPositions"/>·<see cref="_cellZones"/>만 보므로
-    /// 패널이 SetActive(false)여도 동작한다(선택 팝업이 배치 화면 밖에서 판정해야 하기 때문).
-    /// 판정 규칙은 <see cref="UpdateAdjacencyConstraints"/> + GridManager.TryPlaceShape과 동일하다:
-    /// 모든 셀이 판 위에 있고, 비어 있고, (판에 뭔가 있다면) 전부 인접 도달 범위 안이어야 한다.
-    /// </para>
-    /// 회전은 미지원이므로 주어진 방향 그대로만 검사한다.
-    /// <paramref name="elementId"/>를 주면 속성 배치 제약(<see cref="RuneZoneRule"/>)까지 함께 본다 —
-    /// 이게 없으면 "놓을 자리 있음"으로 표시된 룬이 막상 판에서는 어디에도 안 들어간다.
-    /// </summary>
-    public bool CanPlaceAnywhere(IReadOnlyList<Vector2Int> offsets, string elementId = null, bool isLegendary = false)
-    {
-        if (offsets == null || offsets.Count == 0) return false;
-        // 판이 아직 빌드된 적 없으면(첫 룬 획득 등) 판정 불가 → 막지 않는다(permissive).
-        // 배치 화면을 한 번도 연 적 없을 때 모든 카드가 '놓을 자리 없음'으로 뜨던 첫 사용 버그 방지.
-        if (_cellZones.Count == 0) return true;
-
-        var placeable = BuildPlaceableSet();
-        if (placeable.Count == 0) return false;
-
-        // 발자국은 실배치(GridManager.ResolveFootprint)와 같은 규칙으로 잡는다 — 블록 하나를 기준(0,0)으로,
-        // 화면 위(+y) = row 감소. 예전엔 anchor + offset이라 모양이 위아래로 뒤집혀 판정됐고,
-        // 원점(0,0)이 빈칸인 모양(역L 등)은 판 가장자리 자리를 놓쳤다(빈 판에서도 전설 2종 「자리 없음」).
-        var origin = offsets[0];
-        foreach (var anchor in _cellZones.Keys)
-        {
-            bool fits = true;
-            for (int i = 0; i < offsets.Count; i++)
-            {
-                var o    = offsets[i];
-                var cell = new Vector2Int(anchor.x + (o.x - origin.x), anchor.y - (o.y - origin.y));
-                if (!placeable.Contains(cell)) { fits = false; break; }
-                if (!_cellZones.TryGetValue(cell, out var zc) || !RuneZoneRule.Accepts(zc, elementId, isLegendary))
-                { fits = false; break; }
-            }
-            if (fits) return true;
-        }
-        return false;
     }
 
     /// <summary>배치 가능한(판 위 · 비어 있음 · 인접 조건 충족) 셀 집합. UpdateAdjacencyConstraints의 순수 함수 버전.</summary>
@@ -740,7 +734,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         {
             _occupiedPositions.Remove(pos);
             if (_cellImages.TryGetValue(pos, out var img) && _cellBaseColors.TryGetValue(pos, out var bc))
-                img.color = EmptyColor(bc);
+                PaintEmpty(pos, img, bc);
             // 금테는 점유 해제와 동시에 즉시 끈다(RefreshOccupiedBorders를 기다리지 않게).
             if (_cellBorderImages.TryGetValue(pos, out var frame) && frame != null)
             {
@@ -835,7 +829,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     {
         foreach (var pos in _occupiedPositions)
             if (_cellImages.TryGetValue(pos, out var img) && _cellBaseColors.TryGetValue(pos, out var bc))
-                img.color = EmptyColor(bc);
+                PaintEmpty(pos, img, bc);
         _occupiedPositions.Clear();
         MerlinRuneBridge.Instance?.OnZoneCellsUpdated(new Dictionary<string, int>());
         MerlinRuneBridge.Instance?.OnZoneAmplifiersUpdated(null);
@@ -858,8 +852,11 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         // 타일이 있으면 색은 타일이 소유 → 베이스를 흰색으로 두고 명암(empty/occupied)만 틴트.
         var baseColor     = tile != null ? Color.white : zoneColor;
         if (tile != null) img.sprite = tile;
-        img.color         = EmptyColor(baseColor);
         img.raycastTarget = false;
+
+        // 빈 칸 얼굴(10-11 v2) — 문양 없는 코드 타일. 타일보다 위 · 다른 겹판(테 · 번쩍임 · 맥박 · 미리보기)보다 아래(첫 자식).
+        // 색은 타일 유무와 상관없이 존 색에서 뽑는다(타일이 있으면 baseColor가 흰색이라 존 색을 잃는다).
+        var emptyFace = MakeEmptyFace(cellGO.transform, zoneColor);
 
         // 약간의 둥글기를 위해 배경 위에 내부 하이라이트 추가
         var innerGO = new GameObject("Inner", typeof(RectTransform));
@@ -951,6 +948,9 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         _cellFlashImages[gridPos] = flashImg;
         _cellBaseColors[gridPos]  = baseColor;
         _cellZones[gridPos]       = zoneCode;
+        _cellEmptyFaces[gridPos]  = emptyFace;
+        _cellInnerImages[gridPos] = innerImg;
+        PaintEmpty(gridPos, img, baseColor);   // 처음엔 빈 칸
     }
 
     private static Image MakeOverlay(Transform cell, string name)
@@ -963,6 +963,65 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         img.color         = Color.clear;
         img.raycastTarget = false;
         return img;
+    }
+
+    /// <summary>
+    /// 빈 칸 코드 타일 — 바탕(존 색 ×0.30 · 0.35, 1px 들임) + 자식 1px 테(×0.45 · 0.5, 칸 가장자리). 꺼진 채로 만든다.
+    /// 스프라이트는 칠할 때 붙인다(<see cref="EnsureEmptyFaceSprites"/>) — 코드로 구운 스프라이트는 직렬화되지 않는다.
+    /// </summary>
+    private static Image MakeEmptyFace(Transform cell, Color zone)
+    {
+        var fill = MakeOverlay(cell, "EmptyFace");
+        fill.color = new Color(zone.r * EmptyFillMul, zone.g * EmptyFillMul, zone.b * EmptyFillMul, EmptyFillA);
+        fill.rectTransform.offsetMin = Vector2.one;
+        fill.rectTransform.offsetMax = -Vector2.one;
+
+        var line = MakeOverlay(fill.transform, "Line");
+        line.color = new Color(zone.r * EmptyLineMul, zone.g * EmptyLineMul, zone.b * EmptyLineMul, EmptyLineA);
+        // RoundedOutline은 선을 스프라이트 가장자리에서 4px 안쪽에 긋는다 — 바탕 들임 1 + 4만큼 벌려 선을 칸 가장자리에 맞춘다.
+        line.rectTransform.offsetMin = -Vector2.one * 5f;
+        line.rectTransform.offsetMax =  Vector2.one * 5f;
+
+        fill.gameObject.SetActive(false);
+        return fill;
+    }
+
+    private static void EnsureEmptyFaceSprites(Image fill)
+    {
+        if (fill.sprite != null) return;
+        fill.sprite = UIProceduralSprites.RoundedRect(radius: EmptyFaceRadius, feather: 1f);
+        fill.type   = Image.Type.Sliced;
+        if (fill.transform.childCount > 0 && fill.transform.GetChild(0).TryGetComponent<Image>(out var line))
+        {
+            line.sprite = UIProceduralSprites.RoundedOutline(radius: EmptyFaceRadius, stroke: 1f);
+            line.type   = Image.Type.Sliced;
+        }
+    }
+
+    /// <summary>
+    /// 빈 칸을 칠한다 — 타일 그림(속성 테 · 문양이 구워져 있다)과 흰 겹판(Inner 0.08)을 끄고 코드 타일만 켠다(10-11 v2).
+    /// 겹판이 빈 칸을 밝히던 몫이 가장 컸다 — 선형 색공간이라 알파 0.08 흰색이 어두운 바탕(≈25)을 ≈80까지 올렸다(10-11 실측 83).
+    /// 코드 타일이 없는 칸(만들기 전)은 예전처럼 타일 명암으로 칠한다.
+    /// </summary>
+    private void PaintEmpty(Vector2Int pos, Image img, Color bc)
+    {
+        if (!_cellEmptyFaces.TryGetValue(pos, out var face) || face == null) { img.color = EmptyColor(bc); return; }
+        img.color = Color.clear;
+        SetEmptyLook(pos, face, true);
+    }
+
+    /// <summary>빈 칸이 아닌 칸(놓인 칸 · 힌트 칸 · 드래그 미리보기)을 칠한다 — 타일 그림 그대로, 코드 타일은 끈다.</summary>
+    private void PaintTile(Vector2Int pos, Image img, Color c)
+    {
+        img.color = c;
+        if (_cellEmptyFaces.TryGetValue(pos, out var face) && face != null) SetEmptyLook(pos, face, false);
+    }
+
+    private void SetEmptyLook(Vector2Int pos, Image face, bool empty)
+    {
+        if (empty) EnsureEmptyFaceSprites(face);
+        if (face.gameObject.activeSelf != empty) face.gameObject.SetActive(empty);
+        if (_cellInnerImages.TryGetValue(pos, out var inner) && inner != null && inner.enabled == empty) inner.enabled = !empty;
     }
 
     private void CreateGridSquare(Vector2Int gridPos, float posX, float posY,
@@ -1021,6 +1080,8 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         _cellGlowImages.Clear();
         _cellPreviewImages.Clear();
         _cellBorderImages.Clear();
+        _cellEmptyFaces.Clear();
+        _cellInnerImages.Clear();
         _cellEdgeImages.Clear();
         _cellPieceId.Clear();
         _cellBaseColors.Clear();
@@ -1057,13 +1118,10 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     private static Color OccupiedColor(Color c) =>
         new(Mathf.Min(1f, c.r * 1.45f), Mathf.Min(1f, c.g * 1.45f), Mathf.Min(1f, c.b * 1.45f), HIGHLIGHT_ALPHA);
 
-    // 비어 있음: 어둡고 반투명
+    // 비어 있음: 어둡고 흐리게 — 10-11 v2 ×0.55 · 0.55 → ×0.30 · 0.35(리서치 B §3 P1 · 배낭 게임 · Last Epoch처럼 색은 채워진 것에만).
+    // 코드 타일(EmptyFace)이 생긴 뒤로는 그것이 빈 칸을 그린다 — 이 색은 코드 타일이 없는 칸의 예비다(PaintEmpty).
     private static Color EmptyColor(Color c) =>
-        new(c.r * 0.55f, c.g * 0.55f, c.b * 0.55f, 0.55f);
-
-    // 배치 가능(빈 셀): 어두움(Empty)과 점유(Occupied) 사이 — "여기 놓을 수 있다"를 밝기로 안내
-    private static Color PlaceableColor(Color c) =>
-        new(Mathf.Min(1f, c.r * 1.05f), Mathf.Min(1f, c.g * 1.05f), Mathf.Min(1f, c.b * 1.05f), 0.85f);
+        new(c.r * 0.30f, c.g * 0.30f, c.b * 0.30f, 0.35f);
 
     // 매칭 속성칸 강조: 존 색을 강하게 + 높은 알파(배치 유도 하이라이트)
     private static Color MatchHighlightColor(Color c) =>
@@ -1101,7 +1159,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         {
             _occupiedPositions.Add(pos);
             if (_cellImages.TryGetValue(pos, out var img) && _cellBaseColors.TryGetValue(pos, out var bc))
-                img.color = OccupiedColor(bc);
+                PaintTile(pos, img, OccupiedColor(bc));
         }
 
         // Bridge에 클러스터 업데이트 알림 (시너지 패널 즉시 갱신)
@@ -1139,7 +1197,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             {
                 if (!_cellEdgeImages.TryGetValue(pos, out var edges) || edges == null) continue;
                 _cellPieceId.TryGetValue(pos, out string pid);
-                var target = PieceOutlineColor(pid);
+                var target = EdgeColor(pid);
                 var draw   = Color.Lerp(Color.white, target, lineT);
                 for (int e = 0; e < edges.Length; e++)
                 {

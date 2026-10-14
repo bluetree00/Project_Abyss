@@ -89,10 +89,20 @@ public static class LichHazards
                                   float tickSeconds = 0.4f)
         => Host.Add(new LingerPoolHazard(ctx, center, radius, seconds, tickDamageMult, tickSeconds));
 
+    /// <summary>
+    /// 한 줄로 이어 터지는 지연 폭발 묶음(낫의 대마법) — 묶음 안 폭발 하나에 닿으면 나머지는 그 플레이어를 치지 않는다.
+    /// 원이 겹친 띠에 서 있으면 0.2초 간격으로 두 번 맞았다(10-08 점검).
+    /// </summary>
+    public sealed class BlastRow
+    {
+        internal bool Touched;
+    }
+
     /// <summary>지연 폭발 — 판정 크기의 원이 <paramref name="warn"/>초 동안 차오른 뒤 터진다(마법 추격 · 결박 추격).</summary>
     public static void DelayedBlast(MonsterContext ctx, Vector3 center, float radius, float warn, float damageMult,
-                                    LichVfxSlot impact, float impactScale = 1f, bool crack = true)
-        => Host.Add(new DelayedBlastHazard(ctx, center, radius, warn, damageMult, impact, impactScale, crack));
+                                    LichVfxSlot impact, float impactScale = 1f, bool crack = true, BlastRow row = null,
+                                    bool armed = false)
+        => Host.Add(new DelayedBlastHazard(ctx, center, radius, warn, damageMult, impact, impactScale, crack, row, armed));
 
     /// <summary>
     /// 뻗어 나가는 광선 — 앞머리가 <paramref name="speed"/>(m/s)로 나아가며, 앞머리가 지난 자리에서만 맞는다.
@@ -136,6 +146,7 @@ public static class LichHazards
     {
         s_bound = null;
         if (s_host != null) s_host.ClearAll();
+        LichDarkRainZone.ClearAll();   // 결계 폭격 장판도 함께 — 사망 · 페이지 전환 뒤에 남아 터졌다(10-08 점검)
     }
 
     // ── 장판·투사체 ─────────────────────────────────────────
@@ -249,7 +260,9 @@ public static class LichHazards
             if (_vfx != null) _vfx.transform.SetPositionAndRotation(_pos, Quaternion.LookRotation(_dir));
             if (_marker != null) _marker.transform.position = LichPatternUtil.OnFloor(_ctx, _pos) + Vector3.up * 0.03f;
 
-            if (LichPatternUtil.HitCircle(_ctx, _pos, _radius, _damage, _knockback))
+            // 무적이 아니던 플레이어에 닿으면 터진다 — 무효화 · 저스트 회피로 피해가 0이어도(매 프레임 다시 굴리지 않게, 10-08 점검).
+            LichPatternUtil.HitCircle(_ctx, _pos, _radius, _damage, out bool contact, _knockback);
+            if (contact)
             {
                 LichVfx.Play(LichVfxSlot.DarkOrbImpact, _pos, Quaternion.identity, 0.35f);
                 return false;
@@ -384,6 +397,7 @@ public static class LichHazards
         private float      _chainTimer = -1f;
         private Vector3    _chainPos;
         private GameObject _chainDisc;
+        private bool       _chainSignaled;
 
         public QuadrantHazard(MonsterContext ctx, QuadrantSettings s)
         {
@@ -497,19 +511,24 @@ public static class LichHazards
         /// <summary>번개 사분면에서 맞으면 낙뢰가 한 번 더 따라온다(재발동 대기 있음 — 낙뢰 자신이 다시 부르지 않게).</summary>
         private void OnPlayerDamaged()
         {
+            // 바닥이 다 채워지기 전엔 낙뢰도 없다 — 원소 성질은 채워진 뒤부터(10-08 점검).
+            if (_age < FillSeconds) return;
             if (_chainTimer >= 0f || _chainCooldown > 0f) return;
             if (PlayerQuadrant(out var target) != QuadrantElement.Lightning) return;
 
             _chainCooldown = _s.ChainCooldown;
             _chainTimer    = _s.ChainWarn;
             _chainPos      = LichPatternUtil.OnFloor(_ctx, target);
-            _chainDisc     = PatternGuideHelper.Disc(_chainPos, _s.ChainRadius, LichPatternUtil.Arcane);
+            _chainDisc     = LichPatternUtil.PrepareTelegraph(
+                PatternGuideHelper.Disc(_chainPos, _s.ChainRadius, LichPatternUtil.Arcane), LichPatternUtil.Arcane);   // 차오름 + 신호(10-13 검증 — 빈 테두리였다)
+            _chainSignaled = false;
         }
 
         private void TickChain(float dt)
         {
             if (_chainTimer < 0f) return;
             _chainTimer -= dt;
+            LichPatternUtil.TickTelegraph(_chainDisc, _s.ChainWarn - _chainTimer, _s.ChainWarn, 0.15f, ref _chainSignaled);
             if (_chainTimer > 0f) return;
 
             _chainTimer = -1f;
@@ -547,10 +566,11 @@ public static class LichHazards
         public override bool Tick(float dt)
         {
             _front = Mathf.Min(_length, _front + _speed * dt);
-            if (LichPatternUtil.HitBeam(_ctx, _origin, _dir, _front, _halfWidth, _damage, _knockback))
+            bool damaged = LichPatternUtil.HitBeam(_ctx, _origin, _dir, _front, _halfWidth, _damage, out bool contact, _knockback);
+            if (contact)
             {
-                LichPatternUtil.Impact(LichImpact.Medium, true);
-                return false;   // 한 번만
+                if (damaged) LichPatternUtil.Impact(LichImpact.Medium, true);
+                return false;   // 한 번만 — 흘렸어도(무효화 · 저스트 회피) 이 광선은 쓰였다(10-08 점검)
             }
             return _front < _length;
         }
@@ -624,13 +644,16 @@ public static class LichHazards
         private readonly LichVfxSlot    _impact;
         private readonly float          _impactScale;
         private readonly bool           _crack;
+        private readonly BlastRow       _row;
+        private readonly bool           _armed;   // 앞선 예고를 꽉 찬 빨강으로 이어받았다
         private float      _t;
         private bool       _signaled;
         private GameObject _disc;
 
         public DelayedBlastHazard(MonsterContext ctx, Vector3 center, float radius, float warn, float damage,
-                                  LichVfxSlot impact, float impactScale, bool crack)
+                                  LichVfxSlot impact, float impactScale, bool crack, BlastRow row, bool armed)
         {
+            _row         = row;
             _ctx         = ctx;
             _center      = center;
             _radius      = radius;
@@ -641,17 +664,31 @@ public static class LichHazards
             _crack       = crack;
             _disc        = LichPatternUtil.PrepareTelegraph(
                 PatternGuideHelper.Disc(center, radius, LichPatternUtil.Arcane), LichPatternUtil.Arcane);
+            _armed       = armed;
+            if (armed)
+            {
+                // 앞선 예고(꽉 찬 빨강)를 이어받는다 — 비운 채 다시 차오르면 예고가 거꾸로 간다(10-13 검증 · 낫의 대마법)
+                PatternGuideHelper.SetProgress(_disc, 1f);
+                LichPatternUtil.TickTelegraph(_disc, _warn, _warn, SignalSeconds, ref _signaled);
+            }
         }
 
         public override bool Tick(float dt)
         {
             _t += dt;
-            LichPatternUtil.TickTelegraph(_disc, _t, _warn, SignalSeconds, ref _signaled);
+            LichPatternUtil.TickTelegraph(_disc, _armed ? _warn : _t, _warn, SignalSeconds, ref _signaled);   // 이어받은 예고는 꽉 찬 채
             if (_t < _warn) return true;
 
             LichVfx.Play(_impact, _center, Quaternion.identity, _impactScale);
             LichSfx.Play(LichSfxSlot.BoltImpact, _center);
-            LichPatternUtil.Impact(LichImpact.Light, LichPatternUtil.HitCircle(_ctx, _center, _radius, _damage));
+            // 묶음에서 이미 닿았으면 판정하지 않는다 — 겹친 원에 두 번 맞지 않게(10-08 점검).
+            bool damaged = false;
+            if (_row == null || !_row.Touched)
+            {
+                damaged = LichPatternUtil.HitCircle(_ctx, _center, _radius, _damage, out bool contact);
+                if (contact && _row != null) _row.Touched = true;
+            }
+            LichPatternUtil.Impact(LichImpact.Light, damaged);
             if (_crack) LichCrack.Spawn(_center, _radius * 1.6f, 6f);
             return false;
         }

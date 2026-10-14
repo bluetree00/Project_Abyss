@@ -11,12 +11,13 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     /// <summary>히트 VFX 안전 수명(초). CombatDamage의 클램프 구간(0.5~3s) 안쪽 값.</summary>
     private const float HitVfxLife = 2f;
 
-    /// <summary>유도 목표 탐색 반경(m)·최대 후보 수. 매 프레임이 아니라 목표를 잃었을 때만 돈다.</summary>
+    /// <summary>유도 목표 탐색 반경(m)·최대 후보 수. 매 프레임이 아니라 목표를 잃었을 때만 돈다.
+    /// 후보엔 부술 물체(기둥 · 봉인석)도 섞여 들어와 걸러지므로 넉넉히 잡는다.</summary>
     private const float HomingSearchRadius = 18f;
-    private const int   HomingSearchMax    = 8;
+    private const int   HomingSearchMax    = 16;
 
     /// <summary>유도 탐색용 공유 버퍼 — 투사체마다 리스트를 만들면 발사마다 할당이 생긴다.</summary>
-    private static readonly List<MonsterBase> s_homingBuffer = new();
+    private static readonly List<GameObject> s_homingBuffer = new();
 
     /// <summary>스윕 1회가 담을 수 있는 최대 충돌 수.</summary>
     private const int SweepMax = 12;
@@ -70,6 +71,7 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     // 이 화살이 '무슨 행동'으로 나갔는가. 스킬이 쏜 화살은 스킬로 신고해야 스킬 피해 증가가 붙는다(09-21).
     private WeaponActionType _actionType = WeaponActionType.GroundLight;
     private bool _isFinisher;   // 스킬 막타(차지샷 등) — 연출 단계만
+    private float _splitWeight = 1f;   // 분열 무게(가운데 1 · 갈래 CombatSpawner.SplitExtraWeight) — 피해 파이프라인 마지막에 곱한다(10-14)
     private string _explodeEffectKey;
     private float _explodeEffectScale;
 
@@ -87,10 +89,11 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     /// <summary>예산을 이미 한 번 되채웠는지. 리필은 발사당 1회뿐이라 이 플래그가 상한 역할을 한다.</summary>
     private bool  _pierceRefilled;
     /// <summary>
-    /// 추적 중인 적. Transform이 아니라 <see cref="MonsterBase"/>로 들고 있어야 <b>HP까지</b> 볼 수 있다.
+    /// 추적 중인 적 — <see cref="MonsterBase"/> 또는 보스가 부른 잡몹(<see cref="IKillable"/> · 3챕터 새끼 용, 10-14).
+    /// Transform이 아니라 컴포넌트로 들고 있어야 <b>살았는지까지</b> 볼 수 있다(<see cref="IsLiveTarget"/>).
     /// 몹은 죽어도 사망 연출 동안 오브젝트가 살아 있어, 활성 여부만 보면 화살이 시체 주위를 맴돈다.
     /// </summary>
-    private MonsterBase _homingTarget;
+    private Component _homingTarget;
 
     /// <summary>
     /// 귀환 진입 시점에 <b>몸을 겹치고 있던</b> 대상. 이 자리를 벗어나기 전까지는 무시한다.
@@ -195,6 +198,7 @@ public class BasicArrow : MonoBehaviour, IPooledObject
         // 파츠 옵션은 발사마다 초기화 — 풀에서 재사용되므로 이전 발사의 설정이 남으면 안 된다.
         _actionType     = WeaponActionType.GroundLight;   // 스킬이 쏜 화살이면 SetActionType이 곧바로 덮어쓴다
         _isFinisher     = false;
+        _splitWeight    = 1f;
         _speedMult      = 1f;
         _homing         = 0f;
         _returnOnPierce = false;
@@ -225,6 +229,9 @@ public class BasicArrow : MonoBehaviour, IPooledObject
 
     /// <summary>스킬 마무리 일격 화살인지(타격 연출 단계용).</summary>
     public void SetFinisher(bool isFinisher) => _isFinisher = isFinisher;
+
+    /// <summary>분열 무게 — 갈래 화살만 1보다 작다(<see cref="CombatDamage.Request.SplitWeight"/>). 발사(Fire)마다 1로 돌아간다.</summary>
+    public void SetSplitWeight(float weight) => _splitWeight = Mathf.Clamp01(weight);
 
     /// <summary>폭발 설정</summary>
     public void SetExplosion(float radius, float explosionDamage, string effectKey = "", float effectScale = 1f)
@@ -330,7 +337,9 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     {
         if (dist <= 0f) return;
 
-        int n = Physics.SphereCastNonAlloc(from, hitRadius, dir, s_sweepHits, dist,
+        // 화살 크기 배율(크기 파츠 · 스킬 확대)만큼 판정도 — 그림이 커지는데 0.35 m로만 맞았다(10-13 이펙트 = 판정). 줄이지는 않는다
+        float radius = hitRadius * Mathf.Max(1f, Mathf.Abs(transform.lossyScale.x));
+        int n = Physics.SphereCastNonAlloc(from, radius, dir, s_sweepHits, dist,
                                            ~0, QueryTriggerInteraction.Collide);
         if (n <= 0) return;
         if (n > 1) System.Array.Sort(s_sweepHits, 0, n, s_sweepOrder);
@@ -341,6 +350,11 @@ public class BasicArrow : MonoBehaviour, IPooledObject
 
             var col = s_sweepHits[i].collider;
             if (col == null) continue;
+
+            // 벽 · 바닥(맞을 수 없는 실체)은 화살 중심선이 닿을 때만 막는다 — 넓은 판정 구가 스치기만 해도 막히면
+            // 낮은 적을 향해 기운 화살이 적보다 먼저 바닥을 스쳐 사라졌다(10-15 석궁 + 거력 0맞힘 · 거력 없이도 절반).
+            if (!col.isTrigger && col.GetComponentInParent<IDamageable>() == null
+                && !col.Raycast(new Ray(from, dir), out _, dist + radius)) continue;
 
             // 시작 지점에 이미 겹쳐 있으면 point가 (0,0,0)으로 온다 — 그때는 출발점을 쓴다.
             Vector3 point = s_sweepHits[i].distance > 0f ? s_sweepHits[i].point : from;
@@ -369,28 +383,40 @@ public class BasicArrow : MonoBehaviour, IPooledObject
         ApplyRotation();
     }
 
-    /// <summary>가장 가까운 살아있는 적. 이미 관통한 대상은 제외해 같은 적을 다시 쫓지 않는다.</summary>
+    /// <summary>
+    /// 가장 가까운 살아있는 적. 이미 관통한 대상은 제외해 같은 적을 다시 쫓지 않는다.
+    /// 몬스터(MonsterBase)만 찾던 탓에 보스가 부른 잡몹(3챕터 새끼 용 — IKillable)을 지나쳐 보스만 노렸다(10-14).
+    /// </summary>
     private Transform AcquireTarget()
     {
         // 매 프레임 재탐색하지 않는다 — 대상이 살아있으면 그대로 유지(탐색 비용·궤적 흔들림 방지).
         // 단 HP가 0이 되는 순간 놓는다. 활성 여부만 보면 사망 연출 중인 시체를 계속 쫓는다.
-        if (_homingTarget != null && _homingTarget.gameObject.activeInHierarchy && _homingTarget.CurrentHp > 0)
+        if (IsLiveTarget(_homingTarget))
             return _homingTarget.transform;
 
         _homingTarget = null;
 
-        int n = CombatQuery.GetNearbyEnemies(transform.position, HomingSearchRadius, _instigator,
-                                             HomingSearchMax, s_homingBuffer);
+        int n = CombatQuery.GetNearbyDamageables(transform.position, HomingSearchRadius, _instigator,
+                                                 HomingSearchMax, s_homingBuffer);
         for (int i = 0; i < n; i++)
         {
-            var mb = s_homingBuffer[i];
-            if (mb == null) continue;
-            if (_pierced != null && _pierced.Contains(mb.gameObject)) continue;   // 이미 뚫은 적은 건너뛴다
-            _homingTarget = mb;
-            return mb.transform;
+            var go = s_homingBuffer[i];
+            if (go == null) continue;
+            if (_pierced != null && _pierced.Contains(go)) continue;   // 이미 뚫은 적은 건너뛴다
+            // 죽을 수 있는 적만 — 기둥 · 봉인석 같은 부술 물체(IDamageable만)는 쫓지 않는다
+            Component c = go.TryGetComponent<MonsterBase>(out var mb) ? mb
+                        : go.TryGetComponent<IKillable>(out var k) ? k as Component : null;
+            if (!IsLiveTarget(c)) continue;
+            _homingTarget = c;
+            return c.transform;
         }
         return null;
     }
+
+    /// <summary>쫓을 만한 산 적인가 — 몬스터는 HP, 잡몹(IKillable)은 사망 여부로 본다.</summary>
+    private static bool IsLiveTarget(Component c) =>
+        c != null && c.gameObject.activeInHierarchy &&
+        (c is MonsterBase mb ? mb.CurrentHp > 0 : c is IKillable k && !k.IsDead);
 
     /// <summary>
     /// 몬스터가 스스로 화살 위로 걸어 들어오는 경우를 위한 보조 경로.
@@ -453,6 +479,7 @@ public class BasicArrow : MonoBehaviour, IPooledObject
                 SourcePosition      = _instigator != null ? _instigator.transform.position : transform.position,
                 IsRanged            = true,
                 SkipHitVfx          = true,
+                SplitWeight         = _splitWeight,
             });
         }
 
@@ -564,6 +591,7 @@ public class BasicArrow : MonoBehaviour, IPooledObject
                 SourcePosition      = center,
                 IsRanged            = true,
                 SkipHitVfx          = true,
+                SplitWeight         = _splitWeight,
             });
         }
     }

@@ -161,7 +161,7 @@ public class LichAbyssalRendState : UnInterruptibleState<LichAbyssalRendPatternS
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -200,7 +200,10 @@ public class LichAbyssalRendState : UnInterruptibleState<LichAbyssalRendPatternS
         LichSfx.Play(LichSfxSlot.SlamImpact, _center + dir * mid);
         LichSfx.Play(LichSfxSlot.Collapse, _center + dir * mid);
 
-        bool hit = InWedge(ctx) && LichPatternUtil.HitPlayer(ctx, _center, Data.damageMultiplier, Data.knockbackMultiplier);
+        // 넉백은 코어(안전 원) 쪽으로 — 중심에서 밀면 같은 순간 무너지는 바깥 칸 · 제단 밖으로 떨어졌다(10-08 점검).
+        var  target = ctx.Runtime.PlayerTarget;
+        bool hit    = InWedge(ctx) && LichPatternUtil.HitPlayer(ctx, target.position * 2f - _center,
+                                                               Data.damageMultiplier, Data.knockbackMultiplier);
         LichPatternUtil.Impact(LichImpact.Transition, hit);
     }
 

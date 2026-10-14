@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
+using RelicFairy.Monster;
 
 /// <summary>
 /// 가웨인 정오 게이지(Zenith) — 시간 자동 사이클. <see cref="IRelicResource"/> 구현.
@@ -19,6 +21,12 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     // 잔열 가속 상한 — 3배속까지. 없으면 학살 구간에서 정오가 끊기지 않고 도는 무한 루프가 된다.
     private const float MaxChargeAccel = 2f;
 
+    // 해는 싸울 때만 돈다(10-11) — 이 거리 안에 살아 있는 적이 없으면 시계가 멈춘다.
+    // 예전엔 복도 · 보상방 · 상점에서도 흘러 정오(강화 10초 · 낙일 1회)가 싸울 상대 없이 지나갔다(랜슬롯 광란은 때려야 차니 늘 전투 중에 온다).
+    private const float FoeRadius     = 30f;
+    private const float FoeCheckEvery = 0.25f;
+    private static readonly List<MonsterBase> s_foes = new();
+
     private float _chargeTime = 20f, _noonTime = 10f, _cooldownTime = 15f, _markThreshold = 0.8f;
 
     private ZPhase _phase = ZPhase.Charging;
@@ -37,6 +45,8 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     private bool   _shortNoon;          // 지금 정오가 짧은 정오
     private float  _shortNoonTime = 3f;
     private bool   _paused;       // 일식 — 해의 시간이 멈춘다
+    private bool   _foeNear = true;
+    private float  _foeCheckTimer;
 
     // 라벨 캐시 — 표시값이 바뀔 때만 문자열을 새로 만든다.
     private string _label = "여명";
@@ -86,6 +96,9 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
             return;
         }
 
+        // 싸울 상대가 없으면 해가 기다린다 — 정오 도중 방을 비우면 남은 정오가 다음 싸움으로 넘어간다
+        if (!FoeNear()) return;
+
         // [v2 일식] 해의 시간이 멈춘다
         if (_paused) return;
 
@@ -118,6 +131,20 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
         if (markNow != _markActiveLast) { _markActiveLast = markNow; changed = true; }
 
         if (changed) OnChanged?.Invoke();
+    }
+
+    /// <summary>근처(<see cref="FoeRadius"/>)에 살아 있는 적이 있는가 — 0.25초마다 활성 몬스터 장부를 훑는다(할당 없음).</summary>
+    private bool FoeNear()
+    {
+        _foeCheckTimer -= Time.deltaTime;
+        if (_foeCheckTimer > 0f) return _foeNear;
+        _foeCheckTimer = FoeCheckEvery;
+        MonsterBase.CopyActive(s_foes);
+        Vector3 me = transform.position;
+        _foeNear = false;
+        foreach (var m in s_foes)
+            if (m != null && !m.IsDead && (m.transform.position - me).sqrMagnitude <= FoeRadius * FoeRadius) { _foeNear = true; break; }
+        return _foeNear;
     }
 
     /// <summary>런(던전)이 실제로 진행 중인가. 허브·런 종료 구간에서는 사이클을 멈춘다.</summary>

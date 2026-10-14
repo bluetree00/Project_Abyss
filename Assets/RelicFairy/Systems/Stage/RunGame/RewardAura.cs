@@ -17,6 +17,7 @@ public sealed class RewardAura : MonoBehaviour
     // ── Private ────────────────────────────────────────────────
     private readonly List<GameObject> _loops      = new(3);
     private readonly List<Vector3>    _baseScales = new(3);
+    private readonly List<bool>       _keepIdle   = new(3);   // 보상이 선 뒤에도 남는가(예고에만 쓰는 빛은 Follow에서 흩는다)
     private GameObject _target;
     private bool       _following;
     private float      _growSeconds;
@@ -55,12 +56,16 @@ public sealed class RewardAura : MonoBehaviour
         return go.AddComponent<RewardAura>();
     }
 
-    /// <summary>반복 이펙트 하나를 맡는다(null이면 무시 — 목록에 칸이 없을 때).</summary>
-    public void AddLoop(GameObject loop)
+    /// <summary>
+    /// 반복 이펙트 하나를 맡는다(null이면 무시 — 목록에 칸이 없을 때).
+    /// <paramref name="keepWhenIdle"/>이 false면 예고 동안만 쓰고 보상이 서면(<see cref="Follow"/>) 흩는다.
+    /// </summary>
+    public void AddLoop(GameObject loop, bool keepWhenIdle = true)
     {
         if (loop == null) return;
         _loops.Add(loop);
         _baseScales.Add(loop.transform.localScale);
+        _keepIdle.Add(keepWhenIdle);
     }
 
     /// <summary>지금부터 <paramref name="seconds"/> 동안 작게 시작해 제 크기로 자란다(예고).</summary>
@@ -76,6 +81,17 @@ public sealed class RewardAura : MonoBehaviour
         _target    = target;
         _following = true;
         _pulseHz   = Mathf.Max(0f, pulseHz);
+
+        // 예고에만 쓰는 빛을 흩는다 — 놓여 있는 동안 두 반복 이펙트가 같은 말(등급)을 겹쳐 하지 않게(10-11 이펙트 톤 점검)
+        for (int i = _loops.Count - 1; i >= 0; i--)
+        {
+            if (_keepIdle[i]) continue;
+            var loop = _loops[i];
+            if (loop != null) RunFx.Stop(ref loop, FadeOut);
+            _loops.RemoveAt(i);
+            _baseScales.RemoveAt(i);
+            _keepIdle.RemoveAt(i);
+        }
     }
 
     /// <summary>반복 이펙트를 흩고 사라진다.</summary>
@@ -97,5 +113,6 @@ public sealed class RewardAura : MonoBehaviour
         }
         _loops.Clear();
         _baseScales.Clear();
+        _keepIdle.Clear();
     }
 }

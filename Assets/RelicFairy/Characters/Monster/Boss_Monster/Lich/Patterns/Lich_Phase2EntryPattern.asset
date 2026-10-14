@@ -21,7 +21,7 @@ MonoBehaviour:
     type: 3}
   playerStatusEffect: {fileID: 0}
   patternTag: phase2entry
-  breakOverride: 0.3
+  breakOverride: 1
   targetPage: 2
   form: 3
   dialogueKey: Lich_Page2_Nightmare

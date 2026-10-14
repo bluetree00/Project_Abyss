@@ -87,6 +87,7 @@ public class GridManager : MonoBehaviour
 
         var squares = ResolveFootprint(shape, anchor, out bool allValid);
         if (squares == null) return;
+        if (!RuneBlockBudget.FitsSame(shape.ItemData)) allValid = false;   // 같은 룬 상한(10-14) — 손을 놓기 전에 빨강
 
         // 미리보기는 타일 위 겹판이다 — 타일 무늬가 비치게 0.55(09-27, 예전 0.85는 타일 밑에 깔려 있을 때 값).
         Color color = allValid
@@ -204,6 +205,7 @@ public class GridManager : MonoBehaviour
         }
 
         if (firstBlock == null || firstTargetSq == null) return false;
+        if (!RuneBlockBudget.FitsSame(shape.ItemData)) allValid = false;   // 같은 룬 상한(10-14)
 
         // 스냅 오프셋: 첫 번째 블록을 타깃 Square 중심에 맞추는 shape 로컬 이동량
         var shapeRT     = (RectTransform)shape.transform;
@@ -289,8 +291,11 @@ public class GridManager : MonoBehaviour
         }
 
         if (!onBoard)  return null;
+        int used = RuneBlockBudget.UsedExcept(shape.ItemData);
+        if (!RuneBlockBudget.Fits(used)) return RuneBlockBudget.FullMessage(used);
+        if (!RuneBlockBudget.FitsSame(shape.ItemData)) return RuneBlockBudget.SameMessage(shape.ItemData);
         if (offBoard)  return "룬 전체가 판 안에 들어가야 합니다";
-        if (center)    return "전설 룬과 핵 룬은 중앙에 놓을 수 없습니다";
+        if (center)    return "Legendary 룬과 핵 룬은 중앙에 놓을 수 없습니다";
         if (zone)
         {
             string n = ElementDef.GetById(element)?.Name ?? element;
@@ -357,6 +362,12 @@ public class GridManager : MonoBehaviour
             if (firstTarget == null)
                 firstTarget = square.GetComponent<RectTransform>();
         }
+
+        // 룬 수 상한 — 판 전체 룬 개수(RuneBlockBudget, 10-10 칸 → 개수). 끌어 놓기 · 칸 누르기 · 자리 비우고 배치가 모두 여기를 지난다(세이브 복원은 안 지난다).
+        // 이미 판에 놓인 룬을 옮기는 중이면 자기 자신은 세지 않는다.
+        if (!RuneBlockBudget.Fits(RuneBlockBudget.UsedExcept(shape.ItemData))) return false;
+        // 같은 룬 상한(10-14 · 판에 2개까지) — 같은 자리 · 같은 규칙(세이브 복원은 안 지난다)
+        if (!RuneBlockBudget.FitsSame(shape.ItemData)) return false;
 
         // Snap by delta (keeps multi-block shape aligned)
         if (placementRules == null || placementRules.snapShapeToFirstSquare)

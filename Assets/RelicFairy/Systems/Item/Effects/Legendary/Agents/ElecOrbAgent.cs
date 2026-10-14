@@ -15,10 +15,13 @@ public sealed class ElecOrbAgent : LegendaryProjectileBase
     private const float BoltInterval = 3f;
     private readonly List<GameObject> _boltBuf = new(2);
 
+    /// <summary>true면 3초마다 볼트, false면 <see cref="FireBoltNow"/>로만(전자기 구체 = 스킬 적중 때 · 10-14 R3).</summary>
+    public bool TimedBolts { get; set; } = true;
+
     public void InitElec(object owner, ItemEffectContext ctx, float damage, float explosionMult,
                          float speed, float lifetime, Vector3 startDir)
     {
-        Init(owner, ctx, damage, speed, 9999f, RuneElement.Electric, startDir,
+        Init(owner, ctx, damage, speed, lifetime, RuneElement.Electric, startDir,
              maxBounces: 99999, pierce: true, hitRadius: 0.55f);
         _explosionMult = explosionMult;
         _boltTimer = BoltInterval; // 첫 발사 즉시 대기
@@ -27,6 +30,7 @@ public sealed class ElecOrbAgent : LegendaryProjectileBase
     protected override void Update()
     {
         base.Update();
+        if (!TimedBolts) return;
         _boltTimer -= Time.deltaTime;
         if (_boltTimer <= 0f)
         {
@@ -34,6 +38,9 @@ public sealed class ElecOrbAgent : LegendaryProjectileBase
             TryFireBolt();
         }
     }
+
+    /// <summary>가장 가까운 적에게 볼트 한 발(스킬 적중 때).</summary>
+    public void FireBoltNow() => TryFireBolt();
 
     private void TryFireBolt()
     {
@@ -48,7 +55,7 @@ public sealed class ElecOrbAgent : LegendaryProjectileBase
         var go = new GameObject("ElecBolt");
         go.transform.position = transform.position;
         var bolt = go.AddComponent<ElecBoltAgent>();
-        bolt.InitBolt(Owner, _ctx, _damage, toTarget.normalized);
+        bolt.InitBolt(Owner, _ctx, CurrentDamage, toTarget.normalized);
     }
 
     protected override void TryNavMeshBounce() { } // BoxCollider 벽에서만 반사
@@ -66,9 +73,10 @@ public sealed class ElecOrbAgent : LegendaryProjectileBase
 
     protected override void OnHitEnemy(GameObject target)
     {
-        float explosionDmg = _damage * _explosionMult;
+        float hit = CurrentDamage;
+        float explosionDmg = hit * _explosionMult;
 
-        CombatQuery.DealSynergyDamage(target, _damage, _ctx?.Player?.gameObject, element: RuneElement.Electric);
+        CombatQuery.DealSynergyDamage(target, hit, _ctx?.Player?.gameObject, element: RuneElement.Electric);
 
         int n = CombatQuery.GetNearbyDamageables(transform.position, 2f, target, 8, _hitBuffer);
         for (int i = 0; i < n; i++)

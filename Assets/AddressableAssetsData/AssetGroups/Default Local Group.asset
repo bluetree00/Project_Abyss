@@ -20,8 +20,23 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 048d24a7c8c15422e8960ff703790d5e
+    m_Address: sfx_covenant_forge
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 04ec0216e865d452a9faa8b617f56e9d
+    m_Address: sfx_forge_take
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 052bcac36379be64798879c91da09a5a
     m_Address: UI/Popup/UI_StartPartPopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0598b31e0b2714a0c8aec68123887515
+    m_Address: sfx_relic_grudge_wave
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -36,8 +51,23 @@ MonoBehaviour:
     m_SerializedLabels:
     - Achievement
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 069ec9111b5ec43aabe768a98ea66aba
+    m_Address: sfx_clause_ruby
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 06f8161bc55784d24b18f2e95d88193c
+    m_Address: sfx_crucible_hit
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 07757cf211bd45044a1f1917658b9e66
     m_Address: VFX_ExtraAttack
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 086f220e15e1344a2a3180f851f8291d
+    m_Address: sfx_costume_up
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -52,14 +82,34 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0bb624ebf71364282a8bf9a2b51c8021
+    m_Address: sfx_rune_return
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0dd2569d1b69449e0ae35fab72a5e5b0
+    m_Address: sfx_gate_seal
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0dd3f6f57d3da5c40a295a89d6324a7d
     m_Address: Assets/RelicFairy/Data/Quest/Generated/Quests/tut_covenant.asset
     m_ReadOnly: 0
     m_SerializedLabels:
     - Quest
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0de2ea81552d74ec2832ea4900796f2e
+    m_Address: sfx_ui_close
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0f14191108fddf644b2b93fb6eac8b7b
     m_Address: UI/Popup/UI_RelicPartDraftPopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0f806d9f8ebdc0c4990726f6cdfae22e
+    m_Address: sfx_skill_buff
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -93,11 +143,36 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 164d95bb13c89480a9e40e667cb4f9a3
+    m_Address: sfx_potion_use
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 175c7ff75b40a3d48aa811efc33d3afa
     m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/depth_3_clear.asset
     m_ReadOnly: 0
     m_SerializedLabels:
     - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 19b25d745cccc4496ae825dcd7c2cdb4
+    m_Address: sfx_rune_take
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1cf10d68406ef4714a240476f6c1c2b3
+    m_Address: sfx_crucible_evolve
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1e0ba9ad3a2f746d890c1fe2d0c87b2f
+    m_Address: sfx_clause_gold
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1e4d1627c08b147b7b6de3a8af9bc2d9
+    m_Address: sfx_fuel_material
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1f33e38f004dea4459c7e28969c59464
     m_Address: Illust_God_Default
@@ -106,6 +181,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 202cd1cc6c363ef47a3daad39bb2eaa4
     m_Address: sfx_player_shot
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 20cd96a1cecaf4c48b2b636834c6a8d0
+    m_Address: sfx_shop_buy
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -126,8 +206,33 @@ MonoBehaviour:
     m_SerializedLabels:
     - Achievement
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 22b78bb57830c4f67afce4440672c5ea
+    m_Address: sfx_rune_flip
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 23c6a4a772bbb4978953367c35df6b1a
+    m_Address: sfx_player_shot_bow
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 24d098200df484638a8ec41969bfa22c
+    m_Address: sfx_skill_tier_up
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2774a226feab2a14894ec2ae8a52eea6
     m_Address: Lobby
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 282be8d5a28884474b8c121c9a6f076e
+    m_Address: sfx_reward_arrive
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 29b56f80cda21401f89a9ee4b159ff92
+    m_Address: sfx_shop_deal
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -137,6 +242,26 @@ MonoBehaviour:
     m_SerializedLabels:
     - Achievement
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2afd86dd678b741c394322a85715e99b
+    m_Address: sfx_covenant_fix
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2d1008e87eaad43cd958723e88088b3f
+    m_Address: sfx_shop_select
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2e753dc07cf5b604fb05e6556bce0bc4
+    m_Address: Portrait_Boss_Dragon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2fb76ee90bb95475e88a8dbea74fee7d
+    m_Address: sfx_crucible_success
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2fdaa0f1669510d4facfcbc0327037a6
     m_Address: Ch3_Map
     m_ReadOnly: 0
@@ -144,6 +269,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2ff3c3d93538a434e963eafdab340c37
     m_Address: Button
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 300b474069b2c434284c1239dd93b3b7
+    m_Address: sfx_ui_open
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -167,6 +297,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 35c0561f70cde47cd91cb34212aaf0f4
+    m_Address: sfx_relic_harvest
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 364dd7223b1b6cb44a74230a5b252eaa
     m_Address: Crucible/CrucibleNpc
     m_ReadOnly: 0
@@ -174,6 +309,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 37261ed02c0b7c649b572232dfd21f30
     m_Address: Illust_Shadow_Default
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3848859217cd2437f8b6ecb593ee9f70
+    m_Address: sfx_spring_drink
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -202,6 +342,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3fcdd89b2ab22024cbc4f52ad5b5d053
+    m_Address: Illust_Story_EndingCard
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 401cef01134edc44a8ab9c33ddca52b9
+    m_Address: Lich_Portrait_Rage
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4063d8dd02099dc479ba8eaaa99c0331
     m_Address: DissolveMaterial
     m_ReadOnly: 0
@@ -222,6 +372,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 416e27d28b9a4264ba6557af65ed4221
+    m_Address: Lich_Portrait
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 41a396b1895ec9a4d89ca918b11139d7
+    m_Address: Illust_Story_MorganaReveal
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 422382185d558764082dcdd29457bc89
     m_Address: Assets/RelicFairy/Data/Quest/Generated/Quests/tut_enter_gate.asset
     m_ReadOnly: 0
@@ -234,17 +394,47 @@ MonoBehaviour:
     m_SerializedLabels:
     - Achievement
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 43d0096b0842e884385d7fbf0a3e016f
+    m_Address: Lich_Portrait_Dying
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 44f25c5ab2e214ed180ff347d9486b3b
+    m_Address: sfx_refine_lit
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 457dea71cecdb4c368896a00f2f64da8
+    m_Address: sfx_gamble_open
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4835e93769013cc46aa1e3c7d675789c
     m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/kill_1000.asset
     m_ReadOnly: 0
     m_SerializedLabels:
     - Achievement
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 487af83246b5e462f97f3c1cf691dc70
+    m_Address: sfx_esc_memory_page
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 494124c30f80e874babc6b004b2e6b30
     m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/boss_10.asset
     m_ReadOnly: 0
     m_SerializedLabels:
     - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4a98c44125d8c40abbd772ea45596990
+    m_Address: sfx_altar_buy
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4c398c4d9ba36493dab6b6289b206527
+    m_Address: sfx_reward_grade
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4c7fb6fbc39560845a086e84d9f1ce15
     m_Address: UI/Popup/UI_RefineryPanel
@@ -256,8 +446,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4e0437013a2af4b4e8755ddcc147008c
+    m_Address: sfx_fuel_ore
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4ee45bb4770e68d44ad92c515113d40e
     m_Address: WEAPON_PARTS_DATA
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4f30576795cb84584a8b6ec70440f4c5
+    m_Address: sfx_mg_grade_down
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -276,11 +476,21 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5322309d867c04f87943dc59dad8d06a
+    m_Address: sfx_result_reveal
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 53e60c31dec99dd47b69241f116fb5d4
     m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/refine_100.asset
     m_ReadOnly: 0
     m_SerializedLabels:
     - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 551cf5609aec348ec8d9260945c989a1
+    m_Address: sfx_shop_reroll
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 56c4b4031637f304195e522f4e9af529
     m_Address: UI/ScreenWipeSkin
@@ -292,8 +502,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 59df2493ccfbd4f0a915625515c385f5
+    m_Address: sfx_ui_click
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 5ad6173f365f3a84093ab916a594ac29
     m_Address: Illust_Intro_Page01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5b7e4af5e540e4d2f9f4b527012fe9dc
+    m_Address: sfx_reward_charge
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -329,6 +549,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 622685aba6ffb47928d0e20ae84be81b
+    m_Address: sfx_altar_engrave
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 62294dc7d2980df40a28f787afcc2832
     m_Address: sfx_relic_sun_fall
     m_ReadOnly: 0
@@ -336,6 +561,16 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 63418a5331367b04287574885f39e9ac
     m_Address: dragon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 63c2e9d937644482190088288bf5e06b
+    m_Address: sfx_refine_spin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 63fa9ba00cecc64418a20bbd48b3aaec
+    m_Address: Illust_Story_MissionSeal
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -356,17 +591,32 @@ MonoBehaviour:
     m_SerializedLabels:
     - Quest
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6736d17605982a14c82832a5d8212dae
+    m_Address: UI/RelicPartDraftSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 695ab98ea9e74a147accf27ab542df3f
     m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/shop_5.asset
     m_ReadOnly: 0
     m_SerializedLabels:
     - Achievement
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6a5d9ecfe1ef24db09d9ec42a0e9fafe
+    m_Address: sfx_altar_era
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 6e6fa982cf6140e42bf113daa4f6e187
     m_Address: Assets/RelicFairy/Data/Quest/Generated/Quests/hidden_elite_ambush.asset
     m_ReadOnly: 0
     m_SerializedLabels:
     - Quest
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6f310f85a4efa4f18b2f48983b906591
+    m_Address: sfx_altar_grow
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7030943ff0db8b143aa282079060903f
     m_Address: UI/Popup/UI_RuneSelectPopup
@@ -375,6 +625,31 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 721cfe8018b2cd04abd0748143d2a312
     m_Address: VFX_Heal
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 727217aa69cbb4865a36202562ae8fc1
+    m_Address: sfx_rune_salvage
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7514705720265459dbf91a0ea929ec6f
+    m_Address: sfx_mg_card
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 76a60afb0ffc74b619b9ef280e0bcbdf
+    m_Address: sfx_result_count
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 774493741b63a4cf4a263e603f964a87
+    m_Address: sfx_buffbox_open
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 77cf8c90b0dc141ee80b8eeec7fd426c
+    m_Address: sfx_form_weight
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -399,8 +674,28 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7f7f2003f18fd4f6a9b31445986ac291
+    m_Address: sfx_stair_rise
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 830eebaf8e6997144a2b0c5970f117ab
     m_Address: SoundEventTable
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8459a860bc1684a01964dcbcafab4b49
+    m_Address: sfx_clause_silver
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8602c98eebfb94b8d9b2d09c463e815f
+    m_Address: sfx_altar_keystone
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 876db8e809bce4c6a9011ef127be67c1
+    m_Address: sfx_crucible_fail
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -411,6 +706,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8943c0e696b59cc448db461a0ed4ee21
     m_Address: Refinery/RefineryNpc
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 89819cb2b454a48c2a327329bb8042f5
+    m_Address: sfx_memory_take
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -435,8 +735,43 @@ MonoBehaviour:
     m_SerializedLabels:
     - Achievement
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8c9454f440a5d4147ac39c04e5a82204
+    m_Address: sfx_portal_open
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8cfccb018f2151747ba68544f3c1c112
+    m_Address: Lich_Portrait_Calm
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8ead54ae71c9848d2b9c38a38930fdf7
+    m_Address: sfx_mg_success
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8ec87d839631de74ea7870ad93b63eb5
     m_Address: Ch1_Map
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8f7a5ee2814784d42bda156f86885379
+    m_Address: sfx_portal_enter
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 900ee1c5a43a5483b9608a38d0bf7fee
+    m_Address: sfx_memory_redraw
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 92c0b248a622b41af90c3c89a7c895f6
+    m_Address: sfx_refine_reveal
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 93d02d444f3964944a6158ad2d305af7
+    m_Address: sfx_mg_note
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -453,6 +788,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 9b097f7e7ab5a134fb5d5e38ead48cb1
     m_Address: Illust_Intro_Page03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9bffd48790497ea4fa3825b9e9e79bd3
+    m_Address: UI/ThemeFonts
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -477,6 +817,11 @@ MonoBehaviour:
     m_SerializedLabels:
     - Achievement
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9ebd67a496e154865b4cb3db7e72cc55
+    m_Address: sfx_room_clear
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a0e7d6dce9c8e2042af2763fe0487008
     m_Address: UI/AchievementSkin
     m_ReadOnly: 0
@@ -487,13 +832,28 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a99b59bc25a954b7a892f92526659c8b
+    m_Address: sfx_rune_lift
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: aa767a21a4d31ba4189f56a14d9b3993
     m_Address: skeleton_1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ab20a4c89177e460f89d28e5901f9dd5
+    m_Address: sfx_covenant_reroll
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ac3815a3a11e2d84eaa1152c92adad04
     m_Address: VFX_DamageReflect
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ad054ac8df1ce403ba2d4fffbdc7129d
+    m_Address: sfx_smith_hammer
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -508,14 +868,29 @@ MonoBehaviour:
     m_SerializedLabels:
     - Achievement
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b1ad057f9218d492caf2524bff303f42
+    m_Address: sfx_ui_select
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b2838b9e05dfcc740a9cfd8febd2e69a
     m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/reach_ch4.asset
     m_ReadOnly: 0
     m_SerializedLabels:
     - Achievement
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b2a4c433e5b7b4c8dabeaabe839d8ca7
+    m_Address: sfx_rune_reset
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b2fc212087f94454595128336e811841
     m_Address: UI/Popup/UI_CovenantAssemble
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b547c6126c817487b9913914ef233500
+    m_Address: sfx_mg_grade_up
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -539,6 +914,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b8ab3cb21e7f54fb58deea0688f0e519
+    m_Address: sfx_mg_start
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b96409764644cba44b9841b9c069e8ed
     m_Address: Illust_Intro_Page02
     m_ReadOnly: 0
@@ -549,11 +929,26 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ba9b33c5a3af041c2843642be5e7fc4c
+    m_Address: sfx_ui_reject
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bb72aea1d35f14859b6e6dd095cdc422
+    m_Address: sfx_ui_tick
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bc440c820344b6a499f3f811e0d51026
     m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/shop_30.asset
     m_ReadOnly: 0
     m_SerializedLabels:
     - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bfca528ec585a864ebff437b4ab6d80e
+    m_Address: sfx_skill_heavy_impact
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c004dd9604a3985439fb2e97d98773a6
     m_Address: RuneArtLibrary
@@ -570,17 +965,42 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c2d6d65fade8c4991838cbff5c597d8f
+    m_Address: sfx_essence_pickup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c48a15492982ecc42b88808476882e12
     m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/reach_ch3.asset
     m_ReadOnly: 0
     m_SerializedLabels:
     - Achievement
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c575851654be140c88ad36e7c7baab06
+    m_Address: sfx_rest_forge
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c5a523cdf8d6c458cb498fc77c2e8573
+    m_Address: sfx_enhance_success
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c605692d16683a843ba6065a29444f3b
     m_Address: Assets/RelicFairy/Data/Quest/Generated/Achievements/clear_5.asset
     m_ReadOnly: 0
     m_SerializedLabels:
     - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c681d5af0ad934b688e3877f9a9e02ce
+    m_Address: sfx_item_stash
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c6d1bce2956564dd09bb1712dde2f538
+    m_Address: sfx_ui_confirm
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ca58b3c4bf8304440a7ab62986fce7ef
     m_Address: BloodShot
@@ -590,6 +1010,21 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: cbc9e2a6d0bf89c4080db22760991f79
     m_Address: sfx_relic_sun_impact
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cd9cf8756fbc44824a88437a50310c9b
+    m_Address: sfx_relic_rend
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d043519c03adf5b4bbba96049cd1de44
+    m_Address: sfx_skill_charge
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d2533e9b250a048f18f3da79c2e627f8
+    m_Address: sfx_covenant_pick
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -613,8 +1048,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d9e730924a7ad491a9814846b425d3c1
+    m_Address: sfx_rune_place
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dc5c4a87f8985374494021879967c823
     m_Address: VFX_PoisonAura
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dc80a066f7ef44098b6ed6b4f03d12d5
+    m_Address: sfx_sacrifice_offer
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -633,8 +1078,28 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e1ea57dfcd48e4141ba7bc8560cfd649
+    m_Address: sfx_memory_absorb
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e2b471e1bf74a124dbbce45cadd39641
+    m_Address: Portrait_Boss_Mordred
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e3a0b60ac751f420193e42de32eb175c
+    m_Address: sfx_relic_bloom
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e46de729db3a82544a974f5ba870e90d
     m_Address: UI/Popup/UI_CruciblePanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e479676bcd06347d8b91890b86fa5028
+    m_Address: sfx_crucible_promote
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -648,13 +1113,38 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e4fb2ecc77a4d47978db9404ecbbf2b2
+    m_Address: sfx_quest_done
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e5500b67cc9173243b4667c2128b9e37
     m_Address: UI/Popup/UI_RelicInfoPopup
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e5513300316d44aa6acab599c3b4f943
+    m_Address: sfx_form_windblade
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e691e2141c8a745d5bcde7c33d95bf43
+    m_Address: sfx_refine_legend
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e6a6ce726cc2d451183b2e7d949c962c
+    m_Address: sfx_rune_legend
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e9e94aeb82c51314993a535370bdae7e
     m_Address: sfx_player_perfect_dodge
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ea33cc7d830045340b557a00d3bdffda
+    m_Address: Portrait_Boss_ForestGuardian
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -670,8 +1160,23 @@ MonoBehaviour:
     m_SerializedLabels:
     - Quest
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: eeb96056c221942249f2e8aeaf86d576
+    m_Address: sfx_mg_stamp
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f4c66d76b0374432693168267057ad1d
+    m_Address: sfx_crucible_jackpot
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f57f53ea551199c4d8e7a657e81d8859
     m_Address: Ch2_Map
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f68251ea6f14c47908352c5f30f3a7fc
+    m_Address: sfx_player_die
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -680,8 +1185,28 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f75742919a47342e1b3a8650f59a5331
+    m_Address: sfx_vault_open
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f8fbfe66b0789674cb9ad0af625584b1
     m_Address: sfx_player_swing_heavy
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fa0e08b9dad8b4dd7ae6e61edc6de17c
+    m_Address: sfx_oracle_choose
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fbfadc9ab51be4a6485de893074dde69
+    m_Address: sfx_rest_heal
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fc3473918dbb24eb3a0eec4019ad8b6d
+    m_Address: sfx_sword_pickup
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

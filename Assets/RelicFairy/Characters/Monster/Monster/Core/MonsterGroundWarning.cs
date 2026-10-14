@@ -68,6 +68,114 @@ public class MonsterGroundWarning : MonoBehaviour
         warning.SetupGrid(origin, forward, shape, duration, color);
     }
 
+    // ── 얇은 외곽선(10-11) ───────────────────────────────────────────
+    // 사용자(10-10) 「몬스터 공격 전 범위 예고가 없다」 + 이펙트 톤 절제 — 07-10에 끈 빨간 격자(칸마다 굵은 선) 대신
+    // 판정 칸들의 바깥 테두리 하나만 얇게 그린다. 나타날 땐 옅고 맞는 순간에 가까울수록 진해진다(언제 맞는지 읽힌다).
+    private const float OutlineWidth = 0.06f;   // 게임 카메라(높은 부감)에서 1~2픽셀 — 0.04는 안 보였다(10-11 실측)
+    private const float OutlineFadeOut = 0.1f;  // 맞는 순간 뒤 이만큼 서서히 사라진다(맞는 순간에 바로 지워져 읽히지 않았다)
+    private LineRenderer _outline;
+    private float _outlineDuration, _outlineElapsed;
+    private bool  _outlineHold;                   // 원 외곽선 — 판정이 이어지는 동안 처음부터 진하게(비홀더 눈 빔 발사)
+    private const int CircleSegments = 48;
+    private Color _outlineColor;
+
+    /// <summary>판정 칸(<see cref="GridShape"/>)의 바깥 상자를 얇은 선으로 — 히트 판정(IsInsideGrid)과 같은 칸 반폭.</summary>
+    /// <summary>
+    /// 원 외곽선 예고(10-11 P1-7) — 격자 외곽선과 같은 결: 얇은 선 · 옅게 나타나 맞는 순간 가장 진하고 · 뒤 0.1초에 사라진다.
+    /// <paramref name="hold"/> = true면 처음부터 끝까지 진하게 둔다(판정이 이어지는 구간).
+    /// </summary>
+    public static void SpawnCircleOutline(Vector3 center, float radius, float duration, Color color, bool hold = false)
+    {
+        var go = new GameObject("[MonsterGroundWarning.Circle]");
+        go.AddComponent<MonsterGroundWarning>().SetupCircleOutline(center, radius, duration, color, hold);
+    }
+
+    public static void SpawnGridOutline(Vector3 origin, Vector3 forward, GridShape shape, float duration, Color color)
+    {
+        var go = new GameObject("[MonsterGroundWarning.Outline]");
+        go.AddComponent<MonsterGroundWarning>().SetupGridOutline(origin, forward, shape, duration, color);
+    }
+
+    /// <summary>판정 칸(격자)의 바깥 상자(몬스터 기준 오른쪽 x · 앞 y, m) — 히트 판정 IsInsideGrid와 같은 칸 반폭. MonsterTelegraph.Grid가 쓴다.</summary>
+    public static void GridBounds(GridShape shape, out float minX, out float maxX, out float minY, out float maxY)
+    {
+        minX = float.MaxValue; maxX = float.MinValue; minY = float.MaxValue; maxY = float.MinValue;
+        foreach (var c in GetCells(shape))
+        {
+            minX = Mathf.Min(minX, c.x * CellSize - CellHalfSize); maxX = Mathf.Max(maxX, c.x * CellSize + CellHalfSize);
+            minY = Mathf.Min(minY, c.y * CellSize - CellHalfSize); maxY = Mathf.Max(maxY, c.y * CellSize + CellHalfSize);
+        }
+    }
+
+    private void SetupGridOutline(Vector3 origin, Vector3 forward, GridShape shape, float duration, Color color)
+    {
+        _outlineDuration = Mathf.Max(0.05f, duration);
+        _remaining       = _outlineDuration + OutlineFadeOut;
+        _outlineColor = color;
+
+        Vector3 f = forward;
+        f.y = 0f;
+        if (f.sqrMagnitude < 0.001f) f = Vector3.forward;
+        f.Normalize();
+        Vector3 r = Vector3.Cross(Vector3.up, f).normalized;
+
+        float minX = float.MaxValue, maxX = float.MinValue, minY = float.MaxValue, maxY = float.MinValue;
+        foreach (var c in GetCells(shape))
+        {
+            minX = Mathf.Min(minX, c.x * CellSize - CellHalfSize); maxX = Mathf.Max(maxX, c.x * CellSize + CellHalfSize);
+            minY = Mathf.Min(minY, c.y * CellSize - CellHalfSize); maxY = Mathf.Max(maxY, c.y * CellSize + CellHalfSize);
+        }
+        Vector3 P(float x, float y) => origin + r * x + f * y + Vector3.up * 0.05f;
+
+        _outline = gameObject.AddComponent<LineRenderer>();
+        _outline.loop = true;
+        _outline.useWorldSpace = true;
+        _outline.positionCount = 4;
+        _outline.widthMultiplier = OutlineWidth;
+        _outline.material = GetMaterial();
+        _outline.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        _outline.receiveShadows = false;
+        _outline.SetPosition(0, P(minX, minY));
+        _outline.SetPosition(1, P(maxX, minY));
+        _outline.SetPosition(2, P(maxX, maxY));
+        _outline.SetPosition(3, P(minX, maxY));
+        TickOutline(0f);
+    }
+
+    private void SetupCircleOutline(Vector3 center, float radius, float duration, Color color, bool hold)
+    {
+        _outlineDuration = Mathf.Max(0.05f, duration);
+        _remaining       = _outlineDuration + OutlineFadeOut;
+        _outlineColor    = color;
+        _outlineHold     = hold;
+
+        _outline = gameObject.AddComponent<LineRenderer>();
+        _outline.loop = true;
+        _outline.useWorldSpace = true;
+        _outline.positionCount = CircleSegments;
+        _outline.widthMultiplier = OutlineWidth;
+        _outline.material = GetMaterial();
+        _outline.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        _outline.receiveShadows = false;
+        for (int i = 0; i < CircleSegments; i++)
+        {
+            float a = i * Mathf.PI * 2f / CircleSegments;
+            _outline.SetPosition(i, center + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * radius + Vector3.up * 0.05f);
+        }
+        TickOutline(0f);
+    }
+
+    private void TickOutline(float dt)
+    {
+        _outlineElapsed += dt;
+        float t = Mathf.Clamp01(_outlineElapsed / _outlineDuration);
+        float fade = 1f - Mathf.Clamp01((_outlineElapsed - _outlineDuration) / OutlineFadeOut);
+        Color c = _outlineColor;
+        c.a = (_outlineHold ? 0.85f : Mathf.Lerp(0.2f, 0.85f, t * t)) * fade * _outlineColor.a;   // 옅게 나타나 맞는 순간에 가장 진하고, 뒤 0.1초에 사라진다
+        _outline.startColor = c;
+        _outline.endColor   = c;
+    }
+
     private void SetupFill(Vector3 worldPos, float radius, float duration, Color fillColor, Color outerColor)
     {
         transform.position = worldPos + Vector3.up * 0.05f;
@@ -258,6 +366,7 @@ public class MonsterGroundWarning : MonoBehaviour
     private void Update()
     {
         _remaining -= Time.deltaTime;
+        if (_outline != null) TickOutline(Time.deltaTime);
 
         if (_fillMode)
         {

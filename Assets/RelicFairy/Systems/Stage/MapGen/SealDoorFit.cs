@@ -1,3 +1,5 @@
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -15,6 +17,9 @@ public static class SealDoorFit
     public const float PlaneZ = -0.25f;
     /// <summary>젖힘 문이 다 열렸을 때의 각도(도) — 문짝이 통로 벽에 붙듯 바깥으로 젖혀진다.</summary>
     public const float SwingAngle = 95f;
+    /// <summary>디졸브 문(10-06) — 열릴 때 사라지는 시간 · 봉인 때 나타나는 시간.</summary>
+    public const float DissolveOpenSeconds  = 0.9f;
+    public const float DissolveCloseSeconds = 0.6f;
 
     private static readonly Vector3[] s_corner = new Vector3[8];
 
@@ -110,6 +115,46 @@ public static class SealDoorFit
             float side = h.localPosition.x > 0f ? 1f : -1f;
             h.localRotation = Quaternion.Euler(0f, side * outward * SwingAngle * k, 0f);
         }
+    }
+
+    /// <summary>
+    /// 디졸브 문 열기(10-06) — 디졸브로 사라진 뒤 끄고 <b>원래 재질을 되돌려 둔다</b>
+    /// (<see cref="DissolveEffect.PlayDisappearAsync"/>는 원본을 되돌리지 않아, 다시 닫힐 때 켜면 빈 재질이 된다).
+    /// 나타나는 디졸브가 아직 돌고 있으면 끝날 때까지 기다린다 — 겹치면 서로의 임시 재질을 원본으로 잡는다(마젠타).
+    /// </summary>
+    public static async UniTask DissolveOpenAsync(GameObject door, CancellationToken ct)
+    {
+        if (door == null || !door.activeInHierarchy) return;
+        var rs = door.GetComponentsInChildren<Renderer>(true);
+        try
+        {
+            while (AnyDissolving(rs)) await UniTask.Yield(ct);
+            var orig = new Material[rs.Length][];
+            for (int i = 0; i < rs.Length; i++)
+                if (rs[i] != null) orig[i] = DissolveEffect.OriginalMaterialsResolver?.Invoke(rs[i]) ?? rs[i].sharedMaterials;
+            try { await DissolveEffect.PlayDisappearAsync(door, DissolveOpenSeconds, ct); }
+            finally
+            {
+                if (door != null) door.SetActive(false);   // 같은 프레임에 꺼서 파괴된 디졸브 재질이 한 번도 그려지지 않게
+                for (int i = 0; i < rs.Length; i++)
+                    if (rs[i] != null && orig[i] != null) rs[i].sharedMaterials = orig[i];
+            }
+        }
+        catch (System.OperationCanceledException) { }
+    }
+
+    /// <summary>디졸브 문 봉인(10-06) — 문을 끈 뒤 투명에서 나타나게 한다(<see cref="DissolveEffect.PlayAppearAsync"/>가 투명으로 켜서 깜빡임 없음).</summary>
+    public static async UniTask DissolveCloseAsync(GameObject door, CancellationToken ct)
+    {
+        if (door == null) return;
+        door.SetActive(false);
+        await DissolveEffect.PlayAppearAsync(door, DissolveCloseSeconds, ct);
+    }
+
+    private static bool AnyDissolving(Renderer[] rs)
+    {
+        foreach (var r in rs) if (DissolveEffect.IsDissolving(r)) return true;
+        return false;
     }
 
     /// <summary><paramref name="root"/> 아래 메시들의 바운즈를 <paramref name="space"/> 로컬로 — 꼭짓점 변환이라 회전 · 거울에도 정확하다.</summary>

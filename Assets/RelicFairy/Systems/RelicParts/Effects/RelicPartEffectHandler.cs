@@ -36,6 +36,18 @@ public sealed class RelicPartEffectHandler
     {
         if (loadout == null) return;
         Sync(loadout.RelicPartIds, loadout);
+        SyncEvolution(loadout.RelicEvolutionId);
+    }
+
+    /// <summary>유물 진화(10-14 C) — 데이터 행이 없는 효과라 id로 바로 만든다. 한 번 켜지면 런 끝까지.</summary>
+    private void SyncEvolution(string evolutionId)
+    {
+        if (string.IsNullOrEmpty(evolutionId) || !_activeKeys.Add(evolutionId)) return;
+        var effect = RelicEvolution.CreateEffect(evolutionId);
+        if (effect == null) { _activeKeys.Remove(evolutionId); return; }
+        effect.SetGrade(RelicMemoryGrade.Radiant, _player);
+        _active.Add(effect);
+        effect.OnAcquire(_player);
     }
 
     private void Sync(IReadOnlyList<string> partIds, PlayerLoadout loadout)

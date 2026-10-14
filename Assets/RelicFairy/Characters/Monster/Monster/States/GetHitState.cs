@@ -17,8 +17,13 @@ public class GetHitState : IMonsterState
         ctx.Agent.enabled = false;
         ctx.Runtime.StateTimer = StunDuration;
 
-        if (ctx.Animator != null && !string.IsNullOrEmpty(ctx.Animation.getHitTrigger))
-            ctx.Animator.CrossFade(ctx.Animation.getHitTrigger, 0.05f, 0, 0f);
+        // 트리거 칸이 비면 상태 이름으로 — 트리거 없이 상태만 둔 컨트롤러(황소)는 경직 · 휘청에 동작이 없었다(10-14 정예 애니 점검)
+        if (ctx.Animator != null)
+        {
+            string hit = !string.IsNullOrEmpty(ctx.Animation.getHitTrigger) ? ctx.Animation.getHitTrigger : ctx.Animation.getHitStateName;
+            if (!string.IsNullOrEmpty(hit) && ctx.Animator.HasState(0, Animator.StringToHash(hit)))
+                ctx.Animator.CrossFade(hit, 0.05f, 0, 0f);
+        }
     }
 
     public virtual void Update(MonsterContext ctx)

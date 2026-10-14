@@ -112,6 +112,9 @@ public static class CovenantMath
             _                        => mag,   // None
         };
 
+        // 원인 계열의 각인 배율(10-14 빌드 시너지 A4) — 룬에만 붙던 각인을 서약에도. 개수형(Count)은 키우지 않는다. 상한은 그대로.
+        v *= BuildImprint.EffectMultiplier(BuildFamilyRules.FromCause(cause.cls));
+
         if (effect.cap > 0f) v = Mathf.Min(v, effect.cap);
         return Mathf.Max(0f, v);
     }

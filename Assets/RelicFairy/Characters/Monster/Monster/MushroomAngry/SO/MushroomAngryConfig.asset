@@ -13,15 +13,15 @@ MonoBehaviour:
   m_Name: MushroomAngryConfig
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
   monsterName: MushroomAngry
-  grade: 0
+  grade: 1
   playerLayer:
     serializedVersion: 2
     m_Bits: 64
   visualHeightMeters: 1.15
   stat:
-    maxHp: 120
+    maxHp: 55
     defense: 2
-    attackPower: 18
+    attackPower: 40
     moveSpeed: 2.5
     attackRange: 2
     attackRadius: 2
@@ -72,6 +72,15 @@ MonoBehaviour:
     earth:
       resistance: 1
       overrideState: {fileID: 0}
+  death:
+    despawnDelay: 0.5
+    dissolveDuration: 0.35
+    deathVfxKey: MonsterDeathBurst
+    deathVfxScale: 1.05
+    deathVfxHeight: 0.57
+    deathVfxUnscaled: 1
+    killHitStopScale: 0.04
+    killHitStopDuration: 0.09
   specialStates:
   - conditions:
     - {fileID: 11400000, guid: b1b5565a20fa58340b52e680d49cb77d, type: 2}

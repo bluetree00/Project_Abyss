@@ -1,3 +1,5 @@
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -11,6 +13,8 @@ public enum PropFlyStyle
 [DisallowMultipleComponent]
 public class EntrancePropDestructible : MonoBehaviour
 {
+    private const float PropFadeSeconds = 0.5f;   // 날아간 소품을 거두는 디졸브
+
     [SerializeField] private GameObject   _replacementPrefab;
     [SerializeField] private float        _flyForce     = 7f;
     [SerializeField] private float        _destroyDelay = 4f;
@@ -22,9 +26,20 @@ public class EntrancePropDestructible : MonoBehaviour
         {
             var replacement = Instantiate(_replacementPrefab, transform.position, transform.rotation);
             Launch(replacement, fromPos);
-            Destroy(replacement, _destroyDelay);
+            FadeOutLaterAsync(replacement, _destroyDelay, replacement.GetCancellationTokenOnDestroy()).Forget();
         }
         Destroy(gameObject);
+    }
+
+    // 날아간 소품은 디졸브로 거둔다 — 모두 합쳐 _destroyDelay 뒤에 사라진다(10-12 디졸브 원칙 — 예전엔 그냥 사라졌다)
+    private static async UniTaskVoid FadeOutLaterAsync(GameObject go, float delay, CancellationToken ct)
+    {
+        try
+        {
+            await UniTask.Delay(System.TimeSpan.FromSeconds(Mathf.Max(0f, delay - PropFadeSeconds)), cancellationToken: ct);
+            DissolveEffect.PlayDisappear(go, PropFadeSeconds, () => { if (go != null) Destroy(go); });
+        }
+        catch (System.OperationCanceledException) { }
     }
 
     private void Launch(GameObject go, Vector3 fromPos)

@@ -122,7 +122,15 @@ public abstract class GroundFieldBase : MonoBehaviour
     public void SetFollow(Transform target) => _followTarget = target;
 
     /// <summary>남은 수명을 늘린다(유물 성장 v2 들불 — 불안개 지속 2배).</summary>
-    public void ExtendLife(float seconds) { if (seconds > 0f) _lifetime += seconds; }
+    public void ExtendLife(float seconds)
+    {
+        if (seconds <= 0f) return;
+        _lifetime += seconds;
+        // 오라는 붙일 때의 수명으로 꺼진다 — 같은 키로 다시 걸면 남은 수명까지 늘어난다(재부여 = top-up).
+        // 안 그러면 늘어난 절반이 보이지 않는 장판이었다(10-12 B6).
+        if (_auraHandle != 0 && FieldElement.HasValue)
+            _auraHandle = ElementVfxPlayer.AttachAura(FieldElement.Value, transform, Remaining, _radius);
+    }
 
     /// <summary>남은 수명(초).</summary>
     public float Remaining => Mathf.Max(0f, _lifetime - _age);

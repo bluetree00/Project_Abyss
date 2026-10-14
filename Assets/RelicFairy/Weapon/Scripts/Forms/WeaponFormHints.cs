@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using RelicFairy.UI;
 
@@ -10,6 +10,10 @@ public static class WeaponFormHints
 {
     private const string Prefix = "seen.wf.";
     private static readonly HashSet<string> s_checked = new();
+
+    /// <summary>슬롯 메타를 다시 읽으면(슬롯 전환 · 새 게임) 「이번 실행에서 본 것」도 버린다 — 같은 실행에서 새 게임을 하면
+    /// 첫 경험 자막이 안 나왔다(10-09 출시 점검).</summary>
+    public static void ForgetSession() => s_checked.Clear();
 
     public static void TryShowOnce(WeaponFormSO form)
     {

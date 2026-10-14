@@ -6,6 +6,7 @@ using UnityEngine.UI;
 /// 베이스캠프 목표 길잡이 — 아직 안 끝낸 곳마다 <b>목표 표식</b>(◆ + 남은 거리, 화면 밖이면 가장자리에서 방향)을 띄우고,
 /// 화면 왼쪽 위에 할 일 줄을 적는다. 09-30 사용자: 「미완료 구간은 화살표나 명조·원신 같은 구조로」.
 ///   · 목표: 미완의 검(처음만) → 장비 공방 · 유물 성소 → 파츠 공방(원거리를 얻은 뒤) → 심연의 문(전부 끝나면).
+///   · 기억의 제단(10-14 사용자 「해금 장소가 유저들이 잘 알 수 있게」) — 정수로 열 수 있는 것이나 받을 업적이 있을 때만. 문보다 앞 순서.
 ///   · 첫 판만이 아니라 <b>매 판</b> — 복귀 판에도 안 고른 곳이 남아 있으면 표식이 선다. 고르면 그 표식이 사라지고 다음이 밝아진다.
 ///   · 가장 앞 순서의 목표가 「주」(밝게), 나머지는 옅게. 가까이(5 m) 가면 옅어진다 — 거기선 스테이션 이름표·[F] 안내가 이어받는다.
 ///   · 연출·대사·팝업 중에는 숨는다. 조작은 막지 않는다.
@@ -15,8 +16,9 @@ using UnityEngine.UI;
 public sealed class BaseCampObjectiveGuide : MonoBehaviour
 {
     // ── Constants ─────────────────────────────────────────────
-    private const int   Count          = 5;
-    private const int   Sword = 0, Ranged = 1, Relic = 2, Parts = 3, Gate = 4;   // 표시·주 목표 순서
+    private const int   Count          = 6;
+    private const int   Sword = 0, Ranged = 1, Relic = 2, Parts = 3, Gate = 4, Altar = 5;   // 표시·주 목표 순서
+    private const float AltarPollSec   = 0.5f;    // 제단 셈(열 수 있는 것 · 받을 업적)은 이 간격으로만 다시 센다
     private const float MarkerHeight   = 2.6f;    // 목표 위(m)
     private const float NearFadeStart  = 7f;      // 이 거리부터 옅어져
     private const float NearFadeEnd    = 4.5f;    // 여기서 사라진다(스테이션 이름표·[F]가 이어받음)
@@ -33,11 +35,12 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
     private static readonly Color Ink  = new(0.95f, 0.93f, 0.88f, 1f);
     private static readonly string[] Lines =
     {
-        "미완의 검을 쥔다",
+        "무형검을 쥔다",
         "장비 공방 — 원거리 무기를 고른다",
         "유물 성소 — 기사의 유물을 고른다",
         "파츠 공방 — 파츠 하나를 고른다",
         "심연의 문 — 포탈로 내려간다",
+        "기억의 제단 — 정수로 해금한다",   // 실제 줄은 셈을 붙여 쓴다(AppendLine)
     };
 
     // ── Static ────────────────────────────────────────────────
@@ -69,6 +72,8 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
     private int          _trackerMask = -1;
     private float        _trackerAlpha;
     private readonly System.Text.StringBuilder _sb = new(160);
+    private int   _altarAffordable, _altarWaiting, _trackerAltarKey = -1;
+    private float _altarPolledAt = -99f;
 
     // ── Lifecycle ─────────────────────────────────────────────
     private void Start()
@@ -84,6 +89,8 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
             foreach (var r in relics) sum += r.transform.position;
             Set(Relic, sum / relics.Length);   // 성소 가운데(제단 사이 통로)
         }
+        var altar = FindFirstObjectByType<WorldAwakeningAltar>();
+        if (altar != null) Set(Altar, altar.transform.position);
         Build();
         Active = true;
     }
@@ -120,9 +127,11 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
             m.Group.alpha = m.Alpha;
         }
 
-        if (mask != _trackerMask)
+        int altarKey = _altarAffordable * 1000 + _altarWaiting;   // 제단 줄의 셈이 바뀌어도 다시 쓴다
+        if (mask != _trackerMask || ((mask & (1 << Altar)) != 0 && altarKey != _trackerAltarKey))
         {
             _trackerMask = mask;
+            _trackerAltarKey = altarKey;
             if (mask != 0) ComposeTracker(mask, primary);
         }
         _trackerAlpha = Mathf.MoveTowards(_trackerAlpha, mask != 0 ? 1f : 0f, FadeSpeed * dt);
@@ -173,12 +182,15 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
             if (!relic && _has[Relic]) mask |= 1 << Relic;
             if (ranged && !part && _has[Parts]) mask |= 1 << Parts;   // 파츠는 원거리 무기에 끼우는 것 — 원거리 뒤에
             if (ranged && part && relic && _has[Gate]) mask |= 1 << Gate;
+            PollAltar();
+            if (_has[Altar] && (_altarAffordable > 0 || _altarWaiting > 0)) mask |= 1 << Altar;
         }
         // 주 목표 = 매 판 걷는 순서(장비 → 파츠 → 유물 → 성문)에서 가장 앞
         if ((mask & (1 << Sword)) != 0) primary = Sword;
         else if ((mask & (1 << Ranged)) != 0) primary = Ranged;
         else if ((mask & (1 << Parts)) != 0) primary = Parts;
         else if ((mask & (1 << Relic)) != 0) primary = Relic;
+        else if ((mask & (1 << Altar)) != 0) primary = Altar;   // 내려가기 전에 — 열 수 있는 것을 먼저
         else if ((mask & (1 << Gate)) != 0) primary = Gate;
         return mask;
     }
@@ -226,8 +238,29 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
     {
         if (i < 0) return;
         if (_sb.Length > 0) _sb.Append('\n');
-        if (primary) _sb.Append("<color=#FFD173>◆</color> ").Append(Lines[i]);
-        else _sb.Append("<alpha=#99><size=85%>◇ ").Append(Lines[i]).Append("</size><alpha=#FF>");
+        if (primary) _sb.Append("<color=#FFD173>◆</color> ");
+        else _sb.Append("<alpha=#99><size=85%>◇ ");
+        if (i == Altar) AppendAltarLine();
+        else _sb.Append(Lines[i]);
+        if (!primary) _sb.Append("</size><alpha=#FF>");
+    }
+
+    /// <summary>제단 줄 — 「기억의 제단 — 열 수 있는 것 N · 받을 업적 M」(있는 것만).</summary>
+    private void AppendAltarLine()
+    {
+        _sb.Append("기억의 제단 — ");
+        if (_altarAffordable > 0) _sb.Append("열 수 있는 것 ").Append(_altarAffordable);
+        if (_altarAffordable > 0 && _altarWaiting > 0) _sb.Append(" · ");
+        if (_altarWaiting > 0) _sb.Append("받을 업적 ").Append(_altarWaiting);
+    }
+
+    /// <summary>제단 셈 — 0.5초 간격(노드 31개 · 업적 목록을 매 프레임 세지 않는다).</summary>
+    private void PollAltar()
+    {
+        if (Time.unscaledTime - _altarPolledAt < AltarPollSec) return;
+        _altarPolledAt   = Time.unscaledTime;
+        _altarAffordable = MemoryAltarService.AffordableCount();
+        _altarWaiting    = Managers.Quest?.WaitingAchievementCount() ?? 0;
     }
 
     /// <summary>자기 캔버스(1920×1080 · Match 0.5) — HUD 표식 층. 레이캐스터가 없어 클릭을 받지 않는다.</summary>

@@ -45,6 +45,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 111b1099a70d86646a94081dcae9ff1e
+    m_Address: Nameless_GroundLight_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 12713f02b45a7bd4a9d6a3238d575d07
+    m_Address: Bow_Common_StrafeRun_R
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 12f3ca945177aff49ac41ed5d9a5109c
     m_Address: GreatswordAirLight_01
     m_ReadOnly: 0
@@ -60,13 +70,39 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 171163edf8b5e7047a60e8826b6051d9
+    m_Address: Bow_Common_StrafeRun_B
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1c0b8265125452341a43f1394358cdb0
-    m_Address: GreatswordAttack_01
+    m_Address: Assets/RelicFairy/_Imported/Grruzam Powerful Sword Animation(Great
+      Sword, Katana)/Animation/M_Big_Sword/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_1.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1d5c7812f65dad54d84c707f1396f6b3
+    m_Address: Bow_Common_StrafeWalkB
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1fb5156f95474594ba5c842a0c266fdf
     m_Address: APose_Idle
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1fbf40b2c962bfe4ba575da1cd6b2576
+    m_Address: Assets/RelicFairy/_Imported/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_Attack03_5_Inplace.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2336e21b03e6d85468ba775ae8809a76
+    m_Address: SS_Run
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 24851744c1b9b7b47bfb0d15b5900de8
+    m_Address: Bow_Common_StrafeRun_L
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -95,13 +131,24 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4261e43b4f9eb514ca0ef5d63a72caef
+    m_Address: Bow_Common_StrafeRun_FR
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4c2e4c472ee2e0345bf589fe9cb190a4
-    m_Address: GreatswordAttack_02
+    m_Address: Assets/RelicFairy/_Imported/Grruzam Powerful Sword Animation(Great
+      Sword, Katana)/Animation/M_Big_Sword/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_2.FBX
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4c5460041af046348ae1b736d1a97e0b
     m_Address: SS_Sprint
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4c85db673b27def469e54c81e44d3c77
+    m_Address: Bow_Common_StrafeRun_BL
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -120,13 +167,38 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5377c2863e4f22340a1d6c58edfce1c1
+    m_Address: Bow_Common_StrafeWalkBR
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 54109ccbe0735284cabdeac03f8d81e6
+    m_Address: GreatswordAttack_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 588ee2ebb5b974f40a831a58b9d67eff
+    m_Address: Bow_Common_StrafeRun_BR
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 60b4d355ddea6384bb6a30d889d08638
     m_Address: GreatswordAirPlunge
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 643ab983cdc961a4e9b93477d52805a2
+    m_Address: Bow_Common_StrafeWalkR
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 67b5eaabd1c06c54cabd782bfb3693b4
+    m_Address: Bow_Common_StrafeRun_FL
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 686d6fee3c23524439553401966a5bab
-    m_Address: GS_Attack02_3
+    m_Address: Katana_GroundLight_03
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -140,6 +212,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7677665cdf35ddc4c920b392e1735dc0
+    m_Address: GreatswordAttack_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 77fc626278dbd774a9e6b1fee68562c4
     m_Address: GroundLightAttack_02
     m_ReadOnly: 0
@@ -150,8 +227,33 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7ccce761310858d41af48025d0a69fc6
+    m_Address: Bow_Common_StrafeWalkL
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7e9f20295bfb55740b0070eb6ea1fee0
+    m_Address: Bow_Common_StrafeWalkFL
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7fdcb7870a28be842ab460677f406554
+    m_Address: Bow_Common_StrafeWalkF
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 841790aa24d3b714a9a34d231d93282d
     m_Address: GreatswordQSkill
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 843bdaa36cb0479b98109c19f6606db3
+    m_Address: Crossbow_GroundLight_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8749bcec3b38eb1459341ddf81a2501c
+    m_Address: Bow_Common_StrafeRun_F
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -165,13 +267,23 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 934f04acaf17b574997c50ae732d1f57
+    m_Address: Bow_Common_StrafeWalkBL
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 94e0a9c1e45a4bea9bf72452306bc5dc
     m_Address: BowQSkill_02
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 96c4cd3beea084842ac292ca05489f14
+    m_Address: Katana_ESkill
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 9a50ebdafd4db4a47abd08965c9d4f3a
-    m_Address: GS_Attack02_2
+    m_Address: Katana_GroundLight_02
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -201,7 +313,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b2240b17a57760c48b5b2e6de43e37bb
-    m_Address: GS_Attack02_4
+    m_Address: Assets/RelicFairy/_Imported/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_Attack02_4_Inplace.FBX
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -210,13 +322,24 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b3dffd00b2fa124408d7b07093f3d8a2
+    m_Address: Katana_GroundLight_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b72313c5276bb2a458d79fe4e12198c0
-    m_Address: GreatswordAttack_03
+    m_Address: Assets/RelicFairy/_Imported/Grruzam Powerful Sword Animation(Great
+      Sword, Katana)/Animation/M_Big_Sword/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_3.FBX
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b7b344e22e4b411aacf1bd0cf8300c64
     m_Address: BowAirAttack_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ba107c9917d64e7f890a12ada6930a55
+    m_Address: Crossbow_ESkill
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -235,8 +358,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d03b0ba70bc28304580a748b3ecc0180
+    m_Address: Crossbow_GroundLight_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d2fc1ff2a60758f458dea8497b59f619
     m_Address: APose_Strafe_Walk_FL
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d43428396fb9d224b96734343a559d29
+    m_Address: Bow_Common_Idle
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -246,7 +379,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dad1a61f9a9f4992bd184068b197ec67
-    m_Address: BowESkill_03
+    m_Address: Crossbow_RSkill
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -255,8 +388,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e0ca48ee53a7ac04988a94f2ded0a9b3
+    m_Address: Bow_Common_StrafeWalkFR
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e306eeef2ac6c6e468f98c57bacda733
     m_Address: APose_Strafe_Walk_FR
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ea88c1cbbc57198499ce3da9463baea4
+    m_Address: GreatswordAttack_02
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

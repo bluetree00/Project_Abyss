@@ -43,6 +43,7 @@ public sealed class SacrificeAltarChallenge : WorldInteractionChallenge
         var ps = Run?.PlayerState;
         int given = ps != null ? ps.PotionCount : 0;
         for (int i = 0; i < given; i++) ps.TryConsumePotion();
+        if (given > 0) Managers.Sound?.PlayEvent(SoundEvent.SacrificeOffer);
 
         ChallengeGrade grade = given >= 3 ? ChallengeGrade.Platinum
                              : given == 2 ? ChallengeGrade.Gold

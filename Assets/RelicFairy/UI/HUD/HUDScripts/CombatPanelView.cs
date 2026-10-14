@@ -13,7 +13,7 @@ using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using TMPro;
 
-public sealed class CombatPanelView : MonoBehaviour
+public sealed partial class CombatPanelView : MonoBehaviour
 {
     [Header("Status — HP")]
     [SerializeField] private Slider   hpSlider;
@@ -188,6 +188,7 @@ public sealed class CombatPanelView : MonoBehaviour
     // 무기 칸 위 이름(「무명의 형상」, 09-21 추가 · 09-28 간격 26)이 302~324를 쓴다 — 287이면 버프 아이콘 줄이 이름 위에 겹쳤다
     // (ae 보스 시뮬 09-28 실측). 이름 위 12px로 올린다.
     private const float BuffDockBottomY = 336f;
+    private const float BuffCellSize    = 36f;   // 버프 칸 한 변(그리드 칸 = 톤 v2 1px 테 크기)
 
     // ── 캐릭터 HUD 레이아웃(원신/명조식): HP 하단중앙 · 스킬 우하단 2포드(유물 Q / 무기 E·R) ──
     private static readonly Color RelicColor  = new Color(1.00f, 0.80f, 0.30f, 1f);  // 유물=금
@@ -222,6 +223,10 @@ public sealed class CombatPanelView : MonoBehaviour
     private System.Action  _relicChanged;
     private bool           _lastSkillReady;  // 절정(정오 등) 진입 엣지
     private float          _relicFlash;      // 진입 플래시(1→0)
+    private PlayerController _relicOwner;      // Q 문(CanUseSkill) · 남은 횟수(QUsesLeft)를 묻는 플레이어 — 없으면 예전대로 게이지 조건(10-12 A4)
+    private bool           _qGateOpen = true; // 지금 Q를 쓸 수 있나(실제 문) — 명조형 Q 빛도 이 값을 본다
+    private TMP_Text       _qUsesLabel;       // Q 칸 오른쪽 위 「×N」(2회 이상일 때만 · 지연 생성)
+    private int            _qUsesShown = -1;
 
     // 가웨인 태양 게이지(Style==Sun 전용) — 수평 바 대신 사용. 열린 태양(충전)+게이지 / 닫힌 태양(정오)+내부 감소.
     private RectTransform _sunRoot;
@@ -254,7 +259,7 @@ public sealed class CombatPanelView : MonoBehaviour
     public float LeftColumnRightWorld()
     {
         float right = float.NaN;
-        for (int i = 0; i < _weaponSlotRoot.Length; i++)
+        for (int i = 0; !WuwaHud && i < _weaponSlotRoot.Length; i++)   // 명조형은 무기가 기둥에 없다
         {
             var root = _weaponSlotRoot[i];
             if (root == null || !root.gameObject.activeInHierarchy) continue;
@@ -279,12 +284,13 @@ public sealed class CombatPanelView : MonoBehaviour
     /// </summary>
     public float WeaponColumnTopWorld()
     {
+        if (WuwaHud) return WuwaDockBottomWorld();   // 명조형 — 무기가 아래 가운데로 옮겨 가 왼쪽 기둥은 바닥부터
         float top = float.NaN;
         for (int i = 0; i < _weaponSlotRoot.Length; i++)
         {
             var root = _weaponSlotRoot[i];
             if (root == null || !root.gameObject.activeInHierarchy || root.localScale.y <= 0f) continue;
-            float k  = ActiveSlotScale / root.localScale.y;   // 지금 배율 → 활성 배율로 환산
+            float k  = (ThinHud ? 1f : ActiveSlotScale) / root.localScale.y;   // 지금 배율 → 활성 배율로 환산(톤 v2는 배율 없음)
             float py = root.position.y;                         // 피벗(배율 중심)
             root.GetWorldCorners(_columnCorners);
             float t = py + (_columnCorners[1].y - py) * k;
@@ -330,6 +336,7 @@ public sealed class CombatPanelView : MonoBehaviour
                 _ghostTimer  = ghostDelay;
                 _ghostActive = true;
             }
+            if (ThinHud && newRatio > _hpTargetRatio + 0.001f) _hpSweepT = 0f;   // 회복 = 밝은 띠가 지나감
             _hpTargetRatio = newRatio;
         }
 
@@ -345,7 +352,13 @@ public sealed class CombatPanelView : MonoBehaviour
         if (hpFillImage != null)
         {
             hpFillImage.fillAmount = ratio;
-            if (HasHpSkin)
+            if (WuwaHud)
+            {
+                // 명조형 — 장식 아트 없이 한 줄, 색 = 상태(30% 이하 붉게)
+                hpFillImage.sprite = UIThinShapes.Solid;
+                hpFillImage.color  = ratio <= LowHpRatio ? UITheme.Thin.HpLow : UITheme.Thin.HpFill;
+            }
+            else if (HasHpSkin)
             {
                 // 스킨: 무채색 원본 위에 고/저체력 색(원본을 못 만들었으면 예전처럼 스프라이트 스왑)
                 bool low = ratio <= hpFillSwapThreshold;
@@ -488,26 +501,61 @@ public sealed class CombatPanelView : MonoBehaviour
     }
 
     /// <summary>
-    /// Q(유물) 슬롯 활성 아트 판단 — <b>쿨다운 완료 AND 유물 게이지 조건(IRelicResource.IsSkillReady)</b>
+    /// Q(유물) 슬롯 활성 아트 판단 — <b>쿨다운 완료 AND 유물의 실제 Q 문(IRelicBehavior.CanUseSkill)</b>
     /// 둘 다 만족해야 '사용 가능'이므로 두 조건을 합쳐 테두리를 스왑한다.
-    /// 유물 리소스가 없는 경우(게이지 게이팅 없음)엔 쿨다운만으로 판단.
+    /// 정오 · 광란만 보던 IsSkillReady는 실제 문과 어긋났다 — 가웨인 붙든 새벽 · 황혼 사용권은 잠겨 보이고, 정오에 쓴 뒤 · 랜슬롯 심판 소진은 켜져 보였다(10-12 B5 · A4).
+    /// 해 · 고리 게이지 그림은 그대로 IsSkillReady를 본다. 플레이어를 모르면(실측 도구) 예전대로 게이지 조건.
     /// </summary>
     private void RefreshQFrame()
     {
-        bool gaugeReady = _relicResource == null || _relicResource.IsSkillReady;
+        var relic = _relicOwner != null ? _relicOwner.RelicBehavior : null;
+        bool gaugeReady = relic != null ? relic.CanUseSkill(SkillType.Q) : _relicResource == null || _relicResource.IsSkillReady;
+        _qGateOpen = gaugeReady;
+        SetQUses(_qHasSkill && relic != null ? relic.QUsesLeft : 0);
 
         // Q는 '사용할 수 있을 때만' 열어둔다 — 스킬 자체가 없거나 게이지 조건(정오 등)이 닫혀 있으면 잠금.
         // 쿨다운은 전용 연출이 따로 있으므로 잠금 조건에서 제외한다.
         // Q 잠금의 단일 소유자가 여기다(게이지가 매 프레임 변하므로). 프레젠터는 _qHasSkill만 갱신한다.
         skillQ?.SetLocked(!_qHasSkill || !gaugeReady, GetSafeFont());
 
-        if (_qFrameImg == null || relicSlotActiveSprite == null) return;
+        SetThinReady(_qThin, _qHasSkill && _qCooldownReady && gaugeReady);   // 톤 v2 — 유물 Q 있음 · 쿨다운 · 게이지 = 유물칸이 그려지며 켜짐
+
+        if (ThinHud || _qFrameImg == null || relicSlotActiveSprite == null) return;   // 톤 v2는 얇은 테가 그림 · 색을 바꾼다
 
         bool ready = _qCooldownReady && gaugeReady;
 
         var target = ready ? relicSlotActiveSprite : relicSlotFrameSprite;
         if (target != null && _qFrameImg.sprite != target)
             _qFrameImg.sprite = target;
+    }
+
+    /// <summary>Q 남은 횟수 — 2 이상이면 「×N」(황혼 사용권 · 두 번째 심판), 1 · 0이면 숫자 없음. 바뀔 때만 쓴다(매 프레임 불린다).</summary>
+    private void SetQUses(int n)
+    {
+        int show = n >= 2 ? n : 0;
+        if (show == _qUsesShown) return;
+        _qUsesShown = show;
+        if (show > 0) EnsureQUsesLabel();
+        if (_qUsesLabel == null) return;
+        // 끌 때는 글자를 비운다 — HUD 하드 가드가 0.2초마다 꺼진 전투 패널 글자를 다시 켠다
+        if (show > 0) _qUsesLabel.SetText("×{0}", show);
+        else _qUsesLabel.text = string.Empty;
+    }
+
+    /// <summary>Q 칸 오른쪽 위 바깥(게이지 고리 밖) 「×N」 — 처음 2회 이상이 될 때 짓는다. 금 = 지금 누를 것.</summary>
+    private void EnsureQUsesLabel()
+    {
+        if (_qUsesLabel != null) return;
+        var q = _wQSlot != null ? _wQSlot : FindChildRecursive(transform, "HUD_QSkile") as RectTransform;
+        if (q == null) return;
+        var rt = (RectTransform)new GameObject("QUses", typeof(RectTransform)).transform;
+        rt.SetParent(q, false);
+        Anchor(rt, Vector2.one, new Vector2(2f, 2f), new Vector2(40f, 24f), new Vector2(0.5f, 0.5f));
+        _qUsesLabel = rt.gameObject.AddComponent<TextMeshProUGUI>();
+        UITheme.StyleThinText(_qUsesLabel, UIWeight.Medium, UITheme.Thin.Body, UITheme.Thin.Gold, shadow: true);
+        _qUsesLabel.alignment        = TextAlignmentOptions.Center;
+        _qUsesLabel.textWrappingMode = TextWrappingModes.NoWrap;
+        _qUsesLabel.raycastTarget    = false;
     }
 
     /// <summary>
@@ -523,10 +571,12 @@ public sealed class CombatPanelView : MonoBehaviour
 
             // 의뢰서 3-4의 「활성 = 금테 + 1.15배」. 배율은 칸 루트에 건다(색은 WeaponSlotUI가 맡는다).
             if (_weaponSlotRoot[i] != null && _weaponPopSlot != i)
-                _weaponSlotRoot[i].localScale = Vector3.one * (active ? ActiveSlotScale : 1f);
+                _weaponSlotRoot[i].localScale = Vector3.one * (active && !ThinHud ? ActiveSlotScale : 1f);   // 톤 v2 = 배율 튐 없음
+            _weaponThin[i]?.SetState(active ? ThinFrameState.Active : ThinFrameState.Idle, animate: true);
             if (_weaponName[i] != null)
                 _weaponName[i].color = active ? WeaponNameActive : WeaponNameIdle;
         }
+        if (WuwaHud) PlaceWeapons(animate: true);   // 명조형 — 든 무기 = 큰 원(자리 · 크기 맞바꿈)
     }
 
     /// <summary>유물(Q) 슬롯: 마름모 내부 + 테두리. 쿨다운 완료 시 활성 테두리로 스왑.</summary>
@@ -554,7 +604,7 @@ public sealed class CombatPanelView : MonoBehaviour
     /// <summary>E/R 슬롯 테두리 스왑: 사용 가능=금색(er_2x) / 쿨다운 중=기본(흰색).</summary>
     private void SetSkillFrameReady(Image frame, bool ready)
     {
-        if (frame == null) return;
+        if (frame == null || ThinHud) return;   // 톤 v2는 얇은 테(UIThinFrame)가 그림 · 색을 바꾼다
         var target = (ready && skillFrameReadySprite != null) ? skillFrameReadySprite : skillFrameSprite;
         if (target != null && frame.sprite != target)
             frame.sprite = target;
@@ -738,6 +788,7 @@ public sealed class CombatPanelView : MonoBehaviour
         }
 
         ApplyHpFill(_hpDisplayRatio);
+        if (ThinHud) TickThinHp(_hpDisplayRatio);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -755,7 +806,7 @@ public sealed class CombatPanelView : MonoBehaviour
 
             // 「지금 든 장비」는 이름으로 확정된다 — 타입 아이콘만으로는 무형검과 카타나가 같은 그림이다.
             if (_weaponName[index] != null)
-                _weaponName[index].text = info.HasWeapon ? info.Name : "없음";
+                _weaponName[index].text = WuwaHud ? string.Empty : info.HasWeapon ? info.Name : "없음";   // 명조형 = 이름 없음(끄면 하드 가드가 켠다)
             if (_weaponLevel[index] != null)
             {
                 bool showLv = info.HasWeapon && info.EnhanceLevel > 0;
@@ -810,20 +861,26 @@ public sealed class CombatPanelView : MonoBehaviour
             if (_rCooldownFill != null)
                 _rCooldownFill.fillAmount = (onCd && total > 0f) ? remaining / total : 0f;
             if (_rCooldownTxt != null)
-                _rCooldownTxt.text = onCd ? Mathf.CeilToInt(remaining).ToString() : string.Empty;
+            {
+                if (onCd) SetCooldownLabel(_rCooldownTxt, remaining);
+                else      _rCooldownTxt.text = string.Empty;
+            }
             SetSkillFrameReady(_rFrameImg, ready);   // 사용가능 → 금색 테두리
+            SetThinReady(_rThin, ready);             // 톤 v2 — 켜짐 · 눌림
             return;
         }
 
         // 유물(Q): 쿨다운 상태만 기록하고, 활성 아트 판단은 게이지 조건까지 합쳐 RefreshQFrame이 결정.
         if (skill == SkillType.Q)
         {
+            if (WuwaHud && _qCooldownReady && !ready) PlayQStreak();   // 명조형 — 쓴 순간 게이지가 Q로 빠져나간다
             _qCooldownReady = ready;
             RefreshQFrame();
         }
         else if (skill == SkillType.E)
         {
             SetSkillFrameReady(_eFrameImg, ready);   // 사용가능 → 금색 테두리
+            SetThinReady(_eThin, ready);             // 톤 v2 — 켜짐 · 눌림
         }
 
         GetSkillSlot(skill)?.SetCooldown(remaining, total);
@@ -857,7 +914,8 @@ public sealed class CombatPanelView : MonoBehaviour
             // 이모지 자물쇠는 폰트에 글리프가 없으면 네모로 깨지므로 쓰지 않는다.
             if (_rCooldownBg  != null) _rCooldownBg.SetActive(false);
             if (_rCooldownTxt != null) _rCooldownTxt.text = string.Empty;
-            if (_rFrameImg    != null)
+            if (ThinHud) _rThin?.SetState(locked ? ThinFrameState.Idle : ThinFrameState.Ready, animate: false);   // 톤 v2 — 색은 얇은 테가
+            else if (_rFrameImg != null)
             {
                 var c = _rFrameImg.color;
                 _rFrameImg.color = new Color(c.r, c.g, c.b, locked ? 0.4f : 1f);
@@ -912,11 +970,18 @@ public sealed class CombatPanelView : MonoBehaviour
         rt.pivot     = new Vector2(0.5f, 0f);
         rt.anchoredPosition = new Vector2(0f, FrameBelow(slotGo) + KeyLabelGap);
         rt.sizeDelta = new Vector2(64f, 22f);
+        if (WuwaHud)   // 명조형 — 원 위 가운데(10-10: 원이 커지자 오른쪽 아래 모서리 숫자가 원 테에 걸쳤다)
+        {
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
+            rt.pivot            = new Vector2(0.5f, 0f);
+            rt.anchoredPosition = new Vector2(0f, 3f);
+            rt.sizeDelta        = new Vector2(48f, 22f);
+        }
 
         _potionCountLabel = go.AddComponent<TextMeshProUGUI>();
-        if (slotLabelFont != null) _potionCountLabel.font = slotLabelFont;
-        _potionCountLabel.fontSize  = 18f;
-        _potionCountLabel.fontStyle = FontStyles.Bold;
+        if (ThinHud) AssignSafeFont(_potionCountLabel); else if (slotLabelFont != null) _potionCountLabel.font = slotLabelFont;
+        _potionCountLabel.fontSize  = WuwaHud ? WKeySize : 18f;
+        _potionCountLabel.fontStyle = BoldUnlessThin;
         _potionCountLabel.alignment = TextAlignmentOptions.Bottom;
         _potionCountLabel.raycastTarget = false;
         var ol = go.AddComponent<UnityEngine.UI.Outline>();   // 아이콘 위에서도 읽히게 외곽선
@@ -944,6 +1009,17 @@ public sealed class CombatPanelView : MonoBehaviour
         [SerializeField] private Sprite iconSword;
         [SerializeField] private Sprite iconBow;
         [SerializeField] private Sprite iconCrossbow;
+
+        private bool _thin;
+
+        /// <summary>장식 테 Image — 톤 v2가 얇게 깎아 넘겨받는다(10-08).</summary>
+        internal Image CellFrame => cellFrame;
+        /// <summary>칸 바탕 · 아이콘 — 명조형이 원으로 바꾼다(10-08).</summary>
+        internal Image CellBg => cellBg;
+        internal Image Icon   => iconImage;
+
+        /// <summary>톤 v2(10-08) — 테 색은 얇은 테(UIThinFrame)가 맡는다. 바탕 · 아이콘 밝기만 여기서.</summary>
+        internal void ApplyThin() => _thin = true;
 
         public void Apply(WeaponSlotInfo info)
         {
@@ -974,6 +1050,13 @@ public sealed class CombatPanelView : MonoBehaviour
         /// </summary>
         internal void SetSelected(bool selected)
         {
+            if (_thin)
+            {
+                if (cellBg    != null) cellBg.color    = WuwaHud ? (selected ? WDisc : UITheme.Thin.WithA(WDisc, 0.35f))   // 명조형 — 원판(흰 그림)이라 어둡게
+                                                                 : selected ? Color.white : WeaponBgIdle;
+                if (iconImage != null) iconImage.color = selected ? Color.white : WeaponIconIdle;
+                return;   // 테 색은 얇은 테(UIThinFrame)가 맡는다
+            }
             // 예전엔 두 칸의 차이가 알파 0.5뿐이라 어느 쪽을 들고 있는지 흐렸다 —
             // 의뢰서대로 활성은 금테, 비활성은 어둡게 눌러 한눈에 갈리게 한다(배율은 패널이 건다).
             if (cellBg    != null) cellBg.color    = selected ? Color.white : WeaponBgIdle;
@@ -1112,7 +1195,7 @@ public sealed class CombatPanelView : MonoBehaviour
                 var tmp = go.AddComponent<TextMeshProUGUI>();
                 if (font != null) tmp.font = font;
                 tmp.fontSize      = 18f;
-                tmp.fontStyle     = FontStyles.Bold;
+                tmp.fontStyle     = BoldUnlessThin;
                 tmp.alignment     = TextAlignmentOptions.Center;
                 tmp.color         = Color.white;
                 tmp.raycastTarget = false;
@@ -1128,13 +1211,37 @@ public sealed class CombatPanelView : MonoBehaviour
                 cooldownBg.SetActive(onCooldown);
 
             if (cooldownText != null)
-                cooldownText.text = onCooldown ? Mathf.CeilToInt(remaining).ToString() : string.Empty;
+            {
+                if (onCooldown) SetCooldownLabel(cooldownText, remaining);
+                else            cooldownText.text = string.Empty;
+            }
 
             if (cooldownOverlay != null)
             {
                 cooldownOverlay.gameObject.SetActive(onCooldown);
                 cooldownOverlay.fillAmount = (onCooldown && total > 0f) ? remaining / total : 0f;
             }
+        }
+
+        /// <summary>톤 v2(10-07) — 쿨다운 숫자 = Light 28 · 키 글자 = Medium 15(굵게 없음).</summary>
+        internal void StyleThin()
+        {
+            if (cooldownText != null) UITheme.StyleThinText(cooldownText, UIWeight.Light, 28f, UITheme.Thin.Ink, shadow: true);
+            if (keyLabel != null)     UITheme.StyleThinText(keyLabel, UIWeight.Medium, UITheme.Thin.Small, keyLabel.color, shadow: true);
+        }
+
+        /// <summary>명조형(10-08) — 재사용 대기 부채꼴 = 원판 · 숫자 = Medium <paramref name="textSize"/>.</summary>
+        internal void UseRound(Sprite disc, float textSize)
+        {
+            if (cooldownOverlay != null)
+            {
+                cooldownOverlay.sprite        = disc;
+                cooldownOverlay.type          = Image.Type.Filled;
+                cooldownOverlay.fillMethod    = Image.FillMethod.Radial360;
+                cooldownOverlay.fillOrigin    = (int)Image.Origin360.Top;
+                cooldownOverlay.fillClockwise = true;
+            }
+            if (cooldownText != null) UITheme.StyleThinText(cooldownText, UIWeight.Medium, textSize, UITheme.Thin.Ink, shadow: true);
         }
     }
 
@@ -1175,10 +1282,13 @@ public sealed class CombatPanelView : MonoBehaviour
         EnsureStatPanel();       // ATK/DEF → HpBar
 
         // Q/E는 프리팹에 cooldownOverlay·cooldownText가 미할당이라 R처럼 도는 연출이 없었다 → 런타임 보강.
-        skillQ?.EnsureCooldownVisuals(skillInnerSprite, GetSafeFont());
-        skillE?.EnsureCooldownVisuals(skillInnerSprite, GetSafeFont());
+        // 톤 v2: 부채꼴 모양 = 칸 모양(Q 마름모 · E 네모) — 납품 안쪽 아트를 쓰면 마름모 밖으로 네모 모서리가 돌았다.
+        skillQ?.EnsureCooldownVisuals(ThinHud ? UIThinShapes.Fill(ThinShape.Diamond, SkillQSize, SkillQSize) : skillInnerSprite, GetSafeFont());
+        skillE?.EnsureCooldownVisuals(ThinHud ? UIThinShapes.Fill(ThinShape.Square, SkillERSize, SkillERSize) : skillInnerSprite, GetSafeFont());
 
-        ApplySlotSkins();        // 디자이너 아트 스킨(미지정 시 기존 플랫 외형 유지)
+        ApplySlotSkins();               // 디자이너 아트 스킨(미지정 시 기존 플랫 외형 유지)
+        if (ThinHud) ApplyThinSkin();   // 톤 v2 — 위 납품 테를 얇게 깎아 넘겨받고 활성화 연출을 건다(10-08)
+        if (WuwaHud) ApplyWuwaLayout(); // 명조형 — 아래 가운데 한 묶음 · 오른쪽 원형 칸(10-08)
     }
 
     private void OnEnable()
@@ -1330,7 +1440,7 @@ public sealed class CombatPanelView : MonoBehaviour
         _reviveLabel = labelGo.AddComponent<TextMeshProUGUI>();
         _reviveLabel.text          = "부활";
         _reviveLabel.fontSize      = 16f;   // 가독성 하한(16px)
-        _reviveLabel.fontStyle     = FontStyles.Bold;
+        _reviveLabel.fontStyle     = BoldUnlessThin;
         _reviveLabel.alignment     = TextAlignmentOptions.Center;
         _reviveLabel.color         = ReviveInkOn;
         _reviveLabel.raycastTarget = false;
@@ -1401,7 +1511,7 @@ public sealed class CombatPanelView : MonoBehaviour
         rt.sizeDelta = new Vector2(70f, 16f);
         var tmp = go.AddComponent<TextMeshProUGUI>();
         AssignSafeFont(tmp);
-        tmp.text = text; tmp.fontSize = 12f; tmp.fontStyle = FontStyles.Bold;
+        tmp.text = text; tmp.fontSize = 12f; tmp.fontStyle = BoldUnlessThin;
         tmp.alignment = TextAlignmentOptions.Center; tmp.color = color;
         tmp.raycastTarget = false;
     }
@@ -1589,7 +1699,8 @@ public sealed class CombatPanelView : MonoBehaviour
         RefreshQFrame();
 
         if (_sunOpenImg   != null && _sunOpenImg.gameObject.activeSelf   == noon)  _sunOpenImg.gameObject.SetActive(!noon);
-        if (_sunGaugeRoot != null && _sunGaugeRoot.gameObject.activeSelf == noon)  _sunGaugeRoot.gameObject.SetActive(!noon);
+        // 명조형은 정오에도 게이지가 남는다 — 남은 정오 시간만큼 흰 금빛으로 타들어 간다(TickWuwa)
+        if (!WuwaHud && _sunGaugeRoot != null && _sunGaugeRoot.gameObject.activeSelf == noon)  _sunGaugeRoot.gameObject.SetActive(!noon);
         if (_sunClosedImg != null && _sunClosedImg.gameObject.activeSelf != noon)  _sunClosedImg.gameObject.SetActive(noon);
 
         if (noon)
@@ -1607,7 +1718,7 @@ public sealed class CombatPanelView : MonoBehaviour
         if (_relicFlash > 0f) _relicFlash = Mathf.Max(0f, _relicFlash - Time.unscaledDeltaTime * 2.5f);
         // 이 메서드의 다른 위젯 참조는 전부 널 체크를 하는데 여기만 빠져 있었다.
         // _sunRoot가 비면 Update가 매 프레임 던져 뒤쪽(알림 만료 등)이 통째로 죽는다.
-        if (_sunRoot != null)
+        if (_sunRoot != null && !WuwaHud)   // 명조형은 통째 튐 대신 문장만 자리 잡으며 커진다(TickWuwa)
             _sunRoot.localScale = Vector3.one * (1f + _relicFlash * 0.12f);
 
         TickWeaponPop();
@@ -1619,7 +1730,7 @@ public sealed class CombatPanelView : MonoBehaviour
         // 바뀐 순간에만 칸이 한 번 튄다 — 같은 값으로 다시 불려도(매 갱신) 흔들리지 않게 한다.
         bool changed = _activeWeaponIndex != index;
         _activeWeaponIndex = index;
-        if (changed && index >= 0 && index < _weaponSlotRoot.Length)
+        if (changed && !ThinHud && index >= 0 && index < _weaponSlotRoot.Length)
         {
             _weaponPopSlot = index;
             _weaponPop     = WeaponPopDur;
@@ -1646,9 +1757,14 @@ public sealed class CombatPanelView : MonoBehaviour
         }
     }
 
-    /// <summary>유물 아이덴티티 바에 활성 유물 리소스를 연결(null이면 숨김). 라벨은 OnChanged, Fill/색은 Update 폴링.</summary>
-    public void SetRelicResource(IRelicResource res)
+    /// <summary>
+    /// 유물 아이덴티티 바에 활성 유물 리소스를 연결(null이면 숨김). 라벨은 OnChanged, Fill/색은 Update 폴링.
+    /// <paramref name="owner"/> = Q 칸의 잠김 · 「×N」이 묻는 플레이어(유물 행동의 CanUseSkill · QUsesLeft).
+    /// </summary>
+    public void SetRelicResource(IRelicResource res, PlayerController owner = null)
     {
+        _relicOwner = res != null ? owner : null;
+        if (res == null) SetQUses(0);
         if (_relicBar == null) return;
         if (_relicResource != null && _relicChanged != null)
             _relicResource.OnChanged -= _relicChanged;
@@ -1845,9 +1961,9 @@ public sealed class CombatPanelView : MonoBehaviour
 
         var tmp = go.AddComponent<TextMeshProUGUI>();
         AssignSafeFont(tmp);
-        if (slotLabelFont != null) tmp.font = slotLabelFont;
+        if (ThinHud) AssignSafeFont(tmp); else if (slotLabelFont != null) tmp.font = slotLabelFont;
         tmp.fontSize          = size;
-        tmp.fontStyle         = FontStyles.Bold;
+        tmp.fontStyle         = BoldUnlessThin;
         tmp.alignment         = align;
         tmp.enableWordWrapping = false;
         tmp.overflowMode      = TextOverflowModes.Overflow;
@@ -1898,7 +2014,7 @@ public sealed class CombatPanelView : MonoBehaviour
 
         tmp.text          = text;
         tmp.fontSize      = KeyLabelSize;
-        tmp.fontStyle     = FontStyles.Bold;
+        tmp.fontStyle     = BoldUnlessThin;
         tmp.color         = KeyLabelColor;
         tmp.alignment     = TextAlignmentOptions.Top;
         tmp.enableWordWrapping = false;
@@ -1911,12 +2027,19 @@ public sealed class CombatPanelView : MonoBehaviour
         ol.effectColor    = KeyLabelOutline;
         ol.effectDistance = new Vector2(1.5f, -1.5f);
 
-        if (slotLabelFont != null) tmp.font = slotLabelFont;
+        if (ThinHud) AssignSafeFont(tmp); else if (slotLabelFont != null) tmp.font = slotLabelFont;
+        if (WuwaHud) StyleRoundKey(tmp, 4f);   // 명조형 — 늦게 생기는 키 글자(물약 C)도 원 아래 Medium 13
     }
 
     private static TMP_FontAsset _safeFontCache;
     private static TMP_FontAsset GetSafeFont()
     {
+        if (ThinHud)
+        {
+            // 톤 v2 — 나중에 생기는 HUD 글자(알림 · 버프 칸)도 Noto Medium. 아직 안 올라왔으면 아래 예전 경로.
+            var thin = UITheme.Font(UIWeight.Medium);
+            if (thin != null && thin.material != null && thin != TMP_Settings.defaultFontAsset) return thin;
+        }
         if (_safeFontCache != null && _safeFontCache.material != null)
             return _safeFontCache;
         var def = TMP_Settings.defaultFontAsset;
@@ -1927,6 +2050,12 @@ public sealed class CombatPanelView : MonoBehaviour
     }
     private static void AssignSafeFont(TMP_Text tmp)
     {
+        if (ThinHud)
+        {
+            // 톤 v2 — AddComponent가 기본 글꼴(DNF Bold)을 이미 넣어 두므로 「비었을 때만」이 아니라 늘 Noto Medium(10-08 리뷰 I3).
+            var thin = UITheme.Font(UIWeight.Medium);
+            if (thin != null && thin.material != null && thin != TMP_Settings.defaultFontAsset) { tmp.font = thin; return; }
+        }
         if (tmp.font != null && tmp.font.material != null) return;
         var safe = GetSafeFont();
         if (safe != null) tmp.font = safe;
@@ -1947,6 +2076,8 @@ public sealed class CombatPanelView : MonoBehaviour
     {
         if (_hpInitialized)
             UpdateHpAnimation();
+        if (ThinHud) TickThinFonts();
+        TickSkillBuffs(Time.deltaTime);   // 석궁 강화 남은 시간 막대(A9)
 
         // 가웨인 태양형: 라디얼 태양 위젯을 대신 구동(수평 바는 숨김).
         if (_useSunGauge && _relicResource != null)
@@ -1991,9 +2122,10 @@ public sealed class CombatPanelView : MonoBehaviour
             }
             // 정오 진입 시 바를 잠깐 확대(펀치) — 절정 강조
             // 분기 조건이 _relicBarFill만 보고 _relicBar는 안 봐서 여기만 무방비였다(_sunRoot와 같은 결함).
-            if (_relicBar != null)
+            if (_relicBar != null && !WuwaHud)
                 _relicBar.localScale = Vector3.one * (1f + _relicFlash * 0.10f);
         }
+        if (WuwaHud) TickWuwa();   // 명조형 — 가운데 게이지 · Q 고리 · 정오/절정 변신
 
         UpdateBuffNotice();
 
@@ -2126,7 +2258,12 @@ public sealed class CombatPanelView : MonoBehaviour
         go.transform.SetParent(_buffGrid.transform, false);
         var cell = go.AddComponent<BuffCell>();
         _buffIconResolver ??= BuffIconFor;
-        cell.Initialize(GetSafeFont(), OnBuffCellHover, buffInnerSprite, buffFrameSprite, _buffIconResolver);
+        // 톤 v2(10-11) — 납품 테(323px 흰 6px 선)를 36칸에 줄이면 0.67px로 깜빡이고, 검정 80% 안쪽이 아이콘 둘레에 5px 검은 띠로 읽혔다
+        // (선 굵기 흰 1 + 검정 5). 1px 사각 테(잉크 18%, BuffCell이 칠함) + 원형 칸과 같은 글래스 바탕으로 바꾼다.
+        if (ThinHud)
+            cell.Initialize(GetSafeFont(), OnBuffCellHover, null, UIThinShapes.Outline(ThinShape.Square, BuffCellSize, BuffCellSize), _buffIconResolver);
+        else
+            cell.Initialize(GetSafeFont(), OnBuffCellHover, buffInnerSprite, buffFrameSprite, _buffIconResolver);
         return cell;
     }
 
@@ -2440,7 +2577,7 @@ public sealed class CombatPanelView : MonoBehaviour
         _rCooldownTxt = cdTxtGO.AddComponent<TextMeshProUGUI>();
         AssignSafeFont(_rCooldownTxt);
         _rCooldownTxt.fontSize  = 18f;
-        _rCooldownTxt.fontStyle = FontStyles.Bold;
+        _rCooldownTxt.fontStyle = BoldUnlessThin;
         _rCooldownTxt.alignment = TextAlignmentOptions.Center;
         _rCooldownTxt.color     = Color.white;
 
@@ -2544,7 +2681,7 @@ public sealed class CombatPanelView : MonoBehaviour
         AssignSafeFont(tmp);
         tmp.text      = "—";
         tmp.fontSize  = _statSkinned ? 22f : 15f;
-        tmp.fontStyle = FontStyles.Bold;
+        tmp.fontStyle = BoldUnlessThin;
         tmp.color     = color;
         // 스킨: 아이콘이 라벨 왼쪽에 붙으므로 [아이콘][숫자]로 읽히려면 좌측 정렬이어야 한다.
         tmp.alignment = _statSkinned ? TextAlignmentOptions.MidlineLeft : TextAlignmentOptions.Midline;
@@ -2597,7 +2734,7 @@ public sealed class CombatPanelView : MonoBehaviour
 
         _buffGrid = rootGo.GetComponent<GridLayoutGroup>();
         if (_buffGrid == null) _buffGrid = rootGo.AddComponent<GridLayoutGroup>();
-        _buffGrid.cellSize        = new Vector2(36f, 36f);   // 목업 아이콘 36px (step 41)
+        _buffGrid.cellSize        = new Vector2(BuffCellSize, BuffCellSize);   // 목업 아이콘 36px (step 41)
         _buffGrid.spacing         = new Vector2(5f, 5f);
         _buffGrid.startCorner     = GridLayoutGroup.Corner.LowerLeft;   // 하단 행부터 채우고 위로 쌓기
         _buffGrid.startAxis       = GridLayoutGroup.Axis.Horizontal;
@@ -2673,7 +2810,7 @@ public sealed class CombatPanelView : MonoBehaviour
         buffNoticeText.fontSize = 22f;
         buffNoticeText.color = Color.yellow;
         buffNoticeText.alignment = TextAlignmentOptions.Center;
-        buffNoticeText.fontStyle = FontStyles.Bold;
+        buffNoticeText.fontStyle = BoldUnlessThin;
 
         // Outline 효과
         var outline = go.AddComponent<Outline>();

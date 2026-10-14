@@ -120,6 +120,10 @@ public class MonsterDeathFxData
     public string deathVfxKey = "DieEffect_01";
     [Tooltip("처치 VFX 스케일 배율.")]
     public float deathVfxScale = 1f;
+    [Tooltip("처치 VFX를 발에서 이 높이(m)만큼 올려 띄운다 — 몸 가운데에서 터지게. 0 = 발.")]
+    public float deathVfxHeight = 0f;
+    [Tooltip("처치 VFX를 실시간으로 재생 — 막타 히트스톱(배속 0.04) 동안에도 터져 보이게. 끄면 정지가 풀린 뒤에야 보인다.")]
+    public bool  deathVfxUnscaled = false;
 
     [Header("막타 임팩트 (킬 히트스톱)")]
     [Tooltip("킬 순간 timeScale (0~1). killHitStopDuration 이 0이면 비활성.")]

@@ -18,6 +18,13 @@ public abstract class WeaponFormBase
     /// <summary>발동 이름(풍절 · 내려찍기 · 변주 이름).</summary>
     public event Action<string> Triggered;
 
+    /// <summary>쌓인 수가 바뀐 까닭 — HUD가 줄어듦을 다르게 그린다(맞음 = 붉음 · 시간 = 회색 · 발동 = 비움 · 돌려받음 = 금 테 · 10-12 A7 · S9).</summary>
+    public enum StackReason { Gain, Damaged, Idle, Trigger, Refund }
+    /// <summary>마지막 StacksChanged의 까닭 — 사건 안에서 읽는다.</summary>
+    public StackReason LastReason { get; private set; }
+    /// <summary>마지막 발동 뒤 돌려받은 칸(폭풍의 눈) — LastReason이 Refund일 때 뜻이 있다.</summary>
+    public int LastRefund { get; private set; }
+
     protected WeaponFormBase(PlayerController player, WeaponData weapon)
     {
         Player = player;
@@ -30,6 +37,8 @@ public abstract class WeaponFormBase
     public int          MaxStacks => Def.MaxStacks;
     public bool         IsFull    => _stacks >= Def.MaxStacks;
     public int          Tier      => Weapon.formTier;
+    /// <summary>근접 칸을 들고 있다 — 구동기가 매 프레임 넣는다. 아니면 쌓인 수를 줄이거나 잃지 않는다.</summary>
+    public bool         Holding   { get; set; } = true;
 
     /// <summary>무기의 형 정의로 만든다. 형이 없거나 모르는 id면 null.</summary>
     public static WeaponFormBase Create(PlayerController player, WeaponData weapon)
@@ -49,19 +58,27 @@ public abstract class WeaponFormBase
     public virtual void OnDodgeStart() { }
     public virtual void OnDodgeEnd() { }
     public virtual void OnSkillHit(in HitInfo hit) { }
+    /// <summary>새 휘두름(슬래시 이벤트)이 나왔다 — 그 판정이 닿기 전. comboStep = 이 휘두름의 콤보 단계.</summary>
+    public virtual void OnSwing(int comboStep) { }
     public virtual void Tick(float dt) { }
     public virtual void Dispose() { }
 
     protected bool  Has(string variantId) => Weapon.HasFormVariant(variantId);
     protected float Atk => Player.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee);
 
-    protected void SetStacks(int v)
+    protected void SetStacks(int v, StackReason why = StackReason.Gain)
     {
         v = Mathf.Clamp(v, 0, Def.MaxStacks);
         if (v == _stacks) return;
         _stacks = v;
+        LastReason = why;
+        LastRefund = why == StackReason.Refund ? v : 0;
         StacksChanged?.Invoke(_stacks, Def.MaxStacks);
     }
 
     protected void RaiseTriggered(string name) => Triggered?.Invoke(name);
+
+    /// <summary>형 실측 로그 — 에디터에서만(빌드에서는 호출과 문자열 조립이 통째로 빠진다 · 검토 M7). 실측 메뉴가 횟수를 센다.</summary>
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    protected static void Log(string msg) => Debug.Log("[WeaponForm] " + msg);
 }

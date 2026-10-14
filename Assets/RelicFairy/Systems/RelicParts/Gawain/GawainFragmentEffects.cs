@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using RelicFairy.Monster;
@@ -32,7 +32,8 @@ public abstract class GawainFragment : RelicPartEffect
     protected virtual void Bind() { }
     protected virtual void Unbind() { }
 
-    protected float Atk => Player != null ? Player.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee) : 0f;
+    // 유물 피해 공격력 = 근접 · 원거리 중 큰 값(10-14 A5 — 원거리 빌드와도 맞물리게) × 이 조각 계열 각인 배율(A4)
+    protected float Atk => Player != null ? Player.RuntimeStats.AttackPower * ImprintMul : 0f;
     protected GameObject Owner => Player != null ? Player.gameObject : null;
 
     protected static MonsterBase AsMonster(GameObject go) => go != null && go.TryGetComponent<MonsterBase>(out var mb) ? mb : null;
@@ -305,28 +306,35 @@ public sealed class GSecondSunEffect : GawainFragment
 /// <summary>G7 해시계 — 낙일이 3체 이상 맞히면 정오 +2초(정오당 1번) · ② 늘어난 2초 동안 공격이 태양흔 · ③ 낙일 처치 시 한 번 더.</summary>
 public sealed class GSundialEffect : GawainFragment
 {
-    private bool  _used, _extended, _bonusAllowed;
-    private float _impactAt = -9f;
+    private bool  _used, _extended, _bonusAllowed, _bonusUsed;
+    private float _impactAt = -9f, _killAt = -9f;
     public GSundialEffect() : base("g_sundial") { }
     protected override void Bind()   { Hub.Relic.SunImpact += OnSunImpact; Hub.NoonStarted += OnNoon; }
     protected override void Unbind() { if (Hub.Relic != null) Hub.Relic.SunImpact -= OnSunImpact; Hub.NoonStarted -= OnNoon; }
-    private void OnNoon(bool shortNoon) { _used = _extended = _bonusAllowed = false; }
+    private void OnNoon(bool shortNoon) { _used = _extended = _bonusAllowed = _bonusUsed = false; }
     private void OnSunImpact(Vector3 at, List<GameObject> hits, bool small)
     {
         if (Hub == null || !Hub.IsNoon) return;
         _impactAt = Time.time;
+        // 착탄은 피해 → 처치 → 이 통지 순서다 — 이 낙일로 죽은 적은 이미 OnKill을 지났다(같은 시각 처치 = 이 낙일의 처치 · 10-12 B2)
+        bool killedNow = Line3 && _killAt >= Time.time;
         int monsters = 0;
         foreach (var go in hits) if (AsMonster(go) != null) monsters++;
-        if (monsters < 3 || (_used && !_bonusAllowed)) return;
-        if (_used) _bonusAllowed = false;
-        _used = true; _extended = true;
-        Hub.Gauge.ExtendNoon(2f);
-        Say(at, "정오 +2초");
-        Debug.Log($"[GawainMemory] 해시계 — 낙일 {monsters}체 · 정오 +2초");
+        if (monsters >= 3 && (!_used || _bonusAllowed))
+        {
+            if (_used) { _bonusAllowed = false; _bonusUsed = true; }   // ③ 「한 번 더」 — 정오당 최대 2번
+            _used = true; _extended = true;
+            Hub.Gauge.ExtendNoon(2f);
+            Say(at, "정오 +2초");
+            Debug.Log($"[GawainMemory] 해시계 — 낙일 {monsters}체 · 정오 +2초{(_bonusUsed ? " (처치로 한 번 더)" : "")}");
+        }
+        if (killedNow && !_bonusUsed) _bonusAllowed = true;
     }
     public override void OnKill(GameObject deadEnemy, PlayerController player)
     {
-        if (Line3 && Hub != null && Hub.IsNoon && Time.time - _impactAt < 1.5f) _bonusAllowed = true;
+        if (!Line3 || Hub == null || !Hub.IsNoon) return;
+        _killAt = Time.time;
+        if (Time.time - _impactAt < 1.5f && !_bonusUsed) _bonusAllowed = true;   // 낙일 화상 등으로 조금 뒤에 죽은 적
     }
     public override void Tick(float dt, PlayerController player)
     {
@@ -429,7 +437,7 @@ public sealed class GSettingSunEffect : GawainFragment
         if (_pullTimer > 0f) return;
         _pullTimer = PullEvery;
         ElementVfxPlayer.PlayBurst(RuneElement.Fire, _at, FieldRadius);
-        int n = CombatQuery.GetNearbyEnemies(_at, FieldRadius + 2f, null, 16, Buf);
+        int n = CombatQuery.GetNearbyEnemies(_at, FieldRadius, null, 16, Buf);   // 당김 = 보이는 노을 지대(4 m) — 6 m로 당기는데 이펙트는 4 m였다(10-12 B7)
         for (int i = 0; i < n; i++)
         {
             var mb = Buf[i];
@@ -498,9 +506,9 @@ public sealed class GDuskJudgmentEffect : GawainFragment
             int n = CombatQuery.GetNearbyEnemies(mb.transform.position, 5f, mb.gameObject, marks, Buf);
             for (int i = 0; i < n; i++) if (Buf[i] != null) Hub.AddSunmark(Buf[i], 1, ignoreGap: true);
         }
-        ElementVfxPlayer.PlayBurst(RuneElement.Fire, mb.transform.position, 1.5f);
+        ElementVfxPlayer.PlayBurst(RuneElement.Fire, mb.transform.position, 1f);   // 처형은 한 명 — 1.5 m 면적 폭발이 광역으로 읽혔다(10-13)
         mb.TakeDamage(mb.CurrentHp * 10f, player.gameObject, 0.3f);
-        Debug.Log($"[GawainMemory] 심판의 노을 — 처형 {mb.name}");
+        RFLog.D($"[GawainMemory] 심판의 노을 — 처형 {mb.name}");
     }
 }
 
@@ -559,7 +567,7 @@ public sealed class GNoonToDuskEffect : GawainFragment
         {
             float a = i * Mathf.PI * 2f / count;
             Vector3 p = _center + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * 2.5f;
-            var f = FireField.SpawnAt(Owner, p, 1.2f, 3f, Atk * 0.10f, 1.5f);
+            var f = FireField.SpawnAt(Owner, p, 1.2f, 3f, Atk * 0.10f, 1.5f, "g_noon_to_dusk", MaxEmbers);   // 따로 센다 — 전역 상한 5가 6번째 · 잔염의 길이 이 불씨를 지웠다(10-12 B10)
             if (f != null) _embers.Add(f);
         }
         _waiting = Line3 && _embers.Count > 0;
@@ -584,5 +592,80 @@ public sealed class GNoonToDuskEffect : GawainFragment
             _waiting = false;
             SolarDescentSkillRuntime.StrikeSmallSun(player, Hub.Relic, _center, 0.25f, 0.5f);
         }
+    }
+}
+
+/// <summary>
+/// G15 햇살 화살(사격 · 10-14 A5) — 정오 동안 원거리 적중 = 태양흔 +1(같은 적 간격 무시) · ② 정오의 원거리 치명은 +2 ·
+/// ③ 정오 동안 상한에 닿은 적은 그 자리 개화(같은 적 2초에 한 번).
+/// </summary>
+public sealed class GSunArrowEffect : GawainFragment
+{
+    private const float BloomGap = 2f;
+    private readonly Dictionary<int, float> _bloomReadyAt = new();
+    public GSunArrowEffect() : base("g_sun_arrow") { }
+    protected override void Bind()   => Hub.Hit += OnHubHit;
+    protected override void Unbind() => Hub.Hit -= OnHubHit;
+    private void OnHubHit(HitInfo h)
+    {
+        if (!h.IsRanged || !Hub.IsNoon) return;
+        var mb = AsMonster(h.Target);
+        if (mb == null || mb.IsDead) return;
+        Hub.AddSunmark(mb, Line2 && h.IsCritical ? 2 : 1, ignoreGap: true);
+        if (!Line3) return;
+        var st = RelicMarkStatus.Of(mb.gameObject, false);
+        if (st == null || st.Sunmark < Hub.SunmarkCap) return;
+        int id = mb.GetInstanceID();
+        if (_bloomReadyAt.TryGetValue(id, out float at) && Time.time < at) return;
+        _bloomReadyAt[id] = Time.time + BloomGap;
+        Hub.Bloom(mb, st.ConsumeSunmark(), GawainMemoryHub.BloomCause.Fragment);
+    }
+}
+
+/// <summary>
+/// G16 노을 사냥꾼(사격 · 10-14 A5) — 황혼 동안 원거리로 처치하면 그 자리에 불씨(2 m · 3초) ·
+/// ② 처치한 적의 태양흔이 4 m 안 1마리로 옮는다 · ③ 불씨 안 적을 원거리로 맞히면 태양흔 +1(황혼에도 쌓임).
+/// </summary>
+public sealed class GDuskHunterEffect : GawainFragment
+{
+    private const string Pool = "g_dusk_hunter";
+    private const int   MaxEmbers = 4;
+    private const float Radius = 2f, Life = 3f, CarryRadius = 4f;
+    private readonly List<FireField> _embers = new();
+    public GDuskHunterEffect() : base("g_dusk_hunter") { }
+    protected override void Bind()   => Hub.Hit += OnHubHit;
+    protected override void Unbind() => Hub.Hit -= OnHubHit;
+    private void OnHubHit(HitInfo h)
+    {
+        if (!h.IsRanged || !Hub.IsDusk) return;
+        var mb = AsMonster(h.Target);
+        if (mb == null) return;
+        if (mb.IsDead) { OnRangedKill(mb); return; }   // 막타 적중 보고 때 대상은 이미 죽어 있다(처치 신호가 먼저 온다)
+        if (Line3 && InEmber(mb.transform.position)) Hub.AddSunmark(mb, 1);
+    }
+    private void OnRangedKill(MonsterBase dead)
+    {
+        Vector3 at = dead.transform.position;
+        var f = FireField.SpawnAt(Owner, at, Radius, Life, Atk * 0.10f, 1.5f, Pool, MaxEmbers);
+        if (f != null && !_embers.Contains(f)) _embers.Add(f);
+        if (!Line2) return;
+        var st = RelicMarkStatus.Of(dead.gameObject, false);
+        int marks = st != null ? st.Sunmark : 0;
+        if (marks <= 0) return;
+        int n = CombatQuery.GetNearbyEnemies(at, CarryRadius, dead.gameObject, 1, Buf);
+        if (n <= 0 || Buf[0] == null) return;
+        Hub.AddSunmark(Buf[0], marks, ignoreGap: true);
+        ElementVfxPlayer.PlayBeam(RuneElement.Fire, at, Buf[0].transform.position);
+    }
+    private bool InEmber(Vector3 p)
+    {
+        for (int i = _embers.Count - 1; i >= 0; i--)
+        {
+            var f = _embers[i];
+            if (f == null || !f.IsActive) { _embers.RemoveAt(i); continue; }
+            Vector3 d = p - f.Center; d.y = 0f;
+            if (d.sqrMagnitude <= f.Radius * f.Radius) return true;
+        }
+        return false;
     }
 }

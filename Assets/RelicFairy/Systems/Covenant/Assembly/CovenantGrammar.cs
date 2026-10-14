@@ -167,7 +167,7 @@ public static class CovenantGrammar
         "bloodmark"  => "피가 굳어 나를 막는다",
         "aegis"      => "성역이 나를 감싼다",
         "ward"       => "결계가 선다",
-        "lastbreath" => "나는 쓰러지지 않는다",
+        "lastbreath" => "쓰러짐 막기를 하나 모은다",
         "goldrain"   => "금이 쏟아진다",
         _            => effectId,
     };

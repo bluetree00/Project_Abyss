@@ -33,8 +33,7 @@ MonoBehaviour:
   _dangerZoneHeightOffset: 0.1
   _arenaFitPadding: 0.15
   _warningOutlineWidth: 0.18
-  _icePillarPrefab: {fileID: 6530448752386012335, guid: c3467a660c4fd4f429b33f697302408c,
-    type: 3}
+  _icePillarPrefab: {fileID: 0}
   _pillarCount: 8
   _pillarRadius: 5
   _pillarTintColor: {r: 0.4, g: 0.8, b: 1, a: 1}

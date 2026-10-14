@@ -62,6 +62,12 @@ public class UI_RelicInfoPopup : UI_Popup
     private const float AccentBar      = 4f;
     private const float ButtonRowHeight = 62f;
     private const float StatLabelWidth = 132f;  // 수치 표의 라벨 열 폭(고정해야 값이 세로로 정렬된다)
+    // 한눈 줄(10-13 사용자 「스크롤로 내리는 게 불편 · 상세할 필요 없이 한눈에」) — 능력 칸 하나에 능력마다 한 줄
+    private const float GlanceRail     = 3f;     // 줄 왼쪽 종류 색 띠
+    private const float GlanceNameSize = 19f, GlanceCondSize = 13f, GlanceLineSize = 14.5f;
+    private const float GlanceValueSize = 21f, GlanceLabelSize = 12f;
+    private const float GlanceKeyWidth = 70f;    // 수치 한 칸 폭(값 · 라벨이 세로로 정렬된다) — 92면 수치가 칸 아트 가운데 문장 위에 얹혔다(②f 사진)
+    private const int   GlanceMaxKeys  = 2;
 
     // 판은 완전 불투명이어야 한다 — 0.97이면 뒤의 월드 조명·바닥이 옅게 배어 글자와 경쟁한다.
     private static readonly Color PanelBg   = new(0.07f, 0.06f, 0.10f, 1f);
@@ -242,11 +248,65 @@ public class UI_RelicInfoPopup : UI_Popup
         var frame = _placeholder.parent != null ? _placeholder.parent.GetComponent<Image>() : null;
         bool frameArt = frame != null && frame.sprite != null;
         _placeholder.gameObject.SetActive(sprite == null && !frameArt);
+        EnsurePortraitBacking(sprite == null);
 
         if (sprite != null) { _portrait.sprite = sprite; return; }
 
         string name = _relic.DisplayName;
         _placeholderInitial.text = string.IsNullOrEmpty(name) ? "?" : name.Substring(0, 1);
+    }
+
+    /// <summary>
+    /// 초상 뒤 받침(금 타원 고리 + 옅은 빛)과, 초상이 없을 때의 임시 문장(10-13 Artsystack — 분석 문서 §3-5).
+    /// 그림과 같은 액자 안 · 그림보다 뒤에 깐다. 처음 한 번 만들고 열 때마다 색 · 문장만 바꾼다. 스킨이 비면 아무것도 안 한다.
+    /// </summary>
+    private void EnsurePortraitBacking(bool noPortrait)
+    {
+        var box = _portrait != null ? _portrait.transform.parent as RectTransform : null;
+        if (box == null || _skin == null) return;
+
+        var glow = EnsureBackingImage(box, "PortraitGlow", _skin.PortraitGlow, 0.92f);
+        if (glow != null) glow.color = UITheme.Thin.InkA(0.10f);
+        var ring = EnsureBackingImage(box, "PortraitRing", UISpriteMaster.Thinned(_skin.PortraitRing), 0.86f);
+        if (ring != null) ring.color = UITheme.Thin.WithA(UITheme.Thin.Gold, 0.30f);
+
+        var emblemArt = noPortrait && _relic != null ? _skin.RelicEmblem(_relic.Id.ToString()) : null;
+        var emblem = EnsureBackingImage(box, "PortraitEmblem", emblemArt, 0.50f);
+        if (emblem != null)
+        {
+            var theme = _relic.ThemeColor(TitleColor);
+            emblem.color = new Color(theme.r, theme.g, theme.b, 0.25f);
+            emblem.gameObject.SetActive(emblemArt != null);
+        }
+        _portrait.transform.SetAsLastSibling();   // 그림은 받침 · 문장 위
+        if (_placeholder != null) _placeholder.SetAsLastSibling();
+    }
+
+    /// <summary>액자 안 가운데 정사각 그림 하나(짧은 변 × <paramref name="fill"/>) — 부모 맞춤(AspectRatioFitter)이라 첫 열림에 칸 크기가 아직 없어도 맞는다. 그림이 없으면 null(만들지 않는다).</summary>
+    private static Image EnsureBackingImage(RectTransform box, string name, Sprite art, float fill)
+    {
+        var t = box.Find(name);
+        if (t == null)
+        {
+            if (art == null) return null;
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(AspectRatioFitter));
+            var rt = (RectTransform)go.transform;
+            rt.SetParent(box, false);
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.pivot     = new Vector2(0.5f, 0.5f);
+            rt.localScale = new Vector3(fill, fill, 1f);
+            var fit = go.GetComponent<AspectRatioFitter>();
+            fit.aspectMode  = AspectRatioFitter.AspectMode.FitInParent;
+            fit.aspectRatio = 1f;
+            go.AddComponent<LayoutElement>().ignoreLayout = true;
+            t = rt;
+        }
+        var img = t.GetComponent<Image>();
+        img.raycastTarget  = false;
+        img.preserveAspect = true;
+        if (art != null) img.sprite = art;
+        return img;
     }
 
     private static void SetOrHide(TMP_Text t, string body)
@@ -295,7 +355,7 @@ public class UI_RelicInfoPopup : UI_Popup
             // 칩 폭은 글자 길이에 따라 변한다 — 9-slice로 늘리고, 아트는 자식으로 깐다.
             // (칩은 ContentSizeFitter로 글자 폭을 재는데, 스프라이트를 직접 넣으면
             //  아트 원본 폭 222px가 preferredWidth로 보고돼 칩이 전부 같은 크기로 뚱뚱해진다.)
-            AddBackdrop(chip, _skin?.tagChip, sliced: true);
+            AddBackdrop(chip, UISpriteMaster.Thinned(_skin?.tagChip), sliced: true, tint: UITheme.Thin.LineActive);   // 10-13 Hexagon_01 무채 + 금선
 
             // 칩은 글자 폭만큼만 오그라들어야 한다. 안 그러면 균등 분할돼 거대한 '버튼'처럼 보이고,
             // 누를 수 있는 것으로 오인된다(affordance 오류).
@@ -337,6 +397,15 @@ public class UI_RelicInfoPopup : UI_Popup
         var abilities = _relic.Abilities;
         if (abilities == null) return;
 
+        // 새 배치(능력 칸 하나 · 구운 프리팹 포함)는 스크롤 없이 한눈 줄로 — 칸 높이를 줄 수로 나눈다
+        if (_skillZone != null && _skillZone == _passiveZone)
+        {
+            UseGlanceLayout(_skillZone);
+            foreach (var a in abilities)
+                if (a != null && !string.IsNullOrWhiteSpace(a.name)) _spawned.Add(BuildGlanceRow(a, _skillZone));
+            return;
+        }
+
         int passiveCount = 0;
         for (int i = 0; i < abilities.Length; i++)
         {
@@ -372,6 +441,8 @@ public class UI_RelicInfoPopup : UI_Popup
         var cardArt = !_heroCardUsesOwnArt ? null
                     : hero ? _skin?.uniqueCard
                            : _skin?.PassivePlate(parent.childCount - 1);
+        // 10-13 Artsystack — 항목 아트가 없으면 남색 판(store_item_frame_03_navy · 1px 연금 테). 단색 상자 + Outline 대신.
+        if (cardArt == null) cardArt = _skin?.AbilityPanel;
         AddBackdrop(card, cardArt, sliced: true);
 
         if (hero)
@@ -419,10 +490,30 @@ public class UI_RelicInfoPopup : UI_Popup
         name.text = a.name;
         name.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
-        var badge = NewText("Badge", head, 16f, BadgeColor, FontStyles.Normal, TextAlignmentOptions.MidlineRight);
+        RectTransform badgeHost = head;
+        if (_skin?.KindBadge != null)
+        {
+            // 10-13 Artsystack — Q · 패시브 배지를 육각 남색 판(64×22 이상 · 글자 폭에 맞춰 늘어남)에 얹는다
+            var box = NewImage("BadgeBox", head, Color.white);
+            AddBackdrop(box, _skin.KindBadge, sliced: true);
+            var bh = box.gameObject.AddComponent<HorizontalLayoutGroup>();
+            bh.padding = new RectOffset(14, 14, 2, 2);
+            bh.childControlWidth = true;  bh.childForceExpandWidth  = false;
+            bh.childControlHeight = true; bh.childForceExpandHeight = false;
+            bh.childAlignment = TextAnchor.MiddleCenter;
+            var bfit = box.gameObject.AddComponent<ContentSizeFitter>();
+            bfit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var ble = box.gameObject.AddComponent<LayoutElement>();
+            ble.flexibleWidth = 0f;
+            ble.minWidth = 64f;
+            ble.preferredHeight = 24f;
+            badgeHost = box.rectTransform;
+        }
+        var badge = NewText("Badge", badgeHost, 16f, BadgeColor, FontStyles.Normal,
+                            badgeHost == head ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.Center);
         badge.text = string.IsNullOrWhiteSpace(a.badge) ? DefaultBadge(a.kind) : a.badge;
         badge.textWrappingMode = TextWrappingModes.NoWrap;
-        badge.gameObject.AddComponent<LayoutElement>().flexibleWidth = 0f;
+        if (badgeHost == head) badge.gameObject.AddComponent<LayoutElement>().flexibleWidth = 0f;
 
         if (!string.IsNullOrWhiteSpace(a.summary))
         {
@@ -483,6 +574,136 @@ public class UI_RelicInfoPopup : UI_Popup
             v.text = Highlight(value);
             v.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
         }
+    }
+
+    /// <summary>
+    /// 능력 칸을 한눈 줄용으로 — 스크롤 · 가장자리 흐림을 끄고 내용을 뷰포트에 꽉 채워, 줄들이 높이를 똑같이 나눠 갖게 한다.
+    /// 구운 프리팹의 칸(ScrollRect · RectMask2D · ContentSizeFitter)도 런타임에 그대로 바꾼다 — 프리팹은 손대지 않는다.
+    /// </summary>
+    private static void UseGlanceLayout(RectTransform content)
+    {
+        var viewport = content.parent as RectTransform;
+        var box      = viewport != null ? viewport.parent : null;
+        if (box != null && box.TryGetComponent<ScrollRect>(out var scroll)) scroll.enabled = false;
+        if (viewport != null && viewport.TryGetComponent<RectMask2D>(out var mask)) mask.softness = Vector2Int.zero;
+        if (content.TryGetComponent<ContentSizeFitter>(out var fit)) fit.enabled = false;
+
+        content.anchorMin = Vector2.zero;
+        content.anchorMax = Vector2.one;
+        content.pivot     = new Vector2(0.5f, 1f);
+        content.offsetMin = content.offsetMax = Vector2.zero;
+        if (content.TryGetComponent<VerticalLayoutGroup>(out var v))
+        {
+            v.spacing = 4f;
+            v.childControlHeight = true; v.childForceExpandHeight = true;   // 줄 수만큼 똑같이 나눈다
+            v.childControlWidth  = true; v.childForceExpandWidth  = true;
+        }
+    }
+
+    /// <summary>
+    /// 능력 한 줄 — 왼쪽: 종류 색 띠 · 이름 + 조건(배지) / 한 줄 요약. 오른쪽: 큰 수치 1~2개(값 위 · 라벨 아래).
+    /// 글은 데이터의 한눈 칸(<see cref="RelicAbilityInfo.glance"/> · <see cref="RelicAbilityInfo.glanceStats"/>), 비었으면 요약 첫 문장 · 수치 앞 2개.
+    /// 이름이 「Card」인 것은 인트로(차례로 떠오름)가 이 이름으로 찾기 때문.
+    /// </summary>
+    private GameObject BuildGlanceRow(RelicAbilityInfo a, RectTransform parent)
+    {
+        Color accent = a.kind switch
+        {
+            RelicAbilityKind.State => AccentState,
+            RelicAbilityKind.Skill => _accentSkill,
+            _                      => AccentPassive,
+        };
+
+        var row = NewRect("Card", parent);
+        var rh = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+        rh.padding = new RectOffset(0, 6, 4, 4);
+        rh.spacing = 12f;
+        rh.childAlignment = TextAnchor.MiddleLeft;
+        rh.childControlWidth = true;  rh.childForceExpandWidth  = false;
+        rh.childControlHeight = true; rh.childForceExpandHeight = true;
+
+        var rail = NewImage("Rail", row, accent);
+        var railLe = rail.gameObject.AddComponent<LayoutElement>();
+        railLe.preferredWidth = railLe.minWidth = GlanceRail;
+
+        // 왼쪽 — 이름 + 조건 / 한 줄 요약
+        var left = NewRect("Left", row);
+        var lv = left.gameObject.AddComponent<VerticalLayoutGroup>();
+        lv.spacing = 2f;
+        lv.childAlignment = TextAnchor.MiddleLeft;
+        lv.childControlWidth = true;  lv.childForceExpandWidth  = true;
+        lv.childControlHeight = true; lv.childForceExpandHeight = false;
+        left.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+        string cond = string.IsNullOrWhiteSpace(a.badge) ? DefaultBadge(a.kind) : a.badge;
+        var head = NewText("Name", left, GlanceNameSize, accent, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+        head.text = $"{a.name}<space=10><size={GlanceCondSize / GlanceNameSize * 100f:0}%><color=#{ColorUtility.ToHtmlStringRGB(BadgeColor)}>{cond}</color></size>";
+        head.textWrappingMode = TextWrappingModes.NoWrap;
+        head.overflowMode     = TextOverflowModes.Ellipsis;
+
+        var line = NewText("Glance", left, GlanceLineSize, SummaryCol, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+        line.text = GlanceLine(a);
+        line.textWrappingMode = TextWrappingModes.NoWrap;
+        line.overflowMode     = TextOverflowModes.Ellipsis;
+
+        // 오른쪽 — 큰 수치(값 위 · 라벨 아래), 칸 폭 고정이라 줄마다 세로로 맞는다
+        var keys = GlanceKeys(a);
+        var right = NewRect("Keys", row);
+        var kh = right.gameObject.AddComponent<HorizontalLayoutGroup>();
+        kh.spacing = 4f;
+        kh.childAlignment = TextAnchor.MiddleRight;
+        kh.childControlWidth = true;  kh.childForceExpandWidth  = false;
+        kh.childControlHeight = true; kh.childForceExpandHeight = false;
+        var rle = right.gameObject.AddComponent<LayoutElement>();
+        rle.preferredWidth = rle.minWidth = GlanceKeyWidth * GlanceMaxKeys + kh.spacing;
+        for (int i = 0; i < keys.Count; i++)
+        {
+            var (label, value) = keys[i];
+            var cell = NewRect("Key", right);
+            var cv = cell.gameObject.AddComponent<VerticalLayoutGroup>();
+            cv.childAlignment = TextAnchor.MiddleCenter;
+            cv.childControlWidth = true;  cv.childForceExpandWidth  = true;
+            cv.childControlHeight = true; cv.childForceExpandHeight = false;
+            var cle = cell.gameObject.AddComponent<LayoutElement>();
+            cle.preferredWidth = cle.minWidth = GlanceKeyWidth;
+
+            var vt = NewText("V", cell, GlanceValueSize, UIPalette.Gold, FontStyles.Bold, TextAlignmentOptions.Center);
+            vt.text = value;
+            vt.textWrappingMode = TextWrappingModes.NoWrap;
+            var lt = NewText("L", cell, GlanceLabelSize, StatLabelCol, FontStyles.Normal, TextAlignmentOptions.Center);
+            lt.text = label;
+            lt.textWrappingMode = TextWrappingModes.NoWrap;
+        }
+        return row.gameObject;
+    }
+
+    /// <summary>한 줄 요약 — 데이터의 한눈 칸, 비었으면 요약의 첫 문장(마침표 · 줄바꿈까지).</summary>
+    private static string GlanceLine(RelicAbilityInfo a)
+    {
+        if (!string.IsNullOrWhiteSpace(a.glance)) return a.glance.Trim();
+        string s = a.summary ?? string.Empty;
+        int cut = s.IndexOfAny(new[] { '.', '\n' });
+        return (cut > 0 ? s.Substring(0, cut) : s).Trim();
+    }
+
+    /// <summary>큰 수치 1~2개 — 데이터의 한눈 수치, 비었으면 수치 표 앞 2개(값이 길면 첫 토막만).</summary>
+    private static List<(string label, string value)> GlanceKeys(RelicAbilityInfo a)
+    {
+        var src  = a.glanceStats != null && a.glanceStats.Length > 0 ? a.glanceStats : a.stats;
+        var list = new List<(string, string)>(GlanceMaxKeys);
+        if (src == null) return list;
+        foreach (var raw in src)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) continue;
+            int bar = raw.IndexOf('|');
+            string label = bar >= 0 ? raw.Substring(0, bar).Trim() : string.Empty;
+            string value = bar >= 0 ? raw.Substring(bar + 1).Trim() : raw.Trim();
+            int cut = value.IndexOfAny(new[] { ' ', '(', '·' });
+            if (src == a.stats && cut > 0) value = value.Substring(0, cut);   // 폴백은 첫 토막만(「+20%  (정오 첫 …)」 → 「+20%」)
+            list.Add((label, value));
+            if (list.Count >= GlanceMaxKeys) break;
+        }
+        return list;
     }
 
     private static string DefaultBadge(RelicAbilityKind kind) => kind switch
@@ -1038,7 +1259,7 @@ public class UI_RelicInfoPopup : UI_Popup
     /// <param name="marginTop">아트에서 <b>테두리 선 위쪽</b>이 차지하는 비율(장식이 사는 여백).</param>
     /// <param name="marginBottom">아트에서 테두리 선 아래쪽이 차지하는 비율.</param>
     private static void AddBackdrop(Image host, Sprite art, bool sliced,
-                                    float marginTop = 0f, float marginBottom = 0f)
+                                    float marginTop = 0f, float marginBottom = 0f, Color? tint = null)
     {
         if (host == null || art == null) return;
 
@@ -1063,6 +1284,7 @@ public class UI_RelicInfoPopup : UI_Popup
         img.sprite        = art;
         img.type          = sliced ? Image.Type.Sliced : Image.Type.Simple;
         img.raycastTarget = false;
+        if (tint.HasValue) img.color = tint.Value;
         rt.SetAsFirstSibling();   // 내용보다 뒤에 깔린다
     }
 

@@ -20,10 +20,11 @@ MonoBehaviour:
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: fg_page_transition
-  breakOverride: 0.5
+  breakOverride: 1.5
   staggerState: GetHit_Heavy
   chargeState: MagicAttackS
   roarState: MagicAttackE
+  chargeLoopState: MagicAttackL
   roarSpeed: 0.8
   staggerSeconds: 0.6
   lowShotSeconds: 0.8
@@ -35,8 +36,7 @@ MonoBehaviour:
   roarDistance: 7
   roarHeight: 2.6
   bodyHeight: 3
-  roarVfxPrefab: {fileID: 8719263370430895187, guid: cfcf1b1a67677664b8243dfeeeeb152e,
-    type: 3}
+  roarVfxPrefab: {fileID: 0}
   roarVfxScale: 3
   flashColor: {r: 1, g: 0.7, b: 0.55, a: 1}
   roarSfx: {fileID: 8300000, guid: 7f0d41ccc31864540a18d071e7651837, type: 3}

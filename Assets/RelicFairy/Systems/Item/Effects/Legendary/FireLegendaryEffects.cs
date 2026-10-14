@@ -3,73 +3,72 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
-// ── 공통 헬퍼 ─────────────────────────────────────────────────────────
-// 배치 시점의 FIRE 존 시너지 단계를 저장하고, 추후 추가된 단계 수를 추가 수량으로 환산한다.
-//   _baseTier  : OnActivate 시점 GetZoneTier("FIRE")
-//   ExtraTiers : 이후 비레전드리 룬으로 올라간 단계 수
+// ── 불 전설 3종 — 「몇 초마다」를 없애고 빌드 행동으로 발동(10-14 룬 재설계 R3) ─────────────
+// 마그마 분출 = 처치 · 불사조 강타 = 연격 · 화염 오브 = 기동. 존 단계마다 피해 +15%(개수형은 +1) — LegendaryTuning.
 
-// ── F-1. 마그마 분출 (광역기) ─────────────────────────────────────────
+// ── F-1. 마그마 분출 (처치) ───────────────────────────────────────────
+/// <summary>
+/// 쓰러뜨린 자리에서 반경 3 m 폭발(공격력 100%) — 폭발이 쓰러뜨리면 또 터진다(연쇄 · 한 번에 3겹까지).
+/// value = 공격력 배율 · value3 = 반경(새 행).
+/// </summary>
 public sealed class FireLegendAoeEffect : ItemCombatEffectBase
 {
     private static readonly string[] s_hitSfx = { SoundKey.Sfx.MonsterHit1, SoundKey.Sfx.MonsterHit2, SoundKey.Sfx.MonsterHit3 };
+    private const int MaxChain = 3;
+    private static int s_depth;   // 연쇄 깊이 — 폭발 → 처치 → 폭발이 같은 프레임에 끝없이 이어지지 않게
 
     private readonly List<GameObject> _buf = new();
-    private float _timer;
-    private int _baseTier;
-    private bool _baseSet;
+
+    /// <summary>새 행(발동 「OnKill」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
+    private bool NewRow => _trigger == "OnKill";
 
     public FireLegendAoeEffect(ItemEffectSlot s) : base(s) { }
 
-    public override void OnActivate(ItemEffectContext ctx)
+    public override void OnActivate(ItemEffectContext ctx) => LegendaryRuntime.EnsureExists();
+
+    public override void OnKill(ItemEffectContext ctx, GameObject target)
     {
-        LegendaryRuntime.EnsureExists();
-        _timer    = 0f;
-        _baseTier = 0;
-        _baseSet  = false;
-    }
-
-    public override void OnTick(ItemEffectContext ctx, float deltaTime)
-    {
-        if (!_baseSet) { _baseTier = MerlinRuneBridge.Instance?.GetZoneTier("FIRE") ?? 0; _baseSet = true; }
-        _timer += deltaTime;
-        if (_timer < _value2) return;
-        _timer -= _value2;
-        if (ctx?.Player == null) return;
-
-        int extra = ExtraTiers();
-        float radius = 3f + extra * 0.4f;
-
-        Vector3 pos = ctx.Player.transform.position;
-        float dmg  = EffAtk(ctx) * _value;
+        if (ctx?.Player == null || target == null || s_depth >= MaxChain) return;
+        float radius = LegendaryTuning.Pick(NewRow, _value3, 3f);
+        float dmg    = LegendaryTuning.Atk(ctx) * LegendaryTuning.Pick(NewRow, _value, 1f) * LegendaryTuning.TierMul("FIRE");
+        Vector3 pos  = target.transform.position;
         var cat = LegendaryRuntime.Catalog;
-        int n = CombatQuery.GetNearbyDamageables(pos, radius, Self(ctx), 20, _buf);
-        for (int i = 0; i < n; i++)
+
+        s_depth++;
+        try
         {
-            CombatQuery.DealSynergyDamage(_buf[i], dmg, Self(ctx), element: RuneElement.Fire);
-            LegendaryRuntime.SpawnVfx(cat?.fireAoeHitVfx, _buf[i].transform.position, Quaternion.identity, 1.5f, 0.8f);
+            int n = CombatQuery.GetNearbyDamageables(pos, radius, Self(ctx), 20, _buf);
+            var hit = new List<GameObject>(_buf);   // 피해 중 처치 → 재귀가 _buf를 다시 쓴다
+            for (int i = 0; i < n; i++)
+            {
+                if (hit[i] == null) continue;
+                CombatQuery.DealSynergyDamage(hit[i], dmg, Self(ctx), element: RuneElement.Fire);
+                LegendaryRuntime.SpawnVfx(cat?.fireAoeHitVfx, hit[i].transform.position, Quaternion.identity, 1.5f, 0.8f);
+            }
+            LegendaryRuntime.SpawnVfx(cat?.fireAoeVfx, pos, Quaternion.identity, 2f, radius * 0.1333f, alpha: 0.18f, yScale: 0.1f);
+            SkillRangeRing.Circle(pos, radius);
+            if (n > 0) Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
         }
-        if (n > 0)
-            Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
-
-        float vfxScale = 0.4f + extra * 0.15f;
-        LegendaryRuntime.SpawnVfx(cat?.fireAoeVfx, pos, Quaternion.identity, 3f, vfxScale, alpha: 0.18f, yScale: 0.1f);
+        finally { s_depth--; }
     }
-
-    private int ExtraTiers() =>
-        Mathf.Max(0, (MerlinRuneBridge.Instance?.GetZoneTier("FIRE") ?? 0) - _baseTier);
 }
 
-// ── F-2. 불사조 강타 (단일기) ─────────────────────────────────────────
+// ── F-2. 불사조 강타 (연격) ───────────────────────────────────────────
+/// <summary>
+/// 맞힌 12번마다(value2) 불사조가 6번 내리꽂힌다 — 합계 공격력 × value · 공속 +1%마다 피해 +1%.
+/// 무적인 적을 헛친 타(피해 0)는 세지 않는다. 마지막 타 반경 2 m 공격력 × value3.
+/// </summary>
 public sealed class FireLegendSingleEffect : ItemCombatEffectBase
 {
     private static readonly string[] s_hitSfx = { SoundKey.Sfx.MonsterHit1, SoundKey.Sfx.MonsterHit2, SoundKey.Sfx.MonsterHit3 };
 
     private readonly List<GameObject> _buf = new();
     private int _hitCount;
-    private int _baseTier;
-    private bool _baseSet;
     private const int BaseStrikes = 6;
     private CancellationTokenSource _cts;
+
+    /// <summary>새 행(발동 「OnHitCount」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
+    private bool NewRow => _trigger == "OnHitCount";
 
     public FireLegendSingleEffect(ItemEffectSlot s) : base(s) { }
 
@@ -77,8 +76,6 @@ public sealed class FireLegendSingleEffect : ItemCombatEffectBase
     {
         LegendaryRuntime.EnsureExists();
         _hitCount = 0;
-        _baseTier = 0;
-        _baseSet  = false;
         _cts = new CancellationTokenSource();
     }
 
@@ -91,10 +88,8 @@ public sealed class FireLegendSingleEffect : ItemCombatEffectBase
 
     public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
-        if (!_baseSet) { _baseTier = MerlinRuneBridge.Instance?.GetZoneTier("FIRE") ?? 0; _baseSet = true; }
-        int extra    = ExtraTiers();
-        int required = Mathf.Max(1, (int)_value2 - extra);
-
+        if (report.DamageDealt <= 0f) return;   // 무적 대상 헛침은 안 센다
+        int required = Mathf.Max(1, Mathf.RoundToInt(_value2 > 0f ? _value2 : 12f));
         if (++_hitCount < required) return;
         _hitCount = 0;
         if (ctx?.Player == null || report.Target == null || _cts == null) return;
@@ -107,8 +102,11 @@ public sealed class FireLegendSingleEffect : ItemCombatEffectBase
         try
         {
             var cat = LegendaryRuntime.Catalog;
-            float hitDmg    = EffAtk(ctx) * _value / count;
-            float splashDmg = EffAtk(ctx) * _value3;
+            // 공속 +1%마다 피해 +1% — 연타 빌드의 축(넘친 공속도 배율 상한 2.0까지)
+            float asMul     = ctx.Stats != null ? ctx.Stats.AttackSpeedMultiplier : 1f;
+            float tier      = LegendaryTuning.TierMul("FIRE");
+            float hitDmg    = LegendaryTuning.Atk(ctx) * _value * asMul * tier / count;
+            float splashDmg = LegendaryTuning.Atk(ctx) * _value3 * tier;
 
             for (int i = 0; i < count; i++)
             {
@@ -123,10 +121,11 @@ public sealed class FireLegendSingleEffect : ItemCombatEffectBase
 
                 LegendaryRuntime.SpawnVfx(cat?.fireSingleVfx, spawn, rot, 1.5f);
                 CombatQuery.DealSynergyDamage(target, hitDmg, ctx?.Player?.gameObject, element: RuneElement.Fire);
-                LegendaryRuntime.SpawnVfx(cat?.fireSingleHitVfx, tPos, Quaternion.identity, 1.5f, 0.8f);
+                // 마지막 타는 아래 피격 폭발 하나로 — 같은 점 · 같은 프레임 두 겹(10-11 이펙트 톤 점검)
+                if (i < count - 1)
+                    LegendaryRuntime.SpawnVfx(cat?.fireSingleHitVfx, tPos, Quaternion.identity, 1.5f, 0.8f);
                 Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
 
-                // 마지막 타: 스플래시 + 피격 VFX
                 if (i == count - 1)
                 {
                     int n = CombatQuery.GetNearbyDamageables(tPos, 2f, target, 10, _buf);
@@ -140,27 +139,35 @@ public sealed class FireLegendSingleEffect : ItemCombatEffectBase
         }
         catch (System.OperationCanceledException) { }
     }
-
-    private int ExtraTiers() =>
-        Mathf.Max(0, (MerlinRuneBridge.Instance?.GetZoneTier("FIRE") ?? 0) - _baseTier);
 }
 
-// ── F-3. 화염 오브 (투사체) ───────────────────────────────────────────
+// ── F-3. 화염 오브 (기동) ─────────────────────────────────────────────
+/// <summary>
+/// 플레이어 둘레를 도는 오브 3개(존 단계마다 +1) — 닿은 적에게 공격력 × value(0.5) × 이동속도 배율, 대시 뒤 1초는 ×2.
+/// 같은 대상은 0.5초에 한 번. 피해는 맞힐 때의 공격력으로 다시 센다.
+/// </summary>
 public sealed class FireLegendProjectileEffect : ItemCombatEffectBase
 {
+    private const int   BaseOrbs   = 3;
+    private const float OrbitRadius = 2.2f, OrbitDegPerSec = 150f, DashBoostSeconds = 1f, DashBoostMul = 2f, HitGap = 0.5f;
+
     private readonly List<GameObject> _orbs = new();
-    private int _baseTier;
-    private int _lastExtra = -1;
-    private bool _baseSet;
+    private int _lastCount = -1;
+    private bool _spawned;
+    private float _dashUntil = -999f;
+    private ItemEffectContext _ctx;
+
+    /// <summary>새 행(발동 「OnDash」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
+    private bool NewRow => _trigger == "OnDash";
 
     public FireLegendProjectileEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnActivate(ItemEffectContext ctx)
     {
         LegendaryRuntime.EnsureExists();
-        _baseTier  = 0;
-        _lastExtra = -1;
-        _baseSet   = false;
+        _ctx = ctx;
+        _lastCount = -1;
+        _spawned   = false;
     }
 
     public override void OnDeactivate() => ClearOrbs();
@@ -168,43 +175,44 @@ public sealed class FireLegendProjectileEffect : ItemCombatEffectBase
     public override void OnRoomEnter(ItemEffectContext ctx)
     {
         ClearOrbs();
-        _baseSet = false;
+        _spawned = false;
     }
+
+    public override void OnRollEnd(ItemEffectContext ctx) => _dashUntil = Time.time + DashBoostSeconds;
 
     public override void OnTick(ItemEffectContext ctx, float deltaTime)
     {
-        if (!_baseSet)
-        {
-            _baseTier  = MerlinRuneBridge.Instance?.GetZoneTier("FIRE") ?? 0;
-            _lastExtra = ExtraTiers();
-            _baseSet   = true;
-            SpawnOrbs(ctx);
-            return;
-        }
-        int extra = ExtraTiers();
-        if (extra == _lastExtra) return;
-        _lastExtra = extra;
+        _ctx = ctx;
+        int count = BaseOrbs + LegendaryTuning.Tier("FIRE");
+        if (_spawned && count == _lastCount) return;
         ClearOrbs();
-        SpawnOrbs(ctx);
+        _lastCount = count;
+        _spawned   = true;
+        SpawnOrbs(ctx, count);
     }
 
-    private void SpawnOrbs(ItemEffectContext ctx)
+    private float OrbDamage()
+    {
+        if (_ctx == null) return 0f;
+        float move = _ctx.Stats != null ? _ctx.Stats.MoveSpeedMultiplier : 1f;
+        float dash = Time.time < _dashUntil ? DashBoostMul : 1f;
+        return LegendaryTuning.Atk(_ctx) * LegendaryTuning.Pick(NewRow, _value, 0.5f) * Mathf.Max(0.5f, move) * dash;
+    }
+
+    private void SpawnOrbs(ItemEffectContext ctx, int count)
     {
         if (ctx?.Player == null) return;
-        int extra = ExtraTiers();
-        int count = (int)_value3 + extra;
-        float dmg = EffAtk(ctx) * _value;
-
+        Vector3 c = ctx.Player.transform.position;
         for (int i = 0; i < count; i++)
         {
-            float angle = i * 360f / count + 45f + Random.Range(-10f, 10f);
-            Vector3 dir = Quaternion.Euler(0, angle, 0) * Vector3.forward;
-            Vector3 pos = LegendaryRuntime.GetRandomNavPoint(LegendaryProjectileBase.FlyHeight);
-
+            float angle = i * 360f / count;
             var go    = new GameObject("FireOrb");
+            go.transform.position = new Vector3(c.x, LegendaryProjectileBase.FlyHeight + c.y, c.z);
             var agent = go.AddComponent<FireOrbAgent>();
-            agent.Init(this, ctx, dmg, 7f, 9999f, RuneElement.Fire, dir, maxBounces: 99999, pierce: true);
-            go.transform.position = pos;
+            agent.Init(this, ctx, 0f, 0f, 9999f, RuneElement.Fire, Vector3.forward, maxBounces: 99999, pierce: true, hitRadius: 0.6f);
+            agent.PerTargetGap = HitGap;
+            agent.DamageFn     = OrbDamage;
+            agent.SetOrbit(ctx.Player.transform, OrbitRadius, angle, OrbitDegPerSec);
             _orbs.Add(go);
         }
     }
@@ -214,7 +222,4 @@ public sealed class FireLegendProjectileEffect : ItemCombatEffectBase
         LegendaryRuntime.Instance?.ClearAgentsOf(this);
         _orbs.Clear();
     }
-
-    private int ExtraTiers() =>
-        Mathf.Max(0, (MerlinRuneBridge.Instance?.GetZoneTier("FIRE") ?? 0) - _baseTier);
 }

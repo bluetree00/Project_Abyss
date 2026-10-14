@@ -12,8 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 841f0d6354dd4e8c94990ea5b5f00e8a, type: 3}
   m_Name: CyclopsPatternAttack
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PatternAttackOverrideSO
-  selectionMode: 0
-  engageDistance: 8
   patterns:
   - name: RangedShot
     animationStateName: Cyclops_Attack01
@@ -22,10 +20,37 @@ MonoBehaviour:
     priority: 0
     cooldown: 2.5
     damageDelay: 0.5
-    attackDuration: 2.0
+    attackDuration: 2
     damageMultiplier: 1
     knockbackMultiplier: 1
-    attackShapeOverride: {fileID: 11400000, guid: 8c0a63a80bb026547876bf1492c06441, type: 2}
-    disableWarning: 1
+    attackShapeOverride: {fileID: 11400000, guid: 8c0a63a80bb026547876bf1492c06441,
+      type: 2}
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
+    warningShape: 0
+    castVfxPrefab: {fileID: 0}
+    castVfxDuration: 0
+    castVfxDelay: 0
+    castVfxLeadTime: 0.15
+    castVfxXRotationOffset: 0
+    castVfxYRotationOffset: 0
+    castVfxZRotationOffset: 0
+    castVfxForwardOffset: 0
+    castVfxRightOffset: 0
+    castVfxVerticalOffset: 0.8
+    castVfxScale: 1
+    castVfxAttachToMonster: 1
+    castVfxAtPlayerPosition: 0
+    useProceduralBeamVfx: 0
+    proceduralBeamLength: 3
+    proceduralBeamWidth: 0.16
+    proceduralBeamColor: {r: 1, g: 0.2, b: 0.2, a: 0.95}
+    slowScale: 0
+    slowDuration: 0
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
+  selectionMode: 0
+  engageDistance: 8
+  engageDistanceScale: 0.85

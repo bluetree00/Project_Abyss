@@ -223,9 +223,10 @@ public sealed class LichSealRitual
     private void PlaySealComplete()
     {
         Vector3 body = _lich.transform.position + Vector3.up * 1.2f;
-        LichVfx.Play(LichVfxSlot.SealComplete, new Vector3(_center.x, _center.y + 0.05f, _center.z), Quaternion.identity);
-        LichVfx.Play(LichVfxSlot.SealBurst, body, Quaternion.identity);
-        LichVfx.PlayScreen(LichVfxSlot.ScreenMagicFlow, 2.5f);
+        LichPatternUtil.PlaySealComplete(new Vector3(_center.x, _center.y + 0.05f, _center.z));   // 금빛 고리만 남긴 판(10-14)
+        // 금빛 사슬 구(SealBurst · HolyRedemption — 사슬이 감기는 순간 칸)는 뺀다 — 고리 · 빛기둥과 같은 순간 같은 뜻으로 겹쳐
+        // 흰 빛줄기 · 파편이 약 4초 화면을 덮었다(10-14 전주기 5회차 · 이펙트 절제 ①). 봉인석 사슬 번쩍 · 금빛 번쩍이 「감긴다」를 알린다.
+        // 화면 전체 마법 흐름(2.5초)은 뺀다 — 같은 순간 금빛 번쩍이 화면 전체로 이미 알린다(10-11 이펙트 톤 2차)
         LichSfx.Play(LichSfxSlot.SealComplete, body);
         foreach (var stone in _stones)
             if (stone != null) stone.PulseChain();
@@ -269,12 +270,12 @@ public sealed class LichSealRitual
 
         Vector3 basePos = target.position;
         for (int i = 0; i < aimedCount; i++)
-            LichDarkRainZone.Spawn(basePos + new Vector3(0f, 0.05f, 0f), aimedRadius, telegraph * 0.6f, active, aimedDamage, 0.5f);
+            LichDarkRainZone.Spawn(_ctx, basePos + new Vector3(0f, 0.05f, 0f), aimedRadius, telegraph * 0.6f, active, aimedDamage, 0.5f);
 
         for (int i = 0; i < zoneCount; i++)
         {
             Vector2 offset = UnityEngine.Random.insideUnitCircle * scatter;
-            LichDarkRainZone.Spawn(basePos + new Vector3(offset.x, 0.05f, offset.y), zoneRadius, telegraph, active, zoneDamage, 0.5f);
+            LichDarkRainZone.Spawn(_ctx, basePos + new Vector3(offset.x, 0.05f, offset.y), zoneRadius, telegraph, active, zoneDamage, 0.5f);
         }
     }
 
@@ -287,6 +288,7 @@ public sealed class LichSealRitual
         LichCinematics.CutsceneHud(true);
         LichCinematics.LetterboxInAsync(ct).Forget();
         LichCinematics.TakeCamera();
+        bool exiled = false;   // 추방(10-11)이 화면 · 몸 · HUD를 넘겨받았다 — 아래 정리를 하지 않는다
         try
         {
             // +0.0 플레이어를 코어 남쪽 끝으로 — 무너질 타일 위에 서 있지 않게
@@ -339,6 +341,14 @@ public sealed class LichSealRitual
             MoveAsync(_lich.transform, _lich.transform.position + Vector3.up * RiseHeight, RiseSeconds, ct).Forget();
             await Wait(2.0f, ct);
 
+            // +9.0 추방(10-11 「리치의 추방」) — 사라지는 대신 공중에 멈춰 플레이어를 가리키고, 코어를 무너뜨려 떨어뜨린다
+            //      → 챕터를 가로지르는 추락 → 같은 런으로 Ch1. 그림자 한 줄은 추락 중으로 옮겼다. 런이 없으면 예전처럼 사라진다.
+            if (ExileFallSequence.CanExile(player))
+            {
+                exiled = await ExileFallSequence.ExileAsync(_lich.transform, _ctx.Animator, _grid, player, ct);
+                if (exiled) return;
+            }
+
             // +9.0 하늘로 사라진다
             LichVfx.Play(LichVfxSlot.TeleportVanish, _lich.transform.position + Vector3.up, Quaternion.identity, 1.8f);
             LichSfx.Play(LichSfxSlot.Vanish, _lich.transform.position);
@@ -352,11 +362,14 @@ public sealed class LichSealRitual
         finally
         {
             LichVfx.Stop(ref _reversedChains);
-            LichCinematics.LetterboxOutAsync(CancellationToken.None).Forget();
-            if (player != null)
-                LichCinematics.ReturnToPlayerAsync(player.transform, CancellationToken.None).Forget();
-            LichCinematics.CutsceneHud(false);
-            player?.SetInputEnabled(true);
+            if (!exiled)
+            {
+                LichCinematics.LetterboxOutAsync(CancellationToken.None).Forget();
+                if (player != null)
+                    LichCinematics.ReturnToPlayerAsync(player.transform, CancellationToken.None).Forget();
+                LichCinematics.CutsceneHud(false);
+                player?.SetInputEnabled(true);
+            }
         }
     }
 

@@ -65,6 +65,23 @@ public sealed class RunItemInventory
         return false;
     }
 
+    /// <summary>이미 상한(maxStack — 룬은 전부 1)만큼 가졌는가. 보상 · 정제소 · 행상 후보에서 뺀다(10-09 출시 점검).</summary>
+    public bool IsAtMaxStack(string itemId)
+    {
+        if (string.IsNullOrEmpty(itemId)) return false;
+        var so = ItemSORegistry.Find(itemId);
+        return CountItem(itemId) >= (so != null ? Mathf.Max(1, so.MaxStack) : 1);
+    }
+
+    /// <summary><paramref name="pool"/>에서 아직 더 가질 수 있는 것만 <paramref name="into"/>에 담는다.</summary>
+    public void FilterObtainable(IReadOnlyList<ItemSO> pool, List<ItemSO> into)
+    {
+        into.Clear();
+        if (pool == null) return;
+        foreach (var so in pool)
+            if (so != null && !IsAtMaxStack(so.itemId)) into.Add(so);
+    }
+
     public int CountItem(string itemId)
     {
         int count = 0;

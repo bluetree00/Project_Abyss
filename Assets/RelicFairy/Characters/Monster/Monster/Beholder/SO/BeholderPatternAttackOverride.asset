@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PatternAttackOverrideSO
   patterns:
   - name: Laser2_Burst8
-    animationStateName: Attack02ST
+    animationStateName: Attack03
     minDistance: 0
-    maxDistance: 1.7
+    maxDistance: 1.5
     priority: 1
     cooldown: 1.25
     damageDelay: 0.45
@@ -25,16 +25,24 @@ MonoBehaviour:
     knockbackMultiplier: 1.25
     attackShapeOverride: {fileID: 11400000, guid: 56cb80cf84a84c8c93d43f1e4f73c2d9,
       type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0.35
     warningShape: 5
-    castVfxPrefab: {fileID: 4550076289710732121, guid: 115c845e096dbc44c8da446ef941b73b, type: 3}
+    castVfxPrefab: {fileID: 4550076289710732121, guid: 115c845e096dbc44c8da446ef941b73b,
+      type: 3}
     castVfxDuration: 0.65
+    castVfxDelay: 0
+    castVfxLeadTime: 0.15
+    castVfxXRotationOffset: 0
+    castVfxYRotationOffset: 0
+    castVfxZRotationOffset: 0
     castVfxForwardOffset: 0
+    castVfxRightOffset: 0
     castVfxVerticalOffset: 0.05
-    castVfxScale: 0.1
+    castVfxScale: 0.16
     castVfxAttachToMonster: 0
+    castVfxAtPlayerPosition: 0
     useProceduralBeamVfx: 0
     proceduralBeamLength: 2.5
     proceduralBeamWidth: 0.2
@@ -47,7 +55,7 @@ MonoBehaviour:
   - name: Laser1_Line3
     animationStateName: Attack01
     minDistance: 0
-    maxDistance: 3.2
+    maxDistance: 2.5
     priority: 2
     cooldown: 3.5
     damageDelay: 0.35
@@ -56,26 +64,32 @@ MonoBehaviour:
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: 9f6b6b3f7f5f4af8a2d0d447fa7b77c1,
       type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0.25
     warningShape: 3
-    castVfxPrefab: {fileID: 4550076289710732121, guid: 4c39a6c991d146645a3f17d017dcda9b, type: 3}
+    castVfxPrefab: {fileID: 0}
     castVfxDuration: 0.9
+    castVfxDelay: 0
+    castVfxLeadTime: 0.15
+    castVfxXRotationOffset: 0
+    castVfxYRotationOffset: 0
+    castVfxZRotationOffset: 0
     castVfxForwardOffset: 0.55
+    castVfxRightOffset: 0
     castVfxVerticalOffset: 1.15
     castVfxScale: 0.1
     castVfxAttachToMonster: 1
-    castVfxAtPlayerPosition: 1
-    useProceduralBeamVfx: 0
-    proceduralBeamLength: 3
-    proceduralBeamWidth: 0.2
-    proceduralBeamColor: {r: 1, g: 0.25, b: 0.2, a: 0.98}
+    castVfxAtPlayerPosition: 0
+    useProceduralBeamVfx: 1
+    proceduralBeamLength: 1.95
+    proceduralBeamWidth: 0.16
+    proceduralBeamColor: {r: 0.7, g: 0.4, b: 1, a: 0.95}
     slowScale: 0
     slowDuration: 0
     hitVfxPrefab: {fileID: 0}
     hitVfxScale: 1
     hitVfxOffset: {x: 0, y: 0, z: 0}
   selectionMode: 0
-  engageDistance: 2.9
+  engageDistance: 2.5
   engageDistanceScale: 0.85

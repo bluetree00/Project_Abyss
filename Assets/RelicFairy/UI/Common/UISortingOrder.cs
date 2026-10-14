@@ -69,6 +69,8 @@ public static class UISortingOrder
     public const int Cinematic    = 600;
     /// <summary>레터박스 프레임 — 전환 와이프보다는 아래.</summary>
     public const int Letterbox    = 620;
+    /// <summary>보스 「이름 + 칭호」 카드 — 레터박스 아래 띠에 걸려도 가려지지 않게 그 위.</summary>
+    public const int BossTitle    = 630;
 
     // ── 700~799 : 전체 화면 임팩트 ─────────────────────────
     /// <summary>보스 타격 등 화면을 때리는 순간 효과.</summary>

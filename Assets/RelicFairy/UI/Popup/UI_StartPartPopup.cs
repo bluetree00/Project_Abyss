@@ -104,6 +104,7 @@ public sealed class UI_StartPartPopup : UI_Popup
     /// <summary>카드를 주입한다. <paramref name="currentPartId"/>는 이번 판에 이미 고른 파츠(없으면 null) — 「장착 중」 표시.</summary>
     public void Setup(IReadOnlyList<Card> cards, string currentPartId)
     {
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);
         _currentPartId = currentPartId;
         ResultPartId   = null;
         BuildCards(cards);
@@ -185,14 +186,16 @@ public sealed class UI_StartPartPopup : UI_Popup
         // 유물 개화와 같은 아트(창·띠·카드·버튼) — 미납품이면 색 박스 그대로
         var skin = UISkin.RelicPartDraft;
         _skinned = skin != null && skin.cardFrame != null;
-        ShopUIStyle.Skin(window.transform.parent.GetComponent<Image>(), skin?.background);
+        // 10-13: 남색 판(Artsystack)은 9-slice 판 — 아트 스킨(카드 테까지 납품)이 아니면 안쪽 판에 깐다(바깥 금선은 그대로)
+        if (_skinned) ShopUIStyle.Skin(window.transform.parent.GetComponent<Image>(), skin?.background);
+        else          ShopUIStyle.Skin(window, skin?.background, sliced: true);
         ShopUIStyle.Skin(titleBar, skin?.titleBar, sliced: true);
         ShopUIStyle.Skin(_confirmBtnImg, skin?.confirmButton, sliced: true);
 
         // 아트가 없을 때의 공통 언어 — 둥근 창 + 금 가는 선 · 공통 베벨 버튼(09-28 UI 톤 진단 D4, 개화와 같은 규칙)
         if (!_skinned)
         {
-            UITheme.RoundFrame(window, 18f);
+            if (skin?.background == null) UITheme.RoundFrame(window, 18f);   // 남색 판(10-13)이 있으면 그 판
             if (window.transform.parent.TryGetComponent<Image>(out var edge)) edge.color = UITheme.GoldLine;
             _themed = UITheme.StyleFrameButton(_confirmBtnImg, UITheme.CtaTintOff);
             UITheme.StyleFrameButton(close, UITheme.SecondaryTint);
@@ -245,7 +248,7 @@ public sealed class UI_StartPartPopup : UI_Popup
             var skin = UISkin.RelicPartDraft;
             ShopUIStyle.Skin(view.Border, skin?.cardFrame, sliced: true);
             ShopUIStyle.Skin(view.Fill,   skin?.cardFill,  sliced: true);
-            if (!_skinned) UITheme.RoundFrame(view.Fill, 14f);
+            if (!_skinned && skin?.cardFill == null) UITheme.RoundFrame(view.Fill, 14f);
             int idx = _cards.Count;
             _cards.Add(view);
             AddClick(rt.gameObject, () => SetSelected(idx, playSound: true));
@@ -310,7 +313,7 @@ public sealed class UI_StartPartPopup : UI_Popup
 
     private void SetSelected(int index, bool playSound)
     {
-        if (playSound && index >= 0) Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        if (playSound && index >= 0) Managers.Sound?.PlayUiEvent(SoundEvent.UiSelect);
         _selected = index;
         for (int i = 0; i < _cards.Count; i++)
         {
@@ -348,14 +351,14 @@ public sealed class UI_StartPartPopup : UI_Popup
             ShopUIStyle.PlaySfx("shop_reject");   // 말없이 무시하면 버튼이 죽은 것으로 읽힌다 — 라벨이 사유를 말한다
             return;
         }
-        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiConfirm);
         ResultPartId = _cards[_selected].PartId;
         ClosePopupUI();   // 창이 먼저 닫혀야 호출측 획득 연출이 돈다(시간정지 해제)
     }
 
     private void OnCloseClicked()
     {
-        Managers.Sound.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);
         ClosePopupUI();
     }
 

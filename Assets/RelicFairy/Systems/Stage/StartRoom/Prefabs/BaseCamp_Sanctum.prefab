@@ -292,6 +292,8 @@ MonoBehaviour:
   moteLifetime: 3.5
   moteSize: 0.18
   moteColor: {r: 0.7, g: 0.8, b: 1, a: 0.8}
+  fadeInDelay: 0
+  fadeInSeconds: 0
 --- !u!1 &261687724978769664
 GameObject:
   m_ObjectHideFlags: 0
@@ -1423,6 +1425,8 @@ MonoBehaviour:
   moteLifetime: 3.5
   moteSize: 0.18
   moteColor: {r: 0.7, g: 0.8, b: 1, a: 0.8}
+  fadeInDelay: 0
+  fadeInSeconds: 0
 --- !u!1 &1358293301615020613
 GameObject:
   m_ObjectHideFlags: 0
@@ -1955,6 +1959,8 @@ MonoBehaviour:
   moteLifetime: 3.5
   moteSize: 0.18
   moteColor: {r: 0.7, g: 0.8, b: 1, a: 0.8}
+  fadeInDelay: 0
+  fadeInSeconds: 0
 --- !u!1 &1942279760573833266
 GameObject:
   m_ObjectHideFlags: 0
@@ -3337,7 +3343,7 @@ MonoBehaviour:
   bossNames:
   - "\uC232\uC758 \uC218\uD638\uC790"
   - "\uD654\uB8E1"
-  - "\uC8FD\uC74C\uC758 \uAE30\uC0AC"
+  - "\uD0C0\uB77D\uD55C \uBAA8\uB974\uB4DC\uB808\uB4DC"
   - "\uB9AC\uCE58"
   bossColors:
   - {r: 0.35, g: 0.95, b: 0.45, a: 1}
@@ -3916,6 +3922,8 @@ MonoBehaviour:
   moteLifetime: 3.5
   moteSize: 0.18
   moteColor: {r: 0.7, g: 0.8, b: 1, a: 0.8}
+  fadeInDelay: 0
+  fadeInSeconds: 0
 --- !u!1 &4213385988265754902
 GameObject:
   m_ObjectHideFlags: 0
@@ -4550,6 +4558,8 @@ MonoBehaviour:
   moteLifetime: 3.5
   moteSize: 0.18
   moteColor: {r: 0.7, g: 0.8, b: 1, a: 0.8}
+  fadeInDelay: 0
+  fadeInSeconds: 0
 --- !u!1 &4876066153517746057
 GameObject:
   m_ObjectHideFlags: 0
@@ -5037,6 +5047,8 @@ MonoBehaviour:
   moteLifetime: 3.5
   moteSize: 0.18
   moteColor: {r: 0.7, g: 0.8, b: 1, a: 0.8}
+  fadeInDelay: 0
+  fadeInSeconds: 0
 --- !u!1 &5627745745996806371
 GameObject:
   m_ObjectHideFlags: 0
@@ -5618,6 +5630,8 @@ MonoBehaviour:
   moteLifetime: 3.5
   moteSize: 0.18
   moteColor: {r: 0.7, g: 0.8, b: 1, a: 0.8}
+  fadeInDelay: 0
+  fadeInSeconds: 0
 --- !u!1 &6001500456816456572
 GameObject:
   m_ObjectHideFlags: 0
@@ -7301,6 +7315,8 @@ MonoBehaviour:
   moteLifetime: 3.5
   moteSize: 0.18
   moteColor: {r: 0.7, g: 0.8, b: 1, a: 0.8}
+  fadeInDelay: 0
+  fadeInSeconds: 0
 --- !u!1 &7881025764647797076
 GameObject:
   m_ObjectHideFlags: 0
@@ -7638,6 +7654,8 @@ MonoBehaviour:
   moteLifetime: 3.5
   moteSize: 0.18
   moteColor: {r: 0.7, g: 0.8, b: 1, a: 0.8}
+  fadeInDelay: 0
+  fadeInSeconds: 0
 --- !u!1 &8070497261934061338
 GameObject:
   m_ObjectHideFlags: 0
@@ -8124,6 +8142,8 @@ MonoBehaviour:
   moteLifetime: 3.5
   moteSize: 0.18
   moteColor: {r: 0.7, g: 0.8, b: 1, a: 0.8}
+  fadeInDelay: 0
+  fadeInSeconds: 0
 --- !u!1 &8559547248480482433
 GameObject:
   m_ObjectHideFlags: 0
@@ -8351,6 +8371,18 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 474058, guid: f0b305e0396894e9ab7116818553b752, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19802038, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19851048, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19862942, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -9647,6 +9679,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1880444406079617075}
     m_Modifications:
+    - target: {fileID: 5743487053115991087, guid: 4760895ce813d0448899ead78a75c134,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7935417353228486464, guid: 4760895ce813d0448899ead78a75c134,
         type: 3}
       propertyPath: m_Name
@@ -9854,28 +9891,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 9018091451179046850}
     m_Modifications:
     - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_Name
       value: Rock_A
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalScale.x
@@ -9928,6 +9949,22 @@ PrefabInstance:
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -10725,28 +10762,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 5234328222974668464}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_4
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -10799,6 +10820,22 @@ PrefabInstance:
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -11213,28 +11250,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 2372594597596211507}
     m_Modifications:
     - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_Name
       value: Rock_B
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalScale.x
@@ -11288,6 +11309,22 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -11307,6 +11344,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1880444406079617075}
     m_Modifications:
+    - target: {fileID: 5743487053115991087, guid: 4760895ce813d0448899ead78a75c134,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7935417353228486464, guid: 4760895ce813d0448899ead78a75c134,
         type: 3}
       propertyPath: m_Name
@@ -11581,28 +11623,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 1074563368647510040}
     m_Modifications:
     - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_Name
       value: Rock_A
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalScale.x
@@ -11655,6 +11681,22 @@ PrefabInstance:
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -12782,28 +12824,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 5234328222974668464}
     m_Modifications:
     - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_Name
       value: Rock_A
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalScale.x
@@ -12856,6 +12882,22 @@ PrefabInstance:
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -13920,28 +13962,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 5234328222974668464}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -13994,6 +14020,22 @@ PrefabInstance:
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -14449,28 +14491,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 9018091451179046850}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_4
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -14523,6 +14549,22 @@ PrefabInstance:
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -15954,28 +15996,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 1074563368647510040}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -16028,6 +16054,22 @@ PrefabInstance:
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -16212,28 +16254,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 7636322882734449786}
     m_Modifications:
     - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_Name
       value: SanctumUnderside_B
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalScale.x
@@ -16286,6 +16312,22 @@ PrefabInstance:
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -16449,28 +16491,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 5234328222974668464}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -16523,6 +16549,22 @@ PrefabInstance:
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -17135,6 +17177,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 19802038, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19851048, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19862942, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -17283,6 +17337,18 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 474058, guid: f0b305e0396894e9ab7116818553b752, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19802038, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19851048, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19862942, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -17449,6 +17515,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 19802038, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19851048, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19862942, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -17532,28 +17610,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 2372594597596211507}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -17606,6 +17668,22 @@ PrefabInstance:
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -17857,24 +17935,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 5234328222974668464}
     m_Modifications:
     - target: {fileID: 1031128274, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128277, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128281, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128285, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128274, guid: abc00000000010230471736683779177, type: 3}
       propertyPath: m_Name
       value: Dais
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128274, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
       objectReference: {fileID: 0}
     - target: {fileID: 1031128275, guid: abc00000000010230471736683779177, type: 3}
       propertyPath: m_LocalScale.x
@@ -17927,6 +17993,18 @@ PrefabInstance:
     - target: {fileID: 1031128275, guid: abc00000000010230471736683779177, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128277, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128281, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128285, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -18144,6 +18222,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1880444406079617075}
     m_Modifications:
+    - target: {fileID: 5743487053115991087, guid: 4760895ce813d0448899ead78a75c134,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7935417353228486464, guid: 4760895ce813d0448899ead78a75c134,
         type: 3}
       propertyPath: m_Name
@@ -19758,6 +19841,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 19802038, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19851048, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19862942, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -19853,28 +19948,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 9018091451179046850}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_3
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -19927,6 +20006,22 @@ PrefabInstance:
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -20869,6 +20964,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 19802038, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19851048, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19862942, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -20888,6 +20995,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1880444406079617075}
     m_Modifications:
+    - target: {fileID: 5743487053115991087, guid: 4760895ce813d0448899ead78a75c134,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7935417353228486464, guid: 4760895ce813d0448899ead78a75c134,
         type: 3}
       propertyPath: m_Name
@@ -21152,6 +21264,18 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 474058, guid: f0b305e0396894e9ab7116818553b752, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19802038, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19851048, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19862942, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -21981,6 +22105,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 19802038, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19851048, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19862942, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -22000,6 +22136,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1880444406079617075}
     m_Modifications:
+    - target: {fileID: 5743487053115991087, guid: 4760895ce813d0448899ead78a75c134,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7935417353228486464, guid: 4760895ce813d0448899ead78a75c134,
         type: 3}
       propertyPath: m_Name
@@ -22143,10 +22284,33 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 4496604847744319043}
     m_Modifications:
+    - target: {fileID: 1001775782, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
+      propertyPath: looping
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1924701490, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
+      propertyPath: looping
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 131587655575345367, guid: ad086e0fe857e42498115575f8a88e39,
         type: 3}
       propertyPath: m_Name
       value: PortalVortex
+      objectReference: {fileID: 0}
+    - target: {fileID: 1924977842411482027, guid: ad086e0fe857e42498115575f8a88e39,
+        type: 3}
+      propertyPath: looping
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2196145004614185802, guid: ad086e0fe857e42498115575f8a88e39,
+        type: 3}
+      propertyPath: looping
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6496472656836085614, guid: ad086e0fe857e42498115575f8a88e39,
+        type: 3}
+      propertyPath: looping
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7411903745007991211, guid: ad086e0fe857e42498115575f8a88e39,
         type: 3}
@@ -22212,6 +22376,16 @@ PrefabInstance:
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7770903443404308967, guid: ad086e0fe857e42498115575f8a88e39,
+        type: 3}
+      propertyPath: looping
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8755393693430357940, guid: ad086e0fe857e42498115575f8a88e39,
+        type: 3}
+      propertyPath: looping
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -22296,28 +22470,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 9018091451179046850}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -22371,6 +22529,22 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -22391,28 +22565,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 2372594597596211507}
     m_Modifications:
     - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_Name
       value: Rock_A
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalScale.x
@@ -22465,6 +22623,22 @@ PrefabInstance:
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -22691,28 +22865,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 9018091451179046850}
     m_Modifications:
     - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_Name
       value: Rock_B
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalScale.x
@@ -22765,6 +22923,22 @@ PrefabInstance:
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -22950,28 +23124,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 5234328222974668464}
     m_Modifications:
     - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_Name
       value: Rock_B
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalScale.x
@@ -23024,6 +23182,22 @@ PrefabInstance:
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -23911,24 +24085,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 2372594597596211507}
     m_Modifications:
     - target: {fileID: 1031128274, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128277, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128281, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128285, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128274, guid: abc00000000010230471736683779177, type: 3}
       propertyPath: m_Name
       value: Dais
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128274, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
       objectReference: {fileID: 0}
     - target: {fileID: 1031128275, guid: abc00000000010230471736683779177, type: 3}
       propertyPath: m_LocalScale.x
@@ -23981,6 +24143,18 @@ PrefabInstance:
     - target: {fileID: 1031128275, guid: abc00000000010230471736683779177, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128277, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128281, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128285, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -25474,28 +25648,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 2372594597596211507}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_4
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -25548,6 +25706,22 @@ PrefabInstance:
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -26592,6 +26766,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1880444406079617075}
     m_Modifications:
+    - target: {fileID: 5743487053115991087, guid: 4760895ce813d0448899ead78a75c134,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7935417353228486464, guid: 4760895ce813d0448899ead78a75c134,
         type: 3}
       propertyPath: m_Name
@@ -26954,6 +27133,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 19802038, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19851048, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19862942, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -27103,6 +27294,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1880444406079617075}
     m_Modifications:
+    - target: {fileID: 5743487053115991087, guid: 4760895ce813d0448899ead78a75c134,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7935417353228486464, guid: 4760895ce813d0448899ead78a75c134,
         type: 3}
       propertyPath: m_Name
@@ -27473,28 +27669,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 7636322882734449786}
     m_Modifications:
     - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_Name
       value: SanctumUnderside_A
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalScale.x
@@ -27547,6 +27727,22 @@ PrefabInstance:
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -27826,28 +28022,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 7696994775162496118}
     m_Modifications:
     - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_Name
       value: TerraceUnderside_B
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalScale.x
@@ -27900,6 +28080,22 @@ PrefabInstance:
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -28177,28 +28373,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 9018091451179046850}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -28251,6 +28431,22 @@ PrefabInstance:
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -28514,28 +28710,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 1074563368647510040}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -28588,6 +28768,22 @@ PrefabInstance:
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -29031,28 +29227,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 2372594597596211507}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_3
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -29106,6 +29286,22 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -29126,28 +29322,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 1074563368647510040}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_4
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -29200,6 +29380,22 @@ PrefabInstance:
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -31236,28 +31432,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 1074563368647510040}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_3
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -31311,6 +31491,22 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -31331,24 +31527,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 9018091451179046850}
     m_Modifications:
     - target: {fileID: 1031128274, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128277, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128281, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128285, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128274, guid: abc00000000010230471736683779177, type: 3}
       propertyPath: m_Name
       value: Dais
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128274, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
       objectReference: {fileID: 0}
     - target: {fileID: 1031128275, guid: abc00000000010230471736683779177, type: 3}
       propertyPath: m_LocalScale.x
@@ -31401,6 +31585,18 @@ PrefabInstance:
     - target: {fileID: 1031128275, guid: abc00000000010230471736683779177, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128277, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128281, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128285, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -31522,28 +31718,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 1074563368647510040}
     m_Modifications:
     - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_Name
       value: Rock_B
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalScale.x
@@ -31596,6 +31776,22 @@ PrefabInstance:
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -31896,6 +32092,18 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 474058, guid: f0b305e0396894e9ab7116818553b752, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19802038, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19851048, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19862942, guid: f0b305e0396894e9ab7116818553b752, type: 3}
+      propertyPath: scalingMode
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -32888,6 +33096,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1880444406079617075}
     m_Modifications:
+    - target: {fileID: 5743487053115991087, guid: 4760895ce813d0448899ead78a75c134,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7935417353228486464, guid: 4760895ce813d0448899ead78a75c134,
         type: 3}
       propertyPath: m_Name
@@ -33725,6 +33938,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1880444406079617075}
     m_Modifications:
+    - target: {fileID: 5743487053115991087, guid: 4760895ce813d0448899ead78a75c134,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7935417353228486464, guid: 4760895ce813d0448899ead78a75c134,
         type: 3}
       propertyPath: m_Name
@@ -34907,6 +35125,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1880444406079617075}
     m_Modifications:
+    - target: {fileID: 5743487053115991087, guid: 4760895ce813d0448899ead78a75c134,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7935417353228486464, guid: 4760895ce813d0448899ead78a75c134,
         type: 3}
       propertyPath: m_Name
@@ -35050,6 +35273,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1880444406079617075}
     m_Modifications:
+    - target: {fileID: 5743487053115991087, guid: 4760895ce813d0448899ead78a75c134,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7935417353228486464, guid: 4760895ce813d0448899ead78a75c134,
         type: 3}
       propertyPath: m_Name
@@ -35823,28 +36051,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 7696994775162496118}
     m_Modifications:
     - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_Name
       value: TerraceUnderside_A
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124002, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalScale.x
@@ -35897,6 +36109,22 @@ PrefabInstance:
     - target: {fileID: 1031124003, guid: abc00000000014134336692533146485, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124006, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124010, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124014, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031124018, guid: abc00000000014134336692533146485, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -35980,6 +36208,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1880444406079617075}
     m_Modifications:
+    - target: {fileID: 5743487053115991087, guid: 4760895ce813d0448899ead78a75c134,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7935417353228486464, guid: 4760895ce813d0448899ead78a75c134,
         type: 3}
       propertyPath: m_Name
@@ -38005,24 +38238,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 1074563368647510040}
     m_Modifications:
     - target: {fileID: 1031128274, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128277, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128281, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128285, guid: abc00000000010230471736683779177, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 4294967294
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031128274, guid: abc00000000010230471736683779177, type: 3}
       propertyPath: m_Name
       value: Dais
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128274, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
       objectReference: {fileID: 0}
     - target: {fileID: 1031128275, guid: abc00000000010230471736683779177, type: 3}
       propertyPath: m_LocalScale.x
@@ -38075,6 +38296,18 @@ PrefabInstance:
     - target: {fileID: 1031128275, guid: abc00000000010230471736683779177, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128277, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128281, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031128285, guid: abc00000000010230471736683779177, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 4294967294
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -38238,28 +38471,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 5234328222974668464}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_3
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -38312,6 +38529,22 @@ PrefabInstance:
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -38471,28 +38704,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 2372594597596211507}
     m_Modifications:
     - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483646
-      objectReference: {fileID: 0}
-    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_Name
       value: Pillar_1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125735, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalScale.x
@@ -38545,6 +38762,22 @@ PrefabInstance:
     - target: {fileID: 1031125736, guid: abc00000000002610143072961334228, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125739, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125743, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125747, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
+      objectReference: {fileID: 0}
+    - target: {fileID: 1031125751, guid: abc00000000002610143072961334228, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483646
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

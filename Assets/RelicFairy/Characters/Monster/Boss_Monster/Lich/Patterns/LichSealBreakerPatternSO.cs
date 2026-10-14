@@ -297,7 +297,7 @@ public class LichSealBreakerState : InvincibleState<LichSealBreakerPatternSO>
         // 플레이어 위치 직접 조준 존 — 짧은 예고로 긴장감 증가
         for (int i = 0; i < Data.aimedZoneCount; i++)
         {
-            LichDarkRainZone.Spawn(basePos + new Vector3(0f, 0.05f, 0f), Data.aimedZoneRadius,
+            LichDarkRainZone.Spawn(ctx, basePos + new Vector3(0f, 0.05f, 0f), Data.aimedZoneRadius,
                 Data.periodicTelegraphDuration * 0.6f, Data.periodicActiveDuration,
                 aimedDmg, 0.5f);
         }
@@ -307,7 +307,7 @@ public class LichSealBreakerState : InvincibleState<LichSealBreakerPatternSO>
         {
             Vector2 rand2D = Random.insideUnitCircle * Data.periodicScatterRadius;
             Vector3 pos = basePos + new Vector3(rand2D.x, 0.05f, rand2D.y);
-            LichDarkRainZone.Spawn(pos, Data.periodicZoneRadius,
+            LichDarkRainZone.Spawn(ctx, pos, Data.periodicZoneRadius,
                 Data.periodicTelegraphDuration, Data.periodicActiveDuration,
                 scatterDmg, 0.5f);
         }

@@ -67,14 +67,15 @@ public sealed class LichSealChainBolt : MonoBehaviour, IDamageable
 
         Vector3 flat = _target.position - p;
         flat.y = 0f;
-        if (flat.magnitude <= TouchRadius && LichPatternUtil.HitPlayer(_ctx, p, SealChainDamage, 0f))
-        {
-            LichVfx.Play(LichVfxSlot.SealBurst, p, Quaternion.identity, 0.35f);
-            LichSfx.Play(LichSfxSlot.ChainPulse, p);
-            _done = true;
-            Hit?.Invoke(this);
-            Dispose();
-        }
+        if (flat.magnitude > TouchRadius) return;
+        // 닿으면 사슬은 끝난다 — 흘렸어도(무효화 · 저스트 회피) 매 프레임 다시 굴리지 않게. 봉인(Hit)은 실제로 맞았을 때만(10-08 점검).
+        bool damaged = LichPatternUtil.HitPlayer(_ctx, p, SealChainDamage, out bool contact);
+        if (!contact) return;
+        LichVfx.Play(LichVfxSlot.SealBurst, p, Quaternion.identity, 0.35f);
+        LichSfx.Play(LichSfxSlot.ChainPulse, p);
+        _done = true;
+        if (damaged) Hit?.Invoke(this);
+        Dispose();
     }
 
     private void OnDestroy()

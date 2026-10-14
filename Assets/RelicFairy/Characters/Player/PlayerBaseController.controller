@@ -253,7 +253,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: RelicQ_Slash3
-  m_Speed: 2
+  m_Speed: 3.66
   m_CycleOffset: 0
   m_Transitions: []
   m_StateMachineBehaviours: []
@@ -414,6 +414,9 @@ AnimatorStateMachine:
   - serializedVersion: 1
     m_State: {fileID: 499767862479500314}
     m_Position: {x: 735, y: 1285, z: 0}
+  - serializedVersion: 1
+    m_State: {fileID: 4837197877920236024}
+    m_Position: {x: 770, y: 1350, z: 0}
   m_ChildStateMachines: []
   m_AnyStateTransitions:
   - {fileID: 8169459706678807483}
@@ -748,7 +751,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: RelicQ_Slash2
-  m_Speed: 2
+  m_Speed: 2.95
   m_CycleOffset: 0
   m_Transitions: []
   m_StateMachineBehaviours: []
@@ -1350,6 +1353,32 @@ AnimatorState:
   m_MirrorParameter: 
   m_CycleOffsetParameter: 
   m_TimeParameter: 
+--- !u!1102 &4837197877920236024
+AnimatorState:
+  serializedVersion: 6
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: RelicQ_Finish
+  m_Speed: 1.93
+  m_CycleOffset: 0
+  m_Transitions: []
+  m_StateMachineBehaviours: []
+  m_Position: {x: 50, y: 50, z: 0}
+  m_IKOnFeet: 0
+  m_WriteDefaultValues: 0
+  m_Mirror: 0
+  m_SpeedParameterActive: 0
+  m_MirrorParameterActive: 0
+  m_CycleOffsetParameterActive: 0
+  m_TimeParameterActive: 0
+  m_Motion: {fileID: 7400000, guid: 594c3bcb23303e14d939d396360cab5e, type: 2}
+  m_Tag: 
+  m_SpeedParameter: 
+  m_MirrorParameter: 
+  m_CycleOffsetParameter: 
+  m_TimeParameter: 
 --- !u!1102 &4852640194446582874
 AnimatorState:
   serializedVersion: 6
@@ -1465,7 +1494,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: RelicQ_Slash1
-  m_Speed: 2
+  m_Speed: 2.3
   m_CycleOffset: 0
   m_Transitions: []
   m_StateMachineBehaviours: []
@@ -1595,7 +1624,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: QSkill_03
-  m_Speed: 1.5
+  m_Speed: 2
   m_CycleOffset: 0
   m_Transitions: []
   m_StateMachineBehaviours: []
@@ -1607,7 +1636,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 0}
+  m_Motion: {fileID: 7400000, guid: 8bc61df0eb13b934fa0d1d202fd75b69, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 

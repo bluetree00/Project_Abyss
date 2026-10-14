@@ -19,6 +19,11 @@ using Object = UnityEngine.Object;
 /// </summary>
 public static class RelicMemoryRecall
 {
+    // 고른 뒤 몸 이펙트(10-06)
+    private const float AcquiredFxScale     = 0.8f;
+    private const float AcquiredPillarScale = 0.6f;   // 10-11 톤 2차: 1.2는 충격파 지름 약 6 m — 플레이어 연출 「살짝」 상한 위였다
+    private const float AcquiredHoldSeconds = 1.3f;
+
     // ── Constants ─────────────────────────────────────────────────
     private const string RecallKeyPrefix = "RelicMemory_Recall_";
     private const string ReturnKey       = "RelicMemory_Return";
@@ -126,6 +131,62 @@ public static class RelicMemoryRecall
             RelicMemoryGrade.Clear   => entry.memory_line,
             _                        => FaintLine(entry.memory_line),
         };
+    }
+
+    /// <summary>
+    /// ④′ 고른 뒤(10-06 사용자 「선택 후 메인 이펙트나 피드백이 느껴질 연출」) — 창이 닫히면 플레이어 몸에 유물 메인 이펙트
+    /// (가웨인 = 태양 착탄 · 랜슬롯 = 심판의 일격)와 등급색 기둥 · 고리, 머리 위에 고른 조각 이름이 떠오른다.
+    /// 공용 이펙트(RunFx)가 없으면 메인 이펙트와 이름만.
+    /// </summary>
+    public static async UniTask PlayAcquiredAsync(RelicDraftCard card, PlayerController player, RelicClassSO relic, CancellationToken ct)
+    {
+        if (card == null || player == null) return;
+        await PlayAcquiredFxAsync(card, player, relic, ct);
+        // 몸 이펙트가 보일 동안 기다린다 — 바로 넘어가면 출구 길 연출(와이프 · 카메라 이동)이 화면을 가져간다(10-06 실측).
+        await UniTask.Delay(TimeSpan.FromSeconds(AcquiredHoldSeconds), DelayType.UnscaledDeltaTime, cancellationToken: ct);
+    }
+
+    private static async UniTask PlayAcquiredFxAsync(RelicDraftCard card, PlayerController player, RelicClassSO relic, CancellationToken ct)
+    {
+        Color tint = card.Grade switch
+        {
+            RelicMemoryGrade.Radiant => RadiantGold,
+            RelicMemoryGrade.Faint   => Color.Lerp(ThemeOf(relic), Color.white, FaintWash),
+            _                        => ThemeOf(relic),
+        };
+        Vector3 at = player.transform.position;
+        string mainFx = MainFxKey(relic);
+        if (!string.IsNullOrEmpty(mainFx)) RelicStateVfx.PlayOneShot(mainFx, at + Vector3.up * 0.1f, AcquiredFxScale);
+        Managers.Sound?.PlayUiEvent(SoundEvent.MemoryAbsorb);   // 기억의 빛이 유물로 스밈(10-12 M1)
+
+        string label = card.Kind switch
+        {
+            RelicDraftCardKind.Echo    => "메아리",
+            RelicDraftCardKind.Residue   => $"정수 +{card.ResidueEssence}",
+            RelicDraftCardKind.Evolution => $"진화 — {RelicEvolution.ById(card.EvolutionId)?.Name}",
+            _                          => card.Entry?.part_name,
+        };
+        if (!string.IsNullOrEmpty(label)) RelicFloatText.Show(at, label, tint);   // 발밑 — 높이는 RelicFloatText가 더한다
+
+        if (!RunFx.IsReady)
+        {
+            try { await RunFx.LoadAsync(); }
+            catch (Exception e) { Debug.LogWarning($"[RelicMemory] 공용 이펙트 로드 실패: {e.Message}"); }
+            if (!RunFx.IsReady || ct.IsCancellationRequested || player == null) return;
+        }
+        at = player.transform.position;
+        // 등급색은 기둥 하나로 — 같은 자리 · 같은 순간 등급색 고리가 메인 이펙트 · 기둥과 겹쳤다(10-11 이펙트 톤 점검)
+        RunFx.Play(RunFxSlot.Pillar, at, AcquiredPillarScale, tint);
+    }
+
+    /// <summary>유물 메인 이펙트 — 그 유물의 간판 일격(일회성 · 3초 뒤 정리).</summary>
+    private static string MainFxKey(RelicClassSO relic)
+    {
+        if (relic == null) return null;
+        string id = relic.Id.ToString().ToLowerInvariant();
+        if (id.Contains("gawain"))   return "vfx_gawain_solar_impact";
+        if (id.Contains("lancelot")) return "vfx_lancelot_judgment";
+        return null;
     }
 
     /// <summary>⑤ 고른 뒤 한 마디 — 시기 · 반복 단계에 맞는 멀린/그림자 자막(비모달).</summary>

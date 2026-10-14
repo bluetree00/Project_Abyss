@@ -32,6 +32,7 @@ public sealed class RuneMemoryGame : EventMinigame
         new Color(1.00f, 0.50f, 0.62f),   // 분홍
     };
     private static readonly float[] PlatePitches = { 0.8f, 1.0f, 1.2f, 1.5f };
+    private const float BuildNoteVolume = 0.6f;   // 발판이 서며 내는 음은 작게(예전 0.5 / 0.8)
     private const float DimFactor = 0.35f;
 
     private enum Phase { Wait, Show, Input, Pause }
@@ -122,7 +123,7 @@ public sealed class RuneMemoryGame : EventMinigame
             Own(disc);
             _discs.Add(disc);
             RunFx.Play(RunFxSlot.Ring, _plates[i], 0.35f, PlateColors[i]);
-            MinigameFx.Sound(SoundKey.Sfx.ItemPickup, 0.5f, PlatePitches[i]);
+            MinigameFx.Cue(SoundEvent.MgNote, PlatePitches[i], BuildNoteVolume);
             float t = 0f;
             while (t < 1f)
             {
@@ -233,7 +234,7 @@ public sealed class RuneMemoryGame : EventMinigame
         int k = _seq[_showIndex];
         SetPlate(k, true);
         RunFx.Play(RunFxSlot.Pillar, _plates[k], 0.04f, PlateColors[k]);
-        MinigameFx.Sound(SoundKey.Sfx.ItemPickup, 0.8f, PlatePitches[k]);
+        MinigameFx.Cue(SoundEvent.MgNote, PlatePitches[k]);
         _lit   = true;
         _timer = _stepTime - ShowGap;
     }
@@ -253,8 +254,8 @@ public sealed class RuneMemoryGame : EventMinigame
         {
             _streak++;
             FlashPlateAsync(plate, PlateColors[plate]).Forget();
-            MinigameFx.Sound(SoundKey.Sfx.ItemPickup, 0.85f, PlatePitches[plate]);
-            RunFx.Play(RunFxSlot.Ring, _plates[plate], 0.35f, PlateColors[plate]);
+            MinigameFx.Cue(SoundEvent.MgNote, PlatePitches[plate]);
+            // 고리는 뺐다 — 같은 순간 발판 반짝임 · 음이 「맞았다」를 말한다(10-11 이펙트 톤 2차 V-14)
             _inputIndex++;
             if (_inputIndex >= _seq.Count) CompleteRound();
             return;
@@ -274,8 +275,8 @@ public sealed class RuneMemoryGame : EventMinigame
     {
         _round++;
         PlayArpeggioAsync().Forget();
+        if (_round >= _lengths.Length) return;   // FinishedEarly → 결말(같은 프레임 가운데 빛기둥이 맡는다 — 고리를 겹치지 않는다, 10-11 톤 점검)
         RunFx.Play(RunFxSlot.Ring, Center, 0.9f, Theme);
-        if (_round >= _lengths.Length) return;   // FinishedEarly → 결말
         NewSequence();
         _phase = Phase.Pause;
         _timer = AfterRound;
@@ -329,7 +330,7 @@ public sealed class RuneMemoryGame : EventMinigame
         {
             for (int i = 0; i < _plates.Count; i++)
             {
-                MinigameFx.Sound(SoundKey.Sfx.ItemPickup, 0.8f, PlatePitches[i]);
+                MinigameFx.Cue(SoundEvent.MgNote, PlatePitches[i]);
                 SetPlate(i, true);
                 await UniTask.Delay(110, cancellationToken: ct);
             }

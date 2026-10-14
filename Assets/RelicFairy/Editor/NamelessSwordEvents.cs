@@ -82,9 +82,14 @@ public static class NamelessSwordEvents
                              new Ev(0.50f,"AE_EndTrail"),   new Ev(1.00f,"AE_AttackEnd") } },
     };
 
-    [MenuItem("Tools/RelicFairy/Setup Nameless Anim Events")]
+    // 10-09: 무형검 지상 평타 이벤트는 WeaponAnimChains가 정규화 시간으로 다시 넣는다(이 표는 초 단위라 타격이 휘두름보다 늦고
+    // 트레일 끄기가 발동하지 않았다 · 3타는 01_4 → 01_3, 01_4는 무형검 E). 다시 돌리면 그걸 덮어쓴다 — 막는다.
+    private static readonly bool Replaced = true;
+
+    [MenuItem("Tools/RelicFairy/Setup Nameless Anim Events (10-09 대체됨)")]
     public static void Setup()
     {
+        if (Replaced) { Debug.LogWarning("[NamelessSwordEvents] 대체됨 — RelicFairy/Weapon/무기 동작 연속기 배정 (10-09)을 쓴다"); return; }
         int done = 0;
         foreach (var d in Defs)
         {

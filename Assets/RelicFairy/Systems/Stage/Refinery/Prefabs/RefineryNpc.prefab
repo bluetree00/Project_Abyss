@@ -317,9 +317,25 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 2054062089391510995}
     m_Modifications:
+    - target: {fileID: 1089380033080018, guid: fba65961026dc9645916176ab380ddc1, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1089508368587912, guid: fba65961026dc9645916176ab380ddc1, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1444219754028486, guid: fba65961026dc9645916176ab380ddc1, type: 3}
       propertyPath: m_Name
       value: Circle
+      objectReference: {fileID: 0}
+    - target: {fileID: 1619491268255216, guid: fba65961026dc9645916176ab380ddc1, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1687447598225580, guid: fba65961026dc9645916176ab380ddc1, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4037254154905776, guid: fba65961026dc9645916176ab380ddc1, type: 3}
       propertyPath: m_LocalScale.x

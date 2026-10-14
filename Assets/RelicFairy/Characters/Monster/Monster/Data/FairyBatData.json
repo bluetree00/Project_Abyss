@@ -2,9 +2,9 @@
   "monsterName": "FairyBat",
   "grade": "Normal",
   "stat": {
-    "maxHp": 10,
+    "maxHp": 14,
     "defense": 1.0,
-    "attackPower": 10.0,
+    "attackPower": 20.0,
     "moveSpeed": 3.0,
     "attackRange": 2.0,
     "attackRadius": 1.0,

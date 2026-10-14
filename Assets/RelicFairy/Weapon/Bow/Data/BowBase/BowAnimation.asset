@@ -12,6 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 027b38215b45a3a419b771ed55a162e2, type: 3}
   m_Name: BowAnimation
   m_EditorClassIdentifier: 
+  useGuardCharge: 0
+  lightAttackAnimSpeed: 1
+  heavyAttackAnimSpeed: 1
   defaultComboWindowOpen: 0.15
   defaultComboWindowClose: 0.5
   defaultAttackEndAt: 0.55
@@ -28,9 +31,18 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
+      recoveryEndAt: -1
       attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
       moveInputScale: 0
+      useAimAssist: 1
       aimAssistRadius: 10
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
     - baseClipName: GroundLightAttack_02
       addressableKey: GroundLightBowAttack_02
       actionType: 1
@@ -41,9 +53,18 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
+      recoveryEndAt: -1
       attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
       moveInputScale: 0
+      useAimAssist: 1
       aimAssistRadius: 10
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
     - baseClipName: GroundLightAttack_03
       addressableKey: GroundLightBowAttack_03
       actionType: 1
@@ -54,9 +75,18 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
+      recoveryEndAt: -1
       attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
       moveInputScale: 0
+      useAimAssist: 1
       aimAssistRadius: 10
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
     - baseClipName: QSkill_01
       addressableKey: BowQSkill_01
       actionType: 3
@@ -67,6 +97,18 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
     - baseClipName: QSkill_Iasen
       addressableKey: BowQSkill_02
       actionType: 3
@@ -77,6 +119,18 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
     - baseClipName: ESkill_01
       addressableKey: BowESkill_01
       actionType: 4
@@ -87,6 +141,18 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
     - baseClipName: AirLightAttack_01
       addressableKey: BowAirAttack_01
       actionType: 6
@@ -97,6 +163,18 @@ MonoBehaviour:
       comboWindowOpen: 0.1
       comboWindowClose: 0.4
       attackEndAt: 0.45
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
     - baseClipName: AirLightAttack_02
       addressableKey: BowAirAttack_02
       actionType: 6
@@ -107,6 +185,18 @@ MonoBehaviour:
       comboWindowOpen: 0.1
       comboWindowClose: 0.4
       attackEndAt: 0.45
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
     - baseClipName: AirLightAttack_03
       addressableKey: BowAirAttack_03
       actionType: 6
@@ -117,6 +207,18 @@ MonoBehaviour:
       comboWindowOpen: 0.1
       comboWindowClose: 0.4
       attackEndAt: 0.45
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
     - baseClipName: AirPlungeAttack
       addressableKey: BowAirPlunge
       actionType: 8
@@ -127,3 +229,389 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_Idle_Inplace
+      addressableKey: Bow_Common_Idle
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeWalkF_Inplace
+      addressableKey: Bow_Common_StrafeWalkF
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeWalkFL_Inplace
+      addressableKey: Bow_Common_StrafeWalkFL
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeWalkFR_Inplace
+      addressableKey: Bow_Common_StrafeWalkFR
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeWalkL_Inplace
+      addressableKey: Bow_Common_StrafeWalkL
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeWalkR_Inplace
+      addressableKey: Bow_Common_StrafeWalkR
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeWalkB_Inplace
+      addressableKey: Bow_Common_StrafeWalkB
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeWalkBL_Inplace
+      addressableKey: Bow_Common_StrafeWalkBL
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeWalkBR_Inplace
+      addressableKey: Bow_Common_StrafeWalkBR
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeRun_F_Inplace
+      addressableKey: Bow_Common_StrafeRun_F
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeRun_FL_Inplace
+      addressableKey: Bow_Common_StrafeRun_FL
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeRun_FR_Inplace
+      addressableKey: Bow_Common_StrafeRun_FR
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeRun_L_Inplace
+      addressableKey: Bow_Common_StrafeRun_L
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeRun_R_Inplace
+      addressableKey: Bow_Common_StrafeRun_R
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeRun_B_Inplace
+      addressableKey: Bow_Common_StrafeRun_B
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeRun_BL_Inplace
+      addressableKey: Bow_Common_StrafeRun_BL
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1
+    - baseClipName: GhostSamurai_Common_StrafeRun_BR_Inplace
+      addressableKey: Bow_Common_StrafeRun_BR
+      actionType: 0
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+      recoveryEndAt: -1
+      attackStepDistance: 0
+      attackStepStartNorm: 0.1
+      attackStepEndNorm: 0.4
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 0
+      moveInputScale: 0
+      useAimAssist: 1
+      aimAssistRadius: 6
+      aimAssistConeHalfAngle: 40
+      aimAssistStrength: 1
+      aimRotationDuration: 0.1

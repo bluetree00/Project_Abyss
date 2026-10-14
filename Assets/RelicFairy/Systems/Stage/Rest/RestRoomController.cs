@@ -114,6 +114,7 @@ public sealed class RestRoomController : MonoBehaviour
         _run.Player.Heal(Mathf.Max(1, Mathf.RoundToInt(stats.MaxHp * HealRatio)));
         Close();
         RunFx.Play(RunFxSlot.Ring, _restIt.transform.position + Vector3.up * 0.1f, 1f, RestInk);
+        Managers.Sound?.PlayEvent(SoundEvent.RestHeal);
         Notice($"<color=#FFC982>쉼터</color> — 불가에서 숨을 골랐다 · 체력 +{stats.Hp - before}");
     }
 
@@ -124,6 +125,7 @@ public sealed class RestRoomController : MonoBehaviour
         _run.ReportEnhanceLevel(weapon.enhanceLevel);
         Close();
         RunFx.Play(RunFxSlot.Burst, _forgeIt.transform.position + Vector3.up * 0.8f, 0.6f, ForgeInk);
+        Managers.Sound?.PlayEvent(SoundEvent.RestForge);
         Notice($"<color=#FFC982>쉼터</color> — {weapon.displayName} 강화 +{weapon.enhanceLevel}");
     }
 }

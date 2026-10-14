@@ -113,11 +113,13 @@ public class LichSealArrayState : UnInterruptibleState<LichSealArrayPatternSO>
         // 봉인진 = 바닥의 보라 문양 원(반경 arrayRadius). 가운데 시계형 구체는 작게(크면 리치를 가린다 — 09-19 실측).
         _arrayDisc = PatternGuideHelper.Disc(_center + Vector3.up * 0.02f, Data.arrayRadius, LichPatternUtil.Arcane);
         PatternGuideHelper.SetIntensity(_arrayDisc, 0.6f);
-        _arrayVfx = LichVfx.PlayLoop(LichVfxSlot.SealArray, _center + Vector3.up * 0.05f, Quaternion.identity, CoreOrbScale);
+        _arrayVfx = LichVfx.PlayLoop(LichVfxSlot.SealArray, _center + Vector3.up * 0.05f, BossStoryScenes.SigilFlat, CoreOrbScale);   // 칸 60 = 보스 봉인진 문양(10-11 이펙트 톤 2차)
         LichPatternUtil.CastBeat(ctx, LichCast.ArcaneOrb, Data.openDuration, 2f, 0.12f);
         LichPatternUtil.Lich(ctx)?.PulseBook(Data.openDuration + Data.activeDuration);
         LichSfx.Play(LichSfxSlot.ZoneHum, _center);
-        UI_BossBark.Show("…작은 빛. 이쪽이야, 이리 와.", BossBarkType.PatternAnnounce);   // 멀린 말투 흉내(대사 CSV Lich_MerlinVoice와 같은 문구)
+        // 멀린 말투 흉내 — 대사 CSV Lich_MerlinVoice 먼저(리치 이름표로 뜨고, 멀린의 「그건 내가 아니야!」가 잇는다)
+        if (!UI_BossBark.ShowDialogue("Lich_MerlinVoice", BossBarkType.PatternAnnounce))
+            UI_BossBark.Show("…작은 빛. 이쪽이야, 이리 와.", BossBarkType.PatternAnnounce);
     }
 
     public override void Update(MonsterContext ctx)
@@ -159,7 +161,7 @@ public class LichSealArrayState : UnInterruptibleState<LichSealArrayPatternSO>
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -196,7 +198,7 @@ public class LichSealArrayState : UnInterruptibleState<LichSealArrayPatternSO>
         if (!_reverseWarned && _reverseTimer >= Data.reverseEvery - Data.reverseWarn)
         {
             _reverseWarned = true;
-            PatternGuideHelper.SetColor(_spokes[0], LichPatternUtil.SafeWhite);
+            PatternGuideHelper.SetColor(_spokes[0], LichPatternUtil.Lethal);   // 반전 경고는 빨강 — 흰색(안전)인데 피해가 들어갔다(10-13 검증)
             PatternGuideHelper.SetIntensity(_spokes[0], 3f);
             LichSfx.Play(LichSfxSlot.CastShort, _center, 0.8f);
         }
@@ -226,7 +228,9 @@ public class LichSealArrayState : UnInterruptibleState<LichSealArrayPatternSO>
             float spoke = _angle + 360f / _count * i;
             if (Mathf.Abs(Mathf.DeltaAngle(yaw, spoke)) > halfWidthDeg) continue;
             _lastHit = Time.time;
-            bool hit = LichPatternUtil.HitPlayer(ctx, _center, Data.damageMultiplier, 0.6f);
+            // 넉백은 빛줄기가 이미 지나간 옆으로 — 중심에서 바깥으로 밀면 빛줄기를 따라 미끄러져 그 위에 남았다(10-08 점검).
+            Vector3 trailing = Vector3.Cross(Vector3.up, Quaternion.Euler(0f, spoke, 0f) * Vector3.forward) * -_spin;
+            bool hit = LichPatternUtil.HitPlayer(ctx, target.position - trailing, Data.damageMultiplier, 0.6f);
             LichPatternUtil.Impact(LichImpact.Light, hit);
             return;
         }

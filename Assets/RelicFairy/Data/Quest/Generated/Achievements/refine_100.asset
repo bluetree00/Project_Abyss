@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: refine_100
   m_EditorClassIdentifier: Assembly-CSharp::Achievement
   category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: e0b7983842a02174a8d2e08d3477a000, type: 3}
   codeName: refine_100
   displayName: "\uC874\uD575 \uC7A5\uC778"
   description: "\uC815\uC81C 100\uD68C"

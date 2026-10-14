@@ -30,7 +30,7 @@ MonoBehaviour:
   beamRange: 16
   beamWidth: 1.2
   sweepArc: 200
-  flowEmitInterval: 0.06
+  flowEmitInterval: 0
   flowMotesPerEmit: 2
   flowMoteRadius: 0.25
   flowMoteLifetime: 0.3

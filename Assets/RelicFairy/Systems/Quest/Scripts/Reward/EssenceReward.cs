@@ -1,3 +1,4 @@
+﻿using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -26,5 +27,7 @@ public class EssenceReward : Reward
         }
 
         data.abyssEssence += essenceAmount;
+        // 바로 저장 — 퀘스트 완료는 곧장 저장되는데 정수는 다음 메타 저장까지 메모리에만 있어, 그 사이 튕기면 보상만 사라졌다(10-09 출시 점검)
+        BackendGameData.Instance.SaveAsync().Forget();
     }
 }

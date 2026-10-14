@@ -101,7 +101,7 @@ public readonly struct CovenantAssemblePreview
             EffectKind.Execute    => $"체력 {effective * 100f:0}% 이하 즉사",
             EffectKind.Burn       => $"화상 공격력×{effective * 100f:0}% · {duration:0}초",
             EffectKind.Invincible => $"무적 {effective:0.0}초",
-            EffectKind.DeathSave  => $"치명 피해 생존 {effectiveCount}회",
+            EffectKind.DeathSave  => $"쓰러짐 막기 +1 · 최대 {effectiveCount}",
             EffectKind.StatBuff   => MomentumLabel(),
             EffectKind.BleedStack => $"출혈 공격력×{effective * 100f:0}% · {duration:0}초 (최대 {CovenantMath.BleedMaxStacks}중첩)",
             EffectKind.Detonate   => causeTargeted
@@ -112,7 +112,7 @@ public readonly struct CovenantAssemblePreview
                 ? $"감전 1중첩 · 순차 체인 {effectiveCount + CovenantMath.ArcflashChainBonus + 1}체 (간격 {CovenantMath.ArcflashChainHop:0}m)"
                 : $"감전 1중첩 · 방사형 {effectiveCount + 1}체 · 반경 {radius:0.0}m",
             EffectKind.Stasis     => $"감전 전량 소모 → 반경 {radius:0.0}m 기절 (1중첩당 {effective:0.00}초 · 최대 {CovenantMath.StasisStunCap:0.0}초)",
-            EffectKind.Ward       => $"받는 피해 -{effective * 100f:0}% · {duration:0}초 (상태 걸린 적 1체당 -{CovenantMath.WardPerSteepedEnemy * 100f:0}%p · 최대 -{CovenantMath.WardReductionCap * 100f:0}%)",
+            EffectKind.Ward       => $"받는 피해 -{effective * 100f:0}% · {duration:0}초 (상태 걸린 적 1마리당 -{CovenantMath.WardPerSteepedEnemy * 100f:0}%p · 최대 -{CovenantMath.WardReductionCap * 100f:0}%)",
             _                     => $"{effective:0.0}",
         };
     }

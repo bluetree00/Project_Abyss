@@ -14,6 +14,7 @@ public static class EndingSequence
     public const string MorganaKey   = "Ending_Morgana";
     public const string CardKey      = "Ending_Card";
     public const string CreditsKey   = "Ending_Credits";
+    private const string MorganaPageKey = "Illust_Story_MorganaReveal";   // 반전 그림 페이지(10-13 힉스필드)
 
     public static async UniTask PlayAsync(CancellationToken ct)
     {
@@ -27,7 +28,10 @@ public static class EndingSequence
         {
             UnityEngine.Debug.Log("[Ending] 엔딩 연출 시작");
             await ShowDialogueAsync(dlg.GetLines(LichDeathKey), ct);
-            await ShowDialogueAsync(dlg.GetLines(MorganaKey), ct);
+            // 모르가나의 정체 — 반전 그림 페이지를 대사 뒤에 깐다(10-13 사용자 「중요 스토리 때 그림」)
+            bool page = await StoryPageOverlay.ShowAsync(MorganaPageKey, ct);
+            try { await ShowDialogueAsync(dlg.GetLines(MorganaKey), ct); }
+            finally { if (page) await StoryPageOverlay.HideAsync(ct); }
             await EndingCardOverlay.PlayAsync(dlg.GetLines(CardKey), dlg.GetLines(CreditsKey), ct);
             UnityEngine.Debug.Log("[Ending] 엔딩 연출 끝");
         }

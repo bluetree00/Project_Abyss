@@ -23,7 +23,7 @@ public class MonsterSphereAttackSO : MonsterAttackShapeSO
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
-        player.TakeDamage(damage);
+        player.TakeDamage(damage, ctx.Transform.gameObject);
 
         Vector3 dir = (ctx.Runtime.PlayerTarget.position - ctx.Transform.position).normalized;
         dir.y = 0.3f;

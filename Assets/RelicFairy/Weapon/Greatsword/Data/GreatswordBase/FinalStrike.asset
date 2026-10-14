@@ -24,10 +24,11 @@ MonoBehaviour:
   tier2ExtraEffectKey: OrangeExplosionBig
   tier2ExtraEffectScale: 0.4
   maxHpDamageRatio: 0.1
+  tier3ExtraDamage: 45
   tier3ExtraEffectKey: GreenExplosionBig
   tier3ExtraEffectScale: 0.5
   strikeEffectKey: SlashLine
-  strikeEffectScale: 1.5
+  strikeEffectScale: 0.96
   hitEffectKey: SwordHitImpact
   hitEffectScale: 0.42
   endDelay: 0.3

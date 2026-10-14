@@ -46,6 +46,27 @@ public sealed class DecorationCatalogSO : ScriptableObject
 
         [Tooltip("벽에서 방 안쪽으로의 수평 오프셋. faceNearestWall이 true일 때 적용.")]
         public float wallInset = 0.45f;
+
+        [Tooltip("벽을 향해 돌린 뒤 더 돌릴 Y 각도(도). 기본 0 = 프리팹 +Z가 방 안쪽.\n" +
+                 "Gothic_Interior 벽걸이는 앞뒤가 X축이다 — 창 · 장미창 -90 · 벽 촛대 +90. 0이면 벽에서 직각으로 튀어나온 판이 된다(10-12 Ch3 점검).")]
+        [SerializeField] private float wallYawOffset;
+
+        [Tooltip("켜면 배치한 인스턴스의 (트리거 아닌) 콜라이더를 끈다 — 프리팹은 그대로.\n" +
+                 "전투 공간 한가운데 놓이는 작은 소품이 대시 · 몬스터 이동을 걸지 않게(10-12 Ch3 점검 D1).")]
+        [SerializeField] private bool disableColliders;
+
+        [Tooltip("켜면 배치한 인스턴스의 LODGroup을 LOD0에 고정한다 — 프리팹은 그대로.\n" +
+                 "하위 LOD 메시가 깨진 프리팹용(SM_WallCandleabra_01a: LOD1~4에 24 m 떨어진 정점 3개가 면 6~26개를 잡아당긴다 · 10-12 Ch3 점검).")]
+        [SerializeField] private bool forceLod0;
+
+        /// <summary>faceNearestWall 회전 뒤 더하는 Y 각도(도).</summary>
+        public float WallYawOffset => wallYawOffset;
+
+        /// <summary>배치 뒤 통행을 막는 콜라이더를 끌지.</summary>
+        public bool DisableColliders => disableColliders;
+
+        /// <summary>배치 뒤 LOD0에 고정할지.</summary>
+        public bool ForceLod0 => forceLod0;
     }
 
     [Tooltip("방 테마 문자열. 비어있으면 범용 (모든 테마의 fallback).")]

@@ -25,6 +25,14 @@ public sealed class RelicPartDraftSkinSO : ScriptableObject
         public Sprite  symbol;
     }
 
+    /// <summary>열쇠 문자열 → 그림(10-13 Artsystack). 자리 · 반응 문양과 유물 배지에 쓴다.</summary>
+    [System.Serializable]
+    public struct KeyArt
+    {
+        public string key;
+        public Sprite sprite;
+    }
+
     [Header("창 — 1280×760")]
     [Tooltip("개화 배경 — 전면 일러스트(9-slice 아님). 창 전체를 덮는다.")]
     public Sprite background;
@@ -50,6 +58,27 @@ public sealed class RelicPartDraftSkinSO : ScriptableObject
     [Tooltip("장착 버튼 — 220×56.")]
     public Sprite confirmButton;
 
+    [Header("자리 · 반응 문양(10-13 Artsystack 흰 아이콘) — 기억 카드 고리 안 · 되찾은 기억 머리")]
+    [SerializeField, Tooltip("키 = RelicPartAnchor 값(dawn · noon · dusk · dawn+noon · noon+dusk · frenzy · judgment) · residue · 반응 속성(fire · ice · electric · grass · light · dark). 숫자 단계(r10~r40)는 글자를 쓴다.")]
+    private KeyArt[] anchorArt = new KeyArt[0];
+    [SerializeField, Tooltip("유물 배지 — 키 = RelicId 이름(Gawain · Lancelot). 흰 아이콘이라 유물 테마색으로 칠한다.")]
+    private KeyArt[] relicBadge = new KeyArt[0];
+
+    [Header("되찾은 기억 쪽(10-13)")]
+    [SerializeField, Tooltip("묶음 머리 밑줄(selected_line — 무채 뒤 금선).")]
+    private Sprite groupUnderline;
+    [SerializeField, Tooltip("묶음 사이 구분선(Line_1 — 무채 뒤 잉크 35%).")]
+    private Sprite groupDivider;
+
+    public Sprite GroupUnderline => groupUnderline;
+    public Sprite GroupDivider   => groupDivider;
+
+    /// <summary>자리 · 반응 문양(없으면 null → 글자 기호).</summary>
+    public Sprite AnchorArt(string key)  => Find(anchorArt, key);
+
+    /// <summary>유물 배지(없으면 null → Q 아이콘).</summary>
+    public Sprite RelicBadge(string key) => Find(relicBadge, key);
+
     public Sprite KindChip(int kindIndex)   => Pick(kindChip, kindIndex);
     public Sprite KindEmblem(int kindIndex) => Pick(kindEmblem, kindIndex);
 
@@ -59,6 +88,14 @@ public sealed class RelicPartDraftSkinSO : ScriptableObject
         if (string.IsNullOrEmpty(partId) || partArt == null) return null;
         for (int i = 0; i < partArt.Length; i++)
             if (partArt[i].partId == partId) return partArt[i].symbol;
+        return null;
+    }
+
+    private static Sprite Find(KeyArt[] arr, string key)
+    {
+        if (string.IsNullOrEmpty(key) || arr == null) return null;
+        for (int i = 0; i < arr.Length; i++)
+            if (string.Equals(arr[i].key, key, System.StringComparison.OrdinalIgnoreCase)) return arr[i].sprite;
         return null;
     }
 

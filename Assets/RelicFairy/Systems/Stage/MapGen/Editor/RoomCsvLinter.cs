@@ -42,7 +42,8 @@ public static class RoomCsvLinter
     private static readonly Regex DoorRegex    = new Regex(@"^DR[0-9]*$", RegexOptions.Compiled);
     private static readonly Regex PickupRegex  = new Regex(@"^(WP|CP)[0-9]+$", RegexOptions.Compiled);
     private static readonly Regex NpcAnchorRegex = new Regex(@"^NS[nsewNSEW]?$", RegexOptions.Compiled);
-    private static readonly Regex PropAnchorRegex = new Regex(@"^NP[1-9]$", RegexOptions.Compiled);   // 번호 붙은 소품 자리
+    private static readonly Regex PropAnchorRegex = new Regex(@"^NP[1-9]$", RegexOptions.Compiled);
+    private static readonly Regex MidBossRegex = new Regex(@"^MB[A-Za-z][A-Za-z0-9]*$", RegexOptions.Compiled);   // 정예 보스 MB<종류>(10-12)   // 번호 붙은 소품 자리
 
     private const string DocsRelative = "RelicFairy/Docs";
     private static readonly string[] CsvNames =
@@ -189,7 +190,7 @@ public static class RoomCsvLinter
             Warn($"선언 크기 {declW}x{declH} != 실제 {w}x{h} (자동계산이라 무시되지만 표기 수정 권장)");
 
         // 토큰 스캔
-        int pCount = 0, bCount = 0, shopCount = 0, spawnCount = 0, mConfirmed = 0;
+        int pCount = 0, bCount = 0, shopCount = 0, spawnCount = 0, mConfirmed = 0, midBossCount = 0;
         int emptyCount = 0, innerDoor = 0, unknownTotal = 0;
         var unknownSamples = new List<string>();
 
@@ -211,6 +212,7 @@ public static class RoomCsvLinter
                 if (c == "P") pCount++;
                 else if (c == "B") bCount++;
                 else if (c == "S" || c == "Sw" || c == "Si") shopCount++;
+                else if (MidBossRegex.IsMatch(c)) midBossCount++;
 
                 if (c == "M" || c == "m" || SpawnerRegex.IsMatch(c))
                 {
@@ -260,6 +262,13 @@ public static class RoomCsvLinter
         if (category == "Shop" && shopCount < 1)         Err("Shop방에 매대(Sw/Si) 없음");
         if ((category == "Normal" || category == "Elite") && spawnCount < 1)
             Err($"{category}방에 스포너(M/m) 없음 — 전투 클리어 불가");
+        // 정예 보스 방 — MB 정확히 1 · M/m 0(늘 한 마리 · 졸개 없음 — 배치 설계 §7-1). 다른 방의 MB는 오류.
+        if (category == "MidBoss")
+        {
+            if (midBossCount != 1) Err($"MidBoss방 MB<종류> {midBossCount}개 — 정확히 1개 필요");
+            if (spawnCount > 0)    Err($"MidBoss방에 일반 스포너(M/m) {spawnCount}개 — 0개여야 한다");
+        }
+        else if (midBossCount > 0) Err($"MB<종류> {midBossCount}개 — MidBoss방에만 쓴다");
 
         // ⑨ max_active_spawners 정합
         if (maxActive > 0 && mConfirmed > maxActive)
@@ -305,6 +314,7 @@ public static class RoomCsvLinter
         if (PickupRegex.IsMatch(t)) return true;
         if (NpcAnchorRegex.IsMatch(t)) return true;    // 서비스 NPC 자리 NS(+방향)
         if (PropAnchorRegex.IsMatch(t)) return true;   // 소품 자리 NP<n>
+        if (MidBossRegex.IsMatch(t)) return true;      // 정예 보스 MB<종류>
         if (t.Length >= 2 && t[0] == 'd') return true; // 장식 d<code>
         return false;
     }
@@ -339,7 +349,7 @@ public static class RoomCsvLinter
         }
 
         // (2) 핸들러 토큰: 레지스트리가 린터가 아는 코드만 갖는지
-        var known = new HashSet<string> { "M", "m", "B", "d", "WP", "CP", "Pt", "CV", "NS", "NC", "NP" };
+        var known = new HashSet<string> { "M", "m", "B", "d", "WP", "CP", "Pt", "CV", "NS", "NC", "NP", "MB" };
         foreach (var kv in TokenRegistry.ExactHandlers)
             if (!known.Contains(kv.Key))
             {

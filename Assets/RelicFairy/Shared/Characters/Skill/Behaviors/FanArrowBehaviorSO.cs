@@ -13,6 +13,8 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "Game/Skill/FanArrowBehavior")]
 public class FanArrowBehaviorSO : SkillBehaviorSO
 {
+    private const float RingRadius = 5f;   // 퍼짐 고리 반경(화살은 더 멀리 간다 — 방향 · 폭만 보인다, 10-08 A10)
+
     [Header("발사 설정")]
     public int arrowCount = 3;
     public float spreadAngle = 60f;
@@ -85,7 +87,7 @@ public class FanArrowBehaviorSO : SkillBehaviorSO
 
         public void OnUpdate(SkillExecutionContext ctx)
         {
-            _timer += Time.deltaTime;
+            _timer += ctx.DeltaTime;   // 애니메이터와 같은 시계(슬로모 — 10-09)
             switch (_phase)
             {
                 case Phase.WindUp: UpdateWindUp(ctx); break;
@@ -119,6 +121,7 @@ public class FanArrowBehaviorSO : SkillBehaviorSO
 
         private void UpdateEnd(SkillExecutionContext ctx)
         {
+            ctx.EnterRecovery();   // 후딜 — 회피로 끊을 수 있다 · 스탠스 해제(10-08 A2 · A4)
             if (_timer >= _data.endDelay)
                 ctx.RequestEnd();
         }
@@ -131,6 +134,9 @@ public class FanArrowBehaviorSO : SkillBehaviorSO
 
             float dmg = ctx.CalculateDamage(_data.baseDamagePerArrow);
             float halfSpread = _data.spreadAngle * 0.5f;
+            Managers.Sound?.PlayEvent(SoundEvent.PlayerShot);   // 발사음(A6)
+            if (_data.arrowCount > 1)   // 갈래화살 퍼짐(A10) — 한 발 검기(무형참)는 고리 없음
+                SkillRangeRing.Fan(ctx.PlayerTransform.position, forward, RingRadius, _data.spreadAngle);
 
             // 머즐 이펙트
             if (!string.IsNullOrEmpty(_data.muzzleEffectKey))

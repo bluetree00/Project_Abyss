@@ -89,7 +89,7 @@ public class LichReaperFlurryState : UnInterruptibleState<LichReaperFlurryPatter
 {
     private enum Phase { Windup, Gap, End, Recovery }
 
-    private const float SignalSeconds     = 0.35f;   // 방향 고정 → 판정(0.15 → 0.35, 10-02 — 옆으로 피할 실제 창)
+    private const float SignalSeconds     = LichPatternUtil.MinLead;   // 방향 고정 → 판정(0.15 → 0.35 → 0.45, 10-13 검증)
     private const float SlamPoint         = 2f;     // 내려찍기 — 낫이 바닥에 닿는 자리(리치 앞 m)
 
     private Phase      _phase;
@@ -97,6 +97,7 @@ public class LichReaperFlurryState : UnInterruptibleState<LichReaperFlurryPatter
     private float      _windup;
     private int        _strikes;
     private float      _yaw;
+    private Vector3    _strikeOrigin;   // 예고 · 판정 원점 = 돌진이 닿을 자리
     private float      _endSeconds;
     private bool       _parryOpen;
     private bool       _signaled;
@@ -151,7 +152,7 @@ public class LichReaperFlurryState : UnInterruptibleState<LichReaperFlurryPatter
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -176,7 +177,7 @@ public class LichReaperFlurryState : UnInterruptibleState<LichReaperFlurryPatter
     private void BeginStrike(MonsterContext ctx, float windup)
     {
         _finisher  = Data.finisherOverhead && _strikes == Data.strikeCount - 1;
-        _windup    = Mathf.Max(0.35f, _finisher ? Mathf.Max(windup, Data.finisherWindup) : windup);
+        _windup    = Mathf.Max(SignalSeconds, _finisher ? Mathf.Max(windup, Data.finisherWindup) : windup);
         _parryOpen = false;
         _signaled  = false;
 
@@ -185,6 +186,7 @@ public class LichReaperFlurryState : UnInterruptibleState<LichReaperFlurryPatter
         _yaw = ctx.Transform.eulerAngles.y;
 
         var mc = LichPatternUtil.Mover(ctx);
+        Vector3 origin = LichPatternUtil.OnFloor(ctx, ctx.Transform.position);
         if (_finisher)
         {
             // 내려찍기는 제자리에서 들어 올린다 — 방향은 지금 고정(직선이라 옆으로 비키면 산다).
@@ -192,15 +194,19 @@ public class LichReaperFlurryState : UnInterruptibleState<LichReaperFlurryPatter
         }
         else if (mc != null)
         {
-            Vector3 to   = player - LichPatternUtil.OnFloor(ctx, ctx.Transform.position);
+            Vector3 to   = player - origin;
             float   dist = to.magnitude;
             float   step = Mathf.Clamp(dist - Data.lungeStopShort, 0f, Data.lungeDistance);
             if (step > 0.1f)
-                mc.ScriptMove(ctx.Transform.position + to / Mathf.Max(0.01f, dist) * step, _windup * 0.6f, 0f, facePlayer: true);
+            {
+                Vector3 dest = ctx.Transform.position + to / Mathf.Max(0.01f, dist) * step;
+                mc.ScriptMove(dest, _windup * 0.6f, 0f, facePlayer: true);
+                origin = LichPatternUtil.OnFloor(ctx, dest);   // 예고 · 판정 = 돌진이 닿을 자리(10-13 검증 — 예고는 출발 자리, 판정은 도착 자리였다)
+            }
         }
+        _strikeOrigin = origin;
 
         PatternGuideHelper.SafeDestroy(ref _guide);
-        Vector3 origin = LichPatternUtil.OnFloor(ctx, ctx.Transform.position);
         Vector3 dir    = Quaternion.Euler(0f, _yaw, 0f) * Vector3.forward;
         _guide = LichPatternUtil.PrepareTelegraph(
             _finisher
@@ -233,7 +239,7 @@ public class LichReaperFlurryState : UnInterruptibleState<LichReaperFlurryPatter
             return;
         }
 
-        Vector3 origin = LichPatternUtil.OnFloor(ctx, ctx.Transform.position);
+        Vector3 origin = _strikeOrigin;
         Vector3 dir    = Quaternion.Euler(0f, _yaw, 0f) * Vector3.forward;
         LichSwing swing = SwingOf(_strikes);
         _strikes++;

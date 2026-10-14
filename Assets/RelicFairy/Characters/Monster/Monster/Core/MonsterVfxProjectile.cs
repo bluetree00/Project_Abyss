@@ -23,6 +23,9 @@ public class MonsterVfxProjectile : MonoBehaviour
     private float _travelled;
     private bool  _done;
 
+    /// <summary>쏜 몬스터 — 플레이어 피격의 가해자(저스트 회피 · 피격 방향 · 반격 룬 · 결과창). 쏘는 쪽이 Init 뒤에 넣는다.</summary>
+    public GameObject Owner { get; set; }
+
     // ── Public Methods ─────────────────────────────────────────────────────────
 
     public void Init(
@@ -98,7 +101,7 @@ public class MonsterVfxProjectile : MonoBehaviour
             var player = _playerTarget.GetComponent<PlayerController>();
             if (player != null)
             {
-                player.TakeDamage(_damage);
+                player.TakeDamage(_damage, Owner);
 
                 if (_slowDuration > 0f)
                     player.ApplySlow(_slowScale, _slowDuration);

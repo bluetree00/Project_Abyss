@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using LitJson;
@@ -100,10 +100,11 @@ public class DialogueDataManager
         if (string.IsNullOrEmpty(baseKey)) return null;
 
         string key = EraKey(baseKey);
-        string prefsKey = VisitPrefix + key;
+        string prefsKey = VisitKeyOf(key);
         int count = PlayerPrefs.GetInt(prefsKey, 0);
         PlayerPrefs.SetInt(prefsKey, count + 1);
         RememberVisitKey(key); // 새 게임 시 일괄 초기화할 수 있도록 키를 인덱스에 남긴다
+        PlayerPrefs.Save();    // 튕겨도 대사 단계가 되감기지 않게
 
         if (count == 0)
         {
@@ -145,32 +146,38 @@ public class DialogueDataManager
     private const string VisitPrefix   = "dlgVisit_";
     private const string VisitIndexKey = "dlgVisit_index";
 
+    // 슬롯별 — 0번은 예전 이름 그대로(기존 진행 보존), 1 · 2번은 꼬리표를 붙인다.
+    // 예전엔 전역이라 한 슬롯의 「새 게임」이 모든 슬롯의 대사 단계를 First로 되돌렸다(10-09 출시 점검).
+    private static int    VisitSlot => RunProgressManager.Instance?.ActiveSlotIndex ?? 0;
+    private static string VisitKeyOf(string key) => VisitSlot > 0 ? $"{VisitPrefix}s{VisitSlot}_{key}" : VisitPrefix + key;
+    private static string IndexKeyOf()           => VisitSlot > 0 ? $"{VisitIndexKey}_s{VisitSlot}" : VisitIndexKey;
+
     /// <summary>방문 키를 인덱스(쉼표 구분)에 누적 기록. ResetVisitCounts가 이걸로 전부 지운다.</summary>
     private static void RememberVisitKey(string baseKey)
     {
-        string index = PlayerPrefs.GetString(VisitIndexKey, string.Empty);
+        string index = PlayerPrefs.GetString(IndexKeyOf(), string.Empty);
         if (index.Length == 0)
         {
-            PlayerPrefs.SetString(VisitIndexKey, baseKey);
+            PlayerPrefs.SetString(IndexKeyOf(), baseKey);
             return;
         }
         // 이미 기록된 키면 스킵(중복 누적 방지)
         foreach (var k in index.Split(','))
             if (k == baseKey) return;
 
-        PlayerPrefs.SetString(VisitIndexKey, index + "," + baseKey);
+        PlayerPrefs.SetString(IndexKeyOf(), index + "," + baseKey);
     }
 
-    /// <summary>새 게임 시작 — 모든 방문 횟수를 초기화한다.
+    /// <summary>새 게임 시작 — 활성 슬롯의 방문 횟수를 초기화한다.
     /// 이게 없으면 이전 플레이의 카운트가 남아 첫 진입부터 재방문(_R*) 대사가 나온다.</summary>
     public static void ResetVisitCounts()
     {
-        string index = PlayerPrefs.GetString(VisitIndexKey, string.Empty);
+        string index = PlayerPrefs.GetString(IndexKeyOf(), string.Empty);
         if (index.Length > 0)
             foreach (var k in index.Split(','))
-                if (!string.IsNullOrEmpty(k)) PlayerPrefs.DeleteKey(VisitPrefix + k);
+                if (!string.IsNullOrEmpty(k)) PlayerPrefs.DeleteKey(VisitKeyOf(k));
 
-        PlayerPrefs.DeleteKey(VisitIndexKey);
+        PlayerPrefs.DeleteKey(IndexKeyOf());
         PlayerPrefs.Save();
     }
 

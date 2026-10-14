@@ -21,6 +21,10 @@ MonoBehaviour:
     spawnMark: {fileID: 1838261207787406, guid: ab872fa9fd895d44d8a5fa026496a8c3,
       type: 3}
     spawnMarkScale: 0.55
+    sunColor: {r: 0.93, g: 1.0, b: 0.8, a: 1}
+    eraTint: {r: 0.85, g: 0.32, b: 0.18, a: 0.45}
+    ambientFx: {fileID: 0}
+    ambientFxRate: 0
   - chapter: 2
     voidColor: {r: 0.05, g: 0.025, b: 0.02, a: 1}
     shellTint: {r: 0.3, g: 0.2, b: 0.17, a: 1}
@@ -29,6 +33,10 @@ MonoBehaviour:
     spawnMark: {fileID: 1797740254408388, guid: 651015d990cb813499103b1670630c10,
       type: 3}
     spawnMarkScale: 0.55
+    sunColor: {r: 1.0, g: 0.66, b: 0.45, a: 1}
+    eraTint: {r: 0.55, g: 0.12, b: 0.3, a: 0.35}
+    ambientFx: {fileID: 0}
+    ambientFxRate: 0
   - chapter: 3
     voidColor: {r: 0.025, g: 0.03, b: 0.05, a: 1}
     shellTint: {r: 0.22, g: 0.24, b: 0.3, a: 1}
@@ -37,6 +45,10 @@ MonoBehaviour:
     spawnMark: {fileID: 1228060220772394, guid: 26ca230b5e25e7a4394b9883f13f4527,
       type: 3}
     spawnMarkScale: 0.55
+    sunColor: {r: 0.8, g: 0.88, b: 1.0, a: 1}
+    eraTint: {r: 0.75, g: 0.16, b: 0.14, a: 0.35}
+    ambientFx: {fileID: 0}
+    ambientFxRate: 0
   - chapter: 4
     voidColor: {r: 0.035, g: 0.02, b: 0.055, a: 1}
     shellTint: {r: 0.24, g: 0.2, b: 0.3, a: 1}
@@ -45,4 +57,8 @@ MonoBehaviour:
     spawnMark: {fileID: 1501320978331502, guid: e11e0bfa702caed41bff71e9ac30de1c,
       type: 3}
     spawnMarkScale: 0.55
+    sunColor: {r: 0, g: 0, b: 0, a: 0}
+    eraTint: {r: 0.45, g: 0.12, b: 0.42, a: 0.3}
+    ambientFx: {fileID: 0}
+    ambientFxRate: 0
   shaftMaterial: {fileID: 2100000, guid: 44bb5e8b7e0594f49973f71eb6ab1e7d, type: 2}

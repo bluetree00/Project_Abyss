@@ -44,7 +44,6 @@ public class DragonAirDashPatternSO : BossPatternSO
     [SerializeField] private string _crashStateName = "AirDashCrash";
     [SerializeField] private string _fallStateName = "AirDashFall";
     [SerializeField] private string _recoverStateName = "AirDashRecover";
-    [SerializeField] private string _landingStateName = "Landing";
 
     public float Cooldown => _cooldown;
     public float TakeoffDuration => _takeoffDuration;
@@ -72,7 +71,6 @@ public class DragonAirDashPatternSO : BossPatternSO
     public string CrashStateName => _crashStateName;
     public string FallStateName => _fallStateName;
     public string RecoverStateName => _recoverStateName;
-    public string LandingStateName => _landingStateName;
 
     private DragonAirDashState _runtimeState;
 
@@ -97,8 +95,6 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
 {
     // 벽 안면(바닥 상자 −1 m) + 머리 · 몸 앞 길이 — 돌진이 여기서 끝나 벽에 박히지 않는다(10-03 개선 1-2: 매번 벽 충돌 → 사망 클립 낙하)
     private const float WallBodyMargin = 4.5f;
-    private const float YankFraction   = 0.5f;   // 봉인기: 첫 돌진의 이만큼에서 사슬이 끌어내린다(10-03 S2)
-    private const float YankStagger    = 1.2f;
     private const float FallCrossFade  = 0.2f;   // 낙하 · 회복 클립 전환(0.05초는 자세가 튀었다)
 
     private enum Phase
@@ -109,7 +105,6 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         Crash,
         Fall,
         Recover,
-        Landing,
         Done,
     }
 
@@ -127,12 +122,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
     private int _crashHash;
     private int _fallHash;
     private int _recoverHash;
-    private int _landingHash;
     private DragonBossWarningZone _warningZone;
-    private bool  _yankPlanned;
-    private bool  _yanked;
-    private float _yankStagger;
-    private float _yankWait;
 
     internal DragonAirDashState(DragonAirDashPatternSO data) : base(data) { }
 
@@ -157,10 +147,6 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         _playerHit = false;
         _selfDamageApplied = false;
         _dashCount = 0;
-        _yankPlanned = false;
-        _yanked = false;
-        _yankStagger = 0f;
-        _yankWait = 0f;
         _takeoffStartPos = ctx.Transform.position;
         _hoverPos = _takeoffStartPos;
         _hoverPos.y = Mathf.Max(ctx.Transform.position.y, ctx.Runtime.SpawnPosition.y + Data.WarningHoverHeight);
@@ -169,7 +155,6 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         _crashHash = Animator.StringToHash(Data.CrashStateName);
         _fallHash = Animator.StringToHash(Data.FallStateName);
         _recoverHash = Animator.StringToHash(Data.RecoverStateName);
-        _landingHash = Animator.StringToHash(Data.LandingStateName);
 
         // [DESIGN GUIDE] DashSlashCooldown 은 DragonBossBlackboard 소속이어야 합니다.
         // 베이스 타입(BossAttackBlackboard) 캐스팅 대신 DragonBossBlackboard 로 캐스팅하세요.
@@ -205,9 +190,6 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
                 break;
             case Phase.Recover:
                 UpdateRecover(ctx);
-                break;
-            case Phase.Landing:
-                UpdateLanding(ctx);
                 break;
         }
     }
@@ -251,9 +233,11 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
     private void UpdateDash(MonsterContext ctx)
     {
         float step = Data.DashSpeed * Time.deltaTime;
-        if (TryGetWallHit(ctx, step, out RaycastHit hit))
+        if (TryGetWallHit(ctx, step, out float wallDistance))
         {
-            Vector3 stopPos = hit.point - _dashDirection * Data.WallStopPadding;
+            // 벽 앞 여유까지만 나아가 멈춘다 — 옛 hit.point 기준은 구체 캐스트 접점이 옆으로 비껴 한 프레임에 6 m 튀었다(10-06 연출 점검)
+            float   advance = Mathf.Clamp(wallDistance - Data.WallStopPadding, 0f, step);
+            Vector3 stopPos = ctx.Transform.position + _dashDirection * advance;
             stopPos.y = ctx.Transform.position.y;
             ctx.Transform.position = stopPos;
             StartCrash(ctx);
@@ -310,43 +294,10 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         ReturnToGroundCombat(ctx);
     }
 
-    private void UpdateLanding(MonsterContext ctx)
-    {
-        float groundY = DragonPatternFloorUtils.GetFloorY(ctx.Transform.position, ctx.Runtime.SpawnPosition.y);
-        Vector3 pos = ctx.Transform.position;
-        pos.y = Mathf.MoveTowards(pos.y, groundY, Data.DashSpeed * 0.45f * Time.deltaTime);
-        ctx.Transform.position = pos;
-        FacePlayer(ctx, Data.RotationSpeed);
-
-        if (!IsAnimNearEnd(ctx, _landingHash) || pos.y > groundY + 0.05f)
-            return;
-
-        // 사슬에 끌려 내려왔으면 그 자리에서 휘청
-        if (_yankWait < _yankStagger)
-        {
-            _yankWait += Time.deltaTime;
-            return;
-        }
-
-        RestoreAgent(ctx);
-        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
-            bb.BodyState = BodyState.Grounded;
-        ReturnToGroundCombat(ctx);
-    }
-
     private void FinishDash(MonsterContext ctx)
     {
-        // 봉인기 — 옛 봉인 사슬이 날개를 끌어내린다: 착지 클립으로 내려와 휘청(10-03 S2)
-        if (_yankPlanned && !_yanked)
-        {
-            _yanked      = true;
-            _yankStagger = BossBinding.Of(ctx.Monster)?.Yank(YankStagger) ?? 0f;
-            StartLanding(ctx);
-            return;
-        }
-
         _dashCount++;
-        if (_dashCount < Data.DashRepeatCount)
+        if (_dashCount < DashCount(ctx))
         {
             _phase = Phase.Warning;
             _phaseTimer = 0f;
@@ -417,13 +368,6 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         PlayAnim(ctx, Data.RecoverStateName, FallCrossFade);
     }
 
-    private void StartLanding(MonsterContext ctx)
-    {
-        _phase = Phase.Landing;
-        _phaseTimer = 0f;
-        PlayAnim(ctx, Data.LandingStateName, 0.08f);
-    }
-
     private void SpawnWarningMarker(MonsterContext ctx)
     {
         float groundY = ctx.Runtime.SpawnPosition.y;
@@ -431,15 +375,10 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         // 경고장판이 항상 바닥 끝까지 닿도록 fallback을 룸 최대 크기로 보정 — 드래곤이 경고장판 경로 끝까지 돌진한다
         float maxDistance = Mathf.Max(Data.DashDistance, DragonPatternFloorUtils.GetRoomMaxExtent());
         _effectiveDashDistance = Mathf.Max(2f, DragonPatternFloorUtils.DistanceToFloorEdge(origin, _dashDirection, maxDistance) - WallBodyMargin);
-        // 봉인기 첫 돌진 — 사슬이 닿는 데까지만(예고도 이 길이)
-        if (_dashCount == 0 && !StoryProgress.IsLiberated && BossBinding.Of(ctx.Monster)?.IsBound == true)
-        {
-            _yankPlanned = true;
-            _effectiveDashDistance *= YankFraction;
-        }
         // 예고는 돌진 거리 + 몸 판정 반경 — 멈춘 자리에서도 판정 캡슐이 반경만큼 앞으로 닿는다(10-03)
-        float guideLength = _effectiveDashDistance + Data.DashHitRadius;
-        Vector3 center = origin + _dashDirection * (guideLength * 0.5f);
+        // 출발 순간에도 판정 캡슐이 출발점 뒤로 반경만큼 닿는다 — 예고도 출발점 뒤 반경부터(10-13 검증)
+        float guideLength = _effectiveDashDistance + Data.DashHitRadius * 2f;
+        Vector3 center = origin + _dashDirection * (guideLength * 0.5f - Data.DashHitRadius);
         // 2페이지(심연)엔 검은 불 색으로 — 알파는 에셋 값 유지
         Color lineColor = Data.WarningLineColor;
         if (ctx.Monster is DragonBossMonster dragon && dragon.IsAbyssPage)
@@ -490,38 +429,31 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         }
     }
 
-    private bool TryGetWallHit(MonsterContext ctx, float stepDistance, out RaycastHit bestHit)
+    /// <summary>
+    /// 벽 = 아레나 경계(바닥 상자 − <see cref="DragonPatternFloorUtils.WallInset"/> = 벽 안면) — 돌진 길이 · 몸 가두기와 같은 기준.
+    /// 화룡 아레나(Ch2)의 경계벽(Bound_N/S/E/W)은 Default 레이어 · Wall 레이어는 경계 밖 탑뿐이라 레이어로는 못 가른다.
+    /// 예전 구체 캐스트는 마스크가 ~playerLayer(에셋 0 → 모든 레이어)라 장식 · 바닥 아치 · 새끼 용에 걸려 「충돌 → 자해 80」이 났다(10-08 점검).
+    /// <paramref name="wallDistance"/> = 몸 판정 구(DashCollisionRadius)가 벽 안면에 닿기까지 남은 거리.
+    /// </summary>
+    private bool TryGetWallHit(MonsterContext ctx, float stepDistance, out float wallDistance)
     {
-        Vector3 origin = ctx.Transform.position + Vector3.up * 0.5f;
-        int mask = ctx.Config != null ? ~ctx.Config.playerLayer.value : Physics.DefaultRaycastLayers;
-        var hits = Physics.SphereCastAll(origin, Data.DashCollisionRadius, _dashDirection, stepDistance + Data.WallStopPadding, mask, QueryTriggerInteraction.Ignore);
-
-        float bestDistance = float.MaxValue;
-        bestHit = default;
-
-        foreach (var hit in hits)
-        {
-            if (hit.collider == null)
-                continue;
-            if (hit.collider.transform == ctx.Transform || hit.collider.transform.IsChildOf(ctx.Transform))
-                continue;
-            if (hit.collider.GetComponent<PlayerController>() != null || hit.collider.GetComponentInParent<PlayerController>() != null)
-                continue;
-
-            if (hit.distance >= bestDistance)
-                continue;
-
-            bestDistance = hit.distance;
-            bestHit = hit;
-        }
-
-        return bestDistance < float.MaxValue;
+        wallDistance = DragonPatternFloorUtils.DistanceToFloorEdge(ctx.Transform.position, _dashDirection, float.MaxValue)
+                     - DragonPatternFloorUtils.WallInset - Data.DashCollisionRadius;
+        return wallDistance < stepDistance + Data.WallStopPadding;
     }
 
-    private static Vector3 GetHorizontalDirectionToPlayer(MonsterContext ctx)
+    private const float DashLeadExtra = 0.25f;   // 돌진이 플레이어 근처에 닿기까지(경고 뒤)
+
+    // 2페이지(심연)는 한 번 더(10-14 화룡 위협)
+    private int DashCount(MonsterContext ctx)
+        => Data.DashRepeatCount + ((ctx.Monster as DragonBossMonster)?.CurrentElement == DragonBossBlackboard.DragonElement.Abyss ? 1 : 0);
+
+    // 플레이어가 가는 쪽 — 경고가 끝나고 돌진이 닿을 즈음의 자리를 겨눈다(10-14 화룡 위협 · 예전엔 지금 자리라 옆으로 걷기만 해도 비켜났다).
+    // 예고 줄은 그 방향에 그려지고 경고 내내 굳어 있다 — 멈추거나 꺾으면 피한다.
+    private Vector3 GetHorizontalDirectionToPlayer(MonsterContext ctx)
     {
         Vector3 dir = ctx.Runtime.PlayerTarget != null
-            ? ctx.Runtime.PlayerTarget.position - ctx.Transform.position
+            ? DragonThreat.PredictPlayer(ctx, Data.WarningDuration + DashLeadExtra) - ctx.Transform.position
             : ctx.Transform.forward;
         dir.y = 0f;
         if (dir.sqrMagnitude < 0.001f)

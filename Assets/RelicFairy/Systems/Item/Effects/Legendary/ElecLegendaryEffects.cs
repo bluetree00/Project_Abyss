@@ -1,57 +1,61 @@
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using RelicFairy.Monster;
 using UnityEngine;
 
-// ── T-1. 천둥 폭격 (광역기) ───────────────────────────────────────────
+// ── 번개 전설 3종 — 「몇 초마다」를 없애고 빌드 행동으로 발동(10-14 룬 재설계 R3) ──────────
+// 천둥 폭격 = 연격 · 과전류 포박 = 필살 · 전자기 구체 = 주문. 존 단계마다 피해 +15%(개수형은 +1) — LegendaryTuning.
+
+// ── T-1. 천둥 폭격 (연격) ─────────────────────────────────────────────
+/// <summary>
+/// 맞힌 15번마다(value2) 15 m 안 적 3명(value3)에게 낙뢰 — 공격력 × value(100%), 다음 3명에게 절반 연쇄.
+/// 무적인 적을 헛친 타(피해 0)는 세지 않는다.
+/// </summary>
 public sealed class ElecLegendAoeEffect : ItemCombatEffectBase
 {
     private static readonly string[] s_hitSfx = { SoundKey.Sfx.MonsterHit1, SoundKey.Sfx.MonsterHit2, SoundKey.Sfx.MonsterHit3 };
 
     private readonly List<GameObject> _buf = new();
-    private float _timer;
-    private int _baseTier;
-    private bool _baseSet;
+    private int _hits;
+
+    /// <summary>새 행(발동 「OnHitCount」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
+    private bool NewRow => _trigger == "OnHitCount";
 
     public ElecLegendAoeEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnActivate(ItemEffectContext ctx)
     {
         LegendaryRuntime.EnsureExists();
-        _timer    = 0f;
-        _baseTier = 0;
-        _baseSet  = false;
+        _hits = 0;
     }
 
-    public override void OnTick(ItemEffectContext ctx, float deltaTime)
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
-        if (!_baseSet) { _baseTier = MerlinRuneBridge.Instance?.GetZoneTier("ELECTRIC") ?? 0; _baseSet = true; }
-        _timer += deltaTime;
-        if (_timer < _value2) return;
-        _timer -= _value2;
-        if (ctx?.Player == null) return;
+        if (report.DamageDealt <= 0f || ctx?.Player == null) return;
+        int required = Mathf.Max(1, Mathf.RoundToInt(LegendaryTuning.Pick(NewRow, _value2, 15f)));
+        if (++_hits < required) return;
+        _hits = 0;
+        Strike(ctx);
+    }
 
-        int extra   = ExtraTiers();
-        int targets = 3 + extra;
-
-        Vector3 pos     = ctx.Player.transform.position;
-        float mainDmg  = EffAtk(ctx) * _value;
+    private void Strike(ItemEffectContext ctx)
+    {
+        int targets    = Mathf.Max(1, Mathf.RoundToInt(LegendaryTuning.Pick(NewRow, _value3, 3f)));
+        Vector3 pos    = ctx.Player.transform.position;
+        float mainDmg  = LegendaryTuning.Atk(ctx) * LegendaryTuning.Pick(NewRow, _value, 1f) * LegendaryTuning.TierMul("ELECTRIC");
         float chainDmg = mainDmg * 0.5f;
 
         int n = CombatQuery.GetNearbyDamageables(pos, 15f, Self(ctx), targets * 2, _buf);
-
         var cat = LegendaryRuntime.Catalog;
         int hitCount = Mathf.Min(n, targets);
         Quaternion strikeRot = Quaternion.Euler(180f, 0f, 0f); // 수직 반전: 위에서 아래로
-        float vfxScale = 0.5f;
 
         for (int i = 0; i < hitCount; i++)
         {
             CombatQuery.DealSynergyDamage(_buf[i], mainDmg, Self(ctx), element: RuneElement.Electric);
             LegendaryRuntime.SpawnVfx(cat?.elecAoeHitVfx, _buf[i].transform.position, Quaternion.identity, 1.5f, 0.8f);
-            // 각 타겟 머리 위 4m에서 번개 낙뢰
-            Vector3 strikePos = _buf[i].transform.position + Vector3.up * 4f;
-            LegendaryRuntime.SpawnVfx(cat?.elecAoeVfx, strikePos, strikeRot, 2f, vfxScale);
+            LegendaryRuntime.SpawnVfx(cat?.elecAoeVfx, _buf[i].transform.position + Vector3.up * 4f, strikeRot, 2f, 0.5f);
 
             int chainIdx = i + targets;
             if (chainIdx < n)
@@ -63,32 +67,30 @@ public sealed class ElecLegendAoeEffect : ItemCombatEffectBase
         if (hitCount > 0)
             Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
     }
-
-    private int ExtraTiers() =>
-        Mathf.Max(0, (MerlinRuneBridge.Instance?.GetZoneTier("ELECTRIC") ?? 0) - _baseTier);
 }
 
-// ── T-2. 과전류 포박 (단일기) ─────────────────────────────────────────
+// ── T-2. 과전류 포박 (필살) ───────────────────────────────────────────
+/// <summary>
+/// 치명 또는 강타가 터지면(쿨 value2 = 6초) 그 대상을 1.5초 속박(보스 제외)하고 대상을 포함해 반경 3 m 폭발 — 그 타격 피해 × value(150%).
+/// </summary>
 public sealed class ElecLegendSingleEffect : ItemCombatEffectBase
 {
     private static readonly string[] s_hitSfx = { SoundKey.Sfx.MonsterHit1, SoundKey.Sfx.MonsterHit2, SoundKey.Sfx.MonsterHit3 };
+    private const float BindSeconds = 1.5f, ExplosionRadius = 3f;
 
     private readonly List<GameObject> _buf = new();
-    private float _timer;
-    private int _baseTier;
-    private bool _baseSet;
-    private const float BindDuration = 3f;
-    private const float ExplosionRadius = 3f;
+    private float _readyAt;
     private CancellationTokenSource _cts;
+
+    /// <summary>새 행(발동 「OnCrit」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
+    private bool NewRow => _trigger == "OnCrit";
 
     public ElecLegendSingleEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnActivate(ItemEffectContext ctx)
     {
         LegendaryRuntime.EnsureExists();
-        _timer    = 0f;
-        _baseTier = 0;
-        _baseSet  = false;
+        _readyAt = 0f;
         _cts = new CancellationTokenSource();
     }
 
@@ -99,128 +101,109 @@ public sealed class ElecLegendSingleEffect : ItemCombatEffectBase
         _cts = null;
     }
 
-    public override void OnTick(ItemEffectContext ctx, float deltaTime)
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
-        if (!_baseSet) { _baseTier = MerlinRuneBridge.Instance?.GetZoneTier("ELECTRIC") ?? 0; _baseSet = true; }
-        _timer += deltaTime;
-        if (_timer < _value2) return;
-        _timer -= _value2;
-        if (ctx?.Player == null || _cts == null) return;
-
-        int n = CombatQuery.GetNearbyDamageables(ctx.Player.transform.position, 20f, Self(ctx), 1, _buf);
-        if (n == 0) return;
-
-        BindAndExplodeAsync(ctx, _buf[0], ExtraTiers(), _cts.Token).Forget();
+        if (!(report.IsCrit || report.IsHeavy) || report.DamageDealt <= 0f || report.Target == null) return;
+        if (ctx?.Player == null || _cts == null || Time.time < _readyAt) return;
+        _readyAt = Time.time + LegendaryTuning.Pick(NewRow, _value2, 6f);
+        float boom = report.DamageDealt * LegendaryTuning.Pick(NewRow, _value, 1.5f) * LegendaryTuning.TierMul("ELECTRIC");
+        BindAndExplodeAsync(ctx, report.Target, boom, _cts.Token).Forget();
     }
 
-    private async UniTaskVoid BindAndExplodeAsync(ItemEffectContext ctx, GameObject target, int extra, CancellationToken ct)
+    private async UniTaskVoid BindAndExplodeAsync(ItemEffectContext ctx, GameObject target, float boom, CancellationToken ct)
     {
         try
         {
             var cat = LegendaryRuntime.Catalog;
-            float explosionR = ExplosionRadius + extra * 0.5f;
-            float tickDmg    = EffAtk(ctx) * _value * 0.5f;
-            float aoeEnd     = EffAtk(ctx) * 2f;
-            // Z축 -3 오프셋: Effect_16_ElectricField가 몬스터 중심에 맞춰지도록 보정
-            Vector3 vfxCenter = target.transform.position + new Vector3(0f, 0f, -3f);
+            var mb = target.GetComponentInParent<MonsterBase>();
+            if (mb != null && mb.Grade != MonsterGrade.Boss) mb.Status.ApplyCc("bind", BindSeconds);   // 이름대로 실제 속박
+            Vector3 vfxCenter = target.transform.position + new Vector3(0f, 0f, -3f);   // Effect_16_ElectricField 중심 보정
+            LegendaryRuntime.SpawnVfx(cat?.elecSingleVfx, vfxCenter, Quaternion.identity, BindSeconds, 0.6f);
 
-            LegendaryRuntime.SpawnVfx(cat?.elecSingleVfx, vfxCenter, Quaternion.identity, BindDuration, 0.6f);
+            await UniTask.Delay(System.TimeSpan.FromSeconds(BindSeconds), cancellationToken: ct);
+            if (target == null) return;
 
-            int ticks = Mathf.RoundToInt(BindDuration / 0.5f);
-            for (int t = 0; t < ticks; t++)
-            {
-                if (ct.IsCancellationRequested || target == null) break;
-                CombatQuery.DealSynergyDamage(target, tickDmg, ctx?.Player?.gameObject, element: RuneElement.Electric);
-                LegendaryRuntime.SpawnVfx(cat?.elecSingleHitVfx, target.transform.position, Quaternion.identity, 1.5f, 0.8f);
-                Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
-                await UniTask.Delay(500, cancellationToken: ct);
-            }
-
-            if (target != null)
-            {
-                Vector3 explPos = target.transform.position;
-                int nb = CombatQuery.GetNearbyDamageables(explPos, explosionR, target, 10, _buf);
-                for (int i = 0; i < nb; i++)
-                    CombatQuery.DealSynergyDamage(_buf[i], aoeEnd, ctx?.Player?.gameObject, element: RuneElement.Electric);
-                LegendaryRuntime.SpawnVfx(cat?.elecHitVfx, explPos, Quaternion.identity, 2f, 0.3f);
-                Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
-            }
+            Vector3 explPos = target.transform.position;
+            CombatQuery.DealSynergyDamage(target, boom, ctx?.Player?.gameObject, element: RuneElement.Electric);   // 대상도 폭발에 든다
+            int nb = CombatQuery.GetNearbyDamageables(explPos, ExplosionRadius, target, 10, _buf);
+            for (int i = 0; i < nb; i++)
+                CombatQuery.DealSynergyDamage(_buf[i], boom, ctx?.Player?.gameObject, element: RuneElement.Electric);
+            LegendaryRuntime.SpawnVfx(cat?.elecHitVfx, explPos, Quaternion.identity, 2f, 0.3f);
+            SkillRangeRing.Circle(explPos, ExplosionRadius);   // 섬광은 점 크기 — 폭발 판정은 외곽선으로(10-13 이펙트 = 판정)
+            Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
         }
         catch (System.OperationCanceledException) { }
     }
-
-    private int ExtraTiers() =>
-        Mathf.Max(0, (MerlinRuneBridge.Instance?.GetZoneTier("ELECTRIC") ?? 0) - _baseTier);
 }
 
-// ── T-3. 전자기 구체 (투사체) ─────────────────────────────────────────
+// ── T-3. 전자기 구체 (주문) ───────────────────────────────────────────
+/// <summary>
+/// E · R 스킬을 쓸 때마다 구체 +1(최대 3 · 존 단계마다 +1 · 12초). 구체는 튕겨 다니며 닿은 적에게 공격력 × value(60%)(같은 대상 0.5초),
+/// 스킬이 적을 맞힐 때마다 구체마다 볼트 한 발(0.3초에 한 번).
+/// </summary>
 public sealed class ElecLegendProjectileEffect : ItemCombatEffectBase
 {
-    private int _baseTier;
-    private int _lastExtra = -1;
-    private bool _baseSet;
-    private ItemEffectContext _savedCtx;
+    private const int   BaseMax = 3;
+    private const float OrbSeconds = 12f, HitGap = 0.5f, BoltGap = 0.3f;
+
+    private readonly List<ElecOrbAgent> _orbs = new();
+    private float _nextBoltAt;
+    private ItemEffectContext _ctx;
+
+    /// <summary>새 행(발동 「OnSkillUse」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
+    private bool NewRow => _trigger == "OnSkillUse";
 
     public ElecLegendProjectileEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnActivate(ItemEffectContext ctx)
     {
         LegendaryRuntime.EnsureExists();
-        _baseTier  = 0;
-        _lastExtra = -1;
-        _baseSet   = false;
-        _savedCtx  = ctx;
+        _ctx = ctx;
     }
 
-    public override void OnDeactivate() => LegendaryRuntime.Instance?.ClearAgentsOf(this);
+    public override void OnDeactivate()
+    {
+        LegendaryRuntime.Instance?.ClearAgentsOf(this);
+        _orbs.Clear();
+    }
 
     public override void OnRoomEnter(ItemEffectContext ctx)
     {
         LegendaryRuntime.Instance?.ClearAgentsOf(this);
-        _savedCtx = ctx;
-        _baseSet  = false;
+        _orbs.Clear();
     }
 
-    public override void OnTick(ItemEffectContext ctx, float deltaTime)
+    public override void OnSkillUse(ItemEffectContext ctx, SkillType skill)
     {
-        _savedCtx = ctx;
-        if (!_baseSet)
-        {
-            _baseTier  = MerlinRuneBridge.Instance?.GetZoneTier("ELECTRIC") ?? 0;
-            _lastExtra = ExtraTiers();
-            _baseSet   = true;
-            SpawnBalls(ctx);
-            return;
-        }
-        int extra = ExtraTiers();
-        if (extra == _lastExtra) return;
-        _lastExtra = extra;
-        LegendaryRuntime.Instance?.ClearAgentsOf(this);
-        SpawnBalls(ctx);
-    }
-
-    private void SpawnBalls(ItemEffectContext ctx)
-    {
+        if (skill != SkillType.E && skill != SkillType.R) return;
         if (ctx?.Player == null) return;
-        int extra      = ExtraTiers();
-        int count      = Mathf.RoundToInt(_value2) + extra;
-        float dmg      = EffAtk(ctx) * _value;
-        float explMult = _value3;
+        _ctx = ctx;
+        _orbs.RemoveAll(o => o == null);
+        int max = BaseMax + LegendaryTuning.Tier("ELECTRIC");
+        while (_orbs.Count >= max) { if (_orbs[0] != null) Object.Destroy(_orbs[0].gameObject); _orbs.RemoveAt(0); }
 
-        float flyY = LegendaryProjectileBase.FlyHeight + 0.3f;
-        for (int i = 0; i < count; i++)
-        {
-            float angle = i * 360f / count + 45f + Random.Range(-10f, 10f);
-            Vector3 dir = Quaternion.Euler(0, angle, 0) * Vector3.forward;
-            Vector3 pos = LegendaryRuntime.GetRandomNavPoint(flyY);
-
-            var go    = new GameObject("ElecBall");
-            var agent = go.AddComponent<ElecOrbAgent>();
-            agent.InitElec(this, ctx, dmg, explMult, 6f, 9999f, dir);
-            go.transform.position = pos;
-        }
+        float angle = Random.Range(0f, 360f);
+        Vector3 dir = Quaternion.Euler(0, angle, 0) * Vector3.forward;
+        var go    = new GameObject("ElecBall");
+        go.transform.position = ctx.Player.transform.position + Vector3.up * (LegendaryProjectileBase.FlyHeight + 0.3f);
+        var agent = go.AddComponent<ElecOrbAgent>();
+        agent.InitElec(this, ctx, 0f, LegendaryTuning.Pick(NewRow, _value3, 1.2f), 6f, OrbSeconds, dir);
+        agent.TimedBolts   = false;
+        agent.PerTargetGap = HitGap;
+        agent.DamageFn     = OrbDamage;
+        _orbs.Add(agent);
     }
 
-    private int ExtraTiers() =>
-        Mathf.Max(0, (MerlinRuneBridge.Instance?.GetZoneTier("ELECTRIC") ?? 0) - _baseTier);
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
+    {
+        if (!CombatDamage.IsSkillAction(report.ActionType) || report.ActionType == WeaponActionType.QSkill || report.DamageDealt <= 0f) return;
+        if (Time.time < _nextBoltAt) return;
+        _nextBoltAt = Time.time + BoltGap;
+        _orbs.RemoveAll(o => o == null);
+        foreach (var o in _orbs) o.FireBoltNow();
+    }
+
+    // 개수형 — 존 단계는 구체 수(+1)로 받는다(피해 배율은 붙이지 않는다)
+    private float OrbDamage()
+        => LegendaryTuning.Atk(_ctx) * LegendaryTuning.Pick(NewRow, _value, 0.6f);
 }

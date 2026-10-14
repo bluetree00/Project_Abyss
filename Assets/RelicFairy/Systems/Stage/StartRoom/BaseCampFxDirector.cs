@@ -34,6 +34,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
 
     private const string ConjureKeyPrefix = "basecamp_conjure_seen_v1_slot";
     private const string AcquireKeyPrefix = "basecamp_acquire_seen_v1_slot";
+    private const string NightmareSeenKeyPrefix = "basecamp_nightmare_reveal_seen_v1_slot";   // 악몽 갈림길이 드러나는 연출을 본 슬롯(10-11 톤 2차 D-7)
     private const int RingSegments = 40;
     private const int RuneCount = 3;   // 원거리 · 파츠 · 유물(무형검은 소환의 방에서 먼저 받는다)
     private const float RuneFlashPeak = 4f;       // 준비 룬·파츠 공방이 켜질 때 번쩍임 — 14는 화면이 튀었다(09-29 사용자)
@@ -42,7 +43,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     private const float PartsPathFade = 1.2f;
     private const float PartsGlowFade = 0.9f;     // 파츠 받침 빛이 켜지고 꺼지는 시간
     private const float PartsRingRadius = 3.2f;   // 파츠 받침(반지름 약 4 m) 안쪽 고리
-    private const float PartsLightMax = 2.5f;
+    private static readonly string[] PartsCircleMuted = { "Fire", "ElectricySides", "ElectricyCenter", "Distortion", "Light" };   // 파츠 마법진에서 끄는 하위
     private const float PartsMoteRate = 6f;
     private const float LoadingWaitMax = 6f;
     private const float NightmareLookSeconds   = 1.2f;   // 갈림길에서 고를 때 게이트가 물드는 시간
@@ -80,10 +81,8 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     [Header("③ 소환 — 처음(소환의 방) · 복귀(매 판)")]
     [Tooltip("별빛 기둥·발밑 고리 선 재질 — 마력 결계 띠와 같은 Hovl Laser2")]
     [SerializeField] private Material beamMaterial;
-    [Tooltip("형태가 맺히는 순간 터지는 빛 — Hit 18 nova orange")]
-    [SerializeField] private GameObject burstGold;
-    [Tooltip("사망 복귀용 — Hit 17 nova violet")]
-    [SerializeField] private GameObject burstViolet;
+    // 형태가 맺히는 순간의 분출(Hit 18 nova orange · 사망 = Hit 17 nova violet)은 뺐다 — 고리가 퍼지며 사라짐 · 디졸브 가장자리 · 광원이
+    // 같은 순간을 이미 알린다. 번개 · 연기 9겹 원색이 매 귀환마다 터졌다(10-11 이펙트 톤 점검, 09-29 얻기 빛에서 같은 nova를 걷은 것과 같은 판단)
     [SerializeField] private Color summonGold = new(1f, 0.78f, 0.38f);
     [SerializeField] private Color summonViolet = new(0.66f, 0.42f, 1f);
 
@@ -95,8 +94,6 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     [SerializeField] private Transform portalCenter;
     [Tooltip("룬 빛 입자 재질 — 마력 결계 빛 입자와 같은 Hovl Glow1cg. 투사체 이펙트를 반복 재생하면 지름 4~5 m 빛 구가 돼 문과 화면을 덮었다(ae 09-28)")]
     [SerializeField] private Material runeGlowMaterial;
-    [Tooltip("소환진(스폰 자리 돌 고리) 룬 줄 반지름(월드 m) — 매 판 스폰 자리에서 첫 화면에 보인다")]
-    [SerializeField] private float runeCircleRadius = 5.0f;
     [Tooltip("소환진 룬이 가리킬 곳 — 원거리(장비 공방) · 파츠(파츠 공방) · 유물(성문 쪽). 비면 성문 방향")]
     [SerializeField] private Transform[] runeTargets = new Transform[RuneCount];
     [SerializeField] private Color runeLitColor = new(1f, 0.8f, 0.45f, 1f);
@@ -167,7 +164,6 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     private LineRenderer _partsRing;
     private GameObject _partsCircle;
     private ParticleSystem[] _partsCircleSystems;
-    private Light _partsLight;
     private ParticleSystem _partsMotes;
     private float _partsGlow;                    // 0 꺼짐 ~ 1 켜짐
     private CancellationTokenSource _partsGlowCts;
@@ -274,6 +270,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     public static void ClearFirstTimeForSlot(int slot)
     {
         PlayerPrefs.DeleteKey(ConjureKeyPrefix + slot);
+        PlayerPrefs.DeleteKey(NightmareSeenKeyPrefix + slot);
         foreach (AcquireKind k in Enum.GetValues(typeof(AcquireKind)))
             PlayerPrefs.DeleteKey(AcquireKeyPrefix + slot + "_" + k);
         PlayerPrefs.Save();
@@ -398,7 +395,6 @@ public sealed class BaseCampFxDirector : MonoBehaviour
                 if (!burst && t >= formedAt - 0.05f)
                 {
                     burst = true;
-                    SpawnBurst(kind == SummonKind.Death ? burstViolet : burstGold, feet + Vector3.up * 0.9f, first ? 0.4f : 0.3f);
                     if (first) FinisherEdgeService.Pulse();   // 형태가 맺히는 순간 — 흔들림 대신 가장자리 금빛
                 }
                 if (!unlocked && t >= unlockAt)
@@ -449,6 +445,18 @@ public sealed class BaseCampFxDirector : MonoBehaviour
 
     private static int ActiveSlot() => RunProgressManager.Instance?.ActiveSlotIndex ?? 0;
     private static string ConjureKey() => ConjureKeyPrefix + ActiveSlot();
+    private static string NightmareSeenKey() => NightmareSeenKeyPrefix + ActiveSlot();
+
+    /// <summary>
+    /// 파츠 공방 바닥 마법진(Hovl electro loop) 톤 — 불꽃 · 번개 · 굴절층 · 입자 광원 하위를 끄고 공방 빛깔로 갈아 끼운다(10-11 톤 2차 V-13).
+    /// 인스턴스 하나뿐이라 풀 걱정 없음.
+    /// </summary>
+    private void ToneDownPartsCircle(Transform circle)
+    {
+        foreach (var t in circle.GetComponentsInChildren<Transform>(true))
+            if (t != circle && Array.IndexOf(PartsCircleMuted, t.name) >= 0) t.gameObject.SetActive(false);
+        RunFxRecolor.Apply(circle.gameObject, partsGlowColor);
+    }
 
     private void SetStationsActive(bool on)
     {
@@ -509,7 +517,8 @@ public sealed class BaseCampFxDirector : MonoBehaviour
                 s.SetActive(true);
                 if (s.GetComponentInChildren<Renderer>() != null)
                     DissolveEffect.PlayAppear(s, stationDissolve, null, default, conjureEdge);
-                FlashAsync(s.transform.position + Vector3.up * 1.6f, ct).Forget();   // 멀린의 빛 — 렌더러 없는 스테이션도 「생겨남」이 보이게
+                else
+                    FlashAsync(s.transform.position + Vector3.up * 1.6f, ct).Forget();   // 멀린의 빛 — 렌더러 없는 스테이션만(디졸브 금빛 가장자리와 겹치지 않게, 10-11 톤 점검)
                 await UniTask.Delay(TimeSpan.FromSeconds(stationInterval), DelayType.UnscaledDeltaTime, cancellationToken: ct);
             }
             await camTask;
@@ -632,18 +641,8 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     private void BuildReadyRunes()
     {
         if (runeGlowMaterial == null || gateFront == null) return;
-        if (plazaCenter != null)
-        {
-            _runeDim = new GameObject[RuneCount];
-            _runeLit = new GameObject[RuneCount];
-            for (int i = 0; i < RuneCount; i++)
-            {
-                Vector3 p = CircleRunePosition(i);
-                _runeLit[i] = MakeRuneGlow($"~ReadyRune_Circle_Lit_{i}", p, 0.75f, runeLitColor, true);
-                _runeDim[i] = MakeRuneGlow($"~ReadyRune_Circle_Dim_{i}", p, 0.4f, runeDimColor, false);
-                _runeLit[i].SetActive(false);
-            }
-        }
+        // 소환진 고리 룬 셋(원거리 · 파츠 · 유물)은 걷었다 — 목표 길잡이 ◆ · 할 일 줄과 같은 정보를 상시 반복 빛 셋이 또 말했다(10-11 이펙트 톤 2차 V-13).
+        // _runeLit이 비어 있으면 SetRune은 상태만 기억한다. 셋이 다 차면 켜지는 아치 등불 둘은 남긴다(성문이 열린다는 뜻).
         for (int s = 0; s < 2; s++)
         {
             Vector3 p = ArchLampPosition(s == 0 ? -1f : 1f);
@@ -719,14 +718,6 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         return go;
     }
 
-    /// <summary>소환진 고리 위 — 각 룬이 얻는 곳(장비 공방 · 파츠 공방 · 유물 성소) 쪽을 가리킨다.</summary>
-    private Vector3 CircleRunePosition(int i)
-    {
-        var target = runeTargets != null && i < runeTargets.Length && runeTargets[i] != null ? runeTargets[i] : gateFront;
-        Vector3 dir = target.position - plazaCenter.position;
-        dir.y = 0f;
-        return plazaCenter.position + dir.normalized * runeCircleRadius + Vector3.up * 0.9f;
-    }
 
     /// <summary>로드아웃은 여러 제단에서 바뀌고 변경 통지가 없어 매 프레임 본다(null 검사뿐, 바뀔 때만 켜고 끈다 — 게이트와 같은 방식).</summary>
     private void UpdateReadyRunes()
@@ -884,18 +875,12 @@ public sealed class BaseCampFxDirector : MonoBehaviour
             _partsCircle = Instantiate(partsCirclePrefab, parts.position + Vector3.up * 0.1f, Quaternion.identity);
             _partsCircle.name = "~PartsCircle";
             _partsCircle.transform.localScale = Vector3.one * partsCircleScale;
+            ToneDownPartsCircle(_partsCircle.transform);
             _partsCircleSystems = _partsCircle.GetComponentsInChildren<ParticleSystem>(true);
             _partsCircle.SetActive(false);
         }
 
-        var lightGo = new GameObject("~PartsLight");
-        lightGo.transform.position = parts.position + Vector3.up * 1.6f;
-        _partsLight = lightGo.AddComponent<Light>();
-        _partsLight.type = LightType.Point;
-        _partsLight.color = partsGlowColor;
-        _partsLight.range = 7f;
-        _partsLight.shadows = LightShadows.None;
-        _partsLight.intensity = 0f;
+        // 런타임 광원(~PartsLight)은 만들지 않는다 — 씬에 고정 광원 PartsLight가 이미 있어 같은 자리를 두 빛이 비췄다(10-11 톤 2차 V-13).
 
         if (runeGlowMaterial != null)
         {
@@ -930,7 +915,6 @@ public sealed class BaseCampFxDirector : MonoBehaviour
             _partsRing.enabled = on;
         }
         _partsGlow = k;
-        if (_partsLight != null) _partsLight.intensity = PartsLightMax * k;
         if (_partsMotes != null)
         {
             var em = _partsMotes.emission;
@@ -945,9 +929,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
             // 날아가는 얻기 구슬이 다 도착한 뒤 한 박자 — 유물 빛과 배너가 같은 순간에 겹쳤다(ae 09-28 캡처)
             await UniTask.WaitUntil(() => _acquireInFlight <= 0, cancellationToken: ct);
             await UniTask.Delay(TimeSpan.FromSeconds(0.6f), DelayType.UnscaledDeltaTime, cancellationToken: ct);
-            foreach (var lamp in _archLit)
-                if (lamp != null) FlashAsync(lamp.transform.position, ct).Forget();   // 아치 점등
-            if (portalCenter != null) FlashAsync(portalCenter.position + Vector3.up * 3f, ct).Forget();
+            // 아치 · 포탈 번쩍(세기 14 ×3)은 뺐다 — 같은 뜻을 성문 열림 번쩍(OpenGateAsync)이 방금 알렸고 이 배너가 말한다(10-11 톤 점검)
             ZoneSign.RequestTitle(abyssOpenTitle, abyssOpenSubtitle);
             Debug.Log("[BaseCampFx] 심연이 열렸다 — 준비 룬 셋");
         }
@@ -1081,8 +1063,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     private async UniTaskVoid VeilTouchAsync(Vector3 at, CancellationToken ct)
     {
         _veilTouchUntil = Time.unscaledTime + 1f;
-        // 약하게 — 번쩍이 부족분 안내 글자 뒤에서 밝아 읽기 어려웠다(ae 09-28)
-        FlashAsync(at, ct, 5f).Forget();
+        // 번쩍(광원)은 뺐다 — 1초마다 번쩍 · 입자 18 · 막 색 맥동 · 3초마다 안내 글이 한꺼번에 났다(10-11 톤 2차 V-13). 입자 · 맥동이 「막혔다」를 말한다
         if (_veilMotes != null) _veilMotes.Emit(18);
         var hot = Color.Lerp(gateVeilColor, Color.white, 0.25f);
         hot.a = 1f;
@@ -1137,7 +1118,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     {
         try
         {
-            FlashAsync(_veilRenderer.transform.position + Vector3.up * 2f, ct).Forget();
+            FlashAsync(_veilRenderer.transform.position + Vector3.up * 2f, ct, RuneFlashPeak).Forget();   // 14는 화면이 튀었다(09-29) — 준비 룬과 같은 4
             for (float t = 0f; t < gateOpenDuration; t += Time.unscaledDeltaTime)
             {
                 ApplyGateState(t / gateOpenDuration);
@@ -1304,6 +1285,12 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         trigger.center = Vector3.up;
         toggle.Setup(this, crystal, nightmareTextColor, crystalY);
 
+        // 드러남(디졸브 + 번쩍)은 해금 뒤 첫 방문에만 — 매 방문 「새로 생긴 것」처럼 보였다(10-11 이펙트 톤 2차 D-7). 본 뒤로는 처음부터 서 있다.
+        if (PlayerPrefs.GetInt(NightmareSeenKey(), 0) == 1)
+        {
+            toggle.MarkReady();
+            return;
+        }
         root.SetActive(false);
         RevealNightmareStationAsync(root, toggle, _destroyCt).Forget();
     }
@@ -1318,6 +1305,8 @@ public sealed class BaseCampFxDirector : MonoBehaviour
                                     cancellationToken: ct);
             await UniTask.Delay(TimeSpan.FromSeconds(0.8f), DelayType.UnscaledDeltaTime, cancellationToken: ct);
             if (root == null) return;
+            PlayerPrefs.SetInt(NightmareSeenKey(), 1);
+            PlayerPrefs.Save();
             root.SetActive(true);
             DissolveEffect.PlayAppear(root, NightmareRevealSeconds, null, default, nightmareColor);
             FlashAsync(root.transform.position + Vector3.up * 1.6f, ct, RuneFlashPeak).Forget();
@@ -1447,31 +1436,6 @@ public sealed class BaseCampFxDirector : MonoBehaviour
             if ((r is SkinnedMeshRenderer || r is MeshRenderer) && !r.gameObject.name.StartsWith("~") && !r.TryGetComponent<TMPro.TMP_Text>(out _))
                 return r;
         return null;
-    }
-
-    /// <summary>이펙트 프리팹을 띄운다 — 원본 투사체의 충돌체·강체는 끈다(시각만). loop=true면 계속 돈다(룬·날아가는 구슬).</summary>
-    private static GameObject SpawnFx(GameObject prefab, Vector3 at, float scale, bool loop)
-    {
-        var go = Instantiate(prefab, at, Quaternion.identity);
-        go.transform.localScale = Vector3.one * scale;
-        foreach (var rb in go.GetComponentsInChildren<Rigidbody>(true)) { rb.isKinematic = true; rb.detectCollisions = false; }
-        foreach (var col in go.GetComponentsInChildren<Collider>(true)) col.enabled = false;
-        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
-        {
-            var main = ps.main;
-            main.scalingMode = ParticleSystemScalingMode.Hierarchy;   // 부모 배율을 따르게(Local 배율 함정)
-            if (!loop) continue;
-            ps.Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);
-            main.loop = true;
-            ps.Play(false);
-        }
-        return go;
-    }
-
-    private static void SpawnBurst(GameObject prefab, Vector3 at, float scale)
-    {
-        if (prefab == null) return;
-        Destroy(SpawnFx(prefab, at, scale, false), 3f);
     }
 
     /// <summary>방출을 멈추고 남은 불티가 사그라든 뒤 지운다.</summary>

@@ -441,13 +441,13 @@ MonoBehaviour:
     beamLength: 0
     tint: {r: 0, g: 0, b: 0, a: 0}
   - slot: 60
-    prefab: {fileID: 6935568911942545081, guid: 96aacb3c58028424aa3e5f4e5c55f12e,
+    prefab: {fileID: 1850189845468026, guid: d1d040913aaa78849ae2be0b3157158b,
       type: 3}
-    scale: 0.2
+    scale: 1.15
     offset: {x: 0, y: 0, z: 0}
     lifetime: 0
-    note: "SSEP1 \uC2DC\uACC4\uD615 \uBD09\uC778\uC9C4 \u2014 \uBCF4\uB77C\uB85C
-      \uC0C9 \uC785\uD798(F2)"
+    note: "\uBCF4\uC2A4 \uBD09\uC778\uC9C4(\uCE78 80) \uBB38\uC591 \u2014 \uBCF4\uB77C\uB85C
+      \uC0C9 \uC785\uD798(F2 \u00B7 10-11 \uC2DC\uACC4\uD615 TimeField \uAD50\uCCB4)"
     beamLength: 0
     tint: {r: 0.6901961, g: 0.4392157, b: 1, a: 1}
   - slot: 63
@@ -588,6 +588,33 @@ MonoBehaviour:
       \xB7 \uD3EC\uD6A8). \uB4F1\uC7A5\uACFC \uB2E4\uB978 \uC790\uC6D0\uC73C\uB85C(09-20
       \uC0AC\uC6A9\uC790 \uC9C0\uC801: \uB4F1\uC7A5 \xB7 \uC804\uD658\uC774 \uAC19\uC740
       \uC774\uD399\uD2B8)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 80
+    prefab: {fileID: 1850189845468026, guid: d1d040913aaa78849ae2be0b3157158b,
+      type: 3}
+    scale: 2.2
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Hovl Magic circle 2 loop \uC0AC\uBCF8(\uC65C\uACE1 \uCE35 \uBE8C) \u2014 \uBCF4\uC2A4 \uBD09\uC778\uC9C4. \uC61B \uC2DC\uACC4\uD615 TimeField\uAC00 \uBD09\uC778\uC5D0 \uC5B4\uC0C9(10-10)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 81
+    prefab: {fileID: 1282723261638982, guid: fad6fdc4b504309408177913b8fb8e56,
+      type: 3}
+    scale: 1
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 1.5
+    note: "Hovl Magic circle sun sparks \u2014 \uBCF4\uC2A4 \uC0AC\uC2AC\uC774 \uAC10\uAE30\uAC70\uB098 \uB04A\uAE30\uB294 \uC21C\uAC04\uC758 \uBE5B\uC904\uAE30. \uC61B HolyRedemption\uC740 \uC4F0\uB7EC\uC9C8 \uB54C \uBCF4\uC2A4\uB97C \uB36E\uB294 \uD070 \uAE08\uBE5B \uACF5(10-10)"
+    beamLength: 0
+    tint: {r: 0, g: 0, b: 0, a: 0}
+  - slot: 82
+    prefab: {fileID: 1334179685657794, guid: b7ca013ba4e4e9642997ba1e44e159ef,
+      type: 3}
+    scale: 2.2
+    offset: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    note: "Hovl Magic circle 2 \uD55C \uBC88\uD310 \uC0AC\uBCF8(\uC65C\uACE1 \uCE35 \uBE8C) \u2014 \uBCF4\uC2A4 \uBD09\uC778 \uC644\uC131. \uC61B GloryBoundary \uBE5B\uAE30\uB465 \uB300\uC2E0(10-10)"
     beamLength: 0
     tint: {r: 0, g: 0, b: 0, a: 0}
   chainMaterial: {fileID: 2100000, guid: 78ae7c5cda35e6d47abbbd3ada229965, type: 2}

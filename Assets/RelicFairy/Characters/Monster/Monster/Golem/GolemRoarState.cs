@@ -13,6 +13,13 @@ public class GolemRoarState : InvincibleState<GolemRoarData>
     private static readonly int Color07Id = Shader.PropertyToID("_Color07");
     private static readonly int Color08Id = Shader.PropertyToID("_Color08");
     private static readonly Color InvincibleColor = new Color(1f, 0.85f, 0.2f);
+    private const float BlastTelegraph = 0.6f;   // 충격파 예고(원 외곽선 · 머리 위 반짝임) — 예전엔 들어가자마자 터져 피할 수 없었다(10-11 P1-7)
+    private float _blastTimer;
+    private bool  _blasted;
+
+    /// <summary>예고 동안만 무적 — 충격파 뒤엔 피해가 들어간다(포효는 끝까지 하고 끊기지 않는다).</summary>
+    public override SpecialStateConstraint Constraints
+        => _blasted ? SpecialStateConstraint.UnInterruptible : SpecialStateConstraint.Invincible;
 
     private float      _timer;
     private Renderer[] _renderers;
@@ -33,15 +40,30 @@ public class GolemRoarState : InvincibleState<GolemRoarData>
 
         Data.SpawnVFX(ctx.Transform);
 
-        // 포효 충격파 — 주변 오브젝트 날리기
-        ApplyRoarBlast(ctx);
+        // 포효 충격파 — 예고(판정과 같은 원 외곽선 + 머리 위 반짝임) 뒤에 날린다
+        _blasted    = false;
+        _blastTimer = BlastTelegraph;
+        MonsterGroundWarning.SpawnCircleOutline(ctx.Transform.position, Data.knockbackRadius, BlastTelegraph, PatternAttackOverrideSO.WarningOutlineColor);
+        ctx.Monster.NotifyAttackIncoming(BlastTelegraph);
     }
 
     public override void Update(MonsterContext ctx)
     {
-        // 무적 펄스 (흰색 ↔ 금색)
-        float pulse = Mathf.Abs(Mathf.Sin(Time.time * 4f));
-        ApplyTint(_renderers, Color.Lerp(Color.white, InvincibleColor, pulse));
+        if (!_blasted)
+        {
+            // 무적 펄스 (흰색 ↔ 금색) — 예고 동안만
+            float pulse = Mathf.Abs(Mathf.Sin(Time.time * 4f));
+            ApplyTint(_renderers, Color.Lerp(Color.white, InvincibleColor, pulse));
+            _blastTimer -= Time.deltaTime;
+            ctx.Monster.NotifyAttackIncoming(_blastTimer);
+            if (_blastTimer <= 0f)
+            {
+                _blasted = true;
+                ClearTint(_renderers);
+                ctx.Monster.ResetAttackGlint();
+                ApplyRoarBlast(ctx);
+            }
+        }
 
         _timer -= Time.deltaTime;
         if (_timer <= 0f)
@@ -51,6 +73,7 @@ public class GolemRoarState : InvincibleState<GolemRoarData>
     public override void Exit(MonsterContext ctx)
     {
         ClearTint(_renderers);
+        ctx.Monster.ResetAttackGlint();
         // 포효 종료 → 분노 추격 속도 부스트
         ctx.Runtime.SpeedMultiplier = Data.rageSpeedMultiplier;
         ctx.Agent.speed = ctx.Config.stat.moveSpeed * Data.rageSpeedMultiplier;
@@ -88,6 +111,7 @@ public class GolemRoarState : InvincibleState<GolemRoarData>
             if (damageable != null)
             {
                 if (damageable == selfDamageable) continue;
+                if (damageable is MonsterBase) continue;   // 다른 몬스터는 다치지 않는다(아군 피해 제거 · 10-11 P1-7)
                 damageable.TakeDamage(Data.knockbackDamage, ctx.Monster.gameObject, Data.knockbackForce);
                 continue;
             }

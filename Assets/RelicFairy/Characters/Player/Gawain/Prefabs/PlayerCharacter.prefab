@@ -78,6 +78,7 @@ GameObject:
   - component: {fileID: 7912345678901234567}
   - component: {fileID: 1627041588284324856}
   - component: {fileID: 6587070314926738816}
+  - component: {fileID: 1402824059423445420}
   m_Layer: 0
   m_Name: PlayerCharacter
   m_TagString: Player
@@ -220,7 +221,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   rb: {fileID: 0}
-  playerTransform: {fileID: 0}
   _hitBloodVfxPrefab: {fileID: 0}
   _hitBloodVfxScale: 1
   _hitBloodVfxHeightOffset: 1
@@ -229,12 +229,9 @@ MonoBehaviour:
   relicClass: {fileID: 0}
   debugInvincible: 0
   cinemachineCamera: {fileID: 0}
-  EventReceiver: {fileID: 0}
+  _freezeLoopSfx: {fileID: 8300000, guid: 03edcd1bf1c003641b6a22d10c411ee6, type: 3}
   locoStateDebug: 0
   actStateDebug: 0
-  _freezeLoopSfx: {fileID: 0}
-  handTransform: {fileID: 0}
-  handTransformLeft: {fileID: 0}
 --- !u!114 &6587070314926738816
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -259,6 +256,18 @@ MonoBehaviour:
   positionLerpSpeed: 15
   weightLerpSpeed: 14
   pelvisLerpSpeed: 12
+--- !u!114 &1402824059423445420
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3926761019246361657}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b1b6b6b6657e33d4bb21e206a0039d4d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerCostume
 --- !u!1001 &1697851272020990271
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -327,12 +336,22 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: e88d6535d62d53a4988430913fd5e58d, type: 2}
+    - target: {fileID: -7183793997163976449, guid: b5f2179a52b86c14589ef598cfa7ffa5,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: -5536780222139571171, guid: b5f2179a52b86c14589ef598cfa7ffa5,
         type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: e88d6535d62d53a4988430913fd5e58d, type: 2}
     - target: {fileID: -3982814334460317276, guid: b5f2179a52b86c14589ef598cfa7ffa5,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -706951193946901214, guid: b5f2179a52b86c14589ef598cfa7ffa5,
         type: 3}
       propertyPath: m_IsActive
       value: 0
@@ -357,6 +376,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: CombatGirls_Sword_Shield
       objectReference: {fileID: 0}
+    - target: {fileID: 1807535675454030672, guid: b5f2179a52b86c14589ef598cfa7ffa5,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3193188195148567180, guid: b5f2179a52b86c14589ef598cfa7ffa5,
         type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
@@ -365,9 +389,19 @@ PrefabInstance:
     - target: {fileID: 3602869660553272248, guid: b5f2179a52b86c14589ef598cfa7ffa5,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4097260818889917354, guid: b5f2179a52b86c14589ef598cfa7ffa5,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6121451658225040233, guid: b5f2179a52b86c14589ef598cfa7ffa5,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6197773389201178136, guid: b5f2179a52b86c14589ef598cfa7ffa5,
         type: 3}
       propertyPath: m_IsActive
       value: 0
@@ -375,7 +409,7 @@ PrefabInstance:
     - target: {fileID: 6345425753346773307, guid: b5f2179a52b86c14589ef598cfa7ffa5,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6565399204737833716, guid: b5f2179a52b86c14589ef598cfa7ffa5,
         type: 3}

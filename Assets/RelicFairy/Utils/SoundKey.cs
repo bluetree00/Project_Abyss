@@ -14,6 +14,7 @@ public static class SoundKey
         // Player
         public const string PlayerAttack = "sfx_player_attack";
         public const string PlayerHit    = "sfx_player_hit";
+        public const string PlayerHitMedium = "sfx_player_hit_medium";   // 피격 중(기존 3단계 중 가운데) — 인트로 피격 · 놀이 실패(10-12)
         public const string PlayerDie    = "sfx_player_die";
         public const string PlayerDash   = "sfx_player_dash";
         public const string PlayerJump   = "sfx_player_jump";

@@ -20,6 +20,7 @@ public sealed class LichChainLine : MonoBehaviour
     private const float ShakeAmplitude = 0.12f;
     private const float ShakeFrequency = 38f;
     private const float FlashBoost     = 2.5f;
+    private const float FadeSeconds    = 0.25f;   // Dispose 뒤 옅어지며 가늘어지는 시간(10-12 디졸브 원칙 — 예전엔 바로 사라졌다)
 
     private static Material s_fallback;
 
@@ -37,6 +38,8 @@ public sealed class LichChainLine : MonoBehaviour
     private float        _flash;
     private float        _flashSeconds;
     private float        _seed;
+    private float        _fade = -1f;   // 0 이상 = 거두는 중(1 → 0)
+    private float        _baseWidth;
 
     // ── Properties ────────────────────────────────────────────────
     public Color Color => _color;
@@ -47,6 +50,13 @@ public sealed class LichChainLine : MonoBehaviour
     // ── Lifecycle ─────────────────────────────────────────────────
     private void LateUpdate()
     {
+        if (_fade >= 0f)
+        {
+            _fade = Mathf.MoveTowards(_fade, 0f, Time.deltaTime / FadeSeconds);
+            if (_fade <= 0f) { Destroy(gameObject); return; }
+            if (_line != null) _line.widthMultiplier = _baseWidth * (0.4f + 0.6f * _fade);
+            ApplyColor();
+        }
         if (_from != null) _fromPos = _from.position + _fromOffset;
         if (_to   != null) _toPos   = _to.position   + _toOffset;
 
@@ -121,9 +131,12 @@ public sealed class LichChainLine : MonoBehaviour
     /// <summary>팽팽하게 — 곧게 펴지고 떨린다. 1 = 최대, 1.5초에 걸쳐 풀린다.</summary>
     public void Tension(float amount = 1f) => _tension = Mathf.Clamp01(Mathf.Max(_tension, amount));
 
+    /// <summary>거둔다 — <see cref="FadeSeconds"/> 동안 옅어지며 가늘어진 뒤 스스로 지운다. 여러 번 불러도 한 번.</summary>
     public void Dispose()
     {
-        if (this != null) Destroy(gameObject);
+        if (this == null || _fade >= 0f) return;
+        _fade      = 1f;
+        _baseWidth = _line != null ? _line.widthMultiplier : 0f;
     }
 
     // ── Private Methods ───────────────────────────────────────────
@@ -155,8 +168,9 @@ public sealed class LichChainLine : MonoBehaviour
     private void ApplyColor()
     {
         if (_line == null) return;
-        Color c = _color * (1f + _flash * (FlashBoost - 1f));
-        c.a = _color.a;
+        float k = _fade >= 0f ? _fade : 1f;
+        Color c = _color * ((1f + _flash * (FlashBoost - 1f)) * k);
+        c.a = _color.a * k;
         _line.startColor = c;
         _line.endColor   = c;
     }

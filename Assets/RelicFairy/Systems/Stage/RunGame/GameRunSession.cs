@@ -1,4 +1,4 @@
-//============================================================
+﻿//============================================================
 // GameRunManager.cs (Improved + HUD Mode Safe + Late Bind Friendly)
 //============================================================
 using System;
@@ -92,10 +92,10 @@ public sealed class GameRunSession
 
     /// <summary>
     /// 현재 챕터의 몬스터 <b>체력</b> 배율 — 챕터(<see cref="ChapterBalance"/>, 10-02 설계서 §2) × 루프 깊이 × 시기(<see cref="EraBalance"/>).
-    /// 보스는 MonsterBase가 배율에서 뺀다.
+    /// 챕터 몫은 등급(= 층: 잡몹 · 위협 · 정예)마다 다르다(10-11 일반방 긴장감 설계 §3-1). 보스는 MonsterBase가 배율에서 뺀다.
     /// </summary>
-    public float CurrentDifficultyScale
-        => ChapterBalance.Of(CurrentChapter).Hp * (1f + AbyssDepth * LoopScalePerDepth) * EraBalance.Current.StatScale;
+    public float CurrentDifficultyScaleFor(MonsterGrade grade)
+        => ChapterBalance.Of(CurrentChapter).HpFor(grade) * (1f + AbyssDepth * LoopScalePerDepth) * EraBalance.Current.StatScale;
 
     /// <summary>현재 챕터의 몬스터 <b>공격</b> 배율 — 체력보다 완만하게(10-02 설계서 §2). 루프 깊이 · 시기는 체력과 같이 곱한다.</summary>
     public float CurrentAttackScale
@@ -110,7 +110,7 @@ public sealed class GameRunSession
     // 05-26 StageMapBootstrapper 삭제 때 BindChapterRegistry 호출이 사라져 최종 챕터가 늘 Ch3였다(Ch4 해금해도 리치 미도달).
     private ChapterId _registryFinalChapter = ChapterId.Chapter3;
 
-    /// <summary>레지스트리의 최종 챕터만 받는다 — 「챕터 4 개방」 해금 판정은 <see cref="FinalChapter"/>가 그대로 한다.</summary>
+    /// <summary>레지스트리의 최종 챕터만 받는다 — 마지막 챕터 판정은 <see cref="FinalChapter"/>.</summary>
     public void BindFinalChapter(ChapterRegistry registry)
     {
         if (registry != null) _registryFinalChapter = registry.FinalChapter;
@@ -138,11 +138,26 @@ public sealed class GameRunSession
     /// <summary>런 지속 연료(강화재료·원석). 이벤트방 생산·#1/#2 소비. 미소비분은 런 종료 시 abyssEssence로 환산.</summary>
     public RunFuelBank FuelBank { get; private set; } = new RunFuelBank();
     public RunDelta RunDelta { get; private set; } = new RunDelta();
+    /// <summary>런 결과창 집계(10-07) — 세션에 없던 값(챕터 시간 · 사인 · 연료 획득 · 서약 발동 · 피해 비중).</summary>
+    public RunStats RunStats { get; private set; } = new RunStats();
+    /// <summary>이 런을 시작한 시기(결과창 칩).</summary>
+    public StoryEra StartEra => _startEra;
+    /// <summary>진행 가능한 마지막 챕터 번호(결과창 띠의 남은 챕터).</summary>
+    public int FinalChapterNumber => (int)FinalChapter;
+    /// <summary>챕터 이름(결과창). 레지스트리에 없으면 빈 문자열.</summary>
+    public string ChapterName(ChapterId id)
+    {
+        // 배율용 바인딩(BindChapterRegistry)은 호출처가 없다(챕터 배율 1 — 별도 과제). 이름만 부트스트래퍼의 레지스트리에서 읽는다.
+        var reg = _chapterRegistry;
+        if (reg == null && GameRunBootstrapper.Instance != null) reg = GameRunBootstrapper.Instance.ChapterRegistry;
+        return reg != null ? reg.GetData(id)?.chapterName ?? string.Empty : string.Empty;
+    }
     public RoomBuffHandler BuffHandler { get; private set; } = new RoomBuffHandler();
     public ItemEffectManager EffectManager { get; private set; } = new ItemEffectManager();
     public CovenantHandler CovenantHandler { get; private set; } = new CovenantHandler();
 
     private PlayerController _covenantPlayer;   // 서약 문맥이 묶인 플레이어 — 바뀌면 다시 묶는다
+    private PlayerController _runePlayer;       // 룬 시너지가 붙은 플레이어 — 바뀌면(챕터 전환 · 심연 루프) 다시 붙인다
 
     /// <summary>존 단위 진행 서비스. startWithZoneLayout 모드에서만 초기화된다.</summary>
     public ZoneProgressionService ZoneProgression { get; private set; }
@@ -192,6 +207,11 @@ public sealed class GameRunSession
     public void SetCurrentRoomKind(RoomPlanKind kind, bool countSpecialVisit = true)
     {
         CurrentRoomKind = kind;
+        MonsterRoomLedger.Reset();   // 방 단위 특성 · 정예 접두어 기록(10-11 정예 접두어)
+
+        // 방 버프의 남은 방 수 — 새 방에 들어설 때 하나 준다(이어하기로 같은 방을 다시 짓는 건 빼고). 예전엔 OnRoomExit을 부르는 곳이 없어
+        // 「한 방」 버프 · 버프 타일 디버프가 런 끝까지 남았다(10-09 출시 점검)
+        if (countSpecialVisit) BuffHandler?.OnRoomExit();
 
         // 「고독」 기행 — 특수방을 하나도 안 들르고 완주했는가.
         if (countSpecialVisit &&
@@ -342,6 +362,7 @@ public sealed class GameRunSession
 
             PlayerState = CreateInitialPlayerStateFromSession();
             RunDelta = new RunDelta();
+            RunStats = new RunStats();                      // 결과창 집계(10-07) — 연료 구독은 시작 지급 뒤(아래)
 
             // 원거리 파츠는 런 스코프 — 새 런은 빈 상태로 시작한다(직전 런 장착이 새어 나오지 않게).
             RangedPartsState.Current = new RangedPartsState();
@@ -354,17 +375,29 @@ public sealed class GameRunSession
             string startPart2 = AppBootstrapper.Instance?.Loadout?.StartPartId2;
             if (!string.IsNullOrEmpty(startPart2) && startPart2 != startPart && MemoryAltarService.StartPartSlots >= 2)
                 RangedPartsState.Current.Equip(startPart2, 1);
+            // 무기별 성향(10-14 빌드 시너지 A5) — 활은 분열(다발) +1, 석궁은 거력(한 발) +1에서 시작한다. 같은 파츠를 골랐으면 그 위에 쌓인다.
+            var lo = AppBootstrapper.Instance?.Loadout;
+            WeaponType rangedType = lo?.WeaponSlot0 != null && (lo.WeaponSlot0.weaponType == WeaponType.Bow || lo.WeaponSlot0.weaponType == WeaponType.Crossbow)
+                ? lo.WeaponSlot0.weaponType : lo?.WeaponSlot1 != null ? lo.WeaponSlot1.weaponType : WeaponType.None;
+            RangedPartsState.Current.ApplyWeaponBias(rangedType);
 
             // 계약 3개 부여. 시드를 챕터에 섞어 런마다 다른 조합이 나오되, 같은 시드는 같은 계약을 준다.
             RunContracts.Current = new RunContracts();
             RunContracts.Current.RollIfEmpty(new System.Random(Environment.TickCount ^ (int)CurrentChapter));
 
-            FirstRunService.BeginRun();   // 초행 판정은 로드아웃이 확정될 때 들어온다
+            StoryProgress.ClearRunFlags();
+            FirstRunService.BeginRun();
+            // 초행 판정은 로드아웃이 확정될 때 서는데, 거점에서 이미 확정된 판정을 위 BeginRun이 지워
+            // 초행 배율이 한 번도 안 나갔다 — 지금 로드아웃으로 다시 세운다(10-09 출시 점검).
+            AppBootstrapper.Instance?.Loadout?.EvaluateFirstRun();
 
             // 신규 런 강화재료 시작 지급 — 재련소(첫 소비처)가 이벤트방(첫 생산처)보다 앞 순번일 수 있어
             // 첫 재련소에서 강화재료=0이 되는 갭을 막는 안전장치. 이어하기(RestoreFromSaveAsync)는 이 경로를
             // 거치지 않으므로 이중지급 없음. 신규 런 = 새 세션(FuelBank 잔량 0)이라 정확히 초기량만 지급된다.
             FuelBank.Add(FuelKind.EnhanceMaterial, NewRunStartingEnhanceMaterial);
+            // 시작 지급은 「얻은 양」이 아니다 — 지급한 뒤에 구독한다(10-08 리뷰 M7).
+            FuelBank.OnGained -= HandleFuelGained;
+            FuelBank.OnGained += HandleFuelGained;
             PlayerState.AddPotion(NewRunStartingPotions);   // 신규 런 포션 지급(이어하기는 세이브 복원)
             ResetPlayClock(0);                              // 신규 런 = 플레이 시간 0부터
 
@@ -419,6 +452,9 @@ public sealed class GameRunSession
             PlayerState.RestorePotions(save.potionCount, save.potionCapacity > 0 ? save.potionCapacity : PlayerRunState.DefaultPotionCapacity);
 
             RunDelta = new RunDelta();
+            RunStats = RunStats.FromJson(save.runStatsJson);   // 결과창 집계(10-07) — 구 세이브(필드 없음)는 빈 집계
+            FuelBank.OnGained -= HandleFuelGained;
+            FuelBank.OnGained += HandleFuelGained;
 
             // 원거리 파츠 복원 — 장착·레벨은 런 진행분이라 세이브에서 되살린다.
             RangedPartsState.Current = new RangedPartsState();
@@ -464,6 +500,14 @@ public sealed class GameRunSession
             // 런 중 적립 정수 복원 (런 종료 시 메타 반영분)
             RunDelta.GainedEssence = save.runEssence;
             FuelBank.RestoreRaw(save.fuelEnhanceMaterial, save.fuelRuneOre);   // 연료 은행 복원
+
+            // 이어하기에서 빠지던 런 상태(10-09 출시 점검) — 상점 「런 유지」 버프 · 룬 제거 · 정제 누진 단계 · 골드 통계
+            RunDelta.GainedGold = save.runGoldGained;
+            RuneExtractCount    = save.runeExtractCount;
+            Refinery.RestoreCraftCount(save.refineryCraftCount);
+            RestoreRoomBuffs(save.roomBuffsJson);
+            FirstRunService.Restore(save.firstRunComboKey, save.firstRunCoreParts);
+            StoryProgress.ClearRunFlags();
 
             Phase = RunPhase.Running;
             ChangeRunState(RunState.Map);
@@ -513,7 +557,11 @@ public sealed class GameRunSession
 
         // ── 초행 정산 ──
         // 계약분까지 포함한 총액에 배율을 건다 — 초행을 깊이 끌고 갈수록 이득이 커지는 게 설계 의도다.
-        RunDelta.GainedEssence += FirstRunService.SettleRun(RunDelta.GainedEssence);
+        // 포기한 런은 보상이 없으니 조합 기록도 소모하지 않는다(10-09 출시 점검)
+        int firstRunBonus = 0;
+        if (reason == "abandon") FirstRunService.DiscardRun();
+        else firstRunBonus = FirstRunService.SettleRun(RunDelta.GainedEssence);
+        RunDelta.GainedEssence += firstRunBonus;
 
         var result = new EndRunResult(
             isCleared:     isCleared,
@@ -536,7 +584,9 @@ public sealed class GameRunSession
             // 서약은 런 단위라 핸들러에 남은 수가 곧 이번 런에 맺은 수다(이어하기 복원분도 같은 런).
             covenants:     CovenantHandler?.Covenants?.Count ?? 0,
             libBossKills:  _startEra == StoryEra.Liberated     ? BossKillCount : 0,
-            nmBossKills:   _startEra == StoryEra.NightmareMode ? BossKillCount : 0
+            nmBossKills:   _startEra == StoryEra.NightmareMode ? BossKillCount : 0,
+            contractEssence: contractEssence,     // 결과창 정수 내역(10-07)
+            firstRunBonus:   firstRunBonus
         );
 
         OnRunEnded?.Invoke(result);
@@ -560,6 +610,13 @@ public sealed class GameRunSession
 
         Debug.Log($"[GameRun] Ended. cleared={isCleared}, reason={reason}");
         return result;
+    }
+
+    private void HandleFuelGained(FuelKind kind, int amount)
+    {
+        RunStats.ReportFuelGained(kind, amount);
+        // 획득음(10-12) — 강화재료는 쇳조각, 원석은 잔돌. 자주 생기므로 아주 짧은 소리다.
+        Managers.Sound?.PlayEvent(kind == FuelKind.RuneOre ? SoundEvent.FuelOre : SoundEvent.FuelMaterial);
     }
 
     private void ResetToNotRunning()
@@ -638,7 +695,13 @@ public sealed class GameRunSession
         var prev = CurrentRunState;
         CurrentRunState = newState;
         Debug.Log($"[RunState] {prev} → {newState}  |  HudMode: {RunStateToHudMode(newState)}");
-        RequestHudMode(RunStateToHudMode(newState));
+        // 방 클리어(Standby)는 컷신이 걷어 둔 HUD를 덮지 않는다 — 보스 봉인 장면은 보스가 쓰러지는 순간 시작하고
+        // 방 클리어가 바로 뒤따라와 Combat으로 덮는 바람에 전투 HUD · 보스바가 장면 위에 다시 떴다(10-14 cf 봉인 장면 사진).
+        // HUD는 컷신을 연 쪽이 닫을 때(EndSceneHud(false)) 돌아온다. 지도(Map)는 컷신을 닫는 길(CutsceneHud(false))이라 그대로 바꾼다.
+        if (newState == RunState.Standby && InCutscene)
+            Debug.Log($"[RunState] 컷신 중({CurrentHudMode}) — HUD 모드 유지");
+        else
+            RequestHudMode(RunStateToHudMode(newState));
         OnRunStateChanged?.Invoke(newState);
     }
 
@@ -697,20 +760,9 @@ public sealed class GameRunSession
         ChangeRunState(RunState.ChapterClear);
     }
 
-    /// <summary>설정상 진행 가능한 마지막 챕터. ChapterRegistry._finalChapter(없으면 Chapter3).
-    /// Ch4는 빌드에서 제외된 미완 콘텐츠라, 레지스트리 유실 시에도 없는 씬으로 진행하지 않도록 Chapter3로 폴백한다.
-    /// <para>「챕터 4 개방」을 해금하면 한 챕터 더 나아간다 — 다만 <b>레지스트리 상한을 넘지는 않는다.</b>
-    /// 해금이 없는 씬을 여는 열쇠가 되면 안 되므로, 레지스트리가 Ch3까지만 인정하면 해금해도 Ch3에 머문다.</para></summary>
-    private ChapterId FinalChapter
-    {
-        get
-        {
-            var registryMax = _chapterRegistry != null ? _chapterRegistry.FinalChapter : _registryFinalChapter;
-            if (!MemoryAltarService.IsChapter4Unlocked && registryMax > ChapterId.Chapter3)
-                return ChapterId.Chapter3;
-            return registryMax;
-        }
-    }
+    /// <summary>설정상 진행 가능한 마지막 챕터. ChapterRegistry._finalChapter(없으면 Chapter3 — 레지스트리 유실 시 없는 씬으로 가지 않게).
+    /// <para>예전엔 기억의 제단 「챕터 4 개방」을 사야 Ch4로 갔다 — 사용자 10-14 「챕터 해금은 빼고 바로 갈 수 있게」로 걷었다(첫 런부터 리치까지).</para></summary>
+    private ChapterId FinalChapter => _chapterRegistry != null ? _chapterRegistry.FinalChapter : _registryFinalChapter;
 
     /// <summary>현재 챕터 다음에 진행할 챕터가 남아 있으면 true. 마지막 챕터면 false(= 보스 클리어 시 런 클리어).</summary>
     public bool HasNextChapter() => CurrentChapter + 1 <= FinalChapter;
@@ -726,6 +778,8 @@ public sealed class GameRunSession
 
         var next = CurrentChapter + 1;
         if (next > FinalChapter) return false;
+
+        RunStats.ReportChapterEnd((int)CurrentChapter, PlaySeconds);   // 결과창 챕터 시간 띠
 
         CurrentChapter = next;
         ResolveActiveTheme();
@@ -749,11 +803,42 @@ public sealed class GameRunSession
             return false;
         }
 
+        RunStats.ReportChapterEnd((int)CurrentChapter, PlaySeconds);   // 결과창 챕터 시간 띠 — 루프 직전 챕터
         AbyssDepth++;
         CurrentChapter = ChapterId.Chapter1;
         ResolveActiveTheme();
         ChangeRunState(RunState.Map);
         return true;
+    }
+
+    /// <summary>
+    /// 리치의 추방(10-11 「챕터를 가로지르는 추락」) — 봉인기 첫 붕괴 뒤 같은 런 · 같은 빌드로 Ch1에 떨어진다.
+    /// <see cref="BeginAbyssLoop"/>와 같은 기계지만 <b>심연 깊이를 올리지 않는다</b>(해금도 묻지 않는다 — 이야기 장면이다).
+    /// 로드아웃 · 서약 · 파츠 · 아이템은 세션에 그대로 남는다. 런이 돌고 있지 않으면 false(상태를 바꾸지 않았다).
+    /// </summary>
+    public bool BeginExileFall()
+    {
+        if (!IsRunning) return false;
+
+        RunStats.ReportChapterEnd((int)CurrentChapter, PlaySeconds);   // 결과창 챕터 시간 띠 — 추방 직전 챕터
+        CurrentChapter = ChapterId.Chapter1;
+        ResolveActiveTheme();
+        ChangeRunState(RunState.Map);
+        return true;
+    }
+
+    /// <summary>
+    /// 리치의 추방(10-11) — 추방이 시작되는 순간(코어 붕괴) 「다음 = Ch1 대기방」 저장을 미리 쓴다. 붕괴 저장(해방기) 뒤 보스방 클리어(추락 3초)
+    /// 사이에 끄면 해방기 리치방이 다시 열리던 빈틈을 막는다. <paramref name="save"/>를 부르는 동안만 챕터를 Ch1로 적고 곧바로 되돌린다 —
+    /// 보스방 클리어(처치 수 · 보스 기록 · 방 클리어 기록)는 아직 Ch4 기준으로 돌아야 한다(<see cref="BeginExileFall"/>가 그 뒤에 진짜로 옮긴다).
+    /// </summary>
+    public void SaveAsExileLanding(Action save)
+    {
+        if (!IsRunning || save == null) return;
+        var keep = CurrentChapter;
+        CurrentChapter = ChapterId.Chapter1;
+        try { save(); }
+        finally { CurrentChapter = keep; }
     }
 
     /// <summary>
@@ -802,6 +887,22 @@ public sealed class GameRunSession
     // =========================================================
     // Scene Bind (Bootstrapper injects)
     // =========================================================
+    /// <summary>세이브의 활성 방 버프를 되살린다(남은 방 수 · 원래 지속 그대로). 스탯 반영은 BindPlayer의 방 버프 갱신이 맡는다.</summary>
+    private void RestoreRoomBuffs(string json)
+    {
+        if (string.IsNullOrEmpty(json)) return;
+        var w = JsonUtility.FromJson<RoomBuffListWrapper>(json);
+        if (w?.items == null) return;
+        foreach (var b in w.items)
+        {
+            if (b == null || b.roomsRemaining <= 0) continue;
+            BuffHandler.AddBuff(new StatModifier((StatType)b.statType, b.value), b.roomsRemaining,
+                                b.isPercent, b.isDebuff, b.buffType, b.tier);
+            var added = BuffHandler.ActiveBuffs[BuffHandler.ActiveBuffs.Count - 1];
+            added.BaseDuration = b.baseDuration > 0 ? b.baseDuration : b.roomsRemaining;
+        }
+    }
+
     public void BindPlayer(PlayerController player)
     {
         // 챕터 전환 시 새 플레이어는 InitializeFrom으로 만피(Hp=MaxHp)가 된다.
@@ -877,13 +978,23 @@ public sealed class GameRunSession
         if (player != null)
             CovenantHandler.BindPlayer(player);
 
+        // 룬 시너지 — 새 플레이어 인스턴스에 다시 붙인다. 디스패처는 플레이어마다 새로 생기는데 브리지의 적용 기록이 남아
+        // 같은 단계를 건너뛰어, Ch2부터 룬 효과가 빠졌다(10-09 출시 점검). 첫 바인드(새 런 · 이어하기)는 룬판 복원이 맡는다.
+        // 직전 플레이어는 씬과 함께 파괴됐을 수 있어 참조로 비교한다.
+        if (player != null && !ReferenceEquals(player, _runePlayer))
+        {
+            bool replaced = !ReferenceEquals(_runePlayer, null);
+            _runePlayer = player;
+            if (replaced) MerlinRuneBridge.Instance?.ReapplyToCurrentPlayer();
+        }
+
         // 악몽 규칙 — 새 플레이어 인스턴스·세이브 보정이 값을 되돌리므로 바인딩마다 다시 건다.
         NightmareRules.ApplyOnBind(this);
     }
 
     private void RefreshPlayerItemStats()
     {
-        Debug.Log($"[GridChk] 스탯 refresh (frame {Time.frameCount}) placed={ItemInventory.PlacedCount} 효과수={EffectManager.ActiveEffects.Count}");
+        RFLog.D($"[GridChk] 스탯 refresh (frame {Time.frameCount}) placed={ItemInventory.PlacedCount} 효과수={EffectManager.ActiveEffects.Count}");
         Player?.RuntimeStats?.RefreshItemBonuses(ItemInventory);
     }
 
@@ -926,7 +1037,7 @@ public sealed class GameRunSession
     {
         EffectManager.RefreshContext(Player, this);
         EffectManager.Rebuild();
-        Debug.Log($"[GridChk] 효과 rebuild (frame {Time.frameCount}) placed={ItemInventory.PlacedCount} → 효과수={EffectManager.ActiveEffects.Count}");
+        RFLog.D($"[GridChk] 효과 rebuild (frame {Time.frameCount}) placed={ItemInventory.PlacedCount} → 효과수={EffectManager.ActiveEffects.Count}");
         RefreshPlayerItemStats();   // 새 효과 목록으로 스탯을 다시 모은다
     }
 
@@ -953,6 +1064,15 @@ public sealed class GameRunSession
         float eraGold = EraBalance.Current.GoldScale;
         if (!Mathf.Approximately(eraGold, 1f))
             amount = Mathf.Max(1, Mathf.RoundToInt(amount * eraGold));
+        // 기억의 제단 「골드 획득」(10-14 강화형 +5%/단계) — 몬스터 금화는 1씩 들어와 반올림하면 +50% 아래가 사라진다 → 끝수를 이어 모은다
+        float altarGold = MemoryAltarService.GoldGainMult;
+        if (altarGold > 1f)
+        {
+            _altarGoldCarry += amount * (altarGold - 1f);
+            int extra = Mathf.FloorToInt(_altarGoldCarry);
+            _altarGoldCarry -= extra;
+            amount += extra;
+        }
 
         RunDelta.GainedGold += amount;
         PlayerState?.AddTempGold(amount);
@@ -968,7 +1088,8 @@ public sealed class GameRunSession
 
         // 고행자의 인장 — 보상을 줄인 대가는 여기서 돌아온다.
         // 악몽기 가산 — 규칙에 묶여 싸우는 필수 구간이라 벌칙만 두지 않는다.
-        float gain = AsceticSigilService.ApplyEssence(amount * EssenceDepthMultiplier * NightmareRules.EssenceMultiplier);
+        // 기억의 제단 「정수 획득」(10-14 강화형 +4%/단계) — 같은 깔때기에 곱한다
+        float gain = AsceticSigilService.ApplyEssence(amount * EssenceDepthMultiplier * NightmareRules.EssenceMultiplier * MemoryAltarService.EssenceGainMult);
         RunDelta.GainedEssence += Mathf.RoundToInt(gain);
         OnEssenceChanged?.Invoke(RunDelta.GainedEssence);
     }
@@ -981,10 +1102,10 @@ public sealed class GameRunSession
     /// <para>깊이가 오를수록 적이 ×1.25로 세지는데 보상이 그대로면 깊이가 순손해가 된다.
     /// 이 노드가 그 기울기를 메우는 자리라, 곱은 <b>수급 깔때기 한 곳</b>에만 건다.</para>
     /// </summary>
-    private float EssenceDepthMultiplier =>
-        MemoryAltarService.IsUnlocked(MemoryAltarCatalog.DepthReward)
-            ? 1f + AbyssDepth * 0.15f
-            : 1f;
+    private float EssenceDepthMultiplier => 1f + AbyssDepth * MemoryAltarService.DepthRewardPerDepth;   // 10-14 강화형 — 깊이마다 +5%/단계
+
+    /// <summary>제단 「골드 획득」 끝수(0 ~ 1) — 금화 하나씩 들어와도 +5%가 사라지지 않게 이어 모은다.</summary>
+    private float _altarGoldCarry;
 
     public void AddItem(ItemId itemId, int count)
     {
@@ -1128,14 +1249,17 @@ public sealed class GameRunSession
 
         PotionUsedThisRun = true;   // 「금욕」 기행 판정 — 실제로 소비된 순간에만 센다
 
-        int heal = Mathf.Max(1, Mathf.RoundToInt(Player.RuntimeStats.MaxHp * PotionHealRatio));
+        // 기억의 제단 「포션 회복량」(10-14 강화형) — 40%에 단계마다 +4%p(= +10%)
+        int heal = Mathf.Max(1, Mathf.RoundToInt(Player.RuntimeStats.MaxHp * (PotionHealRatio + MemoryAltarService.PotionHealBonus)));
         Player.Heal(heal);
+        Managers.Sound?.PlayEvent(SoundEvent.PotionUse);   // 10-12 4b 몫(83 표)
         return true;
     }
 
     /// <summary>포션을 못 쓴 이유를 HUD 알림으로 알린다(무반응 = 고장으로 읽히지 않게).</summary>
     private static void NotifyPotionBlocked(string reason)
     {
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiReject);   // 못 씀 — 공용 「안 됨」(10-12 사운드 점검표 4-1 P3)
         var hud = UnityEngine.Object.FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
         hud?.ShowBuffNotice($"<color=#9AA0A6>{reason}</color>");
     }

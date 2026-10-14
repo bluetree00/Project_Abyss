@@ -27,10 +27,23 @@ public static class RoomBoundaryTracer
     private const float Outset      = 0.12f;   // 발이 멈추는 선보다 살짝 바깥(몸 가장자리 쪽)에 그린다
     private const float SimplifyEps = 0.04f;
     private const float MinLength   = 2f;      // 이보다 짧은 토막(문설주 사이 등)은 버린다
+    private const float OpeningDepthIn  = 1.5f;   // 문 자리 — 문에서 방 안쪽으로
+    private const float OpeningDepthOut = 6f;     // 문 자리 — 문에서 밖으로(출구 너머를 막는 장식 벽까지 덮는다)
 
     // 방향: 0=남(−z) 1=동(+x) 2=북(+z) 3=서(−x). 테두리를 영역을 왼쪽에 두고 돌면 남→동→북→서 = 왼쪽으로 꺾기.
     private static readonly int[] Dx = { 0, 1, 0, -1 };
     private static readonly int[] Dz = { -1, 0, 1, 0 };
+
+    /// <summary>
+    /// 문 자리 — 이 사각형 안에 걸린 경계 변은 막혔어도 「열린 곳」으로 친다(선을 비운다).
+    /// 손맵 아레나는 출구 너머를 장식 벽(Tree Wall 등)으로 막아 두어, 문인데도 막힌 벽으로 재졌다(10-11 대기방 보스 입구).
+    /// </summary>
+    public struct Opening
+    {
+        public Vector3 center;     // 문 바닥 중앙(월드)
+        public Vector3 outward;    // 방 밖 방향(수평 단위 벡터)
+        public float   halfWidth;  // 문 폭의 반
+    }
 
     public struct Line
     {
@@ -53,7 +66,7 @@ public static class RoomBoundaryTracer
     /// <paramref name="entry"/>에서 걸어서 닿는 영역의 바깥 테두리 — 막힌 구간마다 선 하나(열린 곳이 없으면 닫힌 고리 하나).
     /// <paramref name="limit"/>는 XZ 범위만 쓴다. 잴 수 없으면(진입 지점에 바닥 없음) 빈 목록.
     /// </summary>
-    public static List<Line> Trace(Vector3 entry, Bounds limit)
+    public static List<Line> Trace(Vector3 entry, Bounds limit, IReadOnlyList<Opening> openings = null)
     {
         var lines = new List<Line>();
         int mask = ~LayerMask.GetMask("Player", "Monster", "MonsterHit", "Ignore Raycast", "UI", "TransparentFX", "Water");
@@ -116,6 +129,7 @@ public static class RoomBoundaryTracer
                         default: e.from = (cz + 1) * cw + cx;     e.to = cz * cw + cx;             break;
                     }
                     e.point = BoundaryPoint(CellCenter(cx, x0), CellCenter(cz, z0), floorY[c], d, outside, mask);
+                    if (!e.open && InOpening(e.point, openings)) e.open = true;   // 문 자리 — 막혔어도 선을 비운다
                     if (out0[e.from] < 0) out0[e.from] = edges.Count; else out1[e.from] = edges.Count;
                     edges.Add(e);
                 }
@@ -170,6 +184,21 @@ public static class RoomBoundaryTracer
     // ── Private Methods ────────────────────────────────────────
 
     private static float CellCenter(int i, float origin) => origin + (i + 0.5f) * Cell;
+
+    /// <summary>점이 어느 문 자리 안인가 — 문 폭 안 · 문 앞 <see cref="OpeningDepthIn"/> m ~ 밖 <see cref="OpeningDepthOut"/> m.</summary>
+    private static bool InOpening(Vector3 p, IReadOnlyList<Opening> openings)
+    {
+        if (openings == null) return false;
+        for (int i = 0; i < openings.Count; i++)
+        {
+            var o = openings[i];
+            Vector3 d = p - o.center; d.y = 0f;
+            float f = Vector3.Dot(d, o.outward);
+            float s = Mathf.Abs(d.x * o.outward.z - d.z * o.outward.x);   // 옆 거리(|d × outward|)
+            if (s <= o.halfWidth && f >= -OpeningDepthIn && f <= OpeningDepthOut) return true;
+        }
+        return false;
+    }
 
     /// <summary>진입 지점 칸 — 막혀 있으면(마커가 장식 옆 등) 가까운 칸부터 두 칸 둘레까지 찾는다.</summary>
     private static int FindSeed(Vector3 entry, float x0, float z0, int nx, int nz, int mask, out float y)

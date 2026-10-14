@@ -81,7 +81,7 @@ public sealed class MinigameHud : MonoBehaviour
         Text(card, rule,      new Vector2(0f, -100f), 32f, UITheme.Ink,  760f);
         Text(card, gradeHint, new Vector2(0f, -154f), 22f, UITheme.Mute, 760f);
 
-        MinigameFx.Sound(SoundKey.Sfx.UiButton, 0.8f, 0.8f);
+        MinigameFx.Cue(SoundEvent.MgCard);
         Vector2 basePos = card.anchoredPosition;
         await Tween(CardInSecs, t =>
         {
@@ -161,7 +161,7 @@ public sealed class MinigameHud : MonoBehaviour
         if (first) return;
 
         UIJuice.PunchAsync(_medal.rectTransform, 0.25f, 0.18f, _ct).Forget();
-        MinigameFx.Sound(up ? SoundKey.Sfx.ItemPickup : SoundKey.Sfx.UiButton, 0.6f, up ? 1.3f : 0.7f);
+        MinigameFx.Cue(up ? SoundEvent.MgGradeUp : SoundEvent.MgGradeDown);
     }
 
     public void SetStatus(string text) { if (_status != null) _status.text = text; }
@@ -300,10 +300,10 @@ public sealed class MinigameHud : MonoBehaviour
                 PlayNotesAsync().Forget();
                 break;
             case ChallengeGrade.Fail:
-                MinigameFx.Sound(SoundKey.Sfx.UiButton, 0.7f, 0.55f);
+                MinigameFx.Cue(SoundEvent.MgStamp, 0.55f);                  // 실패 도장은 낮게
                 break;
             default:
-                MinigameFx.Sound(SoundKey.Sfx.ItemPickup, 0.8f, 0.9f + 0.1f * (int)g);
+                MinigameFx.Cue(SoundEvent.MgStamp, 0.9f + 0.1f * (int)g);   // 등급 피치는 그대로
                 break;
         }
     }
@@ -313,7 +313,7 @@ public sealed class MinigameHud : MonoBehaviour
         float[] pitches = { 1.0f, 1.15f, 1.3f };
         foreach (var p in pitches)
         {
-            MinigameFx.Sound(SoundKey.Sfx.ItemPickup, 0.8f, p);
+            MinigameFx.Cue(SoundEvent.MgNote, p);
             await UniTask.Delay(150, DelayType.Realtime);
         }
     }

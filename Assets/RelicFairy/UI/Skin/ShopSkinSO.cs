@@ -10,6 +10,8 @@ using UnityEngine;
 ///   테두리: 9-slice 1장 → 코너 4장 / 상단바: 밴드+등불 2장 → 간판 1장 / 특가: 탭+틀+내용 3장 → 1장.
 ///
 /// 카테고리 배열 순서는 <see cref="ShopProductCategory"/>와 같다 — 0=버프 1=룬 2=재료 3=포션.
+/// 10-13: 룬 · 재료 배지 바탕은 납품 버프바탕(초록)을 보라 · 주황으로 재색칠한 리본(룬바탕 · 재료바탕) — 넷이 같은 모양.
+///        나가기 · 새로고침 폴백 · 이름 명판 · 가격 알약은 Artsystack 부품(아래 「Artsystack 부품」) — 비면 코드 판.
 /// </summary>
 [CreateAssetMenu(menuName = "RelicFairy/UI/Shop Skin", fileName = "ShopSkin")]
 public sealed class ShopSkinSO : ScriptableObject
@@ -47,7 +49,7 @@ public sealed class ShopSkinSO : ScriptableObject
     public Sprite iconFill;
     [Tooltip("아이콘 칸 테두리.")]
     public Sprite iconFrame;
-    [Tooltip("카테고리 배지 바탕. 0=버프 1=룬 2=재료 3=포션 — 룬·재료는 미납품(색 폴백).")]
+    [Tooltip("카테고리 배지 바탕. 0=버프 1=룬 2=재료 3=포션 — 룬·재료는 버프바탕 재색칠 리본(10-13). 비면 색 폴백.")]
     public Sprite[] categoryBadgeBg = new Sprite[4];
     [Tooltip("카테고리 배지 글자. 0=버프 1=룬 2=재료 3=포션 — 룬·재료는 미납품(코드 라벨 폴백).")]
     public Sprite[] categoryBadge = new Sprite[4];
@@ -59,6 +61,22 @@ public sealed class ShopSkinSO : ScriptableObject
     [Header("조작")]
     public Sprite buyButton;      // 구매버튼("사겠네"가 아트에 구워져 있다)
     public Sprite rerollButton;   // 새로고침 버튼
+
+    [Header("Artsystack 부품 (10-13) — 비면 코드 판")]
+    [Tooltip("나가기 판 — components/slot_short_inactive(원색 · 먹갈 = 나무 톤). 9-slice 22/12/22/12.")]
+    [SerializeField] private Sprite exitPanel;
+    [Tooltip("새로고침 폴백 판(비용이 아트의 10과 다름 · 골드 모자람 · 이미 돌림) — components/slot_short_active(원색 · 먹 + 금 테). " +
+             "비활성은 같은 판을 버튼 틴트(알파 0.45)가 누른다. 9-slice 24/20/24/20.")]
+    [SerializeField] private Sprite rerollPanel;
+    [Tooltip("고른 물건 이름 명판 — components/placeholder(양 끝 뾰족 + 금 테 · 원색). 9-slice 150/0/150/0.")]
+    [SerializeField] private Sprite namePlate;
+    [Tooltip("가격 알약 · 룬 태그 판 — components/Rectangle_locked. 코드가 무채로 바꿔 고동(60,44,28)으로 칠한다. 9-slice 22/0/22/0.")]
+    [SerializeField] private Sprite pricePill;
+
+    public Sprite ExitPanel   => exitPanel;
+    public Sprite RerollPanel => rerollPanel;
+    public Sprite NamePlate   => namePlate;
+    public Sprite PricePill   => pricePill;
 
     // ── 조회 (범위 밖·미할당은 null → 색 폴백) ──
 

@@ -35,7 +35,7 @@ public class LichPhase2EntryPatternSO : BossPatternSO
     public string dialogueKey = "Lich_Page2_Nightmare";
     [Tooltip("페이지 진입 후 이동 속도 배율 (1 = 기본)")]
     public float speedMultiplier = 1.2f;
-    [Tooltip("페이지 진입 후 공격 속도 배율 (1 = 기본)")]
+    [Tooltip("페이지 진입 후 공격 속도 배율 (1 = 기본) — 공격 뒤 회복 시간을 이만큼 짧게. 예고 · 판정 시간은 그대로(10-08)")]
     public float attackSpeedMultiplier = 1.2f;
     [Tooltip("페이지 진입 후 패턴 사이 휴식 (초). 음수면 설정값(BossConfig) 그대로")]
     public float breakDurationMin = 0.3f;
@@ -461,7 +461,7 @@ public class LichPhase2EntryState : FullLockState<LichPhase2EntryPatternSO>
             // ① 휘청 — 한 줄이 다 깎였다.
             Vector3 body = ctx.Transform.position + Vector3.up;
             ctx.Animator?.CrossFade("GetHit", 0.05f);
-            LichCinematics.Flash(Color.white, 0.25f, 0.2f);    // 한 줄이 깨지는 휘청 — 한 전투에 2~3번이라 약하게(0.45는 화면이 지워졌다, 09-20 실측)
+            // 흰 번쩍은 뺀다 — 몸에서 한 줄이 깨지는 이펙트(PageBreak) · 느린 화면 · 소리가 같은 순간 알린다(10-11 이펙트 톤 2차)
             LichCinematics.SlowMo(0.25f, 0.45f);
             LichPatternUtil.Impact(LichImpact.Transition);
             LichVfx.Play(LichVfxSlot.PageBreak, body, Quaternion.identity, 0.6f);   // 한 줄이 깨진다
@@ -538,8 +538,7 @@ public class LichPhase2EntryState : FullLockState<LichPhase2EntryPatternSO>
             // 포효 = 모은 힘을 낫으로 한 번에 — 빠르게 휘둘러 폭발 순간 멈칫(접촉 0.22초 뒤).
             if (lich != null) lich.PlaySwing(LichSwing.LeftToRight, RoarSwingContact, 0.18f);
             else              ctx.Animator?.CrossFade("ScytheSweep", 0.1f);
-            LichVfx.Play(LichVfxSlot.PageBreak, body, Quaternion.identity, 1.3f);   // 포효 — 모은 힘이 터진다
-            LichVfx.Play(LichVfxSlot.SlamImpact, floorR, Quaternion.identity, Data.blastRadius / 4f);
+            LichVfx.Play(LichVfxSlot.SlamImpact, floorR, Quaternion.identity, Data.blastRadius / 4f);   // 포효 — 모은 힘이 터진다(같은 자리 PageBreak ×1.3은 뺐다 · 10-11 이펙트 톤 2차)
             LichSfx.Play(LichSfxSlot.SlamImpact, R);
             LichCinematics.Chroma(0.6f, 0.5f);
             LichCinematics.SlowMo(0.5f, 0.3f);

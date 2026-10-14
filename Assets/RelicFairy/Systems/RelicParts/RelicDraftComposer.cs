@@ -69,8 +69,11 @@ public static class RelicDraftComposer
         // ① 잇기
         Pick(draft, PickFresh(fresh, used, rng, e => ownedGroups.Count == 0 || Overlaps(e, ownedGroups), 1),
              fresh, sharpen, used, l, relicId, era, band, rng, get);
-        // ② 넓히기
-        Pick(draft, PickFresh(fresh, used, rng, e => !Overlaps(e, ownedGroups), 1),
+        // ② 넓히기 — 보유 각인 1위 계열 조각에 가중(봉인기 ×2 · 해방기 ×1.5 · 악몽 ×1.2 · 10-14 빌드 시너지 A4 · 초반 강하게 후반 약하게)
+        BuildImprint.TopFamilies(1, s_top);
+        var favored = s_top.Count > 0 ? s_top[0] : BuildFamily.None;
+        float favorMul = era <= 0 ? 2f : era == 1 ? 1.5f : 1.2f;
+        Pick(draft, PickFresh(fresh, used, rng, e => !Overlaps(e, ownedGroups), 1, favored, favorMul),
              fresh, sharpen, used, l, relicId, era, band, rng, get);
         // ③ 자유 — 선명하게 25% 또는 반응 ×2 가중
         RelicDraftCard third = null;
@@ -82,6 +85,11 @@ public static class RelicDraftComposer
             if (e != null) third = MakeNew(e, era, band, rng);
         }
         Pick(draft, third, fresh, sharpen, used, l, relicId, era, band, rng, get);
+
+        // ④ 진화 — 레시피를 채웠으면 4번째 카드(런당 한 번 고름 · 안 고르면 다음 보스에 다시)(10-14 빌드 시너지 C)
+        var evo = RelicEvolution.Ready(l, relicId);
+        if (evo != null)
+            draft.Cards.Add(new RelicDraftCard { Kind = RelicDraftCardKind.Evolution, EvolutionId = evo.Id, Grade = RelicMemoryGrade.Radiant });
 
         // 천장 — 찬란 없이 PityDrafts번 지났다면 한 장을 찬란으로
         if (l.RelicDraftsSinceRadiant >= RelicMemoryOdds.PityDrafts && !draft.HasRadiant)
@@ -123,22 +131,37 @@ public static class RelicDraftComposer
         return false;
     }
 
-    /// <summary>후보 중 하나를 가중 무작위로(반응 조각 가중치 <paramref name="reactionWeight"/>).</summary>
+    private static readonly List<BuildFamily> s_top = new(1);
+
+    /// <summary>
+    /// 후보 중 하나를 가중 무작위로(반응 조각 가중치 <paramref name="reactionWeight"/>).
+    /// <paramref name="favored"/> 계열(데이터 build_family) 조각은 <paramref name="favorMul"/>배 — 보유 우대(10-14 A4).
+    /// </summary>
     private static RelicPartEntry PickFresh(List<RelicPartEntry> fresh, HashSet<string> used, Random rng,
-                                            Func<RelicPartEntry, bool> filter, int reactionWeight)
+                                            Func<RelicPartEntry, bool> filter, int reactionWeight,
+                                            BuildFamily favored = BuildFamily.None, float favorMul = 1f)
     {
-        int total = 0;
+        double total = 0;
         foreach (var e in fresh)
-            if (!used.Contains(e.part_id) && filter(e)) total += e.IsReaction ? reactionWeight : 1;
+            if (!used.Contains(e.part_id) && filter(e)) total += Weight(e, reactionWeight, favored, favorMul);
         if (total <= 0) return null;
-        int r = rng.Next(total);
+        double r = rng.NextDouble() * total;
+        RelicPartEntry last = null;
         foreach (var e in fresh)
         {
             if (used.Contains(e.part_id) || !filter(e)) continue;
-            r -= e.IsReaction ? reactionWeight : 1;
+            last = e;
+            r -= Weight(e, reactionWeight, favored, favorMul);
             if (r < 0) return e;
         }
-        return null;
+        return last;   // 부동소수 끝자락
+    }
+
+    private static double Weight(RelicPartEntry e, int reactionWeight, BuildFamily favored, float favorMul)
+    {
+        double w = e.IsReaction ? reactionWeight : 1;
+        if (favored != BuildFamily.None && Enum.TryParse<BuildFamily>(e.build_family, out var f) && f == favored) w *= favorMul;
+        return w;
     }
 
     private static RelicDraftCard MakeNew(RelicPartEntry e, int era, int band, Random rng) => new RelicDraftCard

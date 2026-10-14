@@ -30,6 +30,9 @@ public class MonsterProjectile : MonoBehaviour
     private bool    _initialized;
     private bool    _hit;
 
+    /// <summary>쏜 몬스터 — 플레이어 피격의 가해자(저스트 회피 · 피격 방향 · 반격 룬 · 결과창). 쏘는 쪽이 Init 뒤에 넣는다.</summary>
+    public GameObject Owner { get; set; }
+
     public void Init(Vector3 direction, float speed, float maxRange, int damage, float knockbackForce,
                      float slowScale = 0f, float slowDuration = 0f)
     {
@@ -80,7 +83,7 @@ public class MonsterProjectile : MonoBehaviour
 
         _hit = true;
 
-        player.TakeDamage(_damage);
+        player.TakeDamage(_damage, Owner);
 
         if (_slowDuration > 0f)
             player.ApplySlow(_slowScale, _slowDuration);

@@ -87,6 +87,7 @@ public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
                 ctx.Runtime.PlayerTarget,
                 sonicVfxHitEffectPrefab,
                 sonicVfxHitEffectScale);
+            vfxProjectile.Owner = ctx.Transform.gameObject;
             return;
         }
 
@@ -94,6 +95,7 @@ public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
 
         var proj = Object.Instantiate(sonicWaveProjectile, origin, Quaternion.LookRotation(direction));
         proj.Init(direction, sonicSpeed, sonicMaxRange, damage, knockback);
+        proj.Owner = ctx.Transform.gameObject;
     }
 
     private static void RotateTowardPlayer(MonsterContext ctx, float turnSpeed = 10f)
@@ -196,6 +198,7 @@ public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
             RotateTowardPlayer(ctx, 15f);
 
             ctx.Runtime.StateTimer -= Time.deltaTime;
+            ctx.Monster.NotifyAttackIncoming(ctx.Runtime.StateTimer + ctx.Combat.damageApplyDelay);
             if (ctx.Runtime.StateTimer <= 0f)
                 ctx.Monster.ChangeState<AttackState>();
         }
@@ -208,6 +211,7 @@ public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
         private float _damageTimer;
         private bool _damageDealt;
         private bool _useRangedAttack;
+        private MonsterTelegraph _telegraph;   // 근접 원 예고(10-13)
 
         public FairyBatDualAttackState(FairyBatDualAttackOverrideSO data)
         {
@@ -230,8 +234,17 @@ public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
                 ? ctx.Animation.attackStateName
                 : ctx.Animation.attackTrigger;
             var attackAnim = _useRangedAttack ? _data.sonicAnimTrigger : meleeAnim;
+            // 컨트롤러에 없는 상태면 공격 클립(attackTrigger = Attack01)으로 — 요정 박쥐 컨트롤러엔 Attack01만 있어
+            // 근접 「Attack」 · 음파 「Attack02」가 둘 다 안 나오고 모션 없이 피해만 들어갔다(10-07)
+            if (ctx.Animator != null && !string.IsNullOrEmpty(attackAnim)
+                && !ctx.Animator.HasState(0, Animator.StringToHash(attackAnim)))
+                attackAnim = ctx.Animation.attackTrigger;
             if (ctx.Animator != null && !string.IsNullOrEmpty(attackAnim))
                 ctx.Animator.CrossFade(attackAnim, Mathf.Max(0.08f, ctx.Animation.crossFadeDuration));
+            ctx.Monster.NotifyAttackIncoming(_damageTimer);
+            // 근접은 판정 원(DealDamageToPlayer = 거리 원)을 예고한다 — 예고 없이 1.8 m 피해가 들어갔다(10-13 이펙트 = 판정)
+            if (!_useRangedAttack)
+                _telegraph = MonsterTelegraph.Circle(ctx.Transform.position, ctx.Monster.GetCombatHitDistance(ctx), Mathf.Max(0.05f, _damageTimer), MonsterTelegraph.Normal);
         }
 
         public void Update(MonsterContext ctx)
@@ -239,9 +252,11 @@ public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
             if (!_damageDealt)
             {
                 _damageTimer -= Time.deltaTime;
+                ctx.Monster.NotifyAttackIncoming(_damageTimer);
                 if (_damageTimer <= 0f)
                 {
                     _damageDealt = true;
+                    _telegraph = null;   // 맞는 순간까지 그렸다
                     if (_useRangedAttack)
                         _data.FireSonicWave(ctx);
                     else
@@ -264,6 +279,11 @@ public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
                 ctx.Monster.ChangeState<ChaseState>();
         }
 
-        public void Exit(MonsterContext ctx) { }
+        public void Exit(MonsterContext ctx)
+        {
+            ctx.Monster.ResetAttackGlint();
+            if (_telegraph != null) _telegraph.Cancel();   // 피해 전에 끊겼다 — 헛예고를 지운다
+            _telegraph = null;
+        }
     }
 }

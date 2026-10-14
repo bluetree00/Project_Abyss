@@ -68,11 +68,13 @@ public static class RuneElementMap
     {
         switch (statusId)
         {
-            case "ignite": case "burn":
+            case "ignite": case "burn": case "item_burn":
                 element = RuneElement.Fire; return true;
             case "frost": case "freeze": case "shatter":
                 element = RuneElement.Ice; return true;
-            case "shock": case "static": case "stun":
+            // 기절(stun)은 속성이 아니다 — 무기 형 일격 · 랜슬롯 경직 · 서약 정지에도 전기 구슬이 붙었다(10-11 톤 2차 D-4).
+            // 전기 3단계의 기절은 같은 순간 거는 「감전 취약」(shocked)이 전기 몸을 맡는다.
+            case "shock": case "static": case "shocked":
                 element = RuneElement.Electric; return true;
             case "poison": case "item_poison": case "poison_atk":
                 element = RuneElement.Grass; return true;

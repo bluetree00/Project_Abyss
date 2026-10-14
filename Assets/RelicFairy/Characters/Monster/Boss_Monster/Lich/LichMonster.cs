@@ -699,7 +699,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
         if (_runtime != null)
             _runtime.SpeedMultiplier = speedMult;
         _lichBB.MoveSpeedMult   = speedMult;   // 이동 컨트롤러가 읽는다(10-01)
-        _lichBB.AttackSpeedMult = attackSpeedMult;
+        _lichBB.AttackSpeedMult = attackSpeedMult;   // 공격 뒤 회복을 이만큼 짧게 — LichPatternUtil.Recovery(10-08)
 
         // 휴식 덮어쓰기는 블랙보드에만 — 공용 BossConfig SO를 건드리지 않는다. 악몽 모드면 ×0.8.
         if (breakMin >= 0f) _lichBB.BreakDurationMinOverride = breakMin * _lichBB.BreakScale;

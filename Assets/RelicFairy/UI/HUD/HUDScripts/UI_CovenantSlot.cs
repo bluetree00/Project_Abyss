@@ -31,6 +31,16 @@ public sealed class UI_CovenantSlot : MonoBehaviour
     /// <summary>CovenantPanelView가 런타임 생성한 설명 텍스트를 주입.</summary>
     public void AttachDescText(TMP_Text desc) => _descText = desc;
 
+    /// <summary>
+    /// 톤 v2 글자 — 제목 Noto Medium · 설명 Noto Regular, 가짜 굵게 · 기울임 없음(CovenantPanelView가 글꼴이 올라온 뒤 한 번).
+    /// 칸 안쪽 어두운 판 위라 그림자는 두지 않는다(획만 두꺼워진다).
+    /// </summary>
+    public void StyleThin(float titleSize, Color titleInk, float descSize, Color descInk)
+    {
+        UITheme.StyleThinText(_nameText, UIWeight.Medium, titleSize, titleInk);
+        UITheme.StyleThinText(_descText, UIWeight.Regular, descSize, descInk);
+    }
+
     public TMP_Text NameText => _nameText;
     public Image    Icon       => _icon;
     public Image    StageBadge => _stageBadge;
@@ -55,7 +65,7 @@ public sealed class UI_CovenantSlot : MonoBehaviour
 
         // 효과 설명.
         // 조립 서약은 원인/결과가 별도 데이터다 → 한 줄로 이어붙이지 않고 <b>줄을 나눠</b> 보여준다(좁은 칸에서 훨씬 읽힌다).
-        // 그 외(고정 서약)는 기존대로 단계별 문구를 인용체로.
+        // 그 외(고정 서약)는 단계별 문구 그대로 — 기울임 · 따옴표 인용은 톤 v2에서 뺐다(10-11).
         if (_descText != null)
         {
             string cause  = covenant.CauseText;
@@ -63,10 +73,7 @@ public sealed class UI_CovenantSlot : MonoBehaviour
 
             string text;
             if (!string.IsNullOrWhiteSpace(cause) && !string.IsNullOrWhiteSpace(effect))
-            {
-                _descText.fontStyle = FontStyles.Normal;
                 text = cause + "\n↓\n" + effect;
-            }
             else
             {
                 string desc = covenant.Stage switch
@@ -75,12 +82,13 @@ public sealed class UI_CovenantSlot : MonoBehaviour
                     CovenantStage.Enhanced => covenant.EnhancedDescription,
                     _                      => covenant.BasicDescription,
                 };
-                _descText.fontStyle = FontStyles.Italic;
-                text = string.IsNullOrWhiteSpace(desc) ? string.Empty : $"\"{desc}\"";
+                text = string.IsNullOrWhiteSpace(desc) ? string.Empty : desc;
             }
 
             bool has = !string.IsNullOrEmpty(text);
-            _descText.text = UIKeywordInk.Words(text, UIKeywordInk.OnDark);   // 수치에 금색(09-29)
+            _descText.fontStyle = FontStyles.Normal;
+            // 수치 금색(09-29)은 뺐다 — 톤 v2에서 금은 「준비됨 · 지금」 한 뜻(10-11 금색 뜻 정리)
+            _descText.text = UIKoreanWrap.Words(text);
             _descText.gameObject.SetActive(has);
         }
 
@@ -102,9 +110,22 @@ public sealed class UI_CovenantSlot : MonoBehaviour
     private static readonly Color PipDim = new(0.55f, 0.50f, 0.42f, 0.55f);
     private static readonly Color PipLit = new(1.00f, 0.82f, 0.40f, 1.00f);
 
+    private static readonly Color PipCool = new(0.30f, 0.28f, 0.25f, 0.35f);   // 절이 쿨다운 중 — 지금은 이어지지 않는다
+    private const float ProgressTick = 0.1f;   // 진척 글자 갱신 주기(초)
+
     private RectTransform _pipRow;
     private readonly System.Collections.Generic.List<Image> _pips = new();
     private readonly System.Collections.Generic.List<float> _pipUntil = new();
+
+    // 진척(10-07 U2) — 제목 오른쪽 한 마디. 문자열은 묶을 때 미리 지어 두고 Update에선 고르거나 숫자만 넣는다(할당 0).
+    private CovenantSentence _bound;
+    private string[] _countLabels;    // cur 0..max — 「연격 ●●○」
+    private string   _fmtSeconds, _fmtMeters, _fmtCooldown, _fmtWindow;
+    private string   _labelIdle, _labelWindowWait, _labelArmed, _labelSpent, _labelPlain;
+    private float    _nextProgressAt;
+    private int      _lastKind = -1, _lastCur = -1;
+    private float    _lastSec = -99f;
+    private bool     _chargeMeters;   // 행군 — 남은 거리(m)
 
     /// <summary>서약서 한 장 — 제목 「서약서 · 조건」, 설명 = 조건 + 결과 줄(이음 머리말), 절 표식(결과마다 마름모). 반환 = 설명 줄 수.</summary>
     public int BindSentence(CovenantSentence s)
@@ -115,6 +136,7 @@ public sealed class UI_CovenantSlot : MonoBehaviour
 
         string causeName = CovenantPalette.TryGetCause(s.CauseId, out var cd) ? cd.name : s.CauseId;
         if (_nameText != null) _nameText.text = $"서약서 · {causeName}";
+        BuildProgressLabels(s, $"서약서 · {causeName}");
 
         int lines = 1;
         if (_descText != null)
@@ -154,8 +176,76 @@ public sealed class UI_CovenantSlot : MonoBehaviour
         {
             float from = _pipFrom != null && i < _pipFrom.Count ? _pipFrom[i] : 0f;
             bool lit = now >= from && now < _pipUntil[i];
-            var c = lit ? PipLit : PipDim;
+            var c = lit ? PipLit : (_bound != null && _bound.ResultCooldownLeft(i) > 0f ? PipCool : PipDim);
             if (_pips[i].color != c) _pips[i].color = c;
+        }
+        if (_bound != null && now >= _nextProgressAt)
+        {
+            _nextProgressAt = now + ProgressTick;
+            RefreshProgress();
+        }
+    }
+
+    /// <summary>
+    /// 원인 모양에 맞는 글자 틀을 미리 짓는다 — 「연격 ●●○」 · 「심장박동 2.1초」 · 「포위 재정비 1.2초」 · 「전환 1.5초 안에」.
+    /// 색 뜻(10-11 톤 v2 금색 정리): 금 = 지금 일어난다(준비됨 · n초 안에) · 잉크 = 차오르는 중(연격 수 · 남은 초 · 거리) · 회색 = 쉬는 중.
+    /// 예전엔 차오르는 값도 금이라 「준비됨」과 같은 색이었다.
+    /// </summary>
+    private void BuildProgressLabels(CovenantSentence s, string prefix)
+    {
+        _bound = s;
+        _lastKind = -1; _lastCur = -1; _lastSec = -99f; _nextProgressAt = 0f;
+        _chargeMeters = CovenantPalette.TryGetCause(s.CauseId, out var def) && def.trigger == CauseTriggerKind.OnMoveDistance;
+        var p = s.CauseProgress;
+        string ready = "<color=#" + ColorUtility.ToHtmlStringRGB(UITheme.Thin.Gold) + ">";
+        string fill  = "<color=#" + ColorUtility.ToHtmlStringRGB(UITheme.Thin.Ink) + ">";
+        const string Off = "<color=#8A8594>", End = "</color>";
+        _labelPlain = prefix;
+        if (p.kind == CovenantProgressKind.Count && p.max > 0)
+        {
+            _countLabels = new string[p.max + 1];
+            for (int cur = 0; cur <= p.max; cur++)
+                _countLabels[cur] = p.max <= 6
+                    ? prefix + "  " + fill + new string('●', cur) + End + Off + new string('○', p.max - cur) + End
+                    : prefix + "  " + fill + cur + "/" + p.max + End;
+        }
+        _fmtSeconds      = prefix + "  " + fill + "{0:1}초" + End;
+        _fmtMeters       = prefix + "  " + fill + "{0:0}m" + End;
+        _fmtCooldown     = prefix + "  " + Off + "재정비 {0:1}초" + End;
+        _fmtWindow       = prefix + "  " + ready + "{0:1}초 안에!" + End;
+        _labelIdle       = prefix + "  " + Off + "전투 대기" + End;
+        _labelWindowWait = prefix + "  " + Off + "기회 대기" + End;
+        _labelArmed      = prefix + "  " + ready + "준비됨" + End;
+        _labelSpent      = prefix + "  " + Off + "이 방은 끝" + End;
+    }
+
+    /// <summary>진척 글자를 바꾼다 — 값이 그대로면 손대지 않는다(메시 재생성 없음).</summary>
+    private void RefreshProgress()
+    {
+        if (_nameText == null) return;
+        var p = _bound.CauseProgress;
+        int kind = (int)p.kind;
+        float sec = Mathf.Round(p.seconds * 10f) / 10f;
+        if (kind == _lastKind && p.cur == _lastCur && Mathf.Approximately(sec, _lastSec)) return;
+        _lastKind = kind; _lastCur = p.cur; _lastSec = sec;
+
+        switch (p.kind)
+        {
+            case CovenantProgressKind.Count:
+                if (_countLabels != null && p.cur >= 0 && p.cur < _countLabels.Length) _nameText.text = _countLabels[p.cur];
+                break;
+            case CovenantProgressKind.Charge:
+                if (p.seconds < 0f) _nameText.text = _labelIdle;
+                else if (_chargeMeters) _nameText.SetText(_fmtMeters, p.seconds);
+                else _nameText.SetText(_fmtSeconds, p.seconds);
+                break;
+            case CovenantProgressKind.Cooldown: _nameText.SetText(_fmtCooldown, p.seconds); break;
+            case CovenantProgressKind.Window:
+                if (p.seconds > 0f) _nameText.SetText(_fmtWindow, p.seconds);
+                else _nameText.text = _labelWindowWait;
+                break;
+            case CovenantProgressKind.Armed: _nameText.text = p.cur > 0 ? _labelArmed : _labelSpent; break;
+            default: _nameText.text = _labelPlain; break;
         }
     }
 
@@ -200,5 +290,6 @@ public sealed class UI_CovenantSlot : MonoBehaviour
     public void HidePips()
     {
         if (_pipRow != null) _pipRow.gameObject.SetActive(false);
+        _bound = null;   // 진척 글자도 멈춘다
     }
 }

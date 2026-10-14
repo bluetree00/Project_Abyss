@@ -11,8 +11,8 @@ using UnityEngine;
 
 /// <summary>
 /// 기억의 제단 트리(09-29 개편 · 10-02 재설계 「기억을 모시는 제단」) 검증 도구.
-/// <para>① 그래프 · 배치 검증(에디터) — 부모 존재 · 같은 갈래 · 순환 없음 · 자물쇠는 둘뿐 · 값이 부모보다 싸지 않음 ·
-/// 자식 시기가 부모보다 앞서지 않음 · 노드 겹침 0 · 시기별 노드 수.</para>
+/// <para>① 그래프 · 배치 검증(에디터) — 부모 존재 · 같은 갈래 · 순환 없음 · 자물쇠는 하나(심연 입장) ·
+/// 노드 겹침 0 · 시기별 노드 수 · (10-14 강화형) 포인트 고리 값 · 고리마다 닿을 수 있음(10-14 시기 드러남 폐기 — 모든 칸으로).</para>
 /// <para>② 화면 실측(플레이 중) — 봉인기 새 계정 · 봉인기 중간(해금 연출 보통 · 열쇠) · 해방기 고리가 드러나는 순간 · 악몽 고리 · 전부를
 /// 이야기 오버라이드로 바꿔 가며 찍는다(끝나면 오버라이드 원래대로).
 /// <b>세이브를 건드리지 않는다</b> — 정수 · 해금 · 기록을 메모리에서만 바꾸고 끝나면 원래 값으로 되돌린다(저장 호출 0).</para>
@@ -42,11 +42,15 @@ public static class MemoryAltarTreeProbeEditor
             {
                 var parent = MemoryAltarCatalog.Get(p);
                 if (parent == null) { bad++; sb.AppendLine($"✗ 없는 부모: {n.Id} ← {p}"); continue; }
-                if (parent.Era > n.Era) { bad++; sb.AppendLine($"✗ 자식 시기가 부모보다 앞선다: {n.DisplayName}(시기 {n.Era}) ← {parent.DisplayName}(시기 {parent.Era})"); }
                 if (parent.Branch != n.Branch) { bad++; sb.AppendLine($"✗ 갈래를 넘는 선: {n.Id}({n.Branch}) ← {p}({parent.Branch})"); }
-                if (!n.ConditionRequired && n.BaseCost < parent.BaseCost)
-                { bad++; sb.AppendLine($"✗ 값이 부모보다 싸다: {n.DisplayName} {n.BaseCost} < {parent.DisplayName} {parent.BaseCost}"); }
+                // 10-14 — 부모는 논리 선행(예: 영웅 룬 확률 ← 영웅 룬)이라 값 순서는 따지지 않는다 · 대신 바깥 고리가 부모가 될 수는 없다
+                if (parent.RequiredPoints > n.RequiredPoints)
+                { bad++; sb.AppendLine($"✗ 부모가 더 바깥 고리: {n.DisplayName}({n.RequiredPoints}포인트) ← {parent.DisplayName}({parent.RequiredPoints}포인트)"); }
             }
+            if (Array.IndexOf(MemoryAltarCatalog.TierPoints, n.RequiredPoints) < 0)
+            { bad++; sb.AppendLine($"✗ 고리 값이 아니다: {n.DisplayName} {n.RequiredPoints}포인트(고리 {string.Join("/", MemoryAltarCatalog.TierPoints)})"); }
+            for (int lv = 1; lv <= n.MaxLevel; lv++)
+                if (n.CostForLevel(lv, false) <= 0) { bad++; sb.AppendLine($"✗ 값 0: {n.DisplayName} Lv{lv}"); }
             // 순환 — 부모를 따라 올라가다 자기를 만나면 순환
             var seen = new HashSet<string>();
             var stack = new Stack<string>(n.Parents);
@@ -59,7 +63,22 @@ public static class MemoryAltarTreeProbeEditor
                 if (p != null) foreach (var pp in p.Parents) stack.Push(pp);
             }
         }
-        if (locks != 2) { bad++; sb.AppendLine($"✗ 자물쇠 노드가 {locks}개(정본: 챕터 4 · 심연 입장 둘뿐)"); }
+        if (locks != 1) { bad++; sb.AppendLine($"✗ 자물쇠 노드가 {locks}개(10-14 정본: 심연 입장 하나 — 챕터 4 개방은 뺐다)"); }
+
+        // 10-14 포인트 고리 — 갈래의 각 고리에 안쪽 고리 칸만으로 닿을 수 있어야 한다. 자물쇠 칸은 포인트로 안 친다.
+        int total = 0;
+        foreach (var n in all) for (int lv = 1; lv <= n.MaxLevel; lv++) total += n.CostForLevel(lv, false);
+        foreach (var branch in MemoryAltarLayout.BranchOrder)
+        foreach (var n in all)
+        {
+            if (n.Branch != branch || n.RequiredPoints <= 0) continue;
+            int pts = 0;
+            foreach (var m in all)
+                if (m.Branch == branch && m.RequiredPoints < n.RequiredPoints && !m.ConditionRequired && m.Branch != AltarBranch.Memory)
+                    pts += m.MaxLevel;
+            if (pts < n.RequiredPoints)
+            { bad++; sb.AppendLine($"✗ 닿을 수 없다: {n.DisplayName} {n.RequiredPoints}포인트 — 안쪽 고리 최대 {pts}"); }
+        }
 
         // 배치 — 노드 원끼리 겹침(간격 8px 미만)
         var place = MemoryAltarLayout.Compute(all);
@@ -76,9 +95,10 @@ public static class MemoryAltarTreeProbeEditor
 
         int maxDepth = 0;
         var perEra = new int[4];
-        foreach (var p in place.Values) { maxDepth = Mathf.Max(maxDepth, p.Depth); perEra[p.Era]++; }
+        var perTier = new int[5];
+        foreach (var p in place.Values) { maxDepth = Mathf.Max(maxDepth, p.Depth); perEra[p.Era]++; perTier[Mathf.Clamp(p.Depth, 0, 4)]++; }
         sb.Insert(0, $"기억의 제단 트리 검증 — 노드 {all.Count}(봉인기 {perEra[1]} · 해방기 {perEra[2]} · 악몽 {perEra[3]}) · 갈래 4 + 가운데 기억 · " +
-                     $"고리 칸 {MemoryAltarLayout.EraRingLevel(1):0.0}/{MemoryAltarLayout.EraRingLevel(2):0.0}/{MemoryAltarLayout.EraRingLevel(3):0.0} · " +
+                     $"포인트 고리 0/3/8/15 칸 {perTier[1]}/{perTier[2]}/{perTier[3]}/{perTier[4]} · 전부 강화 정수 {total:N0} · " +
                      $"최대 깊이 {maxDepth} · 자물쇠 {locks} · 가장 가까운 두 노드 {minGap:0}px({pair})\n" +
                      (bad == 0 ? "결과: 이상 없음\n" : $"결과: 문제 {bad}건\n"));
         Directory.CreateDirectory("Temp");
@@ -107,7 +127,7 @@ public static class MemoryAltarTreeProbeEditor
         Invoke("HideTestHubGui");
         try
         {
-            // A — 봉인기 새 계정: 아무것도 없고 정수 800 · 다음 고리(해방기)는 점선 + 한 줄
+            // A — 새 계정: 아무것도 없고 정수 800 · 모든 칸이 보이고(10-14 시기 드러남 폐기) 포인트 고리 칸은 잠김
             SetEra(0);
             data.unlockedIds = ""; data.abyssEssence = 800;
             ResetFirstOpen();
@@ -117,18 +137,28 @@ public static class MemoryAltarTreeProbeEditor
             Managers.UI.CloseAllPopupUI();
             await UniTask.Delay(300, ignoreTimeScale: true);
 
-            // B — 봉인기 중간: 갈래마다 앞쪽 몇 칸 + 정수 8000
+            // B — 봉인기 중간(10-14 강화형): 갈래마다 몇 단계 + 정수 8000 · 룬 갈래는 7포인트(8포인트 고리 바로 앞)
             data.unlockedIds = string.Join(",", new[]
             {
-                MemoryAltarCatalog.RuneStorage1,
+                $"{MemoryAltarCatalog.RuneStorage1}:2", $"{MemoryAltarCatalog.RuneRareOdds}:3", $"{MemoryAltarCatalog.OreGain}:2",
                 MemoryAltarCatalog.CovenantParts1,
-                MemoryAltarCatalog.PartPierce, MemoryAltarCatalog.WeaponCrossbow, MemoryAltarCatalog.PartPower, MemoryAltarCatalog.SigilSmith,
-                MemoryAltarCatalog.Revive, MemoryAltarCatalog.SigilMerchant,
+                MemoryAltarCatalog.PartPierce, $"{MemoryAltarCatalog.SigilSmith}:2", MemoryAltarCatalog.WeaponCrossbow, MemoryAltarCatalog.PartPower,
+                MemoryAltarCatalog.Revive, $"{MemoryAltarCatalog.MaxHpUp}:2", MemoryAltarCatalog.SigilMerchant,
             });
             data.abyssEssence = 8000;
             panel = await OpenAsync();
             await Shots("Altar_B_Open", new[] { 60, 300 });
             DumpLabels(sb, "B 봉인기 중간", panel);
+
+            // B-0 포인트 고리(세피리아식) — 룬 7포인트면 8포인트 칸은 잠김 · 원석 한 단계 더 사면(8) 열린다 · 단계 산 값이 다음 단계 값으로
+            var pick = MemoryAltarService.GetState(MemoryAltarCatalog.RefinePick);
+            sb.AppendLine($"B-0 룬 {MemoryAltarService.BranchPoints(AltarBranch.Rune)}포인트 — 「정제 두 장」 포인트 잠김 {pick.BlockedByPoints} · 살 수 있음 {pick.CanBuy} (true · false여야)");
+            var ore0 = MemoryAltarService.GetState(MemoryAltarCatalog.OreGain);
+            await UnlockAndShoot(panel, MemoryAltarCatalog.OreGain, "Altar_B_LevelUp", sb);
+            var ore1 = MemoryAltarService.GetState(MemoryAltarCatalog.OreGain);
+            pick = MemoryAltarService.GetState(MemoryAltarCatalog.RefinePick);
+            sb.AppendLine($"B-0 원석 Lv {ore0.Level}→{ore1.Level} · 값 {ore0.Cost}→{ore1.Cost} · 룬 {MemoryAltarService.BranchPoints(AltarBranch.Rune)}포인트 — 「정제 두 장」 잠김 {pick.BlockedByPoints} · 살 수 있음 {pick.CanBuy} (false · true여야)");
+            sb.AppendLine($"B-0 효과 — 원석 배율 {MemoryAltarService.OreGainMult:0.00} · 희귀 확률 +{MemoryAltarService.RareOddsBonus:0}%p · 최대 체력 +{MemoryAltarService.MaxHpPct * 100f:0}% · 상점 −{MemoryAltarService.ShopDiscount * 100f:0}% · 재련 +{MemoryAltarService.SmithBonus * 100f:0}%p");
 
             // B-1 보통 노드 해금(정제 두 장) · B-2 열쇠 해금(영웅 룬) — 저장 없이 연출만
             await UnlockAndShoot(panel, MemoryAltarCatalog.RefinePick, "Altar_B_UnlockNormal", sb);
@@ -140,27 +170,9 @@ public static class MemoryAltarTreeProbeEditor
             Managers.UI.CloseAllPopupUI();
             await UniTask.Delay(300, ignoreTimeScale: true);
 
-            // C — 해방기로 넘어간 첫 방문: 해방기 고리가 그려지고 그 띠가 스며든다(고리 본 기록 1)
-            SetEra(1);
-            SetRecord(data, MemoryAltarCatalog.Rec.AltarEraSeen, 1);
-            panel = await OpenAsync();
-            await Shots("Altar_C_Liberated", new[] { 300, 900, 1500, 2200, 3000 });
-            DumpLabels(sb, "C 해방기 첫 방문", panel);
-            sb.AppendLine($"C 뒤 고리 본 기록 = {data.GetRecord(MemoryAltarCatalog.Rec.AltarEraSeen)} (2여야)");
-            Managers.UI.CloseAllPopupUI();
-            await UniTask.Delay(300, ignoreTimeScale: true);
-
-            // D — 엔딩 뒤(악몽 고리) 첫 방문
-            SetEra(3);
-            panel = await OpenAsync();
-            await Shots("Altar_D_Ended", new[] { 300, 900, 1500, 2200, 3000 });
-            DumpLabels(sb, "D 엔딩 뒤 첫 방문", panel);
-            Managers.UI.CloseAllPopupUI();
-            await UniTask.Delay(300, ignoreTimeScale: true);
-
             // E — 전부 연 계정
             var allIds = new List<string>();
-            foreach (var n in MemoryAltarCatalog.All) allIds.Add(n.Id);
+            foreach (var n in MemoryAltarCatalog.All) allIds.Add(n.MaxLevel > 1 ? $"{n.Id}:{n.MaxLevel}" : n.Id);
             data.unlockedIds = string.Join(",", allIds);
             data.abyssEssence = 12000;
             panel = await OpenAsync();
@@ -186,17 +198,6 @@ public static class MemoryAltarTreeProbeEditor
     {
         EditorPrefs.SetInt(StoryProgress.DebugOverridePrefsKey, overrideValue);
         StoryProgress.RefreshDebugOverride();
-    }
-
-    /// <summary>기록 한 칸을 메모리에서만 바꾼다(SetRecordMax는 내리지 못한다).</summary>
-    private static void SetRecord(UserGameData data, string key, int value)
-    {
-        var parts = new List<string>();
-        if (!string.IsNullOrEmpty(data.records))
-            foreach (var kv in data.records.Split(','))
-                if (!kv.StartsWith(key + ":")) parts.Add(kv);
-        parts.Add($"{key}:{value}");
-        data.records = string.Join(",", parts);
     }
 
     private static async UniTask<UI_AwakeningPanel> OpenAsync()

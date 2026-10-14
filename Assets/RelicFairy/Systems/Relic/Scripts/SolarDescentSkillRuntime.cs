@@ -23,7 +23,7 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
     private const float  CastTime         = 0.30f; // 하늘로 손을 뻗어 태양을 부르는 순간(낙하 시작)
     private const float  ImpactDistance  = 3.0f;   // 전방 낙하 지점 거리
     private const float  ImpactRadius    = 6.5f;   // 착탄 폭발 반경 — 크게(태양이 내리꽂히는 광역)
-    private const float  ImpactVfxScale  = 3.2f;   // 착탄 폭발 크기 — 반경에 맞춰 크게
+    private const float  ImpactVfxScale  = 1.25f;  // 착탄 폭발 크기 — 판정 고리 6.5 m에 맞춤(10-13 실측: 3.2 → 17 m)
     private const float  ZoneRadius      = 6.0f;   // 작열 지대 반경 — 착탄 반경에 맞춰 넓게
     private const float  ZoneDuration    = 4.0f;   // 작열 지대 지속
     private const float  ZoneTickInterval = 0.5f;
@@ -67,6 +67,8 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
 
         ctx.RotateToMouse();
         ctx.SetMoveScale(0f);
+        // 시전 스탠스(경직 면역) — 0.3초 시전 중 띄워지면 정오 충전만 쓰고 해가 안 떨어졌다(10-09 출시 점검)
+        ctx.Controller?.BeginStance(this, 0f);
 
         // Q 모션의 주인은 무기가 아니라 유물이다 — 상태 이름을 유물 데이터에서 읽는다(미설정이면 기본 상태).
         var relicClass = ctx.Controller != null ? ctx.Controller.RelicClass : null;
@@ -79,13 +81,17 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
     public void OnUpdate(SkillExecutionContext ctx)
     {
         if (_openNoonOnly) { ctx.RequestEnd?.Invoke(); return; }
-        _elapsed += Time.deltaTime;
+        _elapsed += ctx.DeltaTime;   // 애니메이터와 같은 시계(슬로모 — 10-09)
         // 캐스트 순간 태양을 부른다 → 불덩이가 하늘에서 떨어지기 시작 → MeteorFallTime 뒤 착탄.
         if (!_hitDone && _elapsed >= _castTime) { _hitDone = true; CallMeteor(ctx); }
         if (_elapsed >= _castTime + MeteorFallTime + 0.25f) ctx.RequestEnd?.Invoke();
     }
 
-    public void OnExit(SkillExecutionContext ctx) => ctx.SetMoveScale(1f);
+    public void OnExit(SkillExecutionContext ctx)
+    {
+        ctx.SetMoveScale(1f);
+        ctx.Controller?.EndStance(this);
+    }
 
     /// <summary>
     /// 태양을 부른다 — 하늘에서 불덩이가 떨어진다.
@@ -102,7 +108,7 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
 
         // 낙하 중 공격력이 변할 일은 없으니 지금 확정해 콜백으로 넘긴다.
         float markMul = (_relic != null && _relic.ConsumeMarkFirstHit()) ? (1f + V(V_FIRST_HIT, 0.5f)) : 1f;
-        int   effAtk  = ctx.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee);
+        int   effAtk  = ctx.RuntimeStats.AttackPower;   // 유물 피해 = 근접 · 원거리 중 큰 값(10-14 A5)
         float total   = effAtk * V(V_SKILL_MULT, 3.5f) * markMul;
 
         // 낙하가 총 피해의 30%를 여러 틱으로, 착탄이 70%를 한 방에.
@@ -114,10 +120,12 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
         var relic = _relic;
         bool small = _small;
 
+        var fallHit = new HashSet<GameObject>();   // 낙하 피해는 대상마다 한 번
         Managers.Sound?.PlayEvent(SoundEvent.RelicSunFall);   // 떨어지는 태양 — 착탄(0.6초 뒤)에 맞춰 차오르는 소리
         SolarMeteor.Strike(impact, MeteorFallHeight, MeteorFallTime, ImpactVfxScale * scale, ImpactRadius * scale,
-                           onGroundContact: sunPos => OnMeteorFallTick(sunPos, fallDmg, owner),
-                           onImpact:        ()      => OnMeteorImpact(impact, effAtk, impactDmg, owner, scale, relic, small));
+                           onGroundContact: _  => OnMeteorFallTick(impact, fallDmg, owner, fallHit),
+                           onImpact:        () => OnMeteorImpact(impact, effAtk, impactDmg, owner, scale, relic, small),
+                           zoneRadius: ZoneRadius * scale, zoneDuration: ZoneDuration);
     }
 
     /// <summary>
@@ -127,28 +135,31 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
     public static void StrikeSmallSun(PlayerController player, GawainZenithRelic relic, Vector3 at, float damageFraction, float radiusScale)
     {
         if (player == null) return;
-        int   effAtk = player.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee);
+        int   effAtk = player.RuntimeStats.AttackPower;   // 유물 피해 = 근접 · 원거리 중 큰 값(10-14 A5)
         float total  = effAtk * V(V_SKILL_MULT, 3.5f) * Mathf.Max(0f, damageFraction);
         var   owner  = player.gameObject;
         var   runner = new SolarDescentSkillRuntime(relic);
         Managers.Sound?.PlayEvent(SoundEvent.RelicSunFall);
         SolarMeteor.Strike(at, MeteorFallHeight * 0.6f, MeteorFallTime, ImpactVfxScale * radiusScale, ImpactRadius * radiusScale,
                            onGroundContact: _ => { },
-                           onImpact:        () => runner.OnMeteorImpact(at, effAtk, total, owner, radiusScale, relic, true));
+                           onImpact:        () => runner.OnMeteorImpact(at, effAtk, total, owner, radiusScale, relic, true),
+                           zoneRadius: ZoneRadius * radiusScale, zoneDuration: ZoneDuration);
     }
 
     /// <summary>
     /// 낙하 중 태양이 지면 가까이 왔을 때 매 틱 호출 — 태양 아래 좁은 범위의 적을 태운다(약하게, 방어무시).
     /// SolarMeteor가 이미 '지면 근처'일 때만 부르므로 여기선 범위 질의만 한다.
+    /// 판정은 공중의 해가 아니라 그 아래 지면(착탄점)에서 잰다 — 해는 착탄점 바로 위로 떨어진다.
+    /// 대상마다 한 번(<paramref name="hit"/>) — 예전엔 0.06초 틱마다 낙하 몫(30%)을 통째로 줘 프레임에 따라 들어간 횟수가 달랐다(10-11).
     /// </summary>
-    private void OnMeteorFallTick(Vector3 sunPos, float fallDmg, GameObject owner)
+    private void OnMeteorFallTick(Vector3 impact, float fallDmg, GameObject owner, HashSet<GameObject> hit)
     {
         var buf = new List<GameObject>(16);
-        int n = CombatQuery.GetNearbyDamageables(sunPos, FallHitRadius, owner, 16, buf);
+        int n = CombatQuery.GetNearbyDamageables(impact, FallHitRadius, owner, 16, buf);
         for (int i = 0; i < n; i++)
         {
             var t = buf[i];
-            if (t == null) continue;
+            if (t == null || !hit.Add(t)) continue;
             // 낙하 피해는 2차(방어무시 즉발) — 여러 틱이라 파이프라인을 태우면 크리·흡혈이 매 틱 터진다.
             CombatQuery.DealSynergyDamage(t, fallDmg, owner, 1f);
         }
@@ -163,8 +174,9 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
 
         GuidelineVisual.SynergyDamage(impact + Vector3.up * 0.2f, false);   // 착탄 표시
         Managers.Sound?.PlayEvent(SoundEvent.RelicSunImpact);
-        HitFeelService.CameraShake(0.28f, 0.30f);                          // 태양이 하늘에서 꽂히는 무게
-        HitFeelService.HitStop(0.05f, 0.06f);                              // 착탄 순간 짧은 정지 — 타격의 방점
+        // 작은 해(조각 · 저무는 해)는 흔들림 1/3 · 정지 없음 — 처치마다 부르는 조각(들불 ③)이 있어 「살짝」 정책과 부딪혔다(10-12)
+        HitFeelService.CameraShake(small ? 0.28f / 3f : 0.28f, 0.30f);   // 태양이 하늘에서 꽂히는 무게
+        if (!small) HitFeelService.HitStop(0.05f, 0.06f);               // 착탄 순간 짧은 정지 — 타격의 방점
 
         var buffer = new List<GameObject>(32);
         // 몬스터로 좁히지 않고 IDamageable 전체를 잡는다 — 그래야 훈련용 허수아비에도 들어간다.
@@ -187,6 +199,9 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
                 HitPoint            = target.transform.position + Vector3.up * 1.2f,
                 SourcePosition      = impact,
                 IsFinisher          = true,   // 태양 낙하 한 방 — 막타 연출
+                ProcCoef            = 2.5f,   // 한 방 — 강타 · 포이즈를 크게 깎는다(10-14 A1)
+                // 피격 이펙트 = 태양 불꽃(공용 노란 베기 HitEffect_02는 칼 베기로 읽혔다 — 10-08 「공격 종류에 맞춘다」)
+                HitEffectKey        = "GawainSolarHit",
             });
 
             // 화상은 2차 피해(DoT) — 파이프라인을 타지 않는다(틱마다 크릿/흡혈이 터지면 안 됨).

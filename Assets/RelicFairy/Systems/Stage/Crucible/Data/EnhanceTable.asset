@@ -31,24 +31,24 @@ MonoBehaviour:
   - successRate: 0.45
     dropAmount: 0
     cost: 6
-  - successRate: 0.35
-    dropAmount: 2
+  - successRate: 0.55
+    dropAmount: 0
+    cost: 6
+  - successRate: 0.45
+    dropAmount: 0
+    cost: 7
+  - successRate: 0.4
+    dropAmount: 0
     cost: 8
-  - successRate: 0.28
-    dropAmount: 2
+  - successRate: 0.33
+    dropAmount: 1
     cost: 10
-  - successRate: 0.2
-    dropAmount: 2
-    cost: 13
-  - successRate: 0.15
-    dropAmount: 2
-    cost: 16
-  - successRate: 0.12
-    dropAmount: 2
-    cost: 20
-  - successRate: 0.1
-    dropAmount: 3
-    cost: 25
+  - successRate: 0.27
+    dropAmount: 1
+    cost: 12
+  - successRate: 0.22
+    dropAmount: 1
+    cost: 15
   - successRate: 0.08
     dropAmount: 3
     cost: 30

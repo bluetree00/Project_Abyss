@@ -14,6 +14,8 @@ public static class UISpriteMaster
     // ── Static ───────────────────────────────────────────────
     private static readonly Dictionary<Sprite, Sprite> s_cache   = new();
     private static readonly HashSet<Sprite>            s_masters = new();
+    private static readonly Dictionary<Sprite, Sprite> s_thin    = new();
+    private static readonly Dictionary<Sprite, Sprite> s_thinKeep = new();
 
     // ── Public Methods ───────────────────────────────────────
 
@@ -30,9 +32,27 @@ public static class UISpriteMaster
         return master;
     }
 
+    /// <summary>
+    /// 얇게 깎은 무채색 원본(10-08 톤 v2) — 납품 장식 테의 선을 1px 침식해(알파 3×3 최소) 장식은 남기고 굵기만 덜어낸다.
+    /// 사용자 「유물 컨셉 UI는 남겨야 해 · 테두리도 조금은 사용하되 얇게」. 무채색이라 코드가 금 · 잉크로 틴트한다. null이면 null.
+    /// <paramref name="keepColor"/>면 색은 그대로 두고 선만 깎는다(유물칸처럼 색 자체가 컨셉인 그림).
+    /// </summary>
+    public static Sprite Thinned(Sprite src, bool keepColor = false)
+    {
+        if (src == null) return null;
+        var cache = keepColor ? s_thinKeep : s_thin;
+        if (cache.TryGetValue(src, out var hit) && hit != null) return hit;
+
+        var thin = Build(src, erode: true, neutral: !keepColor);
+        if (thin == null) return keepColor ? src : Neutral(src);   // 만들지 못하면 굵은 원본(화면은 산다)
+        cache[src] = thin;
+        s_masters.Add(thin);
+        return thin;
+    }
+
     // ── Private Methods ──────────────────────────────────────
 
-    private static Sprite Build(Sprite src)
+    private static Sprite Build(Sprite src, bool erode = false, bool neutral = true)
     {
         var tex = src.texture;
         if (tex == null) return null;
@@ -61,22 +81,12 @@ public static class UISpriteMaster
         }
 
         var px = copy.GetPixels32();
-        float max = 0f;
-        for (int i = 0; i < px.Length; i++)
-        {
-            if (px[i].a < 128) continue;
-            max = Mathf.Max(max, Luma(px[i]));
-        }
-        float k = max > 0.01f ? 1f / max : 1f;
-        for (int i = 0; i < px.Length; i++)
-        {
-            byte v = (byte)Mathf.Clamp(Mathf.RoundToInt(Luma(px[i]) * k * 255f), 0, 255);
-            px[i] = new Color32(v, v, v, px[i].a);
-        }
+        if (neutral) ToNeutral(px);
+        if (erode) Erode(px, w, h);
         copy.SetPixels32(px);
         copy.wrapMode   = TextureWrapMode.Clamp;
         copy.filterMode = FilterMode.Bilinear;
-        copy.name       = src.name + " (Neutral)";
+        copy.name       = src.name + (erode ? (neutral ? " (Thin)" : " (Thin Color)") : " (Neutral)");
         copy.hideFlags  = HideFlags.HideAndDontSave;
         copy.Apply(false, true);
 
@@ -88,5 +98,54 @@ public static class UISpriteMaster
         return master;
     }
 
+    /// <summary>명암만 남긴 흰 계열 — 가장 밝은 곳이 1(틴트 색이 그대로 최대 밝기).</summary>
+    private static void ToNeutral(Color32[] px)
+    {
+        float max = MaxLuma(px, 128);
+        // 불투명 화소가 하나도 없는 옅은 그림(Artsystack icon_slot_active — 최대 알파 0.31)은 밝기가 안 올라 고리가 흐렸다(10-13) — 반투명 화소로 잡는다
+        if (max <= 0.01f) max = MaxLuma(px, 11);
+        float k = max > 0.01f ? 1f / max : 1f;
+        for (int i = 0; i < px.Length; i++)
+        {
+            byte v = (byte)Mathf.Clamp(Mathf.RoundToInt(Luma(px[i]) * k * 255f), 0, 255);
+            px[i] = new Color32(v, v, v, px[i].a);
+        }
+    }
+
+    private static float MaxLuma(Color32[] px, byte minAlpha)
+    {
+        float max = 0f;
+        for (int i = 0; i < px.Length; i++)
+            if (px[i].a >= minAlpha) max = Mathf.Max(max, Luma(px[i]));
+        return max;
+    }
+
     private static float Luma(Color32 c) => (0.299f * c.r + 0.587f * c.g + 0.114f * c.b) / 255f;
+
+    /// <summary>알파 3×3 최소(1px 침식) — 선 양쪽이 1px씩 얇아진다. 바깥은 투명으로 본다.</summary>
+    private static void Erode(Color32[] px, int w, int h)
+    {
+        var a = new byte[px.Length];
+        for (int i = 0; i < px.Length; i++) a[i] = px[i].a;
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                byte m = 255;
+                for (int dy = -1; dy <= 1 && m > 0; dy++)
+                {
+                    int sy = y + dy;
+                    if (sy < 0 || sy >= h) { m = 0; break; }
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int sx = x + dx;
+                        if (sx < 0 || sx >= w) { m = 0; break; }
+                        byte v = a[sy * w + sx];
+                        if (v < m) m = v;
+                    }
+                }
+                px[y * w + x].a = m;
+            }
+        }
+    }
 }

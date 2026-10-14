@@ -38,7 +38,7 @@ MonoBehaviour:
     type: 3}
   summonDelay: 0.8
   channelSeconds: 10
-  lockLead: 0.4
+  lockLead: 0.45
   swingLead: 0.35
   recoveryTime: 0.8
   whiteTilePrefab: {fileID: 1700000001, guid: 36c704cc48b1a834ba1cff41dbe566e4, type: 3}

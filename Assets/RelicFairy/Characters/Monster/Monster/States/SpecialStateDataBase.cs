@@ -22,6 +22,8 @@ public abstract class SpecialStateDataBase : ScriptableObject
     [SerializeField] private Vector3 _vfxOffset = Vector3.zero;
     [Tooltip("true 이면 VFX 오브젝트를 몬스터 Transform의 자식으로 붙인다.")]
     [SerializeField] private bool _vfxFollowTransform = false;
+    [Tooltip("true 이면 몬스터 정면 방향으로 띄운다(앞으로 뿜는 이펙트 — 브레스). false 이면 예전처럼 월드 고정 회전.")]
+    [SerializeField] private bool _vfxFaceForward = false;
 
     // ── Public Methods ─────────────────────────────────────────────────────────
 
@@ -39,7 +41,9 @@ public abstract class SpecialStateDataBase : ScriptableObject
         if (_vfxPrefab == null) return null;
 
         var position = parent.position + _vfxOffset;
-        var go = Object.Instantiate(_vfxPrefab, position, Quaternion.identity);
+        Vector3 fwd = parent.forward; fwd.y = 0f;
+        var rot = _vfxFaceForward && fwd.sqrMagnitude > 1e-4f ? Quaternion.LookRotation(fwd) : Quaternion.identity;   // 10-13 P3 — 브레스가 몬스터 방향을 따르게
+        var go = Object.Instantiate(_vfxPrefab, position, rot);
         go.transform.localScale = Vector3.one * _vfxScale;
         ApplyHierarchyScaling(go);
 

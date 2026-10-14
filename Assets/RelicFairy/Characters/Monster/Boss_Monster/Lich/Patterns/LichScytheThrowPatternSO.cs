@@ -84,8 +84,8 @@ public class LichScytheThrowState : UnInterruptibleState<LichScytheThrowPatternS
 
     private const float TetherWidth = 0.7f;   // 사슬 텍스처 — 보이는 고리 굵기 약 0.25 m
     private const int   MinCurveDots = 6;      // 휘는 궤적 예고 — 나가는 길·돌아오는 길 각각 원 몇 개로 찍는다
-    private const int   MaxCurveDots = 24;
-    private const float DotOverlap   = 0.85f;  // 원 사이 간격 = 지름 × 이 값(틈 없이 겹치게, 09-19 감사)
+    private const int   MaxCurveDots = 48;
+    private const float DotOverlap   = 0.35f;  // 원 사이 간격 = 지름 × 이 값 — 0.85면 원 사이 가운데가 옆으로 반경의 53%만 덮었다(10-13 검증 · 판정은 반경 전체)
 
     private static readonly Color TetherColor = new Color(1.00f, 0.80f, 0.25f);
 
@@ -136,9 +136,9 @@ public class LichScytheThrowState : UnInterruptibleState<LichScytheThrowPatternS
 
         if (Data.curve <= 0.01f)
         {
-            // 곧은 왕복 — 리치 발밑부터 끝(+판정 반경)까지.
+            // 곧은 왕복 — 발밑 뒤(판정 반경)부터 끝(+판정 반경)까지: 낫이 출발점에서도 반경만큼 친다.
             _guide = LichPatternUtil.PrepareTelegraph(
-                PatternGuideHelper.Beam(_start, dir, Vector3.Distance(_start, _end) + Data.hitRadius, Data.hitRadius * 2f,
+                PatternGuideHelper.Beam(_start - dir * Data.hitRadius, dir, Vector3.Distance(_start, _end) + Data.hitRadius * 2f, Data.hitRadius * 2f,
                                         LichPatternUtil.Crimson),
                 LichPatternUtil.Crimson);
         }
@@ -212,7 +212,7 @@ public class LichScytheThrowState : UnInterruptibleState<LichScytheThrowPatternS
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -274,11 +274,18 @@ public class LichScytheThrowState : UnInterruptibleState<LichScytheThrowPatternS
         }
         _lastPos = pos;
 
-        if (!hit && LichPatternUtil.HitCircle(ctx, floorPos, Data.hitRadius, Data.damageMultiplier, Data.knockbackMultiplier))
+        if (!hit)
         {
-            hit = true;
-            LichPatternUtil.Impact(LichImpact.Slash, true);
-            TryBind(ctx);
+            // 결박판은 묶을 수 있으면 넉백 없이 선 자리에서 — 밀린 뒤 묶여 추격 폭발이 밀리기 전 자리에 떨어졌다.
+            // 속박탄 · 사슬 포획과 같은 규칙(10-08 점검).
+            float knockback = Data.bindSeconds > 0f && LichHazards.CanBind ? 0f : Data.knockbackMultiplier;
+            bool  damaged   = LichPatternUtil.HitCircle(ctx, floorPos, Data.hitRadius, Data.damageMultiplier, out bool contact, knockback);
+            if (contact) hit = true;   // 흘렸어도(무효화 · 저스트 회피) 이번 비행은 쓰였다 — 매 프레임 다시 굴리지 않게(10-08 점검)
+            if (damaged)
+            {
+                LichPatternUtil.Impact(LichImpact.Slash, true);
+                TryBind(ctx);
+            }
         }
     }
 

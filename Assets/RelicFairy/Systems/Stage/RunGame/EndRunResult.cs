@@ -33,12 +33,16 @@ public readonly struct EndRunResult
     public readonly int LibBossKills;
     /// <summary>악몽 모드로 시작한 런의 보스 처치 수 — 기억의 제단 악몽 고리 할인 조건(10-02).</summary>
     public readonly int NmBossKills;
+    /// <summary>계약 달성으로 받은 정수(결과창 내역, 10-07). GainedEssence에 이미 들어 있다.</summary>
+    public readonly int ContractEssence;
+    /// <summary>초행 보너스로 받은 정수(결과창 내역, 10-07). GainedEssence에 이미 들어 있다.</summary>
+    public readonly int FirstRunBonus;
 
     public EndRunResult(bool isCleared, ChapterId chapter, int gainedGold, int gainedEssence, ItemStack[] gainedItems, string reason,
                         int abyssDepth = 0, int roomClears = 0, int kills = 0, int eliteKills = 0, int bossKills = 0,
                         int shopUses = 0, int refineUses = 0, int maxEnhance = 0,
                         bool potionUsed = false, int specialVisits = 0, int flawless = 0, int covenants = 0,
-                        int libBossKills = 0, int nmBossKills = 0)
+                        int libBossKills = 0, int nmBossKills = 0, int contractEssence = 0, int firstRunBonus = 0)
     {
         IsCleared     = isCleared;
         Chapter       = chapter;
@@ -61,5 +65,7 @@ public readonly struct EndRunResult
         Covenants     = covenants;
         LibBossKills  = libBossKills;
         NmBossKills   = nmBossKills;
+        ContractEssence = contractEssence;
+        FirstRunBonus   = firstRunBonus;
     }
 }

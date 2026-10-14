@@ -82,7 +82,7 @@ public static class NamelessSkillSetup
         // 2) 스킬 SO
         var e = LoadOrCreate<SkillSO>($"{DataDir}/Nameless_ESkill.asset");
         e.skillName   = "무형참";
-        e.description = "형태 없는 검기를 전방으로 날린다. 강화 +5부터 적을 꿰뚫는다.";
+        e.description = "형태 없는 검기를 전방으로 날린다. 강화 +3부터 적을 꿰뚫는다.";   // 스킬 단계 임계 +3 / +6(SkillTierResolver) — 10-08 B8
         e.icon        = LoadSprite(IconEGuid);
         e.cooldown    = 4f;
         e.behavior    = beam;
@@ -90,7 +90,7 @@ public static class NamelessSkillSetup
 
         var r = LoadOrCreate<SkillSO>($"{DataDir}/Nameless_RSkill.asset");
         r.skillName   = "무형일섬";
-        r.description = "형태를 지우고 8m를 꿰뚫어 지나간 뒤, 스쳐 간 적을 연이어 벤다. 강화 +5부터 연참이 늘고 공간을 가른다.";
+        r.description = "형태를 지우고 8m를 꿰뚫어 지나간 뒤(돌진 중 무적), 스쳐 간 적을 연이어 벤다. 강화 +3부터 연참이 늘고, +6부터 마지막 일섬이 지나온 길을 통째로 가른다.";
         r.icon        = LoadSprite(IconRGuid);
         r.cooldown    = 8f;
         r.behavior    = iasen;

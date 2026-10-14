@@ -32,6 +32,7 @@ public sealed class ZoneTitleBanner : MonoBehaviour
     private const float SubtleHold      = 1.1f;
     private const float SubtleFadeOut   = 1.0f;
     private const float SubtlePeak      = 0.85f;
+    private static readonly Vector2 RuleArtSize = new(420f, 8f);   // 붓 획 밑줄(direction_line 1449×27 비 그대로, 10-13)
 
     private static readonly Color TitleInk = new(0.97f, 0.93f, 0.84f, 1f);
     private static readonly Color DescInk  = new(0.82f, 0.85f, 0.92f, 1f);
@@ -47,6 +48,7 @@ public sealed class ZoneTitleBanner : MonoBehaviour
     private Image         _back;
     private Image         _rule;
     private bool          _fullShowing;   // 처음 배너가 떠 있는 동안 — 도착 표시가 끼어들지 않는다
+    private bool          _ruleArt;       // 밑줄 그림을 걸었다(10-13)
     private int           _fullSeq;       // 배너가 배너를 교체하면 앞 것의 끝 처리가 늦게 돌아 표시를 끄지 않게
     private CancellationTokenSource _cts;
 
@@ -139,8 +141,25 @@ public sealed class ZoneTitleBanner : MonoBehaviour
     {
         _title.fontSize         = subtle ? SubtleTitleSize : TitleSize;
         _title.characterSpacing = subtle ? 4f : 6f;
+        if (!subtle) EnsureRuleArt();
         _rule.gameObject.SetActive(!subtle);
         _back.color = subtle ? SubtleBackInk : BackInk;
+    }
+
+    /// <summary>
+    /// 금빛 가는 선 → 붓 획 밑줄(10-13 Artsystack direction_line · 무채 + 잉크 50%). 앱 시작 때 세우는 창이라 스킨이 뒤에 온다 —
+    /// 처음 띄울 때 한 번 건다. 그림이 없으면 지금 금빛 선. 빛 띠(후광)는 넣지 않는다 — 후광은 제단 해금 배너 한 곳.
+    /// </summary>
+    private void EnsureRuleArt()
+    {
+        if (_ruleArt) return;
+        var art = UISkin.Achievement != null ? UISkin.Achievement.ZoneTitleRule : null;
+        if (art == null) return;
+        _ruleArt = true;
+        _rule.sprite = UISpriteMaster.Neutral(art);
+        _rule.color  = UITheme.Thin.InkA(0.5f);
+        _rule.preserveAspect = true;
+        _rule.rectTransform.sizeDelta = RuleArtSize;
     }
 
     private async UniTask FadeAsync(float from, float to, float dur, bool rise, CancellationToken ct)

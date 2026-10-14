@@ -115,15 +115,12 @@ public sealed class BarrageCorridorGame : EventMinigame
 
     protected override void OnPlayEnd()
     {
-        // 남은 위험은 빛 가루로 흩어진다
-        for (int i = 0; i < _hazards.Count; i++)
-        {
-            RunFx.Play(RunFxSlot.Ring, _hazards[i].Anchor, 0.4f, Theme);
-            _hazards[i].Clear();
-        }
+        // 남은 위험은 조용히 걷는다 — 위험마다 고리를 내면 끝나는 순간 같은 뜻의 고리가 여럿 겹쳤다(10-11 이펙트 톤 2차 V-14 · 결과는 HUD가 알린다)
+        for (int i = 0; i < _hazards.Count; i++) _hazards[i].Clear();
         _hazards.Clear();
+        // 무피격 빛기둥은 플레이어 발밑이라 작게(0.08 = 충격파 지름 약 4 m → 0.05, 「살짝」 상한 — V-4)
         if (_hits == 0 && PlayerT != null)
-            RunFx.Play(RunFxSlot.Pillar, PlayerT.position, 0.08f, MinigameHud.GradeColor(ChallengeGrade.Platinum));
+            RunFx.Play(RunFxSlot.Pillar, PlayerT.position, 0.05f, MinigameHud.GradeColor(ChallengeGrade.Platinum));
     }
 
     protected override void DemoTick(MinigameDemo mode, float dt) { }   // 시연은 판정 쪽(Absorb)에서 흉내 낸다
@@ -299,7 +296,7 @@ public sealed class BarrageCorridorGame : EventMinigame
             {
                 _active = true;
                 PatternGuideHelper.Arm(_beam);
-                MinigameFx.Sound(SoundKey.Sfx.PlayerHit, 0.45f, 1.6f);
+                MinigameFx.Sound(SoundKey.Sfx.PlayerHitMedium, 0.45f, 1.6f);
             }
 
             // 띠 안에 든 첫 순간 한 번만 판정 — 회피 무적으로 그 순간을 넘기면 피한 것

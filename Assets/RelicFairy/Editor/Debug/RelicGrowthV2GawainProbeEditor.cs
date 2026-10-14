@@ -25,7 +25,23 @@ public static class RelicGrowthV2GawainProbeEditor
     private const int    TankHp       = 50000;
     private const BindingFlags Inst = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
     private const string OutPath = "Temp/relic_growth_v2_gawain.txt";
+    private const string QOutPath = "Temp/gawain_q_probe.txt";   // 12 가웨인 Q · 정오(10-11)
     private static bool s_armed;
+    private static string s_mode = "full";
+    private static bool   s_prevGuideline;   // 개발용 표시 원래 값(10-11 b0가 기본 OFF로 바꿈) — 실측 뒤 되돌린다
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/12 가웨인 Q · 정오 실측 (10-11, 테스트 허브, 플레이 중)")]
+    private static void BeginQ() { s_mode = "q"; Begin(); }
+
+    private const string Q2OutPath = "Temp/gawain_q2_probe.txt";   // 12b 평가 보충(10-11 b0)
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/12b 가웨인 평가 보충 — 프레임 · 수확 대조군 · 시계 (10-11, 테스트 허브, 플레이 중)")]
+    private static void BeginQ2() { s_mode = "q2"; Begin(); }
+
+    private const string FixOutPath = "Temp/gawain_fix_probe.txt";   // 12c ① 결함 전 · 후(10-12)
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/12c 가웨인 ① 결함 전 · 후 — 겹해 · 1스택 수확 · 해시계 ③ · 불씨 6 (10-12, 테스트 허브, 플레이 중)")]
+    private static void BeginFix() { s_mode = "fix"; Begin(); }
 
     [MenuItem("RelicFairy/Debug/유물 성장 v2/5 가웨인 실측 (테스트 허브, 플레이 중)")]
     private static void Begin()
@@ -93,6 +109,9 @@ public static class RelicGrowthV2GawainProbeEditor
             c.Sb.AppendLine($"대상 몬스터 {c.Pool.Count} · 유물 {player.RelicBehavior?.GetType().Name ?? "없음"} · 개화 1스택 {c.Per:0}");
             if (c.Relic == null || c.Gauge == null) { c.Line(false, "가웨인 유물이 아니다"); return; }
             SetGaugeTimes(c.Gauge, 3f, 4f, 3f);
+            if (s_mode == "q") { await GawainQAsync(c, ct); return; }
+            if (s_mode == "q2") { await GawainQ2Async(c, ct); return; }
+            if (s_mode == "fix") { await GawainFixAsync(c, ct); return; }
             c.Hub = GawainMemoryHub.Ensure(player);
             FaceOpen(player, c.Park);
             await BaseAsync(c, ct);
@@ -108,9 +127,417 @@ public static class RelicGrowthV2GawainProbeEditor
         finally
         {
             c.Sb.Insert(0, $"통과 {c.Pass} · 실패 {c.Fail}\n");
-            System.IO.File.WriteAllText(OutPath, c.Sb.ToString());
-            Debug.Log($"[RGV2가웨인] 끝 — 통과 {c.Pass} · 실패 {c.Fail} → {OutPath}");
+            string outPath = s_mode == "q" ? QOutPath : s_mode == "q2" ? Q2OutPath : s_mode == "fix" ? FixOutPath : OutPath;
+            if (s_mode != "full") GuidelineVisual.Enabled = s_prevGuideline;
+            s_mode = "full";
+            System.IO.File.WriteAllText(outPath, c.Sb.ToString());
+            Debug.Log($"[RGV2가웨인] 끝 — 통과 {c.Pass} · 실패 {c.Fail} → {outPath}");
         }
+    }
+
+    // ── 12c ① 결함 전 · 후 (10-12 · 유물 · 장비 기능 확장 설계 §2 · B2 · B3 · B4 · B10) ─────
+    // 고치기 전 코드와 고친 뒤 코드에서 같은 칸을 돌려 값을 대조한다. 줄마다 「전 · 후」 기대값을 적는다.
+    // 한 바퀴째: 여명 겹해(B4) → 정오 겹해(대조). 두 바퀴째: 1스택 수확(B3) → 해시계 ③(B2) → 불씨 6(B10).
+    private static async UniTask GawainFixAsync(Ctx c, CancellationToken ct)
+    {
+        s_prevGuideline = GuidelineVisual.Enabled;
+        c.Hub = GawainMemoryHub.Ensure(c.Player);
+        FaceOpen(c.Player, c.Park);
+        c.Runes = typeof(RuneSynergyFullProbeEditor).GetMethod("LoadCsv", BindingFlags.Static | BindingFlags.NonPublic)
+            ?.Invoke(null, null) as Dictionary<string, RuneSynergyEntry>;
+        var lastReaction = typeof(GawainMemoryHub).GetField("_lastReaction", Inst)?.GetValue(c.Hub) as Dictionary<string, float>;
+        float TwinAt() => lastReaction != null && lastReaction.TryGetValue("g_rx_twin_sun", out var t) ? t : -1f;
+        c.Sb.AppendLine("■ ① 결함 전 · 후 (「전」 = 고치기 전 코드의 기대값)");
+
+        // B4 겹해 ① — 여명(기본 쌓기가 있는 때)과 정오(없는 때)
+        AddPart(c, "g_rx_twin_sun");
+        Rune(c, "FireEmber");
+        await WaitPhase(c.Gauge, ZenithGauge.ZPhase.Charging, 15f, ct);
+        c.Gauge.Paused = true;
+        ResetPhaseTimer(c.Gauge);
+        var f1 = Take(c);
+        Place(c, f1, 2f, 0f);
+        await Wait(0.3f, ct);
+        RelicMarkStatus.Of(f1.gameObject, true).SetSunmark(1, c.Hub.SunmarkCap);
+        await Wait(0.55f, ct);
+        float tw0 = TwinAt();
+        await Hit(c, f1, ct);
+        bool twinDawn = TwinAt() > tw0;
+        c.Line(Mark(f1) == 2 && !twinDawn, $"B4 겹해 ① 여명 적중 1회 — 태양흔 1 → {Mark(f1)} · 겹해 신호 {(twinDawn ? "뜸" : "안 뜸")} (전: 2 · 뜸 = 순이득 0인데 신호 · 후: 2 · 안 뜸)");
+        c.Gauge.Paused = false;
+        await WaitPhase(c.Gauge, ZenithGauge.ZPhase.Noon, 8f, ct);
+        await Wait(0.4f, ct);   // 정오 수확이 끝난 뒤
+        RelicMarkStatus.Of(f1.gameObject, true).SetSunmark(1, c.Hub.SunmarkCap);
+        await Wait(0.55f, ct);
+        tw0 = TwinAt();
+        await Hit(c, f1, ct);
+        bool twinNoon = TwinAt() > tw0;
+        c.Line(Mark(f1) == 2 && twinNoon, $"B4 겹해 ① 정오 적중 1회(대조) — 태양흔 1 → {Mark(f1)} · 겹해 신호 {(twinNoon ? "뜸" : "안 뜸")} (전후 같음: 2 · 뜸)");
+
+        // B3 새벽에서 한낮으로 ① — 1스택 적이 수확에서 터지는가(3스택 적은 1 남김 = 대조)
+        AddPart(c, "g_dawn_to_noon");
+        AddPart(c, "g_sundial");
+        AddPart(c, "g_noon_to_dusk");
+        await WaitPhase(c.Gauge, ZenithGauge.ZPhase.Charging, 15f, ct);
+        var h1 = Take(c); var h3 = Take(c);
+        Place(c, h1, 4f, -2.5f); Place(c, h3, 4f, 2.5f);   // 5 m 떨어뜨린다 — 개화 연쇄(2 m)가 서로 더하지 않게
+        await Wait(0.3f, ct);
+        RelicMarkStatus.Of(h1.gameObject, true).SetSunmark(1, c.Hub.SunmarkCap);
+        RelicMarkStatus.Of(h3.gameObject, true).SetSunmark(3, c.Hub.SunmarkCap);
+        int hp1 = h1.CurrentHp;
+        await WaitPhase(c.Gauge, ZenithGauge.ZPhase.Noon, 8f, ct);
+        await Wait(0.3f, ct);
+        c.Line(Mark(h1) == 0 && h1.CurrentHp < hp1, $"B3 ① 1스택 적 수확 — 태양흔 {Mark(h1)} · 피해 {hp1 - h1.CurrentHp} (전: 1 · 0 = 안 터짐 · 후: 0 · 개화)");
+        c.Line(Mark(h3) == 1, $"B3 ① 대조 3스택 적 — 1스택 남김 ({Mark(h3)} · 전후 같음: 1)");
+
+        // B2 해시계 ③ — 같은 정오에 작은 해 두 번, 첫 번째가 1체를 죽인다 → 정오 늘림 두 번
+        Retire(c);
+        var ext = new List<string>();
+        void OnExt(string msg, string st, LogType t) { if (msg.StartsWith("[GawainMemory] 해시계")) ext.Add(msg); }
+        Application.logMessageReceived += OnExt;
+        try
+        {
+            var d = new MonsterBase[4];
+            for (int i = 0; i < 4; i++) { d[i] = Take(c); Place(c, d[i], 5f + i / 2, (i % 2) * 2f - 1f); }
+            SetHp(d[0], 1);
+            await Wait(0.2f, ct);
+            Vector3 at = (d[0].transform.position + d[3].transform.position) * 0.5f;
+            SolarDescentSkillRuntime.StrikeSmallSun(c.Player, c.Relic, at, 0.30f, 0.6f);
+            await Wait(1.0f, ct);
+            bool killed = d[0].IsDead;
+            SolarDescentSkillRuntime.StrikeSmallSun(c.Player, c.Relic, at, 0.30f, 0.6f);
+            await Wait(1.0f, ct);
+            c.Line(killed && ext.Count == 2, $"B2 해시계 ③ 정오에 작은 해 2번(첫 번째가 1체 처치 {killed}) — 정오 늘림 {ext.Count}번 (전: 1 · 후: 2){(ext.Count > 0 ? " · " + ext[ext.Count - 1] : "")}");
+        }
+        finally { Application.logMessageReceived -= OnExt; }
+
+        // B10 한낮에서 노을로 — 정오 처치 6 → 불씨 6, 다른 불씨 3개가 생겨도 남는가
+        var ntd = Find<GNoonToDuskEffect>(c);
+        typeof(GNoonToDuskEffect).GetField("_kills", Inst)?.SetValue(ntd, 6);
+        bool spawned = await WaitLog("[GawainMemory] 한낮에서 노을로", 10f, ct);
+        var embers = ntd != null ? typeof(GNoonToDuskEffect).GetField("_embers", Inst)?.GetValue(ntd) as List<FireField> : null;
+        int Alive() { int n = 0; if (embers != null) foreach (var f in embers) if (f != null && f.IsActive) n++; return n; }
+        int a0 = Alive();
+        for (int i = 0; i < 3; i++) FireField.SpawnAt(c.Player.gameObject, c.Park + Vector3.right * (3f * i), 1f, 5f, 1f, 1f);
+        await Wait(0.1f, ct);
+        int a1 = Alive();
+        c.Line(spawned && a0 == 6 && a1 == 6, $"B10 한낮에서 노을로 — 정오 처치 6 → 남은 불씨 {a0} · 다른 불씨 3개 뒤 {a1} (전: 5 · 2 · 후: 6 · 6)");
+        GroundFieldBase.DespawnAll();
+    }
+
+    // ── 12 가웨인 Q · 정오 (10-11) ──────────────────────────────
+    // 판정(낙하 · 착탄 · 지대 몫) · 동작 맞춤(오른손 최저점 vs 착탄) · 화면(낙하 · 착탄 · 1 · 2 · 3 · 3.8초) ·
+    // 정오 해가 화면 안인가 · 정오 수확(화상 3체) · 적이 없을 때 시계. 개발용 표시는 끄고 찍는다(출시 화면과 같게).
+
+    private static async UniTask GawainQAsync(Ctx c, CancellationToken ct)
+    {
+        c.Sb.AppendLine("■ 가웨인 Q · 정오 (10-11)");
+        System.IO.Directory.CreateDirectory("Temp/ui_shots");
+        s_prevGuideline = GuidelineVisual.Enabled;
+        GuidelineVisual.Enabled = false;
+        c.Line(await WaitPhase(c.Gauge, ZenithGauge.ZPhase.Noon, 15f, ct), "정오 진입");
+        c.Gauge.Paused = true;   // 칸 1 · 2는 정오에 세워 두고 쏜다
+        await Wait(0.8f, ct);    // 해 등장 페이드 0.4초
+        SunInView(c);
+        ScreenCapture.CaptureScreenshot($"Temp/ui_shots/GQ_{DateTime.Now:HHmmss}_noon.png");
+        await Wait(0.3f, ct);
+        await QCellAsync(c, "1 기본 프레임", 0, true, ct);
+        await QCellAsync(c, "2 30 fps", 30, false, ct);
+        await HarvestCellAsync(c, ct);
+        await ClockCellAsync(c, ct);
+    }
+
+    private static async UniTask GawainQ2Async(Ctx c, CancellationToken ct)
+    {
+        c.Sb.AppendLine("■ 가웨인 평가 보충 (10-11 · b0 교차 평가 1 ~ 3)");
+        s_prevGuideline = GuidelineVisual.Enabled;
+        GuidelineVisual.Enabled = false;
+        c.Line(await WaitPhase(c.Gauge, ZenithGauge.ZPhase.Noon, 15f, ct), "정오 진입");
+        c.Gauge.Paused = true;
+        await QCellAsync(c, "1 목표 60 fps", 60, false, ct);
+        await QCellAsync(c, "2 15 fps", 15, false, ct);
+        await HarvestControlCellAsync(c, ct);
+        await ClockCell2Async(c, ct);
+    }
+
+    /// <summary>정오 수확 — 화상 3체 + 화상 없는 대조군 1체. 정오 진입 0.15초 뒤 몬스터 둘레 1.5 m 안 새 입자계 수.</summary>
+    private static async UniTask HarvestControlCellAsync(Ctx c, CancellationToken ct)
+    {
+        c.Sb.AppendLine("□ 칸 3 정오 수확 — 화상 3체 + 대조군(화상 없음) 1체");
+        Retire(c);
+        FaceOpen(c.Player, c.Park);
+        c.Gauge.Paused = false;
+        bool dawn = await WaitPhase(c.Gauge, ZenithGauge.ZPhase.Charging, 15f, ct);
+        c.Gauge.Paused = true;
+        var ms = new[] { Take(c), Take(c), Take(c), Take(c) };
+        Place(c, ms[0], 3f, -2f); Place(c, ms[1], 3f, 2f); Place(c, ms[2], 5f, -1f); Place(c, ms[3], 5f, 2.5f);
+        await Wait(0.3f, ct);
+        foreach (var m in ms) if (m != null && m.TryGetComponent<MonsterBurnHandler>(out var bh)) UnityEngine.Object.Destroy(bh);
+        await Wait(0.1f, ct);
+        for (int i = 0; i < 3; i++) if (ms[i] != null) MonsterBurnHandler.Apply(ms[i].gameObject, 50f, 6f, 0.5f, c.Player.gameObject);
+        await Wait(0.2f, ct);
+        var before = new HashSet<int>();
+        foreach (var ps in UnityEngine.Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None)) before.Add(ps.GetInstanceID());
+        string stamp = DateTime.Now.ToString("HHmmss");
+        c.Gauge.Paused = false;
+        c.Gauge.OpenNoonNow();
+        await Wait(0.15f, ct);
+        ScreenCapture.CaptureScreenshot($"Temp/ui_shots/GQ_{stamp}_harvest_ctrl.png");
+        var near = new int[ms.Length];
+        var names = new StringBuilder();
+        foreach (var ps in UnityEngine.Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None))
+        {
+            if (before.Contains(ps.GetInstanceID())) continue;
+            for (int i = 0; i < ms.Length; i++)
+            {
+                if (ms[i] == null || ps.transform.IsChildOf(ms[i].transform)) continue;
+                var d = ps.transform.position - ms[i].transform.position; d.y = 0f;
+                if (d.magnitude > 1.5f) continue;
+                near[i]++;
+                if (near[i] == 1) names.Append($"적{i} {ps.transform.root.name}/{ps.name} · ");
+                break;
+            }
+        }
+        c.Note($"새 입자계 이름(적마다 첫 개) — {names}사진 GQ_{stamp}_harvest_ctrl");
+        c.Line(dawn && near[0] >= 1 && near[1] >= 1 && near[2] >= 1 && near[3] == 0,
+               $"수확 불꽃 — 화상 적 {near[0]} · {near[1]} · {near[2]} · 대조군 {near[3]} (화상 적만 ≥ 1, 대조군 0)");
+    }
+
+    /// <summary>적이 없을 때 시계 — 끄는 순간 · 1.5초 · 3초 값으로 「늘지 않음」을 판정하고, 되살린 뒤 1.5초 진행으로 「적이 있을 때 속도 그대로」를 판정.</summary>
+    private static async UniTask ClockCell2Async(Ctx c, CancellationToken ct)
+    {
+        c.Sb.AppendLine("□ 칸 4 적이 없을 때 시계 — 끄는 순간 · 1.5초 · 3초");
+        c.Gauge.Paused = false;
+        await WaitPhase(c.Gauge, ZenithGauge.ZPhase.Charging, 15f, ct);
+        var fT = typeof(ZenithGauge).GetField("_timer", Inst);
+        var off = new List<MonsterBase>();
+        foreach (var m in UnityEngine.Object.FindObjectsByType<MonsterBase>(FindObjectsSortMode.None))
+            if (m.gameObject.activeSelf) { m.gameObject.SetActive(false); off.Add(m); }
+        ResetPhaseTimer(c.Gauge);
+        float a0 = (float)fT.GetValue(c.Gauge);
+        await Wait(1.5f, ct);
+        float a1 = (float)fT.GetValue(c.Gauge);
+        await Wait(1.5f, ct);
+        float a2 = (float)fT.GetValue(c.Gauge);
+        var ph = c.Gauge.CurrentPhase;
+        c.Line(ph == ZenithGauge.ZPhase.Charging && a2 - a0 <= 0.3f && a2 - a1 <= 0.01f,
+               $"적 없음 — 여명 시계 끄는 순간 {a0:0.00} → 1.5초 {a1:0.00} → 3초 {a2:0.00} ({ph}) · 늘어난 몫은 첫 확인 주기(0.25초) 안");
+        foreach (var m in off) if (m != null) m.gameObject.SetActive(true);
+        float b0 = (float)fT.GetValue(c.Gauge);
+        await Wait(1.5f, ct);
+        float b1 = (float)fT.GetValue(c.Gauge);
+        c.Line(c.Gauge.CurrentPhase == ZenithGauge.ZPhase.Charging && b1 - b0 >= 1.2f,
+               $"적 되살림 — 1.5초 동안 {b0:0.00} → {b1:0.00} (적이 있을 때 진행 = 전 1.53과 같은 속도, 첫 확인 주기 0.25초 안 지연)");
+    }
+
+    private static void SunInView(Ctx c)
+    {
+        var comp = c.Player.GetComponent<SolarNoonSun>();
+        var sun  = comp != null ? typeof(SolarNoonSun).GetField("_sun", Inst)?.GetValue(comp) as GameObject : null;
+        var cam  = Camera.main;
+        if (sun == null || cam == null) { c.Note($"정오 해 — 오브젝트 {sun != null} · 카메라 {cam != null}"); return; }
+        Vector3 vp = cam.WorldToViewportPoint(sun.transform.position);
+        bool inView = vp.z > 0f && vp.x >= 0f && vp.x <= 1f && vp.y >= 0f && vp.y <= 1f;
+        int alive = 0, inside = 0;
+        var buf = new ParticleSystem.Particle[512];
+        foreach (var ps in sun.GetComponentsInChildren<ParticleSystem>())
+        {
+            int n = ps.GetParticles(buf);
+            bool world = ps.main.simulationSpace == ParticleSystemSimulationSpace.World;
+            for (int i = 0; i < n; i++)
+            {
+                Vector3 wp = world ? buf[i].position : ps.transform.TransformPoint(buf[i].position);
+                var v = cam.WorldToViewportPoint(wp);
+                alive++;
+                if (v.z > 0f && v.x >= 0f && v.x <= 1f && v.y >= 0f && v.y <= 1f) inside++;
+            }
+        }
+        c.Note($"정오 해 — 중심 화면 좌표 ({vp.x:0.00}, {vp.y:0.00}) 깊이 {vp.z:0.0} · 중심 화면 안 {inView} · 입자 {alive}개 중 화면 안 {inside} · 플레이어 위 {sun.transform.position.y - c.Player.transform.position.y:0.0} m");
+    }
+
+    private static bool InState(Animator a, string state, out float norm)
+    {
+        norm = -1f;
+        if (a == null) return false;
+        for (int l = 0; l < a.layerCount; l++)
+        {
+            var st = a.GetCurrentAnimatorStateInfo(l);
+            if (st.IsName(state)) { norm = st.normalizedTime; return true; }
+        }
+        return false;
+    }
+
+    private static async UniTask QCellAsync(Ctx c, string tag, int fps, bool film, CancellationToken ct)
+    {
+        c.Sb.AppendLine($"□ 칸 {tag}");
+        Retire(c);
+        var p = c.Player;
+        FaceOpen(p, c.Park);
+        await Wait(0.3f, ct);
+        var tf = p.transform;
+        Vector3 f = tf.forward; f.y = 0f; f.Normalize();
+        Vector3 r = Vector3.Cross(Vector3.up, f);
+        Vector3 impact = tf.position + f * 3f;   // SolarDescentSkillRuntime.ImpactDistance
+        float[] off = { 0f, 2.5f, -5f, 7.5f };
+        var ms = new MonsterBase[off.Length];
+        for (int i = 0; i < ms.Length; i++)
+        {
+            ms[i] = Take(c);
+            if (ms[i] == null) continue;
+            if (ms[i].TryGetComponent<MonsterBurnHandler>(out var bh)) UnityEngine.Object.Destroy(bh);
+            Warp(ms[i], impact + r * off[i]);
+        }
+        await Wait(0.4f, ct);
+        var dist = new float[ms.Length];
+        for (int i = 0; i < ms.Length; i++) if (ms[i] != null) { var q = ms[i].transform.position - impact; q.y = 0f; dist[i] = q.magnitude; }
+
+        typeof(GawainZenithRelic).GetField("_skillUsedThisNoon", Inst)?.SetValue(c.Relic, false);
+        c.Relic.ConsumeMarkFirstHit();   // 각인 첫 타 ×1.5를 빼고 기본 몫만 본다
+        int vsync = QualitySettings.vSyncCount, tfr = Application.targetFrameRate;
+        if (fps > 0) { QualitySettings.vSyncCount = 0; Application.targetFrameRate = fps; await Wait(0.4f, ct); }
+
+        var prev = new int[ms.Length];
+        for (int i = 0; i < ms.Length; i++) prev[i] = ms[i] != null ? ms[i].CurrentHp : 0;
+        var fall = new int[ms.Length]; var fallN = new int[ms.Length]; var imp = new int[ms.Length]; var aft = new int[ms.Length];
+        float tImpact = -1f, tState = -1f, tExit = -1f, lastNorm = -1f, normAtImpact = -1f;
+        int frames = 0;
+        float t0 = Time.time;
+        void H(string msg, string st, LogType lt)
+        {
+            if (tImpact >= 0f || !msg.StartsWith("[가웨인Q] 착탄")) return;
+            tImpact = Time.time - t0;
+            InState(p.Anim, "RelicQ_Main", out normAtImpact);
+        }
+        var hand = p.Anim != null ? p.Anim.GetBoneTransform(HumanBodyBones.RightHand) : null;
+        var track = new List<(float t, float y)>();
+        string stamp = DateTime.Now.ToString("HHmmss");
+        var shots = new List<(bool fromImpact, float at, string name)>
+        {
+            (false, 0.6f, "fall"), (true, 0.05f, "impact"), (true, 1f, "1s"), (true, 2f, "2s"), (true, 3f, "3s"), (true, 3.8f, "3_8s"),
+        };
+        var zoneAt = new StringBuilder();
+        Application.logMessageReceived += H;
+        try
+        {
+            p.CooldownTracker.ResetCooldown(SkillType.Q);
+            p.InputBuffer.Clear();
+            p.InputBuffer.Push(Command.QSkill);
+            while (Time.time - t0 < 6.5f)
+            {
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+                frames++;
+                float t = Time.time - t0;
+                bool inQ = InState(p.Anim, "RelicQ_Main", out float norm);
+                if (inQ && tState < 0f) tState = t;
+                if (inQ) lastNorm = norm;
+                else if (tState >= 0f && tExit < 0f) tExit = t;
+                if (inQ && hand != null) track.Add((t - tState, hand.position.y - tf.position.y));
+                for (int i = 0; i < ms.Length; i++)
+                {
+                    if (ms[i] == null) continue;
+                    int dmg = prev[i] - ms[i].CurrentHp; prev[i] = ms[i].CurrentHp;
+                    if (dmg <= 0) continue;
+                    if (tImpact < 0f) { fall[i] += dmg; fallN[i]++; }
+                    else if (t - tImpact < 0.08f) imp[i] += dmg;   // 착탄 프레임(내 확인이 운석보다 먼저 돌면 한 프레임 뒤)
+                    else aft[i] += dmg;
+                }
+                if (!film) continue;
+                for (int k = 0; k < shots.Count; k++)
+                {
+                    var (fromImpact, at, name) = shots[k];
+                    float baseT = fromImpact ? tImpact : tState;
+                    if (baseT < 0f || t - baseT < at) continue;
+                    ScreenCapture.CaptureScreenshot($"Temp/ui_shots/GQ_{stamp}_{name}.png");
+                    int zones = UnityEngine.Object.FindObjectsByType<SolarZone>(FindObjectsSortMode.None).Length;
+                    zoneAt.Append($"{name} 지대 {zones} · ");
+                    shots.RemoveAt(k);
+                    break;
+                }
+            }
+        }
+        finally
+        {
+            Application.logMessageReceived -= H;
+            QualitySettings.vSyncCount = vsync; Application.targetFrameRate = tfr;
+        }
+
+        float dtAvg = frames > 0 ? 6.5f / frames : 0f;
+        c.Note($"착탄 순간 Q 클립 진행률 {normAtImpact:0.00}(클립 {normAtImpact * 2.9f:0.00}초 · 상태 {normAtImpact * 1.45f:0.00}초)");
+        c.Note($"평균 프레임 {dtAvg * 1000f:0.0} ms · Q 상태 시작 {tState:0.00}s · 착탄 {tImpact:0.00}s(상태 기준 {tImpact - tState:0.00}s) · 상태 끝 {tExit:0.00}s(상태 기준 {tExit - tState:0.00}s, 마지막 진행률 {lastNorm:0.00})");
+        for (int i = 0; i < ms.Length; i++)
+            c.Note($"적 {i} 착탄점에서 {dist[i]:0.0} m — 낙하 {fall[i]}({fallN[i]}번) · 착탄 {imp[i]} · 뒤(지대 + 화상) {aft[i]}");
+        int effAtk = p.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee);
+        c.Note($"설계 몫 — 공격력 {effAtk} × 3.5 = {effAtk * 3.5f:0}: 낙하 30% {effAtk * 3.5f * 0.3f:0}(3 m 안 · 대상마다 1번) · 착탄 70% {effAtk * 3.5f * 0.7f:0}(6.5 m 안, 방어 · 치명 적용)");
+        bool fallOk = ms[0] != null && fallN[0] == 1 && (ms[2] == null || fall[2] == 0);
+        c.Line(fallOk, $"낙하 피해 — 가운데 적 1번 · 5 m 적 0 (가운데 {fallN[0]}번 · 5 m {fall[2]})");
+        c.Line(ms[3] == null || (imp[3] == 0 && dist[3] > 6.6f), $"7.5 m 적은 착탄 밖 (거리 {dist[3]:0.0} · 착탄 {imp[3]})");
+        if (track.Count > 4)
+        {
+            int iTop = 0;
+            for (int i = 0; i < track.Count && track[i].t < 0.9f; i++) if (track[i].y > track[iTop].y) iTop = i;
+            int iLow = iTop;
+            for (int i = iTop; i < track.Count; i++) if (track[i].y < track[iLow].y) iLow = i;
+            float vMax = 0f, tV = 0f;
+            for (int i = iTop + 1; i <= iLow && i < track.Count; i++)
+            {
+                float dt = track[i].t - track[i - 1].t; if (dt <= 0f) continue;
+                float v = (track[i - 1].y - track[i].y) / dt;
+                if (v > vMax) { vMax = v; tV = track[i].t; }
+            }
+            c.Note($"오른손 — 가장 높음 {track[iTop].t:0.00}s({track[iTop].y:0.00} m) → 가장 낮음 {track[iLow].t:0.00}s({track[iLow].y:0.00} m) · 내려치는 속도 최대 {tV:0.00}s · 착탄 {tImpact - tState:0.00}s");
+        }
+        if (film) c.Note($"사진 GQ_{stamp}_* · {zoneAt}");
+    }
+
+    private static async UniTask HarvestCellAsync(Ctx c, CancellationToken ct)
+    {
+        c.Sb.AppendLine("□ 칸 6 정오 수확");
+        Retire(c);
+        FaceOpen(c.Player, c.Park);
+        c.Gauge.Paused = false;
+        bool dawn = await WaitPhase(c.Gauge, ZenithGauge.ZPhase.Charging, 15f, ct);
+        c.Gauge.Paused = true;
+        var ms = new[] { Take(c), Take(c), Take(c) };
+        Place(c, ms[0], 3f, -1.5f); Place(c, ms[1], 3f, 1.5f); Place(c, ms[2], 4.5f, 0f);
+        await Wait(0.3f, ct);
+        foreach (var m in ms) if (m != null) MonsterBurnHandler.Apply(m.gameObject, 50f, 6f, 0.5f, c.Player.gameObject);
+        await Wait(0.2f, ct);
+        var hp = new int[ms.Length];
+        for (int i = 0; i < ms.Length; i++) hp[i] = ms[i] != null ? ms[i].CurrentHp : 0;
+        string stamp = DateTime.Now.ToString("HHmmss");
+        c.Gauge.Paused = false;
+        c.Gauge.OpenNoonNow();
+        await Wait(0.12f, ct);
+        ScreenCapture.CaptureScreenshot($"Temp/ui_shots/GQ_{stamp}_harvest.png");
+        await Wait(0.3f, ct);
+        var sb = new StringBuilder();
+        int burst = 0;
+        for (int i = 0; i < ms.Length; i++)
+        {
+            if (ms[i] == null) continue;
+            int d = hp[i] - ms[i].CurrentHp; if (d > 0) burst++;
+            sb.Append($"{d} · ");
+        }
+        c.Line(dawn && c.Gauge.IsNoon && burst == 3, $"정오 진입 → 화상 3체 터짐 (체력 감소 {sb}사진 GQ_{stamp}_harvest)");
+    }
+
+    private static async UniTask ClockCellAsync(Ctx c, CancellationToken ct)
+    {
+        c.Sb.AppendLine("□ 칸 7 적이 없을 때 시계");
+        c.Gauge.Paused = false;
+        await WaitPhase(c.Gauge, ZenithGauge.ZPhase.Charging, 15f, ct);
+        var off = new List<MonsterBase>();
+        foreach (var m in UnityEngine.Object.FindObjectsByType<MonsterBase>(FindObjectsSortMode.None))
+            if (m.gameObject.activeSelf) { m.gameObject.SetActive(false); off.Add(m); }
+        var fT = typeof(ZenithGauge).GetField("_timer", Inst);
+        ResetPhaseTimer(c.Gauge);
+        await Wait(1.5f, ct);
+        float a1 = (float)fT.GetValue(c.Gauge);
+        var ph1 = c.Gauge.CurrentPhase;
+        foreach (var m in off) if (m != null) m.gameObject.SetActive(true);
+        await Wait(1.5f, ct);
+        float a2 = (float)fT.GetValue(c.Gauge);
+        c.Note($"적 없음 1.5초 뒤 여명 시계 {a1:0.00}({ph1}) · 적 되살리고 1.5초 뒤 {a2:0.00}({c.Gauge.CurrentPhase}) · 몬스터 {off.Count}체 껐다 켬");
     }
 
     // ── 1 허브 기본 규칙 ─────────────────────────────────────────

@@ -8,7 +8,11 @@ using UnityEngine;
 /// <summary>
 /// S5 「층계 회랑」 — 보스 처치 뒤 다음 층으로 걸어 오른다(10-03 설계 · 구현 설계 §2). <see cref="ChapterGate"/>의 자리를 맡는다.
 /// <list type="number">
-/// <item>출구 자리(Next_Ch 마커 앞)의 벽이 디졸브로 걷히고 오르는 첫 계단이 나타난다.</item>
+/// <item>출구 자리(Next_Ch 마커 앞)의 벽이 디졸브로 걷히고, 출구 카메라가 닿으면 돌 디딤판 계단이 아래 단부터 한 단씩 바닥에서 솟는다 —
+///       층계참 · 꼭대기 돌 아치 · 아치 안 포탈이 차례로(10-10 사용자 「계단이 느낌 있게 생성되고 올라가는 느낌」, A안).
+///       리소스 = <see cref="StairwaySetSO"/>(Addressables).
+///       층계참 바닥 마법진 · 포탈 열림 분출 · 들어설 때 분출은 뺐다(10-11 이펙트 톤 점검 — 사용자 10-10 「다음 챕터 포탈 아래 이펙트」:
+///       포탈 · 「다음 층으로」 글자와 같은 뜻을 같은 순간에 겹쳐 말했다).</item>
 /// <item>계단 꼭대기에 닿으면 보스방을 떠난다 — 봉인 장면 정리(8b <c>BossStoryScenes.FlushSealed</c>) · 잉크 와이프 ·
 ///       같은 씬 높은 곳에 지어 둔 회랑으로 옮긴다 · 다음 챕터 씬을 미리 불러 둔다(<see cref="ScenePreloader"/>).</item>
 /// <item>회랑 끝 문 → 덮고 다음 챕터(미리 불러 둔 씬을 로딩 화면 없이 켠다 · 대기방 둘러보기 생략).</item>
@@ -20,14 +24,28 @@ public sealed class ChapterStairway : MonoBehaviour
     // ── Constants ─────────────────────────────────────────────────
     private const float CellSize        = 1f;
     private const float CorridorLift    = 200f;   // 회랑을 지을 높이(아레나 위)
-    private const int   EntrySteps      = 4;
-    private const int   EntryWidth      = 5;
+    // 돌계단(10-10) — 한 단 0.25 m(플레이어 StepClimb 0.35 m 아래 · 회랑과 같은 높이) × 8 = 2 m. 더 높이면 꼭대기에서 카메라가 벽 위로 나간다.
+    private const int   StepCount       = 8;
+    private const float StepRise        = 0.25f;
+    private const float StepRun         = 0.75f;
+    private const float StairWidth      = 3.6f;   // 디딤판 두 장(1.8 m)
+    private const float LandingDepth    = 3f;
+    private const int   LandingCells    = 3;
+    private const float AssembleDelay   = 2.4f;   // 출구 카메라 이동(2.5초)이 닿을 무렵 솟기 시작 — 생성 순간이 화면에 잡히게
+    private const float StepInterval    = 0.09f;
+    private const float RiseDuration    = 0.35f;
+    private const float LandingRise     = 0.45f;
+    private const float ArchAppear      = 0.7f;
+    private const float ArchInset       = 0.9f;   // 아치 = 층계참 가운데에서 바깥쪽으로 이만큼
+    private const float PortalGrow      = 0.5f;
+    private const float PortalScale     = 0.45f;  // 아치 안(트인 폭 ≈ 2 m)에 들어가게 — 0.7은 층계참에서 화면을 덮었다(10-10 실측)
     private const float WallOpenRadius  = 3.2f;   // 출구 앞에서 걷어낼 벽 반경
     private const float AppearDuration  = 0.9f;
     private const float WipeDuration    = 0.35f;
     private const float CorridorTimeout = 40f;    // 회랑에 들어선 뒤 이만큼 지나도 끝 문을 못 지나면 자동 진행(소프트락 방지 · 걸어서 ~8초)
     private const float WallPieceMax    = 8f;     // 걷어낼 벽 조각 최대 크기 — 커스텀 아레나의 통짜 벽(Ch2 50 m)은 건드리지 않는다
     private const float DoorTriggerSize = 3.2f;
+    private const float LabelScale      = 0.012f; // 글자 ≈ 0.6 m — 0.02는 아치 위(카메라 높이 근처)에서 화면 위를 덮었다(10-10 실측)
     private const float LabelDilate     = 0.14f;  // Noto는 Thin 마스터 — 0.08은 이 크기(글자 ~1 m)에서 획이 끊겼다(10-02 실측) · 기본 0.18은 굵다
 
     private static readonly Color WipeColor = new(0.05f, 0.04f, 0.09f, 1f);
@@ -44,6 +62,7 @@ public sealed class ChapterStairway : MonoBehaviour
 
     // ── Private ───────────────────────────────────────────────────
     private Vector3      _outward;
+    private Vector3      _rise;      // 계단이 오르는 방향 — 카메라가 보는 쪽(디딤판이 카메라 쪽에 놓여 보인다, 10-10 실측)
     private BlockPalette _lower;
     private BlockPalette _upper;
     private string       _nextScene;
@@ -51,19 +70,22 @@ public sealed class ChapterStairway : MonoBehaviour
     private bool         _leaving;
     private Transform    _entry;
     private Transform    _corridor;
+    private readonly Dictionary<GameObject, Bounds> _localBounds = new();   // 프리팹 → 단위 배치에서의 렌더 범위
     private GameObject   _doorFx;
     private float        _corridorEnteredAt = -1f;
     private Vector3      _doorCenter;
+    private Vector3      _doorFwd;
 
     // ── Public Methods ────────────────────────────────────────────
     /// <param name="groundPos">출구 자리(바닥) — <see cref="BossExitPath"/>가 정한 곳.</param>
-    /// <param name="outward">아레나 밖 쪽(마커 방향) — 계단이 그쪽으로 오른다.</param>
+    /// <param name="outward">아레나 밖 쪽(마커 방향) — 그쪽 벽을 걷는다. 계단이 오르는 방향은 카메라 기준으로 따로 고른다(<see cref="ChooseRise"/>).</param>
     public static ChapterStairway Spawn(Vector3 groundPos, Vector3 outward, BlockPalette lower, BlockPalette upper, string nextScene)
     {
         var go = new GameObject("@ChapterStairway");
         go.transform.position = groundPos;
         var s = go.AddComponent<ChapterStairway>();
         s._outward   = SnapToAxis(outward);
+        s._rise      = ChooseRise(groundPos, s._outward);
         s._lower     = lower;
         s._upper     = upper;
         s._nextScene = nextScene;
@@ -92,54 +114,202 @@ public sealed class ChapterStairway : MonoBehaviour
     {
         try
         {
+            var set = Managers.AddressableManager != null
+                ? await Managers.AddressableManager.TryLoadAssetAsync<StairwaySetSO>(StairwaySetSO.Address) : null;
+            await RunFx.LoadAsync();
+            ct.ThrowIfCancellationRequested();
+            if (set == null || set.StepSlabs == null || set.StepSlabs.Length == 0)
+                throw new Exception($"계단 세트 없음 — {StairwaySetSO.Address}");
+
             // 1) 출구 앞 벽을 걷는다(렌더만 디졸브 — 콜라이더는 남겨 허공으로 떨어지지 않게)
             OpenWall();
 
-            // 2) 첫 계단 — 아레나 바닥 위에서 바깥쪽으로 오른다
-            _entry = MapBuilder.BuildEntrySteps(_lower, transform.position - _outward * (EntrySteps * CellSize), _outward,
-                                                EntrySteps, EntryWidth, CellSize);
-            _entry.SetParent(transform, true);
-            DissolveEffect.PlayAppear(_entry.gameObject, AppearDuration);
+            // 2) 돌계단 — 바닥 아래에 지어 두고(바닥이 가린다) 카메라가 닿으면 아래 단부터 한 단씩 솟는다
+            var columns = new List<Transform>(StepCount);
+            var landing = BuildStone(set, columns);
+            await UniTask.Delay(TimeSpan.FromSeconds(AssembleDelay), DelayType.UnscaledDeltaTime, cancellationToken: ct);
+            for (int k = 0; k < columns.Count; k++)
+            {
+                RiseAsync(columns[k], RiseDuration, ct).Forget();
+                if (k % 2 == 0) Managers.Sound?.PlayEvent(SoundEvent.StairRise);
+                await UniTask.Delay(TimeSpan.FromSeconds(StepInterval), DelayType.UnscaledDeltaTime, cancellationToken: ct);
+            }
+            Managers.Sound?.PlayEvent(SoundEvent.StairRise);
+            await RiseAsync(landing, LandingRise, ct);
 
-            // 꼭대기 트리거 — 마지막 계단 위
+            // 3) 꼭대기 — 돌 아치(디졸브) · 아치 안 포탈이 작게 열려 커진다.
+            // 층계참 바닥 마법진(Hovl 원색 반복 · 굴절층 그대로)과 포탈 열림 분출은 뺐다 — 커지는 포탈 · 열림 소리 · 글자가 이미 「여기로」를 말한다(10-11 톤 점검)
+            float top = StepCount * StepRise;
+            Vector3 archBase = transform.position + _rise * ArchInset + Vector3.up * top;
+            float archH = PlaceArch(set, archBase);
+            await UniTask.Delay(TimeSpan.FromSeconds(ArchAppear * 0.5f), DelayType.UnscaledDeltaTime, cancellationToken: ct);
+            Vector3 portalPos = archBase + Vector3.up * (archH * 0.45f);
+            _doorFx = RunFx.PlayLoop(RunFxSlot.Portal, portalPos, FaceCamera(portalPos, -_rise), PortalScale, Color.clear);
+            Managers.Sound?.PlayEvent(SoundEvent.PortalOpen);
+            if (_doorFx != null)
+            {
+                _doorFx.AddComponent<FaceCameraYaw>();
+                await GrowAsync(_doorFx.transform, PortalGrow, ct);
+            }
+            CreateLabel(archBase + Vector3.up * (archH + 0.35f));
+
+            // 포탈 트리거 — 아치 안(계단을 다 지은 뒤에야 생긴다)
             var trig = new GameObject("TopTrigger");
             trig.transform.SetParent(transform, false);
-            trig.transform.position = transform.position + Vector3.up * (EntrySteps * MapBuilderRise() + 1f);
-            trig.transform.rotation = Quaternion.LookRotation(_outward, Vector3.up);
+            trig.transform.position = archBase + Vector3.up * 1.2f;
+            trig.transform.rotation = Quaternion.LookRotation(_rise, Vector3.up);
             var col = trig.AddComponent<BoxCollider>();
             col.isTrigger = true;
-            col.size = new Vector3(EntryWidth * CellSize, 2.5f, 1.5f);
+            col.size = new Vector3(StairWidth * 0.75f, 2.4f, 1.2f);
             trig.AddComponent<StairTrigger>().Init(this, false);
 
-            await RunFx.LoadAsync();
-            ct.ThrowIfCancellationRequested();
-            // 계단 끝 문 빛 — 「다음 층으로」
-            Vector3 topFxPos = transform.position + Vector3.up * (EntrySteps * MapBuilderRise() + 1.8f);
-            _doorFx = RunFx.PlayLoop(RunFxSlot.Portal, topFxPos, FaceCamera(topFxPos, -_outward), 0.8f, Color.clear);
-            if (_doorFx != null) _doorFx.AddComponent<FaceCameraYaw>();
-            CreateLabel(transform.position + Vector3.up * (EntrySteps * MapBuilderRise() + 4.4f));
-
-            // 3) 회랑을 미리 지어 둔다(같은 씬 높은 곳) — 오르는 순간 바로 옮기도록
+            // 4) 회랑을 미리 지어 둔다(같은 씬 높은 곳) — 오르는 순간 바로 옮기도록. 카메라가 돌아가는 동안이라 지을 때의 끊김이 연출에 안 걸린다.
             _corridor = MapBuilder.BuildStairCorridor(_lower, _upper, transform.position + Vector3.up * CorridorLift, CellSize,
-                                                      new System.Random(), out _doorCenter, out var doorFwd);
+                                                      new System.Random(), out _doorCenter, out _doorFwd);
             var door = new GameObject("DoorTrigger");
             door.transform.SetParent(_corridor, false);
             door.transform.position = _doorCenter + Vector3.up * 1.2f;
-            door.transform.rotation = Quaternion.LookRotation(doorFwd, Vector3.up);
+            door.transform.rotation = Quaternion.LookRotation(_doorFwd, Vector3.up);
             var dcol = door.AddComponent<BoxCollider>();
             dcol.isTrigger = true;
             dcol.size = new Vector3(DoorTriggerSize, 2.5f, 1.5f);
             door.AddComponent<StairTrigger>().Init(this, true);
-            Vector3 doorFxPos = _doorCenter + Vector3.up * 1.8f;
-            var doorFx = RunFx.PlayLoop(RunFxSlot.Portal, doorFxPos, FaceCamera(doorFxPos, -doorFwd), 0.9f, Color.clear);
-            if (doorFx != null) { doorFx.transform.SetParent(_corridor, true); doorFx.AddComponent<FaceCameraYaw>(); }
+            // 회랑 끝 문 포탈은 회랑에 들어설 때 켠다(EnterCorridorAsync) — 미리 켜 두면 보이지도 않는 200 m 위에서 계속 돌았다(10-11 톤 2차 V-6)
             Debug.Log($"[ChapterStairway] 계단 · 회랑 준비 — 다음 {_nextScene}");
         }
         catch (OperationCanceledException) { }
         catch (Exception e) { Debug.LogError($"[ChapterStairway] 짓기 예외 — 게이트로 대신한다: {e}"); FallbackGate(); }
     }
 
-    private static float MapBuilderRise() => 0.25f;   // MapBuilder.StairRise와 같다(계단 높이)
+    /// <summary>
+    /// 돌계단 · 층계참을 바닥 아래에 짓는다 — 단 k(아래 0 → 위)는 디딤판 (k+1)층 기둥, 층계참은 <see cref="StepCount"/>층.
+    /// 디딤판은 폭 두 장 · 단마다 판 무늬를 섞고 반쯤은 뒤집는다. 밟는 판정은 기둥마다 상자 하나(Ground) — 판 자체 콜라이더는 걷는다.
+    /// 반환 = 층계참(솟기 전).
+    /// </summary>
+    private Transform BuildStone(StairwaySetSO set, List<Transform> columns)
+    {
+        _entry = new GameObject("@StairEntry").transform;
+        _entry.SetParent(transform, false);
+        _entry.SetPositionAndRotation(transform.position, Quaternion.LookRotation(_rise, Vector3.up));
+        var rng = new System.Random();
+        for (int k = 0; k < StepCount; k++)
+        {
+            float z = -(LandingDepth * 0.5f + (StepCount - 1 - k + 0.5f) * StepRun);
+            columns.Add(Column(set, $"Step_{k}", new Vector3(0f, 0f, z), StepRun, 1, k + 1, rng));
+        }
+        return Column(set, "Landing", Vector3.zero, LandingDepth, LandingCells, StepCount, rng);
+    }
+
+    private Transform Column(StairwaySetSO set, string name, Vector3 localCenter, float depth, int depthCells, int layers, System.Random rng)
+    {
+        var col = new GameObject(name).transform;
+        col.SetParent(_entry, false);
+        float h = layers * StepRise, cellD = depth / depthCells, halfW = StairWidth * 0.5f;
+        for (int j = 0; j < layers; j++)
+            for (int x = 0; x < 2; x++)
+                for (int d = 0; d < depthCells; d++)
+                {
+                    var prefab = set.StepSlabs[rng.Next(set.StepSlabs.Length)];
+                    if (prefab == null) continue;
+                    var center = new Vector3((x - 0.5f) * halfW, (j + 0.5f) * StepRise, -depth * 0.5f + (d + 0.5f) * cellD);
+                    PlaceFitted(prefab, col, center, new Vector3(halfW, StepRise, cellD), rng.Next(2) == 0);
+                }
+        var box = col.gameObject.AddComponent<BoxCollider>();
+        box.center = new Vector3(0f, h * 0.5f, 0f);
+        box.size   = new Vector3(StairWidth, h, depth);
+        col.gameObject.layer = LayerMask.NameToLayer("Ground");
+        col.localPosition = localCenter + Vector3.down * (h + 0.1f);   // 바닥 아래에서 기다린다
+        return col;
+    }
+
+    /// <summary>프리팹 하나를 상자 <paramref name="size"/>에 꼭 맞게(가운데 <paramref name="center"/>) 놓는다. 콜라이더는 걷는다.</summary>
+    private void PlaceFitted(GameObject prefab, Transform parent, Vector3 center, Vector3 size, bool flip)
+    {
+        var b = LocalBounds(prefab);   // 원래 배율이 들어간 범위 — 그 위에 k를 더 곱한다
+        var k = new Vector3(size.x / Mathf.Max(0.01f, b.size.x), size.y / Mathf.Max(0.01f, b.size.y), size.z / Mathf.Max(0.01f, b.size.z));
+        var rot = flip ? Quaternion.Euler(0f, 180f, 0f) : Quaternion.identity;
+        var go = Instantiate(prefab, parent, false);
+        go.transform.localRotation = rot;
+        go.transform.localScale    = Vector3.Scale(prefab.transform.localScale, k);
+        go.transform.localPosition = center - rot * Vector3.Scale(b.center, k);
+        foreach (var c in go.GetComponentsInChildren<Collider>(true)) Destroy(c);
+    }
+
+    /// <summary>프리팹을 원점 · 단위 배율로 놓았을 때의 렌더 범위(한 번 재고 기억).</summary>
+    private Bounds LocalBounds(GameObject prefab)
+    {
+        if (_localBounds.TryGetValue(prefab, out var b)) return b;
+        var probe = Instantiate(prefab, new Vector3(0f, -5000f, 0f), Quaternion.identity);
+        var rends = probe.GetComponentsInChildren<Renderer>();
+        b = rends.Length > 0 ? rends[0].bounds : new Bounds(probe.transform.position, Vector3.one);
+        foreach (var r in rends) b.Encapsulate(r.bounds);
+        b.center -= probe.transform.position;
+        Destroy(probe);
+        _localBounds[prefab] = b;
+        return b;
+    }
+
+    /// <summary>꼭대기 돌 아치 — 문이 계단 쪽을 향하게 세우고(원본은 X축이 문 방향) 디졸브로 나타난다. 반환 = 높이(m).</summary>
+    private float PlaceArch(StairwaySetSO set, Vector3 basePos)
+    {
+        if (set.Arch == null) return 3f;
+        var b   = LocalBounds(set.Arch);
+        var rot = Quaternion.LookRotation(_rise, Vector3.up) * Quaternion.Euler(0f, -90f, 0f);
+        float sc = set.ArchScale;
+        var go = Instantiate(set.Arch, transform, false);
+        go.transform.rotation   = rot;
+        go.transform.localScale = set.Arch.transform.localScale * sc;
+        var bottom = new Vector3(b.center.x, b.min.y, b.center.z) * sc;
+        go.transform.position = basePos - rot * bottom;
+        foreach (var c in go.GetComponentsInChildren<Collider>(true)) Destroy(c);   // 장식 — 기둥이 문 앞을 막지 않게
+        DissolveEffect.PlayAppear(go, ArchAppear);
+        return b.size.y * sc;
+    }
+
+    /// <summary>다음 챕터 — 다음 씬 이름(GameScene_ChN)의 끝 숫자.</summary>
+    private ChapterId NextChapter()
+    {
+        int n = !string.IsNullOrEmpty(_nextScene) && char.IsDigit(_nextScene[^1]) ? _nextScene[^1] - '0' : 2;
+        return (ChapterId)Mathf.Clamp(n, 1, 4);
+    }
+
+    /// <summary>다음 층 맵 곡 — Ch4는 맵 곡이 없어 지금 곡 그대로(null).</summary>
+    private string NextMapBgm() => NextChapter() switch
+    {
+        ChapterId.Chapter2 => "Ch2_Map",
+        ChapterId.Chapter3 => "Ch3_Map",
+        _ => null,
+    };
+
+    /// <summary>바닥 아래에서 제자리(로컬 y 0)로 솟는다 — 감속.</summary>
+    private static async UniTask RiseAsync(Transform t, float seconds, CancellationToken ct)
+    {
+        float y0 = t.localPosition.y, t0 = Time.unscaledTime;
+        while (true)
+        {
+            float k = Mathf.Clamp01((Time.unscaledTime - t0) / seconds);
+            float e = 1f - (1f - k) * (1f - k) * (1f - k);
+            var p = t.localPosition;
+            p.y = Mathf.Lerp(y0, 0f, e);
+            t.localPosition = p;
+            if (k >= 1f) return;
+            await UniTask.Yield(PlayerLoopTiming.Update, ct);
+        }
+    }
+
+    /// <summary>포탈이 작게 열려 제 크기로 — 감속.</summary>
+    private static async UniTask GrowAsync(Transform t, float seconds, CancellationToken ct)
+    {
+        var full = t.localScale;
+        float t0 = Time.unscaledTime;
+        while (t != null)
+        {
+            float k = Mathf.Clamp01((Time.unscaledTime - t0) / seconds);
+            t.localScale = full * Mathf.Lerp(0.05f, 1f, 1f - (1f - k) * (1f - k));
+            if (k >= 1f) return;
+            await UniTask.Yield(PlayerLoopTiming.Update, ct);
+        }
+    }
 
     /// <summary>
     /// 계단 · 회랑 방향을 방 격자 축(±X · ±Z)에 맞춘다. 블록은 늘 격자 축으로 놓이는데 방향이 대각이면
@@ -150,6 +320,44 @@ public sealed class ChapterStairway : MonoBehaviour
         v.y = 0f;
         if (v.sqrMagnitude < 0.001f) return Vector3.forward;
         return Mathf.Abs(v.x) >= Mathf.Abs(v.z) ? new Vector3(Mathf.Sign(v.x), 0f, 0f) : new Vector3(0f, 0f, Mathf.Sign(v.z));
+    }
+
+    /// <summary>
+    /// 계단이 오르는 방향 — 카메라가 보는 쪽(화면 위)으로 오르게 고른다. 그래야 디딤판이 층계참 앞(카메라 쪽)에 놓여 보인다.
+    /// 출구 마커 쪽으로만 세웠더니 그 쪽이 카메라 쪽인 아레나(Ch1)에서 계단이 층계참 뒤에 가려 「돌벽 위 아치」로만 보였다(10-10 실측).
+    /// 디딤판 자리에 바닥이 없거나 벽이 있으면 옆(바깥쪽에 가까운 것 먼저) → 마지막에 카메라 쪽.
+    /// </summary>
+    private static Vector3 ChooseRise(Vector3 ground, Vector3 outward)
+    {
+        var cam = Camera.main;
+        var d0 = SnapToAxis(cam != null ? cam.transform.forward : outward);
+        var side = new Vector3(d0.z, 0f, -d0.x);
+        if (Vector3.Dot(side, outward) < 0f) side = -side;
+        foreach (var d in new[] { d0, side, -side, -d0 })
+            if (FootprintClear(ground, d))
+            {
+                Debug.Log($"[ChapterStairway] 오름 방향 {d} (바깥 {outward})");
+                return d;
+            }
+        Debug.LogWarning($"[ChapterStairway] 디딤판 자리가 다 막혔다 — 카메라 쪽 {d0}으로 세운다");
+        return d0;
+    }
+
+    /// <summary>층계참 앞 디딤판 자리(바닥 높이 ±0.6 m)에 바닥이 이어지고 벽이 없는가.</summary>
+    private static bool FootprintClear(Vector3 ground, Vector3 rise)
+    {
+        float run  = StepCount * StepRun;
+        int   mask = LayerMask.GetMask("Ground");
+        for (float t = LandingDepth * 0.5f + 0.4f; t <= LandingDepth * 0.5f + run; t += 1.4f)
+            foreach (float x in new[] { -StairWidth * 0.4f, StairWidth * 0.4f })
+            {
+                var p = ground - rise * t + new Vector3(rise.z, 0f, -rise.x) * x;
+                if (!Physics.Raycast(p + Vector3.up * 3f, Vector3.down, out var hit, 6f, mask, QueryTriggerInteraction.Ignore)) return false;
+                if (Mathf.Abs(hit.point.y - ground.y) > 0.6f) return false;
+            }
+        var center = ground - rise * (LandingDepth * 0.5f + run * 0.5f) + Vector3.up * 1.2f;
+        return !Physics.CheckBox(center, new Vector3(StairWidth * 0.5f, 1f, run * 0.5f), Quaternion.LookRotation(rise, Vector3.up),
+                                 LayerMask.GetMask("Wall"), QueryTriggerInteraction.Ignore);
     }
 
     /// <summary>
@@ -206,7 +414,7 @@ public sealed class ChapterStairway : MonoBehaviour
         if (Camera.main != null) go.transform.rotation = Camera.main.transform.rotation;
         var rt = go.GetComponent<RectTransform>();
         rt.sizeDelta  = new Vector2(320f, 90f);
-        rt.localScale = Vector3.one * 0.02f;
+        rt.localScale = Vector3.one * LabelScale;
         var tmp = go.AddComponent<TextMeshProUGUI>();
         tmp.text      = "다음 층으로";
         tmp.fontSize  = 48f;
@@ -244,14 +452,23 @@ public sealed class ChapterStairway : MonoBehaviour
         try
         {
             RelicFairy.Monster.BossStoryScenes.FlushSealed();   // 8b 요청 — 보스방을 떠나는 순간 봉인된 몸을 치운다
-            Vector2 dir = new Vector2(_outward.x, _outward.z);
+            Managers.Sound?.PlayEvent(SoundEvent.PortalEnter);
+            // 들어설 때 분출은 뺐다 — 0.35초 와이프가 바로 덮어 화면에 남지 않았다(10-11 톤 점검)
+            Vector2 dir = new Vector2(_rise.x, _rise.z);   // 걸어 들어가는 쪽으로 덮는다
             await ScreenFade.CoverAsync(dir, WipeColor, WipeDuration, WipeCurve, ct);
+            // 보스 곡이 회랑까지 이어졌다 — 다음 층 맵 곡으로(10-10). Ch4로 가는 길은 맵 곡이 없어 그대로.
+            var bgm = NextMapBgm();
+            if (bgm != null) Managers.Sound?.PlayBgmAsync(bgm).Forget();
             if (player != null)
             {
                 var start = _corridor.position + Vector3.up * 0.1f;
                 player.transform.SetPositionAndRotation(start, Quaternion.LookRotation(Vector3.forward, Vector3.up));
+                player.RequestFacing(Quaternion.LookRotation(Vector3.forward, Vector3.up));   // 방향 목표도 — 안 하면 다음 물리 프레임에 옛 방향으로 돌아갔다(10-09 출시 점검)
                 if (player.TryGetComponent<Rigidbody>(out var rb)) { rb.position = start; rb.linearVelocity = Vector3.zero; }
             }
+            Vector3 doorFxPos = _doorCenter + Vector3.up * 1.8f;
+            var doorFx = RunFx.PlayLoop(RunFxSlot.Portal, doorFxPos, FaceCamera(doorFxPos, -_doorFwd), 0.9f, Color.clear);
+            if (doorFx != null) { doorFx.transform.SetParent(_corridor, true); doorFx.AddComponent<FaceCameraYaw>(); }
             ScenePreloader.Begin(_nextScene);
             _corridorEnteredAt = Time.unscaledTime;
             await UniTask.Delay(TimeSpan.FromSeconds(0.15f), DelayType.UnscaledDeltaTime, cancellationToken: ct);   // 카메라가 따라붙을 틈

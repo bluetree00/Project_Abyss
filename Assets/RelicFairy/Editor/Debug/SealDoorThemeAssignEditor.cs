@@ -6,7 +6,8 @@ using UnityEngine;
 
 /// <summary>
 /// 10-05 챕터 방 봉인 문 테마 배정 — 팔레트마다 실제 문 모델(Gothic_Interior)을 꽂는다(사용자 10-02 「문도 제대로 된 오브젝트로 — 챕터방들」).
-/// 문 세우기는 <see cref="SealDoorFit"/>(돌려 세움 · 균등 배율 · 좁으면 쌍문). 나무문 = Swing(경첩 젖힘, 10-06) · 쇠창살 = Drop(내리닫이) — 숲의 Grow(뿌리 자람)는 문이라 맞지 않아 바꾼다.
+/// 문 세우기는 <see cref="SealDoorFit"/>(돌려 세움 · 균등 배율 · 좁으면 쌍문). 움직임은 전부 Dissolve(10-06 사용자 「문 연출은 애매 — 디졸브로 사라지면서 열리게」 —
+/// 그 전 나무문 Swing · 쇠창살 Drop).
 /// 배정 표는 아래 한 곳. 결과: Temp/seal_door_assign.txt · 로그 「[DoorAssign] 끝」.
 /// </summary>
 public static class SealDoorThemeAssignEditor
@@ -17,11 +18,11 @@ public static class SealDoorThemeAssignEditor
     // 팔레트 → 문(테마): 숲 = 아치 나무 쌍문 · 동굴(Ch2) = 쇠창살 문 · 성채(Ch3) = 장식 고딕 문(쌍) · 왕좌(Ch4) = 아치 쇠창살 문 · 심연 = 부서진 문
     private static readonly (string palette, string door, SealDoorMotion motion)[] Table =
     {
-        ("BlockPalette_Forest", "SM_Door_01a",              SealDoorMotion.Swing),
-        ("BlockPalette_Cave",   "SM_BarMetalDoor_01a",      SealDoorMotion.Drop),
-        ("BlockPalette_Castle", "SM_Door_03b",              SealDoorMotion.Swing),
-        ("BlockPalette_Throne", "SM_BarMetalFrameDoor_01a", SealDoorMotion.Drop),
-        ("BlockPalette_Abyss",  "SM_Door_Broken_01a",       SealDoorMotion.Swing),
+        ("BlockPalette_Forest", "SM_Door_01a",              SealDoorMotion.Dissolve),
+        ("BlockPalette_Cave",   "SM_BarMetalDoor_01a",      SealDoorMotion.Dissolve),
+        ("BlockPalette_Castle", "SM_Door_03b",              SealDoorMotion.Dissolve),
+        ("BlockPalette_Throne", "SM_BarMetalFrameDoor_01a", SealDoorMotion.Dissolve),
+        ("BlockPalette_Abyss",  "SM_Door_Broken_01a",       SealDoorMotion.Dissolve),
     };
 
     [MenuItem("RelicFairy/Setup/10-05 봉인 문 테마 배정")]

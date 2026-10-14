@@ -29,6 +29,8 @@ public sealed class EndingCardOverlay : MonoBehaviour
     private const float ScreenHeight       = 1080f;
     private const string TitleTag          = "title";
     private const string HeaderTag         = "header";
+    private const string BackdropKey       = "Illust_Story_EndingCard";   // 엔딩 카드 배경 그림(10-13 힉스필드)
+    private const float  BackdropDim       = 0.55f;                       // 그림 위 어둠 — 흰 글자 · 크레딧이 읽히게
 
     private static readonly Color BodyColor = new Color(0.92f, 0.92f, 0.95f);
 
@@ -37,6 +39,16 @@ public sealed class EndingCardOverlay : MonoBehaviour
     private TextMeshProUGUI _card;
     private RectTransform   _credits;
     private float           _phaseStart;
+    private Image           _backdrop;
+    private Image           _dim;
+    private Action          _release;
+
+    // ── Lifecycle ─────────────────────────────────────────────────
+    private void OnDestroy()
+    {
+        _release?.Invoke();
+        _release = null;
+    }
 
     // ── Public Methods ────────────────────────────────────────────
     /// <summary>카드 → 크레딧을 튼다. 끝나면 화면을 검게 덮은 채(ScreenFade) 오버레이를 거둔다 — 뒤이은 귀환 연출이 이어받는다.</summary>
@@ -55,6 +67,30 @@ public sealed class EndingCardOverlay : MonoBehaviour
     }
 
     // ── Private Methods ───────────────────────────────────────────
+    private static Image NewLayer(Transform parent, string name, Color color)
+    {
+        var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+        go.transform.SetParent(parent, false);
+        Stretch((RectTransform)go.transform);
+        var img = go.GetComponent<Image>();
+        img.color         = color;
+        img.raycastTarget = false;
+        return img;
+    }
+
+    private async UniTask LoadBackdropAsync()
+    {
+        var addressables = Managers.AddressableManager;
+        if (addressables == null || _backdrop == null) return;
+        var sprite = await addressables.TryLoadAssetAsync<Sprite>(BackdropKey);
+        if (sprite == null) return;
+        if (this == null) { addressables.ReleaseAsset<Sprite>(BackdropKey); return; }
+        _release         = () => addressables.ReleaseAsset<Sprite>(BackdropKey);
+        _backdrop.sprite = sprite;
+        _backdrop.color  = Color.white;
+        _dim.color       = new Color(0f, 0f, 0f, BackdropDim);
+    }
+
     private static EndingCardOverlay Create()
     {
         var canvasGO = new GameObject("EndingCardCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(CanvasGroup));
@@ -78,6 +114,11 @@ public sealed class EndingCardOverlay : MonoBehaviour
         Stretch((RectTransform)bg.transform);
         bg.GetComponent<Image>().color = Color.black;
 
+        // 배경 그림 — 불러오면 깔고 어둡게 덮는다. 없으면 검은 바탕 그대로(그림은 RunAsync 첫머리에 불러온다)
+        overlay._backdrop = NewLayer(canvasGO.transform, "Backdrop", new Color(1f, 1f, 1f, 0f));
+        overlay._backdrop.preserveAspect = true;
+        overlay._dim = NewLayer(canvasGO.transform, "Dim", new Color(0f, 0f, 0f, 0f));
+
         overlay._card = MakeText(canvasGO.transform, "Card", CardBodySize, BodyColor);
         var cardRt = overlay._card.rectTransform;
         cardRt.sizeDelta = new Vector2(1500f, 200f);
@@ -93,6 +134,7 @@ public sealed class EndingCardOverlay : MonoBehaviour
 
     private async UniTask RunAsync(DialogueLine[] cardLines, DialogueLine[] creditLines, CancellationToken ct)
     {
+        await LoadBackdropAsync();
         await FadeAsync(_group, 1f, FadeSeconds, ct);
 
         if (cardLines != null && cardLines.Length > 0)

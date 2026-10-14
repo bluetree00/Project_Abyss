@@ -21,7 +21,7 @@ MonoBehaviour:
     type: 3}
   playerStatusEffect: {fileID: 0}
   patternTag: page3finalcircle
-  breakOverride: 0.5
+  breakOverride: 1
   targetPage: 3
   form: 3
   dialogueKey: Lich_Page3

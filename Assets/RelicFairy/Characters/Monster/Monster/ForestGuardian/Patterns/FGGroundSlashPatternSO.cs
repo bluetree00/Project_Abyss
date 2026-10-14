@@ -225,6 +225,7 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
 
         int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
         player.TakeDamage(dmg, ctx.Monster.gameObject);
+        if (player.IsInvincible) return;   // 회피 · 무적으로 막혔으면 날리지 않는다(10-08 점검 — 피해는 막고 몸만 날아갔다)
 
         // 위로 + 보스에서 멀어지는 방향으로 발사
         Vector3 outDir = playerPos - bossPos;

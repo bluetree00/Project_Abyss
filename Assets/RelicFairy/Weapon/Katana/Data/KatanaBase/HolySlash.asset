@@ -24,21 +24,21 @@ MonoBehaviour:
   explodeRadius: 3
   explodeDamage: 30
   explodeEffectKey: FrontAttackHit
-  explodeEffectScale: 2
+  explodeEffectScale: 4.5
   endDelay: 0.3
   dashEffectKey: 
   dashTrailKey: 
   slashEffectKey: HolySlashFinish
   hitEffectKey: SwordHitImpact
-  hitEffectScale: 0.34
+  hitEffectScale: 0.23
   dashLineEffectKey: KatanaDashLine
   dashLineScale: 1.5
   tier2ExtraHitKey: KatanaSlashHit
-  tier2ExtraHitScale: 0.5
+  tier2ExtraHitScale: 0.1
   tier2DashMuzzleKey: 
   tier2DashMuzzleScale: 1.5
   tier3BurstEffectKey: MissileExplosion
-  tier3BurstScale: 3
+  tier3BurstScale: 0.65
   tier3DashLineExtraKey: 
   tier3DashLineExtraScale: 1.5
   animationOverride: QSkill_02

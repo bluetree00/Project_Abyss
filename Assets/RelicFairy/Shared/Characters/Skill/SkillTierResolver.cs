@@ -58,6 +58,9 @@ public static class SkillTierResolver
         return true;
     }
 
+    /// <summary>단계 임계(근접 = 강화 단계 {3, 6} · 원거리 = 파츠 레벨 합 {2, 10}) — 재련소 막대 ◇ · 성장 길(10-08).</summary>
+    public static int[] Milestones(WeaponData wd) => wd == null ? System.Array.Empty<int>() : MilestonesFor(wd);
+
     public static bool IsRanged(WeaponData wd)
         => wd != null && wd.weaponType.GetAttackStatKind() == AttackStatKind.Ranged;
 

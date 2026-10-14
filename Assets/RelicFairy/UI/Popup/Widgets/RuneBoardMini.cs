@@ -31,8 +31,12 @@ public sealed class RuneBoardMini
     private const float PipGap   = 4f;
     private const int   MaxTier  = 4;     // 속성 단계 30 · 50 · 70 · 100%
 
-    private const float EmptyAlpha  = 0.30f;
-    private const float CenterAlpha = 0.22f;
+    // 빈 칸은 옅게(10-11 v2 0.30 → 0.18 · 중앙도 같은 비율) — 놓인 칸(타일 · 불투명)과 차이를 키운다. 색은 채워진 것에만.
+    private const float EmptyAlpha  = 0.18f;
+    private const float CenterAlpha = 0.13f;
+    // 글자(10-11 v2 — Noto · 가짜 굵게 없음): 제목 500 17 · 나머지 15.
+    private const float TitleSize = 17f;
+    private const float TextSize  = 15f;
     private const float HintAlpha   = 0.60f;   // 고른 룬이 들어갈 수 있는 빈 칸 — 놓인 칸(타일 · 불투명)보다는 옅게
     private const float OffAlpha    = 0.08f;   // 고른 룬이 못 들어가는 빈 칸
     private const float RowOffAlpha = 0.45f;   // 고른 룬과 다른 속성 줄
@@ -127,17 +131,17 @@ public sealed class RuneBoardMini
         }
 
         // ── 제목 · 전체 채움 ──
-        int allTotal = 0, allFilled = 0;
+        int allTotal = 0;
         foreach (var kv in totals)  allTotal  += kv.Value;
-        foreach (var kv in filled)  allFilled += kv.Value;
 
-        var title = ShopUIStyle.MakeText(panel, "Title", 18f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextPrimary);
+        var title = Label(panel, "Title", UIWeight.Medium, TitleSize, TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextPrimary);
         PlaceTL(title.rectTransform, Pad, TitleY, width * 0.5f, TitleH);
         title.text = "지금 룬판";
 
-        var total = ShopUIStyle.MakeText(panel, "Total", 16f, FontStyles.Normal, TextAlignmentOptions.MidlineRight, ShopUIStyle.TextDim);
+        var total = Label(panel, "Total", UIWeight.Regular, TextSize, TextAlignmentOptions.MidlineRight, ShopUIStyle.TextDim);
         PlaceTL(total.rectTransform, width * 0.5f, TitleY, width * 0.5f - Pad, TitleH);
-        total.text = $"<color=#{ColorUtility.ToHtmlStringRGB(ShopUIStyle.TextPrimary)}>{allFilled}</color> / {allTotal}칸";
+        // 판 전체 칸(132)이 아니라 룬 수 상한 — 판에 놓을 수 있는 룬은 RuneBlockBudget.Max개까지다(10-08 · 10-10 칸 → 개수).
+        total.text = $"룬 <color=#{ColorUtility.ToHtmlStringRGB(ShopUIStyle.TextPrimary)}>{RuneBlockBudget.Used}</color> / {RuneBlockBudget.Max}";
 
         // ── 속성 줄 — 채운 칸 / 존 칸 · 단계 ──
         float y = BoardY + rowCount * step + RowsGap;
@@ -158,12 +162,12 @@ public sealed class RuneBoardMini
             if (tileArt != null) { dot.sprite = tileArt; dot.preserveAspect = true; }
             PlaceTL(dot.rectTransform, 0f, (RowH - TileSize) * 0.5f, TileSize, TileSize);
 
-            var name = ShopUIStyle.MakeText(row, "Name", 16f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft, def.Color);
+            var name = Label(row, "Name", UIWeight.Medium, TextSize, TextAlignmentOptions.MidlineLeft, def.Color);
             PlaceTL(name.rectTransform, TileSize + 6f, 0f, NameW, RowH);
             name.text = def.Name;
 
-            var count = ShopUIStyle.MakeText(row, "Count", 16f, FontStyles.Normal, TextAlignmentOptions.MidlineRight,
-                                             zf > 0 ? ShopUIStyle.TextPrimary : ShopUIStyle.TextDim);
+            var count = Label(row, "Count", UIWeight.Regular, TextSize, TextAlignmentOptions.MidlineRight,
+                              zf > 0 ? ShopUIStyle.TextPrimary : ShopUIStyle.TextDim);
             PlaceTL(count.rectTransform, TileSize + 6f + NameW, 0f, CountW, RowH);
             count.text = $"{zf}/{zt}";
 
@@ -204,6 +208,14 @@ public sealed class RuneBoardMini
 
     private static Color EmptyColor(Cell c)
         => WithAlpha(c.Zone, c.Code == ElementDef.CenterCode ? CenterAlpha : EmptyAlpha);
+
+    /// <summary>톤 v2 글자(10-11) — Noto 굵기 글꼴 · 가짜 굵게 없음 · 소프트 그림자.</summary>
+    private static TMP_Text Label(RectTransform parent, string name, UIWeight weight, float size, TextAlignmentOptions align, Color color)
+    {
+        var t = ShopUIStyle.MakeText(parent, name, size, FontStyles.Normal, align, color);
+        UITheme.StyleThinText(t, weight, size, color, shadow: true);
+        return t;
+    }
 
     private static RuntimeItemData FindPlaced(RunItemInventory inventory, string instanceId)
     {

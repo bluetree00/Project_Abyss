@@ -240,6 +240,7 @@ public class FGHeartOfForestState : FullLockState<FGHeartOfForestPatternSO>
             float  band  = Mathf.Max(0.5f, half - Data.creepInnerHalfSize);
             _creep = BossStageHazard.CreateEdgeBand(fg, arena, fg.ArenaFloorY, band, Data.channelDuration,
                                                     fg.ThornBandColor, null, 1f, fg.ThornBandDamageMult);
+            _creep.SkipWhereCovered(fg.ThornBand);   // 영구 띠와 겹친 가장자리는 영구 띠만 찌른다 — 주기마다 두 번 맞았다(10-08 점검)
             fg.NotifyVulnerableWindow(Data.channelDuration);
         }
 
@@ -326,7 +327,7 @@ public class FGHeartOfForestState : FullLockState<FGHeartOfForestPatternSO>
     {
         PatternGuideHelper.SafeDestroy(ref _heartGO);
         PatternGuideHelper.SafeDestroy(ref _shockGO);
-        if (_creep != null) Object.Destroy(_creep.gameObject);
+        if (_creep != null) _creep.Dismiss();   // 차오른 가시 띠는 물러난 뒤 스스로 지운다(10-12 디졸브 원칙)
         _creep = null;
         if (_channelFx != null) Object.Destroy(_channelFx);
         _channelFx = null;

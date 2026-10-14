@@ -20,11 +20,20 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
     private const float Pad    = 44f;
     private const float BtnW   = 260f, BtnH = 60f;
     private const float HeaderSize = 24f, NameSize = 22f, LineSize = 19f;
+    private const float CrestSize  = 40f;   // 제목 양옆 유물 문장
     private const float GroupGap = 22f, RowGap = 12f, LineGap = 3f;
+    // 10-13 Artsystack — 묶음 머리 문양 24 · 밑줄(selected_line 비율 320:46) · 묶음 사이 구분선(Line_1)
+    private const float GlyphSize = 24f, GlyphGap = 8f;
+    private const float UnderlineW = 104f, UnderlineH = 15f;
+    private const float DividerH = 8f;
 
     private static readonly Color LineLit    = UITheme.Ink;
     private static readonly Color LineLocked = new(0.62f, 0.60f, 0.64f, 0.55f);
     private static readonly Color AwakeColor = new(0.55f, 0.85f, 0.55f, 1f);
+    // 단계 표 글자색(리치 텍스트) — 지금 단계 금 · 닿은 단계 잉크 · 아직 흐림
+    private static readonly string GoldHex   = "#" + ColorUtility.ToHtmlStringRGB(UITheme.Gold);
+    private static readonly string LitHex    = "#" + ColorUtility.ToHtmlStringRGB(UITheme.Ink);
+    private static readonly string LockedHex = "#" + ColorUtility.ToHtmlStringRGBA(LineLocked);
     private static readonly Color[] GradeColor =
     {
         new(0.62f, 0.60f, 0.64f), // 없음
@@ -45,6 +54,7 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
 
     private sealed class Group
     {
+        public string Anchor;   // 자리 키(문양) — 계단 머리 · 반응은 null/문양 없음
         public string Title;
         public string Note;
         public readonly List<Row> Rows = new();
@@ -55,6 +65,8 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
     private RectTransform _content;
     private ScrollRect    _scroll;
     private TMP_Text      _title;
+    private Image         _crestL;
+    private Image         _crestR;
     private TMP_Text      _empty;
     private Action        _onBack;
 
@@ -78,6 +90,7 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
         gameObject.SetActive(true);
         Render(BuildGroups(out string relicName));
         _title.text = string.IsNullOrEmpty(relicName) ? "되찾은 기억" : $"되찾은 기억 — {relicName}";
+        ApplyCrest(AppBootstrapper.Instance?.Loadout?.Relic);
         if (_scroll != null) _scroll.verticalNormalizedPosition = 1f;
     }
 
@@ -109,6 +122,7 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
         var player = GameRunBootstrapper.Instance?.Run?.Player;
         var runes  = player != null ? player.RuneEffectsOrNull : null;
         bool gawain = relicId == "gawain";
+        groups.Add(BaseRules(gawain, player));   // 10-12 4b 요청 6 — 맨 위 「기본 규칙」
         string[] order = gawain
             ? new[] { RelicPartAnchor.Dawn, RelicPartAnchor.Noon, RelicPartAnchor.Dusk, RelicPartAnchor.DawnNoon, RelicPartAnchor.NoonDusk, RelicPartAnchor.Reaction }
             : new[] { RelicPartAnchor.R10, RelicPartAnchor.R20, RelicPartAnchor.R30, RelicPartAnchor.R40, RelicPartAnchor.Frenzy, RelicPartAnchor.Judgment, RelicPartAnchor.Reaction };
@@ -116,13 +130,18 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
         if (!gawain)
         {
             int ladder = RelicResonance.LancelotLadder(loadout);
-            string text = RelicResonance.LadderText(RelicResonance.LancelotTier(ladder));
-            groups.Add(new Group { Title = $"이어진 계단 {ladder}", Note = string.IsNullOrEmpty(text) ? "광기 10부터 끊김 없이 조각을 달면 계단이 이어진다(2 · 3 · 4)" : text });
+            int tier   = RelicResonance.LancelotTier(ladder);
+            groups.Add(new Group
+            {
+                Title = $"이어진 계단 {ladder}",
+                Note  = "광기 10부터 끊김 없이 조각을 달면 계단이 이어진다\n"
+                      + TierTable(tier, (2, RelicResonance.LadderText(2)), (3, RelicResonance.LadderText(3)), (4, RelicResonance.LadderText(4))),
+            });
         }
 
         foreach (var anchor in order)
         {
-            var g = new Group { Title = RelicPartAnchor.Label(anchor) };
+            var g = new Group { Anchor = anchor, Title = RelicPartAnchor.Label(anchor) };
             foreach (var e in owned) if (e.anchor == anchor) g.Rows.Add(MakeRow(e, loadout, runes));
             int echo = loadout.GetRelicEcho(anchor);
             if (g.Rows.Count == 0 && echo <= 0) continue;
@@ -132,12 +151,63 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
                 int tier  = RelicResonance.GawainTier(count);
                 string tierText = RelicResonance.GawainTierText(anchor, tier);
                 g.Title += $"  ·  {count}개" + (tier >= 2 ? $"  ·  공명 {tier}" : string.Empty);
-                g.Note = tier >= 2 ? tierText : "같은 시간대에 2 · 4개를 모으면 공명";
+                // 단계 효과는 누적이다 — 2단계 · 4단계를 함께 보이고 지금 단계만 금(10-12 4b 요청 6, 예전엔 지금 단계 글만 보여 2단계가 사라진 듯했다)
+                g.Note = TierTable(tier, (2, RelicResonance.GawainTierText(anchor, 2)), (4, RelicResonance.GawainTierText(anchor, 4)));
             }
             if (echo > 0) g.Title += $"  ·  메아리 {echo}";
+            if (anchor == RelicPartAnchor.Reaction) g.Note = CrossLightNote(gawain, player);
             groups.Add(g);
         }
         return groups;
+    }
+
+    /// <summary>맨 위 「기본 규칙」 — 조각 없이도 돌아가는 유물 규칙과 지금 상한(10-12 4b 요청 6).</summary>
+    private static Group BaseRules(bool gawain, PlayerController player)
+    {
+        if (gawain)
+        {
+            int cap = GawainMemoryHub.SunmarkCapOf(player);
+            return new Group
+            {
+                Title = "기본 규칙",
+                Note  = $"태양흔 — 여명에 적중 1 · 같은 적 0.5초에 한 번 · 상한 {cap}"
+                      + (cap < GawainMemoryHub.DawnTier2Cap ? $"(여명 공명 2 → {GawainMemoryHub.DawnTier2Cap})" : string.Empty)
+                      + $"\n개화 — 1스택 = 공격력 {GawainMemoryHub.BloomAtkRatio * 100f:0}% · 반경 {GawainMemoryHub.BloomRadius:0.#} m"
+                      + $"\n정오 수확 — {GawainMemoryHub.HarvestRadius:0} m 안 태양흔 적 전부",
+            };
+        }
+        int brand = LancelotMemoryHub.BrandCapOf(player);
+        return new Group
+        {
+            Title = "기본 규칙",
+            Note  = $"낙인 — 광기 20+ 적중 1 · 상한 {brand}(광기의 눈 {LancelotMemoryHub.EyeBrandCap} · {LancelotMemoryHub.EyeBrandCapMax})"
+                  + $"\n찢기 — X자 1회 = 공격력 {LancelotMemoryHub.TearAtkRatio * 100f:0}%"
+                  + $"\n원한 — 넘친 낙인이 쌓인다 · 상한 {LancelotMemoryHub.GrudgeCap}"
+                  + $"\n참격파 — 원한 1개 = {LancelotMemoryHub.WaveLength:0} m 1줄 · 공격력 {LancelotMemoryHub.WaveAtkRatio * 100f:0}%",
+        };
+    }
+
+    /// <summary>단계 누적 표 — 닿은 단계는 밝게, 지금 단계는 금, 아직은 흐리게 「◇」.</summary>
+    private static string TierTable(int current, params (int tier, string text)[] rows)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var (tier, text) in rows)
+        {
+            if (string.IsNullOrEmpty(text)) continue;
+            if (sb.Length > 0) sb.Append('\n');
+            string col = tier == current ? GoldHex : tier < current ? LitHex : LockedHex;
+            sb.Append("<color=").Append(col).Append('>').Append(tier <= current ? "◆ " : "◇ ").Append(tier).Append("단계 — ").Append(text).Append("</color>");
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>엇갈린 빛(두 유물 공통 · 10-12 A3) — 조건 한 줄 + 지금 대기 · 켜짐.</summary>
+    private static string CrossLightNote(bool gawain, PlayerController player)
+    {
+        bool on = gawain ? GawainMemoryHub.Of(player)?.HasCrossLight == true : LancelotMemoryHub.Of(player)?.HasCrossLight == true;
+        string next = gawain ? "다음 수확" : "다음 찢기";
+        return $"엇갈린 빛 — 반응 조각 2개 + 서로 다른 반응 둘을 10초 안 → {next}가 스택을 남긴다  "
+             + (on ? $"<color={GoldHex}>◆ 켜짐</color>" : $"<color={LockedHex}>◇ 대기</color>");
     }
 
     private static Row MakeRow(RelicPartEntry e, PlayerLoadout loadout, RuneEffectDispatcher runes)
@@ -156,7 +226,7 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
 
     private static string RuneElementLabel(string el) => el switch
     {
-        "fire" => "불", "ice" => "얼음", "electric" => "번개", "grass" => "독", "light" => "빛", "dark" => "어둠", _ => el,
+        "fire" => "불", "ice" => "물", "electric" => "전기", "grass" => "풀", "light" => "빛", "dark" => "어둠", _ => el,
     };
 
     // ── View ─────────────────────────────────────────────────
@@ -168,9 +238,12 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
         _panel.anchorMin = _panel.anchorMax = _panel.pivot = new Vector2(0.5f, 0.5f);
         _panel.sizeDelta = new Vector2(PanelW, PanelH);
         UITheme.StylePanel(panel, UITheme.Window);
+        ShopUIStyle.Skin(panel, UISkin.RelicPartDraft?.background, sliced: true);   // 10-13 Artsystack 남색 판(되살아난 기억 · 제단과 같은 판)
 
         _title = NewText("Title", _panel, "되찾은 기억", 32f, UITheme.Gold, TextAlignmentOptions.Center);
         Place(_title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -30f), new Vector2(PanelW - 80f, 44f));
+        _crestL = NewCrest("CrestL");   // 유물 문장(10-13 힉스필드) — 제목 양옆, Open에서 글 폭에 맞춰 놓는다
+        _crestR = NewCrest("CrestR");
 
         // 스크롤 판 — 제목 아래 · 버튼 위
         var viewport = NewRect("Viewport", _panel);
@@ -223,9 +296,26 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
 
         float width = _panel.sizeDelta.x - Pad * 2f;
         float y = 0f;
-        foreach (var g in groups)
+        var skin      = UISkin.RelicPartDraft;
+        var underline = UISpriteMaster.Neutral(skin?.GroupUnderline);
+        var divider   = UISpriteMaster.Neutral(skin?.GroupDivider);
+        for (int gi = 0; gi < groups.Count; gi++)
         {
-            y = AddLine(g.Title, HeaderSize, UITheme.Gold, 0f, y, width, FontStyles.Bold);
+            var g = groups[gi];
+            // 머리 — 자리 문양(있으면) + 이름 + 밑줄(10-13 Artsystack)
+            var glyph = skin?.AnchorArt(g.Anchor);
+            float hx = 0f;
+            if (glyph != null)
+            {
+                AddSprite("Glyph", glyph, 0f, y + (HeaderSize * 1.25f - GlyphSize) * 0.5f, GlyphSize, GlyphSize, UITheme.Gold, true);
+                hx = GlyphSize + GlyphGap;
+            }
+            y = AddLine(g.Title, HeaderSize, UITheme.Gold, hx, y, width - hx, FontStyles.Bold);
+            if (underline != null)
+            {
+                AddSprite("Underline", underline, hx, y + 1f, UnderlineW, UnderlineH, UITheme.Thin.LineActive, false);
+                y += UnderlineH + 2f;
+            }
             if (!string.IsNullOrEmpty(g.Note)) y = AddLine(g.Note, LineSize, UITheme.Mute, 0f, y + LineGap, width, FontStyles.Normal);
             foreach (var r in g.Rows)
             {
@@ -242,6 +332,10 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
                 }
                 if (r.RuneNote != null)
                     y = AddLine(r.RuneNote, LineSize, r.RuneAwake ? AwakeColor : LineLocked, 36f, y + LineGap, width - 36f, FontStyles.Normal);
+            }
+            if (divider != null && gi < groups.Count - 1)
+            {
+                AddSprite("Divider", divider, 0f, y + (GroupGap - DividerH) * 0.5f, width, DividerH, UITheme.Thin.InkA(0.35f), false);
             }
             y += GroupGap;
         }
@@ -270,6 +364,20 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
         return y + h;
     }
 
+    /// <summary>목록에 그림 한 장(왼쪽 위 기준 · 글자와 같은 좌표계). 글리프는 비율 유지.</summary>
+    private void AddSprite(string name, Sprite sprite, float x, float y, float w, float h, Color color, bool keepAspect)
+    {
+        var img = NewImage(name, _content, color);
+        img.sprite = sprite;
+        img.preserveAspect = keepAspect;
+        img.raycastTarget  = false;
+        var rt = img.rectTransform;
+        rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
+        rt.pivot = new Vector2(0f, 1f);
+        rt.anchoredPosition = new Vector2(x, -y);
+        rt.sizeDelta = new Vector2(w, h);
+    }
+
     // ── 도우미 ───────────────────────────────────────────────
 
     private static void Stretch(RectTransform rt)
@@ -277,6 +385,35 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
         rt.anchorMin = Vector2.zero;
         rt.anchorMax = Vector2.one;
         rt.offsetMin = rt.offsetMax = Vector2.zero;
+    }
+
+    private Image NewCrest(string name)
+    {
+        var img = NewImage(name, _panel, Color.white);
+        img.raycastTarget  = false;
+        img.preserveAspect = true;
+        var rt = img.rectTransform;
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(CrestSize, CrestSize);
+        img.gameObject.SetActive(false);
+        return img;
+    }
+
+    /// <summary>제목 양옆에 유물 문장을 유물 색으로. 문장이 없는 유물은 숨긴다.</summary>
+    private void ApplyCrest(RelicClassSO relic)
+    {
+        var crest = relic != null ? relic.Crest : null;
+        bool on = crest != null;
+        _crestL.gameObject.SetActive(on);
+        _crestR.gameObject.SetActive(on);
+        if (!on) return;
+        var color = relic.ThemeColor(UITheme.Gold);
+        color.a = 0.9f;
+        float half = _title.GetPreferredValues(_title.text).x * 0.5f + CrestSize * 0.5f + 14f;
+        float y    = -30f - 22f;   // 제목 칸(위 30 · 높이 44)의 가운데
+        _crestL.sprite = crest; _crestL.color = color; _crestL.rectTransform.anchoredPosition = new Vector2(-half, y);
+        _crestR.sprite = crest; _crestR.color = color; _crestR.rectTransform.anchoredPosition = new Vector2(half, y);
     }
 
     private static void Place(RectTransform rt, Vector2 anchor, Vector2 pos, Vector2 size)

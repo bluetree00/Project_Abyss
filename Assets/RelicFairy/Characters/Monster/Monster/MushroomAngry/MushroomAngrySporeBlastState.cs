@@ -43,8 +43,15 @@ public class MushroomAngrySporeBlastState : UnInterruptibleState<MushroomAngrySp
         var obj = Object.Instantiate(Data.sporeEffectPrefab,
                                      ctx.Transform.position, Quaternion.identity);
         obj.transform.localScale = Vector3.one * Data.sporeEffectScale;
+        // 배율이 입자에도 먹게 — Local 모드 팩(Spells Pack)은 오브젝트 배율을 무시했다(10-13 83 렌더 비교 · 특수 상태 경로와 같게)
+        foreach (var p in obj.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var m = p.main;
+            m.scalingMode = ParticleSystemScalingMode.Hierarchy;
+        }
         var ps = obj.GetComponent<ParticleSystem>() ?? obj.GetComponentInChildren<ParticleSystem>();
-        float lifetime = ps != null ? ps.main.duration + 0.5f : 3f;
+        // 입자가 다 사라진 뒤 지운다(예전 duration + 0.5는 살아 있는 구름을 툭 지웠다) — SpawnVFX 경로와 같은 셈
+        float lifetime = ps != null ? ps.main.duration + ps.main.startLifetimeMultiplier + 0.3f : 3f;
         Object.Destroy(obj, lifetime);
     }
 
@@ -61,7 +68,7 @@ public class MushroomAngrySporeBlastState : UnInterruptibleState<MushroomAngrySp
                       ?? col.GetComponentInParent<PlayerController>();
             if (player != null)
             {
-                player.TakeDamage((int)damage);
+                player.TakeDamage((int)damage, ctx.Transform.gameObject);
                 player.ApplyKnockback(
                     (player.transform.position - ctx.Transform.position).normalized * 3f, 0.3f);
                 continue;

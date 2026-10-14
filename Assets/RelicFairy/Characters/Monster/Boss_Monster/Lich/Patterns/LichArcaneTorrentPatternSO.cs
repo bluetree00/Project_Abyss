@@ -114,6 +114,7 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
     private float      _tickTimer;
     private float      _flowTimer;
     private GameObject _beam;       // 텔레그래프 가이드
+    private GameObject _arc;        // 쓸어 갈 범위(보라 부채꼴)
     private GameObject _chargeVfx;  // 시전 VFX 인스턴스
     private GameObject _beamVfx;    // 빔 VFX 인스턴스
     private Transform  _beamFrom;   // 격류 광선 두 끝(LichVfx.PlayBeamTracked가 매 프레임 따라간다)
@@ -156,6 +157,7 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
                 UpdateChargeVfx(ctx);
                 // 보라가 차오르고 발사 0.15초 전 빨강(리치 예고 규약).
                 LichPatternUtil.TickTelegraph(_beam, _timer, Data.chargeDuration, 0.15f, ref _signaled);
+                PatternGuideHelper.SetProgress(_arc, _timer / Mathf.Max(0.01f, Data.chargeDuration));
                 if (_timer >= Data.chargeDuration) BeginSweep(ctx);
                 break;
 
@@ -175,7 +177,7 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -184,6 +186,7 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
     public override void Exit(MonsterContext ctx)
     {
         PatternGuideHelper.SafeDestroy(ref _beam);
+        PatternGuideHelper.SafeDestroy(ref _arc);
         DestroyVfx(ref _chargeVfx);
         DestroyVfx(ref _beamVfx);
         DestroyBeamEnds();
@@ -213,6 +216,11 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         _beam = LichPatternUtil.PrepareTelegraph(
             PatternGuideHelper.Beam(BeamOrigin(ctx), BeamDir(), Data.beamRange, Data.beamWidth, LichPatternUtil.Arcane),
             LichPatternUtil.Arcane);
+        // 쓸어 갈 범위 — 시작선만 보이고 나머지 쓸 자리는 예고가 없었다(10-13 검증). 시작선(빨강 신호)과 구분해 보라
+        _arc = LichPatternUtil.PrepareTelegraph(
+            PatternGuideHelper.Sector(BeamOrigin(ctx), Data.beamRange, Data.sweepArc,
+                                      _beamAngle + _sweepDir * Data.sweepArc * 0.5f, LichPatternUtil.Arcane),
+            LichPatternUtil.Arcane);
         AimBossToBeam(ctx);
         UpdateBeamVisual(ctx);
 
@@ -225,7 +233,7 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
     {
         _phase     = Phase.Sweep;
         _timer     = 0f;
-        _tickTimer = 0f;
+        _tickTimer = Data.tickInterval;   // 첫 틱은 쓸기 시작 순간 — 0이면 처음 0.4초(32°)가 판정 없이 지나갔다(10-13 검증)
         _flowTimer = 0f;
         ctx.Animator?.CrossFade("DeathRayLoop", 0.1f);
         PatternGuideHelper.SetColor(_beam, LichPatternUtil.Lethal);
@@ -236,8 +244,9 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         _beamFrom = new GameObject("LichTorrent_From").transform;
         _beamTo   = new GameObject("LichTorrent_To").transform;
         UpdateBeamEnds(ctx);
-        // 굵기 ×2 — 판정 폭(1.2 m) 그대로면 화면에서 가는 흰 선으로만 보였다(09-19 실측).
-        LichVfx.PlayBeamTracked(LichVfxSlot.ArcaneBeam, _beamFrom, _beamTo, Data.beamWidth * 2f, Data.sweepDuration + 0.1f);
+        // 굵기 인자 = 판정 폭(10-08 점검 — 예전 ×2). 팩 광선 드라이버(PixPlays BeamVfx)는 이 값을 읽지 않고 배율도 프리팹 값으로
+        // 되돌려 보이는 굵기는 프리팹 그대로다(×2도 효과가 없었다). 판정 폭은 바닥 예고가 그대로 보여 준다.
+        LichVfx.PlayBeamTracked(LichVfxSlot.ArcaneBeam, _beamFrom, _beamTo, Data.beamWidth, Data.sweepDuration + 0.1f);
 
         // 빔 VFX 훅(에셋 지정 시) — 바닥 격류를 따라 스폰.
         if (Data.beamVfxPrefab != null && _beamVfx == null)
@@ -250,6 +259,7 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         _timer = 0f;
         ctx.Animator?.CrossFade("DeathRayEnd", 0.1f);
         PatternGuideHelper.SafeDestroy(ref _beam);
+        PatternGuideHelper.SafeDestroy(ref _arc);
         DestroyVfx(ref _chargeVfx);
         DestroyVfx(ref _beamVfx);
         DestroyBeamEnds();
@@ -355,12 +365,14 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         if (_tickTimer < Data.tickInterval) return;
 
         // 바닥 직선(사정거리 × 폭) — 공용 판정이라 회피 무적이면 맞지 않고 넉백도 없다.
-        if (LichPatternUtil.HitBeam(ctx, BeamOrigin(ctx), BeamDir(), Data.beamRange, Data.beamWidth * 0.5f,
-                                    Data.damageMultiplier, Data.knockbackMultiplier))
-        {
-            _tickTimer = 0f;
-            LichPatternUtil.Impact(LichImpact.Light, true);
-        }
+        // 넉백은 격류가 이미 지나간 옆으로 — 쓸고 가는 앞쪽(또는 광선을 따라)으로 밀면 다음 틱에 또 걸렸다(10-08 점검).
+        Vector3 dir      = BeamDir();
+        Vector3 trailing = Vector3.Cross(Vector3.up, dir) * -_sweepDir;
+        bool damaged = LichPatternUtil.HitBeam(ctx, BeamOrigin(ctx), dir, Data.beamRange, Data.beamWidth * 0.5f,
+                                               Data.damageMultiplier, out bool contact, Data.knockbackMultiplier, trailing);
+        if (!contact) return;
+        _tickTimer = 0f;   // 닿으면 틱을 쓴다 — 흘렸어도(무효화 · 저스트 회피) 매 프레임 다시 굴리지 않게(10-08 점검)
+        if (damaged) LichPatternUtil.Impact(LichImpact.Light, true);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

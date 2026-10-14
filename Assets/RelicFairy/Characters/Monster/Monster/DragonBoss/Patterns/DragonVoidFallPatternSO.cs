@@ -341,7 +341,7 @@ internal sealed class DragonVoidFallState : FullLockState<DragonVoidFallPatternS
         _meteor = null;
         DragonAbyssFx.Burst(Data.ImpactVfxPrefab, _center, Quaternion.identity, Data.ImpactVfxScale, 4f);
         Managers.Sound?.PlayEffectAt(Data.ImpactSfx, _center);
-        LichCinematics.Flash(DragonAbyssFx.WithAlpha(DragonAbyssFx.Abyss, 1f), 0.35f, 0.35f);
+        // 화면 번쩍 뺌 — 아레나 전체 폭발 이펙트와 같은 뜻(10-11 이펙트 톤 2차)
 
         var player = DragonAbyssFx.Player(ctx);
         if (player != null)

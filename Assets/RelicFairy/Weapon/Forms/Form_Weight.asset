@@ -15,8 +15,9 @@ MonoBehaviour:
   formId: weight
   displayName: "\uBB34\uAC8C"
   triggerName: "\uB0B4\uB824\uCC0D\uAE30"
-  line: "\uB290\uB9AC\uC9C0\uB9CC, \uB137\uC9F8 \uD718\uB450\uB984\uB9C8\uB2E4 \uD655\uC2E4\uD55C
-    \uD55C \uBC29\uC774 \uC628\uB2E4"
+  line: "\uB290\uB9AC\uC9C0\uB9CC, \uBB34\uAC8C 4\uAC00 \uCC2C \uB4A4 \uCF64\uBCF4
+    \uB9C8\uC9C0\uB9C9 \uD0C0\uAC00 \uB9DE\uC73C\uBA74 \uD655\uC2E4\uD55C \uD55C
+    \uBC29\uC774 \uC628\uB2E4"
   tint: {r: 0.95, g: 0.62, b: 0.32, a: 1}
   maxStacks: 4
   triggerAtkRatio: 0.6
@@ -47,8 +48,8 @@ MonoBehaviour:
     displayName: "\uC9D3\uB204\uB984"
     traitTag: "\uBAB0\uC544 \uC7A1\uAE30"
     line: "\uACBD\uC9C1\uB41C \uC801\uC740 2\uCD08 \uB3D9\uC548 \uBC1B\uB294 \uD53C\uD574
-      +12%"
+      +6%"
   triggerVfxKey: NovaOrangeHit
-  triggerVfxScale: 2
+  triggerVfxScale: 3
   fullTrailPrefab: {fileID: 4274544991885015352, guid: c75fd1a0eb944484880cbd9ea7944d49,
     type: 3}

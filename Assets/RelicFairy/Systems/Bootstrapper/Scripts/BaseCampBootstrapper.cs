@@ -12,6 +12,8 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
 {
     // 서버에서 로드하는 대화 시퀀스 ID. 원래 Zone0(시작방)에서 쓰던 것과 동일 — 영속 허브로 이전.
     private const string IntroSequenceId = "StartRoom";
+    private const string MissionPageKey  = "Illust_Story_MissionSeal";   // 봉인기 사명 그림 페이지(10-13 힉스필드)
+    private const float  RespawnAppearSeconds = 0.6f;   // 유물 교체 재스폰 — 새 몸이 툭 생기지 않게(10-12 디졸브 ②)
 
     public static BaseCampBootstrapper Instance { get; private set; }
 
@@ -205,6 +207,9 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             Destroy(go);
             return;
         }
+        // 위치를 받은 재스폰(유물 교체)만 — 처음 들어올 때는 입장 연출이 따로 있다. 만든 프레임에 걸어 첫 그림부터 투명이다
+        if (overridePos.HasValue)
+            DissolveEffect.PlayAppear(go, RespawnAppearSeconds, edgeColor: AppBootstrapper.Instance?.Loadout?.Relic?.ThemeColor(Color.white));
 
         // InitAsync 완료 대기 (WeaponManager 준비 = 초기화 완료 신호).
         await UniTask.WaitUntil(() => player.WeaponManager != null, cancellationToken: ct);
@@ -344,32 +349,41 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
 
         // 이야기 비트(엔딩·붕괴·봉인/처치 첫 기록)가 있으면 평소 복귀 대사 대신 그것을 튼다.
         DialogueLine[] lines = reason != RunReturnTracker.Reason.None ? StoryDialogue.TakeReturnBeat(dlgMgr) : null;
+        // 봉인기 사명은 방문 대사 뒤에 따로 튼다 — 보스 넷이 봉인진에 묶인 그림 페이지를 깔고(10-13 사용자 「중요 스토리 때 그림」)
+        DialogueLine[] mission = null;
+        if (lines == null && reason != RunReturnTracker.Reason.Death && reason != RunReturnTracker.Reason.Clear)
+            mission = StoryDialogue.TakeMission(dlgMgr);
         lines ??= reason switch
         {
             RunReturnTracker.Reason.Death => dlgMgr?.GetCountLines("RunFail", count),
             RunReturnTracker.Reason.Clear => dlgMgr?.GetCountLines("RunClear", count),
-            _                             => WithMission(dlgMgr, dlgMgr?.GetVisitLines(IntroSequenceId)),
+            _                             => dlgMgr?.GetVisitLines(IntroSequenceId),
         };
         lines ??= introDialogueSO?.Lines;
-        if (lines == null || lines.Length == 0) return;
 
-        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
-        if (popup == null) return;
-
-        await popup.ShowAsync(lines);
+        if (lines != null && lines.Length > 0)
+        {
+            var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
+            if (popup == null) return;
+            await popup.ShowAsync(lines);
+        }
+        await ShowMissionAsync(mission, ct);
     }
 
-    /// <summary>거점 방문 대사 뒤에 봉인기 사명을 한 번 이어 붙인다(사명이 없거나 이미 봤으면 그대로).</summary>
-    private static DialogueLine[] WithMission(DialogueDataManager dlgMgr, DialogueLine[] visit)
+    /// <summary>봉인기 사명 — 보스 넷이 봉인진에 묶인 그림 페이지를 대사 뒤에 깔고 튼다(그림이 없으면 대사만).</summary>
+    private static async UniTask ShowMissionAsync(DialogueLine[] mission, CancellationToken ct)
     {
-        var mission = StoryDialogue.TakeMission(dlgMgr);
-        if (mission == null) return visit;
-        if (visit == null || visit.Length == 0) return mission;
-
-        var merged = new DialogueLine[visit.Length + mission.Length];
-        visit.CopyTo(merged, 0);
-        mission.CopyTo(merged, visit.Length);
-        return merged;
+        if (mission == null || mission.Length == 0) return;
+        bool page = await StoryPageOverlay.ShowAsync(MissionPageKey, ct);
+        try
+        {
+            var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
+            if (popup != null) await popup.ShowAsync(mission);
+        }
+        finally
+        {
+            if (page) await StoryPageOverlay.HideAsync(ct);
+        }
     }
 
     /// <summary>Main Camera에 GameCameraController가 없으면 부착. GameRunBootstrapper.EnsureCameraController와 동일.</summary>

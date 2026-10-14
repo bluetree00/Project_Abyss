@@ -88,6 +88,7 @@ public sealed class ChapterSpring : MonoBehaviour
         _interaction.SetInteractable(false);
         if (_light != null) _light.intensity *= 0.35f;   // 마신 샘은 빛이 잦아든다
         RunFx.Play(RunFxSlot.Ring, transform.position + Vector3.up * 0.1f, 1f, SpringInk);
+        Managers.Sound?.PlayEvent(SoundEvent.SpringDrink);
         Notice($"<color=#8FD9FF>요정의 샘</color> — 체력 +{stats.Hp - before} · 포션 {potionsBefore}→{state.PotionCount}");
     }
 

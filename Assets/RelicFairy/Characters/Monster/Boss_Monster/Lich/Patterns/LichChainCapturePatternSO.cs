@@ -178,7 +178,7 @@ public class LichChainCaptureState : UnInterruptibleState<LichChainCapturePatter
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -235,9 +235,12 @@ public class LichChainCaptureState : UnInterruptibleState<LichChainCapturePatter
         for (int i = 0; i < _count && !_caught; i++)
         {
             float len = Mathf.Min(Data.chainLength, LichPatternUtil.DistanceToArenaEdge(ctx, _origin, _dirs[i]));
-            if (!LichPatternUtil.HitBeam(ctx, _origin, _dirs[i], len, Data.chainWidth * 0.5f, Data.hitDamage)) continue;
+            bool damaged = LichPatternUtil.HitBeam(ctx, _origin, _dirs[i], len, Data.chainWidth * 0.5f, Data.hitDamage, out bool contact);
+            if (!contact) continue;
 
+            // 닿으면 판정은 끝 — 흘렸으면(무효화 · 저스트 회피) 다음 줄에서 다시 굴리지 않고 묶지도 않는다(10-08 점검).
             _caught = true;
+            if (!damaged) continue;
             _chains[i]?.Flash(0.2f);
             LichPatternUtil.Impact(LichImpact.Slash, true);
 

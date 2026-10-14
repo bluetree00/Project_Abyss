@@ -44,7 +44,11 @@ public class DieState : IMonsterState
             if (directHitKill && fx.killHitStopDuration > 0f)
                 HitFeelService.KillImpact(fx.killHitStopScale, fx.killHitStopDuration);
             if (!string.IsNullOrEmpty(fx.deathVfxKey))
-                SpawnDeathVfx(ctx.Monster.transform.position, fx.deathVfxKey, fx.deathVfxScale).Forget();
+            {
+                float k = BodySizeFactor(ctx);   // 등급 · 분열로 바뀐 몸 크기에 섬광 높이 · 크기를 맞춘다(10-14)
+                SpawnDeathVfx(ctx.Monster.transform.position + Vector3.up * fx.deathVfxHeight * k,
+                              fx.deathVfxKey, fx.deathVfxScale * k, fx.deathVfxUnscaled).Forget();
+            }
         }
 
         // 이동 중지
@@ -87,12 +91,28 @@ public class DieState : IMonsterState
 
     public virtual void Exit(MonsterContext ctx) { }
 
+    // ── 처치 이펙트 크기 ──────────────────────────────────
+
+    /// <summary>
+    /// 처치 섬광 배율 — 지금 몸 높이 ÷ 설정 기본 신장(visualHeightMeters). 설정 높이 · 크기는 기본 신장으로 정한 값이라
+    /// 등급(희귀 1.1 · 정예 1.25) · 분열 자식으로 바뀐 몸에 그대로 쓰면 정예에선 몸의 40% 높이에서 작게 터졌다(10-14 사용자 「처치 이펙트가 잘 안 맞아」).
+    /// 기본 신장이 없거나 못 재면 1.
+    /// </summary>
+    private static float BodySizeFactor(MonsterContext ctx)
+    {
+        float baseH = ctx.Config != null ? ctx.Config.visualHeightMeters : 0f;
+        if (baseH <= 0f || ctx.Monster == null) return 1f;
+        float now = ctx.Monster.MeasureModelHeight();
+        return now > 0.001f ? Mathf.Clamp(now / baseH, 0.5f, 2f) : 1f;
+    }
+
     // ── 드롭 ──────────────────────────────────────────────
 
     private static void SpawnGoldDrop(MonsterContext ctx)
     {
         var config = ctx.Config;
         if (config == null) return;
+        if (MonsterTraits.IsDropless(ctx.Monster)) return;   // 「소환하는」 정예의 졸개 — 파밍 방지(10-11 정예 접두어)
 
         var drop = config.drop;
         if (drop == null || drop.coinMax <= 0 || drop.coinValue <= 0) return;
@@ -113,23 +133,26 @@ public class DieState : IMonsterState
     /// 왜 배율이 필요한가: MonsterConfigSO 36개 중 30개에 drop 블록이 없어 C# 기본값(5~8)으로 역직렬화되고,
     /// 값이 있는 6개도 5개가 같은 5~8이다. 즉 <b>슬라임과 흑기사와 보스가 같은 골드</b>를 준다.
     ///
-    /// ⚠️ 계수는 <b>런의 실제 등급 구성</b>에 묶여 있다. 현재 구성은 Common 31% / Rare 38% / Elite 32%
-    /// (룸풀 토큰 기준)이고, 이 값이면 가중평균 0.93 → 런당 약 2,200골드 → 상점 진열가 3,351 대비
-    /// <b>충당률 66%</b>다. 진열의 3분의 2만 살 수 있어야 "무엇을 포기할까"가 성립한다.
-    /// 룸풀 토큰의 등급 비중을 바꾸면 <b>여기도 함께 재계산해야 한다</b> —
-    /// 구 구성(C60/R28/E12) 기준 계수를 새 구성에 그대로 쓰면 가중평균이 1.42로 튀어 충당률 101%가 된다(실측).
+    /// ⚠️ 계수는 <b>런의 실제 등급 구성</b>에 묶여 있다. 진열의 3분의 2만 살 수 있어야(상점 진열가 3,351 대비
+    /// <b>충당률 66%</b>) "무엇을 포기할까"가 성립한다. 룸풀 토큰의 등급 비중을 바꾸면 <b>여기도 함께 재계산해야 한다</b>.
+    /// · 10-11 재계산(일반방 긴장감 설계 P1-8): 토큰 재편 + 봉인기 두 번째 파도 30%로 런 처치가 약 395 → 499마리,
+    ///   구성이 C30/R40/E29 → <b>C77/R18/E5</b>로 바뀌었다. 옛 계수(0.4 · 0.8 · 1.6)면 런당 약 1,680골드(50%).
+    ///   정예 1마리 = 일반 4마리(0.5 : 2.0)는 지키고 위협만 조금 더(1.1 — 이제 5타 이상 버티는 층) → 가중평균 0.68 → 약 2,230골드(66.5%, 옛 판과 같다).
+    ///   코인 수는 반올림(은행가)이라 깔끔한 ×1.25(0.5 · 1.0 · 2.0)는 64%, ×1.375(0.55 · 1.1 · 2.2)는 70%로 갈린다.
+    ///   (모델: 전투방 + 이벤트 전투방 처치 기대값 × 종별 코인 범위 — 확인 도구 「10-11 몬스터 층 · 체력 표」가 같은 식으로 다시 센다.)
+    /// · 이전: C31/R38/E32에서 0.4 · 0.8 · 1.6 → 가중평균 0.93 → 약 2,200골드(66%).
     /// </summary>
     private static float GoldScale(MonsterGrade grade) => grade switch
     {
-        MonsterGrade.Rare  => 0.8f,
-        MonsterGrade.Elite => 1.6f,
+        MonsterGrade.Rare  => 1.1f,
+        MonsterGrade.Elite => 2.0f,
         MonsterGrade.Boss  => 5f,
-        _                  => 0.4f,
+        _                  => 0.5f,
     };
 
     // ── 처치 VFX ──────────────────────────────────────────
 
-    private static async UniTaskVoid SpawnDeathVfx(Vector3 pos, string key, float scale)
+    private static async UniTaskVoid SpawnDeathVfx(Vector3 pos, string key, float scale, bool unscaled)
     {
         var pooler = Managers.ObjectPooler;
         if (pooler == null) return;
@@ -142,6 +165,17 @@ public class DieState : IMonsterState
         }
         catch (System.OperationCanceledException) { return; }
         if (go == null) return;
+
+        // 막타 히트스톱 동안에도 터지게 — 배속 0.04에선 파티클이 멈춰 정지가 풀린 뒤에야 보였다(10-08 사망 연출 촬영: 0.15초까지 빈 화면).
+        // 켠 키만 바꾼다(끈 쪽 — 보스 등 — 은 프리팹 값 그대로).
+        if (unscaled)
+        {
+            foreach (var p in go.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                var main = p.main;
+                main.useUnscaledTime = true;
+            }
+        }
 
         var ps = go.GetComponent<ParticleSystem>() ?? go.GetComponentInChildren<ParticleSystem>();
         float lifetime = ps != null

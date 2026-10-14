@@ -35,7 +35,7 @@ public class DragonSummonPatternSO : BossPatternSO
     [SerializeField] private float _miniBreathRange     = 8f;
     [SerializeField] private float _miniBreathCooldown  = 3f;
     [SerializeField] private int   _miniBreathDamage    = 15;
-    [SerializeField] private float _miniBreathSpeed     = 12f;
+    [SerializeField] private float _miniBreathSpeed     = 12f;   // 탄 이펙트 뿌리 입자에 속도가 없을 때만 쓴다(번개 15 · 불 12 m/s는 입자 속도) — 얼음 구슬(10-08)은 예전 얼음 탄과 같은 20
 
     [Header("속성 브레스 프리팹")]
     [Tooltip("얼음 속성 (Projectile 6 blue fire)")]

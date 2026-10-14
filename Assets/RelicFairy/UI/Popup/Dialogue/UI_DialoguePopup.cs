@@ -55,7 +55,7 @@ public class UI_DialoguePopup : UI_Popup
     [SerializeField] private string knightName  = "기사";
     [SerializeField] private string forestGuardianName = "숲의 수호자";
     [SerializeField] private string dragonName  = "화룡";
-    [SerializeField] private string deathKnightName = "죽음의 기사";
+    [SerializeField] private string deathKnightName = "모르드레드";   // 인트로 모르드레드와 같은 인물(10-13 이름 통일)
 
     [Header("Speaker Titles — 이름 옆 역할 태그")]
     [Tooltip("DialogueSpeaker 순서(None·Merlin·Shadow·Lich·Mordred·Arthur·Knight·ForestGuardian·Dragon·DeathKnight). "

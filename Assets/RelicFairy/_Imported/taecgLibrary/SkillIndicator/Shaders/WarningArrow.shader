@@ -9,6 +9,7 @@
 		[Header(Flow)]
 		_FlowColor("Flow Color",color) = (1,1,1,1)
 		_Duration ("Duration",range(0,1)) = 0
+		_TailFade ("Tail Fade (0 = none)",range(0,1)) = 0.3
 		
 		[Space]
 		[Header(Blend)]
@@ -57,6 +58,7 @@
 			half _Intensity;
 			half4 _FlowColor;
 			half _Duration;
+			half _TailFade;
 			CBUFFER_END
 			TEXTURE2D (_MainTex);SAMPLER(sampler_MainTex);float4 _MainTex_ST;
 			// #define smp _linear_clampU_mirrorV
@@ -77,7 +79,7 @@
 			half4 frag(Varyings i) : SV_Target
 			{
 				//尾部透明遮罩
-				half mask = smoothstep(0, 0.3, i.uv_mask.y);
+				half mask = _TailFade > 0.001 ? smoothstep(0, _TailFade, i.uv_mask.y) : 1;
 				half2 uv = i.uv;
 
 				//主纹理
@@ -130,6 +132,7 @@
 			fixed _Intensity;
 			fixed4 _FlowColor;
 			fixed _Duration;
+			fixed _TailFade;
 
 			v2f vert (appdata v)
 			{
@@ -144,7 +147,7 @@
 			fixed4 frag (v2f i) : SV_Target
 			{
 				//尾部透明遮罩
-				fixed mask = smoothstep(0, 0.3, i.uv_mask.y);
+				fixed mask = _TailFade > 0.001 ? smoothstep(0, _TailFade, i.uv_mask.y) : 1;
 				half2 uv = i.uv;
 
 				//主纹理

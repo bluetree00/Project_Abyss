@@ -112,6 +112,11 @@ public sealed class IntroBootstrapper : MonoBehaviour
     {
         try
         {
+            // 마지막 일격이 읽히게 — 런 사망과 같은 짧은 슬로모 뒤에 암전(인트로 설계 S16, 10-10).
+            TimeScaleArbiter.Acquire(this, 0.25f, TimeScaleArbiter.Priority.SlowMotion);
+            try { await UniTask.Delay(TimeSpan.FromSeconds(0.6f), DelayType.Realtime, cancellationToken: ct); }
+            finally { TimeScaleArbiter.Release(this); }
+
             await ScreenFade.Out(1.0f, ct);
 
             IntroCompletionTracker.MarkCompleted();

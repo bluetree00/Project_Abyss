@@ -15,14 +15,17 @@ public static class HitFeelBurstDriver
     private const float SkillShakeScale    = 0.3f;
     private const float FinisherShakeScale = 1f;
     private const float FinisherSfxMinInterval = 0.2f;   // 막타가 여러 적에 연달아 나도 소리는 한 번
+    private const float RangedStopMinInterval  = 0.3f;   // 원거리 멈칫 최소 간격(10-14)
 
     private static float _lastFinisherSfx = -999f;
+    private static float _lastRangedStop  = -999f;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void Init()
     {
         // 도메인 리로드 OFF 2회차 중복 구독 방지 — 빼고 더한다.
         _lastFinisherSfx = -999f;
+        _lastRangedStop  = -999f;
         GlobalFeelCoalescer.OnBurst -= OnBurst;
         GlobalFeelCoalescer.OnBurst += OnBurst;
     }
@@ -41,6 +44,15 @@ public static class HitFeelBurstDriver
             case DealtHitTier.Skill:    tierScale = SkillShakeScale;    cap = HitFeelService.DealtShakeSkill;    break;
             default:                    tierScale = BasicShakeScale;    cap = HitFeelService.DealtShakeBasic;    break;
         }
+        // 원거리(활 · 석궁) — 화살은 착탄이 프레임마다 흩어져(분열 · 연사 · 관통) 프레임 합산으로 못 묶는다.
+        // 잔타마다 멈추면 연사가 끊겨 렉처럼 보였다(10-14 사용자) → 멈칫은 치명 · 막타만, 0.3초에 한 번. 흔들림은 그대로.
+        bool stop = true;
+        if (burst.WeaponType == WeaponType.Bow || burst.WeaponType == WeaponType.Crossbow)
+        {
+            stop = (burst.AnyCritical || burst.Tier == DealtHitTier.Finisher)
+                && Time.unscaledTime - _lastRangedStop >= RangedStopMinInterval;
+            if (stop) _lastRangedStop = Time.unscaledTime;
+        }
         HitFeelService.Hit(
             burst.MaxDamage,
             burst.AnyCritical,
@@ -48,7 +60,8 @@ public static class HitFeelBurstDriver
             burst.Direction,
             GlobalFeelCoalescer.MultiHitScale(burst.Count) * tierScale,
             cap,
-            longStop: burst.Tier == DealtHitTier.Finisher);
+            longStop: burst.Tier == DealtHitTier.Finisher,
+            stop: stop);
 
         // 막타는 흔들림 대신 화면 가장자리 금빛과 소리로 알린다(HUD 아래).
         if (burst.Tier == DealtHitTier.Finisher)

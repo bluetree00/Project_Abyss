@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -17,6 +18,10 @@ using UnityEngine.UI;
 ///
 /// 슬라이드는 위치가 아니라 알파+스케일 크로스페이드(레이아웃과 안 싸운다). 시간정지 중이라 unscaled.
 /// 가독성 머티리얼은 UI_RelicInfoPopup과 동일(얇은 폰트 두께 보정).
+///
+/// <para>10-11 v2 — 후보가 2~3개면 <b>한 화면에 나란히</b> 놓는다(리서치 C §4 「차이」: 하데스 · RoR2는 고를 후보를 다 늘어놓고 눈으로 비교한다).
+/// 카드를 누르면 고르고(금 85% 2px 테 + 1.03배 · 나머지 0.55), [장착하기] 하나로 확정한다. 좌우 화살표 · ← → 키는 고르는 카드를 옮긴다.
+/// 4개 이상이면 지금처럼 한 장씩 넘긴다. 나란히 카드는 구운 프리팹에 없어 처음 쓸 때 넘기기 카드(Slider)를 복제해 만든다.</para>
 /// </summary>
 public class UI_RangedForgePopup : UI_Popup
 {
@@ -43,19 +48,46 @@ public class UI_RangedForgePopup : UI_Popup
     private const float DividerW = 280f, DividerH = 37f;
     private const float EquipW = 137f, EquipH = 45f;   // 목업 166×55 × 환산 0.826 — 예전 160×52는 17% 컸다
 
+    // 10-11 색 정리(리서치 C §4 「고칠 값」 P1) — 이 화면만 파랑 계열 6색(#8CB8F2 · #9ECCFF …)을 썼다. 다른 화면처럼 금 · 잉크(UITheme.Thin)로.
+    // 금 = 누를 것 · 지금 위치(제목 · 확정 · 화살표 · 점) / 잉크 = 이름 · 수치 / 잠김 = 청동. 무기 테마색은 더는 글자에 쓰지 않는다.
     private static readonly Color PanelBg   = new(0.07f, 0.06f, 0.10f, 0.97f);
-    private static readonly Color PanelLine = new(0.55f, 0.72f, 0.95f, 1f);
-    private static readonly Color Accent    = new(0.62f, 0.80f, 1f, 1f);
+    private static readonly Color PanelLine = UITheme.Thin.LineActive;
+    private static readonly Color Accent    = UITheme.Thin.Gold;
 
-    private static readonly Color TitleColor = new(0.82f, 0.90f, 1f, 1f);
-    private static readonly Color BodyColor  = new(0.88f, 0.88f, 0.84f, 1f);
-    private static readonly Color SubColor   = new(0.62f, 0.64f, 0.70f, 1f);
+    private static readonly Color TitleColor = UITheme.Thin.Gold;
+    private static readonly Color BodyColor  = UITheme.Thin.Ink;
+    private static readonly Color SubColor   = UITheme.Thin.InkA(0.6f);
     private static readonly Color LockColor  = new(0.52f, 0.42f, 0.40f, 1f);
-    private static readonly Color ArrowOn    = new(0.75f, 0.85f, 1f, 1f);
-    private static readonly Color ArrowOff   = new(0.35f, 0.37f, 0.42f, 0.5f);
-    private static readonly Color DotOn      = new(0.70f, 0.84f, 1f, 1f);
-    private static readonly Color DotOff     = new(0.40f, 0.42f, 0.48f, 1f);
-    private const string NumberHex = "#8FC7FF";
+    private static readonly Color ArrowOn    = UITheme.Thin.Gold;
+    private static readonly Color ArrowOff   = UITheme.Thin.InkA(0.25f);
+    private static readonly Color DotOn      = UITheme.Thin.Gold;
+    private static readonly Color DotOff     = UITheme.Thin.InkA(0.28f);
+
+    // 글자 단계(톤 v2 · 설계 크기 — 창은 localScale ×1.31로 함께 커진다). 제목만 DNF.
+    private const float TitleSize = 24f;          // 설계 30 → 24(화면 ≈ 32, 리서치 C §4 P3)
+    private const float NameSize  = 24f;
+    private const float BodySize  = 17f;          // 부제 · 태그라인 · 취소
+    private const float SmallSize = 15f;          // 잠금 배지 · 「1 / N」
+    // 수치표(P1) — 라벨 왼쪽 17 · 잉크 60% / 값 오른쪽 20 · 잉크, 표 폭 360
+    private const float StatLabelSize = 17f, StatValueSize = 20f, StatTableW = 360f;
+    private const string StatLabelHex = "#ECE6D899";   // Thin.Ink 60%
+    private const float DotSize = 14f;                 // 점 10 → 14(P2)
+
+    // 나란히 놓기(10-11 v2) — 2~3개는 카드를 나란히, 그보다 많으면 넘기기. 창(747 · 아트 비율 고정)은 그대로 두고 무대만 나눈다.
+    private const int   MaxColumns     = 3;
+    private const int   MultiViewerPad = 10;      // 화살표를 판 가장자리 쪽으로 — 카드 폭 확보(넘기기 판은 프리팹 값 53). 무대 ≈ 545 → 카드 ≈ 264
+    private const float CardGap        = 16f;
+    private const float CardIconSize   = 120f;    // 나란히 카드의 그림 칸(넘기기 198) — 뷰어 세로(≈ 400)에 이름 · 배지 · 태그라인 · 수치표를 다 넣는다
+    private const float TagTwoLineH    = 50f;     // 태그라인 두 줄(17 · 줄 높이 ≈ 24.6) — 넘치면 말줄임
+    // 3열은 카드 폭 ≈ 171이라 태그라인(약 35자)이 17로는 네 줄이 된다(10-11 실측 폭 159 · 세 줄 칸에서도 세 장 모두 잘림).
+    // 3열만 글자를 한 단계 낮추고(배지와 같은 15 — 화면 ≈ 20px) 네 줄을 준다. 그림 칸은 그만큼 줄인다
+    private const float CardIconSize3  = 84f;
+    private const float TagFourLineH3  = 88f;     // 15 · 줄 높이 ≈ 21.8 × 4
+    private const float CardStatInset  = 12f;     // 수치표 좌우 여백(카드가 표 폭 360보다 좁다)
+    private const float SelScale       = 1.03f;
+    private const float DimAlpha       = 0.55f;
+    private const float SelEdgePx      = 2f;      // v2 선 굵기 — 고른 것 2 · 평소 1(1080 기준 px, 창 배율을 나눠 화면에서 맞춘다)
+    private const float IdleEdgePx     = 1f;
 
     // ── Nested ────────────────────────────────────────────────
     public struct Entry
@@ -63,6 +95,17 @@ public class UI_RangedForgePopup : UI_Popup
         public WeaponSO Weapon;
         public bool     Locked;
         public string   LockReason;
+    }
+
+    /// <summary>나란히 놓인 후보 카드 한 장 — 넘기기 카드(Slider)를 복제한 것과 덧붙인 테.</summary>
+    private sealed class CardView
+    {
+        public RectTransform Root;
+        public CanvasGroup   Group;
+        public Image         Glow, Icon;
+        public TMP_Text      Name, Badge, Tag, Stats;
+        public LayoutElement IconBox;
+        public Image[]       Edge;   // 상 · 하 · 좌 · 우 — 평소 1px 잉크 18% / 고른 것 2px 금 85%
     }
 
     // ── Private ───────────────────────────────────────────────
@@ -89,11 +132,24 @@ public class UI_RangedForgePopup : UI_Popup
     private readonly Dictionary<Button, Image>    _arrowArts   = new();   // 아트 화살표는 글리프 대신 이 이미지를 흐린다
     private readonly StringBuilder _sb = new();
     private static Material s_textMat;
+    private TMP_Text _dotCount;   // 「1 / N」(런타임 생성)
 
     private int _index;
     private int _slideGen;
     private int _slideDir;   // 넘긴 방향(+1 오른쪽 / -1 왼쪽) — 카드가 그쪽에서 밀려 들어온다
     private UniTaskCompletionSource<WeaponSO> _tcs;
+
+    // 나란히 판(10-11 v2) — 처음 쓸 때 만든다(구운 프리팹엔 없다)
+    private readonly List<CardView> _cards = new();
+    private RectTransform _cardsRoot;
+    private RectTransform _panelRt;
+    private HorizontalLayoutGroup _viewerRow;
+    private int  _viewerPadBase = -1;   // 프리팹의 화살표 들임(넘기기 판) — 처음 볼 때 기억한다
+    private bool _multi;
+    private CancellationTokenSource _selCts;
+    private readonly float[] _fromAlpha = new float[MaxColumns];
+    private readonly float[] _fromScale = new float[MaxColumns];
+    private readonly Color[] _fromEdge  = new Color[MaxColumns];
 
     public override bool BlocksGameplay => true;
 
@@ -103,11 +159,20 @@ public class UI_RangedForgePopup : UI_Popup
         base.Init();
         _skin = UISkin.WeaponForge;
         BuildLayout();
+        ApplyThinStyle();
+    }
+
+    /// <summary>← → 키 = 좌우 화살표와 같다 — 나란히 판은 고르는 카드를 옮기고, 넘기기 판은 넘긴다. 시간정지 중에도 입력은 읽힌다.</summary>
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.LeftArrow))       Step(-1);
+        else if (Input.GetKeyDown(KeyCode.RightArrow)) Step(+1);
     }
 
     // ── Public API ────────────────────────────────────────────
     public void Setup(IReadOnlyList<Entry> entries)
     {
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);
         _entries.Clear();
         if (entries != null)
             for (int i = 0; i < entries.Count; i++)
@@ -116,8 +181,15 @@ public class UI_RangedForgePopup : UI_Popup
         _index = 0;
         _tcs = new UniTaskCompletionSource<WeaponSO>();
 
+        // 2~3개는 나란히(10-11 v2) — 처음엔 첫 후보를 골라 둔다(예전처럼 열자마자 [장착하기]가 첫 후보를 단다).
+        _multi = _entries.Count >= 2 && _entries.Count <= MaxColumns;
+        ApplyViewMode();
+
         BuildDots();
-        ShowCard(_index, instant: true);
+        // 수치표 폭(360) 여백은 무대 폭을 보고 정한다 — 열자마자 레이아웃이 아직 안 돌았으면 폭이 0이다.
+        LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)transform);
+        if (_multi) ShowCards();
+        else        ShowCard(_index, instant: true);
     }
 
     public UniTask<WeaponSO> WaitForChoiceAsync() => _tcs.Task;
@@ -131,6 +203,7 @@ public class UI_RangedForgePopup : UI_Popup
     {
         base.OnDestroy();   // 차단 잠금 누수 방지(UI_Popup)
         _tcs?.TrySetResult(null);
+        CancelSelectionTween();
     }
 
     // ── 캐러셀 ────────────────────────────────────────────────
@@ -138,6 +211,8 @@ public class UI_RangedForgePopup : UI_Popup
     {
         int next = _index + dir;
         if (next < 0 || next >= _entries.Count) return;
+        if (_multi) { Select(next); return; }   // 나란히 판 — 고르는 카드만 옮긴다
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiSelect);   // 넘기기 판 — 캐러셀 넘김
         _index = next;
         _slideDir = dir;
         ShowCard(_index, instant: false);
@@ -147,47 +222,15 @@ public class UI_RangedForgePopup : UI_Popup
     {
         if (i < 0 || i >= _entries.Count) return;
         var e = _entries[i];
-        var w = e.Weapon;
 
-        // 무기 테마색(없으면 기본 청색). 잠금이면 색을 죽인다.
-        Color theme = w.uiThemeColor.a > 0.01f ? w.uiThemeColor : Accent;
-        Color accent = e.Locked ? LockColor : theme;
-
-        _icon.sprite  = w.icon;
-        _icon.enabled = w.icon != null;   // 아이콘이 없는 무기는 흰 네모 대신 빈 홀더로
-        _icon.color  = w.icon != null ? Color.white : new Color(1f, 1f, 1f, 0.12f);
-
-        _name.text  = w.displayName;
-        _name.color = e.Locked ? LockColor : accent;
-
-        _badge.gameObject.SetActive(e.Locked);
-        if (e.Locked) _badge.text = "■ " + (string.IsNullOrEmpty(e.LockReason) ? "잠금" : e.LockReason);
-
-        _tag.text   = w.tagline ?? string.Empty;
-        _tag.color  = e.Locked ? LockColor : SubColor;
-
-        _stats.text = e.Locked ? "<color=#8A6B6B>기억의 제단에서 해금하는 무기</color>" : StatBlock(w);
-
-        // ⚠️ 코드로 구운 스프라이트(UIProceduralSprites)는 <b>프리팹에 직렬화되지 않는다</b> —
-        //    베이크된 프리팹에서는 null로 되살아나 각진 색판으로 보였다(2026-09-10 게임 화면의 초록 판때기).
-        //    그래서 짓는 곳이 아니라 <b>쓰는 곳</b>에서 한 번 붙인다.
-        if (_stageGlow.sprite == null)
-        {
-            _stageGlow.sprite = UIProceduralSprites.RoundedRect(radius: 36f, feather: 28f, size: 160);
-            _stageGlow.type   = Image.Type.Sliced;
-        }
-
-        // 테마색으로 톤 통일 — 무대 배경 은은하게 물들이고, 확정 버튼도 이 색을 따른다.
-        // 0.08은 선형 색공간에서 어두운 판 위에 초록 상자로 보였다(09-28 UI 전수) — 은은하게.
-        _stageGlow.color = e.Locked
-            ? new Color(LockColor.r, LockColor.g, LockColor.b, 0.025f)
-            : new Color(accent.r, accent.g, accent.b, 0.035f);
+        FillCard(e, _icon, _name, _badge, _tag, _stats, _stageGlow, reserveBadge: false);
+        FitStatTable();
 
         // 화살표 활성/비활성 — 양 끝에서 못 넘어감을 색으로 알린다.
         SetArrow(_prev, i > 0);
         SetArrow(_next, i < _entries.Count - 1);
         UpdateDots(i);
-        RefreshConfirm(e, theme);
+        RefreshConfirm(e);
 
         if (instant)
         {
@@ -197,6 +240,284 @@ public class UI_RangedForgePopup : UI_Popup
             return;
         }
         SlideInAsync(++_slideGen, _slideDir).Forget();
+    }
+
+    /// <summary>
+    /// 카드 한 장에 후보 하나를 채운다 — 넘기기 판(한 장)과 나란히 판(카드마다)이 같이 쓴다.
+    /// <paramref name="reserveBadge"/>면 잠금이 아니어도 배지 줄 자리를 비워 둔다(나란히 카드끼리 줄 높이를 맞춘다).
+    /// </summary>
+    private void FillCard(Entry e, Image icon, TMP_Text name, TMP_Text badge, TMP_Text tag, TMP_Text stats, Image glow, bool reserveBadge)
+    {
+        var w = e.Weapon;
+
+        // 잠금이면 청동, 아니면 금(10-11 — 무기 테마색은 계열이 하나 더 늘어 쓰지 않는다).
+        Color accent = e.Locked ? LockColor : Accent;
+
+        icon.sprite  = w.icon;
+        icon.enabled = w.icon != null;   // 아이콘이 없는 무기는 흰 네모 대신 빈 홀더로
+        icon.color   = w.icon != null ? Color.white : new Color(1f, 1f, 1f, 0.12f);
+
+        name.text  = w.displayName;
+        name.color = e.Locked ? LockColor : BodyColor;   // 이름은 잉크 — 금은 누를 것에만
+
+        badge.gameObject.SetActive(e.Locked || reserveBadge);
+        badge.text = e.Locked ? "■ " + (string.IsNullOrEmpty(e.LockReason) ? "잠금" : e.LockReason) : string.Empty;
+
+        tag.text   = w.tagline ?? string.Empty;
+        tag.color  = e.Locked ? LockColor : SubColor;
+
+        stats.text = e.Locked ? "<size=17><color=#8A6B6B>기억의 제단에서 해금하는 무기</color></size>" : StatBlock(w);
+
+        // ⚠️ 코드로 구운 스프라이트(UIProceduralSprites)는 <b>프리팹에 직렬화되지 않는다</b> —
+        //    베이크된 프리팹에서는 null로 되살아나 각진 색판으로 보였다(2026-09-10 게임 화면의 초록 판때기).
+        //    그래서 짓는 곳이 아니라 <b>쓰는 곳</b>에서 한 번 붙인다.
+        if (glow.sprite == null)
+        {
+            glow.sprite = UIProceduralSprites.RoundedRect(radius: 36f, feather: 28f, size: 160);
+            glow.type   = Image.Type.Sliced;
+        }
+
+        // 테마색으로 톤 통일 — 무대 배경 은은하게 물들이고, 확정 버튼도 이 색을 따른다.
+        // 0.08은 선형 색공간에서 어두운 판 위에 초록 상자로 보였다(09-28 UI 전수) — 은은하게.
+        glow.color = e.Locked
+            ? new Color(LockColor.r, LockColor.g, LockColor.b, 0.025f)
+            : new Color(accent.r, accent.g, accent.b, 0.035f);
+    }
+
+    // ── 나란히 판(10-11 v2) ───────────────────────────────────
+    /// <summary>
+    /// 나란히 / 넘기기를 고른다. 나란히면 화살표를 판 가장자리 쪽으로 붙여 카드 폭을 벌고, 다 보이니 점 · 「1 / N」은 숨긴다
+    /// (리서치 C §4 P2 주 — 다 보이는 화면은 위치 표시가 필요 없다). 넘기기면 프리팹 그대로.
+    /// </summary>
+    private void ApplyViewMode()
+    {
+        if (_viewerRow == null && _stage != null && _stage.parent != null) _stage.parent.TryGetComponent(out _viewerRow);
+        if (_viewerRow != null)
+        {
+            if (_viewerPadBase < 0) _viewerPadBase = _viewerRow.padding.left;
+            int pad = _multi ? MultiViewerPad : _viewerPadBase;
+            _viewerRow.padding = new RectOffset(pad, pad, _viewerRow.padding.top, _viewerRow.padding.bottom);
+        }
+
+        if (_multi) EnsureCards(_entries.Count);
+        if (_cardsRoot != null) _cardsRoot.gameObject.SetActive(_multi);
+        _slider.gameObject.SetActive(!_multi);
+        if (_dots != null) _dots.gameObject.SetActive(!_multi);
+    }
+
+    /// <summary>후보 수만큼 카드를 갖춘다 — 모자라면 만들고, 남으면 숨긴다. 폭은 앵커로 n등분(사이 16).</summary>
+    private void EnsureCards(int n)
+    {
+        if (_cardsRoot == null)
+        {
+            _cardsRoot = NewRect("Cards", _stage);
+            Stretch(_cardsRoot);
+        }
+        while (_cards.Count < n) _cards.Add(MakeCard(_cards.Count));
+
+        for (int i = 0; i < _cards.Count; i++)
+        {
+            bool on = i < n;
+            _cards[i].Root.gameObject.SetActive(on);
+            if (!on) continue;
+            // 앵커로 n등분하고 사이만 오프셋으로 뺀다 — 무대 폭을 몰라도 카드 폭이 같다(i·g/n · (i+1−n)·g/n).
+            var rt = _cards[i].Root;
+            rt.anchorMin = new Vector2(i / (float)n, 0f);
+            rt.anchorMax = new Vector2((i + 1) / (float)n, 1f);
+            rt.offsetMin = new Vector2(i * CardGap / n, 0f);
+            rt.offsetMax = new Vector2((i + 1 - n) * CardGap / n, 0f);
+
+            // 2열 = 그림 120 · 태그라인 17 두 줄 / 3열 = 그림 84 · 15 네 줄(카드는 한 번 만들어 다시 쓰니 열 수가 바뀔 때마다 고친다)
+            bool three = n >= 3;
+            var box = _cards[i].IconBox;
+            if (box != null)
+            {
+                float h = three ? CardIconSize3 : CardIconSize;
+                box.preferredHeight = h;
+                box.minHeight       = Mathf.Min(96f, h);   // 지은 판의 하한 96(BuildStage) — 3열 84는 하한도 같이 내려야 줄어든다(10-11 실측 96 고정 · 아래 넘침 6.5)
+            }
+            var tag = _cards[i].Tag;
+            tag.fontSize = three ? SmallSize : BodySize;
+            if (tag.enableAutoSizing) tag.fontSizeMax = tag.fontSize;   // 막 지은 판은 자동 크기가 켜져 있다(최대 = 설계 크기)
+            FixHeight(tag.gameObject, three ? TagFourLineH3 : TagTwoLineH);
+        }
+    }
+
+    /// <summary>
+    /// 나란히 카드 한 장 — 넘기기 카드(Slider: 그림 · 이름 · 배지 · 태그라인 · 수치표)를 그대로 복제한다. 구운 프리팹이든 막 지은 판이든
+    /// 계층이 같아 따로 짓지 않는다. 다른 점만 고친다 — 그림 칸 120 · 태그라인 두 줄 · 누르면 고름 · 얇은 테.
+    /// </summary>
+    private CardView MakeCard(int i)
+    {
+        var go = Instantiate(_slider.gameObject, _cardsRoot, false);
+        go.name = "Card" + i;
+        go.SetActive(true);
+        var rt = (RectTransform)go.transform;
+        rt.pivot = new Vector2(0.5f, 0.5f);   // 고른 카드는 가운데를 축으로 1.03배
+        rt.localScale = Vector3.one;
+        rt.anchoredPosition = Vector2.zero;
+
+        var iconTf = rt.Find("IconBox/Holder/Icon");
+        if (iconTf == null) iconTf = rt.Find("IconBox/Icon");
+        var c = new CardView
+        {
+            Root  = rt,
+            Glow  = Child<Image>(rt, "Glow"),
+            Icon  = iconTf != null ? iconTf.GetComponent<Image>() : null,
+            Name  = Child<TMP_Text>(rt, "Name"),
+            Badge = Child<TMP_Text>(rt, "Badge"),
+            Tag   = Child<TMP_Text>(rt, "Tag"),
+            Stats = Child<TMP_Text>(rt, "Stats"),
+        };
+        if (!go.TryGetComponent(out c.Group)) c.Group = go.AddComponent<CanvasGroup>();
+        c.Group.alpha = 1f;
+
+        var box = rt.Find("IconBox");
+        if (box != null && box.TryGetComponent<LayoutElement>(out var boxLe)) c.IconBox = boxLe;   // 높이는 EnsureCards가 열 수로 정한다
+        c.Tag.textWrappingMode = TextWrappingModes.Normal;   // 카드 폭이 좁다 — 두(3열은 네) 줄까지, 넘치면 말줄임
+        c.Tag.overflowMode     = TextOverflowModes.Ellipsis;
+        c.Badge.overflowMode   = TextOverflowModes.Ellipsis;
+        c.Stats.margin         = new Vector4(CardStatInset, 0f, CardStatInset, 0f);
+
+        // 카드 전체가 누르는 면 — 물든 바탕(Glow)이 카드를 꽉 채운다. 배율 · 색은 이 화면이 직접 굴린다(버튼 전환 · 키보드 이동 없음).
+        c.Glow.raycastTarget = true;
+        var btn = go.AddComponent<Button>();
+        btn.transition    = Selectable.Transition.None;
+        btn.navigation    = new Navigation { mode = Navigation.Mode.None };
+        btn.targetGraphic = c.Glow;
+        int captured = i;
+        btn.onClick.AddListener(() => Select(captured));
+
+        c.Edge = BuildCardEdge(rt);
+        return c;
+    }
+
+    /// <summary>카드 테 네 변 — 카드 안쪽 가장자리에 붙고 레이아웃 · 누름은 받지 않는다. 굵기 · 색은 고름이 바뀔 때 칠한다.</summary>
+    private static Image[] BuildCardEdge(RectTransform card)
+    {
+        var host = NewRect("Edge", card);
+        Stretch(host);
+        host.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;   // 카드의 세로 레이아웃이 한 줄로 세지 않게
+        return new[]
+        {
+            EdgeSide(host, "Top",    new Vector2(0f, 1f), Vector2.one,         new Vector2(0.5f, 1f)),
+            EdgeSide(host, "Bottom", Vector2.zero,        new Vector2(1f, 0f), new Vector2(0.5f, 0f)),
+            EdgeSide(host, "Left",   Vector2.zero,        new Vector2(0f, 1f), new Vector2(0f, 0.5f)),
+            EdgeSide(host, "Right",  new Vector2(1f, 0f), Vector2.one,         new Vector2(1f, 0.5f)),
+        };
+    }
+
+    private static Image EdgeSide(RectTransform host, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot)
+    {
+        var img = NewImage(name, host, UITheme.Thin.LineIdle);
+        img.raycastTarget = false;
+        var rt = img.rectTransform;
+        rt.anchorMin = anchorMin;
+        rt.anchorMax = anchorMax;
+        rt.pivot     = pivot;
+        rt.anchoredPosition = Vector2.zero;
+        rt.sizeDelta = Vector2.zero;
+        return img;
+    }
+
+    private static void SetEdgeWidth(CardView c, float w)
+    {
+        c.Edge[0].rectTransform.sizeDelta = new Vector2(0f, w);
+        c.Edge[1].rectTransform.sizeDelta = new Vector2(0f, w);
+        c.Edge[2].rectTransform.sizeDelta = new Vector2(w, 0f);
+        c.Edge[3].rectTransform.sizeDelta = new Vector2(w, 0f);
+    }
+
+    private static T Child<T>(Transform root, string path) where T : Component
+    {
+        var t = root.Find(path);
+        return t != null ? t.GetComponent<T>() : null;
+    }
+
+    /// <summary>후보를 카드마다 채우고 지금 고른 카드를 바로(연출 없이) 표시한다. 잠긴 후보가 하나라도 있으면 모든 카드가 배지 줄을 둔다.</summary>
+    private void ShowCards()
+    {
+        bool anyLocked = false;
+        for (int i = 0; i < _entries.Count; i++) anyLocked |= _entries[i].Locked;
+
+        for (int i = 0; i < _entries.Count; i++)
+        {
+            var c = _cards[i];
+            FillCard(_entries[i], c.Icon, c.Name, c.Badge, c.Tag, c.Stats, c.Glow, reserveBadge: anyLocked);
+        }
+        ApplySelection(instant: true);
+    }
+
+    /// <summary>나란히 판에서 카드를 고른다(카드 클릭 · 좌우 화살표 · ← →). 확정은 [장착하기]만 한다.</summary>
+    private void Select(int i)
+    {
+        if (!_multi || i == _index || i < 0 || i >= _entries.Count) return;
+        _index = i;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiSelect);
+        ApplySelection(instant: false);
+    }
+
+    /// <summary>
+    /// 고른 카드 = 금 85% 2px 테 + 1.03배, 나머지 = 알파 0.55 · 잉크 1px 테. 상태가 바뀌는 순간은 0.18초 감속(실시간 — 팝업은 시간정지).
+    /// 확정 버튼 · 화살표도 고른 후보에 맞춘다(잠긴 후보를 고르면 [장착하기]가 잠긴다 — 예전과 같다).
+    /// </summary>
+    private void ApplySelection(bool instant)
+    {
+        int n = Mathf.Min(_entries.Count, _cards.Count);
+        float px = 1f / PanelScale();   // 창이 localScale로 커져 있다 — 나눠야 화면에서 1 · 2px
+        for (int i = 0; i < n; i++)
+        {
+            var c = _cards[i];
+            SetEdgeWidth(c, (i == _index ? SelEdgePx : IdleEdgePx) * px);
+            _fromAlpha[i] = c.Group.alpha;
+            _fromScale[i] = c.Root.localScale.x;
+            _fromEdge[i]  = c.Edge[0].color;
+        }
+
+        SetArrow(_prev, _index > 0);
+        SetArrow(_next, _index < _entries.Count - 1);
+        RefreshConfirm(_entries[_index]);
+
+        CancelSelectionTween();
+        if (instant) { PaintCards(1f); return; }
+        _selCts = CancellationTokenSource.CreateLinkedTokenSource(destroyCancellationToken);
+        SelectionTweenAsync(_selCts.Token).Forget();
+    }
+
+    /// <summary>k(0→1)만큼 지금 값에서 목표로 — 고른 카드는 밝게 · 크게 · 금 테, 나머지는 흐리게 · 잉크 테.</summary>
+    private void PaintCards(float k)
+    {
+        int n = Mathf.Min(_entries.Count, _cards.Count);
+        for (int i = 0; i < n; i++)
+        {
+            var c = _cards[i];
+            bool on = i == _index;
+            c.Group.alpha     = Mathf.Lerp(_fromAlpha[i], on ? 1f : DimAlpha, k);
+            c.Root.localScale = Vector3.one * Mathf.Lerp(_fromScale[i], on ? SelScale : 1f, k);
+            var edge = Color.Lerp(_fromEdge[i], on ? UITheme.Thin.LineReady : UITheme.Thin.LineIdle, k);
+            for (int e = 0; e < c.Edge.Length; e++) c.Edge[e].color = edge;
+        }
+    }
+
+    private async UniTaskVoid SelectionTweenAsync(CancellationToken ct)
+    {
+        try { await UIMotion.Tween(UIMotion.Swap, PaintCards, ct); }
+        catch (OperationCanceledException) { }
+    }
+
+    private void CancelSelectionTween()
+    {
+        if (_selCts == null) return;
+        _selCts.Cancel();
+        _selCts.Dispose();
+        _selCts = null;
+    }
+
+    /// <summary>창 배율(UIWindowFitter가 localScale로 건다) — 선 굵기를 화면 px로 맞출 때 나눈다.</summary>
+    private float PanelScale()
+    {
+        if (_panelRt == null) _panelRt = transform.Find("Panel") as RectTransform;
+        return _panelRt != null ? Mathf.Max(0.01f, _panelRt.localScale.x) : 1f;
     }
 
     /// <summary>
@@ -232,12 +553,78 @@ public class UI_RangedForgePopup : UI_Popup
         return _sb.ToString();
     }
 
+    /// <summary>
+    /// 한 줄 = 라벨(왼쪽, 17 · 잉크 60%) + 값(오른쪽, 20 · 잉크). 같은 기준선에 둘을 두려고 라벨 줄 끝에 줄 높이 0을 건다 —
+    /// 다음 줄(값)이 같은 높이에서 오른쪽 정렬로 그려지고, 값 줄 끝에서 줄 높이를 되돌린다(TMP line-height 태그).
+    /// </summary>
     private void Row(string label, string value)
     {
         if (_sb.Length > 0) _sb.Append('\n');
-        // 라벨 폭을 스페이스로 대충 맞춰 값을 정렬(모노 느낌). 숫자만 강조.
-        _sb.Append("<color=#9A9C9F>").Append(label).Append("</color>   ")
-           .Append("<color=").Append(NumberHex).Append('>').Append(value).Append("</color>");
+        _sb.Append("<align=left><size=").Append(StatLabelSize).Append("><color=").Append(StatLabelHex).Append('>')
+           .Append(label).Append("</color></size><line-height=0>\n")
+           .Append("<align=right>").Append(value).Append("</line-height>");
+    }
+
+    /// <summary>수치표를 무대 가운데 360px 폭으로 — 남는 폭은 좌우 여백으로 나눈다(무대가 좁으면 꽉 채운다).</summary>
+    private void FitStatTable()
+    {
+        if (_stats == null) return;
+        float m = Mathf.Max(0f, (_stats.rectTransform.rect.width - StatTableW) * 0.5f);
+        _stats.margin = new Vector4(m, 0f, m, 0f);
+    }
+
+    /// <summary>
+    /// 톤 v2 글자(10-11) — 구운 프리팹은 DNF · 가짜 굵게 · 기울임(태그라인)으로 굳어 있어 열 때마다 입힌다.
+    /// 제목만 DNF(굵게 없음), 나머지는 Noto 400/500. 글자가 커진 만큼 고정 높이도 늘린다 — 무대가 모자라면 아이콘 칸이 양보한다.
+    /// </summary>
+    private void ApplyThinStyle()
+    {
+        var title = transform.Find("Panel/Title")?.GetComponent<TMP_Text>();
+        if (title != null)
+        {
+            title.fontStyle = FontStyles.Normal;
+            title.enableAutoSizing = false;
+            title.fontSize  = TitleSize;
+            title.color     = TitleColor;
+        }
+        var sub = transform.Find("Panel/Sub")?.GetComponent<TMP_Text>();
+        if (sub != null) Thin(sub, UIWeight.Regular, BodySize, SubColor);
+
+        if (_name != null)
+        {
+            Thin(_name, UIWeight.Medium, NameSize, BodyColor);
+            FixHeight(_name.gameObject, 36f);
+        }
+        if (_badge != null)
+        {
+            Thin(_badge, UIWeight.Medium, SmallSize, LockColor);
+            FixHeight(_badge.gameObject, 22f);
+        }
+        if (_tag != null)
+        {
+            Thin(_tag, UIWeight.Regular, BodySize, SubColor);   // 기울임 없앰(P2) · 잉크 60%
+            FixHeight(_tag.gameObject, 26f);
+        }
+        if (_stats != null)
+        {
+            Thin(_stats, UIWeight.Regular, StatValueSize, BodyColor);
+            _stats.lineSpacing = 0f;   // 줄 높이 태그로 짝을 맞춘다 — 줄 간격을 더하면 라벨과 값이 어긋난다
+            _stats.richText    = true;
+            FixHeight(_stats.gameObject, 120f);   // 4줄 × 20(줄높이 ≈ 29) + 여유
+        }
+        if (_dots != null && _dots.TryGetComponent<LayoutElement>(out var dle)) dle.preferredHeight = 22f;   // 「1 / N」 15px가 들어갈 높이
+
+        var cancelLabel = transform.Find("Panel/Buttons/Btn_Cancel/L")?.GetComponent<TMP_Text>();
+        if (cancelLabel != null) Thin(cancelLabel, UIWeight.Medium, BodySize, BodyColor);
+        if (_confirmLabel != null) Thin(_confirmLabel, UIWeight.Medium, 20f, TitleColor);
+        foreach (var g in _arrowGlyphs.Values)
+            if (g != null) g.fontStyle = FontStyles.Normal;
+    }
+
+    private static void Thin(TMP_Text t, UIWeight weight, float size, Color color)
+    {
+        t.enableAutoSizing = false;   // 단계 밖 크기로 줄지 않게 — 넘치면 말줄임
+        UITheme.StyleThinText(t, weight, size, color);
     }
 
     // ── 상태 표시 ─────────────────────────────────────────────
@@ -257,9 +644,10 @@ public class UI_RangedForgePopup : UI_Popup
     {
         for (int i = 0; i < _dotImgs.Count; i++)
             _dotImgs[i].color = i == active ? DotOn : DotOff;
+        if (_dotCount != null) _dotCount.text = $"{active + 1} / {_entries.Count}";
     }
 
-    private void RefreshConfirm(Entry e, Color theme)
+    private void RefreshConfirm(Entry e)
     {
         bool ok = !e.Locked;
         if (_confirm != null) { _confirm.interactable = ok; UIAffordGlow.Set(_confirm, ok); }   // 고를 수 있으면 은은한 불(09-29)
@@ -269,8 +657,7 @@ public class UI_RangedForgePopup : UI_Popup
         if (_confirmBg != null)
             _confirmBg.color = _skin?.equipButton != null
                 ? (ok ? Color.white : new Color(1f, 1f, 1f, 0.35f))
-                : (ok ? new Color(theme.r * 0.32f, theme.g * 0.32f, theme.b * 0.40f, 1f)
-                      : new Color(0.14f, 0.15f, 0.18f, 1f));
+                : (ok ? UITheme.CtaTint : new Color(0.14f, 0.15f, 0.18f, 1f));
     }
 
     private void Confirm()
@@ -297,7 +684,7 @@ public class UI_RangedForgePopup : UI_Popup
 
     private void Complete(WeaponSO result)
     {
-        Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton).Forget();
+        Managers.Sound?.PlayUiEvent(result != null ? SoundEvent.ForgeTake : SoundEvent.UiClose);   // 받기 · 취소
         _tcs?.TrySetResult(result);
         ClosePopupUI();
     }
@@ -355,7 +742,7 @@ public class UI_RangedForgePopup : UI_Popup
         var title = NewText("Title", prt, 30f, TitleColor, FontStyles.Bold, TextAlignmentOptions.Center);
         title.text = "보조 무기 — 원거리";
         var sub = NewText("Sub", prt, 16f, SubColor, FontStyles.Normal, TextAlignmentOptions.Center);
-        sub.text = "주무기 <color=#CFC0A0>무명의 형상</color>은 이미 손에 있다. 곁에 둘 하나를 고른다.";
+        sub.text = "주무기 <color=#CFC0A0>무형검</color>은 이미 손에 있다. 곁에 둘 하나를 고른다.";
 
         BuildViewer(prt);   // ◀  [카드]  ▶
         BuildDotsRow(prt);
@@ -598,7 +985,7 @@ public class UI_RangedForgePopup : UI_Popup
         FixHeight(_badge.gameObject, 20f);
 
         // 한 줄 설명
-        _tag = NewText("Tag", stage, 16f, SubColor, FontStyles.Italic, TextAlignmentOptions.Center);   // 글자 하한
+        _tag = NewText("Tag", stage, 16f, SubColor, FontStyles.Normal, TextAlignmentOptions.Center);   // 글자 하한 · 기울임 없음(10-11)
         _tag.textWrappingMode = TextWrappingModes.NoWrap;
         _tag.overflowMode     = TextOverflowModes.Ellipsis;
         FixHeight(_tag.gameObject, 22f);
@@ -663,11 +1050,34 @@ public class UI_RangedForgePopup : UI_Popup
         for (int i = 0; i < _entries.Count; i++)
         {
             var dot = NewImage("Dot", _dots, DotOff);
+            dot.sprite = UIProceduralSprites.Circle(32);   // 코드로 그린 원 — 넘겨 보는 위치 표시(10 → 14px, P2)
+            dot.raycastTarget = false;
             var le = dot.gameObject.AddComponent<LayoutElement>();
-            le.preferredWidth = 10f; le.preferredHeight = 10f;
-            le.minWidth = 10f; le.minHeight = 10f;
+            le.preferredWidth = DotSize; le.preferredHeight = DotSize;
+            le.minWidth = DotSize; le.minHeight = DotSize;
             _dotImgs.Add(dot);
         }
+        EnsureDotCount().SetAsLastSibling();
+    }
+
+    /// <summary>점 오른쪽 「1 / N」(15 · 잉크 60%) — 구운 프리팹엔 없어 처음 쓸 때 만든다.</summary>
+    private RectTransform EnsureDotCount()
+    {
+        if (_dotCount == null)
+        {
+            var found = _dots.Find("Count");
+            _dotCount = found != null ? found.GetComponent<TMP_Text>() : null;
+        }
+        if (_dotCount == null)
+        {
+            _dotCount = NewText("Count", _dots, SmallSize, SubColor, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+            _dotCount.textWrappingMode = TextWrappingModes.NoWrap;
+            _dotCount.margin = new Vector4(6f, 0f, 0f, 0f);
+            var le = _dotCount.gameObject.AddComponent<LayoutElement>();
+            le.preferredWidth = 56f; le.minWidth = 56f; le.preferredHeight = 22f;
+            Thin(_dotCount, UIWeight.Regular, SmallSize, SubColor);
+        }
+        return _dotCount.rectTransform;
     }
 
     private void BuildButtons(RectTransform parent)

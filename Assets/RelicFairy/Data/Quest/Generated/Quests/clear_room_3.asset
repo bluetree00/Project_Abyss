@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: clear_room_3
   m_EditorClassIdentifier: Assembly-CSharp::Quest
   category: {fileID: 11400000, guid: 0912c96fd3e6cf0429209aa4b4ad45dd, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 5eaf064a03379e345ac06c41d7468413, type: 3}
   codeName: clear_room_3
   displayName: "\uCCAB \uBC1C\uAC78\uC74C"
   description: "\uBC29 3\uAC1C \uD074\uB9AC\uC5B4"

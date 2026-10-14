@@ -3,11 +3,11 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
-/// 최후의 일격 — 대검 Q스킬.
+/// 최후의 일격 — 대검 R스킬.
 /// 차징 모션 후 전방 3m 반원을 강타한다.
 ///   1단계: 차징 → 전방 반원 1회 공격
-///   2단계: + 피격 적에게 추가 강타 1회 (피격 이펙트 A)
-///   3단계: + 피격 적에게 최대체력 비례 추가 1회 (피격 이펙트 B, 더 화려)
+///   2단계: + 피격 적에게 추가 강타 1회 30+공격력 (피격 이펙트 A)
+///   3단계: 추가 강타가 45+공격력 (피격 이펙트 B, 더 화려)
 /// </summary>
 [CreateAssetMenu(menuName = "Game/Skill/FinalStrikeBehavior")]
 public class FinalStrikeBehaviorSO : SkillBehaviorSO
@@ -30,7 +30,9 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
     [SerializeField] private float tier2ExtraEffectScale = 0.5f;
 
     [Header("3단계: 최대체력 비례")]
-    [SerializeField] private float maxHpDamageRatio = 0.1f;
+    [SerializeField] private float maxHpDamageRatio = 0.1f;   // [폐기 10-08 B5] 3단계 추가타가 「플레이어」 최대 체력 비례였다 — 직렬화 값이라 남긴다
+    [Tooltip("3단계 추가타 기본 피해(공격력 반영 — 2단계 extraDamage보다 크다). 10-08 B5: 예전엔 플레이어 최대 체력 10%였다.")]
+    [SerializeField] private float tier3ExtraDamage = 45f;
     [SerializeField] private string tier3ExtraEffectKey = "EnergyExplosion";
     [SerializeField] private float tier3ExtraEffectScale = 0.7f;
 
@@ -80,7 +82,7 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
 
         public void OnUpdate(SkillExecutionContext ctx)
         {
-            _timer += Time.deltaTime;
+            _timer += ctx.DeltaTime;   // 애니메이터와 같은 시계(슬로모 — 10-09)
             switch (_phase)
             {
                 case Phase.Charge:   UpdateCharge(ctx);   break;
@@ -112,14 +114,14 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
         // ── 공격 후 대기 ──
         private void UpdateStrike(SkillExecutionContext ctx)
         {
-            if (_skillTier >= 2 && _timer >= _data.extraDelay)
+            if (_skillTier >= 2 && _hitTargets.Count > 0 && _timer >= _data.extraDelay)
             {
                 _timer = 0f;
                 _phase = Phase.ExtraHit;
             }
-            else if (_skillTier < 2 && _timer >= _data.endDelay)
+            else if (_skillTier < 2 || _hitTargets.Count == 0)   // A3: 헛치면 추가타 대기(0.8초) 없이 바로 끝
             {
-                _timer = 0f;
+                // B6: 여기서 endDelay를 기다린 뒤 End가 또 endDelay를 기다려 끝 대기가 두 번(0.6초)이었다 — 바로 End로 넘겨 한 번만 기다린다
                 _phase = Phase.End;
             }
         }
@@ -133,8 +135,8 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
 
             if (_skillTier >= 3)
             {
-                // 3단계: 최대체력 비례 + 화려한 이펙트
-                extraDmg = ctx.RuntimeStats.MaxHp * _data.maxHpDamageRatio;
+                // 3단계: 공격력 반영 추가타(2단계보다 큼) + 화려한 이펙트 — B5: 예전엔 플레이어 최대 체력 10%(공격력과 무관 · 2단계보다 약했다)
+                extraDmg = ctx.CalculateDamage(_data.tier3ExtraDamage);
                 effectKey = _data.tier3ExtraEffectKey;
                 effectScale = _data.tier3ExtraEffectScale;
             }
@@ -167,6 +169,7 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
 
         private void UpdateEnd(SkillExecutionContext ctx)
         {
+            ctx.EnterRecovery();   // 후딜 — 회피로 끊을 수 있다 · 스탠스 해제(10-08 A2 · A4)
             if (_timer >= _data.endDelay)
                 ctx.RequestEnd();
         }
@@ -175,12 +178,15 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
         private void ExecuteStrike(SkillExecutionContext ctx)
         {
             var playerPos = ctx.PlayerTransform.position;
-            var forward = ctx.PlayerTransform.forward;
-            var center = playerPos + forward * (_data.detectRadius * 0.5f);
+            var forward = ctx.AimForward;   // 놓을 때 다시 겨눈 방향(B2 — transform.forward는 옛 방향)
+            SkillRangeRing.Fan(playerPos, forward, _data.detectRadius, _data.detectAngle);   // 내려찍는 반원(A10)
+            Managers.Sound?.PlayEvent(SoundEvent.SkillHeavyImpact);   // 내려찍기 충격(A6)
             float halfAngle = _data.detectAngle * 0.5f;
 
             float dmg = ctx.CalculateDamage(_data.baseDamage);
-            var colliders = Physics.OverlapSphere(center, _data.detectRadius);
+            // 판정 = 범위 고리(플레이어 중심 반원). 예전엔 구의 중심을 1.5 m 앞에 둬 앞으로 4.5 m까지 닿았다
+            // — 고리 · 설명(3 m)보다 넓었다(10-08 강화 점검)
+            var colliders = Physics.OverlapSphere(playerPos, _data.detectRadius);
             foreach (var col in colliders)
             {
                 if (col.gameObject == ctx.Controller.gameObject) continue;
@@ -192,7 +198,8 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
 
                 if (col.TryGetComponent<IDamageable>(out var d))
                 {
-                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier, isFinisher: true);   // 스킬 자체가 한 방 — 본타가 막타
+                    // 스킬 자체가 한 방 — 본타가 막타. 첫 적은 아래에서 자기 타격 이펙트를 띄우므로 공용 이펙트를 건너뛴다
+                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier, isFinisher: true, skipHitVfx: _hitObjects.Count == 0);
                     _hitTargets.Add(d);
                     _hitObjects.Add(col.gameObject);
                 }
@@ -207,18 +214,18 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
             }
 
             // 전방 휘두르기 이펙트 — T1은 1개, T2+는 3개 부채꼴
-            var strikeCenter = playerPos + forward * _data.detectRadius * 0.5f + Vector3.up * 1f;
+            var strikeCenter = playerPos + forward * _data.detectRadius * 0.17f + Vector3.up * 1f;   // 반원 판정에 맞춰 몸 가까이(10-13: 반경의 절반 앞이라 앞 5.4 m까지 나갔다)
             if (_skillTier <= 1)
             {
                 SpawnEffectRotated(ctx, _data.strikeEffectKey, strikeCenter,
-                    ctx.PlayerTransform.rotation, _data.strikeEffectScale, 1f);
+                    Quaternion.LookRotation(forward), _data.strikeEffectScale, 1f);   // 판정 방향 그대로(10-13 — 회전이 한 프레임 늦어 옛 방향을 봤다)
             }
             else
             {
                 for (int i = -1; i <= 1; i++)
                 {
                     float spreadAngle = i * 20f;
-                    Quaternion rot = ctx.PlayerTransform.rotation * Quaternion.Euler(0f, spreadAngle, 0f);
+                    Quaternion rot = Quaternion.LookRotation(forward) * Quaternion.Euler(0f, spreadAngle, 0f);
                     Vector3 offset = Quaternion.Euler(0f, spreadAngle, 0f) * forward * 0.3f * Mathf.Abs(i);
                     SpawnEffectRotated(ctx, _data.strikeEffectKey, strikeCenter + offset,
                         rot, _data.strikeEffectScale, 1f);

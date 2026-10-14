@@ -91,6 +91,8 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
 {
     private enum Phase { Takeoff, Hover, Warning, Attack, EndPose, Landing, Done }
 
+    private const float WindBlastAt = 0.4f;   // 날개치기 클립에서 돌풍(판정)이 나가는 비율
+
     private Phase   _phase;
     private float   _timer;
     private Vector3 _hoverPos;
@@ -105,6 +107,9 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
     private float      _effectiveLength;
     private bool       _windBlastSpawned;
     private bool       _wingStrikeSfxPlayed;
+
+    /// <summary>예고 채움 시간 = 예고 + 날개를 쳐 돌풍이 나가기까지 — 다 차는 순간이 판정(10-08 점검: 다 찬 뒤 0.72초에 맞았다).</summary>
+    private float FillSeconds => Data.WarningDuration + Data.AttackAnimDuration * WindBlastAt;
 
     internal DragonStormWingsState(DragonStormWingsPatternSO data) : base(data) { }
 
@@ -243,11 +248,12 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
             Managers.Sound?.PlayEffectAt(Data.WingStrikeSfx, _warnCenter);
         }
 
-        PatternGuideHelper.SetProgress(_guide, _timer / Data.WarningDuration);
+        PatternGuideHelper.SetProgress(_guide, _timer / FillSeconds);
 
         if (_timer < Data.WarningDuration) return;
 
-        PatternGuideHelper.Arm(_guide);   // 날개를 치는 동안 판정 색으로 — 돌풍이 나가면 치운다
+        PatternGuideHelper.Arm(_guide);   // 날개를 치는 동안 판정 색으로 — 채움은 돌풍이 나가는 순간까지 이어지고, 나가면 치운다
+        PatternGuideHelper.SetProgress(_guide, _timer / FillSeconds);
 
         _phase = Phase.Attack;
         _timer = 0f;
@@ -260,7 +266,8 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
     {
         ctx.Transform.position = _hoverPos;
 
-        if (!_windBlastSpawned && _timer >= Data.AttackAnimDuration * 0.4f)
+        PatternGuideHelper.SetProgress(_guide, (Data.WarningDuration + _timer) / FillSeconds);   // 돌풍이 나간 뒤엔 가이드가 없어 아무 일도 안 한다
+        if (!_windBlastSpawned && _timer >= Data.AttackAnimDuration * WindBlastAt)
         {
             _windBlastSpawned = true;
             SpawnWindBlast(ctx);
@@ -342,7 +349,7 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
             var player = col.GetComponent<PlayerController>()
                       ?? col.GetComponentInParent<PlayerController>();
             if (player == null) continue;
-            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier));
+            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier), ctx.Monster.gameObject);   // 공격자 = 화룡(10-08 점검)
             Data.StatusEffect?.Apply(player);
             break;
         }

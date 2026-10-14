@@ -45,6 +45,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 594c3bcb23303e14d939d396360cab5e
+    m_Address: RelicQ_Finish
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 679a031c10fa6e74c89b97a739405d0b
     m_Address: Nameless_GroundHeavy
     m_ReadOnly: 0
@@ -91,7 +96,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e4263221de5102548a26722e06080ab4
-    m_Address: Nameless_GroundLight_03
+    m_Address: Nameless_ESkill
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

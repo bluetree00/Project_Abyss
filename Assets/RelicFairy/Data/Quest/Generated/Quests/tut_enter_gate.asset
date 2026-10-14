@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: tut_enter_gate
   m_EditorClassIdentifier: Assembly-CSharp::Quest
   category: {fileID: 11400000, guid: e7ce8d0be6825a447a97b7be3ae0c2db, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: e1290382f86e0674f89d3aafef14813b, type: 3}
   codeName: tut_enter_gate
   displayName: "\uC2EC\uC5F0\uC73C\uB85C"
   description: "\uD3EC\uD0C8\uC744 \uC9C0\uB098 \uC2EC\uC5F0\uC73C\uB85C"

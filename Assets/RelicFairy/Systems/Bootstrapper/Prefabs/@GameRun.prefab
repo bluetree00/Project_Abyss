@@ -1070,6 +1070,13 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 4b4f07306239f16488bca7a61cb44a78, type: 2}
   - {fileID: 11400000, guid: 8da2fca1ba714d8c974c330efda6c05c, type: 2}
   essenceTracker: {fileID: 0}
+  exileFallClip: {fileID: 7400002, guid: b7a64e0ef3758e147bf2495200625a65, type: 3}
+  exileDownClip: {fileID: 7400002, guid: c6221b0c83382414d9141f17453924ea, type: 3}
+  exileGetUpClip: {fileID: 7400002, guid: a49f0878d8be29845b72eafaf0f28296, type: 3}
+  exileRoars:
+  - {fileID: 8300000, guid: 3a39861fff5dbef4bbb1fd94e286c037, type: 3}
+  - {fileID: 8300000, guid: 1d70c1c40e448d54a8efaab06e24ca83, type: 3}
+  - {fileID: 8300000, guid: 7f0d41ccc31864540a18d071e7651837, type: 3}
 --- !u!1 &7934002030709558994
 GameObject:
   m_ObjectHideFlags: 0

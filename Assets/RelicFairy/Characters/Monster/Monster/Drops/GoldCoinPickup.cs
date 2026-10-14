@@ -2,11 +2,12 @@ using UnityEngine;
 
 /// <summary>
 /// 몬스터 사망 시 드롭되는 골드 코인.
-///  · 스폰 직후 짧은 파라볼라 비행(arc) 후 착지
+///  · 스폰 직후 짧은 파라볼라 비행(arc) — 금화가 두 바퀴 뒤집히다 바닥에 누운 채 내려앉는다
 ///  · 플레이어가 MagnetRange 진입 시 자석처럼 빨려오다가 PickupRadius 안에서 획득
 ///  · 획득 시 GameRunSession.AddGold 로 coinValue 지급
-/// 런타임 Primitive(Sphere) 로 시각을 생성하므로 별도 프리팹 등록 불필요.
-/// 추후 아트 프리팹이 생기면 SpawnDrops 를 프리팹 로드 기반으로 교체.
+///  · 나타나기 · 사라지기(획득 · 수명 끝)는 디졸브(<see cref="CurrencyVisuals"/>)
+/// 모양은 재화 오브젝트 목록(<see cref="CurrencyVisualSetSO"/>의 골드 칸 = 왕관 금화, 10-12)에서 꺼낸다.
+/// 목록이 아직 없거나 칸이 비면 예전 임시 비주얼(Primitive Sphere)로 떨어진다.
 /// </summary>
 public class GoldCoinPickup : MonoBehaviour
 {
@@ -18,26 +19,40 @@ public class GoldCoinPickup : MonoBehaviour
     private const float MagnetSpeed   = 12f;
     private const float PickupRadius  = 0.6f;
     private const float ScatterRadius = 1.3f;
-    private const float CoinSize      = 0.35f;
+    private const float CoinSize      = 0.35f;  // 임시 구체 지름
     private const float LifeTime      = 30f;
     private const float SpinSpeed     = 720f;
+    private const float FlipTurns     = 2f;     // 날아가는 동안 뒤집히는 바퀴 수 — 정수라야 누운 채 내려앉는다
+    private const float AppearSeconds = 0.3f;   // 나타나기 디졸브 — 날아가는 동안(0.45초) 끝난다. 줍기 대기(0.4초)보다 짧게
+    private const float CollectVanishSeconds = 0.18f;
+    private const float ExpireVanishSeconds  = 0.6f;
 
     // ── Static ───────────────────────────────────────────────
     private static readonly Color CoinColor = new Color(1f, 0.82f, 0.1f);
+    private static readonly Color CoinEdge  = new Color(2.2f, 1.5f, 0.35f, 1f);   // 디졸브 테두리(HDR) — 금빛
 
     // ── Private Fields ───────────────────────────────────────
     private int       _value;
     private float     _spawnTime;
     private float     _arcTimer;
+    private float     _yaw;
     private Vector3   _arcStart;
     private Vector3   _arcEnd;
     private bool      _arcing;
     private bool      _collected;
+    private bool      _vanishing;
     private Transform _playerTf;
 
     // ── Lifecycle ────────────────────────────────────────────
     private void Update()
     {
+        if (_vanishing)
+        {
+            // 주운 금화는 녹는 동안 몸으로 따라 들어간다 — 제자리에서 녹으면 「안 주워졌다」로 읽힌다
+            if (_collected) FollowPlayer();
+            return;
+        }
+
         if (_arcing)
         {
             _arcTimer += Time.deltaTime;
@@ -45,7 +60,7 @@ public class GoldCoinPickup : MonoBehaviour
             Vector3 pos = Vector3.Lerp(_arcStart, _arcEnd, t);
             pos.y += Mathf.Sin(t * Mathf.PI) * ArcHeight;
             transform.position = pos;
-            transform.Rotate(Vector3.up, SpinSpeed * Time.deltaTime, Space.World);
+            transform.rotation = Quaternion.Euler(t * 360f * FlipTurns, _yaw, 0f);
 
             if (t >= 1f) _arcing = false;
             return;
@@ -74,7 +89,10 @@ public class GoldCoinPickup : MonoBehaviour
         }
 
         if (Time.time - _spawnTime >= LifeTime)
-            Destroy(gameObject);
+        {
+            _vanishing = true;
+            CurrencyVisuals.Vanish(gameObject, CurrencyVisualKind.Gold, ExpireVanishSeconds);
+        }
     }
 
     // ── Public Methods ───────────────────────────────────────
@@ -97,6 +115,7 @@ public class GoldCoinPickup : MonoBehaviour
 
             var coin = go.AddComponent<GoldCoinPickup>();
             coin.Initialize(startPos, landing, valuePerCoin);
+            CurrencyVisuals.Appear(go, CurrencyVisualKind.Gold, AppearSeconds, CoinEdge);
         }
     }
 
@@ -109,15 +128,25 @@ public class GoldCoinPickup : MonoBehaviour
         _spawnTime = Time.time;
         _arcTimer  = 0f;
         _arcing    = true;
+        _yaw       = Random.Range(0f, 360f);
+        transform.rotation = Quaternion.Euler(0f, _yaw, 0f);
     }
 
     private void Collect()
     {
         if (_collected) return;
         _collected = true;
+        _vanishing = true;
 
         GameRunBootstrapper.Instance?.Run?.AddGold(_value);
-        Destroy(gameObject);
+        CurrencyVisuals.Vanish(gameObject, CurrencyVisualKind.Gold, CollectVanishSeconds);
+    }
+
+    private void FollowPlayer()
+    {
+        Transform player = ResolvePlayer();
+        if (player == null) return;
+        transform.position = Vector3.MoveTowards(transform.position, player.position, MagnetSpeed * Time.deltaTime);
     }
 
     private Transform ResolvePlayer()
@@ -130,6 +159,19 @@ public class GoldCoinPickup : MonoBehaviour
     }
 
     private static GameObject CreateCoinVisual()
+    {
+        // 왕관 금화(10-12) — 목록이 없거나 칸이 비면 임시 구체
+        var art = CurrencyVisuals.TryCreate(CurrencyVisualKind.Gold);
+        if (art != null)
+        {
+            art.name = "GoldCoin";
+            return art;
+        }
+        return CreatePlaceholder();
+    }
+
+    /// <summary>예전 임시 비주얼(금색 구체). 목록이 없을 때의 폴백 · 비교 도구의 「지금」 사진.</summary>
+    private static GameObject CreatePlaceholder()
     {
         var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         go.name = "GoldCoin";

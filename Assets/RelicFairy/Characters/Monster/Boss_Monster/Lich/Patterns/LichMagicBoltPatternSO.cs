@@ -197,7 +197,7 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -296,7 +296,7 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
     {
         LichVfx.Stop(ref b.Vfx);
         LichVfx.Stop(ref b.Gild, 0.2f);
-        LichVfx.Play(LichVfxSlot.BoltImpact, b.To, Quaternion.identity, Data.impactRadius / 2f);
+        LichVfx.Play(LichVfxSlot.BoltImpact, b.To, Quaternion.identity, LichPatternUtil.BoltScale(Data.impactRadius));   // r/2는 판정의 1.5배(10-08 점검)
         LichSfx.Play(LichSfxSlot.BoltImpact, b.To);
         LichCrack.Spawn(b.To, Data.impactRadius * CrackScale, CrackSeconds);
 

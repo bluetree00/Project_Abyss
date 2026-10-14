@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using RelicFairy.Monster;
@@ -80,6 +80,10 @@ public class BossRoomController : MonoBehaviour
 
     // ── Properties ───────────────────────────────────────────────
     public bool SuppressEntryFogVeil => suppressEntryFogVeil;
+    /// <summary>등장 연출이 끝나 조작이 돌아왔는가 — 외부 연출(인트로)이 전투 대사·HUD를 이 뒤로 미룬다.</summary>
+    public bool IsCombatReady { get; private set; }
+    /// <summary>등장 클로즈업에 띄울 이름 — 비우면 보스 자신의 인카운터 대사(인트로는 「타락한 모르드레드」).</summary>
+    public string EntranceTitle { get; set; }
     public bool EntryDialogueAsBark  => entryDialogueAsBark;
 
     // ── Lifecycle ────────────────────────────────────────────────
@@ -173,6 +177,7 @@ public class BossRoomController : MonoBehaviour
         if (boss is not IBossEntrance entrance)
         {
             _playerController?.SetInputEnabled(true);
+            IsCombatReady = true;
             ShowNonEntranceEncounterBark(boss); // 등장 연출 없는 보스도 인카운터 대사는 띄움
             return;
         }
@@ -184,6 +189,7 @@ public class BossRoomController : MonoBehaviour
             entrance.OnCombatReady -= combatReadyHandler;
             if (this == null) return;
             _playerController?.SetInputEnabled(true);
+            IsCombatReady = true;
         };
         entrance.OnCombatReady += combatReadyHandler;
 

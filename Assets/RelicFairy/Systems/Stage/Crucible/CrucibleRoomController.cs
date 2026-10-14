@@ -33,8 +33,6 @@ public class CrucibleRoomController : MonoBehaviour
     private const float JackpotMaxChance   = 0.5f;
 
     private const float DiscountCostMult    = 0.5f;   // 반값 재련
-    /// <summary>「대장장이의 인장」(기억의 제단 Ⅰ 출발) 해금 시 붙는 성공률. 화로 이벤트와 <b>합연산</b>이다.</summary>
-    public const float SmithSigilBonus = 0.08f;   // 성공률 +8%p
 
     private const float FeverSuccessBonus   = 0.15f;  // 성공률 +15%p
     private const float BountyJackpotBonus  = 0.15f;  // 잭팟 확률 +15%p (방 전체)
@@ -100,8 +98,7 @@ public class CrucibleRoomController : MonoBehaviour
     private float SuccessBonus => EventBonus + SigilBonus;
 
     /// <summary>「대장장이의 인장」(기억의 제단 Ⅰ 출발) 상시 보정.</summary>
-    public static float SigilBonus =>
-        MemoryAltarService.IsUnlocked(MemoryAltarCatalog.SigilSmith) ? SmithSigilBonus : 0f;
+    public static float SigilBonus => MemoryAltarService.SmithBonus;   // 10-14 강화형 — 「재련 성공률」 +3%p/단계
 
     private float EventBonus => _event switch
     {
@@ -114,9 +111,9 @@ public class CrucibleRoomController : MonoBehaviour
     /// <summary>돌발 이벤트 배너 문구(없으면 빈 문자열).</summary>
     public string EventBanner => _event switch
     {
-        CrucibleEvent.Discount => "↗ 반값 재련! 안 지르면 손해지…",
+        CrucibleEvent.Discount => "↗ 반값 재련! 지금 안 두드리면 손해지…",
         CrucibleEvent.Fever    => "▲ 열기 오른 화로 — 성공률 상승 중!",
-        CrucibleEvent.Bounty   => "◆ 풍요로운 화로 — 잭팟이 가깝다!",
+        CrucibleEvent.Bounty   => "◆ 풍요로운 화로 — 재료가 되돌아올 기운이 짙다!",
         CrucibleEvent.Curse    => "◆ 저주받은 화로 — 성공률이 떨어진다…",
         _                      => string.Empty,
     };
@@ -126,7 +123,7 @@ public class CrucibleRoomController : MonoBehaviour
     {
         CrucibleEvent.Discount => "재료 비용 50%",
         CrucibleEvent.Fever    => "성공률 +15%p",
-        CrucibleEvent.Bounty   => "잭팟 확률 +15%p",
+        CrucibleEvent.Bounty   => "재료 환불 확률 +15%p",
         CrucibleEvent.Curse    => "성공률 -10%p",
         _                      => string.Empty,
     };
@@ -584,13 +581,13 @@ public class CrucibleRoomController : MonoBehaviour
     private static readonly string[] IdleLines =
     {
         "쇠는 두드릴수록 강해지지… 운이 따라준다면 말이야.",
-        "멀린이 날 여기 처박아둔 지도 천 년이야. 심심하던 참이지.",
+        "그 마법사가 날 여기 처박아둔 지도 천 년이야. 심심하던 참이지.",
     };
     private static readonly string[] TauntLines =
     {
         "겁이 나나? 이 정도 확률에 벌벌 떨면 영웅은 무슨.",
-        "안 지를 거면 왜 왔어? 화로만 식잖아.",
-        "확률이 낮다고? 낮으니까 지르는 맛이 있는 거지, 애송이.",
+        "안 두드릴 거면 왜 왔어? 화로만 식잖아.",
+        "확률이 낮다고? 낮으니까 두드리는 맛이 있는 거지, 애송이.",
     };
     private static readonly string[] StreakLines =
     {
@@ -605,7 +602,7 @@ public class CrucibleRoomController : MonoBehaviour
     private static readonly string[] FailLines =
     {
         "쯧, 쇠가 배신했군. …한 번 더 안 할 거야?",
-        "실패? 원래 도박이 그런 거야. 다시 지르면 되잖아.",
+        "실패? 쇠가 원래 그래. 다시 두드리면 되잖아.",
     };
     private static readonly string[] SuccessLines =
     {

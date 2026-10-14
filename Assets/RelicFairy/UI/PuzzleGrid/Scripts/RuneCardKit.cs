@@ -18,8 +18,6 @@ public static class RuneCardKit
     private const float ChipTile = 14f;
 
     private static readonly Color ChipFill = new(0.05f, 0.06f, 0.10f, 0.72f);
-    public static readonly Color OkColor   = new(0.47f, 0.84f, 0.60f, 1f);
-    public static readonly Color NoColor   = new(0.92f, 0.40f, 0.33f, 1f);
 
     // ── 등급 보석 테두리 ──
 
@@ -27,8 +25,9 @@ public static class RuneCardKit
     /// <paramref name="cardRT"/> 위에 등급 보석 테두리를 새로 세운다(이전 것은 지운다). 모서리 4 + 위·아래 장식바.
     /// 좌상단 모서리 한 장을 축 반전해 네 귀퉁이로 쓴다 — 룬 선택 카드와 같은 방식.
     /// </summary>
+    /// <paramref name="scale"/> · <paramref name="thin"/> = 톤 v2(룬판) — 조각을 줄이고 선을 1텍셀 깎는다(색은 그대로, 사용자 「리소스는 쓰되 얇게 조금」).
     public static void BuildGemFrame(RectTransform cardRT, ItemRarity rarity, float cornerW, float barW, float outset = 3f,
-                                     bool bottomBar = true)
+                                     bool bottomBar = true, float scale = 1f, bool thin = false)
     {
         if (cardRT == null) return;
         var root = Rebuild(cardRT, "GemFrame");
@@ -37,6 +36,13 @@ public static class RuneCardKit
         var corner = skin?.RarityCorner(rarity);
         var bar    = skin?.RarityBar(rarity);
         if (corner == null || bar == null) { BuildColorFrame(root, rarity); return; }
+        if (thin)
+        {
+            corner = UISpriteMaster.Thinned(corner, keepColor: true);
+            bar    = UISpriteMaster.Thinned(bar, keepColor: true);
+        }
+        cornerW *= scale;
+        barW    *= scale;
 
         float ch = cornerW * corner.rect.height / Mathf.Max(1f, corner.rect.width);
         float bh = barW * bar.rect.height / Mathf.Max(1f, bar.rect.width);
@@ -128,20 +134,6 @@ public static class RuneCardKit
 
     // ── 모양 · 놓을 자리 ──
 
-    /// <summary>지금 판에 이 룬을 놓을 자리가 있는가. 판정할 수 없으면 막지 않는다(true).</summary>
-    public static bool CanPlace(RuntimeItemData data)
-    {
-        if (data == null) return true;
-        var entry = Managers.RuneData?.GetShape(data.shapeId);
-        if (entry == null) return true;
-        var offsets = RuneDataManager.ParseCellOffsets(entry);
-        if (offsets == null || offsets.Length == 0) return true;
-
-        // 속성까지 넘긴다 — 룬은 자기 속성 존(레전드리는 중앙 제외)에만 놓인다.
-        return MerlinRuneBridge.Instance == null
-            || MerlinRuneBridge.Instance.CanPlaceShape(offsets, data.element, RuneZoneRule.NoCenter(data));
-    }
-
     /// <summary>
     /// 작은 모양을 <paramref name="root"/> 안에 가운데 정렬로 그린다(판 위 블록과 같은 속성 타일). 이전 칸은 지운다.
     /// <paramref name="dim"/>이면 어둡게(놓을 자리 없음).
@@ -190,15 +182,6 @@ public static class RuneCardKit
                 new Vector2(-totalW * 0.5f + cell * 0.5f + col * (cell + gap), totalH * 0.5f - cell * 0.5f - row * (cell + gap)),
                 Vector2.one * cell);
         }
-    }
-
-    /// <summary>놓을 자리 배지 — 테두리·채움·글자 색과 문구를 상태에 맞춘다(룬 선택 카드와 같은 색).</summary>
-    public static void ApplyFitBadge(Image border, Image fill, TMP_Text label, bool ok, string text)
-    {
-        var col = ok ? OkColor : NoColor;
-        if (border != null) border.color = WithAlpha(col, 0.55f);
-        if (fill   != null) fill.color   = new Color(col.r * 0.12f, col.g * 0.14f, col.b * 0.12f, 0.85f);
-        if (label  != null) { label.color = col; label.text = text; }
     }
 
     /// <summary>모양 데이터의 칸 수. 모르면 0.</summary>

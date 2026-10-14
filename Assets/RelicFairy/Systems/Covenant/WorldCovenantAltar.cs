@@ -24,6 +24,11 @@ public class WorldCovenantAltar : MonoBehaviour
     private const float  TomeSpinSpeed  = 18f;     // 초당 회전(도) — 눈에 띄되 어지럽지 않게
     private const float  TomeBobHeight  = 0.12f;   // 상하 부유 진폭
     private const float  TomeBobSpeed   = 1.6f;
+    private const float  TomeFadeSec    = 0.8f;    // 소진 때 마도서 입자가 사그라드는 시간
+    // 10-11 이펙트 톤 2차(V-8): Spells Pack 마도서의 원래 마젠타를 서약 보랏빛으로(책 몸은 그대로 — 입자만) · 5초마다 퍼지는 물결은 끈다
+    private static readonly Color TomeTint = new(0.62f, 0.48f, 1f, 1f);
+    private static readonly string[] TomeRecolorChildren = { "Sparks", "Arcane", "Glow" };
+    private const string TomePulseChild = "Expansive Wave";
 
     // ── [SerializeField] ─────────────────────────────────
     [Header("월드 텍스트")]
@@ -104,6 +109,18 @@ public class WorldCovenantAltar : MonoBehaviour
         var go = Instantiate(prefab, _tomeBasePos, Quaternion.identity, transform);
         go.name = "CovenantTome";
         _tomeVisual = go.transform;
+        ToneTome(_tomeVisual);
+    }
+
+    /// <summary>마도서 톤 — 입자(반짝이 · 비전 · 빛)만 서약 보랏빛으로 갈아 끼우고(밝기 유지) 5초 물결은 끈다. 인스턴스 하나뿐이라 풀 걱정 없음.</summary>
+    private static void ToneTome(Transform tome)
+    {
+        foreach (var t in tome.GetComponentsInChildren<Transform>(true))
+        {
+            if (t == tome) continue;
+            if (t.name == TomePulseChild) { t.gameObject.SetActive(false); continue; }
+            if (Array.IndexOf(TomeRecolorChildren, t.name) >= 0) RunFxRecolor.Apply(t.gameObject, TomeTint);
+        }
     }
 
     /// <summary>마도서를 천천히 회전·부유시켜 "벼려지길 기다리는 서약"으로 읽히게 한다.</summary>
@@ -221,6 +238,16 @@ public class WorldCovenantAltar : MonoBehaviour
         // 제단만 사라지고 "서약 완료" 글자만 공중에 남는 그림을 막기 위해 여기서 먼저 끈다.
         if (_worldText != null) _worldText.gameObject.SetActive(false);
         ShowPrompt(false);
+
+        // 마도서는 입자뿐이라 디졸브 대상이 없어 한 프레임에 툭 사라졌다 — 방출을 멈추고 떼어 내 남은 빛이 사그라든 뒤 지운다(10-11 톤 2차 V-8)
+        if (_tomeVisual != null)
+        {
+            foreach (var ps in _tomeVisual.GetComponentsInChildren<ParticleSystem>())
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            _tomeVisual.SetParent(null, true);
+            Destroy(_tomeVisual.gameObject, TomeFadeSec);
+            _tomeVisual = null;
+        }
 
         DissolveEffect.PlayDisappear(gameObject, 0.6f, () => { if (this != null) Destroy(gameObject); });
     }

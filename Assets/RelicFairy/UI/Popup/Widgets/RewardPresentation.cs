@@ -197,6 +197,7 @@ public static class RewardPresentation
 
     // 가로로 읽으면 "빛 몇 가닥 → 빛기둥 → 문양+기둥+빛 박자 → 표지 기둥(예고부터)+빛 박자 2+슬로모+금빛 가장자리"로 채널이 계단진다(카드 표와 같은 원칙).
     // 낮은 등급은 빨리 서고(런 템포), 높은 등급은 기다림 자체가 예고다.
+    // 10-11 이펙트 톤 2차(D-2): 빛 박자(고리) 0 — 등급은 예고부터 선 등급 기둥이 이미 말하고, 등장 순간은 빛기둥 · 음(전설 3음 · 슬로모 · 금 가장자리)이 맡는다.
     private static readonly WorldSpec WorldCommon = new(
         foretell: 0.6f,  swirlScale: 0.5f,  pillarScale: 0f,    rings: 0,
         slowScale: 1f,   slowSeconds: 0f,   pulsePeak: 0f,    edgeGlow: false,
@@ -208,12 +209,12 @@ public static class RewardPresentation
         idlePulseHz: 0f,   idleAura: true,  idlePillar: true,  notes: 1);
 
     private static readonly WorldSpec WorldEpic = new(
-        foretell: 1.5f,  swirlScale: 1.1f,  pillarScale: 0.85f, rings: 1,
+        foretell: 1.5f,  swirlScale: 1.1f,  pillarScale: 0.85f, rings: 0,
         slowScale: 1f,   slowSeconds: 0f,   pulsePeak: 0f,    edgeGlow: false,
         idlePulseHz: 0.8f, idleAura: true,  idlePillar: true,  notes: 1);
 
     private static readonly WorldSpec WorldLegendary = new(
-        foretell: 2.0f,  swirlScale: 1.6f,  pillarScale: 1.15f, rings: 2,
+        foretell: 2.0f,  swirlScale: 1.6f,  pillarScale: 1.15f, rings: 0,
         slowScale: 0.5f, slowSeconds: 0.3f, pulsePeak: 0.15f, edgeGlow: true,
         idlePulseHz: 0.6f, idleAura: true,  idlePillar: true,  notes: 3);
 
@@ -244,14 +245,15 @@ public static class RewardPresentation
     // ── 등급 표기 ────────────────────────────────────────────────
 
     /// <summary>
-    /// 카드 등급 라벨. Epic·Legendary가 같은 <c>◆</c>를 쓰던 것을 고쳐 최상위를 <c>★</c>로 분리한다
+    /// 카드 등급 라벨. Epic·Legendary가 같은 <c>◆</c>를 쓰던 것을 고쳐 최상위를 형태로도 분리한다
     /// — 최상위 등급이 형태로도 구별되지 않으면 색만으로는 안 읽힌다(§C-2 · Hades 반례).
+    /// 10-13: <c>★</c>는 폰트 화이트리스트 밖이라 □로 깨졌다 → <c>■</c>(화이트리스트 · ★와 같은 1em 폭이라 상점 태그 88px 등 자리가 그대로다).
     /// </summary>
     public static string RarityLabel(ItemRarity rarity) => rarity switch
     {
         ItemRarity.Rare      => "◇ Rare",
         ItemRarity.Epic      => "◆ Epic",
-        ItemRarity.Legendary => "★ Legendary",
+        ItemRarity.Legendary => "■ Legendary",
         _                    => "□ Common",   // 가운뎃점은 구분자와 겹쳐 "· Common · 2칸"으로 읽혔다 — 빈 네모(글리프 화이트리스트)
     };
 

@@ -12,11 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dbaaa75f1d9cda84f9dc1d171ccb100c, type: 3}
   m_Name: SalamanderBreathData
   m_EditorClassIdentifier: Assembly-CSharp::SalamanderBreathData
-  _vfxPrefab: {fileID: 4186470608034871016, guid: c99fe753a22cb824a9e1e46c80b74139,
+  _vfxPrefab: {fileID: 8668567159659304503, guid: f740aab2344d9ac499e27430d01904cc,
     type: 3}
-  _vfxScale: 0.5
+  _vfxScale: 5
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
+  _vfxFaceForward: 1
   hpThreshold: 0.7
   breathDuration: 2
   breathStateName: Salamander_Attack03

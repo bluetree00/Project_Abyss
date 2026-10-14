@@ -21,7 +21,7 @@ using RelicFairy.Monster;
 /// </summary>
 public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewProvider
 {
-    private enum Channel { AttackPercent, DefensePercent, AttackSpeed, MoveSpeed, CritChance, CritDamage, SkillDamage, AllDamage, MaxHpPercent, None }
+    private enum Channel { AttackPercent, DefensePercent, AttackSpeed, MoveSpeed, CritChance, CritDamage, SkillDamage, AllDamage, MaxHpPercent, DamageReduction, None }
 
     private const float NEARBY_RADIUS = 3f;
     private static readonly List<MonsterBase> s_buf = new();
@@ -35,8 +35,7 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
 
     // 연속 적중 카운터 (SameTarget / Consecutive)
     private const float STREAK_GAP = 2f;  // 이 시간 이상 미적중 시 연속 끊김
-    private GameObject _streakTarget;     // 같은 대상 판정
-    private int   _sameTargetCount;       // 같은 대상 연속 적중 수
+    private SameTargetStreak _sameStreak; // 같은 대상 — 주 대상만 센다(10-14 R1 · 광역에 함께 맞은 적이 셈을 끊지 않게)
     private int   _streakCount;           // 임의 대상 연속 적중 수
     private float _lastDealTime = -999f;  // 마지막 적중 시각
 
@@ -55,6 +54,7 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
             "CondSkillDamage"    => Channel.SkillDamage,
             "CondAllDamage"      => Channel.AllDamage,
             "CondMaxHpPercent"   => Channel.MaxHpPercent,
+            "CondDamageReduction"=> Channel.DamageReduction,   // 위기 룬 — 받는 피해 감소(10-14 R1)
             _                    => Channel.None,
         };
 
@@ -67,9 +67,19 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
     public override bool IsActive(ItemEffectContext ctx) => true;
 
     // ── 타임드 윈도 트리거 ──────────────────────────────────
+    private readonly float[] _skillUsedAt = { -999f, -999f, -999f };
+    private const float SkillChainWindow = 4f;   // 「서로 다른 스킬 둘째」 — 앞 스킬이 이 시간 안이면 창이 열린다
+
     public override void OnSkillUse(ItemEffectContext ctx, SkillType skill)
     {
         if (_trigger == "AfterSkill") _windowUntil = Time.time + Mathf.Max(0f, _duration);
+        if (_trigger == "AfterSkillChain")   // 주문 깃든 분노(10-14 R1) — 서로 다른 스킬을 이어 쓴 둘째에 창
+        {
+            float now = Time.time;
+            for (int i = 0; i < _skillUsedAt.Length; i++)
+                if (i != (int)skill && now - _skillUsedAt[i] <= SkillChainWindow) { _windowUntil = now + Mathf.Max(0f, _duration); break; }
+            _skillUsedAt[(int)skill] = now;
+        }
     }
 
     public override void OnRoomEnter(ItemEffectContext ctx)
@@ -79,8 +89,7 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
 
         // 연속 적중(SameTarget/Consecutive) 카운터 리셋 — 방 넘어 streak가 이어지면 새 방 첫 타에
         // 즉시 만렙 버프가 붙는 누적 오염을 막는다.
-        _streakTarget = null;
-        _sameTargetCount = 0;
+        _sameStreak.Reset();
         _streakCount = 0;
         _lastDealTime = -999f;
     }
@@ -111,12 +120,13 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
         float now = Time.time;
         if (_trigger == "AfterCrit" && report.IsCrit && report.DamageDealt > 0f)
             _windowUntil = now + Mathf.Max(0f, _duration);
+        if (_trigger == "AfterHeavyHit" && report.IsHeavy)   // 강타 뒤 창(10-14 A2)
+            _windowUntil = now + Mathf.Max(0f, _duration);
         if (now - _lastDealTime > STREAK_GAP) _streakCount = 0;   // 갭 초과 시 연속 끊김
         _lastDealTime = now;
         _streakCount++;
 
-        if (report.Target != _streakTarget) { _streakTarget = report.Target; _sameTargetCount = 1; }
-        else _sameTargetCount++;
+        _sameStreak.Hit(report.Target, now);
     }
 
     // ── 동적 스탯 기여 ──────────────────────────────────────
@@ -135,6 +145,7 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
             case Channel.SkillDamage:    dyn.skillDamage    += _value; break;
             case Channel.AllDamage:      dyn.allDamage      += _value; break;
             case Channel.MaxHpPercent:   dyn.maxHpPercent   += _value; break;
+            case Channel.DamageReduction: dyn.damageReduction += _value; break;
         }
     }
 
@@ -151,6 +162,8 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
             case "HPBelow30": return ctx.HpRatio <= 0.3f;
 
             case "AfterSkill":
+            case "AfterSkillChain":
+            case "AfterHeavyHit":
             case "AfterRoomEnter":
             case "AfterHit":
             case "AfterDash":
@@ -190,7 +203,7 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
                 return ctx?.Stats != null && ctx.Stats.Defense >= (int)_value2;
 
             case "SameTarget":
-                return Time.time - _lastDealTime <= STREAK_GAP && _sameTargetCount >= (int)_value2;
+                return _sameStreak.SinceLast(Time.time) <= STREAK_GAP && _sameStreak.Count >= (int)_value2;
 
             case "Consecutive":
                 return Time.time - _lastDealTime <= STREAK_GAP && _streakCount >= (int)_value2;
@@ -211,7 +224,7 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
     }
 
     private static bool IsWindowTrigger(string t)
-        => t is "AfterSkill" or "AfterRoomEnter" or "AfterHit" or "AfterDash" or "AfterCrit" or "AfterKill";
+        => t is "AfterSkill" or "AfterRoomEnter" or "AfterHit" or "AfterDash" or "AfterCrit" or "AfterKill" or "AfterHeavyHit" or "AfterSkillChain";
 
     private static int CountNearby(ItemEffectContext ctx)
     {

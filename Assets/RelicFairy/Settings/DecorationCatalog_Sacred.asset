@@ -22,16 +22,18 @@ MonoBehaviour:
     sizeX: 1
     sizeZ: 1
     faceNearestWall: 1
-    wallInset: 0.2
+    wallInset: -0.48
+    wallYawOffset: -90
   - code: ros
     prefab: {fileID: 1031027331, guid: abc00000000011690436166337848184, type: 3}
     yOffset: 5
-    scale: 1
+    scale: 0.45
     randomYRotation: 0
     sizeX: 1
     sizeZ: 1
     faceNearestWall: 1
-    wallInset: 0.2
+    wallInset: -0.48
+    wallYawOffset: -90
   - code: can
     prefab: {fileID: 1031121324, guid: abc00000000007793251874140466416, type: 3}
     yOffset: 0
@@ -42,7 +44,7 @@ MonoBehaviour:
     faceNearestWall: 0
     wallInset: 0
   - code: can2
-    prefab: {fileID: 1031121356, guid: abc00000000008136434539379879985, type: 3}
+    prefab: {fileID: 1031121454, guid: abc00000000007558386576962310616, type: 3}
     yOffset: 0
     scale: 1
     randomYRotation: 1
@@ -50,6 +52,7 @@ MonoBehaviour:
     sizeZ: 1
     faceNearestWall: 0
     wallInset: 0
+    disableColliders: 1
   - code: wcan
     prefab: {fileID: 1031125587, guid: abc00000000004087831523513137304, type: 3}
     yOffset: 3
@@ -58,10 +61,12 @@ MonoBehaviour:
     sizeX: 1
     sizeZ: 1
     faceNearestWall: 1
-    wallInset: 0.35
+    wallInset: -0.45
+    forceLod0: 1
+    wallYawOffset: 90
   - code: cha
-    prefab: {fileID: 1031121644, guid: abc00000000004330950515077372940, type: 3}
-    yOffset: 8
+    prefab: {fileID: 1031123151, guid: abc00000000006234915089979794746, type: 3}
+    yOffset: 0
     scale: 1
     randomYRotation: 1
     sizeX: 1
@@ -96,7 +101,7 @@ MonoBehaviour:
     faceNearestWall: 0
     wallInset: 0
   - code: amb
-    prefab: {fileID: 1031028587, guid: abc00000000010329191950015044777, type: 3}
+    prefab: {fileID: 1031120808, guid: abc00000000006235341517758020108, type: 3}
     yOffset: 0
     scale: 1
     randomYRotation: 1
@@ -104,6 +109,7 @@ MonoBehaviour:
     sizeZ: 1
     faceNearestWall: 0
     wallInset: 0
+    disableColliders: 1
   - code: sta
     prefab: {fileID: 1031125134, guid: abc00000000003064275970823802713, type: 3}
     yOffset: 0
@@ -123,13 +129,33 @@ MonoBehaviour:
     faceNearestWall: 0
     wallInset: 0
   - code: bok
-    prefab: {fileID: 1031120614, guid: abc00000000004670342986549298938, type: 3}
+    prefab: {fileID: 1031126741, guid: abc00000000009217102088672742404, type: 3}
     yOffset: 0
     scale: 1
     randomYRotation: 1
     sizeX: 1
     sizeZ: 1
     faceNearestWall: 0
+    wallInset: 0
+    disableColliders: 1
+  - code: ban
+    prefab: {fileID: 1031125235, guid: abc00000000002504902498064927479, type: 3}
+    yOffset: 7
+    scale: 0.6
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 1
+    wallInset: -0.21
+    wallYawOffset: -90
+  - code: kst
+    prefab: {fileID: 1031123842, guid: abc00000000014482205491929310782, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 1
     wallInset: 0
   - code: lL
     prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,

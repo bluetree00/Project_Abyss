@@ -21,7 +21,7 @@ MonoBehaviour:
   knockbackMultiplier: 0.2
   tier2ExtraSlashCount: 2
   tier2FinishEffectKey: NamelessCut
-  tier2FinishEffectScale: 1
+  tier2FinishEffectScale: 0.28
   endDelay: 0.3
   dashEffectKey: 
   dashTrailKey: IasenDashFire

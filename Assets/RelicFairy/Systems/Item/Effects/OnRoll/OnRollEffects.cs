@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using RelicFairy.Monster;
 
@@ -24,7 +24,8 @@ public sealed class FirstAttackAfterRollEffect : ItemEffectBase
         if (Time.time >= _windowUntil) return;
         pkt.FinalDamage *= (1f + _value);
         _windowUntil = -999f;   // 1회 소비
-        Debug.Log($"[FirstAttackAfterRoll] 구르기 후 첫 공격 +{_value * 100f:F0}%");
+        if (_value3 > 0f) ProcCoefficient.ArmHeavyNext();   // 덮치는 그림자(10-14 R2) — 그 타를 강타로
+        RFLog.D($"[FirstAttackAfterRoll] 구르기 후 첫 공격 +{_value * 100f:F0}%");
     }
 }
 
@@ -51,7 +52,7 @@ public sealed class RollLandingDamageEffect : ItemEffectBase
         for (int i = 0; i < n; i++)
             s_buf[i].TakeDamage(damage, ctx.Player.gameObject, knockbackMultiplier: 0f);
 
-        ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), position);
+        ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), position, radius / 4.17f);   // 판정 반경(값으로 바뀜)에 맞춤(10-13 실측: 배율 1 → 4.4 m)
         ItemEffectVfxHelper.ShowNotice($"<color=#FFAA44>착지 충격</color> {damage:F0} 데미지");
         Debug.Log($"[JumpLandingDamage] 착지 범위 피해 {damage:F0} (반경 {radius}m)");
     }

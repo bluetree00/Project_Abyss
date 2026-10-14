@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: kill_100_any
   m_EditorClassIdentifier: Assembly-CSharp::Achievement
   category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: bfedb76d5fe24054bacba63a38dcef01, type: 3}
   codeName: kill_100_any
   displayName: "\uBC31\uC778 \uD559\uC0B4\uC790"
   description: "\uBAAC\uC2A4\uD130 100\uB9C8\uB9AC \uCC98\uCE58"

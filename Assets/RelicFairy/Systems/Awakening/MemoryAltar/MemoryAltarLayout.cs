@@ -23,6 +23,9 @@ public readonly struct AltarNodePlacement
 /// <summary>
 /// 기억의 제단 트리의 <b>자동 배치</b>. 화면을 모르는 순수 계산이다 — 노드를 추가해도 자리는 여기서 다시 잡힌다.
 ///
+/// <para><b>10-14 강화형</b> — 반지름 = <b>갈래 포인트 고리</b>(0 · 3 · 8 · 15포인트에 열리는 칸이 안에서 바깥으로). 같은 고리 칸은 옆으로 나란히.
+/// 선은 앞 고리의 가장 가까운 칸에서 잇는 <b>자리 표시</b>일 뿐 사는 순서가 아니다(살 수 있는가는 갈래 포인트 — 사용자 「깊이에 따라 해금은 폐기」).
+/// 아래 옛 규칙(시기 띠 · 부모 사슬)은 10-14에 걷었다.</para>
 /// <para><b>규칙(10-02 재설계 「기억을 모시는 제단」)</b> — 바깥 갈래 넷이 90°씩 십자로 퍼진다(위 무기 · 오른쪽 서약 · 아래 여정 · 왼쪽 룬).
 /// 반지름은 <b>시기 띠</b>로 나뉜다: 봉인기 노드가 안쪽 띠, 해방기 · 악몽이 차례로 바깥 띠. 띠 안에서는 같은 시기 부모를 따라 한 칸씩 나간다.
 /// (예전엔 트리 깊이 하나가 반지름이었는데, 그러면 엔딩 뒤 노드 「심연 입장」이 부모 「챕터 4」 바로 옆 — 봉인기 띠 안에 끼었다.)
@@ -34,12 +37,13 @@ public static class MemoryAltarLayout
     // ── Constants ────────────────────────────────────────
     /// <summary>가운데 제단 문양의 반지름.</summary>
     public const float CenterRadius = 80f;
-    /// <summary>한 칸의 거리(시기 띠 셋이 들어가도록 09-29의 116보다 짧게).</summary>
-    public const float RingStep     = 100f;
-    /// <summary>같은 갈래 안 차선 간격.</summary>
-    public const float LaneSpacing  = 100f;
+    /// <summary>한 칸(포인트 고리 하나)의 거리. 10-14 강화형 105 · 차선 95 · 기억 120 — 룬 첫 고리 칸 셋이 가운데 기억 노드에 붙었고(5px)
+    /// 원석 획득 ↔ Epic 룬 확률 이름표가 겹쳤다(실측) → 오프라인 흉내로 고른 값(최소 간격 22px · 이름표 겹침 0 · 글자 폭 ±20%에도 0).</summary>
+    public const float RingStep     = 105f;
+    /// <summary>같은 고리 안 옆자리 간격.</summary>
+    public const float LaneSpacing  = 95f;
     /// <summary>가운데 기억 노드가 앉는 반지름(제단 문양 바깥 · 첫 칸 안쪽).</summary>
-    public const float MemoryRadius = 150f;
+    public const float MemoryRadius = 120f;
     /// <summary>고리를 가로로 늘리는 비(화면이 가로로 넓다).</summary>
     public const float ScaleX       = 1.18f;
     public const float ScaleY       = 0.90f;
@@ -49,8 +53,7 @@ public static class MemoryAltarLayout
     public static readonly AltarBranch[] BranchOrder =
         { AltarBranch.Weapon, AltarBranch.Covenant, AltarBranch.Journey, AltarBranch.Rune };
 
-    private static readonly int[] s_eraOffset = new int[4];   // 시기 띠가 시작하기 전 칸 수
-    private static readonly int[] s_eraDepth  = new int[4];   // 시기 띠 안 가장 깊은 칸
+    private static readonly Dictionary<string, string> s_layoutParent = new(40);   // 선을 그을 앞 칸(null = 가운데) — Compute가 채운다
 
     // ── Public Methods ───────────────────────────────────
 
@@ -79,12 +82,11 @@ public static class MemoryAltarLayout
         return new Vector2(r * ScaleX, r * ScaleY);
     }
 
-    /// <summary>시기 <paramref name="era"/> 띠의 바깥 경계 칸 — 그 시기 고리를 그리는 자리. <see cref="Compute"/> 뒤에 부른다.</summary>
-    public static float EraRingLevel(int era)
-    {
-        era = Mathf.Clamp(era, 1, 3);
-        return s_eraOffset[era] + Mathf.Max(1, s_eraDepth[era]) + 0.5f;
-    }
+    /// <summary>갈래 포인트 고리 <paramref name="tier"/>(1 ~ 4)의 바깥 경계 칸 — 그 고리 선을 그리는 자리(10-14).</summary>
+    public static float TierRingLevel(int tier) => Mathf.Clamp(tier, 1, 4) + 0.5f;
+
+    /// <summary>선을 그을 앞 칸 id(null = 가운데에서). 사는 순서가 아니라 자리 표시다 — <see cref="Compute"/> 뒤에 부른다.</summary>
+    public static string LayoutParent(string id) => id != null && s_layoutParent.TryGetValue(id, out var p) ? p : null;
 
     /// <summary>갈래 방향으로 거리 <paramref name="along"/>만큼 나간 점(갈래 이름표 자리 등).</summary>
     public static Vector2 AlongBranch(AltarBranch branch, float along)
@@ -99,14 +101,14 @@ public static class MemoryAltarLayout
     public static Dictionary<string, AltarNodePlacement> Compute(IReadOnlyList<MemoryAltarNode> nodes)
     {
         var result = new Dictionary<string, AltarNodePlacement>(nodes.Count);
-        var local  = MeasureEraBands(nodes);
+        s_layoutParent.Clear();
 
         foreach (var branch in BranchOrder)
         {
-            var list = new List<MemoryAltarNode>(10);
+            var list = new List<MemoryAltarNode>(12);
             foreach (var n in nodes) if (n.Branch == branch) list.Add(n);
             if (list.Count == 0) continue;
-            PlaceBranch(branch, list, local, result);
+            PlaceBranch(branch, list, result);
         }
 
         foreach (var n in nodes)
@@ -122,89 +124,51 @@ public static class MemoryAltarLayout
     // ── Private Methods ──────────────────────────────────
 
     /// <summary>
-    /// 시기 띠를 잰다 — 노드마다 「같은 시기 · 같은 갈래 부모를 따라 몇 칸째인가」, 시기마다 가장 깊은 칸,
-    /// 그리고 띠가 시작하는 칸(앞 시기 띠의 깊이 합). 반환 = 노드별 띠 안 깊이.
+    /// 갈래 하나(10-14 강화형) — 고리 = 열리는 갈래 포인트 단계(<see cref="MemoryAltarCatalog.Tier"/>). 같은 고리 칸은 정의 순서로 옆으로 나란히(가운데 맞춤),
+    /// 선은 앞 고리(있는 것 중 가장 바깥)의 옆자리가 가장 가까운 칸에서 잇는다(첫 고리는 가운데에서).
     /// </summary>
-    private static Dictionary<string, int> MeasureEraBands(IReadOnlyList<MemoryAltarNode> nodes)
+    private static void PlaceBranch(AltarBranch branch, List<MemoryAltarNode> list, Dictionary<string, AltarNodePlacement> result)
     {
-        var byId  = new Dictionary<string, MemoryAltarNode>(nodes.Count);
-        foreach (var n in nodes) byId[n.Id] = n;
-        var local = new Dictionary<string, int>(nodes.Count);
-
-        System.Array.Clear(s_eraDepth, 0, s_eraDepth.Length);
-        foreach (var n in nodes)
-        {
-            if (n.Branch == AltarBranch.Memory) continue;
-            int d = LocalDepth(n, byId, local);
-            s_eraDepth[n.Era] = Mathf.Max(s_eraDepth[n.Era], d);
-        }
-        s_eraOffset[1] = 0;
-        s_eraOffset[2] = s_eraOffset[1] + s_eraDepth[1];
-        s_eraOffset[3] = s_eraOffset[2] + s_eraDepth[2];
-        return local;
-    }
-
-    private static int LocalDepth(MemoryAltarNode n, Dictionary<string, MemoryAltarNode> byId, Dictionary<string, int> local)
-    {
-        if (local.TryGetValue(n.Id, out int cached)) return cached;
-        int best = 0;
-        foreach (var p in n.Parents)
-            if (byId.TryGetValue(p, out var parent) && parent.Era == n.Era && parent.Branch == n.Branch)
-                best = Mathf.Max(best, LocalDepth(parent, byId, local));
-        local[n.Id] = best + 1;
-        return best + 1;
-    }
-
-    /// <summary>
-    /// 갈래 하나 — 첫 부모를 배치용 부모로 삼은 나무를 만들고, 잎마다 차선 한 칸, 부모는 자식 차선의 가운데.
-    /// 반지름 = 시기 띠 시작 + 띠 안 깊이.
-    /// </summary>
-    private static void PlaceBranch(AltarBranch branch, List<MemoryAltarNode> list, Dictionary<string, int> local,
-                                    Dictionary<string, AltarNodePlacement> result)
-    {
-        var inBranch = new HashSet<string>();
-        foreach (var n in list) inBranch.Add(n.Id);
-
-        var kids  = new Dictionary<string, List<MemoryAltarNode>>();
-        var roots = new List<MemoryAltarNode>();
-        foreach (var n in list)
-        {
-            string layoutParent = null;
-            foreach (var p in n.Parents) if (inBranch.Contains(p)) { layoutParent = p; break; }
-            if (layoutParent == null) { roots.Add(n); continue; }
-            if (!kids.TryGetValue(layoutParent, out var k)) kids[layoutParent] = k = new List<MemoryAltarNode>(3);
-            k.Add(n);
-        }
-
-        var lane = new Dictionary<string, float>(list.Count);
-        float next = 0f;
-        foreach (var r in roots) AssignLane(r, kids, lane, ref next);
-        float center = (next - 1f) * 0.5f;
-
         float a    = BranchAngle(branch) * Mathf.Deg2Rad;
         var   dir  = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
         var   perp = new Vector2(-dir.y, dir.x);
 
+        var byTier = new SortedDictionary<int, List<MemoryAltarNode>>();
         foreach (var n in list)
         {
-            int   depth   = s_eraOffset[n.Era] + local[n.Id];
-            float along   = CenterRadius + depth * RingStep;
-            float lateral = (lane[n.Id] - center) * LaneSpacing;
-            var   p       = dir * along + perp * lateral;
-            result[n.Id]  = new AltarNodePlacement(new Vector2(p.x * ScaleX, p.y * ScaleY), depth, n.Era, Diameter(n.Size));
+            int t = MemoryAltarCatalog.Tier(n);
+            if (!byTier.TryGetValue(t, out var row)) byTier[t] = row = new List<MemoryAltarNode>(4);
+            row.Add(n);
         }
-    }
 
-    private static void AssignLane(MemoryAltarNode node, Dictionary<string, List<MemoryAltarNode>> kids,
-                                   Dictionary<string, float> lane, ref float next)
-    {
-        if (!kids.TryGetValue(node.Id, out var children) || children.Count == 0)
+        var lateral = new Dictionary<string, float>(list.Count);
+        List<MemoryAltarNode> prev = null;
+        foreach (var kv in byTier)
         {
-            lane[node.Id] = next;
-            next += 1f;
-            return;
+            var row = kv.Value;
+            float center = (row.Count - 1) * 0.5f;
+            for (int i = 0; i < row.Count; i++)
+            {
+                var   n   = row[i];
+                float lat = (i - center) * LaneSpacing;
+                lateral[n.Id] = lat;
+                float along = CenterRadius + kv.Key * RingStep;
+                var   p     = dir * along + perp * lat;
+                result[n.Id] = new AltarNodePlacement(new Vector2(p.x * ScaleX, p.y * ScaleY), kv.Key, n.Era, Diameter(n.Size));
+
+                string parent = null;
+                if (prev != null)
+                {
+                    float best = float.MaxValue;
+                    foreach (var q in prev)
+                    {
+                        float d = Mathf.Abs(lateral[q.Id] - lat);
+                        if (d < best) { best = d; parent = q.Id; }
+                    }
+                }
+                s_layoutParent[n.Id] = parent;
+            }
+            prev = row;
         }
-        foreach (var c in children) AssignLane(c, kids, lane, ref next);
-        lane[node.Id] = (lane[children[0].Id] + lane[children[children.Count - 1].Id]) * 0.5f;
     }
 }

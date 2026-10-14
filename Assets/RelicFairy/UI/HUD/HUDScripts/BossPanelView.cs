@@ -11,7 +11,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-public sealed class BossPanelView : MonoBehaviour
+public sealed partial class BossPanelView : MonoBehaviour
 {
     [Header("Boss HP")]
     [SerializeField] private Slider hpSlider;
@@ -194,6 +194,7 @@ public sealed class BossPanelView : MonoBehaviour
     public void Init(int maxHp, string bossName)
     {
         EnsureWired();
+        if (CombatPanelView.WuwaHud) EnsureWuwaFonts();
 
         _maxHp = Mathf.Max(1, maxHp);
 
@@ -419,6 +420,8 @@ public sealed class BossPanelView : MonoBehaviour
 
     private void EnsureWired()
     {
+        // 명조형 — 창(바 · 덮개)을 얇은 한 줄로. 꺼진 채 시작하는 패널은 Awake보다 Init/SetHP가 먼저 여기를 부르므로 스킨보다 먼저 여기서.
+        if (CombatPanelView.WuwaHud) innerWindowRatio = WuwaInnerWindow;
         hpSlider ??= GetComponentInChildren<Slider>(true);
         if (hpFillImage == null && hpSlider != null)
             hpFillImage = hpSlider.fillRect != null ? hpSlider.fillRect.GetComponent<Image>() : null;
@@ -455,6 +458,7 @@ public sealed class BossPanelView : MonoBehaviour
 
         ApplySkin();
         StyleTexts();
+        if (CombatPanelView.WuwaHud) ApplyWuwaBossBar();
     }
 
     /// <summary>
@@ -820,20 +824,21 @@ public sealed class BossPanelView : MonoBehaviour
 
     private void EnsureTextVisible()
     {
-        ForceTextVisible(nameText);
-        ForceTextVisible(hpText);
+        ForceTextVisible(nameText, 1f);
+        // 명조형 수치는 일부러 옅다(3순위 · 알파 0.6) — 그 아래로만 떨어지지 않게 지킨다(1로 되살리면 이름만큼 밝아진다).
+        ForceTextVisible(hpText, CombatPanelView.WuwaHud ? WuwaHpAlpha : 1f);
     }
 
-    private static void ForceTextVisible(TMP_Text text)
+    private static void ForceTextVisible(TMP_Text text, float alpha)
     {
         if (text == null) return;
         if (!text.gameObject.activeSelf)
             text.gameObject.SetActive(true);
 
         var color = text.color;
-        if (color.a < 0.95f)
+        if (color.a < alpha - 0.05f)
         {
-            color.a = 1f;
+            color.a = alpha;
             text.color = color;
         }
     }

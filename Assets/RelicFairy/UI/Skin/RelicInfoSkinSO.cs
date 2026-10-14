@@ -55,6 +55,32 @@ public sealed class RelicInfoSkinSO : ScriptableObject
     public Sprite selectButton;
     public Sprite cancelButton;
 
+    [Header("10-13 Artsystack — 능력 카드 · 배지 · 초상 받침 · 임시 문장")]
+    [SerializeField, Tooltip("능력 카드 판(store_item_frame_03_navy — 가죽 질감 + 1px 연금 테 · 9-slice). 칸이 카드 아트를 갖지 않을 때.")]
+    private Sprite abilityPanel;
+    [SerializeField, Tooltip("Q · 패시브 배지 판(Hexagon_02_navy · 좌우 9-slice).")]
+    private Sprite kindBadge;
+    [SerializeField, Tooltip("초상 뒤 받침 고리(Design_01 — 무채 · 얇게 뒤 금선 30%).")]
+    private Sprite portraitRing;
+    [SerializeField, Tooltip("초상 뒤 빛(Glow_Circle — 잉크 10%).")]
+    private Sprite portraitGlow;
+    [SerializeField, Tooltip("초상이 없을 때의 임시 문장 — 키 = RelicId 이름(Gawain · Lancelot). 흰 아이콘을 유물 테마색 25%로.")]
+    private RelicPartDraftSkinSO.KeyArt[] relicEmblem = new RelicPartDraftSkinSO.KeyArt[0];
+
+    public Sprite AbilityPanel => abilityPanel;
+    public Sprite KindBadge    => kindBadge;
+    public Sprite PortraitRing => portraitRing;
+    public Sprite PortraitGlow => portraitGlow;
+
+    /// <summary>임시 문장(없으면 null).</summary>
+    public Sprite RelicEmblem(string key)
+    {
+        if (relicEmblem == null || string.IsNullOrEmpty(key)) return null;
+        for (int i = 0; i < relicEmblem.Length; i++)
+            if (string.Equals(relicEmblem[i].key, key, System.StringComparison.OrdinalIgnoreCase)) return relicEmblem[i].sprite;
+        return null;
+    }
+
     /// <summary>태그 문자열에 맞는 완성 칩 아트. 없으면 null → 호출측이 tagChip + 글자로 폴백한다.</summary>
     public Sprite TagSprite(string tag)
     {

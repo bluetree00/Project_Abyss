@@ -106,6 +106,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
 {
     private const string AnimIdle2 = "Idle2";
     private const float  SwordAheadOfAnchor = 4f;   // 떠 있는 검 — 앵커에서 기사 쪽으로(유리 앞 플레이어 구역)
+    private const float  SwordAppearSeconds = 0.5f; // 떠 있는 검 등장 디졸브(10-12 디졸브 원칙)
 
     private enum Phase { TileExpansion, SlashAttack, Recovery }
 
@@ -190,6 +191,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SetInvincible(true);
         SpawnFireShield(ctx);
         SpawnFloatingSwords(ctx);
+        (ctx.Monster as DeathKnightBossMonster)?.AnnounceBigSkill(DeathKnightBossMonster.BigSkill.Strike);   // 떠 있는 검이 나타나는 순간 — 기술 이름 + 처음이면 멀린 요령(10-11)
         _phase          = Phase.TileExpansion;
         _timer          = 0f;
         _tileLayerTimer = 0f;
@@ -218,6 +220,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
     public override void Update(MonsterContext ctx)
     {
         _timer += Time.deltaTime;
+        DKPage2Zone.KeepLooping(ctx, AnimIdle2);   // Idle2 루프 — 클립은 루프가 아니다(타일 확장 · 베기 · 회복 내내)
 
         switch (_phase)
         {
@@ -255,14 +258,14 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
 
     private void UpdateSlashAttack(MonsterContext ctx)
     {
+        DKGridPatternHelper.ArmBefore(_timer, Data.slashHitDelay, _tiles, _swordColor);   // 판정 0.25초 전 위험 칸을 붉게(10-11) — 방패 밖 전부
         if (!_damageDone && _timer >= Data.slashHitDelay)
         {
             _damageDone = true;
             ApplySlashDamage(ctx);
             // §3 타격감 — 전멸기급 강공격 (0.2s 히트스톱)
             BossImpactFeedback.TriggerHitStop(0.2f);
-            BossImpactFeedback.TriggerCameraShake(0.2f, 0.4f);
-            BossImpactFeedback.TriggerScreenFlash(new Color(1f, 0.9f, 0.7f, 0.5f), 0.1f);
+            BossImpactFeedback.TriggerCameraShake(0.2f, 0.4f);   // 화면 번쩍은 뺐다 — 히트스톱 · 흔들림으로 충분(10-13 이펙트 톤)
             _phase = Phase.Recovery;
             _timer = 0f;
         }
@@ -318,9 +321,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
             {
                 Vector3 pos = DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, z, 0.1f);
                 DKGridPatternHelper.SpawnStretchedVfx(
-                    Data.impactVfxPrefab, pos, Quaternion.Euler(0f,  90f, 0f), rowLen, tint);
-                DKGridPatternHelper.SpawnStretchedVfx(
-                    Data.impactVfxPrefab, pos, Quaternion.Euler(0f, -90f, 0f), rowLen, tint);
+                    Data.impactVfxPrefab, pos, Quaternion.Euler(0f,  90f, 0f), rowLen, tint);   // 한 방향만 — 반대 방향을 겹쳐 두 배로 띄우던 것을 뺐다(10-11 이펙트 톤 점검)
 
                 if (z % perFrame == 0)
                     await UniTask.Yield(PlayerLoopTiming.Update, ct);
@@ -373,7 +374,6 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         if (Data.floatingSwordPrefab == null) return;
 
         Vector3 dkPos  = ctx.Transform.position;
-        var     dkBoss = ctx.Monster as DeathKnightBossMonster;
 
         // 검은 플레이어 구역 안 — 앵커에서 기사 쪽으로 SwordAheadOfAnchor m. 유리 너머(기사 옆)에 두면 근접은 못 깨
         // 방패(안전지대)를 못 만들고 전역 강타를 회피 무적 타이밍으로만 버텨야 했다(10-01 감사 D3). 앵커가 없으면 예전 자리.
@@ -391,19 +391,16 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         // 고정 세계 X축 기준 — 보스 시선 방향에 무관하게 항상 동일한 좌우 2지점에 소환
         SpawnOneSword(
             basePos - Vector3.right * Data.swordSideOffset + Vector3.up * Data.swordHeight,
-            basePos.y, dkBoss,
             leftIsWhite ? DKSwordColor.White : DKSwordColor.Black,
             leftIsSame);
 
         SpawnOneSword(
             basePos + Vector3.right * Data.swordSideOffset + Vector3.up * Data.swordHeight,
-            basePos.y, dkBoss,
             !leftIsWhite ? DKSwordColor.White : DKSwordColor.Black,
             !leftIsSame);
     }
 
-    private void SpawnOneSword(Vector3 position, float groundY, DeathKnightBossMonster dkBoss,
-                                DKSwordColor color, bool isSameColorAsDK)
+    private void SpawnOneSword(Vector3 position, DKSwordColor color, bool isSameColorAsDK)
     {
         // 칼끝이 바닥을 향하도록 X축 180° 회전
         var go = BossEffectPool.Spawn(
@@ -482,7 +479,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
             Data.swordBobSpeed,
             OnSwordDestroyed);
 
-        SpawnSwordAura(position, groundY, dkBoss, color, go.transform);
+        // 검 아래 원색 오라는 뺐다 — 검 재질 · 스포트라이트가 이미 색을 말한다(10-11 이펙트 톤 2차)
 
         // Monster 레이어 부여 — URP 외곽선 Render Objects가 검도 동일한 파란 테두리로 표시
         int monsterLayer = LayerMask.NameToLayer("Monster");
@@ -495,24 +492,8 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         int hitLayer = LayerMask.NameToLayer("MonsterHit");
         if (hitLayer >= 0) go.layer = hitLayer;
 
+        DissolveEffect.PlayAppear(go, SwordAppearSeconds);   // 색 재질을 입힌 뒤 — 등장 디졸브가 이 재질을 원본으로 잡는다
         _swords.Add(sword);
-    }
-
-    /// <summary>검 바로 아래 바닥에 보스와 동일한 색상의 오라를 띄운다 (검과 함께 반환됨).</summary>
-    private static void SpawnSwordAura(Vector3 swordPos, float groundY, DeathKnightBossMonster dkBoss,
-                                        DKSwordColor color, Transform parent)
-    {
-        if (dkBoss == null) return;
-        GameObject auraPrefab = color == DKSwordColor.White ? dkBoss.WhiteAuraPrefab : dkBoss.BlackAuraPrefab;
-        if (auraPrefab == null) return;
-
-        Vector3 groundPos = new Vector3(swordPos.x, groundY, swordPos.z);
-        var     auraGo    = BossEffectPool.Spawn(auraPrefab, groundPos, Quaternion.identity, parent);
-
-        // 보스용으로 꺼둔 바닥 마법진 이펙트는 검 아래에서는 그대로 보여줘도 된다.
-        foreach (Transform child in auraGo.transform)
-            if (child.name == "Glow" || child.name == "Aura_Effect")
-                child.gameObject.SetActive(true);
     }
 
     private void OnSwordDestroyed(bool isSameColorAsDK, Vector3 position)
@@ -567,8 +548,8 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
 
         foreach (var sword in _swords)
         {
-            if (sword != null && sword.gameObject != null)
-                BossEffectPool.Release(sword.gameObject);
+            if (sword != null)
+                sword.Dismiss();   // 디졸브로 거둔 뒤 풀에 돌려준다
         }
         _swords.Clear();
     }

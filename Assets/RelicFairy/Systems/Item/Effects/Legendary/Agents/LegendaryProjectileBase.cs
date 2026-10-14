@@ -24,6 +24,16 @@ public abstract class LegendaryProjectileBase : MonoBehaviour
 
     private float _fixedY;
 
+    // 비전투 방 숨김(10-11 이펙트 톤 2차 V-10) — 궤도 투사체는 방에 들어가면 생겨 무한히 돌아, 대기방 · 상점 · 쉼터에서도
+    // 맞을 것 없이 빛을 뿌렸다. 플레이어 둘레에 맞을 것이 없으면 보이는 것(자식 이펙트 · 자기 렌더러)만 끈다 — 움직임 · 판정은 그대로.
+    private const float IdleCheckInterval = 0.5f;
+    private const float IdleRadius        = 25f;
+    private static readonly List<GameObject> s_idleBuf = new(1);
+    private float _idleCheck;
+
+    /// <summary>맞을 것이 없어 보이는 것을 숨긴 상태.</summary>
+    protected bool IsIdle { get; private set; }
+
     protected ItemEffectContext _ctx;
     protected float _damage;
     protected float _speed;
@@ -34,6 +44,14 @@ public abstract class LegendaryProjectileBase : MonoBehaviour
     protected float _hitRadius;
 
     public object Owner { get; private set; }
+
+    /// <summary>같은 대상 재타격 간격(초) — 0이면 판정 주기(0.08초)마다. 관통 투사체가 한 번 지나며 2 ~ 3타 넣던 것(10-14 룬 재설계 R3).</summary>
+    public float PerTargetGap { get; set; }
+    /// <summary>맞힐 때마다 피해를 다시 셈(그때 공격력 · 존 단계) — 없으면 Init 때의 고정값. 방 입장 때 공격력에 굳던 것(10-14 R3).</summary>
+    public System.Func<float> DamageFn { get; set; }
+    /// <summary>지금 한 번 맞힐 피해.</summary>
+    protected float CurrentDamage => DamageFn != null ? DamageFn() : _damage;
+    private readonly Dictionary<GameObject, float> _lastHitAt = new();
 
     protected virtual float BounceNoiseAngle => 0f;
 
@@ -99,6 +117,22 @@ public abstract class LegendaryProjectileBase : MonoBehaviour
         Move();
         TryNavMeshBounce();
         DetectEnemies();
+        UpdateIdle();
+    }
+
+    private void UpdateIdle()
+    {
+        _idleCheck -= Time.deltaTime;
+        if (_idleCheck > 0f) return;
+        _idleCheck = IdleCheckInterval;
+
+        var player = _ctx?.Player;
+        bool idle = player != null
+                    && CombatQuery.GetNearbyDamageables(player.transform.position, IdleRadius, player.gameObject, 1, s_idleBuf) == 0;
+        if (idle == IsIdle) return;
+        IsIdle = idle;
+        for (int i = 0; i < transform.childCount; i++) transform.GetChild(i).gameObject.SetActive(!idle);
+        foreach (var r in GetComponents<Renderer>()) r.enabled = !idle;   // 독화살 궤적(TrailRenderer)은 자기 몸에 붙어 있다
     }
 
     protected virtual void Move()
@@ -167,16 +201,23 @@ public abstract class LegendaryProjectileBase : MonoBehaviour
         int n = CombatQuery.GetNearbyDamageables(
             transform.position, _hitRadius, _ctx?.Player?.gameObject, 5, _hitBuffer);
 
+        float now = Time.time;
         for (int i = 0; i < n; i++)
         {
-            OnHitEnemy(_hitBuffer[i]);
+            var go = _hitBuffer[i];
+            if (PerTargetGap > 0f)
+            {
+                if (_lastHitAt.TryGetValue(go, out float at) && now - at < PerTargetGap) continue;
+                _lastHitAt[go] = now;
+            }
+            OnHitEnemy(go);
             if (!_pierce) { Expire(); return; }
         }
     }
 
     protected virtual void OnHitEnemy(GameObject target)
     {
-        CombatQuery.DealSynergyDamage(target, _damage, _ctx?.Player?.gameObject, element: _element);
+        CombatQuery.DealSynergyDamage(target, CurrentDamage, _ctx?.Player?.gameObject, element: _element);
         OnSpawnHitVfx(target.transform.position);
     }
 

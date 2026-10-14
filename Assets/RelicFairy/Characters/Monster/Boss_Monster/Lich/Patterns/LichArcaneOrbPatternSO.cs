@@ -90,6 +90,7 @@ public class LichArcaneOrbState : UnInterruptibleState<LichArcaneOrbPatternSO>
         public bool       Alive;
         public int        Bounces;    // 남은 튕김(M3⁺)
         public bool       EdgeBound;  // 가장자리에 막혀 멈추는 궤적인가(튕길 수 있는가)
+        public float      Wait;       // 튕긴 뒤 굴러가기 전 멈춤 — 새 궤적 예고 앞섬(10-13)
     }
 
     private const float SharedHitGap = 0.35f;   // 구체끼리 판정 간격 — 한 번 맞으면 이만큼은 다른 구체도 못 친다
@@ -199,7 +200,7 @@ public class LichArcaneOrbState : UnInterruptibleState<LichArcaneOrbPatternSO>
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -262,6 +263,13 @@ public class LichArcaneOrbState : UnInterruptibleState<LichArcaneOrbPatternSO>
         {
             var o = _orbs[i];
             if (!o.Alive) continue;
+            if (o.Wait > 0f)
+            {
+                o.Wait -= dt;   // 튕긴 자리에서 새 궤적(빨강)을 보여 준 뒤 굴러간다
+                _orbs[i] = o;
+                any = true;
+                continue;
+            }
 
             o.Travelled += Data.orbSpeed * dt;
             Vector3 center = o.Start + o.Dir * Mathf.Min(o.Travelled, o.Length);
@@ -273,13 +281,21 @@ public class LichArcaneOrbState : UnInterruptibleState<LichArcaneOrbPatternSO>
                 LichCrack.Spawn(center, Data.orbRadius * 1.3f);   // 지나간 줄에 균열(설계: 흔적)
             }
 
-            if (!o.Hit && Time.time - _lastHitTime >= SharedHitGap
-                && LichPatternUtil.HitCircle(ctx, center, Data.orbRadius, Data.damageMultiplier, Data.knockbackMultiplier))
+            if (!o.Hit && Time.time - _lastHitTime >= SharedHitGap)
             {
-                o.Hit        = true;
-                _lastHitTime = Time.time;
-                LichVfx.Play(LichVfxSlot.ArcaneOrbBurst, center + Vector3.up * lift, Quaternion.identity, 0.35f);
-                LichPatternUtil.Impact(LichImpact.Medium, true);
+                bool damaged = LichPatternUtil.HitCircle(ctx, center, Data.orbRadius, Data.damageMultiplier,
+                                                         out bool contact, Data.knockbackMultiplier);
+                // 닿으면 이 구체의 판정은 쓰였다 — 흘렸어도(무효화 · 저스트 회피) 매 프레임 다시 굴리지 않게(10-08 점검).
+                if (contact)
+                {
+                    o.Hit        = true;
+                    _lastHitTime = Time.time;
+                }
+                if (damaged)
+                {
+                    LichVfx.Play(LichVfxSlot.ArcaneOrbBurst, center + Vector3.up * lift, Quaternion.identity, 0.35f);
+                    LichPatternUtil.Impact(LichImpact.Medium, true);
+                }
             }
 
             if (o.Travelled >= o.Length)
@@ -297,7 +313,7 @@ public class LichArcaneOrbState : UnInterruptibleState<LichArcaneOrbPatternSO>
         return any;
     }
 
-    /// <summary>M3⁺ — 가장자리에서 튕겨 지금 플레이어 쪽으로 다시 구른다. 새 궤적은 곧장 빨강(속도가 느려 피할 수 있다).</summary>
+    /// <summary>M3⁺ — 가장자리에서 튕겨 지금 플레이어 쪽으로 다시 구른다. 새 궤적은 곧장 빨강 · 0.45초 멈춘 뒤 굴러간다(10-13 검증 — 튕김점 6 m 안은 앞섬이 모자랐다).</summary>
     private void Bounce(MonsterContext ctx, ref Orb o, Vector3 center)
     {
         o.Bounces--;
@@ -314,6 +330,7 @@ public class LichArcaneOrbState : UnInterruptibleState<LichArcaneOrbPatternSO>
         o.EdgeBound = len < room - 0.01f;
         o.NextCrack = Data.crackSpacing;
         o.Hit       = false;
+        o.Wait      = LichPatternUtil.MinLead;
 
         PatternGuideHelper.SafeDestroy(ref o.Arrow);
         o.Arrow = PatternGuideHelper.Beam(center, dir, o.Length + Data.orbRadius, Data.orbRadius * 2f, LichPatternUtil.Lethal);

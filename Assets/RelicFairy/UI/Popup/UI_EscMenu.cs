@@ -1,5 +1,8 @@
+﻿using System.Threading;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
@@ -16,21 +19,32 @@ public sealed class UI_EscMenu : MonoBehaviour
 {
     // ── Constants ────────────────────────────────────────────
     private const int   SortingOrder = UISortingOrder.SystemModal;
-    // 버튼 5개 기준 높이(4개 422 + 「되찾은 기억」 82). 타이틀(중심 -52, 높이 48) 아래 17px, 마지막 버튼 아래 17px가 되도록 계산한 값이다.
+    // 10-11 위계 개편(리서치 C §6 「고칠 값」) — 66px 베벨 · 간격 16 → 48px 평판 · 간격 8, 고른 줄은 위아래 1px 금 띠(RoR2 일시정지).
+    // 세로 = 위 여백 30 + 제목 44 + 24 + 버튼 5개(5×48 + 4×8 = 272) + 아래 여백 30 = 400.
     // 버튼을 늘리거나 줄이면 PanelH도 ±(BtnH + BtnGap) 해야 여백 대칭이 유지된다.
-    private const float PanelW = 420f, PanelH = 504f;
-    private const float BtnW   = 320f, BtnH   = 66f, BtnGap = 16f;
+    private const float PanelW = 420f, PanelH = 512f;   // 10-13 「장비」 · 10-14 「업적」 버튼 하나씩 더(+BtnH + BtnGap)
+    private const float BtnW   = 320f, BtnH   = 48f, BtnGap = 8f;
+    private const float PadY   = 30f, TitleH = 44f, TitleGap = 24f;
+    private const float TitleSize = 32f, LabelSize = 22f;
 
     private static readonly Color Backdrop   = new(0f, 0f, 0f, 0.72f);
-    // 전 화면 공통 언어(UITheme) — 인디고 글래스 판 + 금 가는 선, 주 버튼 금 · 보조 먹빛 · 종료 가라앉은 진홍(09-28 UI 톤 통일).
-    private static readonly Color LabelColor = UITheme.Ink;
-    private static readonly Color TitleColor = UITheme.Gold;
+    // 뜻은 셋만 — 주 버튼(계속하기) 금 · 보조 잉크 · 종료 진홍(09-28 UI 톤 통일의 세 갈래를 평판 위 글자색 · 옅은 바탕으로 옮긴다).
+    private static readonly Color LabelColor  = UITheme.Thin.Ink;
+    private static readonly Color TitleColor  = UITheme.Gold;
+    private static readonly Color PlateIdle   = new(1f, 1f, 1f, 0.035f);
+    private static readonly Color PlateCta    = UITheme.Thin.WithA(UITheme.Thin.Gold, 0.10f);
+    private static readonly Color PlateDanger = UITheme.Thin.WithA(UITheme.Thin.Danger, 0.12f);
 
     // ── Private ──────────────────────────────────────────────
     private GameObject    _root;
     private RectTransform _panel;
     private bool          _quitting;
     private UI_RelicMemoryPage _memoryPage;   // 「되찾은 기억」 — 보유 유물 조각 보기(유물 성장 v2 §6-5)
+    private UI_EquipmentPage   _equipPage;    // 「장비」 — 무기 두 칸 · 강화 · 형 · 스킬 단계(10-13 4b 요청 8)
+    private TMP_Text      _lobbyLabel;
+    private bool          _lobbyArmed;   // 런 중 「로비로 가기」 첫 누름 — 한 번 더 눌러야 포기한다
+    private TMP_Text      _quitLabel;
+    private bool          _quitArmed;    // 전투 중(피해를 받은 뒤) 「게임 종료」 첫 누름 — 지금 끄면 이어하기에서 사망 정산(10-10 Hades식)
 
     // ── Properties ───────────────────────────────────────────
     public bool IsOpen => _root != null && (_root.TryGetComponent<UIFader>(out var f) ? f.Visible : _root.activeSelf);
@@ -46,6 +60,7 @@ public sealed class UI_EscMenu : MonoBehaviour
     public void Open()
     {
         if (_quitting) return;
+        if (!IsOpen) Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);
         if (_root == null) Build();
 
         UIFader.On(_root, _panel).Show();   // 순간 등장 → 공통 박자(09-28)
@@ -54,7 +69,10 @@ public sealed class UI_EscMenu : MonoBehaviour
 
     public void Close()
     {
+        if (IsOpen) Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);
+        DisarmLobby();
         CloseMemoryPage();
+        CloseEquipPage();
         if (_root != null) UIFader.On(_root, _panel).Hide();
         TimeScaleArbiter.Release(this);
     }
@@ -93,17 +111,22 @@ public sealed class UI_EscMenu : MonoBehaviour
         UITheme.StylePanel(panel, UITheme.Window);
         _panel = prt;
 
-        UITheme.StyleText(NewLabel("Title", panel.transform, "일시정지", 34f, TitleColor,
-                 new Vector2(0f, PanelH * 0.5f - 52f), new Vector2(PanelW - 40f, 48f)), TitleColor);
+        // 제목 — DNF는 이 한 줄에만(가짜 굵게 없음, 부드러운 그림자는 StyleText).
+        UITheme.StyleText(NewLabel("Title", panel.transform, "일시정지", TitleSize, TitleColor,
+                 new Vector2(0f, PanelH * 0.5f - PadY - TitleH * 0.5f), new Vector2(PanelW - 40f, TitleH)), TitleColor);
 
-        // 버튼 묶음의 시작 y. 타이틀 아래 여백과 패널 하단 여백이 17px로 같아지는 값이다.
-        float top  = PanelH * 0.5f - 126f;
+        // 첫 버튼 중심 y — 위 여백 · 제목 · 간격을 뺀 자리에서 버튼 반 높이만큼 내려온다(아래 여백도 PadY로 같다).
+        float top  = PanelH * 0.5f - PadY - TitleH - TitleGap - BtnH * 0.5f;
         float step = BtnH + BtnGap;
-        NewButton(panel.transform, "계속하기",   new Vector2(0f, top),            UITheme.CtaTint,       OnResume);
-        NewButton(panel.transform, "되찾은 기억", new Vector2(0f, top - step),     UITheme.SecondaryTint, OnMemory);
-        NewButton(panel.transform, "설정",       new Vector2(0f, top - step * 2f), UITheme.SecondaryTint, OnSettings);
-        NewButton(panel.transform, "로비로 가기", new Vector2(0f, top - step * 3f), UITheme.SecondaryTint, OnLobby);
-        NewButton(panel.transform, "게임 종료",   new Vector2(0f, top - step * 4f), UITheme.DangerTint,    OnQuit);
+        NewButton(panel.transform, "계속하기",   new Vector2(0f, top),            PlateCta,    UITheme.Thin.Gold,   OnResume);
+        NewButton(panel.transform, "되찾은 기억", new Vector2(0f, top - step),     PlateIdle,   LabelColor,          OnMemory);
+        NewButton(panel.transform, "장비",       new Vector2(0f, top - step * 2f), PlateIdle,   LabelColor,          OnEquipment);
+        NewButton(panel.transform, "업적",       new Vector2(0f, top - step * 3f), PlateIdle,   LabelColor,          OnAchievements);
+        NewButton(panel.transform, "설정",       new Vector2(0f, top - step * 4f), PlateIdle,   LabelColor,          OnSettings);
+        NewButton(panel.transform, "로비로 가기", new Vector2(0f, top - step * 5f), PlateIdle,   LabelColor,          OnLobby);
+        _lobbyLabel = panel.transform.Find("Btn_로비로 가기/Label")?.GetComponent<TMP_Text>();
+        NewButton(panel.transform, "게임 종료",   new Vector2(0f, top - step * 6f), PlateDanger, UITheme.Thin.Danger, OnQuit);
+        _quitLabel = panel.transform.Find("Btn_게임 종료/Label")?.GetComponent<TMP_Text>();
     }
 
     private static void Stretch(RectTransform rt)
@@ -146,24 +169,59 @@ public sealed class UI_EscMenu : MonoBehaviour
         return tmp;
     }
 
-    private void NewButton(Transform parent, string label, Vector2 pos, Color tint,
+    /// <summary>
+    /// 평판 버튼 한 줄 — 옅은 바탕(뜻별) + 위아래 1px 금 띠(고르거나 마우스가 올라오면 0.14초에 걸쳐 85%로 켜진다) + Noto 500 글자.
+    /// 66px 베벨은 메뉴 한 줄이 판보다 무거워 보였다(리서치 C §6 — RoR2 46px 평판 · 간격 8).
+    /// </summary>
+    private void NewButton(Transform parent, string label, Vector2 pos, Color plate, Color ink,
                            UnityEngine.Events.UnityAction onClick)
     {
-        var img = NewImage($"Btn_{label}", parent, tint);
+        var img = NewImage($"Btn_{label}", parent, plate);
         var rt  = img.rectTransform;
         rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = pos;
         rt.sizeDelta = new Vector2(BtnW, BtnH);
-        UITheme.StyleButton(img, tint);   // 전 화면 같은 베벨 버튼(크기를 잡은 뒤 — 9-slice 배율이 칸 크기를 본다)
 
         var btn = img.gameObject.AddComponent<Button>();
         btn.targetGraphic = img;
+        btn.transition    = Selectable.Transition.None;   // 고른 표시는 금 띠가 맡는다 — 틴트까지 겹치면 표시가 둘이 된다
         btn.onClick.AddListener(onClick);
 
         // UI_Popup을 상속하지 않아 자동 부착 경로를 못 탄다 — 팝업과 같은 손맛을 여기서 직접 건다.
         img.gameObject.AddComponent<UIButtonFeedback>();
+        img.gameObject.AddComponent<SelectBand>().Init(Band(rt, "BandTop", 1f), Band(rt, "BandBottom", 0f));
 
-        UITheme.StyleText(NewLabel("Label", img.transform, label, 26f, LabelColor, Vector2.zero, new Vector2(BtnW, BtnH)), LabelColor);
+        var t = NewLabel("Label", img.transform, label, LabelSize, ink, Vector2.zero, new Vector2(BtnW, BtnH));
+        UITheme.StyleThinText(t, UIWeight.Medium, LabelSize, ink);
+    }
+
+    /// <summary>버튼 위(y=1) · 아래(y=0) 가장자리에 붙는 1px 금 띠. 처음엔 투명.</summary>
+    private static Image Band(RectTransform host, string name, float y)
+    {
+        var img = NewImage(name, host, UITheme.Thin.WithA(UITheme.Thin.Gold, 0f));
+        img.raycastTarget = false;
+        var rt = img.rectTransform;
+        rt.anchorMin = new Vector2(0f, y);
+        rt.anchorMax = new Vector2(1f, y);
+        rt.pivot     = new Vector2(0.5f, y);
+        rt.sizeDelta = new Vector2(0f, UITheme.Thin.Stroke);
+        rt.anchoredPosition = Vector2.zero;
+        return img;
+    }
+
+    private void DisarmLobby()
+    {
+        _lobbyArmed = false;
+        if (_lobbyLabel != null) _lobbyLabel.text = "로비로 가기";
+        _quitArmed = false;
+        if (_quitLabel != null) _quitLabel.text = "게임 종료";
+    }
+
+    private void CloseEquipPage()
+    {
+        if (_equipPage == null || !_equipPage.gameObject.activeSelf) return;
+        _equipPage.Close();
+        if (_panel != null) _panel.gameObject.SetActive(true);
     }
 
     private void CloseMemoryPage()
@@ -176,10 +234,22 @@ public sealed class UI_EscMenu : MonoBehaviour
     // ── Event Handlers ───────────────────────────────────────
     private void OnResume() => Close();
 
+    /// <summary>
+    /// 「업적」 — 어디서든 진행 · 받을 것을 본다(10-14 사용자 「업적과 해금을 잘 볼 수 있는 구조」). 이 메뉴는 시스템 정렬이라 팝업이 밑에 깔리므로
+    /// 메뉴를 닫고 업적 화면을 연다. 정수는 기억의 제단에서 받는다(조회 전용 — 화면이 「제단에서 받기」라고 말한다).
+    /// </summary>
+    private void OnAchievements()
+    {
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
+        Close();
+        UI_AwakeningPanel.OpenAchievementsAsync(readOnlyView: true).Forget();
+    }
+
     // 일시정지 패널 자리에 「되찾은 기억」 쪽을 연다(같은 캔버스 · 같은 정지). 돌아가기로 패널이 돌아온다.
     private void OnMemory()
     {
         if (_root == null) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
         _memoryPage ??= UI_RelicMemoryPage.Create(_root.transform, CloseMemoryPage);
         _panel.gameObject.SetActive(false);
         _memoryPage.Open();
@@ -189,8 +259,27 @@ public sealed class UI_EscMenu : MonoBehaviour
     // 닫으면 시간 정지가 풀려 설정을 만지는 동안 게임이 다시 돈다.
     private void OnSettings() => UI_Settings.Open();
 
+    // 「장비」 쪽 — 「되찾은 기억」과 같은 자리 · 같은 정지(10-13). 런 밖이면 빈 칸이 보인다.
+    private void OnEquipment()
+    {
+        if (_root == null) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
+        _equipPage ??= UI_EquipmentPage.Create(_root.transform, CloseEquipPage);
+        _panel.gameObject.SetActive(false);
+        _equipPage.Open();
+    }
+
     private void OnLobby()
     {
+        // 런 중엔 한 번 더 눌러야 — 이 버튼은 런을 포기(정산 없음)한다. 확인 없이 바로 포기해 진행이 사라졌다(10-09 출시 점검).
+        if (!_lobbyArmed && GameRunBootstrapper.Instance?.Run?.IsRunning == true)
+        {
+            _lobbyArmed = true;
+            Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
+            if (_lobbyLabel != null) _lobbyLabel.text = "런 포기 — 한 번 더";
+            return;
+        }
+
         // 시간부터 되돌린다 — 로딩 연출과 로비가 timeScale 0으로 멈춘 채 뜨면 안 된다.
         Close();
 
@@ -213,6 +302,15 @@ public sealed class UI_EscMenu : MonoBehaviour
 
     private void OnQuit()
     {
+        // 피해를 받은 뒤 전투가 끝나기 전이면 한 번 더 — 지금 끄면 이 런은 이어하기에서 사망으로 정산된다(Hades의 「포기」 · 10-10).
+        if (!_quitArmed && RunFlowController.Active != null && RunFlowController.Active.IsCombatLocked)
+        {
+            _quitArmed = true;
+            Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
+            if (_quitLabel != null) _quitLabel.text = "전투 중 — 끄면 런 사망";
+            return;
+        }
+
         _quitting = true;
         TimeScaleArbiter.Release(this);
 #if UNITY_EDITOR
@@ -220,5 +318,67 @@ public sealed class UI_EscMenu : MonoBehaviour
 #else
         Application.Quit();
 #endif
+    }
+
+    // ── Nested ───────────────────────────────────────────────
+
+    /// <summary>
+    /// 고른 줄 표시 — 마우스가 올라오거나(포인터) 패드 · 키보드로 골랐을 때(선택) 위아래 금 띠가 켜진다.
+    /// 시간정지 중에도 돈다(<see cref="UIMotion"/> = unscaled). 메뉴가 꺼지면 띠를 바로 끈다.
+    /// </summary>
+    private sealed class SelectBand : MonoBehaviour,
+        IPointerEnterHandler, IPointerExitHandler, ISelectHandler, IDeselectHandler
+    {
+        private const float OnAlpha = 0.85f;
+
+        private Image _top, _bottom;
+        private bool  _hover, _selected;
+        private float _a;
+        private CancellationTokenSource _cts;
+
+        private void OnDisable()
+        {
+            Cancel();
+            _hover = _selected = false;
+            SetAlpha(0f);
+        }
+
+        private void OnDestroy() => Cancel();
+
+        public void Init(Image top, Image bottom) { _top = top; _bottom = bottom; }
+
+        public void OnPointerEnter(PointerEventData e) { _hover = true;     Refresh(); }
+        public void OnPointerExit(PointerEventData e)  { _hover = false;    Refresh(); }
+        public void OnSelect(BaseEventData e)          { _selected = true;  Refresh(); }
+        public void OnDeselect(BaseEventData e)        { _selected = false; Refresh(); }
+
+        private void Refresh()
+        {
+            float to = _hover || _selected ? OnAlpha : 0f;
+            Cancel();
+            _cts = CancellationTokenSource.CreateLinkedTokenSource(destroyCancellationToken);
+            FadeAsync(_a, to, _cts.Token).Forget();
+        }
+
+        private async UniTaskVoid FadeAsync(float from, float to, CancellationToken ct)
+        {
+            try { await UIMotion.Tween(UIMotion.Quick, k => SetAlpha(Mathf.Lerp(from, to, k)), ct); }
+            catch (System.OperationCanceledException) { }
+        }
+
+        private void SetAlpha(float a)
+        {
+            _a = a;
+            var c = UITheme.Thin.WithA(UITheme.Thin.Gold, a);
+            if (_top != null)    _top.color = c;
+            if (_bottom != null) _bottom.color = c;
+        }
+
+        private void Cancel()
+        {
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = null;
+        }
     }
 }

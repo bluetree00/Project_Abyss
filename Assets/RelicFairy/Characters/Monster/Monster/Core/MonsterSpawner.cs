@@ -41,6 +41,8 @@ public class MonsterSpawner : MonoBehaviour
 {
     /// <summary>동시 생존 상한(<see cref="MonsterBudget"/>)에 걸렸을 때 자리를 다시 확인하는 주기(초).</summary>
     private const float BudgetPollInterval = 0.25f;
+    private const float MinionAppearSeconds  = 0.5f;   // 소환 졸개 · 중간 보스 등장 디졸브(10-12 중간 보스 — 작은 소환물 0.4~0.6 · 큰 것 0.8)
+    private const float MidBossAppearSeconds = 0.8f;
 
     // ── 스폰 지점 여유 검사 ────────────────────────────────
     // NavMesh는 장식(나무·기둥·석상)을 <b>담고 있지 않다</b> —
@@ -201,9 +203,6 @@ public class MonsterSpawner : MonoBehaviour
     /// <summary>몬스터가 실제로 스폰된 직후 발행. (풀에서 꺼낸 MonsterBase 인스턴스 전달)
     /// RoomClearController가 몬스터 OnDied를 체이닝하는 데 사용.</summary>
     public event System.Action<MonsterBase> OnMonsterSpawned;
-
-    // 시기 특성(10-02 설계서 §4) — 이 스포너(≈ 방)에서 나온 특성 종류. 종류 2까지만(한 방에 특성이 난무하지 않게).
-    private readonly HashSet<MonsterTraitKind> _roomTraits = new();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 초기화
@@ -546,12 +545,25 @@ public class MonsterSpawner : MonoBehaviour
         _spawnedMonsters.Add(monster);
         _totalSpawned++;
 
-        // 시기 특성 — 해방기 · 악몽 모드만(봉인기 · 보스는 없음). 통지 전에 붙여 방 컨트롤러가 처음부터 특성 붙은 몸을 본다.
-        var traits = MonsterTraitTable.Roll(entry.grade, StoryProgress.Era, _roomTraits);
+        // 정예 접두어(10-11 정예 접두어 · 봉인기부터) + 시기 특성(해방기 · 악몽 모드만 · 보스는 없음). 통지 전에 붙여 방 컨트롤러가 처음부터 특성 붙은 몸을 본다.
+        // 방 단위 기록(MonsterRoomLedger)으로 센다 — 예전엔 스포너마다 따로 세어 「방당 종류 2」가 스포너당이었다.
+        var era    = StoryProgress.Era;
+        var prefix = MonsterTraitTable.RollPrefix(entry.grade, era, CurrentChapterNumber(),
+                                                  GameRunBootstrapper.Instance?.Run?.CurrentRoomKind == RoomPlanKind.Elite);
+        bool avengerInRoom = prefix == MonsterTraitKind.Avenger || MonsterRoomLedger.HasPrefix(MonsterTraitKind.Avenger);
+        var traits = MonsterTraitTable.Roll(entry.grade, era, MonsterRoomLedger.Traits,
+                                            prefix.HasValue ? MonsterTraitTable.Of(prefix.Value).category : (MonsterTraitCategory?)null,
+                                            noCommander: avengerInRoom, maxCount: prefix.HasValue ? 1 : 2);   // 한 몸 최대 2(접두어 1 + 특성 1)
+        if (prefix.HasValue)
+        {
+            traits.Insert(0, prefix.Value);
+            MonsterRoomLedger.AddPrefix(prefix.Value);
+            Debug.Log($"[ElitePrefix] {monster.name} ← {prefix.Value} · {era} · Ch{CurrentChapterNumber()} · {GameRunBootstrapper.Instance?.Run?.CurrentRoomKind} · 방 접두어 {MonsterRoomLedger.PrefixCount}");
+        }
         if (traits.Count > 0)
         {
             var splitFrom = entry;
-            MonsterTraits.Attach(monster, traits, pos => SpawnSplitChildAsync(splitFrom, pos));
+            MonsterTraits.Attach(monster, traits, pos => SpawnSplitChildAsync(splitFrom, pos), SpawnSummonedMinionAsync);
         }
 
         // 외부 수명주기 구독자(RoomWaveController 등)에게 통지 — OnDied 체이닝 기회 제공
@@ -576,6 +588,82 @@ public class MonsterSpawner : MonoBehaviour
     /// 분열 분신 하나 — 같은 몬스터를 그 자리에 세우고 작게 만든다. 스폰 통지를 거쳐 방 생존 수에 들어간다(분신까지 잡아야 방이 끝난다).
     /// 그 사이 방이 끝나 스포너가 사라졌으면 바로 풀로 돌려보낸다.
     /// </summary>
+    /// <summary>
+    /// 「소환하는」 정예의 졸개 하나 — 이 방 풀 그룹의 잡몹(Common) 중에서. 방 생존 수에 들어가고(통지), 특성은 없다(10-11 정예 접두어).
+    /// 소환사가 졸개를 「졸개」로 표시(골드 없음 · 소환사와 함께 쓰러짐)한다.
+    /// </summary>
+    private async UniTask<MonsterBase> SpawnSummonedMinionAsync(Vector3 pos)
+    {
+        if (!MonsterBudget.CanSpawn) return null;
+        SpawnEntry entry = spawnTable.PickRandom(e => e.grade == MonsterGrade.Common && PassesPoolGroupFilter(e)
+                                                      && !_disabledKeys.Contains(e.addressableKey));
+        if (entry == null) return null;
+        MonsterBase child;
+        try
+        {
+            child = await Managers.ObjectPooler.SpawnAsync<MonsterBase>(
+                entry.addressableKey, ObjectPoolerManager.PoolType.Monster, pos, Quaternion.identity);
+        }
+        catch (System.OperationCanceledException) { return null; }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"[MonsterSpawner] 소환 졸개 스폰 실패 '{entry.addressableKey}': {ex.Message}", this);
+            return null;
+        }
+        if (child == null) return null;
+        if (this == null)
+        {
+            Managers.ObjectPooler?.Despawn(child.gameObject);
+            return null;
+        }
+        _spawnedMonsters.Add(child);
+        OnMonsterSpawned?.Invoke(child);
+        PlaySpawnEffectAsync(pos).Forget();
+        DissolveEffect.PlayAppear(child.gameObject, MinionAppearSeconds, activationToken: child.ActivationToken, edgeColor: spawnOutlineColor);   // 툭 생기지 않게(10-12 중간 보스 디졸브 원칙)
+        return child;
+    }
+
+    /// <summary>
+    /// 중간 엘리트 보스 한 마리 — 방 토큰(83 · 정예 보스 방)이 방 가운데에 가장 가까운 스포너에서 한 번 부른다(10-12 중간 보스).
+    /// 주소 = <c>{kind}/{kind}_Ch{챕터}</c>(예: BullTank/BullTank_Ch2 — 설정은 프리팹이 들고 있다). 스폰 테이블 · 수량 배율 · 무작위 뽑기와 무관해 늘 1마리.
+    /// 방 생존 수에 들어가고(통지), 특성 · 접두어는 없다. 디졸브로 나타난다. 실패 · 취소면 null.
+    /// </summary>
+    public async UniTask<MonsterBase> SpawnMidBossAsync(string kind, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(kind)) return null;
+        if (!await WaitForSpawnBudgetAsync(ct)) return null;
+        string key = $"{kind}/{kind}_Ch{Mathf.Clamp(CurrentChapterNumber(), 1, 4)}";
+        Vector3 pos = TryGetSpawnPosition(out var p) ? p : transform.position;
+        MonsterBase boss;
+        try
+        {
+            boss = await Managers.ObjectPooler.SpawnAsync<MonsterBase>(key, ObjectPoolerManager.PoolType.Monster, pos, Quaternion.identity);
+        }
+        catch (System.OperationCanceledException) { return null; }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"[MonsterSpawner] 중간 보스 스폰 실패 '{key}': {ex.Message}", this);
+            return null;
+        }
+        if (boss == null) return null;
+        if (this == null || ct.IsCancellationRequested)
+        {
+            Managers.ObjectPooler?.Despawn(boss.gameObject);
+            return null;
+        }
+        _spawnedMonsters.Add(boss);
+        OnMonsterSpawned?.Invoke(boss);
+        DissolveEffect.PlayAppear(boss.gameObject, MidBossAppearSeconds, activationToken: boss.ActivationToken, edgeColor: spawnOutlineColor);
+        Debug.Log($"[MonsterSpawner] 중간 보스 '{key}' @ {pos}", this);
+        return boss;
+    }
+
+    private static int CurrentChapterNumber()
+    {
+        var run = AppBootstrapper.Instance?.CurrentRun;
+        return run != null ? (int)run.CurrentChapter : 1;
+    }
+
     private async UniTask SpawnSplitChildAsync(SpawnEntry entry, Vector3 pos)
     {
         MonsterBase child;
@@ -598,6 +686,7 @@ public class MonsterSpawner : MonoBehaviour
         }
         _spawnedMonsters.Add(child);
         MonsterTraits.MakeSplitChild(child);
+        DissolveEffect.PlayAppear(child.gameObject, MinionAppearSeconds, activationToken: child.ActivationToken, edgeColor: spawnOutlineColor);   // 분열 분신도 툭 생기지 않게(10-12 디졸브 ②)
         OnMonsterSpawned?.Invoke(child);
     }
 

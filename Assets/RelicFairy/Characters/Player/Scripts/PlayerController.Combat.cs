@@ -52,7 +52,21 @@ public sealed partial class PlayerController
     /// 장판 틱·DoT처럼 잦은 피해는 Light로 넘기면 같은 공격자 기준 0.3초 안 연출이 한 번으로 줄어든다.</param>
     public void TakeDamage(int dmg, GameObject attacker = null, bool ignorePoise = false, HitWeight weight = HitWeight.Auto)
     {
+        if (_dead) return;   // 사망 뒤 피해가 연출 · 서약 · 아이템 · 기록을 다시 돌렸다(10-09 출시 점검)
         int rawDmg = dmg;
+
+        // 약(Light — 장판 틱 · DoT · 잔불)은 저스트 회피를 일으키지 않고 대시 동안 흘리기만 한다. 대시로 장판을 지나가다
+        // 틱이 겹치면 슬로모 · 무적 · 게이지 환급이 공짜로 났다(10-08 · 40 보스 판정 점검). 피해 결과는 예전과 같다(0).
+        // 약이라도 최대 HP의 15% 이상인 한 방(예고 있는 보스 공격 — 기사 환영 · 리치 결계 폭격 190~380)은 틱이 아니다 — 피하면 보상한다.
+        // 진짜 틱은 20~90(브레스 · 가시 · 흑염 · 붕괴 바닥)이고 최대 HP는 650~950이다.
+        const float TickMaxHpRatio = 0.15f;
+        bool lightTick = weight == HitWeight.Light && !ignorePoise;
+        bool dodgeTick = lightTick && RuntimeStats != null && rawDmg < RuntimeStats.MaxHp * TickMaxHpRatio;
+        if (dodgeTick && LocoSM != null && LocoSM.CurrentId == LocoState.Dodge)
+        {
+            OnDamageResolved?.Invoke(attacker, rawDmg, 0, DamageOutcome.Invincible);
+            return;
+        }
 
         // 저스트 회피 — 회피 초반(퍼펙트 창)에 스친 공격이면 슬로모+이동보너스로 보상하고 피해는 무효.
         if (PerfectDodge.TryTriggerOnHit(attacker))
@@ -113,7 +127,7 @@ public sealed partial class PlayerController
         // [받피감소 통합 채널] 아이템/캐릭터/어둠룬 피해감소(%)를 한 곳에서 1회 적용.
         // (DamageReductionEffect.OnPreTakeDamage 제거 → 여기로 통합. DamageReduction은 Recalculate에서 Clamp01.)
         // 스탠스(스킬 시전 중 방어)는 같은 채널에 얹는다 — 따로 곱하면 감소가 두 번 적용된다.
-        float dr = Mathf.Clamp01(RuntimeStats.DamageReduction + _stanceDefenseAdd);
+        float dr = Mathf.Clamp(RuntimeStats.DamageReduction + _stanceDefenseAdd, 0f, PlayerRuntimeStats.MaxDamageReduction);   // 상한 — 100%면 완전 무적이었다(10-09 출시 점검)
         if (dr > 0f)
             finalDmg = Mathf.Max(0, Mathf.RoundToInt(finalDmg * (1f - dr)));
 
@@ -167,6 +181,8 @@ public sealed partial class PlayerController
             // 회피·무효는 위에서 return되지만 finalDmg가 0으로 깎이는 경로(방어력·받피감소·실드 전량 흡수)는
             // 여기까지 내려온다. 블록 밖에 두면 HP가 1도 안 깎였는데 무피격이 깨진다.
             GameRunBootstrapper.Instance?.Run?.ReportPlayerDamaged();
+            GameRunBootstrapper.Instance?.Run?.RunStats?.ReportHitBy(RunStats.NameOf(attacker));   // 결과창 「~에게」
+            RunFlowController.Active?.NotifyPlayerDamaged();   // Hades식 잠금 — 다음 저장 전에 끄면 이어하기에서 사망 정산(10-10)
         }
 
         // [서약] 피격 통보 (실제 적용 피해량)
@@ -188,7 +204,6 @@ public sealed partial class PlayerController
         //
         // 약(Light — 장판 틱 · DoT · 잔불)은 포이즈를 쌓지 않는다. 틱이 쌓여 1초 안에 날아가고, 내려앉으면 같은 장판에서
         // 다시 날아가는 연쇄가 생겼다(10-01 보스 감사 — 화룡 잔불 · 숲 브레스 · 가시 띠). 확정 날아감(ignorePoise)은 그대로.
-        bool lightTick = weight == HitWeight.Light && !ignorePoise;
         if (!_dead && !IsGrabbed && !PoiseImmune && !lightTick && Poise != null && CharacterData != null && RuntimeStats != null)
         {
             float maxPoise = RuntimeStats.MaxPoise;
@@ -264,11 +279,34 @@ public sealed partial class PlayerController
         _invincibleEnd = Mathf.Max(_invincibleEnd, Time.time + duration);
     }
 
+    /// <summary>피해 없는 판정(잡기 등)도 저스트 회피를 따르게 — 대시 중(장전)이면 회피가 발동하고 true. 10-08 40 요청(숲의 수호자 잡기).</summary>
+    public bool TryEvadeHit(GameObject attacker) => PerfectDodge.TryTriggerOnHit(attacker);
+
     /// <summary>잡기 패턴이 붙들기 시작/해제 시 호출. 이동 잠금(SetMoveScale)과 같은 수명으로 다뤄야 한다.</summary>
     public void SetGrabbed(bool grabbed) => IsGrabbed = grabbed;
 
     /// <summary>분신으로 마킹. Awake 전에 호출해야 카메라 등록이 방지된다.</summary>
-    public void SetAsShadowClone() => IsShadowClone = true;
+    /// <summary>
+    /// 분신으로 마킹 — 비활성 상태에서(켜기 전에) 부른다. 유물을 다시 붙이지 않고 화면 · 카메라 · HUD 연출 부품을 뗀다(10-09 출시 점검:
+    /// 복사된 카메라 틀이 정적 Active를 빼앗아 카메라 구역이 망가졌고, 분신의 유물 OnDetach가 진짜 플레이어의 유물 표시를 지웠고,
+    /// 분신의 피격 연출이 저체력 경고를 덮었다).
+    /// </summary>
+    public void SetAsShadowClone()
+    {
+        IsShadowClone = true;
+        relicClass = null;
+        DestroyCopied<CombatCameraFraming>();
+        DestroyCopied<CameraRigAnchor>();
+        DestroyCopied<PlayerHitPresentation>();
+        DestroyCopied<AimTargetIndicator>();
+        DestroyCopied<StaminaBarView>();
+        DestroyCopied<WeaponFormRuntime>();
+    }
+
+    private void DestroyCopied<T>() where T : Component
+    {
+        if (TryGetComponent<T>(out var c)) DestroyImmediate(c);
+    }
 
     /// <summary>번개 그로기: duration초 동안 비네트로 시야를 좁힌다.</summary>
     public void ApplyThunderGroggy(float duration)
@@ -298,6 +336,16 @@ public sealed partial class PlayerController
         return d.sqrMagnitude > 0.0001f ? d.normalized : -transform.forward;
     }
 
+    // ── Public Methods: 장비 스킬 후딜 ────────────────────────────
+    /// <summary>
+    /// 장비 스킬이 후딜(마지막 피해 뒤 마무리 동작)에 들어갔는가(10-08 A2). 이때만 회피로 끊을 수 있다(결정 S2 「피해 뒤만」).
+    /// <see cref="SkillExecutionContext.EnterRecovery"/>가 켜고 스킬 상태 진입 · 종료가 끈다.
+    /// </summary>
+    public bool SkillRecovering { get; set; }
+
+    /// <summary>스킬 자기 강화 시작 알림(<see cref="SkillBuffStarted"/>) — 석궁 강화 스킬이 부른다.</summary>
+    public void RaiseSkillBuffStarted(SkillType slot, float duration) => SkillBuffStarted?.Invoke(slot, duration);
+
     // ── Public Methods: 스킬 스탠스 ───────────────────────────────
     /// <summary>
     /// 스탠스 시작. owner는 해제 권한을 가진 주체(보통 스킬 런타임 자신)다.
@@ -320,7 +368,11 @@ public sealed partial class PlayerController
 
     // ── Public Methods: 상태이상 (PlayerStatusEffects 위임) ────────
     /// <summary>이동 속도를 scale 배율로 duration초 동안 감소시킨다. 종료 시 자동으로 복구.</summary>
-    public void ApplySlow(float scale, float duration) => Status.ApplySlow(scale, duration);
+    public void ApplySlow(float scale, float duration)
+    {
+        if (IsInvincible) return;   // 피한 공격(무적 · 저스트 회피)의 둔화는 걸지 않는다 — 넉백과 같은 규칙(10-09 출시 점검)
+        Status.ApplySlow(scale, duration);
+    }
 
     /// <summary>슬로우 상태를 즉시 해제하고 부착된 VFX를 제거한다.</summary>
     public void ClearSlow() => Status.ClearSlow();
@@ -328,7 +380,7 @@ public sealed partial class PlayerController
     /// <summary>
     /// 얼음 공격 1회 처리. 반환값: 1=1단계(화면이펙트), 2=빙결 발동, 0=이미 빙결 중(연장만).
     /// </summary>
-    public int AddIceStack(float fullDuration) => Status.AddIceStack(fullDuration);
+    public int AddIceStack(float fullDuration) => IsInvincible ? 0 : Status.AddIceStack(fullDuration);   // 피한 공격은 얼리지 않는다(10-09 출시 점검)
 
     /// <summary>외부 힘(넉백)을 가하고 일정 시간 동안 수평 이동 잠금을 스킵한다. 무적 중이면 무시한다.</summary>
     public void ApplyKnockback(Vector3 force, float duration = 0.3f)
@@ -369,7 +421,10 @@ public sealed partial class PlayerController
         else
         {
             _dead = true;
+            Managers.Sound?.PlayEvent(SoundEvent.PlayerDie);   // 10-12 4b 몫(83 표) — 사망 소리가 연결된 적이 없었다
+            RunFlowController.Active?.NotifyPlayerDamaged();   // 피해 밖 경로(자해 · 낙하)로 죽어도 잠근다 — 사망 연출 중에 끄면 이어하기에서 사망 정산(10-10)
             SetInputEnabled(false);
+            CancelActions();   // 진행 중이던 스킬이 사망 슬로모 동안 계속 때리고 몸을 움직였다(10-09 출시 점검)
             PerfectDodge.Clear();   // 사망했는데 슬로모가 남아 시간이 느린 채로 진행되는 것 방지
             if (IntroBootstrapper.Instance != null)
                 IntroBootstrapper.Instance.HandleIntroDeath();

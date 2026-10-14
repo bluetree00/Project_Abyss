@@ -47,7 +47,7 @@ MonoBehaviour:
   sealDoorPrefab: {fileID: 1031059844, guid: abc00000000000511869263103611266, type: 3}
   gateFramePrefab: {fileID: 6812090675127939861, guid: c3d38e03b620d21419252181a127a644,
     type: 3}
-  sealDoorMotion: 0
+  sealDoorMotion: 3
   blocks:
   - {fileID: 11400000, guid: 9aa8b58e024dd3d4fa8175d71645cde8, type: 2}
   - {fileID: 11400000, guid: 0eb3ff44f728bde4eb330fbe506d6066, type: 2}

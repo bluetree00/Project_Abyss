@@ -21,7 +21,7 @@ MonoBehaviour:
   stat:
     maxHp: 20
     defense: 5
-    attackPower: 30
+    attackPower: 20
     moveSpeed: 3
     attackRange: 1
     attackRadius: 1
@@ -55,6 +55,15 @@ MonoBehaviour:
     speedParam: Blend
     speedDampTime: 0.1
     crossFadeDuration: 0.15
+  death:
+    despawnDelay: 0.5
+    dissolveDuration: 0.35
+    deathVfxKey: MonsterDeathBurst
+    deathVfxScale: 1.5
+    deathVfxHeight: 0.85
+    deathVfxUnscaled: 1
+    killHitStopScale: 0.04
+    killHitStopDuration: 0.09
   specialStates:
   - conditions:
     - {fileID: 11400000, guid: 7f12c79cbd951484e87f8b810a55058d, type: 2}

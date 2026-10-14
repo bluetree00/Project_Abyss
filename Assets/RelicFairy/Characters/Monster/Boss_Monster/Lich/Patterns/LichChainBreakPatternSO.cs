@@ -151,7 +151,7 @@ public class LichChainBreakState : UnInterruptibleState<LichChainBreakPatternSO>
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -239,11 +239,12 @@ public class LichChainBreakState : UnInterruptibleState<LichChainBreakPatternSO>
             if (!r.Hit && target != null)
             {
                 float d = LichPatternUtil.FlatDistance(r.Center, target.position);
-                if (Mathf.Abs(d - r.Radius) <= Data.ringThickness * 0.5f
-                    && LichPatternUtil.HitCircle(ctx, r.Center, r.Radius + Data.ringThickness, Data.damageMultiplier, Data.knockbackMultiplier))
+                if (Mathf.Abs(d - r.Radius) <= Data.ringThickness * 0.5f)
                 {
-                    r.Hit = true;
-                    LichPatternUtil.Impact(LichImpact.Light, true);
+                    bool damaged = LichPatternUtil.HitCircle(ctx, r.Center, r.Radius + Data.ringThickness, Data.damageMultiplier,
+                                                             out bool contact, Data.knockbackMultiplier);
+                    if (contact) r.Hit = true;   // 흘렸어도(무효화 · 저스트 회피) 이 링은 쓰였다 — 매 프레임 다시 굴리지 않게(10-08 점검)
+                    if (damaged) LichPatternUtil.Impact(LichImpact.Light, true);
                 }
             }
 

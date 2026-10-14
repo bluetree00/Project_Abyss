@@ -5,7 +5,7 @@ using UnityEngine;
 /// 봉인기는 지금 수치 그대로(×1). 해방기부터 몬스터가 세지고 많아지는 만큼 보상(룬 등급 · 연료 · 골드)도 오른다.
 /// 보스는 여기서 세지지 않는다 — 보스의 시기 차이는 페이지(해방 2페이지 · 악몽 강화)가 맡는다.
 ///
-/// 꽂히는 곳: 몬스터 스탯 = <c>GameRunSession.CurrentDifficultyScale</c> · 수량 = <c>CurrentMonsterCountScale</c> ·
+/// 꽂히는 곳: 몬스터 스탯 = <c>GameRunSession.CurrentDifficultyScaleFor</c> · 수량 = <c>CurrentMonsterCountScale</c> ·
 /// 정예 확률 = <c>RunSequencer.RollKind</c> · 룬 등급 가중 · 연료 = <c>RoomRewardTable.For</c> · 골드 = <c>GameRunSession.AddGold</c> ·
 /// 이벤트방 놀이 제한 시간 = <c>EventMinigame</c> · 두 번째 파도 = <c>RoomWaveController</c>(10-02 설계서 §5).
 /// 몬스터 특성(v3 §4-3)은 다음 단계 — 여기엔 숫자만 있다.
@@ -39,7 +39,7 @@ public static class EraBalance
     }
 
     // 가로로 읽으면 봉인기(지금 그대로) → 해방기(같은 빌드로 한 번 더 오를 수 있는 선) → 악몽(성장이 받쳐 주는 도전).
-    private static readonly Spec SealedSpec    = new(stat: 1.0f, count: 1.0f, elite: 0.00f, rarityStep: 0, fuel: 1.00f, gold: 1.0f, eventTime: 1.00f, extraWave: 0.0f);
+    private static readonly Spec SealedSpec    = new(stat: 1.0f, count: 1.0f, elite: 0.00f, rarityStep: 0, fuel: 1.00f, gold: 1.0f, eventTime: 1.00f, extraWave: 0.3f);
     private static readonly Spec LiberatedSpec = new(stat: 1.2f, count: 1.1f, elite: 0.05f, rarityStep: 1, fuel: 1.25f, gold: 1.2f, eventTime: 1.00f, extraWave: 0.3f);
     private static readonly Spec NightmareSpec = new(stat: 1.4f, count: 1.2f, elite: 0.10f, rarityStep: 2, fuel: 1.50f, gold: 1.4f, eventTime: 0.85f, extraWave: 1.0f);
 
@@ -62,7 +62,8 @@ public static class EraBalance
 
     /// <summary>
     /// 두 번째 파도(10-02 설계서 §5) — 일반 · 정예 전투방만. 첫 파도를 다 잡으면 정예가 이끄는 무리가 한 번 더 온다.
-    /// 해방기 30% · 악몽 전부. 악몽 정예 방은 정예 둘이 함께 온다. 안 오면 (0, 0).
+    /// 봉인기 · 해방기 30%(봉인기는 10-11 일반방 긴장감 설계 D3 — 첫 회차에도 「정예가 이끄는 무리」 박자) · 악몽 전부.
+    /// 악몽 정예 방은 정예 둘이 함께 온다. 안 오면 (0, 0).
     /// </summary>
     public static (int elites, int commons) RollExtraWave(RoomPlanKind kind, StoryEra era)
     {

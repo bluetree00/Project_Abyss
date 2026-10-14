@@ -112,6 +112,7 @@ internal sealed class DragonAbyssDiveState : FullLockState<DragonAbyssDivePatter
     private Vector3    _target;
     private GameObject _guide;
     private float      _guideLift;
+    private float      _diveSeconds;   // 지금 자리 → 착지점 급강하 시간 — 예고 채움을 착지 판정에 맞춘다(10-08 점검)
     private GameObject _trail;
 
     internal DragonAbyssDiveState(DragonAbyssDivePatternSO data) : base(data) { }
@@ -214,7 +215,9 @@ internal sealed class DragonAbyssDiveState : FullLockState<DragonAbyssDivePatter
             _locked = true;
             PatternGuideHelper.Arm(_guide);
         }
-        PatternGuideHelper.SetProgress(_guide, _timer / Data.AimSeconds);
+        // 채움은 몸이 꽂히는 순간(= 판정)에 끝난다 — 겨눔 + 급강하(10-08 점검: 다 찬 뒤 0.3~0.6초에 맞았다)
+        _diveSeconds = Vector3.Distance(ctx.Transform.position, LandPoint(ctx)) / Data.DiveSpeed;
+        PatternGuideHelper.SetProgress(_guide, _timer / (Data.AimSeconds + _diveSeconds));
         DragonAbyssFx.Face(ctx, _target - ctx.Transform.position, 240f);
 
         if (_timer < Data.AimSeconds) return;
@@ -227,6 +230,10 @@ internal sealed class DragonAbyssDiveState : FullLockState<DragonAbyssDivePatter
         Vector3 p = ctx.Runtime.PlayerTarget != null ? ctx.Runtime.PlayerTarget.position : ctx.Transform.position;
         return DragonAbyssFx.OnFloor(ctx, DragonAbyssFx.ClampToArena(p, 1.5f));
     }
+
+    /// <summary>몸이 내려앉는 자리 — 벽 안면 − 몸 반경 안(예고 원 · 판정은 _target 그대로).</summary>
+    private Vector3 LandPoint(MonsterContext ctx)
+        => DragonPatternFloorUtils.ClampInsideWalls(_target, DragonPatternFloorUtils.BodyRadiusOf(ctx));
 
     // ── Dive ─────────────────────────────────────────────────────────────────
 
@@ -245,9 +252,10 @@ internal sealed class DragonAbyssDiveState : FullLockState<DragonAbyssDivePatter
 
     private void UpdateDive(MonsterContext ctx)
     {
+        PatternGuideHelper.SetProgress(_guide, (Data.AimSeconds + _timer) / (Data.AimSeconds + _diveSeconds));
         // 몸은 벽 안면 − 몸 반경 안에 내려앉는다 — 예고 원 · 판정은 그대로 플레이어 발밑(_target)
         // (10-03 개선 1-3: 벽 안 0.5 m에 꽂혀 몸 절반이 벽 너머였다)
-        Vector3 land = DragonPatternFloorUtils.ClampInsideWalls(_target, DragonPatternFloorUtils.BodyRadiusOf(ctx));
+        Vector3 land = LandPoint(ctx);
         Vector3 pos  = ctx.Transform.position;
         Vector3 to   = land - pos;
         float   step = Data.DiveSpeed * Time.deltaTime;

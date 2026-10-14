@@ -54,6 +54,7 @@ public class DeathKnightSwordController : MonoBehaviour
 
     // ── 상태 ──────────────────────────────────────────
     private bool _isVisible;
+    private bool _hiding;   // 숨기는 디졸브가 도는 중 — 끝나야 다시 등장한다(10-12 디졸브 원칙)
     private CancellationToken _destroyCt;
     private Renderer _swordRenderer;
     private WeaponTrailEffect _trail;
@@ -132,9 +133,24 @@ public class DeathKnightSwordController : MonoBehaviour
     {
         if (_swordGO == null || _isVisible) return;
         _isVisible = true;
-        _swordGO.SetActive(true);
-        DissolveEffect.PlayAppear(_swordGO, _appearDuration, activationToken: _destroyCt);
+        ShowWhenSettledAsync().Forget();
         if (_trail != null) _trail.StartTrailWithLength(_trailFadeIn, _trailLength);
+    }
+
+    /// <summary>
+    /// 숨기는 디졸브가 끝나 원본 재질을 되돌린 뒤에 등장시킨다 — 그 전에 등장하면 임시 재질을 원본으로 잡아 마젠타(10-12 디졸브 원칙).
+    /// 켜기는 PlayAppear가 투명하게 만든 뒤 한다(먼저 켜면 한 프레임 불투명).
+    /// </summary>
+    private async UniTaskVoid ShowWhenSettledAsync()
+    {
+        try
+        {
+            while (_hiding || (_swordRenderer != null && DissolveEffect.IsDissolving(_swordRenderer)))
+                await UniTask.Yield(_destroyCt);
+        }
+        catch (System.OperationCanceledException) { return; }
+        if (!_isVisible || _swordGO == null) return;   // 그새 다시 숨김
+        DissolveEffect.PlayAppear(_swordGO, _appearDuration, activationToken: _destroyCt);
     }
 
     /// <summary>검 Transform을 반환한다 (VFX 부착 등에 사용).</summary>
@@ -186,14 +202,16 @@ public class DeathKnightSwordController : MonoBehaviour
     {
         if (_swordGO == null || !_isVisible) return;
         _isVisible = false;
+        _hiding = true;
         if (_trail != null) _trail.StopTrail(_trailFadeOut);
         DissolveEffect.PlayDisappear(
             _swordGO,
             _disappearDuration,
             onComplete: () =>
             {
+                _hiding = false;
                 if (_swordGO != null)
-                    _swordGO.SetActive(false);
+                    _swordGO.SetActive(false);   // 늘 끈다 — 끄여야 디졸브가 원본을 되돌리고, 그 뒤에 기다리던 등장이 이어진다
             });
     }
 

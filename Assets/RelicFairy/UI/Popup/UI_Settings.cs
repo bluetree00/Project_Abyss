@@ -30,8 +30,16 @@ public sealed class UI_Settings : MonoBehaviour
 
     private const float PanelW = 1480f, PanelH = 859f;   // 납품 판(bg 1498×869) 비율 — 620이면 아트가 1.38배 눌린다
     private const float SidePad = 40f, TopPad = 30f;
-    private const float RowH = 60f, RowGap = 14f;   // 드롭다운 박스 아트 341×54가 들어가는 높이. 행 간격 74 ≈ 납품 구분선(작대기) 529/7
+    // 행 높이 = 드롭다운 박스 아트 341×54. 행 간격 74 → 60(10-11 리서치 C §6 「고칠 값」 — 하데스 설정 60, 74는 줄 사이가 떠 보였다).
+    private const float RowH = 54f, RowGap = 6f;
     private const float TitleH = 54f, SectionH = 40f, SectionGap = 14f;
+
+    // 글자 단계(톤 v2) — 제목만 DNF 32, 나머지는 Noto: 구획 라벨 15(500 · 자간) · 행 · 값 20(400) · 버튼 22(500)
+    private const float TitleSize = 32f, SectionSize = 15f, BodySize = 20f, ButtonSize = 22f;
+    private const float SectionSpacing = 15f;
+
+    // 슬라이더 트랙 15 → 6px(리서치 C §6, 하데스 4px) — 24px 칸 가운데 0.375~0.625. 손잡이(19px 아트)는 그대로.
+    private const float TrackFrom = 0.375f, TrackTo = 0.625f;
 
     private const float LabelW = 200f;
     private const float CtrlW  = 340f;
@@ -55,12 +63,14 @@ public sealed class UI_Settings : MonoBehaviour
     private static readonly Color PanelBg     = new(0.08f, 0.09f, 0.13f, 0.98f);
     private static readonly Color PanelEdge   = new(0.52f, 0.72f, 0.86f, 0.85f);
     private static readonly Color CtrlBg      = new(0.16f, 0.19f, 0.27f, 1f);
-    private static readonly Color TrackBg     = new(0.05f, 0.06f, 0.09f, 1f);
+    // 6px 트랙은 납품 게이지 아트(347×15)를 눌러 담을 수 없다 — 얇은 잉크 선 위에 금 채움(톤 v2 「얇은 금선」).
+    private static readonly Color TrackBg     = UITheme.Thin.InkA(0.16f);
     // 강조는 금 계열로 — 하늘색 게이지 · 청회색 제목이 이 화면만 따로 놀았다(09-28 UI 톤 통일, 청색은 무기 전용).
-    private static readonly Color TrackFill   = UITheme.CtaTint;
+    private static readonly Color TrackFill   = UITheme.Thin.WithA(UITheme.Thin.Gold, 0.85f);
     private static readonly Color HandleColor = new(0.88f, 0.93f, 1f, 1f);
-    private static readonly Color LabelColor  = UITheme.Ink;
-    private static readonly Color SectionColor= new(0.86f, 0.74f, 0.50f, 1f);
+    private static readonly Color LabelColor  = UITheme.Thin.Ink;
+    // 구획 이름은 금을 쓰지 않는다 — 금은 「누를 것 · 준비됨」에만(v2 강조색). 잉크 60%(어두운 판 위 6:1)
+    private static readonly Color SectionColor= UITheme.Thin.InkA(0.6f);
     private static readonly Color TitleColor  = UIPalette.Gold;
     private static readonly Color ConfirmColor = new(0.20f, 0.34f, 0.50f, 1f);   // 확정 = 강조
     private static readonly Color CancelColor  = new(0.16f, 0.17f, 0.22f, 1f);   // 되돌림 = 보조
@@ -98,6 +108,8 @@ public sealed class UI_Settings : MonoBehaviour
     private bool _suppressCallbacks;   // 값 복원 중 onValueChanged가 되먹임되는 것을 막는다
     private bool _volumeDirty;         // 드래그 중 미뤄 둔 볼륨 저장이 남아 있는가
     private bool _graphicsDirty;       // 렌더 스케일 드래그 중 미뤄 둔 저장이 남아 있는가
+    private bool _previewSfx;          // 효과음 슬라이더를 움직였다 — 놓을 때 효과음 채널로 한 번 미리듣기(10-12 D3)
+    private bool _previewUi;           // UI 슬라이더를 움직였다 — 놓을 때 UI 채널로 한 번 미리듣기
 
     // ── Properties ───────────────────────────────────────────
     public bool IsOpen => _root != null && (_root.TryGetComponent<UIFader>(out var f) ? f.Visible : _root.activeSelf);
@@ -118,6 +130,10 @@ public sealed class UI_Settings : MonoBehaviour
         {
             _volumeDirty = false;
             Managers.Sound?.SaveVolumePrefs();
+            // 놓는 순간 그 채널 볼륨으로 한 번 — 효과음은 효과음 채널(PlayEvent), UI는 UI 채널(PlayUiEvent)로 같은 클릭음을 낸다.
+            if (_previewSfx) Managers.Sound?.PlayEvent(SoundEvent.UiClick);
+            if (_previewUi)  Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
+            _previewSfx = _previewUi = false;
         }
 
         if (_graphicsDirty)
@@ -193,6 +209,7 @@ public sealed class UI_Settings : MonoBehaviour
         RefreshFromSystems();
         UIFader.On(_root, _panelRt).Show();   // 순간 등장 → 공통 박자(09-28)
         _root.transform.SetAsLastSibling();
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);
     }
 
     /// <summary>
@@ -218,10 +235,12 @@ public sealed class UI_Settings : MonoBehaviour
             }
 
             _volumeDirty = _graphicsDirty = false;
+            _previewSfx = _previewUi = false;
             _entryCaptured = false;
         }
 
         if (_root != null) UIFader.On(_root, _panelRt).Hide();
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);   // 되돌린 볼륨으로 난다
     }
 
     /// <summary>
@@ -232,6 +251,7 @@ public sealed class UI_Settings : MonoBehaviour
     private void ConfirmInternal()
     {
         _volumeDirty = _graphicsDirty = false;
+        _previewSfx = _previewUi = false;
         _entryCaptured = false;   // 아래 닫기가 되돌리지 않도록 먼저 끈다
 
         Managers.Sound?.SaveVolumePrefs();
@@ -246,6 +266,7 @@ public sealed class UI_Settings : MonoBehaviour
             ScreenSettings.Apply(_pendingRes.x, _pendingRes.y, _fullscreen);
 
         if (_root != null) _root.SetActive(false);
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);
     }
 
     /// <summary>표시값을 실제 시스템 상태에서 다시 읽어온다 — 화면이 곧 진실이 되지 않게.</summary>
@@ -410,8 +431,9 @@ public sealed class UI_Settings : MonoBehaviour
             outline.effectDistance = new Vector2(2f, -2f);
         }
 
-        // 화면 맞춤 — 판이 목업 비율을 지킨 채 화면에 맞춰 커진다.
-        panel.gameObject.AddComponent<UIWindowFitter>().Configure(maxScale: UIWindowFitter.ContentScreen);
+        // 화면 맞춤(UIWindowFitter)은 붙이지 않는다(10-11) — 판 아트만 1749×1015로 늘고 내용은 1480×859에 머물러
+        // 판 안 둘레가 좌우 ~135 · 위아래 ~78px 비었다(리서치 C §6). 판을 내용 크기로 둔다. 1480×859는 5:4 · 21:9 · 720p
+        // 어디서도 캔버스(1920×1080 · Match 0.5) 안에 들어간다(클래스 주석의 검증 범위).
 
         // 위에서 아래로 내려가는 커서. 각 요소는 [y - h/2]에 중심을 둔다.
         float top = PanelH * 0.5f - TopPad;
@@ -454,7 +476,7 @@ public sealed class UI_Settings : MonoBehaviour
 
     private static float AddTitle(Transform panel, float y)
     {
-        NewLabel("Title", panel, "설정", 36f, TitleColor, new Vector2(0f, y - TitleH * 0.5f),
+        NewLabel("Title", panel, "설정", TitleSize, TitleColor, new Vector2(0f, y - TitleH * 0.5f),
                  new Vector2(PanelW - SidePad * 2f, TitleH), TextAlignmentOptions.Center);
         float bottom = y - TitleH - 6f;
         // 의뢰서 B1 「창 + 타이틀바(바 1)」 — 납품 상단 장식(1357×38)을 제목 바로 아래 원본 크기로 깐다.
@@ -473,11 +495,12 @@ public sealed class UI_Settings : MonoBehaviour
         return bottom;
     }
 
+    /// <summary>구획 이름(오디오 · 화면 · 그래픽) — 작은 라벨(Noto 500 · 15 · 자간 15). 열 폭 전체에 왼쪽 정렬로 깐다.</summary>
     private static float AddSectionLabel(Transform panel, float cx, float y, string text)
     {
-        NewLabel($"Section_{text}", panel, text, 24f, SectionColor,
-                 new Vector2(cx + LabelDx, y - SectionH * 0.5f), new Vector2(LabelW, SectionH),
-                 TextAlignmentOptions.Left);
+        var t = ThinLabel($"Section_{text}", panel, text, SectionSize, UIWeight.Medium, SectionColor,
+                          new Vector2(cx, y - SectionH * 0.5f), new Vector2(ColW, SectionH), TextAlignmentOptions.Left);
+        t.characterSpacing = SectionSpacing;
         return y - SectionH - RowGap;
     }
 
@@ -485,8 +508,8 @@ public sealed class UI_Settings : MonoBehaviour
     private static float AddRowLabel(Transform panel, float cx, float y, string name, string label)
     {
         float cy = y - RowH * 0.5f;
-        NewLabel($"Label_{name}", panel, label, 24f, LabelColor,
-                 new Vector2(cx + LabelDx, cy), new Vector2(LabelW, RowH), TextAlignmentOptions.Left);
+        ThinLabel($"Label_{name}", panel, label, BodySize, UIWeight.Regular, LabelColor,
+                  new Vector2(cx + LabelDx, cy), new Vector2(LabelW, RowH), TextAlignmentOptions.Left);
         return cy;
     }
 
@@ -505,8 +528,8 @@ public sealed class UI_Settings : MonoBehaviour
         slider = NewSlider(panel, $"Slider_{label}", new Vector2(cx + CtrlDx, cy), new Vector2(CtrlW, 24f), min, max);
         slider.onValueChanged.AddListener(onChanged);
 
-        valueText = NewLabel($"Value_{label}", panel, "100%", 22f, LabelColor,
-                             new Vector2(cx + ValueDx, cy), new Vector2(ValueW, RowH), TextAlignmentOptions.Right);
+        valueText = ThinLabel($"Value_{label}", panel, "100%", BodySize, UIWeight.Regular, LabelColor,
+                              new Vector2(cx + ValueDx, cy), new Vector2(ValueW, RowH), TextAlignmentOptions.Right);
 
         return y - RowH - RowGap;
     }
@@ -546,8 +569,8 @@ public sealed class UI_Settings : MonoBehaviour
         btn.onClick.AddListener(onClick);
         img.gameObject.AddComponent<UIButtonFeedback>();
 
-        stateLabel = NewLabel("Label", img.transform, string.Empty, 22f, LabelColor,
-                              Vector2.zero, new Vector2(CtrlW, 44f), TextAlignmentOptions.Center);
+        stateLabel = ThinLabel("Label", img.transform, string.Empty, BodySize, UIWeight.Regular, LabelColor,
+                               Vector2.zero, new Vector2(CtrlW, 44f), TextAlignmentOptions.Center);
 
         return y - RowH - RowGap;
     }
@@ -603,8 +626,8 @@ public sealed class UI_Settings : MonoBehaviour
         btn.onClick.AddListener(onClick);
         img.gameObject.AddComponent<UIButtonFeedback>();
 
-        NewLabel("Label", img.transform, label, 26f, LabelColor, Vector2.zero,
-                 new Vector2(w, h), TextAlignmentOptions.Center);
+        ThinLabel("Label", img.transform, label, ButtonSize, UIWeight.Medium, LabelColor, Vector2.zero,
+                  new Vector2(w, h), TextAlignmentOptions.Center);
     }
 
     // ── Widget Factory ───────────────────────────────────────
@@ -647,6 +670,15 @@ public sealed class UI_Settings : MonoBehaviour
         return tmp;
     }
 
+    /// <summary>톤 v2 글자(Noto 300/400/500 · 가짜 굵게 없음). 글꼴이 아직 안 올라왔으면 기본 글꼴 — 스킨 도착 뒤 첫 열기에서 다시 굽는다(OpenInternal).</summary>
+    private static TMP_Text ThinLabel(string name, Transform parent, string text, float size, UIWeight weight, Color color,
+                                      Vector2 pos, Vector2 sizeDelta, TextAlignmentOptions align)
+    {
+        var t = NewLabel(name, parent, text, size, color, pos, sizeDelta, align);
+        UITheme.StyleThinText(t, weight, size, color);
+        return t;
+    }
+
     private static TMP_FontAsset ResolveFont()
     {
         var font = TMP_Settings.defaultFontAsset;
@@ -667,35 +699,23 @@ public sealed class UI_Settings : MonoBehaviour
 
         var skin = UISkin.Settings;
 
+        // 트랙 · 채움은 납품 게이지 아트(347×15) 대신 얇은 선 — 6px로 누르면 아트 결이 뭉개진다(10-11, 리서치 C §6).
         var bg = NewImage("Background", go.transform, TrackBg);
-        if (skin?.gaugeTrack != null)
-        {
-            bg.sprite = skin.gaugeTrack;
-            bg.type   = Image.Type.Sliced;
-            bg.color  = Color.white;
-        }
         var bgRt = bg.rectTransform;
-        bgRt.anchorMin = new Vector2(0f, 0.1875f);
-        bgRt.anchorMax = new Vector2(1f, 0.8125f);
+        bgRt.anchorMin = new Vector2(0f, TrackFrom);
+        bgRt.anchorMax = new Vector2(1f, TrackTo);
         bgRt.offsetMin = bgRt.offsetMax = Vector2.zero;
         bg.raycastTarget = false;
 
         var fillArea = new GameObject("Fill Area", typeof(RectTransform));
         fillArea.transform.SetParent(go.transform, false);
         var faRt = fillArea.GetComponent<RectTransform>();
-        faRt.anchorMin = new Vector2(0f, 0.1875f);
-        faRt.anchorMax = new Vector2(1f, 0.8125f);
+        faRt.anchorMin = new Vector2(0f, TrackFrom);
+        faRt.anchorMax = new Vector2(1f, TrackTo);
         faRt.offsetMin = new Vector2(5f, 0f);
         faRt.offsetMax = new Vector2(-15f, 0f);
 
         var fill = NewImage("Fill", fillArea.transform, TrackFill);
-        if (skin?.gaugeFill != null)
-        {
-            // 게이지 아트는 하늘색이 구워져 있다 — 무채색 원본에 금을 입힌다(09-28 UI 톤 통일).
-            fill.sprite = UISpriteMaster.Neutral(skin.gaugeFill);
-            fill.type   = Image.Type.Sliced;
-            fill.color  = TrackFill;
-        }
         var fRt = fill.rectTransform;
         fRt.anchorMin = new Vector2(0f, 0f);
         fRt.anchorMax = new Vector2(1f, 1f);
@@ -765,8 +785,8 @@ public sealed class UI_Settings : MonoBehaviour
         rt.anchoredPosition = pos;
         rt.sizeDelta = size;
 
-        var caption = NewLabel("Label", bg.transform, string.Empty, 22f, LabelColor,
-                               Vector2.zero, size, TextAlignmentOptions.Center);
+        var caption = ThinLabel("Label", bg.transform, string.Empty, BodySize, UIWeight.Regular, LabelColor,
+                                Vector2.zero, size, TextAlignmentOptions.Center);
         if (skin?.dropdownArrow != null)
         {
             var arrow = NewImage("Arrow", bg.transform, Color.white);
@@ -834,8 +854,8 @@ public sealed class UI_Settings : MonoBehaviour
         chRt.anchoredPosition = new Vector2(16f, 0f);
         chRt.sizeDelta = new Vector2(12f, 12f);
 
-        var itemLabel = NewLabel("Item Label", item.transform, string.Empty, 20f, LabelColor,
-                                 Vector2.zero, Vector2.zero, TextAlignmentOptions.Left);
+        var itemLabel = ThinLabel("Item Label", item.transform, string.Empty, BodySize, UIWeight.Regular, LabelColor,
+                                  Vector2.zero, Vector2.zero, TextAlignmentOptions.Left);
         var ilRt = itemLabel.rectTransform;
         ilRt.anchorMin = Vector2.zero;
         ilRt.anchorMax = Vector2.one;
@@ -891,6 +911,7 @@ public sealed class UI_Settings : MonoBehaviour
         Managers.Sound?.SetEffectVolume(v, save: false);
         SetValueText(_sfxValue, v);
         _volumeDirty = true;
+        _previewSfx  = true;
     }
 
     private void OnUiChanged(float v)
@@ -899,6 +920,7 @@ public sealed class UI_Settings : MonoBehaviour
         Managers.Sound?.SetUiVolume(v, save: false);
         SetValueText(_uiValue, v);
         _volumeDirty = true;
+        _previewUi   = true;
     }
 
     // 화면은 여기서 적용하지 않는다 — 고른 값만 담고, 실제 전환은 ConfirmInternal(「완료」)이 한다.
@@ -912,6 +934,7 @@ public sealed class UI_Settings : MonoBehaviour
 
     private void OnToggleWindowMode()
     {
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
         _fullscreen = !_fullscreen;
         UpdateWindowModeLabel();
     }
@@ -964,6 +987,7 @@ public sealed class UI_Settings : MonoBehaviour
 
     private void OnToggleVSync()
     {
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
         GraphicsQualitySettings.SetVSync(!GraphicsQualitySettings.VSync);
         UpdateVSyncRow();
         SyncPresetLabel();

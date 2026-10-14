@@ -5789,7 +5789,7 @@ MonoBehaviour:
   _patternFontSize: 44
   _patternDuration: 1.5
   _patternOffsetY: 200
-  _barkFontSize: 28
+  _barkFontSize: 32
   _barkDuration: 3.5
   _barkOffsetY: -220
   _phaseFontSize: 64

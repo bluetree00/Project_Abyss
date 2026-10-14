@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// 런 종료(사망/클리어) 사유·누적 횟수를 PlayerPrefs로 기록하고 BaseCamp 진입 시 소비한다.
@@ -6,9 +6,12 @@ using UnityEngine;
 /// </summary>
 public static class RunReturnTracker
 {
-    private const string ReasonKey     = "run_return_reason";
-    private const string DeathCountKey = "run_death_count";
-    private const string ClearCountKey = "run_clear_count";
+    // 슬롯별 — 0번은 예전 이름 그대로(기존 진행 보존), 1 · 2번은 꼬리표. 예전엔 전역이라 한 슬롯의 사망 수가 다른 슬롯의
+    // 멀린 이름 공개를 앞당기고, 한 슬롯의 복귀 사유를 다른 슬롯 거점이 소비했다(10-09 출시 점검).
+    private static string SlotTag => (RunProgressManager.Instance?.ActiveSlotIndex ?? 0) is var s && s > 0 ? "_s" + s : string.Empty;
+    private static string ReasonKey     => "run_return_reason" + SlotTag;
+    private static string DeathCountKey => "run_death_count" + SlotTag;
+    private static string ClearCountKey => "run_clear_count" + SlotTag;
 
     public enum Reason { None = 0, Death = 1, Clear = 2 }
 
@@ -31,7 +34,7 @@ public static class RunReturnTracker
         PlayerPrefs.Save();
     }
 
-    /// <summary>새 게임 시작 — 사유·누적 횟수를 전부 초기화한다. 이게 없으면 이전 플레이의
+    /// <summary>새 게임 시작 — 활성 슬롯의 사유·누적 횟수를 전부 초기화한다. 이게 없으면 이전 플레이의
     /// 사망/클리어 횟수가 남아 첫 복귀부터 반복 대사가 나온다.</summary>
     public static void ResetAll()
     {

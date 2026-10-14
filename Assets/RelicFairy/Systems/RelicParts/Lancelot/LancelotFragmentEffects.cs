@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using RelicFairy.Monster;
 using UnityEngine;
 
@@ -32,7 +32,7 @@ public abstract class LancelotFragment : RelicPartEffect
     protected virtual void Bind() { }
     protected virtual void Unbind() { }
 
-    protected float Atk => Hub != null ? Hub.Atk : 0f;
+    protected float Atk => Hub != null ? Hub.Atk * ImprintMul : 0f;   // × 이 조각 계열 각인 배율(10-14 A4)
     protected GameObject Owner => Player != null ? Player.gameObject : null;
 
     protected static MonsterBase AsMonster(GameObject go)
@@ -115,10 +115,11 @@ public sealed class LSplitOathEffect : LancelotFragment
     }
 }
 
-/// <summary>L2 피 냄새 — 광기 10+: 체력 30% 이하로 몰린 적을 처치하면 2초 동안 광기가 줄지 않는다 · ② 그 적의 낙인이 가장 가까운 적에게 · ③ 넘치면 원한.</summary>
+/// <summary>L2 피 냄새 — 광기 10+: 체력 30% 이하로 몰린 적을 처치하면 5초 동안 광기가 줄지 않는다 · ② 그 적의 낙인이 가장 가까운 적에게 · ③ 넘치면 원한.</summary>
 public sealed class LBloodScentEffect : LancelotFragment
 {
-    private const float LowHp = 0.3f, Hold = 2f, TransferRadius = 6f;
+    // 감쇠는 마지막 적중 3초 뒤에야 시작한다 — 처치 뒤 2초 정지는 처치 타가 마지막 적중을 갱신해 아무것도 안 바꿨다(10-12 B1) → 유예 3초 + 2초
+    private const float LowHp = 0.3f, Hold = 5f, TransferRadius = 6f;
     private readonly HashSet<int> _wounded = new();
     public LBloodScentEffect() : base("l_blood_scent") { }
     public override void OnHit(in HitInfo hit, PlayerController player)
@@ -204,7 +205,7 @@ public sealed class LBlackAfterimageEffect : LancelotFragment
             Cut(e.target, e.dmg * EchoRatio);
             if (Line2) Hub.AddBrand(e.target, 1, overflowToGrudge: false, ignoreGap: true);
         }
-        if (hits > 0) Debug.Log($"[LancelotMemory] 검은 잔상 {which} — 되풀이 {hits}체 · 피해 {EchoRatio:P0}");
+        if (hits > 0) RFLog.D($"[LancelotMemory] 검은 잔상 {which} — 되풀이 {hits}체 · 피해 {EchoRatio:P0}");
     }
 }
 
@@ -251,7 +252,7 @@ public sealed class LBetrayerStepEffect : LancelotFragment
         _mark = null;
         Cut(mb, Atk * SlashRatio, 2);
         Say(mb.transform.position, "배신의 일격");
-        Debug.Log($"[LancelotMemory] 배신자의 걸음 ② — 그림자 베기 {mb.name} · {Atk * SlashRatio:0}");
+        RFLog.D($"[LancelotMemory] 배신자의 걸음 ② — 그림자 베기 {mb.name} · {Atk * SlashRatio:0}");
     }
 }
 
@@ -268,7 +269,7 @@ public sealed class LTornOathBladeEffect : LancelotFragment
     {
         if (no % 4 != 0 || !Hub.AtRung(3)) return;
         Vector3 pos = Player.transform.position;
-        Vector3 fwd = Player.transform.forward; fwd.y = 0f;
+        Vector3 fwd = Player.AimForward; fwd.y = 0f;   // 본 Q와 같은 조준 — 돌아선 직후 옛 방향을 보던 것(10-13)
         if (fwd.sqrMagnitude < 0.001f) return;
         fwd.Normalize();
         bool circle = Line3 && Hub.Grudge != null && Hub.Grudge.Value >= 1;
@@ -277,6 +278,7 @@ public sealed class LTornOathBladeEffect : LancelotFragment
         {
             targets = Near(pos, CircleRadius, Owner, 16);
             ElementVfxPlayer.PlayBurst(RuneElement.Dark, pos, 2f);   // 판정 3 m — 어둠 폭발은 같은 크기면 화면을 덮는다
+            SkillRangeRing.Circle(pos, CircleRadius);                 // 그래서 판정 둘레는 얇은 원으로(10-13 이펙트 = 판정)
         }
         else
         {
@@ -284,7 +286,7 @@ public sealed class LTornOathBladeEffect : LancelotFragment
             Scratch.Clear();
             for (int i = 0; i < n; i++) if (Buf[i] != null) Scratch.Add(Buf[i]);
             targets = Scratch;
-            RelicStateVfx.PlayOneShot(LancelotMemoryHub.SlashVfxKey, pos + fwd * 1.6f + Vector3.up * 0.7f, 0.3f, fwd, 1.2f);
+            RelicStateVfx.PlayOneShot(LancelotMemoryHub.SlashVfxKey, pos + fwd * 1.6f + Vector3.up * 0.7f, 0.12f, fwd, 1.2f);   // 콘 4 m에 맞춤(10-13 실측 0.3 → 앞 8 m · 0.13 → 옆 1.31배)
         }
         int torn = 0, cut = 0;
         var list = new List<MonsterBase>(targets);
@@ -318,7 +320,7 @@ public sealed class LMadnessEyeEffect : LancelotFragment
         if (!Line3 || mb == null || added <= 0) return;
         if (LancelotMemoryHub.BrandOf(mb) < Hub.BrandCap) return;
         if (_primed.Count > 128) _primed.Clear();
-        if (_primed.Add(mb.GetInstanceID())) ElementVfxPlayer.PlayBurst(RuneElement.Fire, mb.transform.position, 0.8f);   // 붉게 빛난다
+        _primed.Add(mb.GetInstanceID());   // 상한 찬 적 — 표시는 체력바 맥동(83 · 10-13), 불 폭발은 뺐다(S10)
     }
     public override void OnHit(in HitInfo hit, PlayerController player)
     {
@@ -419,6 +421,7 @@ public sealed class LMadnessCrownEffect : LancelotFragment
         if (Line3 && Hub.Grudge != null && Hub.Grudge.TrySpend(2) && Hub.Relic != null)
         {
             Say(me + Vector3.up * 0.4f, "왕관의 심판");
+            Hub.SkipGrudgeNextJudgment = true;   // 원한 2개는 위에서 썼다 — 이 심판이 남은 원한까지 다 쓰지 않게(10-12 D3 · 글 「원한 2개를 써서」)
             Hub.Relic.PerformJudgmentStrike(Player.transform, 0, 1, LancelotMadnessRelic.InstantJudgmentShare);   // 한 방짜리 심판(막타 몫 · 광란의 심판 횟수는 쓰지 않는다)
         }
     }
@@ -539,7 +542,7 @@ public sealed class LFrenzyStepEffect : LancelotFragment
         }
         _trail.Clear();
         if (lines > 0) Say(Player.transform.position, "궤적이 베인다");
-        Debug.Log($"[LancelotMemory] 광란의 걸음 ③ — 궤적 {lines}줄 · 적중 {hits}");
+        RFLog.D($"[LancelotMemory] 광란의 걸음 ③ — 궤적 {lines}줄 · 적중 {hits}");
     }
 }
 
@@ -658,6 +661,7 @@ public sealed class LGrudgeBladeEffect : LancelotFragment
                 KnockbackMultiplier = 0.3f,
                 HitPoint            = at + Vector3.up * 1.2f,
                 SourcePosition      = pos,
+                SkipHitVfx          = true,   // 위에서 베기 이펙트를 직접 띄운다 — 공용 히트 VFX까지 떠 한 타에 둘이었다(10-08)
             });
         }
         if (n > 0) Say(pos, "원한의 칼날");
@@ -697,11 +701,11 @@ public sealed class LBetrayerBrandEffect : LancelotFragment
         var st = RelicMarkStatus.Of(mb.gameObject, false);
         int b = st != null ? st.ConsumeBrand() : 0;
         Vector3 at = mb.transform.position;
-        ElementVfxPlayer.PlayBurst(RuneElement.Dark, at, 1.5f);
+        ElementVfxPlayer.PlayBurst(RuneElement.Dark, at, 1f);   // 처형은 한 명 — 면적 폭발이 광역으로 읽혔다(10-13)
         mb.TakeDamage(mb.CurrentHp * 10f, player.gameObject, 0.3f);   // 처형(오버킬)
         if (b > 0) Hub.SaveGrudge(b);
         Say(at, "처형");
-        Debug.Log($"[LancelotMemory] 배신자의 낙인 — 처형 {mb.name} · 낙인 {b} → 원한");
+        RFLog.D($"[LancelotMemory] 배신자의 낙인 — 처형 {mb.name} · 낙인 {b} → 원한");
         if (Line2 && _cracks.Count < MaxCracks)
         {
             _cracks.Add(new Crack { at = at, until = Time.time + CrackLife, nextVfx = Time.time + 1f });
@@ -788,5 +792,59 @@ public sealed class LSecondJudgmentEffect : LancelotFragment
         if (Hub == null || Hub.Relic == null || !Hub.IsFrenzy || player == null) return;
         _pendingSecond = true;
         Hub.Relic.PerformJudgmentStrike(player.transform, 0, 1, LancelotMadnessRelic.InstantJudgmentShare);
+    }
+}
+
+/// <summary>
+/// L17 표적의 낙인(사격 · 10-14 A5) — 광기 10부터 같은 적을 원거리로 3번 이어 맞히면 낙인 +1 · ② 그 셋째가 치명이면 +2 ·
+/// ③ 낙인 상한 적을 원거리로 맞히면 낙인 1개를 찢는다(1초에 한 번). 원거리 적중의 광기는 이미 근접과 같다(패시브 OnAttackHit).
+/// </summary>
+public sealed class LQuarryBrandEffect : LancelotFragment
+{
+    private const int   Every = 3;
+    private const float TearGap = 1f;
+    private SameTargetStreak _streak;
+    private float _tearReadyAt;
+    public LQuarryBrandEffect() : base("l_quarry_brand") { }
+    protected override void Bind()   { _streak.Reset(); Hub.Hit += OnHubHit; }
+    protected override void Unbind() => Hub.Hit -= OnHubHit;
+    private void OnHubHit(HitInfo h)
+    {
+        if (!h.IsRanged || !Hub.AtRung(1)) return;
+        var mb = AsMonster(h.Target);
+        if (mb == null || mb.IsDead) return;
+        if (Line3 && Time.time >= _tearReadyAt && LancelotMemoryHub.BrandOf(mb) >= Hub.BrandCap)
+        {
+            _tearReadyAt = Time.time + TearGap;
+            Hub.Tear(mb, LancelotMemoryHub.TearCause.Fragment, 1);
+        }
+        if (!_streak.Hit(mb.gameObject, Time.time) || _streak.Count % Every != 0) return;
+        Hub.AddBrand(mb, Line2 && h.IsCritical ? 2 : 1, overflowToGrudge: true, ignoreGap: true);
+    }
+}
+
+/// <summary>
+/// L18 멀리서 내리는 심판(사격 · 10-14 A5) — 심판 막타 뒤 막타 방향으로 화살 줄기 1줄(12 m · 원한 참격파와 같은 피해) ·
+/// ② 줄기에 맞은 적 낙인 +1(다음 심판 준비 — 이번 심판의 찢기는 이미 끝났다) · ③ 줄기 3줄(18° 간격).
+/// </summary>
+public sealed class LDistantJudgmentEffect : LancelotFragment
+{
+    private const float Length = 12f;
+    public LDistantJudgmentEffect() : base("l_distant_judgment") { }
+    protected override void Bind()   => Hub.FinisherLanded += OnFinisher;
+    protected override void Unbind() => Hub.FinisherLanded -= OnFinisher;
+    private void OnFinisher(Vector3 pos, Vector3 fwd)
+    {
+        if (Player == null) return;
+        int lines = Line3 ? 3 : 1;
+        float dmg = Atk * LancelotMemoryHub.WaveAtkRatio;
+        for (int i = 0; i < lines; i++)
+        {
+            Vector3 dir = Quaternion.Euler(0f, (i - (lines - 1) * 0.5f) * LancelotMemoryHub.WaveSpreadDeg, 0f) * fwd;
+            Scratch.Clear();
+            Hub.Wave(pos, dir, Length, dmg, RuneElement.Dark, Scratch);
+            if (!Line2) continue;
+            foreach (var mb in Scratch) Hub.AddBrand(mb, 1, overflowToGrudge: false, ignoreGap: true);
+        }
     }
 }

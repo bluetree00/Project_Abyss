@@ -10,7 +10,7 @@ namespace RelicFairy.Monster
 /// <summary>
 /// 2페이지 전환 — 숲의 수호자 · 화룡 · 죽음의 기사 공용(09-28 설계 확정 §2).
 /// 1페이지 체력이 다 깎이면(<see cref="BossPages.TransitionDue"/>) 강제 발동:
-///   휘청 → (첫 관람만) 로우 앵글 — 해방기 첫 전환이면 옛 봉인이 깨지는 각성 장면(<see cref="BossStoryScenes.AwakenAsync"/>)
+///   휘청 → (첫 관람만) 로우 앵글 — 해방기 첫 전환이면 멀린이 다시 건 봉인을 보스가 끊고 깨는 장면(<see cref="BossStoryScenes.ResealFailAsync"/> · 10-13)
 ///   → 전경 — 두 번째 체력바가 차오르고 무대가 바뀐다(<see cref="IPagedBoss.OnPageStageChange"/>)
 ///   → 포효 · 대사 → 플레이어 카메라로 복귀 → 2페이지(<see cref="IPagedBoss.OnPage2Entered"/>).
 /// 전환 내내 보스는 무적 · 제자리, 플레이어는 입력 잠금 + 잠깐 무적. 리치 전환 연출(LichPhase2EntryPatternSO)을 일반화했다.
@@ -23,6 +23,8 @@ public class BossPageTransitionPatternSO : BossPatternSO
     public string staggerState = "GetHit";
     public string chargeState  = "Idle";
     public string roarState    = "";
+    [Tooltip("힘 모으기 모션이 루프 클립이 아니면 끝 자세로 굳는다 — 끝나면 이 상태를 처음부터 되풀이(비우면 그대로)")]
+    public string chargeLoopState = "";
     [Tooltip("포효 모션 속도 배율")]
     public float  roarSpeed    = 1f;
 
@@ -84,6 +86,7 @@ public sealed class BossPageTransitionState : SpecialStateBase
     private readonly BossPageTransitionPatternSO _data;
     private CancellationTokenSource _cts;
     private bool _done;
+    private bool _charging;
 
     public BossPageTransitionState(BossPageTransitionPatternSO data) { _data = data; }
 
@@ -93,6 +96,7 @@ public sealed class BossPageTransitionState : SpecialStateBase
     public override void Enter(MonsterContext ctx)
     {
         _done = false;
+        _charging = false;
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
         {
             ctx.Agent.isStopped = true;
@@ -109,6 +113,7 @@ public sealed class BossPageTransitionState : SpecialStateBase
 
     public override void Update(MonsterContext ctx)
     {
+        KeepCharging(ctx);
         if (!_done) return;
         _done = false;
         (ctx.Monster as IPagedBoss)?.ReturnToCombat();
@@ -123,8 +128,22 @@ public sealed class BossPageTransitionState : SpecialStateBase
         _cts?.Cancel();
     }
 
+    /// <summary>
+    /// 힘 모으기 모션이 루프 클립이 아니면 끝 자세로 굳는다(10-06 연출 점검: 숲 MagicAttackS 끝 프레임으로 약 4초) —
+    /// 끝나면 <see cref="BossPageTransitionPatternSO.chargeLoopState"/>를 처음부터 되풀이한다(숲 브레스 루프와 같은 방식).
+    /// </summary>
+    private void KeepCharging(MonsterContext ctx)
+    {
+        string loop = _data.chargeLoopState;
+        if (!_charging || string.IsNullOrEmpty(loop) || ctx.Animator == null || ctx.Animator.IsInTransition(0)) return;
+        var si = ctx.Animator.GetCurrentAnimatorStateInfo(0);
+        if (si.normalizedTime < 1f) return;
+        if (si.IsName(loop))                   ctx.Animator.Play(loop, 0, 0f);
+        else if (si.IsName(_data.chargeState)) Play(ctx, loop, 1f);
+    }
+
     private float TotalSeconds(bool full, bool awaken)
-        => _data.staggerSeconds + (full ? _data.lowShotSeconds + (awaken ? BossStoryScenes.AwakenSeconds : _data.lowShotHold) : 0f)
+        => _data.staggerSeconds + (full ? _data.lowShotSeconds + (awaken ? BossStoryScenes.ResealSeconds : _data.lowShotHold) : 0f)
            + _data.refillSeconds + _data.roarHoldSeconds + 0.8f;
 
     private async UniTaskVoid CinematicAsync(MonsterContext ctx, CancellationToken ct)
@@ -134,7 +153,9 @@ public sealed class BossPageTransitionState : SpecialStateBase
         var  player = ctx.Runtime.PlayerTarget;
         string bossId = paged?.StoryBossId;
         bool awaken = BossStoryScenes.IsAwakenDue(bossId);        // 해방기 첫 전환(계정 1회) — 옛 봉인이 깨진다
-        bool full   = s_seen.Add(_data.name) || awaken;
+        // 첫 관람 기준 = 계정 · 시기마다(이야기 전투) — 세션 기준(s_seen)은 앱을 켤 때마다 다시 길게 나왔다(10-14 리서치 G12)
+        bool full   = (BossStoryScenes.IsFirstPageView(bossId) ?? s_seen.Add(_data.name)) || awaken;
+        bool musicOut = false;
         bool camera = false;
 
         pc?.SetInputEnabled(false);
@@ -153,7 +174,10 @@ public sealed class BossPageTransitionState : SpecialStateBase
             LichCinematics.TakeCamera();
             camera = true;
             LichCinematics.LetterboxUnderHudAsync(ct).Forget();
+            BossStoryScenes.PageMusicOut(bossId);   // 정적 속에 다시 봉인 · 깨뜨림 → 포효에서 보스 곡을 처음부터(10-14)
+            musicOut = true;
             Play(ctx, _data.chargeState, 1f);
+            _charging = true;
 
             Vector3 B   = ctx.Transform.position;
             Vector3 dir = player != null ? player.position - B : ctx.Transform.forward;
@@ -170,7 +194,7 @@ public sealed class BossPageTransitionState : SpecialStateBase
                     ? BossStoryScenes.AwakenShot(bossId, B, dir)
                     : ClearShot(look, B + dir * 4.5f + side * 1.2f + Vector3.up * 0.6f, look);
                 await LichCinematics.ShotAsync(lowPos, lowLook, _data.lowShotSeconds, ct);
-                if (awaken) await BossStoryScenes.AwakenAsync(ctx.Transform, bossId, _data.bodyHeight, ct);
+                if (awaken) await BossStoryScenes.ResealFailAsync(ctx.Monster, bossId, ct);   // 다시 봉인 → 보스가 깬다(10-13 사용자)
                 else        await UniTask.Delay(TimeSpan.FromSeconds(_data.lowShotHold), DelayType.UnscaledDeltaTime, cancellationToken: ct);
             }
 
@@ -186,6 +210,7 @@ public sealed class BossPageTransitionState : SpecialStateBase
             Vector3 roarLook = R + Vector3.up * _data.bodyHeight;
             var (roarPos, roarAt) = ClearShot(roarLook, R + dir * _data.roarDistance + side * 2f + Vector3.up * _data.roarHeight, roarLook);
             LichCinematics.ShotAsync(roarPos, roarAt, 0.6f, ct).Forget();
+            _charging = false;
             Play(ctx, _data.roarState, _data.roarSpeed);
             if (_data.roarVfxPrefab != null)
             {
@@ -197,6 +222,8 @@ public sealed class BossPageTransitionState : SpecialStateBase
             if (_data.roarSfx != null) Managers.Sound?.PlayEffectAt(_data.roarSfx, R);
             LichCinematics.Chroma(0.55f, 0.5f);
             LichCinematics.SlowMo(0.5f, 0.3f);
+            BossStoryScenes.PageMusicIn(bossId);
+            musicOut = false;
             if (string.IsNullOrEmpty(_data.dialogueKey) || !UI_BossBark.ShowDialogue(_data.dialogueKey, BossBarkType.PhaseAnnounce))
                 if (!string.IsNullOrEmpty(_data.fallbackLine)) UI_BossBark.Show(_data.fallbackLine, BossBarkType.PhaseAnnounce);
             await UniTask.Delay(TimeSpan.FromSeconds(_data.roarHoldSeconds), DelayType.UnscaledDeltaTime, cancellationToken: ct);
@@ -204,6 +231,7 @@ public sealed class BossPageTransitionState : SpecialStateBase
             // ⑤ 복귀 — 2페이지.
             paged?.Pages?.CompleteTransition();
             paged?.OnPage2Entered();
+            BossStoryScenes.MarkPageViewSeen(bossId);
             LichCinematics.LetterboxOutAsync(ct).Forget();
             if (player != null) await LichCinematics.ReturnToPlayerAsync(player, ct);
             camera = false;
@@ -215,7 +243,9 @@ public sealed class BossPageTransitionState : SpecialStateBase
             if (camera && player != null) LichCinematics.ReturnToPlayerAsync(player, CancellationToken.None).Forget();
             LichCinematics.LetterboxOutAsync(CancellationToken.None).Forget();
             LichCinematics.BossCutsceneHud(false);
+            if (musicOut) BossStoryScenes.PageMusicIn(bossId);   // 중간에 끊겨도 보스 곡이 꺼진 채 남지 않게
             if (pc != null) pc.SetInputEnabled(true);
+            _charging = false;
             _done = true;
         }
     }
@@ -225,27 +255,50 @@ public sealed class BossPageTransitionState : SpecialStateBase
     /// (시선도 같이 돈다). 어디나 막히면 원래 방향에서 막힌 곳 바로 앞으로 당긴다.
     /// 09-28 실측: 숲이 아레나 가장자리에서 전환하자 전경 카메라(보스 뒤 10 m)가 벽 너머 덤불 속에 들어가 화면 절반을 가렸다.
     /// </summary>
-    internal static (Vector3 pos, Vector3 look) ClearShot(Vector3 body, Vector3 desired, Vector3 look)
+    private const float CameraClearance = 1.5f;   // 끝 장면 카메라 둘레 여유(벽 · 기둥이 화면을 덮지 않게)
+
+    internal static (Vector3 pos, Vector3 look) ClearShot(Vector3 body, Vector3 desired, Vector3 look, float radius = 0f)
     {
         int mask = ~LayerMask.GetMask("Player", "Monster", "MonsterHit", "UI", "Ignore Raycast");
         Vector3 off = desired - body, lookOff = look - body;
+        (Vector3 pos, Vector3 look)? tight = null;   // 선은 트였지만 카메라 바로 옆에 벽 · 기둥이 있는 자리 — 더 나은 자리가 없을 때만
         for (int i = 0; i < 8; i++)
         {
             float yaw = (i % 2 == 1 ? 1f : -1f) * 45f * ((i + 1) / 2);   // 0, +45, −45, +90, −90, …
             var   rot = Quaternion.Euler(0f, yaw, 0f);
             Vector3 cand = body + rot * off;
-            if (!Physics.Linecast(body, cand, mask, QueryTriggerInteraction.Ignore)) return (cand, body + rot * lookOff);
+            if (!IsClear(body, cand, radius, mask)) continue;
+            // 몸 크기를 넘긴 샷(끝 장면)은 카메라 둘레도 비어 있는 자리를 먼저 — 바로 옆 기둥이 화면 절반을 덮었다(10-14 실측)
+            if (radius <= 0f || !Physics.CheckSphere(cand, CameraClearance, mask, QueryTriggerInteraction.Ignore)) return (cand, body + rot * lookOff);
+            tight ??= (cand, body + rot * lookOff);
         }
+        if (tight.HasValue) return tight.Value;
         return Physics.Linecast(body, desired, out var hit, mask, QueryTriggerInteraction.Ignore)
             ? (hit.point - off.normalized * 0.6f, look)
             : (desired, look);
     }
 
     /// <summary>
+    /// 몸 가운데에서 카메라까지 트였는가 — <paramref name="radius"/>가 있으면 화면 기준 좌우 · 위로 그만큼 떨어진 세 점도
+    /// (10-14 실측: 가운데는 트이고 화룡 머리가 기둥 뒤였다).
+    /// </summary>
+    private static bool IsClear(Vector3 body, Vector3 cam, float radius, int mask)
+    {
+        if (Physics.Linecast(body, cam, mask, QueryTriggerInteraction.Ignore)) return false;
+        if (radius <= 0f) return true;
+        Vector3 f = cam - body;
+        f.y = 0f;
+        Vector3 right = f.sqrMagnitude > 0.01f ? Vector3.Cross(Vector3.up, f.normalized) : Vector3.right;
+        return !Physics.Linecast(body + right * radius, cam, mask, QueryTriggerInteraction.Ignore)
+            && !Physics.Linecast(body - right * radius, cam, mask, QueryTriggerInteraction.Ignore)
+            && !Physics.Linecast(body + Vector3.up * radius * 0.6f, cam, mask, QueryTriggerInteraction.Ignore);
+    }
+
+    /// <summary>
     /// 포효 이펙트 톤 — 굴절층(URP에서 흰 덩어리로 뜬다)을 끄고, 빛깔이 있으면 입힌다.
     /// 10-01 f5 전주기 시뮬: 기사 포효(SSEP 27)의 자홍 칼날 조각이 화면을 덮고 가운데가 흰 빛 덩어리로 날았다.
     /// </summary>
-    private static void ToneRoarVfx(GameObject fx, Color tint)
+    internal static void ToneRoarVfx(GameObject fx, Color tint)
     {
         foreach (var r in fx.GetComponentsInChildren<Renderer>(true))
         {

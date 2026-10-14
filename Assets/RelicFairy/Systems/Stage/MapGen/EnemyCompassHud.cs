@@ -28,6 +28,7 @@ public sealed class EnemyCompassHud : MonoBehaviour
     private const float BottomBand      = 300f;   // 아래 = 무기 칸 · 체력 · 스킬 칸 자리
     private const float BossArrowGap    = 46f;
     private const float PlayerClearX    = 210f;   // 보스가 카메라 뒤(아래)일 때 배지를 캐릭터 옆으로 비키는 거리
+    private const float DistFontSize    = 20f;    // 거리 글자 — 크기 그대로, 서체만 Noto Medium(10-11 톤 v2 · 비교 리서치 A §3-4 P3)
 
     private static readonly Color EnemyInk = new(1f, 0.45f, 0.32f, 1f);
     private static readonly Color BossInk  = new(1f, 0.30f, 0.26f, 1f);
@@ -73,7 +74,8 @@ public sealed class EnemyCompassHud : MonoBehaviour
     {
         var player = Managers.Player?.PlayerTransform;
         if (_cam == null) _cam = Camera.main;
-        bool live = player != null && _cam != null && !UIInputGate.Blocked;
+        // 리치 추방 추락 동안은 걷는다(10-12) — 이 나침반은 @HUD 숨김 밖(자기 캔버스)이라 따로 본다
+        bool live = player != null && _cam != null && !UIInputGate.Blocked && !ExileFallSequence.IsActive;
         float dt = Time.unscaledDeltaTime;
         float arrowTarget = 0f, bossTarget = 0f;
 
@@ -211,6 +213,8 @@ public sealed class EnemyCompassHud : MonoBehaviour
         _bossImage.texture = icon;
         _bossImage.enabled = icon != null;
         _bossGlyph.enabled = icon == null;   // 아이콘이 없는 보스는 붉은 ◆로
+        // 거리 글자 — 배지가 처음 뜰 때 바른다(Build는 톤 v2 글꼴이 올라오기 전일 수 있다). 화살표 · ◆ 기호는 기본 글꼴 그대로.
+        UITheme.StyleThinText(_bossDist, UIWeight.Medium, DistFontSize, DistInk, shadow: true);
     }
 
     /// <summary>자기 캔버스(1920×1080 · Match 0.5) — HUD 표식 층. 레이캐스터가 없어 클릭을 받지 않는다.</summary>
@@ -257,7 +261,7 @@ public sealed class EnemyCompassHud : MonoBehaviour
         _bossGlyph.rectTransform.sizeDelta = new Vector2(BossIconSize, BossIconSize);
         _bossGlyph.enabled = false;
 
-        _bossDist = MakeText(_boss, "Dist", 20f, DistInk, out _);
+        _bossDist = MakeText(_boss, "Dist", DistFontSize, DistInk, out _);
         _bossDist.rectTransform.anchoredPosition = new Vector2(0f, -(BossIconSize * 0.5f + 14f));
         _bossDist.rectTransform.sizeDelta = new Vector2(120f, 26f);
 

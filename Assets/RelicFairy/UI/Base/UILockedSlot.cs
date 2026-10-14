@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// 드래프트 화면의 <b>잠긴 자리</b>. 해금하면 여기에 후보가 하나 더 놓인다는 것을 미리 보여준다.
@@ -14,6 +15,8 @@ using UnityEngine;
 ///
 /// <para><b>조용해야 한다</b> — 진짜 카드와 경쟁하면 고르는 일을 방해한다. 그래서 테두리만 흐리게 남기고
 /// 채움은 거의 투명하며, 클릭도 받지 않는다(<c>raycastTarget = false</c>).</para>
+///
+/// <para>10-13 Artsystack — 「잠긴 자리」 글자 대신 자물쇠(lock_1 · 잉크 60%). 테는 코드 그대로. 그림이 없으면 글자.</para>
 /// </summary>
 public static class UILockedSlot
 {
@@ -22,6 +25,7 @@ public static class UILockedSlot
     private static readonly Color Fill    = new(0.06f, 0.05f, 0.04f, 0.35f);
     private static readonly Color Ink     = new(0.62f, 0.57f, 0.47f, 0.75f);
     private static readonly Color InkDim  = new(0.52f, 0.47f, 0.39f, 0.60f);
+    private const float LockSize = 36f;
 
     /// <summary>
     /// 잠긴 자리 한 칸을 만든다. 위치·크기는 진짜 카드와 <b>같은 규칙</b>으로 넘겨야
@@ -36,13 +40,28 @@ public static class UILockedSlot
         ShopUIStyle.Anchor(rt,
             new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), pos, size);
 
-        var title = ShopUIStyle.MakeText(frame.transform, "LockTitle", 20f, FontStyles.Bold,
-                                         TextAlignmentOptions.Center, Ink);
-        title.text = "잠긴 자리";
-        title.raycastTarget = false;
-        ShopUIStyle.Anchor(title.rectTransform,
-            new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f),
-            new Vector2(0f, 12f), new Vector2(0f, 26f));
+        var lockArt = UISkin.Achievement != null ? UISkin.Achievement.AltarLock : null;
+        if (lockArt != null)
+        {
+            var icon = new GameObject("LockIcon", typeof(RectTransform), typeof(CanvasRenderer)).AddComponent<Image>();
+            icon.transform.SetParent(frame.transform, false);
+            icon.sprite = lockArt;
+            icon.color  = UITheme.Thin.InkA(0.6f);
+            icon.preserveAspect = true;
+            icon.raycastTarget  = false;
+            var c = new Vector2(0.5f, 0.5f);
+            ShopUIStyle.Anchor(icon.rectTransform, c, c, c, new Vector2(0f, 18f), new Vector2(LockSize, LockSize));
+        }
+        else
+        {
+            var title = ShopUIStyle.MakeText(frame.transform, "LockTitle", 20f, FontStyles.Bold,
+                                             TextAlignmentOptions.Center, Ink);
+            title.text = "잠긴 자리";
+            title.raycastTarget = false;
+            ShopUIStyle.Anchor(title.rectTransform,
+                new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(0f, 12f), new Vector2(0f, 26f));
+        }
 
         var sub = ShopUIStyle.MakeText(frame.transform, "LockCaption", 16f, FontStyles.Normal,   // 가독성 하한 16(09-26, 14였다)
                                        TextAlignmentOptions.Center, InkDim);

@@ -8,8 +8,12 @@ using UnityEngine;
 /// </summary>
 public class SalamanderFlameBreathState : MovementLockedState<SalamanderBreathData>
 {
+    private const float BreathLead = 0.6f;   // 예고 — 불 혀가 판정 끝 가까이 닿는 때(10-13 이펙트 = 판정)
+
     private float _breathTimer;
     private float _tickTimer;
+    private MonsterTelegraph _telegraph;
+    private GameObject _vfx;
 
     public SalamanderFlameBreathState(SalamanderBreathData data) : base(data) { }
 
@@ -18,13 +22,14 @@ public class SalamanderFlameBreathState : MovementLockedState<SalamanderBreathDa
         ctx.Agent.ResetPath();
         ctx.Agent.velocity = Vector3.zero;
 
-        _breathTimer = Data.breathDuration;
-        _tickTimer   = 0f;
+        _breathTimer = Data.breathDuration + BreathLead;
+        _tickTimer   = BreathLead;
 
         if (ctx.Animator != null && !string.IsNullOrEmpty(Data.breathStateName))
             ctx.Animator.CrossFade(Data.breathStateName, 0.1f);
 
-        Data.SpawnVFX(ctx.Transform);
+        _vfx = Data.SpawnVFX(ctx.Transform);
+        _telegraph = MonsterTelegraph.Cone(ctx.Transform.position, ctx.Transform.forward, Data.breathRadius, Data.breathAngle * 0.5f, BreathLead, MonsterTelegraph.Heavy);
     }
 
     public override void Update(MonsterContext ctx)
@@ -35,6 +40,7 @@ public class SalamanderFlameBreathState : MovementLockedState<SalamanderBreathDa
         if (_tickTimer <= 0f)
         {
             _tickTimer = Data.damageTick;
+            _telegraph = null;   // 첫 피해까지 그렸다
             ApplyConeDamage(ctx);
         }
 
@@ -42,7 +48,14 @@ public class SalamanderFlameBreathState : MovementLockedState<SalamanderBreathDa
             ctx.Monster.ChangeState<ChaseState>();
     }
 
-    public override void Exit(MonsterContext ctx) { }
+    public override void Exit(MonsterContext ctx)
+    {
+        if (_telegraph != null) _telegraph.Cancel();   // 첫 피해 전에 끊겼다 — 헛예고를 지운다
+        _telegraph = null;
+        // 끊기거나 끝나면 불 뿜기를 멈춘다(남은 불꽃은 제 수명대로 사그라든다 · 오브젝트는 SpawnVFX가 지운다)
+        if (_vfx != null && _vfx.TryGetComponent<ParticleSystem>(out var ps)) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        _vfx = null;
+    }
 
     private void ApplyConeDamage(MonsterContext ctx)
     {
@@ -69,7 +82,7 @@ public class SalamanderFlameBreathState : MovementLockedState<SalamanderBreathDa
                 // 예전엔 넉백 0만 걸고 피해를 주지 않았다(플레이어가 맞아도 무해) — 성난 버섯 포자와 같은 방식으로 준다.
                 if (playerHit) continue;
                 playerHit = true;
-                player.TakeDamage(Mathf.RoundToInt(Data.breathDamage * ctx.Runtime.AttackMultiplier));
+                player.TakeDamage(Mathf.RoundToInt(Data.breathDamage * ctx.Runtime.AttackMultiplier), ctx.Transform.gameObject);
                 player.ApplyKnockback((player.transform.position - ctx.Transform.position).normalized * 3f, 0.3f);
                 continue;
             }

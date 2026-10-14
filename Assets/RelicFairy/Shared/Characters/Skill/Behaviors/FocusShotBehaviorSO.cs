@@ -3,12 +3,12 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
-/// 궁수의 집중 — 활 Q스킬.
-/// 1초간 차징 후 강한 화살을 발사한다.
-/// 티어에 따라 발사 수가 줄고 개당 데미지/이펙트가 강력해진다.
-///   1단계: 3발 발사
-///   2단계: 2발 발사 (더 강함)
-///   3단계: 1발 발사 (가장 강함)
+/// 궁수의 집중 — 활 R스킬.
+/// R을 누르고 있는 동안 모으고(최대 1초) 떼면 강한 화살을 발사한다.
+/// 티어에 따라 발사 수가 줄고 개당 데미지/이펙트가 강력해진다(공격력 몫은 줄어든 화살에 모인다).
+///   1단계: 3발 · 발당 30+공격력
+///   2단계: 2발 · 발당 50+공격력×1.5
+///   3단계: 1발 · 100+공격력×3 · 착탄 폭발
 /// </summary>
 [CreateAssetMenu(menuName = "Game/Skill/FocusShotBehavior")]
 public class FocusShotBehaviorSO : SkillBehaviorSO
@@ -69,12 +69,24 @@ public class FocusShotBehaviorSO : SkillBehaviorSO
     [Tooltip("발사 애니메이션 (비어있으면 QSkill_02)")]
     public string fireAnimationOverride;
 
+    // 10-08 C4(결정 S4): 누르고 있는 동안 모으고 떼면 쏜다. 다 모이면(chargeTime) 저절로 쏜다.
+    // 일찍 떼면 그만큼 약하게 — 최소 모음 MinCharge초(톡 친 입력이 헛방이 되지 않게) · 피해 MinChargeDamage ~ 1배.
+    private const float MinCharge       = 0.25f;
+    private const float MinChargeDamage = 0.5f;
+    // 10-08 강화 점검: 발수가 줄면 화살마다 붙던 공격력 몫도 같이 줄어, 단계가 오를수록 피해 합이 떨어졌다
+    // (공격력 18: 1단계 3×48 = 144 → 2단계 2×68 = 136). 공격력 몫은 1단계 발수(3발)어치를 남은 화살에 모은다.
+    private const float Tier1Shots = 3f;
+
     public override ISkillRuntime CreateRuntime() => new Runtime(this);
+
+    public override string StartSoundEvent => SoundEvent.SkillCharge;   // 시작음(10-08 A6)
 
     private class Runtime : ISkillRuntime
     {
         private readonly FocusShotBehaviorSO _data;
         private enum Phase { Charge, Fire, End }
+        private float _chargeMul = 1f;   // 모은 정도에 따른 피해 배율(C4)
+        private bool _exited;            // 충전 이펙트가 늦게 떴을 때 이미 끝난 시전인지
         private Phase _phase;
         private float _timer;
         private int _skillTier;
@@ -122,6 +134,8 @@ public class FocusShotBehaviorSO : SkillBehaviorSO
                     break;
             }
 
+            _damagePerArrow += ctx.CalculateDamage(0f) * (Tier1Shots / _totalShots - 1f);   // 공격력 몫을 모은다(2발 ×1.5 · 1발 ×3)
+
             _shotsFired = 0;
             _timer = 0f;
             _phase = Phase.Charge;
@@ -133,7 +147,7 @@ public class FocusShotBehaviorSO : SkillBehaviorSO
 
         public void OnUpdate(SkillExecutionContext ctx)
         {
-            _timer += Time.deltaTime;
+            _timer += ctx.DeltaTime;   // 애니메이터와 같은 시계(슬로모 — 10-09)
             switch (_phase)
             {
                 case Phase.Charge: UpdateCharge(ctx); break;
@@ -144,6 +158,7 @@ public class FocusShotBehaviorSO : SkillBehaviorSO
 
         public void OnExit(SkillExecutionContext ctx)
         {
+            _exited = true;
             ctx.SetMoveScale(1f);
             if (_chargeEffect != null && _chargeEffect.activeInHierarchy)
                 Managers.ObjectPooler.Despawn(_chargeEffect);
@@ -152,8 +167,11 @@ public class FocusShotBehaviorSO : SkillBehaviorSO
 
         private void UpdateCharge(SkillExecutionContext ctx)
         {
-            if (_timer >= _data.chargeTime)
+            bool released = !ctx.Controller.IsSkillButtonHeld(ctx.Slot);
+            if (_timer >= _data.chargeTime || (released && _timer >= MinCharge))
             {
+                float charge = Mathf.Clamp01(_timer / Mathf.Max(0.01f, _data.chargeTime));
+                _chargeMul = Mathf.Lerp(MinChargeDamage, 1f, charge);
                 // 차징 이펙트 제거
                 if (_chargeEffect != null && _chargeEffect.activeInHierarchy)
                     Managers.ObjectPooler.Despawn(_chargeEffect);
@@ -191,6 +209,7 @@ public class FocusShotBehaviorSO : SkillBehaviorSO
 
         private void UpdateEnd(SkillExecutionContext ctx)
         {
+            ctx.EnterRecovery();   // 후딜 — 회피로 끊을 수 있다 · 스탠스 해제(10-08 A2 · A4)
             if (_timer >= _data.endDelay)
                 ctx.RequestEnd();
         }
@@ -199,9 +218,8 @@ public class FocusShotBehaviorSO : SkillBehaviorSO
         {
             ctx.RotateToMouse();
 
-            var forward = ctx.PlayerTransform.forward;
-            forward.y = 0f;
-            forward.Normalize();
+            var forward = ctx.AimForward;   // 겨눈 방향(B3 — transform.forward는 한 박자 전 조준)
+            Managers.Sound?.PlayEvent(SoundEvent.PlayerShot);   // 발사음(A6)
 
             Vector3 firePos = ctx.PlayerTransform.position
                 + forward * _data.forwardOffset
@@ -215,7 +233,7 @@ public class FocusShotBehaviorSO : SkillBehaviorSO
             if (_skillTier >= 2 && !string.IsNullOrEmpty(_data.tier2ExtraMuzzleKey))
                 SpawnEffect(ctx, _data.tier2ExtraMuzzleKey, firePos, _data.tier2ExtraMuzzleScale, 1.5f);
 
-            SpawnArrow(ctx, firePos, forward, _damagePerArrow, _arrowScale);
+            SpawnArrow(ctx, firePos, forward, _damagePerArrow * _chargeMul, _arrowScale);   // 모은 만큼(C4)
             _shotsFired++;
         }
 
@@ -258,6 +276,8 @@ public class FocusShotBehaviorSO : SkillBehaviorSO
                 _data.chargeEffectKey, ObjectPoolerManager.PoolType.Effect,
                 ctx.PlayerTransform.position + Vector3.up * 1f, ctx.PlayerTransform.rotation);
             if (obj == null) return;
+            // 불러오는 사이 이미 쐈거나 끝났으면 바로 돌려놓는다 — 몸에 붙은 채 씬이 바뀔 때까지 남았다(10-09 출시 점검)
+            if (_exited || _phase != Phase.Charge || ctx.PlayerTransform == null) { Managers.ObjectPooler.Despawn(obj); return; }
             obj.transform.localScale = Vector3.one * _data.chargeEffectScale;
             obj.transform.SetParent(ctx.PlayerTransform, true);
             _chargeEffect = obj;

@@ -116,6 +116,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
 {
     private const string AnimGrab  = "GrabBiteShakeSpit";
     private const string AnimReady = "AttackReady";
+    private const float  GuideArmLead = 0.25f;   // 판정 이만큼 전 판정색(기사 칸과 같은 박자)
 
     private enum Phase { Windup, Hold, Recovery }
 
@@ -129,6 +130,8 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
     private bool             _throwDone;
     private PlayerController _heldPlayer;
     private Vector3          _bossForward;
+    private Vector3          _grabOrigin;
+    private bool             _armed;
     private GameObject       _warningGO;
     private bool             _grabAnimStarted;   // 예고(준비 자세) 뒤 손 뻗기 애니를 틀었나
 
@@ -167,6 +170,8 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
 
         FacePlayer(ctx);
         _bossForward = ctx.Transform.forward;
+        _grabOrigin  = ctx.Transform.position;   // 예고 자리 = 판정 원점(루트 모션으로 몸이 밀려도)
+        _armed       = false;
 
         // Generic 리그 손 본 캐시 (뼈 이름은 FBX skeleton 기준)
         _rightHandBone = FindBone(ctx.Animator.transform, "TreantRPalm");
@@ -190,9 +195,15 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
             {
                 // 가이드 채우기 — 예고(준비 자세) + 손 뻗기. 다 차는 순간이 잡기 판정(그 순간 치운다)
                 float lead  = Mathf.Max(0f, Data.grabWarnLead);
-                float total = lead + Data.grabTime;
+                // 예고(시작부터 자리 고정) → 잡기는 실제 시간으로 0.45초 이상 — 배속(×1.2)이 0.5초를 0.417초로 줄였다(10-13 검증)
+                float total = Mathf.Max(lead + Data.grabTime, PatternGuideHelper.MinLead * SpeedMult(ctx));
                 if (total > 0f)
                     PatternGuideHelper.SetProgress(_warningGO, _timer / total);
+                if (!_armed && _timer >= total - GuideArmLead * SpeedMult(ctx))
+                {
+                    _armed = true;
+                    PatternGuideHelper.Arm(_warningGO);   // 판정 0.25초 전 판정색
+                }
                 if (!_grabAnimStarted && _timer >= lead)
                 {
                     _grabAnimStarted = true;
@@ -313,7 +324,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
     {
         if (ctx.Runtime.PlayerTarget == null) return;
 
-        Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+        Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - _grabOrigin;
         toPlayer.y = 0f;
 
         if (toPlayer.sqrMagnitude > Data.range * Data.range) return;
@@ -324,7 +335,8 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
         // 회피 무적(저스트 회피 창 포함) 중이면 손이 빗나간다 — 다른 공격과 같은 규칙(10-01)
-        if (player.IsInvincible) return;
+        // 대시 중(저스트 회피 장전 · 아직 미발동)도 다른 공격처럼 저스트 회피로 흘린다 — 잡기만 대시를 무시했다(10-08 점검)
+        if (player.IsInvincible || player.TryEvadeHit(ctx.Monster.gameObject)) return;
 
         _grabbed     = true;
         _wasGrabbed  = true;
@@ -396,16 +408,16 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
     {
         if (_heldPlayer == null) return;
 
+        // 던지기 피해는 잡힘 해제 <b>후</b> 판정돼야 날아가는 자세가 정상 발동한다 — 먼저 풀고 피해를 넣는다.
+        // 예전엔 붙들린 채 TakeDamage가 먼저 돌아 던지기 날아감(포이즈)이 늘 막혔다(10-08 점검)
+        _heldPlayer.SetGrabbed(false);
+        _heldPlayer.SetMoveScale(1f);
+
         if (ctx.Config?.stat != null)
         {
             int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.throwDamageMultiplier));
             _heldPlayer.TakeDamage(dmg, ctx.Monster.gameObject, false, HitWeight.Heavy);   // 던지기 — 강
         }
-
-        // 던지기 피해는 잡힘 해제 <b>후</b> 판정돼야 날아가는 자세가 정상 발동한다 —
-        // 위 TakeDamage는 아직 붙들린 상태로 처리하고, 여기서 풀며 던진다.
-        _heldPlayer.SetGrabbed(false);
-        _heldPlayer.SetMoveScale(1f);
 
         // Rigidbody velocity 직접 설정 — ApplyKnockback의 _knockbackTimer도 함께 설정해
         // PlayerController 이동 로직이 velocity를 덮어쓰지 않도록 보장

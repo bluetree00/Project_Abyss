@@ -19,6 +19,10 @@ public sealed class ServiceNpcReactor : MonoBehaviour
     private const string BodyName        = "Body";   // NPC 프리팹 규약 — 몸(모델)은 루트의 자식 「Body」
     private const float CrossFadeSeconds = 0.18f;
     private const float OneShotEnd       = 0.92f;   // 한 번 하는 몸짓이 이만큼 지나면 대기로 돌린다
+    private const float SightInterval    = 0.25f;   // 시야 검사 주기(초)
+    private const float SightHeight      = 1.3f;    // 눈높이 — 낮은 소품(통 · 상자)에는 안 가린다
+    private const float BehindMargin     = 30f;     // 돌아볼 수 있는 각도 + 이만큼 넘게 뒤면 돌아보지 않는다
+    private const int   SightMask        = 1 << 0 | 1 << 8;   // Default · Wall — 벽 너머는 못 본다
 
     // ── [SerializeField] ────────────────────────────────────
     [Header("거리(m) — 알아보기 · 떠났다고 보기")]
@@ -52,6 +56,8 @@ public sealed class ServiceNpcReactor : MonoBehaviour
     private bool       _talking;
     private float      _workTimer;
     private int        _oneShotHash;   // 지금 재생 중인 한 번 하는 몸짓(없으면 0)
+    private float      _sightTimer;
+    private bool       _canSee = true;
 
     // ── Properties ──────────────────────────────────────────
     /// <summary>반응이 일어날 때마다 — 애니메이터가 아닌 몸(수정 정령)·불꽃 같은 곁들이 연출이 받는다.</summary>
@@ -99,7 +105,7 @@ public sealed class ServiceNpcReactor : MonoBehaviour
             Fire(Reaction.Farewell, farewellState);
         }
 
-        Turn(_near || _talking ? to : Vector3.zero);
+        Turn(_talking || (_near && CanFace(to)) ? to : Vector3.zero);
         TickOneShot();
 
         if (_near || _talking || workInterval <= 0f || _oneShotHash != 0) return;
@@ -152,6 +158,25 @@ public sealed class ServiceNpcReactor : MonoBehaviour
         if (info.normalizedTime < OneShotEnd) return;
         _oneShotHash = 0;
         CrossFade(idleState);
+    }
+
+    /// <summary>
+    /// 돌아볼 만한가 — 플레이어가 등 뒤 깊숙이 있거나 벽 너머면 돌아보지 않고 제자리(정면)를 지킨다.
+    /// 예전엔 벽 너머 · 등 뒤의 플레이어 쪽으로도 한도까지 돌아서, 출구로 가는 플레이어를 따라 벽을 보고 섰다(10-10 사용자).
+    /// </summary>
+    private bool CanFace(Vector3 toPlayer)
+    {
+        if (toPlayer.sqrMagnitude < 0.01f) return false;
+        if (Vector3.Angle(_home * Vector3.forward, toPlayer) > maxTurn + BehindMargin) return false;
+        _sightTimer -= Time.deltaTime;
+        if (_sightTimer <= 0f)
+        {
+            _sightTimer = SightInterval;
+            Vector3 eye = _turnRoot.position + Vector3.up * SightHeight;
+            Vector3 target = _player.position + Vector3.up * SightHeight;
+            _canSee = !Physics.Linecast(eye, target, SightMask, QueryTriggerInteraction.Ignore);
+        }
+        return _canSee;
     }
 
     /// <summary>플레이어 쪽으로 돌아본다(처음 방향에서 <see cref="maxTurn"/>까지) — 멀어지면 처음 방향으로.</summary>

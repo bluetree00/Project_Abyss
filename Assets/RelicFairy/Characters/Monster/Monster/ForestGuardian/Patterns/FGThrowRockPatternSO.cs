@@ -7,7 +7,7 @@ namespace RelicFairy.Monster
 ///
 /// 흐름  : Windup(집어들기+조준) → PostThrow(비행 감시) → Recovery
 /// 타이밍: MagicAttack1 클립 전체 길이 기준. throwNormalizedTime 에 발사.
-/// 착지  : MonsterProjectile 소멸 감지 → 경고장판 즉시 제거 + 이펙트 생성.
+/// 착지  : MonsterProjectile 소멸 감지 → 경고장판 즉시 제거 + 원 안 피해(한 번) + 이펙트 생성.
 ///         타임아웃 안전망으로 _postThrowDuration 후에도 진행.
 /// </summary>
 [CreateAssetMenu(menuName = "RelicFairy/Boss/ForestGuardian/FG_ThrowRockPattern", fileName = "FG_ThrowRockPattern")]
@@ -123,6 +123,7 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     private const int FragmentCount = 3;
     private const float RockVanishSeconds = 0.5f;   // 던지기 전에 끊긴 바위가 디졸브로 꺼지는 시간(10-03)
     private const float PreLaunchWarn = 0.4f;   // 던지기 전에 착지 원을 먼저 깐다(초, 2페이즈 배속 적용 전)
+    private const float ArmLead = 0.25f;        // 착지 · 파편 판정 이만큼 전 판정색(기사 칸과 같은 박자)
 
     private Phase              _phase;
     private float              _timer;
@@ -140,6 +141,7 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     private Transform          _handBone;
     private bool               _grabbed;
     private bool               _landingWarned;   // 착지 원을 던지기 전에 깔았다 — 그 자리로 던진다
+    private bool               _rockArmed, _fragmentsArmed;
     private readonly GameObject[] _fragmentWarnings  = new GameObject[FragmentCount];
     private readonly Vector3[]    _fragmentPositions = new Vector3[FragmentCount];
     private float                 _fragmentTimer;
@@ -213,7 +215,8 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
                     LaunchRock(ctx);
                     // 비행 시간을 PostThrow 최소값으로 보장 (안전망)
                     float flightTime = Data.projectileSpeed > 0f ? _launchDist / Data.projectileSpeed : 0f;
-                    _postThrowDuration = Mathf.Max(_postThrowDuration, flightTime + 0.15f);
+                    // 비행은 실시간인데 이 타이머는 2페이즈 배속으로 흐른다 — 배속을 곱해야 돌이 닿기 전에 착지(피해)가 나지 않는다(10-08 점검)
+                    _postThrowDuration = Mathf.Max(_postThrowDuration, (flightTime + 0.15f) * SpeedMult(ctx));
                     _timer = 0f;
                     _phase = Phase.PostThrow;
                 }
@@ -225,6 +228,11 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
                 {
                     _warningGrowTimer += Time.deltaTime * SpeedMult(ctx);
                     PatternGuideHelper.SetProgress(_warningGO, _warningGrowTimer / _warningGrowDuration);
+                    if (!_rockArmed && _warningGrowTimer >= _warningGrowDuration - ArmLead * SpeedMult(ctx))
+                    {
+                        _rockArmed = true;
+                        PatternGuideHelper.Arm(_warningGO);   // 착지 직전 판정색(10-13 검증 — 예고색 그대로 사라졌다)
+                    }
                 }
 
                 // 투사체 소멸 감지 — Destroy 호출 직후 Unity null 체크가 true
@@ -252,6 +260,11 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
                     float ft = (_fragmentTimer - Data.fragmentWarningStartDelay) / Data.fragmentLandDelay;
                     for (int i = 0; i < FragmentCount; i++)
                         PatternGuideHelper.SetProgress(_fragmentWarnings[i], ft);
+                    if (!_fragmentsArmed && _fragmentTimer >= Data.fragmentWarningStartDelay + Data.fragmentLandDelay - ArmLead * SpeedMult(ctx))
+                    {
+                        _fragmentsArmed = true;
+                        for (int i = 0; i < FragmentCount; i++) PatternGuideHelper.Arm(_fragmentWarnings[i]);
+                    }
                 }
 
                 // 파편 착지 — 피격판정 + 사운드 + 이펙트
@@ -263,7 +276,7 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
                         if (Data.stoneLandSfx != null)
                             Managers.Sound?.PlayEffectAt(Data.stoneLandSfx, _fragmentPositions[i]);
                         SpawnFragmentImpactEffect(_fragmentPositions[i]);
-                        TryDealFragmentDamage(ctx, _fragmentPositions[i]);
+                        TryDealAreaDamage(ctx, _fragmentPositions[i], Data.fragmentWarningRadius, Data.fragmentDamageMultiplier);
                         DespawnFragmentWarning(i);
                     }
                     _timer = 0f;
@@ -288,13 +301,16 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
             ctx.Agent.isStopped = false;
     }
 
-    // ── 착지 처리 (경고장판 제거 + 이펙트 + 사운드 → 파편 페이즈) ──
+    // ── 착지 처리 (경고장판 제거 + 피해 + 이펙트 + 사운드 → 파편 페이즈) ──
     private void OnRockLanded(MonsterContext ctx)
     {
         SpawnImpactEffect();
         if (Data.stoneLandSfx != null)
             Managers.Sound?.PlayEffectAt(Data.stoneLandSfx, _landingPos);
         DespawnWarning();
+        // 판정 = 예고 원(warningRadius) 안 · 착지 순간 한 번 · 가해자 보스. 예전엔 날아가는 돌(반경 약 1 m)이 비행 경로 전체에서
+        // 가해자 없이 쳤다 — 원 밖 경로에서 맞고, 원 안에 있어도 돌이 안 스치면 안 맞았다(10-08 점검)
+        TryDealAreaDamage(ctx, _landingPos, Data.warningRadius, Data.damageMultiplier);
         _proj                    = null;
         _fragmentTimer           = 0f;
         _fragmentWarningsSpawned = false;
@@ -368,13 +384,11 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
 
         if (!_rockGO.TryGetComponent<MonsterProjectile>(out var proj)) return;
 
-        int   dmg = ctx.Config?.stat != null
-            ? Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier))
-            : 1;
-        float kb  = (ctx.Config?.stat?.knockbackForce ?? 8f) * Data.knockbackMultiplier;
-
         // maxRange = 실제 거리 → 경고장판 중앙 도달 시 자동 소멸
-        proj.Init(dir, Data.projectileSpeed, _launchDist, dmg, kb);
+        // 날아가는 돌은 치지 않는다 — 피해 0 + 충돌체 끔(트리거가 살아 있으면 피해 0이어도 넉백 잠금 · 조기 착지가 난다).
+        // 피해는 착지 때 예고 원으로 준다(OnRockLanded · 10-08 점검)
+        proj.Init(dir, Data.projectileSpeed, _launchDist, 0, 0f);
+        if (proj.TryGetComponent<Collider>(out var col)) col.enabled = false;
         _proj  = proj;   // 소멸 감지용 레퍼런스 보존
         _rockGO = null;  // 이후 Transform 조작 차단
     }
@@ -383,6 +397,7 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     private void SpawnWarning(MonsterContext ctx, Vector3 landPos, float leadSeconds)
     {
         _warningGrowTimer    = 0f;
+        _rockArmed           = false;
         // 던지기까지 남은 시간 + 비행 시간만큼 차오른다(최소 0.3s). 거리는 지금 손(바위) 위치에서 잰다 —
         // 예전엔 _launchDist를 계산하기 전에 불러 직전 던지기 거리로 찼다
         Vector3 from = _rockGO != null ? _rockGO.transform.position : ctx.Transform.position;
@@ -409,6 +424,7 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     // ── 파편 경고장판 ────────────────────────────────────
     private void SpawnFragmentWarnings()
     {
+        _fragmentsArmed = false;
         float r       = Data.fragmentSpreadRadius;
         var   angles  = Data.fragmentAngles;
         for (int i = 0; i < FragmentCount; i++)
@@ -447,18 +463,19 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
             DespawnFragmentWarning(i);
     }
 
-    private void TryDealFragmentDamage(MonsterContext ctx, Vector3 pos)
+    /// <summary>예고 원(pos · radius) 안이면 피해 한 번 + 원 바깥으로 넉백 — 본 돌 착지 · 파편 공용(10-08 점검).</summary>
+    private void TryDealAreaDamage(MonsterContext ctx, Vector3 pos, float radius, float damageMult)
     {
         if (ctx.Config?.stat == null || ctx.Runtime.PlayerTarget == null) return;
         Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
         float dx = playerPos.x - pos.x;
         float dz = playerPos.z - pos.z;
-        if (Mathf.Sqrt(dx * dx + dz * dz) > Data.fragmentWarningRadius) return;
+        if (Mathf.Sqrt(dx * dx + dz * dz) > radius) return;
 
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
-        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.fragmentDamageMultiplier));
+        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * damageMult));
         player.TakeDamage(dmg, ctx.Monster.gameObject);
 
         Vector3 dir = playerPos - pos;
@@ -476,6 +493,8 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
         float lifetime = 3f;
         foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
         {
+            var main = ps.main;
+            main.loop = false;   // 한 번만 — 반복이면 착지 2초 뒤 다시 터져 파편 착지로 읽혔다(10-11 이펙트 톤 점검)
             float end = ps.main.duration + ps.main.startLifetime.constantMax;
             if (end > lifetime) lifetime = end;
         }

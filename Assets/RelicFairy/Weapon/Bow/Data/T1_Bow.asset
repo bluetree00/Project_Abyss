@@ -16,7 +16,7 @@ MonoBehaviour:
   weaponPrefabKey: T1_Bow_Weapon
   displayName: "\uAE30\uBCF8 \uBCF4\uC6B0"
   tagline: "\uBE60\uB978 \uC5F0\uC0AC\uB85C \uAC70\uB9AC\uB97C \uC720\uC9C0\uD558\uBA70
-    \uC99D\uCCCA\uB2E4. \uC548\uC815\uC801\uC778 \uAE30\uBCF8 \uBCF4\uC870\uBB34\uAE30."
+    \uC2F8\uC6B4\uB2E4. \uC548\uC815\uC801\uC778 \uAE30\uBCF8 \uBCF4\uC870\uBB34\uAE30."
   uiThemeColor: {r: 0.42, g: 0.86, b: 0.72, a: 1}
   iconKey: T1_BowIcon
   icon: {fileID: 21300000, guid: 4756722abbdce364f807736d4d73cec6, type: 3}
@@ -36,7 +36,8 @@ MonoBehaviour:
   trailVfxPrefab: {fileID: 0}
   weaponType: 2
   evolution: {fileID: 0}
-  skillQ: {fileID: 11400000, guid: f8ed2817829c9e448b483cd3c381c397, type: 2}
+  form: {fileID: 0}
+  skillQ: {fileID: 11400000, guid: f13606e204e18f64ea72e2d77f8d9ee1, type: 2}
   skillE: {fileID: 11400000, guid: 31982dfcf2ce0e74ea006f2cfb53741e, type: 2}
   holdThreshold: 0
   promoteMode: 0

@@ -28,7 +28,7 @@ public class MonsterConeAttackSO : MonsterAttackShapeSO
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
-        player.TakeDamage(damage);
+        player.TakeDamage(damage, ctx.Transform.gameObject);
 
         Vector3 dir = toPlayer.normalized;
         dir.y = 0.3f;

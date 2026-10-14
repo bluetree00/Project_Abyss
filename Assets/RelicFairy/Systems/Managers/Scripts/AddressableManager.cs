@@ -28,7 +28,7 @@ public class LoadedAsset
 public sealed class AddressableManager
 {
     private bool _initialized;
-    private UniTask? _initTask;
+    private UniTaskCompletionSource _initSource;
 
     /// <summary>
     /// ✅ Asset Handle 캐시 (key|type)
@@ -62,16 +62,28 @@ public sealed class AddressableManager
     {
         if (_initialized) return;
 
-        if (_initTask.HasValue)
+        if (_initSource != null)
         {
-            await _initTask.Value;
+            await _initSource.Task;
             return;
         }
 
-        _initTask = InitializeInternalAsync();
-        await _initTask.Value;
+        // 초기화가 끝나기 전에 여럿이 기다린다(부트 AppBootstrapper.Start · 같은 프레임 LobbyBgmController.Start).
+        // async UniTask는 대기자를 하나만 받아(Preserve도 끝나기 전엔 같다) 빌드(카탈로그 읽기에 몇 프레임)에선
+        // 두 번째 대기가 예외로 부트를 멈춰 씬이 안 떴다(10-09) — 대기자 여럿을 받는 완료 소스로 묶는다.
+        _initSource = new UniTaskCompletionSource();
+        try
+        {
+            await InitializeInternalAsync();
+        }
+        catch (Exception e)
+        {
+            _initSource.TrySetException(e);
+            throw;
+        }
 
         _initialized = true;
+        _initSource.TrySetResult();
         Debug.Log("[AddressableManager] Initialized");
     }
 

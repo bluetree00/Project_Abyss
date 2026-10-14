@@ -49,6 +49,8 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
     public static readonly Color SectionInk  = new(0.75f, 0.90f, 1.00f, 1f);
     // 머리띠 높이 — 활성 효과(≈21px)와 속성 시너지(≈44px)가 비율 앵커라 서로 달랐다(09-28). 둘 다 이 고정 높이.
     public const float SectionBandH = 32f;
+    /// <summary>활성 효과가 시작하는 높이(패널 아래에서 비율) — 위 = 캐릭터 정보, 아래 = 활성 효과. 톤 v2는 활성 효과를 떼어 가고(<see cref="DetachEffects"/>) 위를 이 값 기준으로 편다.</summary>
+    public const float EffectsSplit = 0.392f;
 
     // ── Private fields ────────────────────────────────────────────
     private Image      _portraitImg;
@@ -142,6 +144,46 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
     {
         RefreshStats();
         RefreshEffects();
+    }
+
+    /// <summary>
+    /// 활성 효과(머리띠 + 목록)를 <paramref name="host"/>로 옮긴다 — 룬판 톤 v2 왼쪽 열 순서(10-10 사용자 「시너지가 너무 위 —
+    /// 맨 위 정보 · 가운데 시너지 · 아래 총합 구성」). 남은 캐릭터 정보(머리 · HP · 스탯)는 패널 전체 높이로 다시 편다.
+    /// 바탕 · 좌우 여백은 이 패널과 같게. 한 번만 부른다(두 번째부터는 옮길 것이 없어 그냥 돌아간다).
+    /// </summary>
+    public void DetachEffects(RectTransform host)
+    {
+        var content = transform.Find("Content") as RectTransform;
+        if (host == null || content == null) return;
+        var hdr    = content.Find("EffectsHdr") as RectTransform;
+        var scroll = content.Find("EffectsScroll") as RectTransform;
+        if (hdr == null || scroll == null) return;
+
+        if (TryGetComponent<Image>(out var bg) && !host.TryGetComponent<Image>(out _))
+            host.gameObject.AddComponent<Image>().color = bg.color;
+        var inner = Go("Content").GetComponent<RectTransform>();
+        inner.SetParent(host, false);
+        inner.anchorMin = Vector2.zero;
+        inner.anchorMax = Vector2.one;
+        inner.offsetMin = new Vector2(Gutter, BOTTOM_BAR_PX + 6f);
+        inner.offsetMax = new Vector2(-Gutter, -6f);
+
+        hdr.SetParent(inner, false);
+        Anc(hdr, new Vector2(0f, 1f), Vector2.one);
+        hdr.offsetMin = new Vector2(0f, -SectionBandH);
+        scroll.SetParent(inner, false);
+        Anc(scroll, Vector2.zero, Vector2.one);
+        scroll.offsetMax = new Vector2(0f, -SectionBandH);
+
+        // 위 캐릭터 정보 — [EffectsSplit, 1] 비율로 놓였던 자식을 [0, 1]로 편다. 정보와 효과 사이 나눔 선은 걷는다.
+        float span = 1f - EffectsSplit;
+        for (int i = content.childCount - 1; i >= 0; i--)
+        {
+            if (content.GetChild(i) is not RectTransform rt) continue;
+            if (rt.name == "Divider") { Destroy(rt.gameObject); continue; }
+            rt.anchorMin = new Vector2(rt.anchorMin.x, Mathf.Clamp01((rt.anchorMin.y - EffectsSplit) / span));
+            rt.anchorMax = new Vector2(rt.anchorMax.x, Mathf.Clamp01((rt.anchorMax.y - EffectsSplit) / span));
+        }
     }
 
     // ── BuildUI ───────────────────────────────────────────────────
@@ -281,7 +323,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         _txtLuck  = StatCard(grid.transform, "행운",     C_LUCK,  new(L,  R2B), new(R,  R2T));
         _txtSpd   = StatCard(grid.transform, "이동속도", C_SPD,   new(RL, R2B), new(RR, R2T));
         _txtCdr   = StatCard(grid.transform, "스킬 쿨감", C_CDR,   new(L,  R3B), new(R,  R3T));   // 약어(CDR) 대신 한글
-        _txtMaxHp = StatCard(grid.transform, "최대 HP",  C_MAXHP, new(RL, R3B), new(RR, R3T));
+        _txtMaxHp = StatCard(grid.transform, "최대 체력", C_MAXHP, new(RL, R3B), new(RR, R3T));
     }
 
     private TMP_Text StatCard(Transform parent, string label, Color accent,
@@ -338,7 +380,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         hdr.transform.SetParent(parent, false);
         // 스탯 판 아래(0.392)에서 SectionBandH만큼 — 속성 시너지 머리띠와 같은 높이(예전 비율 0.046 ≈ 21px).
         var hrt = hdr.GetComponent<RectTransform>();
-        Anc(hrt, new Vector2(0f, 0.392f), new Vector2(1f, 0.392f));
+        Anc(hrt, new Vector2(0f, EffectsSplit), new Vector2(1f, EffectsSplit));
         hrt.offsetMin = new Vector2(0f, -SectionBandH);
         hdr.AddComponent<Image>().color = SectionBand;   // 속성 시너지 머리띠와 같은 띠
         var hdrTxt = Txt(hdr.transform, "Title", "◆ 활성 효과", 17f, SectionInk, bold: true);   // 속성 시너지 제목(17 굵게)과 같은 급
@@ -350,7 +392,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         var scrollGO = Go("EffectsScroll");
         scrollGO.transform.SetParent(parent, false);
         var srt = scrollGO.GetComponent<RectTransform>();
-        Anc(srt, Vector2.zero, new Vector2(1f, 0.392f));
+        Anc(srt, Vector2.zero, new Vector2(1f, EffectsSplit));
         srt.offsetMax = new Vector2(0f, -SectionBandH);
         scrollGO.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.06f);
         var mask = scrollGO.AddComponent<RectMask2D>();
@@ -695,7 +737,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
             new Vector2(0.04f, 0f), new Vector2(0.80f, 1f));
         var bodyTxt = bodyGO.AddComponent<TextMeshProUGUI>();
         bodyTxt.text = body;
-        bodyTxt.fontSize = 16f;
+        bodyTxt.fontSize = 18f;   // 10-11 v2 16 → 18(리서치 B §3 활성 효과 줄) — 칩 높이 34에 Noto 한 줄(≈26)이 든다
         bodyTxt.color = new Color(
             Mathf.Clamp01(accent.r * 0.65f + 0.35f),
             Mathf.Clamp01(accent.g * 0.65f + 0.35f),

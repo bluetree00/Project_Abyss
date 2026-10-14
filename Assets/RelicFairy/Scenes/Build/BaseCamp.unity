@@ -74413,8 +74413,7 @@ MonoBehaviour:
   swordAwakenCategory: SwordAwaken
   swordAwakenTarget: {fileID: 421853650}
   swordAwakenBarrier: {fileID: 0}
-  swordAwakenGuideline: "\uC81C\uB2E8\uC758 \uAC80\uC744 \uC950\uC5B4\uB77C \u2014
-    [F]"
+  swordAwakenGuideline: "\uBB34\uD615\uAC80\uC744 \uC950\uC5B4\uB77C \u2014 [F]"
   gateTarget: {fileID: 1155803283}
   gateGuideline: "\uC900\uBE44 \uC644\uB8CC \u2014 \uC131\uBB38 \uB108\uBA38 \uC2EC\uC5F0\uC73C\uB85C
     \uB0B4\uB824\uAC00\uB77C."

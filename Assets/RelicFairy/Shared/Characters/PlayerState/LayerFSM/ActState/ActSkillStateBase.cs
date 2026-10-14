@@ -1,4 +1,4 @@
-/// <summary>
+﻿/// <summary>
 /// Q/E/R 스킬 상태 공통 기반 (Template Method).
 ///
 /// 골격(Enter/Update/Exit)은 <c>sealed</c>다 — 파생 클래스는 아래 훅만 채우고 순서는 바꿀 수 없다.
@@ -32,7 +32,7 @@ public abstract class ActSkillStateBase : LayerStateBase<ActState>
 
         if (!_controller.CooldownTracker.IsReady(Slot))
         {
-            UnityEngine.Debug.Log($"[SkillBase] {Slot} blocked by cooldown");
+            RFLog.D($"[SkillBase] {Slot} blocked by cooldown");
             _stateChanger.Change(ActState.None);
             return;
         }
@@ -50,9 +50,9 @@ public abstract class ActSkillStateBase : LayerStateBase<ActState>
 
         _entered = true;
 
-        UnityEngine.Debug.Log($"[SkillBase] {Slot} Enter");
+        RFLog.D($"[SkillBase] {Slot} Enter");
         // 무기 스킬 시작음(09-25). Q는 유물 스킬이라 각자 소리를 낸다(가웨인 태양 낙하·랜슬롯 참격).
-        if (Slot != SkillType.Q) Managers.Sound?.PlayEvent(SoundEvent.PlayerSkill);
+        if (Slot != SkillType.Q) Managers.Sound?.PlayEvent(StartSoundEvent);
         _controller.FirePassive(PassiveTrigger.OnSkillUse,
             new PassiveContext { skillUsed = Slot });
 
@@ -97,6 +97,9 @@ public abstract class ActSkillStateBase : LayerStateBase<ActState>
 
     /// <summary>스킬 종료 정리 (AbilityExecution 해제 등).</summary>
     protected virtual void OnExit() { }
+
+    /// <summary>무기 스킬 시작음 — 기본은 공용. 스킬 행동 SO가 정한다(10-08 A6).</summary>
+    protected virtual string StartSoundEvent => SoundEvent.PlayerSkill;
 
     /// <summary>이 슬롯의 기본 쿨다운(초). 0이면 쿨다운 없음.</summary>
     protected abstract float GetCooldown();

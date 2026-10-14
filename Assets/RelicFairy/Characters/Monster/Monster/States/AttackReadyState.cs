@@ -17,13 +17,18 @@ public class AttackReadyState : IMonsterState
 
     public virtual void Enter(MonsterContext ctx)
     {
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
+        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
+        {
+            ctx.Agent.ResetPath();
+            ctx.Agent.velocity = Vector3.zero;   // 추적 속도가 남아 전투 대기 자세로 0.2~0.4초 미끄러졌다(10-14 정예 애니 점검)
+        }
 
         // 첫 조우 시 빠르게 반응하되, 0으로 스킵하지 않고 최소 예고창을 남긴다.
         ctx.Runtime.StateTimer = ctx.Runtime.IsFirstAttack
             ? Mathf.Min(ctx.Stat.attackDelay, FirstAttackReadyMaxDelay)
             : ctx.Stat.attackDelay;
         ctx.Runtime.IsFirstAttack = false;
+        ctx.Monster.ResetAttackGlint();
 
         PlayAnim(ctx, ctx.Animation.attackReadyStateName);
         FacePlayer(ctx);
@@ -50,6 +55,8 @@ public class AttackReadyState : IMonsterState
         FacePlayer(ctx);
 
         ctx.Runtime.StateTimer -= Time.deltaTime;
+        // 공격 예고 반짝임 — 준비가 끝나고 공격 상태가 맞히기까지(damageApplyDelay)를 더한 남은 초
+        ctx.Monster.NotifyAttackIncoming(ctx.Runtime.StateTimer + ctx.Combat.damageApplyDelay);
         if (ctx.Runtime.StateTimer <= 0f)
             ctx.Monster.ChangeState<AttackState>();
     }

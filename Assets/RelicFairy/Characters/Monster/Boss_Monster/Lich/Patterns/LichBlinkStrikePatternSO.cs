@@ -154,7 +154,7 @@ public class LichBlinkStrikeState : UnInterruptibleState<LichBlinkStrikePatternS
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -195,8 +195,9 @@ public class LichBlinkStrikeState : UnInterruptibleState<LichBlinkStrikePatternS
         _yaw  = Quaternion.LookRotation(-back).eulerAngles.y;   // 잔상 자리에서 플레이어 쪽
 
         PatternGuideHelper.SafeDestroy(ref _mark);
+        // 판정 부채꼴은 진홍 — 흰색은 안전 칸 색이다(10-13 검증). 흰빛은 잔상 이펙트만
         _mark = LichPatternUtil.PrepareTelegraph(
-            PatternGuideHelper.Sector(_dest, Data.hitRadius, Data.hitHalfAngle * 2f, _yaw, AfterimageColor), AfterimageColor);
+            PatternGuideHelper.Sector(_dest, Data.hitRadius, Data.hitHalfAngle * 2f, _yaw, LichPatternUtil.Crimson), LichPatternUtil.Crimson);
         // 흰 잔상 — 거기로 온다
         LichVfx.PlayTinted(LichVfxSlot.BlinkAfterimage, _dest, Quaternion.Euler(0f, _yaw, 0f), 0.35f, AfterimageColor);
         Next(Phase.Mark);

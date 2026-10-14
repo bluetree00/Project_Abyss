@@ -128,5 +128,32 @@ public class ChaseState : IMonsterState
         ctx.Animator.speed = 1f;
         ctx.Animator.CrossFade(ctx.Animation.chaseStateName, Mathf.Min(0.08f, ctx.Animation.crossFadeDuration));
     }
+
+    /// <summary>
+    /// 둘레 돌기 · 물러나기 — 플레이어를 보며 옆 · 뒤로 움직일 땐 그쪽 걷기(팩에 있으면), 멈춰 있으면 전투 대기.
+    /// 예전엔 늘 앞으로 달리는 동작이라 옆 · 뒤로 미끄러졌다(10-14 정예 애니 점검). 걷기가 없으면 추적 동작.
+    /// </summary>
+    protected static void KeepMoveAnimation(MonsterContext ctx)
+    {
+        if (ctx.Animator == null || ctx.Agent == null) return;
+        if (ctx.Animator.IsInTransition(0)) return;
+        Vector3 v = ctx.Agent.velocity; v.y = 0f;
+        float speed = v.magnitude;
+        int want;
+        if (speed < 0.3f)
+            want = string.IsNullOrEmpty(ctx.Animation.attackReadyStateName) ? 0 : Animator.StringToHash(ctx.Animation.attackReadyStateName);
+        else
+        {
+            var set = MonsterAnimStates.Of(ctx);
+            Vector3 local = ctx.Transform.InverseTransformDirection(v);
+            want = local.z < -0.5f * speed ? set.Back
+                 : Mathf.Abs(local.x) > 0.6f * speed ? (local.x < 0f ? set.Left : set.Right)
+                 : 0;
+        }
+        if (want == 0 || !ctx.Animator.HasState(0, want)) { KeepChaseAnimation(ctx); return; }
+        if (ctx.Animator.GetCurrentAnimatorStateInfo(0).shortNameHash == want) return;
+        ctx.Animator.speed = 1f;
+        ctx.Animator.CrossFade(want, 0.15f, 0);
+    }
 }
 }

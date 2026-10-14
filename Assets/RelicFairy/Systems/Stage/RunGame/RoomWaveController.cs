@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using RelicFairy.Monster;
 using Cysharp.Threading.Tasks;
@@ -36,6 +36,10 @@ public sealed class RoomWaveController : MonoBehaviour
     private LuckRollTableSO _luckTable;
     private readonly List<MonsterSpawner> _spawners = new();
     private BossSpawner     _bossSpawner;
+    // 정예 보스 방(10-12) — MB 토큰 스포너. 있으면 첫 파도는 이 스포너가 SpawnMidBossAsync로 한 마리만 부르고 나머지는 쉰다.
+    private MonsterSpawner  _midBossSpawner;
+    private string          _midBossKind;
+    private bool            _midBossCalled;
     private bool            _active;
     private bool            _cleared;
 
@@ -92,6 +96,14 @@ public sealed class RoomWaveController : MonoBehaviour
         if (spawners != null)
             foreach (var s in spawners)
                 if (s != null) _spawners.Add(s);
+
+        foreach (var s in _spawners)
+        {
+            if (!s.TryGetComponent<MidBossSpawnMarker>(out var marker)) continue;
+            _midBossSpawner = s;
+            _midBossKind    = marker.Kind;
+            break;
+        }
 
         _bossSpawner = bossSpawner;
 
@@ -251,6 +263,7 @@ public sealed class RoomWaveController : MonoBehaviour
             var s = _spawners[i];
             if (s == null)                    tasks[i] = UniTask.FromResult(0);
             else if (eraWave)                 tasks[i] = s.SpawnExtraAsync(Share(_eraElites, i, start, n), Share(_eraCommons, i, start + _eraElites, n), ct);
+            else if (_midBossSpawner != null) tasks[i] = s == _midBossSpawner ? SpawnMidBossOnceAsync(ct) : UniTask.FromResult(0);
             else if (s.WaveCount > waveIndex) tasks[i] = s.SpawnWaveAsync(waveIndex, ct);
             else                              tasks[i] = UniTask.FromResult(0);
         }
@@ -296,11 +309,20 @@ public sealed class RoomWaveController : MonoBehaviour
     /// <summary>시기 두 번째 파도를 굴린다 — 보스방은 빼고 방 종류(일반 · 정예)와 시기로. 오면 파도 수 +1.</summary>
     private void RollEraWave()
     {
-        if (_bossSpawner != null || _baseWaves == 0) return;
+        if (_bossSpawner != null || _midBossSpawner != null || _baseWaves == 0) return;   // 정예 보스 방도 덤 파도가 없다
         (_eraElites, _eraCommons) = EraBalance.RollExtraWave(_run?.CurrentRoomKind ?? RoomPlanKind.Normal, StoryProgress.Era);
         if (_eraElites + _eraCommons == 0) return;
         _totalWaves = _baseWaves + 1;
         Debug.Log($"[RoomWave] 시기 두 번째 파도 — 정예 {_eraElites} · 일반 {_eraCommons} ({StoryProgress.Era})", this);
+    }
+
+    /// <summary>정예 보스 한 마리 — 방에서 한 번만 부른다(두 번째 부름은 0). 결과 = 소환 수(1/0).</summary>
+    private async UniTask<int> SpawnMidBossOnceAsync(System.Threading.CancellationToken ct)
+    {
+        if (_midBossCalled) return 0;
+        _midBossCalled = true;
+        var boss = await _midBossSpawner.SpawnMidBossAsync(_midBossKind, ct);
+        return boss != null ? 1 : 0;
     }
 
     /// <summary>count마리를 start 스포너부터 한 마리씩 돌릴 때 spawnerIndex 스포너가 맡는 수.</summary>
@@ -400,7 +422,7 @@ public sealed class RoomWaveController : MonoBehaviour
     private void HandleLegacyMonsterSpawned(MonsterBase monster)
     {
         if (monster == null) return;
-        Debug.Log($"[RoomWave] 몬스터 스폰 감지 '{monster.name}' — OnDied 구독", this);
+        RFLog.D($"[RoomWave] 몬스터 스폰 감지 '{monster.name}' — OnDied 구독", this);
         monster.OnDied += HandleLegacyMonsterDied;
     }
 
@@ -412,7 +434,7 @@ public sealed class RoomWaveController : MonoBehaviour
             _lastKillPosition = monster.transform.position;
             _hasKillPosition  = true;
         }
-        Debug.Log($"[RoomWave] 몬스터 사망 감지 '{(monster != null ? monster.name : "null")}' — active={_active} cleared={_cleared} killed={_killed+1}/{_targetKillCount}", this);
+        RFLog.D($"[RoomWave] 몬스터 사망 감지 '{(monster != null ? monster.name : "null")}' — active={_active} cleared={_cleared} killed={_killed+1}/{_targetKillCount}", this);
         if (!_active || _cleared) return;
 
         _killed++;
@@ -445,7 +467,8 @@ public sealed class RoomWaveController : MonoBehaviour
         if (_cleared) return;
         _cleared = true;
         QuestEvents.ReportRoomClear("Normal");
-        Managers.Sound?.PlayEvent(SoundEvent.RoomClear);
+        // 리치의 추방(10-11) — 봉인이 끊기고 쫓겨나는 순간이라 승리 징글을 내지 않는다(이 방 클리어만 · 다른 방은 그대로).
+        if (!ExileFallSequence.IsActive) Managers.Sound?.PlayEvent(SoundEvent.RoomClear);
 
         string modeTag = _waveMode ? $"웨이브 {_totalWaves}/{_totalWaves}" : $"{_killed}/{_targetKillCount}";
         Debug.Log($"[RoomWave] 방 클리어 달성 ({modeTag}) — 포탈 등장 시퀀스 시작", this);

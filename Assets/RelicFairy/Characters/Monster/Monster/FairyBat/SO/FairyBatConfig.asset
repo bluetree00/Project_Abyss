@@ -19,9 +19,9 @@ MonoBehaviour:
     m_Bits: 64
   visualHeightMeters: 1.1
   stat:
-    maxHp: 10
+    maxHp: 14
     defense: 1
-    attackPower: 30
+    attackPower: 20
     moveSpeed: 3
     attackRange: 2
     attackRadius: 1
@@ -55,6 +55,15 @@ MonoBehaviour:
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15
+  death:
+    despawnDelay: 0.5
+    dissolveDuration: 0.35
+    deathVfxKey: MonsterDeathBurst
+    deathVfxScale: 1.05
+    deathVfxHeight: 0.55
+    deathVfxUnscaled: 1
+    killHitStopScale: 0.04
+    killHitStopDuration: 0.09
   specialStates:
   - conditions:
     - {fileID: 11400000, guid: 38efe0d8eaabc0b4580d8205554ff856, type: 2}

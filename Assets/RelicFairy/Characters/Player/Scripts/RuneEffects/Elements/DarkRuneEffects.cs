@@ -201,7 +201,9 @@ public sealed class DarkAbyssEffect : DarkRuneEffectBase
         int n = CombatQuery.GetNearbyEnemies(player.transform.position, NEARBY_RADIUS, null, 16, s_buf);
         for (int i = 0; i < n; i++) s_buf[i].ApplyDamageTakenAmp(vulnAmp, duration, "vulnerable");
 
-        ElementVfxPlayer.PlayBurst(RuneElement.Dark, player.transform.position);
+        // 자기 강화 문장(Buff_Arcane) 한 번 — 예전엔 점 타격 칸(Explosion_Arcane_2 · 자홍 고리 · 크기 1)이라 효과 반경(6 m)과도
+        // 안 맞고 진했다(10-01 보류 「은은하게면 Buff_Arcane」 → 10-11 톤 2차 V-9). 주변 적의 「취약」은 HP바 아이콘이 보여 준다.
+        ElementVfxPlayer.PlayActivation(RuneElement.Dark, player.transform.position);
     }
 
     public override void Tick(float dt, PlayerController player)

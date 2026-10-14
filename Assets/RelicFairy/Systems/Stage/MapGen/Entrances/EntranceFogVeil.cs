@@ -16,7 +16,8 @@ using UnityEngine;
 public static class EntranceFogVeil
 {
     // ⚠️ 과하면 진입 직후 <b>본 방까지</b> 하얗게 덮여 답답하다. 조립 구간만 흐리는 정도로 억제한다.
-    private const float DensityMult  = 2.5f;    // 원래 밀도 대비 베일 배수
+    // 10-12 챕터 안개 밀도를 약 1.8배(0.009~0.013 → 0.016~0.020)로 올려 2.5 → 1.5 — 베일의 절대 밀도(≈0.024~0.03)는 예전과 같게 둔다.
+    private const float DensityMult  = 1.5f;    // 원래 밀도 대비 베일 배수
     private const float MinDensity   = 0.022f;  // 안개가 꺼져 있던 씬에서 쓸 최소 밀도
     private const float LinearShrink = 0.35f;   // Linear 모드에서 끝거리를 당기는 비율
 

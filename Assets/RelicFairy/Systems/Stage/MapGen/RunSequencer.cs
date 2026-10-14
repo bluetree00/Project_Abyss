@@ -14,6 +14,7 @@ public enum RoomPlanKind
     Crucible,   // 재련소(무기 강화/승급 + 도박) — PRD 확률 등장, 챕터당 1회
     Refinery,   // 정제소(룬 지급/룬판) — PRD 확률 등장, 챕터당 1회
     Rest,       // 쉼터(10-01) — 챕터 중간 한 번, 외길. 모닥불에서 쉬거나 모루에서 벼린다. ⚠️ 저장은 int라 맨 끝에만 덧붙인다
+    MidBoss,    // 정예 보스 방(10-12 「관문지기」) — 챕터 한가운데 외길 · 보스 진행 2칸 몫. 번갈이로 챕터마다 50%
 }
 
 /// <summary>한 출구 문의 계획. 종류 + 선택된 방 템플릿(entry).</summary>
@@ -80,6 +81,22 @@ public class RunSequencer
     /// 상한이 없으면 후반이 특수방으로만 채워져 전투가 사라진다.</summary>
     private const float SpecialSlotCap = 0.55f;
 
+    // ── 재화를 쓰는 방(상점 · 재련소 · 정제소) — 횟수 문턱 · 묶음 ─────────────
+    // 런 첫 챕터 초반엔 쓸 재화가 없어 들어가도 아무 의미가 없었다(10-10 사용자 「재화 쓰는 방은 카운트나 묶어서」).
+    // 원석은 전투방마다 4라 정제 1회(12)에 3방, 골드는 방마다 약 30이라 상점에서 무엇이든 사려면 2방이 든다.
+    // 재화는 챕터를 넘어 이어지므로 문턱은 런의 첫 챕터에만 건다.
+    private const int ShopGateProgress     = 2;
+    private const int CrucibleGateProgress = 2;
+    private const int RefineryGateProgress = 3;
+
+    // ── 정예 보스 방(10-12 중간 엘리트 보스 「관문지기」 — 배치 설계 §1) ─────────────
+    // 시작 방 뒤 전투 2방을 마친 문에서 외길로 나오고, 보스 진행을 2칸 쓴다 → 쉼터 문턱(3)을 넘어 바로 뒤가 쉼터다.
+    private const int   MidBossProgress     = 2;
+    private const int   MidBossProgressCost = 2;
+    /// <summary>보스 문턱이 이보다 작으면(테스트 오버라이드) 정예 보스를 건너뛴다 — 나온 뒤 쉼터 · 마무리 전투가 남지 않는다.</summary>
+    private const int   MidBossMinThreshold = 4;
+    private const float MidBossChance       = 0.5f;
+
     /// <summary>PRD 대상 특수방 4종. 등장 순서 편향을 막기 위해 매 롤마다 섞어 쓴다.</summary>
     private static readonly RoomPlanKind[] SpecialKinds =
     {
@@ -122,6 +139,12 @@ public class RunSequencer
     // 이번 롤에서 각 문에 강제할 종류(null=자유 롤). 문 수와 같은 길이 고정 버퍼.
     private readonly RoomPlanKind?[]    _forcedSlots    = new RoomPlanKind?[2];
 
+    /// <summary>런의 첫 챕터인가 — 재화 방 횟수 문턱을 건다. <see cref="BuildPlan"/>보다 먼저 정해야 예보도 같다.</summary>
+    public bool GateCurrencyRooms { get; set; }
+
+    /// <summary>이 챕터에 정예 보스 방이 예정됐는가(<see cref="MidBossScheduled"/>). <see cref="BuildPlan"/>보다 먼저 정해야 예보도 같다.</summary>
+    public bool MidBossPlanned { get; set; }
+
     public int  VisitCount     => _visitCount;
     public int  BossProgress   => _bossProgress;
     public bool InBossApproach => _phase != Phase.Normal;
@@ -143,6 +166,21 @@ public class RunSequencer
     /// <summary>방별 자식 시드. 같은 (마스터 시드, visitCount) → 동일 롤 → 이어하기 재현.</summary>
     public static int Combine(int seed, int visitCount) => unchecked((seed * 397) ^ visitCount);
 
+    /// <summary>
+    /// 정예 보스 「번갈이」(배치 설계 §1-3) — 챕터마다 50%, 직전 챕터에 없었으면 확정. 런당 2~4번.
+    /// 마스터 시드와 런 안 챕터 순번(0부터 · 리치 추방 · 심연 루프 뒤에도 이어서 센다)의 순수 함수라 이어하기에 저장 필드가 없다.
+    /// </summary>
+    public static bool MidBossScheduled(int masterSeed, int chapterOrdinal)
+    {
+        // 한 런에 난수 하나를 차례로 굴린다 — 챕터마다 시드를 조금씩 바꿔 새로 만들면 System.Random의 첫 값들이 서로 닮아
+        // 굴림이 함께 움직였다(10-13 실측: 챕터별 50 · 52 · 53 · 51%, 런당 2회 93% — 설계 50 · 75 · 62.5 · 68.8%).
+        var rng = new System.Random(Combine(masterSeed, 9100));
+        bool prev = true;   // 첫 챕터 앞은 「있었다」로 본다 — 첫 챕터는 50%
+        for (int i = 0; i <= chapterOrdinal; i++)
+            prev = !prev || rng.NextDouble() < MidBossChance;
+        return prev;
+    }
+
     /// <param name="bossThresholdOverride">0이면 무시(정상). 1 이상이면 config의 BossThreshold 대신 이 값으로
     /// 보스 어프로치를 게이팅한다 — 보스 전방/보스방을 빨리 보기 위한 <b>테스트 전용</b> 값이다.</param>
     public RunSequencer(IEnumerable<ZonePoolEntry> pool, IRunStructure config, int seed,
@@ -163,6 +201,14 @@ public class RunSequencer
 
     /// <summary>쉼터가 나오는 보스 진행 수 — 보스까지 전투방의 절반(5 → 3 · 6 → 3). 「챕터 중간」의 정의.</summary>
     private int RestMilestone => Mathf.Max(1, (EffectiveBossThreshold + 1) / 2);
+
+    /// <summary>이 챕터에서 정예 보스가 실제로 돈다 — 예정 · 문턱 4 이상 · 풀에 MidBoss 방이 있다(CDN 미업로드면 예전 그대로).</summary>
+    private bool MidBossActive => MidBossPlanned && _config != null && EffectiveBossThreshold >= MidBossMinThreshold
+                                  && FirstByCategory(CategoryName(RoomPlanKind.MidBoss)) != null;
+
+    /// <summary>정예 보스가 아직 남았다. 나온 뒤엔 진행이 2 → 4로 뛰므로 「진행 ≤ 2」가 곧 「아직」이다(저장 필드 0).
+    /// 방금 들어간 방이 정예 보스면 아니다 — 「다음 문 고정」으로 진행 0에서 들어가 2가 된 테스트 런이 또 받지 않게.</summary>
+    private bool MidBossPending => MidBossActive && _bossProgress <= MidBossProgress && _lastCommittedKind != RoomPlanKind.MidBoss;
 
     /// <summary>이어하기: 저장된 시퀀서 진행 상태를 복원한다.
     /// 재련/정제 캡과 PRD 미출현 누적은 구 세이브에 없으므로 기본값 0(=만량·미출현 없음)으로 폴백한다.</summary>
@@ -205,7 +251,7 @@ public class RunSequencer
     public RunPlan BuildPlan()
     {
         var plan = new RunPlan();
-        var sim  = new RunSequencer(_pool, _config, _seed);
+        var sim  = new RunSequencer(_pool, _config, _seed) { GateCurrencyRooms = GateCurrencyRooms, MidBossPlanned = MidBossPlanned };
         int guard = 0;
         while (!sim.IsDone && guard++ < 256)
         {
@@ -248,6 +294,13 @@ public class RunSequencer
         if (!_restUsed && _bossProgress >= RestMilestone && FirstByCategory(CategoryName(RoomPlanKind.Rest)) != null)
         {
             result.Add(MakeDoor(rng, RoomPlanKind.Rest));
+            return result;
+        }
+
+        // 정예 보스 — 전투 2방을 마친 문에서 외길로(10-12 배치 설계 §1-2). 특수방을 끼우지 않는다.
+        if (MidBossPending && _bossProgress == MidBossProgress)
+        {
+            result.Add(MakeDoor(rng, RoomPlanKind.MidBoss));
             return result;
         }
 
@@ -343,7 +396,9 @@ public class RunSequencer
         // (특수방을 다 들르면 전투방이 절반 이하). 이제 특수방은 '깊이'를 소모하지 않는다.
         // 런이 무한정 길어지지 않는 근거: 특수방은 챕터 캡(ShopMaxPerChapter/EventMaxPerChapter,
         // 재련·정제 각 1회)이 있어 한 챕터의 최대 방 수는 BossThreshold + 캡 합으로 묶인다.
-        if (!IsSpecialKind(chosen.kind) && chosen.kind != RoomPlanKind.Rest) _bossProgress++;   // 쉼터도 깊이를 소모하지 않는다
+        // 쉼터도 깊이를 소모하지 않는다. 정예 보스 방은 전투방 두 칸 몫이다(배치 설계 §1-4).
+        if (!IsSpecialKind(chosen.kind) && chosen.kind != RoomPlanKind.Rest)
+            _bossProgress += chosen.kind == RoomPlanKind.MidBoss ? MidBossProgressCost : 1;
         if (chosen.kind == RoomPlanKind.Rest) _restUsed = true;
 
         TickCooldowns();
@@ -381,6 +436,28 @@ public class RunSequencer
     private static bool IsSpecialKind(RoomPlanKind k) =>
         k == RoomPlanKind.Shop || k == RoomPlanKind.Event ||
         k == RoomPlanKind.Crucible || k == RoomPlanKind.Refinery;
+
+    private static bool IsCurrencyKind(RoomPlanKind k) =>
+        k == RoomPlanKind.Shop || k == RoomPlanKind.Crucible || k == RoomPlanKind.Refinery;
+
+    /// <summary>
+    /// 지금 이 종류를 문에 내놓을 수 있는가 — 챕터 캡 + 재화 방 문턱(첫 챕터) + 재화 방끼리 붙지 않기.
+    /// 재화 방은 한 묶음으로 본다 — 방금 재화 방을 나왔으면 다음 문쌍엔 재화 방을 내지 않는다(쓸 재화가 다시 모일 틈).
+    /// </summary>
+    private bool IsOfferable(RoomPlanKind k)
+    {
+        if (!CanUseSpecial(k)) return false;
+        if (!IsCurrencyKind(k)) return true;
+        if (IsCurrencyKind(_lastCommittedKind)) return false;
+        if (!GateCurrencyRooms) return true;
+        int gate = k switch
+        {
+            RoomPlanKind.Shop     => ShopGateProgress,
+            RoomPlanKind.Crucible => CrucibleGateProgress,
+            _                     => RefineryGateProgress,
+        };
+        return _bossProgress >= gate;
+    }
 
     /// <summary>챕터 캡 잔여 여부(= 아직 방문하지 않았는가). 재련소/정제소는 챕터당 1개.</summary>
     private bool CanUseSpecial(RoomPlanKind k) => k switch
@@ -478,14 +555,15 @@ public class RunSequencer
         _pityForced.Clear();
         if (_config == null) return 0;
 
-        int roomsLeft = EffectiveBossThreshold - _bossProgress;
+        // 정예 보스가 남았으면 그 문은 외길이라 특수방을 놓을 수 없다 — 두 칸을 빼고 센다.
+        int roomsLeft = EffectiveBossThreshold - _bossProgress - (MidBossPending ? MidBossProgressCost : 0);
         if (roomsLeft <= 0) return 0;
 
         _pityCandidates.Clear();
         for (int i = 0; i < SpecialKinds.Length; i++)
         {
             var k = SpecialKinds[i];
-            if (UsedOf(k) > 0 || !CanUseSpecial(k) || BaseChance(k) <= 0f) continue;
+            if (UsedOf(k) > 0 || !IsOfferable(k) || BaseChance(k) <= 0f) continue;   // 문턱 전 · 묶음 휴지 중인 재화 방은 피티도 강제하지 않는다
             _pityCandidates.Add(k);
         }
 
@@ -535,7 +613,7 @@ public class RunSequencer
             {
                 var k = SpecialKinds[i];
                 // 캡이 남고, 직전에 들어간 종류가 아니어야 한다("상점 → 상점" 연속 방지).
-                if (!CanUseSpecial(k) || _lastCommittedKind == k) continue;
+                if (!IsOfferable(k) || _lastCommittedKind == k) continue;
                 float c = SpecialChance(k);
                 if (c <= 0f) continue;
                 _specialBuffer.Add(k);
@@ -554,6 +632,9 @@ public class RunSequencer
                 }
             }
         }
+
+        // 정예 보스가 나오는 챕터는 그가 정점이다 — 정예방을 내지 않는다(배치 설계 §1-3 · 런 길이).
+        if (MidBossActive) return RoomPlanKind.Normal;
 
         // 시기 가산(10-01) — 해방기 +5% · 악몽 모드 +10%(EraBalance)
         if (Roll(rng, _config.EliteChance + EraBalance.Current.EliteBonus)) return RoomPlanKind.Elite;
@@ -582,7 +663,8 @@ public class RunSequencer
         // 윈도로 거르면 난이도 0인 상호작용 5종(도박·신탁·희생·금고·성역)은 한 번도 못 뽑혔고(곡선이 0.4부터),
         // 뒤 챕터에선 곡선을 벗어난 전투형까지 빠졌다. difficulty_scale은 방 선택에만 쓰이고 체력엔 곱해지지 않는다 —
         // 난이도 곡선은 일반·정예방이 맡는다.
-        if (kind == RoomPlanKind.Event) return available[rng.Next(available.Count)];
+        // 정예 보스 방도 같다 — 황소 체력은 챕터 배율이 정하고, 방은 도안만 다르다.
+        if (kind == RoomPlanKind.Event || kind == RoomPlanKind.MidBoss) return available[rng.Next(available.Count)];
 
         // 난이도 윈도로 추가 좁히기 (충족 후보 없으면 무시)
         // 곡선의 정의역은 0~BossThreshold(= 보스까지의 거리)이므로 축은 _visitCount가 아니라 _bossProgress다.
@@ -611,6 +693,7 @@ public class RunSequencer
         RoomPlanKind.Crucible => "Crucible",
         RoomPlanKind.Refinery => "Refinery",
         RoomPlanKind.Rest     => "Rest",
+        RoomPlanKind.MidBoss  => "MidBoss",
         _                    => "Normal",
     };
 

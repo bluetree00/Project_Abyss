@@ -193,6 +193,9 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         public float Timer;
         public float TickTimer;
         public int SweepIndex;
+        public GameObject   GuideGo;    // 판정 사각형 바닥 표시(10-08 점검)
+        public MeshRenderer GuideMr;
+        public Material     GuideMat;
     }
 
     private struct ScorchEntry
@@ -226,6 +229,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     private float _timer;
     private int   _sweepIndex;
     private int   _nextColIndex;
+    private bool  _breathHit;   // 이번 휩쓸기에 이미 맞음 — 진행 방향으로 달리면 이웃 열에서 또 맞았다(10-08 점검)
     private int   _totalCols;
 
     private float _beamLength;
@@ -249,11 +253,13 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private static Texture2D s_ScorchTex;
     private static Material  s_ScorchMat;
+    private static readonly Color TsunamiGuideColor = new Color(1f, 0.1f, 0.1f, 0.35f);   // 잔불 판정 칸 — 판정 색(PatternGuideHelper.Active)을 옅게(10-08 점검)
 
     private readonly List<Vector2Int>   _warnCells = new();
     private readonly List<GameObject>   _warnTiles = new();
     private readonly List<Material>     _warnMats  = new();
     private readonly List<MeshRenderer> _warnMrs   = new();
+    private int _passedWarnCount;   // 앞에서부터 걷은 레인 예고 칸 수 — 불줄기가 다 지나간 칸(10-08 점검)
     private readonly List<TsunamiEntry> _tsunamis  = new();
     private readonly List<ScorchEntry>  _scorches  = new();
     private readonly List<MeteorEntry>  _meteors   = new();
@@ -308,6 +314,8 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         _meteorSpawning    = false;
         _cameraReturned    = false;
         if (ctx.Agent != null) ctx.Agent.enabled = false;
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
+            bb.PassiveMeteorSuppressed = true;   // 휩쓸기 운석에 수동 운석까지 겹쳐 초당 20개 가까이 떨어졌다 — Exit에서 푼다(10-08 점검)
 
         if (Data.BreathHorizReach > 0f)
         {
@@ -345,7 +353,10 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     public override void Exit(MonsterContext ctx)
     {
         if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard exitBb)
-            exitBb.LeapCooldown = Data.Cooldown;
+        {
+            exitBb.LeapCooldown            = Data.Cooldown;
+            exitBb.PassiveMeteorSuppressed = false;
+        }
         RestoreDragonSpeed(ctx);
         CleanupWarn();
         CleanupFollowLight();
@@ -451,7 +462,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
         if (_timer < warnDur) return;
 
-        CleanupWarn();
+        // 레인 예고는 불줄기가 그 칸을 다 지날 때까지 남긴다(ClearPassedWarnTiles) — 예전엔 불을 뿜는 순간 통째로 꺼져 휩쓸기 내내 바닥이 비었다(10-08 점검)
         _sweepRootPos = GetSweepStartPosition(ctx);
         ctx.Transform.SetPositionAndRotation(
             KeepBodyInside(ctx, _sweepRootPos), Quaternion.LookRotation(_sweepDir, Vector3.up));
@@ -472,6 +483,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             _meteorSpawnTimer = 0f;
         }
         _nextColIndex  = 0;
+        _breathHit     = false;
         _phase = Phase.Sweep;
         _timer = 0f;
     }
@@ -496,6 +508,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             if (tipProj < colProj + Data.TsunamiLagCells * DragonBossRoomContext.CellSize) break;
 
             ApplyBreathDamage(ctx, colProj);
+            ClearPassedWarnTiles(colProj);
 
             int interval = Mathf.Max(1, Data.TsunamiColInterval);
             if (_nextColIndex % interval == 0)
@@ -512,6 +525,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
         CleanupFlameBreath();
         CleanupFollowLight();
+        CleanupWarn();   // 마지막 열까지 지나 다 걷혔다 — 남은 목록만 비운다
         _sweepIndex++;
 
         if (_sweepIndex < Mathf.Max(1, Data.SweepCount))
@@ -562,13 +576,12 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         _warnCells.Clear();
         float minProj         = float.PositiveInfinity;
         float maxProj         = float.NegativeInfinity;
-        float paddedHalfWidth = _halfLaneWidth + DragonBossRoomContext.CellSize * 0.5f;
-
+        // 칸 중심이 반폭 안인 칸만(판정과 같은 폭 — 위와 같다)
         foreach (var cell in DragonBossRoomContext.GetInteriorCells())
         {
             Vector3 delta = DragonBossRoomContext.CellToWorld(cell.x, cell.y, 0f) - _laneCenter;
             float   perp  = Mathf.Abs(Vector3.Dot(delta, _sweepRight));
-            if (perp > paddedHalfWidth) continue;
+            if (perp > _halfLaneWidth) continue;
 
             float proj = Vector3.Dot(delta, _sweepDir);
             minProj    = Mathf.Min(minProj, proj);
@@ -612,14 +625,13 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         _warnCells.Clear();
         float minProj = float.PositiveInfinity;
         float maxProj = float.NegativeInfinity;
-        float paddedHalfWidth = _halfLaneWidth + DragonBossRoomContext.CellSize * 0.5f;
-
+        // 칸 중심이 반폭 안인 칸만 — 칸 끝이 반폭 + 반 칸(판정과 같은 폭)까지 덮는다(10-13 검증: 칸은 ±8.5, 판정은 ±7.5였다)
         foreach (var cell in DragonBossRoomContext.GetInteriorCells())
         {
             Vector3 world = DragonBossRoomContext.CellToWorld(cell.x, cell.y, 0f);
             Vector3 delta = world - _laneCenter;
             float perp = Mathf.Abs(Vector3.Dot(delta, _sweepRight));
-            if (perp > paddedHalfWidth) continue;
+            if (perp > _halfLaneWidth) continue;
 
             float proj = Vector3.Dot(delta, _sweepDir);
             minProj = Mathf.Min(minProj, proj);
@@ -829,6 +841,14 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         foreach (var mb in go.GetComponentsInChildren<VariousTranslateMove>(true))
             mb.enabled = false;
 
+        // 잔불 판정 사각형(진행 ±반길이 · 가로 ±HalfWidth) 그대로 바닥에 깐다 — 불길 이펙트는 앞으로 부푼 반타원 고리라 어디까지 타는지 안 보였다(10-08 점검).
+        // 화살표 데칼(PatternGuideHelper.Beam)은 꼬리 30%가 투명해 사각형을 다 못 덮는다 — 레인 예고와 같은 평면 칸을 쓴다
+        var (guideGo, guideMr, guideMat) = QuadTilePool.Rent();
+        guideGo.name = "BreathSweepTsunamiGuide";
+        guideGo.transform.SetPositionAndRotation(pos + Vector3.up * 0.02f, Quaternion.LookRotation(Vector3.down, _sweepDir));
+        guideGo.transform.localScale = new Vector3(_halfLaneWidth * 2f, TsunamiHalfLength() * 2f, 1f);
+        guideMat.color = TsunamiGuideColor;
+
         _tsunamis.Add(new TsunamiEntry
         {
             Go = go,
@@ -837,6 +857,9 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             Right = _sweepRight,
             HalfWidth = _halfLaneWidth,
             SweepIndex = _sweepIndex,
+            GuideGo  = guideGo,
+            GuideMr  = guideMr,
+            GuideMat = guideMat,
         });
 
         // 이 라인(sweep)의 첫 화염 패치일 때만 루프 사운드 1개 시작 — 패치마다 개별 재생하지 않음
@@ -887,13 +910,14 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
             if (entry.TickTimer >= Data.TsunamiTickInterval)
             {
-                entry.TickTimer = 0f;
+                entry.TickTimer -= Data.TsunamiTickInterval;   // 나머지는 넘긴다 — 0으로 되돌리면 틱 간격이 프레임만큼 늘어 피해가 프레임률을 탔다(10-08 점검)
                 ApplyTsunamiDamage(ctx, entry);
             }
 
             if (entry.Timer >= Data.TsunamiDuration)
             {
                 if (entry.Go != null) BossEffectPool.Release(entry.Go);
+                QuadTilePool.Return(entry.GuideGo, entry.GuideMr, entry.GuideMat);
                 ReleaseLineFireSlot(entry.SweepIndex);
                 _tsunamis.RemoveAt(i);
                 continue;
@@ -912,7 +936,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         float playerProj = Vector3.Dot(delta, _sweepDir);
         float playerPerp = Mathf.Abs(Vector3.Dot(delta, _sweepRight));
         if (Mathf.Abs(playerProj - projection) > DragonBossRoomContext.CellSize * 0.5f) return;
-        if (playerPerp > _halfLaneWidth) return;
+        if (playerPerp > _halfLaneWidth + DragonBossRoomContext.CellSize * 0.5f) return;   // 그린 칸 끝까지 = 판정
 
         Vector3 origin = ctx.Transform.position;
         if (Data.BreathBlockMask != 0)
@@ -924,10 +948,12 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         }
 
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
-        if (player == null) return;
+        if (player == null || _breathHit) return;
 
+        _breathHit = true;
+        // 한 번 지날 때 한 번 맞는 큰 한 방(1.5배) — 연출 등급은 피해량대로(약으로 두면 잔불 틱 묶기가 이 한 방의 피격 연출을 삼켰다 · 10-08 점검)
         player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.BreathDamageMultiplier), ctx.Monster.gameObject,
-                          false, HitWeight.Light);   // 휩쓸기 불길 틱 — 약
+                          false, HitWeight.Auto);
         PlayerStatusEffectVisuals.ApplyScreenEffectTimed(Data.ScreenFireEffectPrefab, 1f, Data.ScreenFireGraceDuration, "StatusEffectScreen_" + StatusEffectType.Slow);
     }
 
@@ -938,7 +964,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         Vector3 delta = ctx.Runtime.PlayerTarget.position - entry.Center;
         float along = Mathf.Abs(Vector3.Dot(delta, entry.Direction));
         float perp = Mathf.Abs(Vector3.Dot(delta, entry.Right));
-        float halfLength = Mathf.Max(1, Data.TsunamiColInterval / 2) * DragonBossRoomContext.CellSize;
+        float halfLength = TsunamiHalfLength();
         if (along > halfLength || perp > entry.HalfWidth) return;
 
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
@@ -949,6 +975,9 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
                           false, HitWeight.Light);
         PlayerStatusEffectVisuals.ApplyScreenEffectTimed(Data.ScreenFireEffectPrefab, 1f, Data.ScreenFireGraceDuration, "StatusEffectScreen_" + StatusEffectType.Slow);
     }
+
+    /// <summary>잔불 판정 반길이(진행 방향) — 판정과 바닥 표시가 같은 값을 쓴다(10-08 점검).</summary>
+    private float TsunamiHalfLength() => Mathf.Max(1, Data.TsunamiColInterval / 2) * DragonBossRoomContext.CellSize;
 
     private void ApplyDragonSlow(MonsterContext ctx)
     {
@@ -988,11 +1017,26 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private void CleanupWarn()
     {
-        for (int i = 0; i < _warnTiles.Count; i++)
+        for (int i = _passedWarnCount; i < _warnTiles.Count; i++)   // 앞쪽은 이미 걷어 풀에 돌려줬다
             QuadTilePool.Return(_warnTiles[i], _warnMrs[i], _warnMats[i]);
         _warnTiles.Clear();
         _warnMats.Clear();
         _warnMrs.Clear();
+        _passedWarnCount = 0;
+    }
+
+    // 불줄기가 다 지나간 칸만 걷는다(칸은 진행 방향 순으로 깔려 있다) — 지난 자리는 잔불 판정 칸이 이어받는다(10-08 점검)
+    private void ClearPassedWarnTiles(float colProj)
+    {
+        float cell   = DragonBossRoomContext.CellSize;
+        // 판정 열 앞끝(colProj + 반 칸) − 칸이 진행 방향으로 뻗은 반폭(사선이면 대각선 쪽으로 길다)
+        float passed = colProj + cell * 0.5f - cell * 0.5f * (Mathf.Abs(_sweepDir.x) + Mathf.Abs(_sweepDir.z));
+        while (_passedWarnCount < _warnTiles.Count
+               && Vector3.Dot(_warnTiles[_passedWarnCount].transform.position - _laneCenter, _sweepDir) <= passed)
+        {
+            QuadTilePool.Return(_warnTiles[_passedWarnCount], _warnMrs[_passedWarnCount], _warnMats[_passedWarnCount]);
+            _passedWarnCount++;
+        }
     }
 
     // ─── Scorch marks ────────────────────────────────────────────────────────
@@ -1192,7 +1236,11 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private void CleanupAllTsunamis()
     {
-        foreach (var entry in _tsunamis) if (entry.Go != null) BossEffectPool.Release(entry.Go);
+        foreach (var entry in _tsunamis)
+        {
+            if (entry.Go != null) BossEffectPool.Release(entry.Go);
+            QuadTilePool.Return(entry.GuideGo, entry.GuideMr, entry.GuideMat);
+        }
         _tsunamis.Clear();
         StopAllLineFireAudio();
     }
@@ -1288,8 +1336,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
                 if (e.WarnTimer >= Data.MeteorPattern.WarningDuration)
                 {
                     e.Falling  = true;
-                    e.FallTimer = 0f;
-                    DestroyMeteorWarnTiles(ref e);
+                    e.FallTimer = 0f;   // 예고 칸은 착탄 때 걷는다(10-08 점검 — 걷힌 뒤 0.6초에 맞았다)
                     if (Data.MeteorPattern.FireballPrefab != null)
                     {
                         e.Projectile = BossEffectPool.Spawn(Data.MeteorPattern.FireballPrefab, e.LandPos, Quaternion.identity);
@@ -1306,6 +1353,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
                 if (!e.ImpactApplied && e.FallTimer >= Data.MeteorPattern.ImpactDelay)
                 {
                     e.ImpactApplied = true;
+                    DestroyMeteorWarnTiles(ref e);
                     ApplyMeteorImpact(ctx, ref e);
                     if (e.Projectile != null)
                         foreach (var ps in e.Projectile.GetComponentsInChildren<ParticleSystem>(true))
@@ -1337,7 +1385,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             float halfExtent = (e.HalfR + 0.5f) * DragonBossRoomContext.CellSize;
             Vector3 d = playerPos - e.LandPos;
             if (Mathf.Abs(d.x) <= halfExtent && Mathf.Abs(d.z) <= halfExtent)
-                ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()?.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.MeteorPattern.DamageMultiplier));
+                ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()?.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.MeteorPattern.DamageMultiplier), ctx.Monster.gameObject);   // 공격자 = 화룡(10-08 점검)
         }
     }
 

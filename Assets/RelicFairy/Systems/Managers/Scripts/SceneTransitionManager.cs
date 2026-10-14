@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Cysharp.Threading.Tasks;
@@ -41,17 +41,18 @@ public sealed class SceneTransitionManager
         while (op.progress < 0.9f)
         {
             display = Mathf.MoveTowards(display, op.progress / 0.9f, Time.unscaledDeltaTime * speed);
-            loading?.SetProgress(display);
+            loading?.SetProgress(display * UI_SceneLoading.LoadShare);
             await UniTask.Yield(PlayerLoopTiming.Update);
         }
         while (display < 1f)
         {
             display = Mathf.MoveTowards(display, 1f, Time.unscaledDeltaTime * speed);
-            loading?.SetProgress(display);
+            loading?.SetProgress(display * UI_SceneLoading.LoadShare);
             await UniTask.Yield(PlayerLoopTiming.Update);
         }
         op.allowSceneActivation = true;
         await UniTask.WaitUntil(() => op.isDone);
+        loading?.CreepUntilReadyAsync().Forget();   // 씬 준비(NotifySceneReady)까지 90 → 99%
 
         onLoaded?.Invoke();
         // 오버레이 숨김은 각 씬의 부트스트래퍼가 NotifySceneReady() 호출 시 처리

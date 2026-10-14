@@ -17,9 +17,10 @@ public sealed class HudView : MonoBehaviour
     // 재화별 테두리 틴트 — 같은 테두리 아트를 색으로만 구분한다(재화당 아트를 따로 받지 않기 위함).
     // 소비처와 색을 1:1로 묶어 "이 색 = 이 방에서 쓰는 것"이 학습되게 한다.
     private static readonly Color GoldFrameTint    = new(0.85f, 0.70f, 0.29f); // 골드   → 상점
-    private static readonly Color EnhanceFrameTint = new(0.90f, 0.55f, 0.20f); // 강화재료 → 재련소
-    private static readonly Color RuneOreFrameTint = new(0.35f, 0.70f, 0.95f); // 원석    → 정제소
-    private static readonly Color EssenceFrameTint = new(0.29f, 0.76f, 0.67f); // 정수    → 기억의 제단
+    // 10-13: 납품 아이콘 색(푸른 결정 · 초록 시험관 · 남보라 캡슐)에 맞춘다 — 예전 주황 · 하늘 · 청록은 아이콘과 어긋났다(UIPalette 재화 색과 같은 색조).
+    private static readonly Color EnhanceFrameTint = new(0.30f, 0.55f, 0.95f); // 강화재료 → 재련소
+    private static readonly Color RuneOreFrameTint = new(0.32f, 0.74f, 0.48f); // 원석    → 정제소
+    private static readonly Color EssenceFrameTint = new(0.55f, 0.47f, 0.90f); // 정수    → 기억의 제단
 
     // 툴팁 문구 — 소비처 + "런이 끝나면 사라진다"(하드리셋 규칙을 재화 단에서 알린다).
     private const string TipGoldTitle    = "골드";
@@ -38,6 +39,10 @@ public sealed class HudView : MonoBehaviour
     private const float CovenantLabelH   = 26f;    // 서약 칸 위 「서약 n/N」 글자 몫
     private const float CovenantMinScale = 0.72f;  // 짧은 화면비에서 서약 칸을 이만큼까지 줄인다
     private const float NoticeSideGap    = 16f;    // 왼쪽 기둥 ↔ 발동 알림 줄(10-02 「패시브 텍스트의 가시성」)
+    // 재화 알약(톤 v2, 10-11) — 납품 「칸_테두리」(검정 선이 150×40에서 2px)를 같은 육각 모양의 1px 잉크 18% 선으로.
+    // 뾰족한 끝의 들어간 폭 = 납품 그림 비율(32 / 344).
+    private const float CurrencyValueSize = 24f;   // 재화 숫자 — 크기 그대로(하데스 23 · 하데스 II 22), 글꼴만 Noto Medium
+    private const float PillSlant         = 32f / 344f;
     private static readonly Vector3[] s_corners = new Vector3[4];
 
     [Header("Sections")]
@@ -85,6 +90,8 @@ public sealed class HudView : MonoBehaviour
     private TMP_Text      _essenceText;
     private bool          _essenceSeen;
     private bool          _currencyBuilt;
+    private bool          _currencyFontsApplied;   // 재화 숫자를 Noto Medium으로 다 발랐는가(글꼴은 앱 부트 뒤 늦게 올라온다)
+    private Sprite        _pillLine;               // 재화 알약 1px 테(알약 크기로 한 번 굽는다)
 
     // 재화 표시 정책 — "실제로 얻은 재화만 보인다".
     // 한 번 획득하면 그 런 동안은 계속 보인다(0으로 써 버렸다고 칸이 사라지면 깜빡여 읽기 나쁘다).
@@ -127,7 +134,11 @@ public sealed class HudView : MonoBehaviour
             nicknameText.gameObject.SetActive(false);
     }
 
-    private void LateUpdate() => LayoutLeftColumn();
+    private void LateUpdate()
+    {
+        if (!_currencyFontsApplied) TryStyleCurrencyFonts();
+        LayoutLeftColumn();
+    }
 
     /// <summary>
     /// 재화 라인 1줄 생성 — 골드 · 강화재료 · 원석이 <b>같은 줄</b>에 <b>같은 배경(골드바 내부)</b>을 공유한다.
@@ -211,7 +222,10 @@ public sealed class HudView : MonoBehaviour
         hit.raycastTarget = true;
 
         AddStretchedImage(prt, "Inner", goldInnerSprite);            // 모든 재화 공통 배경
-        AddStretchedImage(prt, "Frame", frame, frameTint);           // 테두리는 재화색으로 틴트
+        if (CombatPanelView.ThinHud && frame != null)
+            AddStretchedImage(prt, "Frame", PillLine(currencyPillSize), UITheme.Thin.LineIdle, sliced: false);   // 톤 v2 — 1px 평소 선
+        else
+            AddStretchedImage(prt, "Frame", frame, frameTint);       // 테두리는 재화색으로 틴트
         UITooltipTrigger.Attach(prt.gameObject, tipTitle, tipBody, frameTint);
 
         // 내용(아이콘 + 수치) — 테두리 안쪽으로 인셋
@@ -271,7 +285,7 @@ public sealed class HudView : MonoBehaviour
         return pill;
     }
 
-    private static void AddStretchedImage(Transform parent, string name, Sprite sprite, Color? tint = null)
+    private static void AddStretchedImage(Transform parent, string name, Sprite sprite, Color? tint = null, bool sliced = true)
     {
         if (sprite == null) return;
 
@@ -285,9 +299,59 @@ public sealed class HudView : MonoBehaviour
 
         var img = go.GetComponent<Image>();
         img.sprite        = sprite;
-        img.type          = Image.Type.Sliced;
+        img.type          = sliced ? Image.Type.Sliced : Image.Type.Simple;
         img.color         = tint ?? Color.white;
         img.raycastTarget = false;
+    }
+
+    /// <summary>
+    /// 재화 알약 테(톤 v2) — 납품 「칸_테두리」와 같은 길쭉한 육각(좌우 끝이 뾰족)을 1px 선으로 굽는다. 알약 크기 그대로 한 장(늘리지 않는다).
+    /// 2배 해상도 · 가장자리 1px 안티에일리어싱(UIThinShapes와 같은 방식).
+    /// </summary>
+    private Sprite PillLine(Vector2 size)
+    {
+        if (_pillLine != null) return _pillLine;
+        const int k = UIThinShapes.Oversample;
+        int tw = Mathf.Max(4, Mathf.RoundToInt(size.x * k)), th = Mathf.Max(4, Mathf.RoundToInt(size.y * k));
+        float s  = UITheme.Thin.Stroke * k;
+        float hx = tw * 0.5f - s * 0.5f - 0.5f, hy = th * 0.5f - s * 0.5f - 0.5f;   // 선 가운데가 지나는 반폭 · 반높이
+        float ex = hx - tw * PillSlant;                                               // 윗변 · 아랫변 끝(뾰족한 끝이 시작되는 곳)
+        _pillLine = UI_RuneSelectPopup.MakeProcSprite("ThinCurrencyPill", tw, th, (u, v) =>
+        {
+            float x = Mathf.Abs((u - 0.5f) * tw), y = Mathf.Abs((v - 0.5f) * th);
+            float d = Mathf.Min(SegDist(x, y, 0f, hy, ex, hy), SegDist(x, y, ex, hy, hx, 0f));   // 한 사분면 = 윗변 + 빗변
+            return Mathf.Clamp01(s * 0.5f + 0.5f - d);
+        });
+        return _pillLine;
+    }
+
+    private static float SegDist(float px, float py, float ax, float ay, float bx, float by)
+    {
+        float dx = bx - ax, dy = by - ay;
+        float t  = Mathf.Clamp01(((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy));
+        float qx = ax + dx * t - px, qy = ay + dy * t - py;
+        return Mathf.Sqrt(qx * qx + qy * qy);
+    }
+
+    /// <summary>
+    /// 재화 숫자 = Noto Medium 24 · 잉크 · 부드러운 그림자(10-11). 재화 줄은 Panel_TopBar 아래라 전투 패널의 일괄 글꼴 패스가 닿지 않아
+    /// 기본 글꼴(DNF Bold)로 남았다. 글꼴이 늦게 올라오면(앱 부트 때 생긴 HUD) 올라온 뒤 한 번 바른다.
+    /// </summary>
+    private void TryStyleCurrencyFonts()
+    {
+        if (!CombatPanelView.ThinHud) { _currencyFontsApplied = true; return; }
+        if (UISkin.ThemeFonts == null) return;
+        _currencyFontsApplied = true;
+        StyleCurrencyValue(goldText);
+        StyleCurrencyValue(_enhanceMatText);
+        StyleCurrencyValue(_runeOreText);
+        StyleCurrencyValue(_essenceText);
+    }
+
+    private static void StyleCurrencyValue(TMP_Text t)
+    {
+        if (t == null) return;
+        UITheme.StyleThinText(t, UIWeight.Medium, CurrencyValueSize, t.color, shadow: true);
     }
 
     public void SetSections(HUDIds.Section sections)
@@ -386,10 +450,12 @@ public sealed class HudView : MonoBehaviour
     /// </summary>
     public void ResetCurrencyVisibility()
     {
-        _goldSeen = _enhanceMatSeen = _runeOreSeen = false;
+        // 정수도 같이 — 빠져 있어 지난 런 정수가 로비에 남고, 다음 런은 시작부터 「0」 칸이 떴다(10-09 출시 점검)
+        _goldSeen = _enhanceMatSeen = _runeOreSeen = _essenceSeen = false;
         if (goldText != null) goldText.text = "0";
         if (_enhanceMatText != null) _enhanceMatText.text = "0";
         if (_runeOreText != null) _runeOreText.text = "0";
+        if (_essenceText != null) _essenceText.text = "0";
         ApplyCurrencyVisibility();
     }
 
@@ -431,7 +497,12 @@ public sealed class HudView : MonoBehaviour
         var notice = combatPanel.ItemNoticeRect;
         float right = combatPanel.LeftColumnRightWorld();
         if (notice != null && !float.IsNaN(right))
-            PlaceBottomLeftAt(notice, right + NoticeSideGap * unit, top + LeftColumnGap * unit);
+        {
+            float floor  = top + LeftColumnGap * unit;
+            float weapon = combatPanel.NoticeFloorWorld();   // 명조형 — 무기 원 · 형 알약 위로(알림 줄이 무기 원을 덮었다, 10-14 SYN_4)
+            if (!float.IsNaN(weapon)) floor = Mathf.Max(floor, weapon + LeftColumnGap * unit);
+            PlaceBottomLeftAt(notice, right + NoticeSideGap * unit, floor);
+        }
 
         if (covenantPanel == null || !covenantPanel.isActiveAndEnabled) return;
         var cov = (RectTransform)covenantPanel.transform;

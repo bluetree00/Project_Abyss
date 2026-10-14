@@ -15,8 +15,23 @@ MonoBehaviour:
   m_GroupName: Characters
   m_GUID: b0930bf1af79c624a8497762c3e7fc29
   m_SerializeEntries:
+  - m_GUID: 0296196c76b8a14448eba2486d733d86
+    m_Address: RelicClass_Gawain
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0b37cb7dea38eb849961ecb1ece16665
+    m_Address: BullTank/BullTank_Ch1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 119497b481e20d54f843d3cf322d7234
     m_Address: LichSkeleton/LichSkeleton
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1e0d91314d01c4145813cc5484d9182b
+    m_Address: BullTank/BullTank_Ch4
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -25,8 +40,28 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4fec165a395d871439df0cae970ec346
+    m_Address: BullTank/BullTank_Ch3
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 53606885d646b554c99b1fb3dbbc1e21
+    m_Address: BullTank/BullTankConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5da846cd9a93c4048ade70b9df2383db
+    m_Address: BullTank/BullTank_Ch2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7d11b99f341fb2e49a0b8cccd382c24a
     m_Address: GawainData
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7f96b93fb9c1ad6428d43baf0c722130
+    m_Address: RelicClass_Lancelot
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

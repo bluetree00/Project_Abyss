@@ -58,6 +58,7 @@ public sealed class TreasureVaultChallenge : WorldInteractionChallenge
         if (m == null || m.Consumed) return;
 
         ConsumeMarker(markerIndex);
+        Managers.Sound?.PlayEvent(SoundEvent.VaultOpen);
         SetLabel(markerIndex, "빈 상자", new Color(0.6f, 0.62f, 0.66f));
         _opened++;
         if (Run?.FuelBank != null) Run.FuelBank.Add(FuelKind.EnhanceMaterial, FuelPerChest);

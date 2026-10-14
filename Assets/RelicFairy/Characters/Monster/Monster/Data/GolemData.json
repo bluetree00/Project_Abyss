@@ -2,9 +2,9 @@
   "monsterName": "Golem",
   "grade": "Normal",
   "stat": {
-    "maxHp": 30,
+    "maxHp": 60,
     "defense": 7.0,
-    "attackPower": 20.0,
+    "attackPower": 40.0,
     "moveSpeed": 1.8,
     "attackRange": 2.0,
     "attackRadius": 2.0,

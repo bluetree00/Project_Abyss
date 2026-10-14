@@ -20,7 +20,7 @@ MonoBehaviour:
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: page_transition
-  breakOverride: -1
+  breakOverride: 1.5
   staggerState: UGetHit Back Right
   chargeState: AttackReady
   roarState: UAttackWindHighStart
@@ -37,7 +37,7 @@ MonoBehaviour:
   bodyHeight: 3
   roarVfxPrefab: {fileID: 1766868900565162, guid: f82a1a892a042c1438f8f4704a37e11b,
     type: 3}
-  roarVfxScale: 4
+  roarVfxScale: 2
   flashColor: {r: 0.75, g: 0.55, b: 1, a: 1}
   roarSfx: {fileID: 0}
   dialogueKey: 

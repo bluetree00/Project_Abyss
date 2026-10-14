@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -136,6 +136,9 @@ public class UI_SaveSlotPanel : UI_Base
     private static RunSaveData ResolveSlotData(RunProgressManager rpm, int i)
     {
         if (rpm == null || i < 0 || i >= RunProgressManager.SlotCount) return null;
+        // 프롤로그를 끝냈는데 기록이 없는 슬롯(예전 판의 런 종료가 기록을 지웠다)은 허브 기록을 다시 세운다 —
+        // 「새 게임」으로 보이면 누르는 순간 메타가 지워진다(10-09 출시 점검).
+        rpm.RepairHubRecord(i);
         var local = rpm.LoadLocalRun(i);
         return local != null && local.hasActiveRun ? local : null;
     }

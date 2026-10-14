@@ -10,7 +10,7 @@ using UnityEngine.UI;
 /// <para>값은 의뢰서 §3을 상점 계열이 먼저 구현한 것 그대로다 — <see cref="ShopUIStyle"/>의 같은 이름 색은 이곳을 가리킨다
 /// (상점·룬 획득·재련소 화면은 바뀌지 않는다). 가게 나무판 · 서약 양피지는 「가게 · 문서」 소품이라 이 규칙 밖이다.</para>
 /// </summary>
-public static class UITheme
+public static partial class UITheme
 {
     // ── 바탕 ─────────────────────────────────────────────
     public static readonly Color Veil     = new(0f, 0f, 0f, 0.80f);

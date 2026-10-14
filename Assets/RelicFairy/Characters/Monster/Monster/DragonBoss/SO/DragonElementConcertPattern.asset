@@ -34,7 +34,7 @@ MonoBehaviour:
   _iceStatus: {fileID: 0}
   _iceVfxPrefab: {fileID: 1965956805206708, guid: 18923174f2b0caa4d9dbc5fe46052f5b,
     type: 3}
-  _iceVfxScale: 1
+  _iceVfxScale: 0.35
   _iceSfx: {fileID: 0}
   _thunderHalfLength: 14
   _thunderWidth: 2.2
@@ -54,7 +54,7 @@ MonoBehaviour:
   _fireStatus: {fileID: 0}
   _fireVfxPrefab: {fileID: 4830294202082529915, guid: 2850b16fc529cf247beb49ced59cb6c5,
     type: 3}
-  _fireVfxScale: 1
+  _fireVfxScale: 1.8
   _fireSfx: {fileID: 0}
   _groundStateName: UAttackWindHighStart
   _airStateName: Airborne_Hover

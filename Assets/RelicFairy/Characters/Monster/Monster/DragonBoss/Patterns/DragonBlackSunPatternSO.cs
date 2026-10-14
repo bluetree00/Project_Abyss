@@ -313,7 +313,7 @@ internal sealed class DragonBlackSunState : FullLockState<DragonBlackSunPatternS
     {
         _wingsBroken++;
         if (_ctx != null) Managers.Sound?.PlayEffectAt(Data.BreakSfx, wing.transform.position);
-        LichCinematics.Flash(PatternGuideHelper.Breakable, 0.15f, 0.2f);
+        // 화면 번쩍 뺌 — 날개 자리 부서짐 이펙트 · 소리가 같은 뜻(10-11 이펙트 톤 2차)
     }
 
     // ── 격추 → 그로기 ────────────────────────────────────────────────────────

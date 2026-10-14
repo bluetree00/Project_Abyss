@@ -7,7 +7,7 @@ using System.Threading;
 
 /// <summary>
 /// 우측 아이템 정보 패널 — 룬 선택 카드와 같은 얼굴(09-25 UX 시안 「룬 선택 규격」).
-/// 등급 보석 테두리 · 문양과 등급빛 · 이름 · 등급/속성 칩 · 효과 전부 · 작은 모양 + 놓을 자리.
+/// 등급 보석 테두리 · 문양과 등급빛 · 이름 · 등급/속성 칩 · 효과 전부 · 작은 모양(「놓을 자리」는 10-08에 뺐다 — 블록 수는 시너지 머리띠).
 ///
 /// 표시 우선순위:
 /// 1. 방금 획득한 아이템 (ShowItem isNew=true)
@@ -45,9 +45,6 @@ public sealed class ItemInfoPanel : MonoBehaviour
     [SerializeField] private RectTransform cardRoot;     // 등급 보석 테두리·뒤집기 대상
     [SerializeField] private Image         iconGlow;     // 문양 뒤 등급빛
     [SerializeField] private RectTransform chipRow;      // 등급·칸 수 / 속성 칩
-    [SerializeField] private Image         fitBorder;    // 놓을 자리 배지
-    [SerializeField] private Image         fitFill;
-    [SerializeField] private TMP_Text      fitLabel;
 
     [Header("빈 상태")]
     [SerializeField] private GameObject  emptyRoot;
@@ -136,15 +133,16 @@ public sealed class ItemInfoPanel : MonoBehaviour
         // 효과 목록 — 전부 보여준다(한 개만 보이면 둘째 효과가 없는 룬으로 읽힌다)
         BuildEffectList(item);
 
-        // 모양 + 놓을 자리
+        // 모양
         BuildShapePreview(item);
-        RefreshFitBadge(item);
 
         // 등급 보석 테두리·전설 광택 — 카드 위에 얹는다
         if (cardRoot != null)
         {
-            RuneCardKit.BuildGemFrame(cardRoot, item.rarity, GEM_CORNER_W, GEM_BAR_W);
+            RuneCardKit.BuildGemFrame(cardRoot, item.rarity, GEM_CORNER_W, GEM_BAR_W,
+                                      scale: UI_GridPanel.ThinGrid ? UI_GridPanel.ThinGemScale : 1f, thin: UI_GridPanel.ThinGrid);
             RebuildLegendShine(item.rarity == ItemRarity.Legendary);
+            if (newBadge != null) newBadge.transform.SetAsLastSibling();   // NEW가 보석 테에 가리지 않게(테는 매번 새로 얹힌다)
         }
 
         if (changed || slideIn)
@@ -212,28 +210,6 @@ public sealed class ItemInfoPanel : MonoBehaviour
         if (shapePreviewRoot == null) return;
         // 칸 크기는 자리(상자)에 맞춰 줄어든다 — 12칸 전설도 같은 상자에 들어간다.
         RuneCardKit.BuildShape(shapePreviewRoot, item.shapeId > 0 ? item : null, MINI_CELL_SIZE, MINI_CELL_GAP);
-    }
-
-    /// <summary>
-    /// 놓을 자리 배지. 이미 판에 놓인 룬은 「판에 놓임」 — 놓인 룬을 다시 판정하면 자기 자리를 모르고 "없음"이 뜬다.
-    /// </summary>
-    private void RefreshFitBadge(RuntimeItemData item)
-    {
-        if (fitLabel == null) return;
-
-        bool placed = IsPlaced(item);
-        bool ok     = placed || RuneCardKit.CanPlace(item);
-        RuneCardKit.ApplyFitBadge(fitBorder, fitFill, fitLabel, ok,
-            placed ? "판에 놓임" : ok ? "놓을 자리 있음" : "놓을 자리 없음");
-    }
-
-    private static bool IsPlaced(RuntimeItemData item)
-    {
-        var placed = GameRunBootstrapper.Instance?.Run?.ItemInventory?.PlacedItems;
-        if (placed == null || item == null) return false;
-        foreach (var p in placed)
-            if (p == item) return true;
-        return false;
     }
 
     // ── 전설 광택 ──

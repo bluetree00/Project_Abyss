@@ -28,6 +28,16 @@ public sealed class DungeonSpaceSetSO : ScriptableObject
         public GameObject spawnMark;
         [Tooltip("도착 마법진 배율")]
         public float spawnMarkScale;
+
+        // ── 10-12 챕터 공기(구현설계 「챕터별_톤·포그·배경_점검_20261012」) ──
+        [Tooltip("직사광 색 — 알파 0이면 씬 값 그대로. MCP가 조명 Color를 못 바꿔 런 시작 때 여기서 입힌다")]
+        public Color sunColor;
+        [Tooltip("해방기 · 악몽 모드 색 — 안개 · 환경광 · 직사광 · 그림자를 이 색조로 민다(밝기는 그대로). 알파 = 세기, 0 = 시기 변화 없음")]
+        public Color eraTint;
+        [Tooltip("분위기 입자 1종(절제) — 플레이어를 따라가며 월드 공간에 흩날린다. 비우면 없음")]
+        public GameObject ambientFx;
+        [Tooltip("분위기 입자 방출 배율 — 0이면 원본 그대로")]
+        public float ambientFxRate;
     }
 
     [SerializeField] private List<Entry> entries = new();

@@ -19,9 +19,9 @@ MonoBehaviour:
     m_Bits: 64
   visualHeightMeters: 1.4
   stat:
-    maxHp: 10
+    maxHp: 14
     defense: 1
-    attackPower: 45
+    attackPower: 30
     moveSpeed: 5
     attackRange: 1.5
     attackRadius: 1.5
@@ -72,6 +72,15 @@ MonoBehaviour:
     earth:
       resistance: 1
       overrideState: {fileID: 0}
+  death:
+    despawnDelay: 0.5
+    dissolveDuration: 0.35
+    deathVfxKey: MonsterDeathBurst
+    deathVfxScale: 1.24
+    deathVfxHeight: 0.7
+    deathVfxUnscaled: 1
+    killHitStopScale: 0.04
+    killHitStopDuration: 0.09
   specialStates: []
   stateOverrides:
   - {fileID: 11400000, guid: e2be1d456659420dbf1cc2f9fa74253f, type: 2}

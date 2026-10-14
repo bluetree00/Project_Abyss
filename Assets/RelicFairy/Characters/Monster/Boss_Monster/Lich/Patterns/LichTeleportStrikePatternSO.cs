@@ -87,6 +87,7 @@ public class LichTeleportStrikeState : UnInterruptibleState<LichTeleportStrikePa
     private float      _dropFromY;
     private GameObject _targetDisc;
     private bool       _signaled;
+    private bool       _dropFromLeap;   // 2차 이후 도약의 낙하 — 예고 채움을 이어 간다
     private int        _leap;       // 지금 몇 번째 도약(1부터)
     private Vector3    _leapFrom;
 
@@ -182,6 +183,7 @@ public class LichTeleportStrikeState : UnInterruptibleState<LichTeleportStrikePa
                 {
                     _phase = Phase.Drop;
                     _timer = 0f;
+                    _dropFromLeap = true;
                 }
                 break;
             }
@@ -189,11 +191,16 @@ public class LichTeleportStrikeState : UnInterruptibleState<LichTeleportStrikePa
             case Phase.Drop:
             {
                 float t = Mathf.Clamp01(_timer / Data.dropDuration);
+                // 2차 도약 — 낙하 동안에도 예고를 채우고 신호를 띄운다(10-13 검증: 떠오름 끝에서 69%로 멈췄다)
+                if (_dropFromLeap)
+                    LichPatternUtil.TickTelegraph(_targetDisc, Mathf.Max(0.05f, Data.nextLeapWarn - Data.dropDuration) + _timer,
+                                                  Data.nextLeapWarn, SignalSeconds, ref _signaled);
                 float floor = LichPatternUtil.FloorY(ctx);
                 mc?.SnapAltitude(Mathf.Lerp(_dropFromY, floor, t * t));
 
                 if (t >= 1f)
                 {
+                    _dropFromLeap = false;
                     Land(ctx);
                     _phase = Phase.Punish;
                     _timer = 0f;
@@ -217,7 +224,7 @@ public class LichTeleportStrikeState : UnInterruptibleState<LichTeleportStrikePa
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }

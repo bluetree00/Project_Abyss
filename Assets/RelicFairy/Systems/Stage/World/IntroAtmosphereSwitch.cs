@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -9,6 +9,8 @@ using UnityEngine;
 /// </summary>
 public sealed class IntroAtmosphereSwitch : MonoBehaviour
 {
+    private static readonly int SkyExposureId = Shader.PropertyToID("_Exposure");
+
     // ── [SerializeField] ─────────────────────────────────────────────
     [Header("라이트 세트 (오브젝트 토글)")]
     [Tooltip("밝은 상태에서 켜질 오브젝트(창 성광·볼류메트릭 등).")]
@@ -34,11 +36,23 @@ public sealed class IntroAtmosphereSwitch : MonoBehaviour
     [SerializeField, Min(0f)] private float brightFogDensity = 0.004f;
     [SerializeField, Min(0f)] private float darkFogDensity   = 0.018f;
 
+    [Header("하늘 (스카이박스 노출)")]
+    [Tooltip("어둠 상태의 스카이박스 노출 — 성당 벽 틈으로 한낮 하늘이 하얗게 뚫려 보였다(10-09 전주기 시뮬). 복제본에만 걸어 원본 재질은 그대로.")]
+    [SerializeField, Min(0f)] private float darkSkyExposure = 0.08f;
+
     [Header("초기 상태")]
     [SerializeField] private bool startBright = true;
 
+    // ── Private ──────────────────────────────────────────────────────
+    private Material _skyInstance;
+
     // ── Lifecycle ────────────────────────────────────────────────────
     private void Awake() => ApplyInstant(startBright);
+
+    private void OnDestroy()
+    {
+        if (_skyInstance != null) Destroy(_skyInstance);
+    }
 
     // ── Public ───────────────────────────────────────────────────────
     /// <summary>지정 시간에 걸쳐 밝은→어둠으로 <b>보이게</b> 전환(웅장한 배경 페이드). duration&lt;=0이면 즉시.</summary>
@@ -53,6 +67,8 @@ public sealed class IntroAtmosphereSwitch : MonoBehaviour
         Color ambFrom  = RenderSettings.ambientLight;
         Color fogFrom  = RenderSettings.fogColor;
         float fogDFrom = RenderSettings.fogDensity;
+        Material sky   = DarkableSky();
+        float skyFrom  = sky != null ? sky.GetFloat(SkyExposureId) : 0f;
 
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
         if (controlFog) RenderSettings.fog = true;
@@ -74,6 +90,7 @@ public sealed class IntroAtmosphereSwitch : MonoBehaviour
                 RenderSettings.fogColor   = Color.Lerp(fogFrom, darkFog, k);
                 RenderSettings.fogDensity = Mathf.Lerp(fogDFrom, darkFogDensity, k);
             }
+            if (sky != null) sky.SetFloat(SkyExposureId, Mathf.Lerp(skyFrom, darkSkyExposure, k));
 
             try { await UniTask.Yield(PlayerLoopTiming.Update, ct); }
             catch (System.OperationCanceledException) { return; }
@@ -154,6 +171,20 @@ public sealed class IntroAtmosphereSwitch : MonoBehaviour
             RenderSettings.fogColor   = bright ? brightFog : darkFog;
             RenderSettings.fogDensity = bright ? brightFogDensity : darkFogDensity;
         }
+
+        // 밝은 쪽은 씬 하늘 그대로(복제본을 만들지 않는다) — 어둠으로 간 뒤에만 노출을 내린다.
+        if (!bright) DarkableSky()?.SetFloat(SkyExposureId, darkSkyExposure);
+    }
+
+    /// <summary>노출을 바꿀 수 있는 하늘의 복제본 — 처음 한 번 만들어 RenderSettings에 건다(원본 재질 에셋을 플레이 중에 고치지 않게).</summary>
+    private Material DarkableSky()
+    {
+        if (_skyInstance != null) return _skyInstance;
+        var sky = RenderSettings.skybox;
+        if (sky == null || !sky.HasProperty(SkyExposureId)) return null;
+        _skyInstance = new Material(sky);
+        RenderSettings.skybox = _skyInstance;
+        return _skyInstance;
     }
 
     private static void SetActiveAll(GameObject[] objs, bool on)

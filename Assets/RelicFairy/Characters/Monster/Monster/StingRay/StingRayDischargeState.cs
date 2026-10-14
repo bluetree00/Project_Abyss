@@ -50,7 +50,7 @@ public class StingRayDischargeState : UnInterruptibleState<StingRayDischargeData
                 // 예전엔 넉백 0만 걸고 피해를 주지 않았다(플레이어가 맞아도 무해) — 성난 버섯 포자와 같은 방식으로 준다.
                 if (playerHit) continue;
                 playerHit = true;
-                player.TakeDamage(Mathf.RoundToInt(damage * ctx.Runtime.AttackMultiplier));
+                player.TakeDamage(Mathf.RoundToInt(damage * ctx.Runtime.AttackMultiplier), ctx.Transform.gameObject);
                 player.ApplyKnockback((player.transform.position - ctx.Transform.position).normalized * 3f, 0.3f);
                 continue;
             }

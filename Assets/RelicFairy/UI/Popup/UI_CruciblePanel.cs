@@ -16,8 +16,11 @@ using UnityEngine.UI;
 ///  - 대사 밴드(하단): 대장장이 초상 · 대사 · 이벤트/위험 배지
 ///
 /// 제물(sacrifice) 메커닉은 제거됨 — 한 무기에 집중하는 강화. 데이터/계산/결정성은 CrucibleRoomController가 권위.
+///
+/// v3 「한눈에」(10-14)는 이 구운 판을 Bind 때 창 1560×880 · 왼쪽 판(무엇이 좋아지나) · 오른쪽 판(될까 · 얼마)으로 다시 앉힌다 —
+/// <c>UI_CruciblePanel.V3.cs</c>. 위 배치(무대 60% · 정보 35% · 대사 밴드)는 굽기 · 코드 빌드가 만드는 바탕이다.
 /// </summary>
-public sealed class UI_CruciblePanel : UI_Popup
+public sealed partial class UI_CruciblePanel : UI_Popup
 {
     public override bool BlocksGameplay => true; // 재련 중 시간정지 + 입력잠금
     public override bool CloseOnEscape  => true; // ESC = 나가기(기존 동작, EscKeyListener 공용 경로)
@@ -78,6 +81,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     private const float ResultPopDur    = 0.12f;  // 등장(큰 글씨 → 제자리)
     private const float ResultHoldDur   = 0.85f;
     private const float ResultFadeDur   = 0.30f;
+    private const float StampTierHold   = 0.80f;  // 도장 아래 「스킬 N단계 — …」 줄이 있으면 더 머문다(두 줄을 읽는 틈)
     private const float SuccessFontSize = 64f;    // 무기 위 한가운데 도장
     private const float SuccessPopScale = 1.35f;
     private const float JackpotFontSize = 72f;    // 잭팟은 한눈에 다르게
@@ -152,9 +156,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     private static readonly Color EventInk     = new(1f, 0.76f, 0.63f, 1f);
     private static readonly Color RowLine      = new(1f, 0.78f, 0.55f, 0.12f);
     private static readonly Color TickDim      = new(0.70f, 0.62f, 0.52f, 1f);   // 09-25: 0.49 → 0.70(검은 막대 밑에서 안 읽혔다)
-    private static readonly Color TickNext     = new(1f, 0.80f, 0.55f, 1f);      // 다음 단계 — 성공하면 닿는 곳
     private static readonly Color GhostColor   = new(1f, 0.55f, 0.20f, 0.55f);   // 다음 한 칸 미리보기(맥박)
-    private static readonly Color TickDanger   = new(1f, 0.54f, 0.44f, 1f);
     private static readonly Color TickLine     = new(1f, 0.78f, 0.55f, 0.18f);
     private static readonly Color MatTint      = new(0.90f, 0.55f, 0.20f, 1f);    // HUD 강화재료 테두리색
     private static readonly Color OreTint      = new(0.35f, 0.70f, 0.95f, 1f);    // HUD 원석 테두리색
@@ -177,8 +179,6 @@ public sealed class UI_CruciblePanel : UI_Popup
     private static readonly Color HammerEdge   = new(0.17f, 0.18f, 0.21f, 1f);
     private static readonly Color HammerSteel  = new(0.60f, 0.63f, 0.68f, 1f);
     private static readonly Color HammerShine  = new(0.91f, 0.93f, 0.95f, 0.9f);
-    private static readonly Color EvolveReady  = new(0.40f, 0.28f, 0.62f, 1f);
-    private static readonly Color EvolveLocked = new(0.12f, 0.10f, 0.13f, 0.9f);
     // 진화 갈래 성격 — 원색을 피한 두 결: 서늘한 강철빛(빠른 검) · 화로의 잉걸빛(묵직한 검)
     private static readonly Color FastTint  = new(0.62f, 0.80f, 0.95f, 1f);
     private static readonly Color HeavyTint = new(0.95f, 0.62f, 0.32f, 1f);
@@ -188,7 +188,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     private static readonly Color CardSolid   = new(0.10f, 0.07f, 0.05f, 1f);
 
     // 진화 선택 · 연출(10-01 개편)
-    private const float EvCardW = 640f, EvCardH = 640f, EvCardY = 176f, EvCardGap = 64f;
+    private const float EvCardW = 640f, EvCardH = 680f, EvCardY = 136f, EvCardGap = 64f;   // 10-08 시안 02 — 형 · 작동 그림 3컷이 들어가며 높아졌다
     private const float EvolveStrikeGap = 0.12f;   // 망치 두 번 사이
     private const float EvolvePopDur    = 0.42f;   // 새 형태가 맺혔다 부푸는 시간
     private const float EvolveStampSize = 60f;
@@ -225,6 +225,8 @@ public sealed class UI_CruciblePanel : UI_Popup
     [SerializeField] private RectTransform  _meleeStage, _rangedStage;
     [SerializeField] private TMP_Text       _stageResult;      // 스테이지 중앙 결과 팝업(두 탭 공용)
     private int            _stageResultSeq;   // 연타 시 이전 페이드가 새 결과를 지우지 않게 하는 세대 번호
+    private TMP_Text       _stampTier;        // 판정 도장 아래 단계 줄(10-13) — 구운 프리팹에 없어 처음 쓸 때 만든다
+    private string         _stampTierNext;    // 다음 도장에 붙일 단계 줄(ShowStageResult가 한 번 쓰고 비운다)
     // 스킬 각인 택1 — 구운 프리팹에 없고 처음 필요할 때 만든다(EnsureEngravePanel).
     private GameObject _engravePanel;
     private TMP_Text   _engraveTitle;
@@ -232,12 +234,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     private readonly List<SkillSO.EngravingDef> _engraveOptions = new();
     private WeaponData _engraveWeapon;
     private SkillSO    _engraveSkill;
-    // 형 단련 택1(장비 개선 Part A — Part B에서 시안 03으로 다시 그린다). 처음 필요할 때 만든다.
-    private GameObject _temperPanel;
-    private TMP_Text   _temperTitle, _temperSub;
-    private readonly TMP_Text[] _temperName = new TMP_Text[2], _temperDesc = new TMP_Text[2];
-    private readonly List<WeaponFormSO.VariantDef> _temperOptions = new(2);
-    private int _temperTierShown, _temperCostShown;
+    // 형 단련 택1 — 정식판(시안 03)은 UI_CruciblePanel.Form.cs(10-08).
     // 전설 승급 택1 — 진화가 끝난 검이 최대 강화에 닿으면 연다(09-27 복원: 승급 줄이 숨겨져 아무도 닿지 못했다).
     private GameObject _legendPanel;
     private readonly List<GameObject> _legendCards = new();
@@ -248,22 +245,14 @@ public sealed class UI_CruciblePanel : UI_Popup
     private readonly EvolveCard[] _evolveCards = new EvolveCard[2];
     private int           _evolvePick = -1;
 
-    private sealed class EvolveCard
-    {
-        public RectTransform root;
-        public CanvasGroup   group;
-        public Image         border, tagBack, glow, icon;
-        public Button        button;
-        public TMP_Text      tag, name, line, skills, foot;
-        public readonly TMP_Text[] statValue = new TMP_Text[4], statDelta = new TMP_Text[4];
-    }
-
     // 들어올 때 고르기(10-01) — 근거리 무기와 원거리 파츠 중 무엇을 벼릴지 먼저 고른다. 구운 프리팹에 없고 처음 필요할 때 만든다.
     private GameObject _chooser;
     private TMP_Text   _chooserSub;
     private readonly Button[]   _chooseCard  = new Button[2];
     private readonly TMP_Text[] _chooseName  = new TMP_Text[2], _chooseBig   = new TMP_Text[2];
-    private readonly TMP_Text[] _chooseLine1 = new TMP_Text[2], _chooseLine2 = new TMP_Text[2], _chooseLine3 = new TMP_Text[2];
+    private readonly TMP_Text[] _chooseLine1 = new TMP_Text[2], _chooseLine2 = new TMP_Text[2];
+    private readonly UIThinFrame[] _chooseFrame = new UIThinFrame[2];   // 1px 테 — 할 수 있는 쪽이 금(준비됨) · 후광 없음(10-11)
+    private readonly CanvasGroup[] _chooseHint  = new CanvasGroup[2];   // 「눌러서 들어간다」 — 호버 때만
     [SerializeField] private Image          _tabWeaponImg, _tabRangedImg;
     private int            _activeTab;   // 0=무기강화 1=원거리 파츠
 
@@ -385,6 +374,9 @@ public sealed class UI_CruciblePanel : UI_Popup
             _controller.OnCrucibleChanged += RefreshAll;
 
         InitRuntimeFx();
+        EnsureFormUi();          // 성장 길 · 형 칸(10-08) — 판을 줄여 길 자리를 낸다. 고르기 화면보다 먼저
+        ApplyUxChrome();         // 위계 · 가독성 v2(10-11) — 구운 글자 · 판 · 대사 띠를 덮어쓴다(재굽기 없이)
+        ApplyV3Layout();         // v3 「한눈에」(10-14) — 창 1560×880 · 왼쪽 판(무엇이 좋아지나) · 오른쪽 판(될까 · 얼마) · 아래 말풍선
         ShopUIStyle.PlaySfx("shop_open");
         _targetSlot = PlayerWeaponManager.Slot0;
         BuildLegendButtons();
@@ -479,7 +471,9 @@ public sealed class UI_CruciblePanel : UI_Popup
             _slotName[i]   = Txt(row, "Nm");
             _slotVal[i]    = Txt(row, "Val");
             _slotLv[i]     = Txt(row, "Lv");
-            _slotBar[i]    = row.Find("LvBar") as RectTransform;
+            // 채움을 잡는다(빌드 경로 BuildBar와 같게) — 트랙을 잡으면 SetBar가 트랙을 행 전체로 늘리고, 막대.parent가 행이 된다(10-14 v3 실측: 행이 막대 자리로 줄었다)
+            var lvBar      = row.Find("LvBar");
+            _slotBar[i]    = (lvBar != null ? lvBar.Find("Fill") as RectTransform : null) ?? lvBar as RectTransform;
             _partsMark[i]  = Txt(row, "Lock");
 
             var enhance = row.Find("RowEnhance");
@@ -537,8 +531,8 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         // 탭 클릭은 람다로 건 <b>비영속 리스너</b>라 프리팹에 저장되지 않는다 —
         // 다시 걸지 않으면 구운 화면에서 원거리 파츠 탭으로 갈 길 자체가 없다.
-        Rewire(FindDeep("TabWeapon")?.GetComponent<Button>(), () => SelectTab(0));
-        Rewire(FindDeep("TabRanged")?.GetComponent<Button>(), () => SelectTab(1));
+        Rewire(FindDeep("TabWeapon")?.GetComponent<Button>(), () => ClickTab(0));
+        Rewire(FindDeep("TabRanged")?.GetComponent<Button>(), () => ClickTab(1));
         SelectTab(0);
     }
 
@@ -579,8 +573,8 @@ public sealed class UI_CruciblePanel : UI_Popup
         Place(sub.rectTransform, 112f, HdrY + 48f, 220f, 24f);
 
         // 탭 — 무기강화 / 원거리 파츠
-        _tabWeaponImg = MakeTab(w, "TabWeapon", "무기강화",    Tab0X, () => SelectTab(0));
-        _tabRangedImg = MakeTab(w, "TabRanged", "원거리 파츠", Tab1X, () => SelectTab(1));
+        _tabWeaponImg = MakeTab(w, "TabWeapon", "무기강화",    Tab0X, () => ClickTab(0));
+        _tabRangedImg = MakeTab(w, "TabRanged", "원거리 파츠", Tab1X, () => ClickTab(1));
 
         // 재화 — HUD와 같은 칸. 이 방에서 쓰는 강화재료가 앞, 원석이 뒤.
         _matPill = MakeCurrencyPill(w, "MatPill", MatPillX, _skin?.MaterialIcon, MatTint, out _fuelText);
@@ -647,6 +641,13 @@ public sealed class UI_CruciblePanel : UI_Popup
         return tab;
     }
 
+    /// <summary>탭 · 첫 화면 카드를 눌렀을 때 — 고르기 소리 + 탭 전환. 코드가 부르는 <see cref="SelectTab"/>은 소리를 내지 않는다.</summary>
+    private void ClickTab(int tab)
+    {
+        ShopUIStyle.PlaySfx(SoundEvent.UiSelect);
+        SelectTab(tab);
+    }
+
     /// <summary>탭 전환 — 스테이지 표시 토글 + 대상 슬롯 전환 + 탭 아트 갱신 + 갱신.</summary>
     private void SelectTab(int tab)
     {
@@ -656,18 +657,28 @@ public sealed class UI_CruciblePanel : UI_Popup
         if (_meleeStage != null)  _meleeStage.gameObject.SetActive(tab == 0);
         if (_rangedStage != null) _rangedStage.gameObject.SetActive(tab == 1);
 
-        ApplyTab(_tabWeaponImg, _skin?.tabWeaponOff, tab == 0);
-        ApplyTab(_tabRangedImg, _skin?.tabRangedOff, tab == 1);
+        if (_v3Ready)
+        {
+            // v3(10-14) — 탭은 글자 + 금 밑줄
+            ApplyTabV3(_tabWeaponImg, tab == 0);
+            ApplyTabV3(_tabRangedImg, tab == 1);
+        }
+        else
+        {
+            ApplyTab(_tabWeaponImg, _skin?.tabWeaponOff, tab == 0);
+            ApplyTab(_tabRangedImg, _skin?.tabRangedOff, tab == 1);
+        }
 
         // 액션 컬럼의 강화·진화 버튼은 <b>근접 탭 전용</b>이다.
         // 파츠 탭에는 행마다 강화 버튼이 있고, 진화(승급)는 근접 무기 대상이라
         // 원거리 화면에 남겨두면 "지금 무엇을 올리는 버튼인지"가 어긋난다.
-        if (_enhanceBtn != null) _enhanceBtn.gameObject.SetActive(tab == 0);
+        // v3(10-14)는 두 탭이 같은 두 판이라 [강화하기]가 두 탭 공용이다 — 파츠 탭에선 고른 파츠를 올린다(OnEnhanceClicked가 가른다).
+        if (_enhanceBtn != null) _enhanceBtn.gameObject.SetActive(tab == 0 || _v3Ready);
         if (_evolveBtn  != null && tab == 1) _evolveBtn.gameObject.SetActive(false);
         if (tab == 0)
         {
             if (_enhanceLabel != null) _enhanceLabel.text = "강화하기";
-            SkinButton(_enhanceBtn, _skin?.enhanceButton, _enhanceLabel);
+            if (!_v3Ready) SkinButton(_enhanceBtn, _skin?.enhanceButton, _enhanceLabel);   // v3는 그림 없이 금 1px 테 · 글자
         }
 
         // 강화 대상 슬롯은 <b>항상 근접</b>이다. 원거리 무기 강화를 폐지했으므로 탭을 옮겨도 바뀌지 않는다.
@@ -677,6 +688,9 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         // 결과 줄은 직전 행동의 결과다 — 탭을 옮기면 다른 대상의 결과(「성공! +6」)가 남아 보였다(실측 09-20).
         if (_resultText != null) _resultText.text = "";
+        // 판정 도장(두 탭 공용 · 무대 위)도 걷는다 — 근접 「성공! +5」 · 단계 줄이 파츠 행 위에 겹쳤다(10-14 v3 실측)
+        HideStageResult();
+        if (_stampTier != null) _stampTier.gameObject.SetActive(false);
 
         // 정보창은 탭 전환에도 살아 있는 공용 컬럼이다 — 파츠 탭에서는 발사 미리보기로 쓴다.
         if (_infoTitle != null) _infoTitle.text = tab == 0 ? "강화 정보" : "발사 미리보기";
@@ -752,17 +766,79 @@ public sealed class UI_CruciblePanel : UI_Popup
     private void ShowStageResult(string richText, float fontSize, float popScale)
     {
         if (_stageResult == null || string.IsNullOrEmpty(richText)) return;
+        if (_v3Ready) fontSize = StampV3(fontSize);   // v3 — 주인공은 초점 숫자 72 · 도장은 무기 열 안에서 한 단계 작게
         _stageResult.text     = richText;
         _stageResult.fontSizeMax = fontSize;   // 자동 크기가 켜져 있어 최대를 같이 올려야 잭팟 도장이 커진다
         _stageResult.fontSize    = fontSize;
+        SetStampTier(_stampTierNext);
+        _stampTierNext = null;
         _stageResultSeq++;
         StageResultAsync(_stageResultSeq, popScale).Forget();
+    }
+
+    /// <summary>
+    /// 판정 도장 아래 한 줄 — 「스킬 2단계 — E 관통 5 · R 연참 +2」(10-12 요청 7). 도장의 자식이라 같이 튀어나오고 같이 꺼진다.
+    /// 빈 글이면 숨긴다. 구운 프리팹엔 없어 처음 쓸 때 만든다(구운 프리팹 함정).
+    /// </summary>
+    private void SetStampTier(string line)
+    {
+        bool on = !string.IsNullOrEmpty(line);
+        if (_stampTier == null)
+        {
+            if (!on) return;
+            _stampTier = ThinText(_stageResult.transform, "StampTier", UITheme.Thin.Lead, UIWeight.Medium, TextAlignmentOptions.Center, FormInk);
+            _stampTier.richText = true;
+            _stampTier.enableAutoSizing = true;   // 변화 글이 긴 무기는 20 → 15까지 줄여 한 줄에
+            _stampTier.fontSizeMin = UITheme.Thin.Small;
+            _stampTier.fontSizeMax = UITheme.Thin.Lead;
+            _stampTier.overflowMode = TextOverflowModes.Ellipsis;
+            var rt = _stampTier.rectTransform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = new Vector2(1f, 0f);
+            rt.pivot     = new Vector2(0.5f, 1f);
+            rt.anchoredPosition = new Vector2(0f, -2f);
+            rt.sizeDelta = new Vector2(0f, 32f);
+            if (_v3Ready)
+            {
+                // v3 — 도장이 무기 열(356) 안이라 두 줄로 접는다 · 본문 최소 16
+                _stampTier.textWrappingMode = TextWrappingModes.Normal;
+                _stampTier.alignment   = TextAlignmentOptions.Top;
+                _stampTier.fontSizeMin = FMin;
+                _stampTier.fontSizeMax = FTable;
+                _stampTier.fontSize    = FTable;
+                rt.sizeDelta = new Vector2(0f, 52f);
+            }
+            TMPOutlineHelper.ApplySoftShadow(_stampTier);   // 무대 마법진 위에서 읽히게
+        }
+        _stampTier.text  = on ? line : string.Empty;
+        _stampTier.alpha = 1f;
+        _stampTier.gameObject.SetActive(on);
+    }
+
+    /// <summary>
+    /// 이번 성공으로 스킬 단계 임계를 넘었으면 「스킬 N단계 — E … · R …」, 아니면 null.
+    /// 근접 = 강화 단계, 원거리 = 파츠 레벨 합(<see cref="SkillTierResolver"/>). 성공 뒤라 무기 · 파츠는 이미 오른 값이다.
+    /// </summary>
+    private string TierReachedLine(EnhanceResult r, bool part)
+    {
+        var w = _controller.GetSlot(part ? PlayerWeaponManager.Slot1 : PlayerWeaponManager.Slot0);
+        if (w == null || SkillTierResolver.IsRanged(w) != part) return null;
+        int after  = part ? (RangedPartsState.Current?.TotalLevel ?? 0) : r.afterLevel;
+        int before = after - (r.afterLevel - r.beforeLevel);
+        var ms = SkillTierResolver.Milestones(w);
+        bool crossed = false;
+        for (int i = 0; i < ms.Length; i++) crossed |= ms[i] > before && ms[i] <= after;
+        if (!crossed) return null;
+        int tier = SkillTierResolver.Resolve(w);
+        string body = TierChangeBody(w, tier);
+        return body != null ? $"스킬 {tier}단계 — {body}" : $"스킬 {tier}단계";
     }
 
     private void HideStageResult()
     {
         _stageResultSeq++;   // 굴러가던 페이드는 세대가 바뀌어 스스로 물러난다
         if (_stageResult != null) _stageResult.gameObject.SetActive(false);
+        _stampTierNext = null;
     }
 
     /// <summary>등장 → 유지 → 페이드. 연출 잠금 바깥에서 굴러 연타를 막지 않는다(세대가 바뀌면 즉시 물러남).</summary>
@@ -784,7 +860,8 @@ public sealed class UI_CruciblePanel : UI_Popup
             }
 
             t = 0f;
-            while (t < ResultHoldDur)
+            float hold = ResultHoldDur + (_stampTier != null && _stampTier.gameObject.activeSelf ? StampTierHold : 0f);
+            while (t < hold)
             {
                 if (seq != _stageResultSeq) return;
                 t += Time.unscaledDeltaTime;
@@ -797,6 +874,7 @@ public sealed class UI_CruciblePanel : UI_Popup
                 if (seq != _stageResultSeq) return;
                 t += Time.unscaledDeltaTime;
                 _stageResult.alpha = 1f - t / ResultFadeDur;
+                if (_stampTier != null) _stampTier.alpha = _stageResult.alpha;
                 await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
             }
         }
@@ -1266,6 +1344,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         var all = Managers.WeaponParts?.All;
         if (all == null || index < 0 || index >= all.Count) return;
+        ShopUIStyle.PlaySfx(SoundEvent.UiSelect);
 
         if (_selectedPartSlot == index)
         {
@@ -1302,8 +1381,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         int have  = _controller != null ? _controller.FuelAmount : 0;
 
         if (_slotSummary != null && state != null)
-            _slotSummary.text = $"켠 파츠 <color=#FFD24A>{state.ActiveCount}</color> / {(all?.Count ?? 0)}"
-                              + $"   ·   보유 재료 <color=#FFD24A>{have}</color>";
+            _slotSummary.text = $"켠 파츠 {state.ActiveCount} / {(all?.Count ?? 0)}   ·   보유 재료 {have}";
 
         for (int i = 0; i < PartRows; i++)
         {
@@ -1331,29 +1409,36 @@ public sealed class UI_CruciblePanel : UI_Popup
 
             // 꺼짐(Lv0)도 목록에 그대로 남긴다 — 없는 것과 안 켠 것은 다르다.
             _slotKind[i].text  = on ? "◆" : "◇";
-            _slotKind[i].color = on ? ShopUIStyle.Gold : ShopUIStyle.TextDim;
+            _slotKind[i].color = on ? UITheme.Thin.Ink : ShopUIStyle.TextDim;
             _slotName[i].text  = def.part_name;
             // 효과가 한눈에 — 꺼진 파츠는 켜면 얻는 것, 켠 파츠는 지금 → 다음 강화(09-29 사용자 「효과를 알 수 있는 디자인」).
-            _slotVal[i].text   = !on   ? $"<color=#C9A66A>켜면</color> {PartValueText(def, def.ValueAt(1))}"
-                               : maxed ? PartValueText(def, def.ValueAt(level))
-                                       : $"{PartValueText(def, def.ValueAt(level))} <color=#7AD46E>→ {PartValueText(def, def.ValueAt(level + 1))}</color>";
+            _slotVal[i].text   = PartStepLine(def, level, brief: true);
             _slotLv[i].text    = on ? $"Lv.{level}" : "—";
             SetBar(_slotBar[i], max > 0 ? (float)level / max : 0f);
 
             int cost = _controller != null ? _controller.PartCostAt(def.part_id) : 0;
             bool afford = have >= cost;
-            // 버튼 = 행동 + 비용 두 줄. 「◆4」는 무엇을 쓰는지 안 읽혔다 — 재료 N, 모자라면 붉게(09-29).
+            // 버튼 = 행동 + 비용. 「◆4」는 무엇을 쓰는지 안 읽혔다 — 재료 N, 모자라면 붉게(09-29).
+            // v3(10-14) — 704×52 행의 한 줄 버튼 「강화 · 재료 4」(크기 태그 없이 — 본문 최소 16)
+            bool sel = (i == _selectedPartSlot);
             if (_slotBtnLbl[i] != null)
-                _slotBtnLbl[i].text = maxed ? "최대"
-                    : $"{(on ? "강화" : "켜기")}\n<size=76%><color={(afford ? "#E8D9B0" : "#FF7A6A")}>재료 {cost}</color></size>";
+            {
+                string verb = on ? "강화" : "켜기";
+                string price = afford ? $"재료 {cost}" : $"<color=#FF7A6A>재료 {cost}</color>";
+                _slotBtnLbl[i].text = maxed ? "최대" : _v3Ready ? $"{verb} · {price}" : $"{verb}\n{price}";
+            }
             if (_slotBtn[i] != null)
             {
-                _slotBtn[i].interactable = !maxed && afford && !_animating;
-                UIAffordGlow.Set(_slotBtn[i], _slotBtn[i].interactable);   // 누를 수 있을 때만 은은한 불
+                bool can = !maxed && afford && !_animating;
+                _slotBtn[i].interactable = can;
+                // 채움 없이 1px 테(10-11) · 후광은 고른 행 하나에만 — 다섯 행이 한꺼번에 빛났다
+                // v3는 오른쪽 판 [강화하기]가 고른 파츠를 올린다 — 후광은 그 한 곳(RefreshV3Ranged)
+                StyleRowButton(i, can, sel);
+                Halo(_slotBtn[i], !_v3Ready && can && sel && _activeTab == 1 && !Choosing);
             }
 
-            bool sel = (i == _selectedPartSlot);
-            if (_partRowArt)
+            if (_v3Ready) StylePartRowV3(i, sel, on);
+            else if (_partRowArt)
             {
                 // 아트 행 — 바탕은 밝기로, 테두리는 선택(금빛) · 켬(흰) · 꺼짐(옅게)
                 _partsSlots[i].color = sel ? Color.white : on ? new Color(0.88f, 0.88f, 0.88f, 1f) : new Color(0.72f, 0.72f, 0.72f, 1f);
@@ -1365,8 +1450,7 @@ public sealed class UI_CruciblePanel : UI_Popup
                 _partsSlots[i].color = sel  ? new Color(0.18f, 0.14f, 0.09f, 1f)
                                      : on   ? new Color(0.12f, 0.10f, 0.15f, 1f)
                                             : new Color(0.09f, 0.07f, 0.11f, 1f);
-            _slotName[i].color   = sel ? ShopUIStyle.Gold
-                                 : on  ? ShopUIStyle.TextPrimary : ShopUIStyle.TextDim;
+            _slotName[i].color   = sel || on ? ShopUIStyle.TextPrimary : ShopUIStyle.TextDim;   // 고른 행은 금 테가 말한다
         }
     }
 
@@ -1497,10 +1581,17 @@ public sealed class UI_CruciblePanel : UI_Popup
             if (val != null) val.gameObject.SetActive(on);
             if (_rowLines[i] != null) _rowLines[i].gameObject.SetActive(on);
         }
+        if (_v3Ready)
+        {
+            // v3 — 표는 원거리 탭(발사 미리보기 5줄)에만. 결과 문구는 버튼 위 고정 자리(LayoutV3Right)
+            if (_rowLineTop != null) _rowLineTop.gameObject.SetActive(n > 0);
+            return;
+        }
         // 결과 문구는 표 바로 아래 — 3줄로 줄자 버튼 위 빈 칸 한가운데 떴다. 파츠 탭(5줄)은 연속·이벤트 줄 밑 그대로.
+        float y0 = _compact ? CRowY0 : RowY0, rh = _compact ? CRowH : RowH;
         if (_resultText != null)
-            PlaceIn(_resultText.rectTransform, RowPad, n >= InfoRows ? RowY0 + InfoRows * RowH + 40f : RowY0 + n * RowH + 18f,
-                    RowW, 28f, InfoW, InfoH);
+            PlaceIn(_resultText.rectTransform, RowPad, n >= InfoRows ? y0 + InfoRows * rh + 40f : y0 + n * rh + (_compact ? 4f : 18f),
+                    RowW, 30f, InfoW, InfoHNow);
     }
 
     private TMP_Text RowValue(int i) => i switch
@@ -1526,20 +1617,22 @@ public sealed class UI_CruciblePanel : UI_Popup
         var found = panel.Find("RateBreak");
         _rateBreak = found != null ? found.GetComponent<TMP_Text>()
                                    : MakeLabel(panel, "RateBreak", 17f, FontStyles.Normal, TextAlignmentOptions.Center, TextMuted);
+        Restyle(_rateBreak, UIWeight.Regular, UITheme.Thin.Body, MuteInk);
         _rateBreak.richText         = true;
         _rateBreak.textWrappingMode = TextWrappingModes.NoWrap;
-        // 큰 숫자(72px · 86 높이)를 조금 줄여 올리고 그 아래에 한 줄 — 표 첫 줄(196)과 겹치지 않게.
+        // 큰 숫자는 48 · Noto 300(10-11 — 72/64 굵은 숫자가 화면에서 가장 무거웠다) · 그 아래 한 줄 — 표 첫 줄과 겹치지 않게.
         if (_successText != null)
         {
-            _successText.fontSize = 64f;
-            PlaceIn(_successText.rectTransform, 0f, 94f, InfoW, 74f, InfoW, InfoH);
+            Restyle(_successText, UIWeight.Light, UITheme.Thin.H1, UITheme.Thin.Ink);
+            _successText.enableAutoSizing = false;
+            PlaceIn(_successText.rectTransform, 0f, _compact ? 66f : 94f, InfoW, _compact ? 66f : 74f, InfoW, InfoHNow);
         }
-        PlaceIn(_rateBreak.rectTransform, 0f, 168f, InfoW, 24f, InfoW, InfoH);
+        PlaceIn(_rateBreak.rectTransform, 0f, _compact ? 134f : 168f, InfoW, 26f, InfoW, InfoHNow);
         TMPOutlineHelper.ApplySoftShadow(_rateBreak);
         return _rateBreak;
     }
 
-    /// <summary>「기본 55% · ▲ 인장 +8%p · ▲ 화로 +15%p」 — 보정이 하나도 없으면 빈 줄.</summary>
+    /// <summary>「기본 55% · ▲ 인장 +8%p · ▲ 화로 +15%p」 — 보정이 하나도 없으면 빈 줄. 올리는 것은 초록 · 깎는 것은 빨강(10-11).</summary>
     private string RateBreakText(int slot)
     {
         float sig = CrucibleRoomController.SigilBonus;
@@ -1549,10 +1642,10 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         var sb = new System.Text.StringBuilder();
         sb.Append("<color=#9A93A6>기본 ").Append((_controller.BaseSuccessChanceAt(slot) * 100f).ToString("F0")).Append("%</color>");
-        if (sig > 0f) sb.Append("    <color=#E8C07A>▲ 인장 +").Append((sig * 100f).ToString("F0")).Append("%p</color>");
-        if (ev > 0f)  sb.Append("    <color=#FFA35A><b>▲ 화로 +").Append((ev * 100f).ToString("F0")).Append("%p</b></color>");
-        if (ev < 0f)  sb.Append("    <color=#FF6A5A><b>▼ 저주 ").Append((ev * 100f).ToString("F0")).Append("%p</b></color>");
-        if (cut)      sb.Append("    <color=#7FD8A0><b>▼ 재료 반값</b></color>");
+        if (sig > 0f) sb.Append("    <color=#7AD46E>▲ 인장 +").Append((sig * 100f).ToString("F0")).Append("%p</color>");
+        if (ev > 0f)  sb.Append("    <color=#7AD46E>▲ 화로 +").Append((ev * 100f).ToString("F0")).Append("%p</color>");
+        if (ev < 0f)  sb.Append("    <color=#FF7A6A>▼ 저주 ").Append((ev * 100f).ToString("F0")).Append("%p</color>");
+        if (cut)      sb.Append("    <color=#7AD46E>· 재료 반값</color>");
         return sb.ToString();
     }
 
@@ -1645,95 +1738,6 @@ public sealed class UI_CruciblePanel : UI_Popup
         _evolvePanel.SetActive(false);
     }
 
-    /// <summary>
-    /// 진화 선택 화면 — 제목 · 카드 두 장 · [취소] [「○○」로 벼린다]. 되돌릴 수 없는 선택이라 카드는 고르기만 하고 확정은 버튼이 한다.
-    /// 구운 화면의 옛 내용(이름만 있던 카드 두 장 · 취소)은 끄고 같은 암막 안에 새로 짓는다.
-    /// </summary>
-    private void EnsureEvolveContent()
-    {
-        if (_evolveContent != null || _evolvePanel == null) return;
-        foreach (Transform c in _evolvePanel.transform) c.gameObject.SetActive(false);
-        // 구운 화면의 암막은 옛 반투명(0.90) 그대로다 — 새 내용 밑에서 무대 글자가 비치지 않게 덮어쓴다.
-        if (_evolvePanel.TryGetComponent<Image>(out var veil)) veil.color = ChooserVeil;
-
-        _evolveContent = (RectTransform)ShopUIStyle.MakeRect(_evolvePanel.transform, "EvolveContent").transform;
-        ShopUIStyle.Stretch(_evolveContent);
-        var d = _evolveContent;   // 창(1600×1000)과 같은 크기 — 목업 좌표로 앉힌다
-
-        _evolveTitle = MakeLabel(d, "Title", 34f, FontStyles.Bold, TextAlignmentOptions.Center, ShopUIStyle.Gold);
-        Place(_evolveTitle.rectTransform, 0f, 64f, MockW, 52f);
-        _evolveSub = MakeLabel(d, "Sub", 20f, FontStyles.Normal, TextAlignmentOptions.Center, TextMuted);
-        Place(_evolveSub.rectTransform, 0f, 120f, MockW, 30f);
-
-        for (int k = 0; k < _evolveCards.Length; k++) _evolveCards[k] = BuildEvolveCard(d, k);
-
-        var cancel = MakeStyledButton(d, "EvolveCancel", "취소", out var cancelLbl);
-        Place((RectTransform)cancel.transform, 468f, 846f, 200f, 64f);
-        cancelLbl.fontSize = 22f;
-        cancel.onClick.AddListener(HideEvolvePanel);
-
-        _evolveConfirm = MakeStyledButton(d, "EvolveConfirm", "", out _evolveConfirmLbl);
-        Place((RectTransform)_evolveConfirm.transform, 692f, 846f, 440f, 64f);
-        _evolveConfirmLbl.fontSize = 24f;
-        _evolveConfirm.onClick.AddListener(() => { if (_evolvePick >= 0) OnBranchClicked(_evolvePick); });
-
-        var hint = MakeLabel(d, "Hint", 16f, FontStyles.Normal, TextAlignmentOptions.Center, ShopUIStyle.TextDim);
-        hint.text = "카드를 골라 비교하고, 벼리기를 눌러야 바뀐다";
-        Place(hint.rectTransform, 0f, 922f, MockW, 26f);
-    }
-
-    /// <summary>카드 하나 — 성격 표식 · 무기 그림 · 이름 · 한 줄 · 수치 4줄(지금 대비) · 스킬 · 비용/잠금.</summary>
-    private EvolveCard BuildEvolveCard(Transform d, int k)
-    {
-        var card = new EvolveCard();
-        var fill = ShopUIStyle.MakeFrame(d, k == 0 ? "EvolveA" : "EvolveB", BronzeEdge, CardSolid, 3f, raycast: true);
-        card.root   = (RectTransform)fill.transform.parent;
-        card.border = card.root.GetComponent<Image>();
-        Place(card.root, 128f + k * (EvCardW + EvCardGap), EvCardY, EvCardW, EvCardH);
-        card.group  = card.root.gameObject.AddComponent<CanvasGroup>();
-        var c = fill.transform;
-
-        card.tagBack = ShopUIStyle.MakeImage(c, "TagBack", Color.clear);
-        PlaceIn(card.tagBack.rectTransform, 200f, 28f, 240f, 44f, EvCardW, EvCardH);
-        card.tagBack.sprite = UIProceduralSprites.RoundedRect(22f, 4f);
-        card.tagBack.type   = Image.Type.Sliced;
-        card.tag = MakeLabel(card.tagBack.transform, "Tag", 24f, FontStyles.Bold, TextAlignmentOptions.Center, Color.white);
-        ShopUIStyle.Stretch(card.tag.rectTransform);
-
-        card.glow = ShopUIStyle.MakeImage(c, "Glow", Color.clear);
-        card.glow.sprite = UI_RuneSelectPopup.SoftDot;
-        PlaceIn(card.glow.rectTransform, 160f, 64f, 320f, 260f, EvCardW, EvCardH);
-        card.icon = ShopUIStyle.MakeImage(c, "Icon", Color.white);
-        card.icon.preserveAspect = true;
-        PlaceIn(card.icon.rectTransform, 210f, 84f, 220f, 220f, EvCardW, EvCardH);
-
-        card.name = ChooserLine(c, "Name", 40f, FontStyles.Bold, LevelGold, 0f, 316f, EvCardW, 52f, EvCardW, EvCardH);
-        card.line = ChooserLine(c, "Line", 20f, FontStyles.Normal, TextMuted, 0f, 370f, EvCardW, 30f, EvCardW, EvCardH);
-        // ▲▼가 무엇과 견준 값인지 — 없으면 「빠른 검」의 속도 ▼(지금 무기보다 0.1 느림)가 모순처럼 읽혔다(10-01 실측).
-        var vs = MakeLabel(c, "VsNow", 16f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextDim);
-        vs.text = "지금 무기 대비";
-        PlaceIn(vs.rectTransform, 412f, 398f, 150f, 20f, EvCardW, EvCardH);
-        for (int i = 0; i < EvStatNames.Length; i++)
-        {
-            float y = 418f + i * 34f;
-            var label = MakeLabel(c, $"StatL{i}", 22f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft, TextMuted);
-            label.text = EvStatNames[i];
-            PlaceIn(label.rectTransform, 96f, y, 170f, 32f, EvCardW, EvCardH);
-            card.statValue[i] = MakeLabel(c, $"StatV{i}", 22f, FontStyles.Bold, TextAlignmentOptions.MidlineRight, ShopUIStyle.TextPrimary);
-            PlaceIn(card.statValue[i].rectTransform, 266f, y, 130f, 32f, EvCardW, EvCardH);
-            card.statDelta[i] = MakeLabel(c, $"StatD{i}", 20f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft, TextMuted);
-            PlaceIn(card.statDelta[i].rectTransform, 412f, y, 150f, 32f, EvCardW, EvCardH);
-        }
-        card.skills = ChooserLine(c, "Skills", 18f, FontStyles.Normal, ShopUIStyle.TextPrimary, 24f, 562f, EvCardW - 48f, 30f, EvCardW, EvCardH);
-        card.foot   = ChooserLine(c, "Foot", 16f, FontStyles.Normal, ShopUIStyle.TextDim, 24f, 598f, EvCardW - 48f, 26f, EvCardW, EvCardH);
-
-        card.button = card.root.gameObject.AddComponent<Button>();
-        ShopUIStyle.ApplyButtonColors(card.button);
-        int pick = k;
-        card.button.onClick.AddListener(() => PickEvolveCard(pick));
-        return card;
-    }
-
     /// <summary>현재 장착 무기의 진화 분기(WeaponEvolutionSO). 진화 불가면 빈 목록.</summary>
     private IReadOnlyList<WeaponEvolutionSO.Branch> CurrentBranches
     {
@@ -1748,7 +1752,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         if (_evolvePanel == null || _controller == null) return;
 
-        var wd       = _controller.Run?.Player?.WeaponManager?.CurrentWeaponData;
+        var wd       = _controller.GetSlot(PlayerWeaponManager.Slot0);   // 진화는 근접 칸 — 활을 든 채 열어도 근접 기준(검토 I3)
         var branches = CurrentBranches;
 
         if (branches.Count == 0)
@@ -1761,9 +1765,16 @@ public sealed class UI_CruciblePanel : UI_Popup
         }
 
         EnsureEvolveContent();
+        FitOverlayToV3(_evolvePanel);   // v3 — 판(1560×880) 안을 덮는다
+        // 켠 뒤에 채운다 — 꺼진 채 처음 만든 글자는 TMP 초기화 전이라 폭을 0에 가깝게 재서 칩 테가 글자보다 작았다(10-08 실측 EV_1)
+        _evolvePanel.transform.SetAsLastSibling();
+        _evolvePanel.SetActive(true);
         int lv = wd?.enhanceLevel ?? 0;
         _evolveTitle.text = $"{wd?.displayName ?? "무기"} — 형(形)을 고른다";
-        _evolveSub.text   = $"되돌릴 수 없다 · 강화 +{lv}와 각인은 새 형태로 그대로 이어진다";
+        bool free = true;
+        foreach (var b in branches) if (b != null && b.cost > 0) free = false;
+        _evolveSub.text   = $"진화하면 형이 깨어난다 · 되돌릴 수 없다 · 강화 +{lv}와 각인은 새 형태로 그대로 이어진다"
+                          + (free ? " · 진화 비용 없음" : "");
         for (int k = 0; k < _evolveCards.Length; k++)
             FillEvolveCard(_evolveCards[k], k < branches.Count ? branches[k] : null, wd);
         PickEvolveCard(-1);
@@ -1771,69 +1782,6 @@ public sealed class UI_CruciblePanel : UI_Popup
         _evolvePanel.transform.SetAsLastSibling();
         _evolvePanel.SetActive(true);
         ShopUIStyle.PlaySfx("shop_open");
-    }
-
-    private void FillEvolveCard(EvolveCard card, WeaponEvolutionSO.Branch b, WeaponData current)
-    {
-        bool valid = b != null && b.IsValid;
-        card.root.gameObject.SetActive(valid);
-        if (!valid) return;
-
-        var so = b.target;
-        var (tag, tint, line) = Persona(so);
-        card.tag.text  = tag;
-        card.tag.color = tint;
-        card.tagBack.color = new Color(tint.r, tint.g, tint.b, 0.16f);
-        card.glow.color    = new Color(tint.r, tint.g, tint.b, 0.22f);
-        card.icon.sprite  = so.icon;
-        card.icon.enabled = so.icon != null;
-        card.name.text = so.displayName;
-        card.line.text = line;
-
-        int level = current?.enhanceLevel ?? 0;
-        var next = PreviewStats(so, level);
-        var now  = current != null ? new[] { current.baseAttack, current.attackSpeed, current.attackRange, current.areaOfEffect } : null;
-        for (int i = 0; i < EvStatNames.Length; i++)
-        {
-            card.statValue[i].text = StatText(i, next[i]);
-            card.statDelta[i].text = now != null ? DeltaText(i, next[i] - now[i]) : "";
-        }
-
-        string q = so.skillQ != null ? so.skillQ.skillName : null;
-        string e = so.skillE != null ? so.skillE.skillName : null;
-        card.skills.text = q != null || e != null ? $"스킬  Q 「{q ?? "—"}」 · E 「{e ?? "—"}」" : "";
-
-        bool unlocked = WeaponEvolutionSO.IsUnlocked(b, level);
-        card.foot.text = !unlocked ? $"<color=#FF7A6A>강화 +{b.requiredEnhanceLevel}에서 열린다</color>"
-                       : b.cost > 0 ? $"진화 비용  강화재료 <color=#FFD24A>{b.cost}</color>" : "진화 비용 없음";
-        card.button.interactable = unlocked;
-    }
-
-    /// <summary>카드 고르기 — 고른 카드는 금빛 테두리, 다른 카드는 옅게. 확정 버튼은 고른 뒤 · 재료가 되면 열리고 불이 켜진다.</summary>
-    private void PickEvolveCard(int k)
-    {
-        var branches = CurrentBranches;
-        bool ok = k >= 0 && k < branches.Count && branches[k] != null && branches[k].IsValid;
-        _evolvePick = ok ? k : -1;
-        for (int i = 0; i < _evolveCards.Length; i++)
-        {
-            var card = _evolveCards[i];
-            if (card == null) continue;
-            bool picked = i == _evolvePick;
-            card.border.color = picked ? ShopUIStyle.Gold : BronzeEdge;
-            card.group.alpha  = _evolvePick < 0 || picked ? 1f : 0.55f;
-        }
-
-        var b = ok ? branches[k] : null;
-        int fuel = _controller != null ? _controller.FuelAmount : 0;
-        bool affordable = b != null && (b.cost <= 0 || fuel >= b.cost);
-        if (_evolveConfirm == null) return;
-        _evolveConfirm.interactable = affordable;
-        string name = b?.target != null ? b.target.displayName : "";
-        string cost = b == null || b.cost <= 0 ? ""
-                    : affordable ? $"  <size=80%>재료 {b.cost}</size>" : $"  <size=80%><color=#FF5250>재료 {b.cost}</color></size>";
-        _evolveConfirmLbl.text = b == null ? "<color=#9A98A0>형태를 고른다</color>" : $"「{name}」{Ro(name)} 벼린다{cost}";
-        UIAffordGlow.Set(_evolveConfirm, affordable);
     }
 
     /// <summary>진화 갈래의 성격 — 표식 · 색 · 한 줄. 한 줄은 무기 데이터(tagline)가 있으면 그것을.</summary>
@@ -1908,7 +1856,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         if (branchIndex < 0 || branchIndex >= branches.Count)
         {
             HideEvolvePanel();
-            if (_resultText != null) _resultText.text = "<color=#C7554A>진화 분기가 없다</color>";
+            if (_resultText != null) _resultText.text = "<color=#FF7A6A>진화 분기가 없다</color>";
             ShopUIStyle.PlaySfx("shop_reject");
             return;
         }
@@ -1919,6 +1867,13 @@ public sealed class UI_CruciblePanel : UI_Popup
             await wm.SwitchToSlotAsync(PlayerWeaponManager.Slot0);   // 진화는 근접 칸 — EvolveCurrentWeaponAsync가 들고 있는 칸을 바꾸므로 먼저 쥔다
         var wd = wm?.CurrentWeaponData;
         if (wm == null || wd == null) { HideEvolvePanel(); return; }
+        if (wm.CurrentSlotIndex != PlayerWeaponManager.Slot0)   // 전환 중이라 못 바꿨다 — 그대로 진화하면 원거리 칸이 바뀐다(검토 M1)
+        {
+            HideEvolvePanel();
+            if (_resultText != null) _resultText.text = "<color=#FF7A6A>무기를 바꾸는 중 — 잠시 뒤 다시</color>";
+            ShopUIStyle.PlaySfx("shop_reject");
+            return;
+        }
 
         // 조건: 강화 레벨
         // 거절 사유는 진화 패널이 <b>덮고 있는</b> 정보창에 뜬다 — 패널을 닫아야 그 줄이 보인다
@@ -1927,7 +1882,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         {
             HideEvolvePanel();
             if (_resultText != null)
-                _resultText.text = $"<color=#C7554A>강화 {b.requiredEnhanceLevel} 이상이어야 한다</color>";
+                _resultText.text = $"<color=#FF7A6A>강화 {b.requiredEnhanceLevel} 이상이어야 한다</color>";
             ShopUIStyle.PlaySfx("shop_reject");
             return;
         }
@@ -1937,7 +1892,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         if (b.cost > 0 && !(fuel?.TrySpend(FuelKind.EnhanceMaterial, b.cost) ?? false))
         {
             HideEvolvePanel();
-            if (_resultText != null) _resultText.text = "<color=#C7554A>재료가 부족하다</color>";
+            if (_resultText != null) _resultText.text = "<color=#FF7A6A>재료가 부족하다</color>";
             ShopUIStyle.PlaySfx("shop_reject");
             return;
         }
@@ -1974,7 +1929,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         {
             // 실패 시 재료 환불(차감했다면)
             if (b.cost > 0) fuel?.Add(FuelKind.EnhanceMaterial, b.cost);
-            if (_resultText != null) _resultText.text = "<color=#C7554A>진화에 실패했다</color>";
+            if (_resultText != null) _resultText.text = "<color=#FF7A6A>진화에 실패했다</color>";
             ShopUIStyle.PlaySfx("shop_reject");
         }
 
@@ -1991,13 +1946,20 @@ public sealed class UI_CruciblePanel : UI_Popup
     private async UniTask EvolveRevealAsync(WeaponEvolutionSO.Branch b)
     {
         var (tag, tint, _) = Persona(b.target);
-        ShopUIStyle.PlaySfx("crucible_success");
+        ShopUIStyle.PlaySfx("crucible_evolve");   // 진화는 강화 성공보다 한 급 위(10-12 C6)
         HitFeelService.HitStop(0.6f, 0.05f);
         FlashStage(StageFlashSuccess);
         RefreshAll();
-        BurstSparks(JackpotSparks, SparkJackpot, StrikeX, StrikeY);
+        BurstSparks(JackpotSparks, SparkJackpot, StrikeX, StrikeYNow);
         ShowStageResult($"<size=55%><color=#{ColorUtility.ToHtmlStringRGB(tint)}>{tag}</color></size>\n{b.target.displayName}",
                         EvolveStampSize, SuccessPopScale);
+        if (_v3Ready)
+        {
+            // v3 이정표 1.5초 — 새 형태가 부풀고 · 초점 펀치 · 형 칸(이제 「단련」)이 두 번 빛난다
+            await UniTask.WhenAll(PopWeaponAsync(), FocusAsync(false), PunchFocalAsync(_v3Focal, FormInk, V3SuccessDur, V3PunchAmp),
+                                  MilestoneGlowAsync(V3MilestoneDur));
+            return;
+        }
         await UniTask.WhenAll(PopWeaponAsync(), FocusAsync(false));
         await Hold(SettleDur * 2f);
     }
@@ -2034,118 +1996,163 @@ public sealed class UI_CruciblePanel : UI_Popup
         _chooser.SetActive(true);
     }
 
+    // 고르기 카드(10-11 v2) — 두 장이 같은 형식 네 줄: 머리(무엇 · 대상) → 큰 수(48 · 300) → 성공 · 하락 → 비용. 왼쪽 정렬.
+    // 예전엔 굵은 글 6줄 가운데 정렬 + 3px 테 + 15px 후광이 두 장에 똑같이 켜져 「어느 쪽」을 말하지 못했다(리서치 C §1).
+    private const float ChCardW = 640f, ChCardH = 360f, ChGap = 64f, ChPad = 48f, ChHeadH = 112f;
+
     private void EnsureChooser()
     {
         if (_chooser != null) return;
-        var host = _window != null ? (Transform)_window : transform;
-        const float bodyW = InfoX + InfoW - StageX, bodyH = StagePanelH;   // 무대 + 정보창 자리(1552×748)
-        var dim = ShopUIStyle.MakeImage(host, "ForgeChooser", ChooserVeil, raycast: true);
-        Place(dim.rectTransform, StageX, StageY, bodyW, bodyH);
+        var host = _v3Ready ? _v3Root : _window != null ? (Transform)_window : transform;
+        float top    = _compact ? GtY : StageY;   // 줄인 판이면 성장 길까지 덮는다(10-08)
+        float bottom = _compact ? StageY + BodyShift + CStageH : StageY + StagePanelH;
+        float bodyW  = InfoX + InfoW - StageX, bodyH = bottom - top;
+        if (_v3Ready) { bodyW = V3W - V3LeftX * 2f; bodyH = V3BoardH; }   // v3 — 두 판 자리만 덮는다(머리 · 아래 말풍선은 그대로)
+        var dim = ShopUIStyle.MakeImage(host, "ForgeChooser", _v3Ready ? V3Base : ChooserVeil, raycast: true);
+        if (_v3Ready) PlaceIn(dim.rectTransform, V3LeftX, V3BoardY, bodyW, bodyH, V3W, V3H);
+        else          Place(dim.rectTransform, StageX, top, bodyW, bodyH);
         _chooser = dim.gameObject;
         var d = dim.transform;
 
-        var title = MakeLabel(d, "ChooserTitle", 36f, FontStyles.Bold, TextAlignmentOptions.Center, ShopUIStyle.Gold);
+        // 제목 · 한 줄 · 카드 두 장을 한 덩어리로 세로 가운데
+        float y0 = Mathf.Max(24f, (bodyH - ChHeadH - ChCardH) * 0.5f);
+        var title = ThinText(d, "ChooserTitle", UITheme.Thin.H2, UIWeight.Medium, TextAlignmentOptions.Center, UITheme.Thin.Ink);
         title.text = "무엇을 벼릴까";
-        PlaceIn(title.rectTransform, 0f, 40f, bodyW, 50f, bodyW, bodyH);
+        PlaceIn(title.rectTransform, 0f, y0, bodyW, 48f, bodyW, bodyH);
+        _chooserSub = ThinText(d, "ChooserSub", UITheme.Thin.Body, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.65f));
+        _chooserSub.richText = true;
+        PlaceIn(_chooserSub.rectTransform, 0f, y0 + 54f, bodyW, 28f, bodyW, bodyH);
 
-        _chooserSub = MakeLabel(d, "ChooserSub", 20f, FontStyles.Normal, TextAlignmentOptions.Center, TextMuted);
-        PlaceIn(_chooserSub.rectTransform, 0f, 96f, bodyW, 30f, bodyW, bodyH);
-
-        const float cardW = 640f, cardH = 520f, gap = 64f;
-        float left = (bodyW - cardW * 2f - gap) * 0.5f;
+        float left = (bodyW - ChCardW * 2f - ChGap) * 0.5f;
         for (int k = 0; k < 2; k++)
         {
             int tab = k;
-            var fill = ShopUIStyle.MakeFrame(d, k == 0 ? "ChooseMelee" : "ChooseRanged", BronzeEdge, CardSolid, 3f, raycast: true);
-            var rt = (RectTransform)fill.transform.parent;
-            PlaceIn(rt, left + k * (cardW + gap), 160f, cardW, cardH, bodyW, bodyH);
-            var c = fill.transform;
+            var bg = ShopUIStyle.MakeImage(d, k == 0 ? "ChooseMelee" : "ChooseRanged", _v3Ready ? V3Card : CardSolid, raycast: true);
+            var c  = bg.rectTransform;
+            PlaceIn(c, left + k * (ChCardW + ChGap), y0 + ChHeadH, ChCardW, ChCardH, bodyW, bodyH);
+            _chooseFrame[k] = UIThinFrame.Create(c, ThinShape.Square, new Vector2(ChCardW, ChCardH));
 
-            var head = ChooserLine(c, "Head", 30f, FontStyles.Bold, ShopUIStyle.Gold, 0f, 28f, cardW, 44f, cardW, cardH);
-            head.text = k == 0 ? "근거리 · 무기 강화" : "원거리 · 파츠 강화";
-            _chooseName[k]  = ChooserLine(c, "Name",  22f, FontStyles.Normal, TextMuted, 0f, 82f, cardW, 36f, cardW, cardH);
-            _chooseBig[k]   = ChooserLine(c, "Big",   52f, FontStyles.Bold, LevelGold, 0f, 140f, cardW, 80f, cardW, cardH);
-            _chooseLine1[k] = ChooserLine(c, "Line1", 24f, FontStyles.Normal, ShopUIStyle.TextPrimary, 40f, 250f, cardW - 80f, 36f, cardW, cardH);
-            _chooseLine2[k] = ChooserLine(c, "Line2", 24f, FontStyles.Normal, ShopUIStyle.TextPrimary, 40f, 300f, cardW - 80f, 36f, cardW, cardH);
-            _chooseLine3[k] = ChooserLine(c, "Line3", 22f, FontStyles.Normal, TextMuted, 40f, 350f, cardW - 80f, 34f, cardW, cardH);
-            var hint = ChooserLine(c, "Hint", 18f, FontStyles.Normal, ShopUIStyle.TextDim, 0f, 452f, cardW, 30f, cardW, cardH);
-            hint.text = "눌러서 들어간다";
+            _chooseName[k]  = ChooserLine(c, "Head", UITheme.Thin.Title, UIWeight.Medium,  UITheme.Thin.Ink, 40f, 36f);
+            _chooseBig[k]   = ChooserLine(c, "Big",  UITheme.Thin.H1,    UIWeight.Light,   UITheme.Thin.Ink, 96f, 72f);
+            _chooseLine1[k] = ChooserLine(c, "Rate", UITheme.Thin.Lead,  UIWeight.Regular, UITheme.Thin.Ink, 192f, 32f);
+            _chooseLine2[k] = ChooserLine(c, "Cost", UITheme.Thin.Body,  UIWeight.Regular, UITheme.Thin.InkA(0.75f), 236f, 28f);
 
-            var btn = rt.gameObject.AddComponent<Button>();
-            ShopUIStyle.ApplyButtonColors(btn);
-            btn.onClick.AddListener(() => SelectTab(tab));
+            // 「눌러서 들어간다」는 손을 올렸을 때만 — 늘 떠 있으면 두 카드의 같은 자리에 같은 글이 한 줄씩 더 쌓인다
+            var hint = ChooserLine(c, "Hint", UITheme.Thin.Small, UIWeight.Regular, UITheme.Thin.InkA(0.55f), ChCardH - 48f, 24f);
+            hint.alignment = TextAlignmentOptions.MidlineRight;
+            hint.text = "눌러서 들어간다  ▶";
+            _chooseHint[k] = hint.gameObject.AddComponent<CanvasGroup>();
+            _chooseHint[k].alpha = 0f;
+
+            var btn = bg.gameObject.AddComponent<Button>();
+            ShopUIStyle.ApplyButtonColors(btn, bg);
+            btn.onClick.AddListener(() => ClickTab(tab));
             _chooseCard[k] = btn;
+            var hover = bg.gameObject.AddComponent<EventTrigger>();
+            AddTrigger(hover, EventTriggerType.PointerEnter, () => ShowChooseHint(tab, true));
+            AddTrigger(hover, EventTriggerType.PointerExit,  () => ShowChooseHint(tab, false));
+        }
+        if (_v3Ready)
+        {
+            // v3 — 본문 최소 16(안내 15 · 자동 크기 바닥 15를 올린다)
+            foreach (var t in _chooser.GetComponentsInChildren<TMP_Text>(true))
+            {
+                if (t.fontSize < FMin) t.fontSize = FMin;
+                t.fontSizeMax = Mathf.Max(t.fontSizeMax, FMin);
+                t.fontSizeMin = Mathf.Max(t.fontSizeMin, FMin);
+            }
         }
         _chooser.SetActive(false);
     }
 
-    private static TMP_Text ChooserLine(Transform c, string name, float size, FontStyles style, Color color,
-                                        float x, float y, float w, float h, float pw, float ph)
+    /// <summary>카드 한 줄 — 톤 v2 글자 · 왼쪽 정렬. 긴 이름 · 비용 줄은 칸 안에서만 줄인다(15 아래로는 안 간다).</summary>
+    private static TMP_Text ChooserLine(RectTransform c, string name, float size, UIWeight weight, Color color, float y, float h)
     {
-        var t = MakeLabel(c, name, size, style, TextAlignmentOptions.Center, color);
-        t.textWrappingMode = TextWrappingModes.NoWrap;
-        PlaceIn(t.rectTransform, x, y, w, h, pw, ph);
+        var t = ThinText(c, name, size, weight, TextAlignmentOptions.MidlineLeft, color);
+        t.richText         = true;
+        t.enableAutoSizing = true;
+        t.fontSizeMax      = size;
+        t.fontSizeMin      = Mathf.Min(size, Mathf.Max(UITheme.Thin.Small, size * 0.75f));
+        PlaceIn(t.rectTransform, ChPad, y, ChCardW - ChPad * 2f, h, ChCardW, ChCardH);
         return t;
     }
 
-    /// <summary>카드 두 장 — 근거리는 다음 단계 · 성공률 · 비용, 원거리는 켠 파츠 · 가장 싼 강화. 할 수 있는 쪽에 불.</summary>
+    private void ShowChooseHint(int k, bool on)
+    {
+        var g = _chooseHint[k];
+        if (g == null) return;
+        if (isActiveAndEnabled) FadeGroupAsync(g, on ? 1f : 0f).Forget();
+        else g.alpha = on ? 1f : 0f;
+    }
+
+    /// <summary>
+    /// 카드 두 장 — 같은 네 줄(머리 · 큰 수 · 성공 · 비용)이라 나란히 견줘진다. 할 수 있는 쪽은 1px 금 테(준비됨)가 그려진다 — 후광 없음.
+    /// </summary>
     private void RefreshChooser()
     {
         if (_chooser == null || !_chooser.activeSelf || _controller == null) return;
         int fuel = _controller.FuelAmount;
-        string ev = _controller.HasEvent ? $" · 화로: {_controller.EventEffectDesc}" : "";
-        _chooserSub.text = $"두 쪽이 같은 강화재료를 쓴다 · 보유 <color=#FFD24A>{fuel}</color>{ev}";
+        string ev = _controller.HasEvent ? $" · 화로 {_controller.EventEffectDesc}" : "";
+        _chooserSub.text = $"두 쪽이 같은 강화재료를 쓴다 · 보유 {fuel}{ev}";
 
         int m = PlayerWeaponManager.Slot0;
         var w = _controller.GetSlot(m);
+        _chooseName[0].text = "무기 강화" + ChooseSub(w != null ? w.displayName : "근거리 무기 없음");
         if (w == null)
         {
-            _chooseName[0].text = "근거리 무기 없음";
-            _chooseBig[0].text  = "—";
-            _chooseLine1[0].text = _chooseLine2[0].text = _chooseLine3[0].text = "";
+            _chooseBig[0].text   = "—";
+            _chooseLine1[0].text = _chooseLine2[0].text = "";
         }
         else if (!_controller.CanEnhance(m))
         {
-            _chooseName[0].text  = w.displayName;
-            _chooseBig[0].text   = $"+{w.enhanceLevel} <size=60%>최대</size>";
+            _chooseBig[0].text   = $"+{w.enhanceLevel} <size=50%><color={HexMute}>최대</color></size>";
             _chooseLine1[0].text = _controller.CanPromote(m) || _controller.CanEvolve(m) || _controller.CanTemperForm(m, out _, out _)
-                                 ? "<color=#B49AF0>◆ 진화 · 단련 · 승급을 고를 수 있다</color>" : "더 올릴 수 없다";
-            _chooseLine2[0].text = _chooseLine3[0].text = "";
+                                 ? $"<color={HexForm}>◆ 진화 · 단련 · 승급을 고를 수 있다</color>" : "더 올릴 수 없다";
+            _chooseLine2[0].text = "";
         }
         else
         {
             int cost = _controller.CostAt(m);
-            _chooseName[0].text  = w.displayName;
-            _chooseBig[0].text   = $"+{w.enhanceLevel} <color=#7AD46E>→ +{w.enhanceLevel + 1}</color>";
-            _chooseLine1[0].text = $"성공률 {_controller.SuccessChanceAt(m) * 100f:0}%"
-                                 + (_controller.DropAt(m) > 0 ? " · <color=#FF7A6A>실패하면 하락</color>" : " · 실패해도 그대로");
-            _chooseLine2[0].text = CostLine("다음 강화", cost, fuel);
-            _chooseLine3[0].text = cost > 0 ? $"지금 재료로 {fuel / cost}번 시도" : "";
+            _chooseBig[0].text   = $"+{w.enhanceLevel} <color={HexUp}>→ +{w.enhanceLevel + 1}</color>";
+            _chooseLine1[0].text = RateLine(_controller.SuccessChanceAt(m), _controller.DropAt(m));
+            _chooseLine2[0].text = CostLine("다음 강화", cost, fuel, cost > 0 ? $"지금 재료로 {fuel / cost}번" : "");
         }
 
         var (cheap, cheapName, count) = RangedOutlook();
         var rw    = _controller.GetSlot(PlayerWeaponManager.Slot1);
         var state = RangedPartsState.Current;
-        _chooseName[1].text  = rw != null ? rw.displayName : "원거리 무기";
-        _chooseBig[1].text   = $"파츠 {state.ActiveCount} <size=60%>/ {Managers.WeaponParts?.All?.Count ?? 0} 켬</size>";
-        _chooseLine1[1].text = $"레벨 합 {state.TotalLevel} · <color=#7AD46E>실패 없음</color>";
-        _chooseLine2[1].text = cheap > 0 ? CostLine($"가장 싼 강화({cheapName})", cheap, fuel) : "<color=#8AB0D5>모든 파츠가 최대</color>";
-        _chooseLine3[1].text = cheap > 0 ? $"지금 재료로 {count}번 올릴 수 있다" : "";
+        _chooseName[1].text  = "파츠 강화" + ChooseSub(rw != null ? rw.displayName : "원거리 무기");
+        _chooseBig[1].text   = $"파츠 {state.ActiveCount} <size=50%><color={HexMute}>/ {Managers.WeaponParts?.All?.Count ?? 0} 켬</color></size>";
+        _chooseLine1[1].text = RateLine(1f, 0);   // 파츠 강화는 확정이다 — 근거리와 같은 말 · 같은 색
+        _chooseLine2[1].text = cheap > 0 ? CostLine($"가장 싼 강화 {cheapName}", cheap, fuel, $"지금 재료로 {count}번")
+                                         : $"<color={HexMute}>모든 파츠가 최대</color>";
 
-        UIAffordGlow.Set(_chooseCard[0], MeleeActionable());
-        UIAffordGlow.Set(_chooseCard[1], count > 0);
+        _chooseFrame[0]?.SetState(MeleeActionable() ? ThinFrameState.Ready : ThinFrameState.Idle, animate: true);
+        _chooseFrame[1]?.SetState(count > 0 ? ThinFrameState.Ready : ThinFrameState.Idle, animate: true);
     }
 
-    private static string CostLine(string label, int cost, int have)
-        => have >= cost ? $"{label}  강화재료 <color=#FFD24A>{cost}</color>"
-                        : $"{label}  <color=#FF5250>강화재료 {cost}</color>";
+    /// <summary>머리 줄 꼬리 — 대상 이름(17 · 무채). 머리 24의 71%.</summary>
+    private static string ChooseSub(string name) => $"  <size=71%><color={HexMute}>{name}</color></size>";
 
-    /// <summary>탭 안에서도 반대쪽에 할 수 있는 강화가 남았으면 그 탭에 불 — 한쪽만 올리다 다른 쪽을 놓치지 않게.</summary>
+    /// <summary>「성공 53% · 하락 없음」 — 두 카드가 같은 말 · 같은 색(10-11). 하락이 있으면 그 말만 빨강.</summary>
+    private static string RateLine(float chance, int drop)
+        => $"성공 {chance * 100f:0}% · " + (drop > 0 ? $"<color={HexDown}>실패하면 -{drop}</color>" : "하락 없음");
+
+    /// <summary>「다음 강화 · 강화재료 1 · 지금 재료로 5번」 — 모자라면 비용 숫자만 빨강.</summary>
+    private static string CostLine(string label, int cost, int have, string tail)
+    {
+        string c = have >= cost ? $"강화재료 {cost}" : $"강화재료 <color={HexDown}>{cost}</color>";
+        return string.IsNullOrEmpty(tail) ? $"{label} · {c}" : $"{label} · {c} · {tail}";
+    }
+
+    /// <summary>
+    /// 탭 안에서도 반대쪽에 할 수 있는 강화가 남았으면 그 탭에 금 ◆ — 한쪽만 올리다 다른 쪽을 놓치지 않게.
+    /// 예전엔 탭에도 후광을 켜 [강화하기] 후광과 둘이 다퉜다(10-11 · 후광은 한 화면 한 곳).
+    /// </summary>
     private void RefreshTabGlow()
     {
-        bool choosing = _chooser != null && _chooser.activeSelf;
-        UIAffordGlow.Set(_tabWeaponImg, !choosing && _activeTab != 0 && MeleeActionable());
-        UIAffordGlow.Set(_tabRangedImg, !choosing && _activeTab != 1 && RangedOutlook().count > 0);
+        TabReady(_tabWeaponImg, !Choosing && _activeTab != 0 && MeleeActionable());
+        TabReady(_tabRangedImg, !Choosing && _activeTab != 1 && RangedOutlook().count > 0);
     }
 
     /// <summary>근거리 — 지금 재료로 강화하거나, 진화 · 승급을 고를 수 있는가.</summary>
@@ -2247,7 +2254,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     private void EnsureEngravePanel()
     {
         if (_engravePanel != null) return;
-        var host = _window != null ? (Transform)_window : transform;
+        var host = _v3Ready ? _v3Root : _window != null ? (Transform)_window : transform;   // v3 — 판(1560×880) 안을 덮는다
         var dim = ShopUIStyle.MakeImage(host, "EngraveDim", new Color(0.02f, 0.02f, 0.04f, 0.90f), raycast: true);
         ShopUIStyle.Stretch(dim.rectTransform);
         _engravePanel = dim.gameObject;
@@ -2257,7 +2264,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         ShopUIStyle.Anchor(_engraveTitle.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
                            new Vector2(0, -150), new Vector2(900, 50));
 
-        var sub = MakeLabel(d, "EngraveSub", 18f, FontStyles.Italic, TextAlignmentOptions.Center, ShopUIStyle.TextDim);
+        var sub = ThinText(d, "EngraveSub", UITheme.Thin.Body, UIWeight.Regular, TextAlignmentOptions.Center, ShopUIStyle.TextDim);   // 기울임 없음(10-11)
         sub.text = "◇ 둘 중 하나를 새긴다 · 되돌릴 수 없다 ◇";
         ShopUIStyle.Anchor(sub.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
                            new Vector2(0, -206), new Vector2(900, 30));
@@ -2269,69 +2276,6 @@ public sealed class UI_CruciblePanel : UI_Popup
             pick.onClick.AddListener(() => OnEngravePicked(captured));
         }
         _engravePanel.SetActive(false);
-    }
-
-    /// <summary>형 단련 — 다음 단계 변주 두 장 중 하나를 고른다. 확정 성공 · 하락 없음 · 되돌릴 수 없다. 「다음에」를 누르면 다음 방문에 다시 고른다.</summary>
-    private void ShowTemperPanel()
-    {
-        int m = PlayerWeaponManager.Slot0;
-        var w = _controller?.GetSlot(m);
-        if (w == null || !_controller.CanTemperForm(m, out int tier, out int cost)) return;
-        w.form.GetVariants(tier, _temperOptions);
-        if (_temperOptions.Count < 2) return;
-        EnsureTemperPanel();
-        _temperTitle.text = $"{w.displayName} · 형 「{w.form.DisplayName}」 — 단련 {RomanTier(tier)}";
-        string costText = _controller.FuelAmount >= cost ? cost.ToString() : $"<color=#FF5250>{cost}</color>";
-        _temperSub.text = $"변주 둘 중 하나 · 확정 성공(실패 · 하락 없음) · 되돌릴 수 없다 · 강화재료 {costText}";
-        for (int k = 0; k < 2; k++)
-        {
-            _temperName[k].text = $"{_temperOptions[k].displayName}  <size=70%><color=#B49AF0>{_temperOptions[k].traitTag}</color></size>";
-            _temperDesc[k].text = _temperOptions[k].line;
-        }
-        _temperPanel.transform.SetAsLastSibling();
-        _temperPanel.SetActive(true);
-        ShopUIStyle.PlaySfx("shop_open");
-    }
-
-    private void OnTemperPicked(int k)
-    {
-        if (k < 0 || k >= _temperOptions.Count) return;
-        var def = _temperOptions[k];
-        bool ok = _controller != null && _controller.TryTemperForm(PlayerWeaponManager.Slot0, def.id);
-        _temperPanel.SetActive(false);
-        if (_resultText != null)
-            _resultText.text = ok ? $"<color=#9D7EE6>형 단련 — {def.displayName}</color>" : "<color=#FF7A6A>강화재료가 모자란다</color>";
-        ShopUIStyle.PlaySfx(ok ? "enhance_success" : "shop_reject");
-        RefreshAll();
-    }
-
-    private void EnsureTemperPanel()
-    {
-        if (_temperPanel != null) return;
-        var host = _window != null ? (Transform)_window : transform;
-        var dim = ShopUIStyle.MakeImage(host, "TemperDim", new Color(0.02f, 0.02f, 0.04f, 0.90f), raycast: true);
-        ShopUIStyle.Stretch(dim.rectTransform);
-        _temperPanel = dim.gameObject;
-        var d = dim.transform;
-
-        _temperTitle = MakeLabel(d, "TemperTitle", 30f, FontStyles.Bold, TextAlignmentOptions.Center, ShopUIStyle.Gold);
-        ShopUIStyle.Anchor(_temperTitle.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-                           new Vector2(0, -150), new Vector2(1000, 50));
-        _temperSub = MakeLabel(d, "TemperSub", 18f, FontStyles.Normal, TextAlignmentOptions.Center, ShopUIStyle.TextDim);
-        ShopUIStyle.Anchor(_temperSub.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-                           new Vector2(0, -206), new Vector2(1200, 30));
-
-        for (int k = 0; k < 2; k++)
-        {
-            int captured = k;
-            var pick = BuildEngraveCard(d, k == 0 ? -230f : 230f, out _temperName[k], out _temperDesc[k], "눌러서 벼린다");
-            pick.onClick.AddListener(() => OnTemperPicked(captured));
-        }
-        var later = MakeStyledButton(d, "TemperLater", "다음에", out _);
-        ShopUIStyle.Anchor((RectTransform)later.transform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                           new Vector2(0, 110), new Vector2(200, 56));
-        later.onClick.AddListener(() => _temperPanel.SetActive(false));
-        _temperPanel.SetActive(false);
     }
 
     private static string RomanTier(int t) => t switch { 2 => "Ⅱ", 3 => "Ⅲ", _ => "Ⅰ" };
@@ -2420,7 +2364,7 @@ public sealed class UI_CruciblePanel : UI_Popup
             descText.text = $"공격력 +{(legend.attackBonusMult - 1f) * 100f:0}%\n승급 재료 "
                           + $"<color={(afford ? "#E8D9B0" : "#FF7A6E")}>{legend.promoteCost}</color>  (보유 {have})";
             pick.onClick.AddListener(() => { HideLegendPanel(); OnPromoteClicked(id); });
-            UIAffordGlow.Set(pick, afford);   // 재료가 되면 은은한 불 — 재화를 쓰는 버튼 공통(10-01)
+            Halo(pick, afford);   // 재료가 되면 은은한 불 — 재화를 쓰는 버튼 공통(10-01) · 8px(10-11)
             _legendCards.Add(pick.gameObject);
         }
         _legendPanel.transform.SetAsLastSibling();
@@ -2437,7 +2381,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     private void EnsureLegendPanel()
     {
         if (_legendPanel != null) return;
-        var host = _window != null ? (Transform)_window : transform;
+        var host = _v3Ready ? _v3Root : _window != null ? (Transform)_window : transform;   // v3 — 판(1560×880) 안을 덮는다
         var dim = ShopUIStyle.MakeImage(host, "LegendDim", new Color(0.02f, 0.02f, 0.04f, 0.90f), raycast: true);
         ShopUIStyle.Stretch(dim.rectTransform);
         _legendPanel = dim.gameObject;
@@ -2447,7 +2391,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         title.text = "전설 승급";
         ShopUIStyle.Anchor(title.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
                            new Vector2(0, -150), new Vector2(900, 50));
-        var sub = MakeLabel(d, "LegendSub", 18f, FontStyles.Italic, TextAlignmentOptions.Center, ShopUIStyle.TextDim);
+        var sub = ThinText(d, "LegendSub", UITheme.Thin.Body, UIWeight.Regular, TextAlignmentOptions.Center, ShopUIStyle.TextDim);   // 기울임 없음(10-11)
         sub.text = "◇ 검에 전설의 이름을 새긴다 · 되돌릴 수 없다 ◇";
         ShopUIStyle.Anchor(sub.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
                            new Vector2(0, -206), new Vector2(900, 30));
@@ -2546,6 +2490,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         if (_activeTab == 1) { EnhanceSelectedPart(); return; }
 
         // 컨트롤러가 결과를 즉시 확정(OnCrucibleChanged→RefreshAll 동기 발화). 연출은 표시층만 재생.
+        V3SnapshotBefore();   // v3 — 망치가 닿기 전까지 보일 값(연속 · 잭팟 · 「다음」 · 형 칸)
         var result = _controller.TryEnhance(_targetSlot);
         PlayEnhanceSequence(result, EnhanceView.MeleeWeapon).Forget();
     }
@@ -2622,14 +2567,20 @@ public sealed class UI_CruciblePanel : UI_Popup
             await ForgeStrikeAsync();
             await Hold(EvolveStrikeGap);
             await ForgeStrikeAsync();
-            ShopUIStyle.PlaySfx("crucible_success");
+            ShopUIStyle.PlaySfx("crucible_promote");   // 전설 승급 — 런 안에서 가장 큰 연출(10-12 C7)
             HitFeelService.HitStop(0.6f, 0.05f);
             FlashStage(StageFlashSuccess);
             RefreshAll();
             BurstSparks(JackpotSparks, SparkJackpot, StrikeX, StrikeY);
             ShowStageResult($"<size=55%><color=#FFD24A>전설</color></size>\n{name}", EvolveStampSize, SuccessPopScale);
-            await UniTask.WhenAll(PopWeaponAsync(), FocusAsync(false));
-            await Hold(SettleDur * 2f);
+            if (_v3Ready)
+                await UniTask.WhenAll(PopWeaponAsync(), FocusAsync(false), PunchFocalAsync(_v3Focal, UITheme.Thin.Gold, V3SuccessDur, V3PunchAmp),
+                                      Hold(V3MilestoneDur));   // v3 이정표 1.5초
+            else
+            {
+                await UniTask.WhenAll(PopWeaponAsync(), FocusAsync(false));
+                await Hold(SettleDur * 2f);
+            }
         }
         catch (OperationCanceledException) { return; }
 
@@ -2685,6 +2636,7 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         if (isMelee) HoldBeforeState(r, max);
         else         ShowResultText(r, view);
+        if (r.outcome == EnhanceOutcome.Success && view != EnhanceView.RangedWeapon) _stampTierNext = TierReachedLine(r, isPart);
 
         try
         {
@@ -2692,6 +2644,7 @@ public sealed class UI_CruciblePanel : UI_Popup
             {
                 await ForgeStrikeAsync();
                 ShowResultText(r, view);   // 망치가 닿는 순간 공개 — 결과 문구·대장장이 대사
+                V3Reveal();                // v3 두 판도 이 순간에 지금 값으로
             }
 
             switch (r.outcome)
@@ -2738,10 +2691,12 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         if (_controller.LastJackpot)
             CurrencyCounter.Apply(_fuelText, _controller.FuelAmount - _controller.LastRefund);
+        if (_v3Ready) V3HoldBefore(r, max);
     }
 
     private async UniTask SuccessSequence(int slot, EnhanceResult r, int max, bool count, bool melee)
     {
+        if (_v3Ready) { await SuccessSequenceV3(slot, r, max, count, melee); return; }
         ShopUIStyle.PlaySfx("crucible_success");
         HitFeelService.HitStop(0.6f, 0.05f); // 시간정지 팝업에선 timeScale 무효(무해) — 카메라측 반응만
         ShowStageResult(_resultText.text, SuccessFontSize, SuccessPopScale);   // 망치가 닿는 순간 = 판정 순간
@@ -2760,6 +2715,7 @@ public sealed class UI_CruciblePanel : UI_Popup
 
     private async UniTask JackpotSequence(int slot, EnhanceResult r, int max, bool count, bool melee)
     {
+        if (_v3Ready) { await JackpotSequenceV3(slot, r, max, count, melee); return; }
         HitFeelService.Heavy();
         if (melee)
         {
@@ -2789,6 +2745,7 @@ public sealed class UI_CruciblePanel : UI_Popup
 
     private async UniTask FailSequence(int slot, EnhanceResult r, int max, bool count, bool melee)
     {
+        if (_v3Ready) { await FailSequenceV3(slot, r, max, count, melee); return; }
         bool nearMiss = IsNearMiss(r);
         ShopUIStyle.PlaySfx("crucible_fail");
         HitFeelService.Light();
@@ -2813,6 +2770,72 @@ public sealed class UI_CruciblePanel : UI_Popup
         if (melee) await Hold(SettleDur);
     }
 
+    // ── v3 결과 연출(10-14 · 설계 §1-2 디아블로 4 원칙) — 길이는 결과 무게에 비례 · 카메라 · 화면 흔들림 없음 ──
+    // 평범한 성공 0.4초(「+N」 펀치) · 이정표(형 열림) 1.5초 · 잭팟 1.0초 · 실패 0.5초(붉게 가라앉았다 돌아옴). 시간은 망치가 닿은 뒤부터.
+
+    private async UniTask SuccessSequenceV3(int slot, EnhanceResult r, int max, bool count, bool melee)
+    {
+        bool milestone = melee && IsFormMilestone(r);
+        if (milestone && _stampTierNext == null) _stampTierNext = FormAwakeLine();   // 도장 아래 「형이 깨어난다 — 칼바람 또는 무게」
+        ShopUIStyle.PlaySfx("crucible_success");
+        HitFeelService.HitStop(0.6f, 0.05f); // 시간정지 팝업에선 timeScale 무효(무해) — 흔들림 아님
+        ShowStageResult(_resultText.text, SuccessFontSize, SuccessPopScale);
+        if (melee)
+        {
+            FlashStage(StageFlashSuccess);
+            _heatLevel01 = max > 0 ? Mathf.Clamp01((float)r.afterLevel / max) : 0f;
+        }
+        await UniTask.WhenAll(count ? CountLevel(slot, r.beforeLevel, r.afterLevel, max) : UniTask.CompletedTask,
+                              melee ? FocusAsync(false) : UniTask.CompletedTask,
+                              PunchFocalAsync(FocalFor(slot), UITheme.Thin.Gold, V3SuccessDur, V3PunchAmp),
+                              PunchCard(slot, PunchScale, PunchDur),
+                              FlashCard(slot, SuccessFlash),
+                              milestone ? MilestoneGlowAsync(V3MilestoneDur) : UniTask.CompletedTask);
+    }
+
+    private async UniTask JackpotSequenceV3(int slot, EnhanceResult r, int max, bool count, bool melee)
+    {
+        ShopUIStyle.PlaySfx("crucible_jackpot");
+        VolumePulseService.Pulse(JackpotPulsePeak, JackpotPulseDur); // 전체화면 크로매틱+블룸(unscaled) — 흔들림 아님
+        ShowStageResult(_resultText.text, JackpotFontSize, JackpotPopScale);
+        if (melee)
+        {
+            FlashStage(StageFlashJackpot);
+            _jackpotGen++;
+            JackpotShowAsync(_jackpotGen).Forget();
+            BurstSparks(JackpotSparks, SparkJackpot, StagePanelW * 0.5f, 300f);
+            _heatLevel01 = max > 0 ? Mathf.Clamp01((float)r.afterLevel / max) : 0f;
+        }
+        bool milestone = melee && IsFormMilestone(r);
+        await UniTask.WhenAll(count ? CountLevel(slot, r.beforeLevel, r.afterLevel, max) : UniTask.CompletedTask,
+                              melee ? FocusAsync(false) : UniTask.CompletedTask,
+                              melee ? RefundAsync() : UniTask.CompletedTask,
+                              PunchFocalAsync(FocalFor(slot), JackpotInk, V3SuccessDur, V3PunchAmp * 1.4f),
+                              PunchCard(slot, JackpotPunchScale, JackpotPunchDur),
+                              FlashCard(slot, JackpotFlash),
+                              Hold(milestone ? V3MilestoneDur : V3JackpotDur),
+                              milestone ? MilestoneGlowAsync(V3MilestoneDur) : UniTask.CompletedTask);
+    }
+
+    private async UniTask FailSequenceV3(int slot, EnhanceResult r, int max, bool count, bool melee)
+    {
+        bool nearMiss = IsNearMiss(r);
+        ShopUIStyle.PlaySfx("crucible_fail");
+        ShowStageResult(_resultText.text, SuccessFontSize, SuccessPopScale);   // 아슬아슬해도 크기 · 튐은 같게 — 색 · 문구만 다르다
+        if (melee)
+        {
+            FlashStage(nearMiss ? StageFlashNear : StageFlashFail);
+            _coolGen++;
+            CoolWeaponAsync(_coolGen).Forget();
+            _heatLevel01 = max > 0 ? Mathf.Clamp01((float)r.afterLevel / max) : 0f;
+        }
+        bool dropped = r.beforeLevel != r.afterLevel;   // 하락분이 있으면 카운트다운
+        await UniTask.WhenAll(count && dropped ? CountLevel(slot, r.beforeLevel, r.afterLevel, max) : UniTask.CompletedTask,
+                              melee ? FocusAsync(false) : UniTask.CompletedTask,
+                              PunchFocalAsync(FocalFor(slot), DownRed, V3FailDur, -0.04f),
+                              FlashCard(slot, nearMiss ? NearMissFlash : FailFlash));
+    }
+
     private void ShowResultText(EnhanceResult r, EnhanceView view)
     {
         // 파츠는 확정 상승이라 잭팟·스트릭·니어미스가 없다 — 무기 문구를 그대로 쓰면 있지도 않은 도박을 암시한다.
@@ -2822,9 +2845,9 @@ public sealed class UI_CruciblePanel : UI_Popup
         {
             case EnhanceOutcome.Success:
                 _resultText.text = _controller.LastJackpot
-                    ? $"<color=#FFD24A>잭팟! +{_controller.LastRefund} 환불</color>"
+                    ? $"<color=#7AD46E>잭팟! +{_controller.LastRefund} 환불</color>"
                     : $"<color=#7AD46E>성공! +{r.afterLevel}</color>";
-                _resultText.color = ShopUIStyle.Gold;
+                _resultText.color = UITheme.Thin.Ink;
                 _dialogText.text = _controller.LastJackpot ? _controller.GetDialogue(CrucibleMood.Jackpot)
                                  : _controller.Streak >= 2 ? _controller.GetDialogue(CrucibleMood.Streak)
                                  : _controller.GetDialogue(CrucibleMood.Success);
@@ -2833,19 +2856,19 @@ public sealed class UI_CruciblePanel : UI_Popup
             {
                 // 안전 구간 실패는 단계가 그대로다 — 「하락」이라고 쓰면 틀린 말이 된다.
                 string what = r.beforeLevel == r.afterLevel ? "단계 유지" : "하락";
-                _resultText.text = IsNearMiss(r) ? $"<color=#FF7A3A>아슬아슬! {what} (+{r.afterLevel})</color>"
-                                                 : $"<color=#FF5250>실패 — {what} (+{r.afterLevel})</color>";
+                _resultText.text = IsNearMiss(r) ? $"<color=#FF7A6A>아슬아슬! {what} (+{r.afterLevel})</color>"
+                                                 : $"<color=#FF7A6A>실패 — {what} (+{r.afterLevel})</color>";
                 _dialogText.text = _controller.GetDialogue(CrucibleMood.Fail);
                 break;
             }
             case EnhanceOutcome.RejectNoFuel:
-                _resultText.text = "<color=#FF5250>강화재료 부족</color>";
+                _resultText.text = "<color=#FF7A6A>강화재료 부족</color>";
                 break;
             case EnhanceOutcome.RejectMaxed:
-                _resultText.text = "<color=#8AB0D5>이미 최대 강화</color>";
+                _resultText.text = "<color=#9A98A0>이미 최대 강화</color>";
                 break;
             default:
-                _resultText.text = "<color=#FF5250>강화 불가</color>";
+                _resultText.text = "<color=#FF7A6A>강화 불가</color>";
                 break;
         }
     }
@@ -2858,29 +2881,29 @@ public sealed class UI_CruciblePanel : UI_Popup
         switch (r.outcome)
         {
             case EnhanceOutcome.Success:
-                bool stepped = def != null &&
-                               !Mathf.Approximately(def.ValueAt(r.beforeLevel), def.ValueAt(r.afterLevel));
+                bool stepped = def != null && (r.beforeLevel <= 0 ||
+                               !Mathf.Approximately(def.ValueAt(r.beforeLevel), def.ValueAt(r.afterLevel)));
                 _resultText.text = stepped
-                    ? $"<color=#FFD24A>단계 상승! {(def != null ? PartValueText(def, def.ValueAt(r.afterLevel)) : "")}</color>"
+                    ? $"<color=#7AD46E>단계 상승! {(def != null ? PartValueText(def, def.ValueAt(r.afterLevel)) : "")}</color>"
                     : $"<color=#7AD46E>강화 성공 — Lv.{r.afterLevel}</color>";
-                _resultText.color = ShopUIStyle.Gold;
+                _resultText.color = UITheme.Thin.Ink;
                 _dialogText.text = stepped
                     ? "형태가 바뀌었군. 이제 다르게 날아갈 거다."
                     : "아직이다. 조금 더 두들겨야 모양이 잡힌다.";
                 break;
 
             case EnhanceOutcome.RejectNoFuel:
-                _resultText.text = "<color=#FF5250>강화재료 부족</color>";
+                _resultText.text = "<color=#FF7A6A>강화재료 부족</color>";
                 _dialogText.text = "재료 없이는 손도 못 댄다.";
                 break;
 
             case EnhanceOutcome.RejectMaxed:
-                _resultText.text = "<color=#8AB0D5>이미 최대 강화</color>";
+                _resultText.text = "<color=#9A98A0>이미 최대 강화</color>";
                 _dialogText.text = "이 파츠는 여기가 끝이다.";
                 break;
 
             default:
-                _resultText.text = "<color=#FF5250>강화할 파츠를 선택하세요</color>";
+                _resultText.text = "<color=#FF7A6A>강화할 파츠를 선택하세요</color>";
                 break;
         }
     }
@@ -2897,8 +2920,8 @@ public sealed class UI_CruciblePanel : UI_Popup
 
     private static string FormatLevel(int level, int max, bool isPart = false)
         => isPart
-            ? $"Lv.{level} <size=55%><color=#9A98A0>/ {max}</color></size>"
-            : $"+{level} <size=55%><color=#9A98A0>/ {max}</color></size>";
+            ? $"Lv.{level} <size=90%><color=#9A98A0>/ {max}</color></size>"
+            : $"+{level} <size=75%><color=#9A98A0>/ {max}</color></size>";   // v3 — 단계 글자 24 · 「/ 6」 18(본문 최소 16 · 10-14)
 
     private void SetGauge(int slot, int level, int max)
     {
@@ -3021,10 +3044,10 @@ public sealed class UI_CruciblePanel : UI_Popup
         _resultText.text = r.outcome switch
         {
             PromoteOutcome.Success             => "<color=#FFD24A>전설로 승급!</color>",
-            PromoteOutcome.RejectNoFuel        => "<color=#FF5250>강화재료 부족</color>",
-            PromoteOutcome.RejectNotMaxed      => "<color=#FF5250>강화 MAX 필요</color>",
-            PromoteOutcome.RejectAlreadyLegend => "<color=#8AB0D5>이미 승급됨</color>",
-            _                                  => "<color=#FF5250>승급 불가</color>",
+            PromoteOutcome.RejectNoFuel        => "<color=#FF7A6A>강화재료 부족</color>",
+            PromoteOutcome.RejectNotMaxed      => "<color=#FF7A6A>강화 MAX 필요</color>",
+            PromoteOutcome.RejectAlreadyLegend => "<color=#9A98A0>이미 승급됨</color>",
+            _                                  => "<color=#FF7A6A>승급 불가</color>",
         };
         if (!r.IsSuccess) ShopUIStyle.PlaySfx("shop_reject");   // 성공 소리는 승급 연출(판정 빛)이 낸다
     }
@@ -3152,6 +3175,7 @@ public sealed class UI_CruciblePanel : UI_Popup
                 }
                 if (melee && _embers != null) TickEmbers(dt);
                 if (_sparksAlive > 0) TickSparks(dt);
+                if (_v3Ready) TickV3(dt, time);
 
                 await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
             }
@@ -3169,7 +3193,7 @@ public sealed class UI_CruciblePanel : UI_Popup
             {
                 if (_emberSpawn < 1f) continue;
                 _emberSpawn -= 1f;
-                _emberPos[i]   = new Vector2(UnityEngine.Random.Range(180f, 780f), StagePanelH + 8f);
+                _emberPos[i]   = new Vector2(UnityEngine.Random.Range(180f, 780f), StageHNow + 8f);
                 _emberVel[i]   = new Vector2(UnityEngine.Random.Range(-12f, 12f), -UnityEngine.Random.Range(36f, 108f));
                 _emberLife[i]  = 1f;
                 _emberDecay[i] = UnityEngine.Random.Range(0.22f, 0.42f);
@@ -3241,10 +3265,10 @@ public sealed class UI_CruciblePanel : UI_Popup
         await FocusAsync(true);
         await SwingHammerAsync();
         ShopUIStyle.PlaySfx("crucible_hit");
-        BurstSparks(StrikeSparks, SparkGold, StrikeX, StrikeY);
+        BurstSparks(StrikeSparks, SparkGold, StrikeX, StrikeYNow);
         _hammerGen++;
         HammerRecoverAsync(_hammerGen).Forget();
-        await PunchWindowAsync();
+        if (!_v3Ready) await PunchWindowAsync();   // v3 — 창(화면)이 꺼지는 펀치 없음(설계 §1-2 흔들림 없음) · 망치 · 불꽃이 충격을 말한다
     }
 
     /// <summary>포커스 — 정보창·대사 밴드가 흐려지고 암막이 짙어지며 무대가 살짝 다가온다(끄면 되돌림).</summary>
@@ -3269,6 +3293,8 @@ public sealed class UI_CruciblePanel : UI_Popup
         float a = Mathf.Lerp(1f, FocusDim, k);
         if (_infoGroup != null) _infoGroup.alpha = a;
         if (_bandGroup != null) _bandGroup.alpha = a;
+        if (_trackGroup != null) _trackGroup.alpha = a;
+        if (_v3PathGroup != null) _v3PathGroup.alpha = a;   // v3 — 단계 점 · 「다음」 · 형 칸도 판정 전엔 흐리게(결과가 새지 않게)
         if (_veil != null)
         {
             var c = ShopUIStyle.Veil;
@@ -3427,13 +3453,13 @@ public sealed class UI_CruciblePanel : UI_Popup
         var brt = _jackpotBanner.rectTransform;
         try
         {
-            float t = 0f;
-            while (t < JackpotShowDur)
+            float t = 0f, dur = _v3Ready ? V3JackpotDur : JackpotShowDur;   // v3 — 잭팟 1.0초(평범한 성공 0.4 · 이정표 1.5 사이)
+            while (t < dur)
             {
                 if (gen != _jackpotGen) return;
                 if (_skipAnim) break;
                 t += Time.unscaledDeltaTime;
-                float k = Mathf.Clamp01(t / JackpotShowDur);
+                float k = Mathf.Clamp01(t / dur);
                 var rc = RaysColor;
                 rc.a = Mathf.Sin(k * Mathf.PI) * 0.9f;
                 _rays.color = rc;
@@ -3550,6 +3576,8 @@ public sealed class UI_CruciblePanel : UI_Popup
         RefreshPromoteRow();
         RefreshChooser();
         RefreshTabGlow();
+        RefreshFormUi();   // 성장 길 · 형 칸(10-08)
+        RefreshV3();       // v3 두 판(10-14) — 맨 끝: 성장 길이 고친 「다음」 글을 읽고, 위의 v2 값(숫자 색 · 표 줄 수)을 v3 규칙으로 덮는다
     }
 
     /// <summary>진화 · 승급 중 지금 재료로 고를 수 있는 것이 있는가 — 여는 버튼의 불은 「할 수 있다」일 때만.</summary>
@@ -3572,6 +3600,7 @@ public sealed class UI_CruciblePanel : UI_Popup
     private void RefreshEvolveButton()
     {
         if (_evolveBtn == null) return;
+        if (_v3Ready) { RefreshFormRowV3(); return; }   // v3 — 왼쪽 판 형 칸 한 줄(같은 버튼 · 같은 ShowEvolvePanel)
         // 진화 분기가 남았으면 진화, 마지막 형태의 검이면 같은 자리에서 전설 승급.
         int  m       = PlayerWeaponManager.Slot0;
         bool evolve  = CurrentBranches.Count > 0;
@@ -3581,30 +3610,49 @@ public sealed class UI_CruciblePanel : UI_Popup
         // 열렸을 때만 보인다 — 잠긴 「◆ 진화 — +6에서 열림」은 게이지 끝 눈금(◆)과 같은 말이라 읽을 거리만 늘렸다(09-29).
         bool ready = evolve ? _controller.CanEvolve(m) : temper || (promote && _controller.CanPromote(m));
         bool show  = _activeTab == 0 && (evolve || temper || promote) && ready;
+        bool afford = temper ? _controller.FuelAmount >= _temperCostShown : CanAffordNextForm(promote);
+        // 후광은 한 화면 한 곳(10-11) — [강화하기]를 지금 누를 수 있으면 그쪽, 아니면 여기
+        bool enhanceFirst = _controller.GetSlot(m) != null && _controller.CanEnhance(m) && _controller.FuelAmount >= _controller.CostAt(m);
         _evolveBtn.gameObject.SetActive(show);
-        UIAffordGlow.Set(_evolveBtn, show && (temper ? _controller.FuelAmount >= _temperCostShown : CanAffordNextForm(promote)));   // 조건만 채워도 켜져, 재료가 모자란 갈래만 있을 때도 불이 들어왔다(10-01)
+        Halo(_evolveBtn, show && afford && !enhanceFirst && !Choosing);   // 조건만 채워도 켜져, 재료가 모자란 갈래만 있을 때도 불이 들어왔다(10-01)
         if (!show) return;
 
-        _evolveBtn.interactable = ready;
-        if (_evolveBtn.TryGetComponent<Image>(out var img)) img.color = ready ? EvolveReady : EvolveLocked;
+        // 단련은 재료가 모자라면 꺼진다(시안 ③ — 진화 확정 버튼과 같은 규칙). 진화 · 승급은 창 안 확정 버튼이 막는다.
+        bool usable = ready && (!temper || afford);
+        _evolveBtn.interactable = usable;
+        // 채움 주 버튼은 [강화하기] 하나(10-11 · 리서치 C P1) — 여기는 채움 없이 1px 테 · 보라 글자(보라 = 진화 글자에만)
+        if (_evolveBtn.TryGetComponent<Image>(out var img)) img.color = Color.clear;
+        SetBoxLine(_evolveEdge, !usable ? UITheme.Thin.LineIdle : afford && !enhanceFirst ? UITheme.Thin.LineReady : UITheme.Thin.LineActive);
         if (_evolveLabel != null)
         {
             string verb = promote ? "승급" : "진화";
-            _evolveLabel.text  = temper ? $"◆ 형 단련 {RomanTier(_temperTierShown)} — 변주를 고른다 · 강화재료 {_temperCostShown}"
+            string temperCost = afford ? _temperCostShown.ToString() : $"<color=#FF7A6A>{_temperCostShown}</color>";
+            _evolveLabel.text  = temper ? $"◆ 형 단련 {RomanTier(_temperTierShown)} — 변주를 고른다 · 강화재료 {temperCost}"
                                : ready  ? (promote ? "◆ 승급 — 전설을 고른다" : "◆ 진화 — 형을 고른다")
                                         : $"◆ {verb} — +{_controller.MaxAt(PlayerWeaponManager.Slot0)}에서 열림";
-            _evolveLabel.color = ready ? Color.white : TextMuted;
+            _evolveLabel.color = usable ? FormInk : UITheme.Thin.InkA(0.5f);
+            _evolveLabel.richText = true;
         }
     }
 
-    /// <summary>대사 밴드 배지 — 돌발 이벤트가 우선이고, 없으면 무기 탭의 도박 구간 경고.</summary>
+    /// <summary>
+    /// 대사 밴드 배지 — 돌발 이벤트가 우선이고, 없으면 무기 탭의 도박 구간 경고.
+    /// 얇은 선 칩 한 줄(10-11) — 좋은 화로 = 금 「▲ 화로 · 재료 비용 50%」, 저주 · 위험 = 빨강 「▼」.
+    /// </summary>
     private void RefreshBandBadge()
     {
         if (_eventBanner == null || _controller == null) return;
         bool ev   = _controller.HasEvent;
         bool warn = !ev && _activeTab == 0 && _danger;
         _eventBanner.SetActive(ev || warn);
-        if (_eventBannerText != null) _eventBannerText.text = ev ? _controller.EventBanner : "위험 · 실패 시 하락";
+        bool good = ev && _controller.EventSuccessBonus >= 0f;
+        var tone  = good ? UITheme.Thin.Gold : DownRed;
+        if (_eventBannerText != null)
+        {
+            _eventBannerText.text  = ev ? ForgeEventLine() : "▼ 위험 · 실패하면 하락";
+            _eventBannerText.color = tone;
+        }
+        SetBoxLine(_bannerEdge, UITheme.Thin.WithA(tone, 0.55f));
     }
 
     /// <summary>
@@ -3618,6 +3666,8 @@ public sealed class UI_CruciblePanel : UI_Popup
         int n = Mathf.Min(max, _ticks.Length);
         bool roomy = (GaugeW - 48f) / n >= 80f;   // 「+6 위험」이 들어갈 칸 폭
         bool firstDanger = true;
+        int  evoAt = EvolveAt();
+        var  tiers = w != null && !SkillTierResolver.IsRanged(w) ? SkillTierResolver.Milestones(w) : System.Array.Empty<int>();
         for (int j = 0; j < _ticks.Length; j++)
         {
             var t = _ticks[j];
@@ -3635,14 +3685,35 @@ public sealed class UI_CruciblePanel : UI_Popup
 
             bool last   = lv >= max;
             bool danger = !last && table != null && table.DropAt(lv) > 0;
-            if (last)                                t.text = w != null && w.CanEvolve ? $"+{lv} ◆" : $"+{lv}";
-            else if (danger && firstDanger && roomy) t.text = $"+{lv} 위험";
-            else                                     t.text = $"+{lv}";
+            bool evo    = lv == evoAt;
+            int  skill  = System.Array.IndexOf(tiers, lv);   // 0 → 2단계, 1 → 3단계
+            string mark = evo ? " ◆" : skill >= 0 ? " ◇" : "";
+            if (danger && firstDanger && roomy && mark.Length == 0) t.text = $"+{lv} 위험";
+            else                                                    t.text = $"+{lv}{mark}";
             if (danger) firstDanger = false;
 
-            t.color = last ? ShopUIStyle.Gold : danger ? TickDanger : lv <= level ? ShopUIStyle.TextPrimary
-                    : lv == level + 1 ? TickNext : TickDim;
+            t.color = lv <= level ? ShopUIStyle.TextPrimary : evo || skill >= 0 ? FormInk
+                    : danger ? DownRed : lv == level + 1 || last ? UITheme.Thin.Ink : TickDim;
+            TickTip(t, w, lv, evo, skill);
         }
+    }
+
+    /// <summary>표시가 있는 눈금(◆ 진화 · ◇ 스킬 단계)에 손을 올리면 그 단계에서 무엇이 바뀌는지. 표시 없는 눈금은 호버를 받지 않는다.</summary>
+    private void TickTip(TMP_Text t, WeaponData w, int lv, bool evo, int skill)
+    {
+        bool on = w != null && (evo || skill >= 0);
+        t.raycastTarget = on;
+        if (!on) return;
+        if (evo)
+        {
+            var (fa, fb) = BranchForms();
+            UITooltipTrigger.Attach(t.gameObject, $"+{lv} · 형이 깨어난다",
+                $"진화 — {fa?.DisplayName ?? "?"} 또는 {fb?.DisplayName ?? "?"}\n강화 단계와 각인은 그대로 이어진다", ShopUIStyle.Gold);
+            return;
+        }
+        string body = TierChangeBody(w, skill + 2);
+        UITooltipTrigger.Attach(t.gameObject, $"+{lv} · 스킬 {skill + 2}단계",
+            body != null ? body.Replace(" · R ", "\nR ") : "스킬이 한 단계 오른다", FormInk);
     }
 
     /// <summary>
@@ -3670,6 +3741,7 @@ public sealed class UI_CruciblePanel : UI_Popup
             // 고른 파츠가 없을 땐 레벨 막대 트랙도 감춘다 — 아트 바탕 위에 빈 띠만 남아 보인다.
             _cardGaugeFill[RangedCard].parent.gameObject.SetActive(false);
             SetPartButton(null, 0, 0, false);
+            RefreshPartFocalV3();
             return;
         }
         _cardGaugeFill[RangedCard].parent.gameObject.SetActive(true);
@@ -3680,7 +3752,7 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         _cardName[RangedCard].text  = def.part_name;
         _partKindText.text          = PartKindLabel(def);
-        _cardLevel[RangedCard].text = $"Lv.{level} <size=70%><color=#9A98A0>/ {max}</color></size>";
+        _cardLevel[RangedCard].text = $"Lv.{level} <size=90%><color=#9A98A0>/ {max}</color></size>";   // 90% — 18의 90% ≈ 16(본문 최소)
         _cardAtk[RangedCard].text   = PartEffectLine(def, level);
         _partGrowthText.text        = PartGrowthLine(def, level, maxed);
         _partDescText.text          = def.description;
@@ -3691,6 +3763,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         bool isSelected = SelectedPartDef() == def;
         SetPartButton(def, _controller != null ? _controller.PartCostAt(def.part_id) : 0,
                       _controller != null ? _controller.FuelAmount : 0, isSelected && !maxed);
+        RefreshPartFocalV3();   // v3 초점 「Lv 3 → 4」도 손을 올린 파츠를 따라간다
     }
 
     /// <summary>마우스가 올라간 슬롯의 파츠. 없으면 null.</summary>
@@ -3712,38 +3785,45 @@ public sealed class UI_CruciblePanel : UI_Popup
         {
             if (def == null) _partCostText.text = "";
             else if (def.max_level > 0 && RangedPartsState.Current.LevelOf(def.part_id) >= def.max_level)
-                _partCostText.text = "<color=#8AB0D5>더 올릴 수 없다</color>";
+                _partCostText.text = "<color=#9A98A0>더 올릴 수 없다</color>";
             else
                 _partCostText.text = have >= cost
-                    ? $"강화 비용 <color=#FFD24A>{cost}</color> · 보유 {have} · <color=#7AD46E>실패 없음</color>"
-                    : $"<color=#FF5250>강화 비용 {cost}</color> · 보유 {have}";
+                    ? $"강화 비용 {cost} · 보유 {have} · 하락 없음"
+                    : $"강화 비용 <color=#FF7A6A>{cost}</color> · 보유 {have}";
         }
 
         if (_partEnhanceBtn == null) return;
         _partEnhanceBtn.interactable = def != null && usable && have >= cost && !_animating;
     }
 
-    /// <summary>파츠 효과 한 줄 — 지금 값과 다음 레벨 값. 계단형은 임계 전까지 값이 그대로라 남은 강수도 함께 보인다.</summary>
-    private static string PartEffectLine(WeaponPartEntry def, int level)
-    {
-        bool maxed = def.max_level > 0 && level >= def.max_level;
-        float cur  = def.ValueAt(level);
-        if (maxed) return $"{PartValueText(def, cur)}  <color=#8AB0D5>(최대)</color>";
+    /// <summary>파츠 효과 한 줄(상세) — 「지금 2발 → Lv7에 3발」 · 꺼짐 「Lv1에 켜짐: 2발」 · 더 오를 값이 없으면 「최대」.</summary>
+    private static string PartEffectLine(WeaponPartEntry def, int level) => PartStepLine(def, level, brief: false);
 
-        float next = def.ValueAt(level + 1);
-        if (Mathf.Approximately(cur, next))
-        {
-            int toStep = def.milestone_every > 0 ? def.milestone_every - ((level - 1) % def.milestone_every) : 0;
-            return $"{PartValueText(def, cur)}  <size=85%><color=#9A98A0>다음 단계까지 {toStep}강</color></size>";
-        }
-        return $"{PartValueText(def, cur)} <color=#7AD46E>→ {PartValueText(def, next)}</color>";
+    /// <summary>
+    /// 지금 값 · 다음 계단(레벨 · 값) — <see cref="WeaponPartEntry.TryGetNextStep"/>(10-12 A10). 예전엔 Lv0을 Lv1 값으로 읽어
+    /// 꺼진 파츠가 켜진 것처럼 보였고(「다음 단계까지 0강 · 4강」), 계단형 Lv10 · 11은 상한 밖 Lv13을, 계단 사이 목록은 「2발 → 2발」을 보였다.
+    /// brief = 왼쪽 목록(278px) — 「지금」 · 폭발 피해 비율(고정)을 빼고, 바로 다음 레벨에 오르는 연속형은 「LvN에」도 뺀다.
+    /// </summary>
+    private static string PartStepLine(WeaponPartEntry def, int level, bool brief)
+    {
+        bool next = def.TryGetNextStep(level, out int nextLv, out float nextVal);
+        if (level <= 0) return $"<color=#9A98A0>Lv{nextLv}에 켜짐:</color> {(brief ? PartStepValue(def, nextVal) : PartValueText(def, nextVal))}";
+        float cur = def.ValueAt(level);
+        string now = brief ? PartStepValue(def, cur) : $"지금 {PartValueText(def, cur)}";
+        if (!next) return $"{now}  <color=#9A98A0>최대</color>";
+        string at = brief && nextLv == level + 1 ? "" : $"Lv{nextLv}에 ";
+        return $"{now} <color=#7AD46E>→ {at}{PartStepValue(def, nextVal)}</color>";
     }
+
+    /// <summary>계단 값 짧게 — 폭발은 피해 비율이 고정이라 반경만(한 줄에 들어가게). 나머지는 <see cref="PartValueText"/> 그대로.</summary>
+    private static string PartStepValue(WeaponPartEntry def, float v)
+        => def.Kind == RangedPartKind.Explode ? $"반경 {v:0.##}m" : PartValueText(def, v);
 
     /// <summary>파츠 종류별 단위를 붙인 효과값 표기 — 숫자만 띄우면 무엇이 오르는지 읽히지 않는다.</summary>
     // 시작 파츠 선택창(UI_StartPartPopup)도 같은 문구를 쓴다 — 두 화면의 효과 표기가 갈라지지 않게 한곳에.
     internal static string PartValueText(WeaponPartEntry def, float v) => def.Kind switch
     {
-        RangedPartKind.Split   => $"{Mathf.RoundToInt(v) + 1}발",
+        RangedPartKind.Split   => $"{Mathf.RoundToInt(v) + 1}발 · 갈래 피해 {CombatSpawner.SplitExtraWeight(Mathf.RoundToInt(v) + 1) * 100f:0}%",
         RangedPartKind.Pierce  => $"관통 {Mathf.RoundToInt(v)}",
         RangedPartKind.Explode => $"반경 {v:0.##}m · 피해 {RangedPartsState.ExplodeDamageRatio * 100f:0}%",
         RangedPartKind.Homing  => $"유도 {v:F0}°/s",
@@ -3756,14 +3836,14 @@ public sealed class UI_CruciblePanel : UI_Popup
     /// </summary>
     private static string PartGrowthLine(WeaponPartEntry def, int level, bool maxed)
     {
-        if (maxed) return "<color=#8AB0D5>강화</color>  더 올릴 수 없다";
+        if (maxed) return "<color=#9A98A0>강화</color>  더 올릴 수 없다";
 
         int left = def.max_level > 0 ? def.max_level - level : 0;
-        string cap = left > 0 ? $"  <size=85%><color=#9A98A0>상한까지 {left}강</color></size>" : "";
+        string cap = left > 0 ? $"  <color=#9A98A0>상한까지 {left}강</color>" : "";   // 크기 태그 없이(18의 85% = 15 — 본문 최소 16 · 10-14)
 
         return def.milestone_every > 0
-            ? $"<color=#FFD24A>계단형</color>  {def.milestone_every}강마다 한 단계 오른다{cap}"
-            : $"<color=#7FE3FF>연속형</color>  1강마다 꾸준히 오른다{cap}";
+            ? $"계단형  {def.milestone_every}강마다 한 단계 오른다{cap}"
+            : $"연속형  1강마다 꾸준히 오른다{cap}";
     }
 
     /// <summary>
@@ -3795,12 +3875,12 @@ public sealed class UI_CruciblePanel : UI_Popup
 
             case RangedPartKind.Split:
                 return HasKind(state, RangedPartKind.Power)
-                    ? "<color=#FF9A5A>상충</color>  거력은 단발 강공, 분열은 다발 약공 — 축이 반대다"
+                    ? "<color=#FF7A6A>상충</color>  거력은 단발 강공, 분열은 다발 약공 — 축이 반대다"
                     : "<size=90%><color=#9A98A0>폭발과 함께 끼면 갈래마다 터진다</color></size>";
 
             default:   // Power
                 return hasSplit
-                    ? "<color=#FF9A5A>상충</color>  분열과 축이 반대다 — 한쪽에 몰아주는 편이 세다"
+                    ? "<color=#FF7A6A>상충</color>  분열과 축이 반대다 — 한쪽에 몰아주는 편이 세다"
                     : "<size=90%><color=#9A98A0>단발 강공 축 — 분열과는 서로 깎아먹는다</color></size>";
         }
     }
@@ -3827,9 +3907,6 @@ public sealed class UI_CruciblePanel : UI_Popup
         _                      => "거력 — 위력·크기",
     };
 
-    /// <summary>다음 강화가 성공했을 때의 공격력. 테이블이 없으면 현재값 그대로.</summary>
-    private float NextAttack(WeaponData w) => w == null ? 0f : AttackAt(w, w.enhanceLevel + 1);
-
     /// <summary>이 무기가 <paramref name="level"/>강일 때의 공격력(연출의 전→후 카운트용). 테이블이 없으면 현재값.</summary>
     private float AttackAt(WeaponData w, int level)
     {
@@ -3841,15 +3918,18 @@ public sealed class UI_CruciblePanel : UI_Popup
         return raw * table.AttackMult(level, w.legendId);
     }
 
-    /// <summary>카드 아래 공격력 한 줄 — 지금 값과 성공 시 값. 파츠 카드의 효과 줄과 같은 형식.</summary>
+    /// <summary>카드 아래 공격력 한 줄 — 「공격 5.0 → 5.4 (+8%)」(10-12 요청 7). 지금 · 성공 시 값은 강화 서비스가 낸다.</summary>
     private string AttackLine(WeaponData w, bool maxed)
     {
         if (w == null) return "";
-        if (maxed) return $"공격 {w.baseAttack:F1}  <size=85%><color=#8AB0D5>(최대)</color></size>";
+        var t = _controller?.Table;
+        float now = WeaponEnhanceService.EffectiveAttack(w, t);
+        if (maxed) return $"공격 {now:F1}  <size=70%><color=#9A98A0>(최대)</color></size>";
 
-        float next = NextAttack(w);
-        return $"공격 {w.baseAttack:F1} <color=#7AD46E>→ {next:F1}</color>"
-             + $" <size=80%><color=#9A98A0>(+{next - w.baseAttack:F1})</color></size>";
+        float next = WeaponEnhanceService.EffectiveAttackAt(w, t, w.enhanceLevel + 1);
+        float pct  = now > 0f ? (next / now - 1f) * 100f : 0f;
+        return $"공격 {now:F1} <color=#7AD46E>→ {next:F1}</color>"
+             + $" <size=70%><color=#9A98A0>(+{pct:0}%)</color></size>";
     }
 
     /// <summary>무기 탭 — 도박 구간(배지·열기) + 표의 값(성공 시 / 실패 시 / 잭팟 / 다음 목표).</summary>
@@ -3884,15 +3964,15 @@ public sealed class UI_CruciblePanel : UI_Popup
             // 무기 탭 3줄: [0] 필요 재료(RefreshInfo) · [1] 실패 시 · [2] 잭팟. 성공 시 공격은 무대의 공격 줄이 말한다.
             int drop = _controller.DropAt(PlayerWeaponManager.Slot0);
             _detailSuccess.text = drop > 0 ? $"<color=#FF7A6A>-{drop} 하락</color>"
-                                           : "<color=#7AD46E>하락 없음 (안전)</color>";
+                                           : "하락 없음";
 
             var jb = new System.Text.StringBuilder();
-            jb.Append("<color=#FFD24A>").Append((_controller.JackpotChance * 100f).ToString("F0")).Append("%</color>")
-              .Append(" <size=80%><color=#9A98A0>재료 환불</color></size>");
+            jb.Append((_controller.JackpotChance * 100f).ToString("F0")).Append('%')
+              .Append(" <size=85%><color=#9A98A0>재료 환불</color></size>");
             if (_controller.StreakJackpotBonus > 0f)
-                jb.Append(" <size=80%><color=#E8C07A>▲ 연속 +").Append((_controller.StreakJackpotBonus * 100f).ToString("F0")).Append("%p</color></size>");
+                jb.Append(" <size=85%><color=#7AD46E>▲ 연속 +").Append((_controller.StreakJackpotBonus * 100f).ToString("F0")).Append("%p</color></size>");
             if (_controller.EventJackpotBonus > 0f)
-                jb.Append(" <size=80%><color=#FFA35A><b>▲ 화로 +").Append((_controller.EventJackpotBonus * 100f).ToString("F0")).Append("%p</b></color></size>");
+                jb.Append(" <size=85%><color=#7AD46E>▲ 화로 +").Append((_controller.EventJackpotBonus * 100f).ToString("F0")).Append("%p</color></size>");
             _detailFail.text    = jb.ToString();
             _detailJackpot.text = "";
         }
@@ -3960,7 +4040,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         return body == null ? null : $"<size=80%><color=#C9A6FF>{body}</color></size>";
     }
 
-    private static string TierChangeBody(WeaponData w, int tier)
+    internal static string TierChangeBody(WeaponData w, int tier)
     {
         string e = w.skillE != null ? w.skillE.ChangeAtTier(tier) : null;
         string r = w.skillQ != null ? w.skillQ.ChangeAtTier(tier) : null;
@@ -3968,25 +4048,34 @@ public sealed class UI_CruciblePanel : UI_Popup
         return e != null && r != null ? $"E {e} · R {r}" : e != null ? $"E {e}" : $"R {r}";
     }
 
-    /// <summary>원거리 스킬 단계 안내(파츠 총레벨) — 근접 「◇ 스킬 N단계까지 M강」과 같은 역할. 파츠 탭 배율 행의 둘째 줄.</summary>
-    private string RangedSkillTierLine()
-    {
-        var w = _controller.GetSlot(PlayerWeaponManager.Slot1);
-        if (w == null || !SkillTierResolver.IsRanged(w)) return "";
-        if (!SkillTierResolver.TryGetNext(w, 0, out int nextTier, out int remaining)) return "";
-        string body = TierChangeBody(w, nextTier);
-        return $"\n<size=80%>◇ {nextTier}단계까지 파츠 +{remaining}"
-             + (body != null ? $": <color=#C9A6FF>{body}</color>" : "") + "</size>";
-    }
-
-    /// <summary>마스터리 누적 효과(스킬 확장) 한 줄. 없으면 빈 문자열.</summary>
+    /// <summary>마스터리 한 줄 — 지금 → 다음 단계(최대면 지금만). 없으면 빈 문자열.</summary>
     private string MasteryText(WeaponData w)
     {
         var table = _controller.Table;
         int mastery = WeaponEnhanceService.MasteryLevel(w, table);
         if (table == null || mastery <= 0) return "";
-        return $"<color=#C9A6FF>마스터리 {mastery}</color>  스킬 피해 +{table.MasterySkillDamage(mastery) * 100f:F0}%" +
-               $" · 쿨다운 -{table.MasterySkillCdr(mastery) * 100f:F0}%";
+        int next = WeaponEnhanceService.IsMaxed(w, table) ? mastery : mastery + 1;
+        return $"<color=#C9A6FF>마스터리 {mastery}</color>  {MasteryDelta(w, mastery, next)}";
+    }
+
+    /// <summary>
+    /// 마스터리 전후 — 「E 재사용 5.0 → 4.85초 · 스킬 피해 +6% → +12%」(10-12 요청 7 · A9). 초는 실제 시전과 같은 셈(<see cref="SkillCooldownPreview"/>).
+    /// E 칸이 비면 R. 단계가 같으면(최대) 지금 값만 · 0단계에서 여는 줄은 피해 「+0% →」를 뺀다.
+    /// </summary>
+    private string MasteryDelta(WeaponData w, int from, int to)
+    {
+        var table = _controller.Table;
+        if (table == null) return "";
+        var player = _controller.Run?.Player;
+        var slot   = w.skillE != null ? SkillType.E : SkillType.R;
+        string key = slot == SkillType.E ? "E" : "R";
+        float s0 = SkillCooldownPreview.Seconds(player, w, slot, from), s1 = SkillCooldownPreview.Seconds(player, w, slot, to);
+        float d0 = table.MasterySkillDamage(from) * 100f, d1 = table.MasterySkillDamage(to) * 100f;
+        bool same = from == to;
+        string cd = s0 <= 0f ? "" : same ? $"{key} 재사용 {s0:0.0#}초 · " : $"{key} 재사용 {s0:0.0#} <color=#7AD46E>→ {s1:0.0#}초</color> · ";
+        string dmg = same ? $"스킬 피해 +{d0:0}%" : d0 <= 0f ? $"스킬 피해 <color=#7AD46E>+{d1:0}%</color>"
+                          : $"스킬 피해 +{d0:0}% <color=#7AD46E>→ +{d1:0}%</color>";
+        return cd + dmg;
     }
 
     private void RefreshInfo()
@@ -3999,7 +4088,7 @@ public sealed class UI_CruciblePanel : UI_Popup
             if (_milestoneLabel != null) _milestoneLabel.text = "";
             SetRowCount(InfoRows);
             if (EnsureRateBreak() != null) _rateBreak.text = string.Empty;
-            UIAffordGlow.Set(_enhanceBtn, false);
+            Halo(_enhanceBtn, false);
             RefreshPartInfo();
             return;
         }
@@ -4021,7 +4110,7 @@ public sealed class UI_CruciblePanel : UI_Popup
             if (_eventEffectText != null) _eventEffectText.text = "";
             if (rateBreak != null)        rateBreak.text = string.Empty;
             SetEnhanceCost(0, true);
-            UIAffordGlow.Set(_enhanceBtn, false);
+            Halo(_enhanceBtn, false);
             return;
         }
 
@@ -4030,11 +4119,11 @@ public sealed class UI_CruciblePanel : UI_Popup
         {
             SetRowLabels(MaxedRowLabels);
             if (_rateLabel != null) _rateLabel.text = "강화 단계";
-            _successText.text = "<color=#8AB0D5>MAX</color>";
-            _costText.text    = w.CanEvolve ? "<color=#C9A6FF>진화 대기</color>" : "<color=#8AB0D5>최대 강화 도달</color>";
+            _successText.text = "MAX";
+            _costText.text    = w.CanEvolve ? "<color=#C9A6FF>진화 대기</color>" : "<color=#9A98A0>최대 강화 도달</color>";
             if (rateBreak != null) rateBreak.text = string.Empty;
             SetEnhanceCost(0, true);
-            UIAffordGlow.Set(_enhanceBtn, false);
+            Halo(_enhanceBtn, false);
         }
         else
         {
@@ -4043,20 +4132,20 @@ public sealed class UI_CruciblePanel : UI_Popup
             int cost = _controller.CostAt(_targetSlot);
             int have = _controller.FuelAmount;
             // 해금·이벤트가 값을 하는 만큼 화면이 그걸 말해야 한다 — 성공률 바로 아래 한 줄에 무엇이 올렸는지(09-29).
-            if (_rateLabel != null) _rateLabel.text = "성공률";
+            if (_rateLabel != null) _rateLabel.text = _compact ? "성공률 · 수치를 올린다" : "성공률";
             if (rateBreak != null)  rateBreak.text  = RateBreakText(_targetSlot);
             float evBonus = _controller.EventSuccessBonus;
-            _successText.text = evBonus > 0f ? $"<color=#FFB45A>{chance * 100f:F0}%</color>"
-                              : evBonus < 0f ? $"<color=#E0806A>{chance * 100f:F0}%</color>"
+            _successText.text = evBonus > 0f ? $"<color=#7AD46E>{chance * 100f:F0}%</color>"
+                              : evBonus < 0f ? $"<color=#FF7A6A>{chance * 100f:F0}%</color>"
                                              : $"{chance * 100f:F0}%";
             _costText.text = have >= cost
-                ? $"{cost} <size=80%><color=#9A98A0>· 보유 {have}</color></size>"
-                : $"<color=#FF5250>{cost}</color> <size=80%><color=#9A98A0>· 보유 {have}</color></size>";
+                ? $"{cost} <size=85%><color=#9A98A0>· 보유 {have}</color></size>"
+                : $"<color=#FF7A6A>{cost}</color> <size=85%><color=#9A98A0>· 보유 {have}</color></size>";
             SetEnhanceCost(cost, have >= cost);
 
             // 연출 중에도 켜 둔다 — 재입력이 연출을 건너뛰고 다음 강화로 이어지는 경로(QueueWhileAnimating).
             if (_enhanceBtn != null) _enhanceBtn.interactable = have >= cost;
-            UIAffordGlow.Set(_enhanceBtn, have >= cost);   // 누를 수 있을 때만 은은한 불(09-29)
+            Halo(_enhanceBtn, have >= cost && !Choosing);   // 누를 수 있을 때만 은은한 불(09-29) · 한 화면 한 곳 8px(10-11)
         }
 
         // 연속 · 이벤트 효과는 성공률 아래 줄과 잭팟 줄에 붙었다 — 따로 떠 있던 두 줄은 비운다(09-29).
@@ -4074,7 +4163,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         _enhanceCost.gameObject.SetActive(show);
         if (!show) return;
         _enhanceCost.text  = cost.ToString();
-        _enhanceCost.color = affordable ? CostInk : ShopUIStyle.RejectRed;
+        _enhanceCost.color = affordable ? CostInk : DownRed;
     }
 
     /// <summary>
@@ -4096,23 +4185,23 @@ public sealed class UI_CruciblePanel : UI_Popup
         SetRowLabels(RangedRowLabels);
         if (_rateLabel != null) _rateLabel.text = "투사체 — 현재 조합의 총합";
         _successText.text   = $"{shots}발";
-        _costText.text      = shots > 1 ? $"<color=#FFD24A>{req.spreadDeg:F0}°</color>" : NoneMark;
-        _detailSuccess.text = req.pierce > 0 ? $"<color=#FFD24A>{req.pierce}회</color>" : NoneMark;
+        _costText.text      = shots > 1 ? $"{req.spreadDeg:F0}°" : NoneMark;
+        _detailSuccess.text = req.pierce > 0 ? $"{req.pierce}회" : NoneMark;
         _detailFail.text    = hasExp
-            ? $"반경 <color=#FFD24A>{req.explodeRadius:F2}</color>"
-              + $" <size=80%><color=#9A98A0>· 피해 {req.explodeDamageRatio * 100f:F0}%</color></size>"
+            ? $"반경 {req.explodeRadius:F2}"
+              + $" <size=85%><color=#9A98A0>· 피해 {req.explodeDamageRatio * 100f:F0}%</color></size>"
             : NoneMark;
         _detailJackpot.text = hasHom
-            ? $"<color=#FFD24A>{req.homingStrength:F0}</color>°/s"
-              + (req.returnOnPierce ? " <size=80%><color=#7FE3FF>· 관통 후 복귀</color></size>" : "")
+            ? $"{req.homingStrength:F0}°/s"
+              + (req.returnOnPierce ? " <size=85%><color=#9A98A0>· 관통 후 복귀</color></size>" : "")
             : NoneMark;
-        _milestoneLabel.text = $"피해 ×{req.damageMult:F2} · 크기 ×{req.sizeMult:F2}" + RangedSkillTierLine();
+        _milestoneLabel.text = $"피해 ×{req.damageMult:F2} · 크기 ×{req.sizeMult:F2}";   // 스킬 단계 안내 = 성장 길 「다음」(10-08)
         _streakText.text     = "2번 키(원거리)로 쏠 때만 적용된다";
         SetEnhanceCost(0, true);
 
         // 강화 버튼은 무대 행 안으로 옮겼다 — 정보창의 버튼은 파츠 탭에서 쓰지 않는다.
         if (_eventEffectText != null)
-            _eventEffectText.text = _controller.HasEvent ? $"↗ {_controller.EventEffectDesc}" : "";
+            _eventEffectText.text = ForgeEventLine();
     }
 
     /// <summary>
@@ -4128,8 +4217,14 @@ public sealed class UI_CruciblePanel : UI_Popup
         if (w == null) return "";
 
         // 진화 전 주무기 = 무형검. 타입·티어를 숨긴다.
-        if (slotIndex == PlayerWeaponManager.Slot0 && w.evolutionStage <= 0)
+        if (slotIndex == PlayerWeaponManager.Slot0 && w.evolutionStage <= 0 && !w.HasForm)
             return "무형 · 형태 없음";
+        // 형이 깨어난 검 — 성격 · 형 · 단련 단계(10-08)
+        if (slotIndex == PlayerWeaponManager.Slot0 && w.HasForm)
+        {
+            string tag = w.weaponType == WeaponType.Katana ? "빠른 검" : w.weaponType == WeaponType.Greatsword ? "묵직한 검" : "검";
+            return $"{tag} · 형 「{w.form.DisplayName}」 {RomanTier(w.formTier)}";
+        }
 
         string type = w.weaponType switch
         {

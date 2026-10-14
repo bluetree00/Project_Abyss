@@ -75,10 +75,42 @@ public sealed class MemoryAltarNode
     public AltarNodeSize Size { get; }
 
     /// <summary>
-    /// 고리 = 시기(10-02 재설계). 1 봉인기(처음부터) · 2 해방기(첫 리치 = 붕괴 뒤 드러남) · 3 악몽(엔딩 뒤 드러남).
-    /// 드러나지 않은 시기의 노드는 그리지도 팔지도 않는다(<see cref="MemoryAltarCatalog.IsEraRevealed"/>).
+    /// 시기 표시(1 봉인기 · 2 해방기 · 3 악몽) — <b>10-14부터 아무것도 막지 않는다</b>(시기 드러남 폐기 · <see cref="MemoryAltarCatalog.IsEraRevealed"/>).
+    /// 예전(10-02)엔 드러나지 않은 시기의 노드를 그리지도 팔지도 않았다.
     /// </summary>
     public int Era { get; }
+
+    /// <summary>
+    /// 단계 수(10-14 강화형) — 1이면 한 번 사면 끝(해금), 2 이상이면 같은 노드를 단계마다 다시 사서 조금씩 올린다(강화).
+    /// 산 단계는 <see cref="UserGameData.unlockedIds"/>에 「id:단계」로 남는다(1단계는 「id」).
+    /// </summary>
+    public int MaxLevel { get; }
+
+    /// <summary>
+    /// 이 노드가 열리는 「갈래 포인트」(10-14 세피리아 재능식) — 그 갈래에서 산 단계 수가 이 값 이상이어야 산다.
+    /// 예전엔 선으로 이어진 앞 노드(부모)를 사야 열렸다(트리 깊이) — 사용자 「깊이에 따라 해금은 폐기 · 포인트를 쓰면 열리게」.
+    /// 단계 = <see cref="MemoryAltarCatalog.TierPoints"/>(0 · 3 · 8 · 15).
+    /// </summary>
+    public int RequiredPoints { get; }
+
+    private readonly System.Func<int, string> _valueText;
+
+    /// <summary>단계 <paramref name="lv"/>의 효과 글(0 = 아직 안 산 상태). 강화 노드는 「지금 → 다음」을 이 글 둘로 만든다.</summary>
+    public string ValueText(int lv) => _valueText != null ? _valueText(lv) : (lv <= 0 ? "" : Description);
+
+    public bool IsLeveled => MaxLevel > 1;
+
+    /// <summary>
+    /// <paramref name="level"/>단계(1부터)를 사는 값. 1단계만 할인 조건이 깎는다(<paramref name="discounted"/>) — 뒤 단계는 기본가 × 곡선.
+    /// 곡선 = <see cref="MemoryAltarCatalog.LevelCurve"/>(1 · 1.4 · 1.9 · 2.5 · 3.2) · 10 단위로 맞춘다.
+    /// </summary>
+    public int CostForLevel(int level, bool discounted)
+    {
+        if (level <= 1) return discounted ? DiscountCost : BaseCost;
+        var curve = MemoryAltarCatalog.LevelCurve;
+        float k = curve[System.Math.Min(level, curve.Length) - 1];
+        return (int)System.Math.Round(BaseCost * k / 10.0) * 10;
+    }
 
     public MemoryAltarNode(string id, AltarBranch branch, string displayName, string description,
                            int baseCost,
@@ -87,8 +119,14 @@ public sealed class MemoryAltarNode
                            bool conditionRequired = false,
                            string[] parents = null,
                            AltarNodeSize size = AltarNodeSize.Normal,
-                           int era = 1)
+                           int era = 1,
+                           int maxLevel = 1,
+                           int requiredPoints = 0,
+                           System.Func<int, string> valueText = null)
     {
+        MaxLevel          = maxLevel < 1 ? 1 : maxLevel;
+        RequiredPoints    = requiredPoints < 0 ? 0 : requiredPoints;
+        _valueText        = valueText;
         Id                = id;
         Branch            = branch;
         DisplayName       = displayName;
@@ -117,8 +155,35 @@ public sealed class MemoryAltarNode
 /// </summary>
 public static class MemoryAltarCatalog
 {
-    /// <summary>「최대 체력 +76」 노드가 주는 값. <b>제단에 남은 유일한 영구 스탯</b>이고, 영구 공격력은 0이다.</summary>
-    public const int MaxHpBonus = 76;
+    // ── 강화형(10-14) — 단계 값 곡선 · 갈래 포인트 단계 ──
+    /// <summary>강화 단계 값 곡선(1단계 = 기본가) — 5단계까지. 단계가 오를수록 값이 오른다(하데스 「밤의 거울」 결).</summary>
+    public static readonly float[] LevelCurve = { 1f, 1.4f, 1.9f, 2.5f, 3.2f };
+    /// <summary>갈래 포인트 단계(세피리아 재능 5 · 10 · 20 투자 지점의 결) — 고리 하나 = 이 포인트부터 열리는 칸들.</summary>
+    public static readonly int[] TierPoints = { 0, 3, 8, 15 };
+
+    /// <summary>노드가 앉는 고리(1 ~ 4) = 열리는 갈래 포인트 단계.</summary>
+    public static int Tier(MemoryAltarNode node)
+    {
+        if (node == null) return 1;
+        int t = 1;
+        for (int i = 1; i < TierPoints.Length; i++) if (node.RequiredPoints >= TierPoints[i]) t = i + 1;
+        return t;
+    }
+
+    // ── 강화 단계별 몫(효과를 읽는 쪽과 노드 글이 같은 값을 본다) ──
+    public const float MaxHpPctPerLevel   = 0.04f;   // 최대 체력 +4% — 제단에 남은 유일한 영구 스탯(사용자 10-14 「최대 체력만」)
+    public const float RareOddsPerLevel   = 3f;      // Rare 룬 +3%p(Common에서 옮겨 온다)
+    public const float EpicOddsPerLevel   = 2f;      // Epic 룬 +2%p(Epic 등장을 연 뒤)
+    public const float LegendOddsPerLevel = 1f;      // Legendary 룬 +1%p(Legendary 등장을 연 뒤)
+    public const float RefineEpicPerLevel = 0.03f;   // 정제소 Epic +3%p
+    public const float SmithPerLevel      = 0.03f;   // 재련 강화 성공률 +3%p
+    public const float OreGainPerLevel    = 0.10f;   // 원석 +10%
+    public const float EnhanceGainPerLevel = 0.10f;  // 강화재료 +10%
+    public const float GoldGainPerLevel   = 0.05f;   // 골드 +5%
+    public const float EssenceGainPerLevel = 0.04f;  // 정수 +4%
+    public const float ShopDiscountPerLevel = 0.05f; // 상점 가격 -5%
+    public const float PotionHealPerLevel = 0.04f;   // 포션 회복 40% → 44 · 48 · 52%(최대 체력 대비, +10%씩)
+    public const float DepthRewardPerLevel = 0.05f;  // 심연 깊이마다 정수 +5%
 
     // ── 기록 키 ─────────────────────────────────────────
     // 해금 할인 조건과 업적 진척이 <b>같은 값</b>을 본다 — 따로 추적하지 않는다(정본 §6).
@@ -162,6 +227,8 @@ public static class MemoryAltarCatalog
 
         /// <summary>10-02 재설계로 뺀 유물 노드 4개의 정수 환급을 마쳤는가(1회성 가드). 업적 진척 아님.</summary>
         public const string RemovedNodesRefunded = "altarRefund1002";
+        public const string RemovedNodesRefunded1014 = "altarRefund1014";   // 「챕터 4 개방」 걷음 환급(1회)
+        public const string LevelsReset1014 = "altarLevels1014";   // 강화형 전환 리셋 · 환급(1회 — 사용자 「출시 전이니 리셋」)
 
         /// <summary>업적 진척으로 흘려보낼 기록 키 전량. 내부 가드(AwakeningRefunded)는 제외한다.</summary>
         public static readonly string[] All =
@@ -202,28 +269,38 @@ public static class MemoryAltarCatalog
 
     public const string CovenantParts1 = "covenant_parts_1";
     public const string CovenantSlot   = "covenant_slot";
-    public const string CovenantParts2 = "covenant_parts_2";
+    public const string CovenantParts2 = "covenant_parts_2";   // 10-14 걷음 — 「서약 카드」(covenant_parts_1) 3단계로 합쳤다
     public const string CovenantParts3 = "covenant_parts_3";
 
     public const string Revive         = "revive_once";
     public const string MaxHpUp        = "max_hp_up";
 
     public const string AbyssDepth     = "abyss_depth";
-    public const string Chapter4       = "chapter_4";
+    public const string Chapter4       = "chapter_4";   // 10-14 걷음 — 카탈로그에 없다 · 산 세이브는 RemovedNodes1014로 환급
     public const string DepthReward    = "depth_reward";
 
     // ── 판 넓히기(09-29 개편 신설) — 런의 칸 · 선택지를 넓힌다. 영구 스탯은 없다 ──
     public const string RuneStorage1   = "rune_storage_1";   // 룬 보관함 5 → 6
-    public const string RuneStorage2   = "rune_storage_2";   // 룬 보관함 6 → 7
+    public const string RuneStorage2   = "rune_storage_2";   // 10-14 걷음 — 「룬 보관함」(rune_storage_1) 2단계로 합쳤다
     public const string RefinePick     = "refine_pick";      // 정제 1개 → 2장 중 고르기
     public const string ShopReroll     = "shop_reroll";      // 상점 새로고침 개방
     public const string StartParts2    = "start_parts_2";    // 시작 파츠 1 → 2개
     public const string PotionSlot     = "potion_slot";      // 포션 3 → 4칸
 
+    // ── 강화형(10-14) 신설 — 단계로 조금씩 오르는 것 ──
+    public const string RuneRareOdds   = "rune_rare_odds";     // Rare 룬 확률 +3%p/단계
+    public const string RuneEpicOdds   = "rune_epic_odds";     // Epic 룬 확률 +2%p/단계
+    public const string RuneLegendOdds = "rune_legend_odds";   // Legendary 룬 확률 +1%p/단계
+    public const string OreGain        = "ore_gain";           // 원석 +10%/단계
+    public const string EnhanceGain    = "enhance_gain";       // 강화재료 +10%/단계
+    public const string GoldGain       = "gold_gain";          // 골드 +5%/단계
+    public const string EssenceGain    = "essence_gain";       // 정수 +4%/단계
+    public const string PotionHeal     = "potion_heal";        // 포션 회복 +4%p/단계(40% 기준 +10%)
+
     // ── 가운데 · 유물의 기억(10-02 재설계) — 유물 성장 「공명 그물」의 기억 카드를 넓힌다 ──
     public const string MemRedraw      = "mem_redraw";       // 런당 1회 기억 카드 3장 다시 굴리기
     public const string MemClear       = "mem_clear";        // 기억 카드 등급 띠 한 단
-    public const string MemRadiant     = "mem_radiant";      // 등급 띠 한 단 더
+    public const string MemRadiant     = "mem_radiant";      // 10-14 걷음 — 「기억 카드 등급」(mem_clear) 2단계로 합쳤다(옛 세이브 환급 표에만)
 
     /// <summary>
     /// 가운데 기억 노드를 살 수 있는가. 기억 카드 다시 굴리기 · 등급 띠는 유물 성장 「공명 그물」(f7)이 받아야 효과가 있다 —
@@ -237,114 +314,144 @@ public static class MemoryAltarCatalog
         (PartsDraft4, 2200), (CorePartsTier1, 3000), (CorePartsAll, 4200), (PartsInherit, 4800),
     };
 
+    /// <summary>10-14 뺀 노드와 환급 정수 — 「챕터 4 개방」(사용자 「챕터 해금은 빼고 바로 갈 수 있게」). 10-02 환급을 이미 받은 세이브도 받도록 기록 키를 따로 쓴다.</summary>
+    public static readonly (string id, int refund)[] RemovedNodes1014 =
+    {
+        (Chapter4, 800),
+    };
+
     private static readonly MemoryAltarNode[] Nodes =
     {
-        // 10-02 재설계 「기억을 모시는 제단」(설계서 `RelicFairy_기억의제단_재설계_설계서_20261002.md`).
-        // 고리 = 시기: 1 봉인기(처음부터) · 2 해방기(붕괴 뒤) · 3 악몽(엔딩 뒤). 할인 조건 = 그 고리의 시기 기록.
-        // 부모가 전부 열려야 산다(선으로 이어진 앞 노드). 가격은 정수 실측(챕터 완주 290~370)으로 시뮬레이션해 정했다 —
-        // 봉인기 고리 18런(붕괴 22런 앞) · 해방기 31런(엔딩 32런 앞) · 전부 42런 · 챕터 4 개방 = 첫 완주 그 런.
+        // 10-14 강화형 v2(설계 `기획/RelicFairy_기억의제단_강화형_개편안_20261014.md`) — 사용자 「강화로 조금씩」 · 「깊이 대신 포인트를 쓰면 열리게(세피리아)」.
+        // · 강화 노드 = 단계(maxLevel ≥ 2) — 단계 하나 = 그 갈래 포인트 1. 해금 노드 = 한 번(maxLevel 1) — 이것도 포인트 1.
+        // · 열림 = 그 갈래 포인트가 requiredPoints(0 · 3 · 8 · 15) 이상. 부모(parents)는 뜻으로 묶인 것만(Epic 확률 ← Epic 등장 등).
+        // · 시기 고리(era)는 그대로 — 붕괴 · 엔딩 전엔 그 칸을 그리지도 팔지도 않는다(스포일러 금지).
+        // · 값 합 ≈ 73,900(사용자 결정 「약 72,000」) · 1단계 값 220 ~ 560 — 귀환마다 무엇이든 하나는 오른다.
 
         // ── 가운데 · 유물의 기억 ─────────────────────────
         new(MemRedraw,  AltarBranch.Memory, "다시 떠올리기", "런당 1회 — 보스를 쓰러뜨린 뒤 기억 카드 3장을 다시 굴린다", 1400,
             Rec.Seals, 2, "보스 2명 봉인", 900, size: AltarNodeSize.Keystone, era: 1),
-        new(MemClear,   AltarBranch.Memory, "선명한 기억",   "기억 카드 등급 한 단 — 선명 · 찬란이 더 자주 뜬다", 2600,
-            Rec.LibKills, 2, "해방된 보스 2회 처치", 1650,
-            parents: new[] { MemRedraw }, size: AltarNodeSize.Keystone, era: 2),
-        new(MemRadiant, AltarBranch.Memory, "찬란한 기억",   "기억 카드 등급 한 단 더 — 찬란이 더 자주 뜬다", 4500,
-            Rec.NmKills, 2, "악몽 보스 2회 처치", 2800,
-            parents: new[] { MemClear }, size: AltarNodeSize.Keystone, era: 3),
+        new(MemClear,   AltarBranch.Memory, "기억 카드 등급", "기억 카드 등급 띠 — 선명 · 찬란이 더 자주 뜬다", 1450,
+            Rec.LibKills, 2, "해방된 보스 2회 처치", 950,
+            parents: new[] { MemRedraw }, size: AltarNodeSize.Keystone, era: 2, maxLevel: 2,
+            valueText: lv => lv <= 0 ? "기본 등급 띠" : lv == 1 ? "선명 · 찬란이 더 자주" : "찬란이 더 자주"),
 
         // ── 룬 — 어떤 룬이 나오나 ─────────────────────────
-        new(RuneStorage1,   AltarBranch.Rune, "룬 보관함 +1",   "룬 보관함  5칸 → 6칸",              700,
-            Rec.RoomClears, 60, "방 60회 클리어", 450, size: AltarNodeSize.Small),
-        new(RefinePick,     AltarBranch.Rune, "정제 두 장",     "정제할 때  룬 1개 → 2장 중 고르기", 1800,
-            Rec.RefineCount, 10, "정제 10회", 1150,
-            parents: new[] { RuneStorage1 }),
-        new(RuneEpic,       AltarBranch.Rune, "영웅 룬 등장",   "룬 최고 등급  희귀 → 영웅",        2600,
-            Rec.Seals, 3, "보스 3명 봉인", 1650,
-            parents: new[] { RuneStorage1 }, size: AltarNodeSize.Keystone),
-        new(RuneLegendary,  AltarBranch.Rune, "전설 룬 등장",   "룬 최고 등급  영웅 → 전설",        3000,
-            Rec.LibKills, 3, "해방된 보스 3회 처치", 1900,
-            parents: new[] { RuneEpic }, size: AltarNodeSize.Keystone, era: 2),
+        new(RuneStorage1,   AltarBranch.Rune, "룬 보관함",   "룬 보관함 칸",              560,
+            Rec.RoomClears, 60, "방 60회 클리어", 360, size: AltarNodeSize.Small, maxLevel: 2,
+            valueText: lv => $"룬 보관함 {5 + lv}칸"),
+        new(RuneRareOdds,   AltarBranch.Rune, "Rare 룬 확률", "방 보상 Rare 룬 확률", 250, maxLevel: 5,
+            valueText: lv => $"Rare 룬 +{RareOddsPerLevel * lv:0}%p"),
+        new(OreGain,        AltarBranch.Rune, "원석 획득",   "방 보상 원석", 220, size: AltarNodeSize.Small, maxLevel: 5,
+            valueText: lv => $"원석 +{OreGainPerLevel * 100f * lv:0}%"),
+        new(RuneEpic,       AltarBranch.Rune, "Epic 룬 등장",   "룬 최고 등급  Rare → Epic",        1900,
+            Rec.Seals, 3, "보스 3명 봉인", 1250, size: AltarNodeSize.Keystone, requiredPoints: 3),
+        new(RuneEpicOdds,   AltarBranch.Rune, "Epic 룬 확률", "방 보상 Epic 룬 확률", 380,
+            parents: new[] { RuneEpic }, maxLevel: 5, requiredPoints: 3,
+            valueText: lv => $"Epic 룬 +{EpicOddsPerLevel * lv:0}%p"),
+        new(RefinePick,     AltarBranch.Rune, "정제 두 장",     "정제할 때  룬 1개 → 2장 중 고르기", 1400,
+            Rec.RefineCount, 10, "정제 10회", 900, requiredPoints: 8),
         // 영웅 룬 <b>뒤</b>여야 한다 — 영웅이 잠겨 있으면 정제소도 영웅을 낼 수 없어(등급 제한) 사 봐야 효과가 없다.
-        new(RefineQuality,  AltarBranch.Rune, "정제 등급 상승", "정제소 영웅 확률  +12%p",          2700,
-            Rec.RefineCount, 30, "정제 30회", 1700,
-            parents: new[] { RuneEpic }, era: 2),
-        new(RuneStorage2,   AltarBranch.Rune, "룬 보관함 +2",   "룬 보관함  6칸 → 7칸",              3000,
-            Rec.NmKills, 3, "악몽 보스 3회 처치", 1900,
-            parents: new[] { RefinePick }, size: AltarNodeSize.Small, era: 3),
+        new(RefineQuality,  AltarBranch.Rune, "정제 등급", "정제소 Epic 확률",          380,
+            Rec.RefineCount, 30, "정제 30회", 250,
+            parents: new[] { RuneEpic }, maxLevel: 5, requiredPoints: 8,
+            valueText: lv => $"정제소 Epic +{RefineEpicPerLevel * 100f * lv:0}%p"),
+        new(RuneLegendary,  AltarBranch.Rune, "Legendary 룬 등장", "룬 최고 등급  Epic → Legendary",        2500,
+            Rec.LibKills, 3, "해방된 보스 3회 처치", 1600,
+            parents: new[] { RuneEpic }, size: AltarNodeSize.Keystone, era: 2, requiredPoints: 15),
+        new(RuneLegendOdds, AltarBranch.Rune, "Legendary 룬 확률", "방 보상 Legendary 룬 확률", 720,
+            parents: new[] { RuneLegendary }, era: 2, maxLevel: 3, requiredPoints: 15,
+            valueText: lv => $"Legendary 룬 +{LegendOddsPerLevel * lv:0}%p"),
 
         // ── 서약 — 어떤 서약을 맺나 ───────────────────────
-        // 원인·효과 카드는 네 단계로 열린다(<see cref="CovenantPalette"/>의 개방 단계). 처음 5·6은 서약이
-        // 무엇인지 가르치는 카드만 — 다른 서약과 맞물려야 빛나는 것(기폭·수확·정지·처형)은 뒤로 미룬다.
-        new(CovenantParts1, AltarBranch.Covenant, "서약 카드 +5", "원인 5 → 8종 · 효과 7 → 9종",   1600,
-            Rec.Covenants, 5, "서약 5번 맺기", 1000),
+        // 원인·효과 카드는 네 단계로 열린다(<see cref="CovenantPalette"/>의 개방 단계 0 ~ 3 = 이 노드의 단계).
+        new(CovenantParts1, AltarBranch.Covenant, "서약 카드", "서약 원인 · 효과 종류",   820,
+            Rec.Covenants, 5, "서약 5번 맺기", 530, maxLevel: 3,
+            valueText: lv => lv switch
+            {
+                <= 0 => "원인 5 · 효과 7종",
+                1    => "원인 8 · 효과 9종",
+                2    => "원인 9 · 효과 12종",
+                _    => "원인 9 · 효과 15종",
+            }),
         // 「한 장의 서약서」(10-02) — id는 그대로(세이브), 뜻만 「서약 칸 +1」 → 「다섯째 절」
-        new(CovenantSlot,   AltarBranch.Covenant, "다섯째 절",    "서약서 한 문장의 결과  4 → 5절", 2400,
-            Rec.Covenants, 25, "서약 25번 맺기", 1500,
-            parents: new[] { CovenantParts1 }, size: AltarNodeSize.Keystone, era: 2),
-        new(CovenantParts2, AltarBranch.Covenant, "서약 카드 +4", "원인 8 → 9종 · 효과 9 → 12종",  2100,
-            Rec.LibKills, 2, "해방된 보스 2회 처치", 1300,
-            parents: new[] { CovenantParts1 }, era: 2),
-        new(CovenantParts3, AltarBranch.Covenant, "서약 카드 +3", "효과 12 → 15종",                3200,
-            Rec.NmKills, 2, "악몽 보스 2회 처치", 2000,
-            parents: new[] { CovenantParts2 }, era: 3),
+        new(CovenantSlot,   AltarBranch.Covenant, "다섯째 절",    "서약서 한 문장의 결과  4 → 5절", 2000,
+            Rec.Covenants, 25, "서약 25번 맺기", 1300,
+            size: AltarNodeSize.Keystone, era: 2, requiredPoints: 3),
 
         // ── 무기 — 무엇을 들고 싸우나(근접 + 원거리) ─────────
         // 주무기는 항상 무형검이고(시나리오), 카타나·대검은 런 안의 진화 분기라 노드가 아니다.
         // 원거리 시작 파츠는 베이스캠프 파츠 작업대에서 매 런 Lv1로 들고 나간다 — 분열의 시위는 기본으로 열려 있다(사용자 결정).
         new(PartPierce,     AltarBranch.Weapon, "관통의 촉",        "시작 파츠  +관통",                450,
             Rec.RoomClears, 30, "방 30회 클리어", 300),
+        new(SigilSmith,     AltarBranch.Weapon, "재련 성공률",  "재련 강화 성공률",          400,
+            Rec.MaxEnhance, 6, "무기 +6 도달", 260, maxLevel: 3,
+            valueText: lv => $"재련 성공률 +{SmithPerLevel * 100f * lv:0}%p"),
+        new(EnhanceGain,    AltarBranch.Weapon, "강화재료 획득",  "방 보상 강화재료", 340, size: AltarNodeSize.Small, maxLevel: 3,
+            valueText: lv => $"강화재료 +{EnhanceGainPerLevel * 100f * lv:0}%"),
         new(WeaponCrossbow, AltarBranch.Weapon, "석궁",             "시작 원거리 무기  활 → 활·석궁",  900,
-            Rec.EliteKills, 5, "정예 5회 처치", 600,
-            parents: new[] { PartPierce }, size: AltarNodeSize.Keystone),
+            Rec.EliteKills, 5, "정예 5회 처치", 600, size: AltarNodeSize.Keystone, requiredPoints: 3),
         new(PartPower,      AltarBranch.Weapon, "거력의 축",        "시작 파츠  +거력",                1200,
-            Rec.EliteKills, 12, "정예 12회 처치", 800,
-            parents: new[] { PartPierce }),
-        new(SigilSmith,     AltarBranch.Weapon, "대장장이의 인장",  "재련 강화 성공률  +8%p",          1500,
-            Rec.MaxEnhance, 6, "무기 +6 도달", 950),
+            Rec.EliteKills, 12, "정예 12회 처치", 800, requiredPoints: 3),
         new(PartHoming,     AltarBranch.Weapon, "추적의 깃",        "시작 파츠  +추적",                1500,
-            Rec.LibKills, 1, "해방된 보스 1회 처치", 950,
-            parents: new[] { PartPower }, era: 2),
+            Rec.LibKills, 1, "해방된 보스 1회 처치", 950, era: 2, requiredPoints: 8),
         // 시작 파츠가 셋(분열·관통·거력)은 있어야 「둘 들고 가기」가 고르는 일이 된다.
-        new(StartParts2,    AltarBranch.Weapon, "시작 파츠 둘",     "시작 파츠  1개 → 2개 들고 가기",  2300,
-            Rec.EliteKills, 40, "정예 40회 처치", 1450,
-            parents: new[] { PartPower }, era: 2),
+        new(StartParts2,    AltarBranch.Weapon, "시작 파츠 둘",     "시작 파츠  1개 → 2개 들고 가기",  2200,
+            Rec.EliteKills, 40, "정예 40회 처치", 1400,
+            parents: new[] { PartPower }, era: 2, requiredPoints: 8),
         // 승급 자체는 해금 없이도 된다(강화 MAX면 가능) — 해금이 넓히는 것은 <b>후보의 수</b>다.
-        new(WeaponEvolve,   AltarBranch.Weapon, "전설 무기 3종",    "승급할 전설 무기  1종 → 3종",     2800,
-            Rec.LibKills, 3, "해방된 보스 3회 처치", 1750,
-            parents: new[] { SigilSmith }, size: AltarNodeSize.Keystone, era: 2),
-        new(PartExplode,    AltarBranch.Weapon, "작렬의 탄두",      "시작 파츠  +작렬",                2600,
-            Rec.NmKills, 1, "악몽 보스 1회 처치", 1650,
-            parents: new[] { PartHoming }, era: 3),
+        new(WeaponEvolve,   AltarBranch.Weapon, "전설 무기 3종", "승급할 전설 무기  1종 → 3종",     2600,
+            Rec.LibKills, 3, "해방된 보스 3회 처치", 1650, size: AltarNodeSize.Keystone, era: 2, requiredPoints: 8),
+        new(PartExplode,    AltarBranch.Weapon, "작렬의 탄두",      "시작 파츠  +작렬",                2400,
+            Rec.NmKills, 1, "악몽 보스 1회 처치", 1550, era: 3, requiredPoints: 8),
 
-        // ── 여정 — 얼마나 멀리 가나 ───────────────────────
-        // 버티는 것(부활 · 체력 · 포션) · 길의 상점(인장 · 새로고침) · 더 멀리(챕터 4 · 심연). 진행 관문 앞에는 비싼 칸을 두지 않는다 —
-        // 끼면 챕터 4가 몇 런씩 밀린다(그래서 챕터 4는 뿌리 · 800). 버티는 쪽은 조건 없음: 벽을 넘게 해주는 것이라 무조건 열려야 한다.
+        // ── 여정 — 얼마나 멀리 가나(버티기 · 재화 · 길의 상점 · 심연) ─────────
+        // 버티는 쪽은 조건 없음: 벽을 넘게 해주는 것이라 무조건 열려야 한다.
         new(Revive,         AltarBranch.Journey, "부활 1회",       "런당 1회 — 쓰러지면 최대 체력 50%로 일어나 2초 무적",   800,
             size: AltarNodeSize.Keystone),
-        new(SigilMerchant,  AltarBranch.Journey, "상인의 인장",    "상점 가격  -15%",                 1300,
-            Rec.ShopUses, 5, "상점 5회 이용", 850),   // 뿌리 — 사슬을 짧게(트리 깊이 8 → 6칸, 10-02 화면 실측: 이름표가 9px까지 작아졌다)
-        new(ShopReroll,     AltarBranch.Journey, "상점 새로고침",  "상점마다 1회 · 10골드로 진열 새로고침",   1600,
-            Rec.ShopUses, 10, "상점 10회 이용", 1000,
-            parents: new[] { SigilMerchant }, size: AltarNodeSize.Small),
-        // 이 둘만 조건이 <b>자물쇠</b>다 — 논리적 선후가 있어 데드락이 아니다(정본 §2-3).
-        // 세 보스를 봉인(첫 완주)하면 성소의 문(챕터 4)이 열리고, 심연(순환)은 악몽기 리치를 쓰러뜨린 엔딩 뒤에 열린다.
-        new(Chapter4,       AltarBranch.Journey, "챕터 4 개방",    "갈 수 있는 챕터  3 → 4",         800,
-            Rec.Clears, 1, "첫 완주", 800, conditionRequired: true, size: AltarNodeSize.Keystone),
-        new(MaxHpUp,        AltarBranch.Journey, "최대 체력 +76",  "최대 체력  +76",                 1400,
-            parents: new[] { Revive }, era: 2),
-        new(PotionSlot,     AltarBranch.Journey, "포션 칸 +1",     "포션  3칸 → 4칸",                1900,
-            parents: new[] { MaxHpUp }, size: AltarNodeSize.Small, era: 2),
+        new(MaxHpUp,        AltarBranch.Journey, "최대 체력",  "최대 체력",                 440, maxLevel: 5,
+            valueText: lv => $"최대 체력 +{MaxHpPctPerLevel * 100f * lv:0}%"),
+        new(SigilMerchant,  AltarBranch.Journey, "상점 가격",    "상점 가격",                 360,
+            Rec.ShopUses, 5, "상점 5회 이용", 240, maxLevel: 3,
+            valueText: lv => lv <= 0 ? "상점 가격 그대로" : $"상점 가격 -{ShopDiscountPerLevel * 100f * lv:0}%"),
+        new(GoldGain,       AltarBranch.Journey, "골드 획득",    "얻는 골드",                 230, size: AltarNodeSize.Small, maxLevel: 5,
+            valueText: lv => $"골드 +{GoldGainPerLevel * 100f * lv:0}%"),
+        new(PotionHeal,     AltarBranch.Journey, "포션 회복량",  "포션 한 병 회복량",           360, maxLevel: 3, requiredPoints: 3,
+            valueText: lv => $"포션 회복 최대 체력의 {(0.40f + PotionHealPerLevel * lv) * 100f:0}%"),
+        new(EssenceGain,    AltarBranch.Journey, "정수 획득",    "얻는 심연의 정수",            400, maxLevel: 5, requiredPoints: 3,
+            valueText: lv => $"정수 +{EssenceGainPerLevel * 100f * lv:0}%"),
+        new(ShopReroll,     AltarBranch.Journey, "상점 새로고침",  "상점 진열 새로고침(10골드)",   820,
+            Rec.ShopUses, 10, "상점 10회 이용", 530, size: AltarNodeSize.Small, maxLevel: 2, requiredPoints: 3,
+            valueText: lv => lv <= 0 ? "새로고침 없음" : $"상점마다 {lv}회"),
+        new(PotionSlot,     AltarBranch.Journey, "포션 칸",     "포션 칸",                1100,
+            size: AltarNodeSize.Small, era: 2, maxLevel: 2, requiredPoints: 8,
+            valueText: lv => $"포션 {3 + lv}칸"),
+        // 「심연 입장」만 조건이 <b>자물쇠</b>다 — 심연(순환)은 악몽기 리치를 쓰러뜨린 엔딩 뒤에 열린다(정본 §2-3).
         new(AbyssDepth,     AltarBranch.Journey, "심연 입장",      "엔딩 뒤 심연 개방 — 깊이마다 적 체력 · 공격력 +25%",  1000,
             StoryProgress.Rec.Ending, 1, "성소의 주인을 완전히 쓰러뜨리기", 1000, conditionRequired: true,
-            parents: new[] { Chapter4 }, size: AltarNodeSize.Keystone, era: 3),
-        new(DepthReward,    AltarBranch.Journey, "깊이 보상",      "심연 깊이마다 정수  +15%",       3400,
-            Rec.NmKills, 4, "악몽 보스 4회 처치", 2200,
-            parents: new[] { AbyssDepth }, era: 3),
-        new(SigilAscetic,   AltarBranch.Journey, "고행자의 인장",  "보상 선택지 -1 · 정수 ×1.6 (켜고 끄기)", 4200,
-            Rec.NmKills, 8, "악몽 보스 8회 처치", 2700,
-            parents: new[] { AbyssDepth }, size: AltarNodeSize.Keystone, era: 3),   // 깊이 보상과 형제 — 사슬을 짧게
+            size: AltarNodeSize.Keystone, era: 3, requiredPoints: 8),
+        new(DepthReward,    AltarBranch.Journey, "깊이 보상",      "심연 깊이마다 정수",       720,
+            Rec.NmKills, 4, "악몽 보스 4회 처치", 470,
+            parents: new[] { AbyssDepth }, era: 3, maxLevel: 3, requiredPoints: 15,
+            valueText: lv => $"깊이마다 정수 +{DepthRewardPerLevel * 100f * lv:0}%"),
+        new(SigilAscetic,   AltarBranch.Journey, "고행자의 인장",  "보상 선택지 -1 · 정수 ×1.6 (켜고 끄기)", 3200,
+            Rec.NmKills, 8, "악몽 보스 8회 처치", 2100,
+            parents: new[] { AbyssDepth }, size: AltarNodeSize.Keystone, era: 3, requiredPoints: 15),
+    };
+
+    /// <summary>
+    /// 10-14 강화형 전환 — 사용자 「아직 출시 전이니 리셋」. 옛 노드(한 번 사는 29칸)에 쓴 정수를 옛 기본가로 돌려주고 산 칸을 비운다(1회 · 기록 키).
+    /// 강화로 합쳐진 노드(룬 보관함 +2 · 찬란한 기억 · 서약 카드 +4/+3)도 여기 든다.
+    /// </summary>
+    public static readonly (string id, int refund)[] LegacyNodes1014 =
+    {
+        (MemRedraw, 1400), (MemClear, 2600), (MemRadiant, 4500),
+        (RuneStorage1, 700), (RefinePick, 1800), (RuneEpic, 2600), (RuneLegendary, 3000), (RefineQuality, 2700), (RuneStorage2, 3000),
+        (CovenantParts1, 1600), (CovenantSlot, 2400), (CovenantParts2, 2100), (CovenantParts3, 3200),
+        (PartPierce, 450), (WeaponCrossbow, 900), (PartPower, 1200), (SigilSmith, 1500), (PartHoming, 1500),
+        (StartParts2, 2300), (WeaponEvolve, 2800), (PartExplode, 2600),
+        (Revive, 800), (SigilMerchant, 1300), (ShopReroll, 1600), (MaxHpUp, 1400), (PotionSlot, 1900),
+        (AbyssDepth, 1000), (DepthReward, 3400), (SigilAscetic, 4200),
     };
 
     private static Dictionary<string, MemoryAltarNode>       _byId;
@@ -450,21 +557,13 @@ public static class MemoryAltarCatalog
         _                    => "",
     };
 
-    /// <summary>고리의 이름 = 시기(10-02 재설계 — 옛 「정착 · 확장 · 심화 · 완성 · 심연」 깊이 이름은 버렸다).</summary>
-    public static string RingLabel(int era) => era switch
-    {
-        1 => "봉인기",
-        2 => "해방기",
-        _ => "악몽",
-    };
-
     /// <summary>
-    /// 그 시기의 고리가 드러났는가 — 1 봉인기는 처음부터, 2 해방기는 첫 리치(붕괴) 뒤, 3 악몽은 엔딩 뒤.
-    /// 드러나지 않은 고리의 노드는 그리지도 팔지도 않는다(설계서 §4 — 붕괴 · 엔딩 스포일러 금지).
+    /// 그 시기의 칸이 드러났는가 — <b>10-14 폐기: 늘 true</b>(사용자 「해금 내용이 봉인기 · 악몽기 등에 따라 늘어나는 것은 불편만 준다」).
+    /// 처음부터 모든 칸이 보인다. 살 수 있는가는 갈래 포인트(고리) · 논리상 앞 칸 · 자물쇠 조건(심연 입장 = 엔딩)만 정한다.
+    /// (10-02엔 1 봉인기 · 2 해방기(붕괴 뒤) · 3 악몽(엔딩 뒤)에 맞춰 고리가 드러났다.)
     /// </summary>
-    public static bool IsEraRevealed(int era) =>
-        era <= 1 || (era == 2 && StoryProgress.IsLiberated) || (era >= 3 && StoryProgress.HasEnded);
+    public static bool IsEraRevealed(int era) => true;
 
-    /// <summary>지금 드러난 가장 늦은 시기(1~3).</summary>
-    public static int RevealedEra => IsEraRevealed(3) ? 3 : IsEraRevealed(2) ? 2 : 1;
+    /// <summary>드러난 가장 늦은 시기 — 10-14부터 늘 3(전부).</summary>
+    public static int RevealedEra => 3;
 }

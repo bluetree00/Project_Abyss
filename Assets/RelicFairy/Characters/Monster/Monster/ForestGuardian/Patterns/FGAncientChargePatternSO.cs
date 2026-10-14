@@ -143,7 +143,8 @@ public class FGAncientChargeState : FullLockState<FGAncientChargePatternSO>
                 {
                     FacePlayer(ctx, Data.windupTurnSpeed * dt);
                     Aim(ctx);
-                    PatternGuideHelper.PlaceBeam(_guideGO, ctx.Transform.position, _dir, _length, Data.width);
+                    PatternGuideHelper.PlaceBeam(_guideGO, ctx.Transform.position - _dir * Data.hitRadius, _dir, _length + Data.hitRadius * 2f,
+                                                 Mathf.Max(Data.width, Data.hitRadius * 2f));
                     if (_timer >= _windup - Data.lockDuration)
                     {
                         _locked = true;
@@ -229,7 +230,10 @@ public class FGAncientChargeState : FullLockState<FGAncientChargePatternSO>
         Aim(ctx);
         PatternGuideHelper.SafeDestroy(ref _guideGO);
         _guideGO = PatternGuideHelper.Prepare(
-            PatternGuideHelper.Beam(ctx.Transform.position, _dir, _length, Data.width, PatternGuideHelper.Telegraph),
+            // 가이드 = 돌진 거리 + 몸 판정 반경 — 멈춘 자리에서도 hitRadius만큼 닿는다(1페이지 돌진 10-02와 같게 · 10-08 점검)
+            // 출발 자리 뒤로도 hitRadius · 폭 = 몸 판정 폭(1페이지 돌진과 같게 · 10-08 점검)
+            PatternGuideHelper.Beam(ctx.Transform.position - _dir * Data.hitRadius, _dir, _length + Data.hitRadius * 2f,
+                                    Mathf.Max(Data.width, Data.hitRadius * 2f), PatternGuideHelper.Telegraph),
             ForestGuardianMonster.GuideFlow);
         PlayAnim(ctx, AnimReady);
     }

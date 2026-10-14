@@ -110,6 +110,7 @@ public class BuffTileInteraction : MonoBehaviour
         }
 
         var session = app.CurrentRun;
+        Managers.Sound?.PlayEvent(SoundEvent.BuffboxOpen);
         var result = BuffRoller.Roll(roomDuration);
 
         string noticeMsg;

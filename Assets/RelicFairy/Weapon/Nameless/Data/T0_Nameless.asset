@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MainWeaponSO
   weaponDisplayKey: T0_Nameless_Display
   weaponPrefabKey: T0_Nameless_Weapon
-  displayName: "\uBB34\uBA85\uC758 \uD615\uC0C1"
+  displayName: "\uBB34\uD615\uAC80"
   tagline: 
   uiThemeColor: {r: 0, g: 0, b: 0, a: 0}
   iconKey: T1_KatanaIcon

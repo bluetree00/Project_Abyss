@@ -35,7 +35,8 @@ MonoBehaviour:
   trailVfxPrefab: {fileID: 0}
   weaponType: 2
   evolution: {fileID: 0}
-  skillQ: {fileID: 11400000, guid: f8ed2817829c9e448b483cd3c381c397, type: 2}
+  form: {fileID: 0}
+  skillQ: {fileID: 11400000, guid: f13606e204e18f64ea72e2d77f8d9ee1, type: 2}
   skillE: {fileID: 11400000, guid: 31982dfcf2ce0e74ea006f2cfb53741e, type: 2}
   holdThreshold: 0
   promoteMode: 0

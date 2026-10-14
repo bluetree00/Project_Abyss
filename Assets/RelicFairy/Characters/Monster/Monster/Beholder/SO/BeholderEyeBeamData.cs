@@ -38,5 +38,8 @@ public class BeholderEyeBeamData : SpecialStateDataBase
     [Tooltip("빔 발사 시 스폰할 이펙트 프리팹 (루트에 배치, beamDuration 후 자동 소멸).")]
     public GameObject beamVfxPrefab;
 
+    [Tooltip("발사 이펙트 배율 — 보이는 반경이 판정 원(beamRadius)에 맞게(10-15 정예 점검 실측)")]
+    public float beamVfxScale = 1f;
+
     public override SpecialStateBase CreateState() => new BeholderEyeBeamState(this);
 }

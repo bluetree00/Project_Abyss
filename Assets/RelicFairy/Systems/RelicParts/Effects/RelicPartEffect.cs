@@ -21,6 +21,12 @@ public class RelicPartEffect : IRelicPartEffect
 
     public RelicPartEffect(string effectKey) => EffectKey = effectKey;
 
+    /// <summary>
+    /// 이 조각 계열(RELIC_PARTS_DATA build_family)의 각인 배율 — 1 · 1.2 · 1.4 · 1.6(10-14 빌드 시너지 A4).
+    /// 룬에만 붙던 각인을 유물 조각에도 곱해 「같은 계열을 모을수록 유물도 세진다」. 조각 수치가 코드 상수라 피해 공격력(Atk)에 곱한다.
+    /// </summary>
+    protected float ImprintMul => BuildImprint.EffectMultiplier(BuildFamilyRules.OfRelicPart(EffectKey));
+
     public void SetGrade(RelicMemoryGrade grade, PlayerController player)
     {
         if (grade < RelicMemoryGrade.Faint) grade = RelicMemoryGrade.Faint;

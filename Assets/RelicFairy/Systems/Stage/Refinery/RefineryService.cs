@@ -1,10 +1,10 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// 정제소 — 원석을 넣고 돌리면 <b>룬 하나를 무작위로</b> 뽑는다. 런 스코프 상태(누진 비용).
 /// 설계: 바탕화면 기획/RelicFairy_기획_재련소_정제소.md §2.2(원석 → 룬) · 09-28 사용자 「간단하게 줄여서 룬을 랜덤으로 뽑는 시스템으로」.
 ///
-/// 흐름: <see cref="Craft"/> → 등급 굴림(희귀 이상 · 기억의 제단 해금을 넘지 않음) → 그 등급 룬 풀에서 하나
+/// 흐름: <see cref="Craft"/> → 등급 굴림(희귀 이상 · 영웅 · 전설도 처음부터 — 10-14 사용자) → 그 등급 룬 풀에서 하나
 /// (ItemSORegistry — 방 보상과 같은 풀) → 원석 소비 → 보관함.
 /// 예전의 속성 선택 · 존핵 · 피버 · 돌발 이벤트 · 재점화 · 방 특전은 걷었다.
 /// 이미 만들어진 존핵(이어하기 세이브)은 <see cref="IsZoneCore"/>로 계속 알아본다(룬판 중앙 금지 · 얼굴).
@@ -21,20 +21,24 @@ public sealed class RefineryService
     private const float EpicOdds   = 0.40f;
     private const float LegendOdds = 0.15f;
 
-    /// <summary>「정제 등급 상승」(기억의 제단 룬 갈래) 해금 시 Epic 확률에 더해지는 몫. Rare에서 넘어온다.</summary>
-    public const float QualityUnlockEpic = 0.12f;
+    /// <summary>「정제 등급」(기억의 제단 룬 갈래 · 10-14 강화형 +3%p/단계)이 Epic 확률에 더하는 몫. Rare에서 넘어온다.</summary>
+    public static float QualityUnlockEpic => MemoryAltarService.RefineEpicBonus;
 
     private const string ZoneCoreIdPrefix = "special_zonecore_";
 
     // 정제 두 장의 둘째 장 — 보유 계열 추림(할당 없이 재사용).
     private static readonly System.Collections.Generic.List<BuildFamily> s_topFamilies = new(2);
     private static readonly System.Collections.Generic.List<ItemSO>      s_familyPool  = new(16);
+    private static readonly System.Collections.Generic.List<ItemSO>      s_obtainable  = new(32);
 
     // ── 런 상태 ──
     private readonly RunFuelBank      _fuel;
     private readonly RunItemInventory _inventory;
 
     public int CraftCount { get; private set; }
+
+    /// <summary>이어하기 — 저장된 정제 횟수(비용 단계)를 되살린다. 없으면 복원 뒤 비용이 첫 단계로 돌아갔다(10-09 출시 점검).</summary>
+    public void RestoreCraftCount(int count) => CraftCount = Mathf.Max(0, count);
 
     public RefineryService(RunFuelBank fuel, RunItemInventory inventory)
     {
@@ -45,19 +49,21 @@ public sealed class RefineryService
     // ── 조회 ──
 
     public int  CurrentCost => BaseCost + (CraftCount / 2) * CostStep;
+    /// <summary>이번 정제를 한 뒤의 비용 — 제단 화면 「다음 정제부터 원석 N」.</summary>
+    public int  NextCost    => BaseCost + ((CraftCount + 1) / 2) * CostStep;
     public int  OreOwned    => _fuel?.RuneOre ?? 0;
     public bool CanAfford   => OreOwned >= CurrentCost;
 
     /// <summary>
-    /// 이번 돌리기 등급 확률. 등급 해금(기억의 제단)을 넘지 않는다 — 잠긴 등급의 몫은 한 단계 아래로 접힌다.
-    /// 표시(확률 막대)와 굴림이 이 한 곳을 같이 보므로 「전설 5%」를 보여 주고 영웅을 주는 일이 없다.
+    /// 이번 돌리기 등급 확률. 표시(확률 막대)와 굴림이 이 한 곳을 같이 본다.
+    /// <para>정제소는 원석을 내고 돌리는 곳이라 기억의 제단 등급 해금(영웅 · 전설)으로 <b>접지 않는다</b> — 예전엔 해금 전이면
+    /// 영웅 · 전설 몫이 전부 희귀로 접혀 「희귀 100%」만 나왔다(10-14 사용자 「정제소에서 높은 등급의 룬도 나올 수 있게」).
+    /// 방 보상 · 상점은 그대로 해금을 따른다.</para>
     /// </summary>
     public (float rare, float epic, float legend) CurrentOdds()
     {
-        float epic = EpicOdds;
-        if (MemoryAltarService.IsUnlocked(MemoryAltarCatalog.RefineQuality))
-            epic += QualityUnlockEpic;
-        return MemoryAltarService.FoldOdds(Mathf.Max(0f, 1f - epic - LegendOdds), epic, LegendOdds);
+        float epic = EpicOdds + QualityUnlockEpic;
+        return (Mathf.Max(0f, 1f - epic - LegendOdds), epic, LegendOdds);
     }
 
     // ── 돌리기 ──
@@ -132,7 +138,11 @@ public sealed class RefineryService
     {
         for (var r = rarity; r >= ItemRarity.Rare; r--)
         {
-            var pool = ItemSORegistry.GetByRarity(r);
+            var all = ItemSORegistry.GetByRarity(r);
+            // 이미 가진 룬(상한 1)은 뺀다(10-09 출시 점검)
+            var refineInv = GameRunBootstrapper.Instance?.Run?.ItemInventory;
+            System.Collections.Generic.IReadOnlyList<ItemSO> pool = all;
+            if (refineInv != null && all != null) { refineInv.FilterObtainable(all, s_obtainable); pool = s_obtainable; }
             if (pool == null || pool.Count == 0) continue;
             var so   = pool[Random.Range(0, pool.Count)];
             if (preferOwnedFamily)

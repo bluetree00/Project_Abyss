@@ -14,7 +14,16 @@ public sealed class PlayerRuntimeStats
     public int Defense { get; private set; }
     public int Luck { get; private set; }
     public float AttackSpeedMultiplier { get; private set; } = 1f;
+    /// <summary>넘친 공속이 바뀐 모든 피해 %(10-14 A6) — 공속 합이 상한 2.0을 넘은 몫의 절반. HUD · 실측이 읽는다.</summary>
+    public float AttackSpeedOverflowDamage { get; private set; }
     public float SkillCooldownReduction { get; private set; }
+
+    // 상한(10-09 출시 점검) — 룬 · 상점 축복 · 각성 · 반응 · 마스터리가 제한 없이 더해져 쿨다운 0(쿨감 100%) · 완전 무적(피해 감소 100%) ·
+    // 콤보 창이 뭉개지는 공격 속도(3~4배)가 됐다. 밸런스 값이라 조정 가능.
+    public const float MaxSkillCooldownReduction = 0.6f;
+    public const float MaxDamageReduction        = 0.75f;
+    public const float MaxAttackSpeed            = 2.0f;
+    public const float AttackSpeedOverflowRatio  = 0.5f;   // 넘친 공속 → 모든 피해 %(D5 · 10-14 A6)
     public float ActiveItemCooldownReduction { get; private set; }
     public float HeavyChargeThreshold { get; private set; }
     public float MoveSpeedMultiplier { get; private set; } = 1f;
@@ -109,6 +118,8 @@ public sealed class PlayerRuntimeStats
         _roomCritChance = _roomCritDamage = _roomSkillCdr = 0f;
 
         _bonusAttackSpeed = 0f;
+        _zenithAttackSpeed = 0f;
+        _skillAttackSpeed = 0f; _skillAttackSpeedGen++;
 
         HeavyChargeThreshold = Mathf.Max(0f, data.heavyAttackChargeThreshold);
 
@@ -168,6 +179,8 @@ public sealed class PlayerRuntimeStats
         _roomMoveSpeed = 0f; _roomAttackSpeed = 0f; _roomProjectile = 0;
         _roomMaxHp = _roomLuck = 0; _roomCritChance = _roomCritDamage = _roomSkillCdr = 0f;
         _bonusAttackSpeed = 0f;
+        _zenithAttackSpeed = 0f;
+        _skillAttackSpeed = 0f; _skillAttackSpeedGen++;
 
         HeavyChargeThreshold = Mathf.Max(0f, entry.heavy_charge_threshold);
 
@@ -453,6 +466,14 @@ public sealed class PlayerRuntimeStats
 
     // -- 공격 속도 보너스 (패시브 등에서 직접 설정) --
     private float _bonusAttackSpeed;
+    // -- 가웨인 정오 공속(유물 Q 상태) — 패시브 칸과 따로. 예전엔 같은 칸이라 정오가 끝나며 0을 넣을 때 패시브 공속까지 지웠다(10-14 K1) --
+    private float _zenithAttackSpeed;
+
+    // -- 스킬 자기 강화 공격 속도(석궁 빨리쏘기 · 10-08 B4) — 시전마다 자기 몫만 더하고 끝나면 자기 몫만 뺀다 --
+    // 예전엔 지금 전체 배율(아이템 · 방 · 서약 · 유물 몫까지)을 _bonusAttackSpeed에 다시 적어 시전할 때마다 영구히 쌓였고,
+    // 가웨인 정오가 같은 칸을 0으로 지워 서로 덮었다.
+    private float _skillAttackSpeed;
+    private int   _skillAttackSpeedGen;   // 초기화마다 +1 — 초기화 전에 걸린 버프의 해제가 새 버프를 깎지 않게
 
     // -- Synergy Dynamic (룬 속성 효과의 런타임 동적 버프, 6속성 공용) --
     // 기존 단일 슬롯(SetRelicCritBuff/SetCharacterAttackMultiplier 등 유물 점유)과 충돌하지 않도록
@@ -489,6 +510,14 @@ public sealed class PlayerRuntimeStats
     /// 강화가 진화에서 끝나지 않고 "쌓을수록 스킬이 커지는" 구간으로 이어지게 하는 소비처.
     /// 장착 무기 1자루분만 유지되므로 대입(가산 아님) — 무기 교체/강화 시마다 덮어쓴다.
     /// </summary>
+    /// <summary>
+    /// UI용 — 마스터리 재사용 감소를 <paramref name="masteryCdr"/>로 바꿨을 때의 전체 스킬 재사용 감소(상한 0.6 적용).
+    /// 이미 상한에 걸린 SkillCooldownReduction에서 빼고 더하면 틀린다 — 합을 처음부터 다시 낸다(10-12 A9).
+    /// </summary>
+    public float SkillCooldownReductionWithMastery(float masteryCdr)
+        => Mathf.Clamp(_passiveSkillCdr + _itemSkillCdr + _awakeningSkillCdr + _relicSkillCdr + _reactionSkillCdr + Mathf.Max(0f, masteryCdr) + _roomSkillCdr,
+                       0f, MaxSkillCooldownReduction);
+
     public void SetWeaponMastery(float skillDamage, float skillCdr)
     {
         _masterySkillDamage = Mathf.Max(0f, skillDamage);
@@ -681,8 +710,10 @@ public sealed class PlayerRuntimeStats
         _awakeningLuck      = 0;
         _awakeningLifesteal = 0f;
 
-        if (MemoryAltarService.IsUnlocked(MemoryAltarCatalog.MaxHpUp))
-            _awakeningMaxHp = MemoryAltarCatalog.MaxHpBonus;
+        // 10-14 강화형 — 「최대 체력」 +4%/단계(5단계 +20%). 예전 +76 한 번
+        float hpPct = MemoryAltarService.MaxHpPct;
+        if (hpPct > 0f)
+            _awakeningMaxHp = Mathf.RoundToInt(MaxHp * hpPct);
 
         if (_awakeningMaxHp != 0)
         {
@@ -786,6 +817,24 @@ public sealed class PlayerRuntimeStats
     public void SetBonusAttackSpeed(float bonus)
     {
         _bonusAttackSpeed = bonus;
+        Recalculate();
+    }
+
+    /// <summary>가웨인 정오 공속(0.3 = +30%) — 자기 칸이라 끝날 때 0을 넣어도 패시브 공속을 지우지 않는다(10-14 K1).</summary>
+    public void SetZenithAttackSpeed(float bonus)
+    {
+        _zenithAttackSpeed = bonus;
+        Recalculate();
+    }
+
+    /// <summary>스킬 자기 강화 공격 속도의 지금 세대 — 버프를 걸 때 받아 두고 해제할 때 같이 넘긴다.</summary>
+    public int SkillAttackSpeedGeneration => _skillAttackSpeedGen;
+
+    /// <summary>스킬 자기 강화 공격 속도 가산(0.3 = +30%). 해제는 같은 값의 음수로. 세대가 바뀌었으면(런 초기화) 무시한다.</summary>
+    public void AddSkillAttackSpeed(float delta, int generation)
+    {
+        if (generation != _skillAttackSpeedGen) return;
+        _skillAttackSpeed = Mathf.Max(0f, _skillAttackSpeed + delta);
         Recalculate();
     }
 
@@ -895,10 +944,13 @@ public sealed class PlayerRuntimeStats
 
     private void Recalculate()
     {
+        // 공속 합 — 상한 2.0(애니가 읽히는 한계)을 넘은 몫의 절반은 모든 피해 %로 바꾼다(10-14 A6 · 공속을 더 모아도 헛되지 않게)
+        float rawAttackSpeed = 1f + _bonusAttackSpeed + _zenithAttackSpeed + _skillAttackSpeed + _synergyDynAttackSpeed + _itemDyn.attackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + _relicAttackSpeed + _reactionAttackSpeed;
+        AttackSpeedOverflowDamage = Mathf.Max(0f, rawAttackSpeed - MaxAttackSpeed) * AttackSpeedOverflowRatio;
 
         // % 보너스 배율
-        float dmgMul  = (1f + _itemAllDamagePercent + _synergyDynAttackPct + _itemDyn.attackPercent + _itemDyn.allDamage + _reactionDamagePercent) * _characterMeleeMult;
-        float dmgMulR = (1f + _itemAllDamagePercent + _synergyDynAttackPct + _itemDyn.attackPercent + _itemDyn.allDamage + _reactionDamagePercent) * _characterRangedMult;
+        float dmgMul  = (1f + _itemAllDamagePercent + _synergyDynAttackPct + _itemDyn.attackPercent + _itemDyn.allDamage + _reactionDamagePercent + AttackSpeedOverflowDamage) * _characterMeleeMult;
+        float dmgMulR = (1f + _itemAllDamagePercent + _synergyDynAttackPct + _itemDyn.attackPercent + _itemDyn.allDamage + _reactionDamagePercent + AttackSpeedOverflowDamage) * _characterRangedMult;
         float defMul  = (1f + _itemAllStatsPercent + _itemDefensePercent + _itemDyn.defensePercent) * _characterDefenseMult;
         float luckMul = 1f + _itemAllStatsPercent;
 
@@ -930,12 +982,12 @@ public sealed class PlayerRuntimeStats
             _maxHpItemContribution = newContribution;
         }
 
-        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyDynAttackSpeed + _itemDyn.attackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + _relicAttackSpeed + _reactionAttackSpeed);
+        AttackSpeedMultiplier = Mathf.Clamp(rawAttackSpeed, 0.1f, MaxAttackSpeed);
         MoveSpeedMultiplier  = Mathf.Max(0.1f, 1f + _itemDyn.moveSpeed + _roomMoveSpeed + _covenantMoveSpeed + _itemMoveSpeed + _awakeningMoveSpeed + _relicMoveSpeed);
         // 방 버프 + 아이템 추가 투사체를 합산한다 — 예전엔 방 버프만 반영돼 아이템 멀티샷이 무효였다.
         BonusProjectile       = Mathf.Max(0, _roomProjectile + _itemProjectileCount);
         ProjectilePierceBonus = Mathf.Max(0, _itemProjectilePierce);
-        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _awakeningSkillCdr + _relicSkillCdr + _reactionSkillCdr + _masterySkillCdr + _roomSkillCdr);
+        SkillCooldownReduction = Mathf.Clamp(_passiveSkillCdr + _itemSkillCdr + _awakeningSkillCdr + _relicSkillCdr + _reactionSkillCdr + _masterySkillCdr + _roomSkillCdr, 0f, MaxSkillCooldownReduction);
         ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr);
 
         // 확장 스탯 공개 프로퍼티 갱신
@@ -945,7 +997,7 @@ public sealed class PlayerRuntimeStats
         HealingReceivedBonus = _itemHealingReceived;
         DebuffResistance    = _itemDebuffResistance;
         AllDamagePercent    = _itemAllDamagePercent + _reactionDamagePercent;
-        DamageReduction     = Mathf.Clamp01(_itemDamageReduction + _characterDamageReduction + _synergyDynDamageReduction + _reactionDamageReduction);
+        DamageReduction     = Mathf.Clamp(_itemDamageReduction + _characterDamageReduction + _synergyDynDamageReduction + _reactionDamageReduction + _itemDyn.damageReduction, 0f, MaxDamageReduction);
         ItemLifesteal       = _itemLifesteal + _awakeningLifesteal;
 
         // 시스템 스탯

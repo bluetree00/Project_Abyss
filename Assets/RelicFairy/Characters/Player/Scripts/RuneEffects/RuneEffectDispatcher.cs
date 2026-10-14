@@ -335,12 +335,16 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
             attackDirection: dir,
             damage:          report.DamageDealt,
             isCritical:      report.IsCrit,
-            actionType:      report.ActionType);
+            actionType:      report.ActionType,
+            isHeavy:         report.IsHeavy,
+            isRanged:        report.IsRanged);
 
+        // 치명 훅은 강타(발동 계수 ≥ 문턱)에도 — 빛 광채가 「치명 또는 강타」로 쌓여 대검 · 석궁 한 방 빌드도 받친다(10-14 A3)
+        bool critLike = info.IsCritical || report.IsHeavy;
         for (int i = 0; i < _active.Count; i++)
         {
             _active[i].OnHit(info, _player);
-            if (info.IsCritical) _active[i].OnCrit(info, _player);
+            if (critLike) _active[i].OnCrit(info, _player);
         }
         if (hasParts) _parts.NotifyHit(info);
 

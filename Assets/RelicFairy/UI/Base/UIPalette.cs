@@ -19,4 +19,13 @@ public static class UIPalette
 
     /// <summary>RichText <c>&lt;color&gt;</c> 태그용. <see cref="Gold"/>와 같은 색이다.</summary>
     public const string GoldHex = "#FFD147";
+
+    // ── 재화 색(10-13 · 재화 문서 D2) — 납품 HUD 아이콘 색에 맞춘다. 예전엔 강화재료 주황 · 원석 하늘색/청록 · 정수 청록이라
+    //    아이콘(푸른 결정 · 초록 시험관 · 남보라 캡슐)과 어긋났다. 알림 · 분해 표기 글자가 이 셋을 쓴다(HUD 칸 테두리는 HudView가 같은 색조로).
+    /// <summary>강화재료(푸른 결정) — 재련소.</summary>
+    public const string EnhanceHex = "#6FA8FF";
+    /// <summary>원석(초록 시험관) — 정제소.</summary>
+    public const string RuneOreHex = "#6FD69A";
+    /// <summary>심연의 정수(남보라 캡슐) — 기억의 제단.</summary>
+    public const string EssenceHex = "#A99BF2";
 }

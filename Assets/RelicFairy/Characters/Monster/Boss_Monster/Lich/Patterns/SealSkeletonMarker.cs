@@ -12,6 +12,8 @@ namespace RelicFairy.Monster
 /// </summary>
 public class SealSkeletonMarker : MonoBehaviour
 {
+    private const float SafeFlashSeconds = 0.4f;   // 끊긴 봉인 — 초록 바닥 원이 이만큼 보인 뒤 지워진다
+
     /// <summary>해당 해골 사망 시 발행. LichSealBreakerState가 구독한다.</summary>
     public event Action OnKilled;
 
@@ -67,7 +69,9 @@ public class SealSkeletonMarker : MonoBehaviour
             PatternGuideHelper.SetColor(_disc, PatternGuideHelper.Safe);
 
         OnKilled?.Invoke();
-        Destroy(gameObject);
+        // 몸은 공용 사망 디졸브(DieState)가 거둔다 — 예전엔 여기서 통째로 지워 디졸브 없이 사라졌다(10-12 디졸브 원칙). 표식만 뗀다
+        if (_disc != null) { Destroy(_disc, SafeFlashSeconds); _disc = null; _discTransform = null; }
+        Destroy(this);
     }
 }
 }

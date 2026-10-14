@@ -39,7 +39,15 @@ public class FGDormantState : IMonsterState
 
     public void Update(MonsterContext ctx) { }
 
-    public void Exit(MonsterContext ctx) { }
+    // 등장 팬 도중 상태를 떠나면(팬이 끝나기 전 쓰러짐 등 — onPanComplete가 안 불린다) 레터박스 · HUD를 여기서 걷는다(10-14 전주기 5회차 참고)
+    public void Exit(MonsterContext ctx)
+    {
+        if (!_cine) return;
+        BossStoryScenes.EndEntrance(StoryProgress.ForestGuardian, completed: false);
+        _cine = false;
+    }
+
+    private bool _cine;   // 이야기 전투 등장 — 레터박스 · HUD를 걷었다(끝에 되돌린다)
 
     // BRC 가 호출할 수 있으나, 이 보스는 Enter 에서 직접 시작하므로 무시
     public void TriggerEntrance(MonsterContext ctx) { }
@@ -55,13 +63,14 @@ public class FGDormantState : IMonsterState
 
         var cam = GameCameraController.Instance;
         var ct  = fg.destroyCancellationToken;
-        BossBinding.Attach(fg, StoryProgress.ForestGuardian);   // 옛 봉인 사슬(10-03 S2) — 해방기엔 아래에서 끊어진다
+        // 해방기도 묶임 없이 — 봉인은 리치에게 떨어질 때 이미 깨졌다(10-13 사용자 「봉인 상태에서 시작은 레거시」)
 
         if (cam == null || ctx.Runtime.PlayerTarget == null)
         {
             FinishSequence(ctx);
             return;
         }
+        _cine = BossStoryScenes.BeginEntrance(StoryProgress.ForestGuardian, ct);   // 레터박스 · 전투 HUD 걷기(10-14)
 
         // ① 플레이어 시점 → 대각선(이동1)
         // onPanComplete 에서 HUD+복귀 시퀀스 시작. ReturnToPlayerAsync 가 이 팬을 내부 캔슬함.
@@ -88,24 +97,24 @@ public class FGDormantState : IMonsterState
 
         try
         {
-            // ② 보스 이름 HUD (대각선 카메라 상태에서 표시)
-            if (UI_BossBark.Instance != null)
-            {
-                string bark = "Forest Guardian";
-                var lines = Managers.DialogueData?.GetBossEncounterLines("ForestGuardian_Encounter");
-                if (lines != null && lines.Length > 0) bark = lines[0].text;
-                await UI_BossBark.ShowAndWaitAsync(bark, BossBarkType.BossIntro);
-            }
-            else
-                await UniTask.Delay(TimeSpan.FromSeconds(BossIntroFallbackDuration), cancellationToken: ct);
+            // ② 등장 자막 + 이름 · 칭호(대각선 카메라 상태) — 반복 관람은 짧게(10-14)
+            string bark = "Forest Guardian";
+            var lines = Managers.DialogueData?.GetBossEncounterLines("ForestGuardian_Encounter");
+            if (lines != null && lines.Length > 0) bark = lines[0].text;
+            await BossStoryScenes.IntroLineAsync(fg, StoryProgress.ForestGuardian, bark, ct);
 
-            // 해방기 — 카메라가 보스를 비추는 동안 사슬이 끊어지고 포효(10-03 S2-3)
-            await BossStoryScenes.UnbindAsync(fg, StoryProgress.ForestGuardian, ct);
+            // 해방기 — 카메라가 보스를 비추는 동안 옛 봉인 자국이 깨지며 포효(10-13 재조우)
+            await BossStoryScenes.ReturnAsync(fg, StoryProgress.ForestGuardian, ct);
 
             // ③ 플레이어 카메라 복귀(이동2) — 내부에서 ①의 팬을 캔슬하고 이어받음
-            await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, 0f, ct);
+            await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, 0.6f, ct);   // 짧게 블렌드 — 복귀 목표가 게임 카메라 자세로 고쳐져(10-14) 덜컥 넘어가지 않게
+            if (_cine) { BossStoryScenes.EndEntrance(StoryProgress.ForestGuardian, completed: true); _cine = false; }
         }
         catch (OperationCanceledException) { return; }
+        finally
+        {
+            if (_cine) { BossStoryScenes.EndEntrance(StoryProgress.ForestGuardian, completed: false); _cine = false; }
+        }
 
         FinishSequence(ctx);
     }

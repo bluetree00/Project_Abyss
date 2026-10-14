@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -44,6 +44,16 @@ public class PlayerLoadout
     /// <summary>이번 런에 「다시 떠올리기」(제단 노드, 런당 1회)를 썼는가.</summary>
     public bool RelicRedrawUsed { get; private set; }
 
+    /// <summary>이번 런의 유물 진화(RelicEvolution.Def.Id · 없으면 빈 값) — 런당 하나(10-14 빌드 시너지 C).</summary>
+    public string RelicEvolutionId { get; private set; }
+
+    public void SetRelicEvolution(string id)
+    {
+        if (string.IsNullOrEmpty(id) || !string.IsNullOrEmpty(RelicEvolutionId)) return;
+        RelicEvolutionId = id;
+        RelicPartsChanged?.Invoke();
+    }
+
     /// <summary>유물 파츠가 늘었다(드래프트 · 계승 · 복원) — 발동 계열 각인을 다시 센다(09-29).</summary>
     [field: NonSerialized] public event Action RelicPartsChanged;
 
@@ -84,7 +94,7 @@ public class PlayerLoadout
     /// 유물과 원거리 무기가 <b>둘 다</b> 정해지는 순간 초행을 판정한다.
     /// 종료 시점에 보면 그 사이 기록이 쓰여 "방금 한 것" 때문에 초행이 아니게 된다 — 확정 시 1회다.
     /// </summary>
-    private void EvaluateFirstRun()
+    public void EvaluateFirstRun()
     {
         if (Relic == null || WeaponSlot1 == null) return;
         FirstRunService.MarkLoadout(Relic.Id.ToString(), WeaponSlot1.name);
@@ -151,6 +161,7 @@ public class PlayerLoadout
                 if (key.StartsWith("echo.")) { if (v > 0) _relicEchoes[key.Substring(5)] = v; }
                 else if (key == "pity")   RelicDraftsSinceRadiant = Mathf.Max(0, v);
                 else if (key == "redraw") RelicRedrawUsed = v != 0;
+                else if (key == "evo")    RelicEvolutionId = RelicEvolution.ByIndex(v)?.Id;
             }
         }
         RelicPartsChanged?.Invoke();
@@ -178,6 +189,8 @@ public class PlayerLoadout
             if (kv.Value > 0) sb.Append("echo.").Append(kv.Key).Append('=').Append(kv.Value).Append(';');
         if (RelicDraftsSinceRadiant > 0) sb.Append("pity=").Append(RelicDraftsSinceRadiant).Append(';');
         if (RelicRedrawUsed) sb.Append("redraw=1;");
+        var evo = RelicEvolution.ById(RelicEvolutionId);
+        if (evo != null) sb.Append("evo=").Append(evo.Index).Append(';');
         return sb.ToString();
     }
 
@@ -224,6 +237,7 @@ public class PlayerLoadout
         _relicEchoes.Clear();
         RelicDraftsSinceRadiant = 0;
         RelicRedrawUsed = false;
+        RelicEvolutionId = null;
     }
 
     public void Clear()

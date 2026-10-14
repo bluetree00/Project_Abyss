@@ -1,6 +1,9 @@
 using System;
 using UnityEngine;
 
+/// <summary>원인 진척의 모양(HUD) — 세는 것 · 차오르는 것 · 쿨 · 열린 기회 · 준비 여부.</summary>
+public enum CovenantProgressKind { None, Count, Charge, Cooldown, Window, Armed }
+
 /// <summary>
 /// 서약 원인(조건절) 상태기계 — 연격 · 학살 · 전환 · 개선 · 심장박동 · 연주 · 사냥 개시 · 선제 · 포위 · 행군.
 /// 조건이 맞으면 <c>fire(대상)</c>을 부른다. 조립 서약과 서약서(문장)가 같은 추적기를 쓴다(10-02 「한 장의 서약서」 E1 —
@@ -37,6 +40,7 @@ public sealed class CovenantCauseTracker
     private float _proximityTimer, _proximityCd;   // 포위
     private Vector3 _lastPos; private bool _movePrimed; private float _moveAccum;   // 행군
     private float _gateTimer, _gateOpenUntil;   // 전투 게이트
+    private int   _lastNear;                    // 포위 — 마지막으로 잰 인접 수(HUD)
 
     /// <param name="fire">조건이 맞은 순간 — 대상형 원인은 그 적, 범위형은 null.</param>
     /// <param name="onProximitySample">포위 원인이 인접 수를 잴 때마다(「격노」 위험 변형이 포위가 풀리면 증폭을 끈다).</param>
@@ -52,10 +56,47 @@ public sealed class CovenantCauseTracker
     /// <summary>전투 게이트가 열려 있는 시각(실측 도구가 읽는다).</summary>
     public float GateOpenUntil => _gateOpenUntil;
 
+    /// <summary>
+    /// HUD 진척(10-07 U2 「서약서가 숨 쉰다」) — 지금 원인이 얼마나 찼는가. 읽기 전용(상태를 바꾸지 않는다).
+    /// <para>Count = cur/max(연격 · 학살 · 포위 인접) · Charge = 남은 초/거리(심장박동 · 행군, 전투 밖이면 Fill 0 · Seconds −1) ·
+    /// Cooldown = 재발동까지 남은 초(포위) · Window = 기회 남은 초(전환 · 사냥 개시) · Armed = 이번 방 선제 준비.</para>
+    /// </summary>
+    public (CovenantProgressKind kind, int cur, int max, float seconds) Progress
+    {
+        get
+        {
+            float now = Time.time;
+            switch (_cause.trigger)
+            {
+                case CauseTriggerKind.OnHitStreakSameTarget:
+                case CauseTriggerKind.OnRangedStreakSameTarget: return (CovenantProgressKind.Count, _streak, _cause.thresholdInt, 0f);
+                case CauseTriggerKind.OnKillStreak:          return (CovenantProgressKind.Count, _killStreak, _cause.thresholdInt, 0f);
+                case CauseTriggerKind.Periodic:
+                    return (CovenantProgressKind.Charge, 0, 0, now < _gateOpenUntil ? Mathf.Max(0f, _cause.thresholdF - _periodicTimer) : -1f);
+                case CauseTriggerKind.OnMoveDistance:
+                    return (CovenantProgressKind.Charge, 0, 0, now < _gateOpenUntil ? Mathf.Max(0f, _cause.thresholdF - _moveAccum) : -1f);
+                case CauseTriggerKind.OnProximity:
+                    return now < _proximityCd
+                        ? (CovenantProgressKind.Cooldown, 0, 0, _proximityCd - now)
+                        : (CovenantProgressKind.Count, Mathf.Min(_lastNear, _cause.thresholdInt), _cause.thresholdInt, 0f);
+                case CauseTriggerKind.OnWeaponSwapWindow:  return (CovenantProgressKind.Window, 0, 0, Mathf.Max(0f, _swapWindowEnd - now));
+                case CauseTriggerKind.OnKillThenHitWindow: return (CovenantProgressKind.Window, 0, 0, Mathf.Max(0f, _killHitWindowEnd - now));
+                case CauseTriggerKind.OnFirstHitInRoom:    return (CovenantProgressKind.Armed, _firstHitArmed ? 1 : 0, 1, 0f);
+                default:                                   return (CovenantProgressKind.None, 0, 0, 0f);
+            }
+        }
+    }
+
+    /// <summary>지금 들어온 적중이 원거리(화살 · 볼트)인가 — CombatDamage가 서약 적중 디스패치 동안만 켠다(「겨눔」 · 10-14).</summary>
+    public static bool CurrentHitRanged;
+
     public void OnAttackHit(GameObject target)
     {
         switch (_cause.trigger)
         {
+            case CauseTriggerKind.OnRangedStreakSameTarget:
+                if (!CurrentHitRanged) break;   // 겨눔은 원거리 적중만 센다(근접은 셈을 끊지도 않는다)
+                goto case CauseTriggerKind.OnHitStreakSameTarget;
             case CauseTriggerKind.OnHitStreakSameTarget:
                 if (target == _streakTarget) _streak++;
                 else { _streakTarget = target; _streak = 1; }
@@ -123,6 +164,7 @@ public sealed class CovenantCauseTracker
                 {
                     _proximityTimer = 0f;
                     int near = CountNearbyEnemies(ProximityRadius);
+                    _lastNear = near;
                     _onProximitySample?.Invoke(near);
 
                     if (Time.time >= _proximityCd && near >= _cause.thresholdInt)

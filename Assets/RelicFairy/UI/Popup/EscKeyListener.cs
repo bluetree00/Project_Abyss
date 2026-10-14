@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// @Popup에 항상 활성 상태로 부착. 프로젝트의 유일한 ESC 진입점.
@@ -27,6 +28,11 @@ public sealed class EscKeyListener : MonoBehaviour
     private void Update()
     {
         if (!Input.GetKeyDown(KeyCode.Escape)) return;
+        // 리치의 추방(10-11) — 추락 · 착지 전환 · Ch1에서 일어나는 동안엔 일시정지를 열지 않는다(ESC는 건너뛰기 키도 아니다).
+        if (ExileFallSequence.BlocksPause) return;
+        if (RunResultView.Active != null) return;   // 결과창 동안엔 ESC 메뉴를 열지 않는다 — 아래에 열린 채 허브로 넘어갔다(10-08 리뷰)
+        // 로딩 화면(900)이 덮는 동안엔 무시 — 그 아래(500)에 메뉴가 열려 시간을 멈춘 채 다음 씬으로 넘어갔다(10-09 출시 점검)
+        if (UI_SceneLoading.Instance != null && UI_SceneLoading.Instance.IsCovering) return;
 
         // 설정은 ESC 메뉴 위에도, 로비 단독으로도 열린다 — 어느 쪽이든 가장 먼저 닫힌다.
         if (UI_Settings.CloseIfOpen()) return;
@@ -40,6 +46,9 @@ public sealed class EscKeyListener : MonoBehaviour
         // 스택 팝업이 ESC를 소비하면 메뉴는 열지 않는다.
         if (Managers.UI != null && Managers.UI.TryCloseTopPopupOnEscape())
             return;
+
+        // 로비엔 일시정지 메뉴를 열지 않는다 — 「계속하기」 · 「로비로 가기」가 뜻이 없다. 설정 · 팝업 닫기는 위에서 그대로 받는다(10-09 출시 점검)
+        if (SceneManager.GetActiveScene().name == nameof(Define.Scene.Lobby)) return;
 
         _menu?.Open();
     }

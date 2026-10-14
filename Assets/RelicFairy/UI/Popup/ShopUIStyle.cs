@@ -14,6 +14,8 @@ using UnityEngine.UI;
 /// </summary>
 public static class ShopUIStyle
 {
+    private const float FallbackSfxVolume = 0.65f;   // 표에 없는 뜻 키 — 예전 기본 라우팅의 기본값
+
     /// <summary>
     /// 상점·재련소 SFX 훅. <b>기본 라우팅이 걸려 있다</b> — 예전엔 이 필드에 대입하는 코드가
     /// 프로젝트 어디에도 없어서, <c>PlaySfx</c>를 부르는 22곳(상점 구매·거부·리롤, 재련소 성공·잭팟·실패)이
@@ -24,38 +26,26 @@ public static class ShopUIStyle
     public static void PlaySfx(string key) => Sfx?.Invoke(key);
 
     /// <summary>
-    /// 기본 라우팅 — 전용 클립이 아직 없으므로 기존 UI 클립 1종을 <b>피치·볼륨으로 구분</b>해 쓴다.
-    /// (성공은 올라가고, 거부·실패는 내려간다.) 전용 오디오가 들어오면 여기 키만 갈아끼우면 된다.
+    /// 기본 라우팅(10-12 Fantasy UI SFX) — 뜻 키를 효과음 표(SoundEventTable)의 이벤트로 UI 채널에 낸다.
+    /// 클립 · 볼륨 · 피치 흔들림은 표가 정한다(귀로 맞출 곳은 표 하나). 예전엔 키 19개를 기존 UI 클립 1종의 피치로만 나눴다.
+    /// 옛 이름 shop_open · shop_close · shop_reject는 화면 공용 열기 · 닫기 · 거절(ui_*)로 잇는다(D2).
+    /// 표에 없는 키면 예전처럼 공용 버튼 소리로 낸다 — 반입 도구를 돌리기 전에도 무음이 되지 않게.
     /// </summary>
     private static void DefaultSfx(string key)
     {
         var sound = Managers.Sound;
         if (sound == null || string.IsNullOrEmpty(key)) return;
 
-        (float volume, float pitch) = key switch
+        string eventId = key switch
         {
-            "crucible_jackpot" => (1.00f, 1.45f),
-            "crucible_success" => (0.85f, 1.20f),
-            "enhance_success"  => (0.85f, 1.20f),
-            "shop_buy"         => (0.80f, 1.10f),
-            "shop_deal"        => (0.95f, 1.60f),   // 특가는 종소리로 구분(기획: 소리 구분)
-            "shop_select"      => (0.45f, 0.95f),   // 좌판에서 물건을 집는 소리
-            "shop_reroll"      => (0.70f, 1.25f),
-            "refine_spin"      => (0.55f, 0.85f),   // 정제소 — 로가 빛을 모으기 시작
-            "refine_reveal"    => (0.80f, 1.15f),   // 공개
-            "refine_legend"    => (1.00f, 1.50f),   // 전설 오버로드
-            "shop_open"        => (0.60f, 1.00f),
-            "shop_close"       => (0.55f, 0.90f),
-            "crucible_fail"    => (0.80f, 0.65f),
-            "crucible_hit"     => (0.90f, 0.55f),   // 망치가 모루에 닿는 순간(낮은 쿵)
-            "shop_reject"      => (0.65f, 0.70f),
-            "altar_engrave"    => (0.80f, 1.30f),   // 기억의 제단 — 각인(짧은 금속 울림)
-            "altar_grow"       => (0.50f, 1.60f),   // 빛실이 자란다(오르는 음)
-            "altar_keystone"   => (1.00f, 1.55f),   // 열쇠 노드(종)
-            _                  => (0.65f, 1.00f),
+            "shop_open"   => SoundEvent.UiOpen,
+            "shop_close"  => SoundEvent.UiClose,
+            "shop_reject" => SoundEvent.UiReject,
+            _             => key,
         };
 
-        sound.PlayUiAsync(SoundKey.Sfx.UiButton, volume, pitch).Forget();
+        if (!sound.PlayUiEvent(eventId))
+            sound.PlayUiAsync(SoundKey.Sfx.UiButton, FallbackSfxVolume, 1f).Forget();
     }
 
     // ── 팔레트 (다크 판타지/유물) ───────────────────────────

@@ -53,6 +53,8 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     /// </summary>
     private const string QSwordBone = "hand_r";
     private static readonly Quaternion QSwordBoneRotation = Quaternion.Euler(-90f, 0f, 0f);
+    // 툭 생기고 툭 사라지지 않게(10-12 디졸브 ②) — 장착 무기 숨김은 짧게: 길면 첫 참격 동안 활이 보여 「활로 후려치기」로 읽힌다
+    private const float WeaponAwaySeconds = 0.15f, QSwordInSeconds = 0.25f, QSwordOutSeconds = 0.25f, WeaponBackSeconds = 0.3f;
 
     /// <summary>
     /// 마무리 강타 전용 상태. 연타(RelicQ_Slash*)와 <b>다른 모션</b>이라야 "한 방"으로 읽힌다.
@@ -86,10 +88,21 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     private const float  HitInterval  = 0.17f;
     private const int    FlurryHits   = 10;      // 0.16 ~ 1.69초. 막타(2.40초)까지 0.7초 여유
 
-    private const float  FinisherAnimAt = 1.75f; // 마무리 베기 모션(RelicQ_Main = SPAttack01 1.45s → 막타가 45% 지점에 얹힌다)
+    private const float  FinisherAnimAt = 1.75f; // 마무리 베기 모션 — 시퀀스 마지막 칸이 이어지는 자세에 닿기 전 쓰는 시각(아래 진행 기준이 우선)
+    // 10-09 동작 연결: 마무리(03_5)는 연타 마지막 칸(02_5)의 진행 0.56 자세에서 이어진다(03_5 진행 0.04부터 · 21.5점, 장비 형/27 실측).
+    // 그 자세에 닿으면 넘기고, 못 닿으면 이 시각에 넘긴다. 마무리 상태 속도는 큰 베기(0.34)가 막타 2.40초에 오게 맞췄다(RelicQSlashClipGenerator).
+    private const float  FinisherEntryNormalized = 0.56f;
+    private const float  FinisherStartNormalized = 0.04f;
+    private const float  FinisherAnimLatest      = 2.10f;
     private const float  FinisherHitAt  = 2.40f; // 막타 — 강조 버스트가 한창일 때 꽂는다
 
     private const int    HitCount = FlurryHits + 1;   // 연타 + 마무리
+
+    /// <summary>
+    /// 연타 중 다시 겨눔(10-10 사용자 「Q를 잘못 쓰거나 몬스터가 움직이면 그 자리에서 헛치기가 길어진다 — 중간중간 회전」).
+    /// 마우스 쪽으로 이 각속도까지 돈다 — 한 타(0.17초)에 약 60°라 칼이 바뀔 때마다 방향을 고쳐 잡는 것으로 읽힌다. 마무리는 따로(가장 가까운 적).
+    /// </summary>
+    private const float  FlurryTurnDegPerSec = 360f;
 
     private readonly LancelotMadnessRelic _relic;
 
@@ -150,9 +163,10 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
 
     public void OnUpdate(SkillExecutionContext ctx)
     {
-        _elapsed += Time.deltaTime;
+        _elapsed += ctx.DeltaTime;   // 애니메이터와 같은 시계(슬로모 — 10-09)
 
         TickAnimation(ctx);
+        if (!_finisherAnimPlayed && _hitsDone < FlurryHits) TurnTowardMouse(ctx);
 
         // 프레임이 길어져도(스파이크·히트스톱) 타를 흘리지 않도록 밀린 만큼 while로 소화한다.
         while (_hitsDone < HitCount && _elapsed >= HitTimeAt(_hitsDone))
@@ -167,6 +181,8 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
             // 한 타 = 한 참격이면 0.17초마다 칼이 바뀌어 몰아치는 것으로 읽힌다.
             // 막타는 별도 모션이 따로 들어가므로 여기서 제외한다.
             if (!_finisherAnimPlayed && _hitsDone < FlurryHits) PlayStep(ctx, _stepIndex + 1);
+            // 마지막 연타 뒤엔 마무리로 이어지는 칸(시퀀스 마지막)을 한 번 더 건다 — 그 칸의 끝 자세에서 마무리가 시작된다(10-09 동작 연결)
+            else if (!_finisherAnimPlayed && _hitsDone == FlurryHits && _stepIndex != _stepCount - 1) PlayStep(ctx, _stepCount - 1);
         }
 
         if (_elapsed >= SkillDuration) ctx.RequestEnd?.Invoke();
@@ -193,14 +209,14 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         var anim = ctx.Animator;
         if (anim == null) return;
 
-        if (!_finisherAnimPlayed && _elapsed >= FinisherAnimAt)
+        if (!_finisherAnimPlayed && _hitsDone >= FlurryHits && ReadyForFinisher(anim))
         {
             _finisherAnimPlayed = true;
             FaceNearestEnemy(ctx);   // 시작 때 마우스 방향 그대로면 막타가 엉뚱한 쪽으로 나갔다(10-06 사용자)
 
             // 마무리는 <b>연타와 다른 모션</b>이어야 한 방임이 읽힌다.
             // 예전엔 시퀀스의 마지막 참격을 한 번 더 걸어서, 앞선 연타와 구분이 안 됐다.
-            anim.CrossFade(FinisherState, AnimBlend, 0, 0f);
+            anim.CrossFade(FinisherState, AnimBlend, 0, FinisherStartNormalized);
             _lastStepAt = _elapsed;
             return;
         }
@@ -243,6 +259,18 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         ctrl.RequestFacing(Quaternion.LookRotation(dir.normalized, Vector3.up));
     }
 
+    /// <summary>연타 중 마우스 쪽으로 <see cref="FlurryTurnDegPerSec"/>까지 돈다 — 판정 콘이 몸 앞이라 함께 따라간다.</summary>
+    private void TurnTowardMouse(SkillExecutionContext ctx)
+    {
+        var ctrl = ctx.Controller;
+        if (ctrl == null || !ctrl.TryGetMouseLookDir(out var dir)) return;
+        float cur    = ctrl.transform.eulerAngles.y;
+        float target = Quaternion.LookRotation(dir, Vector3.up).eulerAngles.y;
+        if (Mathf.Abs(Mathf.DeltaAngle(cur, target)) < 1f) return;
+        float yaw = Mathf.MoveTowardsAngle(cur, target, FlurryTurnDegPerSec * ctx.DeltaTime);
+        ctrl.RequestFacing(Quaternion.Euler(0f, yaw, 0f));
+    }
+
     /// <summary>막타 순간의 시간 정지. 실시간으로 잰 뒤 풀며, 스킬이 먼저 끊기면 OnExit이 푼다.</summary>
     private void BeginTimeStop(SkillExecutionContext ctx)
     {
@@ -264,12 +292,27 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         }
     }
 
-    /// <summary>시퀀스 index번째 참격을 처음부터 재생. 시퀀스 끝에 닿으면 앞으로 돌아 계속 몰아친다.</summary>
+    /// <summary>
+    /// 시퀀스 index번째 참격을 그 칸의 시작 지점부터 재생. 끝에 닿으면 앞으로 돌아 계속 몰아친다 —
+    /// 세 칸 이상이면 첫 칸은 대기 자세에서 들어가는 칸이라 순환은 둘째 칸부터(10-09 동작 연결: 들어가기 Attack07 → 02_4 ↔ 02_5).
+    /// </summary>
     private void PlayStep(SkillExecutionContext ctx, int index)
     {
-        _stepIndex  = _stepCount > 0 ? ((index % _stepCount) + _stepCount) % _stepCount : 0;
+        int loopStart = _stepCount >= 3 ? 1 : 0;
+        int loopLen   = Mathf.Max(1, _stepCount - loopStart);
+        _stepIndex  = index < _stepCount ? Mathf.Max(0, index) : loopStart + (index - loopStart) % loopLen;
         _lastStepAt = _elapsed;
-        ctx.Animator?.CrossFade(StateName(_stepIndex), AnimBlend, 0, 0f);
+        float start = _relicClass != null ? _relicClass.QSkillStartAt(_stepIndex) : 0f;
+        ctx.Animator?.CrossFade(StateName(_stepIndex), AnimBlend, 0, start);
+    }
+
+    /// <summary>연타가 끝나고 마지막 칸이 마무리와 이어지는 자세에 닿았는가(못 닿으면 시각으로).</summary>
+    private bool ReadyForFinisher(Animator anim)
+    {
+        if (_elapsed >= FinisherAnimLatest) return true;
+        if (_elapsed < FinisherAnimAt || anim.IsInTransition(0)) return false;
+        var st = anim.GetCurrentAnimatorStateInfo(0);
+        return _stepIndex == _stepCount - 1 && st.IsName(StateName(_stepIndex)) && st.normalizedTime >= FinisherEntryNormalized;
     }
 
     /// <summary>장착 무기를 숨기고 전용 검을 오른손 소켓에 붙인다. 에셋이 없으면 숨기기까지만 한다.</summary>
@@ -281,8 +324,9 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         var equipped = ctrl.WeaponManager?.CurrentWeaponInstance;
         if (equipped != null && equipped.activeSelf)
         {
-            equipped.SetActive(false);
             _hiddenWeapon = equipped;
+            // 다 사라진 뒤 끈다. 그새 Q가 끝나 복귀하면 등장 디졸브가 이 퇴장을 되돌린다
+            DissolveEffect.PlayDisappear(equipped, WeaponAwaySeconds, () => { if (equipped != null && _hiddenWeapon == equipped) equipped.SetActive(false); });
         }
 
         // 검 참격 모션은 오른손 기준이다(활은 왼손이라 무기 소켓이 왼손일 수 있다) — 오른손 뼈 → 오른손 무기 소켓 순.
@@ -333,6 +377,8 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         go.transform.localRotation = localRotation;
         _qSword = go;
         AttachBladeFx(go);
+        var glow = _relicClass != null ? _relicClass.QSwordGlowColor : Color.clear;
+        DissolveEffect.PlayAppear(go, QSwordInSeconds, edgeColor: glow.maxColorComponent > 0f ? glow : (Color?)null);   // 테두리 = Q 검 색
     }
 
     /// <summary>
@@ -411,14 +457,18 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
         }
         if (_qSword != null)
         {
-            Managers.AddressableManager?.ReleaseInstance(_qSword);
+            var sword = _qSword;
             _qSword = null;
+            // 디졸브로 사라진 뒤 해제한다. 디졸브를 못 하면(재질 · 렌더러 없음) 콜백이 바로 와 그대로 해제된다
+            DissolveEffect.PlayDisappear(sword, QSwordOutSeconds, () => { if (sword != null) Managers.AddressableManager?.ReleaseInstance(sword); });
         }
 
         if (_hiddenWeapon != null)
         {
-            _hiddenWeapon.SetActive(true);
+            var weapon = _hiddenWeapon;
             _hiddenWeapon = null;
+            weapon.SetActive(true);
+            DissolveEffect.PlayAppear(weapon, WeaponBackSeconds);   // 숨김 디졸브가 아직 돌고 있으면 되돌린다
         }
     }
 

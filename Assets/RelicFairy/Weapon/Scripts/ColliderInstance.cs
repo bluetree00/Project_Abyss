@@ -107,6 +107,13 @@ public class ColliderInstance : MonoBehaviour
                 box.transform.TransformPoint(box.center), half, s_overlapBuf,
                 box.transform.rotation, HitMask, QueryTriggerInteraction.Collide);
         }
+        else if (col is SphereCollider sphere)
+        {
+            // 구는 구로 — 예전엔 AABB(정육면체)로 재 대각선 3.1 m(대검 r 2.2)까지 맞아 슬래시보다 넓게 맞았다(10-13 이펙트 = 판정)
+            Vector3 s = sphere.transform.lossyScale;
+            float r = sphere.radius * Mathf.Max(Mathf.Abs(s.x), Mathf.Abs(s.y), Mathf.Abs(s.z));
+            n = Physics.OverlapSphereNonAlloc(sphere.transform.TransformPoint(sphere.center), r, s_overlapBuf, HitMask, QueryTriggerInteraction.Collide);
+        }
         else
         {
             Bounds b = col.bounds;

@@ -544,7 +544,8 @@ ModelImporter:
       will be discarded.\n\t'ball_l' has translation animation that will be discarded.\n\t'calf_r'
       has translation animation that will be discarded.\n\t'foot_r' has translation
       animation that will be discarded.\n\t'ball_r' has translation animation that
-      will be discarded.\n"
+      will be discarded.\nEvent AE_AttackEnd has a time (3.737780) outside the clip's
+      valid range (0.000000..1.933334). It will never be fired"
     animationRetargetingWarnings: 
     animationDoRetargetingWarnings: 0
     importAnimatedCustomProperties: 0
@@ -582,21 +583,21 @@ ModelImporter:
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
       curves: []
       events:
-      - time: 0.29
+      - time: 0.17
         functionName: AE_BeginTrail
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
-      - time: 0.29
-        functionName: SpawnSlashEffect2
+      - time: 0.23
+        functionName: SpawnSlashEffect1
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
-      - time: 1.4500008
+      - time: 0.48000002
         functionName: AE_EndTrail
         data: 
         objectReferenceParameter: {instanceID: 0}

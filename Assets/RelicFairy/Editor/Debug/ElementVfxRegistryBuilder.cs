@@ -22,7 +22,7 @@ public static class ElementVfxRegistryBuilder
     {
         public RuneElement element;
         public string aura;  public float auraRadius;
-        public string body;
+        public string body;  public float bodyScale; public Color bodyTint;   // 몸 배율(0 = 1) · 색 곱(알파 0 = 원래 색) — 10-11 톤 2차
         public string burst;
         public string impact; public float impactHeight;
         public string area;   public float areaRadius; public float areaLife;
@@ -32,24 +32,29 @@ public static class ElementVfxRegistryBuilder
     {
         new Row { element = RuneElement.Fire,
                   aura = Pack + "Auras/Aura_Fire_LWRP.prefab", auraRadius = CircleRadius,
-                  body = Pig + "Particle Flame.prefab",
+                  // 10-11 톤 2차: Magic Pig 불꽃은 시작 색이 흰 기본 — 불빛을 곱한다
+                  body = Pig + "Particle Flame.prefab", bodyTint = new Color(1f, 0.6f, 0.3f, 1f),
                   burst = Pack + "Buffs/Buff_Fire_LWRP.prefab",
                   impact = Pack + "Projectiles/Explosion/Explosion _Fire_2_LWRP.prefab", impactHeight = 1f,
-                  area = Pack + "Spells/Spell_Fire_5_LWRP.prefab", areaRadius = 2.2f, areaLife = 1.6f },
+                  area = Pack + "Spells/Spell_Fire_5_LWRP.prefab", areaRadius = 4.1f /* 10-13 실측: 공칭 2.2 → 반경 4에 9.4 m · 5.17 → 2.9 m */, areaLife = 1.6f },
         new Row { element = RuneElement.Ice,
                   aura = Pack + "Auras/Aura_Ice_LWRP.prefab", auraRadius = CircleRadius,
-                  body = Pack + "Shields/Shield_Ice_LWRP.prefab",
+                  // 10-11 톤 2차: 얼음 방패 거품은 빙결 · 분쇄에만(서리는 몸 이펙트 없음) — 그마저 옅게(알파 0.5)
+                  body = Pack + "Shields/Shield_Ice_LWRP.prefab", bodyTint = new Color(1f, 1f, 1f, 0.5f),
                   burst = Pack + "Buffs/Buff_Ice_LWRP.prefab",
                   impact = Pack + "Projectiles/Explosion/Explosion_Ice_2_LWRP.prefab", impactHeight = 1f,
-                  area = Pack + "Spells/Spell_Ice_5_LWRP.prefab", areaRadius = 2.2f, areaLife = 1.5f },
+                  area = Pack + "Spells/Spell_Ice_5_LWRP.prefab", areaRadius = 6.8f /* 10-13 실측: 공칭 2.2 → 반경 3에 10.8 m · 5.5 → 4.0 m */, areaLife = 1.5f },
         new Row { element = RuneElement.Electric,
                   aura = Pack + "Auras/Aura_Storm_LWRP.prefab", auraRadius = CircleRadius,
-                  body = Pig + "Particle Electric Ball.prefab",
+                  // 10-11 톤 2차: 구슬 원래 크기 2가 몸을 덮었다 — 반
+                  body = Pig + "Particle Electric Ball.prefab", bodyScale = 0.5f,
                   burst = Pack + "Buffs/Buff_Storm_LWRP.prefab",
                   impact = Pig + "Particle Electric Explosion.prefab", impactHeight = 1f,
-                  area = Pack + "Spells/Spell_Storm_4_LWRP.prefab", areaRadius = 2f, areaLife = 1.1f },
+                  area = Pack + "Spells/Spell_Storm_4_LWRP.prefab", areaRadius = 3.0f /* 10-13 실측: 반경 3 → 5.3 m */, areaLife = 1.1f },
         new Row { element = RuneElement.Grass,
-                  aura = Pack + "Spells/Spell_Nature_10_LWRP.prefab", auraRadius = 2.4f,
+                  // 10-11 톤 2차: 독안개 장판 — 옛 Spell_Nature_10은 한 번 터지는 주문(길이 7초)이라 반복하면 7초마다 다시 터졌다 →
+                  // 다른 속성 장판과 같은 바닥 루프(Aura_Nature)
+                  aura = Pack + "Auras/Aura_Nature_LWRP.prefab", auraRadius = CircleRadius,
                   // 중독 몸 = 몸을 도는 푸른 잎 소용돌이(은은함). 방패 거품(Shield_Nature)은 장판 안 몬스터마다 밝은 공이 떠 「막았다」로 읽혔다(10-01 실측).
                   body = "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/Auras pack 3/Prefabs/Forest aura.prefab",
                   burst = Pack + "Buffs/Buff_Nature_LWRP.prefab",
@@ -60,14 +65,14 @@ public static class ElementVfxRegistryBuilder
                   body = Pack + "Buffs/Buff_Light_LWRP.prefab",
                   burst = Pack + "Buffs/Buff_Light_LWRP.prefab",
                   impact = Pack + "Projectiles/Explosion/Explosion_Light_2_LWRP.prefab", impactHeight = 1f,
-                  area = Pack + "Spells/Spell_Light_2_LWRP.prefab", areaRadius = 2.3f, areaLife = 1.5f },
+                  area = Pack + "Spells/Spell_Light_2_LWRP.prefab", areaRadius = 4.53f /* 10-13 실측: 반경 3.5 → 6.9 m */, areaLife = 1.5f },
         // 이 묶음의 「Dark」는 초록-검정이라 독으로 읽힌다 — 어둠은 보라(Arcane)를 쓴다.
         new Row { element = RuneElement.Dark,
                   aura = Pack + "Auras/Aura_Arcane_LWRP.prefab", auraRadius = CircleRadius,
                   body = "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/RPG VFX Bundle/Prefabs/Magic buffs and hits/Debuff 1.prefab",
                   burst = Pack + "Buffs/Buff_Arcane_LWRP.prefab",
                   impact = Pack + "Projectiles/Explosion/Explosion_Arcane_2_LWRP.prefab", impactHeight = 1f,
-                  area = Pack + "Projectiles/Explosion/Explosion_Arcane_2_LWRP.prefab", areaRadius = 1.3f, areaLife = 2f },
+                  area = Pack + "Projectiles/Explosion/Explosion_Arcane_2_LWRP.prefab", areaRadius = 3.6f /* 10-13 실측: 공칭 1.3 → 반경 3에 9.4 m · 2.97 → 3.9 m */, areaLife = 2f },
     };
 
     [MenuItem("RelicFairy/Debug/속성 이펙트 목록 채우기")]
@@ -89,6 +94,8 @@ public static class ElementVfxRegistryBuilder
             missing += Set(e, "statusAura", r.aura, sb, r.element);
             e.FindPropertyRelative("auraRadius").floatValue = r.auraRadius;
             missing += Set(e, "statusBody", r.body, sb, r.element);
+            e.FindPropertyRelative("bodyScale").floatValue = r.bodyScale;
+            e.FindPropertyRelative("bodyTint").colorValue  = r.bodyTint;
             missing += Set(e, "burst", r.burst, sb, r.element);
             missing += Set(e, "impact", r.impact, sb, r.element);
             e.FindPropertyRelative("impactHeight").floatValue = r.impactHeight;

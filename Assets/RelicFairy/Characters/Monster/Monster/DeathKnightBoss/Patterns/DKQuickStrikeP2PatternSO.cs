@@ -101,6 +101,7 @@ public class DKQuickStrikeP2State : FullLockState<DKQuickStrikeP2PatternSO>
     public override void Enter(MonsterContext ctx)
     {
         _strikeIndex = 0;
+        (ctx.Monster as DeathKnightBossMonster)?.AnnounceBigSkill(DeathKnightBossMonster.BigSkill.QuickP2);   // 기술 이름 + 처음이면 멀린 요령(10-11)
         StopAgent(ctx);
         BeginNextStrike(ctx);
     }
@@ -131,7 +132,9 @@ public class DKQuickStrikeP2State : FullLockState<DKQuickStrikeP2PatternSO>
     private void UpdateWindup(MonsterContext ctx)
     {
         // ① Opening Pose → 경고 타일 생성
-        if (!_tilesSpawned && _timer >= Data.warningDuration)
+        // 칸 → 판정은 실제 시간으로 0.45초 이상 — 2페이지 격앙(애니 배속 ≈1.7)이 0.75초(배속 시간)를 0.44초로 줄였다(10-13 검증 2회차)
+        float spawnAt = Mathf.Min(Data.warningDuration, Data.hitTime + Data.hitDuration - (PatternGuideHelper.MinLead + FrameMargin) * AnimSpeed(ctx));
+        if (!_tilesSpawned && _timer >= spawnAt)
         {
             _tilesSpawned = true;
             DKSwordColor sc = GetSwordColor(ctx);
@@ -158,6 +161,8 @@ public class DKQuickStrikeP2State : FullLockState<DKQuickStrikeP2PatternSO>
             DKSwordColor sc = GetSwordColor(ctx);
             DKGridPatternHelper.SpawnCrossVfx(Data.impactVfxPrefab, _playerCell, sc);
         }
+
+        DKGridPatternHelper.ArmBefore(_timer, Data.hitTime + Data.hitDuration, _tiles, GetSwordColor(ctx));   // 판정 0.25초 전 위험 칸을 붉게(10-11)
 
         // ③ 피격 판정
         if (!_hitDone && _timer >= Data.hitTime + Data.hitDuration)
@@ -247,6 +252,8 @@ public class DKQuickStrikeP2State : FullLockState<DKQuickStrikeP2PatternSO>
 
     private static DKSwordColor Opposite(DKSwordColor c)
         => c == DKSwordColor.White ? DKSwordColor.Black : DKSwordColor.White;
+
+    private const float FrameMargin = 0.05f;   // 칸 깔기 · 판정이 각각 한 프레임 늦을 수 있다(10-13 실측 0.43초)
 
     private static float AnimSpeed(MonsterContext ctx)
         => (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.AnimSpeedMult ?? 1f;

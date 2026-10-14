@@ -256,7 +256,7 @@ public sealed class WorldSwordAwakening : MonoBehaviour
 
         _worldText = go.AddComponent<TextMeshPro>();
         if (worldTextFont != null) _worldText.font = worldTextFont;
-        _worldText.text = "미완의 검";
+        _worldText.text = "무형검";
         _worldText.fontSize = textSize;
         _worldText.alignment = TextAlignmentOptions.Center;
         _worldText.color = new Color(0.95f, 0.85f, 0.55f);

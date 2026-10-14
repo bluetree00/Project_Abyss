@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -30,18 +31,25 @@ public class LegendaryRuntime : MonoBehaviour
         var go = new GameObject("[LegendaryRuntime]");
         DontDestroyOnLoad(go);
         Instance = go.AddComponent<LegendaryRuntime>();
-        Instance.TryLoadCatalogFallback();
+        Instance.LoadCatalogAsync().Forget();
     }
 
-    // 씬 컴포넌트로 _catalog가 이미 연결된 경우 스킵.
-    // 에디터 플레이 모드에서 EnsureExists()로 생성된 경우 AssetDatabase로 폴백.
-    private void TryLoadCatalogFallback()
+    private const string CatalogKey = "LegendaryVfxCatalog";
+
+    // 씬 컴포넌트로 _catalog가 이미 연결된 경우 스킵. 코드로 만든 경우(EnsureExists) Addressables로 불러온다 —
+    // 예전엔 에디터 전용 AssetDatabase 분기뿐이라 빌드에서 카탈로그가 늘 비어, 레전드리 룬 이펙트가 하나도 안 보였다(10-09 출시 점검).
+    // 에디터도 같은 길을 타서 빌드와 다르게 보이지 않게 한다.
+    private async UniTaskVoid LoadCatalogAsync()
     {
         if (_catalog != null) return;
-#if UNITY_EDITOR
-        _catalog = UnityEditor.AssetDatabase.LoadAssetAtPath<LegendaryVfxCatalog>(
-            "Assets/RelicFairy/Systems/Item/Effects/Legendary/LegendaryVfxCatalog.asset");
-#endif
+        try
+        {
+            var cat = await Managers.AddressableManager.TryLoadAssetAsync<LegendaryVfxCatalog>(CatalogKey);
+            if (this == null || _catalog != null) return;
+            _catalog = cat;
+            if (cat == null) Debug.LogError($"[LegendaryRuntime] 이펙트 카탈로그 「{CatalogKey}」를 못 불렀다 — 레전드리 룬 이펙트가 안 보인다");
+        }
+        catch (System.OperationCanceledException) { }
     }
 
     private void Awake()
@@ -91,7 +99,7 @@ public class LegendaryRuntime : MonoBehaviour
 
     /// <summary>한 번 재생 후 자동 파괴되는 VFX 스폰. 플레이어 충돌 방지를 위해 Collider를 비활성화한다.</summary>
     /// <param name="yScale">0 이상이면 Y축 스케일만 별도 지정 (scale은 XZ에만 적용).</param>
-    public static void SpawnVfx(GameObject prefab, Vector3 pos, Quaternion rot, float lifetime = 3f, float scale = 1f, float alpha = 1f, float yScale = -1f)
+    public static void SpawnVfx(GameObject prefab, Vector3 pos, Quaternion rot, float lifetime = 3f, float scale = 1f, float alpha = 1f, float yScale = -1f, Transform follow = null)
     {
         if (prefab == null) return;
         var vfx = Instantiate(prefab, pos, rot);
@@ -99,6 +107,7 @@ public class LegendaryRuntime : MonoBehaviour
         var ls = Vector3.one * scale;
         if (yScale >= 0f) ls.y = yScale;
         vfx.transform.localScale = ls;
+        if (follow != null) vfx.transform.SetParent(follow, true);   // 판정이 따라가는 광역 — 그림도 붙인다(10-13 이펙트 = 판정)
         if (!Mathf.Approximately(alpha, 1f))
         {
             foreach (var ps in vfx.GetComponentsInChildren<ParticleSystem>())

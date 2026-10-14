@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -19,7 +19,7 @@ public readonly struct MonsterTraitBadge
 /// 나머지(질주 · 폭발 · 흔적 · 잠복 · 분열)는 여기서 몬스터를 바깥에서 다룬다.
 /// </summary>
 [DisallowMultipleComponent]
-public sealed class MonsterTraits : MonoBehaviour
+public sealed partial class MonsterTraits : MonoBehaviour
 {
     // ── Constants ──────────────────────────────────────────────
     private const float SwiftMoveMul      = 1.3f;   // 질주 — 이동 속도(공격 속도 배율은 몬스터 쪽에 쓰는 곳이 없어 이동만)
@@ -30,6 +30,7 @@ public sealed class MonsterTraits : MonoBehaviour
     private const float CommanderAtkMul   = 1.2f;
     private const float CommanderTick     = 0.5f;
     private const float LurkerRevealMin   = 5f;     // 이 거리(또는 공격 사거리 + 1.5 m) 안에 들면 드러난다
+    private const float LurkerRevealSeconds = 0.5f; // 드러날 때 디졸브 — 렌더러만 켜 툭 나타났다(10-12 디졸브 ②)
     private const float VolatileDelay     = 1.2f;
     private const float VolatileRadius    = 3f;
     private const float VolatileDmgMul    = 1.5f;
@@ -62,7 +63,9 @@ public sealed class MonsterTraits : MonoBehaviour
     private Func<Vector3, UniTask> _spawnChild;
     private RuneElement  _resist;
     private float        _wardLeft;
-    private float        _swiftApplied = -1f;
+    private float        _speedApplied = -1f;   // 마지막으로 곱해 넣은 이동 속도 · 그때의 바탕 · 배율(질주 · 강철 · 복수)
+    private float        _speedBase;
+    private float        _speedMulApplied = 1f;
     private float        _nextCommanderTick;
     private Vector3      _lastTrailPos;
     private float        _nextTrailAt;
@@ -83,10 +86,11 @@ public sealed class MonsterTraits : MonoBehaviour
     {
         if (_reverted || _monster == null || _monster.IsDead) return;
 
-        if (Has(MonsterTraitKind.Swift)) TickSwift();
+        TickSpeed();
         if (Has(MonsterTraitKind.Lurker) && _hidden) TickLurker();
         if (Has(MonsterTraitKind.Commander) && Time.time >= _nextCommanderTick) TickCommander();
         if (Has(MonsterTraitKind.Trail)) TickTrail();
+        TickElite();
     }
 
     private void OnDisable() => Revert();
@@ -95,11 +99,15 @@ public sealed class MonsterTraits : MonoBehaviour
 
     /// <summary>
     /// 스포너가 굴린 특성을 붙인다. <paramref name="spawnChild"/> = 분열 분신 하나를 그 자리에 세우는 스포너 쪽 길(방 생존 수에 들어가게).
+    /// <paramref name="summon"/> = 「소환하는」 정예가 졸개 하나를 세우는 스포너 쪽 길(같은 챕터 잡몹 · 방 생존 수에 들어감, 10-11 정예 접두어).
     /// </summary>
-    public static MonsterTraits Attach(MonsterBase monster, IReadOnlyList<MonsterTraitKind> kinds, Func<Vector3, UniTask> spawnChild)
+    public static MonsterTraits Attach(MonsterBase monster, IReadOnlyList<MonsterTraitKind> kinds, Func<Vector3, UniTask> spawnChild,
+                                       Func<Vector3, UniTask<MonsterBase>> summon = null)
     {
         if (monster == null || kinds == null || kinds.Count == 0) return null;
+        RemoveStale(monster);
         var t = monster.gameObject.AddComponent<MonsterTraits>();
+        t._summon = summon;
         t.Init(monster, kinds, spawnChild);
         return t;
     }
@@ -108,6 +116,7 @@ public sealed class MonsterTraits : MonoBehaviour
     public static void MakeSplitChild(MonsterBase child)
     {
         if (child == null) return;
+        RemoveStale(child);
         var t = child.gameObject.AddComponent<MonsterTraits>();
         t._monster        = child;
         t._isChild        = true;
@@ -117,10 +126,14 @@ public sealed class MonsterTraits : MonoBehaviour
         child.BindTraits(t);
     }
 
-    /// <summary>받는 피해 — 수호막(남은 몫 동안 −50%) · 속성 저항(그 속성 −50%). 몬스터 본체의 피해 계산 끝에서 부른다.</summary>
-    public float ModifyIncoming(float actual, RuneElement? element)
+    /// <summary>
+    /// 받는 피해 — 정예 접두어(강철 정면 −60% · 가시 쌓임) · 수호막(남은 몫 동안 −50%) · 속성 저항(그 속성 −50%). 몬스터 본체의 피해 계산 끝에서 부른다.
+    /// <paramref name="direct"/> = 플레이어 직접 타격(무기 · 투사체) — DoT · 시너지는 접두어에 안 걸린다(10-11 정예 접두어).
+    /// </summary>
+    public float ModifyIncoming(float actual, RuneElement? element, GameObject instigator = null, bool direct = false)
     {
         if (_reverted) return actual;
+        actual = ModifyIncomingElite(actual, instigator, direct);
         if (element.HasValue && Has(MonsterTraitKind.Resist) && element.Value == _resist)
             actual *= ResistCut;
         if (_wardLeft > 0f && Has(MonsterTraitKind.Ward))
@@ -139,6 +152,19 @@ public sealed class MonsterTraits : MonoBehaviour
 
     // ── Private Methods ────────────────────────────────────────
 
+    /// <summary>
+    /// 풀에서 되살린 몸에 남은 옛 특성을 바로 뗀다 — Revert의 Destroy(this)는 프레임 끝이라, 같은 프레임에 다시 나온 몸엔
+    /// 아직 붙어 있어 AddComponent가 null(DisallowMultipleComponent)을 돌려줬고 웨이브 스폰이 통째로 멈춰 방이 안 끝났다
+    /// (10-09 전주기 시뮬 · 해방기 Ch3 BishopKnight).
+    /// </summary>
+    private static void RemoveStale(MonsterBase monster)
+    {
+        var stale = monster.GetComponent<MonsterTraits>();
+        if (stale == null) return;
+        stale.Revert();
+        DestroyImmediate(stale);
+    }
+
     private void Init(MonsterBase monster, IReadOnlyList<MonsterTraitKind> kinds, Func<Vector3, UniTask> spawnChild)
     {
         _monster    = monster;
@@ -155,6 +181,7 @@ public sealed class MonsterTraits : MonoBehaviour
         if (Has(MonsterTraitKind.Splitter))  monster.OnHPChanged += HandleHpSplitter;
         if (Has(MonsterTraitKind.Lurker))    Conceal();
         _lastTrailPos = monster.transform.position;
+        InitElite();
 
         RebuildBadges();
         PushBadges();
@@ -167,6 +194,7 @@ public sealed class MonsterTraits : MonoBehaviour
     {
         if (_reverted) return;
         _reverted = true;
+        RevertElite();
 
         if (_monster != null)
         {
@@ -194,14 +222,17 @@ public sealed class MonsterTraits : MonoBehaviour
             if (k == MonsterTraitKind.Ward && _wardLeft <= 0f) continue;
             var d = MonsterTraitTable.Of(k);
             string icon = k == MonsterTraitKind.Resist ? ElementIcon(_resist) : d.iconKey;
-            _badges.Add(new MonsterTraitBadge(icon, MonsterTraitTable.CategoryColor(d.category)));
+            _badges.Add(new MonsterTraitBadge(icon, EliteRing(k, MonsterTraitTable.CategoryColor(d.category))));
         }
+        AppendEliteBadges();
     }
 
     private void PushBadges()
     {
         var bar = _monster != null ? _monster.WorldHPBar : null;
-        if (bar != null) bar.SetTraitBadges(_badges);
+        if (bar == null) return;
+        bar.SetTraitBadges(_badges);
+        if (_elite) bar.SetMonsterInfo(_monster.DisplayName);   // 접두어 붙은 이름(바가 먼저 생겼으면 여기서 고친다)
     }
 
     private static string ElementIcon(RuneElement e) => e switch
@@ -214,14 +245,19 @@ public sealed class MonsterTraits : MonoBehaviour
         _                    => "dark",
     };
 
-    // 질주 — FSM · 둔화가 속도를 새로 정할 때마다(값이 바뀌었을 때만) 한 번 곱한다. 매 프레임 곱하면 쌓인다.
-    private void TickSwift()
+    // 이동 속도 배율(질주 · 강철 · 복수) — FSM · 둔화가 속도를 새로 정하면 그 값을 바탕으로 삼아 한 번 곱한다. 매 프레임 곱하면 쌓인다.
+    // 배율이 바뀌면(복수 중첩) 같은 바탕에서 다시 곱한다(10-11 정예 접두어).
+    private void TickSpeed()
     {
+        float mul = (Has(MonsterTraitKind.Swift) ? SwiftMoveMul : 1f) * EliteSpeedMul();
         if (_agent == null || !_agent.isActiveAndEnabled) return;
         float s = _agent.speed;
-        if (Mathf.Approximately(s, _swiftApplied)) return;
-        _agent.speed  = s * SwiftMoveMul;
-        _swiftApplied = _agent.speed;
+        if (!Mathf.Approximately(s, _speedApplied)) _speedBase = s;          // 바깥에서 새로 정한 값 = 새 바탕
+        else if (Mathf.Approximately(mul, _speedMulApplied)) return;          // 바탕도 배율도 그대로
+        if (Mathf.Approximately(mul, 1f) && _speedApplied < 0f) return;       // 처음부터 배율 없음
+        _agent.speed     = _speedBase * mul;
+        _speedApplied    = _agent.speed;
+        _speedMulApplied = mul;
     }
 
     // 지휘 — 반경 안 아군 공격 ×1.2. 반경을 벗어나면(다른 지휘관 반경도 아니면) 원래대로.
@@ -272,7 +308,9 @@ public sealed class MonsterTraits : MonoBehaviour
         if (player == null) return;
         float reveal = Mathf.Max(LurkerRevealMin, _monster.AttackRange + 1.5f);
         bool near = (player.position - _monster.transform.position).sqrMagnitude <= reveal * reveal;
-        if (near || _monster.CurrentHp < _monster.EffectiveMaxHp) Reveal();
+        if (!near && _monster.CurrentHp >= _monster.EffectiveMaxHp) return;
+        Reveal();
+        DissolveEffect.PlayAppear(_monster.gameObject, LurkerRevealSeconds, activationToken: _monster.ActivationToken);   // 특성 해제(죽음 · 풀) 때의 Reveal은 디졸브 없이
     }
 
     private void Reveal()
@@ -293,10 +331,10 @@ public sealed class MonsterTraits : MonoBehaviour
         _nextTrailAt  = Time.time + TrailInterval;
         _lastTrailPos = p;
         int dmg = Mathf.Max(1, Mathf.RoundToInt(_monster.EffectiveAttackPower * _monster.AttackMultiplierNow * TrailDmgMul));
-        TrailSpotAsync(p, dmg).Forget();
+        TrailSpotAsync(p, dmg, _monster.gameObject).Forget();
     }
 
-    private static async UniTaskVoid TrailSpotAsync(Vector3 at, int dmg)
+    private static async UniTaskVoid TrailSpotAsync(Vector3 at, int dmg, GameObject src)
     {
         var disc = SpawnDisc(at, TrailRadius, TrailColor);
         if (disc == null) return;
@@ -307,7 +345,7 @@ public sealed class MonsterTraits : MonoBehaviour
             while (Time.time < end)
             {
                 PatternGuideHelper.SetProgress(disc, 1f - (end - Time.time) / TrailLife);
-                HurtPlayerWithin(at, TrailRadius, dmg, HitWeight.Light);
+                HurtPlayerWithin(at, TrailRadius, dmg, HitWeight.Light, src);
                 await UniTask.Delay(TimeSpan.FromSeconds(TrailTick), cancellationToken: ct);
             }
         }
@@ -320,10 +358,10 @@ public sealed class MonsterTraits : MonoBehaviour
     {
         if (m == null) return;
         int dmg = Mathf.Max(1, Mathf.RoundToInt(m.EffectiveAttackPower * m.AttackMultiplierNow * VolatileDmgMul));
-        VolatileBlastAsync(m.transform.position, dmg).Forget();
+        VolatileBlastAsync(m.transform.position, dmg, m.gameObject).Forget();
     }
 
-    private static async UniTaskVoid VolatileBlastAsync(Vector3 at, int dmg)
+    private static async UniTaskVoid VolatileBlastAsync(Vector3 at, int dmg, GameObject src)
     {
         var disc = SpawnDisc(at, VolatileRadius, VolatileColor);
         if (disc == null) return;
@@ -338,8 +376,8 @@ public sealed class MonsterTraits : MonoBehaviour
             }
         }
         catch (OperationCanceledException) { return; }
-        RunFx.Play(RunFxSlot.Burst, at, 0.6f, VolatileColor);
-        HurtPlayerWithin(at, VolatileRadius, dmg, HitWeight.Medium);
+        RunFx.Play(RunFxSlot.Burst, at, 3.2f, VolatileColor);   // 판정 · 예고 3 m에 맞춤(10-13: ×0.6 → 0.5 m · 84 실측 배율 1당 정점 0.77 · 최대 1.14 m → 둘 다 0.8 ~ 1.25배)
+        HurtPlayerWithin(at, VolatileRadius, dmg, HitWeight.Medium, src);
         PatternGuideHelper.SafeDestroy(ref disc);
     }
 
@@ -367,13 +405,16 @@ public sealed class MonsterTraits : MonoBehaviour
         return disc;
     }
 
-    private static void HurtPlayerWithin(Vector3 at, float radius, int dmg, HitWeight weight)
+    /// <param name="src">그 특성을 가진 몬스터 — 피격의 가해자(저스트 회피 · 피격 방향 · 결과창 · 피해 모사 출처). 죽은 뒤 터지는 유해도 그 몬스터.</param>
+    private static bool HurtPlayerWithin(Vector3 at, float radius, int dmg, HitWeight weight, GameObject src)
     {
         var pt = Managers.Player != null ? Managers.Player.PlayerTransform : null;
-        if (pt == null) return;
+        if (pt == null) return false;
         Vector3 d = pt.position - at; d.y = 0f;
-        if (d.sqrMagnitude > radius * radius) return;
-        if (pt.TryGetComponent<PlayerController>(out var pc)) pc.TakeDamage(dmg, null, false, weight);
+        if (d.sqrMagnitude > radius * radius) return false;
+        if (!pt.TryGetComponent<PlayerController>(out var pc)) return false;
+        pc.TakeDamage(dmg, src, false, weight);
+        return true;
     }
 
     // 첫 조우 안내 — 특성마다 한 번(프로필 기준). 정예 둘이 처음이면 한 줄에 같이(알림 칸이 하나라 따로 띄우면 덮인다).
@@ -386,6 +427,7 @@ public sealed class MonsterTraits : MonoBehaviour
             string key = SeenPrefsPrefix + k;
             if (PlayerPrefs.GetInt(key, 0) != 0) continue;
             PlayerPrefs.SetInt(key, 1);
+            PlayerPrefs.Save();   // 튕기면 첫 안내가 또 뜨지 않게
             var d = MonsterTraitTable.Of(k);
             msg = msg == null ? $"{d.name}: {d.desc}" : $"{msg}   ·   {d.name}: {d.desc}";
         }

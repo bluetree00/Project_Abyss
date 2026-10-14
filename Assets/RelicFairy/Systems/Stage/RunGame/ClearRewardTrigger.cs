@@ -25,8 +25,6 @@ public class ClearRewardTrigger : MonoBehaviour
     private const float WorldIconHeight  = 2.8f;
     private const float WorldCanvasScale = 0.005f;
 
-    /// <summary>차징 상승 SFX의 시작 피치. 종료 피치는 등급 스펙(TierSpec.SfxPitch)이 정한다.</summary>
-    private const float ChargeStartPitch = 0.85f;
     /// <summary>다중 라운드(챌린지 보상)에서 2라운드부터 차징 길이 배율.</summary>
     private const float MultiRoundChargeScale = 0.4f;
 
@@ -208,8 +206,7 @@ public class ClearRewardTrigger : MonoBehaviour
             if (tier == ItemRarity.Legendary)
                 HitFeelService.CameraShake(0.06f, 0.20f);
 
-            // 상승 SFX — 신규 클립 없이 기존 1클립을 피치 램프로 쓴다(§C-4 "피치 인자로 무료 티어링").
-            Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton, 0.5f, ChargeStartPitch).Forget();
+            // 충전 시작 소리는 뺐다 — 2초 안에 보상 소리 3개(충전 · 등급 빛 · 내려앉음)가 몰렸다. 끝(등급 빛) 하나만 낸다(10-12 D4).
 
             // 보상 오브젝트 떨림 — 내용 공개 전 상자가 떨리는 신호(각성 사전 신호).
             Vector3 basePos = transform.position;
@@ -228,7 +225,7 @@ public class ClearRewardTrigger : MonoBehaviour
             }
             transform.position = basePos;
 
-            Managers.Sound?.PlayUiAsync(SoundKey.Sfx.UiButton, 0.6f, spec.SfxPitch).Forget();
+            Managers.Sound?.PlayUiEvent(SoundEvent.RewardGrade, spec.SfxPitch);   // 등급 피치는 그대로
         }
         finally
         {

@@ -21,8 +21,6 @@ public static class CovenantFxService
 
     /// <summary>효과 VFX 세트 Addressable 키.</summary>
     public const string SetKey  = "CovenantVfxSet";
-    /// <summary>루비 발동 VFX 키(세트 안).</summary>
-    public const string RubyKey = "ruby";
 
     // 실버 — 존재감만. 연타 원인(연격 등)에 얹혀도 거슬리지 않을 만큼 약하게.
     private const float SilverShakeAmp = HitFeelService.DealtShakeBasic, SilverShakeDur = 0.06f;   // 09-25: 0.04 → 기본 공격 상한
@@ -32,10 +30,11 @@ public static class CovenantFxService
     private const float GoldShakeAmp   = HitFeelService.DealtShakeSkill, GoldShakeDur   = 0.12f;   // 09-25: 0.10 → 스킬 상한
     private const float GoldPulsePeak  = 0.35f, GoldPulseDur   = 0.12f;
 
-    // 루비 — 더 깊고 긴 정지(단 0.10s 상한) + 방향성 셰이크 + 큰 펄스 + VFX.
+    // 루비 — 더 깊고 긴 정지(단 0.10s 상한) + 방향성 셰이크. 루비 VFX(Buff 7)는 뺐다 — 정지 · 흔들림 · 펄스 · 낮은 소리가 이미 등급을 알린다(10-11 톤 2차 V-7).
+    // 화면 펄스는 HUD 절 소리(CovenantPanelView 0.22)가 낸다 —
+    // 여기서 0.70을 같은 프레임에 먼저 냈지만 뒤의 HUD 펄스가 덮어 보이지 않았다(10-11 이펙트 톤 점검 · VolumePulseService는 마지막 호출이 이긴다).
     private const float RubyStopScale  = 0.04f, RubyStopDur    = 0.10f;
     private const float RubyShakeAmp   = HitFeelService.DealtShakeFinisher, RubyShakeDur   = 0.18f;   // 09-25: 0.18(최대치) → 막타 상한
-    private const float RubyPulsePeak  = 0.70f, RubyPulseDur   = 0.20f;
 
     // ── Static ───────────────────────────────────────────
     private static readonly Dictionary<string, float> _lastPlay = new();
@@ -81,7 +80,6 @@ public static class CovenantFxService
             case CovenantTier.Ruby:
                 HitFeelService.HitStop(RubyStopScale, RubyStopDur);
                 HitFeelService.CameraShakeDirectional(dir, RubyShakeAmp, RubyShakeDur);
-                VolumePulseService.Pulse(RubyPulsePeak, RubyPulseDur);
                 break;
 
             case CovenantTier.Gold:
@@ -107,8 +105,8 @@ public static class CovenantFxService
     public static void Burst(string key, Vector3 pos, float radius = 0f)
     {
         if (_set == null) { Preload(); return; }
-        if (_set.TryGet(key, radius, out var prefab, out float scale, out float life))
-            ElementVfxPlayer.PlayPrefab(prefab, pos, scale, life);
+        if (_set.TryGet(key, radius, out var prefab, out float scale, out float life, out var tint, out var mute))
+            ElementVfxPlayer.PlayPrefab(prefab, pos, scale, life, tint, mute);
     }
 
     /// <summary>효과 VFX를 대상에 붙인다(대상+프리팹별 1개, 다시 붙이면 수명 갱신). duration≤0이면 세트의 기본 지속.</summary>
@@ -116,8 +114,8 @@ public static class CovenantFxService
     {
         if (target == null) return;
         if (_set == null) { Preload(); return; }
-        if (_set.TryGet(key, 0f, out var prefab, out float scale, out float life))
-            ElementVfxPlayer.AttachPrefab(prefab, target, duration > 0f ? duration : life, scale);
+        if (_set.TryGet(key, 0f, out var prefab, out float scale, out float life, out var tint, out var mute))
+            ElementVfxPlayer.AttachPrefab(prefab, target, duration > 0f ? duration : life, scale, tint, mute);
     }
 
     // ── Private Methods ──────────────────────────────────

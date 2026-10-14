@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: tut_acquire_relic
   m_EditorClassIdentifier: Assembly-CSharp::Quest
   category: {fileID: 11400000, guid: ef4f07a544106a447b90df75f3fc0c64, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: f683b423b684e9749a70e6b57d6c0bae, type: 3}
   codeName: tut_acquire_relic
   displayName: "\uC720\uBB3C\uC758 \uBD80\uB984"
   description: "\uCCAB \uC720\uBB3C \uD68D\uB4DD"

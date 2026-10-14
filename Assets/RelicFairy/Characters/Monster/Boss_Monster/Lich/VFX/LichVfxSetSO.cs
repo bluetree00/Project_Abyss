@@ -88,6 +88,11 @@ public enum LichVfxSlot
     ScreenMagicFlow = 71,  // 봉인 완성
     ScreenSpace     = 72,  // 최후의 대마법
     ScreenWind      = 73,  // 최후의 원 — 코어로 끄는 바람
+
+    // ── 보스 봉인(숲 · 화룡 · 기사 — 봉인 장면 · 해방기 사슬 끊기). 리치 패턴 칸과 따로(10-10 「봉인에 맞지 않게 어색」) ──
+    BossSealSigil    = 80,  // 봉인진(반복) — 배율 1 = 반경 10 m(SealArray와 같은 뜻)
+    BossSealBurst    = 81,  // 사슬이 감기거나 끊기는 순간의 섬광
+    BossSealComplete = 82,  // 봉인 완성
 }
 
 [Serializable]

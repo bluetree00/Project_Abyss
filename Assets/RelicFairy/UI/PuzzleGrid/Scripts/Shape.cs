@@ -123,6 +123,8 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
     public void OnBeginDrag(PointerEventData eventData)
     {
+        Managers.Sound?.PlayUiEvent(SoundEvent.RuneLift);   // 판 · 보관함에서 집기(10-12 G1)
+
         // 전역 배치 상태에서 제거 (슬롯으로 돌아올 수 있도록)
         BoardManager.Instance?.OnShapePickedUp(this);
 
@@ -180,6 +182,7 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
                 transform.SetParent(BoardManager.Instance.gridHost, true);
             BoardManager.Instance?.OnShapePlaced(this);
             SetBlocksRaycastTarget(true);
+            Managers.Sound?.PlayUiEvent(SoundEvent.RunePlace);
         }
         else
         {
@@ -187,6 +190,7 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             string why = GridManager.Instance.DescribeDropFailure(this);
             if (why != null) UI_GridPanel.NotifyDropRejected(why);
             BoardManager.Instance.ReSlotAndReturn(this);
+            Managers.Sound?.PlayUiEvent(SoundEvent.RuneReturn);   // 보관함으로 돌아간다는 정보(10-12 G3)
         }
 
         if (_layout != null) _layout.ignoreLayout = false;

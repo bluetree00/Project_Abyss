@@ -134,6 +134,7 @@ public class DKRoundTableTombState : FullLockState<DKRoundTableTombPatternSO>
     {
         _timer += Time.deltaTime;
         if (_zone == null) { ctx.Monster.ChangeState<AttackReadyState>(); return; }
+        DKPage2Zone.KeepLooping(ctx, ChannelAnim);   // 채널링 Idle2 루프 — 클립은 루프가 아니다
 
         if (!_summoned && _timer >= Data.summonDelay)
         {
@@ -155,6 +156,7 @@ public class DKRoundTableTombState : FullLockState<DKRoundTableTombPatternSO>
             DKPage2Zone.PlayAnim(ctx, SlashAnim);
         }
 
+        DKGridPatternHelper.ArmBefore(_timer, SlashTime, _tiles, _swordColor);   // 판정 0.25초 전 위험 칸을 붉게(10-11)
         if (!_slashed && _timer >= SlashTime)
         {
             _slashed = true;
@@ -196,8 +198,12 @@ public class DKRoundTableTombState : FullLockState<DKRoundTableTombPatternSO>
         if (_slashed || pillar == null) return;
         Vector3 p = pillar.transform.position;
         _safeSpots.Add(p);
-        _safeDiscs.Add(PatternGuideHelper.Disc(p, Data.safeRadius, DKPage2Zone.SafeWhite));
-        if (Data.safeVfxPrefab == null) return;
+        // 안전 자리 = 보호막 하나(검 소환과 같은 말 「방패 안이 안전」) — 바닥 원은 보호막이 없을 때만(10-11 이펙트 톤 2차)
+        if (Data.safeVfxPrefab == null)
+        {
+            _safeDiscs.Add(PatternGuideHelper.Disc(p, Data.safeRadius, DKPage2Zone.SafeWhite));
+            return;
+        }
         var fx = BossEffectPool.Spawn(Data.safeVfxPrefab, p, Quaternion.identity);
         if (fx == null) return;
         fx.transform.localScale = Vector3.one * (Data.safeRadius / ShieldVfxSphereUnit);
@@ -254,8 +260,7 @@ public class DKRoundTableTombState : FullLockState<DKRoundTableTombPatternSO>
         }
 
         BossImpactFeedback.TriggerHitStop(0.2f);
-        BossImpactFeedback.TriggerCameraShake(0.2f, 0.4f);
-        BossImpactFeedback.TriggerScreenFlash(new Color(0.85f, 0.85f, 0.9f, 0.5f), 0.1f);
+        BossImpactFeedback.TriggerCameraShake(0.2f, 0.4f);   // 화면 번쩍은 뺐다 — 히트스톱 · 흔들림으로 충분(10-13 이펙트 톤)
 
         // 베기 뒤 — 남은 기둥 · 예고를 걷고 무적을 푼다(회복 모션 동안 칠 수 있다)
         Cleanup();

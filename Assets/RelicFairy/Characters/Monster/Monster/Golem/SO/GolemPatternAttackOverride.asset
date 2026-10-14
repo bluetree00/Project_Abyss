@@ -19,22 +19,30 @@ MonoBehaviour:
     maxDistance: 1.35
     priority: 0
     cooldown: 0.35
-    damageDelay: 0.35
+    damageDelay: 0.47
     attackDuration: 0.95
     damageMultiplier: 1
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: 8a87deef4ca24f1192c20d1f0f6f49a9,
       type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
-    castVfxPrefab: {fileID: 1210069404974878, guid: 80827e23de3f2e440bffda304f3022a4, type: 3}
+    castVfxPrefab: {fileID: 1210069404974878, guid: 7b6f83f9d11ca78459e1c799c85fe12c,
+      type: 3}
     castVfxDuration: 0.8
-    castVfxForwardOffset: 0.4
+    castVfxDelay: 0
+    castVfxLeadTime: 0.15
+    castVfxXRotationOffset: 0
+    castVfxYRotationOffset: 0
+    castVfxZRotationOffset: 0
+    castVfxForwardOffset: 1
+    castVfxRightOffset: 0
     castVfxVerticalOffset: 0
-    castVfxScale: 1.2
+    castVfxScale: 0.28
     castVfxAttachToMonster: 1
+    castVfxAtPlayerPosition: 0
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
     proceduralBeamWidth: 0.16
@@ -47,25 +55,33 @@ MonoBehaviour:
   - name: Slam
     animationStateName: Attack
     minDistance: 0
-    maxDistance: 1.75
+    maxDistance: 1.5
     priority: 0
     cooldown: 1.9
-    damageDelay: 0.95
+    damageDelay: 0.48
     attackDuration: 1.85
     damageMultiplier: 1.2
     knockbackMultiplier: 1.25
     attackShapeOverride: {fileID: 11400000, guid: 8fcb4fbc689e4f5fb99e64bd7a2ce2f0,
       type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 1.8
     warningDuration: 0.6
     warningShape: 0
-    castVfxPrefab: {fileID: 1210069404974878, guid: 80827e23de3f2e440bffda304f3022a4, type: 3}
+    castVfxPrefab: {fileID: 1210069404974878, guid: 7b6f83f9d11ca78459e1c799c85fe12c,
+      type: 3}
     castVfxDuration: 0.8
+    castVfxDelay: 0
+    castVfxLeadTime: 0.15
+    castVfxXRotationOffset: 0
+    castVfxYRotationOffset: 0
+    castVfxZRotationOffset: 0
     castVfxForwardOffset: 0.4
+    castVfxRightOffset: 0
     castVfxVerticalOffset: 0
-    castVfxScale: 1.2
+    castVfxScale: 0.6
     castVfxAttachToMonster: 1
+    castVfxAtPlayerPosition: 0
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
     proceduralBeamWidth: 0.16

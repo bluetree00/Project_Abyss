@@ -19,6 +19,8 @@ public sealed class DialogueZoneTrigger : MonoBehaviour
 
     private bool _triggered;
 
+    private bool IsIntroLine => !string.IsNullOrEmpty(csvSequenceId) && csvSequenceId.StartsWith("Intro_");
+
     private void Reset()
     {
         if (TryGetComponent<Collider>(out var col))
@@ -28,6 +30,9 @@ public sealed class DialogueZoneTrigger : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         if (_triggered && triggerOnce) return;
+        // 인트로 대사(Intro_*)는 인트로 씬에서만 — 트리거가 공용 프리팹 Road_Boss_Ch3(본편 Ch3 보스 앞 통로)에 박혀 있어
+        // 본편 Ch3에서 서임식 대사가 나왔다(10-10 사용자 「챕터 3 대기방과 인트로가 겹친다」).
+        if (IsIntroLine && IntroBootstrapper.Instance == null) return;
         if (!other.TryGetComponent<PlayerController>(out var player))
             player = other.GetComponentInParent<PlayerController>();
         if (player == null) return;

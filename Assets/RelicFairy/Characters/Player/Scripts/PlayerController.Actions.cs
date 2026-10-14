@@ -135,6 +135,9 @@ public sealed partial class PlayerController
     }
 
     /// <summary>공격·스킬 상태 여부 판별 (Safe_OnAttackAnimationEnd 내부 사용).</summary>
+    private bool IsInSkillState() =>
+        _actSM != null && (_actSM.CurrentId == ActState.QSkill || _actSM.CurrentId == ActState.ESkill || _actSM.CurrentId == ActState.RSkill);
+
     private bool IsInAttackOrSkillState() =>
         _actSM.CurrentId == ActState.Attack      ||
         _actSM.CurrentId == ActState.AttackReady ||
@@ -175,6 +178,9 @@ public sealed partial class PlayerController
         // 외형 — 현재는 오라 VFX만(키 있을 때). 추후 모델/애니메이터 변형은 이 지점에서 확장.
         if (!string.IsNullOrEmpty(relicClass.AuraVfxKey))
             _relicAppearance.SpawnAuraAsync(relicClass.AuraVfxKey, relicClass.AuraSocket, transform).Forget();
+
+        // 의상 — 견습 기사 옷 위에 이 유물의 기억 등급만큼 갑옷을 덧입는다(10-08)
+        if (_costume != null) _costume.ApplyRelic(relicClass);
 
         Debug.Log($"[PlayerController] 유물 적용: {relicClass.Id} (char_id={relicCharId}, passives={relicClass.Passives?.Length ?? 0})");
     }
@@ -306,6 +312,9 @@ public sealed partial class PlayerController
             return;
 
         Combo.SetAttacking(false);
+
+        // 스킬은 자기 타이머(런타임)로 끝난다 — 끊긴 평타 클립의 끝 이벤트가 막 시작한 스킬을 끝내고 쿨다운만 소모했다(10-09 출시 점검)
+        if (IsInSkillState()) return;
 
         if (IsInAttackOrSkillState())
             _actSM.Change(ActState.None);

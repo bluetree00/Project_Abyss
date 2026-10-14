@@ -25,8 +25,8 @@ MonoBehaviour:
   _hoverStateName: URFlyStand
   _hideHeight: 20
   _riseSpeed: 20
-  _fireballCount: 50
-  _spawnInterval: 0.1
+  _fireballCount: 100
+  _spawnInterval: 0.05
   _warningDuration: 1.5
   _fallHeight: 5
   _fallSpeed: 18

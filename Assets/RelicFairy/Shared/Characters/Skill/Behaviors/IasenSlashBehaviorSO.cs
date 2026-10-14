@@ -47,6 +47,12 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
     [Tooltip("비어있으면 WeaponAnimationSetSO에서 QSkill 매핑 사용")]
     public string animationOverride;
 
+    // 10-08 C1 — 발도 클립(QSkill_Iasen 2.6초 · 닿는 순간 1.63초 · 상태 속도 1.5)은 닿은 뒤 약 0.65초가 남는다.
+    // 연참 7개(2단계)를 0.15초 간격으로 베면 모션이 끝난 뒤에도 벴다 → 첫 베기 뒤 나머지를 이 창 안에 몰아 넣는다.
+    private const float SlashWindow      = 0.62f;
+    private const float Tier3PathRadius  = 3f;     // 3단계 마지막 일섬 — 지나온 길 폭(감지 반경 2 m보다 넓게)
+    private const float Tier3PathDamageX = 3f;     // 연참 한 타의 몇 배
+
     public override ISkillRuntime CreateRuntime() => new Runtime(this);
 
     // ── Runtime ──────────────────────────────────────────────────
@@ -58,6 +64,7 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
         private float _timer;
         private int _slashIndex;
         private int _slashTotal;
+        private float _slashInterval;   // 둘째 베기부터의 간격(C1 — 모션 안에)
         private int _skillTier;
         private Vector3 _dashStart, _dashEnd;
         private readonly List<IDamageable> _hitTargets = new();
@@ -72,12 +79,12 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
 
             // 대시 직전, 캐릭터를 마우스 방향으로 정면 고정한다.
             // (현재 forward를 그대로 쓰면 정면이 마우스를 향하지 않은 상태에서 엉뚱하게 전진함)
-            Quaternion aimRot = ctx.Controller.ComputeMouseAimAssistRotation(0f, 0f, 0f);
+            Quaternion aimRot = ctx.Controller.ComputeSkillAimRotation();   // 장비 스킬 조준 보조(A1)
             ctx.Controller.RequestFacing(aimRot);
 
             var dir = aimRot * Vector3.forward;
             _dashStart = ctx.PlayerTransform.position;
-            _dashEnd = _dashStart + dir * _data.dashDistance;
+            _dashEnd = ctx.DashEndBeforeWall(_dashStart, dir, _data.dashDistance);   // 벽 앞에서 멈춘다(10-14 — 끝점 Lerp가 벽을 뚫었다)
 
             if (ctx.Rigidbody != null)
             {
@@ -92,6 +99,8 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
             _slashTotal = _data.slashCount + (_skillTier >= 2 ? Mathf.Max(0, _data.tier2ExtraSlashCount) : 0);
             _timer = 0f;
             _phase = Phase.Dash;
+            _slashInterval = Mathf.Min(_data.slashDelay, SlashWindow / Mathf.Max(1, _slashTotal - 1));
+            ctx.Controller.SetInvincible(_data.dashDuration);   // 돌진 중 무적(C1) — 꿰뚫고 지나가는 동안 맞지 않는다
 
             // 대시 시작 이펙트
             SpawnEffect(ctx, _data.dashTrailKey, ctx.PlayerTransform.position + Vector3.up * 0.5f, 0.8f);
@@ -100,7 +109,7 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
 
         public void OnUpdate(SkillExecutionContext ctx)
         {
-            _timer += Time.deltaTime;
+            _timer += ctx.DeltaTime;   // 애니메이터와 같은 시계(슬로모 — 10-09)
             switch (_phase)
             {
                 case Phase.Dash:  UpdateDash(ctx);  break;
@@ -151,7 +160,10 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
             if (t >= 1f)
             {
                 _timer = 0f;
-                _phase = Phase.Slash;
+                // A3(10-08): 스쳐 간 적이 없으면 연참(5 × 0.15초)을 접고 바로 끝 — 예전엔 아무도 없는데 0.75초 서 있었다.
+                // 3단계 길 가르기는 길 폭(3 m)이 감지(2 m)보다 넓어 헛스윙이어도 벤다(C1)
+                _phase = _hitTargets.Count > 0 ? Phase.Slash : Phase.End;
+                if (_hitTargets.Count == 0 && _skillTier >= 3) CutWholePath(ctx);
 
                 // 대시 종료 시점에 잔류 회전/속도 다시 제거 (벽 충돌 잔여물 정리)
                 if (ctx.Rigidbody != null)
@@ -173,10 +185,13 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
         // ── Slash ──
         private void UpdateSlash(SkillExecutionContext ctx)
         {
-            if (_timer >= _data.slashDelay)
+            float wait = _slashIndex == 0 ? _data.slashDelay : _slashInterval;
+            if (_timer >= wait)
             {
-                _timer = 0f;
+                _timer -= wait;   // 넘친 시간을 다음 간격에 넘긴다 — 0으로 지우면 연참마다 한 프레임씩 밀렸다(C1 실측 마지막 1.02초)
                 ApplySlashDamage(ctx);
+                Managers.Sound?.PlayEvent(SoundEvent.PlayerSwing);   // 연참마다 베는 소리(A6)
+                if (_skillTier >= 3 && _slashIndex == _slashTotal - 1) CutWholePath(ctx);   // 3단계 마지막 일섬(C1)
                 _slashIndex++;
 
                 if (_slashIndex >= _slashTotal)
@@ -195,20 +210,42 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
         // ── End ──
         private void UpdateEnd(SkillExecutionContext ctx)
         {
+            ctx.EnterRecovery();   // 후딜 — 회피로 끊을 수 있다 · 스탠스 해제(10-08 A2 · A4)
             if (_timer >= _data.endDelay)
                 ctx.RequestEnd();
         }
 
         // ── Damage ──
+        /// <summary>
+        /// 3단계 마지막 일섬(C1 · 설명 「공간을 가른다」) — 지나온 길 전체(폭 <see cref="Tier3PathRadius"/> m)의 적을 한 번에 벤다. 막타.
+        /// 예전엔 3단계가 2단계와 똑같았다(설명만 「공간을 가른다」).
+        /// </summary>
+        private void CutWholePath(SkillExecutionContext ctx)
+        {
+            Vector3 a = _dashStart + Vector3.up * 0.8f, b = _dashEnd + Vector3.up * 0.8f;
+            // 연참 한 타(기본 + 공격력)의 3배 — 예전엔 기본값만 3배(15 + 공격력)라 문구 「연참 3배」에 못 미쳤다(10-08 강화 점검)
+            float dmg = ctx.CalculateDamage(_data.baseDamagePerSlash) * Tier3PathDamageX;
+            var seen = new HashSet<GameObject>();
+            foreach (var col in Physics.OverlapCapsule(a, b, Tier3PathRadius))
+            {
+                if (col.gameObject == ctx.Controller.gameObject || !seen.Add(col.gameObject)) continue;
+                if (col.TryGetComponent<IDamageable>(out var d))
+                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f, isFinisher: true);
+            }
+            Vector3 mid = (_dashStart + _dashEnd) * 0.5f + Vector3.up * 1f;
+            SpawnEffect(ctx, string.IsNullOrEmpty(_data.tier2FinishEffectKey) ? _data.slashEffectKey : _data.tier2FinishEffectKey,
+                        mid, 1.5f, _data.tier2FinishEffectScale * 1.5f);   // 길 폭 3 m에 맞춤(10-13 ⑥ 실측: 마무리 ×2 → 14.5 m)
+        }
+
         private void ApplySlashDamage(SkillExecutionContext ctx)
         {
             if (_hitTargets.Count == 0) return;
 
             float dmg = ctx.CalculateDamage(_data.baseDamagePerSlash);
 
-            bool last = _slashIndex >= _slashTotal - 1;   // 증가 전에 불린다 — 마지막 베기가 막타
+            bool last = _slashIndex >= _slashTotal - 1 && _skillTier < 3;   // 증가 전에 불린다 — 마지막 베기가 막타(3단계는 뒤 「길 가르기」가 막타)
             foreach (var target in _hitTargets)
-                ctx.DealDamage(target, dmg, _data.knockbackMultiplier, last);
+                ctx.DealDamage(target, dmg, _data.knockbackMultiplier, last, skipHitVfx: true);   // 타격 이펙트는 아래에서 직접
 
             // 히트 이펙트
             foreach (var obj in _hitObjects)
@@ -218,7 +255,8 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
                     Random.Range(-0.3f, 0.3f),
                     Random.Range(0.5f, 1.5f),
                     Random.Range(-0.3f, 0.3f));
-                SpawnEffect(ctx, _data.hitEffectKey, obj.transform.position + offset, _data.hitEffectScale);
+                // hitEffectScale이 수명 자리로 들어가 크기는 늘 1이었다(10-08 수정) — 크기로 넘기고 수명은 칼 타격 이펙트 길이(0.5초)
+                SpawnEffect(ctx, _data.hitEffectKey, obj.transform.position + offset, 0.5f, _data.hitEffectScale);
             }
         }
 
@@ -257,10 +295,14 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
 
         private static async void DespawnAfter(GameObject obj, float delay)
         {
-            await Cysharp.Threading.Tasks.UniTask.Delay(
-                (int)(delay * 1000), cancellationToken: obj.GetCancellationTokenOnDestroy());
-            if (obj != null && obj.activeInHierarchy)
-                Managers.ObjectPooler.Despawn(obj);
+            try
+            {
+                await Cysharp.Threading.Tasks.UniTask.Delay(
+                    (int)(delay * 1000), cancellationToken: obj.GetCancellationTokenOnDestroy());
+                if (obj != null && obj.activeInHierarchy)
+                    Managers.ObjectPooler.Despawn(obj);
+            }
+            catch (System.OperationCanceledException) { }   // 기다리는 사이 이펙트가 파괴됐다(10-09 출시 점검)
         }
 
         // ── Player Trail (Local 부착) ──

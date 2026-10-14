@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: depth_3_clear
   m_EditorClassIdentifier: Assembly-CSharp::Achievement
   category: {fileID: 11400000, guid: fef76b25d615ec241a33a98214aee78b, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 43376f61d496196448f66a5e2a86d05e, type: 3}
   codeName: depth_3_clear
   displayName: "\uC2EC\uC5F0\uC758 \uC0C1\uC8FC\uC790"
   description: "\uC2EC\uC5F0 \uAE4A\uC774 3 \uB3C4\uB2EC"

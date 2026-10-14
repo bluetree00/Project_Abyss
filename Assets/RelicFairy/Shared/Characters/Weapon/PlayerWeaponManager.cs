@@ -22,6 +22,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 {
     public const int Slot0 = 0;
     public const int Slot1 = 1;
+    private const float WeaponOutSeconds = 0.3f;   // 손에서 빠지는 무기 디졸브 — 들어오는 무기(0.4초)와 짝(10-12 디졸브 ②)
 
     public int SlotCount => 2;
 
@@ -41,6 +42,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
     private int currentSlotIndex = -1;
     private bool _isSwitching = false;
+    private int  _equipBusy;   // 장착 중(Acquire*) — 그동안 SwitchToSlotAsync는 무시(10-14)
 
     /// <summary>슬롯 0 무기 데이터</summary>
     public WeaponData Weapon0Data => slots[Slot0]?.runtimeData;
@@ -186,7 +188,9 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         {
             int targetSlot = GetFirstEmptySlotIndex();
             if (targetSlot < 0) targetSlot = Slot0;
-            await EquipToSlotAsync(targetSlot, runtimeData, setActive: true);
+            _equipBusy++;
+            try { await EquipToSlotAsync(targetSlot, runtimeData, setActive: true); }
+            finally { _equipBusy--; }
         }
     }
 
@@ -203,7 +207,9 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         if (runtimeData == null || slotIndex < 0 || slotIndex >= SlotCount) return;
 
         _owned.Add(runtimeData);
-        await EquipToSlotAsync(slotIndex, runtimeData, setActive, playAppear, beforeShow);
+        _equipBusy++;
+        try { await EquipToSlotAsync(slotIndex, runtimeData, setActive, playAppear, beforeShow); }
+        finally { _equipBusy--; }
     }
 
     // ----------------------
@@ -223,7 +229,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         if (setActive && currentSlotIndex >= 0 && currentSlotIndex != slotIndex)
         {
             var cur = slots[currentSlotIndex];
-            if (cur.instance != null) cur.instance.SetActive(false);
+            HideOutgoing(cur.instance);
         }
 
         // 슬롯에 데이터 등록
@@ -285,12 +291,28 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         Debug.Log($"[WeaponManager] Equipped {runtimeData.displayName} to slot {slotIndex} (active={setActive})");
     }
 
+    /// <summary>
+    /// 손에서 빠지는 무기 — 툭 꺼지지 않게 0.3초 디졸브로 사라진 뒤 끈다(10-12 디졸브 ②).
+    /// 사라지는 동안 그 무기가 다시 들어오면 등장 디졸브가 이 퇴장을 되돌린다(완료 콜백 없음 · 켠 채로).
+    /// 다 사라져 끌 때도 그새 다시 손에 든 무기면 끄지 않는다. 시간이 멈춘 창(재련소 등)에서는 디졸브도 멈췄다가 창을 닫으면 이어진다.
+    /// </summary>
+    private void HideOutgoing(GameObject instance)
+    {
+        if (instance == null || !instance.activeSelf) return;
+        DissolveEffect.PlayDisappear(instance, WeaponOutSeconds, () =>
+        {
+            if (instance != null && instance != CurrentWeaponInstance) instance.SetActive(false);
+        });
+    }
+
     // ----------------------
     // 슬롯 전환
     // ----------------------
     public async UniTask SwitchToSlotAsync(int slotIndex)
     {
-        if (_isSwitching) return;
+        // 장착(무기 불러오기 · 몇 프레임) 도중엔 바꾸지 않는다(10-14) — 그 칸 인스턴스가 아직 없어 바꾸기가 하나 더 만들고,
+        // 늦게 끝난 쪽이 칸을 덮어 다른 하나가 손에 남았다(근접이 보이는데 HUD는 원거리).
+        if (_isSwitching || _equipBusy > 0) return;
         _isSwitching = true;
 
         try
@@ -309,7 +331,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             if (currentSlotIndex >= 0)
             {
                 var cur = slots[currentSlotIndex];
-                if (cur.instance != null) cur.instance.SetActive(false);
+                HideOutgoing(cur.instance);
             }
 
             // 타겟 인스턴스 없으면 생성

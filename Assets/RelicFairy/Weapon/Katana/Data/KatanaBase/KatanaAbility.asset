@@ -15,7 +15,7 @@ MonoBehaviour:
   steps:
   - stepIndex: 0
     order: 0
-    baseDamage: 2
+    baseDamage: 3.125
     knockbackMultiplier: 1
     selfMovement: {x: 0, y: 0, z: 0}
     effect:
@@ -23,13 +23,13 @@ MonoBehaviour:
       socket: 0
       space: 0
       positionOffset: {x: 0, y: 1, z: 0.5}
-      rotationEuler: {x: 0, y: 0, z: 0}
+      rotationEuler: {x: 0, y: 0, z: -44}
       scaleMultiplier: 1
       lifeTimeMultiplier: 1
       behavior: {fileID: 0}
     collider:
       mode: 0
-      damage: 2
+      damage: 3.125
       trailRadiusOverride: 0
       colliderPrefabKey: 
       positionOffset: {x: 0, y: 0, z: 0}
@@ -40,12 +40,12 @@ MonoBehaviour:
       shape: 1
       behavior: {fileID: 0}
     hitEffectKey: SwordHitImpact
-    hitEffectScale: 0.20
+    hitEffectScale: 0.2
     oneShot: 0
     rotateToMouse: 0
   - stepIndex: 1
     order: 0
-    baseDamage: 2
+    baseDamage: 3.125
     knockbackMultiplier: 1
     selfMovement: {x: 0, y: 0, z: 0}
     effect:
@@ -53,13 +53,13 @@ MonoBehaviour:
       socket: 0
       space: 0
       positionOffset: {x: 0, y: 1, z: 0.5}
-      rotationEuler: {x: 0, y: 0, z: 0}
+      rotationEuler: {x: 0, y: 0, z: 79}
       scaleMultiplier: 1
       lifeTimeMultiplier: 1
       behavior: {fileID: 0}
     collider:
       mode: 0
-      damage: 2
+      damage: 3.125
       trailRadiusOverride: 0
       colliderPrefabKey: 
       positionOffset: {x: 0, y: 0, z: 0}
@@ -70,12 +70,12 @@ MonoBehaviour:
       shape: 1
       behavior: {fileID: 0}
     hitEffectKey: SwordHitImpact
-    hitEffectScale: 0.20
+    hitEffectScale: 0.2
     oneShot: 0
     rotateToMouse: 0
   - stepIndex: 2
     order: 0
-    baseDamage: 2
+    baseDamage: 3.125
     knockbackMultiplier: 1
     selfMovement: {x: 0, y: 0, z: 0}
     effect:
@@ -83,13 +83,13 @@ MonoBehaviour:
       socket: 0
       space: 0
       positionOffset: {x: 0, y: 1, z: 0.5}
-      rotationEuler: {x: 0, y: 0, z: 0}
+      rotationEuler: {x: 0, y: 0, z: 64}
       scaleMultiplier: 1
       lifeTimeMultiplier: 1
       behavior: {fileID: 0}
     collider:
       mode: 0
-      damage: 2
+      damage: 3.125
       trailRadiusOverride: 0
       colliderPrefabKey: 
       positionOffset: {x: 0, y: 0, z: 0}
@@ -100,12 +100,12 @@ MonoBehaviour:
       shape: 1
       behavior: {fileID: 0}
     hitEffectKey: SwordHitImpact
-    hitEffectScale: 0.20
+    hitEffectScale: 0.2
     oneShot: 0
     rotateToMouse: 0
   - stepIndex: 3
     order: 0
-    baseDamage: 2
+    baseDamage: 3.125
     knockbackMultiplier: 1
     selfMovement: {x: 0, y: 0, z: 0}
     effect:
@@ -113,13 +113,13 @@ MonoBehaviour:
       socket: 0
       space: 0
       positionOffset: {x: 0, y: 1, z: 0.5}
-      rotationEuler: {x: 0, y: 90, z: 0}
+      rotationEuler: {x: 0, y: 90, z: 180}
       scaleMultiplier: 1
       lifeTimeMultiplier: 1
       behavior: {fileID: 0}
     collider:
       mode: 0
-      damage: 2
+      damage: 3.125
       trailRadiusOverride: 0
       colliderPrefabKey: 
       positionOffset: {x: 0, y: 0, z: 0}
@@ -130,6 +130,6 @@ MonoBehaviour:
       shape: 1
       behavior: {fileID: 0}
     hitEffectKey: SwordHitImpact
-    hitEffectScale: 0.20
+    hitEffectScale: 0.2
     oneShot: 0
     rotateToMouse: 0

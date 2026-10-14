@@ -14,84 +14,107 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CovenantVfxSet
   entries:
   - key: supernova
-    prefab: {fileID: 4020421568969601508, guid: 0ced40189347d054588156810ea36d23,
-      type: 3}
+    prefab: {fileID: 4020421568969601508, guid: 0ced40189347d054588156810ea36d23, type: 3}
     scale: 1
     nativeRadius: 3.4
     life: 2
+    tint: {r: 0, g: 0, b: 0, a: 0}
+    mute: 
   - key: detonate
-    prefab: {fileID: 6981941031284743971, guid: edbcd3b3c18ccf44db5b7031741faf88,
-      type: 3}
+    prefab: {fileID: 6981941031284743971, guid: edbcd3b3c18ccf44db5b7031741faf88, type: 3}
     scale: 1
     nativeRadius: 3.5
     life: 2
+    tint: {r: 0, g: 0, b: 0, a: 0}
+    mute: 
   - key: detonate_hit
-    prefab: {fileID: 1651363388222792, guid: a32d87b33cadfed4b83eeaa564eb7724, type: 3}
-    scale: 0.5
+    prefab: {fileID: 6981941031284743971, guid: edbcd3b3c18ccf44db5b7031741faf88, type: 3}
+    scale: 0.35
     nativeRadius: 0
     life: 1
+    tint: {r: 0, g: 0, b: 0, a: 0}
+    mute: 
   - key: execute
-    prefab: {fileID: 5490221094549253126, guid: 6917c8ff75e3f2c44ad44d8df072e2dd,
-      type: 3}
-    scale: 1
+    prefab: {fileID: 5490221094549253126, guid: 6917c8ff75e3f2c44ad44d8df072e2dd, type: 3}
+    scale: 0.5
     nativeRadius: 0
     life: 1.5
+    tint: {r: 0, g: 0, b: 0, a: 0}
+    mute: 
   - key: stasis
-    prefab: {fileID: 6533228452991066826, guid: f9604ed79c6db494fb939d0a585130a6,
-      type: 3}
+    prefab: {fileID: 6533228452991066826, guid: f9604ed79c6db494fb939d0a585130a6, type: 3}
     scale: 1
     nativeRadius: 4.4
     life: 1.2
+    tint: {r: 0, g: 0, b: 0, a: 0}
+    mute: Flash
   - key: harvest
     prefab: {fileID: 1824691927606644, guid: 51f58a7ac453dab48a238fee31899d31, type: 3}
     scale: 0.5
     nativeRadius: 0
-    life: 1.2
+    life: 0.95
+    tint: {r: 0, g: 0, b: 0, a: 0}
+    mute: 
   - key: bloodmark
     prefab: {fileID: 1269619656826376, guid: 8d50ead57204b1e4ea67b269c30f2bb5, type: 3}
-    scale: 0.6
+    scale: 0.35
     nativeRadius: 0
     life: 1.5
+    tint: {r: 1, g: 1, b: 1, a: 0.6}
+    mute: 
   - key: aegis
     prefab: {fileID: 1341365785022538, guid: 3f30c0442b887064bb00401ceb9a8816, type: 3}
     scale: 0.6
     nativeRadius: 0
     life: 0.5
+    tint: {r: 0, g: 0, b: 0, a: 0}
+    mute: 
   - key: ward
-    prefab: {fileID: 4481419373420190473, guid: a1f3d2db3e03101408c646570eefe2e1,
-      type: 3}
+    prefab: {fileID: 4481419373420190473, guid: a1f3d2db3e03101408c646570eefe2e1, type: 3}
     scale: 0.6
     nativeRadius: 0
-    life: 4
+    life: 0.95
+    tint: {r: 0, g: 0, b: 0, a: 0}
+    mute: 
   - key: lastbreath
-    prefab: {fileID: 2605316480486226868, guid: 114ab6919cf39484e946697e02cfa078,
-      type: 3}
-    scale: 0.5
+    prefab: {fileID: 1918476138427834, guid: 3e4e9c6a4ac7e10418454a21dd359975, type: 3}
+    scale: 0.4
     nativeRadius: 0
-    life: 1.5
-  - key: fury
-    prefab: {fileID: 1873886433987638, guid: fb2df51e77abde1429eb83c0317784af, type: 3}
+    life: 1
+    tint: {r: 0.55, g: 0.4, b: 0.12, a: 0.8}
+    mute: 
+  - key: lastbreath_save
+    prefab: {fileID: 1341365785022538, guid: 3f30c0442b887064bb00401ceb9a8816, type: 3}
     scale: 0.6
     nativeRadius: 0
     life: 1
+    tint: {r: 0, g: 0, b: 0, a: 0}
+    mute: 
+  - key: fury
+    prefab: {fileID: 1612411718768874, guid: 31596570f56513640a2b53d8aac322ab, type: 3}
+    scale: 0.5
+    nativeRadius: 0
+    life: 1
+    tint: {r: 0, g: 0, b: 0, a: 0}
+    mute: 
   - key: momentum
     prefab: {fileID: 1171190231128718, guid: d9467a10b94fb3b428cc539326c9579b, type: 3}
     scale: 0.6
     nativeRadius: 0
     life: 1.2
+    tint: {r: 0, g: 0, b: 0, a: 0}
+    mute: 
   - key: curse
-    prefab: {fileID: 1775157058538326, guid: 53cc67d1559f30f45945995c620b82df, type: 3}
-    scale: 0.6
+    prefab: {fileID: 1918476138427834, guid: 3e4e9c6a4ac7e10418454a21dd359975, type: 3}
+    scale: 0.7
     nativeRadius: 0
     life: 1.5
+    tint: {r: 0.42, g: 0.16, b: 0.78, a: 1}
+    mute: 
   - key: hemorrhage
-    prefab: {fileID: 6714037650790324515, guid: 4a476f63e4da5ca4fa476ddfbad3ace2,
-      type: 3}
+    prefab: {fileID: 6714037650790324515, guid: 4a476f63e4da5ca4fa476ddfbad3ace2, type: 3}
     scale: 0.028
     nativeRadius: 0
     life: 1.2
-  - key: ruby
-    prefab: {fileID: 1761614549529672, guid: 7ee7aea814e67034c991de25882a040b, type: 3}
-    scale: 1.5
-    nativeRadius: 0
-    life: 1
+    tint: {r: 0, g: 0, b: 0, a: 0}
+    mute: 

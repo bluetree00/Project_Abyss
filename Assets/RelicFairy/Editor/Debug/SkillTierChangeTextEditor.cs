@@ -13,14 +13,15 @@ public static class SkillTierChangeTextEditor
 
     private static readonly (string asset, string tier2, string tier3)[] Rows =
     {
-        (W + "Nameless/Data/Nameless_ESkill.asset",     "관통 5",       "착탄 폭발"),        // FanArrow: 2 관통 · 3 폭발
-        (W + "Nameless/Data/Nameless_RSkill.asset",     "연참 +2",      ""),                 // IasenSlash: 2 연참 +2(3단계 분기 없음)
-        (W + "Katana/Data/Katana_ESkill.asset",         "추가 베기 3회", "마무리 폭발"),      // HolySlash: 2 적중 시 추가 타격 · 3 폭발
-        (W + "Katana/Data/Katana_QSkill.asset",         "각인 택1(추격·응축)", "검기 폭발"),  // PhantomDance: 2 각인 선택(시범, SkillEngravingPilotEditor) · 3 검기 폭발
-        (W + "Greatsword/Data/Greatsword_ESkill.asset", "2연속 시전",    "3연속·검기 확장"),  // PerimeterGuard: 시전 1→2→3 · 3 확장 파동
-        (W + "Greatsword/Data/Greatsword_QSkill.asset", "충격파 추가타", "폭발 추가타"),      // FinalStrike: 2 추가 타격 · 3 폭발
-        (W + "Bow/Data/Bow_ESkill.asset",               "관통 5",       "착탄 폭발"),        // FanArrow
-        (W + "Bow/Data/Bow_QSkill.asset",               "화살 강화",     "화살 최대"),        // FocusShot: 피해·크기 단계
+        // 10-08 강화 점검: 실제 동작 · 에셋 문구(10-06~08 손질 반영)와 맞췄다 — 예전 표로 돌리면 문구가 낡은 값으로 되돌아갔다
+        (W + "Nameless/Data/Nameless_ESkill.asset",     "관통 5",       "착탄 폭발 반경 2m · 피해 50%"),           // FanArrow: 2 관통 · 3 폭발
+        (W + "Nameless/Data/Nameless_RSkill.asset",     "연참 +2",      "마지막 일섬 = 지나온 길 전체(폭 6m · 연참 3배)"),  // IasenSlash: 2 연참 +2 · 3 길 가르기(C1)
+        (W + "Katana/Data/Katana_ESkill.asset",         "적중 시 추가 베기 3회(각 8+공격력)", "적중 시 마무리 폭발 반경 3m(30+공격력)"),  // HolySlash: 적중해야 이어진다
+        (W + "Katana/Data/Katana_QSkill.asset",         "각인 택1(추격·응축)", "검기 폭발 반경 3m(25+공격력)"),  // PhantomDance: 2 각인 선택(시범, SkillEngravingPilotEditor) · 3 검기 폭발
+        (W + "Greatsword/Data/Greatsword_ESkill.asset", "2연속 시전",    "3연속 · 확산 검기 반경 6.5m(3파)"),       // PerimeterGuard: 시전 1→2→3 · 3 확산(C3)
+        (W + "Greatsword/Data/Greatsword_QSkill.asset", "추가타 30+공격력", "추가타 45+공격력"),                 // FinalStrike: 2·3 추가 강타
+        (W + "Bow/Data/Bow_ESkill.asset",               "관통 5",       "착탄 폭발 반경 2m · 피해 50%"),           // FanArrow
+        (W + "Bow/Data/Bow_QSkill.asset",               "2발 · 발당 50+공격력×1.5", "1발 · 100+공격력×3 · 착탄 폭발 2m(30%)"),  // FocusShot: 공격력 몫을 모은다
         (W + "Crossbow/Data/Crossbow_ESkill.asset",     "공속 +50%",    "공속 +70%"),        // RapidFire
         (W + "Crossbow/Data/Crossbow_QSkill.asset",     "+2발",         "+3발"),             // MultiShot
     };

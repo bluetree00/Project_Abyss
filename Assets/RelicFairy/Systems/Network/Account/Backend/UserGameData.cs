@@ -186,28 +186,68 @@ public class UserGameData
 
     // ── 해금 (unlockedIds) ─────────────────────────────
 
-    /// <summary>해당 노드가 해금됐는지.</summary>
-    public bool IsUnlocked(string nodeId)
+    // 단계 캐시(10-14 강화형) — unlockedIds 문자열이 바뀔 때만 다시 읽는다(예전 IsUnlocked는 부를 때마다 Split으로 할당했다 · 굴림마다 불린다).
+    [System.NonSerialized] private string _levelsSrc;
+    [System.NonSerialized] private System.Collections.Generic.Dictionary<string, int> _levels;
+
+    /// <summary>
+    /// 노드 단계(0 = 안 삼). 저장 형식 = 쉼표 목록 「id」(1단계) 또는 「id:단계」(10-14 강화형 — 같은 노드를 단계마다 다시 산다).
+    /// </summary>
+    public int GetLevel(string nodeId)
     {
-        if (string.IsNullOrEmpty(nodeId) || string.IsNullOrEmpty(unlockedIds)) return false;
-        foreach (var id in unlockedIds.Split(','))
-            if (id == nodeId) return true;
-        return false;
+        if (string.IsNullOrEmpty(nodeId) || string.IsNullOrEmpty(unlockedIds)) return 0;
+        if (_levels == null || !ReferenceEquals(_levelsSrc, unlockedIds))
+        {
+            _levels ??= new System.Collections.Generic.Dictionary<string, int>(40);
+            _levels.Clear();
+            foreach (var raw in unlockedIds.Split(','))
+            {
+                if (string.IsNullOrEmpty(raw)) continue;
+                int c = raw.IndexOf(':');
+                string id = c < 0 ? raw : raw.Substring(0, c);
+                int lv = c < 0 ? 1 : (int.TryParse(raw.Substring(c + 1), out var n) ? n : 1);
+                if (!_levels.TryGetValue(id, out var had) || lv > had) _levels[id] = lv;
+            }
+            _levelsSrc = unlockedIds;
+        }
+        return _levels.TryGetValue(nodeId, out var level) ? level : 0;
     }
+
+    /// <summary>해당 노드가 해금됐는지(1단계 이상).</summary>
+    public bool IsUnlocked(string nodeId) => GetLevel(nodeId) > 0;
 
     /// <summary>
     /// 정수를 지불하고 노드를 해금한다. 이미 해금됐거나 정수가 모자라면 false.
     /// <para>cost&lt;=0은 <b>거부</b>한다 — 노드 정의가 비면 0이 넘어오는데 그대로 통과시키면 전량 무료 해금이 된다.
     /// (구 TryUpgradeAwakening에서 실제로 겪었던 함정이라 규약을 그대로 옮긴다.)</para>
     /// </summary>
-    public bool TryUnlock(string nodeId, int cost)
+    public bool TryUnlock(string nodeId, int cost) => TryBuyLevel(nodeId, cost, 1);
+
+    /// <summary>
+    /// 정수를 지불하고 노드를 한 단계 올린다(10-14 강화형). 이미 <paramref name="maxLevel"/>이거나 정수가 모자라면 false. cost&lt;=0 거부(위와 같은 규약).
+    /// </summary>
+    public bool TryBuyLevel(string nodeId, int cost, int maxLevel)
     {
         if (string.IsNullOrEmpty(nodeId)) return false;
         if (cost <= 0) return false;
-        if (IsUnlocked(nodeId)) return false;
+        int lv = GetLevel(nodeId);
+        if (lv >= maxLevel) return false;
         if (abyssEssence < cost) return false;
 
-        unlockedIds = string.IsNullOrEmpty(unlockedIds) ? nodeId : unlockedIds + "," + nodeId;
+        int next = lv + 1;
+        string entry = next <= 1 ? nodeId : $"{nodeId}:{next}";
+        var parts = new System.Collections.Generic.List<string>(string.IsNullOrEmpty(unlockedIds) ? System.Array.Empty<string>() : unlockedIds.Split(','));
+        bool replaced = false;
+        for (int i = 0; i < parts.Count; i++)
+        {
+            string p = parts[i];
+            int c = p.IndexOf(':');
+            if ((c < 0 ? p : p.Substring(0, c)) != nodeId) continue;
+            if (!replaced) { parts[i] = entry; replaced = true; }
+            else { parts.RemoveAt(i); i--; }
+        }
+        if (!replaced) parts.Add(entry);
+        unlockedIds = string.Join(",", parts);
         abyssEssence -= cost;
         return true;
     }

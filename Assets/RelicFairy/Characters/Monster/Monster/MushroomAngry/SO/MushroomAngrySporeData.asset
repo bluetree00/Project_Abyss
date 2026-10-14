@@ -17,11 +17,12 @@ MonoBehaviour:
   _vfxScale: 0.5
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
+  _vfxFaceForward: 0
   hpThreshold: 0.5
   sporeStateName: Mushroom_Attack03Angry
   sporeDuration: 1.5
   sporeRadius: 4
   sporeDamage: 10
-  sporeEffectPrefab: {fileID: 1156591902748042, guid: 55b36a9461ee12b4b9ed1546b95e8ba4,
+  sporeEffectPrefab: {fileID: 1419038392936696643, guid: b28c35bf210c52b42b2d6622660b9aca,
     type: 3}
-  sporeEffectScale: 1
+  sporeEffectScale: 1.143

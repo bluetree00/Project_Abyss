@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using RelicFairy.Monster;
 
@@ -33,9 +33,9 @@ public sealed class FireExplosionOnSkillEffect : ItemEffectBase
         for (int i = 0; i < n; i++)
             s_buf[i].TakeDamage(damage, ctx.Player.gameObject, knockbackMultiplier: 0.5f);
 
-        ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), center);
+        ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), center, Radius / 1.25f);   // 판정 반경에 맞춤(10-13 실측: 배율 1 → 1.0 m)
         ItemEffectVfxHelper.ShowNotice($"<color=#FF6622>화염 폭발</color> {damage:F0} 데미지");
-        Debug.Log($"[FireExplosionOnSkill] 화염 폭발 {damage:F0} (반경 {Radius}m)");
+        RFLog.D($"[FireExplosionOnSkill] 화염 폭발 {damage:F0} (반경 {Radius}m)");
     }
 }
 
@@ -61,8 +61,8 @@ public sealed class LightningOnSkillEffect : ItemEffectBase
         for (int i = 0; i < n; i++)
             s_buf[i].TakeDamage(damage, ctx.Player.gameObject, knockbackMultiplier: 0.3f);
 
-        ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), center);
+        ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), center, Radius / 4.3f);   // 판정 반경에 맞춤(10-13 실측: 배율 1 → 4.5 m)
         ItemEffectVfxHelper.ShowNotice($"<color=#44CCFF>번개 강타</color> {damage:F0} 데미지");
-        Debug.Log($"[LightningOnSkill] 번개 강타 {damage:F0} (반경 {Radius}m)");
+        RFLog.D($"[LightningOnSkill] 번개 강타 {damage:F0} (반경 {Radius}m)");
     }
 }

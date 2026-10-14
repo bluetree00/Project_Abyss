@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 // ═══════════════════════════════════════════════════════════
 // 피격 시 발동하는 효과
@@ -14,7 +14,7 @@ public sealed class DamageNegateEffect : ItemEffectBase
         {
             pkt.Negated = true;
             pkt.FinalDamage = 0f;
-            Debug.Log("[DamageNegate] 피해 무효화!");
+            RFLog.D("[DamageNegate] 피해 무효화!");
         }
     }
 }
@@ -37,8 +37,8 @@ public sealed class DamageReflectEffect : ItemEffectBase
             damageable.TakeDamage(reflect, instigator, knockbackMultiplier: 0f);
 
             ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Attacker.transform.position);
-            ItemEffectVfxHelper.ShowNotice($"<color=#88CCFF>피해 반사</color> {reflect:F0} → {report.Attacker.name}");
-            Debug.Log($"[DamageReflect] {reflect:F0} 반사 → {report.Attacker.name}");
+            // HUD 왼쪽 알림은 뺐다 — 맞을 때마다 떠 같은 순간 이펙트 · 피해 숫자와 같은 말을 했다(10-11 톤 2차 V-12)
+            RFLog.D($"[DamageReflect] {reflect:F0} 반사 → {report.Attacker.name}");
         }
     }
 }
@@ -66,8 +66,8 @@ public sealed class FireReflectEffect : ItemEffectBase
             damageable.TakeDamage(reflect, instigator, knockbackMultiplier: 0f);
 
             ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Attacker.transform.position);
-            ItemEffectVfxHelper.ShowNotice($"<color=#FF7744>불 반사</color> {reflect:F0} → {report.Attacker.name}");
-            Debug.Log($"[FireReflect] {reflect:F0} 불 반사 → {report.Attacker.name}");
+            // HUD 왼쪽 알림은 뺐다(피해 반사와 같은 까닭 · 10-11 톤 2차 V-12)
+            RFLog.D($"[FireReflect] {reflect:F0} 불 반사 → {report.Attacker.name}");
         }
     }
 }
@@ -95,7 +95,7 @@ public sealed class DefenseOnHitEffect : ItemEffectBase
 
         _cooldownEnd = Time.time + cooldown;
         if (ctx.Player != null) ItemGuide.Toast(ctx.Player.transform.position, $"방어 +{_value}");
-        Debug.Log($"[DefenseOnHit] 방어력 +{_value} ({_duration}초), 쿨다운 {cooldown}초");
+        RFLog.D($"[DefenseOnHit] 방어력 +{_value} ({_duration}초), 쿨다운 {cooldown}초");
     }
 }
 

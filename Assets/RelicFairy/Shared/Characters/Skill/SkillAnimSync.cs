@@ -22,7 +22,8 @@ public static class SkillAnimSync
     {
         { "GreatswordQSkill", 1.22f },   // 최후의 일격 — 내려찍기
         { "GreatswordESkill", 1.27f },   // 주변경계 — 회전 베기(1.05초 예비 동작 뒤 1.27초가 가장 빠르다)
-        { "QSkill_Iasen",     1.63f },   // 발도 — 성광베기·무형일섬
+        { "QSkill_Iasen",     1.63f },   // 발도 — 무형일섬
+        { "GhostSamurai_APose_SPAttack06_Inplace", 0.95f },   // 카타나 성광베기 — 낮게 웅크린 발도 3연속의 첫 베기(10-09 · 무형일섬과 같던 클립을 갈랐다)
     };
 
     /// <summary>상태 이름과 그 상태의 원본 클립 이름이 다른 곳(오버라이드 키는 원본 클립 이름이다).</summary>

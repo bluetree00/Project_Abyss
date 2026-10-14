@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using RelicFairy.Monster;
 using UnityEngine;
 
@@ -41,6 +43,7 @@ public sealed class GawainMemoryHub : MonoBehaviour
     public event Action<MonsterBase, int, BloomCause> Bloomed;
     public event Action<MonsterBase, int> SunmarkAdded;   // (대상, 실제로 쌓인 수) — 해빙 · 반응
     public event Action<HitInfo> Hit;                 // 허브가 받는 적중(조각이 같은 신호를 두 번 받지 않게 허브 경유)
+    public event Action<bool> CrossLightChanged;      // 엇갈린 빛 켜짐(true) · 써서 꺼짐(false) — HUD · 기억 쪽이 읽는다(10-12 A3)
 
     public enum BloomCause { Harvest, Chain, Instant, Reaction, Fragment }
 
@@ -49,6 +52,9 @@ public sealed class GawainMemoryHub : MonoBehaviour
 
     /// <summary>조각 글자 색(가웨인 금빛).</summary>
     public static readonly Color GawainColor = new(1f, 0.82f, 0.35f);
+    private const float BloomPopGap = 0.06f;   // 개화 한 번마다 터지는 간격 — ×3이 셋으로 보이게(10-12 S1)
+    private const int   BloomPopMax = 5;       // 흑점처럼 상한 없는 스택도 5번까지만 터뜨린다
+    private static readonly Color BloomTint = new(1f, 0.85f, 0.45f, 1f);   // 금빛 — 다른 불(화상 · 잔불)과 가른다
 
     private PlayerController  _player;
     private GawainZenithRelic _relic;
@@ -61,6 +67,7 @@ public sealed class GawainMemoryHub : MonoBehaviour
     private readonly List<MonsterBase> _buf2 = new(16);
     private readonly HashSet<int> _sown = new();     // 새벽 파종 ③ — 개화 때 한 번 더
     private readonly Dictionary<string, float> _lastReaction = new();
+    private float _lastBloomSfxAt = -1f;
     private bool _crossLight;
     private bool _harvesting;   // 수확 중 — 「한낮이 길다」 즉석 개화를 막는다(정점 맞춤이 상한을 채워도 수확이 거둔다)
 
@@ -102,6 +109,9 @@ public sealed class GawainMemoryHub : MonoBehaviour
 
     public static GawainMemoryHub Of(PlayerController player)
         => player != null && player.TryGetComponent<GawainMemoryHub>(out var h) ? h : null;
+
+    /// <summary>UI용 — 지금 태양흔 상한(허브가 없으면 기본 3). 몬스터 체력바 스택 칸 「▮▮▯」 · 「상한 참」이 읽는다(10-12 A1). 흑점은 상한이 없다.</summary>
+    public static int SunmarkCapOf(PlayerController player) => Of(player)?.SunmarkCap ?? BaseCap;
 
     private void Bind(PlayerController player)
     {
@@ -211,10 +221,14 @@ public sealed class GawainMemoryHub : MonoBehaviour
     /// <summary>허브 기본 규칙 — 여명 적중 = 태양흔 1(+「한낮이 길다」 · 해시계 ② 창).</summary>
     private void OnBaseHit(in HitInfo hit)
     {
+        // 기본 쌓기가 먼저다 — 겹해(잔불 룬)가 같은 적의 0.5초 간격을 먼저 써서 기본 쌓기가 0이 됐다(순이득 0인데 글만 떴다 · 10-12 B4).
+        // 이제 겹해는 기본 쌓기가 없을 때(정오 · 황혼)에만 실제로 더한다 — 「시간대와 상관없이」.
+        if (hit.Target != null && hit.Target.TryGetComponent<MonsterBase>(out var mb))
+        {
+            bool canStack = IsDawn || (IsNoon && (_tierNoon >= 4 || Time.time < NoonStackUntil)) || (IsDusk && DuskStacking);
+            if (canStack) AddSunmark(mb, 1);
+        }
         Hit?.Invoke(hit);
-        if (hit.Target == null || !hit.Target.TryGetComponent<MonsterBase>(out var mb)) return;
-        bool canStack = IsDawn || (IsNoon && (_tierNoon >= 4 || Time.time < NoonStackUntil)) || (IsDusk && DuskStacking);
-        if (canStack) AddSunmark(mb, 1);
     }
 
     // ── 개화 ─────────────────────────────────────────────
@@ -230,10 +244,10 @@ public sealed class GawainMemoryHub : MonoBehaviour
         try
         {
             Vector3 at = target.transform.position;
-            float per = _player.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee) * BloomAtkRatio;
+            float per = _player.RuntimeStats.AttackPower * BloomAtkRatio;   // 근접 · 원거리 중 큰 값(10-14 A5)
+            PlayBloomPops(at, stacks);   // 피해는 지금 다 들어가고, 터지는 그림 · 소리만 차례로(10-12 S1)
             for (int s = 0; s < stacks; s++)
             {
-                ElementVfxPlayer.PlayBurst(RuneElement.Fire, at, BloomRadius);
                 int n = CombatQuery.GetNearbyEnemies(at, BloomRadius, null, 16, _buf2);
                 for (int i = 0; i < n; i++)
                 {
@@ -250,6 +264,35 @@ public sealed class GawainMemoryHub : MonoBehaviour
             Debug.Log($"[GawainMemory] 개화 {target.name} ×{stacks} ({cause}) · 1스택 {per:0} · 반경 {BloomRadius}m{(BloomCanCrit ? " · 치명 가능" : "")}");
         }
         finally { _bloomDepth--; }
+    }
+
+    /// <summary>개화 그림 — 스택마다 0.06초 간격으로 금빛 불 버스트 + 짧은 소리(한 프레임에 겹쳐 ×3이 하나로 보였다 · 10-12 S1).</summary>
+    private void PlayBloomPops(Vector3 at, int stacks)
+    {
+        int n = Mathf.Min(stacks, BloomPopMax);
+        PopBloomOnce(at);
+        if (n > 1) BloomPopsAsync(at, n - 1, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    private void PopBloomOnce(Vector3 at)
+    {
+        ElementVfxPlayer.PlayBurst(RuneElement.Fire, at, BloomRadius, tint: BloomTint);
+        if (Time.time - _lastBloomSfxAt < BloomPopGap * 0.9f) return;   // 여러 적이 한꺼번에 터져도 소리는 간격마다 하나
+        _lastBloomSfxAt = Time.time;
+        Managers.Sound?.PlayEvent(SoundEvent.RelicBloom);
+    }
+
+    private async UniTaskVoid BloomPopsAsync(Vector3 at, int more, CancellationToken ct)
+    {
+        try
+        {
+            for (int i = 0; i < more; i++)
+            {
+                await UniTask.Delay(TimeSpan.FromSeconds(BloomPopGap), cancellationToken: ct);
+                PopBloomOnce(at);
+            }
+        }
+        catch (OperationCanceledException) { }
     }
 
     private void ChainFrom(MonsterBase source, Vector3 at)
@@ -290,7 +333,8 @@ public sealed class GawainMemoryHub : MonoBehaviour
             if (mb == null || mb.IsDead) continue;
             var st = RelicMarkStatus.Of(mb.gameObject, false);
             if (st == null) continue;
-            int sun = _crossLight ? st.Sunmark : st.ConsumeSunmark(HarvestKeep);
+            // 새벽에서 한낮으로 ① — 1스택뿐인 적까지 1을 남기면 수확에서 안 터졌다(10-12 B3) → 2스택 이상일 때만 남긴다
+            int sun = _crossLight ? st.Sunmark : st.ConsumeSunmark(st.Sunmark >= 2 ? HarvestKeep : 0);
             int black = _crossLight ? st.Blackspot : st.ConsumeBlackspot();
             int stacks = sun + black;
             if (stacks <= 0) continue;
@@ -300,7 +344,15 @@ public sealed class GawainMemoryHub : MonoBehaviour
             if (sown) Bloom(mb, 1, BloomCause.Fragment);
             bloomedTargets++; bloomedStacks += stacks;
         }
-        if (_crossLight && bloomedTargets > 0) { _crossLight = false; Debug.Log("[GawainMemory] 엇갈린 빛 — 이번 수확은 스택을 남겼다"); }
+        if (_crossLight && bloomedTargets > 0)
+        {
+            _crossLight = false;
+            RelicFloatText.Show(_player.transform.position + Vector3.up * 0.4f, "태양흔 유지", GawainColor);   // 엇갈린 빛을 썼다(10-12 S5)
+            CrossLightChanged?.Invoke(false);
+            Debug.Log("[GawainMemory] 엇갈린 빛 — 이번 수확은 스택을 남겼다");
+        }
+        if (bloomedTargets > 0) Managers.Sound?.PlayEvent(SoundEvent.RelicHarvest);   // 정오 수확(10-12 S2)
+        if (bloomedTargets >= 2) RelicFloatText.Show(_player.transform.position, $"수확 ×{bloomedTargets}", GawainColor);
         Debug.Log($"[GawainMemory] {why} 수확 — 대상 {bloomedTargets} · 스택 {bloomedStacks}{(twice ? " · 두 번" : "")}");
     }
 
@@ -318,6 +370,8 @@ public sealed class GawainMemoryHub : MonoBehaviour
             if (now - kv.Value <= CrossLightWindow)
             {
                 _crossLight = true;
+                if (_player != null) RelicFloatText.Show(_player.transform.position, "엇갈린 빛", GawainColor);   // 10-12 S5 — 다음 수확이 스택을 남긴다
+                CrossLightChanged?.Invoke(true);
                 Debug.Log($"[GawainMemory] 엇갈린 빛 — {kv.Key} + {reactionKey}");
                 break;
             }

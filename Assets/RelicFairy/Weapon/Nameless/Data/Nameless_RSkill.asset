@@ -13,14 +13,11 @@ MonoBehaviour:
   m_Name: Nameless_RSkill
   m_EditorClassIdentifier: Assembly-CSharp::SkillSO
   skillName: "\uBB34\uD615\uC77C\uC12C"
-  description: "\uD615\uD0DC\uB97C \uC9C0\uC6B0\uACE0 8m\uB97C \uAFF0\uB6AB\uC5B4
-    \uC9C0\uB098\uAC04 \uB4A4, \uC2A4\uCCD0 \uAC04 \uC801\uC744 \uC5F0\uC774\uC5B4
-    \uBCA4\uB2E4. \uAC15\uD654 +5\uBD80\uD130 \uC5F0\uCC38\uC774 \uB298\uACE0 \uACF5\uAC04\uC744
-    \uAC00\uB978\uB2E4."
+  description: "형태를 지우고 8m를 꿰뚫어 지나간 뒤(돌진 중 무적), 스쳐 간 적을 연이어 벤다. 강화 +3부터 연참이 늘고, +6부터 마지막 일섬이 지나온 길을 통째로 가른다."
   icon: {fileID: 21300000, guid: 7c81c294755be9949a8908959b251607, type: 3}
   iconTier2: {fileID: 21300000, guid: e07a5eaebc139c049879ede475c2570e, type: 3}
   iconTier3: {fileID: 21300000, guid: 66f9a1f61aa664b4f92ddfcf3adfae39, type: 3}
   _tier2Change: "\uC5F0\uCC38 +2"
-  _tier3Change: 
+  _tier3Change: "마지막 일섬 = 지나온 길 전체(폭 6m · 연참 3배)"
   cooldown: 8
   behavior: {fileID: 11400000, guid: 0ab4e4ce9ba1b0e40bf6a8f4b2ff927b, type: 2}

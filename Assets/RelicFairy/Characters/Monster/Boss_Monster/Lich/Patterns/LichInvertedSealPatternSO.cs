@@ -112,7 +112,8 @@ public class LichInvertedSealState : UnInterruptibleState<LichInvertedSealPatter
         _gather = LichChainLine.Create(hand.position, hand.position + Vector3.up * 2.2f, 0.3f, PatternGuideHelper.PlayerSeal);
         lich?.PulseBook(Data.openDuration);
         LichSfx.Play(LichSfxSlot.ChainPulse, hand.position, 0.8f);
-        UI_BossBark.Show("네 봉인술이다. 돌려주지.", BossBarkType.PatternAnnounce);
+        if (!UI_BossBark.ShowDialogue("Lich_ReverseSeal", BossBarkType.PatternAnnounce))   // 대사 CSV 먼저
+            UI_BossBark.Show("네 봉인술이다. 돌려주마.", BossBarkType.PatternAnnounce);
     }
 
     public override void Update(MonsterContext ctx)
@@ -170,7 +171,7 @@ public class LichInvertedSealState : UnInterruptibleState<LichInvertedSealPatter
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }

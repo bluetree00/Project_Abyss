@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -51,6 +52,8 @@ public sealed class StagingAreaView : MonoBehaviour
     private static readonly Color COLOR_EMPTY_BG        = new(0.14f, 0.14f, 0.20f, 0.7f);
     private static readonly Color COLOR_EMPTY_BORDER    = new(0.3f, 0.3f, 0.4f, 0.4f);
     private static readonly Color FilledTint            = new(0.34f, 0.35f, 0.42f, 1f);   // 룬이 든 칸의 바탕 아트 곱
+    private static readonly Color ThinSlotEmpty         = new(1f, 1f, 1f, 0.035f);           // 톤 v2 — 빈 칸 = 옅은 글래스
+    private static readonly Color ThinSlotFilled        = new(0.06f, 0.06f, 0.09f, 0.62f);    // 톤 v2 — 룬이 든 칸
     private static readonly Color NameInk               = new(0.98f, 0.97f, 0.93f, 1f);
     private static readonly Color SelectedNameInk       = new(1f, 0.84f, 0.45f, 1f);
 
@@ -364,7 +367,11 @@ public sealed class StagingAreaView : MonoBehaviour
             // 예전엔 Border 이미지가 슬롯 전체를 반투명하게 한 번 더 덮어 배경과 두 겹으로 겹쳤고,
             // 그래서 빈 칸이 두꺼운 색 블록처럼 보였다(장식 프레임 위에서 특히 지저분했다).
             var bg = slotGO.AddComponent<Image>();
-            if (_slotFillSprite != null)
+            if (UI_GridPanel.ThinGrid)
+            {
+                bg.color = ThinSlotEmpty;   // 톤 v2(10-08) — 돌판 바탕 아트 대신 옅은 글래스, 테는 아래 1px 잉크
+            }
+            else if (_slotFillSprite != null)
             {
                 // 바탕(287×204)은 슬롯과 비율이 달라 통째로 늘리면 가로로 8% 왜곡된다.
                 // 스프라이트에 9슬라이스 경계(24px)를 넣어 모서리는 그대로 두고 가운데만 늘린다.
@@ -378,7 +385,7 @@ public sealed class StagingAreaView : MonoBehaviour
             }
 
             // 아트가 자체 테두리를 갖고 있으면 코드 외곽선은 붙이지 않는다(이중 테두리 방지).
-            if (_slotFrameSprite == null)
+            if (_slotFrameSprite == null && !UI_GridPanel.ThinGrid)
             {
                 var slotOutline = slotGO.AddComponent<Outline>();
                 slotOutline.effectColor    = COLOR_EMPTY_BORDER;
@@ -397,7 +404,14 @@ public sealed class StagingAreaView : MonoBehaviour
             borderImg.raycastTarget = false;
 
             // 장식 테두리 아트 — 틴트 레이어보다 위, 카드 내용보다 아래.
-            if (_slotFrameSprite != null)
+            if (UI_GridPanel.ThinGrid)
+            {
+                // 톤 v2 — 빈 칸 테 = 1px 잉크(칸 폭이 바뀌어도 선이 1px로 남게 조각으로). 이름 Frame = 빈 칸에서만 켜진다.
+                var frameRT = UIThinBox.Create((RectTransform)slotGO.transform, "Frame", Vector2.zero, Vector2.one, 0f,
+                                               UITheme.Thin.InkA(0.3f), Color.clear, Color.clear);
+                frameRT.SetSiblingIndex(1);   // Border(틴트) 뒤 = 카드 내용 아래
+            }
+            else if (_slotFrameSprite != null)
             {
                 var frameGO = new GameObject("Frame", typeof(RectTransform));
                 frameGO.transform.SetParent(slotGO.transform, false);
@@ -459,9 +473,11 @@ public sealed class StagingAreaView : MonoBehaviour
         var slotGO = _slotGOs[index];
         if (slotGO == null) return;
 
-        // 이전 shimmer 컴포넌트 제거 (ShimmerMask 자식은 아래 루프에서 함께 제거됨)
+        // 이전 shimmer 컴포넌트 제거 (ShimmerMask 자식은 아래 루프에서 함께 제거됨).
+        // 바로 지운다 — [DisallowMultipleComponent]라 Destroy(프레임 끝)로 두면 같은 프레임에 다시 그릴 때 AddComponent가 null이 되어
+        // 배치 처리가 예외로 끊겼다(전설 룬이 보관함에 있을 때, 10-08 실측).
         var prevShimmer = slotGO.GetComponent<StagingSlotShimmer>();
-        if (prevShimmer != null) Destroy(prevShimmer);
+        if (prevShimmer != null) DestroyImmediate(prevShimmer);
 
         // 기존 아이템 컨텐츠 제거 — BuildFixedSlots가 만든 슬롯 골격은 남긴다.
         // "Frame"(디자이너 룬 배치 테두리)이 예외에 빠져 있어서 첫 Refresh 때 5칸 아트가
@@ -494,7 +510,7 @@ public sealed class StagingAreaView : MonoBehaviour
         if (item == null)
         {
             // 빈 슬롯 상태
-            if (bgImg != null)     bgImg.color     = hasArt ? Color.white : COLOR_EMPTY_BG;
+            if (bgImg != null)     bgImg.color     = UI_GridPanel.ThinGrid ? ThinSlotEmpty : hasArt ? Color.white : COLOR_EMPTY_BG;
             if (borderImg != null) borderImg.color = Color.clear;   // 빈 칸엔 틴트 없음(테두리는 슬롯 본체)
             SetSlotOutline(slotGO, COLOR_EMPTY_BORDER);
             if (emptyLbl != null)  emptyLbl.SetActive(true);
@@ -507,7 +523,7 @@ public sealed class StagingAreaView : MonoBehaviour
             bool isNew = _newItemIds.Contains(item.instanceId);
 
             // 룬이 든 칸은 바탕 아트를 어둡게 누른다 — 흰색 그대로면 밝은 회색 판이라 룬 문양·글자가 떴다(09-25 캡처).
-            if (bgImg != null)     bgImg.color     = hasArt ? FilledTint : new Color(0.18f, 0.18f, 0.26f, 0.95f);
+            if (bgImg != null)     bgImg.color     = UI_GridPanel.ThinGrid ? ThinSlotFilled : hasArt ? FilledTint : new Color(0.18f, 0.18f, 0.26f, 0.95f);
             if (borderImg != null)
             {
                 ApplySlotBorderColor(index, item);   // 상태색은 한 창구에서만 칠한다
@@ -610,7 +626,9 @@ public sealed class StagingAreaView : MonoBehaviour
         fxTxt.raycastTarget     = false;
 
         // 등급 보석 테두리 — 룬 선택 카드와 같은 조각을 카드 크기(272)에 맞춰 줄여 얹는다. 글자·단추보다 아래.
-        RuneCardKit.BuildGemFrame((RectTransform)slotGO.transform, item.rarity, 30f, 118f, bottomBar: false);
+        RuneCardKit.BuildGemFrame((RectTransform)slotGO.transform, item.rarity, 30f, 118f, bottomBar: false,
+                                  scale: UI_GridPanel.ThinGrid ? UI_GridPanel.ThinGemScale : 1f, thin: UI_GridPanel.ThinGrid);
+        if (UI_GridPanel.ThinGrid) TintGem(slotGO.transform, item == _highlightedItem);
 
         // NEW 뱃지 — 위 끝에 걸터앉은 금빛 칩(16px). 예전 9px 빨강 글자는 읽히지 않았다.
         if (isNew)
@@ -836,12 +854,50 @@ public sealed class StagingAreaView : MonoBehaviour
         return SlotBasePos(index) + (selected ? new Vector2(0f, SELECT_LIFT) : Vector2.zero);
     }
 
+    /// <summary>
+    /// 쉬는 자리로 — 톤 v2는 0.18초 미끄러지듯(고르면 들리고 다른 걸 고르면 내려앉는다), 아니면 바로.
+    /// 열기 연출(DealSlotAsync)은 매 프레임 쉬는 자리를 따라가므로 겹쳐도 마지막엔 같은 자리다.
+    /// </summary>
+    private void MoveSlotToRest(int index)
+    {
+        var rt = (RectTransform)_slotGOs[index].transform;
+        var target = SlotRestPos(index);
+        if (!UI_GridPanel.ThinGrid || !isActiveAndEnabled || (rt.anchoredPosition - target).sqrMagnitude < 0.01f)
+        {
+            rt.anchoredPosition = target;
+            return;
+        }
+        SlideAsync(rt, target, destroyCancellationToken).Forget();
+    }
+
+    private static async UniTaskVoid SlideAsync(RectTransform rt, Vector2 target, CancellationToken ct)
+    {
+        var from = rt.anchoredPosition;
+        try { await UIMotion.Tween(UIMotion.Swap, k => rt.anchoredPosition = Vector2.LerpUnclamped(from, target, k), ct); }
+        catch (System.OperationCanceledException) { }
+    }
+
+    /// <summary>톤 v2 — 고른 카드의 등급 보석 테는 밝게, 나머지는 한 단 낮춘다(테는 카드를 다시 그릴 때마다 새로 얹힌다).</summary>
+    private static void TintGem(Transform slot, bool selected)
+    {
+        if (slot.Find("GemFrame") is not Transform gem) return;
+        foreach (var g in gem.GetComponentsInChildren<Image>(true))
+            g.color = new Color(1f, 1f, 1f, selected ? 1f : 0.75f);
+    }
+
     /// <summary>슬롯 한 칸 스케일 펀치. 팝업이 아니라 오버레이지만 룬판은 시간정지 중일 수 있어 unscaled(UIJuice)로 돈다.</summary>
     private async UniTaskVoid PulseSlotAsync(RectTransform rt)
     {
         if (rt == null) return;
 
-        try { await UIJuice.PunchAsync(rt, 0.08f, 0.22f, destroyCancellationToken); }
+        try
+        {
+            // 톤 v2 — 튕김 없이 살짝 눌렸다 돌아온다(0.95 → 1, 0.14초)
+            if (UI_GridPanel.ThinGrid)
+                await UIMotion.Tween(UIMotion.Quick, k => rt.localScale = Vector3.one * Mathf.Lerp(0.95f, 1f, k), destroyCancellationToken);
+            else
+                await UIJuice.PunchAsync(rt, 0.08f, 0.22f, destroyCancellationToken);
+        }
         catch (System.OperationCanceledException) { }
     }
 
@@ -860,7 +916,7 @@ public sealed class StagingAreaView : MonoBehaviour
         if (glow == null && on)
         {
             var img = ShopUIStyle.MakeImage(slot, "HoverGlow", HoverGlowColor);
-            img.sprite        = UIProceduralSprites.RoundedOutline(radius: 12f, stroke: 2.5f);
+            img.sprite        = UIProceduralSprites.RoundedOutline(radius: 12f, stroke: UI_GridPanel.ThinGrid ? 1.2f : 2.5f);
             img.type          = Image.Type.Sliced;
             img.raycastTarget = false;
             ShopUIStyle.Stretch(img.rectTransform, -3f);
@@ -922,7 +978,8 @@ public sealed class StagingAreaView : MonoBehaviour
         // 상태는 <b>들림 + 등급빛</b>으로 말한다. 예전엔 상태색(청록·노랑)을 알파 0.35로 카드 전체에 덮어
         // 어두운 판이 밝은 색판으로 보였다(09-25 캡처) — 룬 아트·글자가 그 색에 묻혔다.
         bool selected = item != null && _highlightedItem == item;
-        ((RectTransform)slotGO.transform).anchoredPosition = SlotRestPos(index);
+        MoveSlotToRest(index);
+        if (UI_GridPanel.ThinGrid) TintGem(slotGO.transform, selected);
 
         // 판 전체를 덮는 틴트는 쓰지 않는다 — 고른 카드가 통째로 회색 판처럼 떴다(09-25 2차 캡처).
         // 고른 표시는 들림 + 이름 금색(룬 선택 카드의 「고르면 들림·금빛」과 같은 말).
@@ -1152,7 +1209,7 @@ public sealed class StagingAreaView : MonoBehaviour
             int ore = RuneSalvage.OreValueOf(item);
             _discardDialogText.text =
                 $"\"{item.displayName ?? item.itemId}\"\n분해합니까?\n\n" +
-                $"<color=#63D9C0>원석 +{ore}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
+                $"<color={UIPalette.RuneOreHex}>원석 +{ore}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
         }
         if (_discardDialog != null)
         {

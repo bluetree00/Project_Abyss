@@ -92,6 +92,8 @@ public class LichScytheSweepState : UnInterruptibleState<LichScytheSweepPatternS
     private GameObject _guide;
     private bool       _parryOpen;    // 다음 휘두르기의 패링 창을 열었다
     private float      _endSeconds;   // 반격창 길이 — 튕겨내면 휘청 시간으로 바뀐다
+    private bool       _aimLocked;    // 판정 0.45초 전부터 방향 고정
+    private Vector3    _lockOrigin;   // 굳힌 순간의 자리 — 예고 · 판정 원점
 
     public LichScytheSweepState(LichScytheSweepPatternSO data) : base(data) { }
 
@@ -102,6 +104,7 @@ public class LichScytheSweepState : UnInterruptibleState<LichScytheSweepPatternS
         _swings     = 0;
         _parryOpen  = false;
         _endSeconds = Data.endDuration;
+        _aimLocked  = false;
 
         // 첫 휘두름(왼쪽 → 오른쪽)의 접촉 프레임이 첫 판정 순간에 오게 한다 — 끌어당김이 늘어지고 베기는 빠르게.
         LichPatternUtil.Swing(ctx, SwingOf(1), Data.windupDuration + Data.signalDuration);
@@ -138,8 +141,18 @@ public class LichScytheSweepState : UnInterruptibleState<LichScytheSweepPatternS
                 // 판정 크기의 진홍 반원이 안에서부터 차오른다 → 끝나면 빨강(신호).
                 float t = Mathf.Clamp01(_timer / Data.windupDuration);
                 PatternGuideHelper.SetProgress(_guide, t);
-                _yaw = ctx.Transform.eulerAngles.y;
-                if (_guide != null) _guide.transform.rotation = PatternGuideHelper.SectorRotation(_yaw);
+                if (!_aimLocked)
+                {
+                    _yaw = ctx.Transform.eulerAngles.y;
+                    if (_guide != null) _guide.transform.rotation = PatternGuideHelper.SectorRotation(_yaw);
+                    // 판정 0.45초 전부터 방향을 굳힌다 — 신호(0.15초)까지 따라 돌아 옆으로 피할 틈이 없었다(10-13 검증)
+                    if (_timer >= Data.windupDuration + Data.signalDuration - LichPatternUtil.MinLead)
+                    {
+                        _aimLocked  = true;
+                        _lockOrigin = LichPatternUtil.OnFloor(ctx, ctx.Transform.position);   // 자리도 굳힌다(10-13 검증 2회차 — 몸이 미끄러져 예고가 마지막 0.35초에 움직였다)
+                        LichPatternUtil.HoldFacing(ctx, _yaw);
+                    }
+                }
                 TryOpenParry(ctx, Data.windupDuration - _timer + Data.signalDuration);
                 if (t >= 1f)
                 {
@@ -180,7 +193,7 @@ public class LichScytheSweepState : UnInterruptibleState<LichScytheSweepPatternS
                 break;
 
             case Phase.Recovery:
-                if (_timer >= Data.recoveryDuration)
+                if (_timer >= LichPatternUtil.Recovery(ctx, Data.recoveryDuration))
                     ctx.Monster.ChangeState<ChaseState>();
                 break;
         }
@@ -219,7 +232,7 @@ public class LichScytheSweepState : UnInterruptibleState<LichScytheSweepPatternS
         }
 
         _swings++;
-        Vector3 origin = LichPatternUtil.OnFloor(ctx, ctx.Transform.position);
+        Vector3 origin = _aimLocked ? _lockOrigin : LichPatternUtil.OnFloor(ctx, ctx.Transform.position);
         Vector3 dir    = Quaternion.Euler(0f, _yaw, 0f) * Vector3.forward;
 
         LichPatternUtil.SlashVfx(origin, dir, Data.sweepRadius, SwingOf(_swings));
@@ -309,7 +322,7 @@ public class LichScytheSweepState : UnInterruptibleState<LichScytheSweepPatternS
 
     private void FollowGuide(MonsterContext ctx)
     {
-        if (_guide == null) return;
+        if (_guide == null || _aimLocked) return;   // 굳힌 뒤엔 제자리
         Vector3 p = LichPatternUtil.OnFloor(ctx, ctx.Transform.position);
         p.y += 0.03f;
         _guide.transform.position = p;

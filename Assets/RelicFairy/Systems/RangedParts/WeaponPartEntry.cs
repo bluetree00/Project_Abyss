@@ -71,6 +71,27 @@ public sealed class WeaponPartEntry
         return base_value + per_level * (level - 1);
     }
 
+    /// <summary>
+    /// 다음에 값이 바뀌는 레벨과 그 값 — UI 「다음 계단」(10-12 A10). 꺼진 파츠(Lv0)는 Lv1 = 켜짐.
+    /// 상한까지 더 바뀌지 않으면 false. 예전 재련소 글은 Lv0에서 Lv1 값을 지금 값으로 보였고(연속형 「다음 단계까지 0강」),
+    /// 계단형 Lv10 · 11에서는 상한(12) 밖 Lv13을 다음 단계로 보였다.
+    /// </summary>
+    public bool TryGetNextStep(int level, out int nextLevel, out float nextValue)
+    {
+        nextLevel = 0; nextValue = 0f;
+        if (level <= 0) { nextLevel = 1; nextValue = ValueAt(1); return true; }
+        float cur = ValueAt(level);
+        int top = max_level > 0 ? max_level : level + UnityEngine.Mathf.Max(1, milestone_every);
+        for (int l = level + 1; l <= top; l++)
+        {
+            float v = ValueAt(l);
+            if (UnityEngine.Mathf.Approximately(v, cur)) continue;
+            nextLevel = l; nextValue = v;
+            return true;
+        }
+        return false;
+    }
+
     /// <summary>데이터가 비었을 때의 비용 기본값 — 차트 미갱신 상태에서도 강화가 공짜가 되지 않게 한다.</summary>
     private const int   DefaultCostBase   = 3;
     private const float DefaultCostGrowth = 1.35f;

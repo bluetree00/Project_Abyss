@@ -97,6 +97,22 @@ public class WeaponData
         formVariants = string.IsNullOrEmpty(formVariants) ? id : formVariants + "," + id;
     }
 
+    /// <summary>세이브에서 온 변주를 이 형 · 단계에 맞게 거른다 — 없는 id · 단계보다 높은 변주 · 같은 단계 두 번째는 버린다(변조 세이브 · 검토 M9).</summary>
+    public void SanitizeFormVariants()
+    {
+        if (form == null || string.IsNullOrEmpty(formVariants)) { formVariants = form == null ? "" : (formVariants ?? ""); return; }
+        var kept = new System.Text.StringBuilder();
+        int usedTiers = 0;
+        foreach (var id in formVariants.Split(','))
+        {
+            if (!form.TryGetVariant(id, out var v) || v.tier < 2 || v.tier > formTier || (usedTiers & (1 << v.tier)) != 0) continue;
+            usedTiers |= 1 << v.tier;
+            if (kept.Length > 0) kept.Append(',');
+            kept.Append(id);
+        }
+        formVariants = kept.ToString();
+    }
+
     public int groundEndCount;
     public int airEndCount;
 

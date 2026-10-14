@@ -29,14 +29,18 @@ public static class MinigameFx
     public static void Sound(string key, float volume, float pitch)
         => Managers.Sound?.PlayUiAsync(key, volume, pitch).Forget();
 
+    /// <summary>표 이벤트로 낸다(10-12) — 클립 · 볼륨은 SoundEventTable이, 피치 · 볼륨 배율은 그 순간 몫(연속 · 등급 · 음계)만 곱한다.</summary>
+    public static void Cue(string eventId, float pitch = 1f, float volume = 1f)
+        => Managers.Sound?.PlayUiEvent(eventId, pitch, volume);
+
     /// <summary>틱 — 카운트다운 · 마지막 5초 · 간발.</summary>
-    public static void Tick(float pitch = 1f) => Sound(SoundKey.Sfx.UiButton, 0.6f, pitch);
+    public static void Tick(float pitch = 1f) => Cue(SoundEvent.UiTick, pitch);
 
     /// <summary>성공음 — 연속 성공이면 한 단계씩 높아진다(최대 8단계).</summary>
-    public static void Success(int streak) => Sound(SoundKey.Sfx.ItemPickup, 0.7f, 1f + 0.06f * Mathf.Clamp(streak, 0, 8));
+    public static void Success(int streak) => Cue(SoundEvent.MgSuccess, 1f + 0.06f * Mathf.Clamp(streak, 0, 8));
 
-    /// <summary>실패 · 틀림 — 낮은 불협음.</summary>
-    public static void Fail() => Sound(SoundKey.Sfx.PlayerHit, 0.7f, 0.6f);
+    /// <summary>실패 · 틀림 — 낮은 불협음. 표 줄 mg_fail = 기존 피격음 중간 단계(sfx_player_hit_medium)를 낮게 쓴다(예전 키 sfx_player_hit는 주소가 없어 무음이었다).</summary>
+    public static void Fail() => Cue(SoundEvent.MgFail, 0.6f);
 
     // ── 화면 ───────────────────────────────────────────────────
 
@@ -81,11 +85,8 @@ public static class MinigameFx
         try     { player.TakeDamage(dmg, null, false, HitWeight.Light); }
         finally { player.OnDamageResolved -= Capture; }
 
-        if (applied)
-        {
-            Flash(HurtColor, 0.25f);
-            Sound(SoundKey.Sfx.PlayerHit, 0.8f, 0.85f);
-        }
+        // 피격음은 플레이어 피격 연출(PlayerHitPresentation — 약)이 낸다. 여기서 또 내면 같은 순간 2개라 뺐다(10-12 — 예전 키는 주소가 없어 무음이었다).
+        if (applied) Flash(HurtColor, 0.25f);
         return applied;
     }
 

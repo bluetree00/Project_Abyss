@@ -22,7 +22,7 @@ MonoBehaviour:
     volume: 0.4
     pitchJitter: 0.06
   - eventId: player_shot
-    sfxKey: sfx_player_shot
+    sfxKey: sfx_player_shot_bow
     volume: 0.3
     pitchJitter: 0.1
   - eventId: player_skill
@@ -50,6 +50,374 @@ MonoBehaviour:
     volume: 0.45
     pitchJitter: 0.08
   - eventId: item_pickup
-    sfxKey: sfx_item_pickup
+    sfxKey: sfx_item_stash
+    volume: 0.45
+    pitchJitter: 0.05
+  - eventId: skill_charge
+    sfxKey: sfx_skill_charge
+    volume: 0.45
+    pitchJitter: 0.04
+  - eventId: skill_buff
+    sfxKey: sfx_skill_buff
+    volume: 0.8
+    pitchJitter: 0.05
+  - eventId: skill_heavy_impact
+    sfxKey: sfx_skill_heavy_impact
+    volume: 0.55
+    pitchJitter: 0.04
+  - eventId: stair_rise
+    sfxKey: sfx_stair_rise
+    volume: 0.3
+    pitchJitter: 0.15
+  - eventId: portal_open
+    sfxKey: sfx_portal_open
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: portal_enter
+    sfxKey: sfx_portal_enter
+    volume: 0.6
+    pitchJitter: 0
+  - eventId: ui_click
+    sfxKey: sfx_ui_click
+    volume: 0.45
+    pitchJitter: 0.04
+  - eventId: ui_select
+    sfxKey: sfx_ui_select
+    volume: 0.35
+    pitchJitter: 0.05
+  - eventId: ui_open
+    sfxKey: sfx_ui_open
+    volume: 0.4
+    pitchJitter: 0
+  - eventId: ui_close
+    sfxKey: sfx_ui_close
+    volume: 0.4
+    pitchJitter: 0
+  - eventId: ui_reject
+    sfxKey: sfx_ui_reject
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: ui_confirm
+    sfxKey: sfx_ui_confirm
+    volume: 0.55
+    pitchJitter: 0
+  - eventId: ui_tick
+    sfxKey: sfx_ui_tick
+    volume: 0.35
+    pitchJitter: 0
+  - eventId: shop_select
+    sfxKey: sfx_shop_select
+    volume: 0.4
+    pitchJitter: 0.05
+  - eventId: shop_buy
+    sfxKey: sfx_shop_buy
+    volume: 0.5
+    pitchJitter: 0.05
+  - eventId: shop_deal
+    sfxKey: sfx_shop_deal
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: shop_reroll
+    sfxKey: sfx_shop_reroll
+    volume: 0.45
+    pitchJitter: 0.05
+  - eventId: crucible_hit
+    sfxKey: sfx_crucible_hit
+    volume: 0.55
+    pitchJitter: 0.06
+  - eventId: crucible_success
+    sfxKey: sfx_crucible_success
+    volume: 0.6
+    pitchJitter: 0
+  - eventId: crucible_jackpot
+    sfxKey: sfx_crucible_jackpot
+    volume: 0.65
+    pitchJitter: 0
+  - eventId: crucible_fail
+    sfxKey: sfx_crucible_fail
+    volume: 0.55
+    pitchJitter: 0
+  - eventId: enhance_success
+    sfxKey: sfx_enhance_success
+    volume: 0.55
+    pitchJitter: 0
+  - eventId: crucible_evolve
+    sfxKey: sfx_crucible_evolve
+    volume: 0.65
+    pitchJitter: 0
+  - eventId: crucible_promote
+    sfxKey: sfx_crucible_promote
+    volume: 0.65
+    pitchJitter: 0
+  - eventId: smith_hammer
+    sfxKey: sfx_smith_hammer
+    volume: 0.25
+    pitchJitter: 0.08
+  - eventId: refine_spin
+    sfxKey: sfx_refine_spin
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: refine_reveal
+    sfxKey: sfx_refine_reveal
+    volume: 0.55
+    pitchJitter: 0
+  - eventId: refine_lit
+    sfxKey: sfx_refine_lit
+    volume: 0.35
+    pitchJitter: 0
+  - eventId: refine_legend
+    sfxKey: sfx_refine_legend
+    volume: 0.65
+    pitchJitter: 0
+  - eventId: covenant_pick
+    sfxKey: sfx_covenant_pick
+    volume: 0.4
+    pitchJitter: 0.05
+  - eventId: covenant_reroll
+    sfxKey: sfx_covenant_reroll
+    volume: 0.4
+    pitchJitter: 0.05
+  - eventId: covenant_fix
+    sfxKey: sfx_covenant_fix
+    volume: 0.4
+    pitchJitter: 0
+  - eventId: covenant_forge
+    sfxKey: sfx_covenant_forge
+    volume: 0.55
+    pitchJitter: 0
+  - eventId: clause_silver
+    sfxKey: sfx_clause_silver
+    volume: 0.3
+    pitchJitter: 0
+  - eventId: clause_gold
+    sfxKey: sfx_clause_gold
+    volume: 0.35
+    pitchJitter: 0
+  - eventId: clause_ruby
+    sfxKey: sfx_clause_ruby
+    volume: 0.35
+    pitchJitter: 0
+  - eventId: rune_flip
+    sfxKey: sfx_rune_flip
+    volume: 0.4
+    pitchJitter: 0.08
+  - eventId: rune_legend
+    sfxKey: sfx_rune_legend
+    volume: 0.6
+    pitchJitter: 0
+  - eventId: rune_take
+    sfxKey: sfx_rune_take
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: rune_lift
+    sfxKey: sfx_rune_lift
+    volume: 0.35
+    pitchJitter: 0.08
+  - eventId: rune_place
+    sfxKey: sfx_rune_place
+    volume: 0.45
+    pitchJitter: 0.06
+  - eventId: rune_return
+    sfxKey: sfx_rune_return
+    volume: 0.4
+    pitchJitter: 0
+  - eventId: rune_salvage
+    sfxKey: sfx_rune_salvage
+    volume: 0.45
+    pitchJitter: 0
+  - eventId: rune_reset
+    sfxKey: sfx_rune_reset
+    volume: 0.45
+    pitchJitter: 0
+  - eventId: forge_take
+    sfxKey: sfx_forge_take
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: rest_forge
+    sfxKey: sfx_rest_forge
+    volume: 0.55
+    pitchJitter: 0
+  - eventId: rest_heal
+    sfxKey: sfx_rest_heal
+    volume: 0.6
+    pitchJitter: 0
+  - eventId: altar_buy
+    sfxKey: sfx_altar_buy
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: altar_engrave
+    sfxKey: sfx_altar_engrave
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: altar_grow
+    sfxKey: sfx_altar_grow
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: altar_keystone
+    sfxKey: sfx_altar_keystone
+    volume: 0.6
+    pitchJitter: 0
+  - eventId: altar_era
+    sfxKey: sfx_altar_era
+    volume: 0.65
+    pitchJitter: 0
+  - eventId: memory_absorb
+    sfxKey: sfx_memory_absorb
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: memory_take
+    sfxKey: sfx_memory_take
+    volume: 0.55
+    pitchJitter: 0
+  - eventId: memory_redraw
+    sfxKey: sfx_memory_redraw
+    volume: 0.4
+    pitchJitter: 0
+  - eventId: esc_memory_page
+    sfxKey: sfx_esc_memory_page
+    volume: 0.4
+    pitchJitter: 0
+  - eventId: result_reveal
+    sfxKey: sfx_result_reveal
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: result_count
+    sfxKey: sfx_result_count
+    volume: 0.4
+    pitchJitter: 0
+  - eventId: quest_done
+    sfxKey: sfx_quest_done
+    volume: 0.45
+    pitchJitter: 0
+  - eventId: fuel_material
+    sfxKey: sfx_fuel_material
+    volume: 0.4
+    pitchJitter: 0.08
+  - eventId: fuel_ore
+    sfxKey: sfx_fuel_ore
+    volume: 0.4
+    pitchJitter: 0.08
+  - eventId: essence_pickup
+    sfxKey: sfx_essence_pickup
+    volume: 0.3
+    pitchJitter: 0.1
+  - eventId: gate_seal
+    sfxKey: sfx_gate_seal
     volume: 0.6
     pitchJitter: 0.05
+  - eventId: room_clear
+    sfxKey: sfx_room_clear
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: gamble_open
+    sfxKey: sfx_gamble_open
+    volume: 0.55
+    pitchJitter: 0
+  - eventId: vault_open
+    sfxKey: sfx_vault_open
+    volume: 0.5
+    pitchJitter: 0.08
+  - eventId: buffbox_open
+    sfxKey: sfx_buffbox_open
+    volume: 0.5
+    pitchJitter: 0.05
+  - eventId: sacrifice_offer
+    sfxKey: sfx_sacrifice_offer
+    volume: 0.55
+    pitchJitter: 0
+  - eventId: oracle_choose
+    sfxKey: sfx_oracle_choose
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: spring_drink
+    sfxKey: sfx_spring_drink
+    volume: 0.55
+    pitchJitter: 0
+  - eventId: sword_pickup
+    sfxKey: sfx_sword_pickup
+    volume: 0.6
+    pitchJitter: 0
+  - eventId: reward_charge
+    sfxKey: sfx_reward_charge
+    volume: 0.4
+    pitchJitter: 0
+  - eventId: reward_grade
+    sfxKey: sfx_reward_grade
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: reward_arrive
+    sfxKey: sfx_reward_arrive
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: mg_success
+    sfxKey: sfx_mg_success
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: mg_fail
+    sfxKey: sfx_player_hit_medium
+    volume: 0.55
+    pitchJitter: 0
+  - eventId: mg_start
+    sfxKey: sfx_mg_start
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: mg_card
+    sfxKey: sfx_mg_card
+    volume: 0.45
+    pitchJitter: 0
+  - eventId: mg_grade_up
+    sfxKey: sfx_mg_grade_up
+    volume: 0.45
+    pitchJitter: 0
+  - eventId: mg_grade_down
+    sfxKey: sfx_mg_grade_down
+    volume: 0.45
+    pitchJitter: 0
+  - eventId: mg_stamp
+    sfxKey: sfx_mg_stamp
+    volume: 0.55
+    pitchJitter: 0
+  - eventId: mg_note
+    sfxKey: sfx_mg_note
+    volume: 0.5
+    pitchJitter: 0
+  - eventId: potion_use
+    sfxKey: sfx_potion_use
+    volume: 0.5
+    pitchJitter: 0.05
+  - eventId: player_die
+    sfxKey: sfx_player_die
+    volume: 0.6
+    pitchJitter: 0
+  - eventId: costume_up
+    sfxKey: sfx_costume_up
+    volume: 0.35
+    pitchJitter: 0
+  - eventId: relic_harvest
+    sfxKey: sfx_relic_harvest
+    volume: 0.45
+    pitchJitter: 0.03
+  - eventId: relic_bloom
+    sfxKey: sfx_relic_bloom
+    volume: 0.35
+    pitchJitter: 0.06
+  - eventId: relic_rend
+    sfxKey: sfx_relic_rend
+    volume: 0.45
+    pitchJitter: 0.06
+  - eventId: relic_grudge_wave
+    sfxKey: sfx_relic_grudge_wave
+    volume: 0.45
+    pitchJitter: 0.04
+  - eventId: form_windblade
+    sfxKey: sfx_form_windblade
+    volume: 0.5
+    pitchJitter: 0.05
+  - eventId: form_weight
+    sfxKey: sfx_form_weight
+    volume: 0.6
+    pitchJitter: 0.04
+  - eventId: skill_tier_up
+    sfxKey: sfx_skill_tier_up
+    volume: 0.4
+    pitchJitter: 0

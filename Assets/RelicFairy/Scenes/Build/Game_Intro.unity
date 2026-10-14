@@ -1593,7 +1593,10 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   castRadius: 0.3
+  nearDistance: 0
+  nearRadius: 2.5
   hiddenAlpha: 0.15
+  nearHiddenAlpha: 0.06
   fadeSpeed: 8
 --- !u!114 &330585552
 MonoBehaviour:
@@ -2624,7 +2627,6 @@ MonoBehaviour:
   lichVanishDuration: 1
   mordredTransform: {fileID: 984135922}
   mordredActor: {fileID: 984135921}
-  mordredChestPoint: {fileID: 1321605735}
   lichPortalVfxPrefab: {fileID: 5514321952988987512, guid: 63e8dd4e6545e2541b0b3fc31c548509,
     type: 3}
   lichAuraVfxPrefab: {fileID: 4832121135125949560, guid: d67be8e74f13e26429aece1e53a117b7,
@@ -2632,29 +2634,24 @@ MonoBehaviour:
   lichCastVfxPrefab: {fileID: 0}
   chainStrikeVfxPrefab: {fileID: 1290426356431852618, guid: 32614a0360ca45044b4436c4f3c5a6a9,
     type: 3}
-  chainToCorruptGap: 1.2
   bindChainVfxPrefab: {fileID: 4832121135125949560, guid: d67be8e74f13e26429aece1e53a117b7,
     type: 3}
   swordRenderer: {fileID: 2115833843}
-  swordCorruptedColor: {r: 0.18, g: 0.06, b: 0.24, a: 1}
-  swordCorruptDuration: 2
   atmosphere: {fileID: 819366185}
   preDimAmount: 0.35
   fadeDuration: 1
   grandTransitionDuration: 2.5
-  camMoveDuration: 1.6
   useLetterbox: 1
   letterboxDuration: 0.5
   letterboxAspect: 2.39
   letterboxSortingOrder: 150
   hudFadeDuration: 0.8
-  hudFadeDelay: 6
   swordHandOverDuration: 1.4
   namelessWeaponKey: T0_Nameless
   rangedWeaponKey: T1_Bow
   rangedTutorialLines:
-  - "\uD0C0\uB77D\uD55C \uAE30\uC0AC\uB294 \uAC80\uC774 \uB2FF\uC9C0 \uC54A\uB294\uB2E4.
-    \u2014 \uC6D0\uAC70\uB9AC \uBB34\uAE30\uB85C \uB9DE\uC11C\uB77C."
+  - "\uD0C0\uB77D\uD55C \uBAA8\uB974\uB4DC\uB808\uB4DC\uC5D0\uAC90 \uAC80\uC774 \uB2FF\uC9C0
+    \uC54A\uB294\uB2E4. \u2014 \uC6D0\uAC70\uB9AC \uBB34\uAE30\uB85C \uB9DE\uC11C\uB77C."
   - "[2] \uD0A4\uB85C \uC6D0\uAC70\uB9AC \uBB34\uAE30\uB97C \uB4E4\uACE0, \uC870\uC900\uD574
     \uACF5\uACA9\uD558\uB77C."
   rangedTutorialGap: 3.5
@@ -3672,6 +3669,7 @@ MonoBehaviour:
   darkFog: {r: 0.05, g: 0.05, b: 0.09, a: 1}
   brightFogDensity: 0.004
   darkFogDensity: 0.018
+  darkSkyExposure: 0.08
   startBright: 1
 --- !u!4 &819366186
 Transform:

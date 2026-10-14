@@ -213,6 +213,7 @@ public class StartRoomGate : MonoBehaviour
     // ── 봉인 석문 (스타트 방 모드) ──────────────────────────────────
     private Vector3 _sealDoorClosedPos;   // 닫힌 자리 — 문을 세운 방식에 따라 다르다(SealDoorFit = 개구부 중앙 · 옛 규약 = 코너 피벗)
     private Transform[] _sealHinges;      // 젖힘 문(10-06 · 나무문 팔레트) 경첩 — null이면 위로 걷힌다
+    private bool        _sealDissolve;    // 디졸브 문(10-06) — 열릴 때 사라진다
 
     private void EnsureSealDoor()
     {
@@ -240,6 +241,7 @@ public class StartRoomGate : MonoBehaviour
             _sealDoorClosedPos = new Vector3(0f, _gateHeight * 0.5f, 0f);
             if (_injectedCorridorPalette != null && _injectedCorridorPalette.SealDoorMotion == SealDoorMotion.Swing)
                 _sealHinges = SealDoorFit.BuildHinges(door.transform);
+            _sealDissolve = _injectedCorridorPalette != null && _injectedCorridorPalette.SealDoorMotion == SealDoorMotion.Dissolve;
         }
         else
         {
@@ -266,6 +268,7 @@ public class StartRoomGate : MonoBehaviour
     {
         if (_sealDoor != null) _sealDoor.localPosition = _sealDoorClosedPos;
         SealDoorFit.SetSwing(_sealHinges, 1f, 0f);
+        if (_sealDoor != null && _sealDissolve && !_sealDoor.gameObject.activeSelf) _sealDoor.gameObject.SetActive(true);   // 재질은 열 때 되돌려 둠
     }
 
     private async UniTaskVoid OpenSealDoorAsync()
@@ -276,6 +279,14 @@ public class StartRoomGate : MonoBehaviour
         // 나무문은 바깥(플레이어 반대쪽)으로 젖혀 열린다(10-06) — 바깥은 지금 플레이어 자리로 정한다
         var   pt      = Managers.Player != null ? Managers.Player.PlayerTransform : null;
         float outward = pt != null && Vector3.Dot(transform.forward, transform.position - pt.position) < 0f ? -1f : 1f;
+
+        // 디졸브 문(10-06) — 먼지 없이 사라지며 열린다
+        if (_sealDissolve)
+        {
+            Managers.Sound?.PlayEvent(SoundEvent.DoorOpen);
+            await SealDoorFit.DissolveOpenAsync(_sealDoor.gameObject, this.GetCancellationTokenOnDestroy());
+            return;
+        }
 
         // 열림 임팩트 — 먼지 + 문 열림 사운드
         var dust = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.GateSealDustVfx : null;
@@ -327,6 +338,7 @@ public class StartRoomGate : MonoBehaviour
     {
         if (_startCorridorBuilt) return;
         _startCorridorBuilt = true; // 팔레트 미지정이어도 매 프레임 재시도 방지(1회만)
+        EnsureGateFrame(create: true);   // 문틀(10-07) — 팔레트가 주입된 뒤라 여기서 세운다
 
         var palette    = _injectedCorridorPalette != null ? _injectedCorridorPalette : startCorridorPalette;
         int wallLayers = _injectedCorridorWallLayers > 0 ? _injectedCorridorWallLayers : startCorridorWallLayers;
@@ -448,6 +460,78 @@ public class StartRoomGate : MonoBehaviour
             lintel.localPosition = new Vector3(0f, _gateHeight + ps.y * 0.5f, 0f);
             lintel.localScale    = new Vector3(_gateWidth, ps.y, ps.z);
         }
+
+        EnsureGateFrame(create: false);   // 이미 선 문틀만 크기에 다시 맞춘다(Awake는 팔레트 주입 전이다)
+    }
+
+    // 문틀(10-07) — 전투방 출구와 같은 팔레트 문틀. 프리팹은 20×12 m 개구부 기준 · 피벗 = 개구부 가운데(RunFlowController.SpawnGateFrame과 같은 규약).
+    private const float FrameRefW = 20f;
+    private const float FrameRefH = 12f;
+    private const float LintelClearance = 1.04f;                                    // 상인방 아랫면 = 문 꼭대기 × 이 값
+    private const float GateTorchIntensity = 2.5f;                                  // 방 벽 횃불과 같은 줄(HDRP 원본 51.7 — 10-06 입구 과노출)
+    private static readonly Color GateTorchColor = new Color(1f, 0.72f, 0.45f);
+    private readonly List<(Transform torch, Vector3 pos, Vector3 scale)> _frameTorches = new();   // 문틀 횃불 원래 자리 · 크기(배율을 바꿔도 겹쳐 쌓이지 않게)
+
+    /// <summary>
+    /// 대기방 문에 팔레트 문틀을 세운다(사용자 10-07 「대기방 입구도 신경써야 해」 — 회색 캡슐 기둥 · 큐브 상인방이 그대로 보였다).
+    /// <paramref name="create"/> = 없으면 세운다(주입 뒤 첫 Update) · false면 이미 선 문틀만 크기에 맞춘다(ResizeGate).
+    /// 문틀이 서면 원시 도형 기둥 · 상인방은 렌더러만 끈다(위치 · 충돌은 그대로). 팔레트에 문틀이 없으면 지금처럼 둔다.
+    /// </summary>
+    private void EnsureGateFrame(bool create)
+    {
+        var frame = transform.Find("GateFrame");
+        if (frame == null)
+        {
+            if (!create) return;
+            var palette     = _injectedCorridorPalette != null ? _injectedCorridorPalette : startCorridorPalette;
+            var framePrefab = palette != null ? palette.GateFramePrefab : null;
+            if (framePrefab == null) return;
+            var go = Instantiate(framePrefab, transform);
+            go.name = "GateFrame";
+            foreach (var torch in go.GetComponentsInChildren<Light>(true))
+            {
+                torch.intensity = Mathf.Min(torch.intensity, GateTorchIntensity);
+                torch.color     = GateTorchColor;
+            }
+            foreach (var col in go.GetComponentsInChildren<Collider>()) Destroy(col);   // 통과 판정은 게이트 트리거가 맡는다
+            frame = go.transform;
+            _frameTorches.Clear();
+            foreach (var name in new[] { "Torch_L", "Torch_R" })
+                if (frame.Find(name) is Transform torch) _frameTorches.Add((torch, torch.localPosition, torch.localScale));
+        }
+        frame.localRotation = Quaternion.identity;
+
+        // 가로 기준 배율(전투방 문틀과 같은 규약)만 쓰면 대기방 개구부(세로가 긴 6.5×5 m)에선 상인방이
+        // 문 꼭대기가 아니라 문 허리(약 4 m)를 지나고 문틀이 바닥에서 0.55 m 떠 있었다(10-07 실측).
+        // → 상인방 아랫면이 문 위에 오도록 배율을 키우고 문틀 바닥을 개구부 바닥에 붙인다. 기둥은 벽 속으로 들어가 안 보인다.
+        float kw = Mathf.Min(_gateWidth / FrameRefW, _gateHeight / FrameRefH);
+        float k  = kw;
+        var lintel = frame.Find("Lintel");
+        if (lintel != null)
+        {
+            frame.localPosition = Vector3.zero;
+            frame.localScale    = Vector3.one;
+            float bottom = float.MaxValue;
+            foreach (var r in lintel.GetComponentsInChildren<Renderer>())
+                bottom = Mathf.Min(bottom, frame.InverseTransformPoint(r.bounds.min).y);
+            float fromFloor = bottom + FrameRefH * 0.5f;   // 배율 1 · 문틀 바닥 기준 상인방 아랫면 높이
+            if (bottom < float.MaxValue && fromFloor > 0.01f) k = Mathf.Max(kw, _gateHeight * LintelClearance / fromFloor);
+        }
+        frame.localScale    = new Vector3(k, k, k);
+        frame.localPosition = new Vector3(0f, FrameRefH * 0.5f * k, 0f);   // 문틀 바닥 = 개구부 바닥(피벗은 문틀 가운데)
+
+        // 횃불은 가로 기준 배율의 자리 · 크기 그대로 — 키운 문틀을 따라 벽 속으로 들어가거나 커지지 않게(바닥 높이는 그대로).
+        float tk = kw / k;
+        foreach (var (torch, pos, scale) in _frameTorches)
+        {
+            if (torch == null) continue;
+            torch.localPosition = new Vector3(pos.x * tk, pos.y, pos.z * tk);
+            torch.localScale    = scale * tk;
+        }
+
+        foreach (var name in new[] { "Pillar_L", "Pillar_R", "Lintel" })
+            if (transform.Find(name) is Transform t)
+                foreach (var r in t.GetComponentsInChildren<Renderer>()) r.enabled = false;
     }
 
     private void ApplyCategoryColor()

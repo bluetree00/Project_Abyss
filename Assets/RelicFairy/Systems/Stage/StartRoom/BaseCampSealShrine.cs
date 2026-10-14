@@ -34,7 +34,7 @@ public sealed class BaseCampSealShrine : MonoBehaviour
 
     // ── Serialized ────────────────────────────────────────────────
     [Header("보스 (Ch1~4 순)")]
-    [SerializeField] private string[] bossNames  = { "숲의 수호자", "화룡", "죽음의 기사", "리치" };
+    [SerializeField] private string[] bossNames  = { "숲의 수호자", "화룡", "타락한 모르드레드", "리치" };
     [SerializeField] private Color[]  bossColors =
     {
         new(0.35f, 0.95f, 0.45f), new(1f, 0.45f, 0.18f), new(0.62f, 0.8f, 1f), new(0.72f, 0.42f, 1f),
@@ -260,7 +260,7 @@ public sealed class BaseCampSealShrine : MonoBehaviour
                 mist     = boss;
                 light    = boss;
                 lightK   = 0.25f;
-                mistRate = 10f;
+                mistRate = 3f;   // 10은 네 섬 중 아무 일 없는 상태가 가장 요란했다(10-11 톤 2차 V-13)
                 chainK   = 0f;
                 break;
         }
