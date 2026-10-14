@@ -404,8 +404,11 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
 
         bool isHeavy = _fgBB.IsBigWindowOpen;
 
+        // 화살은 그로기 · 방어도를 안 깎는다 — 타수 많은 화살이 보스를 계속 경직시켰다(10-15 사용자 「넉백 같은 건 보스에서 최소화」)
+        bool arrow = MonsterPoise.PendingNoFlinch;
+
         // 그로기는 2페이즈에서만 발동
-        if (_fgBB.IsPhase2)
+        if (_fgBB.IsPhase2 && !arrow)
             _fgBB.ApplyToughnessDamage(ForestGuardianBlackboard.NormalHitDamage, isHeavy);
 
         if (_fgBB.IsGroggy)
@@ -415,7 +418,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
         }
 
         // 방어도 데미지 — 파괴되면 GetHit 방향 경직 발동, 그렇지 않으면 추적 유지
-        bool poiseBroke = _fgBB.ApplyPoiseDamage(isHeavy);
+        bool poiseBroke = !arrow && _fgBB.ApplyPoiseDamage(isHeavy);
         if (!poiseBroke)
             _suppressGetHitThisHit = true;   // base의 ChangeState<GetHitState>() 스킵
         // poiseBroke=true 이면 _suppressGetHitThisHit = false 유지 → base가 GetHitState 진입

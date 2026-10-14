@@ -52,7 +52,7 @@ public sealed class WindbladeForm : WeaponFormBase
         int n = FormStrike.Line(Player, _dodgeFrom, to - _dodgeFrom, len, HalfWidth, Atk * StillWindRatio, _buf);
         if (len > 0.3f) FormStrike.PlayVfx(Def.TriggerVfxKey, _dodgeFrom + Vector3.up, to - _dodgeFrom,
                                            Def.TriggerVfxScale * Mathf.Clamp(len / Mathf.Max(0.1f, Def.TriggerRange), 0.25f, 1f));   // 지나간 길 길이만큼(풍절 8 m 배율 기준 · 10-13)
-        if (len > 0.3f) FormStrike.GroundStrip(_dodgeFrom, to - _dodgeFrom, len, HalfWidth + StripBody, StripSeconds, Def.Tint);
+        if (len > 0.3f) FormStrike.GroundStrip(_dodgeFrom, to - _dodgeFrom, len, HalfWidth + StripBody, StripSeconds);
         Log($"무풍 — 맞힘 {n}");
         if (n > 0) RaiseTriggered("무풍");
     }
@@ -65,7 +65,7 @@ public sealed class WindbladeForm : WeaponFormBase
             Vector3 end = _returnFrom + _returnDir * Def.TriggerRange;
             int n = FormStrike.Line(Player, end, -_returnDir, Def.TriggerRange, HalfWidth, Atk * Def.TriggerAtkRatio, _buf);
             FormStrike.PlayVfx(Def.TriggerVfxKey, end + Vector3.up, -_returnDir, Def.TriggerVfxScale);
-            FormStrike.GroundStrip(end, -_returnDir, Def.TriggerRange, HalfWidth + StripBody, StripSeconds, Def.Tint);
+            FormStrike.GroundStrip(end, -_returnDir, Def.TriggerRange, HalfWidth + StripBody, StripSeconds);
             Log($"되감는 바람 — 맞힘 {n}");
         }
         if (!Holding) { _lastHitAt += dt; return; }   // 원거리를 든 동안 쉬는 시간을 세지 않는다
@@ -87,15 +87,15 @@ public sealed class WindbladeForm : WeaponFormBase
             hits = FormStrike.Lines(Player, from, left, right, Def.TriggerRange, HalfWidth, dmg, _buf);
             FormStrike.PlayVfx(Def.TriggerVfxKey, from + Vector3.up, left,  Def.TriggerVfxScale);
             FormStrike.PlayVfx(Def.TriggerVfxKey, from + Vector3.up, right, Def.TriggerVfxScale);
-            FormStrike.GroundStrip(from, left,  Def.TriggerRange, HalfWidth + StripBody, StripSeconds, Def.Tint);
-            FormStrike.GroundStrip(from, right, Def.TriggerRange, HalfWidth + StripBody, StripSeconds, Def.Tint);
+            FormStrike.GroundStrip(from, left,  Def.TriggerRange, HalfWidth + StripBody, StripSeconds);
+            FormStrike.GroundStrip(from, right, Def.TriggerRange, HalfWidth + StripBody, StripSeconds);
             Log($"쌍풍 — 맞힘 {hits}");
         }
         else
         {
             hits = FormStrike.Line(Player, from, dir, Def.TriggerRange, HalfWidth, dmg, _buf);
             FormStrike.PlayVfx(Def.TriggerVfxKey, from + Vector3.up, dir, Def.TriggerVfxScale);
-            FormStrike.GroundStrip(from, dir, Def.TriggerRange, HalfWidth + StripBody, StripSeconds, Def.Tint);
+            FormStrike.GroundStrip(from, dir, Def.TriggerRange, HalfWidth + StripBody, StripSeconds);
         }
         if (Has(ReturnWind)) { _returnAt = Time.time + ReturnDelay; _returnFrom = from; _returnDir = dir; }
         int back = Has(StormEye) ? Mathf.Min(StormEyeCap, hits) : 0;

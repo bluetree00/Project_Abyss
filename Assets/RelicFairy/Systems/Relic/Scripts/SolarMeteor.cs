@@ -29,8 +29,9 @@ public sealed class SolarMeteor : MonoBehaviour
     private const int    RingSegments = 64;
     private const float  RingWidth    = 0.18f;
     private const float  RingLift     = 0.06f;   // 지면 z-파이팅 방지용 살짝 띄움
-    private static readonly Color RingColor       = new(1f, 0.72f, 0.20f, 0.85f);   // 태양빛 주황금
-    private static readonly Color RingImpactColor = new(1f, 0.95f, 0.55f, 1f);      // 착탄 순간 백열
+    // 조준 링 = 플레이어 범위 표시(SkillRangeRing.PlayerGuideColor) — 태양빛 주황금은 화룡 운석 예고(노랑 → 빨강)와 섞였다(10-15 사용자 「누가 쓴 건지 구분하기 어렵다」).
+    private static readonly Color RingColor       = SkillRangeRing.PlayerGuideColor;
+    private static readonly Color RingImpactColor = new(1f, 1f, 1f, 1f);      // 착탄 순간 백열
     // 작열 지대 테두리(10-11) — 지대는 그림 없이 4초 동안 피해만 줘 「보이지 않는 불」이었다. 조준 링을 지대 반경으로 줄여 남긴다.
     private const float  ZoneRingWidth = 0.1f;
     private const float  ZoneRingAlpha = 0.45f;

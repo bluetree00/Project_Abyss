@@ -3337,8 +3337,8 @@ public static class WeaponFormProbeEditor
         PatternGuideHelper.Arm(t2);
         SkillRangeRing.Circle(c + rt * 2.6f, 1.5f, 6f);
         SkillRangeRing.Fan(c + rt * 2.6f + fw * 2.4f, fw, 3f, 90f, 6f);
-        FormStrike.GroundRing(c + fw * 7.5f, 1.5f, 6f, new Color(1f, 0.55f, 0.25f));   // 고치기 전 사진용(속성색) — 고친 뒤엔 색 인자가 없다
-        FormStrike.GroundStrip(c + fw * 4.5f - rt * 0.8f, fw, 1.5f, 0.4f, 6f, new Color(1f, 0.55f, 0.25f));
+        FormStrike.GroundRing(c + fw * 7.5f, 1.5f, 6f);
+        FormStrike.GroundStrip(c + fw * 4.5f - rt * 0.8f, fw, 1.5f, 0.4f, 6f);
         await ShotUi("GU_1", 400);
         string path = Path.Combine(Directory.GetCurrentDirectory(), "Temp", "ui_shots", "GU_1.png");
         sb.AppendLine($"   적 예고 데칼 {(t1 != null && t2 != null ? "있음" : "없음")} · 사진 {path}");
@@ -3375,7 +3375,13 @@ public static class WeaponFormProbeEditor
                 float t0 = Time.realtimeSinceStartup, nextPush = 0f;
                 while (Time.realtimeSinceStartup - t0 < 3f)
                 {
-                    if (Time.realtimeSinceStartup >= nextPush) { HideStrays(); Steer(p, m.transform.position); p.InputBuffer.Push(Command.Light); nextPush = Time.realtimeSinceStartup + 0.1f; }
+                    if (Time.realtimeSinceStartup >= nextPush)
+                    {
+                        // 파도 몬스터만 끈다 — HideStrays는 추적 목록에 없는 이 슬라임까지 꺼서 1회차 맞힘 0이었다
+                        foreach (var o in UnityEngine.Object.FindObjectsByType<MonsterBase>(FindObjectsSortMode.None))
+                            if (o != null && o != m && !o.IsDead) o.gameObject.SetActive(false);
+                        Steer(p, m.transform.position); p.InputBuffer.Push(Command.Light); nextPush = Time.realtimeSinceStartup + 0.1f;
+                    }
                     bool stun = m.IsInState<GetHitState>();
                     if (stun && !wasStun) stuns++;
                     wasStun = stun;
@@ -3457,8 +3463,9 @@ public static class WeaponFormProbeEditor
         var savedPlaced = placed != null ? new List<RuntimeItemData>(placed) : null;
         var parts = RangedPartsState.Current;
         var savedParts = new List<RangedPartsState.Equipped>(parts.Equipped_);
-        int hits = 0;
-        Action<HitInfo> onHit = h => { if (h.Attacker == p.gameObject) hits++; };
+        int hits = 0, crits = 0;
+        float dealt = 0f;
+        Action<HitInfo> onHit = h => { if (h.Attacker == p.gameObject) { hits++; dealt += h.Damage; if (h.IsCritical) crits++; } };
         HitFeedbackService.OnHit += onHit;
         try
         {
@@ -3467,7 +3474,12 @@ public static class WeaponFormProbeEditor
             if (t == null) { sb.AppendLine("   슬라임 부르기 실패"); return; }
             aim = t.M.transform.position;
             var line = new StringBuilder("   석궁 단계(새 화살/맞힘): ");
-            async UniTask StageAsync(string label) { hits = 0; int s = await ShootAsync(label, 1.5f); line.Append($"{label} {s}/{hits} · "); }
+            async UniTask StageAsync(string label)
+            {
+                hits = 0; crits = 0; dealt = 0f;
+                int s = await ShootAsync(label, 3f);
+                line.Append($"{label} {s}/{hits} 한 발 {(hits > 0 ? dealt / hits : 0f):0.0}(치명 {crits}) · ");
+            }
             await StageAsync("① 석궁만");
             parts.Restore(new[] { new RangedPartsState.Equipped { partId = b.part, level = 2 } });
             await StageAsync("② 거력 Lv2");

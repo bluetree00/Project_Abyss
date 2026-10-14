@@ -141,7 +141,7 @@ public sealed class WeightForm : WeaponFormBase
         {
             _fissureUntil = Time.time + FissureSeconds;
             _fissureNext  = Time.time + FissureInterval;
-            FormStrike.GroundRing(_slamAt, Def.TriggerRange, FissureSeconds, Def.Tint);   // 판정 3.5 m인데 이펙트는 그 30%라 경계가 안 보였다(10-12 B9)
+            FormStrike.GroundRing(_slamAt, Def.TriggerRange, FissureSeconds);   // 판정 3.5 m인데 이펙트는 그 30%라 경계가 안 보였다(10-12 B9)
         }
         SetStacks(0, StackReason.Trigger);
         Log($"내려찍기 — 맞힘 {hits}");

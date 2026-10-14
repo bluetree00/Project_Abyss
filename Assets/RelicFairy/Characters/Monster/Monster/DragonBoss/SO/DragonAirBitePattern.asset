@@ -48,7 +48,7 @@ MonoBehaviour:
   _attackDamage: 24
   _fireballPrefab: {fileID: 1839445213900760, guid: 35e4510b293ebbf41b420c5953592cb1,
     type: 3}
-  _fireballScale: 1.5
+  _fireballScale: 0.49
   _explosionPrefab: {fileID: 0}
   _explosionScale: 1
   _warningMarkerPrefab: {fileID: 1173698457435006, guid: a8b2d1c44c0f47ac9aab7c77d9f3b891,

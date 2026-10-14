@@ -82,7 +82,8 @@ public static class FormStrike
     /// 바닥에 얇은 고리를 seconds 동안 남긴다(형 색) — 남아 있는 판정 자리의 경계를 보인다(균열 · 10-12 B9).
     /// 마지막 0.3초에 옅어지며 사라진다. 방이 바뀌어 오브젝트가 사라지면 그대로 끝난다.
     /// </summary>
-    public static void GroundRing(Vector3 center, float radius, float seconds, Color color)
+    /// <summary>바닥 고리(판정 반경) — 플레이어 표시 색(<see cref="SkillRangeRing.PlayerGuideColor"/>)의 얇은 선(10-15 적 예고와 구분).</summary>
+    public static void GroundRing(Vector3 center, float radius, float seconds)
     {
         if (radius <= 0f || seconds <= 0f) return;
         var go = new GameObject("FormGroundRing");
@@ -101,6 +102,7 @@ public static class FormStrike
             float a = i * Mathf.PI * 2f / RingSegments;
             lr.SetPosition(i, new Vector3(Mathf.Cos(a) * radius, 0f, Mathf.Sin(a) * radius));
         }
+        Color color = SkillRangeRing.PlayerGuideColor;
         color.a = RingAlpha;
         lr.startColor = lr.endColor = color;
         FadeRingAsync(lr, mat, seconds, color, go.GetCancellationTokenOnDestroy()).Forget();
@@ -110,7 +112,7 @@ public static class FormStrike
     /// 바닥에 얇은 띠(직사각형) 외곽선을 seconds 동안 — 직선 판정(참격파 · 궤적 베기)의 폭을 보인다(10-13 이펙트 = 판정).
     /// 끝은 판정처럼 반폭만큼 둥글게 넘는 몫을 포함해 길이 + 반폭 × 2로 그린다.
     /// </summary>
-    public static void GroundStrip(Vector3 from, Vector3 dir, float length, float halfWidth, float seconds, Color color)
+    public static void GroundStrip(Vector3 from, Vector3 dir, float length, float halfWidth, float seconds)
     {
         dir.y = 0f;
         if (dir.sqrMagnitude < 1e-4f || length <= 0f || halfWidth <= 0f || seconds <= 0f) return;
@@ -133,6 +135,7 @@ public static class FormStrike
         lr.SetPosition(1, new Vector3((b - right).x, y, (b - right).z));
         lr.SetPosition(2, new Vector3((b + right).x, y, (b + right).z));
         lr.SetPosition(3, new Vector3((a + right).x, y, (a + right).z));
+        Color color = SkillRangeRing.PlayerGuideColor;   // 플레이어 표시 색 — 속성색(주황 · 빨강)은 적 예고와 섞였다(10-15)
         color.a = RingAlpha;
         lr.startColor = lr.endColor = color;
         FadeRingAsync(lr, mat, seconds, color, go.GetCancellationTokenOnDestroy()).Forget();

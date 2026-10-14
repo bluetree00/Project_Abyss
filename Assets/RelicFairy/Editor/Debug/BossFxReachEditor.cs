@@ -166,6 +166,7 @@ internal static class BossFxReachEditor
     private static readonly (string tag, string path, float judge)[] FitDragon =
     {
         ("meteor", "Assets/RelicFairy/Characters/Monster/Monster/DragonBoss/Art/Effects/Meteor.prefab", 1.5f),
+        ("bite",   "Assets/RelicFairy/Characters/Monster/Monster/DragonBoss/Art/Effects/Meteor.prefab", 2.35f),   // 물기 화염구 — 판정 반경 2.35 m(10-15)
     };
 
     [MenuItem("RelicFairy/Boss/FX Fit - Dragon Meteor (Play)")]

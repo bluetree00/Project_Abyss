@@ -507,7 +507,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     {
         if (_dkBB == null) return;
 
-        bool armorBroke = _dkBB.ApplyArmorDamage(isHeavy: false);
+        bool armorBroke = !MonsterPoise.PendingNoFlinch && _dkBB.ApplyArmorDamage(isHeavy: false);   // 화살은 아머를 안 깎는다(10-15 — 보스 경직 최소화)
         if (!armorBroke)
             _suppressGetHitThisHit = true;  // 아머 미파괴 → 경직 스킵
 

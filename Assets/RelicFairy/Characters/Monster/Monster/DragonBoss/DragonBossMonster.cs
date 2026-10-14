@@ -778,7 +778,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
             return;
         }
 
-        bool poiseBroke = _dragonBB.ApplyPoiseDamage();
+        // 화살은 보스 포이즈를 깎지 않는다 — 타수 많은 화살이 보스를 계속 경직시켰다(10-15 사용자 「넉백 같은 건 보스에서 최소화」)
+        bool poiseBroke = !MonsterPoise.PendingNoFlinch && _dragonBB.ApplyPoiseDamage();
         if (!poiseBroke)
             _suppressGetHitThisHit = true;
     }

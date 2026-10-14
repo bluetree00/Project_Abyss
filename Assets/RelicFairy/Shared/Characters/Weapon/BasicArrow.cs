@@ -480,6 +480,7 @@ public class BasicArrow : MonoBehaviour, IPooledObject
                 IsRanged            = true,
                 SkipHitVfx          = true,
                 SplitWeight         = _splitWeight,
+                NoFlinch            = true,   // 화살은 경직 · 넉백 없음 — 연사 · 분열이 몹을 계속 묶고 밀어냈다(10-15)
             });
         }
 
@@ -592,6 +593,7 @@ public class BasicArrow : MonoBehaviour, IPooledObject
                 IsRanged            = true,
                 SkipHitVfx          = true,
                 SplitWeight         = _splitWeight,
+                NoFlinch            = true,   // 화살 폭발도 경직 · 넉백 없음(10-15)
             });
         }
     }

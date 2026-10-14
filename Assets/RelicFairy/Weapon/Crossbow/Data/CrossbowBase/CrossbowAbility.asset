@@ -15,7 +15,7 @@ MonoBehaviour:
   steps:
   - stepIndex: 0
     order: 0
-    baseDamage: 30
+    baseDamage: 6
     knockbackMultiplier: 1.5
     selfMovement: {x: 0, y: 0, z: 0}
     effect:

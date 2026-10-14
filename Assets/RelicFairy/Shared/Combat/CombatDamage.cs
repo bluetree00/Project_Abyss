@@ -110,6 +110,9 @@ public static class CombatDamage
         /// 갈래 화살 = <see cref="CombatSpawner.SplitExtraWeight"/>(2발 50% · 3발 45% …) — 방어를 뺀 최종 피해 · 포이즈가 이만큼이고, 적중 효과(⑨~⑪)는 이 비율로만 붙는다.
         /// </summary>
         public float SplitWeight;
+
+        /// <summary>맞은 적을 멈추게(경직) · 밀어내지(넉백) 않는다 — 피해만(화살, 10-15 사용자 「활 같은 공격은 경직 · 넉백이 없어야」). 정예 포이즈는 깎되 안 깨진다.</summary>
+        public bool NoFlinch;
     }
 
     public static bool IsMeleeAction(WeaponActionType a) =>
@@ -253,8 +256,9 @@ public static class CombatDamage
         if (!penetrated)
         {
             MonsterPoise.PendingHitWeight = procCoef * splitW;
-            try { damageable.TakeDamage(finalDmg, owner, req.KnockbackMultiplier, isCrit); }
-            finally { MonsterPoise.PendingHitWeight = MonsterPoise.RestingWeight; }
+            MonsterPoise.PendingNoFlinch  = req.NoFlinch;
+            try { damageable.TakeDamage(finalDmg, owner, req.NoFlinch ? 0f : req.KnockbackMultiplier, isCrit); }
+            finally { MonsterPoise.PendingHitWeight = MonsterPoise.RestingWeight; MonsterPoise.PendingNoFlinch = false; }
         }
 
         // ⑧ 타격감 (HitFeedbackService 허브 경유 → 구독자 전파)

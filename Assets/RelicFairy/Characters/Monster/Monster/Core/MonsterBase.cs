@@ -1218,6 +1218,14 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
                 return;
             }
 
+            // 화살 — 경직 · 넉백 없음(10-15 사용자 「활 같은 공격은 경직 · 넉백이 없어야 — 원거리는 연타가 많다」).
+            // 정예 포이즈는 깎되(가득 차도 여기선 안 깨진다) 휘청은 다른 타격이 낸다.
+            if (MonsterPoise.PendingNoFlinch)
+            {
+                Poise?.Hit(MonsterPoise.PendingHitWeight, canBreak: false);
+                return;
+            }
+
             // 공격 확약 · 정예 포이즈(10-11 일반방 긴장감 P2-①).
             //  - 위협(희귀) · 정예는 공격 상태에 들어가면 맞아도 끊기지 않는다(피해는 들어간다).
             //    예전엔 보스 말고 모든 등급이 매 타 0.4초 경직 · 넉백 · 공격 취소라, 때리는 동안 반격이 없었다.

@@ -65,8 +65,6 @@ public static class CovenantMath
 
     /// <summary>「정지」 기절 지속 = 유효 수치 × 소모한 감전 스택. 그 절대 상한(초).</summary>
     public const float StasisStunCap = 3.0f;
-    /// <summary>「정지」 보스 기절 지속 배수 — 페이즈·연출이 통째로 건너뛰어지지 않게 깎는다.</summary>
-    public const float StasisBossMult = 0.30f;
 
     // ── 결계(비-흡혈 방어) ────────────────────────────────
     /// <summary>「결계」 반경 내 상태가 걸린 적 1체당 추가 받피 감소.</summary>

@@ -46,7 +46,7 @@ namespace RelicFairy.Monster
         private readonly List<string> _expireScratch = new();
         private readonly List<Action> _fireScratch   = new();
 
-        // [가이드라인 비주얼] 마커 위치용 소유 몬스터(통지 전용 — 상태 로직엔 미사용).
+        // 소유 몬스터 — 가이드라인 마커 위치 · 보스 무력화 축소(10-15)에 쓴다.
         private MonsterBase _owner;
         public void AttachOwner(MonsterBase owner) => _owner = owner;
         private Transform OwnerTf => _owner != null ? _owner.transform : null;
@@ -57,9 +57,13 @@ namespace RelicFairy.Monster
 
         // ── CC (스턴/빙결/석화) ────────────────────────────
         /// <summary>무력화 부여. 같은 id는 더 긴 만료 시각 유지. onExpire는 정상 만료 시 1회 발화.</summary>
+        /// <summary>보스 무력화 시간 배율 — 기절 · 빙결이 보스 패턴을 통째로 멈추므로 넉백처럼 최소화한다(10-15 사용자 「넉백 같은 건 보스에서 최소화」).</summary>
+        public const float BossCcScale = 0.3f;
+
         public void ApplyCc(string id, float duration, Action onExpire = null)
         {
             if (string.IsNullOrEmpty(id) || duration <= 0f) return;
+            if (_owner != null && _owner.Grade == MonsterGrade.Boss) duration *= BossCcScale;
             if (!_cc.TryGetValue(id, out var c)) { c = new CcSlot(); _cc[id] = c; }
             c.until = Mathf.Max(c.until, Time.time + duration);
             c.total = Mathf.Max(0.01f, c.until - Time.time);   // 게이지 기준(부여 직후 = 100%)

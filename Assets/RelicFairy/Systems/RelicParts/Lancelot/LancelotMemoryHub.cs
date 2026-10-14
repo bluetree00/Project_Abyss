@@ -479,7 +479,7 @@ public sealed class LancelotMemoryHub : MonoBehaviour
         Vector3 to = from + dir * length;
         ElementVfxPlayer.PlayBeam(beam, from + Vector3.up * 0.8f, to + Vector3.up * 0.8f, 0.3f);
         // 판정 폭(반폭 0.9 + 여유 0.4)을 바닥 띠로 — 0.14 m 줄만으로는 약 2.6 m 폭이 안 보였다(10-13 이펙트 = 판정)
-        FormStrike.GroundStrip(from, dir, length, WaveHalfWidth + 0.4f, 0.35f, beam == RuneElement.Fire ? new Color(1f, 0.55f, 0.25f) : LancelotColor);
+        FormStrike.GroundStrip(from, dir, length, WaveHalfWidth + 0.4f, 0.35f);
         Vector3 mid = (from + to) * 0.5f;
         int n = CombatQuery.GetNearbyEnemies(mid, length * 0.5f + WaveHalfWidth + 0.5f, _player.gameObject, 32, _buf);
         var hit = new List<MonsterBase>(n);

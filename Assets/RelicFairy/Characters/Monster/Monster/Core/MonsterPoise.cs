@@ -26,6 +26,12 @@ public sealed class MonsterPoise
     /// <summary>이번 직접 타격 한 번의 포이즈 무게 — CombatDamage가 그 적중의 발동 계수로 올리고 호출 직후 <see cref="RestingWeight"/>로 되돌린다.</summary>
     public static float PendingHitWeight = RestingWeight;
 
+    /// <summary>
+    /// 이번 직접 타격은 경직 · 넉백이 없다(화살 — 10-15 사용자 「활 같은 공격은 경직 · 넉백이 없어야」). CombatDamage가 호출 동안만 올린다.
+    /// 포이즈는 깎되 이 타격으로는 깨지지 않는다(<see cref="Hit"/> canBreak false).
+    /// </summary>
+    public static bool PendingNoFlinch;
+
     private float _taken;
     private float _lastHitAt   = -999f;
     private float _brokenUntil = -999f;

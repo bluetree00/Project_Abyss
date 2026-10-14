@@ -340,7 +340,7 @@ public sealed class DashAfterimageEffect : ItemEffectBase
             for (int k = 0; k < n; k++)
                 if (FormStrike.DistToSegmentXZ(s_buf[k].transform.position, a, b) <= HalfWidth + 0.4f)
                     CombatQuery.DealSynergyDamage(s_buf[k], dmg, ctx.Player.gameObject, element: RuneElement.Dark);
-            FormStrike.GroundStrip(a, b - a, Vector3.Distance(a, b), HalfWidth, 0.3f, new Color(0.45f, 0.35f, 0.6f));
+            FormStrike.GroundStrip(a, b - a, Vector3.Distance(a, b), HalfWidth, 0.3f);
         }
     }
 

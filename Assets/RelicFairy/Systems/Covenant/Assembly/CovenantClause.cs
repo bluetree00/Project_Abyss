@@ -508,7 +508,7 @@ public sealed class CovenantClause
         {
             var mb = _areaScratch[i];
             if (mb == null || mb.IsDead) continue;
-            mb.ApplyStun(mb.Grade == MonsterGrade.Boss ? duration * CovenantMath.StasisBossMult : duration);
+            mb.ApplyStun(duration);   // 보스는 무력화 공통 축소(MonsterStatusReceiver.BossCcScale)가 줄인다(10-15 — 예전 서약만의 보스 × 0.3과 같은 값)
             Touch(mb);
         }
         _areaScratch.Clear();
