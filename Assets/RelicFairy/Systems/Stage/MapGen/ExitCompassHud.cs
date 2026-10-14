@@ -307,6 +307,13 @@ public sealed class ExitCompassHud : MonoBehaviour
         if (pos.y > sideLimit) pos.y = sideLimit;
         float topLimit = h - TopCenterBand * scale - halfH;
         if (pos.y > topLimit && Mathf.Abs(pos.x - w * 0.5f) < TopCenterHalfW * scale + halfW) pos.y = topLimit;
+        // 서약서 칸(미니맵 아래 · 10-15) — 왼쪽 가장자리로 밀린 배지가 그 위에 얹히지 않게 칸 아래로
+        if (CovenantPanelView.TryGetScreenRect(out var cov))
+        {
+            float pad = 8f * scale;
+            if (pos.x - halfW < cov.xMax + pad && pos.x + halfW > cov.xMin - pad && pos.y + halfH > cov.yMin - pad && pos.y - halfH < cov.yMax + pad)
+                pos.y = cov.yMin - pad - halfH;
+        }
         float bottomLimit = BottomHudBand * scale + halfH;
         if (pos.y < bottomLimit) pos.y = bottomLimit;
         return pos;

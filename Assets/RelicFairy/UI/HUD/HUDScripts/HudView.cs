@@ -38,6 +38,7 @@ public sealed class HudView : MonoBehaviour
     private const float LeftColumnTopGap = 12f;    // 서약 칸 ↔ 미니맵
     private const float CovenantLabelH   = 26f;    // 서약 칸 위 「서약 n/N」 글자 몫
     private const float CovenantMinScale = 0.72f;  // 짧은 화면비에서 서약 칸을 이만큼까지 줄인다
+    private const float CovenantEdge     = 16f;    // 미니맵이 없을 때 서약 칸의 화면 가장자리 여백(미니맵과 같은 16)
     private const float NoticeSideGap    = 16f;    // 왼쪽 기둥 ↔ 발동 알림 줄(10-02 「패시브 텍스트의 가시성」)
     // 재화 알약(톤 v2, 10-11) — 납품 「칸_테두리」(검정 선이 150×40에서 2px)를 같은 육각 모양의 1px 잉크 18% 선으로.
     // 뾰족한 끝의 들어간 폭 = 납품 그림 비율(32 / 344).
@@ -504,19 +505,45 @@ public sealed class HudView : MonoBehaviour
             PlaceBottomLeftAt(notice, right + NoticeSideGap * unit, floor);
         }
 
+        LayoutCovenant(y, unit);
+    }
+
+    /// <summary>
+    /// 서약서 칸 — 미니맵 바로 아래(왼쪽 위)에서 아래로 자란다(10-15 사용자 「패시브나 다른 UI에 겹치기 좋은 위치」).
+    /// 예전엔 왼쪽 기둥(버프 · 패시브 줄 위)에 얹혀, 패시브가 늘면 밀려 올라가 미니맵에 눌려 줄었고 오른쪽 발동 알림 줄과 붙었다.
+    /// 이 자리엔 상시 UI가 없다(퀘스트 추적은 첫 서약을 맺으면 끝 · 도전/놀이 띠는 x 310부터 · 나침반 배지는 칸을 비킨다).
+    /// 바닥이 왼쪽 기둥 위(<paramref name="columnTop"/>)까지 내려오면 그만큼 줄인다(하한 <see cref="CovenantMinScale"/>).
+    /// </summary>
+    private void LayoutCovenant(float columnTop, float unit)
+    {
         if (covenantPanel == null || !covenantPanel.isActiveAndEnabled) return;
         var cov = (RectTransform)covenantPanel.transform;
-        PlaceBottomAt(cov, y);
 
-        float limit = float.PositiveInfinity;
+        ((RectTransform)transform).GetWorldCorners(s_corners);
+        float left = s_corners[1].x + CovenantEdge * unit;
+        float top  = s_corners[1].y - (CovenantEdge + CovenantLabelH) * unit;
         if (minimapPanel != null && minimapPanel.activeInHierarchy && minimapPanel.transform is RectTransform map)
         {
             map.GetWorldCorners(s_corners);
-            limit = s_corners[0].y - LeftColumnTopGap * unit;
+            left = s_corners[0].x;
+            top  = s_corners[0].y - (LeftColumnTopGap + CovenantLabelH) * unit;   // 「서약서 n절」 글자 몫을 미니맵 아래에 둔다
         }
-        float need  = (cov.rect.height + CovenantLabelH) * unit;   // 배율 1 기준 높이
-        float scale = need > 0f && y + need > limit ? Mathf.Clamp((limit - y) / need, CovenantMinScale, 1f) : 1f;
+        PlaceTopLeftAt(cov, left, top);
+
+        float need  = cov.rect.height * unit;   // 배율 1 기준 높이
+        float scale = need > 0f && top - need < columnTop ? Mathf.Clamp((top - columnTop) / need, CovenantMinScale, 1f) : 1f;
         if (Mathf.Abs(cov.localScale.y - scale) > 0.001f) cov.localScale = new Vector3(scale, scale, 1f);
+    }
+
+    /// <summary>점 앵커 위젯의 <b>왼쪽 위 모서리</b>를 화면 (worldX, worldY)에 놓는다. 피벗 · 배율을 고려한다.</summary>
+    private static void PlaceTopLeftAt(RectTransform rt, float worldX, float worldY)
+    {
+        if (!(rt.parent is RectTransform parent) || rt.anchorMin != rt.anchorMax) return;
+        Vector3 local  = parent.InverseTransformPoint(new Vector3(worldX, worldY, 0f));
+        Vector2 anchor = parent.rect.min + Vector2.Scale(rt.anchorMin, parent.rect.size);
+        Vector2 want   = (Vector2)local - anchor
+                       + new Vector2(rt.pivot.x * rt.rect.width, (rt.pivot.y - 1f) * rt.rect.height) * rt.localScale.x;
+        if ((rt.anchoredPosition - want).sqrMagnitude > 0.25f) rt.anchoredPosition = want;
     }
 
     /// <summary>점 앵커 위젯의 <b>아랫변</b>을 화면 높이 worldY에 놓는다(가로는 그대로). 피벗 · 배율을 고려한다.</summary>

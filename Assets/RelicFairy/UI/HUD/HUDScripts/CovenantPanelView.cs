@@ -21,16 +21,12 @@ public sealed class CovenantPanelView : MonoBehaviour
     [SerializeField] private Sprite covenantInnerSprite;   // 서약 내부
 
     [Header("서약 슬롯 레이아웃 (스킨 시)")]
-    [Tooltip("패널 위치 — 화면 좌하단 기준. 서약이 늘면 위로 쌓인다(버프/무기 영역 침범 방지).")]
-    [SerializeField] private Vector2 panelOffset = new Vector2(101f, 337f);
     // 237×156 = 1.52:1 → 테두리 아트(1217×798) 비율과 정확히 일치(왜곡 0).
     // 목업 148보다 8px 여유를 둬 원인/결과 2줄이 답답하지 않게 한다.
     [Tooltip("슬롯 크기. 테두리 아트 1217×798 = 1.52:1 과 같은 비율로 두면 왜곡이 없다.")]
     [SerializeField] private Vector2 slotSize    = new Vector2(237f, 156f);
     [Tooltip("슬롯 세로 간격")]
     [SerializeField] private float   slotSpacing = 8f;
-    [Tooltip("슬롯 내용(뱃지/아이콘/이름)을 프레임 장식 안쪽으로 들여넣는 여백 (L,B,R,T)")]
-    [SerializeField] private Vector4 slotContentPadding = new Vector4(14f, 12f, 14f, 12f);
     [Tooltip("제목/설명 사이 간격")]
     [SerializeField] private float contentSpacing = 6f;
 
@@ -42,8 +38,23 @@ public sealed class CovenantPanelView : MonoBehaviour
     private const float TitleFontSize = UITheme.Thin.Body;    // 17
     private const float DescFontSize  = UITheme.Thin.Small;   // 15
     private const float CountFontSize = UITheme.Thin.Small;   // 15
-    private static readonly Color DescInk  = UITheme.Thin.InkA(0.85f);   // 설명 = 제목(잉크)보다 한 단 옅게
     private static readonly Color CountInk = UITheme.Thin.InkA(0.80f);
+
+    // 10-15 사용자 「HUD 서약 팝업 — 디자인 · 가독성 · 위치」: 미니맵 아래(왼쪽 위)로 옮기고(HudView.LayoutCovenant) 왼쪽 정렬 목록으로.
+    // 옛 칸(237 · 가운데 정렬 · 자동 축소)은 5절이면 설명이 13.9px까지 줄었고 긴 결과 줄이 테 장식에 닿았다(실측 CovHud_5).
+    private const float SentenceWidth = 280f;    // 서약서 칸 폭 — 결과 줄이 15px 그대로(줄바꿈은 들여쓴 채로)
+    private static readonly Vector4 ContentPad = new(24f, 14f, 24f, 16f);   // L,B,R,T — 테 안쪽 이중선(가장자리에서 약 19px) 안으로(옛 14 · 12는 선에 닿았다)
+    private const float TitleH = 26f;            // 제목 한 줄(17 × 1.5) — 「서약서 ·」 머리를 떼어 한 줄에 든다
+
+    // 테 · 판 그림은 9분할 여백이 0이라 서약서 높이가 바뀌면 모서리 장식이 늘어나 찌그러졌다 → 실행 중에 여백을 준 사본(그림 파일 · 메타는 그대로).
+    private const float FrameBorderPx   = 130f;  // 테 그림(1217×798) 모서리 장식이 다 들어가는 폭(그림 픽셀)
+    private const float PlateBorderPx   = 70f;   // 판 그림(1068×761) 깎인 모서리(≈60)
+    private const float SkinDesignWidth = 237f;  // 그림을 이 폭에 맞췄을 때의 모서리 크기를 지킨다(옛 칸 폭)
+    private static readonly Color FrameTint = UITheme.Thin.WithA(UITheme.Thin.Gold, 0.6f);   // 흰 선 → 얇은 금선(톤 v2)
+    private static Sprite s_frameSliced, s_plateSliced;
+
+    private static CovenantPanelView s_shown;    // 켜진 서약 칸 — 출구 · 보스 나침반 배지가 비킨다
+    private static readonly Vector3[] s_corners = new Vector3[4];
 
     private bool HasSkin => covenantFrameSprite != null || covenantInnerSprite != null;
     private bool _thinFontsApplied;   // 톤 v2 글꼴로 한 번 다 발랐는가(패널은 앱 부트 때 생겨 Awake엔 글꼴이 아직 없다)
@@ -68,14 +79,13 @@ public sealed class CovenantPanelView : MonoBehaviour
     {
         if (!HasSkin || _slots == null || _slots.Length == 0) return;
 
-        // 패널 자체를 좌하단 기준으로 고정한다.
-        // 프리팹은 anchor(0,0.6)·pivot(0,1)이라 서약이 늘수록 '아래로' 자라 버프/무기 영역을 침범했다.
-        // 좌하단 피벗으로 바꿔 위로 쌓이게 한다(목업 순서: 무기 → 버프 → 서약).
+        // 패널 = 왼쪽 위 기준 · 아래로 자람(10-15 미니맵 아래). 자리는 HudView.LayoutCovenant가 매 프레임 맞춘다.
+        // (예전: 왼쪽 아래 기준으로 버프 · 패시브 줄 위에 쌓였다 — 패시브가 늘면 밀려 올라가고 발동 알림 줄과 붙었다)
         var prt = (RectTransform)transform;
-        prt.anchorMin = Vector2.zero;
-        prt.anchorMax = Vector2.zero;
-        prt.pivot     = Vector2.zero;
-        prt.anchoredPosition = panelOffset;
+        prt.anchorMin = new Vector2(0f, 1f);
+        prt.anchorMax = new Vector2(0f, 1f);
+        prt.pivot     = new Vector2(0f, 1f);
+        prt.anchoredPosition = new Vector2(16f, -190f);
         prt.sizeDelta = new Vector2(slotSize.x, prt.sizeDelta.y);   // 높이는 ContentSizeFitter가 결정
 
         // 09-27: 세로 줄(VLG) → 격자. 「서약 슬롯 +1」로 4칸이 되면 세로로 쌓은 윗변(y 993)이 미니맵(아랫변 928)을 덮었다 —
@@ -88,7 +98,7 @@ public sealed class CovenantPanelView : MonoBehaviour
         _grid.spacing         = new Vector2(slotSpacing, slotSpacing);
         _grid.startCorner     = GridLayoutGroup.Corner.UpperLeft;
         _grid.startAxis       = GridLayoutGroup.Axis.Horizontal;
-        _grid.childAlignment  = TextAnchor.LowerLeft;
+        _grid.childAlignment  = TextAnchor.UpperLeft;
         _grid.constraint      = GridLayoutGroup.Constraint.FixedColumnCount;
         _grid.constraintCount = 1;
         if (TryGetComponent<ContentSizeFitter>(out var fitter))
@@ -138,11 +148,9 @@ public sealed class CovenantPanelView : MonoBehaviour
             vlg = slot.gameObject.AddComponent<VerticalLayoutGroup>();
         if (vlg == null) return;   // 방어: 레이아웃 그룹 확보 실패 시 스킵(기존 외형 유지)
 
-        vlg.padding = new RectOffset(
-            (int)slotContentPadding.x, (int)slotContentPadding.z,
-            (int)slotContentPadding.w, (int)slotContentPadding.y);
+        vlg.padding = new RectOffset((int)ContentPad.x, (int)ContentPad.z, (int)ContentPad.w, (int)ContentPad.y);
         vlg.spacing                = contentSpacing;
-        vlg.childAlignment         = TextAnchor.MiddleCenter;
+        vlg.childAlignment         = TextAnchor.UpperLeft;
         vlg.childControlWidth      = true;
         vlg.childControlHeight     = true;
         vlg.childForceExpandWidth  = true;
@@ -152,18 +160,18 @@ public sealed class CovenantPanelView : MonoBehaviour
         if (slot.Icon       != null) slot.Icon.gameObject.SetActive(false);
         if (slot.StageBadge != null) slot.StageBadge.gameObject.SetActive(false);
 
-        // 제목 — 가운데(굵기는 글꼴 Medium이 맡는다 · 가짜 굵게 없음). 이름이 길면(조립 서약: "원인[티어] × 결과[티어]") 줄바꿈 + 자동 축소로 잘리지 않게.
+        // 제목 — 왼쪽 한 줄(10-15 · 굵기는 글꼴 Medium · 가짜 굵게 없음). 「연격  ●●○」처럼 진척이 붙어도 한 줄에 들고, 넘치면 자동 축소.
         var name = slot.NameText;
         if (name != null)
         {
-            name.alignment = TextAlignmentOptions.Center;
+            name.alignment = TextAlignmentOptions.MidlineLeft;
             name.fontStyle = FontStyles.Normal;
-            name.enableWordWrapping = true;
+            name.enableWordWrapping = false;
             name.fontSize    = TitleFontSize;                 // 기준값 — 자동축소가 안 걸려도 이 크기로 나온다
             name.enableAutoSizing = true;
             name.fontSizeMin = TitleFontSize * 0.75f;
             name.fontSizeMax = TitleFontSize;
-            SetTextLayout(name.gameObject, TitleFontSize * 2.4f, 0f);   // 두 줄까지 허용한 고정 높이
+            SetTextLayout(name.gameObject, TitleH, 0f);
             name.transform.SetSiblingIndex(0);
         }
 
@@ -178,15 +186,16 @@ public sealed class CovenantPanelView : MonoBehaviour
             desc = go.AddComponent<TextMeshProUGUI>();
             if (name != null) desc.font = name.font;
         }
-        desc.alignment = TextAlignmentOptions.Center;
-        desc.color     = DescInk;
+        // 설명 — 왼쪽 정렬 목록(10-15). 15px 고정(자동 축소 없음 — 칸이 내용만큼 자란다) · 원인 줄은 한 단 옅게(UI_CovenantSlot.BindSentence)
+        desc.alignment = TextAlignmentOptions.TopLeft;
+        desc.color     = UITheme.Thin.Ink;
         desc.enableWordWrapping = true;
-        // 원인/결과 2줄 + 화살표라 문구가 길어질 수 있다 → 칸을 넘기지 않도록 자동 축소(하한까지 줄바꿈으로 흡수).
-        desc.fontSize    = DescFontSize;                      // 기준값 — 자동축소가 안 걸려도 이 크기로 나온다
-        desc.enableAutoSizing = true;
-        desc.fontSizeMin = DescFontSize * 0.75f;
+        desc.enableAutoSizing = false;
+        desc.fontSize    = DescFontSize;
+        desc.fontSizeMin = DescFontSize;
         desc.fontSizeMax = DescFontSize;
-        desc.lineSpacing = -5f;                               // 원인/↓/결과 3줄이 세로로 뜨지 않게 살짝 조임
+        desc.lineSpacing = -5f;                               // 줄바꿈된 한 결과 줄은 붙여서
+        desc.paragraphSpacing = 4f;                           // 결과 줄끼리는 살짝 떼어 한 줄 = 한 절이 보이게
         SetTextLayout(desc.gameObject, 0f, 1f);               // 제목을 뺀 남은 높이를 전부 차지(TMP에게 묻지 않음)
         desc.transform.SetSiblingIndex(1);
 
@@ -202,7 +211,7 @@ public sealed class CovenantPanelView : MonoBehaviour
         if (_thinFontsApplied || UISkin.ThemeFonts == null || _slots == null) return;
         _thinFontsApplied = true;
         foreach (var slot in _slots)
-            slot?.StyleThin(TitleFontSize, UITheme.Thin.Ink, DescFontSize, DescInk);
+            slot?.StyleThin(TitleFontSize, UITheme.Thin.Ink, DescFontSize, UITheme.Thin.Ink);
         if (_countLabel != null) UITheme.StyleThinText(_countLabel, UIWeight.Medium, CountFontSize, CountInk, shadow: true);
     }
 
@@ -253,15 +262,50 @@ public sealed class CovenantPanelView : MonoBehaviour
         if (_slots == null) return;
         if (covenantFrameSprite == null && covenantInnerSprite == null) return;
 
+        var plate = Sliced(covenantInnerSprite, PlateBorderPx, ref s_plateSliced);
+        var frame = Sliced(covenantFrameSprite, FrameBorderPx, ref s_frameSliced);
         foreach (var slot in _slots)
         {
             if (slot == null) continue;
-            AddSkinLayer(slot.transform, "SkinBg",    covenantInnerSprite, false);
-            AddSkinLayer(slot.transform, "SkinFrame", covenantFrameSprite, true);
+            // 판 두 겹 — 판 그림이 반투명(알파 0.70)이라 밝은 벽 · 횃불 위에서 글자가 묻혔다. 같은 모양을 한 겹 더 깔아 0.91로(10-15).
+            AddSkinLayer(slot.transform, "SkinBg2",   plate, false, Color.white, PpuMul(covenantInnerSprite));
+            AddSkinLayer(slot.transform, "SkinBg",    plate, false, Color.white, PpuMul(covenantInnerSprite));
+            AddSkinLayer(slot.transform, "SkinFrame", frame, true,  FrameTint,   PpuMul(covenantFrameSprite));
         }
     }
 
-    private static void AddSkinLayer(Transform parent, string name, Sprite sprite, bool onTop)
+    /// <summary>그림 사본에 9분할 여백(그림 픽셀)을 준다 — 높이가 바뀌어도 모서리 장식은 그대로, 가운데 띠만 늘어난다.</summary>
+    private static Sprite Sliced(Sprite src, float borderPx, ref Sprite cache)
+    {
+        if (src == null) return null;
+        if (cache != null) return cache;
+        cache = Sprite.Create(src.texture, src.rect, new Vector2(0.5f, 0.5f), src.pixelsPerUnit, 0, SpriteMeshType.FullRect,
+                              new Vector4(borderPx, borderPx, borderPx, borderPx));
+        cache.name = src.name + "_Sliced";
+        return cache;
+    }
+
+    /// <summary>모서리를 옛 칸 폭(237)에 맞춘 크기로 — 그림 폭 / 237.</summary>
+    private static float PpuMul(Sprite src) => src != null ? src.rect.width / SkinDesignWidth : 1f;
+
+    /// <summary>켜진 서약서 칸의 화면 사각형(스크린 좌표 · 아래에서 위) — 출구 · 보스 나침반 배지가 이 위에 얹히지 않게 비킨다(10-15).</summary>
+    public static bool TryGetScreenRect(out Rect r)
+    {
+        r = default;
+        var p = s_shown;
+        if (p == null || !p.isActiveAndEnabled || p._slots == null || p._slots.Length == 0 || p._slots[0] == null
+            || !p._slots[0].gameObject.activeInHierarchy) return false;
+        var rt = (RectTransform)p.transform;
+        rt.GetWorldCorners(s_corners);
+        var canvas = p.GetComponentInParent<Canvas>()?.rootCanvas;
+        Camera cam = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+        Vector2 a = RectTransformUtility.WorldToScreenPoint(cam, s_corners[0]);
+        Vector2 b = RectTransformUtility.WorldToScreenPoint(cam, s_corners[2]);
+        r = Rect.MinMaxRect(a.x, a.y, b.x, b.y);
+        return r.width > 1f && r.height > 1f;
+    }
+
+    private static void AddSkinLayer(Transform parent, string name, Sprite sprite, bool onTop, Color color, float ppuMul)
     {
         if (parent == null || sprite == null) return;
         if (parent.Find(name) != null) return;
@@ -281,7 +325,8 @@ public sealed class CovenantPanelView : MonoBehaviour
         var img = go.GetComponent<Image>();
         img.sprite        = sprite;
         img.type          = Image.Type.Sliced;
-        img.color         = Color.white;
+        img.pixelsPerUnitMultiplier = ppuMul;
+        img.color         = color;
         img.raycastTarget = false;
 
         if (onTop) rt.SetAsLastSibling();
@@ -289,8 +334,6 @@ public sealed class CovenantPanelView : MonoBehaviour
     }
 
     // ── 서약서(문장) — 좌하단 서약 칸 4장 → 서약서 한 장(10-02 설계서 §4) ──
-    private const float LineHeight    = 21f;   // 설명 한 줄 높이(Noto 15px 글자 · 줄 간격 -5 기준 — 15 × 1.448 − 0.75. DNF일 땐 19)
-    private const float SentenceBase  = 71f;   // 설명 밖 몫 = 위아래 여백 24 + 제목 두 줄 칸(17 × 2.4 ≈ 41) + 간격 6
     private const float ChainStagger  = 0.08f; // 연쇄 표식이 차례로 켜지는 간격
     private const float ChainPitchUp  = 0.12f; // 절마다 소리가 한 음씩 올라간다
     // 등급 소리(10-07 U2 · 개편기획 ① — 실버 맑은 종 · 골드 겹종 · 루비 낮은 울림 + 짧은 화면 효과). 흔들림은 늘리지 않는다.
@@ -312,10 +355,15 @@ public sealed class CovenantPanelView : MonoBehaviour
 
     private void OnEnable()
     {
+        s_shown = this;
         EnsureThinFonts();
         BindSentenceEvents(_lastSentence);
     }
-    private void OnDisable() => BindSentenceEvents(null);
+    private void OnDisable()
+    {
+        if (s_shown == this) s_shown = null;
+        BindSentenceEvents(null);
+    }
 
     /// <summary>문장이 바뀌면(이어 쓰기 · 고쳐 쓰기 = 새 인스턴스) 절 사건을 다시 듣는다.</summary>
     private void BindSentenceEvents(CovenantSentence s)
@@ -415,15 +463,18 @@ public sealed class CovenantPanelView : MonoBehaviour
                 _countLabel.gameObject.SetActive(true);
                 _countLabel.text = $"서약서 {sentence.ResultCount}절";
             }
-            int lines = _slots[0] != null ? _slots[0].BindSentence(sentence) : 0;
-            float h = Mathf.Max(slotSize.y, SentenceBase + LineHeight * lines);
-            if (_grid != null) { _grid.constraintCount = 1; _grid.cellSize = new Vector2(slotSize.x, h); }
-            if (_slots[0] != null && _slots[0].TryGetComponent<LayoutElement>(out var le)) { le.preferredHeight = h; le.minHeight = h; }
+            // 높이 = 여백 + 제목 한 줄 + 간격 + 설명(실제 줄바꿈까지 잰 높이) — 1절이 휑하지 않고 5절이 줄어들지 않는다(10-15)
+            float descH = _slots[0] != null ? _slots[0].BindSentence(sentence, SentenceWidth - ContentPad.x - ContentPad.z) : 0f;
+            float h = Mathf.Ceil(ContentPad.w + TitleH + contentSpacing + descH + ContentPad.y);
+            if (_grid != null) { _grid.constraintCount = 1; _grid.cellSize = new Vector2(SentenceWidth, h); }
+            if (_slots[0] != null && _slots[0].TryGetComponent<LayoutElement>(out var le))
+            { le.preferredWidth = SentenceWidth; le.minWidth = SentenceWidth; le.preferredHeight = h; le.minHeight = h; }
             for (int i = 1; i < _slots.Length; i++) _slots[i]?.SetEmpty();
             return;
         }
         if (_grid != null) _grid.cellSize = slotSize;
-        if (_slots[0] != null && _slots[0].TryGetComponent<LayoutElement>(out var le0)) { le0.preferredHeight = slotSize.y; le0.minHeight = slotSize.y; }
+        if (_slots[0] != null && _slots[0].TryGetComponent<LayoutElement>(out var le0))
+        { le0.preferredWidth = slotSize.x; le0.minWidth = slotSize.x; le0.preferredHeight = slotSize.y; le0.minHeight = slotSize.y; }
 
         int count = covenants != null ? covenants.Count : 0;
         if (_grid != null) _grid.constraintCount = count > 3 ? 2 : 1;

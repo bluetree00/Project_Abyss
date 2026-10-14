@@ -193,6 +193,13 @@ public sealed class EnemyCompassHud : MonoBehaviour
         float clear = PlayerClearX * scale;
         if (dir.y < 0f && Mathf.Abs(p.x - center.x) < clear)
             p.x = center.x + (dir.x >= 0f ? clear : -clear);
+        // 서약서 칸(미니맵 아래 · 10-15) 위에 얹히지 않게 칸 아래로
+        if (CovenantPanelView.TryGetScreenRect(out var cov))
+        {
+            float half = (BossIconSize * 0.5f + 8f) * scale;
+            if (p.x - half < cov.xMax && p.x + half > cov.xMin && p.y + half > cov.yMin && p.y - half < cov.yMax)
+                p.y = cov.yMin - half;
+        }
         _boss.position = new Vector3(p.x, p.y, 0f);
         _bossArrow.anchoredPosition = dir * BossArrowGap;
         // 거리 글자는 화살표 반대쪽 — 아래를 가리키면 화살표가 글자를 덮는다

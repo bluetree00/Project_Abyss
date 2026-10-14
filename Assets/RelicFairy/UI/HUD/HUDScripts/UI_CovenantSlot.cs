@@ -104,13 +104,18 @@ public sealed class UI_CovenantSlot : MonoBehaviour
     public void SetEmpty() => gameObject.SetActive(false);
 
     // ── 서약서(문장) — 「한 장의 서약서」(10-02 설계서 §4) ──────────
-    private const float PipSize   = 9f;
-    private const float PipGap    = 5f;
+    // 10-15: 절 표식 = 결과 줄의 머리(옛 「→」 자리). 예전엔 제목 위 한 줄에 따로 모여 어느 절이 켜졌는지 줄과 짝을 지을 수 없었다 —
+    // 이제 연쇄가 일어나면 표식이 목록을 따라 위에서 아래로 켜진다.
+    private const float PipSize   = 8f;
     private const float PipLitSec = 0.7f;
-    private static readonly Color PipDim = new(0.55f, 0.50f, 0.42f, 0.55f);
+    private const float ResultIndentEm = 1.15f;   // 결과 줄 들여쓰기(표식 자리) — 줄바꿈돼도 글머리가 맞는다
+    private const string CauseAlpha = "<alpha=#B3>";   // 원인 줄 = 결과보다 한 단 옅게(0.70)
+    private static readonly Color PipDim = UITheme.Thin.InkA(0.45f);                  // 글머리 — 잉크(옛 갈색 0.55는 어두운 판에 묻혔다)
     private static readonly Color PipLit = new(1.00f, 0.82f, 0.40f, 1.00f);
 
-    private static readonly Color PipCool = new(0.30f, 0.28f, 0.25f, 0.35f);   // 절이 쿨다운 중 — 지금은 이어지지 않는다
+    private static readonly Color PipCool = UITheme.Thin.InkA(0.16f);   // 절이 쿨다운 중 — 지금은 이어지지 않는다
+    private bool    _pipLayoutDirty;   // 줄 자리가 바뀌었다(묶음 · 칸 크기 변경) — Update에서 한 번 다시 놓는다
+    private Vector2 _pipRectSize;
     private const float ProgressTick = 0.1f;   // 진척 글자 갱신 주기(초)
 
     private RectTransform _pipRow;
@@ -127,33 +132,37 @@ public sealed class UI_CovenantSlot : MonoBehaviour
     private float    _lastSec = -99f;
     private bool     _chargeMeters;   // 행군 — 남은 거리(m)
 
-    /// <summary>서약서 한 장 — 제목 「서약서 · 조건」, 설명 = 조건 + 결과 줄(이음 머리말), 절 표식(결과마다 마름모). 반환 = 설명 줄 수.</summary>
-    public int BindSentence(CovenantSentence s)
+    /// <summary>
+    /// 서약서 한 장 — 제목 = 조건 이름(+ 진척), 설명 = 조건 한 줄(옅게) + 결과마다 한 줄(머리 = 절 표식 · 줄바꿈은 들여쓴 채로).
+    /// 「서약서」 낱말은 칸 위 「서약서 n절」이 맡는다(10-15 — 예전엔 제목 「서약서 · 연격」과 두 번). 반환 = 설명 높이(px, 줄바꿈까지 잰 값).
+    /// </summary>
+    public float BindSentence(CovenantSentence s, float descWidth)
     {
         gameObject.SetActive(true);
         if (_icon != null) _icon.gameObject.SetActive(false);
         if (_stageBadge != null) _stageBadge.color = ColorBasic;
 
         string causeName = CovenantPalette.TryGetCause(s.CauseId, out var cd) ? cd.name : s.CauseId;
-        if (_nameText != null) _nameText.text = $"서약서 · {causeName}";
-        BuildProgressLabels(s, $"서약서 · {causeName}");
+        if (_nameText != null) _nameText.text = causeName;
+        BuildProgressLabels(s, causeName);
 
-        int lines = 1;
+        float h = 0f;
         if (_descText != null)
         {
-            var sb = new System.Text.StringBuilder(cd.desc);
+            var sb = new System.Text.StringBuilder(CauseAlpha).Append(UIKoreanWrap.Words(cd.desc)).Append("<alpha=#FF>");
             for (int i = 0; i < s.ResultCount; i++)
             {
                 string prev = i > 0 ? s.ResultId(i - 1) : null;
-                sb.Append('\n').Append("→ ").Append(CovenantGrammar.Line(s.ResultId(i), s.ResultLink(i), prev));
-                lines++;
+                sb.Append("\n<indent=").Append(ResultIndentEm.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)).Append("em>")
+                  .Append(UIKoreanWrap.Words(CovenantGrammar.Line(s.ResultId(i), s.ResultLink(i), prev))).Append("</indent>");
             }
             _descText.fontStyle = FontStyles.Normal;
             _descText.text = sb.ToString();
             _descText.gameObject.SetActive(true);
+            h = _descText.GetPreferredValues(_descText.text, descWidth, 0f).y;
         }
         EnsurePips(s.ResultCount);
-        return lines;
+        return h;
     }
 
     /// <summary>절 하나가 일어났다 — 그 표식을 <paramref name="delay"/>초 뒤부터 잠깐 밝힌다(연쇄 = 차례로 켜짐).</summary>
@@ -171,6 +180,8 @@ public sealed class UI_CovenantSlot : MonoBehaviour
     private void Update()
     {
         if (_pips.Count == 0) return;
+        if (_pipRow != null && _pipRow.gameObject.activeSelf && _descText != null
+            && (_pipLayoutDirty || _descText.rectTransform.rect.size != _pipRectSize)) LayoutPips();
         float now = Time.unscaledTime;
         for (int i = 0; i < _pips.Count; i++)
         {
@@ -249,25 +260,26 @@ public sealed class UI_CovenantSlot : MonoBehaviour
         }
     }
 
-    /// <summary>제목 아래 마름모 줄 — 결과 수만큼(레이아웃에서 빠진 덧그림).</summary>
+    /// <summary>결과 줄 글머리 마름모 — 결과 수만큼. 설명 글자와 같은 좌표계(설명 위에 겹친 판)에 두고 자리는 <see cref="LayoutPips"/>가 줄에서 잰다.</summary>
     private void EnsurePips(int count)
     {
-        if (_pipRow == null)
+        if (_pipRow == null && _descText != null)
         {
-            var go = new GameObject("Pips", typeof(RectTransform), typeof(LayoutElement));
-            go.GetComponent<LayoutElement>().ignoreLayout = true;
+            var go = new GameObject("Pips", typeof(RectTransform));
             _pipRow = (RectTransform)go.transform;
-            _pipRow.SetParent(transform, false);
-            _pipRow.anchorMin = _pipRow.anchorMax = new Vector2(0.5f, 1f);
-            _pipRow.pivot = new Vector2(0.5f, 1f);
-            _pipRow.anchoredPosition = new Vector2(0f, -4f);
-            _pipRow.sizeDelta = new Vector2(200f, PipSize + 4f);
+            _pipRow.SetParent(_descText.transform, false);
+            _pipRow.anchorMin = Vector2.zero;
+            _pipRow.anchorMax = Vector2.one;
+            _pipRow.offsetMin = _pipRow.offsetMax = Vector2.zero;
+            _pipRow.pivot = _descText.rectTransform.pivot;   // 글자 좌표(피벗 기준)를 그대로 쓴다
         }
+        if (_pipRow == null) return;
         while (_pips.Count < count)
         {
             var go = new GameObject($"Pip{_pips.Count}", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
             var rt = (RectTransform)go.transform;
             rt.SetParent(_pipRow, false);
+            rt.anchorMin = rt.anchorMax = _pipRow.pivot;
             rt.sizeDelta = new Vector2(PipSize, PipSize);
             rt.localEulerAngles = new Vector3(0f, 0f, 45f);
             var img = go.GetComponent<Image>();
@@ -276,14 +288,35 @@ public sealed class UI_CovenantSlot : MonoBehaviour
             _pips.Add(img);
             _pipUntil.Add(0f);
         }
-        float total = count * PipSize + (count - 1) * PipGap;
-        for (int i = 0; i < _pips.Count; i++)
-        {
-            bool on = i < count;
-            _pips[i].gameObject.SetActive(on);
-            if (on) ((RectTransform)_pips[i].transform).anchoredPosition = new Vector2(-total * 0.5f + PipSize * 0.5f + i * (PipSize + PipGap), -(PipSize * 0.5f + 2f));
-        }
+        for (int i = 0; i < _pips.Count; i++) _pips[i].gameObject.SetActive(i < count);
         _pipRow.gameObject.SetActive(count > 0);
+        _pipLayoutDirty = true;
+    }
+
+    /// <summary>
+    /// 글머리를 결과 줄 첫 줄에 놓는다 — 줄마다 「바로 앞 글자가 줄바꿈(\n)」이면 새 문단(0 = 조건 줄, k = 결과 k-1).
+    /// 묶을 때 · 칸 크기가 바뀔 때만(Update가 부른다) — 매 프레임 메시를 다시 만들지 않는다.
+    /// </summary>
+    private void LayoutPips()
+    {
+        _pipLayoutDirty = false;
+        var rt = _descText.rectTransform;
+        _pipRectSize = rt.rect.size;
+        if (_pipRectSize.x < 1f) return;   // 아직 레이아웃 전 — 크기가 생기면 다시 온다
+        _descText.ForceMeshUpdate();
+        var ti = _descText.textInfo;
+        float x = rt.rect.xMin + _descText.fontSize * ResultIndentEm * 0.5f;
+        int para = 0;
+        for (int l = 0; l < ti.lineCount; l++)
+        {
+            int first = ti.lineInfo[l].firstCharacterIndex;
+            if (first > 0 && ti.characterInfo[first - 1].character != '\n') continue;   // 줄바꿈으로 이어진 줄
+            int pip = para - 1;
+            para++;
+            if (pip < 0 || pip >= _pips.Count || !_pips[pip].gameObject.activeSelf) continue;
+            float y = (ti.lineInfo[l].ascender + ti.lineInfo[l].descender) * 0.5f;
+            ((RectTransform)_pips[pip].transform).anchoredPosition = new Vector2(x, y);
+        }
     }
 
     /// <summary>조립 서약으로 다시 쓰일 때(옛 세이브) 표식을 감춘다.</summary>
