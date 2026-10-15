@@ -145,22 +145,26 @@ public static class AbyssPeddlerCatalog
     // 표시용 — GameRunSession.PotionHealRatio(0.40) + 제단 「포션 회복량」(10-14)과 같게
     private static int PotionHealPercent => Mathf.RoundToInt((0.40f + MemoryAltarService.PotionHealBonus) * 100f);
     private const float SpecialDiscount = 0.5f;      // 특가 50% 할인
+    private const float ClearanceDiscount = 0.3f;    // 돌발 「떨이」 −30%(10-15)
 
     public sealed class Result
     {
         public List<ShopProduct> Products = new();
         public ShopProduct Special;                   // 오늘의 특가(뽑은 7종 중 1개의 할인본)
         public int SpecialOriginalPrice;              // 취소선 표시용 원가
+        public ShopProduct RareGoods;                 // 돌발 「귀한 물건」 — 정규 진열 맨 앞 Epic 룬(없으면 null)
     }
 
     /// <summary>
     /// 진열을 새로 롤. 룬/포션/버프/재료 <b>풀에서 7종을 뽑고</b>, 그중 무작위 1개를 할인해
     /// 오늘의 특가로 올린다(나머지 6종이 정규 진열). 소스가 없는 카테고리는 자동으로 다른 풀이 메운다.
     /// </summary>
-    public static Result Build(System.Random rng)
+    public static Result Build(System.Random rng, ShopEvent ev = ShopEvent.None)
     {
         rng ??= new System.Random();
         var res = new Result();
+        // 귀한 물건(10-15) — 먼저 굴려 둔다(특가로 뽑히지 않게 따로 · 정규 진열 맨 앞에 선다)
+        var rare = ev == ShopEvent.RareGoods ? BuildRune(rng, ItemRarity.Epic) : null;
 
         // 포션은 CSV 없이 <b>1칸 고정</b> — 언제 와도 회복 수단은 살 수 있어야 한다.
         var draw = new List<ShopProduct>(DrawCount);
@@ -180,6 +184,8 @@ public static class AbyssPeddlerCatalog
         // 「상인의 인장」 — 특가를 고르기 <b>전에</b> 건다. 나중에 걸면 취소선 원가만 싸지고
         // 특가는 그대로라 할인이 이중으로 보이거나 역전된다.
         for (int i = 0; i < draw.Count; i++) draw[i] = MerchantSigil.Apply(draw[i]);
+        if (ev == ShopEvent.Clearance)
+            for (int i = 0; i < draw.Count; i++) draw[i] = Discounted(draw[i], ClearanceDiscount);
 
         // 뽑은 7종 중 1개를 특가로
         int specialIdx = rng.Next(draw.Count);
@@ -192,8 +198,21 @@ public static class AbyssPeddlerCatalog
         for (int i = 0; i < draw.Count; i++)
             if (i != specialIdx) res.Products.Add(draw[i]);
 
+        if (rare != null)
+        {
+            rare = MerchantSigil.Apply(rare);
+            res.RareGoods = new ShopProduct(rare.Category, rare.DisplayName, rare.EffectText,
+                "귀한 물건 — 오늘만 들어온 Epic 룬 · 구매 즉시 판에 배치", rare.Price, rare.Rarity, rare.Icon, rare.Grant, rare.Rune);
+            res.Products.Insert(0, res.RareGoods);
+            if (res.Products.Count > ProductCount) res.Products.RemoveAt(res.Products.Count - 1);   // 진열 6칸 그대로
+        }
         return res;
     }
+
+    /// <summary>값만 깎은 사본(룬 원본까지 넘긴다 — <see cref="MerchantSigil.Apply(ShopProduct)"/>와 같은 이유).</summary>
+    private static ShopProduct Discounted(ShopProduct p, float off)
+        => p == null ? null : new ShopProduct(p.Category, p.DisplayName, p.EffectText, p.DetailText,
+                                              Mathf.Max(1, Mathf.RoundToInt(p.Price * (1f - off))), p.Rarity, p.Icon, p.Grant, p.Rune);
 
     /// <summary>
     /// 「상인의 인장」(기억의 제단 Ⅰ 출발) — 상점 전 품목 −15%.
@@ -268,7 +287,7 @@ public static class AbyssPeddlerCatalog
     }
 
     // ── 룬 ── 아이템 테이블(ITEM_DATA)에서 shape_id>0 인 항목을 조회 → 보관함으로
-    private static ShopProduct BuildRune(System.Random rng)
+    private static ShopProduct BuildRune(System.Random rng, ItemRarity? exact = null)
     {
         var itemData = Managers.ItemData;
         if (itemData == null || !itemData.IsInitialized) return null;
@@ -283,6 +302,7 @@ public static class AbyssPeddlerCatalog
         var peddlerInv = GameRunBootstrapper.Instance?.Run?.ItemInventory;   // 이미 가진 룬(상한 1)은 진열하지 않는다(10-09 출시 점검)
         var runeIds = all.Where(kv => kv.Value != null && kv.Value.Count > 0 && kv.Value[0].shape_id > 0
                                       && ParseRarity(kv.Value[0].ResolvedRarity) <= maxRarity
+                                      && (exact == null || ParseRarity(kv.Value[0].ResolvedRarity) == exact.Value)
                                       && (peddlerInv == null || !peddlerInv.IsAtMaxStack(kv.Key)))
                          .Select(kv => kv.Key).ToList();
         if (runeIds.Count == 0) return null;

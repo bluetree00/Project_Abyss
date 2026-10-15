@@ -382,6 +382,16 @@ public class RunProgressManager : MonoBehaviour
         d.weapon1FormTier     = w1?.formTier ?? 0;
         d.weapon0FormVariants = w0?.formVariants ?? string.Empty;
         d.weapon1FormVariants = w1?.formVariants ?? string.Empty;
+        // 근접 강화 증강(10-15) — 받은 단계는 고를 때만 기록되므로 창이 열린 채 저장돼도 이어하기 뒤 다음 강화에서 다시 열린다
+        d.weapon0Augments            = w0?.augments ?? string.Empty;
+        d.weapon1Augments            = w1?.augments ?? string.Empty;
+        d.weapon0AugmentHighest      = w0?.highestEnhanceReached ?? 0;
+        d.weapon1AugmentHighest      = w1?.highestEnhanceReached ?? 0;
+        d.weapon0AugmentSilverStreak = w0?.augmentSilverStreak ?? 0;
+        d.weapon1AugmentSilverStreak = w1?.augmentSilverStreak ?? 0;
+        d.weapon0AugmentAfterEvolve  = w0 != null && w0.augmentAfterEvolve;
+        d.weapon1AugmentAfterEvolve  = w1 != null && w1.augmentAfterEvolve;
+        d.meleeAugmentRerollsUsed    = MeleeAugmentDraft.RerollsPerRun - MeleeAugmentDraft.RerollsLeft;
     }
 
     private static WeaponData SlotFromSaved(GameRunSession s, int slot)

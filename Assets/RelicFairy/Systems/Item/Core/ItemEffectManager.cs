@@ -66,6 +66,9 @@ public sealed class ItemEffectManager
                 effect.OnActivate(_ctx);
             }
         }
+
+        // 근접 강화 증강(10-15) — 두 무기의 증강 효과. 켜짐은 그 무기를 들 때만(MeleeAugmentEffect.IsActive).
+        MeleeAugmentEffect.AppendFor(_ctx.Player, _activeEffects, _ctx);
     }
 
     /// <summary>

@@ -10,7 +10,7 @@ public enum CrucibleEvent
     Curse,     // 저주받은 화로(성공률 하락 — 공포/위험)
 }
 
-/// <summary>재련공 NPC 대사 상황(도발/부추김/축하/위로/성공/평상).</summary>
+/// <summary>재련공 NPC 대사 상황(도발/부추김/축하/위로/성공/평상 · 10-15 아깝게 실패/재료 부족/진화/승급/단련/화로 이벤트).</summary>
 public enum CrucibleMood
 {
     Idle,
@@ -19,4 +19,10 @@ public enum CrucibleMood
     Jackpot,
     Fail,
     Success,
+    NearMiss,   // 성공률 바로 아래로 빗나감
+    NoFuel,     // 강화재료가 모자람
+    Evolve,     // 무형검 → 형
+    Promote,    // 전설 승급
+    Temper,     // 형 단련
+    Event,      // 패널 열 때 — 화로 이벤트가 있으면 그 이야기(없으면 평상)
 }

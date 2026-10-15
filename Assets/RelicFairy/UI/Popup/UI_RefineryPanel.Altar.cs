@@ -48,7 +48,7 @@ public sealed partial class UI_RefineryPanel
     private Color[] _iGemBase;
     private Image[] _iSpinLine;
     private RectTransform[] _iGems;
-    private TMP_Text _iSub, _iOwn, _iSpinLabel, _iSpinCost, _iCost, _iNext, _iMode, _iBoost, _iHint;
+    private TMP_Text _iSub, _iOwn, _iSpinLabel, _iSpinCost, _iCost, _iNext, _iMode, _iBoost, _iHint, _iEvent, _iPity;
     private readonly OddsRow[] _iOdds = new OddsRow[3];
 
     /// <summary>「나올 수 있는 등급」 한 줄 — ◆ · 등급 이름 · 큰 % · 막대(바탕 선 + 채움).</summary>
@@ -194,6 +194,9 @@ public sealed partial class UI_RefineryPanel
 
         _iBoost = WText(idle, "OddsBoost", UIWeight.Regular, UITheme.Thin.Body, UITheme.Thin.Gold, TextAlignmentOptions.MidlineLeft);
         PutLeft(_iBoost.rectTransform, ColLeftX, ColTopY - 62f - 3f * RowPitch, ColW, 28f);
+        // 천장(10-15) — Legend 없이 10번이면 다음은 Legend. 몇 번 남았는지 · 확정이면 금빛
+        _iPity = WText(idle, "OddsPity", UIWeight.Regular, UITheme.Thin.Body, UITheme.Thin.InkA(0.6f), TextAlignmentOptions.MidlineLeft);
+        PutLeft(_iPity.rectTransform, ColLeftX, ColTopY - 62f - 3f * RowPitch - 34f, ColW, 28f);
     }
 
     /// <summary>오른쪽 열 「이번 정제」 — 원석 아이콘 + 비용(큰 숫자) · 다음 비용 · 정제 방식(한 장 / 두 장 중 하나).</summary>
@@ -215,6 +218,9 @@ public sealed partial class UI_RefineryPanel
         PutLeft(_iNext.rectTransform, ColRightX, ColTopY - 126f, ColW, 28f);
         _iMode = WText(idle, "Mode", UIWeight.Regular, UITheme.Thin.Body, UITheme.Thin.InkA(0.85f), TextAlignmentOptions.MidlineLeft);
         PutLeft(_iMode.rectTransform, ColRightX, ColTopY - 62f - 2f * RowPitch, ColW, 28f);
+        // 이 방 돌발 이벤트(10-15) — 「◆ 반값 정제 — 원석 절반 · 이 방에서만」(금 = 지금 걸려 있다)
+        _iEvent = WText(idle, "RoomEvent", UIWeight.Medium, UITheme.Thin.Body, UITheme.Thin.Gold, TextAlignmentOptions.MidlineLeft);
+        PutLeft(_iEvent.rectTransform, ColRightX, ColTopY - 62f - 3f * RowPitch, ColW, 28f);
     }
 
     /// <summary>아래 가운데 큰 [정제하기 ◆ N] — 평판 + 1px 금(창 버튼과 같은 모양) · 아래 안내 줄.</summary>
@@ -303,10 +309,20 @@ public sealed partial class UI_RefineryPanel
         _iCost.text  = _iCostIcon.enabled ? _svc.CurrentCost.ToString() : $"원석 {_svc.CurrentCost}";
         _iCost.color = _svc.CanAfford ? UITheme.Thin.Ink : UITheme.Thin.Danger;
         _iNext.text  = _svc.NextCost > _svc.CurrentCost ? $"다음 정제부터 원석 {_svc.NextCost}" : $"다음 정제도 원석 {_svc.NextCost}";
-        bool pick    = MemoryAltarService.IsRefinePickUnlocked;
+        bool pick    = _svc.TwoCards;
         _iMode.text  = pick ? "룬 두 장 중 하나를 고른다" : "룬 하나가 나온다";
         _iMode.color = pick ? UITheme.Thin.Gold : UITheme.Thin.InkA(0.85f);
         _iSub.text   = pick ? "원석을 바치면 밤하늘이 룬 두 장을 내린다 — 하나를 고른다" : "원석을 바치면 밤하늘이 룬 하나를 내린다";
+
+        int left = RefineryService.PityLimit - _svc.PityCount;
+        _iPity.text  = _svc.PityReady ? "◆ 이번 정제 Legend 확정" : $"Legend 확정까지 {left}회";
+        _iPity.color = _svc.PityReady ? UITheme.Thin.Gold : UITheme.Thin.InkA(0.6f);
+        var ev = _svc.RoomEvent;
+        bool spent = ev == RefineryEvent.HighPurity && !_svc.PurityReady;   // 고순도는 한 번 쓰면 끝
+        _iEvent.text  = ev == RefineryEvent.None ? string.Empty
+                      : spent ? $"{RefineryService.EventTitle(ev)} — 이미 썼다"
+                      : $"◆ {RefineryService.EventTitle(ev)} — {RefineryService.EventLine(ev)} · 이 방에서만";
+        _iEvent.color = spent ? UITheme.Thin.InkA(0.5f) : UITheme.Thin.Gold;
     }
 
     /// <summary>[정제하기] 큰 버튼 — 비용 숫자는 모자라면 빨강, 잠금 중엔 흐림(창 버튼과 같은 규칙).</summary>

@@ -288,7 +288,7 @@ public sealed class UI_StartPartPopup : UI_Popup
         ShopUIStyle.Anchor(desc.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, DescTop), new Vector2(cardW - 36f, DescH));
         desc.textWrappingMode = TextWrappingModes.Normal;
-        desc.text = def.description ?? string.Empty;
+        desc.text = UIKeywordInk.Values(def.description ?? string.Empty);   // 수치만 Noto 500(10-15 설명 글 강조)
 
         // 1단계 효과 — 재련소 파츠 줄과 같은 문구(「2발」「관통 1」…)
         var band = ShopUIStyle.MakeImage(card, "EffectBand", new Color(kc.r * 0.16f, kc.g * 0.16f, kc.b * 0.16f, 1f));

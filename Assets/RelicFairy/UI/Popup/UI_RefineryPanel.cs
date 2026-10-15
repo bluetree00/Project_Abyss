@@ -64,7 +64,7 @@ public sealed partial class UI_RefineryPanel : UI_Popup
     private const float InfoArt   =  114f;
     private const float MinFont   =   16f;  // 글자 최소(1080 화면 px — 설계 v3 3장 CHECK)
     private const float HintY     = -350f;  // 안내 · 거절 사유는 버튼 아래(버튼 아래끝 -326)
-    private static string IdleHint => MemoryAltarService.IsRefinePickUnlocked
+    private string IdleHint => _svc != null && _svc.TwoCards
         ? "원석으로 정제하면 룬 두 장 중 하나를 고른다"
         : "원석으로 정제하면 룬 하나가 나온다";
 
@@ -704,7 +704,7 @@ public sealed partial class UI_RefineryPanel : UI_Popup
         _infoCaption.text = "나올 룬";
         _infoGem.sprite   = RuneArt.GetArt(ItemRarity.Rare);
         _infoGem.enabled  = _infoGem.sprite != null;
-        _infoName.text    = MemoryAltarService.IsRefinePickUnlocked ? "무작위 룬 두 장 중 하나" : "무작위 룬 하나";
+        _infoName.text    = _svc != null && _svc.TwoCards ? "무작위 룬 두 장 중 하나" : "무작위 룬 하나";
         _infoName.color   = UITheme.Thin.Ink;
         // 등급 이름은 영문(Rare · Epic · Legend — 10-10 용어집, 확률판과 같은 말)
         _infoDesc.text    = "Rare 이상 · 효과와 속성,\n모양은 룬마다 다르다";

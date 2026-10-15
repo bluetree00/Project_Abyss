@@ -84,6 +84,56 @@ public class WeaponData
 
     public bool HasForm => form != null && formTier > 0;
 
+    // ── 근접 강화 증강(10-15) — 「id:단계」 쉼표 문자열(형 단련처럼 그대로 세이브에 싣는다) ──
+    /// <summary>고른 증강과 단계(I~III) — 「aug_sharp_edge:2,aug_pursuit:1」.</summary>
+    public string augments = "";
+    /// <summary>처음 닿은 최고 강화 단계 — 이 단계를 처음 넘을 때만 증강을 준다(하락 뒤 다시 닿으면 안 준다).</summary>
+    public int highestEnhanceReached;
+    /// <summary>은 등급이 이어진 수 — 3이면 다음 화면은 금 이상(바닥 보장).</summary>
+    public int augmentSilverStreak;
+    /// <summary>진화 직후 첫 강화 — 그 화면은 금 이상.</summary>
+    public bool augmentAfterEvolve;
+
+    /// <summary>이 증강의 단계(없으면 0).</summary>
+    public int AugmentRank(string id)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(augments)) return 0;
+        foreach (var (aid, rank) in AugmentList()) if (aid == id) return rank;
+        return 0;
+    }
+
+    /// <summary>가진 증강 목록(id · 단계).</summary>
+    public System.Collections.Generic.IEnumerable<(string id, int rank)> AugmentList()
+    {
+        if (string.IsNullOrEmpty(augments)) yield break;
+        foreach (var part in augments.Split(','))
+        {
+            int c = part.IndexOf(':');
+            string id = c > 0 ? part.Substring(0, c) : part;
+            int rank = c > 0 && int.TryParse(part.Substring(c + 1), out int r) ? r : 1;
+            if (!string.IsNullOrEmpty(id)) yield return (id, UnityEngine.Mathf.Clamp(rank, 1, 3));
+        }
+    }
+
+    /// <summary>증강을 얻거나 한 단계 올린다(최대 III). 새 단계를 돌려준다.</summary>
+    public int AddAugment(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return 0;
+        var sb = new System.Text.StringBuilder();
+        int result = 1;
+        bool found = false;
+        foreach (var (aid, rank) in AugmentList())
+        {
+            int r = rank;
+            if (aid == id) { r = UnityEngine.Mathf.Min(rank + 1, 3); result = r; found = true; }
+            if (sb.Length > 0) sb.Append(',');
+            sb.Append(aid).Append(':').Append(r);
+        }
+        if (!found) { if (sb.Length > 0) sb.Append(','); sb.Append(id).Append(":1"); }
+        augments = sb.ToString();
+        return result;
+    }
+
     public bool HasFormVariant(string id)
     {
         if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(formVariants)) return false;

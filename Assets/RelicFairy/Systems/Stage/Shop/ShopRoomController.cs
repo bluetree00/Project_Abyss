@@ -3,6 +3,14 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
+/// <summary>상점 방 돌발 이벤트(10-15 · 방 들어갈 때 1회 굴림 · 이 방에서만).</summary>
+public enum ShopEvent
+{
+    None,
+    Clearance,   // 떨이 — 전 품목 −30%(새로고침해도 그대로)
+    RareGoods,   // 귀한 물건 — Epic 룬 하나 진열(처음 진열만)
+}
+
 /// <summary>TryPurchaseSlot 결과. UI가 피드백 분기에 사용.</summary>
 public enum ShopPurchaseResult
 {
@@ -58,6 +66,8 @@ public class ShopRoomController : MonoBehaviour
     private LuckRollTableSO _luckTable;
     private System.Random _roomRng;     // 최초 진열용 결정적 RNG. null이면 전역 Random.
     private System.Random _rerollRng;   // 리롤용 비결정 RNG(시간 기반). lazy init.
+    private ShopEvent _event;           // 이 방 돌발 이벤트(10-15)
+    private NpcAmbientChatter _chatter;
     private int _slotCount;
     private int _weaponSlotFallback;    // 매대 없는 방에서 무기 슬롯 수 폴백
     private bool _rerollEnabled;
@@ -99,7 +109,38 @@ public class ShopRoomController : MonoBehaviour
     /// <summary>슬롯/골드 상태가 바뀌어 UI 재렌더가 필요할 때 발생.</summary>
     public event Action OnShopChanged;
 
+    public ShopEvent ActiveEvent => _event;
+
+    /// <summary>돌발 이벤트 이름 · 한 줄 · 상인 인사 · 외침(10-15). 없으면 빈 문자열.</summary>
+    public string EventTitle => _event switch
+    {
+        ShopEvent.Clearance => "떨이",
+        ShopEvent.RareGoods => "귀한 물건",
+        _                   => string.Empty,
+    };
+    public string EventLine => _event switch
+    {
+        ShopEvent.Clearance => "전 품목 −30%",
+        ShopEvent.RareGoods => "Epic 룬 하나 입고",
+        _                   => string.Empty,
+    };
+    public string EventGreeting => _event switch
+    {
+        ShopEvent.Clearance => "떨이야! 전부 30% 싸다!",
+        ShopEvent.RareGoods => "귀한 물건 들어왔어!",
+        _                   => string.Empty,
+    };
+    private string EventShout => _event switch
+    {
+        ShopEvent.Clearance => "떨이야, 떨이! 오늘은 전부 싸다!",
+        ShopEvent.RareGoods => "귀한 물건 들어왔어! 구경하고 가!",
+        _                   => null,
+    };
+
     // ── Lifecycle ───────────────────────────────────────────
+
+    private void OnEnable()  => RunFlowController.RoomRevealed += HandleRoomRevealed;
+    private void OnDisable() => RunFlowController.RoomRevealed -= HandleRoomRevealed;
 
     private void OnDestroy()
     {
@@ -139,8 +180,10 @@ public class ShopRoomController : MonoBehaviour
         _rerollCost = Mathf.Max(0, rerollCost);
 
         var (npcPos, npcRot) = ResolveNpcPlacement();
+        _event = RollEvent(_roomRng);   // 진열보다 먼저 — 방 시드의 첫 수(이어하기 때 같은 이벤트)
         BuildSlots(_roomRng);
-        _peddler = AbyssPeddlerCatalog.Build(_roomRng);   // 심연의 행상 진열(방 시드 = 결정성 유지)
+        _peddler = AbyssPeddlerCatalog.Build(_roomRng, _event);   // 심연의 행상 진열(방 시드 = 결정성 유지)
+        if (_event == ShopEvent.RareGoods && _peddler.RareGoods == null) _event = ShopEvent.None;   // 들일 Epic 룬이 없으면 이벤트도 없다
         SpawnNpc(npcPrefab, npcPos, npcRot);
         SpawnDecor(npcPos, npcRot);                       // 판매대(정면) + 뒤쪽 소품
         HookRunEvents();
@@ -261,7 +304,8 @@ public class ShopRoomController : MonoBehaviour
         // 진열 자체는 여전히 저장하지 않는다(이어하면 처음 진열) — 다시 굴리면 같은 순서로 같은 진열이 나온다.
         _rerollRng ??= new System.Random(_roomRng != null ? _roomRng.Next() : System.Environment.TickCount);
         BuildSlots(_rerollRng);
-        _peddler = AbyssPeddlerCatalog.Build(_rerollRng);   // 상품 돌리기 = 행상 진열도 새로 롤
+        // 상품 돌리기 = 행상 진열도 새로 롤 — 떨이는 이 방 내내 · 귀한 물건은 처음 진열에만
+        _peddler = AbyssPeddlerCatalog.Build(_rerollRng, _event == ShopEvent.Clearance ? ShopEvent.Clearance : ShopEvent.None);
         RefreshOwnership();
         OnShopChanged?.Invoke();
         Debug.Log($"[ShopRoom] 리롤 완료 ({_rerollCost}G 차감) — 슬롯 {_slots.Count}개 재생성");
@@ -289,8 +333,25 @@ public class ShopRoomController : MonoBehaviour
         _npcInstance.TryGetComponent(out _reactor);
 
         // 주기적 월드스페이스 잡담 — 상인 컨셉.
-        _npcInstance.AddComponent<NpcAmbientChatter>()
-                    .Initialize(ShopChatterLines, 9f, new Color(1f, 0.9f, 0.6f), _npc != null ? _npc.ChatterHeight : null);
+        _chatter = _npcInstance.AddComponent<NpcAmbientChatter>();
+        _chatter.Initialize(ShopChatterLines, 9f, new Color(1f, 0.9f, 0.6f), _npc != null ? _npc.ChatterHeight : null);
+    }
+
+    // ── 돌발 이벤트(10-15 · 기획 §6 — 30%: 떨이 15 · 귀한 물건 15) ──
+    private static ShopEvent RollEvent(System.Random rng)
+    {
+        double r = rng != null ? rng.NextDouble() : UnityEngine.Random.value;
+        if (r < 0.15) return ShopEvent.Clearance;
+        // Epic 룬을 아직 못 여는 제단이면 귀한 물건은 진열할 수 없다 — 떨이로(제시되는 이벤트는 늘 유의미)
+        if (r < 0.30) return MemoryAltarService.MaxRuneRarity >= ItemRarity.Epic ? ShopEvent.RareGoods : ShopEvent.Clearance;
+        return ShopEvent.None;
+    }
+
+    private void HandleRoomRevealed(GameObject room)
+    {
+        if (room == null || !transform.IsChildOf(room.transform) || _event == ShopEvent.None) return;
+        RoomEventNotice.Raise(EventTitle, $"{EventLine} — 이 방에서만");
+        if (_chatter != null) _chatter.ShoutFirst(EventShout);
     }
 
     /// <summary>Initialize 전에 호출 — [0]=NPC 앞 판매대, 나머지=뒤쪽 소품.</summary>

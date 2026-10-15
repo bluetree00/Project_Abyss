@@ -444,7 +444,7 @@ public sealed partial class UI_RefineryPanel
         c.Name.text   = rune != null ? rune.displayName : "";
         c.Name.color  = UITheme.Thin.Ink;
         c.Attr.text   = RuneFootText(rune);
-        c.Effect.text = RuneEffectText(rune);
+        c.Effect.text = UIKeywordInk.Values(RuneEffectText(rune));   // 수치만 Noto 500(10-15 설명 글 강조)
         c.TextGroup.alpha = 0f;
 
         float y = c.Twin ? 52f : 123f;   // 한 장 — 등급 글과 이름 사이 가운데 줄

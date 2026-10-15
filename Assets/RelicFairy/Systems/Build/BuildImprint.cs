@@ -71,6 +71,16 @@ public static class BuildImprint
             var evo = RelicEvolution.ById(AppBootstrapper.Instance != null ? AppBootstrapper.Instance.Loadout?.RelicEvolutionId : null);
             if (evo != null)
                 for (int k = 0; k < RelicEvolution.ImprintBonus; k++) Add(evo.Family);
+
+            // 근접 강화 증강 「각인 공명」(10-15) — 지금 든 무기에 있으면 가장 높은 계열에 반 칸 단위로 더한다
+            float echo = MeleeAugments.ValueOnCurrent("aug_imprint_echo");
+            if (echo > 0f)
+            {
+                int top = -1;
+                for (int i = 0; i < s_halves.Length; i++)
+                    if ((BuildFamily)i != BuildFamily.None && (top < 0 || s_halves[i] > s_halves[top])) top = i;
+                if (top >= 0 && s_halves[top] > 0) s_halves[top] += UnityEngine.Mathf.RoundToInt(echo * 2f);
+            }
         }
         for (int i = 0; i < s_counts.Length; i++) s_counts[i] = s_halves[i] / 2;
 

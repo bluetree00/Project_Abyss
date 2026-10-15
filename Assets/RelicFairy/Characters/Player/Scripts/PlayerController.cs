@@ -222,6 +222,9 @@ public sealed partial class PlayerController : CharacterBase
     /// <summary>Q · E · R 스킬 상태인가. 이동 상태 전환이 스킬 동작을 이동 동작으로 덮지 않게 본다(10-09 출시 점검).</summary>
     public bool IsInSkillAction => IsInSkillState();
 
+    /// <summary>평타 · 스킬 동작 중인가 — 근접 강화 증강 「철벽 자세」(대검 · 10-15)가 본다.</summary>
+    public bool IsInAttackAction => _actSM != null && IsInAttackOrSkillState();
+
     /// <summary>보스 잡기 패턴에 붙들려 있는 중인가. 이 동안은 포이즈 브레이크(날아감)를 발동하지 않는다(→ SetGrabbed).</summary>
     private bool IsGrabbed    { get; set; }
     /// <summary>분신(ShadowClone)으로 동작 중인 경우. 카메라/입력/PlayerManager 등록 생략.</summary>

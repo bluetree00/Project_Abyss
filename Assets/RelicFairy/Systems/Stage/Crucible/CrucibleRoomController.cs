@@ -46,6 +46,7 @@ public class CrucibleRoomController : MonoBehaviour
 
     private GameObject _npcInstance;
     private ShopNpcInteraction _npc;
+    private NpcAmbientChatter _chatter;   // 머리 위 잡담 — 방이 드러나면 화로 이벤트를 외친다
     private ServiceNpcReactor _reactor;   // 혼자면 망치질 · 다가오면 알아봄 · 벼리고 나가면 반김
     private int _fuelAtOpen;              // 패널을 열 때 재료 — 닫을 때 달라졌으면 일을 맡긴 것
 
@@ -118,6 +119,16 @@ public class CrucibleRoomController : MonoBehaviour
         _                      => string.Empty,
     };
 
+    /// <summary>돌발 이벤트 이름(입장 배너 · 10-15) — 없으면 빈 문자열.</summary>
+    public string EventTitle => _event switch
+    {
+        CrucibleEvent.Discount => "반값 재련",
+        CrucibleEvent.Fever    => "열기 오른 화로",
+        CrucibleEvent.Bounty   => "풍요로운 화로",
+        CrucibleEvent.Curse    => "저주받은 화로",
+        _                      => string.Empty,
+    };
+
     /// <summary>돌발 이벤트 효과 요약(정보 패널 디테일 표시용).</summary>
     public string EventEffectDesc => _event switch
     {
@@ -135,6 +146,9 @@ public class CrucibleRoomController : MonoBehaviour
     public event Action OnCrucibleChanged;
 
     // ── Lifecycle ───────────────────────────────────────────
+
+    private void OnEnable()  => RunFlowController.RoomRevealed += HandleRoomRevealed;
+    private void OnDisable() => RunFlowController.RoomRevealed -= HandleRoomRevealed;
 
     private void OnDestroy()
     {
@@ -277,6 +291,11 @@ public class CrucibleRoomController : MonoBehaviour
 
             // 「석궁」·「대장장이의 인장」 할인 조건 집계 — 도달한 최고 강화 수치만 남는다.
             _run.ReportEnhanceLevel(target.enhanceLevel);
+
+            // 근접 강화 증강(10-15) — 처음 닿은 단계면 두 장 중 하나(진화 직후 첫 강화는 금 이상)
+            bool afterEvolve = target.augmentAfterEvolve;
+            if (MeleeAugmentDraft.TryOfferForEnhance(target, target.enhanceLevel, afterEvolve, new System.Random(unchecked(_run.CrucibleRollIndex * 7919 + target.enhanceLevel * 104729))))
+                target.augmentAfterEvolve = false;
         }
         else if (result.outcome == EnhanceOutcome.FailDropped)
         {
@@ -535,8 +554,34 @@ public class CrucibleRoomController : MonoBehaviour
         _npcInstance.TryGetComponent(out _reactor);
 
         // 주기적 월드스페이스 잡담 — 방이 '사람이 일하는 장소'로 읽히게.
-        _npcInstance.AddComponent<NpcAmbientChatter>()
-                    .Initialize(ChatterLines, 9f, new Color(1f, 0.82f, 0.55f), _npc != null ? _npc.ChatterHeight : null);
+        _chatter = _npcInstance.AddComponent<NpcAmbientChatter>();
+        _chatter.Initialize(ChatterLines, 9f, new Color(1f, 0.82f, 0.55f), _npc != null ? _npc.ChatterHeight : null);
+        TintForge();
+    }
+
+    /// <summary>방이 화면에 드러난 순간 — 화로 이벤트가 있으면 화면 위 배너 + 대장장이 외침(10-15 · 덮개 뒤에서 외치지 않게 이때).</summary>
+    private void HandleRoomRevealed(GameObject room)
+    {
+        if (room == null || !transform.IsChildOf(room.transform) || !HasEvent) return;
+        RoomEventNotice.Raise(EventTitle, $"{EventEffectDesc} — 이 방에서만");
+        if (_chatter != null) _chatter.ShoutFirst(EventShout);
+    }
+
+    /// <summary>화로 빛 — 이벤트마다 모루 불빛(Heat) 색 · 세기만 바꾼다(10-15 · 연출 절제: 새 이펙트 없이 있는 빛으로).</summary>
+    private void TintForge()
+    {
+        if (_npcInstance == null || _event == CrucibleEvent.None) return;
+        foreach (var l in _npcInstance.GetComponentsInChildren<Light>(true))
+        {
+            if (l.name != "Heat") continue;
+            switch (_event)
+            {
+                case CrucibleEvent.Fever:    l.color = new Color(1f, 0.48f, 0.16f); l.intensity *= 1.6f; l.range *= 1.25f; break;   // 열기 — 불이 커진다
+                case CrucibleEvent.Discount: l.color = new Color(1f, 0.80f, 0.38f); break;                                         // 반값 — 금빛
+                case CrucibleEvent.Bounty:   l.color = new Color(1f, 0.90f, 0.60f); l.intensity *= 1.3f; l.range *= 1.4f; break;   // 풍요 — 모루 위로 빛이 번진다
+                case CrucibleEvent.Curse:    l.color = new Color(0.62f, 0.30f, 0.55f); l.intensity *= 0.7f; break;                  // 저주 — 검붉게 가라앉는다
+            }
+        }
     }
 
     private void HandleNpcInteract()
@@ -604,14 +649,24 @@ public class CrucibleRoomController : MonoBehaviour
     /// <summary>상황별 재련공 동기부여 대사(도발/부추김/축하/위로). UI가 표시.</summary>
     public string GetDialogue(CrucibleMood mood)
     {
+        if (mood == CrucibleMood.Event)
+        {
+            string greet = EventGreeting;
+            if (!string.IsNullOrEmpty(greet)) return greet;
+        }
         var pool = mood switch
         {
-            CrucibleMood.Taunt   => TauntLines,
-            CrucibleMood.Streak  => StreakLines,
-            CrucibleMood.Jackpot => JackpotLines,
-            CrucibleMood.Fail    => FailLines,
-            CrucibleMood.Success => SuccessLines,
-            _                    => IdleLines,
+            CrucibleMood.Taunt    => TauntLines,
+            CrucibleMood.Streak   => StreakLines,
+            CrucibleMood.Jackpot  => JackpotLines,
+            CrucibleMood.Fail     => FailLines,
+            CrucibleMood.Success  => SuccessLines,
+            CrucibleMood.NearMiss => NearMissLines,
+            CrucibleMood.NoFuel   => NoFuelLines,
+            CrucibleMood.Evolve   => EvolveLines,
+            CrucibleMood.Promote  => PromoteLines,
+            CrucibleMood.Temper   => TemperLines,
+            _                     => IdleLines,
         };
         if (pool == null || pool.Length == 0) return string.Empty;
         return pool[_dialogueRng.Next(pool.Length)];
@@ -647,6 +702,51 @@ public class CrucibleRoomController : MonoBehaviour
     {
         "좋아, 제법인데. 더 두드려볼까?",
         "쇠가 노래하는군. 멈추지 마.",
+    };
+    private static readonly string[] NearMissLines =
+    {
+        "아깝다! 머리카락 한 올 차이였어.",
+        "거의 붙었는데… 쇠가 마지막에 튕겼군.",
+    };
+    private static readonly string[] NoFuelLines =
+    {
+        "재료 없이는 손도 못 댄다.",
+        "빈손으로 망치를 들 순 없지. 재료부터 가져와.",
+    };
+    private static readonly string[] EvolveLines =
+    {
+        "껍질을 깼군. 이제 제 이름을 가진 무기다.",
+        "모양이 완전히 바뀌었어. 손에 새로 익혀 둬.",
+    };
+    private static readonly string[] PromoteLines =
+    {
+        "전설이다… 천 년 만에 이런 걸 두드려 보는군.",
+        "내 평생 최고의 작품이다. 잘 써라.",
+    };
+    private static readonly string[] TemperLines =
+    {
+        "형이 단단해졌다. 손에 더 붙을 거야.",
+        "이 형, 이제 제법 길이 들었군.",
+    };
+
+    /// <summary>패널을 열 때 화로 이벤트 이야기(10-15) — 없으면 빈 문자열(평상 대사로).</summary>
+    private string EventGreeting => _event switch
+    {
+        CrucibleEvent.Discount => "오늘은 반값이다. 이럴 때 많이 두드려 둬.",
+        CrucibleEvent.Fever    => "화로가 잔뜩 달았어. 오늘은 쇠가 잘 붙을 거다.",
+        CrucibleEvent.Bounty   => "불 기운이 좋군. 재료가 되돌아올지도 몰라.",
+        CrucibleEvent.Curse    => "화로가 시커멓다… 오늘은 쇠가 잘 안 붙을 거야.",
+        _                      => string.Empty,
+    };
+
+    /// <summary>방에 들어올 때 머리 위 외침(10-15 · 월드 글자라 기호 없이) — 화로 이벤트가 없으면 null(평소 잡담만).</summary>
+    private string EventShout => _event switch
+    {
+        CrucibleEvent.Discount => "오늘은 반값이다! 이럴 때 두드려 둬!",
+        CrucibleEvent.Fever    => "화로가 잔뜩 달았다! 오늘은 잘 붙는다!",
+        CrucibleEvent.Bounty   => "불 기운이 좋아! 재료가 되돌아올 날이야!",
+        CrucibleEvent.Curse    => "화로가 시커멓군… 오늘은 조심해라.",
+        _                      => null,
     };
 
     /// <summary>성공 직후 스트릭 비례 잭팟 굴림(결정적) — 성공 시 소모 재료 환불.</summary>

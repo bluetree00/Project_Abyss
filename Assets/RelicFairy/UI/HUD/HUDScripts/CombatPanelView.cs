@@ -2363,7 +2363,7 @@ public sealed partial class CombatPanelView : MonoBehaviour
             _                 => "",
         };
 
-        string text = $"<b>{item.Label}</b>";
+        string text = $"<b>{UIKeywordInk.Values(item.Label)}</b>";   // 효과 글 수치만 Noto 500(10-15)
         if (item.Stacks > 1) text += $"\n중첩 ×{item.Stacks}";
         if (!string.IsNullOrEmpty(item.RemainText)) text += $"\n잔여 {item.RemainText}";
         else if (item.Remaining01 >= 0f) text += $"\n충전 {Mathf.RoundToInt(Mathf.Clamp01(item.Remaining01) * 100f)}%";

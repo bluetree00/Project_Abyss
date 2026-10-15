@@ -33,7 +33,7 @@ public class EnhanceTableSO : ScriptableObject
     [Header("단계 곡선 (index = 현재 단계, level→level+1)")]
     [SerializeField] private LevelStep[] _steps;
 
-    [Header("레벨당 공격 증가율 (선형, +8%/단계)")]
+    [Header("레벨당 공격 증가율 (선형, +4%/단계 — 10-15 단계를 두 개로 쪼갬 · 단계마다 증강)")]
     [SerializeField] private float _attackPctPerLevel = 0.08f;
 
     [Header("등급별 강화 상한")]
@@ -43,17 +43,17 @@ public class EnhanceTableSO : ScriptableObject
     [SerializeField] private int _maxLegendary = 15;
 
     [Header("진화 1회당 상한 확장 (진화 = 강화의 끝이 아니라 다음 구간의 문)")]
-    [SerializeField] private int _maxPerEvolution = 6;
+    [SerializeField] private int _maxPerEvolution = 12;   // 10-15 단계 세분(옛 6)
 
     [Header("마스터리(진화 후 추가 구간) 1단계당 스킬 확장")]
     [Tooltip("스킬 피해 % 가산 (0.06 = +6%/단계)")]
-    [SerializeField] private float _masterySkillDamagePerLevel = 0.06f;
+    [SerializeField] private float _masterySkillDamagePerLevel = 0.03f;   // 10-15 단계 세분(옛 0.06)
     [Tooltip("스킬 쿨다운 감소 % (0.03 = -3%/단계)")]
-    [SerializeField] private float _masterySkillCdrPerLevel = 0.03f;
+    [SerializeField] private float _masterySkillCdrPerLevel = 0.015f;    // 10-15 단계 세분(옛 0.03)
 
     [Header("스킬 단계 임계 — 2·3단계가 열리는 지점 (근접=강화 레벨 / 원거리=파츠 총레벨)")]
     [Tooltip("근접: 강화 레벨이 이 값에 닿을 때마다 스킬 단계 +1. 기본 +3 / +6 (09-25 도달 범위로 당김 — 기획 스킬구성_재련소연결)")]
-    [SerializeField] private int[] _meleeSkillTierMilestones  = { 3, 6 };
+    [SerializeField] private int[] _meleeSkillTierMilestones  = { 6, 12 };   // 10-15 단계 세분(옛 3 · 6)
     [Tooltip("원거리: 파츠 총레벨이 이 값에 닿을 때마다 스킬 단계 +1. 기본 2 / 10 (근접과 재료 비용을 맞춤)")]
     [SerializeField] private int[] _rangedSkillTierMilestones = { 2, 10 };
 

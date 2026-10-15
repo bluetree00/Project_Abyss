@@ -16,6 +16,7 @@ public sealed class NpcAmbientChatter : MonoBehaviour
     private const float FadeTime        = 0.35f;
     private const float HeadOffsetY     = 2.35f; // NPC 머리 위
     private const float VisibleRange    = 22f;   // 이 거리 밖이면 표시하지 않음(멀리서 글자만 둥둥 방지)
+    private const float ShoutDelay      = 0.8f;  // 외칠 말이 있으면 가까이 온 뒤 이만큼 뒤에(초)
 
     // ── Private fields ───────────────────────────────────
     private string[]    _lines;
@@ -29,13 +30,14 @@ public sealed class NpcAmbientChatter : MonoBehaviour
     private Transform   _player;
     private Color       _baseColor = new Color(0.94f, 0.92f, 0.85f);
     private float       _headOffsetY = HeadOffsetY;
+    private string      _shout;   // 다음 한 번은 이 말 먼저(ShoutFirst)
 
     // ── Lifecycle ────────────────────────────────────────
     private void Start()
     {
         _camT   = Camera.main != null ? Camera.main.transform : null;
         _player = Managers.Player != null ? Managers.Player.PlayerTransform : null;
-        _timer  = _interval * 0.35f;   // 방 입장 직후 한 번 빨리 말하게
+        _timer  = _shout != null ? ShoutDelay : _interval * 0.35f;   // 방 입장 직후 한 번 빨리 말하게(외칠 말이 있으면 더 빨리)
     }
 
     private void Update()
@@ -79,6 +81,14 @@ public sealed class NpcAmbientChatter : MonoBehaviour
         HideNow();
     }
 
+    /// <summary>다음 한 번은 이 말을 먼저 — 방에 들어오면 곧(<see cref="ShoutDelay"/>) 외친다(재련소 화로 이벤트 · 10-15). 그 뒤는 평소 잡담.</summary>
+    public void ShoutFirst(string line)
+    {
+        if (string.IsNullOrEmpty(line)) return;
+        _shout = line;
+        if (!_shown) _timer = Mathf.Min(_timer, ShoutDelay);
+    }
+
     // ── Private Methods ──────────────────────────────────
     private void CreateText()
     {
@@ -97,8 +107,8 @@ public sealed class NpcAmbientChatter : MonoBehaviour
 
     private void ShowNext()
     {
-        _text.text = _lines[_index % _lines.Length];
-        _index++;
+        if (_shout != null) { _text.text = _shout; _shout = null; }
+        else { _text.text = _lines[_index % _lines.Length]; _index++; }
         _shown    = true;
         _holdLeft = DefaultHold;
         _text.gameObject.SetActive(true);

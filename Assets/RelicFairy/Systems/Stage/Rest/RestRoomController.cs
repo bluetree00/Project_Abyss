@@ -123,6 +123,9 @@ public sealed class RestRoomController : MonoBehaviour
         if (_chosen || !CanForge(out var weapon)) return;
         if (!WeaponEnhanceService.GrantLevel(weapon, WeaponEnhanceService.Table)) return;
         _run.ReportEnhanceLevel(weapon.enhanceLevel);
+        // 근접 강화 증강(10-15) — 쉼터 벼리기도 처음 닿은 단계면 두 장 중 하나
+        if (MeleeAugmentDraft.TryOfferForEnhance(weapon, weapon.enhanceLevel, weapon.augmentAfterEvolve, new System.Random(unchecked(System.Environment.TickCount))))
+            weapon.augmentAfterEvolve = false;
         Close();
         RunFx.Play(RunFxSlot.Burst, _forgeIt.transform.position + Vector3.up * 0.8f, 0.6f, ForgeInk);
         Managers.Sound?.PlayEvent(SoundEvent.RestForge);

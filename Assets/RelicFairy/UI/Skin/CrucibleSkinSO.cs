@@ -76,9 +76,15 @@ public sealed class CrucibleSkinSO : ScriptableObject
     [SerializeField] private Sprite materialIcon;   // HUD 아이콘_강화재료
     [SerializeField] private Sprite oreIcon;        // HUD 아이콘_원석
 
+    // ── 10-15 대장장이 말풍선 ──
+    [Header("대장장이 초상(10-15)")]
+    [Tooltip("말풍선 곁 초상 — 방의 NPC 모델을 에디터에서 찍은 그림(RelicFairy/UI/10-15 재련소 대장장이 초상 굽기). 비우면 모루 아이콘.")]
+    [SerializeField] private Sprite blacksmithPortrait;
+
     public Sprite LevelTag      => levelTag;
     public Sprite CurrencyInner => currencyInner;
     public Sprite CurrencyFrame => currencyFrame;
     public Sprite MaterialIcon  => materialIcon;
     public Sprite OreIcon       => oreIcon;
+    public Sprite BlacksmithPortrait => blacksmithPortrait;
 }

@@ -41,6 +41,10 @@ public sealed class WeaponFormRuntime : MonoBehaviour
     public WeaponFormBase Current => _form;
     /// <summary>지금 「다음 타에 발동」 상태인가 — HUD가 붙을 때 읽는다.</summary>
     public bool IsReadyNext => _readyNext;
+    /// <summary>휘두름 일련번호(슬래시 이벤트마다 +1 · 받는 쪽이 없으면 −1) — 근접 강화 증강이 「휘두름당 한 번」을 형과 같은 기준으로 센다(10-15).</summary>
+    public int SwingSerial => _receiver != null ? _swingSerial : -1;
+    /// <summary>그 휘두름의 콤보 단계(슬래시가 나올 때) — 「마지막 타」 · 「n번째 타」 증강이 읽는다(10-15).</summary>
+    public int SwingStep => _swingStep;
 
     public static WeaponFormRuntime Of(PlayerController p)
         => p != null && p.TryGetComponent(out WeaponFormRuntime r) ? r : null;

@@ -23,7 +23,7 @@ public static class SkillTierResolver
     public const int MinTier = 1;
     public const int MaxTier = 3;
 
-    private static readonly int[] DefaultMeleeMilestones  = { 3, 6 };
+    private static readonly int[] DefaultMeleeMilestones  = { 6, 12 };   // 10-15 강화 단계 세분(옛 3 · 6)
     private static readonly int[] DefaultRangedMilestones = { 2, 10 };
 
     /// <summary>현재 스킬 단계(1~3).</summary>

@@ -151,6 +151,7 @@ public sealed class UI_ShopPanel : UI_Popup
     private static Sprite s_edgeVignette;
     private int     _reactionGen; // 상인 반응 문구 세대
     private TMP_Text _sigilText;  // 골드 밑 「상인의 인장 −15%」(런타임 생성 — 구운 프리팹에 없다)
+    private TMP_Text _eventText;  // 그 밑 「◆ 떨이 −30%」 · 「◆ 귀한 물건」(10-15 돌발 이벤트 · 런타임 생성)
     private static Sprite s_ribbon;
 
     // ── Lifecycle ──
@@ -195,6 +196,7 @@ public sealed class UI_ShopPanel : UI_Popup
 
         ShopUIStyle.PlaySfx("shop_open");
         _selectedIndex = -1;
+        if (_dialogText != null) _dialogText.text = GreetingNow;   // 돌발 이벤트가 있으면 그 이야기부터(10-15)
         RefreshAll();
         PlayWindowInAsync().Forget();   // 판이 먼저 떠오르고
         PlayOpenFxAsync().Forget();     // 카드가 내려앉는다(겹쳐 흐른다)
@@ -369,6 +371,14 @@ public sealed class UI_ShopPanel : UI_Popup
             _sigilText.textWrappingMode = TextWrappingModes.NoWrap;
             _sigilText.raycastTarget    = false;
             _sigilText.text = string.Empty;
+        }
+        if (_eventText == null && _sigilText != null)
+        {
+            _eventText = ShopUIStyle.MakeText(_sigilText.transform.parent, "EventLine", 16f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft,
+                                              new Color(0.88f, 0.72f, 0.42f, 1f));
+            _eventText.textWrappingMode = TextWrappingModes.NoWrap;
+            _eventText.raycastTarget    = false;
+            _eventText.text = string.Empty;
         }
     }
 
@@ -1092,6 +1102,12 @@ public sealed class UI_ShopPanel : UI_Popup
         if (_sigilText != null)
             _sigilText.text = AbyssPeddlerCatalog.MerchantSigil.Active
                 ? $"◆ 상인의 인장  −{AbyssPeddlerCatalog.MerchantSigil.Discount * 100f:F0}%" : string.Empty;
+        // 돌발 이벤트(10-15) — 인장 줄이 있으면 그 밑, 없으면 그 자리(간판 문장 앞까지 · 190)
+        if (_eventText != null)
+        {
+            _eventText.text = _controller.ActiveEvent == ShopEvent.None ? string.Empty : $"◆ {_controller.EventTitle}  {_controller.EventLine}";
+            Place(_eventText, GoldX, GoldY + (AbyssPeddlerCatalog.MerchantSigil.Active ? 46f : 24f), 190f, 22f);
+        }
 
         RefreshReroll();
         RefreshDeal();
@@ -1110,7 +1126,8 @@ public sealed class UI_ShopPanel : UI_Popup
         if (_dealStamp != null) { _dealStamp.gameObject.SetActive(false); _dealStamp.rectTransform.localScale = Vector3.one; }
 
         // 룬은 효과 글이 길어 한 줄에 넘쳐 깨졌다 — 눌러서 오른쪽 상세 열에서 본다(10-14 사용자). 다른 상품은 짧은 요약 그대로.
-        if (_dealCat != null)   _dealCat.text   = deal.Category == ShopProductCategory.Rune ? deal.CategoryLabel : $"{deal.CategoryLabel} · {deal.EffectText}";
+        // 수치만 Noto 500(10-15 설명 글 강조)
+        if (_dealCat != null)   _dealCat.text   = deal.Category == ShopProductCategory.Rune ? deal.CategoryLabel : $"{deal.CategoryLabel} · {UIKeywordInk.Values(deal.EffectText, true)}";
         if (_dealName != null)  _dealName.text  = deal.DisplayName;
         if (_dealDesc != null)  _dealDesc.text  = deal.DetailText;
         if (_dealPrice != null) _dealPrice.text = deal.Price.ToString();
@@ -1161,7 +1178,8 @@ public sealed class UI_ShopPanel : UI_Popup
             }
 
             if (c.Name != null)   c.Name.text   = p.DisplayName;
-            if (c.Effect != null) c.Effect.text = p.Category == ShopProductCategory.Rune ? string.Empty : p.EffectText;   // 룬 효과는 눌러서 상세 열에서(10-14)
+            // 수치만 Noto 500(10-15 설명 글 강조)
+            if (c.Effect != null) c.Effect.text = p.Category == ShopProductCategory.Rune ? string.Empty : UIKeywordInk.Values(p.EffectText, true);   // 룬 효과는 눌러서 상세 열에서(10-14)
             if (c.Price != null)
             {
                 c.Price.text  = p.Sold ? "품절" : p.Price.ToString();
@@ -1248,6 +1266,7 @@ public sealed class UI_ShopPanel : UI_Popup
         }
         if (_goldText  != null) Thin(_goldText,  UIWeight.Medium, 20f * k, _goldText.color);
         if (_sigilText != null) Thin(_sigilText, UIWeight.Medium, 15f * k, _sigilText.color);
+        if (_eventText != null) Thin(_eventText, UIWeight.Medium, 15f * k, _eventText.color);
 
         // 특가 띠
         if (_dealRoot != null)
@@ -1510,7 +1529,7 @@ public sealed class UI_ShopPanel : UI_Popup
             if (rune.effects != null)
                 foreach (var slot in rune.effects)
                     if (!string.IsNullOrEmpty(slot.effectType))
-                        sb.Append("▲ ").Append(EffectDescriptionFormatter.Describe(slot).Combined).Append('\n');
+                        sb.Append("▲ ").Append(UIKeywordInk.Values(EffectDescriptionFormatter.Describe(slot).Combined, true)).Append('\n');   // 수치만 Noto 500(10-15)
 
             bool fit = RuneBlockBudget.Fits(RuneBlockBudget.Used) && RuneBlockBudget.FitsSame(rune);   // + 같은 룬 상한(10-14)
             // 블록 모양 — 판 위 블록과 같은 속성 타일. 룬 수 상한을 넘으면 어둡게(룬 선택 카드와 같은 규칙, 10-10 칸 → 개수).
@@ -1526,7 +1545,7 @@ public sealed class UI_ShopPanel : UI_Popup
                 _selCat.text  = p.CategoryLabel;
                 _selCat.color = InkLabel;
             }
-            sb.Append("▲ ").Append(p.EffectText).Append('\n');
+            sb.Append("▲ ").Append(UIKeywordInk.Values(p.EffectText, true)).Append('\n');   // 수치만 Noto 500(10-15)
             if (!string.IsNullOrEmpty(p.DetailText)) sb.Append("<color=#4A3820>").Append(p.DetailText).Append("</color>\n");
         }
 
@@ -1752,6 +1771,7 @@ public sealed class UI_ShopPanel : UI_Popup
     /// </summary>
     // 행상 = 웃는 버섯(10-01 NPC 교체) — 밝은 반말 장사꾼. 예전 「어서 오게, 빛이여 · ~네」는 사람 상인 몸이었을 때 말투.
     private const string Greeting = "어서 와! 오늘도 살아 있네?";
+    private string GreetingNow => _controller != null && !string.IsNullOrEmpty(_controller.EventGreeting) ? _controller.EventGreeting : Greeting;
     private const string BuyLabel = "산다";   // 재련소 「벼린다」 · 쉼터 「쉰다」와 같은 결
 
     private void SetMerchantReaction(ShopProduct p)
@@ -1773,7 +1793,7 @@ public sealed class UI_ShopPanel : UI_Popup
         try { await UniTask.Delay(ReactionMs, ignoreTimeScale: true, cancellationToken: destroyCancellationToken); }
         catch (OperationCanceledException) { return; }
         if (gen != _reactionGen || _dialogText == null) return;
-        _dialogText.text = Greeting;
+        _dialogText.text = GreetingNow;
     }
 
     /// <summary>특가 — 「1개 남음」이 「품절」로 바뀌고 도장이 찍힌 뒤 좌판에서 사라진다.</summary>

@@ -616,7 +616,7 @@ public sealed class StagingAreaView : MonoBehaviour
         fxRT.offsetMax        = new Vector2(-8f, 0f);
         var fxTxt = fxTxtGO.AddComponent<TextMeshProUGUI>();
         if (cardFont != null) fxTxt.font = cardFont;
-        fxTxt.text              = EffectLine(item);
+        fxTxt.text              = UIKeywordInk.Values(EffectLine(item));   // 수치만 Noto 500(10-15 설명 글 강조)
         fxTxt.fontSize          = 16f;   // 잉크 판을 깔아 자리가 생겼다(줄바꿈 없음 + 말줄임이라 넘치지 않는다)
         fxTxt.fontStyle         = FontStyles.Bold;
         fxTxt.color             = new Color(0.93f, 0.97f, 0.72f, 1f);

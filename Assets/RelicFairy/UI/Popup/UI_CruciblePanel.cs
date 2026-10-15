@@ -310,6 +310,10 @@ public sealed partial class UI_CruciblePanel : UI_Popup
     private bool _built;
     private bool _closing;
     private bool _animating;   // 연출 재생 중(결과는 이미 확정 — 표시층만 진행 중)
+    private static UI_CruciblePanel s_open;
+
+    /// <summary>재련소 연출 중인가(10-15) — 증강 고르기 창(MeleeAugmentDraftHost)이 망치 · 결과 도장이 끝난 뒤 뜨게 기다린다.</summary>
+    public static bool Revealing => s_open != null && s_open._animating;
     private bool _skipAnim;    // 재입력이 들어와 진행 중 연출을 즉시 끝내는 중
     private Action _queued;    // 연출 중 눌린 다음 강화(항상 최신 1개만 유지)
 
@@ -358,6 +362,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
     protected override void OnDestroy()
     {
         base.OnDestroy();   // 차단 잠금 누수 방지(UI_Popup)
+        if (s_open == this) s_open = null;
         if (_controller != null)
         {
             _controller.OnCrucibleChanged -= RefreshAll;
@@ -369,6 +374,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
 
     public void Bind(CrucibleRoomController controller)
     {
+        s_open = this;
         _controller = controller;
         if (_controller != null)
             _controller.OnCrucibleChanged += RefreshAll;
@@ -380,7 +386,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
         ShopUIStyle.PlaySfx("shop_open");
         _targetSlot = PlayerWeaponManager.Slot0;
         BuildLegendButtons();
-        _dialogText.text = _controller.GetDialogue(CrucibleMood.Idle);   // 이벤트는 이제 전용 배너로 표시
+        Say(_controller.GetDialogue(CrucibleMood.Event));   // 화로 이벤트가 있으면 그 이야기부터(10-15 · 없으면 평상)
         ShowChooser();           // 근거리 · 원거리 중 무엇을 벼릴지 먼저 — 두 쪽 비용을 한눈에 비교한다
         RefreshAll();
         TryShowEngraveOffer();   // 전 방문에 올라 두고 안 고른 각인이 있으면 먼저 묻는다(선택 화면 위로 뜬다)
@@ -1369,10 +1375,11 @@ public sealed partial class UI_CruciblePanel : UI_Popup
         EnhanceSelectedPart();
     }
 
-    /// <summary>파츠 탭 안내 문구. 전용 슬롯이 없어 NPC 대사창을 그대로 쓴다(정보가 한 곳에 모임).</summary>
+    /// <summary>파츠 탭 안내 문구 — v3는 오른쪽 판 안내 줄(10-15 · 시스템 안내는 대장장이 말풍선에 넣지 않는다).</summary>
     private void SetPartHint(string msg)
     {
-        if (_dialogText != null) _dialogText.text = msg;
+        if (_v3Ready && _v3Fail != null) { _v3Fail.text = msg; return; }
+        Say(msg);
     }
 
     /// <summary>5행을 파츠 정의 목록으로 채운다. 파츠 탭을 열거나 강화한 뒤 호출.</summary>
@@ -1926,6 +1933,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
         {
             var (tag, _, _) = Persona(b.target);
             if (_resultText != null) _resultText.text = $"<color=#9D7EE6>진화 — {b.target.displayName} · {tag}</color>";
+            Say(_controller.GetDialogue(CrucibleMood.Evolve));
         }
         else
         {
@@ -2224,7 +2232,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
             for (int k = 0; k < 2; k++)
             {
                 _engraveName[k].text = _engraveOptions[k].displayName;
-                _engraveDesc[k].text = _engraveOptions[k].description;
+                _engraveDesc[k].text = UIKeywordInk.Values(_engraveOptions[k].description);   // 수치만 Noto 500(10-15 설명 글 강조)
             }
             _engravePanel.transform.SetAsLastSibling();
             _engravePanel.SetActive(true);
@@ -2363,7 +2371,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
             bool afford = have >= legend.promoteCost;
             var pick = BuildEngraveCard(d, x, out var nameText, out var descText, "눌러서 승급한다");
             nameText.text = legend.displayName;
-            descText.text = $"공격력 +{(legend.attackBonusMult - 1f) * 100f:0}%\n승급 재료 "
+            descText.text = UIKeywordInk.Values($"공격력 +{(legend.attackBonusMult - 1f) * 100f:0}%") + "\n승급 재료 "   // 효과 수치만 Noto 500(10-15)
                           + $"<color={(afford ? "#E8D9B0" : "#FF7A6E")}>{legend.promoteCost}</color>  (보유 {have})";
             pick.onClick.AddListener(() => { HideLegendPanel(); OnPromoteClicked(id); });
             Halo(pick, afford);   // 재료가 되면 은은한 불 — 재화를 쓰는 버튼 공통(10-01) · 8px(10-11)
@@ -2467,7 +2475,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
     {
         if (_controller == null) return;
         if (_controller.CanEnhance(_targetSlot) && _controller.SuccessChanceAt(_targetSlot) < 0.4f)
-            _dialogText.text = _controller.GetDialogue(CrucibleMood.Taunt);
+            Say(_controller.GetDialogue(CrucibleMood.Taunt));
     }
 
     /// <summary>
@@ -2858,9 +2866,9 @@ public sealed partial class UI_CruciblePanel : UI_Popup
                     ? $"<color=#7AD46E>잭팟! +{_controller.LastRefund} 환불</color>"
                     : $"<color=#7AD46E>성공! +{r.afterLevel}</color>";
                 _resultText.color = UITheme.Thin.Ink;
-                _dialogText.text = _controller.LastJackpot ? _controller.GetDialogue(CrucibleMood.Jackpot)
-                                 : _controller.Streak >= 2 ? _controller.GetDialogue(CrucibleMood.Streak)
-                                 : _controller.GetDialogue(CrucibleMood.Success);
+                Say(_controller.LastJackpot ? _controller.GetDialogue(CrucibleMood.Jackpot)
+                  : _controller.Streak >= 2 ? _controller.GetDialogue(CrucibleMood.Streak)
+                  : _controller.GetDialogue(CrucibleMood.Success));
                 break;
             case EnhanceOutcome.FailDropped:
             {
@@ -2868,11 +2876,12 @@ public sealed partial class UI_CruciblePanel : UI_Popup
                 string what = r.beforeLevel == r.afterLevel ? "단계 유지" : "하락";
                 _resultText.text = IsNearMiss(r) ? $"<color=#FF7A6A>아슬아슬! {what} (+{r.afterLevel})</color>"
                                                  : $"<color=#FF7A6A>실패 — {what} (+{r.afterLevel})</color>";
-                _dialogText.text = _controller.GetDialogue(CrucibleMood.Fail);
+                Say(_controller.GetDialogue(IsNearMiss(r) ? CrucibleMood.NearMiss : CrucibleMood.Fail));
                 break;
             }
             case EnhanceOutcome.RejectNoFuel:
                 _resultText.text = "<color=#FF7A6A>강화재료 부족</color>";
+                Say(_controller.GetDialogue(CrucibleMood.NoFuel));
                 break;
             case EnhanceOutcome.RejectMaxed:
                 _resultText.text = "<color=#9A98A0>이미 최대 강화</color>";
@@ -2899,10 +2908,10 @@ public sealed partial class UI_CruciblePanel : UI_Popup
                 _resultText.color = UITheme.Thin.Ink;
                 if (_controller.LastJackpot)
                     _resultText.text += $"  <color=#FFD24A>잭팟! +{_controller.LastRefund} 환불</color>";
-                _dialogText.text = _controller.LastJackpot ? _controller.GetDialogue(CrucibleMood.Jackpot)
-                                 : stepped ? "형태가 바뀌었군. 이제 다르게 날아갈 거다."
-                                 : _controller.Streak >= 2 ? _controller.GetDialogue(CrucibleMood.Streak)
-                                 : "아직이다. 조금 더 두들겨야 모양이 잡힌다.";
+                Say(_controller.LastJackpot ? _controller.GetDialogue(CrucibleMood.Jackpot)
+                  : stepped ? "형태가 바뀌었군. 이제 다르게 날아갈 거다."
+                  : _controller.Streak >= 2 ? _controller.GetDialogue(CrucibleMood.Streak)
+                  : "아직이다. 조금 더 두들겨야 모양이 잡힌다.");
                 break;
 
             case EnhanceOutcome.FailDropped:
@@ -2911,18 +2920,18 @@ public sealed partial class UI_CruciblePanel : UI_Popup
                 string what = r.beforeLevel == r.afterLevel ? "단계 유지" : "하락";
                 _resultText.text = IsNearMiss(r) ? $"<color=#FF7A6A>아슬아슬! {what} (Lv.{r.afterLevel})</color>"
                                                  : $"<color=#FF7A6A>실패 — {what} (Lv.{r.afterLevel})</color>";
-                _dialogText.text = _controller.GetDialogue(CrucibleMood.Fail);
+                Say(_controller.GetDialogue(IsNearMiss(r) ? CrucibleMood.NearMiss : CrucibleMood.Fail));
                 break;
             }
 
             case EnhanceOutcome.RejectNoFuel:
                 _resultText.text = "<color=#FF7A6A>강화재료 부족</color>";
-                _dialogText.text = "재료 없이는 손도 못 댄다.";
+                Say(_controller.GetDialogue(CrucibleMood.NoFuel));
                 break;
 
             case EnhanceOutcome.RejectMaxed:
                 _resultText.text = "<color=#9A98A0>이미 최대 강화</color>";
-                _dialogText.text = "이 파츠는 여기가 끝이다.";
+                Say("이 파츠는 여기가 끝이다.");
                 break;
 
             default:
@@ -3073,6 +3082,8 @@ public sealed partial class UI_CruciblePanel : UI_Popup
             _                                  => "<color=#FF7A6A>승급 불가</color>",
         };
         if (!r.IsSuccess) ShopUIStyle.PlaySfx("shop_reject");   // 성공 소리는 승급 연출(판정 빛)이 낸다
+        if (r.IsSuccess) Say(_controller.GetDialogue(CrucibleMood.Promote));
+        else if (r.outcome == PromoteOutcome.RejectNoFuel) Say(_controller.GetDialogue(CrucibleMood.NoFuel));
     }
 
     // ── 무대 연출 층 (개편 09-20; 표시층 전용 — 결과/데이터/세이브 불변) ──────────

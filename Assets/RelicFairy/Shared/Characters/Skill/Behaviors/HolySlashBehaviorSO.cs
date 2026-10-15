@@ -76,6 +76,7 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
         private float _timer;
         private int _skillTier;
         private int _extraHitIndex;
+        private int _extraHits;   // 추가 타격 수 — 발도 연속 증강(10-15)이 늘린다
         private Vector3 _dashStart, _dashEnd;
         private readonly List<IDamageable> _hitTargets = new();
         private readonly HashSet<GameObject> _hitObjects = new();
@@ -92,7 +93,9 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
 
             var dir = ctx.AimForward;   // 방금 요청한 회전(B1 — transform.forward는 옛 방향)
             _dashStart = ctx.PlayerTransform.position;
-            _dashEnd = ctx.DashEndBeforeWall(_dashStart, dir, _data.dashDistance);   // 벽 앞에서 멈춘다(10-14 — 끝점 Lerp가 벽을 뚫었다)
+            float dashDist = _data.dashDistance * (1f + MeleeAugments.ValueOn(ctx.WeaponData, MeleeAugmentCatalog.KatanaDraw) * 0.01f);   // 발도 연속 증강(10-15)
+            _extraHits = _data.extraHitCount + Mathf.RoundToInt(MeleeAugments.Value2On(ctx.WeaponData, MeleeAugmentCatalog.KatanaDraw));
+            _dashEnd = ctx.DashEndBeforeWall(_dashStart, dir, dashDist);   // 벽 앞에서 멈춘다(10-14 — 끝점 Lerp가 벽을 뚫었다)
 
             if (ctx.Rigidbody != null)
                 ctx.Rigidbody.linearVelocity = Vector3.zero;
@@ -211,11 +214,11 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
             {
                 _timer = 0f;
                 // 2단계 마지막 추가타가 마무리(3단계는 뒤 폭발이 마무리) — A5
-                ApplyDamageToAll(ctx, _data.extraHitDamage, finisher: _skillTier < 3 && _extraHitIndex + 1 >= _data.extraHitCount);
+                ApplyDamageToAll(ctx, _data.extraHitDamage, finisher: _skillTier < 3 && _extraHitIndex + 1 >= _extraHits);
                 SpawnHitEffects(ctx);
                 _extraHitIndex++;
 
-                if (_extraHitIndex >= _data.extraHitCount)
+                if (_extraHitIndex >= _extraHits)
                 {
                     _timer = 0f;
                     if (_skillTier >= 3)

@@ -57,6 +57,15 @@ public class RunSaveData
     public int    weapon1FormTier;
     public string weapon0FormVariants;      // 고른 단련 변주 id(쉼표 구분)
     public string weapon1FormVariants;
+    public string weapon0Augments;          // 근접 강화 증강 「id:단계」(쉼표) — 10-15
+    public string weapon1Augments;
+    public int    weapon0AugmentHighest;    // 처음 닿은 최고 강화 단계(증강 지급 기준)
+    public int    weapon1AugmentHighest;
+    public int    weapon0AugmentSilverStreak;
+    public int    weapon1AugmentSilverStreak;
+    public bool   weapon0AugmentAfterEvolve;
+    public bool   weapon1AugmentAfterEvolve;
+    public int    meleeAugmentRerollsUsed;  // 이번 런에 쓴 증강 리롤(옛 세이브 0 = 다 남음)
 
     public string relicKey;               // PlayerLoadout.Relic SO 이름(Addressables 키)
     public string relicPartIds = "";      // 보스 클리어로 되찾은 유물 기억 조각 — `id:등급`(쉼표) · 옛 저장은 id만(흐릿) — 런 진행분

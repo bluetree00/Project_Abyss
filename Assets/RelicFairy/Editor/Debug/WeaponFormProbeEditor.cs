@@ -209,6 +209,27 @@ public static class WeaponFormProbeEditor
     [MenuItem(Root + "56 룬 · 서약 다 낀 빌드 + 활 최대 다발 — 단일 · 무리 · 타격 트리거 (테스트 허브, 플레이 중, 약 4분)")]
     private static void BeginLoadout() => Begin("loadout");
 
+    [MenuItem(Root + "58 근접 강화 증강 2차 — 진화 변환 · 제시 거름 · 평타 · 스킬 · 돌진 (테스트 허브, 플레이 중)")]
+    private static void BeginAugment2() => Begin("augment2");
+
+    [MenuItem(Root + "60 같은 투자 비교 — 활 최대 다발 대 근접 +20 · 증강 (테스트 허브, 플레이 중, 약 4분)")]
+    private static void BeginEqualInvest() => Begin("equalinvest");
+
+    [MenuItem(Root + "60b 같은 투자 비교 — 스킬 포함(E · R 쿨마다) (테스트 허브, 플레이 중, 약 5분)")]
+    private static void BeginEqualInvestSkills() => Begin("equalinvest2");
+
+    [MenuItem(Root + "59 규칙형 증강 — 기습 · 튕김 · X자 · 칼자국 · 표식 · 처형 · 연쇄 · 마지막 의지 · 철벽 (테스트 허브, 플레이 중)")]
+    private static void BeginAugment3() => Begin("augment3");
+
+    [MenuItem(Root + "59b 규칙형 증강 — 마지막 의지 칸만 (테스트 허브, 플레이 중)")]
+    private static void BeginAugment3b() => Begin("augment3b");
+
+    [MenuItem(Root + "58b 근접 강화 증강 2차 — 돌진 · 무형검 칸만 (테스트 허브, 플레이 중)")]
+    private static void BeginAugment2b() => Begin("augment2b");
+
+    [MenuItem(Root + "57 근접 강화 증강 — 등급 확률 · 뽑기 · 효과 · 강화 표 (테스트 허브, 플레이 중)")]
+    private static void BeginAugment() => Begin("augment");
+
     [MenuItem(Root + "50 돌진 벽 — 무형검 R · 회피 대시 · 카타나 E가 벽을 넘나 (테스트 허브, 플레이 중)")]
     private static void BeginDashWall() => Begin("dashwall");
 
@@ -265,7 +286,7 @@ public static class WeaponFormProbeEditor
 
     private static void OnLog(string msg, string stack, LogType type)
     {
-        if (msg.StartsWith("[WeaponForm]")) s_formLog.Add(msg);
+        if (msg.StartsWith("[WeaponForm]") || msg.StartsWith("[MeleeAugment]")) s_formLog.Add(msg);
         if (!s_armed || !msg.StartsWith("[RunAuto]") || !msg.Contains("방 진입")) return;
         s_armed = false;
         EditorApplication.delayCall += () =>
@@ -349,6 +370,13 @@ public static class WeaponFormProbeEditor
                 case "noflinch": await NoFlinchAsync(p, sb, ct); break;
                 case "guides": await GuidesAsync(p, sb, ct); break;
                 case "loadout": await LoadoutAsync(p, sb, ct); break;
+                case "augment": await AugmentAsync(p, sb, ct); break;
+                case "augment2": await Augment2Async(p, sb, ct); break;
+                case "augment2b": await Augment2Async(p, sb, ct, dashOnly: true); break;
+                case "augment3": await Augment3Async(p, sb, ct); break;
+                case "equalinvest": await EqualInvestAsync(p, sb, ct); break;
+                case "equalinvest2": await EqualInvestAsync(p, sb, ct, skills: true); break;
+                case "augment3b": await Augment3Async(p, sb, ct, lastWillOnly: true); break;
                 case "deathfx": await DeathFxAsync(p, sb, ct); break;
                 case "arrowfeel": await ArrowFeelAsync(p, sb, ct); break;
                 case "bs5x": await FourBuildsAsync(p, sb, ct); break;
@@ -3321,6 +3349,705 @@ public static class WeaponFormProbeEditor
         sb.AppendLine($"   일제 사격 1회당 — 3발 ÷ 1발 {k:0.00}배 · 5발 ÷ 1발 {k5:0.00}배(참고 — 부채꼴이 넓어 단일엔 바깥 갈래가 덜 맞는다) · 초당은 박자가 흔들려 참고만({rows[1].total / Mathf.Max(0.01f, rows[0].total):0.00}배)");
         sb.AppendLine("   (갈래 3발 45% · 5발 38% — 다 맞으면 1.9 · 2.5배 · 갈래 명중 약 60%면 3발 약 1.55배 · 고치기 전 무게 1이면 약 2.2배)");
         Check(sb, $"분열 3발 1회당이 1발보다 조금 더 — 1.2 ~ 1.8배({k:0.00}배)", k >= 1.2f && k <= 1.8f);
+    }
+
+    // ── 58 근접 강화 증강 2차(10-15 사용자 「새로운 근접 무기에만 맞는 효과」) ──
+    private static int AugLog(string key) => s_formLog.FindAll(l => l.Contains(key)).Count;
+    private static string s_augSwingDiag = "";
+
+    /// <summary>앞 1.5 m 슬라임을 seconds 동안 평타 — 휘두름(슬래시 이벤트) 수를 돌려준다. 로그는 시작 때 비운다.</summary>
+    private static async UniTask<int> AugSwingAsync(PlayerController p, float seconds, CancellationToken ct, Action tick = null)
+    {
+        s_home = p.transform.position;   // 앞 칸(돌진)이 옮긴 자리 — 옛 자리로 끌려가지 않게
+        var t = await TrackAsync(p.transform.position + Flat(p.transform.forward) * 1.5f, ct);
+        if (t == null) return -1;
+        int swings = 0, hits = 0, lastHits = 0;
+        var recv = p.GetComponentInChildren<PlayerAnimationEventReceiver>();
+        var rt = WeaponFormRuntime.Of(p);
+        int lastStep = Mathf.Max(1, p.WeaponManager.Weapon0Data.groundEndCount) - 1;
+        Action<int> onSlash = _ => swings++;
+        Action<HitInfo> onHit = h =>
+        {
+            if (h.Attacker != p.gameObject || h.ActionType != WeaponActionType.GroundLight) return;
+            hits++;
+            if (rt != null && rt.SwingStep >= lastStep) lastHits++;
+        };
+        if (recv != null) recv.OnEffectStep += onSlash;
+        HitFeedbackService.OnHit += onHit;
+        s_formLog.Clear();
+        try
+        {
+            float t0 = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - t0 < seconds)
+            {
+                RefillAll();
+                t = await EnsureAliveAsync(t, ct);
+                Steer(p, t.M.transform.position);
+                p.InputBuffer.Push(Command.Light);
+                tick?.Invoke();
+                await Wait(0.25f, ct);
+            }
+        }
+        finally { if (recv != null) recv.OnEffectStep -= onSlash; HitFeedbackService.OnHit -= onHit; }
+        p.InputBuffer.Clear();
+        s_augSwingDiag = $"적중 {hits} · 마지막 타 적중 {lastHits} · 표적 피해 {t.Dealt:0} · 거리 {Vector3.Distance(p.transform.position, t.M != null ? t.M.transform.position : p.transform.position):0.0} m · 받는 쪽 {recv != null} · 구동기 {rt != null}";
+        await Wait(1.4f, ct);   // 늦게 터지는 효과(지진 1초 · 형 없는 연타 0.2초)
+        DetachAll();
+        return swings;
+    }
+
+    // ── 59 규칙형 증강(10-15 사용자 「증강은 의미 있는 증강이어야 해 — 그냥 스탯 증가만이 아닌」) ──
+    private static async UniTask Augment3Async(PlayerController p, StringBuilder sb, CancellationToken ct, bool lastWillOnly = false)
+    {
+        sb.AppendLine("규칙형 증강 — 스탯 한 줄 대신 화면에서 일어나는 규칙");
+        await Wait(3f, ct);
+        var run = GameRunBootstrapper.Instance.Run;
+        foreach (var m in UnityEngine.Object.FindObjectsByType<MonsterBase>(FindObjectsSortMode.None))
+            if (m != null && !m.IsDead) m.gameObject.SetActive(false);
+        if (!await EquipAsync(p, Katana, ct)) { sb.AppendLine("카타나 장착 실패"); return; }
+        var k = p.WeaponManager.Weapon0Data;
+        k.enhanceLevel = 0;
+        void Set(WeaponData w, string augs) { w.augments = augs; run.EffectManager.Rebuild(); }
+        await Wait(0.5f, ct);
+        s_home = p.transform.position;
+        if (lastWillOnly) goto LastWill;   // ⑤만(바뀐 칸만 다시)
+        Vector3 f = Flat(p.transform.forward), r = Vector3.Cross(Vector3.up, f);
+
+        // ① 기습 + 튕기는 칼끝 II — 2초 쉬고 친 첫 타 = 확정 치명 → 옆 두 적(3.5 m)에게 튄다 · 3번
+        Set(k, "aug_ambush:1,aug_ricochet:2");
+        var main = await TrackAsync(p.transform.position + f * 1.5f, ct);
+        var sideA = await TrackAsync(p.transform.position + f * 1.5f + r * 3.5f, ct);
+        var sideB = await TrackAsync(p.transform.position + f * 1.5f - r * 3.5f, ct);
+        if (main == null || sideA == null || sideB == null) { sb.AppendLine("슬라임 부르기 실패"); return; }
+        s_formLog.Clear();
+        for (int i = 0; i < 3; i++)
+        {
+            p.InputBuffer.Clear();
+            await Wait(2.4f, ct);
+            RefillAll();
+            Steer(p, main.M.transform.position);
+            p.InputBuffer.Push(Command.Light);
+            await Wait(0.8f, ct);
+        }
+        p.InputBuffer.Clear();
+        int ambAll = AugLog("] 기습"), ambCrit = AugLog("] 기습 — 치명 True"), ric = AugLog("] 튕기는 칼끝 — 2명");
+        Check(sb, $"① 기습 {ambCrit}/{ambAll}(치명) · 튕기는 칼끝 2명 {ric} · 옆 표적 피해 {sideA.Dealt:0} · {sideB.Dealt:0}",
+              ambAll == 3 && ambCrit == 3 && ric >= 3 && sideA.Dealt > 0 && sideB.Dealt > 0);
+        DetachAll();
+
+        // ② 세 번째 칼 · 칼자국 · 연격 표식 — 8초 평타
+        Set(k, "aug_katana_third:1,aug_blade_scar:1,aug_combo_mark:1");
+        int ksw = await AugSwingAsync(p, 8f, ct);
+        int third = AugLog("] 세 번째 칼"), scar = AugLog("] 칼자국"), mark = AugLog("] 연격 표식");
+        sb.AppendLine($"   평타 진단 — {s_augSwingDiag}");
+        Check(sb, $"② 카타나 — 휘두름 {ksw} · X자 베기 {third}(≈ 휘두름/3) · 칼자국 적중 {scar} · 연격 표식 {mark}",
+              ksw >= 8 && Mathf.Abs(third - ksw / 3f) <= 2.5f && scar >= ksw / 2 && mark >= 2);
+
+        // ③ 주문의 날(E 뒤 평타 3번) · 회피 베기(지나간 길) · 물 흐르듯(회피 뒤 첫 적중 = 회피 1칸)
+        Set(k, "aug_spell_blade:1,aug_dodge_riposte:1,aug_katana_flow:1");
+        s_home = p.transform.position;
+        var t3 = await TrackAsync(p.transform.position + Flat(p.transform.forward) * 1.5f, ct);
+        if (t3 == null) { sb.AppendLine("슬라임 부르기 실패"); return; }
+        s_formLog.Clear();
+        p.CooldownTracker.ResetCooldown(SkillType.E);
+        p.InputBuffer.Push(Command.ESkill);
+        await Wait(1.6f, ct);
+        for (float t = 0f; t < 3f; t += 0.25f) { RefillAll(); Steer(p, t3.M.transform.position); p.InputBuffer.Push(Command.Light); await Wait(0.25f, ct); }
+        p.InputBuffer.Clear();
+        await Wait(0.8f, ct);
+        int spell = AugLog("] 주문의 날");
+        DetachAll();
+        // 회피 베기 · 물 흐르듯 — 앞 2 m 새 표적을 향해 회피(지나간다) → 회피가 끝나면 곧 평타
+        s_home = p.transform.position;
+        var t3b = await TrackAsync(p.transform.position + Flat(p.transform.forward) * 2f, ct);
+        if (t3b == null) { sb.AppendLine("슬라임 부르기 실패"); return; }
+        Vector3 toT = Flat(t3b.M.transform.position - p.transform.position);
+        AimAt(t3b.M.transform.position);
+        p.RequestFacing(Quaternion.LookRotation(toT));
+        await Wait(0.35f, ct);
+        float rollEndAt = -1f, firstHitAt = -1f;
+        Action onRollEnd = () => { if (rollEndAt < 0f) rollEndAt = Time.time; };
+        Action<HitInfo> onHit3 = h => { if (h.Attacker == p.gameObject && h.ActionType == WeaponActionType.GroundLight && rollEndAt > 0f && firstHitAt < 0f) firstHitAt = Time.time; };
+        p.OnDodgeEnd += onRollEnd;
+        HitFeedbackService.OnHit += onHit3;
+        Vector3 dodgeFrom = p.transform.position, dodgeVec = Vector3.zero;
+        try
+        {
+            p.InputBuffer.Push(Command.Dodge);
+            float w3 = Time.time;
+            while (rollEndAt < 0f && Time.time - w3 < 1.5f) await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            dodgeVec = Flat(p.transform.position - dodgeFrom) * Vector3.Distance(Flat(p.transform.position), Flat(dodgeFrom));
+            s_home = p.transform.position;   // 회피한 자리 — 되돌려 끌지 않는다
+            Steer(p, t3b.M.transform.position);
+            p.InputBuffer.Push(Command.Light);
+            await Wait(1.0f, ct);
+        }
+        finally { p.OnDodgeEnd -= onRollEnd; HitFeedbackService.OnHit -= onHit3; }
+        p.InputBuffer.Clear();
+        int cut = AugLog("] 회피 베기"), flow = AugLog("] 물 흐르듯");
+        string cutLine = s_formLog.Find(l => l.Contains("회피 베기")) ?? "-";
+        sb.AppendLine($"   회피 진단 — 회피 {dodgeVec.magnitude:0.0} m · 표적 쪽과 {Vector3.Angle(dodgeVec, toT):0}° · 회피 끝 → 첫 평타 적중 {(firstHitAt > 0f ? (firstHitAt - rollEndAt).ToString("0.00") + "초" : "없음")}");
+        Check(sb, $"③ 주문의 날 {spell}/3 · 회피 베기 {cut}({cutLine}) · 물 흐르듯 {flow}", spell == 3 && cut >= 1 && !cutLine.Contains("맞힘 0") && flow == 1);
+        DetachAll();
+
+        // ④ 처형인 → 처치 → 사냥꾼의 숨(둘레 사냥감) · 학살의 연쇄(칼바람이 체력 1 둘을 쓰러뜨려 다시 일어난다)
+        Set(k, "aug_executioner:1,aug_hunter_breath:1,aug_slaughter_chain:1");
+        s_home = p.transform.position;
+        Vector3 f4 = Flat(p.transform.forward), r4 = Vector3.Cross(Vector3.up, f4), c4 = p.transform.position + f4 * 1.5f;
+        var a4 = await TrackAsync(c4, ct);
+        var b4 = await TrackAsync(c4 + r4 * 1.5f, ct);
+        var d4 = await TrackAsync(c4 - r4 * 1.5f, ct);
+        if (a4 == null || b4 == null || d4 == null) { sb.AppendLine("슬라임 부르기 실패"); return; }
+        SetHp(a4.M, Mathf.Max(1, Mathf.RoundToInt(a4.M.EffectiveMaxHp * 0.1f)));   // 처형 문턱(15%) 아래
+        SetHp(b4.M, 1);
+        SetHp(d4.M, 1);
+        s_formLog.Clear();
+        // 처형은 그 적중의 결과를 본다 — 한 타에 죽으면 처형할 것이 없으니 효과를 직접 부른다(피해 1 적중)
+        var mctx = typeof(ItemEffectManager).GetField("_ctx", Inst)?.GetValue(run.EffectManager) as ItemEffectContext;
+        foreach (var e in run.EffectManager.ActiveEffects)
+            if (e is ExecutionerAugment ex)
+                ex.OnPostDealDamage(mctx, new DamageReport { Target = a4.M.gameObject, Attacker = p.gameObject, DamageDealt = 1f, ActionType = WeaponActionType.GroundLight });
+        await Wait(1.8f, ct);
+        int exec = AugLog("] 처형인"), hunt = AugLog("] 사냥꾼의 숨"), chain = AugLog("] 학살의 연쇄");
+        bool allDead = (a4.M == null || a4.M.IsDead) && (b4.M == null || b4.M.IsDead) && (d4.M == null || d4.M.IsDead);
+        Check(sb, $"④ 처치 규칙 — 처형 {exec} · 사냥감 {hunt} · 학살의 연쇄 {chain} · 셋 다 쓰러짐 {allDead}", exec == 1 && hunt >= 1 && chain >= 2 && allDead);
+        DetachAll();
+
+        // ⑤ 마지막 의지 — 40% 아래로 떨어지면 1.5초 무적 · 둘레 경직, 같은 방에선 한 번
+        LastWill:
+        Set(k, "aug_last_will:2");
+        s_home = p.transform.position;
+        var t5 = await TrackAsync(p.transform.position + Flat(p.transform.forward) * 1.5f, ct);
+        if (t5 == null) { sb.AppendLine("슬라임 부르기 실패"); return; }
+        s_formLog.Clear();
+        int maxHp = p.RuntimeStats.MaxHp;
+        var dbgInv = typeof(PlayerController).GetField("debugInvincible", Inst);
+        dbgInv?.SetValue(p, false);   // 실측 시작 때 켠 무적 — 이 칸만 끈다
+        typeof(PlayerController).GetField("_invincibleEnd", Inst)?.SetValue(p, 0f);
+        await Wait(0.3f, ct);
+        p.RuntimeStats.SetHp(Mathf.RoundToInt(maxHp * 0.45f));
+        p.TakeDamage(Mathf.RoundToInt(maxHp * 0.2f), t5.M.gameObject, true);   // 방어로 줄어도 40% 아래
+        await UniTask.DelayFrame(2, cancellationToken: ct);
+        bool inv = p.IsInvincible, stunned = t5.M != null && t5.M.Status.HasCc("stun");
+        await Wait(1.8f, ct);
+        p.TakeDamage(1, t5.M.gameObject, true);
+        await Wait(0.3f, ct);
+        int lw = AugLog("] 마지막 의지");
+        Check(sb, $"⑤ 마지막 의지 — 발동 {lw} · 무적 {inv} · 둘레 경직 {stunned} · 체력 {p.RuntimeStats.Hp}/{maxHp}", lw == 1 && inv && stunned);
+        dbgInv?.SetValue(p, true);
+        p.RuntimeStats.SetHp(maxHp);
+        DetachAll();
+        if (lastWillOnly) return;
+
+        // ⑥ 철벽 자세(대검) — 평타 동작 중 자세(경직 면역 · 방어 +25%) · 쉬면 내려놓는다
+        if (!await EquipAsync(p, Great, ct)) { sb.AppendLine("대검 장착 실패"); return; }
+        var g = p.WeaponManager.Weapon0Data;
+        g.enhanceLevel = 0;
+        Set(g, "aug_great_bulwark:3");
+        await Wait(0.5f, ct);
+        var stOwner = typeof(PlayerController).GetField("_stanceOwner", Inst);
+        var stDef   = typeof(PlayerController).GetField("_stanceDefenseAdd", Inst);
+        string ownerIn = "-";
+        float defIn = -1f;
+        await AugSwingAsync(p, 4f, ct, () =>
+        {
+            if (defIn >= 0f || !p.IsInAttackAction || p.IsInSkillAction) return;
+            var o = stOwner?.GetValue(p);
+            if (o == null) return;
+            ownerIn = o.GetType().Name;
+            defIn = (float)stDef.GetValue(p);
+        });
+        var ownerAfter = stOwner?.GetValue(p);
+        Check(sb, $"⑥ 철벽 자세 — 동작 중 자세 {ownerIn} · 방어 +{defIn:0.00} · 쉴 때 {(ownerAfter == null ? "없음" : ownerAfter.GetType().Name)}",
+              ownerIn == "BulwarkAugment" && Mathf.Abs(defIn - 0.25f) < 0.001f && ownerAfter == null);
+        Set(g, "");
+
+        // ⑦ 표식 퍼뜨리기(카타나 · 마지막 타) · 안개 칼날(무형검 E)
+        if (!await EquipAsync(p, Katana, ct)) { sb.AppendLine("카타나 장착 실패"); return; }
+        var k7 = p.WeaponManager.Weapon0Data;
+        k7.enhanceLevel = 0;
+        Set(k7, "aug_mark_spread:2");
+        s_home = p.transform.position;
+        Vector3 f7 = Flat(p.transform.forward), r7 = Vector3.Cross(Vector3.up, f7), c7 = p.transform.position + f7 * 1.5f;
+        var m7 = await TrackAsync(c7, ct);
+        var n7a = await TrackAsync(c7 + f7 * 2f + r7 * 1f, ct);   // 표적 뒤 — 평타가 닿지 않는 자리(3 m 안)
+        var n7b = await TrackAsync(c7 + f7 * 2f - r7 * 1f, ct);
+        if (m7 == null || n7a == null || n7b == null) { sb.AppendLine("슬라임 부르기 실패"); return; }
+        int sunA0 = RelicMarkStatus.Of(n7a.M.gameObject, false)?.Sunmark ?? 0, sunB0 = RelicMarkStatus.Of(n7b.M.gameObject, false)?.Sunmark ?? 0;
+        s_formLog.Clear();
+        for (float t = 0f; t < 4f; t += 0.25f)
+        {
+            RefillAll();
+            RelicMarkStatus.Of(m7.M.gameObject, true)?.SetSunmark(1, RelicMarkStatus.DefaultSunmarkCap);   // 표적엔 늘 태양흔 1
+            Steer(p, m7.M.transform.position);
+            p.InputBuffer.Push(Command.Light);
+            await Wait(0.25f, ct);
+        }
+        p.InputBuffer.Clear();
+        await Wait(0.6f, ct);
+        int sunA = RelicMarkStatus.Of(n7a.M.gameObject, false)?.Sunmark ?? 0, sunB = RelicMarkStatus.Of(n7b.M.gameObject, false)?.Sunmark ?? 0;
+        int spread = AugLog("] 표식 퍼뜨리기");
+        DetachAll();
+        Set(k7, "");
+
+        if (!await EquipAsync(p, Nameless, ct)) { sb.AppendLine("무형검 장착 실패"); return; }
+        var n7 = p.WeaponManager.Weapon0Data;
+        n7.enhanceLevel = 0;
+        Set(n7, "aug_nameless_mist:1");
+        s_home = p.transform.position;
+        var t7 = await TrackAsync(p.transform.position + Flat(p.transform.forward) * 4f, ct);
+        int mist = 0;
+        if (t7 != null)
+        {
+            s_formLog.Clear();
+            AimAt(t7.M.transform.position);
+            p.RequestFacing(Quaternion.LookRotation(Flat(t7.M.transform.position - p.transform.position)));
+            await Wait(0.3f, ct);
+            p.CooldownTracker.ResetCooldown(SkillType.E);
+            p.InputBuffer.Push(Command.ESkill);
+            await Wait(2.4f, ct);
+            mist = AugLog("] 안개 칼날");
+        }
+        DetachAll();
+        Set(n7, "");
+        Check(sb, $"⑦ 표식 퍼뜨리기 {spread}회(뒤 두 적 태양흔 {sunA0} → {sunA} · {sunB0} → {sunB}) · 안개 칼날 적중 {mist}(0.5초마다)",
+              spread >= 1 && sunA > sunA0 && sunB > sunB0 && mist >= 2);
+    }
+
+    private static async UniTask Augment2Async(PlayerController p, StringBuilder sb, CancellationToken ct, bool dashOnly = false)
+    {
+        sb.AppendLine("근접 강화 증강 2차 — 진화 변환 · 제시 거름 · 카타나 평타 · 대검 평타 · 대검 스킬 · 카타나 돌진 · 무형검");
+        await Wait(3f, ct);
+        var run = GameRunBootstrapper.Instance.Run;
+        foreach (var m in UnityEngine.Object.FindObjectsByType<MonsterBase>(FindObjectsSortMode.None))
+            if (m != null && !m.IsDead) m.gameObject.SetActive(false);
+
+        if (dashOnly) goto Dash;   // ⑥ · ⑦만(바뀐 칸만 다시)
+
+        // ① 진화 변환 — 무형검 전용은 새 갈래 전용(같은 단계) · 비어 있는 칼집 II = 새 전용 2개(I)
+        {
+            var nl = WeaponData.FromSO(AssetDatabase.LoadAssetAtPath<WeaponSO>(Nameless));
+            var ka = WeaponData.FromSO(AssetDatabase.LoadAssetAtPath<WeaponSO>(Katana));
+            var gs = WeaponData.FromSO(AssetDatabase.LoadAssetAtPath<WeaponSO>(Great));
+            nl.augments = "aug_nameless_mist:2,aug_nameless_sheath:2,aug_ricochet:1";
+            ka.augments = MeleeAugmentCatalog.ConvertForEvolution(nl, ka);
+            gs.augments = MeleeAugmentCatalog.ConvertForEvolution(nl, gs);
+            sb.AppendLine($"   무형검 {nl.augments} → 카타나 {ka.augments} · 대검 {gs.augments}");
+            int kc = 0, gc = 0;
+            foreach (var _ in ka.AugmentList()) kc++;
+            foreach (var _ in gs.AugmentList()) gc++;
+            bool kOk = kc == 4 && ka.AugmentRank("aug_katana_third") == 2 && ka.AugmentRank("aug_katana_gale") == 1 && ka.AugmentRank("aug_ricochet") == 1 && !ka.augments.Contains("nameless");
+            bool gOk = gc == 4 && gs.AugmentRank("aug_great_bulwark") == 2 && gs.AugmentRank("aug_great_giant") == 1 && !gs.augments.Contains("nameless");
+            Check(sb, "① 진화 변환", kOk && gOk);
+        }
+
+        // ② 제시 거름 — 대검 +1 → +24: 묵직한 손(대검은 이미 강타) · 다른 무기 전용 0
+        if (!await EquipAsync(p, Great, ct)) { sb.AppendLine("대검 장착 실패"); return; }
+        var g = p.WeaponManager.Weapon0Data;
+        g.augments = ""; g.highestEnhanceReached = 0; g.augmentSilverStreak = 0; g.augmentAfterEvolve = false;
+        MeleeAugmentDraft.ResetForRun();
+        int bad = 0, heavyOffered = 0, gsOnly = 0;
+        Action<MeleeAugmentOffer> onOffer = o =>
+        {
+            foreach (var c in o.Cards)
+            {
+                var d = c.Def;
+                if (d == null) continue;
+                if (d.Id == MeleeAugmentCatalog.HeavyHand) heavyOffered++;
+                if (d.Weapon == MeleeWeaponKind.Greatsword) gsOnly++;
+                else if (d.Weapon != MeleeWeaponKind.None) bad++;
+            }
+            MeleeAugmentDraft.Choose(0);
+        };
+        MeleeAugmentDraft.Offered += onOffer;
+        try { for (int lv = 1; lv <= 24; lv++) { g.enhanceLevel = lv; MeleeAugmentDraft.TryOfferForEnhance(g, lv, false, new System.Random(lv * 17)); } }
+        finally { MeleeAugmentDraft.Offered -= onOffer; }
+        sb.AppendLine($"   대검 가진 증강: {g.augments}");
+        Check(sb, $"② 대검 제시 — 묵직한 손 {heavyOffered} · 다른 무기 전용 {bad} · 대검 전용 카드 {gsOnly}", heavyOffered == 0 && bad == 0 && gsOnly > 0);
+        g.augments = ""; g.enhanceLevel = 0; g.highestEnhanceReached = 0;
+
+        // ③ 카타나 평타 — 묵직한 손 III(2번째 휘두름마다 강타) · 검기 · 쌍검기 · 충격파 · 천둥
+        if (!await EquipAsync(p, Katana, ct)) { sb.AppendLine("카타나 장착 실패"); return; }
+        var k = p.WeaponManager.Weapon0Data;
+        k.enhanceLevel = 0;
+        k.augments = "aug_heavy_hand:3,aug_sword_wave:1,aug_twin_wave:1,aug_impact:1,aug_thunder:1";
+        run.EffectManager.Rebuild();
+        await Wait(0.5f, ct);
+        s_home = p.transform.position;
+        int ksw = await AugSwingAsync(p, 10f, ct);
+        int heavy = AugLog("] 묵직한 손"), wave = AugLog("] 검기 —"), twin = AugLog("] 쌍검기"), impact = AugLog("] 충격파"), thunder = AugLog("] 천둥");
+        sb.AppendLine($"   휘두름 {ksw} · 강타 예약 {heavy} · 검기 {wave} · 쌍검기 {twin} · 충격파 {impact} · 천둥 {thunder}");
+        Check(sb, "③ 카타나 평타 — 강타 ≈ 휘두름/2 · 검기 = 마지막 타 · 쌍검기 = 검기 · 충격파 ≥ 강타 · 천둥 ≈ 강타",
+              ksw >= 8 && Mathf.Abs(heavy - ksw / 2f) <= 2f && wave >= 1 && wave <= ksw / 3 + 1 && twin == wave && impact >= heavy - 1 && impact <= ksw && thunder >= heavy - 1 && thunder <= heavy);
+
+        // ④ 대검 평타 — 거인의 걸음(휘두름마다) · 지진(마지막 타 1초 뒤) · 철벽 자세 III(동작 중 −25%)
+        if (!await EquipAsync(p, Great, ct)) { sb.AppendLine("대검 장착 실패"); return; }
+        var g2 = p.WeaponManager.Weapon0Data;
+        g2.enhanceLevel = 0;
+        g2.augments = "aug_great_giant:1,aug_great_quake:1,aug_great_bulwark:3";
+        run.EffectManager.Rebuild();
+        await Wait(0.5f, ct);
+        var stOwner = typeof(PlayerController).GetField("_stanceOwner", Inst);
+        var stDef   = typeof(PlayerController).GetField("_stanceDefenseAdd", Inst);
+        string ownerIn = "-";
+        float defIn = -1f;
+        int gsw = await AugSwingAsync(p, 8f, ct, () =>
+        {
+            if (defIn >= 0f || !p.IsInAttackAction || p.IsInSkillAction) return;
+            var o = stOwner?.GetValue(p);
+            if (o == null) return;
+            ownerIn = o.GetType().Name;
+            defIn = (float)stDef.GetValue(p);
+        });
+        var ownerAfter = stOwner?.GetValue(p);
+        int giant = AugLog("] 거인의 걸음"), quake = AugLog("] 지진");
+        Check(sb, $"④ 대검 평타 — 휘두름 {gsw} · 거인의 걸음 {giant} · 지진 {quake} · 철벽(동작 중 자세 {ownerIn} · 방어 +{defIn:0.00} · 쉴 때 {(ownerAfter == null ? "없음" : ownerAfter.GetType().Name)})",
+              gsw >= 3 && Mathf.Abs(giant - gsw) <= 1 && quake >= 1 && quake <= gsw / 3 + 1 && ownerIn == "BulwarkAugment" && Mathf.Abs(defIn - 0.25f) < 0.001f && ownerAfter == null);
+
+        // ⑤ 대검 스킬 — 주변경계 연장 III(+3회) · 최후의 일격 충전 III(0.6 → 0.3초)
+        async UniTask<float> SkillTime(SkillType slot, Command cmd)
+        {
+            p.InputBuffer.Clear();
+            await Wait(0.8f, ct);
+            p.CooldownTracker.ResetCooldown(slot);
+            p.InputBuffer.Push(cmd);
+            float w0 = Time.time;
+            while (!p.IsInSkillAction && Time.time - w0 < 1.5f) await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            float s0 = Time.time;
+            while (p.IsInSkillAction && Time.time - s0 < 8f) await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            return Time.time - s0;
+        }
+        g2.augments = ""; run.EffectManager.Rebuild();
+        float e0 = await SkillTime(SkillType.E, Command.ESkill), r0 = await SkillTime(SkillType.R, Command.RSkill);
+        g2.augments = "aug_great_perimeter:3,aug_great_final:3"; run.EffectManager.Rebuild();
+        float e1 = await SkillTime(SkillType.E, Command.ESkill), r1 = await SkillTime(SkillType.R, Command.RSkill);
+        var peri = g2.skillE != null ? g2.skillE.behavior : null;
+        float interval = peri != null ? (float)(peri.GetType().GetField("castInterval", Inst)?.GetValue(peri) ?? 0f) : 0f;
+        Check(sb, $"⑤ 대검 스킬 — 주변경계 {e0:0.00} → {e1:0.00}초(+3회 × {interval:0.00}) · 최후의 일격 {r0:0.00} → {r1:0.00}초",
+              interval > 0f && e1 - e0 > interval * 2.5f && r0 - r1 > 0.2f);
+        g2.augments = ""; run.EffectManager.Rebuild();
+
+        // ⑥ 카타나 성광베기 — 발도 연속 III(돌진 +65%)
+        Dash:
+        if (!await EquipAsync(p, Katana, ct)) { sb.AppendLine("카타나 장착 실패"); return; }
+        var k2 = p.WeaponManager.Weapon0Data;
+        k2.enhanceLevel = 0;
+        Vector3 pos = p.transform.position, open = Vector3.forward;
+        float best = -1f;
+        for (int i = 0; i < 12; i++)
+        {
+            var d = Quaternion.Euler(0f, i * 30f, 0f) * Vector3.forward;
+            float wa = WallAhead(p, pos, d, 15f);
+            if (wa < 0f) wa = 15f;   // −1 = 15 m 안에 벽 없음(가장 트임)
+            if (wa > best) { best = wa; open = d; }
+        }
+        async UniTask<float> DashLen()
+        {
+            var rb = p.Rigid;
+            if (rb != null) { rb.linearVelocity = Vector3.zero; rb.position = pos; }
+            p.transform.position = pos;
+            s_home = pos;
+            await Wait(0.5f, ct);
+            AimAt(pos + open * 5f);
+            p.RequestFacing(Quaternion.LookRotation(open));
+            await Wait(0.3f, ct);
+            p.CooldownTracker.ResetCooldown(SkillType.E);
+            p.InputBuffer.Push(Command.ESkill);
+            await Wait(1.4f, ct);
+            return Vector3.Dot(p.transform.position - pos, open);
+        }
+        k2.augments = ""; run.EffectManager.Rebuild();
+        float d0 = await DashLen();
+        k2.augments = "aug_katana_draw:3"; run.EffectManager.Rebuild();
+        float d1 = await DashLen();
+        k2.augments = ""; run.EffectManager.Rebuild();
+        Check(sb, $"⑥ 카타나 성광베기 — 돌진 {d0:0.00} → {d1:0.00} m(발도 연속 III +65% · 트인 거리 {best:0.0} m)",
+              d0 > 1f && (best < 8.8f ? d1 > d0 + 1f : Mathf.Abs(d1 / d0 - 1.65f) < 0.15f));
+
+        // ⑦ 무형검 — 형 없는 연타(마지막 타 0.2초 뒤) · 무형일섬 잔상(지나간 길 0.4초 뒤)
+        if (!await EquipAsync(p, Nameless, ct)) { sb.AppendLine("무형검 장착 실패"); return; }
+        var n0 = p.WeaponManager.Weapon0Data;
+        n0.enhanceLevel = 0;
+        n0.augments = "aug_nameless_afterimage:1,aug_nameless_formless:1";
+        run.EffectManager.Rebuild();
+        await Wait(0.5f, ct);
+        int nsw = await AugSwingAsync(p, 6f, ct);
+        int formless = AugLog("] 형 없는 연타");
+        sb.AppendLine($"   무형검 평타 진단 — {s_augSwingDiag}");
+        var tgt = await TrackAsync(p.transform.position + Flat(p.transform.forward) * 4f, ct);
+        string afterLine = "-";
+        if (tgt != null)
+        {
+            s_formLog.Clear();
+            AimAt(tgt.M.transform.position);
+            p.RequestFacing(Quaternion.LookRotation(Flat(tgt.M.transform.position - p.transform.position)));
+            await Wait(0.3f, ct);
+            p.CooldownTracker.ResetCooldown(SkillType.R);
+            p.InputBuffer.Push(Command.RSkill);
+            await Wait(2f, ct);
+            afterLine = s_formLog.Find(l => l.Contains("무형일섬 잔상")) ?? "-";
+        }
+        int after = AugLog("] 무형일섬 잔상");
+        DetachAll();
+        n0.augments = ""; run.EffectManager.Rebuild();
+        int dashAt = afterLine.IndexOf("— ", StringComparison.Ordinal), mAt = afterLine.IndexOf(" m ", StringComparison.Ordinal);
+        float afterLen = dashAt >= 0 && mAt > dashAt && float.TryParse(afterLine.Substring(dashAt + 2, mAt - dashAt - 2), out var al) ? al : 0f;
+        Check(sb, $"⑦ 무형검 — 휘두름 {nsw} · 형 없는 연타 {formless} · 무형일섬 잔상 {after}({afterLine})",
+              formless >= 1 && formless <= nsw / 3 + 1 && after == 1 && afterLen >= 3f && afterLine.Contains("맞힘") && !afterLine.Contains("맞힘 0"));
+    }
+
+    // ── 57 근접 강화 증강(10-15 사용자 「강화마다 2지선다 랜덤 · 중복 = 강화 · 등급도 랜덤 · 무기마다 전용 · 단계를 잘게」) ──
+    private static async UniTask AugmentAsync(PlayerController p, StringBuilder sb, CancellationToken ct)
+    {
+        sb.AppendLine("근접 강화 증강 — 등급 확률 · 뽑기 · 효과 · 강화 표");
+        // ① 등급 확률(2만 번)
+        var rng = new System.Random(15);
+        bool tierOk = true;
+        foreach (var (lv, ex) in new[] { (4, (0.70f, 0.25f)), (12, (0.45f, 0.40f)), (22, (0.20f, 0.50f)) })
+        {
+            int s = 0, g = 0, pr = 0;
+            for (int i = 0; i < 20000; i++)
+            {
+                var t = MeleeAugmentDraft.RollTier(lv, false, 0, rng);
+                if (t == AugmentTier.Silver) s++; else if (t == AugmentTier.Gold) g++; else pr++;
+            }
+            float fs = s / 20000f, fg = g / 20000f;
+            bool ok = Mathf.Abs(fs - ex.Item1) < 0.02f && Mathf.Abs(fg - ex.Item2) < 0.02f;
+            tierOk &= ok;
+            sb.AppendLine($"   +{lv}: 은 {fs:0.00} · 금 {fg:0.00} · 프리즘 {pr / 20000f:0.00} (기대 {ex.Item1:0.00} · {ex.Item2:0.00})");
+        }
+        int pitySilver = 0, evoSilver = 0;
+        for (int i = 0; i < 5000; i++)
+        {
+            if (MeleeAugmentDraft.RollTier(4, false, 3, rng) == AugmentTier.Silver) pitySilver++;
+            if (MeleeAugmentDraft.RollTier(4, true, 0, rng) == AugmentTier.Silver) evoSilver++;
+        }
+        sb.AppendLine($"   바닥 보장(은 3연속 뒤) 은 {pitySilver}/5000 · 진화 직후 은 {evoSilver}/5000");
+        Check(sb, "① 등급 확률 · 바닥 보장 · 진화 직후 금 이상", tierOk && pitySilver == 0 && evoSilver == 0);
+
+        // ② 뽑기 — 카타나를 +1 → +24(창 없음 = 왼쪽 카드 자동)
+        await Wait(3f, ct);
+        if (!await EquipAsync(p, Katana, ct)) { sb.AppendLine("카타나 장착 실패"); return; }
+        var w = p.WeaponManager.Weapon0Data;
+        w.augments = ""; w.highestEnhanceReached = 0; w.augmentSilverStreak = 0; w.augmentAfterEvolve = false;
+        MeleeAugmentDraft.ResetForRun();
+        int offers = 0, upgrades = 0, exclusive = 0, wrongWeapon = 0;
+        var tiers = new int[3];
+        Action<MeleeAugmentOffer> onOffer = o =>
+        {
+            offers++; tiers[(int)o.Tier]++;
+            foreach (var c in o.Cards)
+            {
+                var d = c.Def;
+                if (c.IsUpgrade) upgrades++;
+                if (d != null && d.Weapon != MeleeWeaponKind.None) exclusive++;
+                if (d != null && d.Weapon != MeleeWeaponKind.None && d.Weapon != MeleeWeaponKind.Katana) wrongWeapon++;
+            }
+            MeleeAugmentDraft.Choose(0);
+        };
+        MeleeAugmentDraft.Offered += onOffer;
+        try
+        {
+            for (int lv = 1; lv <= 24; lv++)
+            {
+                w.enhanceLevel = lv;
+                MeleeAugmentDraft.TryOfferForEnhance(w, lv, false, new System.Random(lv * 31));
+            }
+            // 하락 뒤 다시 닿으면 안 준다
+            int before = offers;
+            w.enhanceLevel = 20;
+            MeleeAugmentDraft.TryOfferForEnhance(w, 20, false, new System.Random(99));
+            sb.AppendLine($"   화면 {offers}(+1 ~ +24) · 등급 은 {tiers[0]} · 금 {tiers[1]} · 프리즘 {tiers[2]} · 강화 카드 {upgrades} · 전용 카드 {exclusive} · 다른 무기 전용 {wrongWeapon} · 하락 뒤 다시 닿음 화면 {offers - before}");
+            sb.AppendLine($"   가진 증강: {w.augments}");
+            int maxRank = 0;
+            foreach (var (_, r) in w.AugmentList()) maxRank = Mathf.Max(maxRank, r);
+            Check(sb, $"② 단계마다 화면 24 · 다른 무기 전용 0 · 하락 뒤 0 · 단계 ≤ III(최고 {maxRank})", offers == 24 && wrongWeapon == 0 && offers - before == 0 && maxRank <= 3);
+        }
+        finally { MeleeAugmentDraft.Offered -= onOffer; }
+
+        // ③ 효과 — 지금 든 카타나에 직접 단다
+        var rs = p.RuntimeStats;
+        w.augments = "";
+        GameRunBootstrapper.Instance.Run.EffectManager.Rebuild();
+        await Wait(0.3f, ct);
+        float crit0 = rs.CritChanceBonus, heavy0 = ProcCoefficient.HeavyThreshold();
+        w.augments = "aug_ricochet:3,aug_heavy_hand:2,aug_ambush:1,aug_katana_phantom:2";
+        GameRunBootstrapper.Instance.Run.EffectManager.Rebuild();
+        await Wait(0.3f, ct);
+        float crit1 = rs.CritChanceBonus, heavy1 = ProcCoefficient.HeavyThreshold();
+        float phantom = MeleeAugments.SkillDamageMult(w, SkillType.R), phantomE = MeleeAugments.SkillDamageMult(w, SkillType.E);
+        sb.AppendLine($"   치명 {crit0:0.0} → {crit1:0.0}%(규칙형 — 스탯 그대로) · 강타 문턱 {heavy0:0.00} → {heavy1:0.00} · 환영베기 ×{phantom:0.00} · E ×{phantomE:0.00}");
+        Check(sb, "③ 효과 — 스탯 그대로(치명 · 문턱) · 환영베기(R) ×1.35 · E는 그대로", Mathf.Abs(crit1 - crit0) < 0.01f && Mathf.Abs(heavy0 - heavy1) < 0.001f
+                                                                                    && Mathf.Abs(phantom - 1.35f) < 0.001f && Mathf.Abs(phantomE - 1f) < 0.001f);
+        w.augments = "";
+        GameRunBootstrapper.Instance.Run.EffectManager.Rebuild();
+
+        // ④ 강화 표
+        var t2 = WeaponEnhanceService.Table;
+        sb.AppendLine($"   상한 일반 {t2.MaxFor(ItemRarity.Common)} · 전설 {t2.MaxFor(ItemRarity.Legendary)} · 진화 1번 일반 {t2.MaxFor(ItemRarity.Common, 1)} · +12 공격 ×{t2.AttackMult(12, null):0.00} · 스킬 단계 {string.Join("/", t2.MeleeSkillTierMilestones)} · +12→13 성공 {t2.SuccessAt(12):0.00} · +24→25 하락 {t2.DropAt(24)}");
+        Check(sb, "④ 강화 표 — 상한 12 · 30 · 24 · +12 공격 ×1.48 · 스킬 6/12", t2.MaxFor(ItemRarity.Common) == 12 && t2.MaxFor(ItemRarity.Legendary) == 30 && t2.MaxFor(ItemRarity.Common, 1) == 24
+                                                                         && Mathf.Abs(t2.AttackMult(12, null) - 1.48f) < 0.001f && t2.MeleeSkillTierMilestones.Length == 2 && t2.MeleeSkillTierMilestones[0] == 6);
+    }
+
+    // ── 60 같은 투자 비교(설계 §4 · 10-15 사용자 「근접 강화에도 메리트 — 활에 맞게끔」) ──
+    private const int EqualInvestLevel = 20;   // 쪼갠 강화표 기대 재료 ≈ 152(활 최대 다발 파츠 ≈ 212보다 적게 — 근접에 불리한 쪽으로)
+
+    private static async UniTask EqualInvestAsync(PlayerController p, StringBuilder sb, CancellationToken ct, bool skills = false)
+    {
+        if (skills) sb.AppendLine("   ★스킬 포함 — E · R을 쿨이 돌 때마다 쓴다(스킬 중엔 제자리로 끌지 않는다)");
+        sb.AppendLine($"같은 투자 비교 — 활 최대 다발(파츠 재료 ≈ 212) 대 근접 +{EqualInvestLevel}(≈ 152) · 증강 = 강화마다 왼쪽 카드(시드) · 룬 · 각인 · 서약은 56과 같다 · 단일 10초 + 무리 5마리 10초");
+        sb.AppendLine("   ※ 실측은 평타만 · 표적 체력을 늘 채운다 — 처치 · 피격 · 회피 · 쉬기가 필요한 증강(학살 · 사냥감 · 처형 · 마지막 의지 · 회피 베기 · 기습)은 값이 0으로 잡힌다");
+        var run    = GameRunBootstrapper.Instance.Run;
+        var placed = typeof(RunItemInventory).GetField("_placedItems", Inst)?.GetValue(run.ItemInventory) as List<RuntimeItemData>;
+        if (placed == null) { sb.AppendLine("룬 판 목록을 못 읽음"); return; }
+        var savedPlaced = new List<RuntimeItemData>(placed);
+        var parts = RangedPartsState.Current;
+        var savedParts = new List<RangedPartsState.Equipped>(parts.Equipped_);
+        string savedSentence = run.CovenantHandler?.Sentence?.CovenantId;
+        foreach (var m in UnityEngine.Object.FindObjectsByType<MonsterBase>(FindObjectsSortMode.None))
+            if (m != null && !m.IsDead) m.gameObject.SetActive(false);
+        DetachAll();
+        await Wait(5f, ct);   // 방 입장 입력 잠금
+
+        void Act(Vector3 aim)
+        {
+            RefillAll();
+            if (p.IsInSkillAction) return;   // 돌진 스킬이 표적을 지나가게 — 제자리로 끌지 않는다
+            Steer(p, aim);
+            if (skills && p.CooldownTracker.IsReady(SkillType.E)) p.InputBuffer.Push(Command.ESkill);
+            else if (skills && p.CooldownTracker.IsReady(SkillType.R)) p.InputBuffer.Push(Command.RSkill);
+            else p.InputBuffer.Push(Command.Light);
+        }
+        async UniTask<float> MeasureAsync(List<HpTrack> ts, Vector3 aim)
+        {
+            float s0t = Time.time;
+            while (Time.time - s0t < 2f) { RefillAll(); Steer(p, aim); p.InputBuffer.Push(Command.Light); await Wait(0.1f, ct); }
+            if (skills) { p.CooldownTracker.ResetCooldown(SkillType.E); p.CooldownTracker.ResetCooldown(SkillType.R); }
+            foreach (var t in ts) t.Dealt = 0f;
+            float t0 = Time.time;
+            while (Time.time - t0 < 10f) { Act(aim); await Wait(0.1f, ct); }
+            float secs = Mathf.Max(0.01f, Time.time - t0);
+            float sum = 0f;
+            foreach (var t in ts) sum += t.Dealt;
+            return sum / secs;
+        }
+
+        // (빌드 칸 번호 · 강화 · 증강 시드(−1 = 증강 없음))
+        var cases = new (int build, int level, int seed)[]
+        {
+            (4, 0, -1),
+            (0, EqualInvestLevel, -1), (0, EqualInvestLevel, 1), (0, EqualInvestLevel, 2),
+            (1, EqualInvestLevel, -1), (1, EqualInvestLevel, 1), (1, EqualInvestLevel, 2),
+        };
+        var rows = new List<(string label, float single, float group)>();
+        try
+        {
+            foreach (var (bi, level, seed) in cases)
+            {
+                var b = Loadouts[bi];
+                Managers.UI?.CloseAllPopupUI();
+                Time.timeScale = 1f;
+                DetachAll();
+                foreach (var m in UnityEngine.Object.FindObjectsByType<MonsterBase>(FindObjectsSortMode.None))
+                    if (m != null && !m.IsDead) m.gameObject.SetActive(false);
+                bool ranged = b.fam == BuildFamily.Ranged;
+                int slot = ranged ? PlayerWeaponManager.Slot1 : PlayerWeaponManager.Slot0;
+                if (!await EquipAsync(p, b.weapon, ct, slot)) { sb.AppendLine($"장착 실패 {b.label}"); continue; }
+                var w = slot == PlayerWeaponManager.Slot1 ? p.WeaponManager.Weapon1Data : p.WeaponManager.Weapon0Data;
+                typeof(PlayerWeaponManager).GetMethod("ApplyServerOverrideIfAvailable", BindingFlags.Static | BindingFlags.NonPublic)
+                    ?.Invoke(null, new object[] { w, Path.GetFileNameWithoutExtension(b.weapon) });
+                w.formTier = 0;
+                w.formVariants = "";
+                w.augments = "";
+                w.highestEnhanceReached = 0;
+                w.augmentSilverStreak = 0;
+                w.augmentAfterEvolve = false;
+
+                placed.Clear();
+                foreach (var id in b.ids)
+                {
+                    var d = ProjectRune(id);
+                    if (d == null) continue;
+                    if (string.IsNullOrEmpty(d.element)) d.element = b.el;
+                    placed.Add(d);
+                }
+                var eq = new List<RangedPartsState.Equipped>();
+                foreach (var (pid, lv) in b.parts) eq.Add(new RangedPartsState.Equipped { partId = pid, level = lv });
+                parts.Restore(eq.ToArray());
+                string sentence = CovenantSentence.MakeId(b.cause, CovenantTier.Gold, new List<(string, CovenantTier, ClauseLink)>
+                    { ("supernova", CovenantTier.Gold, ClauseLink.Immediate), ("ember", CovenantTier.Gold, ClauseLink.Immediate) });
+                run.CovenantHandler?.TryWriteSentence(sentence);
+                run.EffectManager.Rebuild();
+                ForceImprint(b.fam, 4);
+
+                // 증강 — 강화가 처음 닿는 단계마다 한 화면 · 왼쪽 카드(플레이어가 고르지 않은 평균에 가깝게)
+                if (seed >= 0)
+                {
+                    MeleeAugmentDraft.ResetForRun();
+                    Action<MeleeAugmentOffer> pick = _ => MeleeAugmentDraft.Choose(0);
+                    MeleeAugmentDraft.Offered += pick;
+                    try
+                    {
+                        for (int lv = 1; lv <= level; lv++)
+                        {
+                            w.enhanceLevel = lv;
+                            MeleeAugmentDraft.TryOfferForEnhance(w, lv, false, new System.Random(seed * 1000 + lv));
+                        }
+                    }
+                    finally { MeleeAugmentDraft.Offered -= pick; }
+                }
+                w.enhanceLevel = level;
+                w.RecomputeEnhancedStats();
+                WeaponFormRuntime.Of(p).Rebuild();
+                p.WeaponManager.RaiseEquippedWeaponRefreshed();
+                run.EffectManager.Rebuild();
+                ForceImprint(b.fam, 4);
+                await Wait(0.5f, ct);
+
+                string label = ranged ? b.label : $"{b.label} +{level} {(seed < 0 ? "증강 없음" : "시드 " + seed)}";
+                s_home = p.transform.position;
+                Vector3 fw = Flat(p.transform.forward);
+                Vector3 c = p.transform.position + fw * b.range;
+                var one = await TrackAsync(c, ct);
+                if (one == null) { sb.AppendLine($"슬라임 부르기 실패 {label}"); continue; }
+                float single = await MeasureAsync(new List<HpTrack> { one }, one.M.transform.position);
+                one.M.gameObject.SetActive(false);
+                DetachAll();
+                var grp = new List<HpTrack>();
+                var center = await TrackAsync(c, ct);
+                if (center != null) grp.Add(center);
+                for (int k = 0; k < 4; k++)
+                {
+                    float a = k * Mathf.PI * 0.5f + Mathf.PI * 0.25f;
+                    var t = await TrackAsync(c + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * 1.8f, ct);
+                    if (t != null) grp.Add(t);
+                }
+                float group = await MeasureAsync(grp, c);
+                rows.Add((label, single, group));
+                sb.AppendLine($"{label}: 단일 {single:0}/초 · 무리 {group:0}/초 · 공격력 {p.RuntimeStats.GetEffectiveAttack(ranged ? AttackStatKind.Ranged : AttackStatKind.Melee)}{(seed >= 0 ? " · 증강 " + w.augments : "")}");
+                foreach (var t in grp) if (t.M != null) t.M.gameObject.SetActive(false);
+                w.augments = "";
+            }
+        }
+        finally
+        {
+            placed.Clear();
+            placed.AddRange(savedPlaced);
+            parts.Restore(savedParts);
+            if (!string.IsNullOrEmpty(savedSentence)) run.CovenantHandler?.TryWriteSentence(savedSentence);
+            run.EffectManager.Rebuild();
+            DetachAll();
+        }
+        if (rows.Count < cases.Length) { Check(sb, $"일곱 칸 모두 잼 — {rows.Count}/{cases.Length}", false); return; }
+        var bow = rows[0];
+        string Ratio((string label, float single, float group) r) => $"단일 ×{(bow.single > 0f ? r.single / bow.single : 0f):0.00} · 무리 ×{(bow.group > 0f ? r.group / bow.group : 0f):0.00}";
+        for (int i = 1; i < rows.Count; i++) sb.AppendLine($"   {rows[i].label} 대 활 최대 다발 — {Ratio(rows[i])}");
+        float kS = (rows[2].single + rows[3].single) * 0.5f, kG = (rows[2].group + rows[3].group) * 0.5f;
+        float gS = (rows[5].single + rows[6].single) * 0.5f, gG = (rows[5].group + rows[6].group) * 0.5f;
+        float kSr = kS / Mathf.Max(1f, bow.single), kGr = kG / Mathf.Max(1f, bow.group), gSr = gS / Mathf.Max(1f, bow.single), gGr = gG / Mathf.Max(1f, bow.group);
+        Check(sb, $"① 카타나 +{EqualInvestLevel} · 증강(시드 평균) — 단일 ×{kSr:0.00}(목표 0.8 ~ 1.2) · 무리 ×{kGr:0.00}(목표 0.6 ~ 1.0)", kSr >= 0.8f && kSr <= 1.2f && kGr >= 0.6f && kGr <= 1.0f);
+        Check(sb, $"② 대검 +{EqualInvestLevel} · 증강(시드 평균) — 단일 ×{gSr:0.00}(목표 0.8 ~ 1.2) · 무리 ×{gGr:0.00}(목표 0.6 ~ 1.0)", gSr >= 0.8f && gSr <= 1.2f && gGr >= 0.6f && gGr <= 1.0f);
+        Check(sb, $"③ 증강 몫 — 카타나 단일 {rows[1].single:0} → {kS:0}/초 · 대검 {rows[4].single:0} → {gS:0}/초(증강이 더한다)", kS > rows[1].single && gS > rows[4].single);
     }
 
     // ── 56 룬 · 서약 다 낀 빌드 + 활 최대 다발(10-15 사용자 「DPS · 조합 오버파워 · 룬과 서약 · 분열한 활의 타격 트리거」) ──

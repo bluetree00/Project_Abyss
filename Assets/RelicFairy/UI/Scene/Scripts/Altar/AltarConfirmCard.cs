@@ -65,7 +65,7 @@ public sealed class AltarConfirmCard : MonoBehaviour
         _header.text = string.IsNullOrEmpty(m.LevelLine) ? m.Header ?? "" : $"{m.Header} · {m.LevelLine}";
         _eyebrow.text = string.IsNullOrEmpty(m.LevelLine) ? "해금하기 — 정수를 써서 영구히 연다" : $"강화하기 — {m.LevelLine}";
         _name.text   = m.Name ?? "";
-        _effect.text = m.Effect ?? "";
+        _effect.text = UIKeywordInk.Values(m.Effect ?? "");   // 수치만 Noto 500(10-15 설명 글 강조)
         int after    = Mathf.Max(0, essence - m.Cost);
         _cost.text   = $"정수 <color=#FFCC4D>◆ {m.Cost:N0}</color> 사용     →     남는 정수 ◆ {after:N0}";
         _condition.text = m.Condition ?? "";

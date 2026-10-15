@@ -35,6 +35,12 @@ public sealed class WeightForm : WeaponFormBase
 
     public WeightForm(PlayerController player, WeaponData weapon) : base(player, weapon) { }
 
+    /// <summary>내려찍기 반경 — 근접 강화 증강 「땅 가르기」(10-15)가 넓힌다. 이펙트도 같은 비율(이펙트 = 판정).</summary>
+    private float SlamRange    => Def.TriggerRange * (1f + MeleeAugments.ValueOn(Weapon, MeleeAugmentCatalog.GreatSplit) * 0.01f);
+    private float SlamVfxScale => Def.TriggerVfxScale * SlamRange / Mathf.Max(0.01f, Def.TriggerRange);
+    /// <summary>균열이 남는 시간 — 땅 가르기 둘째 값만큼 길어진다.</summary>
+    private float FissureTime  => FissureSeconds + MeleeAugments.Value2On(Weapon, MeleeAugmentCatalog.GreatSplit);
+
     public override void OnMeleeHit(in HitInfo hit, bool newSwing, bool finisherStep)
     {
         if (!newSwing) return;
@@ -82,15 +88,15 @@ public sealed class WeightForm : WeaponFormBase
         if (_aftershockAt > 0f && Time.time >= _aftershockAt)
         {
             _aftershockAt = -1f;
-            int n = FormStrike.Radius(Player, _slamAt, Def.TriggerRange * AftershockScale, Atk * Def.TriggerAtkRatio * AftershockRatio, _buf);
-            FormStrike.PlayVfx(Def.TriggerVfxKey, _slamAt, Player.AimForward, Def.TriggerVfxScale * AftershockScale);
+            int n = FormStrike.Radius(Player, _slamAt, SlamRange * AftershockScale, Atk * Def.TriggerAtkRatio * AftershockRatio, _buf);
+            FormStrike.PlayVfx(Def.TriggerVfxKey, _slamAt, Player.AimForward, SlamVfxScale * AftershockScale);
             Log($"여진 — 맞힘 {n}");
         }
         if (_fissureUntil > 0f && Time.time >= _fissureNext)
         {
             _fissureNext += FissureInterval;
-            int n = FormStrike.Radius(Player, _slamAt, Def.TriggerRange, Atk * FissureRatio, _buf);
-            FormStrike.PlayVfx(Def.TriggerVfxKey, _slamAt, Player.AimForward, Def.TriggerVfxScale * FissureVfxScale);   // 갈라진 땅이 남아 있음을 보이게
+            int n = FormStrike.Radius(Player, _slamAt, SlamRange, Atk * FissureRatio, _buf);
+            FormStrike.PlayVfx(Def.TriggerVfxKey, _slamAt, Player.AimForward, SlamVfxScale * FissureVfxScale);   // 갈라진 땅이 남아 있음을 보이게
             Log($"균열 — 맞힘 {n}");
             if (Time.time >= _fissureUntil) _fissureUntil = -1f;
         }
@@ -135,13 +141,13 @@ public sealed class WeightForm : WeaponFormBase
         _slamAt = Player.transform.position + Player.AimForward * SlamForward;
         int hits = SlamHit(Atk * Def.TriggerAtkRatio);
         if (Has(Crush)) Log($"짓누름 — 받피증 {hits}체");
-        FormStrike.PlayVfx(Def.TriggerVfxKey, _slamAt, Player.AimForward, Def.TriggerVfxScale);
+        FormStrike.PlayVfx(Def.TriggerVfxKey, _slamAt, Player.AimForward, SlamVfxScale);
         if (Has(Aftershock)) _aftershockAt = Time.time + AftershockDelay;
         if (Has(Fissure))
         {
-            _fissureUntil = Time.time + FissureSeconds;
+            _fissureUntil = Time.time + FissureTime;
             _fissureNext  = Time.time + FissureInterval;
-            FormStrike.GroundRing(_slamAt, Def.TriggerRange, FissureSeconds);   // 판정 3.5 m인데 이펙트는 그 30%라 경계가 안 보였다(10-12 B9)
+            FormStrike.GroundRing(_slamAt, SlamRange, FissureTime);   // 판정 3.5 m인데 이펙트는 그 30%라 경계가 안 보였다(10-12 B9)
         }
         SetStacks(0, StackReason.Trigger);
         Log($"내려찍기 — 맞힘 {hits}");
@@ -154,7 +160,7 @@ public sealed class WeightForm : WeaponFormBase
     /// </summary>
     private int SlamHit(float damage)
     {
-        int n = CombatQuery.GetNearbyEnemies(_slamAt, Def.TriggerRange, Player.gameObject, 32, _buf);
+        int n = CombatQuery.GetNearbyEnemies(_slamAt, SlamRange, Player.gameObject, 32, _buf);
         int hits = 0;
         for (int i = 0; i < n; i++)
         {

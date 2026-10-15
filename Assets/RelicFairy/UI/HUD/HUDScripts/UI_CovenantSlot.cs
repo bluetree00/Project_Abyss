@@ -88,7 +88,7 @@ public sealed class UI_CovenantSlot : MonoBehaviour
             bool has = !string.IsNullOrEmpty(text);
             _descText.fontStyle = FontStyles.Normal;
             // 수치 금색(09-29)은 뺐다 — 톤 v2에서 금은 「준비됨 · 지금」 한 뜻(10-11 금색 뜻 정리)
-            _descText.text = UIKoreanWrap.Words(text);
+            _descText.text = UIKeywordInk.Values(UIKoreanWrap.Words(text));   // 수치만 Noto 500 · 조용한 잉크(10-15 — 금 아님)
             _descText.gameObject.SetActive(has);
         }
 
@@ -154,7 +154,7 @@ public sealed class UI_CovenantSlot : MonoBehaviour
             {
                 string prev = i > 0 ? s.ResultId(i - 1) : null;
                 sb.Append("\n<indent=").Append(ResultIndentEm.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)).Append("em>")
-                  .Append(UIKoreanWrap.Words(CovenantGrammar.Line(s.ResultId(i), s.ResultLink(i), prev))).Append("</indent>");
+                  .Append(UIKeywordInk.Values(UIKoreanWrap.Words(CovenantGrammar.Line(s.ResultId(i), s.ResultLink(i), prev)))).Append("</indent>");   // 결과 줄만 수치 강조(10-15) — 원인 줄은 옅은 채(색 태그가 <alpha>를 되살린다)
             }
             _descText.fontStyle = FontStyles.Normal;
             _descText.text = sb.ToString();

@@ -2236,6 +2236,7 @@ public static class UILayoutRuntimeProbeEditor
                 {
                     File.WriteAllBytes(Path.Combine(dir, name.Replace('#', '_') + (black ? "_black" : "") + ".png"), tex.EncodeToPNG());
                     UnityEngine.Object.Destroy(tex);
+                    TextOverlapAudit.Record(name);   // 10-15 — 찍는 순간의 글자 겹침 · 말줄임 · 작은 글자(Temp/text_overlap_audit.txt)
                     return;
                 }
                 UnityEngine.Object.Destroy(tex);

@@ -65,6 +65,7 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
 
             // 3단계: 3파에 걸쳐 검기가 커지며 공격
             _maxCasts = _skillTier >= 3 ? 3 : (_skillTier >= 2 ? 2 : 1);
+            _maxCasts += Mathf.RoundToInt(MeleeAugments.ValueOn(ctx.WeaponData, MeleeAugmentCatalog.GreatPerimeter));   // 주변경계 연장 증강(10-15)
 
             _castIndex = 0;
             _timer = 0f;

@@ -506,6 +506,10 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             evolved.engravings     = current.engravings;            // 각인도 계승 — id가 스킬 전용이라 다른 스킬에선 무해하다
             evolved.formTier       = evolved.form != null ? Mathf.Max(1, current.formTier) : 0;   // 형이 깨어난다(무형검 0 → 1)
             evolved.formVariants   = current.formVariants;
+            evolved.augments              = MeleeAugmentCatalog.ConvertForEvolution(current, evolved);   // 근접 강화 증강 계승 — 무형검 전용은 새 갈래 전용으로(10-15)
+            evolved.highestEnhanceReached = current.highestEnhanceReached;
+            evolved.augmentSilverStreak   = current.augmentSilverStreak;
+            evolved.augmentAfterEvolve    = true;                            // 진화 직후 첫 강화 = 금 이상
             evolved.RecomputeEnhancedStats();
 
             // 3) 새 무브셋 클립 프리로드 — 안 하면 진화 직후 첫 공격이 빈 클립으로 나간다.

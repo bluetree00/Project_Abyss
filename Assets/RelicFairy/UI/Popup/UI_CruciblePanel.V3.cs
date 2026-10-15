@@ -493,20 +493,21 @@ public sealed partial class UI_CruciblePanel
         V3Text(_cardName[1], UIWeight.Medium, FTitle, UITheme.Thin.Ink);
         DP(_partKindText, 20f, 48f, 332f, 26f);
         V3Text(_partKindText, UIWeight.Regular, FTable, UITheme.Thin.InkA(0.6f));
-        DP(_cardAtk[1], 20f, 80f, 332f, 30f);
+        // 효과 줄은 두 줄까지(10-15 겹침 점검 — 「지금 2발 · 갈래 피해 50% → Lv4에 …」가 한 줄로 오른쪽 초점 밑까지 뻗었다)
+        DP(_cardAtk[1], 20f, 80f, 332f, 54f);
         V3Text(_cardAtk[1], UIWeight.Medium, FLead, UITheme.Thin.Ink, autosize: true);
-        DP(_partGrowthText, 20f, 110f, 332f, 54f);   // 두 줄(18 × 1.45 = 26 · 2줄 52)
+        DP(_partGrowthText, 20f, 136f, 332f, 52f);   // 두 줄(18 × 1.45 = 26 · 2줄 52)
         V3Text(_partGrowthText, UIWeight.Regular, FTable, UITheme.Thin.InkA(0.6f));
-        DP(_partSynergyText, 20f, 168f, 332f, 60f);
+        DP(_partSynergyText, 20f, 190f, 332f, 54f);
         V3Text(_partSynergyText, UIWeight.Regular, FTable, UITheme.Thin.InkA(0.85f));
         DP(_cardLevel[1], 368f, 118f, 316f, 26f);
         V3Text(_cardLevel[1], UIWeight.Regular, FTable, UITheme.Thin.InkA(0.75f));
         if (_cardGaugeFill[1] != null) DP(_cardGaugeFill[1].parent, 368f, 148f, 316f, 4f);
         DP(_partDescText, 368f, 158f, 316f, 84f);
         V3Text(_partDescText, UIWeight.Regular, FTable, UITheme.Thin.Ink, autosize: true);
-        foreach (var t in new[] { _cardName[1], _partKindText, _cardAtk[1], _cardLevel[1] })
+        foreach (var t in new[] { _cardName[1], _partKindText, _cardLevel[1] })
             if (t != null) { t.alignment = TextAlignmentOptions.MidlineLeft; t.textWrappingMode = TextWrappingModes.NoWrap; }
-        foreach (var t in new[] { _partGrowthText, _partSynergyText, _partDescText })
+        foreach (var t in new[] { _cardAtk[1], _partGrowthText, _partSynergyText, _partDescText })
             if (t != null) { t.alignment = TextAlignmentOptions.TopLeft; t.textWrappingMode = TextWrappingModes.Normal; }
         _v3PartFocal = NewText(pd.transform, "V3PartFocal", FFocal, UIWeight.Light, TextAlignmentOptions.MidlineLeft, UITheme.Thin.Ink);
         _v3PartFocal.enableAutoSizing = true;
@@ -708,7 +709,7 @@ public sealed partial class UI_CruciblePanel
         PlaceRightForTab(false);
     }
 
-    /// <summary>아래 72 — 왼쪽 = 대장장이 초상 곁 작은 말풍선(전체 폭 띠 대신 · 리서치 B-2-5), 오른쪽 = 단축키 안내.</summary>
+    /// <summary>아래 60 — 왼쪽 = 대장장이 초상 68 + 말풍선(20px 두 줄 · 타자기 — UI_CruciblePanel.Speech.cs · 10-15), 오른쪽 = 단축키 안내.</summary>
     private void LayoutV3Bottom(RectTransform band)
     {
         if (band == null) return;
@@ -717,28 +718,32 @@ public sealed partial class UI_CruciblePanel
         if (band.TryGetComponent<Image>(out var bi)) { bi.sprite = null; bi.color = Color.clear; }
         var edge = band.Find("ThinEdge");
         if (edge != null) edge.gameObject.SetActive(false);
-        if (band.Find("Portrait") is RectTransform por) BP(por, 0f, 8f, 44f, 44f);
+        if (band.Find("Portrait") is RectTransform por) LayoutV3Portrait(por);
         Park(band.Find("Speaker"));
         if (_eventBanner != null) Park(_eventBanner.transform);   // 화로 칩 → 오른쪽 판 원인 칩(성공률 · 재료 · 잭팟 옆)
 
-        // 말풍선 — 꼬리(마름모 반쪽)를 판 뒤에 깔아 초상 쪽으로 낸다
-        var tail = ShopUIStyle.MakeImage(band, "V3BubbleTail", V3Bubble);
+        // 말풍선 — 꼬리(마름모 반쪽)를 판 뒤에 깔아 초상 쪽으로 낸다. 꼬리 · 판이 한 묶음으로 옅어진다(_sayGroup)
+        var say = ShopUIStyle.MakeRect(band, "V3Say").GetComponent<RectTransform>();
+        ShopUIStyle.Stretch(say);
+        _sayGroup = say.gameObject.AddComponent<CanvasGroup>();
+        _sayGroup.blocksRaycasts = false;
+        var tail = ShopUIStyle.MakeImage(say, "V3BubbleTail", V3Bubble);
         tail.sprite = UIThinShapes.Fill(ThinShape.Diamond, 14f, 14f);
-        BP(tail.rectTransform, 49f, 23f, 14f, 14f);
-        var tailLine = ShopUIStyle.MakeImage(band, "V3BubbleTailLine", UITheme.Thin.LineIdle);
+        BP(tail.rectTransform, SayBubbleX - 7f, (V3BarH - 14f) * 0.5f, 14f, 14f);
+        var tailLine = ShopUIStyle.MakeImage(say, "V3BubbleTailLine", UITheme.Thin.LineIdle);
         tailLine.sprite = UIThinShapes.Outline(ThinShape.Diamond, 14f, 14f);
-        BP(tailLine.rectTransform, 49f, 23f, 14f, 14f);
-        var bubble = ShopUIStyle.MakeImage(band, "V3Bubble", V3Bubble);
-        BP(bubble.rectTransform, 56f, 6f, 700f, 48f);
+        BP(tailLine.rectTransform, SayBubbleX - 7f, (V3BarH - 14f) * 0.5f, 14f, 14f);
+        var bubble = ShopUIStyle.MakeImage(say, "V3Bubble", V3Bubble);
+        BP(bubble.rectTransform, SayBubbleX, 0f, SayBubbleW, V3BarH);
         UIThinBox.Create(bubble.rectTransform, "Line", Vector2.zero, Vector2.one, 0f, UITheme.Thin.LineIdle, Color.clear, Color.clear);
         if (_dialogText != null)
         {
             _dialogText.transform.SetParent(bubble.transform, false);
             ShopUIStyle.Stretch(_dialogText.rectTransform);
-            V3Text(_dialogText, UIWeight.Regular, FTable, UITheme.Thin.InkA(0.8f), autosize: true);
-            _dialogText.margin = new Vector4(16f, 0f, 16f, 0f);
+            V3Text(_dialogText, UIWeight.Regular, FLead, UITheme.Thin.InkA(0.88f), autosize: true);   // 20 — 두 줄이면 16까지만 줄어든다
+            _dialogText.margin = new Vector4(16f, 3f, 16f, 3f);
             _dialogText.alignment = TextAlignmentOptions.MidlineLeft;
-            _dialogText.textWrappingMode = TextWrappingModes.NoWrap;
+            _dialogText.textWrappingMode = TextWrappingModes.Normal;
             _dialogText.overflowMode = TextOverflowModes.Ellipsis;
         }
 

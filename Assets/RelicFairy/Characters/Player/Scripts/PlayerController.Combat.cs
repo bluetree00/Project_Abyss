@@ -366,6 +366,9 @@ public sealed partial class PlayerController
         _stanceDefenseAdd = 0f;
     }
 
+    /// <summary>이 주인이 지금 자세를 잡고 있나 — 남이 잡고 있으면 BeginStance가 조용히 실패한다(철벽 자세 증강 · 10-15).</summary>
+    public bool IsStanceOwner(object owner) => owner != null && ReferenceEquals(_stanceOwner, owner);
+
     // ── Public Methods: 상태이상 (PlayerStatusEffects 위임) ────────
     /// <summary>이동 속도를 scale 배율로 duration초 동안 감소시킨다. 종료 시 자동으로 복구.</summary>
     public void ApplySlow(float scale, float duration)

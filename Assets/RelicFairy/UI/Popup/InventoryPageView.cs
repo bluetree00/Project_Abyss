@@ -489,7 +489,7 @@ public class InventoryPageView : MonoBehaviour
                     string valuePart = string.IsNullOrEmpty(display.ValueText) ? "" : $"  {display.ValueText}";
                     effectText += $"  <color=#8B4513>{display.Label}</color>{valuePart}{triggerLabel}\n";
                 }
-                _detailEffects.text = effectText.TrimEnd('\n');
+                _detailEffects.text = UIKeywordInk.Values(effectText.TrimEnd('\n'), true);   // 수치만 Noto 500(10-15) — 라벨은 갈색 그대로
             }
             else
             {
@@ -701,7 +701,7 @@ public class InventoryPageView : MonoBehaviour
             foreach (var eff in item.effects)
             {
                 var display = EffectDescriptionFormatter.Describe(eff);
-                text += $"  {display.Combined}\n";
+                text += $"  {UIKeywordInk.Values(display.Combined)}\n";   // 수치만 Noto 500(10-15 · 어두운 툴팁)
             }
         }
 

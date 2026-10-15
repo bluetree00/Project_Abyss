@@ -714,7 +714,7 @@ public sealed partial class UI_CruciblePanel
             c.name.text = $"<color=#{ColorUtility.ToHtmlStringRGB(Color.Lerp(f.Tint, Color.gray, 0.35f))}>{f.DisplayName}</color>  <size=88%><color=#8C8497>{b.target.displayName}</color></size>";
             PlaceIn(c.name.rectTransform, 12f, 72f, FmCardW - 24f, 26f, FmCardW, 162f);
             c.line.gameObject.SetActive(true);
-            c.line.text = f.Line;
+            c.line.text = UIKeywordInk.Values(f.Line);   // 수치만 Noto 500(10-15 설명 글 강조)
             PlaceIn(c.line.rectTransform, 12f, 98f, FmCardW - 24f, 44f, FmCardW, 162f);
             c.foot.gameObject.SetActive(true);
             c.foot.text = $"+{b.requiredEnhanceLevel}에서 깨어난다";
@@ -747,7 +747,7 @@ public sealed partial class UI_CruciblePanel
             c.name.text = $"<color=#{ColorUtility.ToHtmlStringRGB(f.Tint)}>{f.DisplayName}</color>  <size=88%><color=#8C8497>{b.target.displayName}</color></size>";
             PlaceIn(c.name.rectTransform, 72f, 8f, FmCardW - 80f, 26f, FmCardW, FmPreviewH);
             c.line.gameObject.SetActive(true);
-            c.line.text = f.Line;
+            c.line.text = UIKeywordInk.Values(f.Line);   // 수치만 Noto 500(10-15 설명 글 강조)
             PlaceIn(c.line.rectTransform, 72f, 36f, FmCardW - 80f, 66f, FmCardW, FmPreviewH);
             c.foot.gameObject.SetActive(false);
             c.mark.gameObject.SetActive(false);
@@ -782,7 +782,7 @@ public sealed partial class UI_CruciblePanel
             c.mark.color = FormInk;
             PlaceIn(c.mark.rectTransform, FmCardW - 120f, 8f, 110f, 26f, FmCardW, h);
             c.line.gameObject.SetActive(true);
-            c.line.text = v.line;
+            c.line.text = UIKeywordInk.Values(v.line);   // 수치만 Noto 500(10-15 설명 글 강조)
             PlaceIn(c.line.rectTransform, 10f, 38f, FmCardW - 20f, 64f, FmCardW, h);
             c.foot.gameObject.SetActive(false);
         }
@@ -799,7 +799,7 @@ public sealed partial class UI_CruciblePanel
         var sb = new System.Text.StringBuilder();
         foreach (var id in (w.formVariants ?? "").Split(','))
             if (w.form.TryGetVariant(id, out var v))
-                sb.Append("<color=#C9A6FF>").Append(RomanTier(v.tier)).Append("  ").Append(v.displayName).Append("</color> — ").Append(v.line).Append('\n');
+                sb.Append("<color=#C9A6FF>").Append(RomanTier(v.tier)).Append("  ").Append(v.displayName).Append("</color> — ").Append(UIKeywordInk.Values(v.line)).Append('\n');   // 수치만 Noto 500(10-15)
         sb.Append("<color=#9A93A6>남은 길은 강화 — 수치를 올린다</color>");
         _formSummary.text = sb.ToString();
     }
@@ -838,7 +838,7 @@ public sealed partial class UI_CruciblePanel
         _temperSub.text   = "변주 둘 중 하나를 고른다 · 확정 성공(실패 · 하락 없음) · 고르면 되돌릴 수 없다";
         _temperPips.text  = $"<color=#{ColorUtility.ToHtmlStringRGB(f.Tint)}>{new string('◆', f.MaxStacks)}</color>";
         string v2 = VariantName(w, 2);
-        _temperNow.text = FormNowLine(f) + (v2 != null ? $"  <color=#C9A6FF>· Ⅱ {v2}</color>" : "");
+        _temperNow.text = UIKeywordInk.Values(FormNowLine(f)) + (v2 != null ? $"  <color=#C9A6FF>· Ⅱ {v2}</color>" : "");
 
         int fuel = _controller.FuelAmount;
         for (int k = 0; k < 2; k++)
@@ -850,7 +850,7 @@ public sealed partial class UI_CruciblePanel
             PlaceIn(c.chipBox, 24f, 22f, cw, 30f, TpCardW, TpCardH);
             c.index.text = k == 0 ? "변주 ①" : "변주 ②";
             _temperName[k].text = v.displayName;
-            c.line.text = v.line;
+            c.line.text = UIKeywordInk.Values(v.line);   // 수치만 Noto 500(10-15 설명 글 강조)
             ClearChildren(c.diagram);
             var (caption, changes) = DrawVariant(c.diagram, f, v.id);
             c.caption.text = caption;
@@ -941,6 +941,7 @@ public sealed partial class UI_CruciblePanel
             FlashStage(StageFlashSuccess);
             BurstSparks(StrikeSparks, SparkGold, StrikeX, StrikeYNow);
             ShowStageResult($"<size=50%><color=#C9A6FF>형 단련 {RomanTier(tier)}</color></size>\n{def.displayName}", EvolveStampSize, SuccessPopScale);
+            Say(_controller.GetDialogue(CrucibleMood.Temper));
             await FocusAsync(false);
             await Hold(SettleDur);
         }

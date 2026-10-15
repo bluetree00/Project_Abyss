@@ -1015,6 +1015,7 @@ public sealed class GameRunSession
         {
             _buildWeapons.OnSlotsChanged += RebuildItemEffects;
             _buildWeapons.OnEquippedWeaponRefreshed += OnBuildWeaponRefreshed;
+            _buildWeapons.OnWeaponChanged += OnBuildWeaponSwapped;
         }
         _buildLoadout = AppBootstrapper.Instance != null ? AppBootstrapper.Instance.Loadout : null;
         if (_buildLoadout != null) _buildLoadout.RelicPartsChanged += RebuildItemEffects;
@@ -1026,6 +1027,7 @@ public sealed class GameRunSession
         {
             _buildWeapons.OnSlotsChanged -= RebuildItemEffects;
             _buildWeapons.OnEquippedWeaponRefreshed -= OnBuildWeaponRefreshed;
+            _buildWeapons.OnWeaponChanged -= OnBuildWeaponSwapped;
         }
         if (_buildLoadout != null) _buildLoadout.RelicPartsChanged -= RebuildItemEffects;
         _buildWeapons = null;
@@ -1033,6 +1035,14 @@ public sealed class GameRunSession
     }
 
     private void OnBuildWeaponRefreshed(WeaponData _) => RebuildItemEffects();
+
+    // 각인 공명 증강(10-15)은 든 무기를 따라 켜진다 — 그 증강이 있는 무기가 끼일 때만 다시 센다(룬 쿨 · 중첩을 괜히 풀지 않게)
+    private void OnBuildWeaponSwapped(WeaponData _, GameObject __)
+    {
+        if (_buildWeapons == null) return;
+        if (_buildWeapons.Weapon0Data?.AugmentRank("aug_imprint_echo") > 0 || _buildWeapons.Weapon1Data?.AugmentRank("aug_imprint_echo") > 0)
+            RebuildItemEffects();
+    }
 
     private void RebuildItemEffects()
     {

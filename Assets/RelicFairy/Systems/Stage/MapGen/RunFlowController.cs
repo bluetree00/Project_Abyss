@@ -62,6 +62,9 @@ public class RunFlowController : MonoBehaviour
     /// <summary>현재 활성 런 플로우. 재련소/상점/서약 등이 행동 확정 시 SaveNow를 호출하기 위한 진입점.</summary>
     public static RunFlowController Active { get; private set; }
 
+    /// <summary>방이 화면에 드러나고 입장 대사까지 끝난 순간(10-15) — 서비스 방이 돌발 이벤트를 이때 알린다(전환 덮개 뒤에서 외치지 않게).</summary>
+    public static event System.Action<GameObject> RoomRevealed;
+
     private bool     _currentRoomCleared;   // 현재 방 클리어 여부(세이브 기록)
     private bool     _resumedRoomCleared;   // 이어하기: 저장 당시 방이 클리어 상태였는가(1회성)
     // 클리어 보상 오브젝트가 스폰됐지만 아직 [F]로 수령되지 않았는가(= 미수령). 세이브 기록.
@@ -574,6 +577,7 @@ public class RunFlowController : MonoBehaviour
         await PlayRoomEntryDialogueAsync(plan.kind, bossRoom != null && bossRoom.EntryDialogueAsBark, ct);
         if (this == null || ct.IsCancellationRequested) { SetPlayerInput(true); return; }
         float tDialogue = Time.realtimeSinceStartup;
+        RoomRevealed?.Invoke(result.roomGO);
 
         _lastPlan    = plan;
         _lastEdge    = fromEdge;

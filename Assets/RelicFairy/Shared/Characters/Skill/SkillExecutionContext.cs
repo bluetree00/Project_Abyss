@@ -84,7 +84,7 @@ public class SkillExecutionContext
     {
         if (WeaponData == null) return baseDamage;
         var kind = WeaponData.weaponType.GetAttackStatKind();
-        return DamageFormula.Calculate(baseDamage, RuntimeStats.GetEffectiveAttack(kind));
+        return DamageFormula.Calculate(baseDamage, RuntimeStats.GetEffectiveAttack(kind)) * MeleeAugments.SkillDamageMult(WeaponData, Slot);   // 환영 베기 강화 증강(10-15)
     }
 
     /// <summary>

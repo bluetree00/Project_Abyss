@@ -221,6 +221,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2662264cc33a3474fa1c20d55f9692ce
+    m_Address: UI/Popup/UI_MeleeAugmentPopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2774a226feab2a14894ec2ae8a52eea6
     m_Address: Lobby
     m_ReadOnly: 0

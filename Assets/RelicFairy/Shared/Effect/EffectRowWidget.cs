@@ -117,7 +117,8 @@ public sealed class EffectRowWidget : MonoBehaviour
         {
             string core = _style.showTrigger ? display.Combined : display.LabelWithValue;
             string prefix = _style.usePrefixArrows ? (display.IsRisk ? "▼ " : "▲ ") : "";
-            _label.text  = prefix + core;
+            // 수치만 Noto 500(10-15 설명 글 강조) — 위험 줄은 붉은 글 그대로
+            _label.text  = prefix + (_style.inkValues && !display.IsRisk ? UIKeywordInk.Values(core) : core);
             _label.color = display.IsRisk ? _style.riskColor : _style.normalColor;
         }
     }
@@ -136,6 +137,7 @@ public struct EffectRowStyle
     public bool  usePrefixArrows;   // ▲/▼ 접두(아이템 목록용)
     public bool  showTrigger;       // (트리거) 표기 포함
     public bool  wrap;
+    public bool  inkValues;         // 수치만 Noto 500 + 조용한 잉크(10-15 · 어두운 판)
     public Color normalColor;
     public Color riskColor;
 

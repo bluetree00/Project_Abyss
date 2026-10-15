@@ -22,6 +22,7 @@ public static class RelicInfoShotProbeEditor
     private static async UniTaskVoid RunAsync()
     {
         var sb = new System.Text.StringBuilder("유물 정보 촬영\n");
+        HubGui("HideTestHubGui");   // 테스트 허브 메뉴가 팝업을 덮지 않게(10-15)
         try
         {
             foreach (var id in new[] { "Gawain", "Lancelot" })
@@ -40,8 +41,11 @@ public static class RelicInfoShotProbeEditor
             }
         }
         catch (System.Exception ex) { sb.AppendLine("예외: " + ex); }
-        finally { Debug.Log("[RelicInfoShot] 끝\n" + sb); }
+        finally { HubGui("RestoreTestHubGui"); Debug.Log("[RelicInfoShot] 끝\n" + sb); }
     }
+
+    private static void HubGui(string method)
+        => typeof(UILayoutRuntimeProbeEditor).GetMethod(method, BindingFlags.Static | BindingFlags.NonPublic)?.Invoke(null, null);
 
     private static UniTask Shot(string name)
     {

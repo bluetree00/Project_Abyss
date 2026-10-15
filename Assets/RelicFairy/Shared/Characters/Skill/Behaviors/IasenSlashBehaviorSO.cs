@@ -85,6 +85,8 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
             var dir = aimRot * Vector3.forward;
             _dashStart = ctx.PlayerTransform.position;
             _dashEnd = ctx.DashEndBeforeWall(_dashStart, dir, _data.dashDistance);   // 벽 앞에서 멈춘다(10-14 — 끝점 Lerp가 벽을 뚫었다)
+            MeleeAugments.ReportSkillDash(ctx.WeaponData, ctx.Slot, _dashStart, _dashEnd, _data.dashDuration,
+                                          ctx.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee));   // 무형일섬 잔상 증강(10-15)
 
             if (ctx.Rigidbody != null)
             {

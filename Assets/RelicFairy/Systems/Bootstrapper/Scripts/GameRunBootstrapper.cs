@@ -266,6 +266,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         else
         {
             _run = new GameRunSession();
+            MeleeAugmentDraft.ResetForRun();   // 근접 강화 증강 리롤(10-15)
             if (app != null)
             {
                 app.BeginRun(_run);

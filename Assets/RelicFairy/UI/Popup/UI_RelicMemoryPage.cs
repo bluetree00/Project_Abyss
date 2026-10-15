@@ -328,7 +328,8 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
                     if (string.IsNullOrEmpty(r.Lines[n])) continue;
                     bool lit = (int)r.Grade > n;
                     string mark = lit ? ((char)('①' + n)).ToString() : "◇";
-                    y = AddLine($"{mark} {r.Lines[n]}", LineSize, lit ? LineLit : LineLocked, 36f, y + LineGap, width - 36f, FontStyles.Normal);
+                    // 되찾은 줄만 수치 Noto 500(10-15 설명 글 강조) — 잠긴 줄은 흐린 채
+                    y = AddLine($"{mark} {(lit ? UIKeywordInk.Values(r.Lines[n]) : r.Lines[n])}", LineSize, lit ? LineLit : LineLocked, 36f, y + LineGap, width - 36f, FontStyles.Normal);
                 }
                 if (r.RuneNote != null)
                     y = AddLine(r.RuneNote, LineSize, r.RuneAwake ? AwakeColor : LineLocked, 36f, y + LineGap, width - 36f, FontStyles.Normal);

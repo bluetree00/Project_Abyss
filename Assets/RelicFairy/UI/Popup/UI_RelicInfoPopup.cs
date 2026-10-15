@@ -64,8 +64,9 @@ public class UI_RelicInfoPopup : UI_Popup
     private const float StatLabelWidth = 132f;  // 수치 표의 라벨 열 폭(고정해야 값이 세로로 정렬된다)
     // 한눈 줄(10-13 사용자 「스크롤로 내리는 게 불편 · 상세할 필요 없이 한눈에」) — 능력 칸 하나에 능력마다 한 줄
     private const float GlanceRail     = 3f;     // 줄 왼쪽 종류 색 띠
-    private const float GlanceNameSize = 19f, GlanceCondSize = 13f, GlanceLineSize = 14.5f;
-    private const float GlanceValueSize = 21f, GlanceLabelSize = 12f;
+    // 10-15 겹침 · 크기 점검 — 이름표 12 · 한 줄 14.5 · 조건 13이 글자 최소(15) 아래였다
+    private const float GlanceNameSize = 19f, GlanceCondSize = 15f, GlanceLineSize = 16f;
+    private const float GlanceValueSize = 21f, GlanceLabelSize = 15f;
     private const float GlanceKeyWidth = 70f;    // 수치 한 칸 폭(값 · 라벨이 세로로 정렬된다) — 92면 수치가 칸 아트 가운데 문장 위에 얹혔다(②f 사진)
     private const int   GlanceMaxKeys  = 2;
 
@@ -518,7 +519,7 @@ public class UI_RelicInfoPopup : UI_Popup
         if (!string.IsNullOrWhiteSpace(a.summary))
         {
             var sum = NewText("Summary", col, 17f, SummaryCol, FontStyles.Normal, TextAlignmentOptions.TopLeft);
-            sum.text = a.summary;
+            sum.text = UIKeywordInk.Values(a.summary);   // 수치만 Noto 500(10-15 설명 글 강조)
             sum.lineSpacing = -12f;
         }
 
@@ -642,7 +643,7 @@ public class UI_RelicInfoPopup : UI_Popup
         head.overflowMode     = TextOverflowModes.Ellipsis;
 
         var line = NewText("Glance", left, GlanceLineSize, SummaryCol, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-        line.text = GlanceLine(a);
+        line.text = UIKeywordInk.Values(GlanceLine(a));   // 수치만 Noto 500(10-15 설명 글 강조)
         line.textWrappingMode = TextWrappingModes.NoWrap;
         line.overflowMode     = TextOverflowModes.Ellipsis;
 

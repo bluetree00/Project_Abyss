@@ -184,6 +184,7 @@ public sealed class ItemInfoPanel : MonoBehaviour
         style.rowHeight       = 28f;
         style.wrap            = true;  // 조건부 효과 문장이 한 줄을 넘는다 — 행이 자라게
         style.usePrefixArrows = true;
+        style.inkValues       = true;  // 수치만 Noto 500(10-15 설명 글 강조)
         style.normalColor     = COLOR_NORMAL_FX;
         style.riskColor       = COLOR_RISK;
 

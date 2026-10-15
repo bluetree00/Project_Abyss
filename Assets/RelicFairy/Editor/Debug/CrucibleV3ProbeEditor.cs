@@ -14,7 +14,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// [촬영 · 플레이 중] 10-14 재련소 v3 「한눈에」(구현설계/정제소·재련소_v3_벤치마킹설계_20261014.md §1-2 · §3) — 화면 8장 + CHECK.
-/// 무기(+2) · 무기 +5 · 진화 들어가기(형 칸 → 4b 진화 화면) · 성공 · 실패 · 이정표(+4 → +5) · 원거리 파츠 · 형 칸(진화 뒤 단련).
+/// 무기(+2) · 무기 +10 · 진화 들어가기(형 칸 → 4b 진화 화면) · 성공 · 실패 · 이정표(+9 → +10 · 10-15 04 진화 요구 +5 → +10) · 원거리 파츠 · 형 칸(진화 뒤 단련).
 /// CHECK — 보이는 글자 최소 16px(크기 태그 반영) · 넘침 0 · 글자 겹침 0 · 기울임 0 · 초점 72 · 96 · 판 1560×880 · 창 밖 글자 0 · 후광 1곳 이하 ·
 /// 결과 연출 길이(성공 0.4 · 실패 0.5 · 이정표 1.5 · 진화 1.5 — 망치가 닿은 뒤부터) · 판정 중 창 흔들림 0.
 /// 판정은 결정적으로 — 재련소 굴림 줄기(_roomRng)를 정해진 수를 내는 Random으로 바꿔 끼운다(실측 전용 · 확률 · 비용 · 규칙 불변).
@@ -131,17 +131,39 @@ public static class CrucibleV3ProbeEditor
             Screen(sb, "무기 +2", panel, v3, win, melee: true);
             await Shot("CV3_1_Weapon", 300);
 
-            // ── 2 무기 +5 — 형 칸 「깨어날 수 있다 ▶」 · 반값 화로 칩(재료 줄)
+            // ── 1b 대장장이 말(10-15) — 초상 그림 · 화로 인사 · 타자기 · 20px · 2.5초 뒤 옅어짐 · 두 줄
+            var say = F<TMP_Text>(panel, "_dialogText");
+            var porArt = Find(panel.transform, "Portrait")?.Find("Fill/Art")?.GetComponent<Image>();
+            Check(sb, "대장장이 초상 = 그림(모루 아이콘 아님)", porArt != null && porArt.sprite != null && porArt.sprite.name == "BlacksmithPortrait",
+                  porArt != null && porArt.sprite != null ? porArt.sprite.name : "없음");
+            Check(sb, "말풍선 — 화로 인사(열기 화로)", Parsed(say).Contains("화로"), $"「{Parsed(say)}」");
+            Check(sb, "말풍선 — 타자기 끝(다 보임) · 20px", say != null && say.maxVisibleCharacters >= say.textInfo.characterCount && say.fontSize >= 19.5f,
+                  $"보임 {say?.maxVisibleCharacters} / {say?.textInfo.characterCount} · {say?.fontSize:0.#}px");
+            await Wait(2.6f, ct);
+            var sayGroup = F<CanvasGroup>(panel, "_sayGroup");
+            Check(sb, "말풍선 — 2.5초 뒤 옅어짐(0.5)", sayGroup != null && sayGroup.alpha < 0.6f, $"{sayGroup?.alpha:0.##}");
+            Call(panel, "Say", "이 말은 일부러 길게 해서 두 줄이 되는지 보는 시험 문장이다. 두 줄이 되어도 글자가 넘치거나 잘리면 안 된다.");
+            await Wait(0.15f, ct);
+            Check(sb, "말풍선 — 새 말이면 다시 또렷 · 타자기 중", sayGroup != null && sayGroup.alpha > 0.99f && say.maxVisibleCharacters < say.textInfo.characterCount,
+                  $"{sayGroup?.alpha:0.##} · 보임 {say?.maxVisibleCharacters} / {say?.textInfo.characterCount}");
+            await Wait(1.8f, ct);
+            string sayWhy = "";
+            Check(sb, "말풍선 — 두 줄 · 넘침 0 · 16px 이상", say != null && say.textInfo.lineCount == 2 && !Overflows(say, out sayWhy) && say.fontSize >= MinFont - 0.05f,
+                  $"줄 {say?.textInfo.lineCount} · {say?.fontSize:0.#}px {sayWhy}");
+            Screen(sb, "대장장이 두 줄", panel, v3, win, melee: true);
+            await Shot("CV3_1b_Say", 100);
+
+            // ── 2 무기 +10 — 형 칸 「깨어날 수 있다 ▶」 · 반값 화로 칩(재료 줄)
             SetEvent(ctrl, CrucibleEvent.Discount);
-            SetLevel(wm.Weapon0Data, 5);
+            SetLevel(wm.Weapon0Data, 10);
             Call(panel, "RefreshAll");
             await Wait(0.5f, ct);
             var row    = F<Button>(panel, "_evolveBtn");
             var rowLbl = F<TMP_Text>(panel, "_evolveLabel");
-            Check(sb, "+5 — 형 칸 한 줄(「형 … ▶」 · 누를 수 있음)", row != null && row.gameObject.activeInHierarchy && row.interactable
+            Check(sb, "+10 — 형 칸 한 줄(「형 … ▶」 · 누를 수 있음)", row != null && row.gameObject.activeInHierarchy && row.interactable
                   && Parsed(rowLbl).StartsWith("형") && Parsed(rowLbl).Contains("▶"), $"「{Parsed(rowLbl)}」");
             Check(sb, "반값 화로 칩(재료 줄)", Parsed(Find(F<RectTransform>(panel, "_v3MatChipBox"), "Text")?.GetComponent<TMP_Text>()) == "▲ 반값 화로", "");
-            Screen(sb, "무기 +5", panel, v3, win, melee: true);
+            Screen(sb, "무기 +10", panel, v3, win, melee: true);
             await Shot("CV3_2_Weapon5", 300);
 
             // ── 3 진화 들어가기 — 형 칸을 누르면 4b 진화 화면(기존 그대로 · ShowEvolvePanel)
@@ -172,8 +194,8 @@ public static class CrucibleV3ProbeEditor
             Check(sb, "실패 — 연속 0회", Parsed(F<TMP_Text>(panel, "_v3StreakHead")).Contains("0회"), Parsed(F<TMP_Text>(panel, "_v3StreakHead")));
             Screen(sb, "실패 뒤", panel, v3, win, melee: true);
 
-            // ── 6 이정표(+4 → +5 형이 깨어난다) — 결과 1.5초
-            SetLevel(wm.Weapon0Data, 4);
+            // ── 6 이정표(+9 → +10 형이 깨어난다) — 결과 1.5초
+            SetLevel(wm.Weapon0Data, 9);
             Call(panel, "RefreshAll");
             await Wait(0.4f, ct);
             var tm = await EnhanceAsync(panel, ctrl, win, new SeqRandom(0.0, 0.99), "CV3_6_Milestone", 0.55f, ct);
@@ -229,7 +251,7 @@ public static class CrucibleV3ProbeEditor
 
             // ── 8 형 칸(진화 뒤) — 칼바람으로 진화(이정표 1.5초) → 「형 칼바람 Ⅰ — 단련 Ⅱ · 강화재료 N ▶」 → 누르면 4b 단련 화면
             Call(panel, "SelectTab", 0);
-            SetLevel(wm.Weapon0Data, 5);
+            SetLevel(wm.Weapon0Data, 10);
             run.FuelBank.Add(FuelKind.EnhanceMaterial, 40);
             Call(panel, "RefreshAll");
             await Wait(0.4f, ct);
@@ -504,6 +526,7 @@ public static class CrucibleV3ProbeEditor
     {
         if (wd == null) return;
         wd.enhanceLevel = lv;
+        wd.highestEnhanceReached = Mathf.Max(wd.highestEnhanceReached, 30);   // 증강 고르기 창은 따로 잰다(10-15 MeleeAugmentPopupProbe) — 여기선 뜨지 않게
         wd.RecomputeEnhancedStats();
     }
 

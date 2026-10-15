@@ -33,13 +33,19 @@ public sealed class RefineryRoomController : MonoBehaviour
     private GameObject     _npcInstance;
     private ShopNpcInteraction _npc;
     private ServiceNpcReactor _reactor;   // 다가오면 빛이 오르고 · 정제하고 나가면 응축으로 답한다
+    private NpcAmbientChatter _chatter;
+    private RefineryEvent _event;         // 이 방 돌발 이벤트(10-15 · 방 시드로 1회 굴림)
     private int _craftsAtOpen;            // 패널을 열 때 정제 횟수 — 닫을 때 늘었으면 정제한 것
     private bool _initialized;
     private bool _uiOpen;
 
+    private void OnEnable()  => RunFlowController.RoomRevealed += HandleRoomRevealed;
+    private void OnDisable() => RunFlowController.RoomRevealed -= HandleRoomRevealed;
+
     private void OnDestroy()
     {
         if (_npc != null) _npc.OnInteract -= HandleNpcInteract;
+        _run?.Refinery?.EndRoomEvent(this);
     }
 
     /// <summary>Initialize 전에 호출 — NPC 주변에 배치할 룬 소품·VFX 프리팹.</summary>
@@ -52,6 +58,8 @@ public sealed class RefineryRoomController : MonoBehaviour
 
         _run     = run;
         _roomRng = roomRng ?? new System.Random();
+        _event   = RollEvent();   // 소품보다 먼저 — 방 시드의 첫 수(이어하기 때 같은 이벤트)
+        _run?.Refinery?.BeginRoomEvent(this, _event);
 
         var (npcPos, npcRot) = ResolveNpcPlacement();
         SpawnNpc(npcPrefab, npcPos, npcRot);
@@ -92,9 +100,36 @@ public sealed class RefineryRoomController : MonoBehaviour
         _npcInstance.TryGetComponent(out _reactor);
 
         // 주기적 월드스페이스 잡담 — 정제소 컨셉(원석·속성 응축).
-        _npcInstance.AddComponent<NpcAmbientChatter>()
-                    .Initialize(ChatterLines, 9f, new Color(0.62f, 0.85f, 1f), _npc != null ? _npc.ChatterHeight : null);
+        _chatter = _npcInstance.AddComponent<NpcAmbientChatter>();
+        _chatter.Initialize(ChatterLines, 9f, new Color(0.62f, 0.85f, 1f), _npc != null ? _npc.ChatterHeight : null);
     }
+
+    // ── 돌발 이벤트(10-15 · 기획 §6 — 35%: 고순도 12 · 반값 12 · 두 장 11) ──
+    private RefineryEvent RollEvent()
+    {
+        double r = _roomRng.NextDouble();
+        if (r < 0.12) return RefineryEvent.HighPurity;
+        if (r < 0.24) return RefineryEvent.HalfPrice;
+        // 제단 「정제 두 장」을 이미 열었으면 두 장 정제는 아무것도 아니다 — 반값으로(제시되는 이벤트는 늘 유의미)
+        if (r < 0.35) return MemoryAltarService.IsRefinePickUnlocked ? RefineryEvent.HalfPrice : RefineryEvent.TwoCards;
+        return RefineryEvent.None;
+    }
+
+    private void HandleRoomRevealed(GameObject room)
+    {
+        if (room == null || !transform.IsChildOf(room.transform) || _event == RefineryEvent.None) return;
+        RoomEventNotice.Raise(RefineryService.EventTitle(_event), $"{RefineryService.EventLine(_event)} — 이 방에서만");
+        if (_chatter != null) _chatter.ShoutFirst(EventShout);
+    }
+
+    /// <summary>정령의 외침 — 월드 글자라 기호 없이.</summary>
+    private string EventShout => _event switch
+    {
+        RefineryEvent.HighPurity => "맑은 원석이 울린다… 다음 응축은 Epic 이상.",
+        RefineryEvent.HalfPrice  => "오늘은 돌이 가볍다. 원석 절반이면 된다.",
+        RefineryEvent.TwoCards   => "빛이 둘로 갈라진다. 둘 중 하나를 고르라.",
+        _                        => null,
+    };
 
     private void HandleNpcInteract()
     {

@@ -39,6 +39,50 @@ public sealed class RefineryService
     private readonly RunFuelBank      _fuel;
     private readonly RunItemInventory _inventory;
 
+    // ── 방 돌발 이벤트(10-15) — 방 컨트롤러가 들어갈 때 걸고 나갈 때 푼다(이 방에서만) ──
+    private object _eventOwner;
+    private bool   _purityUsed;
+    public RefineryEvent RoomEvent { get; private set; }
+
+    public void BeginRoomEvent(object owner, RefineryEvent ev)
+    {
+        _eventOwner = owner;
+        RoomEvent   = ev;
+        _purityUsed = false;
+    }
+
+    /// <summary>건 방만 푼다 — 다음 방(정제소가 이어 나올 수 있다)이 먼저 걸었으면 그대로 둔다.</summary>
+    public void EndRoomEvent(object owner)
+    {
+        if (!ReferenceEquals(owner, _eventOwner)) return;
+        _eventOwner = null;
+        RoomEvent   = RefineryEvent.None;
+    }
+
+    /// <summary>「고순도 원석」 — 이번 한 번은 Epic 이상(쓰면 꺼진다).</summary>
+    public bool PurityReady => RoomEvent == RefineryEvent.HighPurity && !_purityUsed;
+
+    /// <summary>두 장 중 하나를 고르나 — 기억의 제단 「정제 두 장」 또는 이 방 「두 장 정제」.</summary>
+    public bool TwoCards => MemoryAltarService.IsRefinePickUnlocked || RoomEvent == RefineryEvent.TwoCards;
+
+    public static string EventTitle(RefineryEvent ev) => ev switch
+    {
+        RefineryEvent.HighPurity => "고순도 원석",
+        RefineryEvent.HalfPrice  => "반값 정제",
+        RefineryEvent.TwoCards   => "두 장 정제",
+        _                        => string.Empty,
+    };
+
+    public static string EventLine(RefineryEvent ev) => ev switch
+    {
+        RefineryEvent.HighPurity => "이번 한 번 Epic 이상",
+        RefineryEvent.HalfPrice  => "원석 절반",
+        RefineryEvent.TwoCards   => "룬 두 장 중 하나",
+        _                        => string.Empty,
+    };
+
+    private int EventPrice(int cost) => RoomEvent == RefineryEvent.HalfPrice ? Mathf.Max(1, Mathf.RoundToInt(cost * 0.5f)) : cost;
+
     public int CraftCount { get; private set; }
 
     /// <summary>전설 없이 돌린 수(천장 · 0 ~ <see cref="PityLimit"/>). 전설이 나오면 0.</summary>
@@ -61,9 +105,9 @@ public sealed class RefineryService
 
     // ── 조회 ──
 
-    public int  CurrentCost => BaseCost + (CraftCount / 2) * CostStep;
-    /// <summary>이번 정제를 한 뒤의 비용 — 제단 화면 「다음 정제부터 원석 N」.</summary>
-    public int  NextCost    => BaseCost + ((CraftCount + 1) / 2) * CostStep;
+    public int  CurrentCost => EventPrice(BaseCost + (CraftCount / 2) * CostStep);
+    /// <summary>이번 정제를 한 뒤의 비용 — 제단 화면 「다음 정제부터 원석 N」(반값 정제 방이면 그 값도 절반).</summary>
+    public int  NextCost    => EventPrice(BaseCost + ((CraftCount + 1) / 2) * CostStep);
     public int  OreOwned    => _fuel?.RuneOre ?? 0;
     public bool CanAfford   => OreOwned >= CurrentCost;
 
@@ -75,6 +119,7 @@ public sealed class RefineryService
     /// </summary>
     public (float rare, float epic, float legend) CurrentOdds()
     {
+        if (PurityReady) return (0f, 1f - LegendOdds, LegendOdds);   // 고순도 원석 — Rare 몫이 Epic으로(10-15)
         float epic = EpicOdds + QualityUnlockEpic;
         return (Mathf.Max(0f, 1f - epic - LegendOdds), epic, LegendOdds);
     }
@@ -98,7 +143,7 @@ public sealed class RefineryService
             return RefineryOutcome.Fail("뽑을 룬이 없습니다");
 
         RuntimeItemData alt = null; ItemSO altSo = null;
-        if (MemoryAltarService.IsRefinePickUnlocked)
+        if (TwoCards)
         {
             // 두 번째 장 — 보유 발동 계열 쪽으로 굴린다(한 장은 넓게 · 한 장은 내 빌드). 같은 룬이면 고르는 의미가 없어 몇 번 다시 굴린다.
             for (int i = 0; i < 4 && alt == null; i++)
@@ -113,6 +158,7 @@ public sealed class RefineryService
             return RefineryOutcome.Fail("원석이 부족합니다");
 
         CraftCount++;
+        if (RoomEvent == RefineryEvent.HighPurity) _purityUsed = true;
         // 천장 — 보여 주는 쪽(좋은 장)이 전설이면 처음부터 · 아니면 한 칸
         bool gotLegend = rune.rarity >= ItemRarity.Legendary || (alt != null && alt.rarity >= ItemRarity.Legendary);
         PityCount = gotLegend ? 0 : Mathf.Min(PityLimit, PityCount + 1);
@@ -176,6 +222,15 @@ public sealed class RefineryService
         Debug.LogWarning($"[Refinery] {rarity} 이하 룬 풀이 비었다 — 뽑기 생략");
         return (null, null);
     }
+}
+
+/// <summary>정제소 방 돌발 이벤트(10-15 · 방 들어갈 때 1회 굴림 · 이 방에서만).</summary>
+public enum RefineryEvent
+{
+    None,
+    HighPurity,   // 고순도 원석 — 이번 한 번 Epic 이상
+    HalfPrice,    // 반값 정제 — 원석 ×0.5
+    TwoCards,     // 두 장 정제 — 두 장 중 하나(제단 「정제 두 장」을 이미 열었으면 굴리지 않는다)
 }
 
 /// <summary>정제소 돌리기 결과.</summary>

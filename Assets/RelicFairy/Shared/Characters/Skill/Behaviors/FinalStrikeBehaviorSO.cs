@@ -57,6 +57,7 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
         private Phase _phase;
         private float _timer;
         private int _skillTier;
+        private float _charge, _angle;   // 충전 시간 · 판정 각 — 근접 강화 증강 「최후의 일격 충전」(10-15)이 바꾼다
         private readonly List<IDamageable> _hitTargets = new();
         private readonly List<GameObject> _hitObjects = new();
 
@@ -65,6 +66,8 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
         public void OnEnter(SkillExecutionContext ctx)
         {
             _skillTier = ctx.SkillTier;
+            _charge = _data.chargeDuration * (1f - MeleeAugments.ValueOn(ctx.WeaponData, MeleeAugmentCatalog.GreatFinal) * 0.01f);
+            _angle  = MeleeAugments.RankOn(ctx.WeaponData, MeleeAugmentCatalog.GreatFinal) >= 3 ? 360f : _data.detectAngle;
             _timer = 0f;
             _phase = Phase.Charge;
             _hitTargets.Clear();
@@ -102,7 +105,7 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
         // ── 차징 페이즈 ──
         private void UpdateCharge(SkillExecutionContext ctx)
         {
-            if (_timer >= _data.chargeDuration)
+            if (_timer >= _charge)
             {
                 _timer = 0f;
                 ctx.RotateToMouse();
@@ -179,9 +182,10 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
         {
             var playerPos = ctx.PlayerTransform.position;
             var forward = ctx.AimForward;   // 놓을 때 다시 겨눈 방향(B2 — transform.forward는 옛 방향)
-            SkillRangeRing.Fan(playerPos, forward, _data.detectRadius, _data.detectAngle);   // 내려찍는 반원(A10)
+            if (_angle >= 359f) SkillRangeRing.Circle(playerPos, _data.detectRadius);   // 최후의 일격 충전 III — 둘레 전체(10-15)
+            else SkillRangeRing.Fan(playerPos, forward, _data.detectRadius, _angle);   // 내려찍는 반원(A10)
             Managers.Sound?.PlayEvent(SoundEvent.SkillHeavyImpact);   // 내려찍기 충격(A6)
-            float halfAngle = _data.detectAngle * 0.5f;
+            float halfAngle = _angle * 0.5f;
 
             float dmg = ctx.CalculateDamage(_data.baseDamage);
             // 판정 = 범위 고리(플레이어 중심 반원). 예전엔 구의 중심을 1.5 m 앞에 둬 앞으로 4.5 m까지 닿았다
@@ -256,7 +260,7 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
             }
 
             // 차지가 끝나는 순간(판정)에 클립의 내려찍기가 닿게 — 클립 앞부분을 건너뛴다(09-25 실측: 닿음 1.22초 ↔ 판정 0.6초).
-            SkillAnimSync.CrossFadeToContact(ctx.Animator, animName, _data.chargeDuration, 0.05f);
+            SkillAnimSync.CrossFadeToContact(ctx.Animator, animName, _charge, 0.05f);
         }
 
         private async void SpawnChargeEffect(SkillExecutionContext ctx)
@@ -270,9 +274,9 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
             obj.transform.localScale = Vector3.one * _data.chargeEffectScale;
             obj.transform.SetParent(ctx.PlayerTransform, true);
             if (obj.TryGetComponent<EffectBehaviour>(out var eb))
-                eb.Initialize(eb.behaviorSO, ctx.PlayerTransform, _data.chargeDuration);
+                eb.Initialize(eb.behaviorSO, ctx.PlayerTransform, _charge);
             else
-                DespawnAfter(obj, _data.chargeDuration);
+                DespawnAfter(obj, _charge);
         }
 
         private static async void SpawnEffect(SkillExecutionContext ctx, string key,

@@ -416,6 +416,10 @@ public sealed class AppBootstrapper : MonoBehaviour
         // 형 — 형이 있는 무기는 최소 1(옛 세이브에 칸이 없으면 0으로 와도 깨어난 채로).
         if (w0 != null) { w0.formTier = w0.form != null ? Mathf.Clamp(save.weapon0FormTier, 1, 3) : 0; w0.formVariants = save.weapon0FormVariants ?? ""; w0.SanitizeFormVariants(); }
         if (w1 != null) { w1.formTier = w1.form != null ? Mathf.Clamp(save.weapon1FormTier, 1, 3) : 0; w1.formVariants = save.weapon1FormVariants ?? ""; w1.SanitizeFormVariants(); }
+        // 근접 강화 증강(10-15) — 옛 세이브(칸 없음 = null)는 지금 단계까지 받은 것으로(소급 지급 방지) · 새 세이브는 받은 단계 그대로(고르기 전에 껐으면 다음 강화에서 다시 열린다)
+        if (w0 != null) { w0.augments = save.weapon0Augments ?? ""; w0.highestEnhanceReached = save.weapon0Augments == null ? w0.enhanceLevel : save.weapon0AugmentHighest; w0.augmentSilverStreak = save.weapon0AugmentSilverStreak; w0.augmentAfterEvolve = save.weapon0AugmentAfterEvolve; }
+        if (w1 != null) { w1.augments = save.weapon1Augments ?? ""; w1.highestEnhanceReached = save.weapon1Augments == null ? w1.enhanceLevel : save.weapon1AugmentHighest; w1.augmentSilverStreak = save.weapon1AugmentSilverStreak; w1.augmentAfterEvolve = save.weapon1AugmentAfterEvolve; }
+        MeleeAugmentDraft.ResetForRun(Mathf.Max(0, MeleeAugmentDraft.RerollsPerRun - save.meleeAugmentRerollsUsed));
         if (w0 != null || w1 != null)
         {
             // 저장된 현재 슬롯 복원(미설정 시 0). SpawnPlayerAsync가 SwitchToSlotAsync로 적용.

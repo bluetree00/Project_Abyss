@@ -78,6 +78,12 @@ public abstract class WeaponFormBase
 
     protected void RaiseTriggered(string name) => Triggered?.Invoke(name);
 
+    /// <summary>바깥에서 칸을 더한다(근접 강화 증강 「바람 가르기」 · 10-15) — 가득을 넘지 않는다.</summary>
+    public void AddStacks(int n)
+    {
+        if (n > 0) SetStacks(Stacks + n);
+    }
+
     /// <summary>형 실측 로그 — 에디터에서만(빌드에서는 호출과 문자열 조립이 통째로 빠진다 · 검토 M7). 실측 메뉴가 횟수를 센다.</summary>
     [System.Diagnostics.Conditional("UNITY_EDITOR")]
     protected static void Log(string msg) => Debug.Log("[WeaponForm] " + msg);

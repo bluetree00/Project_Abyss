@@ -112,16 +112,20 @@ public sealed class OddsBarView : MonoBehaviour
         float s = roomy ? Mathf.Max(1f, LayoutScale) : 1f;
         _padX = PadX * s;
         // 좁은 자리(룬 선택 236×78)는 간격을 줄이고 숫자를 키운다 — 10-10 실측 사진에서 % 글자가 작았다.
-        float titleY = (roomy ? 14f : 6f) * s, titleH = (roomy ? 20f : 16f) * s;
-        float barY   = titleY + titleH + (roomy ? 12f : 5f) * s, barH = (roomy ? 8f : 7f) * s;
-        float colY   = barY + barH + (roomy ? 14f : 5f) * s;
-        float nameH  = (roomy ? 22f : 14f) * s, pctH = (roomy ? 32f : 22f) * s;
+        // 좁은 판(룬 선택)은 실제 판 높이에 비례해 칸을 나눈다 — 창 맞춤으로 판이 78 → 101로 커져도 칸은 고정(이름 14px)이라
+        // 자동 크기가 「Common · Rare」를 9.7px까지 줄였다(10-15 겹침 · 크기 점검). 글자는 칸 높이 ÷ 줄 높이(≈1.45em).
+        float h = size.y;
+        float titleY = roomy ? 14f * s : h * 0.04f, titleH = roomy ? 20f * s : h * 0.22f;
+        float barY   = titleY + titleH + (roomy ? 12f * s : h * 0.03f), barH = roomy ? 8f * s : h * 0.06f;
+        float colY   = barY + barH + (roomy ? 14f * s : h * 0.04f);
+        float nameH  = roomy ? 22f * s : h * 0.22f, pctH = roomy ? 32f * s : h * 0.33f;
+        float lineF  = titleH / 1.45f, pctF = Mathf.Min(24f, pctH / 1.45f);
 
-        var title = Text(root, "Title", roomy ? 15f * s : 13f, UITheme.Thin.InkA(0.7f), TextAlignmentOptions.MidlineLeft);
+        var title = Text(root, "Title", roomy ? 15f * s : lineF, UITheme.Thin.InkA(0.7f), TextAlignmentOptions.MidlineLeft);
         PlaceTop(title.rectTransform, _padX, titleY, size.x * 0.45f, titleH);
         title.text = "등급 확률";
 
-        _boostText = Text(root, "Boost", roomy ? 15f * s : 12f, UITheme.Thin.Gold, TextAlignmentOptions.MidlineRight);
+        _boostText = Text(root, "Boost", roomy ? 15f * s : lineF, UITheme.Thin.Gold, TextAlignmentOptions.MidlineRight);
         PlaceTop(_boostText.rectTransform, size.x * 0.40f, titleY, size.x * 0.60f - _padX, titleH);
         _boostText.text = _boost;
 
@@ -142,10 +146,10 @@ public sealed class OddsBarView : MonoBehaviour
             col.anchoredPosition = new Vector2(0f, -colY);
             _col[i] = col;
 
-            _name[i] = Text(col, "Name", roomy ? 17f * s : 13f, ShopUIStyle.Rarity(TierRarity[i]), TextAlignmentOptions.BottomLeft);
+            _name[i] = Text(col, "Name", roomy ? 17f * s : lineF, ShopUIStyle.Rarity(TierRarity[i]), TextAlignmentOptions.BottomLeft);
             Stretch(_name[i].rectTransform, 1f - nameH / (nameH + pctH), 1f);
             _name[i].text = TierName[i];
-            _pct[i] = Text(col, "Pct", roomy ? 24f * s : 20f, UITheme.Thin.Ink, TextAlignmentOptions.TopLeft);
+            _pct[i] = Text(col, "Pct", roomy ? 24f * s : pctF, UITheme.Thin.Ink, TextAlignmentOptions.TopLeft);
             Stretch(_pct[i].rectTransform, 0f, 1f - nameH / (nameH + pctH));
         }
         LayoutColumns();

@@ -69,12 +69,14 @@ public sealed class ZoneTitleBanner : MonoBehaviour
     {
         ZoneSign.TitleRequested   += Show;
         ZoneSign.ArrivalRequested += ShowSubtle;
+        RoomEventNotice.Requested += Show;   // 10-15 서비스 방 돌발 이벤트 — 같은 자리 · 같은 모양(이름 + 한 줄)
     }
 
     private void OnDisable()
     {
         ZoneSign.TitleRequested   -= Show;
         ZoneSign.ArrivalRequested -= ShowSubtle;
+        RoomEventNotice.Requested -= Show;
         Cancel();
     }
     private void OnDestroy() => Cancel();

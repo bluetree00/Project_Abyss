@@ -3,8 +3,10 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 진화 선택 카드(10-08 · c3 시안 02) — 형이 주인공이고 수치는 뒷줄: 성격 · 계열 칩 → 무기 줄(그림 · 이름 · E · R) → 형 이름 · 한 줄 →
-/// 작동 그림 3컷(① 쌓임 → ② 가득 → ③ 발동) → 규칙 한 줄 → 잃는 것 → 수치 칩 4개(지금 무기 대비) → 바닥 글.
+/// 진화 선택 카드(10-08 · c3 시안 02) — 형이 주인공이고 수치는 뒷줄: 무기 줄(그림 · 성격 · 계열 · 이름 · E · R) → 형 이름 · 한 줄 →
+/// 「이렇게 싸운다」 세 줄(① 쌓기 → ② 가득 → ③ 발동) → 규칙 한 줄 → 잃는 것 → 수치 칸 4개(지금 무기 대비) → 바닥 글.
+/// 10-15 사용자 「무기 형 선택 디자인과 레이아웃이 더 보기 편하고 간단한 구조로」 — 작동 그림 3컷(작은 도해 + 두 줄 글 × 3) · 칩 둘을 걷고
+/// 글 세 줄로 · 글자는 화면 15px 이상(덮개가 판에 맞춰 0.88배라 목업 17 이상 — 예전 15 = 화면 13.2px).
 /// 고르기 → 확정 흐름 · 이름(_evolveConfirm · PickEvolveCard)은 그대로다(9c 실측 장비 형/7이 부른다). 톤 v2 — 얇은 테 · Noto 본문.
 /// 10-11 v2 — 글자 15 · 17 · 20 · 24 · 32 다섯 단계(작은 글 12~14 없앰) · 성격 칩은 무채 글자 + 모양(◇ 빠른 · ◆ 묵직한) ·
 /// 보조 문장 3줄(규칙 · 수치 머리 · 바닥 글) → 규칙 한 줄(바닥 글은 잠겼을 때만) · 그림 뒤 빛 없음.
@@ -12,20 +14,19 @@ using UnityEngine.UI;
 public sealed partial class UI_CruciblePanel
 {
     private const float EvTitleY = 40f, EvSubY = 94f, EvBtnY = 834f, EvHintY = 906f;
-    private const float EvCutW = 184f, EvCutH = 196f, EvCutY = 280f, EvCutGap = 20f, EvDrawH = 110f;
+    private const float EvStepY = 284f, EvStepH = 44f;   // 「이렇게 싸운다」 세 줄
 
     private UIThinFrame _evolveConfirmFrame;
 
     private sealed class EvolveCard
     {
-        public RectTransform root, personaBox, familyBox, lostBox;
+        public RectTransform root, lostBox;
         public CanvasGroup   group;
         public UIThinFrame   frame;
         public Button        button;
         public Image         icon, iconGlow;
-        public TMP_Text      persona, family, lostChip, name, skills, formHead, formLine, rule, lost, statsHead, foot;
-        public readonly RectTransform[] draw = new RectTransform[3];
-        public readonly TMP_Text[] cutPips = new TMP_Text[3], cutLine1 = new TMP_Text[3], cutLine2 = new TMP_Text[3];
+        public TMP_Text      meta, lostChip, name, skills, formHead, formLine, rule, lost, foot;
+        public readonly TMP_Text[] steps = new TMP_Text[3];
         public readonly TMP_Text[] statValue = new TMP_Text[4];
     }
 
@@ -72,7 +73,7 @@ public sealed partial class UI_CruciblePanel
         _evolveTitle = MakeLabel(d, "Title", 32f, FontStyles.Normal, TextAlignmentOptions.Center, UITheme.Thin.Ink);   // DNF는 제목 한 줄 · 금은 확정 버튼에
         _evolveTitle.textWrappingMode = TextWrappingModes.NoWrap;
         Place(_evolveTitle.rectTransform, 0f, EvTitleY, MockW, 52f);
-        _evolveSub = ThinText(d, "Sub", 17f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.75f));
+        _evolveSub = ThinText(d, "Sub", 19f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.75f));
         Place(_evolveSub.rectTransform, 0f, EvSubY, MockW, 28f);
 
         for (int k = 0; k < _evolveCards.Length; k++) _evolveCards[k] = BuildEvolveCard(d, k);
@@ -85,7 +86,7 @@ public sealed partial class UI_CruciblePanel
         Place((RectTransform)_evolveConfirm.transform, 692f, EvBtnY, 440f, 60f);
         _evolveConfirm.onClick.AddListener(() => { if (_evolvePick >= 0) OnBranchClicked(_evolvePick); });
 
-        var hint = ThinText(d, "Hint", 15f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.5f));
+        var hint = ThinText(d, "Hint", 18f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.5f));
         hint.text = "카드를 골라 비교하고, 「벼린다」를 눌러야 바뀐다 · ▲▼는 지금 무기 대비";
         Place(hint.rectTransform, 0f, EvHintY, MockW, 26f);
     }
@@ -99,94 +100,72 @@ public sealed partial class UI_CruciblePanel
         c.group = bg.gameObject.AddComponent<CanvasGroup>();
         c.frame = UIThinFrame.Create(c.root, ThinShape.Square, new Vector2(EvCardW, EvCardH));
 
-        c.personaBox = ChipBox(c.root, "Persona", out c.persona, 15f);
-        c.familyBox  = ChipBox(c.root, "Family", out c.family, 15f);
-
-        // 무기 줄 — 그림 96 · 이름 32 · E · R
+        // 무기 줄 — 그림 112 · 성격 · 계열 한 줄 · 이름 30 · E · R
         var iconBox = ShopUIStyle.MakeImage(c.root, "IconBox", new Color(0f, 0f, 0f, 0.35f));
-        PlaceIn(iconBox.rectTransform, 24f, 62f, 96f, 96f, EvCardW, EvCardH);
+        PlaceIn(iconBox.rectTransform, 24f, 24f, 112f, 112f, EvCardW, EvCardH);
         UIThinBox.Create(iconBox.rectTransform, "Line", Vector2.zero, Vector2.one, 0f, UITheme.Thin.InkA(0.2f), Color.clear, Color.clear);
         c.iconGlow = ShopUIStyle.MakeImage(iconBox.transform, "Glow", Color.clear);
         c.iconGlow.sprite = UI_RuneSelectPopup.SoftDot;
         ShopUIStyle.Stretch(c.iconGlow.rectTransform);
         c.icon = ShopUIStyle.MakeImage(iconBox.transform, "Icon", Color.white);
         c.icon.preserveAspect = true;
-        PlaceIn(c.icon.rectTransform, 8f, 8f, 80f, 80f, 96f, 96f);
-        c.name = ThinText(c.root, "Name", 24f, UIWeight.Medium, TextAlignmentOptions.MidlineLeft, UITheme.Thin.Ink);
-        PlaceIn(c.name.rectTransform, 136f, 70f, EvCardW - 160f, 44f, EvCardW, EvCardH);
-        c.skills = ThinText(c.root, "Skills", 17f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.65f));
-        PlaceIn(c.skills.rectTransform, 136f, 116f, EvCardW - 160f, 26f, EvCardW, EvCardH);
+        PlaceIn(c.icon.rectTransform, 8f, 8f, 96f, 96f, 112f, 112f);
+        c.meta = ThinText(c.root, "Meta", 18f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.6f));
+        PlaceIn(c.meta.rectTransform, 156f, 26f, EvCardW - 180f, 28f, EvCardW, EvCardH);
+        c.name = ThinText(c.root, "Name", 30f, UIWeight.Medium, TextAlignmentOptions.MidlineLeft, UITheme.Thin.Ink);
+        PlaceIn(c.name.rectTransform, 156f, 56f, EvCardW - 180f, 46f, EvCardW, EvCardH);
+        c.skills = ThinText(c.root, "Skills", 18f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.7f));
+        c.skills.richText = true;
+        PlaceIn(c.skills.rectTransform, 156f, 104f, EvCardW - 180f, 30f, EvCardW, EvCardH);
 
         var div = ShopUIStyle.MakeImage(c.root, "Divider", UITheme.Thin.InkA(0.15f));
-        PlaceIn(div.rectTransform, 24f, 172f, EvCardW - 48f, 1f, EvCardW, EvCardH);
+        PlaceIn(div.rectTransform, 24f, 154f, EvCardW - 48f, 1f, EvCardW, EvCardH);
 
         // 형 — 주인공
-        c.formHead = ThinText(c.root, "FormHead", 32f, UIWeight.Medium, TextAlignmentOptions.MidlineLeft, Color.white);
+        c.formHead = ThinText(c.root, "FormHead", 34f, UIWeight.Medium, TextAlignmentOptions.MidlineLeft, Color.white);
         c.formHead.richText = true;
-        PlaceIn(c.formHead.rectTransform, 24f, 180f, EvCardW - 48f, 56f, EvCardW, EvCardH);
-        c.formLine = ThinText(c.root, "FormLine", 20f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.Ink);
-        PlaceIn(c.formLine.rectTransform, 24f, 236f, EvCardW - 48f, 30f, EvCardW, EvCardH);
+        PlaceIn(c.formHead.rectTransform, 24f, 166f, EvCardW - 48f, 58f, EvCardW, EvCardH);
+        c.formLine = ThinText(c.root, "FormLine", 22f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.Ink);
+        c.formLine.richText = true;
+        c.formLine.enableAutoSizing = true;   // 긴 한 줄(「느리지만, 무게 4가 찬 뒤 …」)이 카드 테를 넘었다 — 18(화면 15.8)까지만 줄인다
+        c.formLine.fontSizeMax = 22f;
+        c.formLine.fontSizeMin = 18f;
+        PlaceIn(c.formLine.rectTransform, 24f, 226f, EvCardW - 48f, 34f, EvCardW, EvCardH);
 
-        // 작동 그림 3컷 — 쌓임 → 가득 → 발동
-        string[] heads = { "① 쌓임", "② 가득", "③ 발동" };
+        // 이렇게 싸운다 — ① 쌓기 → ② 가득 → ③ 발동(작동 그림 3컷 대신 글 세 줄)
         for (int i = 0; i < 3; i++)
         {
-            float x = 24f + i * (EvCutW + EvCutGap);
-            var cut = ShopUIStyle.MakeImage(c.root, $"Cut{i}", new Color(0f, 0f, 0f, 0.3f));
-            PlaceIn(cut.rectTransform, x, EvCutY, EvCutW, EvCutH, EvCardW, EvCardH);
-            UIThinBox.Create(cut.rectTransform, "Line", Vector2.zero, Vector2.one, 0f, UITheme.Thin.InkA(0.15f), Color.clear, Color.clear);
-            var head = ThinText(cut.transform, "Head", 15f, UIWeight.Medium, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.6f));
-            head.text = heads[i];
-            PlaceIn(head.rectTransform, 10f, 4f, EvCutW - 20f, 22f, EvCutW, EvCutH);
-            var draw = ShopUIStyle.MakeRect(cut.transform, "Draw").GetComponent<RectTransform>();
-            draw.anchorMin = draw.anchorMax = draw.pivot = new Vector2(0.5f, 1f);
-            draw.anchoredPosition = new Vector2(0f, -26f);
-            draw.sizeDelta = new Vector2(EvCutW, EvDrawH);
-            c.draw[i] = draw;
-            c.cutPips[i] = MakeLabel(cut.transform, "Pips", 15f, FontStyles.Normal, TextAlignmentOptions.Center, Color.white);
-            c.cutPips[i].richText = true;
-            c.cutPips[i].textWrappingMode = TextWrappingModes.NoWrap;
-            PlaceIn(c.cutPips[i].rectTransform, 0f, 134f, EvCutW, 20f, EvCutW, EvCutH);
-            c.cutLine1[i] = ThinText(cut.transform, "Line1", 15f, UIWeight.Medium, TextAlignmentOptions.Center, UITheme.Thin.Ink);
-            PlaceIn(c.cutLine1[i].rectTransform, 4f, 152f, EvCutW - 8f, 22f, EvCutW, EvCutH);
-            c.cutLine2[i] = ThinText(cut.transform, "Line2", 15f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.6f));
-            PlaceIn(c.cutLine2[i].rectTransform, 4f, 173f, EvCutW - 8f, 22f, EvCutW, EvCutH);
-            if (i < 2)
-            {
-                var arrow = ThinText(c.root, "Arrow", 15f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.6f));
-                arrow.text = "▶";
-                PlaceIn(arrow.rectTransform, x + EvCutW, EvCutY + 88f, EvCutGap, 20f, EvCardW, EvCardH);
-            }
+            c.steps[i] = ThinText(c.root, $"Step{i}", 20f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.85f));
+            c.steps[i].richText = true;
+            PlaceIn(c.steps[i].rectTransform, 24f, EvStepY + i * EvStepH, EvCardW - 48f, EvStepH, EvCardW, EvCardH);
         }
 
-        c.rule = ThinText(c.root, "Rule", 15f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.6f));
-        PlaceIn(c.rule.rectTransform, 24f, 482f, EvCardW - 48f, 24f, EvCardW, EvCardH);
+        c.rule = ThinText(c.root, "Rule", 18f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.6f));
+        c.rule.richText = true;
+        PlaceIn(c.rule.rectTransform, 24f, 422f, EvCardW - 48f, 30f, EvCardW, EvCardH);
 
-        c.lostBox = ChipBox(c.root, "LostChip", out c.lostChip, 15f);   // 칩 폭은 채울 때(창이 켜진 뒤) 잰다
-        c.lost = ThinText(c.root, "Lost", 17f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.Ink);
+        c.lostBox = ChipBox(c.root, "LostChip", out c.lostChip, 17f);   // 칩 폭은 채울 때(창이 켜진 뒤) 잰다
+        c.lost = ThinText(c.root, "Lost", 19f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.Ink);
         c.lost.richText = true;
-        PlaceIn(c.lost.rectTransform, 112f, 512f, EvCardW - 136f, 28f, EvCardW, EvCardH);
+        PlaceIn(c.lost.rectTransform, 116f, 464f, EvCardW - 140f, 30f, EvCardW, EvCardH);
 
-        // 수치 머리 줄(「수치 · 지금 무기 대비」)은 걷었다 — ▲▼가 대비를 말하고, 아래 안내 줄이 한 번 적는다(10-11)
-        c.statsHead = ThinText(c.root, "StatsHead", 15f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.5f));
-        PlaceIn(c.statsHead.rectTransform, 24f, 548f, EvCardW - 48f, 22f, EvCardW, EvCardH);
-        c.statsHead.gameObject.SetActive(false);
+        // 수치 칸 4개 — 이름 17 · 값 21(▲▼ = 지금 무기 대비, 아래 안내 줄이 한 번 적는다)
         for (int i = 0; i < 4; i++)
         {
             var box = ShopUIStyle.MakeRect(c.root, $"Stat{i}").GetComponent<RectTransform>();
-            PlaceIn(box, 24f + i * 150f, 572f, 142f, 52f, EvCardW, EvCardH);
+            PlaceIn(box, 24f + i * 150f, 514f, 142f, 66f, EvCardW, EvCardH);
             UIThinBox.Create(box, "Line", Vector2.zero, Vector2.one, 0f, UITheme.Thin.InkA(0.18f), Color.clear, new Color(1f, 1f, 1f, 0.02f));
-            var label = ThinText(box, "Label", 15f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.55f));
+            var label = ThinText(box, "Label", 17f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.55f));
             label.text = EvStatNames[i];
-            PlaceIn(label.rectTransform, 8f, 2f, 126f, 22f, 142f, 52f);
-            c.statValue[i] = ThinText(box, "Value", 17f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.Ink);
+            PlaceIn(label.rectTransform, 10f, 4f, 124f, 26f, 142f, 66f);
+            c.statValue[i] = ThinText(box, "Value", 21f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.Ink);
             c.statValue[i].richText = true;
-            PlaceIn(c.statValue[i].rectTransform, 8f, 24f, 130f, 26f, 142f, 52f);
+            PlaceIn(c.statValue[i].rectTransform, 10f, 30f, 128f, 32f, 142f, 66f);
         }
 
-        c.foot = ThinText(c.root, "Foot", 15f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.55f));
+        c.foot = ThinText(c.root, "Foot", 18f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.55f));
         c.foot.richText = true;
-        PlaceIn(c.foot.rectTransform, 24f, 634f, EvCardW - 48f, 26f, EvCardW, EvCardH);
+        PlaceIn(c.foot.rectTransform, 24f, 600f, EvCardW - 48f, 30f, EvCardW, EvCardH);
 
         c.button = bg.gameObject.AddComponent<Button>();
         ShopUIStyle.ApplyButtonColors(c.button);
@@ -227,11 +206,9 @@ public sealed partial class UI_CruciblePanel
         var so = b.target;
         var f  = so.Form;
         var (tag, tint, line) = Persona(so);
-        // 성격은 색이 아니라 모양으로(10-11 · 파랑 · 주황 글자 → 무채) — ◇ 빠른 검 · ◆ 묵직한 검
+        // 성격은 색이 아니라 모양으로(10-11 · 파랑 · 주황 글자 → 무채) — ◇ 빠른 검 · ◆ 묵직한 검 · 계열은 같은 한 줄(10-15 — 칩 둘을 걷었다)
         bool heavy = f != null ? f.FormId == "weight" : so.weaponType == WeaponType.Greatsword;
-        SetChip(card.personaBox, card.persona, $"{(heavy ? "◆" : "◇")} {tag}", UITheme.Thin.InkA(0.8f), 24f, 20f, rightAlign: false);
-        SetChip(card.familyBox, card.family, f == null ? null : f.FormId == "weight" ? "필살 계열" : "연격 계열",
-                UITheme.Thin.InkA(0.6f), EvCardW - 24f, 22f, rightAlign: true, h: 28f);
+        card.meta.text = $"{(heavy ? "◆" : "◇")} {tag}" + (f == null ? "" : f.FormId == "weight" ? " · 필살 계열" : " · 연격 계열");
 
         card.icon.sprite  = so.icon;
         card.icon.enabled = so.icon != null;
@@ -246,36 +223,29 @@ public sealed partial class UI_CruciblePanel
         if (f != null)
         {
             card.formHead.text = $"<size=47%><color=#9A93A6>형</color></size> <color=#{hex}>{f.DisplayName}</color>  <size=53%><color=#8C8497>평타가 바뀐다</color></size>";
-            card.formLine.text = f.Line;
-            for (int i = 0; i < 3; i++)
-            {
-                ClearChildren(card.draw[i]);
-                var (pips, l1, l2) = DrawCut(card.draw[i], i, so, f);
-                card.cutPips[i].text  = pips;
-                card.cutLine1[i].text = l1;
-                card.cutLine2[i].text = l2;
-            }
-            card.rule.text = f.FormId == "weight"
+            card.formLine.text = UIKeywordInk.Values(f.Line);   // 수치만 Noto 500(10-15 설명 글 강조)
+            for (int i = 0; i < 3; i++) card.steps[i].text = FormStep(i, f, hex);
+            card.rule.text = UIKeywordInk.Values(f.FormId == "weight"   // 수치만 Noto 500(10-15)
                 ? $"{f.IdleSeconds:0}초간 맞힌 휘두름이 없으면 0 · 충격파 {f.TriggerRange:0.#} m · 일반 몹 0.8초 경직"
-                : $"{f.IdleSeconds:0}초간 못 맞히면 1초에 1씩 준다 · 발동하면 0부터";
+                : $"{f.IdleSeconds:0}초간 못 맞히면 1초에 1씩 준다 · 발동하면 0부터");
         }
         else
         {
             card.formHead.text = $"<color=#{hex}>{so.displayName}</color>";
             card.formLine.text = line;
             card.rule.text = "";
+            for (int i = 0; i < 3; i++) card.steps[i].text = "";
         }
 
         // 잃는 것 — 정직하게(시안 02): 무형검의 E(무형참)는 새 형태로 넘어가지 않는다
         string lostName = current?.skillE != null ? current.skillE.skillName : null;
         bool lostOn = f != null && lostName != null && (so.skillE == null || so.skillE.skillName != lostName);
-        SetChip(card.lostBox, card.lostChip, lostOn ? "잃는 것" : null, UITheme.Thin.Danger, 24f, 512f, rightAlign: false, h: 28f);
+        SetChip(card.lostBox, card.lostChip, lostOn ? "잃는 것" : null, UITheme.Thin.Danger, 24f, 464f, rightAlign: false, h: 30f);
         string tail = f == null ? "" : f.FormId == "weight" ? "멀리 닿는 평타가 없다" : $"{f.TriggerName}{Iga(f.TriggerName)} 조건부로 멀리 잇는다";
         card.lost.text = lostOn ? $"{lostName} <color=#9A93A6>— {tail}</color>" : "";
 
         var next = PreviewStats(so, level);
         var now  = current != null ? new[] { current.baseAttack, current.attackSpeed, current.attackRange, current.areaOfEffect } : null;
-        card.statsHead.text = current != null ? $"수치 · 지금 무기({current.displayName} +{level}) 대비" : "수치";
         for (int i = 0; i < EvStatNames.Length; i++)
             card.statValue[i].text = $"{StatText(i, next[i])}  {(now != null ? DeltaText(i, next[i] - now[i]) : "")}";
 
@@ -325,61 +295,28 @@ public sealed partial class UI_CruciblePanel
         return (c - 0xAC00) % 28 == 0 ? "가" : "이";
     }
 
-    /// <summary>작동 그림 한 컷(184×110 · 위에서 본 그림) — (칸 글자, 첫 줄, 둘째 줄). 수치는 형 데이터 · 형 코드 상수와 같다.</summary>
-    private static (string pips, string l1, string l2) DrawCut(RectTransform p, int i, WeaponSO so, WeaponFormSO f)
+    /// <summary>
+    /// 「이렇게 싸운다」 한 줄(① 쌓기 · ② 가득 · ③ 발동) — 번호 · 머리말은 형 색, 수치는 Noto 500. 수치는 형 데이터 · 형 코드 상수와 같다
+    /// (예전 작동 그림 3컷의 칸 글자 · 두 줄을 한 줄로 모았다 — 10-15).
+    /// </summary>
+    private static string FormStep(int i, WeaponFormSO f, string hex)
     {
         bool weight = f.FormId == "weight";
-        var bright  = UITheme.Thin.WithA(f.Tint, 0.95f);
-        string hex  = ColorUtility.ToHtmlStringRGB(f.Tint);
-        char on = weight ? '●' : '◆', off = weight ? '○' : '◇';
+        string Head(string n, string w) => $"<color=#{hex}>{n}  {w}</color>   ";
         switch (i)
         {
             case 0:
-            {
-                int part = weight ? 2 : 3;
-                DDot(p, new Vector2(30f, 58f), 10f, UITheme.Thin.Ink);
-                DCrescent(p, new Vector2(weight ? 70f : 72f, 58f), weight ? 54f : 40f, 0f, bright);
-                DDot(p, new Vector2(110f, 58f), 12f, EnemyDot);
-                DText(p, new Vector2(138f, 38f), "+1", 15f, UITheme.Thin.Gold);
-                return ($"<color=#{hex}>{new string(on, part)}</color><color=#5A5566>{new string(off, f.MaxStacks - part)}</color>",
-                        weight ? "적중한 휘두름 +1" : "평타 적중 +1",
-                        weight ? "피격돼도 유지" : "피격하면 0");
-            }
+                return Head("①", "쌓기") + UIKeywordInk.Values(weight ? "적중한 휘두름마다 +1 · 피격돼도 유지" : "평타 적중마다 +1 · 피격하면 0");
             case 1:
             {
-                var glow = ShopUIStyle.MakeImage(DRect(p, "Glow", new Vector2(EvCutW * 0.5f, 56f), new Vector2(150f, 110f)), "Img", UITheme.Thin.WithA(f.Tint, 0.35f));
-                glow.sprite = UI_RuneSelectPopup.SoftDot;
-                ShopUIStyle.Stretch(glow.rectTransform);
-                if (so.icon != null)
-                {
-                    var icon = ShopUIStyle.MakeImage(DRect(p, "Icon", new Vector2(EvCutW * 0.5f, 56f), new Vector2(104f, 84f)), "Img", Color.white);
-                    icon.sprite = so.icon;
-                    icon.preserveAspect = true;
-                    ShopUIStyle.Stretch(icon.rectTransform);
-                }
-                return ($"<color=#{hex}>{new string(on, f.MaxStacks)}</color>", $"{f.DisplayName} {f.MaxStacks}칸",
-                        weight ? "잉걸빛 칼날" : "바람을 두른 칼날");
+                char on = weight ? '●' : '◆';
+                return Head("②", "가득") + $"{f.DisplayName} <color=#{hex}>{new string(on, f.MaxStacks)}</color> "
+                     + UIKeywordInk.Values($"{f.MaxStacks}칸") + (weight ? " · 잉걸빛 칼날" : " · 바람을 두른 칼날");
             }
             default:
-            {
-                if (weight)
-                {
-                    var c = new Vector2(EvCutW * 0.5f, 78f);
-                    var ring = DRing(p, c, 140f, bright, 2f);
-                    ring.rectTransform.parent.localScale = new Vector3(1f, 0.36f, 1f);   // 바닥에 누운 충격파
-                    DLine(p, new Vector2(c.x, 14f), new Vector2(c.x, 72f), 4f, bright);
-                    DDot(p, c + new Vector2(-48f, 4f), 9f, EnemyDot);
-                    DDot(p, c + new Vector2(42f, -6f), 9f, EnemyDot);
-                    DText(p, new Vector2(150f, 22f), $"{f.TriggerRange:0.#} m", 13f, UITheme.Thin.InkA(0.7f));
-                    return ("", $"「{f.TriggerName}」", "반드시 치명 · 충격파");
-                }
-                DDash(p, new Vector2(14f, 62f), new Vector2(150f, 62f), 1.5f, bright, 6f, 5f);
-                DDot(p, new Vector2(70f, 62f), 9f, EnemyDot);
-                DDot(p, new Vector2(110f, 62f), 9f, EnemyDot);
-                DCrescent(p, new Vector2(156f, 62f), 36f, 0f, bright);
-                DText(p, new Vector2(150f, 26f), $"{f.TriggerRange:0} m", 13f, UITheme.Thin.InkA(0.7f));
-                return ("", $"마지막 타 「{f.TriggerName}」", $"{f.TriggerRange:0} m 관통 · {f.TriggerAtkRatio * 100f:0}%");
-            }
+                return Head("③", "발동") + UIKeywordInk.Values(weight
+                    ? $"「{f.TriggerName}」 반드시 치명 · 충격파 {f.TriggerRange:0.#} m"
+                    : $"마지막 타 「{f.TriggerName}」 · {f.TriggerRange:0} m 관통 · {f.TriggerAtkRatio * 100f:0}%");
         }
     }
 }

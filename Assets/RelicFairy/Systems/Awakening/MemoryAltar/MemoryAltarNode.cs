@@ -385,7 +385,7 @@ public static class MemoryAltarCatalog
         new(PartPierce,     AltarBranch.Weapon, "관통의 촉",        "시작 파츠  +관통",                450,
             Rec.RoomClears, 30, "방 30회 클리어", 300),
         new(SigilSmith,     AltarBranch.Weapon, "재련 성공률",  "재련 강화 성공률",          400,
-            Rec.MaxEnhance, 6, "무기 +6 도달", 260, maxLevel: 3,
+            Rec.MaxEnhance, 12, "무기 +12 도달", 260, maxLevel: 3,   // 10-15 강화 단계 세분(옛 +6)
             valueText: lv => $"재련 성공률 +{SmithPerLevel * 100f * lv:0}%p"),
         new(EnhanceGain,    AltarBranch.Weapon, "강화재료 획득",  "방 보상 강화재료", 340, size: AltarNodeSize.Small, maxLevel: 3,
             valueText: lv => $"강화재료 +{EnhanceGainPerLevel * 100f * lv:0}%"),

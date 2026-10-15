@@ -91,6 +91,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
         private int _hitIndex;
         private int _slashIndex;
         private int _skillTier;
+        private int _slashCount;   // 검기 수 — 환영 베기 강화 증강(10-15)이 늘린다
         private bool _pursuit, _condense;
         private readonly List<MonsterBase> _pursuitTargets = new();
         private readonly List<IDamageable> _hitTargets = new();
@@ -110,6 +111,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
             ctx.SetMoveScale(0f);
 
             _skillTier = ctx.SkillTier;
+            _slashCount = _data.slashProjectileCount + Mathf.RoundToInt(MeleeAugments.Value2On(ctx.WeaponData, MeleeAugmentCatalog.KatanaPhantom));
             _pursuit   = ctx.WeaponData != null && ctx.WeaponData.HasEngraving(EngravePursuit);
             _condense  = !_pursuit && ctx.WeaponData != null && ctx.WeaponData.HasEngraving(EngraveCondense);
 
@@ -231,7 +233,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
                     // 3단계는 뒤에 검기 폭발이 막타 — 그 아래 단계는 마지막 검기가 막타
                     if (col.TryGetComponent<IDamageable>(out var d))
                         ctx.DealDamage(d, dmg, _data.knockbackMultiplier,
-                            _skillTier < 3 && _slashIndex >= _data.slashProjectileCount - 1);
+                            _skillTier < 3 && _slashIndex >= _slashCount - 1);
                 }
 
                 // 검기 이펙트
@@ -243,7 +245,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
                     _slashCenter + slashOffset, _data.slashProjectileEffectScale, 0.6f);
 
                 _slashIndex++;
-                if (_slashIndex >= _data.slashProjectileCount)
+                if (_slashIndex >= _slashCount)
                 {
                     _timer = 0f;
                     if (_skillTier >= 3)
@@ -271,7 +273,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
             var target = _pursuitTargets[_slashIndex % _pursuitTargets.Count];
             if (target != null && !target.IsDead) _slashCenter = target.transform.position;
 
-            bool last = _slashIndex >= _data.slashProjectileCount - 1;
+            bool last = _slashIndex >= _slashCount - 1;
             float dmg = ctx.CalculateDamage(_data.slashProjectileDamage);
             foreach (var col in Physics.OverlapSphere(_slashCenter, _data.pursuitHitRadius))
             {
@@ -282,7 +284,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
             SpawnEffectScaled(ctx, _data.slashProjectileEffectKey, _slashCenter + Vector3.up * 1f, _data.slashProjectileEffectScale, 0.6f);
 
             _slashIndex++;
-            if (_slashIndex >= _data.slashProjectileCount)
+            if (_slashIndex >= _slashCount)
             {
                 _timer = 0f;
                 _phase = _skillTier >= 3 ? Phase.SlashExplode : Phase.End;   // 폭발은 마지막으로 쫓아간 자리에서
@@ -295,7 +297,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
             if (_timer < _data.slashProjectileDelay * 2f) return;   // 모으는 한 박자
             _timer = 0f;
 
-            float dmg    = ctx.CalculateDamage(_data.slashProjectileDamage) * _data.slashProjectileCount * _data.condenseDamageMult;
+            float dmg    = ctx.CalculateDamage(_data.slashProjectileDamage) * _slashCount * _data.condenseDamageMult;
             float radius = _data.slashProjectileRadius * _data.condenseRadiusMult;
             foreach (var col in Physics.OverlapSphere(_slashCenter, radius))
             {
@@ -306,7 +308,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
             SpawnEffectScaled(ctx, _data.slashProjectileEffectKey, _slashCenter + Vector3.up * 1f,
                               _data.slashProjectileEffectScale * _data.condenseEffectScaleMult, 0.8f);
 
-            _slashIndex = _data.slashProjectileCount;
+            _slashIndex = _slashCount;
             _phase = _skillTier >= 3 ? Phase.SlashExplode : Phase.End;
         }
 
