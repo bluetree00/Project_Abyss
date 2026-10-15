@@ -139,6 +139,17 @@ public sealed class RangedPartsState
         else if (rangedType == WeaponType.Crossbow) LevelUp("part_power", 1);
     }
 
+    /// <summary>파츠 강화 실패 하락(10-15) — 켜진 파츠는 꺼지지 않는다(하한 1).</summary>
+    public bool LevelDown(string partId, int delta = 1)
+    {
+        int i = IndexOf(partId);
+        if (i < 0 || delta <= 0) return false;
+        var e = _equipped[i];
+        e.level = Mathf.Max(1, e.level - delta);
+        _equipped[i] = e;
+        return true;
+    }
+
     public bool LevelUp(string partId, int delta = 1)
     {
         int i = IndexOf(partId);

@@ -281,6 +281,7 @@ public class RunProgressManager : MonoBehaviour
         d.potionCapacity      = s.PlayerState?.PotionCapacity ?? PlayerRunState.DefaultPotionCapacity;
         d.runeExtractCount    = s.RuneExtractCount;
         d.refineryCraftCount  = s.Refinery?.CraftCount ?? 0;
+        d.refineryPity        = s.Refinery?.PityCount ?? 0;
         d.runGoldGained       = s.RunDelta?.GainedGold ?? 0;
         d.firstRunComboKey    = FirstRunService.PendingComboKeyIfFirst;
         d.firstRunCoreParts   = FirstRunService.RunCorePartFirsts;

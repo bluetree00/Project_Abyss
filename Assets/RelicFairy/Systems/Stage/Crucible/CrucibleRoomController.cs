@@ -296,14 +296,40 @@ public class CrucibleRoomController : MonoBehaviour
 
     // ── 원거리 파츠 강화 (UI가 호출) ────────────────────────
     //
-    // 무기 강화와 달리 <b>확정 상승</b>이다. 파츠는 계단형(분열·관통은 3레벨마다만 수치가 오름)이라
-    // 여기에 실패 판정까지 얹으면 "재료를 냈는데 실패하고, 성공해도 눈에 띄는 변화가 없는" 이중 불투명이 된다.
-    // 긴장은 도박이 아니라 <b>기회비용</b>이 만든다 — 같은 강화재료를 무기에 쓰면 공격력과 파츠 슬롯이 열리고,
-    // 파츠에 쓰면 투사체 구조가 바뀐다. 재료가 유한하므로 매 재련소가 배분 결정이 된다.
-    //
-    // 확정이라 RNG를 소비하지 않는다 → BumpRoll 없음(승급과 같은 취급).
+    // 10-15 사용자 「파츠 강화도 어느 정도의 확률은 요구해야 · 높은 단계에서 하락」: 확정 → 확률.
+    // 다음 단계별 성공률 <see cref="PartSuccess"/>(켜기 100 → Lv12 32%) · 다음 단계 8 이상 실패면 1 하락(켜진 파츠는 꺼지지 않는다).
+    // 연속 성공 · 잭팟 · 화로 이벤트(열기 · 저주 · 현상금) · 제단 「재련 성공률」을 무기 강화와 똑같이 적용한다 — 원거리 탭에 뜨던 이벤트에 뜻이 생긴다.
+    // (예전 10-08 판단 「계단형 + 실패 = 이중 불투명」은 사용자가 뒤집었다 — 대신 화면이 「지금 → 다음」과 성공률을 크게 보인다.)
+    // 굴림은 무기 강화와 같은 방 난수 + 굴림 번호(BumpRoll) — 다시 열어도 결과가 같다.
 
-    /// <summary>파츠 강화 1회 시도. 확정 성공 — 재료가 모자라거나 상한이면 거부.</summary>
+    /// <summary>파츠 다음 단계(1 ~ 12)의 기본 성공률 — 0번 칸은 비운다.</summary>
+    private static readonly float[] PartSuccess = { 1f, 1f, 0.95f, 0.90f, 0.85f, 0.80f, 0.72f, 0.65f, 0.58f, 0.50f, 0.44f, 0.38f, 0.32f };
+    /// <summary>이 다음 단계부터 실패하면 하락한다.</summary>
+    private const int PartDropFromLevel = 8;
+
+    /// <summary>파츠를 한 단계 올릴 기본 성공률(보정 전) — 상한이면 0.</summary>
+    public float PartBaseSuccessAt(string partId)
+    {
+        var def = Managers.WeaponParts?.GetById(partId);
+        var state = RangedPartsState.Current;
+        if (def == null || state == null) return 0f;
+        int next = state.LevelOf(partId) + 1;
+        if (def.max_level > 0 && next > def.max_level) return 0f;
+        return PartSuccess[Mathf.Clamp(next, 0, PartSuccess.Length - 1)];
+    }
+
+    /// <summary>파츠 성공률(화로 이벤트 · 제단 보정 포함) — 표시와 굴림이 같은 값.</summary>
+    public float PartSuccessChanceAt(string partId) => Mathf.Clamp01(PartBaseSuccessAt(partId) + SuccessBonus);
+
+    /// <summary>파츠 실패 때 내려가는 단계(0 또는 1).</summary>
+    public int PartDropAt(string partId)
+    {
+        var state = RangedPartsState.Current;
+        if (state == null) return 0;
+        return state.LevelOf(partId) + 1 >= PartDropFromLevel ? 1 : 0;
+    }
+
+    /// <summary>파츠 강화 1회 시도. 재료가 모자라거나 상한이면 거부 · 아니면 굴림(성공 +1 · 실패 높은 단계 −1).</summary>
     public EnhanceResult TryEnhancePart(string partId)
     {
         if (_run == null || !_run.IsRunning) return EnhanceResult.Reject(EnhanceOutcome.RejectInvalid);
@@ -320,16 +346,30 @@ public class CrucibleRoomController : MonoBehaviour
             return EnhanceResult.Reject(EnhanceOutcome.RejectMaxed);
 
         int cost = PartCostAt(partId);
+        float chance = PartSuccessChanceAt(partId);
+        int drop = PartDropAt(partId);
         if (!fuel.TrySpend(FuelKind.EnhanceMaterial, cost))
             return EnhanceResult.Reject(EnhanceOutcome.RejectNoFuel);
 
-        state.LevelUp(partId);
-
-        // 잭팟은 무기 강화 전용(도박의 보상축) — 파츠는 확정이라 굴리지 않는다.
         _lastJackpot = false;
         _lastRefund  = 0;
 
-        SaveNow("crucible-part-enhance");   // S3: 확정 즉시 저장 — 다음 방까지 미루면 진행분이 날아간다
+        double roll = _roomRng.NextDouble();
+        BumpRoll(1);
+        bool success = roll < chance;
+        if (success)
+        {
+            state.LevelUp(partId);
+            _streak++;
+            RollJackpot(fuel, cost);   // 잭팟 — 무기 강화와 같은 축(연속 · 현상금)
+        }
+        else
+        {
+            if (drop > 0) state.LevelDown(partId, drop);
+            _streak = 0;
+        }
+
+        SaveNow("crucible-part-enhance");   // S3: 결과 즉시 저장 — 다음 방까지 미루면 진행분이 날아간다
         OnCrucibleChanged?.Invoke();
 
         // 원거리 <b>스킬 단계</b>는 무기 강화가 아니라 이 파츠 총합 레벨에서 나온다(SkillTierResolver, 임계 2·10).
@@ -337,15 +377,14 @@ public class CrucibleRoomController : MonoBehaviour
         // 무기를 바꾸기 전까지 그대로였다(09-21). 장착 무기 갱신 통지를 보내 HUD가 다시 읽게 한다.
         RefreshEquippedIfCurrent(_run?.Player?.WeaponManager?.GetCurrentSlotIndex() ?? -1);
 
-        // chance=1 / roll=0 → 연출층이 '확정 성공'으로 읽는다(니어미스 판정에도 걸리지 않음).
         return new EnhanceResult
         {
-            outcome     = EnhanceOutcome.Success,
+            outcome     = success ? EnhanceOutcome.Success : EnhanceOutcome.FailDropped,
             beforeLevel = level,
             afterLevel  = state.LevelOf(partId),
             spent       = cost,
-            chance      = 1f,
-            roll        = 0.0,
+            chance      = chance,
+            roll        = roll,
         };
     }
 

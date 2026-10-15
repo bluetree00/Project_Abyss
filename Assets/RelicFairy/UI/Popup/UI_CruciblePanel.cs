@@ -766,6 +766,8 @@ public sealed partial class UI_CruciblePanel : UI_Popup
     private void ShowStageResult(string richText, float fontSize, float popScale)
     {
         if (_stageResult == null || string.IsNullOrEmpty(richText)) return;
+        // 원거리 탭(10-15) — 도장 자리가 근거리 무대(모루) 칸이라 파츠 목록 위에 겹쳤다. 결과는 오른쪽 판 결과 글 · 상세 칸 번쩍임 · 대장장이 말이 맡는다.
+        if (_v3Ready && _activeTab == 1) { _stampTierNext = null; return; }
         if (_v3Ready) fontSize = StampV3(fontSize);   // v3 — 주인공은 초점 숫자 72 · 도장은 무기 열 안에서 한 단계 작게
         _stageResult.text     = richText;
         _stageResult.fontSizeMax = fontSize;   // 자동 크기가 켜져 있어 최대를 같이 올려야 잭팟 도장이 커진다
@@ -1392,7 +1394,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
 
             SetSlotDetailVisible(i, exists);
             _partsMark[i].gameObject.SetActive(!exists);
-            if (_slotBtn[i] != null) _slotBtn[i].gameObject.SetActive(exists);
+            if (_slotBtn[i] != null) _slotBtn[i].gameObject.SetActive(exists && !_v3Ready);   // v3(10-15) — 입구는 오른쪽 [강화하기] 하나
 
             if (!exists)
             {
@@ -2497,8 +2499,8 @@ public sealed partial class UI_CruciblePanel : UI_Popup
 
     /// <summary>
     /// 선택한 파츠를 1레벨 올린다. 임계를 넘으면 효과가 계단 상승한다(분열 갈래 +1 등).
-    /// 판정은 <b>확정</b>이고 재료만 든다 — 실패 도박은 무기 강화의 축이고, 계단형 파츠에 겹치면
-    /// 체감이 탁해진다. 재료 차감·저장은 컨트롤러(<see cref="CrucibleRoomController.TryEnhancePart"/>)가 소유한다.
+    /// 10-15부터 <b>확률</b>이다(높은 단계 실패 = 1 하락 · 연속 · 잭팟 · 화로 이벤트 근거리와 같이 — 사용자 「파츠 강화도 확률을 요구」).
+    /// 재료 차감 · 굴림 · 저장은 컨트롤러(<see cref="CrucibleRoomController.TryEnhancePart"/>)가 소유한다.
     /// </summary>
     private void EnhanceSelectedPart()
     {
@@ -2515,6 +2517,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
             return;
         }
 
+        V3SnapshotBefore();   // 판정 전 연속 · 잭팟(근거리와 같이 — 한 박자 뒤 공개)
         var result = _controller.TryEnhancePart(partId);
         PlayEnhanceSequence(result, EnhanceView.Part).Forget();
     }
@@ -2634,8 +2637,9 @@ public sealed partial class UI_CruciblePanel : UI_Popup
         // (RefreshAll이 이미 afterLevel로 세팅했으나 다음 렌더 전 동일 프레임에서 덮어씀 → 깜빡임 없음).
         if (count && IsCardSlot(slot)) { _cardLevel[slot].text = FormatLevel(r.beforeLevel, max, isPart); SetGauge(slot, r.beforeLevel, max); }
 
-        if (isMelee) HoldBeforeState(r, max);
-        else         ShowResultText(r, view);
+        if (isMelee)     HoldBeforeState(r, max);
+        else if (isPart) V3HoldBeforePart(r);   // 10-15 파츠도 확률 — 한 박자 뒤 공개
+        else             ShowResultText(r, view);
         if (r.outcome == EnhanceOutcome.Success && view != EnhanceView.RangedWeapon) _stampTierNext = TierReachedLine(r, isPart);
 
         try
@@ -2645,6 +2649,12 @@ public sealed partial class UI_CruciblePanel : UI_Popup
                 await ForgeStrikeAsync();
                 ShowResultText(r, view);   // 망치가 닿는 순간 공개 — 결과 문구·대장장이 대사
                 V3Reveal();                // v3 두 판도 이 순간에 지금 값으로
+            }
+            else if (isPart)
+            {
+                await PartStrikeAsync();   // 판정 한 박자(0.4초)
+                ShowResultText(r, view);
+                RefreshV3();               // 오른쪽 판 · 초점을 지금 값으로
             }
 
             switch (r.outcome)
@@ -2838,7 +2848,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
 
     private void ShowResultText(EnhanceResult r, EnhanceView view)
     {
-        // 파츠는 확정 상승이라 잭팟·스트릭·니어미스가 없다 — 무기 문구를 그대로 쓰면 있지도 않은 도박을 암시한다.
+        // 파츠는 계단형이라 문구가 다르다(「단계 상승!」 · 하락) — 잭팟 · 연속은 10-15부터 근거리와 같이 있다.
         if (view == EnhanceView.Part) { ShowPartResultText(r); return; }
 
         switch (r.outcome)
@@ -2887,10 +2897,23 @@ public sealed partial class UI_CruciblePanel : UI_Popup
                     ? $"<color=#7AD46E>단계 상승! {(def != null ? PartValueText(def, def.ValueAt(r.afterLevel)) : "")}</color>"
                     : $"<color=#7AD46E>강화 성공 — Lv.{r.afterLevel}</color>";
                 _resultText.color = UITheme.Thin.Ink;
-                _dialogText.text = stepped
-                    ? "형태가 바뀌었군. 이제 다르게 날아갈 거다."
-                    : "아직이다. 조금 더 두들겨야 모양이 잡힌다.";
+                if (_controller.LastJackpot)
+                    _resultText.text += $"  <color=#FFD24A>잭팟! +{_controller.LastRefund} 환불</color>";
+                _dialogText.text = _controller.LastJackpot ? _controller.GetDialogue(CrucibleMood.Jackpot)
+                                 : stepped ? "형태가 바뀌었군. 이제 다르게 날아갈 거다."
+                                 : _controller.Streak >= 2 ? _controller.GetDialogue(CrucibleMood.Streak)
+                                 : "아직이다. 조금 더 두들겨야 모양이 잡힌다.";
                 break;
+
+            case EnhanceOutcome.FailDropped:
+            {
+                // 10-15 파츠도 확률 — 낮은 단계는 그대로 · 높은 단계(다음 8 이상)는 1 하락
+                string what = r.beforeLevel == r.afterLevel ? "단계 유지" : "하락";
+                _resultText.text = IsNearMiss(r) ? $"<color=#FF7A6A>아슬아슬! {what} (Lv.{r.afterLevel})</color>"
+                                                 : $"<color=#FF7A6A>실패 — {what} (Lv.{r.afterLevel})</color>";
+                _dialogText.text = _controller.GetDialogue(CrucibleMood.Fail);
+                break;
+            }
 
             case EnhanceOutcome.RejectNoFuel:
                 _resultText.text = "<color=#FF7A6A>강화재료 부족</color>";

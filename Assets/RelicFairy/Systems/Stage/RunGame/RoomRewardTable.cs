@@ -166,11 +166,12 @@ public static class RoomRewardTable
     {
         // 정예 — 확정 드롭 + Rare 하한 + 연료 증량 + 강화재료(§3-2 개편표).
         // 후보는 다른 방과 같은 3장이다 — 룬 선택지를 3장으로 고정했다(10-01 사용자 결정, 예전 4장).
-        RoomPlanKind.Elite => new Rule(1f, 3, ItemRarity.Rare, EliteWeights, ore: 6, enhanceMaterial: 2),
+        // 10-15 사용자 「금화보다 재련소와 정제소의 재화를 높여야 — 도박하는 재미」: 원석 6 → 9 · 강화재료 2 → 4(확률은 낮췄다 · EnhanceTable D3)
+        RoomPlanKind.Elite => new Rule(1f, 3, ItemRarity.Rare, EliteWeights, ore: 9, enhanceMaterial: 4),
 
         // 정예 보스(10-12 「관문지기」) — 정예방 위 · 보스방 아래. Epic 하한 · 원석 12(= 정제 한 번) · 강화재료 4.
         // 그 챕터에서 빠진 전투 두 방 + 정예방 몫을 돌려주는 값이다(배치 설계 §5-2). 골드 · 정수는 처치 · 정수 적립이 맡는다.
-        RoomPlanKind.MidBoss => new Rule(1f, 3, ItemRarity.Epic, EliteWeights, ore: 12, enhanceMaterial: 4),
+        RoomPlanKind.MidBoss => new Rule(1f, 3, ItemRarity.Epic, EliteWeights, ore: 16, enhanceMaterial: 6),   // 10-15 12 · 4 → 16 · 6
 
         // [제거됨 2026-08-12] PreBoss 규칙 —
         // 보스 전 통로는 전 챕터 grid_csv에 스포너가 0개다. 그래서 AttachRoomClearController가
@@ -181,12 +182,13 @@ public static class RoomRewardTable
         // 스포너를 넣어 전투방으로 만들거나, 별도 지급 경로를 세우는 쪽이 정본이다.
 
         // 이벤트 — 확정 보상. 등급/개수는 챌린지 성과(ChallengeRewardTable)가 따로 덮어쓴다.
-        RoomPlanKind.Event => new Rule(1f, 3, null, NormalWeights, ore: 4, enhanceMaterial: 0),
+        RoomPlanKind.Event => new Rule(1f, 3, null, NormalWeights, ore: 6, enhanceMaterial: 0),   // 10-15 원석 4 → 6(강화재료는 챌린지 성과)
 
         // 일반방 및 그 외(상점/재련소/정제소 = 전투 없음 → 이 경로가 호출되지 않음).
         // 확정 드롭 — 예전 0.6 고정은 "방을 깼는데 아무것도 안 나오는" 40%를 만들었고,
         // 그 구간이 런 내 도파민의 가장 큰 구멍이었다(§2-2 원칙 2 "바닥은 안전").
-        _ => new Rule(1f, 3, null, NormalWeights, ore: 4, enhanceMaterial: 0),
+        // 10-15: 원석 4 → 6 · 강화재료 0 → 2 — 강화재료가 이벤트 방에만 몰려 런마다 편차가 컸다.
+        _ => new Rule(1f, 3, null, NormalWeights, ore: 6, enhanceMaterial: 2),
     };
 
     /// <summary>드롭 발생 여부 추첨.</summary>

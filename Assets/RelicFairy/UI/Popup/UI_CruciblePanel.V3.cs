@@ -60,6 +60,8 @@ public sealed partial class UI_CruciblePanel
 
     /// <summary>잭팟 확률 상한 — CrucibleRoomController.JackpotMaxChance(비공개 0.5)와 같은 값. 게이지 끝 · 「최대 50%」 표시용.</summary>
     private const float JackpotCapShown = 0.5f;
+    private const float PartStrikeDur  = 0.18f;   // 파츠 판정 — 초점 펀치(10-15)
+    private const float PartStrikeHold = 0.22f;   // 펀치 뒤 공개까지 — 합 0.4초 「두근」
 
     private static readonly Color V3Base    = new(0.055f, 0.051f, 0.086f, 1f);     // (14,13,22) — 남색 판 아래 불투명 바탕
     private static readonly Color V3BoardC  = new(0.075f, 0.071f, 0.118f, 0.92f);
@@ -471,16 +473,11 @@ public sealed partial class UI_CruciblePanel
             RowP(_slotLv[i], 242f, 0f, 64f, PrH);
             V3Text(_slotLv[i], UIWeight.Regular, FTable, UITheme.Thin.InkA(0.75f));
             if (_slotLv[i] != null) _slotLv[i].alignment = TextAlignmentOptions.MidlineLeft;
-            RowP(_slotVal[i], 312f, 0f, 262f, PrH);
+            RowP(_slotVal[i], 312f, 0f, 380f, PrH);   // 10-15 262 → 380 — 줄마다 있던 [강화 · 재료 N] 버튼을 걷어 「지금 → 다음」이 「…」 없이 든다
             V3Text(_slotVal[i], UIWeight.Regular, FMin, UITheme.Thin.InkA(0.7f));
             if (_slotVal[i] != null) { _slotVal[i].alignment = TextAlignmentOptions.MidlineLeft; _slotVal[i].textWrappingMode = TextWrappingModes.NoWrap; _slotVal[i].overflowMode = TextOverflowModes.Ellipsis; }
             RowP(row.transform.Find("LvBar"), 42f, 45f, 196f, 3f);   // 트랙(구운 경로에선 _slotBar가 트랙일 수 있어 이름으로 찾는다)
-            if (_slotBtn[i] != null)
-            {
-                RowP(_slotBtn[i].transform, 580f, 8f, 116f, 36f);
-                V3Text(_slotBtnLbl[i], UIWeight.Medium, FMin, UITheme.Thin.Gold);
-                if (_slotBtnLbl[i] != null) { _slotBtnLbl[i].alignment = TextAlignmentOptions.Center; _slotBtnLbl[i].textWrappingMode = TextWrappingModes.NoWrap; }
-            }
+            if (_slotBtn[i] != null) _slotBtn[i].gameObject.SetActive(false);   // 10-15 — 강화 입구는 오른쪽 [강화하기] 하나(두 곳이면 어느 쪽인지 헷갈렸다)
             V3Text(_partsMark[i], UIWeight.Regular, FMin, UITheme.Thin.InkA(0.5f));
         }
 
@@ -763,7 +760,10 @@ public sealed partial class UI_CruciblePanel
             PlaceTL(_v3Path, 0f, ranged ? PathRangedY : PathMeleeY, V3LeftW, PathH);
             PlaceRightForTab(ranged);
         }
-        if (_v3MeleeRight != null) _v3MeleeRight.gameObject.SetActive(!ranged);
+        if (_v3MeleeRight != null) _v3MeleeRight.gameObject.SetActive(true);   // 10-15 — 파츠도 확률 · 연속 · 잭팟(칩 · 연속 게이지 공용)
+        // 옛 정보창 두 줄(「2번 키로 쏠 때만」 · 화로 이벤트 글) — 칩 · 연속 게이지 · 재료 칩이 대신한다
+        if (_streakText != null) _streakText.gameObject.SetActive(false);
+        if (_eventEffectText != null) _eventEffectText.gameObject.SetActive(false);
         if (ranged) RefreshV3Ranged();
         else        RefreshV3Melee(0);
     }
@@ -1072,20 +1072,28 @@ public sealed partial class UI_CruciblePanel
         return string.IsNullOrEmpty(s) ? string.Empty : $"<color={HexMute}>다음</color>   {s}";
     }
 
-    /// <summary>원거리 — 발사 미리보기 96(RefreshPartInfo가 채운 「N발」) · 표 5줄 · 고른 파츠의 재료 · 확정 한 줄 · [강화하기 · 비용].</summary>
+    /// <summary>
+    /// 원거리 — 근거리와 같은 뼈대(10-15 사용자 「원거리는 좀 더 보기 편한 가독성과 레이아웃 · 파츠 강화도 확률」):
+    /// 오른쪽 = 성공 확률 96 · 원인 칩(인장 · 화로 · 저주) · 연속 · 잭팟 · 재료 · 실패 규칙 · [강화하기 · 비용].
+    /// 지금 조합의 총합(몇 발 · 관통 · 폭발 · 유도)은 왼쪽 목록 머리 한 줄로 옮겼다 — 예전 오른쪽 표 5줄은 파츠가 없으면 「없음」만 다섯 줄이었다.
+    /// </summary>
     private void RefreshV3Ranged()
     {
-        SetRowCount(InfoRows);
+        SetRowCount(0);
         RenderPathRanged();
         _v3Next.text = NextLineV3();
-        _rateLabel.text = "발사 미리보기 — 지금 조합";
         _successText.color = UITheme.Thin.Ink;
-        UITooltipTrigger.Attach(_successText.gameObject, "발사 미리보기", "2번 키(원거리)로 쏠 때 — 지금 켠 파츠를 모두 합친 결과", UITheme.Thin.Gold);
+        if (_slotSummary != null) _slotSummary.text = RangedComboLine();
 
         var def   = SelectedPartDef();
         int have  = _controller.FuelAmount;
         if (def == null)
         {
+            _rateLabel.text   = "성공 확률";
+            _successText.text = "—";
+            UITooltipTrigger.Attach(_successText.gameObject, "성공 확률", "왼쪽 목록에서 올릴 파츠를 고르면 확률이 나온다", UITheme.Thin.Gold);
+            HideChips(0);
+            StreakV3(0, 0f, hidden: true);
             MaterialV3(0, have, hidden: true);
             _v3Fail.text = "왼쪽 목록에서 올릴 파츠를 고른다";
             if (_enhanceBtn != null) _enhanceBtn.interactable = false;
@@ -1097,14 +1105,54 @@ public sealed partial class UI_CruciblePanel
             int lv = RangedPartsState.Current?.LevelOf(def.part_id) ?? 0;
             bool maxed = def.max_level > 0 && lv >= def.max_level;
             int cost = maxed ? 0 : _controller.PartCostAt(def.part_id);
+            float chance = maxed ? 0f : _controller.PartSuccessChanceAt(def.part_id);
+            int drop = maxed ? 0 : _controller.PartDropAt(def.part_id);
+            _rateLabel.text   = maxed ? "파츠 단계" : "성공 확률";
+            _successText.text = maxed ? "MAX" : $"{chance * 100f:F0}%";
+            HideChips(maxed ? 0 : FillRateChips());
+            UITooltipTrigger.Attach(_successText.gameObject, "성공 확률", maxed ? "최대 — 더 굴릴 것이 없다" : RateTip(chance), UITheme.Thin.Gold);
+            StreakV3(_controller.Streak, _controller.JackpotChance, maxed);
             MaterialV3(cost, have, hidden: maxed);
-            _v3Fail.text = maxed ? "이 파츠는 최대 — 더 올릴 수 없다" : "파츠 강화는 확정 — 실패 · 하락 없이 재료만 든다";
+            _v3Fail.text = maxed ? "이 파츠는 최대 — 더 올릴 수 없다"
+                         : drop > 0 ? $"<color={HexDown}>실패하면 −{drop} 하락 · 재료도 사라진다</color>"
+                                    : "실패해도 단계는 그대로 · 재료만 사라진다";
             bool afford = !maxed && have >= cost;
             if (_enhanceBtn != null) _enhanceBtn.interactable = afford;
             ButtonV3(maxed ? "최대" : lv <= 0 ? "켜기" : "강화하기", cost, have);
-            Halo(_enhanceBtn, afford && !Choosing);   // 후광은 한 화면 한 곳 — 행 버튼 대신 여기
+            Halo(_enhanceBtn, afford && !Choosing);   // 후광은 한 화면 한 곳
         }
         RefreshPartFocalV3();
+    }
+
+    /// <summary>지금 켠 파츠를 모두 합친 발사 — 실제 발사 퍼널(RangedParts.Apply)을 그대로 돌린다(표시용 수식을 따로 두지 않는다).</summary>
+    private static string RangedComboLine()
+    {
+        var req = ProjectileRequest.Create("preview", Vector3.zero, Vector3.forward, 100f, null, RangedParts.RangedSlot);
+        RangedParts.Apply(ref req);
+        var sb = new StringBuilder($"<color={HexMute}>지금 조합</color>  {Mathf.Max(1, req.count)}발");
+        if (req.pierce > 0) sb.Append(" · 관통 ").Append(req.pierce);
+        if (req.explodeRadius > 0f) sb.Append(" · 폭발 ").Append(req.explodeRadius.ToString("0.#")).Append("m");
+        if (req.homingStrength > 0f) sb.Append(" · 유도");
+        if (!Mathf.Approximately(req.damageMult, 1f)) sb.Append(" · 피해 ×").Append(req.damageMult.ToString("0.00"));
+        return sb.ToString();
+    }
+
+    /// <summary>파츠 강화 — 판정 한 박자 전까지 오른쪽 판 · 초점을 강화 전 값으로(결과가 새지 않게 · 근거리 V3HoldBefore와 같은 뜻).</summary>
+    private void V3HoldBeforePart(EnhanceResult r)
+    {
+        if (!_v3Ready) return;
+        _successText.text = $"{r.chance * 100f:F0}%";
+        StreakV3(_v3StreakBefore, _v3JackpotBefore, false);
+        if (_v3PartFocal != null)
+            _v3PartFocal.text = $"Lv {r.beforeLevel} <color={HexMute}>→</color> <color={HexUp}>{r.beforeLevel + 1}</color>";
+    }
+
+    /// <summary>파츠 판정 한 박자 — 타격음 · 초점이 한 번 부풀었다 가라앉는다(망치는 근거리 무대에만 있어 소리와 초점이 충격을 말한다).</summary>
+    private async UniTask PartStrikeAsync()
+    {
+        ShopUIStyle.PlaySfx("crucible_hit");
+        await PunchFocalAsync(_v3PartFocal, UITheme.Thin.Gold, PartStrikeDur, 0.06f);
+        await Hold(PartStrikeHold);
     }
 
     /// <summary>고른(또는 손을 올린) 파츠의 초점 「Lv 3 → 4」 — RefreshRangedCard가 부른다(호버에도 따라간다).</summary>
@@ -1196,8 +1244,9 @@ public sealed partial class UI_CruciblePanel
     /// <summary>재료 줄 · 실패 한 줄 자리 — 근거리는 연속 게이지 아래, 원거리는 표 아래.</summary>
     private void PlaceRightForTab(bool ranged)
     {
-        if (_v3MatRow != null) RP(_v3MatRow, RPad, ranged ? 444f : MatY, RInner, 44f);
-        if (_v3Fail != null) RP(_v3Fail.transform, RPad, ranged ? 498f : MatY + 56f, RInner, 30f);
+        // 10-15 — 원거리도 근거리와 같은 자리(표 5줄을 걷었다 · 파츠 확률 · 연속 게이지가 그 자리)
+        if (_v3MatRow != null) RP(_v3MatRow, RPad, MatY, RInner, 44f);
+        if (_v3Fail != null) RP(_v3Fail.transform, RPad, MatY + 56f, RInner, 30f);
     }
 
     // ── 결과 연출(v3) ──

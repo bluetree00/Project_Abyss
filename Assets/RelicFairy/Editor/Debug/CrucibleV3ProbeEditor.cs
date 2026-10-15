@@ -181,15 +181,51 @@ public static class CrucibleV3ProbeEditor
             Check(sb, "이정표 — 판정 중 창 흔들림 0", tm.shake < 0.5f, $"{tm.shake:0.0}px");
             CloseEngrave(panel, sb);
 
-            // ── 7 원거리 파츠 — 같은 두 판(목록 + 고른 파츠 초점 · 발사 미리보기 96)
+            // ── 7 원거리 파츠 — 근거리와 같은 뼈대(10-15): 성공 확률 · 칩 · 연속 · 재료 · 실패 규칙 · [강화하기] 하나
             Call(panel, "SelectTab", 1);
             await Wait(0.5f, ct);
+            var parts = Managers.WeaponParts?.All;
+            string pid = parts != null && parts.Count > 0 ? parts[0].part_id : null;
+            if (typeof(UI_CruciblePanel).GetField("_selectedPartSlot", Inst)?.GetValue(panel) is int sel0 && sel0 != 0) Call(panel, "SelectPartSlot", 0);
+            run.FuelBank.Add(FuelKind.EnhanceMaterial, 300);
+            Call(panel, "RefreshAll");
+            await Wait(0.3f, ct);
+            string rate = Parsed(F<TMP_Text>(panel, "_successText"));
+            Check(sb, "원거리 — 성공 확률 숫자(%)", rate.EndsWith("%"), $"「{rate}」");
+            var rowBtns = F<Button[]>(panel, "_slotBtn");
+            bool anyRowBtn = rowBtns != null && System.Array.Exists(rowBtns, b => b != null && b.gameObject.activeInHierarchy);
+            Check(sb, "원거리 — 줄마다 강화 버튼 없음(입구 하나)", !anyRowBtn, $"{anyRowBtn}");
+            Check(sb, "원거리 — 재료 줄 · 실패 규칙", F<RectTransform>(panel, "_v3MatRow") is RectTransform mr && mr.gameObject.activeInHierarchy,
+                  Parsed(F<TMP_Text>(panel, "_v3Fail")));
             var partFocal = F<TMP_Text>(panel, "_v3PartFocal");
             Check(sb, "원거리 — 고른 파츠 초점 「Lv a → b」", partFocal != null && Parsed(partFocal).StartsWith("Lv"), $"「{Parsed(partFocal)}」");
             Check(sb, "원거리 — [강화하기]가 고른 파츠를 올린다(두 탭 공용)", F<Button>(panel, "_enhanceBtn") is Button eb && eb.gameObject.activeInHierarchy,
                   Parsed(F<TMP_Text>(panel, "_enhanceLabel")));
             Screen(sb, "원거리 파츠", panel, v3, win, melee: false);
             await Shot("CV3_7_Ranged", 300);
+
+            // 7b 파츠 성공 — 판정 한 박자 뒤 공개 · Lv +1
+            var pstate = RangedPartsState.Current;
+            int plv0 = pstate != null && pid != null ? pstate.LevelOf(pid) : -1;
+            var tps = await EnhanceAsync(panel, ctrl, win, new SeqRandom(0.0, 0.99), "CV3_7b_PartSuccess", 0.10f, ct);
+            CloseEngrave(panel, sb);
+            Check(sb, "파츠 성공 — Lv +1", pstate != null && pstate.LevelOf(pid) == plv0 + 1, $"{plv0} → {pstate?.LevelOf(pid)} · {tps}");
+
+            // 7c 높은 단계 실패 — 다음 단계 8 이상이면 1 하락(Lv7 → 6)
+            if (pstate != null && pid != null)
+            {
+                int need = 7 - pstate.LevelOf(pid);
+                if (need > 0) pstate.LevelUp(pid, need);
+                Call(panel, "RefreshAll");
+                await Wait(0.3f, ct);
+                string rule = Parsed(F<TMP_Text>(panel, "_v3Fail"));
+                Check(sb, "파츠 Lv7 — 실패 규칙 「−1 하락」", rule.Contains("하락"), $"「{rule}」 · 확률 「{Parsed(F<TMP_Text>(panel, "_successText"))}」");
+                var tpf = await EnhanceAsync(panel, ctrl, win, new SeqRandom(0.999), "CV3_7c_PartFail", 0.12f, ct);
+                CloseEngrave(panel, sb);
+                Check(sb, "파츠 실패 — Lv7 → 6 · 연속 0회", pstate.LevelOf(pid) == 6 && Parsed(F<TMP_Text>(panel, "_v3StreakHead")).Contains("0회"),
+                      $"Lv {pstate.LevelOf(pid)} · 「{Parsed(F<TMP_Text>(panel, "_v3StreakHead"))}」 · {tpf}");
+                await Shot("CV3_7d_AfterFail", 200);
+            }
 
             // ── 8 형 칸(진화 뒤) — 칼바람으로 진화(이정표 1.5초) → 「형 칼바람 Ⅰ — 단련 Ⅱ · 강화재료 N ▶」 → 누르면 4b 단련 화면
             Call(panel, "SelectTab", 0);

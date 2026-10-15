@@ -12,14 +12,18 @@
 public sealed class RefineryService
 {
     // ── 비용/확률 ──
-    // 누진 비용은 그대로(과잉 억제, 기획 §2.8): 12,12,20,20,28,28,36… → 원석 ≈160이면 런당 6회 안팎.
-    private const int BaseCost = 12;
-    private const int CostStep = 8;   // 2회마다 +8
+    // 10-15 사용자 「재화는 잘 주되 확률을 내려 더 뽑게 — 도박하는 재미」: 값 12 · 12 · 20 · 20 · 28 … → 10 · 10 · 14 · 14 · 18 …,
+    // 원석 수입 ↑(방 보상 4 → 6 등) → 런당 정제 ≈6회 → ≈11회. 등급 확률은 낮추고 천장으로 바닥을 받친다.
+    private const int BaseCost = 10;
+    private const int CostStep = 4;   // 2회마다 +4
 
-    // 등급 확률(고정) — 원석을 내고 돌리는 곳이라 <b>정예방 보상(희귀 52 · 영웅 36 · 전설 12)보다 좋게</b>:
-    // 희귀 45 · 영웅 40 · 전설 15(09-28 사용자 「정제소에서 좋은 확률을」 — 첫 값 70/25/5는 정예방보다 나빴다).
-    private const float EpicOdds   = 0.40f;
-    private const float LegendOdds = 0.15f;
+    // 등급 확률(고정): 희귀 58 · 영웅 32 · 전설 10(예전 45 · 40 · 15 — 09-28 「정예방보다 좋게」에서 횟수를 늘리는 쪽으로 옮겼다).
+    // 기대 전설 수는 비슷하다(6회 × 15% ≈ 0.9 → 11회 × 10% + 천장 ≈ 1.1).
+    private const float EpicOdds   = 0.32f;
+    private const float LegendOdds = 0.10f;
+
+    /// <summary>천장 — 전설 없이 이만큼 돌리면 다음 한 번은 전설(10-15). 런 단위 · 이어하기에 남는다.</summary>
+    public const int PityLimit = 10;
 
     /// <summary>「정제 등급」(기억의 제단 룬 갈래 · 10-14 강화형 +3%p/단계)이 Epic 확률에 더하는 몫. Rare에서 넘어온다.</summary>
     public static float QualityUnlockEpic => MemoryAltarService.RefineEpicBonus;
@@ -36,6 +40,15 @@ public sealed class RefineryService
     private readonly RunItemInventory _inventory;
 
     public int CraftCount { get; private set; }
+
+    /// <summary>전설 없이 돌린 수(천장 · 0 ~ <see cref="PityLimit"/>). 전설이 나오면 0.</summary>
+    public int PityCount { get; private set; }
+
+    /// <summary>이번 한 번이 천장(전설 확정)인가 — 화면 「다음 정제 전설 확정」.</summary>
+    public bool PityReady => PityCount >= PityLimit;
+
+    /// <summary>이어하기 — 천장 진척을 되살린다.</summary>
+    public void RestorePity(int count) => PityCount = Mathf.Clamp(count, 0, PityLimit);
 
     /// <summary>이어하기 — 저장된 정제 횟수(비용 단계)를 되살린다. 없으면 복원 뒤 비용이 첫 단계로 돌아갔다(10-09 출시 점검).</summary>
     public void RestoreCraftCount(int count) => CraftCount = Mathf.Max(0, count);
@@ -80,7 +93,7 @@ public sealed class RefineryService
         if (!CanAfford)
             return RefineryOutcome.Fail("원석이 부족합니다");
 
-        var (rune, so) = DrawRune(RollRarity());
+        var (rune, so) = DrawRune(PityReady ? ItemRarity.Legendary : RollRarity());
         if (rune == null)
             return RefineryOutcome.Fail("뽑을 룬이 없습니다");
 
@@ -100,6 +113,9 @@ public sealed class RefineryService
             return RefineryOutcome.Fail("원석이 부족합니다");
 
         CraftCount++;
+        // 천장 — 보여 주는 쪽(좋은 장)이 전설이면 처음부터 · 아니면 한 칸
+        bool gotLegend = rune.rarity >= ItemRarity.Legendary || (alt != null && alt.rarity >= ItemRarity.Legendary);
+        PityCount = gotLegend ? 0 : Mathf.Min(PityLimit, PityCount + 1);
         if (alt == null)
         {
             _inventory?.AddToStaging(rune);

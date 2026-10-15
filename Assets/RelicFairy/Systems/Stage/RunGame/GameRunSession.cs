@@ -41,7 +41,7 @@ public sealed class GameRunSession
     /// <summary>신규 런 시작 시 지급하는 강화재료(EnhanceMaterial) 초기량. 재련소(#1 소비처)가
     /// 이벤트방(유일 생산처)보다 앞 순번일 때 첫 재련소에서 재료=0이 되는 갭의 안전장치.
     /// EnhanceTable +0→+1 비용(1) 기준 약 5회 시도분. 이어하기 복원 경로에는 지급하지 않는다.</summary>
-    private const int NewRunStartingEnhanceMaterial = 5;
+    private const int NewRunStartingEnhanceMaterial = 8;   // 10-15 5 → 8(재련소 재화 넉넉히 · 확률은 낮춤)
 
     // 포션 — 신규 런 시작 지급량, 사용 시 회복 비율(최대 HP 대비).
     private const int   NewRunStartingPotions = 3;
@@ -505,6 +505,7 @@ public sealed class GameRunSession
             RunDelta.GainedGold = save.runGoldGained;
             RuneExtractCount    = save.runeExtractCount;
             Refinery.RestoreCraftCount(save.refineryCraftCount);
+            Refinery.RestorePity(save.refineryPity);   // 10-15 정제 천장(전설 없이 돌린 수)
             RestoreRoomBuffs(save.roomBuffsJson);
             FirstRunService.Restore(save.firstRunComboKey, save.firstRunCoreParts);
             StoryProgress.ClearRunFlags();

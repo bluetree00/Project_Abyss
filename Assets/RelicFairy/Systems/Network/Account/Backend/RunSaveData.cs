@@ -73,6 +73,7 @@ public class RunSaveData
     public string roomBuffsJson;          // RoomBuffListWrapper JSON
     public int    runeExtractCount;       // 룬 제거 누진 가격 단계
     public int    refineryCraftCount;     // 정제 비용 단계
+    public int    refineryPity;           // 10-15 정제 천장 — 전설 없이 돌린 수(옛 세이브 = 0)
     public int    runGoldGained;          // RunDelta.GainedGold(결과 · 누적 골드 통계)
     public string firstRunComboKey;       // 초행 조합 키(초행 런일 때만) — 이어하기에서 초행 배율 유지
     public int    firstRunCoreParts;      // 이번 런에 새로 밟은 코어 파츠 초행 수(+200씩)
