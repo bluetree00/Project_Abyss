@@ -53,7 +53,7 @@ public sealed class GRxThawEffect : GawainReaction
         mb.Status.ConsumeSlow(Frost);
         Vector3 at = mb.transform.position;
         Fire(at);
-        Hub.Bloom(mb, stacks * 2, GawainMemoryHub.BloomCause.Reaction);
+        Hub.Bloom(mb, stacks * 2, GawainMemoryHub.BloomCause.Reaction, ImprintMul);
         if (!Line2) return;
         int n = CombatQuery.GetNearbyEnemies(at, 3f, mb.gameObject, 8, Buf);
         var list = new List<MonsterBase>(n);
@@ -101,7 +101,7 @@ public sealed class GRxOverheatEffect : GawainReaction
             int s = st != null ? st.ConsumeSunmark() : 0;
             if (s <= 0) continue;
             any = true;
-            Hub.Bloom(mb, s, GawainMemoryHub.BloomCause.Reaction);
+            Hub.Bloom(mb, s, GawainMemoryHub.BloomCause.Reaction, ImprintMul);
         }
         if (any) Fire(player.transform.position);
     }
@@ -226,7 +226,7 @@ public sealed class GRxCoronaEffect : GawainReaction
             int s = st != null ? st.ConsumeSunmark() : 0;
             if (s <= 0) continue;
             any = true;
-            Hub.Bloom(mb, s, GawainMemoryHub.BloomCause.Reaction);
+            Hub.Bloom(mb, s, GawainMemoryHub.BloomCause.Reaction, ImprintMul);
         }
         if (any) { Fire(pos + fwd.normalized * 2f); Debug.Log("[GawainMemory] 일륜 ③ — 광폭발 원뿔 태양흔 즉시 개화"); }
     }
@@ -238,7 +238,7 @@ public sealed class GRxCoronaEffect : GawainReaction
         if (st == null || st.Sunmark <= 0) return;
         st.ConsumeSunmark(st.Sunmark - 1);
         Fire(mb.transform.position);
-        Hub.Bloom(mb, 1, GawainMemoryHub.BloomCause.Reaction);
+        Hub.Bloom(mb, 1, GawainMemoryHub.BloomCause.Reaction, ImprintMul);
     }
     private void OnBloomed(MonsterBase mb, int stacks, GawainMemoryHub.BloomCause cause)
     {
@@ -282,7 +282,7 @@ public sealed class GRxEclipseEffect : GawainReaction
         {
             var st = RelicMarkStatus.Of(mb.gameObject, false);
             int s = st != null ? st.ConsumeBlackspot() : 0;
-            if (s > 0) Hub.Bloom(mb, s, GawainMemoryHub.BloomCause.Reaction);
+            if (s > 0) Hub.Bloom(mb, s, GawainMemoryHub.BloomCause.Reaction, ImprintMul);
         }
         Fire(player.transform.position);
     }

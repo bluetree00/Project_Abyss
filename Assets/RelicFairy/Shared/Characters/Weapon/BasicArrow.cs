@@ -71,7 +71,11 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     // 이 화살이 '무슨 행동'으로 나갔는가. 스킬이 쏜 화살은 스킬로 신고해야 스킬 피해 증가가 붙는다(09-21).
     private WeaponActionType _actionType = WeaponActionType.GroundLight;
     private bool _isFinisher;   // 스킬 막타(차지샷 등) — 연출 단계만
-    private float _splitWeight = 1f;   // 분열 무게(가운데 1 · 갈래 CombatSpawner.SplitExtraWeight) — 피해 파이프라인 마지막에 곱한다(10-14)
+    private float _splitWeight = 1f;
+    // 이 화살이 적중 효과를 낸 수(직격 · 관통 · 폭발 대상 합) — 상한을 넘으면 피해만(10-15 활 최대 다발 폭주)
+    private int _effectHits;
+    private const int EffectHitsPerArrow = 3;
+    private const float ReturnWeight = 0.5f;   // 유도 × 관통 귀환 화살의 무게(10-15)   // 분열 무게(가운데 1 · 갈래 CombatSpawner.SplitExtraWeight) — 피해 파이프라인 마지막에 곱한다(10-14)
     private string _explodeEffectKey;
     private float _explodeEffectScale;
 
@@ -199,6 +203,7 @@ public class BasicArrow : MonoBehaviour, IPooledObject
         _actionType     = WeaponActionType.GroundLight;   // 스킬이 쏜 화살이면 SetActionType이 곧바로 덮어쓴다
         _isFinisher     = false;
         _splitWeight    = 1f;
+        _effectHits     = 0;
         _speedMult      = 1f;
         _homing         = 0f;
         _returnOnPierce = false;
@@ -481,14 +486,19 @@ public class BasicArrow : MonoBehaviour, IPooledObject
                 SkipHitVfx          = true,
                 SplitWeight         = _splitWeight,
                 NoFlinch            = true,   // 화살은 경직 · 넉백 없음 — 연사 · 분열이 몹을 계속 묶고 밀어냈다(10-15)
+                NoEffects           = !TakeEffectHit(),
             });
         }
 
         SpawnHitEffect(hitPoint);
 
-        // 폭발
+        // 폭발 — 화살당 한 번. 관통 화살은 첫 적에서 터지고 뒤로는 꿰뚫기만 한다
+        // (예전엔 관통할 때마다 터져 관통 × 폭발이 제곱으로 불었다 — 10-15 활 최대 다발 무리 3,989/초)
         if (_explode)
-            DoExplosion(hitPoint);
+        {
+            DoExplosion(hitPoint, victim);
+            _explode = false;
+        }
 
         // 관통 처리
         if (_pierce)
@@ -507,6 +517,8 @@ public class BasicArrow : MonoBehaviour, IPooledObject
                     _pierceRefilled = true;
                     _pierceCount = 0;
                     _pierced?.Clear();
+                    // 돌아온 화살은 덤 — 피해 · 적중 효과 절반(분열 무게와 같은 자리). 같은 적을 한 번 더 맞혀 단일 피해가 2배였다(10-15 활 최대 다발)
+                    _splitWeight *= ReturnWeight;
 
                     // 기록을 비운 순간 화살은 아직 이 몬스터 안에 있다 — 벗어나기 전까지만 이 대상을 막는다.
                     // 막지 않으면 다음 프레임에 제자리 재타격으로 관통을 다 쓰고 돌아서기 전에 사라진다.
@@ -554,8 +566,19 @@ public class BasicArrow : MonoBehaviour, IPooledObject
         }
     }
 
-    private void DoExplosion(Vector3 center)
+    /// <summary>이 화살이 적중 효과를 하나 더 낼 수 있나 — 낼 수 있으면 센다. 직격 · 관통 · 폭발 대상 합쳐 <see cref="EffectHitsPerArrow"/>번까지.</summary>
+    private bool TakeEffectHit()
     {
+        if (_effectHits >= EffectHitsPerArrow) return false;
+        _effectHits++;
+        return true;
+    }
+
+    private void DoExplosion(Vector3 center, GameObject directVictim)
+    {
+        // 맞은 대상 한 번씩 — 직격 대상은 이미 맞았고, 콜라이더가 여럿인 몬스터도 한 번만(10-15 점검: 직격 대상이 폭발로 한 번 더 · 콜라이더마다 피해 · 적중 효과)
+        var seen = new HashSet<GameObject>();
+        if (directVictim != null) seen.Add(directVictim);
         // 폭발 이펙트
         if (!string.IsNullOrEmpty(_explodeEffectKey))
             SpawnEffectAt(center, _explodeEffectKey, _explodeEffectScale);
@@ -572,7 +595,8 @@ public class BasicArrow : MonoBehaviour, IPooledObject
             if (d == null) continue;
 
             GameObject victim = d is Component c ? c.gameObject : col.gameObject;
-            // 직접 맞은 대상은 이미 데미지 받음 — 주변 적만
+            if (!seen.Add(victim)) continue;   // 직격 대상 · 이미 이 폭발에 맞은 대상
+            // 앞서 관통한 대상은 이미 데미지 받음 — 주변 적만
             if (_pierce && _pierced != null && _pierced.Contains(victim)) continue;
 
             // 직격과 같은 파이프라인으로 넣는다(09-21 사용자 결정). 예전엔 TakeDamage를 직접 불러
@@ -594,6 +618,7 @@ public class BasicArrow : MonoBehaviour, IPooledObject
                 SkipHitVfx          = true,
                 SplitWeight         = _splitWeight,
                 NoFlinch            = true,   // 화살 폭발도 경직 · 넉백 없음(10-15)
+                NoEffects           = !TakeEffectHit(),
             });
         }
     }

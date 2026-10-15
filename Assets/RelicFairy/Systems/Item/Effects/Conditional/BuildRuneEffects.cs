@@ -360,6 +360,7 @@ public sealed class DashAfterimageEffect : ItemEffectBase
 public sealed class PierceChainBonusEffect : ItemEffectBase
 {
     private const float ChainWindow = 0.15f;
+    private const int   MaxChain    = 4;   // 관통 파츠 상한 — 같은 순간의 분열 갈래 · 폭발 대상까지 세어 끝없이 올랐다(10-15 점검)
     private float _lastAt = -999f;
     private GameObject _lastTarget;
     private int _chain;
@@ -371,7 +372,7 @@ public sealed class PierceChainBonusEffect : ItemEffectBase
     {
         if (ctx?.WeaponType is not (WeaponType.Bow or WeaponType.Crossbow) || pkt.Target == null) return;
         float now = Time.time;
-        _chain = now - _lastAt <= ChainWindow && pkt.Target != _lastTarget ? _chain + 1 : 0;
+        _chain = now - _lastAt <= ChainWindow && pkt.Target != _lastTarget ? Mathf.Min(_chain + 1, MaxChain) : 0;
         _lastAt = now; _lastTarget = pkt.Target;
         if (_chain > 0) pkt.FinalDamage *= 1f + _value * _chain;
     }

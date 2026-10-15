@@ -517,6 +517,8 @@ public sealed class GDuskJudgmentEffect : GawainFragment
 /// <summary>G13 새벽에서 한낮으로 — 수확 때 1스택 남김 · ② 정오 동안 적중마다 남은 스택 1 개화 · ③ 정오 끝에 남은 스택 한꺼번에 개화.</summary>
 public sealed class GDawnToNoonEffect : GawainFragment
 {
+    // 대상당 마지막 개화 — 표식 간격(RelicMarkStatus.ApplyGap)보다 자주 터지지 않게. 대기가 없어 화살 · 연타마다 개화했다(10-15 점검)
+    private readonly Dictionary<int, float> _lastBloomAt = new();
     public GDawnToNoonEffect() : base("g_dawn_to_noon") { }
     protected override void Bind()   { Hub.HarvestKeep = 1; Hub.Hit += OnHubHit; Hub.NoonEnded += OnNoonEnd; }
     protected override void Unbind() { Hub.HarvestKeep = 0; Hub.Hit -= OnHubHit; Hub.NoonEnded -= OnNoonEnd; }
@@ -526,8 +528,11 @@ public sealed class GDawnToNoonEffect : GawainFragment
         var mb = AsMonster(hit.Target);
         var st = mb != null ? RelicMarkStatus.Of(mb.gameObject, false) : null;
         if (st == null || st.Sunmark <= 0) return;
+        int id = mb.GetInstanceID();
+        if (_lastBloomAt.TryGetValue(id, out float at) && Time.time - at < RelicMarkStatus.ApplyGap) return;
+        _lastBloomAt[id] = Time.time;
         st.ConsumeSunmark(st.Sunmark - 1);
-        Hub.Bloom(mb, 1, GawainMemoryHub.BloomCause.Fragment);
+        Hub.Bloom(mb, 1, GawainMemoryHub.BloomCause.Fragment, ImprintMul);
     }
     private void OnNoonEnd()
     {
@@ -539,7 +544,7 @@ public sealed class GDawnToNoonEffect : GawainFragment
         {
             var st = RelicMarkStatus.Of(mb.gameObject, false);
             int s = st != null ? st.ConsumeSunmark() : 0;
-            if (s > 0) Hub.Bloom(mb, s, GawainMemoryHub.BloomCause.Fragment);
+            if (s > 0) Hub.Bloom(mb, s, GawainMemoryHub.BloomCause.Fragment, ImprintMul);
         }
     }
 }
@@ -618,7 +623,7 @@ public sealed class GSunArrowEffect : GawainFragment
         int id = mb.GetInstanceID();
         if (_bloomReadyAt.TryGetValue(id, out float at) && Time.time < at) return;
         _bloomReadyAt[id] = Time.time + BloomGap;
-        Hub.Bloom(mb, st.ConsumeSunmark(), GawainMemoryHub.BloomCause.Fragment);
+        Hub.Bloom(mb, st.ConsumeSunmark(), GawainMemoryHub.BloomCause.Fragment, ImprintMul);
     }
 }
 

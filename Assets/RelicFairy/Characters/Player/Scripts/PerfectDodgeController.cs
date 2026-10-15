@@ -25,6 +25,8 @@ public sealed class PerfectDodgeController
     private const float DodgedAttackMargin    = 0.25f;
     // 피한 공격을 따라가는 상한(실시간 초) — 풀로 돌아간 적의 예고 표시가 남아 무적이 끝없이 늘지 않게.
     private const float DodgedAttackFollowMax = 2.5f;
+    // 반격 창 적중 환급 최소 간격(실시간 초) — 한 번에 여러 대상을 맞혀도 한 번(10-15 점검)
+    private const float RefundGap = 0.1f;
 
     // ── Private ───────────────────────────────────────────────────
     private readonly PlayerController _owner;
@@ -33,6 +35,7 @@ public sealed class PerfectDodgeController
     private readonly List<RelicFairy.Monster.MonsterBase> _senseBuf = new(SenseMax);
 
     private bool  _armed;             // 이번 회피에서 아직 발동하지 않았는지
+    private float _lastRefundAt = -999f;   // 반격 창 적중 환급 마지막 시각(unscaled)
     private float _end;               // 슬로모/보너스 종료 시각(unscaled) — 반격 창도 이 시각에 닫힌다
     private float _freezeEnd;         // 프레임 스톱 종료 시각(unscaled)
     private bool  _frozen;            // 지금 프레임 스톱 구간인지
@@ -145,6 +148,9 @@ public sealed class PerfectDodgeController
     {
         if (!IsCounterWindow) return;
         if (info.Attacker != _owner.gameObject || info.Damage <= 0f) return;
+        // 한 번에 여러 대상을 맞혀도(분열 · 관통 · 폭발) 환급은 0.1초에 한 번 — 적중마다 들어와 화살 수만큼 늘었다(10-15 점검)
+        if (Time.unscaledTime - _lastRefundAt < RefundGap) return;
+        _lastRefundAt = Time.unscaledTime;
 
         var cd = _owner.CharacterData;
         if (cd != null) RefundStamina(cd.perfectDodgeCounterHitRefund);

@@ -326,7 +326,8 @@ public sealed class LancelotMemoryHub : MonoBehaviour
     /// 낙인을 찢는다 — X자 참격(유물 공격력 × 0.35 × X자 수). <paramref name="limit"/>개까지만 찢는다(작은 심판 = 1).
     /// 찢은(센) 낙인 수를 돌려준다. 엇갈린 빛이면 낙인을 남긴다.
     /// </summary>
-    public int Tear(MonsterBase mb, TearCause cause, int limit = int.MaxValue)
+    /// <param name="imprintMul">부른 조각의 계열 각인 배율(조각이 부를 때 — 심판 마무리 등 유물 자체는 1, 10-15 빌드 연결).</param>
+    public int Tear(MonsterBase mb, TearCause cause, int limit = int.MaxValue, float imprintMul = 1f)
     {
         if (mb == null) return 0;
         var st = RelicMarkStatus.Of(mb.gameObject, false);
@@ -361,7 +362,7 @@ public sealed class LancelotMemoryHub : MonoBehaviour
         Vector3 at = mb.transform.position;
         if (x > 0)
         {
-            float dmg = Atk * TearAtkRatio * x;
+            float dmg = Atk * TearAtkRatio * x * imprintMul;
             if (!mb.IsDead) CombatQuery.DealSynergyDamage(mb, dmg, _player.gameObject, 1f, false, RuneElement.Dark);
             if (cause == TearCause.Judgment) PlayXLaterAsync(at, Mathf.Min(x, MaxTearVfx), this.GetCancellationTokenOnDestroy()).Forget();
             else PlayX(at, Mathf.Min(x, MaxTearVfx));

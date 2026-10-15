@@ -236,7 +236,8 @@ public sealed class GawainMemoryHub : MonoBehaviour
     /// <summary>
     /// 개화 — 스택마다 반경 2m 폭발. 엇갈린 빛이 있으면 이번 개화는 스택을 소모하지 않는다(부르는 쪽이 소모 전에 확인).
     /// </summary>
-    public void Bloom(MonsterBase target, int stacks, BloomCause cause)
+    /// <param name="imprintMul">부른 조각의 계열 각인 배율(조각이 부를 때 — 유물 자체가 부르면 1, 10-15 빌드 연결).</param>
+    public void Bloom(MonsterBase target, int stacks, BloomCause cause, float imprintMul = 1f)
     {
         if (target == null || stacks <= 0 || _player == null) return;
         if (_bloomDepth >= MaxBloomDepth) return;
@@ -244,7 +245,7 @@ public sealed class GawainMemoryHub : MonoBehaviour
         try
         {
             Vector3 at = target.transform.position;
-            float per = _player.RuntimeStats.AttackPower * BloomAtkRatio;   // 근접 · 원거리 중 큰 값(10-14 A5)
+            float per = _player.RuntimeStats.AttackPower * BloomAtkRatio * imprintMul;   // 근접 · 원거리 중 큰 값(10-14 A5) × 조각 각인(10-15)
             PlayBloomPops(at, stacks);   // 피해는 지금 다 들어가고, 터지는 그림 · 소리만 차례로(10-12 S1)
             for (int s = 0; s < stacks; s++)
             {

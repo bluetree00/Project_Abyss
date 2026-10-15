@@ -113,6 +113,11 @@ public static class CombatDamage
 
         /// <summary>맞은 적을 멈추게(경직) · 밀어내지(넉백) 않는다 — 피해만(화살, 10-15 사용자 「활 같은 공격은 경직 · 넉백이 없어야」). 정예 포이즈는 깎되 안 깨진다.</summary>
         public bool NoFlinch;
+
+        /// <summary>
+        /// 적중 효과(⑨~⑪ — 룬 · 아이템 · 유물 조각 · 패시브 · 서약)를 내지 않는다 — 피해만. 화살 한 발이 효과 상한(<see cref="BasicArrow"/>)을 넘긴 적중(10-15).
+        /// </summary>
+        public bool NoEffects;
     }
 
     public static bool IsMeleeAction(WeaponActionType a) =>
@@ -274,18 +279,7 @@ public static class CombatDamage
         if (tgtMb != null && tgtMb.IsDamageImmuneNow)
         {
             tgtMb.NotifyBlockedHit(hitPoint);
-            mgr?.OnPostDealDamage(new DamageReport
-            {
-                DamageDealt = 0f,
-                Attacker    = owner,
-                Target      = target,
-                IsCrit      = isCrit,
-                HitPosition = hitPoint,
-                ActionType  = actionType,
-                IsRanged    = req.IsRanged,
-                ProcCoef    = procCoef,
-                IsHeavy     = false,   // 막힌 타격은 강타로 세지 않는다
-            });
+            // 적중 효과에 보고하지 않는다 — 막힌 타격이 「N번마다」 · 표식 카운터를 올려 무적 보스에 쏘면 쌓였다(10-15 점검)
             return 0f;   // 피해 0 — 막혔다
         }
 
@@ -316,7 +310,7 @@ public static class CombatDamage
             IsHeavy     = isHeavy && finalDmg > 0f,
         };
         // 분열 갈래는 적중 효과(⑨~⑪)가 무게만큼만 붙는다 — 50%면 갈래 두 발에 한 번. 가운데 화살 · 근접은 늘.
-        bool effects = SplitEffectTurn(splitW);
+        bool effects = !req.NoEffects && SplitEffectTurn(splitW);
         if (effects) mgr?.OnPostDealDamage(report);
 
         // ⑩ 아이템 형태변형: 다단히트·원형 충격파·스킬 추가 투사체(2차 피해 경로 사용 → 재귀 없음)

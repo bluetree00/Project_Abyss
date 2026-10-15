@@ -57,7 +57,7 @@ public static class RelicEvolution
         BuildFamily best = BuildFamily.None;
         int bestCount = 0;
         var wm = GameRunBootstrapper.Instance?.Run?.Player != null ? GameRunBootstrapper.Instance.Run.Player.WeaponManager : null;
-        var weaponFam = wm != null ? BuildFamilyRules.OfWeapon(wm.Weapon0Data) : BuildFamily.None;
+        var weaponFam = wm != null ? BuildFamilyRules.OfWeapon(wm.CurrentWeaponData) : BuildFamily.None;   // 지금 든 무기(예전엔 슬롯 0만 — 활을 들어도 근접 계열, 10-15 점검)
         foreach (var f in new[] { BuildFamily.Combo, BuildFamily.Crit, BuildFamily.Ranged })
         {
             int c = BuildImprint.Count(f);

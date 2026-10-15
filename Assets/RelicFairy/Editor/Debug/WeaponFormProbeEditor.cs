@@ -206,6 +206,9 @@ public static class WeaponFormProbeEditor
     [MenuItem(Root + "55 범위 표시 구분 — 적 예고 vs 플레이어 표시 사진 (테스트 허브, 플레이 중)")]
     private static void BeginGuides() => Begin("guides");
 
+    [MenuItem(Root + "56 룬 · 서약 다 낀 빌드 + 활 최대 다발 — 단일 · 무리 · 타격 트리거 (테스트 허브, 플레이 중, 약 4분)")]
+    private static void BeginLoadout() => Begin("loadout");
+
     [MenuItem(Root + "50 돌진 벽 — 무형검 R · 회피 대시 · 카타나 E가 벽을 넘나 (테스트 허브, 플레이 중)")]
     private static void BeginDashWall() => Begin("dashwall");
 
@@ -345,6 +348,7 @@ public static class WeaponFormProbeEditor
                 case "rswap": await RangedSwapAsync(p, sb, ct); break;
                 case "noflinch": await NoFlinchAsync(p, sb, ct); break;
                 case "guides": await GuidesAsync(p, sb, ct); break;
+                case "loadout": await LoadoutAsync(p, sb, ct); break;
                 case "deathfx": await DeathFxAsync(p, sb, ct); break;
                 case "arrowfeel": await ArrowFeelAsync(p, sb, ct); break;
                 case "bs5x": await FourBuildsAsync(p, sb, ct); break;
@@ -3317,6 +3321,152 @@ public static class WeaponFormProbeEditor
         sb.AppendLine($"   일제 사격 1회당 — 3발 ÷ 1발 {k:0.00}배 · 5발 ÷ 1발 {k5:0.00}배(참고 — 부채꼴이 넓어 단일엔 바깥 갈래가 덜 맞는다) · 초당은 박자가 흔들려 참고만({rows[1].total / Mathf.Max(0.01f, rows[0].total):0.00}배)");
         sb.AppendLine("   (갈래 3발 45% · 5발 38% — 다 맞으면 1.9 · 2.5배 · 갈래 명중 약 60%면 3발 약 1.55배 · 고치기 전 무게 1이면 약 2.2배)");
         Check(sb, $"분열 3발 1회당이 1발보다 조금 더 — 1.2 ~ 1.8배({k:0.00}배)", k >= 1.2f && k <= 1.8f);
+    }
+
+    // ── 56 룬 · 서약 다 낀 빌드 + 활 최대 다발(10-15 사용자 「DPS · 조합 오버파워 · 룬과 서약 · 분열한 활의 타격 트리거」) ──
+    private static readonly (string label, string weapon, BuildFamily fam, (string id, int lv)[] parts, float range, string el, string[] ids, string cause)[] Loadouts =
+    {
+        ("카타나 연타", Katana,   BuildFamily.Combo,  new (string, int)[0],                    1.6f, "ELECTRIC", new[] { "item_t4_fire_single",  "item_t3_elec_static",    "item_t3_fire_spark",    "item_t2_sharp_instinct", "item_t2_trig_same" },   "streak"),
+        ("대검 한 방",  Great,    BuildFamily.Crit,   new (string, int)[0],                    1.8f, "LIGHT",    new[] { "item_t4_light_single", "item_t3_light_radiance", "item_t3_light_sanctum", "item_t2_heavy_weight",   "item_t2_fierce_blade" }, "streak"),
+        ("활 다발",     Bow,      BuildFamily.Ranged, new[] { ("part_split", 2) },             6f,   "GRASS",    new[] { "item_t4_grass_proj",   "item_t3_elec_arc",       "item_t3_grass_venom",   "item_t2_trig_ranged",    "item_t2_sharp_instinct" }, "aim"),
+        ("석궁 저격",   Crossbow, BuildFamily.Ranged, new[] { ("part_power", 2) },             6f,   "ICE",      new[] { "item_t4_ice_single",   "item_t3_light_radiance", "item_t3_fire_ember",    "item_t2_heavy_weight",   "item_t2_aim_fury" },     "aim"),
+        ("활 최대 다발", Bow,     BuildFamily.Ranged, new[] { ("part_split", 10), ("part_pierce", 7), ("part_explode", 5), ("part_homing", 4) },
+                                                                                                 6f,   "FIRE",     new[] { "item_t4_fire_single",  "item_t2_trig_ranged",    "item_t2_trig_crit_stack", "item_t3_grass_venom", "item_t2_sharp_instinct" }, "aim"),
+    };
+
+    private static async UniTask LoadoutAsync(PlayerController p, StringBuilder sb, CancellationToken ct)
+    {
+        sb.AppendLine("룬 · 서약 다 낀 빌드 — 룬 5 · 각인 4 · 서약 「조건(연격/겨눔) → 초신성 → 잔불」 금 · 단일 10초 + 무리 5마리 10초 · 입력 0.1초 · 유물 없음");
+        var run    = GameRunBootstrapper.Instance.Run;
+        var placed = typeof(RunItemInventory).GetField("_placedItems", Inst)?.GetValue(run.ItemInventory) as List<RuntimeItemData>;
+        if (placed == null) { sb.AppendLine("룬 판 목록을 못 읽음"); return; }
+        var savedPlaced = new List<RuntimeItemData>(placed);
+        var parts = RangedPartsState.Current;
+        var savedParts = new List<RangedPartsState.Equipped>(parts.Equipped_);
+        string savedSentence = run.CovenantHandler?.Sentence?.CovenantId;
+        int hits = 0;
+        Action<HitInfo> onHit = h => { if (h.Attacker == p.gameObject) hits++; };
+        var rows = new List<(string label, float single, float group)>();
+        foreach (var m in UnityEngine.Object.FindObjectsByType<MonsterBase>(FindObjectsSortMode.None))
+            if (m != null && !m.IsDead) m.gameObject.SetActive(false);
+        DetachAll();
+        await Wait(5f, ct);   // 방 입장 입력 잠금
+
+        string Split(float secs, long[] s0, int cov0)
+        {
+            var st = run.RunStats;
+            float B(DamageSource k) => (st.DamageOf(k) - s0[(int)k]) / secs;
+            return $"평타 {B(DamageSource.Basic):0} · 룬 {B(DamageSource.Rune):0} · 지속 {B(DamageSource.Dot):0} · 서약 {B(DamageSource.Covenant):0} · 서약 발동 {(st.CovenantFires - cov0) / secs:0.0}/초";
+        }
+        async UniTask<(float dps, string split, float hps)> MeasureAsync(List<HpTrack> ts, Vector3 aim)
+        {
+            float s0t = Time.time;
+            while (Time.time - s0t < 2f) { RefillAll(); Steer(p, aim); p.InputBuffer.Push(Command.Light); await Wait(0.1f, ct); }
+            foreach (var t in ts) t.Dealt = 0f;
+            hits = 0;
+            var st = run.RunStats;
+            var src0 = new long[RunStats.SourceCount];
+            for (int k = 0; k < RunStats.SourceCount; k++) src0[k] = st.DamageOf((DamageSource)k);
+            int cov0 = st.CovenantFires;
+            float t0 = Time.time;
+            while (Time.time - t0 < 10f) { RefillAll(); Steer(p, aim); p.InputBuffer.Push(Command.Light); await Wait(0.1f, ct); }
+            float secs = Mathf.Max(0.01f, Time.time - t0);
+            float sum = 0f;
+            foreach (var t in ts) sum += t.Dealt;
+            return (sum / secs, Split(secs, src0, cov0), hits / secs);
+        }
+
+        HitFeedbackService.OnHit += onHit;
+        try
+        {
+            foreach (var b in Loadouts)
+            {
+                Managers.UI?.CloseAllPopupUI();
+                Time.timeScale = 1f;
+                DetachAll();
+                foreach (var m in UnityEngine.Object.FindObjectsByType<MonsterBase>(FindObjectsSortMode.None))
+                    if (m != null && !m.IsDead) m.gameObject.SetActive(false);
+                bool ranged = b.fam == BuildFamily.Ranged;
+                int slot = ranged ? PlayerWeaponManager.Slot1 : PlayerWeaponManager.Slot0;
+                if (!await EquipAsync(p, b.weapon, ct, slot)) { sb.AppendLine($"장착 실패 {b.label}"); continue; }
+                var w = slot == PlayerWeaponManager.Slot1 ? p.WeaponManager.Weapon1Data : p.WeaponManager.Weapon0Data;
+                typeof(PlayerWeaponManager).GetMethod("ApplyServerOverrideIfAvailable", BindingFlags.Static | BindingFlags.NonPublic)
+                    ?.Invoke(null, new object[] { w, Path.GetFileNameWithoutExtension(b.weapon) });
+                w.enhanceLevel = 0;
+                w.RecomputeEnhancedStats();
+                w.formTier = 0;
+                w.formVariants = "";
+                WeaponFormRuntime.Of(p).Rebuild();
+                p.WeaponManager.RaiseEquippedWeaponRefreshed();
+
+                placed.Clear();
+                foreach (var id in b.ids)
+                {
+                    var d = ProjectRune(id);
+                    if (d == null) continue;
+                    if (string.IsNullOrEmpty(d.element)) d.element = b.el;
+                    placed.Add(d);
+                }
+                var eq = new List<RangedPartsState.Equipped>();
+                foreach (var (pid, lv) in b.parts) eq.Add(new RangedPartsState.Equipped { partId = pid, level = lv });
+                parts.Restore(eq.ToArray());
+                string sentence = CovenantSentence.MakeId(b.cause, CovenantTier.Gold, new List<(string, CovenantTier, ClauseLink)>
+                    { ("supernova", CovenantTier.Gold, ClauseLink.Immediate), ("ember", CovenantTier.Gold, ClauseLink.Immediate) });
+                bool wrote = run.CovenantHandler != null && run.CovenantHandler.TryWriteSentence(sentence);
+                run.EffectManager.Rebuild();
+                ForceImprint(b.fam, 4);
+                await Wait(0.5f, ct);
+
+                s_home = p.transform.position;
+                Vector3 fw = Flat(p.transform.forward);
+                Vector3 c = p.transform.position + fw * b.range;
+                var one = await TrackAsync(c, ct);
+                if (one == null) { sb.AppendLine($"슬라임 부르기 실패 {b.label}"); continue; }
+                var (single, sSplit, sHps) = await MeasureAsync(new List<HpTrack> { one }, one.M.transform.position);
+                one.M.gameObject.SetActive(false);
+                DetachAll();
+                var grp = new List<HpTrack>();
+                var center = await TrackAsync(c, ct);
+                if (center != null) grp.Add(center);
+                for (int k = 0; k < 4; k++)
+                {
+                    float a = k * Mathf.PI * 0.5f + Mathf.PI * 0.25f;
+                    var t = await TrackAsync(c + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * 1.8f, ct);
+                    if (t != null) grp.Add(t);
+                }
+                var (group, gSplit, gHps) = await MeasureAsync(grp, c);
+                rows.Add((b.label, single, group));
+                sb.AppendLine($"{b.label}: 단일 {single:0}/초 · 무리 {group:0}/초(배율 {(single > 0f ? group / single : 0f):0.00}) · 적중 단일 {sHps:0.0}/초 · 무리 {gHps:0.0}/초 · 서약 {(wrote ? sentence : "못 씀")}");
+                sb.AppendLine($"   단일 — {sSplit}");
+                sb.AppendLine($"   무리 — {gSplit}");
+                foreach (var t in grp) if (t.M != null) t.M.gameObject.SetActive(false);
+            }
+        }
+        finally
+        {
+            HitFeedbackService.OnHit -= onHit;
+            placed.Clear();
+            placed.AddRange(savedPlaced);
+            parts.Restore(savedParts);
+            if (!string.IsNullOrEmpty(savedSentence)) run.CovenantHandler?.TryWriteSentence(savedSentence);
+            run.EffectManager.Rebuild();
+            DetachAll();
+        }
+        if (rows.Count < 5) { Check(sb, $"다섯 칸 모두 잼 — {rows.Count}/5", false); return; }
+        float mean = 0f;
+        for (int i = 0; i < 4; i++) mean += rows[i].single;
+        mean /= 4f;
+        var spread = new StringBuilder();
+        bool within = true;
+        for (int i = 0; i < 4; i++)
+        {
+            float k = mean > 0f ? rows[i].single / mean : 0f;
+            spread.Append($"{rows[i].label} {k:0.00} · ");
+            if (k < 0.75f || k > 1.25f) within = false;
+        }
+        Check(sb, $"① 서약까지 낀 단일 — 평균 {mean:0}/초 대비 {spread}(0.75 ~ 1.25)", within);
+        float meleeGroup = Mathf.Max(rows[0].group, rows[1].group);
+        Check(sb, $"② 활 최대 다발 무리 {rows[4].group:0}/초 ≤ 근접 무리 최고 {meleeGroup:0}/초 × 1.5 (다발 최대치가 근접 광역을 크게 넘지 않는다)", rows[4].group <= meleeGroup * 1.5f);
     }
 
     // ── 55 범위 표시 구분(10-15 사용자 「플레이어 룬 · 서약 가이드라인과 보스 · 몬스터 가이드라인 구분 — 누가 쓴 건지 구분하기 어려워」) ──

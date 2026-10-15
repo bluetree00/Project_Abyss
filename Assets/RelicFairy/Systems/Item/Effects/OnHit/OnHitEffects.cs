@@ -57,6 +57,12 @@ public sealed class PoisonOnHitEffect : ItemEffectBase
     /// </summary>
     public void SetElement(string elementId) => _statusId = elementId == "FIRE" ? "item_burn" : "item_poison";
 
+    /// <summary>
+    /// 「OnCrit」 · 「AfterHit」은 공통 판정표에 없어 꺼져 있었다(10-15 점검 — 스며드는 · 되받아치는 화염의 룬 화상이 한 번도 안 걸렸다).
+    /// 스며드는 화염은 설계 · 설명이 「적중 시 화상」이라 적중으로, 되받아치는 화염은 아래 「맞은 뒤 창」이 거른다.
+    /// </summary>
+    public override bool IsActive(ItemEffectContext ctx) => _trigger is "OnCrit" or "AfterHit" || base.IsActive(ctx);
+
     private const int DefaultPoisonStacks = 8;
 
     // 되받아치는 화염(10-14 R2) — 발동이 「AfterHit」이면 맞은 뒤 창(duration) 동안만 적중이 화상 · 창은 6초에 한 번

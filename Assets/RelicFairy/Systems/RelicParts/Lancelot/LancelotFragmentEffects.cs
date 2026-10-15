@@ -294,7 +294,7 @@ public sealed class LTornOathBladeEffect : LancelotFragment
         {
             if (mb == null || mb.IsDead) continue;
             cut++;
-            torn += Hub.Tear(mb, LancelotMemoryHub.TearCause.SmallJudgment, 1);
+            torn += Hub.Tear(mb, LancelotMemoryHub.TearCause.SmallJudgment, 1, ImprintMul);
             CombatQuery.DealSynergyDamage(mb, Atk * Ratio, Owner, 1f, false, RuneElement.Dark);
         }
         if (Line2 && torn > 0) Hub.SaveGrudge(torn);
@@ -651,7 +651,7 @@ public sealed class LGrudgeBladeEffect : LancelotFragment
             Hub.MarkFinisherHit(mb);
             Vector3 at = mb.transform.position;
             RelicStateVfx.PlayOneShot(LancelotMemoryHub.SlashVfxKey, at + Vector3.up * 0.9f, 0.45f, fwd, 1.2f);
-            Hub.Tear(mb, LancelotMemoryHub.TearCause.Judgment);
+            Hub.Tear(mb, LancelotMemoryHub.TearCause.Judgment, int.MaxValue, ImprintMul);
             CombatDamage.Deal(new CombatDamage.Request
             {
                 Target              = mb.gameObject,
@@ -816,7 +816,7 @@ public sealed class LQuarryBrandEffect : LancelotFragment
         if (Line3 && Time.time >= _tearReadyAt && LancelotMemoryHub.BrandOf(mb) >= Hub.BrandCap)
         {
             _tearReadyAt = Time.time + TearGap;
-            Hub.Tear(mb, LancelotMemoryHub.TearCause.Fragment, 1);
+            Hub.Tear(mb, LancelotMemoryHub.TearCause.Fragment, 1, ImprintMul);
         }
         if (!_streak.Hit(mb.gameObject, Time.time) || _streak.Count % Every != 0) return;
         Hub.AddBrand(mb, Line2 && h.IsCritical ? 2 : 1, overflowToGrudge: true, ignoreGap: true);

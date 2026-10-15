@@ -93,7 +93,7 @@ public sealed class RelicPartEffectHandler
         for (int i = 0; i < _active.Count; i++)
         {
             _active[i].OnHit(hit, _player);
-            if (hit.IsCritical) _active[i].OnCrit(hit, _player);
+            if (hit.IsCritical || hit.IsHeavy) _active[i].OnCrit(hit, _player);   // 치명 또는 강타 — 룬과 같은 규칙(10-14 A3 · 10-15 점검)
         }
     }
 
