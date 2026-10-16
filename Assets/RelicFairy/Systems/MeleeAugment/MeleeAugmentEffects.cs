@@ -581,6 +581,84 @@ public sealed class BulwarkAugment : MeleeAugmentEffect
     }
 }
 
+/// <summary>
+/// 원소의 날 — 콤보 마지막 타가 룬 판에 가장 많이 놓인 속성으로 터진다(둘레 2 m · 그 속성 피해 · 휘두름당 1번) — 근접 평타와 룬 빌드를 잇는다.
+/// 속성 상태: 불 화상 · 독 중독(둘 다 더 센 지속 피해만 남는다 — 룬 것을 덮지 않는다) · 번개 0.3초 기절(보스 제외) · 얼음 2초 30% 느림(룬 서리 쌓임과 따로) ·
+/// 빛 = 다음 근접 타 확정 치명 · 어둠 = 3초 받는 피해 +15%.
+/// 처음 안(마지막 타 적중 효과를 한 번 더 알림)은 룬마다 같은 대상 재발동 간격이 있어 룬 피해가 +7%에 그쳤다(10-15 실측 61) — 결정적인 폭발로 바꿨다.
+/// </summary>
+public sealed class ElementEdgeAugment : MeleeAugmentEffect
+{
+    private const float Radius = 2f, DotRatio = 0.15f, DotInterval = 0.5f, Stun = 0.3f, Slow = 0.3f, SlowSeconds = 2f, DarkAmp = 0.15f, DarkSeconds = 3f;
+    private const int DotTicks = 4;
+    private static readonly int[] s_count = new int[6];
+    public ElementEdgeAugment(MeleeAugmentDef d, int r) : base(d, r) { }
+
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
+    {
+        if (!FirstHitOfSwing(report) || !IsFinisherStep(ctx) || !TopElement(out var el)) return;
+        var p = ctx.Player;
+        Vector3 at = report.Target.transform.position;
+        float atk = Atk(ctx), dmg = atk * V * 0.01f;
+        int n = CombatQuery.GetNearbyEnemies(at, Radius, p.gameObject, 16, Buf), hits = 0;
+        for (int i = 0; i < n; i++)
+        {
+            var e = Buf[i];
+            if (e == null || e.IsDead) continue;
+            CombatQuery.DealSynergyDamage(e, dmg, p.gameObject, 1f, false, el);
+            if (!e.IsDead) ApplyStatus(e, el, atk, p);
+            hits++;
+        }
+        if (el == RuneElement.Light && !p.RuntimeStats.ForceCritArmed) p.RuntimeStats.ArmForceCrit(0f);
+        ElementVfxPlayer.PlayBurst(el, at, Radius);
+        FormStrike.GroundRing(at, Radius, RingSeconds);
+        Log($"원소의 날 — {el} 맞힘 {hits}");
+    }
+
+    /// <summary>룬 판에 가장 많이 놓인 속성(동점이면 먼저 센 것). 룬 판이 비었거나 속성이 없으면 false.</summary>
+    public static bool TopElement(out RuneElement element)
+    {
+        element = RuneElement.Fire;
+        var inv = GameRunBootstrapper.Instance?.Run?.ItemInventory;
+        if (inv == null) return false;
+        Array.Clear(s_count, 0, s_count.Length);
+        foreach (var item in inv.PlacedItems)
+            if (item != null && TryParse(item.element, out var e)) s_count[(int)e]++;
+        int best = -1;
+        for (int i = 0; i < s_count.Length; i++)
+            if (s_count[i] > 0 && (best < 0 || s_count[i] > s_count[best])) best = i;
+        if (best < 0) return false;
+        element = (RuneElement)best;
+        return true;
+    }
+
+    private static bool TryParse(string s, out RuneElement e)
+    {
+        switch (s)
+        {
+            case "FIRE":     e = RuneElement.Fire;     return true;
+            case "ICE":      e = RuneElement.Ice;      return true;
+            case "ELECTRIC": e = RuneElement.Electric; return true;
+            case "GRASS":    e = RuneElement.Grass;    return true;
+            case "LIGHT":    e = RuneElement.Light;    return true;
+            case "DARK":     e = RuneElement.Dark;     return true;
+            default:         e = RuneElement.Fire;     return false;
+        }
+    }
+
+    private static void ApplyStatus(MonsterBase e, RuneElement el, float atk, PlayerController p)
+    {
+        switch (el)
+        {
+            case RuneElement.Fire:     e.Status.ApplyStrongestDot("burn", atk * DotRatio, DotInterval, DotTicks, p.gameObject); break;
+            case RuneElement.Grass:    e.Status.ApplyStrongestDot("poison", atk * DotRatio, DotInterval, DotTicks, p.gameObject); break;
+            case RuneElement.Electric: if (e.Grade != MonsterGrade.Boss) e.ApplyStun(Stun); break;
+            case RuneElement.Ice:      e.Status.ApplySlow("aug_chill", Slow, SlowSeconds); break;
+            case RuneElement.Dark:     e.ApplyDamageTakenAmp(DarkAmp, DarkSeconds, "vulnerable"); break;
+        }
+    }
+}
+
 /// <summary>검기 — 콤보 마지막 타 적중 때 앞으로 6 m 관통 검기(쌍검기면 ±20° 두 갈래 더).</summary>
 public sealed class SwordWaveAugment : MeleeAugmentEffect
 {

@@ -30,8 +30,9 @@ public sealed class FireExplosionOnSkillEffect : ItemEffectBase
         float damage = DamageFormula.Calculate(_value, ctx.Stats.GetEffectiveAttack(kind));
 
         int n = CombatQuery.GetNearbyEnemies(center, Radius, ctx.Player.gameObject, 32, s_buf);
-        for (int i = 0; i < n; i++)
-            s_buf[i].TakeDamage(damage, ctx.Player.gameObject, knockbackMultiplier: 0.5f);
+        using (DamageSourceScope.Enter(DamageSource.Rune))   // 룬 몫으로 센다(10-16)
+            for (int i = 0; i < n; i++)
+                s_buf[i].TakeDamage(damage, ctx.Player.gameObject, knockbackMultiplier: 0.5f);
 
         ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), center, Radius / 1.25f);   // 판정 반경에 맞춤(10-13 실측: 배율 1 → 1.0 m)
         ItemEffectVfxHelper.ShowNotice($"<color=#FF6622>화염 폭발</color> {damage:F0} 데미지");
@@ -58,8 +59,9 @@ public sealed class LightningOnSkillEffect : ItemEffectBase
         float damage = DamageFormula.Calculate(_value, ctx.Stats.GetEffectiveAttack(kind));
 
         int n = CombatQuery.GetNearbyEnemies(center, Radius, ctx.Player.gameObject, 32, s_buf);
-        for (int i = 0; i < n; i++)
-            s_buf[i].TakeDamage(damage, ctx.Player.gameObject, knockbackMultiplier: 0.3f);
+        using (DamageSourceScope.Enter(DamageSource.Rune))   // 룬 몫으로 센다(10-16)
+            for (int i = 0; i < n; i++)
+                s_buf[i].TakeDamage(damage, ctx.Player.gameObject, knockbackMultiplier: 0.3f);
 
         ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), center, Radius / 4.3f);   // 판정 반경에 맞춤(10-13 실측: 배율 1 → 4.5 m)
         ItemEffectVfxHelper.ShowNotice($"<color=#44CCFF>번개 강타</color> {damage:F0} 데미지");

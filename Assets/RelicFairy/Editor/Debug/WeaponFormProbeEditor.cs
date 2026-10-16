@@ -212,6 +212,12 @@ public static class WeaponFormProbeEditor
     [MenuItem(Root + "58 근접 강화 증강 2차 — 진화 변환 · 제시 거름 · 평타 · 스킬 · 돌진 (테스트 허브, 플레이 중)")]
     private static void BeginAugment2() => Begin("augment2");
 
+    [MenuItem(Root + "62 아이템 직접 피해 집계 — 추가 타격 복사 = 룬 몫 (테스트 허브, 플레이 중)")]
+    private static void BeginItemDirectSource() => Begin("itemsource");
+
+    [MenuItem(Root + "61 원소의 날 · 형 「쉬었다 친 첫 타」 (테스트 허브, 플레이 중)")]
+    private static void BeginElementEdge() => Begin("elementedge");
+
     [MenuItem(Root + "60 같은 투자 비교 — 활 최대 다발 대 근접 +20 · 증강 (테스트 허브, 플레이 중, 약 4분)")]
     private static void BeginEqualInvest() => Begin("equalinvest");
 
@@ -375,6 +381,8 @@ public static class WeaponFormProbeEditor
                 case "augment2b": await Augment2Async(p, sb, ct, dashOnly: true); break;
                 case "augment3": await Augment3Async(p, sb, ct); break;
                 case "equalinvest": await EqualInvestAsync(p, sb, ct); break;
+                case "elementedge": await ElementEdgeAsync(p, sb, ct); break;
+                case "itemsource": await ItemDirectSourceAsync(p, sb, ct); break;
                 case "equalinvest2": await EqualInvestAsync(p, sb, ct, skills: true); break;
                 case "augment3b": await Augment3Async(p, sb, ct, lastWillOnly: true); break;
                 case "deathfx": await DeathFxAsync(p, sb, ct); break;
@@ -3887,6 +3895,132 @@ public static class WeaponFormProbeEditor
         sb.AppendLine($"   상한 일반 {t2.MaxFor(ItemRarity.Common)} · 전설 {t2.MaxFor(ItemRarity.Legendary)} · 진화 1번 일반 {t2.MaxFor(ItemRarity.Common, 1)} · +12 공격 ×{t2.AttackMult(12, null):0.00} · 스킬 단계 {string.Join("/", t2.MeleeSkillTierMilestones)} · +12→13 성공 {t2.SuccessAt(12):0.00} · +24→25 하락 {t2.DropAt(24)}");
         Check(sb, "④ 강화 표 — 상한 12 · 30 · 24 · +12 공격 ×1.48 · 스킬 6/12", t2.MaxFor(ItemRarity.Common) == 12 && t2.MaxFor(ItemRarity.Legendary) == 30 && t2.MaxFor(ItemRarity.Common, 1) == 24
                                                                          && Mathf.Abs(t2.AttackMult(12, null) - 1.48f) < 0.001f && t2.MeleeSkillTierMilestones.Length == 2 && t2.MeleeSkillTierMilestones[0] == 6);
+    }
+
+    // ── 62 아이템 직접 피해 집계(10-16 — 추가 타격 복사가 평타 · 스킬 몫으로 잡혔다) ──
+    private static async UniTask ItemDirectSourceAsync(PlayerController p, StringBuilder sb, CancellationToken ct)
+    {
+        sb.AppendLine("아이템 직접 피해 집계 — 추가 타격(적중 피해 복사 · 매 적중) 5초 평타");
+        await Wait(3f, ct);
+        var run = GameRunBootstrapper.Instance.Run;
+        foreach (var m in UnityEngine.Object.FindObjectsByType<MonsterBase>(FindObjectsSortMode.None))
+            if (m != null && !m.IsDead) m.gameObject.SetActive(false);
+        if (!await EquipAsync(p, Katana, ct)) { sb.AppendLine("카타나 장착 실패"); return; }
+        var k = p.WeaponManager.Weapon0Data;
+        k.enhanceLevel = 0;
+        k.augments = "";
+        k.formTier = 0;
+        WeaponFormRuntime.Of(p).Rebuild();
+        run.EffectManager.Rebuild();
+        Legend("ExtraAttack", "OnHit", 2f);   // 확률 = 값 × 발동 계수(카타나 0.7) → 늘 복사
+        await Wait(0.3f, ct);
+        long b0 = run.RunStats.DamageOf(DamageSource.Basic), r0 = run.RunStats.DamageOf(DamageSource.Rune);
+        int sw = await AugSwingAsync(p, 5f, ct);
+        long b1 = run.RunStats.DamageOf(DamageSource.Basic), r1 = run.RunStats.DamageOf(DamageSource.Rune);
+        run.EffectManager.Rebuild();   // 넣은 효과를 뺀다
+        float basic = b1 - b0, rune = r1 - r0;
+        sb.AppendLine($"   평타 진단 — {s_augSwingDiag}");
+        Check(sb, $"추가 타격 복사 — 평타 몫 {basic:0} · 룬 몫 {rune:0}(휘두름 {sw} · 복사가 룬으로 · 룬 ≈ 평타)", sw >= 6 && basic > 0f && rune >= basic * 0.5f && rune <= basic * 1.3f);
+    }
+
+    // ── 61 원소의 날(규칙형) · 형 「쉬었다 친 첫 타」(슬래시보다 먼저 맞은 타도 한 휘두름 · 10-15) ──
+    private static async UniTask ElementEdgeAsync(PlayerController p, StringBuilder sb, CancellationToken ct)
+    {
+        sb.AppendLine("원소의 날 · 형 쉬었다 친 첫 타");
+        await Wait(3f, ct);
+        var run = GameRunBootstrapper.Instance.Run;
+        foreach (var m in UnityEngine.Object.FindObjectsByType<MonsterBase>(FindObjectsSortMode.None))
+            if (m != null && !m.IsDead) m.gameObject.SetActive(false);
+        var placed = typeof(RunItemInventory).GetField("_placedItems", Inst)?.GetValue(run.ItemInventory) as List<RuntimeItemData>;
+        if (placed == null) { sb.AppendLine("룬 판 목록을 못 읽음"); return; }
+        var savedPlaced = new List<RuntimeItemData>(placed);
+        try
+        {
+            // ① 원소의 날 III — 카타나 연타 룬(56과 같은 5개)으로 6초씩 · 룬 피해/초 · 발동 수
+            if (!await EquipAsync(p, Katana, ct)) { sb.AppendLine("카타나 장착 실패"); return; }
+            var k = p.WeaponManager.Weapon0Data;
+            k.enhanceLevel = 0;
+            k.formTier = 0;
+            WeaponFormRuntime.Of(p).Rebuild();
+            var b = Loadouts[0];
+            placed.Clear();
+            foreach (var id in b.ids)
+            {
+                var d = ProjectRune(id);
+                if (d == null) continue;
+                if (string.IsNullOrEmpty(d.element)) d.element = b.el;
+                placed.Add(d);
+            }
+            async UniTask<(float rune, int swings)> RuneRateAsync(string augs)
+            {
+                k.augments = augs;
+                run.EffectManager.Rebuild();
+                await Wait(0.4f, ct);
+                long r0 = run.RunStats.DamageOf(DamageSource.Rune);
+                float t0 = Time.time;
+                int sw = await AugSwingAsync(p, 6f, ct);
+                float secs = Mathf.Max(0.01f, Time.time - t0);
+                return ((run.RunStats.DamageOf(DamageSource.Rune) - r0) / secs, sw);
+            }
+            var (rune0, sw0) = await RuneRateAsync("");
+            var (rune1, sw1) = await RuneRateAsync("aug_element_edge:3");
+            int edge = AugLog("] 원소의 날");
+            string edgeLine = s_formLog.Find(l => l.Contains("원소의 날")) ?? "-";
+            sb.AppendLine($"   평타 진단 — {s_augSwingDiag}");
+            Check(sb, $"① 원소의 날 III — 룬 · 2차 피해 {rune0:0} → {rune1:0}/초 · 발동 {edge}(휘두름 {sw1} · 마지막 타 ≈ 휘두름/3) · {edgeLine}",
+                  rune1 > rune0 && edge >= sw1 / 3 - 2 && edge <= sw1 / 3 + 2 && edgeLine.Contains("맞힘") && !edgeLine.Contains("맞힘 0"));
+            k.augments = "";
+            run.EffectManager.Rebuild();
+            placed.Clear();
+            run.EffectManager.Rebuild();
+
+            // ② ③ 형 — 2.4초 쉬었다 한 번 치기 × 3 → 쌓임 3(슬래시보다 먼저 맞은 첫 타도 한 휘두름)
+            async UniTask<(int stacks, string trace)> RestedAsync(string path, string label)
+            {
+                if (!await EquipAsync(p, path, ct)) return (-1, label + " 장착 실패");
+                var w = p.WeaponManager.Weapon0Data;
+                w.enhanceLevel = 0;
+                w.formTier = 1;
+                w.formVariants = "";
+                w.augments = "";
+                run.EffectManager.Rebuild();
+                WeaponFormRuntime.Of(p).Rebuild();
+                var form = WeaponFormRuntime.Of(p)?.Current;
+                if (form == null) return (-1, label + " 형 없음");
+                typeof(WeaponFormBase).GetMethod("SetStacks", Inst)?.Invoke(form, new object[] { 0, WeaponFormBase.StackReason.Gain });
+                s_home = p.transform.position;
+                var t = await TrackAsync(p.transform.position + Flat(p.transform.forward) * 1.5f, ct);
+                if (t == null) return (-1, label + " 슬라임 부르기 실패");
+                var trace = new StringBuilder();
+                for (int i = 0; i < 3; i++)
+                {
+                    p.InputBuffer.Clear();
+                    await Wait(2.4f, ct);
+                    RefillAll();
+                    Steer(p, t.M.transform.position);
+                    p.InputBuffer.Push(Command.Light);
+                    await Wait(0.9f, ct);
+                    trace.Append($" {form.Stacks}");
+                }
+                p.InputBuffer.Clear();
+                int st = form.Stacks;
+                DetachAll();
+                w.formTier = 0;
+                WeaponFormRuntime.Of(p).Rebuild();
+                return (st, $"{label} 쌓임 차례:{trace}");
+            }
+            var (wind, windTrace) = await RestedAsync(Katana, "칼바람(카타나)");
+            Check(sb, $"② {windTrace} → {wind}/3", wind == 3);
+            var (weight, weightTrace) = await RestedAsync(Great, "무게(대검)");
+            Check(sb, $"③ {weightTrace} → {weight}/3", weight == 3);
+        }
+        finally
+        {
+            placed.Clear();
+            placed.AddRange(savedPlaced);
+            run.EffectManager.Rebuild();
+            DetachAll();
+        }
     }
 
     // ── 60 같은 투자 비교(설계 §4 · 10-15 사용자 「근접 강화에도 메리트 — 활에 맞게끔」) ──

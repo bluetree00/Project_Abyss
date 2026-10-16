@@ -12,6 +12,9 @@ using UnityEngine;
 public sealed class WeaponFormRuntime : MonoBehaviour
 {
     private const float SwingGap = 0.12f;   // 슬래시 이벤트를 못 받을 때(받는 쪽 없음)만 쓰는 옛 기준
+    // 번호가 그대로인데 앞 적중과 이만큼 떨어졌으면 슬래시보다 먼저 맞은 새 휘두름 — 2초 쉬고 친 첫 타는 피해가 슬래시 이벤트보다 먼저 왔다
+    // (10-15 실측 59). 판정 수명(0.5초)보다 짧게. 근접 강화 증강(MeleeAugmentEffect.EarlyHitGap)과 같은 값.
+    private const float EarlyHitGap = 0.45f;
     private const float GlowMax  = 0.6f;    // 가득일 때 형 색 × 이 값 — 「은은하게」
     private static readonly string[] TriggerVariants = { "twin_wind", "return_wind", "fissure", "aftershock" };   // 발동과 함께 나가는 변주
     private static readonly int EmissiveColorId = Shader.PropertyToID("_Emissive_Color");   // 툰 셰이더
@@ -175,9 +178,11 @@ public sealed class WeaponFormRuntime : MonoBehaviour
             bool newSwing, finisher;
             if (_receiver != null)
             {
-                newSwing = _swingSerial != _countedSwing;   // 이 슬래시로는 처음 맞았다
-                _countedSwing = _swingSerial;
-                finisher = _swingStep >= last;              // 슬래시가 나올 때의 단계 — 판정이 남아 있는 동안 단계가 넘어가도 그대로
+                bool early = _swingSerial <= _countedSwing && Time.time - _lastMeleeHitAt > EarlyHitGap;   // 슬래시보다 먼저 맞은 새 휘두름
+                newSwing = _swingSerial > _countedSwing || early;   // 이 슬래시로는 처음 맞았다
+                if (newSwing) _countedSwing = early ? _swingSerial + 1 : _swingSerial;   // 먼저 맞았으면 곧 올 슬래시 번호도 이 휘두름 것
+                // 슬래시가 나올 때의 단계 — 판정이 남아 있는 동안 단계가 넘어가도 그대로. 슬래시보다 먼저 맞은 타는 지금 단계
+                finisher = (_swingSerial < _countedSwing ? _player.Combo.CurrentComboStep : _swingStep) >= last;
             }
             else
             {

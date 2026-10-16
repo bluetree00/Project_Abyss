@@ -49,8 +49,9 @@ public sealed class RollLandingDamageEffect : ItemEffectBase
         float damage = DamageFormula.Calculate(_value, ctx.Stats.GetEffectiveAttack(kind));
 
         int n = CombatQuery.GetNearbyEnemies(position, radius, ctx.Player.gameObject, 32, s_buf);
-        for (int i = 0; i < n; i++)
-            s_buf[i].TakeDamage(damage, ctx.Player.gameObject, knockbackMultiplier: 0f);
+        using (DamageSourceScope.Enter(DamageSource.Rune))   // 룬 몫으로 센다(10-16)
+            for (int i = 0; i < n; i++)
+                s_buf[i].TakeDamage(damage, ctx.Player.gameObject, knockbackMultiplier: 0f);
 
         ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), position, radius / 4.17f);   // 판정 반경(값으로 바뀜)에 맞춤(10-13 실측: 배율 1 → 4.4 m)
         ItemEffectVfxHelper.ShowNotice($"<color=#FFAA44>착지 충격</color> {damage:F0} 데미지");

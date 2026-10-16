@@ -34,7 +34,8 @@ public sealed class DamageReflectEffect : ItemEffectBase
         if (report.Attacker.TryGetComponent<IDamageable>(out var damageable))
         {
             var instigator = ctx.Player != null ? ctx.Player.gameObject : null;
-            damageable.TakeDamage(reflect, instigator, knockbackMultiplier: 0f);
+            using (DamageSourceScope.Enter(DamageSource.Rune))   // 반사는 룬 몫(10-16)
+                damageable.TakeDamage(reflect, instigator, knockbackMultiplier: 0f);
 
             ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Attacker.transform.position);
             // HUD 왼쪽 알림은 뺐다 — 맞을 때마다 떠 같은 순간 이펙트 · 피해 숫자와 같은 말을 했다(10-11 톤 2차 V-12)
@@ -63,7 +64,8 @@ public sealed class FireReflectEffect : ItemEffectBase
         if (report.Attacker.TryGetComponent<IDamageable>(out var damageable))
         {
             var instigator = ctx.Player != null ? ctx.Player.gameObject : null;
-            damageable.TakeDamage(reflect, instigator, knockbackMultiplier: 0f);
+            using (DamageSourceScope.Enter(DamageSource.Rune))   // 반사는 룬 몫(10-16)
+                damageable.TakeDamage(reflect, instigator, knockbackMultiplier: 0f);
 
             ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Attacker.transform.position);
             // HUD 왼쪽 알림은 뺐다(피해 반사와 같은 까닭 · 10-11 톤 2차 V-12)

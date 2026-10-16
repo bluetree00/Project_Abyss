@@ -145,7 +145,8 @@ public sealed class ExtraAttackEffect : ItemEffectBase
 
         if (report.Target.TryGetComponent<IDamageable>(out var damageable))
         {
-            damageable.TakeDamage(report.DamageDealt, ctx.Player.gameObject, knockbackMultiplier: 0f);
+            using (DamageSourceScope.Enter(DamageSource.Rune))   // 결과창 · 실측 피해 비중 — 복사 피해는 룬 몫(스킬 적중에서 터져도 스킬로 세지 않는다 · 10-16)
+                damageable.TakeDamage(report.DamageDealt, ctx.Player.gameObject, knockbackMultiplier: 0f);
 
             var hitPos = report.HitPosition != Vector3.zero
                 ? report.HitPosition

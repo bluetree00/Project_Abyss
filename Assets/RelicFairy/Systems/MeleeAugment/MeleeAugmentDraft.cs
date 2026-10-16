@@ -232,6 +232,8 @@ public static class MeleeAugmentDraft
             case "aug_katana_gale":   return w.HasForm && w.form.FormId == "windblade";   // 칼바람 형이 있어야 쌓인다
             case MeleeAugmentCatalog.GreatSplit:     return w.HasForm && w.form.FormId == "weight";
             case MeleeAugmentCatalog.NamelessSheath: return w.CanEvolve;   // 진화할 수 있어야 칼집이 바뀐다
+            case "aug_element_edge":  // 룬 판에 속성이 하나도 없으면 터질 속성이 없다
+                return ElementEdgeAugment.TopElement(out _);
             default:
                 return true;
         }

@@ -93,6 +93,8 @@ public static class MeleeAugmentCatalog
             (d, r) => new ExecutionerAugment(d, r)),
         new("aug_mark_spread", "표식 퍼뜨리기", AugmentTier.Gold, BuildFamily.None,     MeleeWeaponKind.None, new[] { 1f, 2f, 3f },    "콤보 마지막 타로 유물 표식이 있는 적을 치면 그 표식을 둘레 3 m 적 {0}명에게 옮긴다",
             (d, r) => new MarkSpreadAugment(d, r)),
+        new("aug_element_edge","원소의 날",   AugmentTier.Gold,   BuildFamily.None,     MeleeWeaponKind.None, new[] { 50f, 75f, 100f },  "콤보 마지막 타가 룬 판에 가장 많은 속성으로 터진다(둘레 2 m · 공격력 {0}% · 그 속성 상태)",
+            (d, r) => new ElementEdgeAugment(d, r)),
         new("aug_spin_slash",  "회전 베기",   AugmentTier.Gold,   BuildFamily.Mobility, MeleeWeaponKind.None, new[] { 50f, 80f, 110f }, "회피가 끝날 때 둘레 2.5 m 베기(공격력 {0}%)",
             (d, r) => new SpinSlashAugment(d, r)),
         new("aug_counter",     "피격 반격",   AugmentTier.Gold,   BuildFamily.Danger,   MeleeWeaponKind.None, new[] { 40f, 70f, 100f }, "맞은 뒤 2초 안 첫 적중 때 둘레 2.5 m 반격 베기(공격력 {0}%)",
