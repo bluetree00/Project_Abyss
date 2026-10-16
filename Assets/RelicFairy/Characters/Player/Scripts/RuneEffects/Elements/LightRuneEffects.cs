@@ -70,7 +70,7 @@ public sealed class LightRadianceEffect : LightRuneEffectBase
 }
 
 /// <summary>
-/// 2단계 광폭발 — 광채 10스택 도달 시(RS 임계콜백) 전방 원뿔 공격력 150% 폭발(AQ Cone + DM), 스택 소모.
+/// 2단계 광폭발 — 광채 10스택 도달 시(RS 임계콜백) 전방 원뿔 공격력 75%(차트 value — 10-15 150 → 75) 폭발(AQ Cone + DM), 스택 소모.
 /// 성역(3단계) 활성 시 폭발 자리에 빛 장판 생성(빛장판=4단계 활성 시 추적·치확/치피 부여).
 /// value=폭발배율(1.5), value2=소모 임계(10).
 /// </summary>

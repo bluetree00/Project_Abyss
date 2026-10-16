@@ -129,8 +129,9 @@ public sealed class ElecShockEffect : ElectricRuneEffectBase
 }
 
 /// <summary>
-/// 4단계 과부하 — 공격 시 체인 라이트닝: 주변 최대 2명에게 적중 피해의 50%.
-/// 주변에 없으면 같은 적을 2회 추가 타격. value=피해비율(0.5), value2=체인수(2).
+/// 4단계 과부하 — 공격 시 체인 라이트닝: 주변 최대 value2명에게 적중 피해의 value(차트 0.25 · 3명).
+/// 주변에 없으면 그 적에게 한 번(10-16 — 예전엔 체인 수만큼 같은 적을 때려 혼자인 보스에게 한 타마다 +150%였다.
+/// 레벨디자인 시뮬: 타수 많은 무기의 단일 대상 화력이 이 규칙 하나로 크게 뛰었다 — 기획/RelicFairy_레벨디자인_성장·클리어시뮬_20261015.md).
 /// 체인 피해는 TakeSynergyDamage 경로라 OnPostDealDamage를 안 타 재귀 없음.
 /// </summary>
 public sealed class ElecOverloadEffect : ElectricRuneEffectBase
@@ -162,9 +163,8 @@ public sealed class ElecOverloadEffect : ElectricRuneEffectBase
         }
         else
         {
-            // 주변에 없으면 같은 적 추가 타격
-            for (int i = 0; i < chainCount; i++)
-                CombatQuery.DealSynergyDamage(hit.Target, dmg, player.gameObject, element: RuneElement.Electric);
+            // 주변에 없으면 그 적에게 한 번(체인 수만큼 거듭 때리지 않는다)
+            CombatQuery.DealSynergyDamage(hit.Target, dmg, player.gameObject, element: RuneElement.Electric);
             ElementVfxPlayer.PlayBurst(RuneElement.Electric, hit.Target.transform.position);   // [실제 VFX] 임팩트
         }
     }

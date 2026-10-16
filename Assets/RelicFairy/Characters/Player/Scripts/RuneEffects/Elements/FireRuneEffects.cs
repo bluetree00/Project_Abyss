@@ -93,7 +93,7 @@ public sealed class FireBlazeEffect : FireRuneEffectBase
 }
 
 /// <summary>
-/// 4단계 작열 — 같은 적에 점화가 세 번 쌓이면 공격력 150% 광역 폭발(10-14 A3 — 예전 「만료 시」).
+/// 4단계 작열 — 같은 적에 점화가 세 번 쌓이면 공격력 75%(차트 value — 10-15 150 → 75) 광역 폭발(10-14 A3 — 예전 「만료 시」).
 /// 본 효과는 마커(IsActive/Entry 제공)이고, 실제 폭발은 점화(2단계)가 Explode를 호출한다.
 /// value=폭발 배율(1.5).
 /// </summary>
