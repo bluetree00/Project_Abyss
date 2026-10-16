@@ -94,7 +94,6 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
 {
     private enum Phase { Jumping, Attacking, EndPose, Done }
 
-    private const float GuideLead     = 0.5f;   // 판정 이만큼 전에 발밑 원 예고(10-03 개선 1-4 · 설계 규칙 R3 · 0.4 → 0.5 10-13 검증)
     private const float GuideHitFlash = 0.15f;  // 판정 순간 판정 색으로 잠깐 남았다 사라진다
     private static readonly Color GuideColor = new Color(1f, 0.28f, 0.18f, 0.85f);   // 공중 물기 예고와 같은 색
 
@@ -119,7 +118,6 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     private int     _totalSwings;
     private bool    _hitApplied;
     private bool    _swingSfxPlayed;
-    private bool    _guideShown;
     private DragonBossWarningZone _guide;
     private DragonClawTrailController _clawTrail;
 
@@ -254,9 +252,9 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         _totalSwings    = Data.ClawCount * 2;
         _hitApplied     = false;
         _swingSfxPlayed = false;
-        _guideShown     = false;
 
         BeginStep(ctx);
+        ShowGuide(ctx);
         PlayCurrentSwingAnim(ctx);
     }
 
@@ -303,13 +301,6 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
             Managers.Sound?.PlayEffectAt(Data.ClawSfx, ctx.Transform.position);
         }
 
-        // 판정 GuideLead초 전 발밑 원 예고 — 바닥 가이드 없는 근접 2타라 해방기 2페이지에서 3번 중 2번 다 맞았다(10-03 개선 1-4)
-        if (!_guideShown && _timer >= Data.HitTime - GuideLead)
-        {
-            _guideShown = true;
-            ShowGuide(ctx);
-        }
-
         if (!_hitApplied && _timer >= Data.HitTime)
         {
             _hitApplied = true;
@@ -325,11 +316,11 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
             _timer          = 0f;
             _hitApplied     = false;
             _swingSfxPlayed = false;
-            _guideShown     = false;
 
             if (_swingIndex < _totalSwings)
             {
                 BeginStep(ctx);
+                ShowGuide(ctx);
                 PlayCurrentSwingAnim(ctx);
             }
             else
@@ -366,12 +357,16 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         }
     }
 
-    /// <summary>판정과 같은 원(화룡 발밑 · AttackRadius) — 다 차는 순간이 판정. 공중 물기 예고와 같은 화룡 가이드.</summary>
+    /// <summary>
+    /// 판정과 같은 원(걸음 끝 정면 1.5 m · 반경 3) — 다 차는 순간이 판정. 공중 물기 예고와 같은 화룡 가이드.
+    /// 휘두르기 시작(BeginStep 직후)에 그린다 — 자리는 이미 정해졌고 앞섬 = HitTime(10-15 · 판정 0.5초 전 첫 프레임에 그리던 것은
+    /// 프레임 간격만큼 흔들려 반응 실측 0.37초까지 내려갔다 · 기준 0.45).
+    /// </summary>
     private void ShowGuide(MonsterContext ctx)
     {
         Vector3 pos = SwingCenter(ctx);
         _guide = DragonBossWarningZone.CreateCircle(
-            "DragonClawSlashWarning", pos, SwingRadius, GuideColor, GuideLead + 0.3f);
+            "DragonClawSlashWarning", pos, SwingRadius, GuideColor, Data.HitTime + 0.3f);
         _guide.BeginFill(Mathf.Max(0.05f, Data.HitTime - _timer));
     }
 

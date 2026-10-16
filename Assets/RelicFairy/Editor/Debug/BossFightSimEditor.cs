@@ -53,6 +53,8 @@ public static class BossFightSimEditor
     private const float  ReactionDelay   = 0.3f;   // 반응 모드 — 가이드를 보고 움직이기 시작할 때까지(사람 반응 + 입력)
     private const float  BodyRadius      = 0.4f;   // 가이드 안 판정 여유 = 플레이어 몸 반경
     private const float  EscapeMargin    = 0.9f;   // 피할 자리는 가이드 가장자리에서 이만큼 더 밖
+    private const float  MaxStepUp       = 0.5f;   // 바닥(Default) 찾기 — 지금 발보다 이만큼 넘게 높은 윗면엔 올라서지 않는다(10-15)
+    private const float  SinkTolerance   = 0.1f;   // 발이 바닥보다 이만큼 넘게 아래면 꺼진 것 — 바닥에 세운다(10-15)
     private const float  SweepGap        = 1f;     // 미발동 패턴 강제 사이 최소 간격(초)
     private const BindingFlags Inst = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
 
@@ -138,6 +140,7 @@ public static class BossFightSimEditor
     [MenuItem(Root + "Tank Mid 7m - Watch Whelps (Play)")] public static void RunTankWatch() => Begin(Mode.Mid, react: true, tank: true, whelpGrace: 20f);
     [MenuItem(Root + "Tank Mid 7m - Long (Play)")] public static void RunTankLong() { s_long = true; Begin(Mode.Mid, react: true, tank: true); }
     [MenuItem(Root + "Mid 7m - Long (Play)")] public static void RunMidLong() { s_long = true; Begin(Mode.Mid); }   // 피하지 않고 오래 — 노림 · 예측 패턴이 실제로 맞히는지(10-14 화룡)
+    [MenuItem(Root + "React Mid 7m - Long (Play)")] public static void RunReactMidLong() { s_long = true; Begin(Mode.Mid, react: true); }   // 걸어서 피하며 오래 — 2페이지 패턴까지 피할 수 있는지(10-15 화룡)
     [MenuItem(Root + "Tank Melee 3m - Long (Play)")] public static void RunTankMeleeLong() { s_long = true; Begin(Mode.Melee, react: true, tank: true); }   // 3 m 안 패턴까지(10-13)
     [MenuItem(Root + "Entrance Shots (Play)")] public static void RunEntranceShots() { BossStoryScenes.DebugForceRepeat = false; s_entranceOnly = true; Begin(Mode.Mid, react: true, tank: true); }   // 등장 구도 사진 · 카메라 수치만(10-13)
     [MenuItem(Root + "Entrance Shots - Repeat (Play)")] public static void RunEntranceShotsRepeat() { BossStoryScenes.DebugForceRepeat = true; s_entranceOnly = true; Begin(Mode.Mid, react: true, tank: true); }   // 반복 관람 판(10-14 · 판이 끝나면 되돌린다)
@@ -351,6 +354,7 @@ public static class BossFightSimEditor
             var shake   = new ShakeTracker();
             float nextAdds = 0f;
             bool    hasEscape = false;
+            bool    sinkLogged = false;
             Vector3 escapeTarget = Vector3.zero;
             int     escapes = 0;
             s_escapeCsv.Clear().AppendLine("t,dist");
@@ -426,7 +430,19 @@ public static class BossFightSimEditor
                             if (BossGuideShapes.InsideAny(shapes, next, BodyRadius, 0f) || InHazard(next)) next = cur;   // 가이드 · 무대 위험 안으로 돌아 들어가지 않는다
                         }
                     }
-                    MovePlayer(player, next);
+                    // 띄움 · 공중이라 바닥 위에 떠 있으면 손대지 않는다 — 매 프레임 속도를 0으로 덮으면 떨어지지 못해
+                    // 착지(피격 무적)가 오지 않고 3~5초 공중에 묶인 채 연타가 쌓였다(10-15 화룡 반응 실측).
+                    // 밑에 바닥이 없으면 예전처럼 붙잡는다(손을 떼자 경기장 밖으로 떨어져 97초 「공중」) · 바닥 밑으로 꺼졌으면 바닥에 세운다
+                    Vector3 feet = player.transform.position;
+                    bool hasFloor = TryGroundY(feet, player, out float footY);
+                    bool sunk  = hasFloor && feet.y < footY - SinkTolerance;
+                    bool aloft = hasFloor && feet.y > footY + SinkTolerance && ReactSpeed(player) <= 0f;
+                    if (sunk)
+                    {
+                        if (!sinkLogged) { sinkLogged = true; Event($"플레이어 바닥 밑 {footY - feet.y:0.00} m — 바닥에 세움 · {UnderFeet(feet, player)}"); }
+                        next.y = footY;
+                    }
+                    if (!aloft) MovePlayer(player, next);
                 }
 
                 // ── 공격: 사거리 안이면 일정 DPS
@@ -961,14 +977,32 @@ public static class BossFightSimEditor
         { y = gh.point.y; return true; }
         int n = Physics.RaycastNonAlloc(from, Vector3.down, s_groundHits, 14f, LayerMask.GetMask("Default"), QueryTriggerInteraction.Ignore);
         float best = float.MinValue;
+        float stepTop = player.transform.position.y + MaxStepUp;
         for (int i = 0; i < n; i++)
         {
             var c = s_groundHits[i].collider;
             if (c.transform.IsChildOf(player.transform) || c.GetComponentInParent<MonsterBase>() != null) continue;
+            if (s_groundHits[i].point.y > stepTop) continue;   // 기둥 밑동 · 잔해 윗면(0.8 m)에 올려 공중 상태로 만들던 것(10-15)
             best = Mathf.Max(best, s_groundHits[i].point.y);
         }
         y = best;
         return n > 0 && best > float.MinValue;
+    }
+
+    /// <summary>발밑 진단 — 위에서 아래로 쏜 광선이 맞은 콜라이더(레이어 · 윗면 높이) 셋까지(10-15 플레이어가 바닥 밑에 꺼진 원인 찾기).</summary>
+    private static string UnderFeet(Vector3 feet, PlayerController player)
+    {
+        int n = Physics.RaycastNonAlloc(feet + Vector3.up * 6f, Vector3.down, s_groundHits, 14f, ~0, QueryTriggerInteraction.Ignore);
+        var sb = new StringBuilder();
+        int shown = 0;
+        for (int i = 0; i < n && shown < 3; i++)
+        {
+            var c = s_groundHits[i].collider;
+            if (c.transform.IsChildOf(player.transform)) continue;
+            sb.Append($"{c.name}({LayerMask.LayerToName(c.gameObject.layer)} · {s_groundHits[i].point.y:0.00}) ");
+            shown++;
+        }
+        return shown > 0 ? sb.ToString().TrimEnd() : "광선이 맞은 것 없음";
     }
 
     private static void MovePlayer(PlayerController player, Vector3 pos)

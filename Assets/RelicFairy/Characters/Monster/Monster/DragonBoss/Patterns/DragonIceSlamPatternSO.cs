@@ -159,7 +159,11 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
             dragon.DragonBlackboard.IsAirborne = true;
 
         if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
+        {
             bb.IceSlamCooldown = Data.Cooldown;
+            // 경기장 전체 내려찍기를 무적 타이밍으로 피하는 판 — 노림 · 큰 메테오(10-14)까지 겹쳐 내려찍기와 0.07초 차로 함께 맞았다(10-15 반응 실측). Exit에서 푼다
+            bb.PassiveMeteorSuppressed = true;
+        }
 
         if (alreadyAirborne)
         {
@@ -195,6 +199,8 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         CleanupPillars();
         if (ctx.Monster is DragonBossMonster dragon)
             dragon.DragonBlackboard.IsAirborne = false;
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard exitBb)
+            exitBb.PassiveMeteorSuppressed = false;
     }
 
     // ── Phase updates ────────────────────────────────────────────────────────
