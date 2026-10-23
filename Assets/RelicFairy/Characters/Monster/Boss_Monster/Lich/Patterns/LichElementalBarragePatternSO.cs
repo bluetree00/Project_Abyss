@@ -280,8 +280,8 @@ public class LichElementalBarrageState : UnInterruptibleState<LichElementalBarra
                 // 붉은 줄이 리치 쪽에서 끝까지 흘러간다(설계: 0.6초 전 붉은 줄).
                 AddStrike(StrikeKind.FireBeam, now + Data.fireWarn, origin, dir,
                           LichPatternUtil.PrepareTelegraph(
-                              PatternGuideHelper.Beam(origin, dir, Data.fireLength, Data.fireWidth, LichPatternUtil.Lethal),
-                              LichPatternUtil.Lethal));
+                              PatternGuideHelper.Beam(origin, dir, Data.fireLength, Data.fireWidth, PatternGuideHelper.AttackFill),
+                              PatternGuideHelper.AttackFill));   // (10-23 가이드 색 통일) 다른 예고와 같게 — 빨강은 끝 신호에
                 LichSfx.Play(LichSfxSlot.CastShort, origin);
                 break;
             }

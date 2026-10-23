@@ -14,6 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   useGuardCharge: 0
   lightAttackAnimSpeed: 0.77
+  windupSpeedRatio: 0.6
+  slashFollowSeconds: 0.15
+  finisherRecoverySeconds: 0.3
+  followSpeedCap: 1.6
   heavyAttackAnimSpeed: 1.7
   defaultComboWindowOpen: 0.25
   defaultComboWindowClose: 0.75
@@ -22,7 +26,7 @@ MonoBehaviour:
   - groupType: 0
     clipMappings:
     - baseClipName: GhostSamurai_Common_Idle_Inplace
-      addressableKey: SS_Idle
+      addressableKey: APose_Idle
       actionType: 0
       comboIndex: 0
       isPlunge: 0
@@ -44,7 +48,7 @@ MonoBehaviour:
       aimAssistStrength: 1
       aimRotationDuration: 0.1
     - baseClipName: GhostSamurai_Common_StrafeWalkF_Inplace
-      addressableKey: SS_Walk
+      addressableKey: APose_Strafe_Walk_F_Loop
       actionType: 0
       comboIndex: 0
       isPlunge: 0
@@ -66,7 +70,7 @@ MonoBehaviour:
       aimAssistStrength: 1
       aimRotationDuration: 0.1
     - baseClipName: GhostSamurai_Common_StrafeWalkFL_Inplace
-      addressableKey: SS_Walk
+      addressableKey: APose_Strafe_Walk_FL
       actionType: 0
       comboIndex: 0
       isPlunge: 0
@@ -88,7 +92,7 @@ MonoBehaviour:
       aimAssistStrength: 1
       aimRotationDuration: 0.1
     - baseClipName: GhostSamurai_Common_StrafeWalkFR_Inplace
-      addressableKey: SS_Walk
+      addressableKey: APose_Strafe_Walk_FR
       actionType: 0
       comboIndex: 0
       isPlunge: 0
@@ -220,7 +224,7 @@ MonoBehaviour:
       aimAssistStrength: 1
       aimRotationDuration: 0.1
     - baseClipName: GhostSamurai_Common_StrafeRun_F_Inplace
-      addressableKey: SS_Run
+      addressableKey: APose_Strafe_Run_F_Loop
       actionType: 0
       comboIndex: 0
       isPlunge: 0
@@ -242,7 +246,7 @@ MonoBehaviour:
       aimAssistStrength: 1
       aimRotationDuration: 0.1
     - baseClipName: GhostSamurai_Common_StrafeRun_FL_Inplace
-      addressableKey: SS_Run
+      addressableKey: APose_Strafe_Run_FL
       actionType: 0
       comboIndex: 0
       isPlunge: 0
@@ -264,7 +268,7 @@ MonoBehaviour:
       aimAssistStrength: 1
       aimRotationDuration: 0.1
     - baseClipName: GhostSamurai_Common_StrafeRun_FR_Inplace
-      addressableKey: SS_Run
+      addressableKey: APose_Strafe_Run_FR
       actionType: 0
       comboIndex: 0
       isPlunge: 0
@@ -447,8 +451,8 @@ MonoBehaviour:
       plungeFallSpeed: 0
       plungeDescendAt: 0
       comboWindowOpen: 0.06
-      comboWindowClose: 0.36
-      attackEndAt: 0.36
+      comboWindowClose: 0.24
+      attackEndAt: 0.24
       recoveryEndAt: 0.8
       attackStepDistance: 1.8
       attackStepStartNorm: 0.02

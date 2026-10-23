@@ -47,7 +47,17 @@ public sealed class RelicStateVfx : MonoBehaviour
     public static void PlayOneShot(string addressableKey, Vector3 pos, float scale = 1f, Vector3 forward = default, float prewarm = 0f)
     {
         if (!string.IsNullOrEmpty(addressableKey))
-            PlayOneShotAsync(addressableKey, pos, scale, forward, prewarm).Forget();
+            PlayOneShotAsync(addressableKey, pos, Vector3.one * scale, forward, prewarm).Forget();
+    }
+
+    /// <summary>
+    /// 축마다 따로 키운다 — <paramref name="scale"/> = 로컬 (옆, 위, 앞) 배율(앞 = <paramref name="forward"/>).
+    /// 검기처럼 판정이 「길이 × 반폭」인 그림을 그 모양에 맞출 때(고르게 키우면 긴 검기는 옆이 판정의 2배였다 · 10-18 ⑯).
+    /// </summary>
+    public static void PlayOneShot(string addressableKey, Vector3 pos, Vector3 scale, Vector3 forward)
+    {
+        if (!string.IsNullOrEmpty(addressableKey))
+            PlayOneShotAsync(addressableKey, pos, scale, forward, 0f).Forget();
     }
 
     private async UniTaskVoid EnsureAsync(string stateKey)
@@ -103,7 +113,7 @@ public sealed class RelicStateVfx : MonoBehaviour
             if (binders[i].Target == null) binders[i].Target = transform;
     }
 
-    private static async UniTaskVoid PlayOneShotAsync(string key, Vector3 pos, float scale, Vector3 forward, float prewarm)
+    private static async UniTaskVoid PlayOneShotAsync(string key, Vector3 pos, Vector3 scale, Vector3 forward, float prewarm)
     {
         GameObject go = null;
         try { go = await Managers.AddressableManager.InstantiateAsync(key, null, true); }
@@ -114,8 +124,8 @@ public sealed class RelicStateVfx : MonoBehaviour
         t.position = pos;
 
         // 프리팹 원본 스케일에 배율을 곱한다(원본을 훼손하지 않고 크기만 조절).
-        if (scale > 0f && !Mathf.Approximately(scale, 1f))
-            t.localScale = Vector3.Scale(t.localScale, Vector3.one * scale);
+        if (scale.x > 0f && scale.y > 0f && scale.z > 0f && scale != Vector3.one)
+            t.localScale = Vector3.Scale(t.localScale, scale);
 
         if (forward.sqrMagnitude > 0.0001f)
             t.rotation = Quaternion.LookRotation(forward.normalized, Vector3.up);

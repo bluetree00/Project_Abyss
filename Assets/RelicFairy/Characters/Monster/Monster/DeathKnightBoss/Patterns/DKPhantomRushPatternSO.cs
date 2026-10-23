@@ -239,7 +239,10 @@ public class DKPhantomRushState : FullLockState<DKPhantomRushPatternSO>
                 DKBossRoomContext.CellToWorld(pc.x, pc.y, 0.05f),
                 Quaternion.Euler(-90f, 0f, 0f));
             if (_warningTileGo != null)
+            {
                 _warningTileGo.transform.localScale = Vector3.one * DKBossRoomContext.CellSize;
+                DKGridPatternHelper.ChargeTile(_warningTileGo);   // (10-23 가이드 색 통일) 맞을 칸 = 처음부터 공격 색 → 판정 직전 빨강
+            }
         }
     }
 

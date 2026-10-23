@@ -14,37 +14,42 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CovenantVfxSet
   entries:
   - key: supernova
-    prefab: {fileID: 4020421568969601508, guid: 0ced40189347d054588156810ea36d23, type: 3}
+    prefab: {fileID: 1785246201711463945, guid: c981bca9cb5c0ce4788d3665c353265d,
+      type: 3}
     scale: 1
-    nativeRadius: 3.4
+    nativeRadius: 0.7
     life: 2
     tint: {r: 0, g: 0, b: 0, a: 0}
     mute: 
   - key: detonate
-    prefab: {fileID: 6981941031284743971, guid: edbcd3b3c18ccf44db5b7031741faf88, type: 3}
+    prefab: {fileID: 6669767379399158163, guid: 6bd7746646e320844a97eaffa20d33c3,
+      type: 3}
     scale: 1
-    nativeRadius: 3.5
+    nativeRadius: 3
     life: 2
     tint: {r: 0, g: 0, b: 0, a: 0}
     mute: 
   - key: detonate_hit
-    prefab: {fileID: 6981941031284743971, guid: edbcd3b3c18ccf44db5b7031741faf88, type: 3}
+    prefab: {fileID: 6981941031284743971, guid: edbcd3b3c18ccf44db5b7031741faf88,
+      type: 3}
     scale: 0.35
     nativeRadius: 0
     life: 1
     tint: {r: 0, g: 0, b: 0, a: 0}
     mute: 
   - key: execute
-    prefab: {fileID: 5490221094549253126, guid: 6917c8ff75e3f2c44ad44d8df072e2dd, type: 3}
+    prefab: {fileID: 5490221094549253126, guid: 6917c8ff75e3f2c44ad44d8df072e2dd,
+      type: 3}
     scale: 0.5
     nativeRadius: 0
     life: 1.5
     tint: {r: 0, g: 0, b: 0, a: 0}
     mute: 
   - key: stasis
-    prefab: {fileID: 6533228452991066826, guid: f9604ed79c6db494fb939d0a585130a6, type: 3}
+    prefab: {fileID: 6533228452991066826, guid: f9604ed79c6db494fb939d0a585130a6,
+      type: 3}
     scale: 1
-    nativeRadius: 4.4
+    nativeRadius: 1.76
     life: 1.2
     tint: {r: 0, g: 0, b: 0, a: 0}
     mute: Flash
@@ -70,7 +75,8 @@ MonoBehaviour:
     tint: {r: 0, g: 0, b: 0, a: 0}
     mute: 
   - key: ward
-    prefab: {fileID: 4481419373420190473, guid: a1f3d2db3e03101408c646570eefe2e1, type: 3}
+    prefab: {fileID: 4481419373420190473, guid: a1f3d2db3e03101408c646570eefe2e1,
+      type: 3}
     scale: 0.6
     nativeRadius: 0
     life: 0.95
@@ -112,7 +118,8 @@ MonoBehaviour:
     tint: {r: 0.42, g: 0.16, b: 0.78, a: 1}
     mute: 
   - key: hemorrhage
-    prefab: {fileID: 6714037650790324515, guid: 4a476f63e4da5ca4fa476ddfbad3ace2, type: 3}
+    prefab: {fileID: 6714037650790324515, guid: 4a476f63e4da5ca4fa476ddfbad3ace2,
+      type: 3}
     scale: 0.028
     nativeRadius: 0
     life: 1.2

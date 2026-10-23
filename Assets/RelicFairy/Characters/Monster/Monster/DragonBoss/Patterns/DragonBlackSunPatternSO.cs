@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using RelicFairy.UI;
 using UnityEngine;
 
@@ -9,6 +10,7 @@ namespace RelicFairy.Monster
 ///   · 둘 다 깨면: 추락 → 그로기 4초(HUD 무방비 창).
 ///   · 못 깨면: 전역 폭발 — 플레이어 최대 체력의 60%, 즉사하지 않는다(남은 체력 1 이상).
 /// 약점 창 동안 보스는 무적이 아니다(몸도 원거리로 칠 수 있다 — 공중이라 근접 면역은 평소대로).
+/// 충전 동안 검은 불씨가 두 차례 플레이어 둘레에 빽빽이 떨어진다 — 날개 약점 원 둘레만 비어 「약점 아래가 곧 안전 자리」(10-22 E5 페이지2).
 /// 이 패턴 동안 수동 운석은 쉰다.
 /// </summary>
 [CreateAssetMenu(fileName = "DragonBlackSunPattern",
@@ -37,6 +39,19 @@ public class DragonBlackSunPatternSO : BossPatternSO
     [SerializeField] private GameObject _weakPointBreakVfx;
     [SerializeField] private float      _weakPointBreakVfxScale = 1.6f;
     [SerializeField] private AudioClip  _breakSfx;
+
+    [Header("충전 중 검은 불씨 (10-22 E5 페이지2)")]
+    [Tooltip("충전 동안 불씨를 떨어뜨리는 차례 — 플레이어 둘레에 원을 빽빽이(첫 원 = 플레이어 자리 · 날개 약점 원 둘레는 비운다). 0이면 없음")]
+    [SerializeField] private int        _emberWaves      = 2;
+    [Tooltip("불씨 예고(원이 차오르는 시간, 초) — 자리는 뜰 때 굳는다")]
+    [SerializeField] private float      _emberWarn       = 1.0f;
+    [SerializeField] private float      _emberRadius     = 1.6f;
+    [Tooltip("원 가장자리 사이 빈틈 (m, 최소 · 최대 무작위)")]
+    [SerializeField] private Vector2    _emberGap        = new Vector2(1.0f, 2.4f);
+    [SerializeField] private int        _emberMax        = 8;
+    [SerializeField] private float      _emberDamageMult = 0.6f;
+    [SerializeField] private GameObject _emberVfx;
+    [SerializeField] private float      _emberVfxScale   = 0.6f;
 
     [Header("격추 — 둘 다 깨면")]
     [SerializeField] private float      _fallSpeed      = 16f;
@@ -93,6 +108,14 @@ public class DragonBlackSunPatternSO : BossPatternSO
     public GameObject WeakPointBreakVfx      => _weakPointBreakVfx;
     public float      WeakPointBreakVfxScale => _weakPointBreakVfxScale;
     public AudioClip  BreakSfx               => _breakSfx;
+    public int        EmberWaves             => Mathf.Max(0, _emberWaves);
+    public float      EmberWarn              => Mathf.Max(0.45f, _emberWarn);
+    public float      EmberRadius            => _emberRadius;
+    public Vector2    EmberGap               => _emberGap;
+    public int        EmberMax               => Mathf.Max(1, _emberMax);
+    public float      EmberDamageMult        => _emberDamageMult;
+    public GameObject EmberVfx               => _emberVfx;
+    public float      EmberVfxScale          => _emberVfxScale;
     public float      FallSpeed              => Mathf.Max(1f, _fallSpeed);
     public float      GroggySeconds          => _groggySeconds;
     public GameObject FallImpactVfx          => _fallImpactVfx;
@@ -150,6 +173,9 @@ internal sealed class DragonBlackSunState : FullLockState<DragonBlackSunPatternS
     private enum Phase { Rise, Charge, Fall, Groggy, Blast, Descend, Recover, Done }
 
     private const float SunSphereRadius = 1.2f;   // 이펙트가 없을 때 도형 구체 반경(× 자라는 배율)
+    private const float EmberAreaRadius = 7f;     // 불씨를 까는 플레이어 둘레(m · 10-22 E5 페이지2)
+    private const float EmberArmHold    = 0.25f;  // 불씨 판정 색을 남겨 두는 시간
+    private const float WingDiscPad     = 0.6f;   // 날개 약점 발밑 원 = 약점 반경 + 이만큼(DragonWingWeakPoint)
 
     private static readonly Color SunCore = new Color(0.08f, 0.01f, 0.12f);
 
@@ -171,7 +197,14 @@ internal sealed class DragonBlackSunState : FullLockState<DragonBlackSunPatternS
     private AudioSource         _chargeAudio;
     private MonsterContext      _ctx;
 
-    internal DragonBlackSunState(DragonBlackSunPatternSO data) : base(data) { }
+    // 충전 중 검은 불씨(10-22 E5 페이지2)
+    private readonly List<Vector3>    _embers      = new();
+    private readonly List<GameObject> _emberGuides = new();
+    private readonly System.Predicate<Vector3> _nearWing;
+    private int                       _emberWave;          // 다음 차례
+    private float                     _emberOpenAt = -1f;  // 지금 불씨가 뜬 충전 시각 — 음수면 없음
+
+    internal DragonBlackSunState(DragonBlackSunPatternSO data) : base(data) => _nearWing = NearWing;
 
     internal void Reset()
     {
@@ -193,6 +226,8 @@ internal sealed class DragonBlackSunState : FullLockState<DragonBlackSunPatternS
         _wingsBroken     = 0;
         _timer           = 0f;
         _phase           = Phase.Rise;
+        _emberWave       = 0;
+        _emberOpenAt     = -1f;
 
         if (ctx.Agent != null) ctx.Agent.enabled = false;
         var bb = DragonAbyssFx.Blackboard(ctx);
@@ -299,6 +334,7 @@ internal sealed class DragonBlackSunState : FullLockState<DragonBlackSunPatternS
             _armed = true;
             PatternGuideHelper.Arm(_disc);
         }
+        TickEmbers(ctx);
 
         if (_wingsBroken >= 2)
         {
@@ -307,6 +343,70 @@ internal sealed class DragonBlackSunState : FullLockState<DragonBlackSunPatternS
         }
         if (_timer < Data.ChargeSeconds) return;
         Blast(ctx);
+    }
+
+    // ── 충전 중 검은 불씨(10-22 E5 페이지2) ─────────────────────────────────
+
+    /// <summary>
+    /// 차례마다 플레이어 둘레에 불씨 원을 빽빽이 깔고(첫 원 = 플레이어 자리 · 틈 1.0~2.4 m 무작위) 예고가 다 차면 터진다.
+    /// 차례는 충전을 고르게 나눈 때에 터진다 · 날개 약점 원 둘레는 비운다 — 약점을 치러 가면 그 자리가 안전하다.
+    /// </summary>
+    private void TickEmbers(MonsterContext ctx)
+    {
+        if (_emberOpenAt >= 0f)
+        {
+            float t = _timer - _emberOpenAt;
+            for (int i = 0; i < _emberGuides.Count; i++) PatternGuideHelper.SetProgress(_emberGuides[i], t / Data.EmberWarn);
+            if (t >= Data.EmberWarn) BurstEmbers(ctx);
+            return;
+        }
+        if (_emberWave >= Data.EmberWaves) return;
+        if (_timer >= Data.ChargeSeconds * (_emberWave + 1) / (Data.EmberWaves + 1) - Data.EmberWarn) OpenEmbers(ctx);
+    }
+
+    private void OpenEmbers(MonsterContext ctx)
+    {
+        _emberWave++;
+        _emberOpenAt = _timer;
+        _embers.Clear();
+        if (ctx.Runtime.PlayerTarget == null) return;
+        Vector3 player = DragonAbyssFx.OnFloor(ctx, ctx.Runtime.PlayerTarget.position);
+        DragonAbyssFx.PackDiscs(_embers, player, EmberAreaRadius, Data.EmberRadius, Data.EmberGap, Data.EmberMax, player, _nearWing);
+        Color c = DragonAbyssFx.WithAlpha(DragonAbyssFx.Abyss, 0.85f);
+        for (int i = 0; i < _embers.Count; i++)
+        {
+            _embers[i] = DragonAbyssFx.OnFloor(ctx, _embers[i]);
+            _emberGuides.Add(PatternGuideHelper.Prepare(PatternGuideHelper.Disc(_embers[i], Data.EmberRadius, c), c));
+        }
+    }
+
+    /// <summary>불씨가 터진다 — 예고 원 그대로 판정 · 한 차례에 한 번만 맞는다. 판정 색을 잠깐 보이고 거둔다.</summary>
+    private void BurstEmbers(MonsterContext ctx)
+    {
+        _emberOpenAt = -1f;
+        var  player = DragonAbyssFx.Player(ctx);
+        bool inside = false;
+        for (int i = 0; i < _embers.Count; i++)
+        {
+            DragonAbyssFx.Burst(Data.EmberVfx, _embers[i], Quaternion.identity, Data.EmberVfxScale);
+            if (player != null) inside |= DragonAbyssFx.InDisc(player.transform.position, _embers[i], Data.EmberRadius);
+        }
+        if (inside) DragonAbyssFx.HitPlayer(ctx, Data.EmberDamageMult, HitWeight.Medium);
+        for (int i = 0; i < _emberGuides.Count; i++)
+        {
+            PatternGuideHelper.Arm(_emberGuides[i]);
+            Object.Destroy(_emberGuides[i], EmberArmHold);
+        }
+        _emberGuides.Clear();
+        _embers.Clear();
+    }
+
+    /// <summary>날개 약점 발밑 원 둘레 — 불씨를 두지 않는다(깨진 날개는 사라져 빠진다).</summary>
+    private bool NearWing(Vector3 p)
+    {
+        float r = Data.WeakPointRadius + WingDiscPad + Data.EmberRadius;
+        return (_leftWing  != null && DragonAbyssFx.InDisc(p, _leftWing.transform.position,  r))
+            || (_rightWing != null && DragonAbyssFx.InDisc(p, _rightWing.transform.position, r));
     }
 
     private void OnWingBroken(DragonWingWeakPoint wing)
@@ -368,7 +468,7 @@ internal sealed class DragonBlackSunState : FullLockState<DragonBlackSunPatternS
         CleanupCharge();
         _phase = Phase.Blast;
 
-        LichCinematics.Flash(DragonAbyssFx.WithAlpha(DragonAbyssFx.Abyss, 1f), 0.45f, 0.4f);
+        LichCinematics.Flash(DragonAbyssFx.WithAlpha(DragonAbyssFx.AbyssVfx, 1f), 0.45f, 0.4f);   // 화면 번쩍임은 심연 색 그대로(10-23)
         LichCinematics.Chroma(0.5f, 0.4f);
         DragonAbyssFx.Burst(Data.FailVfxPrefab, at, Quaternion.identity, Data.FailVfxScale, 3f);
         Managers.Sound?.PlayEffectAt(Data.FailSfx, at);
@@ -425,6 +525,14 @@ internal sealed class DragonBlackSunState : FullLockState<DragonBlackSunPatternS
         _sun = null;
         PatternGuideHelper.SafeDestroy(ref _sunShape);
         PatternGuideHelper.SafeDestroy(ref _disc);
+        for (int i = 0; i < _emberGuides.Count; i++)
+        {
+            var g = _emberGuides[i];
+            PatternGuideHelper.SafeDestroy(ref g);
+        }
+        _emberGuides.Clear();
+        _embers.Clear();
+        _emberOpenAt = -1f;
         if (_chargeAudio != null && Data.ChargeSfx != null) Managers.Sound?.StopEffect(_chargeAudio, Data.ChargeSfx);
         _chargeAudio = null;
     }

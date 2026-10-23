@@ -21,6 +21,9 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: fl2_ancient_charge
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: 32491d96f7e2e4c488e3a0d29b01e08b, type: 2}
+  followUpLateOnly: 0
+  followUpCooldown: 10
   minRange: 8
   maxRange: 40
   chargeCount: 3

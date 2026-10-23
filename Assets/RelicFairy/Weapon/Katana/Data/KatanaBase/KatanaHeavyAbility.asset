@@ -24,7 +24,7 @@ MonoBehaviour:
       space: 0
       positionOffset: {x: 0, y: 1, z: 0.7}
       rotationEuler: {x: 0, y: 0, z: 0}
-      scaleMultiplier: 1.5
+      scaleMultiplier: 1
       lifeTimeMultiplier: 1.2
       behavior: {fileID: 0}
     collider:

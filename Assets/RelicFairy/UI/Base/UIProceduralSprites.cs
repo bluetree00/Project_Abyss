@@ -76,7 +76,35 @@ public static class UIProceduralSprites
             return Mathf.Clamp01(1f - (d - half));
         }));
 
+    /// <summary>
+    /// 길안내 화살촉(흰색 · 배경 투명 · 0° = 오른쪽을 가리킴) — 한쪽으로 길고 뒤가 파인 다트 모양이라 어느 쪽이 앞인지 바로 보인다
+    /// (10-18 사용자 「정삼각형이라 어디 방향인지 헷갈려」 — 예전엔 글자 ▶를 돌렸다). 길이 : 폭 ≈ 1.7 : 1.
+    /// </summary>
+    public static Sprite Pointer(int size = 64)
+        => Get($"pointer_{size}", () => Bake(size, 0f, (x, y) =>
+        {
+            var p     = new Vector2((x + 0.5f) / size, (y + 0.5f) / size);
+            var tip   = new Vector2(0.95f, 0.50f);
+            var top   = new Vector2(0.07f, 0.76f);
+            var notch = new Vector2(0.33f, 0.50f);
+            var bot   = new Vector2(0.07f, 0.24f);
+            bool inside = InTri(p, tip, top, notch) || InTri(p, tip, notch, bot);
+            float d = Mathf.Min(Mathf.Min(SegDist(p, tip, top), SegDist(p, top, notch)),
+                                Mathf.Min(SegDist(p, notch, bot), SegDist(p, bot, tip))) * size;
+            return inside ? Mathf.Clamp01(0.5f + d) : Mathf.Clamp01(0.5f - d);
+        }));
+
     // ── 내부 ────────────────────────────────────────────────────────────
+
+    private static bool InTri(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
+    {
+        float d1 = Cross(p, a, b), d2 = Cross(p, b, c), d3 = Cross(p, c, a);
+        bool neg = d1 < 0f || d2 < 0f || d3 < 0f;
+        bool pos = d1 > 0f || d2 > 0f || d3 > 0f;
+        return !(neg && pos);
+    }
+
+    private static float Cross(Vector2 p, Vector2 a, Vector2 b) => (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
 
     private static float RoundedSdf(int x, int y, int size, float radius, float inset)
     {

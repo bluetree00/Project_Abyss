@@ -235,7 +235,7 @@ public class FGRootWhirlState : FullLockState<FGRootWhirlPatternSO>
         float dist = d.magnitude;
         if (dist > maxRadius || (minRadius > 0f && dist <= minRadius)) return false;
 
-        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * damageMult));
+        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * damageMult * ForestGuardianMonster.ChainScale(ctx)));   // 사슬 둘째 칸 ×0.8(10-22 E5 페이지2)
         player.TakeDamage(dmg, ctx.Monster.gameObject, false, HitWeight.Heavy);
 
         Vector3 knock = dist > 0.001f ? d / dist : ctx.Transform.forward;

@@ -181,6 +181,8 @@ public sealed partial class PlayerController
         }
         bool isInSkill = IsInSkillState();
         bool isDodging = _locoSM.CurrentId == LocoState.Dodge;
+        // 마지막 타 뒤 후딜 — 공격 · 스킬로 끊고 바로 잇는다(10-18 사용자 「후딜이 의미 없이 길다」 · 예전엔 회피만)
+        bool chainFromSkill = isInSkill && SkillRecovering;
         bool isInAct   = _actSM.CurrentId != ActState.None || isDodging;
 
         // 빈 슬롯(예: 무형검은 skillE/skillQ 모두 없음)으로 전환하면 스킬 없는 상태에 들어가
@@ -188,28 +190,36 @@ public sealed partial class PlayerController
         // 스킬 중 누른 다음 스킬은 버리지 않고 버퍼(0.4초)에 남긴다 — 지금 스킬이 끝나면 바로 이어진다(10-08 A2).
         // 회피 중 누른 스킬은 버퍼(0.4초)에 남겼다가 회피가 끝나면 나간다 — 회피 중에 시작하면 회피 종료가 이동 잠금을 풀고
         // 대기 동작으로 덮어 스킬 동작이 끊긴 채 걸어 다녔다(10-09 출시 점검)
-        if (!isInSkill && !isDodging && InputBuffer.TryConsume(Command.QSkill))
+        if ((!isInSkill || chainFromSkill) && !isDodging && InputBuffer.TryConsume(Command.QSkill))
         {
             RFLog.D($"[Input] Q pressed: CanAttack={CanAttack()}, isInSkill={isInSkill}, actState={_actSM.CurrentId}");
-            if (CanAttack() && !isInSkill && CanUseSkillNow(SkillType.Q)) _actSM.Change(ActState.QSkill);
+            if (CanAttack() && (!isInSkill || chainFromSkill) && CanUseSkillNow(SkillType.Q)) _actSM.Change(ActState.QSkill);
             return;
         }
-        if (!isInSkill && !isDodging && InputBuffer.TryConsume(Command.ESkill))
+        if ((!isInSkill || chainFromSkill) && !isDodging && InputBuffer.TryConsume(Command.ESkill))
         {
-            if (CanAttack() && !isInSkill && CanUseSkillNow(SkillType.E)) _actSM.Change(ActState.ESkill);
+            if (CanAttack() && (!isInSkill || chainFromSkill) && CanUseSkillNow(SkillType.E)) _actSM.Change(ActState.ESkill);
             else if (!CooldownTracker.IsReady(SkillType.E)) SkillRejected?.Invoke(SkillType.E);   // HUD 거절 표시(A9)
             return;
         }
-        if (!isInSkill && !isDodging && InputBuffer.TryConsume(Command.RSkill))
+        if ((!isInSkill || chainFromSkill) && !isDodging && InputBuffer.TryConsume(Command.RSkill))
         {
-            if (CanAttack() && !isInSkill && CanUseSkillNow(SkillType.R)) _actSM.Change(ActState.RSkill);
+            if (CanAttack() && (!isInSkill || chainFromSkill) && CanUseSkillNow(SkillType.R)) _actSM.Change(ActState.RSkill);
             else if (!CooldownTracker.IsReady(SkillType.R)) SkillRejected?.Invoke(SkillType.R);
             return;
         }
 
-        // 스킬 중에는 공격 관련 입력 소비하고 무시
+        // 스킬 중에는 공격 관련 입력 소비하고 무시 — 후딜이면 끊고 바로 평타
         if (isInSkill)
+        {
+            if (chainFromSkill && InputBuffer.TryConsume(Command.Light))
+            {
+                _actSM.Change(ActState.None);
+                if (CanAttack()) _actSM.Change(ActState.AttackReady);
+                return;
+            }
             InputBuffer.TryConsume(Command.Light);
+        }
 
         // 스킬 중 회피: 후딜(피해 뒤)이면 끊고 회피, 그 전이면 버퍼(0.4초)에 남긴다 — 예전엔 버렸다(10-08 A2 · 결정 S2)
         if (isInSkill && !SkillRecovering) return;

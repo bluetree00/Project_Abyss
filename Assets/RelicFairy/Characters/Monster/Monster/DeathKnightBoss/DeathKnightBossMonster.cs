@@ -38,11 +38,21 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     private const float Phase2HpThreshold  = 0.4f;
     private const float SoulGateRatio      = 0.5f;   // 영혼 소환 전까지 HP를 붙잡는 1페이지 비율
     private const int   MaxGridGrow        = 2;      // 격자 바깥 줄이 걸어 다니는 바닥이면 넓히는 최대 횟수
+    private const float ChainLinkDamage    = 0.8f;   // 사슬 둘째 칸 피해 배율(10-22 E5 페이지2 — 리치 · 화룡과 같은 규칙)
+    // 사슬 박자(10-22 E5 페이지2) — 사슬 안 쉬는 시간 · 사슬 뒤 숨 고르기(리치와 같은 값). 연계는 2페이지 직접 패턴에만 이어진다
+    private static readonly Vector2 ChainLinkRest = new Vector2(0.2f, 0.35f);
+    private static readonly Vector2 ChainEndRest  = new Vector2(1.5f, 2f);
 
     // ── 2페이지 무대(가운데 3×3 붕괴) ─────────────────────
-    private static readonly Color CollapseColor = new Color(0.22f, 0.20f, 0.26f, 0.62f);
+    private static Color CollapseColor => PatternGuideHelper.HazardFloor;   // (10-23 가이드 색 통일) 회보라 → 머무는 위험 바닥 공용 색(숲 가시 띠 · 화룡 흑염 띠와 같게)
     private const float CollapseDamagePerTick   = 0.12f;  // 0.5초마다 공격력 × 이 배율
     private const float PostTransitionBreak     = 1.5f;   // 전환이 끝나고 첫 패턴까지
+    private const float IntroFinisherFirstDelay = 5f;     // 인트로 — 첫 마무리(10-16 8초 → 10-17 사용자 「오래 기다리게 한다」 5초)
+    private const string IntroFinisherCallKey   = "DK_Intro_FinisherCall";   // 마무리 시작 예고 대사(10-17)
+    private const string IntroFinisherCallText  = "이 일격으로 끝내겠다. 원탁째 무너져라!";
+    private const string IntroDefeatKey         = "DK_Intro_Defeat";         // 쓰러진 주인공에게 검을 겨누고(10-17)
+    private const string IntroDefeatText        = "그대의 검은 아직 내게 닿지 않는다. 다시 일어선다면, 나를 찾아오라.";
+    private const float  IntroDefeatHold        = 2.2f;                      // 대사 뒤 암전까지(실시간)
     private static readonly Color Page2WindowBase     = new Color(0.30f, 0.30f, 0.34f, 0.4f);
     private static readonly Color Page2WindowEmission = new Color(0.32f, 0.32f, 0.36f, 1f);
     private const float Page2EmissionBoost = 2.5f;   // 2페이지 — 갑옷 발광 배율(검 색 알림은 그대로, 09-29)
@@ -51,11 +61,11 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     private const float  SwordCueFlashSeconds = 0.35f;  // 갑옷 번쩍 — 잠깐만
     private const float  SwordCueFlashBoost   = 2f;     // 번쩍 순간 갑옷 발광 배율(2페이지 발광 배율과 곱해진다)
     private const float  SwordCueRingScale    = 1.6f;   // 발밑 고리(런 공용 Ring) 크기
-    private const string FloorRuleHint        = "검과 같은 색의 바닥이 베인다";
+    private const string FloorRuleHint        = "붉게 차오르는 칸이 베인다";                // 10-23 가이드 색 통일 — 맞는 칸만 붉게(옛 「검과 같은 색의 바닥이 베인다」)
     private const string FlipToBlackHint      = "검이 검게 물들었다";
     private const string FlipToWhiteHint      = "검이 하얗게 물들었다";
     private const string CrossFlipHint        = "색이 뒤집힌다 — 마지막 색의 반대로";
-    private const string TreasonColorHint     = "검과 같은 색의 환영만 벤다 — 다른 색 칸으로";
+    private const string TreasonColorHint     = "환영이 붉은 칸을 벤다 — 무채색 칸으로";   // 10-23 가이드 색 통일(옛 「검과 같은 색의 환영만 벤다」)
     private static readonly Color EntranceRadialTint = new Color(0.4f, 0.45f, 0.9f, 0.5f);   // 2페이지 포효(DK_PageTransition)와 같은 색(10-11 이펙트 톤 점검)
     private const float EntranceRadialSeconds = 3f;
 
@@ -226,6 +236,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     private bool                      _lastHudInvulnerable;
     private float                     _swordCueGlow;        // 0~1 — 검 색 신호 때 갑옷 발광이 잠깐 세진다(10-03)
     private bool                      _floorHintShown;      // 규칙 자막 — 전투마다 한 번씩
+    private bool                      _introCallShown;      // 인트로 마무리 예고 대사 — 한 번(10-17)
     private bool                      _flipHintShown;
     private bool                      _crossFlipHintShown;
     private bool                      _treasonHintShown;
@@ -233,6 +244,13 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     private DKCommandTrait            _command;             // 악몽 특성 「지휘」 — 환영 기수(10-02)
 
     public bool SoulGateCleared => _soulGateCleared;
+
+    /// <summary>지금 도는 패턴이 연계로 이어 낸 사슬 둘째 칸인가 — 피해 ×<see cref="ChainLinkDamage"/>(10-22 E5 페이지2).</summary>
+    public bool IsChainLink => _runner != null && _runner.IsFollowUpRunning;
+
+    /// <summary>기사 격자 피해에 곱한다 — 사슬 둘째 칸이면 <see cref="ChainLinkDamage"/>, 아니면 1(10-22 E5 페이지2).</summary>
+    internal static float ChainScale(MonsterBase boss)
+        => (boss as DeathKnightBossMonster)?.IsChainLink == true ? ChainLinkDamage : 1f;
 
     /// <summary>GetHitState 진입/종료 시 콤보 러너 차단 플래그.</summary>
     public void SetStagger(bool value) => _isStaggered = value;
@@ -331,6 +349,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
             changeState:    s => ChangeState(s),
             onExecuted:     OnPatternExecuted,
             stateDecorator: null);
+        _runner.SetChainTempo(ChainLinkRest, ChainEndRest);   // 2페이지 연계 사슬 — 사슬 안 짧게 · 사슬 뒤 숨(10-22 E5 페이지2)
         _command = new DKCommandTrait(this);
 
         BindBossHud();
@@ -354,6 +373,10 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
 
     /// <summary>검을 소멸시킨다 (등장 연출 종료 등 외부 호출용).</summary>
     public void HideSwordVisual() => _swordCtrl?.HideSword();
+
+    /// <summary>검은 든 채 궤적만 켜고 끈다 — 검은 늘 든다(10-22 A4 「검이 연출 때만 나왔다 사라진다」).</summary>
+    public void BeginSwordSwing() => _swordCtrl?.BeginSwing();
+    public void EndSwordSwing() => _swordCtrl?.EndSwing();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 매 프레임
@@ -390,10 +413,9 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
 
             if (active != _prevPatternActive)
             {
-                if (active)
-                    ShowSwordVisual();
-                else
-                    _swordCtrl?.HideSword();
+                // 검은 늘 든다 — 패턴 끝마다 디졸브로 사라졌다 다시 맺혀 「연출 때만 나왔다 사라진다」로 보였다(10-22 A4) · 궤적만 패턴 동안
+                if (active) { ShowSwordVisual(); BeginSwordSwing(); }
+                else EndSwordSwing();
                 _prevPatternActive = active;
             }
         }
@@ -463,6 +485,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
 
     protected override void OnDisable()
     {
+        if (IntroBootstrapper.DefeatOutro == (System.Func<CancellationToken, UniTask>)IntroDefeatOutroAsync) IntroBootstrapper.DefeatOutro = null;
         DestroyStageHazard();   // 죽지 않고 비활성(런 종료 등)돼도 붕괴 구역이 남아 플레이어를 치지 않게
         _command?.Reset("기사 비활성", true);   // 환영 기수도 — 남으면 플레이어 구역에 서 있는다
         _passiveCts?.Cancel();
@@ -661,7 +684,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
 
     /// <summary>
     /// 검 색 바닥 패턴이 타일을 까는 순간(패턴마다 한 번) — 갑옷이 잠깐 번쩍이고 발밑에서 검 색 고리가 퍼진다.
-    /// 「검과 같은 색 바닥이 베인다」를 기사 몸과 바닥으로 잇는다. 이번 전투 첫 번째엔 규칙 자막도(10-03 개선 2-2).
+    /// 검 색을 기사 몸과 바닥으로 잇는다(맞는 칸은 붉게 차오른다 — 10-23). 이번 전투 첫 번째엔 규칙 자막도(10-03 개선 2-2).
     /// 검 렌더러는 디졸브가 재질을 갈아 끼우므로 건드리지 않는다 — 검 색 알림은 갑옷 발광이 맡아 왔다.
     /// </summary>
     public void CueSwordFloor()
@@ -688,6 +711,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         if (!UI_BossBark.ShowDialogue(line.nameKey, BossBarkType.PatternAnnounce))
             UI_BossBark.Show(line.name, BossBarkType.PatternAnnounce);
         if (_bigSkillHintShown[(int)skill]) return;
+        if (IntroBootstrapper.Instance != null) return;   // 인트로는 멀린을 만나기 전 — 멀린 요령을 내지 않는다(10-22 A2 「인트로 보스 가이드 대사가 레거시」)
         _bigSkillHintShown[(int)skill] = true;
         if (!UI_BossBark.ShowDialogue(line.hintKey, BossBarkType.MerlinNarration))
             UI_BossBark.Show(line.hint, BossBarkType.MerlinNarration, DialogueSpeaker.Merlin);
@@ -1008,6 +1032,32 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     {
         _coreBB.LastPatternTag  = pattern.patternTag;
         _coreBB.NormalModeTimer = 0f;
+        // 인트로 — 마무리 광역기를 처음 낼 때 예고 대사(그 패턴 전에 알린다 · 10-17 사용자)
+        if (!_introCallShown && _runner != null && pattern == _runner.OnlyPattern && IntroBootstrapper.Instance != null)
+        {
+            _introCallShown = true;
+            if (!UI_BossBark.ShowDialogueLine(IntroFinisherCallKey, 0))
+                UI_BossBark.Show(IntroFinisherCallText, BossBarkType.Bark, DialogueSpeaker.Mordred);
+            Debug.Log("[DK] 인트로 마무리 예고 대사");
+        }
+    }
+
+    /// <summary>인트로 패배 마무리 — 더 치지 않고, 쓰러진 주인공을 향해 검을 겨눈 채 한 줄 뒤 암전(붙잡는 동작이 없어 겨눔으로 · 10-17).</summary>
+    private async UniTask IntroDefeatOutroAsync(CancellationToken ct)
+    {
+        if (_runner != null) { _runner.OnlyPattern = null; _runner.EnsureMinBreakCooldown(60f); }
+        var pt = _runtime != null ? _runtime.PlayerTarget : null;
+        if (pt != null)
+        {
+            Vector3 to = pt.position - transform.position; to.y = 0f;
+            if (to.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(to);
+        }
+        if (_animator != null && _animator.HasState(0, Animator.StringToHash("AttackReady")))
+            _animator.CrossFadeInFixedTime("AttackReady", 0.15f);
+        if (!UI_BossBark.ShowDialogueLine(IntroDefeatKey, 0, BossBarkType.Bark, interrupt: true))
+            UI_BossBark.Show(IntroDefeatText, BossBarkType.Bark, DialogueSpeaker.Mordred);
+        Debug.Log("[DK] 인트로 패배 마무리 대사");
+        await UniTask.Delay(System.TimeSpan.FromSeconds(IntroDefeatHold), DelayType.Realtime, cancellationToken: ct);
     }
 
     // ── 페이즈 전환 ────────────────────────────────────────
@@ -1248,6 +1298,8 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         foreach (var b in _entranceEndBarriers)
             if (b != null) b.SetActive(true);
         ApplyBarrierTint(_dkBB?.SwordColor ?? DKSwordColor.White);
+        ShowSwordVisual();   // 전투가 열리면 검을 쥔다(10-22 A4 · 이미 들고 있으면 그대로)
+        EndSwordSwing();
         // 인트로 전투 — 카메라가 결계 바깥이라 반투명 결계 유리(20×20 m)가 화면 위쪽을 안개처럼 덮었다(10-10 16 실측: 위쪽 밝기 0.25, 유리를 끄면 0.04).
         // 막는 콜라이더 · SoftBarrier는 그대로 두고 유리만 그리지 않는다. 본편은 그대로
         if (IntroBootstrapper.Instance != null)
@@ -1266,8 +1318,32 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         LoadGuideMaterialsAsync(destroyCancellationToken).Forget();   // 예고 데칼 재질 · 검 색 고리(10-03)
         GameCameraController.Instance?.ActivateDKPlayerOrbit(1.0f);
         _runner?.EnsureMinBreakCooldown(3f);
+        // 인트로 전투 — 플레이어 체력 250이라 기사 한 방(286~429)이면 끝난다. 끝내는 공격이 늘 가장 큰 광역기가 되게
+        // 「무너지는 원탁」(피라미드 베기 · 결계 + 동심 링 3세트)만 낸다(10-16 사용자 「연출상 가장 강력한 광역 패턴으로」). 본편은 그대로
+        if (_runner != null)
+        {
+            _runner.OnlyPattern = IntroBootstrapper.Instance != null ? IntroFinisher() : null;
+            if (_runner.OnlyPattern != null)
+            {
+                _runner.EnsureMinBreakCooldown(IntroFinisherFirstDelay);
+                _introCallShown = false;
+                IntroBootstrapper.DefeatOutro = IntroDefeatOutroAsync;   // 쓰러진 뒤 암전 전에 — 검을 겨누고 대사(10-17)
+            }
+        }
         OnCombatReady?.Invoke();
         RaiseBossCombatReady();
+    }
+
+    /// <summary>인트로 마무리 패턴 — 2페이즈 광역 풀(없으면 1페이즈 풀)의 피라미드 베기.</summary>
+    private BossPatternSO IntroFinisher()
+    {
+        if (_phase2AreaPool != null)
+            foreach (var p in _phase2AreaPool)
+                if (p is DKPyramidSlashPatternSO) return p;
+        if (_attackPool != null)
+            foreach (var p in _attackPool)
+                if (p is DKPyramidSlashPatternSO) return p;
+        return null;
     }
 
     /// <summary>

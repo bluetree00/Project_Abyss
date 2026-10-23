@@ -275,6 +275,9 @@ public sealed class RunResultView : MonoBehaviour
             .text = RunResultPresenter.WeaponTitle(_snap.Weapon);
         Text(p, "WeaponSub", x + 76f, y + 32f, ColW - 76f, 24f, UITheme.Thin.Small, UIWeight.Regular, UITheme.Thin.InkA(0.6f))
             .text = RunResultPresenter.WeaponSub(_snap.Weapon, _snap.SubWeapon);
+        // 보조 무기 빌드 한 줄(10-22 「무기 빌드도 간단히」) — 유물 줄(y + 84) 위 남는 자리
+        Text(p, "SubWeapon", x + 76f, y + 56f, ColW - 76f, 22f, UITheme.Thin.Small, UIWeight.Regular, UITheme.Thin.InkA(0.5f))
+            .text = RunResultPresenter.SubWeaponLine(_snap.SubWeapon);
 
         // 유물 · 되살아난 기억
         float ry = y + 84f;

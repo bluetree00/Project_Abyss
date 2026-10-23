@@ -46,7 +46,7 @@ public sealed class StagingAreaView : MonoBehaviour
 
     private static readonly Color COLOR_NEW_BORDER      = new(1f, 0.92f, 0.3f, 1f);
     private static readonly Color COLOR_NORMAL_BORDER   = new(0.4f, 0.4f, 0.5f, 0.7f);
-    private static readonly Color COLOR_OVERFLOW_BORDER = new(1f, 0.48f, 0.42f, 1f);   // 상한을 넘친 룬 — 놓거나 분해해야 닫힌다
+    private static readonly Color COLOR_OVERFLOW_BORDER = new(0.91f, 0.73f, 0.33f, 1f);   // 상한을 넘친 룬 — 놓거나 분해해야 닫힌다(10-19 붉은색 → 호박색: 받은 룬이지 못 받은 룬이 아니다)
     private static readonly Color COLOR_SELECTED_BORDER = new(0.3f, 0.85f, 1f, 1f);
     private static readonly Color HoverGlowColor        = new(1f, 0.84f, 0.45f, 0.85f);
     private static readonly Color COLOR_EMPTY_BG        = new(0.14f, 0.14f, 0.20f, 0.7f);
@@ -1294,7 +1294,7 @@ public sealed class StagingAreaView : MonoBehaviour
 
             if (RectTransformUtility.ScreenPointToWorldPointInRectangle(
                     parent, eventData.position, eventData.pressEventCamera, out var world))
-                rt.position = world;
+                rt.position = world - rt.TransformVector(_shape.BlockBoundsCenterLocal());   // 10-22 묶음 가운데를 커서 아래에(피벗은 왼쪽 위 칸이라 큰 룬이 오른쪽 아래로 매달렸다)
         }
     }
 

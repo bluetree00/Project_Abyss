@@ -1205,6 +1205,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fa87a22934cea5744aeb58c4981dc887
+    m_Address: Portrait_Mordred_Knight
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: fbfadc9ab51be4a6485de893074dde69
     m_Address: sfx_rest_heal
     m_ReadOnly: 0

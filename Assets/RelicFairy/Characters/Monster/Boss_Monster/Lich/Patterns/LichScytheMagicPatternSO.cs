@@ -10,6 +10,8 @@ namespace RelicFairy.Monster
 /// O 충전(windupDuration) — 책이 펼쳐져 떠오르고 리치가 낫을 뒤로 크게 당긴다. 플레이어를 지나 제단 끝까지 폭발 자리 원(판정 그대로)이 차오른다.
 /// → A 투척 — 낫이 궤적을 따라 날아가고(초속 flySpeed), 지나간 자리가 <b>0.4초 뒤 연쇄 폭발</b>(반경 blastRadius).
 ///   낫을 피해도 폭발이 따라온다 — 궤적 밖으로 빠져야 산다. 폭발이 겹친 칸은 두 번 맞아 영구히 무너진다(누적 한계 안에서).
+///   궤적 양옆에도 평행 폭발 줄 하나씩(가운데 줄과 틈 1.0~2.4 m 무작위 · 같은 묶음 · 10-22 E5 페이지2) — 옆으로 한 걸음이면 끝이던 것을
+///   좁은 틈에 서거나 멀리 비키게. 곁줄은 바닥을 무너뜨리지 않는다.
 ///   플레이어는 한 줄에서 한 번만 맞는다(원이 겹친 띠에서 두 번 맞던 것, 10-08 점검).
 /// → E 무방비 — 낫이 돌아올 때까지 빈손(endDuration) → R 복귀
 /// </summary>
@@ -40,8 +42,14 @@ public class LichScytheMagicPatternSO : BossPatternSO
     [Tooltip("이번 전투에 강한 패턴류가 영구히 무너뜨릴 최대 칸 수(C8 · C9와 같은 예산)")]
     public int   maxErodedCells   = 36;
 
+    [Header("낫의 대마법 — 곁줄 (10-22 E5 페이지2)")]
+    [Tooltip("궤적 양옆 평행 폭발 줄 — 가운데 줄 원 가장자리와의 빈틈 (m, 최소 · 최대 · 쪽마다 무작위)")]
+    [SerializeField] private Vector2 _sideGap = new Vector2(1.0f, 2.4f);
+
     // ── 런타임 ───────────────────────────────────────────
     private LichScytheMagicState _state;
+
+    public Vector2 SideGap => _sideGap;
 
     public override void Initialize(BossPatternContext ctx) => _state = new LichScytheMagicState(this);
     public override void OnRecycled()                       => _state = new LichScytheMagicState(this);
@@ -72,6 +80,9 @@ public class LichScytheMagicState : UnInterruptibleState<LichScytheMagicPatternS
     private readonly List<Vector2Int>            _doomed   = new();
     // 폭발 자리마다 판정 크기 원 — 직선 예고(폭 = 지름)는 원 사이 빈 귀퉁이까지 위험해 보였다(10-08 점검).
     private readonly List<GameObject>            _dots     = new();
+    // 곁줄(10-22 E5 페이지2) — 가운데 줄 폭발마다 양옆 평행 폭발. 예고 원 순번 = 폭발 순번 × 2 + 쪽(제단 밖이면 null)
+    private readonly List<GameObject>            _sideDots = new();
+    private readonly float[]                     _sideOff  = new float[2];
 
     private Phase      _phase;
     private float      _timer;
@@ -120,6 +131,14 @@ public class LichScytheMagicState : UnInterruptibleState<LichScytheMagicPatternS
             _dots.Add(LichPatternUtil.PrepareTelegraph(
                 PatternGuideHelper.Disc(LichPatternUtil.OnFloor(ctx, _start + _dir * d), Data.blastRadius, LichPatternUtil.Arcane),
                 LichPatternUtil.Arcane));
+        // 곁줄 — 쪽마다 틈 무작위(10-22 E5 페이지2) · 예고 = 실제로 터질 원(Fly와 같은 간격 · 같은 자리)
+        for (int s = 0; s < 2; s++)
+            _sideOff[s] = (s == 0 ? -1f : 1f) * (Data.blastRadius * 2f + Random.Range(Data.SideGap.x, Data.SideGap.y));
+        for (float d = 0f; d <= _length; d += BlastStep)
+            for (int s = 0; s < 2; s++)
+                _sideDots.Add(SidePos(ctx, d, s, out var at)
+                    ? LichPatternUtil.PrepareTelegraph(PatternGuideHelper.Disc(at, Data.blastRadius, LichPatternUtil.Arcane), LichPatternUtil.Arcane)
+                    : null);
         _row = new LichHazards.BlastRow();
 
         lich?.PulseBook(Data.windupDuration + Data.signalDuration);
@@ -141,6 +160,11 @@ public class LichScytheMagicState : UnInterruptibleState<LichScytheMagicPatternS
                 {
                     bool signaled = false;
                     LichPatternUtil.TickTelegraph(_dots[i], _timer, Data.windupDuration, 0f, ref signaled);
+                }
+                for (int i = 0; i < _sideDots.Count; i++)
+                {
+                    bool signaled = false;
+                    LichPatternUtil.TickTelegraph(_sideDots[i], _timer, Data.windupDuration, 0f, ref signaled);
                 }
                 if (_timer >= Data.windupDuration) Next(Phase.Signal);
                 break;
@@ -215,6 +239,18 @@ public class LichScytheMagicState : UnInterruptibleState<LichScytheMagicPatternS
                 PatternGuideHelper.SafeDestroy(ref dot);
                 _dots[_blastIndex] = null;
             }
+            for (int s = 0; s < 2; s++)   // 곁줄 — 같은 순간 · 같은 묶음(한 번 투척에 한 번만 맞는다) · 바닥은 안 무너뜨린다(10-22 E5 페이지2)
+            {
+                int k = _blastIndex * 2 + s;
+                if (k >= _sideDots.Count || _sideDots[k] == null) continue;
+                var side = _sideDots[k];
+                PatternGuideHelper.SafeDestroy(ref side);
+                _sideDots[k] = null;
+                if (SidePos(ctx, _nextBlast, s, out var sideAt))
+                    LichHazards.DelayedBlast(ctx, sideAt, Data.blastRadius, Data.blastDelay, Data.damageMultiplier,
+                                             LichVfxSlot.BoltImpact, LichPatternUtil.BoltScale(Data.blastRadius),
+                                             crack: false, row: _row, armed: true);
+            }
             _blastIndex++;
             CountCells(ctx, at);
             _nextBlast += BlastStep;
@@ -236,6 +272,21 @@ public class LichScytheMagicState : UnInterruptibleState<LichScytheMagicPatternS
             PatternGuideHelper.SafeDestroy(ref dot);
         }
         _dots.Clear();
+        for (int i = 0; i < _sideDots.Count; i++)
+        {
+            var dot = _sideDots[i];
+            PatternGuideHelper.SafeDestroy(ref dot);
+        }
+        _sideDots.Clear();
+    }
+
+    /// <summary>곁줄 <paramref name="s"/>(0 왼 · 1 오른)의 <paramref name="d"/> m 자리 — 제단 밖이면 false(10-22 E5 페이지2).</summary>
+    private bool SidePos(MonsterContext ctx, float d, int s, out Vector3 at)
+    {
+        Vector3 side = Vector3.Cross(Vector3.up, _dir);
+        at = LichPatternUtil.OnFloor(ctx, _start + _dir * d + side * _sideOff[s]);
+        var mc = LichPatternUtil.Mover(ctx);
+        return mc == null || LichPatternUtil.FlatDistance(at, mc.ArenaCenter) <= mc.ArenaRadius;
     }
 
     /// <summary>폭발이 덮는 칸마다 맞은 횟수를 센다.</summary>

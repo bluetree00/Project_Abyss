@@ -14,6 +14,8 @@ using UnityEngine;
 public sealed class IceLegendAoeEffect : ItemCombatEffectBase
 {
     private static readonly string[] s_hitSfx = { SoundKey.Sfx.MonsterHit1, SoundKey.Sfx.MonsterHit2, SoundKey.Sfx.MonsterHit3 };
+    // 장판 그림 수명 — 피해는 0.4초 × 4틱(1.2초에 끝)인데 그림이 4초 남아 피해 없는 장판으로 읽혔다(10-18 이펙트 점검)
+    private const float AoeVfxLife = 1.8f;
     private const int   WaveTicks = 4;
     private const string FrostId = "frost";
     private const float FrostSlow = 0.25f, FrostSeconds = 2.5f;
@@ -51,7 +53,7 @@ public sealed class IceLegendAoeEffect : ItemCombatEffectBase
         Vector3 pos  = ctx.Player.transform.position;
         var cat = LegendaryRuntime.Catalog;
         if (CombatQuery.GetNearbyDamageables(pos, radius, Self(ctx), 1, _buf) > 0)
-            LegendaryRuntime.SpawnVfx(cat?.iceAoeVfx, pos, Quaternion.identity, 4f, radius * 0.0488f, alpha: 0.18f, yScale: 0.1f, follow: ctx.Player.transform);
+            LegendaryRuntime.SpawnVfx(cat?.iceAoeVfx, pos, Quaternion.identity, AoeVfxLife, radius * 0.0488f, alpha: 0.18f, yScale: 0.1f, follow: ctx.Player.transform);
         WaveTickAsync(ctx, radius, _cts.Token).Forget();
     }
 
@@ -73,7 +75,7 @@ public sealed class IceLegendAoeEffect : ItemCombatEffectBase
                     // 첫 파동 — 서리 2중첩(얼음 존의 빙결 조건과 같은 통화) · 타격 이펙트는 첫 틱만(10-11 톤 2차 V-10)
                     var mb = _buf[i] != null ? _buf[i].GetComponentInParent<MonsterBase>() : null;
                     if (mb != null) { mb.Status.ApplySlow(FrostId, FrostSlow, FrostSeconds, 2); mb.Status.ApplySlow(FrostId, FrostSlow, FrostSeconds, 2); }
-                    LegendaryRuntime.SpawnVfx(cat?.iceAoeHitVfx, _buf[i].transform.position, Quaternion.identity, 1.5f, 0.8f);
+                    LegendaryRuntime.SpawnVfx(cat?.iceAoeHitVfx, _buf[i].transform.position, Quaternion.identity, 1.5f, 0.22f);   // 대상 타격 ≈ 1 m(10-22 B2 실측 83: ×0.8 = 3.7 m)
                 }
                 if (n > 0) Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
                 await UniTask.Delay(400, cancellationToken: ct);
@@ -139,9 +141,9 @@ public sealed class IceLegendSingleEffect : ItemCombatEffectBase
                 Vector3 dir    = tPos - spawn;
                 Quaternion rot = dir.sqrMagnitude > 0.01f ? Quaternion.LookRotation(dir) : Quaternion.identity;
 
-                LegendaryRuntime.SpawnVfx(cat?.iceSingleVfx, spawn, rot, 1.0f, 0.1f);
+                LegendaryRuntime.SpawnVfx(cat?.iceSingleVfx, tPos + Vector3.up * 0.6f, rot, 1.0f, 0.15f);   // 맞은 자리에 창 방향으로 박힌다(10-18 실측 68)
                 CombatQuery.DealSynergyDamage(target, spearDmg, ctx?.Player?.gameObject, element: RuneElement.Ice);
-                LegendaryRuntime.SpawnVfx(cat?.iceHitVfx, tPos, Quaternion.identity, 1.5f, 0.8f);
+                LegendaryRuntime.SpawnVfx(cat?.iceHitVfx, tPos, Quaternion.identity, 1.5f, 0.67f);   // 대상 타격 ≈ 1 m(10-22 B2 실측 83: ×0.8 = 1.2 m)
                 Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
 
                 await UniTask.Delay(150, cancellationToken: ct);

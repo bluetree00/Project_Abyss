@@ -15,22 +15,26 @@ MonoBehaviour:
   arrowCount: 1
   spreadAngle: 0
   arrowKey: Basic_Arrow_01
-  baseDamagePerArrow: 30
+  baseDamagePerArrow: 230
   fireDelay: 0.35
   forwardOffset: 1
   upOffset: 1
-  pierceMaxCount: 5
+  flyLevel: 1
+  pierceMaxCount: 99
+  pierceFromTier: 1
+  tier2SizeMult: 1.3
   explodeRadius: 2
   explodeDamageRatio: 0.5
   explodeEffectKey: NamelessBeamHit
   explodeEffectScale: 0.19
   projectileEffectKey: NamelessBeam
-  projectileEffectScale: 1
+  projectileEffectScale: 0.52
+  projectileHitRadius: 1.5
   tier2ExtraMuzzleKey: NamelessBeamMuzzle
   tier2ExtraMuzzleScale: 1.3
   tier3ExtraHitKey: NamelessBeamHit
   tier3ExtraHitScale: 0.22
   muzzleEffectKey: NamelessBeamMuzzle
   muzzleEffectScale: 1
-  endDelay: 0.5
+  endDelay: 0.3
   animationOverride: 

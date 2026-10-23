@@ -21,7 +21,15 @@ public static class RunResultPresenter
         return h > 0 ? $"{h}:{m:00}:{s:00}" : $"{seconds / 60}:{s:00}";
     }
 
-    public static string Title(RunResultSnapshot s) => s.Cleared ? "완주" : "쓰러짐";
+    /// <summary>
+    /// 「완주」 · 「쓰러짐」 — 봉인기에 시작해 리치에게 추방되고(Ch1 착지 · 재정비) 클리어로 정산된 런은 「봉인기 완주」(10-22 A10).
+    /// 그 런은 추방 때 챕터가 Ch1로 바뀐 채 끝난다 — 봉인기 런이 Ch1에서 클리어로 끝나는 길은 이것뿐이다.
+    /// </summary>
+    public static string Title(RunResultSnapshot s)
+    {
+        if (!s.Cleared) return "쓰러짐";
+        return s.Era == StoryEra.Sealed && s.ChapterNumber == 1 ? "봉인기 완주" : "완주";
+    }
 
     public static string Subtitle(RunResultSnapshot s)
     {
@@ -74,15 +82,33 @@ public static class RunResultPresenter
 
     public static string WeaponTitle(RunResultSnapshot.WeaponLine w) => w == null ? "무기 없음" : w.Name;
 
-    /// <summary>「+7 강화 · 형 쌍풍 2단 · 보조 석궁」 — 없는 조각은 뺀다.</summary>
+    /// <summary>
+    /// 「재련 3회 · 형 쌍풍 2단 · 튕기는 칼끝 II · 검기 I」 — 지금 든 무기의 빌드 한 줄(없는 조각은 뺀다).
+    /// 10-22 사용자 「무기 빌드도 간단히 보이게」 — 증강 · 파츠를 붙이고, 보조 무기는 <see cref="SubWeaponLine"/>으로 따로.
+    /// </summary>
     public static string WeaponSub(RunResultSnapshot.WeaponLine w, RunResultSnapshot.WeaponLine sub)
     {
         if (w == null) return string.Empty;
+        string line = BuildLine(w);
+        return string.IsNullOrEmpty(line) ? "기본" : line;
+    }
+
+    /// <summary>「보조 클라렌트 · 재련 4회 · 튕기는 칼끝 II」 — 보조 무기가 없으면 빈 글.</summary>
+    public static string SubWeaponLine(RunResultSnapshot.WeaponLine sub)
+    {
+        if (sub == null) return string.Empty;
+        string line = BuildLine(sub);
+        return string.IsNullOrEmpty(line) ? $"보조 {sub.Name}" : $"보조 {sub.Name}{Dot}{line}";
+    }
+
+    private static string BuildLine(RunResultSnapshot.WeaponLine w)
+    {
         var parts = new List<string>();
-        if (w.Enhance > 0) parts.Add($"+{w.Enhance} 강화");
+        if (w.Enhance > 0) parts.Add($"재련 {WeaponReforgeService.CountAt(w.Enhance)}회");
         if (!string.IsNullOrEmpty(w.FormName)) parts.Add(w.FormTier > 0 ? $"형 {w.FormName} {w.FormTier}단" : $"형 {w.FormName}");
-        if (sub != null) parts.Add($"보조 {sub.Name}");
-        return parts.Count == 0 ? "기본" : string.Join(Dot, parts);
+        if (!string.IsNullOrEmpty(w.Build)) parts.Add(w.Build);
+        else if (w.Ranged) parts.Add("파츠 없음");
+        return string.Join(Dot, parts);
     }
 
     public static string MemoryLine(RunResultSnapshot s)

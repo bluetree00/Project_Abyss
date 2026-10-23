@@ -51,6 +51,8 @@ public class LichDormantState : IMonsterState
 
     /// <summary>false가 되면 Exit()가 호출됐음을 의미 — LichMonster가 패턴 러너 차단 해제에 사용.</summary>
     public bool IsActive { get; private set; } = true;
+    /// <summary>등장 연출이 도는 중(감지 뒤 · 전투 진입 전) — 리치는 이 동안 피해를 받지 않는다(10-23 맞으면 잠든 몬스터 깨우기로 연출 중 전투가 켜졌다).</summary>
+    public bool IsEntrancePlaying => IsActive && _triggered;
 
     public LichDormantState(float detectionRange = 12f)
     {

@@ -67,6 +67,13 @@ public sealed class RangedPartsState
     /// <summary>켜진 파츠만 담는다(Lv1 이상). 꺼진 파츠는 여기 없고, 목록 표시는 정적 정의가 담당한다.</summary>
     private readonly List<Equipped> _equipped = new();
 
+    /// <summary>이 런에 한 원거리 재련 수 — 비용 띠(5 ~ 6번째 ×3 · 7번째 ~ ×6 · 10-18 재련 개편).</summary>
+    public int ReforgeCount { get; set; }
+    /// <summary>이 런에 쓴 파츠 카드 다시 뽑기 수(<see cref="RangedPartsDraft.RerollsPerRun"/>에서 뺀다).</summary>
+    public int RerollsUsed { get; set; }
+    /// <summary>재련 기록(10-19) — 원거리 재련마다 고른 파츠 · 오른 Lv(고른 순서). 런 시작 · 끝은 상태를 새로 만들어 함께 빈다.</summary>
+    public List<Equipped> Log { get; } = new();
+
     public IReadOnlyList<Equipped> Equipped_ => _equipped;
     public bool HasAny => _equipped.Count > 0;
 

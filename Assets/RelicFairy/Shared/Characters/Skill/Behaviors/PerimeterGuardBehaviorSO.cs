@@ -1,40 +1,54 @@
+using System;
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
-/// 주변경계 — 대검 E스킬.
-/// 플레이어 중심 360° 원형으로 검을 휘둘러 피해를 준다.
-///   1단계: 360° 1회 휘두르기
-///   2단계: 360° 2회 연속 휘두르기
-///   3단계: 360° 3회 연속 휘두르기 + 확산 검기(반경 6.5 m)가 퍼지며 추가 데미지
+/// 주변경계 — 대검 E스킬. 칼을 끌었다가 한 바퀴 크게 벤다(10-22 개편 — 사용자 「대검 스킬이 대검 컨셉에 비해 너무 가볍다」).
+///   전 단계: 0.3초 끌기(경직 면역) → 360° 회전 베기 반경 3.5 m · 발밑 흙먼지 고리
+///   2단계: + 충격 고리 1번(반경 5 m)
+///   3단계: + 충격 고리 2번(5 m · 6.5 m)
+///   주변경계 연장 증강: 고리 +N(바깥으로 1.5 m씩, 8 m까지)
+/// 예전엔 1단계가 평타 1타 클립이었고 누른 뒤 0.15초에 맞았으며, 2 · 3단계는 같은 빠른 회전을 0.5초마다 되풀이해 바빠 보였다.
+/// 충격 고리는 땅에서 퍼지는 것이라 스킬이 끝나도(회피로 끊어도) 이어진다.
 /// </summary>
 [CreateAssetMenu(menuName = "Game/Skill/PerimeterGuardBehavior")]
 public class PerimeterGuardBehaviorSO : SkillBehaviorSO
 {
-    [Header("기본 공격 (전 티어)")]
-    [SerializeField] private float baseDamage = 25f;
-    [SerializeField] private float detectRadius = 2f;
+    [Header("회전 베기 (전 단계)")]
+    [SerializeField] private float baseDamage = 310f;
+    [SerializeField] private float detectRadius = 3.5f;
     [SerializeField] private float knockbackMultiplier = 1.5f;
+    [Tooltip("누른 뒤 베기(판정)까지(초) — 칼을 끄는 모습이 보이게. 클립의 회전 베기가 이때 닿는다")]
+    [SerializeField] private float windup = 0.3f;
+    [Tooltip("베기 뒤 휘두름이 끝나는 만큼(초) — 그 뒤는 후딜(공격 · 스킬 · 회피로 끊긴다)")]
+    [SerializeField] private float follow = 0.2f;
 
-    [Header("시전")]
-    [SerializeField] private float castInterval = 0.5f;
-
-    [Header("3단계: 확산 공격")]
-    [SerializeField] private float expandDamage = 20f;
-    [SerializeField] private float expandRadius = 4f;
-    [SerializeField] private float expandDelay = 0.3f;
-    [SerializeField] private string expandEffectKey = "MeteorHit";
-    [SerializeField] private float expandEffectScale = 0.8f;
+    [Header("충격 고리 (2 · 3단계 · 연장 증강)")]
+    [SerializeField] private float ringDamage = 310f;
+    [SerializeField] private float ringRadius = 5f;
+    [SerializeField] private float ringRadiusStep = 1.5f;
+    [SerializeField] private float ringRadiusMax = 8f;
+    [Tooltip("베기 뒤 첫 고리까지(초)")]
+    [SerializeField] private float ringDelay = 0.25f;
+    [SerializeField] private float ringGap = 0.25f;
 
     [Header("이펙트")]
     [SerializeField] private string slashEffectKey = "BasicSlashBlue";
-    [SerializeField] private float slashEffectScale = 1.2f;
-    [SerializeField] private string hitEffectKey = "SwordHitImpact";
-    [SerializeField] private float hitEffectScale = 0.5f;
+    [SerializeField] private float slashEffectScale = 1f;
+    [FormerlySerializedAs("expandEffectKey")]
+    [SerializeField] private string shockEffectKey = "GreatswordEFinish";
+    [Tooltip("판정 반경 1 m당 크기")]
+    [SerializeField] private float shockScalePerMeter = 0.26f;
+    [Tooltip("맞은 적 타격 이펙트 — 대검 계열(푸른 타격). 비우면 공용 노란 베기")]
+    [SerializeField] private string hitEffectKey = "GreatswordHitImpact";
+    [SerializeField] private float hitEffectScale = 2.9f;
 
     [Header("마무리")]
-    [SerializeField] private float endDelay = 0.3f;
+    [Tooltip("후딜(초) — 클립은 회전 뒤 자세가 멈춰 있어 길면 굳어 보인다(실측 67)")]
+    [SerializeField] private float endDelay = 0.15f;
 
     [Header("애니메이션")]
     [SerializeField] private string animationOverride;
@@ -44,48 +58,26 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
     private class Runtime : ISkillRuntime
     {
         private readonly PerimeterGuardBehaviorSO _data;
-        private enum Phase { Cast, Expand, End }
+        private enum Phase { Windup, Follow, End }
         private Phase _phase;
         private float _timer;
-        private bool  _firstCastPending;          // 첫 판정 대기(B7)
-        private const float FirstCastWindup = 0.15f;   // 누른 뒤 첫 판정까지 — 휘두르는 모습이 보일 만큼만(조작감 손해 최소)
-        private int _castIndex;
-        private int _maxCasts;
-        private int _skillTier;
-        private int _expandWave;
-        private const int MaxExpandWaves = 3;
-        private readonly HashSet<GameObject> _hitPerCast = new();
-        private readonly HashSet<GameObject> _hitByExpand = new();
+        private int _rings;
+        private readonly List<GameObject> _hits = new();
 
         public Runtime(PerimeterGuardBehaviorSO data) => _data = data;
 
         public void OnEnter(SkillExecutionContext ctx)
         {
-            _skillTier = ctx.SkillTier;
-
-            // 3단계: 3파에 걸쳐 검기가 커지며 공격
-            _maxCasts = _skillTier >= 3 ? 3 : (_skillTier >= 2 ? 2 : 1);
-            _maxCasts += Mathf.RoundToInt(MeleeAugments.ValueOn(ctx.WeaponData, MeleeAugmentCatalog.GreatPerimeter));   // 주변경계 연장 증강(10-15)
-
-            _castIndex = 0;
+            int tier = ctx.SkillTier;
+            _rings = (tier >= 3 ? 2 : (tier >= 2 ? 1 : 0))
+                     + Mathf.RoundToInt(MeleeAugments.ValueOn(ctx.WeaponData, MeleeAugmentCatalog.GreatPerimeter));   // 주변경계 연장 증강(10-15 · 10-22 회전 → 고리)
             _timer = 0f;
-            _phase = Phase.Cast;
+            _phase = Phase.Windup;
 
             ctx.RotateToMouse();
             ctx.SetMoveScale(0f);
-            SkillRangeRing.Circle(ctx.PlayerTransform.position, _data.detectRadius);   // 휘두르는 0.15초 동안 맞을 둘레(A10)
-
-            _expandWave = 0;
-            _hitByExpand.Clear();
-
-            // 첫 시전: T1은 기본공격 애니메이션, T2+는 스킬 애니메이션.
-            // B7(10-08): 예전엔 누른 프레임에 피해가 먼저 들어갔다(클립도 닿는 순간부터 재생 — 휘두르는 모습 없이 맞았다).
-            // 이제 클립이 FirstCastWindup초 뒤에 닿도록 재생하고 그때 첫 판정을 낸다.
-            if (_skillTier <= 1)
-                ctx.Animator.CrossFadeInFixedTime("GroundLightAttack_01", 0.05f, 0, 0f);   // 즉시 재생은 앞 자세에서 한 프레임에 튀었다(10-09 출시 점검)
-            else
-                PlayAnimation(ctx, FirstCastWindup);
-            _firstCastPending = true;
+            SkillRangeRing.Circle(ctx.PlayerTransform.position, _data.detectRadius, _data.windup);   // 끄는 동안 맞을 둘레(A10)
+            PlayAnimation(ctx);
 
             ctx.Controller.InputBuffer.TryConsume(Game.Inputs.Command.Light);
         }
@@ -95,164 +87,83 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
             _timer += ctx.DeltaTime;   // 애니메이터와 같은 시계(슬로모 — 10-09)
             switch (_phase)
             {
-                case Phase.Cast:   UpdateCast(ctx);   break;
-                case Phase.Expand: UpdateExpand(ctx);  break;
-                case Phase.End:    UpdateEnd(ctx);     break;
+                case Phase.Windup:
+                    if (_timer < _data.windup) return;
+                    _timer = 0f;
+                    Spin(ctx);
+                    _phase = Phase.Follow;
+                    break;
+                case Phase.Follow:
+                    if (_timer < _data.follow) return;
+                    _timer = 0f;
+                    _phase = Phase.End;
+                    break;
+                case Phase.End:
+                    ctx.EnterRecovery();   // 후딜 — 회피로 끊을 수 있다 · 스탠스 해제(10-08 A2 · A4)
+                    if (_timer >= _data.endDelay) ctx.RequestEnd();
+                    break;
             }
         }
 
         public void OnExit(SkillExecutionContext ctx)
         {
             ctx.SetMoveScale(1f);
-            _hitPerCast.Clear();
+            _hits.Clear();
         }
 
-        private void UpdateCast(SkillExecutionContext ctx)
-        {
-            if (_firstCastPending)
-            {
-                if (_timer < FirstCastWindup) return;
-                _firstCastPending = false;
-                _timer = 0f;
-                ExecuteCast(ctx);
-                _castIndex++;
-                return;
-            }
-
-            if (_castIndex < _maxCasts && _timer >= _data.castInterval)
-            {
-                _timer = 0f;
-                _hitPerCast.Clear();
-
-                // T3 2타째에만 애니메이션 재생 (1타는 OnEnter에서 이미 재생)
-                if (_skillTier >= 3 && _castIndex == 1)
-                    PlayAnimation(ctx);
-
-                ExecuteCast(ctx);
-                _castIndex++;
-            }
-
-            if (_castIndex >= _maxCasts && _timer >= _data.castInterval)
-            {
-                _timer = 0f;
-                // 3단계는 확산 검기 3파(C3) — 예전엔 Expand로 한 번도 넘어가지 않았다. 반경(에셋 6.5 m)은 셋째 시전(감지 × 1.6 = 5.6 m)보다
-                // 넓게 — 4 m면 셋째 시전에 밀려난 적에게 닿지 않았다(10-08 실측)
-                if (_skillTier >= 3)
-                {
-                    _phase = Phase.Expand;
-                    SkillRangeRing.Circle(ctx.PlayerTransform.position, _data.expandRadius, _data.expandDelay * MaxExpandWaves);
-                }
-                else _phase = Phase.End;
-            }
-        }
-
-        // ── 3단계: 다단계 확산 공격 (3파) ──
-        private void UpdateExpand(SkillExecutionContext ctx)
-        {
-            if (_timer >= _data.expandDelay)
-            {
-                _timer = 0f;
-                _expandWave++;
-
-                var center = ctx.PlayerTransform.position;
-                float waveRadius = _data.expandRadius * (_expandWave / (float)MaxExpandWaves);
-                float waveScale = _data.expandEffectScale * (0.5f + _expandWave * 0.3f);
-
-                // 해당 파의 범위 내 데미지
-                float dmg = ctx.CalculateDamage(_data.expandDamage);
-                var colliders = Physics.OverlapSphere(center, waveRadius);
-                foreach (var col in colliders)
-                {
-                    if (col.gameObject == ctx.Controller.gameObject) continue;
-                    if (_hitByExpand.Contains(col.gameObject)) continue;
-                    if (col.TryGetComponent<IDamageable>(out var d))
-                    {
-                        ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f, _expandWave >= MaxExpandWaves, skipHitVfx: true);   // 마지막 확산파가 막타 · 타격 이펙트는 아래에서 직접
-                        _hitByExpand.Add(col.gameObject);
-
-                        SpawnEffect(ctx, _data.hitEffectKey,
-                            col.transform.position + Vector3.up * 0.8f,
-                            _data.hitEffectScale * 1.5f, 0.5f);
-                    }
-                }
-
-                // 확산 이펙트 — 플레이어 위치에 생성
-                SpawnEffect(ctx, _data.expandEffectKey,
-                    ctx.PlayerTransform.position + Vector3.up * 0.5f, waveScale, 1.5f);
-
-                if (_expandWave >= MaxExpandWaves)
-                    _phase = Phase.End;
-            }
-        }
-
-        private void UpdateEnd(SkillExecutionContext ctx)
-        {
-            ctx.EnterRecovery();   // 후딜 — 회피로 끊을 수 있다 · 스탠스 해제(10-08 A2 · A4)
-            if (_timer >= _data.endDelay)
-                ctx.RequestEnd();
-        }
-
-        // ── 360° 원형 공격 ──
-        private void ExecuteCast(SkillExecutionContext ctx)
+        // ── 360° 회전 베기 ──
+        private void Spin(SkillExecutionContext ctx)
         {
             Managers.Sound?.PlayEvent(SoundEvent.PlayerSwingHeavy);   // 회전 베기 — 대검 무거운 휘두름(A6)
             var center = ctx.PlayerTransform.position;
-            bool isTier3 = _skillTier >= 3;
-
-            // 3단계 3타만 범위 확대
-            bool isLastWave = isTier3 && _castIndex == _maxCasts - 1;
-            float radius = isLastWave ? _data.detectRadius * 1.6f : _data.detectRadius;
+            var rot = Quaternion.LookRotation(ctx.PlayerTransform.forward);
+            SkillRangeRing.Circle(center, _data.detectRadius);
 
             float dmg = ctx.CalculateDamage(_data.baseDamage);
-            var colliders = Physics.OverlapSphere(center, radius);
-            foreach (var col in colliders)
-            {
-                if (col.gameObject == ctx.Controller.gameObject) continue;
-                if (_hitPerCast.Contains(col.gameObject)) continue;
-                if (col.TryGetComponent<IDamageable>(out var d))
-                {
-                    // 마지막 시전이 마무리(A5) — 3단계는 뒤 확산 검기 마지막 파가 마무리
-                    bool finisher = !isTier3 && _castIndex == _maxCasts - 1;
-                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier, finisher, skipHitVfx: true);   // 타격 이펙트는 아래에서 직접
-                    _hitPerCast.Add(col.gameObject);
+            CombatQuery.GetNearbyDamageables(center, _data.detectRadius, ctx.Controller.gameObject, 32, _hits);
+            foreach (var go in _hits)
+                ctx.DealDamage(go, dmg, _data.knockbackMultiplier, isFinisher: _rings == 0,   // 고리가 없으면 베기가 마무리(A5)
+                               hitEffectKey: _data.hitEffectKey, hitEffectScale: _data.hitEffectScale);
 
-                    SpawnEffect(ctx, _data.hitEffectKey,
-                        col.transform.position + Vector3.up * 0.8f,
-                        _data.hitEffectScale, 0.5f);
-                }
+            // 검격 3개를 120°씩 — 판정 둘레에 맞춘 크기 · 발밑 흙먼지 고리가 같은 둘레로 퍼진다
+            for (int i = 0; i < 3; i++)
+            {
+                Vector3 dir = Quaternion.Euler(0f, i * 120f, 0f) * ctx.PlayerTransform.forward;
+                SpawnEffect(ctx, _data.slashEffectKey, center + dir * 0.3f + Vector3.up * 1f, Quaternion.LookRotation(dir), _data.slashEffectScale, 0.6f);
             }
+            SpawnEffect(ctx, _data.shockEffectKey, center + Vector3.up * 0.1f, rot, _data.detectRadius * _data.shockScalePerMeter, 1.5f);
 
-            if (isLastWave)
-            {
-                // 3타: 6개 검격 중첩 — 플레이어 중심에서 방사
-                int effectCount = 6;
-                float scale = _data.slashEffectScale * 1.8f;
-                for (int i = 0; i < effectCount; i++)
-                {
-                    float angle = i * 60f + Random.Range(-10f, 10f);
-                    Vector3 dir = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
-                    Vector3 pos = center + dir * (radius * 0.4f) + Vector3.up * 1f;
-                    Quaternion rot = Quaternion.LookRotation(dir) * Quaternion.Euler(0f, 0f, Random.Range(-30f, 30f));
-                    SpawnEffectRotated(ctx, _data.slashEffectKey, pos, rot, scale, 0.8f);
-                }
-            }
-            else
-            {
-                // 1, 2타: 3개 검격 — 플레이어 가까이에 모아서
-                int effectCount = 3;
-                float scale = _data.slashEffectScale * 1.4f;   // 판정 3.5 m에 맞춤(10-13 실측: ×1 → 2.5 m)
-                for (int i = 0; i < effectCount; i++)
-                {
-                    float angle = (_castIndex * 60f) + (i * 120f);
-                    Vector3 dir = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
-                    Vector3 pos = center + dir * 0.3f + Vector3.up * 1f;
-                    Quaternion rot = Quaternion.LookRotation(dir);
-                    SpawnEffectRotated(ctx, _data.slashEffectKey, pos, rot, scale, 0.6f);
-                }
-            }
+            if (_rings > 0 && ctx.Controller != null)
+                RingsAsync(ctx, _data, center, rot, _rings, ctx.Controller.GetCancellationTokenOnDestroy()).Forget();
         }
 
-        private void PlayAnimation(SkillExecutionContext ctx, float contactIn = 0f)
+        // ── 충격 고리 — 베기 자리에서 바깥으로 퍼진다(원판 판정 · 고리마다 따로 맞는다) ──
+        private static async UniTaskVoid RingsAsync(SkillExecutionContext ctx, PerimeterGuardBehaviorSO data, Vector3 center, Quaternion rot,
+                                                    int count, CancellationToken ct)
+        {
+            var hits = new List<GameObject>(16);
+            try
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    await UniTask.Delay(TimeSpan.FromSeconds(i == 0 ? data.ringDelay : data.ringGap), DelayType.DeltaTime, PlayerLoopTiming.Update, ct);
+                    if (ctx.Controller == null) return;
+
+                    float radius = Mathf.Min(data.ringRadius + data.ringRadiusStep * i, data.ringRadiusMax);
+                    float dmg = ctx.CalculateDamage(data.ringDamage);
+                    CombatQuery.GetNearbyDamageables(center, radius, ctx.Controller.gameObject, 32, hits);
+                    foreach (var go in hits)
+                        ctx.DealDamage(go, dmg, data.knockbackMultiplier, isFinisher: i == count - 1,   // 마지막 고리가 마무리
+                                       hitEffectKey: data.hitEffectKey, hitEffectScale: data.hitEffectScale);
+
+                    SkillRangeRing.Circle(center, radius);
+                    SpawnEffect(ctx, data.shockEffectKey, center + Vector3.up * 0.1f, rot, radius * data.shockScalePerMeter, 1.5f);
+                }
+            }
+            catch (OperationCanceledException) { }
+        }
+
+        private void PlayAnimation(SkillExecutionContext ctx)
         {
             string animName = !string.IsNullOrEmpty(_data.animationOverride)
                 ? _data.animationOverride
@@ -274,26 +185,11 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
                 }
             }
 
-            // 판정 시각에 회전 베기가 가장 빠른 순간(1.27초)이 오도록 중간부터 재생(09-25). 첫 시전은 contactIn만큼 휘두르는 모습을 남긴다(B7).
-            if (contactIn > 0f) SkillAnimSync.CrossFadeToContact(ctx.Animator, animName, contactIn, 0.05f);
-            else                SkillAnimSync.CrossFadeToContact(ctx.Animator, animName, 0f, 0.06f);   // 2 · 3파 — 즉시 재생은 회전 끝 자세에서 튀었다(10-09 출시 점검)
+            // 판정(windup초 뒤)에 회전 베기가 가장 빠른 순간(1.27초)이 오게 — 그 앞 끌기 동작이 windup 동안 보인다(SkillAnimSync)
+            SkillAnimSync.CrossFadeToContact(ctx.Animator, animName, _data.windup, 0.05f);
         }
 
         private static async void SpawnEffect(SkillExecutionContext ctx, string key,
-            Vector3 pos, float scale, float lifetime)
-        {
-            if (string.IsNullOrEmpty(key) || ctx.Controller == null) return;
-            var obj = await Managers.ObjectPooler.SpawnAsync(
-                key, ObjectPoolerManager.PoolType.Effect, pos, ctx.PlayerTransform.rotation);
-            if (obj == null) return;
-            obj.transform.localScale = Vector3.one * scale;
-            if (obj.TryGetComponent<EffectBehaviour>(out var eb))
-                eb.Initialize(eb.behaviorSO, ctx.PlayerTransform, lifetime);
-            else
-                DespawnAfter(obj, lifetime);
-        }
-
-        private static async void SpawnEffectRotated(SkillExecutionContext ctx, string key,
             Vector3 pos, Quaternion rot, float scale, float lifetime)
         {
             if (string.IsNullOrEmpty(key) || ctx.Controller == null) return;

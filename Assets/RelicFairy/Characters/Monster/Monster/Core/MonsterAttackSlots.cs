@@ -16,7 +16,7 @@ public enum AttackSlotKind { Melee, Ranged }
 /// </summary>
 public static class MonsterAttackSlots
 {
-    public const int   RangedCap  = 2;
+    public const int   RangedCap  = 3;   // 10-21 원거리 편성 늘림 — 2면 3마리째부터 줄을 서서 원거리가 거의 안 쐈다
     private const float WaitStale = 0.6f;   // 이만큼 다시 묻지 않은 대기자는 줄에서 뺀다(멀어졌거나 다른 일을 한다)
     private const float ApproachGrace = 1.5f;   // 칸을 잡고 다가가는 동안(추격 상태)엔 칸을 지킨다
 

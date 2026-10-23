@@ -218,8 +218,9 @@ public class DKSoulSpearState : FullLockState<DKSoulSpearPatternSO>
             SpawnRowTiles(data, rowZ - 1, other, tiles);
             SpawnRowTiles(data, rowZ + 1, other, tiles);
         }
-        // 테두리는 바닥색과 상관없이 밝게 — 흰 검 = 흰색, 검은 검 = 밝은 보라(10-03 실측: 어두운 테두리라 줄이 안 갈렸다)
-        Color edge = sc == DKSwordColor.White ? new Color(1f, 1f, 1f, 0.95f) : new Color(0.8f, 0.45f, 1f, 0.95f);
+        // 테두리는 바닥색과 상관없이 밝게(10-03 실측: 어두운 테두리라 줄이 안 갈렸다) — (10-23 가이드 색 통일) 공용 테두리:
+        // 기본 밝은 무채색 · 노린 줄 둘레는 ArmBefore가 공격 색으로 칠한다(옛 흰색 / 밝은 보라 덮어쓰기 대신)
+        Color? edge = null;
         edges.AddRange(DKGridPatternHelper.SpawnBoundaryEdges(tiles, data.edgePrefab, RowEdgeThickness, RowEdgeY, edge));
     }
 

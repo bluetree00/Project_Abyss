@@ -23,7 +23,10 @@ public static class SkillAnimSync
         { "GreatswordQSkill", 1.22f },   // 최후의 일격 — 내려찍기
         { "GreatswordESkill", 1.27f },   // 주변경계 — 회전 베기(1.05초 예비 동작 뒤 1.27초가 가장 빠르다)
         { "QSkill_Iasen",     1.63f },   // 발도 — 무형일섬
-        { "GhostSamurai_APose_SPAttack06_Inplace", 0.95f },   // 카타나 성광베기 — 낮게 웅크린 발도 3연속의 첫 베기(10-09 · 무형일섬과 같던 클립을 갈랐다)
+        { "GhostSamurai_APose_SPAttack06_Inplace", 1.15f },   // 카타나 환영베기(10-22~ · 그 전엔 성광베기) — 낮게 웅크린 발도(10-09 · 무형일섬과 같던 클립을 갈랐다). 0.92초는 약한 예비 동작(6.2 m/s) · 베기는 1.15초(27.6 m/s) — 10-18 실측 67에서 판정보다 0.26초 늦게 휘둘렀다
+        { "GhostSamurai_APose_JumpAttack04_Inplace", 1.25f },     // 대검 최후의 일격(10-22~) — 공중 강공 내려찍기(실측 80: 웅크림 ~0.34 · 뜸 0.43 · 꼭대기 0.77 · 내려찍기 1.25 · 착지 1.28)
+        { "GhostSamurai_APose_Dodge_Attack_F_Inplace", 1.25f },   // 카타나 성광베기(10-22~) — 뛰어들며 베기(실측 78 · 80)
+        { "GhostSamurai_APose_Attack01_4_Inplace", 1.32f },       // 무형검 E 무형참 — 검기를 날리는 베기(10-22 실측 67: 손 봉우리 = 상태 0.66초 × 2배속)
     };
 
     /// <summary>상태 이름과 그 상태의 원본 클립 이름이 다른 곳(오버라이드 키는 원본 클립 이름이다).</summary>

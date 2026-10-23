@@ -44,6 +44,9 @@ public class DragonAirDashPatternSO : BossPatternSO
     [SerializeField] private string _crashStateName = "AirDashCrash";
     [SerializeField] private string _fallStateName = "AirDashFall";
     [SerializeField] private string _recoverStateName = "AirDashRecover";
+    [Tooltip("마지막 돌진 뒤 내려앉기 — 하강 · 착지 상태(착지 패턴과 같은 클립 · 10-22 E3 D2)")]
+    [SerializeField] private string _landDescendStateName   = "Landing_Descend";
+    [SerializeField] private string _landTouchdownStateName = "Landing_Touchdown";
 
     public float Cooldown => _cooldown;
     public float TakeoffDuration => _takeoffDuration;
@@ -71,6 +74,8 @@ public class DragonAirDashPatternSO : BossPatternSO
     public string CrashStateName => _crashStateName;
     public string FallStateName => _fallStateName;
     public string RecoverStateName => _recoverStateName;
+    public string LandDescendStateName => _landDescendStateName;
+    public string LandTouchdownStateName => _landTouchdownStateName;
 
     private DragonAirDashState _runtimeState;
 
@@ -96,6 +101,13 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
     // 벽 안면(바닥 상자 −1 m) + 머리 · 몸 앞 길이 — 돌진이 여기서 끝나 벽에 박히지 않는다(10-03 개선 1-2: 매번 벽 충돌 → 사망 클립 낙하)
     private const float WallBodyMargin = 4.5f;
     private const float FallCrossFade  = 0.2f;   // 낙하 · 회복 클립 전환(0.05초는 자세가 튀었다)
+    // 휘는 돌진(10-22 E3 D4) — 셋째 돌진은 경고 BendAt초 뒤 한 번, 플레이어가 간 쪽으로 ±BendMaxAngle°까지 꺾어 예고를 다시 그린다.
+    // 꺾은 뒤 MinLead(0.45초) 넘게 굳힌 채 돌진한다(예고 = 판정) — 셋째 경고만 0.6 → 0.7초.
+    private const int   BendDashIndex    = 2;
+    private const float BendAt           = 0.25f;
+    private const float BendMaxAngle     = 15f;
+    private const float BendMinAngle     = 2f;    // 이보다 덜 꺾이면 다시 그리지 않는다
+    private const float LandDescentSpeed = 8f;    // 마지막 돌진 뒤 내려앉는 속도(착지 패턴과 같다 · 10-22 E3 D2)
 
     private enum Phase
     {
@@ -105,6 +117,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         Crash,
         Fall,
         Recover,
+        Land,
         Done,
     }
 
@@ -122,7 +135,15 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
     private int _crashHash;
     private int _fallHash;
     private int _recoverHash;
+    private int _touchdownHash;
+    private bool _bent;            // 이번 경고에서 이미 꺾었다(휘는 돌진)
+    private bool _landTouchdown;   // 내려앉기 — 바닥에 닿았다
     private DragonBossWarningZone _warningZone;
+
+    /// <summary>이번 경고 시간 — 휘는 돌진(셋째)은 꺾은 뒤 MinLead를 지키게 늘린다(10-22 E3 D4).</summary>
+    private float WarningSeconds => _dashCount == BendDashIndex
+        ? Mathf.Max(Data.WarningDuration, BendAt + PatternGuideHelper.MinLead)
+        : Data.WarningDuration;
 
     internal DragonAirDashState(DragonAirDashPatternSO data) : base(data) { }
 
@@ -155,6 +176,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         _crashHash = Animator.StringToHash(Data.CrashStateName);
         _fallHash = Animator.StringToHash(Data.FallStateName);
         _recoverHash = Animator.StringToHash(Data.RecoverStateName);
+        _touchdownHash = Animator.StringToHash(Data.LandTouchdownStateName);
 
         // [DESIGN GUIDE] DashSlashCooldown 은 DragonBossBlackboard 소속이어야 합니다.
         // 베이스 타입(BossAttackBlackboard) 캐스팅 대신 DragonBossBlackboard 로 캐스팅하세요.
@@ -162,9 +184,10 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         if ((ctx.Monster as IBoss)?.Blackboard is BossAttackBlackboard bb)
             bb.DashSlashCooldown = Data.Cooldown;
 
-        _dashDirection = GetHorizontalDirectionToPlayer(ctx);
+        _bent = false;
+        _dashDirection = GetHorizontalDirectionToPlayer(ctx, WarningSeconds + DashLeadExtra);
         PlayAnim(ctx, Data.WarningHoverStateName, 0.1f);
-        SpawnWarningMarker(ctx);
+        SpawnWarningMarker(ctx, WarningSeconds);
     }
 
     public override void Update(MonsterContext ctx)
@@ -190,6 +213,9 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
                 break;
             case Phase.Recover:
                 UpdateRecover(ctx);
+                break;
+            case Phase.Land:
+                UpdateLand(ctx);
                 break;
         }
     }
@@ -224,7 +250,10 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         ctx.Transform.position = _hoverPos;
         FaceDirection(ctx, _dashDirection, Data.RotationSpeed);
 
-        if (_phaseTimer < Data.WarningDuration)
+        if (!_bent && _dashCount == BendDashIndex && _phaseTimer >= BendAt)
+            Bend(ctx);
+
+        if (_phaseTimer < WarningSeconds)
             return;
 
         StartDash(ctx);
@@ -303,14 +332,15 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
             _phaseTimer = 0f;
             _traveledDistance = 0f;
             _playerHit = false;
+            _bent = false;
             _hoverPos = ctx.Transform.position;
-            _dashDirection = GetHorizontalDirectionToPlayer(ctx);
+            _dashDirection = GetHorizontalDirectionToPlayer(ctx, WarningSeconds + DashLeadExtra);
             PlayAnim(ctx, Data.WarningHoverStateName, 0.12f);
-            SpawnWarningMarker(ctx);
+            SpawnWarningMarker(ctx, WarningSeconds);
         }
         else
         {
-            ReturnToAirCombat(ctx);
+            StartLand(ctx);   // 마지막 돌진 끝 — 그 자리에 내려앉아 지상전으로(연계: 할퀴기 · 10-22 E3 D2)
         }
     }
 
@@ -319,9 +349,10 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         _phase = Phase.Warning;
         _phaseTimer = 0f;
         _hoverPos = ctx.Transform.position; // UpdateTakeoff에서 이미 Y 스냅 완료
-        _dashDirection = GetHorizontalDirectionToPlayer(ctx);
+        _bent = false;
+        _dashDirection = GetHorizontalDirectionToPlayer(ctx, WarningSeconds + DashLeadExtra);
         PlayAnim(ctx, Data.WarningHoverStateName, 0.12f);
-        SpawnWarningMarker(ctx);
+        SpawnWarningMarker(ctx, WarningSeconds);
     }
 
     private void StartDash(MonsterContext ctx)
@@ -368,7 +399,58 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         PlayAnim(ctx, Data.RecoverStateName, FallCrossFade);
     }
 
-    private void SpawnWarningMarker(MonsterContext ctx)
+    /// <summary>
+    /// 휘는 돌진 — 지금 겨눔에서 플레이어가 간 쪽(돌진이 닿을 즈음 자리)으로 ±BendMaxAngle°까지 한 번 꺾고 예고를 다시 그린다.
+    /// 남은 경고(≥ MinLead) 동안 굳힌다 — 첫 예고를 옆걸음으로 비킨 자리를 꺾어 노린다(10-22 E3 D4).
+    /// </summary>
+    private void Bend(MonsterContext ctx)
+    {
+        _bent = true;
+        float   remain = Mathf.Max(0f, WarningSeconds - _phaseTimer);
+        Vector3 want   = GetHorizontalDirectionToPlayer(ctx, remain + DashLeadExtra);
+        float   angle  = Mathf.Clamp(Vector3.SignedAngle(_dashDirection, want, Vector3.up), -BendMaxAngle, BendMaxAngle);
+        if (Mathf.Abs(angle) < BendMinAngle) return;
+
+        _dashDirection = Quaternion.Euler(0f, angle, 0f) * _dashDirection;
+        DestroyWarningZone();
+        SpawnWarningMarker(ctx, remain);
+    }
+
+    private void StartLand(MonsterContext ctx)
+    {
+        _phase = Phase.Land;
+        _phaseTimer = 0f;
+        _landTouchdown = false;
+        PlayAnim(ctx, Data.LandDescendStateName, 0.15f);
+    }
+
+    /// <summary>제자리로 내려앉는다(착지 패턴과 같은 클립) → 지상 · 에이전트 복구 → 지상전(러너가 연계 할퀴기를 잇는다 · 10-22 E3 D2).</summary>
+    private void UpdateLand(MonsterContext ctx)
+    {
+        if (!_landTouchdown)
+        {
+            float   groundY = DragonPatternFloorUtils.GetFloorY(ctx.Transform.position, ctx.Runtime.SpawnPosition.y);
+            Vector3 pos     = ctx.Transform.position;
+            pos.y = Mathf.MoveTowards(pos.y, groundY, LandDescentSpeed * Time.deltaTime);
+            ctx.Transform.position = pos;
+            if (pos.y > groundY + 0.1f) return;
+
+            _landTouchdown = true;
+            PlayAnim(ctx, Data.LandTouchdownStateName, 0.1f);
+            return;
+        }
+
+        if (!IsAnimNearEnd(ctx, _touchdownHash))
+            return;
+
+        _phase = Phase.Done;
+        RestoreAgent(ctx);
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
+            bb.BodyState = BodyState.Grounded;
+        ReturnToGroundCombat(ctx);
+    }
+
+    private void SpawnWarningMarker(MonsterContext ctx, float fillSeconds)
     {
         float groundY = ctx.Runtime.SpawnPosition.y;
         Vector3 origin = new Vector3(_hoverPos.x, groundY, _hoverPos.z);
@@ -379,13 +461,8 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         // 출발 순간에도 판정 캡슐이 출발점 뒤로 반경만큼 닿는다 — 예고도 출발점 뒤 반경부터(10-13 검증)
         float guideLength = _effectiveDashDistance + Data.DashHitRadius * 2f;
         Vector3 center = origin + _dashDirection * (guideLength * 0.5f - Data.DashHitRadius);
-        // 2페이지(심연)엔 검은 불 색으로 — 알파는 에셋 값 유지
-        Color lineColor = Data.WarningLineColor;
-        if (ctx.Monster is DragonBossMonster dragon && dragon.IsAbyssPage)
-        {
-            Color abyss = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Abyss);
-            lineColor = new Color(abyss.r, abyss.g, abyss.b, lineColor.a);
-        }
+        // (10-23 가이드 색 통일) 1 · 2페이지 모두 공용 공격 색 — 에셋 색은 알파만 쓴다
+        Color lineColor = DragonAbyssFx.WithAlpha(PatternGuideHelper.AttackFill, Data.WarningLineColor.a);
         _warningZone = DragonBossWarningZone.CreateRectangle(
             "DashRangeWarning",
             center,
@@ -393,9 +470,9 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
             Data.DashHitRadius * 2f,
             guideLength,
             lineColor,
-            Data.WarningDuration + 0.5f,
+            fillSeconds + 0.5f,
             Data.WarningMarkerHeightOffset);
-        _warningZone.BeginFill(Data.WarningDuration);   // 다 차는 순간 돌진
+        _warningZone.BeginFill(fillSeconds);   // 다 차는 순간 돌진
     }
 
     private void DestroyWarningZone()
@@ -450,10 +527,10 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
 
     // 플레이어가 가는 쪽 — 경고가 끝나고 돌진이 닿을 즈음의 자리를 겨눈다(10-14 화룡 위협 · 예전엔 지금 자리라 옆으로 걷기만 해도 비켜났다).
     // 예고 줄은 그 방향에 그려지고 경고 내내 굳어 있다 — 멈추거나 꺾으면 피한다.
-    private Vector3 GetHorizontalDirectionToPlayer(MonsterContext ctx)
+    private Vector3 GetHorizontalDirectionToPlayer(MonsterContext ctx, float lead)
     {
         Vector3 dir = ctx.Runtime.PlayerTarget != null
-            ? DragonThreat.PredictPlayer(ctx, Data.WarningDuration + DashLeadExtra) - ctx.Transform.position
+            ? DragonThreat.PredictPlayer(ctx, lead) - ctx.Transform.position
             : ctx.Transform.forward;
         dir.y = 0f;
         if (dir.sqrMagnitude < 0.001f)
@@ -509,25 +586,14 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         if (direction.sqrMagnitude < 0.001f)
             return;
 
-        ctx.Transform.rotation = Quaternion.Slerp(
-            ctx.Transform.rotation,
-            Quaternion.LookRotation(direction),
-            rotationSpeed * Time.deltaTime);
+        const float TurnCap = 360f;   // 초당 — Slerp(dt×k)만이면 공중 돌진 중 76°/프레임 튐(10-19 실측)
+        ctx.Transform.rotation = Quaternion.RotateTowards(ctx.Transform.rotation,
+            Quaternion.Slerp(ctx.Transform.rotation, Quaternion.LookRotation(direction), rotationSpeed * Time.deltaTime),
+            TurnCap * Time.deltaTime);
     }
 
     private static void RestoreAgent(MonsterContext ctx)
         => DragonPatternFloorUtils.SnapToFloorAndRestoreAgent(ctx);
-
-    private static void ReturnToAirCombat(MonsterContext ctx)
-    {
-        if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
-        {
-            ctx.Monster.ChangeState<PatrolState>();
-            return;
-        }
-
-        ctx.Monster.ChangeState<AttackReadyState>();
-    }
 
     private static void ReturnToGroundCombat(MonsterContext ctx)
     {

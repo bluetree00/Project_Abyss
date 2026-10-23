@@ -73,10 +73,40 @@ public sealed class ShopSkinSO : ScriptableObject
     [Tooltip("가격 알약 · 룬 태그 판 — components/Rectangle_locked. 코드가 무채로 바꿔 고동(60,44,28)으로 칠한다. 9-slice 22/0/22/0.")]
     [SerializeField] private Sprite pricePill;
 
+    [Header("흑요석 새 레이아웃 (10-21) — 힉스필드 · Artsystack 흰 아이콘. 비면 코드 판")]
+    [Tooltip("상점 창 틀 — 흑요석 + 호박색 등불 상감. 9칸 72(모서리 쐐기돌 ≈ 60 · 안쪽 빛 선 ≈ 48).")]
+    [SerializeField] private Sprite windowFrame;
+    [Tooltip("행상 초상(웃는 버섯 떠돌이 상인) — 가장자리가 투명으로 풀린 2:3.")]
+    [SerializeField] private Sprite peddlerPortrait;
+    [Tooltip("가호 문장 판 — 흑요석 원판 + 금 테. 가운데에 가호 아이콘(흰)을 얹는다.")]
+    [SerializeField] private Sprite blessingEmblem;
+    [Tooltip("가호 아이콘(흰) — StatType 순서(공격력 · 방어 · 최대 체력 · 이속 · 공속 · 스킬 쿨 · 근접 · 원거리 · 행운 · 액티브 쿨 · 투사체 · 즉시 · 치명 확률 · 치명 피해).")]
+    [SerializeField] private Sprite[] blessingIcons = new Sprite[14];
+    [Tooltip("잠금(닫힘 · 열림) · 새로고침 아이콘(흰).")]
+    [SerializeField] private Sprite lockClosed, lockOpen, rerollIcon;
+    [Tooltip("「내 상태」 띠 아이콘(흰) — 체력 · 포션 · 룬 보관함 · 룬판.")]
+    [SerializeField] private Sprite hpIcon, potionIcon, storageIcon, boardIcon;
+    [Tooltip("원석 환전소(10-22) — 저울 문장(힉스필드 · 둥근 메달) · 원석 아이콘(HUD 재화와 같은 그림).")]
+    [SerializeField] private Sprite exchangeEmblem, oreIcon;
+
     public Sprite ExitPanel   => exitPanel;
     public Sprite RerollPanel => rerollPanel;
     public Sprite NamePlate   => namePlate;
     public Sprite PricePill   => pricePill;
+
+    public Sprite WindowFrame     => windowFrame;
+    public Sprite PeddlerPortrait => peddlerPortrait;
+    public Sprite BlessingEmblem  => blessingEmblem;
+    public Sprite LockClosed      => lockClosed;
+    public Sprite LockOpen        => lockOpen;
+    public Sprite RerollIcon      => rerollIcon;
+    public Sprite HpIcon          => hpIcon;
+    public Sprite PotionIcon      => potionIcon;
+    public Sprite StorageIcon     => storageIcon;
+    public Sprite BoardIcon       => boardIcon;
+    public Sprite ExchangeEmblem  => exchangeEmblem;
+    public Sprite OreIcon         => oreIcon;
+    public Sprite BlessingIcon(StatType stat) => Pick(blessingIcons, (int)stat);
 
     // ── 조회 (범위 밖·미할당은 null → 색 폴백) ──
 

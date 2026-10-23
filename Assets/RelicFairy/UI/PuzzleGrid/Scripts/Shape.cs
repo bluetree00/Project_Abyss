@@ -10,7 +10,8 @@ using UnityEngine.UI;
 /// IMPORTANT: Put this script on the ROOT of the shape prefab.
 /// Do NOT put drag scripts on child blocks.
 /// </summary>
-public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
+public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler,
+                     IPointerEnterHandler, IPointerExitHandler
 {
     private const float DragAlpha = 0.72f;   // 끄는 동안 조각 알파 — 미리보기가 비치게
 
@@ -44,6 +45,7 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
     private List<GridSquare> occupiedSquares = new();
     private LayoutElement _layout;
+    private RunePieceOutline _outline;   // 조각 바깥 윤곽(10-18) — 루트에 붙는다(RebuildOutline)
 
     void Awake()
     {
@@ -59,6 +61,12 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             ApplyAsset(shapeAsset);
         else
             BuildShapeBlocks();
+    }
+
+    // 판이 닫히는 등 커서가 빠져나간 알림 없이 꺼지면 다음에 열 때까지 밝은 채로 남는다.
+    private void OnDisable()
+    {
+        if (_outline != null) _outline.SetHovered(false);
     }
 
     public void ApplyAsset(ShapeAssetSO asset)
@@ -119,6 +127,7 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         }
 
         ApplyRuneArt();   // 재생성(칸 크기 변경 등) 후에도 룬 외형이 유지되도록
+        RebuildOutline(visualSize);
     }
 
     public void OnBeginDrag(PointerEventData eventData)
@@ -136,10 +145,12 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         if (gameplayRoot != null && transform.parent != gameplayRoot)
             transform.SetParent(gameplayRoot, true); // worldPositionStays=true
 
-        // Visual feedback: scale multiplier
-        float mul = (dragAsset != null) ? dragAsset.selectedScale.x : 1.1f;
+        // Visual feedback: scale multiplier — 10-22 1.1 → 1(ShapeDrag.asset): 끄는 동안에도 판 칸과 1:1이어야 맞춰 둔 자리에 놓인다
+        // (1.1배면 칸 68이 74.8로 커져 큰 룬 끝이 0.7칸까지 어긋났고, 놓는 순간 1배로 줄며 자리가 바뀌었다 — 사용자 「전설 룬 크기가 판과 안 맞아 보인다」)
+        float mul = (dragAsset != null) ? dragAsset.selectedScale.x : 1f;
         rt.localScale = cachedStartLocalScale * mul;
         SetDragAlpha(DragAlpha);
+        if (_outline != null) _outline.SetDragging(true);   // 끄는 조각 = 고른 조각 — 외곽선을 밝게(10-18)
 
         // Apply pointer offset ONCE at drag start (so it doesn't accumulate)
         if (dragAsset != null && dragAsset.pointerOffset != Vector2.zero)
@@ -168,6 +179,7 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         // Restore base scale (placement manager will snap position)
         rt.localScale = cachedStartLocalScale;
         SetDragAlpha(1f);
+        if (_outline != null) _outline.SetDragging(false);
 
         GridManager.Instance?.ClearPreview();
 
@@ -211,6 +223,24 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             GridManager.Instance?.NotifyItemSelected(ItemData);
     }
 
+    // 판에 놓인 조각에 커서를 올리면 외곽선이 밝아진다 — 붙어 있는 같은 그림 중 「이 룬은 여기까지」(10-18).
+    // 블록에서 블록으로 옮겨 다닐 땐 루트가 공통 부모라 나갔다 들어오지 않는다.
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (_outline != null) _outline.SetHovered(true);
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        if (_outline != null) _outline.SetHovered(false);
+    }
+
+    /// <summary>오른쪽 정보판에 뜬 놓인 룬 — 외곽선을 밝게(UI_GridPanel이 정보판이 바뀔 때마다 부른다, 10-18).</summary>
+    public void SetOutlineSelected(bool on)
+    {
+        if (_outline != null) _outline.SetSelected(on);
+    }
+
     /// <summary>아이템 데이터를 이 Shape에 연결한다. StagingAreaView에서 보관함 아이템 드래그 시 호출.</summary>
     public void BindItem(RuntimeItemData item)
     {
@@ -220,6 +250,15 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
     /// <summary>아이템 연결 해제. 보관함 반환 또는 폐기 시 호출.</summary>
     public void UnbindItem() => ItemData = null;
+
+    /// <summary>블록 묶음 가운데(셰이프 로컬 · 칸 간격 반영) — 보관함에서 집을 때 이 점을 커서 아래에 둔다(10-22).</summary>
+    public Vector2 BlockBoundsCenterLocal()
+    {
+        if (cellOffsets == null || cellOffsets.Count == 0) return Vector2.zero;
+        Vector2Int min = cellOffsets[0], max = cellOffsets[0];
+        foreach (var o in cellOffsets) { min = Vector2Int.Min(min, o); max = Vector2Int.Max(max, o); }
+        return (Vector2)(min + max) * 0.5f * cellSize;
+    }
 
     /// <summary>
     /// <b>첫 블록을 (0,0)으로 본</b> 각 블록의 칸 오프셋. 클릭 배치가 "이 칸을 누르면 어디까지 덮이나"를
@@ -332,6 +371,20 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         var le = GetComponent<LayoutElement>();
         if (le != null)
             le.ignoreLayout = ignore;
+    }
+
+    /// <summary>
+    /// 조각 외곽선(10-18) — 블록을 새로 만들 때마다 칸 · 간격 · 블록 크기를 다시 넘긴다.
+    /// 자식이 아니라 <b>루트</b>에 붙인다: GridManager · BoardManager는 Shape의 자식을 전부 블록으로 센다.
+    /// </summary>
+    private void RebuildOutline(float visualSize)
+    {
+        if (_outline == null && !TryGetComponent(out _outline))
+        {
+            _outline = gameObject.AddComponent<RunePieceOutline>();
+            _outline.raycastTarget = false;   // 루트가 포인터를 먹으면 블록 집기 · 칸 누르기가 막힌다
+        }
+        _outline.SetCells(cellOffsets, cellSize, visualSize);
     }
 
     private void SetBlocksRaycastTarget(bool enable)

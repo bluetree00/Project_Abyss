@@ -50,14 +50,6 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     // 값 = 최대 블록 선형 길이(5셀) → 5셀짜리 블록도 한 끝만 닿으면 배치 가능
     private const int ADJACENCY_REACH = 5;
 
-    /// <summary>조각 외곽선 두께(px). 10-11 v2 3 → 2 — 타일 베벨(약 4px)과 겹쳐 칸 사이 선이 두 겹으로 보였다.</summary>
-    private const float EdgeThickness = 2f;
-    private static readonly string[] EdgeNames = { "EdgeTop", "EdgeRight", "EdgeBottom", "EdgeLeft" };
-    private static readonly Vector2Int[] EdgeDirs =
-    {
-        new(0, 1), new(1, 0), new(0, -1), new(-1, 0),   // 상·우·하·좌 (EdgeNames와 같은 순서)
-    };
-
     // 존별 색상은 ElementDef에서 조회. 미정의 코드 폴백만 보유.
     private static readonly Color COLOR_EMPTY  = new(0.15f, 0.15f, 0.20f, 0.30f);
 
@@ -80,12 +72,8 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     private readonly Dictionary<Vector2Int, Image> _cellBorderImages  = new();   // 점유 셀 상시 테두리
     private readonly Dictionary<Vector2Int, Image> _cellEmptyFaces    = new();   // 빈 칸 코드 타일(바탕 · 자식 1px 테)
     private readonly Dictionary<Vector2Int, Image> _cellInnerImages   = new();   // 타일 위 흰 겹판(0.08) — 빈 칸에선 끈다
-    // 조각(룬 하나) 단위 외곽선 — 칸마다 상/우/하/좌 4개. 같은 조각끼리 맞닿은 변은 끄고
-    // 바깥으로 향한 변만 켜서, 조각 하나가 <b>하나의 윤곽</b>으로 읽히게 한다.
-    private readonly Dictionary<Vector2Int, Image[]> _cellEdgeImages = new();
-    // 칸 → 조각 식별자(룬 instanceId). 같은 모양이 붙어 있어도 서로 다른 조각임을 이걸로 가른다.
-    private readonly Dictionary<Vector2Int, string> _cellPieceId = new();
-    private string _selectedPieceId;   // 오른쪽 정보판에 뜬 놓인 룬 — 그 조각만 외곽선이 금(SetSelectedPiece)
+    // 조각(룬 하나) 외곽선은 조각이 스스로 그린다(Shape → RunePieceOutline, 10-18). 예전엔 여기서 칸마다 4변을 칸 안쪽에 그었는데
+    // 위에 얹힌 블록 그림에 거의 다 가려, 같은 속성 룬이 붙으면 어디까지가 한 룬인지 안 보였다(10-18 사진 02).
     private readonly Dictionary<Vector2Int, Color>  _cellBaseColors    = new();
     private readonly HashSet<Vector2Int>             _occupiedPositions = new();
     private readonly Dictionary<Vector2Int, char>    _cellZones         = new();
@@ -397,26 +385,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         catch (System.OperationCanceledException) { }
     }
 
-    /// <summary>
-    /// 어느 칸이 어느 <b>조각</b>(룬 하나)에 속하는지 알린다. 외곽선을 조각 단위로 그리는 근거다.
-    /// 없으면 칸마다 따로 테두리가 그려져 3칸짜리 조각이 칸 3개로 보인다 — 같은 모양이 붙어 있으면
-    /// 무엇을 놓았는지 구분할 수 없었다(2026-09-14 지적).
-    /// </summary>
-    public void SetPieceGroups(IReadOnlyDictionary<string, Vector2Int[]> groups)
-    {
-        _cellPieceId.Clear();
-        if (groups != null)
-        {
-            foreach (var kv in groups)
-            {
-                if (kv.Value == null) continue;
-                foreach (var pos in kv.Value) _cellPieceId[pos] = kv.Key;
-            }
-        }
-        RefreshOccupiedBorders();
-    }
-
-    /// <summary>조각별 외곽선. 같은 조각끼리 맞닿은 변은 끄고 <b>바깥으로 향한 변</b>만 켠다.</summary>
+    /// <summary>예전의 칸 단위 링(점유 금테)을 꺼 둔다. 조각 외곽선은 조각이 그린다(RunePieceOutline, 10-18).</summary>
     private void RefreshOccupiedBorders()
     {
         // 예전의 칸 단위 링은 쓰지 않는다(조각 구분이 안 된다) — 항상 꺼 둔다.
@@ -428,83 +397,6 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             var hole = frame.transform.childCount > 0 ? frame.transform.GetChild(0).gameObject : null;
             if (hole != null && hole.activeSelf) hole.SetActive(false);
         }
-
-        foreach (var kvp in _cellEdgeImages)
-        {
-            var pos   = kvp.Key;
-            var edges = kvp.Value;
-            if (edges == null) continue;
-
-            bool occupied = _occupiedPositions.Contains(pos);
-            if (!occupied)
-            {
-                for (int e = 0; e < edges.Length; e++)
-                    if (edges[e] != null && edges[e].color != Color.clear) edges[e].color = Color.clear;
-                continue;
-            }
-
-            _cellPieceId.TryGetValue(pos, out string mine);
-            var line = EdgeColor(mine);
-
-            for (int e = 0; e < edges.Length; e++)
-            {
-                if (edges[e] == null) continue;
-                var np = pos + EdgeDirs[e];
-
-                // 같은 조각이 이웃이면 그 변은 조각 <b>안쪽</b>이다 → 긋지 않는다.
-                bool samePiece = _occupiedPositions.Contains(np)
-                              && _cellPieceId.TryGetValue(np, out string other)
-                              && !string.IsNullOrEmpty(mine) && mine == other;
-
-                edges[e].color = samePiece ? Color.clear : line;
-            }
-        }
-    }
-
-    /// <summary>
-    /// 오른쪽 정보판에 뜬 놓인 룬 — 그 조각만 외곽선을 금 85%로(10-11 v2). null이면 금 조각 없음.
-    /// UI_GridPanel이 정보판이 바뀔 때마다 부른다(놓인 룬이 아니면 null).
-    /// </summary>
-    public void SetSelectedPiece(string pieceId)
-    {
-        if (_selectedPieceId == pieceId) return;
-        _selectedPieceId = pieceId;
-        RefreshOccupiedBorders();
-    }
-
-    /// <summary>조각 외곽선 색 — 고른 조각은 금 85%, 나머지는 채도를 반으로 내린 조각 색.</summary>
-    private Color EdgeColor(string pieceId)
-        => !string.IsNullOrEmpty(pieceId) && pieceId == _selectedPieceId ? UITheme.Thin.LineReady : PieceOutlineColor(pieceId);
-
-    /// <summary>
-    /// 조각 외곽선 색. 같은 식별자는 항상 같은 색이고, 이웃한 다른 조각과는 색이 갈린다 —
-    /// 모양이 같아도 "이건 다른 룬"이 한눈에 보이게 하는 장치다. 어두운 판 위에서 읽히는 밝은 색만 쓴다.
-    /// 10-11 v2: 채도를 반으로 — 판 위 색이 존 6색 + 외곽선 6색 = 12색이었다. 금은 고른 조각에만.
-    /// </summary>
-    private static Color PieceOutlineColor(string pieceId)
-    {
-        if (string.IsNullOrEmpty(pieceId)) return PieceLineColors[0];   // 식별자 없음 = 첫 색
-
-        int h = 0;
-        for (int i = 0; i < pieceId.Length; i++) h = h * 31 + pieceId[i];
-        return PieceLineColors[(h & 0x7fffffff) % PieceLineColors.Length];
-    }
-
-    private static readonly Color[] PieceLineColors =
-    {
-        HalfSaturated(new Color(1.00f, 0.86f, 0.42f, 0.95f)),   // 금
-        HalfSaturated(new Color(0.55f, 0.92f, 1.00f, 0.95f)),   // 하늘
-        HalfSaturated(new Color(1.00f, 0.66f, 0.86f, 0.95f)),   // 분홍
-        HalfSaturated(new Color(0.70f, 1.00f, 0.62f, 0.95f)),   // 연두
-        HalfSaturated(new Color(1.00f, 0.74f, 0.52f, 0.95f)),   // 살구
-        HalfSaturated(new Color(0.82f, 0.76f, 1.00f, 0.95f)),   // 연보라
-    };
-
-    /// <summary>밝기(휘도)는 두고 채도만 반으로 — 같은 밝기의 회색과 반반 섞는다.</summary>
-    private static Color HalfSaturated(Color c)
-    {
-        float l = 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
-        return new Color((c.r + l) * 0.5f, (c.g + l) * 0.5f, (c.b + l) * 0.5f, c.a);
     }
 
     /// <summary>배치할 룬의 속성 힌트를 설정하고 판을 갱신한다. null/빈값이면 힌트 해제.</summary>
@@ -898,33 +790,6 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
 
         _cellBorderImages[gridPos] = borderImg;
 
-        // 조각 외곽선 4변(상·우·하·좌). 평소 투명, 배치되면 <b>바깥 변만</b> 켠다.
-        // 칸마다 링을 그리면 3칸짜리 조각이 칸 3개로 보여 "무슨 모양을 놓았는지" 읽히지 않았다.
-        var edges = new Image[4];
-        for (int e = 0; e < 4; e++)
-        {
-            var edgeGO = new GameObject(EdgeNames[e], typeof(RectTransform));
-            edgeGO.transform.SetParent(cellGO.transform, false);
-            var ert = edgeGO.GetComponent<RectTransform>();
-            switch (e)
-            {
-                case 0: ert.anchorMin = new Vector2(0f, 1f); ert.anchorMax = new Vector2(1f, 1f);   // 상
-                        ert.pivot = new Vector2(0.5f, 1f); ert.sizeDelta = new Vector2(0f, EdgeThickness); break;
-                case 1: ert.anchorMin = new Vector2(1f, 0f); ert.anchorMax = new Vector2(1f, 1f);   // 우
-                        ert.pivot = new Vector2(1f, 0.5f); ert.sizeDelta = new Vector2(EdgeThickness, 0f); break;
-                case 2: ert.anchorMin = new Vector2(0f, 0f); ert.anchorMax = new Vector2(1f, 0f);   // 하
-                        ert.pivot = new Vector2(0.5f, 0f); ert.sizeDelta = new Vector2(0f, EdgeThickness); break;
-                default: ert.anchorMin = new Vector2(0f, 0f); ert.anchorMax = new Vector2(0f, 1f);  // 좌
-                        ert.pivot = new Vector2(0f, 0.5f); ert.sizeDelta = new Vector2(EdgeThickness, 0f); break;
-            }
-            ert.anchoredPosition = Vector2.zero;
-            var eimg = edgeGO.AddComponent<Image>();
-            eimg.color         = Color.clear;
-            eimg.raycastTarget = false;
-            edges[e] = eimg;
-        }
-        _cellEdgeImages[gridPos] = edges;
-
         // 배치 플래시 오버레이 (투명 → 흰색 → 투명 애니메이션용)
         var flashGO = new GameObject("Flash", typeof(RectTransform));
         flashGO.transform.SetParent(cellGO.transform, false);
@@ -1082,8 +947,6 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         _cellBorderImages.Clear();
         _cellEmptyFaces.Clear();
         _cellInnerImages.Clear();
-        _cellEdgeImages.Clear();
-        _cellPieceId.Clear();
         _cellBaseColors.Clear();
         _occupiedPositions.Clear();
         _cellZones.Clear();
@@ -1191,21 +1054,6 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             for (int k = 0; k < popTargets.Count; k++)
                 if (popTargets[k] != null) popTargets[k].localScale = Vector3.one * pop;
 
-            // 조각 외곽선: 흰색에서 조각 색으로 잡히며 굵기가 가라앉는다.
-            float lineT = Mathf.Clamp01(t / 0.7f);
-            foreach (var pos in positions)
-            {
-                if (!_cellEdgeImages.TryGetValue(pos, out var edges) || edges == null) continue;
-                _cellPieceId.TryGetValue(pos, out string pid);
-                var target = EdgeColor(pid);
-                var draw   = Color.Lerp(Color.white, target, lineT);
-                for (int e = 0; e < edges.Length; e++)
-                {
-                    if (edges[e] == null || edges[e].color.a <= 0.01f) continue;   // 안쪽 변은 건드리지 않는다
-                    edges[e].color = draw;
-                }
-            }
-
             // 신규 셀: 흰색 플래시
             float a = t < RAMP_T
                 ? (t / RAMP_T) * PEAK_A
@@ -1233,8 +1081,6 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
 
         for (int k = 0; k < popTargets.Count; k++)
             if (popTargets[k] != null) popTargets[k].localScale = Vector3.one;
-
-        RefreshOccupiedBorders();   // 연출 중 임시로 칠한 외곽선을 최종 색으로 정리
 
         foreach (var pos in positions)
             if (_cellFlashImages.TryGetValue(pos, out var flash))

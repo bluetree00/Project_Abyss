@@ -1,80 +1,73 @@
 using System.Collections.Generic;
-using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using RelicFairy.Monster;
 
 /// <summary>
-/// 환영베기 — 카타나 Q스킬.
-/// 제자리에서 전방 범위 내 적을 다수 타격 (환영검무 스타일).
-/// 티어에 따라 검기 발사/폭발이 해금된다.
-///   1단계: 제자리 5회 공격
-///   2단계: + 전방 검기 3회 발사 (관통 데미지)
-///   3단계: + 검기 발사 후 1회 폭발 범위 공격
+/// 환영베기 — 카타나 R스킬. 낮게 웅크렸다 한 번에 뽑아 베고, 칼을 털면 맞은 적이 X자로 갈라진다(10-22 개편 — 사용자
+/// 「카타나 R — 애매한 애니 · 리소스 · 타격 방식 · 불편한 후딜 → 컨셉에 맞게 아예 개편」).
+///   1단계: 발도(앞 부채꼴) → 칼을 털고 나면(0.53초 뒤) 맞은 적마다 늦게 갈라짐(X자 · 마무리)
+///   2단계: + 이어 갈라짐(각인 택1 — 아래)
+///   3단계: + 늦게 갈라짐이 둘레로 터진다(반경 3 m)
+/// 예전엔 제자리 5연타(앞 1 m 중심 반경 2 m · 넷째와 다섯째 사이 0.56초 빈틈)에 이펙트 넷이 섞여 있었다.
+/// 클립은 낮게 웅크린 발도(SPAttack06 — 성광베기가 쓰던 것)이고, 성광베기는 앞으로 뛰어들며 베기(Dodge_Attack_F)로 옮겼다.
+/// 이 클립의 휘두름은 발도 하나뿐이다(실측 67: 44.7 m/s · 뒤 0.22초 움직임은 7 m/s 칼 털기) — 판정도 하나.
 ///
-/// 각인(09-25 시범, 기획 스킬구성_재련소연결 A안): 2단계에 오를 때 둘 중 하나를 고르면 「검기 발사」가 바뀐다.
-///   잔상 추격 — 검기가 앞자리 대신 <b>가까운 적들을 하나씩 쫓아가</b> 벤다(흩어진 적).
-///   응축     — 검기를 <b>한 번에 모아</b> 크게 벤다(단단한 한 놈). 3단계 폭발은 둘 다 그대로 붙는다.
-/// 고르지 않았으면(선택 화면 전·옛 세이브) 예전 「검기 3연발」.
+/// 각인(09-25 시범, 기획 스킬구성_재련소연결 A안): 2단계에 오를 때 둘 중 하나를 고르면 「이어 갈라짐」이 바뀐다.
+///   잔상 추격 — 갈라짐이 <b>8 m 안 가까운 적부터 하나씩 번진다</b>(흩어진 적). 고르지 않았으면(선택 화면 전 · 옛 세이브) 이쪽.
+///   응축     — 갈라짐을 <b>가장 체력이 많은 적 하나에 모아</b> 크게 가른다(단단한 한 놈).
 /// </summary>
 [CreateAssetMenu(menuName = "Game/Skill/PhantomDanceBehavior")]
 public class PhantomDanceBehaviorSO : SkillBehaviorSO
 {
-    [Header("기본 공격 (전 티어)")]
-    public int hitCount = 5;
-    public float hitDelay = 0.12f;
-    public float detectRadius = 2f;
-    public float detectForwardOffset = 1f;
-    public float baseDamagePerHit = 10f;
-    public float knockbackMultiplier = 0.1f;
+    [Header("발도 (전 단계) — 클립의 휘두름에 맞춘다")]
+    [Tooltip("발도 순간(스킬 시작부터 초). 첫 값에 클립의 첫 발도가 닿게 재생한다(SkillAnimSync)")]
+    [SerializeField] private float[] drawHitTimes = { 0.35f };
+    [SerializeField] private float drawRange = 4.5f;
+    [SerializeField] private float drawAngle = 120f;
+    [SerializeField] private float drawDamage = 600f;
+    [SerializeField] private float knockbackMultiplier = 0.1f;
 
-    [Header("2단계: 검기 발사")]
-    public int slashProjectileCount = 3;
-    public float slashProjectileDelay = 0.1f;
-    public float slashProjectileDamage = 12f;
-    public float slashProjectileDistance = 3f;
-    public float slashProjectileRadius = 1.5f;
-    public string slashProjectileEffectKey = "ShinySlash";
-    public float slashProjectileEffectScale = 1f;
+    [Header("늦게 갈라짐 — 발도에 맞은 적마다 X자")]
+    [Tooltip("마지막 발도 뒤(초) — 클립의 칼 털기가 끝나는 때")]
+    [SerializeField] private float cutDelay = 0.53f;
+    [SerializeField] private float cutDamage = 410f;
 
-    [Header("각인 (2단계 택1) — 고르지 않았으면 위 「검기 발사」 그대로")]
-    [Tooltip("잔상 추격: 쫓아갈 적을 찾는 반경(m)")]
-    public float pursuitRadius = 8f;
-    [Tooltip("잔상 추격: 적 자리에서 베는 반경(m)")]
-    public float pursuitHitRadius = 1.2f;
-    [Tooltip("응축: 검기 N발 피해 합 × 이 배율을 한 번에")]
-    public float condenseDamageMult = 1.2f;
-    public float condenseRadiusMult = 1.6f;
-    public float condenseEffectScaleMult = 2f;
+    [Header("2단계: 이어 갈라짐 (각인 택1)")]
+    [SerializeField] private int slashProjectileCount = 3;
+    [SerializeField] private float slashProjectileDelay = 0.1f;
+    [SerializeField] private float slashProjectileDamage = 100f;
+    [Tooltip("잔상 추격: 번질 적을 찾는 반경(m)")]
+    [SerializeField] private float pursuitRadius = 8f;
+    [Tooltip("잔상 추격: 적 자리에서 가르는 반경(m)")]
+    [SerializeField] private float pursuitHitRadius = 1.2f;
+    [Tooltip("응축: 이어 갈라짐 N번 피해 합 × 이 배율을 한 번에")]
+    [SerializeField] private float condenseDamageMult = 1.2f;
+    [SerializeField] private float condenseRadius = 2.4f;
+    [SerializeField] private float condenseEffectScaleMult = 2f;
 
-    [Header("3단계: 검기 폭발")]
-    public float slashExplodeDelay = 0.3f;
-    public float slashExplodeRadius = 3f;
-    public float slashExplodeDamage = 25f;
-    public string slashExplodeEffectKey = "MissileExplosion";
-    public float slashExplodeEffectScale = 2f;
+    [Header("3단계: 갈라짐 폭발")]
+    [SerializeField] private float slashExplodeRadius = 3f;
+    [SerializeField] private float slashExplodeDamage = 250f;
 
     [Header("마무리")]
-    public float endDelay = 0.3f;
+    [Tooltip("마지막 피해 뒤 칼을 거두는 동안(초) — 후딜이라 회피 · 공격 · 스킬로 끊긴다")]
+    [SerializeField] private float endDelay = 0.2f;
 
     [Header("이펙트")]
-    public string attackEffectKey = "SlashAttack";
-    public float attackEffectScale = 1f;
-    public string hitEffectKey = "SwordHitImpact";
-    public float hitEffectScale = 0.5f;
-    public string finishEffectKey = "IasenFinishFlash";
-    public float finishEffectScale = 1f;
+    [SerializeField] private string drawEffectKey = "SlashAttack";
+    [SerializeField] private float drawEffectScale = 1f;
+    [SerializeField] private string cutEffectKey = "KatanaDelayedCut";
+    [SerializeField] private float cutEffectScale = 0.15f;
+    [Tooltip("3단계 — 갈라짐이 터지는 크기(폭발 반경에 맞춘다)")]
+    [SerializeField] private float explodeEffectScale = 0.3f;
+    [Tooltip("맞은 적 타격 이펙트 — 카타나 계열(붉은 피 + 섬광, 평타와 같다). 비우면 공용 노란 베기")]
+    [SerializeField] private string hitEffectKey = "SwordHitImpact";
+    [SerializeField] private float hitEffectScale = 0.29f;
 
     [Header("애니메이션")]
-    public string animationOverride;
-    [Tooltip("난무 시 번갈아 사용할 공격 상태들 (비어있으면 GroundLightAttack_01~03 사용)")]
-    public string[] flurryAnimStates;
-    [Tooltip("전용 연타 상태(10-08 C2). 있으면 한 번 틀고 타격은 flurryHitTimes에 맞춘다 — 비어 있으면 위 상태들을 타격마다 갈아 끼우는 예전 방식")]
-    public string flurryState;
-    [Tooltip("전용 연타 상태를 어디서부터 틀지(정규화 0~1) — 앞 예비 동작을 건너뛴다")]
-    public float flurryStartNormalized;
-    [Tooltip("타격 순간(스킬 시작부터 초) — hitCount개. 클립의 휘두름에 맞춘다(실측 장비 형/18)")]
-    public float[] flurryHitTimes;
+    [Tooltip("낮게 웅크린 발도 클립을 무는 상태(카타나는 QSkill_Iasen → Katana_ESkill = SPAttack06)")]
+    [SerializeField] private string drawState = "QSkill_02";
 
     public const string EngravePursuit  = "phantom_pursuit";    // 잔상 추격
     public const string EngraveCondense = "phantom_condense";   // 응축
@@ -84,46 +77,42 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
     private class Runtime : ISkillRuntime
     {
         private readonly PhantomDanceBehaviorSO _data;
-        private enum Phase { Attack, SlashProjectile, SlashExplode, End }
+        private enum Phase { Draw, Cut, Chain, End }
         private Phase _phase;
-        private float _timer;
-        private float _attackTime;   // 난무 단계 경과(전용 연타의 타격 순간 기준)
-        private int _hitIndex;
-        private int _slashIndex;
+        private float _timer;        // 단계 경과
+        private float _drawTime;     // 발도 단계 경과(발도 순간 기준)
+        private int _drawIndex;
+        private int _chainIndex;
         private int _skillTier;
-        private int _slashCount;   // 검기 수 — 환영 베기 강화 증강(10-15)이 늘린다
-        private bool _pursuit, _condense;
-        private readonly List<MonsterBase> _pursuitTargets = new();
-        private readonly List<IDamageable> _hitTargets = new();
-        private readonly HashSet<GameObject> _hitObjects = new();
-        private Vector3 _slashCenter;
+        private int _slashCount;     // 이어 갈라짐 수 — 환영 베기 강화 증강(10-15)이 늘린다
+        private bool _condense;
+        private readonly List<GameObject> _cutTargets = new();      // 발도에 맞은 적(늦게 갈라질 자리)
+        private readonly List<GameObject> _chainTargets = new();    // 잔상 추격 — 가까운 순
+        private readonly List<GameObject> _buf = new();
+        private readonly HashSet<GameObject> _burstHit = new();
 
         public Runtime(PhantomDanceBehaviorSO data) => _data = data;
 
-        // 전용 연타(C2) — 상태와 타격 순간이 다 있을 때만. 아니면 예전 「평타 갈아 끼우기」
-        private bool Dedicated => !string.IsNullOrEmpty(_data.flurryState)
-                                  && _data.flurryHitTimes != null && _data.flurryHitTimes.Length >= _data.hitCount;
-
         public void OnEnter(SkillExecutionContext ctx)
         {
-            PlayAnimation(ctx);
             ctx.RotateToMouse();
             ctx.SetMoveScale(0f);
 
             _skillTier = ctx.SkillTier;
             _slashCount = _data.slashProjectileCount + Mathf.RoundToInt(MeleeAugments.Value2On(ctx.WeaponData, MeleeAugmentCatalog.KatanaPhantom));
-            _pursuit   = ctx.WeaponData != null && ctx.WeaponData.HasEngraving(EngravePursuit);
-            _condense  = !_pursuit && ctx.WeaponData != null && ctx.WeaponData.HasEngraving(EngraveCondense);
+            _condense = ctx.WeaponData != null && !ctx.WeaponData.HasEngraving(EngravePursuit) && ctx.WeaponData.HasEngraving(EngraveCondense);
 
-            _hitTargets.Clear();
-            _hitObjects.Clear();
-            _hitIndex = 0;
-            _slashIndex = 0;
+            _cutTargets.Clear();
+            _chainTargets.Clear();
+            _burstHit.Clear();
+            _drawIndex = 0;
+            _chainIndex = 0;
             _timer = 0f;
-            _attackTime = 0f;
-            _phase = Phase.Attack;
+            _drawTime = 0f;
+            _phase = Phase.Draw;
 
-            DetectEnemies(ctx);
+            float firstDraw = _data.drawHitTimes != null && _data.drawHitTimes.Length > 0 ? _data.drawHitTimes[0] : 0.35f;
+            SkillAnimSync.CrossFadeToContact(ctx.Animator, _data.drawState, firstDraw, 0.05f);   // 첫 발도에 클립의 베기가 닿게 — 앞 웅크림이 보인다
 
             // 스킬 진입 시 잔여 공격 입력 제거
             ctx.Controller.InputBuffer.TryConsume(Game.Inputs.Command.Light);
@@ -134,225 +123,144 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
             _timer += ctx.DeltaTime;   // 애니메이터와 같은 시계(슬로모 — 10-09)
             switch (_phase)
             {
-                case Phase.Attack:          UpdateAttack(ctx);          break;
-                case Phase.SlashProjectile: UpdateSlashProjectile(ctx); break;
-                case Phase.SlashExplode:    UpdateSlashExplode(ctx);    break;
-                case Phase.End:             UpdateEnd(ctx);             break;
+                case Phase.Draw:  UpdateDraw(ctx);  break;
+                case Phase.Cut:   UpdateCut(ctx);   break;
+                case Phase.Chain: UpdateChain(ctx); break;
+                case Phase.End:   UpdateEnd(ctx);   break;
             }
         }
 
         public void OnExit(SkillExecutionContext ctx)
         {
             ctx.SetMoveScale(1f);
-            _hitTargets.Clear();
-            _hitObjects.Clear();
+            _cutTargets.Clear();
+            _chainTargets.Clear();
+            _burstHit.Clear();
         }
 
-        // ── Phase: Attack (5회 타격) ──
-        private void UpdateAttack(SkillExecutionContext ctx)
+        // ── 발도 — 앞 부채꼴, 클립의 휘두름 순간마다 ──
+        private void UpdateDraw(SkillExecutionContext ctx)
         {
-            _attackTime += ctx.DeltaTime;
-            bool dedicated = Dedicated;
-            // 전용 연타는 클립의 휘두름 순간에, 예전 방식은 hitDelay마다
-            if (dedicated ? _attackTime >= _data.flurryHitTimes[_hitIndex] : _timer >= _data.hitDelay)
+            _drawTime += ctx.DeltaTime;
+            int count = _data.drawHitTimes != null ? _data.drawHitTimes.Length : 0;
+            if (_drawIndex < count && _drawTime < _data.drawHitTimes[_drawIndex]) return;
+
+            if (_drawIndex < count)
             {
-                _timer = 0f;
-                DetectEnemies(ctx);
-                // 1단계는 난무 마지막 타가 마무리(2단계+는 뒤 검기 · 폭발이 마무리) — A5
-                ApplyHit(ctx, finisher: _skillTier < 2 && _hitIndex >= _data.hitCount - 1);
-
-                // 난무 애니메이션 번갈아 재생 — 전용 연타는 처음 튼 동작이 이어진다
-                if (!dedicated) PlayFlurryAnim(ctx, _hitIndex);
-                Managers.Sound?.PlayEvent(SoundEvent.PlayerSwing);   // 난무마다 휘두름(A6)
-
-                // 공격 이펙트 — 전방에서 좌우 교차하며 중앙 타격
-                var fwd = ctx.PlayerTransform.forward;
-                var right = ctx.PlayerTransform.right;
-                Vector3 targetCenter = ctx.PlayerTransform.position + fwd * _data.detectForwardOffset + Vector3.up * 0.8f;
-
-                // 좌/우 교차: 홀수=왼쪽, 짝수=오른쪽
-                float side = (_hitIndex % 2 == 0) ? 1f : -1f;
-                float spreadDist = 1.5f;
-                Vector3 spawnPos = targetCenter + right * side * spreadDist + Vector3.up * Random.Range(-0.3f, 0.3f);
-
-                // 중앙을 향하도록 회전 + 세워짐/누워짐 교차 (홀수=세로, 짝수=가로)
-                Vector3 toCenter = (targetCenter - spawnPos).normalized;
-                Quaternion baseRot = Quaternion.LookRotation(toCenter);
-                float tilt = (_hitIndex % 2 == 0) ? Random.Range(60f, 80f) : Random.Range(-20f, 20f);
-                Quaternion finalRot = baseRot * Quaternion.Euler(0f, 0f, tilt);
-
-                SpawnEffectRotated(ctx, _data.attackEffectKey, spawnPos, finalRot, _data.attackEffectScale, 0.5f);
-
-                _hitIndex++;
-                if (_hitIndex >= _data.hitCount)
-                {
-                    _timer = 0f;
-
-                    // 마무리 이펙트
-                    if (!string.IsNullOrEmpty(_data.finishEffectKey))
-                    {
-                        var finishPos = ctx.PlayerTransform.position
-                            + ctx.PlayerTransform.forward * (_data.detectForwardOffset + _data.detectRadius)
-                            + Vector3.up * 1f;
-                        SpawnEffect(ctx, _data.finishEffectKey, finishPos, _data.finishEffectScale, 0.8f);
-                    }
-
-                    // 티어별 분기
-                    if (_skillTier >= 2)
-                    {
-                        _slashCenter = ctx.PlayerTransform.position
-                            + ctx.PlayerTransform.forward * _data.slashProjectileDistance;
-                        _phase = Phase.SlashProjectile;
-                        _slashIndex = 0;
-                        if (_pursuit) GatherPursuitTargets(ctx);
-                    }
-                    else
-                    {
-                        _phase = Phase.End;
-                    }
-                }
+                Draw(ctx, _drawIndex);
+                _drawIndex++;
+                if (_drawIndex < count) return;
             }
+
+            _timer = 0f;
+            _phase = _cutTargets.Count > 0 ? Phase.Cut : Phase.End;   // 헛치면 갈라질 것이 없다 — 바로 후딜
         }
 
-        // ── Phase: SlashProjectile (검기 발사 3회) ──
-        private void UpdateSlashProjectile(SkillExecutionContext ctx)
+        private void Draw(SkillExecutionContext ctx, int index)
+        {
+            var origin = ctx.PlayerTransform.position;
+            var fwd = ctx.PlayerTransform.forward;
+            SkillRangeRing.Fan(origin, fwd, _data.drawRange, _data.drawAngle);
+            Managers.Sound?.PlayEvent(SoundEvent.PlayerSwing);   // 발도마다 베는 소리(A6)
+
+            float dmg = ctx.CalculateDamage(_data.drawDamage);
+            CombatQuery.GetDamageablesInCone(origin, fwd, _data.drawRange, _data.drawAngle * 0.5f, ctx.Controller.gameObject, 32, _buf, showGuide: false);
+            foreach (var go in _buf)
+            {
+                ctx.DealDamage(go, dmg, _data.knockbackMultiplier, hitEffectKey: _data.hitEffectKey, hitEffectScale: _data.hitEffectScale);
+                if (!_cutTargets.Contains(go)) _cutTargets.Add(go);
+            }
+
+            // 베기 — 부채꼴 판정에 맞춘 가로 베기 하나. 둘째 발도는 반대로 돌아온다
+            var rot = Quaternion.LookRotation(fwd) * Quaternion.Euler(0f, 0f, index % 2 == 0 ? 8f : 172f);
+            SpawnEffect(ctx, _data.drawEffectKey, origin + fwd * (_data.drawRange * 0.4f) + Vector3.up * 1f, rot, _data.drawEffectScale, 0.5f, ownedFx: false);
+        }
+
+        // ── 늦게 갈라짐 — 맞은 적마다 X자(3단계는 둘레로 터진다) ──
+        private void UpdateCut(SkillExecutionContext ctx)
+        {
+            if (_timer < _data.cutDelay) return;
+            _timer = 0f;
+
+            bool finisher = _skillTier < 2;   // 2단계부터는 뒤 이어 갈라짐이 마무리(A5)
+            bool burst = _skillTier >= 3;
+            float dmg = ctx.CalculateDamage(_data.cutDamage);
+            float burstDmg = ctx.CalculateDamage(_data.slashExplodeDamage);
+            Managers.Sound?.PlayEvent(SoundEvent.PlayerSwing);
+            foreach (var go in _cutTargets)
+            {
+                if (go == null || !go.activeInHierarchy) continue;
+                var at = go.transform.position;
+                ctx.DealDamage(go, dmg, _data.knockbackMultiplier * 2f, finisher, hitEffectKey: _data.hitEffectKey, hitEffectScale: _data.hitEffectScale);
+                SpawnCross(ctx, at + Vector3.up * 1f, burst ? _data.explodeEffectScale : _data.cutEffectScale);
+                if (!burst) continue;
+
+                CombatQuery.GetNearbyDamageables(at, _data.slashExplodeRadius, ctx.Controller.gameObject, 32, _buf);
+                foreach (var b in _buf)
+                    if (_burstHit.Add(b)) ctx.DealDamage(b, burstDmg, _data.knockbackMultiplier * 2f, finisher, skipHitVfx: true);   // 터짐 — 타격 이펙트는 X자가 맡는다
+            }
+
+            if (_skillTier < 2) { _phase = Phase.End; return; }
+            if (!_condense)
+            {
+                // 잔상 추격 — 8 m 안 가까운 적부터(적이 갈라짐 수보다 적으면 가까운 쪽부터 다시)
+                CombatQuery.GetNearbyDamageables(ctx.PlayerTransform.position, _data.pursuitRadius, ctx.Controller.gameObject, 16, _chainTargets);
+                if (_chainTargets.Count == 0) { _phase = Phase.End; return; }
+            }
+            _chainIndex = 0;
+            _phase = Phase.Chain;
+        }
+
+        // ── 2단계: 이어 갈라짐 ──
+        private void UpdateChain(SkillExecutionContext ctx)
         {
             if (_condense) { UpdateCondense(ctx); return; }
-            if (_pursuit && _pursuitTargets.Count > 0) { UpdatePursuit(ctx); return; }
-
-            if (_timer >= _data.slashProjectileDelay)
-            {
-                _timer = 0f;
-
-                // 전방 검기 데미지
-                float dmg = ctx.CalculateDamage(_data.slashProjectileDamage);
-                var colliders = Physics.OverlapSphere(_slashCenter, _data.slashProjectileRadius);
-                foreach (var col in colliders)
-                {
-                    if (col.gameObject == ctx.Controller.gameObject) continue;
-                    // 3단계는 뒤에 검기 폭발이 막타 — 그 아래 단계는 마지막 검기가 막타
-                    if (col.TryGetComponent<IDamageable>(out var d))
-                        ctx.DealDamage(d, dmg, _data.knockbackMultiplier,
-                            _skillTier < 3 && _slashIndex >= _slashCount - 1);
-                }
-
-                // 검기 이펙트
-                var slashOffset = new Vector3(
-                    Random.Range(-0.5f, 0.5f),
-                    Random.Range(0.5f, 1.5f),
-                    Random.Range(-0.3f, 0.3f));
-                SpawnEffectScaled(ctx, _data.slashProjectileEffectKey,
-                    _slashCenter + slashOffset, _data.slashProjectileEffectScale, 0.6f);
-
-                _slashIndex++;
-                if (_slashIndex >= _slashCount)
-                {
-                    _timer = 0f;
-                    if (_skillTier >= 3)
-                        _phase = Phase.SlashExplode;
-                    else
-                        _phase = Phase.End;
-                }
-            }
-        }
-
-        // ── 각인: 잔상 추격 — 검기가 가까운 적을 하나씩 쫓아가 벤다 ──
-        private void GatherPursuitTargets(SkillExecutionContext ctx)
-        {
-            var pos = ctx.PlayerTransform.position;
-            CombatQuery.GetNearbyEnemies(pos, _data.pursuitRadius, ctx.Controller.gameObject, 16, _pursuitTargets);
-            _pursuitTargets.Sort((a, b) => (a.transform.position - pos).sqrMagnitude.CompareTo((b.transform.position - pos).sqrMagnitude));
-        }
-
-        private void UpdatePursuit(SkillExecutionContext ctx)
-        {
             if (_timer < _data.slashProjectileDelay) return;
             _timer = 0f;
 
-            // 검기 i번째 = i번째로 가까운 적(적이 검기 수보다 적으면 가까운 쪽부터 다시)
-            var target = _pursuitTargets[_slashIndex % _pursuitTargets.Count];
-            if (target != null && !target.IsDead) _slashCenter = target.transform.position;
-
-            bool last = _slashIndex >= _slashCount - 1;
-            float dmg = ctx.CalculateDamage(_data.slashProjectileDamage);
-            foreach (var col in Physics.OverlapSphere(_slashCenter, _data.pursuitHitRadius))
+            var target = _chainTargets[_chainIndex % _chainTargets.Count];
+            bool last = _chainIndex >= _slashCount - 1;
+            if (target != null && target.activeInHierarchy)
             {
-                if (col.gameObject == ctx.Controller.gameObject) continue;
-                if (col.TryGetComponent<IDamageable>(out var d))
-                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier, _skillTier < 3 && last);
+                var at = target.transform.position;
+                float dmg = ctx.CalculateDamage(_data.slashProjectileDamage);
+                CombatQuery.GetNearbyDamageables(at, _data.pursuitHitRadius, ctx.Controller.gameObject, 16, _buf);
+                foreach (var go in _buf)
+                    ctx.DealDamage(go, dmg, _data.knockbackMultiplier, last, hitEffectKey: _data.hitEffectKey, hitEffectScale: _data.hitEffectScale);
+                var rot = Quaternion.LookRotation(ctx.PlayerTransform.forward) * Quaternion.Euler(0f, 0f, _chainIndex % 2 == 0 ? 45f : -45f);
+                SpawnEffect(ctx, _data.cutEffectKey, at + Vector3.up * 1f, rot, _data.cutEffectScale, 0.6f, ownedFx: true);
             }
-            SpawnEffectScaled(ctx, _data.slashProjectileEffectKey, _slashCenter + Vector3.up * 1f, _data.slashProjectileEffectScale, 0.6f);
 
-            _slashIndex++;
-            if (_slashIndex >= _slashCount)
-            {
-                _timer = 0f;
-                _phase = _skillTier >= 3 ? Phase.SlashExplode : Phase.End;   // 폭발은 마지막으로 쫓아간 자리에서
-            }
+            _chainIndex++;
+            if (_chainIndex >= _slashCount) { _timer = 0f; _phase = Phase.End; }
         }
 
-        // ── 각인: 응축 — 검기를 한 번에 모아 크게 벤다 ──
+        // 응축 — 갈라짐을 가장 체력이 많은 적 하나에 모아 크게(둘레도 함께)
         private void UpdateCondense(SkillExecutionContext ctx)
         {
             if (_timer < _data.slashProjectileDelay * 2f) return;   // 모으는 한 박자
             _timer = 0f;
 
-            float dmg    = ctx.CalculateDamage(_data.slashProjectileDamage) * _slashCount * _data.condenseDamageMult;
-            float radius = _data.slashProjectileRadius * _data.condenseRadiusMult;
-            foreach (var col in Physics.OverlapSphere(_slashCenter, radius))
+            GameObject target = null;
+            int bestHp = -1;
+            foreach (var go in _cutTargets)
             {
-                if (col.gameObject == ctx.Controller.gameObject) continue;
-                if (col.TryGetComponent<IDamageable>(out var d))
-                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f, _skillTier < 3);
+                if (go == null || !go.activeInHierarchy) continue;
+                int hp = go.TryGetComponent<MonsterBase>(out var mb) ? mb.CurrentHp : 0;
+                if (target == null || hp > bestHp) { target = go; bestHp = hp; }
             }
-            SpawnEffectScaled(ctx, _data.slashProjectileEffectKey, _slashCenter + Vector3.up * 1f,
-                              _data.slashProjectileEffectScale * _data.condenseEffectScaleMult, 0.8f);
-
-            _slashIndex = _slashCount;
-            _phase = _skillTier >= 3 ? Phase.SlashExplode : Phase.End;
+            if (target != null)
+            {
+                var at = target.transform.position;
+                float dmg = ctx.CalculateDamage(_data.slashProjectileDamage) * _slashCount * _data.condenseDamageMult;
+                CombatQuery.GetNearbyDamageables(at, _data.condenseRadius, ctx.Controller.gameObject, 16, _buf);
+                foreach (var go in _buf)
+                    ctx.DealDamage(go, dmg, _data.knockbackMultiplier * 2f, isFinisher: true, hitEffectKey: _data.hitEffectKey, hitEffectScale: _data.hitEffectScale);
+                SpawnCross(ctx, at + Vector3.up * 1f, _data.cutEffectScale * _data.condenseEffectScaleMult);
+            }
+            _phase = Phase.End;
         }
 
-        // ── Phase: SlashExplode (검기 폭발) ──
-        private void UpdateSlashExplode(SkillExecutionContext ctx)
-        {
-            if (_timer >= _data.slashExplodeDelay)
-            {
-                _timer = 0f;
-
-                // 폭발 범위 데미지
-                float dmg = ctx.CalculateDamage(_data.slashExplodeDamage);
-                var colliders = Physics.OverlapSphere(_slashCenter, _data.slashExplodeRadius);
-                foreach (var col in colliders)
-                {
-                    if (col.gameObject == ctx.Controller.gameObject) continue;
-                    if (col.TryGetComponent<IDamageable>(out var d))
-                    {
-                        ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f, isFinisher: true, skipHitVfx: true);   // 검기 폭발 · 타격 이펙트는 아래에서 직접
-
-                        // 피격 이펙트
-                        var hitOffset = new Vector3(
-                            Random.Range(-0.5f, 0.5f),
-                            Random.Range(0.3f, 1.5f),
-                            Random.Range(-0.5f, 0.5f));
-                        SpawnEffect(ctx, _data.hitEffectKey, col.transform.position + hitOffset, _data.hitEffectScale * 1.5f, 0.5f);
-                    }
-                }
-
-                // 폭발 이펙트 — 다중 + 크게
-                SpawnEffectScaled(ctx, _data.slashExplodeEffectKey,
-                    _slashCenter + Vector3.up * 0.5f, _data.slashExplodeEffectScale, 2f);
-                SpawnEffectScaled(ctx, _data.slashExplodeEffectKey,
-                    _slashCenter + Vector3.up * 1.2f + ctx.PlayerTransform.right * 0.5f,
-                    _data.slashExplodeEffectScale * 0.7f, 1.5f);
-                SpawnEffectScaled(ctx, _data.slashExplodeEffectKey,
-                    _slashCenter + Vector3.up * 0.3f - ctx.PlayerTransform.right * 0.5f,
-                    _data.slashExplodeEffectScale * 0.7f, 1.5f);
-
-                _phase = Phase.End;
-            }
-        }
-
-        // ── Phase: End ──
         private void UpdateEnd(SkillExecutionContext ctx)
         {
             ctx.EnterRecovery();   // 후딜 — 회피로 끊을 수 있다 · 스탠스 해제(10-08 A2 · A4)
@@ -360,105 +268,30 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
                 ctx.RequestEnd();
         }
 
-        // ── Detect ──
-        private void DetectEnemies(SkillExecutionContext ctx)
+        // X자 — 같은 베기 둘을 엇갈려
+        private void SpawnCross(SkillExecutionContext ctx, Vector3 at, float scale)
         {
-            var center = ctx.PlayerTransform.position + ctx.PlayerTransform.forward * _data.detectForwardOffset;
-            var colliders = Physics.OverlapSphere(center, _data.detectRadius);
-            foreach (var col in colliders)
-            {
-                if (col.gameObject == ctx.Controller.gameObject) continue;
-                if (_hitObjects.Contains(col.gameObject)) continue;
-                if (col.TryGetComponent<IDamageable>(out var damageable))
-                {
-                    _hitTargets.Add(damageable);
-                    _hitObjects.Add(col.gameObject);
-                }
-            }
+            var face = Quaternion.LookRotation(ctx.PlayerTransform.forward);
+            SpawnEffect(ctx, _data.cutEffectKey, at, face * Quaternion.Euler(0f, 0f, 45f), scale, 0.6f, ownedFx: true);
+            SpawnEffect(ctx, _data.cutEffectKey, at, face * Quaternion.Euler(0f, 0f, -45f), scale, 0.6f, ownedFx: true);
         }
 
-        // ── Damage ──
-        private void ApplyHit(SkillExecutionContext ctx, bool finisher = false)
-        {
-            if (_hitTargets.Count == 0) return;
-            float dmg = ctx.CalculateDamage(_data.baseDamagePerHit);
-            foreach (var target in _hitTargets)
-                ctx.DealDamage(target, dmg, _data.knockbackMultiplier, finisher, skipHitVfx: true);   // 타격 이펙트는 아래에서 직접
-
-            foreach (var obj in _hitObjects)
-            {
-                if (obj == null) continue;
-                var offset = new Vector3(
-                    Random.Range(-0.4f, 0.4f),
-                    Random.Range(0.3f, 1.5f),
-                    Random.Range(-0.4f, 0.4f));
-                SpawnEffect(ctx, _data.hitEffectKey, obj.transform.position + offset, _data.hitEffectScale, 0.4f);
-            }
-        }
-
-        // ── Animation ──
-        private static readonly string[] DefaultFlurryStates = { "GroundLightAttack_01", "GroundLightAttack_02", "GroundLightAttack_03" };
-
-        private void PlayAnimation(SkillExecutionContext ctx)
-        {
-            if (Dedicated)
-            {
-                // 시작 지점은 정규화로 — CrossFadeInFixedTime의 시간은 상태 속도가 곱해진 초라 클립 0.8초를 넘기면 1.6초부터 틀었다(실측 18 1회차)
-                ctx.Animator.CrossFade(_data.flurryState, 0.05f, -1, _data.flurryStartNormalized);
-                return;
-            }
-            PlayFlurryAnim(ctx, 0);
-        }
-
-        private void PlayFlurryAnim(SkillExecutionContext ctx, int index)
-        {
-            var states = (_data.flurryAnimStates != null && _data.flurryAnimStates.Length > 0)
-                ? _data.flurryAnimStates
-                : DefaultFlurryStates;
-            string animName = states[index % states.Length];
-            ctx.Animator.CrossFade(animName, 0.03f);
-        }
-
-        // ── Effect ──
-        private static async void SpawnEffect(SkillExecutionContext ctx, string key, Vector3 pos, float scale, float lifetime)
-        {
-            if (string.IsNullOrEmpty(key)) return;
-            var obj = await Managers.ObjectPooler.SpawnAsync(
-                key, ObjectPoolerManager.PoolType.Effect, pos, ctx.PlayerTransform.rotation);
-            if (obj == null) return;
-            obj.transform.localScale = Vector3.one * scale;
-            if (obj.TryGetComponent<EffectBehaviour>(out var eb))
-                eb.Initialize(eb.behaviorSO, ctx.PlayerTransform, lifetime);
-            else
-                DespawnAfter(obj, lifetime);
-        }
-
-        private static async void SpawnEffectRotated(SkillExecutionContext ctx, string key, Vector3 pos, Quaternion rot, float scale, float lifetime)
+        /// <param name="ownedFx">이 스킬만 쓰는 이펙트(늦게 갈라짐) — 풀에서 다시 꺼내면 처음부터 다시 튼다.
+        /// 여러 곳이 같이 쓰는 이펙트(평타 베기)는 건드리지 않는다.</param>
+        private static async void SpawnEffect(SkillExecutionContext ctx, string key, Vector3 pos, Quaternion rot, float scale, float lifetime, bool ownedFx)
         {
             if (string.IsNullOrEmpty(key)) return;
             var obj = await Managers.ObjectPooler.SpawnAsync(
                 key, ObjectPoolerManager.PoolType.Effect, pos, rot);
             if (obj == null) return;
             obj.transform.localScale = Vector3.one * scale;
-            if (obj.TryGetComponent<EffectBehaviour>(out var eb))
-                eb.Initialize(eb.behaviorSO, ctx.PlayerTransform, lifetime);
-            else
-                DespawnAfter(obj, lifetime);
-        }
-
-        private static async void SpawnEffectScaled(SkillExecutionContext ctx, string key, Vector3 pos, float scale, float lifetime)
-        {
-            if (string.IsNullOrEmpty(key)) return;
-            var obj = await Managers.ObjectPooler.SpawnAsync(
-                key, ObjectPoolerManager.PoolType.Effect, pos, ctx.PlayerTransform.rotation);
-            if (obj == null) return;
-            obj.transform.localScale = Vector3.one * scale;
-            foreach (var trail in obj.GetComponentsInChildren<TrailRenderer>(true))
-                trail.Clear();
-            foreach (var ps in obj.GetComponentsInChildren<ParticleSystem>(true))
+            if (ownedFx)
             {
-                ps.Clear(true);
-                ps.Play(true);
+                foreach (var ps in obj.GetComponentsInChildren<ParticleSystem>(true))
+                {
+                    ps.Clear(true);
+                    ps.Play(true);
+                }
             }
             if (obj.TryGetComponent<EffectBehaviour>(out var eb))
                 eb.Initialize(eb.behaviorSO, ctx.PlayerTransform, lifetime);

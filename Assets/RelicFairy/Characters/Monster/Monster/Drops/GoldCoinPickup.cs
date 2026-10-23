@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
 
 /// <summary>
 /// 몬스터 사망 시 드롭되는 골드 코인.
@@ -31,6 +33,9 @@ public class GoldCoinPickup : MonoBehaviour
     private static readonly Color CoinColor = new Color(1f, 0.82f, 0.1f);
     private static readonly Color CoinEdge  = new Color(2.2f, 1.5f, 0.35f, 1f);   // 디졸브 테두리(HDR) — 금빛
 
+    /// <summary>아직 줍지 않은 금화 — 방 보상이 설 자리를 비울 때 쓴다(10-22).</summary>
+    private static readonly List<GoldCoinPickup> s_live = new();
+
     // ── Private Fields ───────────────────────────────────────
     private int       _value;
     private float     _spawnTime;
@@ -42,8 +47,12 @@ public class GoldCoinPickup : MonoBehaviour
     private bool      _collected;
     private bool      _vanishing;
     private Transform _playerTf;
+    private GameObject _outline;   // 「~Outline」 — 내려앉으면 켠다(10-22)
 
     // ── Lifecycle ────────────────────────────────────────────
+    private void OnEnable()  => s_live.Add(this);
+    private void OnDisable() => s_live.Remove(this);
+
     private void Update()
     {
         if (_vanishing)
@@ -62,7 +71,11 @@ public class GoldCoinPickup : MonoBehaviour
             transform.position = pos;
             transform.rotation = Quaternion.Euler(t * 360f * FlipTurns, _yaw, 0f);
 
-            if (t >= 1f) _arcing = false;
+            if (t >= 1f)
+            {
+                _arcing = false;
+                if (_outline != null) _outline.SetActive(true);
+            }
             return;
         }
 
@@ -91,6 +104,7 @@ public class GoldCoinPickup : MonoBehaviour
         if (Time.time - _spawnTime >= LifeTime)
         {
             _vanishing = true;
+            if (_outline != null) _outline.SetActive(false);   // 테두리는 디졸브를 안 탄다 — 먼저 끈다
             CurrencyVisuals.Vanish(gameObject, CurrencyVisualKind.Gold, ExpireVanishSeconds);
         }
     }
@@ -115,8 +129,42 @@ public class GoldCoinPickup : MonoBehaviour
 
             var coin = go.AddComponent<GoldCoinPickup>();
             coin.Initialize(startPos, landing, valuePerCoin);
+            coin._outline = CurrencyVisuals.AttachOutline(go, CurrencyVisualKind.Gold);
             CurrencyVisuals.Appear(go, CurrencyVisualKind.Gold, AppearSeconds, CoinEdge);
         }
+    }
+
+    /// <summary>
+    /// <paramref name="center"/> 둘레 <paramref name="radius"/> 안에 떨어졌거나 떨어지는 금화를 그 밖으로 다시 튕긴다
+    /// (10-22 사용자 「골드 오브젝트가 룬 획득 오브젝트 위쪽에 떨어진다」). 방 보상은 마지막 처치 자리에 서는데,
+    /// 그 처치의 금화도 같은 자리 1.3 m 안에 흩어져 보상 구체를 덮었다. 걸을 수 있는 면이 가까우면 그 위로 내려앉힌다.
+    /// </summary>
+    public static void PushAwayFrom(Vector3 center, float radius)
+    {
+        int moved = 0;
+        for (int i = 0; i < s_live.Count; i++)
+        {
+            var c = s_live[i];
+            if (c == null || c._collected || c._vanishing) continue;
+
+            Vector3 at   = c._arcing ? c._arcEnd : c.transform.position;
+            Vector3 flat = at - center;
+            flat.y = 0f;
+            float d = flat.magnitude;
+            if (d >= radius) continue;
+
+            Vector3 dir = d > 0.01f ? flat / d : Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) * Vector3.forward;
+            Vector3 landing = at + dir * (radius - d + Random.Range(0.1f, 0.5f));
+            if (NavMesh.SamplePosition(landing, out var hit, 1f, NavMesh.AllAreas) && Mathf.Abs(hit.position.y - at.y) < 0.5f)
+                landing = hit.position + Vector3.up * 0.05f;
+
+            c._arcStart = c.transform.position;
+            c._arcEnd   = landing;
+            c._arcTimer = 0f;
+            c._arcing   = true;
+            moved++;
+        }
+        if (moved > 0) Debug.Log($"[GoldCoin] 보상 자리 비우기 — 금화 {moved}개를 {radius:0.0} m 밖으로");
     }
 
     // ── Private Methods ──────────────────────────────────────
@@ -137,6 +185,7 @@ public class GoldCoinPickup : MonoBehaviour
         if (_collected) return;
         _collected = true;
         _vanishing = true;
+        if (_outline != null) _outline.SetActive(false);
 
         GameRunBootstrapper.Instance?.Run?.AddGold(_value);
         CurrencyVisuals.Vanish(gameObject, CurrencyVisualKind.Gold, CollectVanishSeconds);

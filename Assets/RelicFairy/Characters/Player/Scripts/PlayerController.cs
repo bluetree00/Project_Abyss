@@ -42,6 +42,8 @@ public sealed partial class PlayerController : CharacterBase
     // 2D 블렌드 트리(MoveBlend)가 몸 기준 로컬 속도를 좌표로 쓴다.
     private static readonly int MoveXHash = Animator.StringToHash("MoveX");
     private static readonly int MoveYHash = Animator.StringToHash("MoveY");
+    // 기억의 제단 「결의」(10-22) — 보스 페이지를 찾는 살아 있는 몬스터 장부 사본(쓰러질 한 방에서만 · 목록 재사용)
+    private static readonly System.Collections.Generic.List<RelicFairy.Monster.MonsterBase> s_resolveBossScan = new(16);
 
     // ── SerializeField ────────────────────────────────────────────
     [Header("Hit VFX")]
@@ -96,6 +98,10 @@ public sealed partial class PlayerController : CharacterBase
     // ── Private: 생존·유물·구독 ───────────────────────────────────
     private float _invincibleEnd;     // 아이템 효과: 시간 제한 무적 (DeathNegate 등)
     private bool  _dead;              // 사망 처리 1회 가드 (씬 전환 시 새 인스턴스라 리셋 불필요)
+    // 기억의 제단 「결의」(10-22 해방 대비) — 체력이 문턱 이상이던 마지막 피격 직전 시각 · 이 방(보스는 이 페이지)에서 이미 썼나
+    private float _resolveHighHpAt = float.NegativeInfinity;
+    private bool  _resolveSpent;
+    private int   _resolveSpentPage;
     private bool  _relicApplied;      // 유물 이중 적용 차단
     private bool  _aeSubscribed;
     // 틱 피해 연출 중복 억제 — 같은 공격자의 Light가 이 창 안에 다시 오면 피해만 넣고 연출은 생략한다.
@@ -332,6 +338,9 @@ public sealed partial class PlayerController : CharacterBase
 
         // 타격 통지 — 저스트 회피 반격 창의 적중 환급에 쓴다.
         HitFeedbackService.OnHit += HandleHitFeedback;
+
+        // 새 방이 드러나면 「결의」가 다시 찬다(방마다 1회 · 10-22)
+        RunFlowController.RoomRevealed += HandleRoomRevealedForResolve;
     }
 
     private void Update()
@@ -411,6 +420,7 @@ public sealed partial class PlayerController : CharacterBase
     {
         UnsubscribeFromAnimationReceiver(EventReceiver);
         HitFeedbackService.OnHit -= HandleHitFeedback;
+        RunFlowController.RoomRevealed -= HandleRoomRevealedForResolve;
         Status.StopFreezeLoopSfx();
 
         // 저스트 회피 슬로모가 걸린 채 비활성화되면 시간이 느린 상태로 남는다 → 반드시 해제.

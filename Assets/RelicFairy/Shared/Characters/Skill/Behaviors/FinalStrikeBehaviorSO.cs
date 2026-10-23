@@ -1,49 +1,68 @@
+using System;
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Serialization;
+using RelicFairy.Monster;
 
 /// <summary>
-/// 최후의 일격 — 대검 R스킬.
-/// 차징 모션 후 전방 3m 반원을 강타한다.
-///   1단계: 차징 → 전방 반원 1회 공격
-///   2단계: + 피격 적에게 추가 강타 1회 30+공격력 (피격 이펙트 A)
-///   3단계: 추가 강타가 45+공격력 (피격 이펙트 B, 더 화려)
+/// 최후의 일격 — 대검 R스킬. 겨눈 곳으로 뛰어올라 내려찍는다(10-22 개편 — 사용자 「대검 스킬이 대검 컨셉에 비해 너무 가볍다」).
+///   전 단계: 웅크렸다 도약(경직 면역) → 겨눈 적 앞(최대 4 m)에 내려찍기 → 착지점 둘레 원 3.5 m
+///   2단계: + 0.3초 뒤 여진 1번(반경 5 m)
+///   3단계: + 여진 2번(5 m · 6.5 m, 피해는 둘로 나눔)
+/// 예전엔 제자리 차지(마법진) 뒤 앞 반원을 벴고, 2 · 3단계 추가타가 맞은 적마다 주황 · 초록 폭발(파편이 떨어지는 Hit 25)을 띄웠다
+/// — 사용자 「내려찍기 추가 이펙트가 지저분하게 떨어진다」. 이제 충격은 땅 균열 · 흙먼지 고리 · 칼끝 섬광 하나로 보인다.
+/// 클립은 가웨인 Q와 같던 SPAttack01 대신 공중 강공(JumpAttack04)이다(무기 · 유물끼리 동작 겹침 금지).
+/// 여진은 땅에서 퍼지는 것이라 스킬이 끝나도(회피로 끊어도) 이어진다.
 /// </summary>
 [CreateAssetMenu(menuName = "Game/Skill/FinalStrikeBehavior")]
 public class FinalStrikeBehaviorSO : SkillBehaviorSO
 {
-    [Header("차징")]
-    [SerializeField] private float chargeDuration = 0.6f;
-    [SerializeField] private string chargeEffectKey = "MagicCircleDarkStar";
-    [SerializeField] private float chargeEffectScale = 0.5f;
+    [Header("도약")]
+    [Tooltip("누른 뒤 착지(판정)까지(초) — 클립의 내려찍기가 이때 닿게 재생한다")]
+    [FormerlySerializedAs("chargeDuration")]
+    [SerializeField] private float leapTime = 0.55f;
+    [Tooltip("착지 전 이만큼(초) 동안 수평으로 날아간다 — 앞은 웅크림")]
+    [SerializeField] private float leapAirTime = 0.42f;
+    [SerializeField] private float leapMaxDistance = 4f;
+    [Tooltip("겨눈 적 앞에서 멈출 거리(m, 적 몸 반경에 더한다)")]
+    [SerializeField] private float leapTargetGap = 1.2f;
+    [Tooltip("겨눈 적이 없을 때 앞으로 뛰는 거리(m)")]
+    [SerializeField] private float leapNoTargetDistance = 3f;
+    [SerializeField] private float leapTargetCone = 15f;
 
-    [Header("기본 공격 (전 티어)")]
-    [SerializeField] private float baseDamage = 40f;
-    [SerializeField] private float detectRadius = 3f;
-    [SerializeField] private float detectAngle = 180f;
+    [Header("착지 충격 (전 단계)")]
+    [SerializeField] private float baseDamage = 500f;
+    [SerializeField] private float detectRadius = 3.5f;
     [SerializeField] private float knockbackMultiplier = 2f;
 
-    [Header("2단계: 추가 강타")]
-    [SerializeField] private float extraDamage = 30f;
-    [SerializeField] private float extraDelay = 0.4f;
-    [SerializeField] private string tier2ExtraEffectKey = "DragonPunch";
-    [SerializeField] private float tier2ExtraEffectScale = 0.5f;
-
-    [Header("3단계: 최대체력 비례")]
-    [SerializeField] private float maxHpDamageRatio = 0.1f;   // [폐기 10-08 B5] 3단계 추가타가 「플레이어」 최대 체력 비례였다 — 직렬화 값이라 남긴다
-    [Tooltip("3단계 추가타 기본 피해(공격력 반영 — 2단계 extraDamage보다 크다). 10-08 B5: 예전엔 플레이어 최대 체력 10%였다.")]
-    [SerializeField] private float tier3ExtraDamage = 45f;
-    [SerializeField] private string tier3ExtraEffectKey = "EnergyExplosion";
-    [SerializeField] private float tier3ExtraEffectScale = 0.7f;
+    [Header("여진 (2 · 3단계 · 충격 증강 III)")]
+    [Tooltip("2단계 여진 1번 피해")]
+    [SerializeField] private float extraDamage = 250f;
+    [Tooltip("3단계 여진 2번 피해 합(한 번에 반씩)")]
+    [SerializeField] private float tier3ExtraDamage = 350f;
+    [FormerlySerializedAs("extraDelay")]
+    [SerializeField] private float aftershockDelay = 0.3f;
+    [SerializeField] private float aftershockGap = 0.25f;
+    [SerializeField] private float aftershockRadius = 5f;
+    [SerializeField] private float aftershockRadius2 = 6.5f;
 
     [Header("이펙트")]
-    [SerializeField] private string strikeEffectKey = "GreatswordSlash";
-    [SerializeField] private float strikeEffectScale = 0.5f;
-    [SerializeField] private string hitEffectKey = "SwordHitImpact";
-    [SerializeField] private float hitEffectScale = 0.5f;
+    [SerializeField] private string crackEffectKey = "GreatswordGroundCrack";
+    [Tooltip("판정 반경 1 m당 크기")]
+    [SerializeField] private float crackScalePerMeter = 0.71f;
+    [SerializeField] private string shockEffectKey = "GreatswordEFinish";
+    [SerializeField] private float shockScalePerMeter = 0.26f;
+    [SerializeField] private string flashEffectKey = "SwordStrikeFlash";
+    [SerializeField] private float flashEffectScale = 1.2f;
+    [Tooltip("맞은 적 타격 이펙트 — 대검 계열(푸른 타격). 비우면 공용 노란 베기")]
+    [SerializeField] private string hitEffectKey = "GreatswordHitImpact";
+    [SerializeField] private float hitEffectScale = 3.4f;
 
     [Header("마무리")]
-    [SerializeField] private float endDelay = 0.3f;
+    [Tooltip("착지 뒤 칼끝을 박은 자세(초) — 후딜이라 회피 · 공격 · 스킬로 끊긴다")]
+    [SerializeField] private float endDelay = 0.25f;
 
     [Header("애니메이션")]
     [SerializeField] private string animationOverride;
@@ -53,32 +72,31 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
     private class Runtime : ISkillRuntime
     {
         private readonly FinalStrikeBehaviorSO _data;
-        private enum Phase { Charge, Strike, ExtraHit, End }
+        private enum Phase { Leap, End }
         private Phase _phase;
         private float _timer;
         private int _skillTier;
-        private float _charge, _angle;   // 충전 시간 · 판정 각 — 근접 강화 증강 「최후의 일격 충전」(10-15)이 바꾼다
-        private readonly List<IDamageable> _hitTargets = new();
-        private readonly List<GameObject> _hitObjects = new();
+        private float _radiusMult;   // 착지 · 여진 반경 — 근접 강화 증강 「최후의 일격 충격」(10-15 · 10-22)이 늘린다
+        private Vector3 _leapStart, _leapEnd;
+        private readonly List<GameObject> _hits = new();
 
         public Runtime(FinalStrikeBehaviorSO data) => _data = data;
 
         public void OnEnter(SkillExecutionContext ctx)
         {
             _skillTier = ctx.SkillTier;
-            _charge = _data.chargeDuration * (1f - MeleeAugments.ValueOn(ctx.WeaponData, MeleeAugmentCatalog.GreatFinal) * 0.01f);
-            _angle  = MeleeAugments.RankOn(ctx.WeaponData, MeleeAugmentCatalog.GreatFinal) >= 3 ? 360f : _data.detectAngle;
+            _radiusMult = 1f + MeleeAugments.ValueOn(ctx.WeaponData, MeleeAugmentCatalog.GreatFinal) * 0.01f;
             _timer = 0f;
-            _phase = Phase.Charge;
-            _hitTargets.Clear();
-            _hitObjects.Clear();
+            _phase = Phase.Leap;
 
             ctx.RotateToMouse();
             ctx.SetMoveScale(0f);
-            PlayAnimation(ctx);
+            if (ctx.Rigidbody != null) ctx.Rigidbody.linearVelocity = Vector3.zero;
 
-            // 차징 이펙트 (캐릭터 부착)
-            SpawnChargeEffect(ctx);
+            _leapStart = ctx.PlayerTransform.position;
+            _leapEnd = ctx.DashEndBeforeWall(_leapStart, ctx.AimForward, LeapDistance(ctx));   // 벽 앞에서 멈춘다(10-14)
+            SkillRangeRing.Circle(_leapEnd, _data.detectRadius * _radiusMult, _data.leapTime);
+            PlayAnimation(ctx);
 
             ctx.Controller.InputBuffer.TryConsume(Game.Inputs.Command.Light);
         }
@@ -88,85 +106,38 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
             _timer += ctx.DeltaTime;   // 애니메이터와 같은 시계(슬로모 — 10-09)
             switch (_phase)
             {
-                case Phase.Charge:   UpdateCharge(ctx);   break;
-                case Phase.Strike:   UpdateStrike(ctx);   break;
-                case Phase.ExtraHit: UpdateExtraHit(ctx); break;
-                case Phase.End:      UpdateEnd(ctx);      break;
+                case Phase.Leap: UpdateLeap(ctx); break;
+                case Phase.End:  UpdateEnd(ctx);  break;
             }
         }
 
         public void OnExit(SkillExecutionContext ctx)
         {
             ctx.SetMoveScale(1f);
-            _hitTargets.Clear();
-            _hitObjects.Clear();
-        }
-
-        // ── 차징 페이즈 ──
-        private void UpdateCharge(SkillExecutionContext ctx)
-        {
-            if (_timer >= _charge)
+            _hits.Clear();
+            if (ctx.Rigidbody != null)
             {
-                _timer = 0f;
-                ctx.RotateToMouse();
-                ExecuteStrike(ctx);
-                _phase = Phase.Strike;
+                ctx.Rigidbody.linearVelocity  = Vector3.zero;
+                ctx.Rigidbody.angularVelocity = Vector3.zero;
             }
         }
 
-        // ── 공격 후 대기 ──
-        private void UpdateStrike(SkillExecutionContext ctx)
+        // ── 도약 — 앞은 웅크림, 착지 전 leapAirTime 동안 날아간다 ──
+        private void UpdateLeap(SkillExecutionContext ctx)
         {
-            if (_skillTier >= 2 && _hitTargets.Count > 0 && _timer >= _data.extraDelay)
+            float air = Mathf.Clamp(_data.leapAirTime, 0.01f, _data.leapTime);
+            float u = Mathf.Clamp01((_timer - (_data.leapTime - air)) / air);
+            if (u > 0f)
             {
-                _timer = 0f;
-                _phase = Phase.ExtraHit;
+                Vector3 pos = Vector3.Lerp(_leapStart, _leapEnd, u * u * (3f - 2f * u));
+                // MovePosition — 보간 켠 Rigidbody와 함께 카메라가 부드럽게 따라온다(성광베기와 같은 길)
+                if (ctx.Rigidbody != null && !ctx.Rigidbody.isKinematic) ctx.Rigidbody.MovePosition(pos);
+                else ctx.PlayerTransform.position = pos;
             }
-            else if (_skillTier < 2 || _hitTargets.Count == 0)   // A3: 헛치면 추가타 대기(0.8초) 없이 바로 끝
-            {
-                // B6: 여기서 endDelay를 기다린 뒤 End가 또 endDelay를 기다려 끝 대기가 두 번(0.6초)이었다 — 바로 End로 넘겨 한 번만 기다린다
-                _phase = Phase.End;
-            }
-        }
-
-        // ── 추가 타격 (티어별 이펙트 차별화) ──
-        private void UpdateExtraHit(SkillExecutionContext ctx)
-        {
-            float extraDmg;
-            string effectKey;
-            float effectScale;
-
-            if (_skillTier >= 3)
-            {
-                // 3단계: 공격력 반영 추가타(2단계보다 큼) + 화려한 이펙트 — B5: 예전엔 플레이어 최대 체력 10%(공격력과 무관 · 2단계보다 약했다)
-                extraDmg = ctx.CalculateDamage(_data.tier3ExtraDamage);
-                effectKey = _data.tier3ExtraEffectKey;
-                effectScale = _data.tier3ExtraEffectScale;
-            }
-            else
-            {
-                // 2단계: 고정 추가 데미지 + 기본 이펙트
-                extraDmg = ctx.CalculateDamage(_data.extraDamage);
-                effectKey = _data.tier2ExtraEffectKey;
-                effectScale = _data.tier2ExtraEffectScale;
-            }
-
-            foreach (var target in _hitTargets)
-            {
-                if (target == null) continue;
-                ctx.DealDamage(target, extraDmg, _data.knockbackMultiplier * 1.5f, isFinisher: true);
-            }
-
-            // 티어별 추가 피격 이펙트
-            foreach (var obj in _hitObjects)
-            {
-                if (obj == null) continue;
-                SpawnEffect(ctx, effectKey,
-                    obj.transform.position + Vector3.up * 1f,
-                    effectScale, 0.8f);
-            }
+            if (_timer < _data.leapTime) return;
 
             _timer = 0f;
+            Land(ctx);
             _phase = Phase.End;
         }
 
@@ -177,64 +148,76 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
                 ctx.RequestEnd();
         }
 
-        // ── 전방 반원 공격 실행 ──
-        private void ExecuteStrike(SkillExecutionContext ctx)
+        // ── 착지 — 둘레 원 판정 · 땅 균열 · 흙먼지 고리 · 칼끝 섬광 ──
+        private void Land(SkillExecutionContext ctx)
         {
-            var playerPos = ctx.PlayerTransform.position;
-            var forward = ctx.AimForward;   // 놓을 때 다시 겨눈 방향(B2 — transform.forward는 옛 방향)
-            if (_angle >= 359f) SkillRangeRing.Circle(playerPos, _data.detectRadius);   // 최후의 일격 충전 III — 둘레 전체(10-15)
-            else SkillRangeRing.Fan(playerPos, forward, _data.detectRadius, _angle);   // 내려찍는 반원(A10)
+            var center = ctx.PlayerTransform.position;
+            var rot = Quaternion.LookRotation(ctx.PlayerTransform.forward);
+            float radius = _data.detectRadius * _radiusMult;
+            SkillRangeRing.Circle(center, radius);
             Managers.Sound?.PlayEvent(SoundEvent.SkillHeavyImpact);   // 내려찍기 충격(A6)
-            float halfAngle = _angle * 0.5f;
 
+            // 스킬 자체가 한 방 — 본타가 막타(멈칫이 길다)
             float dmg = ctx.CalculateDamage(_data.baseDamage);
-            // 판정 = 범위 고리(플레이어 중심 반원). 예전엔 구의 중심을 1.5 m 앞에 둬 앞으로 4.5 m까지 닿았다
-            // — 고리 · 설명(3 m)보다 넓었다(10-08 강화 점검)
-            var colliders = Physics.OverlapSphere(playerPos, _data.detectRadius);
-            foreach (var col in colliders)
+            CombatQuery.GetNearbyDamageables(center, radius, ctx.Controller.gameObject, 32, _hits);
+            foreach (var go in _hits)
+                ctx.DealDamage(go, dmg, _data.knockbackMultiplier, isFinisher: true, hitEffectKey: _data.hitEffectKey, hitEffectScale: _data.hitEffectScale);
+            // 맞은 적이 없어도 땅이 울린다 — 맞혔으면 막타 흔들림이 이미 있다(겹치면 「살짝」 상한을 넘는다)
+            if (_hits.Count == 0) HitFeelService.CameraShake(HitFeelService.DealtShakeFinisher, 0.2f);
+
+            SpawnEffect(ctx, _data.crackEffectKey, center + Vector3.up * 0.05f, rot, radius * _data.crackScalePerMeter, 2f, ownedFx: true);
+            SpawnEffect(ctx, _data.shockEffectKey, center + Vector3.up * 0.1f, rot, radius * _data.shockScalePerMeter, 1.5f, ownedFx: false);
+            SpawnEffect(ctx, _data.flashEffectKey, center + Vector3.up * 0.4f, rot, _data.flashEffectScale, 0.6f, ownedFx: false);
+
+            ScheduleAftershocks(ctx, center, rot);
+        }
+
+        // 2단계 1번(5 m) · 3단계 2번(5 m · 6.5 m, 피해 반씩) · 충격 증강 III은 바깥으로 한 번 더(앞 여진과 같은 피해)
+        private void ScheduleAftershocks(SkillExecutionContext ctx, Vector3 center, Quaternion rot)
+        {
+            int count = _skillTier >= 3 ? 2 : (_skillTier >= 2 ? 1 : 0);
+            float each = _skillTier >= 3 ? _data.tier3ExtraDamage * 0.5f : _data.extraDamage;
+            if (MeleeAugments.RankOn(ctx.WeaponData, MeleeAugmentCatalog.GreatFinal) >= 3) count++;
+            if (count == 0 || ctx.Controller == null) return;
+            AftershocksAsync(ctx, _data, center, rot, count, each, _radiusMult,
+                             ctx.Controller.GetCancellationTokenOnDestroy()).Forget();
+        }
+
+        private static async UniTaskVoid AftershocksAsync(SkillExecutionContext ctx, FinalStrikeBehaviorSO data, Vector3 center, Quaternion rot,
+                                                          int count, float damagePct, float radiusMult, CancellationToken ct)
+        {
+            var hits = new List<GameObject>(16);
+            try
             {
-                if (col.gameObject == ctx.Controller.gameObject) continue;
-
-                Vector3 dirToTarget = (col.transform.position - playerPos).normalized;
-                dirToTarget.y = 0f;
-                float angle = Vector3.Angle(forward, dirToTarget);
-                if (angle > halfAngle) continue;
-
-                if (col.TryGetComponent<IDamageable>(out var d))
+                for (int i = 0; i < count; i++)
                 {
-                    // 스킬 자체가 한 방 — 본타가 막타. 첫 적은 아래에서 자기 타격 이펙트를 띄우므로 공용 이펙트를 건너뛴다
-                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier, isFinisher: true, skipHitVfx: _hitObjects.Count == 0);
-                    _hitTargets.Add(d);
-                    _hitObjects.Add(col.gameObject);
+                    float wait = i == 0 ? data.aftershockDelay : data.aftershockGap;
+                    await UniTask.Delay(TimeSpan.FromSeconds(wait), DelayType.DeltaTime, PlayerLoopTiming.Update, ct);
+                    if (ctx.Controller == null) return;
+
+                    float radius = (i == 0 ? data.aftershockRadius : data.aftershockRadius2 + 1.5f * (i - 1)) * radiusMult;
+                    float dmg = ctx.CalculateDamage(damagePct);
+                    CombatQuery.GetNearbyDamageables(center, radius, ctx.Controller.gameObject, 32, hits);
+                    foreach (var go in hits)
+                        ctx.DealDamage(go, dmg, data.knockbackMultiplier, isFinisher: i == count - 1,   // 마지막 여진이 마무리
+                                       hitEffectKey: data.hitEffectKey, hitEffectScale: data.hitEffectScale);
+
+                    SkillRangeRing.Circle(center, radius);
+                    SpawnEffect(ctx, data.shockEffectKey, center + Vector3.up * 0.1f, rot, radius * data.shockScalePerMeter, 1.5f, ownedFx: false);
                 }
             }
+            catch (OperationCanceledException) { }
+        }
 
-            // 타격 이펙트 — 1회만 (첫 번째 적 위치 또는 전방)
-            if (_hitObjects.Count > 0 && _hitObjects[0] != null)
-            {
-                SpawnEffect(ctx, _data.hitEffectKey,
-                    _hitObjects[0].transform.position + Vector3.up * 0.8f,
-                    _data.hitEffectScale, 0.5f);
-            }
-
-            // 전방 휘두르기 이펙트 — T1은 1개, T2+는 3개 부채꼴
-            var strikeCenter = playerPos + forward * _data.detectRadius * 0.17f + Vector3.up * 1f;   // 반원 판정에 맞춰 몸 가까이(10-13: 반경의 절반 앞이라 앞 5.4 m까지 나갔다)
-            if (_skillTier <= 1)
-            {
-                SpawnEffectRotated(ctx, _data.strikeEffectKey, strikeCenter,
-                    Quaternion.LookRotation(forward), _data.strikeEffectScale, 1f);   // 판정 방향 그대로(10-13 — 회전이 한 프레임 늦어 옛 방향을 봤다)
-            }
-            else
-            {
-                for (int i = -1; i <= 1; i++)
-                {
-                    float spreadAngle = i * 20f;
-                    Quaternion rot = Quaternion.LookRotation(forward) * Quaternion.Euler(0f, spreadAngle, 0f);
-                    Vector3 offset = Quaternion.Euler(0f, spreadAngle, 0f) * forward * 0.3f * Mathf.Abs(i);
-                    SpawnEffectRotated(ctx, _data.strikeEffectKey, strikeCenter + offset,
-                        rot, _data.strikeEffectScale, 1f);
-                }
-            }
+        // 겨눈 적(마우스 콘) 앞까지, 없으면 앞으로 정한 거리 — 최대 leapMaxDistance
+        private float LeapDistance(SkillExecutionContext ctx)
+        {
+            ctx.Controller.ComputeMouseAimAssistRotation(_data.leapMaxDistance + _data.leapTargetGap + 2f, _data.leapTargetCone, 1f,
+                                                         out var enemy, out float enemyDist);
+            if (enemy == null) return _data.leapNoTargetDistance;
+            var body = enemy.GetComponentInParent<MonsterBase>();
+            float gap = _data.leapTargetGap + (body != null ? body.BodyRadius : 0f);
+            return Mathf.Clamp(enemyDist - gap, 0f, _data.leapMaxDistance);
         }
 
         private void PlayAnimation(SkillExecutionContext ctx)
@@ -259,48 +242,30 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
                 }
             }
 
-            // 차지가 끝나는 순간(판정)에 클립의 내려찍기가 닿게 — 클립 앞부분을 건너뛴다(09-25 실측: 닿음 1.22초 ↔ 판정 0.6초).
-            SkillAnimSync.CrossFadeToContact(ctx.Animator, animName, _charge, 0.05f);
+            // 착지(판정)에 클립의 내려찍기가 닿게 — 클립 앞부분(서 있는 자세)을 건너뛴다(SkillAnimSync)
+            SkillAnimSync.CrossFadeToContact(ctx.Animator, animName, _data.leapTime, 0.05f);
         }
 
-        private async void SpawnChargeEffect(SkillExecutionContext ctx)
-        {
-            if (string.IsNullOrEmpty(_data.chargeEffectKey) || ctx.Controller == null) return;
-            var obj = await Managers.ObjectPooler.SpawnAsync(
-                _data.chargeEffectKey, ObjectPoolerManager.PoolType.Effect,
-                ctx.PlayerTransform.position + Vector3.up * 2f,
-                Quaternion.identity);
-            if (obj == null) return;
-            obj.transform.localScale = Vector3.one * _data.chargeEffectScale;
-            obj.transform.SetParent(ctx.PlayerTransform, true);
-            if (obj.TryGetComponent<EffectBehaviour>(out var eb))
-                eb.Initialize(eb.behaviorSO, ctx.PlayerTransform, _charge);
-            else
-                DespawnAfter(obj, _charge);
-        }
-
+        /// <param name="ownedFx">이 스킬만 쓰는 이펙트(땅 균열 — 원본이 반복 재생) — 한 번만 처음부터 튼다.
+        /// 여러 곳이 같이 쓰는 이펙트는 풀 인스턴스 설정을 바꾸지 않는다. 크기는 그대로 키워도 비례한다(실측 80 — 계층 크기로 바꾸면 균열이 12.5배).</param>
         private static async void SpawnEffect(SkillExecutionContext ctx, string key,
-            Vector3 pos, float scale, float lifetime)
-        {
-            if (string.IsNullOrEmpty(key) || ctx.Controller == null) return;
-            var obj = await Managers.ObjectPooler.SpawnAsync(
-                key, ObjectPoolerManager.PoolType.Effect, pos, ctx.PlayerTransform.rotation);
-            if (obj == null) return;
-            obj.transform.localScale = Vector3.one * scale;
-            if (obj.TryGetComponent<EffectBehaviour>(out var eb))
-                eb.Initialize(eb.behaviorSO, ctx.PlayerTransform, lifetime);
-            else
-                DespawnAfter(obj, lifetime);
-        }
-
-        private static async void SpawnEffectRotated(SkillExecutionContext ctx, string key,
-            Vector3 pos, Quaternion rot, float scale, float lifetime)
+            Vector3 pos, Quaternion rot, float scale, float lifetime, bool ownedFx)
         {
             if (string.IsNullOrEmpty(key) || ctx.Controller == null) return;
             var obj = await Managers.ObjectPooler.SpawnAsync(
                 key, ObjectPoolerManager.PoolType.Effect, pos, rot);
             if (obj == null) return;
             obj.transform.localScale = Vector3.one * scale;
+            if (ownedFx)
+            {
+                foreach (var ps in obj.GetComponentsInChildren<ParticleSystem>(true))
+                {
+                    var main = ps.main;
+                    main.loop = false;
+                    ps.Clear(true);
+                    ps.Play(true);
+                }
+            }
             if (obj.TryGetComponent<EffectBehaviour>(out var eb))
                 eb.Initialize(eb.behaviorSO, ctx.PlayerTransform, lifetime);
             else

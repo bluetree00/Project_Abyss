@@ -99,6 +99,12 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     private const int    HitCount = FlurryHits + 1;   // 연타 + 마무리
 
     /// <summary>
+    /// 막타 뒤 버티는 자세(<see cref="SkillDuration"/>까지)를 입력으로 끊을 수 있는 시각 — 막타 + 이 값(게임 시간).
+    /// 막타 정지(실시간 0.45초) 동안엔 게임 시간이 0.03배로 흘러 그 컷은 지켜진다. 가만히 있으면 자세를 끝까지 지킨다(10-16).
+    /// </summary>
+    private const float  CancelAfterFinisher = 0.05f;
+
+    /// <summary>
     /// 연타 중 다시 겨눔(10-10 사용자 「Q를 잘못 쓰거나 몬스터가 움직이면 그 자리에서 헛치기가 길어진다 — 중간중간 회전」).
     /// 마우스 쪽으로 이 각속도까지 돈다 — 한 타(0.17초)에 약 60°라 칼이 바뀔 때마다 방향을 고쳐 잡는 것으로 읽힌다. 마무리는 따로(가장 가까운 적).
     /// </summary>
@@ -125,6 +131,9 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
 
     private float _elapsed;
     private int   _hitsDone;
+    // 막타 뒤 이어 갈 입력(공격 · 회피 · E · R) — 스킬 중엔 입력 처리가 공격 입력을 바로 소비해 버퍼에 남지 않는다. 누르는 순간을 듣는다(10-16).
+    private Game.Inputs.InputBuffer _input;
+    private Game.Inputs.Command     _followUp = Game.Inputs.Command.None;
     private bool  _finisherAnimPlayed;
     private bool  _holdingPose;
 
@@ -144,6 +153,11 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     {
         _elapsed = 0f; _hitsDone = 0; _finisherAnimPlayed = false; _holdingPose = false;
         _relic?.ConsumeJudgmentCharge();   // 광란당 심판 횟수 — 조각이 늘리면 다시 쓸 수 있다
+        _followUp = Game.Inputs.Command.None;
+        _input = ctx.Controller != null ? ctx.Controller.InputBuffer : null;
+        if (_input != null) _input.OnPushed += OnInputPushed;
+        // 심판 동안 광란 시계를 멈춘다 — 시전(3.6초 + 막타 정지)이 4초 광란을 거의 다 써 버려, Q를 쓰면 광란 평타 시간을 잃었다(10-16)
+        if (_relic?.Madness != null) _relic.Madness.FrenzyClockPaused = true;
 
         // Q 모션의 주인은 무기가 아니라 유물이다 — 상태 이름을 유물 데이터에서 읽는다.
         _relicClass = ctx.Controller != null ? ctx.Controller.RelicClass : null;
@@ -185,6 +199,15 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
             else if (!_finisherAnimPlayed && _hitsDone == FlurryHits && _stepIndex != _stepCount - 1) PlayStep(ctx, _stepCount - 1);
         }
 
+        // 막타 뒤 버티는 자세 — 공격 · 회피 · 스킬을 누르면 바로 끊고, 그 입력을 다시 넣어 다음 동작이 바로 쓰게 한다(10-16)
+        if (_followUp != Game.Inputs.Command.None && _elapsed >= FinisherHitAt + CancelAfterFinisher)
+        {
+            var cmd = _followUp;
+            _followUp = Game.Inputs.Command.None;
+            ctx.RequestEnd?.Invoke();
+            _input?.Push(cmd);
+            return;
+        }
         if (_elapsed >= SkillDuration) ctx.RequestEnd?.Invoke();
     }
 
@@ -196,6 +219,9 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
 
         // 중단·사망 경로도 이 함수를 지나므로 스탠스·무기·포즈 홀드·시간 정지가 새지 않는다.
         ctx.Controller?.EndStance(this);
+        if (_relic?.Madness != null) _relic.Madness.FrenzyClockPaused = false;
+        if (_input != null) _input.OnPushed -= OnInputPushed;
+        _input = null;
         RestoreWeapon();
         if (_holdingPose && ctx.Animator != null) ctx.Animator.speed = 1f;
         _holdingPose = false;
@@ -203,6 +229,14 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     }
 
     // ── Private Methods ───────────────────────────────────────────
+    /// <summary>막타가 나간 뒤 눌린 공격 · 회피 · E · R을 기억한다(연타 중 누른 것은 세지 않는다).</summary>
+    private void OnInputPushed(Game.Inputs.Command c)
+    {
+        if (_hitsDone < HitCount) return;
+        if (c == Game.Inputs.Command.Light || c == Game.Inputs.Command.Dodge
+            || c == Game.Inputs.Command.ESkill || c == Game.Inputs.Command.RSkill) _followUp = c;
+    }
+
     /// <summary>현재 참격이 끝나면 다음 참격으로 넘겨 연타 내내 캐릭터가 계속 베게 한다. 막타 직전엔 마지막 참격을 한 번 더.</summary>
     private void TickAnimation(SkillExecutionContext ctx)
     {
@@ -263,7 +297,11 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     private void TurnTowardMouse(SkillExecutionContext ctx)
     {
         var ctrl = ctx.Controller;
-        if (ctrl == null || !ctrl.TryGetMouseLookDir(out var dir)) return;
+        if (ctrl == null) return;
+        // 지금 원뿔 안에 맞을 대상이 있으면 돌지 않는다 — 타격 흔들림이 마우스 → 바닥 레이를 흔들어(가까운 적일수록 각이 크게)
+        // 연타가 한 타씩 원뿔 밖으로 돌아 이펙트만 나가고 빗나갔다(10-16 실측 64: 홀수 타 51~70°). 헛칠 때만 마우스 쪽으로 다시 겨눈다.
+        if (_relic != null && _relic.HasJudgmentTargetAhead(ctrl.transform.position, ctrl.AimForward)) return;
+        if (!ctrl.TryGetMouseLookDir(out var dir)) return;
         float cur    = ctrl.transform.eulerAngles.y;
         float target = Quaternion.LookRotation(dir, Vector3.up).eulerAngles.y;
         if (Mathf.Abs(Mathf.DeltaAngle(cur, target)) < 1f) return;

@@ -85,6 +85,9 @@ public sealed class AppBootstrapper : MonoBehaviour
         rpm?.ClearLocalRun(rpm.ActiveSlotIndex);
         CurrentRun = null;
         Loadout.Clear();
+        // 원거리 파츠도 런 스코프 — ESC 책 「로비로」는 세션 EndRun을 거치지 않아 여기서도 비운다(10-19 ⑧ · 거점 활에 지난 런 파츠가 남았다)
+        RangedPartsState.Current = new RangedPartsState();
+        RangedPartsState.ApplyTestCarry();
 
         // HUD teardown. @UIRoot는 DontDestroyOnLoad라 씬 전환으로 OnDestroy가 오지 않는다 —
         // 여기서 끊지 않으면 보스 체력바·서약 목록·골드가 이전 런 값 그대로 허브에 남는다.
@@ -419,6 +422,8 @@ public sealed class AppBootstrapper : MonoBehaviour
         // 근접 강화 증강(10-15) — 옛 세이브(칸 없음 = null)는 지금 단계까지 받은 것으로(소급 지급 방지) · 새 세이브는 받은 단계 그대로(고르기 전에 껐으면 다음 강화에서 다시 열린다)
         if (w0 != null) { w0.augments = save.weapon0Augments ?? ""; w0.highestEnhanceReached = save.weapon0Augments == null ? w0.enhanceLevel : save.weapon0AugmentHighest; w0.augmentSilverStreak = save.weapon0AugmentSilverStreak; w0.augmentAfterEvolve = save.weapon0AugmentAfterEvolve; }
         if (w1 != null) { w1.augments = save.weapon1Augments ?? ""; w1.highestEnhanceReached = save.weapon1Augments == null ? w1.enhanceLevel : save.weapon1AugmentHighest; w1.augmentSilverStreak = save.weapon1AugmentSilverStreak; w1.augmentAfterEvolve = save.weapon1AugmentAfterEvolve; }
+        if (w0 != null) w0.reforgeLog = save.weapon0ReforgeLog ?? "";   // 10-19 재련 기록
+        if (w1 != null) w1.reforgeLog = save.weapon1ReforgeLog ?? "";
         MeleeAugmentDraft.ResetForRun(Mathf.Max(0, MeleeAugmentDraft.RerollsPerRun - save.meleeAugmentRerollsUsed));
         if (w0 != null || w1 != null)
         {
@@ -741,6 +746,10 @@ public sealed class AppBootstrapper : MonoBehaviour
                 break;
 
             case GameFlowState.Lobby:
+                // 10-19 — 거점에서 ESC 「로비로」면 런이 없어 EndRun(→ UnbindHud)을 안 탄다. HUD(@UIRoot · DDOL)가 로비에 남았다.
+                // 다음 씬(거점 · 런)이 스스로 숨김을 푼다(BaseCampBootstrapper · GameRunBootstrapper).
+                UIRootBootstrapper.Instance?.UnbindHud();
+                UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
                 Managers.UI.ShowMenuUI<UI_Lobby>();
                 NotifySceneReady();
                 break;

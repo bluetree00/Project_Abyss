@@ -35,6 +35,11 @@ public class ActAttackState : LayerStateBase<ActState>
     private const float AttackBlendSeconds = 0.12f;
     private float _stepAnimSpeed = 1f;
 
+    // 준비 동작(10-18) — 베기 전 구간 재생 배율 · 베기 뒤 연결 지점까지 재생 배율 상한. 평타 클립의 베기가 8~10% 지점이라 누르자마자 맞았다.
+    // 베기 뒤를 그만큼 빠르게 틀어 한 타 주기(연결 지점까지 시간)는 그대로 둔다 — 베기가 늦은 칸(무형검 3타 0.22)은 상한에 걸려 조금 길어진다.
+    private const float MaxFollowSpeedRatio = 2.5f;   // 준비 배율은 무기 애니 세트(windupSpeedRatio)가 정한다
+    private float _followSpeedRatio = 1f;
+
     // 콤보 창은 실제 시간으로 최소 이만큼 열어 둔다(10-10 사용자 「무형검 연타 시 1타만 빠르게 반복」).
     // 평타 상태 속도 2.5 × 무기 템포 × 애니 보정이 곱해져 무형검 · 카타나는 5~6배속이라, 진행 비율(0.30)로만 닫으면
     // 공격 시작 0.1초 만에 닫혀 사람이 누르는 간격(0.15~0.3초)으로는 콤보가 이어지지 않고 회수를 끊어 1타가 다시 나갔다.
@@ -45,6 +50,16 @@ public class ActAttackState : LayerStateBase<ActState>
     // 「누른 만큼 빠르게 휘두르는데 맞지 않는」 그림이 됐다(10-14 사용자 · 「장비 형/35」 0.1초 연타: 무형검 11번 휘둘러 4번 맞힘).
     // 이 시간 ÷ (공속 × 반격 가속)을 지나야 다음 타로 잇는다 — 공속 빌드는 그만큼 빨라진다.
     private const float MinSwingSeconds = 0.32f;
+
+    // 슬래시(피해 프레임) 뒤 다음 타까지(실시간 · 공속 반영) — 평타가 5~6배속이라 이펙트는 시작 0.04~0.11초에 나오는데
+    // 시작부터 세는 하한(0.32초)이 이펙트 뒤 0.2초 넘게 세워 둬 부자연스러웠다(10-16 사용자). 슬래시 이벤트가 있는 클립은 이 값을 쓴다.
+    private const float SlashFollowSeconds = 0.08f;
+
+    // 막타 뒤 회복(10-21 사용자 「마지막 공격 뒤 조금 텀 · 이펙트가 나온 뒤 살짝 뒤에 다음 받은 입력을」) — 애니 세트 finisherRecoverySeconds(공속 반영).
+    // 그동안 막타 끝 동작을 제 속도로 보이고, 받은 공격은 기억했다가 끝나면 1타로 잇는다. 회피 · 스킬은 바로 끊고, 공격을 안 눌렀으면 이동으로도 끊는다.
+    private float _finisherHoldUntil = -1f;   // _stateElapsed 기준(−1 = 회복 아님)
+    private bool  _finisherQueued;            // 회복 동안 받은 공격
+    private WeaponAnimationSetSO _animSet;    // 이번 타의 애니 세트(무기별 베기 뒤 대기 · 막타 회복 · 빨리 감기 상한)
 
     // ── 회수(recovery) 상태 ─────────────────────────────────────────────────
     // attackEndAt 은 "다음 콤보가 발사되는 체인 지점"이라 그대로 올리면 콤보가 그만큼 느려진다.
@@ -66,6 +81,9 @@ public class ActAttackState : LayerStateBase<ActState>
     private bool      _counterFirst;   // 그 창의 첫 공격 — 먼 거리 추격(사거리 확장)
     private Transform _counterTarget;  // 원인 적
     private float _slashNorm = 1f;     // 이번 클립의 첫 슬래시 이벤트 시각(정규화) — 전진은 이 전에 끝낸다
+    private float _slashPassedAt = -1f; // 이번 타가 슬래시 시각을 지난 순간의 _stateElapsed(아직이면 −1)
+    private float _lastSlashNorm = 1f;      // 마지막 슬래시 이벤트 시각(정규화) — 두 번 베는 칸(무형검 3타)은 여기까지 제 속도(10-19 ④)
+    private float _lastSlashPassedAt = -1f; // 마지막 슬래시를 지난 순간의 _stateElapsed(아직이면 −1)
     private float _lungeTargetDist;    // 그 적까지의 수평 거리
 
     // ── 회전 Lerp 상태 ──────────────────────────────────────────────────────
@@ -89,8 +107,8 @@ public class ActAttackState : LayerStateBase<ActState>
     private const float LungeCastRadius   = 0.4f;   // SphereCast 반경
     private const float LungeCastHeight   = 0.5f;   // 캐스트 원점 높이 오프셋(가슴 높이)
     private static readonly RaycastHit[] _lungeCastBuf = new RaycastHit[16];
-    // 클립별 첫 슬래시 이벤트 시각(정규화) — AnimationClip.events가 매번 사본을 만들어 캐시한다
-    private static readonly Dictionary<AnimationClip, float> s_slashNormCache = new();
+    // 클립별 첫 · 마지막 슬래시 이벤트 시각(정규화, x = 첫 · y = 마지막) — AnimationClip.events가 매번 사본을 만들어 캐시한다
+    private static readonly Dictionary<AnimationClip, Vector2> s_slashNormCache = new();
 
     // ── Enter ────────────────────────────────────────────────────────────────
     // [공중 공격 폐기] 이 상태는 ActAttackReadyState를 통해서만 진입하고, 그쪽이 공중 진입을
@@ -117,6 +135,8 @@ public class ActAttackState : LayerStateBase<ActState>
 
         _waitingForComboInput = false;
         _stateElapsed = 0f;
+        _finisherHoldUntil = -1f;
+        _finisherQueued = false;
 
         PlayCurrentComboAnimation();
     }
@@ -125,6 +145,7 @@ public class ActAttackState : LayerStateBase<ActState>
     public override void Update()
     {
         PollAnimationTiming();
+        if (_finisherHoldUntil >= 0f) { UpdateFinisherHold(); return; }
         if (_inRecovery) { UpdateRecovery(); return; }
         HandleComboInput();
     }
@@ -162,6 +183,17 @@ public class ActAttackState : LayerStateBase<ActState>
         }
 
         float t = stateInfo.normalizedTime;
+        if (_slashPassedAt < 0f && t >= _slashNorm)
+        {
+            _slashPassedAt = _stateElapsed;
+            // 베기가 나갔다 — 연결 지점까지 빠르게(주기 유지). 두 번 베는 칸은 둘째 휘두름이 빨리 감기지 않게 마지막 베기까지 제 속도(10-19 ④)
+            if (!_attackEndFired) anim.speed = _lastSlashNorm > _slashNorm ? _stepAnimSpeed : _stepAnimSpeed * _followSpeedRatio;
+        }
+        if (_lastSlashPassedAt < 0f && _slashPassedAt >= 0f && t >= _lastSlashNorm)
+        {
+            _lastSlashPassedAt = _stateElapsed;
+            if (!_attackEndFired && _lastSlashNorm > _slashNorm) anim.speed = _stepAnimSpeed * _followSpeedRatio;
+        }
 
         // 콤보 창 열기
         if (!_comboWindowOpened && t >= _comboOpen)
@@ -178,9 +210,10 @@ public class ActAttackState : LayerStateBase<ActState>
         }
 
         // 공격 종료 (다음 스텝 판단)
-        if (!_attackEndFired && t >= _attackEnd && _stateElapsed >= MinSwingNow())
+        if (!_attackEndFired && t >= _attackEnd && SwingReadyForNext())
         {
             _attackEndFired = true;
+            anim.speed = _stepAnimSpeed;   // 준비 · 베기 뒤 배율을 거둔다 — 다음 타 · 대기 · 회수가 제 속도를 정한다
             OnAttackEnd();
         }
 
@@ -337,25 +370,31 @@ public class ActAttackState : LayerStateBase<ActState>
     }
 
     /// <summary>
-    /// 상태에 걸린 실제 클립(오버라이드 반영)의 첫 슬래시 이벤트 시각(정규화). 없으면 1 = 제한 없음.
+    /// 상태에 걸린 실제 클립(오버라이드 반영)의 첫 · 마지막 슬래시 이벤트 시각(정규화). 없으면 1 = 제한 없음.
     /// 이벤트 배열은 사본이 할당되므로 클립당 한 번만 읽어 캐시한다.
     /// </summary>
-    private static float ResolveSlashNorm(Animator anim, string stateName)
+    private static float ResolveSlashNorm(Animator anim, string stateName, out float last)
     {
+        last = 1f;
         var aoc  = anim.runtimeAnimatorController as AnimatorOverrideController;
         var clip = aoc != null ? aoc[stateName] : null;
         if (clip == null || clip.length <= 0f) return 1f;
-        if (s_slashNormCache.TryGetValue(clip, out float cached)) return cached;
+        if (s_slashNormCache.TryGetValue(clip, out Vector2 cached)) { last = cached.y; return cached.x; }
 
-        float first  = 1f;
+        float first  = 1f, latest = -1f;
         var   events = clip.events;
         for (int i = 0; i < events.Length; i++)
         {
             string fn = events[i].functionName;
             if (fn == EffectStepEvent || fn.StartsWith(SlashEventPrefix, StringComparison.Ordinal))
-                first = Mathf.Min(first, events[i].time / clip.length);
+            {
+                float n = events[i].time / clip.length;
+                first  = Mathf.Min(first, n);
+                latest = Mathf.Max(latest, n);
+            }
         }
-        s_slashNormCache[clip] = first;
+        last = latest >= 0f ? latest : 1f;
+        s_slashNormCache[clip] = new Vector2(first, last);
         return first;
     }
 
@@ -517,6 +556,8 @@ public class ActAttackState : LayerStateBase<ActState>
         _holdUntil            = 0f;
         _inRecovery           = false;
         _recoveryEnd          = 0f;
+        _finisherHoldUntil    = -1f;
+        _finisherQueued       = false;
         _currentStateHash     = 0;
         _currentMapping        = null;
         _stepLastNT            = 0f;
@@ -556,6 +597,15 @@ public class ActAttackState : LayerStateBase<ActState>
             _controller.Combo.ResetStep();
             _controller.Combo.CloseWindow();
             _controller.NotifyComboFinished(finalStep);
+            float hold = FinisherRecoveryNow();
+            if (hold > 0f && _controller.IsGrounded())
+            {
+                // 막타 뒤 회복 — 받아 둔 공격은 회복이 끝나면 1타로(10-21 ⑥)
+                _controller.Combo.SetNextComboQueued(false);
+                _finisherQueued    = chainNext;
+                _finisherHoldUntil = _stateElapsed + hold;
+                return;
+            }
             if (chainNext)
             {
                 // 회수를 끊고 1타로 잇는다 — 예전엔 예약을 소비한 채 버려 한 번 더 눌러야 했다(카타나 약 0.3초 빈틈 · 출시 점검 D3 · 10-10).
@@ -591,6 +641,34 @@ public class ActAttackState : LayerStateBase<ActState>
             _controller.Anim.speed = _stepAnimSpeed * ComboHoldSpeedRatio;   // 끊는 지점 자세 근처에서 잠깐 느리게 입력을 기다린다
         }
     }
+
+    /// <summary>
+    /// 막타 뒤 회복 중 — 공격 입력은 기억만 하고 회복이 끝나면 1타로 잇는다. 회피 · 스킬이 들어오면 바로 끊고(버퍼는 평소 입력 경로가 받는다),
+    /// 공격을 안 눌렀으면 이동으로도 끊는다. 아무 입력도 없으면 회수 동작을 마저 튼다.
+    /// </summary>
+    private void UpdateFinisherHold()
+    {
+        if (_controller.InputBuffer.TryConsume(Command.Light)) _finisherQueued = true;
+        bool other    = _controller.InputBuffer.Count > 0;
+        bool walkAway = !_finisherQueued && _controller.MoveDirection.sqrMagnitude > 0.0001f;
+        if (!other && !walkAway && _stateElapsed < _finisherHoldUntil) return;
+
+        _finisherHoldUntil = -1f;
+        bool attack = _finisherQueued && !other;
+        _finisherQueued = false;
+        if (attack)
+        {
+            _controller.InputBuffer.Push(Command.Light);   // 상태를 빠져나가면 평소 입력 경로가 1타로 받는다
+            _stateChanger.Change(ActState.None);
+            return;
+        }
+        if (!other && !walkAway && TryEnterRecovery()) return;
+        _stateChanger.Change(ActState.None);
+    }
+
+    /// <summary>막타 뒤 회복(실시간 · 공속 반영) — 애니 세트 finisherRecoverySeconds. 0이면 회복 없이 바로 잇는다.</summary>
+    private float FinisherRecoveryNow()
+        => _animSet != null && _animSet.finisherRecoverySeconds > 0f ? _animSet.finisherRecoverySeconds / SwingTempo() : 0f;
 
     /// <summary>입력 없이 기다림이 끝났다 — 원래 속도로 돌려 회수를 재생한다(회수가 없으면 대기로).</summary>
     private void StopComboHold()
@@ -778,7 +856,8 @@ public class ActAttackState : LayerStateBase<ActState>
             Debug.LogWarning($"[ActAttackState] State not found: {stateToPlay}");
         }
 
-        _slashNorm = playedName != null ? ResolveSlashNorm(anim, playedName) : 1f;
+        _lastSlashNorm = 1f;
+        _slashNorm = playedName != null ? ResolveSlashNorm(anim, playedName, out _lastSlashNorm) : 1f;
 
         // 폴링 상태 초기화 및 타이밍 로드
         _currentStateHash  = playedHash;
@@ -786,10 +865,13 @@ public class ActAttackState : LayerStateBase<ActState>
         _comboWindowClosed = false;
         _attackEndFired    = false;
         _stateElapsed      = 0f;
+        _slashPassedAt     = -1f;
+        _lastSlashPassedAt = -1f;
 
         var mapping = TryGetClipMapping(step, action);
         var animSet = _controller.WeaponManager?.CurrentWeaponData?.animationSet
                       as WeaponAnimationSetSO;
+        _animSet = animSet;
         (_comboOpen, _comboClose, _attackEnd) = ResolveTiming(mapping, animSet);
 
         float baseSpeed = animSet?.lightAttackAnimSpeed ?? 1.0f;
@@ -799,6 +881,19 @@ public class ActAttackState : LayerStateBase<ActState>
                    * WeaponTempo(_controller)
                    * _controller.CounterAttackSpeedMultiplier;   // 저스트 회피 반격 창 가속(평소 1)
         _stepAnimSpeed = anim.speed;
+
+        // 준비 동작 — 베기 이벤트가 있는 클립만. 베기 뒤 배율은 「베기 전 + 베기 ~ 연결 지점」 시간이 그대로 되게 정한다.
+        // 두 번 베는 칸은 첫 ~ 마지막 베기 사이를 제 속도로 두므로 빠르게 감는 몫은 마지막 베기 뒤만(사이 구간은 양쪽에서 지워진다).
+        _followSpeedRatio = 1f;
+        float windup = animSet != null ? Mathf.Clamp(animSet.windupSpeedRatio, 0.3f, 1f) : 1f;
+        if (windup < 0.999f && _slashNorm < 1f && _lastSlashNorm < _attackEnd)
+        {
+            float pre = _slashNorm, post = _attackEnd - _lastSlashNorm;
+            float room = pre + post - pre / windup;   // 베기 뒤에 남는 시간(원래 단위)
+            float cap = animSet.followSpeedCap > 0f ? animSet.followSpeedCap : MaxFollowSpeedRatio;   // 무기별 상한(10-21 무형검 1.6)
+            _followSpeedRatio = room > post / cap ? post / room : cap;
+            anim.speed = _stepAnimSpeed * windup;
+        }
     }
 
     /// <summary>
@@ -832,12 +927,25 @@ public class ActAttackState : LayerStateBase<ActState>
     /// 데이터가 어긋나도 동작이 무너지지 않도록 여기서 순서를 강제한다 — 창을 줄이는 대신
     /// 공격 종료를 창 끝까지 미룬다(카타나 0.45/0.80/0.85, 대검 0.25/0.35/0.35과 같은 형태).
     /// </summary>
+    /// <summary>베기 뒤 다음 타까지(실시간 · 공속 반영) — 애니 세트 slashFollowSeconds(0이면 기본 <see cref="SlashFollowSeconds"/>).</summary>
+    private float SlashFollowNow()
+        => (_animSet != null && _animSet.slashFollowSeconds > 0f ? _animSet.slashFollowSeconds : SlashFollowSeconds) / SwingTempo();
+
     /// <summary>이번 타의 최소 시간(실시간) — <see cref="MinSwingSeconds"/> ÷ (공속 × 반격 가속).</summary>
-    private float MinSwingNow()
+    private float MinSwingNow() => MinSwingSeconds / SwingTempo();
+
+    /// <summary>
+    /// 다음 타로 이을 만큼 휘둘렀나 — 마지막 슬래시(피해 프레임)가 지나갔으면 그 뒤 <see cref="SlashFollowSeconds"/>만(공속 반영),
+    /// 슬래시 이벤트가 없는 클립은 옛 하한(<see cref="MinSwingSeconds"/>). 두 번 베는 칸은 둘째 베기를 끊지 않는다(10-19 ④).
+    /// </summary>
+    private bool SwingReadyForNext()
     {
-        float aspd = (_controller.RuntimeStats?.AttackSpeedMultiplier ?? 1f) * _controller.CounterAttackSpeedMultiplier;
-        return MinSwingSeconds / Mathf.Max(0.5f, aspd);
+        if (_slashNorm < 1f) return _lastSlashPassedAt >= 0f && _stateElapsed - _lastSlashPassedAt >= SlashFollowNow();
+        return _stateElapsed >= MinSwingNow();
     }
+
+    private float SwingTempo()
+        => Mathf.Max(0.5f, (_controller.RuntimeStats?.AttackSpeedMultiplier ?? 1f) * _controller.CounterAttackSpeedMultiplier);
 
     private static (float open, float close, float end) ResolveTiming(
         WeaponAnimationSetSO.ClipMapping mapping,

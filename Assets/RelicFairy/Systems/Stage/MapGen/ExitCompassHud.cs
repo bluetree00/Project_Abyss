@@ -55,6 +55,7 @@ public sealed class ExitCompassHud : MonoBehaviour
     }
 
     private static ExitCompassHud _instance;
+    private const float PromptDimAlpha = 0.2f;   // 상호작용 안내가 떠 있는 동안 배지 알파(10-22)
     private static bool s_popupHidden;   // 게임을 멈추는 팝업이 열려 있다 — 배지가 팝업 창 가장자리에 비쳤다(09-29)
 
     /// <summary>생성돼 있으면 반환(없으면 null) — 정리용. 생성이 필요하면 Create()를 쓴다.</summary>
@@ -176,14 +177,12 @@ public sealed class ExitCompassHud : MonoBehaviour
             s.rectTransform.sizeDelta        = new Vector2(innerW, 26f);
             s.rectTransform.anchoredPosition = new Vector2((PadX + AccentW) * 0.5f, -15f);
 
-            // 방향 화살표 — 글리프 8종 대신 ▶ 하나를 회전시킨다(폰트에 없는 ↖↙가 □로 깨지던 문제 해소).
-            var arrow = NewGraphic<TextMeshProUGUI>(rt, "Arrow", new Vector2(40f, 40f),
-                                                    new Vector2(-(plateW * 0.5f + ArrowGap), 0f));
-            arrow.text      = "▶";
-            arrow.fontSize  = 34f;
-            arrow.fontStyle = FontStyles.Normal;   // 가짜 굵게 금지(기본 글꼴이 이미 굵다)
-            arrow.alignment = TextAlignmentOptions.Center;
-            arrow.color     = color;
+            // 방향 화살표 — 한쪽으로 긴 화살촉 그림 하나를 회전시킨다(10-18: 예전 글자 ▶는 거의 정삼각형이라 돌리면 어느 쪽이 앞인지 헷갈렸다).
+            var arrow = NewGraphic<Image>(rt, "Arrow", new Vector2(40f, 40f),
+                                          new Vector2(-(plateW * 0.5f + ArrowGap), 0f));
+            arrow.sprite         = UIProceduralSprites.Pointer();
+            arrow.preserveAspect = true;
+            arrow.color          = color;
 
             _entries.Add(new Entry
             {
@@ -235,7 +234,8 @@ public sealed class ExitCompassHud : MonoBehaviour
     {
         if (_group != null)
         {
-            float target = s_popupHidden ? 0f : 1f;
+            // 10-22 — 상호작용 안내(「[F] 정제소」 등)가 떠 있으면 배지는 옅게: 지금 할 일은 눈앞의 것이다(배지가 안내 위에 겹쳤다)
+            float target = s_popupHidden ? 0f : WorldTextScreenCap.ActivePrompts > 0 ? PromptDimAlpha : 1f;
             if (!Mathf.Approximately(_group.alpha, target))
                 _group.alpha = Mathf.MoveTowards(_group.alpha, target,
                     Time.unscaledDeltaTime / (s_popupHidden ? UIFader.CloseSec : UIFader.OpenSec));
@@ -272,7 +272,7 @@ public sealed class ExitCompassHud : MonoBehaviour
                 if (dir.sqrMagnitude < 0.0001f) dir = Vector2.up;
                 pos = ClampToEdge(center, dir, w, h);
 
-                // ▶(0°=오른쪽) 하나를 목표 방향으로 회전 — 대각선 글리프(↖↙)가 폰트에 없어 □로 깨지던 것을 대체.
+                // 화살촉(0°=오른쪽) 하나를 목표 방향으로 회전 — 대각선 글리프(↖↙)가 폰트에 없어 □로 깨지던 것을 대체.
                 float ang = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
                 e.ArrowRect.localRotation = Quaternion.Euler(0f, 0f, ang);
             }

@@ -125,6 +125,7 @@ public sealed partial class UI_GridPanel : UI_Base
     private Button          _salvageButton;
     private TMP_Text        _salvageBtnLabel;
     private RuntimeItemData _salvageTarget;
+    private Shape            _outlineSelectedShape;   // 정보판에 뜬 놓인 룬의 조각 — 외곽선이 밝다(10-18)
     private bool             _isOpen;
     private bool             _layoutBuilt;
     private bool             _raisedAbovePopups;   // 팝업(상점) 위로 올려 연 상태 — 닫을 때 원래 순서로
@@ -324,7 +325,6 @@ public sealed partial class UI_GridPanel : UI_Base
 
             // 초기 점유 상태 반영 (재오픈 시 이전 배치 복원)
             _hexGridView.RefreshOccupiedCells();
-            _hexGridView.SetPieceGroups(_placedItemPositions);
             _hexGridView.UpdateAdjacencyConstraints();
 
         }
@@ -1093,9 +1093,15 @@ public sealed partial class UI_GridPanel : UI_Base
     {
         _salvageTarget = item;
         RefreshSalvageButton();
-        // 정보판에 뜬 룬이 판에 놓인 것이면 그 조각만 외곽선이 금(10-11 v2 — 나머지 조각은 채도 반).
+        // 정보판에 뜬 룬이 판에 놓인 것이면 그 조각만 외곽선을 밝게(10-18 — 외곽선은 조각이 그린다, RunePieceOutline).
         bool placed = item != null && _inventory != null && _inventory.IsPlaced(item.instanceId);
-        _hexGridView?.SetSelectedPiece(placed ? item.instanceId : null);
+        var shape = placed ? BoardManager.Instance?.GetSharedShapeByItem(item.instanceId) : null;
+        if (shape != _outlineSelectedShape)
+        {
+            if (_outlineSelectedShape != null) _outlineSelectedShape.SetOutlineSelected(false);
+            _outlineSelectedShape = shape;
+            if (shape != null) shape.SetOutlineSelected(true);
+        }
     }
 
     /// <summary>[분해]는 정보판의 룬이 보관함이나 판에 있을 때만 보인다(룬 선택 미리보기 등은 아님).</summary>
@@ -1226,9 +1232,6 @@ public sealed partial class UI_GridPanel : UI_Base
                 _hexGridView.RefreshOccupiedCells();
             }
 
-            // 어느 칸이 어느 룬의 것인지 알려야 <b>조각 단위 외곽선</b>이 그려진다.
-            // 안 넘기면 칸마다 테두리가 따로 떠서 같은 모양 조각이 붙었을 때 구분이 안 된다.
-            _hexGridView.SetPieceGroups(_placedItemPositions);
             _hexGridView.UpdateAdjacencyConstraints();
         }
 
@@ -1256,7 +1259,6 @@ public sealed partial class UI_GridPanel : UI_Base
             {
                 _hexGridView.RefreshOccupiedCells();
             }
-            _hexGridView.SetPieceGroups(_placedItemPositions);
             _hexGridView.UpdateAdjacencyConstraints();
         }
 
@@ -1452,6 +1454,31 @@ public sealed partial class UI_GridPanel : UI_Base
     }
 
     /// <summary>판에서 룬을 회수해 보관함으로 되돌린다. 드래그로 빼낼 때와 같은 경로.</summary>
+    /// <summary>
+    /// 판에 놓인 룬을 판에서 내리고 없앤다 — 룬판이 닫혀 있어도(ESC 책 「버리기」). 판 분해(<see cref="OnSalvagePlacementConfirm"/>)와 같은 순서로
+    /// 칸 점유 · 판 칸 그림 · 시너지 다리까지 같이 걷는다(10-22 — 책은 인벤토리에서만 빼서 칸이 「차 있음」으로 남고 영역 시너지가 묵었다).
+    /// </summary>
+    public void DiscardPlacedRune(RuntimeItemData item)
+    {
+        // 닫힌 판은 OnDisable이 _inventory를 놓는다 — 런 인벤토리를 직접 쓴다(10-22 실측: 닫힌 채 버리면 아무 일도 없었다)
+        var inv = _inventory ?? GameRunBootstrapper.Instance?.Run?.ItemInventory;
+        if (item == null || inv == null) return;
+        RemovePlacedItem(item);   // 열려 있으면 OnItemRemoved가 인벤토리 · 칸 · 시너지를 처리한다
+        if (inv.IsPlaced(item.instanceId))
+        {
+            // 닫혀 있어 통보를 못 받았다(OnDisable에서 구독 해제) — 받았을 일을 여기서 한다
+            inv.UnplaceItem(item);
+            _totalPlacedCells = Mathf.Max(0, _totalPlacedCells - GetItemCellCount(item));
+            if (_hexGridView != null && _placedItemPositions.TryGetValue(item.instanceId, out var cached))
+                _hexGridView.RemovePlacedCells(cached);
+            _hexGridView?.UpdateAdjacencyConstraints();
+        }
+        _placedItemPositions.Remove(item.instanceId);
+        inv.DiscardFromStaging(item);
+        _stagingArea?.RemoveShapeForItem(item);
+        _hexGridView?.RefreshOccupiedCells();   // 판 칸 그림 · 시너지 다리를 남은 점유로 다시 맞춘다
+    }
+
     private void RemovePlacedItem(RuntimeItemData item)
     {
         // 판에 놓인 룬의 모양은 판 쪽(BoardManager)이 들고 있다 — 보관함은 보관함 룬의 모양만 추적한다(Refresh가 놓인 룬을 지운다).
@@ -1655,11 +1682,14 @@ public sealed partial class UI_GridPanel : UI_Base
             // ⚠️ 배치된 아이템은 PlacedItems에 있다(UnplaceItem이 placed → staging으로 되돌리는 구조).
             //    과거엔 StagingItems를 순회해서 배치된 건 하나도 안 잡혔고,
             //    셀만 지워져 '시너지는 사라졌는데 아이템 효과와 Shape는 남는' 상태가 됐다.
+            // 10-22 판 회수와 같은 길(RemovePlacedItem — 판 모양 · 칸 점유 해제 → OnItemRemoved → 인벤토리 · 판 칸 · 시너지 다리).
+            //   예전엔 모양을 보관함에서만 찾아 놓인 룬은 못 찾았다 — 칸이 「차 있음」으로 남아 스탯은 빠지는데
+            //   아래 RefreshSynergyStatus가 남은 칸을 다시 읽어 영역 시너지 · 반응 · 중앙 보너스가 되살아났다.
             var placed = new List<RuntimeItemData>(_inventory.PlacedItems);
             foreach (var item in placed)
             {
-                _stagingArea?.RemoveShapeForItem(item);
-                _inventory.UnplaceItem(item);   // PlacedItems → StagingItems 복귀
+                RemovePlacedItem(item);
+                if (_inventory.IsPlaced(item.instanceId)) _inventory.UnplaceItem(item);   // 모양을 못 찾은 경우만 — PlacedItems → StagingItems
             }
         }
         _placedItemPositions.Clear();
@@ -1817,9 +1847,10 @@ public sealed partial class UI_GridPanel : UI_Base
         int staged = _inventory?.StagingCount ?? 0;
         int placed = _inventory?.PlacedItems?.Count ?? 0;
         bool over = staged > cap;
-        string box = over ? $"<color=#FF7A6A>{staged}/{cap} 넘침</color>" : $"<color=#FFFFFF>{staged}/{cap}</color>";
+        // 10-19 — 넘침은 붉은 「못 얻음」이 아니라 「새 룬 자리 정리」(호박색): 판에 놓거나 하나를 분해하면 닫힌다
+        string box = over ? $"<color=#E8BA54>{staged}/{cap}</color>" : $"<color=#FFFFFF>{staged}/{cap}</color>";
         _headerStatusText?.SetText($"보관함 {box}    ·    배치 <color=#FFFFFF>{placed}</color>");
-        _stagingCountText?.SetText(over ? $"<color=#FF7A6A>{staged} / {cap}  넘침 — 놓거나 분해</color>" : $"{staged} / {cap}");
+        _stagingCountText?.SetText(over ? $"<color=#E8BA54>{staged} / {cap}  · 놓거나 하나를 분해</color>" : $"{staged} / {cap}");
     }
 
     /// <summary>

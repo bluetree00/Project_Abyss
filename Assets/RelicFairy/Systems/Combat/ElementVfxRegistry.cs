@@ -34,6 +34,8 @@ public sealed class ElementVfxRegistry : ScriptableObject
         public GameObject impact;
         [Tooltip("타격 이펙트를 발밑 기준에서 올리는 높이(m) — 구형 폭발이 바닥에 반쯤 박히지 않게")]
         public float impactHeight;
+        [Tooltip("impact가 배율 1에서 보이는 반경(m, 실측 83). 0이면 예전처럼 반경 인자 그대로 — 원소마다 원래 크기가 달라(어둠 3 m+ · 불 0.5 m) 점 타격 크기를 맞춘다")]
+        public float impactRadius;
         [Tooltip("광역 폭발 1회 — 반경이 있는 폭발(작열 · 빙하 · 광폭발 등)")]
         public GameObject area;
         [Tooltip("area가 배율 1에서 보이는 반경(m). 판정 반경 ÷ 이 값 = 배율")]
@@ -83,12 +85,16 @@ public sealed class ElementVfxRegistry : ScriptableObject
         => Find(element, out var e) ? e.burst : null;
 
     /// <summary>점 타격 이펙트와 올리는 높이. 칸이 비었으면 발동 표시로 폴백(높이 0).</summary>
-    public GameObject GetImpact(RuneElement element, out float lift)
+    public GameObject GetImpact(RuneElement element, out float lift) => GetImpact(element, out lift, out _);
+
+    /// <summary>점 타격 이펙트 · 올리는 높이 · 배율 1에서 보이는 반경(0 = 모름).</summary>
+    public GameObject GetImpact(RuneElement element, out float lift, out float visibleRadius)
     {
-        lift = 0f;
+        lift = 0f; visibleRadius = 0f;
         if (!Find(element, out var e)) return null;
         if (e.impact == null) return e.burst;
         lift = e.impactHeight;
+        visibleRadius = e.impactRadius;
         return e.impact;
     }
 

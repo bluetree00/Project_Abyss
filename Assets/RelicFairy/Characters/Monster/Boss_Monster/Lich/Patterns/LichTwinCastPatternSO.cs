@@ -7,7 +7,7 @@ namespace RelicFairy.Monster
 ///
 /// O 두 원(castDuration) — 색은 같고 <b>움직임으로</b> 가른다: 진짜는 테두리가 안쪽으로 조여들고, 가짜는 바깥으로 흩어진다.
 ///   리치는 플레이어를 축으로 호를 그리며 옆으로 돈다
-/// → S 신호(signalDuration) — 진짜가 빨개지고 가짜는 사라진다
+/// → S 신호(signalDuration) — 진짜가 빨개진다. 가짜는 그보다 먼저, 폭발 MinLead(0.45초) 전에 사라진다(10-22 E2 L3 — 확정 뒤 0.19초였다)
 /// → A 폭발(activeDuration) — 진짜 원 안(겹친 곳 포함)이 맞는다
 /// → E 반격창(endDuration) → R 복귀
 /// 두 원은 플레이어를 가운데 두고 겹친다 — 가짜 쪽으로 반걸음 이상 옮기면 산다.
@@ -100,16 +100,18 @@ public class LichTwinCastState : UnInterruptibleState<LichTwinCastPatternSO>
     private GameObject _castFlare;
     private Vector3    _realDiscScale;
     private Vector3    _realVfxScale;
+    private bool       _fakesCleared;   // 진짜 원 확정(가짜가 사라짐) — 폭발 MinLead 전(10-22 E2 L3)
 
     public LichTwinCastState(LichTwinCastPatternSO data) : base(data) { }
 
     public override void Enter(MonsterContext ctx)
     {
-        _phase = Phase.Cast;
-        _timer = 0f;
+        _phase        = Phase.Cast;
+        _timer        = 0f;
+        _fakesCleared = false;
 
         Vector3 player = LichPatternUtil.PlayerFloorPos(ctx);
-        LichPatternUtil.FaceInstant(ctx, player);
+        LichPatternUtil.FaceToward(ctx, player);   // 즉시 회전 51°/프레임(10-19 실측) → 초당 720° · 판정은 바닥 원 자리라 몸 방향과 무관
         ctx.Animator?.CrossFade("MagicBolt", 0.1f);
 
         // 둘이면 리치 → 플레이어 방향의 옆축(좌우), 셋이면 플레이어 둘레 120°마다. 진짜는 무작위.
@@ -183,6 +185,13 @@ public class LichTwinCastState : UnInterruptibleState<LichTwinCastPatternSO>
                     if (_fakeDisc[f] != null) _fakeDisc[f].transform.localScale = LichPatternUtil.ScaleFlat(_fakeDiscScale[f], fake);
                     if (_fakeVfx[f]  != null) _fakeVfx[f].transform.localScale  = _fakeVfxScale[f] * fake;
                     PatternGuideHelper.SetIntensity(_fakeDisc[f], Mathf.Lerp(1f, 0.35f, t));
+                }
+
+                // 진짜 원 확정(가짜가 사라짐) → 폭발까지 ≥ MinLead(10-22 E2 L3 — 확정 뒤 0.19초였다). 진짜는 끝까지 조여든다.
+                if (!_fakesCleared && _timer >= Data.castDuration + Data.signalDuration - LichPatternUtil.MinLead)
+                {
+                    _fakesCleared = true;
+                    ClearFakes(0.3f);
                 }
 
                 if (t >= 1f)

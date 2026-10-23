@@ -1,5 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Text;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -8,151 +10,120 @@ using UnityEngine.UI;
 /// <summary>
 /// 상점 — 심연의 행상 (Canvas_Popup, Addressable "UI/Popup/UI_ShopPanel").
 ///
-/// 완성본 목업(바탕화면 "상점 UI 리소스/상점 전체이미지.png", 1178×837) 배치를 그대로 옮긴다:
-///  - 상단: 어두운 띠 + 간판(등불 일체) + 골드 / 우상단 문장, 네 모서리 장식
-///  - 오늘의 특가: 리본이 포함된 가로 배너 1장
-///  - 상품 3×2: 양피지 카드(아이콘 칸·카테고리 배지·이름·효과·가격) — 품절은 바탕 교체 + 도장
-///  - 우측 "고른 물건": 겹친 양피지 + 대형 미리보기 + 이름 명판 + 상세 + [사겠네]
-///  - 하단 중앙: 새로고침
+/// 10-21 흑요석 새 레이아웃(사용자 「상점의 새로운 레이아웃부터 필요한 리소스를 제작해서 만들고 빌드」 ·
+/// 레이아웃 판 https://claude.ai/artifact/N69kJVyQsF1T2U8AoUkRbt 「레이아웃은 괜찮다」):
+///  - 머리: 행상 초상(힉스필드) · 이름 · 인사 / 골드 · 상인의 인장 · 돌발 이벤트
+///  - 「내 상태」 띠: 체력 · 포션 · 룬 보관함 · 룬판 — 사기 전에 무엇이 가득인지 본다(보스 정보는 넣지 않는다 — 10-21 사용자 반론)
+///  - 가호 2칸(넓은 카드 — 문장 판 + 흰 아이콘) · 진열 5칸(룬 2 · 재료 1 · 포션 1 + 오늘의 특가)
+///  - 카드마다 자물쇠 1칸(다음 상점까지 같은 값) · 오른쪽 상세 + [구매]
+///  - 아래 줄: 보유 가호 · 잠금 수 · 새로고침(지금 값 · 다음 값) · 나가기
 ///
-/// <b>좌표계</b>: 모든 사각형을 <i>목업 픽셀</i>로 적고 <see cref="S"/>로 환산한다.
-/// 목업을 열어 재면 코드의 숫자와 그대로 대응하므로, 재납품 때 눈으로 대조할 수 있다.
-/// 크기는 항상 아트 원본 비율을 지킨다 — 칸에 맞추려 늘리면 나뭇결·양피지 결이 왜곡된다.
-///
-/// 데이터/구매는 <see cref="ShopRoomController"/>가 권위(Products·SpecialDeal·TryBuyProduct).
-/// 아트는 <see cref="UISkin.Shop"/>, 미로드 시 색 폴백.
+/// 창은 목업 px(<see cref="WinW"/>×<see cref="WinH"/>, 1920×1080 화면 기준)로 짓고 <see cref="UIWindowFitter"/>가 통째로 배율을 건다(scaleTransform).
+/// 프리팹은 루트만 — 런타임에 짓는다(옛 구운 나무 · 양피지 계층이 남아 있으면 지우고 짓는다).
+/// 창 · 카드 틀은 10-19 룬 획득 팝업과 같은 흑요석 가족(상점 창 틀은 호박색 등불 상감 · 카드는 등급 카드 틀).
+/// 데이터/구매는 <see cref="ShopRoomController"/>가 권위(Products · SpecialDeal · TryBuy* · TryReroll · ToggleLock).
 /// </summary>
 public sealed class UI_ShopPanel : UI_Popup
 {
     public override bool BlocksGameplay => true;
     public override bool CloseOnEscape  => true;
 
-    // ── 좌표계 ──
-    private const float MockW  = 1178f;   // 목업 캔버스
-    private const float MockH  =  837f;
-    private const float WindowW = 1272f;  // 1920×1080에서의 창 너비
-    private const float S       = WindowW / MockW;
-    private const float WindowH = MockH * S;
+    // ── 배치(목업 px) ──
+    private const float WinW = 1580f, WinH = 992f;
+    private const float FrameCorner    = 36f;    // 창 틀 9칸 모서리(그림 72 → 36)
+    private const float CardFrameScale = 3.4f;   // 등급 카드 틀 — 그림 px ÷ 이 값(룬 획득 팝업과 같은 두께)
+    private const float L = 52f, R = 1528f, InnerW = R - L;
+    private const float BandY = 160f, BandH = 58f;
+    private const float ExchangeW = 560f;   // 「내 상태」 띠 오른쪽 원석 환전소 몫(10-22)
+    private const float BodyY = 234f;
+    private const float LeftW = 1008f;
+    private const float WideY = 266f, WideW = 494f, WideH = 200f, WideGap = 20f;
+    private const float SmallY = 520f, SmallW = 186f, SmallH = 346f, SmallStep = 205.5f;
+    private const float DetailX = 1084f, DetailW = R - DetailX, DetailH = 632f;
+    private const float FootY = 890f, FootH = 56f;
+    private const float CardLift = 6f;
+    private const int   SpecialIndex = -2;
+    private const int   OwnedChipMax = 5;
+    private const float VeilAlpha    = 0.95f;   // 공용 막 0.8은 선형 색공간에서 체감 절반 — 판 밖 HUD가 비쳤다(09-28)
 
-    // ── 배치 (목업 px) ──
-    // 09-29: 내용(간판~고른 물건 종이)이 창 가운데보다 14px 왼쪽이었다 — 모서리 장식은 창 대칭이라 오른쪽 장식과 종이 사이만
-    // 빈 나무가 넓게 남았다(사용자 「테두리 레이아웃 · 공간 비율이 안 맞는다」). 띠 · 배경 · 모서리를 뺀 내용 전체를 옮긴다.
-    private const float ContentDX  =  14f;
-    private const float BandY      =  14f, BandH     =  91f;
-    private const float TitleX     =  95f + ContentDX, TitleY    =  15f, TitleW  = 360f, TitleH = 166f;
-    private const float CrestX     = 946f + ContentDX, CrestY    =   2f, CrestW  =  80f, CrestH = 118f;
-    private const float CornerW    =  73f, CornerH   = 108f, CornerInsetX = 58f;
-    private const float CornerTopY =   8f, CornerBottomY = 690f;
-    private const float GoldX      = 752f + ContentDX, GoldY     =  56f, GoldIconSize = 22f;
-    // 간판 글자 칸 — 간판 아트의 쇠띠(판 폭의 약 78%) 앞까지. 인사말이 쇠띠를 넘어 꼬리까지 갔다(09-29).
-    private const float TitleTextX = TitleX + 100f, TitleTextW = 172f;
-    // ★ 목업 아트를 전체샷에 템플릿 매칭해 실측한 값(상관 0.97/0.91).
-    //   ⚠️ 바깥 rect를 고칠 때 <b>내부를 배율로 키우면 안 된다</b> — 내부 요소는 카드 아트의 일부가 아니라
-    //   그 위에 얹힌 별개 이미지라, 목업에서 <b>절대 위치가 고정</b>이다. rect 원점이 움직인 만큼만 옮긴다.
-    //   (배율로 키웠더니 코인·배지가 우하단으로 18px 밀려 카드 밖으로 걸쳤다.)
-    //   예전 값은 <b>아트 rect가 아니라 눈으로 잰 "보이는 판"</b>이라 카드가 13% 작았다.
-    //   아트에는 투명 여백이 있어(카드 좌2.1%·우4.9%·상2.2%·하5.2%) rect는 보이는 판보다 커야 한다.
-    private const float DealX      =  95f + ContentDX, DealY     = 158f, DealW   = 625f, DealH  = 158f;
-    private const float DealInY    =   8f;   // 특가 안 글자 · 그림을 내리는 몫 — 분류 줄이 종이 윗가장자리(찢긴 테)에 붙었다(09-29)
-    // 09-25 빈 공간 정리(사용자 지적 「하단 빈 공간이 많고 외곽이 낭비된다」): 카드는 세로로 늘려 카드 아래 빈 띠를 쓰고
-    // (카드 아트는 9-slice라 세로로 늘려도 테두리가 그대로다), 새로고침·나가기는 그 아래 한 줄로 모은다.
-    // 09-29: 카드 222 · 간격 217이면 새로고침 줄이 아래 테두리(826)에 20px까지 붙었다(위 여백 57과 어긋남).
-    // 카드 205(보이는 190) · 간격 199.5 · 새로고침 725 → 아래 여백도 57. 카드 안 요소는 205 안으로 다시 앉혔다(BuildCard).
-    private const float GridX      = 110f + ContentDX, GridY     = 316f;
-    private const float CardW      = 205f, CardH     = 205f;
-    private const float CardStepX  = 201.5f, CardStepY = 199.5f;
-    private const int   GridCols   = 3, GridRows = 2;
-    private const float RerollW    = 230f, RerollH   =  53f, RerollY = 725f;   // 아트는 rect 안 6~44에 보인다
-    // 구매창도 카드와 같은 문제였다 — 아트 rect가 아니라 눈으로 잰 "보이는 종이"를 썼다.
-    // 구매창.png(885×1811)는 좌1.7%·우3.8%·상0.8%·하1.8%가 투명이라 rect가 그만큼 커야 한다.
-    // 09-25: 오른쪽 빈 띠를 쓰도록 290×594 → 312×638(아트 비율 0.489 유지). 안쪽 배치는 예전 설계 크기(SelDW×SelDH)
-    // 기준 좌표 그대로 두고 비율로 따라 커진다 — 좌표를 다시 재지 않아도 된다.
-    private const float SelX       = 736f + ContentDX, SelY      = 142f, SelW    = 312f, SelH   = 638f;
-    private const float SelDW      = 290f, SelDH     = 594f;
+    // ── 연출 ──
+    private const float WindowInSec = 0.26f, WindowInScale = 0.965f;
+    private const float DealStagger = 0.06f, DealDur = 0.26f, DealRise = 22f;
+    private const float CoinFallDur = 0.55f, ItemFlyDur = 0.62f, SoldPopDur = 0.38f, DealHoldDur = 0.75f;
+    private const int   CoinCount   = 5;
+    private const int   ReactionMs  = 2600;
 
-    // 카테고리 색 — 아트 배지가 없는 룬·재료의 폴백이자, 배지 있는 칸의 선택 강조색.
-    private static readonly Color[] CatColor =
+    // 행상 = 웃는 버섯(10-01 NPC 교체) — 밝은 반말 장사꾼.
+    private const string Greeting = "어서 와! 오늘도 살아 있네?";
+    private const string BuyLabel = "구매";   // 10-18 사용자 「직관적인 표현으로」 — 하는 일 그대로
+
+    // ── 색(톤 v2 — 금색은 「누를 것 · 고른 것」에만) ──
+    private static readonly Color Ink       = UITheme.Thin.Ink;
+    private static readonly Color Mute      = UITheme.Thin.InkA(0.64f);
+    private static readonly Color Faint     = UITheme.Thin.InkA(0.42f);
+    private static readonly Color Gold      = UITheme.Thin.Gold;
+    private static readonly Color Amber     = new(0.91f, 0.73f, 0.33f, 1f);   // 등불 호박색 — 띠 이름표 · 할인 줄
+    private static readonly Color Line      = UITheme.Thin.LineIdle;
+    private static readonly Color LineGold  = UITheme.Thin.WithA(UITheme.Thin.Gold, 0.40f);
+    private static readonly Color SelEdge   = UITheme.Thin.WithA(UITheme.Thin.Gold, 0.85f);
+    private static readonly Color PanelFill = new(0.040f, 0.048f, 0.082f, 0.72f);
+    private static readonly Color WellFill  = new(0.024f, 0.028f, 0.050f, 0.78f);
+    private static readonly Color CardFill  = new(0.060f, 0.066f, 0.105f, 0.96f);
+    private static readonly Color BuyFill   = new(0.910f, 0.730f, 0.330f, 0.14f);
+    private static readonly Color BtnFill   = new(0.040f, 0.045f, 0.075f, 0.80f);
+    private static readonly Color Danger    = UITheme.Thin.Danger;
+    private static readonly Color Fit       = new(0.50f, 0.80f, 0.56f, 1f);
+    private static readonly Color Parchment = new(0.851f, 0.769f, 0.604f, 1f);   // 특가 딱지 — 양피지는 이 한 곳만
+    private static readonly Color ParchInk  = new(0.227f, 0.165f, 0.094f, 1f);
+    private static readonly List<(string name, int count)> s_owned = new();   // 보유 가호(이름별 묶음) — 새로 그릴 때마다 다시 채운다
+
+    private sealed class CardView
     {
-        new(0.35f, 0.85f, 0.55f, 1f),   // 버프 초록
-        new(0.72f, 0.52f, 0.95f, 1f),   // 룬  보라
-        new(1.00f, 0.66f, 0.28f, 1f),   // 재료 주황
-        new(0.95f, 0.40f, 0.38f, 1f),   // 포션 빨강
-    };
-
-    /// <summary>새로고침 아트에 구워진 비용. 실제 비용이 다르면 표기가 거짓말이 된다.</summary>
-    private const int RerollCostBakedInArt = 10;
+        public int Index;                   // 진열 칸 번호 · 특가 = SpecialIndex
+        public bool Wide;
+        public RectTransform Root;
+        public Image Frame, Plate, Icon, Coin, LockBg, LockIcon, Edge;
+        public CanvasGroup Group, Content;
+        public TMP_Text Tag, Name, Effect, Note, Price, OldPrice, Sold;
+        public Button LockBtn;
+        public Vector2 Base;
+    }
 
     private ShopRoomController _controller;
     private ShopSkinSO _skin;
-
-    [SerializeField] private TMP_Text _goldText, _dialogText;
-    [SerializeField] private Button   _rerollBtn;
-    [SerializeField] private Image    _rerollImg;
-    [SerializeField] private TMP_Text _rerollLabel;
-
-    // 특가
-    [SerializeField] private GameObject _dealRoot;
-    [SerializeField] private Image      _dealIcon;
-    [SerializeField] private TMP_Text   _dealCat, _dealName, _dealDesc, _dealOldPrice, _dealPrice;
-
-    // 상품 카드
-    private sealed class Card
-    {
-        public GameObject Root;
-        public Image Bg, Icon, BadgeBg, BadgeGlyph, SoldStamp, PriceCoin;
-        public TMP_Text BadgeText, Name, Effect, Price;
-        // 룬 선택 규격(09-25) — 아이콘 칸 등급 테두리·빛, 등급/칸 수 태그, 가격 알약
-        public Image IconFrame, IconGlow, Tag0Bg, Tag1Bg, PricePill;
-        public TMP_Text Tag0, Tag1;
-        public Vector2 Base;   // 쉬는 자리(고르면 CardLift만큼 들린다)
-        public CanvasGroup SelEdge;   // 고른 카드 2px 금 테(10-11, 런타임 생성 — 구운 프리팹에 없다)
-        public bool EdgeOn;
-    }
-    private const float CardLift   = 6f;
-    private const float DealStagger = 0.06f, DealDur = 0.26f, DealRise = 22f;
-    private System.Threading.CancellationTokenSource _openFxCts;
-    private readonly List<Card> _cards = new();
+    private RectTransform _win, _fx;
+    private Image _veil;
+    private TMP_Text _goldText, _dialogText, _subLine;
+    private TMP_Text _hpText, _potionText, _storageText, _boardText;
+    private TMP_Text _oreText, _exStepLabel, _exAllLabel;   // 원석 환전소(10-22)
+    private Button   _exStepBtn, _exAllBtn;
+    private readonly List<CardView> _cards = new();
+    private CardView _deal;
+    private ShopProduct _dealShown;       // 특가 품절 연출 동안 좌판에 붙잡아 둘 물건(컨트롤러는 사는 즉시 비운다)
 
     // 고른 물건
-    [SerializeField] private Image    _selPreview, _selNamePlate, _selGlow;
-    [SerializeField] private RectTransform _selShape;   // 룬 블록 모양(큰 아이콘 오른쪽) — 룬 선택 카드처럼 모양을 보고 산다
-    [SerializeField] private TMP_Text _selName, _selCat, _selEffect, _selFlavor;   // _selEffect = 상세 한 덩어리(09-25)
-    [SerializeField] private Button   _buyBtn;
-    [SerializeField] private TMP_Text _buyLabel;
+    private Image _selPlate, _selIcon;
+    private RectTransform _selShape;
+    private TMP_Text _selName, _selCat, _selEffect, _selFlavor, _selPrice;
+    private Button _buyBtn;
+    private TMP_Text _buyLabel;
 
-    private int _selectedIndex = -1;   // -1 = 미선택, -2 = 특가
-    private const int SpecialIndex = -2;
+    // 아래 줄
+    private readonly List<TMP_Text> _ownedChips = new();
+    private TMP_Text _ownedNone, _lockText;
+    private Button _rerollBtn;
+    private TMP_Text _rerollLabel, _rerollNext;
 
-    private bool _built, _closing;
+    private int  _selectedIndex = -1;    // -1 = 미선택, -2 = 특가
+    private bool _built, _closing, _buying, _dealing, _dealHold;
+    private int  _reactionGen;
+    private CancellationTokenSource _openFxCts;
+    private Image[] _coins;
+    private Image   _flyIcon;
 
-    // ── 거래의 손맛(기획_상점개편) — 동전 빠짐 · 상인 반응 · 물건 → 받는 곳 · 특가 딱지 → 품절 ──
-    private const float CoinFallDur = 0.55f, ItemFlyDur = 0.62f, StampPopDur = 0.38f, DealHoldDur = 0.75f;
-    private const int   CoinCount   = 5;
-    private const int   ReactionMs  = 2600;   // 상인 반응이 인사말로 돌아가기까지
-
-    [SerializeField] private RectTransform _fxRoot;      // 날아가는 물건·동전이 노는 층(창 맨 위)
-    [SerializeField] private TMP_Text      _dealStock;   // 특가 「1개 남음」 → 「품절」
-    [SerializeField] private Image         _dealStamp;   // 특가 품절 도장
-
-    private Image[] _coins;       // 골드 칸에서 떨어지는 동전(풀)
-    private Image   _flyIcon;     // 산 물건이 받는 곳으로 날아가는 그림
-    private bool    _buying;      // 연출 중 재구매 잠금(한 번에 한 건)
-    private bool    _dealHold;    // 특가 연출 동안 좌판에 붙잡아 둔다(컨트롤러는 이미 비웠다)
-
-    // ── 창 액자 · 여는 연출 (09-28) ── 판이 사각형으로 뚝 잘려 「잘린 페이지」처럼 보였다
-    private const float ShopVeilAlpha  = 0.95f;   // 공용 막 0.8은 선형 색공간에서 체감 절반 — 판 밖 HUD가 비쳤다(0.9도 읽혔다)
-    private const float WindowInSec    = 0.26f;
-    private const float WindowInScale  = 0.965f;
-    private const float ShadowOutset   = 30f;
-    private const float RibbonNotch    = 14f;     // 이름 명판 양끝이 파인 깊이(px)
-    private static readonly Color FrameDark  = new(0.05f, 0.03f, 0.02f, 1f);
-    private static readonly Color FrameTrim  = new(0.62f, 0.43f, 0.22f, 0.55f);
-    private static readonly Color EdgeShade  = new(0f, 0f, 0f, 0.55f);
-    private static Sprite s_edgeVignette;
-    private int     _reactionGen; // 상인 반응 문구 세대
-    private TMP_Text _sigilText;  // 골드 밑 「상인의 인장 −15%」(런타임 생성 — 구운 프리팹에 없다)
-    private TMP_Text _eventText;  // 그 밑 「◆ 떨이 −30%」 · 「◆ 귀한 물건」(10-15 돌발 이벤트 · 런타임 생성)
-    private static Sprite s_ribbon;
+    // ── Properties ──
+    private string GreetingNow => _controller != null && !string.IsNullOrEmpty(_controller.EventGreeting) ? _controller.EventGreeting : Greeting;
+    private Sprite CoinSprite  => _skin != null ? _skin.goldCoin : null;
 
     // ── Lifecycle ──
 
@@ -161,11 +132,6 @@ public sealed class UI_ShopPanel : UI_Popup
         base.Init();
         _skin = UISkin.Shop;
         BuildChrome();
-        EnsureWindowFrame();
-        FitCardTags();
-        StyleRuntime();
-        ApplyThinStyle();
-        SkinCardPlates();   // 가격 알약 · 룬 태그 판 — 자리(ApplyThinStyle · FitCardTags)가 잡힌 뒤라야 두께가 칸에 맞는다
     }
 
     protected override void OnDestroy()
@@ -180,318 +146,21 @@ public sealed class UI_ShopPanel : UI_Popup
         }
     }
 
+    // ── Public Methods ──
+
     public void Bind(ShopRoomController controller)
     {
         _controller = controller;
-        if (_controller != null)
-        {
-            _controller.OnShopChanged += RefreshAll;
-
-            // 비용이 어긋나면 RefreshReroll이 아트를 걷어내고 실제 값을 그린다(표기는 항상 옳다).
-            // 다만 완성 아트가 안 보이는 상태이므로, 원인을 남겨 아트/설정 중 하나를 맞추게 한다.
-            if (_controller.RerollEnabled && _controller.RerollCost != RerollCostBakedInArt)
-                Debug.LogWarning($"[UI_ShopPanel] 새로고침 비용 불일치 — 아트 표기 {RerollCostBakedInArt}G / 실제 {_controller.RerollCost}G. " +
-                                 "아트를 숨기고 색 버튼으로 대체한다. 글자 없는 버튼 아트를 받거나 비용을 맞출 것.");
-        }
+        if (_controller != null) _controller.OnShopChanged += RefreshAll;
 
         ShopUIStyle.PlaySfx("shop_open");
-        _selectedIndex = -1;
-        if (_dialogText != null) _dialogText.text = GreetingNow;   // 돌발 이벤트가 있으면 그 이야기부터(10-15)
+        // 열면 오늘의 특가를 상세 칸에 먼저(10-19) · 팔렸으면 첫 가호
+        var deal = _controller?.SpecialDeal;
+        _selectedIndex = deal != null && !deal.Sold ? SpecialIndex : (_controller != null && _controller.Products.Count > 0 ? 0 : -1);
+        if (_dialogText != null) _dialogText.text = GreetingNow;
         RefreshAll();
-        PlayWindowInAsync().Forget();   // 판이 먼저 떠오르고
-        PlayOpenFxAsync().Forget();     // 카드가 내려앉는다(겹쳐 흐른다)
-    }
-
-    private bool _dealing;   // 진열 연출 중 — 카드 자리는 연출이 쥔다(RefreshCards가 들림으로 덮지 않게)
-
-    /// <summary>
-    /// 열기 연출 — 상품 카드가 60ms 간격으로 좌판에 내려앉고(아래에서 22px), 고른 물건 종이가 옆에서 들어온다.
-    /// 룬 선택 팝업의 카드 등장과 같은 결이다. 상점은 방문당 한 번 여는 화면이라 끝까지 0.6초 남짓.
-    /// </summary>
-    private async UniTaskVoid PlayOpenFxAsync()
-    {
-        _openFxCts?.Cancel();
-        _openFxCts?.Dispose();
-        _openFxCts = new System.Threading.CancellationTokenSource();
-        var ct = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(_openFxCts.Token, destroyCancellationToken).Token;
-
-        var sel = transform.Find("Window/Selected") as RectTransform;
-        var selBase = sel != null ? sel.anchoredPosition : Vector2.zero;
-        var groups = new CanvasGroup[_cards.Count];
-        for (int i = 0; i < _cards.Count; i++)
-        {
-            if (_cards[i].Root == null) continue;
-            // ?? 금지 — 에디터의 GetComponent는 없을 때 가짜 null을 돌려줘 ??를 통과한다(MissingComponentException, 09-25 실측)
-            if (!_cards[i].Root.TryGetComponent(out groups[i])) groups[i] = _cards[i].Root.AddComponent<CanvasGroup>();
-            groups[i].alpha = 0f;
-        }
-
-        _dealing = true;
-        float total = (_cards.Count - 1) * DealStagger + DealDur;
-        try
-        {
-            for (float t = 0f; t < total; )
-            {
-                t += Time.unscaledDeltaTime;
-                for (int i = 0; i < _cards.Count; i++)
-                {
-                    var c = _cards[i];
-                    if (c.Root == null || groups[i] == null) continue;
-                    float k = Mathf.Clamp01((t - i * DealStagger) / DealDur);
-                    float e = 1f - Mathf.Pow(1f - k, 3f);
-                    groups[i].alpha = k;
-                    var lift = _selectedIndex == i ? new Vector2(0f, CardLift) : Vector2.zero;
-                    ((RectTransform)c.Root.transform).anchoredPosition = c.Base + lift + new Vector2(0f, -DealRise * (1f - e));
-                }
-                if (sel != null)
-                {
-                    float ks = 1f - Mathf.Pow(1f - Mathf.Clamp01(t / DealDur), 3f);
-                    sel.anchoredPosition = selBase + new Vector2(18f * (1f - ks), 0f);
-                }
-                await UniTask.Yield(PlayerLoopTiming.Update, ct);
-            }
-        }
-        catch (OperationCanceledException) { }
-        finally
-        {
-            _dealing = false;
-            for (int i = 0; i < _cards.Count; i++)
-            {
-                if (groups[i] != null) groups[i].alpha = 1f;
-                var c = _cards[i];
-                if (c.Root != null)
-                    ((RectTransform)c.Root.transform).anchoredPosition = c.Base + (_selectedIndex == i ? new Vector2(0f, CardLift) : Vector2.zero);
-            }
-            if (sel != null) sel.anchoredPosition = selBase;
-        }
-    }
-
-    /// <summary>
-    /// 판을 액자로 — 바깥 그림자 · 어두운 테두리선 + 안쪽 나무 테두리 · 가장자리 음영. 목업(상점 전체이미지)의 가장자리처럼
-    /// 판이 한 장의 물건으로 읽히게 한다. 구운 프리팹에도 붙도록 런타임에 한 번 짓는다. 막은 이 화면만 짙게.
-    /// </summary>
-    private void EnsureWindowFrame()
-    {
-        if (transform.Find("Veil") is RectTransform veilRT && veilRT.TryGetComponent<Image>(out var veil))
-            veil.color = new Color(0f, 0f, 0f, ShopVeilAlpha);
-
-        if (!(transform.Find("Window") is RectTransform win) || win.Find("FrameShadow") != null) return;
-
-        // 바깥 그림자 — 창 밖으로 번지는 부드러운 어둠(창보다 먼저 = 판 뒤).
-        var shadow = ShopUIStyle.MakeImage(win, "FrameShadow", new Color(0f, 0f, 0f, 0.75f));
-        shadow.sprite = UIProceduralSprites.RoundedRect(radius: 30f, feather: 28f);
-        shadow.type   = Image.Type.Sliced;
-        shadow.raycastTarget = false;
-        ShopUIStyle.Stretch(shadow.rectTransform, -ShadowOutset);
-        shadow.transform.SetAsFirstSibling();
-
-        // 배경(Bg) 바로 위 = 내용 아래: 가장자리 음영 → 테두리선 → 안쪽 나무 테두리
-        var bg = win.Find("Bg");
-        int at = bg != null ? bg.GetSiblingIndex() + 1 : 1;
-
-        var shade = ShopUIStyle.MakeImage(win, "FrameEdgeShade", EdgeShade);
-        shade.sprite = EdgeVignette();
-        shade.type   = Image.Type.Sliced;
-        shade.pixelsPerUnitMultiplier = 0.5f;   // 가장자리 폭 24 → 48px
-        shade.raycastTarget = false;
-        ShopUIStyle.Stretch(shade.rectTransform, 0f);
-        shade.transform.SetSiblingIndex(at);
-
-        var dark = ShopUIStyle.MakeImage(win, "FrameLine", FrameDark);
-        dark.sprite = UIProceduralSprites.RoundedOutline(radius: 6f, stroke: 5f);
-        dark.type   = Image.Type.Sliced;
-        dark.raycastTarget = false;
-        ShopUIStyle.Stretch(dark.rectTransform, 0f);
-        dark.transform.SetSiblingIndex(at + 1);
-
-        var trim = ShopUIStyle.MakeImage(win, "FrameTrim", FrameTrim);
-        trim.sprite = UIProceduralSprites.RoundedOutline(radius: 4f, stroke: 1.5f);
-        trim.type   = Image.Type.Sliced;
-        trim.raycastTarget = false;
-        ShopUIStyle.Stretch(trim.rectTransform, 6f);
-        trim.transform.SetSiblingIndex(at + 2);
-    }
-
-    /// <summary>
-    /// 구운 프리팹에도 입히는 모양 — 코드로 그린 스프라이트는 프리팹에 저장되지 않는다(09-29).
-    /// 이름 명판 = 양끝이 파인 띠(목업의 붉은 리본) · 나가기 = 새로고침과 같은 짙은 명판 · 인사말은 간판 쇠띠 앞까지 · 인장 할인 줄.
-    /// 10-13: 명판 · 나가기는 Artsystack 부품(placeholder · slot_short_inactive, 원색)이 있으면 그것으로 — 없으면 위 코드 판.
-    /// </summary>
-    private void StyleRuntime()
-    {
-        if (_selNamePlate != null)
-        {
-            Image fill = null;
-            if (_selNamePlate.transform.Find("Fill") is RectTransform f) f.TryGetComponent(out fill);
-            if (SkinArtPanel(_selNamePlate, _skin != null ? _skin.NamePlate : null, Color.white))
-            {
-                // 판 한 장(금 테 + 먹 채움)이 2겹을 맡는다 — 채움 그림만 끈다(이름 글자는 Fill 아래라 오브젝트는 남긴다).
-                if (fill != null) fill.enabled = false;
-            }
-            else
-            {
-                var rib = RibbonSprite();
-                _selNamePlate.sprite = rib;
-                _selNamePlate.type   = Image.Type.Sliced;
-                if (fill != null)
-                {
-                    fill.sprite = rib;
-                    fill.type   = Image.Type.Sliced;
-                }
-            }
-            if (_selName != null) _selName.margin = new Vector4(RibbonNotch, 0f, RibbonNotch, 0f);
-        }
-
-        if (transform.Find("Window/Exit") is RectTransform exitRt && exitRt.TryGetComponent<Image>(out var exitImg))
-        {
-            // 새로고침 아트(짙은 먹 판 + 금빛 테)와 같은 말투 — 붉은 네모가 이 화면에서만 따로 놀았다.
-            // 10-13: Artsystack slot_short_inactive 원색(먹갈 = 나무 톤 — 보조 버튼이라 금 테 없이, 금 테는 새로고침 · 산다 쪽).
-            if (!SkinArtPanel(exitImg, _skin != null ? _skin.ExitPanel : null, Color.white))
-                UITheme.StylePanel(exitImg, new Color(0.11f, 0.085f, 0.07f, 0.96f), new Color(0.80f, 0.62f, 0.32f, 0.75f), 6f);
-            var lbl = exitRt.GetComponentInChildren<TMP_Text>(true);
-            if (lbl != null) lbl.color = new Color(0.93f, 0.86f, 0.70f, 1f);
-        }
-
-        if (_dialogText != null)
-        {
-            Place(_dialogText, TitleTextX, TitleY + 58f, TitleTextW, 30f);
-            _dialogText.textWrappingMode = TextWrappingModes.Normal;
-            _dialogText.enableAutoSizing = true;
-            _dialogText.fontSizeMax = 16f;
-            _dialogText.fontSizeMin = 12f;
-        }
-
-        if (_sigilText == null && transform.Find("Window") is RectTransform win)
-        {
-            var found = win.Find("SigilLine");
-            _sigilText = found != null ? found.GetComponent<TMP_Text>()
-                       : ShopUIStyle.MakeText(win, "SigilLine", 16f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft,
-                                              new Color(0.88f, 0.72f, 0.42f, 1f));
-            Place(_sigilText, GoldX, GoldY + 24f, 240f, 22f);
-            _sigilText.textWrappingMode = TextWrappingModes.NoWrap;
-            _sigilText.raycastTarget    = false;
-            _sigilText.text = string.Empty;
-        }
-        if (_eventText == null && _sigilText != null)
-        {
-            _eventText = ShopUIStyle.MakeText(_sigilText.transform.parent, "EventLine", 16f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft,
-                                              new Color(0.88f, 0.72f, 0.42f, 1f));
-            _eventText.textWrappingMode = TextWrappingModes.NoWrap;
-            _eventText.raycastTarget    = false;
-            _eventText.text = string.Empty;
-        }
-    }
-
-    /// <summary>
-    /// 가격 알약 · 룬 태그 판(10-13) — Artsystack Rectangle_locked를 무채로 바꿔 고동(60,44,28)으로 칠한다. 글자는 그대로(가격 금 · 등급색).
-    /// 구운 프리팹엔 단색 판으로 굳어 있어 열 때마다 입힌다. 그림이 없으면 지금 단색 판 그대로.
-    /// </summary>
-    private void SkinCardPlates()
-    {
-        var pill = UISpriteMaster.Neutral(_skin != null ? _skin.PricePill : null);
-        if (pill == null) return;
-        foreach (var c in _cards)
-        {
-            SkinArtPanel(c.PricePill, pill, PillBrown);
-            SkinArtPanel(c.Tag0Bg,    pill, PillBrown);
-            SkinArtPanel(c.Tag1Bg,    pill, PillBrown);
-        }
-    }
-
-    /// <summary>
-    /// Artsystack 판 한 장(9-slice)을 입힌다 — 두께는 아트 높이를 칸 높이에 맞춘 배율(원본 높이(단위) ÷ 칸 높이, <see cref="FitCardArt"/>와 같은 셈).
-    /// 공용 SliceScale은 장식을 칸의 12%로 묶어 팩의 얇은 테가 1px 아래로 깎인다. 코드 판(StylePanel)이 달아 둔 금 선(Edge)은 아트 테와 겹쳐 끈다.
-    /// 그림이 없으면 아무것도 하지 않고 false — 호출측이 지금 판으로 폴백한다.
-    /// </summary>
-    private static bool SkinArtPanel(Image img, Sprite art, Color tint)
-    {
-        if (img == null || art == null) return false;
-        ShopUIStyle.Skin(img, art, sliced: true, tint: tint);
-        float h = img.rectTransform.rect.height;
-        float refPpu = img.canvas != null ? img.canvas.referencePixelsPerUnit : 100f;
-        if (h > 1f) img.pixelsPerUnitMultiplier = Mathf.Max(1f, art.rect.height / art.pixelsPerUnit * refPpu / h);
-        var edge = img.transform.Find("Edge");
-        if (edge != null) edge.gameObject.SetActive(false);
-        return true;
-    }
-
-    /// <summary>이름 명판 — 양끝이 제비꼬리로 파인 띠(목업의 붉은 리본). 전용 아트가 납품되지 않아 한 번 굽는다.</summary>
-    private static Sprite RibbonSprite()
-    {
-        if (s_ribbon != null) return s_ribbon;
-        const int W = 128, H = 48;
-        var tex = new Texture2D(W, H, TextureFormat.RGBA32, false)
-            { wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave };
-        for (int y = 0; y < H; y++)
-        for (int x = 0; x < W; x++)
-        {
-            float cy = Mathf.Abs(y + 0.5f - H * 0.5f) / (H * 0.5f);   // 0 = 가운데, 1 = 위아래 끝
-            float dx = Mathf.Min(x + 0.5f, W - x - 0.5f) - RibbonNotch * (1f - cy);   // 가운데가 가장 깊게 파인다
-            float dy = Mathf.Min(y + 0.5f, H - y - 0.5f);
-            tex.SetPixel(x, y, new Color(1f, 1f, 1f, Mathf.Clamp01(Mathf.Min(dx, dy))));
-        }
-        tex.Apply();
-        float b = RibbonNotch + 6f;
-        s_ribbon = Sprite.Create(tex, new Rect(0, 0, W, H), new Vector2(0.5f, 0.5f), 100f, 0,
-                                 SpriteMeshType.FullRect, new Vector4(b, 0f, b, 0f));
-        s_ribbon.hideFlags = HideFlags.HideAndDontSave;
-        return s_ribbon;
-    }
-
-    /// <summary>가장자리가 어둡고 안쪽 투명한 9-slice 판(64px, 테두리 24). 한 번 구워 공유.</summary>
-    private static Sprite EdgeVignette()
-    {
-        if (s_edgeVignette != null) return s_edgeVignette;
-        const int N = 64; const float B = 24f;
-        var tex = new Texture2D(N, N, TextureFormat.RGBA32, false)
-            { wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave };
-        for (int y = 0; y < N; y++)
-        for (int x = 0; x < N; x++)
-        {
-            float d = Mathf.Min(Mathf.Min(x, y), Mathf.Min(N - 1 - x, N - 1 - y)) / B;   // 가장자리에서 0 → 안쪽 1
-            float a = Mathf.Clamp01(1f - d);
-            tex.SetPixel(x, y, new Color(1f, 1f, 1f, a * a));
-        }
-        tex.Apply();
-        s_edgeVignette = Sprite.Create(tex, new Rect(0, 0, N, N), new Vector2(0.5f, 0.5f), 100f, 0,
-                                       SpriteMeshType.FullRect, new Vector4(B, B, B, B));
-        s_edgeVignette.hideFlags = HideFlags.HideAndDontSave;
-        return s_edgeVignette;
-    }
-
-    /// <summary>
-    /// 여는 연출 — 막이 차오르고 판이 살짝 커지며 떠오른다(0.965 → 1, 아래 14px → 제자리). 카드가 내려앉는 연출(PlayOpenFxAsync)과
-    /// 겹쳐 흐른다. 판이 한 번에 나타나 「상점을 여는 느낌」이 없었다(09-28). 표시 전용 — 구매 로직과 무관.
-    /// </summary>
-    private async UniTaskVoid PlayWindowInAsync()
-    {
-        if (!(transform.Find("Window") is RectTransform win)) return;
-        if (!win.TryGetComponent<CanvasGroup>(out var cg)) cg = win.gameObject.AddComponent<CanvasGroup>();
-        Image veil = null;
-        if (transform.Find("Veil") is RectTransform vr) vr.TryGetComponent(out veil);
-        var basePos = win.anchoredPosition;
-
-        try
-        {
-            for (float t = 0f; t < WindowInSec; )
-            {
-                t += Time.unscaledDeltaTime;
-                float k = Mathf.Clamp01(t / WindowInSec);
-                float e = 1f - Mathf.Pow(1f - k, 3f);
-                cg.alpha = Mathf.Clamp01(k * 1.6f);
-                win.localScale = Vector3.one * Mathf.Lerp(WindowInScale, 1f, e);
-                win.anchoredPosition = basePos + new Vector2(0f, -14f * (1f - e));
-                if (veil != null) veil.color = new Color(0f, 0f, 0f, ShopVeilAlpha * Mathf.Clamp01(k * 2f));
-                await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
-            }
-        }
-        catch (OperationCanceledException) { }
-        finally
-        {
-            if (cg != null) cg.alpha = 1f;
-            if (win != null) { win.localScale = Vector3.one; win.anchoredPosition = basePos; }
-            if (veil != null) veil.color = new Color(0f, 0f, 0f, ShopVeilAlpha);
-        }
+        PlayWindowInAsync().Forget();
+        PlayOpenFxAsync().Forget();
     }
 
     public override void ClosePopupUI()
@@ -502,590 +171,322 @@ public sealed class UI_ShopPanel : UI_Popup
         base.ClosePopupUI();
     }
 
-    // ── 배치 헬퍼 ──
-
-    /// <summary>
-    /// 목업 좌상단 기준 사각형으로 배치한다. 창(<c>MockW</c>×<c>MockH</c>)에 대한 <b>비율 앵커</b>로 굳는다.
-    ///
-    /// <para>예전엔 목업 px에 <c>S</c>를 곱한 <b>절대 크기</b>를 점 앵커에 박았다. 그러면 창을 키워도
-    /// 자식은 좌상단에 원래 크기로 붙어 있어, 넓어진 자리가 통째로 빈다 —
-    /// 배경만 커지고 내용은 안 따라오는 원인이 이것이었다.</para>
-    ///
-    /// <para>목업 좌표계는 그 자체가 이미 비율계다(창이 정확히 <c>MockW</c>×<c>MockH</c>다).
-    /// 그래서 나누기 한 번으로 정확히 옮겨진다 — 근사가 아니라 <b>같은 값</b>이다.
-    /// 이제 창 <see cref="RectTransform"/> 하나만 인스펙터에서 끌면 내용 전체가 비율 그대로 따라온다.</para>
-    /// </summary>
-    private static void Place(Component c, float mx, float my, float mw, float mh)
-        => PlaceFrac((RectTransform)c.transform, mx, my, mw, mh, MockW, MockH);
-
-    private static void PlaceFrac(RectTransform rt, float mx, float my, float mw, float mh, float pw, float ph)
-        => UIProportional.Place(rt, mx, my, mw, mh, pw, ph);
-
-    // ── Build ──
+    // ── 짓기 ──
 
     private void BuildChrome()
     {
         if (_built) return;
         _built = true;
-        // 프리팹이 구워져 있으면 <b>짓지 않고 잇기만 한다</b> — 다시 지으면 UI가 두 벌 겹친다.
-        if (transform.childCount > 0)
+        // 옛 구운 계층(나무 · 양피지 · 10-20까지)이 남아 있으면 지운다 — 새 레이아웃은 늘 여기서 짓는다.
+        for (int i = transform.childCount - 1; i >= 0; i--)
         {
-            BindBakedHierarchy();
-            return;
+            var old = transform.GetChild(i).gameObject;
+            old.SetActive(false);
+            Destroy(old);
         }
 
+        ShopUIStyle.Stretch((RectTransform)transform);
+        _veil = ShopUIStyle.MakeImage(transform, "Veil", new Color(0f, 0f, 0f, VeilAlpha), raycast: true);
+        ShopUIStyle.Stretch(_veil.rectTransform);
 
-        ShopUIStyle.Stretch(GetComponent<RectTransform>());
-
-        var veil = ShopUIStyle.MakeImage(transform, "Veil", ShopUIStyle.Veil, raycast: true);
-        ShopUIStyle.Stretch(veil.rectTransform);
-
+        var win = ShopUIStyle.MakeImage(transform, "Window", UITheme.Window, raycast: true);
+        _win = win.rectTransform;
         var half = new Vector2(0.5f, 0.5f);
-        var window = ShopUIStyle.MakeImage(transform, "Window", new Color(0f, 0f, 0f, 0f), raycast: true);
-        // 화면 맞춤은 빌더가 붙인다 — 프리팹에만 붙이면 재굽기 때 사라진다.
-        window.gameObject.AddComponent<UIWindowFitter>().Configure(maxScale: UIWindowFitter.ContentScreen);
-        ShopUIStyle.Anchor(window.rectTransform, half, half, half, Vector2.zero, new Vector2(WindowW, WindowH));
-        var w = window.transform;
+        ShopUIStyle.Anchor(_win, half, half, half, Vector2.zero, new Vector2(WinW, WinH));   // 맞춤이 Awake에서 이 크기를 기준으로 잡는다 — 먼저
+        _win.gameObject.AddComponent<UIWindowFitter>().Configure(maxScale: UIWindowFitter.ContentScreen, scaleTransform: true);
 
-        // 배경은 창과 같은 비율이라 그대로 채운다.
-        var bg = ShopUIStyle.MakeImage(w, "Bg", ShopUIStyle.WindowFill, raycast: true);
-        Place(bg, 0f, 0f, MockW, MockH);
-        ShopUIStyle.Skin(bg, _skin?.background);
-
-        BuildTopBar(w);
-        BuildDeal(w);
-        BuildGrid(w);
-        BuildSelectedColumn(w);
-        BuildReroll(w);
-        BuildExitButton(w);
-
-        // 모서리 장식은 마지막 — 내용 위로 지나가야 액자가 된다.
-        BuildCorners(w);
-
-        // 연출 층은 그 위 — 산 물건과 동전이 카드·장식 위로 지나간다.
-        _fxRoot = ShopUIStyle.MakeRect(w, "PurchaseFx").GetComponent<RectTransform>();
-        ShopUIStyle.Stretch(_fxRoot);
-    }
-
-    /// <summary>
-    /// 구워진 프리팹을 잇는다 — <b>계층·좌표·아트는 프리팹이 갖고, 코드는 배선만 한다.</b>
-    ///
-    /// <para>클릭 리스너와 <see cref="_cards"/> 목록은 직렬화되지 않는다(리스너는 코드가 붙인 것이고,
-    /// 목록은 <c>readonly</c> 런타임 상태다). 그 둘만 여기서 되살린다.
-    /// 이름으로 찾는다 — 빌더가 붙이던 이름 그대로라 프리팹에도 같은 이름으로 굳어 있다.</para>
-    /// </summary>
-    private void BindBakedHierarchy()
-    {
-        _cards.Clear();
-
-        for (int i = 0; i < GridCols * GridRows; i++)
+        var frame = _skin != null ? _skin.WindowFrame : null;
+        if (frame != null)
         {
-            var root = transform.Find($"Window/Card{i}");
-            if (root == null) continue;
-
-            int captured = i;
-            // 배지의 글리프·글자는 카드가 아니라 <b>BadgeBg 아래</b>에 달린다(빌더가 그렇게 짓는다).
-            // Img/Txt는 직속 자식만 찾으므로 카드에서 찾으면 둘 다 null이 되고,
-            // 상품 6장의 카테고리 배지가 전부 빈 칸으로 남는다.
-            var badge = root.Find("BadgeBg");
-            var c = new Card
-            {
-                Root       = root.gameObject,
-                Bg         = root.GetComponent<Image>(),
-                Icon       = Img(root, "Icon"),
-                BadgeBg    = badge != null ? badge.GetComponent<Image>() : null,
-                BadgeGlyph = badge != null ? Img(badge, "BadgeGlyph") : null,
-                SoldStamp  = Img(root, "SoldStamp"),
-                PriceCoin  = Img(root, "PriceCoin"),
-                BadgeText  = badge != null ? Txt(badge, "BadgeText") : null,
-                Name       = Txt(root, "Name"),
-                Effect     = Txt(root, "Effect"),
-                Price      = Txt(root, "Price"),
-                IconFrame  = Img(root, "IconFrame"),
-                IconGlow   = Img(root, "IconGlow"),
-                PricePill  = Img(root, "PricePill"),
-                Tag0Bg     = Img(root, "Tag0"),
-                Tag1Bg     = Img(root, "Tag1"),
-                Tag0       = root.Find("Tag0") != null ? Txt(root.Find("Tag0"), "Label") : null,
-                Tag1       = root.Find("Tag1") != null ? Txt(root.Find("Tag1"), "Label") : null,
-                Base       = ((RectTransform)root).anchoredPosition,
-            };
-            // 코드로 그린 빛(SoftDot)은 구운 프리팹에 저장되지 않는다 — 안 입히면 흰 네모 판으로 뜬다(09-25 캡처).
-            if (c.IconGlow != null) c.IconGlow.sprite = UI_RuneSelectPopup.SoftDot;
-            _cards.Add(c);
-            AddClick(root.gameObject, () => Select(captured));
+            win.sprite = frame;
+            win.type   = Image.Type.Sliced;
+            win.color  = Color.white;
+            win.pixelsPerUnitMultiplier = frame.border.x > 0f ? frame.border.x / FrameCorner : 1f;
         }
-        if (_selGlow != null) _selGlow.sprite = UI_RuneSelectPopup.SoftDot;
-        var selCol = transform.Find("Window/Selected");
-        if (selCol != null) _selShape = EnsureSelShape(selCol);
+        else UITheme.StylePanel(win, UITheme.Window, LineGold, 6f);
 
-        if (_dealRoot != null) AddClick(_dealRoot, () => Select(SpecialIndex));
+        BuildHeader();
+        BuildBand();
+        BuildCards();
+        BuildDetail();
+        BuildFooter();
 
-        Rewire(_buyBtn,    OnBuyClicked);
-        Rewire(_rerollBtn, OnRerollClicked);
-        Rewire(transform.Find("Window/Exit")?.GetComponent<Button>(), ClosePopupUI);
+        // 연출 층은 맨 위 — 산 물건과 동전이 카드 위로 지나간다.
+        _fx = (RectTransform)ShopUIStyle.MakeRect(_win, "PurchaseFx").transform;
+        ShopUIStyle.Stretch(_fx);
     }
 
-    private static Image    Img(Transform p, string n) => p.Find(n)?.GetComponent<Image>();
-    private static TMP_Text Txt(Transform p, string n) => p.Find(n)?.GetComponent<TMP_Text>();
-
-    /// <summary>같은 팝업이 다시 열려도 리스너가 겹쳐 쌓이지 않도록 지우고 건다.</summary>
-    private static void Rewire(Button btn, UnityEngine.Events.UnityAction fn)
+    private void BuildHeader()
     {
-        if (btn == null) return;
-        btn.onClick.RemoveAllListeners();
-        btn.onClick.AddListener(fn);
-    }
+        var portrait = _skin != null ? _skin.PeddlerPortrait : null;
+        var p = Img(_win, "Portrait", 54f, 24f, 82f, 123f, Color.white, portrait);
+        p.gameObject.SetActive(portrait != null);
+        float tx = portrait != null ? 154f : 64f;
 
-    /// <summary>상단 — 어두운 띠 + 간판(등불 일체) + 골드 + 우상단 문장.</summary>
-    private void BuildTopBar(Transform w)
-    {
-        var band = ShopUIStyle.MakeImage(w, "TopBand", new Color(0f, 0f, 0f, 0.55f));
-        Place(band, 0f, BandY, MockW, BandH);
-        ShopUIStyle.Skin(band, _skin?.topBand, sliced: true);
-
-        // 간판 — 아트에 '심연의 행상' 글자는 없다. 판 위에 얹는다.
-        var board = ShopUIStyle.MakeImage(w, "TitleBoard", new Color(1f, 1f, 1f, 0f));
-        Place(board, TitleX, TitleY, TitleW, TitleH);
-        board.raycastTarget = false;
-        ShopUIStyle.Skin(board, _skin?.titleBoard);
-
-        var name = ShopUIStyle.MakeText(w, "Name", 26f, FontStyles.Bold,
-                                        TextAlignmentOptions.MidlineLeft, ShopUIStyle.Gold);
+        var name = Text(_win, "Name", tx, 50f, 520f, 38f, 27f, UIWeight.Medium, Ink);
         name.text = "심연의 행상";
-        Place(name, TitleX + 100f, TitleY + 27f, 230f, 34f);
-
-        _dialogText = ShopUIStyle.MakeText(w, "Dialog", 16f, FontStyles.Normal,
-                                           TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextPrimary);
+        _dialogText = Text(_win, "Dialog", tx, 92f, 760f, 28f, 17f, UIWeight.Regular, Mute);
         _dialogText.text = Greeting;
-        Place(_dialogText, TitleTextX, TitleY + 58f, TitleTextW, 30f);
 
-        // 골드 — 코인 + 수치. 상단 띠 중앙 우측.
-        var coin = ShopUIStyle.MakeImage(w, "GoldCoin", ShopUIStyle.Gold);
-        Place(coin, GoldX, GoldY, GoldIconSize, GoldIconSize);
-        coin.preserveAspect = true;
-        ShopUIStyle.Skin(coin, _skin?.goldCoin);
+        var gold = Row(_win, "GoldRow", R - 360f, 48f, 360f, 40f, TextAnchor.MiddleRight, 10f);
+        RowIcon(gold, "Coin", CoinSprite, 26f, Color.white);
+        _goldText = RowText(gold, "Gold", 27f, UIWeight.Medium, Gold);
 
-        _goldText = ShopUIStyle.MakeText(w, "Gold", 21f, FontStyles.Bold,
-                                         TextAlignmentOptions.MidlineLeft, ShopUIStyle.Gold);
-        Place(_goldText, GoldX + 30f, GoldY - 6f, 190f, 34f);
-
-        var crest = ShopUIStyle.MakeImage(w, "Crest", new Color(1f, 1f, 1f, 0f));
-        Place(crest, CrestX, CrestY, CrestW, CrestH);
-        crest.raycastTarget = false;
-        ShopUIStyle.Skin(crest, _skin?.crest);
+        _subLine = Text(_win, "SubLine", R - 620f, 94f, 620f, 26f, 15f, UIWeight.Medium, Amber, TextAlignmentOptions.MidlineRight);
+        Img(_win, "HeadLine", L, 150f, InnerW, 1f, LineGold);
     }
 
-    private void BuildCorners(Transform w)
+    private void BuildBand()
     {
-        AddCorner(w, "CornerTL", _skin?.cornerTopLeft,     CornerInsetX,                       CornerTopY);
-        AddCorner(w, "CornerTR", _skin?.cornerTopRight,    MockW - CornerInsetX - CornerW,     CornerTopY);
-        AddCorner(w, "CornerBL", _skin?.cornerBottomLeft,  CornerInsetX,                       CornerBottomY);
-        AddCorner(w, "CornerBR", _skin?.cornerBottomRight, MockW - CornerInsetX - CornerW,     CornerBottomY);
+        Panel(_win, "Band", L, BandY, InnerW, BandH, PanelFill, Line);
+        var row = Row(_win, "BandRow", L, BandY, InnerW, BandH, TextAnchor.MiddleLeft, 0f, new RectOffset(26, 26, 0, 0));
+        var label = RowText(row, "Label", 14f, UIWeight.Medium, Amber);
+        label.text = "내 상태";
+        label.characterSpacing = 6f;
+        Spacer(row, 40f);
+        _hpText      = BandItem(row, "Hp",      _skin != null ? _skin.HpIcon : null,      "체력");
+        Spacer(row, 40f);
+        _potionText  = BandItem(row, "Potion",  _skin != null ? _skin.PotionIcon : null,  "포션");
+        Spacer(row, 40f);
+        _storageText = BandItem(row, "Storage", _skin != null ? _skin.StorageIcon : null, "룬 보관함");
+        Spacer(row, 40f);
+        _boardText   = BandItem(row, "Board",   _skin != null ? _skin.BoardIcon : null,   "룬판");
+
+        // 원석 환전소(10-22 사용자 「룬을 다 맞추거나 맞추기 싫을 때 — 원석을 골드로」) — 띠 오른쪽: 저울 문장 · 환율 · 가진 원석 · [10개] · [전부]
+        var ex = Row(_win, "Exchange", R - ExchangeW, BandY, ExchangeW, BandH, TextAnchor.MiddleRight, 10f, new RectOffset(0, 8, 0, 0));
+        RowIcon(ex, "Emblem", _skin != null ? _skin.ExchangeEmblem : null, 46f, Color.white);
+        var rate = RowText(ex, "Rate", 15f, UIWeight.Regular, Mute);
+        rate.text = $"원석 환전  1 → {ShopRoomController.OreToGold}";
+        Spacer(ex, 4f);
+        RowIcon(ex, "OreIcon", _skin != null ? _skin.OreIcon : null, 22f, Color.white);
+        _oreText = RowText(ex, "Ore", 20f, UIWeight.Medium, Ink);
+        Spacer(ex, 4f);
+        _exStepBtn = FootButton(ex, "ExStep", 124f, out var es);
+        _exStepLabel = RowText(es, "Label", 16f, UIWeight.Medium, Ink);
+        RowIcon(es, "Coin", CoinSprite, 18f, Color.white);
+        _exStepBtn.onClick.AddListener(() => OnExchange(ShopRoomController.ExchangeStep));
+        _exAllBtn = FootButton(ex, "ExAll", 132f, out var ea);
+        _exAllLabel = RowText(ea, "Label", 16f, UIWeight.Medium, Ink);
+        RowIcon(ea, "Coin", CoinSprite, 18f, Color.white);
+        _exAllBtn.onClick.AddListener(() => OnExchange(_controller != null ? _controller.Ore : 0));
     }
 
-    private static void AddCorner(Transform w, string name, Sprite art, float mx, float my)
+    private void BuildCards()
     {
-        if (art == null) return;   // 아트 없으면 장식 자체를 만들지 않는다(빈 흰 사각형 방지)
-        var img = ShopUIStyle.MakeImage(w, name, Color.white);
-        Place(img, mx, my, CornerW, CornerH);
-        img.raycastTarget = false;
-        ShopUIStyle.Skin(img, art);
-    }
+        var h1 = Text(_win, "BlessHead", L, BodyY, 80f, 26f, 18f, UIWeight.Medium, Ink);
+        h1.text = "가호";
+        var n1 = Text(_win, "BlessNote", L + 52f, BodyY + 1f, 500f, 24f, 15f, UIWeight.Regular, Mute);
+        n1.text = "런이 끝날 때까지 유지 · 버프 칸";
+        var h2 = Text(_win, "ShelfHead", L, SmallY - 32f, 80f, 26f, 18f, UIWeight.Medium, Ink);
+        h2.text = "진열";
+        var n2 = Text(_win, "ShelfNote", L + 52f, SmallY - 31f, 420f, 24f, 15f, UIWeight.Regular, Mute);
+        n2.text = "룬 2 · 재료 1 · 포션 1 + 오늘의 특가";
+        // 오른쪽 끝은 특가 카드 앞까지 — 특가 딱지(카드 위로 14 솟음)와 겹쳤다(10-21 1차 촬영)
+        var n3 = Text(_win, "LockNote", L + 4 * SmallStep - 20f - 460f, SmallY - 31f, 460f, 24f, 14f, UIWeight.Regular, Faint, TextAlignmentOptions.MidlineRight);
+        n3.text = "자물쇠 — 다음 상점까지 같은 값으로 남긴다";
 
-    /// <summary>오늘의 특가 — 리본이 아트에 포함된 배너 1장. 내용은 그 안에 얹는다.</summary>
-    private void BuildDeal(Transform w)
-    {
-        var card = ShopUIStyle.MakeImage(w, "Deal", new Color(0.20f, 0.09f, 0.08f, 0.96f), raycast: true);
-        _dealRoot = card.gameObject;
-        Place(card, DealX, DealY, DealW, DealH);
-        ShopUIStyle.Skin(card, _skin?.dealPanel, sliced: true);
-        AddClick(card.gameObject, () => Select(SpecialIndex));
-
-        // 아트가 없을 때만 "오늘의 특가" 글자를 그린다 — 있으면 리본에 이미 있다.
-        if (_skin?.dealPanel == null)
+        for (int i = 0; i < AbyssPeddlerCatalog.ProductCount; i++)
         {
-            var tab = ShopUIStyle.MakeText(card.transform, "Tab", 15f, FontStyles.Bold,
-                                           TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
-            tab.text = "오늘의 특가";
-            PlaceIn(card.transform, tab, 27f, 8f, 150f, 26f, DealW, DealH);
+            bool wide = i < 2;
+            _cards.Add(wide ? BuildWideCard(i, L + i * (WideW + WideGap), WideY)
+                            : BuildSmallCard(i, L + (i - 2) * SmallStep, SmallY));
         }
-
-        // 리본이 좌상단을 덮으므로 내용은 그 아래·오른쪽에서 시작한다.
-        _dealIcon = ShopUIStyle.MakeImage(card.transform, "Icon", new Color(0.05f, 0.05f, 0.07f, 1f));
-        PlaceIn(card.transform, _dealIcon, 43f, 42f + DealInY, 88f, 88f, DealW, DealH);
-        _dealIcon.preserveAspect = true;
-        _dealIcon.enabled = false;   // 특가가 채워질 때 켠다 — 구워진 기본 상태가 검은 네모로 남지 않게
-
-        _dealCat = ShopUIStyle.MakeText(card.transform, "Cat", 16f, FontStyles.Normal,
-                                        TextAlignmentOptions.TopLeft, new Color(0.36f, 0.26f, 0.16f, 1f));
-        PlaceIn(card.transform, _dealCat, 147f, 42f + DealInY, 268f, 20f, DealW, DealH);
-
-        _dealName = ShopUIStyle.MakeText(card.transform, "Name", 23f, FontStyles.Bold,
-                                         TextAlignmentOptions.TopLeft, new Color(0.20f, 0.13f, 0.07f, 1f));
-        PlaceIn(card.transform, _dealName, 147f, 62f + DealInY, 268f, 30f, DealW, DealH);
-
-        _dealDesc = ShopUIStyle.MakeText(card.transform, "Desc", 16f, FontStyles.Normal,
-                                         TextAlignmentOptions.TopLeft, new Color(0.36f, 0.26f, 0.16f, 1f));
-        PlaceIn(card.transform, _dealDesc, 147f, 94f + DealInY, 268f, 24f, DealW, DealH);   // 16px 줄높이(≈21) + 여유
-
-        _dealOldPrice = ShopUIStyle.MakeText(card.transform, "OldPrice", 16f, FontStyles.Strikethrough,
-                                             TextAlignmentOptions.MidlineRight, new Color(0.42f, 0.32f, 0.22f, 1f));
-        PlaceIn(card.transform, _dealOldPrice, 427f, 44f + DealInY, 150f, 22f, DealW, DealH);
-
-        _dealPrice = ShopUIStyle.MakeText(card.transform, "Price", 27f, FontStyles.Bold,
-                                          TextAlignmentOptions.MidlineRight, new Color(0.45f, 0.28f, 0.06f, 1f));
-        PlaceIn(card.transform, _dealPrice, 427f, 68f + DealInY, 150f, 34f, DealW, DealH);
-
-        // 「1개 남음」 — 특가는 1회성이다. 사고 나면 이 자리가 「품절」로 바뀌고 도장이 찍힌다(기획: 거래의 손맛).
-        _dealStock = ShopUIStyle.MakeText(card.transform, "Stock", 16f, FontStyles.Bold,
-                                          TextAlignmentOptions.MidlineRight, DealStockInk);
-        _dealStock.text = "1개 남음";
-        PlaceIn(card.transform, _dealStock, 427f, 102f + DealInY, 150f, 22f, DealW, DealH);
-
-        _dealStamp = ShopUIStyle.MakeImage(card.transform, "DealStamp", new Color(1f, 1f, 1f, 0f));
-        PlaceIn(card.transform, _dealStamp, (DealW - 240f) * 0.5f, (DealH - 120f) * 0.5f, 240f, 120f, DealW, DealH);
-        _dealStamp.raycastTarget = false;
-        ShopUIStyle.Skin(_dealStamp, _skin?.soldStamp);
-        _dealStamp.gameObject.SetActive(false);
+        _deal = BuildSmallCard(SpecialIndex, L + 4 * SmallStep, SmallY);
     }
 
-    /// <summary>부모 사각형 안쪽 기준 배치(목업 px). 부모의 좌상단이 원점.</summary>
-    /// <summary>
-    /// 자식을 부모 안에 <b>비율로</b> 앉힌다. <paramref name="pw"/>×<paramref name="ph"/>는
-    /// 부모의 <b>목업 크기</b>다 — 부모가 화면에서 몇 px인지와 무관하게 목업 좌표만으로 비율이 나온다.
-    ///
-    /// <para>부모의 실제 rect를 읽어 추론하지 않는 이유: 부모도 이제 비율 앵커라 <c>sizeDelta</c>가 0이고,
-    /// 실제 크기는 레이아웃이 한 번 돌아야 정해진다. 프리팹을 굽는 동안에는 그게 돌지 않아
-    /// 추론하면 0으로 나눈다. 목업 크기는 <b>상수로 알고 있으니</b> 그대로 넘긴다.</para>
-    /// </summary>
-    private static void PlaceIn(Transform parent, Component c, float mx, float my, float mw, float mh,
-                                float pw, float ph)
+    private CardView BuildWideCard(int index, float x, float y)
     {
-        var rt = (RectTransform)c.transform;
-        if (rt.parent != parent) rt.SetParent(parent, false);
-        PlaceFrac(rt, mx, my, mw, mh, pw, ph);
-    }
-
-    private void BuildGrid(Transform w)
-    {
-        for (int i = 0; i < GridCols * GridRows; i++)
-            _cards.Add(BuildCard(w, i));
-    }
-
-    /// <summary>
-    /// 상품 카드 1장(목업 px 205×205, 09-29). 종이 안쪽은 x 16~176 · y 22~183다. 아이콘 칸 74 · 이름 100 · 효과 122(두 줄) · 가격 161.
-    /// 09-25 룬 선택 규격: 아이콘 칸 등급 테두리·빛(룬) · 아이콘 오른쪽 빈 종이에 등급·칸 수 태그(룬) ·
-    /// 이름 16 굵게 · 효과 16 두 줄 · 가격은 오른쪽 아래 짙은 알약 안(예전엔 효과 끝과 물렸다).
-    /// </summary>
-    private Card BuildCard(Transform parent, int index)
-    {
-        int captured = index;
-        var c = new Card();
-
-        var bg = ShopUIStyle.MakeImage(parent, $"Card{index}", new Color(0.13f, 0.12f, 0.16f, 0.96f), raycast: true);
-        c.Root = bg.gameObject; c.Bg = bg;
-        Place(bg, GridX + (index % GridCols) * CardStepX,
-                  GridY + (index / GridCols) * CardStepY, CardW, CardH);
-        ShopUIStyle.Skin(bg, _skin?.cardBg, sliced: true);
-        AddClick(bg.gameObject, () => Select(captured));
-        c.Base = ((RectTransform)bg.transform).anchoredPosition;
-
-        // 등급빛 — 룬만 켠다(RefreshCards). 아이콘 칸 뒤에서 번진다.
-        c.IconGlow = ShopUIStyle.MakeImage(bg.transform, "IconGlow", new Color(1f, 1f, 1f, 0f));
-        PlaceIn(bg.transform, c.IconGlow, 8f, 10f, 102f, 96f, CardW, CardH);
-        c.IconGlow.sprite = UI_RuneSelectPopup.SoftDot;
-
-        // 아이콘 칸 — 채움 + 테두리 2겹, 그 사이에 상품 아이콘.
-        var fill = ShopUIStyle.MakeImage(bg.transform, "IconFill", new Color(0.05f, 0.05f, 0.07f, 1f));
-        PlaceIn(bg.transform, fill, 24f, 22f, 70f, 74f, CardW, CardH);
-        ShopUIStyle.Skin(fill, _skin?.iconFill, sliced: true);
-
-        c.Icon = ShopUIStyle.MakeImage(bg.transform, "Icon", new Color(1f, 1f, 1f, 0f));
-        PlaceIn(bg.transform, c.Icon, 28f, 26f, 62f, 66f, CardW, CardH);
-        c.Icon.preserveAspect = true;
-
-        c.IconFrame = ShopUIStyle.MakeImage(bg.transform, "IconFrame", new Color(1f, 1f, 1f, 0f));
-        PlaceIn(bg.transform, c.IconFrame, 24f, 22f, 70f, 74f, CardW, CardH);
-        c.IconFrame.raycastTarget = false;
-        ShopUIStyle.Skin(c.IconFrame, _skin?.iconFrame, sliced: true);   // 룬이면 등급색을 곱한다(RefreshCards)
-
-        // 카테고리 배지 — 바탕(아트) + 글자(아트가 있으면 그 위 라벨은 끈다).
-        c.BadgeBg = ShopUIStyle.MakeImage(bg.transform, "BadgeBg", CatColor[0]);
-        PlaceIn(bg.transform, c.BadgeBg, 112f, 22f, 50f, 22f, CardW, CardH);
-
-        c.BadgeGlyph = ShopUIStyle.MakeImage(c.BadgeBg.transform, "BadgeGlyph", new Color(1f, 1f, 1f, 0f));
-        ShopUIStyle.Stretch(c.BadgeGlyph.rectTransform, 2f);
-        c.BadgeGlyph.preserveAspect = true;
-        c.BadgeGlyph.raycastTarget  = false;
-
-        c.BadgeText = ShopUIStyle.MakeText(c.BadgeBg.transform, "BadgeText", 16f, FontStyles.Bold,
-                                           TextAlignmentOptions.Center, new Color(0.1f, 0.09f, 0.12f));
-        ShopUIStyle.Stretch(c.BadgeText.rectTransform);
-
-        // 등급·칸 수 태그(룬만) — 완성본에서 비어 있던 아이콘 오른쪽 종이. 룬 선택 카드의 칩과 같은 말.
-        (c.Tag0Bg, c.Tag0) = MakeTag(bg.transform, "Tag0", TagX, Tag0Y, Tag0W);
-        (c.Tag1Bg, c.Tag1) = MakeTag(bg.transform, "Tag1", TagX, Tag1Y, Tag1W);
-
-        c.Name = ShopUIStyle.MakeText(bg.transform, "Name", 16f, FontStyles.Bold,
-                                      TextAlignmentOptions.TopLeft, new Color(0.18f, 0.12f, 0.06f, 1f));
-        PlaceIn(bg.transform, c.Name, 22f, 100f, 160f, 22f, CardW, CardH);
-        FitLine(c.Name);
-
-        // 효과 — 16px 두 줄까지(넘치면 말줄임). 자동 축소는 끈다 — 줄어들면 하한(16) 아래로 내려간다.
-        c.Effect = ShopUIStyle.MakeText(bg.transform, "Effect", 16f, FontStyles.Normal,
-                                        TextAlignmentOptions.TopLeft, new Color(0.30f, 0.21f, 0.12f, 1f));
-        PlaceIn(bg.transform, c.Effect, 22f, 122f, 160f, 40f, CardW, CardH);
-        c.Effect.enableAutoSizing = false;
-        c.Effect.textWrappingMode = TextWrappingModes.Normal;
-        c.Effect.overflowMode     = TextOverflowModes.Ellipsis;
-
-        // 가격 — 짙은 알약 안(코인 + 수치). 효과 문장과 자리를 나눈다.
-        c.PricePill = ShopUIStyle.MakeImage(bg.transform, "PricePill", new Color(0.12f, 0.07f, 0.03f, 0.88f));
-        PlaceIn(bg.transform, c.PricePill, 100f, 161f, 80f, 21f, CardW, CardH);
-        c.PricePill.raycastTarget = false;
-
-        c.PriceCoin = ShopUIStyle.MakeImage(bg.transform, "PriceCoin", ShopUIStyle.Gold);
-        PlaceIn(bg.transform, c.PriceCoin, 104f, 162.5f, 18f, 18f, CardW, CardH);
-        c.PriceCoin.preserveAspect = true;
-        ShopUIStyle.Skin(c.PriceCoin, _skin?.goldCoin);
-
-        c.Price = ShopUIStyle.MakeText(bg.transform, "Price", 17f, FontStyles.Bold,
-                                       TextAlignmentOptions.MidlineLeft, PriceInk);
-        PlaceIn(bg.transform, c.Price, 125f, 160.5f, 54f, 22f, CardW, CardH);
-        c.Price.enableAutoSizing = false;
-
-        // 품절 도장 — 카드 중앙에 겹친다. 기본은 꺼둔다.
-        c.SoldStamp = ShopUIStyle.MakeImage(bg.transform, "SoldStamp", new Color(1f, 1f, 1f, 0f));
-        PlaceIn(bg.transform, c.SoldStamp, (CardW - 175f) * 0.5f, (CardH - 92f) * 0.5f, 175f, 92f, CardW, CardH);
-        c.SoldStamp.raycastTarget = false;
-        ShopUIStyle.Skin(c.SoldStamp, _skin?.soldStamp);
-        c.SoldStamp.gameObject.SetActive(false);
-
+        var c = NewCard(index, x, y, WideW, WideH, wide: true);
+        var t = c.Content.transform;
+        var emblem = _skin != null ? _skin.BlessingEmblem : null;
+        c.Plate = Img(t, "Plate", 24f, 32f, 136f, 136f, emblem != null ? Color.white : WellFill, emblem);
+        if (emblem == null) { c.Plate.sprite = UIProceduralSprites.Circle(); c.Plate.preserveAspect = true; }
+        c.Icon = CenterIcon(c.Plate.transform, 64f);
+        c.Tag    = Text(t, "Tag",    180f, 24f, 240f, 22f, 14f, UIWeight.Medium, Mute);
+        c.Name   = Text(t, "Name",   180f, 50f, 290f, 34f, 23f, UIWeight.Medium, Ink);
+        c.Effect = Text(t, "Effect", 180f, 90f, 290f, 28f, 19f, UIWeight.Regular, Ink);
+        c.Note   = Text(t, "Note",   180f, 122f, 290f, 22f, 14f, UIWeight.Regular, Faint);
+        BuildPrice(c, WideW - 24f, 150f);
+        BuildLock(c, WideW - 58f, 18f);
+        BuildOverlay(c, WideW, WideH);
         return c;
     }
 
-    /// <summary>
-    /// 고른 물건의 블록 모양 칸 — 큰 아이콘 <b>왼쪽</b> 안쪽 종이(옅은 판 위). 오른쪽은 겹친 종이 장식이라 걸쳐 보였다(09-25 캡처).
-    /// 구운 프리팹에 없으면 만든다. 자리는 LayoutSelArt가 정한다.
-    /// </summary>
-    private static RectTransform EnsureSelShape(Transform selected)
+    private CardView BuildSmallCard(int index, float x, float y)
     {
-        var found = selected.Find("ShapeBox") as RectTransform;
-        if (found != null) return found;
-        var plate = ShopUIStyle.MakeImage(selected, "ShapeBox", ShapePlate);
-        plate.raycastTarget = false;
-        return plate.rectTransform;
-    }
-
-    /// <summary>
-    /// 그림·빛·모양 칸 자리. 룬이면 모양 칸을 왼쪽 절반에 크게 두고 그림은 오른쪽으로 비킨다 —
-    /// 70×104 칸(칸 20px)에선 모양이 점 몇 개로 보였다(09-25 캡처). 룬이 아니면 그림이 가운데.
-    /// 고를 때마다 다시 놓으므로 구운 프리팹의 옛 자리와 상관없다(다시 굽지 않아도 된다).
-    /// </summary>
-    private void LayoutSelArt(bool rune)
-    {
-        if (_selPreview == null) return;
-        var s = _selPreview.transform.parent;
-        if (rune)
+        var c = NewCard(index, x, y, SmallW, SmallH, wide: false);
+        var t = c.Content.transform;
+        bool deal = index == SpecialIndex;
+        c.Tag = Text(t, "Tag", 18f, deal ? 30f : 22f, SmallW - 36f - (deal ? 0f : 40f), 22f, 14f, UIWeight.Medium, Mute);
+        c.Tag.enableAutoSizing = true;   // 「◇ Legendary」만 줄어든다
+        c.Tag.fontSizeMin = 11f;
+        c.Tag.fontSizeMax = 14f;
+        c.Plate = Img(t, "Well", 16f, 56f, SmallW - 32f, 124f, WellFill);
+        c.Plate.sprite = UIProceduralSprites.RoundedRect(radius: 4f, feather: 1f);
+        c.Plate.type   = Image.Type.Sliced;
+        c.Icon = CenterIcon(c.Plate.transform, 92f);
+        c.Name = Text(t, "Name", 18f, 190f, SmallW - 36f, 50f, 17f, UIWeight.Medium, Ink, TextAlignmentOptions.TopLeft);
+        c.Name.textWrappingMode = TextWrappingModes.Normal;
+        c.Effect = Text(t, "Effect", 18f, 244f, SmallW - 36f, 44f, 14f, UIWeight.Regular, Mute, TextAlignmentOptions.TopLeft);
+        c.Effect.textWrappingMode = TextWrappingModes.Normal;
+        BuildPrice(c, SmallW - 18f, SmallH - 50f);
+        if (deal)
         {
-            if (_selGlow != null)  PlaceIn(s, _selGlow, 116f, 60f, 140f, 150f, SelDW, SelDH);
-            PlaceIn(s, _selPreview, 138f, 80f, 96f, 116f, SelDW, SelDH);
-            if (_selShape != null) PlaceIn(s, _selShape, 22f, 82f, 110f, 118f, SelDW, SelDH);
+            // 오늘의 특가 딱지 — 양피지는 이 한 곳만(10-20 개편안 · 결 = 흑요석)
+            var tab = Img(c.Root, "DealTab", -10f, -14f, 150f, 30f, Parchment);
+            tab.sprite = UIProceduralSprites.RoundedRect(radius: 3f, feather: 1f);
+            tab.type   = Image.Type.Sliced;
+            var tt = Text(tab.transform, "Label", 0f, 0f, 150f, 30f, 14f, UIWeight.Medium, ParchInk, TextAlignmentOptions.Center);
+            tt.text = "오늘의 특가 −50%";
         }
-        else
-        {
-            if (_selGlow != null)  PlaceIn(s, _selGlow, 60f, 62f, 170f, 156f, SelDW, SelDH);
-            PlaceIn(s, _selPreview, 90f, 78f, 110f, 124f, SelDW, SelDH);
-        }
+        else BuildLock(c, SmallW - 54f, 16f);
+        BuildOverlay(c, SmallW, SmallH);
+        if (deal) c.Root.Find("DealTab")?.SetAsLastSibling();   // 고른 금 테가 딱지 글자를 지나갔다(10-21 2차 촬영) — 딱지를 맨 위로
+        return c;
     }
 
-    private static readonly Color ShapePlate = new(0.22f, 0.13f, 0.06f, 0.16f);   // 양피지 위 옅은 판
-
-    // 등급·칸 수 태그 자리(카드 목업 px). 등급 태그는 「★ Legendary」까지 들어가게 종이 오른쪽 안(186)까지 — 76이던 때
-    // 「□ Common」(16px)이 칸을 넘어 종이 밖으로 번졌다(09-28 캡처).
-    // 10-11: 등급 이름 17 · 칸 수 15(v2 — 등급 영문 유지 · 크기만 키움) — 높이 20 → 24, 두 태그가 아이콘 칸(22~96) 안에 든다.
-    private const float TagX = 98f, Tag0Y = 46f, Tag0W = 88f, Tag1Y = 73f, Tag1W = 48f, TagH = 24f;   // 아이콘 칸(22~96) 옆
-
-    private static readonly Color PriceInk   = new(0.98f, 0.84f, 0.45f, 1f);   // 알약 위 금색
-    private static readonly Color PriceShort = new(0.95f, 0.52f, 0.45f, 1f);   // 골드 모자람(색만으로 알리지 않게 상세에 사유 문장)
-    private static readonly Color PillBrown  = new(60f / 255f, 44f / 255f, 28f / 255f, 1f);   // 가격 알약 · 룬 태그 판(10-13 Rectangle_locked 무채 + 고동)
-
-    /// <summary>작은 태그(짙은 판 + 16px 글자). 룬 카드에서만 켠다.</summary>
-    private static (Image bg, TMP_Text label) MakeTag(Transform card, string name, float mx, float my, float mw)
+    private CardView NewCard(int index, float x, float y, float w, float h, bool wide)
     {
-        var bg = ShopUIStyle.MakeImage(card, name, new Color(0.16f, 0.11f, 0.07f, 0.92f));
-        PlaceIn(card, bg, mx, my, mw, TagH, CardW, CardH);
-        bg.raycastTarget = false;
-        var label = ShopUIStyle.MakeText(bg.transform, "Label", 16f, FontStyles.Bold, TextAlignmentOptions.Center, Color.white);
-        FitTagLabel(label);
-        label.textWrappingMode = TextWrappingModes.NoWrap;
-        ShopUIStyle.Stretch(label.rectTransform);
-        bg.gameObject.SetActive(false);
-        return (bg, label);
+        var frame = Img(_win, index == SpecialIndex ? "Deal" : $"Card{index}", x, y, w, h, CardFill, null, raycast: true);
+        var c = new CardView { Index = index, Wide = wide, Root = frame.rectTransform, Frame = frame, Base = frame.rectTransform.anchoredPosition };
+        c.Group = frame.gameObject.AddComponent<CanvasGroup>();
+        var content = ShopUIStyle.MakeRect(frame.transform, "Content", typeof(CanvasGroup));
+        ShopUIStyle.Stretch((RectTransform)content.transform);
+        c.Content = content.GetComponent<CanvasGroup>();
+        c.Content.blocksRaycasts = false;
+        var btn = frame.gameObject.AddComponent<Button>();
+        ShopUIStyle.ApplyButtonColors(btn, frame);
+        int captured = index;
+        btn.onClick.AddListener(() => Select(captured));
+        return c;
     }
 
-    /// <summary>
-    /// 우측 "고른 물건" — 겹친 양피지 + 미리보기 + 이름 명판 + 상세 + [사겠네].
-    /// 09-25: 상세 네 줄(12.5px)과 인용(12px)을 16px로 올리고, 줄 수가 물건마다 달라 <b>한 덩어리</b>(_selEffect)로 흘린다 —
-    /// 칸을 줄마다 고정하면 효과가 둘인 룬에서 아래 줄과 겹친다. 룬은 룬 선택 카드와 같은 내용(칩 줄·효과 전부·놓을 자리).
-    /// </summary>
-    private void BuildSelectedColumn(Transform w)
+    private void BuildPrice(CardView c, float right, float y)
     {
-        var col = ShopUIStyle.MakeImage(w, "Selected", new Color(0.11f, 0.11f, 0.14f, 0.96f));
-        Place(col, SelX, SelY, SelW, SelH);
-        ShopUIStyle.Skin(col, _skin?.selectedPanel, sliced: true);
-        var s = col.transform;
+        var row = Row(c.Content.transform, "PriceRow", right - 220f, y, 220f, 34f, TextAnchor.MiddleRight, 8f);
+        c.OldPrice = RowText(row, "Old", 15f, UIWeight.Regular, Faint);
+        c.OldPrice.fontStyle = FontStyles.Strikethrough;
+        c.Coin  = RowIcon(row, "Coin", CoinSprite, 20f, Color.white);
+        c.Price = RowText(row, "Price", 21f, UIWeight.Medium, Ink);
+    }
 
-        _selGlow = ShopUIStyle.MakeImage(s, "PreviewGlow", new Color(1f, 1f, 1f, 0f));
-        _selGlow.sprite = UI_RuneSelectPopup.SoftDot;
-        _selGlow.raycastTarget = false;
+    private void BuildLock(CardView c, float x, float y)
+    {
+        var bg = Img(c.Root, "Lock", x, y, 38f, 38f, BtnFill, null, raycast: true);
+        bg.sprite = UIProceduralSprites.RoundedRect(radius: 4f, feather: 1f);
+        bg.type   = Image.Type.Sliced;
+        var edge = ShopUIStyle.MakeImage(bg.transform, "Edge", Line);
+        edge.sprite = UIProceduralSprites.RoundedOutline(radius: 4f, stroke: 1f);
+        edge.type   = Image.Type.Sliced;
+        ShopUIStyle.Stretch(edge.rectTransform);
+        c.LockBg   = bg;
+        c.LockIcon = Img(bg.transform, "Icon", 9f, 9f, 20f, 20f, Mute, _skin != null ? _skin.LockOpen : null);
+        c.LockBtn  = bg.gameObject.AddComponent<Button>();
+        ShopUIStyle.ApplyButtonColors(c.LockBtn, bg);
+        int captured = c.Index;
+        c.LockBtn.onClick.AddListener(() => OnLockClicked(captured));
+    }
 
-        _selPreview = ShopUIStyle.MakeImage(s, "Preview", new Color(1f, 1f, 1f, 0f));
-        _selPreview.preserveAspect = true;
-        _selShape = EnsureSelShape(s);
-        LayoutSelArt(false);
+    /// <summary>품절 글자 · 고른 금 테 — 내용 위, 자물쇠 아래(자물쇠는 품절이면 끈다).</summary>
+    private static void BuildOverlay(CardView c, float w, float h)
+    {
+        c.Sold = Text(c.Root, "Sold", 0f, 0f, w, h, 28f, UIWeight.Medium, Ink, TextAlignmentOptions.Center);
+        c.Sold.text = "품절";
+        c.Sold.gameObject.SetActive(false);
+        c.Edge = ShopUIStyle.MakeImage(c.Root, "SelEdge", SelEdge);
+        c.Edge.sprite = UIProceduralSprites.RoundedOutline(radius: 6f, stroke: 2f);
+        c.Edge.type   = Image.Type.Sliced;
+        ShopUIStyle.Stretch(c.Edge.rectTransform, -5f);
+        c.Edge.gameObject.SetActive(false);
+        if (c.LockBg != null) c.LockBg.transform.SetAsLastSibling();
+    }
 
-        // 이름 명판 — 전용 아트가 납품되지 않았다. 단색 사각형 하나로 두면 양피지 위에서
-        // '덜 그려진 칸'처럼 보이므로, 어두운 테두리 + 밝은 채움 2겹으로 판의 두께를 만든다.
-        _selNamePlate = ShopUIStyle.MakeImage(s, "NamePlate", new Color(0.26f, 0.06f, 0.05f, 1f));
-        PlaceIn(s, _selNamePlate, 14f, 212f, 214f, 50f, SelDW, SelDH);
+    private void BuildDetail()
+    {
+        var p = Panel(_win, "Selected", DetailX, BodyY, DetailW, DetailH, PanelFill, Line);
+        var t = p.transform;
+        _selPlate = Img(t, "Plate", 24f, 24f, 112f, 112f, WellFill);
+        _selIcon  = CenterIcon(_selPlate.transform, 72f);
+        _selName  = Text(t, "Name", 152f, 30f, DetailW - 176f, 36f, 25f, UIWeight.Medium, Ink);
+        _selCat   = Text(t, "Cat",  152f, 70f, DetailW - 176f, 24f, 15f, UIWeight.Medium, Mute);
+        _selShape = Box(t, "Shape", 152f, 98f, DetailW - 176f, 42f);
+        Img(t, "Line", 24f, 152f, DetailW - 48f, 1f, Line);
 
-        var plateFill = ShopUIStyle.MakeImage(_selNamePlate.transform, "Fill", new Color(0.48f, 0.11f, 0.10f, 1f));
-        ShopUIStyle.Stretch(plateFill.rectTransform, 3f);
-
-        _selName = ShopUIStyle.MakeText(plateFill.transform, "Name", 22f, FontStyles.Bold,
-                                        TextAlignmentOptions.Center, new Color(0.96f, 0.88f, 0.72f, 1f));
-        ShopUIStyle.Stretch(_selName.rectTransform, 6f);
-        FitLine(_selName);
-
-        // 칩 줄 — 룬: 「◇ Rare · 3칸 · 전기」 / 그 밖: 카테고리
-        _selCat = ShopUIStyle.MakeText(s, "Cat", 17f, FontStyles.Bold,
-                                       TextAlignmentOptions.Center, CatColor[0]);
-        PlaceIn(s, _selCat, 20f, 268f, 214f, 22f, SelDW, SelDH);
-        _selCat.enableAutoSizing = false;
-
-        // 상세 한 덩어리 — 효과(전부) · 적용/놓을 자리 · 값 · 걱정. 위에서부터 흐른다.
-        _selEffect = ShopUIStyle.MakeText(s, "Detail", 16f, FontStyles.Normal,
-                                          TextAlignmentOptions.TopLeft, new Color(0.22f, 0.15f, 0.08f, 1f));
-        PlaceIn(s, _selEffect, 30f, 296f, 204f, 128f, SelDW, SelDH);   // 종이 찢긴 왼쪽 가장자리에서 한 칸 띄운다(09-29)
-        _selEffect.enableAutoSizing = false;
-        _selEffect.richText         = true;
+        _selEffect = Text(t, "Detail", 24f, 168f, DetailW - 48f, 292f, 17f, UIWeight.Regular, Ink, TextAlignmentOptions.TopLeft);
         _selEffect.textWrappingMode = TextWrappingModes.Normal;
-        _selEffect.overflowMode     = TextOverflowModes.Ellipsis;
-        _selEffect.lineSpacing      = -6f;
+        _selEffect.richText         = true;
+        _selEffect.lineSpacing      = 6f;
 
-        // 상인의 말 — 버튼 바로 위 한 줄
-        _selFlavor = ShopUIStyle.MakeText(s, "Flavor", 16f, FontStyles.Normal,
-                                          TextAlignmentOptions.Top, new Color(0.42f, 0.30f, 0.18f, 1f));
-        PlaceIn(s, _selFlavor, 18f, 426f, 222f, 22f, SelDW, SelDH);
-        _selFlavor.enableAutoSizing = false;
-        FitLine(_selFlavor);
+        _selFlavor = Text(t, "Flavor", 24f, 466f, DetailW - 48f, 26f, 15f, UIWeight.Regular, Mute, TextAlignmentOptions.Center);
+        var pl = Text(t, "PriceLabel", 24f, 502f, 120f, 38f, 15f, UIWeight.Regular, Mute);
+        pl.text = "값";
+        var row = Row(t, "PriceRow", DetailW - 24f - 260f, 502f, 260f, 38f, TextAnchor.MiddleRight, 10f);
+        RowIcon(row, "Coin", CoinSprite, 26f, Color.white);
+        _selPrice = RowText(row, "Price", 29f, UIWeight.Medium, Ink);
 
-        // 구매버튼 아트는 <b>빈 명판</b>이다 — 라벨을 반드시 그려야 글자가 생긴다.
-        _buyBtn = MakeButton(s, "Buy", BuyLabel, _skin?.buyButton, out _buyLabel);
-        // 목업의 [사겠네]는 종이 기준 437~497에 보인다. 아트에 투명 여백이 있어 451에 86을 놓으면
-        // 그 자리에 정확히 앉는다.
-        PlaceIn(s, _buyBtn, 12f, 451f, 235f, 86f, SelDW, SelDH);
-        _buyLabel.fontSize = 22f;
-        _buyLabel.fontSizeMax = 22f;
-        _buyLabel.color    = new Color(0.96f, 0.88f, 0.72f, 1f);
+        var buy = Img(t, "Buy", 24f, 552f, DetailW - 48f, 58f, BuyFill, null, raycast: true);
+        buy.sprite = UIProceduralSprites.RoundedRect(radius: 4f, feather: 1f);
+        buy.type   = Image.Type.Sliced;
+        var edge = ShopUIStyle.MakeImage(buy.transform, "Edge", SelEdge);
+        edge.sprite = UIProceduralSprites.RoundedOutline(radius: 4f, stroke: 1f);
+        edge.type   = Image.Type.Sliced;
+        ShopUIStyle.Stretch(edge.rectTransform);
+        _buyBtn = buy.gameObject.AddComponent<Button>();
+        ShopUIStyle.ApplyButtonColors(_buyBtn, buy);
+        buy.gameObject.AddComponent<UIButtonFeedback>();   // 런타임에 지어 UI_Popup.Init이 붙이지 못한다
         _buyBtn.onClick.AddListener(OnBuyClicked);
+        _buyLabel = Text(buy.transform, "Label", 0f, 0f, DetailW - 48f, 58f, 22f, UIWeight.Medium, Gold, TextAlignmentOptions.Center);
+        _buyLabel.text = BuyLabel;
+        _buyLabel.characterSpacing = 8f;
     }
 
-    /// <summary>하단 중앙 새로고침. 아트/라벨 중 무엇을 보일지는 비용에 달려 있어 <see cref="RefreshReroll"/>가 정한다.</summary>
-    private void BuildReroll(Transform w)
+    private void BuildFooter()
     {
-        _rerollBtn = MakeButton(w, "Reroll", "새로고침", null, out _rerollLabel);
-        _rerollImg = _rerollBtn.GetComponent<Image>();
-        Place(_rerollBtn, GridX + (GridCols * CardStepX - CardStepX + CardW - RerollW) * 0.5f,
-                          RerollY, RerollW, RerollH);
+        Img(_win, "FootLine", L, FootY - 8f, InnerW, 1f, LineGold);
+        var owned = Row(_win, "Owned", L, FootY, 820f, FootH, TextAnchor.MiddleLeft, 10f);
+        var lbl = RowText(owned, "Label", 15f, UIWeight.Regular, Mute);
+        lbl.text = "보유 가호";
+        Spacer(owned, 4f);
+        _ownedNone = RowText(owned, "None", 15f, UIWeight.Regular, Faint);
+        _ownedNone.text = "없음";
+        for (int i = 0; i < OwnedChipMax + 1; i++)   // 마지막 하나는 「+n」
+        {
+            var chip = ShopUIStyle.MakeImage(owned, $"Chip{i}", new Color(1f, 1f, 1f, 0f));
+            chip.sprite = UIProceduralSprites.RoundedOutline(radius: 4f, stroke: 1f);
+            chip.type   = Image.Type.Sliced;
+            chip.color  = LineGold;
+            var hlg = chip.gameObject.AddComponent<HorizontalLayoutGroup>();
+            hlg.padding = new RectOffset(12, 12, 6, 6);
+            hlg.childAlignment = TextAnchor.MiddleCenter;
+            hlg.childControlWidth = hlg.childControlHeight = true;
+            hlg.childForceExpandWidth = hlg.childForceExpandHeight = false;
+            var ct = RowText(chip.transform, "Label", 15f, UIWeight.Regular, Ink);
+            _ownedChips.Add(ct);
+            chip.gameObject.SetActive(false);
+        }
+
+        var right = Row(_win, "Actions", R - 640f, FootY, 640f, FootH, TextAnchor.MiddleRight, 12f);
+        RowIcon(right, "LockIcon", _skin != null ? _skin.LockClosed : null, 18f, Mute);
+        _lockText = RowText(right, "LockText", 15f, UIWeight.Regular, Mute);
+        Spacer(right, 14f);
+
+        _rerollBtn = FootButton(right, "Reroll", 250f, out var rr);
+        RowIcon(rr, "Icon", _skin != null ? _skin.RerollIcon : null, 18f, Ink);
+        _rerollLabel = RowText(rr, "Label", 17f, UIWeight.Medium, Ink);
+        _rerollNext  = RowText(rr, "Next",  14f, UIWeight.Regular, Mute);
         _rerollBtn.onClick.AddListener(OnRerollClicked);
-    }
 
-    /// <summary>
-    /// 새로고침 버튼 표시.
-    ///
-    /// 아트에 비용 <b>"10"이 그림으로 구워져</b> 있다. 실제 비용(<see cref="ShopRoomController.RerollCost"/>)은
-    /// 인스펙터 값이라 언제든 달라질 수 있고, 그러면 화면이 <b>거짓 가격</b>을 보여준다.
-    /// 그래서 아트가 진실일 때만 아트를 쓰고, 어긋나면 아트를 걷어내고 실제 값을 글자로 그린다 —
-    /// 어떤 설정에서도 표기가 틀리지 않는다. (글자 없는 버튼 아트가 들어오면 이 분기는 지워도 된다.)
-    /// </summary>
-    private void RefreshReroll()
-    {
-        if (_rerollBtn == null) return;
-
-        bool enabled = _controller != null && _controller.RerollEnabled;
-        _rerollBtn.gameObject.SetActive(enabled);
-        if (!enabled) return;
-
-        // 골드가 모자라면 눌러도 거절음만 났다 — 살 수 있는지를 버튼이 먼저 보여준다(구매 버튼과 같은 규약).
-        // 그러면 아트에 구워진 가격만으로는 '왜 안 되는지'를 말할 수 없으므로, 그때만 아트를 걷어내고
-        // 사유를 글자로 그린다(가격이 어긋날 때 아트를 걷어내는 이 메서드의 기존 처리와 같은 방식).
-        bool affordable  = _controller.PlayerGold >= _controller.RerollCost;
-        bool used        = !_controller.RerollAvailable;   // 방문당 1회 — 이미 돌렸다
-        bool artTruthful = _skin?.rerollButton != null && _controller.RerollCost == RerollCostBakedInArt && affordable && !used;
-
-        _rerollBtn.interactable = affordable && !used;
-        UIAffordGlow.Set(_rerollBtn, _rerollBtn.interactable);
-
-        if (_rerollImg != null)
-        {
-            // 아트가 거짓이 되는 때(골드 부족 · 이미 돌림 · 가격 불일치)는 나가기와 같은 짙은 명판 — 예전 금색 판은
-            // 「누를 수 있음」(금빛 · 불)으로 읽혔다(09-29). 크기도 아트가 보이는 폭·높이(rect 안 6~44)에 맞춘다.
-            float rx = GridX + (GridCols * CardStepX - CardStepX + CardW - RerollW) * 0.5f;
-            bool panelArt = false;
-            if (artTruthful)
-            {
-                Place(_rerollBtn, rx, RerollY, RerollW, RerollH);
-                _rerollImg.sprite = _skin.rerollButton;
-                _rerollImg.type   = Image.Type.Simple;
-                _rerollImg.color  = Color.white;
-            }
-            else
-            {
-                Place(_rerollBtn, rx + 10f, RerollY + 6f, RerollW - 20f, 38f);
-                // 10-13: Artsystack slot_short_active 원색(먹 + 금 테). 못 누를 때는 버튼 틴트(비활성 알파 0.45)가 같은 판을 반투명으로 누른다.
-                panelArt = SkinArtPanel(_rerollImg, _skin != null ? _skin.RerollPanel : null, Color.white);
-                if (!panelArt)
-                    UITheme.StylePanel(_rerollImg, new Color(0.11f, 0.085f, 0.07f, 0.96f), new Color(0.80f, 0.62f, 0.32f, 0.75f), 6f);
-            }
-            var edge = _rerollImg.transform.Find("Edge");
-            if (edge != null) edge.gameObject.SetActive(!artTruthful && !panelArt);
-        }
-        if (_rerollLabel != null)
-        {
-            _rerollLabel.gameObject.SetActive(!artTruthful);
-            _rerollLabel.text = used ? "<color=#8A7E6A>새로고침 완료</color>"
-                : affordable
-                ? $"새로고침  {_controller.RerollCost}"
-                : $"<color=#FF5250>골드 부족</color>  {_controller.RerollCost}";   // 230px 버튼 — 사유를 앞에 짧게
-        }
-    }
-
-    /// <summary>
-    /// 나가기 — 완성본에는 없지만 ESC를 모르는 플레이어의 유일한 탈출구라 남긴다.
-    /// 우측 양피지 아래 빈 나무 바닥에 둬서 목업의 구성을 가리지 않는다.
-    /// </summary>
-    private void BuildExitButton(Transform w)
-    {
-        var exit = MakeButton(w, "Exit", "나가기", null, out var lbl);
-        lbl.fontSize = 16f;
-        lbl.color    = ShopUIStyle.TextPrimary;
-        exit.GetComponent<Image>().color = new Color(0.30f, 0.11f, 0.11f, 0.94f);
-        // 09-25: 새로고침과 같은 줄(카드 아래), 카드 열 오른쪽 끝. 고른 물건 종이가 아래로 길어져 예전 자리(종이 밑)가 없다.
-        // 09-29: 새로고침 아트가 보이는 높이(rect 안 6~44)에 맞춘다. 모양은 StyleRuntime이 새로고침과 같은 짙은 명판으로.
-        lbl.fontSize = 18f;
-        lbl.fontSizeMax = 18f;
-        Place(exit, GridX + (GridCols - 1) * CardStepX + CardW - 122f, RerollY + 6f, 112f, 38f);
+        var exit = FootButton(right, "Exit", 128f, out var er);
+        var el = RowText(er, "Label", 17f, UIWeight.Medium, Ink);
+        el.text = "나가기";
         exit.onClick.AddListener(ClosePopupUI);
     }
 
-    // ── 상태 ──
+    // ── 새로 그리기 ──
 
     private void Select(int index)
     {
-        if (_selectedIndex != index) ShopUIStyle.PlaySfx("shop_select");   // 좌판에서 물건을 집는 소리(기획: 소리 구분)
+        if (_selectedIndex != index) ShopUIStyle.PlaySfx("shop_select");
         _selectedIndex = index;
         RefreshCards();
         RefreshSelected();
@@ -1094,475 +495,270 @@ public sealed class UI_ShopPanel : UI_Popup
     private void RefreshAll()
     {
         if (_controller == null) return;
-
         CurrencyCounter.Apply(_goldText, _controller.PlayerGold);
 
-        // 「상인의 인장」이 붙어 있으면 할인 사실을 골드 밑에 적는다 — 값만 조용히 싸지면 무엇 덕분인지 알 수 없다.
-        // (예전엔 인사말 뒤에 붙였는데 간판 쇠띠를 넘어 꼬리까지 갔다, 09-29)
-        if (_sigilText != null)
-            _sigilText.text = AbyssPeddlerCatalog.MerchantSigil.Active
-                ? $"◆ 상인의 인장  −{AbyssPeddlerCatalog.MerchantSigil.Discount * 100f:F0}%" : string.Empty;
-        // 돌발 이벤트(10-15) — 인장 줄이 있으면 그 밑, 없으면 그 자리(간판 문장 앞까지 · 190)
-        if (_eventText != null)
+        var sub = new StringBuilder();
+        if (AbyssPeddlerCatalog.MerchantSigil.Active)
+            sub.Append("◆ 상인의 인장  −").Append((AbyssPeddlerCatalog.MerchantSigil.Discount * 100f).ToString("F0")).Append('%');
+        if (_controller.ActiveEvent != ShopEvent.None)
         {
-            _eventText.text = _controller.ActiveEvent == ShopEvent.None ? string.Empty : $"◆ {_controller.EventTitle}  {_controller.EventLine}";
-            Place(_eventText, GoldX, GoldY + (AbyssPeddlerCatalog.MerchantSigil.Active ? 46f : 24f), 190f, 22f);
+            if (sub.Length > 0) sub.Append("    ");
+            sub.Append("◆ ").Append(_controller.EventTitle).Append("  ").Append(_controller.EventLine);
         }
+        if (_subLine != null) _subLine.text = sub.ToString();
 
-        RefreshReroll();
-        RefreshDeal();
+        RefreshBand();
         RefreshCards();
         RefreshSelected();
+        RefreshFooter();
     }
 
-    private void RefreshDeal()
+    private void RefreshBand()
     {
-        var deal = _controller?.SpecialDeal;
-        // 특가 연출 중에는 좌판에 붙잡아 둔다 — 컨트롤러는 사는 즉시 비우므로, 그대로 두면 도장이 찍히기 전에 사라진다.
-        if (_dealRoot != null) _dealRoot.SetActive(deal != null || _dealHold);
-        if (deal == null) return;
-
-        if (_dealStock != null) { _dealStock.text = "1개 남음"; _dealStock.color = DealStockInk; }
-        if (_dealStamp != null) { _dealStamp.gameObject.SetActive(false); _dealStamp.rectTransform.localScale = Vector3.one; }
-
-        // 룬은 효과 글이 길어 한 줄에 넘쳐 깨졌다 — 눌러서 오른쪽 상세 열에서 본다(10-14 사용자). 다른 상품은 짧은 요약 그대로.
-        // 수치만 Noto 500(10-15 설명 글 강조)
-        if (_dealCat != null)   _dealCat.text   = deal.Category == ShopProductCategory.Rune ? deal.CategoryLabel : $"{deal.CategoryLabel} · {UIKeywordInk.Values(deal.EffectText, true)}";
-        if (_dealName != null)  _dealName.text  = deal.DisplayName;
-        if (_dealDesc != null)  _dealDesc.text  = deal.DetailText;
-        if (_dealPrice != null) _dealPrice.text = deal.Price.ToString();
-        if (_dealOldPrice != null)
+        var run = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.Run : null;
+        var st  = run?.PlayerState;
+        if (_hpText != null)     _hpText.text     = st != null ? $"{st.Hp} / {st.MaxHp}" : "-";
+        if (_potionText != null)
         {
-            int orig = _controller.SpecialOriginalPrice;
-            _dealOldPrice.text = orig > deal.Price ? orig.ToString() : "";
+            bool full = st != null && st.PotionCount >= st.PotionCapacity;
+            _potionText.text  = st != null ? $"{st.PotionCount} / {st.PotionCapacity}" : "-";
+            _potionText.color = full ? Amber : Ink;
         }
-        if (_dealIcon != null)
+        var inv = run?.ItemInventory;
+        if (_storageText != null)
         {
-            _dealIcon.enabled = deal.Icon != null;   // 아이콘 없는 특가는 검은 네모 대신 빈 자리로
-            if (deal.Icon != null) ShopUIStyle.Skin(_dealIcon, deal.Icon);
+            _storageText.text  = inv != null ? $"{inv.StagingCount} / {RunItemInventory.StagingCapacity}" : "-";
+            _storageText.color = inv != null && inv.IsStagingFull ? Amber : Ink;
         }
+        if (_boardText != null)
+        {
+            int used = RuneBlockBudget.Used;
+            _boardText.text  = $"{used} / {RuneBlockBudget.Max}";
+            _boardText.color = used >= RuneBlockBudget.Max ? Amber : Ink;
+        }
+        // 원석 환전소 — 가진 원석 · 버튼마다 받을 골드
+        int ore = _controller != null ? _controller.Ore : 0;
+        if (_oreText != null) _oreText.text = ore.ToString("N0");
+        if (_exStepLabel != null) _exStepLabel.text = $"{ShopRoomController.ExchangeStep}개 → {ShopRoomController.ExchangeStep * ShopRoomController.OreToGold}";
+        if (_exAllLabel != null)  _exAllLabel.text  = $"전부 → {(ore * ShopRoomController.OreToGold):N0}";
+        if (_exStepBtn != null) _exStepBtn.interactable = ore >= ShopRoomController.ExchangeStep;
+        if (_exAllBtn != null)  _exAllBtn.interactable  = ore > 0;
     }
 
     private void RefreshCards()
     {
         var products = _controller?.Products;
         int gold = _controller?.PlayerGold ?? 0;
-
         for (int i = 0; i < _cards.Count; i++)
         {
             var c = _cards[i];
-            bool has = products != null && i < products.Count;
-            if (c.Root != null) c.Root.SetActive(has);
-            if (!has) continue;
-
-            var p = products[i];
-            int cat = Mathf.Clamp((int)p.Category, 0, CatColor.Length - 1);
-            var col = CatColor[cat];
-            bool selected = _selectedIndex == i;
-
-            // 배지 — 아트가 있으면 바탕+글리프, 없으면 색 알약 + 코드 라벨.
-            var badgeBg    = _skin?.CategoryBadgeBg(cat);
-            if (c.BadgeBg != null)
-            {
-                if (badgeBg != null) ShopUIStyle.Skin(c.BadgeBg, badgeBg, sliced: true);
-                else                 c.BadgeBg.color = col;
-            }
-            // 10-11: 배지 글자는 넷 다 같은 Noto 15(500) — 아트 글리프(버프 · 포션, 굵은 외곽선 글자 잉크 19)는 끈다(리서치 C §3 P2).
-            //        바탕(띠 아트 · 색)이 범주 색 하나를 맡는다. 바탕 아트 위는 밝은 글자, 색 알약 위는 짙은 글자.
-            if (c.BadgeGlyph != null) c.BadgeGlyph.gameObject.SetActive(false);
-            if (c.BadgeText != null)
-            {
-                c.BadgeText.gameObject.SetActive(true);
-                c.BadgeText.text  = p.CategoryLabel;
-                c.BadgeText.color = badgeBg != null ? BadgeInkOnArt : BadgeInkOnPill;
-            }
-
-            if (c.Name != null)   c.Name.text   = p.DisplayName;
-            // 수치만 Noto 500(10-15 설명 글 강조)
-            if (c.Effect != null) c.Effect.text = p.Category == ShopProductCategory.Rune ? string.Empty : UIKeywordInk.Values(p.EffectText, true);   // 룬 효과는 눌러서 상세 열에서(10-14)
-            if (c.Price != null)
-            {
-                c.Price.text  = p.Sold ? "품절" : p.Price.ToString();
-                c.Price.color = p.Sold ? new Color(0.70f, 0.64f, 0.56f, 1f)
-                              : (p.Price <= gold ? PriceInk : PriceShort);
-            }
-            if (c.PriceCoin != null) c.PriceCoin.gameObject.SetActive(!p.Sold);
-            if (c.Icon != null && p.Icon != null) ShopUIStyle.Skin(c.Icon, p.Icon);
-
-            // 룬 — 등급은 「등급 태그 한 곳」에만 등급색(v2 강조색). 아이콘 테 틴트 · 등급빛은 끈다(10-11 — 카드 한 장에
-            //       범주 색 · 등급 글자 · 테 색 · 빛 · 이름 색이 겹쳐 강조가 다섯이었다, 리서치 C §3 P2 · 후광은 화면 1곳).
-            var rune = p.Rune;
-            var rc   = rune != null ? ShopUIStyle.Rarity(rune.rarity) : Color.white;
-            if (c.IconFrame != null) c.IconFrame.color = Color.white;
-            if (c.IconGlow  != null) c.IconGlow.color  = Color.clear;
-            SetTag(c.Tag0Bg, c.Tag0, rune != null ? RewardPresentation.RarityLabel(rune.rarity) : null, rc);
-            int cells = rune != null ? RuneCardKit.CellCount(rune) : 0;
-            SetTag(c.Tag1Bg, c.Tag1, cells > 0 ? $"{cells}칸" : null, new Color(0.96f, 0.90f, 0.78f, 1f));
-
-            // 고른 카드는 들린다 — 룬 선택 카드의 「고르면 들림」과 같은 말
-            if (c.Root != null && !_dealing)
-                ((RectTransform)c.Root.transform).anchoredPosition = c.Base + (selected ? new Vector2(0f, CardLift) : Vector2.zero);
-
-            // 품절 — 바탕을 바랜 양피지로 갈고 도장을 겹친다(전용 아트 없으면 틴트로 대체).
-            if (c.Bg != null)
-            {
-                var art = _skin?.CardBackground(p.Sold);
-                if (art != null)
-                {
-                    ShopUIStyle.Skin(c.Bg, art, sliced: true);
-                    FitCardArt(c.Bg);
-                    bool hasSoldArt = _skin.cardBgSold != null;
-                    c.Bg.color = p.Sold && !hasSoldArt ? new Color(0.55f, 0.52f, 0.50f, 1f)
-                               : selected ? Color.white
-                                          : new Color(0.88f, 0.88f, 0.90f, 1f);
-                }
-                else
-                {
-                    c.Bg.color = p.Sold      ? new Color(0.10f, 0.10f, 0.12f, 0.9f)
-                               : selected    ? new Color(0.22f, 0.19f, 0.12f, 0.98f)
-                                             : new Color(0.13f, 0.12f, 0.16f, 0.96f);
-                }
-            }
-            if (c.SoldStamp != null)
-                c.SoldStamp.gameObject.SetActive(p.Sold && _skin?.soldStamp != null);
-
-            // 고른 카드 = 들림 + 2px 금 테(85%, P1). 이름 색은 바꾸지 않는다 — 고른 표시는 테 하나가 맡는다.
-            if (c.Name != null) c.Name.color = InkMain;
-            SetSelEdge(c, selected);
+            bool has = products != null && i < products.Count && products[i] != null;
+            c.Root.gameObject.SetActive(has);
+            if (has) FillCard(c, products[i], gold, _selectedIndex == i);
         }
+        var deal = _controller?.SpecialDeal;
+        if (deal != null) _dealShown = deal;
+        bool showDeal = deal != null || (_dealHold && _dealShown != null);
+        _deal.Root.gameObject.SetActive(showDeal);
+        if (showDeal) FillCard(_deal, deal ?? _dealShown, gold, _selectedIndex == SpecialIndex);
     }
 
-    // ── 10-11 위계 · 가독성(리서치 C §3 「고칠 값」 · 설계 v2 보강) ──────────────────────
-    // 양피지 위 잉크 셋 — 이름 · 본문 #2A1C0E / 효과 · 보조 #4A3820 / 수치 #5E1A0A(가장 얼룩진 종이 위 4.5:1 이상, v2-0).
-    //   리서치 P2의 보조 #6B5238은 얼룩진 종이 위 2.9:1이라 v2 대비 기준(#4A3820)을 따른다.
-    private static readonly Color InkMain  = new(0.165f, 0.110f, 0.055f, 1f);   // #2A1C0E
-    private static readonly Color InkLabel = new(0.290f, 0.220f, 0.125f, 1f);   // #4A3820
-    private static readonly Color InkNum   = new(0.369f, 0.102f, 0.039f, 1f);   // #5E1A0A
-    private static readonly Color BadgeInkOnArt  = new(0.98f, 0.96f, 0.92f, 1f);
-    private static readonly Color BadgeInkOnPill = new(0.10f, 0.09f, 0.12f, 1f);
-    private static readonly Color SelEdgeColor   = UITheme.Thin.WithA(UITheme.Thin.Gold, 0.85f);
-    private const float SelEdgePx = 2f;   // v2 선 굵기 — 고른 것 2px
-
-    /// <summary>
-    /// 글자를 톤 v2로 — 카드 이름 · 가격 20(가격 금 500) · 효과 18 한 줄 · 범주 태그 15(500) · 등급 태그 17 · 플레이버 정자 15 등(리서치 C §3).
-    /// 구운 프리팹은 DNF · 가짜 굵게 · 기울임으로 굳어 있어 열 때마다(Init) 입힌다. 글자가 커진 칸은 자리도 다시 잡는다(비율 앵커라 재굽기 불필요).
-    /// 크기는 설계 단위 × 창 맞춤이 이미 먹인 배율(UIFontScaleMemo) — 맞춤이 뒤에 돌아도 차이만 곱하므로 겹치지 않는다.
-    /// </summary>
-    private void ApplyThinStyle()
+    private void FillCard(CardView c, ShopProduct p, int gold, bool selected)
     {
-        var win = transform.Find("Window");
-        float k = win != null && win.TryGetComponent<UIFontScaleMemo>(out var memo) ? memo.Applied : 1f;
+        ApplyCardFrame(c, p.Rarity);
+        bool bless = p.Category == ShopProductCategory.Buff;
 
-        // 머리 — 가게 이름(제목 한 줄 = DNF, 가짜 굵게만 없앤다) · 인사 · 골드 · 인장
-        if (win != null && win.Find("Name") is Transform nameTf && nameTf.TryGetComponent<TMP_Text>(out var shopName))
+        // 그림 — 가호는 문장 판 위 흰 아이콘(등급색), 나머지는 상품 그림
+        Sprite icon = p.Icon;
+        Color iconTint = Color.white;
+        if (bless && c.Wide && TryBlessingStat(p, out var stat) && _skin != null && _skin.BlessingIcon(stat) != null)
         {
-            shopName.fontStyle = FontStyles.Normal;
-            SetSize(shopName, 24f * k);
+            icon = _skin.BlessingIcon(stat);
+            iconTint = BlessingTint(p.Rarity);
         }
-        if (_dialogText != null)
-        {
-            Thin(_dialogText, UIWeight.Regular, 15f * k, _dialogText.color);
-            AutoSize(_dialogText, 13f * k, 15f * k);   // 간판 쇠띠 앞 좁은 칸 — 긴 상인 반응만 13까지 줄인다
-        }
-        if (_goldText  != null) Thin(_goldText,  UIWeight.Medium, 20f * k, _goldText.color);
-        if (_sigilText != null) Thin(_sigilText, UIWeight.Medium, 15f * k, _sigilText.color);
-        if (_eventText != null) Thin(_eventText, UIWeight.Medium, 15f * k, _eventText.color);
+        c.Icon.sprite  = icon;
+        c.Icon.color   = iconTint;
+        c.Icon.enabled = icon != null;
 
-        // 특가 띠
-        if (_dealRoot != null)
-        {
-            var d = _dealRoot.transform;
-            if (_dealCat != null)  { Thin(_dealCat,  UIWeight.Medium,  15f * k, InkLabel); PlaceIn(d, _dealCat, 147f, 42f + DealInY, 268f, 20f, DealW, DealH); }
-            if (_dealName != null) { Thin(_dealName, UIWeight.Medium,  24f * k, InkMain);  PlaceIn(d, _dealName, 147f, 60f + DealInY, 268f, 34f, DealW, DealH); FitLine(_dealName); }
-            if (_dealDesc != null) { Thin(_dealDesc, UIWeight.Regular, 17f * k, InkLabel); PlaceIn(d, _dealDesc, 147f, 96f + DealInY, 268f, 26f, DealW, DealH); FitLine(_dealDesc); }
-            if (_dealOldPrice != null)
-            {
-                Thin(_dealOldPrice, UIWeight.Regular, 15f * k, InkLabel);
-                _dealOldPrice.fontStyle = FontStyles.Strikethrough;   // 깎이기 전 값(가짜 굵게가 아니라 취소선)
-            }
-            if (_dealPrice != null) Thin(_dealPrice, UIWeight.Medium, 24f * k, InkNum);
-            if (_dealStock != null) Thin(_dealStock, UIWeight.Medium, 15f * k, _dealStock.color);
-        }
+        c.Name.text  = p.DisplayName;
+        c.Tag.text   = TagText(p);
+        c.Tag.color  = TagColor(p);
+        c.Effect.text = p.Category == ShopProductCategory.Rune ? RuneLine(p.Rune) : UIKeywordInk.Values(p.EffectText);
+        if (c.Note != null) c.Note.text = bless ? "런이 끝날 때까지 유지" : string.Empty;
 
-        // 상품 카드
-        foreach (var c in _cards)
+        bool deal = c.Index == SpecialIndex;
+        int orig = deal && _controller != null ? _controller.SpecialOriginalPrice : 0;
+        c.OldPrice.text = orig > p.Price ? orig.ToString() : string.Empty;
+        c.OldPrice.gameObject.SetActive(orig > p.Price && !p.Sold);
+        c.Price.text  = p.Price.ToString();
+        c.Price.color = p.Price <= gold ? Ink : Danger;
+
+        // 품절 — 내용을 누르고 글자 하나
+        c.Content.alpha = p.Sold ? 0.30f : 1f;
+        c.Sold.gameObject.SetActive(p.Sold);
+
+        // 잠금
+        if (c.LockBtn != null)
         {
-            if (c.Root == null) continue;
-            var card = c.Root.transform;
-            if (c.Name != null)
-            {
-                Thin(c.Name, UIWeight.Medium, 20f * k, InkMain);
-                PlaceIn(card, c.Name, 20f, 98f, 166f, 28f, CardW, CardH);
-                FitLine(c.Name);
-                AutoSize(c.Name, 17f * k, 20f * k);   // 긴 룬 이름만 17까지(단계 안) — 그래도 넘치면 말줄임
-            }
-            if (c.Effect != null)
-            {
-                Thin(c.Effect, UIWeight.Regular, 18f * k, InkLabel);
-                PlaceIn(card, c.Effect, 20f, 127f, 166f, 24f, CardW, CardH);
-                FitLine(c.Effect);   // 한 줄 — 넘치면 말줄임(전부는 오른쪽 상세 열)
-            }
-            if (c.PricePill != null) PlaceIn(card, c.PricePill, 90f, 154f, 90f, 28f, CardW, CardH);
-            if (c.PriceCoin != null) PlaceIn(card, c.PriceCoin, 95f, 159f, 18f, 18f, CardW, CardH);
-            if (c.Price != null)
-            {
-                Thin(c.Price, UIWeight.Medium, 20f * k, c.Price.color);
-                PlaceIn(card, c.Price, 116f, 154f, 62f, 28f, CardW, CardH);
-            }
-            if (c.BadgeText != null)
-            {
-                Thin(c.BadgeText, UIWeight.Medium, 15f * k, c.BadgeText.color);
-                c.BadgeText.textWrappingMode = TextWrappingModes.NoWrap;
-            }
-            if (c.Tag0 != null)
-            {
-                Thin(c.Tag0, UIWeight.Medium, 17f * k, c.Tag0.color);
-                AutoSize(c.Tag0, 15f * k, 17f * k);   // 「★ Legendary」만 15까지 줄인다(등급 영문 유지)
-            }
-            if (c.Tag1 != null) Thin(c.Tag1, UIWeight.Medium, 15f * k, c.Tag1.color);
+            bool locked = _controller != null && _controller.IsLocked(p);
+            c.LockBtn.gameObject.SetActive(!p.Sold);
+            c.LockBg.color   = locked ? UITheme.Thin.WithA(Gold, 0.22f) : BtnFill;
+            c.LockIcon.color = locked ? Gold : Mute;
+            var sp = _skin != null ? (locked ? _skin.LockClosed : _skin.LockOpen) : null;
+            if (sp != null) c.LockIcon.sprite = sp;
+            if (c.LockBg.transform.Find("Edge") is Transform e && e.TryGetComponent<Image>(out var ei)) ei.color = locked ? SelEdge : Line;
         }
 
-        // 고른 물건 열
-        if (_selName != null)
-        {
-            Thin(_selName, UIWeight.Medium, 24f * k, _selName.color);
-            AutoSize(_selName, 20f * k, 24f * k);   // 명판 한 줄 — 긴 이름만 20까지
-        }
-        if (_selCat    != null) Thin(_selCat,    UIWeight.Medium,  17f * k, _selCat.color);
-        if (_selEffect != null) Thin(_selEffect, UIWeight.Regular, 17f * k, InkMain);
-        if (_selFlavor != null) Thin(_selFlavor, UIWeight.Regular, 15f * k, InkLabel);   // 정자(P2) — 알파 0.6은 얼룩진 종이 위 3.2:1이라 #4A3820
-        if (_buyLabel  != null) Thin(_buyLabel,  UIWeight.Medium,  24f * k, _buyLabel.color);
-
-        // 아래 버튼
-        if (_rerollLabel != null) Thin(_rerollLabel, UIWeight.Medium, 17f * k, _rerollLabel.color);
-        if (win != null && win.Find("Exit") is Transform exitTf)
-        {
-            var exitLabel = exitTf.GetComponentInChildren<TMP_Text>(true);
-            if (exitLabel != null) Thin(exitLabel, UIWeight.Medium, 17f * k, exitLabel.color);
-        }
+        c.Edge.gameObject.SetActive(selected);
+        if (!_dealing) c.Root.anchoredPosition = c.Base + (selected ? new Vector2(0f, CardLift) : Vector2.zero);
     }
 
-    /// <summary>톤 v2 글자 한 칸 — Noto 굵기 · 가짜 굵게/기울임 없음 · 크기 고정(자동 축소 끔, 넘치면 말줄임).</summary>
-    private static void Thin(TMP_Text t, UIWeight weight, float size, Color color)
+    /// <summary>등급 카드 틀(10-19 룬 획득 팝업과 같은 그림) — 없으면 둥근 판 + 등급색 선.</summary>
+    private static void ApplyCardFrame(CardView c, ItemRarity rarity)
     {
-        t.enableAutoSizing = false;
-        UITheme.StyleThinText(t, weight, size, color);
-    }
-
-    /// <summary>자동 축소를 단계 안(min~max)으로만 — 넘치는 긴 글자만 줄어든다.</summary>
-    private static void AutoSize(TMP_Text t, float min, float max)
-    {
-        t.enableAutoSizing = true;
-        t.fontSizeMin = min;
-        t.fontSizeMax = max;
-    }
-
-    private static void SetSize(TMP_Text t, float size)
-    {
-        t.fontSize = size;
-        if (t.enableAutoSizing) t.fontSizeMax = size;
-    }
-
-    /// <summary>
-    /// 고른 카드의 2px 금 테 — 보이는 종이(아트 투명 여백: 좌 2.1% · 우 4.9% · 위 2.2% · 아래 5.2%) 둘레에 네 변을 깐다.
-    /// 처음 쓸 때 만들고, 켜질 때 0.14초에 걸쳐 스민다(실시간 — 팝업은 시간정지).
-    /// </summary>
-    private void SetSelEdge(Card c, bool on)
-    {
-        if (!on)
+        var art = UISkin.RuneSelect != null ? UISkin.RuneSelect.RarityCardFrame(rarity) : null;
+        if (art != null)
         {
-            if (c.SelEdge != null) c.SelEdge.gameObject.SetActive(false);
-            c.EdgeOn = false;
+            c.Frame.sprite = art;
+            c.Frame.type   = Image.Type.Sliced;
+            c.Frame.pixelsPerUnitMultiplier = CardFrameScale;
+            c.Frame.color  = Color.white;
             return;
         }
-        if (c.SelEdge == null)
-        {
-            var found = c.Root.transform.Find("SelEdge");
-            c.SelEdge = found != null && found.TryGetComponent<CanvasGroup>(out var g) ? g : BuildSelEdge(c.Root.transform);
-        }
-        c.SelEdge.transform.SetAsLastSibling();
-        c.SelEdge.gameObject.SetActive(true);
-        if (c.EdgeOn) return;
-        c.EdgeOn = true;
-        FadeEdgeAsync(c.SelEdge).Forget();
-    }
-
-    private static CanvasGroup BuildSelEdge(Transform card)
-    {
-        var go = ShopUIStyle.MakeRect(card, "SelEdge", typeof(CanvasGroup));
-        var rt = (RectTransform)go.transform;
-        rt.anchorMin = new Vector2(0.021f, 0.052f);
-        rt.anchorMax = new Vector2(1f - 0.049f, 1f - 0.022f);
-        rt.offsetMin = rt.offsetMax = Vector2.zero;
-        var g = go.GetComponent<CanvasGroup>();
-        g.blocksRaycasts = false;
-        g.interactable   = false;
-        EdgeSide(rt, "Top",    new Vector2(0f, 1f), Vector2.one,         new Vector2(0.5f, 1f), new Vector2(0f, SelEdgePx));
-        EdgeSide(rt, "Bottom", Vector2.zero,        new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, SelEdgePx));
-        EdgeSide(rt, "Left",   Vector2.zero,        new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(SelEdgePx, 0f));
-        EdgeSide(rt, "Right",  new Vector2(1f, 0f), Vector2.one,         new Vector2(1f, 0.5f), new Vector2(SelEdgePx, 0f));
-        return g;
-    }
-
-    private static void EdgeSide(RectTransform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 size)
-    {
-        var img = ShopUIStyle.MakeImage(parent, name, SelEdgeColor);
-        var rt = img.rectTransform;
-        rt.anchorMin = anchorMin;
-        rt.anchorMax = anchorMax;
-        rt.pivot     = pivot;
-        rt.sizeDelta = size;
-        rt.anchoredPosition = Vector2.zero;
-    }
-
-    private async UniTaskVoid FadeEdgeAsync(CanvasGroup g)
-    {
-        try { await UIMotion.Tween(UIMotion.Quick, k => { if (g != null) g.alpha = k; }, destroyCancellationToken); }
-        catch (OperationCanceledException) { }
-    }
-
-    /// <summary>태그 글자 — 16이 기본, 칸을 넘을 때만 14까지 줄인다(「★ Legendary」).</summary>
-    private static void FitTagLabel(TMP_Text label)
-    {
-        label.enableAutoSizing = true;
-        label.fontSizeMin      = 14f;
-        label.fontSizeMax      = 16f;
-    }
-
-    /// <summary>구운 프리팹의 태그를 지금 자리(<see cref="TagX"/>…)로 옮긴다 — 다시 굽지 않아도 된다.</summary>
-    private void FitCardTags()
-    {
-        foreach (var c in _cards)
-        {
-            if (c.Root == null) continue;
-            var card = c.Root.transform;
-            if (c.Tag0Bg != null) PlaceIn(card, c.Tag0Bg, TagX, Tag0Y, Tag0W, TagH, CardW, CardH);
-            if (c.Tag1Bg != null) PlaceIn(card, c.Tag1Bg, TagX, Tag1Y, Tag1W, TagH, CardW, CardH);
-            if (c.Tag0 != null) FitTagLabel(c.Tag0);
-            if (c.Tag1 != null) FitTagLabel(c.Tag1);
-        }
-    }
-
-    /// <summary>
-    /// 카드 아트를 목업처럼 <b>통째로 줄인 두께</b>로 그린다. 아트(628×600)는 임포트 때 256으로 줄고 스프라이트 ppu도 함께
-    /// 줄어드는데, 공용 SliceScale은 픽셀 수로 배율을 재서 1.02가 나왔다 → 테두리·오른쪽 아래 그림자 띠가 목업의 약 2.8배로 그려져
-    /// 종이가 좁아지고, 목업 좌표로 놓은 이름·효과·태그·배지가 종이 밖으로 넘쳤다(09-28 사용자 캡처).
-    /// 원본 폭(단위) ÷ 칸 폭으로 재면 임포트 크기와 상관없이 목업과 같은 두께다.
-    /// </summary>
-    private static void FitCardArt(Image bg)
-    {
-        var sp = bg != null ? bg.sprite : null;
-        float w = sp != null ? bg.rectTransform.rect.width : 0f;
-        if (w <= 1f) return;
-        float refPpu = bg.canvas != null ? bg.canvas.referencePixelsPerUnit : 100f;
-        float artW   = sp.rect.width / sp.pixelsPerUnit * refPpu;
-        bg.pixelsPerUnitMultiplier = Mathf.Max(1f, artW / w);
-    }
-
-    private static void SetTag(Image bg, TMP_Text label, string text, Color ink)
-    {
-        bool on = !string.IsNullOrEmpty(text);
-        if (bg != null) bg.gameObject.SetActive(on);
-        if (!on || label == null) return;
-        label.text  = text;
-        label.color = ink;
-    }
-
-    private ShopProduct Selected()
-    {
-        if (_controller == null) return null;
-        if (_selectedIndex == SpecialIndex) return _controller.SpecialDeal;
-        var list = _controller.Products;
-        return (_selectedIndex >= 0 && _selectedIndex < list.Count) ? list[_selectedIndex] : null;
+        c.Frame.sprite = UIProceduralSprites.RoundedRect(radius: 6f, feather: 1f);
+        c.Frame.type   = Image.Type.Sliced;
+        c.Frame.color  = CardFill;
     }
 
     private void RefreshSelected()
     {
         var p = Selected();
         bool has = p != null;
-
         if (_buyBtn != null)
         {
-            _buyBtn.interactable = has && p.Purchasable && _controller.PlayerGold >= p.Price;
-            UIAffordGlow.Set(_buyBtn, _buyBtn.interactable);   // 살 수 있을 때만 은은한 불(09-29)
+            _buyBtn.interactable = has && p.Purchasable && !_controller.IsBlockedByFullPotions(p) && _controller.PlayerGold >= p.Price;
+            UIAffordGlow.Set(_buyBtn, _buyBtn.interactable);
         }
-        if (_buyLabel != null) _buyLabel.text = has && p.Sold ? "품절" : BuyLabel;
-
-        if (_selNamePlate != null) _selNamePlate.gameObject.SetActive(has);
-        if (_selPreview != null)   _selPreview.gameObject.SetActive(has);
-        if (_selGlow != null)      _selGlow.color = Color.clear;
-
-        if (_selShape != null)
+        if (_buyLabel != null)
         {
-            RuneCardKit.BuildShape(_selShape, null, 0f, 0f);   // 지운다(룬이면 아래에서 다시 그린다)
-            if (_selShape.TryGetComponent<Image>(out var plate)) plate.enabled = has && p.Rune != null;
+            _buyLabel.text  = has && p.Sold ? "품절" : has && _controller.IsBlockedByFullPotions(p) ? "포션 가득" : BuyLabel;
+            _buyLabel.color = _buyBtn != null && _buyBtn.interactable ? Gold : Mute;
         }
-        LayoutSelArt(has && p.Rune != null);
-
+        _selPlate.gameObject.SetActive(has);
+        if (_selShape != null) RuneCardKit.BuildShape(_selShape, null, 0f, 0f);   // 지운다(룬이면 아래에서 다시)
         if (!has)
         {
-            SetText(_selName, "");    SetText(_selCat, "");
-            SetText(_selEffect, "");
-            SetText(_selFlavor, "마음에 드는 걸 골라 봐.");
+            _selName.text = _selCat.text = _selEffect.text = _selPrice.text = string.Empty;
+            _selFlavor.text = "마음에 드는 걸 골라 봐.";
             return;
         }
 
         int gold = _controller.PlayerGold;
-        var rune = p.Rune;
-        SetText(_selName, p.DisplayName);
-
-        var sb = new System.Text.StringBuilder();
-        if (rune != null)
+        bool bless = p.Category == ShopProductCategory.Buff;
+        var emblem = _skin != null ? _skin.BlessingEmblem : null;
+        if (bless && emblem != null && TryBlessingStat(p, out var stat) && _skin.BlessingIcon(stat) != null)
         {
-            // 룬 선택 카드와 같은 내용 — 등급·칸 수·속성 / 효과 전부 / 블록 예산
-            var rc = ShopUIStyle.Rarity(rune.rarity);
-            if (_selCat != null)
-            {
-                var elem = ElementDef.GetById(rune.element);
-                _selCat.text  = RuneCardKit.RarityChipText(rune) + (elem != null ? $" · {elem.Name}" : "");
-                // 양피지 위 잉크 — 밝은 등급색은 종이에 묻힌다. 평범(흰색)은 눌러도 회색이라 짙은 갈색 잉크로.
-                _selCat.color = rune.rarity == ItemRarity.Common ? InkLabel
-                                                                 : new Color(rc.r * 0.55f, rc.g * 0.55f, rc.b * 0.55f, 1f);
-            }
-            if (_selGlow != null) _selGlow.color = new Color(rc.r, rc.g, rc.b, rune.rarity == ItemRarity.Common ? 0.25f : 0.5f);
-
-            if (rune.effects != null)
-                foreach (var slot in rune.effects)
-                    if (!string.IsNullOrEmpty(slot.effectType))
-                        sb.Append("▲ ").Append(UIKeywordInk.Values(EffectDescriptionFormatter.Describe(slot).Combined, true)).Append('\n');   // 수치만 Noto 500(10-15)
-
-            bool fit = RuneBlockBudget.Fits(RuneBlockBudget.Used) && RuneBlockBudget.FitsSame(rune);   // + 같은 룬 상한(10-14)
-            // 블록 모양 — 판 위 블록과 같은 속성 타일. 룬 수 상한을 넘으면 어둡게(룬 선택 카드와 같은 규칙, 10-10 칸 → 개수).
-            if (_selShape != null) RuneCardKit.BuildShape(_selShape, rune, 30f, 3f, dim: !fit);
-            sb.Append(fit ? "<color=#2F7A48>" : "<color=#9C2A1C>").Append(RuneBlockBudget.SameLabel(rune) ?? RuneBlockBudget.Label()).Append("</color>")
-              .Append("  <color=#4A3820>사면 판이 열린다</color>\n");
+            _selPlate.sprite = emblem; _selPlate.type = Image.Type.Simple; _selPlate.preserveAspect = true; _selPlate.color = Color.white;
+            _selIcon.sprite = _skin.BlessingIcon(stat); _selIcon.color = BlessingTint(p.Rarity);
         }
         else
         {
-            // 범주 이름은 보조 잉크 — 범주 색은 카드 배지 한 곳이 맡는다(10-11, 카드 한 장 · 화면 한 곳에 뜻 하나).
-            if (_selCat != null)
-            {
-                _selCat.text  = p.CategoryLabel;
-                _selCat.color = InkLabel;
-            }
-            sb.Append("▲ ").Append(UIKeywordInk.Values(p.EffectText, true)).Append('\n');   // 수치만 Noto 500(10-15)
-            if (!string.IsNullOrEmpty(p.DetailText)) sb.Append("<color=#4A3820>").Append(p.DetailText).Append("</color>\n");
+            _selPlate.sprite = UIProceduralSprites.RoundedRect(radius: 4f, feather: 1f); _selPlate.type = Image.Type.Sliced; _selPlate.color = WellFill;
+            _selIcon.sprite = p.Icon; _selIcon.color = Color.white;
+        }
+        _selIcon.enabled = _selIcon.sprite != null;
+
+        _selName.text = p.DisplayName;
+        _selPrice.text = p.Price.ToString();
+        _selPrice.color = gold >= p.Price ? Ink : Danger;
+
+        var sb = new StringBuilder();
+        var rune = p.Rune;
+        if (rune != null)
+        {
+            var rc = ShopUIStyle.Rarity(rune.rarity);
+            var elem = ElementDef.GetById(rune.element);
+            _selCat.text  = RuneCardKit.RarityChipText(rune) + (elem != null ? $" · {elem.Name}" : string.Empty);
+            _selCat.color = rune.rarity == ItemRarity.Common ? Mute : rc;
+            if (rune.effects != null)
+                foreach (var slot in rune.effects)
+                    if (!string.IsNullOrEmpty(slot.effectType))
+                        sb.Append("▲ ").Append(UIKeywordInk.Values(EffectDescriptionFormatter.Describe(slot).Combined)).Append('\n');
+            bool fit = RuneBlockBudget.Fits(RuneBlockBudget.Used) && RuneBlockBudget.FitsSame(rune);
+            if (_selShape != null) RuneCardKit.BuildShape(_selShape, rune, 12f, 2f, dim: !fit);
+            sb.Append(fit ? Hex(Fit) : Hex(Danger)).Append(RuneBlockBudget.SameLabel(rune) ?? RuneBlockBudget.Label()).Append("</color>")
+              .Append("  ").Append(Hex(Mute)).Append("사면 판이 열린다</color>\n");
+        }
+        else
+        {
+            _selCat.text  = bless ? $"가호 · {TierName(p.Rarity)}" : p.CategoryLabel;
+            _selCat.color = bless ? TagColor(p) : Mute;
+            sb.Append("▲ ").Append(UIKeywordInk.Values(p.EffectText)).Append('\n');
+            if (!string.IsNullOrEmpty(p.DetailText)) sb.Append(Hex(Mute)).Append(p.DetailText).Append("</color>\n");
         }
 
-        // 값과 모자람은 두 줄 — 한 줄에 붙이면 「값 81   54 골드 모자람」이 숫자 둘로 읽혔다(09-29).
-        // 10-11: <b>(가짜 굵게) 대신 수치 잉크 #5E1A0A — 굵기는 글꼴(Noto)이 정한다.
-        sb.Append("값 <color=#5E1A0A>").Append(p.Price).Append(" 골드</color>");
-        if (gold < p.Price) sb.Append("\n<color=#9C2A1C>").Append(p.Price - gold).Append(" 골드 모자람</color>");
-        else                sb.Append("   <color=#4A3820>(잔액 ").Append(gold - p.Price).Append(")</color>");
+        if (_selectedIndex == SpecialIndex && _controller.SpecialOriginalPrice > p.Price)
+            sb.Append(Hex(Amber)).Append("오늘의 특가 — 원래 값 ").Append(_controller.SpecialOriginalPrice).Append("</color>\n");
+        if (_controller.IsLocked(p))
+            sb.Append(Hex(Gold)).Append("잠금 — 다음 상점까지 이 값으로 남는다</color>\n");
 
+        if (gold < p.Price) sb.Append(Hex(Danger)).Append(p.Price - gold).Append(" 골드 모자람</color>");
+        else                sb.Append(Hex(Mute)).Append("사면 잔액 ").Append(gold - p.Price).Append("</color>");
         var deal = _controller.SpecialDeal;
         if (deal != null && deal != p && gold >= p.Price && gold - p.Price < deal.Price)
-            sb.Append("\n<color=#4A3820>사면 특가 ").Append(deal.DisplayName).Append("(").Append(deal.Price).Append(")는 못 산다</color>");
+            sb.Append('\n').Append(Hex(Mute)).Append("사면 특가 ").Append(deal.DisplayName).Append("(").Append(deal.Price).Append(")는 못 산다</color>");
 
-        SetText(_selEffect, sb.ToString());
-        SetText(_selFlavor, gold < p.Price ? "골드가 모자라는군." : "힘을 살 텐가, 특가를 챙길 텐가.");   // 16px에 한 줄(예전 문장은 말줄임됐다)
+        _selEffect.text = sb.ToString();
+        _selFlavor.text = gold < p.Price ? "골드가 모자라는군." : bless ? "몸에 스미는 힘이야. 런 끝까지 가." : "힘을 살 텐가, 특가를 챙길 텐가.";
+    }
 
-        if (_selPreview != null && p.Icon != null) ShopUIStyle.Skin(_selPreview, p.Icon);
+    private void RefreshFooter()
+    {
+        // 보유 가호 — 버프 칸 중 상점 가호(상점 표에 있는 id)만, 이름별로 묶는다
+        s_owned.Clear();
+        var buffs = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.Run?.BuffHandler?.ActiveBuffs : null;
+        if (buffs != null)
+            foreach (var b in buffs)
+            {
+                var row = FindBuffRow(b.BuffType);
+                if (row == null) continue;
+                int at = s_owned.FindIndex(o => o.name == row.buffName);
+                if (at >= 0) s_owned[at] = (row.buffName, s_owned[at].count + 1);
+                else s_owned.Add((row.buffName, 1));
+            }
+        _ownedNone.gameObject.SetActive(s_owned.Count == 0);
+        for (int i = 0; i < _ownedChips.Count; i++)
+        {
+            var chip = _ownedChips[i];
+            bool more = i == OwnedChipMax && s_owned.Count > OwnedChipMax;
+            bool on   = i < OwnedChipMax ? i < s_owned.Count : more;
+            chip.transform.parent.gameObject.SetActive(on);
+            if (!on) continue;
+            chip.text = more ? $"+{s_owned.Count - OwnedChipMax}"
+                             : s_owned[i].count > 1 ? $"{s_owned[i].name} ×{s_owned[i].count}" : s_owned[i].name;
+        }
+
+        if (_lockText != null && _controller != null) _lockText.text = $"잠금 {_controller.LockedCount} / {_controller.LockCapacity}";
+
+        // 새로고침 — 제단에서 안 열었으면 잠긴 버튼으로 둔다(제단에서 산 것이 상점에 보이게)
+        if (_rerollBtn == null || _controller == null) return;
+        bool open  = _controller.RerollEnabled;
+        bool left  = _controller.RerollAvailable;
+        int  cost  = _controller.RerollCost;
+        bool afford = _controller.PlayerGold >= cost;
+        _rerollBtn.interactable = open && left && afford;
+        UIAffordGlow.Set(_rerollBtn, _rerollBtn.interactable);
+        if (!open)
+        {
+            _rerollLabel.text = "새로고침";
+            _rerollLabel.color = Faint;
+            _rerollNext.text = "기억의 제단에서 연다";
+            return;
+        }
+        _rerollLabel.text  = !left ? "새로고침 끝" : cost == 0 ? "새로고침 무료" : $"새로고침 {cost}";
+        _rerollLabel.color = left && !afford ? Danger : Ink;
+        int next = _controller.NextRerollCost;
+        _rerollNext.text = !left ? string.Empty : next < 0 ? "마지막" : $"다음 {next}";
     }
 
     // ── 핸들러 ──
@@ -1570,14 +766,10 @@ public sealed class UI_ShopPanel : UI_Popup
     private void OnBuyClicked()
     {
         if (_controller == null || _buying) return;
-
         bool special = _selectedIndex == SpecialIndex;
         int  index   = _selectedIndex;
-        // 연출에 쓸 것은 <b>사기 전에</b> 잡는다 — 특가는 사는 즉시 컨트롤러에서 사라진다.
-        var product = Selected();
-        var source  = special ? (_dealRoot != null ? (RectTransform)_dealRoot.transform : null)
-                              : (index >= 0 && index < _cards.Count && _cards[index].Root != null
-                                 ? (RectTransform)_cards[index].Root.transform : null);
+        var product  = Selected();
+        var card     = special ? _deal : (index >= 0 && index < _cards.Count ? _cards[index] : null);
 
         var result = special ? _controller.TryBuySpecial() : _controller.TryBuyProduct(index);
         if (result != ShopPurchaseResult.Success)
@@ -1586,10 +778,17 @@ public sealed class UI_ShopPanel : UI_Popup
             RefreshAll();
             return;
         }
+        ShopUIStyle.PlaySfx(special ? "shop_deal" : "shop_buy");
+        if (special) { _dealShown = product; _dealHold = true; _selectedIndex = -1; }
+        PurchaseFxAsync(product, special, card).Forget();
+        RefreshAll();
+    }
 
-        ShopUIStyle.PlaySfx(special ? "shop_deal" : "shop_buy");   // 특가는 종소리로 구분(기획: 소리 구분)
-        if (special) _selectedIndex = -1;
-        PurchaseFxAsync(product, special, source, index).Forget();
+    private void OnExchange(int ore)
+    {
+        if (_controller == null) return;
+        bool ok = _controller.TryExchangeOre(ore);
+        ShopUIStyle.PlaySfx(ok ? "shop_buy" : "shop_reject");
         RefreshAll();
     }
 
@@ -1597,49 +796,147 @@ public sealed class UI_ShopPanel : UI_Popup
     {
         if (_controller == null) return;
         bool ok = _controller.TryReroll();
-        if (ok) { ShopUIStyle.PlaySfx("shop_reroll"); _selectedIndex = -1; }
-        else ShopUIStyle.PlaySfx("shop_reject");
+        ShopUIStyle.PlaySfx(ok ? "shop_reroll" : "shop_reject");
+        if (ok) _selectedIndex = _controller.SpecialDeal != null ? SpecialIndex : 0;
         RefreshAll();
         if (!ok) return;
-        // 새로고침도 골드를 쓴다 — 동전이 빠지고 새 물건이 좌판에 다시 깔린다(예전엔 소리 · 숫자뿐이라 진열이 순간 바뀌었다).
-        // 10-01 사용자 「소모할 수 있는 재화가 있는 버튼은 연출이 있어야」.
+        // 새로고침도 골드를 쓴다 — 동전이 빠지고 새 물건이 좌판에 다시 깔린다(10-01 「소모하는 버튼은 연출이 있어야」)
         SpendCoinsAsync().Forget();
         PlayOpenFxAsync().Forget();
     }
 
-    // ── 구매 연출 (기획_상점개편 「거래의 손맛」) ──────────────────────────────
-    //
-    // 기획: 구매 시 골드 코인 빠지는 연출 + 상인 반응 + 물건 → 인벤 이동 / 특가는 딱지 떼어짐 → 품절 / 소리 구분.
-    // 전부 표시층이다 — 골드 차감·지급·품절은 컨트롤러가 이미 확정했고, 여기서는 그 사실을 눈에 보이게만 한다.
-    // 팝업은 시간이 멈춰 있어 모든 시간은 unscaled다.
+    private void OnLockClicked(int index)
+    {
+        if (_controller == null || index < 0) return;
+        if (!_controller.ToggleLock(index)) { ShopUIStyle.PlaySfx("shop_reject"); return; }
+        ShopUIStyle.PlaySfx("shop_select");
+        _selectedIndex = index;
+        RefreshAll();   // 컨트롤러가 OnShopChanged로도 부른다 — 고른 칸을 옮긴 뒤 한 번 더
+    }
 
-    private static readonly Color DealStockInk = new(0.369f, 0.102f, 0.039f, 1f);   // #5E1A0A(10-11 — 주황 갈색은 얼룩진 종이 위 3:1)
-    private static readonly Color SoldInk      = new(0.45f, 0.38f, 0.30f, 1f);
+    // ── 연출 ──
 
-    /// <summary>구매 직후 한 벌 — 동전이 떨어지고, 상인이 반응하고, 산 물건이 받는 곳으로 날아간다.</summary>
-    private async UniTaskVoid PurchaseFxAsync(ShopProduct p, bool special, RectTransform source, int cardIndex)
+    /// <summary>막이 차오르고 판이 살짝 커지며 떠오른다(0.965 → 1) — 창 맞춤 배율 위에 곱한다.</summary>
+    private async UniTaskVoid PlayWindowInAsync()
+    {
+        if (_win == null) return;
+        if (!_win.TryGetComponent<CanvasGroup>(out var cg)) cg = _win.gameObject.AddComponent<CanvasGroup>();
+        var baseScale = _win.localScale;
+        var basePos   = _win.anchoredPosition;
+        try
+        {
+            for (float t = 0f; t < WindowInSec; )
+            {
+                t += Time.unscaledDeltaTime;
+                float k = Mathf.Clamp01(t / WindowInSec);
+                float e = 1f - Mathf.Pow(1f - k, 3f);
+                cg.alpha = Mathf.Clamp01(k * 1.6f);
+                _win.localScale = baseScale * Mathf.Lerp(WindowInScale, 1f, e);
+                _win.anchoredPosition = basePos + new Vector2(0f, -14f * (1f - e));
+                if (_veil != null) _veil.color = new Color(0f, 0f, 0f, VeilAlpha * Mathf.Clamp01(k * 2f));
+                await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (cg != null) cg.alpha = 1f;
+            if (_win != null) { _win.localScale = baseScale; _win.anchoredPosition = basePos; }
+            if (_veil != null) _veil.color = new Color(0f, 0f, 0f, VeilAlpha);
+        }
+    }
+
+    /// <summary>카드가 60ms 간격으로 좌판에 내려앉는다(아래 22px에서) — 룬 선택 팝업과 같은 결.</summary>
+    private async UniTaskVoid PlayOpenFxAsync()
+    {
+        _openFxCts?.Cancel();
+        _openFxCts?.Dispose();
+        _openFxCts = new CancellationTokenSource();
+        var ct = CancellationTokenSource.CreateLinkedTokenSource(_openFxCts.Token, destroyCancellationToken).Token;
+
+        var all = new List<CardView>(_cards) { _deal };
+        foreach (var c in all) if (c?.Group != null) c.Group.alpha = 0f;
+        _dealing = true;
+        float total = (all.Count - 1) * DealStagger + DealDur;
+        try
+        {
+            for (float t = 0f; t < total; )
+            {
+                t += Time.unscaledDeltaTime;
+                for (int i = 0; i < all.Count; i++)
+                {
+                    var c = all[i];
+                    if (c?.Root == null) continue;
+                    float k = Mathf.Clamp01((t - i * DealStagger) / DealDur);
+                    float e = 1f - Mathf.Pow(1f - k, 3f);
+                    c.Group.alpha = k;
+                    var lift = IsSelected(c) ? new Vector2(0f, CardLift) : Vector2.zero;
+                    c.Root.anchoredPosition = c.Base + lift + new Vector2(0f, -DealRise * (1f - e));
+                }
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            _dealing = false;
+            foreach (var c in all)
+            {
+                if (c?.Root == null) continue;
+                c.Group.alpha = 1f;
+                c.Root.anchoredPosition = c.Base + (IsSelected(c) ? new Vector2(0f, CardLift) : Vector2.zero);
+            }
+        }
+    }
+
+    private bool IsSelected(CardView c) => c != null && c.Index == _selectedIndex;
+
+    /// <summary>구매 직후 한 벌 — 동전이 빠지고, 상인이 반응하고, 「품절」이 찍히고, 산 물건이 받는 곳으로 날아간다.</summary>
+    private async UniTaskVoid PurchaseFxAsync(ShopProduct p, bool special, CardView card)
     {
         if (p == null) return;
         _buying = true;
-
         SpendCoinsAsync().Forget();
         SetMerchantReaction(p);
+        if (card != null) PopSoldAsync(card.Sold).Forget();
         if (special) DealSoldAsync().Forget();
-        else if (cardIndex >= 0 && cardIndex < _cards.Count) PopStampAsync(_cards[cardIndex].SoldStamp).Forget();
-
-        await FlyItemAsync(p, source);
+        await FlyItemAsync(p, card != null ? card.Root : null);
         _buying = false;
     }
 
-    /// <summary>
-    /// 골드 칸에서 동전 몇 닢이 튀어 떨어진다. 숫자만 줄면(CurrencyCounter) "빠져나간 느낌"이 없다 —
-    /// 기획이 말하는 "코인 빠지는 연출"이 이 몫이다.
-    /// </summary>
+    private async UniTaskVoid DealSoldAsync()
+    {
+        try { await UniTask.Delay((int)(DealHoldDur * 1000f), ignoreTimeScale: true, cancellationToken: destroyCancellationToken); }
+        catch (OperationCanceledException) { return; }
+        _dealHold = false;
+        RefreshCards();
+    }
+
+    private async UniTaskVoid PopSoldAsync(TMP_Text sold)
+    {
+        if (sold == null) return;
+        sold.gameObject.SetActive(true);
+        var rt = sold.rectTransform;
+        try
+        {
+            for (float t = 0f; t < SoldPopDur; )
+            {
+                t += Time.unscaledDeltaTime;
+                float k = Mathf.Clamp01(t / SoldPopDur);
+                float s = Mathf.Lerp(1.6f, 1f, 1f - (1f - k) * (1f - k));
+                rt.localScale = new Vector3(s, s, 1f);
+                await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
+            }
+        }
+        catch (OperationCanceledException) { return; }
+        rt.localScale = Vector3.one;
+    }
+
+    /// <summary>골드 칸에서 동전 몇 닢이 튀어 떨어진다(숫자만 줄면 「빠져나간 느낌」이 없다).</summary>
     private async UniTaskVoid SpendCoinsAsync()
     {
         EnsureCoins();
-        if (_coins == null || _goldText == null || _fxRoot == null) return;
-
+        if (_coins == null || _goldText == null || _fx == null) return;
         var pos = new Vector2[CoinCount];
         var vel = new Vector2[CoinCount];
         Vector2 origin = LocalInFx(_goldText.rectTransform.position);
@@ -1651,11 +948,9 @@ public sealed class UI_ShopPanel : UI_Popup
             _coins[i].rectTransform.anchoredPosition = pos[i];
             _coins[i].gameObject.SetActive(true);
         }
-
         try
         {
-            float t = 0f;
-            while (t < CoinFallDur)
+            for (float t = 0f; t < CoinFallDur; )
             {
                 float dt = Time.unscaledDeltaTime;
                 t += dt;
@@ -1674,37 +969,30 @@ public sealed class UI_ShopPanel : UI_Popup
             }
         }
         catch (OperationCanceledException) { return; }
-
-        for (int i = 0; i < _coins.Length; i++)
-            if (_coins[i] != null) _coins[i].gameObject.SetActive(false);
+        foreach (var coin in _coins) if (coin != null) coin.gameObject.SetActive(false);
     }
 
-    /// <summary>산 물건이 카드에서 떠올라 받는 곳으로 날아가 빨려든다.</summary>
+    /// <summary>산 물건이 카드에서 떠올라 받는 곳(HUD 칸)으로 날아가 빨려든다.</summary>
     private async UniTask FlyItemAsync(ShopProduct p, RectTransform source)
     {
         EnsureFlyIcon();
-        if (_flyIcon == null || _fxRoot == null || source == null) return;
-
+        if (_flyIcon == null || _fx == null || source == null) return;
         Vector2 from = LocalInFx(source.position);
         Vector2 to   = DestinationInFx(p);
-        int cat = Mathf.Clamp((int)p.Category, 0, CatColor.Length - 1);
-
         var rt = _flyIcon.rectTransform;
-        if (p.Icon != null) ShopUIStyle.Skin(_flyIcon, p.Icon);
-        else { _flyIcon.sprite = null; _flyIcon.color = CatColor[cat]; }   // 아이콘 없는 상품은 카테고리 색 조각으로
+        _flyIcon.sprite = p.Icon;
+        _flyIcon.color  = p.Icon != null ? Color.white : Gold;
         rt.sizeDelta        = new Vector2(96f, 96f);
         rt.anchoredPosition = from;
         rt.localScale       = Vector3.one;
         _flyIcon.gameObject.SetActive(true);
-
         try
         {
-            float t = 0f;
-            while (t < ItemFlyDur)
+            for (float t = 0f; t < ItemFlyDur; )
             {
                 t += Time.unscaledDeltaTime;
                 float k = Mathf.Clamp01(t / ItemFlyDur);
-                float e = 1f - (1f - k) * (1f - k);   // 끝에서 느려지며 빨려든다
+                float e = 1f - (1f - k) * (1f - k);
                 rt.anchoredPosition = Vector2.Lerp(from, to, e) + new Vector2(0f, Mathf.Sin(k * Mathf.PI) * 90f);
                 float s = Mathf.Lerp(1f, 0.35f, e);
                 rt.localScale = new Vector3(s, s, 1f);
@@ -1718,34 +1006,27 @@ public sealed class UI_ShopPanel : UI_Popup
         _flyIcon.gameObject.SetActive(false);
     }
 
-    /// <summary>
-    /// 받는 곳 — HUD에서 실제 칸을 찾아 그쪽으로 보낸다(버프창 · 포션 칸 · 재화 칸).
-    /// 룬 보관함은 HUD에 칸이 없어 화면 오른쪽 아래로 보내고, 어디로 갔는지는 상인이 말로 알린다.
-    /// </summary>
+    /// <summary>받는 곳 — HUD에서 실제 칸(버프창 · 포션 칸 · 재화 칸)을 찾는다. 없으면 화면 가장자리 방향.</summary>
     private Vector2 DestinationInFx(ShopProduct p)
     {
         string hudName = p.Category switch
         {
             ShopProductCategory.Buff     => "BuffGridRoot",
             ShopProductCategory.Potion   => "HUD_Active_01",
-            ShopProductCategory.Material => p.DisplayName != null && p.DisplayName.StartsWith("원석")
-                                            ? "Pill_RuneOre" : "Pill_EnhanceMat",
+            ShopProductCategory.Material => p.DisplayName != null && p.DisplayName.StartsWith("원석") ? "Pill_RuneOre" : "Pill_EnhanceMat",
             _                            => null,
         };
         var hud = hudName != null ? FindHudSlot(hudName) : null;
         if (hud != null) return LocalInFx(hud.position);
-
-        // 폴백 — 카테고리별 화면 가장자리 방향(HUD 배치가 바뀌어도 방향은 남는다).
-        var half = _fxRoot.rect.size * 0.5f;
+        var half = _fx.rect.size * 0.5f;
         return p.Category switch
         {
-            ShopProductCategory.Buff     => new Vector2(-half.x, -half.y),   // 좌하단 버프창
-            ShopProductCategory.Material => new Vector2( half.x,  half.y),   // 우상단 재화 칸
-            _                            => new Vector2( half.x, -half.y),   // 우하단 포션 칸·보관함
+            ShopProductCategory.Buff     => new Vector2(-half.x, -half.y),
+            ShopProductCategory.Material => new Vector2( half.x,  half.y),
+            _                            => new Vector2( half.x, -half.y),
         };
     }
 
-    /// <summary>HUD에서 이름으로 칸을 찾는다(비활성 포함). 없으면 null.</summary>
     private static Transform FindHudSlot(string name)
     {
         var hud = UnityEngine.Object.FindFirstObjectByType<HudView>(FindObjectsInactive.Include);
@@ -1756,24 +1037,15 @@ public sealed class UI_ShopPanel : UI_Popup
         return null;
     }
 
-    /// <summary>월드 좌표를 연출 층의 로컬 좌표로 옮긴다(창 배율이 달라도 자리가 맞는다).</summary>
     private Vector2 LocalInFx(Vector3 world)
     {
         var cam = GetComponentInParent<Canvas>()?.worldCamera;
         var screen = RectTransformUtility.WorldToScreenPoint(cam, world);
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(_fxRoot, screen, cam, out var local);
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(_fx, screen, cam, out var local);
         return local;
     }
 
-    /// <summary>
-    /// 상인 반응 — 무엇을 어디에 넣었는지 말로 알린다. 받는 칸(HUD)은 암막 뒤라 도착지가 안 보인다.
-    /// 잠깐 뒤 인사말로 돌아간다.
-    /// </summary>
-    // 행상 = 웃는 버섯(10-01 NPC 교체) — 밝은 반말 장사꾼. 예전 「어서 오게, 빛이여 · ~네」는 사람 상인 몸이었을 때 말투.
-    private const string Greeting = "어서 와! 오늘도 살아 있네?";
-    private string GreetingNow => _controller != null && !string.IsNullOrEmpty(_controller.EventGreeting) ? _controller.EventGreeting : Greeting;
-    private const string BuyLabel = "산다";   // 재련소 「벼린다」 · 쉼터 「쉰다」와 같은 결
-
+    /// <summary>상인 반응 — 무엇을 어디에 넣었는지 말로 알린다(받는 칸은 막 뒤라 안 보인다). 잠깐 뒤 인사말로.</summary>
     private void SetMerchantReaction(ShopProduct p)
     {
         if (_dialogText == null) return;
@@ -1796,53 +1068,16 @@ public sealed class UI_ShopPanel : UI_Popup
         _dialogText.text = GreetingNow;
     }
 
-    /// <summary>특가 — 「1개 남음」이 「품절」로 바뀌고 도장이 찍힌 뒤 좌판에서 사라진다.</summary>
-    private async UniTaskVoid DealSoldAsync()
-    {
-        _dealHold = true;
-        if (_dealStock != null) { _dealStock.text = "품절"; _dealStock.color = SoldInk; }
-        PopStampAsync(_dealStamp).Forget();
-
-        try { await UniTask.Delay((int)(DealHoldDur * 1000f), ignoreTimeScale: true, cancellationToken: destroyCancellationToken); }
-        catch (OperationCanceledException) { return; }
-
-        _dealHold = false;
-        RefreshDeal();
-    }
-
-    /// <summary>품절 도장이 내려찍힌다(크게 → 제자리).</summary>
-    private async UniTaskVoid PopStampAsync(Image stamp)
-    {
-        if (stamp == null || _skin?.soldStamp == null) return;
-        stamp.gameObject.SetActive(true);
-        var rt = stamp.rectTransform;
-        try
-        {
-            float t = 0f;
-            while (t < StampPopDur)
-            {
-                t += Time.unscaledDeltaTime;
-                float k = Mathf.Clamp01(t / StampPopDur);
-                float s = Mathf.Lerp(1.8f, 1f, 1f - (1f - k) * (1f - k));
-                rt.localScale = new Vector3(s, s, 1f);
-                await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
-            }
-        }
-        catch (OperationCanceledException) { return; }
-        rt.localScale = Vector3.one;
-    }
-
-    /// <summary>동전·물건 그림은 코드가 런타임에 만든다 — 구운 프리팹에 굳혀 둘 이유가 없다.</summary>
     private void EnsureCoins()
     {
-        if (_coins != null || _fxRoot == null) return;
+        if (_coins != null || _fx == null) return;
         _coins = new Image[CoinCount];
         for (int i = 0; i < CoinCount; i++)
         {
-            var img = ShopUIStyle.MakeImage(_fxRoot, "Coin", ShopUIStyle.Gold);
+            var img = ShopUIStyle.MakeImage(_fx, "Coin", Gold);
             img.rectTransform.sizeDelta = new Vector2(22f, 22f);
             img.preserveAspect = true;
-            ShopUIStyle.Skin(img, _skin?.goldCoin);
+            if (CoinSprite != null) { img.sprite = CoinSprite; img.color = Color.white; }
             img.gameObject.SetActive(false);
             _coins[i] = img;
         }
@@ -1850,44 +1085,212 @@ public sealed class UI_ShopPanel : UI_Popup
 
     private void EnsureFlyIcon()
     {
-        if (_flyIcon != null || _fxRoot == null) return;
-        _flyIcon = ShopUIStyle.MakeImage(_fxRoot, "FlyItem", Color.white);
+        if (_flyIcon != null || _fx == null) return;
+        _flyIcon = ShopUIStyle.MakeImage(_fx, "FlyItem", Color.white);
         _flyIcon.preserveAspect = true;
         _flyIcon.gameObject.SetActive(false);
     }
 
-    // ── Helpers ──
+    // ── 도움 ──
 
-    private static void SetText(TMP_Text t, string s) { if (t != null) t.text = s; }
-
-    private static void FitLine(TMP_Text t)
+    private ShopProduct Selected()
     {
-        if (t == null) return;
+        if (_controller == null) return null;
+        if (_selectedIndex == SpecialIndex) return _controller.SpecialDeal;
+        var list = _controller.Products;
+        return _selectedIndex >= 0 && _selectedIndex < list.Count ? list[_selectedIndex] : null;
+    }
+
+    private static string TagText(ShopProduct p)
+    {
+        if (p.Rune != null) return RuneCardKit.RarityChipText(p.Rune);   // 「◇ Rare · 3칸」 — 칸 수는 칩 글에 이미 있다
+        return p.Category == ShopProductCategory.Buff ? $"가호 · {TierName(p.Rarity)}" : p.CategoryLabel;
+    }
+
+    private static Color TagColor(ShopProduct p)
+    {
+        if (p.Category != ShopProductCategory.Rune && p.Category != ShopProductCategory.Buff) return Mute;
+        return p.Rarity == ItemRarity.Common ? Mute : ShopUIStyle.Rarity(p.Rarity);
+    }
+
+    /// <summary>가호 등급 이름 — 상점 표의 하급 · 중급 · 상급(카드 틀은 Common · Rare · Epic).</summary>
+    private static string TierName(ItemRarity r) => r switch
+    {
+        ItemRarity.Epic => "상급",
+        ItemRarity.Rare => "중급",
+        _               => "하급",
+    };
+
+    private static Color BlessingTint(ItemRarity r) => r == ItemRarity.Common ? Ink : Color.Lerp(Ink, ShopUIStyle.Rarity(r), 0.55f);
+
+    /// <summary>룬 작은 카드 둘째 줄 — 속성(효과 전부는 오른쪽 상세에서).</summary>
+    private static string RuneLine(RuntimeItemData rune)
+    {
+        if (rune == null) return string.Empty;
+        var elem = ElementDef.GetById(rune.element);
+        return elem != null ? $"{elem.Name} 속성 · 눌러서 효과 보기" : "눌러서 효과 보기";
+    }
+
+    private static bool TryBlessingStat(ShopProduct p, out StatType stat)
+    {
+        stat = default;
+        if (p == null || p.Category != ShopProductCategory.Buff) return false;
+        foreach (var row in ShopBuffTable.Rows)
+            if (row.buffName == p.DisplayName) { stat = row.statType; return true; }
+        return false;
+    }
+
+    private static ShopBuffRow FindBuffRow(string buffId)
+    {
+        if (string.IsNullOrEmpty(buffId)) return null;
+        foreach (var row in ShopBuffTable.Rows)
+            if (row.buffId == buffId) return row;
+        return null;
+    }
+
+    private static string Hex(Color c) => $"<color=#{ColorUtility.ToHtmlStringRGB(c)}>";
+
+    // ── 배치 도움(목업 px · 부모 왼쪽 위 기준) ──
+
+    private static void Put(RectTransform rt, float x, float y, float w, float h)
+    {
+        rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
+        rt.pivot = new Vector2(0f, 1f);
+        rt.anchoredPosition = new Vector2(x, -y);
+        rt.sizeDelta = new Vector2(w, h);
+    }
+
+    private static RectTransform Box(Transform parent, string name, float x, float y, float w, float h)
+    {
+        var rt = (RectTransform)ShopUIStyle.MakeRect(parent, name).transform;
+        Put(rt, x, y, w, h);
+        return rt;
+    }
+
+    private static Image Img(Transform parent, string name, float x, float y, float w, float h, Color color, Sprite sprite = null, bool raycast = false)
+    {
+        var img = ShopUIStyle.MakeImage(parent, name, color, raycast);
+        if (sprite != null) { img.sprite = sprite; img.preserveAspect = true; }
+        Put(img.rectTransform, x, y, w, h);
+        return img;
+    }
+
+    private static Image Panel(Transform parent, string name, float x, float y, float w, float h, Color fill, Color line)
+    {
+        var bg = Img(parent, name, x, y, w, h, fill);
+        bg.sprite = UIProceduralSprites.RoundedRect(radius: 4f, feather: 1f);
+        bg.type   = Image.Type.Sliced;
+        var edge = ShopUIStyle.MakeImage(bg.transform, "Edge", line);
+        edge.sprite = UIProceduralSprites.RoundedOutline(radius: 4f, stroke: 1f);
+        edge.type   = Image.Type.Sliced;
+        ShopUIStyle.Stretch(edge.rectTransform);
+        return bg;
+    }
+
+    private static Image CenterIcon(Transform parent, float size)
+    {
+        var img = ShopUIStyle.MakeImage(parent, "Icon", Color.white);
+        img.preserveAspect = true;
+        var rt = img.rectTransform;
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = Vector2.zero;
+        rt.sizeDelta = new Vector2(size, size);
+        return img;
+    }
+
+    private static TMP_Text Text(Transform parent, string name, float x, float y, float w, float h, float size, UIWeight weight, Color color,
+                                 TextAlignmentOptions align = TextAlignmentOptions.MidlineLeft)
+    {
+        var t = ShopUIStyle.MakeText(parent, name, size, FontStyles.Normal, align, color);
+        t.enableAutoSizing = false;
+        UITheme.StyleThinText(t, weight, size, color);
         t.textWrappingMode = TextWrappingModes.NoWrap;
         t.overflowMode     = TextOverflowModes.Ellipsis;
+        t.richText         = true;
+        // 칸이 한 줄 높이(Noto ≈ 1.45em)보다 낮으면 TMP 말줄임이 줄을 통째로 지운다 — 제목 · 가호 · 진열 · 상세 이름이 사라졌다(10-21 1차 촬영).
+        float minH = size * 1.5f;
+        if (h < minH) { y -= (minH - h) * 0.5f; h = minH; }
+        Put(t.rectTransform, x, y, w, h);
+        return t;
     }
 
-    private static void AddClick(GameObject go, System.Action onClick)
+    private static RectTransform Row(Transform parent, string name, float x, float y, float w, float h, TextAnchor align, float spacing, RectOffset pad = null)
     {
-        var btn = go.GetComponent<Button>() ?? go.AddComponent<Button>();
-        ShopUIStyle.ApplyButtonColors(btn);
-        btn.onClick.AddListener(() => onClick?.Invoke());
+        var rt = Box(parent, name, x, y, w, h);
+        var hlg = rt.gameObject.AddComponent<HorizontalLayoutGroup>();
+        hlg.childAlignment = align;
+        hlg.spacing = spacing;
+        hlg.padding = pad ?? new RectOffset();
+        hlg.childControlWidth = hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = hlg.childForceExpandHeight = false;
+        return rt;
     }
 
-    private static Button MakeButton(Transform parent, string name, string label, Sprite skin, out TMP_Text labelText)
+    private static Image RowIcon(Transform row, string name, Sprite sprite, float size, Color color)
     {
-        var go = ShopUIStyle.MakeRect(parent, name, typeof(Image), typeof(Button));
-        var img = go.GetComponent<Image>();
-        img.color = ShopUIStyle.BuyFill;
-        ShopUIStyle.Skin(img, skin, sliced: true);
+        var img = ShopUIStyle.MakeImage(row, name, color);
+        img.sprite = sprite;
+        img.preserveAspect = true;
+        var le = img.gameObject.AddComponent<LayoutElement>();
+        le.minWidth = le.preferredWidth = size;
+        le.minHeight = le.preferredHeight = size;
+        img.gameObject.SetActive(sprite != null);
+        return img;
+    }
 
-        var btn = go.GetComponent<Button>();
+    private static TMP_Text RowText(Transform row, string name, float size, UIWeight weight, Color color)
+    {
+        var t = ShopUIStyle.MakeText(row, name, size, FontStyles.Normal, TextAlignmentOptions.MidlineLeft, color);
+        t.enableAutoSizing = false;
+        UITheme.StyleThinText(t, weight, size, color);
+        t.textWrappingMode = TextWrappingModes.NoWrap;
+        t.overflowMode     = TextOverflowModes.Overflow;
+        t.richText         = true;
+        return t;
+    }
+
+    private static void Spacer(Transform row, float w)
+    {
+        var go = ShopUIStyle.MakeRect(row, "Gap");
+        var le = go.AddComponent<LayoutElement>();
+        le.minWidth = le.preferredWidth = w;
+    }
+
+    private TMP_Text BandItem(Transform row, string name, Sprite icon, string label)
+    {
+        RowIcon(row, name + "Icon", icon, 22f, Mute);
+        Spacer(row, 8f);
+        var l = RowText(row, name + "Label", 15f, UIWeight.Regular, Mute);
+        l.text = label;
+        Spacer(row, 10f);
+        return RowText(row, name + "Value", 20f, UIWeight.Medium, Ink);
+    }
+
+    /// <summary>아래 줄 버튼 — 고정 폭 판(얇은 선) · 안쪽은 가로 줄(아이콘 · 글자).</summary>
+    private static Button FootButton(Transform row, string name, float width, out RectTransform inner)
+    {
+        var img = ShopUIStyle.MakeImage(row, name, BtnFill, raycast: true);
+        img.sprite = UIProceduralSprites.RoundedRect(radius: 4f, feather: 1f);
+        img.type   = Image.Type.Sliced;
+        var le = img.gameObject.AddComponent<LayoutElement>();
+        le.minWidth = le.preferredWidth = width;
+        le.minHeight = le.preferredHeight = 46f;
+        var edge = ShopUIStyle.MakeImage(img.transform, "Edge", Line);
+        edge.sprite = UIProceduralSprites.RoundedOutline(radius: 4f, stroke: 1f);
+        edge.type   = Image.Type.Sliced;
+        ShopUIStyle.Stretch(edge.rectTransform);
+        var hlg = img.gameObject.AddComponent<HorizontalLayoutGroup>();
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.spacing = 8f;
+        hlg.padding = new RectOffset(14, 14, 0, 0);
+        hlg.childControlWidth = hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = hlg.childForceExpandHeight = false;
+        // 선(Edge)은 줄 배치에서 뺀다
+        edge.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+        var btn = img.gameObject.AddComponent<Button>();
         ShopUIStyle.ApplyButtonColors(btn, img);
-
-        labelText = ShopUIStyle.MakeText(go.transform, "Label", 16f, FontStyles.Bold,
-                                         TextAlignmentOptions.Center, ShopUIStyle.Gold);
-        labelText.text = label;
-        ShopUIStyle.Stretch(labelText.rectTransform);
+        img.gameObject.AddComponent<UIButtonFeedback>();
+        inner = img.rectTransform;
         return btn;
     }
 }

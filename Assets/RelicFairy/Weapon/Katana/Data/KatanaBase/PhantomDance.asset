@@ -12,43 +12,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b29c78ceac9d18c4cbb3aaf764b949b0, type: 3}
   m_Name: PhantomDance
   m_EditorClassIdentifier: 
-  hitCount: 5
-  hitDelay: 0.12
-  detectRadius: 2
-  detectForwardOffset: 1
-  baseDamagePerHit: 10
+  drawHitTimes:
+  - 0.35
+  drawRange: 4.5
+  drawAngle: 120
+  drawDamage: 600
   knockbackMultiplier: 0.1
+  cutDelay: 0.53
+  cutDamage: 410
   slashProjectileCount: 3
   slashProjectileDelay: 0.1
-  slashProjectileDamage: 12
-  slashProjectileDistance: 3
-  slashProjectileRadius: 1.5
-  slashProjectileEffectKey: ShinySlash
-  slashProjectileEffectScale: 1
+  slashProjectileDamage: 100
   pursuitRadius: 8
   pursuitHitRadius: 1.2
   condenseDamageMult: 1.2
-  condenseRadiusMult: 1.6
+  condenseRadius: 2.4
   condenseEffectScaleMult: 2
-  slashExplodeDelay: 0.3
   slashExplodeRadius: 3
-  slashExplodeDamage: 25
-  slashExplodeEffectKey: DoubleSlash
-  slashExplodeEffectScale: 0.9
-  endDelay: 0.3
-  attackEffectKey: SlashAttack
-  attackEffectScale: 1
+  slashExplodeDamage: 250
+  endDelay: 0.2
+  drawEffectKey: SlashAttack
+  drawEffectScale: 1
+  cutEffectKey: KatanaDelayedCut
+  cutEffectScale: 0.15
+  explodeEffectScale: 0.3
+  drawState: QSkill_02
   hitEffectKey: SwordHitImpact
-  hitEffectScale: 0.23
-  finishEffectKey: PhantomDanceFinish
-  finishEffectScale: 1
-  animationOverride: QSkill_01
-  flurryAnimStates: []
-  flurryState: QSkill_03
-  flurryStartNormalized: 0.25263157
-  flurryHitTimes:
-  - 0.12
-  - 0.21
-  - 0.3
-  - 0.395
-  - 0.955
+  hitEffectScale: 0.29

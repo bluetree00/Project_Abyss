@@ -435,7 +435,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
     private void SpawnRangeIndicator(MonsterContext ctx)
     {
-        Color c = Data.BreathColor;
+        Color c = PatternGuideHelper.AttackFill;   // (10-23 가이드 색 통일) 브레스 속성 색(BreathColor)은 이펙트만
         _rangeIndicator = PatternGuideHelper.Prepare(
             PatternGuideHelper.Beam(ctx.Transform.position, ctx.Transform.forward, 1f, Data.BreathRadius * 2f, c), c);
         SyncRangeIndicator(ctx);

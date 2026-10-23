@@ -42,7 +42,19 @@ public static class RelicGrowthV2BudgetProbeEditor
     private static bool   s_armed;
     private static bool   s_short;   // 짧게 — 기본 · 허브 · 옛3 · 새4 · 기본(끝)만(단독 칸 생략)
     private static bool   s_ablate;  // 이상치 분해 — 랜슬롯 #4 조합에서 조각을 하나씩 뺀다
+    private static bool   s_d11;     // D11(10-22) — 기본 · 허브 · 허브 + 화상(가웨인) / 기본 Q 낙인(랜슬롯) 끔 · 기본(끝)
+    private static bool   s_d7;      // D7(10-22) — 랜슬롯 광기 칸 조각 수 0 · 2 · 3 · 4(메아리) · 방 시작 = 받침
+    private static bool   s_evo;     // 진화 6종 화력 몫(10-22) — 계열 빌드 × 진화 없음/있음
+    private static string s_evoFamily = "";   // 비어 있지 않으면 그 계열만(10-23 상한 고침 재실측)
+    private static bool   s_hud;     // 첫 전투 유물 HUD 사진(10-23 D11 — 허브가 런 시작부터라 해시계 · 광기 눈금이 첫 전투부터 떠야 한다)
+    private static ICharacterPassive s_burnPassive;   // D11 「화상 끔」 칸이 뺀 가웨인 화상 패시브 — 다음 칸에서 되돌린다
+    private static float  s_brandAmpBackup = float.NaN;
     private const string  Combo4 = "l_blood_frenzy:2,l_black_afterimage:1,l_tearing_judgment:1,l_grudge_blade:2";   // 10-03 세 회차 내내 최상위(+72~119%)
+    private const string  EvoBaseGawain   = "g_second_sun:2,g_noon_bloom:2";          // 진화 조건 조각 2개 — 계열 없는 「주문」 조각
+    private const string  EvoBaseLancelot = "l_madness_crown:2,l_tearing_judgment:2";
+    private const string  BowPath = "Assets/RelicFairy/Weapon/Bow/Data/T1_Bow.asset";
+    private const float   ComboAttackSpeed = 1.2f;   // 공속 2.2(정오 2.5) — 상한 2.0을 넘겨 넘친 몫이 생긴다
+    private const float   CritChance       = 0.40f;  // 치명 +40%p(비율 원천 — CritChanceBonus가 ×100)
 
     [MenuItem("RelicFairy/Debug/유물 성장 v2/7 예산 실측 — 가웨인 (테스트 허브, 플레이 중, 약 20분)")]
     private static void BeginGawain() => Begin("Gawain");
@@ -56,7 +68,34 @@ public static class RelicGrowthV2BudgetProbeEditor
     [MenuItem("RelicFairy/Debug/유물 성장 v2/8x 예산 이상치 분해 — 랜슬롯 #4 (6칸, 플레이 중, 약 5분)")]
     private static void BeginLancelotAblate() => Begin("Lancelot", false, true);
 
-    private static void Begin(string relic, bool shortRun = false, bool ablate = false)
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/7d D11 비교 — 가웨인 기본 · 허브 · 허브+화상 끔 (10-22, 플레이 중, 약 4분)")]
+    private static void BeginGawainD11() => Begin("Gawain", d11: true);
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/8d D11 비교 — 랜슬롯 기본 · 허브 · 허브+낙인 +20% 끔 (10-22, 플레이 중, 약 4분)")]
+    private static void BeginLancelotD11() => Begin("Lancelot", d11: true);
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/8r D7 받침 회전 — 랜슬롯 칸 조각 0 · 2 · 3 · 4 (메아리, 10-22, 플레이 중, 약 7분)")]
+    private static void BeginLancelotD7() => Begin("Lancelot", d7: true);
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/7v 진화 화력 — 가웨인 계열 빌드 × 진화 유무 (10-22, 플레이 중, 약 10분)")]
+    private static void BeginGawainEvo() => Begin("Gawain", evo: true);
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/8v 진화 화력 — 랜슬롯 계열 빌드 × 진화 유무 (10-22, 플레이 중, 약 10분)")]
+    private static void BeginLancelotEvo() => Begin("Lancelot", evo: true);
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/7v1 진화 화력 — 가웨인 연격만 (10-23, 플레이 중, 약 4분)")]
+    private static void BeginGawainEvoCombo() => Begin("Gawain", evo: true, evoFamily: "연격");
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/8v3 진화 화력 — 랜슬롯 사격만 (10-23, 플레이 중, 약 4분)")]
+    private static void BeginLancelotEvoRanged() => Begin("Lancelot", evo: true, evoFamily: "사격");
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/7h 첫 전투 유물 HUD 사진 — 가웨인 (10-23, 플레이 중, 약 1분)")]
+    private static void BeginGawainHud() => Begin("Gawain", hud: true);
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/8h 첫 전투 유물 HUD 사진 — 랜슬롯 (10-23, 플레이 중, 약 1분)")]
+    private static void BeginLancelotHud() => Begin("Lancelot", hud: true);
+
+    private static void Begin(string relic, bool shortRun = false, bool ablate = false, bool d11 = false, bool d7 = false, bool evo = false, string evoFamily = "", bool hud = false)
     {
         if (!Application.isPlaying) { Debug.LogWarning("[RGV2예산] 플레이 모드에서만 동작한다."); return; }
         var launcher = UnityEngine.Object.FindFirstObjectByType<TestHubLauncher>();
@@ -68,6 +107,11 @@ public static class RelicGrowthV2BudgetProbeEditor
         s_relic = relic;
         s_short = shortRun;
         s_ablate = ablate;
+        s_d11 = d11;
+        s_d7 = d7;
+        s_evo = evo;
+        s_evoFamily = evoFamily ?? "";
+        s_hud = hud;
         s_armed = true;
         Application.logMessageReceived -= OnLog;
         Application.logMessageReceived += OnLog;
@@ -97,6 +141,9 @@ public static class RelicGrowthV2BudgetProbeEditor
         public string   Kind;      // 기본 · 옛3 · 새4 · 단독
         public string   Ids = "";  // "id:등급,…"
         public string[] Legacy = Array.Empty<string>();
+        public string   Extra = "";    // 메아리 · 진화 — RestoreRelicParts 둘째 인자(「echo.r10=1;evo=4」)
+        public string   Family = "";   // 진화 칸 계열 빌드(연격 · 필살 · 사격)
+        public int      Casts;         // 심판 · 정오 횟수
         public float    Dps;
         public string   Diag = "";
     }
@@ -115,6 +162,7 @@ public static class RelicGrowthV2BudgetProbeEditor
             GameRunBootstrapper.Instance?.Run?.CovenantHandler?.Cleanup();
             await Wait(2.5f, ct);
             await SpawnTargetsAsync(player, targets, ct);
+            if (s_hud) { await HudShotAsync(player, gawain, sb, ct); return; }
             sb.AppendLine($"유물 {s_relic} · 표적 슬라임 {targets.Count} · 칸당 정착 {Settle}초 + 측정 {Measure}초 · 칸 {cases.Count}");
             Debug.Log($"[RGV2예산] 시작 — {cases.Count}칸 · 예상 {cases.Count * (Settle + Measure + 1f) / 60f:0.0}분");
             for (int i = 0; i < cases.Count; i++)
@@ -138,6 +186,16 @@ public static class RelicGrowthV2BudgetProbeEditor
     private static List<Case> BuildCases(bool gawain)
     {
         if (s_ablate) return BuildAblation();
+        if (s_d7) return BuildD7();
+        if (s_evo) return BuildEvo(gawain);
+        if (s_d11)
+            return new List<Case>
+            {
+                new() { Label = "기본(지금 첫 방 · 조각 0)", Kind = "기본" },
+                new() { Label = "허브 런 시작부터(조각 0)", Kind = "허브" },
+                new() { Label = gawain ? "허브 + 화상 끔(C2)" : "허브 + 기본 Q 낙인 +20% 끔(C2 「뺀다」)", Kind = "허브끔" },
+                new() { Label = "기본(끝)", Kind = "기본2" },
+            };
         var rng = new System.Random(gawain ? 7 : 11);
         var list = new List<Case>
         {
@@ -184,6 +242,46 @@ public static class RelicGrowthV2BudgetProbeEditor
         return list;
     }
 
+    /// <summary>D7 — 메아리로 칸 조각 수만 바꾼다(조각 효과가 섞이지 않게) · ABBA.</summary>
+    private static List<Case> BuildD7()
+    {
+        const string e2 = "echo.r10=1;echo.r20=1", e3 = e2 + ";echo.r30=1", e4 = e3 + ";echo.r40=1";
+        return new List<Case>
+        {
+            new() { Label = "칸 조각 0", Kind = "기본" },
+            new() { Label = "칸 조각 2(받침 20)", Kind = "칸2", Extra = e2 },
+            new() { Label = "칸 조각 3(재출발 30)", Kind = "칸3", Extra = e3 },
+            new() { Label = "칸 조각 4(두 번째 광란)", Kind = "칸4", Extra = e4 },
+            new() { Label = "칸 조각 4(두 번째 광란)", Kind = "칸4", Extra = e4 },
+            new() { Label = "칸 조각 3(재출발 30)", Kind = "칸3", Extra = e3 },
+            new() { Label = "칸 조각 2(받침 20)", Kind = "칸2", Extra = e2 },
+            new() { Label = "칸 조각 0(끝)", Kind = "기본2" },
+        };
+    }
+
+    /// <summary>진화 화력 — 계열마다 진화 없음 · 있음 · 있음 · 없음(ABBA). 사격은 활을 쥐므로 맨 뒤.</summary>
+    private static List<Case> BuildEvo(bool gawain)
+    {
+        string ids = gawain ? EvoBaseGawain : EvoBaseLancelot;
+        var list = new List<Case>();
+        foreach (var (fam, id) in gawain
+                     ? new[] { ("연격", "evo_gawain_combo"), ("필살", "evo_gawain_crit"), ("사격", "evo_gawain_ranged") }
+                     : new[] { ("연격", "evo_lancelot_combo"), ("필살", "evo_lancelot_crit"), ("사격", "evo_lancelot_ranged") })
+        {
+            if (s_evoFamily.Length > 0 && fam != s_evoFamily) continue;
+            var d = RelicEvolution.ById(id);
+            string evo = d != null ? "evo=" + d.Index : "";
+            foreach (bool on in new[] { false, true, true, false })
+                list.Add(new Case
+                {
+                    Label = $"{fam} 빌드 · {(on ? "진화 " + d?.Name : "진화 없음")}",
+                    Kind = list.Count == 0 ? "기본" : on ? "진화" : "없음",
+                    Ids = ids, Family = fam, Extra = on ? evo : "",
+                });
+        }
+        return list;
+    }
+
     private static string Short(string key) => key.Replace("gawain_", "").Replace("lancelot_", "");
 
     /// <summary>봉인기 띠 0 등급 확률 65 / 28 / 7.</summary>
@@ -227,16 +325,126 @@ public static class RelicGrowthV2BudgetProbeEditor
 
         var loadout = AppBootstrapper.Instance?.Loadout;
         ClearParts(loadout);   // RestoreRelicParts는 더하기만 한다 — 앞 칸 조각 · 메아리를 비운다
-        loadout?.RestoreRelicParts(c.Ids, "");
+        if (s_evo && loadout != null)   // 진화는 ClearParts가 안 비운다 — 앞 칸 진화가 남지 않게(가웨인 화상 패시브도 이 값을 읽는다)
+            typeof(PlayerLoadout).GetProperty(nameof(PlayerLoadout.RelicEvolutionId))?.GetSetMethod(true)?.Invoke(loadout, new object[] { null });
+        if (s_evo) await ApplyFamilyAsync(player, c.Family, ct);
+        loadout?.RestoreRelicParts(c.Ids, c.Extra);
         if (loadout != null) parts.SyncFromLoadout(loadout);
         foreach (var key in c.Legacy) parts.AddSystemEffect(RelicPartEffectFactory.Create(key));
-        if (c.Kind == "허브")
+        D11Restore(player);
+        if (c.Kind == "허브" || c.Kind == "허브끔" || s_d7 || s_evo)   // D7 · 진화 칸 = D11 뒤 새 기본(허브 런 시작부터)
         {
             if (gawain) GawainMemoryHub.Ensure(player);
             else LancelotMemoryHub.Ensure(player);
         }
+        if (c.Kind == "허브끔") D11Strip(player, gawain);
+        // D7 — 방 사이 감쇠는 받침에서 멈춘다: 방을 받침 광기로 시작(칸 0은 0)
+        if (s_d7 && player.RelicBehavior is LancelotMadnessRelic lmd && lmd.Madness != null) lmd.Madness.SetStacks(lmd.Madness.Floor);
         player.Stamina?.Refund(9999f, player.RuntimeStats.MaxStamina);
         WarpPlayerHome(player);
+    }
+
+    /// <summary>D11 「끔」 칸 — 가웨인: 화상 패시브를 뺀다(정오 폭발할 화상이 없다) · 랜슬롯: 기본 Q 낙인 받는 피해 +20%를 0으로.</summary>
+    private static void D11Strip(PlayerController player, bool gawain)
+    {
+        if (gawain)
+        {
+            var list = PassiveList(player);
+            if (list == null) return;
+            for (int i = list.Count - 1; i >= 0; i--)
+                if (list[i] is GawainSolarBurnPassive) { s_burnPassive = list[i]; list.RemoveAt(i); }
+            return;
+        }
+        var entry = BrandAmpEntry(create: true);
+        if (entry == null) return;
+        s_brandAmpBackup = entry.value;
+        entry.value = 0f;
+    }
+
+    private static void D11Restore(PlayerController player)
+    {
+        if (s_burnPassive != null) { PassiveList(player)?.Add(s_burnPassive); s_burnPassive = null; }
+        if (!float.IsNaN(s_brandAmpBackup))
+        {
+            var entry = BrandAmpEntry(create: false);
+            if (entry != null) entry.value = s_brandAmpBackup;
+            s_brandAmpBackup = float.NaN;
+        }
+    }
+
+    private static List<ICharacterPassive> PassiveList(PlayerController player)
+    {
+        var runner = typeof(PlayerController).GetField("_passives", Inst)?.GetValue(player);
+        return runner?.GetType().GetField("_passives", Inst)?.GetValue(runner) as List<ICharacterPassive>;
+    }
+
+    /// <summary>랜슬롯 기본 Q 낙인 받는 피해(RELIC_STAT_DATA lancelot 13 · 없으면 기본 0.20) — 표에 없으면 0.20으로 만든다.</summary>
+    private static RelicStatEntry BrandAmpEntry(bool create)
+    {
+        var mgr = Managers.RelicStatData;
+        if (mgr == null) return null;
+        var map = typeof(RelicStatDataManager).GetField("_map", Inst)?.GetValue(mgr) as Dictionary<string, Dictionary<int, RelicStatEntry>>;
+        if (map == null) return null;
+        if (!map.TryGetValue("lancelot", out var slots))
+        {
+            if (!create) return null;
+            map["lancelot"] = slots = new Dictionary<int, RelicStatEntry>();
+        }
+        if (!slots.TryGetValue(13, out var e))
+        {
+            if (!create) return null;
+            slots[13] = e = new RelicStatEntry { relic_id = "lancelot", slot = 13, value = 0.20f };
+        }
+        return e;
+    }
+
+    /// <summary>
+    /// 첫 전투 유물 HUD 사진 — 허브를 치우지 않은 실제 상태(유물을 붙일 때 생긴 허브)로 HUD 보임 여부를 적고,
+    /// 치기 전 · 6초 친 뒤 두 장(Temp/rgv2_hud_&lt;relic&gt;_0 · 1.png — 표식 칸이 몬스터 체력바에 뜨는지도).
+    /// </summary>
+    private static async UniTask HudShotAsync(PlayerController player, bool gawain, StringBuilder sb, CancellationToken ct)
+    {
+        string tag = gawain ? "gawain" : "lancelot";
+        var view = UnityEngine.Object.FindFirstObjectByType<RelicMemoryHudView>();
+        bool hub = gawain ? GawainMemoryHub.Of(player) != null : LancelotMemoryHub.Of(player) != null;
+        sb.AppendLine($"유물 {s_relic} 첫 전투 — 허브 {(hub ? "있음" : "없음")} · HUD 보임 {(view != null && view.Visible)}");
+        await Wait(1.5f, ct);
+        await CaptureAsync($"Temp/rgv2_hud_{tag}_0.png", ct);
+        var spots = Spots(player);
+        float t0 = Time.realtimeSinceStartup;
+        while (Time.realtimeSinceStartup - t0 < 6f)
+        {
+            AimAt((spots[0] + spots[1] + spots[2]) / 3f);
+            Vector3 center = (spots[0] + spots[1] + spots[2]) / 3f - player.transform.position; center.y = 0f;
+            if (center.sqrMagnitude > 0.01f) player.RequestFacing(Quaternion.LookRotation(center.normalized));
+            if (player.InputBuffer.Count < 2) player.InputBuffer.Push(Command.Light);
+            await UniTask.Yield(PlayerLoopTiming.Update, ct);
+        }
+        await CaptureAsync($"Temp/rgv2_hud_{tag}_1.png", ct);
+        sb.AppendLine($"6초 친 뒤 — HUD 보임 {(view != null && view.Visible)} · 사진 Temp/rgv2_hud_{tag}_0 · 1.png");
+        Debug.Log("[RGV2예산] " + sb.ToString().Replace("\n", " / "));
+    }
+
+    private static async UniTask CaptureAsync(string path, CancellationToken ct)
+    {
+        var runner = UnityEngine.Object.FindFirstObjectByType<Managers>();
+        if (runner == null) return;
+        await UniTask.WaitForEndOfFrame(runner, ct);
+        var tex = ScreenCapture.CaptureScreenshotAsTexture();
+        System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
+        UnityEngine.Object.Destroy(tex);
+    }
+
+    /// <summary>진화 칸 계열 빌드 — 연격: 공속 +120%(넘침) · 필살: 치명 +40%p · 사격: 활(한 번 쥐면 그대로).</summary>
+    private static async UniTask ApplyFamilyAsync(PlayerController player, string family, CancellationToken ct)
+    {
+        var rs = player.RuntimeStats;
+        rs.SetBonusAttackSpeed(family == "연격" ? ComboAttackSpeed : 0f);
+        rs.SetSynergyDynamicCritChance(family == "필살" ? CritChance : 0f);
+        if (family != "사격" || player.WeaponManager?.CurrentWeaponData?.weaponType == WeaponType.Bow) return;
+        var equip = typeof(WeaponFormProbeEditor).GetMethod("EquipAsync", BindingFlags.Static | BindingFlags.NonPublic);
+        bool ok = equip != null && await (UniTask<bool>)equip.Invoke(null, new object[] { player, BowPath, ct, PlayerWeaponManager.Slot0 });
+        Debug.Log($"[RGV2예산] 사격 빌드 — 활 장착 {(ok ? "됨" : "실패")}");
     }
 
     private static void WarpPlayerHome(PlayerController p)
@@ -304,6 +512,7 @@ public static class RelicGrowthV2BudgetProbeEditor
             if (lm != null) lm.JudgmentBegan -= onJudg;
             if (gz?.Gauge != null) gz.Gauge.PhaseChanged -= onPhase;
         }
+        c.Casts = casts;
         c.Diag = $"공격력 시작 {atk0:0} · 최고 {atkMax:0} · 공속 {spd0:0.00} · {(lm != null ? "심판" : "정오")} {casts}회 · 시간 배율 평균 {(frames > 0 ? scaleSum / frames : 1f):0.00}";
         return dealt / Measure;
     }
@@ -319,6 +528,29 @@ public static class RelicGrowthV2BudgetProbeEditor
         sb.AppendLine();
         foreach (var c in cases)
             sb.AppendLine($"  {c.Kind,-3} {c.Dps,7:0.0}  {(c.Dps / b - 1f) * 100f,+5:+0;-0}%  {c.Label}  [{c.Diag}]");
+        if (s_d7)
+        {
+            sb.AppendLine();
+            float zero = cases.Where(c => c.Kind == "기본" || c.Kind == "기본2").Average(c => c.Dps);
+            foreach (var k in new[] { "칸2", "칸3", "칸4" })
+            {
+                var s = cases.Where(c => c.Kind == k).ToList();
+                if (s.Count == 0) continue;
+                sb.AppendLine($"D7 {k}: DPS {s.Average(c => c.Dps):0.0} (칸 0 평균 {zero:0.0} 대비 {(s.Average(c => c.Dps) / zero - 1f) * 100f:+0;-0}%) · 심판 평균 {s.Average(c => c.Casts):0.0}회");
+            }
+        }
+        if (s_evo)
+        {
+            sb.AppendLine();
+            foreach (var fam in cases.Select(c => c.Family).Distinct())
+            {
+                var on  = cases.Where(c => c.Family == fam && !string.IsNullOrEmpty(c.Extra)).ToList();
+                var off = cases.Where(c => c.Family == fam && string.IsNullOrEmpty(c.Extra)).ToList();
+                if (on.Count == 0 || off.Count == 0) continue;
+                float a = off.Average(c => c.Dps), z = on.Average(c => c.Dps);
+                sb.AppendLine($"진화 {fam}: 없음 {a:0.0} → 있음 {z:0.0} = ×{(a > 0f ? z / a : 0f):0.00}  ({on[0].Label})");
+            }
+        }
     }
 
     // ── 표적 ────────────────────────────────────────────────────

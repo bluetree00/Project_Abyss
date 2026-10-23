@@ -28,6 +28,13 @@ public static class CombatDamage
     // hitEffectKey 미할당 시 사용할 공용 히트 VFX.
     private const string FallbackHitEffectKey = "HitEffect_02";
 
+    // 검류 피격(SwordHitImpact = 피)에 겹치는 「검이 닿는」 짧은 흰 섬광(10-19 ⑫ 「블러드 피격은 좋은데 검 자체의 심플한 타격 이펙트가 필요」).
+    // Travis Hit_02(장비 형 실측 73) — 무형검 평타 피 ×0.29에서 ×0.56(반경 0.45 m). 피 배율을 그대로 곱하면 대검(×0.67~1.26)은 1~2 m 섬광이라 제곱근으로 키운다.
+    private const string SwordBloodKey       = "SwordHitImpact";
+    private const string SwordStrikeKey      = "SwordStrikeFlash";
+    private const float  SwordStrikeScale    = 0.56f;
+    private const float  SwordStrikeBloodRef = 0.29f;
+
     /// <summary>
     /// Deal() 중첩 허용 깊이. 중첩 자체는 <b>정상</b>이다 — ⑪의 패시브/서약이 다시 주 피해를 내는
     /// 설계가 들어오면 깊이 2~3이 정상 동작이 된다. 막으려는 건 자기 자신으로 되돌아오는
@@ -118,6 +125,12 @@ public static class CombatDamage
         /// 적중 효과(⑨~⑪ — 룬 · 아이템 · 유물 조각 · 패시브 · 서약)를 내지 않는다 — 피해만. 화살 한 발이 효과 상한(<see cref="BasicArrow"/>)을 넘긴 적중(10-15).
         /// </summary>
         public bool NoEffects;
+
+        /// <summary>
+        /// 타격감(히트스톱 · 흔들림 · 화면 펄스 — GlobalFeelCoalescer)을 내지 않는다. 피격자 반응 · 적중 효과는 그대로.
+        /// 장판 틱처럼 잦은 주 피해용(가웨인 작열 지대 · 낙하 — 10-16 유물 Q 계수).
+        /// </summary>
+        public bool NoHitFeel;
     }
 
     public static bool IsMeleeAction(WeaponActionType a) =>
@@ -163,6 +176,17 @@ public static class CombatDamage
         var target = req.Target;
         var owner  = req.Owner;
         if (target == null) return 0f;
+        // 중계 물체(공명 성흔석) — 맞은 자리는 그대로, 피해 · 효과는 넘겨받는 대상(기사)에게. 한 번만 바꾼다(10-22 A1b).
+        float relayRatio = 1f;
+        bool  relayed    = false;
+        if (target.TryGetComponent<IDamageRelay>(out var relay))
+        {
+            var to = relay.RelayTarget;
+            if (to == null || !relay.TryAcceptHit()) return 0f;   // 식음 — 뒤 단계(아이템 · 서약)도 돌지 않는다
+            target     = to;
+            relayRatio = relay.RelayRatio;
+            relayed    = true;
+        }
         if (!target.TryGetComponent<IDamageable>(out var damageable)) return 0f;
 
         var mgr        = GameRunBootstrapper.Instance?.Run?.EffectManager;
@@ -171,7 +195,7 @@ public static class CombatDamage
         var actionType = req.ActionType;
 
         // ① 스킬 피해 % — Q/E/R 스킬이고 플레이어 공격일 때만 기본 피해에 적용(SkillDamageBonus 소비처)
-        float baseDamage = req.BaseDamage;
+        float baseDamage = req.BaseDamage * relayRatio;
         if (owner != null
             && IsSkillAction(actionType)
             && owner.TryGetComponent<PlayerController>(out var skillOwner))
@@ -262,12 +286,15 @@ public static class CombatDamage
         {
             MonsterPoise.PendingHitWeight = procCoef * splitW;
             MonsterPoise.PendingNoFlinch  = req.NoFlinch;
-            try { damageable.TakeDamage(finalDmg, owner, req.NoFlinch ? 0f : req.KnockbackMultiplier, isCrit); }
+            try { damageable.TakeDamage(finalDmg, owner, req.NoFlinch || relayed ? 0f : req.KnockbackMultiplier, isCrit); }
             finally { MonsterPoise.PendingHitWeight = MonsterPoise.RestingWeight; MonsterPoise.PendingNoFlinch = false; }
         }
 
         // ⑧ 타격감 (HitFeedbackService 허브 경유 → 구독자 전파)
         Vector3 hitPoint = req.HitPoint.sqrMagnitude > 0.0001f ? req.HitPoint : target.transform.position;
+        // 중계면 타격 이펙트(⑫)만 맞은 자리(성흔석) · 숫자 · 적중 효과 기준점은 넘겨받은 몸 — 룬 광역 · 체인이 유리 너머 기사에 닿게(10-22 A1b)
+        Vector3 fxPoint  = hitPoint;
+        if (relayed) hitPoint = target.TryGetComponent<Collider>(out var relayBody) ? relayBody.ClosestPoint(hitPoint) : target.transform.position;
         Vector3 origin   = req.SourcePosition.sqrMagnitude > 0.0001f
             ? req.SourcePosition
             : (owner != null ? owner.transform.position : target.transform.position);
@@ -294,7 +321,8 @@ public static class CombatDamage
             weaponType:      weaponData != null ? weaponData.weaponType : WeaponType.None,
             isFinisher:      req.IsFinisher);
 
-        HitFeedbackService.RaiseHit(hitInfo);
+        if (req.NoHitFeel) HitFeedbackService.RaiseHitQuiet(hitInfo);
+        else               HitFeedbackService.RaiseHit(hitInfo);
 
         // ⑨ 아이템 효과: 적중 후 (흡혈, 독, 빙결 등)
         var report = new DamageReport
@@ -339,7 +367,9 @@ public static class CombatDamage
         {
             string fxKey   = !string.IsNullOrEmpty(req.HitEffectKey) ? req.HitEffectKey : FallbackHitEffectKey;
             float  fxScale = req.HitEffectScale > 0f ? req.HitEffectScale : 1f;
-            SpawnHitEffectAsync(owner, hitPoint, fxKey, fxScale).Forget();
+            SpawnHitEffectAsync(owner, fxPoint, fxKey, fxScale).Forget();
+            if (fxKey == SwordBloodKey)
+                SpawnHitEffectAsync(owner, fxPoint, SwordStrikeKey, SwordStrikeScale * Mathf.Sqrt(fxScale / SwordStrikeBloodRef)).Forget();
         }
 
         return finalDmg;

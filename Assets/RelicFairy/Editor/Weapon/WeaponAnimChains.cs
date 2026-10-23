@@ -50,7 +50,8 @@ public static class WeaponAnimChains
         {
             new Step(Nameless + Clip("Attack01_1_ALL"), "Nameless_GroundLight_01", 0, 0.08f, 0.24f, 0.30f, 0.04f, 0.75f, 0.08f),
             new Step(Nameless + Clip("Attack01_2"),     "Nameless_GroundLight_02", 1, 0.10f, 0.20f, 0.28f, 0.04f, 0.75f, 0.10f),
-            new Step(Imported + Clip("Attack01_3"),     "Nameless_GroundLight_03", 2, 0.22f, 0.36f, 0.36f, 0.06f, 0.80f, 0.12f),
+            // 3타는 두 번 벤다 — 0.11 · 0.20(10-19 ④ · 둘째 베기는 NamelessFinisherSecondSlash 「두 베기를 초반 두 휘두름으로」가 넣는다 · 이 도구를 다시 돌리면 그것도 다시)
+            new Step(Imported + Clip("Attack01_3"),     "Nameless_GroundLight_03", 2, 0.11f, 0.24f, 0.24f, 0.06f, 0.80f, 0.12f),
         }),
         ("Katana/Data/KatanaBase/KatanaAnimation.asset", new[]
         {
@@ -94,11 +95,11 @@ public static class WeaponAnimChains
     private static readonly string[] BowSets = { "Bow/Data/BowBase/BowAnimation.asset", "Crossbow/Data/CrossbowBase/CrossbowAnimation.asset" };
 
     // 평타 슬래시 이펙트 회전(Z) = 칼끝 휘두름 각 − 180°(10-07 규칙) — 장비 형/8 실측(10-10, 무기마다 6~7회 중앙값).
-    // 무형검 3타(01_3)는 두 번 휘둘러 값이 갈렸다 — 이벤트(0.22)가 걸린 두 번째 휘두름(−142 ~ −150)을 쓴다.
+    // 무형검 3타(01_3)는 두 번 휘두른다 — 10-19 ④에 두 베기를 두 휘두름(0.11 · 0.20)에 걸었다: 첫째 왼쪽 위(126° → −52) · 둘째 오른쪽 위(−142 ~ −150 → −146, 4단계).
     // 카타나 3타(02_3)도 갈렸다(23 / 64) — 23은 이벤트(0.10) 전 넘어오는 움직임이고, 슬래시가 그려지는 동안 칼은 왼쪽 아래로 내려벤다(−116° → 64, 사진 대조).
     private static readonly (string ability, float[] rolls)[] SlashRolls =
     {
-        ("Nameless/Data/NamelessBase/NamelessAbility.asset",       new[] { 20f, -160f, -146f }),
+        ("Nameless/Data/NamelessBase/NamelessAbility.asset",       new[] { 20f, -160f, -52f, -146f }),
         ("Katana/Data/KatanaBase/KatanaAbility.asset",             new[] { -44f, 79f, 64f }),
         ("Greatsword/Data/GreatswordBase/GreatswordAbility.asset", new[] { 62f, -132f, 0f }),
     };

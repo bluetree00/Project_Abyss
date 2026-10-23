@@ -62,6 +62,7 @@ public sealed class MemoryAltarNode
     /// <summary>
     /// 조건이 <b>자물쇠</b>인 예외 노드. 정본 §2-3의 둘(심연 입장·챕터 4)만 true —
     /// 논리적 선후가 있어 데드락이 아니다. 나머지는 전부 false여야 한다.
+    /// 10-22 셋째 예외 — 해방 대비 3칸(「해방기 도달」 · 봉인기에 사면 효과가 없는 칸 · 권장안 D2).
     /// </summary>
     public bool ConditionRequired { get; }
 
@@ -170,6 +171,9 @@ public static class MemoryAltarCatalog
         return t;
     }
 
+    /// <summary>「결의」 단계 <paramref name="level"/>의 체력 문턱(0 = 안 삼 · 1단계 0.60 · 2단계 0.45).</summary>
+    public static float ResolveThreshold(int level) => level >= 2 ? ResolveHpThresholdLv2 : level == 1 ? ResolveHpThresholdLv1 : 0f;
+
     // ── 강화 단계별 몫(효과를 읽는 쪽과 노드 글이 같은 값을 본다) ──
     public const float MaxHpPctPerLevel   = 0.04f;   // 최대 체력 +4% — 제단에 남은 유일한 영구 스탯(사용자 10-14 「최대 체력만」)
     public const float RareOddsPerLevel   = 3f;      // Rare 룬 +3%p(Common에서 옮겨 온다)
@@ -184,6 +188,17 @@ public static class MemoryAltarCatalog
     public const float ShopDiscountPerLevel = 0.05f; // 상점 가격 -5%
     public const float PotionHealPerLevel = 0.04f;   // 포션 회복 40% → 44 · 48 · 52%(최대 체력 대비, +10%씩)
     public const float DepthRewardPerLevel = 0.05f;  // 심연 깊이마다 정수 +5%
+
+    // ── 해방 대비 3칸(10-22 C10 권장안 B) — 효과를 읽는 쪽(PlayerController · ChapterSpring)과 노드 글이 같은 값을 본다 ──
+    public const float LibWardPerLevel       = 0.04f;   // 「해방의 내성」 받는 피해 −4%/단계(3단계 −12%) — 받피감소 채널에 더한다(상한 0.75 공유)
+    public const float ResolveHpThresholdLv1 = 0.60f;   // 「결의」 1단계 — 최근 2초 안에 체력이 60% 이상이었으면
+    public const float ResolveHpThresholdLv2 = 0.45f;   //            2단계 — 문턱 45%
+    public const float ResolveWindowSeconds  = 2f;      //            「최근」의 길이
+    public const float ResolveInvulnSeconds  = 1f;      //            버틴 뒤 무적
+    public const float SpringHealPerLevel    = 0.20f;   // 「재정비의 샘」 챕터 시작 샘 회복 +20%p/단계(50 → 90%)
+    public const float NightmareSpringHealPerLevel = 0.10f;   //  악몽은 +10%p/단계(30 → 50%)
+    /// <summary>해방 대비 3칸의 자물쇠 글 — 잠긴 이유 · 조건 줄에 그대로 나온다.</summary>
+    public const string LiberationLockLabel  = "봉인이 풀린 뒤(해방기)에 연다";
 
     // ── 기록 키 ─────────────────────────────────────────
     // 해금 할인 조건과 업적 진척이 <b>같은 값</b>을 본다 — 따로 추적하지 않는다(정본 §6).
@@ -205,6 +220,8 @@ public static class MemoryAltarCatalog
         public const string NmKills     = "nmKills";      // 악몽 모드로 시작한 런의 보스 처치 누적
         /// <summary>봉인한 보스 수(0~4) — 저장값이 아니라 이야기 기록(<see cref="StoryProgress.IsSealed"/>)에서 센다.</summary>
         public const string Seals       = "seals";
+        /// <summary>해방기에 도달했는가(0/1) — 저장값이 아니라 이야기 기록(<see cref="StoryProgress.IsLiberated"/>)에서 읽는다. 해방 대비 3칸의 자물쇠(10-22).</summary>
+        public const string Liberated   = "liberated";
 
         // ── 기행(自發 난이도) — 완주 전에 자발적으로 어렵게 가는 사람을 위한 축 ──
         public const string NoPotionClear   = "noPotionClear";   // 포션 0개로 완주(0/1)
@@ -283,7 +300,7 @@ public static class MemoryAltarCatalog
     public const string RuneStorage1   = "rune_storage_1";   // 룬 보관함 5 → 6
     public const string RuneStorage2   = "rune_storage_2";   // 10-14 걷음 — 「룬 보관함」(rune_storage_1) 2단계로 합쳤다
     public const string RefinePick     = "refine_pick";      // 정제 1개 → 2장 중 고르기
-    public const string ShopReroll     = "shop_reroll";      // 상점 새로고침 개방
+    public const string ShopReroll     = "shop_reroll";      // 상점 새로고침 개방(10-21 — 1단계 열림 · 2단계 첫 번째 무료)
     public const string StartParts2    = "start_parts_2";    // 시작 파츠 1 → 2개
     public const string PotionSlot     = "potion_slot";      // 포션 3 → 4칸
 
@@ -296,6 +313,13 @@ public static class MemoryAltarCatalog
     public const string GoldGain       = "gold_gain";          // 골드 +5%/단계
     public const string EssenceGain    = "essence_gain";       // 정수 +4%/단계
     public const string PotionHeal     = "potion_heal";        // 포션 회복 +4%p/단계(40% 기준 +10%)
+
+    // ── 해방 대비(10-22 C10 권장안 B) — 「해방기 도달」 자물쇠(봉인기에 사면 효과가 없는 칸이라 잠근다 · D2) ──
+    public const string LibWard        = "lib_ward";           // 해방의 내성 — 받는 피해 −4%/단계
+    public const string LibResolve     = "lib_resolve";        // 결의 — 높은 체력에서 쓰러질 한 방을 체력 1로 버팀(방마다 1회)
+    public const string LibSpring      = "lib_spring";         // 재정비의 샘 — 챕터 시작 샘 회복 +20%p/단계
+    /// <summary>해방 대비 3칸 — 해방기엔 「다음 목표」 별이 이 칸들을 먼저 가리킨다(D5 · <see cref="MemoryAltarService.GetNextGoal"/>).</summary>
+    public static readonly string[] LiberationNodes = { LibWard, LibResolve, LibSpring };
 
     // ── 가운데 · 유물의 기억(10-02 재설계) — 유물 성장 「공명 그물」의 기억 카드를 넓힌다 ──
     public const string MemRedraw      = "mem_redraw";       // 런당 1회 기억 카드 3장 다시 굴리기
@@ -384,9 +408,9 @@ public static class MemoryAltarCatalog
         // 원거리 시작 파츠는 베이스캠프 파츠 작업대에서 매 런 Lv1로 들고 나간다 — 분열의 시위는 기본으로 열려 있다(사용자 결정).
         new(PartPierce,     AltarBranch.Weapon, "관통의 촉",        "시작 파츠  +관통",                450,
             Rec.RoomClears, 30, "방 30회 클리어", 300),
-        new(SigilSmith,     AltarBranch.Weapon, "재련 성공률",  "재련 강화 성공률",          400,
+        new(SigilSmith,     AltarBranch.Weapon, "재련 비용",  "재련 비용 할인",          400,   // 10-18 재련 개편 — 확률이 없어져 성공률 → 비용 −10%/단계(세이브 단계는 그대로)
             Rec.MaxEnhance, 12, "무기 +12 도달", 260, maxLevel: 3,   // 10-15 강화 단계 세분(옛 +6)
-            valueText: lv => $"재련 성공률 +{SmithPerLevel * 100f * lv:0}%p"),
+            valueText: lv => $"재련 비용 −{WeaponReforgeService.SigilCostPerLevel * 100f * lv:0}%"),
         new(EnhanceGain,    AltarBranch.Weapon, "강화재료 획득",  "방 보상 강화재료", 340, size: AltarNodeSize.Small, maxLevel: 3,
             valueText: lv => $"강화재료 +{EnhanceGainPerLevel * 100f * lv:0}%"),
         new(WeaponCrossbow, AltarBranch.Weapon, "석궁",             "시작 원거리 무기  활 → 활·석궁",  900,
@@ -416,13 +440,27 @@ public static class MemoryAltarCatalog
             valueText: lv => lv <= 0 ? "상점 가격 그대로" : $"상점 가격 -{ShopDiscountPerLevel * 100f * lv:0}%"),
         new(GoldGain,       AltarBranch.Journey, "골드 획득",    "얻는 골드",                 230, size: AltarNodeSize.Small, maxLevel: 5,
             valueText: lv => $"골드 +{GoldGainPerLevel * 100f * lv:0}%"),
+        // ── 해방 대비 3칸(10-22 C10 권장안 B · 설계 `기획/RelicFairy_해방기_기억의제단_권장안_20261022.md`) — 고리 1 샘 · 고리 2 내성 · 결의 ──
+        // 해방기 압박(한 대 ×1.2 · 방 받는 피해 ×1.7)을 「견딜 만한 선」까지만 메운다 — 한 대는 거의 상쇄, 챕터 예산은 절반(남는 몫은 해방기의 어려움).
+        // 영구 공격력 0 그대로 · 흡혈 없음(샘 = 쉼 · 결의 = 사망 방지 · 내성 = 받는 피해 감소). 10-14 「영구 스탯 = 최대 체력만」을 해방기 뒤 한정으로 푼다(D1).
+        // 자물쇠 = 「해방기 도달」(D2). 생존 칸이라 할인 조건은 걸지 않는다(할인가 = 기본가). 값 합 8,190(샘 1,440 · 내성 3,870 · 결의 2,880).
+        new(LibSpring,      AltarBranch.Journey, "재정비의 샘",  "챕터 시작 「요정의 샘」 회복량 — 단계마다 +20%p(악몽 +10%p)", 600,
+            Rec.Liberated, 1, LiberationLockLabel, 600, conditionRequired: true, era: 2, maxLevel: 2,
+            valueText: lv => $"요정의 샘 회복 {(0.5f + SpringHealPerLevel * lv) * 100f:0}%(악몽 {(0.3f + NightmareSpringHealPerLevel * lv) * 100f:0}%)"),   // 기본 50 · 악몽 30 = ChapterSpring
         new(PotionHeal,     AltarBranch.Journey, "포션 회복량",  "포션 한 병 회복량",           360, maxLevel: 3, requiredPoints: 3,
             valueText: lv => $"포션 회복 최대 체력의 {(0.40f + PotionHealPerLevel * lv) * 100f:0}%"),
         new(EssenceGain,    AltarBranch.Journey, "정수 획득",    "얻는 심연의 정수",            400, maxLevel: 5, requiredPoints: 3,
             valueText: lv => $"정수 +{EssenceGainPerLevel * 100f * lv:0}%"),
-        new(ShopReroll,     AltarBranch.Journey, "상점 새로고침",  "상점 진열 새로고침(10골드)",   820,
+        new(ShopReroll,     AltarBranch.Journey, "상점 새로고침",  "상점 진열 새로고침(20 → 40 → 80골드)",   820,
             Rec.ShopUses, 10, "상점 10회 이용", 530, size: AltarNodeSize.Small, maxLevel: 2, requiredPoints: 3,
-            valueText: lv => lv <= 0 ? "새로고침 없음" : $"상점마다 {lv}회"),
+            valueText: lv => lv <= 0 ? "새로고침 없음" : lv == 1 ? "상점마다 3회 · 20 → 40 → 80" : "첫 새로고침 무료 · 그다음 40 → 80"),   // 10-21 값이 오르는 새로고침
+        new(LibWard,        AltarBranch.Journey, "해방의 내성",  "받는 피해가 줄어든다 — 단계마다 −4%", 900,
+            Rec.Liberated, 1, LiberationLockLabel, 900, conditionRequired: true, era: 2, maxLevel: 3, requiredPoints: 3,
+            valueText: lv => lv <= 0 ? "받는 피해 그대로" : $"받는 피해 −{LibWardPerLevel * 100f * lv:0}%"),
+        new(LibResolve,     AltarBranch.Journey, "결의",        "체력이 높을 때 쓰러질 한 방을 맞으면 체력 1로 버틴다 — 방마다 1회(보스는 페이지마다)", 1200,
+            Rec.Liberated, 1, LiberationLockLabel, 1200, conditionRequired: true,
+            size: AltarNodeSize.Keystone, era: 2, maxLevel: 2, requiredPoints: 3,
+            valueText: lv => lv <= 0 ? "없음" : $"체력 {ResolveThreshold(lv) * 100f:0}% 이상 · 쓰러질 한 방 버팀"),
         new(PotionSlot,     AltarBranch.Journey, "포션 칸",     "포션 칸",                1100,
             size: AltarNodeSize.Small, era: 2, maxLevel: 2, requiredPoints: 8,
             valueText: lv => $"포션 {3 + lv}칸"),

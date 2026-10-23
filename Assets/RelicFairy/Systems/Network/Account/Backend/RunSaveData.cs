@@ -66,6 +66,8 @@ public class RunSaveData
     public bool   weapon0AugmentAfterEvolve;
     public bool   weapon1AugmentAfterEvolve;
     public int    meleeAugmentRerollsUsed;  // 이번 런에 쓴 증강 리롤(옛 세이브 0 = 다 남음)
+    public string weapon0ReforgeLog;        // 재련 기록 「id:그때 단계」(쉼표 · 고른 순서) — 10-19
+    public string weapon1ReforgeLog;
 
     public string relicKey;               // PlayerLoadout.Relic SO 이름(Addressables 키)
     public string relicPartIds = "";      // 보스 클리어로 되찾은 유물 기억 조각 — `id:등급`(쉼표) · 옛 저장은 id만(흐릿) — 런 진행분
@@ -137,6 +139,9 @@ public class RunSaveData
 public sealed class RangedPartListWrapper
 {
     public System.Collections.Generic.List<RangedPartsState.Equipped> items = new();
+    public int reforges;      // 이 런 원거리 재련 수(10-18 재련 개편 · 옛 세이브 0)
+    public int rerollsUsed;   // 이 런 파츠 카드 다시 뽑기 쓴 수
+    public System.Collections.Generic.List<RangedPartsState.Equipped> log = new();   // 재련 기록(고른 파츠 · 오른 Lv · 10-19)
 }
 
 [Serializable]

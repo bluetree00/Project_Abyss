@@ -194,6 +194,21 @@ public static class CovenantGrammar
     public static string Line(string effectId, ClauseLink link, string prevEffectId)
         => Lead(link, prevEffectId) + Verb(effectId);
 
+    /// <summary>
+    /// 서약서 한 줄(결과절) — 머리말 + <b>수치</b>(10-18 사용자 「『적이 피를 흘린다』보다 『출혈 피해 몇』이 직관적」).
+    /// 수치 글은 카드와 같다(<see cref="CovenantAssemblePreview.EffectAmountCompact"/> — 원인 계수 · 등급 · 절 위치 배율, 런타임과 같은 식).
+    /// 줄엔 효과 이름이 없어 주어가 갈리는 저주만 「적이」를 붙인다(「받는 피해 +20%」는 결계의 내 쪽 감소와 같은 말이다).
+    /// 원인 · 효과를 못 찾으면 동사구로 돌아간다.
+    /// </summary>
+    /// <param name="resultIndex">결과 몇째 절인가(0부터) — 위치 배율(<see cref="PositionMult"/>).</param>
+    public static string NumericLine(string causeId, CovenantTier causeTier, string effectId, CovenantTier effectTier,
+                                     ClauseLink link, string prevEffectId, int resultIndex)
+    {
+        var p = CovenantAssemblePreview.Build(causeId, causeTier, effectId, effectTier, PositionMult(resultIndex));
+        if (!p.valid) return Line(effectId, link, prevEffectId);
+        return Lead(link, prevEffectId) + (p.effectKind == EffectKind.Curse ? "적이 " : string.Empty) + p.EffectAmountCompact();
+    }
+
     // ── id 기호 ─────────────────────────────────────────
     public static char Code(ClauseLink link) => link switch
     {

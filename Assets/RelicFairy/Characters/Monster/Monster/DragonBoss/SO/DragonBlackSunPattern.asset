@@ -36,6 +36,14 @@ MonoBehaviour:
     type: 3}
   _weakPointBreakVfxScale: 1.6
   _breakSfx: {fileID: 0}
+  _emberWaves: 2
+  _emberWarn: 1
+  _emberRadius: 1.6
+  _emberGap: {x: 1, y: 2.4}
+  _emberMax: 8
+  _emberDamageMult: 0.6
+  _emberVfx: {fileID: 1312756255662086, guid: a7cb112e9339d01408d0002aede091cf, type: 3}
+  _emberVfxScale: 0.6
   _fallSpeed: 16
   _groggySeconds: 4
   _fallImpactVfx: {fileID: 1312756255662086, guid: a7cb112e9339d01408d0002aede091cf,

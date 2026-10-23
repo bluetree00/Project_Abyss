@@ -8,6 +8,8 @@ namespace RelicFairy.Monster
 ///
 /// O — 코어 위에 반경 arrayRadius의 보라 봉인진 — 여섯 갈래 빛줄기가 차오른다(예고, 아직 무해).
 /// → A — 빛줄기가 회전한다(한 바퀴 revolutionSeconds). 빛줄기 사이 부채꼴이 안전 — 틈을 따라 함께 돈다.
+///   빛줄기 사이 각은 시전마다 고르지 않다(10-22 E5 페이지2 — 6갈래 고른 틈은 바깥이 6 m로 넓어 외우면 끝이었다 → 8갈래 · ±25%:
+///   회전을 따라갈 수 있는 반경 4~6 m에서 틈 1~3 m).
 ///   reverseEvery마다 한 줄이 흰 빛으로 깜박이고 0.5초 뒤 <b>방향이 뒤집힌다</b>(반전 예고).
 /// → E · R
 /// 바크: 리치가 멀린의 목소리를 흉내 — 「…작은 빛. 이리 오렴.」
@@ -36,9 +38,13 @@ public class LichSealArrayPatternSO : BossPatternSO
     public float damageMultiplier  = 0.7f;
     [Tooltip("같은 빛줄기에 다시 맞기까지(초)")]
     public float tickInterval      = 0.45f;
+    [Tooltip("빛줄기 사이 각을 시전마다 ±이 비율만큼 흔든다 — 틈 너비가 매번 다르다(10-22 E5 페이지2)")]
+    [SerializeField] private float _spacingJitter = 0.25f;
 
     // ── 런타임 ───────────────────────────────────────────
     private LichSealArrayState _state;
+
+    public float SpacingJitter => Mathf.Clamp(_spacingJitter, 0f, 0.6f);
 
     public override void Initialize(BossPatternContext ctx) => _state = new LichSealArrayState(this);
     public override void OnRecycled()                       => _state = new LichSealArrayState(this);
@@ -63,7 +69,8 @@ public class LichSealArrayState : UnInterruptibleState<LichSealArrayPatternSO>
     private const int   MaxSpokes    = 8;
     private const float CoreOrbScale = 0.35f;
 
-    private readonly GameObject[] _spokes = new GameObject[MaxSpokes];
+    private readonly GameObject[] _spokes  = new GameObject[MaxSpokes];
+    private readonly float[]      _offsets = new float[MaxSpokes];   // 빛줄기마다 첫 줄에서 벌어진 각(도) — 고르지 않게(10-22 E5 페이지2)
 
     private Phase      _phase;
     private float      _timer;
@@ -96,11 +103,21 @@ public class LichSealArrayState : UnInterruptibleState<LichSealArrayPatternSO>
         if (grid == null || !grid.TryGetWorldCenter(out _center))
             _center = mc != null ? mc.ArenaCenter : LichPatternUtil.OnFloor(ctx, ctx.Transform.position);
 
-        // 빛줄기 사이(안전)가 플레이어 쪽에서 시작하게 — 공정한 첫 자리.
+        // 빛줄기 사이 각을 시전마다 고르지 않게 — 틈 너비가 매번 다르다(10-22 E5 페이지2)
+        float sum = 0f;
+        for (int i = 0; i < _count; i++)
+        {
+            _offsets[i] = sum;
+            sum += 1f + Random.Range(-Data.SpacingJitter, Data.SpacingJitter);
+        }
+        for (int i = 0; i < _count; i++) _offsets[i] *= 360f / sum;
+        float lastGap = 360f - _offsets[_count - 1];   // 마지막 줄 → 첫 줄 사이
+
+        // 빛줄기 사이(안전)가 플레이어 쪽에서 시작하게 — 공정한 첫 자리(마지막 틈 한가운데).
         Vector3 toPlayer = LichPatternUtil.PlayerFloorPos(ctx) - _center;
         toPlayer.y = 0f;
         float playerYaw = toPlayer.sqrMagnitude > 0.01f ? Quaternion.LookRotation(toPlayer).eulerAngles.y : 0f;
-        _angle = playerYaw + 180f / _count;
+        _angle = playerYaw + lastGap * 0.5f;
 
         for (int i = 0; i < _count; i++)
         {
@@ -111,7 +128,8 @@ public class LichSealArrayState : UnInterruptibleState<LichSealArrayPatternSO>
         PlaceSpokes();
 
         // 봉인진 = 바닥의 보라 문양 원(반경 arrayRadius). 가운데 시계형 구체는 작게(크면 리치를 가린다 — 09-19 실측).
-        _arrayDisc = PatternGuideHelper.Disc(_center + Vector3.up * 0.02f, Data.arrayRadius, LichPatternUtil.Arcane);
+        // (10-23 가이드 색 통일) 원 자체는 판정이 없다(빛줄기만 친다) — 공격 색이 아닌 배치 색으로.
+        _arrayDisc = PatternGuideHelper.Disc(_center + Vector3.up * 0.02f, Data.arrayRadius, PatternGuideHelper.Layout);
         PatternGuideHelper.SetIntensity(_arrayDisc, 0.6f);
         _arrayVfx = LichVfx.PlayLoop(LichVfxSlot.SealArray, _center + Vector3.up * 0.05f, BossStoryScenes.SigilFlat, CoreOrbScale);   // 칸 60 = 보스 봉인진 문양(10-11 이펙트 톤 2차)
         LichPatternUtil.CastBeat(ctx, LichCast.ArcaneOrb, Data.openDuration, 2f, 0.12f);
@@ -225,7 +243,7 @@ public class LichSealArrayState : UnInterruptibleState<LichSealArrayPatternSO>
         float halfWidthDeg = Mathf.Atan2(Data.spokeWidth * 0.5f, d) * Mathf.Rad2Deg;
         for (int i = 0; i < _count; i++)
         {
-            float spoke = _angle + 360f / _count * i;
+            float spoke = _angle + _offsets[i];
             if (Mathf.Abs(Mathf.DeltaAngle(yaw, spoke)) > halfWidthDeg) continue;
             _lastHit = Time.time;
             // 넉백은 빛줄기가 이미 지나간 옆으로 — 중심에서 바깥으로 밀면 빛줄기를 따라 미끄러져 그 위에 남았다(10-08 점검).
@@ -241,7 +259,7 @@ public class LichSealArrayState : UnInterruptibleState<LichSealArrayPatternSO>
         for (int i = 0; i < _count; i++)
         {
             if (_spokes[i] == null) continue;
-            Vector3 dir = Quaternion.Euler(0f, _angle + 360f / _count * i, 0f) * Vector3.forward;
+            Vector3 dir = Quaternion.Euler(0f, _angle + _offsets[i], 0f) * Vector3.forward;
             var t = _spokes[i].transform;
             t.position = _center + dir * (Data.arrayRadius * 0.5f) + Vector3.up * 0.04f;
             t.rotation = Quaternion.LookRotation(Vector3.down, dir);

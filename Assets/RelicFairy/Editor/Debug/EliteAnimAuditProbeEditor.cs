@@ -49,7 +49,7 @@ internal static class EliteAnimAuditProbeEditor
     private static readonly string[] PassiveParts = { "Chase", "Patrol", "Idle", "AttackReady", "Dormant", "Die", "Spawn", "GetHit" };
     private static bool IsPassive(string fsm) { foreach (var k in PassiveParts) if (fsm.Contains(k)) return true; return false; }
 
-    private enum Run { A, B, Bull, Prefix, Stuck, FixA, FixB, FxLook }
+    private enum Run { A, B, Bull, Prefix, Stuck, FixA, FixB, FxLook, BullCh }
     private static bool s_trace;   // 추적 기록(0.5초마다 거리 · 정지 거리 · 남은 길 · 속도 · 칸 대기)
     private static Run    s_run;
     private static bool   s_armed;
@@ -64,6 +64,7 @@ internal static class EliteAnimAuditProbeEditor
     [MenuItem(Root + "6 Fixed A - 7 (Play)")] private static void M6() => Begin(Run.FixA);
     [MenuItem(Root + "7 Fixed B - 5 (Play)")] private static void M7() => Begin(Run.FixB);
     [MenuItem(Root + "8 FX Look - Beholder · BlackKnight (Play)")] private static void M8() => Begin(Run.FxLook);
+    [MenuItem(Root + "9 BullTank Chapters (Play)")] private static void M9() => Begin(Run.BullCh);   // 10-16 챕터별 개성 · 벽 앞 돌진
 
     // 10-14 고친 뒤 확인 — 동작을 바꾼 패턴 · 휘청 · 걷기
     private static readonly string[] FixedA =
@@ -116,6 +117,10 @@ internal static class EliteAnimAuditProbeEditor
                 case Run.A:      foreach (var k in GroupA) await OneAsync(k, null, p, 16f, k.StartsWith("Chest") ? new[] { 1.5f, 2.5f, 1.5f } : new[] { 7f, 2.5f, 9f }, 5f, ct); break;
                 case Run.B:      foreach (var k in GroupB) await OneAsync(k, null, p, 16f, new[] { 7f, 2.5f, 9f }, 5f, ct); break;
                 case Run.Bull:   await OneAsync("BullTank/BullTank_Ch1", null, p, 56f, new[] { 3f, 9f, 12f, 3f, 7f, 10f }, 8f, ct); break;
+                case Run.BullCh:
+                    foreach (var k in new[] { "BullTank/BullTank_Ch1", "BullTank/BullTank_Ch2", "BullTank/BullTank_Ch3", "BullTank/BullTank_Ch4" })
+                        await OneAsync(k, null, p, 40f, new[] { 3f, 9f, 12f, 3f, 7f, 10f }, 6f, ct);
+                    break;
                 case Run.Prefix: foreach (var (k, kind) in PrefixRuns) await OneAsync(k, kind, p, 15f, new[] { 8f }, 4f, ct); break;
                 case Run.Stuck:
                     s_trace = true;

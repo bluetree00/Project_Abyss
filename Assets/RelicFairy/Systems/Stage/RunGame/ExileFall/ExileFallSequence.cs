@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 ///   ① 추방 — 붕괴 컷신 +9.0초부터(<see cref="LichSealRitual"/>): 리치가 공중에 멈춰 플레이어를 가리키고, 발밑 코어가 무너져 떨어진다.
 ///   ② 추락 — 같은 씬 y −3000에 런타임으로 짓는 허공(<see cref="ExileFallStage"/>). 층 넷이 스쳐 가고 봉인진이 하나씩 깨진다.
 ///   ③ 착지 — 흰 섬광 → 와이프. 전환(같은 런 · 같은 빌드 · 깊이 그대로 Ch1)은 <see cref="GameRunBootstrapper.EnterExileFall"/>가 맡는다.
-///   ④ Ch1 첫 방 — 엎드린 채 드러나 일어나고 멀린 한 줄(<see cref="BeginLandingPose"/> · <see cref="PlayLandingAsync"/> · <see cref="LandingLine"/>).
+///   ④ Ch1 첫 방 — 엎드린 채 드러나 일어나고 멀린 한 줄(<see cref="BeginLandingPose"/> · <see cref="PlayLandingAsync"/> · <see cref="RegroupLines"/>).
 /// 전부 실시간(unscaled) · 추락은 1초 뒤 공격 · 대시 · 상호작용(F) · 스페이스로 건너뛴다(ESC는 아니다 — 추방 내내 일시정지도 막는다, <see cref="BlocksPause"/>).
 /// 전환 계기 = 보스방 클리어: 추방이 true로 돌아오면 LichMonster가 RaiseDied → RoomWaveController(3초 뒤) NotifyBossRoomCleared
 /// → GameRunBootstrapper.BossClearSequenceAsync → <see cref="GameRunBootstrapper.EnterExileFall"/>가 <see cref="Claim"/>한다.
@@ -23,7 +23,8 @@ using Object = UnityEngine.Object;
 public static class ExileFallSequence
 {
     // ── Constants ─────────────────────────────────────────────────
-    public const string DialogueKey = "Seal_Exile";      // 0 리치(추방) · 1 멀린(Ch3 무렵) · 2 멀린(Ch1 무렵) · 3 멀린(착지)
+    public const string DialogueKey = "Seal_Exile";      // 0 리치(추방) · 1 멀린(Ch3 무렵) · 2 멀린(Ch1 무렵) · 3 멀린(착지 — 10-22부터 RegroupKey가 대신)
+    public const string RegroupKey  = "Seal_Regroup";    // 착지 「재정비」 — 멀린 · 멀린 · 그림자(10-22 A10)
     private const string ShadowKey      = "Seal_Collapse";   // 3 = 그림자 — 붕괴 컷신 끝에서 추락 중으로 옮겼다
     private const int    ShadowIndex    = 3;
     private const string ShadowFallback = "그 봉인이 버틸 줄 알았어?";
@@ -38,6 +39,14 @@ public static class ExileFallSequence
     };
     private static readonly DialogueSpeaker[] FallbackSpeakers =
         { DialogueSpeaker.Lich, DialogueSpeaker.Merlin, DialogueSpeaker.Merlin, DialogueSpeaker.Merlin };
+    private static readonly string[] RegroupFallback =
+    {
+        "…살아 있어? 맨 처음 숲까지 떨어졌어.",
+        "이 몸으론 다시 못 올라가. 거점으로 돌아가서 재정비하자.",
+        "봉인이 풀린 놈들이야. 이번엔 제대로 준비하고 와.",
+    };
+    private static readonly DialogueSpeaker[] RegroupSpeakers = { DialogueSpeaker.Merlin, DialogueSpeaker.Merlin, DialogueSpeaker.Shadow };
+    private const string ShadowIllust = "Illust_Shadow_Default";
 
     // ① 추방(아레나)
     private const string PointState    = "MagicBolt";   // 가리키는 손짓 — 「낫 끝으로 가리키기」 상태가 없어 시전 손짓의 끝 자세를 빌린다(f9 권장)
@@ -343,15 +352,24 @@ public static class ExileFallSequence
         s_landCam = true;
     }
 
-    /// <summary>④ 착지 멀린 한 줄(Seal_Exile 3) — 대기방 대사창 맨 앞에 붙인다. CSV에 없으면 폴백 줄.</summary>
-    public static DialogueLine LandingLine()
+    /// <summary>④ 착지 「재정비」 대사(Seal_Regroup) — 이 뒤 런을 클리어로 정산하고 거점(해방기)으로 간다(10-22 A10). CSV에 없으면 폴백 줄.</summary>
+    public static DialogueLine[] RegroupLines()
     {
-        var lines = Managers.DialogueData?.GetLines(DialogueKey);
-        var line  = lines != null && lines.Length > 3 ? lines[3] : null;
-        bool csv  = line != null && !string.IsNullOrEmpty(line.text);
-        if (!csv) line = new DialogueLine { speaker = DialogueSpeaker.Merlin, illustrationKey = LandingIllust, text = FallbackLines[3] };
-        Note($"대사 {DialogueKey} 3 ({(csv ? "CSV" : "폴백")}) 「{line.text}」");
-        return line;
+        var lines = Managers.DialogueData?.GetLines(RegroupKey);
+        bool csv  = lines != null && lines.Length > 0;
+        if (!csv)
+        {
+            lines = new DialogueLine[RegroupFallback.Length];
+            for (int i = 0; i < lines.Length; i++)
+                lines[i] = new DialogueLine
+                {
+                    speaker         = RegroupSpeakers[i],
+                    illustrationKey = RegroupSpeakers[i] == DialogueSpeaker.Shadow ? ShadowIllust : LandingIllust,
+                    text            = RegroupFallback[i],
+                };
+        }
+        Note($"대사 {RegroupKey} {lines.Length}줄 ({(csv ? "CSV" : "폴백")})");
+        return lines;
     }
 
 #if UNITY_EDITOR
@@ -413,11 +431,12 @@ public static class ExileFallSequence
     }
 
     /// <summary>
-    /// 추락 건너뛰기 키 — 공격(왼쪽 클릭) · 대시(오른쪽 클릭) · 상호작용(F) · 스페이스만. ESC · 일시정지 키는 세지 않는다(10-11 b0).
+    /// 추락 건너뛰기 키 — 공격(왼쪽 클릭) · 대시(오른쪽 클릭 · Shift) · 상호작용(F) · 스페이스만. ESC · 일시정지 키는 세지 않는다(10-11 b0).
     /// 플레이어 입력 액션은 추락 동안 꺼져 있어 장치 키를 직접 본다(바인딩: PlayerInputActions Attack · Dodge · Jump, 상호작용 F).
     /// </summary>
     internal static bool SkipPressed()
         => Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)
+        || Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift)   // 대시 Shift(10-20)
         || Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.Space);
 
     /// <summary>실측 기록 한 줄(에디터) + 콘솔. 사건마다 한 번만 부른다(매 프레임 금지).</summary>

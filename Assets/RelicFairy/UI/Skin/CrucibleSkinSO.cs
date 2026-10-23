@@ -81,10 +81,27 @@ public sealed class CrucibleSkinSO : ScriptableObject
     [Tooltip("말풍선 곁 초상 — 방의 NPC 모델을 에디터에서 찍은 그림(RelicFairy/UI/10-15 재련소 대장장이 초상 굽기). 비우면 모루 아이콘.")]
     [SerializeField] private Sprite blacksmithPortrait;
 
+    // ── 10-18 증강 · 파츠 고르기 창(힉스필드) ──
+    [Header("증강 · 파츠 고르기 창(10-18 힉스필드)")]
+    [Tooltip("세로 카드 틀(바탕 포함) — 그림 비율(524×824) 그대로 그린다(9칸 자르기 아님). 비우면 남색 판 + 1px 테.")]
+    [SerializeField] private Sprite augmentCardFrame;
+    [Tooltip("창 틀(9칸 자르기 · 바탕 포함). 비우면 남색 판 + 1px 테.")]
+    [SerializeField] private Sprite augmentPanelFrame;
+    [Tooltip("첫 화면 「무기 재련 / 파츠 재련」 가로 카드 틀(10-19 · 9칸 · 바탕 포함). 비우면 남색 판 + 1px 테.")]
+    [SerializeField] private Sprite chooserCardFrame;
+    [Tooltip("첫 화면 카드 그림(10-22 힉스필드 · 4:3 · 왼쪽이 투명하게 흐려진다) — 무기 재련 · 파츠 재련. 비우면 글자만.")]
+    [SerializeField] private Sprite chooserMeleeArt;
+    [SerializeField] private Sprite chooserRangedArt;
+
     public Sprite LevelTag      => levelTag;
     public Sprite CurrencyInner => currencyInner;
     public Sprite CurrencyFrame => currencyFrame;
     public Sprite MaterialIcon  => materialIcon;
     public Sprite OreIcon       => oreIcon;
     public Sprite BlacksmithPortrait => blacksmithPortrait;
+    public Sprite AugmentCardFrame   => augmentCardFrame;
+    public Sprite AugmentPanelFrame  => augmentPanelFrame;
+    public Sprite ChooserCardFrame   => chooserCardFrame;
+    public Sprite ChooserMeleeArt    => chooserMeleeArt;
+    public Sprite ChooserRangedArt   => chooserRangedArt;
 }

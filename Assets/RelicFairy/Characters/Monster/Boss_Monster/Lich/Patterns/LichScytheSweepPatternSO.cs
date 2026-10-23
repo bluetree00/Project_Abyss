@@ -74,6 +74,16 @@ public class LichScytheSweepPatternSO : BossPatternSO
         return dist >= minTriggerRange && dist <= maxTriggerRange;
     }
 
+    /// <summary>연계(10-22 E2 L1 「순간 베기(등 뒤) → 낫 휘두르기(앞)」 협공) — 앞 패턴의 일부라 자기 쿨다운은 보지 않는다.</summary>
+    public override bool CanFollowUp(BossPatternContext ctx)
+    {
+        if (ctx.Ctx.Runtime.PlayerTarget == null) return false;
+        var lichBB = (ctx.Boss as LichMonster)?.LichBB;
+        if (lichBB == null || !lichBB.IsPhase2) return false;
+        float dist = Vector3.Distance(ctx.Ctx.Transform.position, ctx.Ctx.Runtime.PlayerTarget.position);
+        return dist >= minTriggerRange && dist <= maxTriggerRange;
+    }
+
     public override SpecialStateBase GetRuntimeState() => _state;
 }
 

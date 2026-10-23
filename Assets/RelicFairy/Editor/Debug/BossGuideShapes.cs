@@ -228,6 +228,10 @@ public static class BossGuideShapes
     {
         string n = t.name;
         if (n.StartsWith("Guide_Pillar") || n.StartsWith("Guide_Link")) return;   // 시각 전용(판정 없음)
+        // 리치 원소 순환(LichHazards.ElementCycleHazard · 반경 24 m 부채꼴 넷) — 기다리는 칸(옅은 원소 색)은 피해가 없다. 터질 칸은
+        // 보라로 바뀌어 차오르고(번개는 낙뢰 원) 그때부터 피할 범위다(10-22 E2 L2). 원소 색 칸까지 피하면 경기장 전체가 막혔다(10-17 실측)
+        if (n.StartsWith("Guide_Sector") && Mathf.Abs(t.lossyScale.x) * 0.5f >= QuadrantMinRadius && IsHarmlessQuadrant(GuideColor(t))) return;
+        if (IsLayout(GuideColor(t))) return;   // 배치 · 정보 표시(PatternGuideHelper.Layout — 리치 봉인진 원) — 판정도 안전지대도 아니다(10-23 가이드 색 통일)
         var s = new Shape { Name = n, Center = t.position, Age = AgeOf(t.gameObject, now), Still = StillOf(t, now), Safe = IsSafe(GuideColor(t)) };
         Vector3 sc = t.lossyScale;
         bool decal = t.TryGetComponent<MeshFilter>(out var mf) && mf.sharedMesh != null && mf.sharedMesh.name == "Quad";
@@ -260,6 +264,26 @@ public static class BossGuideShapes
         if (!t.TryGetComponent<MeshRenderer>(out var mr)) return Color.clear;
         mr.GetPropertyBlock(s_mpb);
         return s_mpb.GetColor(ColorId);
+    }
+
+    private const float QuadrantMinRadius = 12f;
+    // LichHazards.ElementCycleHazard.Tints 넷 — 기다리는 칸은 원소 색 · 피해 없음(10-22 E2 L2 — 옛 사분면은 불 칸만 상시 피해라 뺐었다)
+    private static readonly Color[] HarmlessQuadrant =
+    {
+        new Color(1.00f, 0.58f, 0.12f), new Color(0.25f, 0.65f, 0.95f), new Color(0.95f, 0.85f, 0.20f), new Color(0.50f, 0.15f, 0.90f),   // 불 = 호박빛(10-23)
+    };
+
+    private static bool IsHarmlessQuadrant(Color c)
+    {
+        foreach (var q in HarmlessQuadrant)
+            if (Mathf.Abs(c.r - q.r) < 0.06f && Mathf.Abs(c.g - q.g) < 0.06f && Mathf.Abs(c.b - q.b) < 0.06f) return true;
+        return false;
+    }
+
+    private static bool IsLayout(Color c)
+    {
+        Color l = PatternGuideHelper.Layout;
+        return Mathf.Abs(c.r - l.r) < 0.06f && Mathf.Abs(c.g - l.g) < 0.06f && Mathf.Abs(c.b - l.b) < 0.06f;
     }
 
     private static bool IsSafe(Color c)

@@ -34,6 +34,9 @@ public sealed class EscKeyListener : MonoBehaviour
         // 로딩 화면(900)이 덮는 동안엔 무시 — 그 아래(500)에 메뉴가 열려 시간을 멈춘 채 다음 씬으로 넘어갔다(10-09 출시 점검)
         if (UI_SceneLoading.Instance != null && UI_SceneLoading.Instance.IsCovering) return;
 
+        // 확인 창(종료 · 요정의 샘 등)은 무엇보다 위에 뜬다 — 가장 먼저 취소로 닫는다(10-16).
+        if (UI_ConfirmDialog.CloseIfOpen()) return;
+
         // 설정은 ESC 메뉴 위에도, 로비 단독으로도 열린다 — 어느 쪽이든 가장 먼저 닫힌다.
         if (UI_Settings.CloseIfOpen()) return;
 

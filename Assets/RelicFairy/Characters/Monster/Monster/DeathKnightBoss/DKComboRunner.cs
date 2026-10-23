@@ -38,10 +38,19 @@ public class DKComboRunner
     private bool                          _currentComboUsePhase1Position;
     private BossPatternSO                 _lastPickedInCombo;
     private float                         _breakMin = -1f, _breakMax = -1f;   // 2페이즈 쉬는 시간 — 공용 설정 SO에 쓰지 않는다
+    // 사슬 박자(10-22 E5 페이지2 · 공용 BossPatternRunner.SetChainTempo와 같은 뜻) — 켜면 연계를 linkRest 쉬고 잇고, 사슬이 끝나면 endRest 숨을 고른다
+    private bool                          _chainTempo;
+    private Vector2                       _linkRest;
+    private Vector2                       _chainEndRest;
+    private BossPatternSO                 _queuedFollowUp;   // 앞 패턴이 끝나면 낼 연계(사슬 박자를 켰을 때만)
 
     public bool  IsPatternActive               { get; private set; }
     public float PatternBreakCooldown          => _breakCooldown;
     public bool  CurrentComboUsePhase1Position => _currentComboUsePhase1Position;
+    /// <summary>지금 도는 패턴이 연계로 이어 낸 사슬 둘째 칸인가 — 보스가 피해 배율(×0.8)에 쓴다(10-22 E5 페이지2). 패턴이 끝나면 내린다.</summary>
+    public bool  IsFollowUpRunning             { get; private set; }
+    /// <summary>정하면 추첨 · 콤보 대신 이 패턴만 낸다(인트로 전투 — 끝내는 공격을 가장 큰 광역기로, 10-16 사용자).</summary>
+    public BossPatternSO OnlyPattern { get; set; }
 
     // ── 생성자 ───────────────────────────────────────────────
     public DKComboRunner(
@@ -87,6 +96,17 @@ public class DKComboRunner
     private float BreakMin => _breakMin >= 0f ? _breakMin : _config.patternBreakDurationMin;
     private float BreakMax => _breakMax >= 0f ? _breakMax : _config.patternBreakDurationMax;
 
+    /// <summary>
+    /// 사슬 박자를 켠다(10-22 E5 페이지2) — 연계 사이 쉬는 시간 <paramref name="linkRest"/>(최소 · 최대 초) · 사슬이 끝난 뒤 <paramref name="endRest"/>.
+    /// 안 켜면 연계는 예전처럼 쉬지 않고 바로 잇는다. 에셋은 건드리지 않는다.
+    /// </summary>
+    public void SetChainTempo(Vector2 linkRest, Vector2 endRest)
+    {
+        _chainTempo   = true;
+        _linkRest     = linkRest;
+        _chainEndRest = endRest;
+    }
+
     /// <summary>현재 break cooldown이 minDuration보다 짧으면 늘린다.</summary>
     public void EnsureMinBreakCooldown(float minDuration)
     {
@@ -102,6 +122,8 @@ public class DKComboRunner
         _comboQueue.Clear();
         _lastFiredAttack   = null;
         _lastPickedInCombo = null;
+        _queuedFollowUp    = null;   // 전환 · 간판(보스가 Reset 뒤 직접 건다)이 끼면 대기 중인 연계는 버린다(10-22 E5 페이지2)
+        IsFollowUpRunning  = false;
         IsPatternActive    = false;
     }
 
@@ -116,10 +138,13 @@ public class DKComboRunner
         // 패턴 종료 감지
         if (_wasInPattern && !inPattern)
         {
+            bool endedAsFollowUp = IsFollowUpRunning;   // 사슬 둘째 칸이 끝났다(10-22 E5 페이지2)
+            IsFollowUpRunning    = false;
             // GetHit 등 경직으로 패턴이 중단된 경우 — 콤보 큐 초기화 후 쿨다운 적용
             if (_isStaggered())
             {
                 _comboQueue.Clear();
+                _queuedFollowUp  = null;
                 _wasInPattern    = false;
                 _breakCooldown   = UnityEngine.Random.Range(BreakMin, BreakMax);
                 return;
@@ -133,8 +158,11 @@ public class DKComboRunner
                 return;
             }
             // 콤보 전체 완료 — 정상 브레이크 설정(2페이지 후반은 −25%, §9 · 악몽 「지휘」 기수가 서 있으면 ×0.85)
-            _breakCooldown = UnityEngine.Random.Range(BreakMin, BreakMax) * (Pages?.BreakScale ?? 1f)
-                           * DKStandardBearer.RestScale(_ctx.Ctx.Monster);
+            // 사슬 박자(10-22 E5 페이지2) — 연계가 줄 서 있으면 잠깐만 쉬고 잇는다 · 사슬 둘째 칸이 끝났으면 숨을 고른다
+            _breakCooldown = _queuedFollowUp != null
+                ? UnityEngine.Random.Range(_linkRest.x, _linkRest.y)
+                : (endedAsFollowUp ? UnityEngine.Random.Range(_chainEndRest.x, _chainEndRest.y) : UnityEngine.Random.Range(BreakMin, BreakMax))
+                  * (Pages?.BreakScale ?? 1f) * DKStandardBearer.RestScale(_ctx.Ctx.Monster);
         }
         _wasInPattern = inPattern;
 
@@ -144,8 +172,24 @@ public class DKComboRunner
         if (!inPattern && _comboQueue.Count == 0 &&
             _breakCooldown <= 0f && _isAlive() && _isInRange() && !_isStaggered())
         {
-            TryFireNext();
+            if (_queuedFollowUp != null) FireFollowUp();
+            else                         TryFireNext();
         }
+    }
+
+    /// <summary>줄 선 연계를 낸다(사슬 둘째 칸) — 그사이 못 내게 됐으면 사슬이 끝난 것으로 보고 숨을 고른다(10-22 E5 페이지2).</summary>
+    private void FireFollowUp()
+    {
+        var next = _queuedFollowUp;
+        _queuedFollowUp = null;
+        if (next.GetRuntimeState() == null || !next.CanFollowUp(_ctx))
+        {
+            _breakCooldown = UnityEngine.Random.Range(_chainEndRest.x, _chainEndRest.y) * (Pages?.BreakScale ?? 1f);
+            return;
+        }
+        _comboQueue.Enqueue(next);
+        IsFollowUpRunning = true;   // 상태 Enter보다 먼저 — 패턴이 Enter부터 사슬 칸인지 읽는다
+        FireNextFromQueue();
     }
 
     // ── 패턴/콤보 선택 후 발동 ───────────────────────────────
@@ -155,6 +199,14 @@ public class DKComboRunner
     /// </summary>
     private void TryFireNext()
     {
+        if (OnlyPattern != null)
+        {
+            if (OnlyPattern.GetRuntimeState() == null || !OnlyPattern.CanExecute(_ctx)) return;
+            _comboQueue.Clear();
+            _comboQueue.Enqueue(OnlyPattern);
+            FireNextFromQueue();
+            return;
+        }
         if (_config?.patternEntries == null || _config.patternEntries.Count == 0) return;
 
         // ⓪ 강제 항목(forceExecute) 우선 — 영혼 소환처럼 HP 게이트를 여는 패턴은 조건이 되면 바로 낸다.
@@ -221,12 +273,14 @@ public class DKComboRunner
                         _comboQueue.Clear();
                         _comboQueue.Enqueue(p);
                         _lastPickedInCombo = p;
-                        // 연계(§9) — 2페이지 후반이면 이어 낼 패턴을 콤보 큐에 붙인다(끝나면 쉬지 않고 바로)
+                        // 연계(§9) — 이어 낼 패턴을 붙인다. 쿨다운은 앞 패턴마다(10-22 E5 페이지2 — 사슬이 여럿이라 하나로 묶으면 서로 막는다).
+                        // 사슬 박자를 켰으면 끝난 뒤 잠깐 쉬고 잇는다(FireFollowUp) · 안 켰으면 예전처럼 콤보 큐로 쉬지 않고 바로
                         if (p.FollowUpActive(_ctx.Ctx.Monster) && p.followUp.GetRuntimeState() != null && p.followUp.CanFollowUp(_ctx)
-                            && Time.time - _lastFollowUpTime >= p.followUpCooldown)
+                            && (!_followUpAt.TryGetValue(p, out float at) || Time.time - at >= p.followUpCooldown))
                         {
-                            _comboQueue.Enqueue(p.followUp);
-                            _lastFollowUpTime = Time.time;
+                            _followUpAt[p] = Time.time;
+                            if (_chainTempo) _queuedFollowUp = p.followUp;
+                            else             _comboQueue.Enqueue(p.followUp);
                         }
                     }
                     FireNextFromQueue();
@@ -324,7 +378,7 @@ public class DKComboRunner
     }
 
     private BossPages Pages => (_ctx.Ctx.Monster as IPagedBoss)?.Pages;
-    private float _lastFollowUpTime = float.NegativeInfinity;   // 연계 쿨다운(§9, 09-28 반복 방지)
+    private readonly Dictionary<BossPatternSO, float> _followUpAt = new Dictionary<BossPatternSO, float>();   // 연계를 마지막으로 붙인 때(앞 패턴별 · §9 반복 방지 · 10-22 E5 페이지2)
 
     // ── 반복 패널티 ──────────────────────────────────────────
 

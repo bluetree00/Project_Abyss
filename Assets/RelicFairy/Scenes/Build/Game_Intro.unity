@@ -225,18 +225,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_BindingMode: 4
-  m_FollowOffset: {x: 0, y: 4, z: -4}
-  m_XDamping: 0.12
-  m_YDamping: 0.12
-  m_ZDamping: 0.12
+  m_FollowOffset: {x: 0, y: 4.8, z: -3.8}
+  m_XDamping: 0
+  m_YDamping: 0
+  m_ZDamping: 0
   m_AngularDampingMode: 0
   m_PitchDamping: 0
   m_YawDamping: 0
   m_RollDamping: 0
   m_AngularDamping: 0
   m_Heading:
-    m_Definition: 2
-    m_VelocityFilterStrength: 4
+    m_Definition: 3
+    m_VelocityFilterStrength: 0
     m_Bias: 0
   m_RecenterToTargetHeading:
     m_enabled: 0
@@ -1443,23 +1443,23 @@ MonoBehaviour:
     Value: 0
     m_SpeedMode: 0
     m_MaxSpeed: 0
-    m_AccelTime: 0
-    m_DecelTime: 0
-    m_InputAxisName: 
+    m_AccelTime: 0.1
+    m_DecelTime: 0.1
+    m_InputAxisName: Mouse X
     m_InputAxisValue: 0
     m_InvertInput: 0
-    m_MinValue: 0
-    m_MaxValue: 0
-    m_Wrap: 0
+    m_MinValue: -180
+    m_MaxValue: 180
+    m_Wrap: 1
     m_Recentering:
       m_enabled: 0
-      m_WaitTime: 0
-      m_RecenteringTime: 0
-      m_LegacyHeadingDefinition: 0
-      m_LegacyVelocityFilterStrength: 0
+      m_WaitTime: 1
+      m_RecenteringTime: 2
+      m_LegacyHeadingDefinition: -1
+      m_LegacyVelocityFilterStrength: -1
   m_Heading:
-    m_Definition: 2
-    m_VelocityFilterStrength: 4
+    m_Definition: 3
+    m_VelocityFilterStrength: 0
     m_Bias: 0
   m_RecenterToTargetHeading:
     m_enabled: 0
@@ -1470,12 +1470,12 @@ MonoBehaviour:
   m_BindingMode: 4
   m_SplineCurvature: 0
   m_Orbits:
-  - m_Height: 7.8
-    m_Radius: 3.6
-  - m_Height: 6.3
-    m_Radius: 4.2
-  - m_Height: 4
+  - m_Height: 8.8
+    m_Radius: 3.4
+  - m_Height: 7.3
     m_Radius: 4
+  - m_Height: 4.8
+    m_Radius: 3.8
   m_LegacyHeadingBias: 3.4028235e+38
   m_Rigs:
   - {fileID: 901022454}
@@ -2646,14 +2646,18 @@ MonoBehaviour:
   letterboxAspect: 2.39
   letterboxSortingOrder: 150
   hudFadeDuration: 0.8
-  swordHandOverDuration: 1.4
+  swordDissolveDuration: 1
+  swordCondenseDuration: 0.8
+  swordHandOverlap: 0.45
+  swordArriveTint: {r: 0.72, g: 0.9, b: 1, a: 1}
   namelessWeaponKey: T0_Nameless
   rangedWeaponKey: T1_Bow
   rangedTutorialLines:
-  - "\uD0C0\uB77D\uD55C \uBAA8\uB974\uB4DC\uB808\uB4DC\uC5D0\uAC90 \uAC80\uC774 \uB2FF\uC9C0
-    \uC54A\uB294\uB2E4. \u2014 \uC6D0\uAC70\uB9AC \uBB34\uAE30\uB85C \uB9DE\uC11C\uB77C."
-  - "[2] \uD0A4\uB85C \uC6D0\uAC70\uB9AC \uBB34\uAE30\uB97C \uB4E4\uACE0, \uC870\uC900\uD574
-    \uACF5\uACA9\uD558\uB77C."
+  - "\uACB0\uACC4 \uB108\uBA38\uC758 \uBAA8\uB974\uB4DC\uB808\uB4DC\uC5D0\uAC8C \uAC80\uC740
+    \uB2FF\uC9C0 \uC54A\uB294\uB2E4. \u2014 \uACB0\uACC4 \uC55E \uCCAD\uB85D\uBE5B
+    \uB3CC\uC744 \uBCA0\uBA74 \uADF8 \uD798\uC774 \uADF8\uC5D0\uAC8C \uC804\uD574\uC9C4\uB2E4."
+  - "[2] \uD0A4\uB85C \uC6D0\uAC70\uB9AC \uBB34\uAE30\uB97C \uB4E4\uBA74 \uACB0\uACC4
+    \uB108\uBA38\uC758 \uADF8\uB97C \uC9C1\uC811 \uC3E0 \uC218 \uC788\uB2E4."
   rangedTutorialGap: 3.5
   combatTorches:
   - {fileID: 1461717819}
@@ -2736,14 +2740,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::IntroOpeningDirector
   prologueSequenceId: Intro_Prologue
   altarAnchor: {fileID: 0}
-  swordAnchor: {fileID: 2115833841}
   mordredAnchor: {fileID: 984135922}
   bootDelay: 0.4
   fadeDuration: 1.2
-  shotGlass: 6
-  shotAltar: 5
-  shotSword: 5
-  shotMordred: 4.5
+  shotReveal: 7.5
+  shotArc: 3.5
+  shotHold: 0.8
   pageIntoScene: 1.8
 --- !u!4 &584082494
 Transform:
@@ -3905,18 +3907,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_BindingMode: 4
-  m_FollowOffset: {x: 0, y: 4, z: -4}
-  m_XDamping: 0.12
-  m_YDamping: 0.12
-  m_ZDamping: 0.12
+  m_FollowOffset: {x: 0, y: 4.8, z: -3.8}
+  m_XDamping: 0
+  m_YDamping: 0
+  m_ZDamping: 0
   m_AngularDampingMode: 0
   m_PitchDamping: 0
   m_YawDamping: 0
   m_RollDamping: 0
   m_AngularDamping: 0
   m_Heading:
-    m_Definition: 2
-    m_VelocityFilterStrength: 4
+    m_Definition: 3
+    m_VelocityFilterStrength: 0
     m_Bias: 0
   m_RecenterToTargetHeading:
     m_enabled: 0
@@ -9718,18 +9720,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_BindingMode: 4
-  m_FollowOffset: {x: 0, y: 4, z: -4}
-  m_XDamping: 0.12
-  m_YDamping: 0.12
-  m_ZDamping: 0.12
+  m_FollowOffset: {x: 0, y: 4.8, z: -3.8}
+  m_XDamping: 0
+  m_YDamping: 0
+  m_ZDamping: 0
   m_AngularDampingMode: 0
   m_PitchDamping: 0
   m_YawDamping: 0
   m_RollDamping: 0
   m_AngularDamping: 0
   m_Heading:
-    m_Definition: 2
-    m_VelocityFilterStrength: 4
+    m_Definition: 3
+    m_VelocityFilterStrength: 0
     m_Bias: 0
   m_RecenterToTargetHeading:
     m_enabled: 0

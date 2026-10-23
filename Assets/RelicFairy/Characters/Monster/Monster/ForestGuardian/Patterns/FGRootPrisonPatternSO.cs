@@ -332,7 +332,7 @@ public class FGRootPrisonState : FullLockState<FGRootPrisonPatternSO>
         d.y = 0f;
         if (d.magnitude > Data.ringRadius) return;   // 틈으로 나갔다
 
-        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
+        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier * ForestGuardianMonster.ChainScale(ctx)));   // 사슬 둘째 칸 ×0.8(10-22 E5 페이지2)
         player.TakeDamage(dmg, ctx.Monster.gameObject, false, HitWeight.Heavy);
 
         Vector3 knock = d.sqrMagnitude > 0.001f ? d.normalized : ctx.Transform.forward;

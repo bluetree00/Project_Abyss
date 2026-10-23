@@ -41,7 +41,7 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     private int   _refill;
 
     // 라벨 캐시 — 표시값이 바뀔 때만 문자열을 새로 만든다(매 프레임 alloc 방지).
-    private string _label = "광기 0%";
+    private string _label = "광기 0/40";
     private int    _labelKey = int.MinValue;
 
     public event Action OnChanged;
@@ -60,6 +60,10 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
 
     public bool  IsFrenzy        => _frenzy;
     public float FrenzyRemaining => _frenzy ? Mathf.Max(0f, _frenzyEnd - Time.time) : 0f;
+    /// <summary>광란 남은 시간 비율(1 → 0) — HUD 칼 게이지가 칼끝에서 칼자루로 줄어든다(10-18). 연장되면 다시 는다(1에서 멈춤).</summary>
+    public float FrenzyRemaining01 => _frenzy ? Mathf.Clamp01(FrenzyRemaining / _lastFrenzyDuration) : 0f;
+    /// <summary>켜져 있는 동안 광란 남은 시간이 줄지 않는다 — 심판의 일격 시전 중(시전이 광란을 깎아 먹지 않게 · 10-16).</summary>
+    public bool  FrenzyClockPaused { get; set; }
 
     /// <summary>[유물 성장 v2] 받침 — 광기가 이 값 이상이면 감쇠가 이 값 아래로 내리지 않는다(0 = 없음).</summary>
     public int Floor { get => _floor; set => _floor = Mathf.Clamp(value, 0, _maxStacks); }
@@ -159,6 +163,7 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     {
         if (_frenzy)
         {
+            if (FrenzyClockPaused) { _frenzyEnd += Time.deltaTime; return; }
             if (Time.time >= _frenzyEnd)
             {
                 // [파츠] 끝나지 않는 광란 — 종료 직전 1회 자동 재점화(스택·상태 유지, 종료 이벤트 없음).
@@ -193,7 +198,8 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     public float Fill => _frenzy ? 1f : Ratio;
 
     /// <summary>
-    /// 게이지 라벨 — 평시엔 충전률(%), 광란 중엔 남은 시간.
+    /// 게이지 라벨 — 평시엔 광기 칸 수 「광기 23/40」(10-22 E1 D6 — % 였는데 카드는 「광기 10 · 20 · 30 · 40」이라 단위가 달랐다),
+    /// 광란 중엔 남은 시간 + 할 일 「광란 3.2초」 / 「Q 심판」(두 줄 — 한 줄이면 왼쪽 무기 원에 닿는다 · CombatPanelView.Wuwa).
     /// 매 프레임 문자열을 새로 만들면 GC가 쌓이므로 표시값이 바뀔 때만 다시 만든다
     /// (광란 잔여는 0.1초 단위로만 갱신 → 초당 10회).
     /// </summary>
@@ -201,13 +207,13 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     {
         get
         {
-            int key = _frenzy ? -Mathf.CeilToInt(FrenzyRemaining * 10f) : _stacks;
+            int key = _frenzy ? -Mathf.CeilToInt(FrenzyRemaining * 10f) : _stacks * 1000 + _maxStacks;
             if (key != _labelKey)
             {
                 _labelKey = key;
                 _label = _frenzy
-                    ? $"광란 {FrenzyRemaining:0.0}초"
-                    : $"광기 {Mathf.RoundToInt(Ratio * 100f)}%";
+                    ? $"광란 {FrenzyRemaining:0.0}초\nQ 심판"
+                    : $"광기 {_stacks}/{_maxStacks}";
             }
             return _label;
         }

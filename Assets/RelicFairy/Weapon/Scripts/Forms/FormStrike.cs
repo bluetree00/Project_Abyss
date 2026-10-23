@@ -26,7 +26,7 @@ public static class FormStrike
         for (int i = 0; i < n; i++)
         {
             var e = buf[i];
-            if (e == null || e.IsDead || DistToSegmentXZ(e.transform.position, from, to) > halfWidth + 0.4f) continue;
+            if (e == null || e.IsDead || DistToSegmentXZ(e.transform.position, from, to) > halfWidth + CombatQuery.BodyReach(e)) continue;   // 몸에 닿으면(10-16)
             CombatQuery.DealSynergyDamage(e, damage, p.gameObject);
             hits++;
         }
@@ -46,7 +46,8 @@ public static class FormStrike
             var e = buf[i];
             if (e == null || e.IsDead) continue;
             Vector3 at = e.transform.position;
-            if (DistToSegmentXZ(at, from, toA) > halfWidth + 0.4f && DistToSegmentXZ(at, from, toB) > halfWidth + 0.4f) continue;
+            float reach = halfWidth + CombatQuery.BodyReach(e);   // 몸에 닿으면(10-16)
+            if (DistToSegmentXZ(at, from, toA) > reach && DistToSegmentXZ(at, from, toB) > reach) continue;
             CombatQuery.DealSynergyDamage(e, damage, p.gameObject);
             hits++;
         }
@@ -78,6 +79,23 @@ public static class FormStrike
         if (!string.IsNullOrEmpty(key)) RelicStateVfx.PlayOneShot(key, at, scale, forward);
     }
 
+    /// <summary>검기 그림(vfx_form_windcut = Hovl Slash wave)이 배율 1에서 보이는 크기 — 보이는 양 90% 앞 ≈5.6 m · 옆 ≈±2.1 m(10-18 실측 71).</summary>
+    public const float WaveForwardPerScale = 5.6f, WaveLateralPerScale = 2.1f;
+
+    /// <summary>이 시간 이하로 남는 바닥 고리는 순간 가이드로 본다(<see cref="SkillRangeRing.PlayerGuides"/>가 꺼지면 안 그린다).</summary>
+    private const float InstantGuideSeconds = 0.35f;
+
+    /// <summary>
+    /// 검기를 판정 모양(앞 <paramref name="length"/> m · 옆 ±<paramref name="lateral"/> m)에 앞 · 옆 따로 맞춰 띄운다(10-18 ⑯).
+    /// 고르게 키우면 8 m 검기는 옆이 판정의 2배 · 2.5 m는 0.6배였다 — 보이는 가장자리의 적이 안 맞아 「판정이 거의 없다」로 읽혔다.
+    /// </summary>
+    public static void PlayWave(string key, Vector3 at, Vector3 forward, float length, float lateral)
+    {
+        if (string.IsNullOrEmpty(key) || length <= 0f || lateral <= 0f) return;
+        float sz = length / WaveForwardPerScale, sx = lateral / WaveLateralPerScale;
+        RelicStateVfx.PlayOneShot(key, at, new Vector3(sx, Mathf.Sqrt(sx * sz), sz), forward);
+    }
+
     /// <summary>
     /// 바닥에 얇은 고리를 seconds 동안 남긴다(형 색) — 남아 있는 판정 자리의 경계를 보인다(균열 · 10-12 B9).
     /// 마지막 0.3초에 옅어지며 사라진다. 방이 바뀌어 오브젝트가 사라지면 그대로 끝난다.
@@ -85,6 +103,7 @@ public static class FormStrike
     /// <summary>바닥 고리(판정 반경) — 플레이어 표시 색(<see cref="SkillRangeRing.PlayerGuideColor"/>)의 얇은 선(10-15 적 예고와 구분).</summary>
     public static void GroundRing(Vector3 center, float radius, float seconds)
     {
+        if (seconds <= InstantGuideSeconds && !SkillRangeRing.PlayerGuides) return;   // 순간 고리(충격파 등)는 가이드라 끈다 — 남는 구역(안개 · 균열 · 지진 예고)은 그대로(10-19 ⑮)
         if (radius <= 0f || seconds <= 0f) return;
         var go = new GameObject("FormGroundRing");
         go.transform.position = center + Vector3.up * RingLift;
@@ -114,6 +133,7 @@ public static class FormStrike
     /// </summary>
     public static void GroundStrip(Vector3 from, Vector3 dir, float length, float halfWidth, float seconds)
     {
+        if (!SkillRangeRing.PlayerGuides) return;   // 검기 판정 띠는 가이드 — 그림이 판정 모양에 맞춰졌으니 끈다(10-19 ⑮)
         dir.y = 0f;
         if (dir.sqrMagnitude < 1e-4f || length <= 0f || halfWidth <= 0f || seconds <= 0f) return;
         dir.Normalize();

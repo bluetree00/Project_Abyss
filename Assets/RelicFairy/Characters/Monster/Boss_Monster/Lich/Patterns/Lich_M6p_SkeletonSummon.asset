@@ -23,7 +23,7 @@ MonoBehaviour:
   breakOverride: -1
   patternCooldown: 25
   castDuration: 1.5
-  legionDuration: 12
+  legionDuration: 9
   recoveryDuration: 0.5
   skeletonPrefab: {fileID: 5098245364127042272, guid: 119497b481e20d54f843d3cf322d7234,
     type: 3}
@@ -38,3 +38,5 @@ MonoBehaviour:
   boltWarn: 0.6
   boltRadius: 1.8
   boltDamage: 0.6
+  boltCount: 2
+  boltGap: 2

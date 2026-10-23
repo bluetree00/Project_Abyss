@@ -788,8 +788,24 @@ public sealed partial class UI_RefineryPanel : UI_Popup
         if (_busy || _svc == null) return;
 
         // 거절에는 반드시 사유가 붙는다 — 흐린 버튼만으로는 "고장난 버튼"으로 읽혔다.
-        if (!_svc.CanAfford) { SetHint("원석이 부족합니다"); ShopUIStyle.PlaySfx("shop_reject"); return; }
+        if (!_svc.CanAfford)
+        {
+            SetHint(_svc.MeltForNext > 0 ? "원석이 부족합니다 — 오른쪽 [녹이기]로 강화재료를 원석으로 바꿀 수 있다" : "원석이 부족합니다");
+            ShopUIStyle.PlaySfx("shop_reject");
+            return;
+        }
         SpinAsync().Forget();
+    }
+
+    /// <summary>[재료 녹이기] — 이번 정제에 모자란 원석만큼 강화재료를 녹인다(<see cref="RefineryService.MeltForNext"/>). 보유 원석 숫자가 굴러 오른다.</summary>
+    private void OnMeltClicked()
+    {
+        if (_busy || _svc == null) return;
+        int melt = _svc.MeltForNext;
+        if (melt <= 0 || !_svc.TryMelt(melt)) { ShopUIStyle.PlaySfx("shop_reject"); Refresh(); return; }
+        ShopUIStyle.PlaySfx("shop_select");
+        SetHint($"강화재료를 녹였다 — 원석 +{melt}");
+        Refresh();
     }
 
     private async UniTaskVoid SpinAsync()
@@ -886,7 +902,7 @@ public sealed partial class UI_RefineryPanel : UI_Popup
             return;
         }
         var wait = popup.WaitForInteractionAsync(CancellationToken.None);
-        popup.Setup(candidates, inv);
+        popup.Setup(candidates, inv, refinerySpent: spent);   // 넘기기 글 = 쓴 원석 환불 · 방 확률 막대 숨김(10-18)
         await wait;
         if (popup.Skipped) svc?.Refund(spent);
     }

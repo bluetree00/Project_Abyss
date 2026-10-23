@@ -96,6 +96,7 @@ public static class AltarTreeUx2ProbeEditor
             DumpTree(sb, tree);
             DumpDetail(sb, detail);
             await DumpMotionAsync(sb, tree);
+            await DragZoomAsync(sb, tree);
 
             // ② 노드 하나 고른 상태 — 흐린 노드(열림 → 한 칸 앞 → 조건 잠김 순)에 초점 + 마우스를 올린 길
             var nodes = Get<Dictionary<string, AltarTreeNodeView>>(tree, "_nodes");
@@ -359,6 +360,41 @@ public static class AltarTreeUx2ProbeEditor
             keep.Add(kv);
         }
         return string.Join(",", keep);
+    }
+
+    /// <summary>
+    /// 10-18 사용자 「노드를 알아볼 수 있게 키우고 마우스 클릭 이동으로 넓게」 — ⑤ 끌기(트리 내용 자리가 옮겨지나) ·
+    /// ⑥ 휠로 끝까지 물러나기(트리 전체가 창에 드나). 끝나면 확대 · 위치를 연 그대로 돌린다.
+    /// </summary>
+    private static async UniTask DragZoomAsync(StringBuilder sb, AltarTreeView tree)
+    {
+        var es = UnityEngine.EventSystems.EventSystem.current;
+        var content = Get<RectTransform>(tree, "_content");
+        sb.AppendLine();
+        if (es == null || content == null) { sb.AppendLine("⑤ 이벤트 시스템 · 트리 내용을 못 찾았다"); return; }
+        object keepPan = tree.GetType().GetField("_pan", Inst)?.GetValue(tree);
+        float keepZoom = GetF(tree, "_zoom");
+
+        Vector2 before = content.anchoredPosition;
+        var drag = new UnityEngine.EventSystems.PointerEventData(es) { delta = new Vector2(-360f, 200f) };
+        tree.OnBeginDrag(drag); tree.OnDrag(drag); tree.OnEndDrag(drag);
+        await UniTask.Delay(300, ignoreTimeScale: true);
+        Vector2 after = content.anchoredPosition;
+        sb.AppendLine($"⑤ 끌기 —내용 자리 {before} → {after} · 트리 배율 {GetF(tree, "_fit") * GetF(tree, "_zoom"):0.00}(전체 맞춤 {GetF(tree, "_fitAll"):0.00})");
+        sb.AppendLine($"CHECK {(after - before).sqrMagnitude > 100f} — ⑤ 끌면 트리가 움직인다");
+        await ShotAsync("AltarUx2_5_Dragged", null);
+
+        var wheel = new UnityEngine.EventSystems.PointerEventData(es) { scrollDelta = new Vector2(0f, -1f) };
+        for (int i = 0; i < 16; i++) tree.OnScroll(wheel);
+        await UniTask.Delay(300, ignoreTimeScale: true);
+        float s = GetF(tree, "_fit") * GetF(tree, "_zoom");
+        sb.AppendLine($"⑥ 휠로 물러남 — 트리 배율 {s:0.00} · 전체 맞춤 {GetF(tree, "_fitAll"):0.00}");
+        sb.AppendLine($"CHECK {Mathf.Abs(s - Mathf.Min(GetF(tree, "_fitAll"), 0.8f * GetF(tree, "_fit"))) < 0.02f} — ⑥ 휠로 트리 전체가 드는 배율까지 물러난다");
+        await ShotAsync("AltarUx2_6_ZoomOut", null);
+
+        tree.GetType().GetField("_zoom", Inst)?.SetValue(tree, keepZoom);
+        if (keepPan != null) tree.GetType().GetField("_pan", Inst)?.SetValue(tree, keepPan);
+        tree.GetType().GetMethod("ApplyTransform", Inst)?.Invoke(tree, null);
     }
 
     private static AltarTreeNodeView PickDim(AltarTreeView tree, Dictionary<string, AltarTreeNodeView> nodes)

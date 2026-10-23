@@ -6,7 +6,8 @@ using RelicFairy.Monster;
 using UnityEngine;
 
 /// <summary>
-/// 가웨인 유물 성장 v2 허브 — 「해의 궤적」(설계 v2 §2). 가웨인 첫 조각과 함께 플레이어에 붙는다.
+/// 가웨인 유물 성장 v2 허브 — 「해의 궤적」(설계 v2 §2). 가웨인 유물을 붙일 때(런 시작부터) 플레이어에 붙는다 —
+/// 태양흔 · 개화 · 정오 수확이 유물 기본 규칙이다(10-22 D11 — 예전엔 첫 조각과 함께 · 옛 「화상 심기 → 정오 폭발」을 대신한다).
 /// <list type="bullet">
 /// <item><b>시간대 사건</b> — 정오 게이지의 구간 전환을 여명 · 정오(짧은 정오 포함) · 정오 끝 · 황혼 사건으로 낸다.</item>
 /// <item><b>태양흔</b> — 여명 적중마다 1(대상당 0.5초). 「한낮이 길다」면 정오에도 쌓이고 상한이면 그 자리에서 개화.</item>
@@ -47,7 +48,7 @@ public sealed class GawainMemoryHub : MonoBehaviour
 
     public enum BloomCause { Harvest, Chain, Instant, Reaction, Fragment }
 
-    /// <summary>허브가 플레이어에 새로 묶였다(첫 조각) — 유물 HUD가 이때 깨어난다.</summary>
+    /// <summary>허브가 플레이어에 새로 묶였다(유물을 붙일 때) — 유물 HUD가 이때 깨어난다.</summary>
     public static event Action<GawainMemoryHub> Bound;
 
     /// <summary>조각 글자 색(가웨인 금빛).</summary>

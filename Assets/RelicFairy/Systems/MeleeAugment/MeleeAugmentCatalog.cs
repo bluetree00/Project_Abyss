@@ -27,15 +27,17 @@ public sealed class MeleeAugmentDef
     public readonly float[] Values;
     public readonly float[] Values2;      // 둘째 값(추가 타격 수 · 반경 · 초) — 없으면 null
     public readonly string DescFormat;   // {0} = 지금 단계 값 · {1} = 둘째 값(표시용으로 이미 다듬은 숫자)
+    public readonly string PhantomDescFormat;   // 진화 뒤 환영이 낼 때의 설명(무형검 전용만 · 없으면 null)
     public readonly Func<MeleeAugmentDef, int, MeleeAugmentEffect> Create;
 
     public const int MaxRank = 3;
 
     public MeleeAugmentDef(string id, string name, AugmentTier tier, BuildFamily family, MeleeWeaponKind weapon,
-                           float[] values, string descFormat, Func<MeleeAugmentDef, int, MeleeAugmentEffect> create, float[] values2 = null)
+                           float[] values, string descFormat, Func<MeleeAugmentDef, int, MeleeAugmentEffect> create, float[] values2 = null,
+                           string phantomDesc = null)
     {
         Id = id; Name = name; Tier = tier; Family = family; Weapon = weapon;
-        Values = values; DescFormat = descFormat; Create = create; Values2 = values2;
+        Values = values; DescFormat = descFormat; Create = create; Values2 = values2; PhantomDescFormat = phantomDesc;
     }
 
     /// <summary>단계(1~3)의 값.</summary>
@@ -46,6 +48,9 @@ public sealed class MeleeAugmentDef
 
     /// <summary>카드 · 무기 정보 글 — 「치명 확률 +8%p」처럼 지금 단계 값을 넣는다.</summary>
     public string Text(int rank) => string.Format(DescFormat, Shown(ValueAt(rank)), Shown(Value2At(rank)));
+
+    /// <summary>진화 뒤 환영이 낼 때의 글(무형검 증강 · ⑧-기획 A) — 없으면 <see cref="Text"/>.</summary>
+    public string PhantomText(int rank) => string.IsNullOrEmpty(PhantomDescFormat) ? Text(rank) : string.Format(PhantomDescFormat, Shown(ValueAt(rank)), Shown(Value2At(rank)));
 
     private static string Shown(float v) => Mathf.Approximately(v, Mathf.Round(v)) ? v.ToString("0") : v.ToString("0.##");
 
@@ -117,7 +122,7 @@ public static class MeleeAugmentCatalog
             (d, r) => new MarkerAugment(d, r), new[] { 1f, 1f, 2f }),   // 성광베기가 읽는다
         new("aug_katana_flow", "물 흐르듯",   AugmentTier.Gold,   BuildFamily.Mobility, MeleeWeaponKind.Katana, new[] { 5f, 4f, 3f },    "회피 뒤 1초 안 첫 적중이 회피 1칸을 돌려준다({0}초에 한 번)",
             (d, r) => new FlowAugment(d, r)),
-        new(KatanaPhantom,     "환영 베기 강화", AugmentTier.Gold, BuildFamily.Spell,   MeleeWeaponKind.Katana, new[] { 20f, 35f, 50f }, "환영베기 피해 +{0}% · 2단계부터 검기 +{1}",
+        new(KatanaPhantom,     "환영 베기 강화", AugmentTier.Gold, BuildFamily.Spell,   MeleeWeaponKind.Katana, new[] { 20f, 35f, 50f }, "환영베기 피해 +{0}% · 2단계부터 이어 갈라짐 +{1}",
             (d, r) => new MarkerAugment(d, r), new[] { 1f, 1f, 2f }),   // 환영베기 · 스킬 피해 계산이 읽는다
         new("aug_katana_gale", "바람 가르기", AugmentTier.Prismatic, BuildFamily.Combo, MeleeWeaponKind.Katana, new[] { 35f, 70f, 100f }, "칼바람이 휘두름마다 {0}% 확률로 1칸 더 쌓인다",
             (d, r) => new GaleAugment(d, r)),
@@ -127,9 +132,9 @@ public static class MeleeAugmentCatalog
             (d, r) => new BulwarkAugment(d, r)),
         new(GreatSplit,        "땅 가르기",   AugmentTier.Gold,   BuildFamily.Crit,     MeleeWeaponKind.Greatsword, new[] { 25f, 45f, 65f }, "내려찍기 범위 +{0}% · 균열 변주면 균열 +{1}초",
             (d, r) => new MarkerAugment(d, r), new[] { 1f, 2f, 3f }),   // 무게 형이 읽는다
-        new(GreatPerimeter,    "주변경계 연장", AugmentTier.Gold, BuildFamily.Spell,    MeleeWeaponKind.Greatsword, new[] { 1f, 2f, 3f },    "주변경계 회전 +{0}",
+        new(GreatPerimeter,    "주변경계 연장", AugmentTier.Gold, BuildFamily.Spell,    MeleeWeaponKind.Greatsword, new[] { 1f, 2f, 3f },    "주변경계 충격 고리 +{0}",
             (d, r) => new MarkerAugment(d, r)),   // 주변경계가 읽는다
-        new(GreatFinal,        "최후의 일격 충전", AugmentTier.Gold, BuildFamily.Spell, MeleeWeaponKind.Greatsword, new[] { 20f, 35f, 50f }, "최후의 일격 충전 −{0}% · III은 둘레 전체",
+        new(GreatFinal,        "최후의 일격 충격", AugmentTier.Gold, BuildFamily.Spell, MeleeWeaponKind.Greatsword, new[] { 20f, 35f, 50f }, "최후의 일격 착지 · 여진 반경 +{0}% · III은 여진 +1",
             (d, r) => new MarkerAugment(d, r)),   // 최후의 일격이 읽는다
         new("aug_great_quake", "지진",        AugmentTier.Gold,   BuildFamily.Combo,    MeleeWeaponKind.Greatsword, new[] { 30f, 45f, 60f }, "콤보 마지막 타 1초 뒤 반경 3 m 땅울림(공격력 {0}%)",
             (d, r) => new QuakeAugment(d, r)),
@@ -138,11 +143,11 @@ public static class MeleeAugmentCatalog
 
         // ── 무형검 전용(형 없는 칼 · 진화 전) ──
         new("aug_nameless_mist","안개 칼날",  AugmentTier.Silver, BuildFamily.Spell,    MeleeWeaponKind.Nameless,   new[] { 15f, 25f, 35f }, "무형참 칼날이 맞힌 자리에 안개가 1.5초 남아 0.5초마다 벤다(공격력 {0}%)",
-            (d, r) => new MistAugment(d, r)),
+            (d, r) => new MistAugment(d, r), phantomDesc: "환영이 E가 맞힌 자리를 한 번 더 그어 안개를 남긴다 — 1.5초 동안 0.5초마다 벤다(공격력 {0}%)"),
         new("aug_nameless_formless","형 없는 연타", AugmentTier.Silver, BuildFamily.Combo, MeleeWeaponKind.Nameless, new[] { 30f, 45f, 60f }, "콤보 마지막 타 0.2초 뒤 앞 2.5 m를 한 번 더 벤다(공격력 {0}%)",
-            (d, r) => new FormlessFollowAugment(d, r)),
+            (d, r) => new FormlessFollowAugment(d, r), phantomDesc: "콤보 마지막 타 0.2초 뒤 환영이 앞 2.5 m를 한 번 더 벤다(공격력 {0}%)"),
         new("aug_nameless_afterimage","무형일섬 잔상", AugmentTier.Gold, BuildFamily.Spell, MeleeWeaponKind.Nameless, new[] { 40f, 60f, 80f }, "무형일섬이 지나간 길을 0.4초 뒤 잔상이 벤다(공격력 {0}%)",
-            (d, r) => new AfterimageAugment(d, r)),
+            (d, r) => new AfterimageAugment(d, r), phantomDesc: "R을 쓰고 0.5초 뒤 환영이 조준 방향 6 m를 일섬으로 가른다(공격력 {0}%)"),
         new(NamelessSheath,    "비어 있는 칼집", AugmentTier.Prismatic, BuildFamily.None, MeleeWeaponKind.Nameless, new[] { 1f, 2f, 3f },  "진화하면 새 무기 전용 증강 {0}개(I)로 바뀐다",
             (d, r) => null),   // 효과 없음 — 진화 때 ConvertForEvolution이 바꾼다
     };
@@ -169,6 +174,26 @@ public static class MeleeAugmentCatalog
         };
     }
 
+    /// <summary>
+    /// 진화 뒤 무형검 증강을 등 뒤 환영이 대신 내나(⑧-기획 A · 10-18) — 무형검 전용(칼집 제외)이 진화한 갈래(카타나 · 대검) 무기에 남았을 때.
+    /// 환영 몫은 증강 고르기 · 단계 올리기에 나오지 않는다(<see cref="FitsWeapon"/>은 그대로 false · D4).
+    /// </summary>
+    public static bool RunsAsPhantom(MeleeAugmentDef d, WeaponData w)
+    {
+        if (d == null || w == null || d.Weapon != MeleeWeaponKind.Nameless || d.Id == NamelessSheath || w.evolutionStage < 1) return false;
+        var kind = KindOf(w);
+        return kind == MeleeWeaponKind.Katana || kind == MeleeWeaponKind.Greatsword;
+    }
+
+    /// <summary>이 무기에 환영 몫 증강이 하나라도 있나(등 뒤 환영 · 화면 「무형검 환영」 칸).</summary>
+    public static bool HasPhantom(WeaponData w)
+    {
+        if (w == null || string.IsNullOrEmpty(w.augments)) return false;
+        foreach (var (id, _) in w.AugmentList())
+            if (RunsAsPhantom(Get(id), w)) return true;
+        return false;
+    }
+
     /// <summary>이 증강이 이 무기에 나올 수 있나(공용 = 근접 무기 전부 · 전용 = 그 갈래만).</summary>
     public static bool FitsWeapon(MeleeAugmentDef d, WeaponData w)
     {
@@ -178,8 +203,9 @@ public static class MeleeAugmentCatalog
     }
 
     /// <summary>
-    /// 진화 때 증강을 옮긴다 — 옛 갈래 전용(무형검)은 새 갈래 전용으로 바뀐다(같은 등급 · 같은 단계, 없으면 아무 등급).
+    /// 진화 때 증강을 옮긴다 — 무형검 전용은 그대로 남아 진화한 무기의 등 뒤 환영이 낸다(<see cref="RunsAsPhantom"/> · ⑧-기획 A · 10-18).
     /// 비어 있는 칼집은 새 갈래 전용 증강 N개(I)가 된다(높은 등급부터). 공용 · 이미 새 갈래 것은 그대로.
+    /// (10-15 ~ 10-18: 무형검 전용을 목록 맨 앞 같은 등급 새 증강으로 말없이 바꿨다 — 고른 것이 버려진 것처럼 읽혔다)
     /// </summary>
     public static string ConvertForEvolution(WeaponData from, WeaponData to)
     {
@@ -195,6 +221,7 @@ public static class MeleeAugmentCatalog
             var d = Get(id);
             if (d == null || d.Weapon == MeleeWeaponKind.None || d.Weapon == kind) { kept.Add((id, rank)); continue; }
             if (d.Id == NamelessSheath) sheathGrants += Mathf.RoundToInt(d.ValueAt(rank));
+            else if (d.Weapon == MeleeWeaponKind.Nameless) kept.Add((id, rank));   // 환영 이식 — 등 뒤 무형검 환영이 낸다
             else convert.Add((d.Tier, rank));
         }
         foreach (var (tier, rank) in convert)

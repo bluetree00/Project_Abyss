@@ -349,7 +349,7 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
         Vector3 mouth  = MouthPos();
         Vector3 flat   = _aimPoint - mouth;
         Vector3 origin = new Vector3(mouth.x, transform.position.y, mouth.z);
-        Color   c      = new Color(_tint.r, _tint.g, _tint.b, 0.85f);
+        Color   c      = PatternGuideHelper.AttackFill;   // (10-23 가이드 색 통일) 새끼 용 속성 색은 몸 · 브레스 이펙트만
         PatternGuideHelper.SafeDestroy(ref _breathGuide);
         _breathGuide = PatternGuideHelper.Prepare(
             PatternGuideHelper.Beam(origin, flat, _breathRange * 1.5f, BreathGuideWidth, c), c);

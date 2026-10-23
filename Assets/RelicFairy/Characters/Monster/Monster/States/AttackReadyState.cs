@@ -11,9 +11,12 @@ namespace RelicFairy.Monster
 /// </summary>
 public class AttackReadyState : IMonsterState
 {
-    // 첫 공격 시에도 최소한의 예고(텔레그래프)를 보장하기 위한 상한.
-    // attackDelay를 0으로 완전히 스킵하지 않고 이 값 이내로만 단축한다.
-    private const float FirstAttackReadyMaxDelay = 0.3f;
+    // 첫 공격 준비 — 등급별 하한(10-21 사용자 「첫 공격 모션까지 조금 느리게 — 플레이어가 연속 공격할 때 성취감」).
+    // 예전엔 min(attackDelay, 0.3)이라 사거리에 닿자마자 0.5~0.8초 안에 첫 타가 나왔다. 두 번째부터는 attackDelay 그대로.
+    // 예고(맞기 0.5초 전 바닥 예고 · 최소 앞섬 0.45)는 PatternAttack 쪽이 맡아 그대로 — 「예고 = 판정」 유지.
+    private const float FirstAttackCommon = 0.7f;
+    private const float FirstAttackRare   = 0.85f;
+    private const float FirstAttackElite  = 1.0f;
 
     public virtual void Enter(MonsterContext ctx)
     {
@@ -23,9 +26,9 @@ public class AttackReadyState : IMonsterState
             ctx.Agent.velocity = Vector3.zero;   // 추적 속도가 남아 전투 대기 자세로 0.2~0.4초 미끄러졌다(10-14 정예 애니 점검)
         }
 
-        // 첫 조우 시 빠르게 반응하되, 0으로 스킵하지 않고 최소 예고창을 남긴다.
+        // 첫 조우 — 등급별 하한만큼은 기다린다(그 사이 플레이어가 먼저 연타를 넣을 틈).
         ctx.Runtime.StateTimer = ctx.Runtime.IsFirstAttack
-            ? Mathf.Min(ctx.Stat.attackDelay, FirstAttackReadyMaxDelay)
+            ? Mathf.Max(ctx.Stat.attackDelay, FirstAttackFloor(ctx.Monster.Grade))
             : ctx.Stat.attackDelay;
         ctx.Runtime.IsFirstAttack = false;
         ctx.Monster.ResetAttackGlint();
@@ -33,6 +36,14 @@ public class AttackReadyState : IMonsterState
         PlayAnim(ctx, ctx.Animation.attackReadyStateName);
         FacePlayer(ctx);
     }
+
+    private static float FirstAttackFloor(MonsterGrade grade) => grade switch
+    {
+        MonsterGrade.Common => FirstAttackCommon,
+        MonsterGrade.Rare   => FirstAttackRare,
+        MonsterGrade.Boss   => 0f,   // 보스는 보스 패턴이 박자를 정한다
+        _                   => FirstAttackElite,
+    };
 
     public virtual void Update(MonsterContext ctx)
     {

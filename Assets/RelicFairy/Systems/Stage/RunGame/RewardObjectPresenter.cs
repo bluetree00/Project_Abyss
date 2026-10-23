@@ -15,6 +15,7 @@ public static class RewardObjectPresenter
     // ── Constants ──────────────────────────────────────────────
     private const float LootScale    = 1.8f;    // 등급 기둥 크기(Vefects 원래 크기 × 1.8) — 원래 크기(레어 기둥 ~3 m · 밑 부채꼴 ~1 m)는 0.6 m 위에 뜬 보상 구체에
                                                 // 밑동이 가려 놓여 있는 동안 등급이 안 읽혔다(10-06 실측). 가늘어 시야를 가리지 않아 낮추지 않는다.
+    private const float LootScaleCommon = 1.1f;   // 일반 = 작은 빛기둥(10-22) — 매 방 보는 등급이라 레어 이상보다 낮고 가늘게
     private const float RingStagger  = 0.15f;   // 빛 박자 · 음 사이 간격(초, 실시간)
     private const float RingGrowth   = 0.35f;   // 박자마다 커지는 비율
     private const float PulseSeconds = 0.25f;
@@ -87,7 +88,7 @@ public static class RewardObjectPresenter
             Vector3 floor = OnFloor(rewardGO.transform.position, floorY);
             Debug.Log($"[RewardFx] 보상 등장 — 최고 등급 {rarity} · 예고 {spec.Foretell:0.0}초 · 빛 {(aura != null ? "있음" : "없음")}");
 
-            // 놓여 있는 빛은 레어 이상 — 매 방 보는 일반은 등장과 함께 흩어진다
+            // 놓여 있는 빛 — 10-22부터 일반도 작은 등급 기둥 하나(예고 소용돌이는 흩어진다)
             if (aura != null)
             {
                 if (spec.IdleAura) aura.Follow(rewardGO, spec.IdlePulseHz);
@@ -119,7 +120,7 @@ public static class RewardObjectPresenter
             // 등급 기둥 — 서기 전부터 솟는다. 원래 빛깔에 등급색이 들어 있어 색을 입히지 않는다(10-05).
             // 예전 바닥 문양 · 금빛 표지 기둥은 리치 봉인진 · 봉인 완성과 같은 프리팹이라 「봉인」으로 읽혔다(사용자 10-03).
             if (spec.IdlePillar)
-                aura.AddLoop(RunFx.PlayLoop(LootSlot(rarity), OnFloor(spot, floorY), LootScale, Color.clear));
+                aura.AddLoop(RunFx.PlayLoop(LootSlot(rarity), OnFloor(spot, floorY), rarity == ItemRarity.Common ? LootScaleCommon : LootScale, Color.clear));
             aura.Grow(spec.Foretell);
 
             Managers.Sound?.PlayUiEvent(SoundEvent.RewardGrade, RewardPresentation.For(rarity).SfxPitch);

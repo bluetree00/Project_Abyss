@@ -1,23 +1,31 @@
+using System.Collections.Generic;
 using UnityEngine;
 using RelicFairy.Monster;
 
 /// <summary>
-/// 랜슬롯 메커닉 — 광기(Madness). 공격 적중마다 광기 스택 획득.
+/// 랜슬롯 메커닉 — 광기(Madness). 공격 <b>행동</b>(휘두름 · 스킬 시전 · 화살 한 발)마다 광기 스택 획득.
 /// 스택 누적/감쇠/광란 진입은 MadnessStack이, 적중 트리거는 이 패시브가 담당.
 ///
-/// ⚠️ <b>적중 1회당 +1로 두면 보스전에서 게이지가 사실상 안 찬다.</b>
-/// OnAttackHit은 <b>적중한 대상마다</b> 발동하므로, 잡몹 5마리를 한 번 베면 +5인 반면
-/// 보스는 같은 스윙에 +1뿐이다 — 충전 속도가 대상 수에 정비례해 버린다.
-/// 그래서 <b>상대의 격(MonsterGrade)</b>으로 가중치를 준다. 잡몹 수급은 그대로 두고
-/// 보스·엘리트만 끌어올리므로, 일반 스테이지의 체감(대량 학살 → 즉시 충전)은 손상되지 않는다.
+/// 10-19 사용자 「랜슬롯 스택이 타격마다 쌓여 너무 바로 찬다 — 공격 횟수로 보는 등」: 예전엔 맞은 대상 1명 × 1타마다
+/// (일반 1 · 정예 2 · 엘리트 3 · 보스 5)라 광역 · 다타 스킬이 대상 수 × 타 수로 불어나 몇 번 휘두르면 찼다.
+/// 이제 한 행동에 한 번 — 기본 +1, 그 행동이 정예 · 엘리트 · 보스를 맞혔으면 +2, 3명 이상 맞혔으면 +1 더(행동당 최대 3).
+/// 같은 행동 = 같은 공격 실행(<see cref="PlayerController.ActiveExecution"/>) · 같은 콤보 단계.
+/// 실행이 없거나(늦게 맞는 투사체) 원거리 무기면 첫 적중부터 <see cref="LooseWindow"/>초를 한 행동으로 묶는다(화살 한 발 · 갈래 화살 한 번).
 /// </summary>
 public sealed class LancelotMadnessPassive : CharacterPassiveBase
 {
-    // 잡몹 한 번에 여럿 베는 상황과 비슷한 체감이 나도록 보스를 크게 잡았다.
-    private const int StackCommon = 1;
-    private const int StackRare   = 2;
-    private const int StackElite  = 3;
-    private const int StackBoss   = 5;
+    private const int   PerAction    = 1;      // 행동 한 번
+    private const int   StrongAction = 2;      // 그 행동이 정예 · 엘리트 · 보스를 맞혔다
+    private const int   CrowdBonus   = 1;      // 그 행동이 CrowdTargets명 이상을 맞혔다
+    private const int   CrowdTargets = 3;
+    private const float LooseWindow  = 0.2f;   // 실행 키가 없을 때 한 행동으로 묶는 시간
+
+    private AbilityExecution _actionExec;
+    private int   _actionStep = -1;
+    private float _actionAt   = -999f;
+    private int   _actionBase;    // 이번 행동의 기본 몫(1 또는 2)
+    private int   _actionGiven;   // 이번 행동에 이미 준 스택
+    private readonly HashSet<int> _actionTargets = new();
 
     public override string         PassiveName => "광기";
     public override PassiveTrigger Trigger     => PassiveTrigger.OnAttackHit;
@@ -27,30 +35,40 @@ public sealed class LancelotMadnessPassive : CharacterPassiveBase
 
     public override void Apply(PlayerController ctrl, in PassiveContext ctx)
     {
-        if (ctrl.RelicBehavior is LancelotMadnessRelic lm)
-            lm.AddStack(StacksFor(ctx.target));
+        if (ctrl.RelicBehavior is not LancelotMadnessRelic lm) return;
+
+        bool ranged = ctx.weaponType == WeaponType.Bow || ctx.weaponType == WeaponType.Crossbow;
+        var  exec   = ranged ? null : ctrl.ActiveExecution;
+        bool same   = exec != null
+            ? ReferenceEquals(exec, _actionExec) && ctx.comboStep == _actionStep
+            : _actionExec == null && Time.time - _actionAt < LooseWindow;
+        if (!same)
+        {
+            _actionExec  = exec;
+            _actionStep  = ctx.comboStep;
+            _actionAt    = Time.time;
+            _actionBase  = PerAction;
+            _actionGiven = 0;
+            _actionTargets.Clear();
+        }
+
+        if (ctx.target != null) _actionTargets.Add(ctx.target.GetInstanceID());
+        if (IsStrong(ctx.target)) _actionBase = StrongAction;
+
+        // 같은 행동 안에서 더 센 적 · 셋째 대상이 뒤늦게 맞으면 차액만 더 준다
+        int want = _actionBase + (_actionTargets.Count >= CrowdTargets ? CrowdBonus : 0);
+        if (want <= _actionGiven) return;
+        lm.AddActionStack(want - _actionGiven);
+        _actionGiven = want;
     }
 
-    /// <summary>대상 등급 → 획득 스택. 등급을 못 읽으면 기본 1(회귀 0).</summary>
-    private static int StacksFor(GameObject target)
+    /// <summary>정예 · 엘리트 · 보스인가(허수아비도 등급을 가진다 — 보스 더미로 수급을 잴 수 있게).</summary>
+    private static bool IsStrong(GameObject target)
     {
-        if (target == null) return StackCommon;
-
+        if (target == null) return false;
         var mb = target.GetComponentInParent<MonsterBase>();
-        if (mb != null) return StacksForGrade(mb.Grade);
-
-        // 훈련용 허수아비도 등급을 가진다 — 보스 더미를 세워 수급 밸런스를 검증할 수 있도록.
+        if (mb != null) return mb.Grade != MonsterGrade.Common;
         var dummy = target.GetComponentInParent<TrainingDummy>();
-        if (dummy != null) return StacksForGrade(dummy.Grade);
-
-        return StackCommon;
+        return dummy != null && dummy.Grade != MonsterGrade.Common;
     }
-
-    private static int StacksForGrade(MonsterGrade grade) => grade switch
-    {
-        MonsterGrade.Boss  => StackBoss,
-        MonsterGrade.Elite => StackElite,
-        MonsterGrade.Rare  => StackRare,
-        _                  => StackCommon,
-    };
 }

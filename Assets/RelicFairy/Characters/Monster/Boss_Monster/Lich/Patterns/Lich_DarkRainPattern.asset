@@ -16,7 +16,7 @@ MonoBehaviour:
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
-  weight: 2
+  weight: 3
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: DarkRain
@@ -32,9 +32,15 @@ MonoBehaviour:
   damageMultiplier: 0.8
   nearPlayerBias: 0.35
   nearPlayerRadius: 8
-  safeCount: 4
-  safeRadius: 3
+  safeCount: 2
+  safeRadius: 1.3
   safeMoveInterval: 1.8
   safeMoveCount: 2
   riseHeight: 5
   cloudHeight: 16
+  _throwAt: 2
+  _throwSource: {fileID: 11400000, guid: 28eba821eb312df41bba4c65b4bc9969, type: 2}
+  _packInterval: 1
+  _packGap: {x: 1, y: 2.4}
+  _packMax: 12
+  _safeNear: {x: 3, y: 6}

@@ -4,7 +4,7 @@ using RelicFairy.Monster;
 
 /// <summary>
 /// 작열 지대 — 가웨인 낙일(태양 강림) 착탄 지점에 남는 지속 화염 장판.
-/// 수명 동안 주기 틱으로 반경 내 적에게 화염 피해(방어 일부 무시) + 태양 화상 부여.
+/// 수명 동안 주기 틱으로 반경 내 적에게 화염 피해(방어 일부 무시 · Q 주 피해 — 10-16) + 태양 화상 부여.
 /// 룬 필드 시스템 부재 → 자체 경량 구현(소수 인스턴스, 수명 후 Destroy).
 /// </summary>
 public sealed class SolarZone : MonoBehaviour
@@ -36,7 +36,15 @@ public sealed class SolarZone : MonoBehaviour
             foreach (var target in _buffer)
             {
                 if (target == null) continue;
-                if (_tickDamage > 0f) CombatQuery.DealSynergyDamage(target, _tickDamage, _instigator, 0.5f);
+                // 지대 틱도 Q 주 피해 — 치명 · 스킬 피해% · 적중 룬 · 발동 계수가 붙는다(10-16 「계수도 포함」). 잦은 틱이라 타격감 · 피격 이펙트 · 경직은 끈다.
+                if (_tickDamage > 0f)
+                    CombatDamage.Deal(new CombatDamage.Request
+                    {
+                        Target = target, BaseDamage = _tickDamage, Owner = _instigator, ActionType = WeaponActionType.QSkill,
+                        KnockbackMultiplier = 0f, NoFlinch = true, DefenseIgnore = 0.5f, ProcCoef = SolarDescentSkillRuntime.ZoneProcCoef,
+                        HitPoint = target.transform.position + Vector3.up, SourcePosition = transform.position,
+                        SkipHitVfx = true, NoHitFeel = true,
+                    });
                 if (_burnDps > 0f)
                     MonsterBurnHandler.Apply(target, _burnDps, _tickInterval * 2f, _tickInterval, _instigator);
             }

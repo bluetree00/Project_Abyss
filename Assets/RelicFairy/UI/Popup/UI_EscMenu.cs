@@ -43,8 +43,6 @@ public sealed class UI_EscMenu : MonoBehaviour
     private UI_EquipmentPage   _equipPage;    // 「장비」 — 무기 두 칸 · 강화 · 형 · 스킬 단계(10-13 4b 요청 8)
     private TMP_Text      _lobbyLabel;
     private bool          _lobbyArmed;   // 런 중 「로비로 가기」 첫 누름 — 한 번 더 눌러야 포기한다
-    private TMP_Text      _quitLabel;
-    private bool          _quitArmed;    // 전투 중(피해를 받은 뒤) 「게임 종료」 첫 누름 — 지금 끄면 이어하기에서 사망 정산(10-10 Hades식)
 
     // ── Properties ───────────────────────────────────────────
     public bool IsOpen => _root != null && (_root.TryGetComponent<UIFader>(out var f) ? f.Visible : _root.activeSelf);
@@ -126,7 +124,6 @@ public sealed class UI_EscMenu : MonoBehaviour
         NewButton(panel.transform, "로비로 가기", new Vector2(0f, top - step * 5f), PlateIdle,   LabelColor,          OnLobby);
         _lobbyLabel = panel.transform.Find("Btn_로비로 가기/Label")?.GetComponent<TMP_Text>();
         NewButton(panel.transform, "게임 종료",   new Vector2(0f, top - step * 6f), PlateDanger, UITheme.Thin.Danger, OnQuit);
-        _quitLabel = panel.transform.Find("Btn_게임 종료/Label")?.GetComponent<TMP_Text>();
     }
 
     private static void Stretch(RectTransform rt)
@@ -213,8 +210,6 @@ public sealed class UI_EscMenu : MonoBehaviour
     {
         _lobbyArmed = false;
         if (_lobbyLabel != null) _lobbyLabel.text = "로비로 가기";
-        _quitArmed = false;
-        if (_quitLabel != null) _quitLabel.text = "게임 종료";
     }
 
     private void CloseEquipPage()
@@ -300,17 +295,19 @@ public sealed class UI_EscMenu : MonoBehaviour
         AppBootstrapper.Instance?.RequestLoad(Define.Scene.Lobby);
     }
 
+    /// <summary>「게임 종료」 — 한 번 묻고 끈다(10-16 사용자 「종료하겠냐고 물어봐야해」).
+    /// 피해를 받은 뒤 전투가 끝나기 전이면 그 사실을 함께 알린다 — 지금 끄면 이 런은 이어하기에서 사망으로 정산된다(Hades의 「포기」 · 10-10).</summary>
     private void OnQuit()
     {
-        // 피해를 받은 뒤 전투가 끝나기 전이면 한 번 더 — 지금 끄면 이 런은 이어하기에서 사망으로 정산된다(Hades의 「포기」 · 10-10).
-        if (!_quitArmed && RunFlowController.Active != null && RunFlowController.Active.IsCombatLocked)
-        {
-            _quitArmed = true;
-            Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
-            if (_quitLabel != null) _quitLabel.text = "전투 중 — 끄면 런 사망";
-            return;
-        }
+        bool combat = RunFlowController.Active != null && RunFlowController.Active.IsCombatLocked;
+        string body = combat
+            ? "게임을 종료하시겠습니까?\n<size=85%><color=#DE6054>전투 중입니다 — 지금 끄면 이 런은 사망으로 정산됩니다.</color></size>"
+            : "게임을 종료하시겠습니까?\n<size=85%>진행은 방마다 저장되어 이어하기로 돌아올 수 있습니다.</size>";
+        UI_ConfirmDialog.Show("게임 종료", body, "종료", "취소", QuitNow, danger: true);
+    }
 
+    private void QuitNow()
+    {
         _quitting = true;
         TimeScaleArbiter.Release(this);
 #if UNITY_EDITOR

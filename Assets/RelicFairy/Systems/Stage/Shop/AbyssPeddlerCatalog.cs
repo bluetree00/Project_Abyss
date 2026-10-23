@@ -156,57 +156,108 @@ public static class AbyssPeddlerCatalog
     }
 
     /// <summary>
-    /// 진열을 새로 롤. 룬/포션/버프/재료 <b>풀에서 7종을 뽑고</b>, 그중 무작위 1개를 할인해
-    /// 오늘의 특가로 올린다(나머지 6종이 정규 진열). 소스가 없는 카테고리는 자동으로 다른 풀이 메운다.
+    /// 진열 칸마다 정해진 종류(10-21 새 레이아웃 — 사용자 「레이아웃은 괜찮다」): 가호 2 · 룬 2 · 재료(강화재료/원석) 1 · 포션 1.
+    /// 예전엔 21종 풀에서 무작위 6칸이라 가호가 한 장도 안 나오거나 같은 종류가 몰렸다 — 「살 만한 진열」이 늘 있게 칸을 정한다.
+    /// 화면 순서도 이것과 같다(앞 둘 = 넓은 가호 카드 · 뒤 넷 = 작은 카드).
     /// </summary>
-    public static Result Build(System.Random rng, ShopEvent ev = ShopEvent.None)
+    private static readonly ShopProductCategory[] ShelfLayout =
+    {
+        ShopProductCategory.Buff, ShopProductCategory.Buff,
+        ShopProductCategory.Rune, ShopProductCategory.Rune,
+        ShopProductCategory.Material, ShopProductCategory.Potion,
+    };
+
+    /// <summary>
+    /// 진열을 새로 롤. 칸마다 정해진 종류(<see cref="ShelfLayout"/>)로 6칸을 채우고, 오늘의 특가는 <b>따로 한 개</b>(어느 종류든)를 뽑아 50% 깎는다.
+    /// 소스가 없는 종류(차트 미로드 등)는 다른 종류가 메운다. <paramref name="locked"/>(지난 상점 · 새로고침 전에 잠근 물건)는
+    /// 같은 종류 첫 칸에 <b>같은 값</b>으로 앉는다(10-21 잠금).
+    /// </summary>
+    public static Result Build(System.Random rng, ShopEvent ev = ShopEvent.None, ShopProduct locked = null)
     {
         rng ??= new System.Random();
         var res = new Result();
-        // 귀한 물건(10-15) — 먼저 굴려 둔다(특가로 뽑히지 않게 따로 · 정규 진열 맨 앞에 선다)
+        // 귀한 물건(10-15) — 먼저 굴려 둔다(특가로 뽑히지 않게 따로 · 첫 룬 칸에 선다)
         var rare = ev == ShopEvent.RareGoods ? BuildRune(rng, ItemRarity.Epic) : null;
 
-        // 포션은 CSV 없이 <b>1칸 고정</b> — 언제 와도 회복 수단은 살 수 있어야 한다.
-        var draw = new List<ShopProduct>(DrawCount);
-        var potion = BuildPotion(rng);
-        if (potion != null) draw.Add(potion);
-
-        // 나머지는 룬(아이템 테이블) + 버프(상점 CSV) + 재료 풀에서 뽑는다.
-        var pool = BuildCandidatePool(rng);
-        if (pool.Count > 0)
+        var shelf = new List<ShopProduct>(ProductCount);
+        foreach (var kind in ShelfLayout)
         {
-            Shuffle(pool, rng);
-            for (int i = 0; draw.Count < DrawCount && i < DrawCount * 2; i++)
-                draw.Add(pool[i % pool.Count]);
+            var p = BuildDistinct(kind, rng, shelf) ?? BuildAny(rng);
+            if (p != null) shelf.Add(p);
         }
-        if (draw.Count == 0) return res;
+        var pick = BuildAny(rng);
+        if (shelf.Count == 0 && pick == null) return res;
 
-        // 「상인의 인장」 — 특가를 고르기 <b>전에</b> 건다. 나중에 걸면 취소선 원가만 싸지고
+        // 「상인의 인장」 — 특가를 깎기 <b>전에</b> 건다. 나중에 걸면 취소선 원가만 싸지고
         // 특가는 그대로라 할인이 이중으로 보이거나 역전된다.
-        for (int i = 0; i < draw.Count; i++) draw[i] = MerchantSigil.Apply(draw[i]);
+        for (int i = 0; i < shelf.Count; i++) shelf[i] = MerchantSigil.Apply(shelf[i]);
+        pick = MerchantSigil.Apply(pick);
         if (ev == ShopEvent.Clearance)
-            for (int i = 0; i < draw.Count; i++) draw[i] = Discounted(draw[i], ClearanceDiscount);
+        {
+            for (int i = 0; i < shelf.Count; i++) shelf[i] = Discounted(shelf[i], ClearanceDiscount);
+            pick = Discounted(pick, ClearanceDiscount);
+        }
 
-        // 뽑은 7종 중 1개를 특가로
-        int specialIdx = rng.Next(draw.Count);
-        var pick = draw[specialIdx];
-        res.SpecialOriginalPrice = pick.Price;
-        int dealPrice = Mathf.Max(1, Mathf.RoundToInt(pick.Price * (1f - SpecialDiscount)));
-        res.Special = new ShopProduct(pick.Category, pick.DisplayName, pick.EffectText,
-            "전 상품 중 무작위로 골라진 오늘의 매물", dealPrice, pick.Rarity, pick.Icon, pick.Grant, pick.Rune);
+        if (pick != null)
+        {
+            res.SpecialOriginalPrice = pick.Price;
+            int dealPrice = Mathf.Max(1, Mathf.RoundToInt(pick.Price * (1f - SpecialDiscount)));
+            res.Special = new ShopProduct(pick.Category, pick.DisplayName, pick.EffectText,
+                "전 상품 중 무작위로 골라진 오늘의 매물", dealPrice, pick.Rarity, pick.Icon, pick.Grant, pick.Rune);
+        }
+        res.Products.AddRange(shelf);
 
-        for (int i = 0; i < draw.Count; i++)
-            if (i != specialIdx) res.Products.Add(draw[i]);
-
+        int rareAt = -1;
         if (rare != null)
         {
             rare = MerchantSigil.Apply(rare);
             res.RareGoods = new ShopProduct(rare.Category, rare.DisplayName, rare.EffectText,
                 "귀한 물건 — 오늘만 들어온 Epic 룬 · 구매 즉시 판에 배치", rare.Price, rare.Rarity, rare.Icon, rare.Grant, rare.Rune);
-            res.Products.Insert(0, res.RareGoods);
-            if (res.Products.Count > ProductCount) res.Products.RemoveAt(res.Products.Count - 1);   // 진열 6칸 그대로
+            rareAt = res.Products.FindIndex(p => p.Category == ShopProductCategory.Rune);
+            if (rareAt < 0) rareAt = 0;
+            if (rareAt < res.Products.Count) res.Products[rareAt] = res.RareGoods;
+            else res.Products.Add(res.RareGoods);
+        }
+
+        // 잠근 물건 — 같은 종류 첫 칸(귀한 물건 칸은 피한다). 없으면 마지막 칸.
+        if (locked != null && !locked.Sold && res.Products.Count > 0)
+        {
+            int at = -1;
+            for (int i = 0; i < res.Products.Count && at < 0; i++)
+                if (i != rareAt && res.Products[i].Category == locked.Category) at = i;
+            if (at < 0) at = res.Products.Count - 1;
+            res.Products[at] = locked;
         }
         return res;
+    }
+
+    /// <summary>한 종류로 한 칸 — 같은 이름이 이미 진열에 있으면 몇 번 더 굴린다(가호 둘이 똑같이 나오지 않게).</summary>
+    private static ShopProduct BuildDistinct(ShopProductCategory kind, System.Random rng, List<ShopProduct> shelf)
+    {
+        ShopProduct p = null;
+        for (int tries = 0; tries < 5; tries++)
+        {
+            p = BuildOf(kind, rng);
+            if (p == null) return null;
+            if (!shelf.Exists(s => s.DisplayName == p.DisplayName)) return p;
+        }
+        return p;
+    }
+
+    private static ShopProduct BuildOf(ShopProductCategory kind, System.Random rng) => kind switch
+    {
+        ShopProductCategory.Buff     => BuildBuff(rng),
+        ShopProductCategory.Rune     => BuildRune(rng),
+        ShopProductCategory.Material => rng.Next(2) == 0 ? BuildMaterial(rng) : BuildOre(rng),
+        ShopProductCategory.Potion   => BuildPotion(rng),
+        _                            => null,
+    };
+
+    /// <summary>어느 종류든 하나 — 특가와 빈 종류 메우기. 예전 후보 풀(버프 6 · 룬 6 · 재료 3 · 원석 3 · 포션 3)과 같은 비율.</summary>
+    private static ShopProduct BuildAny(System.Random rng)
+    {
+        var pool = BuildCandidatePool(rng);
+        return pool.Count > 0 ? pool[rng.Next(pool.Count)] : null;
     }
 
     /// <summary>값만 깎은 사본(룬 원본까지 넘긴다 — <see cref="MerchantSigil.Apply(ShopProduct)"/>와 같은 이유).</summary>
@@ -250,15 +301,6 @@ public static class AbyssPeddlerCatalog
         for (int i = 0; i < 3; i++) { var p = BuildPotion(rng);   if (p != null) pool.Add(p); }
 
         return pool;
-    }
-
-    private static void Shuffle(List<ShopProduct> list, System.Random rng)
-    {
-        for (int i = list.Count - 1; i > 0; i--)
-        {
-            int j = rng.Next(i + 1);
-            (list[i], list[j]) = (list[j], list[i]);
-        }
     }
 
     // ── 버프 ── 상점 전용 CSV(SHOP_BUFF_DATA, 효과별 정리) → StatModifier → RoomBuffHandler.AddBuff

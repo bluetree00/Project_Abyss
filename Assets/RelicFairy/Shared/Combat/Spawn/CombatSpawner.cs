@@ -34,6 +34,10 @@ public static class CombatSpawner
     /// 가운데를 지켜야 갈래가 빗나가도 한 발보다 약해지지 않는다.
     /// </summary>
     public const float SplitExtraShare = 0.5f;
+    /// <summary>짝수 발 분열의 가운데 짝 반각(도) — 정면 표적에 둘 다 닿게 좁게(10-18 대칭).</summary>
+    private const float InnerPairHalfDeg = 3f;
+    /// <summary>짝수 발에서 주 투사체의 거울 화살 무게 배율 — 둘 다 정면 표적을 맞히므로 반만(2발 정면 피해 1 → 1.25).</summary>
+    private const float InnerMirrorWeight = 0.5f;
     /// <summary>갈래가 하나 늘 때마다 갈래당 몫의 분모가 이만큼 커진다 — 늘어날수록 조금씩 준다(10-14 사용자 「늘어날수록 조금 줄여야 한다」).</summary>
     private const float SplitFalloff = 0.1f;
 
@@ -69,10 +73,10 @@ public static class CombatSpawner
                                        System.Action<GameObject> onSpawned = null)
     {
         ApplyModifiers(ref req);
-        req.direction = PitchTowardTarget(req.origin, req.direction, req.owner);
+        if (!req.flyLevel) req.direction = PitchTowardTarget(req.origin, req.direction, req.owner);
 
-        // 주 투사체가 이미 있으면 그것부터 요청대로 세팅한다.
-        if (primary != null) Configure(primary, in req, req.direction);
+        // 주 투사체가 이미 있으면 그것부터 요청대로 세팅한다. 짝수 발이면 가운데에서 살짝 비켜 거울 화살과 좌우 대칭(10-18).
+        if (primary != null) Configure(primary, in req, Quaternion.AngleAxis(SplitAngle(0, req.count, req.spreadDeg), Vector3.up) * req.direction);
 
         int extra = req.count - 1;
         if (extra <= 0 || string.IsNullOrEmpty(req.prefabKey)) return;
@@ -199,8 +203,8 @@ public static class CombatSpawner
     // ── 스폰 ────────────────────────────────────────────────
 
     /// <summary>
-    /// 갈래를 부채꼴로 펼쳐 추가 투사체를 만든다.
-    /// 각도는 전체 확산각을 갈래 수로 균등 분할 — 예전 하드코딩(15°/±8°)을 대체한다.
+    /// 갈래를 부채꼴로 펼쳐 추가 투사체를 만든다 — 한꺼번에 꺼내 같은 프레임에 쏜다.
+    /// 하나씩 기다려 꺼내면 한쪽 갈래가 먼저 나가 「한쪽씩 열리는」 분열로 보였다(10-18 사용자).
     /// </summary>
     private static async UniTaskVoid SpawnExtrasAsync(ProjectileRequest req, int extra, bool hasPrimary,
                                                       System.Action<GameObject> onSpawned)
@@ -210,37 +214,54 @@ public static class CombatSpawner
         Vector3 baseDir = req.direction.sqrMagnitude > 0.0001f ? req.direction.normalized : Vector3.forward;
         Vector3 right   = Vector3.Cross(Vector3.up, baseDir).normalized;
 
-        // 주 투사체가 중앙(0도)을 차지하므로 나머지를 좌우 교대로 배치한다.
-        for (int i = 1; i <= extra; i++)
+        var angles = new float[extra];
+        var tasks  = new UniTask<GameObject>[extra];
+        for (int i = 0; i < extra; i++)
         {
-            float angle = FanAngle(i, req.count, req.spreadDeg, hasPrimary);
-            Vector3 dir = Quaternion.AngleAxis(angle, Vector3.up) * baseDir;
-            Vector3 pos = req.origin + right * (Mathf.Sin(angle * Mathf.Deg2Rad) * LateralSpread);
+            angles[i] = SplitAngle(i + 1, req.count, req.spreadDeg);
+            Vector3 dir = Quaternion.AngleAxis(angles[i], Vector3.up) * baseDir;
+            Vector3 pos = req.origin + right * (Mathf.Sin(angles[i] * Mathf.Deg2Rad) * LateralSpread);
+            tasks[i] = Managers.ObjectPooler.SpawnAsync(req.prefabKey, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.LookRotation(dir));
+        }
+        var spawned = await UniTask.WhenAll(tasks);
 
-            var go = await Managers.ObjectPooler.SpawnAsync(
-                req.prefabKey, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.LookRotation(dir));
-            if (go == null) return;
-
+        float weight = SplitExtraWeight(req.count);
+        for (int i = 0; i < extra; i++)
+        {
+            var go = spawned[i];
+            if (go == null) continue;
+            Vector3 dir = Quaternion.AngleAxis(angles[i], Vector3.up) * baseDir;
             go.transform.localScale = Vector3.one * (req.baseScale * req.sizeMult);
 
             if (go.TryGetComponent<BasicArrow>(out var arrow))
             {
                 Configure(arrow, in req, dir);
-                arrow.SetSplitWeight(SplitExtraWeight(req.count));   // 갈래 — 가운데 화살은 Configure → Fire가 1로 둔다
+                // 갈래 — 가운데 화살은 Configure → Fire가 1로 둔다. 짝수 발의 거울 화살(첫 갈래)은 정면 표적을 같이 맞히니 반 무게.
+                bool innerMirror = req.count % 2 == 0 && i == 0;
+                arrow.SetSplitWeight(innerMirror ? weight * InnerMirrorWeight : weight);
             }
 
             onSpawned?.Invoke(go);
         }
     }
 
-    /// <summary>i번째 추가 갈래의 각도. 좌우 교대로 벌어진다.</summary>
-    private static float FanAngle(int index, int total, float spreadDeg, bool hasPrimary)
+    /// <summary>
+    /// 분열 각도(도) — 조준 기준 좌우 대칭(10-18). <paramref name="slot"/> 0 = 주 투사체.
+    /// 홀수 발: 가운데 + ±step, ±2step …(step = 반각 ÷ 짝 수 — 예전과 같은 각).
+    /// 짝수 발: 가운데 짝 ±<see cref="InnerPairHalfDeg"/>(0 = 왼쪽 · 1 = 오른쪽) + 바깥 짝을 반각까지 고르게.
+    /// </summary>
+    private static float SplitAngle(int slot, int total, float spreadDeg)
     {
         if (total <= 1) return 0f;
-
-        // 주 투사체가 중앙을 쓰면 나머지는 ±step, ±2step … 로 교대 배치.
-        float step = spreadDeg / Mathf.Max(1, total - (hasPrimary ? 1 : 0));
-        int   rank = (index + 1) / 2;
-        return (index % 2 == 1 ? -1f : 1f) * step * rank;
+        float half = spreadDeg * 0.5f;
+        if (total % 2 == 1)
+        {
+            if (slot == 0) return 0f;
+            float step = half / ((total - 1) / 2);
+            return (slot % 2 == 1 ? -1f : 1f) * step * ((slot + 1) / 2);
+        }
+        int pairs = total / 2;
+        float outer = pairs > 1 ? (half - InnerPairHalfDeg) / (pairs - 1) : 0f;
+        return (slot % 2 == 0 ? -1f : 1f) * (InnerPairHalfDeg + outer * (slot / 2));
     }
 }

@@ -82,6 +82,14 @@ public class WeaponAnimationSetSO : ScriptableObject
 
     [Header("애니메이션 속도 배율 (Animator.speed = 이 값 × 아이템 공격속도)")]
     [Range(0.1f, 3f)] public float lightAttackAnimSpeed  = 1.0f;
+    [Tooltip("평타 준비 동작 — 베기 이벤트 전 구간 재생 배율(1 = 그대로). 베기 뒤 연결 지점까지는 그만큼 빠르게 틀어 한 타 주기를 지킨다(10-18)")]
+    [Range(0.3f, 1f)] public float windupSpeedRatio = 1.0f;
+    [Tooltip("평타 베기(피해 프레임) 뒤 다음 타를 받기까지(초 · 공속 반영). 0 = 기본 0.08 — 이펙트 뒤 살짝 늦게 다음 입력을 쓴다(10-21 무형검)")]
+    [Range(0f, 0.5f)] public float slashFollowSeconds = 0f;
+    [Tooltip("콤보 막타 뒤 회복(초 · 공속 반영). 그동안 받은 공격은 기억했다가 끝나면 1타로 잇는다 · 회피 · 스킬은 바로 끊는다. 0 = 바로(10-21 무형검)")]
+    [Range(0f, 1f)] public float finisherRecoverySeconds = 0f;
+    [Tooltip("준비 동작의 베기 뒤 빨리 감기 상한. 0 = 기본 2.5 — 낮추면 휘두름 끝 동작이 보인다(대신 한 타 주기가 길어짐 · 10-21 무형검)")]
+    [Range(0f, 3f)] public float followSpeedCap = 0f;
     [Range(0.1f, 3f)] public float heavyAttackAnimSpeed  = 1.0f;
 
     [Header("콤보 타이밍 기본값 (ClipMapping override가 -1일 때 사용)")]

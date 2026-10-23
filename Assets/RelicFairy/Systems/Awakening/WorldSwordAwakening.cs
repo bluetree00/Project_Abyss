@@ -101,7 +101,18 @@ public sealed class WorldSwordAwakening : MonoBehaviour
 
     // ── 각성 ──────────────────────────────────────────────────
 
-    private async UniTaskVoid AwakenAsync(CancellationToken ct)
+    /// <summary>
+    /// 첫 진입 — 거점 도착(소환 연출 · 시작 대사) 뒤 [F] 없이 넘겨받기를 튼다(10-21 ④ 「첫 베이스캠프 진입시 다시 무형검을 얻는 연출」).
+    /// 이미 받은 슬롯이면 제단은 Start에서 없어지므로 부르지 않는다. 플레이어가 멀리 있어도 카메라가 제단을 보였다 돌아온다.
+    /// </summary>
+    public async UniTask GrantOnArrivalAsync(PlayerController player, CancellationToken ct)
+    {
+        if (_claimed || _busy || player == null || AlreadyArmed()) return;
+        _player = player;
+        await AwakenAsync(ct);
+    }
+
+    private async UniTask AwakenAsync(CancellationToken ct)
     {
         if (_claimed || _busy) return;
 

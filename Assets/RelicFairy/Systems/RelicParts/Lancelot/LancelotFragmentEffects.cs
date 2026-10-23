@@ -608,7 +608,7 @@ public sealed class LTearingJudgmentEffect : LancelotFragment
             float half = Vector3.Distance(a, b) * 0.5f;
             foreach (var e in new List<MonsterBase>(Near(mid, half + ThreadHalfWidth + 0.5f, null, 16)))
             {
-                if (LancelotMemoryHub.DistToSegmentXZ(e.transform.position, a, b) > ThreadHalfWidth + 0.4f) continue;
+                if (LancelotMemoryHub.DistToSegmentXZ(e.transform.position, a, b) > ThreadHalfWidth + CombatQuery.BodyReach(e)) continue;   // 몸에 닿으면(10-16)
                 if (!_cut.Add(e.GetInstanceID())) continue;
                 cut++;
                 CombatQuery.DealSynergyDamage(e, Atk * ThreadRatio, Owner, 1f, false, RuneElement.Dark);

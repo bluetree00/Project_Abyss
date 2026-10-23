@@ -25,18 +25,12 @@ public class CrucibleRoomController : MonoBehaviour
         "쇠는 두드릴수록 단단해지지.",
         "그 무기… 아직 잠재력이 남았군.",
         "불을 지펴뒀다. 올려놓기만 해라.",
-        "승급은 도박이야. 각오는 됐나?",
+        "승급은 큰 결심이야. 각오는 됐나?",
         "좋은 재료를 가져오면 좋은 결과가 나온다.",
     };
-    private const float JackpotBaseChance = 0.05f;
-    private const float JackpotPerStreak  = 0.05f;
-    private const float JackpotMaxChance   = 0.5f;
-
     private const float DiscountCostMult    = 0.5f;   // 반값 재련
-
-    private const float FeverSuccessBonus   = 0.15f;  // 성공률 +15%p
-    private const float BountyJackpotBonus  = 0.15f;  // 잭팟 확률 +15%p (방 전체)
-    private const float CurseSuccessPenalty = 0.10f;  // 성공률 -10%p (방 전체)
+    private const int   FeverExtraCards     = 1;      // 열기 오른 화로 — 이번 방문 카드 +1장(10-18 재련 개편)
+    private const int   BountyVisitRerolls  = 1;      // 풍요로운 화로 — 이번 방문 다시 뽑기 +1(10-18 재련 개편)
 
     // ── 비공개 필드 ─────────────────────────────────────────
     private GameRunSession _run;
@@ -49,10 +43,6 @@ public class CrucibleRoomController : MonoBehaviour
     private NpcAmbientChatter _chatter;   // 머리 위 잡담 — 방이 드러나면 화로 이벤트를 외친다
     private ServiceNpcReactor _reactor;   // 혼자면 망치질 · 다가오면 알아봄 · 벼리고 나가면 반김
     private int _fuelAtOpen;              // 패널을 열 때 재료 — 닫을 때 달라졌으면 일을 맡긴 것
-
-    private int  _streak;          // 연속 성공 수
-    private bool _lastJackpot;     // 직전 시도가 잭팟이었나(UI 연출용)
-    private int  _lastRefund;      // 직전 잭팟 환불량
 
     private CrucibleEvent _event;  // 이 방 돌발 이벤트(결정적 롤)
 
@@ -67,9 +57,6 @@ public class CrucibleRoomController : MonoBehaviour
 
     public EnhanceTableSO Table => _table;
     public int FuelAmount => _run?.FuelBank?.EnhanceMaterial ?? 0;
-    public int Streak => _streak;
-    public bool LastJackpot => _lastJackpot;
-    public int LastRefund => _lastRefund;
     /// <summary>
     /// 승급 후보 전설 목록. 「전설 3종 개방」 전에는 <b>맨 앞 1종</b>만 보인다(기억의 제단).
     /// 승급 자체는 해금과 무관하게 되고, 해금이 넓히는 것은 고를 수 있는 폭이다.
@@ -91,31 +78,12 @@ public class CrucibleRoomController : MonoBehaviour
     public CrucibleEvent ActiveEvent => _event;
     public bool HasEvent => _event != CrucibleEvent.None;
     private float CostMult     => _event == CrucibleEvent.Discount ? DiscountCostMult : 1f;
-    /// <summary>
-    /// 성공률 상시 보정 — 화로 이벤트 + 해금 인장. <b>표시와 굴림이 같은 값을 봐야 한다.</b>
-    /// 예전엔 표시(SuccessChanceAt)에만 인장을 더하고 굴림(TryEnhance)에는 안 넘겨,
-    /// 화면은 +8%p인데 실제 확률은 그대로인 거짓말이 됐다. 여기 한 곳에서 합친다.
-    /// </summary>
-    private float SuccessBonus => EventBonus + SigilBonus;
-
-    /// <summary>「대장장이의 인장」(기억의 제단 Ⅰ 출발) 상시 보정.</summary>
-    public static float SigilBonus => MemoryAltarService.SmithBonus;   // 10-14 강화형 — 「재련 성공률」 +3%p/단계
-
-    private float EventBonus => _event switch
-    {
-        CrucibleEvent.Fever => FeverSuccessBonus,
-        CrucibleEvent.Curse => -CurseSuccessPenalty,
-        _                   => 0f,
-    };
-    private float BountyBonus  => _event == CrucibleEvent.Bounty ? BountyJackpotBonus : 0f;
-
     /// <summary>돌발 이벤트 배너 문구(없으면 빈 문자열).</summary>
     public string EventBanner => _event switch
     {
         CrucibleEvent.Discount => "↗ 반값 재련! 지금 안 두드리면 손해지…",
-        CrucibleEvent.Fever    => "▲ 열기 오른 화로 — 성공률 상승 중!",
-        CrucibleEvent.Bounty   => "◆ 풍요로운 화로 — 재료가 되돌아올 기운이 짙다!",
-        CrucibleEvent.Curse    => "◆ 저주받은 화로 — 성공률이 떨어진다…",
+        CrucibleEvent.Fever    => "▲ 열기 오른 화로 — 이번 방문 카드 +1장!",
+        CrucibleEvent.Bounty   => "◆ 풍요로운 화로 — 다시 뽑기 +1!",
         _                      => string.Empty,
     };
 
@@ -125,25 +93,22 @@ public class CrucibleRoomController : MonoBehaviour
         CrucibleEvent.Discount => "반값 재련",
         CrucibleEvent.Fever    => "열기 오른 화로",
         CrucibleEvent.Bounty   => "풍요로운 화로",
-        CrucibleEvent.Curse    => "저주받은 화로",
         _                      => string.Empty,
     };
 
     /// <summary>돌발 이벤트 효과 요약(정보 패널 디테일 표시용).</summary>
     public string EventEffectDesc => _event switch
     {
-        CrucibleEvent.Discount => "재료 비용 50%",
-        CrucibleEvent.Fever    => "성공률 +15%p",
-        CrucibleEvent.Bounty   => "재료 환불 확률 +15%p",
-        CrucibleEvent.Curse    => "성공률 -10%p",
+        CrucibleEvent.Discount => "재련 비용 50%",
+        CrucibleEvent.Fever    => "고르는 카드 +1장",
+        CrucibleEvent.Bounty   => "다시 뽑기 +1",
         _                      => string.Empty,
     };
 
-    /// <summary>다음 성공 시 잭팟(재료 환불) 확률(표시용) — 스트릭 비례 + 풍요 보너스.</summary>
-    public float JackpotChance => Mathf.Min(JackpotMaxChance, JackpotBaseChance + JackpotPerStreak * _streak + BountyBonus);
-
     /// <summary>강화/승급/연료 변동 시 UI 재렌더 통지.</summary>
     public event Action OnCrucibleChanged;
+    /// <summary>재련 1회가 끝났다(true = 원거리) — 망치 연출 · 카드 창은 각 고르기(증강 · 파츠)가 연다.</summary>
+    public event Action<bool> OnReforged;
 
     // ── Lifecycle ───────────────────────────────────────────
 
@@ -152,6 +117,10 @@ public class CrucibleRoomController : MonoBehaviour
 
     private void OnDestroy()
     {
+        // 이번 방문 몫(화로 열기 · 풍요)은 방을 나가면 사라진다
+        MeleeAugmentDraft.ExtraCards = 0;
+        MeleeAugmentDraft.VisitRerolls = 0;
+        RangedPartsDraft.VisitRerolls = 0;
         UnhookRunEvents();
         if (_npc != null) _npc.OnInteract -= HandleNpcInteract;
     }
@@ -179,6 +148,10 @@ public class CrucibleRoomController : MonoBehaviour
         _dialogueRng = new System.Random(_roomRng.Next());
 
         _event = RollEvent();   // 결정적 돌발 이벤트
+        // 풍요로운 화로 — 이번 방문 다시 뽑기 +1(근접 · 원거리 고르기 각각 · 10-18 재련 개편)
+        int visitRerolls = _event == CrucibleEvent.Bounty ? BountyVisitRerolls : 0;
+        MeleeAugmentDraft.VisitRerolls = visitRerolls;
+        RangedPartsDraft.VisitRerolls  = visitRerolls;
 
         // ── save-scum 방지 ──
         // 방 안에서 저장(S3)하고 재접속하면 _roomRng 스트림이 처음으로 리셋된다.
@@ -213,19 +186,8 @@ public class CrucibleRoomController : MonoBehaviour
         return w != null && _table != null && !WeaponEnhanceService.IsMaxed(w, _table);
     }
 
-    public float SuccessChanceAt(int slot) =>
-        Mathf.Clamp01(WeaponEnhanceService.SuccessChance(GetSlot(slot), _table) + SuccessBonus);
-    /// <summary>보정 전 기본 성공률 — 화면이 「무엇이 확률을 올렸는지」 나눠 보여 줄 때만(굴림은 SuccessChanceAt).</summary>
-    public float BaseSuccessChanceAt(int slot) => Mathf.Clamp01(WeaponEnhanceService.SuccessChance(GetSlot(slot), _table));
-    /// <summary>화로 이벤트가 성공률에 더하는 몫(열기 +, 저주 −). 인장은 <see cref="SigilBonus"/>.</summary>
-    public float EventSuccessBonus => EventBonus;
-    /// <summary>잭팟 확률의 연속 성공 가산 · 풍요 이벤트 가산(표시용).</summary>
-    public float StreakJackpotBonus => JackpotPerStreak * _streak;
-    public float EventJackpotBonus  => BountyBonus;
     public bool  IsDiscountEvent    => _event == CrucibleEvent.Discount;
     public int   MaxAt(int slot)           => WeaponEnhanceService.MaxEnhance(GetSlot(slot), _table);
-    public int   CostAt(int slot)          { var w = GetSlot(slot); return (w != null && _table != null) ? WeaponEnhanceService.CostWith(_table, w.enhanceLevel, CostMult) : 0; }
-    public int   DropAt(int slot)          { var w = GetSlot(slot); return (w != null && _table != null) ? _table.DropAt(w.enhanceLevel) : 0; }
     public float EffectiveAttackAt(int slot) => WeaponEnhanceService.EffectiveAttack(GetSlot(slot), _table);
 
     /// <summary>승급 가능 여부(강화 MAX + 미승급 + 검류).</summary>
@@ -262,177 +224,75 @@ public class CrucibleRoomController : MonoBehaviour
         return true;
     }
 
-    // ── 강화 / 승급 (UI가 호출) ─────────────────────────────
+    // ── 재련(10-18 재련 개편 · 기획/RelicFairy_재련개편_설계_20261018.md) ─────
+    // 확률 강화 대신 재련 1회 = 근접 +3 확정 + 증강 고르기 / 원거리 파츠 카드 3장 중 1. 실패 · 하락 · 연속 · 잭팟 없음.
+    // 이번 방문 n번째 = 방마다 0으로 돌아가는 굴림 번호(CrucibleRollIndex) — 재련 1회가 굴림 1개를 쓴다(저장 · 이어하기가 그대로 센다).
 
-    /// <summary>강화 시도(대상 슬롯 단일). 실패 시 대상 단계 하락(하한 0).</summary>
-    public EnhanceResult TryEnhance(int targetSlot)
+    /// <summary>이번 방문에 한 재련 수(근접 · 원거리 합).</summary>
+    public int ReforgeCountThisVisit => _run != null ? _run.CrucibleRollIndex : 0;
+
+    /// <summary>다음 재련 비용(재료) — 근접 = Slot0 무기 강화 단계 띠 · 원거리 = 이 런 원거리 재련 수 띠 · 반값 · 인장 반영.</summary>
+    public int ReforgeCost(bool ranged)
     {
-        if (_run == null || !_run.IsRunning || _table == null)
-            return EnhanceResult.Reject(EnhanceOutcome.RejectInvalid);
-
-        var target = GetSlot(targetSlot);
-        var fuel   = _run.FuelBank;
-        if (target == null || fuel == null)
-            return EnhanceResult.Reject(EnhanceOutcome.RejectInvalid);
-
-        _lastJackpot = false;
-        _lastRefund  = 0;
-
-        var result = WeaponEnhanceService.TryEnhance(target, _table, _roomRng, fuel, CostMult, SuccessBonus);
-
-        // 롤 소비 기록 — 거부(재료부족/최대치)는 롤을 굴리지 않으므로 세지 않는다.
-        if (!result.IsReject) BumpRoll(1);
-
-
-        if (result.outcome == EnhanceOutcome.Success)
-        {
-            _streak++;
-            RollJackpot(fuel, result.spent);   // 잭팟 굴림도 내부에서 롤 소비를 기록
-
-            // 「석궁」·「대장장이의 인장」 할인 조건 집계 — 도달한 최고 강화 수치만 남는다.
-            _run.ReportEnhanceLevel(target.enhanceLevel);
-
-            // 근접 강화 증강(10-15) — 처음 닿은 단계면 두 장 중 하나(진화 직후 첫 강화는 금 이상)
-            bool afterEvolve = target.augmentAfterEvolve;
-            if (MeleeAugmentDraft.TryOfferForEnhance(target, target.enhanceLevel, afterEvolve, new System.Random(unchecked(_run.CrucibleRollIndex * 7919 + target.enhanceLevel * 104729))))
-                target.augmentAfterEvolve = false;
-        }
-        else if (result.outcome == EnhanceOutcome.FailDropped)
-        {
-            _streak = 0;
-        }
-
-        // 대상이 현재 장착 무기면 데미지/HUD 스탯 즉시 갱신
-        if (!result.IsReject)
-        {
-            RefreshEquippedIfCurrent(targetSlot);
-            SaveNow("crucible-enhance");   // S3: 강화 결과 확정 → 즉시 저장
-        }
-
-        OnCrucibleChanged?.Invoke();
-        return result;
+        float band = ranged ? WeaponReforgeService.RangedBand(RangedPartsState.Current.ReforgeCount + 1)
+                            : WeaponReforgeService.MeleeBand(GetSlot(PlayerWeaponManager.Slot0));
+        return WeaponReforgeService.Cost(ReforgeCountThisVisit + 1, band, CostMult);
     }
 
-    // ── 원거리 파츠 강화 (UI가 호출) ────────────────────────
-    //
-    // 10-15 사용자 「파츠 강화도 어느 정도의 확률은 요구해야 · 높은 단계에서 하락」: 확정 → 확률.
-    // 다음 단계별 성공률 <see cref="PartSuccess"/>(켜기 100 → Lv12 32%) · 다음 단계 8 이상 실패면 1 하락(켜진 파츠는 꺼지지 않는다).
-    // 연속 성공 · 잭팟 · 화로 이벤트(열기 · 저주 · 현상금) · 제단 「재련 성공률」을 무기 강화와 똑같이 적용한다 — 원거리 탭에 뜨던 이벤트에 뜻이 생긴다.
-    // (예전 10-08 판단 「계단형 + 실패 = 이중 불투명」은 사용자가 뒤집었다 — 대신 화면이 「지금 → 다음」과 성공률을 크게 보인다.)
-    // 굴림은 무기 강화와 같은 방 난수 + 굴림 번호(BumpRoll) — 다시 열어도 결과가 같다.
-
-    /// <summary>파츠 다음 단계(1 ~ 12)의 기본 성공률 — 0번 칸은 비운다.</summary>
-    private static readonly float[] PartSuccess = { 1f, 1f, 0.95f, 0.90f, 0.85f, 0.80f, 0.72f, 0.65f, 0.58f, 0.50f, 0.44f, 0.38f, 0.32f };
-    /// <summary>이 다음 단계부터 실패하면 하락한다.</summary>
-    private const int PartDropFromLevel = 8;
-
-    /// <summary>파츠를 한 단계 올릴 기본 성공률(보정 전) — 상한이면 0.</summary>
-    public float PartBaseSuccessAt(string partId)
+    /// <summary>재련할 수 있나 — 안 되면 <paramref name="reason"/>(화면 회색 이유).</summary>
+    public bool CanReforge(bool ranged, out string reason)
     {
-        var def = Managers.WeaponParts?.GetById(partId);
-        var state = RangedPartsState.Current;
-        if (def == null || state == null) return 0f;
-        int next = state.LevelOf(partId) + 1;
-        if (def.max_level > 0 && next > def.max_level) return 0f;
-        return PartSuccess[Mathf.Clamp(next, 0, PartSuccess.Length - 1)];
+        reason = null;
+        if (_run == null || !_run.IsRunning || _table == null || _run.FuelBank == null) { reason = "지금은 재련할 수 없다"; return false; }
+        if (MeleeAugmentDraft.Pending != null || RangedPartsDraft.IsOpen) { reason = "카드를 먼저 고른다"; return false; }
+        if (ranged)
+        {
+            var rw = GetSlot(PlayerWeaponManager.Slot1);
+            if (rw == null || !SkillTierResolver.IsRanged(rw)) { reason = "원거리 무기가 없다"; return false; }
+            if (!RangedPartsDraft.HasCandidates(RangedPartsState.Current)) { reason = $"모든 파츠가 Lv{RangedPartsDraft.PartCap}이다"; return false; }
+        }
+        else if (!WeaponReforgeService.CanReforgeMelee(GetSlot(PlayerWeaponManager.Slot0), _table)) { reason = "이미 최대 강화"; return false; }
+        if (FuelAmount < ReforgeCost(ranged)) { reason = "재료가 모자란다"; return false; }
+        return true;
     }
 
-    /// <summary>파츠 성공률(화로 이벤트 · 제단 보정 포함) — 표시와 굴림이 같은 값.</summary>
-    public float PartSuccessChanceAt(string partId) => Mathf.Clamp01(PartBaseSuccessAt(partId) + SuccessBonus);
-
-    /// <summary>파츠 실패 때 내려가는 단계(0 또는 1).</summary>
-    public int PartDropAt(string partId)
+    /// <summary>
+    /// 재련 1회 — 재료를 내고 근접(Slot0)은 +3 확정 · 증강 고르기, 원거리는 파츠 카드 고르기를 연다.
+    /// 화로 「열기」면 카드 +1장. 근접은 바로 저장 · 원거리는 카드를 고를 때 저장한다(고르기 전에 끄면 재료 · 순번도 되돌아간다).
+    /// </summary>
+    public bool TryReforge(bool ranged)
     {
-        var state = RangedPartsState.Current;
-        if (state == null) return 0;
-        return state.LevelOf(partId) + 1 >= PartDropFromLevel ? 1 : 0;
-    }
-
-    /// <summary>파츠 강화 1회 시도. 재료가 모자라거나 상한이면 거부 · 아니면 굴림(성공 +1 · 실패 높은 단계 −1).</summary>
-    public EnhanceResult TryEnhancePart(string partId)
-    {
-        if (_run == null || !_run.IsRunning) return EnhanceResult.Reject(EnhanceOutcome.RejectInvalid);
-
-        var state = RangedPartsState.Current;
-        var fuel  = _run.FuelBank;
-        var def   = Managers.WeaponParts?.GetById(partId);
-        if (state == null || fuel == null || def == null)
-            return EnhanceResult.Reject(EnhanceOutcome.RejectInvalid);
-
-        // 내장형 — Lv0(꺼짐)은 거부가 아니라 '켜기'다. 장착이라는 별도 단계가 없다.
-        int level = state.LevelOf(partId);
-        if (def.max_level > 0 && level >= def.max_level)
-            return EnhanceResult.Reject(EnhanceOutcome.RejectMaxed);
-
-        int cost = PartCostAt(partId);
-        float chance = PartSuccessChanceAt(partId);
-        int drop = PartDropAt(partId);
-        if (!fuel.TrySpend(FuelKind.EnhanceMaterial, cost))
-            return EnhanceResult.Reject(EnhanceOutcome.RejectNoFuel);
-
-        _lastJackpot = false;
-        _lastRefund  = 0;
-
-        double roll = _roomRng.NextDouble();
+        if (!CanReforge(ranged, out _)) return false;
+        int cost = ReforgeCost(ranged);
+        if (!_run.FuelBank.TrySpend(FuelKind.EnhanceMaterial, cost)) return false;
+        int seed = (int)(_roomRng.NextDouble() * int.MaxValue);   // 재련 1회 = 굴림 1개(이어하기에서 같은 카드)
         BumpRoll(1);
-        bool success = roll < chance;
-        if (success)
+        var rng = new System.Random(seed);
+        int extra = _event == CrucibleEvent.Fever ? FeverExtraCards : 0;
+        bool ok = ranged ? WeaponReforgeService.ReforgeRanged(rng, extra)
+                         : WeaponReforgeService.ReforgeMelee(GetSlot(PlayerWeaponManager.Slot0), _table, _run, rng, extra);
+        if (!ok)
         {
-            state.LevelUp(partId);
-            _streak++;
-            RollJackpot(fuel, cost);   // 잭팟 — 무기 강화와 같은 축(연속 · 현상금)
+            _run.FuelBank.Add(FuelKind.EnhanceMaterial, cost);   // 열 카드가 없었다 — 되돌린다(CanReforge가 먼저 막으므로 거의 없다)
+            return false;
         }
-        else
+        if (!ranged)
         {
-            if (drop > 0) state.LevelDown(partId, drop);
-            _streak = 0;
+            RefreshEquippedIfCurrent(PlayerWeaponManager.Slot0);
+            SaveNow("crucible-reforge");
         }
-
-        SaveNow("crucible-part-enhance");   // S3: 결과 즉시 저장 — 다음 방까지 미루면 진행분이 날아간다
+        OnReforged?.Invoke(ranged);
         OnCrucibleChanged?.Invoke();
-
-        // 원거리 <b>스킬 단계</b>는 무기 강화가 아니라 이 파츠 총합 레벨에서 나온다(SkillTierResolver, 임계 2·10).
-        // 그런데 여기서 아무 통지도 안 해 HUD가 예전 값을 그대로 들고 있었다 — 단계가 올라도 스킬 아이콘·표시가
-        // 무기를 바꾸기 전까지 그대로였다(09-21). 장착 무기 갱신 통지를 보내 HUD가 다시 읽게 한다.
-        RefreshEquippedIfCurrent(_run?.Player?.WeaponManager?.GetCurrentSlotIndex() ?? -1);
-
-        return new EnhanceResult
-        {
-            outcome     = success ? EnhanceOutcome.Success : EnhanceOutcome.FailDropped,
-            beforeLevel = level,
-            afterLevel  = state.LevelOf(partId),
-            spent       = cost,
-            chance      = chance,
-            roll        = roll,
-        };
+        return true;
     }
+
+    // ── 승급 (UI가 호출) ────────────────────────────────────
 
     /// <summary>파츠 지급(티어 보상 선택) 확정 후 즉시 저장 — 방 안에서 끊겨도 지급이 날아가지 않게.</summary>
     public void SavePartGrant()
     {
         SaveNow("crucible-part-grant");
         OnCrucibleChanged?.Invoke();
-    }
-
-    /// <summary>파츠 다음 강화 비용(할인 이벤트 반영). 상한이면 0.</summary>
-    public int PartCostAt(string partId)
-    {
-        var def = Managers.WeaponParts?.GetById(partId);
-        var state = RangedPartsState.Current;
-        if (def == null || state == null) return 0;
-
-        return PartCostFor(def, state.LevelOf(partId));
-    }
-
-    /// <summary>
-    /// 파츠를 <paramref name="level"/>에서 한 단계 올리는 비용(할인 이벤트 반영). 상한이면 0.
-    /// 재련소 첫 화면이 「지금 재료로 몇 번 올릴 수 있나」를 셀 때 앞 레벨의 비용도 봐야 해서 따로 연다.
-    /// </summary>
-    public int PartCostFor(WeaponPartEntry def, int level)
-    {
-        if (def == null) return 0;
-        int raw = def.CostAt(level);
-        return raw <= 0 ? 0 : Mathf.Max(1, Mathf.CeilToInt(raw * CostMult));
     }
 
     /// <summary>결정적 롤 소비 수를 세션에 누적(세이브에 기록 → 복원 시 스트림 재개).</summary>
@@ -633,16 +493,15 @@ public class CrucibleRoomController : MonoBehaviour
         return (pos, ServiceRoomDecorPlacer.ResolveFacing(pos, Quaternion.identity));
     }
 
-    // ── 잭팟 / 스탯 갱신 ────────────────────────────────────
+    // ── 스탯 갱신 ───────────────────────────────────────────
 
-    /// <summary>방 진입 시 돌발 이벤트 결정적 롤. Discount 18 / Fever 15 / Bounty 12 / Curse 10 / None 45.</summary>
+    /// <summary>방 진입 시 돌발 이벤트 결정적 롤. Discount 18 / Fever 15 / Bounty 12 / None 55 — 저주는 없앴다(실패가 없으니 뜻이 없다 · 10-18 재련 개편).</summary>
     private CrucibleEvent RollEvent()
     {
         double r = _roomRng.NextDouble();
         if (r < 0.18) return CrucibleEvent.Discount;
         if (r < 0.33) return CrucibleEvent.Fever;
         if (r < 0.45) return CrucibleEvent.Bounty;
-        if (r < 0.55) return CrucibleEvent.Curse;
         return CrucibleEvent.None;
     }
 
@@ -674,14 +533,14 @@ public class CrucibleRoomController : MonoBehaviour
 
     private static readonly string[] IdleLines =
     {
-        "쇠는 두드릴수록 강해지지… 운이 따라준다면 말이야.",
+        "쇠는 두드릴수록 강해지지. 무엇을 붙일지는 네가 골라.",
         "그 마법사가 날 여기 처박아둔 지도 천 년이야. 심심하던 참이지.",
     };
     private static readonly string[] TauntLines =
     {
-        "겁이 나나? 이 정도 확률에 벌벌 떨면 영웅은 무슨.",
+        "망설이나? 두드리면 반드시 단단해진다. 고르기만 하면 돼.",
         "안 두드릴 거면 왜 왔어? 화로만 식잖아.",
-        "확률이 낮다고? 낮으니까 두드리는 맛이 있는 거지, 애송이.",
+        "재료를 아끼다 무기를 놓친다, 애송이.",
     };
     private static readonly string[] StreakLines =
     {
@@ -733,8 +592,8 @@ public class CrucibleRoomController : MonoBehaviour
     private string EventGreeting => _event switch
     {
         CrucibleEvent.Discount => "오늘은 반값이다. 이럴 때 많이 두드려 둬.",
-        CrucibleEvent.Fever    => "화로가 잔뜩 달았어. 오늘은 쇠가 잘 붙을 거다.",
-        CrucibleEvent.Bounty   => "불 기운이 좋군. 재료가 되돌아올지도 몰라.",
+        CrucibleEvent.Fever    => "화로가 잔뜩 달았어. 오늘은 고를 게 하나 더 나온다.",
+        CrucibleEvent.Bounty   => "불 기운이 좋군. 마음에 안 들면 한 번 더 뽑아 주지.",
         CrucibleEvent.Curse    => "화로가 시커멓다… 오늘은 쇠가 잘 안 붙을 거야.",
         _                      => string.Empty,
     };
@@ -743,29 +602,11 @@ public class CrucibleRoomController : MonoBehaviour
     private string EventShout => _event switch
     {
         CrucibleEvent.Discount => "오늘은 반값이다! 이럴 때 두드려 둬!",
-        CrucibleEvent.Fever    => "화로가 잔뜩 달았다! 오늘은 잘 붙는다!",
-        CrucibleEvent.Bounty   => "불 기운이 좋아! 재료가 되돌아올 날이야!",
+        CrucibleEvent.Fever    => "화로가 잔뜩 달았다! 오늘은 하나 더 골라라!",
+        CrucibleEvent.Bounty   => "불 기운이 좋아! 한 번 더 뽑아 주지!",
         CrucibleEvent.Curse    => "화로가 시커멓군… 오늘은 조심해라.",
         _                      => null,
     };
-
-    /// <summary>성공 직후 스트릭 비례 잭팟 굴림(결정적) — 성공 시 소모 재료 환불.</summary>
-    private void RollJackpot(RunFuelBank fuel, int spent)
-    {
-        if (spent <= 0) return;
-        float chance = Mathf.Min(JackpotMaxChance, JackpotBaseChance + JackpotPerStreak * (_streak - 1) + BountyBonus);
-
-        double roll = _roomRng.NextDouble();
-        BumpRoll(1);   // 잭팟 굴림도 스트림을 소비 → 복원 시 동일하게 건너뛰어야 한다
-
-        if (roll < chance)
-        {
-            fuel.Add(FuelKind.EnhanceMaterial, spent);
-            _lastJackpot = true;
-            _lastRefund  = spent;
-            Debug.Log($"[Crucible] 잭팟! 강화재료 {spent} 환불 (streak={_streak})");
-        }
-    }
 
     /// <summary>변경된 슬롯이 현재 장착 무기면 데미지/HUD 스탯을 즉시 재적용.</summary>
     private void RefreshEquippedIfCurrent(int changedSlot)

@@ -38,7 +38,8 @@ public static class RelicMemoryRecall
     private const float RingScale      = 0.7f;
 
     private const float LineFadeIn     = 0.35f;
-    private const float LineHold       = 1.8f;
+    private const float LineHold       = 1.8f;    // 짧은 줄의 머무름 — 긴 줄은 글자 수만큼 늘린다(LineHoldFor)
+    private const float LineHoldMax    = 2.8f;
     private const float LineFadeOut    = 0.45f;
     private const float LineSize       = 40f;
     private const float DimAlpha       = 0.28f;   // 화면을 옅게 — 회상의 결(은은하게)
@@ -270,6 +271,16 @@ public static class RelicMemoryRecall
         return pick?.text;
     }
 
+    /// <summary>
+    /// 회상 줄 머무름 — 초당 12자로 읽을 시간(1.8~2.8초). 10-16 대사 「뜻이 전해지게」 다시 쓰기로 회상 줄이 길어져
+    /// (사건 · 상대를 밝혔다 — 25~29자) 고정 1.8초로는 다 읽기 전에 사라졌다.
+    /// </summary>
+    private static float LineHoldFor(string text)
+    {
+        int chars = System.Text.RegularExpressions.Regex.Replace(text ?? "", "<[^>]+>", "").Length;
+        return Mathf.Clamp(chars / 12f, LineHold, LineHoldMax);
+    }
+
     /// <summary>회상 한 줄 화면 — 옅게 가라앉은 화면 가운데 흐린 띠 위에 한 줄. 런타임 캔버스(엔딩 카드와 같은 틀).</summary>
     private static async UniTask LineAsync(string text, CancellationToken ct)
     {
@@ -301,7 +312,7 @@ public static class RelicMemoryRecall
             var label = MakeText(canvasGO.transform, text);
 
             await Fade(group, 0f, 1f, LineFadeIn, ct);
-            await UniTask.Delay(TimeSpan.FromSeconds(LineHold), DelayType.UnscaledDeltaTime, cancellationToken: ct);
+            await UniTask.Delay(TimeSpan.FromSeconds(LineHoldFor(text)), DelayType.UnscaledDeltaTime, cancellationToken: ct);
             await Fade(group, 1f, 0f, LineFadeOut, ct);
         }
         finally

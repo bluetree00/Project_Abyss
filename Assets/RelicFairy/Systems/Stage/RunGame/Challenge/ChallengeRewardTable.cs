@@ -61,12 +61,13 @@ public sealed class ChallengeRewardTable : ScriptableObject
         };
     }
 
+    // 10-22 1 · 1.3 · 1.7 · 2.2 → 1 · 1.15 · 1.2 · 1.2 — 강화는 Ch3에서 상한(+21)에 닿아 그 뒤 수입이 그대로 남았다(재련 개편 시뮬 R: 런 끝 130).
+    //   Ch1(진화 0.78)은 그대로 두고 후반만 낮춘다 — 방 보상 인하와 합쳐 런 끝 82(기획/RelicFairy_재련개편_설계_20261018.md §7-b).
     private static float DefaultChapterScale(int chapter) => chapter switch
     {
         <= 1 => 1f,
-        2    => 1.3f,
-        3    => 1.7f,
-        _    => 2.2f,
+        2    => 1.15f,
+        _    => 1.2f,
     };
 
     // ── 내부 ─────────────────────────────────────────────

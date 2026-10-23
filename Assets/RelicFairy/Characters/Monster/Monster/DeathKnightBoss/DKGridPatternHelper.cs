@@ -31,17 +31,37 @@ public static class DKGridPatternHelper
     // 가산 파트가 주된 이펙트용 검정 틴트 — DarkTint는 가산 파트를 지워 영혼 창 빔이 안 보였다(10-03). DarkTint는 다른 패턴이 그대로 쓴다
     public static readonly Color DarkReadableTint = new Color(0.55f, 0.15f, 0.85f, 1f);
 
-    /// <summary>판정 이만큼 전부터 위험 칸(검 색 칸)을 붉게 — 예고 시간 · 판정은 그대로(10-11 사용자 「어떤 공격이 위험한지 더 알려줘야」).</summary>
+    /// <summary>판정 이만큼 전부터 맞는 칸(검 색 칸)을 신호 빨강으로 — 예고 시간 · 판정은 그대로(10-11 사용자 「어떤 공격이 위험한지 더 알려줘야」).</summary>
     public const float ArmLead = 0.25f;
     // 베기 이펙트 최대 수명 — 반복 Sword Slash 15가 2.75초 남아 판정 뒤에도 위험한 줄로 읽혔다. 검 소환은 베기 1.2초 뒤 판정이라 그보다 길게(10-11 이펙트 톤 2차)
     private const float SlashVfxMaxSeconds = 1.6f;
-    private static readonly Color ArmColor = new Color(1f, 0.12f, 0.1f, 0.8f);
-    private const float ArmEmission = 1.5f;
+    // ── 칸 예고 색(10-23 가이드 색 통일 — 「실제로 맞는 칸 = 빨강」 한 가지 규칙) ──────────
+    // 맞는 칸: 깔리는 순간 공용 공격 색(PatternGuideHelper.AttackFill)으로 차오름 → 판정 ArmLead초 전 신호 빨강(Active) · 더 밝게.
+    // 안 맞는 칸: 흑/백 그림 대신 옅은 무채색 하나(검 색은 검 · 갑옷 · 베기 이펙트가 알린다). 어두운 바닥 · 유리 결계 너머에서도 읽히게 발광을 준다.
+    private static Color ChargeColor => new Color(PatternGuideHelper.AttackFill.r, PatternGuideHelper.AttackFill.g, PatternGuideHelper.AttackFill.b, 0.72f);
+    private static Color ArmColor    => new Color(PatternGuideHelper.Active.r, PatternGuideHelper.Active.g, PatternGuideHelper.Active.b, 0.9f);
+    private static readonly Color SafeColor = new Color(0.80f, 0.82f, 0.86f, 0.32f);   // 옅은 무채색 — 안전 흰색보다 어둡고 옅게
+    private const float ChargeEmission = 1.3f;
+    private const float ArmEmission    = 2.2f;    // 1.5 → 2.2 — 유리 결계 너머에서도 신호가 튀게(10-23)
+    private const float SafeEmission   = 0.12f;
+    private const float EdgeGlow       = 1.35f;   // 맞는 칸 둘레 테두리 — 칸보다 이만큼 더 밝게(또렷한 가장자리)
+    private static readonly Color EdgeNeutral         = new Color(0.86f, 0.88f, 0.92f, 0.9f);   // 테두리 기본 — 밝은 무채색(흑/백 어느 칸이든 같은 선)
+    private static readonly Color EdgeNeutralEmission = new Color(0.30f, 0.31f, 0.33f, 1f);
     private static readonly int   BaseMapId = Shader.PropertyToID("_BaseMap");
     private static readonly int   MainTexId = Shader.PropertyToID("_MainTex");
-    // 칠한 칸 → (렌더러, 원래 재질). 검은 칸은 바탕 그림이 어두워 색을 곱해도 붉어지지 않았다(10-11 실측) → 바탕 그림 없는 붉은 재질로 잠깐 바꾼다
-    private static readonly Dictionary<GameObject, (Renderer renderer, Material original)> s_armed = new();
-    private static readonly Dictionary<Material, Material> s_armMaterials = new();   // 원래 재질마다 한 번 만든다
+
+    private enum TileLook { Safe, Charge, Signal }   // 순서 = 세기(테두리는 양옆 칸 중 센 쪽을 따른다 · 칸은 약해지지 않는다)
+
+    // 칠한 칸 → (렌더러, 원래 재질, 지금 모습). 검은 칸은 바탕 그림이 어두워 색을 곱해도 붉어지지 않았다(10-11 실측) → 바탕 그림 없는 단색 재질로 잠깐 바꾼다
+    private static readonly Dictionary<GameObject, (Renderer renderer, Material original, TileLook look)> s_painted = new();
+    private static readonly Dictionary<(Material, TileLook), Material> s_lookMaterials = new();   // 원래 재질 · 모습마다 한 번 만든다
+    // 경계 테두리 → 양옆 칸(바깥 경계면 한쪽만) · 지금 모습 — 맞는 칸 둘레를 공격 색으로 다시 칠할 때 읽는다(10-23)
+    private static readonly Dictionary<GameObject, (GameObject a, GameObject b)> s_edgeSides = new();
+    private static readonly Dictionary<GameObject, TileLook> s_edgeLook = new();
+    private static readonly List<GameObject> s_staleEdges = new();   // 씬과 함께 사라진 테두리 — 다시 칠할 때 걷는다
+    // 테두리 재질에 발광을 켠 사본(원래 재질마다 한 번) — 원래 테두리 재질은 발광이 꺼져 블록 발광 색이 먹지 않았다(10-23)
+    private static readonly Dictionary<Material, Material> s_edgeMaterials = new();
+    private static readonly HashSet<Material> s_edgeCopies = new();
 
     private const float ReachSampleRadius   = 0.75f;   // 칸(2 m) 중심에서 — 칸 안쪽 바닥만 잡는다
     private const float ReachFloorTolerance = 0.6f;
@@ -113,50 +133,107 @@ public static class DKGridPatternHelper
         tiles.Clear();
     }
 
-    // ── 판정 직전 위험 칸(10-11) ────────────────────────────
+    // ── 칸 예고(10-11 · 10-23 가이드 색 통일) ────────────────────
 
-    /// <summary><paramref name="hitAt"/> − <see cref="ArmLead"/>가 지나면 검 색 칸을 붉게 칠한다 — 같은 칸은 다시 칠하지 않아 매 프레임 불러도 된다(새로 깔린 칸만 더 칠한다).</summary>
+    /// <summary>
+    /// 칸 예고 한 프레임 — 검 색 칸(= 실제로 맞는 칸)은 공용 공격 색으로, <paramref name="hitAt"/> − <see cref="ArmLead"/>부터 신호 빨강으로,
+    /// 나머지 칸은 옅은 무채색으로 칠한다(10-23 — 예전엔 판정 0.25초 전까지 흑/백만 보여 어느 칸이 맞는지 규칙으로 읽어야 했다).
+    /// 같은 모습은 다시 칠하지 않아 매 프레임 불러도 된다(새로 깔린 칸만 더 칠한다). 맞는 칸 둘레 테두리도 같은 색으로 또렷이.
+    /// </summary>
     public static void ArmBefore(float timer, float hitAt, List<DKTileInfo> tiles, DKSwordColor swordColor)
     {
-        if (tiles == null || tiles.Count == 0 || timer < hitAt - ArmLead) return;
+        if (tiles == null || tiles.Count == 0) return;
+        TileLook hit = timer >= hitAt - ArmLead ? TileLook.Signal : TileLook.Charge;
+        bool changed = false;
         foreach (var t in tiles)
-            if (t.Color == swordColor) ArmTile(t.GO);
+            changed |= Paint(t.GO, t.Color == swordColor ? hit : TileLook.Safe);
+        if (changed) RestyleEdges();
     }
 
-    /// <summary>이 칸을 붉게(한 번만) — 바탕 그림 없는 붉은 재질로 바꾼다. 풀로 돌려보내기 전에 <see cref="Disarm"/>.</summary>
-    public static void ArmTile(GameObject go)
-    {
-        if (go == null || s_armed.ContainsKey(go)) return;
-        var r = go.TryGetComponent<Renderer>(out var own) ? own : go.GetComponentInChildren<Renderer>();
-        if (r == null || r.sharedMaterial == null) return;
-        Material original = r.sharedMaterial;
-        if (!s_armMaterials.TryGetValue(original, out var arm))
-        {
-            arm = new Material(original) { name = original.name + " (판정 직전)" };
-            if (arm.HasProperty(BaseMapId)) arm.SetTexture(BaseMapId, null);
-            if (arm.HasProperty(MainTexId)) arm.SetTexture(MainTexId, null);
-            if (arm.HasProperty(BaseColorId)) arm.SetColor(BaseColorId, ArmColor);
-            if (arm.HasProperty(ColorId))     arm.SetColor(ColorId, ArmColor);
-            // 칸 재질은 조명을 받는다(URP Lit) — 기사 아레나의 푸른 조명 아래 붉은 바탕은 검게 보였다(10-11 실측) → 발광으로 조명과 무관하게 붉게
-            if (arm.HasProperty(EmissionColorId))
-            {
-                arm.EnableKeyword("_EMISSION");
-                arm.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
-                arm.SetColor(EmissionColorId, new Color(ArmColor.r, ArmColor.g, ArmColor.b) * ArmEmission);
-            }
-            s_armMaterials[original] = arm;
-        }
-        r.sharedMaterial = arm;
-        s_armed[go] = (r, original);
-    }
+    /// <summary>이 칸을 신호 빨강으로 — 바탕 그림 없는 단색 재질로 바꾼다. 풀로 돌려보내기 전에 <see cref="Disarm"/>.</summary>
+    public static void ArmTile(GameObject go) => Paint(go, TileLook.Signal);
+
+    /// <summary>맞을 칸을 깐 순간 — 공용 공격 색으로(10-23 가이드 색 통일). 판정 직전엔 <see cref="ArmTile"/>. 풀로 돌려보내기 전에 <see cref="Disarm"/>.</summary>
+    public static void ChargeTile(GameObject go) => Paint(go, TileLook.Charge);
 
     /// <summary>원래 재질로 되돌린다(칠하지 않은 칸은 그대로).</summary>
     public static void Disarm(GameObject go)
     {
-        if (go == null || !s_armed.TryGetValue(go, out var e)) return;
-        s_armed.Remove(go);
+        if (go == null || !s_painted.TryGetValue(go, out var e)) return;
+        s_painted.Remove(go);
         if (e.renderer != null) e.renderer.sharedMaterial = e.original;
     }
+
+    /// <summary>칸 모습을 바꾼다 — 바뀌었으면 true. 약해지지는 않는다(신호 빨강이 다시 흐려지지 않게).</summary>
+    private static bool Paint(GameObject go, TileLook look)
+    {
+        if (go == null) return false;
+        Renderer r;
+        Material original;
+        if (s_painted.TryGetValue(go, out var e))
+        {
+            if (e.look >= look || e.renderer == null) return false;
+            r        = e.renderer;
+            original = e.original;
+        }
+        else
+        {
+            r = go.TryGetComponent<Renderer>(out var own) ? own : go.GetComponentInChildren<Renderer>();
+            if (r == null || r.sharedMaterial == null) return false;
+            original = r.sharedMaterial;
+        }
+        r.sharedMaterial = LookMaterial(original, look);
+        s_painted[go]    = (r, original, look);
+        return true;
+    }
+
+    /// <summary>
+    /// 원래 재질 · 모습마다 한 번 만든 단색 재질. 칸 재질은 조명을 받는다(URP Lit) — 기사 아레나의 푸른 조명 아래 붉은 바탕은 검게 보였다(10-11 실측)
+    /// → 발광으로 조명과 무관하게.
+    /// </summary>
+    private static Material LookMaterial(Material original, TileLook look)
+    {
+        if (s_lookMaterials.TryGetValue((original, look), out var m) && m != null) return m;
+        Color c    = look == TileLook.Signal ? ArmColor    : look == TileLook.Charge ? ChargeColor    : SafeColor;
+        float glow = look == TileLook.Signal ? ArmEmission : look == TileLook.Charge ? ChargeEmission : SafeEmission;
+        m = new Material(original) { name = original.name + (look == TileLook.Signal ? " (판정 직전)" : look == TileLook.Charge ? " (맞는 칸)" : " (안 맞는 칸)") };
+        if (m.HasProperty(BaseMapId)) m.SetTexture(BaseMapId, null);
+        if (m.HasProperty(MainTexId)) m.SetTexture(MainTexId, null);
+        if (m.HasProperty(BaseColorId)) m.SetColor(BaseColorId, c);
+        if (m.HasProperty(ColorId))     m.SetColor(ColorId, c);
+        if (m.HasProperty(EmissionColorId))
+        {
+            m.EnableKeyword("_EMISSION");
+            m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+            m.SetColor(EmissionColorId, new Color(c.r, c.g, c.b) * glow);
+        }
+        s_lookMaterials[(original, look)] = m;
+        return m;
+    }
+
+    /// <summary>테두리를 양옆 칸 중 센 모습으로 — 맞는 칸 둘레는 차오름 · 신호 색으로 칸보다 밝게(10-23). 칸 모습이 바뀐 프레임에만 부른다.</summary>
+    private static void RestyleEdges()
+    {
+        foreach (var kv in s_edgeSides)
+        {
+            if (kv.Key == null) { s_staleEdges.Add(kv.Key); continue; }   // 씬과 함께 사라진 테두리 — 아래에서 걷는다
+            TileLook look  = LookOf(kv.Value.a);
+            TileLook other = LookOf(kv.Value.b);
+            if (other > look) look = other;
+            if (look == TileLook.Safe) continue;   // 안 맞는 칸 사이 · 바깥 테두리는 밝은 무채색 그대로
+            if (s_edgeLook.TryGetValue(kv.Key, out var cur) && cur >= look) continue;
+            s_edgeLook[kv.Key] = look;
+            Color c    = look == TileLook.Signal ? ArmColor : ChargeColor;
+            float glow = (look == TileLook.Signal ? ArmEmission : ChargeEmission) * EdgeGlow;
+            SetEdgeColor(kv.Key, new Color(c.r, c.g, c.b, 0.95f), new Color(c.r, c.g, c.b) * glow);
+        }
+        if (s_staleEdges.Count == 0) return;
+        foreach (var go in s_staleEdges) { s_edgeSides.Remove(go); s_edgeLook.Remove(go); }
+        s_staleEdges.Clear();
+    }
+
+    private static TileLook LookOf(GameObject tile)
+        => tile != null && s_painted.TryGetValue(tile, out var e) ? e.look : TileLook.Safe;
 
     // ── VFX 스폰 (피격과 분리) ──────────────────────────────
 
@@ -456,7 +533,7 @@ public static class DKGridPatternHelper
 
     /// <summary>
     /// 타일 목록의 색상 경계를 탐지하여 얇은 테두리 엣지를 스폰한다.
-    /// 엣지는 타일과 같은 흑/백 계열을 유지하되 밝기 차이를 줘서 장판 위에서도 읽히게 만든다.
+    /// 엣지는 밝은 무채색 하나 — 맞는 칸 둘레는 <see cref="ArmBefore"/>가 공격 색으로 다시 칠한다(10-23 가이드 색 통일).
     /// 두 색상이 공유하는 내부 경계는 먼저 처리된 타일 기준 엣지 1개만 스폰한다.
     /// </summary>
     public static List<GameObject> SpawnBoundaryEdges(
@@ -472,7 +549,8 @@ public static class DKGridPatternHelper
         float cs = DKBossRoomContext.CellSize;
 
         var colorMap = new Dictionary<Vector2Int, DKSwordColor>(tiles.Count);
-        foreach (var t in tiles) colorMap[t.Cell] = t.Color;
+        var goMap    = new Dictionary<Vector2Int, GameObject>(tiles.Count);   // 테두리 양옆 칸(10-23)
+        foreach (var t in tiles) { colorMap[t.Cell] = t.Color; goMap[t.Cell] = t.GO; }
 
         // 중복 방지: (canonX, canonZ, axis) — axis 0=N/S 경계, 1=E/W 경계
         var processed = new HashSet<(int, int, int)>();
@@ -520,7 +598,8 @@ public static class DKGridPatternHelper
                 if (go == null) continue;
 
                 go.transform.localScale = new Vector3(cs, thickness, cs);
-                ApplyEdgeStyle(go, tile.Color, colorOverride);
+                ApplyEdgeStyle(go, colorOverride);
+                s_edgeSides[go] = (tile.GO, goMap.TryGetValue(nb, out var nbGo) ? nbGo : null);
 
                 result.Add(go);
             }
@@ -534,7 +613,12 @@ public static class DKGridPatternHelper
     {
         if (edges == null) return;
         foreach (var go in edges)
-            if (go != null) BossEffectPool.Release(go);
+        {
+            if (go == null) continue;
+            s_edgeSides.Remove(go);
+            s_edgeLook.Remove(go);
+            BossEffectPool.Release(go);
+        }
         edges.Clear();
     }
 
@@ -548,8 +632,9 @@ public static class DKGridPatternHelper
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
-        // 악몽 「지휘」 — 환영 기수가 서 있는 동안 +15%
-        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * damageMult * DKStandardBearer.DamageScale(ctx.Monster)));
+        // 악몽 「지휘」 — 환영 기수가 서 있는 동안 +15% · 사슬 둘째 칸 ×0.8(10-22 E5 페이지2)
+        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * damageMult * DKStandardBearer.DamageScale(ctx.Monster)
+                                     * DeathKnightBossMonster.ChainScale(ctx.Monster)));
         // 가해자 = 기사 — null이면 피격 방향 연출·같은 공격자 약 피격 억제·전투 로그가 가해자를 모른다(09-26)
         player.TakeDamage(dmg, ctx.Monster != null ? ctx.Monster.gameObject : null, false, weight);
 
@@ -559,20 +644,35 @@ public static class DKGridPatternHelper
         player.ApplyKnockback(knockDir * ctx.Config.stat.knockbackForce * knockbackMult);
     }
 
-    private static void ApplyEdgeStyle(GameObject go, DKSwordColor tileColor, Color? colorOverride = null)
+    /// <summary>
+    /// 테두리 기본 모습 — (10-23 가이드 색 통일) 흑/백 칸마다 흰 · 어두운 회색이던 것(검은 칸 테두리는 어두운 바닥에서 안 보였다)을
+    /// 밝은 무채색 하나로. 맞는 칸 둘레는 <see cref="RestyleEdges"/>가 공격 색으로 다시 칠한다.
+    /// </summary>
+    private static void ApplyEdgeStyle(GameObject go, Color? colorOverride = null)
     {
         if (go == null) return;
+        SetEdgeColor(go, colorOverride ?? EdgeNeutral, colorOverride ?? EdgeNeutralEmission);
+    }
 
-        Color baseColor = colorOverride ?? (tileColor == DKSwordColor.White
-            ? new Color(0.95f, 0.96f, 0.98f, 0.92f)
-            : new Color(0.14f, 0.15f, 0.18f, 0.92f));
-        Color emission = colorOverride ?? (tileColor == DKSwordColor.White
-            ? new Color(0.08f, 0.08f, 0.10f, 1f)
-            : new Color(0.02f, 0.02f, 0.03f, 1f));
-
+    /// <summary>테두리 색 · 발광 — 발광을 켠 재질 사본으로 바꿔 끼운 뒤 블록으로 칠한다(원래 재질은 발광이 꺼져 있었다).</summary>
+    private static void SetEdgeColor(GameObject go, Color baseColor, Color emission)
+    {
         var block = new MaterialPropertyBlock();
         foreach (var renderer in go.GetComponentsInChildren<Renderer>(true))
         {
+            Material src = renderer.sharedMaterial;
+            if (src != null && !s_edgeCopies.Contains(src))
+            {
+                if (!s_edgeMaterials.TryGetValue(src, out var lit) || lit == null)
+                {
+                    lit = new Material(src) { name = src.name + " (발광)" };
+                    lit.EnableKeyword("_EMISSION");
+                    lit.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                    s_edgeMaterials[src] = lit;
+                    s_edgeCopies.Add(lit);
+                }
+                renderer.sharedMaterial = lit;
+            }
             renderer.GetPropertyBlock(block);
             block.SetColor(BaseColorId, baseColor);
             block.SetColor(ColorId, baseColor);

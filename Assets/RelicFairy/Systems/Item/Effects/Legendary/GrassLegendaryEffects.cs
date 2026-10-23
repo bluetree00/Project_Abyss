@@ -15,6 +15,8 @@ using UnityEngine;
 public sealed class GrassLegendAoeEffect : ItemCombatEffectBase
 {
     private static readonly string[] s_hitSfx = { SoundKey.Sfx.MonsterHit1, SoundKey.Sfx.MonsterHit2, SoundKey.Sfx.MonsterHit3 };
+    // 장판 그림 수명 — 피해는 0.4초 × 4틱(1.2초에 끝)인데 그림이 4초 남아 피해 없는 장판으로 읽혔다(10-18 이펙트 점검)
+    private const float AoeVfxLife = 1.8f;
     private const int   WaveTicks = 4, MaxStacks = 8, PoisonTicks = 4;
     private const string PoisonId = "item_poison", BurstCd = "spore_burst";
     private const float BurstGap = 3f;
@@ -59,7 +61,7 @@ public sealed class GrassLegendAoeEffect : ItemCombatEffectBase
         {
             var cat = LegendaryRuntime.Catalog;
             float radius = LegendaryTuning.Pick(NewRow, _value3, 3f);
-            LegendaryRuntime.SpawnVfx(cat?.grassAoeVfx, at, Quaternion.identity, 4f, radius * 0.0556f, alpha: 0.18f);
+            LegendaryRuntime.SpawnVfx(cat?.grassAoeVfx, at, Quaternion.identity, AoeVfxLife, radius * 0.0556f, alpha: 0.18f);
             SkillRangeRing.Circle(at, radius);
             for (int t = 0; t < WaveTicks; t++)
             {
@@ -69,7 +71,7 @@ public sealed class GrassLegendAoeEffect : ItemCombatEffectBase
                 for (int i = 0; i < n; i++)
                 {
                     CombatQuery.DealSynergyDamage(_buf[i], dmg, Self(ctx), element: RuneElement.Grass);
-                    if (t == 0) LegendaryRuntime.SpawnVfx(cat?.grassAoeHitVfx, _buf[i].transform.position, Quaternion.identity, 1.5f, 0.8f);
+                    if (t == 0) LegendaryRuntime.SpawnVfx(cat?.grassAoeHitVfx, _buf[i].transform.position, Quaternion.identity, 1.5f, 0.52f);   // 대상 타격 ≈ 1 m(10-22 B2 실측 83: ×0.8 = 1.5 m)
                 }
                 if (n > 0) Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
                 await UniTask.Delay(400, cancellationToken: ct);
@@ -137,7 +139,7 @@ public sealed class GrassLegendSingleEffect : ItemCombatEffectBase
             {
                 if (ct.IsCancellationRequested || target == null) break;
                 CombatQuery.DealSynergyDamage(target, hitDmg, ctx?.Player?.gameObject, element: RuneElement.Grass);
-                LegendaryRuntime.SpawnVfx(cat?.grassSingleHitVfx, target.transform.position, Quaternion.identity, 1.5f, 0.8f);
+                LegendaryRuntime.SpawnVfx(cat?.grassSingleHitVfx, target.transform.position, Quaternion.identity, 1.5f, 0.65f);   // 대상 타격 ≈ 1 m(10-22 B2 실측 83: ×0.8 = 1.2 m)
                 Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
                 await UniTask.Delay(delayMs, cancellationToken: ct);
             }

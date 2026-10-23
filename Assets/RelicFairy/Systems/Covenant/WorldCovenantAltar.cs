@@ -16,6 +16,8 @@ public class WorldCovenantAltar : MonoBehaviour
 
     // ── Constants ────────────────────────────────────────
     private const float PromptOffsetY = 1.8f;
+    private const float PromptMaxPx   = 34f;   // 「[F] 서약 조립」 1행 화면 높이 상한(1080 기준) — HUD 본문 크기(10-22)
+    private const float LabelMaxPx    = 40f;   // 「서약 조립」 이름표
     private const string GuideShownKey = "covenant_altar_guide_v1";   // 최초 1회 가이드(계정 영속)
 
     /// <summary>제단 비주얼(떠 있는 마도서) Addressable 키. 없으면 콜라이더만 있는 투명 제단이 된다.</summary>
@@ -313,6 +315,8 @@ public class WorldCovenantAltar : MonoBehaviour
         _worldText.textWrappingMode = TextWrappingModes.NoWrap;
         _worldText.sortingOrder = UISortingOrder.WorldLabel;
         TMPOutlineHelper.ApplySoftShadow(_worldText);
+        if (worldTextFont == null) RelicFloatText.ApplyThin(_worldText);   // 글꼴을 안 받으면 기본(굵은 DNF)이었다 — 3D 글자는 얇게(10-22)
+        WorldTextScreenCap.Attach(_worldText, LabelMaxPx, prompt: false);
     }
 
     private void CreatePrompt()
@@ -329,12 +333,20 @@ public class WorldCovenantAltar : MonoBehaviour
         _promptText.textWrappingMode = TextWrappingModes.NoWrap;
         _promptText.sortingOrder = UISortingOrder.WorldPrompt;
         TMPOutlineHelper.ApplySoftShadow(_promptText);
+        if (worldTextFont == null) RelicFloatText.ApplyThin(_promptText);
         _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> 서약 조립";
+        // 10-22 사용자 「서약 근처에 가면 서약 조립 UI가 겹쳐 보인다」 — 글자 크기가 미터라 카메라가 다가가면 화면 아래 HUD까지 덮었다 → 화면 크기 상한
+        WorldTextScreenCap.Attach(_promptText, PromptMaxPx, prompt: true);
 
         _promptGo.SetActive(false);
     }
 
-    private void ShowPrompt(bool show) => _promptGo?.SetActive(show && !_used);
+    private void ShowPrompt(bool show)
+    {
+        _promptGo?.SetActive(show && !_used);
+        // 안내가 뜨면 머리 위 첫 서약 화살표는 걷는다 — 이미 와 있다(10-22 「서약 조립 위 화살표가 어색」 · 이름표 위에 겹쳤다)
+        if (_guideArrow != null) _guideArrow.gameObject.SetActive(!(show && !_used));
+    }
 
     private void OnTriggerEnter(Collider other)
     {

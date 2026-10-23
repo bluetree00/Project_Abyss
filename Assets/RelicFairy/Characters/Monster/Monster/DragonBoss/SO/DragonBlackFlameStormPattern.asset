@@ -21,6 +21,9 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: abyss_storm
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: f6eacd7249a31834a9927d48e8122f1d, type: 2}
+  followUpLateOnly: 0
+  followUpCooldown: 10
   _cooldown: 16
   _lineCount: 2
   _aimSeconds: 1.2
@@ -29,6 +32,7 @@ MonoBehaviour:
   _lineGap: 0.35
   _lineWidth: 3
   _maxLength: 80
+  _sideGap: {x: 1, y: 2.4}
   _hitDamageMult: 1.4
   _stripSeconds: 6
   _stripDamageMult: 0.12

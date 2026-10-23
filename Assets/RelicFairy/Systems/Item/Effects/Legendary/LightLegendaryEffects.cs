@@ -16,6 +16,8 @@ using UnityEngine.AI;
 public sealed class LightLegendAoeEffect : ItemCombatEffectBase
 {
     private static readonly string[] s_hitSfx = { SoundKey.Sfx.MonsterHit1, SoundKey.Sfx.MonsterHit2, SoundKey.Sfx.MonsterHit3 };
+    // 장판 그림 수명 — 피해는 0.4초 × 4틱(1.2초에 끝)인데 그림이 4초 남아 피해 없는 장판으로 읽혔다(10-18 이펙트 점검)
+    private const float AoeVfxLife = 1.8f;
     private const int   WaveTicks = 4;
     private const float LowHp = 0.4f, PushDistance = 1.5f;
 
@@ -57,7 +59,7 @@ public sealed class LightLegendAoeEffect : ItemCombatEffectBase
         if (CombatQuery.GetNearbyDamageables(pos, radius, Self(ctx), 1, _buf) == 0) return;   // 맞을 적이 없으면 아끼다(쿨도 안 돈다)
         _readyAt = Time.time + LegendaryTuning.Pick(NewRow, _value2, 6f);
         var cat = LegendaryRuntime.Catalog;
-        LegendaryRuntime.SpawnVfx(cat?.lightAoeVfx, pos, Quaternion.identity, 4f, radius * 0.0377f, alpha: 0.18f, yScale: 0.1f, follow: ctx.Player.transform);
+        LegendaryRuntime.SpawnVfx(cat?.lightAoeVfx, pos, Quaternion.identity, AoeVfxLife, radius * 0.0377f, alpha: 0.18f, yScale: 0.1f, follow: ctx.Player.transform);
         WaveTickAsync(ctx, radius, _cts.Token).Forget();
     }
 
@@ -76,7 +78,7 @@ public sealed class LightLegendAoeEffect : ItemCombatEffectBase
                 {
                     CombatQuery.DealSynergyDamage(_buf[i], dmg, Self(ctx), element: RuneElement.Light);
                     if (t != 0) continue;
-                    LegendaryRuntime.SpawnVfx(cat?.lightAoeHitVfx, _buf[i].transform.position, Quaternion.identity, 1.5f, 0.8f);
+                    LegendaryRuntime.SpawnVfx(cat?.lightAoeHitVfx, _buf[i].transform.position, Quaternion.identity, 1.5f, 0.49f);   // 대상 타격 ≈ 1 m(10-22 B2 실측 83: ×0.8 = 1.6 m)
                     Push(_buf[i], pos);   // 첫 파동이 밀어낸다 — 몰렸을 때 숨 돌릴 자리
                 }
                 if (n > 0) Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
@@ -170,7 +172,7 @@ public sealed class LightLegendSingleEffect : ItemCombatEffectBase
                 }
 
                 CombatQuery.DealSynergyDamage(target, hitDmg, ctx?.Player?.gameObject, element: RuneElement.Light);
-                LegendaryRuntime.SpawnVfx(cat?.lightSingleHitVfx, tPos, Quaternion.identity, 1.5f, 0.8f);
+                LegendaryRuntime.SpawnVfx(cat?.lightSingleHitVfx, tPos, Quaternion.identity, 1.5f, 0.51f);   // 대상 타격 ≈ 1 m(10-22 B2 실측 83: ×0.8 = 1.6 m)
                 Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
 
                 await UniTask.Delay(150, cancellationToken: ct);

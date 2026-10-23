@@ -115,6 +115,7 @@ public sealed class HudPresenter : MonoBehaviour
         if (_fuelBank != null)
         {
             _fuelBank.OnFuelChanged -= HandleFuelChanged;
+            _fuelBank.OnGained      -= HandleFuelGained;
             _fuelBank = null;
         }
         if (_run != null)
@@ -123,11 +124,14 @@ public sealed class HudPresenter : MonoBehaviour
             _run.OnReviveChanged  -= HandleReviveChanged;
             _run = null;
         }
+        System.Array.Clear(_deferredGains, 0, _deferredGains.Length);
 
         _provider = provider;
         _state = run?.PlayerState;
         _fuelBank = run?.FuelBank;
         _run = run;
+        _lastGold    = _state?.TempGold ?? -1;                 // 지금 값이 기준 — 처음 표시는 「얻은 양」이 아니다(10-22 · -1로 두면 첫 획득이 묻혔다)
+        _lastEssence = run?.RunDelta?.GainedEssence ?? -1;
 
         // 버프 핸들러 구독
         UnbindBuffHandler();
@@ -192,6 +196,7 @@ public sealed class HudPresenter : MonoBehaviour
         {
             HandleFuelChanged();
             _fuelBank.OnFuelChanged += HandleFuelChanged;
+            _fuelBank.OnGained      += HandleFuelGained;   // 얻은 양 → 획득 목록(10-22)
         }
 
         // 심연의 정수 — 런을 넘어 남는 유일한 재화. 줍는 곳과 보이는 곳을 맞춘다.
@@ -452,7 +457,11 @@ public sealed class HudPresenter : MonoBehaviour
     private void HandleBossPageRefill(int page, float seconds) => view?.BossPanel?.PlayPageRefill(page, seconds);
 
     private void HandleHpChanged(int hp, int maxHp) => view?.CombatPanel?.SetHp(hp, maxHp);
-    private void HandleGoldChanged(int gold) => view?.SetGold(gold);
+    private void HandleGoldChanged(int gold)
+    {
+        view?.SetGold(gold);
+        ShowGainDelta(CurrencyGainKind.Gold, ref _lastGold, gold);
+    }
 
     /// <summary>포션 개수 변화 → HUD 슬롯(Q/E 위 첫 칸) 갱신.</summary>
     private void HandlePotionChanged(int count, int capacity)
@@ -464,7 +473,42 @@ public sealed class HudPresenter : MonoBehaviour
         view.SetRuneOre(_fuelBank.RuneOre);
     }
 
-    private void HandleEssenceChanged(int total) => view?.SetEssence(total);
+    private void HandleEssenceChanged(int total)
+    {
+        view?.SetEssence(total);
+        ShowGainDelta(CurrencyGainKind.Essence, ref _lastEssence, total);
+    }
+
+    // ── 재화 획득 목록(10-22) ── 골드 · 정수는 총량 신호라 차이로, 강화재료 · 원석은 「얻은 양」 신호(RunFuelBank.OnGained)로 센다.
+    // 쓰면(줄면) 띄우지 않는다. 컷신 동안엔 HUD가 걷혀 있어 모았다가 끝나면 한 번에 띄운다(알림 보류와 같은 규칙).
+    private int _lastGold = -1, _lastEssence = -1;
+    private readonly int[] _deferredGains = new int[4];
+
+    private void HandleFuelGained(FuelKind kind, int amount)
+        => ShowGain(kind == FuelKind.EnhanceMaterial ? CurrencyGainKind.EnhanceMaterial : CurrencyGainKind.RuneOre, amount);
+
+    private void ShowGainDelta(CurrencyGainKind kind, ref int last, int now)
+    {
+        int gained = last < 0 ? 0 : now - last;
+        last = now;
+        ShowGain(kind, gained);
+    }
+
+    private void ShowGain(CurrencyGainKind kind, int amount)
+    {
+        if (amount <= 0) return;
+        if (_currentMode == HUDIds.Mode.Cutscene) { _deferredGains[(int)kind] += amount; return; }
+        view?.ShowCurrencyGain(kind, amount);
+    }
+
+    private void FlushDeferredGains()
+    {
+        for (int i = 0; i < _deferredGains.Length; i++)
+        {
+            if (_deferredGains[i] > 0) view?.ShowCurrencyGain((CurrencyGainKind)i, _deferredGains[i]);
+            _deferredGains[i] = 0;
+        }
+    }
 
     /// <summary>
     /// 부활 잔여 표기. <b>해금 여부</b>와 <b>이 런에서 남았는지</b>는 다른 질문이라 둘 다 넘긴다 —
@@ -831,6 +875,7 @@ public sealed class HudPresenter : MonoBehaviour
         if (_fuelBank != null)
         {
             _fuelBank.OnFuelChanged -= HandleFuelChanged;
+            _fuelBank.OnGained      -= HandleFuelGained;
             _fuelBank = null;
         }
         // 정수 · 부활도 뗀다 — 끝난 런이 다음 HUD에 값을 밀어 넣지 않게(10-09 출시 점검)
@@ -841,6 +886,10 @@ public sealed class HudPresenter : MonoBehaviour
             _run = null;
         }
         _deferredNotices.Clear();   // 컷신 중 보류한 알림이 다음 런 첫 컷신 뒤에 뜨지 않게
+        // 10-22 사용자 「런이 끝났을 때 UI가 제대로 초기화되지 않는다」 — 거점에 돌아와 HUD가 다시 켜지면 지난 런 골드 · 강화재료 · 원석 · 정수 칸이
+        // 그대로 보였다(구독만 끊고 칸 값은 남겼다). 데이터를 뗄 때 칸도 비운다 — 새 런 Construct는 원래대로 다시 켠다.
+        view?.ResetCurrencyVisibility();
+        System.Array.Clear(_deferredGains, 0, _deferredGains.Length);
         _pendingBuild.Clear();
         _pendingMomentId = null;
 
@@ -942,6 +991,7 @@ public sealed class HudPresenter : MonoBehaviour
         // 컷씬을 벗어나면 그동안 미뤄둔 알림을 차례로 보여준다.
         if (prev == HUDIds.Mode.Cutscene && mode != HUDIds.Mode.Cutscene && _deferredNotices.Count > 0)
             FlushDeferredNoticesAsync().Forget();
+        if (prev == HUDIds.Mode.Cutscene && mode != HUDIds.Mode.Cutscene) FlushDeferredGains();   // 컷신 동안 얻은 재화(10-22)
     }
 
     private static HUDIds.Section ResolveSections(HUDIds.Mode mode)

@@ -92,6 +92,9 @@ public class UI_DialoguePopup : UI_Popup
     private readonly Dictionary<string, Sprite> _illustCache = new();
     private readonly List<Action> _releaseActions = new();
 
+    private Canvas _canvas;                     // UIManager가 붙인 팝업 캔버스(오버레이 · 정렬 400대)
+    private int    _baseOrder = int.MinValue;   // 처음 받은 정렬 — 연출 UI가 걷히면 여기로 돌아온다
+
     // ─────────────────────────────────────────────────────────
     // Lifecycle
     // ─────────────────────────────────────────────────────────
@@ -226,6 +229,7 @@ public class UI_DialoguePopup : UI_Popup
         // 한 번 클릭에 두 줄이 넘어가고, UI 가림 판정도 건너뛰어 다른 창 위를 눌러도 넘어간다.
         if (Input.GetKeyDown(KeyCode.F))
             OnAdvanceClicked();
+        SyncSortingAboveCinematic();
     }
 
     protected override void OnDestroy()
@@ -277,6 +281,21 @@ public class UI_DialoguePopup : UI_Popup
     // ─────────────────────────────────────────────────────────
     // Private Methods
     // ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 연출 UI(레터박스 · 보스 칭호 카드)가 이 팝업보다 위에 떠 있으면 그 바로 위로 올리고, 걷히면 원래 정렬로 돌린다.
+    /// 보스 등장 이야기 대사(예: 리치 Lich_Intro_*)가 등장 레터박스(620) 아래에 깔려 아래 띠가 대사 줄을 덮었다(10-22 사용자).
+    /// 자막(<see cref="RelicFairy.UI.UI_BossBark"/>)의 SyncSorting과 같은 규칙 — 화면 효과(700) · 페이드(800~)보다는 아래.
+    /// </summary>
+    private void SyncSortingAboveCinematic()
+    {
+        if (_canvas == null && !TryGetComponent(out _canvas)) return;
+        if (_baseOrder == int.MinValue) _baseOrder = _canvas.sortingOrder;
+        int above = CinematicFrame.IsShown ? CinematicFrame.CurrentSortingOrder : int.MinValue;
+        if (BossTitleCard.IsShown) above = Mathf.Max(above, UISortingOrder.BossTitle);
+        int target = above >= _baseOrder ? above + 1 : _baseOrder;
+        if (_canvas.sortingOrder != target) _canvas.sortingOrder = target;
+    }
 
     /// <summary>시퀀스 시작 시 등장하는 고유 키를 한 번 순회해 일괄 로드.</summary>
     private async UniTask PreloadIllustrationsAsync(DialogueLine[] lines, CancellationToken ct)

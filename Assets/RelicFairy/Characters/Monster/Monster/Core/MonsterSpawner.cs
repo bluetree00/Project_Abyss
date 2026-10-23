@@ -553,7 +553,8 @@ public class MonsterSpawner : MonoBehaviour
         bool avengerInRoom = prefix == MonsterTraitKind.Avenger || MonsterRoomLedger.HasPrefix(MonsterTraitKind.Avenger);
         var traits = MonsterTraitTable.Roll(entry.grade, era, MonsterRoomLedger.Traits,
                                             prefix.HasValue ? MonsterTraitTable.Of(prefix.Value).category : (MonsterTraitCategory?)null,
-                                            noCommander: avengerInRoom, maxCount: prefix.HasValue ? 1 : 2);   // 한 몸 최대 2(접두어 1 + 특성 1)
+                                            noCommander: avengerInRoom, maxCount: prefix.HasValue ? 1 : 2,   // 한 몸 최대 2(접두어 1 + 특성 1)
+                                            chapter: CurrentChapterNumber());   // 봉인기 무작위 정예화 확률(10-21)
         if (prefix.HasValue)
         {
             traits.Insert(0, prefix.Value);

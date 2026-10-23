@@ -8,7 +8,7 @@ using UnityEngine;
 /// </summary>
 public readonly struct BuildNotice
 {
-    /// <summary>같은 프레임에 들어온 신호는 이 순서로 보인다 — 진화가 각인 +2를 낳으므로 진화가 먼저.</summary>
+    /// <summary>같은 프레임에 들어온 신호는 이 순서로 보인다 — 진화가 먼저.</summary>
     public enum Kind { Evolution = 0, Imprint = 1, Zone = 2 }
 
     // ── Properties ───────────────────────────────────────
@@ -43,12 +43,12 @@ public readonly struct BuildNotice
             stage, BuildFamilyRules.Thresholds.Length, $"각인 {stage}단계", bonus, f, null, null);
     }
 
-    /// <summary>유물 진화 — 「유물 진화 「타오르는 정오」」 / 「연격 각인 +2」(문장 그림은 뷰가 유물에서 읽는다).</summary>
+    /// <summary>유물 진화 — 「유물 진화 「타오르는 정오」」 / 「몰아치는 빌드에 맞춘 진화」(문장 그림은 뷰가 유물에서 읽는다 · 10-22 E1 — 「각인 +2」를 걷고 동작 말로).</summary>
     public static BuildNotice Evolution(RelicEvolution.Def d)
     {
         if (d == null) return default;
         return new BuildNotice(Kind.Evolution, "evo", "유물 진화", BuildFamilyRules.ColorOf(d.Family), 0, 0,
-            $"<color={BuildFamilyRules.Hex(d.Family)}>「{d.Name}」</color>", $"{BuildFamilyRules.Label(d.Family)} 각인 +{RelicEvolution.ImprintBonus}",
+            $"<color={BuildFamilyRules.Hex(d.Family)}>「{d.Name}」</color>", $"{RelicEvolution.DirectionWord(d.Family)} 빌드에 맞춘 진화",
             d.Family, null, d.Id);
     }
 

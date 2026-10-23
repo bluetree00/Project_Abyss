@@ -14,6 +14,7 @@ namespace RelicFairy.Monster
 ///  warningDuration → 경고 타일 생성 (검이 휘두르는 중)
 ///  hitTime        → 타일 제거 + Sword Slash 15 VFX 스폰 (검이 내리치는 순간)
 ///  hitTime+hitDuration → 피격 (VFX 재생 완료 후)
+///  2페이지(10-22 E5 페이지2): 줄무늬를 칸을 깔 때 정한다 — 세로/가로 무작위 · 플레이어가 선 줄이 늘 베인다(1페이지는 예전 그대로 홀수 열)
 ///  hitTime+hitDuration+recoveryTime → FlipSwordColor(+ 전환 연출: 태극 이펙트 · 화면 번쩍 · 바닥 0.3초 새 색, 10-03) → AttackReadyState
 /// </summary>
 [CreateAssetMenu(menuName = "RelicFairy/Boss/DeathKnight/DK_ChangeSlashPattern", fileName = "DK_ChangeSlashPattern")]
@@ -84,6 +85,8 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
     private bool             _hitDone;
     private List<DKTileInfo>  _tiles;
     private List<GameObject>  _edges;
+    private bool              _alongZ;   // 줄무늬가 가로(행)인가 — 2페이지만 무작위(10-22 E5 페이지2)
+    private int               _phase;    // (행 또는 열 + _phase)가 짝수인 줄이 검 색
 
     public DKChangeSlashState(DKChangeSlashPatternSO data) : base(data) { }
 
@@ -96,6 +99,8 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
         _hitDone         = false;
         _tiles           = new List<DKTileInfo>();
         _edges           = new List<GameObject>();
+        _alongZ          = false;   // 1페이지 규칙(홀수 열) — 칸을 깔 때 PickStripes가 다시 정한다
+        _phase           = 1;
 
         StopAgent(ctx);
         FacePlayer(ctx);
@@ -110,9 +115,10 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
         if (!_tilesSpawned && _timer >= Data.warningDuration)
         {
             _tilesSpawned = true;
+            PickStripes(ctx);   // 칸을 까는 순간 줄무늬를 굳힌다(판정까지 1.2초 · 10-22 E5 페이지2)
             DKSwordColor sc = GetSwordColor(ctx);
             _tiles = DKGridPatternHelper.SpawnTiles(
-                (x, z) => x % 2 == 1 ? sc : Opposite(sc),
+                StripeRule(sc),
                 Data.whiteTilePrefab, Data.blackTilePrefab);
             _edges = DKGridPatternHelper.SpawnBoundaryEdges(_tiles, Data.edgePrefab);
             (ctx.Monster as DeathKnightBossMonster)?.CueSwordFloor();   // 검 색 ↔ 바닥 신호(10-03 개선 2-2)
@@ -136,8 +142,8 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
             Managers.Sound?.PlayEffectAt(Data.bigSlashSfx, DKBossRoomContext.WorldCenter, startTime: 0.5f);
             DKSwordColor sc = GetSwordColor(ctx);
             DKGridPatternHelper.SpawnHitVfx(
-                (x, z) => x % 2 == 1 ? sc : Opposite(sc),
-                sc, Data.impactVfxPrefab, DKVfxGroupMode.PerColumn);
+                StripeRule(sc),
+                sc, Data.impactVfxPrefab, _alongZ ? DKVfxGroupMode.PerRow : DKVfxGroupMode.PerColumn);
         }
 
         // hitTime + hitDuration: 피격 (VFX 재생 완료 후)
@@ -146,7 +152,7 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
             _hitDone = true;
             DKSwordColor sc = GetSwordColor(ctx);
             DKGridPatternHelper.TriggerDamage(
-                ctx, (x, z) => x % 2 == 1 ? sc : Opposite(sc),
+                ctx, StripeRule(sc),
                 sc, Data.damageMultiplier, Data.knockbackMultiplier);
             // §3 타격감
             BossImpactFeedback.TriggerHitStop(0.1f);
@@ -207,6 +213,24 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
             DKGridPatternHelper.DestroyTiles(floor);
         }
     }
+
+    /// <summary>
+    /// 줄무늬 정하기 — 1페이지는 예전 그대로(홀수 열 = 검 색). 2페이지는 시전마다 세로/가로를 무작위로 고르고 플레이어가 선 줄이
+    /// 늘 베이게 맞춘다 → 바로 옆 2 m 줄로 비킨다(10-22 E5 페이지2 — 고정 줄무늬는 외우면 끝이었다).
+    /// </summary>
+    private void PickStripes(MonsterContext ctx)
+    {
+        _alongZ = false;
+        _phase  = 1;
+        if ((ctx.Monster as IPagedBoss)?.Pages?.IsPage2 != true || ctx.Runtime.PlayerTarget == null) return;
+        Vector2Int pc = DKBossRoomContext.WorldToCell(ctx.Runtime.PlayerTarget.position);
+        _alongZ = UnityEngine.Random.value < 0.5f;
+        _phase  = (_alongZ ? pc.y : pc.x) & 1;
+    }
+
+    /// <summary>줄무늬 색 규칙 — (가로면 행 · 세로면 열) + _phase가 짝수인 줄이 검 색.</summary>
+    private Func<int, int, DKSwordColor> StripeRule(DKSwordColor sc)
+        => (x, z) => (((_alongZ ? z : x) + _phase) & 1) == 0 ? sc : Opposite(sc);
 
     private static DKSwordColor GetSwordColor(MonsterContext ctx)
         => (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SwordColor ?? DKSwordColor.White;

@@ -6,6 +6,7 @@ namespace RelicFairy.Monster
 /// DL1 「흑염 폭풍」 — 2페이지(심연) 일반 패턴. 검은 불 브레스 두 줄.
 ///   줄마다: 조준(앞부분은 플레이어를 따라 돌고, 마지막 <c>_lockSeconds</c>는 고정 · 판정 색 — 09-28 규칙 R3)
 ///   → 발사(줄 전체 즉시 판정) → 지나간 줄은 몇 초간 불타는 띠(<see cref="DragonAbyssFlameStrip"/>, 동시 최대 2줄).
+///   줄마다 양옆에 곁줄(가운데 줄과 틈 1.0~2.4 m 무작위 · 직격만) — 옆으로 크게 비키면 끝이던 것을 좁은 틈으로 비키게(10-22 E5 페이지2).
 /// 지상 · 공중 어디서든 쓴다(공중이면 그 자리 체공). 거리 제한 없음 — 줄이 바닥 끝까지 닿는다(R6).
 /// </summary>
 [CreateAssetMenu(fileName = "DragonBlackFlameStormPattern",
@@ -28,6 +29,8 @@ public class DragonBlackFlameStormPatternSO : BossPatternSO
     [SerializeField] private float _lineWidth      = 3f;
     [Tooltip("줄 최대 길이 — 바닥 경계가 더 가까우면 경계까지")]
     [SerializeField] private float _maxLength      = 80f;
+    [Tooltip("줄마다 양옆 곁줄 — 가운데 줄 가장자리와의 빈틈 (m, 최소 · 최대 · 줄마다 무작위). 곁줄은 직격만(불타는 띠 없음) · 10-22 E5 페이지2")]
+    [SerializeField] private Vector2 _sideGap      = new Vector2(1.0f, 2.4f);
 
     [Header("피해")]
     [Tooltip("발사 판정 = 공격력 × 이 값 (강)")]
@@ -68,6 +71,7 @@ public class DragonBlackFlameStormPatternSO : BossPatternSO
     public float      LineGap         => _lineGap;
     public float      LineWidth       => _lineWidth;
     public float      MaxLength       => _maxLength;
+    public Vector2    SideGap         => _sideGap;
     public float      HitDamageMult   => _hitDamageMult;
     public float      StripSeconds    => _stripSeconds;
     public float      StripDamageMult => _stripDamageMult;
@@ -97,7 +101,7 @@ public class DragonBlackFlameStormPatternSO : BossPatternSO
            && ctx.Blackboard is DragonBossBlackboard bb
            && bb.BlackFlameStormCooldown <= 0f;
 
-    /// <summary>후반 연계(원소 합주 → 흑염 폭풍, 2페이지 구성 §9) — 연계는 원소 합주의 일부라 흑염 쿨다운을 보지 않는다.</summary>
+    /// <summary>연계(원소 합주 → 흑염 폭풍, 2페이지 구성 §9 · 10-22 E5 페이지2부터 간판 뒤만이 아니라 2페이지 내내) — 연계는 원소 합주의 일부라 흑염 쿨다운을 보지 않는다.</summary>
     public override bool CanFollowUp(BossPatternContext ctx)
         => ctx.Ctx.Runtime.PlayerTarget != null && ctx.Blackboard is DragonBossBlackboard;
 
@@ -113,6 +117,8 @@ internal sealed class DragonBlackFlameStormState : FullLockState<DragonBlackFlam
 {
     private enum Phase { Aim, Gap, EndPose, Done }
 
+    private const int SideCount = 2;   // 곁줄 — 가운데 줄 양옆(10-22 E5 페이지2)
+
     private Phase      _phase;
     private float      _timer;
     private int        _linesFired;
@@ -125,6 +131,15 @@ internal sealed class DragonBlackFlameStormState : FullLockState<DragonBlackFlam
     private Vector3    _lineOrigin;
     private Vector3    _lineDir;
     private float      _lineLength;
+
+    // 곁줄(10-22 E5 페이지2) — 가운데 줄 양옆 평행 · 틈은 줄마다 무작위 · 직격만
+    private readonly GameObject[] _sideGuides      = new GameObject[SideCount];
+    private readonly Vector3[]    _sideOrigins     = new Vector3[SideCount];
+    private readonly float[]      _sideLengths     = new float[SideCount];
+    private readonly float[]      _sideOffsets     = new float[SideCount];
+    private readonly Vector3[]    _waveSideOrigins = new Vector3[SideCount];
+    private readonly float[]      _waveSideLengths = new float[SideCount];
+    private bool                  _waveSideTurn;
 
     // 발사 뒤 줄을 따라 번지는 불(시각) — 다음 줄 조준과 겹쳐도 계속 번진다
     private Vector3 _waveOrigin;
@@ -140,6 +155,7 @@ internal sealed class DragonBlackFlameStormState : FullLockState<DragonBlackFlam
         _phase      = Phase.Done;
         _waveNextAt = float.PositiveInfinity;
         PatternGuideHelper.SafeDestroy(ref _guide);
+        ClearSideGuides();
     }
 
     public override void Enter(MonsterContext ctx)
@@ -178,6 +194,7 @@ internal sealed class DragonBlackFlameStormState : FullLockState<DragonBlackFlam
     public override void Exit(MonsterContext ctx)
     {
         PatternGuideHelper.SafeDestroy(ref _guide);
+        ClearSideGuides();
         _waveNextAt = float.PositiveInfinity;
         _phase      = Phase.Done;
     }
@@ -192,9 +209,14 @@ internal sealed class DragonBlackFlameStormState : FullLockState<DragonBlackFlam
         DragonAbyssFx.PlayAnim(ctx, _airborne ? Data.AirStateName : Data.AimStateName, 0.12f);
 
         Color c = DragonAbyssFx.WithAlpha(DragonAbyssFx.Abyss, 0.85f);
+        for (int s = 0; s < SideCount; s++)   // 곁줄 틈은 줄마다 새로(10-22 E5 페이지2)
+            _sideOffsets[s] = (s == 0 ? -1f : 1f) * (Data.LineWidth + Random.Range(Data.SideGap.x, Data.SideGap.y));
         ResolveLine(ctx);
         _guide = PatternGuideHelper.Prepare(
             PatternGuideHelper.Beam(_lineOrigin, _lineDir, _lineLength, Data.LineWidth, c), c);
+        for (int s = 0; s < SideCount; s++)
+            _sideGuides[s] = PatternGuideHelper.Prepare(
+                PatternGuideHelper.Beam(_sideOrigins[s], _lineDir, _sideLengths[s], Data.LineWidth, c), c);
     }
 
     private void UpdateAim(MonsterContext ctx)
@@ -207,26 +229,52 @@ internal sealed class DragonBlackFlameStormState : FullLockState<DragonBlackFlam
                 DragonAbyssFx.Face(ctx, ctx.Runtime.PlayerTarget.position - ctx.Transform.position, Data.TrackDegPerSec);
             ResolveLine(ctx);
             PatternGuideHelper.PlaceBeam(_guide, _lineOrigin, _lineDir, _lineLength, Data.LineWidth);
+            for (int s = 0; s < SideCount; s++)
+                PatternGuideHelper.PlaceBeam(_sideGuides[s], _sideOrigins[s], _lineDir, _sideLengths[s], Data.LineWidth);
         }
         else if (!_locked)
         {
             // R3 — 판정 LockSeconds 전부터 조준을 멈추고 판정 색으로
             _locked = true;
             PatternGuideHelper.Arm(_guide);
+            for (int s = 0; s < SideCount; s++) PatternGuideHelper.Arm(_sideGuides[s]);
         }
         PatternGuideHelper.SetProgress(_guide, _timer / Data.AimSeconds);
+        for (int s = 0; s < SideCount; s++) PatternGuideHelper.SetProgress(_sideGuides[s], _timer / Data.AimSeconds);
 
         if (_timer < Data.AimSeconds) return;
         Fire(ctx);
     }
 
-    /// <summary>줄 = 입 아래 바닥점에서 몸 정면으로 바닥 끝까지.</summary>
+    /// <summary>줄 = 입 아래 바닥점에서 몸 정면으로 바닥 끝까지. 곁줄은 그 양옆 평행(10-22 E5 페이지2).</summary>
     private void ResolveLine(MonsterContext ctx)
     {
         Vector3 mouth = _mouth != null ? _mouth.position : ctx.Transform.position + ctx.Transform.forward * 2f;
         _lineDir    = DragonAbyssFx.FlatDir(Vector3.zero, ctx.Transform.forward, Vector3.forward);
         _lineOrigin = DragonAbyssFx.OnFloor(ctx, mouth);
         _lineLength = Mathf.Max(1f, DragonPatternFloorUtils.DistanceToFloorEdge(_lineOrigin, _lineDir, Data.MaxLength));
+
+        Vector3 side = Vector3.Cross(Vector3.up, _lineDir);
+        for (int s = 0; s < SideCount; s++)
+        {
+            _sideOrigins[s] = _lineOrigin + side * _sideOffsets[s];
+            _sideLengths[s] = Mathf.Max(1f, DragonPatternFloorUtils.DistanceToFloorEdge(_sideOrigins[s], _lineDir, Data.MaxLength));
+        }
+    }
+
+    /// <summary>가운데 줄 · 곁줄 어느 하나 안인가 — 한 줄 쏘기에 한 번만 맞는다(10-22 E5 페이지2).</summary>
+    private bool InAnyLine(Vector3 p)
+    {
+        float half = Data.LineWidth * 0.5f;
+        if (DragonAbyssFx.InStrip(p, _lineOrigin, _lineDir, _lineLength, half)) return true;
+        for (int s = 0; s < SideCount; s++)
+            if (DragonAbyssFx.InStrip(p, _sideOrigins[s], _lineDir, _sideLengths[s], half)) return true;
+        return false;
+    }
+
+    private void ClearSideGuides()
+    {
+        for (int s = 0; s < SideCount; s++) PatternGuideHelper.SafeDestroy(ref _sideGuides[s]);
     }
 
     // ── Fire ─────────────────────────────────────────────────────────────────
@@ -239,20 +287,26 @@ internal sealed class DragonBlackFlameStormState : FullLockState<DragonBlackFlam
         DragonAbyssFx.Burst(Data.MouthVfxPrefab, mouth, Quaternion.LookRotation(_lineDir), Data.MouthVfxScale);
 
         var player = DragonAbyssFx.Player(ctx);
-        if (player != null
-            && DragonAbyssFx.InStrip(player.transform.position, _lineOrigin, _lineDir, _lineLength, Data.LineWidth * 0.5f))
-            DragonAbyssFx.HitPlayer(ctx, Data.HitDamageMult, HitWeight.Heavy);   // 브레스 직격 — 강
+        if (player != null && InAnyLine(player.transform.position))   // 가운데 줄 · 곁줄 — 한 번만(10-22 E5 페이지2)
+            DragonAbyssFx.HitPlayer(ctx, Data.HitDamageMult * (DragonAbyssFx.Blackboard(ctx)?.ChainDamageScale ?? 1f), HitWeight.Heavy);   // 브레스 직격 — 강 · 연계 둘째 칸 ×0.8(10-22 E3 D2)
 
         DragonAbyssFlameStrip.Create(ctx.Monster, _lineOrigin, _lineDir, _lineLength, Data.LineWidth,
                                      Data.StripSeconds, Data.StripDamageMult,
                                      DragonAbyssFx.WithAlpha(DragonAbyssFx.Abyss, 0.6f),
                                      Data.StripVfxPrefab, Data.StripVfxScale, Data.StripVfxSpacing);
         PatternGuideHelper.SafeDestroy(ref _guide);
+        ClearSideGuides();
 
         _waveOrigin   = _lineOrigin;
         _waveDir      = _lineDir;
         _waveLength   = _lineLength;
         _waveTraveled = 0f;
+        _waveSideTurn = true;
+        for (int s = 0; s < SideCount; s++)
+        {
+            _waveSideOrigins[s] = _sideOrigins[s];
+            _waveSideLengths[s] = _sideLengths[s];
+        }
         _waveNextAt   = Data.WaveVfxPrefab != null ? 0f : float.PositiveInfinity;
 
         _linesFired++;
@@ -268,6 +322,12 @@ internal sealed class DragonBlackFlameStormState : FullLockState<DragonBlackFlam
         {
             DragonAbyssFx.Burst(Data.WaveVfxPrefab, _waveOrigin + _waveDir * _waveNextAt,
                                 Quaternion.LookRotation(_waveDir), Data.WaveVfxScale);
+            if (_waveSideTurn)   // 곁줄 불은 한 칸 건너 — 이펙트 절제(10-22 E5 페이지2)
+                for (int s = 0; s < SideCount; s++)
+                    if (_waveNextAt <= _waveSideLengths[s])
+                        DragonAbyssFx.Burst(Data.WaveVfxPrefab, _waveSideOrigins[s] + _waveDir * _waveNextAt,
+                                            Quaternion.LookRotation(_waveDir), Data.WaveVfxScale);
+            _waveSideTurn = !_waveSideTurn;
             _waveNextAt += Data.WaveSpacing;
         }
     }

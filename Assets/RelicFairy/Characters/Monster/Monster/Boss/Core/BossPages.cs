@@ -17,7 +17,7 @@ namespace RelicFairy.Monster
 public sealed class BossPages
 {
     // ── Constants ──────────────────────────────────────────────
-    public const float DefaultPage2Share = 0.4f;   // 2페이지 체력 = 기존 × 0.4 (D1 더하기)
+    public const float DefaultPage2Share = 0.7f;   // 2페이지 체력 = 기존 × 0.7 (D1 더하기 · 10-22 A10 D4 = 10-17 권장 A 0.4 → 0.7 — 해방 페이지 노출 11 → 약 20초)
     public const float SignatureAt       = 0.5f;   // 2페이지 체력 이 비율에서 간판 패턴 한 번
     public const float LateBreakScale    = 0.75f;  // 간판 뒤(후반) 패턴 사이 쉬는 시간 배율 — 2페이지 구성 §9
     public const float NightmareBreakScale = 0.8f; // 악몽 모드 — 패턴 사이 쉬는 시간 배율(시기별 페이지 §2-1, 강화 1차)

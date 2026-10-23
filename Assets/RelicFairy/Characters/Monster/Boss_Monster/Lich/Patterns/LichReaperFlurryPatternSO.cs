@@ -248,7 +248,7 @@ public class LichReaperFlurryState : UnInterruptibleState<LichReaperFlurryPatter
         {
             // 내려찍기 — 낫이 바닥에 박히고 충격이 앞으로 뻗는다(직선 판정 · 발판이 떨린다).
             Vector3 slam = origin + dir * SlamPoint;
-            LichPatternUtil.SlashVfx(slam, dir, SlamPoint * 1.3f, LichSwing.Overhead, LichPatternUtil.Crimson);
+            LichPatternUtil.SlashVfx(slam, dir, SlamPoint * 1.3f, LichSwing.Overhead, LichPatternUtil.CrimsonVfx);
             LichVfx.Play(LichVfxSlot.SlamImpact, slam, Quaternion.identity, LichPatternUtil.NovaScale(Data.finisherHalfWidth * 1.5f));
             LichSfx.Play(LichSfxSlot.SlamImpact, slam);
             var grid = ArenaTileGrid.Active;
@@ -261,7 +261,7 @@ public class LichReaperFlurryState : UnInterruptibleState<LichReaperFlurryPatter
         }
         else
         {
-            LichPatternUtil.SlashVfx(origin, dir, Data.hitRadius, swing, LichPatternUtil.Crimson);
+            LichPatternUtil.SlashVfx(origin, dir, Data.hitRadius, swing, LichPatternUtil.CrimsonVfx);
             LichSfx.Play(LichSfxSlot.ScytheSlash, origin);
             LichPatternUtil.Impact(LichImpact.Slash, HitArc(ctx, origin, dir));
         }

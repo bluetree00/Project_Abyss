@@ -26,10 +26,10 @@ MonoBehaviour:
   _takeoffDuration: 0.55
   _takeoffHeight: 3
   _hoverHeight: 7
-  _approachSpeed: 6
-  _approachDuration: 0.46
-  _maxApproachDuration: 2.5
-  _recoveryDuration: 0.9
+  _approachSpeed: 10
+  _approachDuration: 0.3
+  _maxApproachDuration: 0.8
+  _recoveryDuration: 0.35
   _airTurnAngleThreshold: 21
   _airChaseRotationSpeed: 3.2
   _airTurnMoveMultiplier: 0.58

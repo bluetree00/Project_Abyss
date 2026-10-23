@@ -665,9 +665,12 @@ public class InventoryPageView : MonoBehaviour
 
         HideTooltip();
         DropItemToWorld(item);
+        // 놓인 룬은 판 모양 · 칸 · 시너지까지 걷는다(10-22 — 인벤토리에서만 빼서 판 칸 · 시너지가 묵었다). 판이 없으면 아래가 마저 뺀다.
+        if (_inventory.IsPlaced(item.instanceId))
+            UI_GridPanel.Instance?.DiscardPlacedRune(item);
         if (_inventory.IsPlaced(item.instanceId))
             _inventory.RemovePlaced(item);
-        else
+        else if (_inventory.IsStaging(item.instanceId))
             _inventory.DiscardFromStaging(item);
         // OnPlacedChanged / OnStagingChanged → Refresh 자동 호출
     }

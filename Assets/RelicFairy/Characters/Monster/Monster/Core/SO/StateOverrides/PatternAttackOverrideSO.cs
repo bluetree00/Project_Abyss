@@ -435,9 +435,9 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         }
     }
 
-    // 범위 예고 외곽선 색 — 따뜻한 흰빛(빨강 경고판은 보스 패턴 몫 · 일반 몬스터는 톤을 낮춘다, 10-11). 알파는 MonsterGroundWarning이 시간에 따라 올린다.
-    /// <summary>범위 예고 외곽선 색(얇은 금빛) — 특수 상태(골렘 포효 · 비홀더 눈 빔)도 같은 색을 쓴다.</summary>
-    public static readonly Color WarningOutlineColor = new Color(1f, 0.82f, 0.55f, 1f);
+    // 범위 예고 외곽선 색 — 알파는 MonsterGroundWarning이 시간에 따라 올린다.
+    /// <summary>범위 예고 외곽선 색 — 특수 상태(골렘 포효 · 비홀더 눈 빔). (10-23 가이드 색 통일) 금빛 → 공용 큰 공격 색(<see cref="PatternGuideHelper.AttackHeavy"/>).</summary>
+    public static Color WarningOutlineColor => PatternGuideHelper.AttackHeavy;
 
     /// <summary>
     /// 범위 예고 — 통일 규칙(10-12 몬스터 전수조사 §4 · <see cref="MonsterTelegraph"/>): 판정과 같은 칸의 외곽선 + 몬스터 쪽에서 차오르는 앞줄이
@@ -608,6 +608,17 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         private readonly float[] _cooldowns;
         public float LastAttackStart = -999f;   // 공격 시작 사이 최소 간격(P1-6)
         public int SelectedPatternIndex { get; set; } = -1;
+        // 공격 준비에서 미리 띄운 예고(10-19 ⑪) — 공격 상태가 같은 패턴이면 이어받는다
+        public MonsterTelegraph EarlyTelegraph;
+        public Vector3 EarlyOrigin, EarlyForward;
+        public int EarlyIndex = -1;
+
+        public void CancelEarly()
+        {
+            if (EarlyTelegraph != null) EarlyTelegraph.Cancel();
+            EarlyTelegraph = null;
+            EarlyIndex = -1;
+        }
 
         public PatternRuntime(int patternCount)
         {
@@ -835,9 +846,12 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
 
     private sealed class PatternAttackReadyState : AttackReadyState
     {
+        // 예고는 맞기 이만큼 전부터(10-19 ⑪ — 공격 상태 안엔 damageDelay(벌 0.3초)뿐이라 최소 0.45초를 못 지켰다)
+        private const float EarlyLead = 0.5f;
         private readonly PatternAttackOverrideSO _owner;
         private readonly PatternRuntime _runtime;
         private int _rangedOnly = -1;   // 역할 AI(P3-⑥)
+        private bool _handOff;          // 공격 상태로 넘어간다 — 미리 띄운 예고를 지우지 않는다
 
         public PatternAttackReadyState(PatternAttackOverrideSO owner, PatternRuntime runtime)
         {
@@ -848,8 +862,17 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         public override void Enter(MonsterContext ctx)
         {
             _runtime.Tick(0f);
+            _runtime.CancelEarly();
+            _handOff = false;
             _runtime.SelectedPatternIndex = _owner.SelectPattern(ctx, _runtime);
             base.Enter(ctx);
+        }
+
+        public override void Exit(MonsterContext ctx)
+        {
+            if (!_handOff) _runtime.CancelEarly();   // 공격으로 안 넘어가면(멀어짐 · 피격 등) 헛예고를 지운다
+            _handOff = false;
+            base.Exit(ctx);
         }
 
         public override void Update(MonsterContext ctx)
@@ -874,7 +897,9 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
                 return;
             }
 
-            _runtime.SelectedPatternIndex = _owner.SelectPattern(ctx, _runtime);
+            // 예고를 띄웠으면 그 패턴으로 굳힌다(무작위 고르기는 매 프레임 다시 굴려 예고가 깜빡였다 — 예고 = 판정)
+            if (_runtime.EarlyTelegraph == null)
+                _runtime.SelectedPatternIndex = _owner.SelectPattern(ctx, _runtime);
             if (_runtime.SelectedPatternIndex < 0)
             {
                 if (_owner.ShouldChaseForCloserPattern(ctx, _runtime))
@@ -883,15 +908,35 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
                     PatternAttackOverrideSO.FacePlayer(ctx, 15f);
                 return;
             }
-            PatternAttackOverrideSO.FacePlayer(ctx, 15f);
+            if (_runtime.EarlyTelegraph == null) PatternAttackOverrideSO.FacePlayer(ctx, 15f);   // 예고를 띄웠으면 방향을 굳힌다(예고 = 판정)
 
             float speed = Mathf.Max(0.1f, ctx.Monster.AttackSpeedMultiplier);   // 공격 속도 배율(10-11 P2-③)
             // 공격 주기(P1-6) — 지난 공격 시작부터 최소 간격이 안 됐으면 준비 시계를 멈춘다(반짝임은 시계가 다시 돌 때 제때 나온다)
             if ((Time.time - _runtime.LastAttackStart) * speed + ctx.Runtime.StateTimer < MinCycleOf(ctx.Monster.Grade)) return;
             ctx.Runtime.StateTimer -= Time.deltaTime * speed;
-            ctx.Monster.NotifyAttackIncoming((ctx.Runtime.StateTimer + HitDelay(ctx)) / speed);
+            float toHit = (ctx.Runtime.StateTimer + HitDelay(ctx)) / speed;
+            int sel = _runtime.SelectedPatternIndex;
+            if (_runtime.EarlyTelegraph == null && sel >= 0 && sel < _owner.patterns.Count && toHit <= EarlyLead)
+            {
+                _runtime.EarlyOrigin  = ctx.Transform.position;
+                _runtime.EarlyForward = ctx.Transform.forward;
+                _runtime.EarlyIndex   = sel;
+                _runtime.EarlyTelegraph = SpawnPatternTelegraph(ctx, _owner.patterns[sel], _runtime.EarlyOrigin, _runtime.EarlyForward, toHit);
+                // 준비가 짧거나 첫 프레임이 길었다(실측 0.39초) — 예고가 최소 MinLead(0.45초) 앞서게 준비를 늘린다
+                if (_runtime.EarlyTelegraph != null && toHit < MonsterTelegraph.MinLead)
+                {
+                    ctx.Runtime.StateTimer += (MonsterTelegraph.MinLead - toHit) * speed;
+                    toHit = MonsterTelegraph.MinLead;
+                    _runtime.EarlyTelegraph.Sync(toHit);
+                }
+            }
+            else if (_runtime.EarlyTelegraph != null) _runtime.EarlyTelegraph.Sync(toHit);
+            ctx.Monster.NotifyAttackIncoming(toHit);
             if (ctx.Runtime.StateTimer <= 0f)
+            {
+                _handOff = true;
                 ctx.Monster.ChangeState<AttackState>();
+            }
         }
 
         /// <summary>고른 패턴이 공격 상태에 들어가서 맞히기까지의 초(PatternAttackState의 _damageTimer와 같다).</summary>
@@ -960,7 +1005,11 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
             _damageDealt = false;
 
             ctx.Runtime.AttackHitDealt = false;
-            PatternAttackOverrideSO.FacePlayer(ctx, 100f);
+            // 공격 준비에서 미리 띄운 예고가 같은 패턴이면 그 자리 · 방향 그대로(10-19 ⑪) — 아니면 예전처럼 돌아서 굳힌다
+            bool early = _runtime.EarlyTelegraph != null && _runtime.EarlyIndex == index;
+            if (!early) _runtime.CancelEarly();
+            if (early) ctx.Transform.rotation = Quaternion.LookRotation(_runtime.EarlyForward);
+            else PatternAttackOverrideSO.FacePlayer(ctx, 100f);
 
             // 경고장판 위치를 Enter 시점에 고정 캐싱 — 이후 몬스터 회전과 무관하게 유지
             _cachedWarningCenter = GetWarningCenterPosition(ctx, _pattern);
@@ -988,9 +1037,21 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
             _speed = Mathf.Max(0.1f, ctx.Monster.AttackSpeedMultiplier);
             if (ctx.Animator != null) ctx.Animator.speed = _speed;   // PlayAttackAnimation이 1로 둔 뒤 — 애니도 같은 배율
             // 예고는 배율을 잡은 뒤에 — 예전엔 배율 전 시간으로 그려 빨라진 공격과 앞줄 박자가 어긋났다
-            _lockOrigin  = ctx.Transform.position;
-            _lockForward = ctx.Transform.forward;
-            _telegraph   = SpawnPatternTelegraph(ctx, _pattern, _lockOrigin, _lockForward, _damageTimer / _speed);
+            if (early)
+            {
+                _lockOrigin  = _runtime.EarlyOrigin;
+                _lockForward = _runtime.EarlyForward;
+                _telegraph   = _runtime.EarlyTelegraph;
+                _telegraph.Sync(_damageTimer / _speed);
+                _runtime.EarlyTelegraph = null;   // 이제 이 공격이 맡는다(끊기면 이 상태가 지운다)
+                _runtime.EarlyIndex = -1;
+            }
+            else
+            {
+                _lockOrigin  = ctx.Transform.position;
+                _lockForward = ctx.Transform.forward;
+                _telegraph   = SpawnPatternTelegraph(ctx, _pattern, _lockOrigin, _lockForward, _damageTimer / _speed);
+            }
             _currentAnimState = animState;
             _waitForAnimFinish = ctx.Animator != null
                 && !string.IsNullOrEmpty(animState)

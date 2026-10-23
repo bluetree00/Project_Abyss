@@ -21,13 +21,16 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: 4e1d020cf84b49849ed4042ac0fbd229, type: 2}
+  followUpLateOnly: 0
+  followUpCooldown: 10
   _hoverHeight: 3
   _takeoffStateName: Takeoff
   _hoverStateName: URFlyStand
   _attackStateName: UAttackWindHighStart
   _landingStateName: Landing
   _warningDuration: 2
-  _warningWidth: 8
+  _warningWidth: 5
   _warningLength: 14
   _borderLineWidth: 0.15
   _warningColor: {r: 0.65, g: 0.3, b: 1, a: 0.55}

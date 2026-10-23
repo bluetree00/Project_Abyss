@@ -93,6 +93,8 @@ public class WeaponData
     public int augmentSilverStreak;
     /// <summary>진화 직후 첫 강화 — 그 화면은 금 이상.</summary>
     public bool augmentAfterEvolve;
+    /// <summary>재련 기록(10-19) — 재련마다 고른 증강 「id:그때 단계」를 고른 순서대로 쌓는다(같은 증강을 다시 골라도 새 줄 · 진화해도 이어진다).</summary>
+    public string reforgeLog = "";
 
     /// <summary>이 증강의 단계(없으면 0).</summary>
     public int AugmentRank(string id)
@@ -103,10 +105,22 @@ public class WeaponData
     }
 
     /// <summary>가진 증강 목록(id · 단계).</summary>
-    public System.Collections.Generic.IEnumerable<(string id, int rank)> AugmentList()
+    public System.Collections.Generic.IEnumerable<(string id, int rank)> AugmentList() => Pairs(augments);
+
+    /// <summary>재련 기록(재련 1번째부터 · id · 그때 단계).</summary>
+    public System.Collections.Generic.IEnumerable<(string id, int rank)> ReforgeLogList() => Pairs(reforgeLog);
+
+    /// <summary>재련 기록에 한 줄 — 증강을 고를 때(<see cref="MeleeAugmentDraft.Choose"/>).</summary>
+    public void AppendReforgeLog(string id, int rank)
     {
-        if (string.IsNullOrEmpty(augments)) yield break;
-        foreach (var part in augments.Split(','))
+        if (string.IsNullOrEmpty(id)) return;
+        reforgeLog = string.IsNullOrEmpty(reforgeLog) ? $"{id}:{rank}" : $"{reforgeLog},{id}:{rank}";
+    }
+
+    private static System.Collections.Generic.IEnumerable<(string id, int rank)> Pairs(string list)
+    {
+        if (string.IsNullOrEmpty(list)) yield break;
+        foreach (var part in list.Split(','))
         {
             int c = part.IndexOf(':');
             string id = c > 0 ? part.Substring(0, c) : part;

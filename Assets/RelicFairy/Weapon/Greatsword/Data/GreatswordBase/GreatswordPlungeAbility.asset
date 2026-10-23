@@ -19,12 +19,12 @@ MonoBehaviour:
     knockbackMultiplier: 4
     selfMovement: {x: 0, y: 0, z: 0}
     effect:
-      payloadKey: DragonPunch
+      payloadKey: GreatswordEFinish
       socket: 0
       space: 0
-      positionOffset: {x: 0, y: 0.5, z: 0}
+      positionOffset: {x: 0, y: 0.1, z: 0}
       rotationEuler: {x: 0, y: 0, z: 0}
-      scaleMultiplier: 2.5
+      scaleMultiplier: 0.8
       lifeTimeMultiplier: 1.5
       behavior: {fileID: 0}
     collider:
@@ -34,12 +34,12 @@ MonoBehaviour:
       colliderPrefabKey: 
       positionOffset: {x: 0, y: 0, z: 0}
       rotationEuler: {x: 0, y: 0, z: 0}
-      sizeMultiplier: 2.5
+      sizeMultiplier: 6
       hitInterval: 0
       duration: 0.4
-      shape: 0
+      shape: 1
       behavior: {fileID: 0}
-    hitEffectKey: SwordHitImpact
-    hitEffectScale: 1.26
+    hitEffectKey: GreatswordHitImpact
+    hitEffectScale: 3.6
     oneShot: 1
     rotateToMouse: 0

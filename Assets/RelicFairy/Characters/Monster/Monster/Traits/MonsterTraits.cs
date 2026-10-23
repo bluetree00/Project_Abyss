@@ -43,11 +43,16 @@ public sealed partial class MonsterTraits : MonoBehaviour
     private const float SplitAt           = 0.5f;
     private const float SplitChildHp      = 0.3f;
     private const float SplitChildScale   = 0.72f;
-    private const float SplitSpread       = 0.9f;
+    private const float SplitSpread       = 1.8f;   // 0.9는 몸 셋이 겹쳐 이름표 · 체력바가 세 겹이었다(10-19 ⑪ — 이름은 숨기지 않는다)
     private const string SeenPrefsPrefix  = "MonsterTraitSeen_";
+    // 챔피언(10-21 무작위 정예화) — 시기 특성을 받은 일반 · 위협 몹. 정예는 같은 특성을 더 세게(EliteTraitPower).
+    private const float ChampionHpScale   = 1.8f;
+    private const float ChampionBodyScale = 1.12f;
+    private const float EliteTraitPower   = 1.5f;
+    /// <summary>챔피언 골드 배율 — <see cref="DieState"/>가 등급 배율에 곱한다.</summary>
+    public const float ChampionGoldMul    = 1.5f;
 
-    private static readonly Color VolatileColor = new(1f, 0.25f, 0.18f, 1f);
-    private static readonly Color TrailColor    = new(1f, 0.45f, 0.15f, 1f);
+    private static readonly Color VolatileColor = new(1f, 0.25f, 0.18f, 1f);   // 폭발 이펙트 색(바닥 원은 공용 공격 색 · 10-23)
 
     // ── Static ─────────────────────────────────────────────────
     private static readonly List<MonsterTraits> s_commanders = new();
@@ -75,11 +80,17 @@ public sealed partial class MonsterTraits : MonoBehaviour
     private bool         _isChild;
     private Vector3      _childBaseScale;
     private bool         _reverted;
+    private bool         _champion;
+    private Vector3      _championBaseScale;
+    private float        _power = 1f;   // 특성 세기 — 정예 1.5(질주 · 수호막 · 지휘 · 폭발 · 흔적)
 
     // ── Properties ─────────────────────────────────────────────
     public IReadOnlyList<MonsterTraitKind>  Kinds  => _kinds;
     public IReadOnlyList<MonsterTraitBadge> Badges => _badges;
     public bool Has(MonsterTraitKind k) => !_reverted && _kinds.Contains(k);
+    /// <summary>무작위 정예화된 일반 · 위협 몹인가(체력 ×1.8 · 몸 ×1.12 · 이름 수식어 · 골드 ×1.5).</summary>
+    public static bool IsChampion(MonsterBase m)
+        => m != null && m.TryGetComponent<MonsterTraits>(out var t) && t._champion && !t._reverted;
 
     // ── Lifecycle ──────────────────────────────────────────────
     private void LateUpdate()
@@ -172,10 +183,23 @@ public sealed partial class MonsterTraits : MonoBehaviour
         _spawnChild = spawnChild;
         _kinds.AddRange(kinds);
         monster.BindTraits(this);
+        _power = monster.Grade == MonsterGrade.Elite ? EliteTraitPower : 1f;
+        // 챔피언 — 시기 특성을 받은 일반 · 위협 몹(정예 접두어 · 분신 · 졸개는 아니다). 수호막 몫보다 먼저 체력을 키운다.
+        if (monster.Grade == MonsterGrade.Common || monster.Grade == MonsterGrade.Rare)
+        {
+            foreach (var k in _kinds)
+                if (!MonsterTraitTable.Of(k).elitePrefix) { _champion = true; break; }
+            if (_champion)
+            {
+                monster.MakeTraitChampion(ChampionHpScale);
+                _championBaseScale = monster.transform.localScale;
+                monster.transform.localScale = _championBaseScale * ChampionBodyScale;
+            }
+        }
         RunFx.LoadAsync().Forget();   // 폭발 · 흔적 장판의 바닥 원 재질
 
         if (Has(MonsterTraitKind.Resist)) _resist = (RuneElement)UnityEngine.Random.Range(0, 6);
-        if (Has(MonsterTraitKind.Ward))   _wardLeft = Mathf.Max(1f, monster.EffectiveMaxHp * WardShare);
+        if (Has(MonsterTraitKind.Ward))   _wardLeft = Mathf.Max(1f, monster.EffectiveMaxHp * WardShare * _power);
         if (Has(MonsterTraitKind.Commander)) s_commanders.Add(this);
         if (Has(MonsterTraitKind.Volatile))  monster.OnDied += HandleDiedVolatile;
         if (Has(MonsterTraitKind.Splitter))  monster.OnHPChanged += HandleHpSplitter;
@@ -186,7 +210,7 @@ public sealed partial class MonsterTraits : MonoBehaviour
         RebuildBadges();
         PushBadges();
         NoticeFirstEncounter(_kinds);
-        Debug.Log($"[MonsterTrait] {monster.name}: {string.Join(", ", _kinds)}{(Has(MonsterTraitKind.Resist) ? $" (저항 {_resist})" : "")}");
+        Debug.Log($"[MonsterTrait] {monster.name}: {string.Join(", ", _kinds)}{(Has(MonsterTraitKind.Resist) ? $" (저항 {_resist})" : "")}{(_champion ? " · 챔피언" : "")}{(_power > 1f ? $" · 세기 ×{_power:0.#}" : "")}");
     }
 
     /// <summary>되돌린다 — 풀로 돌아가거나 꺼질 때. 남의 몸에 건 지휘 배율 · 감춘 그림 · 분신 크기를 원래대로.</summary>
@@ -208,6 +232,7 @@ public sealed partial class MonsterTraits : MonoBehaviour
         _aura.Clear();
         if (_hidden) Reveal();
         if (_isChild && _monster != null) _monster.transform.localScale = _childBaseScale;
+        if (_champion && _monster != null) _monster.transform.localScale = _championBaseScale;
         _kinds.Clear();
         _badges.Clear();   // 떨어지기 전(프레임 끝) 같은 몸에 바가 다시 달려도 배지가 남지 않게
 
@@ -232,7 +257,7 @@ public sealed partial class MonsterTraits : MonoBehaviour
         var bar = _monster != null ? _monster.WorldHPBar : null;
         if (bar == null) return;
         bar.SetTraitBadges(_badges);
-        if (_elite) bar.SetMonsterInfo(_monster.DisplayName);   // 접두어 붙은 이름(바가 먼저 생겼으면 여기서 고친다)
+        bar.SetMonsterInfo(_monster.DisplayName);   // 접두어 · 챔피언 수식어 붙은 이름(바가 먼저 생겼으면 여기서 고친다 — 10-21 챔피언도)
     }
 
     private static string ElementIcon(RuneElement e) => e switch
@@ -249,7 +274,7 @@ public sealed partial class MonsterTraits : MonoBehaviour
     // 배율이 바뀌면(복수 중첩) 같은 바탕에서 다시 곱한다(10-11 정예 접두어).
     private void TickSpeed()
     {
-        float mul = (Has(MonsterTraitKind.Swift) ? SwiftMoveMul : 1f) * EliteSpeedMul();
+        float mul = (Has(MonsterTraitKind.Swift) ? 1f + (SwiftMoveMul - 1f) * _power : 1f) * EliteSpeedMul();
         if (_agent == null || !_agent.isActiveAndEnabled) return;
         float s = _agent.speed;
         if (!Mathf.Approximately(s, _speedApplied)) _speedBase = s;          // 바깥에서 새로 정한 값 = 새 바탕
@@ -273,7 +298,7 @@ public sealed partial class MonsterTraits : MonoBehaviour
             bool inside = (m.transform.position - me).sqrMagnitude <= r2;
             if (inside)
             {
-                if (_aura.Add(m)) m.SetTraitAttackMul(CommanderAtkMul);
+                if (_aura.Add(m)) m.SetTraitAttackMul(1f + (CommanderAtkMul - 1f) * _power);
             }
             else if (_aura.Remove(m) && !CoveredByOtherCommander(m))
             {
@@ -330,13 +355,13 @@ public sealed partial class MonsterTraits : MonoBehaviour
         if ((p - _lastTrailPos).sqrMagnitude < TrailMinMove * TrailMinMove) return;
         _nextTrailAt  = Time.time + TrailInterval;
         _lastTrailPos = p;
-        int dmg = Mathf.Max(1, Mathf.RoundToInt(_monster.EffectiveAttackPower * _monster.AttackMultiplierNow * TrailDmgMul));
+        int dmg = Mathf.Max(1, Mathf.RoundToInt(_monster.EffectiveAttackPower * _monster.AttackMultiplierNow * TrailDmgMul * _power));
         TrailSpotAsync(p, dmg, _monster.gameObject).Forget();
     }
 
     private static async UniTaskVoid TrailSpotAsync(Vector3 at, int dmg, GameObject src)
     {
-        var disc = SpawnDisc(at, TrailRadius, TrailColor);
+        var disc = SpawnDisc(at, TrailRadius, PatternGuideHelper.AttackFill);   // (10-23 가이드 색 통일) 주황 → 공용 공격 색
         if (disc == null) return;
         var ct = disc.GetCancellationTokenOnDestroy();
         try
@@ -357,13 +382,13 @@ public sealed partial class MonsterTraits : MonoBehaviour
     private void HandleDiedVolatile(MonsterBase m)
     {
         if (m == null) return;
-        int dmg = Mathf.Max(1, Mathf.RoundToInt(m.EffectiveAttackPower * m.AttackMultiplierNow * VolatileDmgMul));
+        int dmg = Mathf.Max(1, Mathf.RoundToInt(m.EffectiveAttackPower * m.AttackMultiplierNow * VolatileDmgMul * _power));   // 정예 ×1.5 — 반경은 예고 원 그대로
         VolatileBlastAsync(m.transform.position, dmg, m.gameObject).Forget();
     }
 
     private static async UniTaskVoid VolatileBlastAsync(Vector3 at, int dmg, GameObject src)
     {
-        var disc = SpawnDisc(at, VolatileRadius, VolatileColor);
+        var disc = SpawnDisc(at, VolatileRadius, PatternGuideHelper.AttackFill);   // (10-23 가이드 색 통일)
         if (disc == null) return;
         var ct = disc.GetCancellationTokenOnDestroy();
         try
@@ -400,6 +425,7 @@ public sealed partial class MonsterTraits : MonoBehaviour
         bool borrow = prevCircle == null && RunFx.GuideCircle != null;
         if (borrow) PatternGuideHelper.SetMaterials(RunFx.GuideCircle, RunFx.GuideArrow);
         var disc = PatternGuideHelper.Disc(at, radius, color);
+        PatternGuideHelper.SetFlow(disc, color);   // (10-23 가이드 색 통일) 채움도 같은 색 — 정하지 않으면 빌린 리치 재질의 보라가 차올랐다
         if (borrow) PatternGuideHelper.SetMaterials(prevCircle, prevArrow);
         if (disc != null) RoomScopedDrop.Mark(disc);   // 방을 떠나면 같이 정리
         return disc;

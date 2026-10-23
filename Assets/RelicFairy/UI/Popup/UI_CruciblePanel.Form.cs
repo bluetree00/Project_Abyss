@@ -418,12 +418,12 @@ public sealed partial class UI_CruciblePanel
                   : i == 4 && !legend && !canPromote ? NodeState.Out
                   : i == cur + 1 ? NodeState.Next : NodeState.Future;
 
-        SetNode(0, "무형검", cur == 0 ? $"지금 · 강화 +{w.enhanceLevel}" : NamelessTitle, st[0]);
-        SetNode(1, req > 0 ? $"+{req} 형 깨어남" : "형 깨어남",
+        SetNode(0, "무형검", cur == 0 ? $"지금 · 재련 {Reforges(w.enhanceLevel)}회" : NamelessTitle, st[0]);
+        SetNode(1, req > 0 ? $"재련 {Reforges(req)}회 형" : "형 깨어남",
                 nameless ? $"{fa?.DisplayName ?? "?"} / {fb?.DisplayName ?? "?"}" : cur == 1 ? $"지금 · {fName} Ⅰ" : fName, st[1]);
         SetNode(2, "단련 Ⅱ", v2 == null ? $"강화재료 {c2}" : cur == 2 ? $"지금 · {v2}" : v2, st[2]);
         SetNode(3, "단련 Ⅲ", v3 == null ? $"강화재료 {c3}" : cur == 3 ? $"지금 · {v3}" : v3, st[3]);
-        SetNode(4, "전설", legend ? $"지금 · {LegendName(w.legendId)}" : canPromote ? "승급할 수 있다" : "최대 강화 뒤", st[4]);
+        SetNode(4, "전설", legend ? $"지금 · {LegendName(w.legendId)}" : canPromote ? "승급할 수 있다" : "최대 재련 뒤", st[4]);
 
         FillMeleeNext(w, nameless, req, fa, fb);
         return cur;
@@ -438,22 +438,22 @@ public sealed partial class UI_CruciblePanel
         int lv = w.enhanceLevel, max = _controller.MaxAt(PlayerWeaponManager.Slot0);
         var ahead = new List<(int lv, string text, string brief)>(4);
         string pair = $"{fa?.DisplayName ?? "?"} 또는 {fb?.DisplayName ?? "?"}";
-        if (nameless && lv < req) ahead.Add((req, $"+{req}에서 형이 깨어난다 — {pair}", $"+{req}에서 형이 깨어난다 — {pair}"));
+        if (nameless && lv < req) ahead.Add((req, $"재련 {Reforges(req)}회에서 형이 깨어난다 — {pair}", $"재련 {Reforges(req)}회에서 형이 깨어난다 — {pair}"));
         var tiers = SkillTierResolver.Milestones(w);
         for (int i = 0; i < tiers.Length; i++)
         {
             int t = tiers[i];
             if (t <= lv || t > max) continue;
             string body = TierChangeBody(w, i + 2);
-            ahead.Add((t, body != null ? $"+{t} 스킬 {i + 2}단계 — {body}" : $"+{t} 스킬 {i + 2}단계", $"+{t} 스킬 {i + 2}단계"));
+            ahead.Add((t, body != null ? $"재련 {Reforges(t)}회 스킬 {i + 2}단계 — {body}" : $"재련 {Reforges(t)}회 스킬 {i + 2}단계", $"재련 {Reforges(t)}회 스킬 {i + 2}단계"));
         }
         var table = _controller.Table;
         if (!nameless && table != null)
         {
             int cap = WeaponEnhanceService.BaseEnhanceCap(w, table);
             if (lv <= cap && cap + 1 <= max)
-                ahead.Add((cap + 1, $"+{cap + 1} 마스터리 1단계 — {MasteryDelta(w, 0, 1)}",
-                           $"+{cap + 1} 마스터리 1단계"));
+                ahead.Add((cap + 1, $"재련 {Reforges(cap + 1)}회 마스터리 1단계 — {MasteryDelta(w, 0, 1)}",
+                           $"재련 {Reforges(cap + 1)}회 마스터리 1단계"));
         }
         ahead.Sort((x, y) => x.lv.CompareTo(y.lv));
         string Then(int i) => i < ahead.Count ? $"그다음 {ahead[i].brief}" : "";
@@ -461,7 +461,7 @@ public sealed partial class UI_CruciblePanel
         if (nameless && _controller.CanEvolve(PlayerWeaponManager.Slot0))
         {
             _next1.text = $"형을 고른다 — {pair}";
-            _next2.text = ahead.Count > 0 ? Then(0) : $"진화 비용 없음 · 강화 +{lv}와 각인은 그대로 이어진다";
+            _next2.text = ahead.Count > 0 ? Then(0) : $"진화 비용 없음 · 재련 {Reforges(lv)}회와 증강 · 각인은 그대로 이어진다";
         }
         else if (!nameless && _controller.CanTemperForm(PlayerWeaponManager.Slot0, out int tier, out int cost))
         {
@@ -476,15 +476,15 @@ public sealed partial class UI_CruciblePanel
         {
             _next1.text = ahead[0].text;
             _next2.text = ahead.Count > 1 ? Then(1)
-                        : nameless ? $"강화 +{lv} → +{req} · {Mathf.Max(0, req - lv)}번 더 성공하면 하나를 고른다" : "";
+                        : nameless ? $"재련 {Reforges(lv)}회 → {Reforges(req)}회 · {Mathf.Max(0, Reforges(req) - Reforges(lv))}번 더 재련하면 하나를 고른다" : "";
             if (nameless && ahead[0].lv == req)
-                _next2.text = $"강화 +{lv} → +{req} · {Mathf.Max(0, req - lv)}번 더 성공하면 하나를 고른다" + (ahead.Count > 1 ? $"  ·  {Then(1)}" : "");
+                _next2.text = $"재련 {Reforges(lv)}회 → {Reforges(req)}회 · {Mathf.Max(0, Reforges(req) - Reforges(lv))}번 더 재련하면 하나를 고른다" + (ahead.Count > 1 ? $"  ·  {Then(1)}" : "");
         }
         else
         {
-            _next1.text = "남은 길은 강화 — 수치를 올린다";
+            _next1.text = "남은 길은 재련 — 수치를 올린다";
             string mastery = MasteryText(w);
-            _next2.text = !string.IsNullOrEmpty(mastery) ? mastery : lv >= max ? $"최대 강화 +{max}" : $"최대 강화 +{max}까지 {max - lv}강";
+            _next2.text = !string.IsNullOrEmpty(mastery) ? mastery : lv >= max ? $"최대 재련 {Reforges(max)}회" : $"최대 재련 {Reforges(max)}회까지 {Reforges(max) - Reforges(lv)}번";
         }
     }
 
@@ -696,7 +696,7 @@ public sealed partial class UI_CruciblePanel
     private void FillLocked(WeaponData w)
     {
         int req = Mathf.Max(0, EvolveAt());
-        SetFormHead("잠긴 형", "둘 중 하나가 깨어난다", $"+{req}에서 깨어남", UITheme.Thin.InkA(0.7f));
+        SetFormHead("잠긴 형", "둘 중 하나가 깨어난다", $"재련 {Reforges(req)}회에서 깨어남", UITheme.Thin.InkA(0.7f));
         _formDesc.gameObject.SetActive(false);
         _formSummary.gameObject.SetActive(false);
         var br = CurrentBranches;
@@ -717,7 +717,7 @@ public sealed partial class UI_CruciblePanel
             c.line.text = UIKeywordInk.Values(f.Line);   // 수치만 Noto 500(10-15 설명 글 강조)
             PlaceIn(c.line.rectTransform, 12f, 98f, FmCardW - 24f, 44f, FmCardW, 162f);
             c.foot.gameObject.SetActive(true);
-            c.foot.text = $"+{b.requiredEnhanceLevel}에서 깨어난다";
+            c.foot.text = $"재련 {Reforges(b.requiredEnhanceLevel)}회에서 깨어난다";
             PlaceIn(c.foot.rectTransform, 12f, 140f, FmCardW - 24f, 22f, FmCardW, 162f);
             c.mark.gameObject.SetActive(true);
             c.mark.text = "잠김";
@@ -730,7 +730,7 @@ public sealed partial class UI_CruciblePanel
     {
         SetFormHead("형이 깨어난다", "둘 중 하나를 고른다", "진화 비용 없음", UITheme.Thin.InkA(0.75f), ready: true);
         _formDesc.gameObject.SetActive(true);
-        _formDesc.text = $"되돌릴 수 없다 · 강화 +{w.enhanceLevel}와 각인은 그대로 이어진다";
+        _formDesc.text = $"되돌릴 수 없다 · 재련 {Reforges(w.enhanceLevel)}회와 증강 · 각인은 그대로 이어진다";
         _formSummary.gameObject.SetActive(false);
         var br = CurrentBranches;
         for (int k = 0; k < 2; k++)
@@ -820,7 +820,7 @@ public sealed partial class UI_CruciblePanel
 
     // ── 단련 창(시안 ③) ──
 
-    /// <summary>형 단련 — 다음 단계 변주 두 장. 고르면 금 테 · 다른 카드 0.55, 확정 버튼이 「「쌍풍」으로 벼린다 · 12」로 켜진다. 취소하면 다음 방문에 다시.</summary>
+    /// <summary>형 단련 — 다음 단계 변주 두 장. 고르면 금 테 · 다른 카드 0.55, 확정 버튼이 「「쌍풍」으로 단련 · 12」로 켜진다. 취소하면 다음 방문에 다시.</summary>
     private void ShowTemperPanel()
     {
         if (_animating) return;   // 강화 · 진화 연출 중(결과 미리 보임 방지 · 검토 M2)
@@ -859,7 +859,7 @@ public sealed partial class UI_CruciblePanel
         }
         int next = f.TemperCost(tier + 1);
         _temperHint.text = $"보유 강화재료 {fuel}" + (next > 0 ? $" · 다음 단련 {RomanTier(tier + 1)}은 강화재료 {next}" : "")
-                         + " · 벼리면 망치 연출 뒤 바로 적용된다";
+                         + " · 단련하면 망치 연출 뒤 바로 적용된다";   // 10-18 「벼리면」 → 「단련하면」(용어 통일)
         PickTemperCard(-1);
 
         FitOverlayToV3(_temperPanel);   // v3 — 판(1560×880) 안을 덮는다
@@ -898,7 +898,7 @@ public sealed partial class UI_CruciblePanel
         if (_temperPick < 0) { _temperConfirmLbl.text = "<color=#9A98A0>변주를 고른다</color>"; return; }
         string name = _temperOptions[_temperPick].displayName;
         string cost = afford ? _temperCostNow.ToString() : $"<color=#FF7A6A>{_temperCostNow}</color>";
-        _temperConfirmLbl.text = $"「{name}」{Ro(name)} 벼린다  <size=85%>강화재료 {cost}</size>";
+        _temperConfirmLbl.text = $"「{name}」{Ro(name)} 단련  <size=85%>강화재료 {cost}</size>";   // 10-18 「벼린다」 → 「단련」
     }
 
     private async UniTaskVoid FadeGroupAsync(CanvasGroup g, float to)

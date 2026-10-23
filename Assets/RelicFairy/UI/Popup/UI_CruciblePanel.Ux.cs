@@ -154,7 +154,7 @@ public sealed partial class UI_CruciblePanel
             PlaceIn(_dialogText.rectTransform, 172f, 4f, LogW - 172f - BannerW - 48f, h - 8f, LogW, h);
         }
 
-        // 화로 칩 — 붉은 상자 → 얇은 선 칩(금 = 좋은 화로 · 빨강 = 저주 · 위험). 색은 RefreshBandBadge
+        // 화로 칩 — 붉은 상자 → 얇은 선 칩(금 = 화로 이벤트 · 10-18 저주 · 위험은 없앴다). 색은 RefreshBandBadge
         if (_eventBanner != null && _eventBanner.transform is RectTransform chip)
         {
             PlaceIn(chip, LogW - 24f - BannerW, (h - BannerH) * 0.5f, BannerW, BannerH, LogW, h);
@@ -236,24 +236,10 @@ public sealed partial class UI_CruciblePanel
         mark.gameObject.SetActive(on);
     }
 
-    /// <summary>파츠 행 강화 버튼 — 채움 없이 1px 테. 누를 수 있으면 금(고른 행은 진하게), 아니면 잉크 18%.</summary>
-    private void StyleRowButton(int i, bool can, bool selected)
-    {
-        var b = _slotBtn[i];
-        if (b == null) return;
-        if (b.TryGetComponent<Image>(out var img)) img.color = Color.clear;
-        var edge = b.transform.Find("ThinEdge") as RectTransform;
-        if (edge == null)
-            edge = UIThinBox.Create((RectTransform)b.transform, "ThinEdge", Vector2.zero, Vector2.one, 0f, UITheme.Thin.LineIdle, Color.clear, Color.clear);
-        SetBoxLine(edge, !can ? UITheme.Thin.LineIdle : selected ? UITheme.Thin.LineReady : UITheme.Thin.LineActive);
-        if (_slotBtnLbl[i] != null) _slotBtnLbl[i].color = can ? UITheme.Thin.Gold : UITheme.Thin.InkA(0.5f);
-    }
-
-    /// <summary>화로 한 줄 — 「▲ 화로 · 재료 비용 50%」 · 저주는 「▼」. 이벤트가 없으면 빈 문자열.</summary>
+    /// <summary>화로 한 줄 — 「▲ 화로 · 재료 비용 50%」. 이벤트가 없으면 빈 문자열(저주는 10-18 재련 개편으로 없앴다).</summary>
     private string ForgeEventLine()
     {
         if (_controller == null || !_controller.HasEvent) return string.Empty;
-        bool curse = _controller.EventSuccessBonus < 0f;
-        return $"{(curse ? "▼" : "▲")} 화로 · {_controller.EventEffectDesc}";
+        return $"▲ 화로 · {_controller.EventEffectDesc}";
     }
 }

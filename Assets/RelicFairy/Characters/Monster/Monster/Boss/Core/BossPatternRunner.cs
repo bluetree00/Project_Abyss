@@ -46,6 +46,11 @@ public class BossPatternRunner
     // 연계(2페이지 구성 §9) — 끝난 패턴의 followUp을 이만큼 쉬고 곧바로 낸다
     const float   FollowUpDelay = 0.5f;
     BossPatternSO _queuedFollowUp;
+    // 사슬 박자(10-22 E2 L4 · 리치) — 보스가 SetChainTempo로 켠다. 켜면 연계는 한 칸만(연계로 나온 패턴은 다시 잇지 않는다) ·
+    // 사슬 안 쉬는 시간 = _linkRest · 사슬이 끝나면 _chainEndRest. 안 켠 보스(숲 · 화룡 · 기사)는 옛 그대로.
+    bool          _chainTempo;
+    Vector2       _linkRest;
+    Vector2       _chainEndRest;
     readonly Dictionary<BossPatternSO, float> _followUpAt = new();   // 연계를 마지막으로 이어 낸 때(앞 패턴별)
     readonly Dictionary<BossPatternEntry, int> _seqIndex = new();
     // SelectRandom 평가마다 새 List를 할당하지 않도록 재사용 (보스 1마리·동기 Tick이라 공유 안전)
@@ -57,6 +62,8 @@ public class BossPatternRunner
     /// <summary>현재 패턴이 실행 중인지. NormalModeTimer 계산에 사용.</summary>
     public bool  IsPatternActive      { get; private set; }
     public float PatternBreakCooldown => _patternBreakCooldown;
+    /// <summary>지금 도는 패턴이 연계로 이어 낸 것(사슬 둘째 칸)인가 — 보스가 피해 배율 · 짧은 판에 쓴다(10-22 E2 L1). 패턴이 끝나면 내린다.</summary>
+    public bool  IsFollowUpRunning    { get; private set; }
 
     // ── 생성자 ─────────────────────────────────────────────
     public BossPatternRunner(
@@ -103,6 +110,17 @@ public class BossPatternRunner
             _patternBreakCooldown = minDuration;
     }
 
+    /// <summary>
+    /// 사슬 박자를 켠다(10-22 E2 L4) — 연계 사이 쉬는 시간 <paramref name="linkRest"/>(최소 · 최대 초) · 사슬이 끝난 뒤 <paramref name="endRest"/>.
+    /// 켜면 연계는 한 칸만 잇고, 앞 패턴이 끝난 순간 연계를 낼 수 있는지 미리 본다(못 내면 평소대로 쉰다). 에셋은 건드리지 않는다.
+    /// </summary>
+    public void SetChainTempo(Vector2 linkRest, Vector2 endRest)
+    {
+        _chainTempo   = true;
+        _linkRest     = linkRest;
+        _chainEndRest = endRest;
+    }
+
     /// <summary>보스 풀 재사용(OnEnable) 시 호출.</summary>
     public void Reset()
     {
@@ -115,6 +133,7 @@ public class BossPatternRunner
         _followUpAt.Clear();
         _seqIndex.Clear();
         _weightScales.Clear();
+        IsFollowUpRunning     = false;
         IsPatternActive       = false;
     }
 
@@ -139,6 +158,8 @@ public class BossPatternRunner
         if (_wasInPattern && !inPattern && _config != null)
         {
             _lastPatternEndTime = Time.time;
+            bool endedAsFollowUp = IsFollowUpRunning;   // 사슬 둘째 칸이 끝났다(10-22 E2 L1)
+            IsFollowUpRunning    = false;
             bool forced = false;
             if (_pendingForce.pattern != null)
             {
@@ -160,16 +181,21 @@ public class BossPatternRunner
             {
                 _patternBreakCooldown = (_lastPatternSO != null && _lastPatternSO.breakOverride >= 0f)
                     ? _lastPatternSO.breakOverride
-                    : UnityEngine.Random.Range(GetBreakDurationMin(), GetBreakDurationMax());
+                    : _chainTempo && endedAsFollowUp
+                        ? UnityEngine.Random.Range(_chainEndRest.x, _chainEndRest.y)   // 사슬 뒤 숨 고르기(10-22 E2 L4)
+                        : UnityEngine.Random.Range(GetBreakDurationMin(), GetBreakDurationMax());
                 // 2페이지 후반(간판 뒤) — 쉬는 시간 −25%, 컨셉 연계기는 짧게 쉬고 곧바로(§9)
                 var pages = (_ctx.Ctx.Monster as IPagedBoss)?.Pages;
                 if (pages != null) _patternBreakCooldown *= pages.BreakScale;
+                // 사슬 박자를 켠 보스 — 연계는 한 칸만, 낼 수 있는지 지금 본다(못 내면 사슬이 아니다 · 10-22 E2 L1)
                 if (_lastPatternSO != null && _lastPatternSO.FollowUpActive(_ctx.Ctx.Monster)
-                    && (!_followUpAt.TryGetValue(_lastPatternSO, out float at) || Time.time - at >= _lastPatternSO.followUpCooldown))
+                    && (!_followUpAt.TryGetValue(_lastPatternSO, out float at) || Time.time - at >= _lastPatternSO.followUpCooldown)
+                    && (!_chainTempo || (!endedAsFollowUp && _lastPatternSO.followUp.CanFollowUp(_ctx))))
                 {
                     _followUpAt[_lastPatternSO] = Time.time;
                     _queuedFollowUp       = _lastPatternSO.followUp;
-                    _patternBreakCooldown = Mathf.Min(_patternBreakCooldown, FollowUpDelay);
+                    _patternBreakCooldown = Mathf.Min(_patternBreakCooldown,
+                        _chainTempo ? UnityEngine.Random.Range(_linkRest.x, _linkRest.y) : FollowUpDelay);
                 }
             }
         }
@@ -230,7 +256,13 @@ public class BossPatternRunner
         {
             var next = _queuedFollowUp;
             _queuedFollowUp = null;
-            if (next.CanFollowUp(_ctx)) { ExecutePattern(next); return; }
+            if (next.CanFollowUp(_ctx)) { ExecutePattern(next, asFollowUp: true); return; }
+            // 사슬 박자 — 그사이 연계를 못 내게 됐으면 사슬이 끝난 것으로 보고 숨을 고른다(10-22 E2 L4)
+            if (_chainTempo)
+            {
+                _patternBreakCooldown = UnityEngine.Random.Range(_chainEndRest.x, _chainEndRest.y);
+                return;
+            }
         }
 
         foreach (var entry in _config.patternEntries)
@@ -441,10 +473,11 @@ public class BossPatternRunner
     // 패턴 실행
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    void ExecutePattern(BossPatternSO pattern)
+    void ExecutePattern(BossPatternSO pattern, bool asFollowUp = false)
     {
         var state = pattern.GetRuntimeState();
         if (state == null) return;
+        IsFollowUpRunning = asFollowUp;   // 상태 Enter보다 먼저 — 패턴이 Enter에서 사슬 칸인지 읽는다(10-22 E2 L1)
         _changeState(state);
         (_ctx.Ctx.Monster as IPagedBoss)?.Pages?.NotePatternStarted();   // 2페이지 개막 판정(§9)
         _lastPatternSO   = pattern;

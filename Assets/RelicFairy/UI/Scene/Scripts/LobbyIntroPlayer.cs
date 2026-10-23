@@ -49,7 +49,6 @@ public class LobbyIntroPlayer : MonoBehaviour
 
         _fadeTargets = new CanvasGroup[]
         {
-            GetOrAddCanvasGroup(transform, "DarkOverlay"),
             GetOrAddCanvasGroup(transform, "MenuPanel"),
             GetOrAddCanvasGroup(transform, "TitleImage"),
         };

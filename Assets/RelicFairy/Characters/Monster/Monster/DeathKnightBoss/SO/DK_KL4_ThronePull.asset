@@ -21,6 +21,9 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: kl4_throne
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: 319e3f071fd9121469eca78d7144e426, type: 2}
+  followUpLateOnly: 0
+  followUpCooldown: 10
   pullSeconds: 1.2
   pullSpeed: 6.5
   stopDistance: 0.8

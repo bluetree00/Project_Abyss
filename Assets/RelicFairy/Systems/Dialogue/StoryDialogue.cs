@@ -16,6 +16,12 @@ public static class StoryDialogue
     public const string Chapter4Door   = "Story_Chapter4Door";
     public const string LichIntroSealed    = "Lich_Intro_Sealed";
     public const string LichIntroNightmare = "Lich_Intro_Nightmare";
+    public const string LiberationAltar    = "Altar_Liberation";   // 해방기 첫 귀환 — 멀린이 기억의 제단 해방 대비 3칸을 알린다(10-22 C10 D5)
+
+    // 해방 대비 안내의 폴백 한 줄 — CSV에 오르기 전에도 첫 귀환에 나온다(이 줄은 그때가 제때라 미루지 않는다 · ExileFallSequence 폴백과 같은 결).
+    private const string LiberationAltarFallback =
+        "기억의 제단 여정 갈래에 새 칸 셋이 열렸어. 받는 피해 줄이기, 한 방에 안 쓰러지기, 샘 회복 늘리기야. 해방기 적은 더 세니까 그것부터 사 둬.";
+    private const string MerlinIllust = "Illust_God_Default";
 
     /// <summary>이번 복귀에 틀 이야기 비트. 없으면 null — 호출부는 평소 복귀 대사로 간다.</summary>
     public static DialogueLine[] TakeReturnBeat(DialogueDataManager dlg)
@@ -34,8 +40,11 @@ public static class StoryDialogue
 
         if (StoryProgress.IsNightmare)
         {
-            var begin = TakeOnce(dlg, NightmareBegin);
-            if (begin != null) return begin;
+            // 해방기 첫 귀환 — 붕괴 대사 뒤에 멀린이 제단의 해방 대비 3칸을 한 줄로 알린다(10-22 D5). 붕괴 대사를 이미 본 세이브는 이 줄만.
+            var lib = new List<DialogueLine>();
+            Append(lib, TakeOnce(dlg, NightmareBegin));
+            Append(lib, TakeLiberationAltar(dlg));
+            if (lib.Count > 0) return lib.ToArray();
         }
 
         // 봉인(봉인기)·처치(악몽기) 첫 기록 — 한 런에 여러 개가 쌓일 수 있어 한 창에 이어 붙인다.
@@ -69,6 +78,17 @@ public static class StoryDialogue
         var lines = dlg.GetLines(key);
         if (lines == null || lines.Length == 0) return null;
         StoryProgress.MarkSeen(key);
+        return lines;
+    }
+
+    /// <summary>해방 대비 3칸 안내 — 한 번만. CSV에 없으면 폴백 한 줄(<see cref="LiberationAltarFallback"/>).</summary>
+    private static DialogueLine[] TakeLiberationAltar(DialogueDataManager dlg)
+    {
+        if (StoryProgress.IsSeen(LiberationAltar)) return null;
+        var lines = dlg.GetLines(LiberationAltar);
+        if (lines == null || lines.Length == 0)
+            lines = new[] { new DialogueLine { speaker = DialogueSpeaker.Merlin, illustrationKey = MerlinIllust, text = LiberationAltarFallback } };
+        StoryProgress.MarkSeen(LiberationAltar);
         return lines;
     }
 

@@ -27,6 +27,7 @@ public class ColliderInstance : MonoBehaviour
     private bool _standalone;
     private bool _active;
     private Vector3 _baseScale = Vector3.one;
+    private Vector3 _prefabScale = Vector3.one;   // 풀 반환 때 되돌릴 크기 — 다음 생성 쪽이 SetBaseScale로 다시 정한다
 
     // 근접 원샷 오버랩 질의 버퍼(재사용 — alloc 방지). 밀집 지역 대비 넉넉히.
     // 근접 원샷 오버랩 질의 버퍼.
@@ -48,7 +49,7 @@ public class ColliderInstance : MonoBehaviour
     private void Awake()
     {
         _standalone = GetComponent<EffectBehaviour>() == null;
-        _baseScale = transform.localScale;
+        _baseScale = _prefabScale = transform.localScale;
     }
 
     private void OnEnable()
@@ -58,6 +59,12 @@ public class ColliderInstance : MonoBehaviour
         _hitRecord.Clear();
         _hitTimestamps.Clear();
     }
+
+    /// <summary>
+    /// 이번 생성의 기준 크기 — 생성 쪽이 이펙트를 키운 값. 예전엔 Activate가 Awake 때 크기(프리팹 1)로 되돌려
+    /// 평타 단계의 크기 배율(대검 0.8 · 무형검 0.7 등)이 판정에도 그림에도 먹지 않았다(10-22 실측 82).
+    /// </summary>
+    public void SetBaseScale(Vector3 scale) => _baseScale = scale;
 
     public void Activate()
     {
@@ -137,6 +144,8 @@ public class ColliderInstance : MonoBehaviour
         if (_elapsedTime >= duration)
             ReturnToPool();
     }
+
+    private void OnDisable() => _baseScale = _prefabScale;
 
     private void OnTriggerEnter(Collider other)
     {

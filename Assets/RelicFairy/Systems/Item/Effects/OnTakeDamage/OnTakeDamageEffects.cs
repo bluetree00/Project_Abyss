@@ -51,8 +51,6 @@ public sealed class DamageReflectEffect : ItemEffectBase
 /// </summary>
 public sealed class FireReflectEffect : ItemEffectBase
 {
-    private const string DefaultVfxKey = "VFX_FireReflect";
-
     public FireReflectEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnPostTakeDamage(ItemEffectContext ctx, DamageReport report)
@@ -67,7 +65,10 @@ public sealed class FireReflectEffect : ItemEffectBase
             using (DamageSourceScope.Enter(DamageSource.Rune))   // 반사는 룬 몫(10-16)
                 damageable.TakeDamage(reflect, instigator, knockbackMultiplier: 0f);
 
-            ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Attacker.transform.position);
+            // 기본 키 「VFX_FireReflect」는 없는 키라 아무것도 안 보였다 — 슬롯 키가 없으면 불 속성 충격(10-18 이펙트 점검)
+            string vfxKey = ResolveVfxKey(null);
+            if (!string.IsNullOrEmpty(vfxKey)) ItemEffectVfxHelper.SpawnOneShotAt(vfxKey, report.Attacker.transform.position);
+            else ElementVfxPlayer.PlayBurst(RuneElement.Fire, report.Attacker.transform.position, 1f);
             // HUD 왼쪽 알림은 뺐다(피해 반사와 같은 까닭 · 10-11 톤 2차 V-12)
             RFLog.D($"[FireReflect] {reflect:F0} 불 반사 → {report.Attacker.name}");
         }

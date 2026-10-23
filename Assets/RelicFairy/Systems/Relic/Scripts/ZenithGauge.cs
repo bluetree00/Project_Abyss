@@ -49,7 +49,7 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     private float  _foeCheckTimer;
 
     // 라벨 캐시 — 표시값이 바뀔 때만 문자열을 새로 만든다.
-    private string _label = "여명";
+    private string _label = "여명 — 쳐서 쌓기";
     private int    _labelKey = int.MinValue;
 
     public event Action OnChanged;
@@ -285,7 +285,8 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
         _               => Mathf.Clamp01(_timer / Mathf.Max(0.01f, _cooldownTime)),
     };
     /// <summary>
-    /// 게이지 라벨. 잔열 가속이 붙어 있으면 배속을 함께 보여준다 —
+    /// 게이지 라벨 — 시간대 이름 + 그때 하는 일(10-22 E1 D5 「여명 · 정오 · 황혼이 뭔지 모른다」 — 이름만 있었다).
+    /// 「여명 — 쳐서 쌓기」 · 「정오! — 터짐 · Q」 · 「황혼 — Q 잠김」. 잔열 가속이 붙어 있으면 「 · 처치로 앞당김 ×1.4」 —
     /// 처치가 해를 앞당긴다는 사실이 화면에 보이지 않으면 플레이어는 그런 게 있는지도 모른다.
     /// 표시값이 바뀔 때만 문자열을 새로 만든다(매 프레임 alloc 방지).
     /// </summary>
@@ -299,9 +300,9 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
                 _labelKey = key;
                 _label = _phase switch
                 {
-                    ZPhase.Noon     => "정오!",
-                    ZPhase.Charging => _chargeAccel > 0.01f ? $"여명 ×{1f + _chargeAccel:0.0}" : "여명",
-                    _               => _chargeAccel > 0.01f ? $"황혼 ×{1f + _chargeAccel:0.0}" : "황혼",
+                    ZPhase.Noon     => "정오! — 터짐 · Q",
+                    ZPhase.Charging => _chargeAccel > 0.01f ? $"여명 — 쳐서 쌓기 · 처치로 앞당김 ×{1f + _chargeAccel:0.0}" : "여명 — 쳐서 쌓기",
+                    _               => _chargeAccel > 0.01f ? $"황혼 — Q 잠김 · 처치로 앞당김 ×{1f + _chargeAccel:0.0}" : "황혼 — Q 잠김",
                 };
             }
             return _label;

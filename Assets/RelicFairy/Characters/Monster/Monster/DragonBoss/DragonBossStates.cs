@@ -690,9 +690,12 @@ public class DragonBossAttackReadyState : IMonsterState
         Vector3 dir = targetPos - ctx.Transform.position;
         dir.y = 0f;
         if (dir.sqrMagnitude < 0.001f) return;
-        ctx.Transform.rotation = Quaternion.Slerp(
-            ctx.Transform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * speed);
+        // 초당 상한 — Slerp(dt×k)는 큰 각도 · 긴 프레임에서 한 번에 돌았다(10-18 실측 공격 대기 690°/s · 73°/프레임)
+        ctx.Transform.rotation = Quaternion.RotateTowards(ctx.Transform.rotation,
+            Quaternion.Slerp(ctx.Transform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * speed), DragonTurnCap * Time.deltaTime);
     }
+
+    private const float DragonTurnCap = 180f;   // 화룡 회전 초당 상한(10-18)
 
     private static void PlayAnim(MonsterContext ctx, string stateName)
     {

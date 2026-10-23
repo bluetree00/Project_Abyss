@@ -46,6 +46,10 @@ public static class LevelSimBuildProbeEditor
     private const float  MeasureSeconds = 10f;
     private const BindingFlags Inst = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
     private const string ProbeMouseName = "LevelSimProbeMouse";
+    private const string StoneBuildFile = "Temp/ldsim_builds_stone.json";   // 10-22 A1b 성흔석 실측 빌드(ldsim_builds.json과 따로)
+    private const string StoneOutTxt    = "Temp/ldsim_stone_dps.txt";
+    private const float  StoneFront     = 1.4f;   // 가운데 석상 중심 → 플레이어(석상 반지름 0.9 + 0.5)
+    private const float  SlimeAway      = 8f;     // 슬라임 자리는 석상에서 이만큼 바깥(광역이 석상을 안 치게)
 
     private static readonly Dictionary<string, string> WeaponPath = new()
     {
@@ -80,6 +84,7 @@ public static class LevelSimBuildProbeEditor
     private static Vector3 s_home;
     private static Mouse  s_probeMouse, s_realMouse;
     private static readonly List<HpTrack> s_tracks = new();
+    private static MonsterBase s_keep;   // RefillAll이 숨기지 않는 몬스터(성흔석 실측의 기사)
 
     [MenuItem("RelicFairy/Debug/10-15 레벨디자인 시뮬 — 대표 빌드 장착 초당 피해 (테스트 허브, 플레이 중)")]
     private static void Begin()
@@ -207,12 +212,13 @@ public static class LevelSimBuildProbeEditor
         }
     }
 
-    private static async UniTask<Row> MeasureBuildAsync(PlayerController p, GameRunSession run, List<RuntimeItemData> placed, BuildSpec b, StringBuilder sb, CancellationToken ct)
+    private static async UniTask<Row> MeasureBuildAsync(PlayerController p, GameRunSession run, List<RuntimeItemData> placed, BuildSpec b, StringBuilder sb, CancellationToken ct,
+                                                         bool keepMonsters = false, bool equipOnly = false)
     {
         Managers.UI?.CloseAllPopupUI();
         Time.timeScale = 1f;
         DetachAll();
-        HideAllMonsters();
+        if (!keepMonsters) HideAllMonsters();
         if (!WeaponPath.TryGetValue(b.weapon ?? "", out var path) || !await EquipAsync(p, path, ct)) { sb.AppendLine($"장착 실패 {b.label}"); return null; }
         var w = p.WeaponManager.Weapon0Data;
         typeof(PlayerWeaponManager).GetMethod("ApplyServerOverrideIfAvailable", BindingFlags.Static | BindingFlags.NonPublic)
@@ -254,6 +260,7 @@ public static class LevelSimBuildProbeEditor
         foreach (var z in b.zones) counts[z.zone] = z.cells;
         bridge?.OnZoneCellsUpdated(counts);
         await Wait(0.5f, ct);
+        if (equipOnly) return new Row { label = b.label };   // 입히기만(성흔석 실측)
 
         s_home = p.transform.position;
         Vector3 fw = Flat(p.transform.forward);
@@ -290,6 +297,146 @@ public static class LevelSimBuildProbeEditor
         sb.AppendLine($"   무리 몫 — 평타 {pSrc[0]:0} · 스킬 {pSrc[1]:0} · 룬 {pSrc[4]:0} · 지속 {pSrc[5]:0} · 서약 {pSrc[3]:0}");
         DetachAll();
         return row;
+    }
+
+    /// <summary>
+    /// 10-22 A1b — 「챕터3 보스에게 근접 타격의 실제 피해가 제대로 안 들어간다」. 같은 빌드로 슬라임 단일 ↔ 공명 성흔석 너머 기사.
+    /// 기사 보스방(전투가 열리고 성흔석이 선 뒤)에서. 기사는 숨기지 않고 체력만 0.5초마다 최대로 되돌린다(봉인 문턱 · 특수 상태를 안 밟게).
+    /// </summary>
+    [MenuItem("RelicFairy/Debug/10-22 대표 빌드 — 성흔석 너머 기사 초당 피해 (Ch3 보스방 · 플레이 중)")]
+    private static void BeginStone()
+    {
+        if (!Application.isPlaying) { Debug.LogWarning("[LevelSimBuild] 플레이 모드에서만"); return; }
+        var p  = GameRunBootstrapper.Instance?.Run?.Player;
+        var dk = UnityEngine.Object.FindFirstObjectByType<DeathKnightBossMonster>();
+        var stones = UnityEngine.Object.FindObjectsByType<DKResonanceStone>(FindObjectsSortMode.None);
+        if (p == null || dk == null || stones.Length == 0) { Debug.LogWarning("[LevelSimBuild] 기사 · 성흔석 · 런 플레이어가 있어야 한다(Ch3 보스방 전투 시작 뒤)"); return; }
+        if (!File.Exists(StoneBuildFile)) { Debug.LogWarning("[LevelSimBuild] 빌드 목록 없음: " + StoneBuildFile); return; }
+        RunStoneAsync(p, dk, stones, p.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    private static async UniTaskVoid RunStoneAsync(PlayerController p, DeathKnightBossMonster dk, DKResonanceStone[] stones, CancellationToken ct)
+    {
+        var sb = new StringBuilder($"10-22 A1b — 같은 빌드: 슬라임 단일 ↔ 공명 성흔석 너머 기사(가운데 석상 앞 {StoneFront} m · 평타 0.1초 · E/R 쿨마다 · 각 {MeasureSeconds}초 · 유물 그대로)\n");
+        var run = GameRunBootstrapper.Instance.Run;
+        var placed = typeof(RunItemInventory).GetField("_placedItems", Inst)?.GetValue(run.ItemInventory) as List<RuntimeItemData>;
+        var savedPlaced = placed != null ? new List<RuntimeItemData>(placed) : null;
+        string savedSentence = run.CovenantHandler?.Sentence?.CovenantId;
+        var invField = typeof(PlayerController).GetField("debugInvincible", Inst);
+        object savedInv = invField?.GetValue(p);
+        s_keep = dk;
+        try
+        {
+            if (placed == null) { sb.AppendLine("룬 판 목록을 못 읽음"); return; }
+            s_burstScale = s_synScale = 1f; s_synByType.Clear(); s_secs = MeasureSeconds; s_pack = false;   // 조정 파일은 안 읽는다(차트 값 그대로)
+            var list = JsonUtility.FromJson<BuildList>(File.ReadAllText(StoneBuildFile));
+            TakeMouse();
+            invField?.SetValue(p, true);
+
+            // 가운데 석상 = 기사 → 석상 방향이 나머지 둘의 평균 방향과 가장 가까운 것
+            Vector3 avg = Vector3.zero;
+            foreach (var s in stones) avg += Flat(s.transform.position - dk.transform.position);
+            DKResonanceStone mid = stones[0];
+            float best = -2f;
+            foreach (var s in stones)
+            {
+                float d = Vector3.Dot(Flat(s.transform.position - dk.transform.position), Flat(avg));
+                if (d > best) { best = d; mid = s; }
+            }
+            Vector3 outward   = Flat(mid.transform.position - dk.transform.position);
+            Vector3 stoneHome = mid.transform.position + outward * StoneFront; stoneHome.y = p.transform.position.y;
+            Vector3 slimeHome = stoneHome + outward * SlimeAway;
+            sb.AppendLine($"기사 {dk.transform.position} · 가운데 석상 {mid.transform.position} · 석상 {stones.Length}개 · 기사 최대 체력 {dk.EffectiveMaxHp}");
+
+            foreach (var b in list.builds)
+            {
+                if (await MeasureBuildAsync(p, run, placed, b, sb, ct, keepMonsters: true, equipOnly: true) == null) continue;
+
+                // ① 슬라임 단일(석상에서 떨어진 자리)
+                Place(p, slimeHome);
+                var one = await TrackAsync(slimeHome + outward * 1.7f, ct);
+                float single = 0f;
+                if (one != null)
+                {
+                    (single, _) = await MeasureAsync(p, run, new List<HpTrack> { one }, one.M.transform.position, ct);
+                    one.M.gameObject.SetActive(false);
+                }
+                DetachAll();
+
+                // ② 가운데 성흔석 → 기사
+                var (viaStone, coolFrac, stoneBy) = await MeasureDkAsync(p, run, dk, stoneHome, mid.transform.position, mid, ct);
+                int castE = s_castE, castR = s_castR;
+
+                // ③ 기사 직접(기준) — 유리 결계 콜라이더를 잠시 끄고 기사 앞 1.7 m에서 친다. 기사 방어 · 무적 구간 몫을 성흔석 몫과 가른다.
+                var glass = new List<Collider>();
+                foreach (var sbar in UnityEngine.Object.FindObjectsByType<SoftBarrier>(FindObjectsSortMode.None))
+                    foreach (var c in sbar.GetComponentsInChildren<Collider>())
+                        if (c.enabled) { c.enabled = false; glass.Add(c); }
+                float direct;
+                float[] directBy;
+                try
+                {
+                    Vector3 dkHome = dk.transform.position + outward * 1.7f;
+                    (direct, _, directBy) = await MeasureDkAsync(p, run, dk, dkHome, dk.transform.position, null, ct);
+                }
+                finally { foreach (var c in glass) if (c != null) c.enabled = true; }
+                sb.AppendLine($"{b.label}: 슬라임 단일 {single:0}/초 · 기사 직접 {direct:0}/초 · 성흔석 너머 기사 {viaStone:0}/초(직접의 {(direct > 0f ? viaStone / direct : 0f):P0} · 슬라임의 {(single > 0f ? viaStone / single : 0f):P0}) · 가운데 석상 식음 {coolFrac:P0} · E {castE}번 · R {castR}번 · 결계 콜라이더 {glass.Count}개 끔");
+                sb.AppendLine($"   직접 몫 — 평타 {directBy[0]:0} · 스킬 {directBy[1]:0} · 룬 {directBy[4]:0} · 지속 {directBy[5]:0} · 서약 {directBy[3]:0}");
+                sb.AppendLine($"   성흔석 몫 — 평타 {stoneBy[0]:0} · 스킬 {stoneBy[1]:0} · 룬 {stoneBy[4]:0} · 지속 {stoneBy[5]:0} · 서약 {stoneBy[3]:0}");
+            }
+        }
+        catch (OperationCanceledException oce) { sb.AppendLine("취소됨 — " + string.Join(" | ", (oce.StackTrace ?? "").Split('\n'), 0, Math.Min(6, (oce.StackTrace ?? "").Split('\n').Length))); }
+        catch (Exception e) { sb.AppendLine("예외: " + e); Debug.LogException(e); }
+        finally
+        {
+            s_keep = null;
+            s_pack = true;
+            if (placed != null && savedPlaced != null) { placed.Clear(); placed.AddRange(savedPlaced); }
+            MerlinRuneBridge.Instance?.OnZoneCellsUpdated(new Dictionary<string, int>());
+            if (!string.IsNullOrEmpty(savedSentence)) run.CovenantHandler?.TryWriteSentence(savedSentence);
+            run.EffectManager?.Rebuild();
+            if (invField != null && p != null) invField.SetValue(p, savedInv);
+            DetachAll();
+            ReleaseMouse();
+            File.WriteAllText(StoneOutTxt, sb.ToString());
+            Debug.Log("[LevelSimBuild] 성흔석 끝 → " + StoneOutTxt + "\n" + sb);
+        }
+    }
+
+    /// <summary>기사 체력 감소로 잰 초당 피해(0.1초마다 95% 아래면 최대로 되돌림) · <paramref name="watch"/> 석상 식음 비율.</summary>
+    private static async UniTask<(float dps, float cool, float[] by)> MeasureDkAsync(PlayerController p, GameRunSession run, DeathKnightBossMonster dk,
+                                                                        Vector3 home, Vector3 aim, DKResonanceStone watch, CancellationToken ct)
+    {
+        Place(p, home);
+        float dealt = 0f;
+        int last = dk.CurrentHp;
+        void OnDk(int cur, int max) { if (cur < last) dealt += last - cur; last = cur; }
+        dk.OnHPChanged += OnDk;
+        int cool = 0, samples = 0;
+        using var stop = new CancellationTokenSource();
+        async UniTaskVoid WatchAsync()
+        {
+            while (!stop.IsCancellationRequested && dk != null)
+            {
+                samples++;
+                if (watch != null && watch.IsCooling) cool++;
+                if (dk.CurrentHp < dk.EffectiveMaxHp * 0.95f) { SetHp(dk, dk.EffectiveMaxHp); last = dk.EffectiveMaxHp; }
+                await UniTask.Delay(100, DelayType.Realtime);
+            }
+        }
+        WatchAsync().Forget();
+        float t0 = Time.time;
+        float[] by;
+        try { (_, by) = await MeasureAsync(p, run, new List<HpTrack>(), aim, ct); }
+        finally { stop.Cancel(); dk.OnHPChanged -= OnDk; }
+        return (dealt / Mathf.Max(0.01f, Time.time - t0), samples > 0 ? (float)cool / samples : 0f, by);
+    }
+
+    private static void Place(PlayerController p, Vector3 at)
+    {
+        s_home = at;
+        if (p.TryGetComponent<Rigidbody>(out var rb)) { rb.position = at; rb.linearVelocity = Vector3.zero; }
+        p.transform.position = at;
     }
 
     private static async UniTask<(float dps, float[] bySource)> MeasureAsync(PlayerController p, GameRunSession run, List<HpTrack> ts, Vector3 aim, CancellationToken ct)
@@ -379,7 +526,7 @@ public static class LevelSimBuildProbeEditor
     private static void RefillAll()
     {
         foreach (var m in UnityEngine.Object.FindObjectsByType<MonsterBase>(FindObjectsSortMode.None))
-            if (m != null && !m.IsDead && !s_tracks.Exists(t => t.M == m)) m.gameObject.SetActive(false);
+            if (m != null && !m.IsDead && m != s_keep && !s_tracks.Exists(t => t.M == m)) m.gameObject.SetActive(false);
         foreach (var t in s_tracks) t.Refill();
     }
 

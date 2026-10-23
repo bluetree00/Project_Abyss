@@ -37,6 +37,19 @@ public sealed class RunFuelBank
         return true;
     }
 
+    /// <summary>
+    /// 한 연료를 같은 양의 다른 연료로 바꾼다(정제소 「재료 녹이기」 1 : 1). 부족하면 false(무변경).
+    /// 새로 들어온 것이 아니라 <see cref="OnGained"/>(결과창 「얻은 양」)는 내지 않는다 — 런 종료 환산 총량도 그대로다.
+    /// </summary>
+    public bool Convert(FuelKind from, FuelKind to, int amount)
+    {
+        if (amount <= 0 || from == to || Get(from) < amount) return false;
+        _amounts[from] = Get(from) - amount;
+        _amounts[to]   = Get(to) + amount;
+        OnFuelChanged?.Invoke();
+        return true;
+    }
+
     // ── 세이브 캡처/복원 (종류별 스칼라) ─────────────────
     public int EnhanceMaterial => Get(FuelKind.EnhanceMaterial);
     public int RuneOre         => Get(FuelKind.RuneOre);

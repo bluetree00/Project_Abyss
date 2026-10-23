@@ -119,6 +119,16 @@ public class FGSeedStormPatternSO : BossPatternSO
         return dist >= minRange && dist <= maxRange;
     }
 
+    /// <summary>
+    /// 연계로 이어질 때(내려치기 · 지면 가르기 → 씨앗 폭우, 10-22 E5 페이지2) — 2페이지에서만(두 앞 패턴은 1페이지에도 나온다) ·
+    /// 거리 하한은 보지 않는다(연계는 앞 패턴의 일부 — 원 밖으로 빠진 자리가 가까워도 잇는다).
+    /// </summary>
+    public override bool CanFollowUp(BossPatternContext ctx)
+    {
+        if (ctx.Ctx.Runtime.PlayerTarget == null || (ctx.Ctx.Monster as IPagedBoss)?.Pages?.IsPage2 != true) return false;
+        return Vector3.Distance(ctx.Ctx.Transform.position, ctx.Ctx.Runtime.PlayerTarget.position) <= maxRange;
+    }
+
     public override SpecialStateBase GetRuntimeState() => _state;
 }
 
@@ -284,7 +294,7 @@ public class FGSeedStormState : FullLockState<FGSeedStormPatternSO>
                 if (d.magnitude <= Data.landRadius)
                 {
                     hitPlayer = true;
-                    player.TakeDamage(Mathf.Max(1, (int)(atk * Data.impactDamageMultiplier)), ctx.Monster.gameObject, false, HitWeight.Auto);
+                    player.TakeDamage(Mathf.Max(1, (int)(atk * Data.impactDamageMultiplier * ForestGuardianMonster.ChainScale(ctx))), ctx.Monster.gameObject, false, HitWeight.Auto);   // 사슬 둘째 칸 ×0.8(10-22 E5 페이지2)
                     Vector3 knock = d.sqrMagnitude > 0.001f ? d.normalized : ctx.Transform.forward;
                     knock.y = 0.3f;
                     player.ApplyKnockback(knock.normalized * ctx.Config.stat.knockbackForce * Data.knockbackMultiplier);

@@ -43,7 +43,7 @@ public class EnhanceTableSO : ScriptableObject
     [SerializeField] private int _maxLegendary = 15;
 
     [Header("진화 1회당 상한 확장 (진화 = 강화의 끝이 아니라 다음 구간의 문)")]
-    [SerializeField] private int _maxPerEvolution = 12;   // 10-15 단계 세분(옛 6)
+    [SerializeField] private int _maxPerEvolution = 9;    // 10-18 재련 개편 안 R — 진화 뒤 상한 +24 → +21(재련 7번). 후반을 보스 체력이 아니라 상한으로 받는다(옛 12 · 6)
 
     [Header("마스터리(진화 후 추가 구간) 1단계당 스킬 확장")]
     [Tooltip("스킬 피해 % 가산 (0.06 = +6%/단계)")]

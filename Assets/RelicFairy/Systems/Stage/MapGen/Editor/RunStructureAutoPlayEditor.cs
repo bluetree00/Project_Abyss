@@ -74,8 +74,8 @@ public static class RunStructureAutoPlayEditor
     public  const string SimDpsPrefsKey          = "RunAuto.SimDps";
     public  const string SimDpsByChapterPrefsKey = "RunAuto.SimDpsByChapter";
     private const double SimHitGap     = 1.0 / 3.0;   // 초당 3타
-    private const float  SimReach      = 5f;           // 이 안의 가장 가까운 적을 친다
-    private const double SimChaseAfter = 2.0;          // 이만큼 못 치면 가장 가까운 적을 친다(쫓아가 치는 셈)
+    private const float  SimReach      = 2.5f;         // 근접 사거리 — 이 안의 가장 가까운 적을 바로 친다(10-21: 5 m였다)
+    private const float  SimWalkSpeed  = 6f;           // 그 밖이면 (거리 − 사거리) ÷ 이 속도만큼 걸어간 뒤 친다(10-21: 「2초 뒤 거리 무관」이었다)
     private const float  SimRefillAt   = 0.3f;         // 모사 체력이 최대의 30% 밑이면 다시 채우고 센다(포션 · 사망 대신)
     private static bool    s_sim;
     private static float[] s_simDps = { 80f };
@@ -1024,7 +1024,8 @@ public static class RunStructureAutoPlayEditor
         if (bestD > SimReach * SimReach)
         {
             if (s_simFarSince < 0) s_simFarSince = now;
-            if (now - s_simFarSince < SimChaseAfter) return;   // 다가가는 중
+            double walk = (Mathf.Sqrt(bestD) - SimReach) / SimWalkSpeed;   // 걸어가는 시간 — 근접 몹은 그동안 다가와 사거리에 든다
+            if (now - s_simFarSince < walk) return;
         }
         else s_simFarSince = -1;
         best.TakeDamage(SimDpsFor(chapter) * (float)SimHitGap, player.gameObject, 0f);
@@ -1060,8 +1061,38 @@ public static class RunStructureAutoPlayEditor
         var srcMb  = attacker != null ? attacker.GetComponentInParent<MonsterBase>() : null;   // 몬스터는 @Pools 아래 — root 이름은 전부 「@Pools」였다
         string src = attacker == null ? "?" : Clean(srcMb != null ? srcMb.name : attacker.name);
         s_cur.simSrc[src] = (s_cur.simSrc.TryGetValue(src, out float v) ? v : 0f) + est;
+        string lane = srcMb != null && IsRangedMonster(srcMb) ? "[원거리]" : "[근접 · 기타]";   // 10-21 근접 / 원거리 몫
+        s_cur.simSrc[lane] = (s_cur.simSrc.TryGetValue(lane, out float lv) ? lv : 0f) + est;
         s_simHp -= est;
         if (s_simHp < rs.MaxHp * SimRefillAt) { s_cur.simRefills++; s_simHp = rs.MaxHp; }
+    }
+
+    private static readonly Dictionary<MonsterBase, bool> s_rangedCache = new();
+
+    /// <summary>원거리 몹인가 — 패턴 공격에 원거리 모양(MonsterRangedAttackSO)이 하나라도 있으면(PatternAttackOverrideSO 판정과 같은 기준).</summary>
+    private static bool IsRangedMonster(MonsterBase mb)
+    {
+        if (s_rangedCache.TryGetValue(mb, out bool r)) return r;
+        r = false;
+        var cfgField = typeof(MonsterBase).GetField("_config", Inst);
+        var cfg = cfgField?.GetValue(mb) as ScriptableObject;
+        if (cfg != null)
+        {
+            var so = new SerializedObject(cfg);
+            var it = so.GetIterator();
+            while (it.NextVisible(true))
+                if (it.propertyType == SerializedPropertyType.ObjectReference && it.objectReferenceValue is ScriptableObject child)
+                {
+                    if (child is MonsterRangedAttackSO) { r = true; break; }
+                    var cso = new SerializedObject(child);
+                    var cit = cso.GetIterator();
+                    while (cit.NextVisible(true))
+                        if (cit.propertyType == SerializedPropertyType.ObjectReference && cit.objectReferenceValue is MonsterRangedAttackSO) { r = true; break; }
+                    if (r) break;
+                }
+        }
+        s_rangedCache[mb] = r;
+        return r;
     }
 
     /// <summary>Temp/damage_sim.txt — 챕터별 · 방 종류별 받은 피해(최대 체력 대비) · 방 길이 · 출처 상위.</summary>
@@ -1097,7 +1128,7 @@ public static class RunStructureAutoPlayEditor
             var top = new List<KeyValuePair<string, float>>(src);
             top.Sort((a, b) => b.Value.CompareTo(a.Value));
             var line = new StringBuilder("   출처 상위: ");
-            for (int i = 0; i < top.Count && i < 5; i++) line.Append($"{top[i].Key} {top[i].Value:0} · ");
+            for (int i = 0; i < top.Count && i < 7; i++) line.Append($"{top[i].Key} {top[i].Value:0} · ");
             sb.AppendLine(line.ToString());
         }
         File.WriteAllText(Path.Combine("Temp", "damage_sim.txt"), sb.ToString());

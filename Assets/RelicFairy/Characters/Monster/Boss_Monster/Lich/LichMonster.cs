@@ -98,6 +98,14 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
     private bool IsInvulnerableNow =>
         _fsm != null && (_fsm.CurrentConstraints & SpecialStateConstraint.Invincible) != 0;
 
+    /// <summary>
+    /// 등장 연출 중엔 피해를 통째로 막는다(10-23 ee 재현 · 4판 중 2판). 잠든 몬스터가 맞으면 추격으로 깨우는 공용 규칙(MonsterBase.TakeDamage) 때문에
+    /// 연출 · 이야기 대사 전에 전투 상태가 켜져 리치가 마력탄을 쐈다 — 칭호 직후 한 방 연타로 쓰러졌다.
+    /// </summary>
+    private bool EntranceShielded => _dormantState != null && _dormantState.IsEntrancePlaying;
+
+    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || EntranceShielded;
+
     // ── 내부 필드 ─────────────────────────────────────────────
     private LichBlackboard         _lichBB;
     private BossPatternRunner      _runner;
@@ -132,6 +140,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
     private int                    _hudPage = 1;   // HP바가 보여 주는 페이즈 — 전환 연출이 바를 채우기 시작할 때 넘어간다
     private LichSwingDriver        _swing;         // 낫 휘두름을 판정 순간에 맞춘다(처음 쓸 때 만든다)
     private float                  _damageTakenMult = 1f;   // 그로기 등 — 받는 피해 배율
+    private bool                   _cycleGate;              // 원소 순환 폭발 동안 성흔 탄막 · 비전 구체만(10-22 E2 L2)
 
     public LichMovementController MovementController => _movementController;
 
@@ -151,6 +160,9 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
     /// <summary>지금 패링 창이 열려 있는가(낫이 빛나는 중).</summary>
     public bool IsParryWindowOpen => !_parried && Time.time <= _parryWindowEnd;
 
+    /// <summary>지금 도는 패턴이 연계로 이어 낸 사슬 둘째 칸인가 — 피해 ×0.8(<see cref="LichPatternUtil.ChainLinkDamage"/>) · 짧은 판(10-22 E2 L1).</summary>
+    public bool IsChainLink => _runner != null && _runner.IsFollowUpRunning;
+
     /// <summary>마법이 나가는 손(오른손 본). 없으면 리치 자신.</summary>
     public Transform CastPoint => _castPoint != null ? _castPoint : transform;
 
@@ -164,6 +176,12 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
     [SerializeField] private float[] _nightmarePageThresholds = { 0.6f, 0.25f };
     [SerializeField] private string  _sealedBossName          = "봉인된 리치";
     [SerializeField] private string  _nightmareBossName       = "해방된 리치";
+
+    [Header("── 사슬 박자 (10-22 E2 L4) ───────────────────────")]
+    [Tooltip("사슬 안 — 연계 사이 쉬는 시간(최소 · 최대 초)")]
+    [SerializeField] private Vector2 _chainLinkRest = new Vector2(0.2f, 0.35f);
+    [Tooltip("사슬 뒤 — 연계가 끝난 뒤 숨 고르는 시간(최소 · 최대 초). 악몽 모드 ×0.8")]
+    [SerializeField] private Vector2 _chainEndRest  = new Vector2(1.5f, 2f);
 
     [Header("── 등장 연출 ──────────────────────────────────")]
     [Tooltip("플레이어 감지 반경 (m). 방 입장 시 자연스럽게 감지되도록 방 크기에 맞게 설정한다.")]
@@ -378,6 +396,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
             changeState: s  => ChangeState(s),
             onExecuted:  p  => { _lichBB.LastPatternTag = p.patternTag; _lichBB.NormalModeTimer = 0f; LichPatternProbe.BeginPattern(p.name); });
 
+        ApplyChainTempo();
         _movementController?.Init(_lichBB);
 
         BindBossHud();
@@ -459,6 +478,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
             _movementController?.NotifyPatternEnded();
         _prevPatternActive = nowPattern;
 
+        TickCycleGate();
 #if UNITY_EDITOR
         if (_debugAutoPatternsOff) return;
 #endif
@@ -807,11 +827,19 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
     {
         if (_lichBB == null) return;
         _lichBB.BreakScale = StoryProgress.IsNightmareMode ? BossPages.NightmareBreakScale : 1f;
+        ApplyChainTempo();
         if (_lichBB.Page == 1 && _lichBB.BreakScale < 1f && _config is BossConfigSO boss)
         {
             _lichBB.BreakDurationMinOverride = boss.patternBreakDurationMin * _lichBB.BreakScale;
             _lichBB.BreakDurationMaxOverride = boss.patternBreakDurationMax * _lichBB.BreakScale;
         }
+    }
+
+    /// <summary>사슬 박자(10-22 E2 L4) — 사슬 안 0.2~0.35초 · 사슬 뒤 1.5~2초. 악몽 모드는 다른 쉬는 시간처럼 ×0.8.</summary>
+    private void ApplyChainTempo()
+    {
+        float scale = _lichBB != null ? _lichBB.BreakScale : 1f;
+        _runner?.SetChainTempo(_chainLinkRest * scale, _chainEndRest * scale);
     }
 
     /// <summary>
@@ -841,6 +869,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
     /// </summary>
     public override void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
     {
+        if (EntranceShielded) { NotifyBlockedHit(transform.position + Vector3.up); return; }   // 파이프라인을 거치지 않는 직접 피해도(10-23)
         TryParry(instigator);
         base.TakeDamage(amount * _damageTakenMult, instigator, knockbackMultiplier, isCrit);
     }
@@ -1245,6 +1274,24 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
 
         TickAuraMarker();
         TickBookGlow(dt);
+    }
+
+    /// <summary>
+    /// 원소 일제 발동(M8 · 10-22 E2 L2 2차)이 도는 동안엔 성흔 탄막 · 비전 구체만 고른다 — 사용자 「패턴을 하면서 다른 패턴을 연결」.
+    /// 다른 패턴은 러너 가중치 배율 0(에셋은 그대로) · 순환이 끝나면 되돌린다. 강제 칸(전환 · 최후의 대마법)은 건드리지 않는다.
+    /// </summary>
+    private void TickCycleGate()
+    {
+        bool on = LichHazards.ElementCycleActive;
+        if (on == _cycleGate || _runner == null || _config is not BossConfigSO boss || boss.patternEntries == null) return;
+        _cycleGate = on;
+        foreach (var entry in boss.patternEntries)
+        {
+            if (entry?.patterns == null || entry.forceExecute) continue;
+            foreach (var p in entry.patterns)
+                if (p != null && !(p is LichMagicBoltPatternSO) && !(p is LichArcaneOrbPatternSO))
+                    _runner.SetWeightScale(p, on ? 0f : 1f);
+        }
     }
 
     /// <summary>날고 있는 리치의 바닥 위치 — 카메라가 내려다봐서 떠 있는 몸만으론 위치가 안 읽힌다(시나리오 §3 U7).</summary>

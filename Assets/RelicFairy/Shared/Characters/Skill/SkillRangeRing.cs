@@ -23,10 +23,16 @@ public static class SkillRangeRing
     private static readonly Color FillColor = new(0.82f, 0.94f, 1f, 0.05f);   // 면은 거의 비운다 — 적 예고처럼 칠한 면으로 안 보이게
     private const float RimBand = 0.08f;   // 테두리 띠 두께(반경 비율)
 
+    /// <summary>
+    /// 플레이어 범위 표시를 그리나(기본 꺼짐 · 10-19 사용자 「플레이어 공격엔 웬만하면 가이드라인 이펙트가 필요 없다」).
+    /// 스킬 · 룬 · 전설 · 유물 고리와 검기 판정 띠 · 순간 고리(<see cref="FormStrike"/>)를 한 번에 끈다. 실측 도구가 사진용으로만 켠다.
+    /// </summary>
+    public static bool PlayerGuides { get; set; }
+
     /// <summary>둘레 원(주변경계).</summary>
     public static void Circle(Vector3 center, float radius, float lifetime = DefaultLifetime)
     {
-        if (!EnsureMaterial()) return;
+        if (!PlayerGuides || !EnsureMaterial()) return;
         var go = PatternGuideHelper.Disc(center, radius, FillColor, lifetime);
         if (go != null) { go.name = DiscName; Rim(go); }
     }
@@ -34,7 +40,7 @@ public static class SkillRangeRing
     /// <summary>앞쪽 부채꼴(최후의 일격 반원 · 갈래화살 퍼짐).</summary>
     public static void Fan(Vector3 center, Vector3 forward, float radius, float angleDeg, float lifetime = DefaultLifetime)
     {
-        if (!EnsureMaterial()) return;
+        if (!PlayerGuides || !EnsureMaterial()) return;
         float yaw = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
         var go = PatternGuideHelper.Sector(center, radius, angleDeg, yaw, FillColor, lifetime);
         if (go != null) { go.name = SectorName; Rim(go); }

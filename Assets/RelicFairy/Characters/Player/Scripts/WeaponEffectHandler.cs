@@ -162,9 +162,10 @@ public class WeaponEffectHandler
                         if (wd != null)
                         {
                             var kind = wd.weaponType.GetAttackStatKind();
-                            embedded.damage = DamageFormula.Calculate(s.baseDamage, _player.RuntimeStats.GetEffectiveAttack(kind));
+                            embedded.damage = DamageFormula.Calculate(s.baseDamage, _player.RuntimeStats.GetEffectiveAttack(kind)) * s.DamageScale;
                         }
                     }
+                    embedded.SetBaseScale(effectObj.transform.localScale);   // 단계 크기 배율이 판정 · 그림에 먹게(10-22)
                     embedded.Activate();
                     colliderHandledByCombined = true;
                 }
@@ -289,7 +290,7 @@ public class WeaponEffectHandler
         if (weaponData != null)
         {
             var kind = weaponData.weaponType.GetAttackStatKind();
-            rawDamage = DamageFormula.Calculate(rawDamage, _player.RuntimeStats.GetEffectiveAttack(kind));
+            rawDamage = DamageFormula.Calculate(rawDamage, _player.RuntimeStats.GetEffectiveAttack(kind)) * s.DamageScale;
         }
 
         ci.damage              = rawDamage;

@@ -35,12 +35,23 @@ public sealed class MeleeAugmentOffer
 public static class MeleeAugmentDraft
 {
     public const int RerollsPerRun = 2;
+    /// <summary>
+    /// 증강 화면이 열리는 강화 단계 간격 — +3 · +6 · +9 …(사용자 10-16 「특정 강화 단계에서만 증강을 고르는 구조」).
+    /// 진화 전 상한 +12까지 4번 · 진화 뒤 +24까지 8번 · 전설 +30까지 10번 — 한 장 한 장이 무게를 갖게(롤 아레나도 정해진 라운드에만 고른다).
+    /// </summary>
+    public const int LevelStep = 3;
     private const int SilverPity = 3;                 // 은이 이만큼 이어지면 다음은 금 이상
     private const float ExclusiveChance = 0.4f;       // 한 장이 무기 전용 증강일 확률
     private const float UpgradeChance = 0.35f;        // 가진 증강의 강화 카드가 나올 확률(화면당 최대 1장)
     private static readonly float[] FamilyWeights = { 2f, 1.5f, 1.2f };   // 각인 1 · 2 · 3위 계열(유물 뽑기와 같은 값)
 
     public static int RerollsLeft { get; set; } = RerollsPerRun;
+    /// <summary>이번 재련소 방문에서 화면마다 더 내는 카드 수(화로 「열기」 · 10-18 재련 개편) — 재련이 화면을 열 때만 잠깐 켠다.</summary>
+    public static int ExtraCards { get; set; }
+    /// <summary>이번 방문에만 쓰는 다시 뽑기(화로 「풍요」). 런 몫보다 먼저 쓴다. 방을 나가면 0.</summary>
+    public static int VisitRerolls { get; set; }
+    /// <summary>쓸 수 있는 다시 뽑기(런 몫 + 이번 방문 몫) — 고르기 창이 보인다.</summary>
+    public static int RerollsAvailable => RerollsLeft + VisitRerolls;
     public static MeleeAugmentOffer Pending { get; private set; }
 
     /// <summary>화면이 열렸다(고르기 창이 듣는다). 듣는 쪽이 없으면 왼쪽 카드로 바로 정한다.</summary>
@@ -49,21 +60,27 @@ public static class MeleeAugmentDraft
     public static event Action<WeaponData, string, int> Chosen;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void ResetStatics() { Pending = null; RerollsLeft = RerollsPerRun; Offered = null; Chosen = null; }
+    private static void ResetStatics() { Pending = null; RerollsLeft = RerollsPerRun; ExtraCards = 0; VisitRerolls = 0; Offered = null; Chosen = null; }
+
+    /// <summary>이 강화 단계에서 증강을 고르나 — 재련소 · 무기 정보 창이 「다음 증강 +N」을 보일 때 쓴다.</summary>
+    public static bool IsAugmentLevel(int level) => level > 0 && level % LevelStep == 0;
+
+    /// <summary>받은 마지막 증강 단계 다음의 증강 단계(+3 · +6 · +9 …).</summary>
+    public static int NextAugmentLevel(int highestReached) => (Mathf.Max(0, highestReached) / LevelStep + 1) * LevelStep;
 
     /// <summary>새 런 — 리롤 수를 채우고 걸린 화면을 버린다.</summary>
     public static void ResetForRun(int rerolls = RerollsPerRun) { RerollsLeft = rerolls; Pending = null; }
 
     /// <summary>
-    /// 강화 성공 뒤 부른다. 아직 증강을 받지 않은 가장 낮은 단계의 화면을 연다(열었으면 true).
+    /// 강화 성공 뒤 부른다. 아직 받지 않은 가장 낮은 <b>증강 단계</b>(<see cref="LevelStep"/>의 배수)에 닿았으면 그 화면을 연다(열었으면 true).
     /// 받은 단계는 <b>고를 때</b> 기록한다 — 고르기 전에 끄면 다음 강화 성공 때 그 단계 화면부터 다시 열린다(놓친 단계가 여럿이면 고를 때마다 이어서).
     /// 하락 뒤 다시 닿은 단계는 이미 받았으니 주지 않는다. <paramref name="justEvolved"/> = 진화 직후 첫 강화(금 이상 보장).
     /// </summary>
     public static bool TryOfferForEnhance(WeaponData w, int newLevel, bool justEvolved, System.Random rng)
     {
         if (w == null || rng == null || MeleeAugmentCatalog.KindOf(w) == MeleeWeaponKind.None) return false;
-        int level = w.highestEnhanceReached + 1;
-        if (Mathf.Max(newLevel, w.enhanceLevel) < level) return false;   // 하락 뒤 다시 닿음 — 이미 받았다
+        int level = NextAugmentLevel(w.highestEnhanceReached);
+        if (Mathf.Max(newLevel, w.enhanceLevel) < level) return false;   // 아직 다음 증강 단계 전 · 하락 뒤 다시 닿음(이미 받았다)
         if (Pending != null)
         {
             if (Pending.Weapon == w) return false;   // 같은 무기 화면이 열려 있다 — 고르면 이어서 연다
@@ -72,9 +89,10 @@ public static class MeleeAugmentDraft
 
         var tier = RollTier(level, justEvolved, w.augmentSilverStreak, rng);
         w.augmentSilverStreak = tier == AugmentTier.Silver ? w.augmentSilverStreak + 1 : 0;
-        var cards = Draw(w, tier, rng, 2, null);
+        int count = 2 + Mathf.Max(0, ExtraCards);   // 화로 「열기」 — 이번 방문 카드 +1장
+        var cards = Draw(w, tier, rng, count, null);
         if (cards.Count == 0) { w.highestEnhanceReached = level; return false; }   // 풀이 다 찼다(모두 III) — 그 단계는 넘긴다
-        var offer = new MeleeAugmentOffer { Weapon = w, Level = level, Tier = tier };
+        var offer = new MeleeAugmentOffer { Weapon = w, Level = level, Tier = tier, Cards = new MeleeAugmentCard[count] };
         for (int i = 0; i < offer.Cards.Length; i++) offer.Cards[i] = cards[Mathf.Min(i, cards.Count - 1)];
         Pending = offer;
         Debug.Log($"[MeleeAugment] +{level} {MeleeAugmentDef.TierName(tier)} — {Describe(offer.Cards[0])} | {Describe(offer.Cards[1])}");
@@ -93,13 +111,14 @@ public static class MeleeAugmentDraft
         Pending = null;
         var w = offer.Weapon;
         int rank = w.AddAugment(card.Id);
+        w.AppendReforgeLog(card.Id, rank);   // 10-19 재련 기록 — 재련마다 고른 것(재련소 목록)
         w.highestEnhanceReached = Mathf.Max(w.highestEnhanceReached, offer.Level);   // 받은 단계는 고를 때 기록
         GameRunBootstrapper.Instance?.Run?.EffectManager?.Rebuild();
         Debug.Log($"[MeleeAugment] 고름 — {w.displayName} +{offer.Level} {card.Def?.Name} {MeleeAugmentDef.RankName(rank)}");
         Chosen?.Invoke(w, card.Id, rank);
 
-        // 놓친 단계가 남았으면(고르기 전에 껐다 · 한 번에 여러 단계) 이어서 연다
-        if (w.enhanceLevel > w.highestEnhanceReached)
+        // 놓친 증강 단계가 남았으면(고르기 전에 껐다 · 한 번에 여러 단계) 이어서 연다
+        if (w.enhanceLevel >= NextAugmentLevel(w.highestEnhanceReached))
             TryOfferForEnhance(w, w.enhanceLevel, false, new System.Random(unchecked(System.Environment.TickCount + w.highestEnhanceReached)));
     }
 
@@ -107,12 +126,14 @@ public static class MeleeAugmentDraft
     public static bool Reroll(int index, System.Random rng)
     {
         var offer = Pending;
-        if (offer == null || rng == null || RerollsLeft <= 0 || index < 0 || index >= offer.Cards.Length) return false;
-        var keep = new HashSet<string> { offer.Cards[0].Id, offer.Cards[1].Id };
+        if (offer == null || rng == null || RerollsAvailable <= 0 || index < 0 || index >= offer.Cards.Length) return false;
+        var keep = new HashSet<string>();
+        foreach (var c in offer.Cards) keep.Add(c.Id);
         var fresh = Draw(offer.Weapon, offer.Tier, rng, 1, keep);
         if (fresh.Count == 0) return false;
         offer.Cards[index] = fresh[0];
-        RerollsLeft--;
+        if (VisitRerolls > 0) VisitRerolls--;   // 이번 방문 몫(화로 「풍요」)부터
+        else RerollsLeft--;
         return true;
     }
 

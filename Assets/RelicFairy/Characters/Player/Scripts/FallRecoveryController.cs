@@ -204,6 +204,9 @@ public class FallRecoveryController : MonoBehaviour
 
         if (_rb != null)
         {
+            // 플레이어 Rigidbody는 보간(Interpolate)이라 transform만 옮기면 다음 프레임에 떨어지던 자리로 덮어써져
+            // 되돌림이 안 먹고 계속 떨어지며 낙사 피해만 거듭 깎였다(10-23 리치 경기장 · 부서진 칸).
+            _rb.position = target;
             _rb.linearVelocity = Vector3.zero;
             _rb.angularVelocity = Vector3.zero;
         }

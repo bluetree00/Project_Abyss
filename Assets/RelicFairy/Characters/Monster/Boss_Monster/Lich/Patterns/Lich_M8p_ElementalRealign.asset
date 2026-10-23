@@ -21,18 +21,23 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: realign
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: 8bcdbaff310bedd429a5f6a13702c238, type: 2}
+  followUpLateOnly: 0
   hpThreshold: 1
   maxUses: 2
   patternCooldown: 30
   castDuration: 2
   recoveryDuration: 0.5
-  zoneSeconds: 25
-  fireDps: 0.25
-  iceSlowScale: 0.7
-  chainWarn: 0.45
-  chainRadius: 1.6
-  chainDamage: 0.6
-  chainCooldown: 2
-  darkVignette: 0.4
   hoverHeight: 3
   crossWidth: 0.8
+  _eruptInterval: 3
+  _eruptWarn: 1.2
+  _fireDamage: 1
+  _fireGroundSeconds: 2
+  _fireGroundDamage: 0.1
+  _iceDamage: 0.8
+  _iceSlowScale: 0.5
+  _iceSlowSeconds: 2
+  _boltDamage: 0.9
+  _darkDamage: 1
+  _darkVignette: 3

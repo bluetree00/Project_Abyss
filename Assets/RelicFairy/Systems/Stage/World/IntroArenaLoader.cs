@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.AI;
 
 /// <summary>
 /// Game_Intro 성당 아레나를 씬 임베드 대신 런타임 Addressable로 생성한다.
@@ -23,6 +24,8 @@ public sealed class IntroArenaLoader : MonoBehaviour
 
     // ── Static ───────────────────────────────────────────────────────
     private static IntroArenaLoader _instance;
+    // NavMesh를 굽는 구역 — 회랑 끝 ~ 성당 가운데 전투 자리(아레나 루트 = 원점). 성당 전체(수백 m)는 수 분 걸렸다(10-18)
+    private static readonly Bounds NavVolume = new Bounds(new Vector3(0f, 1f, 8f), new Vector3(60f, 12f, 60f));
 
     // ── Private ──────────────────────────────────────────────────────
     private readonly UniTaskCompletionSource _ready = new UniTaskCompletionSource();
@@ -75,6 +78,13 @@ public sealed class IntroArenaLoader : MonoBehaviour
             go.transform.localScale = Vector3.one;
             _arena = go.transform;
             BrokenLodGuard.Apply(go);   // 깨진 하위 LOD(벽 촛대 · 10-12 D11) — LOD0 고정
+
+            // 씬에 구운 NavMesh(7월)는 인트로가 꺼 둔 높은 제단 기준이라 기사가 0.49 m 떠 섰다 —
+            // 구운 것을 지우고 지금 아레나 콜라이더로 다시 굽는다(10-18 · Ch1/Ch2 테스트 아레나와 같은 빌더).
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            NavMesh.RemoveAllNavMeshData();
+            ArenaNavMeshBuilder.Build(go, NavVolume);
+            Debug.Log($"[IntroArenaLoader] NavMesh 다시 굽기 {sw.ElapsedMilliseconds} ms");
 
             Rebind(_arena);
         }

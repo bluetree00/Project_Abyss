@@ -79,6 +79,13 @@ public class DragonClawSlashPatternSO : BossPatternSO
                && bb.ClawSlashCooldown <= 0f;
     }
 
+    /// <summary>연계(공중 돌진 끝 착지 → 할퀴기 · 10-22 E3 D2) — 돌진의 일부라 할퀴기 쿨다운은 보지 않는다. 사슬은 두 칸까지.</summary>
+    public override bool CanFollowUp(BossPatternContext ctx)
+        => ctx.Ctx.Runtime.PlayerTarget != null
+           && ctx.Blackboard is DragonBossBlackboard bb
+           && bb.BodyState == BodyState.Grounded
+           && !bb.IsChainLink;
+
     public override SpecialStateBase GetRuntimeState() => _runtimeState;
 }
 
@@ -95,7 +102,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     private enum Phase { Jumping, Attacking, EndPose, Done }
 
     private const float GuideHitFlash = 0.15f;  // 판정 순간 판정 색으로 잠깐 남았다 사라진다
-    private static readonly Color GuideColor = new Color(1f, 0.28f, 0.18f, 0.85f);   // 공중 물기 예고와 같은 색
+    private static Color GuideColor => PatternGuideHelper.AttackFill;   // 공중 물기 예고와 같은 색 — 공용 공격 색(10-23 가이드 색 통일)
 
     // 10-14 화룡 위협 — 2초 동안 바닥을 미끄러져 와 자기 발밑 원(2.5 m)만 휘둘렀다(플레이어가 거기 없으면 끝)
     private const float LandRadius    = 3f;     // 착지 충격 — 예고 원은 도약 내내 차오른다
@@ -111,6 +118,8 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     private Vector3 _startPos;
     private Vector3 _targetPos;
     private Vector3 _stepFrom, _stepTo;
+    private Vector3 _aim = Vector3.forward;   // 이번 휘두름의 겨눈 방향 — 예고 · 판정 기준(몸은 따라 돈다 · 10-19)
+    private const float SwingTurnRate = 720f;  // 초당 — 즉시 돌면 착지 사이 뒤로 돈 플레이어에 165°/프레임 튐(10-19 실측)
     private DragonBossWarningZone _landGuide;
     private float   _timer;
     private float   _arcHeight;
@@ -225,7 +234,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         Vector3 d = p.position - at; d.y = 0f;
         if (d.magnitude <= LandRadius)
             p.GetComponent<PlayerController>()?.TakeDamage(
-                Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier * LandDamageMul), ctx.Monster.gameObject, false, HitWeight.Heavy);
+                Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier * LandDamageMul * ChainScale(ctx)), ctx.Monster.gameObject, false, HitWeight.Heavy);
     }
 
     private void StartAttacking(MonsterContext ctx)
@@ -237,14 +246,9 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
                 ctx.Agent.isStopped = true;
         }
 
-        // Face player exactly before attacking
-        if (ctx.Runtime.PlayerTarget != null)
-        {
-            Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
-            dir.y = 0f;
-            if (dir.sqrMagnitude > 0.01f)
-                ctx.Transform.rotation = Quaternion.LookRotation(dir);
-        }
+        // 겨눔은 BeginStep이 정한다 — 몸은 UpdateAttacking에서 그쪽으로 돈다(즉시 돌면 165°/프레임 · 10-19)
+        _aim = ctx.Transform.forward; _aim.y = 0f;
+        _aim = _aim.sqrMagnitude > 0.01f ? _aim.normalized : Vector3.forward;
 
         _phase          = Phase.Attacking;
         _timer          = 0f;
@@ -267,7 +271,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         if (p == null) return;
         Vector3 to = p.position - _stepFrom; to.y = 0f;
         if (to.sqrMagnitude < 0.01f) return;
-        ctx.Transform.rotation = Quaternion.LookRotation(to);
+        _aim = to.normalized;
         float step = Mathf.Clamp(to.magnitude - StepKeep, 0f, StepMax);
         Vector3 want = _stepFrom + to.normalized * step;
         want = DragonPatternFloorUtils.ClampInsideWalls(want, 2f);
@@ -277,8 +281,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
 
     private Vector3 SwingCenter(MonsterContext ctx)
     {
-        Vector3 fwd = ctx.Transform.forward; fwd.y = 0f;
-        Vector3 c = _stepTo + (fwd.sqrMagnitude > 0.01f ? fwd.normalized : Vector3.forward) * SwingForward;
+        Vector3 c = _stepTo + _aim * SwingForward;   // 겨눈 방향 — 몸이 아직 돌고 있어도 예고 = 판정(10-19)
         c.y = DragonPatternFloorUtils.GetFloorY(c, ctx.Runtime.SpawnPosition.y);
         return c;
     }
@@ -288,6 +291,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     private void UpdateAttacking(MonsterContext ctx)
     {
         if (_swingIndex >= _totalSwings) { FinishPattern(ctx); return; }
+        ctx.Transform.rotation = Quaternion.RotateTowards(ctx.Transform.rotation, Quaternion.LookRotation(_aim), SwingTurnRate * Time.deltaTime);
         if (_timer <= StepTime + Time.deltaTime && (_stepTo - _stepFrom).sqrMagnitude > 0.0001f)
         {
             Vector3 next = Vector3.Lerp(_stepFrom, _stepTo, Mathf.Clamp01(_timer / StepTime));
@@ -352,7 +356,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
             var player = col.GetComponent<PlayerController>()
                       ?? col.GetComponentInParent<PlayerController>();
             if (player == null) continue;
-            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier), ctx.Monster.gameObject);
+            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier * ChainScale(ctx)), ctx.Monster.gameObject);
             break;
         }
     }
@@ -388,6 +392,10 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.isStopped = false;
         ctx.Monster.ChangeState<ChaseState>();
     }
+
+    // 연계 둘째 칸이면 ×0.8(10-22 E3 D2)
+    private static float ChainScale(MonsterContext ctx)
+        => GetBlackboard(ctx) is DragonBossBlackboard bb ? bb.ChainDamageScale : 1f;
 
     private static BossAttackBlackboard GetBlackboard(MonsterContext ctx)
         => (ctx.Monster as IBoss)?.Blackboard;

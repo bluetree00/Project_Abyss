@@ -6,7 +6,7 @@ using UnityEngine.UI;
 /// 온보딩 목표 지시 화살표. 대상이 화면 안이면 **3D 월드 화살표**(대상 위 부유 + 바운스 + 빌보드),
 /// 화면 밖이면 **화면 가장자리 UI 인디케이터**로 방향을 가리킨다. (Director가 SetTarget 호출)
 ///
-/// worldArrow / screenIndicator 미할당 시 **TMP 글리프(▼/➤)로 절차 생성**(수동 제작 불필요).
+/// worldArrow / screenIndicator 미할당 시 **절차 생성**(월드 ▼ 글리프 · 화면 화살촉 그림 — 수동 제작 불필요).
 /// </summary>
 public sealed class OnboardingGuideArrow : MonoBehaviour
 {
@@ -17,8 +17,8 @@ public sealed class OnboardingGuideArrow : MonoBehaviour
 
     [Header("3D 월드 화살표 (대상 위) — 미할당 시 자동 생성")]
     [SerializeField] private Transform worldArrow;
-    [SerializeField] private float worldHeight = 2.6f;
-    [SerializeField] private float bounceAmplitude = 0.25f;
+    [SerializeField] private float worldHeight = 2.9f;          // 10-22 2.6 → 2.9 · 0.25 → 0.12 — 서약 조립 이름표(2.15)에 내려앉았다
+    [SerializeField] private float bounceAmplitude = 0.12f;
     [SerializeField] private float bounceSpeed = 3f;
 
     [Header("화면 가장자리 인디케이터 — 미할당 시 자동 생성")]
@@ -133,10 +133,11 @@ public sealed class OnboardingGuideArrow : MonoBehaviour
         go.transform.SetParent(transform, false);
         var tmp = go.AddComponent<TextMeshPro>();
         ApplyFont(tmp);
+        if (font == null) RelicFloatText.ApplyThin(tmp);   // 10-22 「화살표가 어색」 — 굵은 DNF ▼ 1 m(크기 10) → 얇은 ▼ · 크기 4 · 옅은 금
         tmp.text = "▼";
-        tmp.fontSize = 10f;
+        tmp.fontSize = 4f;
         tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color = new Color(1f, 0.85f, 0.2f);
+        tmp.color = new Color(UIPalette.Gold.r, UIPalette.Gold.g, UIPalette.Gold.b, 0.85f);
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
         return go.transform;
     }
@@ -156,27 +157,20 @@ public sealed class OnboardingGuideArrow : MonoBehaviour
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.matchWidthOrHeight  = 0.5f;
 
+        // 한쪽으로 긴 화살촉 그림(10-18: 글자 ▶는 거의 정삼각형이라 돌리면 어느 쪽이 앞인지 헷갈렸다)
         var go = new GameObject("GuideArrowUI", typeof(RectTransform));
         go.transform.SetParent(canvasGo.transform, false);
-        var tmp = go.AddComponent<TextMeshProUGUI>();
-        ApplyFontUI(tmp);
-        tmp.text = "▶";
-        tmp.fontSize = 56f;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color = new Color(1f, 0.85f, 0.2f);
-        tmp.raycastTarget = false;
+        var img = go.AddComponent<Image>();
+        img.sprite         = UIProceduralSprites.Pointer();
+        img.preserveAspect = true;
+        img.color          = new Color(1f, 0.85f, 0.2f);
+        img.raycastTarget  = false;
         var rt = (RectTransform)go.transform;
         rt.sizeDelta = new Vector2(64f, 64f);
         return rt;
     }
 
     private void ApplyFont(TextMeshPro tmp)
-    {
-        var f = font != null ? font : TMP_Settings.defaultFontAsset;
-        if (f != null) tmp.font = f;
-    }
-
-    private void ApplyFontUI(TextMeshProUGUI tmp)
     {
         var f = font != null ? font : TMP_Settings.defaultFontAsset;
         if (f != null) tmp.font = f;

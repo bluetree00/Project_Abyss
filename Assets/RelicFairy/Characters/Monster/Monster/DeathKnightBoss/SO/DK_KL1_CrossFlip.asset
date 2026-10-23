@@ -35,7 +35,7 @@ MonoBehaviour:
   recoveryTime: 0.5
   impactVfxPrefab: {fileID: 1644958980890870, guid: d0ebac18aae7a7349a6feb3ac42cbccd,
     type: 3}
-  impactVfxRadius: 8
+  impactVfxRadius: 6
   flipSfx: {fileID: 8300000, guid: 843f88f7315a7b34384ff4b7fb882ad8, type: 3}
   bigSlashSfx: {fileID: 8300000, guid: a5b4676a78851ad408e98b3c68202f75, type: 3}
   damageMultiplier: 1.2

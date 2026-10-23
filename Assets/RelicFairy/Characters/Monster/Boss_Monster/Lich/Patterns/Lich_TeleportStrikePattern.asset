@@ -21,6 +21,8 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: teleportstrike
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: be71dfe94531dad45995607fc2cd5173, type: 2}
+  followUpLateOnly: 0
   maxTriggerRange: 30
   patternCooldown: 6
   vanishDuration: 0.7
@@ -36,3 +38,6 @@ MonoBehaviour:
   breakRadius: 7
   breakWarn: 1
   breakSeconds: -1
+  leapCount: 2
+  nextLeapDelay: 0.4
+  nextLeapWarn: 0.8

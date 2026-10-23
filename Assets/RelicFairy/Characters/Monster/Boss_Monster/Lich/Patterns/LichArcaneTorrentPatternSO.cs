@@ -105,6 +105,7 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
 
     private const float FlowBurstInterval = 0.12f;
     private const float FlowBurstScale    = 0.6f;
+    private const float MoveSpeedFloor    = 1f;     // 리치 둘레를 이보다 느리게 돌면 제자리로 본다(m/s)
 
     private Phase      _phase;
     private float      _timer;
@@ -120,6 +121,8 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
     private Transform  _beamFrom;   // 격류 광선 두 끝(LichVfx.PlayBeamTracked가 매 프레임 따라간다)
     private Transform  _beamTo;
     private bool       _signaled;
+    private Vector3    _prevPlayer;
+    private Vector3    _playerVel;  // 플레이어 수평 속도(부드럽게) — 회전 방향을 이동 쪽으로(10-22 E2 L3)
 
     public LichArcaneTorrentState(LichArcaneTorrentPatternSO data) : base(data) { }
 
@@ -131,6 +134,8 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         _flowTimer = 0f;
         _groundY   = (ctx.Monster as LichMonster)?.SpawnGroundY ?? ctx.Transform.position.y;
         _signaled  = false;
+        _playerVel  = Vector3.zero;
+        _prevPlayer = LichPatternUtil.PlayerFloorPos(ctx);
 
         ctx.Animator?.CrossFade("DeathRayStart", 0.1f);
 
@@ -149,6 +154,7 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         {
             case Phase.Rise:
                 FacePlayer(ctx);
+                TrackPlayer(ctx, Time.deltaTime);
                 if (_timer >= Data.riseDuration) BeginCharge(ctx);
                 break;
 
@@ -208,7 +214,7 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
     {
         _phase    = Phase.Charge;
         _timer    = 0f;
-        _sweepDir = Random.value > 0.5f ? 1f : -1f;
+        _sweepDir = SweepDirection(ctx);   // 플레이어가 도는 쪽(예측) · 절반은 반대(10-22 E2 L3)
 
         // 시작각: 플레이어 yaw에서 스윕 반대편으로 오프셋 → 격류가 플레이어 위치를 가로지른다.
         _beamAngle = YawToPlayer(ctx) - _sweepDir * (Data.sweepArc * 0.5f);
@@ -393,6 +399,36 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         d.y = 0f;
         if (d.sqrMagnitude < 0.001f) return ctx.Transform.eulerAngles.y;
         return Quaternion.LookRotation(d).eulerAngles.y;
+    }
+
+    /// <summary>
+    /// 회전 방향 — 플레이어가 리치 둘레를 도는 쪽(이동 예측)으로 쓸고, 절반 확률로 반대로(10-22 E2 L3 — 실측 0/3).
+    /// 거의 서 있으면 무작위.
+    /// </summary>
+    private float SweepDirection(MonsterContext ctx)
+    {
+        float dir    = Random.value > 0.5f ? 1f : -1f;
+        var   target = ctx.Runtime.PlayerTarget;
+        if (target != null)
+        {
+            Vector3 to = target.position - ctx.Transform.position;
+            to.y = 0f;
+            // + = 시계 방향(yaw 증가) — 격류 각도 진행(_beamAngle += … × _sweepDir)과 같은 부호
+            float tangential = to.sqrMagnitude > 0.01f ? Vector3.Cross(to.normalized, _playerVel).y : 0f;
+            if (Mathf.Abs(tangential) >= MoveSpeedFloor) dir = Mathf.Sign(tangential);
+        }
+        return Random.value < 0.5f ? -dir : dir;
+    }
+
+    /// <summary>플레이어 수평 속도를 부드럽게 잰다(순간 회피 한 번에 끌려가지 않게 · 성흔 탄막과 같은 방식).</summary>
+    private void TrackPlayer(MonsterContext ctx, float dt)
+    {
+        if (dt <= 0f) return;
+        Vector3 p   = LichPatternUtil.PlayerFloorPos(ctx);
+        Vector3 v   = (p - _prevPlayer) / dt;
+        v.y         = 0f;
+        _playerVel  = Vector3.Lerp(_playerVel, v, Mathf.Clamp01(dt * 6f));
+        _prevPlayer = p;
     }
 
     private static void FacePlayer(MonsterContext ctx)

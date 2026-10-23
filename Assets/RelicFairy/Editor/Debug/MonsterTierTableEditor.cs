@@ -230,11 +230,11 @@ public static class MonsterTierTableEditor
 
     /// <summary>GameRunSession.CurrentDifficultyScaleFor × MonsterBase.EffectiveMaxHp(보스 · 분열 배율 1).</summary>
     private static int EffectiveHp(Species s, int ch)
-        => Mathf.RoundToInt(s.Hp * ChapterBalance.Of((ChapterId)ch).HpFor(s.Grade) * (1f + AbyssDepth * 0.25f) * EraBalance.For(Era).StatScale);
+        => Mathf.RoundToInt(s.Hp * ChapterBalance.Of((ChapterId)ch).HpFor(s.Grade) * (1f + AbyssDepth * 0.25f) * EraBalance.For(Era).HpScale);
 
-    /// <summary>GameRunSession.CurrentAttackScale × attackPower(MonsterBase 근접 판정 · 패턴 배율 전).</summary>
+    /// <summary>GameRunSession.CurrentAttackScaleFor × attackPower(MonsterBase 근접 판정 · 패턴 배율 전).</summary>
     private static int EffectiveAttack(Species s, int ch)
-        => (int)(s.Atk * ChapterBalance.Of((ChapterId)ch).Attack * (1f + AbyssDepth * 0.25f) * EraBalance.For(Era).StatScale);
+        => (int)(s.Atk * ChapterBalance.Of((ChapterId)ch).AttackFor(s.Grade) * (1f + AbyssDepth * 0.25f) * EraBalance.For(Era).StatScale);
 
     /// <summary>MonsterBase.TakeDamage — max(1, 피해 − 방어).</summary>
     private static int Hits(int hp, float def) => Mathf.CeilToInt(hp / Mathf.Max(1f, StartHit - def));

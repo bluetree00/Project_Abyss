@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Threading;
 using RelicFairy.UI;
 using UnityEngine;
 
@@ -39,8 +41,17 @@ public class LichSoulCopyPatternSO : BossPatternSO
     public float boltWarn       = 1.0f;
     public float boltDamage     = 0.5f;
 
+    [Header("영혼 복제 — 동안 천공 낙하 1파 (10-22 E2 L1 동시 연계)")]
+    [Tooltip("복제체가 선 지 이만큼(초) 뒤 잔해 한 파를 떨어뜨린다. 음수면 없음")]
+    [SerializeField] private float _debrisAt = -1f;
+    [Tooltip("잔해 값(첫 파 개수 · 반경 · 예고 · 피해 · 코어 반경)을 빌릴 천공 낙하 에셋. 피해는 사슬 둘째 칸이라 ×0.8")]
+    [SerializeField] private LichSkyDebrisPatternSO _debrisSource;
+
     // ── 런타임 ───────────────────────────────────────────
     private LichSoulCopyState _state;
+
+    public float                  DebrisAt     => _debrisAt;
+    public LichSkyDebrisPatternSO DebrisSource => _debrisSource;
 
     public override void Initialize(BossPatternContext ctx) => _state = new LichSoulCopyState(this);
     public override void OnRecycled()                       => _state = new LichSoulCopyState(this);
@@ -67,20 +78,24 @@ public class LichSoulCopyState : UnInterruptibleState<LichSoulCopyPatternSO>
     private readonly LichSoulTape  _tape     = new();
     private readonly Vector3[]     _anchors  = new Vector3[CopyCount];
     private readonly GameObject[]  _marks    = new GameObject[CopyCount];
-    private readonly bool[]        _signaled = new bool[CopyCount];
 
     private Phase   _phase;
     private float   _timer;
     private float   _boltTimer;
     private Vector3 _center;
+    private bool    _debrisDone;   // 이번 복제 동안 잔해 한 파를 떨어뜨렸다(10-22 E2 L1)
+    private readonly List<Vector3>             _debris = new();   // 잔해 자리 — 천공 낙하와 같게 빽빽이(10-22 E5 페이지2)
+    private readonly System.Predicate<Vector3> _outsideCore;
 
-    public LichSoulCopyState(LichSoulCopyPatternSO data) : base(data) { }
+    public LichSoulCopyState(LichSoulCopyPatternSO data) : base(data)
+        => _outsideCore = p => LichPatternUtil.FlatDistance(p, _center) > Data.coreRadius;
 
     public override void Enter(MonsterContext ctx)
     {
         _phase     = Phase.Open;
         _timer     = 0f;
         _boltTimer = 0f;
+        _debrisDone = false;
 
         var mc = LichPatternUtil.Mover(ctx);
         mc?.SetLocked(true);
@@ -103,9 +118,9 @@ public class LichSoulCopyState : UnInterruptibleState<LichSoulCopyPatternSO>
         PickAnchors(ctx);
         for (int i = 0; i < CopyCount; i++)
         {
-            _signaled[i] = false;
+            // (10-23 가이드 색 통일) 복제가 설 자리 — 피해가 없다 → 공격 색 · 빨강 신호 대신 소환 색으로 차오르기만
             _marks[i] = LichPatternUtil.PrepareTelegraph(
-                PatternGuideHelper.Disc(_anchors[i] + Vector3.up * 0.03f, 1.4f, LichPatternUtil.Arcane), LichPatternUtil.Arcane);
+                PatternGuideHelper.Disc(_anchors[i] + Vector3.up * 0.03f, 1.4f, PatternGuideHelper.Summon), PatternGuideHelper.Summon);
         }
 
         LichPatternUtil.FaceInstant(ctx, target.position);
@@ -126,7 +141,7 @@ public class LichSoulCopyState : UnInterruptibleState<LichSoulCopyPatternSO>
         {
             case Phase.Open:
                 for (int i = 0; i < CopyCount; i++)
-                    LichPatternUtil.TickTelegraph(_marks[i], _timer, Data.openDuration, 0.2f, ref _signaled[i]);
+                    PatternGuideHelper.SetProgress(_marks[i], _timer / Mathf.Max(0.01f, Data.openDuration));
                 if (_timer >= Data.openDuration)
                 {
                     SpawnCopies(ctx);
@@ -142,6 +157,8 @@ public class LichSoulCopyState : UnInterruptibleState<LichSoulCopyPatternSO>
                     _boltTimer = 0f;
                     FireBolt(ctx);
                 }
+                if (!_debrisDone && Data.DebrisSource != null && Data.DebrisAt >= 0f && _timer >= Data.DebrisAt)
+                    DropDebris(ctx);
                 if (LichSoulCopy.Live.Count == 0 || _timer >= Data.activeDuration)
                 {
                     LichSoulCopy.ClearAll();
@@ -211,6 +228,31 @@ public class LichSoulCopyState : UnInterruptibleState<LichSoulCopyPatternSO>
                                  LichVfxSlot.BoltImpact, LichPatternUtil.BoltScale(Data.boltRadius), crack: false);
         LichVfx.Play(LichVfxSlot.BoltMuzzle, ctx.Transform.position + Vector3.up * 1.6f, Quaternion.identity, 0.8f);
         LichSfx.Play(LichSfxSlot.CastShort, ctx.Transform.position, 0.6f);
+    }
+
+    /// <summary>
+    /// 복제체가 싸우는 동안 잔해 한 파(천공 낙하 첫 파 · 10-22 E2 L1 「최종장 몰아침」) — 첫 낙하점은 플레이어 자리, 나머지는 코어 안 무작위.
+    /// 동시 연계의 덧공격이라 피해 × <see cref="LichPatternUtil.ChainLinkDamage"/>.
+    /// </summary>
+    private void DropDebris(MonsterContext ctx)
+    {
+        _debrisDone = true;
+        var src   = Data.DebrisSource;
+        int count = src.waveCounts != null && src.waveCounts.Length > 0 ? Mathf.Max(1, src.waveCounts[0]) : 3;
+        var lich  = LichPatternUtil.Lich(ctx);
+        CancellationToken ct = lich != null ? lich.ActivationToken : CancellationToken.None;
+        // 첫 점 = 플레이어 자리 · 나머지는 둘레에 빽빽이(천공 낙하와 같은 틈 · 10-22 E5 페이지2)
+        Vector3 player = LichPatternUtil.PlayerFloorPos(ctx);
+        _debris.Clear();
+        LichPatternUtil.PackDiscs(_debris, player, src.coreRadius, src.debrisRadius, src.PackGap, count, player, _outsideCore);
+        for (int i = 0; i < _debris.Count; i++)
+        {
+            Vector3 at = LichPatternUtil.OnFloor(ctx, _debris[i]);
+            LichHazards.DelayedBlast(ctx, at, src.debrisRadius, src.debrisWarn, src.damageMultiplier * LichPatternUtil.ChainLinkDamage,
+                                     LichVfxSlot.DebrisImpact, 1f, crack: true);
+            LichSkyDebrisState.DropRockAsync(at, src.debrisWarn, ct).Forget();
+        }
+        LichSfx.Play(LichSfxSlot.Collapse, _center, 0.6f);
     }
 }
 }

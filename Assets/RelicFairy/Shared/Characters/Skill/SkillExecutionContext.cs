@@ -10,6 +10,8 @@ public class SkillExecutionContext
     public AbilityExecution Execution;
     public WeaponData WeaponData;
     public SkillType Slot;
+    /// <summary>피해 값을 「공격력 %」로 읽는가(<see cref="SkillSO.damageIsAtkPercent"/> · 10-18).</summary>
+    public bool DamageIsAtkPercent;
     public WeaponActionType ActionType;
 
     /// <summary>스킬 종료 요청 — 호출하면 다음 프레임에 ActState.None으로 전환</summary>
@@ -84,7 +86,10 @@ public class SkillExecutionContext
     {
         if (WeaponData == null) return baseDamage;
         var kind = WeaponData.weaponType.GetAttackStatKind();
-        return DamageFormula.Calculate(baseDamage, RuntimeStats.GetEffectiveAttack(kind)) * MeleeAugments.SkillDamageMult(WeaponData, Slot);   // 환영 베기 강화 증강(10-15)
+        int atk = RuntimeStats.GetEffectiveAttack(kind);
+        // 공격력 % — 「값 + 공격력」 덧셈은 스킬 한 타가 평타 한 타와 같아 손이 안 갔다(10-18 실측 66)
+        float raw = DamageIsAtkPercent ? atk * baseDamage * 0.01f : DamageFormula.Calculate(baseDamage, atk);
+        return raw * MeleeAugments.SkillDamageMult(WeaponData, Slot);   // 환영 베기 강화 증강(10-15)
     }
 
     /// <summary>
@@ -93,7 +98,9 @@ public class SkillExecutionContext
     /// 스킬은 반드시 이 경로를 쓴다(ActionType이 자동으로 Q/E/R로 전달된다).
     /// </summary>
     /// <param name="skipHitVfx">스킬이 자기 타격 이펙트를 직접 띄우면 true — 공용 히트 VFX(HitEffect_02)가 한 번 더 떠 한 타에 둘이 보였다(10-06 버그 목록).</param>
-    public float DealDamage(UnityEngine.GameObject target, float damage, float knockback, bool isFinisher = false, bool skipHitVfx = false)
+    /// <param name="hitEffectKey">타격 이펙트 키 — 비우면 공용 노란 베기(HitEffect_02). 무기 계열 색을 맞출 때 넘긴다(10-22 B4).</param>
+    public float DealDamage(UnityEngine.GameObject target, float damage, float knockback, bool isFinisher = false, bool skipHitVfx = false,
+                            string hitEffectKey = null, float hitEffectScale = 0f)
     {
         if (target == null || Controller == null) return 0f;
 
@@ -108,15 +115,18 @@ public class SkillExecutionContext
             SourcePosition      = Controller.transform.position,
             IsFinisher          = isFinisher,
             SkipHitVfx          = skipHitVfx,
+            HitEffectKey        = hitEffectKey,
+            HitEffectScale      = hitEffectScale,
         });
     }
 
     /// <summary>IDamageable 대상 오버로드 — 스킬 Behavior들이 IDamageable 목록을 들고 있어 편의 제공.</summary>
-    public float DealDamage(IDamageable target, float damage, float knockback, bool isFinisher = false, bool skipHitVfx = false)
+    public float DealDamage(IDamageable target, float damage, float knockback, bool isFinisher = false, bool skipHitVfx = false,
+                            string hitEffectKey = null, float hitEffectScale = 0f)
     {
         // 파괴된 대상(죽는 순간 Destroy하는 DK 떠다니는 검 · 무덤 기둥 등)은 Unity null인데 `?.`는 C# null만 거른다 — .gameObject에서 예외가 나
         // 스킬 상태가 끝나지 않아 굳고 앞 대상들은 매 프레임 다시 맞았다(10-09 출시 점검 P0)
         if (target is not UnityEngine.Component c || c == null) return 0f;
-        return DealDamage(c.gameObject, damage, knockback, isFinisher, skipHitVfx);
+        return DealDamage(c.gameObject, damage, knockback, isFinisher, skipHitVfx, hitEffectKey, hitEffectScale);
     }
 }

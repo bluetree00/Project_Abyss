@@ -1517,6 +1517,8 @@ public class RunFlowController : MonoBehaviour
         frame.transform.localRotation = Quaternion.identity;
         float k = Mathf.Min(ow / FrameRefW, oh / FrameRefH);
         frame.transform.localScale = new Vector3(k, k, k);
+        // 좁은 개구부(폭이 배율을 정함)에선 문틀이 개구부보다 낮다 — 개구부 가운데에 두면 떴다(10-18 Ch2 대기방 폭 8 m → 3.6 m 위). 바닥에 앉힌다
+        frame.transform.localPosition = Vector3.down * ((oh - FrameRefH * k) * 0.5f);
 
         // 문틀 횃불 — HDRP 원본(SM_Standtorch)의 물리 단위 세기(51.7)가 URP에선 배율 그대로라, 방에 들어선 카메라 3 m 옆에서
         // 통로 벽을 하얗게 태웠다(10-06 실측 — 방 벽 횃불은 0.9~2.5). 방 횃불 수준으로 낮추고 불빛 색을 입힌다.
@@ -1815,7 +1817,7 @@ public class RunFlowController : MonoBehaviour
             case RoomPlanKind.Shop:     return "물건 구매";
             case RoomPlanKind.Crucible: return "무기 강화 · 승급";
             case RoomPlanKind.Refinery: return "룬 정제";
-            case RoomPlanKind.Rest:     return "쉬거나 · 벼리거나";
+            case RoomPlanKind.Rest:     return "체력 회복 또는 무기 강화";   // 10-18 「쉬거나 · 벼리거나」 → 결과로
             case RoomPlanKind.Event:    return "시험 · 선택";
             case RoomPlanKind.Boss:     return "결전";
             case RoomPlanKind.PreBoss:  return "보스 직전";

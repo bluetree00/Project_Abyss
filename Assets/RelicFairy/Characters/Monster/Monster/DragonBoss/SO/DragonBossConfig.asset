@@ -109,6 +109,11 @@ MonoBehaviour:
     - {fileID: 11400000, guid: c48239b7126fa644284c593612ea0bfa, type: 2}
     selectionMode: 0
     forceExecute: 0
+  - conditions: 0f000000
+    patterns:
+    - {fileID: 11400000, guid: 7ff807eaeb89128499e282206387658c, type: 2}
+    selectionMode: 0
+    forceExecute: 0
   - conditions: 290000000f000000
     patterns:
     - {fileID: 11400000, guid: d6ad2cdb070cf7746b9e482391a44610, type: 2}

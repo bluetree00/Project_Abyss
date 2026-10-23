@@ -25,9 +25,15 @@ public class FanArrowBehaviorSO : SkillBehaviorSO
     [Header("발사 위치")]
     public float forwardOffset = 1f;
     public float upOffset = 1f;
+    [Tooltip("수평으로 날린다 — 정면 적 높이로 기울이지 않는다(관통하는 넓은 검기 · 10-23 무형참 9 m 0타)")]
+    public bool flyLevel = false;
 
     [Header("2단계: 관통")]
     public int pierceMaxCount = 5;
+    [Tooltip("관통이 붙는 스킬 단계(10-22 무형참 = 1 — 사용자 「검기가 제대로 적을 관통하면서 날아가게」)")]
+    public int pierceFromTier = 2;
+    [Tooltip("2단계부터 검기 크기(그림 · 판정 반경 함께) 배율 — 1이면 그대로")]
+    public float tier2SizeMult = 1f;
 
     [Header("3단계: 폭발")]
     public float explodeRadius = 2f;
@@ -39,6 +45,8 @@ public class FanArrowBehaviorSO : SkillBehaviorSO
     [Tooltip("비어있으면 기본 화살 메시 사용")]
     public string projectileEffectKey = "";
     public float projectileEffectScale = 1f;
+    [Tooltip("판정 반경(m) — 0이면 화살 기본(0.35). 검기처럼 넓은 그림은 그림 폭에 맞춘다(10-18 무형참)")]
+    public float projectileHitRadius = 0f;
 
     [Header("티어별 추가 이펙트")]
     [Tooltip("2단계: 발사 시 추가 머즐 이펙트")]
@@ -182,6 +190,7 @@ public class FanArrowBehaviorSO : SkillBehaviorSO
             // 스킬 화살에도 얹힌다. 예전엔 여기서 Fire를 직접 불러 파츠가 스킬엔 안 닿았다.
             var req = ProjectileRequest.Create(_data.arrowKey, pos, dir, dmg, ctx.Controller.gameObject, ctx.SourceSlot);
             req.actionType = ctx.ActionType;   // 스킬 피해 증가가 붙도록 — 기본 공격으로 신고하면 안 된다
+            req.flyLevel = _data.flyLevel;
             CombatSpawner.SpawnProjectile(ref req, arrow, extra => ApplySkillExtras(extra, req, dmg, tier));
             obj.transform.localScale = Vector3.one * req.sizeMult;
             ApplySkillExtras(obj, req, dmg, tier);
@@ -195,12 +204,14 @@ public class FanArrowBehaviorSO : SkillBehaviorSO
         {
             if (obj == null || !obj.TryGetComponent<BasicArrow>(out var arrow)) return;
 
-            // 투사체 비주얼 이펙트
+            // 투사체 비주얼 이펙트 — 2단계부터 크기 배율(그림 · 판정 함께)
+            float size = tier >= 2 ? Mathf.Max(0.1f, _data.tier2SizeMult) : 1f;
             if (!string.IsNullOrEmpty(_data.projectileEffectKey))
-                arrow.SetVisualEffect(_data.projectileEffectKey, _data.projectileEffectScale);
+                arrow.SetVisualEffect(_data.projectileEffectKey, _data.projectileEffectScale * size);
+            if (_data.projectileHitRadius > 0f) arrow.SetHitRadius(_data.projectileHitRadius * size);
 
-            // 2단계 이상: 관통
-            if (tier >= 2)
+            // 관통(무형참은 1단계부터)
+            if (tier >= _data.pierceFromTier)
                 arrow.SetPierce(Mathf.Max(_data.pierceMaxCount, req.pierce));
 
             // 3단계: 관통 + 폭발 + 추가 히트 이펙트
@@ -232,7 +243,8 @@ public class FanArrowBehaviorSO : SkillBehaviorSO
                 }
             }
 
-            ctx.Animator.CrossFade(animName, 0.05f);
+            // 검기가 나가는 순간(fireDelay)에 클립의 휘두름이 닿게 — 예전엔 처음부터 틀어 검기가 휘두름보다 0.2초 먼저 나갔다(10-22 실측 67)
+            SkillAnimSync.CrossFadeToContact(ctx.Animator, animName, _data.fireDelay, 0.05f);
         }
 
         private static async void SpawnEffect(SkillExecutionContext ctx, string key, Vector3 pos, float scale, float lifetime)

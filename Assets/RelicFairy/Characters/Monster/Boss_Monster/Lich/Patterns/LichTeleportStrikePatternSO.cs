@@ -68,6 +68,11 @@ public class LichTeleportStrikePatternSO : BossPatternSO
         return Vector3.Distance(ctx.Ctx.Transform.position, ctx.Ctx.Runtime.PlayerTarget.position) <= maxTriggerRange;
     }
 
+    /// <summary>연계(10-22 E2 L1 「쌍둥이 주문 → 공간 도약」) — 앞 패턴의 일부라 자기 쿨다운은 보지 않는다.</summary>
+    public override bool CanFollowUp(BossPatternContext ctx)
+        => ctx.Ctx.Runtime.PlayerTarget != null
+           && Vector3.Distance(ctx.Ctx.Transform.position, ctx.Ctx.Runtime.PlayerTarget.position) <= maxTriggerRange;
+
     public override SpecialStateBase GetRuntimeState() => _state;
 }
 

@@ -13,6 +13,7 @@ public sealed partial class BossPanelView
     private static readonly Color WuwaTrack = new(0.03f, 0.03f, 0.05f, 0.72f);
     private static readonly Color WuwaFill  = new(0.86f, 0.32f, 0.30f, 1f);
     private const float WuwaNameFontSize = 20f;
+    private const float WuwaCapW = 12f, WuwaCapH = 16f;   // 바 옷 끝 마름모(10-18 ⑲) — 창(≈8.5px)보다 위아래 약 4px 크게
     // 수치 「6437 / 42000」 = 3순위(10-11 비교 리서치 A §2-4 P3 — 비교 6게임 중 4게임은 보스 체력 숫자를 안 보인다).
     // 14 · 알파 0.95로 이름과 비슷하게 밝았다 → 13 · 알파 0.6. 이름(20 · 1.0) > 바 > 수치 순으로 읽힌다.
     private const float WuwaHpFontSize = 13f;
@@ -43,9 +44,12 @@ public sealed partial class BossPanelView
         }
         if (hpFillImage != null)
         {
-            hpFillImage.sprite = UIThinShapes.Solid;   // Filled · Horizontal 그대로(채움 비율로 그린다)
+            hpFillImage.sprite = UIBarDress.FillGrain;   // Filled · Horizontal 그대로(채움 비율로 그린다) · 결 = 바 옷(10-18 ⑲)
             hpFillImage.color  = WuwaFill;
         }
+        // 10-18 ⑲ 바 옷(힉스필드 시안 A) — 채움 창(Fill Area)에 맞춰 위아래 금선 · 양 끝 마름모. 채움보다 뒤(위)에 그린다.
+        if (hpSlider != null && hpSlider.fillRect != null)
+            UIBarDress.Dress((RectTransform)hpSlider.transform, hpSlider.fillRect.parent as RectTransform, WuwaCapW, WuwaCapH);
 
         if (nameText != null)
         {

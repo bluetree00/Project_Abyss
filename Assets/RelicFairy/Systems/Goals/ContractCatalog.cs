@@ -54,7 +54,7 @@ public static class ContractCatalog
     public static readonly ContractDef[] Pool =
     {
         new("elite_5",     "정예 5 처치",        5, 50, s => s.EliteKillCount),
-        new("enhance_6",   "무기 강화 +12 도달", 12, 50, s => s.MaxEnhanceLevel),   // 10-15 강화 단계 세분(옛 +6 · id는 세이브 호환으로 그대로)
+        new("enhance_6",   "무기 재련 4회",      4, 50, s => WeaponReforgeService.CountAt(s.MaxEnhanceLevel)),   // 10-19 재련 횟수로 말한다(옛 +12 = 4회 · id는 세이브 호환으로 그대로)
         new("rooms_8",     "방 8개 클리어",      8, 50, s => s.RoomClearRecords.Count),
         new("boss_1",      "보스 1회 처치",      1, 70, s => s.BossKillCount),
         new("refine_3",    "정제 3회",           3, 50, s => s.RefineUseCount),

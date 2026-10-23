@@ -169,6 +169,39 @@ internal static class BossFxReachEditor
         ("bite",   "Assets/RelicFairy/Characters/Monster/Monster/DragonBoss/Art/Effects/Meteor.prefab", 2.35f),   // 물기 화염구 — 판정 반경 2.35 m(10-15)
     };
 
+    // 10-16 중간 보스(황소) 챕터 이펙트 — 판정 크기: 궤적 · 그림자 = 부채꼴 반경 3.2 · 가시 · 불꽃 = 1.6 m 간격 한 점(반경 0.8) · 구슬 0.8 · 공허 터짐 = 반경 2
+    private static readonly (string tag, string path, float judge)[] FitBull =
+    {
+        ("slash",  "Assets/RelicFairy/Characters/Monster/Monster/BlackKnight/Effect/Sword Slash 15.prefab", 3.2f),
+        ("spike",  "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio 2/Sword slash VFX/Prefabs/Spikes attack.prefab", 0.8f),
+        ("flame",  "Assets/RelicFairy/Characters/Monster/Monster/DragonBoss/Art/Effects/Effect_51_FlameTsunami.prefab", 0.8f),   // 10-18: 배율 1 = 16 m → ×0.05(예전 0.25는 한 점이 4 m — 「불에 판정이 없다」)
+        ("mirror", "Assets/RelicFairy/Characters/Monster/Monster/DeathKnightBoss/Art/Effects/Sword Slash mirror.prefab", 3.2f),
+        ("orb",    "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_2(ScriptBased)/Effects/Effect_33_DemonicSphere/Effect_33_DemonicSphere.prefab", 0.8f),
+        ("arcane", "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Projectiles/Explosion/Explosion_Arcane_2_LWRP.prefab", 2f),
+    };
+
+    [MenuItem("RelicFairy/Boss/FX Fit - Bull (Play)")]
+    private static void FitBl() { if (EditorApplication.isPlaying) FitAsync("bull", FitBull).Forget(); }
+
+    // 10-19 ⑬ 사용자 「서약 광역 피해 이펙트 리소스가 적절하지 않다(노란 구름)」 — 초신성(Explosion_Light_2 · 공칭 0.78 m → 4.5~7.1배로 부풂) 후보 크기.
+    // 판정 3.5 m(초신성 기본 반경) — 배율 1 반경이 3~5 m(배율 ≤ 2)인 것을 고른다(01 조사)
+    private const string SpellsFx = "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/";
+    private const string HovlAaa  = "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/AAA Projectiles Vol 1/Prefabs/";
+    private static readonly (string tag, string path, float judge)[] FitNova =
+    {
+        ("now_exp_light2", SpellsFx + "Projectiles/Explosion/Explosion_Light_2_LWRP.prefab", 3.5f),
+        ("exp_light",      SpellsFx + "Projectiles/Explosion/Explosion_Light_LWRP.prefab",   3.5f),
+        ("spell_light3",   SpellsFx + "Spells/Spell_Light_3_LWRP.prefab",                    3.5f),
+        ("spell_light4",   SpellsFx + "Spells/Spell_Light_4_LWRP.prefab",                    3.5f),
+        ("spell_light6",   SpellsFx + "Spells/Spell_Light_6_LWRP.prefab",                    3.5f),
+        ("spell_light8",   SpellsFx + "Spells/Spell_Light_8_LWRP.prefab",                    3.5f),
+        ("hit18_nova",     HovlAaa + "Hit 18 nova orange.prefab",                            3.5f),
+        ("flash18_nova",   HovlAaa + "Flash 18 nova orange.prefab",                          3.5f),
+    };
+
+    [MenuItem("RelicFairy/Boss/FX Fit - Covenant Nova (Play)")]
+    private static void FitNv() { if (EditorApplication.isPlaying) FitAsync("covenant_nova", FitNova).Forget(); }
+
     [MenuItem("RelicFairy/Boss/FX Fit - Dragon Meteor (Play)")]
     private static void FitDr() { if (EditorApplication.isPlaying) FitAsync("dragon_meteor", FitDragon).Forget(); }
 
@@ -200,6 +233,8 @@ internal static class BossFxReachEditor
                     var go = UnityEngine.Object.Instantiate(prefab, at, Quaternion.LookRotation(fwd));
                     go.transform.localScale = Vector3.one * scale;
                     foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true)) { var m = ps.main; m.scalingMode = ParticleSystemScalingMode.Hierarchy; }
+                    foreach (var mb in go.GetComponentsInChildren<MonoBehaviour>(true))   // 저 혼자 흘러가는 불꽃(FlameTsunami) — 게임에서처럼 멈춰 잰다(10-18)
+                        if (mb != null && mb.GetType().Name == "VariousTranslateMove") mb.enabled = false;
                     if (fitted) ShotLater(Path.Combine(dir, $"{tag}_x{scale:0.00}.png"), 0.6f, ct);
                     var r = await EffectReachProbe.ObserveAsync(before, at, fwd, 1.5f, ct);
                     UnityEngine.Object.Destroy(go);

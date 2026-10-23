@@ -55,7 +55,7 @@ public sealed class EnemyCompassHud : MonoBehaviour
     private CanvasGroup   _group;
     private RectTransform _arrow;
     private CanvasGroup   _arrowGroup;
-    private TMP_Text      _arrowText;
+    private Graphic       _arrowInk;
     private bool          _arrowGoal;      // 화살표가 목표를 가리키는 중(청록)
     private RectTransform _boss;
     private CanvasGroup   _bossGroup;
@@ -178,7 +178,7 @@ public sealed class EnemyCompassHud : MonoBehaviour
     {
         if (_arrowGoal == goal) return;
         _arrowGoal = goal;
-        _arrowText.color = goal ? GoalInk : EnemyInk;
+        _arrowInk.color = goal ? GoalInk : EnemyInk;
     }
 
     /// <summary>보스 배지를 화면 가운데에서 dir 쪽 가장자리에 붙인다 — 위(보스 체력바)·아래(HUD) 띠는 비킨다.</summary>
@@ -242,10 +242,10 @@ public sealed class EnemyCompassHud : MonoBehaviour
         _group.interactable   = false;
 
         // 가장 가까운 몬스터 화살표
-        var arrowText = MakeText(canvasGo.transform, "NearestArrow", ArrowSize, EnemyInk, out _arrowGroup);
-        arrowText.text = "▶";
-        _arrow = arrowText.rectTransform;
-        _arrowText = arrowText;
+        // 화살촉 그림(10-18: 글자 ▶는 거의 정삼각형이라 돌리면 어느 쪽이 앞인지 헷갈렸다)
+        var arrowImg = MakePointer(canvasGo.transform, "NearestArrow", EnemyInk, out _arrowGroup);
+        _arrow = arrowImg.rectTransform;
+        _arrowInk = arrowImg;
         _arrow.sizeDelta = new Vector2(40f, 40f);
 
         // 보스 배지 — 아이콘(또는 ◆) + 거리 + 바깥 화살표
@@ -272,10 +272,24 @@ public sealed class EnemyCompassHud : MonoBehaviour
         _bossDist.rectTransform.anchoredPosition = new Vector2(0f, -(BossIconSize * 0.5f + 14f));
         _bossDist.rectTransform.sizeDelta = new Vector2(120f, 26f);
 
-        var bossArrow = MakeText(_boss, "Arrow", 24f, BossInk, out _);
-        bossArrow.text = "▶";
+        var bossArrow = MakePointer(_boss, "Arrow", BossInk, out _);
         _bossArrow = bossArrow.rectTransform;
         _bossArrow.sizeDelta = new Vector2(34f, 34f);
+    }
+
+    /// <summary>길안내 화살촉(0° = 오른쪽) — 회전해서 쓴다.</summary>
+    private static Image MakePointer(Transform parent, string name, Color color, out CanvasGroup group)
+    {
+        var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(CanvasGroup));
+        go.transform.SetParent(parent, false);
+        group = go.GetComponent<CanvasGroup>();
+        group.blocksRaycasts = false;
+        var img = go.AddComponent<Image>();
+        img.sprite         = UIProceduralSprites.Pointer();
+        img.preserveAspect = true;
+        img.color          = color;
+        img.raycastTarget  = false;
+        return img;
     }
 
     private static TMP_Text MakeText(Transform parent, string name, float size, Color color, out CanvasGroup group)

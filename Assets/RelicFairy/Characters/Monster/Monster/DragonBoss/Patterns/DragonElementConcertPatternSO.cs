@@ -5,7 +5,8 @@ namespace RelicFairy.Monster
 {
 /// <summary>
 /// DL2 「원소 합주」 — 2페이지(심연) 일반 패턴. 1페이지에 쓴 세 원소를 한 번씩 몰아친다.
-///   얼음(플레이어 둘레 원 6개) → 번개(플레이어를 가로지르는 X자 두 줄) → 불(플레이어 주변 원 8개).
+///   얼음(플레이어 둘레 원 6개 · 고리 크기 무작위) → 번개(플레이어를 가로지르는 X자 두 줄 + 양옆 곁줄 = 좁은 마름모 칸)
+///   → 불(첫 원 = 플레이어 자리 · 둘레에 빽빽이). 틈은 1.0~2.4 m 무작위(10-22 E5 페이지2 — 넓은 빈자리로 걸어 나가면 끝이었다).
 ///   원소마다 예고 1.0초(원소 색으로 차오름) → 판정(빨강) · 다음 원소는 0.8초 뒤 시작해 예고가 겹친다.
 /// 자리는 원소 예고가 시작되는 순간의 플레이어 위치로 정해지고 따라오지 않는다(조준형 아님 — 원소 색을 읽고 한 번씩 비킨다).
 /// 지상 · 공중 어디서든 쓴다. 거리 제한 없음.
@@ -40,6 +41,9 @@ public class DragonElementConcertPatternSO : BossPatternSO
     [SerializeField] private float                _thunderWidth      = 2.2f;
     [Tooltip("두 줄이 보스→플레이어 방향과 이루는 각 (도) — 45면 직각으로 교차")]
     [SerializeField] private float                _thunderAngle      = 45f;
+    [Tooltip("두 줄마다 양옆 곁줄 — 가운데 줄 가장자리와의 빈틈 (m, 최소 · 최대 무작위 · 10-22 E5 페이지2). 마름모 칸 한 변 = 이 틈 — " +
+             "최소 1.0이면 몸(지름 0.8)을 빼고 0.2 m만 남아 네 칸이 다 좁은 판(16%)은 걸어서 못 피했다 → 최소 1.4(10-23)")]
+    [SerializeField] private Vector2              _thunderGap        = new Vector2(1.4f, 2.4f);
     [SerializeField] private float                _thunderDamageMult = 0.9f;
     [SerializeField] private PlayerStatusEffectSO _thunderStatus;
     [SerializeField] private GameObject           _thunderVfxPrefab;
@@ -52,8 +56,8 @@ public class DragonElementConcertPatternSO : BossPatternSO
     [Tooltip("첫 원은 플레이어 자리, 나머지는 이 반경 안에 흩어진다 (m)")]
     [SerializeField] private float                _fireScatterRadius = 6.5f;
     [SerializeField] private float                _fireDiscRadius    = 1.8f;
-    [Tooltip("원끼리 최소 간격 (m) — 사이로 빠질 길이 남게")]
-    [SerializeField] private float                _fireMinSeparation = 2.6f;
+    [Tooltip("원 가장자리 사이 빈틈 (m, 최소 · 최대) — 원마다 무작위라 좁고 매번 다르다(10-22 E5 페이지2)")]
+    [SerializeField] private Vector2              _fireGap           = new Vector2(1.0f, 2.4f);
     [SerializeField] private float                _fireDamageMult    = 0.9f;
     [SerializeField] private PlayerStatusEffectSO _fireStatus;
     [SerializeField] private GameObject           _fireVfxPrefab;
@@ -80,6 +84,7 @@ public class DragonElementConcertPatternSO : BossPatternSO
     public float                ThunderHalfLength => _thunderHalfLength;
     public float                ThunderWidth      => _thunderWidth;
     public float                ThunderAngle      => _thunderAngle;
+    public Vector2              ThunderGap        => _thunderGap;
     public float                ThunderDamageMult => _thunderDamageMult;
     public PlayerStatusEffectSO ThunderStatus     => _thunderStatus;
     public GameObject           ThunderVfxPrefab  => _thunderVfxPrefab;
@@ -89,7 +94,7 @@ public class DragonElementConcertPatternSO : BossPatternSO
     public int                  FireCount         => Mathf.Clamp(_fireCount, 1, 12);
     public float                FireScatterRadius => _fireScatterRadius;
     public float                FireDiscRadius    => _fireDiscRadius;
-    public float                FireMinSeparation => _fireMinSeparation;
+    public Vector2              FireGap           => _fireGap;
     public float                FireDamageMult    => _fireDamageMult;
     public PlayerStatusEffectSO FireStatus        => _fireStatus;
     public GameObject           FireVfxPrefab     => _fireVfxPrefab;
@@ -120,7 +125,9 @@ public class DragonElementConcertPatternSO : BossPatternSO
 /// <summary>세 원소 박자를 겹쳐 돌린다 — 얼음(0초) · 번개(0.8초) · 불(1.6초), 각자 예고 1.0초 → 판정 → 치움.</summary>
 internal sealed class DragonElementConcertState : FullLockState<DragonElementConcertPatternSO>
 {
-    private const int StepCount = 3;   // 0 얼음 · 1 번개 · 2 불
+    private const int   StepCount       = 3;      // 0 얼음 · 1 번개 · 2 불
+    private const float IceRingScaleMin = 0.94f;  // 얼음 고리 크기 — 가운데 빈자리가 매번 다르다(10-22 E5 페이지2)
+    private const float IceRingScaleMax = 1.12f;
 
     /// <summary>원소 한 박자 — 예고 가이드와 판정 도형.</summary>
     private sealed class Step
@@ -147,6 +154,7 @@ internal sealed class DragonElementConcertState : FullLockState<DragonElementCon
     }
 
     private readonly Step[] _steps = { new Step(), new Step(), new Step() };
+    private readonly List<Vector3> _pack = new();   // 불 원 깔기(10-22 E5 페이지2)
     private float   _timer;
     private bool    _airborne;
     private Vector3 _hoverPos;
@@ -246,66 +254,58 @@ internal sealed class DragonElementConcertState : FullLockState<DragonElementCon
     /// <summary>얼음 — 플레이어 둘레 고리. 원끼리 겹쳐 닫힌 고리가 되고 한가운데만 비어 있다(가만히 서거나 고리 밖으로).</summary>
     private void BuildIce(MonsterContext ctx, Step step, Vector3 player)
     {
-        Color c      = DragonAbyssFx.WithAlpha(DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice), 0.85f);
+        Color c      = PatternGuideHelper.AttackFill;   // (10-23 가이드 색 통일) 속성은 모양 · 이펙트로
         int   count  = Data.IceCount;
         float offset = Random.Range(0f, 360f);
+        float ring   = Data.IceRingRadius * Random.Range(IceRingScaleMin, IceRingScaleMax);   // 가운데 빈자리 1.0~1.6 m(10-22 E5 페이지2)
         for (int i = 0; i < count; i++)
         {
             float   a   = (offset + i * 360f / count) * Mathf.Deg2Rad;
-            Vector3 pos = player + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * Data.IceRingRadius;
+            Vector3 pos = player + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * ring;
             AddDisc(ctx, step, pos, Data.IceDiscRadius, c);
         }
     }
 
-    /// <summary>번개 — 플레이어 자리에서 교차하는 두 줄(보스→플레이어 방향 ± 각).</summary>
+    /// <summary>
+    /// 번개 — 플레이어 자리에서 교차하는 두 줄(보스→플레이어 방향 ± 각) + 줄마다 양옆 곁줄(틈 ThunderGap 무작위 · 10-22 E5 페이지2).
+    /// 교차점 둘레의 좁은 마름모 칸이 빈자리 — 칸 크기가 매번 다르다. 바닥 밖에 걸리는 곁줄은 뺀다.
+    /// </summary>
     private void BuildThunder(MonsterContext ctx, Step step, Vector3 player)
     {
-        Color   c    = DragonAbyssFx.WithAlpha(DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Thunder), 0.85f);
+        Color   c    = PatternGuideHelper.AttackFill;   // (10-23 가이드 색 통일)
         Vector3 axis = DragonAbyssFx.FlatDir(ctx.Transform.position, player, ctx.Transform.forward);
         for (int i = 0; i < 2; i++)
         {
-            Vector3 dir   = Quaternion.Euler(0f, i == 0 ? Data.ThunderAngle : -Data.ThunderAngle, 0f) * axis;
-            float   fwd   = DragonPatternFloorUtils.DistanceToFloorEdge(player,  dir, Data.ThunderHalfLength);
-            float   back  = DragonPatternFloorUtils.DistanceToFloorEdge(player, -dir, Data.ThunderHalfLength);
-            Vector3 start = player - dir * back;
-            float   len   = Mathf.Max(1f, fwd + back);
-
-            step.Centers.Add(start);
-            step.Dirs.Add(dir);
-            step.Lengths.Add(len);
-            step.Guides.Add(PatternGuideHelper.Prepare(PatternGuideHelper.Beam(start, dir, len, Data.ThunderWidth, c), c));
+            Vector3 dir  = Quaternion.Euler(0f, i == 0 ? Data.ThunderAngle : -Data.ThunderAngle, 0f) * axis;
+            Vector3 side = Vector3.Cross(Vector3.up, dir);
+            AddLine(step, player, dir, c);
+            for (int s = -1; s <= 1; s += 2)
+                AddLine(step, player + side * (s * (Data.ThunderWidth + Random.Range(Data.ThunderGap.x, Data.ThunderGap.y))), dir, c);
         }
     }
 
-    /// <summary>불 — 한 개는 플레이어 자리, 나머지는 주변에 흩뿌린다(원끼리 간격을 둬 사이 길이 남는다).</summary>
+    /// <summary>번개 한 줄 — <paramref name="through"/>를 지나 앞뒤로 바닥 끝(또는 ThunderHalfLength)까지.</summary>
+    private void AddLine(Step step, Vector3 through, Vector3 dir, Color c)
+    {
+        if ((DragonAbyssFx.ClampToArena(through, 0.5f) - through).sqrMagnitude > 0.01f) return;   // 바닥 밖 곁줄
+        float   fwd   = DragonPatternFloorUtils.DistanceToFloorEdge(through,  dir, Data.ThunderHalfLength);
+        float   back  = DragonPatternFloorUtils.DistanceToFloorEdge(through, -dir, Data.ThunderHalfLength);
+        Vector3 start = through - dir * back;
+        float   len   = Mathf.Max(1f, fwd + back);
+
+        step.Centers.Add(start);
+        step.Dirs.Add(dir);
+        step.Lengths.Add(len);
+        step.Guides.Add(PatternGuideHelper.Prepare(PatternGuideHelper.Beam(start, dir, len, Data.ThunderWidth, c), c));
+    }
+
+    /// <summary>불 — 첫 원은 플레이어 자리, 나머지는 둘레에 빽빽이(가장자리 사이 틈 FireGap 무작위 · 10-22 E5 페이지2).</summary>
     private void BuildFire(MonsterContext ctx, Step step, Vector3 player)
     {
-        Color c = DragonAbyssFx.WithAlpha(DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire), 0.85f);
-        AddDisc(ctx, step, player, Data.FireDiscRadius, c);
-
-        float minSepSq = Data.FireMinSeparation * Data.FireMinSeparation;
-        for (int i = 1; i < Data.FireCount; i++)
-        {
-            Vector3 pos = player;
-            for (int tries = 0; tries < 12; tries++)
-            {
-                float a = Random.Range(0f, Mathf.PI * 2f);
-                float r = Random.Range(Data.FireDiscRadius * 1.2f, Mathf.Max(Data.FireDiscRadius * 1.3f, Data.FireScatterRadius));
-                pos = DragonAbyssFx.ClampToArena(player + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * r, 1f);
-                if (!TooClose(step, pos, minSepSq)) break;
-            }
-            AddDisc(ctx, step, pos, Data.FireDiscRadius, c);
-        }
-    }
-
-    private static bool TooClose(Step step, Vector3 pos, float minSepSq)
-    {
-        foreach (var c in step.Centers)
-        {
-            float dx = c.x - pos.x, dz = c.z - pos.z;
-            if (dx * dx + dz * dz < minSepSq) return true;
-        }
-        return false;
+        Color c = PatternGuideHelper.AttackFill;   // (10-23 가이드 색 통일)
+        _pack.Clear();
+        DragonAbyssFx.PackDiscs(_pack, player, Data.FireScatterRadius, Data.FireDiscRadius, Data.FireGap, Data.FireCount, player);
+        for (int i = 0; i < _pack.Count; i++) AddDisc(ctx, step, _pack[i], Data.FireDiscRadius, c);
     }
 
     private static void AddDisc(MonsterContext ctx, Step step, Vector3 pos, float radius, Color c)
@@ -339,9 +339,10 @@ internal sealed class DragonElementConcertState : FullLockState<DragonElementCon
                 break;
 
             case 1:
+                float spacing = Data.ThunderVfxSpacing * (step.Centers.Count > 2 ? 2f : 1f);   // 곁줄까지 여러 줄 — 이펙트 간격을 넓힌다(절제 · 10-22 E5 페이지2)
                 for (int i = 0; i < step.Centers.Count; i++)
                 {
-                    for (float d = Data.ThunderVfxSpacing * 0.5f; d < step.Lengths[i]; d += Data.ThunderVfxSpacing)
+                    for (float d = spacing * 0.5f; d < step.Lengths[i]; d += spacing)
                         DragonAbyssFx.Burst(Data.ThunderVfxPrefab, step.Centers[i] + step.Dirs[i] * d, Quaternion.identity, Data.ThunderVfxScale);
                     inside |= DragonAbyssFx.InStrip(p, step.Centers[i], step.Dirs[i], step.Lengths[i], Data.ThunderWidth * 0.5f);
                 }

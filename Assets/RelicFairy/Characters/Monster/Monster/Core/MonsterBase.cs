@@ -217,6 +217,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>보스 HP 바 초기화용. Config 로드 후 유효.</summary>
     public int CurrentHp => _runtime != null ? _runtime.CurrentHp : 0;
+
+    /// <summary>
+    /// 몸 반경(m · 수평) — 첫 캡슐 콜라이더 반경 × 월드 크기(발밑 그림자와 같은 셈). 캡슐이 없으면 0.4.
+    /// 직선 · 원뿔 추가 피해가 「중심점」이 아니라 「몸에 닿으면」 맞게 쓴다(10-16).
+    /// </summary>
+    public float BodyRadius { get; private set; } = 0.4f;
     /// <summary>지금 방어력(감산) — 받는 피해에서 빠지는 양. 분열 무게가 방어를 뺀 몫에 곱하려고 읽는다(10-14).</summary>
     public float CurrentDefense => _baseDefense * _defenseMulti;
     /// <summary>사망 처리됨(런타임). 서약 등 외부 타겟팅에서 시체 제외용.</summary>
@@ -251,6 +257,15 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// 상태이상 공격 둔화(풀 간파 · 지배)와 곱해져 <see cref="AttackSpeedMultiplier"/>가 된다.
     /// </summary>
     public void SetTraitAttackSpeedMul(float mul) => _traitAttackSpeedMul = Mathf.Max(0.1f, mul);
+
+    /// <summary>챔피언(10-21 무작위 정예화) — 체력 배율을 키우고 그 체력으로 가득 채운다. 풀에서 다시 나오면 OnEnable이 1로 되돌린다.</summary>
+    public void MakeTraitChampion(float hpScale)
+    {
+        _traitHpScale = Mathf.Max(1f, hpScale);
+        if (_runtime == null) return;
+        _runtime.CurrentHp = EffectiveMaxHp;
+        NotifyHPChanged();
+    }
 
     /// <summary>분열 분신 — 체력 배율을 줄이고 그 체력으로 가득 채운다.</summary>
     public void MakeTraitSplitChild(float hpScale)
@@ -451,6 +466,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         // Collider 배열 캐싱 (OnEnable에서 GetComponentsInChildren 반복 방지)
         _cachedColliders = GetComponentsInChildren<Collider>(true);
+        ComputeBodyRadius();
 
         // 4-0. 발밑 가짜 그림자 — 등급별 진하기/링. 콜라이더 반경으로 발자국 크기 산출.
         EnsureGroundShadow();
@@ -576,7 +592,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (_config != null && _config.grade == MonsterGrade.Boss) { _difficultyScale = 1f; _attackScale = 1f; return; }
         var run = AppBootstrapper.Instance?.CurrentRun;
         _difficultyScale = run != null ? run.CurrentDifficultyScaleFor(Grade) : 1f;
-        _attackScale     = run != null ? run.CurrentAttackScale     : 1f;
+        _attackScale     = run != null ? run.CurrentAttackScaleFor(Grade) : 1f;
     }
 
     /// <summary>
@@ -1068,6 +1084,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID(), kind, element);
 
+        // 추가 피해도 맞은 자리에 작은 타격 표시(10-19 ⑭ 「맞았는지 구분이 안 된다」) — DoT 틱은 빼고(속성 몸 이펙트 · 숫자로 충분)
+        if (kind != DamageKind.Dot) ExtraHitCue.Play(GetInstanceID(), HitCuePoint(instigator), element);
+
         // [가이드라인 비주얼] 시너지 '즉발' 피해만 플래시. DoT는 제외 —
         // 화상·독은 0.5~1초마다 틱이라 구체가 지속 내내 깜빡여 화면을 어지럽힌다.
         // DoT는 데미지 숫자(속성색) + 속성 몸 이펙트로 이미 충분히 읽힌다.
@@ -1230,7 +1249,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             //  - 위협(희귀) · 정예는 공격 상태에 들어가면 맞아도 끊기지 않는다(피해는 들어간다).
             //    예전엔 보스 말고 모든 등급이 매 타 0.4초 경직 · 넉백 · 공격 취소라, 때리는 동안 반격이 없었다.
             //  - 정예는 그 밖에도 포이즈가 깨지기 전엔 경직 · 넉백이 없고, 깨지면 1.5초 휘청(받는 피해 +25%).
-            bool committed = _fsm != null && _fsm.IsIn<AttackState>();
+            //  - 10-21 b 위협은 공격 준비부터 확약 — 가장 가까운 적을 연타하면 준비 중 경직으로 영영 못 쳤다(피해 모사 방마다 0~8대).
+            bool committed = _fsm != null
+                && (_fsm.IsIn<AttackState>() || Grade == MonsterGrade.Rare && _fsm.IsIn<AttackReadyState>());
             bool broke = false;
             var poise = Poise;
             if (poise != null)
@@ -1426,6 +1447,37 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         }
         catch (System.OperationCanceledException) { return; }
         SetVisibilityMarkup(true);
+    }
+
+    /// <summary>몸 반경 — 첫 캡슐 콜라이더 × 월드 크기(시각 높이 맞춤 뒤). 인스턴스당 1회.</summary>
+    private void ComputeBodyRadius()
+    {
+        if (_cachedColliders == null) return;
+        for (int i = 0; i < _cachedColliders.Length; i++)
+        {
+            if (_cachedColliders[i] is not CapsuleCollider cap) continue;
+            var ls = cap.transform.lossyScale;
+            BodyRadius = cap.radius * Mathf.Max(Mathf.Abs(ls.x), Mathf.Abs(ls.z));
+            return;
+        }
+    }
+
+    /// <summary>
+    /// 추가타 표시 자리 — 몸 가운데(첫 캡슐 콜라이더 중심)에서 공격자 쪽으로 몸 반경 + 0.35 m(실측 75: 발 위 1 m는 슬라임 위로 뜨고,
+    /// 몸 가운데 · 캡슐 겉은 캡슐보다 큰 몸통 그림에 가려 안 보였다). 캡슐이 없으면 발 위 1 m.
+    /// </summary>
+    private const float HitCueOut = 0.35f;
+
+    private Vector3 HitCuePoint(GameObject instigator)
+    {
+        Vector3 c = transform.position + Vector3.up;
+        if (_cachedColliders != null)
+            for (int i = 0; i < _cachedColliders.Length; i++)
+                if (_cachedColliders[i] is CapsuleCollider cap && cap != null) { c = cap.bounds.center; break; }
+        if (instigator == null) return c;
+        Vector3 d = instigator.transform.position - c;
+        d.y = 0f;
+        return d.sqrMagnitude > 0.0001f ? c + d.normalized * (BodyRadius + HitCueOut) : c;
     }
 
     /// <summary>발밑 가짜 그림자(MonsterGroundShadow)를 런타임 부착·구성. 콜라이더(Capsule) 반경으로 발자국 크기 산출.

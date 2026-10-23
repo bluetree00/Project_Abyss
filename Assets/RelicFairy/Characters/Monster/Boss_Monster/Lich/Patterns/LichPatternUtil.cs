@@ -21,10 +21,17 @@ public enum LichImpact
 /// </summary>
 public static class LichPatternUtil
 {
-    /// <summary>마법 예고(보라) — 「곧 마법이 떨어진다」.</summary>
-    public static readonly Color Arcane = new Color(0.62f, 0.25f, 1.00f);
-    /// <summary>낫 예고(진홍) — 「베기가 온다」. 판정 순간엔 <see cref="Lethal"/>.</summary>
-    public static readonly Color Crimson = new Color(0.75f, 0.08f, 0.22f);
+    /// <summary>
+    /// 마법 예고 — 「곧 마법이 떨어진다」. (10-23 가이드 색 통일) 보라 → 공용 공격 색(<see cref="PatternGuideHelper.AttackFill"/>).
+    /// 이름은 예고 호출 자리를 그대로 두려고 남겼다 — 보라 이펙트 색은 <see cref="ArcaneVfx"/>.
+    /// </summary>
+    public static Color Arcane => PatternGuideHelper.AttackFill;
+    /// <summary>낫 예고 — 「베기가 온다」. 판정 순간엔 <see cref="Lethal"/>. (10-23 가이드 색 통일) 진홍 → 마법과 같은 공용 공격 색 — 진홍 이펙트 색은 <see cref="CrimsonVfx"/>.</summary>
+    public static Color Crimson => PatternGuideHelper.AttackFill;
+    /// <summary>보라 — 마법 이펙트 틴트만(옛 마법 예고 색 · 10-23). 바닥 예고에 쓰지 않는다.</summary>
+    public static readonly Color ArcaneVfx = new Color(0.62f, 0.25f, 1.00f);
+    /// <summary>진홍 — 낫 베기 이펙트 틴트만(옛 낫 예고 색 · 10-23). 바닥 예고에 쓰지 않는다.</summary>
+    public static readonly Color CrimsonVfx = new Color(0.75f, 0.08f, 0.22f);
     /// <summary>안전(흰색).</summary>
     public static readonly Color SafeWhite = new Color(0.95f, 0.95f, 0.90f);
     /// <summary>판정 순간(빨강) — 「지금 피하라」.</summary>
@@ -37,6 +44,15 @@ public static class LichPatternUtil
 
     /// <summary>패링 창 길이(초) — 낫 판정 직전. 판정 전 이만큼 먼저 <see cref="OpenParry"/>를 부른다.</summary>
     public const float ParryWindow = 0.25f;
+
+    /// <summary>사슬 둘째 칸 피해 배율(10-22 E2 L1) — 한 사슬을 다 맞아도 HP 절반을 넘지 않게. 동시 연계(비 · 복제 동안)의 덧공격에도 쓴다.</summary>
+    public const float ChainLinkDamage = 0.8f;
+
+    // 원 깔기(PackDiscs · 10-22 E5 페이지2) — 격자점을 겨눈 자리에서 가까운 순으로(정렬 비교는 한 번만 만든다)
+    private static readonly List<Vector3> s_lattice = new(64);
+    private static Vector3 s_latticeOrigin;
+    private static readonly System.Comparison<Vector3> s_byLatticeDistance =
+        (a, b) => FlatDistance(a, s_latticeOrigin).CompareTo(FlatDistance(b, s_latticeOrigin));
 
     /// <summary>봉인 완성 이펙트(Effect_38 GloryBoundary)에서 끄는 자식 — 연기 장(흰 파편 구름) · 긴 빛기둥(늘인 입자 길이 25) · 빛가루 비 둘(초당 1000 · 500).</summary>
     private static readonly string[] SealCompleteHeavyParts =
@@ -117,6 +133,16 @@ public static class LichPatternUtil
 
     public static void HoldFacing(MonsterContext ctx, float yaw, float turnDegPerSec = 720f)
         => Mover(ctx)?.HoldFacing(yaw, turnDegPerSec);
+
+    /// <summary>표적 쪽으로 초당 <paramref name="turnDegPerSec"/>로 돈다(즉시 회전 대신 · 10-18 실측 마법탄마다 162°/프레임). 판정이 몸 방향이 아닌 패턴에만.</summary>
+    public static void FaceToward(MonsterContext ctx, Vector3 target, float turnDegPerSec = 720f)
+    {
+        Vector3 dir = target - ctx.Transform.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude <= 0.001f) return;
+        if (Mover(ctx) == null) { FaceInstant(ctx, target); return; }
+        HoldFacing(ctx, Quaternion.LookRotation(dir).eulerAngles.y, turnDegPerSec);
+    }
 
     /// <summary>
     /// 봉인 완성(금빛 고리 · <see cref="LichVfxSlot.SealComplete"/>) — 고리 넷만 남기고 나머지 자식(<see cref="SealCompleteHeavyParts"/>)은 끈다
@@ -323,8 +349,57 @@ public static class LichPatternUtil
         return Vector3.Distance(a, b);
     }
 
+    /// <summary>
+    /// 반경 <paramref name="radius"/> 원을 빽빽이 깐다(10-22 E5 페이지2) — 흔든 육각 격자: 격자 한 점 = <paramref name="aim"/>(없으면 <paramref name="area"/>),
+    /// 격자 방향 · 간격은 시전마다 무작위, 원마다 조금씩 흔들어 이웃 원 가장자리 사이 빈틈이 <paramref name="gap"/>(최소 · 최대) 안에서 매번 다르다.
+    /// 빈자리를 무작위로 찾으면(원소 일제 발동 방식) 지름 5 m 넘는 빈자리가 남았다(오프라인 실측) — 격자는 가장 큰 빈자리도 지름 2.5~2.8 m.
+    /// <paramref name="area"/> 둘레 <paramref name="areaRadius"/> 안 격자점을 겨눈 자리에서 가까운 순으로 <paramref name="maxCount"/>개까지 ·
+    /// <paramref name="blocked"/>가 true인 자리(제단 밖 · 안전 칸)는 비운다. <paramref name="discs"/>에 이미 든 원(떨어지는 중인 것)과는 최소 빈틈을 지킨다.
+    /// </summary>
+    public static void PackDiscs(List<Vector3> discs, Vector3 area, float areaRadius, float radius, Vector2 gap, int maxCount,
+                                 Vector3? aim, System.Predicate<Vector3> blocked = null)
+    {
+        float   g      = Random.Range(Mathf.Lerp(gap.x, gap.y, 0.3f), Mathf.Lerp(gap.x, gap.y, 0.7f));   // 이번 시전 간격
+        float   jitter = Mathf.Min(g - gap.x, gap.y - g) * 0.5f;                                       // 원마다 흔들림 — 이웃 틈이 gap 안에 남는다
+        float   step   = radius * 2f + g;
+        Vector3 origin = aim ?? area;
+        float   yaw    = Random.Range(0f, 60f);
+        Vector3 u      = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * step;
+        Vector3 v      = Quaternion.Euler(0f, yaw + 60f, 0f) * Vector3.forward * step;
+        int     n      = Mathf.CeilToInt((areaRadius + FlatDistance(origin, area)) / (step * 0.866f)) + 1;
+
+        s_lattice.Clear();
+        for (int a = -n; a <= n; a++)
+        for (int b = -n; b <= n; b++)
+        {
+            Vector3 p = origin + u * a + v * b;
+            if (FlatDistance(p, area) <= areaRadius) s_lattice.Add(p);
+        }
+        s_latticeOrigin = origin;
+        s_lattice.Sort(s_byLatticeDistance);
+
+        int first = discs.Count;
+        for (int i = 0; i < s_lattice.Count && discs.Count - first < maxCount; i++)
+        {
+            Vector3 p = s_lattice[i];
+            if (!aim.HasValue || FlatDistance(p, origin) > 0.01f)   // 겨눈 자리는 그대로
+            {
+                Vector2 o = Random.insideUnitCircle * jitter;
+                p += new Vector3(o.x, 0f, o.y);
+            }
+            if (blocked != null && blocked(p)) continue;
+            bool crowded = false;
+            for (int k = 0; k < first && !crowded; k++) crowded = FlatDistance(p, discs[k]) < radius * 2f + gap.x;
+            if (!crowded) discs.Add(p);
+        }
+    }
+
+    /// <summary>피해 — 공격력 × 배율. 사슬 둘째 칸(<see cref="LichMonster.IsChainLink"/>)이 도는 동안은 × <see cref="ChainLinkDamage"/>(10-22 E2 L1).</summary>
     public static int Damage(MonsterContext ctx, float multiplier)
-        => Mathf.Max(1, Mathf.RoundToInt((ctx.Config?.stat?.attackPower ?? 0f) * multiplier));
+    {
+        if (Lich(ctx)?.IsChainLink == true) multiplier *= ChainLinkDamage;
+        return Mathf.Max(1, Mathf.RoundToInt((ctx.Config?.stat?.attackPower ?? 0f) * multiplier));
+    }
 
     /// <summary>원 판정 — 맞았으면 true.</summary>
     public static bool HitCircle(MonsterContext ctx, Vector3 center, float radius, float damageMult,

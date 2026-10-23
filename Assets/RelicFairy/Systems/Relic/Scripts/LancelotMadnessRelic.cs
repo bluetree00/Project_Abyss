@@ -19,7 +19,7 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
                       V_FRENZY_MOVE = 8, V_SKILL_BASE = 10,
                       V_SKILL_PER = 11, V_BRAND_DUR = 12, V_BRAND_AMP = 13;
     private const string PassiveTip =
-        "찢긴 서약의 검 — 적중마다 광기(일반 1 · 정예 2 · 엘리트 3 · 보스 5, 최대 40): 스택당 공격력 +1% · 받는 피해 +0.75%. " +
+        "찢긴 서약의 검 — 공격(휘두름 · 스킬) 한 번마다 광기 +1(정예 이상을 맞히면 +2 · 3명 이상 맞히면 +1 더, 최대 40): 스택당 공격력 +1% · 받는 피해 +0.75%. " +
         "40스택에서 '광란' 4초(이동속도 +20%) · 심판의 일격 1회";
 
     // VFX Addressable 키(에셋 배선 후 실 프리팹 등록). 미등록 시 무해.
@@ -109,6 +109,9 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         _madness.OnMaxReached  += HandleMaxReached;
         _madness.OnFrenzyChanged += _onFrenzy;
         RefreshStackBuff();
+
+        // 기억 허브 = 유물 기본 규칙(낙인 「광기 20부터 쌓이고 심판이 찢는다」 · 찢긴 적 받는 피해 +20%)이라 런 시작부터 붙인다(10-22 D11 — 예전엔 첫 조각과 함께)
+        LancelotMemoryHub.Ensure(owner);
     }
 
     public void OnDetach(PlayerController owner)
@@ -157,8 +160,18 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         return Mathf.Max(0, Mathf.RoundToInt(dmg * mult));
     }
 
-    /// <summary>광기 패시브(OnAttackHit)가 호출 — 대상 등급에 따른 스택 획득(보스일수록 크다).</summary>
+    /// <summary>스택 획득(조각 · 진화 등 직접 주는 몫).</summary>
     public void AddStack(int amount = 1) => _madness?.AddStack(amount);
+
+    /// <summary>광기 패시브가 행동 단위로 준 몫 — 주고 나서 <see cref="ActionStackGained"/>로 알린다(진화 「끝없는 광란」 ×1.5가 받는다 · 10-19 ⑤).</summary>
+    public void AddActionStack(int amount)
+    {
+        AddStack(amount);
+        ActionStackGained?.Invoke(amount);
+    }
+
+    /// <summary>행동 단위 광기 획득량(광란 중 동결이어도 알린다 — 받는 쪽이 거른다).</summary>
+    public event Action<int> ActionStackGained;
 
     /// <summary>
     /// 심판의 일격 — 연속 참격 1타분. 런타임(JudgmentStrikeRuntime)이 hitCount번 나눠 호출한다.
@@ -169,7 +182,7 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
     /// 광기 스택은 광란 중 동결이라 다타로도 안 불어난다.
     ///
     /// 매 타마다 콘을 <b>다시 질의</b>하므로 도중에 들어온 적도 맞는다.
-    /// 낙인은 1타에서 걸리므로 뒤 타들, 특히 마무리 강타가 증폭된 피해로 꽂힌다(연타의 보상).
+    /// 막타가 낙인을 찢은 적은 받는 피해 +20%(4초)가 막타 피해보다 먼저 걸려 막타부터 증폭된다(10-22 D11 — 「낙인」 하나로).
     /// </summary>
     public void PerformJudgmentStrike(Transform origin, int hitIndex, int hitCount, float shareScale = 1f)
     {
@@ -186,7 +199,7 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
                                      : (1f - JudgmentFinisherShare) / (hitCount - 1)) * Mathf.Max(0f, shareScale);
 
         int   stacks   = _madness != null ? _madness.Stacks : 0;
-        float mult     = V(V_SKILL_BASE, 2.0f) + stacks * V(V_SKILL_PER, 0.08f);
+        float mult     = V(V_SKILL_BASE, 3.5f) + stacks * V(V_SKILL_PER, 0.15f);   // 40스택 9.5(10-16 실측 64: 5.2는 같은 시간 평타의 ×0.5~0.7)
         int   effAtk   = _owner.RuntimeStats.AttackPower;   // 유물 피해 = 근접 · 원거리 중 큰 값(10-14 A5)
 
         // ⚠️ DamageFormula.Calculate(a, b)는 <b>a + b</b>다 — '어빌리티 기본 피해 + 공격 스탯'용 가산 헬퍼.
@@ -242,6 +255,10 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
             // [유물 성장 v2] 피해 직전 — 막타면 허브가 낙인을 찢는다(살아 있을 때 세야 한다).
             JudgmentHit?.Invoke(target, hitIndex, isLast);
 
+            // 받는 피해 +20% = 낙인이 찢긴 적에게만(10-22 D11 — 예전엔 맞은 적 전부 · 1타부터). 몬스터 전용 상태라 더미는 건너뛴다.
+            if (isLast && target.TryGetComponent<MonsterBase>(out var mb) && LancelotMemoryHub.Of(_owner) is { } hub && hub.WasTorn(mb))
+                mb.ApplyDamageTakenAmp(brandAmp, brandDur);
+
             // 주 피해 파이프라인 — 직접 TakeDamage를 부르면 크리티컬·아이템·서약·패시브·타격감이 전부 스킵된다.
             // 넉백은 연타 중 대상이 콘 밖으로 밀려나면 뒤 타가 헛치므로, 마무리에만 세게 준다.
             CombatDamage.Deal(new CombatDamage.Request
@@ -251,6 +268,7 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
                 Owner               = owner,
                 ActionType          = WeaponActionType.QSkill,
                 KnockbackMultiplier = isLast ? 0.8f : 0.05f,
+                NoFlinch            = !isLast,   // 연타는 경직 · 넉백 없이 — 계수 0.9가 포이즈를 깨 표적을 넘어뜨려 남은 연타가 막혔다(10-16 실측 64)
 
                 // 연타는 방어력을 무시한다.
                 // 몬스터 피해식이 감산이다 — actual = max(1, 피해 − 방어). 10타로 줄여 타당 피해가
@@ -263,16 +281,14 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
                 SourcePosition      = pos,
                 ComboStep           = hitIndex,
                 IsFinisher          = isLast,   // 마무리 한 방만 막타 연출
-                ProcCoef            = isLast ? 2.5f : 0.3f,   // 연타 조각은 가볍게 · 마무리는 한 방(10-14 A1)
+                // 연타 0.9 · 마무리 2.5(10-16 「계수도 포함」 — 0.3이면 연타 10타가 같은 시간 평타 계수의 절반도 안 됐다).
+                // 0.9는 강타 문턱(1.5 · 필살 각인 3단계 0.75) 아래라 연타마다 강타 룬이 터지지는 않는다.
+                ProcCoef            = isLast ? 2.5f : 0.9f,
                 // 피격 이펙트 = 붉은 베기(광란 · 원한의 붉은빛). 공용 노란 베기 HitEffect_02 대신(10-08 「공격 종류에 맞춘다」)
                 HitEffectKey        = "KatanaSlashHit",
                 // 연타 10타는 작게(10-11 이펙트 톤 점검 — 0.5는 붉은 폭발 · 불티가 매 타 나와 화면이 어지러웠다) · 마무리 한 방만 0.5
                 HitEffectScale      = isLast ? 0.5f : 0.3f,
             });
-
-            // 심판 낙인(매 타 갱신 → 지속시간은 마무리 기준). 몬스터 전용 상태라 더미는 건너뛴다.
-            if (target.TryGetComponent<MonsterBase>(out var mb))
-                mb.ApplyDamageTakenAmp(brandAmp, brandDur);
         }
 
         if (isLast)
@@ -282,6 +298,12 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
             _finisherRangeScale = 1f;
         }
     }
+
+    private static readonly List<GameObject> s_aheadBuf = new(1);
+
+    /// <summary>심판 판정 원뿔(전방 6 m · ±45°) 안에 맞을 대상이 있나 — 연타 중 다시 겨눔이 쓴다(맞히는 동안은 돌지 않는다 · 10-16).</summary>
+    public bool HasJudgmentTargetAhead(Vector3 pos, Vector3 fwd)
+        => _owner != null && CombatQuery.GetDamageablesInCone(pos, fwd, JudgmentRange, JudgmentHalfAngle, _owner.gameObject, 1, s_aheadBuf, showGuide: false) > 0;
 
     private void HandleMaxReached()
     {

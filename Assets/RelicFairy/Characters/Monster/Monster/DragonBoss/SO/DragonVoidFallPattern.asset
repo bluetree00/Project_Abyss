@@ -21,6 +21,9 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: void_fall
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: f6eacd7249a31834a9927d48e8122f1d, type: 2}
+  followUpLateOnly: 0
+  followUpCooldown: 10
   _cooldown: 32
   _telegraphSeconds: 4
   _blastRadius: 0
@@ -50,7 +53,8 @@ MonoBehaviour:
   _pillarShatterVfxPrefab: {fileID: 1965956805206708, guid: 18923174f2b0caa4d9dbc5fe46052f5b,
     type: 3}
   _pillarShatterVfxScale: 1.2
-  _safeHalfAngle: 20
+  _safeHalfAngle: 15
+  _safeLength: 8
   _groundStateName: UAttackWindHighStart
   _airStateName: Airborne_Hover
   _endPoseSeconds: 0.8

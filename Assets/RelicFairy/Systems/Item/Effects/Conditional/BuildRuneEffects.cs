@@ -305,10 +305,14 @@ public sealed class PoisonSpreadOnKillEffect : ItemEffectBase
         int count = _value2 > 0f ? Mathf.RoundToInt(_value2) : 2;
         float perStack = Mathf.Max(1f, ctx.Stats.GetEffectiveAttack(ctx.WeaponType.GetAttackStatKind()) * (_value > 0f ? _value : 0.04f));
         int n = CombatQuery.GetNearbyEnemies(target.transform.position, 4f, target, count, s_buf);
+        Vector3 from = target.transform.position + Vector3.up * 0.8f;
         for (int i = 0; i < n; i++)
+        {
             for (int k = 0; k <= stacks && k < 8; k++)
                 s_buf[i].Status.ApplyStackingDot(PoisonId, perStack, 1f, 4, 8, ctx.Player.gameObject);
-        ElementVfxPlayer.PlayBurst(RuneElement.Grass, target.transform.position, 2f);
+            // 독이 옮겨 가는 줄기 — 예전 2 m 폭발 그림은 「주변을 터뜨린다」로 읽혔는데 실제는 가까운 2명에게 옮길 뿐이다(10-18 이펙트 점검)
+            ElementVfxPlayer.PlayBeam(RuneElement.Grass, from, s_buf[i].transform.position + Vector3.up * 0.8f, 0.3f);
+        }
     }
 }
 
@@ -338,7 +342,7 @@ public sealed class DashAfterimageEffect : ItemEffectBase
             float dmg = ctx.Stats.GetEffectiveAttack(ctx.WeaponType.GetAttackStatKind()) * (_value > 0f ? _value : 0.8f);
             int n = CombatQuery.GetNearbyEnemies((a + b) * 0.5f, Vector3.Distance(a, b) * 0.5f + HalfWidth + 0.5f, null, 16, s_buf);
             for (int k = 0; k < n; k++)
-                if (FormStrike.DistToSegmentXZ(s_buf[k].transform.position, a, b) <= HalfWidth + 0.4f)
+                if (FormStrike.DistToSegmentXZ(s_buf[k].transform.position, a, b) <= HalfWidth + CombatQuery.BodyReach(s_buf[k]))   // 몸에 닿으면(10-16)
                     CombatQuery.DealSynergyDamage(s_buf[k], dmg, ctx.Player.gameObject, element: RuneElement.Dark);
             FormStrike.GroundStrip(a, b - a, Vector3.Distance(a, b), HalfWidth, 0.3f);
         }

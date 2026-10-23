@@ -20,7 +20,8 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     private static readonly List<GameObject> s_homingBuffer = new();
 
     /// <summary>스윕 1회가 담을 수 있는 최대 충돌 수.</summary>
-    private const int SweepMax = 12;
+    // ⚠️ 작으면 바닥 · 벽 · 트리거가 버퍼를 채워 적이 빠진다 — 넓은 검기(무형참 1.5 m)는 1 m 높이에서 바닥 타일 여럿과 겹쳤다(10-22 실측 85b: 12칸 → 적중 0)
+    private const int SweepMax = 128;
 
     /// <summary>귀환 진입 지점에서 이 거리(m)를 벗어나야 그 대상을 다시 때릴 수 있다. 어떤 몬스터 몸통보다 넉넉히 크다.</summary>
     private const float ReentryGuardDist = 2f;
@@ -34,6 +35,7 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     private const float ReturnTurnMult = 6f;
     private static readonly RaycastHit[] s_sweepHits = new RaycastHit[SweepMax];
     private static readonly SweepDistanceComparer s_sweepOrder = new();
+    private static readonly Collider[] s_startOverlap = new Collider[SweepMax];
 
     /// <summary>가까운 충돌부터 처리해야 화살이 첫 대상에서 멈춘다.</summary>
     private sealed class SweepDistanceComparer : System.Collections.Generic.IComparer<RaycastHit>
@@ -48,6 +50,8 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     /// 물리 스텝 사이(0.6m)를 통째로 건너뛴다 — 판정은 콜라이더가 아니라 이 값으로 한다.
     /// </summary>
     [SerializeField] private float hitRadius = 0.35f;
+    private float _hitRadiusOverride = -1f;   // 이번 발사만의 판정 반경(검기 같은 넓은 투사체 스킬 · 10-18) — 발사마다 지운다
+    private bool _startChecked;               // 출발 지점에 이미 겹친 적을 봤나(발사마다 지운다)
 
     [SerializeField] private float damage = 20f;
     [SerializeField] private float lifetime = 5f;
@@ -194,6 +198,8 @@ public class BasicArrow : MonoBehaviour, IPooledObject
 
         _pierce = false;
         _explode = false;
+        _hitRadiusOverride = -1f;
+        _startChecked = false;
         _pierceCount = 0;
         _pierced = null;
         _hideModel = false;
@@ -262,6 +268,9 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     }
 
     /// <summary>투사체 비주얼을 이펙트로 교체 (스킬용). 모델/트레일을 숨기고 이펙트를 자식으로 부착.</summary>
+    /// <summary>이번 발사의 판정 반경(m) — 보이는 검기 폭에 맞춘다(10-18 무형참). Fire가 지운다.</summary>
+    public void SetHitRadius(float radius) => _hitRadiusOverride = radius;
+
     public async void SetVisualEffect(string effectKey, float scale = 1f)
     {
         _hideModel = true;
@@ -343,7 +352,20 @@ public class BasicArrow : MonoBehaviour, IPooledObject
         if (dist <= 0f) return;
 
         // 화살 크기 배율(크기 파츠 · 스킬 확대)만큼 판정도 — 그림이 커지는데 0.35 m로만 맞았다(10-13 이펙트 = 판정). 줄이지는 않는다
-        float radius = hitRadius * Mathf.Max(1f, Mathf.Abs(transform.lossyScale.x));
+        float radius = _hitRadiusOverride > 0f ? _hitRadiusOverride : hitRadius * Mathf.Max(1f, Mathf.Abs(transform.lossyScale.x));
+
+        // 첫 훑기 — 출발 지점에서 이미 판정 구 안에 든 적은 구체 훑기가 잡지 못했다(무형참 1.2 m가 2 m 앞 적을 0타 · 10-18 실측 66).
+        // 피해 대상만 본다 — 벽 · 바닥은 예전처럼 아래 중심선 검사로만 막는다.
+        if (!_startChecked)
+        {
+            _startChecked = true;
+            int m = Physics.OverlapSphereNonAlloc(from, radius, s_startOverlap, ~0, QueryTriggerInteraction.Collide);
+            for (int i = 0; i < m && !_dead; i++)
+                if (s_startOverlap[i] != null && s_startOverlap[i].GetComponentInParent<IDamageable>() != null)
+                    HandleHit(s_startOverlap[i], from);
+            if (_dead) return;
+        }
+
         int n = Physics.SphereCastNonAlloc(from, radius, dir, s_sweepHits, dist,
                                            ~0, QueryTriggerInteraction.Collide);
         if (n <= 0) return;
@@ -358,8 +380,9 @@ public class BasicArrow : MonoBehaviour, IPooledObject
 
             // 벽 · 바닥(맞을 수 없는 실체)은 화살 중심선이 닿을 때만 막는다 — 넓은 판정 구가 스치기만 해도 막히면
             // 낮은 적을 향해 기운 화살이 적보다 먼저 바닥을 스쳐 사라졌다(10-15 석궁 + 거력 0맞힘 · 거력 없이도 절반).
+            // 중심선은 화살 몸(기본 반경)만큼만 늘린다 — 판정 반경을 넓힌 검기(무형참 1.2 m)는 늘린 중심선이 낮은 표적 앞 바닥에 먼저 닿아 터졌다(10-18 실측 66).
             if (!col.isTrigger && col.GetComponentInParent<IDamageable>() == null
-                && !col.Raycast(new Ray(from, dir), out _, dist + radius)) continue;
+                && !col.Raycast(new Ray(from, dir), out _, dist + Mathf.Min(radius, hitRadius))) continue;
 
             // 시작 지점에 이미 겹쳐 있으면 point가 (0,0,0)으로 온다 — 그때는 출발점을 쓴다.
             Vector3 point = s_sweepHits[i].distance > 0f ? s_sweepHits[i].point : from;

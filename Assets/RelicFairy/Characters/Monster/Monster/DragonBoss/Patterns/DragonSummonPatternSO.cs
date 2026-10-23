@@ -488,8 +488,8 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
         Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
         dir.y = 0f;
         if (dir.sqrMagnitude > 0.01f)
-            ctx.Transform.rotation = Quaternion.Slerp(
-                ctx.Transform.rotation, Quaternion.LookRotation(dir), 8f * Time.deltaTime);
+            ctx.Transform.rotation = Quaternion.RotateTowards(ctx.Transform.rotation,   // 초당 180° 상한(10-18 실측 소환 169°/프레임 — 알 생성 긴 프레임)
+                Quaternion.Slerp(ctx.Transform.rotation, Quaternion.LookRotation(dir), 8f * Time.deltaTime), 180f * Time.deltaTime);
     }
 
     private static void RestoreAgent(MonsterContext ctx)

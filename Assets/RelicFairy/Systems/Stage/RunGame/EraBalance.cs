@@ -14,8 +14,10 @@ public static class EraBalance
 {
     public readonly struct Spec
     {
-        /// <summary>일반 · 정예 몬스터 스탯(HP · 공격) — 챕터 배율 × 심연 깊이 배율에 곱한다.</summary>
+        /// <summary>일반 · 정예 몬스터 <b>공격</b> — 챕터 배율 × 심연 깊이 배율에 곱한다(10-21까지는 체력도 이 값 하나였다).</summary>
         public readonly float StatScale;
+        /// <summary>일반 · 정예 몬스터 <b>체력</b>(10-21 사용자 「악몽은 체급을 압도적으로 — 체력 위주, 공격력은 너무 올리면 비합리적」).</summary>
+        public readonly float HpScale;
         /// <summary>웨이브 마릿수 — 챕터 수량 배율에 곱한다.</summary>
         public readonly float CountScale;
         /// <summary>정예 방 확률에 더한다.</summary>
@@ -31,17 +33,18 @@ public static class EraBalance
         /// <summary>전투방(일반 · 정예)이 두 번째 파도를 받을 확률.</summary>
         public readonly float ExtraWaveChance;
 
-        public Spec(float stat, float count, float elite, int rarityStep, float fuel, float gold, float eventTime, float extraWave)
+        public Spec(float stat, float hp, float count, float elite, int rarityStep, float fuel, float gold, float eventTime, float extraWave)
         {
-            StatScale = stat; CountScale = count; EliteBonus = elite; RarityStep = rarityStep;
+            StatScale = stat; HpScale = hp; CountScale = count; EliteBonus = elite; RarityStep = rarityStep;
             FuelScale = fuel; GoldScale = gold; EventTimeScale = eventTime; ExtraWaveChance = extraWave;
         }
     }
 
-    // 가로로 읽으면 봉인기(지금 그대로) → 해방기(같은 빌드로 한 번 더 오를 수 있는 선) → 악몽(성장이 받쳐 주는 도전).
-    private static readonly Spec SealedSpec    = new(stat: 1.0f, count: 1.0f, elite: 0.00f, rarityStep: 0, fuel: 1.00f, gold: 1.0f, eventTime: 1.00f, extraWave: 0.3f);
-    private static readonly Spec LiberatedSpec = new(stat: 1.2f, count: 1.1f, elite: 0.05f, rarityStep: 1, fuel: 1.25f, gold: 1.2f, eventTime: 1.00f, extraWave: 0.3f);
-    private static readonly Spec NightmareSpec = new(stat: 1.4f, count: 1.2f, elite: 0.10f, rarityStep: 2, fuel: 1.50f, gold: 1.4f, eventTime: 0.85f, extraWave: 1.0f);
+    // 가로로 읽으면 봉인기(지금 그대로) → 해방기(10-22 A10 — 거점에서 새 빌드로 Ch1부터 다시 쌓는 한 단계 높은 판) → 악몽(성장이 받쳐 주는 도전).
+    // 10-21 체력은 따로(hp) — 같은 빌드 악몽 DPS가 봉인기의 ×2.75~3.2(10-15 실측 P2 Ch4 3,914 · Ch2 2,817)라 체력을 거기 맞추고, 공격은 그대로 둔다.
+    private static readonly Spec SealedSpec    = new(stat: 1.0f, hp: 1.0f, count: 1.0f, elite: 0.00f, rarityStep: 0, fuel: 1.00f, gold: 1.0f, eventTime: 1.00f, extraWave: 0.5f);
+    private static readonly Spec LiberatedSpec = new(stat: 1.3f, hp: 2.0f, count: 1.15f, elite: 0.08f, rarityStep: 1, fuel: 1.25f, gold: 1.2f, eventTime: 1.00f, extraWave: 0.7f);   // 10-22 A10 1.2 · 1.6 · 1.1 · 0.05 · 0.5에서
+    private static readonly Spec NightmareSpec = new(stat: 1.4f, hp: 2.6f, count: 1.2f, elite: 0.10f, rarityStep: 2, fuel: 1.50f, gold: 1.4f, eventTime: 0.85f, extraWave: 1.0f);
 
     // 두 번째 파도 구성 — 정예가 이끄는 작은 무리(첫 파도의 3~4할). 마릿수는 챕터 · 시기 수량 배율을 그대로 받는다.
     private const int ExtraWaveCommons = 3;
@@ -62,7 +65,8 @@ public static class EraBalance
 
     /// <summary>
     /// 두 번째 파도(10-02 설계서 §5) — 일반 · 정예 전투방만. 첫 파도를 다 잡으면 정예가 이끄는 무리가 한 번 더 온다.
-    /// 봉인기 · 해방기 30%(봉인기는 10-11 일반방 긴장감 설계 D3 — 첫 회차에도 「정예가 이끄는 무리」 박자) · 악몽 전부.
+    /// 봉인기 · 해방기 50%(봉인기는 10-11 일반방 긴장감 설계 D3 — 첫 회차에도 「정예가 이끄는 무리」 박자 · 10-21 30 → 50%:
+    /// 피해 모사에서 위협은 여럿이 같이 올 때 나왔다) · 악몽 전부.
     /// 악몽 정예 방은 정예 둘이 함께 온다. 안 오면 (0, 0).
     /// </summary>
     public static (int elites, int commons) RollExtraWave(RoomPlanKind kind, StoryEra era)

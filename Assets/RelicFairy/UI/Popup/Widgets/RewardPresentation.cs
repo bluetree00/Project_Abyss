@@ -175,9 +175,9 @@ public static class RewardPresentation
         public readonly bool  EdgeGlow;
         /// <summary>놓여 있는 빛의 맥동 빠르기(Hz). 0이면 고정.</summary>
         public readonly float IdlePulseHz;
-        /// <summary>예고 빛이 등장 뒤에도 보상 곁에 남는가(레어 이상 — 일반은 매 방 보는 등급이라 흩어진다).</summary>
+        /// <summary>예고 빛이 등장 뒤에도 보상 곁에 남는가(10-22부터 일반도 — 등급 기둥만 남는다).</summary>
         public readonly bool  IdleAura;
-        /// <summary>등급 기둥이 예고부터 서는가(레어 이상 — 서기 전부터 등급이 보인다). 등장 뒤 잠시 제 높이로 섰다가 낮아진다(반대편 시야를 가리지 않게).</summary>
+        /// <summary>등급 기둥이 예고부터 서는가(10-22부터 일반도 작게 — 서기 전부터 등급이 보인다). 등장 뒤 잠시 제 높이로 섰다가 낮아진다(반대편 시야를 가리지 않게).</summary>
         public readonly bool  IdlePillar;
         /// <summary>등장음 수 — 0 = 없음, 1 = 한 음, 3 = 상승 3음.</summary>
         public readonly int   Notes;
@@ -198,10 +198,11 @@ public static class RewardPresentation
     // 가로로 읽으면 "빛 몇 가닥 → 빛기둥 → 문양+기둥+빛 박자 → 표지 기둥(예고부터)+빛 박자 2+슬로모+금빛 가장자리"로 채널이 계단진다(카드 표와 같은 원칙).
     // 낮은 등급은 빨리 서고(런 템포), 높은 등급은 기다림 자체가 예고다.
     // 10-11 이펙트 톤 2차(D-2): 빛 박자(고리) 0 — 등급은 예고부터 선 등급 기둥이 이미 말하고, 등장 순간은 빛기둥 · 음(전설 3음 · 슬로모 · 금 가장자리)이 맡는다.
+    // 10-22 사용자 「드랍 오브젝트 리소스 퀄리티 — 작은 빛기둥」 — 일반도 작은 등급 기둥을 세운다(소용돌이는 예고만 · 기둥 하나만 남는다)
     private static readonly WorldSpec WorldCommon = new(
         foretell: 0.6f,  swirlScale: 0.5f,  pillarScale: 0f,    rings: 0,
         slowScale: 1f,   slowSeconds: 0f,   pulsePeak: 0f,    edgeGlow: false,
-        idlePulseHz: 0f,   idleAura: false, idlePillar: false, notes: 1);
+        idlePulseHz: 0f,   idleAura: true,  idlePillar: true,  notes: 1);
 
     private static readonly WorldSpec WorldRare = new(
         foretell: 1.0f,  swirlScale: 0.8f,  pillarScale: 0.6f,  rings: 0,

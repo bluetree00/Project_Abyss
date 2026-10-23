@@ -47,6 +47,10 @@ public sealed class BossTitleCard : MonoBehaviour
     private float         _hideAt;
     private float         _fadeOut = FadeOutTime;
 
+    // ── Properties ───────────────────────────────────────────────────
+    /// <summary>카드가 떠 있는가 — 보스 자막(UI_BossBark)이 이때 카드 위로 올라선다(10-21).</summary>
+    public static bool IsShown => _instance != null;
+
     // ── Lifecycle ────────────────────────────────────────────────────
     private void OnDestroy()
     {

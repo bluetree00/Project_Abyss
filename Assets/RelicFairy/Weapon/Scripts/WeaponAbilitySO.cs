@@ -50,6 +50,8 @@ public class WeaponAbilitySO : ScriptableObject
         [Space(5)]
         [Header("Damage & Impact Values")]
         public float baseDamage = 0f;
+        [Tooltip("(기본값 + 공격력)에 곱하는 배율 — 느리고 무거운 무기가 한 타를 크게 친다(10-22 대검). 0 = 1(예전 에셋)")]
+        public float damageScale = 1f;
         public float knockbackMultiplier = 1f;
         public Vector3 selfMovement = Vector3.zero;
 
@@ -72,6 +74,9 @@ public class WeaponAbilitySO : ScriptableObject
 
         [Tooltip("이 스텝 시작 시 플레이어가 마우스 방향으로 회전할지 여부")]
         public bool rotateToMouse = false;
+
+        /// <summary>피해 배율 — 칸이 없던 예전 에셋은 0으로 읽히므로 1로 본다.</summary>
+        public float DamageScale => damageScale > 0f ? damageScale : 1f;
     }
 
     /// <summary>이펙트 생성 기준점</summary>

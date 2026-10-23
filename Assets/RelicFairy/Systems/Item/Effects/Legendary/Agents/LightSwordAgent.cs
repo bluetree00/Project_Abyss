@@ -42,6 +42,6 @@ public sealed class LightSwordAgent : LegendaryProjectileBase
     {
         var cat = LegendaryRuntime.Catalog;
         if (cat?.lightHitVfx != null)
-            LegendaryRuntime.SpawnVfx(cat.lightHitVfx, pos, Quaternion.identity, 2f);
+            LegendaryRuntime.SpawnVfx(cat.lightHitVfx, pos, Quaternion.identity, 2f, 0.5f);   // 대상 타격 ≈ 1 m(10-22 B2 실측 83: 배율 1 ≈ 2 m)
     }
 }

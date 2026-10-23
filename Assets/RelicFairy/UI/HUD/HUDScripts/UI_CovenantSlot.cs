@@ -154,7 +154,7 @@ public sealed class UI_CovenantSlot : MonoBehaviour
             {
                 string prev = i > 0 ? s.ResultId(i - 1) : null;
                 sb.Append("\n<indent=").Append(ResultIndentEm.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)).Append("em>")
-                  .Append(UIKeywordInk.Values(UIKoreanWrap.Words(CovenantGrammar.Line(s.ResultId(i), s.ResultLink(i), prev)))).Append("</indent>");   // 결과 줄만 수치 강조(10-15) — 원인 줄은 옅은 채(색 태그가 <alpha>를 되살린다)
+                  .Append(UIKeywordInk.Values(UIKoreanWrap.Words(CovenantGrammar.NumericLine(s.CauseId, s.CauseTier, s.ResultId(i), s.ResultTier(i), s.ResultLink(i), prev, i)))).Append("</indent>");   // 결과 줄 = 서약서와 같은 수치형(10-18 「적이 피를 흘린다」 → 「출혈 공격력×37% · 4초」) · 수치 강조(10-15) — 원인 줄은 옅은 채(색 태그가 <alpha>를 되살린다)
             }
             _descText.fontStyle = FontStyles.Normal;
             _descText.text = sb.ToString();

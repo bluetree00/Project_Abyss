@@ -194,6 +194,18 @@ public class DeathKnightSwordController : MonoBehaviour
             _trail.StartTrailWithLength(_trailFadeIn, _trailLength);
     }
 
+    /// <summary>휘두르기 시작 — 검은 이미 들고 있고 궤적만 켠다(10-22 A4 · 검은 늘 든다).</summary>
+    public void BeginSwing()
+    {
+        if (_isVisible && _trail != null) _trail.StartTrailWithLength(_trailFadeIn, _trailLength);
+    }
+
+    /// <summary>휘두르기 끝 — 검은 든 채 궤적만 끈다(늘 켜 두면 서 있을 때 · 순간이동 때 줄이 그어진다).</summary>
+    public void EndSwing()
+    {
+        if (_trail != null && _trail.isActiveAndEnabled) _trail.StopTrail(0.15f);
+    }
+
     /// <summary>
     /// 디졸브 효과와 함께 검을 소멸시킨다.
     /// 디졸브 완료 후 SetActive(false) 처리.

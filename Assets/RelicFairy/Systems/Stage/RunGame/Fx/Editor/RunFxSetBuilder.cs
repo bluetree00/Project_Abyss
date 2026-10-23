@@ -57,8 +57,11 @@ public static class RunFxSetBuilder
             "챕터 게이트 — 서 있는 소용돌이 문(SSEP 16, 반복, 원래 빛깔 · 입자 장 하나 끔)", false, "Effect_16_ParticleField"),
         // 10-07 후보 비교(몬스터 공격 예고/4 — 해골 머리 · 게임 카메라): Yellow Flash만 「작은 반짝임」으로 읽혔다(흰 핵 + 노란 살 0.03초 → 0.3초에 사라짐).
         // 탈락: Magic Pig 별 3종 · Hovl Flash 5 red(안 보임) · cute star(흐린 연기) · StarMuzzle(몸을 덮는 분홍 폭발)
+        // 10-22 사용자 「몬스터 근처 위에 폭발 같은 이펙트 리소스가 문제」 — 연기 두 층(Smoke · Smoke2)이 회색 초승달 조각 + 회색 연기 덩어리로
+        //   빛과 함께 터져 폭발로 읽혔다. 층 끄기 비교(Fb1022GlintProbe — A 지금 · B 연기 끔 · C 불티까지 끔 · D C 작게):
+        //   B만 「노란 별빛 한 번」으로 읽힘 · C · D는 안 보임(별빛 자체가 Sparks 층) → 연기 두 층만 끈다.
         (RunFxSlot.AttackGlint, Fx + "Hovl Studio/RPG VFX Bundle/Prefabs/Magic buffs and hits/Yellow Flash.prefab", 1.4f, 0f,
-            "일반 몬스터 공격 예고 반짝임 — 맞히기 0.45초 전 머리에서(Hovl RPG Yellow Flash, 몸 높이로 크기)", false, null),
+            "일반 몬스터 공격 예고 반짝임 — 맞히기 0.45초 전 머리에서(Hovl RPG Yellow Flash · 연기 두 층 끔, 몸 높이로 크기)", false, "Smoke,Smoke2"),
     };
 
     // 진한 빛깔 칸 — Hovl 「…cg」 재질(_Emission 2~8)에 옅은 색을 곱하면 흰빛으로 바랬다(10-11 2차 촬영 VFX2_01 · 05)

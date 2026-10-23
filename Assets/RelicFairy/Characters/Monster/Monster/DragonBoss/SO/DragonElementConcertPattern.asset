@@ -22,10 +22,11 @@ MonoBehaviour:
   patternTag: element_concert
   breakOverride: -1
   followUp: {fileID: 11400000, guid: 8141604f71a07674ea967670107f8c27, type: 2}
-  followUpLateOnly: 1
+  followUpLateOnly: 0
+  followUpCooldown: 10
   _cooldown: 18
   _telegraphSeconds: 1
-  _stepInterval: 0.8
+  _stepInterval: 0.65
   _armHoldSeconds: 0.25
   _iceCount: 6
   _iceRingRadius: 3.2
@@ -39,6 +40,7 @@ MonoBehaviour:
   _thunderHalfLength: 14
   _thunderWidth: 2.2
   _thunderAngle: 45
+  _thunderGap: {x: 1.4, y: 2.4}
   _thunderDamageMult: 0.9
   _thunderStatus: {fileID: 0}
   _thunderVfxPrefab: {fileID: 1219712984032920, guid: b87545f0bb40e5f4d910e8c21aacafb7,
@@ -49,7 +51,7 @@ MonoBehaviour:
   _fireCount: 8
   _fireScatterRadius: 6.5
   _fireDiscRadius: 1.8
-  _fireMinSeparation: 2.6
+  _fireGap: {x: 1, y: 2.4}
   _fireDamageMult: 0.9
   _fireStatus: {fileID: 0}
   _fireVfxPrefab: {fileID: 4830294202082529915, guid: 2850b16fc529cf247beb49ced59cb6c5,

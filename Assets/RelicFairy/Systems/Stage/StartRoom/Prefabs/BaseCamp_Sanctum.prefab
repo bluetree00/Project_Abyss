@@ -3912,7 +3912,7 @@ MonoBehaviour:
   bandWidth: 0.22
   bandLift: 0.28
   bandColor: {r: 0.55, g: 0.75, b: 1, a: 0.9}
-  veilMaterial: {fileID: 2100000, guid: 768889a2aec4f2d489b8555031dfff7b, type: 2}
+  veilMaterial: {fileID: 0}
   veilHeight: 2.2
   veilTile: 6
   veilColor: {r: 0.45, g: 0.55, b: 1, a: 0.28}
@@ -22386,6 +22386,46 @@ PrefabInstance:
         type: 3}
       propertyPath: looping
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1001775779, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1924701487, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4336335809485325955, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3042062912092360660, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7493566960985714516, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 136889939233582498, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5086488535609003103, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 2.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 5086488535609003103, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 2.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 5086488535609003103, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 2.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 1924977842411482027, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
+      propertyPath: EmissionModule.rateOverTime.scalar
+      value: 700
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

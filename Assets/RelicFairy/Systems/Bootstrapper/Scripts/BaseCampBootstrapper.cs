@@ -133,6 +133,12 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
                 await UniTask.Delay(TimeSpan.FromSeconds(introDialogueDelay), cancellationToken: ct);
 
             await ShowIntroDialogueAsync(ct);
+
+            // 첫 진입 — 무형검을 다시 얻는 연출을 [F] 없이 바로(10-21 ④). 각성 제단은 아직 검을 받지 않은 슬롯에서만 남아 있다
+            // (받은 적이 있으면 제단이 스스로 없어지고 위 스폰에서 자동 지급).
+            var altar = FindFirstObjectByType<WorldSwordAwakening>();
+            if (altar != null && _player != null)
+                await altar.GrantOnArrivalAsync(_player, ct);
         }
         catch (OperationCanceledException) { }
         finally { IsReady = true; }

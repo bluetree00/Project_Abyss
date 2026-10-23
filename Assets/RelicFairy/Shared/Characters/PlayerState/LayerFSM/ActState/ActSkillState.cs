@@ -59,6 +59,7 @@ public class ActSkillState : ActSkillStateBase
             ActionType = _actionType,
             RequestEnd = () => _ended = true,
         };
+        _ctx.DamageIsAtkPercent = _slot != SkillType.Q && (GetSkillSO()?.damageIsAtkPercent ?? false);
 
         if (_slot != SkillType.Q) SkillTierCue.OnUse(_controller, _ctx.WeaponData, _slot, GetSkillSO());   // 단계가 오른 뒤 첫 사용 1회(10-12 S6)
 

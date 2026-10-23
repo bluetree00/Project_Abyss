@@ -122,6 +122,8 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
         var player = GameRunBootstrapper.Instance?.Run?.Player;
         var runes  = player != null ? player.RuneEffectsOrNull : null;
         bool gawain = relicId == "gawain";
+        var evolution = EvolutionGroup(loadout);   // 10-22 E1 B6 — 맨 위 진화 진행(봉인기엔 없다)
+        if (evolution != null) groups.Add(evolution);
         groups.Add(BaseRules(gawain, player));   // 10-12 4b 요청 6 — 맨 위 「기본 규칙」
         string[] order = gawain
             ? new[] { RelicPartAnchor.Dawn, RelicPartAnchor.Noon, RelicPartAnchor.Dusk, RelicPartAnchor.DawnNoon, RelicPartAnchor.NoonDusk, RelicPartAnchor.Reaction }
@@ -129,12 +131,13 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
 
         if (!gawain)
         {
-            int ladder = RelicResonance.LancelotLadder(loadout);
-            int tier   = RelicResonance.LancelotTier(ladder);
+            // 10-22 E1 D7 — 「10부터 이어진 계단」 → 「광기 칸 조각 수」(순서 · 빈틈 상관없음 · 효과 수치 그대로)
+            int count = RelicResonance.LancelotCount(loadout);
+            int tier  = RelicResonance.LancelotTier(count);
             groups.Add(new Group
             {
-                Title = $"이어진 계단 {ladder}",
-                Note  = "광기 10부터 끊김 없이 조각을 달면 계단이 이어진다\n"
+                Title = $"광기 칸 조각 {count}개",
+                Note  = "광기 10 · 20 · 30 · 40 칸 조각(메아리 포함)이 2 · 3 · 4개면 한 단계씩 세진다\n"
                       + TierTable(tier, (2, RelicResonance.LadderText(2)), (3, RelicResonance.LadderText(3)), (4, RelicResonance.LadderText(4))),
             });
         }
@@ -170,21 +173,41 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
             return new Group
             {
                 Title = "기본 규칙",
-                Note  = $"태양흔 — 여명에 적중 1 · 같은 적 0.5초에 한 번 · 상한 {cap}"
+                Note  = $"태양흔 — 여명에 칠 때마다 1개 · 같은 적은 0.5초에 한 번 · 상한 {cap}"
                       + (cap < GawainMemoryHub.DawnTier2Cap ? $"(여명 공명 2 → {GawainMemoryHub.DawnTier2Cap})" : string.Empty)
-                      + $"\n개화 — 1스택 = 공격력 {GawainMemoryHub.BloomAtkRatio * 100f:0}% · 반경 {GawainMemoryHub.BloomRadius:0.#} m"
-                      + $"\n정오 수확 — {GawainMemoryHub.HarvestRadius:0} m 안 태양흔 적 전부",
+                      + $"\n개화 — 태양흔 1개당 공격력 {GawainMemoryHub.BloomAtkRatio * 100f:0}% · 반경 {GawainMemoryHub.BloomRadius:0.#} m"
+                      // 10-22 E1 D8 — 「정오 수확」은 개화와 같은 일의 다른 이름이었다 → 문장으로
+                      + $"\n정오 개화 — 정오가 열리면 {GawainMemoryHub.HarvestRadius:0} m 안 태양흔 적이 모두 개화한다",
             };
         }
         int brand = LancelotMemoryHub.BrandCapOf(player);
         return new Group
         {
             Title = "기본 규칙",
-            Note  = $"낙인 — 광기 20+ 적중 1 · 상한 {brand}(광기의 눈 {LancelotMemoryHub.EyeBrandCap} · {LancelotMemoryHub.EyeBrandCapMax})"
-                  + $"\n찢기 — X자 1회 = 공격력 {LancelotMemoryHub.TearAtkRatio * 100f:0}%"
+            Note  = $"낙인 — 광기 20부터 칠 때마다 1개 · 상한 {brand}(광기의 눈 {LancelotMemoryHub.EyeBrandCap} · {LancelotMemoryHub.EyeBrandCapMax})"
+                  + $"\n찢기 — X자 1번에 공격력 {LancelotMemoryHub.TearAtkRatio * 100f:0}%"
                   + $"\n원한 — 넘친 낙인이 쌓인다 · 상한 {LancelotMemoryHub.GrudgeCap}"
-                  + $"\n참격파 — 원한 1개 = {LancelotMemoryHub.WaveLength:0} m 1줄 · 공격력 {LancelotMemoryHub.WaveAtkRatio * 100f:0}%",
+                  // 10-22 E1 D8 — 「참격파」 명사를 걷어 문장으로(원한의 쓰임새)
+                  + $"\n원한 쓰기 — 심판 막타 뒤 원한 1개마다 참격이 1줄 나간다({LancelotMemoryHub.WaveLength:0} m · 공격력 {LancelotMemoryHub.WaveAtkRatio * 100f:0}%)",
         };
+    }
+
+    /// <summary>
+    /// 맨 위 「유물 진화」 — 진행 한 줄(<see cref="RelicEvolution.ProgressLine"/>) + 조건 한 줄 · 진화했으면 그 이름과 효과(10-22 E1 B6).
+    /// 봉인기엔 null(진화를 말하지 않는다 — D2).
+    /// </summary>
+    private static Group EvolutionGroup(PlayerLoadout loadout)
+    {
+        string progress = RelicEvolution.ProgressLine(loadout);
+        if (string.IsNullOrEmpty(progress)) return null;
+        var def = RelicEvolution.ById(loadout.RelicEvolutionId);
+        return def != null
+            ? new Group { Title = $"유물 진화  ·  {def.Name}", Note = def.Desc }
+            : new Group
+            {
+                Title = $"유물 진화  ·  {progress}",
+                Note  = $"조각 {RelicEvolution.FragmentsNeeded}개를 가진 채 보스를 쓰러뜨리면 진화 카드가 나온다 · 방향은 빌드에 맞춰 저절로 정해진다",
+            };
     }
 
     /// <summary>단계 누적 표 — 닿은 단계는 밝게, 지금 단계는 금, 아직은 흐리게 「◇」.</summary>
@@ -205,8 +228,8 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
     private static string CrossLightNote(bool gawain, PlayerController player)
     {
         bool on = gawain ? GawainMemoryHub.Of(player)?.HasCrossLight == true : LancelotMemoryHub.Of(player)?.HasCrossLight == true;
-        string next = gawain ? "다음 수확" : "다음 찢기";
-        return $"엇갈린 빛 — 반응 조각 2개 + 서로 다른 반응 둘을 10초 안 → {next}가 스택을 남긴다  "
+        string next = gawain ? "다음 수확은 태양흔을" : "다음 찢기는 낙인을";
+        return $"엇갈린 빛 — 반응 조각이 2개 이상일 때 서로 다른 반응 둘이 10초 안에 일어나면 {next} 그대로 남긴다  "
              + (on ? $"<color={GoldHex}>◆ 켜짐</color>" : $"<color={LockedHex}>◇ 대기</color>");
     }
 

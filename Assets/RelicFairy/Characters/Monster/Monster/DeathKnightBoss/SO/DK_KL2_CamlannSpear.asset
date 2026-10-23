@@ -21,6 +21,9 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: kl2_camlann
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: f2705bc255d05f6408e5e4a0625535d1, type: 2}
+  followUpLateOnly: 0
+  followUpCooldown: 10
   lineInterval: 0.45
   lineAim: 0.2
   lineTelegraph: 0.5

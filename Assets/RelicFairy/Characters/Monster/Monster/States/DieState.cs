@@ -122,7 +122,8 @@ public class DieState : IMonsterState
         int count = UnityEngine.Random.Range(min, max + 1);
         if (count <= 0) return;
 
-        count = Mathf.Max(1, Mathf.RoundToInt(count * GoldScale(config.grade)));
+        float champion = MonsterTraits.IsChampion(ctx.Monster) ? MonsterTraits.ChampionGoldMul : 1f;   // 무작위 정예화(10-21)
+        count = Mathf.Max(1, Mathf.RoundToInt(count * GoldScale(config.grade) * champion));
 
         GoldCoinPickup.SpawnDrops(ctx.Monster.transform.position, count, drop.coinValue);
     }

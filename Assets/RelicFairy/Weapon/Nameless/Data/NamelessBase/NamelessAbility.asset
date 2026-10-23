@@ -24,7 +24,7 @@ MonoBehaviour:
       space: 0
       positionOffset: {x: 0, y: 1, z: 0.5}
       rotationEuler: {x: 0, y: 0, z: 20}
-      scaleMultiplier: 0.7
+      scaleMultiplier: 1
       lifeTimeMultiplier: 1
       behavior: {fileID: 0}
     collider:
@@ -54,7 +54,7 @@ MonoBehaviour:
       space: 0
       positionOffset: {x: 0, y: 1, z: 0.5}
       rotationEuler: {x: 0, y: 0, z: -160}
-      scaleMultiplier: 0.7
+      scaleMultiplier: 1
       lifeTimeMultiplier: 1
       behavior: {fileID: 0}
     collider:
@@ -76,15 +76,15 @@ MonoBehaviour:
   - stepIndex: 2
     order: 0
     baseDamage: 3.125
-    knockbackMultiplier: 1
+    knockbackMultiplier: 0
     selfMovement: {x: 0, y: 0, z: 0}
     effect:
       payloadKey: NamelessSlash
       socket: 0
       space: 0
       positionOffset: {x: 0, y: 1, z: 0.5}
-      rotationEuler: {x: 0, y: 0, z: -146}
-      scaleMultiplier: 0.7
+      rotationEuler: {x: 0, y: 0, z: -52}
+      scaleMultiplier: 1
       lifeTimeMultiplier: 1
       behavior: {fileID: 0}
     collider:
@@ -113,8 +113,8 @@ MonoBehaviour:
       socket: 0
       space: 0
       positionOffset: {x: 0, y: 1, z: 0.5}
-      rotationEuler: {x: 0, y: 0, z: 0}
-      scaleMultiplier: 0.75
+      rotationEuler: {x: 0, y: 0, z: -146}
+      scaleMultiplier: 1
       lifeTimeMultiplier: 1
       behavior: {fileID: 0}
     collider:
@@ -125,7 +125,7 @@ MonoBehaviour:
       positionOffset: {x: 0, y: 0, z: 0}
       rotationEuler: {x: 0, y: 0, z: 0}
       sizeMultiplier: 1
-      hitInterval: 0
+      hitInterval: 1
       duration: 0.4
       shape: 1
       behavior: {fileID: 0}

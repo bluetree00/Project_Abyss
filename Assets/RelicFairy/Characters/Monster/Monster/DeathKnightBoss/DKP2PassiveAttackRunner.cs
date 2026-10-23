@@ -172,7 +172,10 @@ public class DKP2PassiveAttackRunner
                 DKBossRoomContext.CellToWorld(pc.x, pc.y, 0.2f),   // 본 패턴 칸(0.05) 위 — 같은 높이면 겹쳐 안 보였다(10-13 검증 · 영혼 창 줄과 같은 높이)
                 Quaternion.Euler(-90f, 0f, 0f));
             if (tileGo != null)
+            {
                 tileGo.transform.localScale = Vector3.one * DKBossRoomContext.CellSize;
+                DKGridPatternHelper.ChargeTile(tileGo);   // (10-23 가이드 색 통일) 맞을 칸 = 처음부터 공격 색 → 판정 직전 빨강
+            }
         }
 
         // 분신 스폰 (Animator child가 별도 오브젝트일 때만)

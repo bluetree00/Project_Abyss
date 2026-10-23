@@ -27,6 +27,8 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
     [Tooltip("2단계 마무리 이펙트(대시 종점, 연참이 끝난 뒤). 비우면 없음")]
     public string tier2FinishEffectKey = "";
     public float tier2FinishEffectScale = 1f;
+    [Tooltip("2단계 마무리가 베는 반경(m) — 그림이 보이는 크기와 같게(10-22 B3: 예전엔 그림만 있고 피해가 없었다). 피해 = 연참 한 타")]
+    public float tier2FinishRadius = 2f;
 
     [Header("마무리")]
     public float endDelay = 0.3f;
@@ -201,10 +203,9 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
                     _timer = 0f;
                     _phase = Phase.End;
 
-                    // 2단계 마무리 — 연참이 끝난 자리(대시 종점)에서 한 번
-                    if (_skillTier >= 2 && !string.IsNullOrEmpty(_data.tier2FinishEffectKey))
-                        SpawnEffect(ctx, _data.tier2FinishEffectKey,
-                            ctx.PlayerTransform.position + Vector3.up * 1f, 1.5f, _data.tier2FinishEffectScale);
+                    // 2단계 마무리 — 연참이 끝난 자리(대시 종점)에서 한 번 벤다. 3단계는 길 전체 베기(CutWholePath)가 마무리라 끝 그림을 따로 안 띄운다
+                    if (_skillTier == 2 && !string.IsNullOrEmpty(_data.tier2FinishEffectKey))
+                        FinishCut(ctx);
                 }
             }
         }
@@ -237,6 +238,19 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
             Vector3 mid = (_dashStart + _dashEnd) * 0.5f + Vector3.up * 1f;
             SpawnEffect(ctx, string.IsNullOrEmpty(_data.tier2FinishEffectKey) ? _data.slashEffectKey : _data.tier2FinishEffectKey,
                         mid, 1.5f, _data.tier2FinishEffectScale * 1.5f);   // 길 폭 3 m에 맞춤(10-13 ⑥ 실측: 마무리 ×2 → 14.5 m)
+        }
+
+        /// <summary>2단계 마무리(10-22 B3) — 대시 종점 둘레(그림 크기)를 연참 한 타로 한 번 벤다. 예전엔 「공간 베기」 그림만 나가 피해가 없었다.</summary>
+        private void FinishCut(SkillExecutionContext ctx)
+        {
+            Vector3 at = ctx.PlayerTransform.position;
+            float dmg = ctx.CalculateDamage(_data.baseDamagePerSlash);
+            var hits = new List<GameObject>(16);
+            CombatQuery.GetNearbyDamageables(at, _data.tier2FinishRadius, ctx.Controller.gameObject, 32, hits);
+            foreach (var go in hits)
+                ctx.DealDamage(go, dmg, _data.knockbackMultiplier * 2f, isFinisher: true, hitEffectKey: _data.hitEffectKey, hitEffectScale: _data.hitEffectScale);
+            SkillRangeRing.Circle(at, _data.tier2FinishRadius);
+            SpawnEffect(ctx, _data.tier2FinishEffectKey, at + Vector3.up * 1f, 1.5f, _data.tier2FinishEffectScale);
         }
 
         private void ApplySlashDamage(SkillExecutionContext ctx)

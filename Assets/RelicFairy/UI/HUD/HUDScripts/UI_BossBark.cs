@@ -51,8 +51,21 @@ namespace RelicFairy.UI
         private const float SpeakerAboveText = 12f;    // 화자줄 아래 끝 — 글 위 끝에서(프리팹 값)
         private const float DividerAboveText = 5f;     // 밑줄 — 글 위 끝에서(프리팹 값)
         private const float DividerWidth     = 240f;   // 밑줄 최대 폭(프리팹 값) — 글이 더 짧으면 글 폭까지
+        // 컷신 배치의 서 있는 그림 — 왼쪽 아래 · 아래 가운데 피벗. 10-22 470×600(대사창 초상 크기) → ×0.65:
+        //   인트로에서 그림 있는 화자가 리치뿐이라 혼자 크게 보였다(사용자 「리치만 꽤 크게 보이고 어색해 — 줄이고 자연스럽게」).
+        //   x = 가장 긴 줄(960) 왼쪽 끝 − 40 − 그림 반폭 → 글 덩어리 바로 옆에 고정(줄마다 옮기지 않는다 · 10-16 사용자).
+        //   y = 레터박스가 있으면 아래 바 위 끝에 앉힌다(바에 발이 잘린 듯 보이게) · 없으면 30.
+        private static readonly Vector2 StandingPos  = new(288f, 30f);
+        private static readonly Vector2 StandingSize = new(305f, 390f);
 
         public static UI_BossBark Instance { get; private set; }
+
+        /// <summary>
+        /// 컷신 배치 — 켜면 초상을 글 옆 원 대신 대사창과 같은 왼쪽 아래 서 있는 그림으로, 화자 이름 · 밑줄은 글 위 가운데에 둔다.
+        /// 원 · 이름이 그린 글의 왼쪽 끝을 따라가 줄마다 좌우로 옮겨 다녔다(10-16 사용자 「인트로에서 텍스트마다 리치의 이미지가 다르게 나오는 게
+        /// 좋지 않아 — 기존 대사처럼 이미지를 특정 위치에 두고 대사도」). 인트로 연출(IntroMordredDirector)이 켜고 끈다. 보스전 대사는 그대로.
+        /// </summary>
+        public static bool CinematicLayout { get; set; }
 
         [Header("References")]
         [SerializeField] private CanvasGroup   _canvasGroup;
@@ -99,12 +112,16 @@ namespace RelicFairy.UI
         private readonly Queue<(string text, BossBarkType type, DialogueSpeaker speaker, UniTaskCompletionSource tcs, int scene)> _queue = new();
         private RectTransform _portraitGroup;
         private Image         _portraitImage;
+        private Image         _standing;              // 컷신 배치의 서 있는 그림
+        private Vector2       _speakerPivot, _dividerPivot;
+        private HorizontalAlignmentOptions _speakerAlign;
         private readonly Dictionary<string, Sprite> _portraitCache = new();
         private int           _portraitReq;
         private CancellationTokenSource _cts;
         private bool _showing;
         private bool  _dismissRequested;   // 장면이 끝났다 — 지금 줄을 일찍 내린다
         private float _dismissMinShown;
+        private Canvas _lift;              // 연출 UI 위로 올리는 중첩 캔버스(10-21) — 처음 올릴 때 붙인다
 
         private void Awake()
         {
@@ -132,8 +149,15 @@ namespace RelicFairy.UI
             {
                 var d = _speakerDivider.rectTransform;
                 d.sizeDelta = new Vector2(d.sizeDelta.x, UITheme.Thin.Stroke);
+                _dividerPivot = d.pivot;
+            }
+            if (_speakerLabel != null)
+            {
+                _speakerPivot = _speakerLabel.rectTransform.pivot;
+                _speakerAlign = _speakerLabel.horizontalAlignment;
             }
             BuildPortrait();
+            BuildStanding();
         }
 
         private void OnDestroy()
@@ -332,6 +356,7 @@ namespace RelicFairy.UI
 
             _dismissRequested = false;
             float shownAt = Time.unscaledTime;
+            SyncSorting();
             await FadeTo(1f, _fadeInDuration, ct);
             // unscaled 필수 — 스케일드면 timeScale=0(일시정지·차단 팝업) 동안 유지 시간이 흐르지 않아
             // 자막이 화면에 굳는다. 페이드(FadeTo)도 이미 unscaled다. 걷기 요청이 오면 최소 표시 시간만 채우고 내린다.
@@ -340,8 +365,30 @@ namespace RelicFairy.UI
             while (Time.unscaledTime < hideAt
                    && !(_dismissRequested && Time.unscaledTime - shownAt >= _dismissMinShown)
                    && scene == SceneManager.GetActiveScene().handle)
+            {
+                SyncSorting();   // 줄이 떠 있는 동안 레터박스 · 카드가 들어오거나 걷힐 수 있다
                 await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
             await FadeTo(0f, _fadeOutDuration, ct);
+        }
+
+        /// <summary>
+        /// 연출 UI(레터박스 · 보스 칭호 카드)가 HUD 위에 떠 있으면 자막을 그 바로 위로 올린다. 자막은 HUD 캔버스(100)에 있어
+        /// 보스 등장 레터박스(620) · 칭호 카드(630) · 인트로 레터박스(150)와 겹치는 부분이 밑에 깔렸다(10-21 사용자
+        /// 「보스의 대사가 시네마틱 UI 연출 아래로 가려진다」). 연출이 걷히면 HUD 자리로 돌아온다. 화면 효과(700) · 페이드(800~)보다는 아래.
+        /// </summary>
+        private void SyncSorting()
+        {
+            int above = CinematicFrame.IsShown ? CinematicFrame.CurrentSortingOrder : int.MinValue;
+            if (BossTitleCard.IsShown) above = Mathf.Max(above, UISortingOrder.BossTitle);
+            bool lift = above >= UISortingOrder.Hud;
+            if (_lift == null)
+            {
+                if (!lift) return;
+                _lift = gameObject.AddComponent<Canvas>();
+            }
+            _lift.overrideSorting = lift;
+            if (lift) _lift.sortingOrder = above + 1;
         }
 
         private void ApplyLayout(string text, BossBarkType type)
@@ -392,7 +439,11 @@ namespace RelicFairy.UI
         private void ApplySpeaker(DialogueSpeaker speaker)
         {
             bool has = speaker != DialogueSpeaker.None;
-            if (has) PlaceSpeaker();
+            if (has)
+            {
+                if (CinematicLayout) PlaceSpeakerCentered();
+                else                 PlaceSpeaker();
+            }
 
             if (_speakerLabel != null)
             {
@@ -427,6 +478,7 @@ namespace RelicFairy.UI
             var (textLeft, textTop, width) = TextBox();
             float left = textLeft + _container.rect.width * 0.5f;    // 그릇 왼쪽 끝에서 글 왼쪽 끝까지
             float top  = textTop - _container.rect.height * 0.5f;    // 그릇 위 끝에서 글 위 끝까지(아래로 음수)
+            SetSpeakerAnchor(_speakerPivot, _speakerAlign, _dividerPivot);   // 컷신 배치를 거쳤으면 프리팹 값으로
             if (_speakerLabel != null)
                 _speakerLabel.rectTransform.anchoredPosition = new Vector2(left, top + SpeakerAboveText);
             if (_speakerDivider != null)
@@ -435,6 +487,34 @@ namespace RelicFairy.UI
                 d.anchoredPosition = new Vector2(left, top + DividerAboveText);
                 d.sizeDelta        = new Vector2(Mathf.Min(DividerWidth, width), d.sizeDelta.y);
             }
+        }
+
+        /// <summary>컷신 배치 — 화자줄 · 밑줄을 글 위 가운데에(대사창처럼). 글은 가운데 정렬이라 줄이 바뀌어도 자리가 같다.</summary>
+        private void PlaceSpeakerCentered()
+        {
+            if (_label == null || _container == null) return;
+            var (_, textTop, width) = TextBox();
+            float center = _container.rect.width * 0.5f;              // 그릇 왼쪽 끝에서 가운데까지
+            float top    = textTop - _container.rect.height * 0.5f;
+            SetSpeakerAnchor(new Vector2(0.5f, 0f), HorizontalAlignmentOptions.Center, new Vector2(0.5f, 0f));
+            if (_speakerLabel != null)
+                _speakerLabel.rectTransform.anchoredPosition = new Vector2(center, top + SpeakerAboveText);
+            if (_speakerDivider != null)
+            {
+                var d = _speakerDivider.rectTransform;
+                d.anchoredPosition = new Vector2(center, top + DividerAboveText);
+                d.sizeDelta        = new Vector2(Mathf.Min(DividerWidth, width), d.sizeDelta.y);
+            }
+        }
+
+        private void SetSpeakerAnchor(Vector2 labelPivot, HorizontalAlignmentOptions align, Vector2 dividerPivot)
+        {
+            if (_speakerLabel != null)
+            {
+                _speakerLabel.rectTransform.pivot = labelPivot;
+                _speakerLabel.horizontalAlignment = align;
+            }
+            if (_speakerDivider != null) _speakerDivider.rectTransform.pivot = dividerPivot;
         }
 
         /// <summary>
@@ -494,20 +574,57 @@ namespace RelicFairy.UI
             group.SetActive(false);
         }
 
-        /// <summary>화자에 초상이 있으면 글 왼쪽에 띄운다(처음엔 불러온 뒤). 없으면 숨김.</summary>
+        /// <summary>
+        /// 컷신 배치의 서 있는 그림 — 대사창 초상과 같은 자리 · 크기. 그릇 안 띠 바로 위 · 글 아래에 둔다(띠가 그림 허리를 가로질러 어둡게 덮지 않게).
+        /// 그릇은 자막 종류마다 높이가 바뀌므로 화면 자리는 띄울 때마다 맞춘다(<see cref="PlaceStanding"/>).
+        /// </summary>
+        private void BuildStanding()
+        {
+            if (_container == null) return;
+            var go = new GameObject("StandingPortrait", typeof(RectTransform), typeof(Image));
+            var rt = (RectTransform)go.transform;
+            rt.SetParent(_container, false);
+            if (_background != null && _background.transform.parent == _container)
+                rt.SetSiblingIndex(_background.transform.GetSiblingIndex() + 1);
+            else
+                rt.SetAsFirstSibling();
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot     = new Vector2(0.5f, 0f);
+            rt.sizeDelta = StandingSize;
+            _standing = go.GetComponent<Image>();
+            _standing.preserveAspect = true;
+            _standing.raycastTarget  = false;
+            go.SetActive(false);
+        }
+
+        /// <summary>서 있는 그림을 화면 왼쪽 아래 고정 자리(<see cref="StandingPos"/>)에 — 자막 전체 칸(루트, 화면 크기) 기준.</summary>
+        private void PlaceStanding()
+        {
+            var root = (RectTransform)transform;
+            var r    = root.rect;
+            float bar = CinematicFrame.BarHeightFraction;
+            float y   = bar > 0f ? r.height * bar : StandingPos.y;
+            _standing.rectTransform.position = root.TransformPoint(new Vector3(r.xMin + StandingPos.x, r.yMin + y, 0f));
+        }
+
+        /// <summary>화자에 초상이 있으면 글 왼쪽 원(컷신 배치면 왼쪽 아래 서 있는 그림)에 띄운다(처음엔 불러온 뒤). 없으면 숨김.</summary>
         private void ApplyPortrait(DialogueSpeaker speaker)
         {
             if (_portraitGroup == null) return;
             int    req = ++_portraitReq;
             string key = PortraitKey(speaker);
-            if (key == null) { _portraitGroup.gameObject.SetActive(false); return; }
+            _portraitGroup.gameObject.SetActive(false);
+            if (_standing != null) _standing.gameObject.SetActive(false);
+            if (key == null) return;
 
-            float left = _label != null ? TextBox().left : -MaxLineWidth * 0.5f;
-            float y    = _label != null ? _container.InverseTransformPoint(_label.rectTransform.TransformPoint(_label.rectTransform.rect.center)).y : 0f;
-            _portraitGroup.anchoredPosition = new Vector2(left - PortraitSize * 0.5f - PortraitGap, y);
+            if (!CinematicLayout)
+            {
+                float left = _label != null ? TextBox().left : -MaxLineWidth * 0.5f;
+                float y    = _label != null ? _container.InverseTransformPoint(_label.rectTransform.TransformPoint(_label.rectTransform.rect.center)).y : 0f;
+                _portraitGroup.anchoredPosition = new Vector2(left - PortraitSize * 0.5f - PortraitGap, y);
+            }
 
             if (_portraitCache.TryGetValue(key, out var cached)) { SetPortrait(cached); return; }
-            _portraitGroup.gameObject.SetActive(false);
             LoadPortraitAsync(key, req).Forget();
         }
 
@@ -524,16 +641,27 @@ namespace RelicFairy.UI
 
         private void SetPortrait(Sprite sprite)
         {
+            if (CinematicLayout && _standing != null)
+            {
+                PlaceStanding();
+                _standing.sprite = sprite;
+                _standing.gameObject.SetActive(true);
+                return;
+            }
             _portraitImage.sprite = sprite;
             _portraitGroup.gameObject.SetActive(true);
         }
 
-        /// <summary>보스 초상 주소. 프롤로그 모르드레드(타락 전 서임 대사)는 타락한 그림을 쓰지 않는다 — 없음.</summary>
+        /// <summary>
+        /// 보스 초상 주소. 프롤로그 모르드레드도 보스 초상 하나를 타락 전 · 뒤 그대로 쓴다
+        /// (10-22 사용자 「인트로에서 모르드레드만 일러스트가 없다」 → 「타락 후 그림을 전 · 후 계속 쓰는 게 좋다 — 리소스에 얼굴을 표현하지 못하니」).
+        /// </summary>
         private static string PortraitKey(DialogueSpeaker speaker) => speaker switch
         {
             DialogueSpeaker.ForestGuardian => "Portrait_Boss_ForestGuardian",
             DialogueSpeaker.Dragon         => "Portrait_Boss_Dragon",
             DialogueSpeaker.DeathKnight    => "Portrait_Boss_Mordred",
+            DialogueSpeaker.Mordred        => "Portrait_Boss_Mordred",
             DialogueSpeaker.Lich           => "Lich_Portrait",
             _                              => null,
         };

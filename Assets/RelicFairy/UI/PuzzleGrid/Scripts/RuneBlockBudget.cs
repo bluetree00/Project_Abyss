@@ -13,7 +13,7 @@ public static class RuneBlockBudget
     public const int Max = 20;
 
     /// <summary>상한 때문에 놓기가 막혔을 때 문구의 머리. 룬판이 이 문구면 룬 수를 붉게 깜빡인다.</summary>
-    public const string FullPrefix = "룬이 가득 찼습니다";
+    public const string FullPrefix = "룬판이 가득 찼다";   // 안내 끝맺음 「-다」(10-19)
 
     /// <summary>지금 판에 놓인 룬 수(이번 런 인벤토리의 배치 목록 — 룬판이 놓기 · 빼기마다 갱신, 세이브 · 결과창과 같은 값). 런이 없으면 0.</summary>
     public static int Used => GameRunBootstrapper.Instance?.Run?.ItemInventory?.PlacedCount ?? 0;
@@ -39,7 +39,7 @@ public static class RuneBlockBudget
     }
 
     /// <summary>상한 때문에 막힌 놓기의 토스트 문구.</summary>
-    public static string FullMessage(int used) => $"{FullPrefix} ({used}/{Max}) — 판의 룬을 빼거나 분해하세요";
+    public static string FullMessage(int used) => $"{FullPrefix} ({used}/{Max}) — 판의 룬을 빼거나 분해한다";
 
     // ── 같은 룬 상한(10-14) ──────────────────────────────
 
@@ -69,7 +69,7 @@ public static class RuneBlockBudget
 
     /// <summary>같은 룬 상한 때문에 막힌 놓기의 토스트 문구.</summary>
     public static string SameMessage(RuntimeItemData item) =>
-        $"같은 룬은 판에 {MaxSame}개까지 놓을 수 있습니다 (「{item?.displayName}」 {SameExcept(item)}/{MaxSame})";
+        $"같은 룬은 판에 {MaxSame}개까지 놓는다 (「{item?.displayName}」 {SameExcept(item)}/{MaxSame})";
 
     /// <summary>룬 선택 · 상점 카드 문구 — 같은 룬이 이미 상한이면 「같은 룬 2/2 · 판에 못 놓음」, 아니면 null.</summary>
     public static string SameLabel(RuntimeItemData item) =>

@@ -574,6 +574,8 @@ public static class BossFightSimEditor
                         Event($"보스 사망 — 전투 {now - t0:0.0}초");
                         ShotLater(Shot, "death_1s", 1000, ct);
                         ShotLater(Shot, "death_4s", 4000, ct);
+                        ShotLater(Shot, "death_10s", 10000, ct);   // 클리어 계단(10-18 62 · 광장 가운데로 옮김)
+                        ShotLater(Shot, "death_18s", 18000, ct);
                     }
                 }
 
@@ -734,7 +736,11 @@ public static class BossFightSimEditor
         {
             if (p == null || seen.ContainsKey(p.name) || p.GetRuntimeState() == null || !p.Available(ctx)) continue;
             if (queue == null)
-                rt.GetMethod("ExecutePattern", Inst)?.Invoke(runner, new object[] { p });
+            {
+                // 10-22 E2 — ExecutePattern(pattern, asFollowUp = false): 리플렉션은 기본값을 채우지 않는다
+                var exec = rt.GetMethod("ExecutePattern", Inst);
+                exec?.Invoke(runner, exec.GetParameters().Length == 2 ? new object[] { p, false } : new object[] { p });
+            }
             else
             {
                 queue.Enqueue(p);

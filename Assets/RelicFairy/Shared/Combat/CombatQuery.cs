@@ -28,6 +28,22 @@ public static class CombatQuery
     /// center 반경 내 살아있는 몬스터를 가까운 순으로 최대 max마리 buffer에 채운다(exclude 제외).
     /// 반환 = 채운 개수. buffer는 호출자가 재사용(매 호출 Clear).
     /// </summary>
+    /// <summary>직선 추가 피해의 몸 여유(m) — 중심점이 선에서 「반폭 + 이 값」 안이면 맞는다. 작은 적 0.4 · 큰 적은 몸 반경(10-16).</summary>
+    public static float BodyReach(MonsterBase e) => e != null ? Mathf.Max(0.4f, e.BodyRadius) : 0.4f;
+
+    /// <summary>
+    /// 원뿔 안인가 — 중심 각이 반각 안이거나, 몸이 원뿔 가장자리에 걸치면(몸 반경만큼 각 여유 · 10-16 「이펙트는 닿았는데 판정이 안 된다」).
+    /// 원점이 몸 안이면(겹침) 통과.
+    /// </summary>
+    private static bool InConeBody(Vector3 forward, Vector3 to, float cosHalf, float halfAngleDeg, float bodyRadius)
+    {
+        float d = to.magnitude;
+        if (d < 0.0001f || d <= bodyRadius) return true;
+        if (Vector3.Dot(forward, to / d) >= cosHalf) return true;
+        if (bodyRadius <= 0f) return false;
+        return Vector3.Angle(forward, to) <= halfAngleDeg + Mathf.Asin(Mathf.Clamp01(bodyRadius / d)) * Mathf.Rad2Deg;
+    }
+
     public static int GetNearbyEnemies(Vector3 center, float radius, GameObject exclude,
                                        int max, List<MonsterBase> buffer)
     {
@@ -48,6 +64,7 @@ public static class CombatQuery
 
             buffer.Add(mb);
         }
+        AddRelays(center, radius, exclude, buffer, null);
 
         // 가까운 순 정렬 후 max로 절단
         buffer.Sort((a, b) =>
@@ -91,9 +108,9 @@ public static class CombatQuery
 
             Vector3 to = mb.transform.position - origin;
             to.y = 0f;
-            if (to.sqrMagnitude < 0.0001f) { buffer.Add(mb); continue; }
-            if (Vector3.Dot(forward, to.normalized) >= cosHalf) buffer.Add(mb);
+            if (InConeBody(forward, to, cosHalf, halfAngleDeg, mb.BodyRadius)) buffer.Add(mb);
         }
+        AddRelays(origin, range, null, buffer, null, true, forward, cosHalf, halfAngleDeg);
 
         buffer.Sort((a, b) =>
         {
@@ -121,6 +138,7 @@ public static class CombatQuery
 
         int n = Physics.OverlapSphereNonAlloc(center, radius, s_overlap, MonsterBase.HitLayerMask, QueryTriggerInteraction.Collide);
         CollectDamageables(n, exclude, buffer);
+        AddRelays(center, radius, exclude, null, buffer);
 
         SortByDistance(buffer, center);
         if (buffer.Count > max) buffer.RemoveRange(max, buffer.Count - max);
@@ -150,13 +168,46 @@ public static class CombatQuery
         {
             Vector3 to = buffer[i].transform.position - origin;
             to.y = 0f;
-            if (to.sqrMagnitude < 0.0001f) continue;          // 겹쳐 있으면 통과
-            if (Vector3.Dot(forward, to.normalized) < cosHalf) buffer.RemoveAt(i);
+            var body = buffer[i].GetComponentInParent<MonsterBase>();
+            if (!InConeBody(forward, to, cosHalf, halfAngleDeg, body != null ? body.BodyRadius : 0f)) buffer.RemoveAt(i);
         }
+        AddRelays(origin, range, exclude, null, buffer, true, forward, cosHalf, halfAngleDeg);
 
         SortByDistance(buffer, origin);
         if (buffer.Count > max) buffer.RemoveRange(max, buffer.Count - max);
         return buffer.Count;
+    }
+
+    /// <summary>
+    /// 중계 물체(공명 성흔석 · 10-22 A1b) — 몬스터 층 겹침에 안 잡히는 중계 몸이 반경(원뿔이면 원뿔도) 안이면 넘겨받는 대상을 더한다.
+    /// monsters가 있으면 MonsterBase로, 없으면 objects에 대상 GameObject로(×0.8 · 중계 두 번이 안 걸리게 성흔석이 아니라 대상). 식음은 안 따진다.
+    /// </summary>
+    private static void AddRelays(Vector3 center, float radius, GameObject exclude, List<MonsterBase> monsters, List<GameObject> objects,
+                                  bool cone = false, Vector3 forward = default, float cosHalf = 0f, float halfAngleDeg = 0f)
+    {
+        var all = DamageRelays.All;
+        for (int i = 0; i < all.Count; i++)
+        {
+            var relay = all[i];
+            var to    = relay?.RelayTarget;
+            var body  = relay?.RelayBody;
+            if (to == null || body == null || !body.enabled || !body.gameObject.activeInHierarchy) continue;
+            if (exclude != null && to == exclude) continue;
+            if ((body.ClosestPoint(center) - center).sqrMagnitude > radius * radius) continue;
+            if (cone)
+            {
+                Vector3 d = body.transform.position - center;
+                d.y = 0f;
+                Vector3 ext = body.bounds.extents;
+                if (!InConeBody(forward, d, cosHalf, halfAngleDeg, Mathf.Max(ext.x, ext.z))) continue;
+            }
+            if (monsters != null)
+            {
+                var mb = to.GetComponentInParent<MonsterBase>();
+                if (mb != null && mb.CurrentHp > 0 && !monsters.Contains(mb)) monsters.Add(mb);
+            }
+            else if (objects != null && !objects.Contains(to)) objects.Add(to);
+        }
     }
 
     /// <summary>s_overlap[0..n) 에서 살아있는 IDamageable의 GameObject를 중복 없이 모은다.</summary>
@@ -198,6 +249,14 @@ public static class CombatQuery
                                          RuneElement? element = null)
     {
         if (target == null || amount <= 0f) return;
+
+        // 중계 물체(공명 성흔석) — 추가타는 넘겨받는 대상(기사)으로 바로, 과열은 세지 않는다(10-22 A1b)
+        if (target.TryGetComponent<IDamageRelay>(out var relay))
+        {
+            target = relay.RelayTarget;
+            if (target == null) return;
+            amount *= relay.RelayRatio;
+        }
 
         var mb = target.GetComponentInParent<MonsterBase>();
         if (mb != null)

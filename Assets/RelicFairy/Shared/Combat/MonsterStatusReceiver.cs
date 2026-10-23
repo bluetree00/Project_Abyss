@@ -34,6 +34,7 @@ namespace RelicFairy.Monster
             public Action     onExpire;
             public Action     onTick;        // 틱마다(피해 직후) 발화 — 풀 독피해 회복 등.
             public int        stacks = 1;    // 중첩형(독 · 10-14 A3) — 틱 피해 = 중첩당 × 중첩 수
+            public DamageSource? source;     // 건 쪽의 피해 출처 — 서약이 건 출혈 틱 = 「서약」(10-22 결과창 서약 0%)
         }
 
         private readonly Dictionary<string, CcSlot>     _cc        = new();
@@ -145,6 +146,7 @@ namespace RelicFairy.Monster
             d.onExpire       = onExpire;
             d.onTick         = onTick;
             d.stacks         = 1;
+            d.source         = DamageSourceScope.Current;
             d.remainingTicks = Mathf.Max(d.remainingTicks, tickCount);   // top-up(보존 타이머)
             d.totalTicks     = Mathf.Max(d.totalTicks, d.remainingTicks); // 게이지 기준
             GuidelineVisual.StatusApplied(OwnerTf, id, tickInterval * d.remainingTicks);
@@ -169,6 +171,7 @@ namespace RelicFairy.Monster
             d.onTick         = null;
             d.remainingTicks = tickCount;
             d.totalTicks     = tickCount;
+            d.source         = DamageSourceScope.Current;
             GuidelineVisual.StatusApplied(OwnerTf, id, tickInterval * tickCount);
         }
 
@@ -342,7 +345,11 @@ namespace RelicFairy.Monster
                     {
                         // 상태 id로 속성을 해석해 데미지 텍스트에 속성색을 입힌다(점화=불, 독=풀 …).
                         RuneElement? el = RuneElementMap.FromStatusId(kv.Key, out var e) ? e : (RuneElement?)null;
-                        owner.TakeSynergyDamage(d.damagePerTick, d.instigator, d.defenseIgnore, false, DamageKind.Dot, el);
+                        if (d.source == DamageSource.Covenant)
+                            using (DamageSourceScope.Enter(DamageSource.Covenant))
+                                owner.TakeSynergyDamage(d.damagePerTick, d.instigator, d.defenseIgnore, false, DamageKind.Dot, el);
+                        else
+                            owner.TakeSynergyDamage(d.damagePerTick, d.instigator, d.defenseIgnore, false, DamageKind.Dot, el);
                         d.onTick?.Invoke();
                         d.remainingTicks--;
                         d.timer += d.interval;

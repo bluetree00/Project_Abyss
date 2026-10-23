@@ -89,8 +89,29 @@ public static class MonsterTraitTable
     };
 
     // ── 시기별 확률(설계서 §4) ────────────────────────────
-    private const float LiberatedCommonChance = 0.20f;
+    private const float LiberatedCommonChance = 0.25f;   // 10-22 A10 0.20 → 0.25(해방기 = 새 빌드로 한 단계 높은 판)
     private const float NightmareCommonChance = 0.35f;
+    // 봉인기 무작위 정예화(10-21 몬스터 개편 §5) — 일반 · 위협 몹이 챕터 확률로 특성 하나를 받고 챔피언이 된다(체력 · 몸 · 이름 — MonsterTraits).
+    // 예고 없는 특성(흔적 · 잠복)과 해방기 몫(속성 저항 · 분열)은 첫 회차에서 뺀다.
+    private static readonly float[] SealedChampionChance = { 0f, 0.06f, 0.10f, 0.14f, 0.18f };   // 챕터 0(모름) · 1 · 2 · 3 · 4
+
+    /// <summary>봉인기에도 챔피언 특성으로 나오는가 — 질주 · 폭발 유해(붉은 원 예고) · 수호막 · 지휘.</summary>
+    public static bool SealedChampionOk(MonsterTraitKind k)
+        => k == MonsterTraitKind.Swift || k == MonsterTraitKind.Volatile || k == MonsterTraitKind.Ward || k == MonsterTraitKind.Commander;
+
+    /// <summary>시기 특성의 이름표 형용사(영문 — 09-27 이름표 규칙). 정예 접두어가 아니면 여기서.</summary>
+    private static string EraAdjective(MonsterTraitKind k) => k switch
+    {
+        MonsterTraitKind.Swift     => "Swift",
+        MonsterTraitKind.Volatile  => "Volatile",
+        MonsterTraitKind.Trail     => "Smoldering",
+        MonsterTraitKind.Ward      => "Warded",
+        MonsterTraitKind.Resist    => "Resistant",
+        MonsterTraitKind.Commander => "Commanding",
+        MonsterTraitKind.Lurker    => "Lurking",
+        MonsterTraitKind.Splitter  => "Splitting",
+        _                          => null,
+    };
     // 정예 접두어 상한(설계서 §7-2 ③) — 토큰 재편 전에도 일반방에 접두어 정예가 몰리지 않게
     private const int   PrefixCapNormalRoom = 1;
     private const int   PrefixCapEliteRoom  = 3;
@@ -105,14 +126,19 @@ public static class MonsterTraitTable
     /// <paramref name="roomTaken"/> = 이 방에서 이미 나온 특성 종류 — 방당 종류 2까지(같은 특성 몰림 방지).
     /// </summary>
     public static List<MonsterTraitKind> Roll(MonsterGrade grade, StoryEra era, HashSet<MonsterTraitKind> roomTaken,
-                                              MonsterTraitCategory? excludeCategory = null, bool noCommander = false, int maxCount = 2)
+                                              MonsterTraitCategory? excludeCategory = null, bool noCommander = false, int maxCount = 2,
+                                              int chapter = 0)
     {
         var result = new List<MonsterTraitKind>(2);
-        if (grade == MonsterGrade.Boss || era == StoryEra.Sealed) return result;
+        if (grade == MonsterGrade.Boss) return result;
+        bool sealedEra = era == StoryEra.Sealed;
+        // 봉인기 — 정예는 접두어만, 일반 · 위협은 챕터 확률로 챔피언(챕터를 모르는 호출 = 예전처럼 없음)
+        if (sealedEra && grade == MonsterGrade.Elite) return result;
         bool nightmare = era == StoryEra.NightmareMode;
 
         int want;
         if (grade == MonsterGrade.Elite) want = nightmare ? 2 : 1;
+        else if (sealedEra) want = Random.value < SealedChampionChance[Mathf.Clamp(chapter, 0, SealedChampionChance.Length - 1)] ? 1 : 0;
         else want = Random.value < (nightmare ? NightmareCommonChance : LiberatedCommonChance) ? 1 : 0;
         want = Mathf.Min(want, maxCount);   // 접두어 정예는 시기 특성 1개까지(한 몸 최대 2)
         if (want == 0) return result;
@@ -122,6 +148,7 @@ public static class MonsterTraitTable
         {
             if (d.elitePrefix) continue;   // 접두어는 RollPrefix가 따로 굴린다
             if (!d.liberated && !nightmare) continue;
+            if (sealedEra && !SealedChampionOk(d.kind)) continue;
             if (d.commonOnly && grade == MonsterGrade.Elite) continue;
             if (excludeCategory.HasValue && d.category == excludeCategory.Value) continue;   // 접두어와 같은 분류 금지
             if (noCommander && d.kind == MonsterTraitKind.Commander) continue;               // 복수의 정예가 있는 방엔 지휘 없음
@@ -168,11 +195,12 @@ public static class MonsterTraitTable
         return pool[Random.Range(0, pool.Count)].kind;
     }
 
-    /// <summary>머리 위 이름 앞 영문 접두어 — 분류색 · 리치 텍스트. 접두어가 아니면 null.</summary>
+    /// <summary>머리 위 이름 앞 영문 수식어 — 분류색 · 리치 텍스트. 정예 접두어(Ironclad …) · 시기 특성 형용사(Swift · Volatile … — 10-21 챔피언).</summary>
     public static string PrefixLabel(MonsterTraitKind k)
     {
         var d = Of(k);
-        if (!d.elitePrefix) return null;
-        return $"<color=#{ColorUtility.ToHtmlStringRGB(CategoryColor(d.category))}>{d.prefix}</color>";
+        string word = d.elitePrefix ? d.prefix : EraAdjective(k);
+        if (string.IsNullOrEmpty(word)) return null;
+        return $"<color=#{ColorUtility.ToHtmlStringRGB(CategoryColor(d.category))}>{word}</color>";
     }
 }

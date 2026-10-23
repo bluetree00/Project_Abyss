@@ -127,7 +127,9 @@ public sealed partial class PlayerController
         // [받피감소 통합 채널] 아이템/캐릭터/어둠룬 피해감소(%)를 한 곳에서 1회 적용.
         // (DamageReductionEffect.OnPreTakeDamage 제거 → 여기로 통합. DamageReduction은 Recalculate에서 Clamp01.)
         // 스탠스(스킬 시전 중 방어)는 같은 채널에 얹는다 — 따로 곱하면 감소가 두 번 적용된다.
-        float dr = Mathf.Clamp(RuntimeStats.DamageReduction + _stanceDefenseAdd, 0f, PlayerRuntimeStats.MaxDamageReduction);   // 상한 — 100%면 완전 무적이었다(10-09 출시 점검)
+        // 기억의 제단 「해방의 내성」(10-22 해방 대비 · −4%/단계)도 같은 채널 — 상한을 함께 쓴다.
+        float dr = Mathf.Clamp(RuntimeStats.DamageReduction + _stanceDefenseAdd + MemoryAltarService.LiberationWardReduction,
+                               0f, PlayerRuntimeStats.MaxDamageReduction);   // 상한 — 100%면 완전 무적이었다(10-09 출시 점검)
         if (dr > 0f)
             finalDmg = Mathf.Max(0, Mathf.RoundToInt(finalDmg * (1f - dr)));
 
@@ -136,6 +138,12 @@ public sealed partial class PlayerController
         {
             finalDmg = RuntimeStats.AbsorbWithShield(finalDmg);
         }
+
+        // 기억의 제단 「결의」(10-22 해방 대비) — 쓰러질 한 방을 체력 1에서 멈춘다. 방마다 다시 차는 것이라
+        // 아래 런 아이템(사망 무효) · 서약 사망 방지 · 부활보다 먼저 쓴다(D6). 피해는 그대로 들어가 맞은 연출 · 서약 피격 통보는 평소와 같다.
+        NoteResolveHp();
+        if (RuntimeStats.Hp - finalDmg <= 0 && TryAltarResolve())
+            finalDmg = Mathf.Max(0, RuntimeStats.Hp - 1);
 
         // 사망 직전 체크
         if (RuntimeStats.Hp - finalDmg <= 0 && mgr != null)
@@ -407,7 +415,12 @@ public sealed partial class PlayerController
         if (RuntimeStats.Hp > 0 || _dead) return;
 
         var run = GameRunBootstrapper.Instance?.Run;
-        if (run?.CovenantHandler != null && run.CovenantHandler.TryPreventDeath())
+        // 순서(10-22 D6) — 결의(방마다) → 서약 사망 방지(런 안) → 부활(런당 1회). 피격 경로는 TakeDamage가 결의를 먼저 봤다 — 여기는 피해 밖 경로(자해 · 낙하 등).
+        if (TryAltarResolve())
+        {
+            RuntimeStats.SetHp(1);
+        }
+        else if (run?.CovenantHandler != null && run.CovenantHandler.TryPreventDeath())
         {
             RuntimeStats.SetHp(Mathf.Max(1, RuntimeStats.Hp)); // 서약 사망방지 → 사망 취소
             _invincibleEnd = Time.time + 1f;
@@ -434,6 +447,49 @@ public sealed partial class PlayerController
             else
                 GameRunBootstrapper.Instance?.HandlePlayerDeath();
         }
+    }
+
+    /// <summary>「결의」 문턱 기록 — 피격 직전 체력이 문턱 이상이면 그 시각을 남긴다(산 단계가 없으면 아무것도 안 함).</summary>
+    private void NoteResolveHp()
+    {
+        float threshold = MemoryAltarService.ResolveHpThreshold;
+        if (threshold > 0f && RuntimeStats.Hp >= RuntimeStats.MaxHp * threshold)
+            _resolveHighHpAt = Time.time;
+    }
+
+    /// <summary>
+    /// 기억의 제단 「결의」(10-22 해방 대비 · 설계 `기획/RelicFairy_해방기_기억의제단_권장안_20261022.md` 안 B) —
+    /// 최근 <see cref="MemoryAltarCatalog.ResolveWindowSeconds"/>초 안에 체력이 문턱(1단계 60% · 2단계 45%) 이상이었으면 이번 한 번은 쓰러지지 않고
+    /// <see cref="MemoryAltarCatalog.ResolveInvulnSeconds"/>초 무적. 방마다 1회 · 보스는 페이지마다 1회. 높은 체력에서 「한 번의 연타로 0」만 막는다 —
+    /// 실수가 이어져 낮은 체력에서 맞으면 그대로 쓰러진다(「강해도 피할 수 있으면 의도」). 체력을 채우지 않는다(흡혈 · 회복 아님).
+    /// 체력을 1로 맞추는 것은 부르는 쪽이 한다(피격 경로는 피해를 줄이고, 피해 밖 경로는 체력을 1로 놓는다).
+    /// </summary>
+    private bool TryAltarResolve()
+    {
+        if (_dead || IsShadowClone || GameRunBootstrapper.Instance?.Run == null) return false;   // 런 밖(인트로 연출 사망 등)은 그대로
+        if (MemoryAltarService.ResolveHpThreshold <= 0f) return false;
+        if (Time.time - _resolveHighHpAt > MemoryAltarCatalog.ResolveWindowSeconds) return false;
+
+        int page = CurrentBossPage();
+        if (_resolveSpent && page == _resolveSpentPage) return false;
+        _resolveSpent     = true;
+        _resolveSpentPage = page;
+
+        _invincibleEnd = Mathf.Max(_invincibleEnd, Time.time + MemoryAltarCatalog.ResolveInvulnSeconds);
+        // 신호는 작게 — 알림 한 줄 + 짧은 소리(흔들림 · 큰 이펙트 없음 · 10-22 설계 「신호」)
+        ItemEffectVfxHelper.ShowNotice("<color=#E8C07A>결의</color> — 쓰러질 한 방을 체력 1로 버텼다");
+        Managers.Sound?.PlayEvent(SoundEvent.SkillBuff);
+        Debug.Log($"[MemoryAltar] 결의 — 체력 1로 버팀 (보스 페이지 {page})");
+        return true;
+    }
+
+    /// <summary>지금 싸우는 보스의 페이지(1부터) — 보스가 없으면 0. 「결의」가 페이지마다 다시 차는 기준.</summary>
+    private static int CurrentBossPage()
+    {
+        RelicFairy.Monster.MonsterBase.CopyActive(s_resolveBossScan);
+        foreach (var m in s_resolveBossScan)
+            if (m is RelicFairy.Monster.IBoss && m is RelicFairy.Monster.IBossHudSource hud) return hud.HudPage;
+        return 0;
     }
 
     /// <summary>
@@ -497,4 +553,7 @@ public sealed partial class PlayerController
     // ── Event Handlers ────────────────────────────────────────────
     /// <summary>타격 통지(OnEnable 구독) — 저스트 회피 반격 창의 적중 환급으로 넘긴다.</summary>
     private void HandleHitFeedback(HitInfo info) => PerfectDodge.NotifyPlayerHit(info);
+
+    /// <summary>새 방이 드러났다(OnEnable 구독) — 기억의 제단 「결의」가 다시 찬다(방마다 1회 · 10-22).</summary>
+    private void HandleRoomRevealedForResolve(GameObject room) => _resolveSpent = false;
 }

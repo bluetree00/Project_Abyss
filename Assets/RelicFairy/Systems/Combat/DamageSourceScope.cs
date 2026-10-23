@@ -22,8 +22,9 @@ public static class DamageSourceScope
 
     public static DamageSource Resolve(DamageKind kind)
     {
-        if (kind == DamageKind.Dot) return DamageSource.Dot;
+        // 10-22 서약이 먼저 — 서약이 건 화상 · 출혈 틱 · 기폭도 「서약」(결과창 「서약 0%」: 발동 179회인데 전부 「지속」으로 갔다)
         if (s_current == DamageSource.Covenant) return DamageSource.Covenant;
+        if (kind == DamageKind.Dot) return DamageSource.Dot;
         if (kind == DamageKind.Synergy) return DamageSource.Rune;
         return s_current ?? DamageSource.Basic;
     }

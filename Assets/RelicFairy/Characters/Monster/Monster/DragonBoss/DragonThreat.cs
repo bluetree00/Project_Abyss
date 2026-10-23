@@ -23,7 +23,17 @@ public static class DragonThreat
     public const int   BigRadius   = 4;
     public const float BigDamage   = 1.4f;
     public const float EdgeDrop    = 0.3f;    // 바깥 테두리 칸을 뺄 확률
-    public const float MeteorReachAtOne = 4.8f; // 운석 이펙트(Meteor.prefab) 배율 1의 보이는 반경(충격파까지 · 10-14 실측 2.14 / 4.81 m) — 예전 배율 1은 3×3칸(반폭 1.5 m)의 1.4~3.2배였다
+    public const float MeteorReachAtOne = 4.8f; // 운석 이펙트(Meteor.prefab) 배율 1의 땅 효과 보이는 반경(충격파까지 · 10-14 실측 2.14 / 4.81 m)
+
+    // 10-19 사용자 「맨 처음 쓰던 메테오 리소스가 좋았다 — 키워서 더 높은 곳에서 떨어져 웅장하게」(10-18 몸통/착탄 분리는 걷음):
+    // Meteor.prefab 하나 — 떨어지는 불덩이(뿌리 입자)와 꼬리는 크게(배율만큼 더 높은 곳에서 · 0.4초 그대로),
+    // 땅 효과 자식만 판정 크기(MeteorScale)로 되돌려 「예고 = 판정」을 지킨다.
+    public const float BodyScale    = 1.6f;   // 흩뿌림 불덩이(예전 판정 크기 0.31~0.94)
+    public const float BigBodyScale = 2.4f;   // 노림 · 큰 메테오
+    private static readonly HashSet<string> TrailParts = new() { "SubFire", "SubSmoke", "SubSparks" };   // 뿌리(불덩이)의 꼬리 — 땅 효과가 아니다
+    private const float SkyPartY      = 1f;     // 로컬 높이가 이보다 높은 자식 = 하늘 부분(출발 섬광 Glow · Flare — 출발점 (0, 7, −4))
+    private const float NativeFallTime = 0.4f;  // Meteor.prefab 불덩이 입자 수명(배율과 무관)
+    private static readonly List<ParticleSystem> s_meteorPs = new();
 
     /// <summary>플레이어 평면 속도(m/s, 6 상한) — 몸의 Rigidbody 기준. 없으면 0.</summary>
     public static Vector3 PlayerVelocity(MonsterContext ctx)
@@ -73,6 +83,32 @@ public static class DragonThreat
 
     /// <summary>운석 이펙트 배율 — 보이는 반경이 판정 반폭(r + 0.5칸)에 맞게(반경 1칸 0.31 · 2칸 0.52 · 3칸 0.73 · 4칸 0.94).</summary>
     public static float MeteorScale(int r) => (r + 0.5f) * DragonBossRoomContext.CellSize / MeteorReachAtOne;
+
+    /// <summary>
+    /// 운석 하나를 착탄 자리에 띄운다 — 불덩이(뿌리 입자)와 꼬리는 <paramref name="bodyScale"/>(클수록 더 높은 곳에서 떨어진다),
+    /// 땅 효과 자식(분화구 · 충격파 · 불 · 연기 · 파편)은 <paramref name="groundScale"/>(판정 크기). 풀 인스턴스라 매번 다시 맞춘다.
+    /// </summary>
+    public static GameObject SpawnMeteor(GameObject prefab, Vector3 land, float bodyScale, float groundScale,
+                                         float fallSeconds = NativeFallTime, bool fromCameraFar = true)
+    {
+        if (prefab == null) return null;
+        // 출발점(로컬 −Z 위)이 카메라 먼 쪽 = 화면 위에서 들어오게(identity면 늘 월드 −Z에서 왔다 · 10-19 01 조사)
+        Quaternion rot = Quaternion.identity;
+        var cam = fromCameraFar ? Camera.main : null;
+        if (cam != null) { Vector3 f = cam.transform.forward; f.y = 0f; if (f.sqrMagnitude > 0.01f) rot = Quaternion.LookRotation(-f.normalized); }
+        var go = BossEffectPool.Spawn(prefab, land, rot);
+        if (go == null) return null;
+        go.transform.localScale = Vector3.one * bodyScale;
+        float k = groundScale / Mathf.Max(0.01f, bodyScale);
+        foreach (Transform c in go.transform)
+            c.localScale = TrailParts.Contains(c.name) || c.localPosition.y > SkyPartY ? Vector3.one : Vector3.one * k;
+        // 보이는 착탄 = 피해 순간 — 불덩이 수명 0.4초를 낙하 시간(ImpactDelay)에 맞춰 재생 속도를 늦춘다(땅 효과도 그만큼 무겁게)
+        float speed = NativeFallTime / Mathf.Max(NativeFallTime, fallSeconds);
+        go.GetComponentsInChildren(true, s_meteorPs);
+        foreach (var ps in s_meteorPs) { var m = ps.main; m.simulationSpeed = speed; }
+        s_meteorPs.Clear();
+        return go;
+    }
 
     // 운석끼리 겹쳐 같은 순간 여러 번 맞으면(맞은 뒤 무적이 없다) 2초에 1994 — 최대 HP를 넘었다(10-14 실측). 운석 피해는 이만큼 사이를 둔다
     public const float MeteorHitGap = 0.6f;

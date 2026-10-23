@@ -186,6 +186,9 @@ public sealed class CovenantPanelView : MonoBehaviour
             desc = go.AddComponent<TextMeshProUGUI>();
             if (name != null) desc.font = name.font;
         }
+        // 꺼진 슬롯(@UIRoot 프리팹에서 비활성) 안의 TMP는 Awake 전이라 원근 카메라로 여겨 높이를 0.1배로 잰다 —
+        // 설명이 4 px로 나와 틀이 제목 줄만 덮고 아래 줄이 틀 밖으로 나갔다(10-16 사용자 「텍스트에 맞는 배경이 적용되지 않는다」).
+        desc.isOrthographic = true;
         // 설명 — 왼쪽 정렬 목록(10-15). 15px 고정(자동 축소 없음 — 칸이 내용만큼 자란다) · 원인 줄은 한 단 옅게(UI_CovenantSlot.BindSentence)
         desc.alignment = TextAlignmentOptions.TopLeft;
         desc.color     = UITheme.Thin.Ink;
@@ -358,11 +361,25 @@ public sealed class CovenantPanelView : MonoBehaviour
         s_shown = this;
         EnsureThinFonts();
         BindSentenceEvents(_lastSentence);
+        // 꺼진 동안(로비 · 컷신 · 대기방) 잰 높이는 틀릴 수 있다 — 켜질 때 지금 문장으로 칸을 다시 맞춘다(10-16)
+        if (_lastSentence != null) FitSentence(_lastSentence);
     }
     private void OnDisable()
     {
         if (s_shown == this) s_shown = null;
         BindSentenceEvents(null);
+    }
+
+    /// <summary>서약서 한 장의 칸 높이 = 여백 + 제목 한 줄 + 간격 + 설명(실제 줄바꿈까지 잰 높이) — 1절이 휑하지 않고 5절이 줄어들지 않는다(10-15).
+    /// Refresh와 켜질 때(OnEnable) 같이 부른다.</summary>
+    private void FitSentence(CovenantSentence sentence)
+    {
+        if (_slots == null || _slots.Length == 0 || _slots[0] == null) return;
+        float descH = _slots[0].BindSentence(sentence, SentenceWidth - ContentPad.x - ContentPad.z);
+        float h = Mathf.Ceil(ContentPad.w + TitleH + contentSpacing + descH + ContentPad.y);
+        if (_grid != null) { _grid.constraintCount = 1; _grid.cellSize = new Vector2(SentenceWidth, h); }
+        if (_slots[0].TryGetComponent<LayoutElement>(out var le))
+        { le.preferredWidth = SentenceWidth; le.minWidth = SentenceWidth; le.preferredHeight = h; le.minHeight = h; }
     }
 
     /// <summary>문장이 바뀌면(이어 쓰기 · 고쳐 쓰기 = 새 인스턴스) 절 사건을 다시 듣는다.</summary>
@@ -392,8 +409,9 @@ public sealed class CovenantPanelView : MonoBehaviour
             handler.ChainEndSaid = true;
             CovenantVoice.Say(CovenantVoice.ChainEnd);
         }
-        PlayClauseSound(index);
-        ShowTriggerText(index);
+        // 10-19 사용자 「서약 조건이 완료될 때마다 나오는 사운드가 오히려 방해」 — 소리는 글자가 뜨는 두 순간(첫 발동 · 끝 절 연쇄)에만.
+        // 절마다의 확인은 서약서 칸의 점 깜빡임(FlashPip)이 맡는다.
+        if (ShowTriggerText(index)) PlayClauseSound(index);
     }
 
     /// <summary>등급마다 다른 소리 — 실버 = 높고 맑게 한 번 · 골드 = 겹종(한 번 더 높게) · 루비 = 낮게 + 짧은 화면 효과. 절이 이어질수록 한 음씩 오른다.</summary>
@@ -428,10 +446,10 @@ public sealed class CovenantPanelView : MonoBehaviour
     /// 출시용 발동 글자(개편기획 ① — 개발 빌드 전용 토스트가 걷힌 뒤 출시 빌드에선 발동이 글자로 보이지 않았다):
     /// 이 서약서의 첫 발동 「서약 발동」 · 끝 절까지 이어진 연쇄 「연쇄 ×N」(<see cref="ChainTextGap"/>초 간격). 플레이어 머리 위 얇은 글자.
     /// </summary>
-    private void ShowTriggerText(int index)
+    private bool ShowTriggerText(int index)
     {
         var player = GameRunBootstrapper.Instance?.Run?.Player;
-        if (player == null || _sentence == null) return;
+        if (player == null || _sentence == null) return false;
         string text = null;
         if (!_firstFireShown) { _firstFireShown = true; text = "서약 발동"; }
         else if (_sentence.ResultCount >= 2 && index == _sentence.ResultCount - 1
@@ -441,6 +459,7 @@ public sealed class CovenantPanelView : MonoBehaviour
             text = "연쇄 ×" + _sentence.ResultCount;
         }
         if (text != null) RelicFloatText.Show(player.transform.position, text, TriggerTextColor);   // 발밑 — 높이는 RelicFloatText가 더한다
+        return text != null;
     }
 
     public void Refresh(IReadOnlyList<CovenantBase> covenants)
@@ -463,12 +482,7 @@ public sealed class CovenantPanelView : MonoBehaviour
                 _countLabel.gameObject.SetActive(true);
                 _countLabel.text = $"서약서 {sentence.ResultCount}절";
             }
-            // 높이 = 여백 + 제목 한 줄 + 간격 + 설명(실제 줄바꿈까지 잰 높이) — 1절이 휑하지 않고 5절이 줄어들지 않는다(10-15)
-            float descH = _slots[0] != null ? _slots[0].BindSentence(sentence, SentenceWidth - ContentPad.x - ContentPad.z) : 0f;
-            float h = Mathf.Ceil(ContentPad.w + TitleH + contentSpacing + descH + ContentPad.y);
-            if (_grid != null) { _grid.constraintCount = 1; _grid.cellSize = new Vector2(SentenceWidth, h); }
-            if (_slots[0] != null && _slots[0].TryGetComponent<LayoutElement>(out var le))
-            { le.preferredWidth = SentenceWidth; le.minWidth = SentenceWidth; le.preferredHeight = h; le.minHeight = h; }
+            FitSentence(sentence);
             for (int i = 1; i < _slots.Length; i++) _slots[i]?.SetEmpty();
             return;
         }

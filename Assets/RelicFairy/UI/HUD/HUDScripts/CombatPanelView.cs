@@ -69,8 +69,8 @@ public sealed partial class CombatPanelView : MonoBehaviour
     [Header("유물 게이지 스킨 (선택)")]
     [SerializeField] private Sprite relicGaugeFrameSprite;   // 유물게이지 테두리 (검 실루엣 외곽)
     [SerializeField] private Sprite relicGaugeTrackSprite;   // 유물 게이지 검정
-    [SerializeField] private Sprite relicGaugeFillSprite;    // 유물 게이지 보라 (평시)
-    [SerializeField] private Sprite relicGaugeReadySprite;   // 유물 게이지 빨강 (절정/IsSkillReady)
+    [SerializeField] private Sprite relicGaugeFillSprite;    // 유물 게이지 보라 — 광란(IsSkillReady) · 10-18부터(예전 평시)
+    [SerializeField] private Sprite relicGaugeReadySprite;   // 유물 게이지 빨강 — 평시 광기 · 10-18부터(예전 절정)
 
     [Header("유물 태양 게이지 — 가웨인 전용 (선택)")]
     [Tooltip("충전중(열린 태양) — 중앙 공간으로 충전 게이지가 통과한다.")]
@@ -354,8 +354,8 @@ public sealed partial class CombatPanelView : MonoBehaviour
             hpFillImage.fillAmount = ratio;
             if (WuwaHud)
             {
-                // 명조형 — 장식 아트 없이 한 줄, 색 = 상태(30% 이하 붉게)
-                hpFillImage.sprite = UIThinShapes.Solid;
+                // 명조형 — 장식 아트 없이 한 줄, 색 = 상태(30% 이하 붉게). 결 = 바 옷(10-18 ⑲ 시안 A — 왼쪽 어둡게 · 위 반사선)
+                hpFillImage.sprite = UIBarDress.FillGrain;
                 hpFillImage.color  = ratio <= LowHpRatio ? UITheme.Thin.HpLow : UITheme.Thin.HpFill;
             }
             else if (HasHpSkin)
@@ -809,9 +809,11 @@ public sealed partial class CombatPanelView : MonoBehaviour
                 _weaponName[index].text = WuwaHud ? string.Empty : info.HasWeapon ? info.Name : "없음";   // 명조형 = 이름 없음(끄면 하드 가드가 켠다)
             if (_weaponLevel[index] != null)
             {
-                bool showLv = info.HasWeapon && info.EnhanceLevel > 0;
+                // 10-22 사용자 「무기 쪽 재련 텍스트가 겹치고 재련 수치를 굳이 HUD에서?」 — 걷는다(재련소 · ESC 장비 · 런 결과에 있다).
+                // 글자를 비워 둬야 HUD 하드 가드가 다시 켜도 안 보인다.
+                bool showLv = false;
                 // 끌 때 글자도 비운다 — HUD 하드 가드가 0.2초마다 전투 패널 글자를 다시 켜서 옛 「+N」이 +0 무기에 떴다(09-28).
-                _weaponLevel[index].text = showLv ? $"+{info.EnhanceLevel}" : string.Empty;
+                _weaponLevel[index].text = showLv ? $"재련 {WeaponReforgeService.CountAt(info.EnhanceLevel)}" : string.Empty;   // 10-19 — 「+N」 대신 재련 횟수
                 _weaponLevel[index].gameObject.SetActive(showLv);
             }
             RefreshWeaponFrames();   // 스킨 시 활성/비활성 테두리 스왑(미지정이면 no-op)
@@ -2091,16 +2093,26 @@ public sealed partial class CombatPanelView : MonoBehaviour
             var c = _relicResource.BarColor;
 
             bool ready = _relicResource.IsSkillReady;
+            // 랜슬롯 광란 = 남은 시간만큼(칼끝 → 칼자루로 줄어듦) — 예전엔 1로 고정이라 남은 시간이 「광란 N.N초」 글로만 보였다(10-18 리서치 · 명조 · 로스트아크 「모드 중 게이지 = 연료」)
+            if (_relicResource is MadnessStack madness && madness.IsFrenzy)
+            {
+                fill = madness.FrenzyRemaining01;
+                // 「광란 N.N초」도 매 프레임 — 라벨은 OnChanged로만 갈렸는데 광란 중엔 시간이 흘러도 신호가 없어 진입 값(「광란 6.0초」)에 멈춰 있었다(10-18 실측).
+                // Label은 0.1초 단위가 바뀔 때만 새 글을 만들고, 같은 글이면 TMP가 다시 그리지 않는다.
+                RefreshRelicLabel();
+            }
 
             // 게이지 조건이 바뀌면 Q 슬롯 사용가능 표시도 즉시 따라간다(쿨다운과 AND).
             RefreshQFrame();
 
             if (_relicGaugeFill != null)
             {
-                // 스킨: 폭 대신 fillAmount(검 실루엣 유지) + 상태별 fill 아트 스왑(평시 보라 / 절정 빨강)
+                // 스킨: 폭 대신 fillAmount(검 실루엣 유지) + 상태별 fill 아트 스왑 — 평시 빨강(광기) / 광란 보라.
+                // 예전엔 거꾸로(평시 보라 / 절정 빨강)라 빛(BarColor = 평시 붉은 · 광란 보라)과 색 뜻이 엇갈렸다(10-18) · 광란 오라도 붉은 분노 위 검보라
                 _relicGaugeFill.fillAmount = fill;
-                var art = (ready && relicGaugeReadySprite != null) ? relicGaugeReadySprite : relicGaugeFillSprite;
+                var art = (!ready && relicGaugeReadySprite != null) ? relicGaugeReadySprite : relicGaugeFillSprite;
                 if (art != null && _relicGaugeFill.sprite != art) _relicGaugeFill.sprite = art;
+                if (_relicResource is MadnessStack lancelot) TickLancelotMotion(lancelot, fill);   // 적중 계단 · 광란 점화(10-18 · CombatPanelView.RelicMotion)
             }
             else
             {
@@ -2115,10 +2127,10 @@ public sealed partial class CombatPanelView : MonoBehaviour
 
             if (_relicBarGlow != null)
             {
-                float pulse     = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * (ready ? 10f : 6f));
-                float intensity = ready ? 1f : fill * fill;               // 절정=상시 강, 아니면 게이지 비례
-                float glow      = pulse * intensity * 0.9f + _relicFlash; // 진입 플래시 가산
-                _relicBarGlow.effectColor = new Color(c.r, c.g, c.b, Mathf.Clamp01(glow));
+                // 맥동 없이 고정(10-18) — 충전 중에도 약 1Hz로 계속 숨쉬어 「상시 깜빡임 금지」와 부딪혔다.
+                // 90%부터 옅게 켜고(곧 광란) · 광란은 진하게 · 진입 때만 한 번 더 밝게(플래시)
+                float intensity = ready ? 0.8f : fill >= RelicGlowFromFill ? 0.4f : 0f;
+                _relicBarGlow.effectColor = new Color(c.r, c.g, c.b, Mathf.Clamp01(intensity + _relicFlash));
             }
             // 정오 진입 시 바를 잠깐 확대(펀치) — 절정 강조
             // 분기 조건이 _relicBarFill만 보고 _relicBar는 안 봐서 여기만 무방비였다(_sunRoot와 같은 결함).

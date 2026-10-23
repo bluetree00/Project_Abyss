@@ -161,6 +161,18 @@ MonoBehaviour:
   _landSfx: {fileID: 8300000, guid: 0c0623ff0510b8d4598a8825a338dad6, type: 3}
   _stompSfx: {fileID: 8300000, guid: c018304781881f243b37f1599df05c12, type: 3}
   _wallSfx: {fileID: 8300000, guid: 5dfd2a02b507f11479a9ae6871fe4543, type: 3}
+  _slashVfx: {fileID: 1644958980890870, guid: bca23e1d22af3404582ac6c498d1487e, type: 3}
+  _slashVfxScale: 0.37
+  _thornVfx: {fileID: 1210069404974878, guid: fbab27c98b168764eb295cfff1e9f61f, type: 3}
+  _thornVfxScale: 0.24
+  _fireVfx: {fileID: 7082525810440381746, guid: 7239f2bebff5f5b4a91fc5d1c2c4619b, type: 3}
+  _fireVfxScale: 0.05
+  _shadowVfx: {fileID: 1105761162065845526, guid: 28668731d069e9444b9b61a080a17947, type: 3}
+  _shadowVfxScale: 1
+  _voidVfx: {fileID: 3470175545269027477, guid: 3f498e4cf53914e48b44a0340f496a52, type: 3}
+  _voidVfxScale: 0.5
+  _voidOrbVfx: {fileID: 8881179166184986975, guid: 0acb59c36e3495a43abbde5a801c28d2, type: 3}
+  _voidOrbVfxScale: 0.9
 --- !u!1001 &2515396205313511283
 PrefabInstance:
   m_ObjectHideFlags: 0

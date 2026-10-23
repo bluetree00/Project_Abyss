@@ -170,6 +170,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 45844c2f40560304f91d70f1d34d1d54
+    m_Address: KatanaDelayedCut
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 469bcc0c68b19764388994d3f0b7f301
     m_Address: GreatswordSlash
     m_ReadOnly: 0
@@ -182,6 +187,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 50b6088f34d09da49a82167de33be527
     m_Address: VFX_Petrify
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 565d5c7e890524194b9ab00c631edaf0
+    m_Address: GreatswordGroundCrack
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -232,6 +242,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 6e37f362b49b90549898b339f0cd3101
     m_Address: Run/StairwaySet
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6ef35fa36e3a65043b2d800600204bdd
+    m_Address: GreatswordHitImpact
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -443,6 +458,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e2d56be574ad63c4c8cf543eb99feb78
+    m_Address: vfx_form_windcut_red
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e71e3e83b252509489dbb4e6432dbdfb
     m_Address: FrontAttack
     m_ReadOnly: 0
@@ -455,7 +475,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ec3f674830402cc45bce805cf6493db7
-    m_Address: GreatswordImpact
+    m_Address: SwordStrikeFlash
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

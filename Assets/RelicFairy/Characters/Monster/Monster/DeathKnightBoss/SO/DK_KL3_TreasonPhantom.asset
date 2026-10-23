@@ -21,6 +21,9 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: kl3_treason
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: 4fd2c475e0cb0d548a238d5e81bdb608, type: 2}
+  followUpLateOnly: 0
+  followUpCooldown: 10
   phantomFadeIn: 0.4
   phantomFadeOut: 0.3
   phantomAnim: Attack2

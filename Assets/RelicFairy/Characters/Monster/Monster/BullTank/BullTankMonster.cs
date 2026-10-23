@@ -14,7 +14,7 @@ namespace RelicFairy.Monster
 /// 깨어나면 포효 → 상단 체력바(「정예 보스」), 처치는 공용 사망 디졸브.
 /// 예고 = 판정(모양 · 크기 · 시점) · 앞섬 내려찍기 0.7 · 도약 0.8 · 돌진 0.8초(기준 ≥ 0.45) · 이펙트는 행동하는 순간에만.
 /// </summary>
-public class BullTankMonster : MonsterBase
+public partial class BullTankMonster : MonsterBase
 {
     // ── Constants ──────────────────────────────────────────────
     public const string Kind = "BullTank";
@@ -119,10 +119,9 @@ public class BullTankMonster : MonsterBase
     protected override float  HPBarHeadOffset => 0.4f;
 
     public override bool   IsEliteBoss => true;
-    // 라인 「관문지기」 첫 종 — 봉인기 「사슬 찬 황소」 · 해방기부터 「사슬 끊은 황소」(머리 위 이름은 영문 — 09-27).
-    // 10-14 사용자 「멍에 진 황소 이름이 이상하다」 — 보스 봉인 사슬과 같은 말로
-    public override string BossName    => StoryProgress.IsLiberated ? "사슬 끊은 황소" : "사슬 찬 황소";
-    public override string DisplayName => StoryProgress.IsLiberated ? "Unchained Bull" : "Chained Bull";
+    // 챕터 이름(10-16 사용자 「제대로 된 이름 · 챕터별 개성」) — 봉인기 「가시뿔 황소」 · 해방기부터 「사슬 끊은 가시뿔 황소」(머리 위는 영문 — 09-27)
+    public override string BossName    => StoryProgress.IsLiberated ? "사슬 끊은 " + ThemeNameKo(_theme) : ThemeNameKo(_theme);
+    public override string DisplayName => StoryProgress.IsLiberated ? "Unchained " + ThemeNameEn(_theme) : ThemeNameEn(_theme);
     protected override string StaggerStateName => AnimChargeEnd;   // 휘청 = 벽에 박힌 비틀거림(Hit 0.5초로는 1.5초를 못 채운다 · 10-14 정예 애니 점검)
 
     // ── Lifecycle ──────────────────────────────────────────────
@@ -133,6 +132,8 @@ public class BullTankMonster : MonsterBase
         _repeat = 0;
         _swingReadyAt = _leapReadyAt = _chargeReadyAt = 0f;
         MonsterRootXZLock.Attach(gameObject, RootBone);   // 클립의 수평 이동을 지운다 — 몸이 자리에서 최대 10.7 m 앞으로 나갔다(10-14)
+        ResolveTheme();
+        BeginKit();
         ApplyEraBody();
         base.OnEnable();
         if (Poise != null) Poise.MaxScale = _poiseScale;   // OnEnable의 포이즈 초기화 뒤에
@@ -150,6 +151,7 @@ public class BullTankMonster : MonsterBase
 
     protected override void OnDisable()
     {
+        EndKit();
         UnbindBossHudIfBound();
         base.OnDisable();
     }
@@ -167,6 +169,7 @@ public class BullTankMonster : MonsterBase
 
     protected override void OnFatalDamage()
     {
+        EndKit();   // 쓰러진 뒤 남은 강화(예고 뒤 일격 · 불길)가 치지 않게
         UnbindBossHudIfBound();
         base.OnFatalDamage();
     }
@@ -215,7 +218,7 @@ public class BullTankMonster : MonsterBase
         => m != null && m.name.StartsWith("M_BullTank_URP_")
            && !m.name.Contains("Viking") && !m.name.Contains("Baton") && !m.name.Contains("Bodyguard");
 
-    // 악몽 모드는 검은 몸 — 몸 색 재질만 바꾸고(옷 · 무기는 그대로) 아니면 원래대로. 등장 디졸브가 이 재질을 원본으로 잡는다
+    // 악몽 모드는 검은 몸 — 몸 색 재질만 바꾸고(옷 · 무기는 그대로) 아니면 챕터 톤(10-16). 등장 디졸브가 이 재질을 원본으로 잡는다
     private void ApplyEraBody()
     {
         if (_bodyRenderers == null)
@@ -232,10 +235,9 @@ public class BullTankMonster : MonsterBase
         for (int i = 0; i < _bodyRenderers.Length; i++)
         {
             if (_bodyRenderers[i] == null) continue;
-            if (!black) { _bodyRenderers[i].sharedMaterials = _bodyOriginals[i]; continue; }
             var mats = (Material[])_bodyOriginals[i].Clone();
             for (int k = 0; k < mats.Length; k++)
-                if (IsBodyColour(mats[k])) mats[k] = _nightmareBodyMaterial;
+                if (IsBodyColour(mats[k])) mats[k] = black ? _nightmareBodyMaterial : Tinted(mats[k], _theme);
             _bodyRenderers[i].sharedMaterials = mats;
         }
     }
@@ -273,6 +275,27 @@ public class BullTankMonster : MonsterBase
     }
 
     private static Vector3 Flat(Vector3 v) { v.y = 0f; return v; }
+
+    private static readonly RaycastHit[] s_obstacleHits = new RaycastHit[16];
+
+    /// <summary>
+    /// 돌진 앞 벽 · 기둥 · 장식까지 거리 — NavMesh에 안 담긴 장애물(메모 「장애물 위 스폰」)을 돌진이 뚫고 넘어갔다(10-16 사용자).
+    /// 몸 높이 구(球)로 쏘고(바닥 · 낮은 잔해는 넘는다) 몸 앞 길이만큼 덜 간다. 시작부터 겹친 것은 건너뛴다.
+    /// </summary>
+    private float ObstacleClear(Vector3 from, Vector3 dir, float maxLen)
+    {
+        const float CastRadius = 0.8f, CastHeight = 1.3f, FrontPad = 0.7f;
+        int mask = LayerMask.GetMask("Wall", "Default");
+        int n = Physics.SphereCastNonAlloc(from + Vector3.up * CastHeight, CastRadius, dir, s_obstacleHits, maxLen + FrontPad, mask, QueryTriggerInteraction.Ignore);
+        float best = maxLen;
+        for (int i = 0; i < n; i++)
+        {
+            var h = s_obstacleHits[i];
+            if (h.collider == null || h.distance <= 0f || h.collider.transform.IsChildOf(transform)) continue;
+            best = Mathf.Min(best, h.distance - FrontPad);
+        }
+        return best;
+    }
 
     private void StopAgent()
     {
@@ -322,17 +345,19 @@ public class BullTankMonster : MonsterBase
         {
             _t = 0f;
             _b.StopAgent();
-            var p = _b.PlayerPos(out bool ok);
-            if (ok) _b.FaceToward(p - _b.transform.position, 0f);
-            _b.Play(AnimRoar);
+            _b.Play(AnimRoar);   // 플레이어 쪽으로는 포효하며 돈다(Update) — 시작 즉시 회전은 180°/프레임이었다(10-18 실측)
             _b.Sfx(_b._roarSfx);
         }
 
         public override void Update(MonsterContext ctx)
         {
             _t += Time.deltaTime;
+            var p = _b.PlayerPos(out bool ok);
+            if (ok) _b.FaceToward(p - _b.transform.position, RoarTurnRate);
             if (_t >= _b._roarSeconds) ctx.Monster.ChangeState<ChaseState>();
         }
+
+        private const float RoarTurnRate = 300f;   // 포효하며 도는 초당 각도(10-18)
 
         public override void Exit(MonsterContext ctx) => _b.ResumeAgent();
     }
@@ -376,7 +401,9 @@ public class BullTankMonster : MonsterBase
                               && Vector3.Angle(_b.transform.forward, to) <= _b._swingAngle * 0.5f;
                 if (inside) _b.HitPlayer(_b.Damage(_b._swingDamageMul), HitWeight.Medium);
                 _b.Sfx(_b._swingSfx);
-                Dust(me + _b.transform.forward * (_b._swingRadius * 0.6f), 1.6f);   // 부채꼴 가운데에서 끝까지 덮게(0.35는 0.3 m — 10-13 실측)
+                // 흙먼지(RunFxSlot.Burst = 구형 폭발 ×1.6)는 뺐다 — 기본 타격이 「이상한 폭발」로 읽혔다(10-22 ⑧) · 궤적만
+                _b.SlashFx(me, _b.transform.forward);   // 휘두르는 궤적(10-16 「모션에 맞는 이펙트」)
+                _b.KitAfterSwing(me, _b.transform.forward, _b._swingRadius, _b._swingAngle * 0.5f);
                 Debug.Log($"[BullTank] 내려찍기 판정 t={Time.time:F2}{(inside ? " — 명중" : "")}");
             }
             if (_t >= _b._swingDuration) _b.EndPattern();
@@ -429,6 +456,7 @@ public class BullTankMonster : MonsterBase
                     else _to = _from;
                     _tele = MonsterTelegraph.Circle(_to, _b._leapRadius, _b._leapAir, MonsterTelegraph.Heavy, face: true);
                     if (_b._agent != null) _b._agent.updatePosition = false;
+                    Dust(_from, 0.7f);   // 박차고 오르는 흙먼지(10-16)
                     _b.Play(AnimJumpAir);
                     _phase = Phase.Air; _t = 0f;
                     Debug.Log($"[BullTank] 도약 착지 자리 굳힘 t={Time.time:F2}(착지까지 {_b._leapAir:F2}초)");
@@ -462,6 +490,7 @@ public class BullTankMonster : MonsterBase
             RunFx.Play(RunFxSlot.Ring, _to + Vector3.up * 0.1f, _b._leapRadius / 1.36f, DustTint);   // 착지 충격파가 판정 원(3 m)까지 퍼진다(먼지 0.55는 0.4 m — 10-13 실측)
             BossImpactFeedback.TriggerCameraShake(0.08f, 0.25f);   // 살짝
             Debug.Log($"[BullTank] 도약 판정 t={Time.time:F2}{(inside ? " — 명중" : "")}");
+            _b.KitAfterLeap(_to, _b._leapRadius);
         }
 
         public override void Exit(MonsterContext ctx)
@@ -482,8 +511,8 @@ public class BullTankMonster : MonsterBase
         private readonly BullTankMonster _b;
         private Phase   _phase;
         private float   _t;
-        private Vector3 _dir;
-        private float   _len, _moved;
+        private Vector3 _dir, _start;
+        private float   _len, _moved, _trailAt;
         private bool    _wall, _hit, _locked, _dazed;
         private MonsterTelegraph _tele;
         public ChargeState(BullTankMonster b) { _b = b; }
@@ -521,6 +550,9 @@ public class BullTankMonster : MonsterBase
                         {
                             _locked = true;
                             _b.FaceToward(_dir, 0f);
+                            // NavMesh에 없는 벽 · 기둥 · 장식에서도 자른다(굳히는 순간 한 번 — 예고 줄 = 실제 길이 · 박히면 기절)
+                            float clear = _b.ObstacleClear(_b.transform.position, _dir, _len);
+                            if (clear < _len) { _len = Mathf.Max(1f, clear); _wall = true; }
                             _tele = MonsterTelegraph.Line(_b.transform.position, _dir, _len + _b._chargeWidth * 0.5f, _b._chargeWidth, ChargeLead,   // 끝에서도 몸 반폭만큼 닿는다
                                                           MonsterTelegraph.Heavy, face: true);
                             Debug.Log($"[BullTank] 돌진 예고 시작 t={Time.time:F2} 길이 {_len:F1} m{(_wall ? " · 벽" : "")}");
@@ -536,6 +568,7 @@ public class BullTankMonster : MonsterBase
                     if (_t < _b._chargeRunIn) break;
                     _b.Play(AnimRunLoop);
                     _phase = Phase.Run; _t = 0f;
+                    _start = _b.transform.position; _trailAt = 0f;
                     Debug.Log($"[BullTank] 돌진 판정 시작 t={Time.time:F2}");
                     break;
 
@@ -546,6 +579,7 @@ public class BullTankMonster : MonsterBase
                     if (_b._agent != null && _b._agent.isOnNavMesh) _b._agent.Move(_dir * step);
                     float moved = Flat(_b.transform.position - before).magnitude;
                     _moved += moved;
+                    if (_t >= _trailAt) { _trailAt = _t + 0.15f; _b.TrailFx(_b.transform.position - _dir * 0.8f); }   // 발밑 흙먼지 자국(10-16)
                     TryHit();
                     bool done = _moved >= _len - 0.05f;
                     bool blocked = moved < step * 0.3f;
@@ -607,6 +641,7 @@ public class BullTankMonster : MonsterBase
             BossImpactFeedback.TriggerCameraShake(0.06f, 0.2f);   // 살짝
             _b.ApplyDamageTakenAmp(_b._stunDamageAmp, _b._chargeStun, ExposedStatus);   // 체력바 아래 「취약」 아이콘
             Debug.Log($"[BullTank] 돌진 벽 충돌 — 기절 {_b._chargeStun:F1}초 t={Time.time:F2}");
+            _b.KitAfterCharge(_start, _b.transform.position, _b._chargeWidth);
         }
 
         private void BeginStop()
@@ -614,6 +649,7 @@ public class BullTankMonster : MonsterBase
             _phase = Phase.Stop; _t = 0f;
             _b.Play(AnimIdle);
             Debug.Log($"[BullTank] 돌진 끝(벽 없음) t={Time.time:F2}");
+            _b.KitAfterCharge(_start, _b.transform.position, _b._chargeWidth);
         }
     }
 }

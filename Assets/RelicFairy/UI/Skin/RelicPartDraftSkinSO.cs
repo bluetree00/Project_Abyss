@@ -70,8 +70,31 @@ public sealed class RelicPartDraftSkinSO : ScriptableObject
     [SerializeField, Tooltip("묶음 사이 구분선(Line_1 — 무채 뒤 잉크 35%).")]
     private Sprite groupDivider;
 
+    [Header("카드 틀(10-18 힉스필드) — 기억 카드 · 유물마다 진화 카드")]
+    [SerializeField, Tooltip("기억 카드 틀(9칸 자르기 · 바탕 포함). 비우면 Artsystack 남색 판 + 1px 코드 테.")]
+    private Sprite memoryCardFrame;
+    [SerializeField, Tooltip("진화 카드 틀 — 키 = RelicId 이름(Gawain · Lancelot). 9칸 자르기 · 위아래 가운데 장식은 지운 판.")]
+    private KeyArt[] evolutionFrame = new KeyArt[0];
+    [SerializeField, Tooltip("진화 카드 위 가운데 문장(해 · 검) — 틀에서 떼어 낸 장식. 카드 위 가장자리에 걸쳐 얹는다.")]
+    private KeyArt[] evolutionCrest = new KeyArt[0];
+
+    [Header("파츠 공방(10-19 힉스필드 — 호두나무 · 황동) — 같은 스킨을 빌려 쓰는 UI_StartPartPopup")]
+    [SerializeField, Tooltip("공방 카드 틀(9칸 · 바탕 포함). 비우면 예전 카드 판.")]
+    private Sprite workshopCardFrame;
+    [SerializeField, Tooltip("공방 창 틀(9칸 · 바탕 포함). 비우면 예전 남색 판 + 금선.")]
+    private Sprite workshopPanelFrame;
+
+    public Sprite WorkshopCardFrame  => workshopCardFrame;
+    public Sprite WorkshopPanelFrame => workshopPanelFrame;
     public Sprite GroupUnderline => groupUnderline;
     public Sprite GroupDivider   => groupDivider;
+    public Sprite MemoryCardFrame => memoryCardFrame;
+
+    /// <summary>진화 카드 틀(없으면 null → 기억 카드 틀 · 코드 테).</summary>
+    public Sprite EvolutionFrame(string relicKey) => Find(evolutionFrame, relicKey);
+
+    /// <summary>진화 카드 위 문장(없으면 null → 얹지 않는다).</summary>
+    public Sprite EvolutionCrest(string relicKey) => Find(evolutionCrest, relicKey);
 
     /// <summary>자리 · 반응 문양(없으면 null → 글자 기호).</summary>
     public Sprite AnchorArt(string key)  => Find(anchorArt, key);

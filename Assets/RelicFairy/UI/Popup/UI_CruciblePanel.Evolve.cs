@@ -14,9 +14,12 @@ using UnityEngine.UI;
 public sealed partial class UI_CruciblePanel
 {
     private const float EvTitleY = 40f, EvSubY = 94f, EvBtnY = 834f, EvHintY = 906f;
+    private const float EvCarryY = 938f;   // 10-18 — 이어지는 것 한 줄 자리(지금은 비어 있고 꺼 둔다)
     private const float EvStepY = 284f, EvStepH = 44f;   // 「이렇게 싸운다」 세 줄
 
     private UIThinFrame _evolveConfirmFrame;
+    // 10-18 ⑧ 환영 이식 — 진화하면 무엇이 이어지나 한 줄(무형검 증강 → 등 뒤 환영 · 비어 있는 칼집 → 새 무기 증강). 이어질 것이 없으면 끈다
+    private TMP_Text    _evolveCarry;
 
     private sealed class EvolveCard
     {
@@ -56,7 +59,7 @@ public sealed partial class UI_CruciblePanel
     }
 
     /// <summary>
-    /// 진화 선택 화면 — 제목 · 카드 두 장 · [취소] [「○○」로 벼린다]. 되돌릴 수 없는 선택이라 카드는 고르기만 하고 확정은 버튼이 한다.
+    /// 진화 선택 화면 — 제목 · 카드 두 장 · [취소] [「○○」로 진화]. 되돌릴 수 없는 선택이라 카드는 고르기만 하고 확정은 버튼이 한다.
     /// 구운 화면의 옛 내용(이름만 있던 카드 두 장 · 취소)은 끄고 같은 암막 안에 새로 짓는다.
     /// </summary>
     private void EnsureEvolveContent()
@@ -87,8 +90,13 @@ public sealed partial class UI_CruciblePanel
         _evolveConfirm.onClick.AddListener(() => { if (_evolvePick >= 0) OnBranchClicked(_evolvePick); });
 
         var hint = ThinText(d, "Hint", 18f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.5f));
-        hint.text = "카드를 골라 비교하고, 「벼린다」를 눌러야 바뀐다 · ▲▼는 지금 무기 대비";
+        hint.text = "카드를 골라 비교하고, 「진화」 버튼을 눌러야 바뀐다 · ▲▼는 지금 무기 대비";   // 10-18 「벼린다」 → 「진화」(용어 통일)
         Place(hint.rectTransform, 0f, EvHintY, MockW, 26f);
+
+        _evolveCarry = ThinText(d, "CarryLine", 18f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.75f));
+        _evolveCarry.richText = true;
+        Place(_evolveCarry.rectTransform, 0f, EvCarryY, MockW, 26f);
+        _evolveCarry.gameObject.SetActive(false);
     }
 
     private EvolveCard BuildEvolveCard(Transform d, int k)
@@ -252,7 +260,7 @@ public sealed partial class UI_CruciblePanel
         bool unlocked = WeaponEvolutionSO.IsUnlocked(b, level);
         // 바닥 글은 잠겼을 때만(10-11) — 비용 · 계승은 제목 아래 한 줄과 확정 버튼이 한 번씩 말한다(두 카드에 같은 줄이 겹쳤다)
         card.foot.gameObject.SetActive(!unlocked);
-        card.foot.text = unlocked ? "" : $"<color=#FF7A6A>강화 +{b.requiredEnhanceLevel}에서 열린다</color>";
+        card.foot.text = unlocked ? "" : $"<color=#FF7A6A>재련 {Reforges(b.requiredEnhanceLevel)}회에서 열린다</color>";
         card.button.interactable = unlocked;
     }
 
@@ -283,7 +291,34 @@ public sealed partial class UI_CruciblePanel
         string name = b?.target != null ? b.target.displayName : "";
         string cost = b == null || b.cost <= 0 ? ""
                     : affordable ? $"  <size=85%>강화재료 {b.cost}</size>" : $"  <size=85%><color=#FF7A6A>강화재료 {b.cost}</color></size>";
-        _evolveConfirmLbl.text = b == null ? "<color=#9A98A0>형을 고른다</color>" : $"「{name}」{Ro(name)} 벼린다{cost}";
+        _evolveConfirmLbl.text = b == null ? "<color=#9A98A0>무기를 고른다</color>" : $"「{name}」{Ro(name)} 진화{cost}";   // 10-18 「벼린다」 → 「진화」
+        RefreshEvolveCarry(b);
+    }
+
+    /// <summary>
+    /// 이어지는 것 한 줄(10-18 ⑧) — 무형검 전용 증강(칼집 제외)은 진화한 무기의 등 뒤 환영이 이어서 쓰고(<see cref="MeleeAugmentCatalog.RunsAsPhantom"/>),
+    /// 비어 있는 칼집은 고른 검의 전용 증강 N개(I)가 된다(<see cref="MeleeAugmentCatalog.ConvertForEvolution"/>). 카드를 고르기 전엔 「새 무기 증강」.
+    /// </summary>
+    private void RefreshEvolveCarry(WeaponEvolutionSO.Branch picked)
+    {
+        if (_evolveCarry == null) return;
+        var wd = _controller?.GetSlot(PlayerWeaponManager.Slot0);
+        int phantom = 0, sheath = 0, sheathRank = 0;
+        if (wd != null && !string.IsNullOrEmpty(wd.augments))
+            foreach (var (id, rank) in wd.AugmentList())
+            {
+                var d = MeleeAugmentCatalog.Get(id);
+                if (d == null || d.Weapon != MeleeWeaponKind.Nameless) continue;
+                if (d.Id == MeleeAugmentCatalog.NamelessSheath) { sheath += Mathf.RoundToInt(d.ValueAt(rank)); sheathRank = rank; }
+                else phantom++;
+            }
+        string kind = picked?.target == null ? "새 무기"
+                    : picked.target.weaponType == WeaponType.Greatsword ? "대검" : "카타나";
+        string line = "";
+        if (phantom > 0) line = $"무형검 증강 {phantom}개 → <color=#C9D3E6>환영이 이어서 씀</color>";
+        if (sheath > 0)  line += (line.Length > 0 ? "  ·  " : "") + $"비어 있는 칼집 {MeleeAugmentDef.RankName(sheathRank)} → {kind} 증강 {sheath}개";
+        _evolveCarry.text = line;
+        _evolveCarry.gameObject.SetActive(line.Length > 0);
     }
 
     /// <summary>「~이 / ~가」 — 받침이 있으면 「이」.</summary>

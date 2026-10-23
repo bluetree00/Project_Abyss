@@ -30,6 +30,12 @@ public sealed class IntroMordredDirector : MonoBehaviour
     /// <summary>지금 쇼트 이름(S2~S14). 컷신 밖이면 null — 실측 도구가 쇼트마다 화면을 찍을 때 읽는다.</summary>
     public static string CurrentShot { get; private set; }
 
+    // 고정 컷이 멈춘 그림으로 보이지 않게 — 컷마다 화각을 조금씩 좁혀 천천히 다가가는 느낌을 준다(10-16 사용자 「흐름과 멈춤이 덜 느껴져야」).
+    // 다음 컷 · 이동이 오면 멈춘다. 카메라 자리는 옮기지 않는다 — 옮기면 달려드는 모르드레드(S14)와 겹쳐 화면을 덮었다(10-16 실측).
+    private const float DriftFovRate = 0.6f;    // 초당 화각 감소(°)
+    private const float DriftFovMax  = 3f;      // 화각을 최대 이만큼만 좁힌다
+    private static CancellationTokenSource s_drift;
+
     // ── [SerializeField] ─────────────────────────────────────────────
     [Header("발동 — 무형검 F키 픽업")]
     [Tooltip("플레이어가 무형검을 F로 획득하면 시퀀스가 시작된다. 비우면 Start에서 씬의 IntroSwordPickup을 자동 탐색.")]
@@ -96,8 +102,14 @@ public sealed class IntroMordredDirector : MonoBehaviour
     [SerializeField] private float hudFadeDuration = 0.8f;
 
     [Header("무형검 하사")]
-    [Tooltip("검이 모르드레드에게서 플레이어에게 건너가는 시간(초).")]
-    [SerializeField, Min(0.2f)] private float swordHandOverDuration = 1.4f;
+    [Tooltip("전시된 검이 디졸브로 사라지는 시간(초).")]
+    [SerializeField, Min(0.2f)] private float swordDissolveDuration = 1.0f;
+    [Tooltip("손의 검이 같은 디졸브로 맺히는 시간(초) — 전시 검이 사라지는 후반부와 겹친다.")]
+    [SerializeField, Min(0.1f)] private float swordCondenseDuration = 0.8f;
+    [Tooltip("전시 검이 이만큼(0~1) 사라졌을 때 손의 검이 맺히기 시작한다.")]
+    [SerializeField, Range(0f, 1f)] private float swordHandOverlap = 0.45f;
+    [Tooltip("검이 손에 맺히는 순간의 빛 고리 색(무형검 안개 빛).")]
+    [SerializeField] private Color swordArriveTint = new Color(0.72f, 0.9f, 1f, 1f);
 
     [Header("무기 지급 (Addressable 무기 SO 키)")]
     [Tooltip("무형검 획득 시 슬롯0(근접)에 장착할 무기 SO 키.")]
@@ -140,6 +152,7 @@ public sealed class IntroMordredDirector : MonoBehaviour
     private Vector3          _p, _m, _f, _r;
     private Vector3          _pHead, _pChest, _mHead, _mChest;
     private float            _baseFov;
+    private Transform        _displayAura;   // 전시 이펙트(FogAura) — 검에서 떼어 바닥에 둔다(PlaceDisplayAura)
 
     // ── Lifecycle ────────────────────────────────────────────────────
     private void Awake()
@@ -154,11 +167,14 @@ public sealed class IntroMordredDirector : MonoBehaviour
             swordPickup = FindFirstObjectByType<IntroSwordPickup>(FindObjectsInactive.Include);
 
         if (swordPickup != null) swordPickup.OnPickup += HandleSwordPickup;
+        PlaceDisplayAura();
     }
 
     private void OnDestroy()
     {
         if (swordPickup != null) swordPickup.OnPickup -= HandleSwordPickup;
+        RelicFairy.UI.UI_BossBark.CinematicLayout = false;
+        StopDrift();
     }
 
     // ── Public Methods ───────────────────────────────────────────────
@@ -198,6 +214,10 @@ public sealed class IntroMordredDirector : MonoBehaviour
             // HUD 억제 재확인 — 부팅 타이밍으로 억제가 누락됐어도 컷신 중엔 확실히 숨긴다.
             UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
             cam?.TakeManualControl();
+            // 대사는 대사창처럼 — 리치 그림은 왼쪽 아래 고정 · 이름 · 글은 가운데(10-16 사용자 「텍스트마다 리치 이미지가 다르게 나오는 게 좋지 않아」)
+            RelicFairy.UI.UI_BossBark.CinematicLayout = true;
+            // 무형검을 서임 대사(약 8초) 동안 미리 불러 둔다 — 받는 순간(S4) 클립 · 프리팹 로드로 4~5초 멈췄다(10-16 실측: S4 7.1초)
+            PrewarmNamelessAsync().Forget();
             if (useLetterbox)
                 CinematicFrame.ShowAsync(letterboxDuration, null, ct, letterboxAspect, 0f,
                                          title: null, sortingOrder: letterboxSortingOrder).Forget();
@@ -214,12 +234,12 @@ public sealed class IntroMordredDirector : MonoBehaviour
 
             // S2 — 검에 손을 뻗는 순간: 플레이어와 검을 낮게, 옆에서
             Cut("S2 검", At(sword, 0.7f, sword.y + 0.35f, -0.5f), sword + Vector3.up * 0.1f, 30f);
-            await Hold(0.8f, ct);
+            await Hold(0.6f, ct);
 
             // S3 — 축 한쪽 눈높이 투샷 → 플레이어 어깨 너머 모르드레드(대화는 컷으로 넘긴다)
             Cut("S3 투샷", Ax(_p, 1.2f, 2.0f, -3.0f), Vector3.Lerp(_pChest, chest, 0.5f), 42f);
             await SayAsync(vows, 0, ct);
-            Cut("S3 기사", At(_m, 1.1f, chest.y, -2.8f), _mHead - Vector3.up * 0.25f, 34f);
+            Cut("S3 기사", At(_m, 1.4f, chest.y, -3.6f), _mHead - Vector3.up * 0.25f, 34f);   // ×1.3 — 속 빈 모델이 가까우면 이상(10-22 ③)
             await SayAsync(vows, 1, ct);
 
             // S5 — 검을 든 모르드레드를 아래에서(모티프). S14에서 같은 구도 · 같은 화각으로 돌아온다.
@@ -227,8 +247,11 @@ public sealed class IntroMordredDirector : MonoBehaviour
             BladeShot("S5 검을 든 기사");
             await SayAsync(vows, 2, ct);
 
-            // S4 — 「받아라」에 답해 검이 손으로 건너온다
-            Cut("S4 검을 받다", At(_p, 1.4f, _pChest.y, 1.6f), _pChest, 40f);
+            // S4 — 「받아라」에 답해 검이 손으로 날아온다
+            // 주인공 정면은 보이지 않는다 — 통로 가운데 등 뒤 높은 곳에서 뻗는 팔과 날아오는 검의 길을 함께 잡는다(10-16 사용자 「캐릭터의 정면은 연출상
+            // 보여줄 필요가 없어」 · 「무형검이 플레이어한테 가는 느낌」). 바로 어깨 너머는 머리가 화면을 덮었고, 옆으로 비키면 신도석에 막혀
+            // 카메라가 팔 앞까지 당겨졌다(10-16 실측 2회).
+            Cut("S4 검을 받다", Ax(_p, 0.6f, 2.3f, -3.0f), Vector3.Lerp(_pChest, sword, 0.5f), 40f);
             await AbsorbSwordAsync(player, ct);
 
             // S6 — 전조: 빛이 줄고 음악이 끊긴다(소리를 비워 다음 목소리가 들리게)
@@ -236,7 +259,7 @@ public sealed class IntroMordredDirector : MonoBehaviour
             Cut("S6 전조", Ax(_p, 1.2f, 3.4f, -4.5f), Vector3.Lerp(_p, _m, 0.6f) + Vector3.up * 1.3f, 46f);
             Managers.Sound.FadeOutBgmAsync(1.2f, ct).Forget();
             if (atmosphere != null) atmosphere.DimStepAsync(preDimAmount, 1.4f, ct).Forget();
-            await Hold(1.6f, ct);
+            await Hold(1.2f, ct);
 
             // S7 — 소리가 먼저, 형체는 나중: 화면 밖 목소리 → 모르드레드가 검을 겨눈다
             Cut("S7 목소리", At(_p, 0.7f, _pHead.y + 0.25f, -1.3f), chest, 24f);
@@ -274,7 +297,7 @@ public sealed class IntroMordredDirector : MonoBehaviour
 
             // S12 — 저항하는 모르드레드(미디엄): 어둠이 몸을 잠식한다
             var bindVfx = SpawnCorruptionAura();
-            Cut("S12 저항", At(_m, 1.3f, chest.y, -2.4f), chest, 40f);
+            Cut("S12 저항", At(_m, 1.7f, chest.y, -3.1f), chest, 40f);   // ×1.3(10-22 ③)
             PlayMordred("GetHit1");
             await WaitStateAsync(_mordredAnim, "GetHit1", 0.85f, 1.6f, ct);
             PlayMordred("GetHit2");
@@ -293,18 +316,19 @@ public sealed class IntroMordredDirector : MonoBehaviour
             Cut("S13 어둠", At(_p, 0.7f, _pHead.y + 0.25f, -1.3f), chest, 30f);
             if (atmosphere != null)
                 await atmosphere.SwitchToDarkAsync(grandTransitionDuration, ct);
-            await Hold(0.8f, ct);
+            await Hold(0.5f, ct);
 
             // S14 — 배신의 일격: S5와 같은 구도 · 같은 화각. 이번엔 검이 내려온다.
             //     어둠으로 뒤집힌 뒤라 인물이 묻힌다 — 카메라 쪽 낮은 붉은 빛 하나로 윤곽만 세운다(일격과 함께 걷는다).
             PlayMordred("AttackReady");
-            BladeShot("S14 배신의 일격");
+            BladeShot("S14 배신의 일격", 1.6f);
             var keyLight = SpawnKeyLight(Ax(_m, 0.8f, 0.9f, -1.6f));
             await SayAsync(strike, 0, ct);
             await SayAsync(strike, 1, ct);
             PlayMordred("Attack1");
             await WaitStateAsync(_mordredAnim, "Attack1", 0.5f, 1.5f, ct);
             RelicFairy.UI.UI_BossBark.Dismiss(0f);
+            RelicFairy.UI.UI_BossBark.CinematicLayout = false;   // 보스전 대사는 평소 배치
             await ScreenFade.Out(0f, ct);
             if (keyLight != null) Destroy(keyLight);
             Managers.Sound.PlayEffectAsync(SoundKey.Sfx.PlayerHitMedium).Forget();   // 예전 키 sfx_player_hit는 주소가 없어 무음이었다(10-12)
@@ -319,6 +343,7 @@ public sealed class IntroMordredDirector : MonoBehaviour
             }
 
             // 컷신 종료 — 물리 복구(접지 후 kinematic 해제). 전투 중엔 정상 중력이 필요하다.
+            StopDrift();
             UnfreezePlayer(player);
             if (view != null) view.fieldOfView = _baseFov;
             CurrentShot = null;
@@ -354,6 +379,8 @@ public sealed class IntroMordredDirector : MonoBehaviour
         }
         catch (OperationCanceledException)
         {
+            RelicFairy.UI.UI_BossBark.CinematicLayout = false;
+            StopDrift();
             UnfreezePlayer(player); // 컷신이 끊겨도 플레이어가 kinematic으로 굳지 않게
             if (view != null) view.fieldOfView = _baseFov;
             CurrentShot = null;
@@ -382,7 +409,7 @@ public sealed class IntroMordredDirector : MonoBehaviour
     }
 
     /// <summary>인물의 몸 범위(스킨드 메시만 — 무기 궤적 · 이펙트는 뺀다). 없으면 피벗에서 키만큼.</summary>
-    private static Bounds BodyBounds(GameObject go, Vector3 pivot, float height)
+    internal static Bounds BodyBounds(GameObject go, Vector3 pivot, float height)
     {
         if (go != null)
         {
@@ -414,8 +441,10 @@ public sealed class IntroMordredDirector : MonoBehaviour
     /// 검을 든 모르드레드를 낮은 곳에서 올려다보는 구도 — S5(서임)와 S14(배신)가 같은 값을 쓴다.
     /// 머리가 아니라 가슴을 겨눈다 — AttackReady는 몸을 숙인 자세라 머리를 겨누면 그가 화면 아래로 빠졌다(10-10 2차 실측).
     /// </summary>
-    private void BladeShot(string label)
-        => Cut(label, Ax(_m, 1.0f, 1.2f, -2.8f), _mChest, 46f);
+    // k = 거리 배율 — 속 빈 모델이 가까우면 이상해 1.3배로 물렸다(10-22 ③). S14는 AttackReady로 몸을 앞으로 숙여
+    // 같은 자리에서 화면 높이 420 %(S5 144 %)였다 → 1.6배
+    private void BladeShot(string label, float k = 1.3f)
+        => Cut(label, Ax(_m, 1.0f * k, 1.2f, -2.8f * k), _mChest, 46f);
 
     /// <summary>배신의 일격 쇼트에만 쓰는 낮은 붉은 키 라이트 — 어둠 속에서 기사의 윤곽을 세운다.</summary>
     private GameObject SpawnKeyLight(Vector3 at)
@@ -458,6 +487,35 @@ public sealed class IntroMordredDirector : MonoBehaviour
         pos = Unblock(pos, lookAt);
         view.transform.SetPositionAndRotation(pos, LookRot(pos, lookAt, view.transform.rotation));
         view.fieldOfView = fov;
+        StartDrift(view);
+    }
+
+    private static void StartDrift(Camera view)
+    {
+        StopDrift();
+        s_drift = new CancellationTokenSource();
+        DriftAsync(view, view.fieldOfView, s_drift.Token).Forget();
+    }
+
+    private static void StopDrift()
+    {
+        s_drift?.Cancel();
+        s_drift?.Dispose();
+        s_drift = null;
+    }
+
+    /// <summary>컷이 걸린 동안 화각을 천천히 좁힌다 — 다음 컷 · 이동(<see cref="StopDrift"/>)이 끊는다.</summary>
+    private static async UniTaskVoid DriftAsync(Camera view, float fov0, CancellationToken ct)
+    {
+        try
+        {
+            while (view != null)
+            {
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+                view.fieldOfView = Mathf.Max(fov0 - DriftFovMax, view.fieldOfView - DriftFovRate * Time.deltaTime);
+            }
+        }
+        catch (OperationCanceledException) { }
     }
 
     /// <summary>이동 — 공개 · 강림처럼 카메라가 움직여야 하는 쇼트만 쓴다(대화는 컷).</summary>
@@ -465,6 +523,7 @@ public sealed class IntroMordredDirector : MonoBehaviour
     {
         var view = Camera.main;
         if (view == null) return;
+        StopDrift();
         CurrentShot = label;
         pos = Unblock(pos, lookAt);
         var t = view.transform;
@@ -489,14 +548,21 @@ public sealed class IntroMordredDirector : MonoBehaviour
     /// 카메라 자리 검사 — 벽 · 의자 · 기둥 속이면 위로 올리고, 대상과의 사이를 막으면 막힌 곳 앞으로 당긴다.
     /// 인물(플레이어 · 몬스터 레이어)은 막는 것으로 치지 않는다(어깨 너머 구도는 의도된 가림이다).
     /// </summary>
-    private static Vector3 Unblock(Vector3 pos, Vector3 lookAt)
+    internal static Vector3 Unblock(Vector3 pos, Vector3 lookAt)
     {
         for (int i = 0; i < 6 && Physics.CheckSphere(pos, CamRadius, EnvMask, QueryTriggerInteraction.Ignore); i++)
             pos += Vector3.up * 0.4f;
         Vector3 toCam = pos - lookAt;
         float dist = toCam.magnitude;
-        if (dist > 0.5f && Physics.SphereCast(lookAt, CamRadius, toCam / dist, out var hit, dist - 0.3f, EnvMask, QueryTriggerInteraction.Ignore))
-            pos = lookAt + toCam / dist * Mathf.Max(0.8f, hit.distance - 0.2f);
+        if (dist <= 0.5f) return pos;
+        // 인물에 붙은 콜라이더(기본 층)도 막는 것으로 치지 않는다 — 대상과 카메라 사이의 플레이어 몸에 걸려 카메라가 대상 0.8 m 앞
+        // (플레이어 몸 속)까지 당겨졌다(10-16 실측: S4 플레이어 화면 높이 579~650%). 시작 구에 이미 겹친 것(거리 0)은 SphereCast처럼 뺀다.
+        float best = float.MaxValue;
+        foreach (var h in Physics.SphereCastAll(lookAt, CamRadius, toCam / dist, dist - 0.3f, EnvMask, QueryTriggerInteraction.Ignore))
+            if (h.distance > 0f && h.distance < best && h.collider.GetComponentInParent<CharacterBase>() == null
+                                  && h.collider.GetComponentInParent<RelicFairy.Monster.MonsterBase>() == null)
+                best = h.distance;
+        if (best < float.MaxValue) pos = lookAt + toCam / dist * Mathf.Max(0.8f, best - 0.2f);
         return pos;
     }
 
@@ -512,14 +578,14 @@ public sealed class IntroMordredDirector : MonoBehaviour
         return v.sqrMagnitude > 0.0001f ? v.normalized : fallback;
     }
 
-    /// <summary>자막 한 줄 — 쇼트에 맞춰 앞 줄을 걷고 바로 띄운 뒤, 읽을 시간만큼 머문다(초당 12자 + 0.8초).</summary>
+    /// <summary>자막 한 줄 — 쇼트에 맞춰 앞 줄을 걷고 바로 띄운 뒤, 읽을 시간만큼 머문다(초당 13자 + 0.6초 · 10-16 흐름 — 예전 12자 + 0.8초).</summary>
     private static async UniTask SayAsync(DialogueLine[] lines, int index, CancellationToken ct)
     {
         if (lines == null || index < 0 || index >= lines.Length || lines[index] == null) return;
         var l = lines[index];
         RelicFairy.UI.UI_BossBark.ShowLatest(l.text, RelicFairy.UI.BossBarkType.Bark, l.speaker);
         int chars = System.Text.RegularExpressions.Regex.Replace(l.text ?? "", "<[^>]+>", "").Length;
-        await Hold(Mathf.Clamp(chars / 12f + 0.8f, 1.8f, 4.5f), ct);
+        await Hold(Mathf.Clamp(chars / 13f + 0.6f, 1.6f, 4.2f), ct);
     }
 
     private static UniTask Hold(float seconds, CancellationToken ct) => DelaySafe(seconds, ct);
@@ -597,9 +663,11 @@ public sealed class IntroMordredDirector : MonoBehaviour
     }
 
     /// <summary>
-    /// 무형검 획득 — 손에 무기가 디졸브로 나타나고, 제단의 검은 알파가 빠지며 사라진다.
-    /// 검이 날아오지 않으므로 플레이어를 건드리지 않는다(부유·이동 문제 없음).
-    /// 카메라는 호출측이 잡아두므로 여기서는 건드리지 않는다.
+    /// 무형검 획득 — 전시된 검이 그 자리에서 청록 테두리 디졸브로 사라지고, 사라지는 후반부(<see cref="swordHandOverlap"/>)에
+    /// 손의 검이 <b>같은 디졸브</b>로 맺힌다 — 같은 검이 자리를 옮기는 것으로 읽힌다(10-18 사용자 「검이 사라지면서 플레이어 손에
+    /// 생성되는 연출이 직접 집는 것보다 좋다」). 손을 뻗던 IK(IntroHandReach)는 「집는」 몸짓으로 읽혀 뺐다.
+    /// (10-16: 검이 손까지 날아오던 것 → 사라진 뒤 손에 안개로 맺힘.) 전시 이펙트는 새 입자를 멈춰 잦아들게 한다. 카메라는 호출측이 잡아 둔다.
+    /// 장착(무기 세트 · 서 있는 자세가 바뀐다)은 손의 검이 맺히기 시작할 때 — 쥐는 자세와 검이 함께 나타난다.
     /// </summary>
     private async UniTask AbsorbSwordAsync(PlayerController player, CancellationToken ct)
     {
@@ -611,19 +679,60 @@ public sealed class IntroMordredDirector : MonoBehaviour
         var drifter = sword.GetComponentInParent<VoidDrifter>();
         if (drifter != null) drifter.enabled = false;
 
-        // 제단의 검이 흩어지는 동안 손의 검이 같은 안개로 맺힌다 — 넘겨받기.
-        // 예전엔 장착(불투명 기본 디졸브)이 끝난 '뒤에' 제단 검이 빠져, 두 자루가 잠시 같이 보였다.
-        // 둘 다 반투명 안개 머티리얼(M_NamelessFog)이라 DissolveEffect 대신 알파 페이드로 맞춘다.
-        var standFade = MaterialFade.FadeOutAsync(sword, swordHandOverDuration, ct);
+        var anim = player.Anim;
+        Transform hand = anim != null && anim.isHuman ? anim.GetBoneTransform(HumanBodyBones.RightHand) : null;
 
-        MaterialFade.FadeInHandle handIn = null;
+        // 전시 이펙트는 새 입자만 멈춘다 — 남은 빛살 · 알갱이는 제 수명대로 사라진다.
+        if (_displayAura != null)
+        {
+            foreach (var ps in _displayAura.GetComponentsInChildren<ParticleSystem>())
+                ps.Stop(false, ParticleSystemStopBehavior.StopEmitting);
+            Destroy(_displayAura.gameObject, 3f);
+        }
+        var vanish = DissolveEffect.PlayDisappearAsync(sword, swordDissolveDuration, ct);
+        await DelaySafe(swordDissolveDuration * swordHandOverlap, ct);
+
+        // 손에 맺힌다 — 작은 빛 고리 + 손의 검이 전시 검과 같은 디졸브로(켜기 전에 디졸브 재질을 씌워 첫 프레임 팝이 없다 —
+        // 재질은 방금 전시 검이 불러 캐시에 있다)
+        RunFx.Play(RunFxSlot.Ring, hand != null ? hand.position : _pChest, 0.35f, swordArriveTint);
         await EquipToSlotAsync(player, namelessWeaponKey, MeleeSlot, setActive: true,
-                               playAppear: false, beforeShow: go => handIn = MaterialFade.BeginFadeIn(go));
-        var handFade = handIn != null ? MaterialFade.FadeInAsync(handIn, swordHandOverDuration, ct) : UniTask.CompletedTask;
-        await UniTask.WhenAll(standFade, handFade);
-
+                               playAppear: false, beforeShow: go => DissolveEffect.PlayAppear(go, swordCondenseDuration));
+        await vanish;
         sword.SetActive(false);
-        await DelaySafe(0.3f, ct);
+        float tail = swordCondenseDuration - swordDissolveDuration * (1f - swordHandOverlap);   // 손의 검이 다 맺히기까지 남은 시간
+        await DelaySafe(Mathf.Max(0f, tail) + 0.2f, ct);
+    }
+
+    /// <summary>
+    /// 전시 이펙트(FogAura = Aura_Light — 바닥 원 · 빛살 · 빛 알갱이)를 검 바로 아래 바닥에 내려놓는다(10-16 사용자 「전시 이펙트도 적절한 포지션이 아닌 것 같아」).
+    /// 허리 높이에 떠 있는 검의 자식이라 바닥 원이 공중에 떴고, 입자 배율 방식이 Local이라 씬에서 준 0.3배가 자식 입자엔 안 먹어
+    /// 빛살이 원래 반경 2 m로 플레이어 둘레까지 퍼졌다 → 검에서 떼어 바닥에 두고(검이 떠다녀도 그대로) 배율 방식을 Hierarchy로.
+    /// </summary>
+    private void PlaceDisplayAura()
+    {
+        if (swordRenderer == null) return;
+        _displayAura = swordRenderer.transform.Find("FogAura");
+        if (_displayAura == null) return;
+        _displayAura.SetParent(swordRenderer.transform.parent, true);
+        Vector3 at = swordRenderer.transform.position;
+        if (Physics.Raycast(at + Vector3.up * 0.2f, Vector3.down, out var hit, 6f, EnvMask, QueryTriggerInteraction.Ignore))
+            _displayAura.position = hit.point + Vector3.up * 0.02f;
+        _displayAura.rotation = Quaternion.identity;
+        foreach (var ps in _displayAura.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var main = ps.main;
+            main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+            ps.Clear(false);
+            ps.Play(false);
+        }
+    }
+
+    /// <summary>무형검 SO · 클립 · 프리팹을 미리 불러 둔다(장착은 S4에서).</summary>
+    private async UniTaskVoid PrewarmNamelessAsync()
+    {
+        if (string.IsNullOrEmpty(namelessWeaponKey)) return;
+        var so = await Managers.AddressableManager.TryLoadAssetAsync<WeaponSO>(namelessWeaponKey);
+        if (so != null) await GameRunBootstrapper.PrewarmWeaponAsync(so);
     }
 
     // 무기 슬롯 규약 — 무형검(근접)=0, 원거리=1. PlayerWeaponManager 주석의 스테이션 규약과 동일.

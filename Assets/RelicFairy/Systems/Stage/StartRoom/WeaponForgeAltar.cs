@@ -10,6 +10,7 @@ using UnityEngine;
 ///
 /// 기획 피벗: 주무기 무형검은 <b>각성 제단(WorldSwordAwakening)에서 하사</b>되므로 여기서 근접을 고르지 않는다.
 /// 곁에 둘 원거리만 고른다(활=선택, 석궁=특전 잠금). 확정 시 원거리=슬롯1 장착(무형검은 이미 슬롯0).
+/// 고른 뒤에도 공방은 남아 다시 고를 수 있다 — 바꾸면 허브 플레이어를 제자리 재스폰해 클린하게 갈아 낀다(10-19 ⑦).
 /// (RelicAltar 상호작용 패턴 기반)
 /// </summary>
 [RequireComponent(typeof(Collider))]
@@ -31,11 +32,11 @@ public class WeaponForgeAltar : MonoBehaviour
     [SerializeField] private float textSize = 3f;
 
     private PlayerController _player;
-    private bool _claimed;
     private bool _busy;
     private Transform _camTransform;
     private TextMeshPro _worldText;
     private GameObject _promptGo;
+    private TextMeshPro _promptText;
 
     // ── Lifecycle ─────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ public class WeaponForgeAltar : MonoBehaviour
     private void Update()
     {
         BillboardTexts();
-        if (_claimed || _busy || _player == null) return;
+        if (_busy || _player == null) return;
         if (UIInputGate.Blocked) return;
         if (Input.GetKeyDown(KeyCode.F))
             ClaimAsync(this.GetCancellationTokenOnDestroy()).Forget();
@@ -65,7 +66,6 @@ public class WeaponForgeAltar : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (_claimed) return;
         var p = other.GetComponentInParent<PlayerController>();
         if (p == null) return;
         _player = p;
@@ -86,7 +86,7 @@ public class WeaponForgeAltar : MonoBehaviour
 
     private async UniTaskVoid ClaimAsync(CancellationToken ct)
     {
-        if (_claimed || _busy) return;
+        if (_busy) return;
 
         var loadout = AppBootstrapper.Instance?.Loadout;
         if (loadout == null || !loadout.IsReady)
@@ -127,11 +127,16 @@ public class WeaponForgeAltar : MonoBehaviour
                 return;
             }
 
-            _claimed = true;
-            await EquipChoiceAsync(loadout, ranged, ct);
+            // 이미 든 무기를 다시 고르면 그대로 둔다(연출 · 퀘스트 보고 없음)
+            if (ranged != loadout.WeaponSlot1)
+            {
+                await EquipChoiceAsync(loadout, ranged, ct);
+                Debug.Log($"[WeaponForgeAltar] 보조 원거리 확정: {ranged.displayName}");
+            }
 
-            Debug.Log($"[WeaponForgeAltar] 보조 원거리 확정: {ranged.displayName}");
-            DissolveEffect.PlayDisappear(gameObject, 0.5f, () => { if (this != null) Destroy(gameObject); });
+            // 공방은 남는다 — 다시 [F]로 바꿀 수 있다(10-19 ⑦)
+            _busy = false;
+            if (_player != null) ShowPrompt(true);
         }
         catch (OperationCanceledException)
         {
@@ -164,12 +169,20 @@ public class WeaponForgeAltar : MonoBehaviour
     {
         // 무형검(슬롯0)은 각성 제단(WorldSwordAwakening)에서만 하사된다 — 무기대는 보조 원거리(슬롯1)만.
         // 폴백 없음: 각성을 거치지 않았으면 무형검을 주지 않는다(원거리만).
+        bool swap = loadout.WeaponSlot1 != null && loadout.WeaponSlot1 != ranged;
         loadout.SetWeaponSlot1(ranged);
         // 얻기 연출 — 공방에서 빛이 떠올라 등으로 날아와 붙는다(베이스캠프에서만, 조작은 막지 않음)
         BaseCampFxDirector.Instance?.PlayAcquire(transform.position + Vector3.up * 1.2f, BaseCampFxDirector.AcquireKind.Ranged);
 
         // 퀘스트: 장비 선택 보고 (범용 채널)
         QuestEvents.Report("Equip", ranged != null ? ranged.name : "Weapon");
+
+        // 바꾸기 — 이미 든 슬롯1은 장착 경로가 갈지 않으므로 유물 제단처럼 제자리 재스폰해 로드아웃대로 다시 끼운다
+        if (swap)
+        {
+            BaseCampBootstrapper.Instance?.RespawnWithLoadout();
+            return;
+        }
 
         var player = _player;
         if (player == null) return;
@@ -230,6 +243,7 @@ public class WeaponForgeAltar : MonoBehaviour
         _promptGo.transform.localPosition = Vector3.up * PromptOffsetY;
 
         var tmp = _promptGo.AddComponent<TextMeshPro>();
+        _promptText = tmp;
         if (worldTextFont != null) tmp.font = worldTextFont;
         tmp.fontSize = 4f;
         tmp.alignment = TextAlignmentOptions.Center;
@@ -244,6 +258,12 @@ public class WeaponForgeAltar : MonoBehaviour
 
     private void ShowPrompt(bool on)
     {
-        if (_promptGo != null) _promptGo.SetActive(on && !_claimed);
+        if (_promptGo == null) return;
+        // 이미 들었으면 「바꾸기」 — 다시 고를 수 있다는 걸 글자로 알린다(10-19 ⑦)
+        if (on && _promptText != null)
+            _promptText.text = AppBootstrapper.Instance?.Loadout?.WeaponSlot1 != null
+                ? $"<color={UIPalette.GoldHex}>[F]</color> 보조 무기 바꾸기"
+                : $"<color={UIPalette.GoldHex}>[F]</color> 보조 무기";
+        _promptGo.SetActive(on);
     }
 }

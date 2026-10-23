@@ -11,7 +11,13 @@ using Unity.AI.Navigation;
 /// </summary>
 public class ArenaNavMeshBuilder : MonoBehaviour
 {
-    private void Start()
+    private void Start() => Build(gameObject);
+
+    /// <summary>
+    /// <paramref name="root"/>와 자식 콜라이더로 모든 에이전트 타입의 NavMesh를 굽는다(인트로 아레나도 씀 — 10-18).
+    /// <paramref name="volume"/>(root 로컬)을 주면 그 안의 콜라이더만 — 성당처럼 큰 아레나를 통째로 구우면 수 분 멈춘다.
+    /// </summary>
+    public static void Build(GameObject root, Bounds? volume = null)
     {
         int excludeMask = ~((1 << LayerMask.NameToLayer("Player")) | (1 << LayerMask.NameToLayer("Monster")));
 
@@ -19,9 +25,10 @@ public class ArenaNavMeshBuilder : MonoBehaviour
         for (int i = 0; i < agentCount; i++)
         {
             var agentSettings = NavMesh.GetSettingsByIndex(i);
-            var surface = gameObject.AddComponent<NavMeshSurface>();
+            var surface = root.AddComponent<NavMeshSurface>();
             surface.agentTypeID    = agentSettings.agentTypeID;
-            surface.collectObjects = CollectObjects.Children;
+            surface.collectObjects = volume.HasValue ? CollectObjects.Volume : CollectObjects.Children;
+            if (volume.HasValue) { surface.center = volume.Value.center; surface.size = volume.Value.size; }
             surface.useGeometry    = NavMeshCollectGeometry.PhysicsColliders;
             surface.layerMask      = excludeMask;
             surface.BuildNavMesh();

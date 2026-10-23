@@ -54,6 +54,8 @@ public struct ProjectileRequest
     public WeaponActionType actionType;
     /// <summary>스킬 마무리 일격(차지샷 등) — 타격 연출 단계만 바꾼다.</summary>
     public bool isFinisher;
+    /// <summary>수평으로 날린다 — 정면 적 높이로 기울이지 않는다(관통하는 넓은 검기가 첫 적 높이로 기울어 뒤 적 아래로 지났다 · 10-23 무형참).</summary>
+    public bool flyLevel;
 
     /// <summary>원본 값만 채운 기본 요청. 변형 필드는 "효과 없음" 상태로 시작한다.</summary>
     public static ProjectileRequest Create(string prefabKey, Vector3 origin, Vector3 direction,

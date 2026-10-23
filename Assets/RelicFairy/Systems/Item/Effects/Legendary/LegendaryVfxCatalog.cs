@@ -14,7 +14,7 @@ public class LegendaryVfxCatalog : ScriptableObject
 
     [Header("Ice")]
     public GameObject iceAoeVfx;        // Effect_49_IceAge
-    public GameObject iceSingleVfx;     // Effect_26_IceFatalWheel (I-2 dive attack)
+    public GameObject iceSingleVfx;     // Icicle (I-2 얼음 창 — 10-18: IceFatalWheel은 바퀴가 13~21 m 밖으로 흩어졌다)
     public GameObject iceFieldVfx;      // Effect_25_IceField
     public GameObject iceHitVfx;        // Flash 26 blue crystal (I-2 hit, I-3 shard)
     public GameObject iceAoeHitVfx;     // Flash 26 blue crystal (I-1 per-enemy)

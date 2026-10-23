@@ -296,13 +296,12 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
                 {
                     e.Falling  = true;
                     e.FallTimer = 0f;   // 예고 타일은 착탄 때 지운다(10-02 — 낙하 중에도 바닥 예고 유지)
-                    if (Data.FireballPrefab != null)
-                    {
-                        // LandPos에 직접 스폰 — 파티클 시뮬레이션이 낙하~폭발 전체를 재생
-                        e.Projectile = BossEffectPool.Spawn(Data.FireballPrefab, e.LandPos, Quaternion.identity);
-                        e.Projectile.transform.localScale = Vector3.one * Data.FireballScale * (e.Scale > 0f ? e.Scale : DragonThreat.MeteorScale(1));   // 이펙트 = 판정 크기(10-14 · 예전 3×3도 반경 1칸 배율)
+                    // 불덩이는 크게(더 높은 곳에서) · 땅 효과는 판정 크기(10-19)
+                    e.Projectile = DragonThreat.SpawnMeteor(Data.FireballPrefab, e.LandPos,
+                        Data.FireballScale * (e.Scale >= DragonThreat.MeteorScale(3) ? DragonThreat.BigBodyScale : DragonThreat.BodyScale),
+                        Data.FireballScale * (e.Scale > 0f ? e.Scale : DragonThreat.MeteorScale(1)), Data.ImpactDelay);
+                    if (e.Projectile != null)
                         BossPageTransitionState.ToneRoarVfx(e.Projectile, Color.clear);   // 굴절층 끔 — 100발이 화면을 일그러뜨렸다(10-11 이펙트 톤 2차)
-                    }
                     if (!e.Second || e.Batch != _secondSfxBatch)   // 2연은 묶음마다 한 소리
                     {
                         if (e.Second) _secondSfxBatch = e.Batch;
@@ -449,7 +448,7 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
         };
 
         // 3×3 경고 타일 생성
-        Color fireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
+        Color fireBase = PatternGuideHelper.AttackFill;   // (10-23 가이드 색 통일) 예고 칸 — 불 색은 이펙트만
         Color tileColor = new Color(fireBase.r, fireBase.g, fireBase.b, 0f);
         if (batch >= 0)   // 2연 = 옅은 칸 — 처음부터 흰빛 · 낮은 알파
         {
@@ -536,7 +535,7 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
     private void ArmSecondVolley()
     {
         _secondFallAt = _timer + Mathf.Max(0f, SecondVolleyLag - Data.ImpactDelay);
-        Color fireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
+        Color fireBase = PatternGuideHelper.AttackFill;   // (10-23 가이드 색 통일)
         Color armed    = new Color(fireBase.r, fireBase.g, fireBase.b, Data.WarningColor.a);
         for (int i = 0; i < _entries.Count; i++)
         {

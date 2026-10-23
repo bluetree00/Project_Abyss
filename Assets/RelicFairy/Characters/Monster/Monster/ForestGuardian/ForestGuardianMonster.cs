@@ -42,11 +42,16 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
     private const float  TrailLifetime         = 3f;      // 줄 수명(초) — 자라남 0.25 · 옅어짐 0.4 포함
     private const float  TrailMinLength        = 1.5f;    // 이보다 짧게 움직였으면 남기지 않는다 (m)
     private const float  TrailVfxScale         = 0.6f;    // 가시 이펙트 크기 — 띠(3.5 m)보다 좁은 줄이라 작게(화면 확인 전 추정값)
+    private const float  ChainLinkDamage       = 0.8f;    // 사슬 둘째 칸 피해 배율(10-22 E5 페이지2 — 리치 · 화룡과 같은 규칙)
+
+    // 사슬 박자(10-22 E5 페이지2) — 사슬 안 쉬는 시간 · 사슬 뒤 숨 고르기(리치와 같은 값). 연계는 2페이지에서만 이어진다
+    private static readonly Vector2 ChainLinkRest = new Vector2(0.2f, 0.35f);
+    private static readonly Vector2 ChainEndRest  = new Vector2(1.5f, 2f);
 
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
-    /// <summary>패턴 가이드 채움 색 — 숲 테마(호박빛). 선은 공통 예고색(노랑)→판정색(빨강).</summary>
-    internal static readonly Color GuideFlow = new Color(1f, 0.55f, 0.12f);
+    /// <summary>패턴 가이드 채움 색 — (10-23 가이드 색 통일) 숲 호박빛 → 공용 공격 색. 선도 같은 색(PatternGuideHelper.Telegraph) → 판정색(빨강).</summary>
+    internal static Color GuideFlow => PatternGuideHelper.AttackFill;
 
     /// <summary>안전 표시(흰색) — 보스 공통 색 규약(리치와 같은 값). 뿌리 감옥 틈 · 뿌리 회오리 안쪽.</summary>
     internal static readonly Color GuideSafe = new Color(0.95f, 0.95f, 0.90f);
@@ -169,6 +174,13 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
 
     /// <summary>플레이어의 직접 타격(실제로 체력이 깎인 것) 누적 수 — 간판 「숲의 심장」이 시작 값과의 차로 센다.</summary>
     internal int DirectHitCount => _directHitCount;
+
+    /// <summary>지금 도는 패턴이 연계로 이어 낸 사슬 둘째 칸인가 — 피해 ×<see cref="ChainLinkDamage"/>(10-22 E5 페이지2).</summary>
+    public bool IsChainLink => _runner != null && _runner.IsFollowUpRunning;
+
+    /// <summary>패턴 피해에 곱한다 — 사슬 둘째 칸이면 <see cref="ChainLinkDamage"/>, 아니면 1(10-22 E5 페이지2).</summary>
+    internal static float ChainScale(MonsterContext ctx)
+        => (ctx?.Monster as ForestGuardianMonster)?.IsChainLink == true ? ChainLinkDamage : 1f;
 
     // ── 내부 필드 ─────────────────────────────────────────────
     private ForestGuardianBlackboard _fgBB;
@@ -313,6 +325,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
             isInRange:   () => _runtime?.PlayerTarget != null,
             changeState: s  => ChangeState(s),
             onExecuted:  OnPatternExecuted);
+        _runner.SetChainTempo(ChainLinkRest, ChainEndRest);   // 2페이지 연계 사슬 — 사슬 안 짧게 · 사슬 뒤 숨(10-22 E5 페이지2)
 
         _walkStateHash         = Animator.StringToHash(_walkStateName);
         _voiceSfxNextInterval  = Random.Range(_voiceSfxIntervalMin, _voiceSfxIntervalMax);

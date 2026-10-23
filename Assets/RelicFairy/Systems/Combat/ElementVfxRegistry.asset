@@ -24,6 +24,7 @@ MonoBehaviour:
     impact: {fileID: 6981941031284743971, guid: edbcd3b3c18ccf44db5b7031741faf88,
       type: 3}
     impactHeight: 1
+    impactRadius: 0.7
     area: {fileID: 1953714657109559461, guid: 247bb6dac5e3cbd408b243d6cb32f46a, type: 3}
     areaRadius: 4.1
     areaLife: 1.6
@@ -38,6 +39,7 @@ MonoBehaviour:
     burst: {fileID: 3317504816819617755, guid: 3b8254cffe7d654418b77c0f62d117a7, type: 3}
     impact: {fileID: 101492313709125170, guid: 09293f3ca582a1e4b8438d520cddecf9, type: 3}
     impactHeight: 1
+    impactRadius: 2.9
     area: {fileID: 534280799920659046, guid: b885061ef6d615947aeac189777647a9, type: 3}
     areaRadius: 6.8
     areaLife: 1.5
@@ -51,6 +53,7 @@ MonoBehaviour:
     burst: {fileID: 3594099513468408576, guid: 68df5f4680898db4a87fcead70933ca1, type: 3}
     impact: {fileID: 100004, guid: 6e118df29b95b41b984ec16039c1f2e3, type: 3}
     impactHeight: 1
+    impactRadius: 2.1
     area: {fileID: 3144161684805450049, guid: e43e54105055b48408331d31eec1cf6a, type: 3}
     areaRadius: 3
     areaLife: 1.1
@@ -66,6 +69,7 @@ MonoBehaviour:
     impact: {fileID: 7593753326982843609, guid: 29ba84524175fa94484f37073cb12c8a,
       type: 3}
     impactHeight: 1
+    impactRadius: 1.73
     area: {fileID: 7593753326982843609, guid: 29ba84524175fa94484f37073cb12c8a, type: 3}
     areaRadius: 1.5
     areaLife: 1.5
@@ -81,6 +85,7 @@ MonoBehaviour:
     impact: {fileID: 4020421568969601508, guid: 0ced40189347d054588156810ea36d23,
       type: 3}
     impactHeight: 1
+    impactRadius: 1.1
     area: {fileID: 4737006685481212167, guid: ce94fa18ce556f048a60fc674737907b, type: 3}
     areaRadius: 4.53
     areaLife: 1.5
@@ -96,6 +101,7 @@ MonoBehaviour:
     impact: {fileID: 3470175545269027477, guid: 3f498e4cf53914e48b44a0340f496a52,
       type: 3}
     impactHeight: 1
+    impactRadius: 4
     area: {fileID: 3470175545269027477, guid: 3f498e4cf53914e48b44a0340f496a52, type: 3}
     areaRadius: 3.6
     areaLife: 2

@@ -103,25 +103,23 @@ public abstract class CovenantBase
     /// 반경 내 적에게 플레이어 공격력 기반 피해(multiplier=V(idx) 배수). 플레이어 자신 제외. 반환=피격 수.
     /// (OnSkillEffects의 AOE 패턴을 공통화 — instigator=player라 IsPlayerInstigator/서약 OnKill과 정합)
     /// </summary>
+    private static readonly List<GameObject> s_aoeBuf = new(32);
+
     protected int DealAoe(Vector3 center, float radius, float multiplier, float knockback = 0.3f)
     {
         if (Ctx?.Player == null || Ctx.Stats == null) return 0;
 
         var weaponData = Ctx.Player.WeaponManager?.CurrentWeaponData;
         var kind = weaponData != null ? weaponData.weaponType.GetAttackStatKind() : AttackStatKind.Melee;
-        float dmg = DamageFormula.Calculate(multiplier, Ctx.Stats.GetEffectiveAttack(kind));
+        // 10-22 공격력 × 배율 — DamageFormula.Calculate는 「기본 + 공격」(더하기)라 카드 · 줄이 약속한 「광역 피해 ×2.6」이 공격력 + 2.6(≈ 1배)으로 들어갔다
+        float dmg = multiplier * Ctx.Stats.GetEffectiveAttack(kind);
 
-        int hits = 0;
-        var cols = Physics.OverlapSphere(center, radius);
-        foreach (var col in cols)
-        {
-            if (col.gameObject == Ctx.Player.gameObject) continue;
-            if (col.TryGetComponent<IDamageable>(out var d))
-            {
+        // 몬스터 판정 질의 — 예전엔 레이어 없는 OverlapSphere로 콜라이더마다 TakeDamage를 불러, 판정이 자식 콜라이더에 있는 몬스터는 못 잡고
+        // 콜라이더가 여럿인 몬스터는 여러 번 맞았다(10-18 이펙트 점검). 대상당 1번.
+        int hits = CombatQuery.GetNearbyDamageables(center, radius, Ctx.Player.gameObject, 32, s_aoeBuf);
+        for (int i = 0; i < hits; i++)
+            if (s_aoeBuf[i] != null && s_aoeBuf[i].TryGetComponent<IDamageable>(out var d))
                 d.TakeDamage(dmg, Ctx.Player.gameObject, knockback);
-                hits++;
-            }
-        }
         return hits;
     }
 

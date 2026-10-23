@@ -28,7 +28,7 @@ MonoBehaviour:
     type: 3}
   iceAoeVfx: {fileID: 3060538840033308853, guid: b65a233b9927456458501944410a7647,
     type: 3}
-  iceSingleVfx: {fileID: 8432317251264659796, guid: c010541b216137240bde60349595f2fc,
+  iceSingleVfx: {fileID: 8660969764485811580, guid: 683839cb91157ec4987bb689a7fa5916,
     type: 3}
   iceFieldVfx: {fileID: 2069352338822879331, guid: 9bd2b17ccd2d70e4890d08479ab9f4a2,
     type: 3}

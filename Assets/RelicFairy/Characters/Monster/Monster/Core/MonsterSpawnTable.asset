@@ -16,7 +16,7 @@ MonoBehaviour:
   - displayName: FairyBatMonster
     addressableKey: FairyBat/FairyBat
     grade: 0
-    poolTags: 04000000
+    poolTags: 020000000300000004000000
     weight: 1
     enabled: 1
   - displayName: GolemMonster
@@ -58,7 +58,7 @@ MonoBehaviour:
   - displayName: EvilMageMonster
     addressableKey: EvilMage/EvilMage
     grade: 2
-    poolTags: 03000000
+    poolTags: 0200000003000000
     weight: 1
     enabled: 1
   - displayName: OrcMonster
@@ -154,7 +154,7 @@ MonoBehaviour:
   - displayName: CyclopsMonster
     addressableKey: Cyclops/Cyclops
     grade: 2
-    poolTags: 0200000004000000
+    poolTags: 010000000200000004000000
     weight: 1
     enabled: 1
   - displayName: DemonKingMonster
@@ -184,7 +184,7 @@ MonoBehaviour:
   - displayName: NagaWizardMonster
     addressableKey: NagaWizard/NagaWizard
     grade: 2
-    poolTags: 
+    poolTags: 0300000004000000
     weight: 1
     enabled: 1
   - displayName: SalamanderMonster

@@ -105,7 +105,37 @@ public static class RunResultProvider
             Enhance  = w.enhanceLevel,
             FormName = w.form != null ? w.form.DisplayName : string.Empty,
             FormTier = w.formTier,
+            Ranged   = SkillTierResolver.IsRanged(w),
+            Build    = BuildOf(w),
         };
+    }
+
+    /// <summary>
+    /// 무기 빌드 한 줄(10-22 사용자 「무기 빌드도 간단히 보이게」) — 근접 = 재련으로 고른 증강 「이름 단계」, 원거리 = 켠 파츠 「이름 Lv」.
+    /// 런 끝(EndRun) 전에 찍는다 — 파츠 상태는 EndRun에서 비워진다.
+    /// </summary>
+    private static string BuildOf(WeaponData w)
+    {
+        var parts = new List<string>();
+        if (SkillTierResolver.IsRanged(w))
+        {
+            var st = RangedPartsState.Current;
+            if (st != null)
+                foreach (var e in st.Equipped_)
+                {
+                    var def = Managers.WeaponParts?.GetById(e.partId);
+                    if (def != null) parts.Add($"{def.part_name} Lv{e.level}");
+                }
+        }
+        else
+        {
+            foreach (var (id, rank) in w.AugmentList())
+            {
+                var def = MeleeAugmentCatalog.Get(id);
+                if (def != null) parts.Add($"{def.Name} {MeleeAugmentDef.RankName(rank)}".TrimEnd());
+            }
+        }
+        return string.Join(" · ", parts);
     }
 
     private static void CaptureRelic(RunResultSnapshot snap, PlayerLoadout loadout)

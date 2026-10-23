@@ -440,15 +440,22 @@ public class RunSequencer
     private static bool IsCurrencyKind(RoomPlanKind k) =>
         k == RoomPlanKind.Shop || k == RoomPlanKind.Crucible || k == RoomPlanKind.Refinery;
 
+    /// <summary>연달아 내지 않는 재화 방(상점 · 정제소) — 재련소는 막지도 막히지도 않는다(<see cref="IsOfferable"/>).</summary>
+    private static bool IsBackToBackGuarded(RoomPlanKind k) =>
+        k == RoomPlanKind.Shop || k == RoomPlanKind.Refinery;
+
     /// <summary>
-    /// 지금 이 종류를 문에 내놓을 수 있는가 — 챕터 캡 + 재화 방 문턱(첫 챕터) + 재화 방끼리 붙지 않기.
-    /// 재화 방은 한 묶음으로 본다 — 방금 재화 방을 나왔으면 다음 문쌍엔 재화 방을 내지 않는다(쓸 재화가 다시 모일 틈).
+    /// 지금 이 종류를 문에 내놓을 수 있는가 — 챕터 캡 + 재화 방 문턱(첫 챕터) + 상점 · 정제소끼리 붙지 않기.
+    /// 방금 상점이나 정제소를 나왔으면 다음 문쌍엔 둘 다 내지 않는다(쓸 재화가 다시 모일 틈).
+    /// 재련소는 이 묶음에서 뺐다(10-17 파워밸런스 진단 안 C-①) — Ch1 정예 보스 챕터에선 재화 방이 쉼터 뒤 문쌍 1~2개에만 떠서
+    /// 재련소(무기 각성)와 상점 · 정제소가 택1이 됐고, 재련소를 거른 런은 Ch1 화력이 크게 뒤졌다. 재화도 서로 달라(재료 · 골드 · 원석)
+    /// 「다시 모일 틈」이 재련소와 나머지 사이엔 맞지 않는다.
     /// </summary>
     private bool IsOfferable(RoomPlanKind k)
     {
         if (!CanUseSpecial(k)) return false;
         if (!IsCurrencyKind(k)) return true;
-        if (IsCurrencyKind(_lastCommittedKind)) return false;
+        if (IsBackToBackGuarded(k) && IsBackToBackGuarded(_lastCommittedKind)) return false;
         if (!GateCurrencyRooms) return true;
         int gate = k switch
         {

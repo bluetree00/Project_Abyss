@@ -15,20 +15,21 @@ MonoBehaviour:
   dashDuration: 0.15
   dashDistance: 5
   detectRadius: 2
-  baseDashDamage: 15
+  baseDashDamage: 250
   knockbackMultiplier: 0.3
   extraHitCount: 3
   extraHitDelay: 0.15
-  extraHitDamage: 8
+  extraHitDamage: 60
   explodeDelay: 0.5
   explodeRadius: 3
-  explodeDamage: 30
+  explodeDamage: 200
   explodeEffectKey: FrontAttackHit
   explodeEffectScale: 4.5
   endDelay: 0.3
   dashEffectKey: 
   dashTrailKey: 
-  slashEffectKey: HolySlashFinish
+  slashEffectKey: KatanaDelayedCut
+  slashEffectScale: 0.15
   hitEffectKey: SwordHitImpact
   hitEffectScale: 0.23
   dashLineEffectKey: KatanaDashLine
@@ -37,8 +38,8 @@ MonoBehaviour:
   tier2ExtraHitScale: 0.1
   tier2DashMuzzleKey: 
   tier2DashMuzzleScale: 1.5
-  tier3BurstEffectKey: MissileExplosion
-  tier3BurstScale: 0.65
+  tier3BurstEffectKey: KatanaDelayedCut
+  tier3BurstScale: 0.26
   tier3DashLineExtraKey: 
   tier3DashLineExtraScale: 1.5
-  animationOverride: QSkill_02
+  animationOverride: ESkill_01

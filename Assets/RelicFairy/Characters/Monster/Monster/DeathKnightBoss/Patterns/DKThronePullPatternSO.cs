@@ -107,7 +107,7 @@ public class DKThronePullState : FullLockState<DKThronePullPatternSO>
         {
             _chain = LichChainLine.Create(ctx.Transform.position + Vector3.up * Data.knightChainHeight,
                                           player.transform.position + Vector3.up * Data.playerChainHeight,
-                                          Data.chainWidth, DKPage2Zone.Grey);
+                                          Data.chainWidth, DKPage2Zone.GreyChain);   // 사슬은 회색 그대로(10-23 — 바닥 띠만 공격 색)
             _chain.Follow(ctx.Transform, Vector3.up * Data.knightChainHeight, player.transform, Vector3.up * Data.playerChainHeight);
             _chain.Slack = 0.02f;
             _chain.Tension(1f);

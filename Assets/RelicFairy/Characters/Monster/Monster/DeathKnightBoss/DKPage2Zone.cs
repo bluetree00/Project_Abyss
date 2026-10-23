@@ -16,8 +16,13 @@ namespace RelicFairy.Monster
 public sealed class DKPage2Zone
 {
     // ── Constants ──────────────────────────────────────────────
-    /// <summary>2페이지 예고색 — 흑백이 섞인 회색 검(차오르는 예고 = 보스 색).</summary>
-    public static readonly Color Grey    = new Color(0.55f, 0.57f, 0.66f);
+    /// <summary>
+    /// 2페이지 바닥 예고 색 — (10-23 가이드 색 통일) 회색 → 공용 공격 색(<see cref="PatternGuideHelper.AttackFill"/>).
+    /// 이름은 예고 호출 자리를 그대로 두려고 남겼다 — 회색 검 색은 <see cref="GreyChain"/>(사슬) · <see cref="GreyVfx"/>(이펙트).
+    /// </summary>
+    public static Color Grey => PatternGuideHelper.AttackFill;
+    /// <summary>흑백이 섞인 회색 검(옛 2페이지 예고 색) — 왕좌 끌기 사슬 줄.</summary>
+    public static readonly Color GreyChain = new Color(0.55f, 0.57f, 0.66f);
     /// <summary>회색 검 이펙트 틴트(파티클 · 슬래시).</summary>
     public static readonly Color GreyVfx = new Color(0.72f, 0.72f, 0.78f, 1f);
     /// <summary>안전 = 흰색(예고 색 규약).</summary>
@@ -138,8 +143,9 @@ public sealed class DKPage2Zone
         var player = ctx?.Runtime?.CachedPlayer;
         if (player == null || ctx.Config?.stat == null) return;
 
-        // 악몽 「지휘」 — 환영 기수가 서 있는 동안 +15%
-        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * damageMult * DKStandardBearer.DamageScale(ctx.Monster)));
+        // 악몽 「지휘」 — 환영 기수가 서 있는 동안 +15% · 사슬 둘째 칸 ×0.8(10-22 E5 페이지2)
+        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * damageMult * DKStandardBearer.DamageScale(ctx.Monster)
+                                     * DeathKnightBossMonster.ChainScale(ctx.Monster)));
         player.TakeDamage(dmg, ctx.Monster != null ? ctx.Monster.gameObject : null, false, weight);
 
         Vector3 away = player.transform.position - from;

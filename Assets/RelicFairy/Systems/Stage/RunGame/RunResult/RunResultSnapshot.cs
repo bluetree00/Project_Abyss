@@ -59,6 +59,8 @@ public sealed class RunResultSnapshot
         public int Enhance;
         public string FormName = string.Empty;
         public int FormTier;
+        public bool Ranged;
+        public string Build = string.Empty;   // 근접 = 증강 「이름 단계」 · 원거리 = 켠 파츠 「이름 Lv」(10-22)
     }
 
     public struct RuneCell

@@ -12,18 +12,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 340f1744e59f73d4ebdf890a1db1758b, type: 3}
   m_Name: PerimeterGuard
   m_EditorClassIdentifier: Assembly-CSharp::PerimeterGuardBehaviorSO
-  baseDamage: 25
+  baseDamage: 310
   detectRadius: 3.5
   knockbackMultiplier: 1.5
-  castInterval: 0.5
-  expandDamage: 20
-  expandRadius: 6.5
-  expandDelay: 0.15
-  expandEffectKey: GreatswordEFinish
-  expandEffectScale: 2
+  windup: 0.3
+  follow: 0.2
+  ringDamage: 310
+  ringRadius: 5
+  ringRadiusStep: 1.5
+  ringRadiusMax: 8
+  ringDelay: 0.25
+  ringGap: 0.25
   slashEffectKey: BasicSlashBlue
-  slashEffectScale: 0.7
-  hitEffectKey: SwordHitImpact
-  hitEffectScale: 0.42
-  endDelay: 0.3
-  animationOverride: 
+  slashEffectScale: 0.98
+  shockEffectKey: GreatswordEFinish
+  shockScalePerMeter: 0.26
+  endDelay: 0.15
+  animationOverride:
+  hitEffectKey: GreatswordHitImpact
+  hitEffectScale: 2.9

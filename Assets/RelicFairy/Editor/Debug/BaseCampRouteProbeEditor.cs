@@ -304,6 +304,87 @@ public static class BaseCampRouteProbeEditor
     /// </summary>
     [MenuItem(Root + "Acquire All - Station Paths (Play)")] public static void AcquireAll() => Start(AcquireAllAsync);
 
+    /// <summary>
+    /// 10-19 ⑦ 「원거리 무기는 고른 뒤에도 다시 고를 기회」 — 장비 공방을 실제 경로(ClaimAsync → 창 → 고름)로 활 → 석궁 → 활 → 활(같은 무기) 네 번.
+    /// 매번: 공방이 남나 · 로드아웃 슬롯1 · 재스폰된 몸의 슬롯1 무기 · 플레이어 수 1 · 프롬프트 「바꾸기」. 석궁 잠금은 창의 확정(Complete)을 직접 불러 건너뛴다.
+    /// </summary>
+    [MenuItem(Root + "Forge Rechoose (Play) - 10-19")] public static void ForgeRechoose() => Start(ForgeRechooseAsync);
+
+    private static async UniTask ForgeRechooseAsync(CancellationToken ct)
+    {
+        var forge = UnityEngine.Object.FindFirstObjectByType<WeaponForgeAltar>();
+        var lo = AppBootstrapper.Instance?.Loadout;
+        if (forge == null || lo == null || FindPlayer() == null)
+        { Debug.LogWarning($"[RouteProbe] 준비 안 됨 — forge={forge != null} lo={lo != null} player={FindPlayer() != null}"); return; }
+
+        var bow      = typeof(WeaponForgeAltar).GetField("bowOption", Inst)?.GetValue(forge) as WeaponSO;
+        var xbow     = typeof(WeaponForgeAltar).GetField("crossbowOption", Inst)?.GetValue(forge) as WeaponSO;
+        var claim    = typeof(WeaponForgeAltar).GetMethod("ClaimAsync", Inst);
+        var show     = typeof(WeaponForgeAltar).GetMethod("ShowPrompt", Inst);
+        var prompt   = typeof(WeaponForgeAltar).GetField("_promptText", Inst);
+        var complete = typeof(UI_RangedForgePopup).GetMethod("Complete", Inst);
+        var sb = new StringBuilder("장비 공방 다시 고르기(10-19 ⑦) — 활 → 석궁 → 활 → 활(같은 무기)\n");
+        int ok = 0, n = 0;
+        // 공방 트리거 안에 세운다 — 재스폰된 새 몸도 실제 트리거(OnTriggerEnter)로 다시 잡히는지 본다(반사로 _player를 넣지 않는다)
+        var forgeCol = forge.GetComponent<Collider>();
+        float ts0 = Time.realtimeSinceStartup;   // 거점 첫 대사 · 둘러보기 중엔 시간이 멈춰 물리(트리거)가 안 돈다 — 풀릴 때까지
+        while (Time.timeScale <= 0.01f && Time.realtimeSinceStartup - ts0 < 3f) await UniTask.Yield(PlayerLoopTiming.Update, ct);
+        sb.AppendLine($"   (시간 배율 {Time.timeScale:0.00} · 기다림 {Time.realtimeSinceStartup - ts0:0.0}초{(Time.timeScale <= 0.01f ? " → 실측만 1로 푼다(첫 대사 모달)" : "")})");
+        if (Time.timeScale <= 0.01f) Time.timeScale = 1f;
+        Teleport(FindPlayer(), Ground(forgeCol.bounds.center) + Vector3.up * 0.1f);
+        await UniTask.Delay(1000, ignoreTimeScale: true, cancellationToken: ct);
+        foreach (var w in new[] { bow, xbow, bow, bow })
+        {
+            n++;
+            var held0 = typeof(WeaponForgeAltar).GetField("_player", Inst)?.GetValue(forge) as PlayerController;
+            if (held0 == null || held0 != FindPlayer())
+            {
+                var fp = FindPlayer();
+                var b = forgeCol.bounds;
+                bool inBox = fp != null && b.Contains(fp.transform.position + Vector3.up * 0.5f);
+                sb.AppendLine($"{n}. 공방이 지금 몸을 못 잡음(트리거) — 공방 몸 {(held0 != null ? held0.GetInstanceID().ToString() : "null")} · 찾은 몸 {fp?.GetInstanceID()} · " +
+                              $"트리거 {b.center} 크기 {b.size} isTrigger {forgeCol.isTrigger} 켜짐 {forgeCol.enabled && forgeCol.gameObject.activeInHierarchy} · 몸 {fp?.transform.position} 안 {inBox} · 공방 수 {UnityEngine.Object.FindObjectsByType<WeaponForgeAltar>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length}");
+                break;
+            }
+            claim.Invoke(forge, new object[] { ct });
+            UI_RangedForgePopup popup = null;
+            float t0 = Time.realtimeSinceStartup;
+            while ((popup = UnityEngine.Object.FindFirstObjectByType<UI_RangedForgePopup>()) == null && Time.realtimeSinceStartup - t0 < 5f)
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            if (popup == null) { sb.AppendLine($"{n}. 창이 안 열림"); break; }
+            await UniTask.Delay(300, ignoreTimeScale: true, cancellationToken: ct);
+            complete.Invoke(popup, new object[] { w });
+            // 장착 · 재스폰(비동기 생성) 기다림 — 공방이 다시 받을 수 있을 때(_busy 꺼짐)까지, 그 뒤 재스폰 몫 2초
+            var busyF = typeof(WeaponForgeAltar).GetField("_busy", Inst);
+            float c0 = Time.realtimeSinceStartup;
+            while (forge != null && (bool)busyF.GetValue(forge) && Time.realtimeSinceStartup - c0 < 15f) await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            float busySec = Time.realtimeSinceStartup - c0;
+            await UniTask.Delay(2000, ignoreTimeScale: true, cancellationToken: ct);
+            sb.Append($"   (확정 → 다시 받을 수 있음 {busySec:0.0}초 · 창 {(UnityEngine.Object.FindFirstObjectByType<UI_RangedForgePopup>(FindObjectsInactive.Include) != null ? "있음" : "없음")}) ");
+            var pl = FindPlayer();
+            var forgePl = typeof(WeaponForgeAltar).GetField("_player", Inst)?.GetValue(forge) as PlayerController;
+            sb.Append($"(찾은 몸 {(pl != null ? pl.GetInstanceID().ToString() : "null")} · 공방 몸 {(forgePl != null ? forgePl.GetInstanceID().ToString() : "null")} · 공방 몸 슬롯1 {(forgePl != null && forgePl.WeaponManager != null && forgePl.WeaponManager.Weapon1Data != null ? forgePl.WeaponManager.Weapon1Data.weaponSOKey : "null")})\n");
+            int players = UnityEngine.Object.FindObjectsByType<PlayerController>(FindObjectsSortMode.None).Length;
+            var held = pl != null && pl.WeaponManager != null ? pl.WeaponManager.Weapon1Data : null;
+            bool alive = forge != null;
+            string text = "-";
+            if (alive)
+            {
+                show.Invoke(forge, new object[] { true });
+                text = (prompt?.GetValue(forge) as TMPro.TMP_Text)?.text ?? "-";
+                show.Invoke(forge, new object[] { false });
+            }
+            bool pass = alive && lo.WeaponSlot1 == w && held != null && held.weaponSOKey == w.name && players == 1 && text.Contains("바꾸기");
+            if (pass) ok++;
+            sb.AppendLine($"{n}. {w.name} → 공방 {(alive ? "남음" : "사라짐")} · 로드아웃 {(lo.WeaponSlot1 != null ? lo.WeaponSlot1.name : "null")} · " +
+                          $"몸 슬롯1 {(held != null ? held.weaponSOKey + "/" + held.displayName : "null")} · 플레이어 {players} · 글자 「{text}」 → {(pass ? "통과" : "실패")}");
+        }
+        sb.AppendLine($"결과 {ok}/{n}");
+        Directory.CreateDirectory("Logs/basecamp_route");
+        File.WriteAllText("Logs/basecamp_route/forge_rechoose.txt", sb.ToString());
+        Debug.Log("[RouteProbe] 공방 다시 고르기 끝 → Logs/basecamp_route/forge_rechoose.txt\n" + sb);
+    }
+
     private static async UniTask AcquireAllAsync(CancellationToken ct)
     {
         var player = FindPlayer();

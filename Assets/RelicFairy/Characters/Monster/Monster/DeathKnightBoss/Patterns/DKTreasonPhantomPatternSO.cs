@@ -10,6 +10,8 @@ namespace RelicFairy.Monster
 ///  차례로 → 시작 방향은 무작위, 시계 방향으로 strikeInterval(0.45)초마다 환영 하나가 제 앞 칸을 벤다
 ///  마지막 → 환영 넷이 한꺼번에 가운데 칸을 벤다(기사도 같은 박자에 검을 내린다)
 ///  흑백 규칙(10-03 S3) → 환영 넷은 흰 / 검 번갈아 선다. 지금 검 색과 같은 환영만 제 앞 칸을 벤다 — 다른 색 환영 앞 칸이 안전.
+///  앞 줄(10-22 E5 페이지2) → 같은 색 환영은 제 앞 칸과 그 양옆(환영 쪽 3칸 줄, 구역 안만)을 벤다 — 3×3 안 안전은 다른 색 환영 칸 둘뿐
+///                       (+ 이미 베인 줄). 예전엔 아홉 칸 중 여섯이 안전해 비키는 느낌이 없었다.
 ///
 /// 칸 예고: 각 칸은 베기 cellTelegraph초 전에 회색으로 차오르고, lockLead(0.4)초 전에 판정 색으로 굳는다.
 /// 칸은 시작 때 한 번 정해지고 따라오지 않는다(R3 — 판정 0.6초 전부터 고정).
@@ -74,6 +76,8 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
     {
         public bool          Active;
         public Vector2Int    Cell;
+        public Vector2Int    Side;        // 줄 방향(환영 방향에 수직) — 가운데 베기는 0(한 칸) · 10-22 E5 페이지2
+        public int           Lo, Hi;      // 줄 범위: Cell + Side × [Lo, Hi] (구역 밖 칸은 뺀다)
         public float         HitTime;
         public bool          Shown, Locked, Swung, Fired;
         public GameObject    Guide;
@@ -125,7 +129,7 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
             SpawnPhantom(ctx, k, target, d, color);
             if (color != _sword) continue;             // 다른 색 환영은 서 있기만 한다 — 그 칸이 안전
 
-            _cuts[slot] = new Cut { Active = true, Cell = target, HitTime = Data.firstStrikeTime + slot * Data.strikeInterval };
+            _cuts[slot] = StripCut(target, d, Data.firstStrikeTime + slot * Data.strikeInterval);   // 앞 줄 3칸(10-22 E5 페이지2)
             _cutOfPhantom[k] = slot;
             slot++;
         }
@@ -145,11 +149,10 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
             if (!cut.Shown && _timer >= cut.HitTime - Data.cellTelegraph)
             {
                 cut.Shown = true;
-                Color c = SwordTint(_sword);   // 예고는 검 색 — 「같은 색이 벤다」
+                Color c = PatternGuideHelper.AttackFill;   // (10-23 가이드 색 통일) 예고는 공용 공격 색 — 「같은 색이 벤다」는 환영 몸 · 베기 이펙트의 검 색이 맡는다
                 // 판정은 칸 전체(2 m 사각)다 — 예전 원(반지름 1.1)은 칸 모서리를 못 덮고 이웃 칸으로 0.1 m 삐져나갔다.
                 // 사각 = 판정 칸 그대로, 원은 그 안에서 차오르는 박자만 보인다(10-08 점검)
-                cut.Guide = PatternGuideHelper.Prepare(
-                    PatternGuideHelper.Disc(_zone.CellCenter(cut.Cell), DKBossRoomContext.CellSize * 0.5f, c), c);
+                cut.Guide = PatternGuideHelper.Prepare(CutGuide(cut, c), c);   // 한 칸 = 원 · 줄 = 줄 그대로의 직선(10-22 E5 페이지2)
                 ShowSquare(ref cut, new Color(c.r, c.g, c.b, SquareAlpha));
             }
             if (cut.Shown && !cut.Locked)
@@ -225,7 +228,7 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
         cut.Fired  = true;
         cut.KillAt = _timer + GuideLinger;
 
-        Vector3 pos = _zone.CellCenter(cut.Cell);
+        Vector3 pos = CutCenter(cut);   // 줄이면 줄 가운데(이펙트는 하나 그대로 · 10-22 E5 페이지2)
         if (Data.slashVfxPrefab != null)
         {
             var fx = BossEffectPool.SpawnOneShot(Data.slashVfxPrefab, pos + Vector3.up * 0.1f,
@@ -238,7 +241,7 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
         }
         if (Data.slashSfx != null) Managers.Sound?.PlayEffectAt(Data.slashSfx, pos);
 
-        if (DKPage2Zone.TryPlayerCell(ctx, out var pc) && pc == cut.Cell)
+        if (DKPage2Zone.TryPlayerCell(ctx, out var pc) && InCut(cut, pc))
             DKPage2Zone.HitPlayer(ctx, center ? Data.centerDamageMultiplier : Data.damageMultiplier,
                                   Data.knockbackMultiplier, center ? HitWeight.Auto : HitWeight.Light, pos);
 
@@ -255,8 +258,10 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
     {
         var (go, mr, mat) = QuadTilePool.Rent();
         go.name = "DK_TreasonCell";
-        go.transform.SetPositionAndRotation(_zone.CellCenter(cut.Cell) + Vector3.up * SquareY, Quaternion.Euler(90f, 0f, 0f));
-        go.transform.localScale = Vector3.one * DKBossRoomContext.CellSize;
+        float cs  = DKBossRoomContext.CellSize;
+        float len = (cut.Hi - cut.Lo + 1) * cs;   // 줄이면 줄 길이 — 판정 칸 그대로(10-22 E5 페이지2)
+        go.transform.SetPositionAndRotation(CutCenter(cut) + Vector3.up * SquareY, Quaternion.Euler(90f, 0f, 0f));
+        go.transform.localScale = new Vector3(cut.Side.x != 0 ? len : cs, cut.Side.y != 0 ? len : cs, cs);   // 눕힌 쿼드: x = 월드 x · y = 월드 z
         mat.color     = color;
         cut.Square    = go;
         cut.SquareMr  = mr;
@@ -270,6 +275,44 @@ public class DKTreasonPhantomState : FullLockState<DKTreasonPhantomPatternSO>
         cut.Square    = null;
         cut.SquareMr  = null;
         cut.SquareMat = null;
+    }
+
+    // ── 앞 줄(10-22 E5 페이지2) ──────────────────────────────
+
+    /// <summary>같은 색 환영의 베기 — 제 앞 칸 <paramref name="cell"/>과 그 양옆(환영 방향 <paramref name="outward"/>에 수직), 구역 안 칸만.</summary>
+    private Cut StripCut(Vector2Int cell, Vector2Int outward, float hitTime)
+    {
+        var side = new Vector2Int(Mathf.Abs(outward.y), Mathf.Abs(outward.x));
+        return new Cut
+        {
+            Active = true, Cell = cell, HitTime = hitTime, Side = side,
+            Lo = _zone.Contains(cell - side) ? -1 : 0,
+            Hi = _zone.Contains(cell + side) ?  1 : 0,
+        };
+    }
+
+    /// <summary>이 칸이 베기 범위 안인가 — 한 칸이면 그 칸, 줄이면 줄 위 [Lo, Hi].</summary>
+    private static bool InCut(in Cut cut, Vector2Int c)
+    {
+        if (cut.Side == Vector2Int.zero) return c == cut.Cell;
+        Vector2Int d   = c - cut.Cell;
+        int        k   = cut.Side.x != 0 ? d.x : d.y;   // 줄을 따라
+        int        off = cut.Side.x != 0 ? d.y : d.x;   // 줄에서 벗어남
+        return off == 0 && k >= cut.Lo && k <= cut.Hi;
+    }
+
+    /// <summary>베기 범위 가운데(바닥) — 줄이면 양 끝 칸의 가운데.</summary>
+    private Vector3 CutCenter(in Cut cut)
+        => (_zone.CellCenter(cut.Cell + cut.Side * cut.Lo) + _zone.CellCenter(cut.Cell + cut.Side * cut.Hi)) * 0.5f;
+
+    /// <summary>차오르는 예고 — 한 칸이면 원(박자만), 줄이면 줄 그대로의 직선(줄을 따라 차오른다).</summary>
+    private GameObject CutGuide(in Cut cut, Color c)
+    {
+        float cs  = DKBossRoomContext.CellSize;
+        int   len = cut.Hi - cut.Lo + 1;
+        if (len <= 1) return PatternGuideHelper.Disc(_zone.CellCenter(cut.Cell), cs * 0.5f, c);
+        Vector3 dir = new Vector3(cut.Side.x, 0f, cut.Side.y);
+        return PatternGuideHelper.Beam(_zone.CellCenter(cut.Cell + cut.Side * cut.Lo) - dir * (cs * 0.5f), dir, len * cs, cs, c);
     }
 
     // ── 환영 ───────────────────────────────────────────────

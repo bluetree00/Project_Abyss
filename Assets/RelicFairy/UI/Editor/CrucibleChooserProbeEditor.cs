@@ -195,16 +195,9 @@ public static class CrucibleChooserProbeEditor
         }
         sb.AppendLine($"  카드 불: 근거리 {Glow(panel, "_chooseCard", 0)} · 원거리 {Glow(panel, "_chooseCard", 1)}");
 
-        // 실제 값 — 카드 숫자와 대조
+        // 실제 값 — 카드 숫자와 대조(10-18 재련 개편 — 성공률 · 하락 · 파츠별 비용은 없다: 재련 비용 근접 · 원거리)
         int m = PlayerWeaponManager.Slot0;
-        sb.AppendLine($"  실제: 재료 {ctrl.FuelAmount} · 근거리 비용 {ctrl.CostAt(m)} · 성공률 {ctrl.SuccessChanceAt(m) * 100f:0}% · 하락 {ctrl.DropAt(m)} · 최대 {ctrl.MaxAt(m)}");
-        var all = Managers.WeaponParts?.All;
-        if (all != null)
-        {
-            var line = new StringBuilder("  실제 파츠 비용:");
-            foreach (var p in all) line.Append($" {p.part_name} Lv{RangedPartsState.Current.LevelOf(p.part_id)}={ctrl.PartCostAt(p.part_id)}");
-            sb.AppendLine(line.ToString());
-        }
+        sb.AppendLine($"  실제: 재료 {ctrl.FuelAmount} · 근거리 재련 비용 {ctrl.ReforgeCost(false)} · 원거리 재련 비용 {ctrl.ReforgeCost(true)} · 최대 {ctrl.MaxAt(m)}");
     }
 
     private static Button Card(UI_CruciblePanel panel, int k)

@@ -359,9 +359,9 @@ public class DKGetHitState : GetHitState
         if (ctx.Animator == null) return;
         string anim = HitAnims[Random.Range(0, HitAnims.Length)];
         if (!ctx.Animator.HasState(0, Animator.StringToHash(anim))) return;
-        // CrossFade 대신 Play — 블렌딩 없이 즉시 전환 (블렌딩이 슬로우처럼 보이는 현상 제거)
+        // 고정 0.06초 — Play는 자세가 한 프레임에 튀었다(10-18 실측 끊김 38). 예전에 느려 보인 건 길이 비율 CrossFade(긴 Idle 기준 0.5초 넘게) 때문
         ctx.Animator.speed = 1f;
-        ctx.Animator.Play(anim, 0, 0f);
+        ctx.Animator.CrossFadeInFixedTime(anim, 0.06f, 0, 0f);
     }
 }
 

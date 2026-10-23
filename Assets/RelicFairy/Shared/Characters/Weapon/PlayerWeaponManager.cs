@@ -510,6 +510,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             evolved.highestEnhanceReached = current.highestEnhanceReached;
             evolved.augmentSilverStreak   = current.augmentSilverStreak;
             evolved.augmentAfterEvolve    = true;                            // 진화 직후 첫 강화 = 금 이상
+            evolved.reforgeLog            = current.reforgeLog;              // 재련 기록도 이어진다(10-19)
             evolved.RecomputeEnhancedStats();
 
             // 3) 새 무브셋 클립 프리로드 — 안 하면 진화 직후 첫 공격이 빈 클립으로 나간다.

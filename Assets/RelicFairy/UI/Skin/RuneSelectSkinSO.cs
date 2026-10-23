@@ -16,6 +16,8 @@ public sealed class RuneSelectSkinSO : ScriptableObject
     [Tooltip("룬 획득 바탕 — 전면 일러스트(9-slice 아님). 창 전체를 덮는다.")]
     public Sprite background;
     public Sprite titleBar;
+    [Tooltip("10-19 힉스필드 창 틀(흑요석 돌 · 은금 상감 · 보라/청록 안쪽 빛 · 9칸) — 있으면 위 전면 일러스트 대신 창에 깐다.")]
+    public Sprite windowFrame;
 
     [Header("카드")]
     [Tooltip("룬 획득 카드 — 테두리 라인아트(9-slice).")]
@@ -55,6 +57,12 @@ public sealed class RuneSelectSkinSO : ScriptableObject
 
     public Sprite RarityCorner(ItemRarity rarity) => Pick(rarityCorner, (int)rarity);
     public Sprite RarityBar(ItemRarity rarity)    => Pick(rarityBar, (int)rarity);
+
+    [Header("10-19 힉스필드 등급 카드 틀 — ItemRarity 순서(0=Common 1=Rare 2=Epic 3=Legendary)")]
+    [SerializeField, Tooltip("흑요석 돌 · 등급별 상감 · 안쪽 빛 · 모서리 보석(9칸). 있으면 등급색 선 · 보석 조각 대신 카드 바탕에 깐다.")]
+    private Sprite[] rarityCardFrame = new Sprite[4];
+
+    public Sprite RarityCardFrame(ItemRarity rarity) => Pick(rarityCardFrame, (int)rarity);
 
     // ── 조회 (범위 밖·미할당은 null → 색 폴백) ──
 

@@ -69,8 +69,8 @@ public class LichChainBreakState : UnInterruptibleState<LichChainBreakPatternSO>
 
     private static readonly Color RingColor = new Color(1.00f, 0.80f, 0.25f, 1f);   // 금빛 — 플레이어의 봉인 사슬
     // 판정 띠 — 사슬(보이는 굵기 약 0.3 m)보다 판정(ringThickness)이 넓어 「안 닿았는데 맞았다」가 나던 것(09-18 감사).
-    // 판정 두께 그대로의 옅은 금빛 띠를 사슬 아래 깐다.
-    private static readonly Color BandColor = new Color(1.00f, 0.80f, 0.25f, 0.28f);
+    // 판정 두께 그대로의 옅은 띠를 사슬 아래 깐다 — (10-23 가이드 색 통일) 금빛 → 공용 공격 색(사슬 줄은 금빛 그대로 = 봉인 이야기 색).
+    private static Color BandColor => new Color(PatternGuideHelper.AttackFill.r, PatternGuideHelper.AttackFill.g, PatternGuideHelper.AttackFill.b, 0.28f);
     private static Material s_ringMaterial;
 
     private sealed class Ring

@@ -64,3 +64,16 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: bfedb76d5fe24054bacba63a38dcef01, type: 3}
   groupUnderline: {fileID: 21300000, guid: 68a5cb80be942d34eb4e91080c07b606, type: 3}
   groupDivider: {fileID: 21300000, guid: 7903bd1dd10846e4cb49c9cd709abf8f, type: 3}
+  memoryCardFrame: {fileID: 21300000, guid: 283018c9856964f4d80d595cbd14e7f5, type: 3}
+  evolutionFrame:
+  - key: Gawain
+    sprite: {fileID: 21300000, guid: b2699301b855cec47bbdde1376b2ebe3, type: 3}
+  - key: Lancelot
+    sprite: {fileID: 21300000, guid: 6ca8ccc2f6d5aa04a87c6c88c92bb56c, type: 3}
+  evolutionCrest:
+  - key: Gawain
+    sprite: {fileID: 21300000, guid: 9cc937b79a6135c47b02babf7c9e5a91, type: 3}
+  - key: Lancelot
+    sprite: {fileID: 21300000, guid: 2cfc79b8ea8cb304b806a7fa773fd0d7, type: 3}
+  workshopCardFrame: {fileID: 21300000, guid: 40aa6443452785742a137d71b0adfea6, type: 3}
+  workshopPanelFrame: {fileID: 21300000, guid: 1def7bb75c04002438005717a6a7aaf9, type: 3}

@@ -7,6 +7,8 @@ namespace RelicFairy.Monster
 /// DL3 「공허 낙하」 — 2페이지(심연) 일반 패턴 · 위협 5.
 ///   아레나 한가운데에 거대 운석 예고(4초) → 가운데에서 9~12 m 떨어진 자리에 얼음 기둥 3개가 솟는다(몸으로 막는 진짜 기둥)
 ///   → 기둥 뒤(운석 반대쪽) <b>흰 부채꼴만 안전</b>, 나머지는 큰 피해.
+///   부채꼴은 기둥 뒤 <c>_safeLength</c> m까지 · 플레이어 쪽 기둥은 플레이어 3~6 m 앞(멀리 있어도) · 시전 때 이미 기둥 뒤에 서 있으면
+///   고리를 돌린다(10-22 E5 페이지2 — 바닥 끝까지 열린 부채꼴은 멀수록 넓어 가장자리에 가만히 서 있어도 안전했다).
 /// 기둥 배치는 플레이어 방위를 기준으로 조금 흔들어 돌린다 — 어디에 있든 가장 가까운 부채꼴이 몇 초 안에 닿는다.
 /// 운석 · 기둥은 조준하지 않는다(자리 고정). 지상 · 공중 어디서든 쓰고, 보스는 제자리에서 부른다.
 /// 이 패턴 동안 수동 운석은 쉰다(숨은 자리에 운석이 떨어지지 않게).
@@ -59,6 +61,8 @@ public class DragonVoidFallPatternSO : BossPatternSO
     [Header("안전 부채꼴")]
     [Tooltip("기둥 중심을 꼭짓점으로 운석 반대쪽으로 벌리는 반각 (도)")]
     [SerializeField] private float _safeHalfAngle = 20f;
+    [Tooltip("기둥 뒤 안전 부채꼴 길이 (m) — 바닥 끝까지 열어 두면 멀수록 넓어진다(10-22 E5 페이지2)")]
+    [SerializeField] private float _safeLength    = 8f;
 
     [Header("애니메이션")]
     [SerializeField] private string _groundStateName = "UAttackWindHighStart";
@@ -91,6 +95,7 @@ public class DragonVoidFallPatternSO : BossPatternSO
     public GameObject PillarShatterVfxPrefab => _pillarShatterVfxPrefab;
     public float      PillarShatterVfxScale  => _pillarShatterVfxScale;
     public float      SafeHalfAngle          => Mathf.Clamp(_safeHalfAngle, 1f, 60f);
+    public float      SafeLength             => Mathf.Max(2f, _safeLength);
     public string     GroundStateName        => _groundStateName;
     public string     AirStateName           => _airStateName;
     public float      EndPoseSeconds         => _endPoseSeconds;
@@ -124,9 +129,12 @@ internal sealed class DragonVoidFallState : FullLockState<DragonVoidFallPatternS
         public GameObject Sector;
         public Vector3    Base;
         public Vector3    Out;   // 운석 중심 → 기둥 (수평 단위)
+        public float      Length;   // 안전 부채꼴 길이 — 그린 그대로(10-22 E5 페이지2)
     }
 
-    private const float PillarNudgeDegrees = 15f;   // 기둥이 플레이어 발밑에 솟지 않게 비켜 주는 각
+    private const float PillarNudgeDegrees  = 15f;   // 기둥이 플레이어 발밑에 솟지 않게 비켜 주는 각
+    private const float PlayerPillarLeadMin = 3f;    // 플레이어 쪽 기둥 — 플레이어보다 이만큼 운석 쪽(m · 10-22 E5 페이지2)
+    private const float PlayerPillarLeadMax = 6f;
 
     private readonly List<Pillar> _pillars = new();
     private Phase      _phase;
@@ -250,10 +258,15 @@ internal sealed class DragonVoidFallState : FullLockState<DragonVoidFallPatternS
         float   baseDeg = DragonAbyssFx.Yaw(DragonAbyssFx.FlatDir(_center, player, Vector3.forward))
                           + Random.Range(-Data.PillarAimJitter, Data.PillarAimJitter);
 
-        // 기둥이 플레이어 발밑에서 솟으면 끼인다 — 겹치면 고리를 조금 돌린다
+        // 기둥이 플레이어 발밑에서 솟으면 끼인다 — 겹치면 고리를 조금 돌린다.
+        // 시전 때 이미 기둥 뒤(안전 부채꼴)에 서 있어도 돌린다 — 가만히 서서 피하지 않게(10-22 E5 페이지2)
         float[] radii = new float[count];
         for (int i = 0; i < count; i++) radii[i] = Random.Range(Data.PillarRingMin, Data.PillarRingMax);
-        for (int attempt = 0; attempt < 4 && PillarOnPlayer(baseDeg, radii, player); attempt++)
+        // 플레이어 쪽 기둥(첫 기둥)은 플레이어 몇 걸음 앞 — 멀리 있어도 짧아진 부채꼴에 몇 초 안에 닿는다(10-22 E5 페이지2)
+        Vector3 toPlayer = player - _center;
+        toPlayer.y = 0f;
+        radii[0] = Mathf.Max(radii[0], toPlayer.magnitude - Random.Range(PlayerPillarLeadMin, PlayerPillarLeadMax));
+        for (int attempt = 0; attempt < 4 && (PillarOnPlayer(baseDeg, radii, player) || LayoutShelters(baseDeg, radii, player)); attempt++)
             baseDeg += PillarNudgeDegrees;
 
         Color ice = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice);
@@ -277,6 +290,17 @@ internal sealed class DragonVoidFallState : FullLockState<DragonVoidFallPatternS
         {
             Vector3 dir = Quaternion.Euler(0f, baseDeg + i * 360f / radii.Length, 0f) * Vector3.forward;
             if (DragonAbyssFx.InDisc(player, _center + dir * radii[i], clear)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>이 고리 배치면 플레이어가 이미 어느 기둥 뒤(안전 부채꼴)에 있는가(10-22 E5 페이지2).</summary>
+    private bool LayoutShelters(float baseDeg, float[] radii, Vector3 player)
+    {
+        for (int i = 0; i < radii.Length; i++)
+        {
+            Vector3 dir = Quaternion.Euler(0f, baseDeg + i * 360f / radii.Length, 0f) * Vector3.forward;
+            if (Shelters(_center + dir * radii[i], dir, Data.SafeLength, player)) return true;
         }
         return false;
     }
@@ -308,7 +332,8 @@ internal sealed class DragonVoidFallState : FullLockState<DragonVoidFallPatternS
         float maxExtent = DragonPatternFloorUtils.GetRoomMaxExtent();
         foreach (var p in _pillars)
         {
-            float len = Mathf.Max(2f, DragonPatternFloorUtils.DistanceToFloorEdge(p.Base, p.Out, maxExtent));
+            float len = Mathf.Max(2f, Mathf.Min(Data.SafeLength, DragonPatternFloorUtils.DistanceToFloorEdge(p.Base, p.Out, maxExtent)));   // 기둥 뒤 SafeLength m까지(10-22 E5 페이지2)
+            p.Length = len;
             p.Sector = PatternGuideHelper.Sector(p.Base, len, Data.SafeHalfAngle * 2f, DragonAbyssFx.Yaw(p.Out), Color.white);
             PatternGuideHelper.SetFlow(p.Sector, Color.white);
             PatternGuideHelper.SetProgress(p.Sector, 1f);
@@ -316,21 +341,24 @@ internal sealed class DragonVoidFallState : FullLockState<DragonVoidFallPatternS
         }
     }
 
-    /// <summary>기둥 뒤 안전 — 기둥 중심을 꼭짓점으로 한 부채꼴 안이거나, 기둥 바로 뒤(기둥 폭 안)면 안전.</summary>
+    /// <summary>기둥 뒤 안전 — 기둥 중심을 꼭짓점으로 한 부채꼴(그린 길이까지) 안이거나, 기둥 바로 뒤(기둥 폭 안)면 안전.</summary>
     private bool IsSheltered(Vector3 pos)
     {
-        float cosHalf = Mathf.Cos(Data.SafeHalfAngle * Mathf.Deg2Rad);
         foreach (var p in _pillars)
-        {
-            Vector3 v = pos - p.Base;
-            v.y = 0f;
-            float along = Vector3.Dot(v, p.Out);
-            if (along <= 0f) continue;
-            float lateralSq = v.sqrMagnitude - along * along;
-            if (lateralSq <= Data.PillarRadius * Data.PillarRadius) return true;
-            if (along >= cosHalf * v.magnitude) return true;
-        }
+            if (Shelters(p.Base, p.Out, p.Length, pos)) return true;
         return false;
+    }
+
+    /// <summary>기둥 하나 뒤 안전 — 기둥에서 <paramref name="length"/> m 안(10-22 E5 페이지2)의 부채꼴 · 기둥 폭 띠.</summary>
+    private bool Shelters(Vector3 basePos, Vector3 outDir, float length, Vector3 pos)
+    {
+        Vector3 v = pos - basePos;
+        v.y = 0f;
+        float along = Vector3.Dot(v, outDir);
+        if (along <= 0f || v.magnitude > length) return false;
+        float lateralSq = v.sqrMagnitude - along * along;
+        if (lateralSq <= Data.PillarRadius * Data.PillarRadius) return true;
+        return along >= Mathf.Cos(Data.SafeHalfAngle * Mathf.Deg2Rad) * v.magnitude;
     }
 
     // ── 충돌 ─────────────────────────────────────────────────────────────────

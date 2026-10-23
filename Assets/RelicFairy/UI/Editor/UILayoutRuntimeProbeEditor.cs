@@ -694,153 +694,14 @@ public static class UILayoutRuntimeProbeEditor
         Debug.Log($"[UILayoutRuntimeProbe] {tag} 연출 캡처 끝 ({Time.realtimeSinceStartup - t0:0.00}초)");
     }
 
-    // ── 재련소 강화 연출(런 중) ─────────────────────────────────────────────
-    /// <summary>
-    /// 재련소 강화 연출을 순간별로 찍는다(포커스 · 망치 · 임팩트 · 판정 · 여운). 성공·실패는 실제 강화에서 처음 나온 것을,
-    /// 잭팟은 드물어 성공 결과에 잭팟 표시(환불 포함)만 켜서 같은 시퀀스로 재생한다.
-    /// 강화 결과는 실제로 반영된다 — 테스트 런에서만 돌린다. 연출마다 전체 길이(시작→다음 입력 가능)를 로그로 남긴다.
-    /// </summary>
-    [MenuItem("RelicFairy/UI/재련소 연출 실측 (런 중)")]
-    private static void RunCrucibleFx()
-    {
-        if (!EditorApplication.isPlaying || GameRunBootstrapper.Instance == null)
-        {
-            Debug.LogWarning("[UILayoutRuntimeProbe] 런에 들어간 뒤 실행해야 한다.");
-            return;
-        }
-        RunCrucibleFxAsync().Forget();
-    }
-
-    private static readonly int[] CrucibleFxShotMs  = { 60, 280, 480, 700, 1100, 1700 };
-    private static readonly int[] CrucibleJackpotMs = { 60, 700, 1300, 1800, 2300, 2900 };   // 멈칫·맥박 뒤 빛살·배너까지
-
-    private static async UniTaskVoid RunCrucibleFxAsync()
-    {
-        HideTestHubGui();
-        var run = GameRunBootstrapper.Instance.Run;
-        GameObject go = null;
-        try
-        {
-            go = new GameObject("~ProbeCrucibleFx");
-            var ctrl = go.AddComponent<CrucibleRoomController>();
-            ctrl.Initialize(run, await WeaponEnhanceService.EnsureLoadedAsync(), new System.Random(7), null);
-            run.FuelBank?.Add(FuelKind.EnhanceMaterial, 300);
-            var panel = await Managers.UI.ShowPopupUIAndGetAsync<UI_CruciblePanel>();
-            panel.Bind(ctrl);
-            await UniTask.Delay(1200, ignoreTimeScale: true);
-            await ShotAsync("Crucible_Idle", 0);
-
-            var t     = typeof(UI_CruciblePanel);
-            var play  = t.GetMethod("PlayEnhanceSequence", NonPub);
-            var melee = Enum.ToObject(t.GetNestedType("EnhanceView", NonPub), 0);
-            var animF = t.GetField("_animating", NonPub);
-            bool gotOk = false, gotFail = false, gotDanger = false;
-
-            for (int i = 0; i < 24 && !(gotOk && gotFail); i++)
-            {
-                if (!gotDanger && ctrl.DropAt(PlayerWeaponManager.Slot0) > 0)
-                {
-                    gotDanger = true;
-                    await UniTask.Delay(900, ignoreTimeScale: true);   // 열기가 차오르도록
-                    await ShotAsync("Crucible_Danger", 0);
-                }
-                var r = ctrl.TryEnhance(PlayerWeaponManager.Slot0);
-                if (r.IsReject) { Debug.Log($"[UILayoutRuntimeProbe] 재련소 강화 거부 {r.outcome} — 중단"); break; }
-                string tag = null;
-                if (r.IsSuccess && ctrl.LastJackpot)  tag = "Crucible_JackpotNatural";
-                else if (r.IsSuccess && !gotOk)       { tag = "Crucible_Success"; gotOk = true; }
-                else if (!r.IsSuccess && !gotFail)    { tag = "Crucible_Fail"; gotFail = true; }
-                await PlayCrucibleAsync(panel, play, melee, animF, r, tag);
-            }
-
-            // 잭팟 — 성공 하나를 받아 잭팟 표시(환불)만 켜서 같은 시퀀스로 재생한다.
-            var ct = typeof(CrucibleRoomController);
-            for (int i = 0; i < 12; i++)
-            {
-                var r = ctrl.TryEnhance(PlayerWeaponManager.Slot0);
-                if (r.IsReject) { Debug.Log($"[UILayoutRuntimeProbe] 잭팟 실측 전 강화 거부 {r.outcome}"); break; }
-                if (!r.IsSuccess) { await PlayCrucibleAsync(panel, play, melee, animF, r, null); continue; }
-                if (!ctrl.LastJackpot)
-                {
-                    ct.GetField("_lastJackpot", NonPub)?.SetValue(ctrl, true);
-                    ct.GetField("_lastRefund",  NonPub)?.SetValue(ctrl, r.spent);
-                    run.FuelBank?.Add(FuelKind.EnhanceMaterial, r.spent);
-                }
-                await PlayCrucibleAsync(panel, play, melee, animF, r, "Crucible_Jackpot");
-                break;
-            }
-            await ShotAsync("Crucible_After", 300);
-
-            // 도박 구간 → 최대 강화(진화 열림)까지 올리며 상태 화면을 찍는다.
-            bool dangerShot = false;
-            for (int i = 0; i < 30; i++)
-            {
-                if (!dangerShot && ctrl.CanEnhance(PlayerWeaponManager.Slot0) && ctrl.DropAt(PlayerWeaponManager.Slot0) > 0)
-                {
-                    dangerShot = true;
-                    await UniTask.Delay(900, ignoreTimeScale: true);   // 열기가 차오르도록
-                    await ShotAsync("Crucible_Danger", 0);
-                }
-                var r = ctrl.TryEnhance(PlayerWeaponManager.Slot0);
-                if (r.IsReject) break;
-                await PlayCrucibleAsync(panel, play, melee, animF, r, null);
-            }
-            await ShotAsync("Crucible_Maxed", 600);
-            // 무기에 따라(무형검 +6) 최대 전까지 하락 단계가 없다 — 표시만 켜서 위험 구간 모습을 찍는다.
-            if (!dangerShot)
-            {
-                t.GetMethod("SetDanger", NonPub)?.Invoke(panel, new object[] { true, true });
-                await UniTask.Delay(1400, ignoreTimeScale: true);
-                await ShotAsync("Crucible_DangerForced", 0);
-                t.GetMethod("SetDanger", NonPub)?.Invoke(panel, new object[] { false, false });
-            }
-            t.GetMethod("SelectTab", NonPub)?.Invoke(panel, new object[] { 1 });
-            await ShotAsync("Crucible_Ranged", 600);
-        }
-        catch (Exception e) { Debug.LogWarning("[UILayoutRuntimeProbe] 재련소 연출 실측 실패: " + e); }
-        finally
-        {
-            Managers.UI.CloseAllPopupUI();
-            if (go != null) UnityEngine.Object.Destroy(go);
-            RestoreTestHubGui();
-        }
-        Debug.Log("[UILayoutRuntimeProbe] 재련소 연출 실측 끝");
-    }
-
-    /// <summary>연출 하나를 재생하고, 태그가 있으면 정해 둔 순간마다 찍는다. 시작→다음 입력 가능까지의 길이를 로그로 남긴다.</summary>
-    private static async UniTask PlayCrucibleAsync(UI_CruciblePanel panel, System.Reflection.MethodInfo play, object view,
-                                                   System.Reflection.FieldInfo animF, EnhanceResult r, string tag)
-    {
-        float t0 = Time.realtimeSinceStartup;
-        play.Invoke(panel, new object[] { r, view });
-        if (tag != null)
-        {
-            foreach (int ms in tag.Contains("Jackpot") ? CrucibleJackpotMs : CrucibleFxShotMs)
-            {
-                int wait = ms - Mathf.RoundToInt((Time.realtimeSinceStartup - t0) * 1000f);
-                if (wait > 0) await UniTask.Delay(wait, ignoreTimeScale: true);
-                await ShotAsync($"{tag}_{ms:0000}", 0);
-            }
-        }
-        while ((bool)animF.GetValue(panel) && Time.realtimeSinceStartup - t0 < 8f) await UniTask.Yield();
-        // 강화로 스킬 단계에 오르면 각인 선택 화면이 창을 덮는다 — 이 실측은 강화 연출이 목적이라 첫 각인을 골라 치운다.
-        if (EngraveDim(panel) is { activeSelf: true })
-        {
-            typeof(UI_CruciblePanel).GetMethod("OnEngravePicked", NonPub)?.Invoke(panel, new object[] { 0 });
-            Debug.Log("[UILayoutRuntimeProbe] 재련소 — 각인 선택 화면이 떠 첫 각인을 골랐다(실측용)");
-        }
-        string shot = tag != null ? $" [{tag} · 캡처 포함]" : "";
-        Debug.Log($"[UILayoutRuntimeProbe] 재련소 {r.outcome} +{r.beforeLevel}→+{r.afterLevel}{shot} 연출 {Time.realtimeSinceStartup - t0:0.00}초");
-        await UniTask.Delay(250, ignoreTimeScale: true);
-    }
-
     // ── 재련소 각인 택1 (09-26) ─────────────────────────────────────────
     private const string EngraveKatanaSO = "Assets/RelicFairy/Weapon/Katana/Data/T1_Katana.asset";
     private const string EngraveOut      = "Temp/crucible_engrave_probe.txt";
 
     /// <summary>
-    /// 재련소 스킬 각인 선택 화면 — ① +3으로 열면 바로 묻는다 ② +2에서 강화로 +3에 오르면 연출 뒤 묻는다.
-    /// 둘 다 찍고, 고른 각인이 무기에 기록되고 같은 단계를 다시 묻지 않는지 확인한다.
+    /// 재련소 스킬 각인 선택 화면 — +3으로 열면 바로 묻는다.
+    /// 찍고, 고른 각인이 무기에 기록되고 같은 단계를 다시 묻지 않는지 확인한다.
+    /// (옛 ② 「+2에서 강화로 +3」은 옛 확률 강화 API가 10-18 재련 개편으로 없어져 걷었다.)
     /// 카타나(환영베기 R)를 근접 칸에 든다 — 테스트 런의 무기가 바뀐다. 결과: Temp/crucible_engrave_probe.txt
     /// </summary>
     [MenuItem("RelicFairy/UI/재련소 각인 선택 실측 (런 중)")]
@@ -898,41 +759,6 @@ public static class UILayoutRuntimeProbeEditor
                 Check(!SkillEngravingService.TryGetPendingOffer(wd, new List<SkillSO.EngravingDef>(), out _, out _),
                       "같은 단계는 다시 묻지 않는다");
                 await ShotAsync("Crucible_Engrave_Picked", 300);
-            }
-            Managers.UI.CloseAllPopupUI();
-            await UniTask.Delay(400, ignoreTimeScale: true);
-
-            // ② +2에서 강화로 +3에 오르면 연출 뒤 묻는다
-            wd.enhanceLevel = 2;
-            wd.engravings   = "";
-            panel = await Managers.UI.ShowPopupUIAndGetAsync<UI_CruciblePanel>();
-            panel.Bind(ctrl);
-            await UniTask.Delay(1000, ignoreTimeScale: true);
-            dim = EngraveDim(panel);
-            Check(dim == null || !dim.activeSelf, "② +2로 열면 묻지 않는다");
-
-            var play  = t.GetMethod("PlayEnhanceSequence", NonPub);
-            var melee = Enum.ToObject(t.GetNestedType("EnhanceView", NonPub), 0);
-            var animF = t.GetField("_animating", NonPub);
-            for (int i = 0; i < 20 && wd.enhanceLevel < 3; i++)
-            {
-                var r = ctrl.TryEnhance(PlayerWeaponManager.Slot0);
-                if (r.IsReject) { sb.AppendLine($"   강화 거부 {r.outcome}"); break; }
-                float t0 = Time.realtimeSinceStartup;
-                play.Invoke(panel, new object[] { r, melee });
-                while ((bool)animF.GetValue(panel) && Time.realtimeSinceStartup - t0 < 8f) await UniTask.Yield();
-                await UniTask.Delay(300, ignoreTimeScale: true);
-                sb.AppendLine($"   강화 {r.outcome} +{r.beforeLevel}→+{r.afterLevel}");
-            }
-            dim = EngraveDim(panel);
-            Check(wd.enhanceLevel >= 3 && dim != null && dim.activeSelf, $"강화로 +{wd.enhanceLevel} → 연출 뒤 각인 선택 화면");
-            if (dim != null && dim.activeSelf)
-            {
-                await ShotAsync("Crucible_Engrave_AfterEnhance", 200);
-                t.GetMethod("OnEngravePicked", NonPub)?.Invoke(panel, new object[] { 1 });
-                await UniTask.Delay(300, ignoreTimeScale: true);
-                Check(wd.HasEngraving(PhantomDanceBehaviorSO.EngraveCondense) && !wd.HasEngraving(PhantomDanceBehaviorSO.EngravePursuit),
-                      $"「응축」만 기록 (engravings=\"{wd.engravings}\")");
             }
         }
         catch (Exception e) { Check(false, "예외: " + e); }

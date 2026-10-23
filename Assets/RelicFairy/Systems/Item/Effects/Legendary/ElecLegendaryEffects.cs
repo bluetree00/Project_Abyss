@@ -54,7 +54,7 @@ public sealed class ElecLegendAoeEffect : ItemCombatEffectBase
         for (int i = 0; i < hitCount; i++)
         {
             CombatQuery.DealSynergyDamage(_buf[i], mainDmg, Self(ctx), element: RuneElement.Electric);
-            LegendaryRuntime.SpawnVfx(cat?.elecAoeHitVfx, _buf[i].transform.position, Quaternion.identity, 1.5f, 0.8f);
+            LegendaryRuntime.SpawnVfx(cat?.elecAoeHitVfx, _buf[i].transform.position, Quaternion.identity, 1.5f, 0.65f);   // 대상 타격 ≈ 1 m(10-22 B2 실측 83: ×0.8 = 1.2 m)
             LegendaryRuntime.SpawnVfx(cat?.elecAoeVfx, _buf[i].transform.position + Vector3.up * 4f, strikeRot, 2f, 0.5f);
 
             int chainIdx = i + targets;
@@ -62,6 +62,8 @@ public sealed class ElecLegendAoeEffect : ItemCombatEffectBase
             {
                 CombatQuery.DealSynergyDamage(_buf[chainIdx], chainDmg, Self(ctx), element: RuneElement.Electric);
                 ItemGuide.Chain(_buf[i].transform.position, _buf[chainIdx].transform.position);
+                // 연쇄 3타 — 피해는 들어가는데 개발용 선(기본 꺼짐)만 있어 안 보였다 → 번개 줄기(10-18 이펙트 점검)
+                ElementVfxPlayer.PlayBeam(RuneElement.Electric, _buf[i].transform.position + Vector3.up, _buf[chainIdx].transform.position + Vector3.up, 0.2f);
             }
         }
         if (hitCount > 0)

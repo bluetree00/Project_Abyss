@@ -21,8 +21,6 @@ public class DragonIceSlamPatternSO : BossPatternSO
     [SerializeField] private GameObject _dangerZonePrefab;
     [SerializeField] private float _dangerZoneScale = 15f;
     [SerializeField] private float _dangerZoneHeightOffset = 0.05f;
-    [SerializeField] private float _arenaFitPadding = 0.15f;
-    [SerializeField] private float _warningOutlineWidth = 0.18f;
 
     [Header("Ice Pillars")]
     [SerializeField] private GameObject _icePillarPrefab;
@@ -39,6 +37,16 @@ public class DragonIceSlamPatternSO : BossPatternSO
     [SerializeField] private float _slamEffectScale = 4f;
     [SerializeField] private AudioClip _slamSfx;
 
+    [Header("충격 고리 (10-22 E3 D3)")]
+    [Tooltip("착지점 = 플레이어의 이만큼 뒤 자리 (초) — 아레나 안으로 당긴다")]
+    [SerializeField] private float _landLeadSeconds = 0.6f;
+    [Tooltip("고리가 퍼지는 끝 반경 (m) — 착지점에서 이보다 멀면 안전")]
+    [SerializeField] private float _ringMaxRadius = 30f;
+    [Tooltip("고리 두께 (m) — 그림 띠 = 판정 띠")]
+    [SerializeField] private float _ringThickness = 2.5f;
+    [Tooltip("고리가 0 → 끝 반경까지 퍼지는 시간 (초)")]
+    [SerializeField] private float _ringSeconds = 1.2f;
+
     [Header("Animator State Names")]
     [SerializeField] private string _takeoffStateName = "Takeoff";
     [SerializeField] private string _airChaseStateName = "AirChase";
@@ -54,8 +62,6 @@ public class DragonIceSlamPatternSO : BossPatternSO
     public GameObject  DangerZonePrefab        => _dangerZonePrefab;
     public float       DangerZoneScale         => _dangerZoneScale;
     public float       DangerZoneHeightOffset  => _dangerZoneHeightOffset;
-    public float       ArenaFitPadding         => _arenaFitPadding;
-    public float       WarningOutlineWidth     => _warningOutlineWidth;
     public GameObject  IcePillarPrefab         => _icePillarPrefab;
     public int         PillarCount             => _pillarCount;
     public float       PillarRadius            => _pillarRadius;
@@ -67,6 +73,10 @@ public class DragonIceSlamPatternSO : BossPatternSO
     public GameObject  SlamEffectPrefab        => _slamEffectPrefab;
     public float       SlamEffectScale         => _slamEffectScale;
     public AudioClip   SlamSfx                 => _slamSfx;
+    public float       LandLeadSeconds         => Mathf.Max(0f, _landLeadSeconds);
+    public float       RingMaxRadius           => Mathf.Max(1f, _ringMaxRadius);
+    public float       RingThickness           => Mathf.Clamp(_ringThickness, 0.5f, RingMaxRadius);
+    public float       RingSeconds             => Mathf.Max(0.1f, _ringSeconds);
     public string      TakeoffStateName        => _takeoffStateName;
     public string      AirChaseStateName       => _airChaseStateName;
     public string      FlyDownStateName        => _flyDownStateName;
@@ -95,8 +105,10 @@ public class DragonIceSlamPatternSO : BossPatternSO
 // ────────────────────────────────────────────────────────────────────────────
 
 /// <summary>
-/// Phases: Takeoff → MoveToCenter → Warning (danger zone + ice pillars) →
-///         FlyDown (vertical descent) → Landing (AoE damage + cleanup) → Done
+/// Phases: Takeoff → MoveToCenter(착지점 위로) → Warning (고리 자리 예고 + ice pillars) →
+///         FlyDown (vertical descent) → Landing (퍼지는 충격 고리 · 다 퍼지면 복귀) → Done
+/// 10-22 E3 D3 — 착지점 = 플레이어 예측 자리(예전 아레나 중앙 고정) · 판정 = 바깥으로 퍼지는 고리(두께 2.5 m · 1.2초에 r0 → 30).
+/// 경기장 전체 판정이라 걸어서 못 피하던 것을 「고리가 오는 순간 대시로 넘기 · 30 m 밖」으로 바꾼다.
 /// </summary>
 internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
 {
@@ -113,9 +125,14 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
     private int                    _landingHash;
     private readonly List<GameObject> _spawnedPillars = new();
     private bool                   _damageApplied;
-    private DragonBossWarningZone  _warningZone;
-    private float                  _warningRadius;
-    private float                  _warningDiameter;
+    private GameObject             _ringGuide;       // 고리 자리(반경 RingMaxRadius) — 예고 땐 차오르고, 착지 뒤엔 판정 띠가 바깥으로 퍼진다(10-22 E3 D3)
+    private float                  _fillTimer;
+    private float                  _fillSeconds;
+    private Vector3                _ringCenter;
+    private float                  _ringTimer;
+    private float                  _ringPrevRadius;
+    private bool                   _ringActive;
+    private bool                   _ringResolved;    // 이번 내려찍기 판정을 이미 했다(맞음 · 회피 무적 모두 한 번)
 
     internal DragonIceSlamState(DragonIceSlamPatternSO data) : base(data) { }
 
@@ -125,9 +142,9 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         _phaseTimer    = 0f;
         _damageApplied = false;
         _spawnedPillars.Clear();
-        _warningZone = null;
-        _warningRadius = 0f;
-        _warningDiameter = 0f;
+        PatternGuideHelper.SafeDestroy(ref _ringGuide);
+        _ringActive   = false;
+        _ringResolved = false;
     }
 
     public override void Enter(MonsterContext ctx)
@@ -145,11 +162,9 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
 
         float groundY = ctx.Runtime.SpawnPosition.y;
         _targetY   = groundY + Data.HoverHeight;
-        // 슬램 중심 = Floor의 실제 중심 — 드래곤 스폰 위치와 다를 수 있어 경고장판이 Floor 밖으로 벗어나는 것을 방지
-        Vector3 floorCenter = DragonBossRoomContext.WorldCenter;
-        _centerPos = new Vector3(floorCenter.x, _targetY, floorCenter.z);
-        _warningDiameter = Mathf.Min(DragonBossRoomContext.Width, DragonBossRoomContext.Height) * DragonBossRoomContext.CellSize;
-        _warningRadius = Mathf.Max(0.5f, (_warningDiameter * 0.5f) - Data.ArenaFitPadding);
+        _ringActive   = false;
+        _ringResolved = false;
+        ResolveLandPoint(ctx);   // 땅에서 떠오르면 날아가기 직전에 한 번 더 잡는다(StartMoveToCenter)
 
         _takeoffHash = Animator.StringToHash(Data.TakeoffStateName);
         _flyDownHash = Animator.StringToHash(Data.FlyDownStateName);
@@ -195,7 +210,8 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
     public override void Exit(MonsterContext ctx)
     {
         RestoreAgent(ctx);
-        DestroyWarningZone();
+        PatternGuideHelper.SafeDestroy(ref _ringGuide);
+        _ringActive = false;
         CleanupPillars();
         if (ctx.Monster is DragonBossMonster dragon)
             dragon.DragonBlackboard.IsAirborne = false;
@@ -242,6 +258,7 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
 
     private void UpdateWarning(MonsterContext ctx)
     {
+        TickFill();
         if (_phaseTimer >= Data.WarningDuration)
             StartFlyDown(ctx);
     }
@@ -261,6 +278,7 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         float newPitch = Mathf.MoveTowardsAngle(euler.x, targetPitch, 270f * Time.deltaTime);
         ctx.Transform.rotation = Quaternion.Euler(newPitch, euler.y, euler.z);
 
+        TickFill();
         if (pos.y > groundY + LandSnap) return;
 
         StartLanding(ctx);
@@ -268,7 +286,9 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
 
     private void UpdateLanding(MonsterContext ctx)
     {
-        if (!IsAnimNearEnd(ctx, _landingHash)) return;
+        TickRing(ctx);
+        // 고리가 다 퍼질 때까지 기다린다 — 착지 클립이 더 짧아도 판정이 끝까지 돈다(수동 운석 멈춤도 그때까지)
+        if (_ringActive || !IsAnimNearEnd(ctx, _landingHash)) return;
 
         RestoreAgent(ctx);
         ReturnToCombat(ctx);
@@ -280,6 +300,7 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
     {
         _phase      = Phase.MoveToCenter;
         _phaseTimer = 0f;
+        ResolveLandPoint(ctx);   // 떠오르는 사이 플레이어가 움직였다 — 날아가기 직전 자리로
         PlayAnim(ctx, Data.AirChaseStateName, 0.15f);
     }
 
@@ -312,9 +333,12 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         ctx.Transform.rotation = Quaternion.Euler(0f, euler.y, 0f);
         PlayAnim(ctx, Data.LandingStateName, 0.1f);
 
-        DestroyWarningZone();
+        // 바닥에 닿았다 — 고리가 퍼지는 동안 지상(근접 가능 · 10-22 E3 D1·D3). 예전엔 착지 클립이 끝날 때까지 공중 판정이었다
+        if (ctx.Monster is DragonBossMonster dragon)
+            dragon.DragonBlackboard.IsAirborne = false;
+
         CleanupPillars();
-        ApplySlamDamage(ctx);
+        StartRing(ctx);
         SpawnSlamEffect(ctx);
         Managers.Sound?.PlayEffectAt(Data.SlamSfx, ctx.Transform.position);
     }
@@ -324,20 +348,16 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
     private void SpawnDangerZone(MonsterContext ctx)
     {
         float groundY = DragonPatternFloorUtils.GetFloorY(_centerPos, ctx.Runtime.SpawnPosition.y);
-        Vector3 pos = new Vector3(_centerPos.x, groundY, _centerPos.z);
-        var iceBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice);
-        _warningZone = DragonBossWarningZone.CreateCircle(
-            "DragonIceSlamWarning",
-            pos,
-            _warningRadius,
-            new Color(iceBase.r, iceBase.g, iceBase.b, 0.85f),
-            Data.WarningDuration + 5f,
-            Data.DangerZoneHeightOffset,
-            Data.WarningOutlineWidth,
-            startEmpty: true);
-        // 채움은 몸이 바닥에 닿는 순간(= 판정)에 끝난다 — 예고 + 내려꽂기(남은 높이 ÷ 낙하 속도)(10-08 점검: 다 찬 뒤 0.57초에 맞았다)
+        _ringCenter = new Vector3(_centerPos.x, groundY, _centerPos.z);
+        Color c       = PatternGuideHelper.AttackFill;   // (10-23 가이드 색 통일) 얼음 색은 기둥 · 이펙트만
+        // 예고 = 고리가 지나갈 자리(착지점 둘레 RingMaxRadius) — 다 차는 순간 착지, 그때부터 판정 띠가 바깥으로 퍼진다(10-22 E3 D3)
+        PatternGuideHelper.SafeDestroy(ref _ringGuide);
+        _ringGuide = PatternGuideHelper.Prepare(
+            PatternGuideHelper.Disc(_ringCenter + Vector3.up * Data.DangerZoneHeightOffset, Data.RingMaxRadius, c), c);
+        // 채움은 몸이 바닥에 닿는 순간(= 고리 시작)에 끝난다 — 예고 + 내려꽂기(남은 높이 ÷ 낙하 속도)(10-08 점검: 다 찬 뒤 0.57초에 맞았다)
         float descent = Mathf.Max(0f, ctx.Transform.position.y - groundY - LandSnap) / Mathf.Max(0.01f, Data.FlyDownSpeed);
-        _warningZone.BeginFill(Data.WarningDuration + descent);
+        _fillSeconds = Data.WarningDuration + descent;
+        _fillTimer   = 0f;
     }
 
     private void SpawnIcePillars(MonsterContext ctx)
@@ -364,23 +384,56 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         }
     }
 
-    private void ApplySlamDamage(MonsterContext ctx)
+    private void TickFill()
     {
-        float   groundY    = DragonPatternFloorUtils.GetFloorY(_centerPos, ctx.Runtime.SpawnPosition.y);
-        Vector3 slamCenter = new Vector3(_centerPos.x, groundY + 0.5f, _centerPos.z);
+        _fillTimer += Time.deltaTime;
+        PatternGuideHelper.SetProgress(_ringGuide, _fillTimer / Mathf.Max(0.01f, _fillSeconds));
+    }
 
-        var hits = Physics.OverlapSphere(slamCenter, _warningRadius);
-        foreach (var col in hits)
-        {
-            var player = col.GetComponent<PlayerController>()
-                      ?? col.GetComponentInParent<PlayerController>();
-            if (player == null) continue;
+    /// <summary>고리 시작 — 지나갈 자리는 옅게 남기고 판정 띠(두께 RingThickness)만 판정 색으로 바깥으로 퍼진다(예고 = 판정 · 10-22 E3 D3).</summary>
+    private void StartRing(MonsterContext ctx)
+    {
+        _ringActive     = true;
+        _ringResolved   = false;
+        _ringTimer      = 0f;
+        _ringPrevRadius = 0f;
+        PatternGuideHelper.SetFlow(_ringGuide, PatternGuideHelper.Active, Data.RingThickness / Data.RingMaxRadius);
+        PatternGuideHelper.SetProgress(_ringGuide, 0f);
+        TickRing(ctx);   // 착지 순간 — 발밑(반경 = 두께)부터
+    }
 
-            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier), ctx.Monster.gameObject,
-                              false, HitWeight.Heavy);   // 다이브 — 강
+    /// <summary>고리를 RingSeconds에 걸쳐 0 → RingMaxRadius로 넓힌다. 다 퍼지면 데칼을 치운다.</summary>
+    private void TickRing(MonsterContext ctx)
+    {
+        if (!_ringActive) return;
+        _ringTimer += Time.deltaTime;
+        float k = Mathf.Clamp01(_ringTimer / Data.RingSeconds);
+        float r = Data.RingMaxRadius * k;
+        PatternGuideHelper.SetProgress(_ringGuide, k);
+        if (!_ringResolved) CheckRingHit(ctx, _ringPrevRadius, r);
+        _ringPrevRadius = r;
+        if (k < 1f) return;
+        _ringActive = false;
+        PatternGuideHelper.SafeDestroy(ref _ringGuide);
+    }
+
+    /// <summary>
+    /// 판정 = 이번 프레임 띠 [r − 두께, r](앞 프레임 바깥 가장자리부터 — 긴 프레임에 건너뛰지 않게) · 수평 거리.
+    /// 한 번만 판정한다(회피 무적으로 넘겼어도 이번 고리는 끝). 빙결은 맞았을 때만.
+    /// </summary>
+    private void CheckRingHit(MonsterContext ctx, float prevRadius, float radius)
+    {
+        var player = DragonAbyssFx.Player(ctx);
+        if (player == null) return;
+        Vector3 d = player.transform.position - _ringCenter;
+        d.y = 0f;
+        float dist  = d.magnitude;
+        float inner = Mathf.Max(0f, Mathf.Min(radius - Data.RingThickness, prevRadius));
+        if (dist < inner || dist > radius) return;
+
+        _ringResolved = true;
+        if (DragonAbyssFx.HitPlayer(ctx, Data.DamageMultiplier, HitWeight.Heavy))   // 충격 고리 — 강
             Data.playerStatusEffect?.Apply(player);
-            break;
-        }
     }
 
     private void SpawnSlamEffect(MonsterContext ctx)
@@ -394,8 +447,9 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         var effect = BossEffectPool.Spawn(prefab, pos, Quaternion.identity);
         if (effect == null) return;
 
+        // 착지 충격 = 발밑 띠 크기(두께) — 판정은 퍼지는 고리라 경기장 크기로 키우지 않는다(10-22 E3 D3 · 예전 × 경기장 반경/SlamRadius)
         float scale = Data.SlamRadius > 0.01f
-            ? Data.SlamEffectScale * (_warningRadius / Data.SlamRadius)
+            ? Data.SlamEffectScale * (Data.RingThickness / Data.SlamRadius)
             : Data.SlamEffectScale;
         effect.transform.localScale = Vector3.one * scale;
         BossEffectPool.ScheduleRelease(effect, 3f);
@@ -411,16 +465,17 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         _spawnedPillars.Clear();
     }
 
-    private void DestroyWarningZone()
-    {
-        if (_warningZone == null)
-            return;
-
-        Object.Destroy(_warningZone.gameObject);
-        _warningZone = null;
-    }
-
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /// <summary>착지점 = 플레이어의 LandLeadSeconds초 뒤 자리 — 몸이 벽 안면 안에 들어오게 당긴다(10-22 E3 D3 · 예전엔 아레나 중앙 고정).</summary>
+    private void ResolveLandPoint(MonsterContext ctx)
+    {
+        Vector3 p = ctx.Runtime.PlayerTarget != null
+            ? DragonThreat.PredictPlayer(ctx, Data.LandLeadSeconds)
+            : DragonBossRoomContext.WorldCenter;
+        p = DragonPatternFloorUtils.ClampInsideWalls(p, DragonPatternFloorUtils.BodyRadiusOf(ctx));
+        _centerPos = new Vector3(p.x, _targetY, p.z);
+    }
 
     private void FaceCenter(MonsterContext ctx)
     {

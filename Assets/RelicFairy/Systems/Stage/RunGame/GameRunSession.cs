@@ -95,11 +95,12 @@ public sealed class GameRunSession
     /// 챕터 몫은 등급(= 층: 잡몹 · 위협 · 정예)마다 다르다(10-11 일반방 긴장감 설계 §3-1). 보스는 MonsterBase가 배율에서 뺀다.
     /// </summary>
     public float CurrentDifficultyScaleFor(MonsterGrade grade)
-        => ChapterBalance.Of(CurrentChapter).HpFor(grade) * (1f + AbyssDepth * LoopScalePerDepth) * EraBalance.Current.StatScale;
+        => ChapterBalance.Of(CurrentChapter).HpFor(grade) * (1f + AbyssDepth * LoopScalePerDepth) * EraBalance.Current.HpScale;   // 10-21 시기 체력은 따로(악몽 체력 위주)
 
-    /// <summary>현재 챕터의 몬스터 <b>공격</b> 배율 — 체력보다 완만하게(10-02 설계서 §2). 루프 깊이 · 시기는 체력과 같이 곱한다.</summary>
-    public float CurrentAttackScale
-        => ChapterBalance.Of(CurrentChapter).Attack * (1f + AbyssDepth * LoopScalePerDepth) * EraBalance.Current.StatScale;
+    /// <summary>현재 챕터의 몬스터 <b>공격</b> 배율 — 체력보다 완만하게(10-02 설계서 §2). 루프 깊이 · 시기는 체력과 같이 곱한다.
+    /// 10-21 b 등급(위협 · 정예)마다 따로.</summary>
+    public float CurrentAttackScaleFor(MonsterGrade grade)
+        => ChapterBalance.Of(CurrentChapter).AttackFor(grade) * (1f + AbyssDepth * LoopScalePerDepth) * EraBalance.Current.StatScale;
 
     /// <summary>현재 챕터의 몬스터 수량 배율 — 챕터 × 시기(해방기 ×1.1 · 악몽 모드 ×1.2).</summary>
     public float CurrentMonsterCountScale
@@ -463,6 +464,12 @@ public sealed class GameRunSession
                 var pw = JsonUtility.FromJson<RangedPartListWrapper>(save.rangedPartsJson);
                 if (pw?.items != null)
                     RangedPartsState.Current.Restore(pw.items);
+                if (pw != null)
+                {
+                    RangedPartsState.Current.ReforgeCount = pw.reforges;
+                    RangedPartsState.Current.RerollsUsed  = pw.rerollsUsed;
+                    if (pw.log != null) RangedPartsState.Current.Log.AddRange(pw.log);   // 10-19 재련 기록
+                }
             }
 
             // 계약 복원 — 이어하기는 같은 계약을 이어간다. 세이브에 없으면(구 세이브) 새로 뽑는다.
@@ -598,6 +605,10 @@ public sealed class GameRunSession
         // 룬판 하드리셋 (DDOL이라 씬 전환으로 안 죽으므로 수동 정리).
         // 적용 이력만 지우면 판 위의 룬이 다음 런까지 남아 빈 인벤토리와 어긋난다 → 판째로 버린다.
         MerlinRuneBridge.Instance?.ClearBoard();
+
+        // 원거리 파츠도 런 스코프 — 새 런 시작에서만 새로 만들어, 거점에 돌아온 뒤에도 지난 런 파츠가 화살에 붙고 장비 창에 보였다(10-19 ⑧).
+        RangedPartsState.Current = new RangedPartsState();
+        RangedPartsState.ApplyTestCarry();   // 베이스캠프 테스트 제단 구성만 이어 간다(평소 무해)
 
         // 살아있는 몬스터도 같은 이유로 수동 회수 — 풀(@Pools)이 DDOL이라 씬 전환으로 죽지 않는다.
         // 남겨두면 허브·다음 런까지 따라와 이전 런의 적이 돌아다닌다.

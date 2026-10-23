@@ -65,7 +65,7 @@ public sealed class UI_EquipmentPage : MonoBehaviour
         if (SkillTierResolver.IsRanged(w))
             sb.Append(Dim("파츠 합 ")).Append(Gold((RangedPartsState.Current?.TotalLevel ?? 0).ToString()));
         else
-            sb.Append(Dim("강화 ")).Append(Gold($"+{w.enhanceLevel}")).Append("   ").Append(Dim("형 "))
+            sb.Append(Dim("재련 ")).Append(Gold($"{WeaponReforgeService.CountAt(w.enhanceLevel)}회")).Append("   ").Append(Dim("형 "))
               .Append(w.HasForm ? Gold($"「{w.form.DisplayName}」") : Faint("없음"));
         sb.Append('\n').Append(Dim("공격력 ")).Append(Ink(w.baseAttack.ToString())).Append("   ")
           .Append(Dim("공속 ")).Append(Ink($"×{w.attackSpeed:0.0}")).Append("\n\n");
@@ -77,7 +77,7 @@ public sealed class UI_EquipmentPage : MonoBehaviour
         for (int tier = SkillTierResolver.MinTier; tier <= SkillTierResolver.MaxTier; tier++)
         {
             int idx = tier - SkillTierResolver.MinTier - 1;
-            string cond = idx < 0 ? "기본" : idx < ms.Length ? (ranged ? $"파츠 합 {ms[idx]}" : $"+{ms[idx]}") : "—";
+            string cond = idx < 0 ? "기본" : idx < ms.Length ? (ranged ? $"파츠 합 {ms[idx]}" : $"재련 {WeaponReforgeService.CountAt(ms[idx])}회") : "—";
             string body = idx < 0 ? null : UI_CruciblePanel.TierChangeBody(w, tier);
             string row  = $"{tier}단계  {cond}{(body != null ? $" — {body}" : "")}";
             sb.Append(tier == now ? Gold($"◆ {row}  · 지금") : tier < now ? Ink($"◆ {row}") : Faint($"◇ {row}")).Append('\n');

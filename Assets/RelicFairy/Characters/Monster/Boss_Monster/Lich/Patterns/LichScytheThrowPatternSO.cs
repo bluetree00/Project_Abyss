@@ -71,6 +71,17 @@ public class LichScytheThrowPatternSO : BossPatternSO
         return Vector3.Distance(ctx.Ctx.Transform.position, ctx.Ctx.Runtime.PlayerTarget.position) <= maxRange;
     }
 
+    /// <summary>
+    /// 연계(10-22 E5 페이지2 「원소 격류 · 삼연 낫무 → 부메랑 낫」 · 봉인판 「어둠의 비 → 사슬 낫」) — 앞 패턴의 일부라 자기 쿨다운은 보지 않는다.
+    /// </summary>
+    public override bool CanFollowUp(BossPatternContext ctx)
+    {
+        if (ctx.Ctx.Runtime.PlayerTarget == null) return false;
+        var lichBB = (ctx.Boss as LichMonster)?.LichBB;
+        if (lichBB == null || !lichBB.IsPhase2) return false;
+        return Vector3.Distance(ctx.Ctx.Transform.position, ctx.Ctx.Runtime.PlayerTarget.position) <= maxRange;
+    }
+
     public override SpecialStateBase GetRuntimeState() => _state;
 }
 

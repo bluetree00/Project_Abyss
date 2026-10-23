@@ -50,8 +50,7 @@ public sealed class WindbladeForm : WeaponFormBase
         Vector3 to = Player.transform.position;
         float len = Vector3.Distance(_dodgeFrom, to);
         int n = FormStrike.Line(Player, _dodgeFrom, to - _dodgeFrom, len, HalfWidth, Atk * StillWindRatio, _buf);
-        if (len > 0.3f) FormStrike.PlayVfx(Def.TriggerVfxKey, _dodgeFrom + Vector3.up, to - _dodgeFrom,
-                                           Def.TriggerVfxScale * Mathf.Clamp(len / Mathf.Max(0.1f, Def.TriggerRange), 0.25f, 1f));   // 지나간 길 길이만큼(풍절 8 m 배율 기준 · 10-13)
+        if (len > 0.3f) FormStrike.PlayWave(Def.TriggerVfxKey, _dodgeFrom + Vector3.up, to - _dodgeFrom, len, HalfWidth + StripBody);   // 지나간 길 · 판정 모양에(10-18 ⑯)
         if (len > 0.3f) FormStrike.GroundStrip(_dodgeFrom, to - _dodgeFrom, len, HalfWidth + StripBody, StripSeconds);
         Log($"무풍 — 맞힘 {n}");
         if (n > 0) RaiseTriggered("무풍");
@@ -64,7 +63,7 @@ public sealed class WindbladeForm : WeaponFormBase
             _returnAt = -1f;
             Vector3 end = _returnFrom + _returnDir * Def.TriggerRange;
             int n = FormStrike.Line(Player, end, -_returnDir, Def.TriggerRange, HalfWidth, Atk * Def.TriggerAtkRatio, _buf);
-            FormStrike.PlayVfx(Def.TriggerVfxKey, end + Vector3.up, -_returnDir, Def.TriggerVfxScale);
+            FormStrike.PlayWave(Def.TriggerVfxKey, end + Vector3.up, -_returnDir, Def.TriggerRange, HalfWidth + StripBody);
             FormStrike.GroundStrip(end, -_returnDir, Def.TriggerRange, HalfWidth + StripBody, StripSeconds);
             Log($"되감는 바람 — 맞힘 {n}");
         }
@@ -85,8 +84,8 @@ public sealed class WindbladeForm : WeaponFormBase
             Vector3 left  = Quaternion.AngleAxis(-TwinSpreadDeg, Vector3.up) * dir;
             Vector3 right = Quaternion.AngleAxis( TwinSpreadDeg, Vector3.up) * dir;
             hits = FormStrike.Lines(Player, from, left, right, Def.TriggerRange, HalfWidth, dmg, _buf);
-            FormStrike.PlayVfx(Def.TriggerVfxKey, from + Vector3.up, left,  Def.TriggerVfxScale);
-            FormStrike.PlayVfx(Def.TriggerVfxKey, from + Vector3.up, right, Def.TriggerVfxScale);
+            FormStrike.PlayWave(Def.TriggerVfxKey, from + Vector3.up, left,  Def.TriggerRange, HalfWidth + StripBody);
+            FormStrike.PlayWave(Def.TriggerVfxKey, from + Vector3.up, right, Def.TriggerRange, HalfWidth + StripBody);
             FormStrike.GroundStrip(from, left,  Def.TriggerRange, HalfWidth + StripBody, StripSeconds);
             FormStrike.GroundStrip(from, right, Def.TriggerRange, HalfWidth + StripBody, StripSeconds);
             Log($"쌍풍 — 맞힘 {hits}");
@@ -94,7 +93,7 @@ public sealed class WindbladeForm : WeaponFormBase
         else
         {
             hits = FormStrike.Line(Player, from, dir, Def.TriggerRange, HalfWidth, dmg, _buf);
-            FormStrike.PlayVfx(Def.TriggerVfxKey, from + Vector3.up, dir, Def.TriggerVfxScale);
+            FormStrike.PlayWave(Def.TriggerVfxKey, from + Vector3.up, dir, Def.TriggerRange, HalfWidth + StripBody);   // 앞 · 옆을 판정 모양에(10-18 ⑯ · 옛 배율 1.3은 옆이 2.1배)
             FormStrike.GroundStrip(from, dir, Def.TriggerRange, HalfWidth + StripBody, StripSeconds);
         }
         if (Has(ReturnWind)) { _returnAt = Time.time + ReturnDelay; _returnFrom = from; _returnDir = dir; }

@@ -449,7 +449,7 @@ public sealed class LichSoulCopy : MonoBehaviour, IDamageable
         _catchUp    = true;
         Vector3 origin = FloorPos();
         LichHazards.BeamFront(_ctx, origin, _telegraphDir, SlashLength, SlashWidth * 0.5f, SlashSpeed, SlashDamage, 0.5f);
-        LichPatternUtil.SlashVfx(origin, _telegraphDir, SlashLength * 0.6f, LichSwing.RightToLeft, LichPatternUtil.Arcane);
+        LichPatternUtil.SlashVfx(origin, _telegraphDir, SlashLength * 0.6f, LichSwing.RightToLeft, LichPatternUtil.ArcaneVfx);
         LichSfx.Play(LichSfxSlot.ScytheSwing, origin, 0.6f);
     }
 

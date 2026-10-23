@@ -95,8 +95,8 @@ public static class SkillContactProbeEditor
         float F(string n) { var pr = so.FindProperty(n); return pr != null ? pr.floatValue : 0f; }
         return beh switch
         {
-            FinalStrikeBehaviorSO   => F("chargeDuration"),
-            PerimeterGuardBehaviorSO => 0f,
+            FinalStrikeBehaviorSO   => F("leapTime"),
+            PerimeterGuardBehaviorSO => F("windup"),
             HolySlashBehaviorSO     => F("dashDuration"),
             IasenSlashBehaviorSO    => F("dashDuration") + F("slashDelay"),
             _ => 0f,

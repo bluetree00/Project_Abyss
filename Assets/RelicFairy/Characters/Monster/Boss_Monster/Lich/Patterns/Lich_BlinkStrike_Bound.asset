@@ -16,11 +16,13 @@ MonoBehaviour:
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
-  weight: 2
+  weight: 3
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: blinkstrike_bound
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: 51c2ef6071e6cc34797ce389cef9081a, type: 2}
+  followUpLateOnly: 0
   maxTriggerRange: 25
   patternCooldown: 9
   strikeCount: 2

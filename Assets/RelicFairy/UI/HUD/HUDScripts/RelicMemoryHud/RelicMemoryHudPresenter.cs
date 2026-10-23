@@ -6,12 +6,23 @@ using UnityEngine;
 /// <item>Provider: 유물 허브(<see cref="GawainMemoryHub"/> · <see cref="LancelotMemoryHub"/>) · <see cref="PlayerLoadout"/> · <see cref="ZenithGauge"/>.</item>
 /// <item>View: <see cref="RelicMemoryHudView"/> — 게이지 루트 아래에 코드로 짓는 위젯(해시계 세 호 / 광기 눈금 넷 · 원한 불씨).</item>
 /// </list>
-/// 허브는 첫 조각과 함께 생기므로 그 전엔 숨긴다(<c>Bound</c> 사건으로 깨어난다).
+/// 허브가 생기기 전엔 숨긴다(<c>Bound</c> 사건으로 깨어난다) — 10-22 D11부터 허브는 유물을 붙일 때 생겨 조각 없이 첫 전투부터 보인다(예전엔 첫 조각과 함께).
 /// 갱신은 사건으로(조각 · 원한 · 시간대 · 계단 넘기 · 엇갈린 빛) — 해시계 바늘 · 광기 막대 떨림 · 멈춤(피 냄새 남은 초)만 매 프레임 읽는다.
+/// <para>10-22 E1 D9 — 유물 기본 규칙을 처음 겪는 순간 멀린 한 줄(<see cref="RelicFirstTips"/>)도 여기서 부른다: 허브와 상관없이 게이지 · 광기 사건을 듣는다
+/// (첫 여명 = 해가 흐르기 시작한 첫 전투 · 첫 정오 · 첫 황혼 / 첫 광기 · 첫 광란 · 광란 끝 · 해방기 첫 런의 진화 한 줄). 묶는 동안 사건마다 한 번만 묻는다.</para>
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class RelicMemoryHudPresenter : MonoBehaviour
 {
+    // 해시계 처음 안내(10-18 사용자 「색별로 있는 UI바는 뭘 의미하는지도 모르겠어」) — 계정에 한 번(빌드 세이브 초기화가 지운다)
+    private const string DialHintKey  = "relic_hud_dial_hint_v1";
+    private const string DialHintText = "같은 시간대 기억 조각을 2개 · 4개 모으면 그 시간대가 강해진다";
+    private const float  DialHintSec  = 6f;
+    // 광기 눈금 처음 안내(10-22 E1 A6 — 하루 띠 안내와 짝)
+    private const string LadderHintKey  = "relic_hud_ladder_hint_v1";
+    private const string LadderHintText = "광기 칸 조각을 2 · 3 · 4개 모으면 한 단계씩 강해진다";
+    private const float  FirstFightProgress = 0.05f;   // 여명이 이만큼 흘렀으면 싸우는 중(해는 적이 있을 때만 돈다)
+
     private RelicMemoryHudView _view;
     private IRelicResource     _res;
     private RectTransform      _root;
@@ -20,6 +31,13 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
     private LancelotMemoryHub  _lHub;
     private GrudgeStore        _grudge;
     private readonly bool[]    _rungs = new bool[4];
+    // 처음 겪는 순간(10-22 E1 D9)
+    private ZenithGauge  _tipSun;
+    private MadnessStack _tipMadness;
+    private bool _tipFightDone, _tipNoonDone, _tipDuskDone, _tipFrenzyDone, _tipFrenzyEndDone;
+
+    /// <summary>런(던전) 안인가 — 처음 겪는 순간 한 줄은 거점(허수아비)에선 내지 않는다.</summary>
+    private static bool InRun => GameRunBootstrapper.Instance?.Run?.IsRunning ?? false;
 
     /// <summary>CombatPanelView가 유물 리소스를 묶을 때 부른다. root = 그 게이지의 루트(가웨인 태양 · 랜슬롯 막대), 없으면 숨김.</summary>
     public static void Bind(Component host, RectTransform root, IRelicResource res)
@@ -49,6 +67,11 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
 
     private void Update()
     {
+        // 첫 여명 — 해가 흐르기 시작했다 = 첫 전투(게이지는 시간대가 바뀔 때만 사건을 낸다). 플래그 하나만 본다(할당 없음)
+        if (!_tipFightDone && _tipSun != null && _tipSun.CurrentPhase == ZenithGauge.ZPhase.Charging
+            && _tipSun.PhaseProgress01 >= FirstFightProgress && InRun)
+            OnFirstFight(RelicFirstTips.GawainDawn);
+
         if (_view == null || !_view.Visible) return;
         if (_gHub != null)
         {
@@ -81,6 +104,7 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
         _root = root;
         if (_view == null) _view = gameObject.AddComponent<RelicMemoryHudView>();
         if (res == null || root == null) { _view.Hide(); return; }
+        BindTips(res);
 
         _loadout = AppBootstrapper.Instance?.Loadout;
         if (_loadout != null) _loadout.RelicPartsChanged += RefreshAll;
@@ -97,6 +121,33 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
         if (_loadout != null) _loadout.RelicPartsChanged -= RefreshAll;
         _loadout = null;
         UnhookHubs();
+        UnbindTips();
+    }
+
+    /// <summary>처음 겪는 순간 한 줄 — 유물 리소스 사건을 듣는다(허브 · HUD 표시와 상관없이 · 10-22 E1 D9).</summary>
+    private void BindTips(IRelicResource res)
+    {
+        _tipFightDone = _tipNoonDone = _tipDuskDone = _tipFrenzyDone = _tipFrenzyEndDone = false;
+        _tipSun     = res as ZenithGauge;
+        _tipMadness = res as MadnessStack;
+        if (_tipSun != null) _tipSun.PhaseChanged += OnSunPhase;
+        if (_tipMadness != null)
+        {
+            _tipMadness.OnChanged       += OnMadnessChanged;
+            _tipMadness.OnFrenzyChanged += OnFrenzyChanged;
+        }
+    }
+
+    private void UnbindTips()
+    {
+        if (_tipSun != null) _tipSun.PhaseChanged -= OnSunPhase;
+        if (_tipMadness != null)
+        {
+            _tipMadness.OnChanged       -= OnMadnessChanged;
+            _tipMadness.OnFrenzyChanged -= OnFrenzyChanged;
+        }
+        _tipSun = null;
+        _tipMadness = null;
     }
 
     private void UnhookHubs()
@@ -130,6 +181,12 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
         hub.CrossLightChanged += OnCrossLight;
         _view.BuildDial(_root, hub.Gauge);
         RefreshAll();
+        if (PlayerPrefs.GetInt(DialHintKey, 0) == 0)
+        {
+            PlayerPrefs.SetInt(DialHintKey, 1);
+            PlayerPrefs.Save();
+            _view.ShowHint(DialHintText, DialHintSec);
+        }
     }
 
     private void OnLancelotHub(LancelotMemoryHub hub)
@@ -142,7 +199,14 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
         hub.CrossLightChanged += OnCrossLight;
         if (_grudge != null) _grudge.Changed += RefreshGrudge;
         _view.BuildLadder(_root);
+        for (int k = 1; k <= 4; k++) _view.SetRungValue(k - 1, hub.Rung(k));   // 계단 표식 위 문턱 값(10-18)
         RefreshAll();
+        if (PlayerPrefs.GetInt(LadderHintKey, 0) == 0)
+        {
+            PlayerPrefs.SetInt(LadderHintKey, 1);
+            PlayerPrefs.Save();
+            _view.ShowHint(LadderHintText, DialHintSec);
+        }
     }
 
     // ── 갱신(사건) ───────────────────────────────────────────────
@@ -163,7 +227,7 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
             var rungs = RelicPartAnchor.LancelotRungs;
             for (int i = 0; i < _rungs.Length && i < rungs.Length; i++)
                 _rungs[i] = RelicResonance.LancelotRungFilled(_loadout, rungs[i]);
-            _view.SetRungs(_rungs, RelicResonance.LancelotTier(RelicResonance.LancelotLadder(_loadout)));
+            _view.SetRungs(_rungs, RelicResonance.LancelotCount(_loadout));   // 10-22 E1 D7 — 광기 칸 조각 수
             RefreshGrudge();
             _view.SetCrossLight(CrossLightPossible("lancelot"), _lHub.HasCrossLight, animate: false);
         }
@@ -197,8 +261,52 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
         return false;
     }
 
+    /// <summary>첫 전투 — 그 유물의 첫 줄(여명 · 광기) 뒤에, 해방기면 「이제 조각 2개면 진화」(계정에 한 번 · D2).</summary>
+    private void OnFirstFight(string tip)
+    {
+        _tipFightDone = true;
+        RelicFirstTips.TryShowOnce(tip);
+        if (RelicEvolution.Unlocked) RelicFirstTips.TryShowOnce(RelicFirstTips.EvolutionOpen);
+    }
+
     private void OnDawn()             => _view?.FlashArc(0);
     private void OnNoon(bool shortNoon) => _view?.FlashArc(1);
     private void OnDusk()             => _view?.FlashArc(2);
     private void OnRung(int k)        => _view?.FlashRung(k - 1);
+
+    private void OnSunPhase(ZenithGauge.ZPhase from, ZenithGauge.ZPhase to)
+    {
+        if (!InRun) return;
+        if (to == ZenithGauge.ZPhase.Noon && !_tipNoonDone)
+        {
+            _tipNoonDone = true;
+            RelicFirstTips.TryShowOnce(RelicFirstTips.GawainNoon);
+        }
+        else if (to == ZenithGauge.ZPhase.Cooldown && !_tipDuskDone)
+        {
+            _tipDuskDone = true;
+            RelicFirstTips.TryShowOnce(RelicFirstTips.GawainDusk);
+        }
+    }
+
+    private void OnMadnessChanged()
+    {
+        if (_tipFightDone || _tipMadness == null || _tipMadness.Stacks <= 0 || !InRun) return;
+        OnFirstFight(RelicFirstTips.LancelotMadness);
+    }
+
+    private void OnFrenzyChanged(bool on)
+    {
+        if (!InRun) return;
+        if (on && !_tipFrenzyDone)
+        {
+            _tipFrenzyDone = true;
+            RelicFirstTips.TryShowOnce(RelicFirstTips.LancelotFrenzy);
+        }
+        else if (!on && !_tipFrenzyEndDone)
+        {
+            _tipFrenzyEndDone = true;
+            RelicFirstTips.TryShowOnce(RelicFirstTips.LancelotFrenzyEnd);
+        }
+    }
 }

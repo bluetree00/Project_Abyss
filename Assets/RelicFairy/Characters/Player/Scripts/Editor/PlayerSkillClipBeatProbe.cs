@@ -87,6 +87,59 @@ public static class PlayerSkillClipBeatProbe
         Debug.Log($"[스킬클립] {OutPath}\n" + sb);
     }
 
+    /// <summary>
+    /// 평타 클립(GroundLightAttack_*) — 손 속도 봉우리 대 베기 이벤트 시각(정규화 · 초)을 나란히 적는다(10-19 ④ 「무형검 막타의 2번째 타격 시각이 이상하다」).
+    /// 결과: Logs/player_basic_clip_beats.txt
+    /// </summary>
+    [MenuItem("RelicFairy/Debug/플레이어 평타 클립 휘두름 대 베기 이벤트 (편집 모드)")]
+    public static void MeasureBasic()
+    {
+        var settings = AddressableAssetSettingsDefaultObject.Settings;
+        if (settings == null) { Debug.LogWarning("[평타클립] Addressables 설정이 없다"); return; }
+        var byAddress = new Dictionary<string, string>();
+        foreach (var g in settings.groups)
+        {
+            if (g == null) continue;
+            foreach (var e in g.entries) if (!string.IsNullOrEmpty(e.address)) byAddress[e.address] = e.AssetPath;
+        }
+        var sb = new StringBuilder();
+        var root = PrefabUtility.LoadPrefabContents(PlayerPrefab);
+        try
+        {
+            var anim = root.GetComponentInChildren<Animator>(true);
+            if (anim == null || !anim.isHuman) { sb.AppendLine("⚠ 휴머노이드 애니메이터가 없다"); }
+            else
+            {
+                var right = anim.GetBoneTransform(HumanBodyBones.RightHand);
+                var left  = anim.GetBoneTransform(HumanBodyBones.LeftHand);
+                foreach (var setPath in AssetDatabase.FindAssets("t:WeaponAnimationSetSO").Select(AssetDatabase.GUIDToAssetPath).OrderBy(x => x))
+                {
+                    var set = AssetDatabase.LoadAssetAtPath<WeaponAnimationSetSO>(setPath);
+                    if (set == null) continue;
+                    var basics = set.GetAllMappings().Where(m => m != null && !string.IsNullOrEmpty(m.baseClipName) && m.baseClipName.StartsWith("GroundLightAttack")).ToList();
+                    if (basics.Count == 0) continue;
+                    sb.AppendLine($"\n■ {Path.GetFileNameWithoutExtension(setPath)}");
+                    foreach (var m in basics)
+                    {
+                        var clip = LoadClip(byAddress, m.addressableKey);
+                        if (clip == null) { sb.AppendLine($"  {m.baseClipName} → {m.addressableKey}: (클립 못 찾음)"); continue; }
+                        sb.AppendLine("  " + MeasureClip(m.baseClipName, clip, anim.gameObject, root.transform, right, left, withDir: true));
+                        var evs = AnimationUtility.GetAnimationEvents(clip);
+                        var line = new StringBuilder("      베기 이벤트:");
+                        foreach (var ev in evs)
+                            if (ev.functionName.StartsWith("SpawnSlash") || ev.functionName == "AE_EffectStep")
+                                line.Append($" {ev.functionName}@{ev.time:F2}s({ev.time / Mathf.Max(0.001f, clip.length):F3})");
+                        sb.AppendLine(line.ToString());
+                    }
+                }
+            }
+        }
+        finally { PrefabUtility.UnloadPrefabContents(root); }
+        Directory.CreateDirectory("Logs");
+        File.WriteAllText("Logs/player_basic_clip_beats.txt", sb.ToString(), Encoding.UTF8);
+        Debug.Log("[평타클립] Logs/player_basic_clip_beats.txt\n" + sb);
+    }
+
     /// <summary>매핑은 그룹(지상·공중)별 목록에 들어 있다 — <see cref="WeaponAnimationSetSO.GetAllMappings"/>로 모은다.</summary>
     private static IEnumerable<WeaponAnimationSetSO.ClipMapping> SkillMappings(WeaponAnimationSetSO set)
         => set.GetAllMappings().Where(m => m != null && !string.IsNullOrEmpty(m.baseClipName) && m.baseClipName.Contains("Skill"));
@@ -101,11 +154,13 @@ public static class PlayerSkillClipBeatProbe
                             .FirstOrDefault(c => !c.name.StartsWith("__preview__"));
     }
 
-    private static string MeasureClip(string state, AnimationClip clip, GameObject target, Transform root, Transform right, Transform left)
+    private static string MeasureClip(string state, AnimationClip clip, GameObject target, Transform root, Transform right, Transform left, bool withDir = false)
     {
         int frames = Mathf.Max(2, Mathf.CeilToInt(clip.length / Step) + 1);
         var vr = new float[frames];
         var vl = new float[frames];
+        var posR = new Vector3[frames];
+        var posL = new Vector3[frames];
         Vector3 pr = Vector3.zero, pl = Vector3.zero;
         for (int i = 0; i < frames; i++)
         {
@@ -114,15 +169,29 @@ public static class PlayerSkillClipBeatProbe
             Vector3 l = left  != null ? root.InverseTransformPoint(left.position)  : Vector3.zero;
             if (i > 0) { vr[i] = (r - pr).magnitude / Step; vl[i] = (l - pl).magnitude / Step; }
             pr = r; pl = l;
+            posR[i] = r; posL[i] = l;
         }
         // 더 빠르게 움직이는 손을 기준으로. 첫 두 프레임은 자세 튐이 섞여 뺀다.
-        var v = Max(vr, 2) >= Max(vl, 2) ? vr : vl;
+        bool useRight = Max(vr, 2) >= Max(vl, 2);
+        var v = useRight ? vr : vl;
         var peaks = TopPeaks(v, 3, minGapFrames: 9);
         var curve = new StringBuilder();
         for (int i = 0; i < frames; i += 6) curve.Append($" {i * Step:F1}:{v[i]:F1}");
+        string dir = "";
+        if (withDir)
+        {
+            // 휘두름 방향 — 봉우리 앞뒤 0.07초 손 이동(몸 기준 · x 오른쪽 + · y 위 + · z 앞 +). 베기 이펙트 회전을 맞출 근거(10-19 ④).
+            var pos = useRight ? posR : posL;
+            int k = Mathf.Max(1, Mathf.RoundToInt(0.07f / Step));
+            dir = $"\n      휘두름 방향({(useRight ? "오른손" : "왼손")} · 봉우리 ±0.07초 · 옆/위/앞 m)" + string.Concat(peaks.Select(i =>
+            {
+                var d = pos[Mathf.Min(frames - 1, i + k)] - pos[Mathf.Max(0, i - k)];
+                return $" {i * Step:F2}s({d.x:+0.00;-0.00},{d.y:+0.00;-0.00},{d.z:+0.00;-0.00})";
+            }));
+        }
         return $"{state} → {clip.name}: 길이 {clip.length:F2}s · 손 속도 봉우리 " +
                string.Join(", ", peaks.Select(i => $"{i * Step:F2}s({v[i]:F1}m/s)")) +
-               $"\n      곡선(초:m/s){curve}";
+               $"\n      곡선(초:m/s){curve}" + dir;
     }
 
     private static float Max(float[] a, int from) { float m = 0f; for (int i = from; i < a.Length; i++) m = Mathf.Max(m, a[i]); return m; }

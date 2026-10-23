@@ -250,7 +250,12 @@ public sealed class UI_SceneLoading : MonoBehaviour
             percentText.text = $"{Mathf.RoundToInt(clamped * 100)}%";
 
         _progress = clamped;
-        if (_fill != null) _fill.fillAmount = clamped;
+        if (_fill != null)
+        {
+            // 채움 = 앵커 폭(진행만큼만 그린다). 1% 미만은 둥근 끝이 뭉개지니 숨긴다.
+            _fill.rectTransform.anchorMax = new Vector2(clamped, 1f);
+            _fill.enabled = clamped * BarW > 3f;
+        }
         if (_head != null) _head.rectTransform.anchoredPosition = new Vector2(-BarW * 0.5f + BarW * clamped, 0f);
         if (_pct  != null) _pct.text = $"<mspace=0.62em>{Mathf.RoundToInt(clamped * 100)}</mspace>%";
     }
@@ -292,12 +297,13 @@ public sealed class UI_SceneLoading : MonoBehaviour
         Stretch(track.rectTransform, 0f);
         track.sprite = rounded; track.type = Image.Type.Sliced;
 
+        // 채움은 앵커 폭으로 그린다 — 예전 Filled 이미지는 스프라이트가 없어 fillAmount를 무시하고 처음부터 꽉 찬 막대로 그려졌다
+        // (숫자 · 머리 점만 움직여 「실제로 차는 느낌」이 없었다 — 10-16 사용자 빌드 피드백)
         _fill = NewImage("Fill", _bar, BarFill);
         Stretch(_fill.rectTransform, 0.5f);
-        _fill.type = Image.Type.Filled;
-        _fill.fillMethod = Image.FillMethod.Horizontal;
-        _fill.fillOrigin = (int)Image.OriginHorizontal.Left;
-        _fill.fillAmount = 0f;
+        _fill.sprite = rounded; _fill.type = Image.Type.Sliced;
+        _fill.rectTransform.anchorMax = new Vector2(0f, 1f);
+        _fill.enabled = false;
 
         var dot = UI_RuneSelectPopup.SoftDot;
         _shine = NewImage("Shine", _bar, new Color(1f, 0.97f, 0.88f, 0.45f));

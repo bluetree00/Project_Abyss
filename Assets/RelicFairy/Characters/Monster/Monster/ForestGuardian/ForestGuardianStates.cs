@@ -42,6 +42,13 @@ public class FGChaseState : IMonsterState
     private const float FaceSpeed      = 8f;
     private const float EngageDistance = 2.5f;
     private const float ChaseStopDist  = 1.0f;
+    // 10-18 실측 — 진입 크로스페이드가 앞 클립 길이 비율이라 긴 공격 뒤 0.45초 넘게 공격 자세로 미끄러졌다(11회) · 멈춰도 걷기(8회)
+    private const float WalkBlend  = 0.2f;    // 초(고정)
+    private const float TurnCap    = 200f;    // 추격 회전 초당 상한 — 큰 몸(10-18)
+    private const float StillSpeed = 0.3f;
+    private const float MoveSpeed  = 0.5f;
+    private const float StillHold  = 0.12f;   // 0.25 + 섞기 0.2는 멈춘 뒤 0.45초 제자리 걷기로 보였다(10-19 재실측 7회)
+    private float _stillFor;
 
     public void Enter(MonsterContext ctx)
     {
@@ -59,7 +66,14 @@ public class FGChaseState : IMonsterState
             ctx.Agent.speed = ctx.Stat.moveSpeed * ctx.Runtime.SpeedMultiplier;
         }
         ApplyAnimSpeed(ctx);
-        PlayAnim(ctx, ctx.Animation.chaseStateName);
+        _stillFor = 0f;
+        // 아직 서 있으면(공격 · 피격 뒤) 전투 대기로 들어가 움직일 때 걷기 — 진입부터 걷기를 틀면 제자리 걷기였다(10-19 재실측)
+        if (ctx.Agent != null && ctx.Agent.isOnNavMesh && FlatSpeed(ctx) < MoveSpeed && !string.IsNullOrEmpty(ctx.Animation.attackReadyStateName))
+        {
+            _stillFor = StillHold;
+            PlayAnim(ctx, ctx.Animation.attackReadyStateName);
+        }
+        else PlayAnim(ctx, ctx.Animation.chaseStateName);
     }
 
     public void Update(MonsterContext ctx)
@@ -80,6 +94,28 @@ public class FGChaseState : IMonsterState
             ctx.Agent.SetDestination(ctx.Runtime.PlayerTarget.position);
 
         FacePlayer(ctx);
+        KeepWalkOrIdle(ctx);
+    }
+
+    /// <summary>걷기는 실제로 움직일 때만 — 거의 안 움직인 지 StillHold 지나면 전투 대기, MoveSpeed 넘으면 다시 걷기(10-18).</summary>
+    private void KeepWalkOrIdle(MonsterContext ctx)
+    {
+        if (ctx.Animator == null || ctx.Agent == null) return;
+        float speed = FlatSpeed(ctx);
+        _stillFor = speed < StillSpeed ? _stillFor + Time.deltaTime : 0f;   // 전환 중에도 센다(전엔 걷기 섞는 0.2초를 빼먹었다)
+        string walk = ctx.Animation.chaseStateName, idle = ctx.Animation.attackReadyStateName;
+        if (string.IsNullOrEmpty(walk) || string.IsNullOrEmpty(idle)) return;
+        var an = ctx.Animator;
+        int to = an.IsInTransition(0) ? an.GetNextAnimatorStateInfo(0).shortNameHash : an.GetCurrentAnimatorStateInfo(0).shortNameHash;
+        int walkH = Animator.StringToHash(walk), idleH = Animator.StringToHash(idle);
+        if (speed >= MoveSpeed) { if (to != walkH) PlayAnim(ctx, walk); return; }   // 대기로 섞는 중이어도 바로(기다리면 0.4초 대기 자세로 미끄러졌다)
+        if (to == walkH && _stillFor >= StillHold) PlayAnim(ctx, idle);   // 걷기(로 가는 중 포함)인데 서 있다 → 대기
+    }
+
+    private static float FlatSpeed(MonsterContext ctx)
+    {
+        Vector3 v = ctx.Agent.velocity; v.y = 0f;
+        return v.magnitude;
     }
 
     public void Exit(MonsterContext ctx)
@@ -97,8 +133,8 @@ public class FGChaseState : IMonsterState
         Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
         dir.y = 0f;
         if (dir.sqrMagnitude < 0.001f) return;
-        ctx.Transform.rotation = Quaternion.Slerp(
-            ctx.Transform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * FaceSpeed);
+        ctx.Transform.rotation = Quaternion.RotateTowards(ctx.Transform.rotation,   // 초당 상한(10-18 실측 회전 튐 55~74°)
+            Quaternion.Slerp(ctx.Transform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * FaceSpeed), TurnCap * Time.deltaTime);
     }
 
     private static void ApplyAnimSpeed(MonsterContext ctx)
@@ -112,7 +148,7 @@ public class FGChaseState : IMonsterState
     {
         if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
         if (!ctx.Animator.HasState(0, Animator.StringToHash(stateName))) return;
-        ctx.Animator.CrossFade(stateName, ctx.Animation.crossFadeDuration);
+        ctx.Animator.CrossFadeInFixedTime(stateName, WalkBlend);   // 고정 0.2초 — 앞 클립 길이 비율이면 긴 공격 뒤 늘어졌다(10-18)
     }
 }
 
@@ -123,6 +159,7 @@ public class FGChaseState : IMonsterState
 public class FGAttackReadyState : IMonsterState
 {
     private const float FaceSpeed      = 3f;
+    private const float ReadyTurnCap   = 150f;   // 공격 대기 회전 초당 상한(10-18)
     // FGChaseState.EngageDistance * 1.5f — 동일 상수 유지
     private const float ChaseBackDist  = 2.5f * 1.5f;
 
@@ -157,8 +194,8 @@ public class FGAttackReadyState : IMonsterState
         Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
         dir.y = 0f;
         if (dir.sqrMagnitude < 0.001f) return;
-        ctx.Transform.rotation = Quaternion.Slerp(
-            ctx.Transform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * FaceSpeed);
+        ctx.Transform.rotation = Quaternion.RotateTowards(ctx.Transform.rotation,   // 서 있는 자세로 크게 돌지 않게 초당 상한(10-18 실측 391°/s)
+            Quaternion.Slerp(ctx.Transform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * FaceSpeed), ReadyTurnCap * Time.deltaTime);
     }
 
     private static void PlayAnim(MonsterContext ctx, string stateName)

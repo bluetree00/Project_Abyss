@@ -21,6 +21,8 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: darkrain_bound
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: d1fb2c7be5bd8d14e9e241f1be0d4578, type: 2}
+  followUpLateOnly: 0
   patternCooldown: 25
   chargeDuration: 1.5
   rainDuration: 5
@@ -32,10 +34,14 @@ MonoBehaviour:
   damageMultiplier: 0.8
   nearPlayerBias: 0.35
   nearPlayerRadius: 8
-  safeCount: 4
-  safeRadius: 4.8
+  safeCount: 2
+  safeRadius: 2
   safeMoveInterval: 1.8
   safeMoveCount: 2
   safeMovePreview: 0.6
   riseHeight: 5
   cloudHeight: 16
+  _packInterval: 1.2
+  _packGap: {x: 1.2, y: 2.4}
+  _packMax: 7
+  _safeNear: {x: 3, y: 6}

@@ -25,7 +25,7 @@ public static class UIPrefabBakeEditor
     /// <summary>굽기 대상 — 타입 이름과 계층을 짓는 메서드. 순서는 검증 순서다.</summary>
     private static readonly (string Type, string Build)[] Targets =
     {
-        ("UI_ShopPanel",           "BuildChrome"),
+        // 10-21 상점(UI_ShopPanel)은 뺐다 — 흑요석 새 레이아웃은 런타임에 짓는다(프리팹은 루트만).
         ("UI_RelicInfoPopup",      "BuildLayout"),
         ("UI_RefineryPanel",       "BuildUI"),
         ("UI_RangedForgePopup",    "BuildLayout"),
@@ -33,9 +33,6 @@ public static class UIPrefabBakeEditor
         ("UI_RelicPartDraftPopup", "BuildChrome"),
         ("UI_CruciblePanel",       "BuildChrome"),
     };
-
-    [MenuItem("RelicFairy/UI/Bake — 상점만")]
-    private static void BakeShop() => Bake("UI_ShopPanel", "BuildChrome");
 
     [MenuItem("RelicFairy/UI/Bake — 코드 생성 팝업 전체")]
     private static void BakeAll()
@@ -50,7 +47,6 @@ public static class UIPrefabBakeEditor
     /// </summary>
     // 하나씩 강제로 다시 굽는다 — 한 번에 7종을 구우면 MCP 명령이 1분을 넘겨 웹소켓이 갇힌다.
     // 손으로 고친 프리팹 값이 코드 빌더에도 들어 있는지(다음 베이크에 되돌아가지 않는지) 검증할 때 쓴다.
-    [MenuItem("RelicFairy/UI/Bake — 강제 재굽기(하나)/상점")]            private static void ForceShop()      => Bake("UI_ShopPanel",           "BuildChrome", force: true);
     [MenuItem("RelicFairy/UI/Bake — 강제 재굽기(하나)/유물 정보")]        private static void ForceRelicInfo() => Bake("UI_RelicInfoPopup",      "BuildLayout", force: true);
     [MenuItem("RelicFairy/UI/Bake — 강제 재굽기(하나)/정제소")]          private static void ForceRefinery()  => Bake("UI_RefineryPanel",       "BuildUI",     force: true);
     [MenuItem("RelicFairy/UI/Bake — 강제 재굽기(하나)/원거리 선택")]      private static void ForceRanged()    => Bake("UI_RangedForgePopup",    "BuildLayout", force: true);

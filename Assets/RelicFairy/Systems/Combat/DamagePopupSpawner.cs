@@ -82,7 +82,7 @@ public static class DamagePopupSpawner
         if (GameRunBootstrapper.Instance?.Run?.InCutscene == true) return;   // 컷신 동안 떠오르는 글은 숨긴다(10-01 f5)
 
         // 같은 대상에 연달아 꽂히면 이미 떠 있는 숫자를 키운다 — 새 팝업을 만들지 않는다.
-        if (merge && targetId != 0 && TryMerge(targetId, damage, isCrit, kind, element)) return;
+        if (merge && targetId != 0 && TryMerge(MergeKey(targetId, kind), damage, isCrit, kind, element)) return;
 
         // 순번은 '지금' 확정한다 — 지연 뒤에 뽑으면 같은 프레임의 연타가 서로 순번을 덮어쓴다.
         SpawnAsync(worldPos, damage, isCrit, NextCascadeIndex(targetId), kind, element, targetId).Forget();
@@ -148,9 +148,15 @@ public static class DamagePopupSpawner
         if (targetId != 0)
         {
             if (_merges.Count >= MergePruneAt) PruneMerges();
-            _merges[targetId] = new Merge { popup = popup, total = damage, lastTime = Time.time, crit = isCrit };
+            _merges[MergeKey(targetId, kind)] = new Merge { popup = popup, total = damage, lastTime = Time.time, crit = isCrit };
         }
     }
+
+    /// <summary>
+    /// 합산 열쇠 — 주 피해와 추가 피해(시너지 · DoT)는 따로 합친다. 같은 순간의 추가타가 주 피해 숫자에 섞이면
+    /// 색만 바뀌고 따로 맞았는지 보이지 않았다(10-19 ⑭). 보수(~)로 대상 ID와 겹치지 않는 둘째 칸을 만든다.
+    /// </summary>
+    private static int MergeKey(int targetId, DamageKind kind) => kind == DamageKind.Normal ? targetId : ~targetId;
 
     /// <summary>창을 넘긴 합산 항목 제거. 순회 중 삭제를 피해 키를 모았다가 지운다.</summary>
     private static void PruneMerges()

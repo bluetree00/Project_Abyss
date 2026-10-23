@@ -49,3 +49,8 @@ MonoBehaviour:
   materialIcon: {fileID: 21300000, guid: bac4bf9fe26fa1141ac67c1ac40eb618, type: 3}
   oreIcon: {fileID: 21300000, guid: deeae6477a3fbc248b47c610832e3ba8, type: 3}
   blacksmithPortrait: {fileID: 21300000, guid: ce8012b9440a237488bfbcdce23abc0b, type: 3}
+  augmentCardFrame: {fileID: 21300000, guid: 91b5f4b09add73c4b97826ed7e1b7d60, type: 3}
+  augmentPanelFrame: {fileID: 21300000, guid: 993409059ebf7884d915b59aa3758267, type: 3}
+  chooserCardFrame: {fileID: 21300000, guid: 7f7e9d122c9744b4793fc0d38cac2202, type: 3}
+  chooserMeleeArt: {fileID: 21300000, guid: 013d70d8d8491464197e69b0e7ccda54, type: 3}
+  chooserRangedArt: {fileID: 21300000, guid: b9b604dfb0e973742b04fc6a3c2ea95e, type: 3}

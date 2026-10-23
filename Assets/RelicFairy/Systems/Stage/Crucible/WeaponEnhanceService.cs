@@ -57,9 +57,6 @@ public static class WeaponEnhanceService
     public static bool IsMaxed(WeaponData w, EnhanceTableSO t)
         => w != null && t != null && w.enhanceLevel >= MaxEnhance(w, t);
 
-    public static float SuccessChance(WeaponData w, EnhanceTableSO t)
-        => (w == null || t == null) ? 0f : t.SuccessAt(w.enhanceLevel);
-
     /// <summary>강화/승급 반영된 유효 공격력(연출/미리보기용).</summary>
     public static float EffectiveAttack(WeaponData w, EnhanceTableSO t)
         => w == null ? 0f : EffectiveAttackAt(w, t, w.enhanceLevel);
@@ -75,73 +72,6 @@ public static class WeaponEnhanceService
 
     private static bool IsSword(WeaponType type)
         => type == WeaponType.Katana || type == WeaponType.Greatsword;
-
-    // ── 강화 ─────────────────────────────────────────────────────────
-
-    /// <summary>돌발 이벤트 재료비 배수 반영 비용(≥0). 미리보기·차감 일관성 위해 공용.</summary>
-    public static int CostWith(EnhanceTableSO t, int level, float costMult)
-        => t == null ? 0 : Mathf.Max(0, Mathf.CeilToInt(t.CostAt(level) * Mathf.Max(0f, costMult)));
-
-    /// <summary>
-    /// 강화 1회 시도. 재료 차감 → 결정적 롤 → 성공(+1) / 실패(하락, 제물 흡수 가능).
-    /// 안전장치 A(제물 흡수) + B(하한 0·파괴 없음). rng·fuel 은 호출측 소유.
-    /// costMult/successBonus: 돌발 이벤트(할인/성공부스트) 반영. 기본 1/0(무보정).
-    /// </summary>
-    /// <summary>재료 · 확률 없이 한 단계 올린다(쉼터 「벼린다」). 이미 최대면 false.</summary>
-    public static bool GrantLevel(WeaponData target, EnhanceTableSO t)
-    {
-        if (target == null || t == null) return false;
-        int max = MaxEnhance(target, t);
-        if (target.enhanceLevel >= max) return false;
-        target.enhanceLevel++;
-        target.RecomputeEnhancedStats();
-        return true;
-    }
-
-    public static EnhanceResult TryEnhance(WeaponData target,
-                                           EnhanceTableSO t, System.Random rng, RunFuelBank fuel,
-                                           float costMult = 1f, float successBonus = 0f)
-    {
-        if (target == null || t == null || rng == null || fuel == null)
-            return EnhanceResult.Reject(EnhanceOutcome.RejectInvalid);
-
-        int max = MaxEnhance(target, t);
-        if (target.enhanceLevel >= max)
-            return EnhanceResult.Reject(EnhanceOutcome.RejectMaxed);
-
-        int level = target.enhanceLevel;
-        int cost  = CostWith(t, level, costMult);
-        if (!fuel.TrySpend(FuelKind.EnhanceMaterial, cost))
-            return EnhanceResult.Reject(EnhanceOutcome.RejectNoFuel);
-
-        float chance = Mathf.Clamp01(t.SuccessAt(level) + successBonus);
-        double roll  = rng.NextDouble();   // RNG 소비 1회 불변(결정성 유지) — 값만 결과에 실어 연출에 전달
-        bool success = roll < chance;
-        if (success)
-        {
-            int before = target.enhanceLevel;
-            target.enhanceLevel = Mathf.Min(before + 1, max);
-            target.RecomputeEnhancedStats();
-            return new EnhanceResult
-            {
-                outcome = EnhanceOutcome.Success,
-                beforeLevel = before, afterLevel = target.enhanceLevel,
-                spent = cost, roll = roll, chance = chance,
-            };
-        }
-
-        // 실패 — 대상 단계 하락(하한 0, 파괴 없음)
-        int drop  = t.DropAt(level);
-        int start = target.enhanceLevel;
-        target.enhanceLevel = Mathf.Max(0, start - drop);
-        target.RecomputeEnhancedStats();
-        return new EnhanceResult
-        {
-            outcome = EnhanceOutcome.FailDropped,
-            beforeLevel = start, afterLevel = target.enhanceLevel,
-            spent = cost, roll = roll, chance = chance,
-        };
-    }
 
     // ── 승급(전설 분기) ───────────────────────────────────────────────
 

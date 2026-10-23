@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MainWeaponSO
   weaponDisplayKey: T2_Greatsword_Display
   weaponPrefabKey: T2_Greatsword_Weapon
-  displayName: "\uBCBC\uB824\uC9C4 \uB9C8\uB974\uBBF8\uC544\uB3C4\uC544\uC988"
+  displayName: "\uD074\uB77C\uB80C\uD2B8 \u2161"
   tagline: 
   uiThemeColor: {r: 0, g: 0, b: 0, a: 0}
   iconKey: T2_GreatswordIcon

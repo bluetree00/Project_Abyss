@@ -194,7 +194,7 @@ public class LichAbyssalRendState : UnInterruptibleState<LichAbyssalRendPatternS
 
         Vector3 dir = Quaternion.Euler(0f, _yaw, 0f) * Vector3.forward;
         float   mid = (Data.safeRadius + WedgeReach * 0.6f) * 0.5f;
-        LichPatternUtil.SlashVfx(_center + dir * mid, dir, mid, LichSwing.Overhead, LichPatternUtil.Crimson);
+        LichPatternUtil.SlashVfx(_center + dir * mid, dir, mid, LichSwing.Overhead, LichPatternUtil.CrimsonVfx);
         for (float d = Data.safeRadius + 3f; d < WedgeReach * 0.7f; d += 7f)
             LichVfx.Play(LichVfxSlot.SlamImpact, _center + dir * d, Quaternion.identity, LichPatternUtil.NovaScale(3f));
         LichSfx.Play(LichSfxSlot.SlamImpact, _center + dir * mid);

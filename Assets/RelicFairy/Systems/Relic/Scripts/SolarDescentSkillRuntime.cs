@@ -27,6 +27,9 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
     private const float  ZoneRadius      = 6.0f;   // 작열 지대 반경 — 착탄 반경에 맞춰 넓게
     private const float  ZoneDuration    = 4.0f;   // 작열 지대 지속
     private const float  ZoneTickInterval = 0.5f;
+    // 작열 지대 주 피해 간격 · 틱 피해(공격력 배율) — 1초에 공격력 20%(총량은 예전 0.5초 · 10%와 같다). 주 피해라 틱마다 룬 효과가 붙어
+    // 0.5초면 룬 빌드에서 Q가 같은 시간 평타의 ×5.3까지 커졌다(10-16 실측 64) — 틱 수를 절반으로.
+    private const float  ZoneHitInterval  = 1.0f, ZoneHitAtkRatio = 0.20f;
 
     private const float  FallDamageShare = 0.30f;  // 총 피해 중 낙하가 가져가는 몫(나머지는 착탄)
     private const float  FallHitRadius   = 3.0f;   // 낙하하는 태양 아래 피해 범위(착탄 반경보다 좁게)
@@ -41,6 +44,12 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
     private float _castTime;
 
     private const float SmallScale = 0.5f;   // 작은 낙일 — 반경 · 피해 절반
+
+    // 낙일 피해 배율(차트 RELIC_STAT_DATA gawain 11이 없을 때) — 3.5에서 11(10-16 실측 64: 같은 시간 평타의 ×1.0 → ×2.6~3.9).
+    private const float SkillMultFallback = 11f;
+    // 발동 계수(10-16 「계수도 포함」) — 낙하 1.0 · 작열 지대 틱 0.9(필살 각인 3단계 문턱 0.75 전에는 강타가 아니다). 착탄 한 방은 2.5.
+    private const float FallProcCoef = 1f, ZoneTickProcCoef = 0.9f;
+    public  static float ZoneProcCoef => ZoneTickProcCoef;
 
     public SolarDescentSkillRuntime(GawainZenithRelic relic) { _relic = relic; }
 
@@ -109,7 +118,7 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
         // 낙하 중 공격력이 변할 일은 없으니 지금 확정해 콜백으로 넘긴다.
         float markMul = (_relic != null && _relic.ConsumeMarkFirstHit()) ? (1f + V(V_FIRST_HIT, 0.5f)) : 1f;
         int   effAtk  = ctx.RuntimeStats.AttackPower;   // 유물 피해 = 근접 · 원거리 중 큰 값(10-14 A5)
-        float total   = effAtk * V(V_SKILL_MULT, 3.5f) * markMul;
+        float total   = effAtk * V(V_SKILL_MULT, SkillMultFallback) * markMul;
 
         // 낙하가 총 피해의 30%를 여러 틱으로, 착탄이 70%를 한 방에.
         float scale     = _small ? SmallScale : 1f;
@@ -136,7 +145,7 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
     {
         if (player == null) return;
         int   effAtk = player.RuntimeStats.AttackPower;   // 유물 피해 = 근접 · 원거리 중 큰 값(10-14 A5)
-        float total  = effAtk * V(V_SKILL_MULT, 3.5f) * Mathf.Max(0f, damageFraction);
+        float total  = effAtk * V(V_SKILL_MULT, SkillMultFallback) * Mathf.Max(0f, damageFraction);
         var   owner  = player.gameObject;
         var   runner = new SolarDescentSkillRuntime(relic);
         Managers.Sound?.PlayEvent(SoundEvent.RelicSunFall);
@@ -160,8 +169,15 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
         {
             var t = buf[i];
             if (t == null || !hit.Add(t)) continue;
-            // 낙하 피해는 2차(방어무시 즉발) — 여러 틱이라 파이프라인을 태우면 크리·흡혈이 매 틱 터진다.
-            CombatQuery.DealSynergyDamage(t, fallDmg, owner, 1f);
+            // 낙하 피해도 Q 주 피해(대상마다 한 번) — 치명 · 스킬 피해% · 적중 룬 · 발동 계수가 붙는다(10-16 「계수도 포함」).
+            // 예전엔 2차 피해라 낙일 몫 30%에 아무것도 안 붙었다. 착탄(0.6초 뒤)이 타격감을 내므로 여기선 끈다.
+            CombatDamage.Deal(new CombatDamage.Request
+            {
+                Target = t, BaseDamage = fallDmg, Owner = owner, ActionType = WeaponActionType.QSkill,
+                KnockbackMultiplier = 0f, NoFlinch = true, DefenseIgnore = 1f, ProcCoef = FallProcCoef,
+                HitPoint = t.transform.position + Vector3.up * 1.2f, SourcePosition = impact,
+                SkipHitVfx = true, NoHitFeel = true,
+            });
         }
     }
 
@@ -212,7 +228,7 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
 
         // 작열 지대 — 착탄 지점에 지속 화염 장판(틱 피해 + 화상)
         SolarZone.Spawn(impact, ZoneRadius * scale, ZoneDuration,
-                        tickDamage: effAtk * 0.10f * scale, burnDps: burnDps, tickInterval: ZoneTickInterval, instigator: owner);
+                        tickDamage: effAtk * ZoneHitAtkRatio * scale, burnDps: burnDps, tickInterval: ZoneHitInterval, instigator: owner);
 
         // [유물 성장 v2] 착탄 통지 — 해시계(3체 이상) · 두 번째 해 · 정점 · 태양 흑점 등이 듣는다
         relic?.NotifySunImpact(impact, buffer, small);

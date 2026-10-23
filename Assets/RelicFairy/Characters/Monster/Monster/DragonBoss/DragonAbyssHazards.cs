@@ -10,8 +10,20 @@ namespace RelicFairy.Monster
 /// </summary>
 internal static class DragonAbyssFx
 {
+    // 원 깔기(PackDiscs · 10-22 E5 페이지2) — 격자점을 겨눈 자리에서 가까운 순으로(정렬 비교는 한 번만 만든다)
+    private static readonly List<Vector3> s_lattice = new(64);
+    private static Vector3 s_latticeOrigin;
+    private static readonly Comparison<Vector3> s_byLatticeDistance =
+        (a, b) => FlatSq(a, s_latticeOrigin).CompareTo(FlatSq(b, s_latticeOrigin));
+
     // ── 색 ────────────────────────────────────────────────────
-    public static Color Abyss => DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Abyss);
+    /// <summary>
+    /// 심연 패턴 바닥 예고 색 — (10-23 가이드 색 통일) 검보라 → 공용 공격 색(<see cref="PatternGuideHelper.AttackFill"/>).
+    /// 이름은 예고 호출 자리를 그대로 두려고 남겼다 — 심연 원소 색(이펙트 · 화면 번쩍임)은 <see cref="AbyssVfx"/>.
+    /// </summary>
+    public static Color Abyss => PatternGuideHelper.AttackFill;
+    /// <summary>심연 원소 색(검보라) — 이펙트 · 화면 번쩍임만.</summary>
+    public static Color AbyssVfx => DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Abyss);
 
     public static Color WithAlpha(Color c, float a) => new Color(c.r, c.g, c.b, a);
 
@@ -70,6 +82,58 @@ internal static class DragonAbyssFx
         float dx = p.x - center.x;
         float dz = p.z - center.z;
         return dx * dx + dz * dz <= radius * radius;
+    }
+
+    /// <summary>
+    /// 반경 <paramref name="radius"/> 원을 빽빽이 깐다(10-22 E5 페이지2 · 리치 LichPatternUtil.PackDiscs와 같은 방식) — 흔든 육각 격자:
+    /// 격자 한 점 = <paramref name="aim"/>(없으면 <paramref name="area"/>), 방향 · 간격은 시전마다 무작위, 원마다 조금씩 흔들어 이웃 원 가장자리 사이
+    /// 빈틈이 <paramref name="gap"/>(최소 · 최대) 안에서 매번 다르다(빈자리를 무작위로 찾으면 지름 5 m 넘는 빈자리가 남았다 — 오프라인 실측).
+    /// <paramref name="area"/> 둘레 <paramref name="areaRadius"/> 안 · 아레나 바닥 안 격자점을 겨눈 자리에서 가까운 순으로 <paramref name="maxCount"/>개까지 ·
+    /// <paramref name="blocked"/>가 true인 자리는 비운다. <paramref name="result"/>에 이미 든 원과는 최소 빈틈을 지킨다.
+    /// </summary>
+    public static void PackDiscs(List<Vector3> result, Vector3 area, float areaRadius, float radius, Vector2 gap, int maxCount,
+                                 Vector3? aim, Predicate<Vector3> blocked = null)
+    {
+        float   g      = UnityEngine.Random.Range(Mathf.Lerp(gap.x, gap.y, 0.3f), Mathf.Lerp(gap.x, gap.y, 0.7f));   // 이번 시전 간격
+        float   jitter = Mathf.Min(g - gap.x, gap.y - g) * 0.5f;                                                   // 원마다 흔들림 — 이웃 틈이 gap 안에 남는다
+        float   step   = radius * 2f + g;
+        Vector3 origin = aim ?? area;
+        float   yaw    = UnityEngine.Random.Range(0f, 60f);
+        Vector3 u      = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * step;
+        Vector3 v      = Quaternion.Euler(0f, yaw + 60f, 0f) * Vector3.forward * step;
+        int     n      = Mathf.CeilToInt((areaRadius + Mathf.Sqrt(FlatSq(origin, area))) / (step * 0.866f)) + 1;
+
+        s_lattice.Clear();
+        for (int a = -n; a <= n; a++)
+        for (int b = -n; b <= n; b++)
+        {
+            Vector3 p = origin + u * a + v * b;
+            if (InDisc(p, area, areaRadius)) s_lattice.Add(p);
+        }
+        s_latticeOrigin = origin;
+        s_lattice.Sort(s_byLatticeDistance);
+
+        int first = result.Count;
+        for (int i = 0; i < s_lattice.Count && result.Count - first < maxCount; i++)
+        {
+            Vector3 p = s_lattice[i];
+            if (!aim.HasValue || FlatSq(p, origin) > 0.0001f)   // 겨눈 자리는 그대로
+            {
+                Vector2 o = UnityEngine.Random.insideUnitCircle * jitter;
+                p += new Vector3(o.x, 0f, o.y);
+            }
+            if ((ClampToArena(p, radius) - p).sqrMagnitude > 0.01f || (blocked != null && blocked(p))) continue;   // 바닥 밖 · 비울 자리
+            bool crowded = false;
+            for (int k = 0; k < first && !crowded; k++) crowded = InDisc(p, result[k], radius * 2f + gap.x);
+            if (!crowded) result.Add(p);
+        }
+    }
+
+    private static float FlatSq(Vector3 a, Vector3 b)
+    {
+        float dx = a.x - b.x;
+        float dz = a.z - b.z;
+        return dx * dx + dz * dz;
     }
 
     // ── 플레이어 ──────────────────────────────────────────────

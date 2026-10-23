@@ -16,11 +16,13 @@ MonoBehaviour:
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
-  weight: 3
+  weight: 4.5
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: f952abf09afb88c42bc84b45713f53cd, type: 2}
+  followUpLateOnly: 0
   maxRange: 28
   patternCooldown: 8
   castDuration: 0.7

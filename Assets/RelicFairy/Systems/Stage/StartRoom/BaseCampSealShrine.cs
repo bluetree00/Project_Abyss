@@ -12,7 +12,8 @@ using UnityEngine;
 ///   성문 오른쪽 봉인 전망대의 비석 넷이 각 섬을 향해 서서, 가까이 가면 보스 이름과 상태를 말한다(이름표 규칙 <see cref="BaseCampLabelRule"/>).
 ///   게임 카메라는 발 +4.8 m 위를 못 잡는다(09-28 실측) — 그래서 섬은 광장보다 낮고, 수정 꼭대기가 광장 +3 m를 넘지 않는다.
 /// 상태는 <see cref="ResolveState"/> 한 곳에서만 정한다(순환 개정 §5-5, 7a 09-29).
-/// 새로 봉인하고 처음 돌아오면 그 섬에 한 번만 불이 들어오고 멀린이 한 줄 — 입력·카메라는 건드리지 않는다(매 판 연출 규칙).
+/// 새로 봉인하고 처음 돌아오면 그 섬에 한 번만 불이 들어왔다가 「흔적」으로 잦아든다 — 입력·카메라는 건드리지 않는다(매 판 연출 규칙).
+/// 봉인기에 거점으로 돌아오는 길은 쓰러짐뿐이라 봉인은 늘 다시 풀려 있다 — 봉인 기록은 흔적(옅은 금빛)으로만 보인다(10-22 C14).
 /// 섬 구성(바위·받침·기둥·수정·광원)은 프리팹 BaseCamp_Sanctum/Wing에 있고, 이 컴포넌트는 이름으로 찾아 상태만 입힌다.
 /// </summary>
 public sealed class BaseCampSealShrine : MonoBehaviour
@@ -22,6 +23,8 @@ public sealed class BaseCampSealShrine : MonoBehaviour
     private const string SeenKeyPrefix = "basecamp.sealLit.";   // StoryProgress 본 것 기록 — 섬 점등 연출은 보스당 한 번
     private const float  BrokenTilt    = 18f;                   // 깨진 수정이 기우는 각도
     private const float  IgniteSeconds = 1.6f;
+    private const float  TraceK        = 0.3f;                  // 봉인기 봉인 기록 = 점등 0.3의 흔적(10-22 C14)
+    private const float  FadeSeconds   = 1.2f;                  // 점등 뒤 흔적으로 잦아드는 시간
     private const float  ChainWidth    = 0.22f;
     private const float  TetherWidth   = 0.09f;
     private const float  RingWidth     = 0.35f;
@@ -53,10 +56,6 @@ public sealed class BaseCampSealShrine : MonoBehaviour
     [Tooltip("안개·불티 입자(Hovl Glow1cg)")]
     [SerializeField] private Material moteMaterial;
     [SerializeField] private TMP_FontAsset labelFont;
-
-    [Header("멀린")]
-    [Tooltip("새로 봉인하고 처음 돌아왔을 때 한 줄 — {0} = 보스 이름")]
-    [SerializeField, TextArea] private string newSealLine = "{0}의 봉인이 섰다. 저 수정이 빛나는 한, 그것은 다시 깨어나지 못한다.";
 
     // ── Private ───────────────────────────────────────────────────
     private sealed class Island
@@ -126,7 +125,7 @@ public sealed class BaseCampSealShrine : MonoBehaviour
     }
 
     /// <summary>디버그 — 섬 하나의 점등 연출을 다시 튼다(저장 없음).</summary>
-    public void DebugIgnite(int island) => IgniteAsync(Mathf.Clamp(island, 0, IslandCount - 1), false, false, destroyCancellationToken).Forget();
+    public void DebugIgnite(int island) => IgniteAsync(Mathf.Clamp(island, 0, IslandCount - 1), false, destroyCancellationToken).Forget();
 
     // ── Private Methods ───────────────────────────────────────────
     /// <summary>계정 기록(자동 로그인·세이브 로드)이 준비된 뒤에 상태를 입힌다 — 씬 직접 실행에서도 상태가 맞게.</summary>
@@ -150,19 +149,16 @@ public sealed class BaseCampSealShrine : MonoBehaviour
             string bossId = StoryProgress.BossIdForChapter((ChapterId)(i + 1));
             var state = ResolveState(bossId);
             bool ignite = state == SealState.Sealed && !StoryProgress.IsSeen(SeenKeyPrefix + bossId);
-            // 새로 봉인한 섬은 풀린 모습으로 두었다가 소환·시작 대사가 끝난 뒤 불을 켠다
-            Apply(i, ignite ? SealState.Unsealed : state, 1f);
+            // 새로 봉인한 섬은 풀린 모습으로 두었다가 소환·시작 대사가 끝난 뒤 불을 켠다 · 봉인 기록은 흔적으로(10-22 C14)
+            Apply(i, ignite ? SealState.Unsealed : state, state == SealState.Sealed ? TraceK : 1f);
             if (ignite && newlySealed < 0) newlySealed = i;
             log.Append(bossId).Append('=').Append(state).Append(ignite ? "(점등)" : "").Append(' ');
         }
         Debug.Log(log.ToString(), this);
 
         if (newlySealed < 0) return;
-        int last = -1;   // 여러 섬이 한꺼번에 새로 켜지면(업데이트 전 봉인분) 멀린은 마지막 하나만 말한다 — 한 순간에 하나만
         for (int i = newlySealed; i < IslandCount; i++)
-            if (IsNewSeal(i)) last = i;
-        for (int i = newlySealed; i < IslandCount; i++)
-            if (IsNewSeal(i)) await IgniteAsync(i, true, i == last, ct);
+            if (IsNewSeal(i)) await IgniteAsync(i, true, ct);
     }
 
     /// <summary>
@@ -184,7 +180,7 @@ public sealed class BaseCampSealShrine : MonoBehaviour
         return ResolveState(bossId) == SealState.Sealed && !StoryProgress.IsSeen(SeenKeyPrefix + bossId);
     }
 
-    private async UniTask IgniteAsync(int i, bool record, bool speak, CancellationToken ct)
+    private async UniTask IgniteAsync(int i, bool record, CancellationToken ct)
     {
         try
         {
@@ -205,12 +201,20 @@ public sealed class BaseCampSealShrine : MonoBehaviour
             var isl = _islands[i];
             if (isl.Mist != null) isl.Mist.Emit(40);   // 불이 들어오는 순간 한 번 피어오름
 
+            // 봉인기에 쓰러져 돌아왔다 — 봉인은 다시 풀렸다: 불이 들어왔다가 흔적만 남기고 잦아든다(10-22 C14 · 멀린 「봉인이 섰다」 끔)
+            t0 = Time.unscaledTime;
+            while (true)
+            {
+                float k = Mathf.Clamp01((Time.unscaledTime - t0) / FadeSeconds);
+                Apply(i, SealState.Sealed, Mathf.Lerp(1f, TraceK, Mathf.SmoothStep(0f, 1f, k)));
+                if (k >= 1f) break;
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+
             if (!record) return;
             string bossId = StoryProgress.BossIdForChapter((ChapterId)(i + 1));
             StoryProgress.MarkSeen(SeenKeyPrefix + bossId);
-            if (speak && !string.IsNullOrEmpty(newSealLine))
-                RelicFairy.UI.UI_BossBark.Show(string.Format(newSealLine, BossName(i)), RelicFairy.UI.BossBarkType.MerlinNarration, DialogueSpeaker.Merlin);
-            Debug.Log($"[SealShrine] 점등 — {bossId}", this);
+            Debug.Log($"[SealShrine] 점등 → 흔적 — {bossId}", this);
         }
         catch (OperationCanceledException) { }
     }
@@ -405,7 +409,7 @@ public sealed class BaseCampSealShrine : MonoBehaviour
     {
         string line = state switch
         {
-            SealState.Sealed => "봉인됨",
+            SealState.Sealed => "봉인했었다 — 다시 풀렸다",   // 봉인기 거점 귀환 = 쓰러진 뒤(10-22 C14)
             SealState.Broken => "봉인이 깨졌다",
             SealState.Slain  => "쓰러뜨렸다",
             _                => "아직 봉인되지 않았다",

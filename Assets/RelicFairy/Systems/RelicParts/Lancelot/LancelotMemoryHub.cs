@@ -6,14 +6,16 @@ using RelicFairy.Monster;
 using UnityEngine;
 
 /// <summary>
-/// 랜슬롯 유물 성장 v2 허브 — 「광기의 계단」(설계 v2 §3). 랜슬롯 첫 조각과 함께 플레이어에 붙는다.
+/// 랜슬롯 유물 성장 v2 허브 — 「광기의 계단」(설계 v2 §3). 랜슬롯 유물을 붙일 때(런 시작부터) 플레이어에 붙는다 —
+/// 낙인 「광기 20부터 쌓이고 심판이 찢는다」가 유물 기본 규칙이다(10-22 D11 — 예전엔 첫 조각과 함께).
 /// <list type="bullet">
 /// <item><b>배신의 낙인</b> — 광기 20+(또는 광란)에서 적중하면 1(대상당 0.5초). 상한 3(광기의 눈 5 · 7). 낙인 자체는 피해가 없다.</item>
 /// <item><b>넘침 → 원한</b> — 적중으로 새긴 낙인이 상한을 넘치면 그 몫이 원한(최대 5)으로 저축된다.
 ///       조각 · 반응이 옮기거나 튀긴 낙인은 그 줄이 말할 때만 원한이 된다.</item>
-/// <item><b>찢기</b> — 심판 막타가 낙인을 찢는다: X자 1회 = 유물 공격력 × 0.35(상태 피해 경로: 방어 무시 · 치명 없음).</item>
+/// <item><b>찢기</b> — 심판 막타가 낙인을 찢는다: X자 1회 = 유물 공격력 × 0.35(상태 피해 경로: 방어 무시 · 치명 없음).
+///       찢긴 적은 4초 동안 받는 피해 +20%(기본 Q — 유물이 <see cref="WasTorn"/>을 묻는다 · 10-22 D11).</item>
 /// <item><b>원한 쓰기</b> — 막타 뒤 원한 1개당 참격파 1줄(8 m)이 부채꼴로 퍼진다.</item>
-/// <item><b>계단 공명</b> — 이어진 계단 2(받침) · 3(재출발 30) · 4(두 번째 광란 + 심판 1회).</item>
+/// <item><b>광기 칸 공명</b> — 광기 칸 조각 수 2(받침) · 3(재출발 30) · 4(두 번째 광란 + 심판 1회) — 10-22 E1 D7(옛 「10부터 이어진 계단」).</item>
 /// <item><b>엇갈린 빛</b> — 반응 조각 2개 이상 + 서로 다른 반응 둘을 10초 안 → 다음 찢기 한 번(심판이면 그 심판 전체)은 낙인을 남긴다.</item>
 /// </list>
 /// 찢기 · 참격파로 죽은 적도 플레이어 처치로 잡힌다(TakeSynergyDamage가 instigator=플레이어면 처치 신호를 낸다).
@@ -59,7 +61,7 @@ public sealed class LancelotMemoryHub : MonoBehaviour
     public event Action<int> GrudgeSpent;                              // 원한을 썼다(참격파 줄 수)
     public event Action<bool> CrossLightChanged;                       // 엇갈린 빛 켜짐(true) · 써서 꺼짐(false) — HUD · 기억 쪽(10-12 A3)
 
-    /// <summary>허브가 플레이어에 새로 묶였다(첫 조각) — 유물 HUD가 이때 깨어난다.</summary>
+    /// <summary>허브가 플레이어에 새로 묶였다(유물을 붙일 때) — 유물 HUD가 이때 깨어난다.</summary>
     public static event Action<LancelotMemoryHub> Bound;
 
     /// <summary>조각 · 허브 글자 색(랜슬롯 진홍).</summary>
@@ -212,20 +214,20 @@ public sealed class LancelotMemoryHub : MonoBehaviour
         }
     }
 
-    /// <summary>계단 공명을 다시 센다(조각 · 메아리 · 등급이 바뀔 때).</summary>
+    /// <summary>광기 칸 공명을 다시 센다(조각 · 메아리 · 등급이 바뀔 때). <see cref="Ladder"/> = 광기 칸 조각 수(10-22 E1 D7).</summary>
     public void RecomputeTiers()
     {
         if (_loadout == null) return;
-        _ladder = RelicResonance.LancelotLadder(_loadout);
+        _ladder = RelicResonance.LancelotCount(_loadout);
         int tier = RelicResonance.LancelotTier(_ladder);
         if (_madness != null)
         {
-            // 받침 — 이어진 맨 위 계단(4 계단이면 30: 40은 광란 문턱이라 받치면 광란 뒤 곧장 다시 광란이다)
+            // 받침 — 칸 조각 수만큼의 칸(2 = 20 · 3 · 4 = 30: 40은 광란 문턱이라 받치면 광란 뒤 곧장 다시 광란이다) — 옛 이어진 계단과 같은 값
             _madness.Floor = tier >= 2 ? Rung(Mathf.Min(tier, 3)) : 0;
             _madness.SetRetainRatio(tier >= 3 ? RestartRatio : 0f);   // 재출발
             _madness.RefillDuringFrenzy = tier >= 4;                  // 두 번째 광란
         }
-        Debug.Log($"[LancelotMemory] 계단 공명 — 이어진 계단 {_ladder} · 받침 {(_madness != null ? _madness.Floor : 0)} · 낙인 상한 {BrandCap} · 원한 상한 {(_grudge != null ? _grudge.Cap : 0)}");
+        Debug.Log($"[LancelotMemory] 광기 칸 공명 — 칸 조각 {_ladder} · 받침 {(_madness != null ? _madness.Floor : 0)} · 낙인 상한 {BrandCap} · 원한 상한 {(_grudge != null ? _grudge.Cap : 0)}");
     }
 
     // ── 광기 · 광란 ───────────────────────────────────────
@@ -426,6 +428,9 @@ public sealed class LancelotMemoryHub : MonoBehaviour
         Tear(mb, TearCause.Judgment);
     }
 
+    /// <summary>이번 심판이 이 적의 낙인을 찢었는가(기본 Q 받는 피해 +20% — 10-22 D11).</summary>
+    public bool WasTorn(MonsterBase mb) => mb != null && _tornTargets.Contains(mb);
+
     /// <summary>이번 막타가 이 적을 맞혔는가(원한의 칼날 ① — 화면 안 나머지 낙인 적).</summary>
     public bool WasHitByFinisher(MonsterBase mb) => mb != null && _finisherHits.Contains(mb.GetInstanceID());
 
@@ -487,7 +492,7 @@ public sealed class LancelotMemoryHub : MonoBehaviour
         for (int i = 0; i < n; i++)
         {
             var e = _buf[i];
-            if (e != null && !e.IsDead && DistToSegmentXZ(e.transform.position, from, to) <= WaveHalfWidth + 0.4f) hit.Add(e);
+            if (e != null && !e.IsDead && DistToSegmentXZ(e.transform.position, from, to) <= WaveHalfWidth + CombatQuery.BodyReach(e)) hit.Add(e);   // 몸에 닿으면(10-16)
         }
         foreach (var e in hit) CombatQuery.DealSynergyDamage(e, damage, _player.gameObject, 1f, false, RuneElement.Dark);
         hitOut?.AddRange(hit);

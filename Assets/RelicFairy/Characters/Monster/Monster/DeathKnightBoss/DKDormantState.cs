@@ -129,9 +129,9 @@ public class DKDormantState : IMonsterState
                     dk.EntranceCameraOffset, dk.EntranceCameraLookOffset,
                     dk.EntranceCameraCloseUpDuration, ct);
 
-            // 보스 이름 HUD 직전: Idle 애니메이션 재생 + 검 소멸 (평상시처럼 비무장 상태로 복귀)
+            // 보스 이름 HUD 직전: Idle 애니메이션 재생 — 검은 든 채 궤적만 끈다(10-22 A4 「검은 들고 있게」 · 예전엔 비무장으로 지웠다)
             PlayIdleAnim(ctx);
-            dk.HideSwordVisual();
+            dk.EndSwordSwing();
 
             // 보스 이름 HUD + 바람 이펙트
             GameObject windVfx = dk.SpawnEntranceWindVfx();
@@ -154,9 +154,9 @@ public class DKDormantState : IMonsterState
             }
 
             // 해방기 — 클로즈업 동안 옛 봉인 자국을 검으로 베어 떨쳐내며 포효(10-13 재조우)
-            if (StoryProgress.IsLiberated) dk.ShowSwordVisual();
+            if (StoryProgress.IsLiberated) { dk.ShowSwordVisual(); dk.BeginSwordSwing(); }
             await BossStoryScenes.ReturnAsync(dk, StoryProgress.DeathKnight, ct);
-            if (StoryProgress.IsLiberated) dk.HideSwordVisual();
+            if (StoryProgress.IsLiberated) dk.EndSwordSwing();
 
             // 플레이어 카메라로 복귀
             if (cam != null)

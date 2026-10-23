@@ -24,6 +24,10 @@ public sealed class PlayerRuntimeStats
     public const float MaxDamageReduction        = 0.75f;
     public const float MaxAttackSpeed            = 2.0f;
     public const float AttackSpeedOverflowRatio  = 0.5f;   // 넘친 공속 → 모든 피해 %(D5 · 10-14 A6)
+    // 근접 위험 보상 — 근접 공격력 × (1 + 이 값). 붙어서 맞을 위험을 지는 근접이 원거리보다 세게(10-16 사용자 「근접이 원거리 비해 훨씬 약하다」).
+    // 같은 투자 비교(실측 60b): 근접 +20 · 증강 대 활 최대 다발 단일 ×0.92 · 무리 ×0.72 → 목표 단일 1.1 ~ 1.4 · 무리 0.8 ~ 1.1.
+    // 유물 배율(_characterMeleeMult)과 따로 곱한다. 근접 무기를 들었을 때만 — 원거리 공격력 · 활을 든 동안의 유물 피해(AttackPower)는 그대로.
+    public const float MeleeRiskBonus            = 0.3f;
     public float ActiveItemCooldownReduction { get; private set; }
     public float HeavyChargeThreshold { get; private set; }
     public float MoveSpeedMultiplier { get; private set; } = 1f;
@@ -490,6 +494,7 @@ public sealed class PlayerRuntimeStats
 
     // -- Character Mechanic (고유 메커닉 배율 — HolyGauge 만충, SolarTimer 강화 등) --
     private float _characterMeleeMult  = 1f;
+    private bool  _meleeRiskActive = true;   // 근접 무기를 들었나(맨손 포함) — 근접 위험 보상(MeleeRiskBonus)이 붙는가
     private float _characterRangedMult = 1f;
     private float _characterDefenseMult = 1f;
     private float _characterDamageReduction = 0f;
@@ -502,6 +507,7 @@ public sealed class PlayerRuntimeStats
         _weaponMelee   = Mathf.Max(0f, melee);
         _weaponRanged  = Mathf.Max(0f, ranged);
         _weaponDefense = Mathf.Max(0f, defense);
+        _meleeRiskActive = _weaponMelee > 0f || _weaponRanged <= 0f;   // 원거리 무기를 들면 근접 위험 보상 없음
         Recalculate();
     }
 
@@ -960,7 +966,7 @@ public sealed class PlayerRuntimeStats
         float baseDefSum    = _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense + _covenantDefense + _awakeningDefense + _relicDefense;
         int baseLuckSum   = _baseLuck + _passiveLuck + _itemLuck + _awakeningLuck + _relicLuck + _roomLuck;
 
-        MeleeAttack  = Mathf.Max(0, Mathf.RoundToInt(baseMeleeSum * dmgMul));
+        MeleeAttack  = Mathf.Max(0, Mathf.RoundToInt(baseMeleeSum * dmgMul * (_meleeRiskActive ? 1f + MeleeRiskBonus : 1f)));
         RangedAttack = Mathf.Max(0, Mathf.RoundToInt(baseRangedSum * dmgMulR));
         Defense      = Mathf.Max(0, Mathf.RoundToInt(baseDefSum * defMul));
         Luck         = Mathf.Max(0, Mathf.RoundToInt(baseLuckSum * luckMul));

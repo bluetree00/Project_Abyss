@@ -87,6 +87,7 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
         QuestEvents.OnMonsterKilled += HandleKill;
         _subscribed = true;
         ElementVfxPlayer.Warmup();   // 속성 이펙트 목록을 미리 읽는다 — 첫 이펙트가 버려지지 않게
+        ExtraHitCue.Warmup();        // 추가타 표시도(10-19 ⑭)
     }
 
     public IReadOnlyList<IRuneEffect> Active => _active;

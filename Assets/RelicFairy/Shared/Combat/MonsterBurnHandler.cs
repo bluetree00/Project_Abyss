@@ -14,6 +14,7 @@ public sealed class MonsterBurnHandler : MonoBehaviour
     private MonsterBase _monster;     // DoT 경로(TakeSynergyDamage)용 — 넉백·GetHit 없이 피해만
     private GameObject  _instigator;
     private float       _dps;
+    private DamageSource? _source;   // 가장 센 화상을 건 쪽의 피해 출처(서약이 건 잔불 틱 = 「서약」 · 10-22)
     private float       _tickInterval;
     private float       _remaining;
     private float       _total;        // 게이지 비율용(부여된 최대 지속)
@@ -123,6 +124,7 @@ public sealed class MonsterBurnHandler : MonoBehaviour
         _monster    = null;
         _instigator = null;
         _dps        = 0f;
+        _source     = null;
         _remaining  = 0f;
         _total      = 0f;
         _tickAccum  = 0f;
@@ -170,6 +172,16 @@ public sealed class MonsterBurnHandler : MonoBehaviour
     /// <summary>화상은 DoT다 — 넉백·GetHit 없는 시너지 경로로 피해만 가한다(방어 그대로 적용).</summary>
     private void DealDot(float amount)
     {
+        if (_source == DamageSource.Covenant)
+        {
+            using (DamageSourceScope.Enter(DamageSource.Covenant)) DealDotRaw(amount);
+            return;
+        }
+        DealDotRaw(amount);
+    }
+
+    private void DealDotRaw(float amount)
+    {
         if (_monster != null) _monster.TakeSynergyDamage(amount, _instigator, 0f, false, DamageKind.Dot, RuneElement.Fire);
         else                  _target.TakeDamage(amount, _instigator, 0f);   // 몬스터가 아닌 대상 폴백
     }
@@ -180,6 +192,7 @@ public sealed class MonsterBurnHandler : MonoBehaviour
         _monster      = target as MonsterBase;
         _instigator   = instigator;
         _tickInterval = tickInterval;
+        if (dps >= _dps) _source = DamageSourceScope.Current;   // 더 센 화상을 건 쪽이 출처(10-22)
         _dps          = Mathf.Max(_dps, dps);    // 더 강한 DPS 유지
         if (_holdRefreshFrame != Time.frameCount)
             _remaining = Mathf.Max(_remaining, duration); // 더 긴 지속시간 유지

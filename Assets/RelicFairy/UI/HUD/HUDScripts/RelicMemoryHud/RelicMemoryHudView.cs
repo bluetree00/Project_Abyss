@@ -8,9 +8,12 @@ using UnityEngine.UI;
 /// <list type="bullet">
 /// <item><b>가웨인 하루 띠</b> — 태양 게이지 오른쪽의 가로 띠 셋(여명 · 정오 · 황혼, 길이 = 구간 시간). 띠마다 위에 조각 점 ●●○○(2 · 4개면 공명),
 ///       공명이 깊을수록 띠가 밝다(4 = 금빛). 바늘이 지금 시간을 따라간다. 구간에 들어서면 그 띠가 한 번 빛난다. 「새벽이 길다」 붙듦 중엔 안내 한 줄.
-///       (설계는 태양을 두른 고리였으나 태양이 화면 맨 아래 · 체력바 뒤라 고리가 가려져 띠로 폈다 — 10-02 실측)</item>
-/// <item><b>랜슬롯 광기 눈금</b> — 막대 10 · 20 · 30 · 40에 눈금과 계단 표식(빈 칸 회색 · 조각 진홍 · 이어진 계단 금빛 + 금선).
-///       광기가 눈금을 넘으면 표식이 빛난다. 막대 오른쪽에 원한 불씨 + 「3/5」(가득 = 금 테 · 금 숫자).
+///       (설계는 태양을 두른 고리였으나 태양이 화면 맨 아래 · 체력바 뒤라 고리가 가려져 띠로 폈다 — 10-02 실측)
+///       10-18 사용자 「색별로 있는 UI바는 뭘 의미하는지도 모르겠어」 — 띠 아래에 이름 · 조각 수(「여명 1/4」), 처음 한 번 띠 위에 규칙 한 줄.</item>
+/// <item><b>랜슬롯 광기 눈금</b> — 막대 10 · 20 · 30 · 40에 눈금과 칸 표식(빈 칸 회색 · 조각 진홍 · 공명이 켜지면 조각 칸 금빛).
+///       10-22 E1 D7 — 공명이 「10부터 이어진 계단」에서 「광기 칸 조각 수」로 바뀌어 이어짐 금선을 걷고 맨 오른쪽 문턱 값 옆에 「조각 2/4」를 둔다.
+///       광기가 눈금을 넘으면 표식이 빛난다. 막대 오른쪽에 원한 불씨 + 「원한 3/5」(가득 = 금 테 · 금 숫자). 표식 위에 문턱 값(「광기 10」 · 20 · 30 · 40 — 10-18).
+///       첫 조각 때 처음 한 번 표식 위에 규칙 한 줄(가웨인 하루 띠 안내와 짝 — 10-22 E1 A6).
 ///       막대가 안 줄어드는 동안(피 냄새 · 끝의 문턱) 채움 끝에 얇은 멈춤 선 + 막대 왼쪽 끝 위(계단 표식 줄)에 「멈춤 N초」. 끝의 문턱 버팀 중엔 막대가 떤다(±1.5 px).</item>
 /// <item><b>엇갈린 빛</b>(두 유물) — 띠 · 원한 숫자 오른쪽 작은 네 갈래 별. 대기 = 빈 별(반응 조각 2개 이상일 때만) · 켜짐 = 금 별(켜지는 순간 한 번 커진다 · 은은히 숨쉰다).</item>
 /// </list>
@@ -27,6 +30,9 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     private static readonly Color EmberOff   = new(0.25f, 0.08f, 0.06f, 0.75f);
     private static readonly Color PipOff     = new(1f, 1f, 1f, 0.22f);
     private static readonly Color HoldColor  = new(1f, 0.86f, 0.5f, 1f);
+    private static readonly Color LabelDim   = new(0.62f, 0.60f, 0.57f, 1f);   // 잉크를 밝기로 흐린 것(알파는 하드 가드가 1로 되돌린다)
+    // 「여명 1/4」는 1/4를 여명 진행도로 읽을 수 있었다 → 둘째 줄에 「조각 1/4」(10-18 사용자 「진행」 · 한 줄이면 정오 띠(44px) 이름끼리 겹친다)
+    private static readonly string[] ArcFormat = { "여명\n조각 {0}/4", "정오\n조각 {0}/4", "황혼\n조각 {0}/4" };
     private static readonly Color[] ArcColor =
     {
         new(1f, 0.87f, 0.55f),   // 여명 — 옅은 금
@@ -35,9 +41,14 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     };
 
     // ── 치수 ──
-    private const float StripX       = 186f;   // 태양 게이지(폭 340) 오른쪽 끝 + 16 — 컨테이너 가운데 기준
-    private const float StripY       = 50f;    // 태양 게이지 높이(컨테이너 하단에서)
-    private const float StripW       = 150f;
+    private const float StripX       = 186f;   // 태양 게이지(폭 340) 오른쪽 끝 + 16 — 컨테이너 가운데 기준(게이지를 못 찾을 때)
+    private const float StripPad     = 12f;    // 게이지 오른쪽 끝 → 띠
+    // 태양 게이지 높이(50) + 8(10-18) — 띠 이름이 두 줄(「여명」 / 「조각 1/4」)이 되자 둘째 줄이 체력바 오른쪽 끝(금선 · 마름모)과
+    // 공 · 방 숫자에 닿았다. 띠 묶음을 올리면 게이지 줄과도 어긋나 「게이지가 띠로 이어진 한 막대」(사진 13)로 덜 읽힌다.
+    private const float StripY       = 58f;
+    // 150 → 200(10-18) — 띠 아래 「정오 1/4」(약 48px)가 이웃 이름과 겹치지 않게(옛 정오 띠 32px).
+    // 더 넓히면 16:10(스팀 덱)에서 엇갈린 빛 별이 물약 C 칸에 닿는다.
+    private const float StripW       = 200f;
     private const float StripH       = 6f;
     private const float StripGap     = 3f;
     private const float PipSize      = 6f;
@@ -54,6 +65,21 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     private const float StarGap      = 8f;
     private const float StarPopSec   = 0.3f;
     private const float HoldTickW    = 2f;
+    private const float ArcLabelW    = 72f;
+    private const float ArcLabelH    = 18f;
+    private const float ArcLabelGap  = 10f;    // 띠 아랫변 → 이름 가운데
+    private const float DialLabelH   = 34f;    // 하루 띠 이름 두 줄(「여명」 / 「조각 1/4」)
+    private const float DialLabelGap = 18f;    // 띠 아랫변 → 두 줄 이름 가운데(윗줄이 예전 한 줄 자리)
+    private const float HoldLabelY   = 28f;    // 붙듦 안내 — 조각 점 위(띠 아래는 이름 줄)
+    private const float HintY        = 50f;    // 처음 안내 — 붙듦 안내 위(16:10에서도 E 칸 원 위로 지난다)
+    private const float HintFadeIn   = 0.25f;
+    private const float HintFadeOut  = 0.5f;
+    private const float RungLabelUp  = 17f;    // 계단 표식 가운데 → 문턱 값 가운데(마름모 꼭짓점 위)
+    // 10-22 E1 — 광기 칸 조각 수(맨 오른쪽 문턱 값 「40」 옆, 막대 오른쪽 끝 +14 ~ +94 · 문턱 값 줄 높이 — 16:10에서도 물약 C 칸(+410부터)과 멀다)
+    private const float RungCountX   = 14f;
+    private const float RungCountW   = 80f;
+    private const float LadderHintUp = 22f;    // 문턱 값 가운데 → 처음 안내 가운데(문턱 값 줄 위)
+    private const string RungCountFormat = "조각 {0}/4";
 
     private static Sprite s_dot;
     private static Sprite s_starFill, s_starLine;
@@ -67,7 +93,8 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     private readonly Image[] _rungIcon = new Image[4];
     private readonly float[] _rungFlash = new float[4];
     private readonly Color[] _rungBase = new Color[4];
-    private RectTransform _link;
+    private readonly TextMeshProUGUI[] _rungLabel = new TextMeshProUGUI[4];   // 문턱 값(10-18)
+    private TextMeshProUGUI _rungCount;   // 광기 칸 조각 수(10-22 E1)
     private RectTransform _emberRow;
     private readonly List<Image> _embers = new(11);
     private Vector2 _barBasePos;
@@ -82,6 +109,13 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     private readonly float[]   _arcFlash = new float[3];
     private RectTransform   _needle;
     private TextMeshProUGUI _holdLabel;
+    private bool            _holdShown;     // 붙듦 안내를 쓰고 있다 — 바뀔 때만 쓴다
+    private readonly TextMeshProUGUI[] _arcLabel = new TextMeshProUGUI[3];   // 띠 이름 · 조각 수(10-18)
+    // 처음 안내 한 줄(10-18) — 흐림은 CanvasGroup으로(하드 가드가 글자 알파를 1로 되돌린다)
+    private TextMeshProUGUI _hint;
+    private CanvasGroup     _hintGroup;
+    private float           _hintSec;
+    private float           _hintLeft;
 
     // 원한 숫자 · 가득 금 테(10-12 A2)
     private TextMeshProUGUI _grudgeLabel;
@@ -126,11 +160,29 @@ public sealed class RelicMemoryHudView : MonoBehaviour
             rt.localRotation = Quaternion.Euler(0f, 0f, 45f);   // 마름모
             _rungIcon[k - 1] = icon;
             _rungBase[k - 1] = RungEmpty;
+
+            // 문턱 값 — 표식 위 가운데. 값은 SetRungValue가 쓴다(10-18 「뜻 모를 표식」).
+            var lbl = NewLabel("RungValue" + k, _overlay, UITheme.Thin.Caption, TextAlignmentOptions.Center);
+            lbl.color = LabelDim;
+            var lrt = lbl.rectTransform;
+            lrt.anchorMin = lrt.anchorMax = new Vector2(x, 1f);
+            lrt.pivot = new Vector2(0.5f, 0.5f);
+            lrt.sizeDelta = new Vector2(ArcLabelW, ArcLabelH);
+            lrt.anchoredPosition = new Vector2(rt.anchoredPosition.x, RungIconY + RungLabelUp);
+            _rungLabel[k - 1] = lbl;
         }
-        var link = NewImage("RungLink", _overlay, null, RungLinked);
-        _link = link.rectTransform;
-        _link.SetAsFirstSibling();
-        _link.gameObject.SetActive(false);
+
+        // 광기 칸 조각 수 — 맨 오른쪽 문턱 값 옆(10-22 E1 D7 · 수는 SetRungs가 쓴다)
+        _rungCount = NewLabel("RungCount", _overlay, UITheme.Thin.Caption, TextAlignmentOptions.MidlineLeft);
+        var crt = _rungCount.rectTransform;
+        crt.anchorMin = crt.anchorMax = new Vector2(1f, 1f);
+        crt.pivot = new Vector2(0f, 0.5f);
+        crt.sizeDelta = new Vector2(RungCountW, ArcLabelH);
+        crt.anchoredPosition = new Vector2(RungCountX, RungIconY + RungLabelUp);
+        _rungCount.color = LabelDim;
+
+        // 처음 안내 한 줄 — 문턱 값 줄 위, 막대 왼쪽 끝에서(ShowHint가 채운다 · 가웨인 하루 띠 안내와 짝 — 10-22 E1 A6)
+        BuildHint(new Vector2(0f, 1f), RungIconY + RungLabelUp + LadderHintUp);
 
         _emberRow = NewRect("Grudge", _overlay);
         _emberRow.anchorMin = _emberRow.anchorMax = new Vector2(1f, 0.5f);
@@ -147,7 +199,7 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         _grudgeLabel = NewLabel("GrudgeCount", _emberRow, UITheme.Thin.Small, TextAlignmentOptions.MidlineLeft);
         _grudgeLabel.rectTransform.anchorMin = _grudgeLabel.rectTransform.anchorMax = new Vector2(0f, 0.5f);
         _grudgeLabel.rectTransform.pivot = new Vector2(0f, 0.5f);
-        _grudgeLabel.rectTransform.sizeDelta = new Vector2(48f, 20f);
+        _grudgeLabel.rectTransform.sizeDelta = new Vector2(80f, 20f);   // 「원한 3/5」(10-18 — 숫자만으론 뜻을 몰랐다)
         _star = NewStar(_emberRow);
 
         // 멈춤 — 채움 끝의 얇은 선(가로 위치는 TickLadder가 채움을 따라 옮긴다) · 남은 초는 막대 왼쪽 끝 위, 계단 표식 줄 높이
@@ -164,24 +216,26 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         Show();
     }
 
-    /// <summary>계단 표식 — occupied[i] = 그 계단에 조각(메아리 포함)이 있다 · ladderTier = 이어진 계단(2 미만이면 0).</summary>
-    public void SetRungs(bool[] occupied, int ladderTier)
+    /// <summary>
+    /// 칸 표식 — occupied[i] = 그 칸에 조각(메아리 포함)이 있다 · count = 광기 칸 조각 수(10-22 E1 D7).
+    /// 공명이 켜지면(2개 이상) 조각 칸이 금빛 · 「조각 n/4」는 공명 전 흐림 · 2 · 3 잉크 · 4 금(가웨인 띠 이름과 같은 단계).
+    /// </summary>
+    public void SetRungs(bool[] occupied, int count)
     {
         if (_dial || _overlay == null) return;
+        int tier = RelicResonance.LancelotTier(count);
         for (int i = 0; i < 4; i++)
         {
             if (_rungIcon[i] == null) continue;
-            bool linked = ladderTier >= 2 && i < ladderTier;
-            _rungBase[i] = linked ? RungLinked : occupied[i] ? RungOwned : RungEmpty;
+            _rungBase[i] = occupied[i] ? (tier >= 2 ? RungLinked : RungOwned) : RungEmpty;
             _rungIcon[i].color = _rungBase[i];
         }
-        if (_link == null) return;
-        _link.gameObject.SetActive(ladderTier >= 2);
-        if (ladderTier >= 2)
-            Anchor(_link, new Vector2(0.25f, 1f), new Vector2(ladderTier / 4f, 1f), new Vector2(0f, RungIconY - 1f), new Vector2(ladderTier == 4 ? -RungIconSize * 0.5f : 0f, RungIconY + 1f));
+        if (_rungCount == null) return;
+        _rungCount.SetText(RungCountFormat, Mathf.Min(count, 4));
+        _rungCount.color = tier >= 4 ? UITheme.Thin.Gold : tier >= 2 ? UITheme.Thin.Ink : LabelDim;
     }
 
-    /// <summary>원한 불씨 — 상한만큼 칸, 찬 만큼 불. 옆에 「3/5」, 가득(<paramref name="full"/>)이면 줄에 금 테 · 숫자 금.</summary>
+    /// <summary>원한 불씨 — 상한만큼 칸, 찬 만큼 불. 옆에 「원한 3/5」, 가득(<paramref name="full"/>)이면 줄에 금 테 · 숫자 금.</summary>
     public void SetGrudge(int value, int cap, bool full)
     {
         if (_dial || _emberRow == null) return;
@@ -214,7 +268,7 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         {
             _grudgeLabel.rectTransform.anchoredPosition = new Vector2(rowW + GrudgeLabelGap, 0f);
             _grudgeLabel.color = rim ? UITheme.Thin.Gold : UITheme.Thin.Ink;
-            if (cap > 0) _grudgeLabel.SetText("{0}/{1}", Mathf.Min(value, cap), cap);
+            if (cap > 0) _grudgeLabel.SetText("원한 {0}/{1}", Mathf.Min(value, cap), cap);
             else _grudgeLabel.text = string.Empty;
             starX += cap > 0 ? _grudgeLabel.preferredWidth : 0f;
         }
@@ -238,6 +292,14 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         _star.rectTransform.localScale = Vector3.one;
     }
 
+    /// <summary>계단 i(0~3)의 문턱 값(광기 스택) — 첫 칸만 「광기 10」, 나머지는 숫자(카드 자리 이름 「광기 20」과 같은 값).</summary>
+    public void SetRungValue(int i, int value)
+    {
+        if (_dial || i < 0 || i >= 4 || _rungLabel[i] == null) return;
+        if (i == 0) _rungLabel[i].SetText("광기 {0}", value);
+        else _rungLabel[i].SetText("{0}", value);
+    }
+
     /// <summary>광기가 계단 i(0~3)를 넘었다 — 표식이 한 번 빛난다.</summary>
     public void FlashRung(int i)
     {
@@ -245,13 +307,14 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     }
 
     /// <summary>
-    /// 매 프레임 — 표식 빛 · 멈춤 · 끝의 문턱 떨림 · 별.
+    /// 매 프레임 — 표식 빛 · 멈춤 · 끝의 문턱 떨림 · 별 · 처음 안내.
     /// <paramref name="holdLeft"/> = 피 냄새 남은 초(0 이하 = 없음) · <paramref name="fill01"/> = 막대 채움(멈춤 선 자리).
     /// </summary>
     public void TickLadder(bool holding, float holdLeft, float fill01)
     {
         float dt = Time.unscaledDeltaTime;
         TickHold(holding, holdLeft, fill01);
+        TickHint();
         TickStar(dt);
         for (int i = 0; i < 4; i++)
         {
@@ -275,9 +338,12 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     {
         if (!Prepare(sunRoot, dial: true)) { Show(); return; }
         // 태양 게이지 오른쪽에 하루 띠를 둔다(체력바 아래 · Q 칸 왼쪽의 빈자리).
+        // 자리는 게이지 실제 폭에서 잰다(10-18) — 명조형 게이지가 340 → 440으로 넓어진 뒤에도 186에 고정돼 있어 띠 앞 34px가
+        // 게이지 끝(채움 · 끝 빛 · 끝 눈금)에 겹쳤다. 사진 13: 게이지 채움이 여명 띠로 이어져 한 막대처럼 읽히고, 끝 눈금이 두 번째 바늘로 보였다.
+        float stripX = sunRoot.Find("SunGauge") is RectTransform sunGauge ? sunGauge.sizeDelta.x * 0.5f + StripPad : StripX;
         _overlay.anchorMin = _overlay.anchorMax = new Vector2(0.5f, 0f);
         _overlay.pivot = new Vector2(0f, 0.5f);
-        _overlay.anchoredPosition = new Vector2(StripX, StripY);
+        _overlay.anchoredPosition = new Vector2(stripX, StripY);
         _overlay.sizeDelta = new Vector2(StripW, 40f);
 
         float d0 = gauge != null ? gauge.DurationOf(ZenithGauge.ZPhase.Charging) : 20f;
@@ -311,6 +377,17 @@ public sealed class RelicMemoryHudView : MonoBehaviour
                 rt.anchoredPosition = new Vector2(first + PipStep * j, StripH * 0.5f + 7f);
                 _pips[i][j] = pip;
             }
+
+            // 이름 · 조각 수 — 띠 아래 가운데(「여명 1/4」, 수는 SetArcs가 쓴다)
+            var arcName = NewLabel("ArcName" + i, _overlay, UITheme.Thin.Caption, TextAlignmentOptions.Center);
+            var nrt = arcName.rectTransform;
+            nrt.anchorMin = nrt.anchorMax = new Vector2(0f, 0.5f);
+            nrt.pivot = new Vector2(0.5f, 0.5f);
+            nrt.anchoredPosition = new Vector2(x + w * 0.5f, -(StripH * 0.5f + DialLabelGap));
+            nrt.sizeDelta = new Vector2(ArcLabelW, DialLabelH);
+            arcName.color = LabelDim;
+            arcName.SetText(ArcFormat[i], 0);
+            _arcLabel[i] = arcName;
             x += w + StripGap;
         }
 
@@ -319,19 +396,19 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         _needle.anchorMin = _needle.anchorMax = new Vector2(0f, 0.5f);
         _needle.sizeDelta = new Vector2(2f, StripH + 8f);
 
-        var lblRt = NewRect("Hold", _overlay);
-        lblRt.anchorMin = lblRt.anchorMax = new Vector2(0f, 0.5f);
-        lblRt.pivot = new Vector2(0f, 0.5f);
-        lblRt.anchoredPosition = new Vector2(0f, -16f);
-        lblRt.sizeDelta = new Vector2(260f, 22f);
-        _holdLabel = lblRt.gameObject.AddComponent<TextMeshProUGUI>();
-        _holdLabel.text = "새벽을 붙들었다 · 낙일로 정오";
-        _holdLabel.fontSize = 16f;
-        _holdLabel.alignment = TextAlignmentOptions.MidlineLeft;
+        // 「새벽이 길다」 붙듦 안내 — 조각 점 위(띠 아래는 이름 줄). 끄지 않고 비운다:
+        // 예전엔 SetActive(false)로 숨겨 HUD 하드 가드(LateUpdate · 0.2초마다)가 다시 켠 채 그 프레임이 그려지고 다음 Update에 꺼져,
+        // 「…낙일로 정오」가 띠 아래에서 1초에 5번 깜빡였다(10-18 ⑨ 사용자 「HUD 오른쪽 아래에 정오 텍스트가 계속 깜빡이는 버그」).
+        _holdLabel = NewLabel("Hold", _overlay, UITheme.Thin.Small, TextAlignmentOptions.MidlineLeft);
+        var hrt = _holdLabel.rectTransform;
+        hrt.anchorMin = hrt.anchorMax = new Vector2(0f, 0.5f);
+        hrt.pivot = new Vector2(0f, 0.5f);
+        hrt.anchoredPosition = new Vector2(0f, HoldLabelY);
+        hrt.sizeDelta = new Vector2(260f, 22f);
         _holdLabel.color = HoldColor;
-        _holdLabel.raycastTarget = false;
-        TMPOutlineHelper.ApplySoftShadow(_holdLabel);
-        _holdLabel.gameObject.SetActive(false);
+
+        // 처음 안내 한 줄 — ShowHint가 채운다. 붙듦 안내 위, 띠 왼쪽 끝에서(오른쪽으로 길어도 Q · E 칸보다 위라 겹치지 않는다).
+        BuildHint(new Vector2(0f, 0.5f), HintY);
 
         // 엇갈린 빛 별 — 하루 띠 오른쪽 끝
         _star = NewStar(_overlay);
@@ -339,7 +416,10 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         Show();
     }
 
-    /// <summary>호마다 조각 수(가지형 「궤적」은 두 호에 다 센다). 2 · 4개면 공명 — 호가 밝아진다(4 = 금빛).</summary>
+    /// <summary>
+    /// 호마다 조각 수(가지형 「궤적」은 두 호에 다 센다). 2 · 4개면 공명 — 호가 밝아진다(4 = 금빛).
+    /// 띠 아래 이름도 「여명 1/4」로 — 공명 전 흐림 · 공명 2 잉크 · 공명 4 금(점과 같은 단계).
+    /// </summary>
     public void SetArcs(int dawn, int noon, int dusk)
     {
         if (!_dial || _overlay == null) return;
@@ -350,7 +430,22 @@ public sealed class RelicMemoryHudView : MonoBehaviour
             _arcAlpha[i] = tier >= 4 ? 1f : tier >= 2 ? 0.65f : 0.32f;
             for (int j = 0; j < 4; j++)
                 if (_pips[i][j] != null) _pips[i][j].color = j < counts[i] ? (tier >= 4 ? RungLinked : ArcColor[i]) : PipOff;
+            if (_arcLabel[i] == null) continue;
+            _arcLabel[i].SetText(ArcFormat[i], Mathf.Min(counts[i], 4));
+            _arcLabel[i].color = tier >= 4 ? UITheme.Thin.Gold : tier >= 2 ? UITheme.Thin.Ink : LabelDim;
         }
+    }
+
+    /// <summary>
+    /// 처음 안내 한 줄 — <paramref name="seconds"/>초 띄우고 걷는다(들어올 때 0.25초 · 나갈 때 0.5초 흐림).
+    /// 게임 시간으로 센다 — 조각을 고른 창(시간 멈춤)이 닫힌 뒤부터 보인다. 가웨인 하루 띠 · 랜슬롯 광기 눈금 둘 다(10-22 E1 A6).
+    /// </summary>
+    public void ShowHint(string text, float seconds)
+    {
+        if (_hint == null) return;
+        _hint.text = text;
+        _hintSec = _hintLeft = Mathf.Max(HintFadeIn + HintFadeOut, seconds);
+        if (_hintGroup != null) _hintGroup.alpha = 0f;
     }
 
     /// <summary>시간대 i(0 여명 · 1 정오 · 2 황혼)에 들어섰다 — 그 호가 한 번 빛난다.</summary>
@@ -373,7 +468,12 @@ public sealed class RelicMemoryHudView : MonoBehaviour
             _arc[i].color = c;
         }
         if (_needle != null) _needle.anchoredPosition = new Vector2(_arcStart[cur] + _arcSpan[cur] * Mathf.Clamp01(progress), 0f);
-        if (_holdLabel != null && _holdLabel.gameObject.activeSelf != holdingDawn) _holdLabel.gameObject.SetActive(holdingDawn);
+        if (_holdLabel != null && _holdShown != holdingDawn)
+        {
+            _holdShown = holdingDawn;
+            _holdLabel.text = holdingDawn ? "새벽을 붙들었다 · 낙일로 정오" : string.Empty;
+        }
+        TickHint();
         TickStar(dt);
     }
 
@@ -386,9 +486,10 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         StopShake();
         if (_overlay != null) Destroy(_overlay.gameObject);
         _embers.Clear();
-        for (int i = 0; i < 4; i++) { _rungIcon[i] = null; _rungFlash[i] = 0f; }
-        for (int i = 0; i < 3; i++) { _arc[i] = null; _arcFlash[i] = 0f; }
-        _link = null; _emberRow = null; _needle = null; _holdLabel = null;
+        for (int i = 0; i < 4; i++) { _rungIcon[i] = null; _rungFlash[i] = 0f; _rungLabel[i] = null; }
+        for (int i = 0; i < 3; i++) { _arc[i] = null; _arcFlash[i] = 0f; _arcLabel[i] = null; }
+        _rungCount = null; _emberRow = null; _needle = null; _holdLabel = null; _holdShown = false;
+        _hint = null; _hintGroup = null; _hintSec = _hintLeft = 0f;
         _grudgeLabel = null; _grudgeRim = null; _holdTick = null; _holdSec = null; _holdKey = -1;
         _star = null; _starOn = false; _starPop = 0f;
         _host = host;
@@ -396,6 +497,20 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         _overlay = NewRect(dial ? "RelicMemoryDial" : "RelicMemoryLadder", host);
         Anchor(_overlay, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         return true;
+    }
+
+    /// <summary>처음 안내 한 줄 자리 — <paramref name="anchor"/>(overlay 기준) 왼쪽 끝에서 오른쪽으로(420px · 흐림은 CanvasGroup — 하드 가드가 글자 알파를 1로 되돌린다).</summary>
+    private void BuildHint(Vector2 anchor, float y)
+    {
+        _hint = NewLabel("Hint", _overlay, UITheme.Thin.Caption, TextAlignmentOptions.MidlineLeft);
+        var irt = _hint.rectTransform;
+        irt.anchorMin = irt.anchorMax = anchor;
+        irt.pivot = new Vector2(0f, 0.5f);
+        irt.anchoredPosition = new Vector2(0f, y);
+        irt.sizeDelta = new Vector2(420f, ArcLabelH);
+        _hintGroup = _hint.gameObject.AddComponent<CanvasGroup>();
+        _hintGroup.blocksRaycasts = _hintGroup.interactable = false;
+        _hintGroup.alpha = 0f;
     }
 
     private void Show()
@@ -424,6 +539,16 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         _holdKey = key;
         if (key > 0) _holdSec.SetText("멈춤 {0:1}초", key * 0.1f);
         else _holdSec.text = key == -2 ? "멈춤" : string.Empty;
+    }
+
+    /// <summary>처음 안내 — 들어오고 머물고 흐려진 뒤 글을 비운다(끄지 않는다 — 하드 가드).</summary>
+    private void TickHint()
+    {
+        if (_hintLeft <= 0f || _hint == null) return;
+        _hintLeft = Mathf.Max(0f, _hintLeft - Time.deltaTime);
+        float a = Mathf.Min(1f, (_hintSec - _hintLeft) / HintFadeIn) * Mathf.Min(1f, _hintLeft / HintFadeOut);
+        if (_hintGroup != null) _hintGroup.alpha = a;
+        if (_hintLeft <= 0f) _hint.text = string.Empty;
     }
 
     /// <summary>켜진 별 — 켜지는 순간 1.5배에서 자리 잡고, 그 뒤 은은히 숨쉰다(배율 ±6% · 알파 0.88~1).</summary>

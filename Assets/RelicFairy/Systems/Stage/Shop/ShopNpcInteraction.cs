@@ -113,6 +113,8 @@ public class ShopNpcInteraction : MonoBehaviour
         _promptTmp.text = promptText;
 
         TMPOutlineHelper.ApplySoftShadow(_promptTmp);
+        RelicFloatText.ApplyThin(_promptTmp);                      // 10-22 3D 글자는 얇게(글꼴을 안 받아 굵은 DNF였다)
+        WorldTextScreenCap.Attach(_promptTmp, 34f, prompt: true);   // 다가가면 화면을 덮었다 — 1행 34 px 상한(1080 기준)
 
         _promptGo.SetActive(false);
     }

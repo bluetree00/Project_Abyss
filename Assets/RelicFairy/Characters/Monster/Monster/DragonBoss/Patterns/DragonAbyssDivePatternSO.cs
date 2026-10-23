@@ -90,6 +90,12 @@ public class DragonAbyssDivePatternSO : BossPatternSO
         return d.sqrMagnitude >= _minDistance * _minDistance;
     }
 
+    /// <summary>연계(흑염 폭풍 → 심연 급강하 · 10-22 E3 D2) — 띠 사이로 몰린 자리를 노린다. 폭풍의 일부라 쿨다운 · 거리는 보지 않는다. 사슬은 두 칸까지.</summary>
+    public override bool CanFollowUp(BossPatternContext ctx)
+        => ctx.Ctx.Runtime.PlayerTarget != null
+           && ctx.Blackboard is DragonBossBlackboard bb
+           && !bb.IsChainLink;
+
     public override SpecialStateBase GetRuntimeState() => _runtimeState ??= new DragonAbyssDiveState(this);
 }
 
@@ -282,7 +288,7 @@ internal sealed class DragonAbyssDiveState : FullLockState<DragonAbyssDivePatter
 
         var player = DragonAbyssFx.Player(ctx);
         if (player != null && DragonAbyssFx.InDisc(player.transform.position, _target, Data.ImpactRadius))
-            DragonAbyssFx.HitPlayer(ctx, Data.DamageMult, HitWeight.Heavy,
+            DragonAbyssFx.HitPlayer(ctx, Data.DamageMult * (DragonAbyssFx.Blackboard(ctx)?.ChainDamageScale ?? 1f), HitWeight.Heavy,   // 연계 둘째 칸 ×0.8(10-22 E3 D2)
                                     knockbackMult: Data.KnockbackMult, knockFrom: _target);   // 착지 충격 — 강
 
         PatternGuideHelper.SafeDestroy(ref _guide);

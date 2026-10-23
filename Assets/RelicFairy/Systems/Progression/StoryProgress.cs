@@ -47,6 +47,7 @@ public static class StoryProgress
         public const string KillPrefix = "kill.";           // 악몽기에 쓰러뜨림
         public const string SeenPrefix = "seen.";           // 1회성 장면·대사를 봤음
         public const string NightmareMode = "story.nmMode"; // 악몽 모드 켬(해금 = 엔딩 뒤) — 거점 게이트 토글
+        public const string Regroup    = "story.regroup";   // 리치 붕괴 → 추락 → Ch1 「재정비」 정산 대기(10-22 A10)
     }
 
     // 붕괴를 일으킨 쓰러뜨림은 붕괴 시점에 「봉인」으로 이미 기록했다 — 뒤따르는 방 클리어 알림이
@@ -55,6 +56,9 @@ public static class StoryProgress
 
     // 악몽기 리치를 처음 쓰러뜨린 전투 — 보스 클리어 흐름이 엔딩 연출을 틀고 내린다.
     private static bool s_endingPending;
+
+    // 추락 → Ch1 착지 「재정비」 정산 대기 — 테스트 오버라이드(저장 안 함)에서도 이번 플레이 동안은 남는다(10-22 A10).
+    private static bool s_regroupPending;
 
 #if UNITY_EDITOR
     /// <summary>에디터 설정 키 — 테스트 허브 메뉴(RelicFairy/Test Run/Story)가 쓴다.</summary>
@@ -103,6 +107,7 @@ public static class StoryProgress
     {
         s_skipNextDefeatOf = null;
         s_endingPending    = false;
+        s_regroupPending   = false;
 #if UNITY_EDITOR
         s_debugOverride = null;
         s_debugModeOn   = false;
@@ -130,6 +135,9 @@ public static class StoryProgress
             return IsNightmareModeUnlocked && Get(Rec.NightmareMode) > 0 ? StoryEra.NightmareMode : StoryEra.Liberated;
         }
     }
+
+    /// <summary>리치 붕괴 뒤 Ch1에 착지해 「재정비」로 런을 정산할 차례(10-22 A10) — 추락 중에 껐다 이어해도 착지 대기방에서 정산한다.</summary>
+    public static bool IsRegroupPending => s_regroupPending || Get(Rec.Regroup) > 0;
 
     /// <summary>봉인이 풀렸다(해방기 · 악몽 모드) — 보스 2페이지 · 리치 3줄.</summary>
     public static bool IsLiberated => Era != StoryEra.Sealed;
@@ -208,6 +216,7 @@ public static class StoryProgress
         if (PersistenceSuspended)
         {
             s_skipNextDefeatOf = Lich;
+            s_regroupPending   = true;
             Debug.Log("[Story] 붕괴 (테스트 오버라이드 — 저장 안 함)");
             return;
         }
@@ -221,6 +230,8 @@ public static class StoryProgress
         }
 
         SetFlag(Rec.SealPrefix + Lich);
+        SetFlag(Rec.Regroup);   // 착지 「재정비」 정산까지 — 같은 저장에 싣는다(10-22 A10)
+        s_regroupPending   = true;
         s_skipNextDefeatOf = Lich;
         foreach (var id in AllBosses)
             data.BreakBossSeal(id);
@@ -305,6 +316,17 @@ public static class StoryProgress
         data.AddRecord(Rec.NightmareMode, want - cur);
         Save();
         Debug.Log($"[Story] 악몽 모드 {(on ? "켬" : "끔")}");
+    }
+
+    /// <summary>「재정비」 정산을 마쳤다(10-22 A10).</summary>
+    public static void ClearRegroup()
+    {
+        s_regroupPending = false;
+        var data = BackendGameData.Instance?.Data;
+        int cur  = data?.GetRecord(Rec.Regroup) ?? 0;
+        if (data == null || cur == 0 || PersistenceSuspended) return;
+        data.AddRecord(Rec.Regroup, -cur);
+        Save();
     }
 
     /// <summary>1회성 장면·대사를 봤다고 남긴다. 처음이면 true.</summary>

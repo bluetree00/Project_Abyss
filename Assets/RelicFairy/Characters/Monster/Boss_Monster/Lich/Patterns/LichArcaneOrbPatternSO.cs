@@ -66,6 +66,11 @@ public class LichArcaneOrbPatternSO : BossPatternSO
         return Vector3.Distance(ctx.Ctx.Transform.position, ctx.Ctx.Runtime.PlayerTarget.position) <= maxRange;
     }
 
+    /// <summary>연계(10-22 E2 L1 「원소 포격 → 비전 구체」) — 앞 패턴의 일부라 자기 쿨다운은 보지 않는다.</summary>
+    public override bool CanFollowUp(BossPatternContext ctx)
+        => ctx.Ctx.Runtime.PlayerTarget != null
+           && Vector3.Distance(ctx.Ctx.Transform.position, ctx.Ctx.Runtime.PlayerTarget.position) <= maxRange;
+
     public override SpecialStateBase GetRuntimeState() => _state;
 }
 

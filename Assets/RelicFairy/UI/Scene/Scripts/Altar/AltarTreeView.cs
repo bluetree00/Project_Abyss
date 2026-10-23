@@ -20,13 +20,19 @@ using UnityEngine.UI;
 /// 선은 산 길 2px 금 90% · 열린 길 1px 금 35% · 한 칸 앞 1px 잉크 18%(톤 v2 선 단계 1 · 2 · 3). 글자는 Noto(가짜 굵게 없음).</para>
 /// <para><b>10-13 Artsystack</b> — 갈래 이름 앞에 갈래 문장(흰 아이콘 · 갈래 색). 트리 바탕 그림(skill bg)은 쓰지 않는다:
 /// 동심원 넷이 시기 고리(가로 타원 · 다음 시기만 점선 · 그 너머는 안 그림)와 반지름 · 모양이 달라 고리가 두 벌로 읽힌다.</para>
+/// <para><b>10-18 크게 + 끌기</b>(사용자 「노드를 알아볼 수 있게 키우고 마우스 클릭 이동으로 넓게」) — 트리를 창에 맞춰 줄이지 않고
+/// <see cref="ReadableScale"/>로 그린다(전체 맞춤은 휠로 물러날 수 있는 끝). 끌어서 옮기고, 처음엔 제단 가운데와 자동 초점 노드의 중간에 놓는다.
+/// 게임패드 · 키보드로 고른 노드가 창 가장자리 밖이면 화면이 따라간다.</para>
 /// </summary>
-public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandler, IScrollHandler
+public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IScrollHandler
 {
     // ── Constants ────────────────────────────────────────
     private const float LabelAllowance = 34f;
     private const float MaxFitScale    = 1.05f;
+    private const float ReadableScale  = 1.1f;   // 10-18 — 창 맞춤(해방기 ≈0.65배 · 지름 56 → 36px · 글자 15 → 10px) 대신 이 배율(지름 62 · 글자 16.5px)
     private const float MinZoom = 0.8f, MaxZoom = 1.8f;
+    private const float KeepInViewMargin = 80f;  // 고른 노드가 창 가장자리 이만큼 안쪽에 들게
+    private const float PanFollowRate    = 12f;  // 따라가기 감쇠(초당) — 약 0.2초에 닿는다
     private const float MoteInterval   = 8f;   // 3 → 8초(10-11 v2 — 쉬는 화면에서 움직이는 것을 줄인다)
     private const float MoteSpeed      = 170f;
     private const int   MotePool       = 8;
@@ -85,8 +91,10 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
     private Image    _centerDisc, _centerTrack, _centerFill, _centerGlyph;
     private TMP_Text _centerTitle, _centerName, _centerStatus;
     private Rect     _bounds;
-    private float    _fit = 1f, _zoom = 1f;
-    private Vector2  _pan;
+    private float    _fit = ReadableScale, _zoom = 1f;
+    private float    _fitAll = MaxFitScale;   // 트리 전체가 창에 드는 배율 — 휠로 물러날 수 있는 끝
+    private Vector2  _pan, _panGoal;
+    private bool     _panGliding, _viewPlaced, _dragging;
     private AltarTreeNodeView _focused;
     private float _focusedAt;   // 초점이 바뀐 실시간 — 그 클릭이 고른 클릭인지 두 번째 누름인지 가른다(10-14)
     private const float SameClickSec = 0.35f;
@@ -104,6 +112,7 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
     {
         // 제단 문양은 이제 돌지 않는다(10-11 v2 — 계속 움직이는 것은 「살 수 있음」 숨쉬기 하나)
         if (!_playing) TickMotes(Time.unscaledDeltaTime);
+        if (_panGliding) TickPanGlide(Time.unscaledDeltaTime);
     }
 
     private void OnRectTransformDimensionsChange()
@@ -159,6 +168,7 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
         view.SetFocused(true);
         if (select && EventSystem.current != null && EventSystem.current.currentSelectedGameObject != view.gameObject)
             EventSystem.current.SetSelectedGameObject(view.gameObject);
+        if (select) Reveal(view);
         NodeFocused?.Invoke(node);
     }
 
@@ -627,7 +637,9 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
     {
         var size = _rt.rect.size;
         if (size.x < 10f || size.y < 10f) return;
-        _fit = Mathf.Min(MaxFitScale, Mathf.Min(size.x / _bounds.width, size.y / _bounds.height));
+        // 10-18 — 전체 맞춤은 휠로 물러날 수 있는 끝으로만 쓰고, 기본은 읽히는 배율로 그려 끌어서 옮긴다
+        _fitAll = Mathf.Min(MaxFitScale, Mathf.Min(size.x / _bounds.width, size.y / _bounds.height));
+        _fit    = ReadableScale;
         ApplyTransform();
     }
 
@@ -635,12 +647,52 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
     {
         float s = _fit * _zoom;
         _content.localScale = new Vector3(s, s, 1f);
-        // 확대했을 때만 옮길 수 있다 — 한 화면에 들어오면 트리가 가운데에 고정된다.
+        // 트리가 창보다 크면 그만큼만 옮길 수 있다 — 창보다 작은 쪽(축)은 가운데에 고정된다.
+        _pan = ClampPan(_pan);
+        _content.anchoredPosition = -_bounds.center * s + _pan;
+    }
+
+    private Vector2 ClampPan(Vector2 pan)
+    {
+        float s = _fit * _zoom;
         var size = _rt.rect.size;
         float maxX = Mathf.Max(0f, (_bounds.width * s - size.x) * 0.5f);
         float maxY = Mathf.Max(0f, (_bounds.height * s - size.y) * 0.5f);
-        _pan = new Vector2(Mathf.Clamp(_pan.x, -maxX, maxX), Mathf.Clamp(_pan.y, -maxY, maxY));
-        _content.anchoredPosition = -_bounds.center * s + _pan;
+        return new Vector2(Mathf.Clamp(pan.x, -maxX, maxX), Mathf.Clamp(pan.y, -maxY, maxY));
+    }
+
+    /// <summary>
+    /// 고른 노드가 보이게 옮긴다. 처음 한 번은 제단 가운데와 그 노드의 중간에 바로 놓는다(가운데 「다음」 표시가 함께 보이게) ·
+    /// 그 뒤엔 창 가장자리 <see cref="KeepInViewMargin"/> 밖일 때만 부드럽게 따라간다(마우스로 누른 노드는 이미 보이므로 대개 그대로).
+    /// </summary>
+    private void Reveal(AltarTreeNodeView view)
+    {
+        if (_place == null || _rt == null || !_place.TryGetValue(view.Node.Id, out var pl)) return;
+        float s = _fit * _zoom;
+        if (!_viewPlaced)
+        {
+            _viewPlaced = true;
+            _panGliding = false;
+            _pan = -(pl.Position * 0.5f - _bounds.center) * s;
+            ApplyTransform();
+            return;
+        }
+        var half = _rt.rect.size * 0.5f - Vector2.one * KeepInViewMargin;
+        var p    = (pl.Position - _bounds.center) * s + _pan;   // 창 가운데 기준 노드 자리
+        var goal = _pan;
+        if (p.x > half.x) goal.x -= p.x - half.x; else if (p.x < -half.x) goal.x += -half.x - p.x;
+        if (p.y > half.y) goal.y -= p.y - half.y; else if (p.y < -half.y) goal.y += -half.y - p.y;
+        goal = ClampPan(goal);
+        if ((goal - _pan).sqrMagnitude < 1f) return;
+        _panGoal    = goal;
+        _panGliding = true;
+    }
+
+    private void TickPanGlide(float dt)
+    {
+        _pan = Vector2.Lerp(_pan, _panGoal, 1f - Mathf.Exp(-PanFollowRate * dt));
+        if ((_pan - _panGoal).sqrMagnitude < 1f) { _pan = _panGoal; _panGliding = false; }
+        ApplyTransform();
     }
 
     private void SetEdgeProgress(string child, float k)
@@ -848,11 +900,17 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
 
     private void OnNodeHover(AltarTreeNodeView v, bool on)
     {
+        if (_dragging) return;   // 끄는 동안 지나가는 노드마다 길을 밝히지 않는다
         _hoverId = on ? v.Node.Id : (_hoverId == v.Node.Id ? null : _hoverId);
         StyleEdges();
     }
 
-    public void OnBeginDrag(PointerEventData eventData) { }
+    // 노드를 누른 채 끌어도 여기로 온다(노드는 끌기 처리기가 없다) — 10px 넘게 끌면 uGUI가 그 누름을 클릭에서 뺀다
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        _dragging   = true;
+        _panGliding = false;
+    }
 
     public void OnDrag(PointerEventData eventData)
     {
@@ -862,10 +920,19 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
         ApplyTransform();
     }
 
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        _dragging = false;
+        _hoverId  = null;
+        StyleEdges();
+    }
+
     public void OnScroll(PointerEventData eventData)
     {
         float step = eventData.scrollDelta.y > 0f ? 1.1f : eventData.scrollDelta.y < 0f ? 1f / 1.1f : 1f;
-        _zoom = Mathf.Clamp(_zoom * step, MinZoom, MaxZoom);
+        float min  = Mathf.Min(MinZoom, _fitAll / _fit);   // 10-18 — 트리 전체가 보일 때까지 물러날 수 있다
+        _zoom = Mathf.Clamp(_zoom * step, min, MaxZoom);
+        _panGliding = false;
         ApplyTransform();
     }
 }

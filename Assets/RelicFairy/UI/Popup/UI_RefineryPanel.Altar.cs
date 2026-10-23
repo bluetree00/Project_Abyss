@@ -27,6 +27,8 @@ public sealed partial class UI_RefineryPanel
     private const float ColRightX    =  420f;
     private const float ColTopY      =  300f;   // 열 머리 줄
     private const float RowPitch     =   64f;
+    private const float MeltY        =  -36f;   // 「재료 녹이기」 버튼(이 방 이벤트 줄 아래)
+    private const float MeltH        =   52f;
     private const float SpinBigW     =  520f;
     private const float SpinBigH     =   88f;
     private const float SpinBigY     = -360f;
@@ -43,12 +45,13 @@ public sealed partial class UI_RefineryPanel
 
     // ── Private ──
     private CanvasGroup _wIdle, _wAltar;   // 글 · 열 · 버튼 / 가운데 제단(연출 동안에도 남아 충전 · 룰렛 · 착지 표적이 된다)
-    private Image _iHalo, _iRays, _iDash, _iRingIn, _iOre, _iOreGlow, _iSpin, _iSpinIcon, _iCostIcon, _iGemGlow;
+    private Image _iHalo, _iRays, _iDash, _iRingIn, _iOre, _iOreGlow, _iSpin, _iSpinIcon, _iCostIcon, _iGemGlow, _iMelt;
+    private Image[] _iMeltLine;
     private Image[] _iGemImgs;
     private Color[] _iGemBase;
     private Image[] _iSpinLine;
     private RectTransform[] _iGems;
-    private TMP_Text _iSub, _iOwn, _iSpinLabel, _iSpinCost, _iCost, _iNext, _iMode, _iBoost, _iHint, _iEvent, _iPity;
+    private TMP_Text _iSub, _iOwn, _iSpinLabel, _iSpinCost, _iCost, _iNext, _iMode, _iBoost, _iHint, _iEvent, _iPity, _iMeltLabel, _iMeltNote;
     private readonly OddsRow[] _iOdds = new OddsRow[3];
 
     /// <summary>「나올 수 있는 등급」 한 줄 — ◆ · 등급 이름 · 큰 % · 막대(바탕 선 + 채움).</summary>
@@ -221,6 +224,18 @@ public sealed partial class UI_RefineryPanel
         // 이 방 돌발 이벤트(10-15) — 「◆ 반값 정제 — 원석 절반 · 이 방에서만」(금 = 지금 걸려 있다)
         _iEvent = WText(idle, "RoomEvent", UIWeight.Medium, UITheme.Thin.Body, UITheme.Thin.Gold, TextAlignmentOptions.MidlineLeft);
         PutLeft(_iEvent.rectTransform, ColRightX, ColTopY - 62f - 3f * RowPitch, ColW, 28f);
+
+        // 재료 녹이기(10-17) — 원석이 모자라고 강화재료로 채울 수 있을 때만 보인다. 누르면 이번 정제에 모자란 만큼만 녹인다.
+        // 기본은 누를 때만(재련소가 다음에 올 때를 위해 아껴 둘 수 있게) — 그래서 금 테 · 불 없이 차분한 선.
+        _iMelt = ShopUIStyle.MakeImage(idle, "Melt", ButtonFill, raycast: true);
+        PutLeft(_iMelt.rectTransform, ColRightX, MeltY, ColW, MeltH);
+        _iMeltLine = StyleFlatButton(_iMelt);
+        SetLine(_iMeltLine, UITheme.Thin.InkA(0.35f));
+        _iMeltLabel = WText(_iMelt.transform, "Label", UIWeight.Regular, UITheme.Thin.Body, UITheme.Thin.Ink, TextAlignmentOptions.Center);
+        ShopUIStyle.Stretch(_iMeltLabel.rectTransform);
+        AddClick(_iMelt.gameObject, OnMeltClicked);
+        _iMeltNote = WText(idle, "MeltNote", UIWeight.Regular, UITheme.Thin.Small, UITheme.Thin.InkA(0.55f), TextAlignmentOptions.MidlineLeft);
+        PutLeft(_iMeltNote.rectTransform, ColRightX, MeltY - MeltH * 0.5f - 22f, ColW, 26f);
     }
 
     /// <summary>아래 가운데 큰 [정제하기 ◆ N] — 평판 + 1px 금(창 버튼과 같은 모양) · 아래 안내 줄.</summary>
@@ -323,6 +338,15 @@ public sealed partial class UI_RefineryPanel
                       : spent ? $"{RefineryService.EventTitle(ev)} — 이미 썼다"
                       : $"◆ {RefineryService.EventTitle(ev)} — {RefineryService.EventLine(ev)} · 이 방에서만";
         _iEvent.color = spent ? UITheme.Thin.InkA(0.5f) : UITheme.Thin.Gold;
+
+        int melt = _svc.MeltForNext;
+        _iMelt.gameObject.SetActive(melt > 0);
+        _iMeltNote.gameObject.SetActive(melt > 0);
+        if (melt > 0)
+        {
+            _iMeltLabel.text = $"강화재료 {melt} → 원석 {melt}  녹이기";
+            _iMeltNote.text  = $"재련소의 강화재료를 원석으로 1 : 1 · 남은 강화재료 {_svc.MaterialOwned}";
+        }
     }
 
     /// <summary>[정제하기] 큰 버튼 — 비용 숫자는 모자라면 빨강, 잠금 중엔 흐림(창 버튼과 같은 규칙).</summary>

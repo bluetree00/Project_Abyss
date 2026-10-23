@@ -19,6 +19,12 @@ public static class CurrencyVisuals
     private static CurrencyVisualSetSO s_set;
     private static bool                s_loading;
     private static readonly bool[]     s_translucent = new bool[KindCount];
+    private static readonly Material[] s_outline     = new Material[KindCount];
+
+    // 외곽선(10-22) — 몬스터 외곽선과 같은 셰이더(뒷면을 화면 px만큼 밀어 낸 껍데기). 굵기는 1080p 기준 px
+    private const string OutlineShader  = "RelicFairy/MonsterOutline";
+    private const float  OutlineWidthPx = 1.5f;
+    private const int    OutlineQueue   = 2460;   // 불투명이 다 그려진 뒤 — 깊이를 안 써서 먼저 그리면 바닥이 덮는다
 
     public static bool IsReady => s_set != null;
 
@@ -28,6 +34,7 @@ public static class CurrencyVisuals
         s_set     = null;
         s_loading = false;
         Array.Clear(s_translucent, 0, KindCount);
+        Array.Clear(s_outline, 0, KindCount);
     }
 
     /// <summary>
@@ -103,7 +110,50 @@ public static class CurrencyVisuals
         });
     }
 
+    /// <summary>
+    /// 얇은 금빛 · 보랏빛 테두리(10-22 사용자 「골드 · 드랍 오브젝트 리소스 퀄리티 — 테두리나 작은 빛기둥」).
+    /// 모양 메시를 외곽선 재질로 한 겹 더 그리는 자식 「~Outline」을 <b>꺼 둔 채</b> 만든다 — 이름이 「~」라 디졸브가 건드리지 않으므로
+    /// 부르는 쪽이 내려앉으면 켜고 사라지기 전에 끈다. 셰이더를 못 찾으면 null(테두리 없이 그대로).
+    /// </summary>
+    public static GameObject AttachOutline(GameObject go, CurrencyVisualKind kind)
+    {
+        if (go == null) return null;
+        var mf  = go.GetComponentInChildren<MeshFilter>(true);
+        var mat = OutlineMaterial(kind);
+        if (mf == null || mf.sharedMesh == null || mat == null) return null;
+
+        var o = new GameObject("~Outline");
+        o.transform.SetParent(mf.transform, false);
+        o.AddComponent<MeshFilter>().sharedMesh = mf.sharedMesh;
+        var r    = o.AddComponent<MeshRenderer>();
+        var mats = new Material[Mathf.Max(1, mf.sharedMesh.subMeshCount)];
+        for (int i = 0; i < mats.Length; i++) mats[i] = mat;
+        r.sharedMaterials   = mats;
+        r.shadowCastingMode = ShadowCastingMode.Off;
+        r.receiveShadows    = false;
+        o.SetActive(false);
+        return o;
+    }
+
     // ── Private Methods ─────────────────────────────────────
+
+    private static Material OutlineMaterial(CurrencyVisualKind kind)
+    {
+        int i = (int)kind;
+        if (i < 0 || i >= KindCount) return null;
+        if (s_outline[i] != null) return s_outline[i];
+
+        var shader = Shader.Find(OutlineShader);
+        if (shader == null) return null;
+        s_outline[i] = new Material(shader) { name = $"CurrencyOutline_{kind}", renderQueue = OutlineQueue };
+        s_outline[i].SetFloat("_OutlineWidth", OutlineWidthPx);
+        s_outline[i].SetColor("_OutlineColor", kind switch
+        {
+            CurrencyVisualKind.Essence => new Color(0.95f, 0.75f, 1.6f),   // 기억의 보랏빛(살짝 HDR — 바닥에서 테두리가 읽히게)
+            _                          => new Color(1.35f, 1.05f, 0.5f),   // 금빛
+        });
+        return s_outline[i];
+    }
 
     private static bool IsTranslucent(CurrencyVisualKind kind)
     {

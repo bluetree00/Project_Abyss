@@ -4,7 +4,7 @@ namespace RelicFairy.Monster
 {
 /// <summary>
 /// 화룡 바닥 예고 — <see cref="PatternGuideHelper"/> 데칼(리치 가이드를 화룡 문양으로 바꾼 것)을 감싼다.
-/// 원(물기·얼음 강타)과 직선(돌진). 선·채움 색 = 호출자가 준 색(속성 색이 뜻을 가진다).
+/// 원(물기·얼음 강타)과 직선(돌진). 선·채움 색 = 호출자가 준 색 — 바닥 예고는 공용 공격 색(PatternGuideHelper.AttackFill · 10-23 가이드 색 통일 — 속성 색은 이펙트만).
 /// 채움은 <see cref="BeginFill"/>로 차오르고, 판정 순간 <see cref="TransitionToHitPhase"/>로 판정 색이 되어 잠시 남는다.
 /// </summary>
 public sealed class DragonBossWarningZone : MonoBehaviour

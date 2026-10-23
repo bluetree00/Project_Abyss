@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 
 /// <summary>
-/// 정제소 — 원석을 넣고 돌리면 <b>룬 하나를 무작위로</b> 뽑는다. 런 스코프 상태(누진 비용).
+/// 정제소 — 원석을 넣고 돌리면 <b>룬 하나를 무작위로</b> 뽑는다. 런 스코프 상태(천장 · 기록) — 비용은 방마다 처음부터 누진(10-18).
 /// 설계: 바탕화면 기획/RelicFairy_기획_재련소_정제소.md §2.2(원석 → 룬) · 09-28 사용자 「간단하게 줄여서 룬을 랜덤으로 뽑는 시스템으로」.
 ///
 /// 흐름: <see cref="Craft"/> → 등급 굴림(희귀 이상 · 영웅 · 전설도 처음부터 — 10-14 사용자) → 그 등급 룬 풀에서 하나
@@ -49,6 +49,7 @@ public sealed class RefineryService
         _eventOwner = owner;
         RoomEvent   = ev;
         _purityUsed = false;
+        VisitCraftCount = 0;   // 비용은 방마다 처음부터(10-18)
     }
 
     /// <summary>건 방만 푼다 — 다음 방(정제소가 이어 나올 수 있다)이 먼저 걸었으면 그대로 둔다.</summary>
@@ -83,7 +84,15 @@ public sealed class RefineryService
 
     private int EventPrice(int cost) => RoomEvent == RefineryEvent.HalfPrice ? Mathf.Max(1, Mathf.RoundToInt(cost * 0.5f)) : cost;
 
+    /// <summary>이번 런에 정제한 횟수(기록 · 이어하기 세이브). 비용은 이것이 아니라 <see cref="VisitCraftCount"/>로 정한다.</summary>
     public int CraftCount { get; private set; }
+
+    /// <summary>
+    /// 이번 방문(정제소 방 하나)에서 정제한 횟수 — 비용 단계. 방에 들어올 때(<see cref="BeginRoomEvent"/>) 0으로 돌아간다
+    /// (10-18 사용자 「누를수록 원석이 많이 들지만 다시 방에 진입할 때는 값을 초기화」 — 예전엔 런 전체에 쌓여 뒤 챕터 정제소가 비쌌다).
+    /// 천장(<see cref="PityCount"/>)은 그대로 런 단위다.
+    /// </summary>
+    public int VisitCraftCount { get; private set; }
 
     /// <summary>전설 없이 돌린 수(천장 · 0 ~ <see cref="PityLimit"/>). 전설이 나오면 0.</summary>
     public int PityCount { get; private set; }
@@ -94,7 +103,7 @@ public sealed class RefineryService
     /// <summary>이어하기 — 천장 진척을 되살린다.</summary>
     public void RestorePity(int count) => PityCount = Mathf.Clamp(count, 0, PityLimit);
 
-    /// <summary>이어하기 — 저장된 정제 횟수(비용 단계)를 되살린다. 없으면 복원 뒤 비용이 첫 단계로 돌아갔다(10-09 출시 점검).</summary>
+    /// <summary>이어하기 — 저장된 런 정제 횟수(기록)를 되살린다. 비용 단계는 방마다 처음부터라 따로 되살리지 않는다(10-18).</summary>
     public void RestoreCraftCount(int count) => CraftCount = Mathf.Max(0, count);
 
     public RefineryService(RunFuelBank fuel, RunItemInventory inventory)
@@ -105,11 +114,31 @@ public sealed class RefineryService
 
     // ── 조회 ──
 
-    public int  CurrentCost => EventPrice(BaseCost + (CraftCount / 2) * CostStep);
-    /// <summary>이번 정제를 한 뒤의 비용 — 제단 화면 「다음 정제부터 원석 N」(반값 정제 방이면 그 값도 절반).</summary>
-    public int  NextCost    => EventPrice(BaseCost + ((CraftCount + 1) / 2) * CostStep);
+    public int  CurrentCost => EventPrice(BaseCost + (VisitCraftCount / 2) * CostStep);
+    /// <summary>이번 정제를 한 뒤의 비용 — 제단 화면 「다음 정제부터 원석 N」(반값 정제 방이면 그 값도 절반). 방을 나가면 다시 처음 값.</summary>
+    public int  NextCost    => EventPrice(BaseCost + ((VisitCraftCount + 1) / 2) * CostStep);
     public int  OreOwned    => _fuel?.RuneOre ?? 0;
     public bool CanAfford   => OreOwned >= CurrentCost;
+
+    // ── 재료 녹이기(10-17 · 파워밸런스 진단 안 C-②) ──
+    // 재련소의 강화재료 1 → 원석 1(이 방에서만 · 되돌리기 없음). 재련소를 건너뛴 챕터의 재료가 룬이 될 길 —
+    // 「지금 룬 vs 다음 재련소에서 무기」가 진짜 맞바꿈이 되게. 상점 값으로 재료 20G · 원석 10G라 녹이면 절반을 잃는다.
+
+    public int MaterialOwned => _fuel?.EnhanceMaterial ?? 0;
+
+    /// <summary>이번 정제에 모자란 원석을 채울 강화재료 수 — 원석이 모자라고 재료로 다 채울 수 있을 때만(아니면 0).
+    /// 누를 때마다 한 번 정제할 만큼만 녹인다 — 나머지 재료는 다음 재련소를 위해 남는다.</summary>
+    public int MeltForNext
+    {
+        get
+        {
+            int need = CurrentCost - OreOwned;
+            return need > 0 && MaterialOwned >= need ? need : 0;
+        }
+    }
+
+    /// <summary>강화재료 <paramref name="material"/>을 같은 수의 원석으로 녹인다. 모자라면 false(무변경).</summary>
+    public bool TryMelt(int material) => _fuel != null && _fuel.Convert(FuelKind.EnhanceMaterial, FuelKind.RuneOre, material);
 
     /// <summary>
     /// 이번 돌리기 등급 확률. 표시(확률 막대)와 굴림이 이 한 곳을 같이 본다.
@@ -158,6 +187,7 @@ public sealed class RefineryService
             return RefineryOutcome.Fail("원석이 부족합니다");
 
         CraftCount++;
+        VisitCraftCount++;
         if (RoomEvent == RefineryEvent.HighPurity) _purityUsed = true;
         // 천장 — 보여 주는 쪽(좋은 장)이 전설이면 처음부터 · 아니면 한 칸
         bool gotLegend = rune.rarity >= ItemRarity.Legendary || (alt != null && alt.rarity >= ItemRarity.Legendary);

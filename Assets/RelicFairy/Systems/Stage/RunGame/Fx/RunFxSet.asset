@@ -29,7 +29,9 @@ MonoBehaviour:
     scale: 1
     offset: {x: 0, y: 0, z: 0}
     lifetime: 2
-    note: "\uBC15\uC790 \uACE0\uB9AC \u2014 \uD770 \uACE0\uB9AC + \uBE44\uD2C0\uB9B0 \uBE5B\uC904\uAE30(Hovl RPG Buff white twist, \uD770\uBE5B \uC6D0\uBCF8 \u00B7 \uC0C9 \uACF1 OK)"
+    note: "\uBC15\uC790 \uACE0\uB9AC \u2014 \uD770 \uACE0\uB9AC + \uBE44\uD2C0\uB9B0
+      \uBE5B\uC904\uAE30(Hovl RPG Buff white twist, \uD770\uBE5B \uC6D0\uBCF8 \xB7
+      \uC0C9 \uACF1 OK)"
     recolor: 0
     mute: 
     vividTint: 1
@@ -39,7 +41,8 @@ MonoBehaviour:
     scale: 0.7
     offset: {x: 0, y: 0, z: 0}
     lifetime: 0
-    note: "\uC608\uACE0 \u2014 \uBE5B \uD638\uAC00 \uBAA8\uC774\uB294 \uC624\uB77C(Hovl Auras 3, \uBC18\uBCF5, \uC7AC\uCC44\uC0C9)"
+    note: "\uC608\uACE0 \u2014 \uBE5B \uD638\uAC00 \uBAA8\uC774\uB294 \uC624\uB77C(Hovl
+      Auras 3, \uBC18\uBCF5, \uC7AC\uCC44\uC0C9)"
     recolor: 1
     mute: 
     vividTint: 0
@@ -58,7 +61,8 @@ MonoBehaviour:
     scale: 1
     offset: {x: 0, y: 0, z: 0}
     lifetime: 0
-    note: "\uB5A0 \uC788\uB294 \uBE5B(\uBC18\uBCF5) \u2014 \uC720\uBB3C \uAE30\uC5B5 \uBE5B(Hovl RPG Gold dot\uC758 \uD770 \uBE5B\uB9CC \u00B7 \uC7AC\uCC44\uC0C9)"
+    note: "\uB5A0 \uC788\uB294 \uBE5B(\uBC18\uBCF5) \u2014 \uC720\uBB3C \uAE30\uC5B5
+      \uBE5B(Hovl RPG Gold dot\uC758 \uD770 \uBE5B\uB9CC \xB7 \uC7AC\uCC44\uC0C9)"
     recolor: 1
     mute: Gold dot,Ground,ShockWave
     vividTint: 1
@@ -79,7 +83,8 @@ MonoBehaviour:
     scale: 1
     offset: {x: 0, y: 0, z: 0}
     lifetime: 0
-    note: "\uBCF4\uC0C1 \uB4F1\uAE09 \uAE30\uB465 \u2014 \uB808\uC5B4(\uC6D0\uB798 \uCCAD\uBE5B \u00B7 \uBC88\uC9D0 \uB054)"
+    note: "\uBCF4\uC0C1 \uB4F1\uAE09 \uAE30\uB465 \u2014 \uB808\uC5B4(\uC6D0\uB798
+      \uCCAD\uBE5B \xB7 \uBC88\uC9D0 \uB054)"
     recolor: 0
     mute: Lens,Flare_03
     vividTint: 0
@@ -89,7 +94,8 @@ MonoBehaviour:
     scale: 1
     offset: {x: 0, y: 0, z: 0}
     lifetime: 0
-    note: "\uBCF4\uC0C1 \uB4F1\uAE09 \uAE30\uB465 \u2014 \uC5D0\uD53D(\uC6D0\uB798 \uBCF4\uB78F\uBE5B \u00B7 \uBC88\uC9D0 \uB054)"
+    note: "\uBCF4\uC0C1 \uB4F1\uAE09 \uAE30\uB465 \u2014 \uC5D0\uD53D(\uC6D0\uB798
+      \uBCF4\uB78F\uBE5B \xB7 \uBC88\uC9D0 \uB054)"
     recolor: 0
     mute: Lens,Flare_03
     vividTint: 0
@@ -99,7 +105,8 @@ MonoBehaviour:
     scale: 1
     offset: {x: 0, y: 0, z: 0}
     lifetime: 0
-    note: "\uBCF4\uC0C1 \uB4F1\uAE09 \uAE30\uB465 \u2014 \uC804\uC124(\uC6D0\uB798 \uAE08\uBE5B \u00B7 \uBC88\uC9D0 \uB054)"
+    note: "\uBCF4\uC0C1 \uB4F1\uAE09 \uAE30\uB465 \u2014 \uC804\uC124(\uC6D0\uB798
+      \uAE08\uBE5B \xB7 \uBC88\uC9D0 \uB054)"
     recolor: 0
     mute: Lens,Flare_04,Flare_05
     vividTint: 0
@@ -108,7 +115,9 @@ MonoBehaviour:
     scale: 0.08
     offset: {x: 0, y: 0, z: 0}
     lifetime: 0
-    note: "\uCC55\uD130 \uAC8C\uC774\uD2B8 \u2014 \uC11C \uC788\uB294 \uC18C\uC6A9\uB3CC\uC774 \uBB38(SSEP 16, \uBC18\uBCF5, \uC6D0\uB798 \uBE5B\uAE54 \u00B7 \uC785\uC790 \uC7A5 \uD558\uB098 \uB054)"
+    note: "\uCC55\uD130 \uAC8C\uC774\uD2B8 \u2014 \uC11C \uC788\uB294 \uC18C\uC6A9\uB3CC\uC774
+      \uBB38(SSEP 16, \uBC18\uBCF5, \uC6D0\uB798 \uBE5B\uAE54 \xB7 \uC785\uC790 \uC7A5
+      \uD558\uB098 \uB054)"
     recolor: 0
     mute: Effect_16_ParticleField
     vividTint: 0
@@ -119,9 +128,10 @@ MonoBehaviour:
     lifetime: 0
     note: "\uC77C\uBC18 \uBAAC\uC2A4\uD130 \uACF5\uACA9 \uC608\uACE0 \uBC18\uC9DD\uC784
       \u2014 \uB9DE\uD788\uAE30 0.45\uCD08 \uC804 \uBA38\uB9AC\uC5D0\uC11C(Hovl RPG
-      Yellow Flash, \uBAB8 \uB192\uC774\uB85C \uD06C\uAE30)"
+      Yellow Flash \xB7 \uC5F0\uAE30 \uB450 \uCE35 \uB054, \uBAB8 \uB192\uC774\uB85C
+      \uD06C\uAE30)"
     recolor: 0
-    mute: 
+    mute: Smoke,Smoke2
     vividTint: 0
   guideCircle: {fileID: 2100000, guid: 6ae8763c346894b46b4d8b79f3ed97cd, type: 2}
   guideArrow: {fileID: 2100000, guid: f11150cb5027606408b87e0ef33e5340, type: 2}

@@ -221,17 +221,14 @@ public class DragonAirMeteorPassiveRunner
         Vector3 landPos  = new Vector3(cellBase.x, floorY + 0.05f, cellBase.z);
         float   warnDur  = kind == Kind.Aimed ? AimedWarn : kind == Kind.Big ? BigWarn : ScatterWarn;
         float   dmgMul   = kind == Kind.Aimed ? DragonThreat.AimedDamage : kind == Kind.Big ? DragonThreat.BigDamage : DragonThreat.ScatterDamage[tier];
-        float   sizeMul  = DragonThreat.MeteorScale(radius);   // 이펙트 = 판정 크기
+        float   sizeMul  = DragonThreat.MeteorScale(radius);   // 땅 효과 = 판정 크기
 
         // ── 경고 타일 생성 ──────────────────────────────────────
         var warnTiles = new List<GameObject>(cells.Count);
         var warnMats  = new List<Material>(cells.Count);
         var warnMrs   = new List<MeshRenderer>(cells.Count);
-        // 예고 색 — 1페이지는 예전대로 불, 2페이지는 심연(검보라)
-        Color fireBase = DragonBossVisualHelper.GetElementColor(
-            GetCurrentElement() == DragonBossBlackboard.DragonElement.Abyss
-                ? DragonBossBlackboard.DragonElement.Abyss
-                : DragonBossBlackboard.DragonElement.Fire);
+        // 예고 색 — (10-23 가이드 색 통일) 1 · 2페이지 모두 공용 공격 색(불 · 심연 색은 이펙트만)
+        Color fireBase = PatternGuideHelper.AttackFill;
 
         foreach (var cell in cells)
         {
@@ -273,14 +270,9 @@ public class DragonAirMeteorPassiveRunner
             throw;
         }
 
-        // ── 낙하 VFX + 사운드 ─────────────────────────────────
-        GameObject projectile = null;
-        if (_so.FireballPrefab != null)
-        {
-            projectile = BossEffectPool.Spawn(_so.FireballPrefab, landPos, Quaternion.identity);
-            if (projectile != null)
-                projectile.transform.localScale = Vector3.one * _so.FireballScale * sizeMul;
-        }
+        // ── 낙하 VFX + 사운드 — 불덩이는 크게(더 높은 곳에서) · 땅 효과는 판정 크기(10-19) ──
+        GameObject projectile = DragonThreat.SpawnMeteor(_so.FireballPrefab, landPos,
+            _so.FireballScale * (kind == Kind.Scatter ? DragonThreat.BodyScale : DragonThreat.BigBodyScale), _so.FireballScale * sizeMul, _so.ImpactDelay);
         Managers.Sound?.PlayEffectAt(_so.FireRainSfx, landPos);
 
         // ── 충돌 판정 → 이펙트 소멸 ────────────────────────────

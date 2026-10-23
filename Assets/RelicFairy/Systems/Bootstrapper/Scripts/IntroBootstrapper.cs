@@ -18,6 +18,12 @@ public sealed class IntroBootstrapper : MonoBehaviour
     private PlayerController _player;
     public PlayerController Player => _player;
 
+    /// <summary>
+    /// 인트로 패배 — 슬로모 뒤 · 암전 전에 보스가 끼우는 마무리(대사 · 자세). 보스가 전투 개시 때 걸고 비활성 때 비운다
+    /// (10-17 사용자 「맞고 오래 기다리지 않게 · 대사로 자연스럽게 넘어가게」).
+    /// </summary>
+    public static Func<CancellationToken, UniTask> DefeatOutro;
+
     // ── Lifecycle ──────────────────────────────────────────────────────────
 
     private void Awake()
@@ -116,6 +122,13 @@ public sealed class IntroBootstrapper : MonoBehaviour
             TimeScaleArbiter.Acquire(this, 0.25f, TimeScaleArbiter.Priority.SlowMotion);
             try { await UniTask.Delay(TimeSpan.FromSeconds(0.6f), DelayType.Realtime, cancellationToken: ct); }
             finally { TimeScaleArbiter.Release(this); }
+
+            if (DefeatOutro != null)
+            {
+                try { await DefeatOutro(ct); }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception e) { Debug.LogException(e); }   // 마무리가 깨져도 거점으로는 넘어간다
+            }
 
             await ScreenFade.Out(1.0f, ct);
 

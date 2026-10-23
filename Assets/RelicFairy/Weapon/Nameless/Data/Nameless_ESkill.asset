@@ -13,11 +13,12 @@ MonoBehaviour:
   m_Name: Nameless_ESkill
   m_EditorClassIdentifier: Assembly-CSharp::SkillSO
   skillName: "\uBB34\uD615\uCC38"
-  description: "형태 없는 검기를 전방으로 날린다. 강화 +3부터 적을 꿰뚫는다."
+  description: "\uD615\uD0DC \uC5C6\uB294 \uAC80\uAE30\uB97C \uC804\uBC29\uC73C\uB85C \uB0A0\uB824 \uC801\uC744 \uAFF0\uB6AB\uB294\uB2E4(\uACF5\uACA9\uB825\uC758 230% \u00B7 \uD3ED \uC57D 3m). \uAC15\uD654 +3\uBD80\uD130 \uAC80\uAE30\uAC00 \uCEE4\uC9C4\uB2E4."
   icon: {fileID: 21300000, guid: f2f9d29cb77162f45b04a9323304c090, type: 3}
   iconTier2: {fileID: 21300000, guid: d60e29745ea4e494b8219d92dc1335ba, type: 3}
   iconTier3: {fileID: 21300000, guid: ff6a4b54bc08b0c43bda5df1439190fe, type: 3}
-  _tier2Change: "\uAD00\uD1B5 5"
+  _tier2Change: "\uAC80\uAE30 \uD06C\uAE30 \u00D71.3"
   _tier3Change: "\uCC29\uD0C4 \uD3ED\uBC1C \uBC18\uACBD 2m \u00B7 \uD53C\uD574 50%"
   cooldown: 4
+  damageIsAtkPercent: 1
   behavior: {fileID: 11400000, guid: e239d54f207d6f84faef5a5ee6e73fe3, type: 2}

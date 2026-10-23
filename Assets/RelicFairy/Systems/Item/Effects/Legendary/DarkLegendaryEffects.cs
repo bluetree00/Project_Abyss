@@ -14,6 +14,8 @@ using UnityEngine;
 public sealed class DarkLegendAoeEffect : ItemCombatEffectBase
 {
     private static readonly string[] s_hitSfx = { SoundKey.Sfx.MonsterHit1, SoundKey.Sfx.MonsterHit2, SoundKey.Sfx.MonsterHit3 };
+    // 장판 그림 수명 — 피해는 0.4초 × 4틱(1.2초에 끝)인데 그림이 4초 남아 피해 없는 장판으로 읽혔다(10-18 이펙트 점검)
+    private const float AoeVfxLife = 1.8f;
     private const int   WaveTicks = 4;
     private const float Radius = 3f, FastPeriod = 3f, FastAtHp = 0.3f;
 
@@ -52,7 +54,7 @@ public sealed class DarkLegendAoeEffect : ItemCombatEffectBase
         if (_timer < period) return;
         _timer = 0f;
         var cat = LegendaryRuntime.Catalog;
-        LegendaryRuntime.SpawnVfx(cat?.darkAoeVfx, pos, Quaternion.identity, 4f, Radius * 0.286f, alpha: 0.18f, yScale: 0.1f, follow: ctx.Player.transform);
+        LegendaryRuntime.SpawnVfx(cat?.darkAoeVfx, pos, Quaternion.identity, AoeVfxLife, Radius * 0.286f, alpha: 0.18f, yScale: 0.1f, follow: ctx.Player.transform);
         WaveTickAsync(ctx, _cts.Token).Forget();
     }
 
@@ -71,7 +73,7 @@ public sealed class DarkLegendAoeEffect : ItemCombatEffectBase
                 {
                     CombatQuery.DealSynergyDamage(_buf[i], dmg, Self(ctx), element: RuneElement.Dark);
                     // 타격 이펙트는 파동 첫 틱만(10-11 이펙트 톤 2차 V-10)
-                    if (t == 0) LegendaryRuntime.SpawnVfx(cat?.darkAoeHitVfx, _buf[i].transform.position, Quaternion.identity, 1.5f, 0.8f);
+                    if (t == 0) LegendaryRuntime.SpawnVfx(cat?.darkAoeHitVfx, _buf[i].transform.position, Quaternion.identity, 1.5f, 0.45f);   // 대상 타격 ≈ 1 m(10-22 B2 실측 83: ×0.8 = 1.8 m)
                 }
                 if (n > 0) Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
                 await UniTask.Delay(400, cancellationToken: ct);
@@ -159,7 +161,7 @@ public sealed class DarkLegendSingleEffect : ItemCombatEffectBase
 
                 SpawnShadowClone(ctx.Player.gameObject, spawnPos, rot);
                 CombatQuery.DealSynergyDamage(target, dmg, ctx?.Player?.gameObject, element: RuneElement.Dark);
-                LegendaryRuntime.SpawnVfx(cat?.darkSingleHitVfx, center, Quaternion.identity, 1.5f, 0.8f);
+                LegendaryRuntime.SpawnVfx(cat?.darkSingleHitVfx, center, Quaternion.identity, 1.5f, 0.19f);   // 대상 타격 ≈ 1 m(10-22 B2 실측 83: 노바 ×0.8 = 4.1 m)
                 Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
 
                 await UniTask.Delay(200, cancellationToken: ct);

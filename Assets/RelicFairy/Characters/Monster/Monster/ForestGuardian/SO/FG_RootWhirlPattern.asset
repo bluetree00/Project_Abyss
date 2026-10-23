@@ -21,6 +21,9 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: fl4_root_whirl
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: 60b5cb02ac4f10a489632aac680a6609, type: 2}
+  followUpLateOnly: 0
+  followUpCooldown: 10
   maxRange: 9
   innerRadius: 5
   outerRadius: 10

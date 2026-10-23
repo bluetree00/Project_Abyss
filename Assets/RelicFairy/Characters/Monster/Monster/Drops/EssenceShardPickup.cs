@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 
 /// <summary>
 /// 심연의 정수 조각 드랍. <see cref="GoldCoinPickup"/>과 같은 규약(파라볼라 → 자석 → 획득)이되
@@ -53,6 +54,7 @@ public class EssenceShardPickup : MonoBehaviour
     private bool      _collected;
     private bool      _vanishing;
     private Transform _playerTf;
+    private GameObject _outline;   // 「~Outline」 — 내려앉으면 켠다(10-22)
 
     // ── Lifecycle ────────────────────────────────────────────
     private void OnEnable()  => s_live.Add(this);
@@ -76,7 +78,12 @@ public class EssenceShardPickup : MonoBehaviour
             transform.position = pos;
             transform.Rotate(Vector3.up, SpinSpeed * Time.deltaTime, Space.World);
 
-            if (t >= 1f) { _arcing = false; _restPos = _arcEnd; }
+            if (t >= 1f)
+            {
+                _arcing  = false;
+                _restPos = _arcEnd;
+                if (_outline != null) _outline.SetActive(true);
+            }
             return;
         }
 
@@ -111,6 +118,7 @@ public class EssenceShardPickup : MonoBehaviour
         if (Time.time - _spawnTime >= LifeTime)
         {
             _vanishing = true;
+            if (_outline != null) _outline.SetActive(false);   // 테두리는 디졸브를 안 탄다 — 먼저 끈다
             CurrencyVisuals.Vanish(gameObject, CurrencyVisualKind.Essence, ExpireVanishSeconds);
         }
     }
@@ -143,7 +151,35 @@ public class EssenceShardPickup : MonoBehaviour
 
             var shard = go.AddComponent<EssenceShardPickup>();
             shard.Initialize(startPos, landing, perShard + (i == 0 ? remainder : 0));
+            shard._outline = CurrencyVisuals.AttachOutline(go, CurrencyVisualKind.Essence);
             CurrencyVisuals.Appear(go, CurrencyVisualKind.Essence, AppearSeconds, ShardEdge);
+        }
+    }
+
+    /// <summary><see cref="GoldCoinPickup.PushAwayFrom"/>과 같다 — 정예 · 보스 정수 조각도 보상 구체 위에 겹쳤다(10-22).</summary>
+    public static void PushAwayFrom(Vector3 center, float radius)
+    {
+        for (int i = 0; i < s_live.Count; i++)
+        {
+            var s = s_live[i];
+            if (s == null || s._collected || s._vanishing) continue;
+
+            Vector3 at   = s._arcing ? s._arcEnd : s._restPos;
+            Vector3 flat = at - center;
+            flat.y = 0f;
+            float d = flat.magnitude;
+            if (d >= radius) continue;
+
+            Vector3 dir = d > 0.01f ? flat / d : Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) * Vector3.forward;
+            Vector3 landing = at + dir * (radius - d + Random.Range(0.1f, 0.5f));
+            if (NavMesh.SamplePosition(landing - Vector3.up * RestHeight, out var hit, 1f, NavMesh.AllAreas)
+                && Mathf.Abs(hit.position.y + RestHeight - at.y) < 0.5f)
+                landing = hit.position + Vector3.up * RestHeight;
+
+            s._arcStart = s.transform.position;
+            s._arcEnd   = landing;
+            s._arcTimer = 0f;
+            s._arcing   = true;
         }
     }
 
@@ -184,6 +220,7 @@ public class EssenceShardPickup : MonoBehaviour
         if (_collected) return;
         _collected = true;
         _vanishing = true;
+        if (_outline != null) _outline.SetActive(false);
 
         // 깊이 보상 배율은 AddEssence 안에서 걸린다 — 여기서 또 곱하면 이중 적용이 된다.
         GameRunBootstrapper.Instance?.Run?.AddEssence(_value);

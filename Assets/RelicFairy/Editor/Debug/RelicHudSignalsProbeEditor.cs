@@ -201,7 +201,7 @@ public static class RelicHudSignalsProbeEditor
         await Shot("RHS_1_lancelot_hold");
         _sb.AppendLine("① 피 냄새 멈춤");
         CheckHold(hud, seconds: true);
-        CheckGrudge(hud, $"3/{hub.Grudge.Cap}", rim: false);
+        CheckGrudge(hud, $"원한 3/{hub.Grudge.Cap}", rim: false);   // 10-18 — 「원한」 이름이 붙었다
         CheckPips(At(mons, 0), "낙인 상한", cap, cap, dim: false);
         CheckPips(At(mons, 1), "낙인 1칸", 1, cap, dim: false);
         CheckCrush(At(mons, 1));
@@ -217,7 +217,7 @@ public static class RelicHudSignalsProbeEditor
         await UniTask.Delay(700, ignoreTimeScale: true);
         await Shot("RHS_2_lancelot_full");
         _sb.AppendLine("② 원한 가득 · 끝의 문턱");
-        CheckGrudge(hud, $"{hub.Grudge.Cap}/{hub.Grudge.Cap}", rim: true);
+        CheckGrudge(hud, $"원한 {hub.Grudge.Cap}/{hub.Grudge.Cap}", rim: true);
         CheckHold(hud, seconds: false);
         CheckStar(hud, "엇갈린 빛 켜짐 = 금 별", on: true);
         await CheckTremble(hud);

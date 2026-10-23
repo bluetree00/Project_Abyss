@@ -220,6 +220,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     // grid_csv의 P 토큰에서 계산한 플레이어 스폰 월드 좌표.
     // SpawnBlockMapAsync에서 채워지고 SpawnPlayerAsync에서 소비.
     private Vector3? _pendingPlayerSpawnPos;
+    private Vector3? _waitingRoomCenter;   // 챕터 시작 대기방(시작 존)의 중심 — 요정의 샘이 선다(10-16)
 
     /// <summary>
     /// 시작방 출구(StartRoomGate) 월드 위치. 시작방에서만 채워지고, 플레이어 스폰 회전을
@@ -412,8 +413,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (_run == null || !_run.HasNextChapter() || lower == null)
             return BossExitPath.Spawn(center, _currentArena);
         Vector3 pos = BossExitPath.ResolveExit(center, _currentArena, out var outward);
-        ChapterStairway.Spawn(pos, outward, lower, upper ?? lower, AppBootstrapper.GetSceneForChapter(next).ToString());
-        return pos;
+        // 계단은 광장 가운데 앞쪽에 선다(10-18) — 출구 자리는 가운데가 막혔을 때의 대안. 카메라는 계단이 실제로 선 자리로.
+        return ChapterStairway.Spawn(pos, outward, _currentArena, lower, upper ?? lower, AppBootstrapper.GetSceneForChapter(next).ToString()).transform.position;
     }
 
     /// <summary>
@@ -1075,6 +1076,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             scatter_range     = startZone.scatter_range,
         };
         var worldCenter = CalcZoneWorldCenter(startZone);
+        _waitingRoomCenter = worldCenter;
         await SpawnBlockMapAsync(roomEntry, worldCenter, ct, instantEntrance: true, suppressInteractables: suppressInteractables); // 시작방 허브: 디졸브 없이 완성된 방으로
 
         // P 타일이 없으면 CSV의 spawn_local로 폴백
@@ -2264,9 +2266,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// toZone 방향 엣지(벽 링)에서 실제 문 개구부(Floor 셀)의 중앙 로컬 좌표를 찾는다.
     /// MapBuilder와 동일한 중앙 오프셋 규약 사용. 개구부 없으면 false.
     /// </summary>
-    private bool TryFindGateOpeningLocal(TileType[,] grid, ZoneLayoutEntry from, ZoneLayoutEntry to, out Vector3 localPos)
+    private bool TryFindGateOpeningLocal(TileType[,] grid, ZoneLayoutEntry from, ZoneLayoutEntry to, out Vector3 localPos, out int openCells)
     {
         localPos = default;
+        openCells = 0;
         int w = grid.GetLength(0), h = grid.GetLength(1);
         float dX = to.world_center_x - from.world_center_x;
         float dZ = to.world_center_z - from.world_center_z;
@@ -2278,6 +2281,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             for (int x = 0; x < w; x++)
                 if (grid[x, z] == TileType.Floor) { sum += x; count++; }
             if (count == 0) return false;
+            openCells = count;
             float cx = sum / (float)count; // 개구부 중앙 x
             localPos = new Vector3((cx - (w - 1) * 0.5f) * blockCellSize, 0f, (z - (h - 1) * 0.5f) * blockCellSize);
             return true;
@@ -2288,6 +2292,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             for (int z = 0; z < h; z++)
                 if (grid[x, z] == TileType.Floor) { sum += z; count++; }
             if (count == 0) return false;
+            openCells = count;
             float cz = sum / (float)count; // 개구부 중앙 z
             localPos = new Vector3((x - (w - 1) * 0.5f) * blockCellSize, 0f, (cz - (h - 1) * 0.5f) * blockCellSize);
             return true;
@@ -2374,7 +2379,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 실제 문 개구부(엣지의 Floor 셀) 중앙에 배치. 개구부 없으면 엣지 중점으로 폴백.
         var grid = MapDataLoader.Parse(startZone.grid_csv);
-        var gateLocalPos = (grid != null && TryFindGateOpeningLocal(grid, startZone, toZone, out var openLocal))
+        int openCells = 0;
+        var gateLocalPos = (grid != null && TryFindGateOpeningLocal(grid, startZone, toZone, out var openLocal, out openCells))
             ? openLocal
             : CalcGateExitPositionTo(startZone, toZone);
         var gateLocalRot = CalcGateRotationTo(startZone, toZone);
@@ -2388,6 +2394,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         if (!gateGO.TryGetComponent<StartRoomGate>(out var gate))
             gate = gateGO.AddComponent<StartRoomGate>();
+        if (openCells > 0) gate.ConfigureOpening(openCells * blockCellSize);   // 문 · 통로 · 문틀 = 개구부 실제 폭(10-16)
 
         // 통로 팔레트/벽높이 주입 — 프리팹은 Forest 고정이라 주입 없이는 Ch2+ 통로만 Ch1 룩이 된다.
         // 벽 높이는 절차 방(BuildProcRoomAsync의 effWallLayers)과 동일 규약: 팔레트 프로필 우선, 없으면 전역 폴백.
@@ -2780,13 +2787,21 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         roomGO.AddComponent<RestRoomController>().Initialize(_run, restFirePrefab, restDecorPrefabs);
     }
 
-    /// <summary>챕터 시작 대기방의 요정의 샘 — 서약 제단(−4, +2)과 마주 보는 앞 오른쪽(+4, +2).
-    /// 예전엔 이 자리에 기억의 제단이 서서 오른쪽 뒤(−2.5)로 비켰는데, 시작 화면 밖이라 안 보였다(전주기 시뮬 2회차).
-    /// 대기방 기억의 제단을 뺀 뒤(10-02) 이 자리로 돌아왔다.</summary>
+    /// <summary>챕터 시작 대기방의 요정의 샘 — 대기방 한가운데(10-16 사용자 「대기방 중앙정도에 위치해야」).
+    /// 예전엔 시작 칸 + (4, 0, 2)라 방 가장자리 · 허공 쪽에 섰다. 시작 칸과 너무 가까우면(서 있는 자리와 겹침) 앞으로 한 칸 비킨다.
+    /// 중심을 모르면(대기방이 아닌 경로) 예전 자리.</summary>
     private void SpawnChapterSpring(Vector3 basePos)
     {
         if (Object.FindFirstObjectByType<ChapterSpring>(FindObjectsInactive.Include) != null) return;
-        ChapterSpring.SpawnAt(basePos + new Vector3(4f, 0f, 2f), chapterSpringPrefab);
+        Vector3 at = basePos + new Vector3(4f, 0f, 2f);
+        if (_waitingRoomCenter.HasValue)
+        {
+            at = _waitingRoomCenter.Value;
+            Vector3 flat = at - basePos; flat.y = 0f;
+            if (flat.sqrMagnitude < 9f) at += (flat.sqrMagnitude > 0.01f ? flat.normalized : Vector3.forward) * (3f - flat.magnitude);
+            at.y = basePos.y;
+        }
+        ChapterSpring.SpawnAt(at, chapterSpringPrefab);
     }
 
     /// <summary>정제소 방 셋업 — 비전투 스테이션(재련소와 동일 흐름). NPC 상호작용 → 룬판(UI_GridPanel).</summary>
@@ -3469,7 +3484,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         Managers.Sound?.PlayBgmAsync("Ch1_Map").Forget();
 
-        // 대기 방 동안 전투 HUD 억제 — 출구 게이트 통과 시 ExitStartRoomAsync가 복원한다.
+        // 둘러보기 · 도착 대사 동안 HUD 억제 — 대사 뒤 다시 켠다(10-18, 아래 RevealHudAsync).
         UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
         if (UIRootBootstrapper.Instance == null)
             await UniTask.WaitUntil(() => UIRootBootstrapper.Instance != null || !this);
@@ -3514,10 +3529,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 챕터 시작 대기방: 조립 서약 제단 배치(선택 픽업은 억제해도 서약 제단은 항상 제공)
         SpawnCovenantAltar(player.transform.position);
-        SpawnChapterSpring(player.transform.position);   // 요정의 샘 — 챕터 시작 회복(10-01)
+        // 요정의 샘은 런 시작 대기방엔 세우지 않는다 — 거점에서 막 출발해 체력 · 포션이 가득이다(10-22 A8 「첫 시작 챕터 대기방엔 샘이 필요 없다」).
+        // 챕터를 넘어가는 대기방(직전 챕터에서 깎인 체력) · 추방 착지는 아래 다른 경로에서 그대로 세운다
 
         // 대기방 도착 대사(방문 변형 — 첫 도착/재도착 다른 스크립트)
         await ShowWaitingRoomDialogueAsync(ResolveCurrentChapter());
+        UIRootBootstrapper.Instance?.RevealHudAsync(0.6f).Forget();   // 둘러보기 · 대사 뒤 HUD — 샘 앞에서 체력 · 포션이 보이게(10-18 사용자 「대기방에도 UI」)
 
         // 던전 빌드(StartProcGenRunAsync)는 여기서 호출하지 않는다 — 출구 게이트가 통과 시 시작한다.
     }
@@ -3620,9 +3637,22 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         WorldCovenantAltar.SpawnAt(basePos + new Vector3(-4f, 0f, 2f));
     }
 
-    /// <summary>챕터 시작 대기방 도착 시 대사 재생(방문 변형). Chapter{N}_Enter: 첫 도착=컨셉 소개+준비, 재도착=지겨움/준비 변형.
-    /// <paramref name="exileLanding"/> — 리치의 추방으로 떨어져 왔다(10-11): 멀린의 착지 한 줄(Seal_Exile 3)을 맨 앞에 붙인다.</summary>
-    private async UniTask ShowWaitingRoomDialogueAsync(ChapterId chapter, bool exileLanding = false)
+    /// <summary>추락 착지 「재정비」 대사(10-22 A10 · Seal_Regroup) — 대사창이 닫힐 때까지 기다린다.</summary>
+    private async UniTask ShowRegroupDialogueAsync()
+    {
+        var dlg = Managers.DialogueData;
+        if (dlg != null && !dlg.IsInitialized) await dlg.InitializeAsync();
+        var lines = ExileFallSequence.RegroupLines();
+
+        await Managers.UI.WaitUntilNoBlockingPopupAsync();
+        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
+        if (popup == null) return;
+        try { await popup.ShowAsync(lines); }
+        catch (System.OperationCanceledException) { }
+    }
+
+    /// <summary>챕터 시작 대기방 도착 시 대사 재생(방문 변형). Chapter{N}_Enter: 첫 도착=컨셉 소개+준비, 재도착=지겨움/준비 변형.</summary>
+    private async UniTask ShowWaitingRoomDialogueAsync(ChapterId chapter)
     {
         var dlg = Managers.DialogueData;
         if (dlg == null) return;
@@ -3630,13 +3660,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 시기판(해방기 _Liberation · 악몽 모드 _Nightmare)과 반복 단계는 GetVisitLines가 고른다.
         var lines = dlg.GetVisitLines($"Chapter{(int)chapter}_Enter");
-        if (exileLanding)
-        {
-            var visit = lines ?? System.Array.Empty<DialogueLine>();
-            lines = new DialogueLine[visit.Length + 1];
-            lines[0] = ExileFallSequence.LandingLine();
-            System.Array.Copy(visit, 0, lines, 1, visit.Length);
-        }
         if (lines == null || lines.Length == 0) return;
 
         // 선택/편집 UI가 열려있으면 닫힐 때까지 대기 후 대사(대사끼리도 큐잉).
@@ -3895,12 +3918,24 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] 추방 착지 연출 예외(건너뜀): {e.Message}"); }
         }
 
+        // 리치 붕괴 → 추락 → Ch1 착지 = 「재정비」(10-22 A10): 서약 제단 · 샘 없이 멀린 대사 뒤 런을 클리어로 정산하고 거점(해방기)으로.
+        // 해방기는 거점에서 새 빌드로 Ch1부터. 추락 중에 껐다 이어해도(byExile 없음) 붕괴 때 남긴 기록으로 같은 길을 탄다.
+        if (byExile || StoryProgress.IsRegroupPending)
+        {
+            await ShowRegroupDialogueAsync();
+            StoryProgress.ClearRegroup();
+            Debug.Log("[GameRunBootstrapper] 리치의 추방 착지 — 재정비: 런 클리어 정산 → 거점(해방기)");
+            HandleRunClear();
+            return;
+        }
+
         // 챕터 시작 대기방: 조립 서약 제단 배치(챕터마다 서약 획득 기회)
         SpawnCovenantAltar(player.transform.position);
         SpawnChapterSpring(player.transform.position);   // 요정의 샘 — 직전 챕터에서 깎인 체력을 여기서 챙긴다(10-01)
 
-        // 대기방 도착 대사(방문 변형 — 첫 도착/재도착 다른 스크립트). 추방 착지면 멀린의 한 줄(Seal_Exile 3)이 맨 앞.
-        await ShowWaitingRoomDialogueAsync(ResolveCurrentChapter(), byExile);
+        // 대기방 도착 대사(방문 변형 — 첫 도착/재도착 다른 스크립트).
+        await ShowWaitingRoomDialogueAsync(ResolveCurrentChapter());
+        UIRootBootstrapper.Instance?.RevealHudAsync(0.6f).Forget();   // 둘러보기 · 대사 뒤 HUD — 샘 앞에서 체력 · 포션이 보이게(10-18 사용자 「대기방에도 UI」)
 
         // 던전(StartProcGenRunAsync)은 대기방 출구 게이트(StartRoomGate) 통과 시 시작된다.
         Debug.Log($"[GameRunBootstrapper] 챕터 {(int)ResolveCurrentChapter()} 대기방 진입");

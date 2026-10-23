@@ -21,6 +21,7 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     private const string RegistryKey = "ElementVfxRegistry";
     private const float  BurstTtl    = 2.0f;   // 버스트 프리팹 자동 회수(초)
     private const float  AreaFrom    = 1.01f;  // 이 반경을 넘으면 「광역」 칸을 쓴다(그 아래는 점 타격)
+    private const float  PointReach  = 0.6f;   // 점 타격 1 = 보이는 반경(m) — 무기 섬광(0.4~0.6 m)보다 조금 크게(10-22 B2: 어둠 3 m+가 무기 타격과 헷갈렸다)
     private const float  FadeTail    = 0.5f;   // 수명이 다하면 방출만 멈추고 남은 입자가 이만큼 사그라든 뒤 거둔다(10-11 톤 2차 — 툭 끊김)
     private const float  LightDim    = 0.4f;   // 팩 이펙트 점광원 세기 배율 — 빛 오라(세기 3 · 5 m)가 바닥을 덮었다(10-11 톤 2차)
 
@@ -268,10 +269,11 @@ public sealed class ElementVfxPlayer : MonoBehaviour
             }
         }
 
-        var prefab = _registry.GetImpact(element, out float lift);
+        var prefab = _registry.GetImpact(element, out float lift, out float visible);
         if (prefab == null) return;
         if (atFeet) pos.y += lift;
-        DoPlayPrefab(prefab, pos, Mathf.Max(0.1f, radiusScale), BurstTtl, tint);
+        float scale = visible > 0.01f ? radiusScale * PointReach / visible : radiusScale;   // 원소마다 다른 원래 크기를 맞춘다
+        DoPlayPrefab(prefab, pos, Mathf.Max(0.05f, scale), BurstTtl, tint);
     }
 
     private void DoPlayPrefab(GameObject prefab, Vector3 pos, float scale, float life, Color tint = default, string mute = null)

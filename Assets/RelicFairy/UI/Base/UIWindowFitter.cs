@@ -91,6 +91,19 @@ public sealed class UIWindowFitter : MonoBehaviour
     }
 
 
+    /// <summary>
+    /// 기준 크기(프리팹 값)를 새로 잡는다 — 구운 프리팹의 창 크기를 코드 목업에 맞춰 키울 때(10-19 룬 획득 창 1100×620 → 1300×680).
+    /// 창 sizeDelta도 같이 두고, 다음 <see cref="Fit"/>이 이 값을 기준으로 맞춘다.
+    /// </summary>
+    public void SetBaseSize(Vector2 size)
+    {
+        if (_rt == null) _rt = (RectTransform)transform;
+        if (size.x <= 0f || size.y <= 0f) return;
+        _baseW = size.x;
+        _baseH = size.y;
+        _rt.sizeDelta = size;
+    }
+
     /// <summary>지금 화면 크기에 맞춰 창을 다시 잰다.</summary>
     public void Fit()
     {

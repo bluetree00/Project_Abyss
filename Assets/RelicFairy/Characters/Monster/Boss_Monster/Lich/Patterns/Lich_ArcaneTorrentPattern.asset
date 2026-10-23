@@ -21,15 +21,17 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: 28eba821eb312df41bba4c65b4bc9969, type: 2}
+  followUpLateOnly: 0
   maxTriggerRange: 16
   riseDuration: 0.8
   chargeDuration: 1.2
-  sweepDuration: 2.5
+  sweepDuration: 3
   descendDuration: 0.6
   recoveryDuration: 1
   beamRange: 16
   beamWidth: 1.2
-  sweepArc: 200
+  sweepArc: 260
   flowEmitInterval: 0
   flowMotesPerEmit: 2
   flowMoteRadius: 0.25

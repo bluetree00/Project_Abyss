@@ -33,6 +33,13 @@ public static class HitFeedbackService
         GlobalFeelCoalescer.Accumulate(info);
     }
 
+    /// <summary>화면 연출 합산(3) 없이 1 · 2만 — 장판 틱처럼 잦은 주 피해(<see cref="CombatDamage.Request.NoHitFeel"/> · 10-16).</summary>
+    public static void RaiseHitQuiet(in HitInfo info)
+    {
+        DispatchToTargetReceiver(info);
+        DispatchToGlobalSubscribers(info);
+    }
+
     // ── Private Methods ───────────────────────────────────────────
     /// <summary>피격자 로컬 피드백 — IHitReceiver 구현체에게 직접 전달.</summary>
     private static void DispatchToTargetReceiver(in HitInfo info)

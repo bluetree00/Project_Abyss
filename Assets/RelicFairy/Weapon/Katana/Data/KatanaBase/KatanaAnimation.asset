@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   useGuardCharge: 0
   lightAttackAnimSpeed: 0.77
+  windupSpeedRatio: 0.6
   heavyAttackAnimSpeed: 1.7
   defaultComboWindowOpen: 0.25
   defaultComboWindowClose: 0.75
@@ -484,7 +485,7 @@ MonoBehaviour:
       aimAssistStrength: 1
       aimRotationDuration: 0.1
     - baseClipName: ESkill_01
-      addressableKey: 
+      addressableKey: Katana_DodgeSlash
       actionType: 4
       comboIndex: 0
       isPlunge: 0

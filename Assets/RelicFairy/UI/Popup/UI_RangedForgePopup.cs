@@ -33,6 +33,8 @@ public class UI_RangedForgePopup : UI_Popup
     // 세로 예산: 카드 내용(홀더198+이름34+배지20+태그22+스탯104+간격40+여백12 = 430)
     //          + 제목38 + 부제20 + 도트16 + 구분장식37 + 버튼45 + 행간격60 + 프레임여백(77+52) = 775.
     // 모자라면 카드 하단(스탯)이 도트·구분장식 위로 흘러넘친다.
+    // 10-19 ⑦ — 고른 뒤에도 공방이 남아 다시 고를 수 있다(WeaponForgeAltar). 구운 프리팹에도 이 글을 덮어쓴다(옛 글은 「무명의 형상」).
+    private const string SubText = "주무기 <color=#CFC0A0>무형검</color>은 이미 손에 있다. 곁에 둘 하나를 고른다 — 심연에 들기 전까지 다시 바꿀 수 있다.";
     private const float SkinPanelWidth  = 747f;
     private const float SkinPanelHeight = 775f;
     private const float PanelWidth  = 620f;
@@ -742,7 +744,7 @@ public class UI_RangedForgePopup : UI_Popup
         var title = NewText("Title", prt, 30f, TitleColor, FontStyles.Bold, TextAlignmentOptions.Center);
         title.text = "보조 무기 — 원거리";
         var sub = NewText("Sub", prt, 16f, SubColor, FontStyles.Normal, TextAlignmentOptions.Center);
-        sub.text = "주무기 <color=#CFC0A0>무형검</color>은 이미 손에 있다. 곁에 둘 하나를 고른다.";
+        sub.text = SubText;
 
         BuildViewer(prt);   // ◀  [카드]  ▶
         BuildDotsRow(prt);
@@ -859,6 +861,10 @@ public class UI_RangedForgePopup : UI_Popup
             cancel.onClick.AddListener(Cancel);
             FrameCancel(cancel.targetGraphic as Image);
         }
+
+        // 부제 — 구운 글은 옛 이름(「무명의 형상」) · 다시 고르기 안내가 없다(10-19 ⑦)
+        foreach (var t in GetComponentsInChildren<TMP_Text>(true))
+            if (t.name == "Sub") { t.text = SubText; break; }
     }
 
     /// <summary>

@@ -4,20 +4,18 @@ using System.Collections.Generic;
 /// <summary>
 /// 유물 기억 드래프트 카드 생성기(유물 성장 v2 §1-3) — 상태 없는 순수 계산, 난수는 주입받는다(실측 도구가 수만 번 돌린다).
 ///
-/// <b>세 자리</b>
+/// <b>두 자리</b>(10-18 사용자 「모든 창을 2장」 — 옛 세 자리의 ③ 자유는 걷고 그 「선명하게」 몫을 ②로 옮겼다)
 /// <list type="number">
-/// <item>잇기 — 안 가진 조각 중 가진 조각과 같은 자리(가웨인 = 시간대가 겹침 · 랜슬롯 = 같은 계단/광란/심판 · 반응끼리).</item>
-/// <item>넓히기 — 안 가진 조각 중 아직 아무것도 없는 자리.</item>
-/// <item>자유 — 안 가진 조각(반응 조각 가중치 ×2) · 25% 확률로 「선명하게」.</item>
+/// <item>잇기 — 안 가진 조각 중 가진 조각과 같은 자리(가웨인 = 시간대가 겹침 · 랜슬롯 = 같은 광기 칸/광란/심판 · 반응끼리).</item>
+/// <item>넓히기 — 안 가진 조각 중 아직 아무것도 없는 자리 · 25% 확률로 「선명하게」. 진화가 열렸으면(해방기 · 조각 2개 — <see cref="RelicEvolution.Ready"/>) 이 자리가 <b>진화</b>.</item>
 /// </list>
-/// <b>채우기 사슬</b>: 자리에 후보가 없으면 새 조각 → 선명하게 → 메아리 → 잔향. 그래서 <b>늘 3장</b>이고, 조건 미충족 카드는 없다
+/// <b>채우기 사슬</b>: 자리에 후보가 없으면 새 조각 → 선명하게 → 메아리 → 잔향. 그래서 <b>늘 2장</b>이고, 조건 미충족 카드는 없다
 /// (반응 조각은 그 룬 속성 1단계가 켜져 있을 때만 후보 — 사용자 「선택지가 비면 안 돼」 · 「제시되는 칸 전부 유효」).
 /// </summary>
 public static class RelicDraftComposer
 {
-    public const int CardCount = 3;
-    private const double SharpenChanceOnFree = 0.25;   // ③ 자유 자리가 「선명하게」일 확률
-    private const int    ReactionWeight      = 2;      // ③ 자유 자리에서 반응 조각 가중치
+    public const int CardCount = 2;
+    private const double SharpenChanceOnWiden = 0.25;   // ② 넓히기 자리가 「선명하게」일 확률(옛 ③ 자유 자리의 몫)
     private static readonly int[] ResidueEssenceByEra = { 40, 60, 80 };
 
     /// <summary>룬 속성(fire · ice · electric · grass · light · dark) → 그 속성 1단계 효과 키.</summary>
@@ -33,7 +31,7 @@ public static class RelicDraftComposer
     };
 
     /// <summary>
-    /// 카드 3장을 만든다.
+    /// 카드 2장을 만든다.
     /// <paramref name="all"/> = 이 유물의 조각 전부(데이터) · <paramref name="runeTier1Active"/> = 속성 이름 → 1단계 켜짐.
     /// </summary>
     public static RelicDraft Compose(string relicId, IReadOnlyList<RelicPartEntry> all, PlayerLoadout l,
@@ -69,27 +67,26 @@ public static class RelicDraftComposer
         // ① 잇기
         Pick(draft, PickFresh(fresh, used, rng, e => ownedGroups.Count == 0 || Overlaps(e, ownedGroups), 1),
              fresh, sharpen, used, l, relicId, era, band, rng, get);
-        // ② 넓히기 — 보유 각인 1위 계열 조각에 가중(봉인기 ×2 · 해방기 ×1.5 · 악몽 ×1.2 · 10-14 빌드 시너지 A4 · 초반 강하게 후반 약하게)
-        BuildImprint.TopFamilies(1, s_top);
-        var favored = s_top.Count > 0 ? s_top[0] : BuildFamily.None;
-        float favorMul = era <= 0 ? 2f : era == 1 ? 1.5f : 1.2f;
-        Pick(draft, PickFresh(fresh, used, rng, e => !Overlaps(e, ownedGroups), 1, favored, favorMul),
-             fresh, sharpen, used, l, relicId, era, band, rng, get);
-        // ③ 자유 — 선명하게 25% 또는 반응 ×2 가중
-        RelicDraftCard third = null;
-        bool wantSharpen = sharpen.Count > 0 && rng.NextDouble() < SharpenChanceOnFree;
-        if (wantSharpen) third = MakeSharpen(sharpen, used, rng, l);
-        if (third == null)
-        {
-            var e = PickFresh(fresh, used, rng, _ => true, ReactionWeight);
-            if (e != null) third = MakeNew(e, era, band, rng);
-        }
-        Pick(draft, third, fresh, sharpen, used, l, relicId, era, band, rng, get);
-
-        // ④ 진화 — 레시피를 채웠으면 4번째 카드(런당 한 번 고름 · 안 고르면 다음 보스에 다시)(10-14 빌드 시너지 C)
+        // ② 진화 — 조각 2개(해방기부터)면 둘째 자리가 진화(런당 한 번 고름 · 안 고르면 다음 보스에 다시)(10-14 빌드 시너지 C ·
+        //    10-18 「모든 창을 2장」 — 넷째 카드로 덧붙이지 않는다: 「진화할까, 기억을 하나 더 모을까」 · 10-22 E1 조건 하나로)
         var evo = RelicEvolution.Ready(l, relicId);
         if (evo != null)
             draft.Cards.Add(new RelicDraftCard { Kind = RelicDraftCardKind.Evolution, EvolutionId = evo.Id, Grade = RelicMemoryGrade.Radiant });
+        else
+        {
+            // ② 넓히기 — 25%는 「선명하게」 · 나머지는 보유 각인 1위 계열 조각에 가중(봉인기 ×2 · 해방기 ×1.5 · 악몽 ×1.2 · 10-14 빌드 시너지 A4)
+            RelicDraftCard second = null;
+            if (sharpen.Count > 0 && rng.NextDouble() < SharpenChanceOnWiden) second = MakeSharpen(sharpen, used, rng, l);
+            if (second == null)
+            {
+                BuildImprint.TopFamilies(1, s_top);
+                var favored = s_top.Count > 0 ? s_top[0] : BuildFamily.None;
+                float favorMul = era <= 0 ? 2f : era == 1 ? 1.5f : 1.2f;
+                var e = PickFresh(fresh, used, rng, x => !Overlaps(x, ownedGroups), 1, favored, favorMul);
+                if (e != null) second = MakeNew(e, era, band, rng);
+            }
+            Pick(draft, second, fresh, sharpen, used, l, relicId, era, band, rng, get);
+        }
 
         // 천장 — 찬란 없이 PityDrafts번 지났다면 한 장을 찬란으로
         if (l.RelicDraftsSinceRadiant >= RelicMemoryOdds.PityDrafts && !draft.HasRadiant)
@@ -103,7 +100,7 @@ public static class RelicDraftComposer
                     if (c.Kind == RelicDraftCardKind.Sharpen && c.Grade == RelicMemoryGrade.Radiant) { draft.PityApplied = true; break; }
         }
 
-        // 기억의 빛 — 세 장 중 가장 높은 등급(메아리 · 잔향은 흐릿으로 친다)
+        // 기억의 빛 — 두 장 중 가장 높은 등급(메아리 · 잔향은 흐릿으로 친다)
         draft.TopGrade = RelicMemoryGrade.Faint;
         foreach (var c in draft.Cards)
             if ((c.Kind == RelicDraftCardKind.NewFragment || c.Kind == RelicDraftCardKind.Sharpen) && c.Grade > draft.TopGrade)
@@ -216,7 +213,7 @@ public static class RelicDraftComposer
         draft.Cards.Add(card);
     }
 
-    /// <summary>메아리 — 공명이 아직 다 차지 않은 자리 하나(가웨인: 4 미만 시간대 · 랜슬롯: 비어 있는 계단).</summary>
+    /// <summary>메아리 — 공명이 아직 다 차지 않은 자리 하나(가웨인: 4 미만 시간대 · 랜슬롯: 광기 칸 조각 4 미만일 때 비어 있는 칸 — 칸 조각 +1).</summary>
     private static RelicDraftCard MakeEcho(string relicId, HashSet<string> used, PlayerLoadout l, Random rng,
                                            Func<string, RelicPartEntry> get)
     {
@@ -226,7 +223,7 @@ public static class RelicDraftComposer
             foreach (var phase in RelicPartAnchor.GawainPhases)
                 if (!used.Contains("echo:" + phase) && RelicResonance.GawainCount(l, phase, get) < 4) open.Add(phase);
         }
-        else if (relicId == "lancelot")
+        else if (relicId == "lancelot" && RelicResonance.LancelotCount(l, get) < 4)   // 10-22 E1 D7 — 4개면 마지막 단계라 메아리가 뜻이 없다
         {
             foreach (var rung in RelicPartAnchor.LancelotRungs)
                 if (!used.Contains("echo:" + rung) && !RelicResonance.LancelotRungFilled(l, rung, get)) open.Add(rung);

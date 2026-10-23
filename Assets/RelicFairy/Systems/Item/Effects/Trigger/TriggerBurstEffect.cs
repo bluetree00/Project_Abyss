@@ -296,6 +296,7 @@ public sealed class TriggerBurstEffect : ItemCombatEffectBase
             if (mb != null && !mb.IsDead) s_hit.Add(mb);
         }
 
+        if (radius <= 0f && s_hit.Count == 0) return;   // 표적 없는 순간 폭발(처형 · 일반 몹)은 피해가 0 — 이펙트도 내지 않는다(10-18 이펙트 점검)
         ElementVfxPlayer.PlayBurst(_element, center, radius > 0f ? radius : 1f);
         if (s_hit.Count == 0) return;
 

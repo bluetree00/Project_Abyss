@@ -43,7 +43,7 @@ public sealed class FireLegendAoeEffect : ItemCombatEffectBase
             {
                 if (hit[i] == null) continue;
                 CombatQuery.DealSynergyDamage(hit[i], dmg, Self(ctx), element: RuneElement.Fire);
-                LegendaryRuntime.SpawnVfx(cat?.fireAoeHitVfx, hit[i].transform.position, Quaternion.identity, 1.5f, 0.8f);
+                LegendaryRuntime.SpawnVfx(cat?.fireAoeHitVfx, hit[i].transform.position, Quaternion.identity, 1.5f, 0.44f);   // 대상 타격 ≈ 1 m(10-22 B2 실측 83: ×0.8 = 1.8 m)
             }
             LegendaryRuntime.SpawnVfx(cat?.fireAoeVfx, pos, Quaternion.identity, 2f, radius * 0.1333f, alpha: 0.18f, yScale: 0.1f);
             SkillRangeRing.Circle(pos, radius);
@@ -131,7 +131,8 @@ public sealed class FireLegendSingleEffect : ItemCombatEffectBase
                     int n = CombatQuery.GetNearbyDamageables(tPos, 2f, target, 10, _buf);
                     for (int j = 0; j < n; j++)
                         CombatQuery.DealSynergyDamage(_buf[j], splashDmg, ctx?.Player?.gameObject, element: RuneElement.Fire);
-                    LegendaryRuntime.SpawnVfx(cat?.fireHitVfx, tPos, Quaternion.identity, 2f);
+                    LegendaryRuntime.SpawnVfx(cat?.fireHitVfx, tPos, Quaternion.identity, 2f, 0.42f);   // 배율 1이 반경 4.7 m — 판정 2 m에 맞춘다(10-18 실측 68)
+                    SkillRangeRing.Circle(tPos, 2f);   // 마지막 2 m 튄 피해 — 범위 표시가 없었다(10-18 이펙트 점검 · F-1과 같은 외곽선)
                 }
 
                 await UniTask.Delay(400, cancellationToken: ct);

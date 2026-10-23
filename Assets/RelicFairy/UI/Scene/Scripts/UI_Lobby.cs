@@ -1,4 +1,3 @@
-using System;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
@@ -21,7 +20,6 @@ public class UI_Lobby : UI_Scene
         Btn_StartRun,
         Btn_Settings,
         Btn_Exit,
-        Btn_Awakening,
     }
 
     // ─────────────────────────────────────────────────────────
@@ -44,7 +42,6 @@ public class UI_Lobby : UI_Scene
         GetButton((int)Buttons.Btn_StartRun).onClick.AddListener(OnClickStartRun);
         GetButton((int)Buttons.Btn_Settings).onClick.AddListener(OnClickSettings);
         GetButton((int)Buttons.Btn_Exit).onClick.AddListener(OnClickExit);
-        GetButton((int)Buttons.Btn_Awakening)?.onClick.AddListener(OnClickAwakening);
 
         var titleTr = transform.Find("TitleImage");
         _titleImageCG = titleTr?.GetComponent<CanvasGroup>();
@@ -97,27 +94,11 @@ public class UI_Lobby : UI_Scene
         UI_Settings.Open();
     }
 
-    private void OnClickAwakening()
-    {
-        OpenAltarReadOnlyAsync().Forget();
-    }
-
-    /// <summary>
-    /// 로비에서는 기억의 제단을 <b>조회 전용</b>으로 연다.
-    /// <para>여기서 해금까지 되면 거점에 돌아올 이유가 사라지고, 「죽음 → 복귀 동선 → 재출발」이라는
-    /// 전체 설계가 무의미해진다. 정수를 쓰는 것은 거점 제단에서만.</para>
-    /// </summary>
-    private async UniTaskVoid OpenAltarReadOnlyAsync()
-    {
-        try
-        {
-            var panel = await Managers.UI.ShowPopupUIAndGetAsync<UI_AwakeningPanel>();
-            if (panel != null) panel.ReadOnly = true;
-        }
-        catch (OperationCanceledException) { }
-    }
-
+    /// <summary>EXIT — 한 번 묻고 끈다(10-16 사용자 「exit나 게임종료 버튼에 종료하겠냐고 물어봐야해」).</summary>
     private void OnClickExit()
+        => UI_ConfirmDialog.Show("게임 종료", "게임을 종료하시겠습니까?", "종료", "취소", QuitApp, danger: true);
+
+    private static void QuitApp()
     {
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;

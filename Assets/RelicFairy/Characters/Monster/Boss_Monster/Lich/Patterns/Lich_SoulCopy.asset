@@ -31,3 +31,5 @@ MonoBehaviour:
   boltRadius: 1.8
   boltWarn: 1
   boltDamage: 0.5
+  _debrisAt: 4
+  _debrisSource: {fileID: 11400000, guid: 63075334fa114b74ebef3678d81de552, type: 2}

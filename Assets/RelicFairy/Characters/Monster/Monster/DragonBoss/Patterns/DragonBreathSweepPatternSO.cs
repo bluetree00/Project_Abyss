@@ -454,7 +454,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         {
             if (_warnMats[_revealedTileCount] != null)
             {
-                Color fireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
+                Color fireBase = PatternGuideHelper.AttackFill;   // (10-23 가이드 색 통일)
                 _warnMats[_revealedTileCount].color = new Color(fireBase.r, fireBase.g, fireBase.b, Data.WarningColor.a);
             }
             _revealedTileCount++;
@@ -668,7 +668,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
         // 바닥은 평탄하므로 레인 중심 1회만 레이캐스트 후 전 타일에 재사용
         float floorY = GetFloorY(_laneCenter, ctx) + 0.05f;
-        Color fireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
+        Color fireBase = PatternGuideHelper.AttackFill;   // (10-23 가이드 색 통일) 예고 칸 — 불 색은 이펙트만
         foreach (var cell in _warnCells)
         {
             Vector3 pos = DragonBossRoomContext.CellToWorld(cell.x, cell.y, 0f);
@@ -1281,7 +1281,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             HalfR         = halfR,
         };
 
-        Color meteorFireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
+        Color meteorFireBase = PatternGuideHelper.AttackFill;   // (10-23 가이드 색 통일)
         for (int dx = -halfR; dx <= halfR; dx++)
         for (int dz = -halfR; dz <= halfR; dz++)
         {
@@ -1337,11 +1337,9 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
                 {
                     e.Falling  = true;
                     e.FallTimer = 0f;   // 예고 칸은 착탄 때 걷는다(10-08 점검 — 걷힌 뒤 0.6초에 맞았다)
-                    if (Data.MeteorPattern.FireballPrefab != null)
-                    {
-                        e.Projectile = BossEffectPool.Spawn(Data.MeteorPattern.FireballPrefab, e.LandPos, Quaternion.identity);
-                        e.Projectile.transform.localScale = Vector3.one * Data.MeteorPattern.FireballScale;
-                    }
+                    // 불덩이는 크게(더 높은 곳에서) · 땅 효과는 판정 반폭(10-19 · 화염구 비와 같은 운석)
+                    e.Projectile = DragonThreat.SpawnMeteor(Data.MeteorPattern.FireballPrefab, e.LandPos,
+                        Data.MeteorPattern.FireballScale * DragonThreat.BodyScale, Data.MeteorPattern.FireballScale * DragonThreat.MeteorScale(e.HalfR), Data.MeteorPattern.ImpactDelay);
                     Managers.Sound?.PlayEffectAt(Data.MeteorPattern.FireRainSfx, e.LandPos);
                 }
                 _meteors[i] = e;
@@ -1376,7 +1374,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         if (Data.MeteorPattern.ExplosionPrefab != null)
         {
             var exp = BossEffectPool.SpawnOneShot(Data.MeteorPattern.ExplosionPrefab, e.LandPos, Quaternion.identity, fallbackLifetime: 3f);
-            if (exp != null) exp.transform.localScale = Vector3.one * Data.MeteorPattern.ExplosionScale;
+            if (exp != null) exp.transform.localScale = Vector3.one * Data.MeteorPattern.ExplosionScale * DragonThreat.MeteorScale(e.HalfR);   // 착탄 폭발 = 판정 반폭(10-18)
         }
 
         if (ctx?.Runtime?.PlayerTarget != null)

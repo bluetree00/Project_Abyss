@@ -31,6 +31,15 @@ public static class CinematicFrame
     private static float _barFrac;   // 현재 목표 바 높이 비율(각 바, 0~0.5)
     private static float _dimTarget; // 목표 Dim 알파
 
+    /// <summary>레터박스가 화면에 떠 있는가(들어오고 나가는 중 포함) — 보스 자막(UI_BossBark)이 이때 띠 위로 올라선다(10-21).</summary>
+    public static bool IsShown => _canvas != null && _canvas.enabled && _shown > 0f;
+
+    /// <summary>지금 레터박스 캔버스의 정렬 순서 — 장면마다 다르다(보스 등장 620 · 인트로 150 · 전환 · 끝 장면은 HUD 아래).</summary>
+    public static int CurrentSortingOrder => _canvas != null ? _canvas.sortingOrder : SortingOrder;
+
+    /// <summary>떠 있는 레터박스 바 하나의 높이(화면 높이 비율 · 다 들어온 뒤 값) — 없으면 0. 컷신 자막의 서 있는 그림이 아래 바 위에 앉는다(10-22).</summary>
+    public static float BarHeightFraction => IsShown ? _barFrac : 0f;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void Init()
     {

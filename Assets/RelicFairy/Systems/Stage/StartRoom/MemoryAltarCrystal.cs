@@ -157,7 +157,9 @@ public sealed class MemoryAltarCrystal : MonoBehaviour
             PlayerPrefs.Save();
             if (_affordable <= before || string.IsNullOrEmpty(affordableLine)) return;
 
-            var next = MemoryAltarService.GetNextGoal();   // 열 수 있는 게 있으면 가장 싼 차례 칸이 곧 열 수 있는 칸이다
+            var next = MemoryAltarService.GetNextGoal();   // 해방기엔 해방 대비 칸이 먼저(10-22 D5) — 지금 열 수 있을 때만 그 칸을 부른다
+            if (next == null || !next.Value.CanBuy)
+                next = MemoryAltarService.GetNextGoal(preferLiberation: false);   // 열 수 있는 게 있으면 가장 싼 차례 칸이 곧 열 수 있는 칸이다
             if (next == null || next.Value.Node == null) return;
             // 새 봉인 한 줄(준비 뒤 0.8초 + 점등 1.6초)이 먼저 지나가게 — 한 순간에 하나만(원칙 5)
             await UniTask.Delay(TimeSpan.FromSeconds(4f), DelayType.UnscaledDeltaTime, cancellationToken: ct);

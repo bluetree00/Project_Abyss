@@ -16,22 +16,26 @@ namespace RelicFairy.Monster
 /// // 공격이 끊기면 — 헛예고가 남지 않게
 /// t.Cancel();
 /// </code>
-/// 면(face)은 위협 · 정예 큰 공격만 켠다(일반 몬스터는 선만 — 결정 D3).
-/// 톤: 얇은 선(0.06) · 따뜻한 흰빛 ~ 주홍 한 계열 · 맞는 순간 뒤 0.1초에 사라진다.
+/// 모든 예고에 판정 범위 옅은 면 + 몬스터 쪽에서 앞줄까지 차오르는 면을 깐다(맞는 순간 판정 모양이 가득) — 얇은 선만으론 「어디 · 언제」가
+/// 안 읽혔다(10-22 ⑧ 「공격 타이밍 예고가 부적절」). face = 위협 · 정예 큰 공격의 바깥 면을 더 진하게.
+/// 톤: 얇은 선(0.06) · 붉은 계열(10-22 — 금빛은 풀밭 바닥에서 면이 회갈색으로 묻혔다 · A/B/C 비교 사진 tele_cmp_1022_045421) · 맞는 순간 뒤 0.1초에 사라진다.
 /// </summary>
 public sealed class MonsterTelegraph : MonoBehaviour
 {
     // ── Constants ────────────────────────────────────────────────
-    /// <summary>일반 공격 — 따뜻한 흰빛 금(10-11 외곽선과 같은 색).</summary>
-    public static readonly Color Normal = new(1f, 0.82f, 0.55f, 1f);
-    /// <summary>위협 · 정예 큰 공격 · 특수 상태 — 같은 계열의 주홍.</summary>
-    public static readonly Color Heavy = new(1f, 0.55f, 0.32f, 1f);
+    /// <summary>일반 공격 — 붉은 주홍(10-22 ⑧ 「예고가 부적절」 — 옛 따뜻한 흰빛 금은 차오르는 면이 바닥에 묻혔다). 10-23 가이드 색 통일 — 보스 예고와 같은 공용 색(<see cref="PatternGuideHelper.AttackFill"/>).</summary>
+    public static Color Normal => PatternGuideHelper.AttackFill;
+    /// <summary>위협 · 정예 큰 공격 · 특수 상태 — 같은 계열의 더 진한 진홍(<see cref="PatternGuideHelper.AttackHeavy"/>).</summary>
+    public static Color Heavy => PatternGuideHelper.AttackHeavy;
     /// <summary>맞기 전 최소 예고(반짝임과 같은 박자). 원 범위는 0.6 ~ 1.0초를 권장한다.</summary>
     public const float MinLead = 0.45f;
 
     private const float LineWidth  = 0.06f;   // 높은 부감에서 1~2픽셀(10-11 실측 — 0.04는 안 보였다)
     private const float SweepWidth = 0.05f;
     private const float FaceAlpha  = 0.15f;
+    private const float FaceAlphaLight = 0.07f;   // 일반 공격의 바깥 옅은 면 — 범위가 처음부터 보이게(10-22 ⑧)
+    private const float FillAlpha  = 0.32f;       // 차오르는 면(10-22 ⑧)
+    private const float FillLift   = 0.01f;       // 바깥 면 위(같은 높이면 깜빡인다)
     private const float FadeOut    = 0.1f;
     private const float Lift       = 0.05f;
     private const int   ArcSegments = 40;
@@ -48,8 +52,11 @@ public sealed class MonsterTelegraph : MonoBehaviour
     private Color  _color;
     private float  _total, _remaining, _fade = -1f;
     private LineRenderer _outline, _sweep;
-    private MeshRenderer _face;
-    private Mesh _faceMesh;
+    private MeshRenderer _face, _fill;
+    private Mesh _faceMesh, _fillMesh;
+    private Vector3[] _fillVerts;
+    private Color[] _faceCols, _fillCols;
+    private bool _faceStrong;
 
     // ── Public API ───────────────────────────────────────────────
     /// <summary>원 — 중심에서 앞줄(고리)이 바깥으로 차오른다.</summary>
@@ -107,6 +114,7 @@ public sealed class MonsterTelegraph : MonoBehaviour
     private void OnDestroy()
     {
         if (_faceMesh != null) Destroy(_faceMesh);
+        if (_fillMesh != null) Destroy(_fillMesh);
     }
 
     // ── Private Methods ──────────────────────────────────────────
@@ -122,7 +130,9 @@ public sealed class MonsterTelegraph : MonoBehaviour
         t._outline = t.MakeLine("Outline", LineWidth, true);
         t._sweep   = t.MakeLine("Sweep", SweepWidth, false);
         t.BuildOutline();
-        if (face) t.BuildFace();
+        t._faceStrong = face;
+        t.BuildFace();
+        t.BuildFill();
         t.Apply(0f, 1f);
         return t;
     }
@@ -244,23 +254,89 @@ public sealed class MonsterTelegraph : MonoBehaviour
         _face.sharedMaterial = GetMaterial();
         _face.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         _face.receiveShadows = false;
+        _faceCols = new Color[_faceMesh.vertexCount];
+    }
+
+    /// <summary>차오르는 면 — 몬스터 쪽(원은 가운데)에서 앞줄까지 판정 모양을 채운다. 정점은 한 번 만들고 매 프레임 자리만 옮긴다.</summary>
+    private void BuildFill()
+    {
+        var go = new GameObject("Fill");
+        go.transform.SetParent(transform, false);
+        _fillMesh = new Mesh { name = "MonsterTelegraphFill" };
+        _fillMesh.MarkDynamic();
+        int[] tris;
+        if (_shape == Shape.Rect)
+        {
+            _fillVerts = new Vector3[4];
+            tris = new[] { 0, 2, 1, 0, 3, 2 };
+        }
+        else
+        {
+            _fillVerts = new Vector3[ArcSegments + 2];
+            tris = new int[ArcSegments * 3];
+            for (int i = 1, k = 0; i <= ArcSegments; i++) { tris[k++] = 0; tris[k++] = i + 1; tris[k++] = i; }
+        }
+        _fillCols = new Color[_fillVerts.Length];
+        UpdateFill(0f);
+        _fillMesh.triangles = tris;
+        go.AddComponent<MeshFilter>().sharedMesh = _fillMesh;
+        _fill = go.AddComponent<MeshRenderer>();
+        _fill.sharedMaterial = GetMaterial();
+        _fill.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        _fill.receiveShadows = false;
+    }
+
+    /// <summary>차오르는 면 정점 — 진행 t(0 → 1)만큼(앞줄과 같은 자리까지).</summary>
+    private void UpdateFill(float t)
+    {
+        Vector3 up = Vector3.up * FillLift;
+        if (_shape == Shape.Rect)
+        {
+            float hw = _width * 0.5f, y = Mathf.Max(0.02f, _length * t);
+            _fillVerts[0] = P(-hw, 0f) + up;
+            _fillVerts[1] = P(hw, 0f) + up;
+            _fillVerts[2] = P(hw, y) + up;
+            _fillVerts[3] = P(-hw, y) + up;
+        }
+        else
+        {
+            float r = Mathf.Max(0.02f, _radius * t);
+            _fillVerts[0] = P(0f, 0f) + up;
+            for (int i = 0; i <= ArcSegments; i++)
+            {
+                if (_shape == Shape.Circle)
+                {
+                    float a = i * Mathf.PI * 2f / ArcSegments;
+                    _fillVerts[i + 1] = P(Mathf.Cos(a) * r, Mathf.Sin(a) * r) + up;
+                }
+                else _fillVerts[i + 1] = ArcPoint(r, i) + up;
+            }
+        }
+        _fillMesh.vertices = _fillVerts;
+        _fillMesh.RecalculateBounds();
     }
 
     /// <summary>t = 진행(0 → 1) · k = 사라짐 배율(1 → 0). 외곽선은 옅게 시작해 맞는 순간 가장 진하다.</summary>
     private void Apply(float t, float k)
     {
         Color c = _color;
-        c.a = Mathf.Lerp(0.2f, 0.85f, t * t) * k * _color.a;
+        c.a = Mathf.Lerp(0.45f, 0.85f, t * t) * k * _color.a;   // 시작 0.2는 처음 0.2초 거의 안 보였다(10-19 ⑪)
         _outline.startColor = c; _outline.endColor = c;
         Color s = _color; s.a = 0.85f * k * _color.a;
         _sweep.startColor = s; _sweep.endColor = s;
         UpdateSweep(t);
         if (_face != null)
         {
-            var fc = _color; fc.a = FaceAlpha * Mathf.Lerp(0.4f, 1f, t) * k * _color.a;
-            var cols = new Color[_faceMesh.vertexCount];
-            for (int i = 0; i < cols.Length; i++) cols[i] = fc;
-            _faceMesh.colors = cols;
+            var fc = _color; fc.a = (_faceStrong ? FaceAlpha : FaceAlphaLight) * Mathf.Lerp(0.4f, 1f, t) * k * _color.a;
+            for (int i = 0; i < _faceCols.Length; i++) _faceCols[i] = fc;
+            _faceMesh.colors = _faceCols;
+        }
+        if (_fill != null)
+        {
+            UpdateFill(t);
+            var lc = _color; lc.a = FillAlpha * Mathf.Lerp(0.6f, 1f, t) * k * _color.a;
+            for (int i = 0; i < _fillCols.Length; i++) _fillCols[i] = lc;
+            _fillMesh.colors = _fillCols;
         }
     }
 

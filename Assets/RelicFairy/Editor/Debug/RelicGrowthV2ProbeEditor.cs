@@ -275,14 +275,14 @@ public static class RelicGrowthV2ProbeEditor
         sb.AppendLine($"  가웨인 정오 {noon}(기대 3) · 여명 {dawn}(기대 1) · 미리 보기 「{prev}」");
 
         var l = new PlayerLoadout();
-        l.AddRelicPart("l_split_oath"); l.AddRelicPart("l_madness_eye");   // r10 · r30 — 20이 비어 이어짐 1
-        int ladder = RelicResonance.LancelotLadder(l, get);
+        l.AddRelicPart("l_split_oath"); l.AddRelicPart("l_madness_eye");   // r10 · r30 — 10-22 E1 D7 칸 조각 수 2(빈틈 상관없음)
+        int ladder = RelicResonance.LancelotCount(l, get);
         string lp = RelicResonance.PreviewLine(l, "lancelot", "r20", get);
-        ok &= ladder == 1 && lp != null && lp.Contains("1 → 3");
+        ok &= ladder == 2 && lp != null && lp.Contains("2 → 3");
         l.AddRelicEcho("r20");
-        int ladder2 = RelicResonance.LancelotLadder(l, get);
+        int ladder2 = RelicResonance.LancelotCount(l, get);
         ok &= ladder2 == 3;
-        sb.AppendLine($"  랜슬롯 이어진 계단 {ladder}(기대 1) · r20 미리 보기 「{lp}」 · 빈 받침 뒤 {ladder2}(기대 3)");
+        sb.AppendLine($"  랜슬롯 광기 칸 조각 {ladder}(기대 2) · r20 미리 보기 「{lp}」 · 메아리 뒤 {ladder2}(기대 3)");
         sb.AppendLine($"  → {(ok ? "통과" : "실패")}");
         return ok;
     }

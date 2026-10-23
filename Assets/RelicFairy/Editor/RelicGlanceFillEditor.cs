@@ -12,14 +12,15 @@ public static class RelicGlanceFillEditor
     private const string Dir = "Assets/RelicFairy/Systems/Relic/Data/";
 
     // 능력 이름 → (한 줄 요약, 큰 수치 "라벨|값")
+    // 10-22 E1 A3 — 하루의 순환 · 광기 한눈 줄을 「때마다 무엇을 하나」로(왼쪽 칸 약 356px · 16pt 한 줄) · D8 기본 Q 「낙인」 명사를 걷었다
     private static readonly (string relic, string ability, string glance, string[] keys)[] Rows =
     {
-        ("RelicClass_Gawain",   "하루의 순환", "여명 → 정오 → 황혼이 저절로 돈다",   new[] { "화상|초당 10%", "처치 충전|+20%" }),
-        ("RelicClass_Gawain",   "정오",       "심어 둔 화상이 한꺼번에 터진다",     new[] { "공격 속도|+30%", "모든 피해|+20%" }),
-        ("RelicClass_Gawain",   "낙일",       "전방에 태양을 떨어뜨린다",           new[] { "착탄 피해|350%", "작열 지대|4초" }),
-        ("RelicClass_Lancelot", "광기",       "맞힐수록 세지고, 그만큼 약해진다", new[] { "공격력 최대|+40%", "받는 피해 최대|+30%" }),
+        ("RelicClass_Gawain",   "하루의 순환", "여명엔 쳐서 태양흔 쌓기 · 황혼엔 Q가 잠긴다", new[] { "태양흔|최대 3", "처치 충전|+20%" }),
+        ("RelicClass_Gawain",   "정오",       "쌓아 둔 태양흔이 한꺼번에 터진다", new[] { "공격 속도|+30%", "모든 피해|+20%" }),
+        ("RelicClass_Gawain",   "낙일",       "전방에 태양을 떨어뜨린다",           new[] { "착탄 피해|1100%", "작열 지대|4초" }),
+        ("RelicClass_Lancelot", "광기",       "칠수록 차오른다 · 40이면 광란 · 그때 Q 심판", new[] { "공격력 최대|+40%", "받는 피해 최대|+30%" }),
         ("RelicClass_Lancelot", "광란",       "40스택에 4초 폭주 — 끝나면 0으로",   new[] { "이동 속도|+20%" }),
-        ("RelicClass_Lancelot", "심판의 일격", "부채꼴 연타 뒤 마무리 강타",         new[] { "피해|520%", "낙인 받는 피해|+20%" }),
+        ("RelicClass_Lancelot", "심판의 일격", "부채꼴 연타 뒤 마무리 강타",         new[] { "피해|950%", "찢긴 적 받는 피해|+20%" }),
     };
 
     [MenuItem("RelicFairy/Tools/10-13 유물 고르기 팝업 — 한눈 줄 채우기(가웨인 · 랜슬롯)")]

@@ -22,7 +22,7 @@ MonoBehaviour:
   patternTag: 
   breakOverride: -1
   patternCooldown: 12
-  waveCounts: 030000000400000005000000
+  waveCounts: 060000000700000007000000
   waveInterval: 1.2
   debrisWarn: 1.2
   debrisRadius: 2.5
@@ -31,3 +31,5 @@ MonoBehaviour:
   coreRadius: 9
   endDuration: 0.5
   recoveryDuration: 0.4
+  _packGap: {x: 1, y: 2.4}
+  _safeNear: {x: 3, y: 6}

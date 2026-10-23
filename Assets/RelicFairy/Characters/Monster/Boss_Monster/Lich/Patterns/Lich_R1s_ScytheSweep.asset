@@ -21,6 +21,8 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: 63075334fa114b74ebef3678d81de552, type: 2}
+  followUpLateOnly: 0
   minTriggerRange: 0
   maxTriggerRange: 9
   patternCooldown: 7

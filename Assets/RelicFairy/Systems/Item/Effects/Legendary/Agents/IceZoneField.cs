@@ -23,7 +23,7 @@ public sealed class IceZoneField : MonoBehaviour
     private const float SlowDuration = 0.7f;
     private const float ShardMult = 0.5f;
     private const float ShardCooldown = 3f;
-    private const float VfxScale = 0.4f;
+    private const float VfxScale = 0.13f;   // 0.4는 반경 6.1 m(판정 2 m의 3배)로 보였다(10-18 실측 68)
 
     private readonly List<GameObject> _buf = new(8);
     private readonly HashSet<GameObject> _hitShown = new();   // 틱 타격 이펙트를 이미 띄운 대상(빙판 하나에 한 번)

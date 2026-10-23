@@ -45,6 +45,10 @@ public class SkillSO : ScriptableObject
     [Header("쿨다운")]
     public float cooldown = 5f;
 
+    [Header("피해")]
+    [Tooltip("켜면 이 스킬 동작 데이터의 피해 값을 「공격력 %」로 읽는다(예: 250 = 공격력의 250%). 끄면 예전처럼 「값 + 공격력」 — 근접 스킬 개선(10-18)")]
+    public bool damageIsAtkPercent = false;
+
     [Header("실행 행동")]
     [Tooltip("스킬의 실행 로직을 정의하는 SO. null이면 기본 애니메이션 재생만 수행")]
     public SkillBehaviorSO behavior;

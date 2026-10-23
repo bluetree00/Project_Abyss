@@ -30,7 +30,7 @@ public static class BuildImprint
     public static int Halves(BuildFamily f) => f == BuildFamily.None ? 0 : s_halves[(int)f];
 
     /// <summary>
-    /// 다시 센다 — 판에 놓인 룬(룬 하나 = 계열 하나 · 스탯 룬은 절반) + 맺은 서약의 원인 계열 + 무기 두 자루(승급 · 진화) + 유물 파츠.
+    /// 다시 센다 — 판에 놓인 룬(룬 하나 = 계열 하나 · 스탯 룬은 절반) + 맺은 서약의 원인 계열 + 무기 두 자루(승급 · 진화).
     /// 효과 재구성(Rebuild) 바로 앞에서 부른다.
     /// </summary>
     public static void Recount(GameRunSession run)
@@ -63,14 +63,7 @@ public static class BuildImprint
                 Add(BuildFamilyRules.OfWeapon(wm.Weapon1Data));
             }
 
-            var parts = AppBootstrapper.Instance != null ? AppBootstrapper.Instance.Loadout?.RelicPartIds : null;
-            if (parts != null)
-                foreach (var id in parts) Add(BuildFamilyRules.OfRelicPart(id));
-
-            // 유물 진화 — 그 계열 각인 +2(진화가 빌드를 한 단계 밀어 줌 · 10-14 C)
-            var evo = RelicEvolution.ById(AppBootstrapper.Instance != null ? AppBootstrapper.Instance.Loadout?.RelicEvolutionId : null);
-            if (evo != null)
-                for (int k = 0; k < RelicEvolution.ImprintBonus; k++) Add(evo.Family);
+            // 유물 조각 · 진화는 더 이상 세지 않는다(10-22 E1 D4 — 유물 창에 계열 낱말 0 · 진화 「각인 +2」 삭제)
 
             // 근접 강화 증강 「각인 공명」(10-15) — 지금 든 무기에 있으면 가장 높은 계열에 반 칸 단위로 더한다
             float echo = MeleeAugments.ValueOnCurrent("aug_imprint_echo");

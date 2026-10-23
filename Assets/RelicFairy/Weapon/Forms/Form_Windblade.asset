@@ -17,7 +17,7 @@ MonoBehaviour:
   triggerName: "\uD48D\uC808"
   line: "\uB04A\uAE30\uC9C0 \uC54A\uACE0 \uBAB0\uC544\uCE58\uBA74, \uB9C8\uC9C0\uB9C9
     \uD0C0\uAC00 \uBA40\uB9AC \uB2FF\uB294\uB2E4"
-  tint: {r: 0.62, g: 0.8, b: 0.95, a: 1}
+  tint: {r: 0.95, g: 0.32, b: 0.3, a: 1}
   maxStacks: 5
   triggerAtkRatio: 1.5
   triggerRange: 8
@@ -47,7 +47,7 @@ MonoBehaviour:
     traitTag: "\uBB34\uB9AC \uC18D \uC5F0\uC1C4"
     line: "\uD48D\uC808\uC5D0 \uB9DE\uC740 \uC801 \uD558\uB098\uB2F9 \uCE7C\uBC14\uB78C
       +1\uC744 \uB3CC\uB824\uBC1B\uB294\uB2E4(\uCD5C\uB300 3)"
-  triggerVfxKey: vfx_form_windcut
+  triggerVfxKey: vfx_form_windcut_red
   triggerVfxScale: 1.3
   fullTrailPrefab: {fileID: 1298082800965881913, guid: 833bd2bfddf27ff4494b0bc4356e2a28,
     type: 3}

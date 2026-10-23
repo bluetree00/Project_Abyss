@@ -90,6 +90,6 @@ public sealed class ElecOrbAgent : LegendaryProjectileBase
     {
         var cat = LegendaryRuntime.Catalog;
         if (cat?.elecOrbHitVfx != null)
-            LegendaryRuntime.SpawnVfx(cat.elecOrbHitVfx, pos, Quaternion.identity, 2f);
+            LegendaryRuntime.SpawnVfx(cat.elecOrbHitVfx, pos, Quaternion.identity, 2f, 3f);   // 폭발 판정 2 m — 배율 1은 0.6 m로 보였다(10-18 실측 68)
     }
 }

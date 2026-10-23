@@ -9,10 +9,11 @@ namespace RelicFairy.Monster
 /// SetMaterials()로 SkillIndicator 머티리얼이 주입되면 Quad + Circle/Arrow 셰이더로 표시하고,
 /// 주입되지 않으면 Unity Primitive(Unlit/Color)로 폴백한다. 호출 API는 두 경우 모두 동일하다.
 ///
-/// 색상 규칙:
-///   Telegraph (노란색) — 공격 예고, 선딜 구간 (리치는 쓰지 않는다 — 원칙 문서에서 노랑은 「안전」)
-///   Active    (빨간색) — 공격 판정 활성 구간
-///   Summon    (보라색) — 소환 범위
+/// 색상 규칙(10-23 가이드 색 통일 — 「공격이면 한 색」, 모든 몬스터 · 보스 공용):
+///   AttackFill (주홍) — 공격 예고 · 차오르는 구간(옛 노랑 Telegraph · 리치 보라/진홍 · 화룡 속성 색 · 기사 회색을 대신한다)
+///   Active     (빨강) — 판정 직전 · 판정 활성 구간(<see cref="Arm"/>). 큰 공격은 같은 계열(AttackHeavy) · 밝기로만 다르다
+///   공격 아님 — 안전 = 흰색 · Breakable(청록) = 칠 수 있음 · Layout(옅은 회청) = 배치 · 정보 · Summon(보라) = 소환 범위.
+///   공격 아닌 표시는 빨강 계열을, 공격 예고는 속성 · 보스 색(보라 · 파랑 · 흰 · 회색)을 쓰지 않는다 — 속성은 이펙트만.
 ///
 /// 예고 진행도: <see cref="SetProgress"/>(0→1)로 데칼을 채운다 — 크기를 줄이고 키우는 흉내 대신.
 ///
@@ -26,7 +27,17 @@ public static class PatternGuideHelper
     /// <summary>데칼을 바닥에서 띄우는 높이(m). 바닥 타일·풀 메시 윗면이 0.1 m 안팎 솟아 있어 0.04면 가이드가 타일에 가려졌다(09-28 실측).</summary>
     private const float DecalLift = 0.2f;
 
-    public static readonly Color Telegraph = new Color(1.00f, 0.85f, 0.00f); // 노란색
+    // ── 공격 색(10-23 가이드 색 통일) ──────────────────────────
+    /// <summary>공격 예고 — 테두리 · 차오르는 면. 모든 몬스터 · 보스 공용(일반 몬스터 MonsterTelegraph.Normal과 같은 값).</summary>
+    public static readonly Color AttackFill  = new Color(1.00f, 0.30f, 0.22f);        // 주홍
+    /// <summary>위협 · 정예 큰 공격 · 특수 상태 — 같은 계열의 더 진한 진홍(MonsterTelegraph.Heavy와 같은 값).</summary>
+    public static readonly Color AttackHeavy = new Color(0.92f, 0.12f, 0.10f);        // 진홍
+    /// <summary>머무는 위험 바닥(<see cref="BossStageHazard"/> 띠 · 구역) — 같은 계열을 어둡게 · 반투명(숲 가시 띠 기본값과 같다).</summary>
+    public static readonly Color HazardFloor = new Color(0.55f, 0.10f, 0.06f, 0.45f); // 어두운 홍
+    /// <summary>배치 · 정보(판정 없음 · 안전지대도 아님) — 봉인진 바닥 원 등. 안전(흰색)보다 어둡고 푸른 회색.</summary>
+    public static readonly Color Layout      = new Color(0.62f, 0.66f, 0.78f);        // 옅은 회청
+    /// <summary>옛 이름 — 노란 공격 예고였다. 10-23부터 <see cref="AttackFill"/>과 같다(숲 보스가 쓴다).</summary>
+    public static readonly Color Telegraph = AttackFill;
     public static readonly Color Active    = new Color(1.00f, 0.10f, 0.10f); // 빨간색
     public static readonly Color Summon    = new Color(0.55f, 0.00f, 1.00f); // 보라색
     public static readonly Color Safe      = new Color(0.00f, 1.00f, 0.40f); // 초록색 — 안전지대
@@ -59,6 +70,11 @@ public static class PatternGuideHelper
     private static Shader                _unlitShader;
     private static Material              _unlitShared; // 프리미티브 폴백 공유 머티리얼
     private static MaterialPropertyBlock _mpb;         // 재사용 — 매 스폰 alloc 회피
+
+    // ── 아레나 대비(10-23) — 붉은 바닥(화룡)에서 가산 예고가 바닥에 묻혔다 ──
+    private static float s_arenaBoost    = 1f;   // 밝기(_Intensity) 배율
+    private static float s_arenaEdgeLift;        // 공격 예고 테두리(_Color)를 흰빛 쪽으로(0 = 그대로)
+    private static readonly Color ArenaEdgeTarget = new Color(1.00f, 0.92f, 0.80f);
 
     /// <summary>지금 주입된 원 · 화살표 재질(없으면 null) — 잠깐 바꿔 쓰는 쪽이 끝나고 돌려놓을 때 읽는다(이벤트방 놀이).</summary>
     public static Material CircleMaterial => _circleSource;
@@ -201,6 +217,23 @@ public static class PatternGuideHelper
 
     // ── 조작 메서드 ────────────────────────────────────────────────
 
+    /// <summary>
+    /// 붉은 바닥 아레나에서 예고 대비를 올린다(10-23 「붉은 화룡 아레나에서 공격 색 대비 약함」). 공격 색 체계는 그대로 —
+    /// 공격 예고의 테두리만 흰빛 쪽으로 <paramref name="edgeLift"/>만큼, 예고 밝기는 × <paramref name="boost"/>.
+    /// 가산 셰이더라 빨강 위에 주홍을 더하면 빨강 채널이 이미 차서 거의 안 달라졌다. 보스가 켜고(OnEnable) 끈다(<see cref="ClearArenaContrast"/>).
+    /// </summary>
+    public static void SetArenaContrast(float boost, float edgeLift)
+    {
+        s_arenaBoost    = Mathf.Max(1f, boost);
+        s_arenaEdgeLift = Mathf.Clamp01(edgeLift);
+    }
+
+    public static void ClearArenaContrast()
+    {
+        s_arenaBoost    = 1f;
+        s_arenaEdgeLift = 0f;
+    }
+
     /// <summary>가이드 오브젝트 색상 교체 (Telegraph → Active 전환 등)</summary>
     public static void SetColor(GameObject go, Color color)
     {
@@ -236,7 +269,7 @@ public static class PatternGuideHelper
     {
         if (!TryDecal(go, out var mr)) return;
         mr.GetPropertyBlock(_mpb);
-        _mpb.SetFloat(IntensityId, intensity);
+        _mpb.SetFloat(IntensityId, intensity * s_arenaBoost);
         mr.SetPropertyBlock(_mpb);
     }
 
@@ -290,6 +323,7 @@ public static class PatternGuideHelper
         mr.receiveShadows    = false;
         mr.sharedMaterial    = source; // 공유 — 인스턴스 미생성
         ApplyGuideColor(mr, color, setSector, sector);
+        if (s_arenaBoost > 1f) SetIntensity(go, 1f);   // 아레나 대비(10-23)
         return go;
     }
 
@@ -316,10 +350,22 @@ public static class PatternGuideHelper
     {
         if (_mpb == null) _mpb = new MaterialPropertyBlock();
         mr.GetPropertyBlock(_mpb); // 기존 블록 값 유지 (섹터 보존)
-        _mpb.SetColor(ColorId, color);
+        _mpb.SetColor(ColorId, ArenaEdge(color));
         if (setSector) _mpb.SetFloat(SectorId, sector);
         mr.SetPropertyBlock(_mpb);
     }
+
+    /// <summary>아레나 대비가 켜져 있으면 공격 예고(채움 · 판정 색) 테두리만 흰빛 쪽으로 — 채움(_FlowColor)은 공격 색 그대로.</summary>
+    private static Color ArenaEdge(Color color)
+    {
+        if (s_arenaEdgeLift <= 0f || !(SameRgb(color, AttackFill) || SameRgb(color, AttackHeavy) || SameRgb(color, Active))) return color;
+        var lifted = Color.Lerp(color, ArenaEdgeTarget, s_arenaEdgeLift);
+        lifted.a = color.a;
+        return lifted;
+    }
+
+    private static bool SameRgb(Color a, Color b)
+        => Mathf.Abs(a.r - b.r) < 0.02f && Mathf.Abs(a.g - b.g) < 0.02f && Mathf.Abs(a.b - b.b) < 0.02f;
 
     /// <summary>
     /// 화살표 텍스처(Clamp)의 머리를 빔 끝에 제 비율로 둔다 — 머리 아래는 텍스처 아래 가장자리가 늘어나 몸통으로 이어진다.

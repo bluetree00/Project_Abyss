@@ -52,6 +52,8 @@ public sealed class HudBootstrapper : MonoBehaviour
     public async Cysharp.Threading.Tasks.UniTask RevealStartRoomAsync(float duration)
     {
         var target = hudVisualRoot != null ? hudVisualRoot : presenter?.transform;
+        // 이미 다 보이는 HUD는 0으로 꺼뜨렸다 다시 올리지 않는다 — 대기방이 켜 둔 HUD(10-18)가 출구(StartRoomGate)에서 깜빡이지 않게
+        if (!_startRoomSuppressed && target != null && target.gameObject.activeInHierarchy && _fadeAlpha >= 0.99f) return;
         CanvasGroup cg = null;
         if (target != null)
         {

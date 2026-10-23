@@ -82,6 +82,7 @@ public sealed class HudView : MonoBehaviour
 
     // 재화 라인 — 골드/강화재료/원석이 같은 줄에 같은 배경으로. 0이면 연료 pill 숨김.
     private RectTransform _currencyRow;
+    private CurrencyGainFeedView _gainFeed;   // 재화 획득 목록 — 재화 칸 바로 아래(10-22)
     private GameObject    _goldSlot;
     private GameObject    _enhanceMatSlot;
     private GameObject    _runeOreSlot;
@@ -428,6 +429,27 @@ public sealed class HudView : MonoBehaviour
     }
 
     /// <summary>
+    /// 얻은 재화 한 줄 — 재화 칸 바로 아래 「획득」 목록(10-22 사용자 「원신 · 명조처럼 획득한 재화를 실시간으로 보여 주고 사라지게」).
+    /// 왼쪽은 미니맵 · 서약 칸(위)과 무기 기둥 · 버프 줄(아래)이 차 있어, 얻은 것이 그 재화 칸 밑에 뜨게 오른쪽 위에 둔다.
+    /// </summary>
+    public void ShowCurrencyGain(CurrencyGainKind kind, int amount)
+    {
+        if (amount <= 0) return;
+        EnsureCurrencyRow();
+        if (_gainFeed == null)
+        {
+            var parent = _currencyRow != null ? _currencyRow.parent as RectTransform : goldText != null ? goldText.transform.parent as RectTransform : null;
+            if (parent == null) return;
+            _gainFeed = CurrencyGainFeedView.Create(parent, currencyRowOffset + new Vector2(0f, -(currencyPillSize.y + 14f)));
+            _gainFeed.SetLook(CurrencyGainKind.Gold,            goldIconSprite,        GoldFrameTint);
+            _gainFeed.SetLook(CurrencyGainKind.EnhanceMaterial, enhanceMatIconSprite,  EnhanceFrameTint);
+            _gainFeed.SetLook(CurrencyGainKind.RuneOre,         runeOreIconSprite,     RuneOreFrameTint);
+            _gainFeed.SetLook(CurrencyGainKind.Essence,         essenceIconSprite,     EssenceFrameTint);
+        }
+        _gainFeed.Push(kind, amount);
+    }
+
+    /// <summary>
     /// 재화 칸 표시 갱신 — <b>얻은 적 있는 재화만</b> 보인다.
     /// 아직 못 얻은 재화 칸을 미리 띄우면 "쓸 수 없는 자원"이 화면을 차지해 정보 밀도만 올린다.
     /// </summary>
@@ -453,11 +475,22 @@ public sealed class HudView : MonoBehaviour
     {
         // 정수도 같이 — 빠져 있어 지난 런 정수가 로비에 남고, 다음 런은 시작부터 「0」 칸이 떴다(10-09 출시 점검)
         _goldSeen = _enhanceMatSeen = _runeOreSeen = _essenceSeen = false;
-        if (goldText != null) goldText.text = "0";
-        if (_enhanceMatText != null) _enhanceMatText.text = "0";
-        if (_runeOreText != null) _runeOreText.text = "0";
-        if (_essenceText != null) _essenceText.text = "0";
+        ResetCounter(goldText);
+        ResetCounter(_enhanceMatText);
+        ResetCounter(_runeOreText);
+        ResetCounter(_essenceText);
         ApplyCurrencyVisibility();
+    }
+
+    /// <summary>
+    /// 칸 숫자를 0으로 — 굴러가던 숫자(<see cref="CurrencyCounter"/>)도 멈춘다(10-22). 글자만 바꾸면 굴림이 지난 런 값을 다시 쓰고,
+    /// 다음 런 첫 값이 지난 런 값에서부터 굴러 「−758」 같은 차이가 떴다.
+    /// </summary>
+    private static void ResetCounter(TMP_Text text)
+    {
+        if (text == null) return;
+        if (text.TryGetComponent<CurrencyCounter>(out var counter)) counter.SetInstant(0);
+        else text.text = "0";
     }
 
     private static void SetActiveSafe(MonoBehaviour comp, bool on)

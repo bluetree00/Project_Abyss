@@ -28,6 +28,9 @@ public sealed class UI_StartPartPopup : UI_Popup
     private const float CardY   = -14f;
     private const float CardSideMargin = 40f;
     private const float SelectedCardScale = 1.04f;
+    private const float CardCornerPx   = 24f;   // 10-19 공방 카드 틀 — 9칸 모서리(황동 모서리 쇠)를 이 크기로
+    private const float PanelCornerPx  = 48f;   // 공방 창 틀 모서리
+    private static readonly Color LockedArtTint = new(0.36f, 0.36f, 0.40f, 1f);   // 잠긴 칸 = 같은 틀을 어둡게(줄이 한 벌로 읽히게)
 
     private const float DiscTop   = -34f;
     private const float DiscSize  = 132f;
@@ -58,6 +61,7 @@ public sealed class UI_StartPartPopup : UI_Popup
         public Image         Border;
         public Image         Fill;
         public RectTransform Rt;
+        public UIThinFrame   Frame;   // 10-19 틀 그림이 있으면 고른 표시 = 이 1px 테(색 틴트 대신)
     }
 
     // ── Private ──────────────────────────────────────────────
@@ -193,10 +197,18 @@ public sealed class UI_StartPartPopup : UI_Popup
         ShopUIStyle.Skin(_confirmBtnImg, skin?.confirmButton, sliced: true);
 
         // 아트가 없을 때의 공통 언어 — 둥근 창 + 금 가는 선 · 공통 베벨 버튼(09-28 UI 톤 진단 D4, 개화와 같은 규칙)
+        var panelArt = skin?.WorkshopPanelFrame;
         if (!_skinned)
         {
-            if (skin?.background == null) UITheme.RoundFrame(window, 18f);   // 남색 판(10-13)이 있으면 그 판
-            if (window.transform.parent.TryGetComponent<Image>(out var edge)) edge.color = UITheme.GoldLine;
+            if (panelArt != null)
+            {
+                // 10-19 ⑥ 공방 창 틀(호두나무 · 황동 · 9칸) — 바깥 금선은 걷는다(틀이 테를 가진다)
+                ShopUIStyle.Skin(window, panelArt, sliced: true);
+                ShopUIStyle.Stretch(window.rectTransform);
+                if (panelArt.border.x > 0f) window.pixelsPerUnitMultiplier = panelArt.border.x / PanelCornerPx;
+            }
+            else if (skin?.background == null) UITheme.RoundFrame(window, 18f);   // 남색 판(10-13)이 있으면 그 판
+            if (window.transform.parent.TryGetComponent<Image>(out var edge)) edge.color = panelArt != null ? Color.clear : UITheme.GoldLine;
             _themed = UITheme.StyleFrameButton(_confirmBtnImg, UITheme.CtaTintOff);
             UITheme.StyleFrameButton(close, UITheme.SecondaryTint);
             TMPOutlineHelper.ApplySoftShadow(_confirmLabel);
@@ -234,6 +246,7 @@ public sealed class UI_StartPartPopup : UI_Popup
                 var lockTitle = ShopUIStyle.FindDeep(locked.transform, "LockTitle");
                 if (lockTitle != null && lockTitle.TryGetComponent<TMP_Text>(out var lt))
                     lt.text = c.Part.part_name ?? c.Part.part_id;   // 무엇이 잠겼는지 보여야 열러 갈 이유가 생긴다
+                SkinLocked(locked.transform);
                 _lockedRoots.Add(locked);
                 continue;
             }
@@ -246,25 +259,54 @@ public sealed class UI_StartPartPopup : UI_Popup
 
             var view = new CardView { PartId = c.Part.part_id, Border = rt.GetComponent<Image>(), Fill = fill, Rt = rt };
             var skin = UISkin.RelicPartDraft;
-            ShopUIStyle.Skin(view.Border, skin?.cardFrame, sliced: true);
-            ShopUIStyle.Skin(view.Fill,   skin?.cardFill,  sliced: true);
-            if (!_skinned && skin?.cardFill == null) UITheme.RoundFrame(view.Fill, 14f);
+            var cardArt = skin?.WorkshopCardFrame;
+            if (cardArt != null)
+            {
+                // 10-19 ⑥ 공방 카드 틀(9칸 · 바탕 포함) — 바깥 테 Image는 투명으로 클릭만 받고, 고른 표시는 1px 테
+                view.Border.color = Color.clear;
+                ShopUIStyle.Stretch(view.Fill.rectTransform);
+                ShopUIStyle.Skin(view.Fill, cardArt, sliced: true);
+                if (cardArt.border.x > 0f) view.Fill.pixelsPerUnitMultiplier = cardArt.border.x / CardCornerPx;
+                view.Frame = UIThinFrame.Create(rt, ThinShape.Square, new Vector2(cardW, CardH));
+            }
+            else
+            {
+                ShopUIStyle.Skin(view.Border, skin?.cardFrame, sliced: true);
+                ShopUIStyle.Skin(view.Fill,   skin?.cardFill,  sliced: true);
+                if (!_skinned && skin?.cardFill == null) UITheme.RoundFrame(view.Fill, 14f);
+            }
             int idx = _cards.Count;
             _cards.Add(view);
             AddClick(rt.gameObject, () => SetSelected(idx, playSound: true));
 
-            BuildCardContent(fill.transform, c.Part, cardW, c.Part.part_id == _currentPartId);
+            BuildCardContent(fill.transform, c.Part, cardW, c.Part.part_id == _currentPartId, cardArt != null);
         }
     }
 
-    private static void BuildCardContent(Transform card, WeaponPartEntry def, float cardW, bool isCurrent)
+    /// <summary>잠긴 칸도 같은 공방 틀을 어둡게 깐다(10-19) — 열린 카드와 한 줄로 읽히고, 자물쇠 · 해금 안내는 그 위에 그대로.</summary>
+    private static void SkinLocked(Transform locked)
+    {
+        var art = UISkin.RelicPartDraft?.WorkshopCardFrame;
+        if (art == null || locked == null) return;
+        if (locked.TryGetComponent<Image>(out var edge)) edge.color = Color.clear;
+        var fill = locked.Find("Fill");
+        if (fill == null || !fill.TryGetComponent<Image>(out var img)) return;
+        ShopUIStyle.Stretch(img.rectTransform);
+        ShopUIStyle.Skin(img, art, sliced: true, tint: LockedArtTint);
+        if (art.border.x > 0f) img.pixelsPerUnitMultiplier = art.border.x / CardCornerPx;
+    }
+
+    private static void BuildCardContent(Transform card, WeaponPartEntry def, float cardW, bool isCurrent, bool framed)
     {
         Color kc = KindColor(def.Kind);
 
-        var ribbon = ShopUIStyle.MakeImage(card, "Ribbon", kc);
-        ShopUIStyle.Anchor(ribbon.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -3f), new Vector2(-28f, 6f));
-        ribbon.sprite = UITheme.SoftBand;   // 끝이 흐려지는 빛줄기(09-28 UI 톤 통일)
+        if (!framed)   // 10-19 틀 그림이 있으면 윗변 빛줄기는 틀(푸른 안쪽 선)이 대신한다 — 나무 테 위에 겹치지 않게
+        {
+            var ribbon = ShopUIStyle.MakeImage(card, "Ribbon", kc);
+            ShopUIStyle.Anchor(ribbon.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0f, -3f), new Vector2(-28f, 6f));
+            ribbon.sprite = UITheme.SoftBand;   // 끝이 흐려지는 빛줄기(09-28 UI 톤 통일)
+        }
 
         // 계열 문양 — 전용 아트가 아직 없다(09-26 리소스 확인). 계열색 원반 + 계열 이름.
         var disc = ShopUIStyle.MakeImage(card, "KindDisc", new Color(kc.r * 0.22f, kc.g * 0.22f, kc.b * 0.22f, 1f));
@@ -319,6 +361,13 @@ public sealed class UI_StartPartPopup : UI_Popup
         {
             bool on = i == index;
             var v = _cards[i];
+            if (v.Frame != null)
+            {
+                // 10-19 틀 그림 — 고른 표시는 금 1px 테 + 확대(재련소 · 되살아난 기억과 같은 말)
+                v.Frame.SetState(on ? ThinFrameState.Ready : ThinFrameState.Idle, animate: index >= 0);
+                if (v.Rt != null) v.Rt.localScale = Vector3.one * (on ? SelectedCardScale : 1f);
+                continue;
+            }
             if (v.Border != null)
                 v.Border.color = _skinned ? (on ? Color.white : new Color(0.62f, 0.62f, 0.66f))
                                           : (on ? SelectBorder : ShopUIStyle.CardBorder);

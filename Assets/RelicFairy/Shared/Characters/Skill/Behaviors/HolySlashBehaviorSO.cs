@@ -42,6 +42,8 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
     public string dashEffectKey = "IasenDashLaser";
     public string dashTrailKey = "IasenDashFire";
     public string slashEffectKey = "IasenFinishFlash";
+    [Tooltip("마무리 이펙트 크기(10-22 B4: 주황 노바 → 붉은 베기 조각)")]
+    public float slashEffectScale = 1f;
     public string hitEffectKey = "SwordHitImpact";
     public float hitEffectScale = 0.4f;
 
@@ -187,8 +189,8 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
                 // 대시 완료 이펙트
                 SpawnEffect(ctx, _data.dashEffectKey,
                     ctx.PlayerTransform.position + Vector3.up * 0.5f, 1f);
-                SpawnEffect(ctx, _data.slashEffectKey,
-                    ctx.PlayerTransform.position + Vector3.up * 1f, 0.6f);
+                SpawnEffectScaled(ctx, _data.slashEffectKey,
+                    ctx.PlayerTransform.position + Vector3.up * 1f, _data.slashEffectScale, 0.6f);
                 Managers.Sound?.PlayEvent(SoundEvent.PlayerSwing);   // 베는 소리(A6 · C8 — 스킬 클립엔 이벤트가 없다)
 
                 // 대시 데미지 적용 (1단계) — 뒤에 추가타가 없으면 이 타가 마무리(A5)
@@ -326,7 +328,7 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
                 if (mapping != null) animName = mapping.baseClipName;
             }
 
-            // 대시가 끝나는 순간(첫 판정)에 발도가 닿게 — 발도 클립은 1.63초에 닿는다(09-25 실측).
+            // 대시가 끝나는 순간(첫 판정)에 베기가 닿게 — 클립별 닿는 순간은 SkillAnimSync 표(10-22~ 뛰어들며 베기 Dodge_Attack_F).
             SkillAnimSync.CrossFadeToContact(ctx.Animator, animName, _data.dashDuration, 0.05f);
         }
 

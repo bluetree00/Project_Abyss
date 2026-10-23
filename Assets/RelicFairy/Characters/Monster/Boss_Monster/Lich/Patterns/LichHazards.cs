@@ -15,6 +15,7 @@ public static class LichHazards
     private static LichHazardHost s_host;
     private static BoundChainsHazard s_bound;
     private static ChainBindHazard s_bind;
+    private static ElementCycleHazard s_cycle;
     private static float s_nextBindAt;
 
     private static LichHazardHost Host
@@ -33,6 +34,7 @@ public static class LichHazards
         s_host       = null;
         s_bound      = null;
         s_bind       = null;
+        s_cycle      = null;
         s_nextBindAt = 0f;
     }
 
@@ -47,26 +49,39 @@ public static class LichHazards
 
     public enum QuadrantElement { Fire, Ice, Lightning, Dark }
 
-    /// <summary>원소 재편(M8) 사분면 설정. 사분면 i = 방위 [BaseAngle + 90·i, +90) (도, +Z 기준 시계 방향).</summary>
-    public struct QuadrantSettings
+    /// <summary>
+    /// 원소 순환 폭발(M8 원소 재편 · 10-22 E2 L2 안 A) 설정. 사분면 i = 방위 [BaseAngle + 90·i, +90) (도, +Z 기준 시계 방향).
+    /// </summary>
+    public struct CycleSettings
     {
         public Vector3           Center;
         public float             Radius;
         public float             BaseAngle;
         public QuadrantElement[] Elements;
-        public float             Seconds;
-        public float             FireDps;
+        public float             Interval;            // 칸 하나가 터지는 간격(초) — 네 칸이면 × 4
+        public float             Warn;                // 터질 칸이 차오르는 예고(초)
+        public float             FireDamage;
+        public float             FireGroundSeconds;
+        public float             FireGroundDamage;    // 불 장판 한 틱(0.4초)
+        public float             IceDamage;
         public float             IceSlowScale;
-        public float             ChainWarn;
-        public float             ChainRadius;
-        public float             ChainDamage;
-        public float             ChainCooldown;
-        public float             DarkVignette;
+        public float             IceSlowSeconds;
+        public float             BoltDamage;
+        public float             DarkDamage;
+        public float             DarkVignetteSeconds;
+        public int               Waves;               // 일제 발동 횟수(10-22 E2 L2 2차)
+        public float             SafeGap;             // 원 가장자리 사이 빈틈(m) — 좁을수록 「틈을 찾아 비키는」 회피
+        public float             DiscRadius;          // 얼음 · 번개 · 어둠 원 반경(m) — 세 칸이 한 격자(10-23)
+        public float             FireWedge;           // 불 줄기 폭(도)
+        public float             FireGap;             // 불 줄기 사이 틈(도)
     }
 
-    /// <summary>원소 사분면 — 바닥 색으로 상시 표시, 플레이어가 선 사분면의 성질을 입힌다.</summary>
-    public static void ElementQuadrants(MonsterContext ctx, QuadrantSettings settings)
-        => Host.Add(new QuadrantHazard(ctx, settings));
+    /// <summary>원소 일제 발동 — 네 칸의 원소 모양이 한꺼번에 터진다(Waves번 · 10-22 E2 L2 2차).</summary>
+    public static void ElementCycle(MonsterContext ctx, CycleSettings settings)
+    {
+        s_cycle = new ElementCycleHazard(ctx, settings);
+        Host.Add(s_cycle);
+    }
 
     /// <summary>
     /// 봉인 사슬(T1 이후 봉인기 2페이지) — 제단 바깥 세 곳에서 리치까지 금빛 사슬 세 줄. 리치를 따라 매 프레임 다시 잇는다.
@@ -115,12 +130,15 @@ public static class LichHazards
     /// <summary>지금 사슬에 묶여 있는가.</summary>
     public static bool IsBinding => s_bind != null;
 
+    /// <summary>원소 순환 폭발이 도는 중인가 — 그동안 리치는 성흔 탄막 · 비전 구체만 고른다(10-22 E2 L2 · LichMonster).</summary>
+    public static bool ElementCycleActive => s_cycle != null;
+
     /// <summary>지금 묶을 수 있는가 — <see cref="ChainBind"/>와 같은 조건(묶여 있지 않고, 풀린 지 <see cref="BindCooldown"/>초가 지났다).</summary>
     public static bool CanBind => s_bind == null && Time.time >= s_nextBindAt;
 
     /// <summary>
     /// <paramref name="pos"/>에 선 채로 <paramref name="seconds"/>초 안에 남은 장판 · 투사체에 맞을 수 있는가 — 묶는 공격(속박탄)이
-    /// 「묶인 채 피할 수 없이 맞는」 자리를 피한다. 여운 장판 안 · 곧 터질 지연 폭발 안 · 그 시간 안에 닿을 추적 구체 · 불/번개 사분면.
+    /// 「묶인 채 피할 수 없이 맞는」 자리를 피한다. 여운 장판 안 · 곧 터질 지연 폭발 안 · 그 시간 안에 닿을 추적 구체 · 곧 터질 원소 칸.
     /// </summary>
     public static bool ThreatNear(Vector3 pos, float seconds) => s_host != null && s_host.AnyThreat(pos, seconds);
 
@@ -145,6 +163,7 @@ public static class LichHazards
     public static void Clear()
     {
         s_bound = null;
+        s_cycle = null;
         if (s_host != null) s_host.ClearAll();
         LichDarkRainZone.ClearAll();   // 결계 폭격 장판도 함께 — 사망 · 페이지 전환 뒤에 남아 터졌다(10-08 점검)
     }
@@ -367,16 +386,41 @@ public static class LichHazards
         private Vector3 Body() => _target != null ? _target.position + Vector3.up * BodyLift : _anchors[0];
     }
 
-    private sealed class QuadrantHazard : Hazard
+    /// <summary>
+    /// 원소 일제 발동(M8 원소 재편 · 10-22 E2 L2 2차 — 사용자 「4가지 한 번에 · 대신 가이드라인 · 틈이 넓으면 피하는 느낌이 안 난다」).
+    /// 사분면 배치(옅은 원소 색 · 판정 없음)는 시전 때 정하고, 네 칸의 원소 모양 가이드가 <b>동시에</b> <see cref="CycleSettings.Warn"/>초 차오른 뒤
+    /// 그 모양 자리만 터진다(예고 = 판정). 모양은 빽빽이 — 원끼리는 가장자리 사이 <see cref="CycleSettings.SafeGap"/>만 비고, 불 줄기 사이도 좁은 틈뿐이라
+    /// 「틈을 찾아 비키는」 회피가 된다. 얼음 = 원 + 빙결 감속 · 번개 = 작은 원 · 어둠 = 큰 원 + 시야 축소 · 불 = 중심에서 번갈아 뻗는 부채꼴 줄기 + 불 장판(플레이어 쪽 줄기).
+    /// 플레이어가 선 칸은 첫 모양이 지금 자리를 노린다. 한 번 발동에 한 번만 맞는다. <see cref="CycleSettings.Waves"/>번(간격 <see cref="CycleSettings.Interval"/>초) —
+    /// 그사이 리치는 성흔 탄막 · 비전 구체를 잇는다(원소 재편 → 성흔 탄막 연계 · LichMonster 관문).
+    /// </summary>
+    private sealed class ElementCycleHazard : Hazard
     {
-        private const float FireTick       = 1f;
-        private const int   VfxPerQuadrant = 2;
-        private const float FillSeconds    = 2f;
-        private static readonly Color FireTickTint = new Color(1f, 0.45f, 0.15f, 1f);
+        private const int   QuadrantCount     = 4;
+        private const float IdleGlow          = 0.35f;   // 배치 칸 — 옅게(판정 없음)
+        private const float SignalSeconds     = 0.15f;
+        private const float FlashSeconds      = 0.12f;
+        private const float BurstSeconds      = 1f;
+        private const float BurstFade         = 0.5f;
+        private const float FireGroundRadius  = 1.5f;
+        private const float FireGroundSpacing = 5f;
+        private const float EdgeMargin        = 6f;      // 부채꼴 줄기는 칸 경계에서 이만큼(도) 안쪽부터
+        private const int   MaxDiscs          = 72;      // 원 칸 셋 합 — 제단 반경 24 m · 원 r2.5면 35개 남짓
+        private const float SeamSpill         = 0.6f;    // 불 칸 경계에서 원 반경 × 이만큼까지 이웃 원 칸이 넘어와 이음매 빈자리를 메운다
+
+        private struct Shape
+        {
+            public QuadrantElement Element;
+            public Vector3         Pos;      // 원 중심 · 줄기는 제단 중심
+            public float           Radius;   // 원 반경 · 줄기는 반폭 각(도)
+            public float           Yaw;      // 줄기 가운데 방위(도)
+            public GameObject      Guide;
+            public bool            Signaled;
+        }
 
         private static readonly Color[] Tints =
         {
-            new Color(0.95f, 0.30f, 0.08f),   // 불   (가산 셰이더라 어두운 색은 거의 안 보였다 — 실측)
+            new Color(1.00f, 0.58f, 0.12f),   // 불   (가산 셰이더라 어두운 색은 거의 안 보였다 — 실측) · 호박빛(10-23 — 붉은 주홍은 공격 색과 겹쳤다)
             new Color(0.25f, 0.65f, 0.95f),   // 얼음
             new Color(0.95f, 0.85f, 0.20f),   // 번개
             new Color(0.50f, 0.15f, 0.90f),   // 어둠
@@ -385,156 +429,300 @@ public static class LichHazards
         private static readonly LichVfxSlot[] Zones =
             { LichVfxSlot.ZoneFire, LichVfxSlot.ZoneIce, LichVfxSlot.ZoneLightning, LichVfxSlot.ZoneDark };
 
+        private static readonly LichSfxSlot[] Sounds =
+            { LichSfxSlot.FireBeam, LichSfxSlot.IceCast, LichSfxSlot.LightningCast, LichSfxSlot.DarkOrb };
+
         private readonly MonsterContext   _ctx;
-        private readonly QuadrantSettings _s;
-        private readonly GameObject[]     _decals = new GameObject[4];
-        private readonly GameObject[]     _vfx    = new GameObject[4 * VfxPerQuadrant];
-        private PlayerController _player;
-        private float      _remaining;
-        private float      _age;
-        private float      _fireTimer;
-        private float      _chainCooldown;
-        private float      _chainTimer = -1f;
-        private Vector3    _chainPos;
-        private GameObject _chainDisc;
-        private bool       _chainSignaled;
+        private readonly CycleSettings    _s;
+        private readonly GameObject[]     _decals = new GameObject[QuadrantCount];
+        private readonly GameObject[]     _burst  = new GameObject[QuadrantCount];
+        private readonly List<Shape>      _shapes = new();
+        private readonly List<Vector3>    _pack   = new();
+        private readonly System.Predicate<Vector3> _packBlocked;
+        private float _packRadius;
+        private int   _wave;       // 터진 횟수
+        private float _t;
+        private float _burstLeft;
+        private bool  _armed;      // 이번 발동 모양을 깔았다
 
-        public QuadrantHazard(MonsterContext ctx, QuadrantSettings s)
+        private int Waves => Mathf.Max(1, _s.Waves);
+
+        public ElementCycleHazard(MonsterContext ctx, CycleSettings s)
         {
-            _ctx       = ctx;
-            _s         = s;
-            _remaining = s.Seconds;
-
-            for (int q = 0; q < 4; q++)
+            _ctx = ctx;
+            _s   = s;
+            _packBlocked = p => DiscQuadrant(p) < 0;
+            for (int q = 0; q < QuadrantCount; q++)
             {
-                int   e   = (int)s.Elements[q];
-                float mid = s.BaseAngle + 45f + 90f * q;
-                _decals[q] = LichPatternUtil.PrepareTelegraph(
-                    PatternGuideHelper.Sector(s.Center, s.Radius, 90f, mid, Tints[e]), Tints[e]);
-
-                Vector3 dir = Quaternion.Euler(0f, mid, 0f) * Vector3.forward;
-                for (int k = 0; k < VfxPerQuadrant; k++)
-                {
-                    Vector3 p = s.Center + dir * (s.Radius * (0.3f + 0.35f * k));
-                    _vfx[q * VfxPerQuadrant + k] = LichVfx.PlayLoop(Zones[e], p, Quaternion.Euler(0f, mid, 0f), s.Radius * 0.25f / 5f);
-                }
+                int e = (int)s.Elements[q];
+                _decals[q] = PatternGuideHelper.Sector(s.Center, s.Radius, 90f, Mid(q), Tints[e]);
+                PatternGuideHelper.SetFlow(_decals[q], Tints[e]);
+                PatternGuideHelper.SetProgress(_decals[q], 1f);
+                PatternGuideHelper.SetIntensity(_decals[q], IdleGlow);
             }
-
-            _player = ctx.Runtime.CachedPlayer;
-            if (_player != null) _player.OnDamageTaken += OnPlayerDamaged;
         }
+
+        private float EruptAt(int wave) => _s.Warn + _s.Interval * wave;
 
         public override bool Tick(float dt)
         {
-            _remaining -= dt;
-            if (_remaining <= 0f) return false;
-            if (_age < FillSeconds)
+            _t += dt;
+            TickBurst(dt);
+            if (_wave >= Waves) return _burstLeft > 0f;   // 마지막 발동 이펙트가 끝날 때까지
+
+            float eruptAt = EruptAt(_wave);
+            float openAt  = eruptAt - _s.Warn;
+            if (_t < openAt) return true;
+
+            if (!_armed) Arm();
+            for (int i = 0; i < _shapes.Count; i++)
             {
-                _age += dt;
-                for (int i = 0; i < _decals.Length; i++)
-                    PatternGuideHelper.SetProgress(_decals[i], _age / FillSeconds);
+                var sh = _shapes[i];
+                LichPatternUtil.TickTelegraph(sh.Guide, _t - openAt, _s.Warn, SignalSeconds, ref sh.Signaled);
+                _shapes[i] = sh;
             }
-            if (_chainCooldown > 0f) _chainCooldown -= dt;
-            TickChain(dt);
+            if (_t < eruptAt) return true;
 
-            // 바닥이 다 채워지기 전엔 성질을 입히지 않는다 — 어느 사분면이 불인지 보이기 전에 타던 것(09-18 감사).
-            if (_age < FillSeconds) return true;
-
-            switch (PlayerQuadrant(out var target))
-            {
-                case QuadrantElement.Fire:
-                    _fireTimer += dt;
-                    if (_fireTimer >= FireTick)
-                    {
-                        _fireTimer = 0f;
-                        if (LichPatternUtil.HitCircle(_ctx, target, 1f, _s.FireDps))
-                            LichVfx.PlayTinted(LichVfxSlot.BoltImpact, target, Quaternion.identity, 0.35f, FireTickTint);
-                    }
-                    break;
-
-                case QuadrantElement.Ice:
-                    _fireTimer = 0f;
-                    if (_player != null) _player.ApplySlow(_s.IceSlowScale, 0.3f);
-                    break;
-
-                case QuadrantElement.Dark:
-                    _fireTimer = 0f;
-                    ThunderGroggyVignetteView.Trigger(_s.DarkVignette);
-                    break;
-
-                default:
-                    _fireTimer = 0f;
-                    break;
-            }
+            EruptAll();
+            _wave++;
+            _armed = false;
+            if (_wave >= Waves)   // 마지막 발동 — 배치 칸도 거둔다
+                for (int q = 0; q < QuadrantCount; q++) PatternGuideHelper.SafeDestroy(ref _decals[q]);
             return true;
         }
 
         public override void Dispose()
         {
-            if (_player != null) _player.OnDamageTaken -= OnPlayerDamaged;
-            _player = null;
+            if (s_cycle == this) s_cycle = null;
             for (int i = 0; i < _decals.Length; i++) PatternGuideHelper.SafeDestroy(ref _decals[i]);
-            for (int i = 0; i < _vfx.Length; i++) LichVfx.Stop(ref _vfx[i], 1f);
-            PatternGuideHelper.SafeDestroy(ref _chainDisc);
+            for (int i = 0; i < _shapes.Count; i++)
+            {
+                var g = _shapes[i].Guide;
+                PatternGuideHelper.SafeDestroy(ref g);
+            }
+            _shapes.Clear();
+            StopBurst();
         }
 
-        /// <summary>불 사분면(틱) · 번개 사분면(맞으면 낙뢰가 따라온다) · 곧 떨어질 낙뢰 자리.</summary>
+        /// <summary>곧 터질 모양 — 속박탄이 「묶인 채 피할 수 없는」 자리에 묶지 않게.</summary>
         public override bool Threatens(Vector3 pos, float seconds)
         {
-            if (_chainTimer >= 0f && LichPatternUtil.FlatDistance(_chainPos, pos) <= _s.ChainRadius + ThreatMargin) return true;
-            var q = QuadrantAt(pos);
-            return q == QuadrantElement.Fire || q == QuadrantElement.Lightning;
+            if (!_armed || _wave >= Waves || EruptAt(_wave) - _t > seconds) return false;
+            for (int i = 0; i < _shapes.Count; i++)
+                if (Inside(_shapes[i], pos, ThreatMargin)) return true;
+            return false;
         }
 
-        /// <summary>플레이어가 선 사분면. 제단 밖이면 -1(원소 없음).</summary>
-        private QuadrantElement PlayerQuadrant(out Vector3 target)
+        /// <summary>이번 발동 모양을 깐다 — 네 칸 동시 · 플레이어가 선 칸은 첫 모양이 지금 자리.</summary>
+        private void Arm()
         {
-            target = default;
-            var t = _ctx.Runtime.PlayerTarget;
-            if (t == null) return (QuadrantElement)(-1);
-            target = t.position;
-            return QuadrantAt(target);
+            _armed = true;
+            _shapes.Clear();
+            var  target = _ctx.Runtime.PlayerTarget;
+            int  pq     = target != null ? QuadrantIndex(target.position) : -1;
+            bool onFire = pq >= 0 && _s.Elements[pq] == QuadrantElement.Fire;
+            for (int q = 0; q < QuadrantCount; q++)
+                if (_s.Elements[q] == QuadrantElement.Fire) ArmFire(q, onFire ? target.position : (Vector3?)null);
+            ArmDiscs(pq >= 0 && !onFire ? target.position : (Vector3?)null);
         }
 
-        /// <summary><paramref name="p"/>가 선 사분면. 제단 밖이면 -1(원소 없음).</summary>
-        private QuadrantElement QuadrantAt(Vector3 p)
+        /// <summary>
+        /// 불 — 중심에서 뻗는 부채꼴 줄기를 번갈아 깐다. 줄기 폭 · 틈은 줄기마다 무작위(폭 FireWedge × 0.8~1.3 · 틈 FireGap × 0.6~1.6)
+        /// — 규칙적이면 외워 버려 지루하다(사용자). 플레이어 칸이면 첫 줄기가 플레이어 방위를 가운데로 덮고 양쪽으로 이어 깐다.
+        /// </summary>
+        private void ArmFire(int q, Vector3? aim)
+        {
+            float lo0  = _s.BaseAngle + 90f * q + EdgeMargin;
+            float hi0  = _s.BaseAngle + 90f * q + 90f - EdgeMargin;
+            if (aim.HasValue)
+            {
+                Vector3 d   = aim.Value - _s.Center;
+                float   c   = lo0 + Mathf.Repeat(Mathf.DeltaAngle(lo0, Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg), 360f);
+                float   w   = WedgeWidth();
+                AddWedge(c - w * 0.5f, c + w * 0.5f, lo0, hi0);
+                for (float a = c + w * 0.5f + WedgeGap(); a < hi0; ) { float ww = WedgeWidth(); AddWedge(a, a + ww, lo0, hi0); a += ww + WedgeGap(); }
+                for (float b = c - w * 0.5f - WedgeGap(); b > lo0; ) { float ww = WedgeWidth(); AddWedge(b - ww, b, lo0, hi0); b -= ww + WedgeGap(); }
+                return;
+            }
+            for (float a = lo0 + Random.Range(0f, _s.FireGap); a < hi0; )
+            {
+                float ww = WedgeWidth();
+                AddWedge(a, a + ww, lo0, hi0);
+                a += ww + WedgeGap();
+            }
+        }
+
+        private float WedgeWidth() => _s.FireWedge * Random.Range(0.8f, 1.3f);
+        private float WedgeGap()   => _s.FireGap   * Random.Range(0.6f, 1.6f);
+
+        private void AddWedge(float lo, float hi, float min, float max)
+        {
+            lo = Mathf.Max(lo, min);
+            hi = Mathf.Min(hi, max);
+            if (hi - lo < _s.FireWedge * 0.4f) return;   // 경계에 잘린 조각은 버린다
+            float yaw   = (lo + hi) * 0.5f;
+            float width = hi - lo;
+            var guide = LichPatternUtil.PrepareTelegraph(
+                PatternGuideHelper.Sector(_s.Center, _s.Radius, width, yaw, LichPatternUtil.Arcane), LichPatternUtil.Arcane);
+            _shapes.Add(new Shape { Element = QuadrantElement.Fire, Pos = _s.Center, Radius = width * 0.5f, Yaw = yaw, Guide = guide });
+        }
+
+        /// <summary>
+        /// 얼음 · 번개 · 어둠 — 세 칸을 한 흔든 육각 격자로 빽빽이(<see cref="LichPatternUtil.PackDiscs"/>). 격자 방향 · 간격(가장자리 사이 SafeGap × 0.8~1.6)은
+        /// 발동마다, 자리는 원마다 조금씩 흔든다 — 틈이 좁고 매번 다르다(사용자). 원 크기는 발동마다 × 0.9~1.15.
+        /// 칸마다 빈자리를 무작위로 찾던 방식은 칸 경계 · 가장자리에 큰 빈자리가 남았다(10-23 오프라인 기하 — 플레이어 8 m 안 반경 3.5 m).
+        /// </summary>
+        private void ArmDiscs(Vector3? aim)
+        {
+            _packRadius = _s.DiscRadius * Random.Range(0.9f, 1.15f);
+            _pack.Clear();
+            LichPatternUtil.PackDiscs(_pack, _s.Center, _s.Radius - _packRadius * 0.3f, _packRadius,
+                                      new Vector2(_s.SafeGap * 0.8f, _s.SafeGap * 1.6f), MaxDiscs, aim, _packBlocked);
+            for (int i = 0; i < _pack.Count; i++)
+            {
+                int q = DiscQuadrant(_pack[i]);
+                if (q >= 0) AddDisc(_s.Elements[q], _pack[i], _packRadius);
+            }
+        }
+
+        /// <summary>
+        /// 원이 맡을 칸 — 원 칸이면 그 칸. 불 칸은 경계에서 원 반경 × <see cref="SeamSpill"/> 안쪽만 가까운 이웃 칸이 맡고(이음매 빈자리 메우기)
+        /// 그보다 깊으면 -1(불 줄기 몫). 제단 밖도 -1.
+        /// </summary>
+        private int DiscQuadrant(Vector3 p)
+        {
+            int q = QuadrantIndex(p);
+            if (q < 0 || _s.Elements[q] != QuadrantElement.Fire) return q;
+            Vector3 d = p - _s.Center;
+            d.y = 0f;
+            float a     = Mathf.Repeat(Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg - _s.BaseAngle - 90f * q, 360f);
+            float toLo  = d.magnitude * Mathf.Sin(a * Mathf.Deg2Rad);
+            float toHi  = d.magnitude * Mathf.Sin((90f - a) * Mathf.Deg2Rad);
+            float spill = _packRadius * SeamSpill;
+            if (toLo <= toHi) return toLo <= spill ? (q + QuadrantCount - 1) % QuadrantCount : -1;
+            return toHi <= spill ? (q + 1) % QuadrantCount : -1;
+        }
+
+        private void AddDisc(QuadrantElement e, Vector3 p, float r)
+        {
+            p = LichPatternUtil.OnFloor(_ctx, p);
+            var guide = LichPatternUtil.PrepareTelegraph(PatternGuideHelper.Disc(p, r, LichPatternUtil.Arcane), LichPatternUtil.Arcane);
+            _shapes.Add(new Shape { Element = e, Pos = p, Radius = r, Guide = guide });
+        }
+
+        private bool Inside(Shape sh, Vector3 pos, float margin)
+        {
+            if (sh.Element != QuadrantElement.Fire)
+                return LichPatternUtil.FlatDistance(sh.Pos, pos) <= sh.Radius + margin;
+            Vector3 d = pos - _s.Center;
+            d.y = 0f;
+            if (d.magnitude > _s.Radius + margin) return false;
+            float yaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
+            return Mathf.Abs(Mathf.DeltaAngle(sh.Yaw, yaw)) <= sh.Radius + Mathf.Rad2Deg * margin / Mathf.Max(1f, d.magnitude);
+        }
+
+        /// <summary>네 칸이 한꺼번에 터진다 — 모양마다 판정(한 번 발동에 한 번만 맞는다) · 원소 성질은 맞았을 때만.</summary>
+        private void EruptAll()
+        {
+            var  target  = _ctx.Runtime.PlayerTarget;
+            bool hitOnce = false;
+            QuadrantElement hitBy = QuadrantElement.Fire;
+            int  fireNearest = -1;
+            float fireBest   = float.MaxValue;
+            for (int i = 0; i < _shapes.Count; i++)
+            {
+                var sh = _shapes[i];
+                if (!hitOnce && target != null && Inside(sh, target.position, 0f))
+                {
+                    float dmg = DamageOf(sh.Element);
+                    hitOnce = sh.Element == QuadrantElement.Fire
+                        ? LichPatternUtil.HitPlayer(_ctx, _s.Center, dmg)
+                        : LichPatternUtil.HitCircle(_ctx, sh.Pos, sh.Radius, dmg);
+                    if (hitOnce) hitBy = sh.Element;
+                }
+                if (sh.Element == QuadrantElement.Lightning)
+                    LichVfx.Play(LichVfxSlot.LightningStrike, sh.Pos, Quaternion.identity, sh.Radius / 1.8f);
+                if (sh.Element == QuadrantElement.Fire && target != null)
+                {
+                    Vector3 d = target.position - _s.Center;
+                    float off = Mathf.Abs(Mathf.DeltaAngle(sh.Yaw, Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg));
+                    if (off < fireBest) { fireBest = off; fireNearest = i; }
+                }
+                var g = sh.Guide;
+                FlashAndDrop(ref g);
+            }
+            if (fireNearest >= 0) SpawnFireGround(_shapes[fireNearest].Yaw);   // 불 장판은 플레이어 쪽 줄기 하나만(이펙트 절제)
+            _shapes.Clear();
+
+            StopBurst();
+            for (int q = 0; q < QuadrantCount; q++)
+            {
+                var     e   = _s.Elements[q];
+                Vector3 mid = _s.Center + Quaternion.Euler(0f, Mid(q), 0f) * Vector3.forward * (_s.Radius * 0.5f);
+                _burst[q] = LichVfx.PlayLoop(Zones[(int)e], mid, Quaternion.Euler(0f, Mid(q), 0f), _s.Radius * 0.25f / 5f);
+                LichSfx.Play(Sounds[(int)e], mid);
+            }
+            _burstLeft = Mathf.Max(BurstSeconds, _s.FireGroundSeconds);
+
+            if (hitOnce && hitBy == QuadrantElement.Ice)
+            {
+                var player = _ctx.Runtime.CachedPlayer;
+                if (player != null) player.ApplySlow(_s.IceSlowScale, _s.IceSlowSeconds);
+            }
+            if (hitOnce && hitBy == QuadrantElement.Dark) ThunderGroggyVignetteView.Trigger(_s.DarkVignetteSeconds);
+            LichPatternUtil.Impact(LichImpact.Medium, hitOnce);
+            Debug.Log($"[Lich] 원소 일제 발동 {_wave + 1}/{Waves} — 플레이어 {(hitOnce ? hitBy + "에 맞음" : "피함")}");
+        }
+
+        private float DamageOf(QuadrantElement e) => e switch
+        {
+            QuadrantElement.Fire      => _s.FireDamage,
+            QuadrantElement.Ice       => _s.IceDamage,
+            QuadrantElement.Lightning => _s.BoltDamage,
+            _                         => _s.DarkDamage,
+        };
+
+        /// <summary>불 줄기 가운데 줄을 따라 불 장판(원소 포격 불길과 같은 크기 · 간격)이 잠깐 남는다.</summary>
+        private void SpawnFireGround(float yaw)
+        {
+            if (_s.FireGroundSeconds <= 0f) return;
+            Vector3 dir = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
+            for (float d = FireGroundRadius + 1f; d < _s.Radius; d += FireGroundSpacing)
+                LingerPool(_ctx, LichPatternUtil.OnFloor(_ctx, _s.Center + dir * d), FireGroundRadius,
+                           _s.FireGroundSeconds, _s.FireGroundDamage);
+        }
+
+        private void TickBurst(float dt)
+        {
+            if (_burstLeft <= 0f) return;
+            _burstLeft -= dt;
+            if (_burstLeft <= 0f) StopBurst();
+        }
+
+        private void StopBurst()
+        {
+            for (int k = 0; k < _burst.Length; k++) LichVfx.Stop(ref _burst[k], BurstFade);
+        }
+
+        /// <summary>판정 순간 빨강으로 번쩍이고 거둔다.</summary>
+        private static void FlashAndDrop(ref GameObject guide)
+        {
+            if (guide == null) return;
+            PatternGuideHelper.SetColor(guide, LichPatternUtil.Lethal);
+            Object.Destroy(guide, FlashSeconds);
+            guide = null;
+        }
+
+        private float Mid(int q) => _s.BaseAngle + 45f + 90f * q;
+
+        /// <summary><paramref name="p"/>가 선 사분면(0~3). 제단 밖이면 -1.</summary>
+        private int QuadrantIndex(Vector3 p)
         {
             Vector3 d = p - _s.Center;
             d.y = 0f;
-            if (d.sqrMagnitude > _s.Radius * _s.Radius) return (QuadrantElement)(-1);
-
+            if (d.sqrMagnitude > _s.Radius * _s.Radius) return -1;
             float yaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
-            int   q   = Mathf.Clamp((int)(Mathf.Repeat(yaw - _s.BaseAngle, 360f) / 90f), 0, 3);
-            return _s.Elements[q];
-        }
-
-        /// <summary>번개 사분면에서 맞으면 낙뢰가 한 번 더 따라온다(재발동 대기 있음 — 낙뢰 자신이 다시 부르지 않게).</summary>
-        private void OnPlayerDamaged()
-        {
-            // 바닥이 다 채워지기 전엔 낙뢰도 없다 — 원소 성질은 채워진 뒤부터(10-08 점검).
-            if (_age < FillSeconds) return;
-            if (_chainTimer >= 0f || _chainCooldown > 0f) return;
-            if (PlayerQuadrant(out var target) != QuadrantElement.Lightning) return;
-
-            _chainCooldown = _s.ChainCooldown;
-            _chainTimer    = _s.ChainWarn;
-            _chainPos      = LichPatternUtil.OnFloor(_ctx, target);
-            _chainDisc     = LichPatternUtil.PrepareTelegraph(
-                PatternGuideHelper.Disc(_chainPos, _s.ChainRadius, LichPatternUtil.Arcane), LichPatternUtil.Arcane);   // 차오름 + 신호(10-13 검증 — 빈 테두리였다)
-            _chainSignaled = false;
-        }
-
-        private void TickChain(float dt)
-        {
-            if (_chainTimer < 0f) return;
-            _chainTimer -= dt;
-            LichPatternUtil.TickTelegraph(_chainDisc, _s.ChainWarn - _chainTimer, _s.ChainWarn, 0.15f, ref _chainSignaled);
-            if (_chainTimer > 0f) return;
-
-            _chainTimer = -1f;
-            PatternGuideHelper.SafeDestroy(ref _chainDisc);
-            LichVfx.Play(LichVfxSlot.LightningStrike, _chainPos, Quaternion.identity, _s.ChainRadius / 1.8f);
-            LichPatternUtil.HitCircle(_ctx, _chainPos, _s.ChainRadius, _s.ChainDamage);
+            return Mathf.Clamp((int)(Mathf.Repeat(yaw - _s.BaseAngle, 360f) / 90f), 0, QuadrantCount - 1);
         }
     }
 

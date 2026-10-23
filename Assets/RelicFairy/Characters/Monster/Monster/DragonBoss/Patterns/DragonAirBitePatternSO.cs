@@ -135,6 +135,13 @@ public class DragonAirBreathPatternSO : BossPatternSO
                && bb.AirBiteCooldown <= 0f;
     }
 
+    /// <summary>연계(폭풍 날개 → 공중 물기 · 10-22 E3 D2) — 날개의 일부라 물기 쿨다운은 보지 않는다. 사슬은 두 칸까지.</summary>
+    public override bool CanFollowUp(BossPatternContext ctx)
+        => ctx.Ctx.Runtime.PlayerTarget != null
+           && ctx.Blackboard is DragonBossBlackboard bb
+           && bb.BodyState == BodyState.Airborne
+           && !bb.IsChainLink;
+
     public override SpecialStateBase GetRuntimeState() => _runtimeState;
 }
 
@@ -377,9 +384,8 @@ internal sealed class DragonAirBreathState : FullLockState<DragonAirBreathPatter
         _fireballStartPos = _biteAttackPos;
         if (Data.FireballPrefab != null)
         {
-            _fireballGo = BossEffectPool.Spawn(Data.FireballPrefab, _fireballStartPos, Quaternion.identity);
-            if (_fireballGo != null)
-                _fireballGo.transform.localScale = Vector3.one * Data.FireballScale;
+            // 운석과 같은 풀 인스턴스 — 운석이 바꿔 둔 자식 배율 · 재생 속도를 되돌리며 꺼낸다(예전 그대로: 한 배율 · 회전 없음 · 10-19)
+            _fireballGo = DragonThreat.SpawnMeteor(Data.FireballPrefab, _fireballStartPos, Data.FireballScale, Data.FireballScale, fromCameraFar: false);
         }
 
         Managers.Sound?.PlayEffectAt(Data.FireRainSfx, ctx.Transform.position);
@@ -414,7 +420,7 @@ internal sealed class DragonAirBreathState : FullLockState<DragonAirBreathPatter
             "DragonAirBreathWarning",
             pos,
             Data.AttackRadius,
-            new Color(1f, 0.28f, 0.18f, 0.85f),
+            PatternGuideHelper.AttackFill,   // (10-23 가이드 색 통일)
             Data.WarningMarkerLifetime,
             Data.WarningMarkerHeightOffset);
         _activeWarningZone.BeginFill(Mathf.Max(0.05f, Data.HitTime - Data.WarningTime));   // 다 차는 순간 = 물기 판정
@@ -443,7 +449,7 @@ internal sealed class DragonAirBreathState : FullLockState<DragonAirBreathPatter
             if (player == null)
                 continue;
 
-            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier), ctx.Monster.gameObject);   // 공격자 = 화룡(10-08 점검)
+            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier * ChainScale(ctx)), ctx.Monster.gameObject);   // 공격자 = 화룡(10-08 점검) · 연계 ×0.8(10-22 E3 D2)
             Data.playerStatusEffect?.Apply(player);
             break;
         }
@@ -529,7 +535,7 @@ internal sealed class DragonAirBreathState : FullLockState<DragonAirBreathPatter
         // 10-14 화룡 위협 — 자기 정면 1.35 m가 아니라 물기 판정 순간 플레이어가 있을 자리(지금 속도 · 6 m 안)
         if (ctx.Runtime.PlayerTarget != null)
         {
-            Vector3 aim = DragonThreat.PredictPlayer(ctx, Data.HitTime) - origin;
+            Vector3 aim = AimPoint(ctx) - origin;   // 첫 입은 날개가 남긴 가운데 길 위(10-22 E3 D2)
             aim.y = 0f;
             if (aim.sqrMagnitude > 0.01f)
             {
@@ -557,6 +563,25 @@ internal sealed class DragonAirBreathState : FullLockState<DragonAirBreathPatter
         target.y = ctx.Runtime.SpawnPosition.y;
         return target;
     }
+
+    // 첫 입 — 폭풍 날개 바로 뒤(연계)면 가운데 안전 길 위, 예측 자리를 그 줄에 내린 점을 노린다(10-22 E3 D2). 그 밖엔 예측 자리
+    private Vector3 AimPoint(MonsterContext ctx)
+    {
+        Vector3 predicted = DragonThreat.PredictPlayer(ctx, Data.HitTime);
+        if (_completedBites > 0) return predicted;
+        if ((ctx.Monster as IBoss)?.Blackboard is not DragonBossBlackboard bb || Time.time > bb.SafeLaneUntil) return predicted;
+
+        bb.SafeLaneUntil = 0f;   // 한 번만
+        Vector3 along = predicted - bb.SafeLaneOrigin;
+        along.y = 0f;
+        Vector3 onLane = bb.SafeLaneOrigin + bb.SafeLaneDir * Mathf.Max(0f, Vector3.Dot(along, bb.SafeLaneDir));
+        onLane.y = predicted.y;
+        return onLane;
+    }
+
+    // 연계 둘째 칸이면 ×0.8(10-22 E3 D2)
+    private static float ChainScale(MonsterContext ctx)
+        => (ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb ? bb.ChainDamageScale : 1f;
 
     private static float GetHorizontalDistanceToPlayer(MonsterContext ctx)
     {
@@ -625,10 +650,10 @@ internal sealed class DragonAirBreathState : FullLockState<DragonAirBreathPatter
         if (dir.sqrMagnitude < 0.001f)
             return;
 
-        ctx.Transform.rotation = Quaternion.Slerp(
-            ctx.Transform.rotation,
-            Quaternion.LookRotation(dir),
-            rotationSpeed * Time.deltaTime);
+        const float TurnCap = 360f;   // 초당 — Slerp(dt×k)만이면 공중 브레스 중 49°/프레임 튐(10-19 실측)
+        ctx.Transform.rotation = Quaternion.RotateTowards(ctx.Transform.rotation,
+            Quaternion.Slerp(ctx.Transform.rotation, Quaternion.LookRotation(dir), rotationSpeed * Time.deltaTime),
+            TurnCap * Time.deltaTime);
     }
 
     private static void PlayAnim(MonsterContext ctx, string stateName, float fadeDuration)

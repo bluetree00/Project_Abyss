@@ -50,13 +50,25 @@ public class ShopRoomController : MonoBehaviour
 
     // ── Constants ───────────────────────────────────────────
     private const int MaxRarityFallbackAttempts = 4;
-    private const int MaxRerollsPerVisit = 1;   // 새로고침은 방문당 한 번 — 싸지만 무한히 돌려 원하는 걸 뽑는 곳이 아니다
+    // 10-21 새 레이아웃 — 새로고침은 방문마다 세 번까지, 값이 오른다(20 → 40 → 80). 횟수로 막지 않고 값으로 남는 골드를 흡수한다.
+    // 제단 「상점 새로고침」 2단계면 첫 번째가 무료(0 → 40 → 80).
+    private const int MaxRerollsPerVisit = 3;
+    private const int RerollBaseCost     = 20;
+    private const int LockSlots          = 1;   // 잠금 칸(10-21) — 진열 하나를 다음 상점까지 같은 값으로 남긴다
     private const string PotionEntryId = "shop_potion";   // SHOP_DATA의 포션 엔트리 id(가격 원본)
     private const float NpcStandHeight = 1f; // 캡슐 바닥(발)이 지면에 닿도록(캡슐 height=2의 절반) — 앵커 · 폴백 모두.
 
     /// <summary>NPC 앞 판매대까지의 거리(m) — 상인이 카운터 뒤에 선 구도.</summary>
     private const float CounterDistance = 2.5f;
     private static readonly string[] DeadStallChildren = { "SoldOutLabel", "DisplayVfxRoot" }; // 과거 월드 구매 상태연출 — NPC+UI로 대체됨.
+
+    // ── 잠금(10-21) ── 상점 방이 바뀌어도 남아야 해서 정적 — 런이 바뀌면 무효(같은 런일 때만 읽는다).
+    // 이어하기(저장)에는 남지 않는다 — 잠금은 공짜라 풀려도 잃는 것이 없다.
+    private static ShopProduct    s_locked;
+    private static GameRunSession s_lockRun;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() { s_locked = null; s_lockRun = null; }
 
     // ── 비공개 필드 ─────────────────────────────────────────
     private readonly List<ShopSlot> _slots = new();
@@ -71,7 +83,6 @@ public class ShopRoomController : MonoBehaviour
     private int _slotCount;
     private int _weaponSlotFallback;    // 매대 없는 방에서 무기 슬롯 수 폴백
     private bool _rerollEnabled;
-    private int _rerollCost;
     private int _rerollsUsed;
 
     private GameObject _npcInstance;
@@ -93,11 +104,25 @@ public class ShopRoomController : MonoBehaviour
     // ── Properties (UI가 읽음) ──────────────────────────────
     public IReadOnlyList<ShopSlot> Slots => _slots;
     public int PlayerGold => _run?.PlayerState?.TempGold ?? 0;
+    /// <summary>포션이 가득 차 이 상품을 살 수 없는가 — 행상 포션은 가득이면 막는다(진열 화면 「포션 가득」).</summary>
+    public bool IsBlockedByFullPotions(ShopProduct p)
+        => p != null && p.Category == ShopProductCategory.Potion
+        && _run?.PlayerState != null && _run.PlayerState.PotionCount >= _run.PlayerState.PotionCapacity;
     public bool RerollEnabled => _rerollEnabled;
     /// <summary>이번 방문에 아직 새로고침을 쓸 수 있는가(켜져 있고 횟수가 남음).</summary>
-    // 10-14 강화형 — 방문당 횟수 = 제단 「상점 새로고침」 단계(디자이너 플래그로만 켜졌으면 1)
-    public bool RerollAvailable => _rerollEnabled && _rerollsUsed < Mathf.Max(MaxRerollsPerVisit, MemoryAltarService.ShopRerollCount);
-    public int RerollCost => _rerollCost;
+    public bool RerollAvailable => _rerollEnabled && _rerollsUsed < MaxRerollsPerVisit;
+    /// <summary>지금 누르면 드는 값(10-21 — 20 → 40 → 80 · 제단 2단계면 첫 번째 0).</summary>
+    public int RerollCost => RerollCostAt(_rerollsUsed);
+    /// <summary>이번에 돌린 다음 번 값. 다음이 없으면 -1.</summary>
+    public int NextRerollCost => _rerollsUsed + 1 < MaxRerollsPerVisit ? RerollCostAt(_rerollsUsed + 1) : -1;
+    public int RerollsLeft => _rerollEnabled ? Mathf.Max(0, MaxRerollsPerVisit - _rerollsUsed) : 0;
+
+    /// <summary>잠금 칸 수 · 지금 잠긴 수(10-21).</summary>
+    public int LockCapacity => LockSlots;
+    public int LockedCount  => LockedForRun != null && !LockedForRun.Sold ? 1 : 0;
+    /// <summary>이 물건이 잠겼는가 — 다음 상점 · 새로고침 뒤에도 같은 값으로 남는다.</summary>
+    public bool IsLocked(ShopProduct p) => p != null && !p.Sold && p == LockedForRun;
+    private ShopProduct LockedForRun => s_lockRun != null && s_lockRun == _run ? s_locked : null;
 
     /// <summary>심연의 행상 정규 상품(6칸).</summary>
     public IReadOnlyList<ShopProduct> Products => (IReadOnlyList<ShopProduct>)_peddler?.Products ?? Array.Empty<ShopProduct>();
@@ -157,7 +182,7 @@ public class ShopRoomController : MonoBehaviour
     /// catalog: ShopDataManager 미초기화/LuckTable 비어있을 때의 폴백.
     /// npcPrefab: 상점 NPC 프리팹(Addressable로 로드해 전달). null이면 NPC 없이 매대만 비활성.
     /// roomRng: 최초 진열 롤 결정성(이어하기 재현)용. null이면 전역 Random.
-    /// rerollEnabled/rerollCost: 리롤 피처 플래그. 기본 off.
+    /// rerollEnabled: 리롤 피처 플래그(기본 off · 제단 「상점 새로고침」과 OR). rerollCost: 옛 고정 값 — 10-21부터 값은 <see cref="RerollCost"/>(20 → 40 → 80)가 정한다.
     /// </summary>
     public void Initialize(GameRunSession run, ShopCatalogSO catalog, LuckRollTableSO luckTable,
                            int slotCount, System.Random roomRng = null,
@@ -177,12 +202,11 @@ public class ShopRoomController : MonoBehaviour
         _slotCount = Mathf.Max(0, slotCount);
         _weaponSlotFallback = Mathf.Max(0, weaponSlotFallback);
         _rerollEnabled = rerollEnabled;
-        _rerollCost = Mathf.Max(0, rerollCost);
 
         var (npcPos, npcRot) = ResolveNpcPlacement();
         _event = RollEvent(_roomRng);   // 진열보다 먼저 — 방 시드의 첫 수(이어하기 때 같은 이벤트)
         BuildSlots(_roomRng);
-        _peddler = AbyssPeddlerCatalog.Build(_roomRng, _event);   // 심연의 행상 진열(방 시드 = 결정성 유지)
+        _peddler = AbyssPeddlerCatalog.Build(_roomRng, _event, LockedForRun);   // 심연의 행상 진열(방 시드 = 결정성 유지 · 잠근 물건은 같은 값으로)
         if (_event == ShopEvent.RareGoods && _peddler.RareGoods == null) _event = ShopEvent.None;   // 들일 Epic 룬이 없으면 이벤트도 없다
         SpawnNpc(npcPrefab, npcPos, npcRot);
         SpawnDecor(npcPos, npcRot);                       // 판매대(정면) + 뒤쪽 소품
@@ -191,7 +215,7 @@ public class ShopRoomController : MonoBehaviour
 
         _initialized = true;
         Debug.Log($"[ShopRoom] 초기화 완료(NPC+UI). 슬롯 {_slots.Count}개 / 매대(카운터) {_stallCategories.Count}개 / " +
-                  $"luckTable={(luckTable != null ? "OK" : "null")} / rng={(roomRng != null ? "seeded" : "global")} / reroll={(_rerollEnabled ? $"on({_rerollCost}G)" : "off")}");
+                  $"luckTable={(luckTable != null ? "OK" : "null")} / rng={(roomRng != null ? "seeded" : "global")} / reroll={(_rerollEnabled ? $"on({RerollCost}G부터)" : "off")}");
     }
 
     // ── 구매 (UI가 호출) ────────────────────────────────────
@@ -245,6 +269,8 @@ public class ShopRoomController : MonoBehaviour
 
         var playerState = _run.PlayerState;
         if (playerState == null) return ShopPurchaseResult.Unavailable;
+        // 포션 가득 — 골드 차감 전에 막는다(예전엔 지급이 「성공」으로 끝나 골드만 빠지고 포션은 늘지 않았다 · 정규 진열과 같은 규칙).
+        if (IsBlockedByFullPotions(p)) return ShopPurchaseResult.Unavailable;
         if (playerState.TempGold < p.Price) return ShopPurchaseResult.InsufficientGold;
         if (!playerState.TrySpendGold(p.Price)) return ShopPurchaseResult.InsufficientGold;
 
@@ -259,6 +285,7 @@ public class ShopRoomController : MonoBehaviour
         }
 
         p.Sold = true;
+        if (p == s_locked) s_locked = null;   // 잠근 물건을 샀으면 잠금 칸이 빈다(10-21)
         _run.ReportShopUse();               // 「상인의 인장」 할인 조건 집계(행상 경로)
         RunFlowController.Active?.SaveNow("shop-product");
         OnShopChanged?.Invoke();
@@ -286,6 +313,31 @@ public class ShopRoomController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 원석 환전(10-22 사용자 「룬을 다 맞추거나 맞추기 싫을 때 — 원석을 골드로」) — 원석 1 = 골드 3.
+    /// 정제소 룬 하나(원석 10)는 상점 룬 값 50~150골드라, 원석은 직접 쓰는 쪽이 늘 낫게 낮게 둔다(남는 원석의 출구).
+    /// </summary>
+    public const int OreToGold = 3;
+    /// <summary>환전 한 번 단위(원석).</summary>
+    public const int ExchangeStep = 10;
+
+    /// <summary>지금 가진 원석.</summary>
+    public int Ore => _run?.FuelBank?.RuneOre ?? 0;
+
+    /// <summary>원석 <paramref name="ore"/>개를 골드로 바꾼다. 모자라면 false.</summary>
+    public bool TryExchangeOre(int ore)
+    {
+        var bank = _run?.FuelBank;
+        var st   = _run?.PlayerState;
+        if (bank == null || st == null || ore <= 0) return false;
+        if (!bank.TrySpend(FuelKind.RuneOre, ore)) return false;
+        st.AddTempGold(ore * OreToGold);
+        RunFlowController.Active?.SaveNow("shop-exchange");
+        OnShopChanged?.Invoke();
+        Debug.Log($"[ShopRoom] 원석 환전 {ore} → 골드 +{ore * OreToGold}(남은 원석 {bank.RuneOre})");
+        return true;
+    }
+
     /// <summary>리롤. 방 시드에서 이어지는 RNG로 진열을 새로 롤. 피처 off거나 골드 부족이면 false.</summary>
     public bool TryReroll()
     {
@@ -293,9 +345,10 @@ public class ShopRoomController : MonoBehaviour
         var playerState = _run?.PlayerState;
         if (playerState == null) return false;
 
-        if (_rerollCost > 0 && !playerState.TrySpendGold(_rerollCost))
+        int cost = RerollCost;
+        if (cost > 0 && !playerState.TrySpendGold(cost))
         {
-            Debug.Log($"[ShopRoom] 리롤 골드 부족: 필요 {_rerollCost}, 보유 {playerState.TempGold}");
+            Debug.Log($"[ShopRoom] 리롤 골드 부족: 필요 {cost}, 보유 {playerState.TempGold}");
             return false;
         }
 
@@ -305,12 +358,32 @@ public class ShopRoomController : MonoBehaviour
         _rerollRng ??= new System.Random(_roomRng != null ? _roomRng.Next() : System.Environment.TickCount);
         BuildSlots(_rerollRng);
         // 상품 돌리기 = 행상 진열도 새로 롤 — 떨이는 이 방 내내 · 귀한 물건은 처음 진열에만
-        _peddler = AbyssPeddlerCatalog.Build(_rerollRng, _event == ShopEvent.Clearance ? ShopEvent.Clearance : ShopEvent.None);
+        _peddler = AbyssPeddlerCatalog.Build(_rerollRng, _event == ShopEvent.Clearance ? ShopEvent.Clearance : ShopEvent.None, LockedForRun);
         RefreshOwnership();
         OnShopChanged?.Invoke();
-        Debug.Log($"[ShopRoom] 리롤 완료 ({_rerollCost}G 차감) — 슬롯 {_slots.Count}개 재생성");
+        Debug.Log($"[ShopRoom] 리롤 완료 ({cost}G 차감 · 남은 {RerollsLeft}회) — 슬롯 {_slots.Count}개 재생성");
         return true;
     }
+
+    /// <summary>
+    /// 잠금 켜고 끄기(10-21) — 잠근 물건은 새로고침 · 다음 상점에서도 같은 칸 종류 · 같은 값으로 남는다.
+    /// 칸은 하나라 다른 물건을 잠그면 앞의 잠금이 그쪽으로 옮겨 간다. 팔린 물건 · 특가는 잠그지 않는다.
+    /// </summary>
+    public bool ToggleLock(int index)
+    {
+        var list = _peddler?.Products;
+        if (_run == null || list == null || index < 0 || index >= list.Count) return false;
+        var p = list[index];
+        if (p == null || p.Sold) return false;
+        if (IsLocked(p)) s_locked = null;
+        else { s_locked = p; s_lockRun = _run; }
+        OnShopChanged?.Invoke();
+        return true;
+    }
+
+    /// <summary>n번째 새로고침 값(0부터) — 20 · 40 · 80, 제단 「상점 새로고침」 2단계면 첫 번째 0.</summary>
+    private static int RerollCostAt(int n)
+        => n == 0 && MemoryAltarService.ShopRerollCount >= 2 ? 0 : RerollBaseCost << Mathf.Clamp(n, 0, 8);
 
     // ── NPC / UI ────────────────────────────────────────────
 

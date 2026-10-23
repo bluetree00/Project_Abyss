@@ -83,6 +83,6 @@ public sealed class DarkScytheAgent : LegendaryProjectileBase
     {
         var cat = LegendaryRuntime.Catalog;
         if (cat?.darkHitVfx != null)
-            LegendaryRuntime.SpawnVfx(cat.darkHitVfx, pos, Quaternion.identity, 2f);
+            LegendaryRuntime.SpawnVfx(cat.darkHitVfx, pos, Quaternion.identity, 2f, 0.5f);   // 대상 타격 ≈ 1 m(10-22 B2 실측 83: 배율 1 ≈ 2 m)
     }
 }

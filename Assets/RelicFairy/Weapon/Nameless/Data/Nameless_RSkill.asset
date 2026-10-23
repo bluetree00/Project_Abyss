@@ -13,11 +13,12 @@ MonoBehaviour:
   m_Name: Nameless_RSkill
   m_EditorClassIdentifier: Assembly-CSharp::SkillSO
   skillName: "\uBB34\uD615\uC77C\uC12C"
-  description: "형태를 지우고 8m를 꿰뚫어 지나간 뒤(돌진 중 무적), 스쳐 간 적을 연이어 벤다. 강화 +3부터 연참이 늘고, +6부터 마지막 일섬이 지나온 길을 통째로 가른다."
+  description: "\ud615\ud0dc\ub97c \uc9c0\uc6b0\uace0 8m\ub97c \uaff0\ub6ab\uc5b4 \uc9c0\ub098\uac04 \ub4a4(\ub3cc\uc9c4 \uc911 \ubb34\uc801), \uc2a4\uccd0 \uac04 \uc801\uc744 \uc5f0\uc774\uc5b4 \ubca4\ub2e4(\ud55c \ubc88\uc5d0 \uacf5\uaca9\ub825\uc758 180% \u00b7 5\uc5f0\ucc38). \uac15\ud654 +3\ubd80\ud130 \uc5f0\ucc38\uc774 \ub298\uace0, +6\ubd80\ud130 \ub9c8\uc9c0\ub9c9 \uc77c\uc12c\uc774 \uc9c0\ub098\uc628 \uae38\uc744 \ud1b5\uc9f8\ub85c \uac00\ub978\ub2e4."
   icon: {fileID: 21300000, guid: 7c81c294755be9949a8908959b251607, type: 3}
   iconTier2: {fileID: 21300000, guid: e07a5eaebc139c049879ede475c2570e, type: 3}
   iconTier3: {fileID: 21300000, guid: 66f9a1f61aa664b4f92ddfcf3adfae39, type: 3}
   _tier2Change: "\uC5F0\uCC38 +2"
   _tier3Change: "마지막 일섬 = 지나온 길 전체(폭 6m · 연참 3배)"
   cooldown: 8
+  damageIsAtkPercent: 1
   behavior: {fileID: 11400000, guid: 0ab4e4ce9ba1b0e40bf6a8f4b2ff927b, type: 2}

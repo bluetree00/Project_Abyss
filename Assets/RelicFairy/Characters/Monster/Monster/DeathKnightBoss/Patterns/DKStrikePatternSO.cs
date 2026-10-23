@@ -302,6 +302,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         if (go == null) return;
         go.transform.localScale = Vector3.one * DKBossRoomContext.CellSize;
         _tiles.Add(new DKTileInfo { Cell = new Vector2Int(x, z), Color = _swordColor, GO = go });
+        DKGridPatternHelper.ChargeTile(go);   // (10-23 가이드 색 통일) 번지는 칸 = 맞을 칸 — 처음부터 공격 색(방패 안 면제는 그대로)
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

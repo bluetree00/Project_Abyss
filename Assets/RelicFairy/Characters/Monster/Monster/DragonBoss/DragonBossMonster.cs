@@ -27,6 +27,12 @@ namespace RelicFairy.Monster
 /// </summary>
 public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, IBossHudSource
 {
+    // ── 상수 (10-22 E3) ───────────────────────────────────
+    private const int   LandingBoostStreak     = 2;    // D1 공중 패턴이 이만큼 이어지면 착지 가중치 ×8(예전 3)
+    private const float ArenaGuideBoost        = 1.35f;   // 붉은 바닥 아레나 — 예고 밝기 배율(10-23 공격 색 대비)
+    private const float ArenaGuideEdgeLift     = 0.5f;    // 공격 예고 테두리를 흰빛 쪽으로(채움은 공격 색 그대로)
+    private const float GroundChainHoldSeconds = 4f;   // D1 착지 뒤 이 시간 안의 다음 패턴은 지상 패턴(할퀴기 · 지상 브레스) — 그동안 이륙 · 얼음 내려찍기를 막는다
+
     // ── 드래곤 전용 설정 (Inspector) ──────────────────────
     [Header("Dragon — 표시")]
     [Tooltip("보스 체력바 이름. config.monsterName은 퀘스트 처치 키라 바꾸지 않는다")]
@@ -317,6 +323,9 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
     /// <summary>소환 기준선 하한에 닿았다 — 소환 패턴이 시작할 때까지 「막힘」(피해 숫자 없이 막힘 표시).</summary>
     private bool SummonHolding => _runtime != null && SummonFloorHp > 0 && _runtime.CurrentHp <= SummonFloorHp;
 
+    /// <summary>착지 뒤 지상 사슬(10-22 E3 D1) — 지상이고, 착지한 지 <see cref="GroundChainHoldSeconds"/>초 안이며, 아직 지상 패턴을 안 썼다.</summary>
+    private bool GroundChainPending => _dragonBB != null && _dragonBB.BodyState == BodyState.Grounded && Time.time < _groundChainUntil;
+
     // ── IBossHudSource ────────────────────────────────────
     public float[] HudPageMarkers  => Pages.HudPageMarkers;
     public int     HudPage         => Pages.HudPage;
@@ -332,10 +341,12 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
     private BossPatternRunner            _runner;
     private DragonDormantState           _dormantState;
     private bool                         _pendingTriggerEntrance;
+    private DragonTailSweepPatternSO     _tailSweepSO;        // 꼬리 휩쓸기 — 등 뒤 머묾 판정(10-22 E3 D5) · 컨피그에 없으면 null
     private DragonAirMeteorPassiveRunner _meteorPassiveRunner;
     private System.Threading.CancellationTokenSource _meteorPassiveCts;
     private Vector3                      _preEntranceSpawnPos;
     private bool                         _hasPreEntranceSpawnPos;
+    private float                        _groundChainUntil;   // 착지 뒤 지상 사슬이 끝나는 시각(Time.time · 10-22 E3 D1)
 
     // ── 2페이지 ───────────────────────────────────────────
     private BossPages                    _pages;
@@ -503,6 +514,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
         if (_dormantState != null && _dormantState.IsActive) return;
 
         _dragonBB.TickCooldowns(Time.deltaTime);
+        TickRearStay();
 
         if (_runner != null)
         {
@@ -511,6 +523,10 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
             else
                 _dragonBB.NormalModeTimer = 0f;
         }
+
+        // 공중→지상(착지) — 다음 한 패턴은 지상 패턴으로(10-22 E3 D1). 가중치 갱신보다 먼저 건다
+        if (_dragonBB.BodyState == BodyState.Grounded && _prevBodyState == BodyState.Airborne)
+            _groundChainUntil = Time.time + GroundChainHoldSeconds;
 
         UpdateTransitionPatternWeights();
 
@@ -532,6 +548,15 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
         UpdateWingFlapSound();
         UpdateFootstepSound();
         UpdateNormalSfx();
+    }
+
+    /// <summary>등 뒤 머묾(초) — 지상에서 플레이어가 꼬리 휩쓸기 부채꼴 안이면 쌓이고 벗어나면 0(10-22 E3 D5). 패턴 중에도 센다.</summary>
+    private void TickRearStay()
+    {
+        bool behind = _tailSweepSO != null
+            && _dragonBB.BodyState == BodyState.Grounded
+            && _tailSweepSO.IsPlayerBehind(_ctx);
+        _dragonBB.RearStaySeconds = behind ? _dragonBB.RearStaySeconds + Time.deltaTime : 0f;
     }
 
     /// <summary>지상에서 패턴이 없을 때 1초마다 — 맵 밖(벽 너머 · 외딴 NavMesh)에 서 있으면 안쪽으로 되돌린다(09-30).</summary>
@@ -704,6 +729,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
         // 풀 재사용 — 이번 전투가 악몽기인지 다시 정한다. base.OnEnable이 HP를 EffectiveMaxHp(= 페이지 배율 포함)로 채우므로 그 전에 비운다.
         _pages = null;
         DestroyStageHazard();
+        PatternGuideHelper.SetArenaContrast(ArenaGuideBoost, ArenaGuideEdgeLift);   // 붉은 바닥에서 예고가 묻혔다(10-23)
         base.OnEnable();
         InitializeRoomContext();
         _dragonBB?.Reset();
@@ -717,6 +743,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
         _prevBodyState              = BodyState.Grounded;
         _airOrbitCurrentLockDegrees = 0f;
         _pendingTriggerEntrance     = false;
+        _groundChainUntil           = 0f;
         _normalSfxTimer = 0f;
         _normalSfxNextInterval = UnityEngine.Random.Range(_normalSfxIntervalMin, _normalSfxIntervalMax);
         StopMeteorPassiveRunner();
@@ -791,6 +818,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
         _pageTransitionCts?.Dispose();
         _pageTransitionCts = null;
         DestroyStageHazard();
+        PatternGuideHelper.ClearArenaContrast();
         base.OnDisable();
     }
 
@@ -970,6 +998,10 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
 
         _dragonBB.LastPatternTag = pattern.patternTag;
 
+        // 연계 둘째 칸 — 러너가 followUp으로 이어 냈으면 피해 ×0.8 · 더 잇지 않는다(10-22 E3 D2)
+        // 러너 표식을 그대로 읽는다 — 「직전 followUp == 이 패턴」만 보면 평소 선택으로 같은 패턴이 나와도 둘째 칸으로 셌다(10-22 E5 페이지2)
+        _dragonBB.IsChainLink = _runner != null && _runner.IsFollowUpRunning;
+
         if (pattern is BossPageTransitionPatternSO)
             PrepareForPageTransition();
 
@@ -978,6 +1010,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
             || pattern is DragonLandingPatternSO
             || pattern is DragonSummonPatternSO
             || pattern is DragonIceSlamPatternSO
+            || pattern is DragonAirDashPatternSO   // 마지막 돌진 끝에 내려앉는다(10-22 E3 D2)
             || pattern is BossPageTransitionPatternSO
             || pattern is DragonAbyssDivePatternSO
             || pattern is DragonBlackSunPatternSO)
@@ -996,6 +1029,10 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
             _dragonBB.AirbornePatternStreak = 0;
         }
 
+        // 착지 뒤 지상 사슬을 채웠다 — 지상에서 이륙이 아닌 패턴이 나갔다(10-22 E3 D1)
+        if (_dragonBB.BodyState == BodyState.Grounded && pattern is not DragonTakeoffPatternSO)
+            _groundChainUntil = 0f;
+
         UpdateTransitionPatternWeights();
     }
 
@@ -1006,7 +1043,10 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
         {
             if (entry?.patterns == null) continue;
             foreach (var p in entry.patterns)
+            {
                 p?.Initialize(_patternCtx);
+                if (p is DragonTailSweepPatternSO tail) _tailSweepSO = tail;   // 등 뒤 머묾을 매 프레임 센다(10-22 E3 D5)
+            }
         }
 
         CacheTransitionPatternBaseWeights();
@@ -1045,10 +1085,12 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
         if (_dragonBB == null || _config is not BossConfigSO bossConfig || bossConfig.patternEntries == null)
             return;
 
-        float takeoffMult = _dragonBB.GroundedPatternStreak >= 3
-            ? _airTransitionWeightMultiplier
-            : 1f;
-        float landingMult = _dragonBB.AirbornePatternStreak >= 3
+        // 착지 뒤 지상 사슬 동안은 이륙 0 · 얼음 내려찍기(떠오름) 0 — 다음 패턴이 할퀴기 · 지상 브레스가 되게(10-22 E3 D1)
+        bool  groundChain = GroundChainPending;
+        float takeoffMult = groundChain ? 0f
+            : _dragonBB.GroundedPatternStreak >= 3 ? _airTransitionWeightMultiplier : 1f;
+        // 공중 2연속 뒤 착지 ×8(예전 3연속 · 10-22 E3 D1 — 봉인기 공중 비율 70~84% → 40~55% 목표)
+        float landingMult = _dragonBB.AirbornePatternStreak >= LandingBoostStreak
             ? _airTransitionWeightMultiplier
             : 1f;
 
@@ -1063,6 +1105,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
                     pattern.weight = _dragonBB.TakeoffBaseWeight * takeoffMult;
                 else if (pattern is DragonLandingPatternSO)
                     pattern.weight = _dragonBB.LandingBaseWeight * landingMult;
+                else if (pattern is DragonIceSlamPatternSO)
+                    _runner?.SetWeightScale(pattern, groundChain ? 0f : 1f);   // 에셋 weight는 건드리지 않는다(러너 배율)
             }
         }
     }
@@ -1124,9 +1168,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
         DestroyStageHazard();
         Bounds arena  = DragonPatternFloorUtils.GetRoomFloorBoundsXZ();
         float  floorY = DragonPatternFloorUtils.GetFloorY(arena.center, _runtime.SpawnPosition.y);
-        Color  abyss  = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Abyss);
         _stageHazard = BossStageHazard.CreateEdgeBand(this, arena, floorY, _abyssEdgeBandWidth, seconds,
-            new Color(abyss.r, abyss.g, abyss.b, 0.45f), _abyssEdgeVfxPrefab, _abyssEdgeVfxScale, _abyssEdgeDamageMult,
+            PatternGuideHelper.HazardFloor, _abyssEdgeVfxPrefab, _abyssEdgeVfxScale, _abyssEdgeDamageMult,   // (10-23 가이드 색 통일) 바닥 띠 = 머무는 위험 바닥 공용 색 · 흑염은 이펙트가
             _abyssEdgeVfxSpacing);
         BlendAbyssBodyAsync(seconds).Forget();   // 바가 차오르는 동안 몸이 서서히 검보라로(09-29)
     }

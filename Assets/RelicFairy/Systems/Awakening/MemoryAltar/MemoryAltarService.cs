@@ -91,9 +91,10 @@ public static class MemoryAltarService
         return n;
     }
 
-    /// <summary>할인 조건 기록 — 봉인 수(<see cref="MemoryAltarCatalog.Rec.Seals"/>)만 이야기 기록에서 세고, 나머지는 영구 기록.</summary>
+    /// <summary>할인 조건 기록 — 봉인 수(<see cref="MemoryAltarCatalog.Rec.Seals"/>) · 해방기 도달(<see cref="MemoryAltarCatalog.Rec.Liberated"/>)만 이야기 기록에서 세고, 나머지는 영구 기록.</summary>
     public static int Record(string key)
     {
+        if (key == MemoryAltarCatalog.Rec.Liberated) return StoryProgress.IsLiberated ? 1 : 0;   // 해방 대비 3칸 자물쇠(10-22)
         if (key == MemoryAltarCatalog.Rec.Seals)
         {
             int n = 0;
@@ -165,18 +166,31 @@ public static class MemoryAltarService
     /// 지금 가리켜야 할 "다음" 목표 하나. 열 개를 나열하면 목표가 아니라 목록이 된다(정본 §3-1).
     /// <para>미해금 중 <b>가장 싼</b> 것을 고른다 — 가장 가까운 것이 곧 다음이다.
     /// 자물쇠 노드는 조건을 못 채웠으면 후보에서 뺀다(가리켜도 살 수 없다).</para>
+    /// <para>10-22 D5 — 해방기엔 해방 대비 3칸(<see cref="MemoryAltarCatalog.LiberationNodes"/>) 중 가장 싼 칸을 먼저 가리킨다.
+    /// 가장 싼 칸만 따라가면 재화 · 확률 칸이 먼저 차고 해방 칸은 끝내 안 산다(시뮬 0). 셋이 다 찼거나 막혔으면 예전처럼 전체에서 가장 싼 칸.
+    /// 봉인기엔 자물쇠가 셋을 막아 저절로 예전과 같다. 「지금 열 수 있는 칸」을 말해야 하는 곳은 <paramref name="preferLiberation"/> = false.</para>
     /// </summary>
-    public static AltarNodeState? GetNextGoal()
+    public static AltarNodeState? GetNextGoal(bool preferLiberation = true)
     {
         AltarNodeState? best = null;
 
-        foreach (var node in MemoryAltarCatalog.All)
+        if (preferLiberation)
         {
-            var s = GetState(node);
-            if (s.Maxed || s.BlockedByRequirement || s.BlockedByChain || s.BlockedByPoints || s.EraHidden || s.Pending) continue;
-            if (best == null || s.Cost < best.Value.Cost) best = s;
+            foreach (var id in MemoryAltarCatalog.LiberationNodes)
+                best = CheaperGoal(best, GetState(id));
+            if (best != null) return best;
         }
+
+        foreach (var node in MemoryAltarCatalog.All)
+            best = CheaperGoal(best, GetState(node));
         return best;
+    }
+
+    /// <summary>「다음 목표」 후보(다 안 샀고 · 막히지 않음)면 지금 고른 것과 견줘 더 싼 쪽.</summary>
+    private static AltarNodeState? CheaperGoal(AltarNodeState? best, AltarNodeState s)
+    {
+        if (s.Maxed || s.BlockedByRequirement || s.BlockedByChain || s.BlockedByPoints || s.EraHidden || s.Pending) return best;
+        return best == null || s.Cost < best.Value.Cost ? s : best;
     }
 
     public static int UnlockedCount()
@@ -473,6 +487,16 @@ public static class MemoryAltarService
     public static int CovenantSlots => IsUnlocked(MemoryAltarCatalog.CovenantSlot) ? 4 : 3;
 
     public static bool IsAbyssDepthUnlocked=> IsUnlocked(MemoryAltarCatalog.AbyssDepth);
+
+    // ── 해방 대비 3칸(10-22 C10 권장안 B) — 자물쇠(해방기 도달)를 지나야 살 수 있어 효과엔 시기 조건을 따로 걸지 않는다 ──
+    // (봉인기로 돌아가는 길이 생기면 그때 효과에 시기 조건을 더한다 — 설계 ⑤ 「A10에 달린 것」.)
+    /// <summary>「해방의 내성」 받는 피해 감소(0 ~ 0.12) — 피격 받피감소 채널에 더한다(상한 0.75 공유).</summary>
+    public static float LiberationWardReduction => MemoryAltarCatalog.LibWardPerLevel * Level(MemoryAltarCatalog.LibWard);
+    /// <summary>「결의」 체력 문턱(0 = 안 삼 · 1단계 0.60 · 2단계 0.45).</summary>
+    public static float ResolveHpThreshold => MemoryAltarCatalog.ResolveThreshold(Level(MemoryAltarCatalog.LibResolve));
+    /// <summary>「재정비의 샘」 챕터 시작 샘 회복 더하기(최대 체력 비) — 평소 +0.20/단계 · 악몽 +0.10/단계.</summary>
+    public static float SpringHealBonus(bool nightmare)
+        => (nightmare ? MemoryAltarCatalog.NightmareSpringHealPerLevel : MemoryAltarCatalog.SpringHealPerLevel) * Level(MemoryAltarCatalog.LibSpring);
     public static bool HasRevive           => IsUnlocked(MemoryAltarCatalog.Revive);
 
     /// <summary>

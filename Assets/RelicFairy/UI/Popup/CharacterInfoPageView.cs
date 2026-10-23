@@ -444,7 +444,7 @@ public class CharacterInfoPageView : MonoBehaviour
         if (SkillTierResolver.IsRanged(w))
             return $"<color=#665544>파츠 합</color> <color=#8B4513>{RangedPartsState.Current?.TotalLevel ?? 0}</color>";
         string form = w.HasForm ? $"<color=#8B4513>「{w.form.DisplayName}」</color>" : "<color=#998877>없음</color>";
-        return $"<color=#665544>강화</color> <color=#8B4513>+{w.enhanceLevel}</color>  <color=#665544>형</color> {form}";
+        return $"<color=#665544>재련</color> <color=#8B4513>{WeaponReforgeService.CountAt(w.enhanceLevel)}회</color>  <color=#665544>형</color> {form}";
     }
 
     /// <summary>
@@ -460,7 +460,7 @@ public class CharacterInfoPageView : MonoBehaviour
         for (int tier = SkillTierResolver.MinTier; tier <= SkillTierResolver.MaxTier; tier++)
         {
             int idx = tier - SkillTierResolver.MinTier - 1;
-            string cond = idx < 0 ? "기본" : idx < ms.Length ? (ranged ? $"파츠 합 {ms[idx]}" : $"+{ms[idx]}") : "—";
+            string cond = idx < 0 ? "기본" : idx < ms.Length ? (ranged ? $"파츠 합 {ms[idx]}" : $"재련 {WeaponReforgeService.CountAt(ms[idx])}회") : "—";
             string body = idx < 0 ? null : UI_CruciblePanel.TierChangeBody(w, tier);
             string row  = $"{tier}단계  {cond}{(body != null ? $" — {body}" : "")}";
             s += tier == now ? $"\n<color=#8B4513>◆ {row}  · 지금</color>"

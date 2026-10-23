@@ -344,6 +344,17 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                 },
                 {
                     ""name"": """",
+                    ""id"": ""4c1e7b2a-9d3f-4e58-b6a1-2f8d0c9e7a31"",
+                    ""path"": ""<Keyboard>/shift"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Dodge"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
                     ""id"": ""be8aab1a-345e-47a2-9e36-56922173b6d1"",
                     ""path"": ""<Keyboard>/e"",
                     ""interactions"": """",

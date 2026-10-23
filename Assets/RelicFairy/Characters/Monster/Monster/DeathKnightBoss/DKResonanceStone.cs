@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace RelicFairy.Monster
 {
@@ -19,15 +20,15 @@ namespace RelicFairy.Monster
 /// · 부서지지 않는다. 청록 = 칠 수 있음(해방 페이지 설계 §7 색 규칙). 모양 = 리치 봉인석 룬석 모델 재활용.
 /// · 기사가 죽거나 사라지면 함께 사라진다.
 /// </summary>
-public sealed class DKResonanceStone : MonoBehaviour, IDamageable
+public sealed class DKResonanceStone : MonoBehaviour, IDamageable, IDamageRelay
 {
     // ── Constants ─────────────────────────────────────────────────
     private const string ModelKey        = "Lich/VFX/SealStoneModel";
     private const string MeleeOnlyLayer  = "Player";
     private const float  TransferRatio   = 0.8f;
-    private const int    OverheatHits    = 6;
+    private const int    OverheatHits    = 12;    // 10-22 A1b 6 → 12 · 2 → 1.5초 — 주 타격만 센 뒤에도 빠른 빌드가 절반 가까이 식어 있었다
     private const float  OverheatWindow  = 3f;
-    private const float  CooldownSeconds = 2f;
+    private const float  CooldownSeconds = 1.5f;
     private const float  Radius          = 0.9f;
     private const float  Height          = 2.6f;
     private const float  FrontOffset     = 2.5f;
@@ -36,6 +37,7 @@ public sealed class DKResonanceStone : MonoBehaviour, IDamageable
     private const float  ClearFromY      = 0.8f;   // 이 높이 아래(바닥 · 계단)는 겹침으로 안 본다
     private const float  NudgeStepDeg    = 3f;     // 막히면 가운데 쪽으로 이만큼씩 돌린다
     private const float  MinSideDeg      = 12f;    // 옆 석상은 이 각도까지만 — 가운데 석상과 붙지 않게
+    private const float  PlayerClear     = 0.6f;   // 석상 몸과 플레이어 사이 — 이보다 가까우면 플레이어를 밖으로 옮긴다(10-22 A0)
     private const float  BeamWidth       = 0.35f;
     private const float  BeamSeconds     = 0.12f;
     private const float  FlashSeconds    = 0.08f;
@@ -60,8 +62,13 @@ public sealed class DKResonanceStone : MonoBehaviour, IDamageable
 
     // ── Properties ────────────────────────────────────────────────
     public bool IsCooling => Time.time < _coolUntil;
+    public GameObject RelayTarget => _boss != null && !_boss.IsDead && !_leaving ? _boss.gameObject : null;
+    public float RelayRatio => TransferRatio;
+    public Collider RelayBody => _capsule;
 
     // ── Lifecycle ─────────────────────────────────────────────────
+    private void OnEnable()  => DamageRelays.Register(this);    // 광역 조회가 성흔석을 기사 몸으로 본다(10-22 A1b)
+
     private void Update()
     {
         if (_leaving) return;
@@ -77,6 +84,8 @@ public sealed class DKResonanceStone : MonoBehaviour, IDamageable
             ApplyLook(PatternGuideHelper.Breakable, IdleGlow);
         }
     }
+
+    private void OnDisable() => DamageRelays.Unregister(this);
 
     // ── Public Methods ────────────────────────────────────────────
     /// <summary>
@@ -97,9 +106,11 @@ public sealed class DKResonanceStone : MonoBehaviour, IDamageable
         toward.Normalize();
 
         Transform parent = boss.transform.parent;
+        var player = GameRunBootstrapper.Instance?.Run?.Player ?? IntroBootstrapper.Instance?.Player;
         foreach (float deg in new[] { -SpreadDeg, 0f, SpreadDeg })
         {
             if (!TryPlace(glass, origin, toward, deg, out Vector3 pos, out Vector3 dir)) continue;
+            EvictPlayer(player, pos, dir);
             try
             {
                 await CreateAsync(boss, pos, dir, parent, ct);
@@ -111,16 +122,24 @@ public sealed class DKResonanceStone : MonoBehaviour, IDamageable
         }
     }
 
+    /// <summary>
+    /// 근접 주 타격은 <see cref="CombatDamage"/>가 <see cref="TryAcceptHit"/> 뒤 기사에게 직접 넣는다(10-22 A1b — 상태 · 룬 효과까지 기사에게).
+    /// 이 길은 CombatDamage를 거치지 않고 부르는 경우의 폴백이다.
+    /// </summary>
     public void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
     {
-        if (_boss == null || _boss.IsDead || amount <= 0f) return;
-        if (IsCooling) return;
+        if (amount <= 0f || !TryAcceptHit()) return;
+        _boss.TakeDamage(amount * TransferRatio, instigator, 0f, isCrit);
+    }
+
+    /// <summary>주 타격 한 번 — 식는 중이면 false. 과열: <see cref="OverheatWindow"/>초 안에 <see cref="OverheatHits"/>타를 넘으면 식는다(그 타는 들어간다).</summary>
+    public bool TryAcceptHit()
+    {
+        if (_boss == null || _boss.IsDead || _leaving || IsCooling) return false;
 
         float now = Time.time;
         _recentHits.Enqueue(now);
         while (_recentHits.Count > 0 && now - _recentHits.Peek() > OverheatWindow) _recentHits.Dequeue();
-
-        _boss.TakeDamage(amount * TransferRatio, instigator, 0f, isCrit);
         FlashBeam();
 
         if (_recentHits.Count > OverheatHits)
@@ -128,9 +147,10 @@ public sealed class DKResonanceStone : MonoBehaviour, IDamageable
             _recentHits.Clear();
             _coolUntil = now + CooldownSeconds;
             ApplyLook(HotColor, CoolGlow);
-            return;
+            return true;
         }
         FlashAsync(destroyCancellationToken).Forget();
+        return true;
     }
 
     // ── Private Methods ───────────────────────────────────────────
@@ -216,7 +236,25 @@ public sealed class DKResonanceStone : MonoBehaviour, IDamageable
         Vector3 ext    = new Vector3(Radius + Clearance, half, Radius + Clearance);
         int     mask   = ~LayerMask.GetMask("Player", "Monster", "MonsterHit", "UI", "Ignore Raycast", "Ground");
         int n = Physics.OverlapBoxNonAlloc(center, ext, s_overlap, Quaternion.LookRotation(outward), mask, QueryTriggerInteraction.Ignore);
-        return n > 0 ? s_overlap[0].name : null;
+        for (int i = 0; i < n; i++)   // 플레이어 몸은 지형이 아니다 — 예전엔 플레이어를 기둥처럼 보고 「빈자리 없음 → 원래 자리」로 몸 위에 세웠다(10-22 A0)
+            if (s_overlap[i].GetComponentInParent<PlayerController>() == null) return s_overlap[i].name;
+        return null;
+    }
+
+    /// <summary>석상 자리에 플레이어가 서 있으면 석상 바깥 빈 바닥으로 옮긴다 — 근접 판정용 캡슐이 몸 위에 생겨 갇혔다(10-22 A0 · 빌드).</summary>
+    private static void EvictPlayer(PlayerController player, Vector3 stonePos, Vector3 outward)
+    {
+        if (player == null) return;
+        Vector3 off = player.transform.position - stonePos; off.y = 0f;
+        float need = Radius + PlayerClear;
+        if (off.magnitude >= need) return;
+        Vector3 away = off.sqrMagnitude > 0.0004f ? off.normalized : outward;   // 한가운데면 유리 반대쪽(플레이어 쪽)으로
+        Vector3 to = stonePos + away * (need + 0.3f);
+        to.y = player.transform.position.y;
+        if (NavMesh.SamplePosition(to, out var hit, 1.5f, NavMesh.AllAreas)) to = hit.position;
+        player.transform.position = to;
+        if (player.TryGetComponent<Rigidbody>(out var rb)) { rb.position = to; rb.linearVelocity = Vector3.zero; }
+        Debug.Log($"[DK] 공명 성흔석 자리에 플레이어가 있어 {Vector3.Distance(stonePos, to):0.0} m 밖으로 옮김");
     }
 
     private static bool TryGlassDistance(List<Collider> glass, Vector3 origin, Vector3 dir, out float dist)

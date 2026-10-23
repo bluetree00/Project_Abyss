@@ -52,7 +52,7 @@ public static class NamelessSkillSetup
         beam.spreadAngle        = 0f;
         beam.arrowKey           = "Basic_Arrow_01";
         beam.baseDamagePerArrow = 30f;
-        beam.fireDelay          = 0.35f;   // ESkill_01(Attack02_2, 1.12s)의 휘두름에 맞춘다
+        beam.fireDelay          = 0.35f;   // ESkill_01(Attack01_4 · 상태 속도 2) 휘두름 봉우리는 0.275초지만 0.28로 당기면 2 m 표적을 놓쳤다(10-22 실측 66 · 0.35 = 적중 1) — 되돌림
         beam.forwardOffset      = 1f;
         beam.upOffset           = 1f;
         beam.pierceMaxCount     = 5;

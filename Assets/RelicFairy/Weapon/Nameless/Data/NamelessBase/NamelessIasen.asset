@@ -17,12 +17,12 @@ MonoBehaviour:
   detectRadius: 2
   slashCount: 5
   slashDelay: 0.15
-  baseDamagePerSlash: 5
+  baseDamagePerSlash: 180
   knockbackMultiplier: 0.2
   tier2ExtraSlashCount: 2
   tier2FinishEffectKey: NamelessCut
   tier2FinishEffectScale: 0.28
-  endDelay: 0.3
+  endDelay: 0.08
   dashEffectKey: 
   dashTrailKey: IasenDashFire
   slashEffectKey: NamelessIasenFinish

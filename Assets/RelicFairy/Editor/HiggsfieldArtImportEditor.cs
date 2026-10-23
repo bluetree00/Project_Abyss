@@ -83,8 +83,209 @@ public static class HiggsfieldArtImportEditor
         Debug.Log($"[HiggsfieldArt] 끝 — 가져오기 {imported} · 주소 {addressed} · 유물 {relics} · 없음 {missing}");
     }
 
-    /// <summary>프롤로그 그림(Illust_Intro_Page)과 같은 가져오기 설정. 파일이 없으면 false.</summary>
-    private static bool Configure(string path)
+    // ── 10-18 증강 · 진화 고르기 틀(사용자 「증강 사용할 팝업 UI 테두리가 포함된 틀」 · 「뽑은 리소스 활용해야지」) ──
+    private const string FrameDir         = Root + "UIFrame/";
+    private const string CrucibleSkinPath = "Assets/RelicFairy/UI/Skin/Crucible/CrucibleSkin.asset";
+    private const string DraftSkinPath    = "Assets/RelicFairy/UI/Skin/RelicPartDraft/RelicPartDraftSkin.asset";
+    private const string RuneSkinPath     = "Assets/RelicFairy/UI/Skin/RuneSelect/RuneSelectSkin.asset";
+
+    // 파일 → 9칸 자르기 경계(왼 · 아래 · 오른 · 위 — 그림 px). 0이면 자르지 않는다(비율 그대로 그리는 카드 · 문장).
+    private static readonly (string file, Vector4 border)[] Frames =
+    {
+        ("Frame_CrucibleAugmentCard.png",    Vector4.zero),
+        ("Frame_CrucibleAugmentPanel.png",   new Vector4(84f, 84f, 84f, 84f)),
+        ("Frame_RelicMemoryCard.png",        new Vector4(56f, 56f, 56f, 56f)),
+        ("Frame_EvolutionCard_Gawain.png",   new Vector4(140f, 150f, 140f, 150f)),
+        ("Frame_EvolutionCard_Lancelot.png", new Vector4(104f, 124f, 104f, 124f)),
+        ("Crest_EvolutionCard_Gawain.png",   Vector4.zero),
+        ("Crest_EvolutionCard_Lancelot.png", Vector4.zero),
+        ("Frame_CrucibleChooserCard.png",    new Vector4(84f, 84f, 84f, 84f)),   // 10-19 ⑯
+        ("Frame_PartsWorkshopCard.png",      new Vector4(64f, 64f, 64f, 64f)),   // 10-19 ⑥
+        ("Frame_PartsWorkshopPanel.png",     new Vector4(76f, 76f, 76f, 76f)),
+        ("Frame_RuneSelectWindow.png",       new Vector4(72f, 72f, 72f, 72f)),   // 10-19 룬 획득 팝업 창(모서리 쐐기돌 ≤ 65 · 안쪽 빛 선 42)
+        ("Frame_RuneCard_Common.png",        new Vector4(56f, 56f, 56f, 56f)),   // 10-19 룬 카드 등급 틀(쐐기돌 ≈ 55 · 안쪽 빛 선 38)
+        ("Frame_RuneCard_Rare.png",          new Vector4(56f, 56f, 56f, 56f)),
+        ("Frame_RuneCard_Epic.png",          new Vector4(58f, 58f, 58f, 58f)),
+        ("Frame_RuneCard_Legendary.png",     new Vector4(136f, 136f, 136f, 136f)),   // 금 세공이 모서리에서 ≈ 130까지
+        ("Frame_ShopWindow.png",             new Vector4(72f, 72f, 72f, 72f)),   // 10-21 상점 새 레이아웃 창(쐐기돌 ≈ 60 · 안쪽 빛 선 ≈ 48)
+        ("Emblem_Blessing.png",              Vector4.zero),                      // 10-21 가호 문장 판(비율 그대로)
+    };
+
+    // ── 10-21 상점 새 레이아웃(사용자 「상점의 새로운 레이아웃부터 필요한 리소스를 제작해서 만들고 빌드」) ──
+    private const string ShopSkinPath = "Assets/RelicFairy/UI/Skin/Shop/ShopSkin.asset";
+    private const string IconDir      = "Assets/RelicFairy/_Imported/Artsystack/Sprites/flaticon/white/128/";
+
+    // 가호 아이콘 — StatType 순서. 이미 반입된 Artsystack 흰 아이콘만 쓴다(새로 들이지 않음).
+    private static readonly string[] BlessingIconFiles =
+    {
+        "power_1",       // AttackPower — 맹공
+        "shield_2",      // Defense — 수호
+        "Heart",         // MaxHp — 생명
+        "wind_spell",    // MoveSpeed — 질풍
+        "dagger",        // AttackSpeed — 연격
+        "sand_glass_1",  // SkillCooldownReduction — 각성
+        "sword_2",       // MeleeAttack
+        "archery",       // RangedAttack
+        "dice",          // Luck — 행운
+        "sand_glass_1",  // ActiveItemCooldownReduction
+        "quiver",        // Projectile — 분열
+        "flame",         // InstantDamage
+        "target_1",      // CritChance — 예리함
+        "bomb",          // CritDamage — 파괴
+    };
+
+    [MenuItem("RelicFairy/Tools/10-21 상점 새 레이아웃 그림 반입 — 창 틀 · 행상 초상 · 가호 문장 · 아이콘 연결")]
+    private static void RunShop()
+    {
+        int imported = 0;
+        foreach (var (file, border) in Frames)
+            if (file == "Frame_ShopWindow.png" || file == "Emblem_Blessing.png")
+                if (Configure(FrameDir + file, border)) imported++;
+        if (Configure(Root + "Portrait/Portrait_Peddler.png")) imported++;
+
+        var shop = AssetDatabase.LoadAssetAtPath<ShopSkinSO>(ShopSkinPath);
+        if (shop == null) { Debug.LogWarning($"[HiggsfieldArt] 상점 스킨 없음 — {ShopSkinPath}"); return; }
+        var s = new SerializedObject(shop);
+        s.FindProperty("windowFrame").objectReferenceValue     = FrameSprite("Frame_ShopWindow.png");
+        s.FindProperty("blessingEmblem").objectReferenceValue  = FrameSprite("Emblem_Blessing.png");
+        s.FindProperty("peddlerPortrait").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>(Root + "Portrait/Portrait_Peddler.png");
+        var icons = s.FindProperty("blessingIcons");
+        icons.arraySize = BlessingIconFiles.Length;
+        int missing = 0;
+        for (int i = 0; i < BlessingIconFiles.Length; i++)
+        {
+            var sp = Icon(BlessingIconFiles[i]);
+            if (sp == null) missing++;
+            icons.GetArrayElementAtIndex(i).objectReferenceValue = sp;
+        }
+        s.FindProperty("lockClosed").objectReferenceValue  = Icon("lock_1");
+        s.FindProperty("lockOpen").objectReferenceValue    = Icon("lock_3");
+        s.FindProperty("rerollIcon").objectReferenceValue  = Icon("refresh");
+        s.FindProperty("hpIcon").objectReferenceValue      = Icon("Heart");
+        s.FindProperty("potionIcon").objectReferenceValue  = Icon("potion_1");
+        s.FindProperty("storageIcon").objectReferenceValue = Icon("chest_1");
+        s.FindProperty("boardIcon").objectReferenceValue   = Icon("crystal_1");
+        s.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(shop);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[HiggsfieldArt] 상점 끝 — 가져오기 {imported}/3 · 창 틀 {shop.WindowFrame != null} · 초상 {shop.PeddlerPortrait != null} · 문장 {shop.BlessingEmblem != null} · 아이콘 없음 {missing}");
+    }
+
+    private static Sprite Icon(string name) => AssetDatabase.LoadAssetAtPath<Sprite>(IconDir + name + "_128.png");
+
+    [MenuItem("RelicFairy/Tools/10-22 인트로 모르드레드(타락 전) 초상 반입 — 가져오기 · 주소")]
+    private static void RunMordredKnight()
+    {
+        const string file = "Portrait/Portrait_Mordred_Knight.png";
+        bool imported = Configure(Root + file);
+        var settings = AddressableAssetSettingsDefaultObject.Settings;
+        string guid = AssetDatabase.AssetPathToGUID(Root + file);
+        if (settings == null || string.IsNullOrEmpty(guid)) { Debug.LogWarning($"[HiggsfieldArt] 모르드레드 초상 주소 실패 — 설정 {settings != null} · guid {guid}"); return; }
+        var entry = settings.CreateOrMoveEntry(guid, settings.FindGroup(GroupName) ?? settings.DefaultGroup, false, false);
+        entry.address = "Portrait_Mordred_Knight";   // UI_BossBark.PortraitKey(Mordred · 타락 전)
+        settings.SetDirty(AddressableAssetSettings.ModificationEvent.EntryMoved, entry, true);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[HiggsfieldArt] 모르드레드 초상 끝 — 가져오기 {imported} · 주소 {entry.address}");
+    }
+
+    [MenuItem("RelicFairy/Tools/10-22 상점 원석 환전소 그림 반입 — 저울 문장 · 원석 아이콘")]
+    private static void RunExchangeArt()
+    {
+        bool imported = Configure(FrameDir + "Emblem_Exchange.png");
+        var shop = AssetDatabase.LoadAssetAtPath<ShopSkinSO>(ShopSkinPath);
+        if (shop == null) { Debug.LogWarning($"[HiggsfieldArt] 상점 스킨 없음 — {ShopSkinPath}"); return; }
+        var s = new SerializedObject(shop);
+        s.FindProperty("exchangeEmblem").objectReferenceValue = FrameSprite("Emblem_Exchange.png");
+        s.FindProperty("oreIcon").objectReferenceValue        = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/RelicFairy/UI/HUD/Sprites/Currency/아이콘_원석.png");
+        s.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(shop);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[HiggsfieldArt] 원석 환전소 그림 끝 — 가져오기 {imported} · 문장 {shop.ExchangeEmblem != null} · 원석 {shop.OreIcon != null}");
+    }
+
+    [MenuItem("RelicFairy/Tools/10-22 재련소 첫 화면 카드 그림 반입 — 무기 재련 · 파츠 재련")]
+    private static void RunChooserArt()
+    {
+        int imported = 0;
+        if (Configure(FrameDir + "Art_CrucibleChooseMelee.png"))  imported++;
+        if (Configure(FrameDir + "Art_CrucibleChooseRanged.png")) imported++;
+        var cru = AssetDatabase.LoadAssetAtPath<CrucibleSkinSO>(CrucibleSkinPath);
+        if (cru == null) { Debug.LogWarning($"[HiggsfieldArt] 재련소 스킨 없음 — {CrucibleSkinPath}"); return; }
+        var s = new SerializedObject(cru);
+        s.FindProperty("chooserMeleeArt").objectReferenceValue  = FrameSprite("Art_CrucibleChooseMelee.png");
+        s.FindProperty("chooserRangedArt").objectReferenceValue = FrameSprite("Art_CrucibleChooseRanged.png");
+        s.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(cru);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[HiggsfieldArt] 재련소 첫 화면 그림 끝 — 가져오기 {imported}/2 · 무기 {cru.ChooserMeleeArt != null} · 파츠 {cru.ChooserRangedArt != null}");
+    }
+
+    [MenuItem("RelicFairy/Tools/10-18 힉스필드 증강 · 진화 틀 반입 — 가져오기 · 9칸 경계 · 스킨 연결")]
+    private static void RunFrames()
+    {
+        int imported = 0;
+        foreach (var (file, border) in Frames) if (Configure(FrameDir + file, border)) imported++;
+
+        var cru = AssetDatabase.LoadAssetAtPath<CrucibleSkinSO>(CrucibleSkinPath);
+        if (cru != null)
+        {
+            var s = new SerializedObject(cru);
+            s.FindProperty("augmentCardFrame").objectReferenceValue  = FrameSprite("Frame_CrucibleAugmentCard.png");
+            s.FindProperty("augmentPanelFrame").objectReferenceValue = FrameSprite("Frame_CrucibleAugmentPanel.png");
+            s.FindProperty("chooserCardFrame").objectReferenceValue  = FrameSprite("Frame_CrucibleChooserCard.png");
+            s.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(cru);
+        }
+        else Debug.LogWarning($"[HiggsfieldArt] 재련소 스킨 없음 — {CrucibleSkinPath}");
+
+        var draft = AssetDatabase.LoadAssetAtPath<RelicPartDraftSkinSO>(DraftSkinPath);
+        if (draft != null)
+        {
+            var s = new SerializedObject(draft);
+            s.FindProperty("memoryCardFrame").objectReferenceValue = FrameSprite("Frame_RelicMemoryCard.png");
+            s.FindProperty("workshopCardFrame").objectReferenceValue  = FrameSprite("Frame_PartsWorkshopCard.png");
+            s.FindProperty("workshopPanelFrame").objectReferenceValue = FrameSprite("Frame_PartsWorkshopPanel.png");
+            SetKeyArt(s.FindProperty("evolutionFrame"), ("Gawain", "Frame_EvolutionCard_Gawain.png"), ("Lancelot", "Frame_EvolutionCard_Lancelot.png"));
+            SetKeyArt(s.FindProperty("evolutionCrest"), ("Gawain", "Crest_EvolutionCard_Gawain.png"), ("Lancelot", "Crest_EvolutionCard_Lancelot.png"));
+            s.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(draft);
+        }
+        else Debug.LogWarning($"[HiggsfieldArt] 기억 스킨 없음 — {DraftSkinPath}");
+
+        var rune = AssetDatabase.LoadAssetAtPath<RuneSelectSkinSO>(RuneSkinPath);
+        if (rune != null)
+        {
+            var s = new SerializedObject(rune);
+            s.FindProperty("windowFrame").objectReferenceValue = FrameSprite("Frame_RuneSelectWindow.png");
+            var cards = s.FindProperty("rarityCardFrame");
+            string[] rarity = { "Common", "Rare", "Epic", "Legendary" };   // ItemRarity 순서
+            cards.arraySize = rarity.Length;
+            for (int i = 0; i < rarity.Length; i++)
+                cards.GetArrayElementAtIndex(i).objectReferenceValue = FrameSprite($"Frame_RuneCard_{rarity[i]}.png");
+            s.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(rune);
+        }
+        else Debug.LogWarning($"[HiggsfieldArt] 룬 획득 스킨 없음 — {RuneSkinPath}");
+
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[HiggsfieldArt] 틀 끝 — 가져오기 {imported}/{Frames.Length} · 재련소 {cru != null} · 기억 {draft != null} · 룬 {rune != null}");
+    }
+
+    private static Sprite FrameSprite(string file) => AssetDatabase.LoadAssetAtPath<Sprite>(FrameDir + file);
+
+    private static void SetKeyArt(SerializedProperty arr, params (string key, string file)[] items)
+    {
+        arr.arraySize = items.Length;
+        for (int i = 0; i < items.Length; i++)
+        {
+            var e = arr.GetArrayElementAtIndex(i);
+            e.FindPropertyRelative("key").stringValue = items[i].key;
+            e.FindPropertyRelative("sprite").objectReferenceValue = FrameSprite(items[i].file);
+        }
+    }
+
+    /// <summary>프롤로그 그림(Illust_Intro_Page)과 같은 가져오기 설정. 파일이 없으면 false. <paramref name="border"/>가 있으면 9칸 경계도 단다.</summary>
+    private static bool Configure(string path, Vector4 border = default)
     {
         var ti = AssetImporter.GetAtPath(path) as TextureImporter;
         if (ti == null) { Debug.LogWarning($"[HiggsfieldArt] 그림 없음 — {path}"); return false; }
@@ -95,6 +296,7 @@ public static class HiggsfieldArtImportEditor
         ti.sRGBTexture         = true;
         ti.maxTextureSize      = 2048;
         ti.textureCompression  = TextureImporterCompression.Compressed;
+        if (border != Vector4.zero) ti.spriteBorder = border;
         ti.SaveAndReimport();
         return true;
     }

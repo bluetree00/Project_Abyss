@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using RelicFairy.Monster;
 
 /// <summary>
 /// 영웅 유물 — 가웨인(정오의 맹세). 차세대 프레임워크 v1.
@@ -21,11 +20,9 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
     // 기본 패시브 설명(버프창 첫 셀의 호버 툴팁). 태양 게이지/정오/각인 사이클 요약.
     private const string PassiveTip =
         "정오의 맹세 — 여명 20초 → 정오 10초 → 황혼 15초. 정오: 공격속도 +30% · 모든 피해 +20% · 치명타 확률 +10%p · 치명타 피해 +20%. " +
-        "게이지 80% 이상 '각인': 공격력 +10%. 정오가 아닐 때 처치마다 충전 속도 +20%(최대 3배)";
+        "게이지가 80%를 넘으면 공격력 +10%. 정오가 아닐 때 처치마다 충전 속도 +20%(최대 3배)";   // 10-22 E1 D8 — 「각인」 명사를 걷었다(계열 각인과 겹침)
 
     private const string NoonVfxKey = "vfx_gawain_noon";  // 정오 오라(상태 토글). 에셋 배선 후 등록.
-    // 정오 수확 불꽃 크기(10-11) — 허브 개화(2 m)와 같은 룬 불 버스트를 작게. 화상이 실제로 터진 적에게만.
-    private const float HarvestBurstScale = 1.2f;
 
     private PlayerController _owner;
     private ZenithGauge      _gauge;
@@ -69,13 +66,14 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
     // ── 하루의 순환 ────────────────────────────────────────────────
     // 이 유물의 정체성은 '게이지를 채우는 것'이 아니라 <b>시간의 순환</b>이다(해가 뜨고 진다).
     // 그래서 구간마다 역할이 다르다 — 채우기형 유물(광기 스택 등)과 구조가 겹치지 않게 한다.
-    //   여명(충전) : 화상을 <b>심는다</b>. 각인(80%+)에서 공격력이 먼저 오른다.
-    //   정오       : <b>수확</b>. 심어둔 화상이 전부 터지고, 전 스탯이 강화되며 Q가 열린다.
+    //   여명(충전) : 태양흔을 <b>쌓는다</b>(기억 허브). 각인(80%+)에서 공격력이 먼저 오른다.
+    //   정오       : <b>수확</b>. 쌓아 둔 태양흔이 전부 터지고(개화), 전 스탯이 강화되며 Q가 열린다.
     //   황혼(쿨다운): <b>잔열</b>. 대지가 아직 뜨거워 화상이 오래 탄다. 처치하면 다음 해를 앞당긴다.
+    // 10-22 D11 — 예전엔 여명에 화상을 심어 정오에 터뜨렸는데 허브의 태양흔 · 개화와 같은 일을 하는 표식이 둘이었다 → 태양흔 하나로.
 
-    /// <summary>정오 구간 — 공격 화염화(화상 강화·즉발). GawainSolarBurnPassive/스킬이 조회.</summary>
+    /// <summary>정오 구간. 낙일 · 타오르는 정오 진화(정오 화상)가 조회.</summary>
     public bool FlameMode => _gauge != null && _gauge.IsNoon;
-    /// <summary>여명(충전) 구간 — 화상 부착(준비).</summary>
+    /// <summary>여명(충전) 구간 — 태양흔을 쌓는다(허브).</summary>
     public bool DawnMode  => _gauge != null && _gauge.CurrentPhase == ZenithGauge.ZPhase.Charging;
     /// <summary>황혼(쿨다운) 구간 — 잔열. 화상이 오래 남고, 처치가 다음 해를 앞당긴다.</summary>
     public bool TwilightMode => _gauge != null && _gauge.CurrentPhase == ZenithGauge.ZPhase.Cooldown;
@@ -105,11 +103,14 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
         // 패시브: 각인 첫타(+50%) · 황혼 처치 충전 가속(잔열)
         owner.RegisterRelicPassive(new GawainSolarMarkPassive());
         owner.RegisterRelicPassive(new GawainAfterglowPassive());
-        owner.RegisterRelicPassive(new GawainSolarBurnPassive());  // 여명/정오 공격 → 화상 부착
+        owner.RegisterRelicPassive(new GawainSolarBurnPassive());  // 황혼 공격 → 잔열 화상(정오는 타오르는 정오 진화만)
 
         _onChanged = RefreshBuffs;
         _gauge.OnChanged += _onChanged;
         RefreshBuffs();
+
+        // 기억 허브 = 유물 기본 규칙(태양흔 · 개화 · 정오 수확)이라 런 시작부터 붙인다(10-22 D11 — 예전엔 첫 조각과 함께)
+        GawainMemoryHub.Ensure(owner);
     }
 
     public void OnDetach(PlayerController owner)
@@ -149,11 +150,10 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
 
         _vfx?.SetActive("noon", _gauge.IsNoon);   // 정오 오라 활성/비활성
 
-        // 정오 진입 시: 스킬 1회 리셋 + 각인 첫타(+50%) 적립(충전 100%→정오라 각인 항상 발동)
+        // 정오 진입 시: 스킬 1회 리셋 + 각인 첫타(+50%) 적립(충전 100%→정오라 각인 항상 발동). 태양흔 수확(개화)은 허브가 같은 순간에 한다.
         if (_gauge.IsNoon && !_wasNoon)
         {
             _skillUsedThisNoon = false; _markPendingFirstHit = true;
-            DetonateBurns();  // 정오 진입 → 붙은 화상 전부 즉발(폭발)
             if (_owner != null) GuidelineVisual.Toast(_owner.transform.position + Vector3.up * 2.4f, "정오 진입", GuidelineVisual.ToastKind.Relic); // [가이드라인 비주얼]
         }
         _wasNoon = _gauge.IsNoon;
@@ -198,26 +198,6 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
         rs.SetZenithAttackSpeed(0f);
         rs.SetRelicCritBuff(0f, 0f);
         rs.SetCharacterAttackMultiplier(1f, 1f);
-    }
-
-    /// <summary>
-    /// 정오 진입 시 주변 화상 몬스터 전부 즉발(폭발) — 여명에 심은 화상을 정오에 터뜨린다.
-    /// 터지는 적마다 작은 불꽃을 띄운다 — 예전엔 숫자만 떠 정체성 순간(수확)이 보이지 않았다(10-11).
-    /// 기억 조각 허브가 있으면 허브의 정오 수확(개화)이 같은 순간을 그리므로 띄우지 않는다(겹침 방지).
-    /// </summary>
-    private void DetonateBurns()
-    {
-        if (_owner == null) return;
-        bool hubDraws = GawainMemoryHub.Of(_owner) != null;
-        var buffer = new List<MonsterBase>(32);
-        CombatQuery.GetNearbyEnemies(_owner.transform.position, 15f, _owner.gameObject, 32, buffer);
-        foreach (var mb in buffer)
-        {
-            if (mb == null) continue;
-            if (!hubDraws && mb.TryGetComponent<MonsterBurnHandler>(out var burn) && burn.Remaining > 0f)
-                ElementVfxPlayer.PlayBurst(RuneElement.Fire, mb.transform.position, HarvestBurstScale);
-            MonsterBurnHandler.DetonateOn(mb.gameObject);
-        }
     }
 
     // ── 버프창 수집(IBuffViewSource) ────────────────────────

@@ -32,6 +32,7 @@ public class RoomClearGate : MonoBehaviour
     /// 이 안에서 찾은 면이면 보상을 그리 옮겨도 원래 자리에서 멀지 않다. 못 찾으면 플레이어 자리로 간다.
     /// </summary>
     private const float RewardSnapRadius = 4f;
+    private const float RewardClearRadius = 1.6f;   // 보상 구체 둘레 — 이 안의 금화 · 정수를 밖으로 튕긴다(10-22)
     // NavMesh 질의 조건 — 에이전트 종류를 밝힌다. 방 NavMesh는 에이전트 종류마다 따로 굽는데(BuildMapNavMeshAsync, 2종),
     // 종류를 안 밝힌 질의(areaMask 오버로드)는 다른 종류의 면을 집어 발밑 면까지도 길이 끊긴 것(PathPartial)으로 나온다(10-01 실측).
     private static readonly NavMeshQueryFilter s_walkFilter = new() { agentTypeID = 0, areaMask = NavMesh.AllAreas };
@@ -225,6 +226,13 @@ public class RoomClearGate : MonoBehaviour
         Vector3    spot      = rewards.Count > 0 ? ResolveReachablePosition(center) : center;
         float      floorY    = spot.y - effectHeightOffset;
         RewardAura aura      = null;
+
+        // 10-22 사용자 「골드가 룬 획득 오브젝트 위쪽에 떨어진다」 — 보상은 마지막 처치 자리에 서고, 그 처치의 금화도 거기 흩어진다
+        if (rewards.Count > 0)
+        {
+            GoldCoinPickup.PushAwayFrom(spot, RewardClearRadius);
+            EssenceShardPickup.PushAwayFrom(spot, RewardClearRadius);
+        }
 
         try
         {

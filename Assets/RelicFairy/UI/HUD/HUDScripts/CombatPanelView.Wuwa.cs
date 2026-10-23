@@ -19,6 +19,7 @@ public sealed partial class CombatPanelView
     // 아래 가운데(화면 가운데 · 바닥에서, 1080 기준 px) — 시안 좌표
     // 10-11 위계 — 체력바 6 → 10(유물 게이지 6 · 정오 8보다 굵게, 체력이 1순위). 비교 게임 두께 10~29 · 명조 12 · 엘든 링 10.
     private const float WHpY = 50f, WHpW = 600f, WHpH = 10f;
+    private const float WHpCapW = 12f, WHpCapH = 18f;   // 바 옷 끝 마름모(10-18 ⑲) — 바(10)보다 위아래 4px 크게
     private const float WHpTextSize = 17f;   // 체력 숫자 14 → 17(몸통 10 → 약 12px, 명조 12.5~13)
     private const float WKeySize    = 15f;   // 키 · 강화 단계 · 물약 개수 14 → 15(글자 단계 15 · 17 · 20 · 24 · 48 안으로)
     private const float WGaugeY = 96f, WGaugeW = 440f, WGaugeH = 6f, WGaugeNoonH = 8f, WGaugeGap = 80f;
@@ -31,8 +32,17 @@ public sealed partial class CombatPanelView
     private const float WQSize = 114f, WERSize = 88f, WCSize = 64f, WQRingGap = 7f, WQRingStroke = 3f;
     private const float WDockBottom = 40f;   // 왼쪽 기둥(버프 · 서약) 바닥 — 무기가 빠진 왼쪽 아래
     private const float WStreakSec = 0.3f;
+    private const float WNoonLabelPop = 0.25f;   // 정오 진입 — 「정오!」가 1.25배에서 자리 잡는다(10-18 ⑨)
+    private const float WNoonGlowA    = 0.39f;   // 정오 가운데 빛 — 숨쉬지 않고 고정(예전 0.32~0.46 숨쉼의 가운데 값)
+    private const float WSunLabelW    = 360f;    // 가웨인 시간대 역할 글 한 줄 폭(10-22 E1 D5)
+    private const float WSunLabelUp   = 56f;     // 태양 가운데 → 역할 글 가운데(40 → 56 · 정오 태양 위끝 위로)
+    private const float WBarLabelH    = 44f;     // 랜슬롯 광기 글 두 줄 높이(광란 중 · 10-22 E1 D6)
 
     private static readonly Color WTrack = new(0.03f, 0.03f, 0.05f, 0.67f);
+    // 가웨인 하루 색(10-18 리서치 · 「금 = 준비」) — 여명은 청동으로 차오르고 각인(80%)부터 금, 황혼은 노을 보라로 남은 시간이 저문다
+    private static readonly Color WDawn = new(0.66f, 0.47f, 0.26f, 1f);
+    private static readonly Color WDusk = new(0.74f, 0.38f, 0.64f, 0.5f);   // 하루 띠 황혼 색(RelicMemoryHudView)을 옅게
+    private const float RelicGlowFromFill = 0.9f;   // 랜슬롯 막대 외곽 빛이 켜지는 광기(곧 광란)
     private static readonly Color WNoon  = new(1f, 0.925f, 0.667f, 1f);    // 정오 · 절정 — 흰 금빛
     private static readonly Color WDisc  = new(0.063f, 0.059f, 0.086f, 0.65f);
 
@@ -72,6 +82,8 @@ public sealed partial class CombatPanelView
         }
         var fillArea = hpSlider != null && hpSlider.fillRect != null ? hpSlider.fillRect.parent as RectTransform : null;
         if (fillArea != null) InsetInside(fillArea, Vector4.zero);
+        // 10-18 ⑲ 사용자 「깔끔한 디자인의 바」 — 힉스필드 시안 A: 위아래 얇은 금선 · 양 끝 마름모(채움 결은 ApplyHpFill)
+        UIBarDress.Dress(_hpBar, null, WHpCapW, WHpCapH);
         if (hpGhostFillImage != null)
         {
             hpGhostFillImage.sprite = UIThinShapes.Solid;
@@ -168,10 +180,14 @@ public sealed partial class CombatPanelView
             {
                 var lrt = _sunLabel.rectTransform;
                 lrt.pivot            = new Vector2(0.5f, 0.5f);
-                lrt.anchoredPosition = new Vector2(0f, SunCenterY + 40f);
-                lrt.sizeDelta        = new Vector2(220f, 22f);
+                // 220 → 360 · 한 줄 · 40 → 56 위로(10-22 E1 D5 — 역할 글 「정오! — 터짐 · Q」 · 「황혼 — Q 잠김 · 처치로 앞당김 ×1.4」가 약 115 ~ 250px).
+                // 가운데 ±180이라 오른쪽 하루 띠(게이지 끝 +12 = 232부터)에 닿지 않는다. 「정오!」 한 단어일 땐 정오 태양(92px · 위끝 142) 꼭대기에 얹혀도 됐지만
+                // 글이 넓어져 햇살을 가로질렀다 → 글 아래끝이 정오 태양 위끝 위로 오게 16px 올렸다
+                lrt.anchoredPosition = new Vector2(0f, SunCenterY + WSunLabelUp);
+                lrt.sizeDelta        = new Vector2(WSunLabelW, 22f);
                 UITheme.StyleThinText(_sunLabel, UIWeight.Medium, 15f, UITheme.Thin.Ink, shadow: true);
                 _sunLabel.alignment = TextAlignmentOptions.Center;
+                _sunLabel.textWrappingMode = TextWrappingModes.NoWrap;
             }
             _wGlowSun = MakeGlow(_sunRoot, new Vector2(0f, SunCenterY), Vector2.one * WGlowSize);
         }
@@ -182,7 +198,15 @@ public sealed partial class CombatPanelView
             _relicBar.pivot            = new Vector2(0.5f, 0.5f);
             _relicBar.anchoredPosition = new Vector2(0f, WGaugeY);
             _relicBar.sizeDelta        = HasRelicGaugeSkin ? new Vector2(WGaugeW, WGaugeW / 7.1f) : new Vector2(WGaugeW, WGaugeNoonH);
-            if (_relicBarLabel != null) UITheme.StyleThinText(_relicBarLabel, UIWeight.Medium, 15f, UITheme.Thin.Ink, shadow: true);
+            if (_relicBarLabel != null)
+            {
+                UITheme.StyleThinText(_relicBarLabel, UIWeight.Medium, 15f, UITheme.Thin.Ink, shadow: true);
+                // 광란 글은 두 줄(「광란 3.2초」 / 「Q 심판」 · 10-22 E1 D6) — 한 줄(약 136px)이면 막대 왼쪽 끝 −228에서 −364까지라
+                // 든 무기 큰 원(−437 ~ −359 · y 39 ~ 117)에 닿는다. 두 줄이면 가장 긴 줄이 약 73px(−301까지).
+                var lrt = _relicBarLabel.rectTransform;
+                if (lrt.anchorMin == lrt.anchorMax) lrt.sizeDelta = new Vector2(lrt.sizeDelta.x, WBarLabelH);
+                _relicBarLabel.textWrappingMode = TextWrappingModes.NoWrap;
+            }
             _wGlowBar = MakeGlow(_relicBar, Vector2.zero, new Vector2(WGaugeW * 0.7f, WGlowSize * 0.7f));
             _wGlowBar.rectTransform.anchorMin = _wGlowBar.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
         }
@@ -476,34 +500,50 @@ public sealed partial class CombatPanelView
         float k     = _relicFlash;   // 정오 · 절정 진입 1 → 0(UpdateSunGauge · 검 바가 줄인다)
         float breathe = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 3f);
 
+        // 게이지 · Q 고리가 함께 쓰는 「보이는 채움 · 색」 — 랜슬롯은 막대 색(평시 붉은 광기) · 광란 남은 시간(10-18)
+        float shown = fill;
+        var   col   = ready ? WNoon : _relicResource.BarColor;
+        if (_relicResource is MadnessStack madness && madness.IsFrenzy) shown = madness.FrenzyRemaining01;
         if (_useSunGauge && _wGaugeL != null)
         {
-            var col = ready ? WNoon : UITheme.Thin.Gold;
-            _wGaugeL.fillAmount = fill; _wGaugeL.color = col;
-            _wGaugeR.fillAmount = fill; _wGaugeR.color = col;
+            // 여명 = 청동 → 각인부터 금 · 정오 = 흰 금(1 → 0) · 황혼 = 노을 보라로 남은 시간(1 → 0, 양 끝에서 가운데로 저묾).
+            // 예전엔 여명도 금이었고(준비처럼 보임) 황혼은 금색으로 0 → 1 차올라 여명 시작에 0으로 떨어졌다(「가짜 가득」 · 10-18 리서치)
+            var  zen  = _relicResource as ZenithGauge;
+            bool dusk = zen != null && zen.CurrentPhase == ZenithGauge.ZPhase.Cooldown;
+            shown = dusk ? 1f - fill : fill;
+            col   = ready ? WNoon : dusk ? WDusk : zen != null && zen.IsMarkReady ? UITheme.Thin.Gold : WDawn;
+            _wGaugeL.fillAmount = shown; _wGaugeL.color = col;
+            _wGaugeR.fillAmount = shown; _wGaugeR.color = col;
             float h = ready ? WGaugeNoonH : WGaugeH;
             if (_sunGaugeRoot != null && Mathf.Abs(_sunGaugeRoot.sizeDelta.y - h) > 0.01f) _sunGaugeRoot.sizeDelta = new Vector2(WGaugeW, h);
 
             // 차오르는 끝 빛 — 충전 중에만
             float halfW = WGaugeW * 0.5f - WGaugeGap * 0.5f;
             float x     = WGaugeGap * 0.5f + halfW * fill;
-            var tip = !ready && fill > 0.01f && fill < 0.995f ? UITheme.Thin.WithA(UITheme.Thin.Gold, 0.9f) : Color.clear;
+            var tip = !ready && !dusk && fill > 0.01f && fill < 0.995f ? UITheme.Thin.WithA(col, 0.9f) : Color.clear;
             if (_wTipL != null) { _wTipL.rectTransform.anchoredPosition = new Vector2(-x, 0f); _wTipL.color = tip; }
             if (_wTipR != null) { _wTipR.rectTransform.anchoredPosition = new Vector2( x, 0f); _wTipR.color = tip; }
 
             // 정오 진입 — 문장이 0.8배에서 자리 잡으며 커진다(튕김 없이)
             if (_sunClosedImg != null) _sunClosedImg.rectTransform.localScale = Vector3.one * Mathf.Lerp(1f, 0.8f, k * k);
-            if (_sunLabel != null) _sunLabel.color = ready ? WNoon : UITheme.Thin.Ink;
+            // 「정오!」 — 들어서는 순간 한 번 1.25배에서 자리 잡고(0.4초) 정오 동안은 그대로 둔다(10-18 사용자 「정오 텍스트가 계속 깜빡이는 버그」)
+            if (_sunLabel != null)
+            {
+                _sunLabel.color = ready ? WNoon : UITheme.Thin.Ink;
+                _sunLabel.rectTransform.localScale = Vector3.one * (1f + WNoonLabelPop * k * k);
+            }
         }
 
+        // 빛 — 정오 · 광란 모두 고정 밝기 + 진입 한 번(숨쉬면 「정오!」 글이 함께 깜빡여 보였다 · 10-18 ⑨ · 광란도 같은 규칙으로 10-18)
         var glow = _useSunGauge ? _wGlowSun : _wGlowBar;
         if (glow != null)
-            glow.color = UITheme.Thin.WithA(_useSunGauge ? UITheme.Thin.Gold : _relicResource.BarColor, ready ? 0.32f + 0.14f * breathe + 0.4f * k : 0f);
+            glow.color = UITheme.Thin.WithA(_useSunGauge ? UITheme.Thin.Gold : _relicResource.BarColor, ready ? WNoonGlowA + 0.4f * k : 0f);
 
         if (_wQRing != null)
         {
-            _wQRing.fillAmount = ready ? 1f : fill;
-            _wQRing.color      = ready ? WNoon : UITheme.Thin.Gold;
+            // 고리 = 게이지와 같은 채움 · 색(충전 중 금이면 준비로 읽혔다 · 10-18). 쓸 수 있을 때만 흰 금 가득
+            _wQRing.fillAmount = ready ? 1f : shown;
+            _wQRing.color      = ready ? WNoon : col;
             bool usable = _qGateOpen && _qCooldownReady && _qHasSkill;   // 빛 = 지금 누를 수 있음(실제 Q 문 · 10-12 A4) — 고리 채움 · 색은 게이지 그대로
             if (_wQGlow != null) _wQGlow.color = UITheme.Thin.WithA(UITheme.Thin.Gold, usable ? 0.3f + 0.15f * breathe : 0f);
         }

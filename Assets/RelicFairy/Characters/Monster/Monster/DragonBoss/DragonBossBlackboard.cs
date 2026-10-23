@@ -25,6 +25,9 @@ public class DragonBossBlackboard : BossAttackBlackboard
     /// </summary>
     public enum DragonElement { Fire, Ice, Thunder, Abyss }
 
+    /// <summary>연계 둘째 칸 피해 배율 — 리치와 같은 규칙(사슬 하나를 다 맞아도 HP 절반을 넘지 않게 · 10-22 E3 D2).</summary>
+    public const float ChainLinkDamageMult = 0.8f;
+
     public bool HasSummonedAt70;
     public bool HasSummonedAt40;
     public bool HasSummonedAt10;
@@ -73,8 +76,24 @@ public class DragonBossBlackboard : BossAttackBlackboard
     public float ElementConcertCooldown;    // DL2 원소 합주
     public float VoidFallCooldown;          // DL3 공허 낙하
     public float AbyssDiveCooldown;         // DL4 심연 급강하
+
+    // ── 꼬리 휩쓸기 (10-22 E3 D5) ───────────────────────────
+    /// <summary>플레이어가 지상 화룡의 등 뒤 부채꼴에 머문 시간(초) — 꼬리 휩쓸기 발동 조건. 벗어나면 0.</summary>
+    public float RearStaySeconds;
+    public float TailSweepCooldown;
     /// <summary>공허 낙하 · 검은 태양 동안 수동 운석을 멈춘다 — 기둥 뒤 · 날개 아래에 숨은 자리에 운석이 떨어지지 않게.</summary>
     public bool  PassiveMeteorSuppressed;
+
+    // ── 연계 사슬 (10-22 E3 D2) ─────────────────────────────
+    /// <summary>지금 패턴이 연계 둘째 칸(직전 패턴의 followUp으로 이어짐) — 피해 ×<see cref="ChainLinkDamageMult"/> · 더 잇지 않는다(사슬은 두 칸까지).</summary>
+    public bool    IsChainLink;
+    /// <summary>폭풍 날개가 남긴 가운데 안전 길(시작점 · 방향) — 이어지는 공중 물기 첫 입이 이 줄 위를 노린다. <see cref="SafeLaneUntil"/>(Time.time)까지.</summary>
+    public Vector3 SafeLaneOrigin;
+    public Vector3 SafeLaneDir;
+    public float   SafeLaneUntil;
+
+    /// <summary>연계 둘째 칸이면 <see cref="ChainLinkDamageMult"/>, 아니면 1.</summary>
+    public float ChainDamageScale => IsChainLink ? ChainLinkDamageMult : 1f;
 
     // ── 피격 방향 ─────────────────────────────────────────
     public enum HitDirection { Front, Back, Left, Right }
@@ -131,6 +150,7 @@ public class DragonBossBlackboard : BossAttackBlackboard
         if (ElementConcertCooldown  > 0f) ElementConcertCooldown  -= deltaTime;
         if (VoidFallCooldown        > 0f) VoidFallCooldown        -= deltaTime;
         if (AbyssDiveCooldown       > 0f) AbyssDiveCooldown       -= deltaTime;
+        if (TailSweepCooldown       > 0f) TailSweepCooldown       -= deltaTime;
     }
 
     public new void Reset()
@@ -154,7 +174,11 @@ public class DragonBossBlackboard : BossAttackBlackboard
         ElementConcertCooldown  = 0f;
         VoidFallCooldown        = 0f;
         AbyssDiveCooldown       = 0f;
+        RearStaySeconds         = 0f;
+        TailSweepCooldown       = 0f;
         PassiveMeteorSuppressed = false;
+        IsChainLink             = false;
+        SafeLaneUntil           = 0f;
         Poise                = MaxPoise;
         IsPoiseBroken         = false;
         LastHitDirection      = HitDirection.Front;

@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: GreatswordAnimation
   m_EditorClassIdentifier: Assembly-CSharp::WeaponAnimationSetSO
   useGuardCharge: 0
-  lightAttackAnimSpeed: 0.6
+  lightAttackAnimSpeed: 0.48
+  windupSpeedRatio: 0.6
   heavyAttackAnimSpeed: 1
   defaultComboWindowOpen: 0.5
   defaultComboWindowClose: 0.85
@@ -462,7 +463,7 @@ MonoBehaviour:
       aimAssistStrength: 1
       aimRotationDuration: 0.1
     - baseClipName: QSkill_01
-      addressableKey: GreatswordQSkill
+      addressableKey: GreatswordAirHeavy
       actionType: 3
       comboIndex: 0
       isPlunge: 0

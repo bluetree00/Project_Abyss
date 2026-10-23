@@ -65,8 +65,17 @@ public class LichMagicBoltPatternSO : BossPatternSO
     public float splitWarn     = 0.45f;
     public float splitDamage   = 0.5f;
 
+    [Header("M1 — 연계 짧은 판 (10-22 E2 L1 「도약 → 탄막 2발」)")]
+    [Tooltip("연계로 이어 쏠 때 탄 수")]
+    [SerializeField] private int   _chainBoltCount    = 2;
+    [Tooltip("연계로 이어 쏠 때 시전 시간(초) — 앞 패턴에 바로 잇는다")]
+    [SerializeField] private float _chainCastDuration = 0.4f;
+
     // ── 런타임 ───────────────────────────────────────────
     private LichMagicBoltState _state;
+
+    public int   ChainBoltCount    => _chainBoltCount;
+    public float ChainCastDuration => _chainCastDuration;
 
     public override void Initialize(BossPatternContext ctx) => _state = new LichMagicBoltState(this);
     public override void OnRecycled()                       => _state = new LichMagicBoltState(this);
@@ -76,6 +85,15 @@ public class LichMagicBoltPatternSO : BossPatternSO
         if (ctx.Ctx.Runtime.PlayerTarget == null) return false;
         var lichBB = (ctx.Boss as LichMonster)?.LichBB;
         if (lichBB != null && lichBB.MagicBoltCooldown > 0f) return false;
+        return Vector3.Distance(ctx.Ctx.Transform.position, ctx.Ctx.Runtime.PlayerTarget.position) <= maxRange;
+    }
+
+    /// <summary>연계(10-22 E2 L1 「공간 도약 → 성흔 탄막 2발」) — 1페이지 사슬이다. 앞 패턴의 일부라 자기 쿨다운은 보지 않는다.</summary>
+    public override bool CanFollowUp(BossPatternContext ctx)
+    {
+        if (ctx.Ctx.Runtime.PlayerTarget == null) return false;
+        var lichBB = (ctx.Boss as LichMonster)?.LichBB;
+        if (lichBB != null && lichBB.Page != 1) return false;
         return Vector3.Distance(ctx.Ctx.Transform.position, ctx.Ctx.Runtime.PlayerTarget.position) <= maxRange;
     }
 
@@ -123,6 +141,8 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
     private GameObject _castFlare;
     private Vector3    _prevPlayer;
     private Vector3    _playerVel;     // 수평 속도(부드럽게) — 마지막 탄의 앞을 노릴 때
+    private int        _boltCount;     // 이번 연발 탄 수 — 연계 짧은 판이면 줄인다(10-22 E2 L1)
+    private float      _castDuration;
 
     public LichMagicBoltState(LichMagicBoltPatternSO data) : base(data) { }
 
@@ -135,25 +155,30 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
         _prevPlayer = LichPatternUtil.PlayerFloorPos(ctx);
         _bolts.Clear();
 
+        // 연계로 이어 쏠 때(10-22 E2 L1 「도약 → 탄막 2발」) — 짧은 판: 탄 수 · 시전을 줄인다
+        bool chain    = LichPatternUtil.Lich(ctx)?.IsChainLink == true;
+        _boltCount    = chain ? Mathf.Max(1, Data.ChainBoltCount) : Data.boltCount;
+        _castDuration = chain ? Data.ChainCastDuration : Data.castDuration;
+
         ctx.Animator?.CrossFade("MagicBolt", 0.1f);
 
         var lich = LichPatternUtil.Lich(ctx);
         var mc   = lich?.MovementController;
         mc?.SetLocked(true);
 
-        LichPatternUtil.FaceInstant(ctx, LichPatternUtil.PlayerFloorPos(ctx));
+        LichPatternUtil.FaceToward(ctx, LichPatternUtil.PlayerFloorPos(ctx));   // 탄은 손 → 표적(몸 방향 무관) — 즉시 회전 대신 초당 720°(10-18)
 
         // 시전 내내 옆으로 흘러간다 — 한자리에 선 포대가 아니라 움직이며 쏘는 시전자.
         if (mc != null && Data.driftDistance > 0f)
         {
-            float total = Data.castDuration + Data.boltCount * Data.boltInterval + Data.endDuration;
+            float total = _castDuration + _boltCount * Data.boltInterval + Data.endDuration;
             Vector3 side = ctx.Transform.right * (Random.value < 0.5f ? -1f : 1f);
             mc.ScriptMove(ctx.Transform.position + side * Data.driftDistance, total, 0f, facePlayer: true);
         }
 
         Transform hand = lich != null ? lich.CastPoint : ctx.Transform;
         _castFlare = LichVfx.PlayLoop(LichVfxSlot.CastFlare, hand.position, hand.rotation, 1f, hand);
-        lich?.PulseBook(Data.castDuration);
+        lich?.PulseBook(_castDuration);
         LichSfx.Play(LichSfxSlot.CastShort, hand.position);
     }
 
@@ -167,7 +192,7 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
         switch (_phase)
         {
             case Phase.Cast:
-                if (_timer >= Data.castDuration)
+                if (_timer >= _castDuration)
                 {
                     LichVfx.Stop(ref _castFlare, 0.3f);
                     _phase = Phase.Volley;
@@ -176,12 +201,12 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
                 break;
 
             case Phase.Volley:
-                if (_fired < Data.boltCount && _timer >= Data.boltInterval)
+                if (_fired < _boltCount && _timer >= Data.boltInterval)
                 {
                     _timer = 0f;
                     Fire(ctx);
                 }
-                if (_fired >= Data.boltCount && _bolts.Count == 0)
+                if (_fired >= _boltCount && _bolts.Count == 0)
                 {
                     _phase = Phase.End;
                     _timer = 0f;
@@ -228,14 +253,14 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
         Transform hand = lich != null ? lich.CastPoint : ctx.Transform;
 
         Vector3 target = LichPatternUtil.PlayerFloorPos(ctx);
-        if (_fired == Data.boltCount && Data.lastBoltLead > 0f)
+        if (_fired == _boltCount && Data.lastBoltLead > 0f)
         {
             // 마지막 탄 — 달아나는 방향 앞. 제자리면 자리 그대로.
             Vector3 lead = Vector3.ClampMagnitude(_playerVel * (Data.flightTime * Data.lastBoltLead), Data.lastBoltLeadMax);
             var mc = LichPatternUtil.Mover(ctx);
             target = LichPatternUtil.OnFloor(ctx, mc != null ? mc.ClampToArena(target + lead) : target + lead);
         }
-        LichPatternUtil.FaceInstant(ctx, target);
+        LichPatternUtil.FaceToward(ctx, target);   // 탄마다 즉시 162° 돌던 것(10-18 실측) — 초당 720°로
         ctx.Animator?.CrossFade("MagicBolt", 0.05f, 0, 0.35f);   // 연발마다 손을 다시 뻗는다
 
         Vector3 from = hand.position;
@@ -243,7 +268,7 @@ public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
         var rot = dir.sqrMagnitude > 0.001f ? Quaternion.LookRotation(dir) : ctx.Transform.rotation;
 
         // 악몽 모드 — 마지막 한 발만 속박탄(같은 연발의 다음 탄이 뒤따르지 않게). 조건이 안 되면 평소 탄.
-        bool bind = _fired == Data.boltCount && BindBoltReady(ctx);
+        bool bind = _fired == _boltCount && BindBoltReady(ctx);
 
         LichVfx.Play(LichVfxSlot.BoltMuzzle, from, rot);
         LichSfx.Play(LichSfxSlot.BoltFire, from);

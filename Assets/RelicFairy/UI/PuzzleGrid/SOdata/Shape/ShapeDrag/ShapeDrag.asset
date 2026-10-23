@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a6d8738199e09d94ea0cd739576d63be, type: 3}
   m_Name: ShapeDrag
   m_EditorClassIdentifier: 
-  selectedScale: {x: 1.1, y: 1.1, z: 1}
+  selectedScale: {x: 1, y: 1, z: 1}
   pointerOffset: {x: 0, y: 0}

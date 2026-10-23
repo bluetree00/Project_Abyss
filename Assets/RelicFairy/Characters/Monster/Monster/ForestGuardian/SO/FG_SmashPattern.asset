@@ -21,6 +21,9 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: smash
   breakOverride: 4
+  followUp: {fileID: 11400000, guid: 295c167eb8b9f9748a02ff1674b1bb6b, type: 2}
+  followUpLateOnly: 0
+  followUpCooldown: 10
   range: 5
   warningDuration: 0.9
   impactDelay: 0.7

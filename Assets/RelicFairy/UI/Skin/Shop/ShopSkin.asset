@@ -44,3 +44,30 @@ MonoBehaviour:
   rerollPanel: {fileID: 21300000, guid: 1540b8f7ae825be4ea229cabfc87d329, type: 3}
   namePlate: {fileID: 21300000, guid: 16bfa79c69596934392cd371ffc2ace5, type: 3}
   pricePill: {fileID: 21300000, guid: 78fa1954c76a52943a234f3b987e5ede, type: 3}
+  windowFrame: {fileID: 21300000, guid: 47a451d3362386346b1c5301e041bf82, type: 3}
+  peddlerPortrait: {fileID: 21300000, guid: d4eae986c73bb11468b80fd849649d2f, type: 3}
+  blessingEmblem: {fileID: 21300000, guid: 9981d1cf11504794c874c38fe23d7930, type: 3}
+  blessingIcons:
+  - {fileID: 21300000, guid: aa05dd8c57b02314db69752f3d592840, type: 3}
+  - {fileID: 21300000, guid: fe1db9f034f624749acc4ecf6b7f3254, type: 3}
+  - {fileID: 21300000, guid: c5489b9a08e52cd438b3ad33de939b16, type: 3}
+  - {fileID: 21300000, guid: cb56108596fe323409e580e2b2dcb7a8, type: 3}
+  - {fileID: 21300000, guid: b0bbe8d0799605841bdbde5417d88303, type: 3}
+  - {fileID: 21300000, guid: 7ed87366b6b737341853221cbfd7ba22, type: 3}
+  - {fileID: 21300000, guid: 91c00731ff01bf343b04af2490e729cd, type: 3}
+  - {fileID: 21300000, guid: 23d8700f9cbe8df4c847c3a86da66aba, type: 3}
+  - {fileID: 21300000, guid: a4013a85ef39d174da3bca5ea1a7cc66, type: 3}
+  - {fileID: 21300000, guid: 7ed87366b6b737341853221cbfd7ba22, type: 3}
+  - {fileID: 21300000, guid: 08bae4badf0c4a444b9e3fcd398158f7, type: 3}
+  - {fileID: 21300000, guid: b14461fae5ee7c942ba2c44eaf9ad5c5, type: 3}
+  - {fileID: 21300000, guid: e387f64504356aa4b905a70921dcc7ca, type: 3}
+  - {fileID: 21300000, guid: 30eb452fba93c0343ac6bedaa4d83e8e, type: 3}
+  lockClosed: {fileID: 21300000, guid: 78d4c61716537e54aaa3e194a6602288, type: 3}
+  lockOpen: {fileID: 21300000, guid: 0012ad2292bfd514baf9a794188ee4d4, type: 3}
+  rerollIcon: {fileID: 21300000, guid: 18768ae2be03c05469c6696e002854a9, type: 3}
+  hpIcon: {fileID: 21300000, guid: c5489b9a08e52cd438b3ad33de939b16, type: 3}
+  potionIcon: {fileID: 21300000, guid: c3996fb4b7fc34447bc57bf1da1d194c, type: 3}
+  storageIcon: {fileID: 21300000, guid: f683b423b684e9749a70e6b57d6c0bae, type: 3}
+  boardIcon: {fileID: 21300000, guid: e0b7983842a02174a8d2e08d3477a000, type: 3}
+  exchangeEmblem: {fileID: 21300000, guid: 617f0ab36353be94dab358976e227d3a, type: 3}
+  oreIcon: {fileID: 21300000, guid: deeae6477a3fbc248b47c610832e3ba8, type: 3}

@@ -2,7 +2,7 @@
   "equipments": [
     {
       "weapon_id": "T1_Katana",
-      "weapon_name": "기본 카타나",
+      "weapon_name": "칼리번",
       "weapon_type": "Katana",
       "rarity": "Common",
       "tier": 1,
@@ -35,7 +35,7 @@
     },
     {
       "weapon_id": "T2_Katana",
-      "weapon_name": "강화된 카타나",
+      "weapon_name": "칼리번 Ⅱ",
       "weapon_type": "Katana",
       "rarity": "Rare",
       "tier": 2,
@@ -68,7 +68,7 @@
     },
     {
       "weapon_id": "T3_Katana",
-      "weapon_name": "전설의 카타나",
+      "weapon_name": "칼리번 Ⅲ",
       "weapon_type": "Katana",
       "rarity": "Epic",
       "tier": 3,
@@ -101,7 +101,7 @@
     },
     {
       "weapon_id": "T1_Greatsword",
-      "weapon_name": "기본 대검",
+      "weapon_name": "클라렌트",
       "weapon_type": "Greatsword",
       "rarity": "Common",
       "tier": 1,
@@ -134,7 +134,7 @@
     },
     {
       "weapon_id": "T2_Greatsword",
-      "weapon_name": "강화된 대검",
+      "weapon_name": "클라렌트 Ⅱ",
       "weapon_type": "Greatsword",
       "rarity": "Rare",
       "tier": 2,
@@ -167,7 +167,7 @@
     },
     {
       "weapon_id": "T3_Greatsword",
-      "weapon_name": "전설의 대검",
+      "weapon_name": "클라렌트 Ⅲ",
       "weapon_type": "Greatsword",
       "rarity": "Epic",
       "tier": 3,

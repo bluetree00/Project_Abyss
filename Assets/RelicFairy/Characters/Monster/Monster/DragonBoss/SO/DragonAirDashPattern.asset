@@ -17,6 +17,9 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: air_dash
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: d6ad2cdb070cf7746b9e482391a44610, type: 2}
+  followUpLateOnly: 0
+  followUpCooldown: 10
   _cooldown: 12
   _takeoffDuration: 0.55
   _takeoffHeight: 3

@@ -168,9 +168,14 @@ public partial class UI_CovenantAssemble : UI_Popup
     /// <summary>결과 대기. 반환 = 조립된 서약 id(취소 시 null).</summary>
     public UniTask<string> WaitForResultAsync() => _tcs.Task;
 
-    /// <summary>ESC(취소)로 닫힐 때만 닫기 소리 — 맺기로 닫히면 맺기 소리가 이미 났다.</summary>
+    /// <summary>
+    /// ESC(취소)로 닫힐 때만 닫기 소리 — 맺기로 닫히면 맺기 소리가 이미 났다.
+    /// 쓰기 판에서 ESC는 고쳐 쓰기를 먼저 푼다 — 그다음 ESC가 창을 닫는다(10-18). 그 프레임에 ESC가 눌린 닫기(EscKeyListener 길)만 가른다 —
+    /// 새긴다 · 다른 닫기 길은 그대로 닫힌다.
+    /// </summary>
     public override void ClosePopupUI()
     {
+        if (!_forged && Input.GetKeyDown(KeyCode.Escape) && LeaveRewrite()) return;
         if (!_forged) Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);
         base.ClosePopupUI();
     }
@@ -234,7 +239,9 @@ public partial class UI_CovenantAssemble : UI_Popup
         }
         if (skin.resultScroll != null)
         {
-            SkinImage(_prismBg, skin.resultScroll);
+            // 가운데 열은 책 양피지 위에 바로 앉힌다 — 예전엔 책(두루마리) 안에 또 두루마리 그림 · 그 위에 흐린 크림 판을 덧대
+            // 톤이 따로 놀았다(10-16 사용자 「중앙 텍스트를 보는 곳이 톤도 다르고 굉장히 어색해」). 쓰기 판과 같은 1px 선 틀(EnsurePlate).
+            if (_prismBg != null) _prismBg.enabled = false;
             if (_prismBorder != null) _prismBorder.enabled = false;
             // 결과 두루마리는 밝은 종이다 — 구 아트(어두운 프리즘)에 맞춘 상아색 글자가 종이 위에서 사라졌다.
             _resultOnPaper = true;
@@ -493,8 +500,7 @@ public partial class UI_CovenantAssemble : UI_Popup
     private const float  LabelCol     = 90f;   // 항목 이름 열 폭(px) — 값은 그 오른쪽에서 시작하고 줄바꿈해도 같은 자리로
     private const string HintSizePct  = "85%"; // 자리표시 글자 = 20의 85% ≈ 17
     private const float  SlotPad      = 10f;   // 자리표시 글자의 왼쪽 여백(점선 안쪽)
-    // 두루마리 안쪽은 종이 결이 글 밑에 깔려 대비가 들쭉날쭉했다 — 평평한 밝은 양피지 판을 깐다(설계서 1장 3).
-    private static readonly Color PlateInk = new(0.94f, 0.90f, 0.81f, 0.72f);
+    private Image _plateFrame;   // 가운데 문장 칸 1px 테 — 원인 · 효과를 다 고르면(맺을 준비) 짙은 금(RowLineInk), 아니면 옅은 먹
     private static readonly Color SlotInk  = new(0.165f, 0.110f, 0.055f, 0.45f);
     private static readonly Color RuleInk  = new(0.165f, 0.110f, 0.055f, 0.22f);
 
@@ -541,11 +547,12 @@ public partial class UI_CovenantAssemble : UI_Popup
         t.margin           = Vector4.zero;
     }
 
-    /// <summary>두루마리 안쪽 밝은 판 — 두루마리 아트 바로 위 · 글 아래에 한 번 깐다.</summary>
+    /// <summary>가운데 문장 칸의 1px 선 틀 — 글 아래에 한 번 깐다(쓰기 판 줄과 같은 ThinBox · 10-16 크림 판 대신).</summary>
     private void EnsurePlate(RectTransform column)
     {
-        const string name = "PaperPlate(Runtime)";
-        if (column.Find(name) != null) return;
+        const string name = "PaperFrame(Runtime)";
+        var found = column.Find(name);
+        if (found != null) { _plateFrame = found.GetComponent<Image>(); return; }
         var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         var rt = (RectTransform)go.transform;
         rt.SetParent(column, false);
@@ -557,11 +564,8 @@ public partial class UI_CovenantAssemble : UI_Popup
         rt.anchorMax = PlateMax;
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
-        var img = go.GetComponent<Image>();
-        img.sprite        = UIProceduralSprites.RoundedRect(radius: 6f, feather: 10f);   // 가장자리가 종이에 스며든다
-        img.type          = Image.Type.Sliced;
-        img.color         = PlateInk;
-        img.raycastTarget = false;
+        _plateFrame = go.GetComponent<Image>();
+        StyleBox(_plateFrame, ThinBox, HeadRuleInk);
     }
 
     /// <summary>자리표시 점선 칸 — 글 상자보다 사방으로 조금 크게. 처음엔 꺼 둔다.</summary>
@@ -754,6 +758,7 @@ public partial class UI_CovenantAssemble : UI_Popup
         CovenantPalette.EffectDef ed = default;
         hasCause  = hasCause  && CovenantPalette.TryGetCause(_causes[_selCause].id, out cd);
         hasEffect = hasEffect && CovenantPalette.TryGetEffect(_effects[_selEffect].id, out ed);
+        if (_plateFrame != null) _plateFrame.color = hasCause && hasEffect ? RowLineInk : HeadRuleInk;   // 금 = 준비(맺을 수 있다)
 
         // 두루마리가 밝은 종이면(개편 스킨) 잉크 · 적갈, 어두운 판이면(구 아트) 상아 · 금.
         string num   = _resultOnPaper ? UI_AssembleCard.NumOnParchment : UIKeywordInk.OnDark;

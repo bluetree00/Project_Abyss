@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 91d4c388d300c464590374d719cac15c, type: 3}
+  m_Name: DragonTailSweepPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.DragonTailSweepPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  _vfxFaceForward: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  followUp: {fileID: 0}
+  followUpLateOnly: 1
+  followUpCooldown: 14
+  liberatedOnly: 0
+  _rearAngle: 120
+  _rearReach: 4
+  _rearStaySeconds: 1.5
+  _cooldown: 8
+  _telegraphSeconds: 0.6
+  _radius: 5
+  _damageMult: 1.2
+  _knockbackMult: 1
+  _endPoseSeconds: 0.6
+  _tailStateName: UAttack Tail L
+  _fallbackStateName: ClawAttackL

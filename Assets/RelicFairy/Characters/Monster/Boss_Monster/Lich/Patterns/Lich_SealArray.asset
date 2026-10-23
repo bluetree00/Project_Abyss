@@ -21,6 +21,8 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
+  followUp: {fileID: 11400000, guid: 798f493c0019cb444b0884fb7917cdef, type: 2}
+  followUpLateOnly: 0
   patternCooldown: 14
   openDuration: 1.5
   activeDuration: 6
@@ -29,7 +31,7 @@ MonoBehaviour:
   reverseWarn: 0.5
   endDuration: 0.8
   recoveryDuration: 0.4
-  spokeCount: 6
+  spokeCount: 8
   arrayRadius: 10
   spokeWidth: 2
   damageMultiplier: 0.7

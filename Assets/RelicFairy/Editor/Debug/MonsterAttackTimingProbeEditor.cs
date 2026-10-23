@@ -218,6 +218,8 @@ public static class MonsterAttackTimingProbeEditor
         var glintField = typeof(MonsterBase).GetField("_attackGlintShown", Inst);
         bool glintPrev = false, glintShot = false;
         float glintAt = -1f;
+        float teleAt = -1f;   // 10-19 ⑪ 바닥 예고가 처음 뜬 순간(공격 준비에서 미리 뜰 수 있다)
+        var teleSeen = new HashSet<int>();   // 예고는 하나씩 새로 만든다 — 앞 예고가 사라지는 중에 뜬 새 예고도 센다
         var bones = new List<Transform>();
         foreach (var smr in m.GetComponentsInChildren<SkinnedMeshRenderer>())
             foreach (var b in smr.bones) if (b != null && !bones.Contains(b)) bones.Add(b);
@@ -250,6 +252,9 @@ public static class MonsterAttackTimingProbeEditor
                 Capture(Camera.main, $"Temp/ui_shots/MT_{name}_glint.png");
             }
             glintPrev = glintNow;
+            foreach (var tg in UnityEngine.Object.FindObjectsByType<MonsterTelegraph>(FindObjectsSortMode.None))
+                if (teleSeen.Add(tg.GetInstanceID()) && teleAt < 0f) teleAt = Time.time;
+            if (s_outlineCap) ApplyTeleStyle(attacks % 3);   // 10-22 ⑧ 예고 비교 — A 옛 선만 · B 차오르는 면 · C 면 + 붉은빛
             float dt = Mathf.Max(Time.deltaTime, 1e-4f);
             if (atk && !inAtk)
             {
@@ -280,7 +285,7 @@ public static class MonsterAttackTimingProbeEditor
                     foreach (var t in UnityEngine.Object.FindObjectsByType<MonsterTelegraph>(FindObjectsSortMode.None))
                         if (t != null) { tele++; shapes += t.name.Replace("[MonsterTelegraph.", "").Replace("]", "") + " "; }
                     sb.AppendLine($"   {name} 준비 0.2초 — 옛 외곽선 {outlines}개 · 통일 예고 {tele}개({shapes.Trim()})");
-                    CaptureClose(m, $"Temp/ui_shots/MO_{name}_{pattern}_{attacks}.png");
+                    CaptureClose(m, $"Temp/ui_shots/MO_{name}_{pattern}_{attacks}{"ABC"[attacks % 3]}.png");
                 }
                 if (tDmg < 0f && rt != null && rt.AttackHitDealt)
                 {
@@ -293,12 +298,34 @@ public static class MonsterAttackTimingProbeEditor
             {
                 attacks++;
                 string lead = tDmg >= 0f && glintAt > 0f ? $"{t0 + tDmg - glintAt:0.00}" : "없음";
-                sb.AppendLine($"{name,-13} {pattern,-12} 피해 {Fmt(tDmg)} (애니 {ntDmg:0.00}) · 휘두름 정점 {Fmt(tPeak)} (애니 {ntPeak:0.00} · {peak:0.0} m/s) · 반짝임 {lead} · 길이 {Time.time - t0:0.00}");
+                string tlead = tDmg >= 0f && teleAt > 0f ? $"{t0 + tDmg - teleAt:0.00}" : "없음";
+                sb.AppendLine($"{name,-13} {pattern,-12} 피해 {Fmt(tDmg)} (애니 {ntDmg:0.00}) · 휘두름 정점 {Fmt(tPeak)} (애니 {ntPeak:0.00} · {peak:0.0} m/s) · 반짝임 {lead} · 예고 {tlead} · 길이 {Time.time - t0:0.00}");
                 glintAt = -1f;
+                teleAt = -1f;
             }
             inAtk = atk;
         }
         if (attacks == 0) sb.AppendLine($"{name,-13} 공격 0회(8초) — 상태:{states}");
+    }
+
+    // 10-22 ⑧ 예고 비교 — 같은 몬스터의 공격마다 모양을 바꿔 찍는다(A = 10-21까지의 선만 · B = 차오르는 면 · C = B를 붉은빛으로)
+    private static readonly HashSet<int> s_tinted = new();
+    private static readonly Color TeleRed = new(1f, 0.3f, 0.22f, 1f);
+
+    private static void ApplyTeleStyle(int style)
+    {
+        var colorF = typeof(MonsterTelegraph).GetField("_color", Inst);
+        foreach (var t in UnityEngine.Object.FindObjectsByType<MonsterTelegraph>(FindObjectsSortMode.None))
+        {
+            if (t == null) continue;
+            foreach (Transform c in t.transform)
+                if (c.name == "Fill" || c.name == "Face") c.gameObject.SetActive(style != 0);
+            if (style == 2 && colorF != null && s_tinted.Add(t.GetInstanceID()))
+            {
+                var c0 = (Color)colorF.GetValue(t);
+                colorF.SetValue(t, new Color(TeleRed.r, TeleRed.g, TeleRed.b, c0.a));
+            }
+        }
     }
 
     /// <summary>9: 플레이어와 몬스터 사이를 옆 위에서 가까이 — 범위 외곽선 · 공격 이펙트 확인용(게임 카메라는 이름표에 가린다).</summary>

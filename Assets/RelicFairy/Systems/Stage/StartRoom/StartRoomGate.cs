@@ -90,6 +90,7 @@ public class StartRoomGate : MonoBehaviour
     // 봉인 석문(Gothic) — 스타트 방 모드에서 준비되면 위로 올라가며 열림. 절차 방 게이트와 일관.
     private Transform       _sealDoor;
     private const float     SealDoorMeshW = 7f;
+    private const float     MaxDoorStretch = 1.6f;   // 문짝 가로 늘림 상한 — 넘으면 문 무늬가 눈에 띄게 퍼진다
     private const float     SealDoorMeshH = 11.5f;
 
     private bool _startCorridorBuilt;
@@ -134,6 +135,19 @@ public class StartRoomGate : MonoBehaviour
         ResizeTriggerCollider();
 
         ApplyCategoryColor();
+        ResizeGate();
+    }
+
+    /// <summary>
+    /// 대기방 문 개구부의 실제 폭(벽 사이 Floor 칸 수 × 칸 크기) — 10-16 사용자 「문보다 입구 프레임이 커서 어색해」.
+    /// 예전엔 기본 5 m라 더 넓은 개구부에서 문 · 통로가 좁아 옆으로 허공이 보였다. 문 · 통로 · 통과 판정 · 문틀이 이 폭을 쓴다.
+    /// 석문 · 통로 · 문틀은 첫 Update 뒤에 서므로 생성 직후(CreateStartRoomGates) 부르면 된다.
+    /// </summary>
+    public void ConfigureOpening(float width)
+    {
+        if (width <= 0.01f) return;
+        _gateWidth = width;
+        ResizeTriggerCollider();
         ResizeGate();
     }
 
@@ -236,12 +250,16 @@ public class StartRoomGate : MonoBehaviour
         // 게이트 원점은 개구부 바닥 가운데라, 문 뿌리를 개구부 중앙 높이에 둔다.
         var door = new GameObject("StartSealDoor");
         door.transform.SetParent(transform, false);
-        if (SealDoorFit.Place(door.transform, prefab, _gateWidth, _gateHeight, out _, out _))
+        if (SealDoorFit.Place(door.transform, prefab, _gateWidth, _gateHeight, out var fit, out _))
         {
             _sealDoorClosedPos = new Vector3(0f, _gateHeight * 0.5f, 0f);
             if (_injectedCorridorPalette != null && _injectedCorridorPalette.SealDoorMotion == SealDoorMotion.Swing)
                 _sealHinges = SealDoorFit.BuildHinges(door.transform);
             _sealDissolve = _injectedCorridorPalette != null && _injectedCorridorPalette.SealDoorMotion == SealDoorMotion.Dissolve;
+            // 문짝은 높이에 맞춘 균등 배율이라 개구부보다 좁으면 양옆에 틈이 남아 문틀만 커 보였다(10-16) — 가로만 늘려 채운다.
+            // 젖힘 문은 경첩을 돌릴 때 늘린 부모 때문에 문짝이 찌그러지므로 그대로 둔다.
+            if (_sealHinges == null && fit.size.x > 0.01f && fit.size.x < _gateWidth * 0.98f)
+                door.transform.localScale = new Vector3(Mathf.Min(_gateWidth / fit.size.x, MaxDoorStretch), 1f, 1f);
         }
         else
         {

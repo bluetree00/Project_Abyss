@@ -13,7 +13,8 @@ public static class CovenantVfxSetCreatorEditor
     private const string AssetPath = "Assets/RelicFairy/Systems/Covenant/Assembly/CovenantVfxSet.asset";
     private const string GroupName = "Effects";
     private const string Spells    = "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Projectiles/Explosion/";
-    private const string HovlRpg   = "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/RPG VFX Bundle/";
+    private const string SpellsSp  = "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Spells/";
+    private const string HovlRpg   ="Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/RPG VFX Bundle/";
     private const string HovlMagic = "Assets/RelicFairy/_Imported/EffectSource/Hovl Studio/Magic circles/Prefabs/";
     private const string Ssep1     = "Assets/RelicFairy/_Imported/EffectSource/SpecialSkillsEffectsPack/AllEffects/EffectsSet_1(NotScriptBased)/Effects/";
 
@@ -25,14 +26,19 @@ public static class CovenantVfxSetCreatorEditor
         // Spells Pack은 파티클 배율 모드가 Hierarchy가 아니지만, 배율 3에서 반경이 약 2.3~3배로 커지는 것을 쟀다(09-17 미리보기).
         // 10-11 톤 2차: 초신성(크림 = 서약 금 계열) · 기폭(태우고 피 흘리는 상태를 터뜨린다 = 불빛)은 빛깔이 뜻과 맞아 그대로 —
         // 대신 2초에 툭 잘리던 것은 재생기가 사그라들게 거둔다(ElementVfxPlayer.FadeTail).
-        ("supernova",    Spells + "Explosion_Light_2_LWRP.prefab",                1.0f, 3.4f, 2.0f, Orig, null),
-        ("detonate",     Spells + "Explosion _Fire_2_LWRP.prefab",                1.0f, 3.5f, 2.0f, Orig, null),
+        // 10-19 사용자 「서약 광역 피해 이펙트 리소스가 적절하지 않다(노란 구름)」 — Explosion_Light_2(공칭 0.78 m)를 4.5~7.1배로 키운 크림 구름이었다 →
+        // Explosion_Light(밝은 섬광 → 금빛 빛줄기가 사방으로 · 배율 1 최대 반경 1.75 m · 판정 3.5 m에 ×2 · 10-19 Covenant Nova Look 후보 9종 비교)
+        // 기준 반경은 보이는 양 90% 도달(실측 68)로 — 최대 반경 1.75로 두니 판정의 0.40배로 보였다 → 1.75 × 0.40 = 0.70
+        ("supernova",    Spells + "Explosion_Light_LWRP.prefab",                  1.0f, 0.70f, 2.0f, Orig, null),
+        // 기폭 — 작은 폭발(Explosion_Fire_2 · 공칭 실측 0.47 m)을 6~10배로 키우면 화면을 덮는 구름이 됐다 → 불티 고리(공칭 3 m · 10-18 실측 68)
+        // 경로에 「..」를 쓰면 LoadAssetAtPath가 못 읽어 프리팹이 비었다(10-19 실측 68 「이펙트 없음」) — 풀어 쓴 경로로
+        ("detonate",     SpellsSp + "Spell_Fire_4_LWRP.prefab",                   1.0f, 3.0f, 2.0f, Orig, null),
         // 대상 하나 기폭 — 옛 Hovl AOE Magic hit(빨강 · 누락 스크립트 경고)를 같은 기폭 폭발의 작은 판으로
         ("detonate_hit", Spells + "Explosion _Fire_2_LWRP.prefab",                0.35f, 0f,  1.0f, Orig, null),
         // 처형 — 단일 대상인데 Expansive Wave(5~10 m)가 광역으로 읽혔다 → 반(재생기가 입자 크기 모드 Hierarchy로 맞춘다)
         ("execute",      Spells + "Explosion_Arcane_LWRP.prefab",                 0.5f, 0f,   1.5f, Orig, null),
         // 제어 — 번개 폭발은 배율이 전부 따라간다(Hierarchy). 원래 반경 약 4.4m를 판정 반경에 맞춘다. 0.1초 9 m 섬광(Flash)은 끈다
-        ("stasis",       HovlRpg + "Random effect prefabs/Chain explosion.prefab", 1.0f, 4.4f, 1.2f, Orig, "Flash"),
+        ("stasis",       HovlRpg + "Random effect prefabs/Chain explosion.prefab", 1.0f, 1.76f, 1.2f, Orig, "Flash"),   // 공칭 4.4 → 판정의 0.40배로 보였다(10-18 실측 68)
         // 경제
         // 10-11 톤 점검: 반복 길이 1초 프리팹이라 1.2초면 1.0초에 한 번 더 터지고 잘렸다 → 한 바퀴 안(0.95)
         ("harvest",      HovlRpg + "Random effect prefabs/Gold dot.prefab",       0.5f, 0f,   0.95f, Orig, null),

@@ -107,6 +107,9 @@ public class RunProgressManager : MonoBehaviour
     /// 슬롯은 독립 세이브이므로 각성·심연의 정수·보스 봉인·퀘스트 완료까지 함께 버린다 —
     /// 남겨두면 "새 게임"인데 지난 플레이의 성장과 퀘스트가 그대로 붙어 있다. 다른 슬롯은 무영향.
     /// </summary>
+    /// <summary>슬롯 메타를 읽기만 한다(세이브 카드 표시용 · 없으면 null). 10-19 거점 카드가 「포션 0/3」 대신 진행 정보를 보이려고.</summary>
+    public UserGameData PeekMeta(int slot) => _metaStore.HasSave(slot) ? _metaStore.Load(slot) : null;
+
     public void ResetSlot(int slot)
     {
         _localStore.Delete(slot);
@@ -327,6 +330,9 @@ public class RunProgressManager : MonoBehaviour
         {
             var partWrapper = new RangedPartListWrapper();
             partWrapper.items.AddRange(parts.Equipped_);
+            partWrapper.reforges    = parts.ReforgeCount;
+            partWrapper.rerollsUsed = parts.RerollsUsed;
+            partWrapper.log.AddRange(parts.Log);
             d.rangedPartsJson            = JsonUtility.ToJson(partWrapper);
         }
 
@@ -392,6 +398,8 @@ public class RunProgressManager : MonoBehaviour
         d.weapon0AugmentAfterEvolve  = w0 != null && w0.augmentAfterEvolve;
         d.weapon1AugmentAfterEvolve  = w1 != null && w1.augmentAfterEvolve;
         d.meleeAugmentRerollsUsed    = MeleeAugmentDraft.RerollsPerRun - MeleeAugmentDraft.RerollsLeft;
+        d.weapon0ReforgeLog          = w0?.reforgeLog ?? string.Empty;
+        d.weapon1ReforgeLog          = w1?.reforgeLog ?? string.Empty;
     }
 
     private static WeaponData SlotFromSaved(GameRunSession s, int slot)

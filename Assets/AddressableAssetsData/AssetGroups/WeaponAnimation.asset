@@ -136,6 +136,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 488fa16aae690b54a8c32dfbe96c81af
+    m_Address: Katana_DodgeSlash
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4c2e4c472ee2e0345bf589fe9cb190a4
     m_Address: Assets/RelicFairy/_Imported/Grruzam Powerful Sword Animation(Great
       Sword, Katana)/Animation/M_Big_Sword/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_2.FBX

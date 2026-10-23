@@ -92,7 +92,7 @@ MonoBehaviour:
   - name: WebShot
     animationStateName: Attack01
     minDistance: 0
-    maxDistance: 2.6
+    maxDistance: 6
     priority: 2
     cooldown: 3
     damageDelay: 0.48
@@ -128,5 +128,5 @@ MonoBehaviour:
     hitVfxScale: 1
     hitVfxOffset: {x: 0, y: 0, z: 0}
   selectionMode: 0
-  engageDistance: 2.6
+  engageDistance: 5
   engageDistanceScale: 0.85

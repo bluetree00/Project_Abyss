@@ -74,7 +74,10 @@ public class UI_SaveSlotPanel : UI_Base
         base.Init();
 
         if (btnBack != null)
+        {
             btnBack.onClick.AddListener(Close);
+            StyleBackButton();
+        }
 
         if (btnConfirmDelete != null)
             btnConfirmDelete.onClick.AddListener(OnClickConfirmDelete);
@@ -91,6 +94,29 @@ public class UI_SaveSlotPanel : UI_Base
     // ─────────────────────────────────────────────────────────
     // Public Methods
     // ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 아래 버튼은 창을 닫고 제목 화면으로 돌아가는 것인데 「Exit」 아트라 게임 종료로 읽혔다(10-16 사용자 빌드 피드백) —
+    /// 확인 창 「취소」와 같은 보조 버튼(무채 베벨 · 220×56)으로 바꾸고 숨겨 둔 글에 「돌아가기」를 얇게 쓴다.
+    /// </summary>
+    private void StyleBackButton()
+    {
+        var label = btnBack.GetComponentInChildren<TMP_Text>(true);
+        if (label == null) return;
+        if (btnBack.transform is RectTransform rt) rt.sizeDelta = new Vector2(220f, 56f);
+        // 로비 메뉴용 그림 바꾸기(LobbyButtonHover)가 붙어 있어, 패널이 처음 켜질 때 Awake에서 Exit 그림을 되돌려 놓는다 — 뗀다.
+        if (btnBack.TryGetComponent<LobbyButtonHover>(out var hover)) Destroy(hover);
+        // 프리팹의 버튼은 targetGraphic이 비어 있다(10-16 실측 — 그래서 Exit 그림이 그대로 남았다) — 같은 오브젝트의 Image를 쓴다.
+        if (btnBack.TryGetComponent<Image>(out var art))
+        {
+            UITheme.StyleButton(art, UITheme.SecondaryTint);
+            art.preserveAspect = false;
+            btnBack.targetGraphic = art;
+        }
+        label.gameObject.SetActive(true);
+        label.text = "돌아가기";
+        UITheme.StyleThinText(label, UIWeight.Medium, 22f, UITheme.Thin.Ink, shadow: true);
+    }
 
     /// <summary>패널을 열고 슬롯 카드를 최신 세이브 데이터로 갱신한다.</summary>
     public override void Open()

@@ -8,7 +8,9 @@ using UnityEngine;
 /// <summary>
 /// S5 「층계 회랑」 — 보스 처치 뒤 다음 층으로 걸어 오른다(10-03 설계 · 구현 설계 §2). <see cref="ChapterGate"/>의 자리를 맡는다.
 /// <list type="number">
-/// <item>출구 자리(Next_Ch 마커 앞)의 벽이 디졸브로 걷히고, 출구 카메라가 닿으면 돌 디딤판 계단이 아래 단부터 한 단씩 바닥에서 솟는다 —
+/// <item>보스 광장 가운데에서 포탈 쪽으로 조금 앞(<see cref="TryArenaCenterSpot"/> — 10-18 사용자 「클리어 계단이 중앙 쪽에 나와야 통일감」, 네 아레나 같은 규칙).
+///       가운데가 막혔으면 예전처럼 출구 자리(Next_Ch 마커 앞) — 그 벽이 디졸브로 걷힌다.
+///       출구 카메라가 닿으면 돌 디딤판 계단이 아래 단부터 한 단씩 바닥에서 솟는다 —
 ///       층계참 · 꼭대기 돌 아치 · 아치 안 포탈이 차례로(10-10 사용자 「계단이 느낌 있게 생성되고 올라가는 느낌」, A안).
 ///       리소스 = <see cref="StairwaySetSO"/>(Addressables).
 ///       층계참 바닥 마법진 · 포탈 열림 분출 · 들어설 때 분출은 뺐다(10-11 이펙트 톤 점검 — 사용자 10-10 「다음 챕터 포탈 아래 이펙트」:
@@ -47,6 +49,13 @@ public sealed class ChapterStairway : MonoBehaviour
     private const float DoorTriggerSize = 3.2f;
     private const float LabelScale      = 0.012f; // 글자 ≈ 0.6 m — 0.02는 아치 위(카메라 높이 근처)에서 화면 위를 덮었다(10-10 실측)
     private const float LabelDilate     = 0.14f;  // Noto는 Thin 마스터 — 0.08은 이 크기(글자 ~1 m)에서 획이 끊겼다(10-02 실측) · 기본 0.18은 굵다
+    // 광장 가운데 자리(10-18) — 층계참 가운데 = 아레나 바닥 가운데에서 오르는 쪽(포탈 쪽)으로 이만큼.
+    // 디딤판 발치(−3.5 m) ~ 층계참 끝(+5.5 m)이 가운데를 감싸고 아치 · 포탈(+4.9 m)이 조금 앞에 선다.
+    private const float CenterAhead     = 4f;
+    private const float ClearLift       = 0.3f;   // 막힘 검사 상자 바닥 — 바닥 타일 · 낮은 장식(계단에 묻힌다)은 막힘으로 안 친다
+    private const float ClearHeight     = 6f;     // 막힘 검사 높이 — 층계참 2 m + 아치 3.8 m
+    private const float ClearSide       = 0.4f;   // 막힘 검사 폭 여유(한쪽) — 아치 기둥이 디딤판보다 조금 넓다
+    private const float FloorSlabMin    = 12f;    // 가로 · 세로 모두 이보다 넓은 콜라이더는 바닥 판으로 본다(막힘 아님)
 
     private static readonly Color WipeColor = new(0.05f, 0.04f, 0.09f, 1f);
     private static readonly AnimationCurve WipeCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
@@ -63,6 +72,7 @@ public sealed class ChapterStairway : MonoBehaviour
     // ── Private ───────────────────────────────────────────────────
     private Vector3      _outward;
     private Vector3      _rise;      // 계단이 오르는 방향 — 카메라가 보는 쪽(디딤판이 카메라 쪽에 놓여 보인다, 10-10 실측)
+    private bool         _centered;  // 광장 가운데에 섰다 — 걷을 출구 벽이 없다(10-18)
     private BlockPalette _lower;
     private BlockPalette _upper;
     private string       _nextScene;
@@ -77,15 +87,20 @@ public sealed class ChapterStairway : MonoBehaviour
     private Vector3      _doorFwd;
 
     // ── Public Methods ────────────────────────────────────────────
-    /// <param name="groundPos">출구 자리(바닥) — <see cref="BossExitPath"/>가 정한 곳.</param>
-    /// <param name="outward">아레나 밖 쪽(마커 방향) — 그쪽 벽을 걷는다. 계단이 오르는 방향은 카메라 기준으로 따로 고른다(<see cref="ChooseRise"/>).</param>
-    public static ChapterStairway Spawn(Vector3 groundPos, Vector3 outward, BlockPalette lower, BlockPalette upper, string nextScene)
+    /// <param name="groundPos">출구 자리(바닥) — <see cref="BossExitPath"/>가 정한 곳. 광장 가운데가 막혔을 때만 여기에 선다.</param>
+    /// <param name="outward">아레나 밖 쪽(마커 방향) — 출구 자리에 서면 그쪽 벽을 걷는다. 계단이 오르는 방향은 카메라 기준으로 따로 고른다(<see cref="ChooseRise"/>).</param>
+    /// <param name="arena">보스 아레나 — 바닥 가운데를 잰다(10-18). 없으면(격자 보스방) 출구 자리.</param>
+    public static ChapterStairway Spawn(Vector3 groundPos, Vector3 outward, Transform arena, BlockPalette lower, BlockPalette upper, string nextScene)
     {
+        var axis      = SnapToAxis(outward);
+        bool centered = TryArenaCenterSpot(arena, groundPos, out var pos, out var rise);
+        if (!centered) { pos = groundPos; rise = ChooseRise(groundPos, axis); }
         var go = new GameObject("@ChapterStairway");
-        go.transform.position = groundPos;
+        go.transform.position = pos;
         var s = go.AddComponent<ChapterStairway>();
-        s._outward   = SnapToAxis(outward);
-        s._rise      = ChooseRise(groundPos, s._outward);
+        s._outward   = axis;
+        s._rise      = rise;
+        s._centered  = centered;
         s._lower     = lower;
         s._upper     = upper;
         s._nextScene = nextScene;
@@ -121,8 +136,8 @@ public sealed class ChapterStairway : MonoBehaviour
             if (set == null || set.StepSlabs == null || set.StepSlabs.Length == 0)
                 throw new Exception($"계단 세트 없음 — {StairwaySetSO.Address}");
 
-            // 1) 출구 앞 벽을 걷는다(렌더만 디졸브 — 콜라이더는 남겨 허공으로 떨어지지 않게)
-            OpenWall();
+            // 1) 출구 앞 벽을 걷는다(렌더만 디졸브 — 콜라이더는 남겨 허공으로 떨어지지 않게). 광장 가운데면 걷을 벽이 없다(10-18).
+            if (!_centered) OpenWall();
 
             // 2) 돌계단 — 바닥 아래에 지어 두고(바닥이 가린다) 카메라가 닿으면 아래 단부터 한 단씩 솟는다
             var columns = new List<Transform>(StepCount);
@@ -358,6 +373,83 @@ public sealed class ChapterStairway : MonoBehaviour
         var center = ground - rise * (LandingDepth * 0.5f + run * 0.5f) + Vector3.up * 1.2f;
         return !Physics.CheckBox(center, new Vector3(StairWidth * 0.5f, 1f, run * 0.5f), Quaternion.LookRotation(rise, Vector3.up),
                                  LayerMask.GetMask("Wall"), QueryTriggerInteraction.Ignore);
+    }
+
+    /// <summary>
+    /// 광장 가운데 자리(10-18 ④) — 층계참 = 아레나 바닥 가운데에서 카메라 정면 축(오르는 쪽 = 포탈 쪽)으로 <see cref="CenterAhead"/>.
+    /// 출구 자리(Next_Ch 마커 앞)는 아레나마다 달라 숲은 광장 오른쪽(대각 마커), 화룡 · 기사는 먼 벽 앞에 섰다(사용자 사진 04).
+    /// 디딤판 · 층계참 자리에 바닥이 이어지고, 아치 높이까지 장식 · 벽이 없고, 발치가 플레이어와 걸어서 이어질 때만 true — 아니면 출구 자리.
+    /// </summary>
+    private static bool TryArenaCenterSpot(Transform arena, Vector3 exitGround, out Vector3 pos, out Vector3 rise)
+    {
+        pos = exitGround;
+        var cam = Camera.main;
+        rise = SnapToAxis(cam != null ? cam.transform.forward : Vector3.forward);
+        if (arena == null || !TryArenaFloorBounds(arena, out var floor)) return false;
+
+        int ground = LayerMask.GetMask("Ground");
+        Vector3 mid = new Vector3(floor.center.x, exitGround.y, floor.center.z) + rise * CenterAhead;
+        if (!Physics.Raycast(mid + Vector3.up * 3f, Vector3.down, out var hit, 6f, ground, QueryTriggerInteraction.Ignore))
+            return Reject(mid, "바닥 없음");
+        mid.y = hit.point.y;
+
+        if (!FootprintClear(mid, rise)) return Reject(mid, "디딤판 자리 바닥이 끊기거나 벽");
+        // 층계참 자리 바닥 — FootprintClear는 디딤판 쪽만 본다
+        var side = new Vector3(rise.z, 0f, -rise.x);
+        foreach (float t in new[] { -LandingDepth * 0.4f, LandingDepth * 0.4f })
+            foreach (float x in new[] { -StairWidth * 0.4f, StairWidth * 0.4f })
+            {
+                var p = mid + rise * t + side * x;
+                if (!Physics.Raycast(p + Vector3.up * 3f, Vector3.down, out var h, 6f, ground, QueryTriggerInteraction.Ignore)
+                    || Mathf.Abs(h.point.y - mid.y) > 0.6f)
+                    return Reject(mid, "층계참 자리 바닥이 끊김");
+            }
+
+        // 디딤판 발치 ~ 아치 뒤까지 · 바닥 위 ClearLift ~ 아치 높이 — 장식(기본 레이어) · 벽이 있으면 안 된다.
+        // 보스 · 플레이어 몸, 가로 · 세로 모두 넓은 판(장식 레이어로 깐 바닥 메시 — 화룡 아치 바닥 92 m)은 치지 않는다.
+        float back = LandingDepth * 0.5f + StepCount * StepRun, front = LandingDepth * 0.5f + 0.6f;
+        var center = mid + rise * ((front - back) * 0.5f) + Vector3.up * ((ClearLift + ClearHeight) * 0.5f);
+        var half   = new Vector3(StairWidth * 0.5f + ClearSide, (ClearHeight - ClearLift) * 0.5f, (front + back) * 0.5f);
+        var hits   = Physics.OverlapBox(center, half, Quaternion.LookRotation(rise, Vector3.up),
+                                        LayerMask.GetMask("Default", "Wall"), QueryTriggerInteraction.Ignore);
+        foreach (var c in hits)
+        {
+            if (c.GetComponentInParent<RelicFairy.Monster.MonsterBase>() != null || c.GetComponentInParent<PlayerController>() != null) continue;
+            var size = c.bounds.size;
+            if (size.x > FloorSlabMin && size.z > FloorSlabMin) continue;
+            return Reject(mid, $"막힘 {c.name}");
+        }
+
+        // 발치가 플레이어와 걸어서 이어지는가(기사 단상처럼 끊긴 곳이면 오를 수 없다)
+        var player = GameRunBootstrapper.Instance?.Run?.Player;
+        Vector3 foot = mid - rise * (back + 0.6f);
+        if (player != null && RelicFairy.Monster.BossArenaGuard.TryPullInside(foot, mid.y, player.transform, player.transform.position, null, out _))
+            return Reject(mid, "발치가 플레이어와 이어지지 않음");
+
+        pos = mid;
+        Debug.Log($"[ChapterStairway] 광장 가운데 {pos} · 바닥 가운데 {floor.center} · 오름 {rise}");
+        return true;
+
+        bool Reject(Vector3 at, string why)
+        {
+            Debug.LogWarning($"[ChapterStairway] 광장 가운데 {at} 못 씀({why}) — 출구 자리 {exitGround}");
+            return false;
+        }
+    }
+
+    /// <summary>아레나 바닥 범위 — Ground 콜라이더(트리거 제외)를 합친다(미니맵이 재는 바닥과 같은 기준).</summary>
+    private static bool TryArenaFloorBounds(Transform arena, out Bounds bounds)
+    {
+        int ground = LayerMask.NameToLayer("Ground");
+        bounds = default;
+        bool has = false;
+        foreach (var col in arena.GetComponentsInChildren<Collider>(false))
+        {
+            if (col.isTrigger || col.gameObject.layer != ground) continue;
+            if (!has) { bounds = col.bounds; has = true; }
+            else bounds.Encapsulate(col.bounds);
+        }
+        return has && bounds.size.x > 1f && bounds.size.z > 1f;
     }
 
     /// <summary>

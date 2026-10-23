@@ -43,11 +43,14 @@ public class LichSkeletonSummonPatternSO : BossPatternSO
     [Tooltip("한 바퀴의 1/4을 도는 시간 (초)")]
     public float orbitLeg    = 2.5f;
 
-    [Header("M6 — 약한 마력탄 (한 발)")]
+    [Header("M6 — 약한 마력탄")]
     public float boltAt        = 5f;
     public float boltWarn      = 0.6f;
     public float boltRadius    = 1.8f;
     public float boltDamage    = 0.6f;
+    [Tooltip("마력탄 수 — 둘째부터는 앞 탄이 떨어지고 boltGap초 뒤 그 순간 플레이어 자리(10-22 E2 R4)")]
+    public int   boltCount     = 1;
+    public float boltGap       = 2f;
 
     // ── 런타임 ───────────────────────────────────────────
     private LichSkeletonSummonState _state;
@@ -89,6 +92,9 @@ public class LichSkeletonSummonState : UnInterruptibleState<LichSkeletonSummonPa
     private int        _orbitStep;
     private bool       _boltFired;
     private bool       _boltLanded;
+    private int        _boltsFired;
+    private float      _boltStart;
+    private float      _boltLandedAt;
     private bool       _boltSignaled;
     private Vector3    _boltTarget;
     private GameObject _boltDisc;
@@ -106,6 +112,7 @@ public class LichSkeletonSummonState : UnInterruptibleState<LichSkeletonSummonPa
         _boltFired  = false;
         _boltLanded = false;
         _boltSignaled = false;
+        _boltsFired = 0;
         _spawnPoints.Clear();
         _spawned.Clear();
         _aliveCount = 0;
@@ -265,9 +272,14 @@ public class LichSkeletonSummonState : UnInterruptibleState<LichSkeletonSummonPa
 
     private void TickBolt(MonsterContext ctx)
     {
-        if (!_boltFired && _timer >= Data.boltAt)
+        float nextAt = _boltsFired == 0 ? Data.boltAt : _boltLandedAt + Data.boltGap;
+        if ((!_boltFired || _boltLanded) && _boltsFired < Data.boltCount && _timer >= nextAt)
         {
-            _boltFired  = true;
+            _boltFired    = true;
+            _boltLanded   = false;
+            _boltSignaled = false;
+            _boltStart    = _timer;
+            _boltsFired++;
             _boltTarget = LichPatternUtil.PlayerFloorPos(ctx);
             _boltDisc   = LichPatternUtil.PrepareTelegraph(
                 PatternGuideHelper.Disc(_boltTarget, Data.boltRadius, LichPatternUtil.Arcane), LichPatternUtil.Arcane);
@@ -282,14 +294,15 @@ public class LichSkeletonSummonState : UnInterruptibleState<LichSkeletonSummonPa
 
         if (!_boltFired || _boltLanded) return;
 
-        float t = Mathf.Clamp01((_timer - Data.boltAt) / Mathf.Max(0.05f, Data.boltWarn));
+        float t = Mathf.Clamp01((_timer - _boltStart) / Mathf.Max(0.05f, Data.boltWarn));
         // 차오르다 착탄 직전 빨강(신호) — 다른 리치 예고와 같은 단계(10-08 점검).
-        LichPatternUtil.TickTelegraph(_boltDisc, _timer - Data.boltAt, Data.boltWarn, BoltSignalSeconds, ref _boltSignaled);
+        LichPatternUtil.TickTelegraph(_boltDisc, _timer - _boltStart, Data.boltWarn, BoltSignalSeconds, ref _boltSignaled);
         if (_boltVfx != null)
             _boltVfx.transform.position = Vector3.Lerp(_boltFrom, _boltTarget, t) + Vector3.up * (4f * t * (1f - t));
         if (t < 1f) return;
 
-        _boltLanded = true;
+        _boltLanded   = true;
+        _boltLandedAt = _timer;
         LichVfx.Stop(ref _boltVfx);
         PatternGuideHelper.SetColor(_boltDisc, LichPatternUtil.Lethal);
         if (_boltDisc != null) Object.Destroy(_boltDisc, 0.12f);

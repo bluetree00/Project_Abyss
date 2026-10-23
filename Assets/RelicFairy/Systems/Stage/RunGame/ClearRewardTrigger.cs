@@ -39,7 +39,7 @@ public class ClearRewardTrigger : MonoBehaviour
     private int  _choiceRounds = 1;  // 3지선다를 몇 번 반복할지(챌린지 다중 보상)
 
     /// <summary>선택을 넘겼을 때 주는 원석 수(밸런스 값).</summary>
-    public const int SkipOreReward = 1;   // 룬 선택 팝업이 넘기기 버튼 옆에 같은 값을 표기한다
+    public const int SkipOreReward = 1;   // 넘기기 최소값 — 룬 선택 팝업은 보이는 카드 중 가장 높은 분해 값을 준다(UI_RuneSelectPopup.SkipOre · 10-19)
 
     private GameObject _promptGO;
     private GameObject _worldIndicatorGO;
@@ -278,7 +278,7 @@ public class ClearRewardTrigger : MonoBehaviour
             int len = (r == rounds - 1) ? _rewards.Count - start
                                         : Mathf.Min(perRound, _rewards.Count - start);
 
-            await ShowOneRuneChoiceAsync(_rewards.GetRange(start, len), ct);
+            await ShowOneRuneChoiceAsync(_rewards.GetRange(start, len), ct, r + 1, rounds);   // 다중이면 제목에 「보상 r/N」(10-19)
         }
     }
 
@@ -287,7 +287,7 @@ public class ClearRewardTrigger : MonoBehaviour
     /// 팝업 로드 실패 시 첫 후보를 자동 지급해 보상이 증발하지 않게 한다.
     /// </summary>
     private async UniTask ShowOneRuneChoiceAsync(
-        List<(RuntimeItemData data, ItemSO so)> candidates, System.Threading.CancellationToken ct)
+        List<(RuntimeItemData data, ItemSO so)> candidates, System.Threading.CancellationToken ct, int round = 0, int rounds = 0)
     {
         if (candidates == null || candidates.Count == 0) return;
 
@@ -305,14 +305,15 @@ public class ClearRewardTrigger : MonoBehaviour
         }
 
         var interactionTask = popup.WaitForInteractionAsync(ct);
-        popup.Setup(candidates, _run.ItemInventory);
+        popup.Setup(candidates, _run.ItemInventory, -1, round, rounds);
         await interactionTask;
 
         if (popup.Skipped)
         {
             // 넘기기 보상 — 원석. 죽은 화폐(RuneOre)에 생산 경로를 주는 지점이기도 하다.
-            _run.FuelBank?.Add(FuelKind.RuneOre, SkipOreReward);
-            Debug.Log($"[ClearRewardTrigger] 룬 선택 넘김 — 원석 +{SkipOreReward}");
+            int ore = Mathf.Max(SkipOreReward, popup.SkipOre);
+            _run.FuelBank?.Add(FuelKind.RuneOre, ore);
+            Debug.Log($"[ClearRewardTrigger] 룬 선택 넘김 — 원석 +{ore}");
             return;
         }
 
