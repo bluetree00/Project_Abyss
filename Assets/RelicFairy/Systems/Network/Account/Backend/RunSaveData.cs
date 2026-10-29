@@ -107,6 +107,7 @@ public class RunSaveData
     public string currentRoomPoolKey;
     public int    currentRoomKind;
     public int    currentRoomMirror;
+    public bool   currentRoomDanger;      // 10-29 F4 위험한 문 방(구버전 = false → 보통 정예)
     public bool   currentRoomCleared;     // 클리어 후 저장 지원 — 복원 시 몹 재스폰 방지 + 출구 개방
     public bool   currentRoomRewardPending; // 클리어 보상 미수령 — 복원 시 보상 재배치(수령했으면 false → 이중지급 차단)
     public int    crucibleRollIndex;      // 재련소 결정적 롤 소비 수 — 복원 시 스트림 진행(save-scum 방지)

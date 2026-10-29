@@ -3,6 +3,10 @@ using Cysharp.Threading.Tasks;
 
 public class WeaponEffectHandler
 {
+    // 속성 검(대검 R) 동안 타격 = 흰 섬광(색은 속성 점 타격이 낸다 · 10-26 사용자 「타격 이펙트 색상」)
+    private const string StrikeFlashKey = "SwordStrikeFlash";
+    private const float  StrikeFlashScale = 1.2f;
+
     private PlayerController _player;
 
     public WeaponEffectHandler(PlayerController player)
@@ -66,7 +70,12 @@ public class WeaponEffectHandler
 
                 if (_player == null || effectObj == null) return;
 
-                effectObj.transform.localScale = Vector3.one * e.scaleMultiplier;
+                // 대검 평타 범위(10-26 무기 개편) — 베기 이펙트를 키우면 그 안의 판정체도 같이 커진다(아래 SetBaseScale · 이펙트 = 판정)
+                bool basic = actionType == WeaponActionType.GroundLight || actionType == WeaponActionType.AirLight;
+                float reach = basic ? GreatswordReach.Basic(_player) : 1f;
+                effectObj.transform.localScale = Vector3.one * (e.scaleMultiplier * reach);
+                var element = basic ? GiantSwordBuff.ElementOf(_player) : null;
+                ElementSlashTint.Set(effectObj, element);   // 속성 검(대검 R) 동안 베기 = 속성 색 · 아니면 원래 색(풀 재사용 · 10-26 사용자 「검 이펙트 색상」)
 
                 // Local space → 소켓에 부착
                 if (e.space == WeaponAbilitySO.EffectSpace.Local)
@@ -138,6 +147,8 @@ public class WeaponEffectHandler
                     continue;
                 }
 
+                if (basic) ShadowPartner.NoteSlash(_player, e.payloadKey, spawnPos, spawnRot, e.scaleMultiplier * reach);   // 따라 하는 분신이 맞힐 때 같은 베기를 옅게(10-26)
+
                 // 소켓의 forward를 이동 방향으로 전달
                 Vector3 spawnForward = socketTransform.forward;
                 effectBehaviour.Initialize(e.behavior, playerTransform, e.lifeTimeMultiplier, spawnForward);
@@ -154,8 +165,8 @@ public class WeaponEffectHandler
                         embedded.knockbackMultiplier = s.knockbackMultiplier;
                         embedded.owner = _player.gameObject;
                         embedded.actionType = actionType;
-                        embedded.hitEffectKey = s.hitEffectKey;
-                        embedded.hitEffectScale = s.hitEffectScale;
+                        embedded.hitEffectKey = element != null ? StrikeFlashKey : s.hitEffectKey;   // 속성 검 = 흰 섬광 + 속성 점 타격(GiantSwordBuff) — 파란 대검 타격 대신
+                        embedded.hitEffectScale = element != null ? StrikeFlashScale : s.hitEffectScale;
                         embedded.attackId = _player.Combo != null ? _player.Combo.CurrentComboStep : 0;
 
                         var wd = _player.WeaponManager?.CurrentWeaponData;
@@ -270,8 +281,8 @@ public class WeaponEffectHandler
         if (cam == null) return _player.transform.position + _player.transform.forward * 10f;
 
         Ray ray = cam.ScreenPointToRay(UnityEngine.Input.mousePosition);
-        if (Physics.Raycast(ray, out var hit, 200f))
-            return hit.point;
+        if (PlayerAim.TryFloorPoint(ray, 200f, Physics.DefaultRaycastLayers, _player.transform.position.y, out var point))   // 머리 위 천장은 건너뜀(10-26)
+            return point;
 
         // 레이캐스트 실패 시 Y=0 평면과 교차
         var plane = new Plane(Vector3.up, Vector3.zero);
@@ -300,8 +311,9 @@ public class WeaponEffectHandler
         ci.actionType          = actionType;
         ci.payloadKey          = c.colliderPrefabKey;
         ci.duration            = c.duration;
-        ci.hitEffectKey        = s.hitEffectKey;
-        ci.hitEffectScale      = s.hitEffectScale;
+        bool tinted = (actionType == WeaponActionType.GroundLight || actionType == WeaponActionType.AirLight) && GiantSwordBuff.ElementOf(_player) != null;
+        ci.hitEffectKey        = tinted ? StrikeFlashKey : s.hitEffectKey;   // 속성 검 = 흰 섬광 + 속성 점 타격(GiantSwordBuff) — 파란 대검 타격 대신
+        ci.hitEffectScale      = tinted ? StrikeFlashScale : s.hitEffectScale;
         ci.attackId            = _player.Combo != null ? _player.Combo.CurrentComboStep : 0;
     }
 

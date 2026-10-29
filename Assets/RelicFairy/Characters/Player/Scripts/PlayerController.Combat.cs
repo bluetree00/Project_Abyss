@@ -11,6 +11,8 @@ public sealed partial class PlayerController
 
     /// <summary>피격 넉백으로 날아가는 중(착지 회복 포함) — 이 동안 모든 조작 불가.</summary>
     private bool IsLaunched => _locoSM?.CurrentId == LocoState.Launched;
+    /// <summary>구르기(회피) 중 — 몬스터 · 보스가 몸으로 막아도 구르기는 지나가게(10-29 2a · 사방이 막혀 갇히지 않게).</summary>
+    public bool IsDodging => _locoSM != null && _locoSM.CurrentId == LocoState.Dodge;
 
     /// <summary>스탠스 중인가 — 포이즈 브레이크(날아감)를 막는다. 피해 자체는 그대로 받는다.</summary>
     private bool PoiseImmune => _stanceOwner != null;
@@ -351,6 +353,12 @@ public sealed partial class PlayerController
     /// </summary>
     public bool SkillRecovering { get; set; }
 
+    /// <summary>
+    /// 지금 스킬을 회피로 끊을 수 없는 구간인가(10-23 — 회피는 스킬을 언제든 끊는다, 이 구간만 예외).
+    /// 대검 R 도약의 공중처럼 끊으면 자세가 튀는 곳만 켠다(<see cref="SkillExecutionContext.LockCancel"/>). 스킬 상태 진입 · 종료가 끈다.
+    /// </summary>
+    public bool SkillCancelLocked { get; set; }
+
     /// <summary>스킬 자기 강화 시작 알림(<see cref="SkillBuffStarted"/>) — 석궁 강화 스킬이 부른다.</summary>
     public void RaiseSkillBuffStarted(SkillType slot, float duration) => SkillBuffStarted?.Invoke(slot, duration);
 
@@ -387,6 +395,9 @@ public sealed partial class PlayerController
 
     /// <summary>슬로우 상태를 즉시 해제하고 부착된 VFX를 제거한다.</summary>
     public void ClearSlow() => Status.ClearSlow();
+
+    /// <summary>10-29 잠깐 빨라짐 — 보물 창고 바람 문양(<paramref name="scale"/> 1 이상 · <paramref name="duration"/>초).</summary>
+    public void ApplyHaste(float scale, float duration) => Status.ApplyHaste(scale, duration);
 
     /// <summary>
     /// 얼음 공격 1회 처리. 반환값: 1=1단계(화면이펙트), 2=빙결 발동, 0=이미 빙결 중(연장만).

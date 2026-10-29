@@ -195,7 +195,7 @@ public sealed partial class PlayerController
         }
 
         // [강공격 봉인] 차지 임계값(holdThreshold)·단계 수(chargeStages)를 넘기던 인자는 사라졌다.
-        // 두 정책은 현재 "누르고 떼면 약공격 1회"로 동일하게 동작한다 — 무기별 입력 차이가
+        // 두 정책은 현재 "누르면 약공격 1회 · 꾹 누르면 계속"(10-25 ④)으로 동일하게 동작한다 — 무기별 입력 차이가
         // 다시 생기면 이 switch가 그대로 분기점이 된다.
         switch (wd.weaponType)
         {
@@ -277,10 +277,13 @@ public sealed partial class PlayerController
     {
         if (newWeapon == null)
         {
+            RuntimeStats.SetSwingAttackSpeedCap(0f);
             RuntimeStats.SetWeaponStats(0, 0, 0);
             RuntimeStats.SetWeaponMastery(0f, 0f);
             return;
         }
+
+        RuntimeStats.SetSwingAttackSpeedCap(newWeapon.animationSet != null ? newWeapon.animationSet.maxSwingAttackSpeed : 0f);   // 평타 휘두름 공속 상한(10-26)
 
         var kind = newWeapon.weaponType.GetAttackStatKind();
         // 절삭하지 않고 소수 그대로 넘긴다 — 강화 배율이 여기서 잘리면 강화가 공격력에 안 닿는다.

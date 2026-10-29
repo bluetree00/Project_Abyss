@@ -10,16 +10,17 @@ public enum MinigameDemo { None, Perfect, Normal, Idle }
 
 /// <summary>
 /// 이벤트방 놀이 공용 뼈대(10-01 설계 §2 · §6). 박자 ①~⑦만 알고 놀이의 규칙은 모른다:
-///   ① 입장(소품이 솟음) → ② 규칙 카드 → ③ 카운트다운 → ④ 진행(제한 시간) → ⑤ 결말 슬로모 → ⑥ 등급 도장 → ⑦ 보상(RoomClearGate).
+///   ① 입장(소품이 솟음) → ② 규칙 카드 → ③ 카운트다운 → ④ 진행(제한 시간) → ⑤ 결말 슬로모 → ⑥ 등급 도장 → ⑦ 보상(놀이가 직접 — <see cref="GrantReward"/>).
 /// 시간 제한이 곧 탈출구다 — 어떤 놀이도 제한 시간이 지나면 그때까지의 성적으로 끝난다. 뼈대에서 예외가 나도 브론즈로 끝낸다(소프트락 금지).
 ///
-/// 출구: 보상을 세운 뒤(<see cref="RoomClearGate.Activate"/>) <see cref="OnResolved"/> — 보상을 받으면 출구가 열린다(10-01 출구 보류).
+/// 출구: 보상을 준 뒤 <see cref="OnResolved"/> — 10-29 룬 고르기 창(RoomClearGate)을 걷어 끝나는 순간 출구가 열린다(설계 「룬이 아닌 특별한 보상」).
+/// 규칙 카드는 처음 보는 놀이만 길게(4초), 다음부터는 1초 — 「빨리 끝나는 이벤트」.
 /// 시작 시점: RunFlowController가 <see cref="OnResolved"/>를 구독하는 순간 = 방 입장 연출이 끝나고 조작이 풀린 뒤.
 /// </summary>
 public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
 {
     // ── Constants ──────────────────────────────────────────────
-    private const float CardSeconds      = 2.5f;
+    private const float CardSeconds      = 1f;     // 10-29 2.5 → 1 — 두 번째부터는 제목만 스친다
     private const float CardFirstSeconds = 4f;
     private const float LowTimeSeconds   = 5f;
 
@@ -50,13 +51,10 @@ public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
     protected float            Elapsed;
     protected bool             Playing;
 
-    private LuckRollTableSO _luck;
-    private GameObject      _endEffect, _endEffect2;
     private readonly List<GameObject> _owned = new();
     private CancellationTokenSource _cts;
     private bool  _resolved;
     private bool  _startNow;
-    private float _fuelScale = 1f;
     private int   _lastTickSecond = -1;
 
     // ── Properties ─────────────────────────────────────────────
@@ -87,8 +85,10 @@ public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
     protected virtual string DotsLine => null;
     /// <summary>제한 시간 전에 끝났는가(모든 라운드 · 챙기기 · 물림).</summary>
     protected virtual bool FinishedEarly => false;
-    /// <summary>보상이 설 자리(바닥).</summary>
+    /// <summary>보상이 설 자리(바닥) — 플레이어를 못 찾을 때만(보상은 발밑에 떨어진다).</summary>
     protected virtual Vector3 RewardSpot => Center;
+    /// <summary>③ 카운트다운을 쓰는가(욕심의 상자는 바로 시작 — 10-29).</summary>
+    protected virtual bool UseCountdown => true;
 
     /// <summary>① 무대 소품을 세운다(발판 · 상자 — 아래에서 솟는 연출 포함, 약 0.6초).</summary>
     protected abstract UniTask BuildStageAsync(CancellationToken ct);
@@ -99,6 +99,8 @@ public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
     protected virtual void OnPlayEnd() { }
     /// <summary>에디터 자동 시연 한 프레임.</summary>
     protected virtual void DemoTick(MinigameDemo mode, float dt) { }
+    /// <summary>⑦ 특별 보상(10-29) — 금화 · 정수 · 증강 다시 뽑기 등 놀이마다 하나. <paramref name="at"/> = 플레이어 발밑(금화 · 정수가 자석 거리 안).</summary>
+    protected abstract void GrantReward(ChallengeGrade grade, Vector3 at);
 
     // ── Lifecycle ──────────────────────────────────────────────
     private void Start()
@@ -117,13 +119,11 @@ public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
 
     // ── Public Methods ─────────────────────────────────────────
 
-    /// <summary>SetupEventRoom이 호출 — 세션 · 보상 이펙트 · 방 시드(다시 들어와도 같은 판).</summary>
+    /// <summary>SetupEventRoom이 호출 — 세션 · 방 시드(다시 들어와도 같은 판).
+    /// 행운표 · 보상 이펙트는 10-29부터 쓰지 않는다(보상을 놀이가 직접 준다) — 확인 메뉴 호출과 맞추려고 자리만 둔다.</summary>
     public void Initialize(GameRunSession run, LuckRollTableSO luck, GameObject endEffect, GameObject endEffect2, int seed)
     {
         Run         = run;
-        _luck       = luck;
-        _endEffect  = endEffect;
-        _endEffect2 = endEffect2;
         Rng         = new System.Random(seed);
         Tier        = MinigameTheme.Tier(run);
         Theme       = MinigameTheme.Of(run);
@@ -165,9 +165,6 @@ public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
         _owned.Remove(go);
         Destroy(go);
     }
-
-    /// <summary>보상 연료 배율(욕심의 상자 4단계 ×1.5).</summary>
-    protected void SetFuelScale(float scale) => _fuelScale = Mathf.Max(0f, scale);
 
     /// <summary>「맞음」 한 번 — 비치명 피해 + 떠오르는 「−1」. 실제로 들어갔으면 true(회피 무적이면 false).</summary>
     protected bool HurtPlayer()
@@ -231,7 +228,7 @@ public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
             if (first) StoryProgress.MarkSeen(seenKey);
 
             // ③ 카운트다운
-            await Hud.CountdownAsync(ct);
+            if (UseCountdown) await Hud.CountdownAsync(ct);
 
             // ④ 진행
             Hud.ShowBand(Title);
@@ -292,12 +289,12 @@ public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
         _resolved = true;
         Playing   = false;
         string result = SafeResult();
+        Vector3 at = PlayerT != null ? PlayerT.position : RewardSpot;
         Teardown();
 
-        var gate = gameObject.AddComponent<RoomClearGate>();
-        gate.Initialize(Run, _luck, _endEffect, _endEffect2, false, grade);
-        if (!Mathf.Approximately(_fuelScale, 1f)) gate.SetFuelScale(_fuelScale);
-        gate.Activate(RewardSpot);
+        // ⑦ 놀이가 정한 특별 보상을 그 자리에서(10-29) — 보상이 깨져도 출구는 연다(소프트락 금지)
+        try { GrantReward(grade, at); }
+        catch (Exception e) { Debug.LogError($"[Minigame] {Id} 보상 예외 — 출구는 연다: {e}"); }
         Debug.Log($"[Minigame] {Id} 끝 — {grade} · {result}");
         OnResolved?.Invoke();
     }

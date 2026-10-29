@@ -161,6 +161,39 @@ public class WeaponData
         formVariants = string.IsNullOrEmpty(formVariants) ? id : formVariants + "," + id;
     }
 
+    /// <summary>
+    /// 세이브에서 온 증강 중 카탈로그에 없는 id(10-26 무기 개편으로 걷은 「추가 검기」 등)를 뺀다 — 재련 기록(<see cref="reforgeLog"/>)은 그대로.
+    /// 레거시 정리로 걷은 것(지진 · 거인의 걸음 · 칼자국)은 빼지 않고 같은 등급 · 같은 무기의 없는 증강 I로 바꿔 준다(<see cref="MeleeAugmentCatalog.ReplacementFor"/> · 10-26 사용자).
+    /// </summary>
+    public void SanitizeAugments()
+    {
+        if (string.IsNullOrEmpty(augments)) return;
+        var list = AugmentList();
+        var owned = new System.Collections.Generic.HashSet<string>();
+        foreach (var (id, _) in list) if (MeleeAugmentCatalog.Get(id) != null) owned.Add(id);
+        var kept = new System.Text.StringBuilder();
+        foreach (var (id, rank) in list)
+        {
+            string useId = id;
+            int useRank = rank;
+            if (MeleeAugmentCatalog.Get(id) == null)
+            {
+                useId = MeleeAugmentCatalog.ReplacementFor(id, this, owned);
+                if (useId == null)
+                {
+                    UnityEngine.Debug.LogWarning($"[MeleeAugment] 세이브의 증강 「{id}」은 카탈로그에 없어 뺐다(10-26 무기 개편으로 걷은 증강 등)");
+                    continue;
+                }
+                useRank = 1;
+                owned.Add(useId);
+                UnityEngine.Debug.LogWarning($"[MeleeAugment] 세이브의 증강 「{id}」은 걷어 「{useId}」 I로 바꿨다(10-26 레거시 정리)");
+            }
+            if (kept.Length > 0) kept.Append(',');
+            kept.Append(useId).Append(':').Append(useRank);
+        }
+        augments = kept.ToString();
+    }
+
     /// <summary>세이브에서 온 변주를 이 형 · 단계에 맞게 거른다 — 없는 id · 단계보다 높은 변주 · 같은 단계 두 번째는 버린다(변조 세이브 · 검토 M9).</summary>
     public void SanitizeFormVariants()
     {

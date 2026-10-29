@@ -78,12 +78,12 @@ public static class CovenantFxService
         switch (tier)
         {
             case CovenantTier.Ruby:
-                HitFeelService.HitStop(RubyStopScale, RubyStopDur);
+                if (HitFeelService.DealtHitStop) HitFeelService.HitStop(RubyStopScale, RubyStopDur);   // 공격 멈칫 끔이면 생략(10-24)
                 HitFeelService.CameraShakeDirectional(dir, RubyShakeAmp, RubyShakeDur);
                 break;
 
             case CovenantTier.Gold:
-                HitFeelService.HitStop(GoldStopScale, GoldStopDur);
+                if (HitFeelService.DealtHitStop) HitFeelService.HitStop(GoldStopScale, GoldStopDur);
                 HitFeelService.CameraShake(GoldShakeAmp, GoldShakeDur);
                 VolumePulseService.Pulse(GoldPulsePeak, GoldPulseDur);
                 break;

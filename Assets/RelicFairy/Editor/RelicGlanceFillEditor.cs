@@ -17,10 +17,10 @@ public static class RelicGlanceFillEditor
     {
         ("RelicClass_Gawain",   "하루의 순환", "여명엔 쳐서 태양흔 쌓기 · 황혼엔 Q가 잠긴다", new[] { "태양흔|최대 3", "처치 충전|+20%" }),
         ("RelicClass_Gawain",   "정오",       "쌓아 둔 태양흔이 한꺼번에 터진다", new[] { "공격 속도|+30%", "모든 피해|+20%" }),
-        ("RelicClass_Gawain",   "낙일",       "전방에 태양을 떨어뜨린다",           new[] { "착탄 피해|1100%", "작열 지대|4초" }),
+        ("RelicClass_Gawain",   "낙일",       "전방에 태양을 떨어뜨린다",           new[] { "착탄 피해|2000%", "작열 지대|4초" }),
         ("RelicClass_Lancelot", "광기",       "칠수록 차오른다 · 40이면 광란 · 그때 Q 심판", new[] { "공격력 최대|+40%", "받는 피해 최대|+30%" }),
         ("RelicClass_Lancelot", "광란",       "40스택에 4초 폭주 — 끝나면 0으로",   new[] { "이동 속도|+20%" }),
-        ("RelicClass_Lancelot", "심판의 일격", "부채꼴 연타 뒤 마무리 강타",         new[] { "피해|950%", "찢긴 적 받는 피해|+20%" }),
+        ("RelicClass_Lancelot", "심판의 일격", "부채꼴 연타 뒤 마무리 강타",         new[] { "피해|1640%", "찢긴 적 받는 피해|+20%" }),
     };
 
     [MenuItem("RelicFairy/Tools/10-13 유물 고르기 팝업 — 한눈 줄 채우기(가웨인 · 랜슬롯)")]

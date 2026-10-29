@@ -13,8 +13,9 @@ MonoBehaviour:
   m_Name: KatanaAnimation
   m_EditorClassIdentifier: 
   useGuardCharge: 0
-  lightAttackAnimSpeed: 0.77
+  lightAttackAnimSpeed: 0.62
   windupSpeedRatio: 0.6
+  maxSwingAttackSpeed: 1.45
   heavyAttackAnimSpeed: 1.7
   defaultComboWindowOpen: 0.25
   defaultComboWindowClose: 0.75

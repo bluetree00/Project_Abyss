@@ -98,6 +98,8 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
             float dashDist = _data.dashDistance * (1f + MeleeAugments.ValueOn(ctx.WeaponData, MeleeAugmentCatalog.KatanaDraw) * 0.01f);   // 발도 연속 증강(10-15)
             _extraHits = _data.extraHitCount + Mathf.RoundToInt(MeleeAugments.Value2On(ctx.WeaponData, MeleeAugmentCatalog.KatanaDraw));
             _dashEnd = ctx.DashEndBeforeWall(_dashStart, dir, dashDist);   // 벽 앞에서 멈춘다(10-14 — 끝점 Lerp가 벽을 뚫었다)
+            MeleeAugments.ReportSkillDash(ctx.WeaponData, ctx.Slot, _dashStart, _dashEnd, _data.dashDuration,
+                                          ctx.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee));   // 일섬 전설 증강(10-24 W7)
 
             if (ctx.Rigidbody != null)
                 ctx.Rigidbody.linearVelocity = Vector3.zero;
@@ -389,16 +391,11 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
                 DespawnAfter(obj, lifetime);
         }
 
-        private static async void DespawnAfter(GameObject obj, float delay)
+        /// <summary>수명을 그 인스턴스에 맡긴다(<see cref="PooledVfxLifetime"/>) — 여기서 타이머를 들면 그 사이 풀로 돌아가 다른 데서 다시 쓰인 이펙트를 옛 타이머가 껐다(10-29 풀 점검 4).</summary>
+        private static void DespawnAfter(GameObject obj, float delay)
         {
-            try
-            {
-                await UniTask.Delay(
-                    (int)(delay * 1000), cancellationToken: obj.GetCancellationTokenOnDestroy());
-                if (obj != null && obj.activeInHierarchy)
-                    Managers.ObjectPooler.Despawn(obj);
-            }
-            catch (System.OperationCanceledException) { }
+            if (!obj.TryGetComponent<PooledVfxLifetime>(out var life)) life = obj.AddComponent<PooledVfxLifetime>();
+            life.SetLife(delay);
         }
     }
 }

@@ -20,6 +20,7 @@ public sealed class PlayerStatusEffects
     private readonly AudioClip        _freezeLoopSfx;
 
     private float _slowTimer;
+    private float _hasteTimer;
 
     private float       _freezeTimer;
     private AudioSource _freezeLoopAudioSource;
@@ -32,6 +33,8 @@ public sealed class PlayerStatusEffects
     // ── Properties ────────────────────────────────────────────────
     /// <summary>슬로우 배율(평소 1). 이동 잠금 채널과 곱해져 최종 이동 배율이 된다.</summary>
     public float SlowScale { get; private set; } = 1f;
+    /// <summary>10-29 잠깐 빨라짐(보물 창고 바람 문양) — 슬로우와 따로 곱한다(1 이상). 끝나면 1.</summary>
+    public float HasteScale { get; private set; } = 1f;
     public bool  IsFrozen    => _freezeTimer > 0f;
     public bool  IsKnockback => _knockbackTimer > 0f;
 
@@ -55,6 +58,12 @@ public sealed class PlayerStatusEffects
             if (_slowTimer <= 0f)
                 SlowScale = 1f;
         }
+        if (_hasteTimer > 0f)
+        {
+            _hasteTimer = Mathf.Max(0f, _hasteTimer - unscaledDt);
+            if (_hasteTimer <= 0f)
+                HasteScale = 1f;
+        }
         if (_iceStage == 1)
         {
             _iceStageTimer -= dt;
@@ -75,6 +84,13 @@ public sealed class PlayerStatusEffects
     {
         SlowScale  = Mathf.Clamp01(scale);
         _slowTimer = Mathf.Max(_slowTimer, duration);
+    }
+
+    /// <summary>10-29 이동 속도를 <paramref name="scale"/>배(1 이상)로 <paramref name="duration"/>초 — 더 센 쪽 · 더 긴 쪽을 남긴다.</summary>
+    public void ApplyHaste(float scale, float duration)
+    {
+        HasteScale  = Mathf.Max(HasteScale, Mathf.Max(1f, scale));
+        _hasteTimer = Mathf.Max(_hasteTimer, duration);
     }
 
     /// <summary>슬로우 상태를 즉시 해제하고 부착된 VFX를 제거한다.</summary>

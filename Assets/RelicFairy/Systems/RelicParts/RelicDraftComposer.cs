@@ -35,7 +35,7 @@ public static class RelicDraftComposer
     /// <paramref name="all"/> = 이 유물의 조각 전부(데이터) · <paramref name="runeTier1Active"/> = 속성 이름 → 1단계 켜짐.
     /// </summary>
     public static RelicDraft Compose(string relicId, IReadOnlyList<RelicPartEntry> all, PlayerLoadout l,
-                                     int era, int band, Func<string, bool> runeTier1Active, Random rng)
+                                     int era, int band, Func<string, bool> runeTier1Active, Random rng, bool allowEvolution = true)
     {
         var draft = new RelicDraft { RelicId = relicId };
         if (all == null || l == null || rng == null) return draft;
@@ -67,9 +67,9 @@ public static class RelicDraftComposer
         // ① 잇기
         Pick(draft, PickFresh(fresh, used, rng, e => ownedGroups.Count == 0 || Overlaps(e, ownedGroups), 1),
              fresh, sharpen, used, l, relicId, era, band, rng, get);
-        // ② 진화 — 조각 2개(해방기부터)면 둘째 자리가 진화(런당 한 번 고름 · 안 고르면 다음 보스에 다시)(10-14 빌드 시너지 C ·
+        // ② 진화 — 해방기부터 보스마다 둘째 자리가 진화(런당 한 번 고름 · 안 고르면 다음 보스에 다시 · 10-29 조각 조건 걷음)(10-14 빌드 시너지 C ·
         //    10-18 「모든 창을 2장」 — 넷째 카드로 덧붙이지 않는다: 「진화할까, 기억을 하나 더 모을까」 · 10-22 E1 조건 하나로)
-        var evo = RelicEvolution.Ready(l, relicId);
+        var evo = allowEvolution ? RelicEvolution.Ready(l, relicId) : null;   // 시작 선물(10-29)은 진화를 빼고 넓히기
         if (evo != null)
             draft.Cards.Add(new RelicDraftCard { Kind = RelicDraftCardKind.Evolution, EvolutionId = evo.Id, Grade = RelicMemoryGrade.Radiant });
         else

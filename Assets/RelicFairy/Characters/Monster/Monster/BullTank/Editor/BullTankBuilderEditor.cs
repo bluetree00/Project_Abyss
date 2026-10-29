@@ -168,10 +168,10 @@ internal static class BullTankBuilderEditor
         cfg.monsterName        = "Yoked Bull";   // 머리 위 이름 · 보스 체력바 이름은 BullTankMonster가 시기로 고른다
         cfg.grade              = MonsterGrade.Elite;   // 정예 — 포이즈가 붙는다(접두어는 SpawnMidBossAsync 길이라 안 붙음)
         cfg.visualHeightMeters = 2.32f;                // × 정예 1.25 = 2.9 m(83 배치 설계 · 미니보스 띠 2.7~3.2)
-        cfg.stat.maxHp         = 2400;                 // Ch1 · 현실 DPS 45 × 약 50초(설계서 §4) — 챕터 배율은 정예 층
+        cfg.stat.maxHp         = 2000;                 // Ch1 · 현실 DPS 45 × 약 44초(설계서 §4 50초 → 10-26 사용자 「체력을 조금 줄여야」) — 챕터 배율은 정예 층
         cfg.stat.defense       = 4f;
         cfg.stat.attackPower   = 95f;
-        cfg.stat.moveSpeed     = 3.2f;
+        cfg.stat.moveSpeed     = 3.8f;                 // 10-23 B6 「약간 더 재빠르게」 3.2 →
         cfg.stat.attackRange   = 4f;
         cfg.stat.knockbackForce = 4f;
         cfg.detection.detectionRange   = 12f;

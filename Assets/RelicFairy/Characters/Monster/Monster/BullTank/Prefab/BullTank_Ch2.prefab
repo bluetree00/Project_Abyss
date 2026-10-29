@@ -123,12 +123,12 @@ MonoBehaviour:
   _debugState: 
   _configAddress: BullTank/BullTankConfig
   _roarSeconds: 1.67
-  _swingRange: 4
+  _swingRange: 3
   _swingRadius: 3.2
   _swingAngle: 90
   _swingHitTime: 0.85
-  _swingDuration: 1.4
-  _swingCooldown: 2.5
+  _swingDuration: 1.3
+  _swingCooldown: 1.5
   _swingDamageMul: 1.1
   _leapMinDist: 6
   _leapMaxDist: 14
@@ -136,21 +136,21 @@ MonoBehaviour:
   _leapAir: 0.8
   _leapHeight: 3
   _leapRadius: 3
-  _leapRecover: 1
-  _leapCooldown: 8
+  _leapRecover: 0.9
+  _leapCooldown: 5
   _leapDamageMul: 1.6
   _chargeMinDist: 5
   _chargeIntro: 0.57
-  _chargeAim: 1.2
+  _chargeAim: 1
   _chargeRunIn: 0.18
   _chargeSpeed: 16
   _chargeMaxLen: 18
   _chargeWidth: 2.2
   _chargeHitPad: 0.3
-  _chargeStun: 3.8
+  _chargeStun: 2.6
   _chargeEndClip: 1.9
-  _chargeStop: 1
-  _chargeCooldown: 7
+  _chargeStop: 0.8
+  _chargeCooldown: 4.4
   _chargeDamageMul: 1.9
   _stunDamageAmp: 0.3
   _nightmareBodyMaterial: {fileID: 2100000, guid: 0c4c7bf40d073494ea7b560184b61347,

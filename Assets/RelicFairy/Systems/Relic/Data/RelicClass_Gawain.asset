@@ -56,13 +56,13 @@ MonoBehaviour:
     summary: "\uC815\uC624 \uC911\uC5D0\uB9CC \uC0AC\uC6A9 \uAC00\uB2A5. \uC804\uBC29
       3m \uC9C0\uC810\uC5D0 \uD0DC\uC591\uC744 \uB099\uD558\uC2DC\uD0A8\uB2E4."
     stats:
-    - "\uCC29\uD0C4 \uD53C\uD574|\uACF5\uACA9\uB825\uC758 1100%"
+    - "\uCC29\uD0C4 \uD53C\uD574|\uACF5\uACA9\uB825\uC758 2000%"
     - "\uD654\uC0C1|\uCD08\uB2F9 \uACF5\uACA9\uB825\uC758 15% \xB7 6\uCD08"
     - "\uC791\uC5F4 \uC9C0\uB300|\uC7A5\uD310 4\uCD08 \xB7 1\uCD08\uB9C8\uB2E4
       \uD53C\uD574"
     glance: "\uC804\uBC29\uC5D0 \uD0DC\uC591\uC744 \uB5A8\uC5B4\uB728\uB9B0\uB2E4"
     glanceStats:
-    - "\uCC29\uD0C4 \uD53C\uD574|1100%"
+    - "\uCC29\uD0C4 \uD53C\uD574|2000%"
     - "\uC791\uC5F4 \uC9C0\uB300|4\uCD08"
   themeColor: {r: 0.98, g: 0.78, b: 0.32, a: 1}
   portrait: {fileID: 21300000, guid: 4c671a8893ffedc4a9a2fdcdf67608eb, type: 3}

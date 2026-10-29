@@ -70,6 +70,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private const float OddsBarH      = 78f;
     private const float OddsBarMargin = 8f;
     private const float WindowFrameCorner = 36f;   // 힉스필드 창 틀 9칸 모서리(목업 px · 10-19)
+    private const float InteriorInset     = 18f;   // 10-29 창 안쪽 그림 — 틀의 돌 테(≈21) 밑으로 조금 들어가 이음매가 안 보이게
+    private static readonly Color ShowcaseTint = new(0.78f, 0.78f, 0.82f, 1f);
     private const float CardFrameScale    = 3.4f;  // 힉스필드 등급 카드 틀 — 그림 px ÷ 이 값 = 카드 목업 px(테 얇게 · 10-19)
     private const float CardY   = 30f;    // 카드 위 100 / 아래 160(버튼 줄 + 여백) — 창 중심 기준(10-20 740 · 480)
 
@@ -185,7 +187,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     /// <summary>공개 시퀀스 진행 중인가 — 아무 입력이 들어오면 즉시 스냅한다.</summary>
     private bool _revealing;
     private float _revealEndedAt = float.NegativeInfinity;   // 공개 연출이 끝난(또는 건너뛴) 실시간 — 그 누름이 뗀 클릭을 넘기기로 읽지 않는다
-    private int _refinerySpent = -1;                          // 정제소에서 열었으면 쓴 원석(넘기면 돌려받는다) · 아니면 -1
+    private int _refinerySpent = -1;                          // 정제소에서 열었으면 쓴 원석(10-26부터 넘겨도 안 돌려준다) · 아니면 -1
     private TMP_Text _skipHint;
     private bool _openBoard = true;   // 고른 뒤 룬판을 연다 — 챌린지 다중 보상은 마지막 라운드만(10-19)
     private bool _briefReveal;        // 챌린지 2라운드부터 짧은 공개 연출(10-19)
@@ -276,7 +278,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
     /// <summary>
     /// 후보를 주입해 카드를 구성한다. ShowPopupUIAndGetAsync 직후 호출.
-    /// <paramref name="refinerySpent"/> ≥ 0 = 정제소에서 연 창(넘기면 쓴 원석을 돌려받는다 · 방 확률 막대는 숨긴다 — 10-18 분석 P1).
+    /// <paramref name="refinerySpent"/> ≥ 0 = 정제소에서 연 창(넘겨도 쓴 원석은 안 돌려준다 — 10-26 · 방 확률 막대는 숨긴다 — 10-18 분석 P1).
     /// <paramref name="rounds"/> &gt; 1 = 챌린지 다중 보상의 <paramref name="round"/>번째 — 제목에 「보상 2/3」(10-19 P2 ⑧).
     /// </summary>
     public void Setup(List<(RuntimeItemData data, ItemSO so)> candidates, RunItemInventory inventory, int refinerySpent = -1,
@@ -336,6 +338,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
         try
         {
+            Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);   // 10-29 UI 소리 — 열기(연출 끔 길도 여기를 지난다)
             if (RewardPresentation.IsOff) return;
             bool brief = _briefReveal || RewardPresentation.Mode == RewardPresentationMode.Brief;
 
@@ -935,23 +938,22 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         if (_refinerySpent >= 0) return;
 
         var kind = GameRunBootstrapper.Instance?.Run?.CurrentRoomKind ?? RoomPlanKind.Normal;
-        var (rare, epic, legendary) = RoomRewardTable.For(kind).Weights.Normalized();
         // 굴림은 제단에서 안 연 등급을 한 단계씩 내린다(ClampRarity) — 표시도 같은 규칙으로 접는다(정제소와 동일).
-        // 안 접으면 영웅·전설이 잠긴 세이브에서도 「Epic 9% · Legend 2%」가 뜬다.
-        (rare, epic, legendary) = MemoryAltarService.FoldOdds(rare, epic, legendary);
+        // 안 접으면 영웅·전설이 잠긴 세이브에서도 「Epic 9% · Legend 2%」가 뜬다. 방 하한(정예 보스 = Epic · 잠금보다 앞섬)도 굴림과 같이 본다(10-23).
+        var (rare, epic, legendary) = RoomRewardTable.DisplayOdds(kind, GameRunBootstrapper.Instance?.Run?.CurrentRoomDanger ?? false);   // 10-29 F4
         // 방 보상은 Common부터 — 네 등급을 다 보이고, 무엇이 등급을 올렸는지(챕터 · 시기 · 정예) 머리 오른쪽에(10-10).
         bar.ShowCommon = true;
         bar.SetBoost(RoomRewardTable.DescribeBoost(kind));
         bar.SetOdds(rare, epic, legendary, heated: false);
     }
 
-    /// <summary>넘기기 아래 한 줄 — 방 보상 = 원석 +1 · 정제소 = 쓴 원석을 돌려받는다(구운 프리팹 글을 열 때마다 덮어쓴다).</summary>
+    /// <summary>넘기기 아래 한 줄 — 방 보상 = 원석 +1 · 정제소 = 환불 없음(10-26 · 구운 프리팹 글을 열 때마다 덮어쓴다).</summary>
     private void RefreshSkipHint()
     {
         if (_skipHint == null) _skipHint = _windowRoot != null ? _windowRoot.Find("SkipHint")?.GetComponent<TMP_Text>() : null;
         if (_skipHint == null) return;
         bool full = _refinerySpent < 0 && StagingFull;
-        _skipHint.text = _refinerySpent >= 0 ? $"넘기면 원석 +{_refinerySpent} 환불"
+        _skipHint.text = _refinerySpent >= 0 ? "넘기면 두 장 다 버린다 · 원석은 돌아오지 않는다"   // 10-26 「환불 없음」(전액 환불로 공짜 다시 돌리기가 됐다)
                        : full ? $"<color={UIPalette.RuneOreHex}>원석 +{SkipOre}</color> · 고르지 않는다" : $"넘기면 원석 +{SkipOre}";
         FitSingleLine(_skipHint);
         // 10-19 — 보관함 가득이면 두 버튼이 두 길을 말한다: [룬판에서 바꾸기](고르고 판에서 정리) · [분해해서 받기](원석)
@@ -1336,7 +1338,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         float pw = _cardW - 24f;
 
         var panel = ShopUIStyle.MakeImage(face, "ShapePanel", ChipFill);
-        if (skin?.runeTile != null) { panel.sprite = skin.runeTile; panel.color = Color.white; }
+        if (skin?.showcaseBackdrop != null) { panel.sprite = skin.showcaseBackdrop; panel.color = ShowcaseTint; }   // 10-29 돌 제단 홈 — 눌러 룬이 앞선다
+        else if (skin?.runeTile != null) { panel.sprite = skin.runeTile; panel.color = Color.white; }
         ShopUIStyle.Anchor(panel.rectTransform, top, top, top, new Vector2(0f, -PanelY), new Vector2(pw, PanelHNow));
         var prt = panel.rectTransform;
 
@@ -1652,10 +1655,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             if (c.Effects != null)
                 foreach (var row in c.Effects.GetComponentsInChildren<EffectRowWidget>(true))
                     if (row.Label != null) font = Mathf.Min(font, row.Label.fontSize);
-        float content = 0f;
         for (; ; font -= 1f)   // 하나로 맞춘 크기에서 어느 카드든 칸(안쪽 8px씩)을 넘으면 1px씩 — 좁은 4장에서 긴 효과가 몇 px 넘쳤다(10-19)
         {
-            content = 0f;
             bool fits = true;
             foreach (var c in _cards)
             {
@@ -1664,7 +1665,6 @@ public sealed class UI_RuneSelectPopup : UI_Popup
                     if (row.Label != null) row.Label.fontSize = font;
                 LayoutRebuilder.ForceRebuildLayoutImmediate(c.Effects);
                 float need = Mathf.Max(LayoutUtility.GetPreferredHeight(c.Effects), RenderedRowsHeight(c.Effects));
-                content = Mathf.Max(content, need);
                 if (c.EffectBox != null && need + 16f > c.EffectBox.sizeDelta.y + 0.5f) fits = false;
             }
             if (fits || font <= MinEffectFont) break;
@@ -1677,15 +1677,9 @@ public sealed class UI_RuneSelectPopup : UI_Popup
                 if (row.Label != null && row.TryGetComponent<LayoutElement>(out var le))
                     le.minHeight = Mathf.Max(EffectRowH, RenderedHeight(row) + 2f);
             LayoutRebuilder.ForceRebuildLayoutImmediate(c.Effects);
-            content = Mathf.Max(content, LayoutUtility.GetPreferredHeight(c.Effects));
         }
-        float h = Mathf.Max(EffectRowH, content) + 16f;   // 줄 묶음은 칸 안쪽 8px(Stretch)
-        foreach (var c in _cards)
-        {
-            if (c.EffectBox == null || h >= c.EffectBox.sizeDelta.y) continue;
-            c.EffectBox.sizeDelta = new Vector2(c.EffectBox.sizeDelta.x, h);
-            LayoutRebuilder.ForceRebuildLayoutImmediate(c.Effects);
-        }
+        // 10-29 칸 높이는 줄이지 않는다 — 가장 긴 효과에 맞춰 줄이면 효과 한 줄짜리(Common) 세 장 모두 칸 아래가 빈 카드 바닥으로 남았다.
+        // 칸이 배지 자리 위까지 그대로 서서 세 장 바닥 줄이 맞는다.
     }
 
     private static RectTransform MakeChip(RectTransform parent, string name, string text, Color textCol, Color lineCol,
@@ -2065,6 +2059,26 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         fill.color  = Color.white;
         fill.pixelsPerUnitMultiplier = art.border.x > 0f ? art.border.x / WindowFrameCorner : 1f;
         if (windowRT != null && windowRT.TryGetComponent<Image>(out var line)) line.color = Color.clear;
+        ApplyWindowInterior();
+    }
+
+    /// <summary>
+    /// 10-29 사용자 「룬 획득 팝업 — 배경의 아쉬운 건 힉스필드로」 — 틀 9칸 안쪽이 무늬 없는 남색 판이었다.
+    /// 흑요석 판 그림(<see cref="RuneSelectSkinSO.windowInterior"/>)을 틀 안쪽에 맨 뒤로 깐다(구운 프리팹도 여기서 · 두 번 깔지 않는다).
+    /// </summary>
+    private void ApplyWindowInterior()
+    {
+        var art = UISkin.RuneSelect?.windowInterior;
+        if (art == null || _windowRoot == null || _windowRoot.Find("InteriorArt") != null) return;
+        var img = ShopUIStyle.MakeImage(_windowRoot, "InteriorArt", Color.white);
+        img.sprite = art;
+        img.type = Image.Type.Simple;
+        img.raycastTarget = false;
+        var rt = img.rectTransform;
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = new Vector2(InteriorInset, InteriorInset);
+        rt.offsetMax = new Vector2(-InteriorInset, -InteriorInset);
+        rt.SetAsFirstSibling();
     }
 
     /// <summary>창 목업 왼쪽 위 기준 사각형(왼쪽 · 위 여백 · 크기)을 비율 앵커로 — 창 맞춤을 그대로 따라간다.</summary>

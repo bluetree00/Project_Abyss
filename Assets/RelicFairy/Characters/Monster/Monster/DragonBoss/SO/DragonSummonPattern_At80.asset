@@ -33,11 +33,11 @@ MonoBehaviour:
   _miniDragonPrefab: {fileID: 3246159262785727669, guid: 714f07f145d35924fb9671342321d622,
     type: 3}
   _miniScale: 0.35
-  _miniHp: 150
+  _miniHp: 90
   _miniSpeed: 4.5
-  _miniBreathRange: 8
-  _miniBreathCooldown: 6
-  _miniBreathDamage: 15
+  _miniBreathRange: 10
+  _miniBreathCooldown: 3.5
+  _miniBreathDamage: 45
   _miniBreathSpeed: 20
   _iceBreathPrefab: {fileID: 8357042805450777661, guid: c4b03b6b9df7efe4b906db6e285d7c65,
     type: 3}

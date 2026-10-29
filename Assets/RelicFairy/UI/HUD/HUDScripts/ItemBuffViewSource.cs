@@ -31,6 +31,19 @@ public sealed class ItemBuffViewSource : IBuffViewSource
 
         // 이룬 발동 계열 — 런 동안 이어지지만 「지금 내 빌드가 무엇인가」라 버프 줄에 둔다(빌드 컨셉 §3-3). 칸 수 = 이룬 계열 수(최대 7).
         BuildImprint.CollectBuffViews(into);
+
+        // 전설 룬 자원(10-24 전설 룬 개편) — 쌓인 동안만. 그 전설이 없으면 TryGet이 false
+        AddLegend(into, "heat", "fire", "불사조의 맥박 · 열기", countAsStacks: true);
+        AddLegend(into, "dark", "dark", "보복의 심연 · 어둠", countAsStacks: false);
+        AddLegend(into, "orb", "lightning", "뇌전 탄창", countAsStacks: true);
+        AddLegend(into, "soul", "dark", "영혼 수확 · 영혼", countAsStacks: true);
+    }
+
+    private static void AddLegend(List<BuffViewItem> into, string key, string icon, string label, bool countAsStacks)
+    {
+        if (!LegendaryHud.TryGet(key, out int value, out int max) || value <= 0) return;
+        float frac = max > 0 ? UnityEngine.Mathf.Clamp01((float)value / max) : -1f;
+        into.Add(new BuffViewItem(icon, $"{label} {value}/{max}", countAsStacks ? value : 1, frac, "", BuffSource.Item, isDebuff: false));
     }
 
     /// <summary>버프창에 올릴 자격 — 잔여 게이지가 있거나(일시적) 스택이 쌓이는 것만.

@@ -92,6 +92,8 @@ public sealed class UI_Settings : MonoBehaviour
     private TMP_Dropdown _presetDropdown, _aaDropdown, _shadowDropdown, _postDropdown, _fpsDropdown;
     private Slider       _renderScaleSlider;
     private TMP_Text     _renderScaleValue, _vsyncLabel;
+    private Slider       _camDistanceSlider, _camHeightSlider;
+    private TMP_Text     _camDistanceValue, _camHeightValue;
 
     private List<Vector2Int> _resolutions = new();
 
@@ -104,6 +106,7 @@ public sealed class UI_Settings : MonoBehaviour
     // 되돌릴 기준이 있어야 한다.
     private GraphicsQualitySettings.Snapshot _entryGraphics;
     private float _entryMaster, _entryBgm, _entrySfx, _entryUi;
+    private float _entryCamDistance = 1f, _entryCamHeight = 1f;
     private bool  _entryCaptured;
     private bool _suppressCallbacks;   // 값 복원 중 onValueChanged가 되먹임되는 것을 막는다
     private bool _volumeDirty;         // 드래그 중 미뤄 둔 볼륨 저장이 남아 있는가
@@ -204,6 +207,8 @@ public sealed class UI_Settings : MonoBehaviour
             _entrySfx    = sound0.EffectVolume;
             _entryUi     = sound0.UiVolume;
         }
+        _entryCamDistance = CameraUserSettings.Distance;
+        _entryCamHeight   = CameraUserSettings.Height;
         _entryCaptured = true;
 
         RefreshFromSystems();
@@ -234,6 +239,9 @@ public sealed class UI_Settings : MonoBehaviour
                 sound.SaveVolumePrefs();
             }
 
+            CameraUserSettings.SetDistance(_entryCamDistance);
+            CameraUserSettings.SetHeight(_entryCamHeight);
+
             _volumeDirty = _graphicsDirty = false;
             _previewSfx = _previewUi = false;
             _entryCaptured = false;
@@ -256,6 +264,7 @@ public sealed class UI_Settings : MonoBehaviour
 
         Managers.Sound?.SaveVolumePrefs();
         GraphicsQualitySettings.SavePrefs();
+        CameraUserSettings.Save();
 
         // 값이 그대로면 건드리지 않는다 — 같은 해상도로 SetResolution을 부르면 창만 한 번 깜빡인다.
         bool changed = !ScreenSettings.HasSaved
@@ -266,7 +275,7 @@ public sealed class UI_Settings : MonoBehaviour
             ScreenSettings.Apply(_pendingRes.x, _pendingRes.y, _fullscreen);
 
         if (_root != null) _root.SetActive(false);
-        Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiConfirm);   // 10-29 UI 소리 — [완료]는 확정(취소 · ESC는 닫기 그대로)
     }
 
     /// <summary>표시값을 실제 시스템 상태에서 다시 읽어온다 — 화면이 곧 진실이 되지 않게.</summary>
@@ -287,6 +296,9 @@ public sealed class UI_Settings : MonoBehaviour
             SetSlider(_sfxSlider,    _sfxValue,    sound.EffectVolume);
             SetSlider(_uiSlider,     _uiValue,     sound.UiVolume);
         }
+
+        SetSlider(_camDistanceSlider, _camDistanceValue, CameraUserSettings.Distance);
+        SetSlider(_camHeightSlider,   _camHeightValue,   CameraUserSettings.Height);
 
         _fullscreen = ScreenSettings.HasSaved ? ScreenSettings.SavedFullscreen : ScreenSettings.IsFullscreenNow;
         UpdateWindowModeLabel();
@@ -452,6 +464,14 @@ public sealed class UI_Settings : MonoBehaviour
         y = AddResolutionRow(panel.transform, ColLeftX, y);
         y = AddWindowModeRow(panel.transform, ColLeftX, y);
 
+        // 카메라(10-24 사용자 「플레이어 시점 카메라를 조금씩 조절」) — 끄는 동안 바로 보이고, 「완료」에 저장 · 「취소」에 되돌린다
+        y -= SectionGap;
+        y = AddSectionLabel(panel.transform, ColLeftX, y, "카메라");
+        y = AddSliderRow(panel.transform, ColLeftX, y, "거리", CameraUserSettings.MinDistance, CameraUserSettings.MaxDistance,
+                         out _camDistanceSlider, out _camDistanceValue, OnCamDistanceChanged);
+        y = AddSliderRow(panel.transform, ColLeftX, y, "높이", CameraUserSettings.MinHeight, CameraUserSettings.MaxHeight,
+                         out _camHeightSlider, out _camHeightValue, OnCamHeightChanged);
+
         // ── 오른쪽 열 — 그래픽 7 (총 418) ──
         y = top;
         y = AddSectionLabel(panel.transform, ColRightX, y, "그래픽");
@@ -600,8 +620,9 @@ public sealed class UI_Settings : MonoBehaviour
         float cy = -PanelH * 0.5f + BottomPad + H * 0.5f;
         var skin = UISkin.Settings;
         // 버튼은 전 화면 같은 베벨(금 = 확정 · 먹빛 = 되돌림) — 납품 남색 판 대신(09-28 UI 톤 통일). 베벨이 없으면 스킨 아트.
-        MakeBottomButton(panel, "Btn_Cancel",  "취소", new Vector2(-(W + Gap) * 0.5f, cy), W, H, CancelColor,  CloseInternal,   skin?.cancelButton, UITheme.SecondaryTint);
-        MakeBottomButton(panel, "Btn_Confirm", "완료", new Vector2( (W + Gap) * 0.5f, cy), W, H, ConfirmColor, ConfirmInternal, skin?.applyButton,  UITheme.CtaTint);
+        // 오른쪽 열 아래(10-24) — 왼쪽 열이 「카메라」 두 줄만큼 내려가 가운데 버튼과 겹쳤다.
+        MakeBottomButton(panel, "Btn_Cancel",  "취소", new Vector2(ColRightX - (W + Gap) * 0.5f, cy), W, H, CancelColor,  CloseInternal,   skin?.cancelButton, UITheme.SecondaryTint);
+        MakeBottomButton(panel, "Btn_Confirm", "완료", new Vector2(ColRightX + (W + Gap) * 0.5f, cy), W, H, ConfirmColor, ConfirmInternal, skin?.applyButton,  UITheme.CtaTint);
     }
 
     private static void MakeBottomButton(Transform panel, string name, string label, Vector2 pos,
@@ -928,6 +949,7 @@ public sealed class UI_Settings : MonoBehaviour
     {
         if (_suppressCallbacks) return;
         if (index < 0 || index >= _resolutions.Count) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiSelect);   // 10-29 UI 소리 — 고르기(값 복원 중엔 위에서 막힌다)
 
         _pendingRes = _resolutions[index];
     }
@@ -945,6 +967,7 @@ public sealed class UI_Settings : MonoBehaviour
     private void OnPresetChanged(int index)
     {
         if (_suppressCallbacks) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiSelect);   // 10-29 UI 소리 — 고르기
 
         GraphicsQualitySettings.SetPreset(index);
 
@@ -954,6 +977,20 @@ public sealed class UI_Settings : MonoBehaviour
     }
 
     // 렌더 스케일은 볼륨과 같은 드래그 경로다 — 즉시 반영만 하고 저장은 손을 뗄 때 Update가 한 번 한다.
+    private void OnCamDistanceChanged(float v)
+    {
+        if (_suppressCallbacks) return;
+        CameraUserSettings.SetDistance(v);
+        SetValueText(_camDistanceValue, v);
+    }
+
+    private void OnCamHeightChanged(float v)
+    {
+        if (_suppressCallbacks) return;
+        CameraUserSettings.SetHeight(v);
+        SetValueText(_camHeightValue, v);
+    }
+
     private void OnRenderScaleChanged(float v)
     {
         if (_suppressCallbacks) return;
@@ -967,6 +1004,7 @@ public sealed class UI_Settings : MonoBehaviour
     private void OnAntialiasingChanged(int index)
     {
         if (_suppressCallbacks) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiSelect);   // 10-29 UI 소리 — 고르기
         GraphicsQualitySettings.SetAntialiasing(index);
         SyncPresetLabel();
     }
@@ -974,6 +1012,7 @@ public sealed class UI_Settings : MonoBehaviour
     private void OnShadowChanged(int index)
     {
         if (_suppressCallbacks) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiSelect);   // 10-29 UI 소리 — 고르기
         GraphicsQualitySettings.SetShadows(index);
         SyncPresetLabel();
     }
@@ -981,6 +1020,7 @@ public sealed class UI_Settings : MonoBehaviour
     private void OnPostProcessingChanged(int index)
     {
         if (_suppressCallbacks) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiSelect);   // 10-29 UI 소리 — 고르기
         GraphicsQualitySettings.SetPostProcessing(index);
         SyncPresetLabel();
     }
@@ -996,6 +1036,7 @@ public sealed class UI_Settings : MonoBehaviour
     private void OnFrameRateChanged(int index)
     {
         if (_suppressCallbacks) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiSelect);   // 10-29 UI 소리 — 고르기
         GraphicsQualitySettings.SetFrameRateIndex(index);
         SyncPresetLabel();
     }

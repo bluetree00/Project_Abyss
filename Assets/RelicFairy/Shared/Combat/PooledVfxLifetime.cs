@@ -10,6 +10,8 @@ using UnityEngine;
 ///
 /// 수명을 인스턴스 자신이 들고 <see cref="OnEnable"/>에서 경과를 0으로 되돌리면,
 /// 풀에서 다시 나올 때마다 타이머가 자연히 리셋되어 그 문제가 <b>구조적으로 사라진다.</b>
+/// 수명은 그 한 번 쓰임 몫이다 — 켜질 때 비우고(끝없음) 꺼낸 쪽이 <see cref="SetLife"/>로 다시 준다. 같은 이펙트를 수명 없이 꺼내 쓰는
+/// 다른 곳(자기 회수 · EffectBehaviour)이 앞 쓰임의 수명에 잘리지 않는다(10-29 풀 점검 4).
 /// </summary>
 public sealed class PooledVfxLifetime : MonoBehaviour
 {
@@ -21,8 +23,12 @@ public sealed class PooledVfxLifetime : MonoBehaviour
     /// <summary>수명(초) 설정. 스폰 직후 호출한다.</summary>
     public void SetLife(float seconds) => _life = Mathf.Max(MinLife, seconds);
 
-    // 풀에서 재활성화될 때마다 경과 리셋 — 이전 사용분의 나이가 이월되지 않는다.
-    private void OnEnable() => _age = 0f;
+    // 풀에서 재활성화될 때마다 경과 리셋 — 이전 사용분의 나이 · 수명이 이월되지 않는다(풀은 켠 뒤 돌려주므로 꺼낸 쪽의 SetLife가 뒤에 온다).
+    private void OnEnable()
+    {
+        _age  = 0f;
+        _life = float.PositiveInfinity;
+    }
 
     private void Update()
     {

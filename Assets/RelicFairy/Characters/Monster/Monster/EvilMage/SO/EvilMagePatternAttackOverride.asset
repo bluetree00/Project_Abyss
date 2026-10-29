@@ -16,7 +16,7 @@ MonoBehaviour:
   - name: Bolt
     animationStateName: Attack01
     minDistance: 0
-    maxDistance: 8
+    maxDistance: 11.5
     priority: 0
     cooldown: 0.2
     damageDelay: 0.45
@@ -54,7 +54,7 @@ MonoBehaviour:
   - name: Burst
     animationStateName: Attack02
     minDistance: 0
-    maxDistance: 8
+    maxDistance: 11.5
     priority: 0
     cooldown: 1.5
     damageDelay: 0.57
@@ -90,5 +90,5 @@ MonoBehaviour:
     hitVfxScale: 1
     hitVfxOffset: {x: 0, y: 0, z: 0}
   selectionMode: 1
-  engageDistance: 6.5
+  engageDistance: 10
   engageDistanceScale: 0.85

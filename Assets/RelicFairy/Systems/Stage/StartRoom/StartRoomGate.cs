@@ -357,6 +357,7 @@ public class StartRoomGate : MonoBehaviour
         if (_startCorridorBuilt) return;
         _startCorridorBuilt = true; // 팔레트 미지정이어도 매 프레임 재시도 방지(1회만)
         EnsureGateFrame(create: true);   // 문틀(10-07) — 팔레트가 주입된 뒤라 여기서 세운다
+        CollectOverheadNextFrameAsync().Forget();   // 10-29 아래에서 복도까지 세운 뒤 모은다
 
         var palette    = _injectedCorridorPalette != null ? _injectedCorridorPalette : startCorridorPalette;
         int wallLayers = _injectedCorridorWallLayers > 0 ? _injectedCorridorWallLayers : startCorridorWallLayers;
@@ -368,6 +369,18 @@ public class StartRoomGate : MonoBehaviour
         MapBuilder.BuildDoorCorridor(
             palette, root, Vector3.zero, startCorridorEdge, widthCells,
             startCorridorLength, 1f, 0f, wallLayers);
+    }
+
+    /// <summary>
+    /// 10-29 사용자 「던전 입구 통로 천장이 안 흐려진다」 — 대기방(던전 입구)은 RoomRevealed가 없어 천장 · 문틀 상인방을 아무도 모으지 않았다.
+    /// 복도 · 문틀을 세운 다음 프레임에 이 구역(게이트의 부모)을 모은다. 런 안에서만(거점 시작방은 낮은 카메라라 그대로).
+    /// </summary>
+    private async UniTaskVoid CollectOverheadNextFrameAsync()
+    {
+        if (GameRunBootstrapper.Instance == null) return;
+        try { await UniTask.Yield(PlayerLoopTiming.LastPostLateUpdate, this.GetCancellationTokenOnDestroy()); }
+        catch (System.OperationCanceledException) { return; }
+        CameraOcclusionFader.CollectArea(transform.parent != null ? transform.parent.gameObject : gameObject);
     }
 
     /// <summary>

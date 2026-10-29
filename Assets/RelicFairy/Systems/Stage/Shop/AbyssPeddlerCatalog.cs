@@ -418,7 +418,7 @@ public static class AbyssPeddlerCatalog
         return new ShopProduct(ShopProductCategory.Potion, $"체력 포션 x{amt}",
             $"최대 체력 {PotionHealPercent}% 즉시 회복", "적용  퀵슬롯 포션 추가",
             price, ItemRarity.Common, EffectIconRegistry.GetSprite(IconPotion),
-            s => { if (s?.PlayerState == null) return false; s.PlayerState.AddPotion(amt); return true; });
+            s => { if (s?.PlayerState == null) return false; s.PlayerState.AddPotion(amt); return true; }, amount: amt);
     }
 
     /// <summary>원석(정제소 연료) 상품 — 재료 카테고리의 다른 얼굴(완성본 특가 예시가 원석).</summary>

@@ -50,6 +50,8 @@ public sealed class RunResultSnapshot
         public string Label;
         public int Seconds;
         public bool Done;   // 마친 챕터 + 쓰러진(끝난) 챕터 = true · 못 간 챕터 = false
+        public int CombatSeconds;   // 챕터 전투 시계(10-24 U5) — -1 = 모름(옛 세이브) · 못 간 챕터
+        public string Grade;        // 등급 글자(색 입힘) — 마친 챕터만 · 쓰러진 챕터 · 모르면 빈 글
     }
 
     public sealed class WeaponLine

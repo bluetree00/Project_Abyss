@@ -54,3 +54,10 @@ MonoBehaviour:
   chooserCardFrame: {fileID: 21300000, guid: 7f7e9d122c9744b4793fc0d38cac2202, type: 3}
   chooserMeleeArt: {fileID: 21300000, guid: 013d70d8d8491464197e69b0e7ccda54, type: 3}
   chooserRangedArt: {fileID: 21300000, guid: b9b604dfb0e973742b04fc6a3c2ea95e, type: 3}
+  evolveBackdrop: {fileID: 21300000, guid: c3570199f6fc93f448c1dc12bf6ada1c, type: 3}
+  evolveBannerKatana: {fileID: 21300000, guid: 6c8d760b457a52e4d8612bc5ea8ab5af, type: 3}
+  evolveBannerGreatsword: {fileID: 21300000, guid: 2baf34b4a8403d247a1fc47aaf26ad91,
+    type: 3}
+  evolveFormWindblade: {fileID: 21300000, guid: 6a37af4e4f45a9d4f96bbdf111fb1072,
+    type: 3}
+  evolveFormWeight: {fileID: 21300000, guid: 4e1fc382ae2d83349a301b5f018d43dd, type: 3}

@@ -92,6 +92,15 @@ public sealed class CrucibleSkinSO : ScriptableObject
     [Tooltip("첫 화면 카드 그림(10-22 힉스필드 · 4:3 · 왼쪽이 투명하게 흐려진다) — 무기 재련 · 파츠 재련. 비우면 글자만.")]
     [SerializeField] private Sprite chooserMeleeArt;
     [SerializeField] private Sprite chooserRangedArt;
+    [Header("진화 선택(10-26 힉스필드 — 실제 무기 모델을 참조로 그림)")]
+    [Tooltip("진화 창 배경 — 모루 위 무형검(4:3). 비우면 암막만.")]
+    [SerializeField] private Sprite evolveBackdrop;
+    [Tooltip("진화 카드 머리 그림(21:9 · 왼쪽 · 아래가 투명하게 흐려진다) — 카타나 · 대검. 비우면 예전 작은 아이콘.")]
+    [SerializeField] private Sprite evolveBannerKatana;
+    [SerializeField] private Sprite evolveBannerGreatsword;
+    [Tooltip("진화 카드 형 문장(둥글게 흐려진 정사각) — 칼바람 · 무게. 비우면 글자만.")]
+    [SerializeField] private Sprite evolveFormWindblade;
+    [SerializeField] private Sprite evolveFormWeight;
 
     public Sprite LevelTag      => levelTag;
     public Sprite CurrencyInner => currencyInner;
@@ -103,5 +112,10 @@ public sealed class CrucibleSkinSO : ScriptableObject
     public Sprite AugmentPanelFrame  => augmentPanelFrame;
     public Sprite ChooserCardFrame   => chooserCardFrame;
     public Sprite ChooserMeleeArt    => chooserMeleeArt;
+    public Sprite EvolveBackdrop     => evolveBackdrop;
+    /// <summary>진화 카드 머리 그림 — 대검이면 대검, 아니면 카타나.</summary>
+    public Sprite EvolveBanner(bool greatsword) => greatsword ? evolveBannerGreatsword : evolveBannerKatana;
+    /// <summary>진화 카드 형 문장 — 형 id(weight · windblade)로.</summary>
+    public Sprite EvolveFormEmblem(string formId) => formId == "weight" ? evolveFormWeight : formId == "windblade" ? evolveFormWindblade : null;
     public Sprite ChooserRangedArt   => chooserRangedArt;
 }

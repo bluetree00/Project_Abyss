@@ -34,7 +34,9 @@ public class UI_RangedForgePopup : UI_Popup
     //          + 제목38 + 부제20 + 도트16 + 구분장식37 + 버튼45 + 행간격60 + 프레임여백(77+52) = 775.
     // 모자라면 카드 하단(스탯)이 도트·구분장식 위로 흘러넘친다.
     // 10-19 ⑦ — 고른 뒤에도 공방이 남아 다시 고를 수 있다(WeaponForgeAltar). 구운 프리팹에도 이 글을 덮어쓴다(옛 글은 「무명의 형상」).
-    private const string SubText = "주무기 <color=#CFC0A0>무형검</color>은 이미 손에 있다. 곁에 둘 하나를 고른다 — 심연에 들기 전까지 다시 바꿀 수 있다.";
+    // 10-29 설계 D1 — 원거리 무기 피해는 Ch2 ~ 4 보스에게 절반(CombatDamage.BossRangedMult) · 고를 때 알린다
+    private const string SubText = "주무기 <color=#CFC0A0>무형검</color>은 이미 손에 있다. 곁에 둘 하나를 고른다 — 심연에 들기 전까지 다시 바꿀 수 있다.\n"
+                                 + "<color=#D9A57A>Ch2 ~ 4 보스에게는 원거리 무기 피해가 절반 · 유물 · 룬은 그대로</color>";
     private const float SkinPanelWidth  = 747f;
     private const float SkinPanelHeight = 775f;
     private const float PanelWidth  = 620f;

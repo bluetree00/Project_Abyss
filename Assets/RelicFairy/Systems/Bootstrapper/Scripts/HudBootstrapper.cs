@@ -687,6 +687,12 @@ public sealed class HudBootstrapper : MonoBehaviour
 
         if (!hasValue) return;
 
-        hpText.text = $"{Mathf.Max(0, hp)} / {Mathf.Max(1, maxHp)}";
+        // 이미 같은 「체력 / 최대」로 시작하면 두는 글이다 — 뒤에 붙은 보호막 「+N」(CombatPanelView.Shield)을
+        // 0.2초마다 지워 「+N」이 한 프레임만 보였다(10-24 실측 Shield23 · 「보호막이 UI에도 적용되는지」).
+        string plain = $"{Mathf.Max(0, hp)} / {Mathf.Max(1, maxHp)}";
+        string cur = hpText.text;
+        if (cur != null && cur.StartsWith(plain, System.StringComparison.Ordinal) && (cur.Length == plain.Length || cur[plain.Length] == ' '))
+            return;
+        hpText.text = plain;
     }
 }

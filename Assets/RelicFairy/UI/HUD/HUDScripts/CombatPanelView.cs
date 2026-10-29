@@ -340,8 +340,7 @@ public sealed partial class CombatPanelView : MonoBehaviour
             _hpTargetRatio = newRatio;
         }
 
-        if (hpText != null)
-            hpText.text = $"{clampedHp} / {clampedMax}";
+        WriteHpText(clampedHp, clampedMax);   // 보호막이 있으면 「+N」을 덧붙인다(CombatPanelView.Shield)
     }
 
     private void ApplyHpFill(float ratio)
@@ -1296,11 +1295,16 @@ public sealed partial class CombatPanelView : MonoBehaviour
     private void OnEnable()
     {
         SceneManager.sceneLoaded += HandleSceneLoaded;
+        RelicEvolutionCue.Procced += HandleRelicEvolutionProcced;   // 진화가 일한 순간 Q 칸 반짝임(10-23 W4)
         // 꺼져 있는 동안 만료된 알림이 한 프레임 번쩍이지 않게 즉시 정리한다.
         UpdateBuffNotice();
     }
 
-    private void OnDisable() => SceneManager.sceneLoaded -= HandleSceneLoaded;
+    private void OnDisable()
+    {
+        SceneManager.sceneLoaded -= HandleSceneLoaded;
+        RelicEvolutionCue.Procced -= HandleRelicEvolutionProcced;
+    }
 
     /// <summary>씬 전환(예: 게이트 통과) 시 전환성 획득/안내 알림을 즉시 클리어 — 다음 씬으로 잔류 방지.</summary>
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)

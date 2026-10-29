@@ -126,6 +126,21 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
 
     private const float RangedKeepMin = 2.5f;   // 원거리가 물러나기 시작하는 최소 거리(P3-⑥)
 
+    // 10-23 B5 원거리 사거리를 늘리며 — 벽(Wall 층) 너머로는 쏘지 않는다. 막히면 원거리 패턴을 고르지 않고 다가가 시야를 잡는다(보스 제외).
+    private const float LineOfFireHeight    = 1.2f;   // 투사체가 나가는 높이(MonsterRangedAttackSO.launchHeightOffset과 같게)
+    private const float LineOfFireChaseStop = 1.5f;   // 원거리만 가진 몬스터가 막힌 동안 걷는 멈춤 거리(길은 벽을 돌아간다)
+    private static int s_lineOfFireMask = -1;
+    private static Material s_beamMaterial;   // 광선 선 재질 하나를 같이 쓴다 — 시전마다 새로 만들고 지우지 않아 쌓였다(10-29 풀링 점검 #6) · 색은 선 정점 색
+
+    /// <summary>몬스터 → 플레이어 사이(투사체 높이)에 벽이 있다 — Wall 층만(Default 층 장식은 보지 않는다).</summary>
+    private static bool LineOfFireBlocked(MonsterContext ctx)
+    {
+        if (ctx.Monster.Grade == MonsterGrade.Boss || ctx.Runtime.PlayerTarget == null) return false;
+        if (s_lineOfFireMask < 0) s_lineOfFireMask = LayerMask.GetMask("Wall");
+        Vector3 up = Vector3.up * LineOfFireHeight;
+        return Physics.Linecast(ctx.Transform.position + up, ctx.Runtime.PlayerTarget.position + up, s_lineOfFireMask, QueryTriggerInteraction.Ignore);
+    }
+
     /// <summary>원거리만 가진 몬스터에게 플레이어가 너무 가깝다 — 공격 거리 절반(최소 2.5 m) 안.</summary>
     private bool TooCloseForRanged(MonsterContext ctx)
         => ctx.Runtime.DistToPlayer < Mathf.Max(RangedKeepMin, GetEffectiveEngageDistance() * 0.5f);
@@ -149,6 +164,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
     private int SelectPattern(MonsterContext ctx, PatternRuntime runtime)
     {
         float dist = ctx.Runtime.DistToPlayer;
+        bool? blocked = null;   // 벽 너머(10-23 B5) — 원거리 패턴을 볼 때 한 번만 잰다
         List<int> validIndices = null;
         List<int> highestPriorityIndices = null;
         int selectedPriority = int.MinValue;
@@ -161,6 +177,9 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
 
             if (runtime.IsCoolingDown(i))
                 continue;
+
+            if (SlotKindOf(ctx, i) == AttackSlotKind.Ranged && (blocked ??= LineOfFireBlocked(ctx)))
+                continue;   // 10-23 B5 벽 너머로는 쏘지 않는다
 
             validIndices ??= new List<int>();
             validIndices.Add(i);
@@ -520,8 +539,8 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         line.startColor = pattern.proceduralBeamColor;
         line.endColor = pattern.proceduralBeamColor;
 
-        var shader = Shader.Find("Sprites/Default");
-        line.material = new Material(shader);
+        if (s_beamMaterial == null) s_beamMaterial = new Material(Shader.Find("Sprites/Default"));
+        line.sharedMaterial = s_beamMaterial;
 
         var follower = go.AddComponent<BeamVfxFollower>();
         follower.Init(
@@ -721,14 +740,16 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
 
             // 역할 AI(P3-⑥) — 원거리만 가진 몬스터는 플레이어가 공격 거리 절반(최소 2.5 m) 안으로 들어오면 물러난다(공격 판단보다 먼저)
             if (_rangedOnly < 0) _rangedOnly = _owner.IsRangedOnly(ctx) ? 1 : 0;
-            if (_rangedOnly == 1 && _owner.TooCloseForRanged(ctx))
+            // 10-23 B5 원거리만 — 벽에 막히면 물러나지도 멈춰 쏘지도 않고 플레이어 쪽으로 걸어 시야를 잡는다
+            bool losBlocked = _rangedOnly == 1 && LineOfFireBlocked(ctx);
+            if (_rangedOnly == 1 && !losBlocked && _owner.TooCloseForRanged(ctx))
             {
                 MonsterAttackSlots.Release(ctx.Monster);
                 Retreat(ctx);
                 return;
             }
 
-            if (ctx.Runtime.DistToPlayer <= _owner.GetEffectiveEngageDistance())
+            if (!losBlocked && ctx.Runtime.DistToPlayer <= _owner.GetEffectiveEngageDistance())
             {
                 int selected = _owner.SelectPattern(ctx, _runtime);
                 if (selected >= 0)
@@ -754,7 +775,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
                 return;
             }
 
-            ctx.Agent.stoppingDistance = _owner.GetCloserPatternStoppingDistance(ctx, _runtime);
+            ctx.Agent.stoppingDistance = losBlocked ? LineOfFireChaseStop : _owner.GetCloserPatternStoppingDistance(ctx, _runtime);
 
             Vector3 targetPos = ctx.Runtime.PlayerTarget.position;
             // 근접은 다가오는 각을 몬스터마다 나눈다(−60 ~ +60°) — 한 줄로 따라붙지 않고 둘러싼다. 가까워지면(공격 거리 + 1.5 m) 곧장
@@ -769,7 +790,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
                 }
             }
             Run(ctx);
-            ctx.Agent.SetDestination(targetPos);
+            if (ctx.Agent.isOnNavMesh) ctx.Agent.SetDestination(targetPos);   // 내비메시 밖에서 켜진 몸은 매 프레임 오류(Error Pause)였다(10-25)
             FaceTarget(ctx);
             KeepChaseAnimation(ctx);
 
@@ -891,7 +912,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
                 return;
             }
             if (_rangedOnly < 0) _rangedOnly = _owner.IsRangedOnly(ctx) ? 1 : 0;
-            if (_rangedOnly == 1 && _owner.TooCloseForRanged(ctx))   // 역할 AI(P3-⑥) — 붙으면 쏘지 않고 물러난다
+            if (_rangedOnly == 1 && (_owner.TooCloseForRanged(ctx) || LineOfFireBlocked(ctx)))   // 역할 AI(P3-⑥) — 붙으면 쏘지 않고 물러난다 · 10-23 B5 벽에 가리면 다시 다가간다
             {
                 ctx.Monster.ChangeState<ChaseState>();
                 return;

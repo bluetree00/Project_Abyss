@@ -25,11 +25,10 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
     [TextArea, SerializeField]
     private string missingRangedHint = "원거리 장비가 없다 — <b>장비 공방</b>에서 활이나 석궁을 골라라.";
     [TextArea, SerializeField]
-    private string missingPartHint = "원거리 파츠가 없다 — <b>파츠 공방</b>에서 파츠 하나를 골라라.";
-    [TextArea, SerializeField]
     private string missingBothHint = "준비가 덜 됐다 — <b>장비 공방</b>(원거리) · <b>파츠 공방</b>(파츠) · <b>유물 성소</b>(유물)를 먼저 들러라.";
 
     private bool _entered;
+    private bool _waitExit;   // 악몽 갈림 창을 닫았다 — 트리거에서 나갔다 다시 들어와야 또 뜬다(머무름 반복 방지)
     private HudPresenter _hud;
     private float _lastNoticeTime = -999f;
     private bool _portalShown;
@@ -55,10 +54,15 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
     private void OnTriggerEnter(Collider other) => TryEnter(other);
     private void OnTriggerStay(Collider other)  => TryEnter(other);
 
+    private void OnTriggerExit(Collider other)
+    {
+        if (other.GetComponentInParent<PlayerController>() != null) _waitExit = false;
+    }
+
     /// <summary>충돌 시점에 전제조건을 검사한다(상시 폴링 없음). 미달이면 부족분 안내만 하고 통과시키지 않는다.</summary>
     private void TryEnter(Collider other)
     {
-        if (_entered) return;
+        if (_entered || _waitExit) return;
         var player = other.GetComponentInParent<PlayerController>();
         if (player == null) return;
 
@@ -69,7 +73,26 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
         }
 
         _entered = true;
-        // 심연 진입 연출(잉크 와이프 뒤 던전) — 연출 담당이 없는 씬이면 곧장 전환
+        // 악몽 해금(해방기 리치 첫 처치) 뒤엔 내려가기 전에 「해방기 / 악몽」을 고른다(10-29 설계 §4 — 성문 곁 받침 대신).
+        // 창이 시간 · 입력을 멈추니 그동안 씬이 안 바뀐다. 닫으면 안 내려간다.
+        if (StoryProgress.IsNightmareModeUnlocked)
+        {
+            NightmareGateChoice.Show(
+                nightmare =>
+                {
+                    StoryProgress.SetNightmareMode(nightmare);
+                    BaseCampFxDirector.Instance?.ApplyNightmareLook(nightmare, animate: true);
+                    Descend(player);
+                },
+                () => { _entered = false; _waitExit = true; });
+            return;
+        }
+        Descend(player);
+    }
+
+    /// <summary>심연 진입 연출(잉크 와이프 뒤 던전) — 연출 담당이 없는 씬이면 곧장 전환.</summary>
+    private static void Descend(PlayerController player)
+    {
         var fx = BaseCampFxDirector.Instance;
         if (fx != null) fx.EnterAbyssAsync(player).Forget();
         else BaseCampBootstrapper.Instance?.EnterDungeon();
@@ -103,16 +126,14 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
         bool noWeapon = loadout.WeaponSlot0 == null;
         bool noRanged = loadout.WeaponSlot1 == null;
         bool noRelic  = loadout.Relic == null;
-        bool noPart   = string.IsNullOrEmpty(loadout.StartPartId);
 
-        int missing = (noWeapon ? 1 : 0) + (noRanged ? 1 : 0) + (noRelic ? 1 : 0) + (noPart ? 1 : 0);
+        int missing = (noWeapon ? 1 : 0) + (noRanged ? 1 : 0) + (noRelic ? 1 : 0);
 
         string msg;
         if (missing == 0)   return;   // 준비됐는데 여기 온 건 레이스 — 다음 프레임 Update가 처리
         else if (missing > 1) msg = missingBothHint;   // 둘 이상 부족 — 통합 안내
         else if (noWeapon)    msg = missingWeaponHint;
         else if (noRanged)    msg = missingRangedHint;
-        else if (noPart)      msg = missingPartHint;
         else                  msg = missingRelicHint;
 
         if (_hud == null) _hud = FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
@@ -126,7 +147,7 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
         return loadout != null
             && loadout.Relic != null
             && loadout.WeaponSlot0 != null    // 무형검 — 각성 제단
-            && loadout.WeaponSlot1 != null    // 원거리 — 장비 공방. [서약 폐기] 서약은 대기방 조립 제단에서 획득 — 게이트 조건서 제외.
-            && !string.IsNullOrEmpty(loadout.StartPartId);   // 시작 파츠 — 파츠 공방(베이스캠프 재설계 §2)
+            && loadout.WeaponSlot1 != null;   // 원거리 — 장비 공방. [서약 폐기] 서약은 대기방 조립 제단에서 획득 — 게이트 조건서 제외.
+                                              // 시작 파츠는 10-29부터 제단 해금이 정한다 — 조건에서 뺐다
     }
 }

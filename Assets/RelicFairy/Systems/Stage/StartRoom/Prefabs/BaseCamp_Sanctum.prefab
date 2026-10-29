@@ -1504,8 +1504,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1362024205652669165}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 60.9, y: 9.05, z: 0}
+  m_LocalRotation: {x: 0, y: 0.9945219, z: 0, w: 0.10452842}
+  m_LocalPosition: {x: 76.25, y: 9.16, z: -22.62}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3357,9 +3357,6 @@ MonoBehaviour:
   beamMaterial: {fileID: 2100000, guid: 9ee388f762487c84f9b624ee392dd9cb, type: 2}
   moteMaterial: {fileID: 2100000, guid: 12fb1d84a82a2de4f8b3e8b1f2747b43, type: 2}
   labelFont: {fileID: 0}
-  newSealLine: "{0}\uC758 \uBD09\uC778\uC774 \uC130\uB2E4. \uC800 \uC218\uC815\uC774
-    \uBE5B\uB098\uB294 \uD55C, \uADF8\uAC83\uC740 \uB2E4\uC2DC \uAE68\uC5B4\uB098\uC9C0
-    \uBABB\uD55C\uB2E4."
 --- !u!1 &3707468885005885410
 GameObject:
   m_ObjectHideFlags: 0
@@ -22284,9 +22281,17 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 4496604847744319043}
     m_Modifications:
+    - target: {fileID: 1001775779, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1001775782, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
       propertyPath: looping
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1924701487, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1924701490, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
       propertyPath: looping
@@ -22297,15 +22302,50 @@ PrefabInstance:
       propertyPath: m_Name
       value: PortalVortex
       objectReference: {fileID: 0}
+    - target: {fileID: 136889939233582498, guid: ad086e0fe857e42498115575f8a88e39,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1924977842411482027, guid: ad086e0fe857e42498115575f8a88e39,
         type: 3}
       propertyPath: looping
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 1924977842411482027, guid: ad086e0fe857e42498115575f8a88e39,
+        type: 3}
+      propertyPath: EmissionModule.rateOverTime.scalar
+      value: 700
+      objectReference: {fileID: 0}
     - target: {fileID: 2196145004614185802, guid: ad086e0fe857e42498115575f8a88e39,
         type: 3}
       propertyPath: looping
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3042062912092360660, guid: ad086e0fe857e42498115575f8a88e39,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4336335809485325955, guid: ad086e0fe857e42498115575f8a88e39,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5086488535609003103, guid: ad086e0fe857e42498115575f8a88e39,
+        type: 3}
+      propertyPath: m_LocalScale.x
+      value: 2.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 5086488535609003103, guid: ad086e0fe857e42498115575f8a88e39,
+        type: 3}
+      propertyPath: m_LocalScale.y
+      value: 2.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 5086488535609003103, guid: ad086e0fe857e42498115575f8a88e39,
+        type: 3}
+      propertyPath: m_LocalScale.z
+      value: 2.5
       objectReference: {fileID: 0}
     - target: {fileID: 6496472656836085614, guid: ad086e0fe857e42498115575f8a88e39,
         type: 3}
@@ -22377,6 +22417,11 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7493566960985714516, guid: ad086e0fe857e42498115575f8a88e39,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7770903443404308967, guid: ad086e0fe857e42498115575f8a88e39,
         type: 3}
       propertyPath: looping
@@ -22386,46 +22431,6 @@ PrefabInstance:
         type: 3}
       propertyPath: looping
       value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1001775779, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1924701487, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4336335809485325955, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3042062912092360660, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7493566960985714516, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 136889939233582498, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5086488535609003103, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 2.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 5086488535609003103, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 2.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 5086488535609003103, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 2.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 1924977842411482027, guid: ad086e0fe857e42498115575f8a88e39, type: 3}
-      propertyPath: EmissionModule.rateOverTime.scalar
-      value: 700
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

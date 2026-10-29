@@ -100,6 +100,7 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
         if (_cam == null) { _cam = Camera.main; if (_cam == null) return; }
 
         int mask = VisibleMask(out int primary);
+        if (RankingHall.IsVisiting) mask = 0;   // 10-29 랭킹방(하늘 위 탑) 안에서는 거점 길잡이(목록 · ◆ 거리)가 쉰다
         Vector3 playerPos = Managers.Player?.PlayerTransform != null ? Managers.Player.PlayerTransform.position : Vector3.zero;
         float dt = Time.unscaledDeltaTime;
         float scale = Screen.height / 1080f;
@@ -169,7 +170,6 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
         int mask = 0;
         bool sword  = lo.WeaponSlot0 != null;
         bool ranged = lo.WeaponSlot1 != null;
-        bool part   = !string.IsNullOrEmpty(lo.StartPartId);
         bool relic  = lo.Relic != null;
 
         if (!sword)
@@ -180,8 +180,7 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
         {
             if (!ranged && _has[Ranged]) mask |= 1 << Ranged;
             if (!relic && _has[Relic]) mask |= 1 << Relic;
-            if (ranged && !part && _has[Parts]) mask |= 1 << Parts;   // 파츠는 원거리 무기에 끼우는 것 — 원거리 뒤에
-            if (ranged && part && relic && _has[Gate]) mask |= 1 << Gate;
+            if (ranged && relic && _has[Gate]) mask |= 1 << Gate;   // 파츠는 10-29부터 제단 해금이 정한다 — 표식 없음
             PollAltar();
             if (_has[Altar] && (_altarAffordable > 0 || _altarWaiting > 0)) mask |= 1 << Altar;
         }

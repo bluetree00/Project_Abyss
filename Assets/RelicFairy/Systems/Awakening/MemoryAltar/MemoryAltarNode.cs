@@ -171,6 +171,15 @@ public static class MemoryAltarCatalog
         return t;
     }
 
+    /// <summary>「증강의 계시」 단계 <paramref name="level"/>의 글 — 화면마다 · 런마다 확률(0단계 = 제단 없이 기본 확률).
+    /// 런마다는 <see cref="MeleeAugmentDraft.LegendChancePerRun"/>과 같은 셈(진화 직후 화면 제외 · 화면 7번).</summary>
+    public static string RevelationText(int level)
+    {
+        float p = MeleeAugmentDraft.LegendBase + MeleeAugmentDraft.LegendPerAltarLevel * level;
+        float run = 1f - UnityEngine.Mathf.Pow(1f - p, 7);
+        return $"화면마다 전설 {p * 100f:0}% · 런마다 약 {run * 100f:0}%";
+    }
+
     /// <summary>「결의」 단계 <paramref name="level"/>의 체력 문턱(0 = 안 삼 · 1단계 0.60 · 2단계 0.45).</summary>
     public static float ResolveThreshold(int level) => level >= 2 ? ResolveHpThresholdLv2 : level == 1 ? ResolveHpThresholdLv1 : 0f;
 
@@ -178,7 +187,7 @@ public static class MemoryAltarCatalog
     public const float MaxHpPctPerLevel   = 0.04f;   // 최대 체력 +4% — 제단에 남은 유일한 영구 스탯(사용자 10-14 「최대 체력만」)
     public const float RareOddsPerLevel   = 3f;      // Rare 룬 +3%p(Common에서 옮겨 온다)
     public const float EpicOddsPerLevel   = 2f;      // Epic 룬 +2%p(Epic 등장을 연 뒤)
-    public const float LegendOddsPerLevel = 1f;      // Legendary 룬 +1%p(Legendary 등장을 연 뒤)
+    public const float LegendOddsPerLevel = 1f;      // Legendary 룬 +1%p(「Legendary 룬 확률 ×10」을 연 뒤)
     public const float RefineEpicPerLevel = 0.03f;   // 정제소 Epic +3%p
     public const float SmithPerLevel      = 0.03f;   // 재련 강화 성공률 +3%p
     public const float OreGainPerLevel    = 0.10f;   // 원석 +10%
@@ -197,6 +206,12 @@ public static class MemoryAltarCatalog
     public const float ResolveInvulnSeconds  = 1f;      //            버틴 뒤 무적
     public const float SpringHealPerLevel    = 0.20f;   // 「재정비의 샘」 챕터 시작 샘 회복 +20%p/단계(50 → 90%)
     public const float NightmareSpringHealPerLevel = 0.10f;   //  악몽은 +10%p/단계(30 → 50%)
+    // ── 근접 버팀 3칸(10-29) — 효과를 읽는 쪽(47 · 플레이어 피격 · 방 입장)과 노드 글이 같은 값을 본다 ──
+    public static readonly float[] MeleeIronWillShield = { 0f, 0.08f, 0.12f, 0.16f };   // 단계 → 방 입장 보호막(최대 체력 비)
+    public static readonly float[] MeleeStanceReduction = { 0f, 0.06f, 0.10f, 0.14f };  // 단계 → 근접 무기 들 때 받는 피해 감소
+    public const float MeleeLastBreathHp        = 0.30f;   // 「버티는 숨」 체력 문턱
+    public const float MeleeLastBreathSeconds   = 2f;      //            지속
+    public const float MeleeLastBreathReduction = 0.50f;   //            받는 피해 감소
     /// <summary>해방 대비 3칸의 자물쇠 글 — 잠긴 이유 · 조건 줄에 그대로 나온다.</summary>
     public const string LiberationLockLabel  = "봉인이 풀린 뒤(해방기)에 연다";
 
@@ -245,6 +260,7 @@ public static class MemoryAltarCatalog
         /// <summary>10-02 재설계로 뺀 유물 노드 4개의 정수 환급을 마쳤는가(1회성 가드). 업적 진척 아님.</summary>
         public const string RemovedNodesRefunded = "altarRefund1002";
         public const string RemovedNodesRefunded1014 = "altarRefund1014";   // 「챕터 4 개방」 걷음 환급(1회)
+        public const string RemovedNodesRefunded1029 = "altarRefund1029";   // 「시작 파츠 둘」 걷음 환급(1회)
         public const string LevelsReset1014 = "altarLevels1014";   // 강화형 전환 리셋 · 환급(1회 — 사용자 「출시 전이니 리셋」)
 
         /// <summary>업적 진척으로 흘려보낼 기록 키 전량. 내부 가드(AwakeningRefunded)는 제외한다.</summary>
@@ -313,6 +329,7 @@ public static class MemoryAltarCatalog
     public const string GoldGain       = "gold_gain";          // 골드 +5%/단계
     public const string EssenceGain    = "essence_gain";       // 정수 +4%/단계
     public const string PotionHeal     = "potion_heal";        // 포션 회복 +4%p/단계(40% 기준 +10%)
+    public const string AugmentRevelation = MeleeAugmentDraft.LegendAltarNode;   // 증강의 계시 — 증강 전설 확률 +2%p/단계(10-24 W7 · 굴림은 MeleeAugmentDraft가 이 id로 읽는다)
 
     // ── 해방 대비(10-22 C10 권장안 B) — 「해방기 도달」 자물쇠(봉인기에 사면 효과가 없는 칸이라 잠근다 · D2) ──
     public const string LibWard        = "lib_ward";           // 해방의 내성 — 받는 피해 −4%/단계
@@ -320,6 +337,20 @@ public static class MemoryAltarCatalog
     public const string LibSpring      = "lib_spring";         // 재정비의 샘 — 챕터 시작 샘 회복 +20%p/단계
     /// <summary>해방 대비 3칸 — 해방기엔 「다음 목표」 별이 이 칸들을 먼저 가리킨다(D5 · <see cref="MemoryAltarService.GetNextGoal"/>).</summary>
     public static readonly string[] LiberationNodes = { LibWard, LibResolve, LibSpring };
+
+    // ── 근접 버팀 3칸(10-29 사용자 「근접 무기는 런 클리어가 굉장히 힘들다 — 해금 · 룬에 체력 보충 · 유지」 · 기획 설계 §2) ──
+    // 흡혈 · 회복 없음(보호막 · 받는 피해 감소 · 위기 버팀만) · 타격 · 처치마다 채우지 않는다 · 상한(보호막 총합 25% · 받피감소 총합 40%)은 효과 쪽(47)이 자른다.
+    public const string MeleeIronWill  = "melee_iron_will";     // 강철 의지 — 방에 들어설 때 보호막 최대 체력 8/12/16%(다음 방 들어설 때 지움)
+    public const string MeleeStance    = "melee_stance_guard";  // 근접 자세 — 근접 무기를 들고 있는 동안 받는 피해 −6/10/14%
+    public const string MeleeLastBreath = "melee_last_breath";  // 버티는 숨 — 근접 무기 · 체력 30% 아래로 떨어지는 순간 2초 받는 피해 −50%(방마다 1번)
+
+    // ── 시기 칸(10-29 사용자 「기억의 제단이 해방기나 악몽기에 더욱 잘 확장」 · 설계 §3 A) — 처음부터 보이고 시기 자물쇠만 ──
+    public const string LibGiftWide    = "lib_gift_wide";      // 넓은 선물 — 시작 선물 룬 3 → 4장 · 증강 2 → 3장(1단) · 유물 기억 두 번(2단)
+    public const string LibReroll      = "lib_reroll";         // 다시 뽑기 — 런마다 근접 증강 다시 뽑기 +1
+    public const string NmLight        = "nm_light";           // 빛 붙잡기 — 악몽 「흐려진 빛」 포션 2 → 3칸
+    public const string NmTame         = "nm_tame";            // 악몽 길들이기 — 챕터 악몽 규칙이 약해진다(NightmareRules)
+    public const string NmGift         = "nm_gift";            // 악몽의 선물 — 악몽 시작 선물 룬 갈래에 전설 한 장
+    public const string NightmareLockLabel = "악몽 보스를 한 번 쓰러뜨린 뒤에 연다";
 
     // ── 가운데 · 유물의 기억(10-02 재설계) — 유물 성장 「공명 그물」의 기억 카드를 넓힌다 ──
     public const string MemRedraw      = "mem_redraw";       // 런당 1회 기억 카드 3장 다시 굴리기
@@ -342,6 +373,12 @@ public static class MemoryAltarCatalog
     public static readonly (string id, int refund)[] RemovedNodes1014 =
     {
         (Chapter4, 800),
+    };
+
+    /// <summary>10-29 뺀 노드 — 「시작 파츠 둘」(사용자 「파츠는 해금하면 장착한 채 시작」). 기본가를 돌려준다.</summary>
+    public static readonly (string id, int refund)[] RemovedNodes1029 =
+    {
+        (StartParts2, 2200),
     };
 
     private static readonly MemoryAltarNode[] Nodes =
@@ -380,7 +417,7 @@ public static class MemoryAltarCatalog
             Rec.RefineCount, 30, "정제 30회", 250,
             parents: new[] { RuneEpic }, maxLevel: 5, requiredPoints: 8,
             valueText: lv => $"정제소 Epic +{RefineEpicPerLevel * 100f * lv:0}%p"),
-        new(RuneLegendary,  AltarBranch.Rune, "Legendary 룬 등장", "룬 최고 등급  Epic → Legendary",        2500,
+        new(RuneLegendary,  AltarBranch.Rune, "Legendary 룬 확률 ×10", "열기 전엔 드물게 나온다 · 열면 10배 자주", 2500,   // 10-29 해금 → 확률 업
             Rec.LibKills, 3, "해방된 보스 3회 처치", 1600,
             parents: new[] { RuneEpic }, size: AltarNodeSize.Keystone, era: 2, requiredPoints: 15),
         new(RuneLegendOdds, AltarBranch.Rune, "Legendary 룬 확률", "방 보상 Legendary 룬 확률", 720,
@@ -406,28 +443,31 @@ public static class MemoryAltarCatalog
         // ── 무기 — 무엇을 들고 싸우나(근접 + 원거리) ─────────
         // 주무기는 항상 무형검이고(시나리오), 카타나·대검은 런 안의 진화 분기라 노드가 아니다.
         // 원거리 시작 파츠는 베이스캠프 파츠 작업대에서 매 런 Lv1로 들고 나간다 — 분열의 시위는 기본으로 열려 있다(사용자 결정).
-        new(PartPierce,     AltarBranch.Weapon, "관통의 촉",        "시작 파츠  +관통",                450,
-            Rec.RoomClears, 30, "방 30회 클리어", 300),
+        // 10-24 사용자 「기억의 제단 활 쪽 빌드를 좀 더 낮은 재화에 뚫을 수 있게」 — 활 쪽(시작 파츠 넷 · 석궁)은 정가 · 업적가를 약 절반으로.
+        //   재련소가 제단에서 연 파츠만 받게 된 뒤(10-23 W6) 이 노드들이 곧 원거리 빌드의 문이다. 시기(era) · 앞 노드 조건은 그대로.
+        new(PartPierce,     AltarBranch.Weapon, "관통의 촉",        "런 시작부터  관통의 촉 Lv1",      250,
+            Rec.RoomClears, 30, "방 30회 클리어", 170),
         new(SigilSmith,     AltarBranch.Weapon, "재련 비용",  "재련 비용 할인",          400,   // 10-18 재련 개편 — 확률이 없어져 성공률 → 비용 −10%/단계(세이브 단계는 그대로)
             Rec.MaxEnhance, 12, "무기 +12 도달", 260, maxLevel: 3,   // 10-15 강화 단계 세분(옛 +6)
             valueText: lv => $"재련 비용 −{WeaponReforgeService.SigilCostPerLevel * 100f * lv:0}%"),
         new(EnhanceGain,    AltarBranch.Weapon, "강화재료 획득",  "방 보상 강화재료", 340, size: AltarNodeSize.Small, maxLevel: 3,
             valueText: lv => $"강화재료 +{EnhanceGainPerLevel * 100f * lv:0}%"),
-        new(WeaponCrossbow, AltarBranch.Weapon, "석궁",             "시작 원거리 무기  활 → 활·석궁",  900,
-            Rec.EliteKills, 5, "정예 5회 처치", 600, size: AltarNodeSize.Keystone, requiredPoints: 3),
-        new(PartPower,      AltarBranch.Weapon, "거력의 축",        "시작 파츠  +거력",                1200,
-            Rec.EliteKills, 12, "정예 12회 처치", 800, requiredPoints: 3),
-        new(PartHoming,     AltarBranch.Weapon, "추적의 깃",        "시작 파츠  +추적",                1500,
-            Rec.LibKills, 1, "해방된 보스 1회 처치", 950, era: 2, requiredPoints: 8),
-        // 시작 파츠가 셋(분열·관통·거력)은 있어야 「둘 들고 가기」가 고르는 일이 된다.
-        new(StartParts2,    AltarBranch.Weapon, "시작 파츠 둘",     "시작 파츠  1개 → 2개 들고 가기",  2200,
-            Rec.EliteKills, 40, "정예 40회 처치", 1400,
-            parents: new[] { PartPower }, era: 2, requiredPoints: 8),
+        // 10-24 W7(사용자 「증강도 등급 · 낮은 확률로 파격 효과 · 확률 증가를 기억의 제단과 연결 — 체감될 정도로」) —
+        // 근접 증강 화면마다 전설 한 장이 끼어들 확률 2% → 4 · 6 · 8%. 런마다(재련 화면 약 7번) 13% → 25 · 35 · 44%.
+        new(AugmentRevelation, AltarBranch.Weapon, "증강의 계시", "근접 증강 화면에 전설 카드가 끼어들 확률", 700, maxLevel: 3, requiredPoints: 3,
+            valueText: lv => RevelationText(lv)),
+        new(WeaponCrossbow, AltarBranch.Weapon, "석궁",             "시작 원거리 무기  활 → 활·석궁",  500,
+            Rec.EliteKills, 5, "정예 5회 처치", 330, size: AltarNodeSize.Keystone, requiredPoints: 3),
+        new(PartPower,      AltarBranch.Weapon, "거력의 축",        "런 시작부터  거력의 축 Lv1",      600,
+            Rec.EliteKills, 12, "정예 12회 처치", 400, requiredPoints: 3),
+        new(PartHoming,     AltarBranch.Weapon, "추적의 깃",        "런 시작부터  추적의 깃 Lv1",      800,
+            Rec.LibKills, 1, "해방된 보스 1회 처치", 500, era: 2, requiredPoints: 8),
+        // 「시작 파츠 둘」은 10-29 걷었다 — 연 파츠를 전부 끼운 채 시작하므로 고를 칸 수가 뜻이 없다(RemovedNodes1029 환급).
         // 승급 자체는 해금 없이도 된다(강화 MAX면 가능) — 해금이 넓히는 것은 <b>후보의 수</b>다.
         new(WeaponEvolve,   AltarBranch.Weapon, "전설 무기 3종", "승급할 전설 무기  1종 → 3종",     2600,
             Rec.LibKills, 3, "해방된 보스 3회 처치", 1650, size: AltarNodeSize.Keystone, era: 2, requiredPoints: 8),
-        new(PartExplode,    AltarBranch.Weapon, "작렬의 탄두",      "시작 파츠  +작렬",                2400,
-            Rec.NmKills, 1, "악몽 보스 1회 처치", 1550, era: 3, requiredPoints: 8),
+        new(PartExplode,    AltarBranch.Weapon, "작렬의 탄두",      "런 시작부터  작렬의 탄두 Lv1",    1200,
+            Rec.NmKills, 1, "악몽 보스 1회 처치", 780, era: 3, requiredPoints: 8),
 
         // ── 여정 — 얼마나 멀리 가나(버티기 · 재화 · 길의 상점 · 심연) ─────────
         // 버티는 쪽은 조건 없음: 벽을 넘게 해주는 것이라 무조건 열려야 한다.
@@ -444,6 +484,14 @@ public static class MemoryAltarCatalog
         // 해방기 압박(한 대 ×1.2 · 방 받는 피해 ×1.7)을 「견딜 만한 선」까지만 메운다 — 한 대는 거의 상쇄, 챕터 예산은 절반(남는 몫은 해방기의 어려움).
         // 영구 공격력 0 그대로 · 흡혈 없음(샘 = 쉼 · 결의 = 사망 방지 · 내성 = 받는 피해 감소). 10-14 「영구 스탯 = 최대 체력만」을 해방기 뒤 한정으로 푼다(D1).
         // 자물쇠 = 「해방기 도달」(D2). 생존 칸이라 할인 조건은 걸지 않는다(할인가 = 기본가). 값 합 8,190(샘 1,440 · 내성 3,870 · 결의 2,880).
+        // ── 근접 버팀 3칸(10-29 · 설계 §2) — 근접 무기를 들 때만 서는 버팀. 조건 없음(근접 런은 봉인기부터 힘들다) ──
+        new(MeleeIronWill,  AltarBranch.Journey, "강철 의지",  "방에 들어설 때 보호막(근접 무기를 들고 있으면) — 다음 방에 남지 않는다", 480, maxLevel: 3,
+            valueText: lv => lv <= 0 ? "보호막 없음" : $"방 들어설 때 보호막 최대 체력 {MeleeIronWillShield[System.Math.Clamp(lv, 0, 3)] * 100f:0}%"),
+        new(MeleeStance,    AltarBranch.Journey, "근접 자세",  "근접 무기를 들고 있는 동안 받는 피해가 줄어든다", 620, maxLevel: 3, requiredPoints: 3,
+            valueText: lv => lv <= 0 ? "받는 피해 그대로" : $"근접 무기 들 때 받는 피해 −{MeleeStanceReduction[System.Math.Clamp(lv, 0, 3)] * 100f:0}%"),
+        new(MeleeLastBreath, AltarBranch.Journey, "버티는 숨", "근접 무기 · 체력이 30% 아래로 떨어지는 순간 2초 받는 피해 −50%(방마다 한 번)", 950,
+            size: AltarNodeSize.Keystone, requiredPoints: 3,
+            valueText: lv => lv <= 0 ? "없음" : "체력 30% 아래 · 2초 받는 피해 −50% · 방마다 1번"),
         new(LibSpring,      AltarBranch.Journey, "재정비의 샘",  "챕터 시작 「요정의 샘」 회복량 — 단계마다 +20%p(악몽 +10%p)", 600,
             Rec.Liberated, 1, LiberationLockLabel, 600, conditionRequired: true, era: 2, maxLevel: 2,
             valueText: lv => $"요정의 샘 회복 {(0.5f + SpringHealPerLevel * lv) * 100f:0}%(악몽 {(0.3f + NightmareSpringHealPerLevel * lv) * 100f:0}%)"),   // 기본 50 · 악몽 30 = ChapterSpring
@@ -461,6 +509,12 @@ public static class MemoryAltarCatalog
             Rec.Liberated, 1, LiberationLockLabel, 1200, conditionRequired: true,
             size: AltarNodeSize.Keystone, era: 2, maxLevel: 2, requiredPoints: 3,
             valueText: lv => lv <= 0 ? "없음" : $"체력 {ResolveThreshold(lv) * 100f:0}% 이상 · 쓰러질 한 방 버팀"),
+        new(LibGiftWide,    AltarBranch.Journey, "넓은 선물",   "해방기 · 악몽 시작 선물이 넓어진다", 900,
+            Rec.Liberated, 1, LiberationLockLabel, 900, conditionRequired: true, era: 2, maxLevel: 2, requiredPoints: 3,
+            valueText: lv => lv <= 0 ? "룬 3장 · 증강 2장 · 유물 기억 한 번" : lv == 1 ? "룬 4장 · 증강 3장 · 유물 기억 한 번" : "룬 4장 · 증강 3장 · 유물 기억 두 번"),
+        new(LibReroll,      AltarBranch.Journey, "다시 뽑기",   "런마다 근접 증강 다시 뽑기 +1", 1100,
+            Rec.Liberated, 1, LiberationLockLabel, 1100, conditionRequired: true, era: 2, requiredPoints: 3,
+            valueText: lv => $"근접 증강 다시 뽑기 런마다 {MeleeAugmentDraft.RerollsPerRun + lv}번"),
         new(PotionSlot,     AltarBranch.Journey, "포션 칸",     "포션 칸",                1100,
             size: AltarNodeSize.Small, era: 2, maxLevel: 2, requiredPoints: 8,
             valueText: lv => $"포션 {3 + lv}칸"),
@@ -475,6 +529,15 @@ public static class MemoryAltarCatalog
         new(SigilAscetic,   AltarBranch.Journey, "고행자의 인장",  "보상 선택지 -1 · 정수 ×1.6 (켜고 끄기)", 3200,
             Rec.NmKills, 8, "악몽 보스 8회 처치", 2100,
             parents: new[] { AbyssDepth }, size: AltarNodeSize.Keystone, era: 3, requiredPoints: 15),
+        new(NmLight,        AltarBranch.Journey, "빛 붙잡기",   "악몽 「흐려진 빛」 — 포션을 하나 더 지닌다", 1200,
+            Rec.NmKills, 1, NightmareLockLabel, 1200, conditionRequired: true, era: 3, requiredPoints: 8,
+            valueText: lv => lv <= 0 ? "악몽 포션 2칸" : "악몽 포션 3칸"),
+        new(NmTame,         AltarBranch.Journey, "악몽 길들이기", "챕터마다 걸리는 악몽 규칙이 약해진다", 1600,
+            Rec.NmKills, 1, NightmareLockLabel, 1600, conditionRequired: true, size: AltarNodeSize.Keystone, era: 3, requiredPoints: 8,
+            valueText: lv => lv <= 0 ? "챕터 규칙 그대로" : "회피 소모 30 · 보호막 상한 20% · 서약 맺기 가능 · 스킬 대기 +12%"),
+        new(NmGift,         AltarBranch.Journey, "악몽의 선물", "악몽 시작 선물 룬 갈래에 전설 한 장이 낀다", 1400,
+            Rec.NmKills, 1, NightmareLockLabel, 1400, conditionRequired: true, era: 3, requiredPoints: 8,
+            valueText: lv => lv <= 0 ? "희귀 · 영웅만" : "전설 한 장 포함"),
     };
 
     /// <summary>

@@ -15,6 +15,7 @@ MonoBehaviour:
   useGuardCharge: 0
   lightAttackAnimSpeed: 0.77
   windupSpeedRatio: 0.6
+  maxSwingAttackSpeed: 1.35
   slashFollowSeconds: 0.15
   finisherRecoverySeconds: 0.3
   followSpeedCap: 1.6

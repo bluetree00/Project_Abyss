@@ -11,7 +11,7 @@
       "value3": 0.0,
       "max_stack": 1,
       "duration": 0,
-      "description": "1단계 잔불: 공격 적중 시 공격력 4% 화염 피해 추가",
+      "description": "1단계 잔불: 적중마다 공격력 4%의 잔불이 모여 5번째 적중에 한 번에 터진다",
       "stat_version": 1
     },
     {
@@ -25,7 +25,7 @@
       "value3": 5.0,
       "max_stack": 3,
       "duration": 3,
-      "description": "2단계 점화: 잔불 5회마다 점화 3초(초당 공격력 8% 3회)",
+      "description": "2단계 점화: 잔불이 터진 적에 점화 3초(초당 공격력 8% 3회)",
       "stat_version": 1
     },
     {

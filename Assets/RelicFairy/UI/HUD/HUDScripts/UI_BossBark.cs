@@ -428,7 +428,7 @@ namespace RelicFairy.UI
                 _label.fontSizeMin      = Mathf.Round(fontSize * ShrinkToRatio);
                 float side = Mathf.Max(0f, (_label.rectTransform.rect.width - MaxLineWidth) * 0.5f);
                 _label.margin = new Vector4(side, 0f, side, 0f);
-                _label.text   = text;
+                _label.text   = NoFauxBold(text);
             }
 
             if (_container != null)
@@ -656,6 +656,13 @@ namespace RelicFairy.UI
         /// 보스 초상 주소. 프롤로그 모르드레드도 보스 초상 하나를 타락 전 · 뒤 그대로 쓴다
         /// (10-22 사용자 「인트로에서 모르드레드만 일러스트가 없다」 → 「타락 후 그림을 전 · 후 계속 쓰는 게 좋다 — 리소스에 얼굴을 표현하지 못하니」).
         /// </summary>
+        /// <summary>
+        /// 굵게(&lt;b&gt;)를 조금 큰 글자로 바꾼다 — 톤 v2 Noto 글꼴(아틀라스 여백 9)에 가짜 굵게 + 부드러운 그림자가 겹치면
+        /// 이웃 글자 조각이 번져 「그대의 검」 같은 강조어가 깨져 보였다(10-23 사용자 「모르드레드 대사 중 깨지는 말」). 강조는 크기로 남긴다.
+        /// </summary>
+        private static string NoFauxBold(string text)
+            => string.IsNullOrEmpty(text) || !text.Contains("<b>") ? text : text.Replace("<b>", "<size=112%>").Replace("</b>", "</size>");
+
         private static string PortraitKey(DialogueSpeaker speaker) => speaker switch
         {
             DialogueSpeaker.ForestGuardian => "Portrait_Boss_ForestGuardian",

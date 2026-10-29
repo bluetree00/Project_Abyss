@@ -42,6 +42,8 @@ public abstract class MeleeAugmentEffect : ItemEffectBase
     }
 
     public string AugmentId => Def.Id;
+    /// <summary>분신(<see cref="PlayerGhostStrike"/>)을 쓰는가 — 켜질 때 미리 만들어 둔다(무기를 바꿀 때마다 사본 3개를 다시 뜨지 않게).</summary>
+    protected virtual bool UsesGhost => false;
     protected WeaponData Weapon => _weapon;
     /// <summary>진화 뒤 등 뒤 무형검 환영이 내는 무형검 증강인가(⑧-기획 A · 10-18).</summary>
     protected bool Phantom { get; private set; }
@@ -72,6 +74,7 @@ public abstract class MeleeAugmentEffect : ItemEffectBase
     {
         _runtime = WeaponFormRuntime.Of(ctx?.Player);
         if (Phantom) NamelessPhantom.Ensure(ctx?.Player);
+        if (UsesGhost) PlayerGhostStrike.Warm(ctx?.Player);   // 분신은 애니 이벤트 밖에서 미리(10-24 ④) — 분신을 쓰는 증강만(10-26: 일섬 · 진화 뒤 안개)
     }
 
     /// <summary>두 무기 칸의 증강 효과를 만들어 <paramref name="into"/>에 붙인다(<see cref="ItemEffectManager.Rebuild"/>가 룬 뒤에 부른다).</summary>
@@ -105,6 +108,9 @@ public abstract class MeleeAugmentEffect : ItemEffectBase
     protected static MonsterBase Monster(GameObject go) => go != null ? go.GetComponentInParent<MonsterBase>() : null;
     protected static float Atk(ItemEffectContext ctx) => ctx?.Player != null ? ctx.Player.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee) : 0f;
     protected static bool IsBasic => DamageSourceScope.Current == DamageSource.Basic;
+    /// <summary>근접 평타(지상 · 공중) 또는 장비 스킬(E · R) 적중인가.</summary>
+    protected static bool IsMeleeOrSkill(WeaponActionType t)
+        => t == WeaponActionType.GroundLight || t == WeaponActionType.AirLight || t == WeaponActionType.ESkill || t == WeaponActionType.RSkill;
 
     /// <summary>이 휘두름의 콤보 단계 — 슬래시가 나올 때 단계(판정이 남은 동안 단계가 넘어가도 그대로). 슬래시보다 먼저 맞은 휘두름은 지금 콤보 단계.</summary>
     protected int SwingStep(ItemEffectContext ctx)
@@ -114,6 +120,10 @@ public abstract class MeleeAugmentEffect : ItemEffectBase
     protected int SwingSerial => _runtime != null ? _runtime.SwingSerial : -1;
 
     protected bool IsFinisherStep(ItemEffectContext ctx) => _weapon != null && SwingStep(ctx) >= Mathf.Max(1, _weapon.groundEndCount) - 1;
+
+    /// <summary>이 휘두름에 카타나 형 풍절이 나간다(가득 · 막타 — 아직 안 나갔거나 방금 나갔다) — 같은 줄 검기를 또 내지 않는다(10-24 ③).</summary>
+    protected bool WindReleasesThisSwing(ItemEffectContext ctx)
+        => _runtime?.Current is WindbladeForm wf && (wf.ReleasedSerial == SwingSerial || (wf.IsFull && IsFinisherStep(ctx)));
 
     /// <summary>
     /// 근접 평타 적중이 이 휘두름의 첫 번째인가(이 효과 기준 — 효과마다 따로 센다). 이 효과가 부른 적중끼리만 비교한다.
@@ -141,12 +151,16 @@ public abstract class MeleeAugmentEffect : ItemEffectBase
 
 
 
-    /// <summary>증강 검기 한 줄 — 검기 · 바닥 띠 + 그 검기를 낸 분신(10-22 사용자 「추가 검기들을 … 복수의 투명 플레이어로」).</summary>
-    protected static void Wave(PlayerController p, Vector3 from, Vector3 dir, float length, float halfWidth)
+    /// <summary>
+    /// 증강 검기 한 줄(10-23 W1 · W2) — 분신이 나와 휘두르고, 그 칼이 닿는 순간 검기 · 바닥 띠가 나가 앞 끝이 지나가는 적을 그때 벤다.
+    /// 예전엔 발동 순간 피해를 한꺼번에 주고 검기 · 분신을 같은 순간에 띄워 「검기가 피해를 못 준다」 · 「분신이 휘두른 것 같지 않다」로 읽혔다(실측 86).
+    /// 10-26 무기 개편: 「추가 검기」 증강을 걷어 일섬만 쓴다 — 분신은 그림자 실루엣(D3 · 그림자 파트너와 같은 모습).
+    /// </summary>
+    protected static void WaveStrike(PlayerController p, Vector3 from, Vector3 dir, float length, float halfWidth, float damage,
+                                     HashSet<MonsterBase> hitOnce = null, Action<int> done = null)
     {
-        PlayerGhostStrike.ForWave(p, from, dir);
-        FormStrike.PlayWave(WaveVfx, from + Vector3.up, dir, length, halfWidth + StripBody);   // 앞 · 옆을 판정 모양에(10-18 ⑯)
-        FormStrike.GroundStrip(from, dir, length, halfWidth + StripBody, StripSeconds);
+        float lead = PlayerGhostStrike.ForWave(p, from, dir, PlayerGhostStrike.ShadowTint);
+        FormStrike.LineTravel(p, from, dir, length, halfWidth, damage, WaveVfx, lead, hitOnce, done, StripBody, StripSeconds);
     }
 
     protected static void Nova(Vector3 at, float radius, Vector3 forward)
@@ -192,96 +206,6 @@ public sealed class HeavySwingAugment : MeleeAugmentEffect
             if (_heavyNow) Log($"묵직한 손 — 휘두름 {_seen} 강타");
         }
         if (_heavyNow) ProcCoefficient.ArmHeavyNext();
-    }
-}
-
-/// <summary>튕기는 칼끝 — 평타 치명타가 둘레 5 m의 다른 적 N명(가까운 순)에게 튄다(치명 피해의 40% · 휘두름당 1번).</summary>
-public sealed class RicochetAugment : MeleeAugmentEffect
-{
-    private const float Range = 5f, Ratio = 0.4f;
-    public RicochetAugment(MeleeAugmentDef d, int r) : base(d, r) { }
-    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
-    {
-        if (!report.IsCrit || !FirstHitOfSwing(report)) return;   // 치명 적중끼리만 견주니 「휘두름의 첫 치명」
-        var p = ctx.Player;
-        var src = Monster(report.Target);
-        Vector3 from = report.Target.transform.position;
-        int n = CombatQuery.GetNearbyEnemies(from, Range, p.gameObject, 16, Buf);
-        int want = Mathf.RoundToInt(V), hit = 0;
-        float dmg = report.DamageDealt * Ratio;
-        for (int k = 0; k < want; k++)
-        {
-            int best = -1;
-            float bestD = float.MaxValue;
-            for (int i = 0; i < n; i++)
-            {
-                var e = Buf[i];
-                if (e == null || e.IsDead || e == src) continue;
-                float d = (e.transform.position - from).sqrMagnitude;
-                if (d < bestD) { bestD = d; best = i; }
-            }
-            if (best < 0) break;
-            var t = Buf[best];
-            Buf[best] = null;   // 다시 고르지 않게
-            CombatQuery.DealSynergyDamage(t, dmg, p.gameObject, 1f, isCrit: true);
-            Vector3 dir = t.transform.position - from;
-            FormStrike.PlayVfx(WaveVfx, from + Vector3.up, dir, WaveVfxPerMeter * dir.magnitude);
-            PlayerGhostStrike.ForWave(p, from, dir);   // 튕기는 갈래마다 분신(10-22)
-            hit++;
-        }
-        if (hit > 0) Log($"튕기는 칼끝 — {hit}명");
-    }
-}
-
-/// <summary>
-/// 칼자국 — 평타 휘두름마다(헛쳐도) 앞 바닥에 1.5초 칼자국 · 0.5초마다 그 위 적을 벤다.
-/// 칼자국 자리는 그리지 않는다 — 휘두름마다 띠 외곽선이 최대 6개 겹쳐 「평타마다 가이드라인」으로 보였다(10-16 사용자).
-/// 벨 때 적이 있으면 그 칼자국을 따라 작은 베기 이펙트(0.5초에 한 번까지)가 판정 자리를 보인다.
-/// </summary>
-public sealed class BladeScarAugment : MeleeAugmentEffect
-{
-    private const float Life = 1.5f, Interval = 0.5f, Forward = 1.4f, Length = 2.2f, HalfWidth = 0.7f;
-    private const float VfxGap = 0.5f;   // 베기 이펙트 간격 — 칼자국 여럿이 같은 적을 베도 이펙트는 한 번(이펙트 남발 금지)
-    private const int MaxScars = 6;
-    private readonly List<(Vector3 from, Vector3 dir, float until, float next)> _scars = new(MaxScars);
-    private int _seen = -1;
-    private float _vfxReadyAt;
-    public BladeScarAugment(MeleeAugmentDef d, int r) : base(d, r) { }
-    public override void OnTick(ItemEffectContext ctx, float dt)
-    {
-        var p = ctx?.Player;
-        if (p == null) return;
-        int s = SwingSerial;
-        if (s != _seen)
-        {
-            bool first = _seen < 0;
-            _seen = s;
-            if (!first && s >= 0 && IsActive(ctx))   // 처음 본 번호는 기준만 잡는다
-            {
-                if (_scars.Count >= MaxScars) _scars.RemoveAt(0);
-                Vector3 dir = p.AimForward, from = p.transform.position + dir * (Forward - Length * 0.5f);
-                _scars.Add((from, dir, Time.time + Life, Time.time + Interval));
-            }
-        }
-        if (_scars.Count == 0) return;
-        float dmg = Atk(ctx) * V * 0.01f;
-        for (int i = _scars.Count - 1; i >= 0; i--)
-        {
-            var sc = _scars[i];
-            if (Time.time >= sc.next)
-            {
-                int n = FormStrike.Line(p, sc.from, sc.dir, Length, HalfWidth, dmg, Buf);
-                if (n > 0 && Time.time >= _vfxReadyAt)
-                {
-                    _vfxReadyAt = Time.time + VfxGap;
-                    FormStrike.PlayWave(WaveVfx, sc.from + Vector3.up, sc.dir, Length, HalfWidth + StripBody);   // 판정 모양에(10-18 ⑯)
-                }
-                if (n > 0) Log($"칼자국 — 맞힘 {n}");
-                sc.next += Interval;
-                _scars[i] = sc;
-            }
-            if (Time.time >= sc.until) _scars.RemoveAt(i);
-        }
     }
 }
 
@@ -334,64 +258,6 @@ public sealed class HuntMarkAugment : MeleeAugmentEffect
         }
         FormStrike.GroundRing(at, Radius, RingSeconds);
         if (marked > 0) Log($"사냥꾼의 숨 — 사냥감 {marked}");
-    }
-}
-
-/// <summary>회피 베기 — 회피로 지나간 길의 적을 벤다(시작 자리는 회피 시작 사건에서 잡는다).</summary>
-public sealed class DodgeCutAugment : MeleeAugmentEffect
-{
-    private const float HalfWidth = 0.9f;
-    private PlayerController _p;
-    private Vector3 _from;
-    public DodgeCutAugment(MeleeAugmentDef d, int r) : base(d, r) { }
-    public override void OnActivate(ItemEffectContext ctx)
-    {
-        base.OnActivate(ctx);
-        _p = ctx?.Player;
-        if (_p != null) _p.OnDodgeStart += HandleDodgeStart;
-    }
-    public override void OnDeactivate()
-    {
-        if (_p != null) _p.OnDodgeStart -= HandleDodgeStart;
-        _p = null;
-    }
-    public override void OnRollEnd(ItemEffectContext ctx)
-    {
-        var p = ctx?.Player;
-        if (p == null) return;
-        Vector3 dir = p.transform.position - _from;
-        dir.y = 0f;
-        float len = dir.magnitude;
-        if (len < 0.5f) return;
-        int n = FormStrike.Line(p, _from, dir, len, HalfWidth, Atk(ctx) * V * 0.01f, Buf);
-        Wave(p, _from, dir / len, len, HalfWidth);
-        Log($"회피 베기 — {len:0.0} m 맞힘 {n}");
-    }
-    private void HandleDodgeStart()
-    {
-        if (_p != null) _from = _p.transform.position;
-    }
-}
-
-/// <summary>주문의 날 — E · R을 쓰면 다음 평타 3번(적중한 휘두름)이 앞 3 m 칼날 파동을 낸다.</summary>
-public sealed class SpellBladeAugment : MeleeAugmentEffect
-{
-    private const int Charges = 3;
-    private const float Length = 3f, HalfWidth = 0.9f;
-    private int _charges;
-    public SpellBladeAugment(MeleeAugmentDef d, int r) : base(d, r) { }
-    public override void OnSkillUse(ItemEffectContext ctx, SkillType skill)
-    {
-        if (skill != SkillType.Q) _charges = Charges;
-    }
-    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
-    {
-        if (_charges <= 0 || !FirstHitOfSwing(report)) return;
-        _charges--;
-        var p = ctx.Player;
-        int n = FormStrike.Line(p, p.transform.position, p.AimForward, Length, HalfWidth, Atk(ctx) * V * 0.01f, Buf);
-        Wave(p, p.transform.position, p.AimForward, Length, HalfWidth);
-        Log($"주문의 날 — 남은 {_charges} · 맞힘 {n}");
     }
 }
 
@@ -453,7 +319,8 @@ public sealed class ExecutionerAugment : MeleeAugmentEffect
         if (mb == null || mb.IsDead || mb.Grade == MonsterGrade.Boss || mb.Grade == MonsterGrade.Elite || mb.EffectiveMaxHp <= 0) return;
         if ((float)mb.CurrentHp / mb.EffectiveMaxHp > V * 0.01f) return;
         CombatQuery.DealSynergyDamage(mb, mb.CurrentHp * 2f + 10f, ctx.Player.gameObject);
-        FormStrike.PlayVfx(WaveVfx, mb.transform.position + Vector3.up, ctx.Player.AimForward, WaveVfxPerMeter * 2f);
+        // 그 자리 베기 — 예전엔 날아가는 검기를 띄워 피해 없는 검기가 뒤로 날아갔다(10-23 W1 「나오는 검기가 데미지를 주지 못한다」)
+        FormStrike.PlayVfx(NovaVfx, mb.transform.position + Vector3.up * 0.5f, ctx.Player.AimForward, NovaVfxPerMeter * 1.2f);
         Log("처형인 — 처형");
     }
 }
@@ -482,8 +349,8 @@ public sealed class MarkSpreadAugment : MeleeAugmentEffect
             if (src.Sunmark > 0)   dst.AddSunmark(1, src.SunmarkCap, ignoreGap: true);
             if (src.Blackspot > 0) dst.AddBlackspot(1, ignoreGap: true);
             if (src.Brand > 0)     dst.AddBrand(1, src.BrandCap, out _, ignoreGap: true);
-            Vector3 dir = e.transform.position - at;
-            FormStrike.PlayVfx(WaveVfx, at + Vector3.up, dir, WaveVfxPerMeter * dir.magnitude);
+            // 표식이 옮겨 가는 줄기 — 날아가는 검기는 피해가 없어 「검기가 피해를 못 준다」로 읽혔다(10-23 W1)
+            ElementVfxPlayer.PlayBeam(src.Brand > 0 ? RuneElement.Dark : RuneElement.Fire, at + Vector3.up * 0.8f, e.transform.position + Vector3.up * 0.8f);
             spread++;
         }
         if (spread > 0) Log($"표식 퍼뜨리기 — {spread}명");
@@ -514,43 +381,6 @@ public sealed class SlaughterChainAugment : MeleeAugmentEffect
     }
 }
 
-/// <summary>세 번째 칼(카타나) — 콤보 3타에 맞은 적마다(휘두름당 5명까지) 0.6초 뒤 X자 베기.</summary>
-public sealed class ThirdBladeAugment : MeleeAugmentEffect
-{
-    private const int Step = 2, MaxPerSwing = 5;
-    private const float Delay = 0.6f, CrossDeg = 45f, CrossLength = 2f;
-    private readonly List<(MonsterBase m, float at, float dmg)> _pending = new(8);
-    private readonly HashSet<MonsterBase> _seen = new();
-    public ThirdBladeAugment(MeleeAugmentDef d, int r) : base(d, r) { }
-    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
-    {
-        if (report.ActionType != WeaponActionType.GroundLight || report.IsRanged) return;
-        if (FirstHitOfSwing(report)) _seen.Clear();
-        if (SwingStep(ctx) != Step) return;
-        var mb = Monster(report.Target);
-        if (mb == null || mb.IsDead) return;
-        if (_seen.Count >= MaxPerSwing || !_seen.Add(mb)) return;
-        _pending.Add((mb, Time.time + Delay, Atk(ctx) * V * 0.01f));
-    }
-    public override void OnTick(ItemEffectContext ctx, float dt)
-    {
-        for (int i = _pending.Count - 1; i >= 0; i--)
-        {
-            var (m, at, dmg) = _pending[i];
-            if (Time.time < at) continue;
-            _pending.RemoveAt(i);
-            if (m == null || m.IsDead || ctx?.Player == null) continue;
-            CombatQuery.DealSynergyDamage(m, dmg, ctx.Player.gameObject);
-            Vector3 c = m.transform.position + Vector3.up, f = ctx.Player.AimForward;
-            Vector3 a = Quaternion.Euler(0f, CrossDeg, 0f) * f, b = Quaternion.Euler(0f, -CrossDeg, 0f) * f;
-            FormStrike.PlayVfx(WaveVfx, c - a * (CrossLength * 0.5f), a, WaveVfxPerMeter * CrossLength);
-            FormStrike.PlayVfx(WaveVfx, c - b * (CrossLength * 0.5f), b, WaveVfxPerMeter * CrossLength);
-            PlayerGhostStrike.ForWave(ctx.Player, m.transform.position, f);   // X자를 낸 분신(10-22)
-            Log("세 번째 칼 — X자 베기");
-        }
-    }
-}
-
 /// <summary>물 흐르듯(카타나) — 회피 뒤 1초 안 첫 적중이 회피 1칸을 돌려준다(V초에 한 번) — 회피와 평타를 끊김 없이 잇는다.</summary>
 public sealed class FlowAugment : MeleeAugmentEffect
 {
@@ -571,9 +401,10 @@ public sealed class FlowAugment : MeleeAugmentEffect
     }
 }
 
-/// <summary>안개 칼날(무형검) — 무형참 칼날이 맞힌 자리에 안개가 1.5초 남아 0.5초마다 벤다(같은 자리 1 m 안은 하나만 · 6개까지).</summary>
+/// <summary>안개 칼날(무형검) — E가 맞힌 자리에 안개가 1.5초 남아 0.5초마다 벤다(같은 자리 1 m 안은 하나만 · 6개까지). 어느 무기 E에나 — 진화 뒤엔 환영이 긋는다(10-24).</summary>
 public sealed class MistAugment : MeleeAugmentEffect
 {
+    protected override bool UsesGhost => Phantom;   // 진화 뒤 환영 몫만 분신을 쓴다
     private const float Life = 1.5f, Interval = 0.5f, Radius = 1.2f, Merge = 1f;
     private const int MaxZones = 6;
     private readonly List<(Vector3 c, float until, float next)> _zones = new(MaxZones);
@@ -587,7 +418,9 @@ public sealed class MistAugment : MeleeAugmentEffect
         if (_zones.Count >= MaxZones) _zones.RemoveAt(0);
         _zones.Add((c, Time.time + Life, Time.time + Interval));
         FormStrike.GroundRing(c, Radius, Life);
-        if (ctx?.Player != null) PhantomSwing(ctx.Player, c - ctx.Player.transform.position);
+        // 진화 뒤(환영 몫) — 다른 무형검 증강처럼 투명 분신이 안개 자리에서 긋는다(10-24 ⑤ · 떠 있는 무형검만 플레이어 앞에서 휘둘렀다)
+        if (ctx?.Player != null) PhantomSwing(ctx.Player, c - ctx.Player.transform.position);   // 등 뒤 떠 있는 무형검도 그쪽으로 가른다
+        if (Phantom && ctx?.Player != null) PlayerGhostStrike.ForWave(ctx.Player, c, c - ctx.Player.transform.position);
     }
     public override void OnTick(ItemEffectContext ctx, float dt)
     {
@@ -712,31 +545,6 @@ public sealed class ElementEdgeAugment : MeleeAugmentEffect
     }
 }
 
-/// <summary>검기 — 콤보 마지막 타 적중 때 앞으로 6 m 관통 검기(쌍검기면 ±20° 두 갈래 더).</summary>
-public sealed class SwordWaveAugment : MeleeAugmentEffect
-{
-    private const float Length = 6f, HalfWidth = 0.9f, TwinSpreadDeg = 20f;
-    public SwordWaveAugment(MeleeAugmentDef d, int r) : base(d, r) { }
-    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
-    {
-        if (!FirstHitOfSwing(report) || !IsFinisherStep(ctx)) return;
-        var p = ctx.Player;
-        Vector3 from = p.transform.position, dir = p.AimForward;
-        float dmg = Atk(ctx) * V * 0.01f;
-        int n = FormStrike.Line(p, from, dir, Length, HalfWidth, dmg, Buf);
-        Wave(p, from, dir, Length, HalfWidth);
-        Log($"검기 — 맞힘 {n}");
-
-        float twin = MeleeAugments.ValueOn(Weapon, MeleeAugmentCatalog.TwinWave);
-        if (twin <= 0f) return;
-        Vector3 a = Quaternion.Euler(0f, TwinSpreadDeg, 0f) * dir, b = Quaternion.Euler(0f, -TwinSpreadDeg, 0f) * dir;
-        int n2 = FormStrike.Lines(p, from, a, b, Length, HalfWidth, dmg * twin * 0.01f, Buf);
-        Log($"쌍검기 — 맞힘 {n2}");
-        Wave(p, from, a, Length, HalfWidth);
-        Wave(p, from, b, Length, HalfWidth);
-    }
-}
-
 /// <summary>충격파 — 강타 · 치명 적중 때 대상 둘레 충격(휘두름당 1번).</summary>
 public sealed class ImpactAugment : MeleeAugmentEffect
 {
@@ -763,10 +571,8 @@ public sealed class ThunderAugment : MeleeAugmentEffect
         Vector3 at = report.Target.transform.position, dir = at - p.transform.position;
         dir.y = 0f;
         if (dir.sqrMagnitude < 0.01f) dir = p.AimForward;
-        int n = FormStrike.Line(p, at, dir, Length, HalfWidth, Atk(ctx) * V * 0.01f, Buf);
-        // 바닥 띠 없이 이펙트만 — 대검 평타는 늘 강타라 매 타 띠가 깔렸다(10-16 사용자 「기본 공격마다 가이드라인」)
-        FormStrike.PlayVfx(WaveVfx, at + Vector3.up, dir.normalized, WaveVfxPerMeter * Length);
-        Log($"천둥 — 맞힘 {n}");
+        // 바닥 띠 없이 검기만 — 대검 평타는 늘 강타라 매 타 띠가 깔렸다(10-16 사용자 「기본 공격마다 가이드라인」) · 날아가며 벤다(10-23 W1)
+        FormStrike.LineTravel(p, at, dir, Length, HalfWidth, Atk(ctx) * V * 0.01f, WaveVfx, 0f, null, n => Log($"천둥 — 맞힘 {n}"), StripBody);   // 그림 폭 = 판정(몸 반경 포함 · 띠는 없음)
     }
 }
 
@@ -817,147 +623,454 @@ public sealed class GaleAugment : MeleeAugmentEffect
     }
 }
 
-/// <summary>지진(대검) — 콤보 마지막 타 적중 1초 뒤 그 앞 반경 3 m 땅울림(고리가 1초 동안 미리 보인다).</summary>
-public sealed class QuakeAugment : MeleeAugmentEffect
-{
-    private const float Delay = 1f, Radius = 3f, Forward = 1.5f;
-    private readonly List<(float at, Vector3 center, float dmg)> _pending = new(2);
-    public QuakeAugment(MeleeAugmentDef d, int r) : base(d, r) { }
-    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
-    {
-        if (!FirstHitOfSwing(report) || !IsFinisherStep(ctx)) return;
-        var p = ctx.Player;
-        Vector3 c = p.transform.position + p.AimForward * Forward;
-        _pending.Add((Time.time + Delay, c, Atk(ctx) * V * 0.01f));
-        FormStrike.GroundRing(c, Radius, Delay);   // 예고 = 판정
-    }
-    public override void OnTick(ItemEffectContext ctx, float dt)
-    {
-        for (int i = _pending.Count - 1; i >= 0; i--)
-        {
-            var (at, c, dmg) = _pending[i];
-            if (Time.time < at) continue;
-            _pending.RemoveAt(i);
-            if (ctx?.Player == null) continue;
-            int n = FormStrike.Radius(ctx.Player, c, Radius, dmg, Buf);
-            FormStrike.PlayVfx(NovaVfx, c, ctx.Player.AimForward, NovaVfxPerMeter * Radius);
-            Log($"지진 — 맞힘 {n}");
-        }
-    }
-}
+// ══ 전설(10-24 W7 · 설계 기획/RelicFairy_증강등급_전설_설계_20261023.md 권장 A) — 단계 없음 · 싸우는 방식을 바꾸는 규칙 ══
 
-/// <summary>거인의 걸음(대검) — 평타 휘두름마다(맞히지 않아도) 발밑 2 m 진동파 · 보스 외 0.3초 경직.</summary>
-public sealed class GiantStepAugment : MeleeAugmentEffect
+/// <summary>전설 바탕 — 발동마다 사건(e2 자막 · HUD) · 런에서 처음 터질 때만 머리 위 이름 한 번(매번 띄우면 화면이 시끄럽다).</summary>
+public abstract class LegendAugment : MeleeAugmentEffect
 {
-    private const float Radius = 2f, Stun = 0.3f, Forward = 0.8f;
-    private int _seen = -1;
-    public GiantStepAugment(MeleeAugmentDef d, int r) : base(d, r) { }
-    public override void OnTick(ItemEffectContext ctx, float dt)
-    {
-        int s = SwingSerial;
-        if (s == _seen) return;
-        bool first = _seen < 0;
-        _seen = s;
-        if (first || s < 0 || !IsActive(ctx)) return;   // 처음 본 번호는 기준만 잡는다
-        var p = ctx.Player;
-        Vector3 c = p.transform.position + p.AimForward * Forward;
-        int n = FormStrike.Radius(p, c, Radius, Atk(ctx) * V * 0.01f, Buf, Stun);
-        // 바닥 고리 없이 이펙트만(이펙트 크기 = 판정 반경) — 휘두름마다 고리가 깔려 「기본 공격마다 가이드라인」으로 보였다(10-16 사용자)
-        FormStrike.PlayVfx(NovaVfx, c, p.AimForward, NovaVfxPerMeter * Radius);
-        Log($"거인의 걸음 — 휘두름 {s} 맞힘 {n}");
-    }
-}
+    private static readonly HashSet<string> s_shown = new();
+    private static readonly Color NameColor = new(1f, 0.62f, 0.38f);
 
-/// <summary>형 없는 연타(무형검) — 콤보 마지막 타 적중 0.2초 뒤 앞 2.5 m를 한 번 더 벤다.</summary>
-public sealed class FormlessFollowAugment : MeleeAugmentEffect
-{
-    private const float Delay = 0.2f, Length = 2.5f, HalfWidth = 1f;
-    private float _at = -1f;
-    private float _dmg;
-    private Vector3 _from, _dir;
-    public FormlessFollowAugment(MeleeAugmentDef d, int r) : base(d, r) { }
-    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => s_shown.Clear();
+
+    /// <summary>새 런 — 첫 발동 이름을 다시 띄운다.</summary>
+    public static void ResetForRun() => s_shown.Clear();
+
+    protected LegendAugment(MeleeAugmentDef d, int r) : base(d, r) { }
+
+    protected void Proc(PlayerController p)
     {
-        if (!FirstHitOfSwing(report) || !IsFinisherStep(ctx) || ctx?.Player == null) return;
-        _at = Time.time + Delay;
-        _dmg = Atk(ctx) * V * 0.01f;
-        // 막타가 맞은 순간의 자리 · 방향 — 0.2초 뒤에 다시 읽으면 그새 돈 쪽으로 나가 맞힌 적을 비껴갔다(10-22 B3)
-        _from = ctx.Player.transform.position;
-        _dir = ctx.Player.AimForward;
-    }
-    public override void OnTick(ItemEffectContext ctx, float dt)
-    {
-        if (_at < 0f || Time.time < _at) return;
-        _at = -1f;
-        var p = ctx?.Player;
-        if (p == null) return;
-        int n = FormStrike.Line(p, _from, _dir, Length, HalfWidth, _dmg, Buf);
-        Wave(p, _from, _dir, Length, HalfWidth);
-        Log($"형 없는 연타{(Phantom ? "(환영)" : "")} — 맞힘 {n}");
+        MeleeAugments.RaiseLegendProcced(Def.Id);
+        if (p == null || !s_shown.Add(Def.Id)) return;
+        RelicFloatText.Show(p.transform.position + Vector3.up * 0.6f, Def.Name, NameColor);
     }
 }
 
 /// <summary>
-/// 무형일섬 잔상(무형검) — 무형일섬이 지나간 길을 도착 0.4초 뒤 잔상이 벤다.
-/// 진화 뒤(환영 몫)엔 새 무기 R이 돌진이 아니라 「지나간 길」이 없다 → R을 쓰고 0.5초 뒤 환영이 조준 방향 6 m를 가른다(⑧-기획 D3).
+/// L2 멈춘 시간 — 저스트 회피 순간 둘레 8 m 적이 2초 멈춘다(보스 · 정예는 이동 · 공격 50% 느려짐) · 그동안 근접 평타 적중마다 같은 피해로 한 번 더 벤다.
+/// 고리 = 멈추는 범위(판정).
 /// </summary>
-public sealed class AfterimageAugment : MeleeAugmentEffect
+public sealed class StoppedTimeLegend : LegendAugment
 {
-    private const float Delay = 0.4f, HalfWidth = 1.2f;
-    private const float PhantomDelay = 0.5f, PhantomLength = 6f;
+    private const float Radius = 8f, Seconds = 2f, BossSlow = 0.5f;
+    private const string StatusId = "aug_legend_time";
+    private PlayerController _p;
+    private float _until = -999f;
+    public StoppedTimeLegend(MeleeAugmentDef d, int r) : base(d, r) { }
+    public override void OnActivate(ItemEffectContext ctx)
+    {
+        base.OnActivate(ctx);
+        _p = ctx?.Player;
+        if (_p != null) _p.OnPerfectDodge += HandlePerfectDodge;
+    }
+    public override void OnDeactivate()
+    {
+        if (_p != null) _p.OnPerfectDodge -= HandlePerfectDodge;
+        _p = null;
+    }
+    private void HandlePerfectDodge(float _)
+    {
+        var p = _p;
+        if (p == null || p.WeaponManager == null || p.WeaponManager.CurrentWeaponData != Weapon) return;   // 이 무기를 들고 있을 때만
+        _until = Time.time + Seconds;
+        Vector3 at = p.transform.position;
+        int n = CombatQuery.GetNearbyEnemies(at, Radius, p.gameObject, 32, Buf), frozen = 0;
+        for (int i = 0; i < n; i++)
+        {
+            var e = Buf[i];
+            if (e == null || e.IsDead) continue;
+            if (e.Grade == MonsterGrade.Boss || e.Grade == MonsterGrade.Elite)
+            {
+                e.Status.ApplySlow(StatusId, BossSlow, Seconds);
+                e.Status.ApplyAttackSlow(StatusId, BossSlow, Seconds);
+            }
+            else e.ApplyStun(Seconds);
+            frozen++;
+        }
+        FormStrike.GroundRing(at, Radius, RingSeconds);
+        Log($"멈춘 시간 — {frozen}명");
+        Proc(p);
+    }
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
+    {
+        if (Time.time > _until || report.IsRanged || report.ActionType != WeaponActionType.GroundLight || report.Target == null || report.DamageDealt <= 0f) return;
+        CombatQuery.DealSynergyDamage(report.Target, report.DamageDealt * V * 0.01f, ctx.Player.gameObject);   // 같은 칼로 한 번 더(2차 피해라 다시 이 훅을 부르지 않는다)
+    }
+}
+
+/// <summary>
+/// L3 끝없는 칼날 — 치명이 난 평타 휘두름마다 치명 피해 +V% 쌓임(최대 10) · 치명이 하나도 없는 휘두름은 쌓인 것의 절반을 날린다 · 스킬 치명도 하나 쌓는다(스킬은 깎지 않는다).
+/// 휘두름이 끝났는지는 다음 휘두름 번호로 안다(그 휘두름의 적중을 다 모은 뒤 셈). 가득 차면 이름 한 번.
+/// 10-24: 예전엔 적중마다 따져 여러 적을 한 번에 치면 치명 아닌 적중이 섞여 금방 깎였다(점검) — 평타 한 번 = 한 번 판정.
+/// </summary>
+public sealed class EndlessEdgeLegend : LegendAugment
+{
+    private const int MaxStacks = 10;
+    private int _stacks, _swing = -1;
+    private bool _swingHit, _swingCrit;
+    public EndlessEdgeLegend(MeleeAugmentDef d, int r) : base(d, r) { }
+    public int Stacks => _stacks;
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
+    {
+        if (report.IsRanged || report.Target == null || report.DamageDealt <= 0f) return;
+        if (report.ActionType == WeaponActionType.GroundLight)
+        {
+            Settle(ctx);   // 새 휘두름의 첫 적중이면 앞 휘두름부터 센다
+            _swingHit = true;
+            _swingCrit |= report.IsCrit;
+            return;
+        }
+        if (report.IsCrit) Add(ctx.Player);   // 스킬 치명
+    }
+    public override void OnTick(ItemEffectContext ctx, float dt) => Settle(ctx);
+
+    /// <summary>휘두름 번호가 바뀌었으면 앞 휘두름을 센다 — 치명이 있었으면 +1, 맞히고도 치명이 없었으면 절반(헛친 휘두름은 그대로).</summary>
+    private void Settle(ItemEffectContext ctx)
+    {
+        int s = SwingSerial;
+        if (s == _swing) return;
+        if (_swingHit)
+        {
+            if (_swingCrit) Add(ctx?.Player);
+            else _stacks /= 2;
+        }
+        _swing = s;
+        _swingHit = _swingCrit = false;
+    }
+
+    private void Add(PlayerController p)
+    {
+        if (_stacks >= MaxStacks) return;
+        _stacks++;
+        if (_stacks == MaxStacks) { Log("끝없는 칼날 — 가득"); Proc(p); }
+    }
+    public override void ContributeDynamicStats(ItemEffectContext ctx, ref ItemDynamicStats dyn)
+    {
+        if (IsActive(ctx)) dyn.critDamage += _stacks * V * 0.01f;
+    }
+}
+
+/// <summary>
+/// L5 일섬(카타나) — E 돌진(성광베기)이 지나간 길을 도착 0.4초 뒤 분신이 한 번 더 벤다(공격력 V%) · 그 길에서 처치하면 E 재사용 대기 초기화.
+/// 성광베기 추가타 · 폭발이 벤 적을 길 밖으로 밀어내므로(넉백) 돌진이 벤 적을 기억해 두었다가, 길 밖으로 밀려난 그 적도 그 자리에서 벤다(실측 90 ⑤).
+/// </summary>
+public sealed class IssenLegend : LegendAugment
+{
+    protected override bool UsesGhost => true;   // 지나간 길 다시 베기 = 그림자 분신
+    private const float Delay = 0.4f, HalfWidth = 1.2f, CutLength = 2f;
     private float _at = -1f, _dmg;
-    private bool _aimAtFire;   // 환영 몫 — 길은 가르는 순간의 자리 · 조준으로 잡는다
     private Vector3 _from, _to;
-    public AfterimageAugment(MeleeAugmentDef d, int r) : base(d, r) { }
+    private readonly HashSet<MonsterBase> _dashed = new();   // 이번 돌진이 벤 적(일섬이 나갈 때까지 모은다)
+    private float _resetUntil = -1f;   // 처치했다 — 스킬이 끝나면 E 초기화(스킬 끝의 쿨 시작이 덮지 않게 · 10-24 ⑥)
+    public IssenLegend(MeleeAugmentDef d, int r) : base(d, r) { }
     public override void OnActivate(ItemEffectContext ctx)
     {
         base.OnActivate(ctx);
         MeleeAugments.SkillDashed += HandleDash;
     }
     public override void OnDeactivate() => MeleeAugments.SkillDashed -= HandleDash;
-    public override void OnSkillUse(ItemEffectContext ctx, SkillType skill)
+    private void HandleDash(WeaponData w, SkillType slot, Vector3 from, Vector3 to, float arriveIn, float atk)
     {
-        if (!Phantom || skill != SkillType.R || ctx?.Player == null) return;
-        _aimAtFire = true;
-        _at = Time.time + PhantomDelay;
-        _dmg = Atk(ctx) * V * 0.01f;
+        if (w != Weapon || slot != SkillType.E) return;
+        _from = from; _to = to;
+        _at = Time.time + arriveIn + Delay;
+        _dmg = atk * V * 0.01f;
+        _dashed.Clear();
+    }
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
+    {
+        if (_at < 0f || report.ActionType != WeaponActionType.ESkill) return;
+        var mb = Monster(report.Target);
+        if (mb != null && !mb.IsDead) _dashed.Add(mb);
     }
     public override void OnTick(ItemEffectContext ctx, float dt)
     {
+        var pl = ctx?.Player;
+        if (_resetUntil > 0f && pl != null && !pl.IsInSkillAction)
+        {
+            if (Time.time <= _resetUntil) { pl.CooldownTracker.ResetCooldown(SkillType.E); Log("일섬 — E 초기화(스킬 끝)"); }
+            _resetUntil = -1f;
+        }
         if (_at < 0f || Time.time < _at) return;
         _at = -1f;
         var p = ctx?.Player;
         if (p == null) return;
-        if (_aimAtFire)
-        {
-            _aimAtFire = false;
-            _from = p.transform.position;
-            _to = _from + p.AimForward * PhantomLength;
-        }
         Vector3 dir = _to - _from;
+        dir.y = 0f;
         float len = dir.magnitude;
         if (len < 0.3f) return;
-        int n = FormStrike.Line(p, _from, dir, len, HalfWidth, _dmg, Buf);
-        Wave(p, _from, dir / len, len, HalfWidth);
-        Log($"무형일섬 잔상{(Phantom ? "(환영)" : "")} — {len:0.0} m 맞힘 {n}");
+        var once = new HashSet<MonsterBase>();
+        var dashed = new List<MonsterBase>(_dashed);   // 다음 돌진이 지우기 전에 이번 몫을 떼어 둔다
+        _dashed.Clear();
+        float dmg = _dmg;
+        Vector3 f = dir / len;
+        WaveStrike(p, _from, f, len, HalfWidth, dmg, once, n =>
+        {
+            foreach (var m in dashed)   // 길 밖으로 밀려난 돌진 표적 — 그 자리 베기
+            {
+                if (m == null || m.IsDead || once.Contains(m)) continue;
+                once.Add(m);
+                CombatQuery.DealSynergyDamage(m, dmg, p.gameObject);
+                FormStrike.PlayVfx(WaveVfx, m.transform.position + Vector3.up - f * (CutLength * 0.5f), f, WaveVfxPerMeter * CutLength);
+                n++;
+            }
+            int kills = 0;
+            foreach (var m in once) if (m != null && m.IsDead) kills++;
+            if (kills > 0 && p != null)
+            {
+                if (p.IsInSkillAction) _resetUntil = Time.time + 3f;   // 아직 성광베기 중 — 끝나면(쿨 시작 뒤) 초기화
+                else p.CooldownTracker.ResetCooldown(SkillType.E);
+            }
+            Log($"일섬 — {len:0.0} m 맞힘 {n} · 처치 {kills}{(kills > 0 ? " · E 초기화" : "")}");
+        });
+        Proc(p);
     }
-    private void HandleDash(WeaponData w, SkillType slot, Vector3 from, Vector3 to, float arriveIn, float atk)
+}
+
+/// <summary>
+/// L6 대지 가르기(대검) — 콤보 마지막 타 적중 때 앞 8 m 균열(바닥 띠 = 판정)을 남기고 0.6초 뒤 솟구친다(공격력 V% · 보스 · 정예 외 0.8초 띄움(기절)).
+/// 솟구침 그림은 균열을 따라 2 m마다 · 균열 폭에 맞춘다(이펙트 = 판정).
+/// </summary>
+public sealed class RiftLegend : LegendAugment
+{
+    private const float Length = 8f, HalfWidth = 1.2f, Delay = 0.6f, Launch = 0.8f, Spacing = 2f;
+    private readonly List<(float at, Vector3 from, Vector3 dir, float dmg)> _pending = new(2);
+    public RiftLegend(MeleeAugmentDef d, int r) : base(d, r) { }
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
-        if (w != Weapon || slot != SkillType.R) return;
-        _from = from; _to = to;
-        _at = Time.time + arriveIn + Delay;
-        _dmg = atk * V * 0.01f;
+        if (!FirstHitOfSwing(report) || !IsFinisherStep(ctx)) return;
+        var p = ctx.Player;
+        Vector3 from = p.transform.position, dir = p.AimForward;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 1e-4f) return;
+        dir.Normalize();
+        _pending.Add((Time.time + Delay, from, dir, Atk(ctx) * V * 0.01f));
+        FormStrike.GroundStrip(from, dir, Length, HalfWidth, Delay);   // 예고 = 판정
+    }
+    public override void OnTick(ItemEffectContext ctx, float dt)
+    {
+        for (int i = _pending.Count - 1; i >= 0; i--)
+        {
+            var (at, from, dir, dmg) = _pending[i];
+            if (Time.time < at) continue;
+            _pending.RemoveAt(i);
+            var p = ctx?.Player;
+            if (p == null) continue;
+            int n = FormStrike.Line(p, from, dir, Length, HalfWidth, dmg, Buf);
+            for (int k = 0; k < Buf.Count; k++)
+            {
+                var e = Buf[k];
+                if (e == null || e.IsDead || e.Grade == MonsterGrade.Boss || e.Grade == MonsterGrade.Elite) continue;
+                if (FormStrike.DistToSegmentXZ(e.transform.position, from, from + dir * Length) > HalfWidth + CombatQuery.BodyReach(e)) continue;
+                e.ApplyStun(Launch);
+            }
+            for (float d = Spacing * 0.5f; d < Length; d += Spacing)
+                FormStrike.PlayVfx(NovaVfx, from + dir * d, dir, NovaVfxPerMeter * HalfWidth);
+            Log($"대지 가르기 — 맞힘 {n}");
+            Proc(p);
+        }
+    }
+}
+
+/// <summary>
+/// 그림자 파트너(카타나 · 10-26 무기 개편) — 곁의 그림자(<see cref="ShadowPartner"/> · 동작을 따라 하는 분신)가 평타 · 스킬(E · R)을 조금 늦게 따라 벤다: 분신마다 그 타격의 값%(재련할수록 +2%p).
+/// 재련 2 · 4회째에 분신이 하나씩 는다(<see cref="CloneCount"/> 1 → 3 · 10-26 사용자 「추가 재련 시 분신을 추가」).
+/// 그림자는 애니메이터를 그대로 따라 하므로 스킬 동작도 같이 하고, 스킬 타격은 약한 계수(<see cref="SkillShare"/> = 평타 몫의 절반)로 따라 벤다(10-26 사용자 「분신도 따라 스킬을 쓰되 약한 계수」).
+/// 추가 피해라 적중 효과(룬 · 유물 발동)는 붙지 않는다(D5). 평타는 맞힌 분신 자리에 옅은 어두운 베기가 난다(<see cref="ShadowPartner.EchoSlash"/>).
+/// </summary>
+public sealed class ShadowPartnerAugment : MeleeAugmentEffect
+{
+    private const float SkillShare = 0.5f;
+    private PlayerController _player;
+    private ShadowPartner _sp;   // 틱마다 찾지 않는다(10-26 검토 M5)
+
+    public ShadowPartnerAugment(MeleeAugmentDef d, int r) : base(d, r) { }
+
+    public override void OnActivate(ItemEffectContext ctx)
+    {
+        base.OnActivate(ctx);
+        _player = ctx?.Player;
+    }
+
+    public override void OnDeactivate()
+    {
+        if (_player != null && _player.TryGetComponent<ShadowPartner>(out var sp)) sp.Wanted = false;
+    }
+
+    public override void OnTick(ItemEffectContext ctx, float deltaTime)
+    {
+        if (ctx?.Player == null) return;
+        if (_sp == null) _sp = ShadowPartner.Ensure(ctx.Player);
+        _sp.Wanted = IsActive(ctx);
+        _sp.Count  = CloneCount(Weapon);
+    }
+
+    /// <summary>분신 수 — 진화 뒤 재련 0 ~ 1회 1 · 2 ~ 3회 2 · 4회 3.</summary>
+    public static int CloneCount(WeaponData w) => Mathf.Min(ShadowPartner.MaxClones, 1 + MeleeAugmentCatalog.ReforgesSinceEvolution(w) / 2);
+
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
+    {
+        if (!IsMeleeOrSkill(report.ActionType) || report.IsRanged || report.DamageDealt <= 0f || report.Target == null || ctx?.Player == null) return;
+        var p = ctx.Player;
+        var target = report.Target;
+        bool skill = report.ActionType == WeaponActionType.ESkill || report.ActionType == WeaponActionType.RSkill;
+        float dmg = report.DamageDealt * Def.ValueFor(Weapon) * 0.01f * (skill ? SkillShare : 1f);
+        int clones = CloneCount(Weapon);
+        for (int i = 0; i < clones; i++)
+        {
+            int slot = i;
+            FormStrike.After(p, ShadowPartner.DelayOf(slot), () =>   // 그 분신의 칼이 닿을 때(분신마다 늦음이 다르다)
+            {
+                if (target == null || !target.activeInHierarchy) return;
+                CombatQuery.DealSynergyDamage(target, dmg, p.gameObject);
+                if (!skill && _sp != null) _sp.EchoSlash(slot);   // 맞힌 분신 자리에 옅은 어두운 베기(10-26 · 스킬은 적중이 많아 그림 없음)
+                Log($"그림자 — {dmg:0.0}{(skill ? " · 스킬" : "")} · 분신 {slot + 1}");
+            });
+        }
+    }
+}
+
+/// <summary>
+/// 검풍(카타나 · 10-26 무기 개편) — 적을 맞힌 평타 휘두름 · 스킬(E · R) 한 번마다 값% 확률로 앞 6 m 관통 검기(공격력 둘째 값%) · 재련할수록 확률 +4%p · 피해 +5%p.
+/// 스킬은 여러 타가 나와도 한 번 시전에 한 번만 굴린다(E · R을 쓸 때 걸어 두고 그 시전의 첫 적중에 쓴다 · 10-26 사용자 「카타나도 증강 내용이 스킬에 적용」).
+/// 검기 분신(10-26 사용자 「분신 2종 — 검기를 날리는 분신 · 행동을 따라 하는 분신 · 엄청난 속도에 분신처럼 보인다는 컨셉」) — 발동하면 옆(좌우 번갈아)에
+/// 잔상 분신(<see cref="PlayerGhostStrike.ForWave"/> · 카타나 붉은 잔상 — 그림자 파트너의 어두운 실루엣과 다른 모습)이 나타나 앞으로 휘두르고, 그 칼이 닿는 순간 검기가 나간다.
+/// 풍절이 나가는 휘두름에는 내지 않는다.
+/// </summary>
+public sealed class SwordGustAugment : MeleeAugmentEffect
+{
+    private const float Length = 6f, HalfWidth = 0.9f, SideOffset = 0.9f;
+#if UNITY_EDITOR
+    /// <summary>실측 99 D — 확률을 이 값(%)으로(−1 = 증강 값).</summary>
+    public static float ProbeChance = -1f;
+#endif
+    private bool _skillArmed;   // E · R을 썼다 — 그 시전의 첫 적중에 한 번 굴린다(10-26 검토 I5 · 옛 1초 창은 E 직후 R을 못 굴렸다)
+    private bool _left;
+
+    public SwordGustAugment(MeleeAugmentDef d, int r) : base(d, r) { }
+
+    protected override bool UsesGhost => true;   // 잔상 분신을 미리 만들어 둔다(애니 이벤트 안에서 만들면 거부된다)
+
+    public override void OnSkillUse(ItemEffectContext ctx, SkillType skill)
+    {
+        if (skill == SkillType.E || skill == SkillType.R) _skillArmed = true;
+    }
+
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
+    {
+        if (ctx?.Player == null) return;
+        bool skill = report.ActionType == WeaponActionType.ESkill || report.ActionType == WeaponActionType.RSkill;
+        if (skill)
+        {
+            if (report.IsRanged || report.Target == null || !_skillArmed) return;
+            _skillArmed = false;
+        }
+        else
+        {
+            if (!FirstHitOfSwing(report)) return;
+            if (WindReleasesThisSwing(ctx)) { Log("검풍 — 풍절 휘두름이라 건너뜀"); return; }
+        }
+        Log(skill ? "검풍 굴림(스킬)" : "검풍 굴림");
+        float chance = Def.ValueFor(Weapon);
+#if UNITY_EDITOR
+        if (ProbeChance >= 0f) chance = ProbeChance;
+#endif
+        if (UnityEngine.Random.value * 100f >= chance) return;
+        var p = ctx.Player;
+        float atk = Atk(ctx);
+        float dmg = atk * Def.Value2For(Weapon) * 0.01f;
+        Vector3 fw = p.AimForward;
+        fw.y = 0f;
+        fw = fw.sqrMagnitude > 0.0001f ? fw.normalized : p.transform.forward;
+        _left = !_left;
+        Vector3 from = p.transform.position + Vector3.Cross(Vector3.up, fw) * (_left ? -SideOffset : SideOffset);
+        float lead = PlayerGhostStrike.ForWave(p, from, fw);   // 옆에 잔상 분신 — 휘두른 칼이 닿을 때 검기가 나간다
+        FormStrike.LineTravel(p, from, fw, Length, HalfWidth, dmg, WaveVfx, lead, null,
+                              n => Log($"검풍 — 피해 {dmg:0.0} · 공격력 {atk:0.0} · 맞힘 {n}"), StripBody, StripSeconds);
+    }
+}
+
+/// <summary>
+/// 칼끝 베기(대검 · 10-26 R 개편 범위 규칙) — 평타가 판정 반경 바깥 35% 띠(칼끝)에 걸린 적을 맞히면 그 타격의 값%(재련할수록 +5%p)를 더 준다.
+/// 띠는 반경에 비례하므로 범위가 넓을수록(속성 검 ×1.3 · 「거대한 칼날」) 넓고 멀다 — 거리를 잡고 칼끝으로 베는 플레이를 보상한다.
+/// 거리 = 몸 가장자리까지(큰 몬스터도 칼끝에 닿으면 칼끝). 추가 피해라 적중 효과는 붙지 않는다.
+/// 지상 평타만 — 공중 베기는 판정 모양(반경 · 앞으로 치우침)이 달라 띠가 맞지 않는다(10-26 검토 M4).
+/// </summary>
+public sealed class TipStrikeAugment : MeleeAugmentEffect
+{
+    private const float Band = 0.35f, FlashScale = 0.6f;
+    private const string FlashKey = "SwordStrikeFlash";
+
+    public TipStrikeAugment(MeleeAugmentDef d, int r) : base(d, r) { }
+
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
+    {
+        if (report.ActionType != WeaponActionType.GroundLight
+            || report.IsRanged || report.DamageDealt <= 0f || report.Target == null || ctx?.Player == null) return;
+        var p = ctx.Player;
+        float r = GiantSwordBuff.SwingRadiusFor(p, SwingStep(ctx));
+        var mb = Monster(report.Target);
+        Vector3 d = report.Target.transform.position - p.transform.position;
+        d.y = 0f;
+        float edge = d.magnitude - (mb != null ? mb.BodyRadius : 0f);
+        if (edge < r * (1f - Band)) return;
+        float bonus = report.DamageDealt * Def.ValueFor(Weapon) * 0.01f;
+        CombatQuery.DealSynergyDamage(report.Target, bonus, p.gameObject);
+        FormStrike.PlayVfx(FlashKey, report.Target.transform.position + Vector3.up * 0.8f, d, FlashScale);   // 칼끝 섬광 — 띠에 걸렸다는 신호
+        Log($"칼끝 — 거리 {edge:0.00} / 반경 {r:0.00} · +{bonus:0.0}");
+    }
+}
+
+/// <summary>
+/// 휩쓸기(대검 · 10-26 R 개편 범위 규칙) — 한 휘두름에 2명 이상 맞히면 첫 적 뒤 한 명마다: 속성 검(R) 중이면 지속 +둘째 값초(시전마다 최대 3초 ·
+/// <see cref="GiantSwordBuff.Extend"/>), 아니면 R 재사용 대기 −값초(휘두름마다 최대 1초). 재련할수록 −0.05초 · +0.03초.
+/// 넓게 휩쓸수록 R이 자주 · 오래 켜지고, 켜지면 범위가 ×1.3 넓어져 더 많이 맞힌다(순환).
+/// </summary>
+public sealed class SweepAugment : MeleeAugmentEffect
+{
+    private const float MaxCutPerSwing = 1f;
+    private readonly HashSet<int> _hitThisSwing = new();
+    private int _serial = int.MinValue;
+    private float _cutThisSwing;
+
+    public SweepAugment(MeleeAugmentDef d, int r) : base(d, r) { }
+
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
+    {
+        if ((report.ActionType != WeaponActionType.GroundLight && report.ActionType != WeaponActionType.AirLight)
+            || report.IsRanged || report.DamageDealt <= 0f || report.Target == null || ctx?.Player == null) return;
+        int s = SwingSerial;
+        if (s < 0) return;   // 휘두름 번호를 못 받는다(받는 쪽 없음) — 휘두름마다 셀 수 없다(10-26 검토 M3)
+        if (s != _serial) { _serial = s; _hitThisSwing.Clear(); _cutThisSwing = 0f; }
+        if (!_hitThisSwing.Add(report.Target.GetInstanceID()) || _hitThisSwing.Count < 2) return;   // 첫 적 · 같은 적은 세지 않는다
+        var p = ctx.Player;
+        if (GiantSwordBuff.IsActive(p))
+        {
+            float add = GiantSwordBuff.Extend(p, Def.Value2For(Weapon));
+            if (add > 0f) Log($"휩쓸기 — {_hitThisSwing.Count}명째 · 속성 검 +{add:0.00}초");
+            return;
+        }
+        float cut = Mathf.Min(Def.ValueFor(Weapon), MaxCutPerSwing - _cutThisSwing);
+        if (cut <= 0f || p.CooldownTracker == null || p.CooldownTracker.IsReady(SkillType.R)) return;
+        p.CooldownTracker.ReduceCooldown(SkillType.R, cut);
+        _cutThisSwing += cut;
+        Log($"휩쓸기 — {_hitThisSwing.Count}명째 · R 대기 −{cut:0.00}초");
     }
 }
 
 /// <summary>지금 든 근접 무기의 증강 질의 — 스킬 · 형 · 각인 코드가 효과 객체 없이 바로 읽는 값.</summary>
 public static class MeleeAugments
 {
-    /// <summary>스킬 돌진이 정해졌다(무기 · 칸 · 시작 · 끝 · 도착까지 초 · 그때 공격력) — 무형일섬 잔상이 듣는다.</summary>
+    /// <summary>스킬 돌진이 정해졌다(무기 · 칸 · 시작 · 끝 · 도착까지 초 · 그때 공격력) — 잔상 일섬(R) · 일섬 전설(E)이 듣는다.</summary>
     public static event Action<WeaponData, SkillType, Vector3, Vector3, float, float> SkillDashed;
 
+    /// <summary>전설 증강이 터졌다(id) — 첫 발동 자막 · HUD는 e2가 듣는다(10-24 W7).</summary>
+    public static event Action<string> LegendProcced;
+    internal static void RaiseLegendProcced(string id) => LegendProcced?.Invoke(id);
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void ResetStatics() => SkillDashed = null;
+    private static void ResetStatics() { SkillDashed = null; LegendProcced = null; }
 
     /// <summary>지금 든 근접 무기 — 증강 그림 색 계열이 읽는다.</summary>
     internal static WeaponData CurrentWeapon => Current();

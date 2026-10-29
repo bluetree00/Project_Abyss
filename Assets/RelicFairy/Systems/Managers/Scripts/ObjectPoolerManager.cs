@@ -41,6 +41,7 @@ public class ObjectPoolerManager
     private class PooledObjectInfo : MonoBehaviour
     {
         public string key;
+        public bool   inPool;   // 큐에 들어 있다 — 두 번 반환 막기(10-29 풀 점검 3)
     }
 
     // =========================
@@ -147,10 +148,14 @@ public class ObjectPoolerManager
     {
         if (obj == null) return;
 
+        // 10-29 풀 점검 3 — 이미 풀에 든 것을 또 돌려받으면(DespawnAfter 타이머와 다른 회수가 겹칠 때) 큐에 두 번 들어가
+        // 다음 두 스폰이 같은 오브젝트를 받았다(이펙트가 순간이동하거나 일찍 사라짐). 두 번째 반환은 무시한다.
+        bool pooled = obj.TryGetComponent(out PooledObjectInfo info);
+        if (pooled && info.inPool) return;
+
         obj.GetComponent<IPooledObject>()?.OnDespawn();
 
-        if (!obj.TryGetComponent(out PooledObjectInfo info) ||
-            !_pools.TryGetValue(info.key, out var queue))
+        if (!pooled || !_pools.TryGetValue(info.key, out var queue))
         {
             // 비풀 경로: AddressableManager.InstantiateAsync로 만든 추적 인스턴스(예: 보스)면
             // ReleaseInstance로 핸들까지 정식 해제(+GO 파괴)해 장부 누수를 막고, 아니면 일반 Destroy.
@@ -163,6 +168,7 @@ public class ObjectPoolerManager
 
         obj.SetActive(false);
         obj.transform.SetParent(_categoryRoots[_configs[info.key].poolType], false);
+        info.inPool = true;
         queue.Enqueue(obj);
     }
 
@@ -271,6 +277,7 @@ public class ObjectPoolerManager
             }
             instance = queue.Dequeue(); // 파괴된 오브젝트면 null → 다시 루프
         }
+        if (instance.TryGetComponent(out PooledObjectInfo pooledInfo)) pooledInfo.inPool = false;
 
         instance.transform.SetPositionAndRotation(position, rotation);
         instance.SetActive(true);
@@ -309,6 +316,7 @@ public class ObjectPoolerManager
 
         obj.SetActive(false);
         obj.transform.SetParent(_categoryRoots[_configs[info.key].poolType], false);
+        info.inPool = true;
         _pools[info.key].Enqueue(obj);
     }
 

@@ -320,9 +320,6 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
         }
     }
 
-    /// <summary>소환 기준선 하한에 닿았다 — 소환 패턴이 시작할 때까지 「막힘」(피해 숫자 없이 막힘 표시).</summary>
-    private bool SummonHolding => _runtime != null && SummonFloorHp > 0 && _runtime.CurrentHp <= SummonFloorHp;
-
     /// <summary>착지 뒤 지상 사슬(10-22 E3 D1) — 지상이고, 착지한 지 <see cref="GroundChainHoldSeconds"/>초 안이며, 아직 지상 패턴을 안 썼다.</summary>
     private bool GroundChainPending => _dragonBB != null && _dragonBB.BodyState == BodyState.Grounded && Time.time < _groundChainUntil;
 
@@ -344,6 +341,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
     private DragonTailSweepPatternSO     _tailSweepSO;        // 꼬리 휩쓸기 — 등 뒤 머묾 판정(10-22 E3 D5) · 컨피그에 없으면 null
     private DragonAirMeteorPassiveRunner _meteorPassiveRunner;
     private System.Threading.CancellationTokenSource _meteorPassiveCts;
+    private DragonMeteorCastState        _meteorCastState;      // 수동 운석 부르는 동작(10-23 B4) — 처음 쓸 때 만든다
     private Vector3                      _preEntranceSpawnPos;
     private bool                         _hasPreEntranceSpawnPos;
     private float                        _groundChainUntil;   // 착지 뒤 지상 사슬이 끝나는 시각(Time.time · 10-22 E3 D1)
@@ -765,7 +763,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     /// <summary>소환 게이트(무적) 구간도 「막힘」으로 읽히게 한다(공용 규약).</summary>
-    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || (_dragonBB != null && _dragonBB.IsSummonGated) || SummonHolding;
+    // 소환 기준선에 닿은 뒤 소환이 시작할 때까진 체력 하한(SummonFloorHp)만 — 무적 · 막힘 표시는 소환 패턴이 켠다(10-29 사용자 — 무적은 패턴 발동이 보인 뒤에)
+    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || (_dragonBB != null && _dragonBB.IsSummonGated);
 
     public override void TakeDamage(float amount, GameObject instigator,
         float knockbackMultiplier = 1f,
@@ -777,15 +776,16 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
             _dragonBB.SetHitDirection(dir, transform.forward);
         }
 
-        // 소환 무적(소환 패턴 중) · 기준선 하한에 닿음(소환 대기) — 막힘. 무적은 소환 패턴이 시작할 때만 건다(10-06).
-        if (_dragonBB != null && (_dragonBB.IsSummonGated || SummonHolding)) return;
+        // 소환 무적(소환 패턴이 이륙을 마친 뒤 ~ 새끼 용을 다 잡을 때) — 막힘. 기준선에 닿아 소환을 기다리는 동안은 체력 하한만(10-29)
+        if (_dragonBB != null && _dragonBB.IsSummonGated) return;
 
         base.TakeDamage(amount, instigator, knockbackMultiplier, isCrit);
 
         // 지상 피격 시 히트스톱 (poise 파괴 = 강타격, 일반 = 약타격)
         // TimeScaleArbiter를 경유하는 HitFeelService 사용 — KillImpact 보호 윈도 자동 적용됨
         bool isAirborne = _dragonBB != null && _dragonBB.BodyState == BodyState.Airborne;
-        if (!isAirborne)
+        // 공격 멈칫 끔(10-24 · DealtHitStop false)을 여기서도 따른다 — 화살이 연달아 맞으면 세상이 5%로 거의 계속 멈췄다(10-29 47 · 4c 실측)
+        if (!isAirborne && HitFeelService.DealtHitStop)
         {
             float dur = (_dragonBB != null && _dragonBB.IsPoiseBroken) ? 0.14f : 0.05f;
             HitFeelService.HitStop(0.05f, dur);
@@ -883,6 +883,52 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
             _abyssBaseHue[i]  = _abyssMats[i].GetFloat(HueId);
             _abyssBaseTint[i] = _abyssMats[i].GetColor(TintId);
         }
+    }
+
+    // ── 수동 운석 부르기(10-23 B4 사용자 「메테오를 떨어뜨리면 그만한 상호작용 애니메이션 · 이펙트 연출」) ──
+    private const float MeteorCueLead = 0.3f;   // 동작 없이 신호만 낼 때 — 섬광 뒤 첫 예고까지
+
+    /// <summary>지상 — 패턴이 끝나길 잠깐 기다리면 하늘을 부르는 동작을 넣을 수 있다(공중이면 기다리지 않고 신호만).</summary>
+    public bool MeteorCastWorthWaiting => _dragonBB != null && _dragonBB.BodyState == BodyState.Grounded;
+
+    /// <summary>지금 동작을 넣을 수 있는가 — 지상 · 쫓기/공격 대기(패턴 · 경직 · 페이지 전환 · 등장 연출 아님).</summary>
+    public bool CanMeteorCastPose
+        => _runtime != null && !_runtime.IsDead && MeteorCastWorthWaiting
+           && (_dormantState == null || !_dormantState.IsActive)
+           && !IsInSpecialState && !IsCcActive && !Pages.Transitioning
+           && (IsInState<ChaseState>() || IsInState<DragonRunChaseState>() || IsInState<AttackReadyState>());
+
+    /// <summary>
+    /// 수동 운석 버스트를 부른다 — 동작을 넣을 수 있으면 하늘을 부르는 동작(<see cref="DragonMeteorCastState"/>)으로 바꾸고 신호까지 남은 초를,
+    /// 아니면 신호(<see cref="PlayMeteorCastCue"/>)만 내고 짧은 틈을 돌려준다. 첫 운석 예고는 그 뒤에.
+    /// </summary>
+    public float BeginMeteorCast()
+    {
+        if (CanMeteorCastPose)
+        {
+            _meteorCastState ??= new DragonMeteorCastState();
+            _runner?.EnsureMinBreakCooldown(DragonMeteorCastState.Seconds);   // 동작 중에 패턴이 덮지 않게 — 동작은 패턴이 아니라 쉬는 시간 계산은 그대로
+            ChangeState(_meteorCastState);
+            return DragonMeteorCastState.ReleaseAt;
+        }
+        PlayMeteorCastCue();
+        return MeteorCueLead;
+    }
+
+    /// <summary>부르는 신호 — 입(Jaw)에서 하늘로 터지는 섬광(2페이지는 검은 불) · 비를 부르는 소리. 버스트마다 한 번.</summary>
+    public void PlayMeteorCastCue()
+    {
+        var so = _passiveMeteorSO;
+        if (so == null) return;
+        Vector3 at = _entranceVfxPoint != null ? _entranceVfxPoint.position : transform.position + Vector3.up * 3f;
+        var prefab = IsAbyssPage && so.CastVfxAbyssPrefab != null ? so.CastVfxAbyssPrefab : so.CastVfxPrefab;
+        if (prefab != null)
+        {
+            Vector3 up = (transform.forward * 0.4f + Vector3.up).normalized;   // 입 앞 위로
+            var fx = BossEffectPool.SpawnOneShot(prefab, at, Quaternion.LookRotation(up), fallbackLifetime: 1.5f);
+            if (fx != null) fx.transform.localScale = Vector3.one * so.CastVfxScale;
+        }
+        Managers.Sound?.PlayEffectAt(so.RainSfx, at, so.CastSfxVolume);
     }
 
     private void StartMeteorPassiveRunner()

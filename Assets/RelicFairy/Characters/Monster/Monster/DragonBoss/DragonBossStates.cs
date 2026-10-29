@@ -863,6 +863,64 @@ public class DragonDieState : DieState
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 수동 운석 부르기 (10-23 B4)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/// <summary>
+/// 수동 운석 버스트 앞 「하늘을 부르는 동작」(10-23 B4 사용자 「메테오를 떨어뜨리면 그만한 상호작용 애니메이션 · 이펙트」).
+/// 지상에서 쫓거나 기다리던 중에만(<see cref="DragonBossMonster.CanMeteorCastPose"/>) — 멈춰 플레이어를 보고, 공허 낙하 지상 시전 · 2페이지 포효와 같은
+/// <c>UAttackWindHighStart</c>(몸을 세우고 날개를 친다) → <see cref="ReleaseAt"/>초에 입 섬광 · 부르는 소리 → <see cref="Seconds"/>초 뒤 공격 대기.
+/// 패턴(특수 상태)이 아니다 — 패턴 러너의 쉬는 시간 · 연계 계산을 건드리지 않는다. 포이즈가 깨지면 경직이 덮는다(그때도 신호는 낸다).
+/// </summary>
+public class DragonMeteorCastState : IMonsterState
+{
+    public const float   ReleaseAt = 0.45f;
+    public const float   Seconds   = 1.0f;
+    private const string CastAnim  = "UAttackWindHighStart";
+    private const float  TurnCap   = 180f;   // 화룡 회전 초당 상한(10-18)
+
+    private float _t;
+    private bool  _released;
+
+    public void Enter(MonsterContext ctx)
+    {
+        _t        = 0f;
+        _released = false;
+        if (ctx.Agent != null && ctx.Agent.enabled && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
+        if (ctx.Animator != null && ctx.Animator.HasState(0, Animator.StringToHash(CastAnim)))
+        {
+            ctx.Animator.speed = 1f;
+            ctx.Animator.CrossFade(CastAnim, 0.15f, 0, 0f);
+        }
+    }
+
+    public void Update(MonsterContext ctx)
+    {
+        _t += Time.deltaTime;
+        if (ctx.Runtime.PlayerTarget != null)
+        {
+            Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+            dir.y = 0f;
+            if (dir.sqrMagnitude > 0.001f)
+                ctx.Transform.rotation = Quaternion.RotateTowards(ctx.Transform.rotation, Quaternion.LookRotation(dir), TurnCap * Time.deltaTime);
+        }
+        if (!_released && _t >= ReleaseAt) Release(ctx);
+        if (_t >= Seconds) ctx.Monster.ChangeState<AttackReadyState>();
+    }
+
+    public void Exit(MonsterContext ctx)
+    {
+        if (!_released && !ctx.Runtime.IsDead) Release(ctx);   // 경직 등으로 끊겨도 운석의 까닭은 보인다
+    }
+
+    private void Release(MonsterContext ctx)
+    {
+        _released = true;
+        (ctx.Monster as DragonBossMonster)?.PlayMeteorCastCue();
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 지상 회전 호 이동 헬퍼
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

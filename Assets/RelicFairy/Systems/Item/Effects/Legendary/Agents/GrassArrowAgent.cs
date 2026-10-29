@@ -13,6 +13,7 @@ public sealed class GrassArrowAgent : LegendaryProjectileBase
         { SoundKey.Sfx.MonsterHit1, SoundKey.Sfx.MonsterHit2, SoundKey.Sfx.MonsterHit3 };
 
     private static readonly List<GrassArrowAgent> s_active = new();
+    private static Material s_trailMat;   // 꼬리 재질 하나를 같이 쓴다(10-24)
 
     /// <summary>활성화된 모든 화살을 즉시 제거한다 (룸 전환·비활성화 시 호출).</summary>
     public static void ClearAll()
@@ -62,7 +63,7 @@ public sealed class GrassArrowAgent : LegendaryProjectileBase
         trail.minVertexDistance = 0.05f;
         trail.startColor = new Color(0.15f, 0.85f, 0.1f, 0.95f);
         trail.endColor   = new Color(0.15f, 0.85f, 0.1f, 0f);
-        trail.material   = new Material(Shader.Find("Sprites/Default"));
+        trail.sharedMaterial = s_trailMat != null ? s_trailMat : (s_trailMat = new Material(Shader.Find("Sprites/Default")));   // 화살마다 새로 만들고 풀지 않았다(발동당 8개 · 10-24)
         trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         trail.receiveShadows    = false;
     }

@@ -28,23 +28,27 @@ public static class DKGridPatternHelper
     // 검정 계열 VFX 틴트 — 순수 black(0,0,0)은 파티클에 곱해져 소멸하므로 어두운 보라로 대체
     public static readonly Color DarkTint = new Color(0.05f, 0f, 0.12f, 1f);
 
-    // 가산 파트가 주된 이펙트용 검정 틴트 — DarkTint는 가산 파트를 지워 영혼 창 빔이 안 보였다(10-03). DarkTint는 다른 패턴이 그대로 쓴다
+    // 가산 파트가 주된 이펙트용 검정 틴트 — DarkTint는 가산 파트를 지워 영혼 창 빔이 안 보였다(10-03). 베기 이펙트도 10-24부터 이것(검은 검 베기가 거의 안 보였다)
     public static readonly Color DarkReadableTint = new Color(0.55f, 0.15f, 0.85f, 1f);
 
     /// <summary>판정 이만큼 전부터 맞는 칸(검 색 칸)을 신호 빨강으로 — 예고 시간 · 판정은 그대로(10-11 사용자 「어떤 공격이 위험한지 더 알려줘야」).</summary>
     public const float ArmLead = 0.25f;
     // 베기 이펙트 최대 수명 — 반복 Sword Slash 15가 2.75초 남아 판정 뒤에도 위험한 줄로 읽혔다. 검 소환은 베기 1.2초 뒤 판정이라 그보다 길게(10-11 이펙트 톤 2차)
     private const float SlashVfxMaxSeconds = 1.6f;
+    // Sword Slash 15의 충격(베임 · 바닥 갈라짐 · 섬광 버스트)은 생성 0.51초 뒤에 나온다 — 판정 순간에 만들면 갈라짐이 피해보다 0.5초 늦고,
+    // 순차 베기(피라미드 · 일반 베기)는 실제 맞는 줄보다 2~3줄 뒤처져 보였다(10-24 사용자 「공격 범위랑 가이드라인이랑 다른 것도」).
+    private const float SlashImpactAt   = 0.51f;
+    private const float SlashImpactLead = 0.05f;   // 건너뛴 뒤 충격까지 — 판정 프레임과 거의 같이
     // ── 칸 예고 색(10-23 가이드 색 통일 — 「실제로 맞는 칸 = 빨강」 한 가지 규칙) ──────────
     // 맞는 칸: 깔리는 순간 공용 공격 색(PatternGuideHelper.AttackFill)으로 차오름 → 판정 ArmLead초 전 신호 빨강(Active) · 더 밝게.
     // 안 맞는 칸: 흑/백 그림 대신 옅은 무채색 하나(검 색은 검 · 갑옷 · 베기 이펙트가 알린다). 어두운 바닥 · 유리 결계 너머에서도 읽히게 발광을 준다.
-    private static Color ChargeColor => new Color(PatternGuideHelper.AttackFill.r, PatternGuideHelper.AttackFill.g, PatternGuideHelper.AttackFill.b, 0.72f);
+    private static Color ChargeColor => new Color(PatternGuideHelper.AttackFill.r, PatternGuideHelper.AttackFill.g, PatternGuideHelper.AttackFill.b, 0.8f);   // 0.72 → 0.8(10-24 「너무 안 보여」)
     private static Color ArmColor    => new Color(PatternGuideHelper.Active.r, PatternGuideHelper.Active.g, PatternGuideHelper.Active.b, 0.9f);
     private static readonly Color SafeColor = new Color(0.80f, 0.82f, 0.86f, 0.32f);   // 옅은 무채색 — 안전 흰색보다 어둡고 옅게
-    private const float ChargeEmission = 1.3f;
-    private const float ArmEmission    = 2.2f;    // 1.5 → 2.2 — 유리 결계 너머에서도 신호가 튀게(10-23)
+    private const float ChargeEmission = 1.6f;    // 1.3 → 1.6(10-24 사용자 「챕터3 보스 패턴이 너무 안 보여」)
+    private const float ArmEmission    = 2.8f;    // 1.5 → 2.2 — 유리 결계 너머에서도 신호가 튀게(10-23) → 2.8(10-24)
     private const float SafeEmission   = 0.12f;
-    private const float EdgeGlow       = 1.35f;   // 맞는 칸 둘레 테두리 — 칸보다 이만큼 더 밝게(또렷한 가장자리)
+    private const float EdgeGlow       = 1.5f;    // 맞는 칸 둘레 테두리 — 칸보다 이만큼 더 밝게(또렷한 가장자리 · 10-24 1.35 → 1.5)
     private static readonly Color EdgeNeutral         = new Color(0.86f, 0.88f, 0.92f, 0.9f);   // 테두리 기본 — 밝은 무채색(흑/백 어느 칸이든 같은 선)
     private static readonly Color EdgeNeutralEmission = new Color(0.30f, 0.31f, 0.33f, 1f);
     private static readonly int   BaseMapId = Shader.PropertyToID("_BaseMap");
@@ -147,6 +151,30 @@ public static class DKGridPatternHelper
         bool changed = false;
         foreach (var t in tiles)
             changed |= Paint(t.GO, t.Color == swordColor ? hit : TileLook.Safe);
+        if (changed) RestyleEdges();
+    }
+
+    /// <summary>
+    /// 안전 원(방패 · 부서진 기둥) 안 칸을 「안 맞는 칸」으로 — 판정은 원 안을 면제하는데 칸이 붉게 남아 예고와 판정이 달랐다(10-24 사용자 「공격 범위랑 가이드라인이 다르다」).
+    /// 칸 색을 검 색의 반대로 바꿔 <see cref="ArmBefore"/>가 다시 붉게 칠하지 않게 하고, 칠한 칸은 원래 재질로 되돌린 뒤 안 맞는 칸 모습으로(칠하기는 약해지지 않으므로).
+    /// </summary>
+    public static void MarkSafeWithin(List<DKTileInfo> tiles, Vector3 center, float radius, DKSwordColor swordColor)
+    {
+        if (tiles == null) return;
+        float r2 = radius * radius;
+        DKSwordColor other = swordColor == DKSwordColor.White ? DKSwordColor.Black : DKSwordColor.White;
+        bool changed = false;
+        for (int i = 0; i < tiles.Count; i++)
+        {
+            var t = tiles[i];
+            if (t.GO == null || t.Color != swordColor) continue;
+            Vector3 d = t.GO.transform.position - center;
+            if (d.x * d.x + d.z * d.z > r2) continue;
+            t.Color  = other;
+            tiles[i] = t;
+            Disarm(t.GO);
+            changed |= Paint(t.GO, TileLook.Safe);
+        }
         if (changed) RestyleEdges();
     }
 
@@ -258,7 +286,7 @@ public static class DKGridPatternHelper
     public static void SpawnCrossVfx(GameObject prefab, Vector2Int playerCell, DKSwordColor swordColor)
     {
         if (prefab == null) return;
-        Color tint  = swordColor == DKSwordColor.White ? Color.white : DarkTint;
+        Color tint  = swordColor == DKSwordColor.White ? Color.white : DarkReadableTint;
         float colLen = (DKBossRoomContext.Height - 2) * DKBossRoomContext.CellSize;
         float rowLen = (DKBossRoomContext.Width  - 2) * DKBossRoomContext.CellSize;
 
@@ -277,9 +305,9 @@ public static class DKGridPatternHelper
     public static void SpawnSingleRowVfx(GameObject prefab, int rowZ, DKSwordColor swordColor)
     {
         if (prefab == null) return;
-        Color tint = swordColor == DKSwordColor.White ? Color.white : DarkTint;
+        Color tint = swordColor == DKSwordColor.White ? Color.white : DarkReadableTint;
         Vector3 pos = DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, rowZ, 0.1f);
-        SpawnStretchedVfx(prefab, pos, Quaternion.Euler(0f, 90f, 0f), RowLineLength(), tint);
+        SpawnStretchedVfx(prefab, pos, Quaternion.Euler(0f, 90f, 0f), RowLineLength(), tint, atImpact: true);   // 줄마다 판정 순간에 만든다
     }
 
     /// <summary>
@@ -330,7 +358,7 @@ public static class DKGridPatternHelper
                                              int ring, DKSwordColor swordColor)
     {
         if (prefab == null) return;
-        Color tint  = swordColor == DKSwordColor.White ? Color.white : DarkTint;
+        Color tint  = swordColor == DKSwordColor.White ? Color.white : DarkReadableTint;
         int   bx    = bossCell.x, bz = bossCell.y;
         float scale = (2 * ring + 1) * DKBossRoomContext.CellSize * 0.1f; // 변 길이(칸) × CellSize × 0.1
 
@@ -341,7 +369,7 @@ public static class DKGridPatternHelper
             if (DKBossRoomContext.IsInterior(bx, bz))
                 SpawnStretchedVfx(prefab,
                     DKBossRoomContext.CellToWorld(bx, bz, 0.1f),
-                    Quaternion.identity, cs * 0.1f, tint);
+                    Quaternion.identity, cs * 0.1f, tint, atImpact: true);
             return;
         }
 
@@ -349,25 +377,25 @@ public static class DKGridPatternHelper
         if (DKBossRoomContext.IsInterior(bx, bz + ring))
             SpawnStretchedVfx(prefab,
                 DKBossRoomContext.CellToWorld(bx, bz + ring, 0.1f),
-                Quaternion.Euler(0f, 90f, 0f), scale, tint);
+                Quaternion.Euler(0f, 90f, 0f), scale, tint, atImpact: true);
 
         // 하단 변 중앙 (x=bx, z=bz-ring): 가로
         if (DKBossRoomContext.IsInterior(bx, bz - ring))
             SpawnStretchedVfx(prefab,
                 DKBossRoomContext.CellToWorld(bx, bz - ring, 0.1f),
-                Quaternion.Euler(0f, 90f, 0f), scale, tint);
+                Quaternion.Euler(0f, 90f, 0f), scale, tint, atImpact: true);
 
         // 좌측 변 중앙 (x=bx-ring, z=bz): 세로
         if (DKBossRoomContext.IsInterior(bx - ring, bz))
             SpawnStretchedVfx(prefab,
                 DKBossRoomContext.CellToWorld(bx - ring, bz, 0.1f),
-                Quaternion.identity, scale, tint);
+                Quaternion.identity, scale, tint, atImpact: true);
 
         // 우측 변 중앙 (x=bx+ring, z=bz): 세로
         if (DKBossRoomContext.IsInterior(bx + ring, bz))
             SpawnStretchedVfx(prefab,
                 DKBossRoomContext.CellToWorld(bx + ring, bz, 0.1f),
-                Quaternion.identity, scale, tint);
+                Quaternion.identity, scale, tint, atImpact: true);
     }
 
     /// <summary>
@@ -455,7 +483,7 @@ public static class DKGridPatternHelper
         DKSwordColor swordColor,
         DKVfxGroupMode mode)
     {
-        Color tint = swordColor == DKSwordColor.White ? Color.white : DarkTint;
+        Color tint = swordColor == DKSwordColor.White ? Color.white : DarkReadableTint;
 
         if (mode == DKVfxGroupMode.PerCell)
         {
@@ -501,14 +529,28 @@ public static class DKGridPatternHelper
     /// 줄 전체를 덮도록 VFX를 스폰한다.
     /// localScale.z = lineLength 로 Z 축 방향으로 늘린다.
     /// </summary>
+    /// <param name="atImpact">판정 순간에 만든다 — 충격 직전까지 앞부분을 건너뛴다(<see cref="SlashImpactAt"/>).</param>
     public static void SpawnStretchedVfx(GameObject prefab, Vector3 worldPos, Quaternion rot,
-                                         float lineLength, Color tint)
+                                         float lineLength, Color tint, bool atImpact = false)
     {
         if (prefab == null) return;
         var go = SpawnSlashVfx(prefab, worldPos, rot);
         if (go == null) return;
         go.transform.localScale = new Vector3(1f, 1f, lineLength);
         TintVfx(go, tint);
+        if (atImpact) SkipToImpact(go);   // 물들인 뒤 — 건너뛰는 동안 나온 입자도 같은 색
+    }
+
+    /// <summary>입자계를 충격 직전까지 돌려 둔다(뿌리 입자계만 — 자식은 함께 돈다).</summary>
+    private static void SkipToImpact(GameObject go)
+    {
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>())
+        {
+            var parent = ps.transform.parent;
+            if (ps.transform != go.transform && parent != null && parent.GetComponentInParent<ParticleSystem>() != null) continue;
+            ps.Simulate(SlashImpactAt - SlashImpactLead, true, false, true);
+            ps.Play(true);
+        }
     }
 
     private static void SpawnVfxAt(GameObject prefab, int x, int z, Color tint, Quaternion rot)

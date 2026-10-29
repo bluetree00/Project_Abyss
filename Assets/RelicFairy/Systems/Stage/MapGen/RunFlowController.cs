@@ -298,7 +298,7 @@ public class RunFlowController : MonoBehaviour
             : null;
         if (entry == null) entry = FindStartEntry();
 
-        var plan = new DoorPlan { kind = (RoomPlanKind)meta.currentRoomKind, entry = entry };
+        var plan = new DoorPlan { kind = (RoomPlanKind)meta.currentRoomKind, entry = entry, danger = meta.currentRoomDanger };
 
         _resuming = true;
         try
@@ -474,7 +474,7 @@ public class RunFlowController : MonoBehaviour
         // 방 빌드보다 먼저 세팅해야 RoomClearGate가 붙는 시점(AttachRoomClearController)에 이미 유효하다.
         // 이어하기 재생성은 특수방 방문으로 세지 않는다 — ResumeAsync가 RestoreAltarProgress로
         // 저장된 SpecialRoomVisits(그 방문이 이미 포함된 값)를 되돌려놓기 때문에 여기서 또 올리면 이중 계상된다.
-        grb.Run?.SetCurrentRoomKind(plan.kind, countSpecialVisit: !_resuming);
+        grb.Run?.SetCurrentRoomKind(plan.kind, countSpecialVisit: !_resuming, danger: plan.danger);   // 10-29 F4 위험한 문
 
         var dir = WipeDir(fromEdge);
         _heading = (int)fromEdge; // 탄 출구의 절대 방향 = 새 진행 방향 → 다음 방을 이만큼 회전
@@ -533,6 +533,8 @@ public class RunFlowController : MonoBehaviour
 
         // [서약] 방 진입 통보
         GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnRoomEnter();
+        // [아이템 효과] 방 진입 통보 — 성검 · 낫 방 시작 생성 · 방 보호막 · 강타 첫 타 · 보스 조건 · 증강 방 리셋(10-24 — 05-26 뒤로 안 불렸다)
+        GameRunBootstrapper.Instance?.Run?.NotifyItemRoomEnter(plan.kind == RoomPlanKind.Boss);
         // 이동 완료 후 이전 방 디스폰 — 자식 배치 파괴로 단발 Destroy 스파이크를 분산(플레이어는 이미 신규 방).
         if (prevRoom != null)
         {
@@ -578,6 +580,8 @@ public class RunFlowController : MonoBehaviour
         if (this == null || ct.IsCancellationRequested) { SetPlayerInput(true); return; }
         float tDialogue = Time.realtimeSinceStartup;
         RoomRevealed?.Invoke(result.roomGO);
+        // 10-29 quickEntry면 SealRoom(문틀 등록)이 위 모으기(목록 비움)보다 먼저라 출구 · 입구 잠금 문틀이 빠졌다(챕터 둘째 전투방부터) — 다시 보탠다
+        ReAddGateFramesToFader();
 
         _lastPlan    = plan;
         _lastEdge    = fromEdge;
@@ -710,6 +714,11 @@ public class RunFlowController : MonoBehaviour
                 if (restoreReward)
                     clearedWave.SpawnPendingClearReward(result.roomGO.transform.position, CurrentRewardSeed ?? 0);
             }
+            // 끝낸 이벤트방 — 상호작용 · 놀이 컴포넌트를 걷는다(10-29 B3). 남겨 두면 이어하기로 돌아와 같은 보상을 또 받았다
+            // (도박 상자 자동 개봉 · 신탁 · 제단 · 창고). 걷으면 세운 글자 · 상자도 함께 사라지고, 놀이는 시작하지 않는다.
+            if (result.roomGO != null)
+                foreach (var done in result.roomGO.GetComponents<IInteractionChallenge>())
+                    if (done is MonoBehaviour mb) { mb.enabled = false; Destroy(mb); }
             _currentWave = null;
             // 정상 클리어 경로를 그대로 탄다: 저장은 _resuming 가드로 무시되고,
             // RollExits는 롤 '전' 상태로 저장돼 있었으므로 같은 시드로 동일 출구가 재현된다.
@@ -918,6 +927,7 @@ public class RunFlowController : MonoBehaviour
             currentRoomPoolKey = plan.entry?.pool_key,
             currentRoomKind    = (int)plan.kind,
             currentRoomMirror  = mirror,
+            currentRoomDanger  = plan.danger,   // 10-29 F4 — 이어하기로 돌아와도 위험한 문 방(정예 둘 · Epic)
             currentRoomCleared = _currentRoomCleared,
             currentRoomRewardPending = _currentRoomRewardPending,
             crucibleRollIndex  = session.CrucibleRollIndex,
@@ -1156,10 +1166,7 @@ public class RunFlowController : MonoBehaviour
             RevealGateAsync(_gates[i], exits[i], withLabel: tr == null).Forget();
             revealed++;
             if (tr != null)
-                marks.Add((tr,
-                           KindGlyph(exits[i].kind) + " " + KindKor(exits[i].kind),
-                           KindSubtitle(exits[i].kind),
-                           KindBrightColor(exits[i].kind)));
+                marks.Add((tr, DoorTitle(exits[i]), DoorSubtitle(exits[i]), DoorColor(exits[i])));
         }
         if (marks.Count > 0) ExitCompassHud.Create().SetExits(marks);
         // 매칭 안 된 여분 슬롯은 봉인 상태 유지(목적지 없음)
@@ -1506,6 +1513,16 @@ public class RunFlowController : MonoBehaviour
     /// <summary>출구 문틀(기둥·상인방·화로)을 개구부에 맞춰 세운다. 프리팹은 20×12 m 기준으로 제작한다.
     /// 석문·포탈과 달리 <b>항상 보이는</b> 구조물이라, 문이 열린 뒤에도 출구 위치가 읽힌다.
     /// 세로·가로를 따로 늘이면 기둥이 찌그러지므로 <b>균등 배율</b>만 쓴다.</summary>
+    /// <summary>문틀(입구 잠금 · 출구)을 머리 위 가림 후보에 다시 보탠다 — 방을 모으면 목록이 비워진다(10-29). 겹치면 가림 쪽이 거른다.</summary>
+    private void ReAddGateFramesToFader()
+    {
+        if (_entranceLock != null && _entranceLock.transform.Find("GateFrame") is Transform lockFrame)
+            CameraOcclusionFader.AddOverheadArea(lockFrame.gameObject);
+        for (int i = 0; i < _gates.Count; i++)
+            if (_gates[i]?.gate != null && _gates[i].gate.transform.Find("GateFrame") is Transform frame)
+                CameraOcclusionFader.AddOverheadArea(frame.gameObject);
+    }
+
     private void SpawnGateFrame(Transform parent, float ow, float oh)
     {
         var framePrefab = _current?.gateFramePrefab;
@@ -1530,6 +1547,8 @@ public class RunFlowController : MonoBehaviour
 
         // 통과 차단은 게이트 blocker가 맡는다 — 문틀 콜라이더는 플레이어를 걸리게만 하므로 제거.
         foreach (var col in frame.GetComponentsInChildren<Collider>()) Destroy(col);
+        // 10-26 사용자 「문 위 천장(상인방)이 안 흐려진다」 — 콜라이더가 없고 방 밖에 서서 가림 페이더 어느 판정에도 안 걸렸다
+        CameraOcclusionFader.AddOverheadArea(frame);
     }
 
     /// <summary>봉인 문을 개구부에 세워 닫힘 위치에 둔다(테마 문). 프리팹 없으면 null.</summary>
@@ -1720,7 +1739,7 @@ public class RunFlowController : MonoBehaviour
         // (통로는 방 빌드 시 MapBuilder.BuildDoorCorridor가 팔레트 블록으로 이미 깔아둔다 — 여기서 만들지 않는다.)
 
         // 다음 방 정보 라벨 — 봉인 중엔 없다가 공개와 함께 페이드인(배지가 없는 출구만)
-        TextMeshProUGUI label = (rend != null && withLabel) ? CreateGateLabel(rend.transform.parent, plan.kind, rend.transform.localScale.y) : null;
+        TextMeshProUGUI label = (rend != null && withLabel) ? CreateGateLabel(rend.transform.parent, plan, rend.transform.localScale.y) : null;
 
         // ⚠️ 예전엔 여기서 marker 머티리얼의 색/발광을 애니메이션했는데, marker는 생성 시점에
         //    enabled=false로 꺼져 있어(석문이 시각 담당) <b>화면에 아무것도 나타나지 않았다</b> —
@@ -1746,7 +1765,7 @@ public class RunFlowController : MonoBehaviour
     }
 
     /// <summary>게이트에 다음 방 종류 라벨(월드 스페이스)을 만든다. 알파 0으로 시작 — 공개 연출과 함께 페이드인.</summary>
-    private TextMeshProUGUI CreateGateLabel(Transform gateTr, RoomPlanKind kind, float openH)
+    private TextMeshProUGUI CreateGateLabel(Transform gateTr, DoorPlan plan, float openH)
     {
         var go = new GameObject("GateLabel");
         go.transform.SetParent(gateTr, false);
@@ -1763,13 +1782,13 @@ public class RunFlowController : MonoBehaviour
 
         var tmp = go.AddComponent<TextMeshProUGUI>();
         // 2행 — 종류 + 그 방에서 얻는 것. 게이트 앞에서 바로 판단할 수 있게 한다.
-        tmp.text      = KindGlyph(kind) + " " + KindKor(kind)
-                        + "\n<size=55%><color=#BEC6D6>" + KindSubtitle(kind) + "</color></size>";
+        tmp.text      = DoorTitle(plan)
+                        + "\n<size=55%><color=#BEC6D6>" + DoorSubtitle(plan) + "</color></size>";
         tmp.fontSize  = 62f;
         tmp.fontStyle = FontStyles.Normal;   // 09-27: 기본 폰트가 이미 굵다 — 가짜 굵게 + 테두리 0.22는 획을 뭉갰다
         tmp.alignment = TextAlignmentOptions.Center;
         // 방 종류별 밝은 색 + 얇은 테두리·부드러운 그림자로 어느 배경에서도 읽히게. 알파 0 시작(공개 시 페이드인).
-        var c = KindBrightColor(kind); c.a = 0f;
+        var c = DoorColor(plan); c.a = 0f;
         tmp.color            = c;
         TMPOutlineHelper.ApplySoftShadow(tmp);
         // 월드 글이라 게이트 앞에선 화면 가운데를 덮을 만큼 커졌다 — 화면 크기 상한 + 게이트 앞 옅어지기(10-01)
@@ -1809,16 +1828,17 @@ public class RunFlowController : MonoBehaviour
     };
 
     /// <summary>문 프리뷰 2행 — "그 방에서 무엇을 얻는가". 이동을 결정으로 만드는 정보.
-    /// 전투방은 보상 등급·후보 수(RoomRewardTable 실값), 서비스방은 기능을 적는다.</summary>
-    private static string KindSubtitle(RoomPlanKind kind)
+    /// 전투방은 보상 등급·후보 수(RoomRewardTable 실값), 서비스방은 기능을 적는다. 이벤트방은 그 방의 보상(pool_key 열쇠말).</summary>
+    private static string KindSubtitle(RoomPlanKind kind, string poolKey = null)
     {
         switch (kind)
         {
-            case RoomPlanKind.Shop:     return "물건 구매";
-            case RoomPlanKind.Crucible: return "무기 강화 · 승급";
-            case RoomPlanKind.Refinery: return "룬 정제";
+            // 재화방은 전투 하나 대신 고르는 문이다(10-24 B2 — 고르면 보스까지 전투 1방 몫)
+            case RoomPlanKind.Shop:     return "물건 구매 · 전투 1방 대신";
+            case RoomPlanKind.Crucible: return "무기 강화 · 승급 · 전투 1방 대신";
+            case RoomPlanKind.Refinery: return "룬 정제 · 전투 1방 대신";
             case RoomPlanKind.Rest:     return "체력 회복 또는 무기 강화";   // 10-18 「쉬거나 · 벼리거나」 → 결과로
-            case RoomPlanKind.Event:    return "시험 · 선택";
+            case RoomPlanKind.Event:    return EventRewards.Badge(poolKey);   // 10-29 「시험 · 선택」 → 「시험 · 금화」 · 「시험 · 정수」 …
             case RoomPlanKind.Boss:     return "결전";
             case RoomPlanKind.PreBoss:  return "보스 직전";
             case RoomPlanKind.MidBoss:  return "강적 하나 · " + RarityKor(ItemRarity.Epic) + " 보상";
@@ -1838,6 +1858,23 @@ public class RunFlowController : MonoBehaviour
         ItemRarity.Legendary => "Legendary",
         _                    => "Common",
     };
+
+    /// <summary>문 배지 · 라벨 첫 줄(기호 + 제목) — 10-29 F4 위험한 문은 「▲ 위험한 문」.</summary>
+    private static string DoorTitle(in DoorPlan p)
+        => p.danger ? "▲ 위험한 문" : KindGlyph(p.kind) + " " + KindTitle(p.kind, p.entry?.pool_key);
+
+    /// <summary>문 배지 · 라벨 둘째 줄 — 위험한 문은 보상 먼저(정예 둘이라는 값을 같이).</summary>
+    private static string DoorSubtitle(in DoorPlan p)
+        => p.danger ? $"보상 {RarityKor(ItemRarity.Epic)} 이상 · 정예 둘" : KindSubtitle(p.kind, p.entry?.pool_key);
+
+    /// <summary>문 글 색 — 위험한 문은 붉게(화면 덮개는 정예 보라 그대로).</summary>
+    private static Color DoorColor(in DoorPlan p) => p.danger ? DangerDoorColor : KindBrightColor(p.kind);
+
+    private static readonly Color DangerDoorColor = new(1f, 0.32f, 0.26f);
+
+    /// <summary>문 제목 — 이벤트방은 이벤트 이름(10-29 「들어가기 전에 어떤 보상의 이벤트방인지」), 나머지는 방 종류.</summary>
+    private static string KindTitle(RoomPlanKind kind, string poolKey)
+        => kind == RoomPlanKind.Event ? EventRewards.Title(poolKey) : KindKor(kind);
 
     /// <summary>방 종류 → 표시용 한글 라벨.</summary>
     private static string KindKor(RoomPlanKind kind) => kind switch

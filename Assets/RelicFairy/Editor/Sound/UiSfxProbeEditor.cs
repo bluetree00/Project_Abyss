@@ -50,7 +50,7 @@ public static class UiSfxProbeEditor
     /// <summary>SoundEvent에 있지만 부르는 곳이 없는 옛 상수(§2-2) · 플레이어 담당 몫 — 표 검사에서 뺀다.</summary>
     private static readonly HashSet<string> NotCalled = new()
     {
-        "boss_appear", "player_die", "player_hit", "monster_die", "monster_hit", "ui_hover",
+        "boss_appear", "player_die", "player_hit", "monster_die", "monster_hit",   // 10-29 ui_hover 뺌 — 부르는 곳 셋 · 표 줄은 UiHoverRowEditor
     };
 
     // ── Static ───────────────────────────────────────────────────
@@ -87,7 +87,7 @@ public static class UiSfxProbeEditor
             fails += await ScreenAsync(sb, "② 무기대", new[] { SoundEvent.UiOpen, SoundEvent.UiSelect, SoundEvent.UiClose }, ForgeAsync);
             fails += await ScreenAsync(sb, "③ 룬판", new[] { SoundEvent.UiOpen, SoundEvent.UiClose }, GridAsync);
             fails += await ScreenAsync(sb, "④ 설정", new[] { SoundEvent.UiOpen, SoundEvent.UiClick, SoundEvent.UiClose }, SettingsAsync);
-            fails += await ScreenAsync(sb, "⑤ ESC", new[] { SoundEvent.UiOpen, SoundEvent.UiClick, SoundEvent.UiClose }, EscAsync);
+            fails += await ScreenAsync(sb, "⑤ ESC", new[] { SoundEvent.UiOpen, SoundEvent.EscMemoryPage, SoundEvent.UiClose }, EscAsync);   // 10-29 기억 쪽 열기 = 책장 소리
             fails += await ScreenAsync(sb, "⑥ 런 결과", new[] { SoundEvent.ResultReveal, SoundEvent.ResultCount, SoundEvent.UiConfirm }, ResultAsync);
             fails += await ScreenAsync(sb, "⑦ 퀘스트 알림", new[] { SoundEvent.QuestDone }, QuestAsync);
             fails += await SilentCellsAsync(sb, sound);

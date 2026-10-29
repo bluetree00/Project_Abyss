@@ -177,7 +177,7 @@ public sealed class MinigameHud : MonoBehaviour
         FloatAsync(t).Forget();
     }
 
-    /// <summary>⑥ 등급 도장 — 메달이 가운데로 와서 찍힌다(0.98 → 1.0 눌림) + 등급 이름 + 성적 한 줄. 합 1.2초.</summary>
+    /// <summary>⑥ 등급 도장 — 메달이 가운데로 와서 찍힌다(0.98 → 1.0 눌림) + 등급 이름 + 성적 한 줄. 합 약 0.9초(10-29 머묾 0.73 → 0.4).</summary>
     public async UniTask StampAsync(ChallengeGrade grade, string resultLine, CancellationToken ct)
     {
         HideBand();
@@ -203,7 +203,7 @@ public sealed class MinigameHud : MonoBehaviour
             float s = t < 0.8f ? Mathf.Lerp(1.4f, 0.98f, EaseOut(t / 0.8f)) : Mathf.Lerp(0.98f, 1f, (t - 0.8f) / 0.2f);
             medal.localScale = Vector3.one * (s * big);
         }, ct);
-        await UIJuice.HoldAsync(0.73f, ct);
+        await UIJuice.HoldAsync(0.4f, ct);
         await Tween(0.25f, t => cg.alpha = 1f - t, ct);
         Destroy(holder.gameObject);
     }

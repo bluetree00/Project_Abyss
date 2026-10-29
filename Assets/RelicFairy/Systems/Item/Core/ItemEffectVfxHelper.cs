@@ -7,6 +7,8 @@ using Cysharp.Threading.Tasks;
 /// </summary>
 public static class ItemEffectVfxHelper
 {
+    private static readonly System.Collections.Generic.Dictionary<string, float> s_lifeByKey = new();   // 키별 한 번 재생 길이(발동마다 자식 입자를 훑었다 · 10-29 풀 점검 5)
+
     /// <summary>지정 위치에 1회성 VFX 스폰 (자동 반환).</summary>
     public static async void SpawnOneShotAt(string addressableKey, Vector3 position, float scale = 1f)
     {
@@ -19,7 +21,8 @@ public static class ItemEffectVfxHelper
         // 다 쓰면 풀에 돌려준다 — 예전엔 반환이 없어 발동마다 새 인스턴스가 @Pools 밑에 켜진 채 쌓였다(10-11 이펙트 톤 점검).
         // 크기 = 프리팹 원본 × scale(재사용 때 곱이 쌓이지 않게) · 반복은 끈다(PooledOneShotVfx).
         if (!obj.TryGetComponent<PooledOneShotVfx>(out var vfx)) vfx = obj.AddComponent<PooledOneShotVfx>();
-        vfx.Play(OneShotLifetime(obj), scale);
+        if (!s_lifeByKey.TryGetValue(addressableKey, out float life)) s_lifeByKey[addressableKey] = life = OneShotLifetime(obj);
+        vfx.Play(life, scale);
     }
 
     /// <summary>한 번 재생 길이 — 입자계마다 (길이 + 최대 수명) 중 가장 긴 것. 입자계가 없으면 2초.</summary>

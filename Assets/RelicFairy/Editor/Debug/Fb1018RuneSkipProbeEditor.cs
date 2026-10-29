@@ -13,7 +13,7 @@ using UnityEngine;
 /// <list type="number">
 /// <item>공개 연출 중 [넘기기] — 창이 닫히지 않고 연출만 끝 상태로 간다(보상을 보기 전에 버리지 않는다).</item>
 /// <item>연출이 끝나고 잠시 뒤 [넘기기] — 그때는 넘긴다.</item>
-/// <item>정제소에서 연 창 — 넘기기 글 「원석 +3 환불」 · 방 확률 막대 숨김.</item>
+/// <item>정제소에서 연 창 — 넘기기 글 「두 장 다 버린다 · 원석은 돌아오지 않는다」(10-26 환불 없음) · 방 확률 막대 숨김.</item>
 /// <item>방 보상 창 — 넘기기 글 「원석 +1」 · 확률 막대 보임.</item>
 /// </list>
 /// 결과 Temp/fb1018_rune.txt · Temp/ui_shots/FB18_rune_*.png · 로그 「[FB18rune] 끝」. 보관함 · 판 · 세이브는 건드리지 않는다(고르지 않고 넘긴다).
@@ -84,7 +84,7 @@ public static class Fb1018RuneSkipProbeEditor
             await Wait(1.6f);
             string hint = HintOf(popup);
             var bar = popup.GetComponentInChildren<OddsBarView>(true);
-            Check(sb, $"③ 정제소 — 넘기기 글 「{hint}」 · 확률 막대 숨김", hint.Contains("+3") && hint.Contains("환불") && (bar == null || !bar.gameObject.activeSelf));
+            Check(sb, $"③ 정제소 — 넘기기 글 「{hint}」 · 확률 막대 숨김", hint.Contains("돌아오지 않는다") && !hint.Contains("환불") && (bar == null || !bar.gameObject.activeSelf));
             await ShotAsync("FB18_rune_2_refinery");
             Managers.UI.CloseAllPopupUI();
             Time.timeScale = 1f;

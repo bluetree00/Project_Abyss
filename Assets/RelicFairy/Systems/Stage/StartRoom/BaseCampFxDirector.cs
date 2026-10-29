@@ -34,7 +34,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
 
     private const string ConjureKeyPrefix = "basecamp_conjure_seen_v1_slot";
     private const string AcquireKeyPrefix = "basecamp_acquire_seen_v1_slot";
-    private const string NightmareSeenKeyPrefix = "basecamp_nightmare_reveal_seen_v1_slot";   // 악몽 갈림길이 드러나는 연출을 본 슬롯(10-11 톤 2차 D-7)
+    private const string RecordSeenKeyPrefix = "basecamp_record_reveal_seen_v1_slot";   // 「기록의 문」이 드러나는 연출을 본 슬롯(옛 악몽 갈림길 자리 · 10-11 톤 2차 D-7 · 10-29 §5)
     private const int RingSegments = 40;
     private const int RuneCount = 3;   // 원거리 · 파츠 · 유물(무형검은 소환의 방에서 먼저 받는다)
     private const float RuneFlashPeak = 4f;       // 준비 룬·파츠 공방이 켜질 때 번쩍임 — 14는 화면이 튀었다(09-29 사용자)
@@ -50,7 +50,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     private const float NightmareRevealSeconds = 1.2f;   // 갈림길이 드러나는 디졸브
     private const float NightmareCrystalLift   = 0.85f;  // 받침 윗면에서 수정 중심까지 — 받침 테두리에 가려지지 않게
     private const float NightmarePlateHeight   = 3.3f;   // 성문 앞 마커 위 「악몽」 이름판 — 카메라는 발 +4.8 m 위를 못 잡는다
-    private const float NightmareCrystalGlow   = 2.2f;   // 수정 발광 배율
+    private const float RecordCrystalGlow      = 0.85f;  // 수정 발광 배율 — 금빛은 옛 악몽 보라보다 밝아 2.2면 번져 이름표를 덮었다(10-29 사진)
     private const string PortalEdgeName = "Arcane_Portal";
     private static readonly string[] PortalLightNames = { "PortalLight", "GateInnerLight" };
     private static readonly int BaseColorId     = Shader.PropertyToID("_BaseColor");
@@ -130,7 +130,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     [SerializeField] private Color abyssWipeColor = new(0.16f, 0.08f, 0.26f);
     [SerializeField] private float abyssWipeDuration = 0.7f;
 
-    [Header("⑨ 악몽 모드 갈림길 — 엔딩 뒤 출발 게이트 곁(순환 개정 v3 D3)")]
+    [Header("⑨ 기록의 문 — 엔딩 뒤 출발 게이트 곁(옛 악몽 갈림길 받침 · 10-29 설계 §5)")]
     [Tooltip("받침 — 성소와 같은 석재(Leartes SM_Statue_Base_1)")]
     [SerializeField] private GameObject nightmarePedestalPrefab;
     [Tooltip("수정 — 기억 성소와 같은 결(Hovl HOVLCrystalPiese)")]
@@ -232,7 +232,8 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         BuildDescentVolume();
         CacheNightmareTargets();
         ApplyNightmareLook(StoryProgress.IsNightmareMode, animate: false);
-        BuildNightmareStation();
+        // 악몽 갈림 받침은 걷었다 — 심연 포탈 트리거에서 고른다(10-29 설계 §4 · BaseCampDungeonGate). 그 자리에 「기록의 문」(§5)
+        BuildRecordDoor();
         if (_conjurePending) WaitForPlazaSpawnAsync(_destroyCt).Forget();
     }
 
@@ -270,7 +271,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     public static void ClearFirstTimeForSlot(int slot)
     {
         PlayerPrefs.DeleteKey(ConjureKeyPrefix + slot);
-        PlayerPrefs.DeleteKey(NightmareSeenKeyPrefix + slot);
+        PlayerPrefs.DeleteKey(RecordSeenKeyPrefix + slot);
         foreach (AcquireKind k in Enum.GetValues(typeof(AcquireKind)))
             PlayerPrefs.DeleteKey(AcquireKeyPrefix + slot + "_" + k);
         PlayerPrefs.Save();
@@ -445,7 +446,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
 
     private static int ActiveSlot() => RunProgressManager.Instance?.ActiveSlotIndex ?? 0;
     private static string ConjureKey() => ConjureKeyPrefix + ActiveSlot();
-    private static string NightmareSeenKey() => NightmareSeenKeyPrefix + ActiveSlot();
+    private static string RecordSeenKey() => RecordSeenKeyPrefix + ActiveSlot();
 
     /// <summary>
     /// 파츠 공방 바닥 마법진(Hovl electro loop) 톤 — 불꽃 · 번개 · 굴절층 · 입자 광원 하위를 끄고 공방 빛깔로 갈아 끼운다(10-11 톤 2차 V-13).
@@ -728,12 +729,12 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         // 준비 전(스폰·시작 대사 중)에 이미 채워진 것은 조용히 켠다 — 소환 연출 위로 번쩍이지 않게
         bool loud = BaseCampBootstrapper.Instance == null || BaseCampBootstrapper.Instance.IsReady;
         bool ranged = lo.WeaponSlot1 != null;
-        bool part = !string.IsNullOrEmpty(lo.StartPartId);
+        bool part = ranged;   // 10-29 파츠는 원거리에 끼워져 온다(제단 해금) — 원거리와 함께 켠다
         bool relic = lo.Relic != null;
         SetRune(0, ranged, loud);
         SetRune(1, part, loud);
         SetRune(2, relic, loud);
-        SetPartsAwake(ranged && !part, loud);   // 원거리를 얻었고 파츠는 아직 — 파츠 공방이 「다음」
+        SetPartsAwake(false, loud);   // 10-29 파츠 공방 걷음 — 받침 빛 · 바닥 길은 켜지 않는다
 
         bool open = ranged && part && relic && lo.WeaponSlot0 != null;
         if (open == _archOn) return;
@@ -1232,17 +1233,17 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     }
 
     /// <summary>
-    /// 엔딩 뒤에만 — 출발 게이트 곁에 받침 + 떠도는 수정 + 빛을 세우고 갈림길(<see cref="BaseCampNightmareToggle"/>)을 붙인다.
-    /// 귀환 대사가 끝난 뒤 디졸브로 드러난다(순간 등장 금지).
+    /// 엔딩 뒤에만 — 출발 게이트 곁(옛 악몽 갈림길 자리)에 받침 + 떠도는 수정 + 빛을 세우고 「기록의 문」(<see cref="BaseCampRecordDoor"/>)을 붙인다(10-29 설계 §5).
+    /// 처음 한 번은 귀환 대사가 끝난 뒤 디졸브로 드러난다(순간 등장 금지).
     /// </summary>
-    private void BuildNightmareStation()
+    private void BuildRecordDoor()
     {
-        if (!StoryProgress.IsNightmareModeUnlocked || gateFront == null) return;
+        if (!StoryProgress.HasEnded || gateFront == null) return;
 
         Vector3 pos = gateFront.TransformPoint(nightmareStationLocal);
         if (Physics.Raycast(pos + Vector3.up * 4f, Vector3.down, out var hit, 10f, LayerMask.GetMask("Ground"), QueryTriggerInteraction.Ignore))
             pos.y = hit.point.y;
-        var root = new GameObject("~NightmareCrossroad");
+        var root = new GameObject("~RecordDoor");
         root.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(Vector3.ProjectOnPlane(-gateFront.forward, Vector3.up), Vector3.up));
 
         float top = 1.1f;   // 받침이 없으면 이 높이에 수정
@@ -1269,33 +1270,33 @@ public sealed class BaseCampFxDirector : MonoBehaviour
             {
                 if (nightmareCrystalMaterial != null) r.sharedMaterial = nightmareCrystalMaterial;
                 r.GetPropertyBlock(mpb);
-                mpb.SetColor(BaseColorId, nightmareColor);
-                mpb.SetColor(EmissionColorId, nightmareColor * NightmareCrystalGlow);
+                mpb.SetColor(BaseColorId, runeLitColor);   // 해방기 금빛 — 열린 성문 등불과 같은 색
+                mpb.SetColor(EmissionColorId, runeLitColor * RecordCrystalGlow);
                 r.SetPropertyBlock(mpb);
                 r.shadowCastingMode = ShadowCastingMode.Off;
             }
             crystal = c.transform;
         }
-        var glow = MakeRuneGlow("Glow", pos + Vector3.up * crystalY, 1.1f, nightmareColor, true);
+        var glow = MakeRuneGlow("Glow", pos + Vector3.up * crystalY, 1.1f, runeLitColor, true);
         glow.transform.SetParent(root.transform, true);
 
-        var toggle = root.AddComponent<BaseCampNightmareToggle>();   // 트리거 구는 RequireComponent로 붙는다
+        var door = root.AddComponent<BaseCampRecordDoor>();   // 트리거 구는 RequireComponent로 붙는다
         var trigger = root.GetComponent<SphereCollider>();
         trigger.radius = 2.4f;
         trigger.center = Vector3.up;
-        toggle.Setup(this, crystal, nightmareTextColor, crystalY);
+        door.Setup(crystal, runeLitColor, crystalY);
 
         // 드러남(디졸브 + 번쩍)은 해금 뒤 첫 방문에만 — 매 방문 「새로 생긴 것」처럼 보였다(10-11 이펙트 톤 2차 D-7). 본 뒤로는 처음부터 서 있다.
-        if (PlayerPrefs.GetInt(NightmareSeenKey(), 0) == 1)
+        if (PlayerPrefs.GetInt(RecordSeenKey(), 0) == 1)
         {
-            toggle.MarkReady();
+            door.MarkReady();
             return;
         }
         root.SetActive(false);
-        RevealNightmareStationAsync(root, toggle, _destroyCt).Forget();
+        RevealRecordDoorAsync(root, door, _destroyCt).Forget();
     }
 
-    private async UniTaskVoid RevealNightmareStationAsync(GameObject root, BaseCampNightmareToggle toggle, CancellationToken ct)
+    private async UniTaskVoid RevealRecordDoorAsync(GameObject root, BaseCampRecordDoor door, CancellationToken ct)
     {
         try
         {
@@ -1305,14 +1306,14 @@ public sealed class BaseCampFxDirector : MonoBehaviour
                                     cancellationToken: ct);
             await UniTask.Delay(TimeSpan.FromSeconds(0.8f), DelayType.UnscaledDeltaTime, cancellationToken: ct);
             if (root == null) return;
-            PlayerPrefs.SetInt(NightmareSeenKey(), 1);
+            PlayerPrefs.SetInt(RecordSeenKey(), 1);
             PlayerPrefs.Save();
             root.SetActive(true);
-            DissolveEffect.PlayAppear(root, NightmareRevealSeconds, null, default, nightmareColor);
+            DissolveEffect.PlayAppear(root, NightmareRevealSeconds, null, default, runeLitColor);
             FlashAsync(root.transform.position + Vector3.up * 1.6f, ct, RuneFlashPeak).Forget();
             await UniTask.Delay(TimeSpan.FromSeconds(NightmareRevealSeconds), DelayType.UnscaledDeltaTime, cancellationToken: ct);
-            if (toggle != null) toggle.MarkReady();
-            Debug.Log("[BaseCampFx] 악몽 모드 갈림길 드러남");
+            if (door != null) door.MarkReady();
+            Debug.Log("[BaseCampFx] 기록의 문 드러남");
         }
         catch (OperationCanceledException) { }
     }

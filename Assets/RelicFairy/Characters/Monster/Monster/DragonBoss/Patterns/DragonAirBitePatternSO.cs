@@ -385,7 +385,7 @@ internal sealed class DragonAirBreathState : FullLockState<DragonAirBreathPatter
         if (Data.FireballPrefab != null)
         {
             // 운석과 같은 풀 인스턴스 — 운석이 바꿔 둔 자식 배율 · 재생 속도를 되돌리며 꺼낸다(예전 그대로: 한 배율 · 회전 없음 · 10-19)
-            _fireballGo = DragonThreat.SpawnMeteor(Data.FireballPrefab, _fireballStartPos, Data.FireballScale, Data.FireballScale, fromCameraFar: false);
+            _fireballGo = DragonThreat.SpawnMeteor(Data.FireballPrefab, _fireballStartPos, Data.FireballScale, Data.FireballScale, fromCameraFar: false, uniform: true);   // 10-23 B4 운석 땅 효과 나눔(몸통 · 멀리 튀는 층)에서 빼고 한 배율 그대로
         }
 
         Managers.Sound?.PlayEffectAt(Data.FireRainSfx, ctx.Transform.position);

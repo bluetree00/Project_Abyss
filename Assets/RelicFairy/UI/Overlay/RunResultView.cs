@@ -188,8 +188,16 @@ public sealed class RunResultView : MonoBehaviour
                 Text(nrt, "Label", x + 12f, TimelineY - 34f, Mathf.Max(90f, widths[i] - 16f), 24f, UITheme.Thin.Small, UIWeight.Medium,
                      UITheme.Thin.InkA(g.Done ? 0.85f : 0.32f)).text = g.Label;
             if (g.Done && RunResultPresenter.SegmentShowsTime(widths[i], lastDone))
+            {
                 Text(nrt, "Time", x + 12f, TimelineY + 12f, 160f, 24f, UITheme.Thin.Small, UIWeight.Regular, UITheme.Thin.InkA(0.55f))
                     .text = RunResultPresenter.FormatTime(g.Seconds);
+                // 챕터 전투 시계 · 등급(10-24 U5 · 기록만) — 시간 아래 한 줄. 보상은 아직 없다(기준을 사람 시간으로 맞춘 뒤)
+                if (g.CombatSeconds > 0)
+                    Text(nrt, "Combat", x + 12f, TimelineY + 36f, 200f, 24f, UITheme.Thin.Small, UIWeight.Regular, UITheme.Thin.InkA(0.55f))
+                        .text = string.IsNullOrEmpty(g.Grade)
+                            ? $"전투 {RunResultPresenter.FormatTime(g.CombatSeconds)}"
+                            : $"전투 {RunResultPresenter.FormatTime(g.CombatSeconds)} · {g.Grade}";
+            }
             _nodes.Add(((x - L) / width, node));
             x += widths[i];
         }

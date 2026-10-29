@@ -117,16 +117,6 @@ public sealed class IntroMordredDirector : MonoBehaviour
     [Tooltip("보스전 진입 시 슬롯1(원거리)에 장착할 무기 SO 키.")]
     [SerializeField] private string rangedWeaponKey = "T1_Bow";
 
-    [Header("원거리 무기 튜토리얼")]
-    [Tooltip("전투 진입 시 순서대로 표시할 튜토리얼 안내(비차단 자막). 실제 키 매핑에 맞춰 문구 수정.")]
-    [SerializeField, TextArea] private string[] rangedTutorialLines =
-    {
-        "타락한 모르드레드에겐 검이 닿지 않는다. — 원거리 무기로 맞서라.",
-        "[2] 키로 원거리 무기를 들고, 조준해 공격하라.",
-    };
-    [Tooltip("튜토리얼 각 줄 사이 간격(초).")]
-    [SerializeField] private float rangedTutorialGap = 3.5f;
-
     [Header("전투 조명 점등")]
     [Tooltip("암전 후 보스전이 시작되면 하나씩 켜질 횃불. 인스펙터의 Intensity가 목표 밝기가 된다.")]
     [SerializeField] private Light[] combatTorches;
@@ -371,7 +361,8 @@ public sealed class IntroMordredDirector : MonoBehaviour
             UIRootBootstrapper.Instance?.FadeInHudAsync(hudFadeDuration).Forget();
             // 활 지급 — 슬롯1(원거리). 들고 있는 무형검(슬롯0)은 유지하고 소지만 시킨다.
             await EquipToSlotAsync(player, rangedWeaponKey, RangedSlot, setActive: false);
-            ShowRangedTutorial();
+            // 「원거리로 잡아야 한다」 안내는 걷었다(10-24 사용자 「인트로씬의 레거시 모르드레드 보스 원거리로 잡아야 한다는 내용 정리」) —
+            // 인트로 보스는 이길 수 없는 연출(무너지는 원탁)로 끝난다. 무기 전환(1 · 2)은 시작 조작 카드가 알려 준다.
 
             // 여기서 시퀀스는 끝난다. 이후 베이스캠프 복귀는 오직 '플레이어 사망'으로만 일어난다
             // (PlayerController가 사망 시 IntroBootstrapper.HandleIntroDeath를 직접 호출).
@@ -976,24 +967,6 @@ public sealed class IntroMordredDirector : MonoBehaviour
         await GameRunBootstrapper.EquipWeaponToPlayerAsync(so, player, slotIndex, setActive, playAppear, beforeShow);
     }
 
-    /// <summary>원거리 무기 튜토리얼 — 멀린 내레이션 톤의 비차단 자막으로 순차 표시.</summary>
-    private void ShowRangedTutorial()
-    {
-        if (rangedTutorialLines == null) return;
-        ShowRangedTutorialAsync(this.GetCancellationTokenOnDestroy()).Forget();
-    }
-
-    private async UniTaskVoid ShowRangedTutorialAsync(CancellationToken ct)
-    {
-        foreach (var line in rangedTutorialLines)
-        {
-            if (string.IsNullOrEmpty(line)) continue;
-            RelicFairy.UI.UI_BossBark.Show(line, RelicFairy.UI.BossBarkType.MerlinNarration);
-            await DelaySafe(rangedTutorialGap, ct);
-            // DelaySafe는 취소를 삼킨다 — 씬이 바뀌어(디렉터 파괴) 취소되면 남은 줄을 다음 씬(거점)에 띄우지 않고 끝낸다(10-13 시뮬 4회차 S0)
-            if (ct.IsCancellationRequested) return;
-        }
-    }
 
     private static async UniTask DelaySafe(float seconds, CancellationToken ct)
     {

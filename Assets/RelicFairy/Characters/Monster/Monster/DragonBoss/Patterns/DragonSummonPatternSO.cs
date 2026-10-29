@@ -1,3 +1,4 @@
+using RelicFairy.UI;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -11,6 +12,8 @@ namespace RelicFairy.Monster
     menuName = "RelicFairy/Boss/Dragon/SummonPattern")]
 public class DragonSummonPatternSO : BossPatternSO
 {
+    internal const string SummonAnnounce = "화룡이 새끼 용을 부른다 — 모두 잡을 때까지 공격이 막힌다";   // 한 줄에 들게(10-29 사진: 두 줄로 접혔다)
+
     [Header("소환 조건")]
     [SerializeField] private DragonSummonPhase _summonPhase = DragonSummonPhase.At70;
 
@@ -211,11 +214,14 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
         if (bb != null)
         {
             Data.SetSummonFlag(bb, true);
-            bb.SetSummonGated(true);
+            // 무적은 발동이 보인 뒤에 — 이륙이 끝나 알을 떨굴 때 켠다(이미 공중이면 바로) · 하던 패턴 · 이동 중에 켜지면 버그처럼 보였다(10-29 사용자 — 무적은 패턴 발동이 보인 뒤에)
+            if (alreadyAirborne) bb.SetSummonGated(true);
             bb.IsAirborne = true;
         }
 
         if (ctx.Agent != null) ctx.Agent.enabled = false;
+
+        UI_BossBark.Show(DragonSummonPatternSO.SummonAnnounce, BossBarkType.PatternAnnounce);
 
         // 소환 시작 시 카메라를 플레이어 시점으로 복귀 (탑다운 등 다른 시점이었을 경우)
         GameCameraController.Instance?.DeactivateDragonTopDownView();
@@ -281,6 +287,7 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
         _hoverPos = ctx.Transform.position;
         _phase    = Phase.Hover;
         _timer    = 0f;
+        GetDragonBB(ctx)?.SetSummonGated(true);   // 이륙 끝 = 무적 시작(보스 체력 바 막힘 덮개가 이때 켜진다)
         // 이륙 완료 = 카메라 밖 공중 위치 → 속성 색상으로 바디 틴트 전환
         DragonBossVisualHelper.ApplyBodyTint(ctx.Transform, Data.GetNextPhaseBodyTint());
         SpawnEggs(ctx);
@@ -372,6 +379,15 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
         }
 
         var (eggColor, miniColor, breathPrefab) = Data.GetElementAssets();
+        // 10-23 B4 사용자 「새끼 용이 위협적이지 않다」 — 체력 150 · 피해 15 고정이라 Ch2 중간 화력(보스 앞 단일 DPS ≈580)에 0.26초 · 한 방이 최대 HP의 1.6%였다.
+        // 위협(Rare) 몬스터와 같은 챕터 · 깊이 · 시기 배율을 곱한다(런 밖 테스트는 Ch2 · 지금 시기) — 에셋 값은 기준치(체력 90 → 봉인기 630 · 피해 45 → 59).
+        var   run      = AppBootstrapper.Instance?.CurrentRun;
+        var   ch2      = ChapterBalance.Of(ChapterId.Chapter2);
+        float hpScale  = run != null ? run.CurrentDifficultyScaleFor(MonsterGrade.Rare) : ch2.HpFor(MonsterGrade.Rare) * EraBalance.Current.HpScale;
+        float atkScale = run != null ? run.CurrentAttackScaleFor(MonsterGrade.Rare)     : ch2.AttackFor(MonsterGrade.Rare) * EraBalance.Current.StatScale;
+        int   miniHp   = Mathf.Max(1, Mathf.RoundToInt(Data.MiniHp * hpScale));
+        int   miniDmg  = Mathf.Max(1, Mathf.RoundToInt(Data.MiniBreathDamage * atkScale));
+        Debug.Log($"[DragonSummon] 새끼 용 {_totalMinions}마리 — 체력 {miniHp} · 브레스 {miniDmg} · 재사용 {Data.MiniBreathCooldown}초");
 
         for (int i = 0; i < _totalMinions; i++)
         {
@@ -401,11 +417,11 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
                 eggColor:           eggColor,
                 miniDragonPrefab:   Data.MiniDragonPrefab,
                 miniScale:          Data.MiniScale,
-                miniHp:             Data.MiniHp,
+                miniHp:             miniHp,
                 miniSpeed:          Data.MiniSpeed,
                 miniBreathRange:    Data.MiniBreathRange,
                 miniBreathCooldown: Data.MiniBreathCooldown,
-                miniBreathDamage:   Data.MiniBreathDamage,
+                miniBreathDamage:   miniDmg,
                 miniBreathSpeed:    Data.MiniBreathSpeed,
                 miniBreathPrefab:   breathPrefab,
                 miniColor:          miniColor,
@@ -428,6 +444,7 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
 
     private void StartLanding(MonsterContext ctx)
     {
+        GetDragonBB(ctx)?.SetSummonGated(false);   // 새끼 용을 다 잡은 순간 풀린다 — 착지(1~2초)까지 기다리지 않는다(10-29)
         _phase = Phase.Landing;
         _timer = 0f;
         PlayAnim(ctx, Data.LandingStateName);

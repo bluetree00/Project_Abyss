@@ -310,7 +310,9 @@ public sealed class RoomWaveController : MonoBehaviour
     private void RollEraWave()
     {
         if (_bossSpawner != null || _midBossSpawner != null || _baseWaves == 0) return;   // 정예 보스 방도 덤 파도가 없다
-        (_eraElites, _eraCommons) = EraBalance.RollExtraWave(_run?.CurrentRoomKind ?? RoomPlanKind.Normal, StoryProgress.Era);
+        (_eraElites, _eraCommons) = _run != null && _run.CurrentRoomDanger
+            ? EraBalance.DangerWave   // 위험한 문(10-29 F4) — 정예 둘이 함께 오는 두 번째 파도 확정
+            : EraBalance.RollExtraWave(_run?.CurrentRoomKind ?? RoomPlanKind.Normal, StoryProgress.Era, (int)(_run?.CurrentChapter ?? ChapterId.Chapter4));
         if (_eraElites + _eraCommons == 0) return;
         _totalWaves = _baseWaves + 1;
         Debug.Log($"[RoomWave] 시기 두 번째 파도 — 정예 {_eraElites} · 일반 {_eraCommons} ({StoryProgress.Era})", this);

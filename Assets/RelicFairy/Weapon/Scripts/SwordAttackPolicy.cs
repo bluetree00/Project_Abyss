@@ -1,7 +1,8 @@
 using Game.Inputs;
 
 /// <summary>
-/// SwordAttackPolicy - 누름/뗌을 약공격 1회로 변환한다.
+/// SwordAttackPolicy - 누르는 순간 약공격 1회 · 꾹 누르고 있으면 계속(<see cref="AttackHoldRepeat"/>, 10-25 ④).
+/// 예전엔 「뗄 때 1회」라 꾹 누르면 뗄 때까지 아무것도 안 나갔다.
 ///
 /// [강공격 봉인] 모으기(Charge)·강공격(Heavy) 경로는 제거됐다. 예전에는 enterThreshold를 넘겨
 /// 쥐고 있으면 Command.Charge를 밀어 넣었는데, 라우팅(DefaultRouteInputsToLayers)이 그 커맨드를
@@ -10,20 +11,15 @@ using Game.Inputs;
 /// </summary>
 public class SwordAttackPolicy : IAttackInputPolicy
 {
-    private bool _holding;
+    private readonly AttackHoldRepeat _hold = new();
 
     public void OnStarted(PlayerController c)
     {
-        _holding = true;
-    }
-
-    public void OnCanceled(PlayerController c)
-    {
-        if (!_holding) return;
-        _holding = false;
-
         c.InputBuffer.Push(Command.Light);
+        _hold.Press();
     }
 
-    public void Tick(PlayerController c, float dt) { }
+    public void OnCanceled(PlayerController c) => _hold.Release();
+
+    public void Tick(PlayerController c, float dt) => _hold.Tick(c, dt);
 }

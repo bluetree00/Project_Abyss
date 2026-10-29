@@ -263,6 +263,7 @@ public static class LichHazards
             if (_remaining <= 0f)
             {
                 LichVfx.Play(LichVfxSlot.DarkOrbImpact, _pos, Quaternion.identity, 0.6f);
+                LichSfx.Play(LichSfxSlot.BoltImpact, _pos, 0.5f);   // 추적 구체가 스러진다(10-29 Ch4 사운드 점검 — 무음이었다)
                 return false;
             }
 
@@ -284,6 +285,7 @@ public static class LichHazards
             if (contact)
             {
                 LichVfx.Play(LichVfxSlot.DarkOrbImpact, _pos, Quaternion.identity, 0.35f);
+                LichSfx.Play(LichSfxSlot.BoltImpact, _pos, 0.6f);   // 닿아 터진다(10-29 Ch4 사운드 점검)
                 return false;
             }
             return true;
@@ -641,7 +643,10 @@ public static class LichHazards
                     if (hitOnce) hitBy = sh.Element;
                 }
                 if (sh.Element == QuadrantElement.Lightning)
+                {
                     LichVfx.Play(LichVfxSlot.LightningStrike, sh.Pos, Quaternion.identity, sh.Radius / 1.8f);
+                    LichSfx.Play(LichSfxSlot.LightningCast, sh.Pos, 0.6f);   // 낙뢰 한 발마다(10-29 Ch4 사운드 점검)
+                }
                 if (sh.Element == QuadrantElement.Fire && target != null)
                 {
                     Vector3 d = target.position - _s.Center;

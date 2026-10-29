@@ -16,6 +16,9 @@ public class UI_DialoguePopup : UI_Popup
 {
     // 대사 중 이동·시간 흐름 차단(보스전 포함). timeScale=0이라 내부 연출은 unscaled로 동작해야 함.
     public override bool BlocksGameplay => true;
+    // 10-25 사용자 「모든 UI를 ESC로」 — ESC = 이 대화 나머지를 건너뛴다. 닫히면 파괴 토큰이 취소돼 ShowAsync가 예외 없이 끝나
+    // 기다리던 흐름(인트로 · 보스 · 귀환)이 바로 이어진다.
+    public override bool CloseOnEscape => true;
 
     /// <summary>
     /// 라인이 넘어갈 때 그 라인의 일러스트 키를 알린다(빈 키 포함).
@@ -160,6 +163,16 @@ public class UI_DialoguePopup : UI_Popup
             rt.anchoredPosition = new Vector2(-18f, 14f);
             rt.sizeDelta = new Vector2(24f, 20f);
             _advanceHint.text = "▼";   // 글리프 화이트리스트 안의 기호
+
+            // 「F키로 넘기기」 — ▼ 왼쪽에 8px 띄워 같은 줄에(10-24 사용자 「대화 텍스트 우측 아래에 문양과 겹치지 않게 F키로 넘기기」).
+            // ▼의 자식이라 함께 켜지고 함께 숨 쉰다.
+            var keyHint = MakeLabel(rt, "AdvanceKey", 12f, new Color(1f, 1f, 1f, 0.75f), TextAlignmentOptions.Right);
+            var krt = keyHint.rectTransform;
+            krt.anchorMin = krt.anchorMax = new Vector2(0f, 0.5f);
+            krt.pivot     = new Vector2(1f, 0.5f);
+            krt.anchoredPosition = new Vector2(-8f, 0f);
+            krt.sizeDelta = new Vector2(160f, 20f);
+            keyHint.text = "F키로 넘기기";
             _advanceHint.gameObject.SetActive(false);
         }
     }
@@ -574,9 +587,10 @@ public class UI_DialoguePopup : UI_Popup
         if (_isTyping)
         {
             _skipRequested = true;
+            Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);   // 10-29 UI 소리 — 넘기기(클릭 · [F]만 이 길을 탄다)
             return;
         }
 
-        _advanceTcs.TrySetResult();
+        if (_advanceTcs.TrySetResult()) Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);   // 10-29 UI 소리 — 다음 줄
     }
 }

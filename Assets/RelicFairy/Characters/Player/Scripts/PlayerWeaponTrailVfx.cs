@@ -42,13 +42,14 @@ public class PlayerWeaponTrailVfx : MonoBehaviour
 
     // 임시 칼날(랜슬롯 Q 전용 검 등) — 장착 무기가 숨은 동안 트레일을 그 칼날에 묶는다
     private bool  _overriding;
+    private GameObject _overridePrefab;       // 덮어쓴 프리팹 — 무기 교체가 _loadedPrefab을 바꿔도 주인 판별이 흔들리지 않게(10-26 검토 I1)
     private float _restoreAt = -1f;           // 덮어쓰기가 끝난 뒤 무기 트레일로 되돌릴 시각(페이드가 끝난 뒤 — 즉시 바꾸면 페이드가 잘린다)
 
     // ── Properties ────────────────────────────────────────────────
     /// <summary>임시 트레일이 켜져 있다(주인: 랜슬롯 Q 검 · 장비 형). 형은 남이 쓰는 동안 기다린다(10-07 검토 I4).</summary>
     public bool       IsOverriding   => _overriding;
     /// <summary>지금 덮어쓴 트레일 프리팹 — 끄기 전에 「내 것인가」를 본다.</summary>
-    public GameObject OverridePrefab => _overriding ? _loadedPrefab : null;
+    public GameObject OverridePrefab => _overriding ? _overridePrefab : null;
 
     // ── Lifecycle ─────────────────────────────────────────────────
     private void Awake()
@@ -131,6 +132,7 @@ public class PlayerWeaponTrailVfx : MonoBehaviour
         _trail.lineBottomTransform = root;
         _trail.SetNewTrailPrefab(prefab);
         _loadedPrefab = prefab;
+        _overridePrefab = prefab;
         _trail.StartTrailWithLength(fadeIn, trailLength);
     }
 
@@ -152,6 +154,7 @@ public class PlayerWeaponTrailVfx : MonoBehaviour
     {
         if (!_overriding) return;
         _overriding = false;
+        _overridePrefab = null;
         if (_trail != null && isActiveAndEnabled) _trail.StopTrail(fadeOut);
         _restoreAt = Time.time + fadeOut + 0.05f;
     }

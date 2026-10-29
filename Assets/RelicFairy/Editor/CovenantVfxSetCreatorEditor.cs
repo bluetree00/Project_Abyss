@@ -29,7 +29,9 @@ public static class CovenantVfxSetCreatorEditor
         // 10-19 사용자 「서약 광역 피해 이펙트 리소스가 적절하지 않다(노란 구름)」 — Explosion_Light_2(공칭 0.78 m)를 4.5~7.1배로 키운 크림 구름이었다 →
         // Explosion_Light(밝은 섬광 → 금빛 빛줄기가 사방으로 · 배율 1 최대 반경 1.75 m · 판정 3.5 m에 ×2 · 10-19 Covenant Nova Look 후보 9종 비교)
         // 기준 반경은 보이는 양 90% 도달(실측 68)로 — 최대 반경 1.75로 두니 판정의 0.40배로 보였다 → 1.75 × 0.40 = 0.70
-        ("supernova",    Spells + "Explosion_Light_LWRP.prefab",                  1.0f, 0.70f, 2.0f, Orig, null),
+        // 10-23 사용자 「초신성 폭발 이펙트가 너무 크다」 — 0.70이면 판정 3.5 m에 ×5라 사방 빛줄기 끝이 8.8 m(판정의 2.5배)까지 뻗었다.
+        // 빛줄기 끝이 판정의 1.25배 안에 들게 1.40(×2.5 · 끝 약 4.4 m) — 가운데 섬광은 판정보다 작게 보인다(끝이 경계를 그린다).
+        ("supernova",    Spells + "Explosion_Light_LWRP.prefab",                  1.0f, 1.40f, 2.0f, Orig, null),
         // 기폭 — 작은 폭발(Explosion_Fire_2 · 공칭 실측 0.47 m)을 6~10배로 키우면 화면을 덮는 구름이 됐다 → 불티 고리(공칭 3 m · 10-18 실측 68)
         // 경로에 「..」를 쓰면 LoadAssetAtPath가 못 읽어 프리팹이 비었다(10-19 실측 68 「이펙트 없음」) — 풀어 쓴 경로로
         ("detonate",     SpellsSp + "Spell_Fire_4_LWRP.prefab",                   1.0f, 3.0f, 2.0f, Orig, null),

@@ -63,8 +63,9 @@ public static class RoomRewardTable
     // ── 등급 분포 ────────────────────────────────────────────────
     // 한 런에 전투방을 10~20회 돈다. 일반방 분포는 "대부분 Common, 가끔 Rare"가 바닥이고,
     // 정예방은 Rare 하한 위에서 Epic이 실제로 자주 나와야 위험을 감수할 이유가 생긴다.
-    private static readonly RarityWeights NormalWeights = new(58f, 31f, 9f, 2f);
-    private static readonly RarityWeights EliteWeights  = new(0f, 52f, 36f, 12f);
+    // 10-29 사용자 「일반 드랍 전설룬의 확률은 좀 낮아야 — 그래야 정제소가 의미가 있다」: 전설 일반 2 → 1 · 정예 12 → 6(뺀 몫은 Epic · Rare로).
+    private static readonly RarityWeights NormalWeights = new(58f, 31f, 10f, 1f);
+    private static readonly RarityWeights EliteWeights  = new(0f, 55f, 39f, 6f);
 
     // ── Public Methods ───────────────────────────────────────────
 
@@ -113,6 +114,43 @@ public static class RoomRewardTable
         return new Rule(r.DropChance, r.ChoiceCount, r.RarityFloor, new RarityWeights(c, rare, epic, leg),
                         ore: Mathf.RoundToInt(r.Ore * om), enhanceMaterial: Mathf.RoundToInt(r.EnhanceMaterial * em));
     }
+
+    /// <summary>
+    /// 이 방의 등급 하한이 기억의 제단 등급 잠금(<see cref="MemoryAltarService.ClampRarity"/>)보다 앞서나 — 정예 보스만(10-23).
+    /// <para>사용자 10-23 「중간보스 보상이 좀 더 의미 있어야」: 문은 「강적 하나 · 영웅 보상」이라 말하는데, 제단 「Epic 룬 등장」을 안 연
+    /// 세이브(빌드마다 초기화되는 첫 회차 전부)에선 하한 Epic이 Rare로 접혀 <b>정예방과 같은 Rare 3장</b>이 나왔다.
+    /// 정제소와 같은 예외 — 값을 치른 자리(원석 · 강적)는 잠긴 등급도 낸다. Legendary 잠금은 그대로 따른다(문이 약속한 것은 영웅).</para>
+    /// </summary>
+    public static bool FloorIgnoresAltarLock(RoomPlanKind kind) => kind == RoomPlanKind.MidBoss;
+
+    /// <summary>
+    /// 룬 선택 창 확률 막대 값 — 방 가중을 하한까지 올리고(하한 밑 몫은 하한으로) 제단 잠금으로 접는다. 굴림(<see cref="RoomClearGate"/>)과 같은 규칙.
+    /// 예전 막대는 하한을 안 봐서 정예 보스(하한 Epic)에도 「Rare 52%」가 떴다(10-23).
+    /// </summary>
+    public static (float rare, float epic, float legendary) DisplayOdds(RoomPlanKind kind, bool danger = false)
+    {
+        var r = For(kind);
+        var (rare, epic, leg) = r.Weights.Normalized();
+        ItemRarity? roomFloor = danger ? ItemRarity.Epic : r.RarityFloor;   // 10-29 F4 위험한 문 — Epic 하한(굴림과 같은 규칙)
+        if (roomFloor is ItemRarity floor)
+        {
+            if (floor >= ItemRarity.Epic)      { epic += rare; rare = 0f; }
+            if (floor >= ItemRarity.Legendary) { leg += epic; epic = 0f; }
+            // Rare 하한의 Common 몫은 Normalized에 없다(정예 가중 Common 0) — 막대도 Common을 따로 그리지 않는다
+        }
+        // 10-29 안 연 Legendary는 10%만 남는다(MemoryAltarService.ClampRarity와 같은 규칙) — 막대에 「잠김」 대신 낮은 %
+        if (!MemoryAltarService.IsLegendaryUnlocked) { float share = MemoryAltarService.LockedLegendShare; epic += leg * (1f - share); leg *= share; }
+        bool keepEpic = (FloorIgnoresAltarLock(kind) || danger) && roomFloor is ItemRarity f && f >= ItemRarity.Epic;
+        if (!MemoryAltarService.IsEpicUnlocked && !keepEpic) { rare += epic; epic = 0f; }
+        return (rare, epic, leg);
+    }
+
+    /// <summary>
+    /// 지금 챕터 · 시기 · 제단 강화로 본 이 방 종류의 등급 확률 — 하한 · 제단 잠금 · 접두어를 보지 않은 바탕 값.
+    /// 정제소(10-29 사용자 「일반 드랍 확률보다 더 좋은 걸 실시간으로」)가 일반방 값 위에 얹어 쓴다.
+    /// </summary>
+    public static (float rare, float epic, float legendary) BaseOdds(RoomPlanKind kind)
+        => WithAltar(For(kind, ChapterStep, EraBalance.Current)).Weights.Normalized();
 
     /// <summary>접두어 정예가 나온 일반방 = 등급 +1단(방당 최대 1 · 정예방은 이미 Rare 하한이라 없음 — 10-11 정예 접두어).</summary>
     public static int PrefixStep(RoomPlanKind kind)

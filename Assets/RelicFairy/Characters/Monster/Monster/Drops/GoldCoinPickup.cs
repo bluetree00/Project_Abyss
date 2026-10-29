@@ -17,7 +17,7 @@ public class GoldCoinPickup : MonoBehaviour
     private const float ArcDuration   = 0.45f;
     private const float ArcHeight     = 1.4f;
     private const float PickupDelay   = 0.4f;   // 스폰 직후 즉시 픽업 방지
-    private const float MagnetRange   = 3f;
+    private const float MagnetRange   = 4.5f;   // 10-29 사용자 「기본 획득 거리를 좀 더」 3 → 4.5
     private const float MagnetSpeed   = 12f;
     private const float PickupRadius  = 0.6f;
     private const float ScatterRadius = 1.3f;

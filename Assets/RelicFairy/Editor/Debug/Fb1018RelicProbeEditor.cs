@@ -79,7 +79,7 @@ public static class Fb1018RelicProbeEditor
             if (popup == null) { sb.AppendLine("창을 못 열었다"); return; }
             Setup(popup, "gawain", gawain, Card(sb, "g_rx_overheat", RelicMemoryGrade.Faint), Card(sb, "g_dawn_oath", RelicMemoryGrade.Clear), Card(sb, "g_dawn_sowing", RelicMemoryGrade.Clear));
             sb.AppendLine($"안내 자동으로 뜸 = {GetField(popup, "_guideRoot") as GameObject != null}");
-            await GuideShotAsync(sb, popup, "gawain", gawain, "FB18_relic_1_guide_gawain", "0/2", "여명(쳐서 쌓기)");
+            await GuideShotAsync(sb, popup, "gawain", gawain, "FB18_relic_1_guide_gawain", "0/2", "여명엔 맞힌 적에게 태양흔이 쌓이고");   // 10-23 U7 — 옛 「여명(쳐서 쌓기)」
             await Wait(0.5f);
             await ShotAsync("FB18_relic_2_gawain_photo");
             Audit(sb, popup, "② 가웨인 · 사진과 같은 세 장(조각 0)");
@@ -118,8 +118,8 @@ public static class Fb1018RelicProbeEditor
             await Wait(0.5f);
             await ShotAsync("FB18_relic_5_lancelot");
             Audit(sb, popup, "⑤ 랜슬롯 · 광기 10 조각을 가진 뒤");
-            Check(sb, "⑤ 검은 잔상 꼬리말 = 「광기 칸 2개 → …」(10-22 E1 D7 광기 칸 조각 수)", FootOf(popup, 0).Contains("광기 칸 2개 →"));
-            Check(sb, "⑤ 찢는 심판 꼬리말 = 「광기 칸 조각 수에는 안 센다」", FootOf(popup, 2).Contains("광기 칸 조각 수에는 안 센다"));
+            Check(sb, "⑤ 검은 잔상 꼬리말 = 「광기 10~40 조각 2개 → …」(10-22 E1 D7 · 10-23 U7 이름)", FootOf(popup, 0).Contains("광기 10~40 조각 2개 →"));
+            Check(sb, "⑤ 찢는 심판 꼬리말 = 「광기 10~40 조각 수에는 안 센다」", FootOf(popup, 2).Contains("광기 10~40 조각 수에는 안 센다"));
             Check(sb, "⑤ 용어 줄에 광기 · 낙인", GlossaryOf(popup).Contains("광기") && GlossaryOf(popup).Contains("낙인"));
 
             var evoCard = new RelicDraftCard { Kind = RelicDraftCardKind.Evolution, EvolutionId = "evo_lancelot_crit", Grade = RelicMemoryGrade.Radiant };

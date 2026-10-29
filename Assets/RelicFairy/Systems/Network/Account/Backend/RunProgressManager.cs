@@ -254,6 +254,7 @@ public class RunProgressManager : MonoBehaviour
         d.currentRoomPoolKey = m.currentRoomPoolKey;
         d.currentRoomKind   = m.currentRoomKind;
         d.currentRoomMirror = m.currentRoomMirror;
+        d.currentRoomDanger = m.currentRoomDanger;   // 10-29 F4
         d.currentRoomCleared = m.currentRoomCleared;   // 클리어 후 저장 → 복원 시 몹 재스폰 방지
         d.currentRoomRewardPending = m.currentRoomRewardPending;   // 미수령 보상 → 복원 시 1회만 재배치
         d.crucibleRollIndex  = m.crucibleRollIndex;    // 재련소 RNG 스트림 위치(save-scum 방지)

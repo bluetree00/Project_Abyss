@@ -20,21 +20,38 @@ public abstract class FireRuneEffectBase : RuneElementEffectBase
 }
 
 /// <summary>
-/// 1단계 잔불 — 적중 시 공격력 8% 화염 즉발 추가(DM, 방어무시).
-/// value=화염비율(0.08).
+/// 1단계 잔불 — 적중마다 공격력 value(0.04)만큼 잔불이 모이고, <see cref="BurstEvery"/>번째 적중에 그 적에게 한 번에 터진다(DM, 방어무시).
+/// 10-24 사용자 「불 시너지가 왜 발동 안 했지」 — 매 타 1~4짜리 숫자 · 0.4 m 섬광이라 발동이 안 보였다 → 같은 피해를 모아
+/// 불 점 타격 + 숫자 하나로(총량 그대로). 터지는 순간 2단계 점화가 그 적에게 걸린다(<see cref="FireIgniteEffect.Ignite"/>).
+/// 몇 번째에 터지나 = 점화 행 value3(없으면 5).
 /// </summary>
 public sealed class FireEmberEffect : FireRuneEffectBase
 {
+    public const int BurstEvery = 5;
+    private const float EmberBurstRadius = 0.5f;   // 반경 1은 연기 낀 약 2 m 불덩이가 겹쳐 체력바를 가렸다(10-24 사진 8bp)
+    private float _pool;
+    private int _count;
+
     public override void OnHit(in HitInfo hit, PlayerController player)
     {
         if (hit.Target == null) return;
-        float dmg = Entry.value * GetEffectiveAttack(player);
+        _pool += Entry.value * GetEffectiveAttack(player);
+        var ignite = player.RuneEffects?.GetActive("FireIgnite") as FireIgniteEffect;
+        int every = ignite?.Entry != null && ignite.Entry.value3 > 0f ? (int)ignite.Entry.value3 : BurstEvery;
+        if (++_count < every) return;
+        _count = 0;
+        float dmg = _pool;
+        _pool = 0f;
+
+        var mb = hit.Target.GetComponentInParent<MonsterBase>();
+        ElementVfxPlayer.PlayBurst(RuneElement.Fire, (mb != null ? mb.transform : hit.Target.transform).position, EmberBurstRadius);   // 점 타격(맞은 적 크기) — 모인 잔불이 터진다
         if (dmg > 0f) CombatQuery.DealSynergyDamage(hit.Target, dmg, player.gameObject, element: RuneElement.Fire);
+        if (mb != null) ignite?.Ignite(mb, player);
     }
 }
 
 /// <summary>
-/// 2단계 점화 — 잔불 N회(value3=5)마다 적중 대상에 점화 DoT 부여.
+/// 2단계 점화 — 잔불이 터진 적(<see cref="FireEmberEffect"/>가 부른다 · 터짐 간격 = value3)에 점화 DoT 부여.
 /// 점화 = 지속(duration=3)초간 초당 공격력 16%(value) × 3틱(max_stack). ST DoT 사용.
 /// 작열(4단계) 활성 시, 같은 적에게 점화가 <see cref="ScorchAt"/>번 쌓이면 그 자리에서 광역 폭발한다(10-14 A3).
 /// 예전엔 점화 「만료」에 터졌는데 연타할수록 점화가 갱신돼 만료가 늦어졌다 — 많이 칠수록 늦게 터지는 역효과.
@@ -42,19 +59,12 @@ public sealed class FireEmberEffect : FireRuneEffectBase
 public sealed class FireIgniteEffect : FireRuneEffectBase
 {
     private const int ScorchAt = 3;
-    private int _emberCount;
     private readonly Dictionary<int, int> _igniteCount = new();   // 적별 점화 횟수(작열까지)
 
-    public override void OnHit(in HitInfo hit, PlayerController player)
+    /// <summary>잔불이 터진 적에 점화를 건다(잔불 터짐과 같은 순간 · 같은 적).</summary>
+    public void Ignite(MonsterBase mb, PlayerController player)
     {
-        if (hit.Target == null) return;
-        var mb = hit.Target.GetComponentInParent<MonsterBase>();
-        if (mb == null) return;
-
-        int period = Entry.value3 > 0f ? (int)Entry.value3 : 5;
-        if (++_emberCount < period) return;
-        _emberCount = 0;
-
+        if (mb == null || player == null) return;
         int atk        = GetEffectiveAttack(player);
         float perTick  = Entry.value * atk;                              // 0.16 × 공격력
         int tickCount  = Entry.max_stack > 0 ? Entry.max_stack : 3;

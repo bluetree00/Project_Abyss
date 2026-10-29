@@ -33,13 +33,16 @@ public class MonsterSpawnTableSO : ScriptableObject
 
     /// <summary>필터 통과 엔트리 중에서만 가중치 랜덤.
     /// filter=null 이면 모든 유효 엔트리 대상. 통과 엔트리가 없으면 null 반환.</summary>
-    public SpawnEntry PickRandom(SpawnEntryFilter filter)
+    public SpawnEntry PickRandom(SpawnEntryFilter filter) => PickRandom(filter, null);
+
+    /// <summary><paramref name="weightScale"/> = 엔트리마다 가중치 배율(해방기 재미 F3 — 시기별 역할 섞기, <see cref="MonsterRoleTable"/>). null이면 1.</summary>
+    public SpawnEntry PickRandom(SpawnEntryFilter filter, Func<SpawnEntry, float> weightScale)
     {
         float total = 0f;
         foreach (var e in entries)
         {
             if (!IsSelectable(e, filter)) continue;
-            total += Mathf.Max(0f, e.weight);
+            total += Mathf.Max(0f, e.weight) * (weightScale?.Invoke(e) ?? 1f);
         }
 
         if (total <= 0f) return null;
@@ -50,7 +53,7 @@ public class MonsterSpawnTableSO : ScriptableObject
         foreach (var e in entries)
         {
             if (!IsSelectable(e, filter)) continue;
-            cumulative += Mathf.Max(0f, e.weight);
+            cumulative += Mathf.Max(0f, e.weight) * (weightScale?.Invoke(e) ?? 1f);
             if (roll < cumulative) return e;
         }
 

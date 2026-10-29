@@ -73,8 +73,38 @@ public static class RangedPartsDraft
         var data = Managers.WeaponParts;
         if (data == null || state == null) return false;
         foreach (var def in data.All)
-            if (def != null && state.LevelOf(def.part_id) < CapOf(def)) return true;
+            if (IsCandidate(def, state)) return true;
         return false;
+    }
+
+    // 파츠 id → 해금 노드(기억의 제단 원거리 갈래). 분열의 시위는 기본이라 노드가 없다 — 시작 파츠 작업대 · 재련 카드가 같은 표를 읽는다(10-23 W6).
+    private static readonly Dictionary<string, string> UnlockNode = new()
+    {
+        { "part_pierce",  MemoryAltarCatalog.PartPierce },
+        { "part_power",   MemoryAltarCatalog.PartPower },
+        { "part_homing",  MemoryAltarCatalog.PartHoming },
+        { "part_explode", MemoryAltarCatalog.PartExplode },
+    };
+
+    /// <summary>이 파츠를 연 제단 노드 id(기본 파츠면 null).</summary>
+    public static string UnlockNodeOf(string partId) => UnlockNode.TryGetValue(partId ?? "", out var node) ? node : null;
+
+    /// <summary>제단에서 연 파츠인가 — 기본 파츠(분열)는 늘 열림.</summary>
+    public static bool IsUnlocked(string partId)
+    {
+        var node = UnlockNodeOf(partId);
+        return node == null || MemoryAltarService.IsUnlocked(node);
+    }
+
+    /// <summary>
+    /// 재련 카드로 낼 수 있나 — 상한 아래 + (제단에서 열었거나 이미 가진 파츠). 예전엔 열지 않은 파츠도 카드로 나왔다(10-23 W6 「확장으로」).
+    /// 이미 가진 파츠는 열림과 상관없이 계속 올린다 — 손에 든 것을 빼앗지 않는다.
+    /// </summary>
+    private static bool IsCandidate(WeaponPartEntry def, RangedPartsState state)
+    {
+        if (def == null) return false;
+        int lv = state.LevelOf(def.part_id);
+        return lv < CapOf(def) && (lv > 0 || IsUnlocked(def.part_id));
     }
 
     /// <summary>
@@ -142,7 +172,7 @@ public static class RangedPartsDraft
         if (data == null) return false;
         s_pool.Clear();
         foreach (var def in data.All)
-            if (def != null && state.LevelOf(def.part_id) < CapOf(def)) s_pool.Add(def);
+            if (IsCandidate(def, state)) s_pool.Add(def);
         if (s_pool.Count == 0) return false;
 
         // 섞기(Fisher–Yates) → 피할 카드는 뒤로

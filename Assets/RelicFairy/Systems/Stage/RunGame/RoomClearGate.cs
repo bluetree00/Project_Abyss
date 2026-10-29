@@ -70,6 +70,7 @@ public class RoomClearGate : MonoBehaviour
     private bool _isInteraction;               // 상호작용 챌린지 보상이면 천장 클램프(§6-3)
     private float _fuelScale = 1f;             // 챌린지 연료 배율(이벤트방 놀이 — 욕심의 상자 4단계 ×1.5)
     private bool _restoreMode;                 // 이어하기 복원 굴림(연료 재지급 금지 + 후보 결정적 고정)
+    private bool _speedBonus;                  // 10-29 F1 — 빠른 정리 방: 룬 첫 장 한 단계 위(첫 장을 뽑으면 끈다)
     private int  _restoreSeed;
 
     // ── Public Methods ─────────────────────────────────────────
@@ -173,7 +174,7 @@ public class RoomClearGate : MonoBehaviour
                 // (되돌리지 않으면 이후 전투/연출의 난수까지 이 시드에 묶인다.)
                 var prevState = UnityEngine.Random.state;
                 UnityEngine.Random.InitState(_restoreSeed);
-                rewards.AddRange(RollRewardChoices(rule.ChoiceCount, rule.RarityFloor));
+                rewards.AddRange(RollRewardChoices(rule.ChoiceCount, RoomFloor(rule)));
                 UnityEngine.Random.state = prevState;
             }
             else
@@ -182,8 +183,14 @@ public class RoomClearGate : MonoBehaviour
                 int? seed = RunFlowController.Active?.CurrentRewardSeed;
                 var prevState = UnityEngine.Random.state;
                 if (seed.HasValue) UnityEngine.Random.InitState(seed.Value);
-                rewards.AddRange(RollRewardChoices(rule.ChoiceCount, rule.RarityFloor));
+                // 10-29 F1 속도 보상 — 정해진 시간 안에 끝낸 방은 룬 첫 장(내 빌드 쪽)이 한 단계 위(판정 = RoomSpeedClear · 2a).
+                // 이어하기 복원 굴림은 속도 결과가 세이브에 없어 올리지 않는다(손해 쪽이라 악용 없음).
+                bool fast = RoomSpeedClear.IsFast;
+                _speedBonus = fast;
+                rewards.AddRange(RollRewardChoices(rule.ChoiceCount, RoomFloor(rule)));
+                _speedBonus = false;
                 if (seed.HasValue) UnityEngine.Random.state = prevState;
+                if (fast && rewards.Count > 0) ShowSpeedNotice();
 
                 // 정제소 연료 — 방 클리어마다 원석 지급(설계 §2.8: 40방 × 4 ≈ 160).
                 // 원석은 정제소의 유일한 정규 소비처이므로, 생산이 없으면 정제소 자체가 죽는다.
@@ -259,6 +266,9 @@ public class RoomClearGate : MonoBehaviour
             var rewardGO = SpawnRewardObject(spot, rewards, isChoice, choiceRounds);
             // 등장 · 놓여 있는 빛 — 보상 오브젝트는 건드리지 않는다(이 오브젝트의 수명이 곧 출구 보류다)
             RewardObjectPresenter.Arrive(rewardGO, aura, floorY, topRarity);
+            // 10-29 사용자 「룬 획득 오브젝트가 어디 있는지 알 수 있게」 — 화면 밖이면 가장자리 배지 + 화살표가 보상 쪽을 가리킨다
+            ExitCompassHud.Create().SetRewardTarget(rewardGO.transform,
+                topRarity == ItemRarity.Common ? UITheme.Gold : RewardPresentation.FrameColor(topRarity));
             // 보상 오브젝트는 수령 · 넘기기 · 지급 실패 어느 길로 끝나든 스스로 파괴된다 — 사라지면 출구를 푼다.
             // 그때까지 문이 닫혀 있는 까닭을 가끔 알려 준다. Time.time 기준이라 보상 화면(시간 정지)이 떠 있는 동안에는 세지 않는다.
             float hintAt = Time.time + ExitHintDelay;
@@ -320,6 +330,16 @@ public class RoomClearGate : MonoBehaviour
         Debug.Log("[RoomClearGate] 출구 안내 — 보상을 받으면 길이 열린다");
     }
 
+    /// <summary>
+    /// 10-29 F1 — 왜 이번 룬이 한 단계 위인지 알린다(표시가 없으면 이유를 모른다 · 체감 원칙).
+    /// 위 가운데 「빠른 정리」 줄 끝에 붙인다 — 알림 칸(가운데 아래)은 이 순간 그 자리에 서는 보상 빛과 겹쳐 읽히지 않았다.
+    /// </summary>
+    private static void ShowSpeedNotice()
+    {
+        RoomSpeedClearHud.MarkRewarded();
+        Debug.Log($"[RoomClearGate] 빠른 정리 — 룬 첫 장 한 단계 위 ({RoomSpeedClear.FightSeconds:0.0} / {RoomSpeedClear.LimitSeconds:0.0}초)");
+    }
+
     /// <summary>플레이어 자리에서 그 면까지 NavMesh 길이 이어지는가. 잴 수 없으면(플레이어 없음 · NavMesh 밖) 이어진 것으로 본다.</summary>
     private static bool IsConnectedToPlayer(Vector3 navPos, PlayerController player)
     {
@@ -376,6 +396,9 @@ public class RoomClearGate : MonoBehaviour
 
     /// <summary>현재 방 종류. 런 세션이 없으면(레거시 단일세계 경로) 일반방으로 본다.</summary>
     private RoomPlanKind RoomKind() => _run?.CurrentRoomKind ?? RoomPlanKind.Normal;
+    /// <summary>10-29 F4 위험한 문으로 들어온 방 — 룬 후보 하한 Epic(제단 잠금보다 앞선다 · 문이 한 약속).</summary>
+    private bool Danger() => _run != null && _run.CurrentRoomDanger;
+    private ItemRarity? RoomFloor(in RoomRewardTable.Rule rule) => Danger() ? ItemRarity.Epic : rule.RarityFloor;
 
     /// <summary>
     /// 선택 팝업용 후보 N개를 뽑는다. 드랍 판정은 한 번만 하고, 같은 아이템이 겹치지 않도록 중복을 배제한다.
@@ -417,6 +440,7 @@ public class RoomClearGate : MonoBehaviour
             // 속성을 무작위로 받는 등급(일반 · 희귀)만 — 영웅 · 전설은 속성이 데이터로 정해져 있다.
             if (result.Count == 1) BiasOwnedElement(d);
             result.Add((d, s));
+            _speedBonus = false;   // 10-29 F1 — 한 단계 위는 첫 장만
         }
 
         if (result.Count < count)
@@ -440,9 +464,12 @@ public class RoomClearGate : MonoBehaviour
     {
         var rarity = RoomRewardTable.RollRarity(weights);
         if (floor.HasValue && rarity < floor.Value) rarity = floor.Value;   // 방 종류·챌린지 등급 rarity 하한
+        if (_speedBonus && rarity < ItemRarity.Legendary) rarity++;          // 10-29 F1 빠른 정리 — 한 단계 위(아래 제단 잠금은 그대로 지킨다)
         // 하한 <b>뒤에</b> 다시 내린다 — RollRarity 안의 클램프만으로는 하한(챌린지 플래티넘=전설 · 골드=영웅)이
         // 기억의 제단 등급 해금을 도로 뚫는다.
         rarity = MemoryAltarService.ClampRarity(rarity);
+        // 정예 보스 — 하한(Epic)이 제단 등급 잠금보다 앞선다(10-23 · 문 「강적 하나 · 영웅 보상」 약속 · 정제소와 같은 예외).
+        if (floor.HasValue && rarity < floor.Value && (RoomRewardTable.FloorIgnoresAltarLock(RoomKind()) || Danger())) rarity = floor.Value;
 
         // 등급 폴백 — 굴린 등급에 보유 아이템이 없을 수 있다(예: 아이템 풀이 Common/Rare뿐인데
         // LuckRollTable은 luck 1부터 Epic/Legendary를 굴린다). 드랍을 통째로 날리는 대신 한 단계씩

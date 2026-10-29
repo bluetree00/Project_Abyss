@@ -55,7 +55,7 @@ MonoBehaviour:
   - name: BubbleShot
     animationStateName: Fishman_Attack02
     minDistance: 0
-    maxDistance: 6
+    maxDistance: 9
     priority: 2
     cooldown: 3.5
     damageDelay: 0.62
@@ -91,5 +91,5 @@ MonoBehaviour:
     hitVfxScale: 1
     hitVfxOffset: {x: 0, y: 0, z: 0}
   selectionMode: 0
-  engageDistance: 5
+  engageDistance: 7.5
   engageDistanceScale: 0.85

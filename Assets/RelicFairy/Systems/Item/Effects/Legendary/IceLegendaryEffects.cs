@@ -7,105 +7,104 @@ using UnityEngine;
 // ── 얼음 전설 3종 — 「몇 초마다」를 없애고 빌드 행동으로 발동(10-14 룬 재설계 R3) ──────────
 // 빙하 파동 = 주문 · 얼음 창 폭격 = 필살 · 영구 빙판 = 기동. 존 단계마다 피해 +15% — LegendaryTuning.
 
-// ── I-1. 빙하 파동 (주문) ─────────────────────────────────────────────
+// ── I-1. 얼려 깨는 주문 (주문 · 옛 빙하 파동) ───────────────────────────
 /// <summary>
-/// E · R 스킬을 쓰면(쿨 value2 = 4초) 플레이어 둘레 3.5 m(value3)에 냉기 파동 4번(공격력 × value = 40%) — 첫 파동이 서리 2중첩을 건다.
+/// 10-24 개편 — E · R이 맞힌 적은 서리 없이 바로 빙결(value2 = 1.5초 · 같은 적 6초에 한 번 · 보스는 받는 피해 +15% 서리 결정 3초).
+/// 빙결된 적을 깨는 다음 적중 = 분쇄: 그 타격 × value(2)가 되도록 더하고 반경 2.5 m 공격력 × value3(80%) 파편 · 빙결을 끝낸다.
+/// 룬 빙결(얼음 존 2단계)로 얼린 적도 깨진다. 존 단계마다 +20% · 각성(얼음 존 4단계) = 파편에 맞은 적도 빙결(같은 적 6초).
 /// </summary>
 public sealed class IceLegendAoeEffect : ItemCombatEffectBase
 {
-    private static readonly string[] s_hitSfx = { SoundKey.Sfx.MonsterHit1, SoundKey.Sfx.MonsterHit2, SoundKey.Sfx.MonsterHit3 };
-    // 장판 그림 수명 — 피해는 0.4초 × 4틱(1.2초에 끝)인데 그림이 4초 남아 피해 없는 장판으로 읽혔다(10-18 이펙트 점검)
-    private const float AoeVfxLife = 1.8f;
-    private const int   WaveTicks = 4;
-    private const string FrostId = "frost";
-    private const float FrostSlow = 0.25f, FrostSeconds = 2.5f;
+    private const string FreezeId = "freeze", FreezeCd = "legend_freeze_cd", CrystalId = "frost_crystal";
+    private const float FreezeGap = 6f, ShardRadius = 2.5f, CrystalAmp = 0.15f, CrystalSeconds = 3f;
+    private const float ShatterAfter = 0.25f;   // 얼린 그 스킬의 다음 틱이 바로 깨지 않게 — 얼음을 보고 깬다
 
     private readonly List<GameObject> _buf = new();
-    private float _readyAt;
-    private CancellationTokenSource _cts;
+    private readonly Dictionary<MonsterBase, float> _frozenAt = new();
 
-    /// <summary>새 행(발동 「OnSkillUse」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
-    private bool NewRow => _trigger == "OnSkillUse";
+    /// <summary>새 행(발동 「OnSkillFreeze」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
+    private bool NewRow => _trigger == "OnSkillFreeze";
 
     public IceLegendAoeEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnActivate(ItemEffectContext ctx)
     {
         LegendaryRuntime.EnsureExists();
-        _readyAt = 0f;
-        _cts = new CancellationTokenSource();
+        _frozenAt.Clear();
     }
 
-    public override void OnDeactivate()
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
-        _cts?.Cancel();
-        _cts?.Dispose();
-        _cts = null;
-    }
+        if (report.DamageDealt <= 0f || report.Target == null || ctx?.Player == null) return;
+        var mb = report.Target.GetComponentInParent<MonsterBase>();
+        if (mb == null || mb.IsDead) return;
 
-    public override void OnSkillUse(ItemEffectContext ctx, SkillType skill)
-    {
-        if (skill != SkillType.E && skill != SkillType.R) return;   // 유물 Q는 제 몫이 따로 있다
-        if (ctx?.Player == null || _cts == null || Time.time < _readyAt) return;
-        _readyAt = Time.time + LegendaryTuning.Pick(NewRow, _value2, 4f);
-
-        float radius = LegendaryTuning.Pick(NewRow, _value3, 3.5f);
-        Vector3 pos  = ctx.Player.transform.position;
-        var cat = LegendaryRuntime.Catalog;
-        if (CombatQuery.GetNearbyDamageables(pos, radius, Self(ctx), 1, _buf) > 0)
-            LegendaryRuntime.SpawnVfx(cat?.iceAoeVfx, pos, Quaternion.identity, AoeVfxLife, radius * 0.0488f, alpha: 0.18f, yScale: 0.1f, follow: ctx.Player.transform);
-        WaveTickAsync(ctx, radius, _cts.Token).Forget();
-    }
-
-    private async UniTaskVoid WaveTickAsync(ItemEffectContext ctx, float radius, CancellationToken ct)
-    {
-        try
+        if (mb.Status.HasCc(FreezeId))
         {
-            var cat = LegendaryRuntime.Catalog;
-            for (int t = 0; t < WaveTicks; t++)
-            {
-                if (ct.IsCancellationRequested || ctx.Player == null) break;
-                float dmg = LegendaryTuning.Atk(ctx) * LegendaryTuning.Pick(NewRow, _value, 0.4f) * LegendaryTuning.TierMul("ICE");
-                Vector3 pos = ctx.Player.transform.position;
-                int n = CombatQuery.GetNearbyDamageables(pos, radius, Self(ctx), 30, _buf);
-                for (int i = 0; i < n; i++)
-                {
-                    CombatQuery.DealSynergyDamage(_buf[i], dmg, Self(ctx), element: RuneElement.Ice);
-                    if (t != 0) continue;
-                    // 첫 파동 — 서리 2중첩(얼음 존의 빙결 조건과 같은 통화) · 타격 이펙트는 첫 틱만(10-11 톤 2차 V-10)
-                    var mb = _buf[i] != null ? _buf[i].GetComponentInParent<MonsterBase>() : null;
-                    if (mb != null) { mb.Status.ApplySlow(FrostId, FrostSlow, FrostSeconds, 2); mb.Status.ApplySlow(FrostId, FrostSlow, FrostSeconds, 2); }
-                    LegendaryRuntime.SpawnVfx(cat?.iceAoeHitVfx, _buf[i].transform.position, Quaternion.identity, 1.5f, 0.22f);   // 대상 타격 ≈ 1 m(10-22 B2 실측 83: ×0.8 = 3.7 m)
-                }
-                if (n > 0) Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();
-                await UniTask.Delay(400, cancellationToken: ct);
-            }
+            if (!_frozenAt.TryGetValue(mb, out float at) || Time.time - at >= ShatterAfter) Shatter(ctx, mb, report.DamageDealt);
+            return;
         }
-        catch (System.OperationCanceledException) { }
+
+        bool skill = report.ActionType == WeaponActionType.ESkill || report.ActionType == WeaponActionType.RSkill;
+        if (!skill || mb.Status.IsOnCooldown(FreezeCd)) return;
+        Freeze(mb);
+    }
+
+    private void Freeze(MonsterBase mb)
+    {
+        mb.Status.SetCooldown(FreezeCd, FreezeGap);
+        if (mb.Grade == MonsterGrade.Boss) { mb.ApplyDamageTakenAmp(CrystalAmp, CrystalSeconds, CrystalId); return; }   // 보스는 서리 결정
+        mb.Status.ApplyCc(FreezeId, LegendaryTuning.Pick(NewRow, _value2, 1.5f));   // 몸 얼음 그림은 상태가 붙인다
+        if (_frozenAt.Count > 32) _frozenAt.Clear();
+        _frozenAt[mb] = Time.time;
+    }
+
+    private void Shatter(ItemEffectContext ctx, MonsterBase mb, float hit)
+    {
+        mb.Status.ClearCc(FreezeId);
+        _frozenAt.Remove(mb);
+        float tier  = LegendaryTuning.TierMul("ICE");
+        float extra = hit * Mathf.Max(0f, LegendaryTuning.Pick(NewRow, _value, 2f) - 1f) * tier;
+        if (extra > 0f) CombatQuery.DealSynergyDamage(mb, extra, Self(ctx), element: RuneElement.Ice);
+        float shard = LegendaryTuning.Atk(ctx) * LegendaryTuning.Pick(NewRow, _value3, 0.8f) * tier;
+        bool awake  = LegendaryTuning.Awakened("ICE");
+        Vector3 at  = mb.transform.position;
+        int n = CombatQuery.GetNearbyDamageables(at, ShardRadius, mb.gameObject, 16, _buf);
+        for (int i = 0; i < n; i++)
+        {
+            CombatQuery.DealSynergyDamage(_buf[i], shard, Self(ctx), element: RuneElement.Ice);
+            if (!awake) continue;
+            var other = _buf[i] != null ? _buf[i].GetComponentInParent<MonsterBase>() : null;   // 각성 — 파편이 얼린다
+            if (other != null && !other.IsDead && !other.Status.IsOnCooldown(FreezeCd)) Freeze(other);
+        }
+        ElementVfxPlayer.PlayBurst(RuneElement.Ice, at, ShardRadius);   // 파편 범위 = 판정
     }
 }
 
-// ── I-2. 얼음 창 폭격 (필살) ──────────────────────────────────────────
+// ── I-2. 서리 처형 (필살 · 옛 얼음 창 폭격) ─────────────────────────────
 /// <summary>
-/// 치명 또는 강타가 터지면(쿨 value2 = 5초) 그 대상에게 얼음 창 5발 — 합계 = 그 타격 피해 × value(150%).
+/// 10-24 개편 — 치명 · 강타가 맞힌 적 체력이 value2(15%) + 2%p × 존 단계 이하면 바로 쓰러뜨린다(일반 · 정예).
+/// 그 위거나 보스면 얼음 창 5발 = 그 타격 × value(1.0)(같은 적 value3 = 6초 · 보스는 문턱 아래에서 ×2 더). 모든 치명 · 강타가 서리 1중첩(실측 95 맞춤).
+/// 각성(얼음 존 4단계) = 처형된 적이 얼어 터지며 반경 3 m 공격력 100% + 서리 2.
 /// </summary>
 public sealed class IceLegendSingleEffect : ItemCombatEffectBase
 {
     private static readonly string[] s_hitSfx = { SoundKey.Sfx.MonsterHit1, SoundKey.Sfx.MonsterHit2, SoundKey.Sfx.MonsterHit3 };
-    private const int Spears = 5;
+    private const int    Spears = 5, FrostMax = 2;
+    private const string FrostId = "frost", SpearCd = "legend_frost_spear";
+    private const float  FrostMag = 0.12f, FrostSeconds = 3f, BlastRadius = 3f, ThresholdPerTier = 0.02f;
 
-    private float _readyAt;
+    private readonly List<GameObject> _buf = new();
     private CancellationTokenSource _cts;
 
-    /// <summary>새 행(발동 「OnCrit」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
-    private bool NewRow => _trigger == "OnCrit";
+    /// <summary>새 행(발동 「OnCritExecute」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
+    private bool NewRow => _trigger == "OnCritExecute";
 
     public IceLegendSingleEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnActivate(ItemEffectContext ctx)
     {
         LegendaryRuntime.EnsureExists();
-        _readyAt = 0f;
         _cts = new CancellationTokenSource();
     }
 
@@ -119,10 +118,40 @@ public sealed class IceLegendSingleEffect : ItemCombatEffectBase
     public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
         if (!(report.IsCrit || report.IsHeavy) || report.DamageDealt <= 0f || report.Target == null) return;
-        if (ctx?.Player == null || _cts == null || Time.time < _readyAt) return;
-        _readyAt = Time.time + LegendaryTuning.Pick(NewRow, _value2, 5f);
-        float total = report.DamageDealt * LegendaryTuning.Pick(NewRow, _value, 1.5f) * LegendaryTuning.TierMul("ICE");
-        StrikeAsync(ctx, report.Target, total / Spears, _cts.Token).Forget();
+        if (ctx?.Player == null || _cts == null) return;
+        var mb = report.Target.GetComponentInParent<MonsterBase>();
+        if (mb == null || mb.IsDead) return;
+        mb.Status.ApplySlow(FrostId, FrostMag, FrostSeconds, FrostMax);   // 모든 치명 · 강타 = 서리 1
+
+        float ratio = mb.EffectiveMaxHp > 0 ? (float)mb.CurrentHp / mb.EffectiveMaxHp : 1f;
+        float threshold = LegendaryTuning.Pick(NewRow, _value2, 0.15f) + ThresholdPerTier * LegendaryTuning.Tier("ICE");
+        bool boss = mb.Grade == MonsterGrade.Boss;
+        if (!boss && ratio <= threshold) { Execute(ctx, mb); return; }
+
+        if (mb.Status.IsOnCooldown(SpearCd)) return;
+        mb.Status.SetCooldown(SpearCd, LegendaryTuning.Pick(NewRow, _value3, 6f));
+        float mult = LegendaryTuning.Pick(NewRow, _value, 1f) * LegendaryTuning.TierMul("ICE");
+        if (boss && ratio <= threshold) mult *= 2f;   // 보스는 처형 대신 문턱 아래에서 창이 두 배
+        StrikeAsync(ctx, report.Target, report.DamageDealt * mult / Spears, _cts.Token).Forget();
+    }
+
+    private void Execute(ItemEffectContext ctx, MonsterBase mb)
+    {
+        Vector3 at = mb.transform.position;
+        CombatQuery.DealSynergyDamage(mb, mb.CurrentHp * 2f + 10f, Self(ctx), element: RuneElement.Ice);
+        ElementVfxPlayer.PlayBurst(RuneElement.Ice, at, 1f);   // 얼어 부서지는 한 점
+        if (!LegendaryTuning.Awakened("ICE")) return;
+        float dmg = LegendaryTuning.Atk(ctx) * LegendaryTuning.TierMul("ICE");   // 각성 — 얼어 터진다
+        int n = CombatQuery.GetNearbyDamageables(at, BlastRadius, mb.gameObject, 16, _buf);
+        for (int i = 0; i < n; i++)
+        {
+            CombatQuery.DealSynergyDamage(_buf[i], dmg, Self(ctx), element: RuneElement.Ice);
+            var o = _buf[i] != null ? _buf[i].GetComponentInParent<MonsterBase>() : null;
+            if (o == null || o.IsDead) continue;
+            o.Status.ApplySlow(FrostId, FrostMag, FrostSeconds, FrostMax);
+            o.Status.ApplySlow(FrostId, FrostMag, FrostSeconds, FrostMax);
+        }
+        ElementVfxPlayer.PlayBurst(RuneElement.Ice, at, BlastRadius);
     }
 
     private async UniTaskVoid StrikeAsync(ItemEffectContext ctx, GameObject target, float spearDmg, CancellationToken ct)
@@ -153,21 +182,22 @@ public sealed class IceLegendSingleEffect : ItemCombatEffectBase
     }
 }
 
-// ── I-3. 영구 빙판 (기동) ─────────────────────────────────────────────
+// ── I-3. 얼음 무대 (기동 · 옛 영구 빙판) ─────────────────────────────────
 /// <summary>
-/// 대시가 끝난 자리에 반경 2 m 빙판 4초(초당 공격력 × value = 30% · 둔화). 최대 3개.
-/// 저스트 회피를 하면 지금 빙판 위의 적이 모두 빙결(1.5초).
+/// 10-24 개편 — 대시 끝 자리에 빙판(반경 value3 = 2.5 m · 5초 · 최대 2). 빙판 위 적: 이동 −40% · 받는 피해 +value2(20%).
+/// 빙판 위 적이 빙결되면 빙판째 깨지며 공격력 × value(150%) 광역. 저스트 회피면 빙판이 바로 깨진다(빙결 1초 + 깨짐 피해).
+/// 존 단계마다 +20% · 각성(얼음 존 4단계) = 반경 +1 m(3.5) · 최대 3.
 /// </summary>
 public sealed class IceLegendFieldEffect : ItemCombatEffectBase
 {
-    private const float FieldRadius = 2f, FieldSeconds = 4f, FreezeSeconds = 1.5f;
-    private const int   MaxFields = 3;
+    private const float FieldSeconds = 5f, SlowMag = 0.4f, DodgeFreeze = 1f, AwakeRadius = 1f;
+    private const int   MaxFields = 2, AwakeMaxFields = 3;
 
     private readonly List<IceZoneField> _fields = new();
     private PlayerController _dodgeSource;
 
-    /// <summary>새 행(발동 「OnDash」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
-    private bool NewRow => _trigger == "OnDash";
+    /// <summary>새 행(발동 「OnDashStage」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
+    private bool NewRow => _trigger == "OnDashStage";
 
     public IceLegendFieldEffect(ItemEffectSlot s) : base(s) { }
 
@@ -196,22 +226,25 @@ public sealed class IceLegendFieldEffect : ItemCombatEffectBase
     public override void OnRollEnd(ItemEffectContext ctx)
     {
         if (ctx?.Player == null) return;
+        bool awake = LegendaryTuning.Awakened("ICE");
+        int max = awake ? AwakeMaxFields : MaxFields;
         _fields.RemoveAll(f => f == null);
-        while (_fields.Count >= MaxFields) { if (_fields[0] != null) Object.Destroy(_fields[0].gameObject); _fields.RemoveAt(0); }
+        while (_fields.Count >= max) { if (_fields[0] != null) Object.Destroy(_fields[0].gameObject); _fields.RemoveAt(0); }
 
-        float atk = LegendaryTuning.Atk(ctx);
-        float dps = atk * LegendaryTuning.Pick(NewRow, _value, 0.3f) * LegendaryTuning.TierMul("ICE");
-        var go = new GameObject("IceZone");
+        float radius  = LegendaryTuning.Pick(NewRow, _value3, 2.5f) + (awake ? AwakeRadius : 0f);
+        float shatter = LegendaryTuning.Atk(ctx) * LegendaryTuning.Pick(NewRow, _value, 1.5f) * LegendaryTuning.TierMul("ICE");
+        float amp     = LegendaryTuning.Pick(NewRow, _value2, 0.2f);
+        var go = new GameObject("IceStage");
         go.transform.position = ctx.Player.transform.position;
         var zone = go.AddComponent<IceZoneField>();
-        zone.Init(this, ctx, dps, FieldRadius, FieldSeconds, atk);
+        zone.InitStage(this, ctx, radius, FieldSeconds, SlowMag, amp, shatter);
         _fields.Add(zone);
-        SkillRangeRing.Circle(go.transform.position, FieldRadius);
     }
 
     private void HandlePerfectDodge(float _)
     {
         _fields.RemoveAll(f => f == null);
-        foreach (var f in _fields) f.FreezeInside(FreezeSeconds);
+        foreach (var f in _fields.ToArray()) f.Shatter(DodgeFreeze);   // 저스트 회피 — 빙판이 바로 깨진다
+        _fields.Clear();
     }
 }

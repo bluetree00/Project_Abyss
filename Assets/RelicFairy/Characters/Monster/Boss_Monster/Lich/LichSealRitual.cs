@@ -327,6 +327,7 @@ public sealed class LichSealRitual
                 Debug.Log($"[LichSeal] 붕괴 — 링 {outer}·{outer - 1} {fallen}장", _lich);
             }
             LichSfx.Play(LichSfxSlot.Collapse, _center);
+            Managers.Sound?.FadeOutBgmAsync(LichMonster.DeathMusicFade).Forget();   // 봉인 = 붕괴 순간 보스 곡을 끊는다(10-29 Ch4 사운드 점검)
             LichPatternUtil.Impact(LichImpact.Transition);
             LichCinematics.SlowMo(0.6f, 0.8f);
             await Wait(1.5f, ct);

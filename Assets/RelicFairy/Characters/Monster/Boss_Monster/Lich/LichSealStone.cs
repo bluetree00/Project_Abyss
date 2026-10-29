@@ -46,6 +46,7 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
     private GameObject    _marker;       // 바닥 표식(기본 도형 폴백)
     private GameObject    _base;         // 바닥 청록 원(이펙트)
     private GameObject    _igniteVfx;
+    private AudioSource   _hum;          // 점화 허밍(루프 — 꺼지거나 스러질 때 끈다 · 10-29 Ch4 사운드 점검)
     private LichChainLine _chain;
     private Transform     _anchor;
     private Action<LichSealStone> _onIgnited;
@@ -71,6 +72,7 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
         _chain = null;
         LichVfx.Stop(ref _base);
         LichVfx.Stop(ref _igniteVfx);
+        LichSfx.StopLoop(ref _hum);
         EnemyCompassHud.RemoveGoal(transform);
     }
 
@@ -166,6 +168,7 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
     public void Darken()
     {
         LichVfx.Stop(ref _igniteVfx, 0.4f);
+        LichSfx.StopLoop(ref _hum);
         _currentColor = DarkColor;
         _currentGlow  = 0f;
         ApplyLook();
@@ -193,6 +196,7 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
     {
         if (_leaving) return;
         _leaving = true;
+        LichSfx.StopLoop(ref _hum);
         if (_collider != null) _collider.enabled = false;
         if (_pips != null) _pips.Show(false);
         EnemyCompassHud.RemoveGoal(transform);
@@ -219,6 +223,7 @@ public sealed class LichSealStone : MonoBehaviour, IDamageable
         _igniteVfx = LichVfx.PlayLoopTinted(LichVfxSlot.SealStoneIgnite, transform.position, Quaternion.identity, 1f,
                                             new Color(1f, 1f, 1f, IgniteVfxAlpha));
         CapBillboards(_igniteVfx, IgniteMaxScreen);
+        _hum = LichSfx.PlayLoop(LichSfxSlot.SealStoneHum, transform.position, 0.5f);
 
         if (_anchor != null)
         {

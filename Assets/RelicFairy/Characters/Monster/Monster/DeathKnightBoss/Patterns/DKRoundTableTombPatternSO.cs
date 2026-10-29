@@ -198,6 +198,7 @@ public class DKRoundTableTombState : FullLockState<DKRoundTableTombPatternSO>
         if (_slashed || pillar == null) return;
         Vector3 p = pillar.transform.position;
         _safeSpots.Add(p);
+        DKGridPatternHelper.MarkSafeWithin(_tiles, p, Data.safeRadius, _swordColor);   // 안전 원 안 칸은 면제 — 붉게 두지 않는다(10-24)
         // 안전 자리 = 보호막 하나(검 소환과 같은 말 「방패 안이 안전」) — 바닥 원은 보호막이 없을 때만(10-11 이펙트 톤 2차)
         if (Data.safeVfxPrefab == null)
         {
@@ -236,6 +237,8 @@ public class DKRoundTableTombState : FullLockState<DKRoundTableTombPatternSO>
             go.transform.localScale = Vector3.one * DKBossRoomContext.CellSize;
             _tiles.Add(new DKTileInfo { Cell = new Vector2Int(x, z), Color = _swordColor, GO = go });
         }
+        for (int i = 0; i < _safeSpots.Count; i++)   // 기둥이 먼저 부서졌으면 새 줄의 안전 원 안 칸도(10-24)
+            DKGridPatternHelper.MarkSafeWithin(_tiles, _safeSpots[i], Data.safeRadius, _swordColor);
     }
 
     // ── 전역 베기 ──────────────────────────────────────────

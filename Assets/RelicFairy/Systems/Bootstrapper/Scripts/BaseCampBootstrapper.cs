@@ -85,6 +85,11 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             // (예전 '둘러보기 패닝 투어'는 제거됨 — 주변을 보여주지 않고 곧장 플레이어 시점으로 시작)
             await ScreenFade.Out(0f);
 
+            // 10-29 지난 세팅 유지 — 비어 있는 칸만 지난번 원거리 · 유물로 채운다(바꾸기는 공방 · 유물 제단에서)
+            var forge = FindFirstObjectByType<WeaponForgeAltar>();
+            await LastLoadoutMemory.RestoreAsync(AppBootstrapper.Instance?.Loadout, w => forge == null || forge.Offers(w), ct);
+            RelicAltar.SyncSelection(AppBootstrapper.Instance?.Loadout?.Relic);
+
             await SpawnPlayerAsync(ct);
 
             var cam = GameCameraController.Instance;
@@ -132,6 +137,11 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             if (introDialogueDelay > 0f)
                 await UniTask.Delay(TimeSpan.FromSeconds(introDialogueDelay), cancellationToken: ct);
 
+            // 10-29 설계 §5 — 해방기 · 악몽 리치를 깨고 돌아왔으면 그 랭킹방에 먼저 들렀다가(비석 · 돌아가는 문) 귀환 대사로
+            var rankEra = RankingFlow.ConsumePendingRoom();
+            if (rankEra.HasValue && _player != null)
+                await RankingHall.VisitAsync(rankEra.Value, _player, ct);
+
             await ShowIntroDialogueAsync(ct);
 
             // 첫 진입 — 무형검을 다시 얻는 연출을 [F] 없이 바로(10-21 ④). 각성 제단은 아직 검을 받지 않은 슬롯에서만 남아 있다
@@ -139,6 +149,11 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             var altar = FindFirstObjectByType<WorldSwordAwakening>();
             if (altar != null && _player != null)
                 await altar.GrantOnArrivalAsync(_player, ct);
+
+            // 10-29 지난 세팅을 쥐여 줬으면 한 줄 — 무엇을 들었고 어디서 바꾸는지
+            if (LastLoadoutMemory.RestoredThisVisit)
+                FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include)?.ShowBuffNotice(
+                    $"지난 세팅 그대로 — {LastLoadoutMemory.Describe(AppBootstrapper.Instance?.Loadout)} · 바꾸려면 공방 · 유물 제단");
         }
         catch (OperationCanceledException) { }
         finally { IsReady = true; }
@@ -163,6 +178,7 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         // 게이트 통과 = 새 런 시작. 로비를 거치지 않은 진입(에디터 직접 Play 등)에서도
         // Ch1 부트스트래퍼가 대기 방 흐름(newRunFromHub)을 타도록 새 런 신호를 세운다.
         AppBootstrapper.Instance?.MarkNewRunPending();
+        LastLoadoutMemory.Capture(AppBootstrapper.Instance?.Loadout);   // 10-29 지난 세팅 — 다음 귀환에 그대로 쥐여 준다
 
         // 시도 횟수 +1 — 로비 세이브 카드의 "시도 N회" 근거. 던전에 실제로 들어갈 때만 센다
         // (허브를 돌아다니는 것은 시도가 아니다). 새 게임/슬롯 삭제에서 0으로 리셋된다.

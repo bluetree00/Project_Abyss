@@ -42,6 +42,10 @@ public sealed class ElementVfxRegistry : ScriptableObject
         public float areaRadius;
         [Tooltip("area를 거두는 시각(초). 0이면 기본(2초)")]
         public float areaLife;
+        [Tooltip("칼날을 감싸는 입자 재질(대검 R 속성 검 · BladeWrapFx가 칼날 표면에서 속성 색 입자를 낸다)")]
+        public Material bladeMaterial;
+        [Tooltip("속성 검 칼 궤적 — INab Weapon Trail 프리팹(커진 칼의 칼끝 · 칼밑에 묶는다)")]
+        public GameObject bladeTrail;
     }
 
     [SerializeField] private Entry[] entries = new Entry[0];
@@ -83,6 +87,14 @@ public sealed class ElementVfxRegistry : ScriptableObject
     /// <summary>단계 발동 표시(플레이어 몸). 없으면 null.</summary>
     public GameObject GetBurst(RuneElement element)
         => Find(element, out var e) ? e.burst : null;
+
+    /// <summary>칼날을 감싸는 입자 재질. 없으면 null.</summary>
+    public Material GetBladeMaterial(RuneElement element)
+        => Find(element, out var e) ? e.bladeMaterial : null;
+
+    /// <summary>속성 검 칼 궤적(INab Weapon Trail 프리팹). 없으면 null.</summary>
+    public GameObject GetBladeTrail(RuneElement element)
+        => Find(element, out var e) ? e.bladeTrail : null;
 
     /// <summary>점 타격 이펙트와 올리는 높이. 칸이 비었으면 발동 표시로 폴백(높이 0).</summary>
     public GameObject GetImpact(RuneElement element, out float lift) => GetImpact(element, out lift, out _);

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using RelicFairy.Monster;
 using UnityEngine;
@@ -18,11 +19,13 @@ public sealed class WindbladeForm : WeaponFormBase
     private const float TwinSpreadDeg = 12f, ReturnDelay = 0.35f, StillWindRatio = 1f;
     private const int   StormEyeCap = 3;
 
-    private readonly List<MonsterBase> _buf = new(16);
     private float   _lastHitAt = -999f, _decay;
     private float   _returnAt = -1f;
     private Vector3 _returnFrom, _returnDir, _dodgeFrom;
     private bool    _dodgeArmed;
+
+    /// <summary>풍절이 나간 휘두름 번호 — 검풍(카타나 증강)이 같은 휘두름에 또 내지 않는다(10-24 ③ · 10-26).</summary>
+    public int   ReleasedSerial { get; private set; } = -2;
 
     public WindbladeForm(PlayerController player, WeaponData weapon) : base(player, weapon) { }
 
@@ -49,11 +52,12 @@ public sealed class WindbladeForm : WeaponFormBase
         _dodgeArmed = false;
         Vector3 to = Player.transform.position;
         float len = Vector3.Distance(_dodgeFrom, to);
-        int n = FormStrike.Line(Player, _dodgeFrom, to - _dodgeFrom, len, HalfWidth, Atk * StillWindRatio, _buf);
-        if (len > 0.3f) FormStrike.PlayWave(Def.TriggerVfxKey, _dodgeFrom + Vector3.up, to - _dodgeFrom, len, HalfWidth + StripBody);   // 지나간 길 · 판정 모양에(10-18 ⑯)
-        if (len > 0.3f) FormStrike.GroundStrip(_dodgeFrom, to - _dodgeFrom, len, HalfWidth + StripBody, StripSeconds);
-        Log($"무풍 — 맞힘 {n}");
-        if (n > 0) RaiseTriggered("무풍");
+        // 지나간 길을 검기가 날아가며 벤다 · 판정 모양에(10-18 ⑯ · 10-23 W1)
+        FormStrike.LineTravel(Player, _dodgeFrom, to - _dodgeFrom, len, HalfWidth, Atk * StillWindRatio, Def.TriggerVfxKey, 0f, null, n =>
+        {
+            Log($"무풍 — 맞힘 {n}");
+            if (n > 0) RaiseTriggered("무풍");
+        }, StripBody, StripSeconds);
     }
 
     public override void Tick(float dt)
@@ -62,10 +66,8 @@ public sealed class WindbladeForm : WeaponFormBase
         {
             _returnAt = -1f;
             Vector3 end = _returnFrom + _returnDir * Def.TriggerRange;
-            int n = FormStrike.Line(Player, end, -_returnDir, Def.TriggerRange, HalfWidth, Atk * Def.TriggerAtkRatio, _buf);
-            FormStrike.PlayWave(Def.TriggerVfxKey, end + Vector3.up, -_returnDir, Def.TriggerRange, HalfWidth + StripBody);
-            FormStrike.GroundStrip(end, -_returnDir, Def.TriggerRange, HalfWidth + StripBody, StripSeconds);
-            Log($"되감는 바람 — 맞힘 {n}");
+            FormStrike.LineTravel(Player, end, -_returnDir, Def.TriggerRange, HalfWidth, Atk * Def.TriggerAtkRatio, Def.TriggerVfxKey, 0f, null,
+                                  n => Log($"되감는 바람 — 맞힘 {n}"), StripBody, StripSeconds);
         }
         if (!Holding) { _lastHitAt += dt; return; }   // 원거리를 든 동안 쉬는 시간을 세지 않는다
         if (Stacks <= 0 || Time.time - _lastHitAt <= Def.IdleSeconds) return;
@@ -78,29 +80,31 @@ public sealed class WindbladeForm : WeaponFormBase
         Vector3 from = Player.transform.position;
         Vector3 dir  = Player.AimForward;
         float   dmg  = Atk * Def.TriggerAtkRatio;
-        int hits;
-        if (Has(TwinWind))
+        bool    storm = Has(StormEye), twin = Has(TwinWind);
+        ReleasedSerial = WeaponFormRuntime.Of(Player)?.SwingSerial ?? -2;
+        SetStacks(0, StackReason.Trigger);
+        // 검기가 날아가며 벤다(10-23 W1) — 폭풍의 눈 되돌림은 다 지나간 뒤 맞힌 수로
+        Action<int> landed = hits =>
+        {
+            Log($"{(twin ? "쌍풍" : "풍절")} — 맞힘 {hits} · 피해 {dmg:0}");
+            int back = storm ? Mathf.Min(StormEyeCap, hits) : 0;
+            if (back <= Stacks) return;
+            SetStacks(back, StackReason.Refund);
+            Log($"폭풍의 눈 — 칼바람 +{back}");
+        };
+        if (twin)
         {
             Vector3 left  = Quaternion.AngleAxis(-TwinSpreadDeg, Vector3.up) * dir;
             Vector3 right = Quaternion.AngleAxis( TwinSpreadDeg, Vector3.up) * dir;
-            hits = FormStrike.Lines(Player, from, left, right, Def.TriggerRange, HalfWidth, dmg, _buf);
-            FormStrike.PlayWave(Def.TriggerVfxKey, from + Vector3.up, left,  Def.TriggerRange, HalfWidth + StripBody);
-            FormStrike.PlayWave(Def.TriggerVfxKey, from + Vector3.up, right, Def.TriggerRange, HalfWidth + StripBody);
-            FormStrike.GroundStrip(from, left,  Def.TriggerRange, HalfWidth + StripBody, StripSeconds);
-            FormStrike.GroundStrip(from, right, Def.TriggerRange, HalfWidth + StripBody, StripSeconds);
-            Log($"쌍풍 — 맞힘 {hits}");
+            var once = new HashSet<MonsterBase>();   // 두 갈래 어느 쪽에 들었든 한 번만
+            int doneN = 0, sum = 0;
+            Action<int> both = n => { sum += n; if (++doneN == 2) landed(sum); };
+            FormStrike.LineTravel(Player, from, left,  Def.TriggerRange, HalfWidth, dmg, Def.TriggerVfxKey, 0f, once, both, StripBody, StripSeconds);
+            FormStrike.LineTravel(Player, from, right, Def.TriggerRange, HalfWidth, dmg, Def.TriggerVfxKey, 0f, once, both, StripBody, StripSeconds);
         }
         else
-        {
-            hits = FormStrike.Line(Player, from, dir, Def.TriggerRange, HalfWidth, dmg, _buf);
-            FormStrike.PlayWave(Def.TriggerVfxKey, from + Vector3.up, dir, Def.TriggerRange, HalfWidth + StripBody);   // 앞 · 옆을 판정 모양에(10-18 ⑯ · 옛 배율 1.3은 옆이 2.1배)
-            FormStrike.GroundStrip(from, dir, Def.TriggerRange, HalfWidth + StripBody, StripSeconds);
-        }
+            FormStrike.LineTravel(Player, from, dir, Def.TriggerRange, HalfWidth, dmg, Def.TriggerVfxKey, 0f, null, landed, StripBody, StripSeconds);   // 앞 · 옆을 판정 모양에(10-18 ⑯)
         if (Has(ReturnWind)) { _returnAt = Time.time + ReturnDelay; _returnFrom = from; _returnDir = dir; }
-        int back = Has(StormEye) ? Mathf.Min(StormEyeCap, hits) : 0;
-        SetStacks(back, back > 0 ? StackReason.Refund : StackReason.Trigger);
-        if (back > 0) Log($"폭풍의 눈 — 칼바람 +{back}");
-        Log($"풍절 — 맞힘 {hits} · 피해 {dmg:0}");
         RaiseTriggered(Def.TriggerName);
     }
 }

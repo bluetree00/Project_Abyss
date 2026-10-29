@@ -91,6 +91,8 @@ public static class MonsterTraitTable
     // ── 시기별 확률(설계서 §4) ────────────────────────────
     private const float LiberatedCommonChance = 0.25f;   // 10-22 A10 0.20 → 0.25(해방기 = 새 빌드로 한 단계 높은 판)
     private const float NightmareCommonChance = 0.35f;
+    // 10-29 사용자 H — 정예 시기 특성: 해방기는 살짝(둘째 특성 30%) · 악몽은 더(늘 둘 · 접두어와 함께 한 몸 최대 3 · 일반방 접두어 정예 2까지)
+    private const float LiberatedEliteSecondChance = 0.3f;
     // 봉인기 무작위 정예화(10-21 몬스터 개편 §5) — 일반 · 위협 몹이 챕터 확률로 특성 하나를 받고 챔피언이 된다(체력 · 몸 · 이름 — MonsterTraits).
     // 예고 없는 특성(흔적 · 잠복)과 해방기 몫(속성 저항 · 분열)은 첫 회차에서 뺀다.
     private static readonly float[] SealedChampionChance = { 0f, 0.06f, 0.10f, 0.14f, 0.18f };   // 챕터 0(모름) · 1 · 2 · 3 · 4
@@ -114,6 +116,7 @@ public static class MonsterTraitTable
     };
     // 정예 접두어 상한(설계서 §7-2 ③) — 토큰 재편 전에도 일반방에 접두어 정예가 몰리지 않게
     private const int   PrefixCapNormalRoom = 1;
+    private const int   PrefixCapNormalRoomNightmare = 2;   // 10-29 H — 악몽 일반방은 접두어 정예 둘까지
     private const int   PrefixCapEliteRoom  = 3;
 
 #if UNITY_EDITOR
@@ -122,7 +125,7 @@ public static class MonsterTraitTable
 #endif
 
     /// <summary>
-    /// 이 몬스터가 받을 특성(없으면 빈 목록). 일반 · 희귀 = 확률로 1개, 정예 = 해방기 1개 · 악몽 2개(다른 분류). 보스 · 봉인기 = 없음.
+    /// 이 몬스터가 받을 특성(없으면 빈 목록). 일반 · 희귀 = 확률로 1개, 정예 = 해방기 1개(30% 둘) · 악몽 2개(다른 분류). 보스 · 봉인기 = 없음.
     /// <paramref name="roomTaken"/> = 이 방에서 이미 나온 특성 종류 — 방당 종류 2까지(같은 특성 몰림 방지).
     /// </summary>
     public static List<MonsterTraitKind> Roll(MonsterGrade grade, StoryEra era, HashSet<MonsterTraitKind> roomTaken,
@@ -137,10 +140,10 @@ public static class MonsterTraitTable
         bool nightmare = era == StoryEra.NightmareMode;
 
         int want;
-        if (grade == MonsterGrade.Elite) want = nightmare ? 2 : 1;
+        if (grade == MonsterGrade.Elite) want = nightmare || Random.value < LiberatedEliteSecondChance ? 2 : 1;
         else if (sealedEra) want = Random.value < SealedChampionChance[Mathf.Clamp(chapter, 0, SealedChampionChance.Length - 1)] ? 1 : 0;
         else want = Random.value < (nightmare ? NightmareCommonChance : LiberatedCommonChance) ? 1 : 0;
-        want = Mathf.Min(want, maxCount);   // 접두어 정예는 시기 특성 1개까지(한 몸 최대 2)
+        want = Mathf.Min(want, maxCount);   // 시기 특성 최대 2(접두어와 함께 한 몸 최대 3 — 10-29 H)
         if (want == 0) return result;
 
         var pool = new List<Def>();
@@ -180,7 +183,8 @@ public static class MonsterTraitTable
 #endif
         bool sealedEra = era == StoryEra.Sealed;
         if (sealedEra && chapter <= 1 && !eliteRoom) return null;
-        int cap = sealedEra && chapter <= 1 ? 1 : eliteRoom ? PrefixCapEliteRoom : PrefixCapNormalRoom;
+        int cap = sealedEra && chapter <= 1 ? 1 : eliteRoom ? PrefixCapEliteRoom
+                : era == StoryEra.NightmareMode ? PrefixCapNormalRoomNightmare : PrefixCapNormalRoom;
         if (MonsterRoomLedger.PrefixCount >= cap) return null;
 
         var pool = new List<Def>();

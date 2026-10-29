@@ -28,6 +28,9 @@ MonoBehaviour:
     area: {fileID: 1953714657109559461, guid: 247bb6dac5e3cbd408b243d6cb32f46a, type: 3}
     areaRadius: 4.1
     areaLife: 1.6
+    bladeMaterial: {fileID: 2100000, guid: 456d9710654aafc459d84a9f8e1c0bed, type: 2}
+    bladeTrail: {fileID: 2495791995618168641, guid: 63f1d38d5a12c93448cfdff82d8ba6d4,
+      type: 3}
   - element: 1
     statusAura: {fileID: 1814480919851174754, guid: f2a5aea27a74c6042a7394e7e68f3790,
       type: 3}
@@ -43,6 +46,9 @@ MonoBehaviour:
     area: {fileID: 534280799920659046, guid: b885061ef6d615947aeac189777647a9, type: 3}
     areaRadius: 6.8
     areaLife: 1.5
+    bladeMaterial: {fileID: 2100000, guid: f2398d750275d9748ae22ec2b9468c7f, type: 2}
+    bladeTrail: {fileID: 1344137490339839236, guid: f98698f6bc2eefb49bcd6d2a8df49fe2,
+      type: 3}
   - element: 2
     statusAura: {fileID: 282865943274501379, guid: 43ef130d1023d7e4695fe417f4dd035f,
       type: 3}
@@ -57,6 +63,9 @@ MonoBehaviour:
     area: {fileID: 3144161684805450049, guid: e43e54105055b48408331d31eec1cf6a, type: 3}
     areaRadius: 3
     areaLife: 1.1
+    bladeMaterial: {fileID: 2100000, guid: f2398d750275d9748ae22ec2b9468c7f, type: 2}
+    bladeTrail: {fileID: 2077574919226338849, guid: 467c798d96721ef438e01fb8c2240b33,
+      type: 3}
   - element: 3
     statusAura: {fileID: 5149745296654590901, guid: b354441b8b822074f8e52d84f17bad97,
       type: 3}
@@ -73,6 +82,9 @@ MonoBehaviour:
     area: {fileID: 7593753326982843609, guid: 29ba84524175fa94484f37073cb12c8a, type: 3}
     areaRadius: 1.5
     areaLife: 1.5
+    bladeMaterial: {fileID: 2100000, guid: c70cdc149f5e26f4ca4b4f67f899fb56, type: 2}
+    bladeTrail: {fileID: 6887721323080817669, guid: cb46ac8503262414989d7d6f9b0fb6b3,
+      type: 3}
   - element: 4
     statusAura: {fileID: 174211133732289389, guid: 6f33d5b0319dbdf4e95edc7a2c267e53,
       type: 3}
@@ -89,6 +101,9 @@ MonoBehaviour:
     area: {fileID: 4737006685481212167, guid: ce94fa18ce556f048a60fc674737907b, type: 3}
     areaRadius: 4.53
     areaLife: 1.5
+    bladeMaterial: {fileID: 2100000, guid: f2398d750275d9748ae22ec2b9468c7f, type: 2}
+    bladeTrail: {fileID: 2318646775085140256, guid: 7dd1d0016b35b5b4eb41078fe62ab4f2,
+      type: 3}
   - element: 5
     statusAura: {fileID: 3594149076506533137, guid: 6fc914f49e5ff664ea5e8a29573adde7,
       type: 3}
@@ -105,3 +120,6 @@ MonoBehaviour:
     area: {fileID: 3470175545269027477, guid: 3f498e4cf53914e48b44a0340f496a52, type: 3}
     areaRadius: 3.6
     areaLife: 2
+    bladeMaterial: {fileID: 2100000, guid: c70cdc149f5e26f4ca4b4f67f899fb56, type: 2}
+    bladeTrail: {fileID: 211711048654108181, guid: 9a1b2e700070e9140a1249cbf0ab8fc6,
+      type: 3}

@@ -171,6 +171,20 @@ public sealed class ElementVfxPlayer : MonoBehaviour
         s_instance.DoReleaseAura(handle);
     }
 
+    /// <summary>속성 검 칼 궤적 프리팹(<see cref="GiantSwordBuff"/>가 무기 트레일 대신 묶는다). 목록이 아직 안 읽혔거나 칸이 비면 null.</summary>
+    public static GameObject GetBladeTrail(RuneElement element)
+    {
+        var inst = Instance;
+        return inst != null && inst._registry != null ? inst._registry.GetBladeTrail(element) : null;
+    }
+
+    /// <summary>칼날을 감싸는 입자 재질(<see cref="BladeWrapFx"/>). 목록이 아직 안 읽혔거나 칸이 비면 null.</summary>
+    public static Material GetBladeMaterial(RuneElement element)
+    {
+        var inst = Instance;
+        return inst != null && inst._registry != null ? inst._registry.GetBladeMaterial(element) : null;
+    }
+
     /// <summary>두 점을 잇는 속성 빔(체인 낙뢰 등). 지그재그 아크로 그려 짧게 페이드. from→to 동일점이면 무동작.</summary>
     public static void PlayBeam(RuneElement element, Vector3 from, Vector3 to, float life = 0.16f)
     {

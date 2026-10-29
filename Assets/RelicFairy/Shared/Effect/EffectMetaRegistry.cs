@@ -259,24 +259,24 @@ public static class EffectMetaRegistry
         Register("MeleeShapeCircle",            "근접 원형 범위",       EffectCategory.Special, EffectUnit.None,    "dmg");
 
         // ── 레전드리 룬 효과 ──────────────────────────────────────
-        Register("FireLegendAoe",         "마그마 분출",     EffectCategory.Special, EffectUnit.None, "fire");
-        Register("FireLegendSingle",      "불사조 강타",     EffectCategory.Special, EffectUnit.None, "fire");
-        Register("FireLegendProjectile",  "화염 오브",       EffectCategory.Special, EffectUnit.None, "fire");
-        Register("IceLegendAoe",          "빙하 파동",       EffectCategory.Special, EffectUnit.None, "freeze");
-        Register("IceLegendSingle",       "얼음 창 폭격",   EffectCategory.Special, EffectUnit.None, "freeze");
-        Register("IceLegendField",        "영구 빙판",       EffectCategory.Special, EffectUnit.None, "freeze");
-        Register("ElecLegendAoe",         "천둥 폭격",       EffectCategory.Special, EffectUnit.None, "lightning");
-        Register("ElecLegendSingle",      "과전류 포박",     EffectCategory.Special, EffectUnit.None, "lightning");
-        Register("ElecLegendProjectile",  "전자기 구체",     EffectCategory.Special, EffectUnit.None, "lightning");
-        Register("GrassLegendAoe",        "포자 폭발",       EffectCategory.Special, EffectUnit.None, "poison");
-        Register("GrassLegendSingle",     "덩굴 구속",       EffectCategory.Special, EffectUnit.None, "poison");
-        Register("GrassLegendProjectile", "사방 독 화살",   EffectCategory.Special, EffectUnit.None, "poison");
-        Register("LightLegendAoe",        "신성 폭발",       EffectCategory.Special, EffectUnit.None, "special");
-        Register("LightLegendSingle",     "성스러운 심판",   EffectCategory.Special, EffectUnit.None, "special");
-        Register("LightLegendProjectile", "영원의 성검",     EffectCategory.Special, EffectUnit.None, "special");
-        Register("DarkLegendAoe",         "심연 잠식",       EffectCategory.Special, EffectUnit.None, "special");
-        Register("DarkLegendSingle",      "그림자 분신",     EffectCategory.Special, EffectUnit.None, "special");
-        Register("DarkLegendProjectile",  "어둠의 낫",       EffectCategory.Special, EffectUnit.None, "special");
+        Register("FireLegendAoe",         "불바다",         EffectCategory.Special, EffectUnit.None, "fire");   // 10-24 전설 룬 개편 2차
+        Register("FireLegendSingle",      "불사조의 맥박",   EffectCategory.Special, EffectUnit.None, "fire");   // 10-24 전설 룬 개편 1차
+        Register("FireLegendProjectile",  "불꽃 질주",       EffectCategory.Special, EffectUnit.None, "fire");
+        Register("IceLegendAoe",          "얼려 깨는 주문",  EffectCategory.Special, EffectUnit.None, "freeze");
+        Register("IceLegendSingle",       "서리 처형",       EffectCategory.Special, EffectUnit.None, "freeze");
+        Register("IceLegendField",        "얼음 무대",       EffectCategory.Special, EffectUnit.None, "freeze");
+        Register("ElecLegendAoe",         "번개 사슬",       EffectCategory.Special, EffectUnit.None, "lightning");
+        Register("ElecLegendSingle",      "축전 포박",       EffectCategory.Special, EffectUnit.None, "lightning");
+        Register("ElecLegendProjectile",  "뇌전 탄창",       EffectCategory.Special, EffectUnit.None, "lightning");
+        Register("GrassLegendAoe",        "포자 전염",       EffectCategory.Special, EffectUnit.None, "poison");
+        Register("GrassLegendSingle",     "뿌리 표적",       EffectCategory.Special, EffectUnit.None, "poison");
+        Register("GrassLegendProjectile", "독안개 사수",     EffectCategory.Special, EffectUnit.None, "poison");
+        Register("LightLegendAoe",        "빛의 반격",       EffectCategory.Special, EffectUnit.None, "light");
+        Register("LightLegendSingle",     "심판의 표식",     EffectCategory.Special, EffectUnit.None, "light");
+        Register("LightLegendProjectile", "호위 성검",       EffectCategory.Special, EffectUnit.None, "light");
+        Register("DarkLegendAoe",         "보복의 심연",     EffectCategory.Special, EffectUnit.None, "dark");
+        Register("DarkLegendSingle",      "그림자 걸음",     EffectCategory.Special, EffectUnit.None, "dark");
+        Register("DarkLegendProjectile",  "영혼 수확",       EffectCategory.Special, EffectUnit.None, "dark");
 
         // 정제소 존핵 — 보관함 카드가 「AmplifyZone +20」으로 내부 이름을 그대로 찍었다(09-27).
         Register("AmplifyZone",           "존 시너지",       EffectCategory.Special, EffectUnit.Percent, "special");

@@ -220,6 +220,72 @@ public static class HiggsfieldArtImportEditor
         Debug.Log($"[HiggsfieldArt] 재련소 첫 화면 그림 끝 — 가져오기 {imported}/2 · 무기 {cru.ChooserMeleeArt != null} · 파츠 {cru.ChooserRangedArt != null}");
     }
 
+    // 10-26 사용자 「무형검 진화 때 무기 선택 · 형(능력) 고르는 카드 리소스가 너무 안 좋다 — 힉스필드로 실제 오브젝트 모양 살려서」
+    [MenuItem("RelicFairy/Tools/10-26 진화 카드 그림 반입 — 배경 무형검 · 카타나 · 대검 머리 그림 · 형 문장")]
+    private static void RunEvolveArt()
+    {
+        string[] files =
+        {
+            "Art_EvolveBackdrop_Nameless.png", "Art_EvolveBanner_Katana.png", "Art_EvolveBanner_Greatsword.png",
+            "Art_EvolveForm_Windblade.png", "Art_EvolveForm_Weight.png",
+        };
+        int imported = 0;
+        foreach (var f in files) if (Configure(FrameDir + f)) imported++;
+        var cru = AssetDatabase.LoadAssetAtPath<CrucibleSkinSO>(CrucibleSkinPath);
+        if (cru == null) { Debug.LogWarning($"[HiggsfieldArt] 재련소 스킨 없음 — {CrucibleSkinPath}"); return; }
+        var s = new SerializedObject(cru);
+        s.FindProperty("evolveBackdrop").objectReferenceValue         = FrameSprite(files[0]);
+        s.FindProperty("evolveBannerKatana").objectReferenceValue     = FrameSprite(files[1]);
+        s.FindProperty("evolveBannerGreatsword").objectReferenceValue = FrameSprite(files[2]);
+        s.FindProperty("evolveFormWindblade").objectReferenceValue    = FrameSprite(files[3]);
+        s.FindProperty("evolveFormWeight").objectReferenceValue       = FrameSprite(files[4]);
+        s.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(cru);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[HiggsfieldArt] 진화 카드 그림 끝 — 가져오기 {imported}/5 · 배경 {cru.EvolveBackdrop != null} · 카타나 {cru.EvolveBanner(false) != null} · 대검 {cru.EvolveBanner(true) != null}"
+                + $" · 칼바람 {cru.EvolveFormEmblem("windblade") != null} · 무게 {cru.EvolveFormEmblem("weight") != null}");
+    }
+
+    // ── 10-23 로비 세이브 창(사용자 「너무 튀는 레거시 리소스 — 톤에 맞게 · 세이브 데이터를 잘 보여 줄 · 배경이랑 틀」) ──
+    private const string SaveSlotFolder   = "Assets/RelicFairy/UI/Skin/SaveSlot";
+    private const string SaveSlotSkinPath = SaveSlotFolder + "/SaveSlotSkin.asset";
+
+    /// <summary>배경 · 카드 틀을 들이고(틀은 9칸 경계 64 — 모서리 쐐기돌 ≈ 58까지) 세이브 창 스킨을 만들어(없으면) 잇고 주소 「UI/SaveSlotSkin」을 단다. 여러 번 눌러도 같다.</summary>
+    [MenuItem("RelicFairy/Tools/10-23 로비 세이브 창 그림 반입 — 배경 · 틀")]
+    private static void RunSaveSlot()
+    {
+        int imported = 0;
+        if (Configure(FrameDir + "Art_SaveSlotBackground.png"))                             imported++;
+        if (Configure(FrameDir + "Frame_SaveSlotCard.png", new Vector4(64f, 64f, 64f, 64f))) imported++;
+
+        if (!AssetDatabase.IsValidFolder(SaveSlotFolder)) AssetDatabase.CreateFolder("Assets/RelicFairy/UI/Skin", "SaveSlot");
+        var skin = AssetDatabase.LoadAssetAtPath<SaveSlotSkinSO>(SaveSlotSkinPath);
+        if (skin == null)
+        {
+            skin = ScriptableObject.CreateInstance<SaveSlotSkinSO>();
+            AssetDatabase.CreateAsset(skin, SaveSlotSkinPath);
+        }
+        var s = new SerializedObject(skin);
+        s.FindProperty("background").objectReferenceValue = FrameSprite("Art_SaveSlotBackground.png");
+        s.FindProperty("cardFrame").objectReferenceValue  = FrameSprite("Frame_SaveSlotCard.png");
+        s.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(skin);
+        AssetDatabase.SaveAssets();
+
+        string address = "-";
+        var settings = AddressableAssetSettingsDefaultObject.Settings;
+        if (settings != null)
+        {
+            var entry = settings.CreateOrMoveEntry(AssetDatabase.AssetPathToGUID(SaveSlotSkinPath), settings.FindGroup(GroupName) ?? settings.DefaultGroup, false, false);
+            entry.address = UISkin.SaveSlotAddress;
+            settings.SetDirty(AddressableAssetSettings.ModificationEvent.EntryMoved, entry, true);
+            AssetDatabase.SaveAssets();
+            address = entry.address;
+        }
+        else Debug.LogWarning("[HiggsfieldArt] AddressableAssetSettings 없음 — 세이브 창 스킨 주소를 달지 못했다");
+        Debug.Log($"[HiggsfieldArt] 로비 세이브 창 끝 — 가져오기 {imported}/2 · 배경 {skin.Background != null} · 틀 {skin.CardFrame != null} · 주소 {address}");
+    }
+
     [MenuItem("RelicFairy/Tools/10-18 힉스필드 증강 · 진화 틀 반입 — 가져오기 · 9칸 경계 · 스킨 연결")]
     private static void RunFrames()
     {

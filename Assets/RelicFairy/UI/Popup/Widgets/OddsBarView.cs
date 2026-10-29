@@ -176,7 +176,6 @@ public sealed class OddsBarView : MonoBehaviour
     {
         if (_track == null) return;
         bool epicLocked = !MemoryAltarService.IsEpicUnlocked;
-        bool legLocked  = !MemoryAltarService.IsLegendaryUnlocked;
 
         int first = _showCommon ? 0 : 1;
         float shown = 0f;
@@ -198,7 +197,7 @@ public sealed class OddsBarView : MonoBehaviour
             _seg[i].color = _heated && i >= 2 ? Color.Lerp(c, UITheme.Thin.Gold, 0.35f) : c;
             x += f;
 
-            bool locked = (i == 2 && epicLocked) || (i == 3 && legLocked);
+            bool locked = i == 2 && epicLocked;   // 10-29 Legendary는 안 열어도 드물게 나온다 — 「잠김」 대신 낮은 %
             if (_name[i] != null)
                 _name[i].color = locked ? UITheme.Thin.InkA(0.35f) : ShopUIStyle.Rarity(TierRarity[i]);
             if (_pct[i] != null)

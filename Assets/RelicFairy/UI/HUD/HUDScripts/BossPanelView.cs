@@ -69,9 +69,14 @@ public sealed partial class BossPanelView : MonoBehaviour
     private const float BreakPulseHz      = 2.5f;
     private const float FullPunchSeconds  = 0.3f;
     private const float FullPunchScale    = 0.05f;
+    // 10-29 사용자 「무적이면 무적 표현이 있어야」 — 얇은 바 위 덮개만으로는 붉은 방에서 안 읽혔다. 이름 옆 글 + 덮개 느린 맥동.
+    private const string InvulnerableTag   = "  <size=78%><color=#A9C2F0>◇ 무적</color></size>";
+    private const float  InvulnerablePulseHz = 0.8f;
     private static readonly Color NameInk = new(0.96f, 0.92f, 0.84f, 1f);
     private static readonly Color HpInk   = new(0.93f, 0.90f, 0.84f, 0.95f);
-    private Image _invulnerableOverlay;
+    private Image  _invulnerableOverlay;
+    private bool   _invulnerable;
+    private string _bossName = string.Empty;
     private Image _vulnerableOverlay;
     private float _vulnerableRemaining;
 
@@ -174,6 +179,9 @@ public sealed partial class BossPanelView : MonoBehaviour
         _invulnerableOverlay.enabled = on;
         FitToFill(_invulnerableOverlay);
         if (on && _vulnerableOverlay != null) _vulnerableOverlay.enabled = false;
+        if (_invulnerable == on) return;
+        _invulnerable = on;
+        ApplyName();
     }
 
     /// <summary>무방비(반격 기회) 표시 — <paramref name="seconds"/> 동안 채움이 금빛으로 맥동.</summary>
@@ -203,9 +211,8 @@ public sealed partial class BossPanelView : MonoBehaviour
         _page       = 1;
         _refilling  = false;
 
-        if (nameText != null)
-            nameText.text = bossName ?? string.Empty;
-        FitNameBand();
+        _bossName = bossName ?? string.Empty;
+        ApplyName();
         Render();
     }
 
@@ -322,6 +329,14 @@ public sealed partial class BossPanelView : MonoBehaviour
     private void TickPageFx()
     {
         float dt = Time.unscaledDeltaTime;
+
+        if (_invulnerable && _invulnerableOverlay != null)   // 무적 덮개 — 느린 숨(0.8Hz)으로 「지금 막혀 있다」를 계속 말한다
+        {
+            float s = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * InvulnerablePulseHz * Mathf.PI * 2f);
+            var c = invulnerableColor;
+            c.a = Mathf.Clamp01(c.a * Mathf.Lerp(0.7f, 1.3f, s));
+            _invulnerableOverlay.color = c;
+        }
 
         if (_flashT >= 0f && _pageFlash != null)
         {
@@ -506,6 +521,14 @@ public sealed partial class BossPanelView : MonoBehaviour
             hpText.characterSpacing = 1f;
             TMPOutlineHelper.ApplySoftShadow(hpText);
         }
+        FitNameBand();
+    }
+
+    /// <summary>이름 — 무적 동안은 옆에 「◇ 무적」(Init이 다시 불려도 남는다).</summary>
+    private void ApplyName()
+    {
+        if (nameText != null)
+            nameText.text = _invulnerable ? _bossName + InvulnerableTag : _bossName;
         FitNameBand();
     }
 

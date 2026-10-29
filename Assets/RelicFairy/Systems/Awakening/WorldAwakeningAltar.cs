@@ -143,7 +143,9 @@ public class WorldAwakeningAltar : MonoBehaviour
         _labelAffordable = affordable;
         _worldText.text = affordable > 0
             ? $"{LabelTitle}\n<size=55%><color={UIPalette.GoldHex}>열 수 있는 것 {affordable}</color> · 정수 {essence:N0}</size>"
-            : $"{LabelTitle}\n<size=55%>정수 {essence:N0}</size>";
+            : MemoryAltarService.GetNextGoal(false) is { } goal && goal.Cost > essence   // 10-29 살 칸이 0이어도 다음 칸까지 남은 정수
+                ? $"{LabelTitle}\n<size=55%>정수 {essence:N0} · 「{goal.Node.DisplayName}」까지 {goal.Cost - essence:N0}</size>"
+                : $"{LabelTitle}\n<size=55%>정수 {essence:N0}</size>";
     }
 
     private void CreateWorldText()

@@ -22,12 +22,12 @@ namespace RelicFairy
         /// 그러면 <c>ShieldCap = MaxHp × 0 = 0</c>이라 <c>AddShield</c>가 무엇을 넣든 0으로 클램프돼
         /// <b>보호막이 통째로 무효</b>였다(서약의 보호막 효과도 같이 죽어 있었다).
         /// </summary>
-        public float ShieldCapRatio = 0.3f;
+        public float ShieldCapRatio = 0.25f;   // 보호막 총합 상한 — 모든 출처 합쳐 최대 체력 25%(10-29 근접 버팀 · 사용자 「무한정 방어는 막아야」 · 옛 0.3)
 
         public void Reset()
         {
             ShieldCurrentValue = 0f;
-            ShieldCapRatio     = 0.3f;
+            ShieldCapRatio     = 0.25f;
         }
     }
 }

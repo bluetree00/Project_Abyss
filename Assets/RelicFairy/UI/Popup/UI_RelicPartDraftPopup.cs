@@ -203,6 +203,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
                            + (string.IsNullOrEmpty(progress) ? string.Empty : $"   <color={UIPalette.GoldHex}>{progress}</color>");
         }
 
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);   // 10-29 UI 소리 — 열기(다시 떠올리기는 창을 닫고 새로 연다)
         BuildCards();
         BuildGlossary(draft.RelicId);
         EnsureRedrawButton(canRedraw);
@@ -760,7 +761,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         {
             case RelicDraftCardKind.Echo:
                 return c.Anchor != null && c.Anchor.StartsWith("r")
-                    ? "조각 없이 광기 칸 조각 개수 +1"   // 10-22 E1 D7 — 옛 「빈 받침」(이어진 계단)을 걷었다
+                    ? "조각 없이 광기 10~40 조각 개수 +1"   // 10-22 E1 D7 — 옛 「빈 받침」(이어진 계단)을 걷었다
                     : $"조각 없이 「{RelicPartAnchor.Label(c.Anchor)}」 개수 +1";
             case RelicDraftCardKind.Residue:
                 return "더 고를 조각이 없다 → 정수";
@@ -877,8 +878,6 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     private void BuildEvolutionChecks(Transform card)
     {
         var loadout = AppBootstrapper.Instance?.Loadout;
-        int parts   = loadout?.RelicPartIds?.Count ?? 0;
-
         var box = (RectTransform)new GameObject("EvoChecks", typeof(RectTransform)).transform;
         box.SetParent(card, false);
         var bottom = new Vector2(0.5f, 0f);
@@ -896,7 +895,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         head.enableAutoSizing = false;
         head.textWrappingMode = TextWrappingModes.NoWrap;
         head.text = "진화 조건";
-        EvoCheckRow(box, "EvoCheckParts", "조각", parts, RelicEvolution.FragmentsNeeded, " 가진 채 보스 처치");
+        EvoCheckRow(box, "EvoCheckBoss", "보스", 1, 1, " 처치");   // 10-29 조각 조건 걷음 — 보스마다 열린다
         LayoutRebuilder.ForceRebuildLayoutImmediate(box);
     }
 
@@ -1061,7 +1060,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             case RelicDraftCardKind.Echo:
                 // 10-18 — 「공명을 하나 더 센다」는 공명을 모르면 뜻이 없었다. 효과가 없다는 것 · 무엇을 세는지를 먼저 말한다
                 return c.Anchor != null && c.Anchor.StartsWith("r")
-                    ? "효과 줄은 없다 — 광기 칸 조각 개수만 하나 늘린다(2 · 3 · 4개면 한 단계씩 세진다)."
+                    ? "효과 줄은 없다 — 광기 10~40 조각 개수만 하나 늘린다(2 · 3 · 4개면 한 단계씩 세진다)."
                     : $"효과 줄은 없다 — 「{RelicPartAnchor.Label(c.Anchor)}」 조각 개수만 하나 늘린다(2 · 4개면 그 시간대가 강해진다).";
             case RelicDraftCardKind.Residue:
                 return "더 고를 조각이 남지 않았다 — 대신 정수를 받는다.";
@@ -1112,13 +1111,13 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             return $"효과 {had}줄 → {had + 1}줄(금색 줄이 새로 열린다)";
         }
         return ResonanceFoot(loadout, relicId, e.anchor)
-            ?? (relicId == "lancelot" ? "바로 켜진다 — 광기 칸 조각 수에는 안 센다" : "바로 켜진다");
+            ?? (relicId == "lancelot" ? "바로 켜진다 — 광기 10~40 조각 수에는 안 센다" : "바로 켜진다");
     }
 
     /// <summary>
     /// 모으기 꼬리말(10-12 4b 요청 5 → 10-18 → 10-22 E1 B5 「카드 글 줄이기」) — 단계가 바뀔 때만 그 단계가 여는 것을 한 줄로,
     /// 그 밖엔 개수만: 「여명 2개 → 태양흔 상한이 3에서 5로」 · 「여명 조각 1/2」 · 「여명 1/2 · 정오 3/4」(두 시간대 조각) ·
-    /// 「광기 칸 2개 → 광기가 20 아래로 떨어지지 않는다」 · 「광기 칸 조각 1/2」.
+    /// 「광기 10~40 조각 2개 → 광기가 20 아래로 떨어지지 않는다」 · 「광기 10~40 조각 1/2」.
     /// 단계 문턱 · 효과는 <see cref="RelicResonance"/>(가웨인 2 · 4 · 랜슬롯 광기 칸 조각 2 · 3 · 4)와 같다. 모으기와 무관한 자리면 null.
     /// </summary>
     private static string ResonanceFoot(PlayerLoadout loadout, string relicId, string anchor)
@@ -1151,8 +1150,8 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         {
             if (System.Array.IndexOf(RelicPartAnchor.LancelotRungs, anchor) < 0) return null;
             int after = RelicResonance.LancelotCount(loadout) + 1;
-            if (after >= 2 && after <= 4) return $"광기 칸 {after}개 → {RelicPartPlainText.LadderStep(after)}";
-            return after < 2 ? $"광기 칸 조각 {after}/2" : $"광기 칸 조각 {after}개";
+            if (after >= 2 && after <= 4) return $"광기 10~40 조각 {after}개 → {RelicPartPlainText.LadderStep(after)}";
+            return after < 2 ? $"광기 10~40 조각 {after}/2" : $"광기 10~40 조각 {after}개";
         }
         return null;
     }

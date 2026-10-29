@@ -47,6 +47,14 @@ public static class RelicGrowthV2BudgetProbeEditor
     private static bool   s_evo;     // 진화 6종 화력 몫(10-22) — 계열 빌드 × 진화 없음/있음
     private static string s_evoFamily = "";   // 비어 있지 않으면 그 계열만(10-23 상한 고침 재실측)
     private static bool   s_hud;     // 첫 전투 유물 HUD 사진(10-23 D11 — 허브가 런 시작부터라 해시계 · 광기 눈금이 첫 전투부터 떠야 한다)
+    private static bool   s_rune;    // 룬 시너지 체감(10-23 W5) — 속성마다 1~2 · 1~4단계를 켜고 칸당 20초
+    private static Dictionary<string, float> s_runeOv;   // 8u2 — 바꾼 수치(Temp/rune_override.txt · 불 · 풀만)
+    private const string RuneOverridePath = "Temp/rune_override.txt";
+    private static bool   s_board;   // 8b — 룬판 실제 경로(칸 채움 → 브리지 → 디스패처) · 이펙트 횟수 · 켜진 효과
+    private static bool   s_photo;   // 8bp — 8b를 1~2단계만 · 칸마다 싸움 화면 세 장(10-24)
+    private static readonly float[] PhotoAt = { 4f, 9f, 15f };   // 정착 뒤 초
+    private static readonly List<(RuneSynergyEntry e, float v)> s_runeRestore = new();   // 8u2 — 칸 동안 바꾼 값(다음 칸 준비 때 되돌린다)
+    private const float   RuneMeasure = 20f;
     private static ICharacterPassive s_burnPassive;   // D11 「화상 끔」 칸이 뺀 가웨인 화상 패시브 — 다음 칸에서 되돌린다
     private static float  s_brandAmpBackup = float.NaN;
     private const string  Combo4 = "l_blood_frenzy:2,l_black_afterimage:1,l_tearing_judgment:1,l_grudge_blade:2";   // 10-03 세 회차 내내 최상위(+72~119%)
@@ -89,13 +97,25 @@ public static class RelicGrowthV2BudgetProbeEditor
     [MenuItem("RelicFairy/Debug/유물 성장 v2/8v3 진화 화력 — 랜슬롯 사격만 (10-23, 플레이 중, 약 4분)")]
     private static void BeginLancelotEvoRanged() => Begin("Lancelot", evo: true, evoFamily: "사격");
 
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/8u 룬 시너지 체감 — 랜슬롯 속성별 1~2 · 1~4단계 (10-23 W5, 플레이 중, 약 6분)")]
+    private static void BeginLancelotRune() => Begin("Lancelot", rune: true);
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/8b 룬판 실제 경로 — 속성 칸 채움 · 발동 · 이펙트 · 화력 (10-23 밤, 플레이 중, 약 7분)")]
+    private static void BeginLancelotRuneBoard() => Begin("Lancelot", rune: true, board: true);
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/8bp 룬판 사진 — 속성별 1~2단계 싸움 화면 세 장 (10-24, 플레이 중, 약 3분)")]
+    private static void BeginLancelotRunePhoto() => Begin("Lancelot", rune: true, board: true, photo: true);
+
+    [MenuItem("RelicFairy/Debug/유물 성장 v2/8u2 룬 시너지 — 불 · 풀 바꾼 수치 Temp/rune_override.txt (10-23 W5, 플레이 중, 약 3분)")]
+    private static void BeginLancelotRuneOverride() => Begin("Lancelot", rune: true, runeOverride: true);
+
     [MenuItem("RelicFairy/Debug/유물 성장 v2/7h 첫 전투 유물 HUD 사진 — 가웨인 (10-23, 플레이 중, 약 1분)")]
     private static void BeginGawainHud() => Begin("Gawain", hud: true);
 
     [MenuItem("RelicFairy/Debug/유물 성장 v2/8h 첫 전투 유물 HUD 사진 — 랜슬롯 (10-23, 플레이 중, 약 1분)")]
     private static void BeginLancelotHud() => Begin("Lancelot", hud: true);
 
-    private static void Begin(string relic, bool shortRun = false, bool ablate = false, bool d11 = false, bool d7 = false, bool evo = false, string evoFamily = "", bool hud = false)
+    private static void Begin(string relic, bool shortRun = false, bool ablate = false, bool d11 = false, bool d7 = false, bool evo = false, string evoFamily = "", bool hud = false, bool rune = false, bool runeOverride = false, bool board = false, bool photo = false)
     {
         if (!Application.isPlaying) { Debug.LogWarning("[RGV2예산] 플레이 모드에서만 동작한다."); return; }
         var launcher = UnityEngine.Object.FindFirstObjectByType<TestHubLauncher>();
@@ -112,6 +132,10 @@ public static class RelicGrowthV2BudgetProbeEditor
         s_evo = evo;
         s_evoFamily = evoFamily ?? "";
         s_hud = hud;
+        s_rune = rune;
+        s_runeOv = runeOverride ? ReadRuneOverride() : null;
+        s_board = board;
+        s_photo = photo;
         s_armed = true;
         Application.logMessageReceived -= OnLog;
         Application.logMessageReceived += OnLog;
@@ -144,6 +168,8 @@ public static class RelicGrowthV2BudgetProbeEditor
         public string   Extra = "";    // 메아리 · 진화 — RestoreRelicParts 둘째 인자(「echo.r10=1;evo=4」)
         public string   Family = "";   // 진화 칸 계열 빌드(연격 · 필살 · 사격)
         public int      Casts;         // 심판 · 정오 횟수
+        public string   RuneZone = ""; // 룬 시너지 칸 — 속성(FIRE …) · 이 단계 문턱까지 켠다
+        public int      RuneUpTo;
         public float    Dps;
         public string   Diag = "";
     }
@@ -177,6 +203,8 @@ public static class RelicGrowthV2BudgetProbeEditor
         catch (Exception e) { sb.AppendLine("예외: " + e); Debug.LogException(e); }
         finally
         {
+            foreach (var (e, v) in s_runeRestore) e.value = v;
+            s_runeRestore.Clear();
             Report(sb, cases);
             System.IO.File.WriteAllText(outPath, sb.ToString());
             Debug.Log($"[RGV2예산] 끝 → {outPath}");
@@ -187,6 +215,7 @@ public static class RelicGrowthV2BudgetProbeEditor
     {
         if (s_ablate) return BuildAblation();
         if (s_d7) return BuildD7();
+        if (s_rune) return BuildRune();
         if (s_evo) return BuildEvo(gawain);
         if (s_d11)
             return new List<Case>
@@ -257,6 +286,116 @@ public static class RelicGrowthV2BudgetProbeEditor
             new() { Label = "칸 조각 2(받침 20)", Kind = "칸2", Extra = e2 },
             new() { Label = "칸 조각 0(끝)", Kind = "기본2" },
         };
+    }
+
+    /// <summary>룬 시너지 체감 — 속성마다 1~2단계(문턱 ≤ 10) · 1~4단계(전부). 기본은 처음 · 가운데 · 끝.</summary>
+    private static List<Case> BuildRune()
+    {
+        var list = new List<Case> { new() { Label = "시너지 없음", Kind = "기본" } };
+        if (s_photo)   // 8bp — 1~2단계만(실제 런에서 흔히 닿는 단계)
+        {
+            foreach (var z in new[] { "FIRE", "ICE", "ELECTRIC", "GRASS", "LIGHT", "DARK" })
+                list.Add(new Case { Label = $"{z} 1~2단계", Kind = "룬2", RuneZone = z, RuneUpTo = 10 });
+            return list;
+        }
+        string[] zones = s_runeOv != null ? new[] { "FIRE", "GRASS" } : new[] { "FIRE", "ICE", "ELECTRIC", "GRASS", "LIGHT", "DARK" };
+        for (int z = 0; z < zones.Length; z++)
+        {
+            if (z == 3 || (s_runeOv != null && z == 1)) list.Add(new Case { Label = "시너지 없음(가운데)", Kind = "기본2" });
+            list.Add(new Case { Label = $"{zones[z]} 1~2단계", Kind = "룬2", RuneZone = zones[z], RuneUpTo = 10 });
+            list.Add(new Case { Label = $"{zones[z]} 1~4단계", Kind = "룬4", RuneZone = zones[z], RuneUpTo = 99 });
+        }
+        list.Add(new Case { Label = "시너지 없음(끝)", Kind = "기본2" });
+        return list;
+    }
+
+    /// <summary>
+    /// 8b — 룬판 실제 경로로 속성 존을 채운다(이어하기와 같은 입구 RestoreOccupiedCells) · 칸 수 = 2단계 10칸 / 4단계 존 전부.
+    /// 켜진 효과(디스패처) · 브리지가 붙인 플레이어 = 싸우는 플레이어인가를 Diag에 적는다.
+    /// </summary>
+    private static async UniTask BoardFillAsync(PlayerController player, Case c, CancellationToken ct)
+    {
+        var view = UnityEngine.Object.FindFirstObjectByType<MerlinRuneHexGridView>(FindObjectsInactive.Include);
+        if (view == null) { c.Diag = "룬판 없음(MerlinRuneHexGridView)"; return; }
+        var zones = typeof(MerlinRuneHexGridView).GetField("_cellZones", Inst)?.GetValue(view) as Dictionary<Vector2Int, char>;
+        if (zones == null || zones.Count == 0)
+        {
+            typeof(MerlinRuneHexGridView).GetMethod("BuildGrid", Inst)?.Invoke(view, null);
+            zones = typeof(MerlinRuneHexGridView).GetField("_cellZones", Inst)?.GetValue(view) as Dictionary<Vector2Int, char>;
+        }
+        var cells = new List<Vector2Int>();
+        if (zones != null && !string.IsNullOrEmpty(c.RuneZone))
+            foreach (var kv in zones)
+                if (ElementDef.CodeToId(kv.Value) == c.RuneZone) cells.Add(kv.Key);
+        cells.Sort((a, b) => a.y != b.y ? a.y.CompareTo(b.y) : a.x.CompareTo(b.x));
+        int want = c.RuneUpTo >= 99 ? cells.Count : Mathf.Min(cells.Count, c.RuneUpTo);
+        view.RestoreOccupiedCells(cells.GetRange(0, want));
+        await UniTask.Yield(PlayerLoopTiming.Update, ct);
+        await UniTask.Yield(PlayerLoopTiming.Update, ct);
+        var active = typeof(RuneEffectDispatcher).GetField("_activeTypes", Inst)?.GetValue(player.RuneEffects) as HashSet<string>;
+        var bridgePlayer = AppBootstrapper.Instance?.CurrentRun?.Player;
+        int zoneCells = cells.Count;
+        c.Diag = $"룬판 {c.RuneZone ?? "빈 판"} {want}/{zoneCells}칸 · 켜진 효과 {(active != null && active.Count > 0 ? string.Join(" · ", active) : "없음")} · 브리지 플레이어 {(ReferenceEquals(bridgePlayer, player) ? "= 싸우는 플레이어" : bridgePlayer == null ? "없음" : "다른 플레이어")}";
+        Debug.Log("[RGV2예산] 8b " + c.Diag);
+    }
+
+    /// <summary>8b — 속성 이펙트 재생기(ElementVfxPlayer) 아래 자식이 꺼짐 → 켜짐이 된 횟수(이름별).</summary>
+    private static readonly Dictionary<int, bool> s_fxWasOn = new();
+    private static readonly Dictionary<string, int> s_fxCount = new();
+    private static void CountElementFx()
+    {
+        var root = GameObject.Find("ElementVfxPlayer");
+        if (root == null) foreach (var m in UnityEngine.Object.FindObjectsByType<ElementVfxPlayer>(FindObjectsSortMode.None)) { root = m.gameObject; break; }
+        if (root == null) return;
+        var tf = root.transform;
+        for (int i = 0; i < tf.childCount; i++)
+        {
+            var ch = tf.GetChild(i);
+            int id = ch.gameObject.GetInstanceID();
+            bool on = ch.gameObject.activeSelf;
+            s_fxWasOn.TryGetValue(id, out bool was);
+            if (on && !was)
+            {
+                string n = ch.name.Replace("(Clone)", "").Trim();
+                s_fxCount.TryGetValue(n, out int k);
+                s_fxCount[n] = k + 1;
+            }
+            s_fxWasOn[id] = on;
+        }
+    }
+
+    /// <summary>8bp — 사진 찍는 순간 켜져 있는 속성 이펙트(재생기 자식 · 이름별 개수).</summary>
+    private static string ActiveElementFx()
+    {
+        var root = GameObject.Find("ElementVfxPlayer");
+        if (root == null) foreach (var m in UnityEngine.Object.FindObjectsByType<ElementVfxPlayer>(FindObjectsSortMode.None)) { root = m.gameObject; break; }
+        if (root == null) return "재생기 없음";
+        var on = new Dictionary<string, int>();
+        var tf = root.transform;
+        for (int i = 0; i < tf.childCount; i++)
+        {
+            var ch = tf.GetChild(i);
+            if (!ch.gameObject.activeSelf) continue;
+            string n = ch.name.Replace("(Clone)", "").Trim();
+            on.TryGetValue(n, out int k);
+            on[n] = k + 1;
+        }
+        return on.Count == 0 ? "없음" : string.Join(" · ", on.Select(kv => $"{kv.Key} {kv.Value}"));
+    }
+
+    /// <summary>8u2 바꾼 수치 — 줄마다 「effect_type value 값」(#으로 시작하면 건너뜀).</summary>
+    private static Dictionary<string, float> ReadRuneOverride()
+    {
+        var map = new Dictionary<string, float>();
+        if (!System.IO.File.Exists(RuneOverridePath)) { Debug.LogWarning($"[RGV2예산] {RuneOverridePath} 없음 — 원래 수치로 잰다"); return map; }
+        foreach (var raw in System.IO.File.ReadAllLines(RuneOverridePath))
+        {
+            var t = raw.Trim().Split(' ');
+            if (t.Length >= 3 && !t[0].StartsWith("#") && t[1] == "value" && float.TryParse(t[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v))
+                map[t[0]] = v;
+        }
+        Debug.Log($"[RGV2예산] 룬 바꾼 수치 {map.Count}개 — {string.Join(" · ", map.Select(kv => kv.Key + " " + kv.Value))}");
+        return map;
     }
 
     /// <summary>진화 화력 — 계열마다 진화 없음 · 있음 · 있음 · 없음(ABBA). 사격은 활을 쥐므로 맨 뒤.</summary>
@@ -332,7 +471,26 @@ public static class RelicGrowthV2BudgetProbeEditor
         if (loadout != null) parts.SyncFromLoadout(loadout);
         foreach (var key in c.Legacy) parts.AddSystemEffect(RelicPartEffectFactory.Create(key));
         D11Restore(player);
-        if (c.Kind == "허브" || c.Kind == "허브끔" || s_d7 || s_evo)   // D7 · 진화 칸 = D11 뒤 새 기본(허브 런 시작부터)
+        if (s_rune && s_board)   // 8b — 룬판 실제 경로: 이 칸 속성 존 칸만 점유로(나머지는 비움)
+        {
+            await BoardFillAsync(player, c, ct);
+        }
+        else if (s_rune)   // 룬 시너지 — 앞 칸 효과를 다 끄고 이 칸 속성만 문턱까지 켠다(런타임 표)
+        {
+            player.RuneEffects.Clear();
+            foreach (var (e, v) in s_runeRestore) e.value = v;   // 앞 칸이 바꾼 값을 되돌린다
+            s_runeRestore.Clear();
+            var zone = string.IsNullOrEmpty(c.RuneZone) ? null : Managers.RuneData?.GetZoneSynergies(c.RuneZone);
+            if (zone != null)
+                foreach (var e in zone.OrderBy(x => x.threshold))
+                {
+                    if (e.threshold > c.RuneUpTo) continue;
+                    // 8u2 — 효과가 같은 엔트리 값을 계속 읽으므로 이 칸 동안 바꿔 두고 다음 칸 준비 때 되돌린다
+                    if (s_runeOv != null && s_runeOv.TryGetValue(e.effect_type, out float ov)) { s_runeRestore.Add((e, e.value)); e.value = ov; }
+                    player.RuneEffects.Activate(e);
+                }
+        }
+        if (c.Kind == "허브" || c.Kind == "허브끔" || s_d7 || s_evo || s_rune)   // D7 · 진화 · 룬 칸 = D11 뒤 새 기본(허브 런 시작부터)
         {
             if (gawain) GawainMemoryHub.Ensure(player);
             else LancelotMemoryHub.Ensure(player);
@@ -459,6 +617,10 @@ public static class RelicGrowthV2BudgetProbeEditor
     {
         float t0 = Time.realtimeSinceStartup, nextPush = 0f, nextDodge = DodgeEvery;
         long dealt = 0;
+        string boardDiag = s_board ? c.Diag : null;
+        s_fxCount.Clear(); s_fxWasOn.Clear();
+        int shot = 0;
+        var shotNotes = new List<string>();
         // 진단 — 칸 순서에 따라 값이 오르는지 가리려고 잰다
         int casts = 0, frames = 0; float scaleSum = 0f, atk0 = player.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee), spd0 = player.RuntimeStats.AttackSpeedMultiplier, atkMax = atk0;
         Action onJudg = () => casts++;
@@ -473,7 +635,7 @@ public static class RelicGrowthV2BudgetProbeEditor
         while (true)
         {
             float t = Time.realtimeSinceStartup - t0;
-            if (t >= Settle + Measure) break;
+            if (t >= Settle + (s_rune ? RuneMeasure : Measure)) break;
             for (int i = 0; i < targets.Count; i++)
             {
                 var m = targets[i];
@@ -504,6 +666,14 @@ public static class RelicGrowthV2BudgetProbeEditor
                 if (off.sqrMagnitude > HomeLeash * HomeLeash) WarpPlayerHome(player);
             }
             if (t >= Settle) { frames++; scaleSum += Time.timeScale; atkMax = Mathf.Max(atkMax, player.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee)); }
+            if (s_board && t >= Settle) CountElementFx();
+            if (s_photo && shot < PhotoAt.Length && t >= Settle + PhotoAt[shot])
+            {
+                string tag = string.IsNullOrEmpty(c.RuneZone) ? "none" : c.RuneZone.ToLowerInvariant();
+                await CaptureAsync($"Temp/rgv2_runeshot_{tag}_{shot}.png", ct);
+                shotNotes.Add($"{shot}: {ActiveElementFx()}");
+                shot++;
+            }
             await UniTask.Yield(PlayerLoopTiming.Update, ct);
         }
         }
@@ -513,8 +683,16 @@ public static class RelicGrowthV2BudgetProbeEditor
             if (gz?.Gauge != null) gz.Gauge.PhaseChanged -= onPhase;
         }
         c.Casts = casts;
+        if (boardDiag != null)
+        {
+            int fxTotal = 0; foreach (var kv in s_fxCount) fxTotal += kv.Value;
+            var top = s_fxCount.OrderByDescending(kv => kv.Value).Take(4).Select(kv => $"{kv.Key} {kv.Value}");
+            c.Diag = $"{boardDiag} · 속성 이펙트 {fxTotal}번({string.Join(" · ", top)})";
+            if (shotNotes.Count > 0) c.Diag += " · 사진 때 켜진 이펙트 [" + string.Join(" / ", shotNotes) + "]";
+            return dealt / (s_rune ? RuneMeasure : Measure);
+        }
         c.Diag = $"공격력 시작 {atk0:0} · 최고 {atkMax:0} · 공속 {spd0:0.00} · {(lm != null ? "심판" : "정오")} {casts}회 · 시간 배율 평균 {(frames > 0 ? scaleSum / frames : 1f):0.00}";
-        return dealt / Measure;
+        return dealt / (s_rune ? RuneMeasure : Measure);
     }
 
     private static void Report(StringBuilder sb, List<Case> cases)
@@ -538,6 +716,13 @@ public static class RelicGrowthV2BudgetProbeEditor
                 if (s.Count == 0) continue;
                 sb.AppendLine($"D7 {k}: DPS {s.Average(c => c.Dps):0.0} (칸 0 평균 {zero:0.0} 대비 {(s.Average(c => c.Dps) / zero - 1f) * 100f:+0;-0}%) · 심판 평균 {s.Average(c => c.Casts):0.0}회");
             }
+        }
+        if (s_rune)
+        {
+            sb.AppendLine();
+            float zero = cases.Where(c => c.Kind == "기본" || c.Kind == "기본2").Average(c => c.Dps);
+            foreach (var c in cases.Where(c => c.Kind == "룬2" || c.Kind == "룬4"))
+                sb.AppendLine($"룬 {c.Label}: DPS {c.Dps:0.0} (시너지 없음 평균 {zero:0.0} 대비 {(c.Dps / zero - 1f) * 100f:+0;-0}%)");
         }
         if (s_evo)
         {

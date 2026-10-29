@@ -54,10 +54,15 @@ public static class CombatDamage
         s_depth = 0;
         s_depthWarned = false;
         s_splitCarry = 0f;
+        s_hierarchyScaled.Clear();
+        s_hitFxLife.Clear();
     }
 
     // 아이템 형태변형 추가타 질의 버퍼(재사용 — alloc 방지)
     private static readonly List<MonsterBase> s_shapeBuf = new();
+    // 맞음 이펙트 — 자식 입자 배율을 맞춘 풀 인스턴스 · 키별 안전 수명(타격마다 자식 입자를 두 번 훑었다 · 10-29 풀 점검 5)
+    private static readonly HashSet<int> s_hierarchyScaled = new();
+    private static readonly Dictionary<string, float> s_hitFxLife = new();
 
     /// <summary>주 피해 1회 요청.</summary>
     public struct Request
@@ -258,6 +263,11 @@ public static class CombatDamage
             finalDmg = finalDmg > def ? def + (finalDmg - def) * splitW : finalDmg;
         }
 
+        // ⑤-c 원거리 무기 → Ch2 ~ 4 보스 절반(10-29 사용자 D1) — 무기 피해만(평타 · E · R · 원거리 파츠 폭발).
+        //      유물 Q(행동 Q) · 룬 시너지 · 서약 · 지속 피해는 이 길을 안 타거나 행동이 달라 그대로. 중간 보스(정예)는 빼다(47 제안 · 일반 방 흐름의 짧은 싸움)
+        if (isPlayerAtk && tgtMb != null && finalDmg > 0f && IsBossRangedHalf(tgtMb, weaponData, actionType))
+            finalDmg *= BossRangedMult;
+
         // ⑥ 아이템 광기의 파동: 무장된 일반(근접) 공격 1타를 실제 방어무시로 적용.
         bool penetrated = false;
         if (isPlayerAtk && tgtMb != null && finalDmg > 0f && isMeleeAtk)
@@ -427,6 +437,7 @@ public static class CombatDamage
     /// </summary>
     private static void ScaleWholeHierarchy(GameObject effectObj)
     {
+        if (!s_hierarchyScaled.Add(effectObj.GetInstanceID())) return;   // 이 인스턴스는 이미 바꿨다
         foreach (var ps in effectObj.GetComponentsInChildren<ParticleSystem>(true))
         {
             var main = ps.main;
@@ -475,7 +486,8 @@ public static class CombatDamage
         // 남의 이펙트를 꺼버린다 — 컴포넌트가 OnEnable에서 리셋하므로 그 문제가 생기지 않는다.
         if (!effectObj.TryGetComponent<PooledVfxLifetime>(out var life))
             life = effectObj.AddComponent<PooledVfxLifetime>();
-        life.SetLife(ResolveVfxLifetime(effectObj));
+        if (!s_hitFxLife.TryGetValue(fxKey, out float seconds)) s_hitFxLife[fxKey] = seconds = ResolveVfxLifetime(effectObj);   // 파티클 길이는 프리팹마다 같다 — 한 번만 잰다
+        life.SetLife(seconds);
     }
 
     /// <summary>히트 VFX 안전 수명 상한(초). 어떤 프리팹이든 이 시간 안에 회수된다.</summary>
@@ -493,5 +505,24 @@ public static class CombatDamage
             longest = Mathf.Max(longest, main.duration + main.startLifetime.constantMax);
         }
         return Mathf.Clamp(longest, MinHitVfxLife, MaxHitVfxLife);
+    }
+
+    // ── 원거리 보스 반감(10-29 사용자 D1) ──
+    public const float BossRangedMult = 0.5f;
+#if UNITY_EDITOR
+    /// <summary>실측 — 켜면 반감을 끈다(같은 판에서 반감 전후 피해 비교).</summary>
+    public static bool ProbeNoBossRangedHalf;
+#endif
+
+    /// <summary>원거리 무기(활 · 석궁)의 무기 피해(유물 Q 빼고)가 Ch2 ~ 4 보스를 맞혔나.</summary>
+    private static bool IsBossRangedHalf(MonsterBase target, WeaponData weapon, WeaponActionType action)
+    {
+#if UNITY_EDITOR
+        if (ProbeNoBossRangedHalf) return false;
+#endif
+        if (target.Grade != MonsterGrade.Boss || weapon == null || action == WeaponActionType.QSkill) return false;
+        if (weapon.weaponType.GetAttackStatKind() != AttackStatKind.Ranged) return false;
+        var run = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.Run : null;
+        return run != null && (int)run.CurrentChapter >= (int)ChapterId.Chapter2;
     }
 }

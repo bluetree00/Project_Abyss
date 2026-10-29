@@ -69,6 +69,11 @@ public class UserGameData
     /// <summary>「고행자의 인장」 착용 여부. 해금해도 <b>켜야</b> 적용된다(자발적 난이도라 강제하지 않는다).</summary>
     public bool asceticSigilOn;
 
+    // ── 거점 — 지난 세팅(10-29) ─────────────────────────
+    /// <summary>성문을 지날 때 들고 간 원거리 · 유물(<c>|</c>로 이음) — 귀환하면 빈 칸을 이걸로 채운다(<see cref="LastLoadoutMemory"/>).
+    /// 로컬 슬롯 메타에만 남는다(뒤끝 Param엔 넣지 않는다 — inheritedPartId와 같은 규약).</summary>
+    public string lastLoadout = "";
+
     // ── [레거시] 유물의 각성 6계열 ──────────────────────
     // 영구 스탯은 폐기됐다(정본 §1 — 항상 적용되어 숙련 가독성을 훼손). 스탯 적용은 이미 끊겨 있고,
     // 이 필드들은 <b>환급 마이그레이션 원장</b>으로만 남는다. MemoryAltarService가 정수로 되돌린 뒤 0으로 만든다.
@@ -100,6 +105,7 @@ public class UserGameData
 
         inheritedPartId      = "";
         asceticSigilOn       = false;
+        lastLoadout          = "";
 
         abyssEssence         = 0;
         awakeningLevelSword  = 0;

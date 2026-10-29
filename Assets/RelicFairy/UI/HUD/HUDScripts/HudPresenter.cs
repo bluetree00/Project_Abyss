@@ -451,7 +451,13 @@ public sealed class HudPresenter : MonoBehaviour
         src.HudPageRefill          += HandleBossPageRefill;
     }
 
-    private void HandleBossInvulnerableChanged(bool on) => view?.BossPanel?.SetInvulnerable(on);
+    private void HandleBossInvulnerableChanged(bool on)
+    {
+#if UNITY_EDITOR
+        Debug.Log($"[BossHud] 무적 {on} → 보스 바 {(view?.BossPanel != null)}");   // 10-29 화룡 실측에서 덮개가 안 보였다 — 신호가 오는지
+#endif
+        view?.BossPanel?.SetInvulnerable(on);
+    }
     private void HandleBossVulnerableWindow(float seconds) => view?.BossPanel?.FlashVulnerable(seconds);
     private void HandleBossPageMarkersChanged() => view?.BossPanel?.SetPages(_bossHud?.HudPageMarkers, _bossHud?.HudPage ?? 1);
     private void HandleBossPageRefill(int page, float seconds) => view?.BossPanel?.PlayPageRefill(page, seconds);
@@ -760,6 +766,7 @@ public sealed class HudPresenter : MonoBehaviour
     {
         if (_runtimeStats == null || view?.CombatPanel == null) return;
         view.CombatPanel.SetHp(_runtimeStats.Hp, _runtimeStats.MaxHp);
+        view.CombatPanel.SetShield(_runtimeStats.Shield, _runtimeStats.MaxHp);
         view.CombatPanel.SetStats(_runtimeStats.AttackPower, _runtimeStats.Defense);
     }
 

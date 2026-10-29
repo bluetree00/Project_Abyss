@@ -104,10 +104,15 @@ public class ShopRoomController : MonoBehaviour
     // ── Properties (UI가 읽음) ──────────────────────────────
     public IReadOnlyList<ShopSlot> Slots => _slots;
     public int PlayerGold => _run?.PlayerState?.TempGold ?? 0;
-    /// <summary>포션이 가득 차 이 상품을 살 수 없는가 — 행상 포션은 가득이면 막는다(진열 화면 「포션 가득」).</summary>
+    /// <summary>
+    /// 포션 칸이 모자라 이 상품을 살 수 없는가 — 지급 개수만큼 비어 있어야 산다(진열 화면 「포션 가득」 · 「포션 칸 부족」).
+    /// 10-26 사용자 「포션이 가득 차 있는데도 구매할 수 있다」 — 예전엔 꽉 찼을 때만 막아 「x2」를 한 칸 남기고 사면 값은 둘, 받는 건 하나였다.
+    /// </summary>
     public bool IsBlockedByFullPotions(ShopProduct p)
         => p != null && p.Category == ShopProductCategory.Potion
-        && _run?.PlayerState != null && _run.PlayerState.PotionCount >= _run.PlayerState.PotionCapacity;
+        && _run?.PlayerState != null && _run.PlayerState.PotionCount + p.Amount > _run.PlayerState.PotionCapacity;
+    /// <summary>포션 칸이 꽉 찼는가(막힌 이유 글 — 꽉 참 「포션 가득」 / 한두 칸 남음 「포션 칸 부족」).</summary>
+    public bool PotionsFull => _run?.PlayerState != null && _run.PlayerState.PotionCount >= _run.PlayerState.PotionCapacity;
     public bool RerollEnabled => _rerollEnabled;
     /// <summary>이번 방문에 아직 새로고침을 쓸 수 있는가(켜져 있고 횟수가 남음).</summary>
     public bool RerollAvailable => _rerollEnabled && _rerollsUsed < MaxRerollsPerVisit;

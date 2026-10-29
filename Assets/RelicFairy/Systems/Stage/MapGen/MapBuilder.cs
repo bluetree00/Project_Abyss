@@ -408,6 +408,7 @@ public class MapBuilder
                 var rot      = flip ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity;
 
                 var go = Object.Instantiate(useDef.prefab, worldPos, rot, parent);
+                go.name = CeilingName;   // 10-29 빌드에서도 — 카메라 가림이 이 이름으로 천장을 걷는다(아래 Name()은 빌드에서 지워진다)
                 Name(go, $"Ceiling_{x}_{z}");
                 SetLayerRecursive(go, 3);
             }
@@ -1109,7 +1110,8 @@ public class MapBuilder
     }
 
     /// <summary>디버그용 블록 명명. 릴리즈 빌드에서는 호출문(문자열 보간 포함)이 제거돼 GC 할당이 사라진다.
-    /// 런타임 코드는 블록 이름에 의존하지 않는다(이름 기반 Find 없음 — 확인 완료).</summary>
+    /// ⚠️ 10-29 예외 — 카메라 가림(CameraOcclusionFader.CeilingNames)이 천장 이름 앞부분을 본다. 천장은 <see cref="CeilingName"/>을 따로 붙인다.</summary>
+    private const string CeilingName = "Ceiling_";
     [System.Diagnostics.Conditional("UNITY_EDITOR")]
     private static void Name(GameObject go, string n) => go.name = n;
 }

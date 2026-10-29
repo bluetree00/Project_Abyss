@@ -15,9 +15,10 @@ namespace RelicFairy.Monster
 /// 10-14 사용자 「같은 판정에 무작위로 내려 의도적인 위협이 없다 — 양 · 크기 · 범위 불규칙 · 플레이어를 노리는 메테오」:
 ///   · 흩뿌림 — 크기 셋(반경 1 · 2 · 3칸 원, 바깥 테두리 칸 일부를 빼 모양이 불규칙) · 넷 중 하나 남짓은 플레이어 둘레 7 m 안.
 ///     크기가 클수록 예고 · 피해 · 이펙트도 크다(예고 = 판정).
-///   · 노림 — 버스트 중 약 1.4초(2페이지 1.0초)마다 플레이어 자리(움직이면 조금 앞) · 두 번에 한 번은 세 발이 0.35초 간격으로 쫓아온다.
+///   · 노림 — 버스트 중 약 1.4초(2페이지 1.0초)마다 플레이어 자리(움직이면 0.85초 앞 · 10-23) · 두 번에 한 번은 세 발이 0.35초 간격으로 쫓아온다.
 ///   · 큰 메테오 — 버스트마다 한 번, 플레이어 자리에 반경 4칸 원 · 예고를 길게.
 /// 예고(바닥 칸) → 낙하(<see cref="DragonFireballRainPatternSO.ImpactDelay"/>) → 착탄. 앞섬은 모두 0.45초 이상.
+/// 10-23 B4 — 버스트 앞에 화룡이 부른다(<see cref="DragonBossMonster.BeginMeteorCast"/>: 지상 · 한가하면 동작, 아니면 입 섬광 · 소리) · 착탄마다 소리(조금씩).
 /// </summary>
 public class DragonAirMeteorPassiveRunner
 {
@@ -33,9 +34,10 @@ public class DragonAirMeteorPassiveRunner
     private const float AimedEveryAbyss = 1.0f;    // 2페이지
     private const int   AimedChain      = 3;
     private const float AimedChainGap   = 0.35f;
-    private const float AimedLead       = 0.35f;   // 첫 발 — 움직이는 방향으로 이만큼(초) 앞
+    private const float AimedLead       = DragonThreat.AimedLead;   // 첫 발 — 움직이는 방향으로 이만큼(초) 앞(10-23 B4 0.35 → 0.85)
     private const float BigWarn         = 1.3f;
     private const float BigAt           = 2f;      // 버스트 시작 뒤 이때 한 번
+    private const float CastWaitMax     = 4f;      // 지상에서 패턴 중이면 이만큼까지 끝나길 기다려 부르는 동작을 넣는다(10-23 B4)
     // 크기 · 모양 · 피해 배율 · 이펙트 배율은 화룡 공용 규칙(DragonThreat — 화염구 비와 같다)
 
     private readonly MonsterContext              _ctx;
@@ -133,6 +135,8 @@ public class DragonAirMeteorPassiveRunner
 
     private async UniTask FireBurstAsync(CancellationToken ct)
     {
+        await CastAsync(ct);                     // 10-23 B4 — 화룡이 부르는 동작 · 신호 뒤에 첫 운석
+        if (!IsAliveAndShouldFire()) return;
         float start    = Time.time;
         float burstEnd = start + UnityEngine.Random.Range(_burstDurationMin, _burstDurationMax);
         bool  abyss    = GetCurrentElement() == DragonBossBlackboard.DragonElement.Abyss;
@@ -162,6 +166,24 @@ public class DragonAirMeteorPassiveRunner
             await UniTask.Delay(TimeSpan.FromSeconds(ScatterGap), cancellationToken: ct);
         }
         Debug.Log($"[DragonAirMeteor] 버스트 {Time.time - start:0.0}초 — 흩뿌림 {scatter} · 노림 {aimed} · 큰 {(bigDone ? 1 : 0)}{(abyss ? " · 2페이지" : "")}");
+    }
+
+    /// <summary>
+    /// 버스트를 부르는 신호(10-23 B4 사용자 「메테오를 떨어뜨리면 그만한 상호작용 애니메이션 · 이펙트」) —
+    /// 지상에서 패턴 중이면 <see cref="CastWaitMax"/>초까지 끝나길 기다려 하늘을 부르는 동작을 넣고, 공중이거나 끝내 바쁘면 입 섬광 · 부르는 소리만.
+    /// </summary>
+    private async UniTask CastAsync(CancellationToken ct)
+    {
+        if (_ctx?.Monster is not DragonBossMonster dragon) return;
+        float until = Time.time + CastWaitMax;
+        while (dragon.MeteorCastWorthWaiting && !dragon.CanMeteorCastPose && Time.time < until)
+        {
+            if (!IsAliveAndShouldFire()) return;
+            await UniTask.Delay(TimeSpan.FromSeconds(0.1f), cancellationToken: ct);
+        }
+        if (!IsAliveAndShouldFire()) return;
+        float lead = dragon.BeginMeteorCast();
+        if (lead > 0f) await UniTask.Delay(TimeSpan.FromSeconds(lead), cancellationToken: ct);
     }
 
     // 노림 연타 — 세 발이 플레이어를 쫓는다(각 발은 그 순간 플레이어 자리)
@@ -257,7 +279,7 @@ public class DragonAirMeteorPassiveRunner
                 {
                     if (mat == null) continue;
                     Color col = mat.color;
-                    col.a = Mathf.Lerp(0f, alpha, t);
+                    col.a = DragonThreat.WarnAlpha(alpha, t);   // 처음부터 보이게 · 탑다운에선 진하게(10-26)
                     mat.color = col;
                 }
                 elapsed += Time.deltaTime;
@@ -273,14 +295,14 @@ public class DragonAirMeteorPassiveRunner
         // ── 낙하 VFX + 사운드 — 불덩이는 크게(더 높은 곳에서) · 땅 효과는 판정 크기(10-19) ──
         GameObject projectile = DragonThreat.SpawnMeteor(_so.FireballPrefab, landPos,
             _so.FireballScale * (kind == Kind.Scatter ? DragonThreat.BodyScale : DragonThreat.BigBodyScale), _so.FireballScale * sizeMul, _so.ImpactDelay);
-        Managers.Sound?.PlayEffectAt(_so.FireRainSfx, landPos);
+        DragonThreat.PlayLaunchSfx(_so.FireRainSfx, landPos);   // 10-23 B4 — 0.6초에 한 번 · 볼륨 0.6(운석마다 겹쳐 착탄 소리를 덮었다)
 
         // ── 충돌 판정 → 이펙트 소멸 ────────────────────────────
         try
         {
             await UniTask.Delay(TimeSpan.FromSeconds(_so.ImpactDelay), cancellationToken: ct);
 
-            ApplyImpact(landPos, cells, sizeMul, dmgMul, kind);
+            ApplyImpact(landPos, cells, sizeMul, dmgMul, kind, (radius + 0.5f) * DragonBossRoomContext.CellSize);
             ReturnWarnTiles();   // 예고는 착탄 순간까지 남긴다(10-02 — 예전엔 낙하 0.6초 동안 바닥 예고가 비어 있었다)
 
             if (projectile != null)
@@ -309,7 +331,7 @@ public class DragonAirMeteorPassiveRunner
 
     // ── 충돌 처리 — 예고 칸에 선 플레이어만 · 폭발은 판정 크기만큼 ─────────
 
-    private void ApplyImpact(Vector3 landPos, List<Vector2Int> cells, float sizeMul, float dmgMul, Kind kind)
+    private void ApplyImpact(Vector3 landPos, List<Vector2Int> cells, float sizeMul, float dmgMul, Kind kind, float halfWidth)
     {
         if (_so.ExplosionPrefab != null)
         {
@@ -318,6 +340,7 @@ public class DragonAirMeteorPassiveRunner
             if (exp != null)
                 exp.transform.localScale = Vector3.one * _so.ExplosionScale * sizeMul;
         }
+        DragonThreat.PlayImpactSfx(_so.ImpactSfx, _so.ImpactSfxVolume, landPos, _ctx?.Runtime?.PlayerTarget, halfWidth, kind != Kind.Scatter);   // 10-23 B4 착탄 소리(조금씩)
         if (kind == Kind.Big) BossImpactFeedback.TriggerCameraShake(0.08f, 0.25f);   // 살짝
 
         if (_ctx?.Runtime?.PlayerTarget == null || _ctx.Runtime.IsDead) return;   // 처치 뒤 떨어지는 운석은 이펙트만(10-08 점검)

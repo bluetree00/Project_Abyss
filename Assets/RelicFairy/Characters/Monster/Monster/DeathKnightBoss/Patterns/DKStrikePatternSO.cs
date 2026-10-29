@@ -302,7 +302,9 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         if (go == null) return;
         go.transform.localScale = Vector3.one * DKBossRoomContext.CellSize;
         _tiles.Add(new DKTileInfo { Cell = new Vector2Int(x, z), Color = _swordColor, GO = go });
-        DKGridPatternHelper.ChargeTile(go);   // (10-23 가이드 색 통일) 번지는 칸 = 맞을 칸 — 처음부터 공격 색(방패 안 면제는 그대로)
+        DKGridPatternHelper.ChargeTile(go);   // (10-23 가이드 색 통일) 번지는 칸 = 맞을 칸 — 처음부터 공격 색
+        if (_guardianShieldActive)            // 방패가 먼저 섰으면 그 안 칸은 안 맞는 칸으로(10-24)
+            DKGridPatternHelper.MarkSafeWithin(_tiles, _guardianShieldPos, Data.guardianShieldRadius, _swordColor);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -312,7 +314,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
     private async UniTaskVoid FireAllRowSlashVfxAsync(CancellationToken ct)
     {
         if (Data.impactVfxPrefab == null) return;
-        Color tint = _swordColor == DKSwordColor.White ? Color.white : DKGridPatternHelper.DarkTint;
+        Color tint = _swordColor == DKSwordColor.White ? Color.white : DKGridPatternHelper.DarkReadableTint;   // 검은 검 베기가 거의 안 보였다(10-24)
         float rowLen = DKGridPatternHelper.RowLineLength();
         const int perFrame = 5;
 
@@ -510,6 +512,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
             _guardianShieldActive = true;
             _guardianShieldPos    = groundPos;
             _dkBB?.SetGuardianShield(true, groundPos, Data.guardianShieldRadius);
+            DKGridPatternHelper.MarkSafeWithin(_tiles, groundPos, Data.guardianShieldRadius, _swordColor);   // 방패 안 칸은 면제 — 붉게 두지 않는다(10-24)
 
             if (Data.guardianShieldPrefab != null)
             {

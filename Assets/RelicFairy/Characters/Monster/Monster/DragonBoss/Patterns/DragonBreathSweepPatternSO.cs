@@ -1329,7 +1329,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
                 {
                     if (mat == null) continue;
                     Color c = mat.color;
-                    c.a = Mathf.Lerp(0f, Data.MeteorPattern.WarningColor.a, t);
+                    c.a = DragonThreat.WarnAlpha(Data.MeteorPattern.WarningColor.a, t);   // 처음부터 보이게 · 탑다운에선 진하게(10-26)
                     mat.color = c;
                 }
 
@@ -1340,7 +1340,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
                     // 불덩이는 크게(더 높은 곳에서) · 땅 효과는 판정 반폭(10-19 · 화염구 비와 같은 운석)
                     e.Projectile = DragonThreat.SpawnMeteor(Data.MeteorPattern.FireballPrefab, e.LandPos,
                         Data.MeteorPattern.FireballScale * DragonThreat.BodyScale, Data.MeteorPattern.FireballScale * DragonThreat.MeteorScale(e.HalfR), Data.MeteorPattern.ImpactDelay);
-                    Managers.Sound?.PlayEffectAt(Data.MeteorPattern.FireRainSfx, e.LandPos);
+                    DragonThreat.PlayLaunchSfx(Data.MeteorPattern.FireRainSfx, e.LandPos);   // 10-23 B4 — 0.6초에 한 번 · 볼륨 0.6
                 }
                 _meteors[i] = e;
             }
@@ -1376,6 +1376,8 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             var exp = BossEffectPool.SpawnOneShot(Data.MeteorPattern.ExplosionPrefab, e.LandPos, Quaternion.identity, fallbackLifetime: 3f);
             if (exp != null) exp.transform.localScale = Vector3.one * Data.MeteorPattern.ExplosionScale * DragonThreat.MeteorScale(e.HalfR);   // 착탄 폭발 = 판정 반폭(10-18)
         }
+        DragonThreat.PlayImpactSfx(Data.MeteorPattern.ImpactSfx, Data.MeteorPattern.ImpactSfxVolume, e.LandPos, ctx?.Runtime?.PlayerTarget,
+            (e.HalfR + 0.5f) * DragonBossRoomContext.CellSize, heavy: false);   // 10-23 B4 착탄 소리(화염구 비 · 수동 운석과 같은 규칙)
 
         if (ctx?.Runtime?.PlayerTarget != null)
         {

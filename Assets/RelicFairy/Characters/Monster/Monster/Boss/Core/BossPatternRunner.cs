@@ -52,6 +52,10 @@ public class BossPatternRunner
     Vector2       _linkRest;
     Vector2       _chainEndRest;
     readonly Dictionary<BossPatternSO, float> _followUpAt = new();   // 연계를 마지막으로 이어 낸 때(앞 패턴별)
+    float         _followUpCooldownScale = 1f;   // 같은 연계를 다시 잇기까지 쿨 배율 — 리치 「몰아치게」(10-26) · 안 켠 보스는 1
+    // 해방 보스 「한 번 더」(10-29 F2) — 2페이지 마지막 25%에 해방기 전용 기술을 잇고, 끝나면 큰 틈. 그런 기술이 없는 보스(리치)는 null
+    readonly BossFinalPush _finalPush;
+    bool          _finalPushQueued, _finalPushRunning;
     readonly Dictionary<BossPatternEntry, int> _seqIndex = new();
     // SelectRandom 평가마다 새 List를 할당하지 않도록 재사용 (보스 1마리·동기 Tick이라 공유 안전)
     readonly List<BossPatternSO> _randomCandidates = new();
@@ -80,6 +84,7 @@ public class BossPatternRunner
         _isInRange   = isInRange;
         _changeState = changeState;
         _onExecuted  = onExecuted;
+        _finalPush   = BossFinalPush.Create(ctx?.Ctx?.Monster, config);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -121,6 +126,9 @@ public class BossPatternRunner
         _chainEndRest = endRest;
     }
 
+    /// <summary>같은 앞 패턴에서 연계를 다시 잇기까지 쿨(<see cref="BossPatternSO.followUpCooldown"/>) 배율 — 에셋은 건드리지 않는다(10-26 리치).</summary>
+    public void SetFollowUpCooldownScale(float scale) => _followUpCooldownScale = Mathf.Max(0f, scale);
+
     /// <summary>보스 풀 재사용(OnEnable) 시 호출.</summary>
     public void Reset()
     {
@@ -131,6 +139,8 @@ public class BossPatternRunner
         _lastPatternEndTime   = float.NegativeInfinity;
         _queuedFollowUp       = null;
         _followUpAt.Clear();
+        _finalPushQueued      = _finalPushRunning = false;
+        _finalPush?.Reset();
         _seqIndex.Clear();
         _weightScales.Clear();
         IsFollowUpRunning     = false;
@@ -160,6 +170,8 @@ public class BossPatternRunner
             _lastPatternEndTime = Time.time;
             bool endedAsFollowUp = IsFollowUpRunning;   // 사슬 둘째 칸이 끝났다(10-22 E2 L1)
             IsFollowUpRunning    = false;
+            bool pushEnded       = _finalPushRunning;   // 「한 번 더」가 끝났다(F2)
+            _finalPushRunning    = false;
             bool forced = false;
             if (_pendingForce.pattern != null)
             {
@@ -189,13 +201,25 @@ public class BossPatternRunner
                 if (pages != null) _patternBreakCooldown *= pages.BreakScale;
                 // 사슬 박자를 켠 보스 — 연계는 한 칸만, 낼 수 있는지 지금 본다(못 내면 사슬이 아니다 · 10-22 E2 L1)
                 if (_lastPatternSO != null && _lastPatternSO.FollowUpActive(_ctx.Ctx.Monster)
-                    && (!_followUpAt.TryGetValue(_lastPatternSO, out float at) || Time.time - at >= _lastPatternSO.followUpCooldown)
+                    && (!_followUpAt.TryGetValue(_lastPatternSO, out float at) || Time.time - at >= _lastPatternSO.followUpCooldown * _followUpCooldownScale)
                     && (!_chainTempo || (!endedAsFollowUp && _lastPatternSO.followUp.CanFollowUp(_ctx))))
                 {
                     _followUpAt[_lastPatternSO] = Time.time;
                     _queuedFollowUp       = _lastPatternSO.followUp;
                     _patternBreakCooldown = Mathf.Min(_patternBreakCooldown,
                         _chainTempo ? UnityEngine.Random.Range(_linkRest.x, _linkRest.y) : FollowUpDelay);
+                }
+                // 해방 보스 「한 번 더」(F2) — 끝났으면 큰 틈 · 마지막 25%에 연계가 안 잡혔으면 해방기 전용 기술을 곧바로
+                if (pushEnded)
+                {
+                    _queuedFollowUp       = null;
+                    _patternBreakCooldown = Mathf.Max(_patternBreakCooldown, BossFinalPush.OpeningBreak);
+                    _finalPush.NoteEnded();
+                }
+                else if (_finalPush != null && _queuedFollowUp == null && _finalPush.TryTake(_lastPatternSO, _ctx))   // 연계 사슬이 끝난 뒤에도 — 숲은 2페이지 연계가 촘촘해 사슬 밖 틈이 없었다(10-29 실측 0번)
+                {
+                    _finalPushQueued      = true;
+                    _patternBreakCooldown = Mathf.Min(_patternBreakCooldown, BossFinalPush.LinkRest);
                 }
             }
         }
@@ -237,6 +261,7 @@ public class BossPatternRunner
             {
                 _patternBreakCooldown = 0f;
                 _queuedFollowUp       = null;   // 강제 패턴(간판 등)이 끼면 대기 중인 연계는 버린다
+                _finalPushQueued      = false;
                 ExecutePattern(pattern);
             }
             return;
@@ -250,6 +275,13 @@ public class BossPatternRunner
     void EvaluateNormalPatterns()
     {
         if (_config?.patternEntries == null) return;
+
+        // 해방 보스 「한 번 더」(F2) — 줄 서 있으면 온전한 패턴으로 낸다(연계 칸이 아니다 — 예고 · 판정 그대로). 그사이 못 내게 됐으면 평소대로
+        if (_finalPushQueued)
+        {
+            _finalPushQueued = false;
+            if (_finalPush.Pattern.CanFollowUp(_ctx)) { _finalPushRunning = true; ExecutePattern(_finalPush.Pattern); return; }
+        }
 
         // 연계(§9) — 직전 패턴에 이어 낼 패턴이 줄 서 있으면 먼저(안 되면 평소대로 고른다)
         if (_queuedFollowUp != null)

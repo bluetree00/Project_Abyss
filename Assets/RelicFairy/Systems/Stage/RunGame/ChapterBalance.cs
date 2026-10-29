@@ -18,16 +18,16 @@ public static class ChapterBalance
             CommonHp = commonHp; RareHp = rareHp; EliteHp = eliteHp; Attack = attack; Count = count;
         }
 
-        /// <summary>등급별 공격 배율 — 챕터 공격 × 등급 배율(10-21). 보스는 여기 오지 않는다(호출자가 뺀다) — 오면 정예 칸.</summary>
-        public float AttackFor(MonsterGrade grade) => Attack * grade switch
+        /// <summary>등급별 공격 배율 — 챕터 공격 × 전체 배율(10-23) × 등급 배율(10-21). 보스는 여기 오지 않는다(호출자가 뺀다) — 오면 정예 칸.</summary>
+        public float AttackFor(MonsterGrade grade) => Attack * AllAttackMul * grade switch
         {
             MonsterGrade.Common => 1f,
             MonsterGrade.Rare   => RareAttackMul,
             _                   => EliteAttackMul,
         };
 
-        /// <summary>등급(= 층)별 체력 배율. 보스는 여기 오지 않는다(호출자가 뺀다) — 오면 정예 칸.</summary>
-        public float HpFor(MonsterGrade grade) => grade switch
+        /// <summary>등급(= 층)별 체력 배율 × 전체 배율(10-23). 보스는 여기 오지 않는다(호출자가 뺀다) — 오면 정예 칸.</summary>
+        public float HpFor(MonsterGrade grade) => AllHpMul * grade switch
         {
             MonsterGrade.Common => CommonHp,
             MonsterGrade.Rare   => RareHp,
@@ -50,6 +50,11 @@ public static class ChapterBalance
     //   잡몹은 그대로(무리로 위협), 챕터 공격 배율에 곱한다.
     private const float RareAttackMul  = 1.2f;
     private const float EliteAttackMul = 1.3f;
+
+    // 10-23 B5 사용자 「몬스터 공격력 전반 올리기 · 체력 조금 더」 — 위 챕터 · 등급 표에 한 번 곱한다(보스 제외 · 중간 보스 황소는 정예 칸이라 포함).
+    //   공격은 체감되게, 체력은 조금만(「체력으로 어렵게 하지 않는다」) — 예고(≥ 0.45초)를 보고 피할 수 있는 공격이 더 아프게.
+    private const float AllAttackMul = 1.25f;
+    private const float AllHpMul     = 1.10f;
 
     public static Entry Of(ChapterId chapter) => chapter switch
     {

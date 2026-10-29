@@ -148,6 +148,8 @@ public static class RuneCardKit
         if (entry == null) return;
         var offsets = RuneDataManager.ParseCellOffsets(entry);
         if (offsets == null || offsets.Length == 0) return;
+        if (data.rotation != 0)   // 돌려 둔 룬은 그 방향으로(10-25) — ParseCellOffsets는 매번 새 배열이라 바로 고쳐도 된다
+            for (int i = 0; i < offsets.Length; i++) offsets[i] = Shape.RotateCW(offsets[i], data.rotation);
 
         int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
         foreach (var o in offsets)

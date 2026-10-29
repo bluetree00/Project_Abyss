@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -71,6 +72,7 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
     private bool _entered;
     private bool _swordPhase;
     private CancellationTokenSource _cts;
+    private readonly HashSet<string> _reported = new();   // 받은 보고 카테고리 — 순서 밖에서 먼저 끝낸 단계도 기억한다
 
     /// <summary>현재 활성 슬롯의 온보딩 완료 여부. 초회 판정(입구 스폰 + 가이드) 근거.</summary>
     public static bool IsCompleted => PlayerPrefs.GetInt(SaveKeyFor(ActiveSlot), 0) == 1;
@@ -159,7 +161,10 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
         // 대상(target)이 없는 단계는 BaseCamp에 실물이 없는 단계다 — 구역만 열고 자동 통과한다.
         // 현재 해당: 서약(획득처가 심연 대기방 WorldCovenantAltar/조립으로 이동함).
         // 퀘스트 체인도 유물 → 장비 → 게이트(tut_enter_gate) → 서약(심연) 순으로 맞춰져 있다. 소프트락 방지.
-        if (steps[i].target == null)
+        // 이미 끝낸 단계도 같이 넘긴다 — 구역 배리어가 없어 유물을 장비 · 파츠보다 먼저 고를 수 있는데, 그 보고를 버려
+        // 유물 단계에서 영영 멈췄다(가리킴이 고른 제단에 남고 완료 기록 · 성문 안내가 오지 않음, 10-24 「유물을 먹고 지나쳐도 가이드 화살표가 안 사라진다」).
+        // 대상이 꺼져 있으면(10-29 파츠 공방 걷음) 그 단계는 건너뛴다
+        if (steps[i].target == null || !steps[i].target.gameObject.activeInHierarchy || _reported.Contains(steps[i].questCategory))
         {
             Unlock(steps[i].unlockBarrier);
             AdvanceFrom(i);
@@ -267,6 +272,7 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
     private void HandleReport(string category, object target, int amount)
     {
         if (!_active) return;
+        if (!string.IsNullOrEmpty(category)) _reported.Add(category);
 
         // 인트로 첫 단계: 무형검 각성 완료 → 다음 구역 개방 후 기존 단계 시작.
         if (_swordPhase)

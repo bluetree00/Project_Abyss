@@ -13,8 +13,9 @@ using RelicFairy.Monster;
 public sealed class CovenantClause
 {
     // 처형 「표식」 탐색 반경 — 경계 원인(개선·선제)은 방 단위 사건이라 근접 반경으로는 짚을 게 없다.
-    private const float ExecuteMarkRadius  = 12f;
-    private const float TargetSearchRadius = 8f;
+    // 10-23 공개 — 서약 줄 글(CovenantAssemblePreview)이 「12m 안에서 체력이 가장 낮은 적」 · 「8m 안에서 가장 가까운 적」을 이 값으로 쓴다.
+    public const float ExecuteMarkRadius  = 12f;
+    public const float TargetSearchRadius = 8f;
 
     // 기폭이 대상 하나를 터뜨릴 때의 VFX 키(범위 폭발은 효과 id 그대로).
     private const string DetonateHitVfx = "detonate_hit";
@@ -504,6 +505,9 @@ public sealed class CovenantClause
         float duration = Mathf.Min(Eff * stacks, CovenantMath.StasisStunCap);
         CovenantFxService.Burst(_effect.id, center, radius);
 
+        // 넘기는 적(최대 PassCap)은 가운데에서 가까운 순 — 모은 순서대로 넘기면 붐비는 방에서 가운데 적(대개 맞힌 적)이
+        // 빠지고 먼 적에게 「쓰러지면」 귀가 붙었다(10-23 서약 실측: 기절한 맞힌 적을 쓰러뜨려도 다음 절이 안 일어남).
+        _areaScratch.Sort((a, b) => (a.transform.position - center).sqrMagnitude.CompareTo((b.transform.position - center).sqrMagnitude));
         for (int i = 0; i < _areaScratch.Count; i++)
         {
             var mb = _areaScratch[i];

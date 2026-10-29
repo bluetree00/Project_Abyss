@@ -17,16 +17,19 @@ public sealed class EssenceTracker : MonoBehaviour
     // [09-28 사용자 결정] +10% — 기억의 제단에 원거리 갈래(5노드)가 더해져 전부 해금이 38 → 41런이 됐다. 완주 구성
     // (방 26×15 · 보스 4×120 · 처치 약 68배치×8)에서 처치 8→9 · 방 15→16 · 보스 120→132 = +142(+10.0%) → 약 38런으로 되돌린다
     // (시뮬 `RelicFairy_문서/기획/시뮬/altar_sim_20260928.py`, 베이스캠프 재설계 설계서 §2-1).
+    // [10-23 사용자 「기억의 제단 재화를 더 줘야 — 다 채우려면 런을 너무 돌아야 한다」] ×1.75 — 10-14 강화형(73,900) + 10-22 해방 대비 3칸(8,190) = 82,090이 되며
+    // 다 차는 데 약 42런(엔딩 때 28%)이 됐다 → 약 27런(엔딩 때 42%) · 플레이타임 목표 「엔딩까지 12~20시간」 끝에 맞춘다(스크래치 eco_1023/altar_fill.py).
+    // 처치 9 → 16 · 방 16 → 28 · 정예 보스 75 → 130 · 보스 132 → 230. 계약 · 업적 · 초행 배율은 그대로.
     // ⚠️ 이 컴포넌트는 씬·프리팹에 없고 GameRunBootstrapper가 AddComponent로 붙인다 — 여기 기본값이 곧 실제 값이다.
     [Header("처치 적립")]
     [SerializeField] private int killsPerBatch    = 10;  // N마리 처치마다 1회 지급
-    [SerializeField] private int essencePerBatch  = 9;   // 처치 배치 지급량
+    [SerializeField] private int essencePerBatch  = 16;  // 처치 배치 지급량
 
     [Header("방 클리어 적립")]
-    [SerializeField] private int essencePerRoom   = 16;
-    [SerializeField] private int essencePerBoss   = 132;
-    // 정예 보스 방(10-12) — 그 챕터에서 빠지는 전투 두 방 + 정예방 몫의 정수(처치 · 방 클리어) 평균 75를 한 번에(배치 설계 §5-2).
-    [SerializeField] private int essencePerMidBoss = 75;
+    [SerializeField] private int essencePerRoom   = 28;
+    [SerializeField] private int essencePerBoss   = 230;
+    // 정예 보스 방(10-12) — 그 챕터에서 빠지는 전투 두 방 + 정예방 몫의 정수(처치 · 방 클리어) 평균을 한 번에(배치 설계 §5-2 · 10-23 ×1.75).
+    [SerializeField] private int essencePerMidBoss = 130;
 
     // ── 상태 ────────────────────────────────────────────────────────────
     private GameRunSession _session;

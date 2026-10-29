@@ -478,9 +478,11 @@ public class MonsterSpawner : MonoBehaviour
         }
     }
 
+    private static readonly System.Func<SpawnEntry, float> s_eraRoleWeight = e => MonsterRoleTable.EraWeight(e, StoryProgress.Era);
+
     private async UniTask<bool> TrySpawnOneAsync()
     {
-        SpawnEntry entry = spawnTable.PickRandom(PassesAllFilters);
+        SpawnEntry entry = spawnTable.PickRandom(PassesAllFilters, s_eraRoleWeight);   // F3 — 해방기 · 악몽은 원거리 · 돌진을 더 섞는다
         if (entry == null)
         {
             if (!_filterMissWarned)
@@ -553,13 +555,16 @@ public class MonsterSpawner : MonoBehaviour
         bool avengerInRoom = prefix == MonsterTraitKind.Avenger || MonsterRoomLedger.HasPrefix(MonsterTraitKind.Avenger);
         var traits = MonsterTraitTable.Roll(entry.grade, era, MonsterRoomLedger.Traits,
                                             prefix.HasValue ? MonsterTraitTable.Of(prefix.Value).category : (MonsterTraitCategory?)null,
-                                            noCommander: avengerInRoom, maxCount: prefix.HasValue ? 1 : 2,   // 한 몸 최대 2(접두어 1 + 특성 1)
+                                            noCommander: avengerInRoom, maxCount: 2,   // 한 몸 최대 3(접두어 1 + 시기 특성 2 — 10-29 H: 악몽 늘 · 해방기 30%)
                                             chapter: CurrentChapterNumber());   // 봉인기 무작위 정예화 확률(10-21)
         if (prefix.HasValue)
         {
             traits.Insert(0, prefix.Value);
             MonsterRoomLedger.AddPrefix(prefix.Value);
+            if (era != StoryEra.Sealed && MonsterRoomLedger.PrefixCount == 1) MonsterTraits.NoticeRoomPrefix(monster, prefix.Value);   // F3 — 이 방 정예 한 줄
+#if UNITY_EDITOR   // 등장마다 로그는 에디터 실측에서만(10-29 풀링 점검 #6 — 빌드에선 스택 기록 비용)
             Debug.Log($"[ElitePrefix] {monster.name} ← {prefix.Value} · {era} · Ch{CurrentChapterNumber()} · {GameRunBootstrapper.Instance?.Run?.CurrentRoomKind} · 방 접두어 {MonsterRoomLedger.PrefixCount}");
+#endif
         }
         if (traits.Count > 0)
         {

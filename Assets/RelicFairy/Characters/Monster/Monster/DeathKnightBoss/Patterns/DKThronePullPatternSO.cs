@@ -68,7 +68,13 @@ public class DKThronePullState : FullLockState<DKThronePullPatternSO>
 
     private DKPage2Zone   _zone;
     private LichChainLine _chain;
+    private const float SquareY = 0.15f;   // 판정 사각 — 띠(0.2) 아래 · 바닥 잔해(≈0.1) 위(반역의 환영과 같게)
+    private static readonly Color SquareCharge = new Color(PatternGuideHelper.AttackFill.r, PatternGuideHelper.AttackFill.g, PatternGuideHelper.AttackFill.b, 0.35f);
+    private static readonly Color SquareArmed  = new Color(1f, 0.1f, 0.1f, 0.5f);   // 굳은 판정 색(PatternGuideHelper.Active)
     private GameObject    _band;
+    private GameObject    _square;   // 판정 넓이 그대로의 사각(앞 세 줄 × 구역 폭)
+    private MeshRenderer  _squareMr;
+    private Material      _squareMat;
     private float         _timer;
     private bool          _pulling;
     private bool          _locked;
@@ -101,6 +107,12 @@ public class DKThronePullState : FullLockState<DKThronePullPatternSO>
         origin.z = (origin.z + _zone.CellCenter(westCol, _zone.FrontRowAt(Data.frontRows - 1)).z) * 0.5f;   // 세 줄 가운데
         _band = PatternGuideHelper.Prepare(
             PatternGuideHelper.Beam(origin, east, _zone.Columns * cs, Data.frontRows * cs, DKPage2Zone.Grey), DKPage2Zone.Grey);
+        // 띠 끝 화살촉이 바깥 두 줄 귀퉁이(약 6 m²)를 비웠다 — 판정(앞 세 줄 × 구역 폭) 그대로의 사각을 아래에 깐다(10-24 · 반역의 환영과 같은 사각)
+        (_square, _squareMr, _squareMat) = QuadTilePool.Rent();
+        _square.name = "DK_ThroneBand";
+        _square.transform.SetPositionAndRotation(origin + east * (_zone.Columns * cs * 0.5f) + Vector3.up * SquareY, Quaternion.Euler(90f, 0f, 0f));
+        _square.transform.localScale = new Vector3(_zone.Columns * cs, Data.frontRows * cs, 1f);   // 눕힌 쿼드: x = 월드 x · y = 월드 z
+        _squareMat.color = SquareCharge;
 
         var player = ctx.Runtime.CachedPlayer;
         if (player != null)
@@ -135,6 +147,7 @@ public class DKThronePullState : FullLockState<DKThronePullPatternSO>
             {
                 _locked = true;
                 PatternGuideHelper.Arm(_band);   // R3 — 끌기가 끝나는 순간 판정 색
+                if (_squareMat != null) _squareMat.color = SquareArmed;
             }
         }
 
@@ -158,6 +171,8 @@ public class DKThronePullState : FullLockState<DKThronePullPatternSO>
     {
         ReleaseChain(snapped: false);
         PatternGuideHelper.SafeDestroy(ref _band);
+        if (_square != null) QuadTilePool.Return(_square, _squareMr, _squareMat);
+        _square = null; _squareMr = null; _squareMat = null;
         DKPage2Zone.RestoreAgent(ctx);
     }
 

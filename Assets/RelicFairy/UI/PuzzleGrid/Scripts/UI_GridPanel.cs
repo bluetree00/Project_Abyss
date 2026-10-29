@@ -30,6 +30,8 @@ public sealed partial class UI_GridPanel : UI_Base
     // ── Properties ──
     public RectTransform BoardContainer => _boardContainer;
     public bool IsOpen => _isOpen;
+    /// <summary>팝업(상점) 위로 올려 연 상태 — ESC가 팝업보다 이 판을 먼저 닫는다.</summary>
+    public bool IsRaisedAbovePopups => _raisedAbovePopups;
 
     // ── Private: Sub-views ──
     private CharacterInfoPanelView      _charInfoView;
@@ -124,6 +126,10 @@ public sealed partial class UI_GridPanel : UI_Base
     // [분해] — 정보판에 떠 있는 룬(보관함 · 판)을 원석으로(10-01 룬 보유 상한)
     private Button          _salvageButton;
     private TMP_Text        _salvageBtnLabel;
+    private Button          _rotateButton;   // 정보판 카드 [돌리기 E] — 보관함 룬일 때(10-26 사용자 「회전은 UI에 잘 표현」)
+    private TMP_Text        _rotateNote;     // 판에 놓인 룬일 때 같은 자리 흐린 안내 「집어 들면 E로 돌린다」
+    private System.Threading.CancellationTokenSource _rotateNoteCts;
+    private GridSquare      _hoveredSquare;  // 마우스가 올라간 판 칸 — 돌리면 그 칸의 놓일 자리 미리보기를 새 모양으로 다시 그린다(10-26)
     private RuntimeItemData _salvageTarget;
     private Shape            _outlineSelectedShape;   // 정보판에 뜬 놓인 룬의 조각 — 외곽선이 밝다(10-18)
     private bool             _isOpen;
@@ -253,6 +259,25 @@ public sealed partial class UI_GridPanel : UI_Base
     public override void Close()
     {
         ClosePanel();
+    }
+
+    /// <summary>
+    /// ESC(10-25 사용자 「모든 UI를 ESC로 닫을 수 있게」) — 판 안 확인 창(넘침 정리 · 버리기 · 초기화)이 떠 있으면 그것만 취소하고,
+    /// 아니면 「돌아가기」와 같은 길로 닫는다(보관함이 넘치면 정리 창이 먼저 뜬다). 열려 있지 않으면 false.
+    /// </summary>
+    public bool TryHandleEscape()
+    {
+        if (!_isOpen) return false;
+        if (_confirmDialog != null && _confirmDialog.activeSelf)
+        {
+            // 그 창의 「취소」를 누른 것과 같다 — 용도마다 취소가 다르다(자리 비우고 배치의 취소는 들던 룬도 보관함으로 돌린다)
+            if (_confirmDialogKeepBtn != null) _confirmDialogKeepBtn.onClick.Invoke();
+            else HideConfirmDialog();
+            return true;
+        }
+        if (_resetDialog != null && _resetDialog.activeSelf)     { HideResetConfirmDialog(); return true; }
+        OnBackClicked();
+        return true;
     }
 
     /// <summary>새로 획득한 아이템을 강조하며 패널을 연다. 룬 선택 팝업이 고른 직후 부른다.</summary>
@@ -701,6 +726,19 @@ public sealed partial class UI_GridPanel : UI_Base
         ShopUIStyle.Anchor(shapeRT, Vector2.zero, Vector2.zero, Vector2.zero, new Vector2(24f, 24f), new Vector2(170f, 110f));
         Inject("shapePreviewRoot", shapeRT);
 
+        // 돌리기(오른쪽 아래 · 모양 옆) — 보관함 룬이면 버튼(마우스로도 돌린다), 판에 놓인 룬이면 같은 자리에 흐린 안내(10-26).
+        _rotateButton = MakeButton(cardRT, "RotateBtn", new Vector2(1f, 0f), new Vector2(1f, 0f),
+                                   new Vector2(168f, 40f), new Vector2(-24f - 84f, 24f + 20f), new Color(1f, 1f, 1f, 0.06f),
+                                   $"돌리기  <color={UIPalette.GoldHex}>E</color>");
+        _rotateButton.onClick.AddListener(RotateTarget);
+        _rotateButton.gameObject.SetActive(false);
+        var noteGO = MakeTxt(cardRT, "RotateNote", "집어 들면 E로 돌린다", 16f, new Color(0.74f, 0.79f, 0.90f, 0.70f));
+        var noteRT = noteGO.GetComponent<RectTransform>();
+        ShopUIStyle.Anchor(noteRT, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0.5f), new Vector2(-24f, 24f + 20f), new Vector2(200f, 40f));
+        _rotateNote = noteGO.GetComponent<TMP_Text>();
+        _rotateNote.alignment = TextAlignmentOptions.Right;
+        noteGO.SetActive(false);
+
         // NEW — 카드 위 끝에 걸터앉는 금빛 칩(16px). 예전 10px 빨강 글자는 읽히지 않았다.
         var newGO = Go("NewBadge");
         newGO.transform.SetParent(cardRT, false);
@@ -768,7 +806,7 @@ public sealed partial class UI_GridPanel : UI_Base
 
         // 안내 두 줄 — 예전 「가짜 버튼」 자리. 배치는 드래그·칸 누르기로만 일어나므로 버튼이 아니라 문장이다.
         var hintGO = MakeTxt(infoRootGO.transform, "PlaceHint",
-            "카드를 끌어 놓거나, 골라서 칸을 누른다\n놓인 룬은 판 밖으로 끌면 보관함으로", 17f,   // 10-11 v2 보조 17(톤 v2 15는 하한 아래) — 두 줄 50px가 카드 영역(위 190) 아래에 든다
+            "카드를 끌어 놓거나, 골라서 칸을 누른다\nE = 돌리기 · 판 밖으로 끌면 보관함으로", 17f,   // 10-11 v2 보조 17(톤 v2 15는 하한 아래) — 두 줄 50px가 카드 영역(위 190) 아래에 든다
             new Color(0.74f, 0.79f, 0.90f, 0.95f));
         var hintRT = hintGO.GetComponent<RectTransform>();
         hintRT.anchorMin        = new Vector2(0f, 0f);
@@ -1093,6 +1131,7 @@ public sealed partial class UI_GridPanel : UI_Base
     {
         _salvageTarget = item;
         RefreshSalvageButton();
+        RefreshRotateControl(item);
         // 정보판에 뜬 룬이 판에 놓인 것이면 그 조각만 외곽선을 밝게(10-18 — 외곽선은 조각이 그린다, RunePieceOutline).
         bool placed = item != null && _inventory != null && _inventory.IsPlaced(item.instanceId);
         var shape = placed ? BoardManager.Instance?.GetSharedShapeByItem(item.instanceId) : null;
@@ -1102,6 +1141,45 @@ public sealed partial class UI_GridPanel : UI_Base
             _outlineSelectedShape = shape;
             if (shape != null) shape.SetOutlineSelected(true);
         }
+    }
+
+    /// <summary>
+    /// 돌리기 자리(10-26) — 정보판 룬이 보관함 룬이면 [돌리기 E] 버튼, 판에 놓인 룬이면 「집어 들면 E로 돌린다」 흐린 안내.
+    /// 한 칸 룬은 돌려도 같아 둘 다 숨긴다.
+    /// </summary>
+    private void RefreshRotateControl(RuntimeItemData item)
+    {
+        bool turnable = item != null && _inventory != null && RuneCardKit.CellCount(item) > 1;
+        bool staging  = turnable && _inventory.IsStaging(item.instanceId);
+        bool placed   = turnable && _inventory.IsPlaced(item.instanceId);
+        if (_rotateButton != null) _rotateButton.gameObject.SetActive(staging);
+        if (_rotateNote != null)   _rotateNote.gameObject.SetActive(placed);
+    }
+
+    /// <summary>판에 놓인 룬을 보며 E를 눌렀다 — 돌리지 않고 안내를 잠깐 금빛으로 밝힌다(「안 됨」 소리).</summary>
+    private void FlashRotateNote()
+    {
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiReject);
+        if (_rotateNote == null || !_rotateNote.gameObject.activeInHierarchy) return;
+        _rotateNoteCts?.Cancel();
+        _rotateNoteCts = new System.Threading.CancellationTokenSource();
+        FlashRotateNoteAsync(_rotateNoteCts.Token).Forget();
+    }
+
+    private async UniTaskVoid FlashRotateNoteAsync(CancellationToken ct)
+    {
+        var rest = new Color(0.74f, 0.79f, 0.90f, 0.70f);
+        var lit  = UITheme.Thin.Gold;
+        try
+        {
+            for (float t = 0f; t < 0.6f; t += Time.unscaledDeltaTime)
+            {
+                _rotateNote.color = Color.Lerp(lit, rest, t / 0.6f);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (System.OperationCanceledException) { return; }
+        if (_rotateNote != null) _rotateNote.color = rest;
     }
 
     /// <summary>[분해]는 정보판의 룬이 보관함이나 판에 있을 때만 보인다(룬 선택 미리보기 등은 아님).</summary>
@@ -1288,6 +1366,56 @@ public sealed partial class UI_GridPanel : UI_Base
     private RuntimeItemData PlacementTarget
         => _stagingArea?.HighlightedItem
            ?? (_inventory != null && _inventory.StagingCount > 0 ? _inventory.StagingItems[0] : null);
+
+    // 룬 돌리기(10-25 사용자 「룬 블록을 회전시키는 기능」) — 끄는 중인 룬, 아니면 보관함에서 고른(놓을) 룬을 E로 90° 돌린다(10-25 사용자 「룬 회전을 E로」).
+    // 놓인 룬은 그 자리에서 돌리지 않는다(자리가 맞는지 다시 볼 수 없다) — 집어 들고 돌린다. Update는 UI_GridPanel.Thin.cs에 있다.
+    private void HandleRotateInput()
+    {
+        if (!_isOpen) return;
+        var kb = UnityEngine.InputSystem.Keyboard.current;
+        if (kb == null || !kb.eKey.wasPressedThisFrame) return;
+        RotateTarget();
+    }
+
+    /// <summary>
+    /// 돌릴 룬을 정해 90° 돌리고 미리보기 · 보관함 카드 · 정보판 모양을 맞춘다(E · [돌리기] 버튼 공용).
+    /// 고르는 순서: 끄는 중인 룬 → 보관함에서 고른 룬 → 정보판에 뜬 보관함 룬 → 보관함 첫 룬.
+    /// 정보판이 판에 놓인 룬을 보이고 있으면 다른 룬을 몰래 돌리지 않는다 — 「집어 들면 E로 돌린다」를 밝힌다(10-26).
+    /// 끄는 중이 아니면 돈 룬을 보관함에서 골라 두고(테 · 튕김) 정보판에 띄워 어느 룬이 돌았는지 보이게 한다.
+    /// </summary>
+    private void RotateTarget()
+    {
+        var shape = Shape.Dragging;
+        var item  = shape != null ? shape.ItemData : null;
+        if (shape == null)
+        {
+            var shown = _itemInfoPanel != null ? _itemInfoPanel.CurrentItem : null;
+            bool shownStaging = shown != null && _inventory != null && _inventory.IsStaging(shown.instanceId);
+            bool shownPlaced  = shown != null && _inventory != null && _inventory.IsPlaced(shown.instanceId);
+            item = _stagingArea?.HighlightedItem ?? (shownStaging ? shown : null);
+            if (item == null && shownPlaced) { FlashRotateNote(); return; }
+            item ??= PlacementTarget;
+            if (item != null) shape = _stagingArea?.GetShapeForItem(item);
+        }
+        if (shape == null) return;
+
+        shape.RotateClockwise();
+        bool dragging = Shape.Dragging == shape;
+        if (dragging) GridManager.Instance?.TryPreviewAndSnap(shape, out _);   // 미리보기를 새 모양으로
+        // 10-26 사용자 「룬 회전 시 실제 보드에 보던 가이드라인도 반영」 — 끌지 않고 판 칸 위에 마우스를 둔 채 돌리면
+        // 칸 미리보기가 다음 칸으로 옮길 때까지 옛 모양이었다
+        else if (_hoveredSquare != null) HandleSquareHovered(_hoveredSquare);
+        Managers.Sound?.PlayUiEvent(SoundEvent.RuneLift);
+        _stagingArea?.RefreshShapePreview(item);   // 보관함 카드 작은 모양도 같은 방향으로
+        if (item == null) return;
+        if (!dragging)
+        {
+            _stagingArea?.HighlightItem(item);   // 돈 룬 = 고른 룬(다음 칸 누르기도 이 룬)
+            _stagingArea?.PulseItem(item);
+        }
+        if (_itemInfoPanel != null && (!dragging || _itemInfoPanel.CurrentItem == item))
+            _itemInfoPanel.ShowItem(item, isNew: false);   // 정보판 작은 모양도 같은 방향으로
+    }
 
     private void HandleSquareClicked(GridSquare square)
     {
@@ -1496,6 +1624,7 @@ public sealed partial class UI_GridPanel : UI_Base
     private void HandleSquareHovered(GridSquare square)
     {
         if (GridManager.Instance == null) return;
+        _hoveredSquare = square;
 
         if (square == null || square.isOccupied) { GridManager.Instance.ClearPreview(); return; }
 

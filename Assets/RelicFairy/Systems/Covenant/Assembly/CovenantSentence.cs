@@ -21,9 +21,10 @@ public sealed class CovenantSentence : CovenantBase, ICovenantClauseHost
 
     private const float ChainMinInterval = 0.5f;
     private const int   PerChainCap      = 3;
-    private const float DeathEarMax      = 6f;    // 「쓰러지면」 — 상태가 남은 동안, 최대 6초
-    private const float DeathEarMin      = 1.5f;  // 지속 없는 결과(폭발 · 정지 뒤)도 잠깐은 듣는다
-    private const float ShieldEarSeconds = 8f;    // 「보호막이 깨지면」을 기다리는 상한
+    // 귀 길이 — 10-23 공개: 서약서 줄 글(CovenantGrammar.NumericLine)이 「불붙은 적이 4초 안에 쓰러지면」 · 「보호막이 8초 안에 깨지면」을 이 값으로 쓴다.
+    public const float DeathEarMax      = 6f;    // 「쓰러지면」 — 상태가 남은 동안, 최대 6초
+    public const float DeathEarMin      = 1.5f;  // 지속 없는 결과(폭발 · 정지 뒤)도 잠깐은 듣는다
+    public const float ShieldEarSeconds = 8f;    // 「보호막이 깨지면」을 기다리는 상한
     private const float TargetSearchRadius = 8f;
 
     private struct Spec
@@ -300,7 +301,8 @@ public sealed class CovenantSentence : CovenantBase, ICovenantClauseHost
         if (Ctx == null) return;
         if (Time.time - _lastChainStart < ChainMinInterval) return;
         _lastChainStart = Time.time;
-        Ctx.Session?.RunStats?.ReportCovenantFire();   // 결과창 「발동 N회」 — 연쇄가 시작된 횟수
+        // 결과창 「발동 N회」는 첫 절이 실제로 일어났을 때 센다(RunCore) — 10-23 점검: 조건만 맞고 받을 적이 없던 헛방(연주 · 심장박동인데 8m 안에 적 없음 ·
+        // 기폭할 화상 없음 …)까지 세어 「발동」이 부풀었다.
         int serial = ++_serial;
         _chainCounts[serial] = new int[_specs.Count];
         PruneChainCounts();
@@ -343,6 +345,7 @@ public sealed class CovenantSentence : CovenantBase, ICovenantClauseHost
             if (counts[i] >= PerChainCap) return;
             if (!FireClause(i, _enemyScratch, place)) return;
             counts[i]++;
+            if (i == 0) Ctx.Session?.RunStats?.ReportCovenantFire();   // 결과창 「발동 N회」 — 첫 절이 실제로 일어난 연쇄 수
             ClauseFired?.Invoke(i);
 
             var clause = _clauses[i];

@@ -51,6 +51,7 @@ public class LobbyButtonHover : MonoBehaviour, IPointerEnterHandler, IPointerExi
 
     public void OnPointerEnter(PointerEventData eventData)
     {
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiHover);   // 10-29 UI 소리 — 올림
         if (_onSprite != null && _image != null)
             _image.sprite = _onSprite;
         if (_onPositionOffset != Vector2.zero)

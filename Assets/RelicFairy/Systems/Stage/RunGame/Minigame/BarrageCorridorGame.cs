@@ -5,18 +5,26 @@ using RelicFairy.Monster;
 using UnityEngine;
 
 /// <summary>
-/// 탄막의 회랑 — 피하기(40초, 10-01 설계 §3-1). 「맞지 마라」.
+/// 탄막의 회랑 — 피하기(20초, 10-01 설계 §3-1). 「맞지 마라」.
 /// 물결이 일정 간격으로 온다 — 낙뢰 셋 · 가르는 빛 · 조이는 고리(틈으로 빠져나가기) · 쫓는 구체. 같은 물결이 연달아 안 나온다.
-/// 마지막 8초 = 최후의 물결(간격 ×0.7). 등급 = 맞은 횟수 0 / 1 / 2~3 / 4~5 / 6 이상.
+/// 마지막 5초 = 최후의 물결(간격 ×0.7). 등급 = 맞은 횟수 0 / 1 / 2~3 / 4~5 / 6 이상.
+/// 10-29 40 → 20초(「빨리 끝나는 이벤트」). 보상 = 등급만큼 정수(EventRewards).
+/// 10-29 사용자 「압도적으로 많게 사방에서 오지만 탄속은 조금 느리게」 — 놀이의 몸통은 <b>느린 탄</b>이다.
+///   · 흘림: 판 가장자리 아무 데서나 0.24~0.18초마다 한 발, 플레이어 둘레 2.5 m 안 아무 데를 향해 — 사방에서 온다
+///   · 꽃잎: 3.2초마다 가장자리 둘레에서 16~22발이 한꺼번에 가운데로 — 한 화면에 50발 남짓
+///   · 탄속 2.6~3.1 m/s(예전 쫓는 구체 3.0~3.6보다 조금 느리게) · 막 생긴 탄은 0.35초 동안 커지며 맞히지 않는다
+///   · 맞은 뒤 1초(예전 0.6)는 닿은 탄이 그냥 사라진다 — 빽빽한 탄에 한꺼번에 여러 번 맞지 않게
+///   · 낙뢰 · 가르는 빛 · 고리 · 쫓는 구체는 양념으로 4.8~4.2초마다(예전 3.0~2.7) · 쫓는 구체도 탄과 같은 빠르기
+///   · 판이 좁으면(방 자리가 막혔다) 탄 수를 줄인다
 /// 판정은 자체 거리 계산(원 · 띠 · 고리 · 구체). 회피 무적 중엔 맞지 않는다(대시로 뚫고 지나가도 된다).
 /// </summary>
 public sealed class BarrageCorridorGame : EventMinigame
 {
     // ── Constants ──────────────────────────────────────────────
-    private const float PlayTime     = 40f;
-    private const float FinalStretch = 8f;
+    private const float PlayTime     = 20f;
+    private const float FinalStretch = 5f;
     private const float FinalFactor  = 0.7f;
-    private const float HitCooldown  = 0.6f;   // 연속 피격 방지
+    private const float HitCooldown  = 1.0f;   // 연속 피격 방지 — 10-29 0.6 → 1.0(탄이 빽빽해졌다)
     private const float NearMargin   = 0.6f;   // 이 안을 스쳤는데 안 맞으면 「간발!」
 
     private const float BoltRadius   = 2.2f;
@@ -32,12 +40,21 @@ public sealed class BarrageCorridorGame : EventMinigame
     private const float OrbRadius    = 0.45f;
     private const float OrbHitDist   = 0.8f;
 
+    // 10-29 느린 탄(「압도적으로 많게 사방에서 · 탄속은 조금 느리게」)
+    private const float BulletRadius  = 0.28f;
+    private const float BulletHitDist = 0.55f;   // 플레이어 중심까지 평면 거리(탄 0.28 + 몸 약 0.27)
+    private const float BulletHeight  = 0.9f;
+    private const float BulletFadeIn  = 0.35f;   // 막 생긴 탄은 이만큼 커지는 동안 맞히지 않는다(가장자리에 선 사람 몫)
+    private const float StreamSpread  = 2.5f;    // 흘림이 노리는 곳 = 플레이어 둘레 이만큼 안 아무 데
+    private const float BloomGap      = 3.2f;
+
     private enum Wave { Bolts, Sweep, Ring, Orb }
     private static readonly Wave[] AllWaves = { Wave.Bolts, Wave.Sweep, Wave.Ring, Wave.Orb };
 
     // ── Private ────────────────────────────────────────────────
     private readonly List<Hazard> _hazards = new();
-    private float _nextWave;
+    private readonly Stack<BulletHazard> _bulletPool = new(64);   // 다 쓴 탄 — 한 판에 수백 발을 만들고 부수지 않게 되쓴다
+    private float _nextWave, _nextStream, _nextBloom;
     private Wave  _lastWave = (Wave)(-1);
     private int   _hits, _nearMisses, _demoHitParity;
     private float _hitCooldown;
@@ -64,7 +81,12 @@ public sealed class BarrageCorridorGame : EventMinigame
 
     protected override string ResultLine => _hits == 0 ? $"한 번도 안 맞았다 · 간발 {_nearMisses}" : $"맞은 횟수 {_hits} · 간발 {_nearMisses}";
 
-    private float Interval => MinigameTheme.Pick(Tier, 2.4f, 2.2f, 2.0f, 1.8f) * (Remaining <= FinalStretch ? FinalFactor : 1f);
+    private float Interval    => MinigameTheme.Pick(Tier, 4.8f, 4.6f, 4.4f, 4.2f) * (Remaining <= FinalStretch ? FinalFactor : 1f);
+    private float BulletSpeed => MinigameTheme.Pick(Tier, 2.6f, 2.75f, 2.9f, 3.1f);
+    private float StreamGap   => MinigameTheme.Pick(Tier, 0.24f, 0.22f, 0.20f, 0.18f) / Fill * (Remaining <= FinalStretch ? FinalFactor : 1f);
+    private int   BloomCount  => Mathf.Max(8, Mathf.RoundToInt(MinigameTheme.Pick(Tier, 16f, 18f, 20f, 22f) * Fill));
+    /// <summary>판이 좁으면 탄 수를 줄인다 — 같은 수면 좁은 판이 더 빽빽하다.</summary>
+    private float Fill        => Mathf.Clamp(Radius / WantRadius, 0.6f, 1f);
 
     // ── Public Methods ─────────────────────────────────────────
 
@@ -88,7 +110,12 @@ public sealed class BarrageCorridorGame : EventMinigame
         RunFx.Play(RunFxSlot.Ring, Center, 1.2f, Theme);
     }
 
-    protected override void OnPlayStart() => _nextWave = 0.6f;
+    protected override void OnPlayStart()
+    {
+        _nextStream = 0.3f;
+        _nextBloom  = 1.5f;
+        _nextWave   = 1.2f;
+    }
 
     protected override void TickPlay(float dt)
     {
@@ -99,6 +126,20 @@ public sealed class BarrageCorridorGame : EventMinigame
         {
             SpawnWave(PickWave());
             _nextWave = Interval;
+        }
+
+        _nextStream -= dt;
+        if (_nextStream <= 0f)
+        {
+            SpawnStream();
+            _nextStream = StreamGap;
+        }
+
+        _nextBloom -= dt;
+        if (_nextBloom <= 0f)
+        {
+            SpawnBloom();
+            _nextBloom = BloomGap;
         }
 
         for (int i = _hazards.Count - 1; i >= 0; i--)
@@ -124,6 +165,14 @@ public sealed class BarrageCorridorGame : EventMinigame
     }
 
     protected override void DemoTick(MinigameDemo mode, float dt) { }   // 시연은 판정 쪽(Absorb)에서 흉내 낸다
+
+    /// <summary>10-29 특별 보상 — 버틴 성적(등급)만큼 정수.</summary>
+    protected override void GrantReward(ChallengeGrade grade, Vector3 at)
+    {
+        int essence = EventRewards.Essence(grade, EventRewards.Chapter(Run));
+        EventRewards.DropEssence(at, essence);
+        EventRewards.Notice($"탄막의 회랑 — 정수 <color=#73D9C7>+{essence}</color>");
+    }
 
     // ── Private Methods ────────────────────────────────────────
 
@@ -169,6 +218,41 @@ public sealed class BarrageCorridorGame : EventMinigame
             }
         }
     }
+
+    /// <summary>흘림 — 가장자리 아무 데서나 한 발, 플레이어 언저리를 향해(사방에서 온다).</summary>
+    private void SpawnStream()
+    {
+        Vector3 from   = RimPoint((float)Rng.NextDouble() * 360f);
+        Vector3 dir    = PlayerPos() + RandomFlat(0f, StreamSpread) - from; dir.y = 0f;
+        Vector3 inward = Center - from; inward.y = 0f;
+        // 플레이어가 그 가장자리에 붙어 서 있으면 바깥으로 나가는 탄이 된다 — 그땐 가운데로
+        if (dir.sqrMagnitude < 0.01f || Vector3.Dot(dir, inward) <= 0f) dir = inward;
+        LaunchBullet(from, dir.normalized);
+    }
+
+    /// <summary>꽃잎 — 가장자리 둘레에서 한꺼번에 가운데로. 탄 사이 틈은 가장자리 쪽이 넓다.</summary>
+    private void SpawnBloom()
+    {
+        int   n    = BloomCount;
+        float yaw0 = (float)Rng.NextDouble() * 360f;
+        for (int i = 0; i < n; i++)
+        {
+            Vector3 from = RimPoint(yaw0 + i * 360f / n);
+            Vector3 dir  = Center - from; dir.y = 0f;
+            LaunchBullet(from, dir.normalized);
+        }
+    }
+
+    private void LaunchBullet(Vector3 from, Vector3 dir)
+    {
+        var b = _bulletPool.Count > 0 ? _bulletPool.Pop() : new BulletHazard(this);
+        b.Launch(from, dir, BulletSpeed);
+        _hazards.Add(b);
+    }
+
+    private void ReturnBullet(BulletHazard b) => _bulletPool.Push(b);
+
+    private Vector3 RimPoint(float yaw) => Center + Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * Radius;
 
     /// <summary>맞음 한 번(쿨다운 · 회피 무적 · 시연 흡수 반영). 실제로 셌으면 true.</summary>
     private bool TryHit()
@@ -371,6 +455,54 @@ public sealed class BarrageCorridorGame : EventMinigame
         }
     }
 
+    /// <summary>느린 탄 — 가장자리에서 곧게 날아와 판을 지나간다. 닿으면 사라진다(맞은 뒤 쿨다운 중이면 세지 않고 사라진다).</summary>
+    private sealed class BulletHazard : Hazard
+    {
+        private readonly GameObject _ball;
+        private Vector3 _dir;
+        private float   _speed, _t;
+
+        public BulletHazard(BarrageCorridorGame g) : base(g)
+        {
+            _ball = g.Own(PatternGuideHelper.Sphere(g.Center, BulletRadius, g.Theme));
+            _ball.SetActive(false);
+        }
+
+        public void Launch(Vector3 from, Vector3 dir, float speed)
+        {
+            Anchor = from + Vector3.up * BulletHeight;
+            _dir   = dir;
+            _speed = speed;
+            _t     = 0f;
+            Done   = false;
+            if (_ball == null) return;
+            _ball.transform.position   = Anchor;
+            _ball.transform.localScale = Vector3.zero;
+            _ball.SetActive(true);
+        }
+
+        public override void Tick(float dt)
+        {
+            _t     += dt;
+            Anchor += _dir * (_speed * dt);
+            if (_ball != null)
+            {
+                _ball.transform.position   = Anchor;
+                _ball.transform.localScale = Vector3.one * (BulletRadius * 2f * Mathf.Clamp01(_t / BulletFadeIn));
+            }
+            if (_t < BulletFadeIn) return;
+
+            if (FlatDist(G.PlayerPos(), Anchor) <= BulletHitDist) { G.TryHit(); Done = true; return; }
+            if (FlatDist(Anchor, G.Center) > G.Radius + 0.5f) Done = true;   // 판을 다 지나갔다
+        }
+
+        public override void Clear()
+        {
+            if (_ball != null) _ball.SetActive(false);
+            G.ReturnBullet(this);
+        }
+    }
+
     /// <summary>쫓는 구체 — 느리게 따라온다(6초). 닿으면 맞고 터진다.</summary>
     private sealed class OrbHazard : Hazard
     {
@@ -381,7 +513,7 @@ public sealed class BarrageCorridorGame : EventMinigame
         public OrbHazard(BarrageCorridorGame g, Vector3 at) : base(g)
         {
             Anchor = at + Vector3.up * 0.9f;
-            _speed = MinigameTheme.Pick(g.Tier, 3.0f, 3.2f, 3.4f, 3.6f);
+            _speed = g.BulletSpeed;   // 10-29 3.0~3.6 → 탄과 같은 2.6~3.1(「탄속은 조금 느리게」)
             _orb   = PatternGuideHelper.Sphere(Anchor, OrbRadius, g.Theme);
         }
 

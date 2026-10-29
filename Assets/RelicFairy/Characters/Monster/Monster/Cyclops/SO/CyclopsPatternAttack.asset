@@ -16,7 +16,7 @@ MonoBehaviour:
   - name: RangedShot
     animationStateName: Cyclops_Attack01
     minDistance: 0
-    maxDistance: 10
+    maxDistance: 14
     priority: 0
     cooldown: 2.5
     damageDelay: 0.5
@@ -52,5 +52,5 @@ MonoBehaviour:
     hitVfxScale: 1
     hitVfxOffset: {x: 0, y: 0, z: 0}
   selectionMode: 0
-  engageDistance: 8
+  engageDistance: 11.5
   engageDistanceScale: 0.85

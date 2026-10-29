@@ -89,7 +89,7 @@ public static class Fb1022EvoProbeEditor
 
     private static void EvolutionRules(StringBuilder sb, FieldInfo eraField, GameRunSession run)
     {
-        sb.AppendLine("\n① 진화 — 조각 2개 + 보스 · 해방기부터 · 각인 문턱 없음");
+        sb.AppendLine("\n① 진화 — 해방기부터 보스마다(10-29 조각 조건 걷음) · 각인 문턱 없음");
         foreach (var relicId in new[] { "gawain", "lancelot" })
         {
             var all = new List<RelicPartEntry>(Managers.RelicParts.GetByRelic(relicId));
@@ -106,45 +106,42 @@ public static class Fb1022EvoProbeEditor
             Check(sb, $"  [{relicId}] 봉인기 — 조각 2개여도 진화 없음 · 진행 줄 빈 글 · 안내에 「진화」 없음",
                   !RelicEvolution.Unlocked && RelicEvolution.Ready(two, relicId) == null && RelicEvolution.ProgressLine(two) == string.Empty
                   && !RelicPartPlainText.Guide(relicId, relicId, two).Contains("진화"));
-            Check(sb, $"  [{relicId}] 봉인기 드래프트 3번 → Ch3 창에 진화 없음", !SimulateThreeBosses(sb, relicId, all, 0));
+            Check(sb, $"  [{relicId}] 봉인기 드래프트 3번 → 진화 없음", SimulateThreeBosses(sb, relicId, all, 0) == 0);
 
             SetEra(eraField, 1);
             BuildImprint.Clear();   // 각인 0 — 문턱이 남아 있으면 안 열린다
             var ready = RelicEvolution.Ready(two, relicId);
             Check(sb, $"  [{relicId}] 해방기 · 조각 2 · 각인 0(연격 {BuildImprint.Count(BuildFamily.Combo)} · 필살 {BuildImprint.Count(BuildFamily.Crit)} · 사격 {BuildImprint.Count(BuildFamily.Ranged)}) → 진화 {ready?.Id}(방향 {RelicEvolution.Direction()} = 「{RelicEvolution.DirectionWord(RelicEvolution.Direction())}」)",
                   ready != null && ready.RelicId == relicId);
-            Check(sb, $"  [{relicId}] 해방기 · 조각 1 → 진화 없음 · 진행 줄 「{RelicEvolution.ProgressLine(one)}」",
-                  RelicEvolution.Ready(one, relicId) == null && RelicEvolution.ProgressLine(one).Contains("1/2"));
-            Check(sb, $"  [{relicId}] 해방기 드래프트 3번(Ch1 · Ch2에서 새 조각) → Ch3 창에 진화", SimulateThreeBosses(sb, relicId, all, 1));
+            Check(sb, $"  [{relicId}] 해방기 · 조각 1 → 진화 열림 · 진행 줄 「{RelicEvolution.ProgressLine(one)}」",
+                  RelicEvolution.Ready(one, relicId) != null && RelicEvolution.ProgressLine(one).Contains("보스마다"));
+            Check(sb, $"  [{relicId}] 해방기 · 조각 0(Ch1 보스) → 진화 열림", RelicEvolution.Ready(new PlayerLoadout(), relicId) != null);
+            Check(sb, $"  [{relicId}] 해방기 드래프트 3번(새 조각만 고름) → Ch1 · Ch2 · Ch3 창 모두 진화", SimulateThreeBosses(sb, relicId, all, 1) == 3);
             string guide = RelicPartPlainText.Guide(relicId, relicId, one);
-            Check(sb, $"  [{relicId}] 해방기 안내 넷째 줄 「지금 1/2」 · 「두 번째 바퀴」 · 「각인」 없음",
-                  guide.Contains("지금 1/2") && !guide.Contains("두 번째 바퀴") && !guide.Contains("각인"));
+            Check(sb, $"  [{relicId}] 해방기 안내 넷째 줄 「보스마다 진화」 · 「두 번째 바퀴」 · 「각인」 없음",
+                  guide.Contains("보스마다 진화") && !guide.Contains("두 번째 바퀴") && !guide.Contains("각인"));
             if (run != null) BuildImprint.Recount(run);
         }
     }
 
-    /// <summary>빈 로드아웃으로 보스 창 셋을 굴린다 — 앞 두 창은 새 조각을 고른다. 셋째 창에 진화가 있으면 true.</summary>
-    private static bool SimulateThreeBosses(StringBuilder sb, string relicId, List<RelicPartEntry> all, int era)
+    /// <summary>빈 로드아웃으로 보스 창 셋을 굴린다 — 새 조각만 고른다(진화는 안 고름). 진화 카드가 나온 창 수.</summary>
+    private static int SimulateThreeBosses(StringBuilder sb, string relicId, List<RelicPartEntry> all, int era)
     {
         var l = new PlayerLoadout();
         var line = new StringBuilder();
-        bool evoOnThird = false, evoEarly = false;
+        int evoWindows = 0;
         for (int boss = 1; boss <= 3; boss++)
         {
             var draft = RelicDraftComposer.Compose(relicId, all, l, era, 0, _ => false, new System.Random(1000 + boss));
             bool hasEvo = draft.Cards.Exists(c => c.Kind == RelicDraftCardKind.Evolution);
             line.Append($" Ch{boss}(조각 {l.RelicPartIds.Count}): ");
             foreach (var c in draft.Cards) line.Append(c.Kind).Append(' ');
-            if (boss < 3)
-            {
-                evoEarly |= hasEvo;
-                var pick = draft.Cards.Find(c => c.Kind == RelicDraftCardKind.NewFragment);
-                if (pick != null) l.AddRelicPart(pick.PartId, pick.Grade);
-            }
-            else evoOnThird = hasEvo;
+            if (hasEvo) evoWindows++;
+            var pick = draft.Cards.Find(c => c.Kind == RelicDraftCardKind.NewFragment);
+            if (pick != null) l.AddRelicPart(pick.PartId, pick.Grade);
         }
         sb.AppendLine($"    시기 {era}:{line}");
-        return evoOnThird && !evoEarly;
+        return evoWindows;
     }
 
     // ── ② 랜슬롯 광기 칸 조각 수 ────────────────────────────
@@ -337,7 +334,7 @@ public static class Fb1022EvoProbeEditor
             Check(sb, $"  새 조각 카드(흐릿) ◇ 숨김 · 「선명해지면 +n줄」 — 「{rest.Replace("\n", " / ")}」", !rest.Contains("◇") && rest.Contains("선명해지면 +"));
             var evoRt = CardRect(popup, 1);
             string evoAll = AllText(evoRt);
-            Check(sb, $"  진화 카드 — 계열 낱말 · 「각인」 없음 · 꼬리표 「{Parsed(Find(evoRt, "AnchorTag"))}」 · 조건 「{Parsed(Find(FindRect(evoRt, "EvoCheckParts"), "Label"))}」",
+            Check(sb, $"  진화 카드 — 계열 낱말 · 「각인」 없음 · 꼬리표 「{Parsed(Find(evoRt, "AnchorTag"))}」 · 조건 「{Parsed(Find(FindRect(evoRt, "EvoCheckBoss"), "Label"))}」",
                   !evoAll.Contains("각인") && !evoAll.Contains("연격") && !evoAll.Contains("필살") && !evoAll.Contains("사격")
                   && Find(evoRt, "FamilyTag") == null && FindRect(evoRt, "EvoCheckImprint") == null
                   && Parsed(Find(evoRt, "AnchorTag")).Contains(RelicEvolution.DirectionWord(BuildFamily.Combo)));
@@ -370,7 +367,7 @@ public static class Fb1022EvoProbeEditor
             var sGuide = GetField(popup, "_guideRoot") as GameObject;
             string sGuideTxt = Parsed(Find(sGuide != null ? sGuide.transform : null, "GuideBody"));
             await ShotAsync("EVO22_5_guide_gawain_sealed");
-            Check(sb, $"  [봉인기] 안내 세 줄(진화 없음)\n{Indent(sGuideTxt)}", sGuide != null && !sGuideTxt.Contains("진화") && sGuideTxt.Contains("여명(쳐서 쌓기)"));
+            Check(sb, $"  [봉인기] 안내 세 줄(진화 없음)\n{Indent(sGuideTxt)}", sGuide != null && !sGuideTxt.Contains("진화") && sGuideTxt.Contains("여명엔 맞힌 적에게 태양흔이 쌓이고"));
             Invoke(popup, "CloseGuide");
             await Wait(0.4f);
             await ShotAsync("EVO22_6_draft_gawain_sealed");

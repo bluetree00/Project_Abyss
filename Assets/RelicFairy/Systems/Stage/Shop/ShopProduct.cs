@@ -43,10 +43,14 @@ public sealed class ShopProduct
     /// <summary>1회성 상품이 팔렸는지(재료/포션 등 수량형은 별도 남은수량으로 관리 가능).</summary>
     public bool Sold { get; set; }
 
+    /// <summary>지급 개수 — 포션은 이만큼 칸이 비어 있어야 살 수 있다(10-26 넘쳐 버려지는 구매 막기). 그 밖은 1.</summary>
+    public int Amount { get; }
+
     public ShopProduct(ShopProductCategory category, string displayName, string effectText,
                        string detailText, int price, ItemRarity rarity, Sprite icon,
-                       Func<GameRunSession, bool> grant, RuntimeItemData rune = null)
+                       Func<GameRunSession, bool> grant, RuntimeItemData rune = null, int amount = 1)
     {
+        Amount      = Mathf.Max(1, amount);
         Category    = category;
         DisplayName = displayName;
         EffectText  = effectText;

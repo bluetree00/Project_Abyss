@@ -150,43 +150,50 @@ public static class CovenantGrammar
         => CovenantPalette.TryGetEffect(id, out var e) ? e.id : id ?? string.Empty;
 
     // ── 문장 문구(설계서 §1-2 동사 · §1-3 이음) ───────────
-    /// <summary>결과의 동사구 — 서약서 줄 · 카드에 쓴다.</summary>
+    /// <summary>
+    /// 결과의 동사구 — 조립 미리보기 「→ …」 줄(수치 없이 무슨 일이 일어나는가).
+    /// 10-23 U8 사용자 「컨셉 말로는 아무도 못 알아듣는다」 — 비유(「나는 날이 선다」 · 「숨이 끊긴다」 · 「상처를 거둔다」)를 걷고 일어나는 일로.
+    /// </summary>
     public static string Verb(string effectId) => Normalize(effectId) switch
     {
-        "supernova"  => "그 자리가 터진다",
+        "supernova"  => "그 자리에서 폭발이 터진다",
         "ember"      => "적이 불탄다",
         "hemorrhage" => "적이 피를 흘린다",
-        "curse"      => "적이 저주받는다",
-        "arcflash"   => "번개가 옮겨붙는다",
-        "execute"    => "숨이 끊긴다",
-        "detonate"   => "상처가 터진다",
-        "harvest"    => "상처를 거둔다",
-        "stasis"     => "적이 멈춰 선다",
-        "fury"       => "나는 날이 선다",
-        "momentum"   => "걸음이 빨라진다",
-        "bloodmark"  => "피가 굳어 나를 막는다",
-        "aegis"      => "성역이 나를 감싼다",
-        "ward"       => "결계가 선다",
-        "lastbreath" => "쓰러짐 막기를 하나 모은다",
-        "goldrain"   => "금이 쏟아진다",
+        "curse"      => "적이 받는 피해가 커진다",
+        "arcflash"   => "적과 둘레 적에게 감전이 걸린다",
+        "execute"    => "체력이 낮은 적이 바로 쓰러진다",
+        "detonate"   => "적의 화상 · 출혈이 바로 터진다",
+        "harvest"    => "적의 화상 · 출혈을 걷어 스킬 대기가 준다",
+        "stasis"     => "감전된 적이 기절한다",
+        "fury"       => "내가 주는 피해가 커진다",
+        "momentum"   => "내 이동 · 공격 속도가 오른다",
+        "bloodmark"  => "보호막을 얻는다",
+        "aegis"      => "잠시 무적이 된다",
+        "ward"       => "내가 받는 피해가 준다",
+        "lastbreath" => "죽을 피해를 1번 버티는 힘을 모은다",
+        "goldrain"   => "골드를 얻는다",
         _            => effectId,
     };
 
-    /// <summary>이음 머리말 — 즉시는 없음. 견디면은 앞 절(성역 = 무적이 끝나면 · 보호막 = 깨지면)을 따른다.</summary>
+    /// <summary>
+    /// 이음 머리말(시간 없이 — 동사구 줄). 즉시는 없음. 견디면은 앞 절(성역 = 무적이 끝나면 · 보호막 = 깨지면)을 따른다.
+    /// 10-23 U8 사용자 「『그 적이 쓰러지면』은 감도 안 잡힌다」 — 앞 절이 건드린 적을 이름으로(「불붙은 적」 · 「폭발에 맞은 적」 …).
+    /// 수치 줄(<see cref="NumericLine"/>)은 귀가 듣는 시간까지 붙인다.
+    /// </summary>
     public static string Lead(ClauseLink link, string prevEffectId) => link switch
     {
-        ClauseLink.OnDeath => "그 적이 쓰러지면 ",
-        ClauseLink.During  => "그동안 처치하면 ",
+        ClauseLink.OnDeath => $"{TouchedNoun(prevEffectId)}이 쓰러지면 ",
+        ClauseLink.During  => $"{WindowWhat(prevEffectId)} 동안 적을 쓰러뜨리면 ",
         ClauseLink.Endure  => Normalize(prevEffectId) == "aegis" ? "무적이 끝나면 " : "보호막이 깨지면 ",
         _                  => string.Empty,
     };
 
-    /// <summary>카드 머리표 — 즉시 「곧바로」 · 쓰러지면 · 그동안 · 견디면.</summary>
+    /// <summary>카드 머리표 — 즉시 「곧바로」 · 쓰러지면 · 그동안 · 견디면(10-23: 「그동안 처치」 · 「보호막·무적 뒤」 — 무엇이 일어나면 이어지는지. 카드 설명 두 줄 안이라 짧게 · 자세한 말은 서약서 줄).</summary>
     public static string LinkTag(ClauseLink link) => link switch
     {
         ClauseLink.OnDeath => "쓰러지면",
-        ClauseLink.During  => "그동안",
-        ClauseLink.Endure  => "견디면",
+        ClauseLink.During  => "그동안 처치",
+        ClauseLink.Endure  => "보호막·무적 뒤",
         _                  => "곧바로",
     };
 
@@ -195,9 +202,10 @@ public static class CovenantGrammar
         => Lead(link, prevEffectId) + Verb(effectId);
 
     /// <summary>
-    /// 서약서 한 줄(결과절) — 머리말 + <b>수치</b>(10-18 사용자 「『적이 피를 흘린다』보다 『출혈 피해 몇』이 직관적」).
-    /// 수치 글은 카드와 같다(<see cref="CovenantAssemblePreview.EffectAmountCompact"/> — 원인 계수 · 등급 · 절 위치 배율, 런타임과 같은 식).
-    /// 줄엔 효과 이름이 없어 주어가 갈리는 저주만 「적이」를 붙인다(「받는 피해 +20%」는 결계의 내 쪽 감소와 같은 말이다).
+    /// 서약서 한 줄(결과절) — 머리말 + <b>누구에게</b> + 수치(10-18 사용자 「『적이 피를 흘린다』보다 『출혈 피해 몇』이 직관적」).
+    /// 10-23 U8 사용자 「『그 적이 쓰러지면 화상』은 감도 안 잡힌다」 — 받는 쪽을 연쇄 실행과 같은 규칙으로 이름 붙인다
+    /// (「맞힌 적이」 · 「8m 안에서 가장 가까운 적이」 · 「불붙은 적이 4초 안에 쓰러지면 그 자리에서 가장 가까운 적이」 …).
+    /// 수치는 카드와 같은 식(<see cref="CovenantAssemblePreview"/> — 원인 계수 · 등급 · 절 위치 배율, 런타임과 같은 값).
     /// 원인 · 효과를 못 찾으면 동사구로 돌아간다.
     /// </summary>
     /// <param name="resultIndex">결과 몇째 절인가(0부터) — 위치 배율(<see cref="PositionMult"/>).</param>
@@ -206,8 +214,90 @@ public static class CovenantGrammar
     {
         var p = CovenantAssemblePreview.Build(causeId, causeTier, effectId, effectTier, PositionMult(resultIndex));
         if (!p.valid) return Line(effectId, link, prevEffectId);
-        return Lead(link, prevEffectId) + (p.effectKind == EffectKind.Curse ? "적이 " : string.Empty) + p.EffectAmountCompact();
+        Receiver(p, link, prevEffectId, resultIndex, out var who, out var at, out var area);
+        return TimedLead(causeId, link, prevEffectId) + p.Clause(who, at, area);
     }
+
+    /// <summary>
+    /// 절이 받는 쪽 이름 — 연쇄 실행(<see cref="CovenantSentence"/> RunCore · FireClause · 귀)과 같은 규칙.
+    /// <list type="bullet">
+    /// <item>첫 결과 = 원인이 가리킨 쪽(<see cref="CovenantAssemblePreview.SubjectAtCause"/>).</item>
+    /// <item>곧바로 = 앞 절이 건드린 적(최대 3) · 처형 뒤는 처형한 자리.</item>
+    /// <item>쓰러지면 · 그동안 = 쓰러진 자리 + 그 자리에서 가장 가까운 적(폭발은 그 적 자리, 없으면 쓰러진 자리).</item>
+    /// <item>견디면 = 나를 중심으로.</item>
+    /// </list>
+    /// </summary>
+    private static void Receiver(CovenantAssemblePreview p, ClauseLink link, string prevEffectId, int resultIndex,
+                                 out string who, out string at, out string area)
+    {
+        if (resultIndex <= 0) { p.SubjectAtCause(out who, out at, out area); return; }
+        switch (link)
+        {
+            case ClauseLink.OnDeath:
+            case ClauseLink.During:
+                who = "그 자리에서 가장 가까운 적"; at = "그 자리 근처"; area = "그 자리";
+                return;
+            case ClauseLink.Endure:
+                who = CovenantAssemblePreview.NearMe; at = "내 근처"; area = "내 둘레";
+                return;
+            default:
+                if (Normalize(prevEffectId) == "execute") { who = "처형한 자리에서 가장 가까운 적"; at = area = "처형한 자리"; return; }
+                // 「나」 쪽 절 뒤(옛 저장 문장) — 넘겨받은 적이 없어 나를 중심으로 찾는다
+                if (Receive(prevEffectId) == ClauseReceive.Me) { who = CovenantAssemblePreview.NearMe; at = "내 자리"; area = "내 둘레"; return; }
+                who = TouchedNoun(prevEffectId); at = area = who + " 자리";
+                return;
+        }
+    }
+
+    /// <summary>
+    /// 이음 머리말 + 귀가 듣는 시간 — 쓰러지면 = 앞 절 지속(1.5~6초 · <see cref="CovenantSentence.DeathEarMin"/>),
+    /// 그동안 = 앞 절 창(박차 · 처치 원인은 두 배) · 창당 1번, 견디면 = 무적이 끝나면 / 보호막이 8초 안에 깨지면.
+    /// </summary>
+    private static string TimedLead(string causeId, ClauseLink link, string prevEffectId)
+    {
+        if (link == ClauseLink.Immediate || !CovenantPalette.TryGetEffect(prevEffectId, out var prev)) return Lead(link, prevEffectId);
+        switch (link)
+        {
+            case ClauseLink.OnDeath:
+            {
+                float hold = UnityEngine.Mathf.Clamp(prev.duration, CovenantSentence.DeathEarMin, CovenantSentence.DeathEarMax);
+                return $"{TouchedNoun(prev.id)}이 {hold:0.#}초 안에 쓰러지면 ";
+            }
+            case ClauseLink.During:
+            {
+                float win = prev.kind == EffectKind.StatBuff && CovenantPalette.TryGetCause(causeId, out var c) && c.cls == CauseClass.Kill
+                    ? prev.duration * CovenantMath.MomentumKillDurationMult
+                    : prev.duration;
+                return $"{WindowWhat(prev.id)} {win:0.#}초 안에 적을 쓰러뜨리면(1번) ";
+            }
+            case ClauseLink.Endure:
+                return prev.kind == EffectKind.Invincible ? "무적이 끝나면 " : $"보호막이 {CovenantSentence.ShieldEarSeconds:0}초 안에 깨지면 ";
+            default:
+                return Lead(link, prevEffectId);
+        }
+    }
+
+    /// <summary>앞 절이 건드린 적 — 「쓰러지면」의 주어 · 「곧바로」의 받는 적.</summary>
+    private static string TouchedNoun(string effectId) => Normalize(effectId) switch
+    {
+        "supernova"  => "폭발에 맞은 적",
+        "ember"      => "불붙은 적",
+        "hemorrhage" => "피 흘리는 적",
+        "curse"      => "저주 걸린 적",
+        "arcflash"   => "감전된 적",
+        "detonate"   => "터진 적",
+        "stasis"     => "기절한 적",
+        _            => "앞 줄의 적",
+    };
+
+    /// <summary>앞 절이 연 창 — 「그동안」의 그동안(격노 · 박차 · 결계).</summary>
+    private static string WindowWhat(string effectId) => Normalize(effectId) switch
+    {
+        "fury"     => "피해가 오른",
+        "momentum" => "빨라진",
+        "ward"     => "받는 피해가 준",
+        _          => "효과가 이어지는",
+    };
 
     // ── id 기호 ─────────────────────────────────────────
     public static char Code(ClauseLink link) => link switch

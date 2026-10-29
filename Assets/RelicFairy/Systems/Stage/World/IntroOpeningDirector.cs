@@ -129,6 +129,7 @@ public sealed class IntroOpeningDirector : MonoBehaviour
             // 통로 이동 구간에서도 HUD는 계속 숨긴다(전투 진입 시 FadeInHudAsync가 띄운다).
             UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
             player?.SetInputEnabled(true);
+            ShowControlsCard(player);
         }
         catch (OperationCanceledException)
         {
@@ -138,6 +139,24 @@ public sealed class IntroOpeningDirector : MonoBehaviour
     }
 
     // ── 헬퍼 ─────────────────────────────────────────────────────────
+    /// <summary>
+    /// 처음 조작을 넘겨받는 순간 잠시 — 이동 · 공격 · 회피 · 무기 전환(10-24 사용자 「점프는 없으니 빼고 · 인트로 초반에 잠시 ·
+    /// 이동 · 회피 · 공격 정도와 무기 전환」). 대사 넘기기는 대사창 오른쪽 아래가 알려 준다. 10초 또는 10 m 걸으면 걷힌다.
+    /// </summary>
+    private static void ShowControlsCard(PlayerController player)
+    {
+        if (player == null) return;
+        var tr = player.transform;
+        Vector3 from = tr.position;
+        KeyGuideCard.Show("조작", new[]
+        {
+            ("W A S D", "이동"),
+            ("좌클릭", "공격 · 꾹 누르면 연속"),   // 10-25 ④ 평타 꾹 누르기
+            ("Shift · 우클릭", "회피"),
+            ("1 · 2", "무기 전환"),
+        }, 10f, () => tr == null || (tr.position - from).sqrMagnitude > 100f);
+    }
+
     /// <summary>카메라를 즉시 해당 포즈로 세운다(샷 시작 = 컷). 벽 · 기둥 속이면 대상 쪽으로 당긴다.</summary>
     private static void SetCamera(Camera view, Vector3 pos, Vector3 lookAt, float fov)
     {

@@ -12,8 +12,9 @@ public sealed class GambleBoxChallenge : MonoBehaviour, IInteractionChallenge
     private const float InteractRange = 2.8f;
     private const float LabelHeight   = 1.4f;
     private const float PromptHeight  = 2.0f;
-    /// <summary>이 시간이 지나면 자동 개봉. 개봉(OnResolved) 전까지 출구가 열리지 않으므로 탈출구가 필요하다.</summary>
-    private const float AutoOpenSeconds = 60f;
+    /// <summary>이 시간이 지나면 자동 개봉. 개봉(OnResolved) 전까지 출구가 열리지 않으므로 탈출구가 필요하다.
+    /// 10-29 60 → 10초 — 「상자를 기다려도 안 나온다」(B2). 도박 상자는 방 풀에서 뺐다(욕심의 상자와 겹친다) — 코드는 남은 방을 위해 둔다.</summary>
+    private const float AutoOpenSeconds = 10f;
 
     private float _elapsed;
 

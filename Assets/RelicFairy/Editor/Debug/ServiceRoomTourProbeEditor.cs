@@ -185,6 +185,19 @@ public static class ServiceRoomTourProbeEditor
             await Shot($"Tour_{key}_near1", 1200);
             sb.AppendLine($"  다가간 뒤 NPC 바라봄 {npcT.eulerAngles.y:0}°");
 
+            // 10-26 사용자 「상점 위쪽 통로 구간이 너무 비좁다」 — 매대 뒤 벽 너머 통로(출구로 가는 길)에 세운 게임 화면 · 앞뒤 트인 폭
+            if (key.Contains("_shop_"))
+            {
+                Vector3 behind = npcT.position - fwd * 4f;   // NPC 2칸 뒤가 매대 벽 · 그 뒤 3칸 통로 가운데
+                if (Physics.Raycast(behind + Vector3.up * 3f, Vector3.down, out var bh, 8f, LayerMask.GetMask("Ground"), QueryTriggerInteraction.Ignore))
+                    behind.y = bh.point.y + 0.2f;
+                player.transform.position = behind;
+                if (player.TryGetComponent<Rigidbody>(out var rbb)) { rbb.position = behind; rbb.linearVelocity = Vector3.zero; }
+                float Free(Vector3 dir) => Physics.Raycast(behind + Vector3.up * 0.8f, dir, out var w, 12f, ~0, QueryTriggerInteraction.Ignore) ? w.distance : 12f;
+                sb.AppendLine($"  뒤 통로 — 앞(매대 벽) {Free(fwd):0.0} m · 뒤(바깥 벽) {Free(-fwd):0.0} m · 트인 폭 {Free(fwd) + Free(-fwd):0.0} m");
+                await Shot($"Tour_{key}_behind", 900);
+            }
+
             // 반응 몸짓 — 말 걸기 · 거래하고 나감 · 안 하고 나감(패널 없이 반응만 불러 무대 카메라로 찍는다)
             if (npc.TryGetComponent<ServiceNpcReactor>(out var reactor))
             {

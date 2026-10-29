@@ -303,38 +303,50 @@ public sealed class GSecondSunEffect : GawainFragment
     }
 }
 
-/// <summary>G7 해시계 — 낙일이 3체 이상 맞히면 정오 +2초(정오당 1번) · ② 늘어난 2초 동안 공격이 태양흔 · ③ 낙일 처치 시 한 번 더.</summary>
+/// <summary>
+/// G7 해시계 — 낙일이 3체 이상 맞히면 정오 +2초(정오당 1번) · ② 늘어난 2초 동안 공격이 태양흔 · ③ 낙일로 쓰러뜨리면 그 자리에서 정오 +2초 한 번 더.
+/// ③은 예전엔 「한 번 더 늘릴 자격」만 주고 3체 이상 착탄을 또 요구했는데 낙일은 정오당 1번이라 사실상 안 터졌다(10-23 e2 발견).
+/// </summary>
 public sealed class GSundialEffect : GawainFragment
 {
-    private bool  _used, _extended, _bonusAllowed, _bonusUsed;
+    private const float BurnKillWindow = 1.5f;   // 낙일 화상 · 지대로 조금 뒤에 쓰러진 적도 낙일 처치
+    private bool  _used, _extended, _bonusUsed;
     private float _impactAt = -9f, _killAt = -9f;
     public GSundialEffect() : base("g_sundial") { }
     protected override void Bind()   { Hub.Relic.SunImpact += OnSunImpact; Hub.NoonStarted += OnNoon; }
     protected override void Unbind() { if (Hub.Relic != null) Hub.Relic.SunImpact -= OnSunImpact; Hub.NoonStarted -= OnNoon; }
-    private void OnNoon(bool shortNoon) { _used = _extended = _bonusAllowed = _bonusUsed = false; }
+    private void OnNoon(bool shortNoon) { _used = _extended = _bonusUsed = false; }
     private void OnSunImpact(Vector3 at, List<GameObject> hits, bool small)
     {
         if (Hub == null || !Hub.IsNoon) return;
         _impactAt = Time.time;
-        // 착탄은 피해 → 처치 → 이 통지 순서다 — 이 낙일로 죽은 적은 이미 OnKill을 지났다(같은 시각 처치 = 이 낙일의 처치 · 10-12 B2)
-        bool killedNow = Line3 && _killAt >= Time.time;
         int monsters = 0;
         foreach (var go in hits) if (AsMonster(go) != null) monsters++;
-        if (monsters >= 3 && (!_used || _bonusAllowed))
+        if (monsters >= 3 && !_used)
         {
-            if (_used) { _bonusAllowed = false; _bonusUsed = true; }   // ③ 「한 번 더」 — 정오당 최대 2번
             _used = true; _extended = true;
             Hub.Gauge.ExtendNoon(2f);
             Say(at, "정오 +2초");
-            Debug.Log($"[GawainMemory] 해시계 — 낙일 {monsters}체 · 정오 +2초{(_bonusUsed ? " (처치로 한 번 더)" : "")}");
+            Debug.Log($"[GawainMemory] 해시계 — 낙일 {monsters}체 · 정오 +2초");
         }
-        if (killedNow && !_bonusUsed) _bonusAllowed = true;
+        // 착탄은 피해 → 처치 → 이 통지 순서다 — 이 낙일로 죽은 적은 이미 OnKill을 지났다(같은 시각 처치 = 이 낙일의 처치 · 10-12 B2)
+        if (_killAt >= Time.time) TryKillBonus(at);
     }
     public override void OnKill(GameObject deadEnemy, PlayerController player)
     {
         if (!Line3 || Hub == null || !Hub.IsNoon) return;
         _killAt = Time.time;
-        if (Time.time - _impactAt < 1.5f && !_bonusUsed) _bonusAllowed = true;   // 낙일 화상 등으로 조금 뒤에 죽은 적
+        if (Time.time - _impactAt < BurnKillWindow && deadEnemy != null) TryKillBonus(deadEnemy.transform.position);   // 낙일 화상 등으로 조금 뒤에 쓰러진 적
+    }
+
+    /// <summary>③ — 낙일로 쓰러뜨리면 그 자리에서 정오 +2초 한 번 더(정오당 1번 · 첫 연장이 난 정오에만).</summary>
+    private void TryKillBonus(Vector3 at)
+    {
+        if (!Line3 || !_used || _bonusUsed || Hub == null || !Hub.IsNoon) return;
+        _bonusUsed = true;
+        Hub.Gauge.ExtendNoon(2f);
+        Say(at, "정오 +2초");
+        Debug.Log("[GawainMemory] 해시계 ③ — 낙일 처치 · 정오 +2초 한 번 더");
     }
     public override void Tick(float dt, PlayerController player)
     {

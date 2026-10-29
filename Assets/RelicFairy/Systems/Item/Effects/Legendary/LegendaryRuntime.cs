@@ -87,6 +87,16 @@ public class LegendaryRuntime : MonoBehaviour
                 _agents.RemoveAt(i);
                 Destroy(a);
             }
+            else if (a.TryGetComponent<LegendGroundField>(out var ground) && ground.Owner == owner)
+            {
+                _agents.RemoveAt(i);
+                Destroy(a);
+            }
+            else if (a.TryGetComponent<LegendOrbitRing>(out var ring) && ring.Owner == owner)
+            {
+                _agents.RemoveAt(i);
+                Destroy(a);
+            }
         }
     }
 

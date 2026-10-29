@@ -13,6 +13,11 @@ using INab.CommonVFX;
 /// </summary>
 public sealed class RelicStateVfx : MonoBehaviour
 {
+#if UNITY_EDITOR
+    /// <summary>실측 99 J — 일회성 이펙트의 반복 재생을 그대로 둔다(옛 동작 · 「검기가 한 번 더」 재현).</summary>
+    public static bool ProbeKeepLoop;
+#endif
+
     private readonly Dictionary<string, string>     _keys      = new();  // stateKey → addressable key
     private readonly Dictionary<string, GameObject> _instances = new();  // stateKey → 스폰 인스턴스
     private readonly Dictionary<string, bool>       _desired   = new();  // 로드 레이스 대비 최종 원하는 상태
@@ -129,6 +134,21 @@ public sealed class RelicStateVfx : MonoBehaviour
 
         if (forward.sqrMagnitude > 0.0001f)
             t.rotation = Quaternion.LookRotation(forward.normalized, Vector3.up);
+
+        // 한 번만 재생한다 — 팩 프리팹의 반복(looping)을 이 인스턴스에서 끈다(원본은 그대로). 검기(Hovl Slash wave)는 2초 주기 반복이라
+        // 3초 뒤 지우기 전 2초째에 같은 검기가 한 번 더 터졌다(10-29 사용자 「카타나 추가 검기가 가끔 한 번 더」 · 피해는 코드 판정이라 한 번).
+        bool once = true;
+#if UNITY_EDITOR
+        once = !ProbeKeepLoop;
+#endif
+        if (once)
+        {
+            foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                var main = ps.main;
+                main.loop = false;
+            }
+        }
 
         if (prewarm > 0f)
         {

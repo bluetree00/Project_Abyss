@@ -641,7 +641,9 @@ public sealed class UI_ShopPanel : UI_Popup
         }
         if (_buyLabel != null)
         {
-            _buyLabel.text  = has && p.Sold ? "품절" : has && _controller.IsBlockedByFullPotions(p) ? "포션 가득" : BuyLabel;
+            _buyLabel.text  = has && p.Sold ? "품절"
+                            : has && _controller.IsBlockedByFullPotions(p) ? (_controller.PotionsFull ? "포션 가득" : "포션 칸 부족")
+                            : BuyLabel;
             _buyLabel.color = _buyBtn != null && _buyBtn.interactable ? Gold : Mute;
         }
         _selPlate.gameObject.SetActive(has);

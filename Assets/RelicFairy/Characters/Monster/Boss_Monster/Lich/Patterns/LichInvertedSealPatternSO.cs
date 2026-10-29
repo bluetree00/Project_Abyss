@@ -260,6 +260,7 @@ public class LichInvertedSealState : UnInterruptibleState<LichInvertedSealPatter
         if (lich == null || bolt == null) return;
         Vector3 from = bolt.transform.position;
         LichVfx.PlayBeam(LichVfxSlot.ArcaneBeam, from, lich.transform.position + Vector3.up * 1.4f, 0.3f, 0.25f);
+        LichSfx.Play(LichSfxSlot.BoltImpact, from, 0.5f);   // 조각이 리치에게 되돌아간다(10-29 Ch4 사운드 점검)
         if (_staggerLeft > 0f) return;
         _staggerLeft = Data.brokenStagger;
         _ctx.Animator?.CrossFade("GetHit", 0.05f);

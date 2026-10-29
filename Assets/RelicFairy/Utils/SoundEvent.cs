@@ -59,6 +59,7 @@ public static class SoundEvent
     public const string UiReject  = "ui_reject";    // 「안 됨」
     public const string UiConfirm = "ui_confirm";   // 확정(시작 파츠 · 룬판 · 결과 [계속])
     public const string UiTick    = "ui_tick";      // 놀이 카운트다운 · 마지막 5초 · 간발
+    public const string CrucibleEvolve = "crucible_evolve";   // 10-29 진화 — 재련소 뜻 키와 같은 줄 · 유물 진화 HUD 순간도 이것
 
     // 서약서 · 서약 발동(전투 HUD)
     public const string CovenantPick   = "covenant_pick";
@@ -84,6 +85,7 @@ public static class SoundEvent
     public const string MemoryAbsorb = "memory_absorb";
     public const string MemoryTake   = "memory_take";
     public const string MemoryRedraw = "memory_redraw";
+    public const string EscMemoryPage = "esc_memory_page";   // 10-29 ESC 「되찾은 기억」 쪽 펼침
     public const string ResultReveal = "result_reveal";
     public const string ResultCount  = "result_count";
     public const string QuestDone    = "quest_done";

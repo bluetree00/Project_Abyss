@@ -424,7 +424,10 @@ public sealed class AppBootstrapper : MonoBehaviour
         if (w1 != null) { w1.augments = save.weapon1Augments ?? ""; w1.highestEnhanceReached = save.weapon1Augments == null ? w1.enhanceLevel : save.weapon1AugmentHighest; w1.augmentSilverStreak = save.weapon1AugmentSilverStreak; w1.augmentAfterEvolve = save.weapon1AugmentAfterEvolve; }
         if (w0 != null) w0.reforgeLog = save.weapon0ReforgeLog ?? "";   // 10-19 재련 기록
         if (w1 != null) w1.reforgeLog = save.weapon1ReforgeLog ?? "";
-        MeleeAugmentDraft.ResetForRun(Mathf.Max(0, MeleeAugmentDraft.RerollsPerRun - save.meleeAugmentRerollsUsed));
+        w0?.SanitizeAugments();   // 걷은 증강(10-26 무기 개편) — 세이브에서 채운 뒤에(먼저 부르면 빈 칸을 거른다 · 10-26 검토)
+        w1?.SanitizeAugments();
+        MeleeAugmentDraft.ResetForRun(Mathf.Max(0, MeleeAugmentDraft.RerollsPerRun + MemoryAltarService.Level(MemoryAltarCatalog.LibReroll)
+                                                   - save.meleeAugmentRerollsUsed));   // 제단 「다시 뽑기」(10-29)
         if (w0 != null || w1 != null)
         {
             // 저장된 현재 슬롯 복원(미설정 시 0). SpawnPlayerAsync가 SwitchToSlotAsync로 적용.

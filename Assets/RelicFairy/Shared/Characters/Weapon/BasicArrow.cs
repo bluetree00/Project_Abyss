@@ -8,8 +8,19 @@ using UnityEngine;
 /// </summary>
 public class BasicArrow : MonoBehaviour, IPooledObject
 {
-    /// <summary>히트 VFX 안전 수명(초). CombatDamage의 클램프 구간(0.5~3s) 안쪽 값.</summary>
-    private const float HitVfxLife = 2f;
+    /// <summary>히트 VFX 안전 수명(초) — 화살 맞음 그림(Hovl Hit 4 yellow arrow)이 1초라 1.2초(옛 2초는 그림이 끝난 뒤에도 자리를 잡아 쌓였다 · 10-29).</summary>
+    private const float HitVfxLife = 1.2f;
+    /// <summary>폭발 그림 안전 수명(초) — 폭발 이펙트는 그대로 2초.</summary>
+    private const float BurstVfxLife = 2f;
+    /// <summary>
+    /// 화살 맞음 그림 동시 상한(모든 화살 합) — 넘으면 그림만 건너뛴다(피해는 그대로).
+    /// 10-29 사용자 「챕터2 보스에서 화살을 쓸 때 타격 연출이 화살별로 다 살아 있어 게임이 제대로 안 돌아간다」 — 활 + 파츠 최대로 화룡에 쏘면 동시에 185개(파티클 시스템 1,110개 · 프레임 최대 260 ms).
+    /// </summary>
+    private const int MaxHitFxAlive = 16;
+    private static readonly Queue<float> s_hitFxUntil = new(MaxHitFxAlive);   // 살아 있는 맞음 그림이 끝나는 시각
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => s_hitFxUntil.Clear();
 
     /// <summary>유도 목표 탐색 반경(m)·최대 후보 수. 매 프레임이 아니라 목표를 잃었을 때만 돈다.
     /// 후보엔 부술 물체(기둥 · 봉인석)도 섞여 들어와 걸러지므로 넉넉히 잡는다.</summary>
@@ -33,6 +44,14 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     /// 배수를 얹어 3m대로 낮춘다. 이게 없으면 "다시 공격한다"가 그냥 직진으로 끝난다.
     /// </summary>
     private const float ReturnTurnMult = 6f;
+
+    /// <summary>
+    /// 기본 사거리(m) — 쏜 자리에서 이만큼 벗어나면 사라진다(10-29 사용자 「화살이 맞을 때까지 꽤 오래 남아 사거리가 무한에 가깝다」 · 예전 수명 5초 × 초속 30 = 150 m).
+    /// 화면 끝 남짓 · 원거리 자동 조준 반경(최대 12 m)보다 길게. 아이템 사거리 보너스(m)는 더한다. 수명(<see cref="lifetime"/>)은 상한으로 남는다 —
+    /// 유도 · 귀환 화살은 길을 돌아도 쏜 자리 기준 거리라 잘리지 않는다. 마지막 <see cref="RangeFade"/> m 동안 작아지며 사라진다(툭 끊기지 않게).
+    /// </summary>
+    public const float BaseRange = 20f;
+    private const float RangeFade = 3f;
     private static readonly RaycastHit[] s_sweepHits = new RaycastHit[SweepMax];
     private static readonly SweepDistanceComparer s_sweepOrder = new();
     private static readonly Collider[] s_startOverlap = new Collider[SweepMax];
@@ -62,6 +81,11 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     private Vector3 direction;
     private GameObject _instigator;
     private float _timer;
+    private float _range;              // 이번 발사의 사거리(m) = 기본 + 사거리 보너스
+    private Vector3 _origin;           // 쏜 자리 — 첫 이동 때 잡는다(발사까지 좌표가 여러 번 옮겨진다)
+    private bool _originSet;
+    private bool _fading;              // 사거리 끝에서 작아지는 중
+    private Vector3 _fadeScale;        // 작아지기 시작할 때 크기 — 회수 때 되돌린다(풀 재사용)
 
     // ── 스킬 전용 옵션 (Fire 시 외부에서 설정) ──
     private bool _pierce;
@@ -191,10 +215,13 @@ public class BasicArrow : MonoBehaviour, IPooledObject
         direction = dir.normalized;
         _instigator = instigator;
         if (dmg >= 0f) damage = dmg;
-        // 아이템 사거리 보너스: speed 기반으로 lifetime 연장
+        // 아이템 사거리 보너스(m): 사거리에 더하고 수명 상한도 그만큼 늘린다
         float rangeBonus = GameRunBootstrapper.Instance?.Run?.Player?.RuntimeStats?.RangedRangeBonus ?? 0f;
         float bonusTime = speed > 0f ? rangeBonus / speed : 0f;
         _timer = lifetime + bonusTime;
+        _range = BaseRange + Mathf.Max(0f, rangeBonus);
+        _originSet = false;
+        RestoreFadeScale();
 
         _pierce = false;
         _explode = false;
@@ -333,10 +360,12 @@ public class BasicArrow : MonoBehaviour, IPooledObject
         // "직선 화살은 안 맞고 선회하는 유도 화살만 맞는" 증상이 났다.
         // → 이번 프레임에 지나갈 구간을 먼저 훑고, 그다음에 옮긴다.
         float stepDist = speed * _speedMult * Time.deltaTime;
+        if (!_originSet) { _origin = transform.position; _originSet = true; }
         SweepForward(transform.position, direction, stepDist);
         if (_dead) return;
 
         transform.position += direction * stepDist;
+        if (OutOfRange()) { Deactivate(); return; }
 
         // 좌표 재배치가 모두 끝난 뒤 첫 이동을 마친 지금부터 기록을 시작한다.
         if (_trailWarmup) BeginTrail();
@@ -444,7 +473,7 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     /// <summary>쫓을 만한 산 적인가 — 몬스터는 HP, 잡몹(IKillable)은 사망 여부로 본다.</summary>
     private static bool IsLiveTarget(Component c) =>
         c != null && c.gameObject.activeInHierarchy &&
-        (c is MonsterBase mb ? mb.CurrentHp > 0 : c is IKillable k && !k.IsDead);
+        (c is MonsterBase mb ? mb.CurrentHp > 0 && !mb.IsDamageImmuneNow : c is IKillable k && !k.IsDead);   // 무적인 몬스터는 놓는다 — 화살이 수명 끝까지 맴돌며 쌓였다(10-29 화룡)
 
     /// <summary>
     /// 몬스터가 스스로 화살 위로 걸어 들어오는 경우를 위한 보조 경로.
@@ -515,6 +544,14 @@ public class BasicArrow : MonoBehaviour, IPooledObject
 
         SpawnHitEffect(hitPoint);
 
+        // 벽 · 바닥(맞을 수 없는 실체) — 관통이어도 여기서 멈춘다. 예전엔 「뚫은 대상」으로 세고 지나가 칸마다 맞음 그림을 남겼다(10-29 화룡 · 화살 119발 동시)
+        if (damageable == null)
+        {
+            if (_explode) { DoExplosion(hitPoint, null); _explode = false; }
+            Deactivate();
+            return;
+        }
+
         // 폭발 — 화살당 한 번. 관통 화살은 첫 적에서 터지고 뒤로는 꿰뚫기만 한다
         // (예전엔 관통할 때마다 터져 관통 × 폭발이 제곱으로 불었다 — 10-15 활 최대 다발 무리 3,989/초)
         if (_explode)
@@ -565,6 +602,7 @@ public class BasicArrow : MonoBehaviour, IPooledObject
         if (_dead) return;
         _dead = true;
 
+        RestoreFadeScale();
         CleanupVisualEffect();
         SetModelVisible(true);
 
@@ -577,6 +615,26 @@ public class BasicArrow : MonoBehaviour, IPooledObject
             Managers.ObjectPooler.Despawn(gameObject);
         else
             gameObject.SetActive(false);
+    }
+
+    /// <summary>쏜 자리에서 사거리를 넘었나 — 마지막 <see cref="RangeFade"/> m는 작아진다(그림 · 판정 함께 · 판정은 기본 반경 아래로 줄지 않음).</summary>
+    private bool OutOfRange()
+    {
+        float d = Vector3.Distance(transform.position, _origin);
+        if (d >= _range) return true;
+        float left = _range - d;
+        if (left >= RangeFade) return false;
+        if (!_fading) { _fading = true; _fadeScale = transform.localScale; }
+        transform.localScale = _fadeScale * (left / RangeFade);
+        return false;
+    }
+
+    /// <summary>작아진 크기를 되돌린다 — 다음 발사가 크기를 정하지 않아도 줄어든 채 나가지 않게.</summary>
+    private void RestoreFadeScale()
+    {
+        if (!_fading) return;
+        _fading = false;
+        transform.localScale = _fadeScale;
     }
 
     private void CleanupVisualEffect()
@@ -649,6 +707,10 @@ public class BasicArrow : MonoBehaviour, IPooledObject
     private async void SpawnHitEffect(Vector3 hitPos)
     {
         if (string.IsNullOrEmpty(hitEffectKey)) return;
+        float now = Time.time;
+        while (s_hitFxUntil.Count > 0 && s_hitFxUntil.Peek() <= now) s_hitFxUntil.Dequeue();
+        if (s_hitFxUntil.Count >= MaxHitFxAlive) return;   // 동시 상한 — 그림만 건너뛴다
+        s_hitFxUntil.Enqueue(now + HitVfxLife);
 
         var fx = await Managers.ObjectPooler.SpawnAsync(
             hitEffectKey, ObjectPoolerManager.PoolType.Effect,
@@ -656,7 +718,7 @@ public class BasicArrow : MonoBehaviour, IPooledObject
 
         if (fx == null) return;
         fx.transform.localScale = Vector3.one * hitEffectScale;
-        EnsureVfxLifetime(fx);
+        EnsureVfxLifetime(fx, HitVfxLife);
     }
 
     private static async void SpawnEffectAt(Vector3 pos, string key, float scale)
@@ -666,19 +728,19 @@ public class BasicArrow : MonoBehaviour, IPooledObject
             pos, Quaternion.identity);
         if (fx == null) return;
         fx.transform.localScale = Vector3.one * scale;
-        EnsureVfxLifetime(fx);
+        EnsureVfxLifetime(fx, BurstVfxLife);
     }
 
     /// <summary>
     /// 스스로 회수되지 못하는 히트 VFX에 수명을 붙인다(CombatDamage.SpawnHitEffectAsync와 같은 방식).
     /// EffectBehaviour가 있으면 그쪽이 회수하므로 건드리지 않는다 — 이중 Despawn 방지.
     /// </summary>
-    private static void EnsureVfxLifetime(GameObject fx)
+    private static void EnsureVfxLifetime(GameObject fx, float seconds)
     {
         if (fx.GetComponent<EffectBehaviour>() != null) return;
 
         if (!fx.TryGetComponent<PooledVfxLifetime>(out var life))
             life = fx.AddComponent<PooledVfxLifetime>();
-        life.SetLife(HitVfxLife);
+        life.SetLife(seconds);
     }
 }

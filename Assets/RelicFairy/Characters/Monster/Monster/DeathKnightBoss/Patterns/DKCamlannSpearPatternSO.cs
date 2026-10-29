@@ -172,7 +172,7 @@ public class DKCamlannSpearState : FullLockState<DKCamlannSpearPatternSO>
         line.Shown = true;
         float cs = DKBossRoomContext.CellSize;
         line.Guide = PatternGuideHelper.Prepare(
-            PatternGuideHelper.Beam(Vector3.zero, Vector3.forward, cs, cs * 0.95f, DKPage2Zone.Grey), DKPage2Zone.Grey);
+            PatternGuideHelper.Beam(Vector3.zero, Vector3.forward, cs, cs, DKPage2Zone.Grey), DKPage2Zone.Grey);
         AimLine(ctx, ref line, order);
         if (Data.spearSfx != null) Managers.Sound?.PlayEffectAt(Data.spearSfx, ctx.Transform.position, 0.6f);
     }
@@ -211,7 +211,7 @@ public class DKCamlannSpearState : FullLockState<DKCamlannSpearPatternSO>
             origin = _zone.CellCenter(startCol, line.Index) - dir * (cs * 0.5f);
             range  = _zone.Columns * cs;
         }
-        PatternGuideHelper.PlaceBeam(line.Guide, origin, dir, range, cs * 0.95f);
+        PatternGuideHelper.PlaceBeam(line.Guide, origin, dir, range, cs);
     }
 
     private void FireLine(MonsterContext ctx, ref Line line)

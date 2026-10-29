@@ -36,6 +36,12 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
     private const float  ArenaOrbitBlend      = 1.2f;
     private const float  BlockedFxGap         = 0.12f;   // 막힘 표시 최소 간격(연타로 겹치지 않게)
     private const float  NightmareHpScale     = 1.1f;    // 악몽 모드 총 체력(레벨디자인 설계서 §6) — 이미 3줄 + 최종 마법이라 다른 보스(×1.15)보다 낮게
+    // 10-26 사용자 「리치의 체력이 2배 정도 많아야 하고 좀 더 몰아쳐야 해」(체력은 LichConfig 70000 → 140000) —
+    // 패턴 사이 쉬는 시간 · 사슬 박자 ×0.6 · 같은 연계를 다시 잇는 쿨 ×0.5 · 공격 뒤 회복 ÷1.25. 예고 · 판정 시간은 그대로(피할 수 있으면 강해도 된다).
+    private const float  AssaultBreakScale    = 0.6f;
+    private const float  AssaultFollowUpScale = 0.5f;
+    internal const float AssaultRecoverySpeed = 1.25f;
+    internal const float DeathMusicFade = 0.8f;   // 처치 · 봉인 순간 보스 곡을 끊는다(다른 보스 BossStoryScenes 처치와 같은 값 — 10-29 Ch4 사운드 점검)
 
     // 패링(연출·UX 시나리오 §12-3) — 낫이 빛나는 창 안에 맞받아치면 그 공격을 튕겨낸다.
     private const float  ParryRange           = 6f;      // 원거리 저격 패링 방지(수평 거리)
@@ -826,7 +832,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
     private void ApplyNightmareTempo()
     {
         if (_lichBB == null) return;
-        _lichBB.BreakScale = StoryProgress.IsNightmareMode ? BossPages.NightmareBreakScale : 1f;
+        _lichBB.BreakScale = AssaultBreakScale * (StoryProgress.IsNightmareMode ? BossPages.NightmareBreakScale : 1f);
         ApplyChainTempo();
         if (_lichBB.Page == 1 && _lichBB.BreakScale < 1f && _config is BossConfigSO boss)
         {
@@ -840,6 +846,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
     {
         float scale = _lichBB != null ? _lichBB.BreakScale : 1f;
         _runner?.SetChainTempo(_chainLinkRest * scale, _chainEndRest * scale);
+        _runner?.SetFollowUpCooldownScale(AssaultFollowUpScale);
     }
 
     /// <summary>
@@ -1386,6 +1393,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
         LichVfx.Play(LichVfxSlot.SkeletonDeath, body, Quaternion.identity, 1.2f);   // 부서진 낫 · 뼛가루
         SetScytheVisible(false);
         LichSfx.Play(LichSfxSlot.SealComplete, body);
+        Managers.Sound?.FadeOutBgmAsync(DeathMusicFade).Forget();
         LichCinematics.SlowMo(0.4f, 0.8f);
         LichCinematics.Flash(Color.white, 0.25f, 0.35f);   // 사망 — 절정(0.6은 화면·HUD가 다 하얗게 지워졌다, 09-20 실측)
         LichPatternUtil.Impact(LichImpact.Transition);

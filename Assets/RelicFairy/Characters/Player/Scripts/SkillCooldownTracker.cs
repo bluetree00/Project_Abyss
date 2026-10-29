@@ -73,6 +73,15 @@ public class SkillCooldownTracker
         }
     }
 
+    /// <summary>한 스킬의 남은 쿨다운을 seconds 만큼 줄인다(0 아래로는 내려가지 않는다) — 대검 「휩쓸기」(10-26).</summary>
+    public void ReduceCooldown(SkillType skill, float seconds)
+    {
+        int idx = (int)skill;
+        if (seconds <= 0f || _remaining[idx] <= 0f) return;
+        _remaining[idx] = Mathf.Max(0f, _remaining[idx] - seconds);
+        OnCooldownChanged?.Invoke(skill, _remaining[idx], _total[idx]);
+    }
+
     /// <summary>현재 남은 쿨다운 시간 (0이면 사용 가능).</summary>
     public float GetRemaining(SkillType skill) => _remaining[(int)skill];
 

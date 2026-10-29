@@ -12,6 +12,8 @@ public class PlayerAnimationEventReceiver : MonoBehaviour
     public event Action OnAttackEnd;
     public event Action<int> OnHitStep;
     public event Action<int> OnEffectStep;
+    /// <summary><see cref="OnEffectStep"/>보다 먼저 — 형 구동기가 휘두름 번호 · 단계를 베기 판정(즉시 피해)보다 먼저 올린다(10-24 ①).</summary>
+    public event Action<int> OnEffectStepEarly;
     public event Action<string> OnGenericTag;
     public event Action OnBeginTrail;
     public event Action OnEndTrail;
@@ -19,6 +21,7 @@ public class PlayerAnimationEventReceiver : MonoBehaviour
     public void AE_EffectStep(int step)
     {
         EnsureTarget();
+        OnEffectStepEarly?.Invoke(step);
         OnEffectStep?.Invoke(step);  // 플레이어가 구독 중이면 step 전달됨
         Trace($"[AE] EffectStep {step}");
     }

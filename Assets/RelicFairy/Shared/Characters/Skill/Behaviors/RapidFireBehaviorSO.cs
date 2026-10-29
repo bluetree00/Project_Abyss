@@ -143,16 +143,11 @@ public class RapidFireBehaviorSO : SkillBehaviorSO
                 DespawnAfter(obj, 5f);
         }
 
-        private static async void DespawnAfter(GameObject obj, float delay)
+        /// <summary>수명을 그 인스턴스에 맡긴다(<see cref="PooledVfxLifetime"/>) — 여기서 타이머를 들면 그 사이 풀로 돌아가 다른 데서 다시 쓰인 이펙트를 옛 타이머가 껐다(10-29 풀 점검 4).</summary>
+        private static void DespawnAfter(GameObject obj, float delay)
         {
-            try
-            {
-                await UniTask.Delay((int)(delay * 1000),
-                    cancellationToken: obj.GetCancellationTokenOnDestroy());
-                if (obj != null && obj.activeInHierarchy)
-                    Managers.ObjectPooler.Despawn(obj);
-            }
-            catch (System.OperationCanceledException) { }
+            if (!obj.TryGetComponent<PooledVfxLifetime>(out var life)) life = obj.AddComponent<PooledVfxLifetime>();
+            life.SetLife(delay);
         }
     }
 }

@@ -21,6 +21,22 @@ public class RelicAltar : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics() => s_selected = null;
 
+    /// <summary>지난 세팅으로 유물을 쥐여 준 채 거점에 들어왔다(10-29) — 그 제단을 고른 상태로 바로 숨긴다(화면이 아직 검다).
+    /// 다른 제단을 고르면 지금처럼 이 제단이 디졸브로 돌아온다(<see cref="Deselect"/>).</summary>
+    public static void SyncSelection(RelicClassSO relic)
+    {
+        if (relic == null) return;
+        foreach (var a in FindObjectsByType<RelicAltar>(FindObjectsSortMode.None))
+        {
+            if (a.relicClass != relic) continue;
+            s_selected = a;
+            a._claimed = true;
+            a._player  = null;
+            a.gameObject.SetActive(false);
+            return;
+        }
+    }
+
     [Header("유물")]
     [SerializeField] private RelicClassSO relicClass;
 

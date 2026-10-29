@@ -30,6 +30,10 @@ public static class NightmareRules
     private const float MeltedShieldCapRatio       = 0.15f;  // 0.30 → 0.15
     private const float BackflowCooldownMultiplier = 1.25f;
     private const float NightmareEssenceMultiplier = 1.2f;   // 필수 진행 구간이라 벌칙만 두지 않는다
+    // 기억의 제단 「악몽 길들이기」(10-29) — 챕터 규칙을 반쯤 · 「부서진 맹세」는 걷는다 · 「빛 붙잡기」 — 포션 +1
+    private const float TamedRootBindStaminaMultiplier  = 1.2f;    // 25 → 30
+    private const float TamedMeltedShieldCapRatio       = 0.20f;
+    private const float TamedBackflowCooldownMultiplier = 1.12f;
 
     public readonly struct RuleInfo
     {
@@ -57,6 +61,18 @@ public static class NightmareRules
         new(NightmareRuleId.BackflowSpell, "역류하는 술식",   "무기 스킬 재사용 대기 +25%",             "cooldown"),
     };
 
+    // 제단 칸을 연 뒤의 글(10-29) — 「부서진 맹세」는 길들이면 걷혀 목록에 없다
+    private static readonly RuleInfo DimLightHeld = new(NightmareRuleId.DimLight, "흐려진 빛", "포션을 3개까지만 지닐 수 있다(빛 붙잡기)", "heal");
+    private static readonly RuleInfo[] TamedCatalog =
+    {
+        new(NightmareRuleId.RootBind,      "뿌리의 속박",     "회피가 스태미나를 더 먹는다 (25 → 30 · 길들임)", "roll"),
+        new(NightmareRuleId.MeltedShield,  "녹아내린 방패",   "보호막 상한이 최대 체력의 20% (길들임)",        "shield"),
+        new(NightmareRuleId.BackflowSpell, "역류하는 술식",   "무기 스킬 재사용 대기 +12% (길들임)",           "cooldown"),
+    };
+
+    private static bool Tamed => MemoryAltarService.IsUnlocked(MemoryAltarCatalog.NmTame);
+    private static bool LightHeld => MemoryAltarService.IsUnlocked(MemoryAltarCatalog.NmLight);
+
     // ── 상태 ───────────────────────────────────────────
 
     /// <summary>지금 런이 악몽 규칙 아래에 있는가.</summary>
@@ -77,6 +93,7 @@ public static class NightmareRules
     public static bool Has(NightmareRuleId id)
     {
         if (id == NightmareRuleId.None || !IsActive) return false;
+        if (id == NightmareRuleId.BrokenOath && Tamed) return false;   // 길들이면 서약을 맺을 수 있다(10-29)
         return id == NightmareRuleId.DimLight || id == ChapterRule(CurrentRun.CurrentChapter);
     }
 
@@ -85,13 +102,24 @@ public static class NightmareRules
     {
         if (!IsActive) return;
         foreach (var info in Catalog)
-            if (Has(info.Id)) into.Add(info);
+            if (Has(info.Id)) into.Add(Variant(info));
+    }
+
+    /// <summary>제단 칸을 연 뒤의 글로 바꾼다(빛 붙잡기 · 길들이기 · 10-29).</summary>
+    private static RuleInfo Variant(RuleInfo info)
+    {
+        if (info.Id == NightmareRuleId.DimLight) return LightHeld ? DimLightHeld : info;
+        if (!Tamed) return info;
+        foreach (var t in TamedCatalog) if (t.Id == info.Id) return t;
+        return info;
     }
 
     // ── 값형 규칙 (호출부가 곱한다) ─────────────────────
 
-    public static float DodgeStaminaMultiplier     => Has(NightmareRuleId.RootBind)      ? RootBindStaminaMultiplier  : 1f;
-    public static float WeaponSkillCooldownMultiplier => Has(NightmareRuleId.BackflowSpell) ? BackflowCooldownMultiplier : 1f;
+    public static float DodgeStaminaMultiplier     => Has(NightmareRuleId.RootBind)
+        ? (Tamed ? TamedRootBindStaminaMultiplier : RootBindStaminaMultiplier) : 1f;
+    public static float WeaponSkillCooldownMultiplier => Has(NightmareRuleId.BackflowSpell)
+        ? (Tamed ? TamedBackflowCooldownMultiplier : BackflowCooldownMultiplier) : 1f;
     public static bool  BlocksCovenantAltar        => Has(NightmareRuleId.BrokenOath);
     public static float EssenceMultiplier          => IsActive ? NightmareEssenceMultiplier : 1f;
     /// <summary>악몽 모드로 들어간 판의 정수 배율 — 거점 갈림길 카드에 적는다(켜기 전에도 같은 값).</summary>
@@ -105,11 +133,11 @@ public static class NightmareRules
         if (run == null || !StoryProgress.IsNightmareMode) return;
 
         if (Has(NightmareRuleId.DimLight))
-            run.PlayerState?.SetPotionCapacity(DimLightPotionCapacity);
+            run.PlayerState?.SetPotionCapacity(DimLightPotionCapacity + (LightHeld ? 1 : 0));
 
         var stats = run.Player != null ? run.Player.RuntimeStats : null;
         if (stats != null && Has(NightmareRuleId.MeltedShield))
-            stats.SynergyMechanics.ShieldCapRatio = MeltedShieldCapRatio;
+            stats.SynergyMechanics.ShieldCapRatio = Tamed ? TamedMeltedShieldCapRatio : MeltedShieldCapRatio;
 
         var active = new List<RuleInfo>(2);
         CollectActive(active);
@@ -121,7 +149,7 @@ public static class NightmareRules
             if (i > 0) names.Append(" · ");
             names.Append(active[i].Name);
         }
-        Debug.Log($"[Nightmare] 규칙 적용 — {run.CurrentChapter}: {names}");
+        Debug.Log($"[Nightmare] 규칙 적용 — {run.CurrentChapter}: {names}{(Tamed ? " (길들임)" : "")}");
         Object.FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include)?.ShowBuffNotice(names.ToString());
     }
 }

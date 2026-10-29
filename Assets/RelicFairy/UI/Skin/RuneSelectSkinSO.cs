@@ -18,6 +18,8 @@ public sealed class RuneSelectSkinSO : ScriptableObject
     public Sprite titleBar;
     [Tooltip("10-19 힉스필드 창 틀(흑요석 돌 · 은금 상감 · 보라/청록 안쪽 빛 · 9칸) — 있으면 위 전면 일러스트 대신 창에 깐다.")]
     public Sprite windowFrame;
+    [Tooltip("10-29 힉스필드 창 안쪽 그림(흑요석 판 · 모서리 룬 고리) — 틀 9칸 안쪽에 깐다. 없으면 틀 채움색 그대로.")]
+    public Sprite windowInterior;
 
     [Header("카드")]
     [Tooltip("룬 획득 카드 — 테두리 라인아트(9-slice).")]
@@ -30,6 +32,8 @@ public sealed class RuneSelectSkinSO : ScriptableObject
     [Header("모양 미리보기")]
     [Tooltip("룬 타일 — 도형을 이루는 한 칸. 속성색으로 곱해 쓴다.")]
     public Sprite runeTile;
+    [Tooltip("10-29 힉스필드 룬 실물 판 바탕(돌 제단 홈) — 있으면 룬 타일 대신 판에 깐다.")]
+    public Sprite showcaseBackdrop;
     [Tooltip("룬조각 속성 엠블럼 — 카드 속성 배지. ElementDef.Order(불/얼음/전기/풀/빛/어둠).")]
     public Sprite[] elementPiece = new Sprite[6];
 

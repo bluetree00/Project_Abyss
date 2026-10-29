@@ -21,6 +21,8 @@ public class RuntimeItemData
 
     // ── 블록 ──
     public int shapeId;
+    /// <summary>판에 놓는 방향 — 90°씩 시계 방향 0 ~ 3(10-25 사용자 「룬 블록을 회전시키는 기능」). 판 · 보관함 · 이어하기가 같은 방향을 쓴다.</summary>
+    public int rotation;
 
     // ── 속성(랜덤) ──
     /// <summary>룬 고유 속성(ElementDef Id: FIRE/ICE/ELECTRIC/GRASS/LIGHT/DARK). 생성 시 랜덤 배정.

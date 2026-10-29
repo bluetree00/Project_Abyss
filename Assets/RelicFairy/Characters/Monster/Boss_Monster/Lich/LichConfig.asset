@@ -19,7 +19,7 @@ MonoBehaviour:
     m_Bits: 0
   visualHeightMeters: 0
   stat:
-    maxHp: 70000
+    maxHp: 140000
     defense: 8
     attackPower: 380
     moveSpeed: 3.5

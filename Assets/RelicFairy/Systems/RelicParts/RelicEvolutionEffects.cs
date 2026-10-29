@@ -19,6 +19,29 @@ internal static class RelicEvolutionNotice
     }
 }
 
+/// <summary>
+/// 진화 효과가 실제로 터진 순간(10-23 W4 「유물 진화가 체감되기 힘들다」) — 머리 위 진화 이름 한 줄(같은 진화 2.5초에 한 번) +
+/// <see cref="Procced"/> 사건(HUD 진화 문장이 듣는다). 그림이 없던 진화(광기 ×1.5 · 광란 +1초 · 낙인 2)도 보이게.
+/// </summary>
+public static class RelicEvolutionCue
+{
+    private const float TextGap = 2.5f;
+    private static readonly Dictionary<string, float> s_lastText = new();
+
+    /// <summary>진화 id가 터졌다.</summary>
+    public static event System.Action<string> Procced;
+
+    public static void Proc(string id, PlayerController p, Color color)
+    {
+        Procced?.Invoke(id);
+        if (p == null) return;
+        if (s_lastText.TryGetValue(id, out float at) && Time.time - at < TextGap && Time.time >= at) return;
+        s_lastText[id] = Time.time;
+        var d = RelicEvolution.ById(id);
+        if (d != null) RelicFloatText.Show(p.transform.position + Vector3.up * 0.6f, d.Name, color);
+    }
+}
+
 // ── 가웨인 ───────────────────────────────────────────────
 
 /// <summary>
@@ -47,6 +70,7 @@ public sealed class GEvoBlazingNoonEffect : GawainFragment
         if (_lastBloom.TryGetValue(id, out float at) && Time.time - at < BloomGap) return;
         _lastBloom[id] = Time.time;
         Hub.Bloom(mb, st.ConsumeSunmark(), GawainMemoryHub.BloomCause.Instant);
+        RelicEvolutionCue.Proc(EffectKey, Player, GawainMemoryHub.GawainColor);
     }
 }
 
@@ -66,6 +90,7 @@ public sealed class GEvoZenithStrikeEffect : GawainFragment
         if (h.ActionType == WeaponActionType.QSkill) return;   // 낙일이 낙일을 부르지 않게
         _readyAt = Time.time + Gap;
         SolarDescentSkillRuntime.StrikeSmallSun(Player, Hub.Relic, h.Target.transform.position, Fraction, RadiusScale);
+        RelicEvolutionCue.Proc(EffectKey, Player, GawainMemoryHub.GawainColor);
     }
 }
 
@@ -86,6 +111,7 @@ public sealed class GEvoSunArrowEffect : GawainFragment
         if (++_count < Every) return;
         _count = 0;
         SolarDescentSkillRuntime.StrikeSmallSun(Player, Hub.Relic, h.Target.transform.position, Fraction, RadiusScale);
+        RelicEvolutionCue.Proc(EffectKey, Player, GawainMemoryHub.GawainColor);
     }
 }
 
@@ -126,7 +152,12 @@ public sealed class LEvoEndlessFrenzyEffect : LancelotFragment
         BindRelic();   // 묶을 때 유물이 아직 없었으면 첫 적중에서 잡는다
         if (relic.IsFrenzy)
         {
-            if (++_frenzyHits >= ExtendEvery) { _frenzyHits = 0; relic.Madness?.ExtendFrenzy(ExtendSeconds); }
+            if (++_frenzyHits >= ExtendEvery)
+            {
+                _frenzyHits = 0;
+                relic.Madness?.ExtendFrenzy(ExtendSeconds);
+                RelicEvolutionCue.Proc(EffectKey, Player, LancelotMemoryHub.LancelotColor);   // 광란 +1초가 보이게(10-23 W4)
+            }
             return;
         }
         _frenzyHits = 0;
@@ -157,7 +188,9 @@ public sealed class LEvoJudgeEffect : LancelotFragment
     {
         if (!h.IsHeavy || h.ActionType == WeaponActionType.QSkill) return;
         var mb = AsMonster(h.Target);
-        if (mb != null && !mb.IsDead) Hub.AddBrand(mb, 2, overflowToGrudge: true, ignoreGap: true);
+        if (mb == null || mb.IsDead) return;
+        Hub.AddBrand(mb, 2, overflowToGrudge: true, ignoreGap: true);
+        RelicEvolutionCue.Proc(EffectKey, Player, LancelotMemoryHub.LancelotColor);
     }
 
     private void OnFinisher(Vector3 pos, Vector3 fwd)
@@ -166,8 +199,10 @@ public sealed class LEvoJudgeEffect : LancelotFragment
         if (relic == null || Player == null) return;
         float bonus = relic.LastFinisherDamage * CritShare;
         if (bonus <= 0f) return;
-        foreach (var mb in Near(pos, FinisherRadius, Owner, 16))
+        var near = Near(pos, FinisherRadius, Owner, 16);
+        foreach (var mb in near)
             CombatQuery.DealSynergyDamage(mb, bonus, Owner, 1f, isCrit: true);
+        if (near.Count > 0) RelicEvolutionCue.Proc(EffectKey, Player, LancelotMemoryHub.LancelotColor);
     }
 }
 
@@ -196,7 +231,7 @@ public sealed class LEvoTraitorArrowEffect : LancelotFragment
         if (LancelotMemoryHub.BrandOf(mb) >= Hub.BrandCap && !(_lastTear.TryGetValue(id, out float tornAt) && Time.time - tornAt < TearGap))
         {
             _lastTear[id] = Time.time;
-            Hub.Tear(mb, LancelotMemoryHub.TearCause.Fragment);
+            if (Hub.Tear(mb, LancelotMemoryHub.TearCause.Fragment) > 0) RelicEvolutionCue.Proc(EffectKey, Player, LancelotMemoryHub.LancelotColor);
             return;
         }
         if (_last.TryGetValue(id, out float at) && Time.time - at < Gap) return;

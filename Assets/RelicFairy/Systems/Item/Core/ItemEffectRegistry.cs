@@ -168,6 +168,12 @@ public static class ItemEffectRegistry
         Register("PierceChainBonus",           s => new PierceChainBonusEffect(s));
         Register("CondDamageReduction",        s => new ConditionalStatBuffEffect(s));
 
+        // ── 근접 버팀 「수호」 룬(10-29) — Conditional/MeleeWardEffects.cs · 타격마다 채우는 것 없음 ──
+        Register("WardClearShield",            s => new WardClearShieldEffect(s));
+        Register("WardRampart",                s => new WardRampartEffect(s));
+        Register("WardFinisherGuard",          s => new WardFinisherGuardEffect(s));
+        Register("WardSteadyBreath",           s => new WardSteadyBreathEffect(s));
+
         // ── 특수 ────────────────────────────────────────────
         Register("PoisonApple",                s => new PoisonAppleEffect(s));
         Register("RandomElement",              s => new RandomElementEffect(s));

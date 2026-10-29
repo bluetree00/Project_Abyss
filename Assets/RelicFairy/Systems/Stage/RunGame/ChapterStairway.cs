@@ -277,6 +277,7 @@ public sealed class ChapterStairway : MonoBehaviour
         var bottom = new Vector3(b.center.x, b.min.y, b.center.z) * sc;
         go.transform.position = basePos - rot * bottom;
         foreach (var c in go.GetComponentsInChildren<Collider>(true)) Destroy(c);   // 장식 — 기둥이 문 앞을 막지 않게
+        CameraOcclusionFader.AddOverheadArea(go);   // 10-29 계단이 카메라 쪽을 향하는 아레나에서 아치가 플레이어를 가렸다
         DissolveEffect.PlayAppear(go, ArchAppear);
         return b.size.y * sc;
     }
@@ -288,11 +289,12 @@ public sealed class ChapterStairway : MonoBehaviour
         return (ChapterId)Mathf.Clamp(n, 1, 4);
     }
 
-    /// <summary>다음 층 맵 곡 — Ch4는 맵 곡이 없어 지금 곡 그대로(null).</summary>
+    /// <summary>다음 층 맵 곡 — Ch4는 전용 곡이 오기 전까지 Ch3 곡(10-29 임시).</summary>
     private string NextMapBgm() => NextChapter() switch
     {
         ChapterId.Chapter2 => "Ch2_Map",
         ChapterId.Chapter3 => "Ch3_Map",
+        ChapterId.Chapter4 => "Ch3_Map",
         _ => null,
     };
 
@@ -548,7 +550,7 @@ public sealed class ChapterStairway : MonoBehaviour
             // 들어설 때 분출은 뺐다 — 0.35초 와이프가 바로 덮어 화면에 남지 않았다(10-11 톤 점검)
             Vector2 dir = new Vector2(_rise.x, _rise.z);   // 걸어 들어가는 쪽으로 덮는다
             await ScreenFade.CoverAsync(dir, WipeColor, WipeDuration, WipeCurve, ct);
-            // 보스 곡이 회랑까지 이어졌다 — 다음 층 맵 곡으로(10-10). Ch4로 가는 길은 맵 곡이 없어 그대로.
+            // 보스 곡이 회랑까지 이어졌다 — 다음 층 맵 곡으로(10-10). Ch4로 가는 길은 Ch3 맵 곡(10-29 임시).
             var bgm = NextMapBgm();
             if (bgm != null) Managers.Sound?.PlayBgmAsync(bgm).Forget();
             if (player != null)
@@ -558,6 +560,8 @@ public sealed class ChapterStairway : MonoBehaviour
                 player.RequestFacing(Quaternion.LookRotation(Vector3.forward, Vector3.up));   // 방향 목표도 — 안 하면 다음 물리 프레임에 옛 방향으로 돌아갔다(10-09 출시 점검)
                 if (player.TryGetComponent<Rigidbody>(out var rb)) { rb.position = start; rb.linearVelocity = Vector3.zero; }
             }
+            // 10-26 사용자 「다음 챕터로 넘어가는 통로 천장이 안 걷힌다」 — 가림 페이더는 보스방 천장만 들고 있었다. 회랑을 지금 서는 곳으로 다시 모은다
+            CameraOcclusionFader.CollectArea(_corridor.gameObject);
             Vector3 doorFxPos = _doorCenter + Vector3.up * 1.8f;
             var doorFx = RunFx.PlayLoop(RunFxSlot.Portal, doorFxPos, FaceCamera(doorFxPos, -_doorFwd), 0.9f, Color.clear);
             if (doorFx != null) { doorFx.transform.SetParent(_corridor, true); doorFx.AddComponent<FaceCameraYaw>(); }

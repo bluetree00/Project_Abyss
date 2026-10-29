@@ -290,6 +290,14 @@ public static class RunStructureAutoPlayEditor
         // 1) 대사창
         if (SkipDialogue(now)) return;
 
+        // 1b) 해방기 · 악몽 시작 선물 창(10-29 StartGift) — 시간을 멈추는 자체 창이라 팝업 목록에 없다. 선물 없이 닫는다(창을 걷으면 취소 경로)
+        if (StartGift.IsOpen)
+        {
+            var gift = GameObject.Find("@StartGift");
+            if (gift != null) { Object.Destroy(gift); Log("시작 선물 창 — 선물 없이 닫음"); }
+            return;
+        }
+
         // 2) 게임 정지 팝업(보상 선택 등)
         var ui = Managers.UI;
         if (ui != null && ui.IsGameplayBlocked)

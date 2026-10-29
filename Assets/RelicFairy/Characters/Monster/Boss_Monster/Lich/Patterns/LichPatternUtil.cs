@@ -224,7 +224,7 @@ public static class LichPatternUtil
     /// </summary>
     public static float Recovery(MonsterContext ctx, float seconds)
     {
-        float mult = Lich(ctx)?.LichBB?.AttackSpeedMult ?? 1f;
+        float mult = (Lich(ctx)?.LichBB?.AttackSpeedMult ?? 1f) * LichMonster.AssaultRecoverySpeed;   // 10-26 「몰아치게」 ÷1.25
         return mult > 0f ? seconds / mult : seconds;
     }
 

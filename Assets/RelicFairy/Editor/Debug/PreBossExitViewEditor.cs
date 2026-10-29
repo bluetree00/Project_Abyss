@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public static class PreBossExitViewEditor
 {
-    private static readonly float[] Back = { 9f, 16f };
+    private static readonly float[] Back = { 4f, 9f, 16f };
 
     [MenuItem("RelicFairy/Debug/10-18 PreBoss Exit View (Play)")]
     private static void Run()
@@ -38,7 +38,8 @@ public static class PreBossExitViewEditor
             if (gate == null) { sb.AppendLine("출구 문 없음"); return; }
             Vector3 gp = gate.transform.position;
             Vector3 outward = gp - player.transform.position; outward.y = 0f; outward.Normalize();
-            float ground = Physics.Raycast(gp + Vector3.up * 8f, Vector3.down, out var gh, 30f, ~0, QueryTriggerInteraction.Ignore) ? gh.point.y : gp.y;
+            // 문 위 높은 데서 쏘면 투명 천장(Ch3 y 9.5)에 먼저 맞는다 — 문 자리 + 2 m(천장 아래)에서 아래로
+            float ground = Physics.Raycast(gp + Vector3.up * 2f, Vector3.down, out var gh, 12f, ~0, QueryTriggerInteraction.Ignore) ? gh.point.y : gp.y;
             sb.AppendLine($"문 {gate.name} · 자리 {gp} · 바깥 {outward} · 바닥 {ground:0.00} · 문 로컬 크기 {gate.transform.lossyScale}");
 
             Vector3 eye = new(gp.x, ground + 2f, gp.z);

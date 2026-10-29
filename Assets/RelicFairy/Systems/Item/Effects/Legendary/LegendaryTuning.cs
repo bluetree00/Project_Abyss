@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -9,12 +10,15 @@ using UnityEngine;
 /// </summary>
 public static class LegendaryTuning
 {
-    public const float DamagePerTier = 0.15f;
+    public const float DamagePerTier = 0.20f;   // 10-24 개편 0.15 → 0.20 + 존 4단계 각성(Awakened)
 
     /// <summary>그 속성 존 단계(0 ~ 4).</summary>
     public static int Tier(string zone) => Mathf.Clamp(MerlinRuneBridge.Instance?.GetZoneTier(zone) ?? 0, 0, 4);
 
-    /// <summary>존 단계 피해 배율 — 1 + 0.15 × 단계.</summary>
+    /// <summary>그 속성 존 4단계 = 각성(10-24 개편) — 전설 규칙이 하나 더 붙는다. 화면(카드 각성 칩 · 띠)도 이것을 읽는다.</summary>
+    public static bool Awakened(string zone) => Tier(zone) >= 4;
+
+    /// <summary>존 단계 피해 배율 — 1 + 0.20 × 단계.</summary>
     public static float TierMul(string zone) => 1f + DamagePerTier * Tier(zone);
 
     /// <summary>지금 든 무기 기준 유효 공격력.</summary>
@@ -23,4 +27,38 @@ public static class LegendaryTuning
 
     /// <summary>새 행이면 CSV 값(0 이하면 기본값), 옛 행이면 기본값.</summary>
     public static float Pick(bool newRow, float csv, float fallback) => newRow && csv > 0f ? csv : fallback;
+}
+
+/// <summary>
+/// 전설 룬이 쌓는 자원의 화면 질의(10-24 개편) — HUD 아이콘(e2)이 key로 읽는다.
+/// 1차: "heat"(불사조의 맥박 열기) · "dark"(보복의 심연 모인 어둠) · 2차: "orb" · "soul". 그 전설이 없으면 TryGet = false.
+/// </summary>
+public static class LegendaryHud
+{
+    private static readonly Dictionary<string, (int value, int max)> s_values = new();
+
+    /// <summary>값이 바뀌었다(key).</summary>
+    public static event System.Action<string> Changed;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() { s_values.Clear(); Changed = null; }
+
+    public static bool TryGet(string key, out int value, out int max)
+    {
+        if (s_values.TryGetValue(key, out var v)) { value = v.value; max = v.max; return true; }
+        value = 0; max = 0;
+        return false;
+    }
+
+    public static void Set(string key, int value, int max)
+    {
+        if (s_values.TryGetValue(key, out var v) && v.value == value && v.max == max) return;
+        s_values[key] = (value, max);
+        Changed?.Invoke(key);
+    }
+
+    public static void Clear(string key)
+    {
+        if (s_values.Remove(key)) Changed?.Invoke(key);
+    }
 }

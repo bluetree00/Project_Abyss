@@ -11,6 +11,8 @@ using UnityEngine.UI;
 ///   - 플레이어 마커는 별도 Image로 항상 최상단 유지
 ///   - HudView.SetSections() 의 Section.Minimap 플래그로 패널 ON/OFF
 ///   - 방 범위가 없으면(베이스캠프 · 런 밖) 판을 투명하게 숨긴다 — 빈 회색 판이 떴다(09-28)
+///   - 판의 위 = 카메라가 보는 쪽(<see cref="ToMap"/>). 방은 들어온 출구 방향으로 90°씩 돌려 지어지고 카메라도 따라 도는데,
+///     월드 북쪽을 위로 고정하면 돌아간 방에서 점이 화면과 뒤집혀 보였다(10-23 사용자 「몬스터 위치가 대칭이 안 맞게」).
 ///
 /// 연결 순서:
 ///   1) Initialize(roomCenter, roomSize)  ← GameRunBootstrapper가 맵 빌드 후 호출
@@ -40,6 +42,8 @@ public sealed class MinimapView : MonoBehaviour
     private Vector2 _roomHalfSize;
 
     private Transform _playerTransform;
+    private Camera    _cam;
+    private float     _viewYaw;   // 지금 카메라 수평각 — 판의 위
 
     private readonly Dictionary<Transform, MinimapMarker> _markers = new();
     private readonly List<MinimapMarker>                  _toRemove = new();
@@ -69,6 +73,8 @@ public sealed class MinimapView : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (_cam == null) _cam = Camera.main;   // 씬이 바뀌어 없어졌을 때만 다시 찾는다
+        if (_cam != null) _viewYaw = _cam.transform.eulerAngles.y;
         UpdatePlayerMarker();
         CleanupDeadMarkers();
     }
@@ -88,11 +94,6 @@ public sealed class MinimapView : MonoBehaviour
         _roomHalfSize = roomSize * 0.5f;
 
         ClearAllMarkers();
-
-        // 기존 마커들 범위 갱신 (재사용 케이스 대비)
-        foreach (var m in _markers.Values)
-            m.UpdateBounds(_roomCenter, _roomHalfSize, mapDisplayHalfSize);
-
         ApplyVisible();
     }
 
@@ -125,7 +126,7 @@ public sealed class MinimapView : MonoBehaviour
 
         var marker = go.GetComponent<MinimapMarker>();
 
-        marker.Initialize(worldTransform, type, this, _roomCenter, _roomHalfSize, mapDisplayHalfSize);
+        marker.Initialize(worldTransform, type, this);
         _markers[worldTransform] = marker;
         return marker;
     }
@@ -146,6 +147,22 @@ public sealed class MinimapView : MonoBehaviour
         _markers.Remove(worldTransform);
         if (marker != null)
             Destroy(marker.gameObject);
+    }
+
+    /// <summary>
+    /// 월드 → 판 좌표. 방 가운데에서 떨어진 만큼을 카메라 오른쪽 · 앞 축으로 돌려 재고, 돌린 방향의 방 반폭으로 나눈다(90°면 가로 · 세로가 바뀐다).
+    /// </summary>
+    public Vector2 ToMap(Vector3 world)
+    {
+        float dx = world.x - _roomCenter.x, dz = world.z - _roomCenter.z;
+        float rad = _viewYaw * Mathf.Deg2Rad, c = Mathf.Cos(rad), s = Mathf.Sin(rad);
+        float sx = dx * c - dz * s;   // 카메라 오른쪽
+        float sy = dx * s + dz * c;   // 카메라 앞
+        float hx = Mathf.Abs(c) * _roomHalfSize.x + Mathf.Abs(s) * _roomHalfSize.y;
+        float hy = Mathf.Abs(s) * _roomHalfSize.x + Mathf.Abs(c) * _roomHalfSize.y;
+        float nx = hx > 0f ? Mathf.Clamp(sx / hx, -1f, 1f) : 0f;
+        float ny = hy > 0f ? Mathf.Clamp(sy / hy, -1f, 1f) : 0f;
+        return new Vector2(nx * mapDisplayHalfSize.x, ny * mapDisplayHalfSize.y);
     }
 
     public void ClearAllMarkers()
@@ -238,16 +255,9 @@ public sealed class MinimapView : MonoBehaviour
     {
         if (_playerTransform == null || _playerMarkerRect == null) return;
 
-        Vector3 world = _playerTransform.position;
-        float nx = (_roomHalfSize.x > 0f) ? (world.x - _roomCenter.x) / _roomHalfSize.x : 0f;
-        float ny = (_roomHalfSize.y > 0f) ? (world.z - _roomCenter.z) / _roomHalfSize.y : 0f;
+        _playerMarkerRect.anchoredPosition = ToMap(_playerTransform.position);
 
-        nx = Mathf.Clamp(nx, -1f, 1f);
-        ny = Mathf.Clamp(ny, -1f, 1f);
-
-        _playerMarkerRect.anchoredPosition = new Vector2(nx * mapDisplayHalfSize.x, ny * mapDisplayHalfSize.y);
-
-        float yaw = _playerTransform.eulerAngles.y;
+        float yaw = Mathf.DeltaAngle(_viewYaw, _playerTransform.eulerAngles.y);   // 카메라가 보는 쪽 기준
         _playerMarkerRect.localEulerAngles = new Vector3(0f, 0f, -yaw);
     }
 

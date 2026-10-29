@@ -934,9 +934,9 @@ public sealed partial class UI_CruciblePanel
                 {
                     var d = MeleeAugmentCatalog.Get(id);
                     if (d == null) continue;
-                    string name = $"{d.Name} {RomanRank(rank)}";
+                    string name = d.IsLegend || d.IsGrowth ? d.Name : $"{d.Name} {RomanRank(rank)}";   // 전설 · 자람(10-26 재련으로 자람)은 단계가 없다
                     if (MeleeAugmentCatalog.RunsAsPhantom(d, w)) name += " <color=#C9D3E6>(환영)</color>";
-                    string eff = d.Text(rank);
+                    string eff = d.IsGrowth ? d.TextFor(w) : d.Text(rank);
                     s_ownedRows.Add((name, eff, eff));
                 }
             headName = history ? "재련 기록" : "가진 증강";

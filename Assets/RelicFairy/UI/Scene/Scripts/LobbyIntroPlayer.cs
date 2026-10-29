@@ -36,6 +36,12 @@ public class LobbyIntroPlayer : MonoBehaviour
             bgRect.anchorMax = Vector2.one;
             bgRect.offsetMin = Vector2.zero;
             bgRect.offsetMax = Vector2.zero;
+
+            // 혹시 모를 배경 — 영상 판 뒤에 늘 검은 판을 깐다. 영상이 아직 안 그려졌거나(첫 프레임 전) 비는 틈엔
+            // 그 뒤로 카메라 배경(유니티 기본 하늘)이 새어 나왔다(10-23 세이브 창 진입).
+            var safety = ShopUIStyle.MakeImage(transform, "SafetyBackdrop", Color.black);
+            ShopUIStyle.Stretch(safety.rectTransform);
+            safety.transform.SetSiblingIndex(bgTr.GetSiblingIndex());
         }
 
         _renderTexture = new RenderTexture(1920, 1080, 0);

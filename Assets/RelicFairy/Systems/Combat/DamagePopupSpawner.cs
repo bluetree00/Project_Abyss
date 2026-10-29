@@ -13,21 +13,11 @@ public static class DamagePopupSpawner
     // 연타(랜슬롯 심판 9타 등)가 다수 적에게 동시에 꽂히면 16개로는 즉시 고갈된다.
     private const int    PoolSize  = 48;
 
-    // ── 영수증 캐스케이드 ──────────────────────────────────────────
-    // 같은 대상에 이 시간(초) 안에 다시 꽂히면 '연타'로 보고 순번을 올려 위로 쌓는다.
-    // 지나면 순번을 0으로 리셋 — 새 공격은 다시 바닥부터 찍힌다.
-    private const float CascadeWindow  = 0.7f;
-    private const int   CascadeMaxStep = 7;   // 그 이상은 화면 밖으로 나가므로 되감는다
-
-    /// <summary>
-    /// 순번 1칸당 스폰을 미루는 시간(초). 분열·다단은 <b>같은 프레임</b>에 수십 발이 꽂히는데,
-    /// 그걸 동시에 찍으면 위로 쌓여도 '기둥이 흘러 올라가는' 게 아니라 벽처럼 한꺼번에 박힌다.
-    /// 순번만큼 늦춰야 아래에서 위로 흐르며 읽힌다. 순번 0(=서로 다른 대상)은 지연이 없다.
-    /// </summary>
-    private const float CascadeStagger = 0.04f;
-
-    private struct Cascade { public int index; public float lastTime; }
-    private static readonly Dictionary<int, Cascade> _cascades = new();
+    // ── 영수증 줄 ────────────────────────────────────────────────
+    // 같은 대상(× 주/추가)의 새 숫자는 맨 아래에 찍히고, 떠 있는 앞 숫자들이 한 칸씩 밀려 올라간다(10-23).
+    // 예전엔 순번만큼 위에 늦춰 찍었다 — 늦게 찍힌 숫자가 떠오르던 앞 숫자를 뚫고 지나가 줄이 엉켰다.
+    // 떠 있는 팝업 목록 — 같은 줄을 찾아 민다(풀 크기 48 안팎이라 훑어도 싸다).
+    private static readonly List<DamagePopup> _live = new();
 
     // ── 다단히트 숫자 합산 ────────────────────────────────────────
     // 분열 투사체 20발처럼 <b>같은 순간에</b> 꽂히는 피해는 숫자를 따로 띄워봐야 겹쳐서 못 읽는다.
@@ -62,7 +52,7 @@ public static class DamagePopupSpawner
     private static void ResetStatics()
     {
         _pool.Clear();
-        _cascades.Clear();
+        _live.Clear();
         _merges.Clear();
         _prefab  = null;
         _root    = null;
@@ -71,7 +61,7 @@ public static class DamagePopupSpawner
 
     /// <summary>
     /// 임의 위치에 데미지 숫자 스폰. 인자 부족하면 무동작.
-    /// targetId: 같은 대상에 꽂힌 연타를 위로 쌓기 위한 식별자(보통 GetInstanceID()). 0이면 캐스케이드 없음.
+    /// targetId: 같은 대상에 꽂힌 연타를 한 줄로 쌓기 위한 식별자(보통 GetInstanceID()). 0이면 줄 없음.
     /// kind: 피해 출처 — 색으로 구분된다(일반/시너지/DoT).
     /// </summary>
     public static void Spawn(Vector3 worldPos, float damage, bool isCrit = false, int targetId = 0,
@@ -84,8 +74,7 @@ public static class DamagePopupSpawner
         // 같은 대상에 연달아 꽂히면 이미 떠 있는 숫자를 키운다 — 새 팝업을 만들지 않는다.
         if (merge && targetId != 0 && TryMerge(MergeKey(targetId, kind), damage, isCrit, kind, element)) return;
 
-        // 순번은 '지금' 확정한다 — 지연 뒤에 뽑으면 같은 프레임의 연타가 서로 순번을 덮어쓴다.
-        SpawnAsync(worldPos, damage, isCrit, NextCascadeIndex(targetId), kind, element, targetId).Forget();
+        SpawnAsync(worldPos, damage, isCrit, kind, element, targetId).Forget();
     }
 
     /// <summary>
@@ -113,36 +102,23 @@ public static class DamagePopupSpawner
         return true;
     }
 
-    /// <summary>대상별 연타 순번. 창(CascadeWindow) 안에 다시 맞으면 +1, 지나면 0으로 리셋.</summary>
-    private static int NextCascadeIndex(int targetId)
-    {
-        if (targetId == 0) return 0;
-
-        float now = Time.time;
-        int index = 0;
-
-        if (_cascades.TryGetValue(targetId, out var c) && now - c.lastTime <= CascadeWindow)
-            index = (c.index + 1) % (CascadeMaxStep + 1);
-
-        _cascades[targetId] = new Cascade { index = index, lastTime = now };
-        return index;
-    }
-
-    private static async UniTaskVoid SpawnAsync(Vector3 worldPos, float damage, bool isCrit, int cascadeIndex,
+    private static async UniTaskVoid SpawnAsync(Vector3 worldPos, float damage, bool isCrit,
                                                 DamageKind kind, RuneElement? element, int targetId = 0)
     {
         await EnsurePrefabAsync();
         if (_prefab == null) return;
 
-        // 순번만큼 늦게 찍는다. 지연 뒤에 풀에서 꺼내므로 대기 중 인스턴스를 붙잡고 있지 않는다.
-        if (cascadeIndex > 0)
-            await UniTask.Delay(System.TimeSpan.FromSeconds(CascadeStagger * cascadeIndex),
-                                DelayType.DeltaTime);
-
         var popup = GetFromPool();
         if (popup == null) return;
 
-        popup.Show(worldPos, damage, isCrit, kind, cascadeIndex, element);
+        // 같은 줄의 앞 숫자들을 한 칸씩 민다 — 새 숫자는 맨 아래.
+        int column = targetId != 0 ? MergeKey(targetId, kind) : 0;
+        if (column != 0)
+            for (int i = 0; i < _live.Count; i++)
+                if (_live[i] != null && _live[i].IsShowing && _live[i].Column == column) _live[i].Bump();
+
+        popup.Show(worldPos, damage, isCrit, kind, element, column);
+        _live.Add(popup);
 
         // 다음 타가 이 팝업에 얹힐 수 있게 등록한다.
         if (targetId != 0)
@@ -225,7 +201,7 @@ public static class DamagePopupSpawner
         go.SetActive(false);
         if (!go.TryGetComponent<DamagePopup>(out var p)) return null;
 
-        p.SetReleaseCallback(static released => _pool.Enqueue(released));
+        p.SetReleaseCallback(static released => { _live.Remove(released); _pool.Enqueue(released); });
         if (!returnInstance) _pool.Enqueue(p);
         return p;
     }

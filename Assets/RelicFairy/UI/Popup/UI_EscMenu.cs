@@ -75,6 +75,16 @@ public sealed class UI_EscMenu : MonoBehaviour
         TimeScaleArbiter.Release(this);
     }
 
+    /// <summary>ESC — 「되찾은 기억」 · 「장비」 쪽이 열려 있으면 그것만 닫고 일시정지 패널로 돌아간다. 아니면 메뉴를 닫는다(10-25).</summary>
+    public void HandleEscape()
+    {
+        bool page = (_memoryPage != null && _memoryPage.gameObject.activeSelf)
+                 || (_equipPage  != null && _equipPage.gameObject.activeSelf);
+        if (!page) { Close(); return; }
+        CloseMemoryPage();   // 10-29 닫기 소리는 쪽 닫기가 한 번 낸다
+        CloseEquipPage();
+    }
+
     // ── Private Methods ──────────────────────────────────────
     private void Build()
     {
@@ -215,6 +225,7 @@ public sealed class UI_EscMenu : MonoBehaviour
     private void CloseEquipPage()
     {
         if (_equipPage == null || !_equipPage.gameObject.activeSelf) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);   // 10-29 UI 소리 — 쪽 닫기(돌아가기 · ESC 어느 길이든 한 번)
         _equipPage.Close();
         if (_panel != null) _panel.gameObject.SetActive(true);
     }
@@ -222,6 +233,7 @@ public sealed class UI_EscMenu : MonoBehaviour
     private void CloseMemoryPage()
     {
         if (_memoryPage == null || !_memoryPage.gameObject.activeSelf) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);   // 10-29 UI 소리 — 쪽 닫기(돌아가기 · ESC 어느 길이든 한 번)
         _memoryPage.Close();
         if (_panel != null) _panel.gameObject.SetActive(true);
     }
@@ -244,7 +256,7 @@ public sealed class UI_EscMenu : MonoBehaviour
     private void OnMemory()
     {
         if (_root == null) return;
-        Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
+        Managers.Sound?.PlayUiEvent(SoundEvent.EscMemoryPage);   // 10-29 UI 소리 — 책장 펼침(누름 소리였다)
         _memoryPage ??= UI_RelicMemoryPage.Create(_root.transform, CloseMemoryPage);
         _panel.gameObject.SetActive(false);
         _memoryPage.Open();

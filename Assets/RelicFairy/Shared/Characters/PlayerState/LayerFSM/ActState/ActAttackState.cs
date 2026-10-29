@@ -876,10 +876,9 @@ public class ActAttackState : LayerStateBase<ActState>
 
         float baseSpeed = animSet?.lightAttackAnimSpeed ?? 1.0f;
         anim.speed = _controller.GlobalAttackAnimSpeedScale
-                   * (_controller.RuntimeStats?.AttackSpeedMultiplier ?? 1f)
+                   * SwingSpeed()   // 공속 × 저스트 회피 반격 창 가속 — 무기 휘두름 상한에서 자른다(10-26)
                    * baseSpeed
-                   * WeaponTempo(_controller)
-                   * _controller.CounterAttackSpeedMultiplier;   // 저스트 회피 반격 창 가속(평소 1)
+                   * WeaponTempo(_controller);
         _stepAnimSpeed = anim.speed;
 
         // 준비 동작 — 베기 이벤트가 있는 클립만. 베기 뒤 배율은 「베기 전 + 베기 ~ 연결 지점」 시간이 그대로 되게 정한다.
@@ -944,8 +943,18 @@ public class ActAttackState : LayerStateBase<ActState>
         return _stateElapsed >= MinSwingNow();
     }
 
-    private float SwingTempo()
-        => Mathf.Max(0.5f, (_controller.RuntimeStats?.AttackSpeedMultiplier ?? 1f) * _controller.CounterAttackSpeedMultiplier);
+    private float SwingTempo() => Mathf.Max(0.5f, SwingSpeed());
+
+    /// <summary>
+    /// 평타 휘두름에 듣는 공속 × 저스트 회피 반격 가속 — 무기 애니 세트의 휘두름 상한(maxSwingAttackSpeed)에서 자른다.
+    /// 휘두름 간격이 약 0.25초 밑이면 피해가 안 들어가는 휘두름이 생겼다(10-26 사용자 「카타나 공격 속도가 너무 빠름」 · 실측 99 G).
+    /// </summary>
+    private float SwingSpeed()
+    {
+        var rs = _controller.RuntimeStats;
+        float spd = (rs != null ? rs.SwingAttackSpeed : 1f) * _controller.CounterAttackSpeedMultiplier;
+        return rs != null ? Mathf.Min(spd, Mathf.Max(1f, rs.SwingSpeedCap)) : spd;
+    }
 
     private static (float open, float close, float end) ResolveTiming(
         WeaponAnimationSetSO.ClipMapping mapping,

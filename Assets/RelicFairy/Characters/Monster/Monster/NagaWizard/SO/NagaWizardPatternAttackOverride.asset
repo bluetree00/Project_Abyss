@@ -16,7 +16,7 @@ MonoBehaviour:
   - name: MagicBolt
     animationStateName: NagaWizard_Attack01
     minDistance: 0
-    maxDistance: 8
+    maxDistance: 11.5
     priority: 0
     cooldown: 0.2
     damageDelay: 0.45
@@ -54,7 +54,7 @@ MonoBehaviour:
   - name: HeavyBolt
     animationStateName: NagaWizard_Attack02
     minDistance: 0
-    maxDistance: 8
+    maxDistance: 11.5
     priority: 0
     cooldown: 1.6
     damageDelay: 0.82
@@ -90,5 +90,5 @@ MonoBehaviour:
     hitVfxScale: 1
     hitVfxOffset: {x: 0, y: 0, z: 0}
   selectionMode: 1
-  engageDistance: 6.5
+  engageDistance: 10
   engageDistanceScale: 0.85

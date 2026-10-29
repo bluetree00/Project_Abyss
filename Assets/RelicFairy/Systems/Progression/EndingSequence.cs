@@ -15,6 +15,7 @@ public static class EndingSequence
     public const string CardKey      = "Ending_Card";
     public const string CreditsKey   = "Ending_Credits";
     private const string MorganaPageKey = "Illust_Story_MorganaReveal";   // 반전 그림 페이지(10-13 힉스필드)
+    private const string EndingBgmKey   = "Lobby";
 
     public static async UniTask PlayAsync(CancellationToken ct)
     {
@@ -32,6 +33,8 @@ public static class EndingSequence
             bool page = await StoryPageOverlay.ShowAsync(MorganaPageKey, ct);
             try { await ShowDialogueAsync(dlg.GetLines(MorganaKey), ct); }
             finally { if (page) await StoryPageOverlay.HideAsync(ct); }
+            // 10-29 임시 — 엔딩 전용 곡이 오기 전까지 카드 · 크레딧은 타이틀 곡(예전엔 보스 곡이 이어졌다)
+            Managers.Sound?.CrossfadeBgmAsync(EndingBgmKey, 2f).Forget();
             await EndingCardOverlay.PlayAsync(dlg.GetLines(CardKey), dlg.GetLines(CreditsKey), ct);
             UnityEngine.Debug.Log("[Ending] 엔딩 연출 끝");
         }

@@ -43,6 +43,9 @@ public class DKComboRunner
     private Vector2                       _linkRest;
     private Vector2                       _chainEndRest;
     private BossPatternSO                 _queuedFollowUp;   // 앞 패턴이 끝나면 낼 연계(사슬 박자를 켰을 때만)
+    // 해방 보스 「한 번 더」(10-29 F2) — 2페이지 마지막 25%에 해방기 전용 기술(무너지는 원탁)을 잇고, 끝나면 큰 틈
+    private readonly BossFinalPush        _finalPush;
+    private bool                          _finalPushQueued, _finalPushRunning;
 
     public bool  IsPatternActive               { get; private set; }
     public float PatternBreakCooldown          => _breakCooldown;
@@ -79,6 +82,7 @@ public class DKComboRunner
         _changeState     = changeState;
         _onExecuted      = onExecuted;
         _stateDecorator  = stateDecorator;
+        _finalPush       = BossFinalPush.Create(ctx?.Ctx?.Monster, config, _phase1AreaPool, _basicPool, _phase2AreaPool);
     }
 
     // ── 풀 재사용 ────────────────────────────────────────────
@@ -123,6 +127,8 @@ public class DKComboRunner
         _lastFiredAttack   = null;
         _lastPickedInCombo = null;
         _queuedFollowUp    = null;   // 전환 · 간판(보스가 Reset 뒤 직접 건다)이 끼면 대기 중인 연계는 버린다(10-22 E5 페이지2)
+        _finalPushQueued   = _finalPushRunning = false;
+        _finalPush?.Reset();
         IsFollowUpRunning  = false;
         IsPatternActive    = false;
     }
@@ -140,11 +146,14 @@ public class DKComboRunner
         {
             bool endedAsFollowUp = IsFollowUpRunning;   // 사슬 둘째 칸이 끝났다(10-22 E5 페이지2)
             IsFollowUpRunning    = false;
+            bool pushEnded       = _finalPushRunning;   // 「한 번 더」가 끝났다(F2)
+            _finalPushRunning    = false;
             // GetHit 등 경직으로 패턴이 중단된 경우 — 콤보 큐 초기화 후 쿨다운 적용
             if (_isStaggered())
             {
                 _comboQueue.Clear();
                 _queuedFollowUp  = null;
+                _finalPushQueued = false;
                 _wasInPattern    = false;
                 _breakCooldown   = UnityEngine.Random.Range(BreakMin, BreakMax);
                 return;
@@ -163,6 +172,18 @@ public class DKComboRunner
                 ? UnityEngine.Random.Range(_linkRest.x, _linkRest.y)
                 : (endedAsFollowUp ? UnityEngine.Random.Range(_chainEndRest.x, _chainEndRest.y) : UnityEngine.Random.Range(BreakMin, BreakMax))
                   * (Pages?.BreakScale ?? 1f) * DKStandardBearer.RestScale(_ctx.Ctx.Monster);
+            // 해방 보스 「한 번 더」(F2) — 끝났으면 큰 틈 · 마지막 25%에 연계가 안 잡혔으면 해방기 전용 기술을 곧바로
+            if (pushEnded)
+            {
+                _queuedFollowUp = null;
+                _breakCooldown  = Mathf.Max(_breakCooldown, BossFinalPush.OpeningBreak);
+                _finalPush.NoteEnded();
+            }
+            else if (_finalPush != null && _queuedFollowUp == null && _finalPush.TryTake(_lastFiredAttack, _ctx))   // 연계 사슬이 끝난 뒤에도(BossPatternRunner와 같은 규칙)
+            {
+                _finalPushQueued = true;
+                _breakCooldown   = Mathf.Min(_breakCooldown, BossFinalPush.LinkRest);
+            }
         }
         _wasInPattern = inPattern;
 
@@ -172,8 +193,9 @@ public class DKComboRunner
         if (!inPattern && _comboQueue.Count == 0 &&
             _breakCooldown <= 0f && _isAlive() && _isInRange() && !_isStaggered())
         {
-            if (_queuedFollowUp != null) FireFollowUp();
-            else                         TryFireNext();
+            if (_finalPushQueued)             FirePush();
+            else if (_queuedFollowUp != null) FireFollowUp();
+            else                              TryFireNext();
         }
     }
 
@@ -189,6 +211,19 @@ public class DKComboRunner
         }
         _comboQueue.Enqueue(next);
         IsFollowUpRunning = true;   // 상태 Enter보다 먼저 — 패턴이 Enter부터 사슬 칸인지 읽는다
+        FireNextFromQueue();
+    }
+
+    /// <summary>「한 번 더」(F2)를 온전한 패턴으로 낸다(연계 칸이 아니다 — 예고 · 판정 그대로). 그사이 못 내게 됐으면 평소대로 고른다.</summary>
+    private void FirePush()
+    {
+        _finalPushQueued = false;
+        var p = _finalPush.Pattern;
+        if (p.GetRuntimeState() == null || !p.CanFollowUp(_ctx)) { TryFireNext(); return; }
+        _comboQueue.Clear();
+        _comboQueue.Enqueue(p);
+        _currentComboUsePhase1Position = true;   // 광역 풀 기술 — 광역 콤보로 뽑혔을 때와 같은 자리 규칙
+        _finalPushRunning = true;
         FireNextFromQueue();
     }
 

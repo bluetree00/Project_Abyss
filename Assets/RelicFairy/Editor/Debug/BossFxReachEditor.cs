@@ -205,6 +205,50 @@ internal static class BossFxReachEditor
     [MenuItem("RelicFairy/Boss/FX Fit - Dragon Meteor (Play)")]
     private static void FitDr() { if (EditorApplication.isPlaying) FitAsync("dragon_meteor", FitDragon).Forget(); }
 
+    // 10-23 B4 — 운석 땅 효과를 게임과 같은 길(DragonThreat.SpawnMeteor: 몸통 = 판정 반폭 · 파편 · 불티 · 연기 × 0.46)로 띄워 반경 1 ~ 4칸마다 잰다.
+    // 떨어지는 불덩이(뿌리 입자 · 그 꼬리)는 멈춰 땅 효과만 — 기준: 90% 반경 0.8 ~ 1.25배 · 최대 1.3배 안. 어긋나면 DragonThreat.MeteorCoreReachAtOne 하나를 고친다.
+    [MenuItem("RelicFairy/Boss/FX Fit - Dragon Meteor Split (Play)")]
+    private static void FitDrSplit() { if (EditorApplication.isPlaying) FitMeteorSplitAsync().Forget(); }
+
+    private static async UniTaskVoid FitMeteorSplitAsync()
+    {
+        string dir = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "boss_fight_sim", $"fx_fit_meteor_split_{DateTime.Now:MMdd_HHmmss}");
+        Directory.CreateDirectory(dir);
+        var sb = new StringBuilder($"화룡 운석 땅 효과 — 몸통 배율 (r + 0.5) ÷ {DragonThreat.MeteorCoreReachAtOne} · 멀리 튀는 층 × {DragonThreat.MeteorCoreReachAtOne / DragonThreat.MeteorReachAtOne:0.00}\n");
+        try
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/RelicFairy/Characters/Monster/Monster/DragonBoss/Art/Effects/Meteor.prefab");
+            var player = UnityEngine.Object.FindFirstObjectByType<PlayerController>();
+            var cam = Camera.main;
+            Vector3 fwd = cam != null ? Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up).normalized : Vector3.forward;
+            if (fwd.sqrMagnitude < 0.01f) fwd = Vector3.forward;
+            Vector3 at = (player != null ? player.transform.position : Vector3.zero) + fwd * 7f;
+            var ct = player != null ? player.GetCancellationTokenOnDestroy() : default;
+            for (int r = 1; r <= DragonThreat.BigRadius; r++)
+            {
+                float judge = r + 0.5f;
+                float body  = r >= 3 ? DragonThreat.BigBodyScale : DragonThreat.BodyScale;
+                var before = EffectReachProbe.Snapshot();
+                var go = DragonThreat.SpawnMeteor(prefab, at, body, DragonThreat.MeteorScale(r), 0.6f);
+                if (go == null) { sb.AppendLine($"  r{r}: 띄우기 실패"); continue; }
+                foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true)) before.Remove(ps.GetInstanceID());   // 풀 재사용 인스턴스도 잰다
+                if (go.TryGetComponent<ParticleSystem>(out var rootPs)) rootPs.Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);   // 떨어지는 불덩이 — 땅 효과만
+                ShotLater(Path.Combine(dir, $"r{r}.png"), 0.75f, ct);
+                var res = await EffectReachProbe.ObserveAsync(before, at, fwd, 1.8f, ct);
+                BossEffectPool.Release(go);
+                sb.AppendLine($"  r{r} 판정 반폭 {judge:0.0} m · 몸통 ×{DragonThreat.MeteorScale(r):0.00}: 반경 {res.Radius:0.00}(×{res.Radius / judge:0.00}) · 최대 {res.RadiusMax:0.00}(×{res.RadiusMax / judge:0.00}) · 정점 {res.PeakAt:0.00}초 · {res.Names}");
+                await UniTask.Delay(800, ignoreTimeScale: true, cancellationToken: ct);
+            }
+        }
+        catch (OperationCanceledException) { sb.AppendLine("취소됨"); }
+        catch (Exception e) { sb.AppendLine("예외: " + e); }
+        finally
+        {
+            File.WriteAllText(Path.Combine(dir, "fit.txt"), sb.ToString(), Encoding.UTF8);
+            Debug.Log($"[BossFxReach] 운석 나눔 맞춤 끝 — {dir}");
+        }
+    }
+
     [MenuItem("RelicFairy/Boss/FX Fit - BlackKnight (Play)")]
     private static void FitBk() { if (EditorApplication.isPlaying) FitAsync("blackknight", FitBlackKnight).Forget(); }
 

@@ -76,6 +76,7 @@ public class UI_Lobby : UI_Scene
         }
         else
         {
+            Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);   // 10-29 UI 소리 — 누름(슬롯 창이 있으면 창 열기 소리가 대신한다)
             AppBootstrapper.Instance?.RequestStartRun();
         }
     }

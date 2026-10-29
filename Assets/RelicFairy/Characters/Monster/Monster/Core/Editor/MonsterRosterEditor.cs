@@ -35,7 +35,7 @@ public static class MonsterRosterEditor
         // 희귀
         ("MonsterPlantMonster",  new[] { 1, 2 }),
         ("FishmanMonster",       new[] { 1 }),
-        ("StingRayMonster",      new[] { 1 }),
+        ("StingRayMonster",      new[] { 1, 4 }),   // 10-15 Ch4에 더함 — 스폰 표에 맞춤(10-29 Ch4 사운드 점검 · 「로스터 적용」이 되돌리지 않게)
         ("GolemMonster",         new[] { 2, 3, 4 }),
         ("OrcMonster",           new[] { 2, 3 }),
         ("LichSkeletonMonster",  new[] { 4 }),
@@ -51,7 +51,7 @@ public static class MonsterRosterEditor
         ("BeholderMonster",      new[] { 3 }),
         ("BishopKnightMonster",  new[] { 3, 4 }),
         ("BlackKnightMonster",   new[] { 4 }),
-        ("NagaWizardMonster",    new int[0]),
+        ("NagaWizardMonster",    new[] { 3, 4 }),   // 10-23 Ch3 · Ch4에 더함 — 스폰 표에 맞춤(10-29 Ch4 사운드 점검)
     };
 
     [MenuItem("RelicFairy/Stage/10-02 몬스터 실물 사진 (편집 모드)")]

@@ -312,6 +312,7 @@ public sealed class JudgmentStrikeRuntime : ISkillRuntime
     /// <summary>막타 순간의 시간 정지. 실시간으로 잰 뒤 풀며, 스킬이 먼저 끊기면 OnExit이 푼다.</summary>
     private void BeginTimeStop(SkillExecutionContext ctx)
     {
+        if (!HitFeelService.DealtHitStop) return;   // 공격 멈칫 끔(10-24) — 포즈 고정 · 이펙트는 그대로
         TimeScaleArbiter.Acquire(TimeStopOwner, TimeStopScale, TimeScaleArbiter.Priority.SlowMotion);
         var ct = ctx.Controller != null ? ctx.Controller.GetCancellationTokenOnDestroy() : CancellationToken.None;
         ReleaseTimeStopAsync(ct).Forget();

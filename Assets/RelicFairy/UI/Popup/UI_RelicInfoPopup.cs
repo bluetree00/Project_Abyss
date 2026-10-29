@@ -141,6 +141,7 @@ public class UI_RelicInfoPopup : UI_Popup
     private static Material s_textMat;
 
     public override bool BlocksGameplay => true;
+    public override bool CloseOnEscape  => true;   // 10-25 사용자 「모든 UI를 ESC로」 — 「닫기」와 같다(유물은 다시 골라 볼 수 있다)
 
     // ── Init ──────────────────────────────────────────────────
     public override void Init()

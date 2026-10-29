@@ -11,6 +11,7 @@ using UnityEngine.Serialization;
 ///   2단계: + 충격 고리 1번(반경 5 m)
 ///   3단계: + 충격 고리 2번(5 m · 6.5 m)
 ///   주변경계 연장 증강: 고리 +N(바깥으로 1.5 m씩, 8 m까지)
+///   속성 검(대검 R) 동안: 베기 · 고리 반경 × 평타와 같은 배율(×1.3 · R 3단계 ×1.45) · 벤 둘레에 속성 자국(10-26 사용자 「e스킬도 r에 맞게」)
 /// 예전엔 1단계가 평타 1타 클립이었고 누른 뒤 0.15초에 맞았으며, 2 · 3단계는 같은 빠른 회전을 0.5초마다 되풀이해 바빠 보였다.
 /// 충격 고리는 땅에서 퍼지는 것이라 스킬이 끝나도(회피로 끊어도) 이어진다.
 /// </summary>
@@ -62,6 +63,7 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
         private Phase _phase;
         private float _timer;
         private int _rings;
+        private float _reach = 1f;   // 「거대한 칼날」 · 속성 검(10-26) — 베기 · 고리 반경 · 그림 배율
         private readonly List<GameObject> _hits = new();
 
         public Runtime(PerimeterGuardBehaviorSO data) => _data = data;
@@ -73,10 +75,11 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
                      + Mathf.RoundToInt(MeleeAugments.ValueOn(ctx.WeaponData, MeleeAugmentCatalog.GreatPerimeter));   // 주변경계 연장 증강(10-15 · 10-22 회전 → 고리)
             _timer = 0f;
             _phase = Phase.Windup;
+            _reach = GreatswordReach.Skill(ctx.Controller);
 
             ctx.RotateToMouse();
             ctx.SetMoveScale(0f);
-            SkillRangeRing.Circle(ctx.PlayerTransform.position, _data.detectRadius, _data.windup);   // 끄는 동안 맞을 둘레(A10)
+            SkillRangeRing.Circle(ctx.PlayerTransform.position, _data.detectRadius * _reach, _data.windup);   // 끄는 동안 맞을 둘레(A10)
             PlayAnimation(ctx);
 
             ctx.Controller.InputBuffer.TryConsume(Game.Inputs.Command.Light);
@@ -117,29 +120,31 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
             Managers.Sound?.PlayEvent(SoundEvent.PlayerSwingHeavy);   // 회전 베기 — 대검 무거운 휘두름(A6)
             var center = ctx.PlayerTransform.position;
             var rot = Quaternion.LookRotation(ctx.PlayerTransform.forward);
-            SkillRangeRing.Circle(center, _data.detectRadius);
+            float radius = _data.detectRadius * _reach;
+            SkillRangeRing.Circle(center, radius);
 
             float dmg = ctx.CalculateDamage(_data.baseDamage);
-            CombatQuery.GetNearbyDamageables(center, _data.detectRadius, ctx.Controller.gameObject, 32, _hits);
+            CombatQuery.GetNearbyDamageables(center, radius, ctx.Controller.gameObject, 32, _hits);
             foreach (var go in _hits)
                 ctx.DealDamage(go, dmg, _data.knockbackMultiplier, isFinisher: _rings == 0,   // 고리가 없으면 베기가 마무리(A5)
                                hitEffectKey: _data.hitEffectKey, hitEffectScale: _data.hitEffectScale);
+            GiantSwordBuff.SpawnField(ctx.Controller, radius);   // 속성 검 동안 벤 둘레 전체에 속성 장판(꺼져 있으면 아무것도 안 한다)
 
             // 검격 3개를 120°씩 — 판정 둘레에 맞춘 크기 · 발밑 흙먼지 고리가 같은 둘레로 퍼진다
             for (int i = 0; i < 3; i++)
             {
                 Vector3 dir = Quaternion.Euler(0f, i * 120f, 0f) * ctx.PlayerTransform.forward;
-                SpawnEffect(ctx, _data.slashEffectKey, center + dir * 0.3f + Vector3.up * 1f, Quaternion.LookRotation(dir), _data.slashEffectScale, 0.6f);
+                SpawnEffect(ctx, _data.slashEffectKey, center + dir * 0.3f + Vector3.up * 1f, Quaternion.LookRotation(dir), _data.slashEffectScale * _reach, 0.6f, GiantSwordBuff.ElementOf(ctx.Controller));
             }
-            SpawnEffect(ctx, _data.shockEffectKey, center + Vector3.up * 0.1f, rot, _data.detectRadius * _data.shockScalePerMeter, 1.5f);
+            SpawnEffect(ctx, _data.shockEffectKey, center + Vector3.up * 0.1f, rot, radius * _data.shockScalePerMeter, 1.5f);
 
             if (_rings > 0 && ctx.Controller != null)
-                RingsAsync(ctx, _data, center, rot, _rings, ctx.Controller.GetCancellationTokenOnDestroy()).Forget();
+                RingsAsync(ctx, _data, center, rot, _rings, _reach, ctx.Controller.GetCancellationTokenOnDestroy()).Forget();
         }
 
         // ── 충격 고리 — 베기 자리에서 바깥으로 퍼진다(원판 판정 · 고리마다 따로 맞는다) ──
         private static async UniTaskVoid RingsAsync(SkillExecutionContext ctx, PerimeterGuardBehaviorSO data, Vector3 center, Quaternion rot,
-                                                    int count, CancellationToken ct)
+                                                    int count, float reach, CancellationToken ct)
         {
             var hits = new List<GameObject>(16);
             try
@@ -149,7 +154,7 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
                     await UniTask.Delay(TimeSpan.FromSeconds(i == 0 ? data.ringDelay : data.ringGap), DelayType.DeltaTime, PlayerLoopTiming.Update, ct);
                     if (ctx.Controller == null) return;
 
-                    float radius = Mathf.Min(data.ringRadius + data.ringRadiusStep * i, data.ringRadiusMax);
+                    float radius = Mathf.Min(data.ringRadius + data.ringRadiusStep * i, data.ringRadiusMax) * reach;
                     float dmg = ctx.CalculateDamage(data.ringDamage);
                     CombatQuery.GetNearbyDamageables(center, radius, ctx.Controller.gameObject, 32, hits);
                     foreach (var go in hits)
@@ -190,11 +195,12 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
         }
 
         private static async void SpawnEffect(SkillExecutionContext ctx, string key,
-            Vector3 pos, Quaternion rot, float scale, float lifetime)
+            Vector3 pos, Quaternion rot, float scale, float lifetime, RuneElement? element = null)
         {
             if (string.IsNullOrEmpty(key) || ctx.Controller == null) return;
             var obj = await Managers.ObjectPooler.SpawnAsync(
                 key, ObjectPoolerManager.PoolType.Effect, pos, rot);
+            ElementSlashTint.Set(obj, element);   // 속성 검 중 E 베기 = 속성 색(10-26)
             if (obj == null) return;
             obj.transform.localScale = Vector3.one * scale;
             if (obj.TryGetComponent<EffectBehaviour>(out var eb))
@@ -203,16 +209,11 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
                 DespawnAfter(obj, lifetime);
         }
 
-        private static async void DespawnAfter(GameObject obj, float delay)
+        /// <summary>수명을 그 인스턴스에 맡긴다(<see cref="PooledVfxLifetime"/>) — 여기서 타이머를 들면 그 사이 풀로 돌아가 다른 데서 다시 쓰인 이펙트를 옛 타이머가 껐다(10-29 풀 점검 4).</summary>
+        private static void DespawnAfter(GameObject obj, float delay)
         {
-            try
-            {
-                await UniTask.Delay((int)(delay * 1000),
-                    cancellationToken: obj.GetCancellationTokenOnDestroy());
-                if (obj != null && obj.activeInHierarchy)
-                    Managers.ObjectPooler.Despawn(obj);
-            }
-            catch (System.OperationCanceledException) { }
+            if (!obj.TryGetComponent<PooledVfxLifetime>(out var life)) life = obj.AddComponent<PooledVfxLifetime>();
+            life.SetLife(delay);
         }
     }
 }

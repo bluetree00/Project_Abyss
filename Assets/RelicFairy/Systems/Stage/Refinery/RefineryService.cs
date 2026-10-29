@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 
 /// <summary>
-/// 정제소 — 원석을 넣고 돌리면 <b>룬 하나를 무작위로</b> 뽑는다. 런 스코프 상태(천장 · 기록) — 비용은 방마다 처음부터 누진(10-18).
+/// 정제소 — 원석을 넣고 돌리면 <b>룬 하나를 무작위로</b> 뽑는다. 런 스코프 상태(천장 · 기록) — 비용은 방마다 처음부터 누진(10-18) · 누를 때마다 오른다(10-23).
 /// 설계: 바탕화면 기획/RelicFairy_기획_재련소_정제소.md §2.2(원석 → 룬) · 09-28 사용자 「간단하게 줄여서 룬을 랜덤으로 뽑는 시스템으로」.
 ///
 /// 흐름: <see cref="Craft"/> → 등급 굴림(희귀 이상 · 영웅 · 전설도 처음부터 — 10-14 사용자) → 그 등급 룬 풀에서 하나
@@ -14,16 +14,24 @@ public sealed class RefineryService
     // ── 비용/확률 ──
     // 10-15 사용자 「재화는 잘 주되 확률을 내려 더 뽑게 — 도박하는 재미」: 값 12 · 12 · 20 · 20 · 28 … → 10 · 10 · 14 · 14 · 18 …,
     // 원석 수입 ↑(방 보상 4 → 6 등) → 런당 정제 ≈6회 → ≈11회. 등급 확률은 낮추고 천장으로 바닥을 받친다.
-    private const int BaseCost = 10;
-    private const int CostStep = 4;   // 2회마다 +4
+    // 10-23 사용자 「정제소 비용이 계속 올라가는 게 적용되어야 하고 좀 더 비싸져야 — 보통 1~2번」: 10 · 10 · 14 · 14 … → 20 · 30 · 40 · 50 …
+    //   예전엔 2회마다 올라 첫 두 번이 같은 값이었다(한 방문 1~2번이면 오르는 것을 못 본다) → 누를 때마다 +10.
+    //   시뮬(스크래치 eco_1023/final.py · 봉인기 P0 · 재화 방 먼저): 방문당 3.7회(4회 이상 46%) → 1.6회(1~2회 89%) · 런 정제 14.6 → 6.4.
+    public const int BaseCost = 20;
+    private const int CostStep = 10;   // 한 번 정제할 때마다 +10(방을 나가면 처음 값)
 
-    // 등급 확률(고정): 희귀 58 · 영웅 32 · 전설 10(예전 45 · 40 · 15 — 09-28 「정예방보다 좋게」에서 횟수를 늘리는 쪽으로 옮겼다).
+    // 등급 확률: 희귀 58 · 영웅 32 · 전설 10(예전 45 · 40 · 15 — 09-28 「정예방보다 좋게」에서 횟수를 늘리는 쪽으로 옮겼다).
     // 기대 전설 수는 비슷하다(6회 × 15% ≈ 0.9 → 11회 × 10% + 천장 ≈ 1.1).
-    private const float EpicOdds   = 0.32f;
-    private const float LegendOdds = 0.10f;
+    // 10-29 사용자 「정제소는 일반 드랍 확률보다 더 좋은 걸 실시간으로」: 고정값 → 지금 방 보상 확률(챕터 · 시기 · 제단) + 덤.
+    //   전설 = 정예방 한 장 확률 + 4%p(방 보상 중 가장 높은 곳보다 위) · 영웅 = 일반방 + 22%p.
+    //   Ch1 봉인기(정예 전설 6 · 일반 영웅 10)에서 예전 값 10 · 32 그대로 · Ch4 악몽(16 · 31.1)이면 20 · 53.1.
+    private const float EpicOverNormal  = 0.22f;
+    private const float LegendOverElite = 0.04f;
+    private const float LegendCap       = 0.30f;
 
-    /// <summary>천장 — 전설 없이 이만큼 돌리면 다음 한 번은 전설(10-15). 런 단위 · 이어하기에 남는다.</summary>
-    public const int PityLimit = 10;
+    /// <summary>천장 — 전설 없이 이만큼 돌리면 다음 한 번은 전설(10-15). 런 단위 · 이어하기에 남는다.
+    /// 10-24 10 → 5(경제 조정 D1 권장 — 비용 누진 뒤 런당 정제가 줄어 전설 정제가 ≈2.7 → 0.7로 떨어진 것을 ≈1.5로 받친다).</summary>
+    public const int PityLimit = 5;
 
     /// <summary>「정제 등급」(기억의 제단 룬 갈래 · 10-14 강화형 +3%p/단계)이 Epic 확률에 더하는 몫. Rare에서 넘어온다.</summary>
     public static float QualityUnlockEpic => MemoryAltarService.RefineEpicBonus;
@@ -114,9 +122,12 @@ public sealed class RefineryService
 
     // ── 조회 ──
 
-    public int  CurrentCost => EventPrice(BaseCost + (VisitCraftCount / 2) * CostStep);
+    public int  CurrentCost => EventPrice(CostAt(VisitCraftCount));
     /// <summary>이번 정제를 한 뒤의 비용 — 제단 화면 「다음 정제부터 원석 N」(반값 정제 방이면 그 값도 절반). 방을 나가면 다시 처음 값.</summary>
-    public int  NextCost    => EventPrice(BaseCost + ((VisitCraftCount + 1) / 2) * CostStep);
+    public int  NextCost    => EventPrice(CostAt(VisitCraftCount + 1));
+
+    /// <summary>이번 방문 <paramref name="craftsThisVisit"/>번 정제한 뒤의 값(이벤트 반값 전) — 20 · 30 · 40 …(10-23).</summary>
+    public static int CostAt(int craftsThisVisit) => BaseCost + Mathf.Max(0, craftsThisVisit) * CostStep;
     public int  OreOwned    => _fuel?.RuneOre ?? 0;
     public bool CanAfford   => OreOwned >= CurrentCost;
 
@@ -148,10 +159,15 @@ public sealed class RefineryService
     /// </summary>
     public (float rare, float epic, float legend) CurrentOdds()
     {
-        if (PurityReady) return (0f, 1f - LegendOdds, LegendOdds);   // 고순도 원석 — Rare 몫이 Epic으로(10-15)
-        float epic = EpicOdds + QualityUnlockEpic;
-        return (Mathf.Max(0f, 1f - epic - LegendOdds), epic, LegendOdds);
+        float legend = Mathf.Min(LegendCap, RoomRewardTable.BaseOdds(RoomPlanKind.Elite).legendary + LegendOverElite);
+        if (PurityReady) return (0f, 1f - legend, legend);   // 고순도 원석 — Rare 몫이 Epic으로(10-15)
+        float epic = Mathf.Min(1f - legend, RoomRewardTable.BaseOdds(RoomPlanKind.Normal).epic + EpicOverNormal + QualityUnlockEpic);
+        return (1f - epic - legend, epic, legend);
     }
+
+    /// <summary>등급 확률 아래 한 줄 — 방 보상 위라는 것 · 정제 등급(무엇이 확률을 올렸나). 왼쪽 열 폭에 한 줄로 들게 둘 중 하나.</summary>
+    public static string DescribeBoost()
+        => QualityUnlockEpic > 0f ? $"방 보상보다 높게 · 정제 등급 +{QualityUnlockEpic * 100f:F0}%p" : "방 보상보다 높게 · 챕터 · 시기 따라 오름";
 
     // ── 돌리기 ──
 
@@ -203,10 +219,12 @@ public sealed class RefineryService
         return new RefineryOutcome { Success = true, Rarity = rune.rarity, Rune = rune, RuneSo = so, Alt = alt, AltSo = altSo, Spent = cost };
     }
 
-    /// <summary>「정제 두 장」에서 넘겼을 때 — 쓴 원석을 돌려준다(고른 것이 없으니 값도 없다).</summary>
+    /// <summary>「정제 두 장」에서 넘겼을 때 — 쓴 원석을 돌려준다(고른 것이 없으니 값도 없다).
+    /// 이번 방문 비용 단계도 한 칸 되돌린다(10-23 — 누를 때마다 +10이 되어, 넘기고 돌려받았는데 다음 값만 오르면 손해로 읽힌다).</summary>
     public void Refund(int ore)
     {
         if (ore > 0) _fuel?.Add(FuelKind.RuneOre, ore);
+        if (VisitCraftCount > 0) VisitCraftCount--;
     }
 
     /// <summary>정제소가 예전에 만든 존핵인가(아이템 차트에 없는 특수 룬 — id 접두로 가른다). 이어하기 세이브 호환용.</summary>
@@ -274,7 +292,7 @@ public struct RefineryOutcome
     /// <summary>「정제 두 장」의 다른 장(없으면 한 장 정제 — 이미 보관함에 들어갔다).</summary>
     public RuntimeItemData Alt;
     public ItemSO          AltSo;
-    /// <summary>쓴 원석(두 장을 넘기면 돌려준다).</summary>
+    /// <summary>쓴 원석.</summary>
     public int             Spent;
 
     public static RefineryOutcome Fail(string reason) => new RefineryOutcome { Success = false, FailReason = reason };

@@ -381,7 +381,8 @@ public static class MemoryAltarService
         if (data == null) return 0;
         // 묶음마다 기록 키가 따로다 — 10-02 환급을 이미 받은 세이브도 10-14(「챕터 4 개방」) 몫은 받는다.
         int refund = RefundBatch(data, MemoryAltarCatalog.RemovedNodes, MemoryAltarCatalog.Rec.RemovedNodesRefunded)
-                   + RefundBatch(data, MemoryAltarCatalog.RemovedNodes1014, MemoryAltarCatalog.Rec.RemovedNodesRefunded1014);
+                   + RefundBatch(data, MemoryAltarCatalog.RemovedNodes1014, MemoryAltarCatalog.Rec.RemovedNodesRefunded1014)
+                   + RefundBatch(data, MemoryAltarCatalog.RemovedNodes1029, MemoryAltarCatalog.Rec.RemovedNodesRefunded1029);
         if (refund > 0)
             Debug.Log($"[MemoryAltar] 카탈로그에서 뺀 노드 — 정수 {refund} 환급");
         return refund;
@@ -400,7 +401,9 @@ public static class MemoryAltarService
 
     // ── 해금 효과 조회 (게임플레이 쪽에서 읽는 창구) ────────
 
-    /// <summary>드랍 풀에 들어와 있는 최고 등급. 해금 전에는 하위 등급으로 폴백된다(정본 §4).</summary>
+    /// <summary>드랍 풀에 들어와 있는 최고 등급. 해금 전에는 하위 등급으로 폴백된다(정본 §4).
+    /// 10-29 Legendary는 예외 — 안 열어도 <see cref="LockedLegendShare"/>만큼 남는다(연 칸은 「확률 업」).</summary>
+    public const float LockedLegendShare = 0.1f;   // 10-29 사용자 「전설룬은 낮은 확률이여도 나올 수 있게」 — 안 열면 굴린 전설의 10%만 남는다
     public static bool IsEpicUnlocked      => IsUnlocked(MemoryAltarCatalog.RuneEpic);
     public static bool IsLegendaryUnlocked => IsUnlocked(MemoryAltarCatalog.RuneLegendary);
 
@@ -409,10 +412,12 @@ public static class MemoryAltarService
     /// <para>가중치를 건드리지 않고 <b>결과만</b> 내리는 이유: 굴림 자체는 시드 결정적이어야
     /// 이어하기 복원이 어긋나지 않는다. 클램프는 순수 함수라 결정성을 깨지 않는다.</para>
     /// <para>둘 다 미해금이면 Legendary → Epic → Rare로 연쇄 강등된다.</para>
+    /// <para>10-29 Legendary는 안 열어도 <see cref="LockedLegendShare"/>(10%)만큼 남는다 — 전역 Random으로 굴린다
+    /// (방 보상은 방 시드로 갈아 끼운 상태라 이어하기 복원도 같은 결과). 남은 전설이 Epic 잠금보다 앞선다.</para>
     /// </summary>
     public static ItemRarity ClampRarity(ItemRarity rolled)
     {
-        if (rolled == ItemRarity.Legendary && !IsLegendaryUnlocked) rolled = ItemRarity.Epic;
+        if (rolled == ItemRarity.Legendary && !IsLegendaryUnlocked && UnityEngine.Random.value >= LockedLegendShare) rolled = ItemRarity.Epic;
         if (rolled == ItemRarity.Epic      && !IsEpicUnlocked)      rolled = ItemRarity.Rare;
         return rolled;
     }
@@ -421,7 +426,8 @@ public static class MemoryAltarService
     /// 지금 나올 수 있는 룬 최고 등급. 등급이 <b>정해진 채로</b> 고르는 경로(상점 진열)는 굴림이 없어
     /// <see cref="ClampRarity"/>를 탈 수 없으니 이 값으로 후보를 거른다.
     /// </summary>
-    public static ItemRarity MaxRuneRarity => ClampRarity(ItemRarity.Legendary);
+    /// 10-29 굴림이 없는 길이라 드문 전설(<see cref="LockedLegendShare"/>)은 넣지 않는다 — 연 등급까지만(예전과 같다).
+    public static ItemRarity MaxRuneRarity => IsLegendaryUnlocked ? ItemRarity.Legendary : IsEpicUnlocked ? ItemRarity.Epic : ItemRarity.Rare;
 
     /// <summary>
     /// 등급 확률 세 몫을 해금 범위로 <b>접는다</b> — 잠긴 등급의 몫은 한 단계 아래로 넘어간다.
@@ -430,7 +436,7 @@ public static class MemoryAltarService
     /// </summary>
     public static (float rare, float epic, float legend) FoldOdds(float rare, float epic, float legend)
     {
-        if (!IsLegendaryUnlocked) { epic += legend; legend = 0f; }
+        if (!IsLegendaryUnlocked) { epic += legend * (1f - LockedLegendShare); legend *= LockedLegendShare; }   // 10-29 드물게 남는다
         if (!IsEpicUnlocked)      { rare += epic;   epic   = 0f; }
         return (rare, epic, legend);
     }
@@ -497,6 +503,13 @@ public static class MemoryAltarService
     /// <summary>「재정비의 샘」 챕터 시작 샘 회복 더하기(최대 체력 비) — 평소 +0.20/단계 · 악몽 +0.10/단계.</summary>
     public static float SpringHealBonus(bool nightmare)
         => (nightmare ? MemoryAltarCatalog.NightmareSpringHealPerLevel : MemoryAltarCatalog.SpringHealPerLevel) * Level(MemoryAltarCatalog.LibSpring);
+    // ── 근접 버팀 3칸(10-29 · 설계 §2) — 근접 무기를 들 때만 효과 쪽(47)이 읽는다. 상한(보호막 25% · 받피감소 40%)은 효과 쪽이 자른다 ──
+    /// <summary>「강철 의지」 방 입장 보호막(최대 체력 비 · 0 = 안 삼).</summary>
+    public static float MeleeIronWillShield => MemoryAltarCatalog.MeleeIronWillShield[Mathf.Clamp(Level(MemoryAltarCatalog.MeleeIronWill), 0, 3)];
+    /// <summary>「근접 자세」 받는 피해 감소(0 ~ 0.14).</summary>
+    public static float MeleeStanceReduction => MemoryAltarCatalog.MeleeStanceReduction[Mathf.Clamp(Level(MemoryAltarCatalog.MeleeStance), 0, 3)];
+    /// <summary>「버티는 숨」을 샀는가.</summary>
+    public static bool HasMeleeLastBreath => IsUnlocked(MemoryAltarCatalog.MeleeLastBreath);
     public static bool HasRevive           => IsUnlocked(MemoryAltarCatalog.Revive);
 
     /// <summary>

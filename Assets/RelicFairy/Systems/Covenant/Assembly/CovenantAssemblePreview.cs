@@ -27,6 +27,10 @@ public readonly struct CovenantAssemblePreview
     /// <summary>원인 형상 — 질적 변형(기폭 단일/광역, 처형 표식 등)이 미리보기 문구에도 반영돼야 한다.</summary>
     public readonly CauseClass causeClass;
     public readonly bool       causeTargeted;
+    /// <summary>원인 계기 — 학살(N마리 처치)은 쓰러진 자리에서 시작한다(10-23 줄 글 「누구에게」).</summary>
+    public readonly CauseTriggerKind causeTrigger;
+    /// <summary>원인 문턱 수(포위 = 5m 안 적 수) — 격노 위험 변형 안내.</summary>
+    public readonly int        causeThreshold;
 
     private CovenantAssemblePreview(
         CovenantPalette.CauseDef c, CovenantTier ct,
@@ -51,6 +55,8 @@ public readonly struct CovenantAssemblePreview
         role        = e.role;
         causeClass  = c.cls;
         causeTargeted = c.targeted;
+        causeTrigger  = c.trigger;
+        causeThreshold = c.thresholdInt;
     }
 
     /// <summary>고른 조합의 유효 수치 미리보기. 미해결 조합이면 valid=false.</summary>
@@ -76,59 +82,142 @@ public readonly struct CovenantAssemblePreview
     /// <summary>결과 문장: "OO 할 때 → 실제 수치" (중앙 미리보기용). 서술형 설명(effectDesc)은 무슨 기능인지 안 읽혀 수치로 쓴다(09-29).</summary>
     public string ResultSentence => valid ? causeDesc + " → " + EffectAmountLabel() : "";
 
-    /// <summary>카드 · HUD처럼 좁은 칸용 — 괄호 속 부연(최대 중첩 · 상한)을 뺀 수치 한 줄.</summary>
+    /// <summary>
+    /// 카드 · 좁은 칸용 한 줄 — 「누구에게」는 빼고 「무엇이 · 얼마나」만(조립 카드 설명 두 줄 ≈ 26자 안).
+    /// 10-23 U8 사용자 「『화상 공격력×80%』 같은 건 감도 안 잡힌다」 — 「4초 동안 불탄다(초당 공격력 80%)」처럼 일어나는 일로 쓴다.
+    /// 값은 전부 실제 동작값(effective — 런타임 <see cref="CovenantClause"/>와 같은 식)이다.
+    /// </summary>
     public string EffectAmountCompact()
-    {
-        // 정지는 괄호 속이 핵심(기절 시간)이라 줄이면 수치가 사라진다 — 좁은 칸용 문장을 따로 둔다.
-        if (valid && effectKind == EffectKind.Stasis)
-            return $"감전 1중첩당 {effective:0.00}초 기절 · 반경 {radius:0.0}m";
-        string s = EffectAmountLabel();
-        int cut = s.IndexOf(" (", System.StringComparison.Ordinal);
-        return cut > 0 ? s.Substring(0, cut) : s;
-    }
-
-    /// <summary>효과 크기 한 줄 표시(효과 종류별 단위). 값은 전부 실제 동작값(effective)이다.</summary>
-    public string EffectAmountLabel()
     {
         if (!valid) return "";
         return effectKind switch
         {
-            EffectKind.DamageBuff => $"피해 +{effective * 100f:0}% · {duration:0}초",
-            EffectKind.AoeBurst   => $"광역 피해 ×{effective:0.0} · 반경 {radius:0.0}m",
-            EffectKind.Shield     => $"보호막 {effective:0}",
-            EffectKind.GoldBurst  => $"골드 +{effective:0}",
-            EffectKind.Curse      => $"받는 피해 +{effective * 100f:0}% · {duration:0}초",
-            EffectKind.Execute    => $"체력 {effective * 100f:0}% 이하 즉사",
-            EffectKind.Burn       => $"화상 공격력×{effective * 100f:0}% · {duration:0}초",
-            EffectKind.Invincible => $"무적 {effective:0.0}초",
-            EffectKind.DeathSave  => $"쓰러짐 막기 +1 · 최대 {effectiveCount}",
-            EffectKind.StatBuff   => MomentumLabel(),
-            EffectKind.BleedStack => $"출혈 공격력×{effective * 100f:0}% · {duration:0}초 (최대 {CovenantMath.BleedMaxStacks}중첩)",
+            EffectKind.AoeBurst   => $"반경 {M(radius)} 폭발(공격력 {P(effective)})",
+            EffectKind.Curse      => $"적이 {Sec(duration)} 동안 받는 피해 +{P(effective)}",
+            EffectKind.Execute    => $"체력 {P(ExecuteThreshold)} 이하인 적 즉사",
+            EffectKind.Burn       => $"{Sec(duration)} 동안 불탄다(초당 공격력 {P(effective)})",
+            EffectKind.BleedStack => $"{Sec(duration)} 동안 피 흘린다(초당 공격력 {P(effective)})",
             EffectKind.Detonate   => causeTargeted
-                ? $"화상·출혈 {CovenantMath.DetonateFraction * 100f:0}% 기폭 · 파편 ×{effective:0.0} · 반경 {radius:0.0}m"
-                : $"주변 전체 화상·출혈 {CovenantMath.DetonateFraction * 100f:0}% 분산 기폭 · 반경 {radius:0.0}m",
-            EffectKind.Harvest    => $"화상·출혈 {CovenantMath.HarvestFraction * 100f:0}% 수확 → 쿨감 {effective:0.0}초 · 골드 +{CovenantMath.HarvestGold}",
-            EffectKind.Arcflash   => causeClass == CauseClass.Skill
-                ? $"감전 1중첩 · 순차 체인 {effectiveCount + CovenantMath.ArcflashChainBonus + 1}체 (간격 {CovenantMath.ArcflashChainHop:0}m)"
-                : $"감전 1중첩 · 방사형 {effectiveCount + 1}체 · 반경 {radius:0.0}m",
-            EffectKind.Stasis     => $"감전 전량 소모 → 반경 {radius:0.0}m 기절 (1중첩당 {effective:0.00}초 · 최대 {CovenantMath.StasisStunCap:0.0}초)",
-            EffectKind.Ward       => $"받는 피해 -{effective * 100f:0}% · {duration:0}초 (상태 걸린 적 1마리당 -{CovenantMath.WardPerSteepedEnemy * 100f:0}%p · 최대 -{CovenantMath.WardReductionCap * 100f:0}%)",
-            _                     => $"{effective:0.0}",
+                ? $"화상 · 출혈 {P(CovenantMath.DetonateFraction)} 터뜨림 · 둘레 {M(radius)}에 그 {P(effective)}"
+                : $"{M(radius)} 안 적 모두의 화상 · 출혈 {P(CovenantMath.DetonateFraction)} 터뜨림",
+            EffectKind.Harvest    => $"화상 · 출혈 걷어 스킬 대기 -{effective:0.0}초 · 골드 +{CovenantMath.HarvestGold}",
+            EffectKind.Arcflash   => ArcChain
+                ? $"{CovenantMath.ArcflashChainHop:0}m씩 튀며 적 {ArcCount}마리에게 감전 1개씩"
+                : $"{M(radius)} 안 적 {ArcCount}마리에게 감전 1개씩",
+            EffectKind.Stasis     => $"{M(radius)} 안 감전 1개당 {effective:0.00}초 기절",
+            _                     => SelfText(),
         };
     }
 
-    /// <summary>「박차」는 원인 형상에 따라 주축이 바뀐다(기동=이속·상한↑ / 처치=공속·지속2배).</summary>
+    /// <summary>
+    /// 미리보기 「효과」 줄 — 첫 결과(원인에서 곧바로)가 <b>누구에게</b> 일어나는가 + 수치 + 덧붙임(쌓임 · 상한 · 보스).
+    /// 10-23 U8 — 예전 「광역 피해 ×3.2 · 반경 3.5m」는 어디서 · 누구에게가 없었다.
+    /// </summary>
+    public string EffectAmountLabel()
+    {
+        if (!valid) return "";
+        SubjectAtCause(out var who, out var at, out var area);
+        return Clause(who, at, area) + Detail();
+    }
+
+    /// <summary>
+    /// 결과 한 문장 — 받는 쪽을 주어로(서약서 줄 · HUD · 미리보기). <paramref name="who"/> = 받는 적(「맞힌 적」 · 「8m 안에서 가장 가까운 적」 …),
+    /// <paramref name="at"/> = 폭발 자리(받은 첫 적, 없으면 자리), <paramref name="area"/> = 분산 기폭 중심(자리). 이름은 <see cref="CovenantGrammar"/>가 짓는다.
+    /// 「나」 쪽 결과(격노 · 박차 · 보호막 · 성역 · 결계 · 숨결 · 황금비)는 받는 쪽이 없어 카드 글과 같다.
+    /// </summary>
+    public string Clause(string who, string at, string area)
+    {
+        if (!valid) return "";
+        return effectKind switch
+        {
+            EffectKind.Burn       => $"{who}이 {Sec(duration)} 동안 불탄다(초당 공격력 {P(effective)})",
+            EffectKind.BleedStack => $"{who}이 {Sec(duration)} 동안 피 흘린다(초당 공격력 {P(effective)})",
+            EffectKind.Curse      => $"{who}이 {Sec(duration)} 동안 받는 피해 +{P(effective)}",
+            // 경계 원인(선제 · 개선)의 처형은 받은 적이 아니라 12m 안 체력이 가장 낮은 적을 짚고 기준이 두 배다(CovenantClause.TryExecute)
+            EffectKind.Execute    => causeClass == CauseClass.Boundary
+                ? $"{CovenantClause.ExecuteMarkRadius:0}m 안에서 체력이 가장 낮은 적이 체력 {P(ExecuteThreshold)} 이하면 즉사"
+                : $"{who}이 체력 {P(ExecuteThreshold)} 이하면 즉사",
+            EffectKind.AoeBurst   => $"{at}에서 {M(radius)} 폭발(공격력 {P(effective)})",
+            EffectKind.Arcflash   => ArcChain
+                ? $"{who}과 {CovenantMath.ArcflashChainHop:0}m씩 이어진 적 {ArcCount - 1}마리에게 감전 1개씩"
+                : $"{who}과 그 둘레 {M(radius)} 안 적 {ArcCount - 1}마리에게 감전 1개씩",
+            EffectKind.Stasis     => $"{who} 둘레 {M(radius)} 안 적의 감전을 걷어 1개당 {effective:0.00}초 기절",
+            EffectKind.Detonate   => causeTargeted
+                ? $"{who}의 화상 · 출혈 {P(CovenantMath.DetonateFraction)}를 터뜨리고 {M(radius)} 안 다른 적에게 그 {P(effective)}"
+                : $"{area} {M(radius)} 안 적 모두의 화상 · 출혈 {P(CovenantMath.DetonateFraction)}를 터뜨린다",
+            EffectKind.Harvest    => $"{who}의 화상 · 출혈 {P(CovenantMath.HarvestFraction)}를 걷어 스킬 대기 -{effective:0.0}초 · 골드 +{CovenantMath.HarvestGold}",
+            _                     => SelfText(),
+        };
+    }
+
+    /// <summary>
+    /// 첫 결과가 받는 쪽(원인에서 곧바로) — <see cref="CovenantSentence"/>의 연쇄 시작 · <see cref="CovenantClause"/>의 대상 해석과 같은 규칙:
+    /// 적을 가리키는 원인(연격 · 겨눔 · 전환 · 사냥 개시 · 선제) = 맞힌 적 · 학살 = 마지막으로 쓰러진 자리 ·
+    /// 그 밖(심장박동 · 연주 · 포위 · 행군 · 개선) = 나를 중심으로 — 적 하나가 필요하면 8m 안에서 가장 가까운 적.
+    /// </summary>
+    public void SubjectAtCause(out string who, out string at, out string area)
+    {
+        if (causeTrigger == CauseTriggerKind.OnKillStreak) { who = "쓰러진 자리에서 가장 가까운 적"; at = area = "쓰러진 자리"; }
+        else if (causeTargeted)                            { who = "맞힌 적"; at = area = "맞힌 적 자리"; }
+        else                                               { who = NearMe; at = "내 자리"; area = "내 둘레"; }
+    }
+
+    /// <summary>「8m 안에서 가장 가까운 적」 — 받을 적이 없을 때 나를 중심으로 찾는 반경(<see cref="CovenantClause.TargetSearchRadius"/>).</summary>
+    public static string NearMe => $"{CovenantClause.TargetSearchRadius:0}m 안에서 가장 가까운 적";
+
+    /// <summary>미리보기에만 붙는 덧붙임 — 쌓임 · 상한 · 보스 · 위험 변형(카드 · 서약서 줄엔 길어서 뺀다).</summary>
+    private string Detail() => effectKind switch
+    {
+        EffectKind.AoeBurst   => $" · 둘레에 상태 걸린 적 1마리당 반경 +{CovenantMath.SupernovaRadiusPerSteeped:0.#}m(최대 {CovenantMath.AoeRadiusCap:0.#}m)",
+        EffectKind.DamageBuff => causeClass == CauseClass.Danger ? $" · 5m 안 적이 {causeThreshold}마리 아래로 줄면 바로 꺼진다" : string.Empty,
+        EffectKind.BleedStack => $" · 다시 걸면 최대 {CovenantMath.BleedMaxStacks}번까지 쌓인다",
+        EffectKind.Execute    => $" · 걸린 상태(화상 · 출혈 · 감전 · 저주) 1종마다 기준 ×{CovenantMath.ExecuteStatusMult:0.#}(최대 {P(CovenantMath.ExecuteThresholdCap)}) · 보스는 즉사 대신 최대 체력의 {P(effective)} 피해",
+        EffectKind.Arcflash   => $" · 감전은 적마다 최대 {CovenantStatus.ShockMaxStacks}개(1개당 이동 속도 -{P(CovenantStatus.ShockSlowPerStack)})",
+        EffectKind.Stasis     => $" · 기절은 최대 {CovenantMath.StasisStunCap:0.#}초",
+        EffectKind.Ward       => $" · {M(radius)} 안 상태 걸린 적 1마리당 -{P(CovenantMath.WardPerSteepedEnemy)}p(최대 -{P(CovenantMath.WardReductionCap)})",
+        EffectKind.StatBuff   => $" · 다시 터지면 겹쳐 쌓인다(최대 {CovenantMath.MomentumStackCap(causeClass)}번)",
+        _                     => string.Empty,
+    };
+
+    /// <summary>「나」 쪽 결과 — 받는 쪽이 없는 효과.</summary>
+    private string SelfText() => effectKind switch
+    {
+        EffectKind.DamageBuff => $"{Sec(duration)} 동안 내 피해 +{P(FuryAmp)}",
+        EffectKind.Shield     => $"보호막 +{effective:0}",
+        EffectKind.GoldBurst  => $"골드 +{effective:0}",
+        EffectKind.Invincible => $"{effective:0.0}초 무적",
+        EffectKind.DeathSave  => $"죽을 피해 1번 버티기 +1(최대 {effectiveCount}번)",
+        EffectKind.StatBuff   => MomentumLabel(),
+        EffectKind.Ward       => $"{Sec(duration)} 동안 받는 피해 -{P(effective)}",
+        _                     => $"{effective:0.0}",
+    };
+
+    /// <summary>「박차」는 원인 형상에 따라 주축이 바뀐다(기동=이속·상한↑ / 처치=공속·지속2배). 1번 터질 때의 값.</summary>
     private string MomentumLabel()
     {
         float off = effective * CovenantMath.MomentumOffAxisRatio;
-        int   cap = CovenantMath.MomentumStackCap(causeClass);
         return causeClass switch
         {
-            CauseClass.Mobility => $"이속 +{effective * 100f:0}% · 공속 +{off * 100f:0}% (최대 {cap}중첩)",
-            CauseClass.Kill     => $"공속 +{effective * 100f:0}% · 이속 +{off * 100f:0}% · 지속 {duration * CovenantMath.MomentumKillDurationMult:0}초 (최대 {cap}중첩)",
-            _                   => $"이속 +{effective * 100f:0}% · 공속 +{effective * CovenantMath.MomentumAtkSpeedRatio * 100f:0}% (최대 {cap}중첩)",
+            CauseClass.Mobility => $"{Sec(duration)} 동안 이동 속도 +{P(effective)} · 공격 속도 +{P(off)}",
+            CauseClass.Kill     => $"{Sec(duration * CovenantMath.MomentumKillDurationMult)} 동안 공격 속도 +{P(effective)} · 이동 속도 +{P(off)}",
+            _                   => $"{Sec(duration)} 동안 이동 속도 +{P(effective)} · 공격 속도 +{P(effective * CovenantMath.MomentumAtkSpeedRatio)}",
         };
     }
+
+    /// <summary>「격노」 실제 증폭 — 위험 원인(포위)이면 ×1.25(<see cref="CovenantClause"/> FuryAmp와 같은 식). 10-23: 예전 카드 · 줄엔 ×1.25가 빠져 있었다.</summary>
+    private float FuryAmp => effective * (causeClass == CauseClass.Danger ? CovenantMath.FuryDangerBonus : 1f);
+
+    /// <summary>처형 기준 — 경계 원인은 ×2(상한 60%). 상태 종수 배수는 그 순간 적에게 달려 있어 덧붙임으로만 말한다.</summary>
+    private float ExecuteThreshold => UnityEngine.Mathf.Min(
+        effective * (causeClass == CauseClass.Boundary ? CovenantMath.ExecuteBoundaryMult : 1f), CovenantMath.ExecuteThresholdCap);
+
+    /// <summary>방전 — 감전이 걸리는 적 수(첫 적 포함). 스킬 원인은 체인이라 한 마리 더.</summary>
+    private bool ArcChain => causeClass == CauseClass.Skill;
+    private int  ArcCount => effectiveCount + (ArcChain ? CovenantMath.ArcflashChainBonus : 0) + 1;
+
+    private static string P(float v)   => $"{v * 100f:0}%";
+    private static string M(float r)   => $"{r:0.#}m";
+    private static string Sec(float s) => $"{s:0.#}초";
 
     /// <summary>카드 통화 배지 문구. 예: "생존 · 보호막".</summary>
     public string Badge => valid ? EffectTaxonomy.Badge(axis, status) : "";

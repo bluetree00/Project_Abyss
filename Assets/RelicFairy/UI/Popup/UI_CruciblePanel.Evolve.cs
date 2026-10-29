@@ -13,9 +13,15 @@ using UnityEngine.UI;
 /// </summary>
 public sealed partial class UI_CruciblePanel
 {
-    private const float EvTitleY = 40f, EvSubY = 94f, EvBtnY = 834f, EvHintY = 906f;
-    private const float EvCarryY = 938f;   // 10-18 — 이어지는 것 한 줄 자리(지금은 비어 있고 꺼 둔다)
-    private const float EvStepY = 284f, EvStepH = 44f;   // 「이렇게 싸운다」 세 줄
+    private const float EvTitleY = 40f, EvSubY = 94f, EvBtnY = 846f, EvHintY = 916f;
+    private const float EvCarryY = 948f;   // 10-18 — 이어지는 것 한 줄 자리(지금은 비어 있고 꺼 둔다)
+    private const float EvStepY = 356f, EvStepH = 40f;   // 「이렇게 싸운다」 세 줄
+    // 10-26 사용자 「무형검 진화 때 무기 선택 · 형 고르는 카드 리소스가 너무 안 좋다 — 힉스필드로 실제 오브젝트 모양 살려서」
+    //   카드 머리 = 실제 무기 모델을 참조로 그린 21:9 그림(오른쪽 542×230 · 왼쪽 · 아래가 투명) — 이름 줄은 그 어두운 왼쪽에 얹는다.
+    //   형 머리 왼쪽 = 형 문장(84). 창 배경 = 모루 위 무형검(4:3 → 목업 1.6 비율로 위아래를 잘라 깐다).
+    private const float EvBannerW = 542f, EvBannerH = 230f, EvEmblem = 84f;
+    private const float EvDividerY = 240f, EvFormY = 252f, EvFormX = 120f, EvRuleY = 480f, EvLostY = 520f, EvStatY = 566f, EvFootY = 642f;
+    private const float EvBackdropAlpha = 0.42f;   // 카드 밖 여백(제목 · 버튼 줄)에만 비친다 — 글자가 읽히게 반쯤
 
     private UIThinFrame _evolveConfirmFrame;
     // 10-18 ⑧ 환영 이식 — 진화하면 무엇이 이어지나 한 줄(무형검 증강 → 등 뒤 환영 · 비어 있는 칼집 → 새 무기 증강). 이어질 것이 없으면 끈다
@@ -27,7 +33,7 @@ public sealed partial class UI_CruciblePanel
         public CanvasGroup   group;
         public UIThinFrame   frame;
         public Button        button;
-        public Image         icon, iconGlow;
+        public Image         icon, iconGlow, banner, formEmblem, under;
         public TMP_Text      meta, lostChip, name, skills, formHead, formLine, rule, lost, foot;
         public readonly TMP_Text[] steps = new TMP_Text[3];
         public readonly TMP_Text[] statValue = new TMP_Text[4];
@@ -73,6 +79,24 @@ public sealed partial class UI_CruciblePanel
         ShopUIStyle.Stretch(_evolveContent);
         var d = _evolveContent;   // 창(1600×1000)과 같은 크기 — 목업 좌표로 앉힌다
 
+        // 배경 — 모루 위 무형검(10-26). 맨 먼저 깔아 모든 것 뒤 · 4:3 그림을 목업 비율(1.6)로 위아래만 잘라 찌그러지지 않게
+        var backdropArt = UISkin.Crucible?.EvolveBackdrop;
+        if (backdropArt != null)
+        {
+            var bd = new GameObject("Backdrop", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
+            bd.transform.SetParent(d, false);
+            ShopUIStyle.Stretch(bd.rectTransform);
+            // v3 판(1560×880)은 목업(1.6)보다 넓다 — 양옆으로 늘려 판 가로를 꽉 채운다(양옆 어두운 띠가 남았다)
+            float padX = _v3Ready ? Mathf.Max(0f, (V3W / Mathf.Min(V3W / MockW, V3H / MockH) - MockW) * 0.5f) : 0f;
+            bd.rectTransform.offsetMin = new Vector2(-padX, 0f);
+            bd.rectTransform.offsetMax = new Vector2(padX, 0f);
+            bd.texture = backdropArt.texture;
+            float vis = Mathf.Min(1f, (backdropArt.rect.width / backdropArt.rect.height) / ((MockW + 2f * padX) / MockH));
+            bd.uvRect = new Rect(0f, (1f - vis) * 0.5f, 1f, vis);
+            bd.color = new Color(1f, 1f, 1f, EvBackdropAlpha);
+            bd.raycastTarget = false;
+        }
+
         _evolveTitle = MakeLabel(d, "Title", 32f, FontStyles.Normal, TextAlignmentOptions.Center, UITheme.Thin.Ink);   // DNF는 제목 한 줄 · 금은 확정 버튼에
         _evolveTitle.textWrappingMode = TextWrappingModes.NoWrap;
         Place(_evolveTitle.rectTransform, 0f, EvTitleY, MockW, 52f);
@@ -102,43 +126,68 @@ public sealed partial class UI_CruciblePanel
     private EvolveCard BuildEvolveCard(Transform d, int k)
     {
         var c = new EvolveCard();
+        // 창 배경 그림이 있으면 옅어진 카드(0.55) 뒤로 그림이 비쳐 글자를 덮는다 — 카드 자리에 불투명 받침을 깔아 글만 옅어지게(10-26)
+        if (UISkin.Crucible?.EvolveBackdrop != null)
+        {
+            c.under = ShopUIStyle.MakeImage(d, k == 0 ? "EvolveAUnder" : "EvolveBUnder", CardSolid, raycast: false);
+            Place(c.under.rectTransform, 128f + k * (EvCardW + EvCardGap), EvCardY, EvCardW, EvCardH);
+        }
         var bg = ShopUIStyle.MakeImage(d, k == 0 ? "EvolveA" : "EvolveB", CardSolid, raycast: true);
         c.root = bg.rectTransform;
         Place(c.root, 128f + k * (EvCardW + EvCardGap), EvCardY, EvCardW, EvCardH);
         c.group = bg.gameObject.AddComponent<CanvasGroup>();
+
+        // 머리 그림(10-26) — 테보다 먼저 깔아 얇은 테가 그림 위에 그려진다. 그림이 있으면 작은 아이콘 칸은 짓지 않는다
+        bool art = UISkin.Crucible?.EvolveBanner(false) != null;
+        if (art)
+        {
+            c.banner = ShopUIStyle.MakeImage(c.root, "Banner", Color.white);
+            c.banner.raycastTarget = false;
+            PlaceIn(c.banner.rectTransform, EvCardW - EvBannerW - 1f, 1f, EvBannerW, EvBannerH, EvCardW, EvCardH);
+        }
         c.frame = UIThinFrame.Create(c.root, ThinShape.Square, new Vector2(EvCardW, EvCardH));
 
-        // 무기 줄 — 그림 112 · 성격 · 계열 한 줄 · 이름 30 · E · R
-        var iconBox = ShopUIStyle.MakeImage(c.root, "IconBox", new Color(0f, 0f, 0f, 0.35f));
-        PlaceIn(iconBox.rectTransform, 24f, 24f, 112f, 112f, EvCardW, EvCardH);
-        UIThinBox.Create(iconBox.rectTransform, "Line", Vector2.zero, Vector2.one, 0f, UITheme.Thin.InkA(0.2f), Color.clear, Color.clear);
-        c.iconGlow = ShopUIStyle.MakeImage(iconBox.transform, "Glow", Color.clear);
-        c.iconGlow.sprite = UI_RuneSelectPopup.SoftDot;
-        ShopUIStyle.Stretch(c.iconGlow.rectTransform);
-        c.icon = ShopUIStyle.MakeImage(iconBox.transform, "Icon", Color.white);
-        c.icon.preserveAspect = true;
-        PlaceIn(c.icon.rectTransform, 8f, 8f, 96f, 96f, 112f, 112f);
+        // 무기 줄 — (그림 112 ·) 성격 · 계열 한 줄 · 이름 30 · E · R. 머리 그림이면 그 어두운 왼쪽에 얹는다
+        float textX = 156f, textW = EvCardW - 180f;
+        if (!art)
+        {
+            var iconBox = ShopUIStyle.MakeImage(c.root, "IconBox", new Color(0f, 0f, 0f, 0.35f));
+            PlaceIn(iconBox.rectTransform, 24f, 24f, 112f, 112f, EvCardW, EvCardH);
+            UIThinBox.Create(iconBox.rectTransform, "Line", Vector2.zero, Vector2.one, 0f, UITheme.Thin.InkA(0.2f), Color.clear, Color.clear);
+            c.iconGlow = ShopUIStyle.MakeImage(iconBox.transform, "Glow", Color.clear);
+            c.iconGlow.sprite = UI_RuneSelectPopup.SoftDot;
+            ShopUIStyle.Stretch(c.iconGlow.rectTransform);
+            c.icon = ShopUIStyle.MakeImage(iconBox.transform, "Icon", Color.white);
+            c.icon.preserveAspect = true;
+            PlaceIn(c.icon.rectTransform, 8f, 8f, 96f, 96f, 112f, 112f);
+        }
+        else { textX = 28f; textW = 380f; }
         c.meta = ThinText(c.root, "Meta", 18f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.6f));
-        PlaceIn(c.meta.rectTransform, 156f, 26f, EvCardW - 180f, 28f, EvCardW, EvCardH);
+        PlaceIn(c.meta.rectTransform, textX, 26f, textW, 28f, EvCardW, EvCardH);
         c.name = ThinText(c.root, "Name", 30f, UIWeight.Medium, TextAlignmentOptions.MidlineLeft, UITheme.Thin.Ink);
-        PlaceIn(c.name.rectTransform, 156f, 56f, EvCardW - 180f, 46f, EvCardW, EvCardH);
+        PlaceIn(c.name.rectTransform, textX, 56f, textW, 46f, EvCardW, EvCardH);
         c.skills = ThinText(c.root, "Skills", 18f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.7f));
         c.skills.richText = true;
-        PlaceIn(c.skills.rectTransform, 156f, 104f, EvCardW - 180f, 30f, EvCardW, EvCardH);
+        PlaceIn(c.skills.rectTransform, textX, 104f, textW, 30f, EvCardW, EvCardH);
 
         var div = ShopUIStyle.MakeImage(c.root, "Divider", UITheme.Thin.InkA(0.15f));
-        PlaceIn(div.rectTransform, 24f, 154f, EvCardW - 48f, 1f, EvCardW, EvCardH);
+        PlaceIn(div.rectTransform, 24f, EvDividerY, EvCardW - 48f, 1f, EvCardW, EvCardH);
 
-        // 형 — 주인공
+        // 형 — 주인공. 왼쪽에 형 문장(10-26 — 「무기 능력」 그림)
+        c.formEmblem = ShopUIStyle.MakeImage(c.root, "FormEmblem", Color.white);
+        c.formEmblem.raycastTarget = false;
+        c.formEmblem.preserveAspect = true;
+        PlaceIn(c.formEmblem.rectTransform, 24f, EvFormY - 2f, EvEmblem, EvEmblem, EvCardW, EvCardH);
+        c.formEmblem.enabled = false;
         c.formHead = ThinText(c.root, "FormHead", 34f, UIWeight.Medium, TextAlignmentOptions.MidlineLeft, Color.white);
         c.formHead.richText = true;
-        PlaceIn(c.formHead.rectTransform, 24f, 166f, EvCardW - 48f, 58f, EvCardW, EvCardH);
+        PlaceIn(c.formHead.rectTransform, EvFormX, EvFormY, EvCardW - EvFormX - 24f, 58f, EvCardW, EvCardH);
         c.formLine = ThinText(c.root, "FormLine", 22f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.Ink);
         c.formLine.richText = true;
         c.formLine.enableAutoSizing = true;   // 긴 한 줄(「느리지만, 무게 4가 찬 뒤 …」)이 카드 테를 넘었다 — 18(화면 15.8)까지만 줄인다
         c.formLine.fontSizeMax = 22f;
         c.formLine.fontSizeMin = 18f;
-        PlaceIn(c.formLine.rectTransform, 24f, 226f, EvCardW - 48f, 34f, EvCardW, EvCardH);
+        PlaceIn(c.formLine.rectTransform, EvFormX, EvFormY + 58f, EvCardW - EvFormX - 24f, 34f, EvCardW, EvCardH);
 
         // 이렇게 싸운다 — ① 쌓기 → ② 가득 → ③ 발동(작동 그림 3컷 대신 글 세 줄)
         for (int i = 0; i < 3; i++)
@@ -150,18 +199,18 @@ public sealed partial class UI_CruciblePanel
 
         c.rule = ThinText(c.root, "Rule", 18f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.6f));
         c.rule.richText = true;
-        PlaceIn(c.rule.rectTransform, 24f, 422f, EvCardW - 48f, 30f, EvCardW, EvCardH);
+        PlaceIn(c.rule.rectTransform, 24f, EvRuleY, EvCardW - 48f, 30f, EvCardW, EvCardH);
 
         c.lostBox = ChipBox(c.root, "LostChip", out c.lostChip, 17f);   // 칩 폭은 채울 때(창이 켜진 뒤) 잰다
         c.lost = ThinText(c.root, "Lost", 19f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.Ink);
         c.lost.richText = true;
-        PlaceIn(c.lost.rectTransform, 116f, 464f, EvCardW - 140f, 30f, EvCardW, EvCardH);
+        PlaceIn(c.lost.rectTransform, 116f, EvLostY, EvCardW - 140f, 30f, EvCardW, EvCardH);
 
         // 수치 칸 4개 — 이름 17 · 값 21(▲▼ = 지금 무기 대비, 아래 안내 줄이 한 번 적는다)
         for (int i = 0; i < 4; i++)
         {
             var box = ShopUIStyle.MakeRect(c.root, $"Stat{i}").GetComponent<RectTransform>();
-            PlaceIn(box, 24f + i * 150f, 514f, 142f, 66f, EvCardW, EvCardH);
+            PlaceIn(box, 24f + i * 150f, EvStatY, 142f, 66f, EvCardW, EvCardH);
             UIThinBox.Create(box, "Line", Vector2.zero, Vector2.one, 0f, UITheme.Thin.InkA(0.18f), Color.clear, new Color(1f, 1f, 1f, 0.02f));
             var label = ThinText(box, "Label", 17f, UIWeight.Regular, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.55f));
             label.text = EvStatNames[i];
@@ -173,7 +222,7 @@ public sealed partial class UI_CruciblePanel
 
         c.foot = ThinText(c.root, "Foot", 18f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.55f));
         c.foot.richText = true;
-        PlaceIn(c.foot.rectTransform, 24f, 600f, EvCardW - 48f, 30f, EvCardW, EvCardH);
+        PlaceIn(c.foot.rectTransform, 24f, EvFootY, EvCardW - 48f, 30f, EvCardW, EvCardH);
 
         c.button = bg.gameObject.AddComponent<Button>();
         ShopUIStyle.ApplyButtonColors(c.button);
@@ -209,6 +258,7 @@ public sealed partial class UI_CruciblePanel
     {
         bool valid = b != null && b.IsValid;
         card.root.gameObject.SetActive(valid);
+        if (card.under != null) card.under.gameObject.SetActive(valid);
         if (!valid) return;
 
         var so = b.target;
@@ -218,9 +268,19 @@ public sealed partial class UI_CruciblePanel
         bool heavy = f != null ? f.FormId == "weight" : so.weaponType == WeaponType.Greatsword;
         card.meta.text = $"{(heavy ? "◆" : "◇")} {tag}" + (f == null ? "" : f.FormId == "weight" ? " · 필살 계열" : " · 연격 계열");
 
-        card.icon.sprite  = so.icon;
-        card.icon.enabled = so.icon != null;
-        card.iconGlow.color = Color.clear;   // 그림 뒤 빛 없음 — 후광은 한 화면 한 곳(10-11)
+        if (card.banner != null)   // 10-26 머리 그림 — 대검이면 대검, 아니면 카타나
+        {
+            card.banner.sprite  = UISkin.Crucible?.EvolveBanner(heavy);
+            card.banner.enabled = card.banner.sprite != null;
+        }
+        if (card.icon != null)
+        {
+            card.icon.sprite  = so.icon;
+            card.icon.enabled = so.icon != null;
+            card.iconGlow.color = Color.clear;   // 그림 뒤 빛 없음 — 후광은 한 화면 한 곳(10-11)
+        }
+        card.formEmblem.sprite  = f != null ? UISkin.Crucible?.EvolveFormEmblem(f.FormId) : null;
+        card.formEmblem.enabled = card.formEmblem.sprite != null;
         card.name.text   = so.displayName;
 
         int level = current?.enhanceLevel ?? 0;
@@ -248,7 +308,7 @@ public sealed partial class UI_CruciblePanel
         // 잃는 것 — 정직하게(시안 02): 무형검의 E(무형참)는 새 형태로 넘어가지 않는다
         string lostName = current?.skillE != null ? current.skillE.skillName : null;
         bool lostOn = f != null && lostName != null && (so.skillE == null || so.skillE.skillName != lostName);
-        SetChip(card.lostBox, card.lostChip, lostOn ? "잃는 것" : null, UITheme.Thin.Danger, 24f, 464f, rightAlign: false, h: 30f);
+        SetChip(card.lostBox, card.lostChip, lostOn ? "잃는 것" : null, UITheme.Thin.Danger, 24f, EvLostY, rightAlign: false, h: 30f);
         string tail = f == null ? "" : f.FormId == "weight" ? "멀리 닿는 평타가 없다" : $"{f.TriggerName}{Iga(f.TriggerName)} 조건부로 멀리 잇는다";
         card.lost.text = lostOn ? $"{lostName} <color=#9A93A6>— {tail}</color>" : "";
 

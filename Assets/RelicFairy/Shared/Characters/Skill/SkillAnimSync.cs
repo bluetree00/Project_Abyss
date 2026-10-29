@@ -58,6 +58,28 @@ public static class SkillAnimSync
         animator.CrossFadeInFixedTime(state, fadeSeconds, 0, StartOffset(animator, state, contactIn));
     }
 
+    /// <summary>
+    /// <paramref name="state"/>를 재생하되, 지금 도는 클립의 첫 <paramref name="eventPrefix"/> 이벤트(베기)가 <paramref name="contactIn"/>초 뒤에 오도록
+    /// 중간부터 시작한다 — 평타 클립을 스킬 상태에 덮어 쓸 때(10-26 대검 R 속성 검 · 클립 이벤트가 곧 칼이 닿는 순간). 이벤트가 없으면 처음부터.
+    /// </summary>
+    public static void CrossFadeToEvent(Animator animator, string state, string eventPrefix, float contactIn, float fadeSeconds)
+    {
+        if (animator == null) return;
+        float offset = 0f;
+        var clip = ResolveClip(animator, state);
+        if (clip != null)
+        {
+            float speed = StateSpeed.TryGetValue(state, out var sp) && sp > 0f ? sp : 1f;
+            foreach (var e in clip.events)
+            {
+                if (!e.functionName.StartsWith(eventPrefix, System.StringComparison.Ordinal)) continue;
+                offset = Mathf.Clamp(e.time / speed - Mathf.Max(0f, contactIn), 0f, Mathf.Max(0f, (clip.length - EndMargin) / speed));
+                break;
+            }
+        }
+        animator.CrossFadeInFixedTime(state, fadeSeconds, 0, offset);
+    }
+
     /// <summary>블렌드 없이 바로 재생하는 쪽(<c>Animator.Play</c>를 쓰던 곳).</summary>
     public static void PlayToContact(Animator animator, string state, float contactIn)
     {

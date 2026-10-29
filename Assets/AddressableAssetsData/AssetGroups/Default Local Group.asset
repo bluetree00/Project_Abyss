@@ -128,6 +128,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 11759f5e1b69db4418b8360ca6e311fa
+    m_Address: UI/RankingBoard/Medal2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 13a7c7a8d1bb29943ae2fda15a8f1e5c
     m_Address: VFX_Debuff
     m_ReadOnly: 0
@@ -161,6 +166,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1cf10d68406ef4714a240476f6c1c2b3
     m_Address: sfx_crucible_evolve
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1dc0a5680f0885f4391beb41abf76523
+    m_Address: UI/RankingBoard/Tablet
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -299,6 +309,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 34b67c9097fda7840a1a2cf55fc0c6b1
     m_Address: VFX_WindBuff
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3522037f089a45440837ced4c175e6f6
+    m_Address: RankingHall/RankingHall
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -760,6 +775,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8f493eeee1eb4c840b15465efe1e679e
+    m_Address: UI/SaveSlotSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8f7a5ee2814784d42bda156f86885379
     m_Address: sfx_portal_enter
     m_ReadOnly: 0
@@ -790,6 +810,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - Achievement
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9a2608fe43fe48541b4ab13f8b9ca4b5
+    m_Address: UI/RankingBoard/Medal1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 9b097f7e7ab5a134fb5d5e38ead48cb1
     m_Address: Illust_Intro_Page03
@@ -849,6 +874,16 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ab20a4c89177e460f89d28e5901f9dd5
     m_Address: sfx_covenant_reroll
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: abc00000000012857661513297908409
+    m_Address: EventProp/Altar
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: abc00000000015657245601655267910
+    m_Address: EventProp/OracleArch
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -1164,6 +1199,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - Quest
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ed8cefc22b3650e42b486270fcd8e9cc
+    m_Address: UI/RankingBoard/Medal3
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: eeb96056c221942249f2e8aeaf86d576
     m_Address: sfx_mg_stamp

@@ -24,6 +24,11 @@ public static class CombatQuery
     private const int MaxOverlap = 256;
     private static readonly Collider[] s_overlap = new Collider[MaxOverlap];
 
+#if UNITY_EDITOR
+    /// <summary>실측 99 L — 추가타(시너지 즉발)가 들어갈 때마다(대상 · 양 · 속성). 에디터에서만.</summary>
+    public static System.Action<GameObject, float, RuneElement?> ProbeSynergyHit;
+#endif
+
     /// <summary>
     /// center 반경 내 살아있는 몬스터를 가까운 순으로 최대 max마리 buffer에 채운다(exclude 제외).
     /// 반환 = 채운 개수. buffer는 호출자가 재사용(매 호출 Clear).
@@ -257,6 +262,9 @@ public static class CombatQuery
             if (target == null) return;
             amount *= relay.RelayRatio;
         }
+#if UNITY_EDITOR
+        ProbeSynergyHit?.Invoke(target, amount, element);
+#endif
 
         var mb = target.GetComponentInParent<MonsterBase>();
         if (mb != null)
@@ -275,6 +283,9 @@ public static class CombatQuery
                                          RuneElement? element = null)
     {
         if (target == null || amount <= 0f) return;
+#if UNITY_EDITOR
+        ProbeSynergyHit?.Invoke(target.gameObject, amount, element);
+#endif
         target.TakeSynergyDamage(amount, instigator, defenseIgnore, isCrit, DamageKind.Synergy, element);
     }
 }

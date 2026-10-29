@@ -7,6 +7,14 @@ using UnityEngine.InputSystem;
 /// </summary>
 public sealed class PlayerAim
 {
+    // ── Constants ─────────────────────────────────────────────────
+    // 발보다 이만큼 높은 맞음은 머리 위(천장 · 상인방)라 버린다 — 천장 타일도 Ground 층 콜라이더라 카메라를 넓혀
+    // 천장 위로 나가면(걷혀 안 보여도 콜라이더는 남는다) 조준점이 천장 윗면에 찍혔다(10-26 사용자 「특히 챕터 4」).
+    private const float MaxAboveFeet = 2f;
+
+    // ── Static ────────────────────────────────────────────────────
+    private static readonly RaycastHit[] s_hits = new RaycastHit[16];
+
     // ── Private ───────────────────────────────────────────────────
     // 공격 입력 순간 캐시한 클릭 월드 좌표. 다음 방향 계산에서 1회 소비된다.
     private Vector3? _lastClickedPosition;
@@ -19,8 +27,8 @@ public sealed class PlayerAim
     public void RecordClick(Transform body)
     {
         Ray atkRay = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
-        if (Physics.Raycast(atkRay, out var hit, 200f, LayerMask.GetMask("Ground")))
-            _lastClickedPosition = hit.point;
+        if (TryFloorPoint(atkRay, 200f, LayerMask.GetMask("Ground"), body.position.y, out var floor))
+            _lastClickedPosition = floor;
         else
         {
             // 지면 레이어 미스 시 Y=player 높이 평면으로 폴백 (탑뷰 대응)
@@ -133,10 +141,10 @@ public sealed class PlayerAim
         {
             Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
 
-            // 2) Ground 콜라이더 히트
-            if (Physics.Raycast(ray, out var hit, 100f, LayerMask.GetMask("Ground")))
+            // 2) Ground 콜라이더 히트(머리 위 천장은 건너뜀)
+            if (TryFloorPoint(ray, 100f, LayerMask.GetMask("Ground"), body.position.y, out var floor))
             {
-                lookDir = hit.point - body.position;
+                lookDir = floor - body.position;
                 lookDir.y = 0f;
                 if (lookDir.sqrMagnitude > 0.01f)
                 {
@@ -162,5 +170,23 @@ public sealed class PlayerAim
 
         lookDir = Vector3.zero;
         return false;
+    }
+
+    /// <summary>
+    /// 레이가 <b>발 높이 근처</b>에서 처음 맞는 곳(<see cref="MaxAboveFeet"/>보다 높은 맞음 = 천장 · 상인방은 건너뜀).
+    /// 마우스 조준 · 마우스 자리 효과가 같이 쓴다.
+    /// </summary>
+    public static bool TryFloorPoint(Ray ray, float maxDistance, int mask, float feetY, out Vector3 point)
+    {
+        point = default;
+        float best = float.MaxValue;
+        int n = Physics.RaycastNonAlloc(ray, s_hits, maxDistance, mask);
+        for (int i = 0; i < n; i++)
+        {
+            if (s_hits[i].point.y > feetY + MaxAboveFeet || s_hits[i].distance >= best) continue;
+            best  = s_hits[i].distance;
+            point = s_hits[i].point;
+        }
+        return best < float.MaxValue;
     }
 }

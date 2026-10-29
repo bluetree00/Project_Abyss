@@ -74,7 +74,7 @@ public static class HitFeelService
     /// <summary>막타(처치) 전용 히트스톱 — duration 동안 일반 HitStop 이 끼어들지 못하게 보호.</summary>
     public static void KillImpact(float scale, float duration)
     {
-        if (duration <= 0f) return;   // config 0 = off
+        if (duration <= 0f || !DealtHitStop) return;   // config 0 = off · 공격 멈칫 끔(10-24)
         EnsureHost();
         _killFreezeUntil = Time.unscaledTime + duration;
         if (_stopCo != null) _host.StopCoroutine(_stopCo);
@@ -90,6 +90,13 @@ public static class HitFeelService
     public const float DealtShakeSkill    = 0.016f;
     /// <summary>스킬 막타·유물 스킬 마무리·서약 최상위 발동 — 플레이어 흔들림의 최대치.</summary>
     public const float DealtShakeFinisher = 0.022f;
+
+    /// <summary>
+    /// 플레이어가 준 타격의 멈칫(시간 정지)을 쓰는가 — 타격 히트스톱 · 처치 정지 · 유물 Q 착탄/막타 정지 · 서약 발동 정지.
+    /// 10-24 사용자 「공격 자체의 경직 연출을 꺼 보자 — 오히려 플레이에 방해」로 끈다. 되돌리려면 기본값을 true로.
+    /// 흔들림 · 숫자 · 이펙트 · 소리는 이 값과 무관하다. 받는 쪽 멈칫(플레이어 강 피격 · 리치 타격)과 연출 슬로모는 묶지 않는다.
+    /// </summary>
+    public static bool DealtHitStop { get; set; } = false;
 
     public static void CameraShake(float amplitude = 0.08f, float duration = 0.12f)
     {
@@ -135,6 +142,7 @@ public static class HitFeelService
     public static void Hit(float damage, bool isCritical, in WeaponFeel feel, Vector3 hitDirection, float shakeScale,
                            float shakeCap = float.PositiveInfinity, bool longStop = false, bool stop = true)
     {
+        stop &= DealtHitStop;   // 공격 멈칫 끔(10-24) — 흔들림만 남는다
         float amp = Mathf.Max(0f, shakeScale);
         float stopLen = (isCritical || longStop ? CritStopDuration(damage) : HitStopDuration(damage)) * feel.StopDurationMult;
         if (isCritical)

@@ -37,6 +37,7 @@ public struct RunMetaSnapshot
     public string currentRoomPoolKey;   // 현재 방 pool_key (재생성 대상)
     public int    currentRoomKind;      // RoomPlanKind (int)
     public int    currentRoomMirror;    // 좌우 미러 (0/1)
+    public bool   currentRoomDanger;    // 10-29 F4 위험한 문으로 들어온 방(정예 둘 · 보상 Epic 하한)
 
     /// <summary>현재 방을 이미 클리어했는가. 복원 시 true면 몬스터를 재스폰하지 않고 출구를 즉시 개방한다.
     /// (클리어 후 저장을 허용하려면 필수 — 없으면 보상은 챙긴 채 몹이 부활해 중복 파밍이 된다.)</summary>

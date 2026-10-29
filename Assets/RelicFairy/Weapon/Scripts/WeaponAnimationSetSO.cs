@@ -90,6 +90,8 @@ public class WeaponAnimationSetSO : ScriptableObject
     [Range(0f, 1f)] public float finisherRecoverySeconds = 0f;
     [Tooltip("준비 동작의 베기 뒤 빨리 감기 상한. 0 = 기본 2.5 — 낮추면 휘두름 끝 동작이 보인다(대신 한 타 주기가 길어짐 · 10-21 무형검)")]
     [Range(0f, 3f)] public float followSpeedCap = 0f;
+    [Tooltip("평타 휘두름에 듣는 공격 속도 상한(저스트 회피 반격 가속 포함). 0 = 전체 상한 2.0. 넘는 공속의 절반은 근접 피해 %로 — 휘두름 간격이 약 0.25초 밑으로 내려가면 헛휘두름이 생겼다(10-26 사용자 · 실측 99 G)")]
+    [Range(0f, 2f)] public float maxSwingAttackSpeed = 0f;
     [Range(0.1f, 3f)] public float heavyAttackAnimSpeed  = 1.0f;
 
     [Header("콤보 타이밍 기본값 (ClipMapping override가 -1일 때 사용)")]

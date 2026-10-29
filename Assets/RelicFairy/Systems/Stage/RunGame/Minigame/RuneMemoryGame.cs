@@ -6,16 +6,17 @@ using RelicFairy.Monster;
 using UnityEngine;
 
 /// <summary>
-/// 룬 기억 — 외우기(최대 60초, 10-01 설계 §3-2). 「빛난 순서대로 밟아라」.
+/// 룬 기억 — 외우기(최대 30초, 10-01 설계 §3-2). 「빛난 순서대로 밟아라」.
 /// 가운데 둘레 반경 5 m에 룬 발판 4개(자리가 막히면 반경을 줄이고, 끝내 안 되면 3개). 발판마다 빛깔과 음이 다르다(0.8 · 1.0 · 1.2 · 1.5).
-/// 3라운드 — 길이 3·4·5(Ch3·4는 4·5·6). 보여 주기(칸당 0.55초, 뒤 챕터 0.45초) → 밟기(발판 반경 1.4 m).
+/// 2라운드 — 길이 3·4(Ch3·4는 4·5). 보여 주기(칸당 0.55초, 뒤 챕터 0.45초) → 밟기(발판 반경 1.4 m).
+/// 10-29 3 → 2라운드 · 60 → 30초(「빨리 끝나는 이벤트」, 약 25초). 보상 = 근접 증강 다시 뽑기 +1(플래티넘 +2 · 이번 런) — 근접 무기가 없거나 실패면 원석.
 /// 틀리면 낮은 불협음 + 발판이 붉게 떨리고, 같은 줄을 다시 보여 준다. 등급 = 틀린 횟수 0 / 1 / 2 / 3 / 4 이상.
 /// 시간이 다 되면 브론즈(끝낸 라운드가 0이면 실패).
 /// </summary>
 public sealed class RuneMemoryGame : EventMinigame
 {
     // ── Constants ──────────────────────────────────────────────
-    private const float PlayTime    = 60f;
+    private const float PlayTime    = 30f;
     private const float PlateRing   = 5f;
     private const float PlateRadius = 1.4f;
     private const float ShowGap     = 0.12f;   // 칸 사이 어두운 틈
@@ -59,7 +60,7 @@ public sealed class RuneMemoryGame : EventMinigame
     protected override string GradeHint => "안 틀리면 플래티넘 · 1번 골드 · 2번 실버 · 3번 브론즈";
     protected override float Duration => PlayTime;
     protected override float WantRadius => 7f;
-    public override ChallengeGrade CurrentGrade => GradeOf(_mistakes, _round, _lengths?.Length ?? 3, Remaining <= 0f);
+    public override ChallengeGrade CurrentGrade => GradeOf(_mistakes, _round, _lengths?.Length ?? 2, Remaining <= 0f);
     protected override bool FinishedEarly => _lengths != null && _round >= _lengths.Length;
 
     protected override string StatusLine => _phase switch
@@ -82,7 +83,7 @@ public sealed class RuneMemoryGame : EventMinigame
 
     protected override string ResultLine => FinishedEarly
         ? (_mistakes == 0 ? "한 번도 안 틀렸다" : $"틀린 횟수 {_mistakes}")
-        : $"{_round} / {_lengths?.Length ?? 3} 라운드 · 틀린 횟수 {_mistakes}";
+        : $"{_round} / {_lengths?.Length ?? 2} 라운드 · 틀린 횟수 {_mistakes}";
 
     // ── Public Methods ─────────────────────────────────────────
 
@@ -101,7 +102,7 @@ public sealed class RuneMemoryGame : EventMinigame
 
     protected override async UniTask BuildStageAsync(CancellationToken ct)
     {
-        _lengths  = Tier >= 2 ? new[] { 4, 5, 6 } : new[] { 3, 4, 5 };
+        _lengths  = Tier >= 2 ? new[] { 4, 5 } : new[] { 3, 4 };   // 10-29 3 → 2라운드
         _stepTime = Tier >= 2 ? 0.45f : 0.55f;
 
         // 좁은 판에서도 발판끼리 겹치지 않게 — 둘레가 좁으면 발판을 줄인다(설계 반경 5 m · 발판 1.4 m)
@@ -163,6 +164,21 @@ public sealed class RuneMemoryGame : EventMinigame
             for (int i = 0; i < _plates.Count; i++) RunFx.Play(RunFxSlot.Ring, _plates[i], 0.5f, PlateColors[i]);
             RunFx.Play(RunFxSlot.Pillar, Center, 0.08f, Theme);
         }
+    }
+
+    /// <summary>10-29 특별 보상 — 근접 증강 다시 뽑기(이번 런 · 브론즈~골드 +1 · 플래티넘 +2). 근접 무기가 없거나 실패면 원석.</summary>
+    protected override void GrantReward(ChallengeGrade grade, Vector3 at)
+    {
+        if (grade >= ChallengeGrade.Bronze && EventRewards.HasMeleeWeapon(Run))
+        {
+            int n = grade == ChallengeGrade.Platinum ? 2 : 1;
+            MeleeAugmentDraft.RerollsLeft += n;   // 런 세이브는 「쓴 수」(RerollsPerRun − 남은 수)로 적어 음수로도 그대로 이어진다
+            EventRewards.Notice($"룬 기억 — 증강 다시 뽑기 <color=#8fd3ff>+{n}</color> · 이번 런");
+            return;
+        }
+        int ore = EventRewards.Ore(grade, EventRewards.Chapter(Run));
+        EventRewards.AddOre(Run, ore);
+        EventRewards.Notice($"룬 기억 — 원석 <color=#73B3F2>+{ore}</color>");
     }
 
     protected override void DemoTick(MinigameDemo mode, float dt)

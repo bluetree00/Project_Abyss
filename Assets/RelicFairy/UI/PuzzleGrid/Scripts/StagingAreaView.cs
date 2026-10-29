@@ -318,6 +318,16 @@ public sealed class StagingAreaView : MonoBehaviour
         PulseSlotAsync(_slotGOs[idx].GetComponent<RectTransform>()).Forget();
     }
 
+    /// <summary>이 룬 카드의 작은 모양만 다시 그린다 — 룬을 돌렸을 때(10-25).</summary>
+    public void RefreshShapePreview(RuntimeItemData item)
+    {
+        int idx = FindSlotIndex(item);
+        if (idx < 0 || _slotGOs[idx] == null) return;
+        if (_slotGOs[idx].transform.Find("ShapePreview") is not RectTransform root) return;
+        for (int i = root.childCount - 1; i >= 0; i--) Destroy(root.GetChild(i).gameObject);
+        BuildCardShapePreview(root, item);
+    }
+
     /// <summary>이 아이템에 연결된 Shape. 클릭 배치가 "무엇을 놓을지" 찾는 데 쓴다. 없으면 null.</summary>
     public Shape GetShapeForItem(RuntimeItemData item)
         => item != null && _shapeByInstanceId.TryGetValue(item.instanceId, out var s) ? s : null;
@@ -1049,6 +1059,8 @@ public sealed class StagingAreaView : MonoBehaviour
 
         var offsets = RuneDataManager.ParseCellOffsets(shapeEntry);
         if (offsets == null || offsets.Length == 0) return;
+        if (item.rotation != 0)   // 돌려 둔 룬은 그 방향으로(10-25) — ParseCellOffsets는 매번 새 배열
+            for (int i = 0; i < offsets.Length; i++) offsets[i] = Shape.RotateCW(offsets[i], item.rotation);
 
         int minX = int.MaxValue, minY = int.MaxValue;
         int maxX = int.MinValue, maxY = int.MinValue;

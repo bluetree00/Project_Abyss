@@ -170,7 +170,7 @@ public sealed class DKPage2Zone
         if (prefab == null) return;
         float len = cellCount * DKBossRoomContext.CellSize * 0.1f;   // Sword Slash 15: 1칸 = scale 0.1 × CellSize
         Quaternion rot = alongX ? Quaternion.Euler(0f, 90f, 0f) : Quaternion.identity;
-        DKGridPatternHelper.SpawnStretchedVfx(prefab, lineCenter + Vector3.up * 0.1f, rot, len, GreyVfx);
+        DKGridPatternHelper.SpawnStretchedVfx(prefab, lineCenter + Vector3.up * 0.1f, rot, len, GreyVfx, atImpact: true);   // 2페이지 줄 베기는 모두 판정 순간에 만든다
     }
 
     // ── 2페이지 패턴 상태 공용 ─────────────────────────────────

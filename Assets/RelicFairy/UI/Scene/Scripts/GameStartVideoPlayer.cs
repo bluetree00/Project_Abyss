@@ -70,8 +70,6 @@ public class GameStartVideoPlayer : MonoBehaviour
         InitComponents();
         if (_clip == null) return;
 
-        if (_rawImage != null) _rawImage.enabled = true;
-
         if (_videoPlayer != null)
         {
             _videoPlayer.source    = VideoSource.VideoClip;
@@ -80,8 +78,13 @@ public class GameStartVideoPlayer : MonoBehaviour
             _videoPlayer.Prepare();
             await UniTask.WaitUntil(() => _videoPlayer.isPrepared, cancellationToken: token);
             _videoPlayer.Play();
+            // 판은 첫 프레임이 RT에 그려진 뒤에 켠다 — 준비 동안 켜 두면 아직 아무것도 안 그린 RT가 화면을 덮어
+            // 빌드에선 유니티 기본 배경 같은 화면이 잠깐 새어 나왔다(10-23). 그동안은 세이브 창이 덮고 있다.
+            await UniTask.WaitUntil(() => _videoPlayer.frame >= 0 || !_videoPlayer.isPlaying, cancellationToken: token);
+            if (_rawImage != null) _rawImage.enabled = true;
             await WaitForEndAsync(_videoPlayer, token);
         }
+        else if (_rawImage != null) _rawImage.enabled = true;
 
         // 영상은 껐지만 레이어는 검은 막으로 남긴다 — 호출자가 다음 화면을 띄운 뒤 HideNow()로 내린다.
         if (_coverOverlay != null) _coverOverlay.gameObject.SetActive(true);

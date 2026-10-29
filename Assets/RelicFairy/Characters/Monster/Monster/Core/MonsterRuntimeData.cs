@@ -52,6 +52,8 @@ public class MonsterRuntimeData
     // ── 위장 감지 ──────────────────────────────────────────
     /// <summary>위장 상태에서 플레이어에게 공격당한 적 있는지. 미믹 등 공격 감지형 몬스터에서 사용.</summary>
     public bool HasBeenAttacked;
+    /// <summary>플레이어에게 마지막으로 맞은 시각(Time.time) — 이 뒤 잠깐은 감지 · 포기 거리와 상관없이 쫓는다(10-25).</summary>
+    public float LastHitByPlayerAt = -999f;
     /// <summary>잠복 대기 중인지.</summary>
     public bool IsDormant;
     /// <summary>스폰 위치로 귀환 중인지. 잠복/귀환 모두 비전투 모드.</summary>

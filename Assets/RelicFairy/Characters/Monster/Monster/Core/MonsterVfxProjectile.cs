@@ -7,6 +7,9 @@ using UnityEngine;
 /// </summary>
 public class MonsterVfxProjectile : MonoBehaviour
 {
+    // ── Static ─────────────────────────────────────────────────────────────────
+    private static int s_wallMask = -1;   // 벽 층(10-23 B5) — 처음 쓸 때 한 번
+
     // ── Private ────────────────────────────────────────────────────────────────
     private Vector3   _direction;
     private float     _speed;
@@ -72,6 +75,16 @@ public class MonsterVfxProjectile : MonoBehaviour
         if (_done) return;
 
         float step = _speed * Time.deltaTime;
+        if (s_wallMask < 0) s_wallMask = LayerMask.GetMask("Wall");
+        if (Physics.Raycast(transform.position, _direction, out var wall, step, s_wallMask, QueryTriggerInteraction.Ignore))
+        {
+            // 10-23 B5 벽에 맞으면 사라진다 — 사거리를 늘려 벽 너머로 날아가는 일이 늘었다(벽 · 기둥 뒤로 피하면 산다)
+            _done = true;
+            transform.position = wall.point;
+            SpawnHitEffect();
+            Destroy(gameObject);
+            return;
+        }
         transform.position += _direction * step;
         _travelled += step;
 

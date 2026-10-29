@@ -44,22 +44,34 @@ public static class EraBalance
     // 10-21 체력은 따로(hp) — 같은 빌드 악몽 DPS가 봉인기의 ×2.75~3.2(10-15 실측 P2 Ch4 3,914 · Ch2 2,817)라 체력을 거기 맞추고, 공격은 그대로 둔다.
     private static readonly Spec SealedSpec    = new(stat: 1.0f, hp: 1.0f, count: 1.0f, elite: 0.00f, rarityStep: 0, fuel: 1.00f, gold: 1.0f, eventTime: 1.00f, extraWave: 0.5f);
     private static readonly Spec LiberatedSpec = new(stat: 1.3f, hp: 2.0f, count: 1.15f, elite: 0.08f, rarityStep: 1, fuel: 1.25f, gold: 1.2f, eventTime: 1.00f, extraWave: 0.7f);   // 10-22 A10 1.2 · 1.6 · 1.1 · 0.05 · 0.5에서
-    private static readonly Spec NightmareSpec = new(stat: 1.4f, hp: 2.6f, count: 1.2f, elite: 0.10f, rarityStep: 2, fuel: 1.50f, gold: 1.4f, eventTime: 0.85f, extraWave: 1.0f);
+    private static readonly Spec NightmareSpec = new(stat: 1.2f, hp: 2.6f, count: 1.2f, elite: 0.10f, rarityStep: 2, fuel: 1.50f, gold: 1.4f, eventTime: 0.85f, extraWave: 1.0f);
 
     // 두 번째 파도 구성 — 정예가 이끄는 작은 무리(첫 파도의 3~4할). 마릿수는 챕터 · 시기 수량 배율을 그대로 받는다.
     private const int ExtraWaveCommons = 3;
 
-    // 룬 등급 가중 옮기기 — 단계마다 일반에서 9점을 떼어 레어 45% · 에픽 40% · 전설 15%로,
-    // 일반이 없는 표(정예)는 레어에서 8점을 떼어 에픽 · 전설 반반으로.
+    /// <summary>위험한 문(10-29 F4)의 두 번째 파도 — 정예 둘이 이끄는 무리(확정).</summary>
+    public static (int elites, int commons) DangerWave => (2, ExtraWaveCommons);
+
+    // 룬 등급 가중 옮기기 — 단계마다 일반에서 9점을 떼어 레어 45% · 에픽 47% · 전설 8%로,
+    // 일반이 없는 표(정예)는 레어에서 8점을 떼어 에픽 75% · 전설 25%로.
+    // 10-29 사용자 「일반 드랍 전설은 낮게 — 정제소가 의미 있게」: 전설 몫 15 → 8% · 정예 50 → 25%(Ch4 악몽 일반방 전설 8.8 → 4.6% · 정예 32 → 16%).
     private const float CommonTakePerStep = 9f;
     private const float RareTakePerStep   = 8f;
 
     public static Spec Current => For(StoryProgress.Era);
 
+    // 10-29 사용자 G — 해방기 · 악몽의 몬스터 강화(공격 · 체력 · 수량)는 챕터마다 커진다. Ch1은 빌드를 준비할 수 없다(시작 선물 하나뿐) —
+    // 봉인기보다 조금만 높게, Ch2부터 크게 오른다. 시기 몫 = 1 + (시기 배율 − 1) × 램프 · Ch4 = 표 값 그대로.
+    private static readonly float[] ChapterRamp = { 0.35f, 0.7f, 0.9f, 1.0f };
+
+    /// <summary>시기 배율을 챕터 램프만큼만 건다(봉인기 1이면 그대로 1). <paramref name="chapter"/> = 1 ~ 4.</summary>
+    public static float Ramp(float eraScale, int chapter)
+        => 1f + (eraScale - 1f) * ChapterRamp[Mathf.Clamp(chapter, 1, ChapterRamp.Length) - 1];
+
     public static Spec For(StoryEra era) => era switch
     {
         StoryEra.Liberated     => LiberatedSpec,
-        StoryEra.NightmareMode => NightmareSpec,
+        StoryEra.NightmareMode => NightmareSpec,   // 공격 1.4 → 1.2(10-23 B5 — ChapterBalance 전체 공격 ×1.25 위에 곱해져 실효 1.5 · 악몽은 체력 위주)
         _                      => SealedSpec,
     };
 
@@ -69,10 +81,11 @@ public static class EraBalance
     /// 피해 모사에서 위협은 여럿이 같이 올 때 나왔다) · 악몽 전부.
     /// 악몽 정예 방은 정예 둘이 함께 온다. 안 오면 (0, 0).
     /// </summary>
-    public static (int elites, int commons) RollExtraWave(RoomPlanKind kind, StoryEra era)
+    public static (int elites, int commons) RollExtraWave(RoomPlanKind kind, StoryEra era, int chapter = 4)
     {
         if (kind != RoomPlanKind.Normal && kind != RoomPlanKind.Elite) return (0, 0);
-        float chance = For(era).ExtraWaveChance;
+        // 10-29 G — 봉인기 확률에서 시기 확률까지 챕터 램프만큼(Ch1 해방 57% · 악몽 68% → Ch4 표 값)
+        float chance = Mathf.Lerp(SealedSpec.ExtraWaveChance, For(era).ExtraWaveChance, ChapterRamp[Mathf.Clamp(chapter, 1, ChapterRamp.Length) - 1]);
         if (chance <= 0f || (chance < 1f && Random.value >= chance)) return (0, 0);
         int elites = kind == RoomPlanKind.Elite && era == StoryEra.NightmareMode ? 2 : 1;
         return (elites, ExtraWaveCommons);
@@ -85,10 +98,10 @@ public static class EraBalance
         if (common > 0f)
         {
             float take = Mathf.Min(common, CommonTakePerStep * step);
-            return (common - take, rare + take * 0.45f, epic + take * 0.40f, legendary + take * 0.15f);
+            return (common - take, rare + take * 0.45f, epic + take * 0.47f, legendary + take * 0.08f);
         }
         float t = Mathf.Min(rare, RareTakePerStep * step);
-        return (common, rare - t, epic + t * 0.5f, legendary + t * 0.5f);
+        return (common, rare - t, epic + t * 0.75f, legendary + t * 0.25f);
     }
 
     /// <summary>로그 한 줄 — 런 시작 · 확인 메뉴.</summary>

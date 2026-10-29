@@ -71,6 +71,8 @@ public sealed class ElecOrbAgent : LegendaryProjectileBase
         }
     }
 
+    private readonly List<GameObject> _blastBuffer = new(8);
+
     protected override void OnHitEnemy(GameObject target)
     {
         float hit = CurrentDamage;
@@ -78,9 +80,10 @@ public sealed class ElecOrbAgent : LegendaryProjectileBase
 
         CombatQuery.DealSynergyDamage(target, hit, _ctx?.Player?.gameObject, element: RuneElement.Electric);
 
-        int n = CombatQuery.GetNearbyDamageables(transform.position, 2f, target, 8, _hitBuffer);
+        // 폭발은 따로 담는다 — 적 감지 루프(DetectEnemies)가 _hitBuffer를 도는 중이라 덮어쓰면 범위 밖 예외 · 안 닿은 적 직격(10-24)
+        int n = CombatQuery.GetNearbyDamageables(transform.position, 2f, target, 8, _blastBuffer);
         for (int i = 0; i < n; i++)
-            CombatQuery.DealSynergyDamage(_hitBuffer[i], explosionDmg, _ctx?.Player?.gameObject, element: RuneElement.Electric);
+            CombatQuery.DealSynergyDamage(_blastBuffer[i], explosionDmg, _ctx?.Player?.gameObject, element: RuneElement.Electric);
 
         OnSpawnHitVfx(target.transform.position);
         Managers.Sound?.PlayEffectAsync(s_hitSfx[Random.Range(0, s_hitSfx.Length)]).Forget();

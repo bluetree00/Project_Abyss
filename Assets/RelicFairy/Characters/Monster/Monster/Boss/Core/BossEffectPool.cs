@@ -8,6 +8,8 @@ public static class BossEffectPool
 {
     private static readonly Dictionary<int, Queue<GameObject>> Pools = new();
     private static readonly Dictionary<int, Transform> Containers = new();
+    // 프리팹(+ 폴백)마다 한 번만 잰다 — 부를 때마다 GetComponentsInChildren로 자식을 훑었다(10-29 풀링 점검 #5)
+    private static readonly Dictionary<(int, float), float> LifetimeCache = new();
 
     private static Transform _root;
     private static Transform _effectRoot;
@@ -115,6 +117,10 @@ public static class BossEffectPool
         if (prefab == null)
             return fallbackLifetime;
 
+        var key = (prefab.GetInstanceID(), fallbackLifetime);
+        if (LifetimeCache.TryGetValue(key, out float cached))
+            return cached;
+
         float maxLifetime = 0f;
         var particles = prefab.GetComponentsInChildren<ParticleSystem>(true);
         foreach (var particle in particles)
@@ -124,8 +130,13 @@ public static class BossEffectPool
             maxLifetime = Mathf.Max(maxLifetime, duration);
         }
 
-        return maxLifetime > 0.05f ? maxLifetime + 0.25f : fallbackLifetime;
+        float lifetime = maxLifetime > 0.05f ? maxLifetime + 0.25f : fallbackLifetime;
+        LifetimeCache[key] = lifetime;
+        return lifetime;
     }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetLifetimeCache() => LifetimeCache.Clear();   // 에디터에서 파티클 값을 고친 뒤 다음 플레이에 다시 잰다
 
     private static GameObject GetOrCreate(GameObject prefab)
     {

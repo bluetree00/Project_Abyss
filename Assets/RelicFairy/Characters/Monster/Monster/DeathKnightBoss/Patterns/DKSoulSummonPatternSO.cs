@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using RelicFairy.UI;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -12,7 +13,7 @@ namespace RelicFairy.Monster
 ///  PillarWait      → 좌·우 그룹에서 각 1개 씩 기둥을 소환 (총 2개).
 ///                    기둥 피격 데미지는 보스 HP에 직결(기둥 HP 한도).
 ///                    waitTimeout(10s) 이내 2개 모두 파괴 → 패턴 종료.
-///                    타임아웃 시: 남은 기둥 HP만큼 보스 HP 회복 후 패턴 종료.
+///                    타임아웃 시: 남은 기둥을 걷고 패턴 종료 — 회복 없음(10-24 사용자 「체력이 차는 패턴은 빼자」).
 ///  Recovery        → 무적 해제, 방패 VFX 제거, recoveryTime 후 AttackReadyState
 /// </summary>
 [CreateAssetMenu(menuName = "Abyss/Boss/DeathKnight/DK_SoulSummonPattern",
@@ -45,10 +46,6 @@ public class DKSoulSummonPatternSO : BossPatternSO
     public float summoningDuration   = 1.5f;
     public float waitTimeout         = 10f;
     public float recoveryTime        = 0.5f;
-    [Tooltip("타임아웃 시 보스 HP 서서히 회복되는 지속 시간 (초)")]
-    public float gradualHealDuration = 2.5f;
-    [Tooltip("타임아웃 시 기둥 1개당 보스 최대 HP 회복 비율 (0.25 = 25%)")]
-    public float pillarHealPercentPerPillar = 0.25f;
 
     private DKSoulSummonState _state;
 
@@ -96,9 +93,6 @@ public class DKSoulSummonState : FullLockState<DKSoulSummonPatternSO>
 
     public override void Enter(MonsterContext ctx)
     {
-        // 이전 사이클의 잔여 힐 비동기 작업 취소 (타임아웃 힐이 다음 사이클까지 이어지는 것 방지)
-        (ctx.Monster as DeathKnightBossMonster)?.CancelGradualHeal();
-
         _phase          = Phase.Summoning;
         _timer          = 0f;
         _pillarsSpawned = false;
@@ -111,6 +105,7 @@ public class DKSoulSummonState : FullLockState<DKSoulSummonPatternSO>
         StopAgent(ctx);
         PlayAnim(ctx, AnimIdle2);
         (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SetInvincible(true);
+        UI_BossBark.Show("영혼 기둥이 솟는다 — 기둥을 부수면 막힘이 풀린다", BossBarkType.PatternAnnounce);   // 시작 알림 → 방패 · 외곽선과 함께 무적(10-29 사용자 — 무적 표현)
 
         if (Data.bossShieldVfxPrefab != null)
         {
@@ -171,7 +166,6 @@ public class DKSoulSummonState : FullLockState<DKSoulSummonPatternSO>
 
         if (_timer >= Data.waitTimeout)
         {
-            HealBossFromRemainingPillars(ctx);
             DestroyRemainingPillars();
             BeginRecovery(ctx);
         }
@@ -255,25 +249,6 @@ public class DKSoulSummonState : FullLockState<DKSoulSummonPatternSO>
     {
         if (_patternEnded) return;
         _destroyedCount++;
-    }
-
-    private void HealBossFromRemainingPillars(MonsterContext ctx)
-    {
-        var boss = ctx.Monster as DeathKnightBossMonster;
-        if (boss == null) return;
-
-        int remaining = 0;
-        foreach (var p in _pillars)
-        {
-            if (p != null && !p.IsDestroyed) remaining++;
-        }
-
-        if (remaining <= 0) return;
-
-        // 1페이지(= 기존 전투) 체력 기준 — 악몽기엔 최대 체력에 2페이지 몫이 더해져 회복이 1.4배로 부풀던 것을 막는다
-        int totalHeal = Mathf.RoundToInt(boss.PhaseMaxHp * Data.pillarHealPercentPerPillar * remaining);
-        boss.SoulPillarHealBossGradual(totalHeal, Data.gradualHealDuration);
-        Debug.Log($"[DKSoulSummon] 타임아웃 — 남은 기둥 {remaining}개 × {Data.pillarHealPercentPerPillar * 100f}% = {totalHeal} 회복", ctx.Monster);
     }
 
     private void DestroyRemainingPillars()

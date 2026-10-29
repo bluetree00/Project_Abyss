@@ -42,6 +42,12 @@ MonoBehaviour:
   _meteorHitDuration: 2.5
   _rainSfx: {fileID: 8300000, guid: a06387a0fba4b4143ad732379a923964, type: 3}
   _fireRainSfx: {fileID: 8300000, guid: a98dd6a28c0bc404da33ae613be45ae0, type: 3}
+  _impactSfx: {fileID: 8300000, guid: 80a04f4eb8c56a24c82b1f4314f0ba78, type: 3}
+  _impactSfxVolume: 0.3
+  _castVfxPrefab: {fileID: 1673707391571236, guid: f326479f7cef0794d95f29731f4bbdb3, type: 3}
+  _castVfxAbyssPrefab: {fileID: 1766868900565162, guid: f82a1a892a042c1438f8f4704a37e11b, type: 3}
+  _castVfxScale: 2.5
+  _castSfxVolume: 0.8
   _scorchTexture: {fileID: 0}
   _scorchClusterCount: 1
   _scorchDuration: 8

@@ -136,8 +136,8 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
             int tier  = RelicResonance.LancelotTier(count);
             groups.Add(new Group
             {
-                Title = $"광기 칸 조각 {count}개",
-                Note  = "광기 10 · 20 · 30 · 40 칸 조각(메아리 포함)이 2 · 3 · 4개면 한 단계씩 세진다\n"
+                Title = $"광기 10~40 조각 {count}개",
+                Note  = "꼬리표가 광기 10 · 20 · 30 · 40인 조각(메아리 포함)이 2 · 3 · 4개면 한 단계씩 세진다\n"
                       + TierTable(tier, (2, RelicResonance.LadderText(2)), (3, RelicResonance.LadderText(3)), (4, RelicResonance.LadderText(4))),
             });
         }
@@ -153,7 +153,7 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
                 int count = RelicResonance.GawainCount(loadout, anchor);
                 int tier  = RelicResonance.GawainTier(count);
                 string tierText = RelicResonance.GawainTierText(anchor, tier);
-                g.Title += $"  ·  {count}개" + (tier >= 2 ? $"  ·  공명 {tier}" : string.Empty);
+                g.Title += $"  ·  {count}개" + (tier >= 2 ? $"  ·  {tier}단계" : string.Empty);
                 // 단계 효과는 누적이다 — 2단계 · 4단계를 함께 보이고 지금 단계만 금(10-12 4b 요청 6, 예전엔 지금 단계 글만 보여 2단계가 사라진 듯했다)
                 g.Note = TierTable(tier, (2, RelicResonance.GawainTierText(anchor, 2)), (4, RelicResonance.GawainTierText(anchor, 4)));
             }
@@ -173,22 +173,22 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
             return new Group
             {
                 Title = "기본 규칙",
-                Note  = $"태양흔 — 여명에 칠 때마다 1개 · 같은 적은 0.5초에 한 번 · 상한 {cap}"
-                      + (cap < GawainMemoryHub.DawnTier2Cap ? $"(여명 공명 2 → {GawainMemoryHub.DawnTier2Cap})" : string.Empty)
-                      + $"\n개화 — 태양흔 1개당 공격력 {GawainMemoryHub.BloomAtkRatio * 100f:0}% · 반경 {GawainMemoryHub.BloomRadius:0.#} m"
+                Note  = $"태양흔 — 여명에 적을 맞힐 때마다 그 적에게 1개(같은 적은 0.5초에 한 번) · 최대 {cap}"
+                      + (cap < GawainMemoryHub.DawnTier2Cap ? $"(여명 조각 2개면 {GawainMemoryHub.DawnTier2Cap})" : string.Empty)
+                      + $"\n태양흔이 터지면 — 1개마다 반경 {GawainMemoryHub.BloomRadius:0.#} m 폭발(공격력 {GawainMemoryHub.BloomAtkRatio * 100f:0}%)"
                       // 10-22 E1 D8 — 「정오 수확」은 개화와 같은 일의 다른 이름이었다 → 문장으로
-                      + $"\n정오 개화 — 정오가 열리면 {GawainMemoryHub.HarvestRadius:0} m 안 태양흔 적이 모두 개화한다",
+                      + $"\n정오가 열리면 — {GawainMemoryHub.HarvestRadius:0} m 안 적의 태양흔이 모두 터진다 · 이때부터 Q(낙일)",
             };
         }
         int brand = LancelotMemoryHub.BrandCapOf(player);
         return new Group
         {
             Title = "기본 규칙",
-            Note  = $"낙인 — 광기 20부터 칠 때마다 1개 · 상한 {brand}(광기의 눈 {LancelotMemoryHub.EyeBrandCap} · {LancelotMemoryHub.EyeBrandCapMax})"
-                  + $"\n찢기 — X자 1번에 공격력 {LancelotMemoryHub.TearAtkRatio * 100f:0}%"
-                  + $"\n원한 — 넘친 낙인이 쌓인다 · 상한 {LancelotMemoryHub.GrudgeCap}"
+            Note  = $"낙인 — 광기 20부터 적을 맞힐 때마다 그 적에게 1개 · 최대 {brand}(광기의 눈 조각: {LancelotMemoryHub.EyeBrandCap} · {LancelotMemoryHub.EyeBrandCapMax})"
+                  + $"\nQ(심판) 마지막 일격 — 맞은 적의 낙인을 터뜨린다: 낙인 1개마다 X자 베기(공격력 {LancelotMemoryHub.TearAtkRatio * 100f:0}%)"
+                  + $"\n원한 — 최대치를 넘친 낙인이 모인다 · 최대 {LancelotMemoryHub.GrudgeCap}"
                   // 10-22 E1 D8 — 「참격파」 명사를 걷어 문장으로(원한의 쓰임새)
-                  + $"\n원한 쓰기 — 심판 막타 뒤 원한 1개마다 참격이 1줄 나간다({LancelotMemoryHub.WaveLength:0} m · 공격력 {LancelotMemoryHub.WaveAtkRatio * 100f:0}%)",
+                  + $"\n원한 쓰기 — Q 마지막 일격 뒤 원한 1개마다 참격이 1줄 나간다({LancelotMemoryHub.WaveLength:0} m · 공격력 {LancelotMemoryHub.WaveAtkRatio * 100f:0}%)",
         };
     }
 
@@ -206,7 +206,7 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
             : new Group
             {
                 Title = $"유물 진화  ·  {progress}",
-                Note  = $"조각 {RelicEvolution.FragmentsNeeded}개를 가진 채 보스를 쓰러뜨리면 진화 카드가 나온다 · 방향은 빌드에 맞춰 저절로 정해진다",
+                Note  = "보스를 쓰러뜨릴 때마다 진화 카드가 나온다(고르지 않으면 다음 보스에 다시) · 방향은 빌드에 맞춰 저절로 정해진다",
             };
     }
 
@@ -228,8 +228,8 @@ public sealed class UI_RelicMemoryPage : MonoBehaviour
     private static string CrossLightNote(bool gawain, PlayerController player)
     {
         bool on = gawain ? GawainMemoryHub.Of(player)?.HasCrossLight == true : LancelotMemoryHub.Of(player)?.HasCrossLight == true;
-        string next = gawain ? "다음 수확은 태양흔을" : "다음 찢기는 낙인을";
-        return $"엇갈린 빛 — 반응 조각이 2개 이상일 때 서로 다른 반응 둘이 10초 안에 일어나면 {next} 그대로 남긴다  "
+        string next = gawain ? "다음에 정오가 열려 터질 때 태양흔을" : "다음에 낙인이 터질 때 낙인을";
+        return $"엇갈린 빛 — 반응 조각을 2개 이상 가진 채 서로 다른 반응 둘을 10초 안에 일으키면 {next} 그대로 남긴다  "
              + (on ? $"<color={GoldHex}>◆ 켜짐</color>" : $"<color={LockedHex}>◇ 대기</color>");
     }
 

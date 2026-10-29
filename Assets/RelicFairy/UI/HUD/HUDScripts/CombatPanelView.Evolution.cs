@@ -31,6 +31,8 @@ public sealed partial class CombatPanelView
     private const float EvoCaption    = 16f;
     private const float EvoNameSize   = 32f;
     private const float EvoInSec = 0.35f, EvoHoldSec = 0.85f, EvoFlySec = 0.4f, EvoLandSec = 0.25f;
+    // 진화가 일한 순간 반짝임(10-23 W4 「진화가 체감되기 힘들다」) — 덧말 1 → 1.18 → 1 · 고리가 흰빛 쪽으로 · 0.6초에 한 번
+    private const float EvoPulseSec = 0.45f, EvoPulseGap = 0.6f, EvoPulseScale = 1.18f, EvoPulseWhite = 0.6f;
 
     private static readonly Color EvoDisc = new(0.04f, 0.035f, 0.06f, 0.78f);
 
@@ -41,6 +43,9 @@ public sealed partial class CombatPanelView
     private Image         _evoLabelCrest;
     private TMP_Text      _evoLabelText;
     private CancellationTokenSource _evoCts;
+    private CancellationTokenSource _evoPulseCts;
+    private Color _evoTint = Color.white;
+    private float _evoPulseAt = -10f;
 
     // ── Public Methods ──
 
@@ -63,6 +68,7 @@ public sealed partial class CombatPanelView
         if (q == null) return;
         Color tint = BuildFamilyRules.ColorOf(def.Family);
         EnsureEvolutionMarker(q);
+        _evoTint = tint;
         _evoRing.color = tint;
         _evoLabelCrest.sprite  = crest;
         _evoLabelCrest.color   = tint;
@@ -78,6 +84,7 @@ public sealed partial class CombatPanelView
         _evoRing.fillAmount  = 0f;
         _evoLabelGroup.alpha = 0f;
         _evoCts = CancellationTokenSource.CreateLinkedTokenSource(destroyCancellationToken);
+        Managers.Sound?.PlayUiEvent(SoundEvent.CrucibleEvolve);   // 10-29 UI 소리 — 유물 진화 순간(재련소 진화와 같은 소리)
         EvolutionMomentAsync(def, crest, tint, _evoCts.Token).Forget();
     }
 
@@ -240,11 +247,52 @@ public sealed partial class CombatPanelView
         return t;
     }
 
+    private async UniTaskVoid EvolutionPulseAsync(CancellationToken ct)
+    {
+        try
+        {
+            await UIMotion.Tween(EvoPulseSec, k =>
+            {
+                float w = Mathf.Sin(k * Mathf.PI);
+                if (_evoLabel != null) _evoLabel.localScale = Vector3.one * (1f + (EvoPulseScale - 1f) * w);
+                if (_evoRing != null) _evoRing.color = Color.Lerp(_evoTint, Color.white, EvoPulseWhite * w);
+            }, ct);
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (_evoLabel != null) _evoLabel.localScale = Vector3.one;
+            if (_evoRing != null) _evoRing.color = _evoTint;
+        }
+    }
+
+    private void CancelEvolutionPulse()
+    {
+        if (_evoPulseCts == null) return;
+        _evoPulseCts.Cancel();
+        _evoPulseCts.Dispose();
+        _evoPulseCts = null;
+    }
+
     private void CancelEvolutionMotion()
     {
+        CancelEvolutionPulse();
         if (_evoCts == null) return;
         _evoCts.Cancel();
         _evoCts.Dispose();
         _evoCts = null;
+    }
+
+    // ── Event Handlers ──
+
+    /// <summary>진화 효과가 지금 일했다(c1 <see cref="RelicEvolutionCue"/>) — 진화 순간 연출 중이 아니면 Q 칸 덧말 · 고리를 짧게 반짝인다.</summary>
+    private void HandleRelicEvolutionProcced(string id)
+    {
+        if (_evoLabel == null || _evoCts != null || !isActiveAndEnabled) return;
+        if (Time.unscaledTime - _evoPulseAt < EvoPulseGap) return;
+        _evoPulseAt = Time.unscaledTime;
+        CancelEvolutionPulse();
+        _evoPulseCts = CancellationTokenSource.CreateLinkedTokenSource(destroyCancellationToken);
+        EvolutionPulseAsync(_evoPulseCts.Token).Forget();
     }
 }

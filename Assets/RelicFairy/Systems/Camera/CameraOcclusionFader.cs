@@ -17,6 +17,22 @@ public class CameraOcclusionFader : MonoBehaviour
     private const int MaxHits = 32;
     private const float NearMinHeight = 1.5f;    // 근거리 판정은 이만큼 높은 구조물만(촛대 · 잔해 · 보상 오브젝트 같은 작은 것은 빼고)
     private const float NearHoldSeconds = 0.35f; // 근거리로 흐린 것은 이만큼 붙잡는다 — 캡슐 경계에서 들락날락 깜박이지 않게
+    // 머리 위 가림(10-25 사용자 「카메라를 늘리면 천장 쪽 오브젝트도 카메라를 사이에 두면 투명 처리」) — 천장 타일은 Ground 층이고
+    // 촛대 · 장식 · 문 상인방은 콜라이더가 없거나 마스크 밖이라 구 판정(SphereCast)에 안 걸린다. 방이 드러날 때 그 방을 둘로 모은다:
+    //  · 천장(Ground 층 · 높이 있는 것 · MapBuilder 천장 조각 이름) — 카메라가 천장 아랫면 근처 · 위로 올라가면 방 천장을 통째로 걷는다(그림자는 남김).
+    //    이름까지 보는 까닭(10-26): 손으로 지은 방(리치 대기방 Plaza_Boss_Ch4 — 출구가 12 m 위 계단 꼭대기)의 윗층 바닥 · 계단참도 Ground 층 ·
+    //    바닥 + 3 m 위라 천장으로 잡혀 통째로 숨었다(사용자 「대기방 바닥들이 날아갔다」).
+    //    시선이 닿는 칸만 흐리면 화면이 천장 윗면으로 덮이고 플레이어 자리만 구멍으로 뚫렸다(Ch4 최대 거리 실측).
+    //  · 떠 있는 것(아래 끝이 바닥 + OverheadClear 위 — 벽에 걸린 것 · 천장에 달린 것 · 상인방) — 카메라 → 플레이어 선분이 지나면 흐린다.
+    //    판정은 렌더러 자기 좌표의 상자 — 월드 축 상자는 돌려 놓은 장식에서 실제보다 커 헛걸린다. 벽(Wall 층)은 구 판정 몫이라 뺀다.
+    private const float OverheadClear    = 1f;     // 바닥에 선 것(바닥 · 기둥 · 석상 · 가구 · 벽 아랫단)은 빼고 — 구 판정 몫
+    private const float OverheadMaxSize  = 40f;    // 방 전체를 감싸는 껍데기(탑 벽 · 하늘 돔)는 빼고
+    private const float CeilingClear     = 3f;     // Ground 층 중 아래 끝이 바닥 + 이만큼 위 = 천장(아래는 바닥 타일)
+    private const float CeilingRestoreExtra = 0.5f;   // 10-29 되돌림 여유
+    private const float CeilingCamMargin = 0.5f;   // 카메라가 천장 아랫면 − 이만큼 위면 걷는다(가까운 면에 잘리는 것까지)
+    private const int   GroundLayer      = 3;      // MapBuilder.BuildCeiling · 복도 천장 층
+    // MapBuilder가 천장 조각에 붙이는 이름 앞머리 — 방 천장 · 문 복도 · 끝 챔버 · 챕터 계단 회랑(계단 바닥 「Stair_F_」 · 앞면 「Stair_R_」은 아님)
+    private static readonly string[] CeilingNames = { "Ceiling_", "Corridor_C_", "Chamber_C_", "Stair_C_" };
     private static readonly int BaseColorID = Shader.PropertyToID("_BaseColor");
     private static readonly int BaseMapID   = Shader.PropertyToID("_BaseMap");
     private static readonly int BumpMapID   = Shader.PropertyToID("_BumpMap");
@@ -33,10 +49,15 @@ public class CameraOcclusionFader : MonoBehaviour
     private static readonly string[] ColorProps   = { "_BaseColor", "_Color", "_BaseTintColor", "_MainColor" };
     private static readonly string[] NormalProps  = { "_BumpMap", "_NormalMap", "_Normal", "Texture2D_7EA392D1" };
 
+    // 지금 켜진 페이더 — 방 밖 구조물(출구 문틀 · 챕터 계단 회랑)이 생길 때 그쪽에서 알린다(10-26)
+    private static CameraOcclusionFader s_active;
+
     // ── SerializeField ────────────────────────────────────────────────────
     [Header("Detection")]
     [SerializeField] private LayerMask occlusionMask = ~0;
     [SerializeField] private float     castRadius    = 0.3f;
+    [Tooltip("플레이어 둘레 — 카메라에서 플레이어 좌우 · 앞뒤 바닥으로 이만큼(m) 떨어진 자리로도 구 판정을 쏜다(카메라 쪽은 좁고 플레이어 쪽은 넓은 원뿔). 0 = 가운데 하나만")]
+    [SerializeField] private float     aroundRadius  = 2.5f;
     [Tooltip("카메라 앞 근거리 판정 — 카메라에서 플레이어 쪽으로 이 거리(m)까지(플레이어까지의 절반을 넘지 않음). 0 = 끔")]
     [SerializeField] private float     nearDistance  = 0f;
     [Tooltip("카메라 앞 근거리 판정 반경(m) — 카메라→플레이어 선 위가 아니어도 카메라 바로 옆 큰 구조물(회랑 기둥)을 잡는다")]
@@ -61,6 +82,20 @@ public class CameraOcclusionFader : MonoBehaviour
 
     // 페이드 상태 테이블
     private readonly Dictionary<Renderer, FadeState> _fading = new();
+
+    // 머리 위 가림 후보 — 방이 드러날 때 모은 고정 렌더러 · 월드 상자 · 자기 좌표 상자 · 월드 → 자기 좌표(고정 지형이라 한 번만 잰다)
+    private readonly List<Renderer>  _overhead = new();
+    private readonly List<Bounds>    _overheadWorld = new();
+    private readonly List<Bounds>    _overheadLocal = new();
+    private readonly List<Matrix4x4> _overheadToLocal = new();
+
+    // 지금 방 천장 — 걷을 때 원래 그림자 설정을 되돌리려고 같이 둔다
+    private readonly List<Renderer> _ceiling = new();
+    private readonly List<UnityEngine.Rendering.ShadowCastingMode> _ceilingShadow = new();
+    private float _ceilingMinY = float.MaxValue;
+    private bool  _ceilingHidden;
+    private float _areaFloorY;   // 지금 모은 곳의 바닥 높이 — 뒤에 생기는 문틀을 같은 기준으로 가른다
+    private int   _wallLayer = -1;
 
     // 이번 프레임 히트 렌더러
     private readonly HashSet<Renderer> _hitThisFrame = new();
@@ -88,18 +123,24 @@ public class CameraOcclusionFader : MonoBehaviour
     {
         _mpb = new MaterialPropertyBlock();
         _fadeShader = Shader.Find("Universal Render Pipeline/Lit");
+        _wallLayer = LayerMask.NameToLayer("Wall");
     }
 
     private void OnEnable()
     {
         // 디졸브가 원본을 기억할 때 이 페이더가 씌운 임시 재질 대신 진짜 원본을 받게 한다(10-01)
         DissolveEffect.OriginalMaterialsResolver = ResolveOriginals;
+        RunFlowController.RoomRevealed += CollectOverhead;
+        s_active = this;
     }
 
     private void OnDisable()
     {
         if (DissolveEffect.OriginalMaterialsResolver == (System.Func<Renderer, Material[]>)ResolveOriginals)
             DissolveEffect.OriginalMaterialsResolver = null;
+        RunFlowController.RoomRevealed -= CollectOverhead;
+        SetCeilingHidden(false);
+        if (s_active == this) s_active = null;
     }
 
     private void Start()
@@ -126,6 +167,26 @@ public class CameraOcclusionFader : MonoBehaviour
     // ── Public ────────────────────────────────────────────────────────────
 
     public void SetTarget(Transform player) => _playerTransform = player;
+
+    /// <summary>
+    /// 방이 드러난 뒤 생긴 고정 구조물을 떠 있는 것 후보에 보탠다 — 출구 문틀(기둥 · 상인방 · 화로, 10-26 사용자 「문 위 천장이 안 흐려진다」).
+    /// 문틀은 콜라이더를 지워 구 판정에 안 걸리고, 방 밖(RunFlowController 아래)에 서서 방을 모을 때도 빠졌다. Wall 층이어도 받는다.
+    /// </summary>
+    public static void AddOverheadArea(GameObject root)
+    {
+        if (s_active == null || root == null) return;
+        foreach (var r in root.GetComponentsInChildren<MeshRenderer>())
+            s_active.AddOverheadCandidate(r, s_active._areaFloorY, allowWall: true);
+    }
+
+    /// <summary>
+    /// 방 밖의 서는 곳을 지금 방처럼 다시 모은다 — 챕터 계단 회랑(10-26 사용자 「다음 챕터로 넘어가는 통로 천장이 안 걷힌다」).
+    /// 계단이라 바닥이 7 m까지 오르지만 천장은 이름(<see cref="CeilingNames"/>)으로 가려 계단 바닥은 걷히지 않는다.
+    /// </summary>
+    public static void CollectArea(GameObject root)
+    {
+        if (s_active != null) s_active.CollectRoot(root, null);
+    }
 
     // ── Private ───────────────────────────────────────────────────────────
 
@@ -165,13 +226,25 @@ public class CameraOcclusionFader : MonoBehaviour
         float dist      = dir.magnitude;
         if (dist < 0.1f) return;
 
-        // NonAlloc — _hitBuffer 재사용, GC 제로
-        int count = Physics.SphereCastNonAlloc(
-            camPos, castRadius, dir / dist, _hitBuffer, dist,
-            occlusionMask, QueryTriggerInteraction.Ignore);
+        CastTo(camPos, playerPos);
+        // 둘레 — 화면 좌우(가슴 높이) · 위아래(먼 쪽 · 가까운 쪽 바닥). 가운데 한 줄만 보면 벽에 붙었을 때 플레이어 자리만 뚫려
+        // 둘레가 안 보였다(10-26 사용자 「벽에 붙으면 플레이어만 보여서 주변이 안 보여 — 지원 범위를 늘려야」)
+        if (aroundRadius > 0f)
+        {
+            Vector3 right = transform.right; right.y = 0f;
+            if (right.sqrMagnitude > 1e-4f)
+            {
+                right.Normalize();
+                Vector3 fwd  = Vector3.Cross(right, Vector3.up);   // 카메라가 보는 쪽(땅 위)
+                Vector3 feet = _playerTransform.position + Vector3.up * 0.3f;
+                CastTo(camPos, playerPos + right * aroundRadius, true);
+                CastTo(camPos, playerPos - right * aroundRadius, true);
+                CastTo(camPos, feet + fwd * aroundRadius, true);
+                CastTo(camPos, feet - fwd * (aroundRadius * 0.6f), true);
+            }
+        }
 
-        for (int i = 0; i < count; i++)
-            MarkOccluder(_hitBuffer[i].collider);
+        DetectOverhead(camPos, playerPos);
 
         // 카메라 앞 근거리 — 카메라 바로 옆 큰 구조물은 플레이어와 한 줄이 아니어도 화면 한쪽을 통째로 가린다
         // (10-01 f5 · 09-25 G21: 기사 아레나 가장자리에서 회랑 기둥이 화면 35~40%). 플레이어까지의 절반에서 멈춰 바닥은 안 닿는다.
@@ -187,6 +260,133 @@ public class CameraOcclusionFader : MonoBehaviour
                 if (col == null || col.attachedRigidbody != null || col.bounds.size.y < NearMinHeight) continue;
                 MarkOccluder(col, true);
             }
+        }
+    }
+
+    /// <summary>
+    /// 방이 드러날 때 — 그 방 천장과 떠 있는 고정 렌더러를 모은다(몬스터 · 투사체는 나중에 생겨 안 들어온다).
+    /// 바닥 기준은 방 뿌리 높이(MapBuilder가 바닥 · 천장을 방 기준 높이로 짓는다). 문 상인방은 방 밖(StartRoomGate)에 붙어 따로 모은다.
+    /// </summary>
+    private void CollectOverhead(GameObject room) => CollectRoot(room, FindObjectsByType<StartRoomGate>(FindObjectsSortMode.None));
+
+    private void CollectRoot(GameObject room, StartRoomGate[] gates)
+    {
+        SetCeilingHidden(false);   // 앞 방 천장은 되돌린다
+        _ceiling.Clear();
+        _ceilingShadow.Clear();
+        _ceilingMinY = float.MaxValue;
+        _overhead.Clear();
+        _overheadWorld.Clear();
+        _overheadLocal.Clear();
+        _overheadToLocal.Clear();
+        if (room == null) return;
+
+        float floorY = room.transform.position.y;
+        _areaFloorY = floorY;
+        foreach (var r in room.GetComponentsInChildren<MeshRenderer>())
+            AddOverheadCandidate(r, floorY, room.transform);
+        if (gates == null) return;
+        foreach (var gate in gates)
+            foreach (var r in gate.GetComponentsInChildren<MeshRenderer>())
+                AddOverheadCandidate(r, gate.transform.position.y, gate.transform);
+    }
+
+    private void AddOverheadCandidate(MeshRenderer r, float floorY, Transform root = null, bool allowWall = false)
+    {
+        // 10-29 꺼진 렌더러도 모은다 — 들어설 때 디졸브 파도가 아직 안 닿은 먼 통로 천장이 빠졌다(걷기는 forceRenderingOff라 enabled와 무관)
+        if (r == null) return;
+        if (_ceiling.Contains(r) || _overhead.Contains(r)) return;   // 10-29 문틀을 다시 보탤 때 겹치지 않게
+        var b = r.bounds;
+        if (b.size.x > OverheadMaxSize || b.size.y > OverheadMaxSize || b.size.z > OverheadMaxSize) return;
+        int layer = r.gameObject.layer;
+        if (layer == GroundLayer)
+        {
+            if (b.min.y < floorY + CeilingClear || !HasCeilingName(r.transform, root)) return;   // 바닥 타일 · 윗층 바닥 · 계단참
+            _ceiling.Add(r);
+            _ceilingShadow.Add(r.shadowCastingMode);
+            _ceilingMinY = Mathf.Min(_ceilingMinY, b.min.y);
+            return;
+        }
+        if ((layer == _wallLayer && !allowWall) || b.min.y < floorY + OverheadClear) return;   // 벽 = 구 판정 몫 · 바닥에 선 것
+        _overhead.Add(r);
+        _overheadWorld.Add(b);
+        _overheadLocal.Add(r.localBounds);
+        _overheadToLocal.Add(r.transform.worldToLocalMatrix);
+    }
+
+    /// <summary>렌더러 · 그 부모(뿌리 앞까지) 중 하나가 MapBuilder 천장 조각 이름인가 — 렌더러가 조각 프리팹 안쪽에 있어도 조각 이름을 본다.</summary>
+    private static bool HasCeilingName(Transform t, Transform root)
+    {
+        for (; t != null && t != root; t = t.parent)
+            foreach (var prefix in CeilingNames)
+                if (t.name.StartsWith(prefix, System.StringComparison.Ordinal)) return true;
+        return false;
+    }
+
+    /// <summary>방 천장을 걷거나(그림자만 남김) 되돌린다 — 상태가 바뀔 때만 손댄다.</summary>
+    private void SetCeilingHidden(bool hide)
+    {
+        if (hide == _ceilingHidden) return;
+        _ceilingHidden = hide;
+        for (int i = 0; i < _ceiling.Count; i++)
+        {
+            var r = _ceiling[i];
+            if (r == null) continue;
+            var original = _ceilingShadow[i];
+            if (original == UnityEngine.Rendering.ShadowCastingMode.Off) r.forceRenderingOff = hide;   // 그림자도 안 드리우던 것은 그냥 끈다
+            else r.shadowCastingMode = hide ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : original;
+        }
+    }
+
+    /// <summary>
+    /// 천장 — 카메라가 천장 아랫면 근처 · 위면 방 천장을 통째로 걷는다.
+    /// 떠 있는 것 — 카메라 → 플레이어 선분이 지나는 것을 흐린다(선분 상자와 겹치는 것만 자기 좌표 상자로 다시 본다 · 콜라이더 · 층 무관).
+    /// </summary>
+    private void DetectOverhead(Vector3 camPos, Vector3 target)
+    {
+        // 10-29 걷은 뒤엔 0.5 m 더 내려와야 되돌린다 — 궤도 높이가 천장 아랫면 근처인 팔레트에서 경계에 깜박였다
+        float margin = _ceilingHidden ? CeilingCamMargin + CeilingRestoreExtra : CeilingCamMargin;
+        SetCeilingHidden(_ceiling.Count > 0 && camPos.y > _ceilingMinY - margin);
+
+        int n = _overhead.Count;
+        if (n == 0) return;
+        float   minY   = _playerTransform.position.y + OverheadClear;
+        Vector3 segMin = Vector3.Min(camPos, target), segMax = Vector3.Max(camPos, target);
+        for (int i = 0; i < n; i++)
+        {
+            var wb = _overheadWorld[i];
+            if (wb.min.y < minY
+                || wb.max.x < segMin.x || wb.min.x > segMax.x
+                || wb.max.y < segMin.y || wb.min.y > segMax.y
+                || wb.max.z < segMin.z || wb.min.z > segMax.z) continue;
+            var   m     = _overheadToLocal[i];
+            var   from  = m.MultiplyPoint3x4(camPos);
+            var   along = m.MultiplyVector(target - camPos);   // 자기 좌표에서의 선분(크기 = 그 좌표의 선분 길이)
+            float len   = along.magnitude;
+            if (len < 1e-4f || !_overheadLocal[i].IntersectRay(new Ray(from, along / len), out float t) || t > len) continue;
+            var r = _overhead[i];
+            if (r == null || !r.enabled || !r.gameObject.activeInHierarchy || DissolveEffect.IsDissolving(r)) continue;
+            _hitThisFrame.Add(r);
+            if (!_fading.ContainsKey(r))
+                BeginFade(r);
+        }
+    }
+
+    /// <summary>
+    /// 카메라 → 한 자리 구 판정 — 걸린 콜라이더를 흐린다(NonAlloc · _hitBuffer 재사용, GC 제로).
+    /// 둘레 판정(<paramref name="around"/>)은 근거리 판정과 같이 큰 고정 구조물만 — 움직이는 것(몬스터 · 투사체) · 낮은 소품은 빼서 깜박이지 않게.
+    /// </summary>
+    private void CastTo(Vector3 from, Vector3 to, bool around = false)
+    {
+        var   d   = to - from;
+        float len = d.magnitude;
+        if (len < 0.1f) return;
+        int count = Physics.SphereCastNonAlloc(from, castRadius, d / len, _hitBuffer, len, occlusionMask, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < count; i++)
+        {
+            var col = _hitBuffer[i].collider;
+            if (around && (col == null || col.attachedRigidbody != null || col.bounds.size.y < NearMinHeight)) continue;
+            MarkOccluder(col);
         }
     }
 
@@ -377,5 +577,6 @@ public class CameraOcclusionFader : MonoBehaviour
             RestoreRenderer(kv.Key, kv.Value);
         _fading.Clear();
         _rendererCache.Clear();
+        SetCeilingHidden(false);
     }
 }

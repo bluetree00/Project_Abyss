@@ -17,6 +17,8 @@ using UnityEngine.UI;
 /// (<see cref="ShowParts"/> — 새 파츠는 Lv1로 켜짐 · 가진 파츠는 다음 눈금까지 · 다시 뽑기는 카드 전부).
 /// 10-18 힉스필드 틀(사용자 「증강 사용할 팝업 UI 테두리가 포함된 틀」 · 「뽑은 리소스 활용해야지」): 카드 = 세로 쇠 틀(그림 비율 300×472 그대로) ·
 /// 창 = 금 매듭 틀(9칸). 등급은 틀 안쪽 1px 선 색으로 읽힌다. 틀(<see cref="CrucibleSkinSO.AugmentCardFrame"/>)이 없으면 남색 판 + 1px 테.
+/// 10-24 전설(W7) — 화면마다 따로 낮은 확률로 굴려 카드 한 장만 전설로 나온다. 그 카드는 화면 등급이 아니라 <c>card.Def.Tier</c>로 그린다:
+/// 전설 색(룬 Legendary와 같은 색) 테 · 「전설 · 공용/전용」 · 단계 없음(처음부터 완성) · 뒤집힐 때 정제소 전설 소리.
 /// </summary>
 public sealed class UI_MeleeAugmentPopup : UI_Popup
 {
@@ -37,6 +39,8 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
     private static readonly Color PanelC = new(0.055f, 0.051f, 0.086f, 0.97f);
     private static readonly Color CardC  = new(0.090f, 0.086f, 0.140f, 1f);
     private static readonly Color SilverC = new(0.80f, 0.82f, 0.88f, 1f);
+    private static readonly Color LegendC = new(1f, 0.52f, 0.36f, 1f);   // 전설 — 금(#FFCC4D)과 갈리는 주홍(룬 Legendary 금색과 같으면 금 카드와 구분이 안 됐다)
+    private const string LegendHex = "#FF855C";
 
     // ── Static ──
     /// <summary>열려 있는 창(없으면 null) — 호스트가 두 번 열지 않게 본다.</summary>
@@ -80,7 +84,8 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
     {
         if (_parts || !_revealed || _offer == null || _offer.Tier != AugmentTier.Prismatic) return;
         var c = PrismColor(Time.unscaledTime);
-        for (int i = 0; i < _count; i++) SetLines(_cards[i], c);
+        for (int i = 0; i < _count; i++)
+            if (CardTier(i) == AugmentTier.Prismatic) SetLines(_cards[i], c);   // 전설 카드는 제 색을 지킨다
         _tier.color = c;
     }
 
@@ -105,11 +110,12 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
         var tc = TierColor(offer.Tier);
         _eyebrow.text = $"재련 {WeaponReforgeService.CountAt(offer.Level)}회째";   // 10-19 — 「+N 강화」 대신 재련 횟수
         _title.text   = "증강 하나를 고른다";
-        _tier.text    = $"{MeleeAugmentDef.TierName(offer.Tier)} 등급";
+        _tier.text    = offer.HasLegend ? $"{MeleeAugmentDef.TierName(offer.Tier)} 등급 · <color={LegendHex}>전설 한 장</color>" : $"{MeleeAugmentDef.TierName(offer.Tier)} 등급";
         _tier.color   = tc;
         _tier.alpha   = 0f;
         _sub.text     = $"{offer.Weapon?.displayName}에 붙는다 · 같은 증강을 다시 고르면 단계가 오른다(최대 III)";
         _foot.text    = "카드를 누르면 고른다 · 다시 뽑기는 그 한 장만 바뀐다";
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);   // 10-29 UI 소리 — 열기(놓친 단계의 다음 화면도 한 번)
         for (int i = 0; i < _count; i++) ShowBack(_cards[i]);
         RefreshRerolls(false);
         RevealAsync(gen).Forget();
@@ -134,6 +140,7 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
         _tier.text    = string.Empty;
         _sub.text     = $"새 파츠는 Lv1로 켜진다 · 가진 파츠는 다음 눈금까지 오른다(최대 Lv{RangedPartsDraft.PartCap})";
         _foot.text    = "카드를 누르면 고른다 · 다시 뽑기는 카드 전부가 바뀐다";
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);   // 10-29 UI 소리 — 열기
         for (int i = 0; i < _count; i++) ShowBack(_cards[i]);
         RefreshRerolls(false);
         RevealAsync(gen).Forget();
@@ -325,7 +332,7 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
             _revealed = true;
             if (_parts) { _busy = false; RefreshRerolls(true); return; }
             // 등급 이름은 카드가 다 드러난 뒤 — 금 · 프리즘이면 소리를 한 번 더(은은 조용히)
-            if (_offer.Tier != AugmentTier.Silver) ShopUIStyle.PlaySfx("enhance_success");
+            if (_offer.Tier != AugmentTier.Silver || _offer.HasLegend) ShopUIStyle.PlaySfx("enhance_success");
             for (float t = 0f; t < 0.2f; t += Time.unscaledDeltaTime)
             {
                 _tier.alpha = t / 0.2f;
@@ -356,7 +363,9 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
         else
         {
             Fill(c, _offer.Cards[index]);
-            Blip(_offer.Tier);
+            var tier = CardTier(index);
+            Blip(tier);
+            if (tier == AugmentTier.Legend) ShopUIStyle.PlaySfx("refine_legend");   // 전설 카드가 드러나는 순간 — 정제소 전설 룬과 같은 소리
         }
         float up = FlipHalf * 1.3f;
         for (float t = 0f; t < up; t += Time.unscaledDeltaTime)
@@ -373,7 +382,8 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
     private void Fill(Card c, MeleeAugmentCard card)
     {
         var def = card.Def;
-        var tc  = TierColor(_offer.Tier);
+        var tier = def != null && def.IsLegend ? AugmentTier.Legend : _offer.Tier;
+        var tc  = TierColor(tier);
         c.Back.enabled = false;
         c.Face.alpha   = 1f;
         SetLines(c, tc);
@@ -384,12 +394,22 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
             return;
         }
         string scope = def.Weapon == MeleeWeaponKind.None ? "공용" : "전용";   // 무기 이름은 창 부제 「…에 붙는다」가 말한다(세로 카드 폭 240)
-        c.Chip.text  = $"{MeleeAugmentDef.TierName(_offer.Tier)} · {scope}";
+        c.Chip.text  = $"{MeleeAugmentDef.TierName(tier)} · {scope}";
         c.Chip.color = tc;
         c.Kind.text  = card.IsUpgrade ? "강화" : "새 증강";
         c.Kind.color = card.IsUpgrade ? tc : UITheme.Thin.InkA(0.6f);
         c.Name.text  = def.Name;
-        c.Rank.text  = card.IsUpgrade ? $"단계 {Roman(card.Rank - 1)} → {Roman(card.Rank)}" : $"단계 {Roman(1)}";
+        if (def.IsGrowth)   // 10-26 재련으로 자라는 증강(그림자 파트너 · 검풍) — 단계가 없다. 「확장은 체감 + UI」: 지금 값과 다음 재련 값을 같이 보인다
+        {
+            var w = _offer.Weapon;
+            c.Rank.text   = $"재련 {MeleeAugmentCatalog.ReforgesSinceEvolution(w)}회";   // 「재련할수록 …」은 본문이 말한다(세로 카드 폭 240에 넘쳤다)
+            c.Rank.color  = tc;
+            c.Effect.text = UIKeywordInk.Values(w != null ? def.TextFor(w) : def.Text(1));
+            c.Now.text    = GrowthLine(def, w);
+            return;
+        }
+        c.Rank.text  = def.IsLegend ? "처음부터 완성"   // 전설은 단계가 없다(W7 D4)
+                     : card.IsUpgrade ? $"단계 {Roman(card.Rank - 1)} → {Roman(card.Rank)}" : $"단계 {Roman(1)}";
         c.Rank.color = tc;
         c.Effect.text = UIKeywordInk.Values(def.Text(card.Rank));   // 수치만 Noto 500 · 조용한 잉크(10-15 설명 글 강조)
         c.Now.text    = card.IsUpgrade ? $"지금  {def.Text(card.Rank - 1)}" : string.Empty;
@@ -531,8 +551,39 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
 
     // ── 도우미 ──
 
+    /// <summary>
+    /// 자람 증강의 다음 재련 줄 — 「다음 재련  따라 치는 피해 19% → 23%」. 다 자랐으면(+21) 그렇다고 쓴다.
+    /// 이름표(<see cref="MeleeAugmentCatalog.TryGrowth"/>의 now · now2): 그림자 파트너 = 따라 치는 피해 · 검풍 = 확률 · 검기 피해 ·
+    /// 칼끝 베기 = 칼끝 추가 피해 · 휩쓸기 = 한 명당 R 대기(초) · 지속(초).
+    /// </summary>
+    private static string GrowthLine(MeleeAugmentDef def, WeaponData w)
+    {
+        if (w == null || !MeleeAugmentCatalog.TryGrowth(def.Id, w.enhanceLevel, out float now, out float next, out float now2, out float next2))
+            return string.Empty;
+        if (Mathf.Approximately(now, next) && Mathf.Approximately(now2, next2)) return "다 자랐다 — 더 재련해도 그대로";
+        // 이름표 · 단위는 증강마다 — 휩쓸기는 초(10-26 대검 R 개편으로 자람 증강이 넷이 됐다)
+        string body = def.Id switch
+        {
+            MeleeAugmentCatalog.KatanaShadow => $"따라 치는 피해 {now:0.#}% → {next:0.#}%",
+            MeleeAugmentCatalog.KatanaGust   => $"확률 {now:0.#}% → {next:0.#}% · 검기 피해 {now2:0.#}% → {next2:0.#}%",
+            MeleeAugmentCatalog.GreatTip     => $"칼끝 추가 피해 {now:0.#}% → {next:0.#}%",
+            MeleeAugmentCatalog.GreatSweep   => $"한 명당 R 대기 −{now:0.##} → −{next:0.##}초 · 지속 +{now2:0.##} → +{next2:0.##}초",
+            _                                => $"{now:0.##} → {next:0.##}",
+        };
+        return $"다음 재련  {body}";
+    }
+
+    /// <summary>카드 한 장의 등급 — 전설 카드만 화면 등급과 다르다(<c>card.Def.Tier</c>).</summary>
+    private AugmentTier CardTier(int index)
+    {
+        var cards = _offer?.Cards;
+        var def = cards != null && index < cards.Length ? cards[index].Def : null;
+        return def != null && def.IsLegend ? AugmentTier.Legend : _offer != null ? _offer.Tier : AugmentTier.Silver;
+    }
+
     private static Color TierColor(AugmentTier t) => t switch
     {
+        AugmentTier.Legend    => LegendC,
         AugmentTier.Gold      => UITheme.Thin.Gold,
         AugmentTier.Prismatic => PrismColor(Time.unscaledTime),
         _                     => SilverC,
@@ -554,7 +605,7 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
     {
         var sound = Managers.Sound;
         if (sound == null) return;
-        sound.PlayUiEvent(SoundEvent.UiHover, t == AugmentTier.Prismatic ? 1.3f : t == AugmentTier.Gold ? 1.15f : 1f, 0.6f);
+        sound.PlayUiEvent(SoundEvent.UiHover, t == AugmentTier.Legend ? 1.45f : t == AugmentTier.Prismatic ? 1.3f : t == AugmentTier.Gold ? 1.15f : 1f, 0.6f);
     }
 
     private async UniTask Hold(float seconds)

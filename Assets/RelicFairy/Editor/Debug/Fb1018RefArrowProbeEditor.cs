@@ -56,7 +56,7 @@ public static class Fb1018RefArrowProbeEditor
             svc.BeginRoomEvent(roomB, RefineryEvent.None);
             int cNewRoom = svc.CurrentCost;
             sb.AppendLine($"정제소: 방 A 첫 값 {c0} → 세 번 정제 뒤 {cAfter} · 방 B 들어온 뒤 {cNewRoom} · 런 정제 수 {crafts0} → {svc.CraftCount} · 천장 진척 {pity} → {svc.PityCount}");
-            sb.AppendLine($"CHECK 방마다 처음 값: {c0 == 10 && cAfter > c0 && cNewRoom == 10} · 런 정제 수 이어짐: {svc.CraftCount == crafts0 + 3} · 천장 이어짐: {svc.PityCount == pity}");
+            sb.AppendLine($"CHECK 방마다 처음 값: {c0 == RefineryService.BaseCost && cAfter > c0 && cNewRoom == RefineryService.BaseCost} · 런 정제 수 이어짐: {svc.CraftCount == crafts0 + 3} · 천장 이어짐: {svc.PityCount == pity}");
             svc.EndRoomEvent(roomB);
             run.FuelBank.RestoreRaw(mat0, ore0);
 

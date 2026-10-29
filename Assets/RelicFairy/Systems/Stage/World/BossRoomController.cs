@@ -129,6 +129,7 @@ public class BossRoomController : MonoBehaviour
             "GameScene_Ch1" => "Ch1_Boss",
             "GameScene_Ch2" => "Ch2_Boss",
             "GameScene_Ch3" => "Ch3_Boss",
+            "GameScene_Ch4" => "Ch3_Boss",   // 10-29 임시 — 리치 전용 곡이 오기 전까지 Ch3 보스 곡
             _               => (string)null,
         };
         if (bossBgmKey != null) Managers.Sound.CrossfadeBgmAsync(bossBgmKey).Forget();

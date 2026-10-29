@@ -52,6 +52,12 @@ public class SkillExecutionContext
     /// 후딜 진입(10-08): 마지막 피해가 끝나 남은 건 마무리 동작뿐이다. 회피로 끊을 수 있게 열고(A2 · 결정 S2 「피해 뒤만」),
     /// 시전 스탠스(경직 면역)를 푼다(A4). 각 스킬의 끝(End) 단계 첫 프레임에 부른다 — 여러 번 불러도 된다.
     /// </summary>
+    /// <summary>이 구간은 회피로 못 끊는다(공중 도약 등 · 10-23) — 끝나면 false로 푼다. 스킬 상태 종료가 늘 푼다.</summary>
+    public void LockCancel(bool locked)
+    {
+        if (Controller != null) Controller.SkillCancelLocked = locked;
+    }
+
     public void EnterRecovery()
     {
         if (InRecovery || Controller == null) return;

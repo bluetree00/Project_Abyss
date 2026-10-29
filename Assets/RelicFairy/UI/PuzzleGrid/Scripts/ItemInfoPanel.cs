@@ -23,6 +23,8 @@ public sealed class ItemInfoPanel : MonoBehaviour
     private const float MINI_CELL_GAP   = 3f;
     private const float GEM_CORNER_W    = 56f;
     private const float GEM_BAR_W       = 200f;
+    private const float EFFECT_FONT     = 18f;     // 상세는 카드보다 크게 — 룬 선택 카드 16, 이 칸은 폭 400
+    private const float EFFECT_FONT_MIN = 13f;     // 효과 줄이 칸을 넘으면 여기까지 한 단계씩 줄인다(10-26 전설 룬 120자 안팎)
 
     private static readonly Color COLOR_RISK      = new(1f, 0.35f, 0.35f, 1f);
     private static readonly Color COLOR_NORMAL_FX = new(0.93f, 0.95f, 1f,  1f);
@@ -179,7 +181,7 @@ public sealed class ItemInfoPanel : MonoBehaviour
 
         var style = EffectRowStyle.Default;
         style.fontAsset       = panelFont;
-        style.fontSize        = 18f;   // 상세는 카드보다 크게 — 룬 선택 카드 16, 이 칸은 폭 400
+        style.fontSize        = EFFECT_FONT;
         style.iconSize        = 22f;
         style.rowHeight       = 28f;
         style.wrap            = true;  // 조건부 효과 문장이 한 줄을 넘는다 — 행이 자라게
@@ -195,9 +197,55 @@ public sealed class ItemInfoPanel : MonoBehaviour
             _effectRows.Add(widget.gameObject);
         }
 
+        // 전설 각성 진척 — 그 속성 존이 4단계면 규칙이 하나 더 붙는다(10-24 전설 룬 개편 · 「불 존 2/4 · 각성까지 9칸」)
+        if (LegendaryAwaken.TryLine(item, out var awaken))
+        {
+            var go = new GameObject("AwakenLine", typeof(RectTransform), typeof(CanvasRenderer), typeof(LayoutElement));
+            go.transform.SetParent(effectListRoot, false);
+            var t = go.AddComponent<TextMeshProUGUI>();
+            UITheme.StyleThinText(t, UIWeight.Regular, 16f, UITheme.Thin.InkA(0.85f));
+            t.richText = true;
+            t.textWrappingMode = TextWrappingModes.Normal;
+            t.raycastTarget = false;
+            t.text = awaken;
+            go.GetComponent<LayoutElement>().minHeight = 26f;
+            _effectRows.Add(go);
+        }
+
         // 수직 레이아웃 갱신
         if (effectListRoot.TryGetComponent<VerticalLayoutGroup>(out _))
             LayoutRebuilder.ForceRebuildLayoutImmediate(effectListRoot as RectTransform);
+        FitEffectList();
+    }
+
+    /// <summary>
+    /// 효과 줄 묶음이 칸(effectListRoot)보다 길면 글자를 한 단계씩 줄인다(<see cref="EFFECT_FONT"/> → <see cref="EFFECT_FONT_MIN"/>).
+    /// 10-26 사용자 「전설 룬은 텍스트가 길어서 넘친다」 — 전설 설명(110~130자)이 칸 높이 74에 다섯 줄(130)로 접혀 위 칩 · 아래 각성 줄을 덮었다.
+    /// </summary>
+    private void FitEffectList()
+    {
+        if (effectListRoot is not RectTransform root || _effectRows.Count == 0) return;
+        Canvas.ForceUpdateCanvases();
+        float room = root.rect.height;
+        if (room <= 1f) return;
+        root.TryGetComponent<VerticalLayoutGroup>(out var vlg);
+        float gaps = vlg != null ? vlg.spacing * (_effectRows.Count - 1) + vlg.padding.vertical : 0f;
+        var texts = new List<TMP_Text>(_effectRows.Count);
+        foreach (var row in _effectRows)
+            if (row != null && row.GetComponentInChildren<TMP_Text>() is TMP_Text t) texts.Add(t);
+
+        for (float size = EFFECT_FONT; ; size -= 1f)
+        {
+            float need = gaps;
+            foreach (var t in texts)
+            {
+                if (size < EFFECT_FONT) t.fontSize = Mathf.Min(t.fontSize, size);
+                float w = t.rectTransform.rect.width > 1f ? t.rectTransform.rect.width : room;
+                need += t.GetPreferredValues(t.text, w, 0f).y;
+            }
+            if (need <= room + 1f || size <= EFFECT_FONT_MIN) break;
+        }
+        LayoutRebuilder.ForceRebuildLayoutImmediate(root);
     }
 
     // ── Shape Preview ──

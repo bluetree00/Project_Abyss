@@ -28,6 +28,13 @@ public sealed class EndingCardOverlay : MonoBehaviour
     private const float SkipGuardSeconds   = 0.8f;   // 대사창을 넘기던 입력이 곧바로 건너뛰지 않게
     private const float ScreenHeight       = 1080f;
     private const string TitleTag          = "title";
+
+    // ── Static ────────────────────────────────────────────────────
+    /// <summary>카드 · 크레딧이 도는 중 — ESC가 여기선 건너뛰기라 ESC 듣개는 그 밑에 일시정지 메뉴를 열지 않는다(10-25).</summary>
+    public static bool IsPlaying { get; private set; }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => IsPlaying = false;
     private const string HeaderTag         = "header";
     private const string BackdropKey       = "Illust_Story_EndingCard";   // 엔딩 카드 배경 그림(10-13 힉스필드)
     private const float  BackdropDim       = 0.55f;                       // 그림 위 어둠 — 흰 글자 · 크레딧이 읽히게
@@ -55,6 +62,7 @@ public sealed class EndingCardOverlay : MonoBehaviour
     public static async UniTask PlayAsync(DialogueLine[] cardLines, DialogueLine[] creditLines, CancellationToken ct)
     {
         var overlay = Create();
+        IsPlaying = true;
         try
         {
             await overlay.RunAsync(cardLines, creditLines, ct);
@@ -62,6 +70,7 @@ public sealed class EndingCardOverlay : MonoBehaviour
         }
         finally
         {
+            IsPlaying = false;
             if (overlay != null) Destroy(overlay.gameObject);
         }
     }

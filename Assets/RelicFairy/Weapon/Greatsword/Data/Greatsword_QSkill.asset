@@ -12,13 +12,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0fe6bb86c17bdbf49b30d604a6cabd56, type: 3}
   m_Name: Greatsword_QSkill
   m_EditorClassIdentifier: Assembly-CSharp::SkillSO
-  skillName: "\uCD5C\uD6C4\uC758 \uC77C\uACA9"
-  description: "\uACA8\uB208 \uACF3\uC73C\uB85C \uB6F0\uC5B4\uC62C\uB77C \uB0B4\uB824\uCC0D\uB294\uB2E4(\uCD5C\uB300 4m \u00B7 \uCC29\uC9C0 \uB458\uB808 3.5m \u00B7 \uACF5\uACA9\uB825\uC758 500%)."
+  skillName: "\uC18D\uC131 \uAC80"
+  description: "\uAC80\uC744 \uBF51\uC544 \uC18D\uC131 \uAC80\uC744 \uB4E4\uACE0
+    \uD06C\uAC8C \uD718\uB450\uB978\uB2E4(\uB458\uB808 \uACF5\uACA9\uB825\uC758 400%).
+    \uC18D\uC131 = \uB8EC\uD310\uC5D0 \uAC00\uC7A5 \uB9CE\uC740 \uC18D\uC131(\uC5C6\uC73C\uBA74
+    \uBD88). \uC18D\uC131 \uAC80 \uB3D9\uC548 \uCE7C\uC774 \uCEE4\uC9C0\uACE0 \uD3C9\uD0C0
+    \uBC94\uC704 \xD71.3 \xB7 \uD718\uB450\uB978 \uC790\uB9AC\uC5D0 \uC18D\uC131
+    \uC790\uAD6D \u2014 6\uCD08 + \uC7AC\uB828\uD560 \uB54C\uB9C8\uB2E4 0.5\uCD08."
   icon: {fileID: 21300000, guid: 332892ca495686e48b82e82ef40b9c7a, type: 3}
   iconTier2: {fileID: 21300000, guid: 1517252a1a6381f4280cecefa24851ff, type: 3}
   iconTier3: {fileID: 21300000, guid: bfc4c88c103bb154caa181a669e991d9, type: 3}
-  _tier2Change: "\uC5EC\uC9C4 \uBC18\uACBD 5m(\uACF5\uACA9\uB825\uC758 250%)"
-  _tier3Change: "\uC5EC\uC9C4 2\uBC88 \u2014 5m \u00B7 6.5m(\uAC01 \uACF5\uACA9\uB825\uC758 175%)"
+  _tier2Change: "\uC18D\uC131 \uAC80 \uD718\uB450\uB984 \uACF5\uACA9\uB825\uC758
+    400% \xB7 \uC18D\uC131 \uC790\uAD6D"
+  _tier3Change: "\uC18D\uC131 \uAC80 \uB3D9\uC548 \uD3C9\uD0C0 \uBC94\uC704 \xD71.3
+    \u2192 \xD71.45"
+  _engravings: []
   cooldown: 9
   damageIsAtkPercent: 1
-  behavior: {fileID: 11400000, guid: ac505e8a632b605409e7d8ececdaf3ea, type: 2}
+  behavior: {fileID: 11400000, guid: deaa2da0f462f3546bd0af834bb965f4, type: 2}

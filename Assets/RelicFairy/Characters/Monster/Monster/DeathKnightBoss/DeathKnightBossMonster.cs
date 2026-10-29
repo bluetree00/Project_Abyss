@@ -23,7 +23,7 @@ namespace RelicFairy.Monster
 ///  위 전투 전체가 1페이지다(<see cref="BossPages"/> — 1페이지 동안 HpRatio는 1페이지 기준 1→0).
 ///  1페이지 체력이 다 깎이면 전환 연출(<see cref="BossPageTransitionPatternSO"/>)을 직접 건다 — 콤보 러너는 강제 항목도
 ///  콤보·휴식이 끝나야 내므로 기다리지 않는다. 전환 전경에서 플레이어 구역 가운데 3×3이 무너지고(영구 · 지속 피해),
-///  2페이지에선 수동 공격(영혼 창 · 환영 돌진)과 영혼 소환 회복이 멈춘다.
+///  2페이지에선 수동 공격(영혼 창 · 환영 돌진)이 멈춘다.
 ///  2페이지 패턴은 설정 SO의 Page_2 항목(직접 패턴)으로 고른다 — 배치 사본(Arena_Boss_Ch3, 약 250 MB)의 풀은 건드리지 않는다.
 ///  간판 「원탁의 무덤」은 2페이지 50%에서 한 번, 역시 직접 건다.
 ///  악몽 모드 2페이지엔 특성 「지휘」 — 환영 기수가 서 있는 동안 쉬는 시간 ×0.85 · 피해 +15%(<see cref="DKCommandTrait"/>).
@@ -44,7 +44,10 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     private static readonly Vector2 ChainEndRest  = new Vector2(1.5f, 2f);
 
     // ── 2페이지 무대(가운데 3×3 붕괴) ─────────────────────
-    private static Color CollapseColor => PatternGuideHelper.HazardFloor;   // (10-23 가이드 색 통일) 회보라 → 머무는 위험 바닥 공용 색(숲 가시 띠 · 화룡 흑염 띠와 같게)
+    // (10-23 가이드 색 통일) 회보라 → 머무는 위험 바닥 공용 색(숲 가시 띠 · 화룡 흑염 띠와 같게) — 기사 아레나는 어두운 보라 조명이라 불투명 0.45 → 0.65(10-24 「너무 안 보여」)
+    private static Color CollapseColor => new Color(PatternGuideHelper.HazardFloor.r, PatternGuideHelper.HazardFloor.g, PatternGuideHelper.HazardFloor.b, 0.65f);
+    private const float ArenaGuideBoost    = 1.3f;    // 어두운 보라 성당 — 예고 밝기 배율(10-24 · 화룡 아레나 대비와 같은 장치)
+    private const float ArenaGuideEdgeLift = 0.35f;   // 공격 예고 테두리를 흰빛 쪽으로(채움은 공격 색 그대로)
     private const float CollapseDamagePerTick   = 0.12f;  // 0.5초마다 공격력 × 이 배율
     private const float PostTransitionBreak     = 1.5f;   // 전환이 끝나고 첫 패턴까지
     private const float IntroFinisherFirstDelay = 5f;     // 인트로 — 첫 마무리(10-16 8초 → 10-17 사용자 「오래 기다리게 한다」 5초)
@@ -184,9 +187,6 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     /// <summary>하한에 닿았다 — 영혼 소환까지 「막힘」(피해 숫자 · 피격 경직 없음 → 지금 공격이 끝나면 바로 소환, 10-06 실측 10초 → 짧게).</summary>
     private bool SoulGateHolding => SoulGatePending && _runtime != null && _runtime.CurrentHp <= SoulGateHp;
 
-    /// <summary>1페이지(= 기존 전투) 최대 체력 — 영혼 소환 회복량 등 기존 비율의 기준. 봉인기엔 최대 체력 그대로.</summary>
-    public int PhaseMaxHp => Pages.Page1Hp;
-
     /// <summary>2페이지 플레이어 구역(유리벽 앞 격자) — 전환 때 한 번 잰다.</summary>
     public DKPage2Zone Page2Zone => _page2Zone ??= DKPage2Zone.Resolve(this);
 
@@ -226,7 +226,6 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     private float                     _page2Glow;           // 0 = 1페이지 · 1 = 2페이지 갑옷 발광
     private DKP2PassiveAttackRunner   _passiveRunner;
     private CancellationTokenSource   _passiveCts;
-    private CancellationTokenSource   _healCts;
     private bool                      _soulGateCleared;
     private BossPages                 _pages;
     private DKPage2Zone               _page2Zone;
@@ -442,6 +441,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     {
         // 2페이지 여부를 먼저 정한다 — base.OnEnable이 HP를 최대 체력(페이지 배율 포함)으로 채운다.
         ResetPages();
+        PatternGuideHelper.SetArenaContrast(ArenaGuideBoost, ArenaGuideEdgeLift);   // 어두운 보라 바닥에서 예고가 묻혔다(10-24)
         base.OnEnable();
         InitializeRoomContext();
         _page2Zone = null;
@@ -492,10 +492,8 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         _passiveCts?.Dispose();
         _passiveCts    = null;
         _passiveRunner = null;
-        _healCts?.Cancel();
-        _healCts?.Dispose();
-        _healCts = null;
         UnbindBossHudIfBound();
+        PatternGuideHelper.ClearArenaContrast();
         base.OnDisable();
     }
 
@@ -511,11 +509,13 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         _passiveCts?.Dispose();
         _passiveCts    = null;
         _passiveRunner = null;
-        _healCts?.Cancel();
-        _healCts?.Dispose();
-        _healCts = null;
         _runner?.Reset();
         _command?.Reset("기사 쓰러짐", false);   // 환영 기수는 흩어진다
+        // 유리 장벽을 걷는다 — 다음 챕터 길(Next_Ch · 단상 뒤)이 장벽 너머라 클리어 뒤 막혔다(10-25 사용자 「챕터3 보스 클리어 뒤 다음 방으로 넘어가는 길이 장벽 때문에 막힘」).
+        // 출구 자리 보정(BossExitPath.KeepReachable)은 NavMesh로만 봐서 플레이어만 막는 유리를 못 본다
+        if (_entranceEndBarriers != null)
+            foreach (var b in _entranceEndBarriers)
+                if (b != null) b.SetActive(false);
         base.OnFatalDamage();
     }
 
@@ -597,64 +597,20 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         NotifyHpChanged();
     }
 
-    public void SoulPillarHealBossGradual(int total, float duration)
-    {
-        if (_runtime == null || _runtime.IsDead || total <= 0) return;
-        if (Pages.IsPage2 || Pages.Transitioning) return;
-        _healCts?.Cancel();
-        _healCts?.Dispose();
-        _healCts = new CancellationTokenSource();
-        HealGradualAsync(total, duration, _healCts.Token).Forget();
-    }
-
-    public void CancelGradualHeal()
-    {
-        _healCts?.Cancel();
-        _healCts?.Dispose();
-        _healCts = null;
-    }
-
-    private async UniTaskVoid HealGradualAsync(int total, float duration, CancellationToken ct)
-    {
-        try
-        {
-            if (_runtime == null || _runtime.IsDead) return;
-            int startHp  = _runtime.CurrentHp;
-            int targetHp = Mathf.Min(startHp + total, EffectiveMaxHp);
-            int actual   = targetHp - startHp;
-            if (actual <= 0) return;
-
-            float elapsed  = 0f;
-            const float tickInterval = 0.05f;
-
-            while (elapsed < duration)
-            {
-                await UniTask.Delay(System.TimeSpan.FromSeconds(tickInterval), cancellationToken: ct);
-                elapsed += tickInterval;
-                if (_runtime == null || _runtime.IsDead) return;
-                _runtime.CurrentHp = startHp + Mathf.RoundToInt(actual * Mathf.Clamp01(elapsed / duration));
-                NotifyHpChanged();
-            }
-
-            _runtime.CurrentHp = targetHp;
-            NotifyHpChanged();
-        }
-        catch (System.OperationCanceledException) { }
-    }
-
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 무적 처리 (피라미드 슬래시 패턴 중 데미지 차단)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     /// <summary>영혼 소환·방패 구간의 자체 무적도 「막힘」으로 읽히게 한다(공용 규약).</summary>
-    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || (_dkBB != null && _dkBB.IsInvincible) || SoulGateHolding;
+    // 기준선에 닿아 소환을 기다리는 동안(SoulGateHolding)은 무적 · 막힘 표시를 켜지 않는다 — 하던 공격 중에 갑자기 막혀 버그처럼 보였다(10-29 사용자 — 무적 표현 · 화룡과 같은 규칙)
+    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || (_dkBB != null && _dkBB.IsInvincible);
 
     public override void TakeDamage(float amount, UnityEngine.GameObject instigator,
                                     float knockbackMultiplier = 1f,
                                     bool isCrit = false)
     {
         if (_dkBB != null && _dkBB.IsInvincible) return;
-        if (SoulGateHolding) return;   // 영혼 소환 대기 — 막힘(CombatDamage가 막힘 표시를 띄운다). 하한은 DamageHpFloor가 지킨다
+        if (SoulGateHolding) return;   // 영혼 소환 대기 — 피해 · 경직만 막는다(경직이 소환을 늦췄다 · 10-06) · 막힘 표시는 소환이 시작해 방패가 서면(10-29). 하한은 DamageHpFloor가 지킨다
         base.TakeDamage(amount, instigator, knockbackMultiplier, isCrit);
     }
 
@@ -1121,13 +1077,12 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
     }
 
     /// <summary>
-    /// 2페이지 진입 — 수동 공격(영혼 창 · 환영 돌진)과 영혼 소환 회복을 멈추고, 1페이지 경계가 다시 켜지지 않게 닫는다.
+    /// 2페이지 진입 — 수동 공격(영혼 창 · 환영 돌진)을 멈추고, 1페이지 경계가 다시 켜지지 않게 닫는다.
     /// (2페이지 HpRatio는 0.4→0이라 페이즈 2 · 광폭 · 55% 소환 재개 조건이 그대로면 다시 켜질 수 있다)
     /// </summary>
     public void OnPage2Entered()
     {
         StopPassiveAttacks();
-        CancelGradualHeal();
         if (_dkBB == null) return;
 
         _dkBB.SetPhase2();          // 페이즈 2 진입 · 영혼 소환 · 55% 재개 모두 닫힘
@@ -1205,7 +1160,6 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
         if (!Pages.TransitionDue(CurrentHp)) return false;
 
         StopPassiveAttacks();
-        CancelGradualHeal();
         ResetRunnerKeepSword();
 
         if (_pageTransition == null || _pageTransition.GetRuntimeState() == null)

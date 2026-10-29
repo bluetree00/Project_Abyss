@@ -65,13 +65,25 @@ public static class RunResultProvider
         for (int i = 0; i < stats.ChapterEndCount; i++)
         {
             var (ch, end) = stats.ChapterEndAt(i);
-            snap.Segments.Add(new RunResultSnapshot.Segment { Label = Label(s, ch), Seconds = Mathf.Max(0, end - prevEnd), Done = true });
+            bool known = stats.TryChapterClockAt(i, out float combat, out float baseSec);
+            snap.Segments.Add(new RunResultSnapshot.Segment
+            {
+                Label = Label(s, ch), Seconds = Mathf.Max(0, end - prevEnd), Done = true,
+                CombatSeconds = known ? Mathf.RoundToInt(combat) : -1,
+                Grade = known ? RunTimeGrade.LetterInk(combat, baseSec) : string.Empty,
+            });
             prevEnd = end;
         }
+        // 지금 챕터 — 완주면 마친 챕터라 등급까지, 쓰러졌으면 전투 시간만(등급은 끝낸 챕터에만 · §6)
         int cur = (int)s.CurrentChapter;
-        snap.Segments.Add(new RunResultSnapshot.Segment { Label = Label(s, cur), Seconds = Mathf.Max(0, s.PlaySeconds - prevEnd), Done = true });
+        snap.Segments.Add(new RunResultSnapshot.Segment
+        {
+            Label = Label(s, cur), Seconds = Mathf.Max(0, s.PlaySeconds - prevEnd), Done = true,
+            CombatSeconds = Mathf.RoundToInt(stats.CombatSeconds),
+            Grade = snap.Cleared ? RunTimeGrade.LetterInk(stats.CombatSeconds, stats.BaseSeconds) : string.Empty,
+        });
         for (int c = cur + 1; c <= s.FinalChapterNumber; c++)
-            snap.Segments.Add(new RunResultSnapshot.Segment { Label = Label(s, c), Seconds = 0, Done = false });
+            snap.Segments.Add(new RunResultSnapshot.Segment { Label = Label(s, c), Seconds = 0, Done = false, CombatSeconds = -1, Grade = string.Empty });
     }
 
     private static string Label(GameRunSession s, int chapter)
@@ -132,7 +144,7 @@ public static class RunResultProvider
             foreach (var (id, rank) in w.AugmentList())
             {
                 var def = MeleeAugmentCatalog.Get(id);
-                if (def != null) parts.Add($"{def.Name} {MeleeAugmentDef.RankName(rank)}".TrimEnd());
+                if (def != null) parts.Add(def.IsLegend || def.IsGrowth ? def.Name : $"{def.Name} {MeleeAugmentDef.RankName(rank)}".TrimEnd());   // 전설 · 자람(10-26 재련으로 자람)은 단계가 없다
             }
         }
         return string.Join(" · ", parts);

@@ -249,7 +249,7 @@ public class CrucibleRoomController : MonoBehaviour
         {
             var rw = GetSlot(PlayerWeaponManager.Slot1);
             if (rw == null || !SkillTierResolver.IsRanged(rw)) { reason = "원거리 무기가 없다"; return false; }
-            if (!RangedPartsDraft.HasCandidates(RangedPartsState.Current)) { reason = $"모든 파츠가 Lv{RangedPartsDraft.PartCap}이다"; return false; }
+            if (!RangedPartsDraft.HasCandidates(RangedPartsState.Current)) { reason = $"열린 파츠가 모두 Lv{RangedPartsDraft.PartCap}이다 · 다른 파츠는 기억의 제단에서 연다"; return false; }   // 10-23 W6 — 제단에서 연 파츠만 재련(c1 RangedPartsDraft.IsUnlocked)
         }
         else if (!WeaponReforgeService.CanReforgeMelee(GetSlot(PlayerWeaponManager.Slot0), _table)) { reason = "이미 최대 강화"; return false; }
         if (FuelAmount < ReforgeCost(ranged)) { reason = "재료가 모자란다"; return false; }

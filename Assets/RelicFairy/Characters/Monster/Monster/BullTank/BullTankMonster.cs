@@ -19,8 +19,11 @@ public partial class BullTankMonster : MonsterBase
     // ── Constants ──────────────────────────────────────────────
     public const string Kind = "BullTank";
     private const float ChargeLead      = 0.8f;    // 돌진 — 따라 돌다가 달리기 이만큼 전에 방향을 굳히고 줄 예고(공용 예고 권장 0.6~1.0초)
-    private const float FirstActDelay   = 1.0f;
+    private const float FirstActDelay   = 0.6f;    // 10-26 사용자 「행동 간격이 너무 길다」 1.0 →
     private const int   MaxRepeat       = 2;       // 같은 패턴 연속 상한
+    private const float SwingApproachPad = 0.6f;   // 추격 멈춤 = 내려찍기 판정 반경 − 이만큼(10-29)
+    private const float ChargeLaneShare = 0.8f;    // 돌진은 플레이어 쪽 길이 이만큼 트였을 때만(10-29)
+    private const float RingFxRadiusAtOne = 1.36f; // RunFx Ring 배율 1의 반경(챕터 강화 착지 고리와 같은 값)
     private const string ExposedStatus  = "vulnerable";
     private static readonly Color DustTint = new(0.62f, 0.5f, 0.38f, 1f);
 
@@ -45,12 +48,12 @@ public partial class BullTankMonster : MonsterBase
     [SerializeField] private float _roarSeconds = 1.67f;   // Angry 클립(60 fps) — 입력 잠금 · 카메라 컷 없음
 
     [Header("① 내려찍기")]
-    [SerializeField] private float _swingRange     = 4f;
+    [SerializeField] private float _swingRange     = 3f;      // 판정 반경(3.2) 안에서만 — 4 m면 허공을 연달아 내려찍었다(10-29 실측)
     [SerializeField] private float _swingRadius    = 3.2f;
     [SerializeField] private float _swingAngle     = 90f;
     [SerializeField] private float _swingHitTime   = 0.85f;   // 곤봉 정점(클립 1.5초) — 실측 0.84~0.87초(10-14 정예 애니 점검 · 0.70은 휘두르기 전에 맞았다)
-    [SerializeField] private float _swingDuration  = 1.40f;   // 클립 1.5초 중 회복 끝에서 끊는다
-    [SerializeField] private float _swingCooldown  = 2.5f;
+    [SerializeField] private float _swingDuration  = 1.30f;   // 클립 1.5초 중 회복 끝에서 끊는다(10-23 B6 1.40 → 1.30 「약간 더 재빠르게」)
+    [SerializeField] private float _swingCooldown  = 1.5f;    // 10-23 B6 2.5 → 2.1 → 10-26 「행동 간격이 너무 길다」
     [SerializeField] private float _swingDamageMul = 1.1f;
 
     [Header("② 도약")]
@@ -60,25 +63,33 @@ public partial class BullTankMonster : MonsterBase
     [SerializeField] private float _leapAir        = 0.8f;    // 공중(이륙 순간 착지 원이 생겨 착지까지 차오른다)
     [SerializeField] private float _leapHeight     = 3.0f;
     [SerializeField] private float _leapRadius     = 3.0f;
-    [SerializeField] private float _leapRecover    = 1.0f;    // Jump_End 1.07초
-    [SerializeField] private float _leapCooldown   = 8f;
+    [SerializeField] private float _leapRecover    = 0.9f;    // Jump_End 1.07초(10-23 B6 1.0 →)
+    [SerializeField] private float _leapCooldown   = 5.0f;    // 10-23 B6 8 → 6.6 → 10-26
     [SerializeField] private float _leapDamageMul  = 1.6f;
 
     [Header("③ 돌진(주력)")]
     [SerializeField] private float _chargeMinDist  = 5f;
     [SerializeField] private float _chargeIntro    = 0.57f;   // 발 구름(Charge_Start 0.57초)
-    [SerializeField] private float _chargeAim      = 1.2f;    // 조준 — 끝 0.45초 전에 굳힘
+    [SerializeField] private float _chargeAim      = 1.0f;    // 조준 — 달리기 ChargeLead 전에 굳힘(10-23 B6 1.2 → 1.0 · 굳히기 전 따라 도는 시간만 줄고 줄 예고 0.8초는 그대로)
     [SerializeField] private float _chargeRunIn    = 0.18f;   // Run_Start 0.18초
     [SerializeField] private float _chargeSpeed    = 16f;
     [SerializeField] private float _chargeMaxLen   = 18f;
     [SerializeField] private float _chargeWidth    = 2.2f;
     [SerializeField] private float _chargeHitPad   = 0.3f;
-    [SerializeField] private float _chargeStun     = 3.8f;    // 벽에 박힘 — Attack02_End(1.9초) 뒤 비틀대는 대기로 이어 붙인다
+    [SerializeField] private float _chargeStun     = 2.6f;    // 벽에 박힘 — Attack02_End(1.9초) 뒤 비틀대는 대기로 이어 붙인다(10-26 「멈추는 문제」 3.8 →)
     [SerializeField] private float _chargeEndClip  = 1.9f;
-    [SerializeField] private float _chargeStop     = 1.0f;    // 벽 없이 끝까지 — 짧은 정지
-    [SerializeField] private float _chargeCooldown = 7f;
+    [SerializeField] private float _chargeStop     = 0.8f;    // 벽 없이 끝까지 — 짧은 정지(10-23 B6 1.0 →)
+    [SerializeField] private float _chargeCooldown = 4.4f;    // 10-23 B6 7 → 5.8 → 10-26
     [SerializeField] private float _chargeDamageMul = 1.9f;
     [SerializeField] private float _stunDamageAmp  = 0.3f;    // 기절 동안 받는 피해 +30%(취약 아이콘)
+
+    [Header("④ 사슬 휘두르기 — 해방기부터(10-29 F5 원형)")]
+    [Tooltip("끊은 사슬을 몸 둘레로 한 바퀴 — 둘레 원 전체가 판정. 옆 · 뒤로 돈 플레이어를 쓸어낸다")]
+    [SerializeField] private float _chainRadius    = 5.5f;
+    [SerializeField] private float _chainWindup    = 1.0f;    // 포효로 사슬을 들어 올리는 동안 원 예고가 차오른다(앞줄 = 판정)
+    [SerializeField] private float _chainRecover   = 0.6f;    // Angry 1.67초 안에서 끊는다
+    [SerializeField] private float _chainCooldown  = 9f;
+    [SerializeField] private float _chainDamageMul = 1.3f;
 
     [Header("겉모습")]
     [Tooltip("악몽 모드 몸 재질(검은 몸 — 83 배치 설계)")]
@@ -95,13 +106,14 @@ public partial class BullTankMonster : MonsterBase
     [SerializeField] private float _sfxPitch = 0.85f;
 
     // ── Private ────────────────────────────────────────────────
-    private enum Pattern { None, Swing, Leap, Charge }
+    private enum Pattern { None, Swing, Leap, Charge, Chain }
 
     private bool    _awake;
     private float   _nextActAt;
     private float   _swingReadyAt;
     private float   _leapReadyAt;
     private float   _chargeReadyAt;
+    private float   _chainReadyAt;
     private Pattern _last;
     private int     _repeat;
 
@@ -112,6 +124,7 @@ public partial class BullTankMonster : MonsterBase
     private SwingState  _swingState;
     private LeapState   _leapState;
     private ChargeState _chargeState;
+    private ChainSwingState _chainState;
 
     // ── MonsterBase ────────────────────────────────────────────
     protected override string ConfigAddress   => _configAddress;
@@ -130,7 +143,7 @@ public partial class BullTankMonster : MonsterBase
         _awake = false;
         _last = Pattern.None;
         _repeat = 0;
-        _swingReadyAt = _leapReadyAt = _chargeReadyAt = 0f;
+        _swingReadyAt = _leapReadyAt = _chargeReadyAt = _chainReadyAt = 0f;
         MonsterRootXZLock.Attach(gameObject, RootBone);   // 클립의 수평 이동을 지운다 — 몸이 자리에서 최대 10.7 m 앞으로 나갔다(10-14)
         ResolveTheme();
         BeginKit();
@@ -166,6 +179,8 @@ public partial class BullTankMonster : MonsterBase
     // ── 추적 · 공격 훅 — 일반 공격은 쓰지 않고 패턴 셋만 ──
     public override bool ShouldEnterAttackReady(MonsterContext ctx) => false;
     public override bool ShouldGiveUpChase(MonsterContext ctx)      => !_awake && base.ShouldGiveUpChase(ctx);
+    // 추격은 내려찍기가 닿는 데까지 — 멈춤 거리(공격 사거리 4 m)가 내려찍기 판정 반경(3.2 m)보다 멀어 4 m에 서서 허공만 8번 내려찍었다(10-29 실측)
+    public override float GetCombatStopDistance(MonsterContext ctx) => Mathf.Min(base.GetCombatStopDistance(ctx), _swingRadius - SwingApproachPad);
 
     protected override void OnFatalDamage()
     {
@@ -193,10 +208,21 @@ public partial class BullTankMonster : MonsterBase
         float d = Flat(player - transform.position).magnitude;
         float now = Time.time;
 
-        bool canCharge = d >= _chargeMinDist && now >= _chargeReadyAt && Allowed(Pattern.Charge);
-        bool canLeap   = d >= _leapMinDist && d <= _leapMaxDist && now >= _leapReadyAt && Allowed(Pattern.Leap);
+        bool canSwing  = d <= _swingRange && now >= _swingReadyAt;
+        bool canCharge = d >= _chargeMinDist && now >= _chargeReadyAt && ChargeLaneClear(player, d);
+        bool canLeap   = d >= _leapMinDist && d <= _leapMaxDist && now >= _leapReadyAt;
+        bool canChain  = StoryProgress.IsLiberated && d <= _chainRadius && now >= _chainReadyAt;   // ④ 해방기부터(10-29 F5)
+        // 같은 패턴 연속 상한은 다른 패턴을 낼 수 있을 때만 — 멀리서 돌진만 되는데 두 번 했다고 묶이면 14 m 안에 올 때까지 아무것도 안 했다(10-29 실측 10~13초 공백)
+        if ((canSwing ? 1 : 0) + (canCharge ? 1 : 0) + (canLeap ? 1 : 0) + (canChain ? 1 : 0) > 1)
+        {
+            canSwing  &= Allowed(Pattern.Swing);
+            canCharge &= Allowed(Pattern.Charge);
+            canLeap   &= Allowed(Pattern.Leap);
+            canChain  &= Allowed(Pattern.Chain);
+        }
         Pattern pick = Pattern.None;
-        if (d <= _swingRange && now >= _swingReadyAt && Allowed(Pattern.Swing)) pick = Pattern.Swing;
+        if (canChain && (!canSwing || Flanked(player))) pick = Pattern.Chain;   // 옆 · 뒤로 돈 플레이어(내려찍기 부채꼴 밖)를 둘레째 쓸어낸다
+        else if (canSwing) pick = Pattern.Swing;
         else if (canCharge && canLeap) pick = _last == Pattern.Charge ? Pattern.Leap : Pattern.Charge;   // 둘 다 되면 번갈아(10-12 실측: 돌진만 나와 도약 0회)
         else if (canCharge) pick = Pattern.Charge;
         else if (canLeap)   pick = Pattern.Leap;
@@ -209,10 +235,30 @@ public partial class BullTankMonster : MonsterBase
             case Pattern.Swing:  _swingReadyAt  = now + _swingCooldown;  ChangeState(_swingState  ??= new SwingState(this));  break;
             case Pattern.Leap:   _leapReadyAt   = now + _leapCooldown;   ChangeState(_leapState   ??= new LeapState(this));   break;
             case Pattern.Charge: _chargeReadyAt = now + _chargeCooldown; ChangeState(_chargeState ??= new ChargeState(this)); break;
+            case Pattern.Chain:  _chainReadyAt  = now + _chainCooldown;  ChangeState(_chainState  ??= new ChainSwingState(this)); break;
         }
     }
 
     private bool Allowed(Pattern p) => p != _last || _repeat < MaxRepeat;
+
+    private bool Flanked(Vector3 player) => Vector3.Angle(transform.forward, Flat(player - transform.position)) > _swingAngle * 0.5f;
+
+    /// <summary>
+    /// 플레이어 쪽 돌진 길이 트였나(길이의 <see cref="ChargeLaneShare"/> 넘게) — 바로 앞 기둥 · 벽에 1 m 돌진하고 3.8초 기절하며 서 있었다
+    /// (10-29 실측: 멀리서 쏠 때 돌진 5번 모두 벽 · 길이 1.0 · 1.0 · 2.2 · 10.8 · 12.2 m — 사용자 「원거리 공격 중에 중간보스가 움직이지 않는다」). 막혔으면 돌아서 쫓는다.
+    /// </summary>
+    private bool ChargeLaneClear(Vector3 player, float d)
+    {
+        Vector3 from = transform.position;
+        Vector3 dir = Flat(player - from);
+        if (dir.sqrMagnitude < 0.01f) return false;
+        dir.Normalize();
+        float clear = _chargeMaxLen;
+        if (_agent != null && _agent.isOnNavMesh && NavMesh.Raycast(from, from + dir * _chargeMaxLen, out var hit, Filter()))
+            clear = hit.distance - 0.4f;
+        clear = Mathf.Min(clear, ObstacleClear(from, dir, _chargeMaxLen));
+        return clear >= Mathf.Min(d, _chargeMaxLen) * ChargeLaneShare;
+    }
 
     private static bool IsBodyColour(Material m)
         => m != null && m.name.StartsWith("M_BullTank_URP_")
@@ -244,7 +290,7 @@ public partial class BullTankMonster : MonsterBase
 
     private void EndPattern()
     {
-        _nextActAt = Time.time + 0.4f;
+        _nextActAt = Time.time + 0.2f;   // 패턴 사이 숨 고르기(10-23 B6 0.4 → 0.3 → 10-26 0.2)
         ChangeState<ChaseState>();
     }
 
@@ -412,6 +458,54 @@ public partial class BullTankMonster : MonsterBase
         public override void Exit(MonsterContext ctx)
         {
             if (_tele != null) _tele.Cancel();   // 판정 전에 끊기면 헛예고를 지운다(판정 뒤엔 이미 스스로 사라졌다)
+            _tele = null;
+            _b.ResumeAgent();
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ④ 사슬 휘두르기(해방기부터 · 10-29 F5 원형) — 끊은 사슬을 몸 둘레로 한 바퀴. 포효로 들어 올리는 동안 둘레 원이 차오르고(앞줄 = 판정) 원 전체를 친다
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private sealed class ChainSwingState : SpecialStateBase
+    {
+        private readonly BullTankMonster _b;
+        private float _t;
+        private bool  _hit;
+        private MonsterTelegraph _tele;
+        public ChainSwingState(BullTankMonster b) { _b = b; }
+        public override SpecialStateConstraint Constraints =>
+            SpecialStateConstraint.UnInterruptible | SpecialStateConstraint.MovementLocked;
+
+        public override void Enter(MonsterContext ctx)
+        {
+            _t = 0f; _hit = false;
+            _b.StopAgent();
+            _b.Play(AnimRoar);
+            _b.Sfx(_b._roarSfx);
+            _tele = MonsterTelegraph.Circle(_b.transform.position, _b._chainRadius, _b._chainWindup, MonsterTelegraph.Heavy);
+            Debug.Log($"[BullTank] 사슬 휘두르기 예고 시작 t={Time.time:F2}");
+        }
+
+        public override void Update(MonsterContext ctx)
+        {
+            _t += Time.deltaTime;
+            if (!_hit && _t >= _b._chainWindup)
+            {
+                _hit = true;
+                Vector3 me = _b.transform.position;
+                var pl = _b.PlayerPos(out bool ok);
+                bool inside = ok && Flat(pl - me).magnitude <= _b._chainRadius;
+                if (inside) _b.HitPlayer(_b.Damage(_b._chainDamageMul), HitWeight.Heavy);
+                _b.Sfx(_b._stompSfx);
+                RunFx.Play(RunFxSlot.Ring, me + Vector3.up * 0.1f, _b._chainRadius / RingFxRadiusAtOne, ThemeColor(_b._theme));   // 고리 = 판정 원(이펙트 = 판정)
+                Debug.Log($"[BullTank] 사슬 휘두르기 판정 t={Time.time:F2}{(inside ? " — 명중" : "")}");
+            }
+            if (_t >= _b._chainWindup + _b._chainRecover) _b.EndPattern();
+        }
+
+        public override void Exit(MonsterContext ctx)
+        {
+            if (_tele != null) _tele.Cancel();
             _tele = null;
             _b.ResumeAgent();
         }

@@ -421,3 +421,7 @@ MonoBehaviour:
     sfxKey: sfx_skill_tier_up
     volume: 0.4
     pitchJitter: 0
+  - eventId: ui_hover
+    sfxKey: sfx_ui_tick
+    volume: 0.2
+    pitchJitter: 0.05

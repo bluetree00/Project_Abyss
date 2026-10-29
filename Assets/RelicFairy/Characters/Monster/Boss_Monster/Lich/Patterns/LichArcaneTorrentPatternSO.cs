@@ -215,6 +215,7 @@ public class LichArcaneTorrentState : UnInterruptibleState<LichArcaneTorrentPatt
         _phase    = Phase.Charge;
         _timer    = 0f;
         _sweepDir = SweepDirection(ctx);   // 플레이어가 도는 쪽(예측) · 절반은 반대(10-22 E2 L3)
+        LichSfx.Play(LichSfxSlot.CastCharge, ctx.Transform.position);   // 격류 충전(10-29 Ch4 사운드 점검 — 무음이었다)
 
         // 시작각: 플레이어 yaw에서 스윕 반대편으로 오프셋 → 격류가 플레이어 위치를 가로지른다.
         _beamAngle = YawToPlayer(ctx) - _sweepDir * (Data.sweepArc * 0.5f);

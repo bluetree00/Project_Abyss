@@ -33,7 +33,6 @@ public sealed class ExileFallStage : MonoBehaviour
     public const float Depth         = -3000f;   // 무대 꼭대기 높이
     public const float FallSpeed     = 24f;      // m/s — 아레나 낙하 끝 속도(약 22)와 이어진다
     public const float LandAt        = 9.35f;    // 착지 섬광 — 바닥이 약 10 m 앞
-    public const float SkipAfter     = 1f;       // 이만큼 지난 뒤 건너뛰기 키(공격 · 대시 · F · 스페이스) = 착지 섬광으로
     public const float SpinDegPerSec = 28f;      // 몸이 천천히 돈다
 
     private const float FloorAt     = 9.75f;
@@ -269,7 +268,7 @@ public sealed class ExileFallStage : MonoBehaviour
     }
 
     /// <summary>
-    /// 떨어진다 — 층이 스쳐 가고 봉인진이 깨지며 대사가 흐른다. 착지 시각이 되거나 건너뛰면 돌아온다(착지 섬광은 부르는 쪽).
+    /// 떨어진다 — 층이 스쳐 가고 봉인진이 깨지며 대사가 흐른다. 착지 시각이 되면 돌아온다(착지 섬광은 부르는 쪽) · 건너뛸 수 없다(10-26 사용자 「리치의 마지막 연출이 스킵되는데 스킵 안 되게」).
     /// <paramref name="snapCamera"/>면 카메라를 바로 제자리에(가림 뒤), 아니면 넘겨받은 자리에서 서서히 맞춘다(아레나 낙하에서 이어질 때).
     /// </summary>
     internal async UniTask PlayAsync(ExileBody body, bool snapCamera, CancellationToken ct)
@@ -311,11 +310,6 @@ public sealed class ExileFallStage : MonoBehaviour
                 _cam.SetPositionAndRotation(camPos, Quaternion.LookRotation(LookPoint(pos) - camPos, Vector3.up));
             }
 
-            if (t >= SkipAfter && ExileFallSequence.SkipPressed())
-            {
-                ExileFallSequence.Note("건너뛰기 — 착지 섬광으로");
-                break;
-            }
             await UniTask.Yield(PlayerLoopTiming.Update, ct);
         }
     }

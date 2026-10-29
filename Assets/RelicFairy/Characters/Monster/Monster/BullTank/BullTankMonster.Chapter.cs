@@ -32,6 +32,7 @@ public partial class BullTankMonster
     private const float FirePointRadius = 0.8f;   // _fireVfxScale이 맞춘 불 한 점의 보이는 반경(LineStep의 절반 · 10-18 FX Fit: FlameTsunami ×1 = 16 m → ×0.05)
     private const float ShadowDamageMul = 0.8f;   // 원래 공격 배율에 곱
     private const float VoidDamageMul   = 0.9f;
+    private const float VoidSfxVolume   = 0.55f;  // 공허 후속타 소리 — 착지음을 그 자리에서 작게(10-29 Ch4 사운드 점검 — 무음이었다)
     private const float LineStep        = 1.6f;   // 줄 위 이펙트 간격(m)
 
     // ── Serialized ─────────────────────────────────────────────
@@ -170,7 +171,7 @@ public partial class BullTankMonster
                 if (_voidOrbVfx != null) Spawn(_voidOrbVfx, tip + Vector3.up * 0.6f, Quaternion.identity, _voidOrbVfxScale, c, VoidLead + 0.1f);
                 MonsterTelegraph.Circle(tip, r, VoidLead, MonsterTelegraph.Normal);
                 StrikeAfter(VoidLead, p => Flat(p - tip).magnitude <= r, VoidDamageMul, HitWeight.Medium,
-                            () => { if (_voidVfx != null) Spawn(_voidVfx, tip, Quaternion.identity, _voidVfxScale * r / 2f, c, 1.5f); }, ct);
+                            () => { if (_voidVfx != null) Spawn(_voidVfx, tip, Quaternion.identity, _voidVfxScale * r / 2f, c, 1.5f); SfxAt(_landSfx, tip, VoidSfxVolume); }, ct);
                 break;
             }
         }
@@ -221,7 +222,7 @@ public partial class BullTankMonster
                 float r = radius + 1.5f;
                 MonsterTelegraph.Circle(at, r, VoidLead, MonsterTelegraph.Heavy);   // 강 타격
                 StrikeAfter(VoidLead, p => Flat(p - at).magnitude <= r, VoidDamageMul, HitWeight.Heavy,
-                            () => { if (_voidVfx != null) Spawn(_voidVfx, at, Quaternion.identity, _voidVfxScale * r / 2f, c, 1.5f); }, ct);
+                            () => { if (_voidVfx != null) Spawn(_voidVfx, at, Quaternion.identity, _voidVfxScale * r / 2f, c, 1.5f); SfxAt(_landSfx, at, VoidSfxVolume); }, ct);
                 break;
             }
         }
@@ -259,13 +260,19 @@ public partial class BullTankMonster
                 const float r = 3f;
                 MonsterTelegraph.Circle(to, r, VoidLead, MonsterTelegraph.Heavy);   // 강 타격
                 StrikeAfter(VoidLead, p => Flat(p - to).magnitude <= r, VoidDamageMul * 1.1f, HitWeight.Heavy,
-                            () => { if (_voidVfx != null) Spawn(_voidVfx, to, Quaternion.identity, _voidVfxScale * r / 2f, c, 1.5f); }, ct);
+                            () => { if (_voidVfx != null) Spawn(_voidVfx, to, Quaternion.identity, _voidVfxScale * r / 2f, c, 1.5f); SfxAt(_wallSfx, to, VoidSfxVolume); }, ct);
                 break;
             }
         }
     }
 
     // ── 강화 도우미 ───────────────────────────────────────────
+    /// <summary>강화 후속타 소리 — 그 자리에서 작게.</summary>
+    private void SfxAt(AudioClip clip, Vector3 at, float volume)
+    {
+        if (clip != null) Managers.Sound?.PlayEffectAt(clip, at, volume, _sfxPitch * UnityEngine.Random.Range(0.96f, 1.04f));
+    }
+
     /// <summary>예고 뒤 한 번 — 예고(MonsterTelegraph)가 다 차는 순간 판정 · 이펙트.</summary>
     private void StrikeAfter(float delay, Func<Vector3, bool> inside, float dmgMul, HitWeight weight, Action fx, CancellationToken ct)
         => StrikeAfterAsync(delay, inside, dmgMul, weight, fx, ct).Forget();

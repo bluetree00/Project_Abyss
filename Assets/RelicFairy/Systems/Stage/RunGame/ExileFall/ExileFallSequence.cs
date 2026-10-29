@@ -14,7 +14,7 @@ using Object = UnityEngine.Object;
 ///   ② 추락 — 같은 씬 y −3000에 런타임으로 짓는 허공(<see cref="ExileFallStage"/>). 층 넷이 스쳐 가고 봉인진이 하나씩 깨진다.
 ///   ③ 착지 — 흰 섬광 → 와이프. 전환(같은 런 · 같은 빌드 · 깊이 그대로 Ch1)은 <see cref="GameRunBootstrapper.EnterExileFall"/>가 맡는다.
 ///   ④ Ch1 첫 방 — 엎드린 채 드러나 일어나고 멀린 한 줄(<see cref="BeginLandingPose"/> · <see cref="PlayLandingAsync"/> · <see cref="RegroupLines"/>).
-/// 전부 실시간(unscaled) · 추락은 1초 뒤 공격 · 대시 · 상호작용(F) · 스페이스로 건너뛴다(ESC는 아니다 — 추방 내내 일시정지도 막는다, <see cref="BlocksPause"/>).
+/// 전부 실시간(unscaled) · 추락은 건너뛸 수 없다(10-26 사용자 — 예전엔 1초 뒤 공격 · 대시 · F · 스페이스로 건너뛰었다) · 추방 내내 일시정지도 막는다(<see cref="BlocksPause"/>).
 /// 전환 계기 = 보스방 클리어: 추방이 true로 돌아오면 LichMonster가 RaiseDied → RoomWaveController(3초 뒤) NotifyBossRoomCleared
 /// → GameRunBootstrapper.BossClearSequenceAsync → <see cref="GameRunBootstrapper.EnterExileFall"/>가 <see cref="Claim"/>한다.
 /// 그 신호가 끝내 안 오면 착지 뒤 직접 부른다(어디서 깨져도 Ch1로 — 소프트락 금지). 추방이 true로 돌아온 뒤엔 리치(꺼진다)를 참조하지 않는다.
@@ -429,15 +429,6 @@ public static class ExileFallSequence
         LichSfx.Play(LichSfxSlot.WardBreak, at);
         Note($"포효 {index} — 칸 비어 결계 깨짐 소리");
     }
-
-    /// <summary>
-    /// 추락 건너뛰기 키 — 공격(왼쪽 클릭) · 대시(오른쪽 클릭 · Shift) · 상호작용(F) · 스페이스만. ESC · 일시정지 키는 세지 않는다(10-11 b0).
-    /// 플레이어 입력 액션은 추락 동안 꺼져 있어 장치 키를 직접 본다(바인딩: PlayerInputActions Attack · Dodge · Jump, 상호작용 F).
-    /// </summary>
-    internal static bool SkipPressed()
-        => Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)
-        || Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift)   // 대시 Shift(10-20)
-        || Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.Space);
 
     /// <summary>실측 기록 한 줄(에디터) + 콘솔. 사건마다 한 번만 부른다(매 프레임 금지).</summary>
     internal static void Note(string message)

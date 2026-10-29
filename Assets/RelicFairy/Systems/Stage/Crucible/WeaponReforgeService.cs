@@ -7,7 +7,7 @@ using UnityEngine;
 /// <item>근접: 강화 +3 확정(다음 3의 배수까지 · 상한까지) + 증강 고르기(<see cref="MeleeAugmentDraft"/> — 증강 단계가 3마다라 재련마다 열린다).</item>
 /// <item>원거리: 파츠 카드 3장 중 1(<see cref="RangedPartsDraft"/>).</item>
 /// <item>실패 · 하락 · 연속 · 잭팟은 없다.</item>
-/// <item>비용 = 이번 방문 n번째(5 · 10 · 15 — 근접 · 원거리 합산) × 띠 × 반값 이벤트 × 대장장이의 인장(−10%/단계).
+/// <item>비용 = 이번 방문 n번째(10 · 20 · 40 — 근접 · 원거리 합산 · 10-23) × 띠 × 반값 이벤트 × 대장장이의 인장(−10%/단계).
 ///   띠: 근접 = 강화 단계(+12 ~ ×3 · +18 ~ ×6) · 원거리 = 이 런 원거리 재련 수(5 ~ 6번째 ×3 · 7번째 ~ ×6) — 62 시뮬 안 R(10-18).</item>
 /// <item>쉼터 「무기 강화」 = 무료 재련 1회(카드 포함 · D2) — 근접 · 원거리 둘 다 되면 쉼터가 고르게 한다(10-22 B7).</item>
 /// </list>
@@ -18,8 +18,10 @@ public static class WeaponReforgeService
     // ── Constants ─────────────────────────────────────────────────
     /// <summary>근접 재련 1회에 오르는 단계 — 증강 단계 간격과 같다(재련마다 증강 고르기).</summary>
     public const int MeleeStep = MeleeAugmentDraft.LevelStep;
-    /// <summary>이번 방문 n번째 재련의 기본 비용(1 · 2 · 3번째부터).</summary>
-    private static readonly int[] VisitCost = { 5, 10, 15 };
+    /// <summary>이번 방문 n번째 재련의 기본 비용(1 · 2 · 3번째부터).
+    /// 10-23 사용자 「한 번 가면 3~5개씩 강화 — 보통 1~2 정도 할 수 있게」: 5 · 10 · 15 → 10 · 20 · 40(셋째부터 두 배씩 뛰어 보통은 둘에서 멈춘다).
+    /// 시뮬(스크래치 eco_1023/final.py · 봉인기 P0 · 근접 · 원거리 같은 재료): 방문당 2.3회(3회 이상 41%) → 1.8회(1~2회 82%) · 숙련(도전 금급) 4회 이상 30% → 8%.</summary>
+    private static readonly int[] VisitCost = { 10, 20, 40 };
     /// <summary>근접 띠 — 이 단계 이상이면 ×3 · ×6(진화 뒤 구간).</summary>
     public const int MeleeBandLevel1 = 12, MeleeBandLevel2 = 18;
     /// <summary>원거리 띠 — 이 런 원거리 재련이 이 번째 이상이면 ×3 · ×6.</summary>

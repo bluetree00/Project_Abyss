@@ -93,11 +93,16 @@ public sealed class DarkReleaseEffect : DarkRuneEffectBase
 
         float ext = res.GetFloat(ABYSS_RELEASE_EXT);   // 심연각성 연장 시간
         float dur = (Entry.duration > 0f ? Entry.duration : 5f) + ext;
+        bool fresh = Time.time >= _releaseUntil;   // 꺼져 있다 새로 켜짐(해방 중 재발동은 연장)
         _releaseUntil = Time.time + dur;
         res.Consume(GAUGE);   // 게이지 리셋 → 임계 재무장
 
-        // 심연각성(4단계): 확정 강화
-        (player.RuneEffects?.GetActive("DarkAbyss") as DarkAbyssEffect)?.Grant(player, dur);
+        // 심연각성(4단계): 확정 강화 — 자기 강화 문장도 거기서 한 번 낸다
+        var abyss = player.RuneEffects?.GetActive("DarkAbyss") as DarkAbyssEffect;
+        if (abyss != null) abyss.Grant(player, dur);
+        // 해방이 켜졌다는 신호 한 번 — 예전엔 5초 강화가 아무 표시 없이 켜졌다(10-24 실측 8bp · 「시너지 발동이 안 되는 것 같아」).
+        // 새로 켜질 때만 — 여러 적을 치면 해방 중에도 게이지가 차 약 3초마다 연장돼 문장이 되풀이됐다
+        else if (fresh) ElementVfxPlayer.PlayActivation(RuneElement.Dark, player.transform.position);
     }
 
     public override void Tick(float dt, PlayerController player)

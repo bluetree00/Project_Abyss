@@ -95,16 +95,16 @@ public sealed class GameRunSession
     /// 챕터 몫은 등급(= 층: 잡몹 · 위협 · 정예)마다 다르다(10-11 일반방 긴장감 설계 §3-1). 보스는 MonsterBase가 배율에서 뺀다.
     /// </summary>
     public float CurrentDifficultyScaleFor(MonsterGrade grade)
-        => ChapterBalance.Of(CurrentChapter).HpFor(grade) * (1f + AbyssDepth * LoopScalePerDepth) * EraBalance.Current.HpScale;   // 10-21 시기 체력은 따로(악몽 체력 위주)
+        => ChapterBalance.Of(CurrentChapter).HpFor(grade) * (1f + AbyssDepth * LoopScalePerDepth) * EraBalance.Ramp(EraBalance.Current.HpScale, (int)CurrentChapter);   // 10-21 시기 체력은 따로(악몽 체력 위주)
 
     /// <summary>현재 챕터의 몬스터 <b>공격</b> 배율 — 체력보다 완만하게(10-02 설계서 §2). 루프 깊이 · 시기는 체력과 같이 곱한다.
     /// 10-21 b 등급(위협 · 정예)마다 따로.</summary>
     public float CurrentAttackScaleFor(MonsterGrade grade)
-        => ChapterBalance.Of(CurrentChapter).AttackFor(grade) * (1f + AbyssDepth * LoopScalePerDepth) * EraBalance.Current.StatScale;
+        => ChapterBalance.Of(CurrentChapter).AttackFor(grade) * (1f + AbyssDepth * LoopScalePerDepth) * EraBalance.Ramp(EraBalance.Current.StatScale, (int)CurrentChapter);
 
     /// <summary>현재 챕터의 몬스터 수량 배율 — 챕터 × 시기(해방기 ×1.1 · 악몽 모드 ×1.2).</summary>
     public float CurrentMonsterCountScale
-        => ChapterBalance.Of(CurrentChapter).Count * EraBalance.Current.CountScale;
+        => ChapterBalance.Of(CurrentChapter).Count * EraBalance.Ramp(EraBalance.Current.CountScale, (int)CurrentChapter);   // 10-29 G 챕터 램프
 
     private ChapterRegistry _chapterRegistry;
     // 레지스트리의 최종 챕터만 — 챕터 배율 · 테마는 아직 꽂지 않는다(10-01 결정 D1 ①: 리치까지 가는 길만 먼저).
@@ -202,12 +202,20 @@ public sealed class GameRunSession
     /// </summary>
     public RoomPlanKind CurrentRoomKind { get; private set; } = RoomPlanKind.Normal;
 
+    /// <summary>위험한 문으로 들어온 방인가(10-29 F4) — 두 번째 파도 정예 둘 확정 · 보상 Epic 이상. 방 진입마다 RunFlowController가 넘긴다.</summary>
+    public bool CurrentRoomDanger { get; private set; }
+
+    /// <summary>방에 들어선 순번(이어하기로 같은 방을 다시 지어도 오른다) — 전투 시계가 방마다 기준 시간을 한 번 더하는 데 쓴다(10-24 U5).</summary>
+    public int RoomEnterSerial { get; private set; }
+
     /// <summary>방 진입 시 RunFlowController가 호출.</summary>
     /// <param name="countSpecialVisit">특수방이면 방문 수를 올릴지. 이어하기 재생성(같은 방을 다시 짓는 것)은
     /// false로 넘긴다 — 저장된 SpecialRoomVisits가 이미 그 방문을 포함하고 있어 그대로 두면 이중 계상된다.</param>
-    public void SetCurrentRoomKind(RoomPlanKind kind, bool countSpecialVisit = true)
+    public void SetCurrentRoomKind(RoomPlanKind kind, bool countSpecialVisit = true, bool danger = false)
     {
         CurrentRoomKind = kind;
+        CurrentRoomDanger = danger;
+        RoomEnterSerial++;
         MonsterRoomLedger.Reset();   // 방 단위 특성 · 정예 접두어 기록(10-11 정예 접두어)
 
         // 방 버프의 남은 방 수 — 새 방에 들어설 때 하나 준다(이어하기로 같은 방을 다시 짓는 건 빼고). 예전엔 OnRoomExit을 부르는 곳이 없어
@@ -369,13 +377,12 @@ public sealed class GameRunSession
             RangedPartsState.Current = new RangedPartsState();
             RangedPartsState.ApplyTestCarry();   // 베이스캠프 테스트 제단을 쓴 경우에만 동작(평소 무해)
 
-            // 베이스캠프 파츠 공방에서 고른 시작 파츠 — 매 런 Lv1 하나를 들고 시작한다(베이스캠프 재설계 §2).
-            string startPart = AppBootstrapper.Instance?.Loadout?.StartPartId;
-            if (!string.IsNullOrEmpty(startPart)) RangedPartsState.Current.Equip(startPart, 1);
-            // 기억의 제단 「시작 파츠 둘」 — 둘째 파츠도 Lv1로(09-29). 해금이 없으면 공방이 둘째를 받지 않는다.
-            string startPart2 = AppBootstrapper.Instance?.Loadout?.StartPartId2;
-            if (!string.IsNullOrEmpty(startPart2) && startPart2 != startPart && MemoryAltarService.StartPartSlots >= 2)
-                RangedPartsState.Current.Equip(startPart2, 1);
+            // 시작 파츠 = 기본(분열) + 기억의 제단에서 연 파츠 전부 Lv1(10-29 사용자 「처음에 고르는 게 의미 없다 — 해금하면 장착한 채 시작」).
+            // 거점 파츠 공방(고르기)은 걷었다(StartPartStation).
+            var partDefs = Managers.WeaponParts?.All;
+            if (partDefs != null)
+                foreach (var def in partDefs)
+                    if (def != null && RangedPartsDraft.IsUnlocked(def.part_id)) RangedPartsState.Current.Equip(def.part_id, 1);
             // 무기별 성향(10-14 빌드 시너지 A5) — 활은 분열(다발) +1, 석궁은 거력(한 발) +1에서 시작한다. 같은 파츠를 골랐으면 그 위에 쌓인다.
             var lo = AppBootstrapper.Instance?.Loadout;
             WeaponType rangedType = lo?.WeaponSlot0 != null && (lo.WeaponSlot0.weaponType == WeaponType.Bow || lo.WeaponSlot0.weaponType == WeaponType.Crossbow)
@@ -889,6 +896,20 @@ public sealed class GameRunSession
         return _hudModeSet;
     }
 
+    /// <summary>
+    /// 아이템 효과의 방 진입 훅만 — 런 상태 · HUD는 바꾸지 않는다. 방 전환(RunFlowController)이 서약 방 진입과 함께 부른다(10-24).
+    /// 보스방은 방 진입(방마다 리셋 · 방 시작 생성) 뒤에 보스 진입(보스 조건)을 낸다 — 방 진입이 보스 표시를 끄므로 순서가 이렇다.
+    /// </summary>
+    public void NotifyItemRoomEnter(bool boss)
+    {
+        if (!IsRunning || EffectManager == null) return;
+        EffectManager.OnRoomEnter();
+        if (boss) EffectManager.OnBossEnter();
+#if UNITY_EDITOR
+        Debug.Log($"[ItemEffect] 방 진입 훅 — 보스 {boss} · 효과 {EffectManager.ActiveEffects.Count}");
+#endif
+    }
+
     // Convenience wrappers
     public void NotifyCombatStarted()   => EnterRoom(RunState.CombatRoom);
     public void NotifyCombatEnded()     => EnterStandby();
@@ -1051,6 +1072,8 @@ public sealed class GameRunSession
     private void OnBuildWeaponSwapped(WeaponData _, GameObject __)
     {
         if (_buildWeapons == null) return;
+        // 효과 문맥의 무기 종류(근접/원거리 공격력 기준)는 재구성 때만 바뀌었다 — 바꿔 들 때 문맥만 갱신(10-24 · 활로 짠 뒤 근접을 들면 전설 피해 ≈0)
+        if (Player != null) EffectManager?.RefreshContext(Player, this);
         if (_buildWeapons.Weapon0Data?.AugmentRank("aug_imprint_echo") > 0 || _buildWeapons.Weapon1Data?.AugmentRank("aug_imprint_echo") > 0)
             RebuildItemEffects();
     }

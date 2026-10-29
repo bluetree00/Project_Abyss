@@ -742,8 +742,7 @@ public sealed partial class UI_RefineryPanel : UI_Popup
         var (rare, epic, leg) = _svc.CurrentOdds();
         // 해금 몫은 확률판 머리 오른쪽(무엇이 등급을 올렸나 — 룬 선택 막대와 같은 자리). 예전엔 결과 줄 끝에 덧붙였는데,
         // 그 줄은 이제 공개 결과(◆ · 등급 · 이름)가 쓴다.
-        _oddsBar?.SetBoost(RefineryService.QualityUnlockEpic > 0f
-            ? $"정제 등급 상승 +{RefineryService.QualityUnlockEpic * 100f:F0}%p" : string.Empty);
+        _oddsBar?.SetBoost(RefineryService.DescribeBoost());
         _oddsBar?.SetOdds(rare, epic, leg, false);
         CurrencyCounter.Apply(_oreText, _svc.OreOwned, "원석 ");
         RefreshIdleStage(rare, epic, leg);
@@ -877,7 +876,8 @@ public sealed partial class UI_RefineryPanel : UI_Popup
 
     /// <summary>
     /// 「정제 두 장」(기억의 제단) — 두 장을 함께 공개했다. 잠깐 보여 준 뒤 정제소를 닫고 두 장을 룬 선택 화면에 올린다
-    /// (방 보상과 같은 화면 · 같은 배치 흐름). 넘기면 쓴 원석을 돌려준다.
+    /// (방 보상과 같은 화면 · 같은 배치 흐름). 넘기면 두 장 다 버린다 — 쓴 원석은 돌려주지 않는다
+    /// (10-26 사용자 「룬이 가득 차 있을 때 좋은 룬이 나올 때까지 계속 돌릴 수 있다」 → 「환불 없음」 · 예전엔 전액 환불이라 공짜로 다시 돌렸다).
     /// </summary>
     private async UniTask OfferPickAsync(RefineryOutcome outcome)
     {
@@ -885,14 +885,13 @@ public sealed partial class UI_RefineryPanel : UI_Popup
         catch (OperationCanceledException) { return; }
 
         var inv  = GameRunBootstrapper.Instance?.Run?.ItemInventory;
-        var svc  = _svc;
         var list = new List<(RuntimeItemData data, ItemSO so)> { (outcome.Rune, outcome.RuneSo), (outcome.Alt, outcome.AltSo) };
         base.ClosePopupUI();   // 정제소를 먼저 닫는다 — 아래는 이 창이 사라진 뒤에도 이어진다
-        OfferPickDetachedAsync(list, inv, svc, outcome.Spent).Forget();
+        OfferPickDetachedAsync(list, inv, outcome.Spent).Forget();
     }
 
     private static async UniTaskVoid OfferPickDetachedAsync(List<(RuntimeItemData data, ItemSO so)> candidates,
-                                                            RunItemInventory inv, RefineryService svc, int spent)
+                                                            RunItemInventory inv, int spent)
     {
         var popup = Managers.UI != null ? await Managers.UI.ShowPopupUIAndGetAsync<UI_RuneSelectPopup>() : null;
         if (popup == null)
@@ -902,9 +901,8 @@ public sealed partial class UI_RefineryPanel : UI_Popup
             return;
         }
         var wait = popup.WaitForInteractionAsync(CancellationToken.None);
-        popup.Setup(candidates, inv, refinerySpent: spent);   // 넘기기 글 = 쓴 원석 환불 · 방 확률 막대 숨김(10-18)
+        popup.Setup(candidates, inv, refinerySpent: spent);   // 넘기기 글 = 환불 없음 · 방 확률 막대 숨김(10-18)
         await wait;
-        if (popup.Skipped) svc?.Refund(spent);
     }
 
     /// <summary>[룬판에 놓기] 뒤 — 결과가 아래로 빨려 들어간 다음(어디로 가는지가 보이게) 정제소를 닫고 그 룬을 판에 올린다.</summary>

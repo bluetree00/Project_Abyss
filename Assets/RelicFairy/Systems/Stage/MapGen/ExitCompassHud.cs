@@ -52,6 +52,7 @@ public sealed class ExitCompassHud : MonoBehaviour
         public Graphic         Arrow;
         public CanvasGroup     Group;     // 등장 페이드
         public float           Width;     // 이 배지의 판 폭(글자에 맞춘 값)
+        public bool            OffScreenOnly;   // 룬 보상 — 화면 안이면 보상 머리 위 아이콘이 이미 가리킨다
     }
 
     private static ExitCompassHud _instance;
@@ -196,6 +197,16 @@ public sealed class ExitCompassHud : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 방 클리어 룬 보상 자리를 가리킨다(10-29 사용자 「룬 획득 오브젝트가 어디 있는지 알 수 있게」) — 화면 밖일 때만 가장자리 배지 + 화살표.
+    /// 출구는 보상을 받아야 열리므로(RoomClearGate 출구 보류) 그동안 배지는 이것 하나다. 보상이 사라지면 저절로 숨고, 출구가 열리면 SetExits가 갈아 끼운다.
+    /// </summary>
+    public void SetRewardTarget(Transform target, Color color)
+    {
+        SetExits(new[] { (target, "◆ 룬 보상", "받으면 길이 열린다", color) });
+        if (_entries.Count > 0) _entries[0].OffScreenOnly = true;
+    }
+
     /// <summary>배지 자식 그래픽 생성 헬퍼 — 중앙 기준 앵커 + 레이캐스트 차단 해제.</summary>
     private static T NewGraphic<T>(RectTransform parent, string name, Vector2 size, Vector2 pos)
         where T : Graphic
@@ -277,6 +288,13 @@ public sealed class ExitCompassHud : MonoBehaviour
                 e.ArrowRect.localRotation = Quaternion.Euler(0f, 0f, ang);
             }
 
+            if (e.OffScreenOnly && onScreen)
+            {
+                if (e.Rect.gameObject.activeSelf) e.Rect.gameObject.SetActive(false);
+                if (e.Group != null) e.Group.alpha = 0f;   // 다시 화면 밖으로 나가면 페이드로 다시 선다
+                continue;
+            }
+
             if (e.Arrow != null && e.Arrow.gameObject.activeSelf == onScreen)
                 e.Arrow.gameObject.SetActive(!onScreen);
 
@@ -291,6 +309,8 @@ public sealed class ExitCompassHud : MonoBehaviour
             // 출구가 같은 변으로 몰리면 배지가 같은 자리에 겹쳐 한 장만 읽힌다 — 세로로 쌓아 벌린다.
             pos = StackAwayFromPlaced(pos, halfW, halfH, halfH * 2f + StackGapY * scale, h);
             if (!onScreen) pos = AvoidHudBands(pos, halfW, halfH, scale, w, h);   // 화면 안 배지는 출구 위에 그대로
+            // 10-29 화면 안이어도 위 끝 띠(미니맵 · 재화 줄)에는 얹지 않는다 — 화면 위 끝 출구의 배지가 금화 칸을 덮었다(F4 사진)
+            else pos.y = Mathf.Min(pos.y, h - TopSideBand * scale - halfH);
             _placed.Add(pos);
 
             e.Rect.gameObject.SetActive(true);

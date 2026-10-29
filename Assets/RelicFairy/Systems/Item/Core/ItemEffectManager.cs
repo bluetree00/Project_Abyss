@@ -69,6 +69,8 @@ public sealed class ItemEffectManager
 
         // 근접 강화 증강(10-15) — 두 무기의 증강 효과. 켜짐은 그 무기를 들 때만(MeleeAugmentEffect.IsActive).
         MeleeAugmentEffect.AppendFor(_ctx.Player, _activeEffects, _ctx);
+        // 근접 버팀 — 기억의 제단 3칸(10-29)
+        MeleeWard.AppendAltar(_activeEffects, _ctx);
     }
 
     /// <summary>
@@ -275,6 +277,7 @@ public sealed class ItemEffectManager
 
     public void OnRoomEnter()
     {
+        _ctx.Stats?.ExpireRoomShield();   // 앞 방의 「방까지」 보호막을 걷고 나서 새 방 효과(강철 의지 등)를 낸다(10-29)
         foreach (var eff in _activeEffects)
             if (eff.IsActive(_ctx))
                 eff.OnRoomEnter(_ctx);

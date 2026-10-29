@@ -45,6 +45,7 @@ public class ActSkillState : ActSkillStateBase
         else                      _controller.RotateTowardsSkillAim();
         _controller.SetMoveScale(0f);
         _controller.SkillRecovering = false;
+        _controller.SkillCancelLocked = false;
         _ended = false;
 
         // 스킬 진입 시 잔여 공격 입력 제거
@@ -119,6 +120,7 @@ public class ActSkillState : ActSkillStateBase
     {
         if (_ctx != null) _controller.EndStance(_ctx);
         _controller.SkillRecovering = false;
+        _controller.SkillCancelLocked = false;
         if (_slot != SkillType.Q) _controller.TrailVfx?.EndSkillTrail();
         _runtime?.OnExit(_ctx);
         _runtime = null;

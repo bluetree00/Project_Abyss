@@ -19,7 +19,7 @@ MonoBehaviour:
   projectilePrefab: {fileID: 6356737226436246457, guid: e6e26bca3a7fb264dbb7398de856a31e,
     type: 3}
   projectileSpeed: 9
-  projectileMaxRange: 8
+  projectileMaxRange: 10.5
   launchHeightOffset: 0.8
   vfxProjectilePrefab: {fileID: 9103632281160831739, guid: 6ae0b1e447ab1b64883a5527dd566d1d,
     type: 3}

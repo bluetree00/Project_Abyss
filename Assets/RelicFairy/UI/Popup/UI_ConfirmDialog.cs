@@ -167,7 +167,7 @@ public sealed class UI_ConfirmDialog : MonoBehaviour
         FadeAsync(0f, 1f, destroyAfter: false).Forget();
         // 키보드 · 패드 — 취소에 초점(Enter 한 번으로 되돌릴 수 없는 결정이 나지 않게)
         if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject((_cancel != null ? _cancel : _confirm).gameObject);
-        Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);   // 10-29 UI 소리 — 열기(누름 소리였다)
     }
 
     private void Close()
@@ -256,6 +256,7 @@ public sealed class UI_ConfirmDialog : MonoBehaviour
     private void OnCancel()
     {
         if (_closing) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);   // 10-29 UI 소리 — 취소 · 바깥 · ESC
         Close();
         _onNo?.Invoke();
     }

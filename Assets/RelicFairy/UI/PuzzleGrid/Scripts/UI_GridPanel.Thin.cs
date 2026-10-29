@@ -27,6 +27,7 @@ public sealed partial class UI_GridPanel
     // ── Lifecycle ──
     private void Update()
     {
+        HandleRotateInput();   // 10-25 룬 돌리기(E) — UI_GridPanel.cs
         if (!ThinGrid || !_isOpen || Time.unscaledTime < _thinTextPassAt) return;
         _thinTextPassAt = Time.unscaledTime + ThinTextPassSec;
         ApplyThinTexts();
@@ -46,6 +47,7 @@ public sealed partial class UI_GridPanel
         ThinButton(_confirmButton,           primary: true);
         ThinButton(_resetButton,             primary: false);
         ThinButton(_salvageButton,           primary: false);
+        ThinButton(_rotateButton,            primary: false);   // 10-26 정보판 [돌리기 E]
         ThinButton(_confirmDialogDiscardBtn, primary: true);
         ThinButton(_confirmDialogKeepBtn,    primary: false);
         ThinButton(_resetDialogYes,          primary: true);

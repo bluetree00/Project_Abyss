@@ -42,6 +42,18 @@ public class DragonFireballRainPatternSO : BossPatternSO
     [SerializeField] private AudioClip _rainSfx;
     [Tooltip("화염구가 낙하를 시작할 때마다 해당 위치에서 재생할 사운드")]
     [SerializeField] private AudioClip _fireRainSfx;
+    [Tooltip("운석이 땅에 닿을 때(판정 순간) — 크게 한 번이 아니라 조금씩: 0.18초에 한 번 · 피치 0.9~1.1 · 플레이어에서 멀수록 작게(10-23 B4). 수동 운석 · 휩쓸기 운석도 이 칸")]
+    [SerializeField] private AudioClip _impactSfx;
+    [SerializeField, Range(0f, 1f)] private float _impactSfxVolume = 0.3f;
+
+    [Header("부르는 신호 (수동 운석 버스트 앞 · 10-23 B4)")]
+    [Tooltip("화룡 입에서 하늘로 터지는 섬광 — 1페이지")]
+    [SerializeField] private GameObject _castVfxPrefab;
+    [Tooltip("2페이지(심연) 섬광 — 비우면 1페이지 것")]
+    [SerializeField] private GameObject _castVfxAbyssPrefab;
+    [SerializeField] private float      _castVfxScale  = 2.5f;
+    [Tooltip("부르는 소리 = 위 「비를 부르는 순간」 소리(_rainSfx)의 볼륨")]
+    [SerializeField, Range(0f, 1f)] private float _castSfxVolume = 0.8f;
 
     [Header("Scorch Marks")]
     [Tooltip("착지 지점에 남길 그을림 텍스처. 없으면 절차적 생성 사용.")]
@@ -71,6 +83,12 @@ public class DragonFireballRainPatternSO : BossPatternSO
     public float  FireballScale         => _fireballScale;
     public AudioClip  RainSfx            => _rainSfx;
     public AudioClip  FireRainSfx        => _fireRainSfx;
+    public AudioClip  ImpactSfx          => _impactSfx;
+    public float      ImpactSfxVolume    => _impactSfxVolume;
+    public GameObject CastVfxPrefab      => _castVfxPrefab;
+    public GameObject CastVfxAbyssPrefab => _castVfxAbyssPrefab;
+    public float      CastVfxScale       => _castVfxScale;
+    public float      CastSfxVolume      => _castSfxVolume;
     public GameObject ExplosionPrefab   => _explosionPrefab;
     public float  ExplosionScale        => _explosionScale;
     public float  ImpactDelay           => _impactDelay;
@@ -288,7 +306,7 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
                 {
                     if (mat == null) continue;
                     Color c = mat.color;
-                    c.a = Mathf.Lerp(0f, Data.WarningColor.a, t);
+                    c.a = DragonThreat.WarnAlpha(Data.WarningColor.a, t);   // 처음부터 보이게 · 탑다운에선 진하게(10-26)
                     mat.color = c;
                 }
 
@@ -300,12 +318,11 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
                     e.Projectile = DragonThreat.SpawnMeteor(Data.FireballPrefab, e.LandPos,
                         Data.FireballScale * (e.Scale >= DragonThreat.MeteorScale(3) ? DragonThreat.BigBodyScale : DragonThreat.BodyScale),
                         Data.FireballScale * (e.Scale > 0f ? e.Scale : DragonThreat.MeteorScale(1)), Data.ImpactDelay);
-                    if (e.Projectile != null)
-                        BossPageTransitionState.ToneRoarVfx(e.Projectile, Color.clear);   // 굴절층 끔 — 100발이 화면을 일그러뜨렸다(10-11 이펙트 톤 2차)
+                    // 굴절층은 SpawnMeteor가 끈다(10-23 B4 — 수동 운석 · 휩쓸기 운석도 같이)
                     if (!e.Second || e.Batch != _secondSfxBatch)   // 2연은 묶음마다 한 소리
                     {
                         if (e.Second) _secondSfxBatch = e.Batch;
-                        Managers.Sound?.PlayEffectAt(Data.FireRainSfx, e.LandPos);
+                        DragonThreat.PlayLaunchSfx(Data.FireRainSfx, e.LandPos);   // 10-23 B4 — 0.6초에 한 번 · 볼륨 0.6
                     }
                 }
                 _entries[i] = e;
@@ -365,7 +382,7 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
     private const float RainScatterWarn = 1.0f;   // 예고(착탄까지 + 낙하 0.6) — 예전 1.5
     private const float RainAimedWarn   = 0.6f;
     private const float RainBigWarn     = 1.3f;
-    private const float RainAimLead     = 0.35f;
+    private const float RainAimLead     = DragonThreat.AimedLead;   // 10-23 B4 0.35 → 0.85(곧장 걸으면 맞고 · 멈추거나 꺾으면 피한다)
     private const float RainNearShare   = 0.25f;  // 흩뿌림 중 플레이어 둘레(8 m)에 떨어지는 몫(0.4는 둘레가 빈틈없이 덮였다 — 10-14 실측)
     private const float RainNearRadius  = 8f;
 
@@ -571,6 +588,10 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
             var expGo = BossEffectPool.SpawnOneShot(Data.ExplosionPrefab, e.LandPos, Quaternion.identity, fallbackLifetime: 3f);
             if (expGo != null) expGo.transform.localScale = Vector3.one * Data.ExplosionScale * (e.Scale > 0f ? e.Scale : DragonThreat.MeteorScale(1));
         }
+        // 10-23 B4 착탄 소리(조금씩) — 반폭 = 모양 칸이면 (r + 0.5)칸, 예전 3×3이면 1.5칸 · 노림 · 큰 운석은 간격을 안 기다린다
+        DragonThreat.PlayImpactSfx(Data.ImpactSfx, Data.ImpactSfxVolume, e.LandPos, ctx?.Runtime?.PlayerTarget,
+            (e.Scale > 0f ? e.Scale * DragonThreat.MeteorCoreReachAtOne : 1.5f * DragonBossRoomContext.CellSize),
+            heavy: e.WarnDur == RainAimedWarn || e.WarnDur == RainBigWarn);
 
         if (ctx?.Runtime?.PlayerTarget != null)
         {

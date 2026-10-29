@@ -317,8 +317,7 @@ public sealed partial class UI_RefineryPanel
             _iOdds[i].Pct.text = Pct(odds[i]);
             _iOdds[i].Fill.rectTransform.sizeDelta = new Vector2(ColW * Mathf.Clamp01(odds[i]), 2f);
         }
-        _iBoost.text = RefineryService.QualityUnlockEpic > 0f
-            ? $"정제 등급 상승 +{RefineryService.QualityUnlockEpic * 100f:F0}%p" : string.Empty;
+        _iBoost.text = RefineryService.DescribeBoost();   // 10-29 방 보상 확률을 따라 오른다는 것을 늘 보인다
 
         CurrencyCounter.Apply(_iOwn, _svc.OreOwned, "원석 ");
         _iCost.text  = _iCostIcon.enabled ? _svc.CurrentCost.ToString() : $"원석 {_svc.CurrentCost}";

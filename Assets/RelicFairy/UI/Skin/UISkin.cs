@@ -21,6 +21,7 @@ public static class UISkin
     private const string AchievementAddress = "UI/AchievementSkin";
     private const string SettingsAddress    = "UI/SettingsSkin";
     private const string RelicPartDraftAddress = "UI/RelicPartDraftSkin";
+    public  const string SaveSlotAddress    = "UI/SaveSlotSkin";      // 10-23 로비 세이브 창 — 반입 메뉴(HiggsfieldArtImportEditor)도 이 주소로 등록
     public  const string ScreenWipeAddress  = "UI/ScreenWipeSkin";   // 에디터 생성기(ScreenWipeSkinCreator)도 이 주소로 등록
     public  const string ThemeFontsAddress  = "UI/ThemeFonts";       // 에디터 생성기(UIThemeFontBuilder)도 이 주소로 등록
 
@@ -35,6 +36,7 @@ public static class UISkin
     private static AchievementSkinSO _achievement;
     private static SettingsSkinSO    _settings;
     private static RelicPartDraftSkinSO _relicPartDraft;
+    private static SaveSlotSkinSO    _saveSlot;
     private static ScreenWipeSkinSO  _screenWipe;
     private static UIThemeFontsSO    _themeFonts;
     private static bool _tried;
@@ -72,6 +74,9 @@ public static class UISkin
     /// <summary>유물 개화(파츠 드래프트) 스킨. 아트 납품 전이라 보통 null → 색·기호 폴백.</summary>
     public static RelicPartDraftSkinSO RelicPartDraft => _relicPartDraft;
 
+    /// <summary>로비 세이브 창 스킨(배경 · 카드 틀). 미로드/미등록이면 null → 코드 색 판.</summary>
+    public static SaveSlotSkinSO SaveSlot => _saveSlot;
+
     /// <summary>방 전환 와이프 스킨. 미로드/미등록이면 null → ScreenFade가 단색 판으로 동작.</summary>
     public static ScreenWipeSkinSO ScreenWipe => _screenWipe;
 
@@ -92,6 +97,7 @@ public static class UISkin
         _achievement = null;
         _settings    = null;
         _relicPartDraft = null;
+        _saveSlot    = null;
         _screenWipe  = null;
         _tried       = false;
     }
@@ -115,6 +121,7 @@ public static class UISkin
         _achievement = await LoadOrNull<AchievementSkinSO>(AchievementAddress, "업적");
         _settings    = await LoadOrNull<SettingsSkinSO>(SettingsAddress, "환경설정");
         _relicPartDraft = await LoadOrNull<RelicPartDraftSkinSO>(RelicPartDraftAddress, "유물 개화");
+        _saveSlot    = await LoadOrNull<SaveSlotSkinSO>(SaveSlotAddress, "로비 세이브 창");
         _screenWipe  = await LoadOrNull<ScreenWipeSkinSO>(ScreenWipeAddress, "방 전환 와이프");
     }
 

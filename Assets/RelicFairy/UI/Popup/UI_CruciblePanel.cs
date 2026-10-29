@@ -162,7 +162,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
     private static readonly Color CardSolid   = new(0.10f, 0.07f, 0.05f, 1f);
 
     // 진화 선택 · 연출(10-01 개편)
-    private const float EvCardW = 640f, EvCardH = 680f, EvCardY = 136f, EvCardGap = 64f;   // 10-08 시안 02 — 형 · 작동 그림 3컷이 들어가며 높아졌다
+    private const float EvCardW = 640f, EvCardH = 700f, EvCardY = 128f, EvCardGap = 64f;   // 10-08 시안 02 — 형 · 작동 그림 3컷이 들어가며 높아졌다 · 10-26 머리 그림(230)이 들어가며 700
     private const float EvolveStrikeGap = 0.12f;   // 망치 두 번 사이
     private const float EvolvePopDur    = 0.42f;   // 새 형태가 맺혔다 부푸는 시간
     private const float EvolveStampSize = 60f;
@@ -1398,6 +1398,20 @@ public sealed partial class UI_CruciblePanel : UI_Popup
                                      : on   ? new Color(0.12f, 0.10f, 0.15f, 1f)
                                             : new Color(0.09f, 0.07f, 0.11f, 1f);
             _slotName[i].color   = sel || on ? ShopUIStyle.TextPrimary : ShopUIStyle.TextDim;   // 고른 행은 금 테가 말한다
+
+            // 기억의 제단에서 아직 열지 않은 파츠 — 재련 카드에 나오지 않는다. 꺼짐(◇)과 같은 모양이라 잠긴 줄 몰랐다
+            // (10-24 사용자 「원거리 파츠의 해금이 필요한 내용은 제대로 표기 — 잠겨 있다던지 · 열려 있으면 재련할 수 있게」).
+            if (!on && !RangedPartsDraft.IsUnlocked(def.part_id))
+            {
+                var node = RangedPartsDraft.UnlockNodeOf(def.part_id);
+                string where = node != null ? MemoryAltarCatalog.Get(node)?.DisplayName ?? node : "기억의 제단";
+                _slotKind[i].text  = "■";
+                _slotKind[i].color = UITheme.Thin.InkA(0.30f);
+                _slotName[i].color = UITheme.Thin.InkA(0.40f);
+                _slotLv[i].text    = "잠김";
+                _slotVal[i].text   = $"<color={HexMute}>기억의 제단 「{where}」에서 연다</color>";   // 열면 재련 카드에 나온다(긴 꼬리는 줄 끝에서 잘렸다)
+                SetBar(_slotBar[i], 0f);
+            }
         }
     }
 

@@ -93,6 +93,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     //
     // 가시성 레이어(Monster=렌더러)와 별개다 — 렌더러/콜라이더가 서로 간섭하지 않게 분리했다.
     private const string MonsterHitLayerName = "MonsterHit";
+    // 일반 · 정예 사망음(10-29 Ch4 사운드 점검 — 전 챕터 없었다): 맞는 소리를 낮게 · 한꺼번에 쓰러져도 한 박자에 하나
+    private const float  DieSfxVolume = 0.55f, DieSfxPitch = 0.7f, DieSfxGap = 0.08f;
+    private static float s_lastDieSfxAt = float.NegativeInfinity;
     private static int s_monsterHitLayer = -2;
 
     /// <summary>몬스터 콜라이더 레이어 마스크. 광역 질의가 몬스터만 고르는 데 쓴다. 레이어 미정의면 ~0(전부).</summary>
@@ -108,6 +111,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     // ── 내부 필드 ─────────────────────────────────────────
     protected MonsterConfigSO    _config;
+    private BossImmunityLook     _immunityLook;   // 보스 무적 표현(외곽선 · 막힘 — 10-29 사용자 — 무적 표현)
     protected MonsterFSM         _fsm;
     protected MonsterContext     _ctx;
     protected MonsterRuntimeData _runtime;
@@ -213,6 +217,15 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         var run = GameRunBootstrapper.Instance?.Run;
         run?.ReportKill();
         if (Grade == MonsterGrade.Elite) run?.ReportEliteKill();
+        if (Grade != MonsterGrade.Boss) PlayDieSfx();
+    }
+
+    private void PlayDieSfx()
+    {
+        float now = Time.time;
+        if (now >= s_lastDieSfxAt && now - s_lastDieSfxAt < DieSfxGap) return;   // 새 플레이(시간이 되감김)면 바로 낸다
+        s_lastDieSfxAt = now;
+        Managers.Sound?.PlayEffectAtAsync(SoundKey.Sfx.MonsterHit3, transform.position, DieSfxVolume, DieSfxPitch).Forget();
     }
 
     /// <summary>보스 HP 바 초기화용. Config 로드 후 유효.</summary>
@@ -372,6 +385,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// 차트 기본값(detectionRange 5m)에 1.5배는 방 크기에 비해 너무 좁아, 플레이어가 안 오는 몹을
     /// 일일이 찾아다니는 피로가 컸다 → 3배로 올려 방에 들어서면 대부분 스스로 붙게 한다.</summary>
     private const float DetectionRangeMultiplier = 3.0f;
+    /// <summary>플레이어에게 맞은 뒤 감지 · 포기 거리와 상관없이 쫓는 시간 — 멀리서 쏘면 맞고도 서 있거나(감지 밖) 쫓다가 돌아섰다(포기 밖)(10-25 사용자 「멀리서 몬스터를 때려도 안 따라옴」).</summary>
+    private const float AggroHoldSeconds = 8f;
+    // 겹친 플레이어를 물리 단계마다 밀어내는 상한(m) — 걸어 들어오는 깊이(6 m/s × 0.02초 = 0.12)는 다 막고, 구르기가 몸 안에서 끝나면 몇 단계에 걸쳐 부드럽게(10-29 47 권장)
+    private const float MaxPushOutStep = 0.25f;
 
     private async void Awake()
     {
@@ -524,6 +541,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             var bar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, EffectiveMaxHp, _hpBarAnchor != null ? _hpBarAnchor : _headBone, HPBarHeadOffset);
             if (AdoptHPBar(bar)) _hpBar.SetMonsterInfo(DisplayName);
         }
+
+        if (Grade == MonsterGrade.Boss && _immunityLook == null && !TryGetComponent(out _immunityLook))
+            _immunityLook = gameObject.AddComponent<BossImmunityLook>();
 
         OnInitialized();
     }
@@ -682,23 +702,38 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 #endif
     }
 
-    private void LateUpdate()
+    // 몬스터 · 보스는 비켜 주지 않는다 — 겹치면 플레이어를 밀어낸다(몸 충돌은 IgnorePlayerCollision으로 꺼져 있다).
+    // 10-23 중간보스만(1.5초에 4 m 밀렸다) → 10-29 사용자 「여전히 플레이어가 보스나 몬스터들을 몸으로 밀어버릴 수 있다」로 전부 —
+    // 예전엔 겹치면 몬스터 쪽을 비켜 놓아(LateUpdate nextPosition) 몸으로 밀고 다녔다. 구르기 중엔 통과(사방이 막혀 갇히지 않게).
+    // 물리 단계마다 — 프레임마다(LateUpdate) 하면 프레임이 떨어질 때 한 프레임 새 플레이어가 몸 가운데를 넘어 반대편으로 빠졌다(10-23 실측).
+    private void FixedUpdate()
     {
         if (LocksNavPosition) return;
-        if (_runtime == null || _runtime.IsDead || _runtime.PlayerTarget == null) return;
-        if (_agent == null || !_agent.isOnNavMesh || !_agent.isActiveAndEnabled || _agent.isStopped) return;
+        var player = _runtime?.CachedPlayer;
+        if (player == null || player.Rigid == null || player.IsDodging) return;
+        if (TryGetPlayerOverlap(player.Rigid.position, out Vector3 push))
+            player.Rigid.position -= Vector3.ClampMagnitude(push, MaxPushOutStep);
+    }
+
+    /// <summary>플레이어(<paramref name="playerPos"/>)가 몸 반경 안으로 겹쳤으면 떼어 놓을 만큼(플레이어 → 몬스터 방향)을 돌려준다.</summary>
+    private bool TryGetPlayerOverlap(Vector3 playerPos, out Vector3 push)
+    {
+        push = Vector3.zero;
+        if (_runtime == null || _runtime.IsDead || _runtime.PlayerTarget == null) return false;
+        if (_agent == null || !_agent.isOnNavMesh || !_agent.isActiveAndEnabled) return false;
 
         const float playerRadius = 0.35f;
-        Vector3 toMonster = transform.position - _runtime.PlayerTarget.position;
+        Vector3 toMonster = transform.position - playerPos;
         toMonster.y = 0f;
         float minSep = _agent.radius + playerRadius;
 
         // sqrMagnitude로 먼저 체크 — 겹치지 않는 대부분의 경우 sqrt 생략
         float sqrDist = toMonster.sqrMagnitude;
-        if (sqrDist >= minSep * minSep || sqrDist < 0.001f * 0.001f) return;
+        if (sqrDist >= minSep * minSep || sqrDist < 0.001f * 0.001f) return false;
 
         float dist = Mathf.Sqrt(sqrDist);
-        _agent.nextPosition = transform.position + (toMonster / dist) * (minSep - dist);
+        push = (toMonster / dist) * (minSep - dist);
+        return true;
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -727,8 +762,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     public virtual bool IsDamageImmuneNow
         => _fsm != null && (_fsm.CurrentConstraints & SpecialStateConstraint.Invincible) != 0;
 
-    /// <summary>무적에 막혔다 — 「맞았다」가 아니라 「막혔다」를 보여줄 기회. 기본은 아무것도 하지 않는다.</summary>
-    public virtual void NotifyBlockedHit(Vector3 hitPoint) { }
+    /// <summary>무적에 막혔다 — 「맞았다」가 아니라 「막혔다」를 보여줄 기회. 보스는 외곽선 번쩍 + 막힘 소리(<see cref="BossImmunityLook"/>) · 리치는 제 결계 섬광.</summary>
+    public virtual void NotifyBlockedHit(Vector3 hitPoint)
+    {
+        if (_immunityLook != null) _immunityLook.Blocked(hitPoint);
+    }
 
     // ── 조건 훅 (공용 상태가 위임, 파생 클래스에서 오버라이드 가능) ────────
 
@@ -737,6 +775,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>true면 NavMeshAgent 이동을 영구 잠금한다. CC 해제·LateUpdate push 모두 차단.</summary>
     protected virtual bool LocksNavPosition => false;
+
+    /// <summary>플레이어에게 맞은 지 <see cref="AggroHoldSeconds"/>초 안이다.</summary>
+    private bool RecentlyHitByPlayer => _runtime != null && Time.time - _runtime.LastHitByPlayerAt < AggroHoldSeconds;
 
     /// <summary>Patrol → Chase 전환 조건. 오버라이드로 몬스터별 감지 로직 교체.</summary>
     public virtual bool ShouldStartChase(MonsterContext ctx)
@@ -748,6 +789,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (ctx.Agent == null || !ctx.Agent.isOnNavMesh)
             return ctx.Runtime.DistToPlayer <= GetCombatStopDistance(ctx);
 
+        if (RecentlyHitByPlayer) return true;   // 감지 밖에서 맞아도 쫓는다(10-25)
         return ctx.Runtime.DistToPlayer <= ctx.Detection.detectionRange;
     }
 
@@ -759,6 +801,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (ctx.Agent == null || !ctx.Agent.isOnNavMesh)
             return ctx.Runtime.DistToPlayer > GetCombatStopDistance(ctx);
 
+        if (RecentlyHitByPlayer) return false;   // 막 맞았으면 포기 거리 밖이어도 쫓는다(10-25) — 내비메시 위에서만(밖이면 이동 명령이 오류)
         return ctx.Runtime.DistToPlayer > ctx.Detection.chaseGiveUpRange;
     }
 
@@ -1189,6 +1232,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (_traits != null) actual = _traits.ModifyIncoming(actual, null, instigator, direct: true);   // 시기 특성 — 수호막 · 정예 접두어(강철 · 가시, 10-11 정예 접두어)
         int hpBefore = _runtime.CurrentHp;
         _runtime.CurrentHp -= (int)actual;
+        if (IsPlayerInstigator(instigator)) _runtime.LastHitByPlayerAt = Time.time;   // 맞으면 쫓는다(AggroHoldSeconds)
         int hpFloor = DamageHpFloor;   // [인트로] 이길 수 없는 연출 · 페이지 보스의 전환 임계
         if (_runtime.CurrentHp < hpFloor) _runtime.CurrentHp = hpFloor;
         ReportDamageDealt(instigator, DamageKind.Normal, hpBefore - Mathf.Max(0, _runtime.CurrentHp));   // 결과창 — 실제로 깎인 체력
@@ -1269,8 +1313,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             if (broke) _runtime.StateTimer = MonsterPoise.BreakDuration;   // 휘청 — 경직 0.4초 대신 1.5초
             if (broke) PlayStaggerAnim();
 
+            // 중간보스도 보스처럼 넉백 물리 없이 휘청만 — kinematic을 풀면 휘청 1.5초 동안 붙어 걷는 플레이어에게 2 m 넘게 밀렸다(10-23).
             if (instigator != null && _rb != null && (_agent == null || !_agent.isActiveAndEnabled)
-                && Grade != MonsterGrade.Boss)
+                && Grade != MonsterGrade.Boss && !IsEliteBoss)
             {
                 _rb.isKinematic = false;
                 Vector3 dir = (transform.position - instigator.transform.position).normalized;
@@ -1641,6 +1686,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _runtime.AttackHitDealt      = false;
         _runtime.IsFirstAttack       = true;
         _runtime.HasBeenAttacked     = false;
+        _runtime.LastHitByPlayerAt   = -999f;
         _runtime.IsDormant           = false;
         _runtime.IsReturning         = false;
         _runtime.TargetCleared       = true;
@@ -1758,6 +1804,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (!UseWorldHPBar) return;
         if (_worldHPBarSuppressed) return;
         if (_hpBarRequesting) return;
+        if (_runtime == null || Managers.MonsterHPBar == null) return;   // 런타임 전(소환 졸개 · 풀 재사용 첫 프레임) — 10-29 악몽 실측 NRE
         _hpBarRequesting = true;
 
         if (_hpBar != null)

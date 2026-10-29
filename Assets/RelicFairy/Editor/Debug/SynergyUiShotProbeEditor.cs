@@ -65,7 +65,7 @@ public static class SynergyUiShotProbeEditor
             var all = Managers.RelicParts.GetByRelic(relicId);
             foreach (var e in all)
             {
-                if (added >= RelicEvolution.FragmentsNeeded) break;
+                if (added >= 2) break;   // 조각 둘(카드 모양 확인용 — 10-29부터 진화 조건은 아니다)
                 if (e == null || e.IsReaction || lo.HasRelicPart(e.part_id)) continue;
                 lo.AddRelicPart(e.part_id, RelicMemoryGrade.Faint); added++;
             }
@@ -99,11 +99,10 @@ public static class SynergyUiShotProbeEditor
                 var frame = Find<Image>(rt, "CompletionFrame");
                 Check(sb, $"① 「완성」 금 고리 · 겹선 그려짐(채움 {ring?.fillAmount:0.##} · {frame?.fillAmount:0.##})",
                       ring != null && frame != null && ring.fillAmount > 0.99f && frame.fillAmount > 0.99f);
-                // 10-22 E1 — 조건 한 줄(「조각 n/2 가진 채 보스 처치」) · 각인 줄 없음 · 꼬리표 = 동작 말(계열 이름 · 「각인 +2」 없음)
-                string partsTxt = Parsed(Find<TMP_Text>(Find<RectTransform>(rt, "EvoCheckParts"), "Label"));
-                int shownParts  = Mathf.Min(lo.RelicPartIds.Count, RelicEvolution.FragmentsNeeded);
-                Check(sb, $"① 조건 한 줄 「{partsTxt}」(조각 {shownParts}/{RelicEvolution.FragmentsNeeded}) · 각인 줄 없음",
-                      partsTxt.Contains($"{shownParts}/{RelicEvolution.FragmentsNeeded}") && Find<RectTransform>(rt, "EvoCheckImprint") == null);
+                // 10-29 — 조건 한 줄(「보스 1/1 처치」 · 조각 조건 걷음) · 각인 줄 없음 · 꼬리표 = 동작 말(계열 이름 · 「각인 +2」 없음)
+                string bossTxt = Parsed(Find<TMP_Text>(Find<RectTransform>(rt, "EvoCheckBoss"), "Label"));
+                Check(sb, $"① 조건 한 줄 「{bossTxt}」(보스 1/1) · 각인 줄 없음",
+                      bossTxt.Contains("1/1") && Find<RectTransform>(rt, "EvoCheckImprint") == null);
                 string anchorTag = Parsed(Find<TMP_Text>(rt, "AnchorTag"));
                 Check(sb, $"① 꼬리표 「{anchorTag}」 = 동작 말 「{RelicEvolution.DirectionWord(def.Family)} 빌드」 · 계열 꼬리표 없음",
                       anchorTag.Contains(RelicEvolution.DirectionWord(def.Family)) && Find<TMP_Text>(rt, "FamilyTag") == null);

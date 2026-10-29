@@ -192,7 +192,7 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
         Managers.Sound?.PlayEvent(SoundEvent.RelicSunImpact);
         // 작은 해(조각 · 저무는 해)는 흔들림 1/3 · 정지 없음 — 처치마다 부르는 조각(들불 ③)이 있어 「살짝」 정책과 부딪혔다(10-12)
         HitFeelService.CameraShake(small ? 0.28f / 3f : 0.28f, 0.30f);   // 태양이 하늘에서 꽂히는 무게
-        if (!small) HitFeelService.HitStop(0.05f, 0.06f);               // 착탄 순간 짧은 정지 — 타격의 방점
+        if (!small && HitFeelService.DealtHitStop) HitFeelService.HitStop(0.05f, 0.06f);   // 착탄 순간 짧은 정지 — 타격의 방점(공격 멈칫 끔이면 생략 · 10-24)
 
         var buffer = new List<GameObject>(32);
         // 몬스터로 좁히지 않고 IDamageable 전체를 잡는다 — 그래야 훈련용 허수아비에도 들어간다.

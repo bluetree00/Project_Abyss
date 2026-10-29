@@ -85,6 +85,10 @@ public sealed partial class PlayerController
         };
     }
 
+    /// <summary>공격 키를 누르고 있는가 — 꾹 누르면 계속 공격(10-25 ④). 입력이 꺼져 있으면(막는 팝업 · 연출) false.</summary>
+    public bool IsAttackButtonHeld()
+        => _inputActions != null && _inputActions.Player.enabled && _inputActions.Player.Attack.IsPressed();
+
     private void BindInputActions()
     {
         if (!_inputInitialized) return;
@@ -174,7 +178,7 @@ public sealed partial class PlayerController
     {
         // 사망 · 컷신/UI 입력 차단 · 잡힘 동안엔 명령을 실행하지 않고 버린다 — 막히기 직전 0.4초에 누른 입력이 잠금 시작에 터졌고,
         // 사망 뒤 다른 코드가 입력을 다시 켜면 죽은 몸으로 움직였다(10-09 출시 점검)
-        if (_dead || _inputDisabledExternally || _inputBlockedByUI || IsGrabbed)
+        if (_dead || _inputDisabledExternally || _inputBlockedByUI || IsGrabbed || Time.timeScale <= 0f)   // 시간 정지 = 룬판 · 메뉴(10-25 룬판에서 E = 룬 돌리기)
         {
             InputBuffer.Clear();
             return;
@@ -221,8 +225,9 @@ public sealed partial class PlayerController
             InputBuffer.TryConsume(Command.Light);
         }
 
-        // 스킬 중 회피: 후딜(피해 뒤)이면 끊고 회피, 그 전이면 버퍼(0.4초)에 남긴다 — 예전엔 버렸다(10-08 A2 · 결정 S2)
-        if (isInSkill && !SkillRecovering) return;
+        // 스킬 중 회피: 언제든 끊고 회피(10-23 사용자 「스킬들이 대시로 캔슬」 · 예전 결정 S2 「피해 뒤만」을 넓힘) —
+        // 스킬은 누른 순간 쓴 것(쿨 · 유물 Q 소모 그대로) · 남은 타는 각 런타임 OnExit가 버린다. 못 끊는 구간(대검 R 공중)만 버퍼(0.4초)에 남긴다.
+        if (isInSkill && SkillCancelLocked) return;
         if (InputBuffer.TryConsume(Command.Dodge))
         {
             if (IsLaunched) return; // 날아가는 중엔 회피로 탈출 불가

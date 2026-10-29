@@ -1,4 +1,7 @@
+using System;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -16,6 +19,12 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     private const float DragAlpha = 0.72f;   // 끄는 동안 조각 알파 — 미리보기가 비치게
 
     private static int _idCounter = 0;
+
+    /// <summary>지금 끌고 있는 룬(없으면 null) — 룬판이 E로 돌릴 대상을 찾는다(10-25).</summary>
+    public static Shape Dragging { get; private set; }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => Dragging = null;
 
     [Header("Identity")]
     [Tooltip("Shape SO에서 복사된 표시 이름. 여러 Shape가 같은 이름을 가질 수 있다.")]
@@ -38,6 +47,9 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     /// <summary>이 Shape에 연결된 아이템 데이터. 배치/제거 시 RunItemInventory와 동기화.</summary>
     public RuntimeItemData ItemData { get; private set; }
 
+    /// <summary>회전 칸(0 ~ 3, 90°씩 시계 방향) — 묶인 아이템의 <see cref="RuntimeItemData.rotation"/>과 같다.</summary>
+    public int Rotation { get; private set; }
+
     private Canvas canvas;
     private RectTransform rt;
     private Vector3 cachedStartLocalScale;
@@ -46,6 +58,8 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     private List<GridSquare> occupiedSquares = new();
     private LayoutElement _layout;
     private RunePieceOutline _outline;   // 조각 바깥 윤곽(10-18) — 루트에 붙는다(RebuildOutline)
+    private List<Vector2Int> _baseOffsets;   // 돌리기 전 모양(에셋 그대로) — 회전은 늘 여기서 다시 계산한다
+    private CancellationTokenSource _spinCts;   // 돌릴 때 칸마다 제자리에서 도는 짧은 연출(10-26)
 
     void Awake()
     {
@@ -67,7 +81,10 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     private void OnDisable()
     {
         if (_outline != null) _outline.SetHovered(false);
+        StopSpin();
     }
+
+    private void OnDestroy() => _spinCts?.Cancel();
 
     public void ApplyAsset(ShapeAssetSO asset)
     {
@@ -77,6 +94,8 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         shapeName        = shapeAsset.shapeName;
         shapeBlockPrefab = shapeAsset.shapeBlockPrefab;
         cellOffsets      = new List<Vector2Int>(shapeAsset.cellOffsets ?? new Vector2Int[0]);
+        _baseOffsets     = new List<Vector2Int>(cellOffsets);
+        Rotation         = 0;
         cellSize         = (GridManager.Instance != null && GridManager.Instance.HasGrid)
                            ? GridManager.Instance.GetGap()
                            : shapeAsset.cellSize;
@@ -152,6 +171,8 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         SetDragAlpha(DragAlpha);
         if (_outline != null) _outline.SetDragging(true);   // 끄는 조각 = 고른 조각 — 외곽선을 밝게(10-18)
 
+        Dragging = this;
+
         // Apply pointer offset ONCE at drag start (so it doesn't accumulate)
         if (dragAsset != null && dragAsset.pointerOffset != Vector2.zero)
         {
@@ -177,6 +198,7 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     public void OnEndDrag(PointerEventData eventData)
     {
         // Restore base scale (placement manager will snap position)
+        if (Dragging == this) Dragging = null;
         rt.localScale = cachedStartLocalScale;
         SetDragAlpha(1f);
         if (_outline != null) _outline.SetDragging(false);
@@ -245,7 +267,85 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     public void BindItem(RuntimeItemData item)
     {
         ItemData = item;
+        if (item != null && item.rotation != Rotation) SetRotation(item.rotation, keepCenter: false);   // 판 · 보관함 · 이어하기가 같은 방향
         ApplyRuneArt();
+    }
+
+    /// <summary>90° 시계 방향으로 한 번 돌린다(10-25 사용자 「룬 블록을 회전시키는 기능」) — 칸마다 제자리에서 짧게 돌아 돈 것이 보인다(10-26).</summary>
+    public void RotateClockwise()
+    {
+        SetRotation(Rotation + 1);
+        StopSpin();
+        _spinCts = new CancellationTokenSource();
+        SpinBlocksAsync(_spinCts.Token).Forget();
+    }
+
+    /// <summary>
+    /// 회전 칸을 정한다 — 칸 모양을 돌리고 <b>블록을 다시 만들지 않고 자리만 옮긴다</b>(끄는 도중 다시 만들면 Destroy가 프레임 끝이라
+    /// 그 프레임 판정 · 미리보기가 옛 블록을 센다). keepCenter면 블록 묶음 가운데가 그 자리에 머문다(커서 아래에서 돈다).
+    /// </summary>
+    public void SetRotation(int rotation, bool keepCenter = true)
+    {
+        rotation = ((rotation % 4) + 4) % 4;
+        _baseOffsets ??= new List<Vector2Int>(cellOffsets);
+        if (rotation == Rotation) return;
+
+        if (rt == null) rt = (RectTransform)transform;
+        Vector2 before = BlockBoundsCenterLocal();
+        Rotation = rotation;
+        cellOffsets.Clear();
+        foreach (var o in _baseOffsets) cellOffsets.Add(RotateCW(o, rotation));
+
+        if (transform.childCount != cellOffsets.Count) BuildShapeBlocks();
+        else
+        {
+            for (int i = 0; i < cellOffsets.Count; i++)
+                if (transform.GetChild(i) is RectTransform brt)
+                    brt.anchoredPosition = new Vector2(cellOffsets[i].x * cellSize, cellOffsets[i].y * cellSize);
+            float visualSize = (GridManager.Instance != null && GridManager.Instance.HasGrid)
+                               ? GridManager.Instance.GetSquareVisualSize()
+                               : cellSize;
+            ApplyLegendarySheen();   // 광택이 왼쪽 → 오른쪽으로 흐르게 x 순서를 다시 잡는다
+            RebuildOutline(visualSize);
+        }
+
+        if (keepCenter) rt.anchoredPosition += (before - BlockBoundsCenterLocal()) * rt.localScale.x;
+        if (ItemData != null) ItemData.rotation = Rotation;
+    }
+
+    /// <summary>
+    /// 돌린 직후 칸마다 제자리에서 90° → 0°(0.14초 · 룬판은 시간을 멈추므로 실시간). 칸 <b>자리</b>는 이미 새 모양이라
+    /// 놓일 칸 판정(칸 위치만 읽는다)은 그대로다 — 돌아가는 것은 칸 그림의 기울기뿐.
+    /// </summary>
+    private async UniTaskVoid SpinBlocksAsync(CancellationToken ct)
+    {
+        const float Dur = 0.14f;
+        try
+        {
+            for (float t = 0f; t < Dur; t += Time.unscaledDeltaTime)
+            {
+                var tilt = Quaternion.Euler(0f, 0f, 90f * (1f - t / Dur));   // +90(반시계 쪽)에서 0으로 풀리며 시계 방향으로 돈다
+                foreach (Transform child in transform) child.localRotation = tilt;
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException) { return; }
+        foreach (Transform child in transform) child.localRotation = Quaternion.identity;
+    }
+
+    private void StopSpin()
+    {
+        _spinCts?.Cancel();
+        _spinCts = null;
+        foreach (Transform child in transform) child.localRotation = Quaternion.identity;
+    }
+
+    /// <summary>칸 하나를 90°씩 시계 방향으로 <paramref name="times"/>번 돌린다(아래가 −y인 판 좌표).</summary>
+    public static Vector2Int RotateCW(Vector2Int o, int times)
+    {
+        times = ((times % 4) + 4) % 4;
+        for (int i = 0; i < times; i++) o = new Vector2Int(o.y, -o.x);
+        return o;
     }
 
     /// <summary>아이템 연결 해제. 보관함 반환 또는 폐기 시 호출.</summary>

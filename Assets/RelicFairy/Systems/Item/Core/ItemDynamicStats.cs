@@ -22,6 +22,7 @@ public struct ItemDynamicStats
     public float allDamage;       // 모든 피해 % (공격 dmgMul + 스킬 SkillDamageBonus 양쪽)
     public float maxHpPercent;    // 최대 HP % (PlayerRuntimeStats.Recalculate에서 정적+동적 합산 적용됨)
     public float damageReduction; // 받는 피해 감소(위기 룬 조건 창 · 10-14 R1) — DamageReduction 합산(상한 그대로)
+    public int wardRampartStacks; // 성벽(룬) 겹침 수 — 이 합산 한 번 안에서 max_stack까지만(10-29 근접 버팀)
 
     public bool Approximately(in ItemDynamicStats o) =>
         Mathf.Approximately(attackPercent, o.attackPercent) &&

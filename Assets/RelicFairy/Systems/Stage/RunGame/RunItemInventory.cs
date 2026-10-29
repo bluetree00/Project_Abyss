@@ -78,8 +78,30 @@ public sealed class RunItemInventory
     {
         into.Clear();
         if (pool == null) return;
+        bool ranged = HasRangedWeapon();
         foreach (var so in pool)
-            if (so != null && !IsAtMaxStack(so.itemId)) into.Add(so);
+            if (so != null && !IsAtMaxStack(so.itemId) && (ranged || !IsRangedOnly(so.itemId))) into.Add(so);
+    }
+
+    /// <summary>두 무기 칸 중 원거리가 있나 — 모르면(플레이어 없음) 거르지 않는다.</summary>
+    private static bool HasRangedWeapon()
+    {
+        var wm = AppBootstrapper.Instance?.CurrentRun?.Player?.WeaponManager;
+        if (wm == null) return true;
+        return SkillTierResolver.IsRanged(wm.Weapon0Data) || SkillTierResolver.IsRanged(wm.Weapon1Data);
+    }
+
+    /// <summary>
+    /// 화살 적중(OnRangedHit)으로만 켜지는 룬인가 — 근접만 쓰는 런엔 죽은 칸이라 제시하지 않는다(10-24 점검 · 덩굴 구속 · 사방 독 화살 등).
+    /// 호위 성검(10-24 개편 2차)도 화살이 맞혀야 칼이 날아가 원거리 전용이다. 표에 없으면 거르지 않는다.
+    /// </summary>
+    private static bool IsRangedOnly(string itemId)
+    {
+        var rows = Managers.ItemData?.GetItem(itemId);
+        if (rows == null || rows.Count == 0) return false;
+        foreach (var r in rows)
+            if (r == null || r.trigger == null || !r.trigger.StartsWith("OnRanged")) return false;   // 새 발동 이름(OnRangedMark …)도
+        return true;
     }
 
     public int CountItem(string itemId)

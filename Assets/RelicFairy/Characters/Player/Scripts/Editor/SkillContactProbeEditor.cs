@@ -95,7 +95,7 @@ public static class SkillContactProbeEditor
         float F(string n) { var pr = so.FindProperty(n); return pr != null ? pr.floatValue : 0f; }
         return beh switch
         {
-            FinalStrikeBehaviorSO   => F("leapTime"),
+            ElementSwordBehaviorSO  => F("drawTime") + F("swingContact"),   // 속성 검(10-26 대검 R 개편 · 옛 도약 내려찍기는 지움) — 뽑기 + 휘두름 닿음
             PerimeterGuardBehaviorSO => F("windup"),
             HolySlashBehaviorSO     => F("dashDuration"),
             IasenSlashBehaviorSO    => F("dashDuration") + F("slashDelay"),

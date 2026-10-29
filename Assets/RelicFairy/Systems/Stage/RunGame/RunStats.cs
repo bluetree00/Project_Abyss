@@ -28,6 +28,13 @@ public sealed class RunStats
     [SerializeField] private int biggestHit;
     [SerializeField] private int biggestHitSource;
     [SerializeField] private int midBossSeed;                       // 정예 보스 번갈이 시드(10-14) — 런에 하나 · 0 = 아직 안 정함(구 세이브 포함)
+    // 챕터 전투 시계(10-24 U5 · 기록만) — RunCombatClock이 싸우는 동안만 더한다. 마친 챕터 값은 chapterIds와 같은 차례(-1 = 옛 세이브라 모름)
+    [SerializeField] private List<float> chapterCombatSeconds = new();
+    [SerializeField] private List<float> chapterBaseSeconds = new();
+    [SerializeField] private float combatSeconds;                   // 지금 챕터 — 싸운 시간
+    [SerializeField] private float baseSeconds;                     // 지금 챕터 — 싸운 방 기준 시간의 합
+    // 해방기 · 악몽 클리어 시간(10-29 랭킹) — 해방기 · 악몽 시기 동안 게임 시간(컷신 뺌 · 시간 0인 창은 저절로 빠짐) · 챕터가 넘어가도 비우지 않는다
+    [SerializeField] private float clearSeconds;
 
     // ── Properties ──
     public int ChapterEndCount => chapterEndSeconds.Count;
@@ -37,6 +44,9 @@ public sealed class RunStats
     public int CovenantFires => covenantFires;
     public int BiggestHit => biggestHit;
     public DamageSource BiggestHitSource => (DamageSource)biggestHitSource;
+    public float CombatSeconds => combatSeconds;
+    public float BaseSeconds => baseSeconds;
+    public float ClearSeconds => clearSeconds;
 
     /// <summary>
     /// 정예 보스 번갈이(<see cref="RunSequencer.MidBossScheduled"/>) 시드 — 런에 하나. 처음 읽을 때 정하고 이어하기 세이브에 같이 실린다.
@@ -63,6 +73,20 @@ public sealed class RunStats
 
     // ── Public Methods ──
     public (int chapter, int seconds) ChapterEndAt(int i) => (chapterIds[i], chapterEndSeconds[i]);
+
+    /// <summary>마친 챕터 <paramref name="i"/>의 전투 시계 · 기준 시간. 옛 세이브라 모르면 false.</summary>
+    public bool TryChapterClockAt(int i, out float combat, out float baseSec)
+    {
+        combat = baseSec = 0f;
+        if (i < 0 || i >= chapterCombatSeconds.Count || i >= chapterBaseSeconds.Count) return false;
+        combat = chapterCombatSeconds[i];
+        baseSec = chapterBaseSeconds[i];
+        return combat >= 0f && baseSec >= 0f;
+    }
+
+    public void AddCombatTime(float dt) { if (dt > 0f) combatSeconds += dt; }
+    public void AddClearTime(float dt) { if (dt > 0f) clearSeconds += dt; }
+    public void AddRoomBase(float seconds) { if (seconds > 0f) baseSeconds += seconds; }
     public long DamageOf(DamageSource s) => damageBySource[(int)s];
 
     /// <summary>출처 비중(0~1). 총합이 0이면 0.</summary>
@@ -76,6 +100,9 @@ public sealed class RunStats
     {
         chapterIds.Add(chapter);
         chapterEndSeconds.Add(Mathf.Max(0, playSeconds));
+        chapterCombatSeconds.Add(combatSeconds);
+        chapterBaseSeconds.Add(baseSeconds);
+        combatSeconds = baseSeconds = 0f;   // 다음 챕터는 새로 잰다
     }
 
     /// <summary>빈 이름(투사체 · 함정 등 몬스터가 아닌 것)은 덮어쓰지 않는다 — 마지막으로 이름 있는 상대가 남는다.</summary>
@@ -119,6 +146,11 @@ public sealed class RunStats
         s.chapterIds ??= new List<int>();
         s.chapterEndSeconds ??= new List<int>();
         if (s.chapterIds.Count != s.chapterEndSeconds.Count) { s.chapterIds.Clear(); s.chapterEndSeconds.Clear(); }
+        s.chapterCombatSeconds ??= new List<float>();
+        s.chapterBaseSeconds ??= new List<float>();
+        if (s.chapterCombatSeconds.Count != s.chapterBaseSeconds.Count || s.chapterCombatSeconds.Count > s.chapterIds.Count)
+        { s.chapterCombatSeconds.Clear(); s.chapterBaseSeconds.Clear(); }
+        while (s.chapterCombatSeconds.Count < s.chapterIds.Count) { s.chapterCombatSeconds.Insert(0, -1f); s.chapterBaseSeconds.Insert(0, -1f); }   // 시계 전 세이브가 마친 챕터
         s.lastHitBy ??= string.Empty;
         return s;
     }

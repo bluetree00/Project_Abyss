@@ -267,7 +267,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         else
         {
             _run = new GameRunSession();
-            MeleeAugmentDraft.ResetForRun();   // 근접 강화 증강 리롤(10-15)
+            MeleeAugmentDraft.ResetForRun(MeleeAugmentDraft.RerollsPerRun + MemoryAltarService.Level(MemoryAltarCatalog.LibReroll));   // 근접 강화 증강 리롤(10-15) · 제단 「다시 뽑기」(10-29)
             if (app != null)
             {
                 app.BeginRun(_run);
@@ -348,6 +348,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 2) 최종 보스: 무한 루프 갈림길(계속=심연 회귀 / 귀환=런 종료). 비최종: 이어지는 길로 다음 챕터.
         if (isFinal)
         {
+            // 10-29 랭킹 — 해방기 · 악몽 리치를 쓰러뜨린 순간의 클리어 시간을 올리고, 귀환 뒤 그 시기 랭킹방을 예약한다
+            RankingFlow.OnFinalBossCleared(_run);
+
             // 악몽기 리치를 처음 쓰러뜨렸다 — 엔딩(리치의 죽음 · 모르가나 · 카드 · 크레딧) 뒤 귀환.
             // 연출이 깨져도 귀환은 해야 한다(출구 없는 보스방에 갇히지 않게).
             if (StoryProgress.ConsumePendingEnding())
@@ -516,7 +519,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// 유물 기억 드래프트 카드 3장을 굴린다(유물 성장 v2) — 유물 · 시기 · 제단 등급 띠 · 켜진 룬 속성으로.
     /// 유물이 없거나 데이터가 없으면 null(드래프트를 건너뛰고 출구는 열린다).
     /// </summary>
-    private RelicDraft PrepareRelicDraft()
+    private RelicDraft PrepareRelicDraft(bool allowEvolution = true)
     {
         var loadout = AppBootstrapper.Instance?.Loadout;
         var relic   = loadout?.Relic;
@@ -539,7 +542,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         int era  = RelicMemoryOdds.EraIndex(StoryProgress.Era);
         int band = MemoryAltarService.MemoryGradeBand;
         var rng  = new System.Random(Random.Range(int.MinValue, int.MaxValue));
-        var draft = RelicDraftComposer.Compose(relicId, all, loadout, era, band, runeTier1, rng);
+        var draft = RelicDraftComposer.Compose(relicId, all, loadout, era, band, runeTier1, rng, allowEvolution);
         Debug.Log($"[GameRunBootstrapper] 유물 기억 카드 — 시기 {era} · 띠 {band} · 최고 {draft.TopGrade}{(draft.PityApplied ? " · 천장" : "")} · " +
                   $"{DescribeCards(draft)}");
         return draft;
@@ -560,7 +563,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// 「되살아난 기억」 창 — 굴려 둔 카드 3장을 보여 주고 고른 카드를 적용한다(새 조각 · 선명하게 · 메아리 · 잔향).
     /// 다시 떠올리기(제단 노드, 런당 1회)를 누르면 새로 굴려 창을 다시 연다.
     /// </summary>
-    private async UniTask ShowRelicPartDraftAsync(RelicDraft draft, CancellationToken ct)
+    private async UniTask ShowRelicPartDraftAsync(RelicDraft draft, CancellationToken ct, bool allowEvolution = true)
     {
         var loadout = AppBootstrapper.Instance?.Loadout;
         if (loadout == null || draft == null || draft.Cards.Count == 0)
@@ -591,7 +594,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             if (popup.RedrawRequested && canRedraw)
             {
                 loadout.MarkRelicRedrawUsed();
-                var again = PrepareRelicDraft();
+                var again = PrepareRelicDraft(allowEvolution);
                 if (again != null && again.Cards.Count > 0) { again.Redrawn = true; draft = again; continue; }
             }
 
@@ -605,6 +608,20 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] 몸 이펙트 예외(건너뜀): {e.Message}"); }
             return;
         }
+    }
+
+    /// <summary>
+    /// 시작 선물 「유물 기억」 · 제물 제단 보상(10-29 · <see cref="StartGift"/> · SacrificeAltarChallenge) — 보스 창과 같은 「되살아난 기억」 창.
+    /// 진화 카드는 뺀다(진화는 보스 보상). 유물 · 카드가 없으면 false — 부른 쪽이 다른 보상을 준다.
+    /// </summary>
+    public async UniTask<bool> OfferRelicGiftAsync(CancellationToken ct)
+    {
+        RelicDraft draft;
+        try { draft = PrepareRelicDraft(allowEvolution: false); }
+        catch (System.Exception e) { Debug.LogError($"[GameRunBootstrapper] 유물 기억 카드 생성 예외 — 건너뜀: {e}"); return false; }
+        if (draft == null || draft.Cards.Count == 0) return false;
+        await ShowRelicPartDraftAsync(draft, ct, allowEvolution: false);
+        return true;
     }
 
     /// <summary>고른 카드를 로드아웃에 적용한다.</summary>
@@ -662,6 +679,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             "GameScene_Ch1" => "Ch1_Map",
             "GameScene_Ch2" => "Ch2_Map",
             "GameScene_Ch3" => "Ch3_Map",
+            "GameScene_Ch4" => "Ch3_Map",   // 10-29 임시 — Ch4 전용 곡이 오기 전까지 Ch3 곡(예전엔 조용했다)
             _               => (string)null,
         };
         if (mapBgmKey != null) Managers.Sound.PlayBgmAsync(mapBgmKey).Forget();
@@ -2866,23 +2884,25 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             gamble.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab, seed);
             Debug.Log($"[GameRunBootstrapper] 이벤트 도박 상자 부착 (seed={seed}) — {typeHint}");
         }
-        else if (kh.Contains("sacrifice"))
+        else if (kh.Contains("sacrifice") && SacrificeAltarChallenge.CanPayAny(_run))
         {
             var c = roomGO.AddComponent<SacrificeAltarChallenge>();
-            c.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab);
+            c.Initialize(_run);
             Debug.Log($"[GameRunBootstrapper] 이벤트 제물 제단 부착 — {typeHint}");
         }
-        else if (kh.Contains("oracle"))
+        else if (kh.Contains("sacrifice") || kh.Contains("oracle"))
         {
+            // 제물 제단인데 낼 대가가 하나도 없으면(물약 0 · 금화 모자람) 신탁의 갈림길로(10-29 B1 — 고를 게 없는 방이었다).
+            // 방을 세우는 순간의 상태(= 방 입장 저장)로 정하므로 이어하기로 돌아와도 같은 방이 선다.
             var c = roomGO.AddComponent<OracleChoiceChallenge>();
-            c.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab, seed);
-            Debug.Log($"[GameRunBootstrapper] 이벤트 신탁 갈림길 부착 — {typeHint}");
+            c.Initialize(_run);
+            Debug.Log($"[GameRunBootstrapper] 이벤트 신탁 갈림길 부착{(kh.Contains("sacrifice") ? "(제물 제단 — 낼 대가 없음)" : "")} — {typeHint}");
         }
         else if (kh.Contains("vault") || kh.Contains("treasure"))
         {
             var c = roomGO.AddComponent<TreasureVaultChallenge>();
-            c.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab);
-            Debug.Log($"[GameRunBootstrapper] 이벤트 보물고 부착 — {typeHint}");
+            c.Initialize(_run, seed);
+            Debug.Log($"[GameRunBootstrapper] 이벤트 보물고 부착 (seed={seed}) — {typeHint}");
         }
     }
 
@@ -3536,6 +3556,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await ShowWaitingRoomDialogueAsync(ResolveCurrentChapter());
         UIRootBootstrapper.Instance?.RevealHudAsync(0.6f).Forget();   // 둘러보기 · 대사 뒤 HUD — 샘 앞에서 체력 · 포션이 보이게(10-18 사용자 「대기방에도 UI」)
 
+        // 10-29 해방기 · 악몽 시작 선물 — 대사 뒤 세 갈래 중 하나(봉인기는 무동작). 기다리지 않는다(장면 준비 알림을 막지 않게)
+        StartGift.OfferAsync(_run, this.GetCancellationTokenOnDestroy()).Forget();
+
         // 던전 빌드(StartProcGenRunAsync)는 여기서 호출하지 않는다 — 출구 게이트가 통과 시 시작한다.
     }
 
@@ -3752,6 +3775,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             ChapterId.Chapter1 => "Ch1_Map",
             ChapterId.Chapter2 => "Ch2_Map",
             ChapterId.Chapter3 => "Ch3_Map",
+            ChapterId.Chapter4 => "Ch3_Map",   // 10-29 임시 — Ch4 전용 곡이 오기 전까지
             _                  => (string)null,
         };
         if (combatMapKey != null) Managers.Sound?.PlayBgmAsync(combatMapKey).Forget();
@@ -3983,6 +4007,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             currentRoomPoolKey = save.currentRoomPoolKey,
             currentRoomKind    = save.currentRoomKind,
             currentRoomMirror  = save.currentRoomMirror,
+            currentRoomDanger  = save.currentRoomDanger,   // 10-29 F4 위험한 문 방
             currentRoomCleared = save.currentRoomCleared,   // 클리어 상태로 복원 → 몹 재스폰 X
             currentRoomRewardPending = save.currentRoomRewardPending,   // 미수령 보상만 복원(구버전=false)
             crucibleRollIndex  = save.crucibleRollIndex,    // 재련소 RNG 스트림 재개 위치

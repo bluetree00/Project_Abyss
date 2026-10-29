@@ -8,7 +8,7 @@ public sealed partial class PlayerController
     /// 최종 이동 입력 배율 = 행동 잠금 채널(<see cref="SetMoveScale"/>) × 슬로우 채널(상태이상).
     /// 두 사유를 곱으로 합쳐, 한쪽이 풀려도 다른 쪽 제한이 사라지지 않는다.
     /// </summary>
-    public float MoveScale => _actionMoveScale * Status.SlowScale;
+    public float MoveScale => _actionMoveScale * Status.SlowScale * Status.HasteScale;   // 10-29 잠깐 빨라짐 채널
 
     /// <summary>현재 수평 실속도를 runMax 기준 0~1로 정규화. 애니 MoveSpeed 구동용(실속도라 가속·감속 반영 + 발미끄러짐 방지).</summary>
     public float HorizontalSpeed01

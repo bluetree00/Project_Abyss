@@ -88,6 +88,7 @@ public class GameCameraController : MonoBehaviour
 
     // 구역 카메라 진입 전 기본 오빗. 최초 ApplyZoneOrbit에서 1회 저장하고 계속 유지한다(구역 릴레이).
     private CinemachineFreeLook.Orbit[] _savedZoneOrbits;
+    private CinemachineFreeLook _framedFreeLook;   // 사용자 시점 조정(CameraUserFraming)을 붙인 FreeLook
     private CancellationTokenSource     _dkOrbitTransitionCts;
     private bool _topDownViewActive;
     private bool _savedBrainBeforeTopDown;
@@ -115,6 +116,9 @@ public class GameCameraController : MonoBehaviour
     /// 궤도를 점유하지는 않는다(점유는 <see cref="IsOrbitOverridden"/>).
     /// </summary>
     public bool IsCombatFramingSuppressed => _framingSuppressors.Count > 0;
+
+    /// <summary>화룡 탑다운(바닥 전체 · 바로 아래로)이 켜져 있는가 — 화룡 메테오 바닥 예고가 이때 더 진하게 그린다(10-26).</summary>
+    public bool IsDragonTopDownActive => _topDownViewActive;
 
     // ── Events ──
     /// <summary>카메라 인트로 줌인이 완전히 끝난 직후 발생</summary>
@@ -1552,5 +1556,11 @@ public class GameCameraController : MonoBehaviour
             _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
         if (_brain == null)
             _brain = GetComponent<CinemachineBrain>();
+        // 플레이어 시점 사용자 조정(설정 「카메라」 — 10-24) — FreeLook마다 한 번 붙인다(씬이 바뀌면 새 FreeLook)
+        if (_cinemachine != null && _framedFreeLook != _cinemachine)
+        {
+            if (!_cinemachine.TryGetComponent<CameraUserFraming>(out _)) _cinemachine.gameObject.AddComponent<CameraUserFraming>();
+            _framedFreeLook = _cinemachine;
+        }
     }
 }

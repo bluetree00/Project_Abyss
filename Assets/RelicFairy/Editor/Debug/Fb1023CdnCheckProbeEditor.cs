@@ -13,8 +13,9 @@ public static class Fb1023CdnCheckProbeEditor
 {
     private static readonly (string id, string line1)[] Parts =
     {
-        ("g_dawn_to_noon",  "정오 개화 때 적마다 태양흔 1개가 남는다(1개뿐이면 다 터진다)"),
-        ("g_daybreak_mark", "게이지가 80%에 닿는 순간 5m 안 적을 내 쪽으로 끌어당긴다"),
+        ("g_dawn_to_noon",  "정오가 열려 태양흔이 터질 때 적마다 1개를 남긴다(1개뿐이면 다 터진다)"),     // 10-23 U7 새 글(txt_1023 표)
+        ("g_daybreak_mark", "해 게이지가 80%에 닿는 순간 5m 안 적을 내 쪽으로 끌어당긴다"),
+        ("l_second_judgment", "Q(심판) 마지막 일격에 맞은 적들의 낙인이 합쳐 6개 이상이면 0.35초 뒤 일격이 한 번 더 떨어진다(심판 피해의 45% · 광란당 1번)"),
     };
 
     private static readonly (string key, string text)[] Lines =

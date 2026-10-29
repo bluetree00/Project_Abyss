@@ -18,7 +18,7 @@ public class EssenceShardPickup : MonoBehaviour
     private const float ArcDuration   = 0.5f;
     private const float ArcHeight     = 1.6f;
     private const float PickupDelay   = 0.4f;
-    private const float MagnetRange   = 3.5f;    // 골드보다 살짝 넓다 — 영구 재화를 놓치면 손실이 크다
+    private const float MagnetRange   = 5f;      // 골드보다 살짝 넓다 — 영구 재화를 놓치면 손실이 크다 · 10-29 「기본 획득 거리를 좀 더」 3.5 → 5
     private const float MagnetSpeed   = 13f;
     private const float PickupRadius  = 0.6f;
     private const float ScatterRadius = 1.3f;

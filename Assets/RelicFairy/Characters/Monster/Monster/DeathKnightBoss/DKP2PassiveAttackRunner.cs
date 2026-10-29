@@ -92,16 +92,18 @@ public class DKP2PassiveAttackRunner
         var edges = new List<GameObject>();
         _spearNeighbours = !_ctx.Monster.IsInSpecialState;   // 본 패턴 중엔 노리는 줄만 — 반대 색 이웃 줄이 본 패턴의 위험 칸을 덮어 안전해 보였다(10-08 점검)
         DKSoulSpearState.SpawnRowGuide(_spearSO, rowZ, sc, tiles, edges, _spearNeighbours);
+        float startedAt = Time.time;
+        float hitAt     = _spearSO.passiveWarningDuration + _spearSO.passiveBeamHitDelay;
 
         try
         {
-            await WaitKeepingRowGuideAsync(_spearSO.passiveWarningDuration, rowZ, sc, tiles, edges, ct);
+            await WaitKeepingRowGuideAsync(_spearSO.passiveWarningDuration, rowZ, sc, tiles, edges, startedAt, hitAt, ct);
 
             DKSoulSpearState.SpawnRowBeam(_spearSO.impactVfxPrefab, rowZ, sc);
             Managers.Sound?.PlayEffectAt(_spearSO.beamSfx,
                 DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, rowZ, 0.1f));
 
-            await WaitKeepingRowGuideAsync(_spearSO.passiveBeamHitDelay, rowZ, sc, tiles, edges, ct);
+            await WaitKeepingRowGuideAsync(_spearSO.passiveBeamHitDelay, rowZ, sc, tiles, edges, startedAt, hitAt, ct);
             await UniTask.Yield(PlayerLoopTiming.PostLateUpdate, ct);   // 같은 프레임 본 패턴 피격을 먼저 센다(10-08 점검)
 
             if (!IsPlayerInGuardianShield() && DKBossRoomContext.WorldCenter == grid   // 격자가 바뀌었으면 그린 줄과 판정 줄이 다르다(10-08 점검) — 버린다
@@ -280,12 +282,15 @@ public class DKP2PassiveAttackRunner
     /// 줄 예고를 둔 채 기다린다 — 그사이 본 패턴이 시작되면 이웃 줄을 걷고 노리는 줄만 다시 깐다(10-08 점검).
     /// </summary>
     private async UniTask WaitKeepingRowGuideAsync(float seconds, int rowZ, DKSwordColor sc,
-                                                   List<DKTileInfo> tiles, List<GameObject> edges, CancellationToken ct)
+                                                   List<DKTileInfo> tiles, List<GameObject> edges,
+                                                   float startedAt, float hitAt, CancellationToken ct)
     {
         float end = Time.time + seconds;
         while (Time.time < end)
         {
             await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            // 노린 줄을 공격 색 → 판정 직전 신호 빨강으로 — 예전엔 흑/백 그대로라 검은 검이면 어두운 바닥 위 검은 줄이었다(10-24)
+            DKGridPatternHelper.ArmBefore(Time.time - startedAt, hitAt, tiles, sc);
             if (!_spearNeighbours || !_ctx.Monster.IsInSpecialState) continue;
             _spearNeighbours = false;
             DKGridPatternHelper.DestroyEdges(edges);

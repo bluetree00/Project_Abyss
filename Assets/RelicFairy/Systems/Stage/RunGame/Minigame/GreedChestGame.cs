@@ -5,16 +5,17 @@ using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// 욕심의 상자 — 멈출 때 정하기(최대 45초, 10-01 설계 §3-3). 「열수록 커진다 — 언제 멈출지는 네가 정한다」.
+/// 욕심의 상자 — 멈출 때 정하기(최대 30초, 10-01 설계 §3-3). 「열수록 커진다 — 언제 멈출지는 네가 정한다」.
 /// 상자 앞 [F] = 열기 → 0.8초 두근거림 → 성공이면 단계 +1(다음 확률 85 / 70 / 55 / 40%), 실패면 상자가 문다(4% 피해 · 실패).
-/// 「챙기기」 빛 원에서 [F] = 지금 단계로 끝(0 브론즈 · 1 실버 · 2 골드 · 3 플래티넘 · 4 플래티넘 + 연료 ×1.5). 시간이 다 되면 자동으로 챙긴다.
+/// 「챙기기」 빛 원에서 [F] = 지금 단계로 끝(0 브론즈 · 1 실버 · 2 골드 · 3 플래티넘 · 4 플래티넘). 시간이 다 되면 자동으로 챙긴다.
+/// 10-29 보상 = 금화(단계마다 는다 · 4단계 ×1.5) + 4단계면 정수도(EventRewards). 카운트다운 없이 바로 시작 · 최대 45 → 30초(「빨리 끝나는 이벤트」).
 /// 운은 방 시드로 정해져 있다(다시 들어와도 같다 — 기존 도박 상자 규칙).
 /// 상자 모델 = 의태 상자 몬스터 프리팹을 <b>소품으로</b>(스크립트 · 에이전트 · 충돌체를 떼고 애니메이터만 쓴다).
 /// </summary>
 public sealed class GreedChestGame : EventMinigame
 {
     // ── Constants ──────────────────────────────────────────────
-    private const float PlayTime     = 45f;
+    private const float PlayTime     = 30f;
     private const float OpenRange    = 2.8f;
     private const float BankRange    = 1.6f;
     private const float BankDistance = 2.5f;
@@ -23,7 +24,7 @@ public sealed class GreedChestGame : EventMinigame
     private const float RiseSeconds  = 0.45f;
     private const float RiseDepth    = 1.2f;
     private const int   MaxStage     = 4;
-    private const float TopFuelScale = 1.5f;
+    private const float TopGoldScale = 1.5f;   // 4단계까지 열었다 — 금화 ×1.5 + 정수
 
     private const string IdleState  = "IdleChest";
     private const string ShakeState = "SenseSomethingST";
@@ -53,11 +54,12 @@ public sealed class GreedChestGame : EventMinigame
     public override string Id => "greed";
     protected override string Title => "욕심의 상자";
     protected override string Rule => "열수록 커진다 — 언제 멈출지는 네가 정한다";
-    protected override string GradeHint => "챙기면 0단 브론즈 · 1단 실버 · 2단 골드 · 3단 플래티넘 · 실패하면 물린다";
+    protected override string GradeHint => "멈추면 그 단계만큼 금화 · 4단까지 열면 정수도 · 실패하면 물린다";
     protected override float Duration => PlayTime;
     protected override float WantRadius => 6f;
     protected override bool FinishedEarly => _state == State.Done;
     protected override Vector3 RewardSpot => _chestPos;
+    protected override bool UseCountdown => false;   // 10-29 상자 앞에 서면 바로 — 카운트다운이 기다림만 늘렸다
     public override ChallengeGrade CurrentGrade => _bitten ? ChallengeGrade.Fail : GradeOf(_stage);
 
     protected override string StatusLine
@@ -65,7 +67,7 @@ public sealed class GreedChestGame : EventMinigame
         get
         {
             if (_bitten) return "물렸다 — 욕심이 과했다";
-            if (_stage >= MaxStage) return "최고 단계 — 연료 ×1.5";
+            if (_stage >= MaxStage) return "최고 단계 — 금화 ×1.5 · 정수";
             return $"지금 챙기면 {MinigameHud.GradeName(GradeOf(_stage))} · 다음 열기 성공 {Mathf.RoundToInt(Chances[_stage] * 100f)}%";
         }
     }
@@ -103,7 +105,7 @@ public sealed class GreedChestGame : EventMinigame
         Vector3 dir = toPlayer.sqrMagnitude > 0.01f ? toPlayer.normalized : Vector3.back;
         _bankPos = MinigameArena.Snap(Center + dir * BankDistance, 1f, out var b) ? b : Center + dir * BankDistance;
 
-        _chest = Own(await SpawnChestPropAsync(_chestPos, Quaternion.LookRotation(dir), ct));
+        _chest = Own(await SpawnChestPropAsync(_chestPos, Quaternion.LookRotation(dir), RiseDepth, ct));
         _anim  = _chest != null ? _chest.GetComponentInChildren<Animator>() : null;
         Play(IdleState);
 
@@ -148,6 +150,20 @@ public sealed class GreedChestGame : EventMinigame
         if (_state != State.Done) Bank();   // 시간이 다 됐다 — 지금 단계로 챙긴다
         _openPrompt?.gameObject.SetActive(false);
         _bankPrompt?.gameObject.SetActive(false);
+    }
+
+    /// <summary>10-29 특별 보상 — 챙긴 단계의 금화(물리면 실패 몫) · 4단계면 ×1.5와 정수.</summary>
+    protected override void GrantReward(ChallengeGrade grade, Vector3 at)
+    {
+        int ch   = EventRewards.Chapter(Run);
+        bool top = _stage >= MaxStage && !_bitten;
+        int gold = EventRewards.Gold(grade, ch);
+        if (top) gold = Mathf.RoundToInt(gold * TopGoldScale);
+        int essence = top ? EventRewards.Essence(ChallengeGrade.Platinum, ch) : 0;
+        EventRewards.DropGold(at, gold);
+        EventRewards.DropEssence(at, essence);
+        EventRewards.Notice(essence > 0 ? $"욕심의 상자 — 금화 <color=#F2D26A>+{gold}</color> · 정수 <color=#73D9C7>+{essence}</color>"
+                                        : $"욕심의 상자 — 금화 <color=#F2D26A>+{gold}</color>");
     }
 
     protected override void DemoTick(MinigameDemo mode, float dt)
@@ -256,7 +272,6 @@ public sealed class GreedChestGame : EventMinigame
         if (_state == State.Done) return;
         _banked = true;
         _state  = State.Done;
-        if (_stage >= MaxStage) SetFuelScale(TopFuelScale);
         MinigameFx.Sound(SoundKey.Sfx.GoldPickup, 0.9f, 1f + 0.08f * _stage);
         if (_stage < MaxStage) RunFx.Play(RunFxSlot.Ring, _bankPos, 0.6f, GoldLight);   // 4단계 자동 챙기기는 상자 빛기둥이 맡는다
         if (_chance != null) { _chance.text = "챙겼다"; _chance.color = Theme; }
@@ -288,8 +303,9 @@ public sealed class GreedChestGame : EventMinigame
     /// <summary>
     /// 의태 상자 몬스터의 <b>모델만</b> 소품으로 세운다 — 프리팹 안 애니메이터가 달린 모델 부분만 복제한다(몬스터 스크립트 · 에이전트 · 충돌체는 뿌리에 있어 따라오지 않는다).
     /// 모델의 애니 이벤트 수신기는 떼고 이벤트도 끈다(물기 모션의 타격 이벤트가 받을 곳 없이 울리지 않게). 못 읽으면 금빛 기둥으로 대신한다.
+    /// 10-29 보물고도 같은 상자를 쓴다(B2) — <paramref name="sinkDepth"/>만큼 바닥 아래에 세운다(솟는 연출은 부른 쪽 몫 · 0이면 제자리). 닫힌 자세로 둔다.
     /// </summary>
-    private async UniTask<GameObject> SpawnChestPropAsync(Vector3 pos, Quaternion rot, CancellationToken ct)
+    public static async UniTask<GameObject> SpawnChestPropAsync(Vector3 pos, Quaternion rot, float sinkDepth, CancellationToken ct)
     {
         GameObject prefab = null;
         try { prefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(ChestMonster.PrefabAddress); }
@@ -302,14 +318,19 @@ public sealed class GreedChestGame : EventMinigame
 
         var holder = new GameObject("GreedChestHolder");
         holder.SetActive(false);   // 꺼 둔 채 만들어 수신기의 Awake가 돌지 않게
-        var go = Instantiate(model.gameObject, pos + Vector3.down * RiseDepth, rot, holder.transform);
+        var go = Instantiate(model.gameObject, pos + Vector3.down * sinkDepth, rot, holder.transform);
         go.name = "GreedChestProp";
         foreach (var mb in go.GetComponentsInChildren<MonoBehaviour>(true)) DestroyImmediate(mb);
         go.transform.SetParent(null, true);
         go.transform.localScale = model.transform.lossyScale;
         Destroy(holder);
         go.SetActive(true);
-        if (go.TryGetComponent<Animator>(out var anim)) anim.fireEvents = false;
+        if (go.TryGetComponent<Animator>(out var anim))
+        {
+            anim.fireEvents = false;
+            int idle = Animator.StringToHash(IdleState);
+            if (anim.isActiveAndEnabled && anim.HasState(0, idle)) anim.Play(idle, 0, 0f);   // 닫힌 상자 자세
+        }
         return go;
     }
 

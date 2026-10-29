@@ -1,4 +1,5 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using System.Threading;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,40 +10,43 @@ using UnityEngine.UI;
 /// 슬롯 선택 결과:
 ///   hasSave=true  → 이어하기 (RequestRestoreRun, 슬롯 인덱스 전달)
 ///   hasSave=false → 새로하기 (RequestStartRun, 스타트 방에서 인게임 선택)
+///
+/// 10-23 새 세이브 창(사용자 「너무 튀는 레거시 리소스라 깔끔하게 톤에 맞게 · 세이브 데이터를 잘 보여 줄 만한 내용으로 배경이랑 틀」):
+///  - 화면 = 힉스필드 배경(달빛 드는 옛 성소 · 가운데 원탁) + 옅은 막 · 위에 「저장 기록」 제목과 금 가는 줄
+///  - 카드 3장 = 흑요석 카드 틀(힉스필드 · 9칸) — 내용은 <see cref="UI_SaveSlotCard"/>
+///  - 아래 「돌아가기」 · 삭제 확인과 이어하기 차단 안내는 공용 확인 창(<see cref="UI_ConfirmDialog"/>)
+/// 목업은 1920×1080 px로 짓고 <see cref="UIWindowFitter"/>가 통째로 배율을 건다. 프리팹의 옛 계층(보라 연기 판 · Yes/No 그림)은 처음 열 때 지운다.
+/// 그림은 <see cref="UISkin.SaveSlot"/>(없으면 색 판 — 화면은 그대로 동작).
 /// </summary>
 public class UI_SaveSlotPanel : UI_Base
 {
     // ─────────────────────────────────────────────────────────
-    // Constants — 확인 다이얼로그 규격
+    // Constants
     // ─────────────────────────────────────────────────────────
 
-    // 판 세로 300 기준 — 메시지는 위 절반(-10~+86), 버튼은 아래(-119~-37)에 앉아 서로 닿지 않는다.
-    private const float DialogW    = 640f;
-    private const float DialogH    = 300f;
-    private const float DialogMsgY = 38f;    // 판 중앙 기준 메시지 중심
-    private const float BtnW       = 152f;   // Yes/No 아트 비율 ≈1.85 유지
-    private const float BtnH       = 82f;
-    private const float BtnGapHalf = 92f;    // 판 중앙에서 각 버튼 중심까지
-    private const float BtnY       = 72f;    // 판 하단에서 버튼 중심까지
+    private const float StageW       = 1920f;
+    private const float StageH       = 1080f;
+    private const float TitleY       = 68f;
+    private const float SubY         = 122f;
+    private const float RuleY        = 166f;
+    private const float RuleW        = 150f;
+    private const float CardY        = 212f;
+    private const float CardGap      = 44f;
+    private const float BackY        = 928f, BackW = 240f, BackH = 52f;
+    private const float EnterStagger = 0.06f;
 
-    private static readonly Color VeilColor   = new(0f, 0f, 0f, 0.82f);
-    private static readonly Color DialogFill  = new(0.06f, 0.05f, 0.09f, 0.985f);
-    private static readonly Color DialogEdge  = new(0.52f, 0.40f, 0.20f, 1f);
+    private static readonly Color BackdropFill = new(0.035f, 0.035f, 0.060f, 1f);    // 그림이 없을 때 · 그림 둘레
+    private static readonly Color ShadeColor   = new(0.010f, 0.012f, 0.025f, 0.40f);  // 그림 위 막 — 카드 글이 먼저 읽히게
+    private static readonly Color BackFill     = new(0.040f, 0.045f, 0.075f, 0.80f);
+
+    private static UI_SaveSlotPanel s_open;   // ESC가 닫을, 지금 열린 패널(10-25)
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => s_open = null;
 
     // ─────────────────────────────────────────────────────────
     // SerializeField
     // ─────────────────────────────────────────────────────────
-
-    [Header("슬롯 카드 (0, 1, 2)")]
-    [SerializeField] private UI_SaveSlotCard[] slotCards;
-
-    [Header("뒤로 가기")]
-    [SerializeField] private Button btnBack;
-
-    [Header("삭제 확인 다이얼로그")]
-    [SerializeField] private GameObject confirmRoot;
-    [SerializeField] private Button     btnConfirmDelete;
-    [SerializeField] private Button     btnCancelDelete;
 
     [Header("이어하기 임시 차단")]
     [Tooltip("켜면 저장된 슬롯을 눌러도 이어하기 대신 '세밀 작업 중' 안내를 띄운다. 재개하려면 끄면 된다.")]
@@ -61,34 +65,19 @@ public class UI_SaveSlotPanel : UI_Base
     // Private
     // ─────────────────────────────────────────────────────────
 
-    private int        _pendingDeleteSlot = -1;
-    private GameObject _noticeRoot;   // 이어하기 차단 안내 오버레이(코드 생성, 1회)
-    private bool       _opened;       // Open으로 연 적이 있다 — 아니면 닫을 때 페이드 없이 곧바로 끈다
+    private readonly UI_SaveSlotCard[] _cards = new UI_SaveSlotCard[RunProgressManager.SlotCount];
+    private bool _built;
+    private bool _opened;   // Open으로 연 적이 있다 — 아니면 닫을 때 페이드 없이 곧바로 끈다
+    private CancellationTokenSource _enterCts;
 
     // ─────────────────────────────────────────────────────────
     // Lifecycle
     // ─────────────────────────────────────────────────────────
 
-    public override void Init()
+    private void OnDestroy()
     {
-        base.Init();
-
-        if (btnBack != null)
-        {
-            btnBack.onClick.AddListener(Close);
-            StyleBackButton();
-        }
-
-        if (btnConfirmDelete != null)
-            btnConfirmDelete.onClick.AddListener(OnClickConfirmDelete);
-
-        if (btnCancelDelete != null)
-            btnCancelDelete.onClick.AddListener(OnClickCancelDelete);
-
-        NormalizeConfirmLayout();
-
-        if (confirmRoot != null)
-            confirmRoot.SetActive(false);
+        CancelEnter();
+        if (s_open == this) s_open = null;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -96,48 +85,110 @@ public class UI_SaveSlotPanel : UI_Base
     // ─────────────────────────────────────────────────────────
 
     /// <summary>
-    /// 아래 버튼은 창을 닫고 제목 화면으로 돌아가는 것인데 「Exit」 아트라 게임 종료로 읽혔다(10-16 사용자 빌드 피드백) —
-    /// 확인 창 「취소」와 같은 보조 버튼(무채 베벨 · 220×56)으로 바꾸고 숨겨 둔 글에 「돌아가기」를 얇게 쓴다.
+    /// ESC(10-25 사용자 「모든 UI를 ESC로」) — 열려 있으면 「돌아가기」와 같이 닫는다. 슬롯을 눌러 화면이 덮이는 중(LeaveCovered)이면
+    /// 손대지 않는다 — 그때 닫으면 로비가 다시 비쳤다(10-23).
     /// </summary>
-    private void StyleBackButton()
+    public static bool CloseIfOpen()
     {
-        var label = btnBack.GetComponentInChildren<TMP_Text>(true);
-        if (label == null) return;
-        if (btnBack.transform is RectTransform rt) rt.sizeDelta = new Vector2(220f, 56f);
-        // 로비 메뉴용 그림 바꾸기(LobbyButtonHover)가 붙어 있어, 패널이 처음 켜질 때 Awake에서 Exit 그림을 되돌려 놓는다 — 뗀다.
-        if (btnBack.TryGetComponent<LobbyButtonHover>(out var hover)) Destroy(hover);
-        // 프리팹의 버튼은 targetGraphic이 비어 있다(10-16 실측 — 그래서 Exit 그림이 그대로 남았다) — 같은 오브젝트의 Image를 쓴다.
-        if (btnBack.TryGetComponent<Image>(out var art))
-        {
-            UITheme.StyleButton(art, UITheme.SecondaryTint);
-            art.preserveAspect = false;
-            btnBack.targetGraphic = art;
-        }
-        label.gameObject.SetActive(true);
-        label.text = "돌아가기";
-        UITheme.StyleThinText(label, UIWeight.Medium, 22f, UITheme.Thin.Ink, shadow: true);
+        if (s_open == null || !s_open._opened) return false;
+        s_open.Close();
+        return true;
     }
 
-    /// <summary>패널을 열고 슬롯 카드를 최신 세이브 데이터로 갱신한다.</summary>
+    /// <summary>패널을 열고 슬롯 카드를 최신 세이브 데이터로 갱신한다. 처음 열 때 짓는다(스킨은 앱 부트에서 미리 올라와 있다).</summary>
     public override void Open()
     {
-        HideConfirm();
-        HideNotice();
+        EnsureBuilt();
         RefreshAllCards();
         _opened = true;
+        s_open  = this;
         UIFader.On(gameObject).Show();   // 순간 등장 → 공통 박자(09-28 UI 톤 통일)
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);   // 10-29 UI 소리 — 열기
+        PlayEnter();
     }
 
     public override void Close()
     {
-        HideConfirm();
-        HideNotice();
+        CancelEnter();
         // 열어 둔 적이 없으면(로비가 켜질 때의 정리) 곧바로 끈다 — 페이드하면 로비 첫 화면에 슬롯이 잠깐 비친다.
         // 닫는 순간 알린다 — 로비 제목이 슬롯이 걷히는 동안 함께 떠오른다(교차 페이드).
+        if (_opened) Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);   // 10-29 UI 소리 — 닫기(로비가 켜질 때의 정리는 조용히)
         if (_opened) UIFader.On(gameObject).Hide();
         else         gameObject.SetActive(false);
         _opened = false;
+        if (s_open == this) s_open = null;
         OnClosed?.Invoke();
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Private Methods — 짓기
+    // ─────────────────────────────────────────────────────────
+
+    private void EnsureBuilt()
+    {
+        if (_built) return;
+        _built = true;
+
+        // 옛 구운 계층(Dim 보라 연기 판 · Panel_Main 카드 · Btn_Back · ConfirmRoot Yes/No)을 걷는다 — 새 창은 늘 여기서 짓는다.
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            var old = transform.GetChild(i).gameObject;
+            old.SetActive(false);
+            Destroy(old);
+        }
+
+        var skin = UISkin.SaveSlot;
+        ShopUIStyle.Stretch((RectTransform)transform);
+
+        // 배경 — 화면을 덮도록 비율을 지켜 키운다(가장자리가 조금 잘린다). 판이 뒤쪽 로비 클릭을 막는다.
+        var backdrop = ShopUIStyle.MakeImage(transform, "Backdrop", BackdropFill, raycast: true);
+        ShopUIStyle.Stretch(backdrop.rectTransform);
+        var art = skin != null ? skin.Background : null;
+        if (art != null)
+        {
+            var pic = ShopUIStyle.MakeImage(backdrop.transform, "Art", Color.white);
+            pic.sprite = art;
+            var prt = pic.rectTransform;
+            prt.anchorMin = prt.anchorMax = prt.pivot = new Vector2(0.5f, 0.5f);
+            var fit = pic.gameObject.AddComponent<AspectRatioFitter>();
+            fit.aspectMode  = AspectRatioFitter.AspectMode.EnvelopeParent;
+            fit.aspectRatio = art.rect.width / Mathf.Max(1f, art.rect.height);
+        }
+        var shade = ShopUIStyle.MakeImage(transform, "Shade", ShadeColor);
+        ShopUIStyle.Stretch(shade.rectTransform);
+
+        // 무대 — 1920×1080 목업 그대로 짓고 화면 비율에 맞춰 통째로 줄인다(넓은 화면은 1배 · 좁은 화면은 맞춰 줄임).
+        var stage = (RectTransform)ShopUIStyle.MakeRect(transform, "Stage").transform;
+        var half  = new Vector2(0.5f, 0.5f);
+        ShopUIStyle.Anchor(stage, half, half, half, Vector2.zero, new Vector2(StageW, StageH));   // 맞춤이 Awake에서 이 크기를 기준으로 잡는다 — 먼저
+        stage.gameObject.AddComponent<UIWindowFitter>().Configure(margin: 1f, scaleFonts: false, maxScale: 1f, scaleTransform: true);
+
+        BuildHeader(stage);
+
+        float total = UI_SaveSlotCard.Width * _cards.Length + CardGap * (_cards.Length - 1);
+        float x0    = (StageW - total) * 0.5f;
+        var frame   = skin != null ? skin.CardFrame : null;
+        for (int i = 0; i < _cards.Length; i++)
+            _cards[i] = UI_SaveSlotCard.Create(stage, i, x0 + (UI_SaveSlotCard.Width + CardGap) * i, CardY, frame);
+
+        var back = SaveSlotUI.MakeButton(stage, "Btn_Back", (StageW - BackW) * 0.5f, BackY, BackW, BackH, BackFill, UITheme.Thin.LineIdle,
+                                         "돌아가기", 18f, UITheme.Thin.Ink, out _, out _, out _);
+        back.onClick.AddListener(Close);
+    }
+
+    private static void BuildHeader(RectTransform stage)
+    {
+        var title = SaveSlotUI.Text(stage, "Title", 0f, TitleY, StageW, 46f, 34f, UIWeight.Medium, UITheme.Thin.Ink, TextAlignmentOptions.Center);
+        title.text = "저장 기록";
+        title.characterSpacing = 8f;
+        var sub = SaveSlotUI.Text(stage, "Sub", 0f, SubY, StageW, 26f, 17f, UIWeight.Light, UITheme.Thin.InkA(0.62f), TextAlignmentOptions.Center);
+        sub.text = "이어 할 기록을 고르거나, 빈 칸에서 새로 시작한다";
+
+        // 금 가는 줄 둘 + 가운데 마름모
+        float cx = StageW * 0.5f;
+        SaveSlotUI.Img(stage, "RuleL", cx - 14f - RuleW, RuleY, RuleW, 1f, UITheme.Thin.LineGold);
+        SaveSlotUI.Img(stage, "RuleR", cx + 14f,         RuleY, RuleW, 1f, UITheme.Thin.LineGold);
+        SaveSlotUI.Diamond(stage, "RuleGem", cx, RuleY + 0.5f, 7f, UITheme.Thin.WithA(UITheme.Thin.Gold, 0.85f), outline: false);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -147,15 +198,15 @@ public class UI_SaveSlotPanel : UI_Base
     private void RefreshAllCards()
     {
         var rpm = RunProgressManager.Instance;
-        for (int i = 0; i < slotCards.Length; i++)
-            slotCards[i].Setup(ResolveSlotData(rpm, i), i, OnSlotStartClicked, OnSlotDeleteClicked);
+        for (int i = 0; i < _cards.Length; i++)
+            _cards[i].Setup(ResolveSlotData(rpm, i), i, OnSlotStartClicked, OnSlotDeleteClicked);
     }
 
     private void RefreshCard(int slotIndex)
     {
-        if (slotIndex < 0 || slotIndex >= slotCards.Length) return;
+        if (!_built || slotIndex < 0 || slotIndex >= _cards.Length) return;
         var rpm = RunProgressManager.Instance;
-        slotCards[slotIndex].Setup(ResolveSlotData(rpm, slotIndex), slotIndex, OnSlotStartClicked, OnSlotDeleteClicked);
+        _cards[slotIndex].Setup(ResolveSlotData(rpm, slotIndex), slotIndex, OnSlotStartClicked, OnSlotDeleteClicked);
     }
 
     /// <summary>진행 중 런은 슬롯별 로컬 파일이 단독 권위. 활성 로컬 런이 있으면 그것을, 없으면 빈 슬롯(null).</summary>
@@ -169,185 +220,21 @@ public class UI_SaveSlotPanel : UI_Base
         return local != null && local.hasActiveRun ? local : null;
     }
 
-    // ─────────────────────────────────────────────────────────
-    // Private Methods — Confirm Dialog
-    // ─────────────────────────────────────────────────────────
-
-    private void HideConfirm()
+    /// <summary>카드가 60ms 간격으로 떠오른다(아래 18px에서 · 0.26초) — 상점 · 룬 선택 팝업과 같은 결.</summary>
+    private void PlayEnter()
     {
-        _pendingDeleteSlot = -1;
-        if (confirmRoot != null) confirmRoot.SetActive(false);
+        CancelEnter();
+        _enterCts = CancellationTokenSource.CreateLinkedTokenSource(destroyCancellationToken);
+        for (int i = 0; i < _cards.Length; i++)
+            _cards[i].PlayEnterAsync(EnterStagger * i, _enterCts.Token).Forget();
     }
 
-    /// <summary>
-    /// 삭제 확인 다이얼로그를 "팝업답게" 잡는다.
-    ///
-    /// 프리팹에는 판(배경 상자) 없이 78pt 제목과 원본 크기 그대로의 Yes/No 아트만 화면 한복판에
-    /// 흩어져 있었다 — 슬롯 카드가 그대로 비쳐 보여 무엇을 묻는 창인지 읽히지 않았다.
-    /// 크기·위치가 코드에서 오는 이상 제약도 코드가 쥐고 있어야 다시 어긋나지 않으므로,
-    /// 여기서 어두운 막 + 가운데 판 + 메시지 + 버튼 2개로 매번 재구성한다.
-    /// 판은 없으면 만들고(1회), 이미 있으면 그대로 쓴다.
-    /// </summary>
-    private void NormalizeConfirmLayout()
+    private void CancelEnter()
     {
-        if (confirmRoot == null) return;
-
-        // 1) 루트 = 전체를 덮는 어두운 막(뒤쪽 클릭 차단)
-        if (confirmRoot.transform is RectTransform rootRT)
-        {
-            rootRT.anchorMin = Vector2.zero;
-            rootRT.anchorMax = Vector2.one;
-            rootRT.offsetMin = rootRT.offsetMax = Vector2.zero;
-        }
-        var veil = confirmRoot.GetComponent<Image>();
-        if (veil == null) veil = confirmRoot.AddComponent<Image>();
-        veil.sprite        = null;
-        veil.color         = VeilColor;
-        veil.raycastTarget = true;
-
-        // 2) 판 — 메시지·버튼이 앉을 상자. 이미 만들어 뒀으면 재사용.
-        var panelTf = confirmRoot.transform.Find("Panel");
-        RectTransform panel;
-        if (panelTf != null)
-        {
-            panel = (RectTransform)panelTf;
-        }
-        else
-        {
-            var go = new GameObject("Panel", typeof(RectTransform), typeof(Image));
-            panel = (RectTransform)go.transform;
-            panel.SetParent(confirmRoot.transform, false);
-            var edge = go.GetComponent<Image>();
-            edge.color = DialogEdge;
-
-            var innerGo = new GameObject("Fill", typeof(RectTransform), typeof(Image));
-            var inner = (RectTransform)innerGo.transform;
-            inner.SetParent(panel, false);
-            inner.anchorMin = Vector2.zero;
-            inner.anchorMax = Vector2.one;
-            inner.offsetMin = new Vector2(2f, 2f);
-            inner.offsetMax = new Vector2(-2f, -2f);
-            innerGo.GetComponent<Image>().color = DialogFill;
-        }
-        Center(panel, Vector2.zero, new Vector2(DialogW, DialogH));
-        panel.SetAsFirstSibling();   // 메시지·버튼보다 뒤에 깔린다
-
-        // 3) 메시지 — 판 위쪽. 78pt는 화면을 가로지르므로 판에 맞춰 줄인다.
-        var msg = confirmRoot.GetComponentInChildren<TMP_Text>(true);
-        if (msg != null)
-        {
-            msg.fontSize          = 26f;
-            msg.alignment         = TextAlignmentOptions.Center;
-            msg.textWrappingMode  = TextWrappingModes.Normal;
-            msg.overflowMode      = TextOverflowModes.Truncate;
-            Center(msg.rectTransform, new Vector2(0f, DialogMsgY), new Vector2(DialogW - 60f, 96f));
-        }
-
-        // 4) 버튼 — 아트 원본(539×291 / 487×269)이 그대로 깔려 있어 화면을 뒤덮었다.
-        //    비율을 지키면서 판 안에 들어오는 크기로 고정한다.
-        PlaceConfirmButton(btnConfirmDelete, -BtnGapHalf);
-        PlaceConfirmButton(btnCancelDelete,   BtnGapHalf);
-    }
-
-    private void PlaceConfirmButton(Button btn, float x)
-    {
-        if (btn == null) return;
-        Center((RectTransform)btn.transform, new Vector2(x, -DialogH * 0.5f + BtnY), new Vector2(BtnW, BtnH));
-        if (btn.TryGetComponent<Image>(out var img)) img.preserveAspect = true;
-    }
-
-    /// <summary>부모 중앙 기준으로 위치·크기를 못 박는다(앵커가 어떻게 authoring 돼 있든 동일 결과).</summary>
-    private static void Center(RectTransform rt, Vector2 pos, Vector2 size)
-    {
-        var half = new Vector2(0.5f, 0.5f);
-        rt.anchorMin = rt.anchorMax = rt.pivot = half;
-        rt.sizeDelta = size;
-        rt.anchoredPosition = pos;
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // Private Methods — 이어하기 차단 안내
-    // ─────────────────────────────────────────────────────────
-
-    /// <summary>이어하기 차단 안내를 띄운다. 오버레이는 1회 생성 후 재사용.</summary>
-    private void ShowResumeBlockedNotice()
-    {
-        if (_noticeRoot == null) BuildNoticeRoot();
-        if (_noticeRoot == null) return;   // 폰트/부모를 못 구한 극단 상황 — 조용히 무시(재개는 막힌 채)
-
-        _noticeRoot.SetActive(true);
-        _noticeRoot.transform.SetAsLastSibling();
-    }
-
-    /// <summary>안내 오버레이를 삭제 확인 다이얼로그와 같은 막·판 스타일로 코드 생성한다(폰트는 그 다이얼로그에서 빌려옴).</summary>
-    private void BuildNoticeRoot()
-    {
-        // 텍스트가 확실히 렌더되도록 기존 확인 다이얼로그의 폰트를 재사용한다(새 TMP는 폰트가 없으면 공백).
-        var srcMsg = confirmRoot != null ? confirmRoot.GetComponentInChildren<TMP_Text>(true) : null;
-        var font   = srcMsg != null ? srcMsg.font : null;
-
-        var root = new GameObject("ResumeBlockedNotice", typeof(RectTransform), typeof(Image));
-        root.transform.SetParent(transform, false);
-        if (root.transform is RectTransform rootRT)
-        {
-            rootRT.anchorMin = Vector2.zero;
-            rootRT.anchorMax = Vector2.one;
-            rootRT.offsetMin = rootRT.offsetMax = Vector2.zero;
-        }
-        var veil = root.GetComponent<Image>();
-        veil.color         = VeilColor;
-        veil.raycastTarget = true;   // 뒤쪽 클릭 차단
-
-        // 판
-        var panelGo = new GameObject("Panel", typeof(RectTransform), typeof(Image));
-        panelGo.transform.SetParent(root.transform, false);
-        panelGo.GetComponent<Image>().color = DialogEdge;
-        var panel = (RectTransform)panelGo.transform;
-        Center(panel, Vector2.zero, new Vector2(DialogW, DialogH));
-
-        var fillGo = new GameObject("Fill", typeof(RectTransform), typeof(Image));
-        fillGo.transform.SetParent(panel, false);
-        var fill = (RectTransform)fillGo.transform;
-        fill.anchorMin = Vector2.zero; fill.anchorMax = Vector2.one;
-        fill.offsetMin = new Vector2(2f, 2f); fill.offsetMax = new Vector2(-2f, -2f);
-        fillGo.GetComponent<Image>().color = DialogFill;
-
-        // 메시지
-        var msgGo = new GameObject("Message", typeof(RectTransform));
-        msgGo.transform.SetParent(panel, false);
-        var msg = msgGo.AddComponent<TextMeshProUGUI>();
-        if (font != null) msg.font = font;
-        msg.text             = blockResumeMessage;
-        msg.fontSize         = 26f;
-        msg.alignment        = TextAlignmentOptions.Center;
-        msg.textWrappingMode = TextWrappingModes.Normal;
-        Center(msg.rectTransform, new Vector2(0f, DialogMsgY), new Vector2(DialogW - 60f, 120f));
-
-        // 확인 버튼 — 누르면 안내만 닫는다(패널은 그대로 열려 있어 바로 삭제 가능)
-        var btnGo = new GameObject("Btn_OK", typeof(RectTransform), typeof(Image), typeof(Button));
-        btnGo.transform.SetParent(panel, false);
-        btnGo.GetComponent<Image>().color = DialogEdge;
-        Center((RectTransform)btnGo.transform, new Vector2(0f, -DialogH * 0.5f + BtnY), new Vector2(BtnW, BtnH));
-        btnGo.GetComponent<Button>().onClick.AddListener(HideNotice);
-
-        var okGo = new GameObject("Label", typeof(RectTransform));
-        okGo.transform.SetParent(btnGo.transform, false);
-        var ok = okGo.AddComponent<TextMeshProUGUI>();
-        if (font != null) ok.font = font;
-        ok.text      = "확인";
-        ok.fontSize  = 28f;
-        ok.alignment = TextAlignmentOptions.Center;
-        var okRT = ok.rectTransform;
-        okRT.anchorMin = Vector2.zero; okRT.anchorMax = Vector2.one;
-        okRT.offsetMin = okRT.offsetMax = Vector2.zero;
-
-        _noticeRoot = root;
-        _noticeRoot.SetActive(false);
-    }
-
-    private void HideNotice()
-    {
-        if (_noticeRoot != null) _noticeRoot.SetActive(false);
+        if (_enterCts == null) return;
+        _enterCts.Cancel();
+        _enterCts.Dispose();
+        _enterCts = null;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -360,10 +247,11 @@ public class UI_SaveSlotPanel : UI_Base
         // 패널은 열어 둔 채라 사용자가 곧바로 삭제 버튼을 누를 수 있다. (blockResume 끄면 원복)
         if (hasSave && blockResume)
         {
-            ShowResumeBlockedNotice();
+            UI_ConfirmDialog.Show("이어하기를 잠시 막아 두었습니다", blockResumeMessage, "확인", null, null);
             return;
         }
 
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiConfirm);   // 10-29 UI 소리 — 이 기록으로 들어간다(이어하기 차단 안내는 위에서 확인 창이 낸다)
         var rpm = RunProgressManager.Instance;
         if (rpm != null) rpm.ActiveSlotIndex = slotIndex;
 
@@ -372,7 +260,7 @@ public class UI_SaveSlotPanel : UI_Base
         BackendGameData.Instance?.ApplyActiveSlot();
         Managers.Quest?.ReloadForActiveSlot();
 
-        Close();
+        LeaveCovered();
 
         Managers.Sound.FadeOutBgmAsync().Forget();
 
@@ -382,20 +270,26 @@ public class UI_SaveSlotPanel : UI_Base
             AppBootstrapper.Instance?.RequestStartRun();
     }
 
+    /// <summary>
+    /// 창을 닫지 않고 덮인 채로 떠난다 — 다음 화면(시작 영상 · 로딩 막)이 위에서 덮는다.
+    /// 닫으면 그 화면이 덮기 전까지(새 게임 = 영상 준비 ≈0.8초) 로비가 다시 비쳤고, 빌드에선 그 틈에 유니티 기본 배경이 새어 나왔다(10-23).
+    /// 덮이는 동안 다시 누르지 못하게 버튼만 막는다. 로비에 돌아오면 UI_Lobby.OnEnable의 Close가 페이드 없이 곧바로 끈다 · 이어하기 실패면 Open이 다시 연다.
+    /// </summary>
+    private void LeaveCovered()
+    {
+        CancelEnter();
+        _opened = false;
+        if (TryGetComponent<CanvasGroup>(out var cg)) cg.interactable = false;
+    }
+
+    /// <summary>한 번 더 묻는다(되돌릴 수 없음 — 붉은 결정 버튼). 「삭제」를 눌러야만 지운다.</summary>
     private void OnSlotDeleteClicked(int slotIndex)
     {
-        _pendingDeleteSlot = slotIndex;
-        if (confirmRoot != null) confirmRoot.SetActive(true);
+        int n = slotIndex + 1;
+        string body = $"기록 {n}{(n == 2 ? "를" : "을")} 삭제하시겠습니까?\n" +
+                      "진행 중인 런과 이 기록의 성장(심연의 정수 · 해금 · 봉인)이 모두 사라지며 되돌릴 수 없습니다.";
+        UI_ConfirmDialog.Show("기록 삭제", body, "삭제", "취소", () => DeleteSlot(slotIndex), danger: true);
     }
-
-    private void OnClickConfirmDelete()
-    {
-        int slot = _pendingDeleteSlot;
-        HideConfirm();
-        DeleteSlot(slot);
-    }
-
-    private void OnClickCancelDelete() => HideConfirm();
 
     private void DeleteSlot(int slotIndex)
     {
@@ -405,5 +299,7 @@ public class UI_SaveSlotPanel : UI_Base
         // 이 슬롯의 로컬 런 세이브만 폐기(다른 슬롯 무영향). 로컬이 단독 권위.
         rpm.ResetSlot(slotIndex);   // 슬롯 삭제 = 이 슬롯으로 다시 시작하면 초회부터
         RefreshCard(slotIndex);
+        if (_enterCts != null && slotIndex < _cards.Length)
+            _cards[slotIndex].PlayEnterAsync(0f, _enterCts.Token).Forget();   // 빈 기록으로 바뀌는 것이 보이게 한 번 더 떠오른다
     }
 }

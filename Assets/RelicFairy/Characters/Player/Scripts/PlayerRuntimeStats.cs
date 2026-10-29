@@ -16,12 +16,18 @@ public sealed class PlayerRuntimeStats
     public float AttackSpeedMultiplier { get; private set; } = 1f;
     /// <summary>넘친 공속이 바뀐 모든 피해 %(10-14 A6) — 공속 합이 상한 2.0을 넘은 몫의 절반. HUD · 실측이 읽는다.</summary>
     public float AttackSpeedOverflowDamage { get; private set; }
+    /// <summary>평타 휘두름에 듣는 공속 — 공속을 들고 있는 무기의 휘두름 상한(<see cref="SwingSpeedCap"/>)에서 자른 값(10-26 사용자 「카타나 공격 속도가 너무 빠름」).</summary>
+    public float SwingAttackSpeed { get; private set; } = 1f;
+    /// <summary>들고 있는 무기의 휘두름 공속 상한(애니 세트 maxSwingAttackSpeed · 없으면 전체 상한).</summary>
+    public float SwingSpeedCap => _swingSpeedCap;
+    /// <summary>휘두름 상한을 넘은 공속의 절반 — 근접 피해 %(넘친 공속 규칙과 같은 비율). HUD · 실측이 읽는다.</summary>
+    public float SwingSpeedOverflowDamage { get; private set; }
     public float SkillCooldownReduction { get; private set; }
 
     // 상한(10-09 출시 점검) — 룬 · 상점 축복 · 각성 · 반응 · 마스터리가 제한 없이 더해져 쿨다운 0(쿨감 100%) · 완전 무적(피해 감소 100%) ·
     // 콤보 창이 뭉개지는 공격 속도(3~4배)가 됐다. 밸런스 값이라 조정 가능.
     public const float MaxSkillCooldownReduction = 0.6f;
-    public const float MaxDamageReduction        = 0.75f;
+    public const float MaxDamageReduction        = 0.40f;   // 받는 피해 감소 총합 상한 — 제단 · 룬 · 유물 · 서약 전부(10-29 근접 버팀 · 사용자 「무한정 방어는 막아야」 · 옛 0.75)
     public const float MaxAttackSpeed            = 2.0f;
     public const float AttackSpeedOverflowRatio  = 0.5f;   // 넘친 공속 → 모든 피해 %(D5 · 10-14 A6)
     // 근접 위험 보상 — 근접 공격력 × (1 + 이 값). 붙어서 맞을 위험을 지는 근접이 원거리보다 세게(10-16 사용자 「근접이 원거리 비해 훨씬 약하다」).
@@ -254,6 +260,28 @@ public sealed class PlayerRuntimeStats
     /// <summary>실드 상한(최대 HP × CapRatio).</summary>
     public int ShieldCap => Mathf.Max(0, Mathf.RoundToInt(MaxHp * Mathf.Clamp01(_synergyMechanics.ShieldCapRatio)));
 
+    /// <summary>
+    /// 「방까지」 보호막(강철 의지 · 수호의 돌 · 10-29 근접 버팀) — 보통 보호막과 같이 쌓되, 다음 방에 들어설 때 남은 만큼 걷는다(<see cref="ExpireRoomShield"/>).
+    /// 피해를 막을 때는 이 몫부터 먼저 쓴 것으로 센다 — 다른 출처(서약 · 룬) 보호막은 방을 넘어 남는다.
+    /// </summary>
+    public void AddRoomShield(float amount)
+    {
+        float before = _synergyMechanics.ShieldCurrentValue;
+        AddShield(amount);
+        _roomShield += _synergyMechanics.ShieldCurrentValue - before;
+    }
+
+    /// <summary>방에 들어설 때(ItemEffectManager.OnRoomEnter 맨 앞) — 앞 방의 「방까지」 보호막 중 남은 만큼 걷는다.</summary>
+    public void ExpireRoomShield()
+    {
+        if (_roomShield <= 0f) return;
+        float take = Mathf.Min(_roomShield, _synergyMechanics.ShieldCurrentValue);
+        _roomShield = 0f;
+        if (take <= 0f) return;
+        _synergyMechanics.ShieldCurrentValue -= take;
+        OnChanged?.Invoke();
+    }
+
     /// <summary>실드 부여(상한 클램프). 음수 무시.</summary>
     public void AddShield(float amount)
     {
@@ -274,10 +302,12 @@ public sealed class PlayerRuntimeStats
         if (s >= damage)
         {
             _synergyMechanics.ShieldCurrentValue = s - damage;
+            _roomShield = Mathf.Max(0f, _roomShield - damage);   // 「방까지」 몫부터 쓴다
             OnChanged?.Invoke();
             return 0;
         }
         _synergyMechanics.ShieldCurrentValue = 0f;
+        _roomShield = 0f;
         OnChanged?.Invoke();
         return damage - Mathf.CeilToInt(s);
     }
@@ -464,6 +494,7 @@ public sealed class PlayerRuntimeStats
 
     // -- Synergy Mechanics (행동 역학 플래그) --
     private readonly SynergyMechanicsState _synergyMechanics = new();
+    private float _roomShield;   // 지금 보호막 중 「방까지」 몫(AddRoomShield) — 다음 방에 들어설 때 걷는다
 
     /// <summary>행동 역학 시너지 플래그. 전투·스킬·이동 시스템이 읽는다.</summary>
     public SynergyMechanicsState SynergyMechanics => _synergyMechanics;
@@ -500,6 +531,15 @@ public sealed class PlayerRuntimeStats
     private float _characterDamageReduction = 0f;
 
     // ── 무기 ─────────────────────────────────────────────────────────────────────
+
+    private float _swingSpeedCap = MaxAttackSpeed;
+
+    /// <summary>무기 장착/해제 시 — 그 무기 평타 휘두름의 공속 상한(0 = 전체 상한).</summary>
+    public void SetSwingAttackSpeedCap(float cap)
+    {
+        _swingSpeedCap = cap > 0f ? Mathf.Clamp(cap, 1f, MaxAttackSpeed) : MaxAttackSpeed;
+        Recalculate();
+    }
 
     /// <summary>무기 장착/해제 시 호출.</summary>
     public void SetWeaponStats(float melee, float ranged, float defense)
@@ -953,9 +993,11 @@ public sealed class PlayerRuntimeStats
         // 공속 합 — 상한 2.0(애니가 읽히는 한계)을 넘은 몫의 절반은 모든 피해 %로 바꾼다(10-14 A6 · 공속을 더 모아도 헛되지 않게)
         float rawAttackSpeed = 1f + _bonusAttackSpeed + _zenithAttackSpeed + _skillAttackSpeed + _synergyDynAttackSpeed + _itemDyn.attackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + _relicAttackSpeed + _reactionAttackSpeed;
         AttackSpeedOverflowDamage = Mathf.Max(0f, rawAttackSpeed - MaxAttackSpeed) * AttackSpeedOverflowRatio;
+        // 휘두름 상한(무기 애니 세트) — 넘는 몫의 절반은 근접 피해로(10-26 · 공속을 모아도 헛되지 않게 · 같은 비율)
+        SwingSpeedOverflowDamage = Mathf.Max(0f, Mathf.Min(rawAttackSpeed, MaxAttackSpeed) - _swingSpeedCap) * AttackSpeedOverflowRatio;
 
         // % 보너스 배율
-        float dmgMul  = (1f + _itemAllDamagePercent + _synergyDynAttackPct + _itemDyn.attackPercent + _itemDyn.allDamage + _reactionDamagePercent + AttackSpeedOverflowDamage) * _characterMeleeMult;
+        float dmgMul  = (1f + _itemAllDamagePercent + _synergyDynAttackPct + _itemDyn.attackPercent + _itemDyn.allDamage + _reactionDamagePercent + AttackSpeedOverflowDamage + SwingSpeedOverflowDamage) * _characterMeleeMult;
         float dmgMulR = (1f + _itemAllDamagePercent + _synergyDynAttackPct + _itemDyn.attackPercent + _itemDyn.allDamage + _reactionDamagePercent + AttackSpeedOverflowDamage) * _characterRangedMult;
         float defMul  = (1f + _itemAllStatsPercent + _itemDefensePercent + _itemDyn.defensePercent) * _characterDefenseMult;
         float luckMul = 1f + _itemAllStatsPercent;
@@ -989,6 +1031,7 @@ public sealed class PlayerRuntimeStats
         }
 
         AttackSpeedMultiplier = Mathf.Clamp(rawAttackSpeed, 0.1f, MaxAttackSpeed);
+        SwingAttackSpeed      = Mathf.Min(AttackSpeedMultiplier, _swingSpeedCap);
         MoveSpeedMultiplier  = Mathf.Max(0.1f, 1f + _itemDyn.moveSpeed + _roomMoveSpeed + _covenantMoveSpeed + _itemMoveSpeed + _awakeningMoveSpeed + _relicMoveSpeed);
         // 방 버프 + 아이템 추가 투사체를 합산한다 — 예전엔 방 버프만 반영돼 아이템 멀티샷이 무효였다.
         BonusProjectile       = Mathf.Max(0, _roomProjectile + _itemProjectileCount);

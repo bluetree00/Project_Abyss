@@ -22,6 +22,8 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
     private Transform            _playerTarget;
     private int                  _orbitIndex;
     private float                _speedVariance;
+    private Rigidbody            _playerBody;   // 앞질러 겨누기 — 플레이어 평면 속도(10-23 B4)
+    private bool                 _leadAim;      // 짝수 새끼 용만 앞질러 겨눈다
 
     private NavMeshAgent _agent;
     private Animator     _animator;
@@ -60,6 +62,7 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
     private const float DeathLinger      = 3f;     // 사망 애니 뒤 사라지기까지(퇴장 디졸브 포함)
     private const float BreathTelegraph  = 0.6f;   // 브레스 예고 — 바닥 화살표가 다 차면 그 줄로 쏜다(10-08 점검: 예고 없이 바로 쐈다)
     private const float BreathGuideWidth = 1.6f;   // 탄 판정(반경 0.4) + 플레이어 몸
+    private const float AimLead          = 0.5f;   // 10-23 B4 「새끼 용이 위협적이지 않다」 — 짝수 새끼 용은 움직이는 쪽으로 이만큼(초) 앞을 겨눈다(예고 줄이 그 자리 = 판정)
 
     private static readonly int WalkChaseHash     = Animator.StringToHash("WalkChase");
     private static readonly int AttackReadyHash   = Animator.StringToHash("AttackReady");
@@ -90,6 +93,9 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
         _statusEffect   = statusEffect;
         _playerTarget   = playerTarget;
         _orbitIndex     = orbitIndex;
+        _leadAim        = orbitIndex % 2 == 0;   // 짝수는 앞질러, 홀수는 지금 자리 — 곧장 가도 멈춰도 한 줄은 겨눈다(10-23 B4)
+        _playerBody     = null;
+        if (playerTarget != null) playerTarget.TryGetComponent(out _playerBody);
         _speedVariance  = Random.Range(0.85f, 1.2f);
 
         // 세 마리 브레스 타이밍 엇갈리기
@@ -344,7 +350,7 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
     {
         _telegraphing   = true;
         _telegraphTimer = 0f;
-        _aimPoint       = _playerTarget.position + Vector3.up * 1f;
+        _aimPoint       = _playerTarget.position + LeadOffset() + Vector3.up * 1f;
 
         Vector3 mouth  = MouthPos();
         Vector3 flat   = _aimPoint - mouth;
@@ -353,6 +359,16 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
         PatternGuideHelper.SafeDestroy(ref _breathGuide);
         _breathGuide = PatternGuideHelper.Prepare(
             PatternGuideHelper.Beam(origin, flat, _breathRange * 1.5f, BreathGuideWidth, c), c);
+    }
+
+    /// <summary>짝수 새끼 용 — 플레이어 평면 속도(6 m/s 상한) × <see cref="AimLead"/>초(10-23 B4). 예고 줄이 그 자리로 깔리고 그 줄로 쏜다.</summary>
+    private Vector3 LeadOffset()
+    {
+        if (!_leadAim || _playerBody == null) return Vector3.zero;
+        Vector3 v = _playerBody.linearVelocity;
+        v.y = 0f;
+        if (v.sqrMagnitude > DragonThreat.MaxPlayerSpeed * DragonThreat.MaxPlayerSpeed) v = v.normalized * DragonThreat.MaxPlayerSpeed;
+        return v * AimLead;
     }
 
     private void CancelBreathTelegraph()

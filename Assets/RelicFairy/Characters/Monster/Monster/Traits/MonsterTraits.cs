@@ -45,6 +45,7 @@ public sealed partial class MonsterTraits : MonoBehaviour
     private const float SplitChildScale   = 0.72f;
     private const float SplitSpread       = 1.8f;   // 0.9는 몸 셋이 겹쳐 이름표 · 체력바가 세 겹이었다(10-19 ⑪ — 이름은 숨기지 않는다)
     private const string SeenPrefsPrefix  = "MonsterTraitSeen_";
+    private const float RoomPrefixNoticeDelay = 1.8f;   // F3 — 「두 번째 파도」 알림이 먼저 읽히게(알림 칸이 하나)
     // 챔피언(10-21 무작위 정예화) — 시기 특성을 받은 일반 · 위협 몹. 정예는 같은 특성을 더 세게(EliteTraitPower).
     private const float ChampionHpScale   = 1.8f;
     private const float ChampionBodyScale = 1.12f;
@@ -210,7 +211,9 @@ public sealed partial class MonsterTraits : MonoBehaviour
         RebuildBadges();
         PushBadges();
         NoticeFirstEncounter(_kinds);
+#if UNITY_EDITOR   // 등장마다 로그는 에디터 실측에서만(10-29 풀링 점검 #6)
         Debug.Log($"[MonsterTrait] {monster.name}: {string.Join(", ", _kinds)}{(Has(MonsterTraitKind.Resist) ? $" (저항 {_resist})" : "")}{(_champion ? " · 챔피언" : "")}{(_power > 1f ? $" · 세기 ×{_power:0.#}" : "")}");
+#endif
     }
 
     /// <summary>되돌린다 — 풀로 돌아가거나 꺼질 때. 남의 몸에 건 지휘 배율 · 감춘 그림 · 분신 크기를 원래대로.</summary>
@@ -332,7 +335,8 @@ public sealed partial class MonsterTraits : MonoBehaviour
         var player = Managers.Player != null ? Managers.Player.PlayerTransform : null;
         if (player == null) return;
         float reveal = Mathf.Max(LurkerRevealMin, _monster.AttackRange + 1.5f);
-        bool near = (player.position - _monster.transform.position).sqrMagnitude <= reveal * reveal;
+        bool near = (player.position - _monster.transform.position).sqrMagnitude <= reveal * reveal
+                    || _monster.IsInState<AttackReadyState>() || _monster.IsInState<AttackState>();   // 10-23 B5 원거리 사거리를 늘려 「사거리 + 1.5 m」 밖에서도 쏜다 — 공격 준비에 들면 드러난다
         if (!near && _monster.CurrentHp >= _monster.EffectiveMaxHp) return;
         Reveal();
         DissolveEffect.PlayAppear(_monster.gameObject, LurkerRevealSeconds, activationToken: _monster.ActivationToken);   // 특성 해제(죽음 · 풀) 때의 Reveal은 디졸브 없이
@@ -441,6 +445,29 @@ public sealed partial class MonsterTraits : MonoBehaviour
         if (!pt.TryGetComponent<PlayerController>(out var pc)) return false;
         pc.TakeDamage(dmg, src, false, weight);
         return true;
+    }
+
+    /// <summary>
+    /// 해방기 재미 F3(10-29) — 해방기 · 악몽 방에 처음 나온 접두어 정예를 한 줄로 「이 방 정예 — 강철의: …」.
+    /// 처음 보는 특성이면 첫 조우 안내(Attach)가 맡는다 — 겹치지 않게 여기선 건너뛴다.
+    /// </summary>
+    public static void NoticeRoomPrefix(MonsterBase elite, MonsterTraitKind k)
+    {
+        if (elite == null || PlayerPrefs.GetInt(SeenPrefsPrefix + k, 0) == 0) return;
+        NoticeRoomPrefixAsync(elite, k).Forget();
+    }
+
+    private static async UniTaskVoid NoticeRoomPrefixAsync(MonsterBase elite, MonsterTraitKind k)
+    {
+        try { await UniTask.Delay(TimeSpan.FromSeconds(RoomPrefixNoticeDelay), cancellationToken: elite.GetCancellationTokenOnDestroy()); }
+        catch (OperationCanceledException) { return; }
+        if (elite == null || elite.IsDead) return;
+        var d = MonsterTraitTable.Of(k);
+        // 행동 팁만(설명의 「— 」 뒤) — 전체 설명은 두 줄로 접혀 플레이어 위를 덮었다(10-29 사진). 첫 조우 안내가 전체를 이미 보여 줬다
+        int cut = d.desc.LastIndexOf(" — ", StringComparison.Ordinal);
+        string msg = $"이 방 정예 — {d.name}: {(cut >= 0 ? d.desc.Substring(cut + 3) : d.desc)}";
+        FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include)?.ShowBuffNotice(msg);
+        Debug.Log("[F3] " + msg);
     }
 
     // 첫 조우 안내 — 특성마다 한 번(프로필 기준). 정예 둘이 처음이면 한 줄에 같이(알림 칸이 하나라 따로 띄우면 덮인다).

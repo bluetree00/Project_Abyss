@@ -20,15 +20,6 @@ public sealed class StartPartStation : MonoBehaviour
     private const float TextHeight    = 1.4f;
     private const string DefaultPartId = "part_split";
 
-    // 파츠 id → 해금 노드(기억의 제단 원거리 갈래). 기본 파츠는 노드가 없다.
-    private static readonly Dictionary<string, string> UnlockNode = new()
-    {
-        { "part_pierce",  MemoryAltarCatalog.PartPierce },
-        { "part_power",   MemoryAltarCatalog.PartPower },
-        { "part_homing",  MemoryAltarCatalog.PartHoming },
-        { "part_explode", MemoryAltarCatalog.PartExplode },
-    };
-
     [Header("월드 텍스트")]
     [SerializeField] private TMP_FontAsset worldTextFont;
     [SerializeField] private float textSize = 3f;
@@ -45,7 +36,9 @@ public sealed class StartPartStation : MonoBehaviour
 
     // ── Lifecycle ─────────────────────────────────────────────
 
-    private void Awake() => GetComponent<Collider>().isTrigger = true;
+    // 10-29 걷음 — 시작 파츠는 제단 해금이 정한다(GameRunSession: 분열 + 연 파츠 전부 Lv1). 공방은 켜지자마자 끈다.
+    // 온보딩은 꺼진 대상을 건너뛰고(BaseCampOnboardingDirector) 성문 · 표식은 파츠를 보지 않는다.
+    private void Awake() => gameObject.SetActive(false);
 
     private void Start()
     {
@@ -84,7 +77,7 @@ public sealed class StartPartStation : MonoBehaviour
 
     /// <summary>파츠의 해금 여부 — 기본 파츠는 항상, 나머지는 기억의 제단 노드.</summary>
     public static bool IsUnlocked(string partId)
-        => partId == DefaultPartId || (UnlockNode.TryGetValue(partId ?? "", out var node) && MemoryAltarService.IsUnlocked(node));
+        => partId == DefaultPartId || RangedPartsDraft.IsUnlocked(partId);   // 파츠 → 노드 표는 재련 카드와 같은 것(10-23 W6)
 
     // ── Private Methods ───────────────────────────────────────
 
@@ -189,7 +182,7 @@ public sealed class StartPartStation : MonoBehaviour
     }
 
     private static string NodeName(string partId)
-        => UnlockNode.TryGetValue(partId ?? "", out var id) ? MemoryAltarCatalog.Get(id)?.DisplayName ?? id : partId;
+        => RangedPartsDraft.UnlockNodeOf(partId) is { } id ? MemoryAltarCatalog.Get(id)?.DisplayName ?? id : partId;
 
     // ── World Text / Prompt (WeaponForgeAltar 패턴) ───────────
 

@@ -32,9 +32,12 @@ public sealed class WeaponFormRuntime : MonoBehaviour
     private Renderer[]            _blade = Array.Empty<Renderer>();
     private readonly System.Collections.Generic.List<(Renderer rd, int index, int prop, Color baseColor)> _glowSlots = new();
     private MaterialPropertyBlock _block;
+    private Color                 _formGlow, _extraGlow;   // 형 빛 · 다른 연출이 더하는 빛(대검 R 속성 검 · 10-26)
     private bool                  _trailWanted, _trailOn;
     private readonly System.Collections.Generic.HashSet<string> _announced = new();
     private bool                  _readyNext;
+    private float                 _lastSlashAt = -999f;
+    private const float           SameSwingGap = 0.5f;   // 같은 단계 슬래시가 이 안에 또 오면 같은 휘두름
 
     /// <summary>형이 새로 만들어짐(무기 교체 · 진화) — HUD가 다시 붙는다.</summary>
     public event Action Changed;
@@ -71,7 +74,7 @@ public sealed class WeaponFormRuntime : MonoBehaviour
             _player.OnDodgeStart  += HandleDodgeStart;
             _player.OnDodgeEnd    += HandleDodgeEnd;
         }
-        if (_receiver != null) _receiver.OnEffectStep += HandleEffectStep;
+        if (_receiver != null) _receiver.OnEffectStepEarly += HandleEffectStep;   // 베기 판정 · 피해보다 먼저 센다(10-24 ①)
         BindWeaponManager();
         SyncCurrentWeapon();   // 장착이 구동기보다 먼저 끝났거나 다시 켜졌다 — 칼끝 · 칼날 캐싱부터(검토 M6)
     }
@@ -113,7 +116,7 @@ public sealed class WeaponFormRuntime : MonoBehaviour
             _player.OnDodgeStart  -= HandleDodgeStart;
             _player.OnDodgeEnd    -= HandleDodgeEnd;
         }
-        if (_receiver != null) _receiver.OnEffectStep -= HandleEffectStep;
+        if (_receiver != null) _receiver.OnEffectStepEarly -= HandleEffectStep;
         if (_wm != null)
         {
             _wm.OnWeaponChanged           -= HandleWeaponChanged;
@@ -121,6 +124,13 @@ public sealed class WeaponFormRuntime : MonoBehaviour
             _wm = null;
         }
         DisposeForm();
+    }
+
+    /// <summary>칼날 발광에 더할 색 — 대검 R 속성 검 동안 속성 색(10-26). 형 빛과 같은 칸에 더해 서로 덮어쓰지 않는다. clear면 뺀다.</summary>
+    public void SetExtraGlow(Color c)
+    {
+        _extraGlow = c;
+        PaintGlow();
     }
 
     /// <summary>근접 칸 무기로 형을 다시 만든다(쌓인 수는 0부터). 같은 무기 · 같은 형이면 그대로 둔다.</summary>
@@ -200,8 +210,13 @@ public sealed class WeaponFormRuntime : MonoBehaviour
 
     private void HandleEffectStep(int _)
     {
+        // 한 동작에 슬래시 이벤트가 둘인 클립(무형검 3타 SpawnSlashEffect2 · 3) — 같은 콤보 단계 · 짧은 간격이면 같은 휘두름(10-24 ②)
+        int step = _player != null ? _player.Combo.CurrentComboStep : 0;
+        bool sameSwing = _swingSerial > 0 && step == _swingStep && Time.time - _lastSlashAt < SameSwingGap;
+        _lastSlashAt = Time.time;
+        if (sameSwing) return;
         _swingSerial++;
-        _swingStep = _player != null ? _player.Combo.CurrentComboStep : 0;
+        _swingStep = step;
         if (MeleeActive) _form?.OnSwing(_swingStep);
         CheckReadyNext();
     }
@@ -238,9 +253,14 @@ public sealed class WeaponFormRuntime : MonoBehaviour
     {
         CheckReadyNext();
         _trailWanted = _form != null && stacks >= max && MeleeActive;
-        if (_form == null) return;
-        float k = MeleeActive && max > 0 ? (float)stacks / max : 0f;   // 원거리를 들면 그 무기는 칠하지 않는다
-        Color c = _form.Form.Tint * (k * GlowMax);
+        float k = _form != null && MeleeActive && max > 0 ? (float)stacks / max : 0f;   // 원거리를 들면 그 무기는 칠하지 않는다
+        _formGlow = _form != null ? _form.Form.Tint * (k * GlowMax) : Color.clear;
+        PaintGlow();
+    }
+
+    private void PaintGlow()
+    {
+        Color c = _formGlow + _extraGlow;
         for (int i = 0; i < _glowSlots.Count; i++)
         {
             var (rd, index, prop, baseColor) = _glowSlots[i];

@@ -11,8 +11,8 @@ using UnityEngine.UI;
 ///   · 고른 값은 <see cref="StoryProgress.SetNightmareMode"/>로 기억한다 — 다음 내려감부터. 거점에서만 바꾼다(런 중엔 이 오브젝트가 없다).
 ///   · 켜져 있으면 게이트가 황혼 보라~진홍으로 물들고 이름판에 「악몽」 한 줄(<see cref="BaseCampFxDirector.ApplyNightmareLook"/>).
 /// 받침 · 수정 · 빛은 <see cref="BaseCampFxDirector"/>가 세워 넘긴다(해금 전엔 아예 만들지 않는다).
-/// 창은 코드로 짠다(심연 깊이 갈림길과 같은 방식) — 시간을 멈추고 플레이어 입력을 막는다. 바깥을 누르거나 [F]로 닫는다
-/// ([Esc]는 ESC 메뉴가 쥐고 있어 쓰지 않는다).
+/// 창은 코드로 짠다(심연 깊이 갈림길과 같은 방식) — 시간을 멈추고 플레이어 입력을 막는다. 바깥을 누르거나 [F] · [Esc]로 닫는다
+/// (10-25 — 열린 동안 ESC 듣개는 <see cref="IsChoiceOpen"/>을 보고 일시정지 메뉴를 열지 않는다).
 /// </summary>
 [RequireComponent(typeof(SphereCollider))]
 public sealed class BaseCampNightmareToggle : MonoBehaviour
@@ -29,6 +29,13 @@ public sealed class BaseCampNightmareToggle : MonoBehaviour
     private const int   Closed             = -1;
     private const int   PickLiberated      = 0;
     private const int   PickNightmare      = 1;
+
+    // ── Static ────────────────────────────────────────────────
+    /// <summary>선택 창이 떠 있다 — 창이 ESC를 직접 받아 닫으므로 ESC 듣개는 그 밑에 일시정지 메뉴를 열지 않는다(10-25).</summary>
+    public static bool IsChoiceOpen { get; private set; }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => IsChoiceOpen = false;
 
     // ── Private ───────────────────────────────────────────────
     private BaseCampFxDirector _director;
@@ -141,6 +148,7 @@ public sealed class BaseCampNightmareToggle : MonoBehaviour
 
         TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
         if (player != null) player.SetInputEnabled(false);   // 카드를 누르는 클릭이 공격으로 새지 않게
+        IsChoiceOpen = true;
         try
         {
             // 바탕 막 — 바깥을 누르면 그대로 두고 닫는다
@@ -160,14 +168,14 @@ public sealed class BaseCampNightmareToggle : MonoBehaviour
                     $"챕터마다 악몽 규칙 · 보스 악몽 강화\n정수 ×{NightmareRules.ModeEssenceMultiplier:0.0#}",
                     _accent, currentOn, () => _picked = PickNightmare);
 
-            NewText(go.transform, "[F] 또는 바깥을 누르면 닫는다", 18f, UITheme.Mute, new Vector2(0f, -170f), new Vector2(900f, 28f));
+            NewText(go.transform, "[F] · [Esc] 또는 바깥을 누르면 닫는다", 18f, UITheme.Mute, new Vector2(0f, -170f), new Vector2(900f, 28f));
 
             FadeAsync(group, 1f, UIFader.OpenSec, ct).Forget();
             // 창을 연 [F]가 같은 프레임에 닫기로 읽히지 않게 한 프레임 넘긴다
             await UniTask.Yield(PlayerLoopTiming.Update, ct);
             while (_picked == Undecided)
             {
-                if (Input.GetKeyDown(KeyCode.F)) _picked = Closed;
+                if (Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.Escape)) _picked = Closed;   // 10-25 ESC로도 닫는다
                 else await UniTask.Yield(PlayerLoopTiming.Update, ct);
             }
             group.blocksRaycasts = false;
@@ -176,6 +184,7 @@ public sealed class BaseCampNightmareToggle : MonoBehaviour
         }
         finally
         {
+            IsChoiceOpen = false;
             TimeScaleArbiter.Release(this);
             if (player != null) player.SetInputEnabled(true);
             if (go != null) Destroy(go);

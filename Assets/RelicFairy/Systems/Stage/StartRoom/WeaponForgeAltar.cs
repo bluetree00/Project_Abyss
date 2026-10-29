@@ -82,6 +82,12 @@ public class WeaponForgeAltar : MonoBehaviour
         }
     }
 
+    // ── Public Methods ────────────────────────────────────────
+
+    /// <summary>이 공방이 지금 내놓는 원거리인가 — 활 · 해금된 석궁(지난 세팅 복원이 확인한다 · 10-29).</summary>
+    public bool Offers(WeaponSO w)
+        => w != null && (w == bowOption || (w == crossbowOption && MemoryAltarService.IsUnlocked(MemoryAltarCatalog.WeaponCrossbow)));
+
     // ── Selection ─────────────────────────────────────────────
 
     private async UniTaskVoid ClaimAsync(CancellationToken ct)
