@@ -66,7 +66,6 @@ public sealed class ExileFallStage : MonoBehaviour
     private const int   ShapeSize   = 64;        // 파편 모양 텍스처(픽셀)
     private const int   StoneCount  = 6;
 
-    private static readonly int   BaseColorId = Shader.PropertyToID("_BaseColor");
     private static readonly Color FloorColor  = new(0.07f, 0.11f, 0.06f, 1f);
     private static readonly Color RedFlash    = new(0.95f, 0.3f, 0.22f, 1f);
     // 앞쪽 반원에만 돌을 놓는다(카메라는 뒤 · 위) — 리치 → 플레이어 방향 기준 각(도)
@@ -541,9 +540,7 @@ public sealed class ExileFallStage : MonoBehaviour
         go.transform.localScale = new Vector3(70f, 0.25f, 70f);
         var r = go.GetComponent<MeshRenderer>();
         r.shadowCastingMode = ShadowCastingMode.Off;
-        var mpb = new MaterialPropertyBlock();
-        mpb.SetColor(BaseColorId, FloorColor);
-        r.SetPropertyBlock(mpb);
+        RuntimePrimitiveMaterial.Apply(r, FloorColor);   // 기본 재질(빌트인 셰이더)은 빌드에서 빠져 분홍으로 그려졌다(10-30 11차 빌드 피드백)
     }
 
     /// <summary>몸을 따라가는 빛 하나 — 층 빛깔(차가운 보라 → 촛불 → 불씨 → 숲)로 몸을 물들인다.</summary>

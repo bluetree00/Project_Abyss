@@ -50,6 +50,19 @@ public sealed class RunFuelBank
         return true;
     }
 
+    /// <summary>
+    /// 환전소(11-02 Q18 · <see cref="RunExchange"/>) — 더하거나(양수) 덜어 낸다(음수). 번 것이 아니라 바꾼 것이라 <see cref="OnGained"/>(결과창 「얻은 양」)는 내지 않는다.
+    /// 덜 때 모자라면 false(무변경).
+    /// </summary>
+    public bool Exchange(FuelKind kind, int delta)
+    {
+        if (delta == 0) return true;
+        if (delta < 0 && Get(kind) < -delta) return false;
+        _amounts[kind] = Get(kind) + delta;
+        OnFuelChanged?.Invoke();
+        return true;
+    }
+
     // ── 세이브 캡처/복원 (종류별 스칼라) ─────────────────
     public int EnhanceMaterial => Get(FuelKind.EnhanceMaterial);
     public int RuneOre         => Get(FuelKind.RuneOre);

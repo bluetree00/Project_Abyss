@@ -299,7 +299,7 @@ public class GridManager : MonoBehaviour
         if (zone)
         {
             string n = ElementDef.GetById(element)?.Name ?? element;
-            return $"{n} 룬은 {n} 존에만 놓을 수 있습니다";
+            return Loc.F("{0} 룬은 {1} 존에만 놓을 수 있습니다", n, n);
         }
         if (occupied)  return "이미 룬이 놓인 칸입니다";
         if (reach)     return "같은 존에 놓인 룬 가까이에만 놓을 수 있습니다";

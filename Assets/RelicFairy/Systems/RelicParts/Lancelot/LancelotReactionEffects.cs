@@ -23,7 +23,10 @@ public abstract class LancelotReaction : LancelotFragment
     protected bool RuneTier(string key) => Player != null && Player.RuneEffectsOrNull != null && Player.RuneEffectsOrNull.IsActive(key);
     protected RuneResourceState Res => Player != null ? Player.RuneEffectsOrNull?.Resources : null;
 
-    /// <summary>반응 표시 + 엇갈린 빛 집계. 같은 반응 글자는 <see cref="_textGap"/>초에 한 번.</summary>
+    /// <summary>
+    /// 반응 표시 + 엇갈린 빛 집계. 같은 반응 글자는 <see cref="_textGap"/>초에 한 번.
+    /// 글 = 반응 이름 + 결과 한 마디(10-30 H-18 — 「전이 · 파쇄」처럼 이름만 떠 무엇이 일어났는지 몰랐다).
+    /// </summary>
     protected void Fire(Vector3 at)
     {
         Hub?.NotifyReaction(EffectKey);
@@ -40,7 +43,7 @@ public sealed class LRxTransferEffect : LancelotReaction
 {
     private const string Static = "ElecStatic", Shocked = "shocked";
     private const float ChainRadius = 5f;
-    public LRxTransferEffect() : base("l_rx_transfer", "ElecStatic", "전이", RuneElement.Electric) { }
+    public LRxTransferEffect() : base("l_rx_transfer", "ElecStatic", "전이 — 낙인 튐", RuneElement.Electric) { }
     protected override void Bind()   { Hub.BrandAdded += OnBrand; Hub.PreTear += OnPreTear; }
     protected override void Unbind() { Hub.BrandAdded -= OnBrand; Hub.PreTear -= OnPreTear; }
     private void OnBrand(MonsterBase mb, int added, int overflow, LancelotMemoryHub.BrandSource src)
@@ -69,7 +72,7 @@ public sealed class LRxTransferEffect : LancelotReaction
 public sealed class LRxShatterEffect : LancelotReaction
 {
     private const string Frost = "frost", Freeze = "freeze", DeepSlow = "lancelot_shatter";
-    public LRxShatterEffect() : base("l_rx_shatter", "IceFrost", "파쇄", RuneElement.Ice) { }
+    public LRxShatterEffect() : base("l_rx_shatter", "IceFrost", "파쇄 — 서리 → 낙인", RuneElement.Ice) { }
     protected override void Bind()   { Hub.Hit += OnHubHit; Hub.PreTear += OnPreTear; }
     protected override void Unbind() { Hub.Hit -= OnHubHit; Hub.PreTear -= OnPreTear; }
     private void OnHubHit(HitInfo hit)
@@ -104,7 +107,7 @@ public sealed class LRxDecayEffect : LancelotReaction
     private const float BleedRatio = 0.04f, MistRatio = 0.04f, MistLife = 6f;
     private readonly List<MonsterBase> _seen = new(32);
     private float _tick;
-    public LRxDecayEffect() : base("l_rx_decay", "GrassMist", "부패", RuneElement.Grass, 2f) { }
+    public LRxDecayEffect() : base("l_rx_decay", "GrassMist", "부패 — 낙인 출혈", RuneElement.Grass, 2f) { }
     protected override void Bind()   => Hub.BrandAdded += OnBrand;
     protected override void Unbind() => Hub.BrandAdded -= OnBrand;
     public override void Tick(float dt, PlayerController player)
@@ -170,7 +173,7 @@ public sealed class LRxBrandIronEffect : LancelotReaction
     private readonly HashSet<MonsterBase> _ignited = new();
     private readonly List<MonsterBase> _gone = new(8);
     private float _tick;
-    public LRxBrandIronEffect() : base("l_rx_brand_iron", "FireEmber", "낙철", RuneElement.Fire) { }
+    public LRxBrandIronEffect() : base("l_rx_brand_iron", "FireEmber", "낙철 — 낙인 +1", RuneElement.Fire) { }
     protected override void Bind()   => Hub.Hit += OnHubHit;
     protected override void Unbind() { Hub.Hit -= OnHubHit; _ignited.Clear(); }
     private void OnHubHit(HitInfo hit)
@@ -217,7 +220,7 @@ public sealed class LRxExposeEffect : LancelotReaction
     private const int    CapBonus = 2;
     private const float  ExposeDur = 8f, BurstRange = 7f, BurstHalf = 50f;
     private int _prevGauge;
-    public LRxExposeEffect() : base("l_rx_expose", "LightRadiance", "폭로", RuneElement.Light) { }
+    public LRxExposeEffect() : base("l_rx_expose", "LightRadiance", "폭로 — 낙인 상한 +" + CapBonus, RuneElement.Light) { }
     protected override void Bind()   => Hub.PreTear += OnPreTear;
     protected override void Unbind() => Hub.PreTear -= OnPreTear;
     public override void OnCrit(in HitInfo hit, PlayerController player)
@@ -263,7 +266,7 @@ public sealed class LRxCorruptEffect : LancelotReaction
     private const string Gauge = "darkGauge", ReleaseActive = "darkReleaseActive";
     private const int    CapBonus = 3, GaugeOnSave = 5, GaugeMax = 100;
     private bool _bonusOn, _wasRelease;
-    public LRxCorruptEffect() : base("l_rx_corrupt", "DarkErosion", "타락", RuneElement.Dark) { }
+    public LRxCorruptEffect() : base("l_rx_corrupt", "DarkErosion", "타락 — 원한 상한 +" + CapBonus, RuneElement.Dark) { }
     protected override void Bind()   => Hub.GrudgeSaved += OnSaved;
     protected override void Unbind()
     {

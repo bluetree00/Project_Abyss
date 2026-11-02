@@ -73,7 +73,7 @@ public sealed partial class CombatPanelView
         _evoLabelCrest.sprite  = crest;
         _evoLabelCrest.color   = tint;
         _evoLabelCrest.gameObject.SetActive(crest != null);   // 문장이 없으면 빈 자리를 남기지 않는다
-        _evoLabelText.text = $"<color={BuildFamilyRules.Hex(def.Family)}>진화</color> · {def.Name}";
+        _evoLabelText.text = $"<color={BuildFamilyRules.Hex(def.Family)}>{Loc.T("진화")}</color> · {Loc.T(def.Name)}";
 
         if (!playMoment || !isActiveAndEnabled)
         {
@@ -185,7 +185,7 @@ public sealed partial class CombatPanelView
             var wordsGroup = words.GetComponent<CanvasGroup>();
             var caption = MomentText(words, "Caption", "유물 진화", UIWeight.Medium, EvoCaption, UITheme.Thin.Gold, 30f);
             caption.characterSpacing = 12f;
-            MomentText(words, "Name", def.Name, UIWeight.Light, EvoNameSize, UITheme.Thin.Ink, -12f);
+            MomentText(words, "Name", Loc.T(def.Name), UIWeight.Light, EvoNameSize, UITheme.Thin.Ink, -12f);
 
             // ① 떠오름 — 금 고리가 시계 방향으로 그려지고 문장이 0.85 → 1
             await UIMotion.Tween(EvoInSec, k =>

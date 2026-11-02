@@ -289,7 +289,7 @@ public sealed class ChapterStairway : MonoBehaviour
         return (ChapterId)Mathf.Clamp(n, 1, 4);
     }
 
-    /// <summary>다음 층 맵 곡 — Ch4는 전용 곡이 오기 전까지 Ch3 곡(10-29 임시).</summary>
+    /// <summary>다음 층 맵 곡 — Ch4는 Ch3 곡(10-30 사용자).</summary>
     private string NextMapBgm() => NextChapter() switch
     {
         ChapterId.Chapter2 => "Ch2_Map",
@@ -419,7 +419,7 @@ public sealed class ChapterStairway : MonoBehaviour
             if (c.GetComponentInParent<RelicFairy.Monster.MonsterBase>() != null || c.GetComponentInParent<PlayerController>() != null) continue;
             var size = c.bounds.size;
             if (size.x > FloorSlabMin && size.z > FloorSlabMin) continue;
-            return Reject(mid, $"막힘 {c.name}");
+            return Reject(mid, Loc.F("막힘 {0}", c.name));
         }
 
         // 발치가 플레이어와 걸어서 이어지는가(기사 단상처럼 끊긴 곳이면 오를 수 없다)

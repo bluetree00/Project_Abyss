@@ -19,7 +19,11 @@ public sealed class SacrificeAltarChallenge : WorldInteractionChallenge
     private const string TagLeave  = "leave";
     private const string AltarProp   = "EventProp/Altar";   // 10-29 글자만 떠 있던 제단에 모델(고딕 제단)
     private const float  AltarHeight = 1.3f;
-    private const float  AltarDist   = 3.2f;
+    private const float  AltarDist   = 3.4f;
+    // 10-30 제단 셋 사이 각도 — ±38°(3.2 m)면 이웃 제단까지 2.1 m라 누르는 거리(2.8 m) 안에 둘이 들어와 엉뚱한 제단이 눌렸다(「떠난다」를 눌러 보상 없이 끝남)
+    private const float  AltarYaw    = 60f;
+    private const string RoomTitle   = "제물 제단";   // 10-30 이름표 · 안내 = 문 배지(EventRewards.Title)와 같은 이름(예전 챕터 테마 「이끼 낀 제단」 …)
+    private const string RewardText  = "유물 기억 카드 고르기";
 
     private bool _paid;
 
@@ -46,27 +50,36 @@ public sealed class SacrificeAltarChallenge : WorldInteractionChallenge
     public void Initialize(GameRunSession run) => InitBase(run);
 
     // ── 서브클래스 훅 ─────────────────────────────────────
+    /// <summary>10-30 O-02 — 남은 시간 아래 줄. 아무것도 안 내고 시간이 다 되면 받는 것이 없다.</summary>
+    protected override string AutoResolveHint => "지나면 아무것도 받지 않고 출구가 열린다";
+
     protected override void PlaceMarkers(Transform player)
     {
         // 10-29 무대(방 가운데) 위 · 입구에서 바라보는 쪽 줄에 — 입구 4~5 m 앞에 세우면 이 방 가운데 띠의 안쪽 벽에 박혔다.
-        string altar = ChallengeFlavor.AltarName(Run);
         var altarColor = new Color(0.95f, 0.55f, 0.45f);
         var ct = this.GetCancellationTokenOnDestroy();
+        bool potion = CanPayPotion(Run), gold = CanPayGold(Run);
+        int  cost   = GoldCost(Run);
         // 낼 수 있는 대가만 세운다 — 물약이 없으면 물약 칸이 안 선다
-        if (CanPayPotion(Run))
+        // 10-30 「— 유물 기억」이 받는 것인지 붙은 이름인지 몰랐다 → 「내기 → 받는 것」으로
+        if (potion)
         {
-            Vector3 p = StageSpot(-38f, AltarDist);
-            AddMarker(p, altar + " · 물약", altarColor, "<color=#FF9668>[F]</color> 물약 1개를 바친다 — 유물 기억", TagPotion);
+            Vector3 p = StageSpot(-AltarYaw, AltarDist);
+            AddMarker(p, RoomTitle + " · 물약", altarColor, Loc.F("<color=#FF9668>[F]</color> 물약 1개 내기 → {0}", RewardText), TagPotion);
             SpawnPropAsync(AltarProp, p, FacingEntry(p), AltarHeight, ct).Forget();
         }
-        if (CanPayGold(Run))
+        if (gold)
         {
             Vector3 p = StageSpot(0f, AltarDist);
-            AddMarker(p, altar + " · 금화", altarColor, $"<color=#FF9668>[F]</color> 금화 {GoldCost(Run)}을 바친다 — 유물 기억", TagGold);
+            AddMarker(p, RoomTitle + " · 금화", altarColor, Loc.F("<color=#FF9668>[F]</color> 금화 {0} 내기 → {1}", cost, RewardText), TagGold);
             SpawnPropAsync(AltarProp, p, FacingEntry(p), AltarHeight, ct).Forget();
         }
-        AddMarker(StageSpot(38f, AltarDist), "떠난다", new Color(0.7f, 0.72f, 0.78f),
+        AddMarker(StageSpot(AltarYaw, AltarDist), "떠난다", new Color(0.7f, 0.72f, 0.78f),
                   "<color=#B8C0CC>[F]</color> 그냥 지나친다", TagLeave);
+
+        // 10-30 S-01 시작 알림 — 신탁에는 있는데 이 방엔 없었다. 낼 수 있는 대가만 적는다.
+        string pay = potion && gold ? Loc.F("물약 1개나 금화 {0}을", cost) : potion ? "물약 1개를" : Loc.F("금화 {0}을", cost);
+        Notice(Loc.F("{0} — {1} 내면 유물 기억 카드 1장을 고른다 · 안 내고 지나가도 된다", RoomTitle, pay));
     }
 
     protected override void OnActivate(int markerIndex)
@@ -89,14 +102,15 @@ public sealed class SacrificeAltarChallenge : WorldInteractionChallenge
         bool paid = ps != null && (tag == TagPotion ? ps.TryConsumePotion() : ps.TrySpendGold(cost));
         if (!paid)
         {
-            Notice("<color=#B8C0CC>바칠 수 없다</color>");
+            Notice("<color=#B8C0CC>낼 수 없다</color>");
             return;
         }
 
         _paid = true;
         Managers.Sound?.PlayEvent(SoundEvent.SacrificeOffer);
-        Notice(tag == TagPotion ? "물약 1개를 바쳤다 — <color=#8fd3ff>기억이 떠오른다</color>"
-                                : $"금화 {cost}을 바쳤다 — <color=#8fd3ff>기억이 떠오른다</color>");
+        // 10-30 「기억이 떠오른다」는 비유 — 다음에 무엇이 뜨는지를 적는다
+        Notice(tag == TagPotion ? "물약 1개를 냈다 — <color=#8fd3ff>유물 기억 카드를 1장 고른다</color>"
+                                : Loc.F("금화 {0}을 냈다 — <color=#8fd3ff>유물 기억 카드를 1장 고른다</color>", cost));
         SetLabel(markerIndex, "봉헌!", new Color(1f, 0.75f, 0.4f));
         FinishWith(ChallengeGrade.Gold, m.Pos);
     }
@@ -116,6 +130,6 @@ public sealed class SacrificeAltarChallenge : WorldInteractionChallenge
         Vector3 at  = EventRewards.PlayerPosOr(center);
         EventRewards.DropEssence(at, essence);
         EventRewards.DropGold(at, gold);
-        Notice($"유물 기억 대신 — 정수 +{essence} · 금화 +{gold}");
+        Notice(Loc.F("유물 기억 대신 — 정수 +{0} · 금화 +{1}", essence, gold));
     }
 }

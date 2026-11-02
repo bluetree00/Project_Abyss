@@ -203,7 +203,7 @@ public sealed class ExitCompassHud : MonoBehaviour
     /// </summary>
     public void SetRewardTarget(Transform target, Color color)
     {
-        SetExits(new[] { (target, "◆ 룬 보상", "받으면 길이 열린다", color) });
+        SetExits(new[] { (target, "◆ 룬 보상", "고르면 출구가 열린다", color) });   // 10-30 X-07 「길」 → 출구
         if (_entries.Count > 0) _entries[0].OffScreenOnly = true;
     }
 

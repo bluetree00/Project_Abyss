@@ -3,7 +3,8 @@ using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// 무형검 픽업 — 플레이어가 트리거 범위 안에서 F키를 누르면 OnPickup을 발생시킨다.
+/// 무형검 픽업 — 플레이어가 트리거 범위에 들어오면 바로 OnPickup을 발생시킨다(11-02 사용자 「입구를 지나 무형검 근처에 가면 연출을 바로 시작」).
+/// <see cref="startOnApproach"/>를 끄면 예전처럼 범위 안에서 F키를 누를 때.
 /// 상점/제단 상호작용(ShopNpcInteraction)의 프롬프트·트리거 컨벤션을 그대로 따른다.
 ///
 /// 구독자(IntroMordredDirector)가 픽업 순간 검 획득 연출 + 리치 타락 시퀀스를 시작한다.
@@ -16,6 +17,10 @@ public sealed class IntroSwordPickup : MonoBehaviour
     private const float PromptOffsetY = 2.0f;
 
     // ── [SerializeField] ────────────────────────────────────
+    [Header("발동")]
+    [Tooltip("켜면 범위에 들어오는 즉시 시작(프롬프트 없음). 끄면 범위 안에서 F.")]
+    [SerializeField] private bool startOnApproach = true;
+
     [Header("프롬프트")]
     [SerializeField] private string promptText = "<color=#CFC4FF>[F]</color> 무형검을 손에 쥔다";
     [Tooltip("프롬프트를 띄울 트리거 콜라이더 크기(반경). Awake에서 SphereCollider로 강제.")]
@@ -28,7 +33,7 @@ public sealed class IntroSwordPickup : MonoBehaviour
     private PlayerController _player;
 
     // ── Properties ──────────────────────────────────────────
-    /// <summary>플레이어가 F로 검을 획득했을 때 발생(1회). 인자 = 획득한 플레이어.</summary>
+    /// <summary>검 받기 시작(1회) — 범위에 들어올 때(또는 F). 인자 = 플레이어.</summary>
     public event Action<PlayerController> OnPickup;
 
     // ── Lifecycle ───────────────────────────────────────────
@@ -47,12 +52,11 @@ public sealed class IntroSwordPickup : MonoBehaviour
         if (_consumed || !_playerInRange) return;
         if (UIInputGate.Blocked) return;
 
-        if (Input.GetKeyDown(KeyCode.F))
+        if (startOnApproach || Input.GetKeyDown(KeyCode.F))
         {
             _consumed = true;
             ShowPrompt(false);
-            Managers.Sound?.PlayEvent(SoundEvent.SwordPickup);
-            OnPickup?.Invoke(_player);
+            OnPickup?.Invoke(_player);   // 줍는 소리는 검이 손에 맺히는 순간 연출이 낸다
         }
     }
 
@@ -62,7 +66,7 @@ public sealed class IntroSwordPickup : MonoBehaviour
         if (p == null) return;
         _player = p;
         _playerInRange = true;
-        if (!_consumed) ShowPrompt(true);
+        if (!_consumed && !startOnApproach) ShowPrompt(true);
     }
 
     private void OnTriggerExit(Collider other)

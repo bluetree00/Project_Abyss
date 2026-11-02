@@ -783,7 +783,7 @@ public sealed class HudPresenter : MonoBehaviour
             {
                 info.HasWeapon = true;
                 info.Icon = slot.runtimeData.icon;
-                info.Name = slot.runtimeData.displayName;
+                info.Name = Loc.T(slot.runtimeData.displayName);
                 info.Attack = slot.runtimeData.baseAttack;
                 info.Defense = slot.runtimeData.baseDefense;
                 info.Type = slot.runtimeData.weaponType;

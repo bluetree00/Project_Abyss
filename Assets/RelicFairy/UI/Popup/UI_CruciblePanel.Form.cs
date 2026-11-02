@@ -372,7 +372,7 @@ public sealed partial class UI_CruciblePanel
     {
         if (w?.form == null || string.IsNullOrEmpty(w.formVariants)) return null;
         foreach (var id in w.formVariants.Split(','))
-            if (w.form.TryGetVariant(id, out var v) && v.tier == tier) return v.displayName;
+            if (w.form.TryGetVariant(id, out var v) && v.tier == tier) return Loc.T(v.displayName);
         return null;
     }
 
@@ -418,12 +418,12 @@ public sealed partial class UI_CruciblePanel
                   : i == 4 && !legend && !canPromote ? NodeState.Out
                   : i == cur + 1 ? NodeState.Next : NodeState.Future;
 
-        SetNode(0, "무형검", cur == 0 ? $"지금 · 재련 {Reforges(w.enhanceLevel)}회" : NamelessTitle, st[0]);
-        SetNode(1, req > 0 ? $"재련 {Reforges(req)}회 형" : "형 깨어남",
-                nameless ? $"{fa?.DisplayName ?? "?"} / {fb?.DisplayName ?? "?"}" : cur == 1 ? $"지금 · {fName} Ⅰ" : fName, st[1]);
-        SetNode(2, "단련 Ⅱ", v2 == null ? $"강화재료 {c2}" : cur == 2 ? $"지금 · {v2}" : v2, st[2]);
-        SetNode(3, "단련 Ⅲ", v3 == null ? $"강화재료 {c3}" : cur == 3 ? $"지금 · {v3}" : v3, st[3]);
-        SetNode(4, "전설", legend ? $"지금 · {LegendName(w.legendId)}" : canPromote ? "승급할 수 있다" : "최대 재련 뒤", st[4]);
+        SetNode(0, "무형검", cur == 0 ? Loc.F("지금 · 재련 {0}회", Reforges(w.enhanceLevel)) : NamelessTitle, st[0]);
+        SetNode(1, req > 0 ? Loc.F("재련 {0}회 형", Reforges(req)) : "형 깨어남",
+                nameless ? $"{fa?.DisplayName ?? "?"} / {fb?.DisplayName ?? "?"}" : cur == 1 ? Loc.F("지금 · {0} Ⅰ", fName) : fName, st[1]);
+        SetNode(2, "단련 Ⅱ", v2 == null ? Loc.F("강화재료 {0}", c2) : cur == 2 ? Loc.F("지금 · {0}", v2) : v2, st[2]);
+        SetNode(3, "단련 Ⅲ", v3 == null ? Loc.F("강화재료 {0}", c3) : cur == 3 ? Loc.F("지금 · {0}", v3) : v3, st[3]);
+        SetNode(4, "전설", legend ? Loc.F("지금 · {0}", LegendName(w.legendId)) : canPromote ? "승급할 수 있다" : "최대 재련 뒤", st[4]);
 
         FillMeleeNext(w, nameless, req, fa, fb);
         return cur;
@@ -437,54 +437,66 @@ public sealed partial class UI_CruciblePanel
     {
         int lv = w.enhanceLevel, max = _controller.MaxAt(PlayerWeaponManager.Slot0);
         var ahead = new List<(int lv, string text, string brief)>(4);
-        string pair = $"{fa?.DisplayName ?? "?"} 또는 {fb?.DisplayName ?? "?"}";
-        if (nameless && lv < req) ahead.Add((req, $"재련 {Reforges(req)}회에서 형이 깨어난다 — {pair}", $"재련 {Reforges(req)}회에서 형이 깨어난다 — {pair}"));
+        string pair = Loc.F("{0} 또는 {1}", fa?.DisplayName ?? "?", fb?.DisplayName ?? "?");
+        if (nameless && lv < req) ahead.Add((req, Loc.F("재련 {0}회에서 형이 깨어난다 — {1}", Reforges(req), pair), Loc.F("재련 {0}회에서 형이 깨어난다 — {1}", Reforges(req), pair)));
         var tiers = SkillTierResolver.Milestones(w);
         for (int i = 0; i < tiers.Length; i++)
         {
             int t = tiers[i];
             if (t <= lv || t > max) continue;
             string body = TierChangeBody(w, i + 2);
-            ahead.Add((t, body != null ? $"재련 {Reforges(t)}회 스킬 {i + 2}단계 — {body}" : $"재련 {Reforges(t)}회 스킬 {i + 2}단계", $"재련 {Reforges(t)}회 스킬 {i + 2}단계"));
+            ahead.Add((t, body != null ? Loc.F("재련 {0}회 스킬 {1}단계 — {2}", Reforges(t), i + 2, body) : Loc.F("재련 {0}회 스킬 {1}단계", Reforges(t), i + 2), Loc.F("재련 {0}회 스킬 {1}단계", Reforges(t), i + 2)));
         }
         var table = _controller.Table;
         if (!nameless && table != null)
         {
             int cap = WeaponEnhanceService.BaseEnhanceCap(w, table);
             if (lv <= cap && cap + 1 <= max)
-                ahead.Add((cap + 1, $"재련 {Reforges(cap + 1)}회 마스터리 1단계 — {MasteryDelta(w, 0, 1)}",
-                           $"재련 {Reforges(cap + 1)}회 마스터리 1단계"));
+            {
+                // 10-30 재련 한 번(+3단계) 몫으로 — 예전 「마스터리 1단계 +3%」는 바로 위 표(+9%)와 숫자가 달랐다
+                int k = Mathf.Max(1, Mathf.Min(WeaponReforgeService.MeleeStep, max - cap));
+                ahead.Add((cap + 1, Loc.F("재련 {0}회부터 재련할 때마다 스킬이 세진다 — {1}", Reforges(cap + 1), MasteryDelta(w, 0, k)),
+                           Loc.F("재련 {0}회 스킬 강화", Reforges(cap + 1))));
+            }
+        }
+        // 10-30 형은 재련 단계에서 저절로 받는다(47) — 다음에 받을 형도 「다음」 줄에(「재련 5회 형 Ⅱ — 쌍풍 · 칼바람이 두 갈래로」)
+        if (!nameless && WeaponFormService.NextGrant(w, out int gTier, out int gAt, out var gv))
+        {
+            int left = Mathf.Max(1, gAt - MeleeAugmentCatalog.ReforgesSinceEvolution(w));
+            int gLv = Mathf.Min(max, lv + left * WeaponReforgeService.MeleeStep);
+            string gLine = string.IsNullOrEmpty(gv.line) ? "" : $" · {gv.line}";
+            ahead.Add((gLv, Loc.F("재련 {0}회 형 {1} — {2}{3}", Reforges(gLv), RomanTier(gTier), Loc.T(gv.displayName), gLine), Loc.F("재련 {0}회 형 {1} {2}", Reforges(gLv), RomanTier(gTier), Loc.T(gv.displayName))));
         }
         ahead.Sort((x, y) => x.lv.CompareTo(y.lv));
-        string Then(int i) => i < ahead.Count ? $"그다음 {ahead[i].brief}" : "";
+        string Then(int i) => i < ahead.Count ? Loc.F("그다음 {0}", ahead[i].brief) : "";
 
         if (nameless && _controller.CanEvolve(PlayerWeaponManager.Slot0))
         {
-            _next1.text = $"형을 고른다 — {pair}";
-            _next2.text = ahead.Count > 0 ? Then(0) : $"진화 비용 없음 · 재련 {Reforges(lv)}회와 증강 · 각인은 그대로 이어진다";
+            _next1.text = Loc.F("형을 고른다 — {0}", pair);
+            _next2.text = ahead.Count > 0 ? Then(0) : Loc.F("진화 비용 없음 · 재련 {0}회와 증강 · 각인은 그대로 이어진다", Reforges(lv));
         }
         else if (!nameless && _controller.CanTemperForm(PlayerWeaponManager.Slot0, out int tier, out int cost))
         {
             w.form.GetVariants(tier, _previewOptions);
             _next1.text = _previewOptions.Count >= 2
-                ? $"단련 {RomanTier(tier)} — {_previewOptions[0].displayName}<size=88%><color=#C9A6FF>({_previewOptions[0].traitTag})</color></size> 또는 {_previewOptions[1].displayName}<size=88%><color=#C9A6FF>({_previewOptions[1].traitTag})</color></size>"
-                : $"단련 {RomanTier(tier)}";
+                ? Loc.F("단련 {0} — {1}<size=88%><color=#C9A6FF>({2})</color></size> 또는 {3}<size=88%><color=#C9A6FF>({4})</color></size>", RomanTier(tier), Loc.T(_previewOptions[0].displayName), _previewOptions[0].traitTag, Loc.T(_previewOptions[1].displayName), _previewOptions[1].traitTag)
+                : Loc.F("단련 {0}", RomanTier(tier));
             string costText = _controller.FuelAmount >= cost ? cost.ToString() : $"<color=#FF7A6A>{cost}</color>";
-            _next2.text = $"형 단련 {RomanTier(tier)} · 확정 성공 · 강화재료 {costText}" + (ahead.Count > 0 ? $"  ·  {Then(0)}" : "");
+            _next2.text = Loc.F("형 단련 {0} · 확정 성공 · 강화재료 {1}", RomanTier(tier), costText) + (ahead.Count > 0 ? $"  ·  {Then(0)}" : "");
         }
         else if (ahead.Count > 0)
         {
             _next1.text = ahead[0].text;
             _next2.text = ahead.Count > 1 ? Then(1)
-                        : nameless ? $"재련 {Reforges(lv)}회 → {Reforges(req)}회 · {Mathf.Max(0, Reforges(req) - Reforges(lv))}번 더 재련하면 하나를 고른다" : "";
+                        : nameless ? Loc.F("재련 {0}회 → {1}회 · {2}번 더 재련하면 하나를 고른다", Reforges(lv), Reforges(req), Mathf.Max(0, Reforges(req) - Reforges(lv))) : "";
             if (nameless && ahead[0].lv == req)
-                _next2.text = $"재련 {Reforges(lv)}회 → {Reforges(req)}회 · {Mathf.Max(0, Reforges(req) - Reforges(lv))}번 더 재련하면 하나를 고른다" + (ahead.Count > 1 ? $"  ·  {Then(1)}" : "");
+                _next2.text = Loc.F("재련 {0}회 → {1}회 · {2}번 더 재련하면 하나를 고른다", Reforges(lv), Reforges(req), Mathf.Max(0, Reforges(req) - Reforges(lv))) + (ahead.Count > 1 ? $"  ·  {Then(1)}" : "");
         }
         else
         {
             _next1.text = "남은 길은 재련 — 수치를 올린다";
             string mastery = MasteryText(w);
-            _next2.text = !string.IsNullOrEmpty(mastery) ? mastery : lv >= max ? $"최대 재련 {Reforges(max)}회" : $"최대 재련 {Reforges(max)}회까지 {Reforges(max) - Reforges(lv)}번";
+            _next2.text = !string.IsNullOrEmpty(mastery) ? mastery : lv >= max ? Loc.F("최대 재련 {0}회", Reforges(max)) : Loc.F("최대 재련 {0}회까지 {1}번", Reforges(max), Reforges(max) - Reforges(lv));
         }
     }
 
@@ -507,17 +519,17 @@ public sealed partial class UI_CruciblePanel
         int total = state?.TotalLevel ?? 0;
         int cur   = Mathf.Clamp(SkillTierResolver.Resolve(rw) - 1, 0, 2);
         for (int i = 0; i < 3; i++) st[i] = i < cur ? NodeState.Past : i == cur ? NodeState.Current : i == cur + 1 ? NodeState.Next : NodeState.Future;
-        SetNode(0, "스킬 1단계", cur == 0 ? $"지금 · 파츠 합 {total}" : "시작", st[0]);
-        SetNode(1, "스킬 2단계", cur == 1 ? $"지금 · 파츠 합 {total}" : ms.Length > 0 ? $"파츠 합 {ms[0]}" : "", st[1]);
-        SetNode(2, "스킬 3단계", cur == 2 ? $"지금 · 파츠 합 {total}" : ms.Length > 1 ? $"파츠 합 {ms[1]}" : "", st[2]);
+        SetNode(0, "스킬 1단계", cur == 0 ? Loc.F("지금 · 파츠 합 {0}", total) : "시작", st[0]);
+        SetNode(1, "스킬 2단계", cur == 1 ? Loc.F("지금 · 파츠 합 {0}", total) : ms.Length > 0 ? Loc.F("파츠 합 {0}", ms[0]) : "", st[1]);
+        SetNode(2, "스킬 3단계", cur == 2 ? Loc.F("지금 · 파츠 합 {0}", total) : ms.Length > 1 ? Loc.F("파츠 합 {0}", ms[1]) : "", st[2]);
 
         if (SkillTierResolver.TryGetNext(rw, 0, out int nt, out int rem))
         {
             string body = TierChangeBody(rw, nt);
-            _next1.text = $"파츠 합 +{rem} — 스킬 {nt}단계" + (body != null ? $" · {body}" : "");
+            _next1.text = Loc.F("파츠 합 +{0} — 스킬 {1}단계", rem, nt) + (body != null ? $" · {body}" : "");
         }
         else _next1.text = "스킬 3단계 — 남은 길은 파츠 강화";
-        _next2.text = $"지금 파츠 합 {total} · 켠 파츠 {state?.ActiveCount ?? 0} · 실패 없음";
+        _next2.text = Loc.F("지금 파츠 합 {0} · 켠 파츠 {1} · 실패 없음", total, state?.ActiveCount ?? 0);
         return cur;
     }
 
@@ -696,7 +708,7 @@ public sealed partial class UI_CruciblePanel
     private void FillLocked(WeaponData w)
     {
         int req = Mathf.Max(0, EvolveAt());
-        SetFormHead("잠긴 형", "둘 중 하나가 깨어난다", $"재련 {Reforges(req)}회에서 깨어남", UITheme.Thin.InkA(0.7f));
+        SetFormHead("잠긴 형", "둘 중 하나가 깨어난다", Loc.F("재련 {0}회에서 깨어남", Reforges(req)), UITheme.Thin.InkA(0.7f));
         _formDesc.gameObject.SetActive(false);
         _formSummary.gameObject.SetActive(false);
         var br = CurrentBranches;
@@ -711,13 +723,13 @@ public sealed partial class UI_CruciblePanel
             FmPlace(c.root, RowPad + k * (FmCardW + FmCardGap), FmY + 42f, FmCardW, 162f);
             c.group.alpha = 1f;
             CardArt(c, b.target.icon, f.Tint, lit: false, 12f, 10f, FmCardW - 24f, 62f, 162f);
-            c.name.text = $"<color=#{ColorUtility.ToHtmlStringRGB(Color.Lerp(f.Tint, Color.gray, 0.35f))}>{f.DisplayName}</color>  <size=88%><color=#8C8497>{b.target.displayName}</color></size>";
+            c.name.text = $"<color=#{ColorUtility.ToHtmlStringRGB(Color.Lerp(f.Tint, Color.gray, 0.35f))}>{Loc.T(f.DisplayName)}</color>  <size=88%><color=#8C8497>{Loc.T(b.target.displayName)}</color></size>";
             PlaceIn(c.name.rectTransform, 12f, 72f, FmCardW - 24f, 26f, FmCardW, 162f);
             c.line.gameObject.SetActive(true);
             c.line.text = UIKeywordInk.Values(f.Line);   // 수치만 Noto 500(10-15 설명 글 강조)
             PlaceIn(c.line.rectTransform, 12f, 98f, FmCardW - 24f, 44f, FmCardW, 162f);
             c.foot.gameObject.SetActive(true);
-            c.foot.text = $"재련 {Reforges(b.requiredEnhanceLevel)}회에서 깨어난다";
+            c.foot.text = Loc.F("재련 {0}회에서 깨어난다", Reforges(b.requiredEnhanceLevel));
             PlaceIn(c.foot.rectTransform, 12f, 140f, FmCardW - 24f, 22f, FmCardW, 162f);
             c.mark.gameObject.SetActive(true);
             c.mark.text = "잠김";
@@ -730,7 +742,7 @@ public sealed partial class UI_CruciblePanel
     {
         SetFormHead("형이 깨어난다", "둘 중 하나를 고른다", "진화 비용 없음", UITheme.Thin.InkA(0.75f), ready: true);
         _formDesc.gameObject.SetActive(true);
-        _formDesc.text = $"되돌릴 수 없다 · 재련 {Reforges(w.enhanceLevel)}회와 증강 · 각인은 그대로 이어진다";
+        _formDesc.text = Loc.F("되돌릴 수 없다 · 재련 {0}회와 증강 · 각인은 그대로 이어진다", Reforges(w.enhanceLevel));
         _formSummary.gameObject.SetActive(false);
         var br = CurrentBranches;
         for (int k = 0; k < 2; k++)
@@ -744,7 +756,7 @@ public sealed partial class UI_CruciblePanel
             FmPlace(c.root, RowPad + k * (FmCardW + FmCardGap), FmY + 64f, FmCardW, FmPreviewH);
             c.group.alpha = 1f;
             CardArt(c, b.target.icon, f.Tint, lit: true, 8f, (FmPreviewH - 56f) * 0.5f, 56f, 56f, FmPreviewH);
-            c.name.text = $"<color=#{ColorUtility.ToHtmlStringRGB(f.Tint)}>{f.DisplayName}</color>  <size=88%><color=#8C8497>{b.target.displayName}</color></size>";
+            c.name.text = $"<color=#{ColorUtility.ToHtmlStringRGB(f.Tint)}>{Loc.T(f.DisplayName)}</color>  <size=88%><color=#8C8497>{Loc.T(b.target.displayName)}</color></size>";
             PlaceIn(c.name.rectTransform, 72f, 8f, FmCardW - 80f, 26f, FmCardW, FmPreviewH);
             c.line.gameObject.SetActive(true);
             c.line.text = UIKeywordInk.Values(f.Line);   // 수치만 Noto 500(10-15 설명 글 강조)
@@ -775,7 +787,7 @@ public sealed partial class UI_CruciblePanel
             FmPlace(c.root, RowPad + k * (FmCardW + FmCardGap), FmY + 64f, FmCardW, h);
             c.group.alpha = 1f;
             CardArt(c, null, Color.clear, lit: false, 0f, 0f, 0f, 0f, h);
-            c.name.text = $"◇ {v.displayName}";
+            c.name.text = $"◇ {Loc.T(v.displayName)}";
             PlaceIn(c.name.rectTransform, 10f, 8f, FmCardW - 20f, 26f, FmCardW, h);
             c.mark.gameObject.SetActive(true);
             c.mark.text  = v.traitTag;
@@ -799,7 +811,7 @@ public sealed partial class UI_CruciblePanel
         var sb = new System.Text.StringBuilder();
         foreach (var id in (w.formVariants ?? "").Split(','))
             if (w.form.TryGetVariant(id, out var v))
-                sb.Append("<color=#C9A6FF>").Append(RomanTier(v.tier)).Append("  ").Append(v.displayName).Append("</color> — ").Append(UIKeywordInk.Values(v.line)).Append('\n');   // 수치만 Noto 500(10-15)
+                sb.Append("<color=#C9A6FF>").Append(RomanTier(v.tier)).Append("  ").Append(Loc.T(v.displayName)).Append("</color> — ").Append(UIKeywordInk.Values(Loc.T(v.line))).Append('\n');   // 수치만 Noto 500(10-15)
         sb.Append("<color=#9A93A6>남은 길은 강화 — 수치를 올린다</color>");
         _formSummary.text = sb.ToString();
     }
@@ -834,7 +846,7 @@ public sealed partial class UI_CruciblePanel
         _temperCostNow = cost;
 
         var f = w.form;
-        _temperTitle.text = $"{w.displayName} · 형 「{f.DisplayName}」 — 단련 {RomanTier(tier)}";
+        _temperTitle.text = Loc.F("{0} · 형 「{1}」 — 단련 {2}", Loc.T(w.displayName), Loc.T(f.DisplayName), RomanTier(tier));
         _temperSub.text   = "변주 둘 중 하나를 고른다 · 확정 성공(실패 · 하락 없음) · 고르면 되돌릴 수 없다";
         _temperPips.text  = $"<color=#{ColorUtility.ToHtmlStringRGB(f.Tint)}>{new string('◆', f.MaxStacks)}</color>";
         string v2 = VariantName(w, 2);
@@ -849,16 +861,16 @@ public sealed partial class UI_CruciblePanel
             float cw = c.chip.GetPreferredValues(v.traitTag).x + 26f;
             PlaceIn(c.chipBox, 24f, 22f, cw, 30f, TpCardW, TpCardH);
             c.index.text = k == 0 ? "변주 ①" : "변주 ②";
-            _temperName[k].text = v.displayName;
+            _temperName[k].text = Loc.T(v.displayName);
             c.line.text = UIKeywordInk.Values(v.line);   // 수치만 Noto 500(10-15 설명 글 강조)
             ClearChildren(c.diagram);
             var (caption, changes) = DrawVariant(c.diagram, f, v.id);
             c.caption.text = caption;
             c.changes.text = changes;
-            c.cost.text = fuel >= cost ? $"강화재료 {cost}" : $"<color=#FF7A6A>강화재료 {cost}</color>";
+            c.cost.text = fuel >= cost ? Loc.F("강화재료 {0}", cost) : Loc.F("<color=#FF7A6A>강화재료 {0}</color>", cost);
         }
         int next = f.TemperCost(tier + 1);
-        _temperHint.text = $"보유 강화재료 {fuel}" + (next > 0 ? $" · 다음 단련 {RomanTier(tier + 1)}은 강화재료 {next}" : "")
+        _temperHint.text = Loc.F("보유 강화재료 {0}", fuel) + (next > 0 ? Loc.F(" · 다음 단련 {0}은 강화재료 {1}", RomanTier(tier + 1), next) : "")
                          + " · 단련하면 망치 연출 뒤 바로 적용된다";   // 10-18 「벼리면」 → 「단련하면」(용어 통일)
         PickTemperCard(-1);
 
@@ -872,9 +884,9 @@ public sealed partial class UI_CruciblePanel
     private static string FormNowLine(WeaponFormSO f)
     {
         string act = f.FormId == "weight"
-            ? $"반경 {f.TriggerRange:0.#} m 충격파 · 공격력 {f.TriggerAtkRatio * 100f:0}% · 경직"
-            : $"정면 {f.TriggerRange:0.#} m 관통 검기 · 공격력 {f.TriggerAtkRatio * 100f:0}%";
-        return $"{f.DisplayName} {f.MaxStacks}에서 콤보 마지막 타가 <color=#FFCC4D>「{f.TriggerName}」</color> — {act}";
+            ? Loc.F("반경 {0:0.#} m 충격파 · 공격력 {1:0}% · 경직", f.TriggerRange, f.TriggerAtkRatio * 100f)
+            : Loc.F("정면 {0:0.#} m 관통 검기 · 공격력 {1:0}%", f.TriggerRange, f.TriggerAtkRatio * 100f);
+        return Loc.F("{0} {1}에서 콤보 마지막 타가 <color=#FFCC4D>「{2}」</color> — {3}", Loc.T(f.DisplayName), f.MaxStacks, Loc.T(f.TriggerName), act);
     }
 
     private void PickTemperCard(int k)
@@ -896,9 +908,9 @@ public sealed partial class UI_CruciblePanel
         _temperConfirm.interactable = ok;
         _temperConfirmFrame.SetState(ok ? ThinFrameState.Ready : ThinFrameState.Idle, animate: true);
         if (_temperPick < 0) { _temperConfirmLbl.text = "<color=#9A98A0>변주를 고른다</color>"; return; }
-        string name = _temperOptions[_temperPick].displayName;
+        string name = Loc.T(_temperOptions[_temperPick].displayName);
         string cost = afford ? _temperCostNow.ToString() : $"<color=#FF7A6A>{_temperCostNow}</color>";
-        _temperConfirmLbl.text = $"「{name}」{Ro(name)} 단련  <size=85%>강화재료 {cost}</size>";   // 10-18 「벼린다」 → 「단련」
+        _temperConfirmLbl.text = Loc.F("「{0}」{1} 단련  <size=85%>강화재료 {2}</size>", name, Ro(name), cost);   // 10-18 「벼린다」 → 「단련」
     }
 
     private async UniTaskVoid FadeGroupAsync(CanvasGroup g, float to)
@@ -918,7 +930,7 @@ public sealed partial class UI_CruciblePanel
         bool ok = _controller != null && _controller.TryTemperForm(PlayerWeaponManager.Slot0, def.id);
         _temperPanel.SetActive(false);
         if (_resultText != null)
-            _resultText.text = ok ? $"<color=#9D7EE6>형 단련 — {def.displayName}</color>" : "<color=#FF7A6A>강화재료가 모자란다</color>";
+            _resultText.text = ok ? Loc.F("<color=#9D7EE6>형 단련 — {0}</color>", Loc.T(def.displayName)) : "<color=#FF7A6A>강화재료가 모자란다</color>";
         if (!ok)
         {
             _holdTrack = false;
@@ -940,7 +952,7 @@ public sealed partial class UI_CruciblePanel
             ShopUIStyle.PlaySfx("enhance_success");
             FlashStage(StageFlashSuccess);
             BurstSparks(StrikeSparks, SparkGold, StrikeX, StrikeYNow);
-            ShowStageResult($"<size=50%><color=#C9A6FF>형 단련 {RomanTier(tier)}</color></size>\n{def.displayName}", EvolveStampSize, SuccessPopScale);
+            ShowStageResult(Loc.F("<size=50%><color=#C9A6FF>형 단련 {0}</color></size>\n{1}", RomanTier(tier), Loc.T(def.displayName)), EvolveStampSize, SuccessPopScale);
             Say(_controller.GetDialogue(CrucibleMood.Temper));
             await FocusAsync(false);
             await Hold(SettleDur);
@@ -1134,8 +1146,8 @@ public sealed partial class UI_CruciblePanel
                         DDot(p, Vector2.Lerp(me, e, 0.70f), 10f, EnemyDot);
                         DText(p, e + new Vector2(40f, s > 0 ? -2f : 2f), s > 0 ? "+12°" : "−12°", 13f, bright);
                     }
-                    return ($"흐린 것 = 지금 {f.TriggerName}(1발 · {f.TriggerRange:0} m 관통) · 위에서 본 그림",
-                            $"· {f.TriggerName} 1발 → 2발, 부채꼴(±12°)로 벌어진다\n· 앞에 넓게 퍼진 무리를 한 번에 벤다");
+                    return (Loc.F("흐린 것 = 지금 {0}(1발 · {1:0} m 관통) · 위에서 본 그림", Loc.T(f.TriggerName), f.TriggerRange),
+                            Loc.F("· {0} 1발 → 2발, 부채꼴(±12°)로 벌어진다\n· 앞에 넓게 퍼진 무리를 한 번에 벤다", Loc.T(f.TriggerName)));
                 }
                 case "return_wind":
                 {
@@ -1147,7 +1159,7 @@ public sealed partial class UI_CruciblePanel
                     var back0 = e + new Vector2(-6f, 34f);
                     DDash(p, back0, me + new Vector2(18f, 18f), 1.5f, bright);
                     DText(p, me + new Vector2(14f, 18f), "◀", 12f, bright, TextAlignmentOptions.Center, 20f);
-                    DText(p, Vector2.Lerp(o, e, 0.5f) + new Vector2(0f, 54f), $"{0.35f:0.##}초 뒤 돌아오며 1번 더", 13f, bright, TextAlignmentOptions.Center, 220f);
+                    DText(p, Vector2.Lerp(o, e, 0.5f) + new Vector2(0f, 54f), Loc.F("{0:0.##}초 뒤 돌아오며 1번 더", 0.35f), 13f, bright, TextAlignmentOptions.Center, 220f);
                     for (int i = 0; i < 3; i++)
                     {
                         var en = Vector2.Lerp(o, e, 0.32f + i * 0.2f) + new Vector2(0f, 17f);
@@ -1155,7 +1167,7 @@ public sealed partial class UI_CruciblePanel
                         DText(p, en + new Vector2(10f, -12f), "×2", 11f, gold, TextAlignmentOptions.Left, 30f);
                     }
                     DText(p, e + new Vector2(30f, -14f), $"{f.TriggerRange:0} m", 13f, UITheme.Thin.InkA(0.6f));
-                    return ($"실선 = 지금 {f.TriggerName} · 점선 = 되돌아오는 길(새로) · 위에서 본 그림",
+                    return (Loc.F("실선 = 지금 {0} · 점선 = 되돌아오는 길(새로) · 위에서 본 그림", Loc.T(f.TriggerName)),
                             "· 같은 줄을 나가며 한 번, 돌아오며 한 번 벤다\n· 한 줄로 선 적 · 큰 적에게 두 번 맞힌다");
                 }
                 case "still_wind":
@@ -1172,9 +1184,9 @@ public sealed partial class UI_CruciblePanel
                         DDot(p, en, 11f, EnemyDot);
                         DLine(p, en + new Vector2(-9f, 9f), en + new Vector2(9f, -9f), 2f, gold);
                     }
-                    DText(p, a + new Vector2(10f, 30f), $"<color=#{ColorUtility.ToHtmlStringRGB(f.Tint)}>{new string('◆', f.MaxStacks)}</color> {f.DisplayName} {f.MaxStacks}인 채로", 13f, UITheme.Thin.InkA(0.75f), TextAlignmentOptions.Left, 220f);
+                    DText(p, a + new Vector2(10f, 30f), Loc.F("<color=#{0}>{1}</color> {2} {3}인 채로", ColorUtility.ToHtmlStringRGB(f.Tint), new string('◆', f.MaxStacks), Loc.T(f.DisplayName), f.MaxStacks), 13f, UITheme.Thin.InkA(0.75f), TextAlignmentOptions.Left, 220f);
                     return ("점선 = 회피 길 · 그 길에 선 적을 벤다 · 위에서 본 그림",
-                            $"· {f.DisplayName} {f.MaxStacks}에서 회피하면 지나간 길의 적을 벤다(공격력 100%)\n· 피하는 동작이 그대로 공격이 된다");
+                            Loc.F("· {0} {1}에서 회피하면 지나간 길의 적을 벤다(공격력 100%)\n· 피하는 동작이 그대로 공격이 된다", Loc.T(f.DisplayName), f.MaxStacks));
                 }
                 case "storm_eye":
                 {
@@ -1187,9 +1199,9 @@ public sealed partial class UI_CruciblePanel
                         DText(p, en + new Vector2(0f, -22f), "+1", 14f, gold);
                         DDash(p, en + new Vector2(0f, 12f), me + new Vector2(10f + i * 12f, 40f), 1.2f, UITheme.Thin.WithA(UITheme.Thin.Gold, 0.55f), 6f, 5f);
                     }
-                    DText(p, me + new Vector2(70f, 54f), $"<color=#{ColorUtility.ToHtmlStringRGB(f.Tint)}>◆◆◆</color> 칼바람 +3까지 돌려받음", 13f, UITheme.Thin.InkA(0.75f), TextAlignmentOptions.Left, 260f);
-                    return ($"{f.TriggerName}에 맞은 적 하나당 {f.DisplayName} +1 · 위에서 본 그림",
-                            $"· {f.TriggerName}에 맞은 적 하나당 {f.DisplayName} +1을 돌려받는다(최대 3)\n· 무리 속에서 {f.TriggerName}이 빨리 다시 찬다");
+                    DText(p, me + new Vector2(70f, 54f), Loc.F("<color=#{0}>◆◆◆</color> 칼바람 +3까지 돌려받음", ColorUtility.ToHtmlStringRGB(f.Tint)), 13f, UITheme.Thin.InkA(0.75f), TextAlignmentOptions.Left, 260f);
+                    return (Loc.F("{0}에 맞은 적 하나당 {1} +1 · 위에서 본 그림", Loc.T(f.TriggerName), Loc.T(f.DisplayName)),
+                            Loc.F("· {0}에 맞은 적 하나당 {1} +1을 돌려받는다(최대 3)\n· 무리 속에서 {2}이 빨리 다시 찬다", Loc.T(f.TriggerName), Loc.T(f.DisplayName), Loc.T(f.TriggerName)));
                 }
             }
         }
@@ -1216,7 +1228,7 @@ public sealed partial class UI_CruciblePanel
                     DDot(p, c + new Vector2(-18f, 36f), 10f, EnemyDot);
                     DText(p, c + new Vector2(r + 120f, -18f), "갈라진 땅 2초", 14f, bright, TextAlignmentOptions.Center, 200f);
                     DText(p, c + new Vector2(r + 120f, 6f), "0.5초마다 공격력 30%", 13f, UITheme.Thin.InkA(0.7f), TextAlignmentOptions.Center, 200f);
-                    return ($"흐린 원 = 지금 {f.TriggerName}(반경 {f.TriggerRange:0.#} m) · 위에서 본 그림",
+                    return (Loc.F("흐린 원 = 지금 {0}(반경 {1:0.#} m) · 위에서 본 그림", Loc.T(f.TriggerName), f.TriggerRange),
                             "· 충격파 자리에 2초 동안 갈라진 땅이 남는다\n· 그 위의 적은 0.5초마다 공격력 30% 피해를 입는다");
                 }
                 case "aftershock":
@@ -1233,8 +1245,8 @@ public sealed partial class UI_CruciblePanel
                     DText(p, c + new Vector2(0f, -r2 + 12f), "2", 13f, bright);
                     DText(p, c + new Vector2(r2 + 110f, -12f), "0.4초 뒤 · 반경 ×1.4", 14f, bright, TextAlignmentOptions.Center, 200f);
                     DText(p, c + new Vector2(r2 + 110f, 12f), "피해 절반", 13f, UITheme.Thin.InkA(0.7f), TextAlignmentOptions.Center, 200f);
-                    return ($"실선 원 = 지금 {f.TriggerName} · 점선 원 = 여진(새로) · 위에서 본 그림",
-                            $"· 0.4초 뒤 더 큰 충격파(반경 ×1.4 · 피해 절반)가 한 번 더 퍼진다\n· 처음 원 밖으로 흩어진 적까지 닿는다");
+                    return (Loc.F("실선 원 = 지금 {0} · 점선 원 = 여진(새로) · 위에서 본 그림", Loc.T(f.TriggerName)),
+                            Loc.T("· 0.4초 뒤 더 큰 충격파(반경 ×1.4 · 피해 절반)가 한 번 더 퍼진다\n· 처음 원 밖으로 흩어진 적까지 닿는다"));
                 }
                 case "heavy_hand":
                 {
@@ -1255,8 +1267,8 @@ public sealed partial class UI_CruciblePanel
                     }
                     DText(p, en + new Vector2(0f, -24f), "치명", 15f, gold);
                     DText(p, c + new Vector2(0f, r + 2f), $"<color=#{ColorUtility.ToHtmlStringRGB(f.Tint)}>{new string('◆', f.MaxStacks)}</color> {f.DisplayName} {f.MaxStacks}", 13f, UITheme.Thin.InkA(0.75f), TextAlignmentOptions.Center, 160f);
-                    return ($"{f.DisplayName}가 가득일 때 스킬 적중 · 위에서 본 그림",
-                            $"· {f.DisplayName} {f.MaxStacks}일 때 E · R 적중이 치명타가 된다\n· 가득 찬 {f.DisplayName}를 스킬로도 쓴다");
+                    return (Loc.F("{0}가 가득일 때 스킬 적중 · 위에서 본 그림", Loc.T(f.DisplayName)),
+                            Loc.F("· {0} {1}일 때 E · R 적중이 치명타가 된다\n· 가득 찬 {2}를 스킬로도 쓴다", Loc.T(f.DisplayName), f.MaxStacks, Loc.T(f.DisplayName)));
                 }
                 case "crush":
                 {
@@ -1270,7 +1282,7 @@ public sealed partial class UI_CruciblePanel
                     }
                     DText(p, c + new Vector2(r + 120f, -12f), "경직된 적 · 2초", 14f, bright, TextAlignmentOptions.Center, 200f);
                     DText(p, c + new Vector2(r + 120f, 12f), "받는 피해 +6%", 14f, gold, TextAlignmentOptions.Center, 200f);
-                    return ($"원 = {f.TriggerName} 범위 · ◆ = 경직(0.8초) · 위에서 본 그림",
+                    return (Loc.F("원 = {0} 범위 · ◆ = 경직(0.8초) · 위에서 본 그림", Loc.T(f.TriggerName)),
                             "· 내려찍기로 경직된 적은 2초 동안 받는 피해 +6%\n· 무리를 묶어 두고 몰아 잡는다");
                 }
             }

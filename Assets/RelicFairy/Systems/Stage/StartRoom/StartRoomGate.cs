@@ -98,6 +98,8 @@ public class StartRoomGate : MonoBehaviour
     private BlockPalette _injectedCorridorPalette;
     private int          _injectedCorridorWallLayers;
     private bool _gateRevealStarted;   // 열림 연출 1회 가드
+    private bool _sealOpening;         // 11-02 봉인문 열기 1회 가드 — F 넘김이 바로 열고, 늦게 오는 예약 열기는 건너뛴다
+    private const float SkipGrace = 0.4f;   // 서약을 확정한 F가 바로 넘김으로 읽히지 않게
     private bool _covenantDone;        // 시작방 서약 제단 완료 여부(통과 조건)
     private bool _sealDoorPrefabWarned;
 
@@ -291,7 +293,8 @@ public class StartRoomGate : MonoBehaviour
 
     private async UniTaskVoid OpenSealDoorAsync()
     {
-        if (_sealDoor == null) return;
+        if (_sealDoor == null || _sealOpening) return;
+        _sealOpening = true;
         Vector3 closed = _sealDoorClosedPos;
         Vector3 open   = closed + Vector3.up * _gateHeight;
         // 나무문은 바깥(플레이어 반대쪽)으로 젖혀 열린다(10-06) — 바깥은 지금 플레이어 자리로 정한다
@@ -404,9 +407,13 @@ public class StartRoomGate : MonoBehaviour
         // 연출 내내 입력 잠금 — 연출 도중 플레이어가 게이트로 걸어가 다이브가 조기 발동/카메라 충돌하는 것 방지.
         // finally에서 반드시 해제(폴백·취소 포함).
         if (pc != null) FreezePlayer(pc);
+        // 11-02 Q16 F로 넘기기 — 이 연출(기다림 · 카메라)만 끊는다. 문은 바로 열고 카메라는 아래 연출의 finally가 게임 카메라로 되돌린다.
+        var skip = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var hint = ShowSkipHint();
+        WatchSkipAsync(skip, hint).Forget();
         try
         {
-            await UniTask.Delay(System.TimeSpan.FromSeconds(gateRevealDelay), cancellationToken: ct);
+            await UniTask.Delay(System.TimeSpan.FromSeconds(gateRevealDelay), cancellationToken: skip.Token);
 
             var cam = GameCameraController.Instance;
             if (cam == null || player == null)
@@ -426,13 +433,78 @@ public class StartRoomGate : MonoBehaviour
 
             await cam.PlayOnboardingRevealAsync(
                 target, worldOffset, gateRevealLookHeight,
-                gateRevealDurations.x, gateRevealDurations.y, gateRevealDurations.z, player, ct);
+                gateRevealDurations.x, gateRevealDurations.y, gateRevealDurations.z, player, skip.Token);
         }
         catch (System.OperationCanceledException) { }
         finally
         {
+            bool skipped = skip.IsCancellationRequested && !ct.IsCancellationRequested;
+            skip.Cancel();   // 넘김 감시를 멈춘다
+            if (hint != null) Destroy(hint);
+            if (skipped) OpenSealDoorAsync().Forget();   // 넘겼다 — 문은 바로(가드가 늦게 오는 예약 열기를 막는다)
             if (pc != null) UnfreezePlayer();
         }
+    }
+
+    /// <summary>11-02 Q16 연출 중 F — 서약을 확정한 키가 바로 읽히지 않게 <see cref="SkipGrace"/> 뒤부터.</summary>
+    private static async UniTaskVoid WatchSkipAsync(System.Threading.CancellationTokenSource skip, GameObject hint)
+    {
+        var token = skip.Token;
+        try
+        {
+            await UniTask.Delay(System.TimeSpan.FromSeconds(SkipGrace), DelayType.UnscaledDeltaTime, cancellationToken: token);
+            while (!token.IsCancellationRequested)
+            {
+                // 창(시작 선물 · 대사 등)이 입력을 막는 동안엔 안내를 숨기고 F도 받지 않는다 — 그 F는 창의 것(11-02 실측)
+                bool blocked = UIInputGate.Blocked;
+                if (hint != null && hint.activeSelf == blocked) hint.SetActive(!blocked);
+                if (!blocked && Input.GetKeyDown(KeyCode.F)) { skip.Cancel(); return; }
+                await UniTask.Yield(PlayerLoopTiming.Update, token);
+            }
+        }
+        catch (System.OperationCanceledException) { }
+    }
+
+    /// <summary>11-02 Q16 오른쪽 아래 작은 「[F] 넘기기」(얇은 글꼴) — 연출이 끝나면 걷는다.</summary>
+    private static GameObject ShowSkipHint()
+    {
+        var go = new GameObject("GateRevealSkipHint");
+        var canvas = go.AddComponent<Canvas>();
+        canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = UISortingOrder.Cinematic;
+        var scaler = go.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight  = 0.5f;
+
+        var textGO = new GameObject("Text", typeof(RectTransform));
+        textGO.transform.SetParent(go.transform, false);
+        var rt = (RectTransform)textGO.transform;
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(1f, 0f);
+        rt.anchoredPosition = new Vector2(-64f, 56f);
+        rt.sizeDelta = new Vector2(360f, 48f);
+        var tmp = textGO.AddComponent<TextMeshProUGUI>();
+        var thin = ThinFont();
+        if (thin != null) tmp.font = thin;
+        tmp.fontSize  = 26f;
+        tmp.alignment = TextAlignmentOptions.BottomRight;
+        tmp.color     = new Color(0.95f, 0.93f, 0.88f, 0.85f);
+        tmp.text      = "<color=#E8C77A>[F]</color> 넘기기";
+        tmp.raycastTarget = false;
+        return go;
+    }
+
+    /// <summary>얇은 본문체 — 기본 폰트의 폴백 목록에 들어 있다(ChapterStairway와 같은 길).</summary>
+    private static TMP_FontAsset ThinFont()
+    {
+        var def = TMP_Settings.defaultFontAsset;
+        if (def == null) return null;
+        if (def.name.Contains("NotoSansKR")) return def;
+        var table = def.fallbackFontAssetTable;
+        if (table == null) return null;
+        for (int i = 0; i < table.Count; i++)
+            if (table[i] != null && table[i].name.Contains("NotoSansKR")) return table[i];
+        return null;
     }
 
     /// <summary>DoorEdge → 게이트 로컬 기준 통로가 뻗는 방향(BuildDoorCorridor의 outward와 동일 규약).</summary>

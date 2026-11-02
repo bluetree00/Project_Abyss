@@ -34,6 +34,7 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
     private readonly List<Marker> _markers = new();
     private Transform _camT;
     private bool _placed;
+    private bool _broken;   // 10-30 세우기 · 진행 예외 — 조작이 풀리면 브론즈로 끝낸다
     private bool _resolved;
     private float _elapsed;
     private Vector3 _inward = Vector3.forward;
@@ -44,6 +45,12 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
 
     private const float StageWant     = 7f;    // 무대 반경 상한
     private const float PropWallClear = 1.0f;  // 소품 자리는 벽(걸을 수 있는 면 가장자리)에서 이만큼 떨어진다
+    private const float AutoTimerHeight = 4.2f;   // 10-30 남은 시간 글 — 문 · 제단 이름표(1.4 · 2.0 m)보다 위
+    private static readonly Color AutoTimerColor = new(0.75f, 0.78f, 0.84f);
+
+    private TextMeshPro _autoTimer;   // 10-30 O-02 자동 해결까지 남은 시간(보이지 않는 60초였다)
+    private string _autoTimerFormat;
+    private int _autoShown = -1;
 
     public event Action OnResolved;
 
@@ -78,6 +85,18 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
     /// </summary>
     protected virtual float AutoResolveSeconds => 60f;
 
+    /// <summary>
+    /// 자동 해결까지 남은 시간을 무대 위에 띄우는가(10-30 O-02 — 「제한이 있는지 몰랐는데 갑자기 끝난다」).
+    /// 자체 타이머를 띄우는 방(보물 창고)은 끈다.
+    /// </summary>
+    protected virtual bool ShowsAutoResolveTimer => true;
+
+    /// <summary>남은 시간 아래 작은 줄 — 시간이 다 되면 어떻게 되는가(남은 시간 글을 처음 세울 때 한 번 읽는다). null이면 줄 없음.</summary>
+    protected virtual string AutoResolveHint => null;
+
+    /// <summary>[F]가 닿는 거리(10-31) — 보물 창고는 상자에 붙어야 연다.</summary>
+    protected virtual float ActivateRange => InteractRange;
+
     /// <summary>SetupEventRoom이 호출 — 세션 주입. (서브클래스별 추가 Init은 각자 정의)
     /// 10-29 행운표 · 보상 이펙트는 뺐다 — 보상을 RoomClearGate가 아니라 이벤트가 직접 준다.</summary>
     public void InitBase(GameRunSession run) => Run = run;
@@ -89,6 +108,38 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
 
         if (!_placed)
         {
+            // 10-30 세우기는 한 번만 — 예전엔 PlaceMarkers 중 예외가 나면 _placed가 안 서 매 프레임 처음부터 다시 세웠다
+            // (빌드 보물 창고: 205번 · 상자 · 이름표 약 1,000개가 플레이어 둘레를 따라 방 곳곳으로 퍼졌다 — 「상자가 맵 밖으로」).
+            _placed = true;
+            try { PlaceOnce(pt); }
+            catch (Exception e)
+            {
+                _broken = true;
+                Debug.LogError($"[WorldInteraction] {GetType().Name} 세우기 예외 — 조작이 풀리면 브론즈로 끝낸다(방에 가두지 않는다): {e}");
+            }
+        }
+
+        Billboard();
+        // 조작이 풀리기 전(방 입장 연출 · 화면이 덮인 동안)엔 시간도 F도 받지 않는다(10-29 B2 — 보물 창고 18초가 덮인 첫 프레임부터 흘렀다).
+        // RunFlowController가 해결 알림을 구독하는 순간이 조작이 풀린 때다(EventMinigame.RunAsync와 같은 기준).
+        if (OnResolved == null) return;
+        if (_broken) { if (!_resolved) FinishWith(ChallengeGrade.Bronze, pt.position); return; }
+        try { Tick(); }
+        catch (Exception e)
+        {
+            // 10-30 진행 중 예외(빌드 보물 창고 가시 예고 3,465번) — 시간이 안 흘러 끝나지 않았다. 한 번 적고 브론즈로 끝낸다.
+            _broken = true;
+            Debug.LogError($"[WorldInteraction] {GetType().Name} 진행 중 예외 — 브론즈로 끝낸다: {e}");
+            if (!_resolved) FinishWith(ChallengeGrade.Bronze, pt.position);
+            return;
+        }
+        UpdateAfterTick(pt);
+    }
+
+    /// <summary>무대를 정하고 표식을 세운다 — <see cref="Update"/>의 첫 프레임에 한 번.</summary>
+    private void PlaceOnce(Transform pt)
+    {
+        {
             _camT = Camera.main != null ? Camera.main.transform : null;
             ServiceRoomDecorPlacer.SyncPhysics();   // 방 블록이 막 생성됨 — 물리 쿼리 전 콜라이더 등록 보장
             _inward = ServiceRoomDecorPlacer.ResolveOpenDirection(pt.position, pt.forward);
@@ -99,18 +150,17 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
             _toEntry = toEntry.sqrMagnitude > 1f ? toEntry.normalized : -_inward;
             PlaceMarkers(pt);
             Debug.Log($"[WorldInteraction] {GetType().Name} 무대 {_stage} · 반경 {_stageRadius:0.0}m · 입구까지 {toEntry.magnitude:0.0}m");
-            _placed = true;
         }
+    }
 
-        Billboard();
-        // 조작이 풀리기 전(방 입장 연출 · 화면이 덮인 동안)엔 시간도 F도 받지 않는다(10-29 B2 — 보물 창고 18초가 덮인 첫 프레임부터 흘렀다).
-        // RunFlowController가 해결 알림을 구독하는 순간이 조작이 풀린 때다(EventMinigame.RunAsync와 같은 기준).
-        if (OnResolved == null) return;
-        Tick();
+    /// <summary>자동 해결 · F 입력 — 진행(Tick) 뒤.</summary>
+    private void UpdateAfterTick(Transform pt)
+    {
         if (_resolved) return;
 
         // 자동 해결 — 마커에 닿지 못하는 상황에서도 방을 떠날 수 있게 하는 안전장치.
         _elapsed += Time.deltaTime;
+        if (ShowsAutoResolveTimer && AutoResolveSeconds > 0f) TickAutoTimer();
         if (AutoResolveSeconds > 0f && _elapsed >= AutoResolveSeconds)
         {
             Notice("<color=#B8C0CC>시간이 다 됐다</color> — 출구가 열렸다");
@@ -120,13 +170,14 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
 
         // 범위 내 가장 가까운 미소비 마커 → F 활성화.
         int hot = -1;
-        float best = InteractRange * InteractRange;
+        float range2 = ActivateRange * ActivateRange;
+        float best = range2;
         for (int i = 0; i < _markers.Count; i++)
         {
             var m = _markers[i];
             if (m.Consumed) continue;
             float d = (pt.position - m.Pos).sqrMagnitude;
-            bool inRange = d <= InteractRange * InteractRange;
+            bool inRange = d <= range2;
             if (m.Prompt != null) m.Prompt.gameObject.SetActive(inRange);
             if (inRange && d <= best) { best = d; hot = i; }
         }
@@ -298,6 +349,7 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
         _resolved = true;
         for (int i = 0; i < _markers.Count; i++)
             if (_markers[i].Prompt != null) _markers[i].Prompt.gameObject.SetActive(false);
+        if (_autoTimer != null) _autoTimer.gameObject.SetActive(false);
 
         FinishAsync(grade, center).Forget();
     }
@@ -320,15 +372,6 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
         hud?.ShowBuffNotice(msg);
     }
 
-    protected static string GradeName(ChallengeGrade g) => g switch
-    {
-        ChallengeGrade.Platinum => "플래티넘",
-        ChallengeGrade.Gold     => "골드",
-        ChallengeGrade.Silver   => "실버",
-        ChallengeGrade.Bronze   => "브론즈",
-        _                       => "실패",
-    };
-
     protected TextMeshPro MakeText(string text, Vector3 worldPos, float size, Color color, int order)
     {
         var go = new GameObject("ChallengeText");
@@ -345,9 +388,25 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
         return t;
     }
 
+    /// <summary>남은 시간 글 — 처음 부를 때 세우고, 초가 바뀔 때만 고친다(매 프레임 문자열 할당 금지).</summary>
+    private void TickAutoTimer()
+    {
+        int sec = Mathf.Max(0, Mathf.CeilToInt(AutoResolveSeconds - _elapsed));
+        if (sec == _autoShown) return;
+        _autoShown = sec;
+        if (_autoTimer == null)
+        {
+            string hint = AutoResolveHint;
+            _autoTimerFormat = string.IsNullOrEmpty(hint) ? "남은 시간 {0}초" : "남은 시간 {0}초\n<size=70%>" + hint + "</size>";
+            _autoTimer = MakeText(string.Empty, _stage + Vector3.up * AutoTimerHeight, 3.4f, AutoTimerColor, 12);
+        }
+        _autoTimer.SetText(_autoTimerFormat, sec);
+    }
+
     private void Billboard()
     {
         if (_camT == null) return;
+        if (_autoTimer != null) _autoTimer.transform.rotation = _camT.rotation;
         foreach (var m in _markers)
         {
             if (m.Label  != null) m.Label.transform.rotation  = _camT.rotation;

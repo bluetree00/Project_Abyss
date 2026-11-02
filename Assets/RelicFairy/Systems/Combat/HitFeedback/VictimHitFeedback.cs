@@ -95,6 +95,7 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
         SoundKey.Sfx.MonsterHit2,
         SoundKey.Sfx.MonsterHit3,
     };
+    private const float CritSfxPitch = 0.78f;   // 치명타 = 같은 타격음을 낮춰 묵직하게(11-02 Q30 「치명타 타격음이 있다면 조금 다르게」)
 
     // ── Public Methods (IHitReceiver) ─────────────────────────────
     public void OnReceiveHit(in HitInfo info)
@@ -102,7 +103,7 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
         if (_profile == null) return;
 
         var sfxKey = s_hitSfxKeys[UnityEngine.Random.Range(0, s_hitSfxKeys.Length)];
-        Managers.Sound?.PlayEffectAsync(sfxKey).Forget();
+        Managers.Sound?.PlayEffectAsync(sfxKey, 1f, info.IsCritical ? CritSfxPitch : 1f).Forget();
 
         Color flashColor = _profile.FlashColor;
         Color lightColor = _profile.LightColor;

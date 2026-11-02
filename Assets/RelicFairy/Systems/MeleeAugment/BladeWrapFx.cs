@@ -13,7 +13,9 @@ public sealed class BladeWrapFx : MonoBehaviour
 {
     // ── Constants ─────────────────────────────────────────────────
     private const float WidthRatio = 0.09f, ThickRatio = 0.3f, LingerSeconds = 1.2f;   // 칼날 폭 = 길이 × 0.09 · 두께 = 폭 × 0.3
-    private const int   Segments = 6, MaxParticles = 160;
+    private const int   Segments = 6, MaxParticles = 240;
+    // 게임 카메라(위 15 m 안팎)에서 읽히게 — 10-26 값은 가까이 찍은 사진 기준이라 게임 화면에선 거의 안 보였다(10-30 사용자 「속성검이 보이지 않아」)
+    private const float SizeBoost = 1.6f, RateBoost = 1.4f;
 
     /// <summary>속성마다 입자 움직임 — 초당 수 · 수명 · 크기 · 위로(월드 m/s) · 흔들림 · 겉면에서 튀어나가는 속도.</summary>
     private readonly struct Motion
@@ -109,7 +111,7 @@ public sealed class BladeWrapFx : MonoBehaviour
         main.playOnAwake     = false;
         main.startLifetime   = new ParticleSystem.MinMaxCurve(m.Life * 0.7f, m.Life * 1.3f);
         main.startSpeed      = new ParticleSystem.MinMaxCurve(m.Speed * 0.5f, m.Speed * 1.5f);
-        main.startSize       = new ParticleSystem.MinMaxCurve(m.Size * 0.7f, m.Size * 1.3f);
+        main.startSize       = new ParticleSystem.MinMaxCurve(m.Size * SizeBoost * 0.7f, m.Size * SizeBoost * 1.3f);
         main.startRotation   = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
         main.startColor      = Color.white;
         main.simulationSpace = ParticleSystemSimulationSpace.World;    // 휘두르면 입자가 남아 궤적을 그린다
@@ -117,7 +119,7 @@ public sealed class BladeWrapFx : MonoBehaviour
         main.maxParticles    = MaxParticles;
 
         var emission = _ps.emission;
-        emission.rateOverTime = m.Rate;
+        emission.rateOverTime = m.Rate * RateBoost;
 
         var shape = _ps.shape;
         shape.enabled       = true;

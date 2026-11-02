@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace RelicFairy.Monster
 {
@@ -10,6 +11,10 @@ public static class BossEffectPool
     private static readonly Dictionary<int, Transform> Containers = new();
     // 프리팹(+ 폴백)마다 한 번만 잰다 — 부를 때마다 GetComponentsInChildren로 자식을 훑었다(10-29 풀링 점검 #5)
     private static readonly Dictionary<(int, float), float> LifetimeCache = new();
+    // 꺼내 준 채 아직 안 돌아온 인스턴스 — 씬이 바뀌면 모두 거둔다(10-30 씬 전환 때 거둔다). @Pools는 DontDestroyOnLoad라 보스가 패턴 도중
+    // 씬과 함께 파괴되면(사망 → 거점) 패턴 Exit가 불리지 않아 떨어지던 운석(반복 재생)이 다음 씬 같은 자리에 계속 떨어졌다(11차 빌드 피드백)
+    private static readonly HashSet<GameObject> Live = new();
+    private static readonly List<GameObject> s_releaseBuffer = new();
 
     private static Transform _root;
     private static Transform _effectRoot;
@@ -47,6 +52,7 @@ public static class BossEffectPool
             instance.transform.SetPositionAndRotation(position, rotation);
             instance.SetActive(true);
             pooled.ResetVisuals();
+            Live.Add(instance);
             return instance;
         }
         catch
@@ -84,6 +90,8 @@ public static class BossEffectPool
     {
         if (instance == null)
             return;
+
+        Live.Remove(instance);
 
         if (!instance.TryGetComponent(out BossPooledEffect pooled) || pooled.SourcePrefab == null)
         {
@@ -137,6 +145,29 @@ public static class BossEffectPool
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetLifetimeCache() => LifetimeCache.Clear();   // 에디터에서 파티클 값을 고친 뒤 다음 플레이에 다시 잰다
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void HookSceneChange()
+    {
+        Live.Clear();
+        SceneManager.activeSceneChanged -= OnActiveSceneChanged;
+        SceneManager.activeSceneChanged += OnActiveSceneChanged;
+    }
+
+    /// <summary>씬이 바뀌었다 — 옛 씬 보스가 돌려주지 못한 이펙트 · 바닥 칸을 모두 거둔다(10-30 씬 전환 때 거둔다).</summary>
+    private static void OnActiveSceneChanged(Scene from, Scene to)
+    {
+        if (Live.Count > 0)
+        {
+            s_releaseBuffer.Clear();
+            s_releaseBuffer.AddRange(Live);
+            foreach (var go in s_releaseBuffer)
+                Release(go);   // 씬 오브젝트 밑에 붙었던 것은 이미 함께 파괴됐다(null — Release가 건너뛴다)
+            s_releaseBuffer.Clear();
+            Live.Clear();
+        }
+        QuadTilePool.ReturnAll();
+    }
 
     private static GameObject GetOrCreate(GameObject prefab)
     {
@@ -303,6 +334,8 @@ public sealed class BossPooledEffect : MonoBehaviour
 public static class QuadTilePool
 {
     private static readonly Queue<(GameObject go, MeshRenderer mr, Material mat)> _pool = new();
+    private static readonly Dictionary<GameObject, (MeshRenderer mr, Material mat)> _rented = new();   // 빌려 간 칸 — 씬이 바뀌면 거둔다(10-30 씬 전환 때 거둔다)
+    private static readonly List<KeyValuePair<GameObject, (MeshRenderer mr, Material mat)>> s_returnBuffer = new();
     private static Shader    _shader;
     private static Mesh      _quadMesh;
     private static Transform _container;
@@ -357,10 +390,12 @@ public static class QuadTilePool
         while (_pool.Count > 0)
         {
             var item = _pool.Dequeue();
-            if (item.go != null) { item.mr.enabled = true; return item; }
+            if (item.go != null) { item.mr.enabled = true; item.mr.sortingOrder = PatternGuideHelper.GuideSortingOrder; _rented[item.go] = (item.mr, item.mat); return item; }
         }
         var newItem = CreateNew();
         newItem.mr.enabled = true;
+        newItem.mr.sortingOrder = PatternGuideHelper.GuideSortingOrder;   // 예고 칸 — 플레이어 이펙트 위(그을음은 빌린 쪽이 0으로 돌린다)
+        _rented[newItem.go] = (newItem.mr, newItem.mat);
         return newItem;
     }
 
@@ -382,12 +417,34 @@ public static class QuadTilePool
 
     public static void Return(GameObject go, MeshRenderer mr, Material ownedMat)
     {
-        if (go == null) return;
+        if (go == null || !_rented.Remove(go)) return;   // 이미 돌려받은 칸(씬 전환 때 거둔 뒤 옛 패턴이 늦게 돌려줌) — 두 번 넣지 않는다
         go.name = "PooledQuad";
         if (_container != null) go.transform.SetParent(_container, false);
         if (mr != null) { mr.sharedMaterial = ownedMat; mr.enabled = false; }
         if (ownedMat != null) ownedMat.color = Color.clear;
         _pool.Enqueue((go, mr, ownedMat));
+    }
+
+    /// <summary>예고 순서로 켜진 칸이 하나라도 있는가 — <see cref="PatternGuideHelper.AnyBossTelegraph"/>가 읽는다(그을음은 순서 0이라 빠진다).</summary>
+    internal static bool AnyGuideTile()
+    {
+        foreach (var kv in _rented)
+            if (kv.Key != null && kv.Value.mr != null && kv.Value.mr.enabled && kv.Value.mr.sortingOrder == PatternGuideHelper.GuideSortingOrder) return true;
+        return false;
+    }
+
+    /// <summary>빌려 간 칸을 모두 돌려받는다 — 씬이 바뀔 때(<see cref="BossEffectPool"/>). 칸을 쥔 패턴이 보스와 함께 파괴돼 돌려주지 못했다(10-30 씬 전환 때 거둔다).</summary>
+    internal static void ReturnAll()
+    {
+        if (_rented.Count == 0) return;
+        s_returnBuffer.Clear();
+        s_returnBuffer.AddRange(_rented);
+        foreach (var kv in s_returnBuffer)
+        {
+            if (kv.Key == null) { _rented.Remove(kv.Key); continue; }
+            Return(kv.Key, kv.Value.mr, kv.Value.mat);
+        }
+        s_returnBuffer.Clear();
     }
 }
 }

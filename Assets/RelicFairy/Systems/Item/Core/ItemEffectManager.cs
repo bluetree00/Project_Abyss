@@ -135,6 +135,18 @@ public sealed class ItemEffectManager
     public void SetPersistentStack(string key, int value) =>
         _persistentStacks[key] = value;
 
+    /// <summary>
+    /// 10-31 정예 · 보스에게 주는 피해 배율(맞서는 분노 등) — 룬 시너지 · 격발 · 전설 · 도트 · 서약 피해(MonsterBase.TakeSynergyDamage)가 읽는다.
+    /// 무기 · 스킬 주 피해는 OnPreDealDamage가 따로 곱한다. 예전엔 주 피해에만 붙었다.
+    /// </summary>
+    public float GradeDamageMultiplier()
+    {
+        float m = 1f;
+        foreach (var eff in _activeEffects)
+            if (eff is TargetGradeBonusEffect g && g.IsActive(_ctx)) m *= g.Multiplier;
+        return m;
+    }
+
     // ── 버프창 표시 수집 ────────────────────────────────────
 
     /// <summary>
@@ -177,7 +189,7 @@ public sealed class ItemEffectManager
         // 다음-공격-강화 버퍼 소비(1타 한정) — 일반(근접)공격에서만(원거리/스킬 누수 방지).
         if (meleeAttack && _nextAttackBonus > 0f)
         {
-            pkt.FinalDamage *= 1f + _nextAttackBonus;
+            pkt.AddBonus(BonusSource.Item, _nextAttackBonus);
             _nextAttackBonus = 0f;
         }
     }

@@ -239,7 +239,7 @@ public sealed class CovenantClause
         {
             item = new BuffViewItem(
                 iconKey:     "dmg",
-                label:       $"{_effect.name} 피해 +{FuryAmp * 100f:0}%",
+                label:       Loc.F("{0} 피해 +{1:0}%", _effect.name, FuryAmp * 100f),
                 stacks:      1,
                 remaining01: Remaining01(_buffEnd, _effect.duration),
                 remainText:  string.Empty,
@@ -253,7 +253,7 @@ public sealed class CovenantClause
             MomentumRates(out float move, out float atk);
             item = new BuffViewItem(
                 iconKey:     "speed",
-                label:       $"{_effect.name} 이속 +{move * 100f:0}% · 공속 +{atk * 100f:0}%",
+                label:       Loc.F("{0} 이속 +{1:0}% · 공속 +{2:0}%", _effect.name, move * 100f, atk * 100f),
                 stacks:      _momentumStacks,
                 remaining01: Remaining01(_momentumEnd, MomentumDuration),
                 remainText:  string.Empty,
@@ -266,7 +266,7 @@ public sealed class CovenantClause
         {
             item = new BuffViewItem(
                 iconKey:     "def",
-                label:       $"{_effect.name} 받는 피해 -{_wardReduction * 100f:0}%",
+                label:       Loc.F("{0} 받는 피해 -{1:0}%", _effect.name, _wardReduction * 100f),
                 stacks:      1,
                 remaining01: Remaining01(_wardEnd, _effect.duration),
                 remainText:  string.Empty,

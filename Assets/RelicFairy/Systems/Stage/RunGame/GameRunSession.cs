@@ -41,7 +41,7 @@ public sealed class GameRunSession
     /// <summary>신규 런 시작 시 지급하는 강화재료(EnhanceMaterial) 초기량. 재련소(#1 소비처)가
     /// 이벤트방(유일 생산처)보다 앞 순번일 때 첫 재련소에서 재료=0이 되는 갭의 안전장치.
     /// EnhanceTable +0→+1 비용(1) 기준 약 5회 시도분. 이어하기 복원 경로에는 지급하지 않는다.</summary>
-    private const int NewRunStartingEnhanceMaterial = 8;   // 10-15 5 → 8(재련소 재화 넉넉히 · 확률은 낮춤)
+    private const int NewRunStartingEnhanceMaterial = 12;   // 10-15 5 → 8(재련소 재화 넉넉히 · 확률은 낮춤) · 10-30 8 → 12(사용자 「재련석 지급량을 좀 더 늘려」)
 
     // 포션 — 신규 런 시작 지급량, 사용 시 회복 비율(최대 HP 대비).
     private const int   NewRunStartingPotions = 3;
@@ -205,16 +205,24 @@ public sealed class GameRunSession
     /// <summary>위험한 문으로 들어온 방인가(10-29 F4) — 두 번째 파도 정예 둘 확정 · 보상 Epic 이상. 방 진입마다 RunFlowController가 넘긴다.</summary>
     public bool CurrentRoomDanger { get; private set; }
 
+    /// <summary>문에 걸린 속성 룬(11-02 Q10 일반 | 일반 갈림길) — 이 방 보상 룬(일반 · 희귀)이 이 속성(ElementDef id). 없으면 null.</summary>
+    public string CurrentRoomRuneFocus { get; private set; }
+
+    /// <summary>보스방에 든 순간의 챕터 전투 시계(11-02 Q14) — 처치 때 빼면 보스전 시간.</summary>
+    public float BossCombatStart { get; private set; }
+
     /// <summary>방에 들어선 순번(이어하기로 같은 방을 다시 지어도 오른다) — 전투 시계가 방마다 기준 시간을 한 번 더하는 데 쓴다(10-24 U5).</summary>
     public int RoomEnterSerial { get; private set; }
 
     /// <summary>방 진입 시 RunFlowController가 호출.</summary>
     /// <param name="countSpecialVisit">특수방이면 방문 수를 올릴지. 이어하기 재생성(같은 방을 다시 짓는 것)은
     /// false로 넘긴다 — 저장된 SpecialRoomVisits가 이미 그 방문을 포함하고 있어 그대로 두면 이중 계상된다.</param>
-    public void SetCurrentRoomKind(RoomPlanKind kind, bool countSpecialVisit = true, bool danger = false)
+    public void SetCurrentRoomKind(RoomPlanKind kind, bool countSpecialVisit = true, bool danger = false, string runeFocus = null)
     {
         CurrentRoomKind = kind;
         CurrentRoomDanger = danger;
+        CurrentRoomRuneFocus = runeFocus;
+        if (kind == RoomPlanKind.Boss) BossCombatStart = RunStats.CombatSeconds;   // 11-02 Q14 보스전 시간 기준
         RoomEnterSerial++;
         MonsterRoomLedger.Reset();   // 방 단위 특성 · 정예 접두어 기록(10-11 정예 접두어)
 
@@ -274,6 +282,7 @@ public sealed class GameRunSession
     public void NotifyBossRoomCleared(Vector3 center)
     {
         BossKillCount++;
+        RecordBoard.Capture(this);   // 11-02 Q14 보스전 · 챕터 전투 시간 — 개인 최고 · 뒤끝 표(신기록만)
 
         // 보스방 클리어 = 챕터 완료. 이 챕터를 한 대도 안 맞고 끝냈으면 기행 1회.
         if (!_damagedThisChapter) FlawlessChapters++;

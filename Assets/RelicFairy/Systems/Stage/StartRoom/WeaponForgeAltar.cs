@@ -88,6 +88,17 @@ public class WeaponForgeAltar : MonoBehaviour
     public bool Offers(WeaponSO w)
         => w != null && (w == bowOption || (w == crossbowOption && MemoryAltarService.IsUnlocked(MemoryAltarCatalog.WeaponCrossbow)));
 
+    /// <summary>
+    /// 지금 내놓는 원거리 중 이 이름의 것(지난 세팅 복원 · 10-30). 공방이 가진 바로 그 에셋을 돌려준다 —
+    /// 빌드에선 Addressables로 따로 불러온 사본이 공방 것과 다른 인스턴스라 <see cref="Offers"/>가 늘 거짓이었다(귀환해도 원거리가 빔).
+    /// </summary>
+    public WeaponSO FindOffered(string assetName)
+    {
+        if (bowOption != null && bowOption.name == assetName && Offers(bowOption)) return bowOption;
+        if (crossbowOption != null && crossbowOption.name == assetName && Offers(crossbowOption)) return crossbowOption;
+        return null;
+    }
+
     // ── Selection ─────────────────────────────────────────────
 
     private async UniTaskVoid ClaimAsync(CancellationToken ct)
@@ -167,7 +178,7 @@ public class WeaponForgeAltar : MonoBehaviour
             Weapon     = weapon,
             Locked     = !unlocked,
             // 제단이 실제로 받는 값(조건을 채웠으면 할인가) — 기본가를 적으면 제단 가격과 어긋난다(09-26 감사).
-            LockReason = unlocked ? null : $"기억의 제단 — {(node != null ? MemoryAltarService.GetState(node).Cost : 0):N0} ◆",
+            LockReason = unlocked ? null : Loc.F("기억의 제단 — {0:N0} ◆", (node != null ? MemoryAltarService.GetState(node).Cost : 0)),
         };
     }
 
@@ -257,7 +268,7 @@ public class WeaponForgeAltar : MonoBehaviour
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.sortingOrder = UISortingOrder.WorldPrompt;
         TMPOutlineHelper.ApplySoftShadow(tmp);
-        tmp.text = $"<color={UIPalette.GoldHex}>[F]</color> 보조 무기";
+        tmp.text = Loc.F("<color={0}>[F]</color> 보조 무기", UIPalette.GoldHex);
 
         _promptGo.SetActive(false);
     }
@@ -268,8 +279,8 @@ public class WeaponForgeAltar : MonoBehaviour
         // 이미 들었으면 「바꾸기」 — 다시 고를 수 있다는 걸 글자로 알린다(10-19 ⑦)
         if (on && _promptText != null)
             _promptText.text = AppBootstrapper.Instance?.Loadout?.WeaponSlot1 != null
-                ? $"<color={UIPalette.GoldHex}>[F]</color> 보조 무기 바꾸기"
-                : $"<color={UIPalette.GoldHex}>[F]</color> 보조 무기";
+                ? Loc.F("<color={0}>[F]</color> 보조 무기 바꾸기", UIPalette.GoldHex)
+                : Loc.F("<color={0}>[F]</color> 보조 무기", UIPalette.GoldHex);
         _promptGo.SetActive(on);
     }
 }

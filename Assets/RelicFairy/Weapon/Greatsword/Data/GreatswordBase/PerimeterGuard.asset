@@ -25,7 +25,7 @@ MonoBehaviour:
   ringGap: 0.25
   slashEffectKey: BasicSlashBlue
   slashEffectScale: 0.98
-  shockEffectKey: GreatswordEFinish
+  shockEffectKey: 
   shockScalePerMeter: 0.26
   endDelay: 0.15
   animationOverride:

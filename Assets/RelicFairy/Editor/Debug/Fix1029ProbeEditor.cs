@@ -79,13 +79,11 @@ public static class Fix1029ProbeEditor
             Check("⑥ 고른 유물 제단은 숨김(고른 상태)", picked != null && !picked.gameObject.activeInHierarchy);
             bool ready = (bool)(typeof(BaseCampDungeonGate).GetMethod("IsLoadoutReady", Any)?.Invoke(null, null) ?? false);
             Check("⑦ 성문 준비(파츠 없이)", ready);
-            var parts = Object.FindObjectsByType<StartPartStation>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            Check("⑧ 파츠 공방 꺼짐", parts.Length > 0 && parts.All(p => !p.gameObject.activeInHierarchy), $"{parts.Length}개");
 
             var player = Managers.Player?.PlayerTransform;
             var altar = Object.FindFirstObjectByType<WorldAwakeningAltar>();
             float dist = player != null && altar != null ? Vector3.Distance(player.position, altar.transform.position) : -1f;
-            Check("⑨ 귀환 자리 = 제단 앞(10 m 안)", dist >= 0f && dist < 10f, $"{dist:0.0} m");
+            Check("⑨ 귀환 자리 = 광장(10-30 되돌림 · 제단은 걸어가 유도)", dist > 10f, $"제단까지 {dist:0.0} m");
 
             // 제단 이름표 — 정수 0이면 「다음 칸까지」
             if (data != null && altar != null)

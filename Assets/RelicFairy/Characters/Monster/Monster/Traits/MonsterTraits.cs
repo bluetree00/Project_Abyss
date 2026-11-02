@@ -464,8 +464,9 @@ public sealed partial class MonsterTraits : MonoBehaviour
         if (elite == null || elite.IsDead) return;
         var d = MonsterTraitTable.Of(k);
         // 행동 팁만(설명의 「— 」 뒤) — 전체 설명은 두 줄로 접혀 플레이어 위를 덮었다(10-29 사진). 첫 조우 안내가 전체를 이미 보여 줬다
-        int cut = d.desc.LastIndexOf(" — ", StringComparison.Ordinal);
-        string msg = $"이 방 정예 — {d.name}: {(cut >= 0 ? d.desc.Substring(cut + 3) : d.desc)}";
+        string desc = Loc.T(d.desc);   // 영어 설명도 「 — 」 뒤가 행동 팁(11-02 Q11)
+        int cut = desc.LastIndexOf(" — ", StringComparison.Ordinal);
+        string msg = Loc.F("이 방 정예 — {0}: {1}", Loc.T(d.name), cut >= 0 ? desc.Substring(cut + 3) : desc);
         FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include)?.ShowBuffNotice(msg);
         Debug.Log("[F3] " + msg);
     }
@@ -482,10 +483,10 @@ public sealed partial class MonsterTraits : MonoBehaviour
             PlayerPrefs.SetInt(key, 1);
             PlayerPrefs.Save();   // 튕기면 첫 안내가 또 뜨지 않게
             var d = MonsterTraitTable.Of(k);
-            msg = msg == null ? $"{d.name}: {d.desc}" : $"{msg}   ·   {d.name}: {d.desc}";
+            msg = msg == null ? $"{Loc.T(d.name)}: {Loc.T(d.desc)}" : $"{msg}   ·   {Loc.T(d.name)}: {Loc.T(d.desc)}";
         }
         if (msg == null) return;
         var hud = FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
-        hud?.ShowBuffNotice("새로운 적 특성 — " + msg);
+        hud?.ShowBuffNotice(Loc.F("새로운 적 특성 — {0}", msg));
     }
 }

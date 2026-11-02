@@ -87,7 +87,7 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
 
             // 10-29 지난 세팅 유지 — 비어 있는 칸만 지난번 원거리 · 유물로 채운다(바꾸기는 공방 · 유물 제단에서)
             var forge = FindFirstObjectByType<WeaponForgeAltar>();
-            await LastLoadoutMemory.RestoreAsync(AppBootstrapper.Instance?.Loadout, w => forge == null || forge.Offers(w), ct);
+            LastLoadoutMemory.Restore(AppBootstrapper.Instance?.Loadout, name => forge != null ? forge.FindOffered(name) : null, RelicAltar.FindInScene);
             RelicAltar.SyncSelection(AppBootstrapper.Instance?.Loadout?.Relic);
 
             await SpawnPlayerAsync(ct);
@@ -153,7 +153,7 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             // 10-29 지난 세팅을 쥐여 줬으면 한 줄 — 무엇을 들었고 어디서 바꾸는지
             if (LastLoadoutMemory.RestoredThisVisit)
                 FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include)?.ShowBuffNotice(
-                    $"지난 세팅 그대로 — {LastLoadoutMemory.Describe(AppBootstrapper.Instance?.Loadout)} · 바꾸려면 공방 · 유물 제단");
+                    Loc.F("지난 세팅 그대로 — {0} · 바꾸려면 공방 · 유물 제단", LastLoadoutMemory.Describe(AppBootstrapper.Instance?.Loadout)));
         }
         catch (OperationCanceledException) { }
         finally { IsReady = true; }

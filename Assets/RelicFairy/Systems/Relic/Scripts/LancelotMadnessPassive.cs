@@ -11,6 +11,7 @@ using RelicFairy.Monster;
 /// 이제 한 행동에 한 번 — 기본 +1, 그 행동이 정예 · 엘리트 · 보스를 맞혔으면 +2, 3명 이상 맞혔으면 +1 더(행동당 최대 3).
 /// 같은 행동 = 같은 공격 실행(<see cref="PlayerController.ActiveExecution"/>) · 같은 콤보 단계.
 /// 실행이 없거나(늦게 맞는 투사체) 원거리 무기면 첫 적중부터 <see cref="LooseWindow"/>초를 한 행동으로 묶는다(화살 한 발 · 갈래 화살 한 번).
+/// 10-30 사용자 「(Q 무적을 넣고) 게이지 수급량은 더 줄이고」 — 행동 몫에 <see cref="GainScale"/>를 곱한다(끝수는 다음 행동으로 넘김 · 차트 MAX 40은 CDN이라 그대로).
 /// </summary>
 public sealed class LancelotMadnessPassive : CharacterPassiveBase
 {
@@ -19,12 +20,14 @@ public sealed class LancelotMadnessPassive : CharacterPassiveBase
     private const int   CrowdBonus   = 1;      // 그 행동이 CrowdTargets명 이상을 맞혔다
     private const int   CrowdTargets = 3;
     private const float LooseWindow  = 0.2f;   // 실행 키가 없을 때 한 행동으로 묶는 시간
+    private const float GainScale    = 0.5f;   // 행동 몫 배율(10-30 — 보스 휘두름 +2 → +1 · 일반 +1 → 두 번에 +1)
 
     private AbilityExecution _actionExec;
     private int   _actionStep = -1;
     private float _actionAt   = -999f;
     private int   _actionBase;    // 이번 행동의 기본 몫(1 또는 2)
-    private int   _actionGiven;   // 이번 행동에 이미 준 스택
+    private int   _actionGiven;   // 이번 행동에 이미 준 몫(배율 전)
+    private float _carry;         // 배율을 곱하고 남은 끝수 — 다음 몫에 더한다
     private readonly HashSet<int> _actionTargets = new();
 
     public override string         PassiveName => "광기";
@@ -58,8 +61,12 @@ public sealed class LancelotMadnessPassive : CharacterPassiveBase
         // 같은 행동 안에서 더 센 적 · 셋째 대상이 뒤늦게 맞으면 차액만 더 준다
         int want = _actionBase + (_actionTargets.Count >= CrowdTargets ? CrowdBonus : 0);
         if (want <= _actionGiven) return;
-        lm.AddActionStack(want - _actionGiven);
+        _carry += (want - _actionGiven) * GainScale;
         _actionGiven = want;
+        int give = Mathf.FloorToInt(_carry + 0.0001f);
+        if (give <= 0) return;
+        _carry -= give;
+        lm.AddActionStack(give);
     }
 
     /// <summary>정예 · 엘리트 · 보스인가(허수아비도 등급을 가진다 — 보스 더미로 수급을 잴 수 있게).</summary>

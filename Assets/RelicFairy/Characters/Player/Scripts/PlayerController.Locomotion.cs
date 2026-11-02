@@ -10,6 +10,13 @@ public sealed partial class PlayerController
     /// </summary>
     public float MoveScale => _actionMoveScale * Status.SlowScale * Status.HasteScale;   // 10-29 잠깐 빨라짐 채널
 
+    /// <summary>
+    /// 10-31 바닥 장치 이동 배율(보물 창고 진흙 · 가시 비틀거림 × 바람 문양) — 지상 이동 최고 속도에 곱한다(DefaultMoveAbility).
+    /// <see cref="MoveScale"/>는 입력 방향에 곱해지는데 Move가 방향을 정규화해 속도엔 닿지 않았다(진흙 · 바람이 실제 속도를 바꾸지 못했다).
+    /// 둘 다 짧은 타이머로 풀리고, 보물 창고가 끝날 때 <see cref="ClearFloorSpeed"/>로 바로 1이 된다.
+    /// </summary>
+    public float FloorSpeedScale => Status.FloorSlowScale * Status.HasteScale;
+
     /// <summary>현재 수평 실속도를 runMax 기준 0~1로 정규화. 애니 MoveSpeed 구동용(실속도라 가속·감속 반영 + 발미끄러짐 방지).</summary>
     public float HorizontalSpeed01
     {
@@ -92,6 +99,8 @@ public sealed partial class PlayerController
     // 시작부터 겹친 벽(거리 0)에 막히지 않는다. 멈출 자리 = 구가 닿은 곳 − (캡슐 반경 − 구 반경) − 틈.
     private const float ClearCastRadius = 0.2f, ClearCastHeight = 0.6f, ClearBodyRadius = 0.27f, ClearWallGap = 0.05f;
     private static readonly RaycastHit[] s_clearHits = new RaycastHit[16];
+    // 돌진 바닥 따라가기(11-02 Q6) — 한 프레임에 오르는 높이 상한(그 위는 벽) · 내려가는 높이 상한(그 아래는 낭떠러지 — 높이 유지) · 바닥 위 띄움
+    private const float DashStepUp = 1f, DashStepDown = 1.2f, DashGroundLift = 0.02f;
 
     /// <summary>
     /// <paramref name="from"/>에서 <paramref name="dir"/>로 막힘 없이 갈 수 있는 거리(m, 최대 <paramref name="max"/>) — 첫 벽 앞까지.
@@ -118,6 +127,23 @@ public sealed partial class PlayerController
             if (s < stop) stop = s;
         }
         return Mathf.Max(0f, stop);
+    }
+
+    /// <summary>
+    /// 돌진 목표의 높이를 발밑 바닥에 맞춘다 — 경사로 · 계단을 따라 오르내린다(11-02 Q6 「R 스킬로 베이스캠프 계단을 뚫고 갈 수 있다」).
+    /// 돌진은 처음 높이 그대로 수평으로 몸을 밀어 오르막 경사로(거점 계단 = Ground 층 상자) 안으로 파고들었다.
+    /// <paramref name="currentY"/> = 지금 몸 높이. 그보다 <see cref="DashStepUp"/> 넘게 높은 바닥은 벽처럼 둔다(높이 그대로 → 물리가 막는다) ·
+    /// <see cref="DashStepDown"/> 안에 바닥이 없으면(낭떠러지) 높이를 그대로 둔다(돌진이 끝나면 떨어진다).
+    /// </summary>
+    public Vector3 DashFollowGround(Vector3 target, float currentY)
+    {
+        int ground = CharacterData != null ? CharacterData.groundLayer.value : 0;
+        if (ground == 0) return target;
+        var from = new Vector3(target.x, currentY + DashStepUp, target.z);
+        target.y = Physics.Raycast(from, Vector3.down, out var hit, DashStepUp + DashStepDown, ground, QueryTriggerInteraction.Ignore)
+            ? hit.point.y + DashGroundLift
+            : currentY;
+        return target;
     }
 
     // ── Public Methods: 회전 · 조준 ───────────────────────────────

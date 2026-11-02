@@ -87,6 +87,12 @@ internal sealed class ExileFallBossCast
     }
 
     // ── Public Methods ────────────────────────────────────────────
+    /// <summary>모든 보스 모델 프리팹을 읽어 캐시에 둔다(<see cref="ExileFallSequence.PreloadAsync"/> — 11-02 Q27).</summary>
+    public static async UniTask PreloadAsync(AddressableManager am)
+    {
+        foreach (var c in Casts) await am.TryLoadAssetAsync<GameObject>(c.address);
+    }
+
     /// <summary>그 보스의 자리 · 값을 정한다(모델은 아직). 표에 없는 보스면 null.</summary>
     public static ExileFallBossCast Plan(string bossId, Vector3 feet, float breakAt)
     {

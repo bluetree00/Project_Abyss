@@ -49,6 +49,9 @@ MonoBehaviour:
     traitTag: "\uBAB0\uC544 \uC7A1\uAE30"
     line: "\uACBD\uC9C1\uB41C \uC801\uC740 2\uCD08 \uB3D9\uC548 \uBC1B\uB294 \uD53C\uD574
       +6%"
+  reforgeVariants:
+  - aftershock
+  - heavy_hand
   triggerVfxKey: GreatswordEFinish
   triggerVfxScale: 0.91
   fullTrailPrefab: {fileID: 1298082800965881913, guid: 833bd2bfddf27ff4494b0bc4356e2a28,

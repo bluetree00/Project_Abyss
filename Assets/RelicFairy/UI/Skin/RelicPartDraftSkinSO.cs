@@ -78,14 +78,6 @@ public sealed class RelicPartDraftSkinSO : ScriptableObject
     [SerializeField, Tooltip("진화 카드 위 가운데 문장(해 · 검) — 틀에서 떼어 낸 장식. 카드 위 가장자리에 걸쳐 얹는다.")]
     private KeyArt[] evolutionCrest = new KeyArt[0];
 
-    [Header("파츠 공방(10-19 힉스필드 — 호두나무 · 황동) — 같은 스킨을 빌려 쓰는 UI_StartPartPopup")]
-    [SerializeField, Tooltip("공방 카드 틀(9칸 · 바탕 포함). 비우면 예전 카드 판.")]
-    private Sprite workshopCardFrame;
-    [SerializeField, Tooltip("공방 창 틀(9칸 · 바탕 포함). 비우면 예전 남색 판 + 금선.")]
-    private Sprite workshopPanelFrame;
-
-    public Sprite WorkshopCardFrame  => workshopCardFrame;
-    public Sprite WorkshopPanelFrame => workshopPanelFrame;
     public Sprite GroupUnderline => groupUnderline;
     public Sprite GroupDivider   => groupDivider;
     public Sprite MemoryCardFrame => memoryCardFrame;

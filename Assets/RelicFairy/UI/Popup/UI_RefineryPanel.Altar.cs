@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -116,6 +117,15 @@ public sealed partial class UI_RefineryPanel
         ShopUIStyle.Stretch(closeLabel.rectTransform);
         closeLabel.text = "닫기 · ESC";
         AddClick(close.gameObject, () => { if (!_busy) ClosePopupUI(); });
+
+        // 11-02 Q18 환전소 — [닫기] 왼쪽 · 금선
+        var exchange = ShopUIStyle.MakeImage(idle, "Exchange", ButtonFill, raycast: true);
+        Corner(exchange.rectTransform, true, -254f, -104f, 150f, 44f);
+        SetLine(StyleFlatButton(exchange), UITheme.Thin.LineGold);
+        var exchangeLabel = WText(exchange.transform, "Label", UIWeight.Regular, UITheme.Thin.Body, UITheme.Thin.InkA(0.85f), TextAlignmentOptions.Center);
+        ShopUIStyle.Stretch(exchangeLabel.rectTransform);
+        exchangeLabel.text = "환전소";
+        AddClick(exchange.gameObject, () => { if (!_busy) OpenExchangeAsync().Forget(); });
 
         BuildOddsColumn(idle);
         BuildCostColumn(idle);
@@ -320,22 +330,22 @@ public sealed partial class UI_RefineryPanel
         _iBoost.text = RefineryService.DescribeBoost();   // 10-29 방 보상 확률을 따라 오른다는 것을 늘 보인다
 
         CurrencyCounter.Apply(_iOwn, _svc.OreOwned, "원석 ");
-        _iCost.text  = _iCostIcon.enabled ? _svc.CurrentCost.ToString() : $"원석 {_svc.CurrentCost}";
+        _iCost.text  = _iCostIcon.enabled ? _svc.CurrentCost.ToString() : Loc.F("원석 {0}", _svc.CurrentCost);
         _iCost.color = _svc.CanAfford ? UITheme.Thin.Ink : UITheme.Thin.Danger;
-        _iNext.text  = _svc.NextCost > _svc.CurrentCost ? $"다음 정제부터 원석 {_svc.NextCost}" : $"다음 정제도 원석 {_svc.NextCost}";
+        _iNext.text  = _svc.NextCost > _svc.CurrentCost ? Loc.F("다음 정제부터 원석 {0}", _svc.NextCost) : Loc.F("다음 정제도 원석 {0}", _svc.NextCost);
         bool pick    = _svc.TwoCards;
         _iMode.text  = pick ? "룬 두 장 중 하나를 고른다" : "룬 하나가 나온다";
         _iMode.color = pick ? UITheme.Thin.Gold : UITheme.Thin.InkA(0.85f);
         _iSub.text   = pick ? "원석을 바치면 밤하늘이 룬 두 장을 내린다 — 하나를 고른다" : "원석을 바치면 밤하늘이 룬 하나를 내린다";
 
         int left = RefineryService.PityLimit - _svc.PityCount;
-        _iPity.text  = _svc.PityReady ? "◆ 이번 정제 Legend 확정" : $"Legend 확정까지 {left}회";
+        _iPity.text  = _svc.PityReady ? "◆ 이번 정제 Legend 확정" : Loc.F("Legend 확정까지 {0}회", left);
         _iPity.color = _svc.PityReady ? UITheme.Thin.Gold : UITheme.Thin.InkA(0.6f);
         var ev = _svc.RoomEvent;
         bool spent = ev == RefineryEvent.HighPurity && !_svc.PurityReady;   // 고순도는 한 번 쓰면 끝
         _iEvent.text  = ev == RefineryEvent.None ? string.Empty
-                      : spent ? $"{RefineryService.EventTitle(ev)} — 이미 썼다"
-                      : $"◆ {RefineryService.EventTitle(ev)} — {RefineryService.EventLine(ev)} · 이 방에서만";
+                      : spent ? Loc.F("{0} — 이미 썼다", RefineryService.EventTitle(ev))
+                      : Loc.F("◆ {0} — {1} · 이 방에서만", RefineryService.EventTitle(ev), RefineryService.EventLine(ev));
         _iEvent.color = spent ? UITheme.Thin.InkA(0.5f) : UITheme.Thin.Gold;
 
         int melt = _svc.MeltForNext;
@@ -343,8 +353,8 @@ public sealed partial class UI_RefineryPanel
         _iMeltNote.gameObject.SetActive(melt > 0);
         if (melt > 0)
         {
-            _iMeltLabel.text = $"강화재료 {melt} → 원석 {melt}  녹이기";
-            _iMeltNote.text  = $"재련소의 강화재료를 원석으로 1 : 1 · 남은 강화재료 {_svc.MaterialOwned}";
+            _iMeltLabel.text = Loc.F("강화재료 {0} → 원석 {1}  녹이기", melt, melt);
+            _iMeltNote.text  = Loc.F("재련소의 강화재료를 원석으로 1 : 1 · 남은 강화재료 {0}", _svc.MaterialOwned);
         }
     }
 
@@ -353,7 +363,7 @@ public sealed partial class UI_RefineryPanel
     {
         if (_iSpin == null || _svc == null) return;
         _iSpinLabel.color = ready ? UITheme.Thin.Gold : UITheme.Thin.InkA(0.45f);
-        _iSpinCost.text   = _iSpinIcon.enabled ? _svc.CurrentCost.ToString() : $"원석 {_svc.CurrentCost}";
+        _iSpinCost.text   = _iSpinIcon.enabled ? _svc.CurrentCost.ToString() : Loc.F("원석 {0}", _svc.CurrentCost);
         _iSpinCost.color  = afford ? UITheme.Thin.Ink : UITheme.Thin.Danger;
         if (_iSpinIcon.enabled) _iSpinIcon.color = new Color(1f, 1f, 1f, ready ? 1f : 0.5f);
         SetLine(_iSpinLine, ready ? UITheme.Thin.LineReady : UITheme.Thin.LineIdle);

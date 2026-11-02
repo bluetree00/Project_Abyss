@@ -203,7 +203,7 @@ public sealed class RankingHall : MonoBehaviour
         go.transform.SetParent(_stele, false);
         go.transform.localPosition = Vector3.up * 3.9f;   // 제목(2.9 m) 위 — 겹쳤다(10-29 사진)
         _prompt = go.AddComponent<TextMeshPro>();
-        _prompt.text             = $"<color={UIPalette.GoldHex}>[F]</color> 기록 보기";
+        _prompt.text             = Loc.F("<color={0}>[F]</color> 기록 보기", UIPalette.GoldHex);
         _prompt.fontSize         = 4f;
         _prompt.alignment        = TextAlignmentOptions.Center;
         _prompt.color            = Color.white;

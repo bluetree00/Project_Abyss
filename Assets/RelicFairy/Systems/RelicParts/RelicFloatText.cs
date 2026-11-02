@@ -48,7 +48,7 @@ public sealed class RelicFloatText : MonoBehaviour
         if (string.IsNullOrEmpty(text) || !Application.isPlaying) return;
         if (GameRunBootstrapper.Instance?.Run?.InCutscene == true) return;
         if (s_instance == null) s_instance = new GameObject("@RelicFloatText").AddComponent<RelicFloatText>();
-        s_instance.Spawn(at, text, color);
+        s_instance.Spawn(at, Loc.T(text), color);   // 머리 위 글 출구 — 화면 언어(11-02 Q11 · 조립 글은 부르는 쪽에서 Loc.F)
     }
 
     private void Spawn(Vector3 at, string text, Color color)

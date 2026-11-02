@@ -289,7 +289,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         _closing       = false;
         _refinerySpent = refinerySpent;
         if (_windowRoot != null && _windowRoot.Find("Title") is Transform titleT && titleT.TryGetComponent<TMP_Text>(out var title))
-            title.text = rounds > 1 ? $"{TitleText}  <color=#9A98A0>보상 {Mathf.Clamp(round, 1, rounds)}/{rounds}</color>" : TitleText;
+            title.text = rounds > 1 ? Loc.F("{0}  <color=#9A98A0>보상 {1}/{2}</color>", TitleText, Mathf.Clamp(round, 1, rounds), rounds) : TitleText;
         _openBoard   = rounds <= 1 || round >= rounds;
         _briefReveal = rounds > 1 && round >= 2;
 
@@ -902,7 +902,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         ShopUIStyle.Anchor(skipHint.rectTransform,
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
             new Vector2(163f, 18f), new Vector2(180f, 22f));
-        skipHint.text = $"넘기면 원석 +{ClearRewardTrigger.SkipOreReward}";
+        skipHint.text = Loc.F("넘기면 원석 +{0}", ClearRewardTrigger.SkipOreReward);
         FitSingleLine(skipHint);
         ApplyThemeButtons();
 
@@ -954,7 +954,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         if (_skipHint == null) return;
         bool full = _refinerySpent < 0 && StagingFull;
         _skipHint.text = _refinerySpent >= 0 ? "넘기면 두 장 다 버린다 · 원석은 돌아오지 않는다"   // 10-26 「환불 없음」(전액 환불로 공짜 다시 돌리기가 됐다)
-                       : full ? $"<color={UIPalette.RuneOreHex}>원석 +{SkipOre}</color> · 고르지 않는다" : $"넘기면 원석 +{SkipOre}";
+                       : full ? Loc.F("<color={0}>원석 +{1}</color> · 고르지 않는다", UIPalette.RuneOreHex, SkipOre) : Loc.F("넘기면 원석 +{0}", SkipOre);
         FitSingleLine(_skipHint);
         // 10-19 — 보관함 가득이면 두 버튼이 두 길을 말한다: [룬판에서 바꾸기](고르고 판에서 정리) · [분해해서 받기](원석)
         if (_windowRoot != null && _windowRoot.Find("SkipBtn/Fill/Label") is Transform sl && sl.TryGetComponent<TMP_Text>(out var skipLbl))
@@ -1227,7 +1227,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
         ShopUIStyle.Anchor(nameText.rectTransform, top, top, top, new Vector2(0f, -NameYNow), new Vector2(_cardW - 24f, NameH));
         UITheme.StyleThinText(nameText, UIWeight.Medium, NameSize, ShopUIStyle.TextPrimary, shadow: true);
-        nameText.text = data.displayName ?? data.itemId;
+        nameText.text = Loc.T(data.displayName) ?? data.itemId;
         FitSingleLine(nameText);
         PlaceRuneIcon(face, nameText, data);
 
@@ -1415,7 +1415,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         var br = new Vector2(1f, 0f);
         ShopUIStyle.Anchor(count.rectTransform, br, br, br, new Vector2(-10f, 2f), new Vector2(80f, CountRowH + 4f));
         UITheme.StyleThinText(count, UIWeight.Medium, LabelSize, ShopUIStyle.TextDim, shadow: true);
-        count.text = $"{offsets.Length}칸";
+        count.text = Loc.F("{0}칸", offsets.Length);
         return canPlace;
     }
 
@@ -1426,7 +1426,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         int now = (BuildImprint.Halves(fam) + (statOnly ? 1 : 2)) / 2;   // 스탯 룬은 절반(10-14 R0)
         int next = BuildFamilyRules.NextThreshold(now);
         bool stageUp = BuildFamilyRules.StageOf(now) > BuildImprint.Stage(fam);
-        string tail = stageUp ? $"  <color=#E8BA54>{BuildFamilyRules.StageOf(now)}단계!</color>"
+        string tail = stageUp ? Loc.F("  <color=#E8BA54>{0}단계!</color>", BuildFamilyRules.StageOf(now))
                     : next > 0 ? $"<color=#8A8594>/{next}</color>" : "";
         var famCol = BuildFamilyRules.ColorOf(fam);
         // 10-19 P2 ⑥: 테 · 채움을 걷고 마름모 점 + 글자(속성 칩 v2와 같은 말 — 카드 안 테 두른 상자 5 → 3)
@@ -1488,13 +1488,13 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     /// 고르면 보관함으로 가고, 룬판에서 하나를 빼거나 분해하면 그 자리에 놓을 수 있다.
     /// </summary>
     private static string FullBadge(RuntimeItemData data) => RuneBlockBudget.FitsSame(data)
-        ? $"룬판 {RuneBlockBudget.Used}/{RuneBlockBudget.Max} — 하나를 빼면 놓인다"
-        : $"같은 룬 {RuneBlockBudget.SameExcept(data)}/{RuneBlockBudget.MaxSame} — 하나를 빼면 놓인다";
+        ? Loc.F("룬판 {0}/{1} — 하나를 빼면 놓인다", RuneBlockBudget.Used, RuneBlockBudget.Max)
+        : Loc.F("같은 룬 {0}/{1} — 하나를 빼면 놓인다", RuneBlockBudget.SameExcept(data), RuneBlockBudget.MaxSame);
 
     /// <summary>좁은 카드(4장)용 짧은 꼴 — 발동 칩 자리를 낸다.</summary>
     private static string ShortBadge(RuntimeItemData data) => RuneBlockBudget.FitsSame(data)
-        ? $"룬판 {RuneBlockBudget.Used}/{RuneBlockBudget.Max}"
-        : $"같은 룬 {RuneBlockBudget.SameExcept(data)}/{RuneBlockBudget.MaxSame}";
+        ? Loc.F("룬판 {0}/{1}", RuneBlockBudget.Used, RuneBlockBudget.Max)
+        : Loc.F("같은 룬 {0}/{1}", RuneBlockBudget.SameExcept(data), RuneBlockBudget.MaxSame);
 
     /// <summary>맨 아래 줄 왼쪽 칩. 칩이 서면 룬 수 글을 오른쪽 끝으로 옮긴다. 폭이 모자라면 짧은 글 → 그래도 모자라면 칩을 내지 않는다.</summary>
     private void BuildProcChip(RectTransform face, RuntimeItemData data, TMP_Text badge)
@@ -1504,7 +1504,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         float coef  = detail == ProcDetail.Coef ? CurrentBasicCoef() : -1f;
         string tail = detail switch
         {
-            ProcDetail.Coef  => coef > 0f ? $"확률 ×{coef:0.#}" : null,
+            ProcDetail.Coef  => coef > 0f ? Loc.F("확률 ×{0:0.#}", coef) : null,
             ProcDetail.Heavy => "강타 때",
             ProcDetail.Count => "타수로",
             _                => null,
@@ -1755,7 +1755,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             var more = ShopUIStyle.MakeText(parent, "MoreEffects", LabelSize, FontStyles.Normal,   // 기울임 없음(10-11 v2)
                 TextAlignmentOptions.Center, ShopUIStyle.TextDim);
             UITheme.StyleThinText(more, UIWeight.Regular, LabelSize, ShopUIStyle.TextDim);
-            more.text = $"+{hidden + 1}개 더";
+            more.text = Loc.F("+{0}개 더", hidden + 1);
             FitSingleLine(more);
             var le = more.gameObject.AddComponent<LayoutElement>();
             le.preferredHeight = style.rowHeight;
@@ -2114,7 +2114,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         int staged = _inventory?.StagingItems?.Count ?? 0;
         int cap    = RunItemInventory.StagingCapacity;
         // 10-19 P2 ③ ⑦: 「배치 n」은 오른쪽 미니 판 「룬 n / 20」과 같은 수라 뺐다 · 가득이면 고르기 전에 알린다(고르면 넘침 칸으로 받는다)
-        _counterText.text = staged >= cap ? $"보관함 <color=#E8BA54>{staged}/{cap} 가득</color>" : $"보관함 {staged}/{cap}";
+        _counterText.text = staged >= cap ? Loc.F("보관함 <color=#E8BA54>{0}/{1} 가득</color>", staged, cap) : Loc.F("보관함 {0}/{1}", staged, cap);
     }
 
     // ── 버튼 ──

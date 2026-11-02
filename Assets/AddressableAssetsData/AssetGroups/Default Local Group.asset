@@ -30,11 +30,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 052bcac36379be64798879c91da09a5a
-    m_Address: UI/Popup/UI_StartPartPopup
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0598b31e0b2714a0c8aec68123887515
     m_Address: sfx_relic_grudge_wave
     m_ReadOnly: 0
@@ -481,6 +476,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4f81b8a2463428640862dea93d12c5bf
+    m_Address: UI/EraChoice/Nightmare
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 51f58a7ac453dab48a238fee31899d31
     m_Address: GoldDot
     m_ReadOnly: 0
@@ -599,6 +599,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 649d0c66b27feb946891d6f0aa1cebf8
+    m_Address: UI/CrucibleWeapon/Katana
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 6525728d92addb54d94eb6c70a0adba4
     m_Address: Assets/RelicFairy/Data/Quest/Generated/Quests/collect_gold_1000.asset
     m_ReadOnly: 0
@@ -643,6 +648,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 709945baa1aa2104485aac3ded6ae25b
+    m_Address: STRINGS
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 721cfe8018b2cd04abd0748143d2a312
     m_Address: VFX_Heal
     m_ReadOnly: 0
@@ -650,6 +660,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 727217aa69cbb4865a36202562ae8fc1
     m_Address: sfx_rune_salvage
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 72dca614c5dfa314393e68e964e83b06
+    m_Address: UI/CrucibleWeapon/Nameless
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -731,6 +746,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 89819cb2b454a48c2a327329bb8042f5
     m_Address: sfx_memory_take
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 89e6d8b8172743e4aa831d5e1ca612ed
+    m_Address: UI/CrucibleWeapon/Greatsword
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -929,6 +949,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b50a520a6d1c3bd44815da1798c54ba5
+    m_Address: UI/EraChoice/Liberation
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b547c6126c817487b9913914ef233500
     m_Address: sfx_mg_grade_up
     m_ReadOnly: 0
@@ -1075,6 +1100,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d4380da49cd4618468e9419a8c78e8d9
     m_Address: chest_1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d64e4487ce196b64b97f65f33819a0e0
+    m_Address: sfx_skill_buff_v2
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

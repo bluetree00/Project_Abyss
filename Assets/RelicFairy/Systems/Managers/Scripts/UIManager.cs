@@ -229,6 +229,7 @@ public class UIManager
 
             GameObject go = Object.Instantiate(prefab, PopupParent);
             go.name = name;
+            LocTextGuard.AttachTree(go);   // 11-02 Q11 — 첫 프레임부터 지금 언어로
 
             T popup = Util.GetOrAddComponent<T>(go);
             popup.Init();

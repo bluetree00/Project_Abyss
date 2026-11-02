@@ -110,8 +110,8 @@ public sealed class RunCombatClock : MonoBehaviour
         string name = run.ChapterName(run.CurrentChapter);
         int ch = (int)run.CurrentChapter;
         string label = string.IsNullOrEmpty(name) ? $"Ch{ch}" : $"Ch{ch} {name}";
-        string title = $"{label} — 전투 {RunResultPresenter.FormatTime(Mathf.RoundToInt(combat))} · {letter}";
-        string desc  = $"기준 {RunResultPresenter.FormatTime(Mathf.RoundToInt(baseSec))}";
+        string title = Loc.F("{0} — 전투 {1} · {2}", label, RunResultPresenter.FormatTime(Mathf.RoundToInt(combat)), letter);
+        string desc  = Loc.F("기준 {0}", RunResultPresenter.FormatTime(Mathf.RoundToInt(baseSec)));
         ShowGradeAsync(run, title, desc, this.GetCancellationTokenOnDestroy()).Forget();
     }
 }

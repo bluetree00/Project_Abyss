@@ -360,9 +360,18 @@ public sealed class DarkLegendProjectileEffect : ItemCombatEffectBase
     private const float OrbitRadius = 1.8f, OrbitDegPerSec = 150f, ScytheScale = 0.35f, ScytheSpin = 540f, ThrowDistance = 10f;
     private const string HudKey = "soul";
 
+    private const string SoulStackKey = "legend_dark_souls";   // 10-31 룬을 놓거나 빼 효과가 새로 만들어져도(Rebuild · 챕터마다) 영혼이 남게
+
     private LegendOrbitRing _ring;
     private ItemEffectContext _ctx;
     private int _souls;
+
+    /// <summary>영혼 수 — 바꿀 때마다 Rebuild를 넘어 남는 스택에도 적는다(예전엔 Rebuild마다 0).</summary>
+    private int Souls
+    {
+        get => _souls;
+        set { _souls = value; _ctx?.Session?.EffectManager?.SetPersistentStack(SoulStackKey, value); }
+    }
 
     /// <summary>새 행(발동 「OnKillSoul」)인가 — 옛 CDN 행이면 코드 기본값을 쓴다.</summary>
     private bool NewRow => _trigger == "OnKillSoul";
@@ -375,8 +384,8 @@ public sealed class DarkLegendProjectileEffect : ItemCombatEffectBase
     {
         LegendaryRuntime.EnsureExists();
         _ctx = ctx;
-        _souls = 0;
-        LegendaryHud.Set(HudKey, 0, Max);
+        _souls = Mathf.Min(Max, ctx?.Session?.EffectManager?.GetPersistentStack(SoulStackKey) ?? 0);
+        LegendaryHud.Set(HudKey, _souls, Max);
     }
 
     public override void OnDeactivate()
@@ -406,7 +415,7 @@ public sealed class DarkLegendProjectileEffect : ItemCombatEffectBase
     public override void OnKill(ItemEffectContext ctx, GameObject target)
     {
         if (ctx?.Player == null) return;
-        _souls = Mathf.Min(Max, _souls + 1);
+        Souls = Mathf.Min(Max, _souls + 1);
     }
 
     public override void OnSkillUse(ItemEffectContext ctx, SkillType skill)
@@ -414,7 +423,7 @@ public sealed class DarkLegendProjectileEffect : ItemCombatEffectBase
         if ((skill != SkillType.E && skill != SkillType.R) || ctx?.Player == null || _ring == null) return;
         _ctx = ctx;
         int thrown = _ring.LaunchAllForward(ctx.Player.transform.forward, ThrowDistance, go => Hit(go, LegendaryTuning.Pick(NewRow, _value, 0.8f), true));
-        _souls = Mathf.Max(0, _souls - thrown);
+        Souls = Mathf.Max(0, _souls - thrown);
     }
 
     private void Hit(GameObject go, float ratio, bool thrown)
@@ -424,6 +433,6 @@ public sealed class DarkLegendProjectileEffect : ItemCombatEffectBase
         bool alive = mb != null && !mb.IsDead;
         CombatQuery.DealSynergyDamage(go, LegendaryTuning.Atk(_ctx) * ratio * LegendaryTuning.TierMul("DARK"), _ctx.Player.gameObject, element: RuneElement.Dark);
         LegendaryRuntime.SpawnVfx(LegendaryRuntime.Catalog?.darkHitVfx, go.transform.position, Quaternion.identity, 2f, 0.5f);   // 대상 타격 ≈ 1 m(10-22 B2 실측 83)
-        if (thrown && alive && mb.IsDead && LegendaryTuning.Awakened("DARK")) _souls = Mathf.Min(Max, _souls + 1);   // 각성 — 날린 낫이 쓰러뜨리면 하나 더
+        if (thrown && alive && mb.IsDead && LegendaryTuning.Awakened("DARK")) Souls = Mathf.Min(Max, _souls + 1);   // 각성 — 날린 낫이 쓰러뜨리면 하나 더
     }
 }

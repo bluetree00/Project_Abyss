@@ -678,6 +678,7 @@ public sealed class AppBootstrapper : MonoBehaviour
         UISkin.PreloadAsync().Forget();   // 화면별 아트 스킨(정제소 등) — 미등록이면 색 폴백
         EffectIconRegistry.PreloadAsync().Forget();   // 효과/상품 아이콘 — 미등록이면 플레이스홀더
         ShopBuffTable.PreloadAsync().Forget();   // 상점 판매 버프 표(SHOP_BUFF_DATA.csv)
+        Loc.PreloadAsync().Forget();             // 11-02 Q11 문자열 표(STRINGS — 없으면 한글만)
 
         // 7) (선택) Flow 시작 (SceneTransitionManager 바인딩 필수)
         if (startFlow)

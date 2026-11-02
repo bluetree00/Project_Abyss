@@ -51,6 +51,8 @@ public sealed class PerfectDodgeController
     private float _invulnEnd;                                  // 무적 종료 시각(unscaled)
     private float _followUntil;                                // 피한 공격을 따라가는 상한 시각(unscaled)
     private RelicFairy.Monster.MonsterBase _dodgedAttacker;    // 예고를 보고 피한 적 — 그 공격이 끝날 때까지 무적을 늘린다
+    private RelicFairy.Monster.MonsterBase _rewardedMonster;   // 보상을 준 예고(적 · 예고 번호) — 같은 예고는 다시 감지하지 않는다(11-02 Q32 ②)
+    private int _rewardedSerial = -1;
 
     // ── Properties ────────────────────────────────────────────────
     /// <summary>저스트 회피 슬로모 동안의 이동 배율(평소 1). DefaultMoveAbility가 최고속에 곱한다.</summary>
@@ -223,6 +225,7 @@ public sealed class PerfectDodgeController
         for (int i = 0; i < n; i++)
         {
             var mb = _senseBuf[i];
+            if (mb != null && mb == _rewardedMonster && mb.TelegraphSerial == _rewardedSerial) continue;   // 이미 피해 보상받은 예고(회피 연타로 다시 터졌다)
             if (mb != null && mb.IsTelegraphingAttack)
             {
                 _pendingSource = mb.transform;
@@ -262,6 +265,7 @@ public sealed class PerfectDodgeController
         _invulnEnd = _end;
         var sourceMonster = source != null ? source.GetComponentInParent<RelicFairy.Monster.MonsterBase>() : null;
         _dodgedAttacker = sourceMonster != null && sourceMonster.IsTelegraphingAttack ? sourceMonster : null;
+        if (_dodgedAttacker != null) { _rewardedMonster = _dodgedAttacker; _rewardedSerial = _dodgedAttacker.TelegraphSerial; }
         _followUntil    = Time.unscaledTime + DodgedAttackFollowMax;
 
         // 세계는 느려지는데 플레이어는 빨라야 한다.

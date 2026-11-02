@@ -35,11 +35,11 @@ public static class RuneBlockBudget
     public static string Label(int adding = 1)
     {
         int used = Used;
-        return Fits(used, adding) ? $"룬 {used} + {adding} / {Max}" : $"룬 {used} + {adding} / {Max} · 넘침";
+        return Fits(used, adding) ? Loc.F("룬 {0} + {1} / {2}", used, adding, Max) : Loc.F("룬 {0} + {1} / {2} · 넘침", used, adding, Max);
     }
 
     /// <summary>상한 때문에 막힌 놓기의 토스트 문구.</summary>
-    public static string FullMessage(int used) => $"{FullPrefix} ({used}/{Max}) — 판의 룬을 빼거나 분해한다";
+    public static string FullMessage(int used) => Loc.F("{0} ({1}/{2}) — 판의 룬을 빼거나 분해한다", FullPrefix, used, Max);
 
     // ── 같은 룬 상한(10-14) ──────────────────────────────
 
@@ -69,9 +69,9 @@ public static class RuneBlockBudget
 
     /// <summary>같은 룬 상한 때문에 막힌 놓기의 토스트 문구.</summary>
     public static string SameMessage(RuntimeItemData item) =>
-        $"같은 룬은 판에 {MaxSame}개까지 놓는다 (「{item?.displayName}」 {SameExcept(item)}/{MaxSame})";
+        Loc.F("같은 룬은 판에 {0}개까지 놓는다 (「{1}」 {2}/{3})", MaxSame, Loc.T(item?.displayName), SameExcept(item), MaxSame);
 
     /// <summary>룬 선택 · 상점 카드 문구 — 같은 룬이 이미 상한이면 「같은 룬 2/2 · 판에 못 놓음」, 아니면 null.</summary>
     public static string SameLabel(RuntimeItemData item) =>
-        FitsSame(item) ? null : $"같은 룬 {SameExcept(item)}/{MaxSame} · 판에 못 놓음";
+        FitsSame(item) ? null : Loc.F("같은 룬 {0}/{1} · 판에 못 놓음", SameExcept(item), MaxSame);
 }

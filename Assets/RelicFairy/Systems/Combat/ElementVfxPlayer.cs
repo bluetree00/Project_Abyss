@@ -278,7 +278,9 @@ public sealed class ElementVfxPlayer : MonoBehaviour
             var area = _registry.GetArea(element, out float nominal, out float life);
             if (area != null)
             {
-                DoPlayPrefab(area, pos, radiusScale / nominal, life > 0f ? life : BurstTtl, tint);
+                _registry.GetAreaStyle(element, out var areaTint, out int maxShown);
+                if (maxShown > 0 && !AreaRoom(area, pos, radiusScale, maxShown)) return;   // 그림만 뺀다 — 판정 · 피해는 부른 쪽이 이미 냈다(10-30 불바다 겹침)
+                DoPlayPrefab(area, pos, radiusScale / nominal, life > 0f ? life : BurstTtl, tint.a > 0f ? tint : areaTint);
                 return;
             }
         }
@@ -288,6 +290,26 @@ public sealed class ElementVfxPlayer : MonoBehaviour
         if (atFeet) pos.y += lift;
         float scale = visible > 0.01f ? radiusScale * PointReach / visible : radiusScale;   // 원소마다 다른 원래 크기를 맞춘다
         DoPlayPrefab(prefab, pos, Mathf.Max(0.05f, scale), BurstTtl, tint);
+    }
+
+    /// <summary>
+    /// 이 광역 폭발을 더 그려도 되나 — 같은 프리팹이 이미 <paramref name="maxShown"/>개 보이거나, 같은 자리(새 반경의 절반 안)에 보이면 false.
+    /// 같은 순간 여러 번 터지면(불바다 존4 — 작열 12번) 화면이 주황으로 덮였다(10-30 사용자 「불 룬의 이펙트가 적절하지 않아」).
+    /// </summary>
+    private bool AreaRoom(GameObject area, Vector3 pos, float radius, int maxShown)
+    {
+        int shown = 0;
+        float near = radius * 0.5f;
+        for (int i = 0; i < _active.Count; i++)
+        {
+            var it = _active[i];
+            if (it.prefab != area || it.fading || it.tf == null) continue;
+            Vector3 d = it.tf.position - pos;
+            d.y = 0f;
+            if (d.sqrMagnitude < near * near) return false;
+            if (++shown >= maxShown) return false;
+        }
+        return true;
     }
 
     private void DoPlayPrefab(GameObject prefab, Vector3 pos, float scale, float life, Color tint = default, string mute = null)
@@ -309,7 +331,11 @@ public sealed class ElementVfxPlayer : MonoBehaviour
         if (body)
         {
             var bodyFx = _registry.GetStatusBody(element, out float bodyScale, out Color bodyTint);
-            return DoAttachPrefab(bodyFx, target, duration, scale * bodyScale, key, BodyCenterOffset(target), bodyTint);
+            int bh = DoAttachPrefab(bodyFx, target, duration, scale * bodyScale, key, BodyCenterOffset(target), bodyTint);
+            // 앞(+Z)으로 뿜는 원뿔 화염은 위로 세운다 — 프리팹 회전 그대로면 몬스터를 가로로 뚫는 브레스였다(10-30 사용자 · 불)
+            if (bh != 0 && _registry.BodyUp(element) && _handles.TryGetValue(bh, out var bit) && bit.tf != null)
+                bit.tf.rotation = Quaternion.LookRotation(Vector3.up, Vector3.forward);
+            return bh;
         }
 
         // 장판: scale = 장판 반경(m) → 프리팹 공칭 반경으로 나눠 배율을 낸다.
@@ -384,6 +410,7 @@ public sealed class ElementVfxPlayer : MonoBehaviour
             it = new VfxItem { go = go, tf = go.transform, prefab = prefab };
             UseHierarchyScale(go.transform);
             StripGameplay(go);
+            PlayerFxCalm.LowerSorting(go);   // 보스 예고 아래로(10-30 · 원소 팩 정렬 10~20이 예고 위였다)
         }
 
         it.tf.SetPositionAndRotation(pos, prefab.transform.rotation);
@@ -392,6 +419,8 @@ public sealed class ElementVfxPlayer : MonoBehaviour
         it.auraKey   = null;
         it.following = false;
         it.fading    = false;
+        if (PlayerFxCalm.Active)   // 보스 예고가 떠 있으면 옅게(10-30) — 색 곱은 풀에서 원래 색으로 되돌린다
+            tint = tint.a > 0f ? new Color(tint.r, tint.g, tint.b, tint.a * PlayerFxCalm.DimAlpha) : new Color(1f, 1f, 1f, PlayerFxCalm.DimAlpha);
         ApplyTint(it.go, tint);
         if (!string.IsNullOrEmpty(mute)) Mute(it.tf, mute);
         it.go.SetActive(true);

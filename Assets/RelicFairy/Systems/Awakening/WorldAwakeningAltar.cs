@@ -21,6 +21,7 @@ public class WorldAwakeningAltar : MonoBehaviour
 
     // ── 상수 ─────────────────────────────────────────────────────────────
     private const float PromptOffsetY = 1.8f;
+    private const float TriggerRadius = 3.6f;   // 11-02 Q28 [F] 범위(월드 m) — 단 바닥 + 1 m 중심
     private const float LabelRefreshInterval = 1f;   // 이름표가 보이는 동안 정수·열 수 있는 수를 다시 읽는 간격(실시간 초)
     private const string LabelTitle = "기억의 제단";   // 여는 창이 기억의 제단(UI_AwakeningPanel) — 옛 이름 「유물 각성」이 베이스캠프 구역 이름과 어긋났다(09-28)
 
@@ -33,6 +34,7 @@ public class WorldAwakeningAltar : MonoBehaviour
     private TextMeshPro  _promptText;
     private int          _labelEssence    = -1;
     private int          _labelAffordable = -1;
+    private Loc.Language _labelLang;              // 11-02 Q11 — 언어가 바뀌어도 다시 쓴다
     private float        _nextLabelCheck;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
@@ -43,6 +45,7 @@ public class WorldAwakeningAltar : MonoBehaviour
         CreateWorldText();
         CreatePrompt();
         BaseCampLabelRule.Register(transform);   // 이름표는 가까이 간 곳 하나만(2차 개편 09-29)
+        FitTriggerToFloor();
     }
 
     private void Update()
@@ -137,15 +140,18 @@ public class WorldAwakeningAltar : MonoBehaviour
         _nextLabelCheck = Time.unscaledTime + LabelRefreshInterval;
         int essence    = MemoryAltarService.Essence;
         int affordable = MemoryAltarService.AffordableCount();
-        if (essence == _labelEssence && affordable == _labelAffordable) return;
+        if (essence == _labelEssence && affordable == _labelAffordable && _labelLang == Loc.Current) return;
 
         _labelEssence    = essence;
         _labelAffordable = affordable;
+        _labelLang       = Loc.Current;
+        string title = Loc.T(LabelTitle);
         _worldText.text = affordable > 0
-            ? $"{LabelTitle}\n<size=55%><color={UIPalette.GoldHex}>열 수 있는 것 {affordable}</color> · 정수 {essence:N0}</size>"
+            ? $"{title}\n<size=55%><color={UIPalette.GoldHex}>{Loc.F("열 수 있는 것 {0}", affordable)}</color> · {Loc.F("정수 {0:N0}", essence)}</size>"
             : MemoryAltarService.GetNextGoal(false) is { } goal && goal.Cost > essence   // 10-29 살 칸이 0이어도 다음 칸까지 남은 정수
-                ? $"{LabelTitle}\n<size=55%>정수 {essence:N0} · 「{goal.Node.DisplayName}」까지 {goal.Cost - essence:N0}</size>"
-                : $"{LabelTitle}\n<size=55%>정수 {essence:N0}</size>";
+                ? $"{title}\n<size=55%>{Loc.F("정수 {0:N0} · 「{1}」까지 {2:N0}", essence, Loc.T(goal.Node.DisplayName), goal.Cost - essence)}</size>"
+                : $"{title}\n<size=55%>{Loc.F("정수 {0:N0}", essence)}</size>";
+        if (_promptText != null) _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> {Loc.T("정수로 해금")}";
     }
 
     private void CreateWorldText()
@@ -156,7 +162,7 @@ public class WorldAwakeningAltar : MonoBehaviour
 
         _worldText = go.AddComponent<TextMeshPro>();
         if (worldTextFont != null) _worldText.font = worldTextFont;
-        _worldText.text = LabelTitle;
+        _worldText.text = Loc.T(LabelTitle);
         _worldText.fontSize = textSize;
         _worldText.alignment = TextAlignmentOptions.Center;
         _worldText.color = new Color(0.9f, 0.7f, 0.2f);
@@ -179,12 +185,26 @@ public class WorldAwakeningAltar : MonoBehaviour
         _promptText.textWrappingMode = TextWrappingModes.NoWrap;
         _promptText.sortingOrder = UISortingOrder.WorldPrompt;
         TMPOutlineHelper.ApplySoftShadow(_promptText);
-        _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> 정수로 해금";   // 「각성 관리」는 옛 이름 — 무엇을 하는 곳인지 동사로(2차 개편 09-29)
+        _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> {Loc.T("정수로 해금")}";   // 「각성 관리」는 옛 이름 — 무엇을 하는 곳인지 동사로(2차 개편 09-29)
 
         _promptGo.SetActive(false);
     }
 
     private void ShowPrompt(bool show) => _promptGo?.SetActive(show);
+
+    /// <summary>
+    /// 11-02 Q28 사용자 「기억의 제단을 좀 더 잘 열 수 있게」 — 실측(거점): [F] 범위 공(반경 2.8)의 중심이 제단 단 바닥(14.5)보다 1.6 m 아래(12.9)에 묻혀
+    /// 단 위에선 반경이 약 2.3 m로 줄었다(제단 곁에 바짝 붙어야 떴다). → 공 중심을 제단 아래 바닥 + 1 m로 올리고 반경 3.6 m.
+    /// </summary>
+    private void FitTriggerToFloor()
+    {
+        if (!TryGetComponent<SphereCollider>(out var col)) return;
+        Vector3 from = transform.TransformPoint(col.center) + Vector3.up * 2f;
+        if (!Physics.Raycast(from, Vector3.down, out var hit, 8f, ~0, QueryTriggerInteraction.Ignore)) return;
+        float sy = Mathf.Max(0.01f, transform.lossyScale.y), sx = Mathf.Max(0.01f, transform.lossyScale.x);
+        col.center = new Vector3(col.center.x, (hit.point.y + 1f - transform.position.y) / sy, col.center.z);
+        col.radius = TriggerRadius / sx;
+    }
 
     private void OnTriggerEnter(Collider other)
     {

@@ -117,7 +117,7 @@ public static class GuidelineVisual
             case "brand":                 c = Dark;     label = "낙인"; break;
             default:                      c = Neutral; c.a = 0.9f; label = statusId; break;
         }
-        r.SpawnMarker(target, statusId, label, c, duration);
+        r.SpawnMarker(target, statusId, Loc.T(label), c, duration);   // 상태 이름표 — 화면 언어(11-02 Q11)
     }
 
     /// <summary>장판/필드 — 대상 추적형 반투명 디스크. 타입명으로 속성색 추정. 반환=해제 핸들.</summary>
@@ -169,7 +169,7 @@ public static class GuidelineVisual
         if (!s_enabled || string.IsNullOrEmpty(label)) return;
         if (GameRunBootstrapper.Instance?.Run?.InCutscene == true) return;   // 끝 장면 보스 몸 위에 떴다(10-01 f5)
         var r = GuidelineVisualRunner.Instance; if (r == null) return;
-        r.SpawnToast(pos, label, TintColor(kind), 1.1f);
+        r.SpawnToast(pos, Loc.T(label), TintColor(kind), 1.1f);   // 알림 출구 — 화면 언어(11-02 Q11)
     }
 
     /// <summary>플레이어 머리 위 지속 배지 — 상태키별 1개(정오/각인/광기 N/전기 N 등). 같은 키 재호출=갱신.</summary>

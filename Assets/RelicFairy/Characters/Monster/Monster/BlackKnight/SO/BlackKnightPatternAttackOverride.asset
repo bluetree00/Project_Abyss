@@ -52,6 +52,10 @@ MonoBehaviour:
     hitVfxPrefab: {fileID: 0}
     hitVfxScale: 1
     hitVfxOffset: {x: 0, y: 0, z: 0}
+    castSfx: {fileID: 8300000, guid: 8b7acdd4373d9d145bb0ad06fee6b391, type: 3}
+    castSfxVolume: 0.6
+    castSfxPitch: 1
+    castSfxPeakTime: 0.59
   - name: Thrust
     animationStateName: Attack02
     minDistance: 0
@@ -91,6 +95,10 @@ MonoBehaviour:
     hitVfxPrefab: {fileID: 0}
     hitVfxScale: 1
     hitVfxOffset: {x: 0, y: 0, z: 0}
+    castSfx: {fileID: 8300000, guid: 8b7acdd4373d9d145bb0ad06fee6b391, type: 3}
+    castSfxVolume: 0.6
+    castSfxPitch: 1.1
+    castSfxPeakTime: 0.59
   - name: Overhead
     animationStateName: Attack03
     minDistance: 0
@@ -101,8 +109,7 @@ MonoBehaviour:
     attackDuration: 1.35
     damageMultiplier: 1.3
     knockbackMultiplier: 1.25
-    attackShapeOverride: {fileID: 11400000, guid: 245a42355d0040499ad63cac6a4e6989,
-      type: 2}
+    attackShapeOverride: {fileID: 0}
     disableWarning: 0
     warningRadius: 1.5
     warningDuration: 0.65
@@ -130,6 +137,10 @@ MonoBehaviour:
     hitVfxPrefab: {fileID: 0}
     hitVfxScale: 1
     hitVfxOffset: {x: 0, y: 0, z: 0}
+    castSfx: {fileID: 8300000, guid: 8b7acdd4373d9d145bb0ad06fee6b391, type: 3}
+    castSfxVolume: 0.6
+    castSfxPitch: 0.85
+    castSfxPeakTime: 0.59
   selectionMode: 1
   engageDistance: 1.2
   engageDistanceScale: 0.85

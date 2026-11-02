@@ -316,7 +316,7 @@ public sealed class WeaponFormRuntime : MonoBehaviour
         {
             string id = TriggerVariants[i];
             if (_formWeapon == null || !_formWeapon.HasFormVariant(id) || !_form.Form.TryGetVariant(id, out var v) || !_announced.Add(id)) continue;
-            RelicFloatText.Show(transform.position + Vector3.up * 0.35f, v.displayName, _form.Form.Tint);
+            RelicFloatText.Show(transform.position + Vector3.up * 0.35f, Loc.T(v.displayName), _form.Form.Tint);   // 화면 언어(11-02 Q11)
         }
     }
     private void HandleWeaponRefreshed(WeaponData _) => Rebuild();

@@ -33,9 +33,10 @@ public class MonsterHPBar : MonoBehaviour
     private const float MarkDim = 0.45f;
     private const float BlackspotTextW = 36f;
     private static readonly Color MarkPipEmpty = new(0.93f, 0.91f, 0.87f, 0.22f);   // 빈 칸 — 잉크 22%(어두운 판 위)
-    private static readonly string SunmarkLabel   = EffectDescriptionFormatter.LabelForStatus(RelicMarkStatus.SunmarkId);
-    private static readonly string BrandLabel     = EffectDescriptionFormatter.LabelForStatus(RelicMarkStatus.BrandId);
-    private static readonly string BlackspotLabel = EffectDescriptionFormatter.LabelForStatus(RelicMarkStatus.BlackspotId);
+    // 11-02 Q11 — 정적 필드 초기값이면 역직렬화 중에 언어를 읽고 언어를 바꿔도 굳는다 → 읽을 때 계산
+    private static string SunmarkLabel   => EffectDescriptionFormatter.LabelForStatus(RelicMarkStatus.SunmarkId);
+    private static string BrandLabel     => EffectDescriptionFormatter.LabelForStatus(RelicMarkStatus.BrandId);
+    private static string BlackspotLabel => EffectDescriptionFormatter.LabelForStatus(RelicMarkStatus.BlackspotId);
 
     // 상한 · 정오는 플레이어 쪽 값 — 바가 여럿이어도 한 프레임에 한 번만 묻는다
     private static int  s_relicFrame = -1;
@@ -767,15 +768,15 @@ public class MonsterHPBar : MonoBehaviour
         go.transform.SetParent(parentRT, false);
 
         var rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.5f, 0f);
-        rt.anchorMax = new Vector2(0.5f, 0f);
-        rt.pivot     = new Vector2(0.5f, 1f);
-        // 상태 아이콘 행이 바로 아래(y -2)에 오므로 그만큼 내려 겹치지 않게 한다.
-        rt.anchoredPosition = new Vector2(0f, -(StatusCellSize + 8f));
+        // 11-02 허수아비 분석 글(4줄)이 바 아래에서 피해 숫자 나는 자리를 덮었다(59 사진) — 이름 위로 올리고, 아래를 기준으로 위로 자란다
+        rt.anchorMin = new Vector2(0.5f, 1f);
+        rt.anchorMax = new Vector2(0.5f, 1f);
+        rt.pivot     = new Vector2(0.5f, 0f);
+        rt.anchoredPosition = new Vector2(0f, _nameLabelYOffset + _nameLabelSize.y + 2f);
         rt.sizeDelta = new Vector2(200f, 20f);
 
         _subLabel = go.AddComponent<TMPro.TextMeshProUGUI>();
-        _subLabel.alignment          = TMPro.TextAlignmentOptions.Center;
+        _subLabel.alignment          = TMPro.TextAlignmentOptions.Bottom;
         _subLabel.color              = new Color(1f, 0.85f, 0.4f, 1f);
         _subLabel.fontSize           = 11f;
         _subLabel.textWrappingMode = TMPro.TextWrappingModes.NoWrap;

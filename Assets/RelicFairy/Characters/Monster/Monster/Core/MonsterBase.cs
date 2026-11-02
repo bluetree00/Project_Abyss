@@ -1113,8 +1113,14 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _lastDamageKind = kind;
 
         // 모든 속성 피해(룬 · 아이템 AllElementBonus) — 예전엔 합산만 되고 읽는 전투 코드가 없었다(10-14 K6). 플레이어가 낸 속성 피해에만.
-        if (element.HasValue && instigator != null && instigator.TryGetComponent<PlayerController>(out var elemOwner) && elemOwner.RuntimeStats != null)
-            amount *= 1f + Mathf.Max(0f, elemOwner.RuntimeStats.AllElementBonus);
+        PlayerController owner = null;
+        if (instigator != null) instigator.TryGetComponent(out owner);
+        if (element.HasValue && owner != null && owner.RuntimeStats != null)
+            amount *= 1f + Mathf.Max(0f, owner.RuntimeStats.AllElementBonus);
+        // 10-31 정예 · 보스에게 주는 피해(맞서는 분노) — 예전엔 무기 · 스킬 주 피해에만 붙고 시너지 · 격발 · 전설 · 도트엔 빠졌다.
+        // 주 피해가 이 함수를 지나는 경로(DamageKind.Normal · CombatDamage 방어 관통)는 사전 보정에서 이미 곱했다.
+        if (owner != null && kind != DamageKind.Normal && (Grade == MonsterGrade.Elite || Grade == MonsterGrade.Boss))
+            amount *= GameRunBootstrapper.Instance?.Run?.EffectManager?.GradeDamageMultiplier() ?? 1f;
 
         float defense = _baseDefense * _defenseMulti * Mathf.Clamp01(1f - defenseIgnore);
         float actual  = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
@@ -1125,7 +1131,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (_runtime.CurrentHp < hpFloor) _runtime.CurrentHp = hpFloor;
         ReportDamageDealt(instigator, kind, hpBefore - Mathf.Max(0, _runtime.CurrentHp));   // 결과창 — 실제로 깎인 체력(오버킬 · 하한 제외)
 
-        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID(), kind, element);
+        if (kind == DamageKind.Normal) DamageBonusSplit.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID());   // 11-02 Q29 방어 관통 주 피해 — 보너스 몫은 추가 피해 숫자로
+        else DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID(), kind, element);   // 10-31 사용자 「누적은 빼도」 — 누적 숫자 끔
 
         // 추가 피해도 맞은 자리에 작은 타격 표시(10-19 ⑭ 「맞았는지 구분이 안 된다」) — DoT 틱은 빼고(속성 몸 이펙트 · 숫자로 충분)
         if (kind != DamageKind.Dot) ExtraHitCue.Play(GetInstanceID(), HitCuePoint(instigator), element);
@@ -1166,8 +1173,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>현재 근접 공격 windup(예고) 중인가. 저스트가드(+피해)·섬광(캔슬) 판정용.</summary>
     public bool IsTelegraphingAttack => _telegraphing;
 
+    /// <summary>예고 번호 — windup에 들어갈 때마다 1 오른다. 저스트 회피가 같은 예고를 두 번 보상하지 않게(11-02 Q32 ②).</summary>
+    public int TelegraphSerial { get; private set; }
+
     /// <summary>AttackState가 데미지 적용 전 windup 진입 시 호출.</summary>
-    public void BeginAttackTelegraph() { _telegraphing = true; _attackCanceled = false; }
+    public void BeginAttackTelegraph() { _telegraphing = true; _attackCanceled = false; TelegraphSerial++; }
 
     /// <summary>windup 종료(데미지 적용/상태 이탈) 시 호출.</summary>
     public void EndAttackTelegraph() { _telegraphing = false; }
@@ -1238,7 +1248,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         ReportDamageDealt(instigator, DamageKind.Normal, hpBefore - Mathf.Max(0, _runtime.CurrentHp));   // 결과창 — 실제로 깎인 체력
 
         // 데미지 팝업 — 모든 데미지 소스에 일관 표시 (각 호출처에서 별도 호출 불필요)
-        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID());
+        DamageBonusSplit.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID());   // 10-31 누적 숫자 끔 · 11-02 Q29 보너스 몫은 추가 피해 숫자로
 
         int effMax = EffectiveMaxHp;
         _hpBar?.UpdateHP(_runtime.CurrentHp, effMax);

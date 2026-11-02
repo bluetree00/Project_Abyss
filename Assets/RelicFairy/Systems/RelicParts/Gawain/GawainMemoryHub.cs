@@ -354,7 +354,8 @@ public sealed class GawainMemoryHub : MonoBehaviour
             Debug.Log("[GawainMemory] 엇갈린 빛 — 이번 수확은 스택을 남겼다");
         }
         if (bloomedTargets > 0) Managers.Sound?.PlayEvent(SoundEvent.RelicHarvest);   // 정오 수확(10-12 S2)
-        if (bloomedTargets >= 2) RelicFloatText.Show(_player.transform.position, $"수확 ×{bloomedTargets}", GawainColor);
+        // 10-30 H-16 — 「수확」은 안쪽 용어라 무엇이 일어났는지 안 보였다 → 결과로(터진 적 수)
+        if (bloomedTargets >= 2) RelicFloatText.Show(_player.transform.position, Loc.F("태양흔 폭발 ×{0}", bloomedTargets), GawainColor);
         Debug.Log($"[GawainMemory] {why} 수확 — 대상 {bloomedTargets} · 스택 {bloomedStacks}{(twice ? " · 두 번" : "")}");
     }
 
@@ -372,7 +373,7 @@ public sealed class GawainMemoryHub : MonoBehaviour
             if (now - kv.Value <= CrossLightWindow)
             {
                 _crossLight = true;
-                if (_player != null) RelicFloatText.Show(_player.transform.position, "엇갈린 빛", GawainColor);   // 10-12 S5 — 다음 수확이 스택을 남긴다
+                if (_player != null) RelicFloatText.Show(_player.transform.position, "엇갈린 빛 켜짐", GawainColor);   // 10-12 S5 — 다음 수확이 스택을 남긴다(10-30 H-16 「켜짐」)
                 CrossLightChanged?.Invoke(true);
                 Debug.Log($"[GawainMemory] 엇갈린 빛 — {kv.Key} + {reactionKey}");
                 break;

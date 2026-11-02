@@ -454,9 +454,6 @@ public static class MemoryAltarService
     /// <summary>상점마다 새로고침 횟수 = 「상점 새로고침」 단계(10-14 강화형 · 0이면 없음).</summary>
     public static int ShopRerollCount => Level(MemoryAltarCatalog.ShopReroll);
 
-    /// <summary>베이스캠프 파츠 작업대에서 들고 나가는 시작 파츠 수 — 기본 1, 해금 시 2.</summary>
-    public static int StartPartSlots => IsUnlocked(MemoryAltarCatalog.StartParts2) ? 2 : 1;
-
     /// <summary>새 런 시작 포션 칸 — 기본 3 + 「포션 칸」 단계(최대 5).</summary>
     public static int PotionCapacity => 3 + Level(MemoryAltarCatalog.PotionSlot);
 

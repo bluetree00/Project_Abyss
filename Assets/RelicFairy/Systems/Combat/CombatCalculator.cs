@@ -32,7 +32,8 @@ public static class CombatCalculator
         var cov = GameRunBootstrapper.Instance?.Run?.CovenantHandler;
         if (cov != null && cov.TryGetCritOverride(weapon, out bool forceCrit, out float floorRatio))
         {
-            float critMulti = (weapon != null && weapon.critDamage > 0f) ? weapon.critDamage : 1.25f;
+            // 10-31 치명 피해 룬 · 유물(CritDamageBonus)을 더한다 — 예전엔 강제 치명 · 하한이 무기 치명 배율만 써서 치명 피해 룬이 서약 아래서 죽었다
+            float critMulti = ((weapon != null && weapon.critDamage > 0f) ? weapon.critDamage : 1.25f) + (rs?.CritDamageBonus ?? 0f);
             if (forceCrit) { isCrit = true; return baseDamage * critMulti; }
             // 치명타 억제 + 최소피해 하한(최대피해×floorRatio). base보다 낮으면 base 유지.
             return Mathf.Max(baseDamage, floorRatio * baseDamage * critMulti);

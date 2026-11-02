@@ -36,8 +36,8 @@ public static class RunResultPresenter
         var sb = new StringBuilder();
         sb.Append(s.ChapterNumber > 0 ? $"Ch{s.ChapterNumber}" : "Ch?");
         if (!string.IsNullOrEmpty(s.ChapterName)) sb.Append(' ').Append(s.ChapterName);
-        sb.Append(Dot).Append($"방 {s.RoomClears}개 정리");
-        if (!s.Cleared && !string.IsNullOrEmpty(s.KilledBy)) sb.Append(Dot).Append(s.KilledBy).Append("에게");
+        sb.Append(Dot).Append(Loc.F("방 {0}개 정리", s.RoomClears));
+        if (!s.Cleared && !string.IsNullOrEmpty(s.KilledBy)) sb.Append(Dot).Append(Loc.F("{0}에게", Loc.T(s.KilledBy)));   // 11-02 Q11
         return sb.ToString();
     }
 
@@ -49,7 +49,7 @@ public static class RunResultPresenter
             StoryEra.NightmareMode => "악몽",
             _                      => "봉인된 세계",
         };
-        return s.AbyssDepth > 0 ? $"{era} · 심연 {s.AbyssDepth}" : era;
+        return s.AbyssDepth > 0 ? Loc.F("{0} · 심연 {1}", era, s.AbyssDepth) : era;
     }
 
     /// <summary>각성 정수 내역 — 처치 · 봉인(나머지) / 계약 / 초행. 0인 줄은 뺀다(첫 줄은 늘 있다).</summary>
@@ -57,7 +57,7 @@ public static class RunResultPresenter
     {
         int rest = Mathf.Max(0, s.Essence - s.EssenceFromContracts - s.EssenceFromFirstRun);
         var rows = new List<(string, int)> { ("처치 · 봉인", rest) };
-        if (s.EssenceFromContracts > 0) rows.Add(($"계약 {s.ContractsDone}건 달성", s.EssenceFromContracts));
+        if (s.EssenceFromContracts > 0) rows.Add((Loc.F("계약 {0}건 달성", s.ContractsDone), s.EssenceFromContracts));
         if (s.EssenceFromFirstRun  > 0) rows.Add(("초행 보너스", s.EssenceFromFirstRun));
         return rows;
     }
@@ -75,8 +75,8 @@ public static class RunResultPresenter
     /// <summary>전투 둘째 줄 — 「정예 9 · 보스 2 · 가장 큰 한 방 3,412 (서약)」.</summary>
     public static string CombatLine(RunResultSnapshot s)
     {
-        var line = $"정예 {s.EliteKills}{Dot}보스 {s.BossKills}";
-        if (s.BiggestHit > 0) line += $"{Dot}가장 큰 한 방 {s.BiggestHit:N0} ({SourceLabel(s.BiggestHitSource)})";
+        var line = Loc.F("정예 {0}{1}보스 {2}", s.EliteKills, Dot, s.BossKills);
+        if (s.BiggestHit > 0) line += Loc.F("{0}가장 큰 한 방 {1:N0} ({2})", Dot, s.BiggestHit, SourceLabel(s.BiggestHitSource));
         return line;
     }
 
@@ -98,14 +98,14 @@ public static class RunResultPresenter
     {
         if (sub == null) return string.Empty;
         string line = BuildLine(sub);
-        return string.IsNullOrEmpty(line) ? $"보조 {sub.Name}" : $"보조 {sub.Name}{Dot}{line}";
+        return string.IsNullOrEmpty(line) ? Loc.F("보조 {0}", Loc.T(sub.Name)) : Loc.F("보조 {0}{1}{2}", Loc.T(sub.Name), Dot, line);
     }
 
     private static string BuildLine(RunResultSnapshot.WeaponLine w)
     {
         var parts = new List<string>();
-        if (w.Enhance > 0) parts.Add($"재련 {WeaponReforgeService.CountAt(w.Enhance)}회");
-        if (!string.IsNullOrEmpty(w.FormName)) parts.Add(w.FormTier > 0 ? $"형 {w.FormName} {w.FormTier}단" : $"형 {w.FormName}");
+        if (w.Enhance > 0) parts.Add(Loc.F("재련 {0}회", WeaponReforgeService.CountAt(w.Enhance)));
+        if (!string.IsNullOrEmpty(w.FormName)) parts.Add(w.FormTier > 0 ? Loc.F("형 {0} {1}단", w.FormName, w.FormTier) : Loc.F("형 {0}", w.FormName));
         if (!string.IsNullOrEmpty(w.Build)) parts.Add(w.Build);
         else if (w.Ranged) parts.Add("파츠 없음");
         return string.Join(Dot, parts);
@@ -114,13 +114,13 @@ public static class RunResultPresenter
     public static string MemoryLine(RunResultSnapshot s)
     {
         int n = s.MemFaint + s.MemClear + s.MemRadiant;
-        return n == 0 ? "되살아난 기억 없음" : $"되살아난 기억 {n}";
+        return n == 0 ? "되살아난 기억 없음" : Loc.F("되살아난 기억 {0}", n);
     }
 
     public static string ElementTier(string elementId, int tier)
     {
         var def = ElementDef.GetById(elementId);
-        return $"{(def != null ? def.Name : elementId)} {tier}단";
+        return Loc.F("{0} {1}단", (def != null ? Loc.T(def.Name) : elementId), tier);
     }
 
     /// <summary>서약 이름 — 조각마다 등급색 점(●). 등급을 모르면 점 없이 이름만.</summary>

@@ -4,7 +4,7 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
-/// 인트로 조우 컷신 — 무형검을 F로 집는 순간 발동(1회).
+/// 인트로 조우 컷신 — 무형검 곁에 다가오는 순간 발동(1회 · 11-02 예전엔 F로 집을 때).
 ///
 /// 원칙: <b>행동이 먼저, 대사는 나중</b>. 각 대사 앞에 그 대사를 정당화하는 화면 사건을 배치한다.
 ///
@@ -37,9 +37,12 @@ public sealed class IntroMordredDirector : MonoBehaviour
     private static CancellationTokenSource s_drift;
 
     // ── [SerializeField] ─────────────────────────────────────────────
-    [Header("발동 — 무형검 F키 픽업")]
-    [Tooltip("플레이어가 무형검을 F로 획득하면 시퀀스가 시작된다. 비우면 Start에서 씬의 IntroSwordPickup을 자동 탐색.")]
+    [Header("발동 — 무형검 곁에 다가옴")]
+    [Tooltip("플레이어가 무형검 범위에 들어오면 시퀀스가 시작된다. 비우면 Start에서 씬의 IntroSwordPickup을 자동 탐색.")]
     [SerializeField] private IntroSwordPickup swordPickup;
+    [Tooltip("시작할 때 짧은 암전 속에 플레이어를 세울 자리 — 검 앞 이 거리(m · 모르드레드 반대쪽), 모르드레드를 본다.")]
+    [SerializeField] private float standBeforeSword = 1.2f;
+    [SerializeField] private float placeFadeDuration = 0.25f;
 
     [Header("대사 시퀀스 (DIALOGUE_DATA.csv)")]
     [SerializeField] private string mordredSequenceId     = "Intro_Mordred";
@@ -171,7 +174,7 @@ public sealed class IntroMordredDirector : MonoBehaviour
     /// <summary>아레나가 런타임 생성이라 보스룸은 IntroArenaLoader가 로드 후 주입한다.</summary>
     public void SetBossRoom(BossRoomController room) => bossRoom = room;
 
-    /// <summary>무형검을 F로 획득한 순간 시퀀스를 시작한다. 1회만.</summary>
+    /// <summary>무형검 곁에 다가온 순간 시퀀스를 시작한다. 1회만.</summary>
     private void HandleSwordPickup(PlayerController player)
     {
         if (_started || player == null) return;
@@ -197,8 +200,9 @@ public sealed class IntroMordredDirector : MonoBehaviour
             // 보스룸은 런타임 생성 아레나에서 주입된다 — 주입 전에 시퀀스가 진행되면 전투가 시작되지 않는다.
             await IntroArenaLoader.ReadyAsync();
 
-            // 플레이어 통제 — 컷신 동안 입력 차단 + 남은 관성 제거 + 카메라 수동 제어 인계.
+            // 플레이어 통제 — 컷신 동안 입력 차단 + 검 곁 자리로 + 남은 관성 제거 + 카메라 수동 제어 인계.
             player?.SetInputEnabled(false);
+            await PlaceBeforeSwordAsync(player, ct);
             FreezePlayerGrounded(player);
             PrepareTorches();   // 목표 밝기를 기억하고 전부 소등(점등은 보스전 개시 후)
             // HUD 억제 재확인 — 부팅 타이밍으로 억제가 누락됐어도 컷신 중엔 확실히 숨긴다.
@@ -222,8 +226,9 @@ public sealed class IntroMordredDirector : MonoBehaviour
             Vector3 chest = _mChest;
             Vector3 sword = swordRenderer != null ? swordRenderer.transform.position : _p + _f * 1.2f + Vector3.up;
 
-            // S2 — 검에 손을 뻗는 순간: 플레이어와 검을 낮게, 옆에서
+            // S2 — 검에 손을 뻗는 순간: 플레이어와 검을 낮게, 옆에서. 자리 옮김을 덮은 암전이 이 컷과 함께 걷힌다
             Cut("S2 검", At(sword, 0.7f, sword.y + 0.35f, -0.5f), sword + Vector3.up * 0.1f, 30f);
+            ScreenFade.In(placeFadeDuration, ct).Forget();
             await Hold(0.6f, ct);
 
             // S3 — 축 한쪽 눈높이 투샷 → 플레이어 어깨 너머 모르드레드(대화는 컷으로 넘긴다)
@@ -686,12 +691,15 @@ public sealed class IntroMordredDirector : MonoBehaviour
         // 손에 맺힌다 — 작은 빛 고리 + 손의 검이 전시 검과 같은 디졸브로(켜기 전에 디졸브 재질을 씌워 첫 프레임 팝이 없다 —
         // 재질은 방금 전시 검이 불러 캐시에 있다)
         RunFx.Play(RunFxSlot.Ring, hand != null ? hand.position : _pChest, 0.35f, swordArriveTint);
+        Managers.Sound?.PlayEvent(SoundEvent.SwordPickup);   // 줍는 소리 — 예전엔 F를 누른 순간(11-02 다가오면 시작)
         await EquipToSlotAsync(player, namelessWeaponKey, MeleeSlot, setActive: true,
                                playAppear: false, beforeShow: go => DissolveEffect.PlayAppear(go, swordCondenseDuration));
+        // 받는 동작 — 맺히는 검을 머리 위로 들어 올렸다 쥐어 내린다(11-02 사용자 「무기를 얻을 때 애니메이션」 · 클립은 38 PlayWeaponReceiveAsync)
+        float receiveEnd = Time.time + await player.PlayWeaponReceiveAsync();
         await vanish;
         sword.SetActive(false);
         float tail = swordCondenseDuration - swordDissolveDuration * (1f - swordHandOverlap);   // 손의 검이 다 맺히기까지 남은 시간
-        await DelaySafe(Mathf.Max(0f, tail) + 0.2f, ct);
+        await DelaySafe(Mathf.Max(Mathf.Max(0f, tail) + 0.2f, receiveEnd - Time.time), ct);   // 동작이 끝나 평소 자세로 돌아온 뒤 다음 컷
     }
 
     /// <summary>
@@ -832,6 +840,25 @@ public sealed class IntroMordredDirector : MonoBehaviour
     /// 차단형 대사(timeScale=0)에서는 FixedUpdate가 아예 멈춰 공중에 그대로 얼어붙는다.
     /// → 접지시킨 뒤 Rigidbody를 kinematic으로 돌려 물리에서 분리한다(컷신 종료 시 복구).
     /// </summary>
+    /// <summary>
+    /// 검 곁 자리로 — 다가온 자리 · 방향이 그때그때 달라 구도가 매번 달랐다(11-02 사용자 「플레이어를 무형검 곁으로 옮겨 예쁜 구도로 받게」).
+    /// 짧은 암전 속에 검 앞(모르드레드 반대쪽 <see cref="standBeforeSword"/> m)에 모르드레드를 보고 세운다. 암전은 첫 컷(S2)과 함께 걷힌다.
+    /// </summary>
+    private async UniTask PlaceBeforeSwordAsync(PlayerController player, CancellationToken ct)
+    {
+        if (player == null || swordRenderer == null) return;
+        await ScreenFade.Out(placeFadeDuration, ct);
+
+        Vector3 sword = swordRenderer.transform.position;
+        Vector3 from  = Flat(sword - player.transform.position, Vector3.forward);
+        Vector3 toM   = mordredTransform != null ? Flat(mordredTransform.position - sword, from) : from;
+        Vector3 at    = sword - toM * standBeforeSword;   // 높이는 검에서 내려 바닥을 찾는다(SnapToGround)
+        var face = Quaternion.LookRotation(toM, Vector3.up);
+        if (player.TryGetComponent<Rigidbody>(out var rb)) { rb.linearVelocity = Vector3.zero; rb.position = at; rb.rotation = face; }
+        player.transform.SetPositionAndRotation(at, face);
+        player.RequestFacing(face);   // 방향 목표도 — 안 하면 다음 물리 프레임에 옛 방향으로 돌아간다
+    }
+
     private void FreezePlayerGrounded(PlayerController player)
     {
         if (player == null) return;

@@ -8,6 +8,8 @@
 //         _OutlineWidth = 1080p 기준 픽셀(해상도에 비례해 맞춘다).
 // [09-25] DOTS 인스턴싱 변형 추가 — GPU Resident Drawer로 그리는 MeshRenderer(기사 검 등)에 이 패스가 붙으면
 //         변형이 없어 에러 → 에디터 Error Pause가 플레이를 멈췄다.
+// [10-30] 바깥 테두리만 — MonsterOutlineMask 패스(바로 앞)가 몸이 보이는 픽셀에 스텐실 비트 128을 찍고, 여기는 그 비트가 없는 곳에만 그린다.
+//         인버티드 헐은 겹친 부위 · 조각(기사 갑옷 18 · 리치 옷 · 사슬 44)마다 몸 안쪽에도 선을 그어 보스 테두리가 두껍고 어지러워 보였다(사용자 두 번째 지적).
 Shader "RelicFairy/MonsterOutline"
 {
     Properties
@@ -28,6 +30,12 @@ Shader "RelicFairy/MonsterOutline"
             Cull Front       // 밀어 낸 껍데기의 바깥(뒷)면만 → 외곽 링
             ZWrite Off       // 깊이 미기록 → 본체 불투명 패스가 막히지 않음(본체 항상 렌더)
             ZTest LEqual     // 보이는 영역
+            Stencil          // 몸 위(스텐실 비트 128)엔 그리지 않는다 — 바깥 테두리만
+            {
+                Ref 128
+                ReadMask 128
+                Comp NotEqual
+            }
 
             HLSLPROGRAM
             #pragma vertex vert

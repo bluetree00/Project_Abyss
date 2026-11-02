@@ -13,6 +13,7 @@ public abstract class GawainFragment : RelicPartEffect
     protected GawainMemoryHub  Hub;
     protected PlayerController Player;
     protected readonly List<MonsterBase> Buf = new(16);
+    private readonly List<MonsterBase> _blastBuf = new(16);   // SmallBlast 전용 — 부르는 쪽이 Buf를 도는 중에 덮어쓰지 않게(10-30 · 랜슬롯 Scratch와 같은 까닭)
 
     protected GawainFragment(string key) : base(key) { }
 
@@ -42,9 +43,9 @@ public abstract class GawainFragment : RelicPartEffect
     protected void SmallBlast(Vector3 at, float radius, float damage)
     {
         ElementVfxPlayer.PlayBurst(RuneElement.Fire, at, radius);
-        int n = CombatQuery.GetNearbyEnemies(at, radius, null, 16, Buf);
-        for (int i = 0; i < n; i++)
-            if (Buf[i] != null && !Buf[i].IsDead) CombatQuery.DealSynergyDamage(Buf[i], damage, Owner, 1f, false, RuneElement.Fire);
+        int n = CombatQuery.GetNearbyEnemies(at, radius, null, 16, _blastBuf);
+        for (int i = 0; i < n && i < _blastBuf.Count; i++)
+            if (_blastBuf[i] != null && !_blastBuf[i].IsDead) CombatQuery.DealSynergyDamage(_blastBuf[i], damage, Owner, 1f, false, RuneElement.Fire);
     }
 
     /// <summary>조각 발동 글자(금빛) — 출시 빌드에서도 뜬다. 처음 켜진 조각이면 화면 아래 자막 한 줄(계정당 1회).</summary>
@@ -138,7 +139,7 @@ public sealed class GDawnOathEffect : GawainFragment
         _heat = Mathf.Min(cap, _heat + hit.Damage);
         if (Line3 && _heat >= cap)
         {
-            Say(player.transform.position, "축열");
+            Say(player.transform.position, "정오 바로 시작");   // 10-30 H-16 — 조각 안쪽 이름 「축열」 대신 결과
             Hub.Gauge.OpenNoonNow();
         }
     }
@@ -434,7 +435,7 @@ public sealed class GSettingSunEffect : GawainFragment
     private void OnDusk()
     {
         if (Hub.Relic.BonusCasts == 0) Hub.Relic.GrantBonusCast();
-        if (Player != null) Say(Player.transform.position, "저무는 해");
+        if (Player != null) Say(Player.transform.position, "황혼 Q 1번");   // 10-30 H-16 — 조각 이름 「저무는 해」 대신 받은 것(황혼에 쓰는 작은 낙일)
     }
     private void OnDawn() => _field = false;
     private void OnSunImpact(Vector3 at, List<GameObject> hits, bool small)
@@ -468,10 +469,18 @@ public sealed class GSettingSunEffect : GawainFragment
 /// <summary>G11 불씨 옮기기 — 화상 적 사망 → 4m 안 1체(② 2체)에 남은 화상 · 태양흔이 옮는다 · ③ 옮겨 붙을 때 작은 폭발.</summary>
 public sealed class GEmberCarryEffect : GawainFragment
 {
+    private bool _carrying;   // 옮긴 불 · 작은 폭발로 쓰러진 적이 이 OnKill을 다시 부르면 Buf가 다시 채워져 앞 순회가 넘쳤다(10-30 빌드 로그 ArgumentOutOfRange)
     public GEmberCarryEffect() : base("g_ember_carry") { }
     public override void OnKill(GameObject deadEnemy, PlayerController player)
     {
-        if (deadEnemy == null || Hub == null) return;
+        if (_carrying || deadEnemy == null || Hub == null) return;
+        _carrying = true;
+        try { Carry(deadEnemy, player); }
+        finally { _carrying = false; }
+    }
+
+    private void Carry(GameObject deadEnemy, PlayerController player)
+    {
         bool burning = deadEnemy.TryGetComponent<MonsterBurnHandler>(out var burn) && burn.Remaining > 0f;
         var st = RelicMarkStatus.Of(deadEnemy, false);
         int marks = st != null ? st.Sunmark : 0;

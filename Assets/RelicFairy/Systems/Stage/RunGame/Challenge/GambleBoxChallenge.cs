@@ -105,7 +105,7 @@ public sealed class GambleBoxChallenge : MonoBehaviour, IInteractionChallenge
     private void CreateVisuals()
     {
         _label  = MakeText(ChallengeFlavor.GambleName(_run), _boxPos + Vector3.up * LabelHeight, 3f, new Color(0.95f, 0.8f, 0.35f), 10);
-        _prompt = MakeText($"<color={UIPalette.GoldHex}>[F]</color> 개봉", _boxPos + Vector3.up * PromptHeight, 4f, Color.white, 11);
+        _prompt = MakeText(Loc.F("<color={0}>[F]</color> 개봉", UIPalette.GoldHex), _boxPos + Vector3.up * PromptHeight, 4f, Color.white, 11);
         _prompt.gameObject.SetActive(false);
     }
 
@@ -135,7 +135,7 @@ public sealed class GambleBoxChallenge : MonoBehaviour, IInteractionChallenge
     private void ShowNotice()
     {
         var hud = UnityEngine.Object.FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
-        hud?.ShowBuffNotice($"도박 결과 — <color=#8fd3ff>{GradeName(_grade)}</color>!");
+        hud?.ShowBuffNotice(Loc.F("도박 결과 — <color=#8fd3ff>{0}</color>!", GradeName(_grade)));
     }
 
     private static string GradeName(ChallengeGrade g) => g switch

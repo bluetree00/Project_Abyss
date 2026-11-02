@@ -134,7 +134,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
     public void SetBlockCount(int used, int max)
     {
         if (!_thin || _guideDesc == null) return;
-        _guideDesc.SetText($"룬 {used} / {max}");
+        _guideDesc.SetText(Loc.F("룬 {0} / {1}", used, max));
         var rest = used >= max ? UITheme.Thin.Gold : UITheme.Thin.Ink;
         if (_blockShown >= 0 && used != _blockShown && isActiveAndEnabled) FadeBlockAsync(UITheme.Thin.Gold, rest, 1).Forget();
         else _guideDesc.color = rest;   // 도는 깜빡임이 있으면 그쪽이 다음 프레임부터 덮는다
@@ -477,7 +477,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             lrt.offsetMin = new Vector2(2f, 0f);
             lrt.offsetMax = new Vector2(-2f, 0f);
             var lTxt = lblGO.AddComponent<TextMeshProUGUI>();
-            lTxt.text               = $"{b + 1}단계";
+            lTxt.text               = Loc.F("{0}단계", b + 1);
             lTxt.fontSize           = 17f;   // 14 → 16(하한) → 17(10-11 v2 보조). 한 줄만 — 단계 이름(최대 6자)은 활성 효과 목록·툴팁에
             lTxt.color              = TierMissInk;
             lTxt.alignment          = TextAlignmentOptions.Center;
@@ -583,7 +583,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             if (row.tierLabels[b] != null)
             {
                 // 도달: 「N단계」가 켜진다 / 미도달: 필요 칸 수. 한 줄(16px) — 단계 이름은 6자까지라 칸(≈60px)에 안 든다.
-                row.tierLabels[b].text      = !hasData ? "—" : (met ? $"{b + 1}단계" : $"{sorted[b].threshold}칸");
+                row.tierLabels[b].text      = !hasData ? "—" : (met ? Loc.F("{0}단계", b + 1) : Loc.F("{0}칸", sorted[b].threshold));
                 row.tierLabels[b].fontStyle = isCur && !_thin ? FontStyles.Bold : FontStyles.Normal;   // 톤 v2는 금 테가 지금 단계를 말한다
                 row.tierLabels[b].color     = met
                     ? new Color(
@@ -691,7 +691,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
     private static readonly System.Text.RegularExpressions.Regex NumberRx =
         new(@"[+\-−×x]?\d+(?:\.\d+)?(?:%p|%|초|칸|m|회|배|단계)?", System.Text.RegularExpressions.RegexOptions.Compiled);
     private static readonly System.Text.RegularExpressions.Regex TierPrefixRx =
-        new(@"^\s*\d+\s*단계\s*", System.Text.RegularExpressions.RegexOptions.Compiled);
+        new(@"^\s*(?:\d+\s*단계|Tier\s*\d+)\s*", System.Text.RegularExpressions.RegexOptions.Compiled);   // 11-02 Q11 영어 「Tier 1 …」
 
     private static string EmphasizeNumbers(string s, string hex)
         => NumberRx.Replace(s, m => $"<color={hex}><b>{m.Value}</b></color>");
@@ -747,10 +747,10 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         }
 
         // 머리 — 존 이름 · 지금 몇 칸 · 다음 단계까지(한 줄, 가장 먼저 읽히게)
-        string next = nextThr > 0 ? $"   <color=#9A93A6>다음 단계까지</color> <color=#FFD98A><b>{nextThr - count}칸</b></color>" : "   <color=#6BE08A>모든 단계 달성</color>";
-        sb.AppendLine($"<size=19><b><color=#{zoneHex}>{ZONE_ICONS[idx]} {ZONE_NAMES[idx]}</color></b></size>   <color=#9A93A6>채움</color> <b>{count}칸</b>{next}");
+        string next = nextThr > 0 ? Loc.F("   <color=#9A93A6>다음 단계까지</color> <color=#FFD98A><b>{0}칸</b></color>", nextThr - count) : "   <color=#6BE08A>모든 단계 달성</color>";
+        sb.AppendLine(Loc.F("<size=19><b><color=#{0}>{1} {2}</color></b></size>   <color=#9A93A6>채움</color> <b>{3}칸</b>{4}", zoneHex, ZONE_ICONS[idx], ZONE_NAMES[idx], count, next));
         int amp = AmpOf(zoneId);
-        if (amp > 0) sb.AppendLine($"<color=#FFCB5A>◆ 핵 증폭 +{amp}%</color>  <color=#9A93A6>이 존의 시너지 효과가 커진다</color>");
+        if (amp > 0) sb.AppendLine(Loc.F("<color=#FFCB5A>◆ 핵 증폭 +{0}%</color>  <color=#9A93A6>이 존의 시너지 효과가 커진다</color>", amp));
 
         if (sorted != null)
         {
@@ -759,7 +759,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
                 var s = sorted[i];
                 bool met    = count >= s.threshold;
                 bool isNext = s.threshold == nextThr;
-                string desc = string.IsNullOrEmpty(s.description) ? s.effect_type : s.description;
+                string desc = string.IsNullOrEmpty(s.description) ? s.effect_type : Loc.T(s.description);
 
                 // 「1단계 독안개 살포: 효과, 효과」 → 이름 · 효과(쉼표 절을 「·」로 이어 한 줄)
                 string name = null, effect = desc;
@@ -773,7 +773,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
                 string body   = met || isNext ? "#D9D3C4" : "#8E8A98";
 
                 sb.AppendLine();
-                sb.AppendLine($"{mark} <color={head}><b>{s.threshold}칸</b>{(string.IsNullOrEmpty(name) ? string.Empty : $"  {name}")}</color>");
+                sb.AppendLine(Loc.F("{0} <color={1}><b>{2}칸</b>{3}</color>", mark, head, s.threshold, (string.IsNullOrEmpty(name) ? string.Empty : $"  {name}")));
                 sb.AppendLine($"<indent=1.4em><color={body}>{EmphasizeNumbers(effect, numHex)}</color></indent>");
             }
         }

@@ -114,8 +114,8 @@ public sealed partial class UI_CruciblePanel
         _evolveConfirm.onClick.AddListener(() => { if (_evolvePick >= 0) OnBranchClicked(_evolvePick); });
 
         var hint = ThinText(d, "Hint", 18f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.5f));
-        hint.text = "카드를 골라 비교하고, 「진화」 버튼을 눌러야 바뀐다 · ▲▼는 지금 무기 대비";   // 10-18 「벼린다」 → 「진화」(용어 통일)
-        Place(hint.rectTransform, 0f, EvHintY, MockW, 26f);
+        hint.text = "카드를 골라 비교한 뒤 아래 버튼을 눌러야 진화한다 · ▲▼ = 지금 무기와 비교";   // 10-30 버튼 글은 「무기를 고른다」라 「「진화」 버튼」이 없었다
+        Place(hint.rectTransform, 0f, EvHintY, MockW, 30f);
 
         _evolveCarry = ThinText(d, "CarryLine", 18f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.75f));
         _evolveCarry.richText = true;
@@ -281,25 +281,25 @@ public sealed partial class UI_CruciblePanel
         }
         card.formEmblem.sprite  = f != null ? UISkin.Crucible?.EvolveFormEmblem(f.FormId) : null;
         card.formEmblem.enabled = card.formEmblem.sprite != null;
-        card.name.text   = so.displayName;
+        card.name.text   = Loc.T(so.displayName);
 
         int level = current?.enhanceLevel ?? 0;
         int startTier = current != null && !SkillTierResolver.IsRanged(current) ? SkillTierResolver.Resolve(current) : SkillTierResolver.MinTier;
-        card.skills.text = $"E {(so.skillE != null ? so.skillE.skillName : "—")} · R {(so.skillQ != null ? so.skillQ.skillName : "—")}"
-                         + (startTier > SkillTierResolver.MinTier ? $"  <color=#C9A6FF>{startTier}단계로 시작</color>" : "");   // 강화 단계가 이어지므로 지금 무기의 단계 = 시작 단계
+        card.skills.text = $"E {(so.skillE != null ? Loc.T(so.skillE.skillName) : "—")} · R {(so.skillQ != null ? Loc.T(so.skillQ.skillName) : "—")}"
+                         + (startTier > SkillTierResolver.MinTier ? Loc.F("  <color=#C9A6FF>스킬 {0}단계로 시작</color>", startTier) : "");   // 강화 단계가 이어지므로 지금 무기의 단계 = 시작 단계
         string hex = ColorUtility.ToHtmlStringRGB(f != null ? f.Tint : tint);
         if (f != null)
         {
-            card.formHead.text = $"<size=47%><color=#9A93A6>형</color></size> <color=#{hex}>{f.DisplayName}</color>  <size=53%><color=#8C8497>평타가 바뀐다</color></size>";
+            card.formHead.text = Loc.F("<size=47%><color=#9A93A6>형</color></size> <color=#{0}>{1}</color>  <size=53%><color=#8C8497>평타가 바뀐다</color></size>", hex, Loc.T(f.DisplayName));
             card.formLine.text = UIKeywordInk.Values(f.Line);   // 수치만 Noto 500(10-15 설명 글 강조)
             for (int i = 0; i < 3; i++) card.steps[i].text = FormStep(i, f, hex);
             card.rule.text = UIKeywordInk.Values(f.FormId == "weight"   // 수치만 Noto 500(10-15)
-                ? $"{f.IdleSeconds:0}초간 맞힌 휘두름이 없으면 0 · 충격파 {f.TriggerRange:0.#} m · 일반 몹 0.8초 경직"
-                : $"{f.IdleSeconds:0}초간 못 맞히면 1초에 1씩 준다 · 발동하면 0부터");
+                ? Loc.F("{0:0}초간 맞힌 휘두름이 없으면 0 · 충격파 {1:0.#} m · 일반 몹 0.8초 경직", f.IdleSeconds, f.TriggerRange)
+                : Loc.F("{0:0}초간 못 맞히면 1초에 1칸씩 줄어든다 · 발동하면 0부터", f.IdleSeconds));   // 10-30 「준다」가 「주다」로 읽혔다
         }
         else
         {
-            card.formHead.text = $"<color=#{hex}>{so.displayName}</color>";
+            card.formHead.text = $"<color=#{hex}>{Loc.T(so.displayName)}</color>";
             card.formLine.text = line;
             card.rule.text = "";
             for (int i = 0; i < 3; i++) card.steps[i].text = "";
@@ -309,8 +309,8 @@ public sealed partial class UI_CruciblePanel
         string lostName = current?.skillE != null ? current.skillE.skillName : null;
         bool lostOn = f != null && lostName != null && (so.skillE == null || so.skillE.skillName != lostName);
         SetChip(card.lostBox, card.lostChip, lostOn ? "잃는 것" : null, UITheme.Thin.Danger, 24f, EvLostY, rightAlign: false, h: 30f);
-        string tail = f == null ? "" : f.FormId == "weight" ? "멀리 닿는 평타가 없다" : $"{f.TriggerName}{Iga(f.TriggerName)} 조건부로 멀리 잇는다";
-        card.lost.text = lostOn ? $"{lostName} <color=#9A93A6>— {tail}</color>" : "";
+        string tail = f == null ? "" : f.FormId == "weight" ? "멀리 닿는 평타가 없다" : Loc.F("{0}{1} 다 찼을 때만 「{2}」이 멀리 닿는다", Loc.T(f.DisplayName), Iga(f.DisplayName), Loc.T(f.TriggerName));   // 10-30 「조건부」
+        card.lost.text = lostOn ? $"{Loc.T(lostName)} <color=#9A93A6>— {tail}</color>" : "";
 
         var next = PreviewStats(so, level);
         var now  = current != null ? new[] { current.baseAttack, current.attackSpeed, current.attackRange, current.areaOfEffect } : null;
@@ -320,7 +320,7 @@ public sealed partial class UI_CruciblePanel
         bool unlocked = WeaponEvolutionSO.IsUnlocked(b, level);
         // 바닥 글은 잠겼을 때만(10-11) — 비용 · 계승은 제목 아래 한 줄과 확정 버튼이 한 번씩 말한다(두 카드에 같은 줄이 겹쳤다)
         card.foot.gameObject.SetActive(!unlocked);
-        card.foot.text = unlocked ? "" : $"<color=#FF7A6A>재련 {Reforges(b.requiredEnhanceLevel)}회에서 열린다</color>";
+        card.foot.text = unlocked ? "" : Loc.F("<color=#FF7A6A>재련 {0}회에서 열린다</color>", Reforges(b.requiredEnhanceLevel));
         card.button.interactable = unlocked;
     }
 
@@ -348,10 +348,10 @@ public sealed partial class UI_CruciblePanel
         if (_evolveConfirm == null) return;
         _evolveConfirm.interactable = affordable;
         _evolveConfirmFrame?.SetState(affordable ? ThinFrameState.Ready : ThinFrameState.Idle, animate: true);
-        string name = b?.target != null ? b.target.displayName : "";
+        string name = b?.target != null ? Loc.T(b.target.displayName) : "";
         string cost = b == null || b.cost <= 0 ? ""
-                    : affordable ? $"  <size=85%>강화재료 {b.cost}</size>" : $"  <size=85%><color=#FF7A6A>강화재료 {b.cost}</color></size>";
-        _evolveConfirmLbl.text = b == null ? "<color=#9A98A0>무기를 고른다</color>" : $"「{name}」{Ro(name)} 진화{cost}";   // 10-18 「벼린다」 → 「진화」
+                    : affordable ? Loc.F("  <size=85%>강화재료 {0}</size>", b.cost) : Loc.F("  <size=85%><color=#FF7A6A>강화재료 {0}</color></size>", b.cost);
+        _evolveConfirmLbl.text = b == null ? "<color=#9A98A0>무기를 고른다</color>" : Loc.F("「{0}」{1} 진화{2}", name, Ro(name), cost);   // 10-18 「벼린다」 → 「진화」
         RefreshEvolveCarry(b);
     }
 
@@ -375,8 +375,8 @@ public sealed partial class UI_CruciblePanel
         string kind = picked?.target == null ? "새 무기"
                     : picked.target.weaponType == WeaponType.Greatsword ? "대검" : "카타나";
         string line = "";
-        if (phantom > 0) line = $"무형검 증강 {phantom}개 → <color=#C9D3E6>환영이 이어서 씀</color>";
-        if (sheath > 0)  line += (line.Length > 0 ? "  ·  " : "") + $"비어 있는 칼집 {MeleeAugmentDef.RankName(sheathRank)} → {kind} 증강 {sheath}개";
+        if (phantom > 0) line = Loc.F("무형검 증강 {0}개 → <color=#C9D3E6>환영이 이어서 씀</color>", phantom);
+        if (sheath > 0)  line += (line.Length > 0 ? "  ·  " : "") + Loc.F("비어 있는 칼집 {0} → {1} 증강 {2}개", MeleeAugmentDef.RankName(sheathRank), kind, sheath);
         _evolveCarry.text = line;
         _evolveCarry.gameObject.SetActive(line.Length > 0);
     }
@@ -384,6 +384,7 @@ public sealed partial class UI_CruciblePanel
     /// <summary>「~이 / ~가」 — 받침이 있으면 「이」.</summary>
     private static string Iga(string word)
     {
+        if (Loc.Current != Loc.Language.Korean) return string.Empty;   // 11-02 Q11 조사는 한국어에만
         if (string.IsNullOrEmpty(word)) return "이";
         char c = word[word.Length - 1];
         if (c < 0xAC00 || c > 0xD7A3) return "이";
@@ -406,12 +407,12 @@ public sealed partial class UI_CruciblePanel
             {
                 char on = weight ? '●' : '◆';
                 return Head("②", "가득") + $"{f.DisplayName} <color=#{hex}>{new string(on, f.MaxStacks)}</color> "
-                     + UIKeywordInk.Values($"{f.MaxStacks}칸") + (weight ? " · 잉걸빛 칼날" : " · 바람을 두른 칼날");
+                     + UIKeywordInk.Values(Loc.F("{0}칸", f.MaxStacks)) + (weight ? " · 잉걸빛 칼날" : " · 바람을 두른 칼날");
             }
             default:
                 return Head("③", "발동") + UIKeywordInk.Values(weight
-                    ? $"「{f.TriggerName}」 반드시 치명 · 충격파 {f.TriggerRange:0.#} m"
-                    : $"마지막 타 「{f.TriggerName}」 · {f.TriggerRange:0} m 관통 · {f.TriggerAtkRatio * 100f:0}%");
+                    ? Loc.F("「{0}」 반드시 치명 · 충격파 {1:0.#} m", Loc.T(f.TriggerName), f.TriggerRange)
+                    : Loc.F("마지막 타 「{0}」 · {1:0} m 관통 · {2:0}%", Loc.T(f.TriggerName), f.TriggerRange, f.TriggerAtkRatio * 100f));
         }
     }
 }

@@ -476,7 +476,7 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
             bool complete = total > 0 && done >= total;
             string name = MemoryAltarCatalog.BranchLabel(kv.Key);
             // 10-14 — 갈래 포인트(산 단계 수). 고리가 이 수로 열린다
-            string count = complete ? "<color=#E8BA54>◆</color>" : $"<color=#9A93A6>{done}포인트</color>";
+            string count = complete ? "<color=#E8BA54>◆</color>" : Loc.F("<color=#9A93A6>{0}포인트</color>", done);
             kv.Value.text = $"{name}  {count}\n<size=15><color=#9A93A6>{MemoryAltarCatalog.BranchQuestion(kv.Key)}</color></size>";
             kv.Value.color = complete ? UITheme.Gold : BranchColor(kv.Key);
             ApplyEmblem(kv.Key, kv.Value, $"{name}  {count}");
@@ -875,7 +875,7 @@ public sealed class AltarTreeView : MonoBehaviour, IBeginDragHandler, IDragHandl
     private static string TierRingText(int k)
     {
         var pts = MemoryAltarCatalog.TierPoints;
-        return k >= 1 && k < pts.Length ? $"갈래 {pts[k]}포인트부터 ↓" : "";
+        return k >= 1 && k < pts.Length ? Loc.F("갈래 {0}포인트부터 ↓", pts[k]) : "";
     }
 
     // ── Event Handlers ───────────────────────────────────

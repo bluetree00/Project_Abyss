@@ -85,6 +85,8 @@ public class SkillExecutionContext
         dir.Normalize();
         return start + dir * Controller.ClearDistanceAhead(start, dir, distance);
     }
+    /// <summary>돌진 목표 높이를 발밑 바닥에 맞춘다 — 경사로 · 계단을 따라 오르내린다(<see cref="PlayerController.DashFollowGround"/> · 11-02 Q6).</summary>
+    public UnityEngine.Vector3 DashFollowGround(UnityEngine.Vector3 target) => Controller.DashFollowGround(target, PlayerTransform.position.y);
     public void SetMoveScale(float s) => Controller.SetMoveScale(s);
 
     /// <summary>캐릭터 공격력을 반영한 최종 데미지 계산</summary>

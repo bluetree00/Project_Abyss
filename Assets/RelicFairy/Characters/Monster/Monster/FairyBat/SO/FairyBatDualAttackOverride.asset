@@ -12,7 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 316cb4f1bf0e2c84c9b85eaab67f057a, type: 3}
   m_Name: FairyBatDualAttackOverride
   m_EditorClassIdentifier: Assembly-CSharp::FairyBatDualAttackOverrideSO
-  sonicWaveProjectile: {fileID: 6356737226436246457, guid: e6e26bca3a7fb264dbb7398de856a31e, type: 3}
+  sonicWaveProjectile: {fileID: 6356737226436246457, guid: e6e26bca3a7fb264dbb7398de856a31e,
+    type: 3}
   sonicVfxProjectilePrefab: {fileID: 5364765115475002985, guid: 8f389528e461f7c408298a06fa44b9a8,
     type: 3}
   sonicVfxProjectileScale: 0.7
@@ -24,3 +25,6 @@ MonoBehaviour:
   sonicMaxRange: 15
   launchHeightOffset: 0.8
   sonicAnimTrigger: Attack02
+  windupSfx: {fileID: 8300000, guid: c4c68a97689654c4384138a17be2e094, type: 3}
+  windupSfxVolume: 1
+  windupSfxPitch: 1.15

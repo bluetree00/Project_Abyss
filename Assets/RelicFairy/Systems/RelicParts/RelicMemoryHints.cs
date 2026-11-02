@@ -25,7 +25,7 @@ public static class RelicMemoryHints
         var entry   = Managers.RelicParts?.GetById(partId);
         if (data == null || entry == null) return;
         if (!data.SetRecordMax(Prefix + partId, 1)) return;   // 이미 본 조각
-        UI_BossBark.Show($"{entry.part_name} — {entry.Line(1)}", BossBarkType.Bark);
+        UI_BossBark.Show($"{Loc.T(entry.part_name)} — {Loc.T(entry.Line(1))}", BossBarkType.Bark);   // 11-02 Q11 조각마다(입구는 조립된 글을 못 찾는다)
         backend.SaveAsync().Forget();
     }
 }

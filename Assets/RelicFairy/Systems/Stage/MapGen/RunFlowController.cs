@@ -137,6 +137,9 @@ public class RunFlowController : MonoBehaviour
 
     /// <summary>방 진입 안개 베일이 걷히는 시간(초). 디졸브 조립 구간을 덮을 만큼은 길어야 한다.</summary>
     private const float FogVeilClearSeconds = 1.6f;
+    /// <summary>챕터 첫 전투방 — 화면이 드러난 뒤 석문이 떨어지기까지 · 떨어진 뒤 웨이브까지(초 · 11-02 부감 대신 짧은 한 박자).</summary>
+    private const float RoomSealLead = 0.3f;
+    private const float RoomSealHold = 0.7f;
 
     private Vector3 _baseAnchor;
     private int     _anchorToggle;
@@ -298,7 +301,7 @@ public class RunFlowController : MonoBehaviour
             : null;
         if (entry == null) entry = FindStartEntry();
 
-        var plan = new DoorPlan { kind = (RoomPlanKind)meta.currentRoomKind, entry = entry, danger = meta.currentRoomDanger };
+        var plan = new DoorPlan { kind = (RoomPlanKind)meta.currentRoomKind, entry = entry, danger = meta.currentRoomDanger, runeFocus = meta.currentRoomFocus };
 
         _resuming = true;
         try
@@ -474,7 +477,7 @@ public class RunFlowController : MonoBehaviour
         // 방 빌드보다 먼저 세팅해야 RoomClearGate가 붙는 시점(AttachRoomClearController)에 이미 유효하다.
         // 이어하기 재생성은 특수방 방문으로 세지 않는다 — ResumeAsync가 RestoreAltarProgress로
         // 저장된 SpecialRoomVisits(그 방문이 이미 포함된 값)를 되돌려놓기 때문에 여기서 또 올리면 이중 계상된다.
-        grb.Run?.SetCurrentRoomKind(plan.kind, countSpecialVisit: !_resuming, danger: plan.danger);   // 10-29 F4 위험한 문
+        grb.Run?.SetCurrentRoomKind(plan.kind, countSpecialVisit: !_resuming, danger: plan.danger, runeFocus: plan.runeFocus);   // 10-29 F4 위험한 문 · 11-02 Q10 문에 걸린 속성
 
         var dir = WipeDir(fromEdge);
         _heading = (int)fromEdge; // 탄 출구의 절대 방향 = 새 진행 방향 → 다음 방을 이만큼 회전
@@ -637,8 +640,6 @@ public class RunFlowController : MonoBehaviour
         bool isBossRoom  = plan.kind == RoomPlanKind.Boss;
         bool freshCombat = !restoreCleared && hasCombat && !isBossRoom;
 
-        var introCam    = GameCameraController.Instance;
-        var introPlayer = GameRunBootstrapper.Instance?.Run?.Player;
         if (isBossRoom)
         {
             // 보스방: procgen 봉인 석문을 입구·출구 어디에도 만들지 않는다(오브젝트·연출 모두 없음).
@@ -648,33 +649,20 @@ public class RunFlowController : MonoBehaviour
             // 입구 석문 슬램·출구 석문 낙하가 보스 등장 연출을 깨던 문제 제거.
             ClearGates();   // 이전 방 게이트 잔재만 정리 — 새 게이트는 만들지 않는다
         }
-        else if (freshCombat && introCam != null && !quickEntry)
+        else if (freshCombat && !quickEntry)
         {
             _chapterCombatIntroShown = true;
-            // 신규 전투방(챕터 첫 전투방): 카메라가 방을 넓게 보여주는 동안 문이 잠기고, 그 후에 몬스터가 나온다.
+            // 신규 전투방(챕터 첫 전투방): 석문이 떨어져 닫히는 한 박자 뒤에 몬스터가 나온다.
             // (몬스터 Activate는 이 await 뒤 웨이브 분기에서 실행 → 연출 종료 전까지 스폰 안 됨)
+            // 11-02 사용자 「모든 방 진입 때 천장을 보여주고 돌아오는 연출 폐기 → 적당히 짧은 연출 하나로」 — 상공 48 m 부감(2.6초)을 걷었다.
+            // 카메라는 플레이어에 머물고, 흔들림 · 소리는 대표 문 하나(약 1초).
             //
-            // 게이트(통과 차단 콜라이더)는 연출 <b>전</b>에 세운다. 예전엔 onWide에서야 만들어져
-            // 부감 팬이 올라가는 ~0.9초 동안 출구가 뻥 뚫려 있었고, 그 사이 통로로 나간 플레이어는
-            // 뒤에서 석문이 떨어지며 통로에 갇혔다. 낙하 <b>연출</b>만 와이드샷 시점으로 미룬다.
+            // 게이트(통과 차단 콜라이더)는 연출 <b>전</b>에 세운다 — 석문이 떨어지기 전에 통로로 나간 플레이어가
+            // 뒤에서 떨어진 석문에 통로에 갇히지 않게. 낙하 <b>연출</b>만 한 박자 미룬다.
             SealRoom(SealDoorEntry.Parked);
-            if (result.hasCeiling)
-            {
-                // 천장 있는 실내 방(성채 등): 상공 부감 팬은 천장만 비추므로 생략한다.
-                // 카메라는 게임플레이 시점 유지, 문 봉인·몬스터 스폰 페이싱은 동일(연출 시간만큼 대기 후 석문 낙하).
-                await UniTask.Delay(TimeSpan.FromSeconds(0.9f), ignoreTimeScale: true, cancellationToken: ct);
-                PlaySealDoorDrops();
-                await UniTask.Delay(TimeSpan.FromSeconds(1.0f), ignoreTimeScale: true, cancellationToken: ct);
-            }
-            else
-            {
-                await introCam.PlayRoomEntryIntroAsync(
-                    result.roomGO.transform.position,
-                    introPlayer != null ? introPlayer.transform : null,
-                    riseDuration: 0.9f, holdDuration: 1.0f, returnDuration: 0.7f,
-                    wideHeight: 48f, wideBack: 20f,
-                    onWide: PlaySealDoorDrops, ct);
-            }
+            await UniTask.Delay(TimeSpan.FromSeconds(RoomSealLead), ignoreTimeScale: true, cancellationToken: ct);
+            PlaySealDoorDrops();
+            await UniTask.Delay(TimeSpan.FromSeconds(RoomSealHold), ignoreTimeScale: true, cancellationToken: ct);
             if (this == null || ct.IsCancellationRequested) { SetPlayerInput(true); return; }
         }
         else if (hasCombat)
@@ -928,6 +916,7 @@ public class RunFlowController : MonoBehaviour
             currentRoomKind    = (int)plan.kind,
             currentRoomMirror  = mirror,
             currentRoomDanger  = plan.danger,   // 10-29 F4 — 이어하기로 돌아와도 위험한 문 방(정예 둘 · Epic)
+            currentRoomFocus   = plan.runeFocus,   // 11-02 Q10 — 이어하기로 돌아와도 그 문의 속성 룬
             currentRoomCleared = _currentRoomCleared,
             currentRoomRewardPending = _currentRoomRewardPending,
             crucibleRollIndex  = session.CrucibleRollIndex,
@@ -1828,27 +1817,32 @@ public class RunFlowController : MonoBehaviour
     };
 
     /// <summary>문 프리뷰 2행 — "그 방에서 무엇을 얻는가". 이동을 결정으로 만드는 정보.
-    /// 전투방은 보상 등급·후보 수(RoomRewardTable 실값), 서비스방은 기능을 적는다. 이벤트방은 그 방의 보상(pool_key 열쇠말).</summary>
-    private static string KindSubtitle(RoomPlanKind kind, string poolKey = null)
+    /// 전투방은 보상 등급·후보 수(RoomRewardTable 실값), 서비스방은 기능을 적는다. 이벤트방은 그 방의 보상(pool_key 열쇠말).
+    /// 10-30 사용자 「컨셉 대사처럼이 아닌 직관적인 설명 글」 — 「1방」(한 대로 읽혔다) · 「후보 3」(무엇의 후보인지) · 「결전」 대신
+    /// 무엇이 있고 무엇을 받는지(구현설계/글_쉬운말_점검_20261030.md R-07~R-11).</summary>
+    private static string KindSubtitle(RoomPlanKind kind, string poolKey = null, string runeFocus = null)
     {
         switch (kind)
         {
             // 재화방은 전투 하나 대신 고르는 문이다(10-24 B2 — 고르면 보스까지 전투 1방 몫)
-            case RoomPlanKind.Shop:     return "물건 구매 · 전투 1방 대신";
-            case RoomPlanKind.Crucible: return "무기 강화 · 승급 · 전투 1방 대신";
-            case RoomPlanKind.Refinery: return "룬 정제 · 전투 1방 대신";
-            case RoomPlanKind.Rest:     return "체력 회복 또는 무기 강화";   // 10-18 「쉬거나 · 벼리거나」 → 결과로
+            case RoomPlanKind.Shop:     return Loc.T("물약 구매 · 전투방 하나 대신");   // 10-30 상점은 물약만 판다
+            case RoomPlanKind.Crucible: return Loc.T("무기 재련 · 승급 · 전투방 하나 대신");
+            case RoomPlanKind.Refinery: return Loc.T("원석으로 룬 정제 · 전투방 하나 대신");
+            // 10-18 「쉬거나 · 벼리거나」 → 결과로 · 10-30 방 안 글(체력 회복 40% · 무료 재련 1회)과 같은 말을 읽는다
+            case RoomPlanKind.Rest:     return Loc.F("{0} 또는 {1}", Loc.T(RestRoomController.RestLabel), Loc.T(RestRoomController.ForgeLabel));
             case RoomPlanKind.Event:    return EventRewards.Badge(poolKey);   // 10-29 「시험 · 선택」 → 「시험 · 금화」 · 「시험 · 정수」 …
-            case RoomPlanKind.Boss:     return "결전";
-            case RoomPlanKind.PreBoss:  return "보스 직전";
-            case RoomPlanKind.MidBoss:  return "강적 하나 · " + RarityKor(ItemRarity.Epic) + " 보상";
+            case RoomPlanKind.Boss:     return Loc.T("보스전 · 이기면 유물 기억 카드");
+            case RoomPlanKind.PreBoss:  return Loc.T("전투 없음 · 다음 방이 보스");
+            case RoomPlanKind.MidBoss:  return Loc.F("정예 보스 1마리 · {0} 이상 룬", RarityKor(ItemRarity.Epic));
         }
 
         var rule  = RoomRewardTable.For(kind);
-        string floor = rule.RarityFloor.HasValue ? RarityKor(rule.RarityFloor.Value) + " 이상" : "보상";
+        string rune = rule.RarityFloor.HasValue ? Loc.F("{0} 이상 룬", RarityKor(rule.RarityFloor.Value)) : Loc.T("룬");
+        if (ElementDef.GetById(runeFocus) is { } focus)   // 11-02 Q10 「불 룬 3장 중 1장」 — 속성 이름을 그 색으로
+            rune = $"<color=#{ColorUtility.ToHtmlStringRGB(focus.Color)}>{Loc.T(focus.Name)}</color> {rune}";
         return rule.EnhanceMaterial > 0
-            ? $"{floor} · 후보 {rule.ChoiceCount} · 강화재료 {rule.EnhanceMaterial}"
-            : $"{floor} · 후보 {rule.ChoiceCount}";
+            ? Loc.F("{0} {1}장 중 1장 · 강화재료 {2}", rune, rule.ChoiceCount, rule.EnhanceMaterial)
+            : Loc.F("{0} {1}장 중 1장", rune, rule.ChoiceCount);
     }
 
     private static string RarityKor(ItemRarity r) => r switch
@@ -1861,11 +1855,11 @@ public class RunFlowController : MonoBehaviour
 
     /// <summary>문 배지 · 라벨 첫 줄(기호 + 제목) — 10-29 F4 위험한 문은 「▲ 위험한 문」.</summary>
     private static string DoorTitle(in DoorPlan p)
-        => p.danger ? "▲ 위험한 문" : KindGlyph(p.kind) + " " + KindTitle(p.kind, p.entry?.pool_key);
+        => p.danger ? Loc.T("▲ 위험한 문") : KindGlyph(p.kind) + " " + Loc.T(KindTitle(p.kind, p.entry?.pool_key));   // 11-02 Q11 방 종류 · 이벤트 이름
 
-    /// <summary>문 배지 · 라벨 둘째 줄 — 위험한 문은 보상 먼저(정예 둘이라는 값을 같이).</summary>
+    /// <summary>문 배지 · 라벨 둘째 줄 — 위험한 문은 보상 먼저(정예 둘이라는 값을 같이). 10-30 「Epic 보상」이 룬이라는 말이 없었다.</summary>
     private static string DoorSubtitle(in DoorPlan p)
-        => p.danger ? $"보상 {RarityKor(ItemRarity.Epic)} 이상 · 정예 둘" : KindSubtitle(p.kind, p.entry?.pool_key);
+        => p.danger ? Loc.F("{0} 이상 룬 · 정예 둘", RarityKor(ItemRarity.Epic)) : KindSubtitle(p.kind, p.entry?.pool_key, p.runeFocus);
 
     /// <summary>문 글 색 — 위험한 문은 붉게(화면 덮개는 정예 보라 그대로).</summary>
     private static Color DoorColor(in DoorPlan p) => p.danger ? DangerDoorColor : KindBrightColor(p.kind);

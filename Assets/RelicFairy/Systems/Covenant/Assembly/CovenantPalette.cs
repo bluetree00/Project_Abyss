@@ -221,15 +221,17 @@ public static class CovenantPalette
     public static bool TryGetCause(string id, out CauseDef def)
     {
         id ??= string.Empty;
-        if (_causes.TryGetValue(id, out def)) return true;
-        return _aliasCause.TryGetValue(id, out var real) && _causes.TryGetValue(real, out def);
+        bool ok = _causes.TryGetValue(id, out def) || (_aliasCause.TryGetValue(id, out var real) && _causes.TryGetValue(real, out def));
+        if (ok) { def.name = Loc.T(def.name); def.desc = Loc.T(def.desc); def.tag = Loc.T(def.tag); }   // 11-02 Q11 — 사본만 지금 언어로
+        return ok;
     }
 
     public static bool TryGetEffect(string id, out EffectDef def)
     {
         id ??= string.Empty;
-        if (_effects.TryGetValue(id, out def)) return true;
-        return _aliasEffect.TryGetValue(id, out var real) && _effects.TryGetValue(real, out def);
+        bool ok = _effects.TryGetValue(id, out def) || (_aliasEffect.TryGetValue(id, out var real) && _effects.TryGetValue(real, out def));
+        if (ok) { def.name = Loc.T(def.name); def.desc = Loc.T(def.desc); def.tag = Loc.T(def.tag); }   // 11-02 Q11 — 사본만 지금 언어로
+        return ok;
     }
 
     /// <summary>해당 효과가 방어축(Survival)인지. 드래프트 보장/리롤 axisLock 판정용.</summary>

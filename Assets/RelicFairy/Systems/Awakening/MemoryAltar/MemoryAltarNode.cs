@@ -177,7 +177,7 @@ public static class MemoryAltarCatalog
     {
         float p = MeleeAugmentDraft.LegendBase + MeleeAugmentDraft.LegendPerAltarLevel * level;
         float run = 1f - UnityEngine.Mathf.Pow(1f - p, 7);
-        return $"화면마다 전설 {p * 100f:0}% · 런마다 약 {run * 100f:0}%";
+        return Loc.F("화면마다 전설 {0:0}% · 런마다 약 {1:0}%", p * 100f, run * 100f);
     }
 
     /// <summary>「결의」 단계 <paramref name="level"/>의 체력 문턱(0 = 안 삼 · 1단계 0.60 · 2단계 0.45).</summary>
@@ -400,29 +400,29 @@ public static class MemoryAltarCatalog
         // ── 룬 — 어떤 룬이 나오나 ─────────────────────────
         new(RuneStorage1,   AltarBranch.Rune, "룬 보관함",   "룬 보관함 칸",              560,
             Rec.RoomClears, 60, "방 60회 클리어", 360, size: AltarNodeSize.Small, maxLevel: 2,
-            valueText: lv => $"룬 보관함 {5 + lv}칸"),
+            valueText: lv => Loc.F("룬 보관함 {0}칸", 5 + lv)),
         new(RuneRareOdds,   AltarBranch.Rune, "Rare 룬 확률", "방 보상 Rare 룬 확률", 250, maxLevel: 5,
-            valueText: lv => $"Rare 룬 +{RareOddsPerLevel * lv:0}%p"),
+            valueText: lv => Loc.F("Rare 룬 +{0:0}%p", RareOddsPerLevel * lv)),
         new(OreGain,        AltarBranch.Rune, "원석 획득",   "방 보상 원석", 220, size: AltarNodeSize.Small, maxLevel: 5,
-            valueText: lv => $"원석 +{OreGainPerLevel * 100f * lv:0}%"),
+            valueText: lv => Loc.F("원석 +{0:0}%", OreGainPerLevel * 100f * lv)),
         new(RuneEpic,       AltarBranch.Rune, "Epic 룬 등장",   "룬 최고 등급  Rare → Epic",        1900,
             Rec.Seals, 3, "보스 3명 봉인", 1250, size: AltarNodeSize.Keystone, requiredPoints: 3),
         new(RuneEpicOdds,   AltarBranch.Rune, "Epic 룬 확률", "방 보상 Epic 룬 확률", 380,
             parents: new[] { RuneEpic }, maxLevel: 5, requiredPoints: 3,
-            valueText: lv => $"Epic 룬 +{EpicOddsPerLevel * lv:0}%p"),
+            valueText: lv => Loc.F("Epic 룬 +{0:0}%p", EpicOddsPerLevel * lv)),
         new(RefinePick,     AltarBranch.Rune, "정제 두 장",     "정제할 때  룬 1개 → 2장 중 고르기", 1400,
             Rec.RefineCount, 10, "정제 10회", 900, requiredPoints: 8),
         // 영웅 룬 <b>뒤</b>여야 한다 — 영웅이 잠겨 있으면 정제소도 영웅을 낼 수 없어(등급 제한) 사 봐야 효과가 없다.
         new(RefineQuality,  AltarBranch.Rune, "정제 등급", "정제소 Epic 확률",          380,
             Rec.RefineCount, 30, "정제 30회", 250,
             parents: new[] { RuneEpic }, maxLevel: 5, requiredPoints: 8,
-            valueText: lv => $"정제소 Epic +{RefineEpicPerLevel * 100f * lv:0}%p"),
+            valueText: lv => Loc.F("정제소 Epic +{0:0}%p", RefineEpicPerLevel * 100f * lv)),
         new(RuneLegendary,  AltarBranch.Rune, "Legendary 룬 확률 ×10", "열기 전엔 드물게 나온다 · 열면 10배 자주", 2500,   // 10-29 해금 → 확률 업
             Rec.LibKills, 3, "해방된 보스 3회 처치", 1600,
             parents: new[] { RuneEpic }, size: AltarNodeSize.Keystone, era: 2, requiredPoints: 15),
         new(RuneLegendOdds, AltarBranch.Rune, "Legendary 룬 확률", "방 보상 Legendary 룬 확률", 720,
             parents: new[] { RuneLegendary }, era: 2, maxLevel: 3, requiredPoints: 15,
-            valueText: lv => $"Legendary 룬 +{LegendOddsPerLevel * lv:0}%p"),
+            valueText: lv => Loc.F("Legendary 룬 +{0:0}%p", LegendOddsPerLevel * lv)),
 
         // ── 서약 — 어떤 서약을 맺나 ───────────────────────
         // 원인·효과 카드는 네 단계로 열린다(<see cref="CovenantPalette"/>의 개방 단계 0 ~ 3 = 이 노드의 단계).
@@ -449,9 +449,9 @@ public static class MemoryAltarCatalog
             Rec.RoomClears, 30, "방 30회 클리어", 170),
         new(SigilSmith,     AltarBranch.Weapon, "재련 비용",  "재련 비용 할인",          400,   // 10-18 재련 개편 — 확률이 없어져 성공률 → 비용 −10%/단계(세이브 단계는 그대로)
             Rec.MaxEnhance, 12, "무기 +12 도달", 260, maxLevel: 3,   // 10-15 강화 단계 세분(옛 +6)
-            valueText: lv => $"재련 비용 −{WeaponReforgeService.SigilCostPerLevel * 100f * lv:0}%"),
+            valueText: lv => Loc.F("재련 비용 −{0:0}%", WeaponReforgeService.SigilCostPerLevel * 100f * lv)),
         new(EnhanceGain,    AltarBranch.Weapon, "강화재료 획득",  "방 보상 강화재료", 340, size: AltarNodeSize.Small, maxLevel: 3,
-            valueText: lv => $"강화재료 +{EnhanceGainPerLevel * 100f * lv:0}%"),
+            valueText: lv => Loc.F("강화재료 +{0:0}%", EnhanceGainPerLevel * 100f * lv)),
         // 10-24 W7(사용자 「증강도 등급 · 낮은 확률로 파격 효과 · 확률 증가를 기억의 제단과 연결 — 체감될 정도로」) —
         // 근접 증강 화면마다 전설 한 장이 끼어들 확률 2% → 4 · 6 · 8%. 런마다(재련 화면 약 7번) 13% → 25 · 35 · 44%.
         new(AugmentRevelation, AltarBranch.Weapon, "증강의 계시", "근접 증강 화면에 전설 카드가 끼어들 확률", 700, maxLevel: 3, requiredPoints: 3,
@@ -474,50 +474,50 @@ public static class MemoryAltarCatalog
         new(Revive,         AltarBranch.Journey, "부활 1회",       "런당 1회 — 쓰러지면 최대 체력 50%로 일어나 2초 무적",   800,
             size: AltarNodeSize.Keystone),
         new(MaxHpUp,        AltarBranch.Journey, "최대 체력",  "최대 체력",                 440, maxLevel: 5,
-            valueText: lv => $"최대 체력 +{MaxHpPctPerLevel * 100f * lv:0}%"),
+            valueText: lv => Loc.F("최대 체력 +{0:0}%", MaxHpPctPerLevel * 100f * lv)),
         new(SigilMerchant,  AltarBranch.Journey, "상점 가격",    "상점 가격",                 360,
             Rec.ShopUses, 5, "상점 5회 이용", 240, maxLevel: 3,
-            valueText: lv => lv <= 0 ? "상점 가격 그대로" : $"상점 가격 -{ShopDiscountPerLevel * 100f * lv:0}%"),
+            valueText: lv => lv <= 0 ? "상점 가격 그대로" : Loc.F("상점 가격 -{0:0}%", ShopDiscountPerLevel * 100f * lv)),
         new(GoldGain,       AltarBranch.Journey, "골드 획득",    "얻는 골드",                 230, size: AltarNodeSize.Small, maxLevel: 5,
-            valueText: lv => $"골드 +{GoldGainPerLevel * 100f * lv:0}%"),
+            valueText: lv => Loc.F("골드 +{0:0}%", GoldGainPerLevel * 100f * lv)),
         // ── 해방 대비 3칸(10-22 C10 권장안 B · 설계 `기획/RelicFairy_해방기_기억의제단_권장안_20261022.md`) — 고리 1 샘 · 고리 2 내성 · 결의 ──
         // 해방기 압박(한 대 ×1.2 · 방 받는 피해 ×1.7)을 「견딜 만한 선」까지만 메운다 — 한 대는 거의 상쇄, 챕터 예산은 절반(남는 몫은 해방기의 어려움).
         // 영구 공격력 0 그대로 · 흡혈 없음(샘 = 쉼 · 결의 = 사망 방지 · 내성 = 받는 피해 감소). 10-14 「영구 스탯 = 최대 체력만」을 해방기 뒤 한정으로 푼다(D1).
         // 자물쇠 = 「해방기 도달」(D2). 생존 칸이라 할인 조건은 걸지 않는다(할인가 = 기본가). 값 합 8,190(샘 1,440 · 내성 3,870 · 결의 2,880).
         // ── 근접 버팀 3칸(10-29 · 설계 §2) — 근접 무기를 들 때만 서는 버팀. 조건 없음(근접 런은 봉인기부터 힘들다) ──
         new(MeleeIronWill,  AltarBranch.Journey, "강철 의지",  "방에 들어설 때 보호막(근접 무기를 들고 있으면) — 다음 방에 남지 않는다", 480, maxLevel: 3,
-            valueText: lv => lv <= 0 ? "보호막 없음" : $"방 들어설 때 보호막 최대 체력 {MeleeIronWillShield[System.Math.Clamp(lv, 0, 3)] * 100f:0}%"),
+            valueText: lv => lv <= 0 ? "보호막 없음" : Loc.F("방 들어설 때 보호막 최대 체력 {0:0}%", MeleeIronWillShield[System.Math.Clamp(lv, 0, 3)] * 100f)),
         new(MeleeStance,    AltarBranch.Journey, "근접 자세",  "근접 무기를 들고 있는 동안 받는 피해가 줄어든다", 620, maxLevel: 3, requiredPoints: 3,
-            valueText: lv => lv <= 0 ? "받는 피해 그대로" : $"근접 무기 들 때 받는 피해 −{MeleeStanceReduction[System.Math.Clamp(lv, 0, 3)] * 100f:0}%"),
+            valueText: lv => lv <= 0 ? "받는 피해 그대로" : Loc.F("근접 무기 들 때 받는 피해 −{0:0}%", MeleeStanceReduction[System.Math.Clamp(lv, 0, 3)] * 100f)),
         new(MeleeLastBreath, AltarBranch.Journey, "버티는 숨", "근접 무기 · 체력이 30% 아래로 떨어지는 순간 2초 받는 피해 −50%(방마다 한 번)", 950,
             size: AltarNodeSize.Keystone, requiredPoints: 3,
             valueText: lv => lv <= 0 ? "없음" : "체력 30% 아래 · 2초 받는 피해 −50% · 방마다 1번"),
         new(LibSpring,      AltarBranch.Journey, "재정비의 샘",  "챕터 시작 「요정의 샘」 회복량 — 단계마다 +20%p(악몽 +10%p)", 600,
             Rec.Liberated, 1, LiberationLockLabel, 600, conditionRequired: true, era: 2, maxLevel: 2,
-            valueText: lv => $"요정의 샘 회복 {(0.5f + SpringHealPerLevel * lv) * 100f:0}%(악몽 {(0.3f + NightmareSpringHealPerLevel * lv) * 100f:0}%)"),   // 기본 50 · 악몽 30 = ChapterSpring
+            valueText: lv => Loc.F("요정의 샘 회복 {0:0}%(악몽 {1:0}%)", (0.5f + SpringHealPerLevel * lv) * 100f, (0.3f + NightmareSpringHealPerLevel * lv) * 100f)),   // 기본 50 · 악몽 30 = ChapterSpring
         new(PotionHeal,     AltarBranch.Journey, "포션 회복량",  "포션 한 병 회복량",           360, maxLevel: 3, requiredPoints: 3,
-            valueText: lv => $"포션 회복 최대 체력의 {(0.40f + PotionHealPerLevel * lv) * 100f:0}%"),
+            valueText: lv => Loc.F("포션 회복 최대 체력의 {0:0}%", (0.40f + PotionHealPerLevel * lv) * 100f)),
         new(EssenceGain,    AltarBranch.Journey, "정수 획득",    "얻는 심연의 정수",            400, maxLevel: 5, requiredPoints: 3,
-            valueText: lv => $"정수 +{EssenceGainPerLevel * 100f * lv:0}%"),
+            valueText: lv => Loc.F("정수 +{0:0}%", EssenceGainPerLevel * 100f * lv)),
         new(ShopReroll,     AltarBranch.Journey, "상점 새로고침",  "상점 진열 새로고침(20 → 40 → 80골드)",   820,
             Rec.ShopUses, 10, "상점 10회 이용", 530, size: AltarNodeSize.Small, maxLevel: 2, requiredPoints: 3,
             valueText: lv => lv <= 0 ? "새로고침 없음" : lv == 1 ? "상점마다 3회 · 20 → 40 → 80" : "첫 새로고침 무료 · 그다음 40 → 80"),   // 10-21 값이 오르는 새로고침
         new(LibWard,        AltarBranch.Journey, "해방의 내성",  "받는 피해가 줄어든다 — 단계마다 −4%", 900,
             Rec.Liberated, 1, LiberationLockLabel, 900, conditionRequired: true, era: 2, maxLevel: 3, requiredPoints: 3,
-            valueText: lv => lv <= 0 ? "받는 피해 그대로" : $"받는 피해 −{LibWardPerLevel * 100f * lv:0}%"),
+            valueText: lv => lv <= 0 ? "받는 피해 그대로" : Loc.F("받는 피해 −{0:0}%", LibWardPerLevel * 100f * lv)),
         new(LibResolve,     AltarBranch.Journey, "결의",        "체력이 높을 때 쓰러질 한 방을 맞으면 체력 1로 버틴다 — 방마다 1회(보스는 페이지마다)", 1200,
             Rec.Liberated, 1, LiberationLockLabel, 1200, conditionRequired: true,
             size: AltarNodeSize.Keystone, era: 2, maxLevel: 2, requiredPoints: 3,
-            valueText: lv => lv <= 0 ? "없음" : $"체력 {ResolveThreshold(lv) * 100f:0}% 이상 · 쓰러질 한 방 버팀"),
+            valueText: lv => lv <= 0 ? "없음" : Loc.F("체력 {0:0}% 이상 · 쓰러질 한 방 버팀", ResolveThreshold(lv) * 100f)),
         new(LibGiftWide,    AltarBranch.Journey, "넓은 선물",   "해방기 · 악몽 시작 선물이 넓어진다", 900,
             Rec.Liberated, 1, LiberationLockLabel, 900, conditionRequired: true, era: 2, maxLevel: 2, requiredPoints: 3,
             valueText: lv => lv <= 0 ? "룬 3장 · 증강 2장 · 유물 기억 한 번" : lv == 1 ? "룬 4장 · 증강 3장 · 유물 기억 한 번" : "룬 4장 · 증강 3장 · 유물 기억 두 번"),
         new(LibReroll,      AltarBranch.Journey, "다시 뽑기",   "런마다 근접 증강 다시 뽑기 +1", 1100,
             Rec.Liberated, 1, LiberationLockLabel, 1100, conditionRequired: true, era: 2, requiredPoints: 3,
-            valueText: lv => $"근접 증강 다시 뽑기 런마다 {MeleeAugmentDraft.RerollsPerRun + lv}번"),
+            valueText: lv => Loc.F("근접 증강 다시 뽑기 런마다 {0}번", MeleeAugmentDraft.RerollsPerRun + lv)),
         new(PotionSlot,     AltarBranch.Journey, "포션 칸",     "포션 칸",                1100,
             size: AltarNodeSize.Small, era: 2, maxLevel: 2, requiredPoints: 8,
-            valueText: lv => $"포션 {3 + lv}칸"),
+            valueText: lv => Loc.F("포션 {0}칸", 3 + lv)),
         // 「심연 입장」만 조건이 <b>자물쇠</b>다 — 심연(순환)은 악몽기 리치를 쓰러뜨린 엔딩 뒤에 열린다(정본 §2-3).
         new(AbyssDepth,     AltarBranch.Journey, "심연 입장",      "엔딩 뒤 심연 개방 — 깊이마다 적 체력 · 공격력 +25%",  1000,
             StoryProgress.Rec.Ending, 1, "성소의 주인을 완전히 쓰러뜨리기", 1000, conditionRequired: true,
@@ -525,7 +525,7 @@ public static class MemoryAltarCatalog
         new(DepthReward,    AltarBranch.Journey, "깊이 보상",      "심연 깊이마다 정수",       720,
             Rec.NmKills, 4, "악몽 보스 4회 처치", 470,
             parents: new[] { AbyssDepth }, era: 3, maxLevel: 3, requiredPoints: 15,
-            valueText: lv => $"깊이마다 정수 +{DepthRewardPerLevel * 100f * lv:0}%"),
+            valueText: lv => Loc.F("깊이마다 정수 +{0:0}%", DepthRewardPerLevel * 100f * lv)),
         new(SigilAscetic,   AltarBranch.Journey, "고행자의 인장",  "보상 선택지 -1 · 정수 ×1.6 (켜고 끄기)", 3200,
             Rec.NmKills, 8, "악몽 보스 8회 처치", 2100,
             parents: new[] { AbyssDepth }, size: AltarNodeSize.Keystone, era: 3, requiredPoints: 15),

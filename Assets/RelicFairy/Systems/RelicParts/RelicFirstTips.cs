@@ -90,15 +90,15 @@ public static class RelicFirstTips
     }
 
     /// <summary>대사 표에 아직 없을 때(CDN 업로드 전) — DIALOGUE_DATA 「RelicTip_*」 행과 같은 글. 멀린 = 동료 반말 · 뜻이 바로.</summary>
-    private static string Fallback(string tip) => tip switch
+    private static string Fallback(string tip) => Loc.T(tip switch   // 화면 언어(11-02 Q11)
     {
         GawainDawn        => "가웨인의 해는 싸울 때만 돌아. 지금은 여명 — 적을 칠 때마다 태양흔이 쌓여.",
         GawainNoon        => "정오야! 쌓아 둔 태양흔이 한꺼번에 터지고 너도 세져. 지금 Q로 해를 떨어뜨려.",
         GawainDusk        => "황혼엔 Q가 잠겨. 적을 쓰러뜨릴수록 다음 해가 빨리 떠.",
-        LancelotMadness   => "칠수록 광기가 차올라. 세지는 만큼 더 아프게 맞으니 조심해.",
+        LancelotMadness   => "칠수록 광기가 차올라 세지지만, 그만큼 아프게 맞아. 3초 안 치면 줄어.",   // 10-30 D-19 3초 감쇠 규칙이 어디에도 없었다
         LancelotFrenzy    => "광기 40 — 광란이야! 지금 Q로 심판을 내려.",
         LancelotFrenzyEnd => "광란이 끝나면 광기는 0부터 다시 쌓여.",
-        EvolutionOpen     => "이제 기억 조각 2개를 모은 채 보스를 쓰러뜨리면 유물이 진화해.",
+        EvolutionOpen     => "이제 보스를 쓰러뜨릴 때마다 유물 진화 카드가 나와. 한 번 고르면 런 끝까지 가.",   // 10-30 D-01 조각 2개 조건은 10-29에 걷었다
         _                 => string.Empty,
-    };
+    });
 }

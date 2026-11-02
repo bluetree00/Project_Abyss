@@ -565,7 +565,7 @@ public sealed partial class MonsterTraits
         var bank = GameRunBootstrapper.Instance?.Run?.FuelBank;
         if (bank == null) return;
         bank.Add(FuelKind.RuneOre, EliteOreReward);
-        ItemEffectVfxHelper.ShowNotice($"<color={UIPalette.RuneOreHex}>원석 +{EliteOreReward}</color>  (정예)");
+        ItemEffectVfxHelper.ShowNotice($"<color={UIPalette.RuneOreHex}>{Loc.F("원석 +{0}", EliteOreReward)}</color>  ({Loc.T("정예")})");
     }
 
     // ── 공용 ───────────────────────────────────────────────

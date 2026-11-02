@@ -119,7 +119,7 @@ public static class BuildImprint
             int stage = s_stages[(int)f];
             if (stage <= 0) continue;
             into.Add(new BuffViewItem(BuildFamilyRules.IconKey(f),
-                $"{BuildFamilyRules.Label(f)} 각인 {stage}단계 · {BuildFamilyRules.StageBonusText(f, stage)}",
+                Loc.F("{0} 각인 {1}단계 · {2}", BuildFamilyRules.Label(f), stage, BuildFamilyRules.StageBonusText(f, stage)),
                 stage, -1f, "", BuffSource.Item, isDebuff: false));
         }
     }

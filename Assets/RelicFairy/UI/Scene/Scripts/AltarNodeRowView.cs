@@ -684,8 +684,8 @@ public class AltarNodeRowView : MonoBehaviour
 
         string progress = $"{Mathf.Min(state.Progress, state.Target)}/{state.Target}";
         return node.ConditionRequired
-            ? $"{node.ConditionLabel} {progress} · 필수"
-            : $"{node.ConditionLabel} {progress} · 반값";
+            ? Loc.F("{0} {1} · 필수", node.ConditionLabel, progress)
+            : Loc.F("{0} {1} · 반값", node.ConditionLabel, progress);
     }
 
     /// <summary>

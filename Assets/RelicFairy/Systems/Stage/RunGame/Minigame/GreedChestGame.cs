@@ -18,7 +18,7 @@ public sealed class GreedChestGame : EventMinigame
     private const float PlayTime     = 30f;
     private const float OpenRange    = 2.8f;
     private const float BankRange    = 1.6f;
-    private const float BankDistance = 2.5f;
+    private const float BankDistance = 4.8f;   // 10-30 2.5 → 4.8 · 옆으로 — 열기(2.8) · 챙기기(1.6) 범위가 겹치지 않게(OpenRange + BankRange 4.4보다 멀리)
     private const float Heartbeat    = 0.8f;
     private const float BiteRange    = 3.5f;
     private const float RiseSeconds  = 0.45f;
@@ -49,12 +49,16 @@ public sealed class GreedChestGame : EventMinigame
     private Transform  _camT;
     private float      _demoTimer;
     private bool       _demoForce;
+    private int        _statusKey = -1;   // 10-30 상태 줄은 단계 · 물림이 바뀔 때만 다시 만든다(매 프레임 문자열 할당 금지)
+    private string     _statusText;
 
     // ── Properties ─────────────────────────────────────────────
     public override string Id => "greed";
     protected override string Title => "욕심의 상자";
-    protected override string Rule => "열수록 커진다 — 언제 멈출지는 네가 정한다";
-    protected override string GradeHint => "멈추면 그 단계만큼 금화 · 4단까지 열면 정수도 · 실패하면 물린다";
+    // 10-30 사용자 「컨셉 대사처럼이 아닌 직관적인 설명 글」 — 「열수록 커진다 — 언제 멈출지는 네가 정한다」는 무엇을 누르는지가 없었다(M-05 · M-06)
+    protected override string Rule => "상자 앞 [F]로 열 때마다 금화가 늘고, 실패하면 상자가 문다";
+    protected override string GradeHint
+        => Loc.F("빛 원에서 [F] = 지금 금화 받고 끝 · {0}번 다 열면 금화 ×{1:0.#} + 정수 · 물리면 금화 {2}", MaxStage, TopGoldScale, BittenGold);
     protected override float Duration => PlayTime;
     protected override float WantRadius => 6f;
     protected override bool FinishedEarly => _state == State.Done;
@@ -62,17 +66,32 @@ public sealed class GreedChestGame : EventMinigame
     protected override bool UseCountdown => false;   // 10-29 상자 앞에 서면 바로 — 카운트다운이 기다림만 늘렸다
     public override ChallengeGrade CurrentGrade => _bitten ? ChallengeGrade.Fail : GradeOf(_stage);
 
+    /// <summary>10-30 M-07 · M-08 — 등급 이름(「실버」) 대신 지금 받는 금화 · 물리면 받는 것.</summary>
     protected override string StatusLine
     {
         get
         {
-            if (_bitten) return "물렸다 — 욕심이 과했다";
-            if (_stage >= MaxStage) return "최고 단계 — 금화 ×1.5 · 정수";
-            return $"지금 챙기면 {MinigameHud.GradeName(GradeOf(_stage))} · 다음 열기 성공 {Mathf.RoundToInt(Chances[_stage] * 100f)}%";
+            int key = _bitten ? MaxStage + 1 : _stage;
+            if (key == _statusKey) return _statusText;
+            _statusKey = key;
+            if (_bitten) return _statusText = Loc.F("상자에 물렸다 — 금화 {0}만 받는다", BittenGold);
+            if (_stage >= MaxStage) return _statusText = Loc.F("{0}번 다 열었다 — 금화 {1} · 정수 {2}", MaxStage, BankGold(_stage), TopEssence);
+            return _statusText = Loc.F("지금 받으면 금화 {0} · 다음 열기 성공 {1}%", BankGold(_stage), Mathf.RoundToInt(Chances[_stage] * 100f));
         }
     }
 
-    protected override string ResultLine => _bitten ? $"{_stage}단에서 물렸다" : $"{_stage}단에서 챙겼다";
+    // 10-30 M-09 「2단」의 「단」은 화면 어디에도 없는 말이었다
+    protected override string ResultLine => _bitten ? Loc.F("{0}번째에 물렸다", _stage + 1)
+                                          : _stage <= 0 ? "열지 않고 받았다" : Loc.F("상자 {0}번 열고 받았다", _stage);
+
+    /// <summary>10-30 M-18 메달 아래 — 지금 받으면 들어오는 금화(물렸으면 그 몫). 3 · 4번은 같은 등급이라 단계로 다시 만든다.</summary>
+    protected override string GradeReward(ChallengeGrade grade)
+        => _bitten ? Loc.F("금화 {0}", BittenGold) : Loc.F("금화 {0}", BankGold(_stage));
+
+    protected override int RewardKey => _bitten ? MaxStage + 1 : _stage;
+
+    private int BittenGold => EventRewards.Gold(ChallengeGrade.Fail, EventRewards.Chapter(Run));
+    private int TopEssence => EventRewards.Essence(ChallengeGrade.Platinum, EventRewards.Chapter(Run));
 
     // ── Public Methods ─────────────────────────────────────────
 
@@ -103,7 +122,14 @@ public sealed class GreedChestGame : EventMinigame
         _chestPos = Center;
         Vector3 toPlayer = PlayerT.position - Center; toPlayer.y = 0f;
         Vector3 dir = toPlayer.sqrMagnitude > 0.01f ? toPlayer.normalized : Vector3.back;
-        _bankPos = MinigameArena.Snap(Center + dir * BankDistance, 1f, out var b) ? b : Center + dir * BankDistance;
+        // 10-30 사용자 「열면 브론즈 기다려도 브론즈」 — 챙기기 원이 상자 2.5 m 앞(다가오는 길 위)이라 상자 앞 [F]가 0단 챙기기(브론즈)로 먹혔다.
+        // 상자 옆(다가오는 길에서 비켜선 자리)에 둔다 — 오른쪽이 막혔으면 왼쪽, 둘 다 막혔으면 예전처럼 앞쪽(멀리)
+        Vector3 side = Vector3.Cross(Vector3.up, dir);
+        if (MinigameArena.Snap(Center + side * BankDistance, 1f, out var b)
+            || MinigameArena.Snap(Center - side * BankDistance, 1f, out b)
+            || MinigameArena.Snap(Center + dir * BankDistance, 1f, out b))
+            _bankPos = b;
+        else _bankPos = Center + side * BankDistance;
 
         _chest = Own(await SpawnChestPropAsync(_chestPos, Quaternion.LookRotation(dir), RiseDepth, ct));
         _anim  = _chest != null ? _chest.GetComponentInChildren<Animator>() : null;
@@ -114,9 +140,10 @@ public sealed class GreedChestGame : EventMinigame
         PatternGuideHelper.SetProgress(_bankDisc, 1f);
 
         _chance     = Label(_chestPos + Vector3.up * 2.6f, "", 6f, GoldLight);
-        _openPrompt = Label(_chestPos + Vector3.up * 1.7f, $"<color={UIPalette.GoldHex}>[F]</color> 열기", 4f, Color.white);
-        _bankLabel  = Label(_bankPos + Vector3.up * 1.2f, "챙기기", 4.5f, Theme);
-        _bankPrompt = Label(_bankPos + Vector3.up * 1.8f, $"<color={UIPalette.GoldHex}>[F]</color> 챙기기", 4f, Color.white);
+        _openPrompt = Label(_chestPos + Vector3.up * 1.7f, Loc.F("<color={0}>[F]</color> 열기", UIPalette.GoldHex), 4f, Color.white);
+        // 10-30 M-11 「챙기기」는 「끝내기」라는 뜻이 약했다(계속 열 수 있는지 헷갈림)
+        _bankLabel  = Label(_bankPos + Vector3.up * 1.2f, "받고 끝내기", 4.5f, Theme);
+        _bankPrompt = Label(_bankPos + Vector3.up * 1.8f, Loc.F("<color={0}>[F]</color> 금화 받고 끝내기", UIPalette.GoldHex), 4f, Color.white);
         _openPrompt.gameObject.SetActive(false);
         _bankPrompt.gameObject.SetActive(false);
         RefreshChance();
@@ -162,8 +189,8 @@ public sealed class GreedChestGame : EventMinigame
         int essence = top ? EventRewards.Essence(ChallengeGrade.Platinum, ch) : 0;
         EventRewards.DropGold(at, gold);
         EventRewards.DropEssence(at, essence);
-        EventRewards.Notice(essence > 0 ? $"욕심의 상자 — 금화 <color=#F2D26A>+{gold}</color> · 정수 <color=#73D9C7>+{essence}</color>"
-                                        : $"욕심의 상자 — 금화 <color=#F2D26A>+{gold}</color>");
+        EventRewards.Notice(essence > 0 ? Loc.F("욕심의 상자 — 금화 <color=#F2D26A>+{0}</color> · 정수 <color=#73D9C7>+{1}</color>", gold, essence)
+                                        : Loc.F("욕심의 상자 — 금화 <color=#F2D26A>+{0}</color>", gold));
     }
 
     protected override void DemoTick(MinigameDemo mode, float dt)
@@ -180,6 +207,13 @@ public sealed class GreedChestGame : EventMinigame
     }
 
     // ── Private Methods ────────────────────────────────────────
+
+    /// <summary>지금 단계에서 받으면 들어오는 금화 — <see cref="GrantReward"/>와 같은 셈(4번 다 열면 ×1.5).</summary>
+    private int BankGold(int stage)
+    {
+        int gold = EventRewards.Gold(GradeOf(stage), EventRewards.Chapter(Run));
+        return stage >= MaxStage ? Mathf.RoundToInt(gold * TopGoldScale) : gold;
+    }
 
     private void TickIdle()
     {
@@ -244,7 +278,7 @@ public sealed class GreedChestGame : EventMinigame
         {
             // 4단계 — 상자가 열린 채 빛기둥, 그대로 챙긴다
             RunFx.Play(RunFxSlot.Pillar, _chestPos, 0.09f, GoldLight);
-            Hud?.Float("최고 단계!", GoldLight);
+            Hud?.Float("다 열었다!", GoldLight);   // 10-30 「최고 단계!」 — 단계라는 말은 화면 다른 곳에 없다
             Bank();
             return;
         }
@@ -274,13 +308,13 @@ public sealed class GreedChestGame : EventMinigame
         _state  = State.Done;
         MinigameFx.Sound(SoundKey.Sfx.GoldPickup, 0.9f, 1f + 0.08f * _stage);
         if (_stage < MaxStage) RunFx.Play(RunFxSlot.Ring, _bankPos, 0.6f, GoldLight);   // 4단계 자동 챙기기는 상자 빛기둥이 맡는다
-        if (_chance != null) { _chance.text = "챙겼다"; _chance.color = Theme; }
+        if (_chance != null) { _chance.text = "받았다"; _chance.color = Theme; }
     }
 
     private void RefreshChance()
     {
         if (_chance == null) return;
-        _chance.text = _stage >= MaxStage ? "최고!" : $"{Mathf.RoundToInt(Chances[_stage] * 100f)}%";
+        _chance.text = _stage >= MaxStage ? "최고!" : Loc.F("다음 성공 {0}%", Mathf.RoundToInt(Chances[_stage] * 100f));   // 10-30 M-10 무엇의 확률인지
     }
 
     private async UniTaskVoid TauntLaterAsync()

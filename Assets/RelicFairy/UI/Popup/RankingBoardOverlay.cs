@@ -150,9 +150,9 @@ public static class RankingBoardOverlay
         int tier = now ? RankingFlow.TitleTier(era, RankingFlow.LastCentis) : RankingFlow.BestTitleTier(era);
         if (tier < 0) return null;
         string title = RankingFlow.TitleName(era, tier);
-        string head  = now ? $"이번 기록  {RankingService.Format(RankingFlow.LastCentis)}  —  「{title}」" : $"내 칭호  「{title}」";
+        string head  = now ? Loc.F("이번 기록  {0}  —  「{1}」", RankingService.Format(RankingFlow.LastCentis), title) : Loc.F("내 칭호  「{0}」", title);
         int next = RankingFlow.NextTierMinutes(era, tier);
-        return next > 0 ? $"{head}   <size=72%><color=#{ColorUtility.ToHtmlStringRGB(UITheme.Mute)}>다음 칭호 {next}분 안</color></size>" : head;
+        return next > 0 ? Loc.F("{0}   <size=72%><color=#{1}>다음 칭호 {2}분 안</color></size>", head, ColorUtility.ToHtmlStringRGB(UITheme.Mute), next) : head;
     }
 
     /// <summary>한 줄 — <paramref name="medal"/> 1 · 2 · 3이면 순위 숫자를 금 · 은 · 동 메달 위에(그림이 없으면 숫자만).</summary>

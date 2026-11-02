@@ -84,8 +84,8 @@ public sealed class RefineryService
 
     public static string EventLine(RefineryEvent ev) => ev switch
     {
-        RefineryEvent.HighPurity => "이번 한 번 Epic 이상",
-        RefineryEvent.HalfPrice  => "원석 절반",
+        RefineryEvent.HighPurity => "다음 정제 1번은 Epic 이상 룬",   // 10-30 X-03 무엇이 Epic인지
+        RefineryEvent.HalfPrice  => "정제에 드는 원석 절반",         // 10-30 X-04 무엇이 절반인지
         RefineryEvent.TwoCards   => "룬 두 장 중 하나",
         _                        => string.Empty,
     };
@@ -167,7 +167,7 @@ public sealed class RefineryService
 
     /// <summary>등급 확률 아래 한 줄 — 방 보상 위라는 것 · 정제 등급(무엇이 확률을 올렸나). 왼쪽 열 폭에 한 줄로 들게 둘 중 하나.</summary>
     public static string DescribeBoost()
-        => QualityUnlockEpic > 0f ? $"방 보상보다 높게 · 정제 등급 +{QualityUnlockEpic * 100f:F0}%p" : "방 보상보다 높게 · 챕터 · 시기 따라 오름";
+        => QualityUnlockEpic > 0f ? Loc.F("방 보상보다 높게 · 정제 등급 +{0:F0}%p", QualityUnlockEpic * 100f) : Loc.T("방 보상보다 높게 · 챕터 · 시기 따라 오름");
 
     // ── 돌리기 ──
 

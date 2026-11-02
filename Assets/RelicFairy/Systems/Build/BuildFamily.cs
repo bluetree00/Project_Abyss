@@ -231,16 +231,16 @@ public static class BuildFamilyRules
         int eff = UnityEngine.Mathf.RoundToInt(stage * BonusPerStage * 100f);
         string stat = f switch
         {
-            BuildFamily.Combo    => $"공격속도 +{Pct(ComboAtkSpeed * stage)} · 연타 요구 −{stage}",
-            BuildFamily.Kill     => $"공격력 +{Pct(KillAttack * stage)} · 처치 폭발 반경 +{Pct(0.15f * stage)}",
-            BuildFamily.Mobility => $"이동속도 +{Pct(MobilityMove * stage)}",
-            BuildFamily.Spell    => $"스킬 피해 +{Pct(SpellSkill * stage)}",
-            BuildFamily.Crit     => $"치명 확률 +{Pct(CritChanceStep * stage)} · 치명 피해 +{Pct(CritDamageStep * stage)}",
-            BuildFamily.Ranged   => $"원거리 무기일 때 피해 +{Pct(RangedDamage * stage)}",
-            BuildFamily.Danger   => $"방어력 +{Pct(DangerDefense * stage)}",
+            BuildFamily.Combo    => Loc.F("공격속도 +{0} · 연타 요구 −{1}", Pct(ComboAtkSpeed * stage), stage),
+            BuildFamily.Kill     => Loc.F("공격력 +{0} · 처치 폭발 반경 +{1}", Pct(KillAttack * stage), Pct(0.15f * stage)),
+            BuildFamily.Mobility => Loc.F("이동속도 +{0}", Pct(MobilityMove * stage)),
+            BuildFamily.Spell    => Loc.F("스킬 피해 +{0}", Pct(SpellSkill * stage)),
+            BuildFamily.Crit     => Loc.F("치명 확률 +{0} · 치명 피해 +{1}", Pct(CritChanceStep * stage), Pct(CritDamageStep * stage)),
+            BuildFamily.Ranged   => Loc.F("원거리 무기일 때 피해 +{0}", Pct(RangedDamage * stage)),
+            BuildFamily.Danger   => Loc.F("방어력 +{0}", Pct(DangerDefense * stage)),
             _                    => "",
         };
-        return $"{Label(f)} 룬 효과 +{eff}% · {stat}";
+        return Loc.F("{0} 룬 효과 +{1}% · {2}", Label(f), eff, stat);
     }
 
     private static string Pct(float v) => UnityEngine.Mathf.RoundToInt(v * 100f) + "%";

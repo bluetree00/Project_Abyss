@@ -23,7 +23,7 @@ public sealed class RestRoomController : MonoBehaviour
     private const float ChoiceReach            = 2.4f;    // 모닥불 · 모루 중심에서 이만큼까지는 [F]가 닿는다(예전 반경)
     private const float ChoicePromptHeight     = 2.2f;
     private const string AnvilName             = "RestAnvil";
-    private const string ForgeLabel            = "무료 재련 1회";   // 10-18 재련 개편 D2 — 근접 +3 · 증강 고르기 / 원거리 파츠 카드(10-22 B7: 둘 다 되면 고른다)
+    public const string ForgeLabel             = "무료 재련 1회";   // 10-18 재련 개편 D2 — 근접 +3 · 증강 고르기 / 원거리 파츠 카드(10-22 B7: 둘 다 되면 고른다)
     private static readonly Color RestInk  = new(1f, 0.72f, 0.38f, 1f);
     private static readonly Color ForgeInk = new(1f, 0.85f, 0.55f, 1f);
 
@@ -78,7 +78,8 @@ public sealed class RestRoomController : MonoBehaviour
     // ── Private Methods ─────────────────────────────────────
     private static float HealRatio => NightmareRules.IsActive ? NightmareRestHealRatio : RestHealRatio;
 
-    private static string RestLabel => $"체력 회복 {Mathf.RoundToInt(HealRatio * 100f)}%";
+    /// <summary>10-30 문 배지(RunFlowController.KindSubtitle)도 같은 말을 읽는다 — 문엔 「체력 회복 또는 무기 강화」, 방 안엔 이 말이라 같은 것을 둘로 불렀다.</summary>
+    public static string RestLabel => Loc.F("체력 회복 {0}%", Mathf.RoundToInt(HealRatio * 100f));
 
     private static int HealAmount(int maxHp) => Mathf.Max(1, Mathf.RoundToInt(maxHp * HealRatio));
 
@@ -88,9 +89,9 @@ public sealed class RestRoomController : MonoBehaviour
     private string Prompt()
     {
         string options = _anvil == null       ? RestLabel
-                       : CanForge(out _)      ? $"{RestLabel}  또는  {ForgeLabel}"
-                                              : $"{RestLabel}  <color=#9AA0A6>· 무기는 최대 강화</color>";
-        return $"<color=#FFD700>[F]</color> 쉼터\n<size=80%>{options}</size>";
+                       : CanForge(out _)      ? Loc.F("{0}  또는  {1}", RestLabel, ForgeLabel)
+                                              : Loc.F("{0}  <color=#9AA0A6>· 무기는 최대 강화</color>", RestLabel);
+        return Loc.F("<color=#FFD700>[F]</color> 쉼터\n<size=80%>{0}</size>", options);
     }
 
     /// <summary>
@@ -101,7 +102,7 @@ public sealed class RestRoomController : MonoBehaviour
     {
         bool melee = CanForgeSlot(PlayerWeaponManager.Slot0, out var meleeDetail);
         bool ranged = CanForgeSlot(PlayerWeaponManager.Slot1, out var rangedDetail);
-        detail = melee && ranged ? $"\n   무기 재련 — {meleeDetail}\n   파츠 재련 — {rangedDetail}"
+        detail = melee && ranged ? Loc.F("\n   무기 재련 — {0}\n   파츠 재련 — {1}", meleeDetail, rangedDetail)
                : melee ? meleeDetail : rangedDetail;
         return melee || ranged;
     }
@@ -120,8 +121,8 @@ public sealed class RestRoomController : MonoBehaviour
     {
         try { await UniTask.Delay(1200, ignoreTimeScale: true, cancellationToken: destroyCancellationToken); }
         catch (System.OperationCanceledException) { return; }
-        Notice(_anvil != null ? $"<color=#FFC982>쉼터</color> — {RestLabel} 또는 {ForgeLabel} (하나만)"
-                              : $"<color=#FFC982>쉼터</color> — {RestLabel}");
+        Notice(_anvil != null ? Loc.F("<color=#FFC982>쉼터</color> — {0} 또는 {1} (하나만)", RestLabel, ForgeLabel)
+                              : Loc.F("<color=#FFC982>쉼터</color> — {0}", RestLabel));
     }
 
     private void Close()
@@ -148,7 +149,7 @@ public sealed class RestRoomController : MonoBehaviour
         string forgeDetail = null;
         bool canForge = _anvil != null && CanForge(out forgeDetail);
 
-        string body = $"{RestLabel}   " + (canRest ? $"체력 {stats.Hp} → {Mathf.Min(stats.MaxHp, stats.Hp + HealAmount(stats.MaxHp))}"
+        string body = $"{RestLabel}   " + (canRest ? Loc.F("체력 {0} → {1}", stats.Hp, Mathf.Min(stats.MaxHp, stats.Hp + HealAmount(stats.MaxHp)))
                                                   : Dim("체력이 가득하다"));
         if (_anvil != null)
             body += $"\n{ForgeLabel}   " + (canForge ? forgeDetail : Dim("더 올릴 것이 없다"));
@@ -180,7 +181,7 @@ public sealed class RestRoomController : MonoBehaviour
         Close();
         RunFx.Play(RunFxSlot.Ring, _fire.position + Vector3.up * 0.1f, 1f, RestInk);
         Managers.Sound?.PlayEvent(SoundEvent.RestHeal);
-        Notice($"<color=#FFC982>쉼터</color> — 체력 회복 +{stats.Hp - before}");
+        Notice(Loc.F("<color=#FFC982>쉼터</color> — 체력 회복 +{0}", stats.Hp - before));
     }
 
     /// <summary>무료 재련 — 근접 · 원거리 중 되는 쪽. 둘 다 되면 한 번 더 고른다(재련소 「무엇을 재련할까」와 같은 말).</summary>
@@ -191,7 +192,7 @@ public sealed class RestRoomController : MonoBehaviour
         bool ranged = CanForgeSlot(PlayerWeaponManager.Slot1, out var rangedDetail);
         if (melee && ranged)
         {
-            string body = UIKeywordInk.Values($"무기 재련   {meleeDetail}\n파츠 재련   {rangedDetail}\n" + Dim("ESC — 고르지 않고 닫기"));
+            string body = UIKeywordInk.Values(Loc.F("무기 재련   {0}\n파츠 재련   {1}\n", meleeDetail, rangedDetail) + Dim("ESC — 고르지 않고 닫기"));
             UI_ConfirmDialog.ShowChoice("무료 재련 — 무엇을 재련할까", body, "무기 재련", "파츠 재련",
                                         () => ForgeSlot(PlayerWeaponManager.Slot0), () => ForgeSlot(PlayerWeaponManager.Slot1));
             return;
@@ -208,7 +209,7 @@ public sealed class RestRoomController : MonoBehaviour
         Close();
         RunFx.Play(RunFxSlot.Burst, _anvil.position + Vector3.up * 0.8f, 0.6f, ForgeInk);
         Managers.Sound?.PlayEvent(SoundEvent.RestForge);
-        Notice(SkillTierResolver.IsRanged(weapon) ? $"<color=#FFC982>쉼터</color> — {ForgeLabel} · 파츠 카드를 고른다"
-                                                  : $"<color=#FFC982>쉼터</color> — {ForgeLabel} · {weapon.displayName} 재련 {WeaponReforgeService.CountAt(weapon.enhanceLevel)}회");
+        Notice(SkillTierResolver.IsRanged(weapon) ? Loc.F("<color=#FFC982>쉼터</color> — {0} · 파츠 카드를 고른다", ForgeLabel)
+                                                  : Loc.F("<color=#FFC982>쉼터</color> — {0} · {1} 재련 {2}회", ForgeLabel, Loc.T(weapon.displayName), WeaponReforgeService.CountAt(weapon.enhanceLevel)));
     }
 }

@@ -473,7 +473,7 @@ public class InventoryPageView : MonoBehaviour
 
         // 설명 (displayName)
         if (_detailDesc != null)
-            _detailDesc.text = !string.IsNullOrEmpty(item.displayName) ? item.displayName : "";
+            _detailDesc.text = !string.IsNullOrEmpty(item.displayName) ? Loc.T(item.displayName) : "";
 
         // 효과
         if (_detailEffects != null)
@@ -502,9 +502,9 @@ public class InventoryPageView : MonoBehaviour
         {
             string extra = "";
             if (item.shapeId > 0)
-                extra += $"블록 Shape #{item.shapeId}\n";
+                extra += Loc.F("블록 Shape #{0}\n", item.shapeId);
             if (item.cooldown > 0)
-                extra += $"쿨다운 {item.cooldown:F1}초\n";
+                extra += Loc.F("쿨다운 {0:F1}초\n", item.cooldown);
             _detailExtra.text = extra.TrimEnd('\n');
             _detailExtra.gameObject.SetActive(!string.IsNullOrEmpty(extra));
         }
@@ -695,7 +695,7 @@ public class InventoryPageView : MonoBehaviour
         // 내용 구성
         string rarityColor = $"#{RarityColorTable.GetHex(item.rarity)}";
 
-        string text = $"<color={rarityColor}><b>{item.displayName}</b></color>\n";
+        string text = $"<color={rarityColor}><b>{Loc.T(item.displayName)}</b></color>\n";
         text += $"<size=10><color=#AAAAAA>{item.rarity} · {item.category}</color></size>\n";
 
         if (item.effects != null && item.effects.Count > 0)
@@ -709,7 +709,7 @@ public class InventoryPageView : MonoBehaviour
         }
 
         if (item.shapeId > 0)
-            text += $"\n<size=10><color=#88AAFF>블록 Shape #{item.shapeId}</color></size>";
+            text += Loc.F("\n<size=10><color=#88AAFF>블록 Shape #{0}</color></size>", item.shapeId);
 
         text += "\n<size=9><color=#666666>우클릭: 메뉴</color></size>";
 

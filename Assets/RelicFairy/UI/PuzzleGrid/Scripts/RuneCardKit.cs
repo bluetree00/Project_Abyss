@@ -74,7 +74,7 @@ public static class RuneCardKit
     public static string RarityChipText(RuntimeItemData data)
     {
         int cells = CellCount(data);
-        return RewardPresentation.RarityLabel(data.rarity) + (cells > 0 ? $" · {cells}칸" : string.Empty);
+        return RewardPresentation.RarityLabel(data.rarity) + (cells > 0 ? Loc.F(" · {0}칸", cells) : string.Empty);
     }
 
     /// <summary>

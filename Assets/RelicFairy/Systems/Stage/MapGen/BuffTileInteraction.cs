@@ -123,7 +123,7 @@ public class BuffTileInteraction : MonoBehaviour
             // 직접 차감이라 사망 판정(TakeDamage 내부)을 안 탄다 — HP가 0이면 즉시 사망 처리.
             if (session.Player != null && session.Player.RuntimeStats.Hp <= 0)
                 session.Player.NotifyHpDepleted();
-            noticeMsg = $"<color=#FF4444>즉시 피해 {damage}</color>";
+            noticeMsg = $"<color=#FF4444>{Loc.F("즉시 피해 {0}", damage)}</color>";
             Debug.Log($"[BuffTile] 즉시 피해 {damage} (티어 {result.Tier})");
         }
         else
@@ -137,14 +137,14 @@ public class BuffTileInteraction : MonoBehaviour
                 result.Tier
             );
 
-            string typeName = GetStatName(result.Modifier.Type);
+            string typeName = Loc.T(GetStatName(result.Modifier.Type));
             string sign = result.Modifier.Value >= 0 ? "+" : "";
             string valueStr = result.IsPercent
                 ? $"{sign}{result.Modifier.Value * 100f:F0}%"
                 : $"{sign}{result.Modifier.Value:F0}";
             string color = result.IsDebuff ? "#FF6666" : "#66CCFF";
 
-            noticeMsg = $"<color={color}>{typeName} {valueStr}</color> ({result.RoomDuration}방)";
+            noticeMsg = $"<color={color}>{typeName} {valueStr}</color> " + Loc.F("({0}방)", result.RoomDuration);
             Debug.Log($"[BuffTile] {(result.IsDebuff ? "디버프" : "버프")} T{result.Tier} {result.Modifier.Type} {valueStr}");
         }
 
@@ -188,7 +188,7 @@ public class BuffTileInteraction : MonoBehaviour
         _promptGo.transform.localPosition = Vector3.up * PromptOffsetY;
 
         _promptText = _promptGo.AddComponent<TextMeshPro>();
-        _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> 열기";
+        _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> {Loc.T("열기")}";
         _promptText.fontSize = 4f;
         _promptText.alignment = TextAlignmentOptions.Center;
         _promptText.color = Color.white;

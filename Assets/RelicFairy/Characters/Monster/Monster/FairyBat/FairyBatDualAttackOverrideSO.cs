@@ -9,6 +9,9 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "FairyBatDualAttackOverride", menuName = "Lee/Monster/Override/FairyBatDualAttack")]
 public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
 {
+    private const float WindupSfxGap = 0.08f;   // 여러 마리가 한꺼번에 덤빌 때 날갯짓 겹침 막기
+    private static float s_lastWindupSfx = float.NegativeInfinity;
+
     [Tooltip("Projectile prefab used for the sonic wave attack.")]
     public MonsterProjectile sonicWaveProjectile;
 
@@ -38,6 +41,14 @@ public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
 
     [Tooltip("Animation state name used for the sonic attack.")]
     public string sonicAnimTrigger = "Attack02";
+
+    [Tooltip("공격 시작 날갯짓 — 근접 · 음파 공통(맞기 damageApplyDelay 전이라 예고음도 된다). null이면 소리 없음(10-29 박쥐 · 흑기사 공격음).")]
+    public AudioClip windupSfx;
+
+    [Range(0f, 1f)]
+    public float windupSfxVolume = 1f;
+
+    public float windupSfxPitch = 1.15f;
 
     public override void RegisterOverrides(MonsterFSM fsm, MonsterBase monster)
     {
@@ -96,6 +107,14 @@ public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
         var proj = Object.Instantiate(sonicWaveProjectile, origin, Quaternion.LookRotation(direction));
         proj.Init(direction, sonicSpeed, sonicMaxRange, damage, knockback);
         proj.Owner = ctx.Transform.gameObject;
+    }
+
+    private void PlayWindupSfx(MonsterContext ctx)
+    {
+        float since = Time.time - s_lastWindupSfx;   // 음수 = 지난 플레이의 값(도메인을 다시 읽지 않을 때) — 막지 않는다
+        if (windupSfx == null || (since >= 0f && since < WindupSfxGap)) return;
+        s_lastWindupSfx = Time.time;
+        Managers.Sound?.PlayEffectAt(windupSfx, ctx.Transform.position, windupSfxVolume, windupSfxPitch * Random.Range(0.95f, 1.05f));
     }
 
     private static void RotateTowardPlayer(MonsterContext ctx, float turnSpeed = 10f)
@@ -241,6 +260,7 @@ public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
                 attackAnim = ctx.Animation.attackTrigger;
             if (ctx.Animator != null && !string.IsNullOrEmpty(attackAnim))
                 ctx.Animator.CrossFade(attackAnim, Mathf.Max(0.08f, ctx.Animation.crossFadeDuration));
+            _data.PlayWindupSfx(ctx);
             ctx.Monster.NotifyAttackIncoming(_damageTimer);
             // 근접은 판정 원(DealDamageToPlayer = 거리 원)을 예고한다 — 예고 없이 1.8 m 피해가 들어갔다(10-13 이펙트 = 판정)
             if (!_useRangedAttack)

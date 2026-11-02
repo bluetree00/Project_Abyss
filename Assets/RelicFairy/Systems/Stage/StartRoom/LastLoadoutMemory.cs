@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -35,9 +34,11 @@ public static class LastLoadoutMemory
 
     /// <summary>
     /// 거점 도착(플레이어를 만들기 전) — 비어 있는 칸을 지난 세팅으로 채운다.
-    /// <paramref name="rangedAllowed"/>: 공방이 내놓는 원거리인가(석궁 해금 등) — 아니면 원거리를 채우지 않는다.
+    /// 이름으로 <b>거점이 가진 에셋</b>을 찾는다(<paramref name="findRanged"/> = 공방이 지금 내놓는 원거리 · <paramref name="findRelic"/> = 유물 제단의 유물).
+    /// 10-30: 예전엔 Addressables로 따로 불러왔는데, 빌드에선 그 사본이 공방 · 제단 것과 다른 인스턴스라 원거리는 「공방이 안 내놓음」으로 빠지고
+    /// 유물 제단은 고른 상태로 숨지 않았다(사용자 「다시 베이스캠프로 와도 무기와 유물을 다 선택해야」). 에디터에선 같은 인스턴스라 안 보였다.
     /// </summary>
-    public static async UniTask RestoreAsync(PlayerLoadout lo, Func<WeaponSO, bool> rangedAllowed, CancellationToken ct)
+    public static void Restore(PlayerLoadout lo, Func<string, WeaponSO> findRanged, Func<string, RelicClassSO> findRelic)
     {
         RestoredThisVisit = false;
         string raw = BackendGameData.Instance?.Data?.lastLoadout;
@@ -48,30 +49,28 @@ public static class LastLoadoutMemory
         string relic  = p.Length > 1 ? p[1] : "";
         bool any = false;
 
-        if (lo.WeaponSlot1 == null && !string.IsNullOrEmpty(ranged))
+        if (lo.WeaponSlot1 == null && !string.IsNullOrEmpty(ranged) && findRanged != null)
         {
-            var w = await Managers.AddressableManager.TryLoadAssetAsync<WeaponSO>(ranged);
-            ct.ThrowIfCancellationRequested();
-            if (w != null && (rangedAllowed == null || rangedAllowed(w))) { lo.SetWeaponSlot1(w); any = true; }
+            var w = findRanged(ranged);
+            if (w != null) { lo.SetWeaponSlot1(w); any = true; }
         }
 
-        if (lo.Relic == null && !string.IsNullOrEmpty(relic))
+        if (lo.Relic == null && !string.IsNullOrEmpty(relic) && findRelic != null)
         {
-            var r = await Managers.AddressableManager.TryLoadAssetAsync<RelicClassSO>(relic);
-            ct.ThrowIfCancellationRequested();
+            var r = findRelic(relic);
             if (r != null) { lo.SetRelic(r); any = true; }
         }
 
         RestoredThisVisit = any;
-        if (any) Debug.Log($"[LastLoadout] 지난 세팅 복원 — {Describe(lo)}");
+        Debug.Log(any ? $"[LastLoadout] 지난 세팅 복원 — {Describe(lo)}" : $"[LastLoadout] 지난 세팅 「{raw}」 — 채울 칸 없음 · 못 찾음");
     }
 
     /// <summary>「석궁 · 가웨인」 — 도착 알림 · 로그.</summary>
     public static string Describe(PlayerLoadout lo)
     {
         if (lo == null) return "";
-        string ranged = lo.WeaponSlot1 != null ? lo.WeaponSlot1.displayName : "";
-        string relic  = lo.Relic != null ? lo.Relic.DisplayName : "";
+        string ranged = lo.WeaponSlot1 != null ? Loc.T(lo.WeaponSlot1.displayName) : "";
+        string relic  = lo.Relic != null ? Loc.T(lo.Relic.DisplayName) : "";
         return ranged.Length > 0 && relic.Length > 0 ? $"{ranged} · {relic}" : ranged + relic;
     }
 }

@@ -17,14 +17,14 @@ public sealed class RefineryRoomController : MonoBehaviour
     /// <summary>NPC 앞 정제대까지의 거리(m) — NPC가 제단 뒤에 선 구도.</summary>
     private const float CounterDistance = 2.5f;
 
-    /// <summary>정제사 잡담 — 수정 정령(10-01 NPC 교체). 짧고 멀리서 울리는 말. 원석에서 무엇이 나올지 모르는 뽑기 컨셉.</summary>
+    /// <summary>정제사 잡담 — 수정 정령(10-01 NPC 교체). 짧고 멀리서 울리는 말. 원석에서 무엇이 나올지 모르는 뽑기 컨셉.
+    /// 10-30 X-06 사용자 「컨셉 대사처럼이 아닌 설명 글」 — 다섯 줄 중 넷이 비유라 쓸 정보가 없었다 → 정제 규칙을 한 줄씩.</summary>
     private static readonly string[] ChatterLines =
     {
-        "…원석 속에서 무언가 울린다.",
-        "응축은 기다림이다. 빛은 서두르지 않는다.",
+        "원석을 내면 룬 한 장을 정제해 준다.",
+        "한 방에서 정제할수록 원석이 더 든다.",
         "같은 돌에서 같은 룬은 두 번 나오지 않는다.",
-        "판을 채워라. 힘은 서로를 부른다.",
-        "돌은 거짓말을 하지 않는다.",
+        "룬판 한 속성 구역을 룬으로 채울수록 그 속성 단계가 오른다.",   // 단계 = 구역의 점유 칸 수(MerlinRuneHexGridView.GetZoneOccupiedCounts)
     };
 
     private GameRunSession _run;
@@ -118,16 +118,16 @@ public sealed class RefineryRoomController : MonoBehaviour
     private void HandleRoomRevealed(GameObject room)
     {
         if (room == null || !transform.IsChildOf(room.transform) || _event == RefineryEvent.None) return;
-        RoomEventNotice.Raise(RefineryService.EventTitle(_event), $"{RefineryService.EventLine(_event)} — 이 방에서만");
+        RoomEventNotice.Raise(Loc.T(RefineryService.EventTitle(_event)), Loc.F("{0} — 이 방에서만", Loc.T(RefineryService.EventLine(_event))));   // 11-02 Q11
         if (_chatter != null) _chatter.ShoutFirst(EventShout);
     }
 
     /// <summary>정령의 외침 — 월드 글자라 기호 없이.</summary>
     private string EventShout => _event switch
     {
-        RefineryEvent.HighPurity => "맑은 원석이 울린다… 다음 응축은 Epic 이상.",
+        RefineryEvent.HighPurity => "맑은 원석이다… 다음 정제는 Epic 이상이 나온다.",   // 10-30 X-05 「응축」은 창에 없는 말(창은 「정제하기」)
         RefineryEvent.HalfPrice  => "오늘은 돌이 가볍다. 원석 절반이면 된다.",
-        RefineryEvent.TwoCards   => "빛이 둘로 갈라진다. 둘 중 하나를 고르라.",
+        RefineryEvent.TwoCards   => "이번 정제는 룬 두 장이 나온다. 하나를 고르라.",   // 10-30 X-05 비유 → 무엇이 나오는지
         _                        => null,
     };
 

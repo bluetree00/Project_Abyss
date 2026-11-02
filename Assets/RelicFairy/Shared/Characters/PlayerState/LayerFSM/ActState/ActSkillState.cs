@@ -43,6 +43,7 @@ public class ActSkillState : ActSkillStateBase
         // 장비 스킬(E · R)은 조준 보조(A1) — 유물 Q는 각자 겨눈다
         if (_slot == SkillType.Q) _controller.RotateTowardsMousePosition();
         else                      _controller.RotateTowardsSkillAim();
+        if (_slot == SkillType.Q) _controller.RelicSkillInvulnerable = true;   // 유물 Q 시전 중 무적(10-30 사용자) — OnExit에서 끈다
         _controller.SetMoveScale(0f);
         _controller.SkillRecovering = false;
         _controller.SkillCancelLocked = false;
@@ -118,6 +119,7 @@ public class ActSkillState : ActSkillStateBase
 
     protected override void OnExit()
     {
+        if (_slot == SkillType.Q) _controller.RelicSkillInvulnerable = false;
         if (_ctx != null) _controller.EndStance(_ctx);
         _controller.SkillRecovering = false;
         _controller.SkillCancelLocked = false;

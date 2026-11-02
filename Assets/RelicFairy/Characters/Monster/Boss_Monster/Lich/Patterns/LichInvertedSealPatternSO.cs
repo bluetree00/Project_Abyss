@@ -240,7 +240,7 @@ public class LichInvertedSealState : UnInterruptibleState<LichInvertedSealPatter
             player.SealSkill(SkillType.E, Data.sealSeconds);
             player.SealSkill(SkillType.R, Data.sealSeconds);
             player.ApplySlow(Data.slowScale, Data.slowSeconds);
-            UI_BossBark.Show($"E · R 기술 봉인 — {Data.sealSeconds:0}초 · 둔화", BossBarkType.PatternAnnounce);
+            UI_BossBark.Show(Loc.F("E · R 기술 봉인 — {0:0}초 · 둔화", Data.sealSeconds), BossBarkType.PatternAnnounce);
             return;
         }
 
@@ -249,7 +249,7 @@ public class LichInvertedSealState : UnInterruptibleState<LichInvertedSealPatter
         SkillType slot = eSealed == rSealed ? (Random.value < 0.5f ? SkillType.E : SkillType.R)
                                             : (eSealed ? SkillType.R : SkillType.E);
         player.SealSkill(slot, Data.sealSeconds);
-        UI_BossBark.Show($"{slot} 기술 봉인 — {Data.sealSeconds:0}초", BossBarkType.PatternAnnounce);
+        UI_BossBark.Show(Loc.F("{0} 기술 봉인 — {1:0}초", slot, Data.sealSeconds), BossBarkType.PatternAnnounce);
     }
 
     /// <summary>사슬을 끊었다 — 조각이 리치에게 튀어 짧게 휘청.</summary>

@@ -18,8 +18,9 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
     private const int V_STACK_ATK = 3, V_TAKEN_CAP = 4, V_GUARD = 5, V_FRENZY_DUR = 6,
                       V_FRENZY_MOVE = 8, V_SKILL_BASE = 10,
                       V_SKILL_PER = 11, V_BRAND_DUR = 12, V_BRAND_AMP = 13;
-    private const string PassiveTip =
-        "찢긴 서약의 검 — 공격(휘두름 · 스킬) 한 번마다 광기 +1(정예 이상을 맞히면 +2 · 3명 이상 맞히면 +1 더, 최대 40): 스택당 공격력 +1% · 받는 피해 +0.75%. " +
+    // 10-30 E-23 · H-19 — 머리 이름을 소개 창 능력 이름(「광기」)과 같게 · 일시정지 「되찾은 기억」 기본 규칙도 이 글을 읽는다(public)
+    public const string PassiveTip =
+        "광기 — 공격(휘두름 · 스킬) 한 번마다 광기 +1(정예 이상을 맞히면 +2 · 3명 이상 맞히면 +1 더, 최대 40): 스택당 공격력 +1% · 받는 피해 +0.75%. " +
         "40스택에서 '광란' 4초(이동속도 +20%) · 심판의 일격 1회";
 
     // VFX Addressable 키(에셋 배선 후 실 프리팹 등록). 미등록 시 무해.

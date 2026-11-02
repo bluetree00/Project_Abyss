@@ -15,12 +15,21 @@ using UnityEngine;
 public sealed class RelicMemoryHudPresenter : MonoBehaviour
 {
     // 해시계 처음 안내(10-18 사용자 「색별로 있는 UI바는 뭘 의미하는지도 모르겠어」) — 계정에 한 번(빌드 세이브 초기화가 지운다)
-    private const string DialHintKey  = "relic_hud_dial_hint_v1";
-    private const string DialHintText = "같은 시간대 기억 조각을 2개 · 4개 모으면 그 시간대가 강해진다";
-    private const float  DialHintSec  = 6f;
-    // 광기 눈금 처음 안내(10-22 E1 A6 — 하루 띠 안내와 짝)
-    private const string LadderHintKey  = "relic_hud_ladder_hint_v1";
-    private const string LadderHintText = "광기 칸 조각을 2 · 3 · 4개 모으면 한 단계씩 강해진다";
+    // 10-30 H-05 — 첫 전투(조각 0개) · 6초 한 번이라 무슨 말인지 몰랐다 → <b>첫 조각을 고른 뒤</b> 8초 · 조각이 보스 보상이라는 말부터(키 v2 — 옛 안내를 본 계정도 한 번 더)
+    private const string DialHintKey  = "relic_hud_dial_hint_v2";
+    private const string DialHintText = "보스 보상 기억 조각 — 같은 시간대 2개 · 4개면 그 시간대가 강해진다";
+    private const float  DialHintSec  = 8f;
+    // 광기 눈금 처음 안내(10-22 E1 A6 — 하루 띠 안내와 짝) — 10-30 H-12 · H-10: 첫 조각 뒤에 · 이어서 마름모 색 범례
+    private const string LadderHintKey    = "relic_hud_ladder_hint_v2";
+    private const string LadderHintText   = "꼬리표가 광기 10~40인 조각 — 2 · 3 · 4개면 한 단계씩 강해진다";
+    private const string LadderLegendText = "마름모 붉음 = 그 광기 칸 조각을 가졌다 · 금 = 조각 2개 이상이라 단계가 켜짐";
+    private const float  LadderLegendSec  = 6f;
+    // 엇갈린 빛 별(10-30 H-07 — 별이 무엇인지 아무 단서가 없었다): 빈 별이 처음 뜰 때 한 번(계정) · 켜지는 순간마다 짧게
+    private const string CrossHintKey = "relic_hud_crosslight_hint_v1";
+    private const float  CrossHintSec = 6f;
+    private const float  CrossOnSec   = 2.5f;
+    private const string GawainCrossOnText   = "엇갈린 빛 켜짐 — 다음 정오 폭발 때 태양흔이 남는다";
+    private const string LancelotCrossOnText = "엇갈린 빛 켜짐 — 다음 낙인 폭발 때 낙인이 남는다";
     private const float  FirstFightProgress = 0.05f;   // 여명이 이만큼 흘렀으면 싸우는 중(해는 적이 있을 때만 돈다)
 
     private RelicMemoryHudView _view;
@@ -180,13 +189,7 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
         hub.DuskStarted += OnDusk;
         hub.CrossLightChanged += OnCrossLight;
         _view.BuildDial(_root, hub.Gauge);
-        RefreshAll();
-        if (PlayerPrefs.GetInt(DialHintKey, 0) == 0)
-        {
-            PlayerPrefs.SetInt(DialHintKey, 1);
-            PlayerPrefs.Save();
-            _view.ShowHint(DialHintText, DialHintSec);
-        }
+        RefreshAll();   // 처음 안내는 첫 조각을 고른 뒤 RefreshAll이 띄운다(10-30 H-05)
     }
 
     private void OnLancelotHub(LancelotMemoryHub hub)
@@ -199,14 +202,9 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
         hub.CrossLightChanged += OnCrossLight;
         if (_grudge != null) _grudge.Changed += RefreshGrudge;
         _view.BuildLadder(_root);
-        for (int k = 1; k <= 4; k++) _view.SetRungValue(k - 1, hub.Rung(k));   // 계단 표식 위 문턱 값(10-18)
-        RefreshAll();
-        if (PlayerPrefs.GetInt(LadderHintKey, 0) == 0)
-        {
-            PlayerPrefs.SetInt(LadderHintKey, 1);
-            PlayerPrefs.Save();
-            _view.ShowHint(LadderHintText, DialHintSec);
-        }
+        // 계단 표식 위 문턱 값(10-18) — 광기 20(계단 2)부터 맞힌 적에 낙인(허브 기본 규칙 AtRung(2)) → 「20 낙인」(10-30 H-10)
+        for (int k = 1; k <= 4; k++) _view.SetRungValue(k - 1, hub.Rung(k), brand: k == 2);
+        RefreshAll();   // 처음 안내는 첫 조각을 고른 뒤 RefreshAll이 띄운다(10-30 H-12)
     }
 
     // ── 갱신(사건) ───────────────────────────────────────────────
@@ -217,20 +215,44 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
         if (_view == null || _loadout == null) return;
         if (_gHub != null)
         {
-            _view.SetArcs(RelicResonance.GawainCount(_loadout, RelicPartAnchor.Dawn),
-                          RelicResonance.GawainCount(_loadout, RelicPartAnchor.Noon),
-                          RelicResonance.GawainCount(_loadout, RelicPartAnchor.Dusk));
-            _view.SetCrossLight(CrossLightPossible("gawain"), _gHub.HasCrossLight, animate: false);
+            int dawn = RelicResonance.GawainCount(_loadout, RelicPartAnchor.Dawn);
+            int noon = RelicResonance.GawainCount(_loadout, RelicPartAnchor.Noon);
+            int dusk = RelicResonance.GawainCount(_loadout, RelicPartAnchor.Dusk);
+            _view.SetArcs(dawn, noon, dusk);
+            bool possible = CrossLightPossible("gawain");
+            _view.SetCrossLight(possible, _gHub.HasCrossLight, animate: false);
+            if (dawn + noon + dusk > 0) TryHintOnce(DialHintKey, DialHintText, DialHintSec);   // 첫 조각을 고른 뒤(10-30 H-05)
+            if (possible) TryCrossHint(GawainMemoryHub.CrossLightWindow);
         }
         else if (_lHub != null)
         {
             var rungs = RelicPartAnchor.LancelotRungs;
             for (int i = 0; i < _rungs.Length && i < rungs.Length; i++)
                 _rungs[i] = RelicResonance.LancelotRungFilled(_loadout, rungs[i]);
-            _view.SetRungs(_rungs, RelicResonance.LancelotCount(_loadout));   // 10-22 E1 D7 — 광기 칸 조각 수
+            int count = RelicResonance.LancelotCount(_loadout);
+            _view.SetRungs(_rungs, count);   // 10-22 E1 D7 — 광기 칸 조각 수
             RefreshGrudge();
-            _view.SetCrossLight(CrossLightPossible("lancelot"), _lHub.HasCrossLight, animate: false);
+            bool possible = CrossLightPossible("lancelot");
+            _view.SetCrossLight(possible, _lHub.HasCrossLight, animate: false);
+            if (count > 0) TryHintOnce(LadderHintKey, LadderHintText, DialHintSec, LadderLegendText, LadderLegendSec);   // 첫 조각 뒤 · 이어서 범례(10-30 H-12 · H-10)
+            if (possible) TryCrossHint(LancelotMemoryHub.CrossLightWindow);
         }
+    }
+
+    /// <summary>계정에 한 번 처음 안내 한 줄(+ 이어지는 한 줄). 이미 띄운 키면 아무것도 안 한다.</summary>
+    private void TryHintOnce(string key, string text, float seconds, string next = null, float nextSeconds = 0f)
+    {
+        if (PlayerPrefs.GetInt(key, 0) != 0) return;
+        PlayerPrefs.SetInt(key, 1);
+        PlayerPrefs.Save();
+        _view.ShowHint(text, seconds, next, nextSeconds);
+    }
+
+    /// <summary>빈 별(엇갈린 빛 대기)이 처음 뜰 때 한 번 — 무엇을 하면 켜지는지(10-30 H-07). 반응 조각 2개째를 고른 직후라 다른 처음 안내와 겹치지 않는다.</summary>
+    private void TryCrossHint(float window)
+    {
+        if (PlayerPrefs.GetInt(CrossHintKey, 0) != 0) return;
+        TryHintOnce(CrossHintKey, Loc.F("빈 별 = 엇갈린 빛 — 서로 다른 반응 2개를 {0:0}초 안에 일으키면 켜진다", window), CrossHintSec);
     }
 
     private void RefreshGrudge()
@@ -244,6 +266,8 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
         if (_view == null) return;
         if (_gHub != null) _view.SetCrossLight(CrossLightPossible("gawain"), on, animate: true);
         else if (_lHub != null) _view.SetCrossLight(CrossLightPossible("lancelot"), on, animate: true);
+        // 켜지는 순간 무엇이 달라지는지 한 줄(10-30 H-07 — 별 옆 대신 처음 안내 자리를 빌린다 · 새 글자 칸 없이)
+        if (on) _view.ShowHint(_gHub != null ? GawainCrossOnText : LancelotCrossOnText, CrossOnSec);
     }
 
     /// <summary>엇갈린 빛이 가능한가 = 그 유물의 반응 조각 2개 이상(허브의 판정과 같은 셈). 아니면 대기 별을 띄우지 않는다.</summary>

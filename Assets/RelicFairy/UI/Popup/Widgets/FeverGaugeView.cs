@@ -153,7 +153,7 @@ public sealed class FeverGaugeView : MonoBehaviour
             int total = artCount > 1 ? artCount - 1 : MaxLevel;
             _hint.text = clamped >= MaxLevel
                 ? "<color=#FFCB5A>최고조 — 상위 등급 최대</color>"
-                : (shown > 0 ? $"{shown}/{total}  확률 상승 중" : $"0/{total}  연속으로 돌리면 오른다");
+                : (shown > 0 ? Loc.F("{0}/{1}  확률 상승 중", shown, total) : Loc.F("0/{0}  연속으로 돌리면 오른다", total));
         }
     }
 

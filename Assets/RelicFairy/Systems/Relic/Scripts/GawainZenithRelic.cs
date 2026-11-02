@@ -18,9 +18,11 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
     private const int V_NOON_ATKSPD = 3, V_NOON_CRITCH = 4, V_NOON_CRITDMG = 5, V_NOON_ALLDMG = 6,
                       V_MARK_ATK = 8;
     // 기본 패시브 설명(버프창 첫 셀의 호버 툴팁). 태양 게이지/정오/각인 사이클 요약.
-    private const string PassiveTip =
-        "정오의 맹세 — 여명 20초 → 정오 10초 → 황혼 15초. 정오: 공격속도 +30% · 모든 피해 +20% · 치명타 확률 +10%p · 치명타 피해 +20%. " +
-        "게이지가 80%를 넘으면 공격력 +10%. 정오가 아닐 때 처치마다 충전 속도 +20%(최대 3배)";   // 10-22 E1 D8 — 「각인」 명사를 걷었다(계열 각인과 겹침)
+    // 10-30 E-23 · H-19 — 머리 이름을 소개 창 능력 이름(「하루의 순환」)과 같게 · 일시정지 「되찾은 기억」 기본 규칙도 이 글을 읽는다(public).
+    // 「처치마다 충전 속도」 → 무엇이 빨라지는지(E-19와 같은 말 · 숫자 그대로)
+    public const string PassiveTip =
+        "하루의 순환 — 여명 20초 → 정오 10초 → 황혼 15초. 정오: 공격속도 +30% · 모든 피해 +20% · 치명타 확률 +10%p · 치명타 피해 +20%. " +
+        "게이지가 80%를 넘으면 공격력 +10%. 여명 · 황혼에 처치할 때마다 해 게이지가 20% 빨리 찬다(최대 3배)";   // 10-22 E1 D8 — 「각인」 명사를 걷었다(계열 각인과 겹침)
 
     private const string NoonVfxKey = "vfx_gawain_noon";  // 정오 오라(상태 토글). 에셋 배선 후 등록.
 

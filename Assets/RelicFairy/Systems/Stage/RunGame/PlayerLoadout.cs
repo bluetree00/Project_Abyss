@@ -23,12 +23,6 @@ public class PlayerLoadout
     // 슬롯 1 = 서브 장비 (Q 스킬 전용)
     public WeaponSO WeaponSlot1 { get; private set; }
 
-    // 베이스캠프 파츠 공방에서 고른 시작 원거리 파츠 id — 런 시작에 Lv1로 켠다(GameRunSession). Clear()에서 리셋.
-    public string StartPartId { get; private set; }
-
-    // 둘째 시작 파츠 — 기억의 제단 「시작 파츠 둘」을 열었을 때만(09-29). Clear()에서 리셋.
-    public string StartPartId2 { get; private set; }
-
     // 보스 클리어 드래프트로 이번 런에 획득한 유물 기억 조각 id(런 내 성장). Clear()에서 리셋.
     private readonly List<string> _relicPartIds = new();
     public IReadOnlyList<string> RelicPartIds => _relicPartIds;
@@ -85,10 +79,6 @@ public class PlayerLoadout
         WeaponSlot1 = weapon;
         EvaluateFirstRun();
     }
-
-    public void SetStartPart(string partId) => StartPartId = partId;
-
-    public void SetStartPart2(string partId) => StartPartId2 = partId;
 
     /// <summary>
     /// 유물과 원거리 무기가 <b>둘 다</b> 정해지는 순간 초행을 판정한다.
@@ -247,8 +237,6 @@ public class PlayerLoadout
         Relic              = null;
         WeaponSlot0        = null;
         WeaponSlot1        = null;
-        StartPartId        = null;
-        StartPartId2       = null;
         ClearRelicMemory();
     }
 }

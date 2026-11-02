@@ -22,7 +22,7 @@ public static class WeaponFormHints
         var data    = backend?.Data;
         if (data == null) return;
         if (!data.SetRecordMax(Prefix + form.FormId, 1)) return;   // 이미 본 형
-        UI_BossBark.Show($"{form.DisplayName} — {form.Line}", BossBarkType.Bark);
+        UI_BossBark.Show($"{Loc.T(form.DisplayName)} — {Loc.T(form.Line)}", BossBarkType.Bark);   // 조각마다 화면 언어(11-02 Q11)
         backend.SaveAsync().Forget();
     }
 }

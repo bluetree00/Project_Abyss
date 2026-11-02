@@ -73,8 +73,8 @@ public sealed class LegendaryAwakenNotice : MonoBehaviour
             if (!_awake.Add(item.instanceId) || !_primed) continue;
             string clause = LegendaryAwaken.AwakenClause(item);
             if (string.IsNullOrEmpty(clause))   // 카드 글에 각성 줄이 아직 없다(표 업로드 전) — 존 단계만이라도
-                clause = $"{ElementDef.GetById(item.element)?.Name ?? item.element} 존 4단계";
-            _pending.Add(($"{item.displayName} — 각성", clause));
+                clause = Loc.F("{0} 존 4단계", ElementDef.GetById(item.element)?.Name ?? item.element);
+            _pending.Add((Loc.F("{0} — 각성", Loc.T(item.displayName)), clause));
         }
         _primed = true;
     }

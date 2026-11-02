@@ -90,6 +90,8 @@ public sealed partial class UI_GridPanel : UI_Base
     private GameObject             _synergyToast;
     private TMP_Text               _synergyToastText;
     private CancellationTokenSource _toastCts;
+    private readonly Dictionary<string, int> _zoneTiers = new();   // 11-02 Q20 존별 마지막 단계 — 내려가면 꺼짐 알림
+    private readonly List<string> _zoneTierKeys = new();
 
     // ── Private: Reset Confirm Dialog ──
     private GameObject _resetDialog;
@@ -123,6 +125,7 @@ public sealed partial class UI_GridPanel : UI_Base
     // ── Private: State ──
     private RunItemInventory _inventory;
     private RuntimeItemData  _pendingNewItem;
+    private bool             _pickedByHand;   // 10-31 지금 고른 룬을 손으로 골랐나 — 저절로 골라진(첫 룬 · 새 룬) 카드를 처음 누르면 풀지 않고 고른다
     // [분해] — 정보판에 떠 있는 룬(보관함 · 판)을 원석으로(10-01 룬 보유 상한)
     private Button          _salvageButton;
     private TMP_Text        _salvageBtnLabel;
@@ -186,6 +189,8 @@ public sealed partial class UI_GridPanel : UI_Base
             MerlinRuneBridge.Instance.OnSynergyActivated    += ShowSynergyActivated;
             MerlinRuneBridge.Instance.OnZoneSynergyBurst    += HandleZoneSynergyBurst;
             MerlinRuneBridge.Instance.OnCenterBonusActivated += HandleCenterBonusActivated;
+            MerlinRuneBridge.Instance.OnSynergiesUpdated    += HandleSynergiesUpdated;   // 11-02 Q20 꺼짐 알림
+            SnapshotZoneTiers();
         }
 
         if (_resetDialogYes != null) _resetDialogYes.onClick.AddListener(OnResetConfirmYes);
@@ -224,6 +229,7 @@ public sealed partial class UI_GridPanel : UI_Base
             MerlinRuneBridge.Instance.OnSynergyActivated    -= ShowSynergyActivated;
             MerlinRuneBridge.Instance.OnZoneSynergyBurst    -= HandleZoneSynergyBurst;
             MerlinRuneBridge.Instance.OnCenterBonusActivated -= HandleCenterBonusActivated;
+            MerlinRuneBridge.Instance.OnSynergiesUpdated    -= HandleSynergiesUpdated;
         }
 
         if (_resetDialogYes != null) _resetDialogYes.onClick.RemoveListener(OnResetConfirmYes);
@@ -729,7 +735,7 @@ public sealed partial class UI_GridPanel : UI_Base
         // 돌리기(오른쪽 아래 · 모양 옆) — 보관함 룬이면 버튼(마우스로도 돌린다), 판에 놓인 룬이면 같은 자리에 흐린 안내(10-26).
         _rotateButton = MakeButton(cardRT, "RotateBtn", new Vector2(1f, 0f), new Vector2(1f, 0f),
                                    new Vector2(168f, 40f), new Vector2(-24f - 84f, 24f + 20f), new Color(1f, 1f, 1f, 0.06f),
-                                   $"돌리기  <color={UIPalette.GoldHex}>E</color>");
+                                   Loc.F("돌리기  <color={0}>E</color>", UIPalette.GoldHex));
         _rotateButton.onClick.AddListener(RotateTarget);
         _rotateButton.gameObject.SetActive(false);
         var noteGO = MakeTxt(cardRT, "RotateNote", "집어 들면 E로 돌린다", 16f, new Color(0.74f, 0.79f, 0.90f, 0.70f));
@@ -1019,6 +1025,43 @@ public sealed partial class UI_GridPanel : UI_Base
         if (tier > 0) ItemEffectVfxHelper.ShowBuildNotice(BuildNotice.Zone(zoneId, tier));
     }
 
+    /// <summary>11-02 Q20 판을 열 때 지금 단계를 기준으로만 잡는다(이때는 알리지 않는다).</summary>
+    private void SnapshotZoneTiers()
+    {
+        _zoneTiers.Clear();
+        var bridge = MerlinRuneBridge.Instance;
+        var counts = bridge != null ? bridge.GetZoneOccupiedCounts() : null;
+        if (counts == null) return;
+        foreach (var kv in counts) _zoneTiers[kv.Key] = bridge.GetZoneTier(kv.Key);
+    }
+
+    /// <summary>
+    /// 11-02 Q20 시너지 갱신 — 존 단계가 내려갔으면 붉은 띠로 알린다(켜질 때는 존 터짐 · 「◆ 시너지 활성화!」가 맡는다).
+    /// 사용자 「켜진지 꺼진지도 모른다」 — 룬을 빼거나 옮겨 단계가 떨어져도 아무것도 안 떴다.
+    /// </summary>
+    private void HandleSynergiesUpdated()
+    {
+        var bridge = MerlinRuneBridge.Instance;
+        if (bridge == null) return;
+        var counts = bridge.GetZoneOccupiedCounts();
+        _zoneTierKeys.Clear();
+        foreach (var k in _zoneTiers.Keys) _zoneTierKeys.Add(k);
+        if (counts != null) foreach (var kv in counts) if (!_zoneTiers.ContainsKey(kv.Key)) _zoneTierKeys.Add(kv.Key);
+
+        string downZone = null;
+        int downFrom = 0, downTo = 0;
+        foreach (var z in _zoneTierKeys)
+        {
+            int now = bridge.GetZoneTier(z);
+            if (_zoneTiers.TryGetValue(z, out int before) && now < before) { downZone = z; downFrom = before; downTo = now; }
+            _zoneTiers[z] = now;
+        }
+        if (downZone == null || !IsOpen) return;
+        var n = BuildNotice.Zone(downZone, downFrom);
+        ShowToast(downTo > 0 ? Loc.F("◇ 시너지 꺼짐  {0} {1} → {2}단계", n.Chip, n.Head, downTo) : Loc.F("◇ 시너지 꺼짐  {0} {1}", n.Chip, n.Head), warn: true);
+        Managers.Sound?.PlayUiEvent(SoundEvent.RuneReturn);
+    }
+
     /// <summary>짧은 안내 문구(배치 실패 사유 등). 시너지 토스트와 같은 자리를 쓴다. <paramref name="warn"/>면 붉은 띠.</summary>
     private void ShowToast(string message, bool warn = false) => ShowSynergyToastAsync(message, prefix: false, warn).Forget();
 
@@ -1041,7 +1084,7 @@ public sealed partial class UI_GridPanel : UI_Base
         var ct = _toastCts.Token;
 
         if (_synergyToastText != null)
-            _synergyToastText.text = prefix ? $"◆ 시너지 활성화!  {description}" : description;
+            _synergyToastText.text = prefix ? Loc.F("◆ 시너지 활성화!  {0}", description) : description;
         if (_synergyToast != null)
         {
             _synergyToast.transform.SetAsLastSibling();   // 판에 놓인 룬 밑에 깔리지 않게
@@ -1052,7 +1095,7 @@ public sealed partial class UI_GridPanel : UI_Base
         {
             await UniTask.Delay(2500, ignoreTimeScale: true, cancellationToken: ct);
         }
-        catch (System.OperationCanceledException) { }
+        catch (System.OperationCanceledException) { return; }   // 11-02 새 알림이 이어받았다 — 띠를 끄지 않는다(예전엔 방금 켠 새 띠를 껐다)
 
         if (_synergyToast != null)
             _synergyToast.SetActive(false);
@@ -1191,7 +1234,7 @@ public sealed partial class UI_GridPanel : UI_Base
                      && (_inventory.IsPlaced(item.instanceId) || _inventory.IsStaging(item.instanceId));
         _salvageButton.gameObject.SetActive(owned);
         if (owned && _salvageBtnLabel != null)
-            _salvageBtnLabel.text = $"분해  <color={UIPalette.RuneOreHex}>원석 +{RuneSalvage.OreValueOf(item)}</color>";
+            _salvageBtnLabel.text = Loc.F("분해  <color={0}>원석 +{1}</color>", UIPalette.RuneOreHex, RuneSalvage.OreValueOf(item));
     }
 
     private void OnSalvageClicked()
@@ -1202,8 +1245,8 @@ public sealed partial class UI_GridPanel : UI_Base
         bool placed = _inventory.IsPlaced(item.instanceId);
         if (_confirmDialogText != null)
             _confirmDialogText.text =
-                $"「{item.displayName ?? item.itemId}」을(를) 분해한다{(placed ? " — 판에서 빠지고 효과도 사라진다" : "")}.\n\n" +
-                $"<color={UIPalette.RuneOreHex}>원석 +{RuneSalvage.OreValueOf(item)}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
+                Loc.F("「{0}」을(를) 분해한다{1}.\n\n", Loc.T(item.displayName) ?? item.itemId, (placed ? Loc.T(" — 판에서 빠지고 효과도 사라진다") : "")) +
+                Loc.F("<color={0}>원석 +{1}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>", UIPalette.RuneOreHex, RuneSalvage.OreValueOf(item));
         RebindConfirmDialog(OnSalvageConfirm, OnDialogKeep, "분해", "취소");
         ShowConfirmDialog();
     }
@@ -1214,7 +1257,7 @@ public sealed partial class UI_GridPanel : UI_Base
         var item = _salvageTarget;
         if (item == null) return;
         int ore = SalvageItem(item);
-        ShowToast($"분해 — 원석 +{ore}");
+        ShowToast(Loc.F("분해 — 원석 +{0}", ore));
         RefreshInfoPanelDefault();
     }
 
@@ -1246,13 +1289,13 @@ public sealed partial class UI_GridPanel : UI_Base
         {
             ore += RuneSalvage.OreValueOf(it);
             if (names.Length > 0) names.Append(" · ");
-            names.Append(it.displayName ?? it.itemId);
+            names.Append(Loc.T(it.displayName) ?? it.itemId);
         }
         if (_confirmDialogText != null)
             _confirmDialogText.text =
-                $"보관함은 {RunItemInventory.StagingCapacity}칸이다 — {over.Count}개가 넘쳤다.\n" +
+                Loc.F("보관함은 {0}칸이다 — {1}개가 넘쳤다.\n", RunItemInventory.StagingCapacity, over.Count) +
                 $"<size=85%>{names}</size>\n" +
-                $"판에 놓거나 분해해야 닫힌다.\n<color={UIPalette.RuneOreHex}>넘친 룬 분해 시 원석 +{ore}</color>";
+                Loc.F("판에 놓거나 분해해야 닫힌다.\n<color={0}>넘친 룬 분해 시 원석 +{1}</color>", UIPalette.RuneOreHex, ore);
         RebindConfirmDialog(OnOverflowSalvageAndClose, OnDialogKeep, "분해하고 닫기", "정리하러 돌아가기");
         ShowConfirmDialog();
     }
@@ -1268,9 +1311,54 @@ public sealed partial class UI_GridPanel : UI_Base
 
     private void OnPlacedChanged()
     {
+        RefreshPieceShades();   // 10-30 맞닿은 같은 속성 룬 밝기 번갈이
         RefreshSynergyStatus();
         RefreshFooter();
         RefreshHeaderStatus();
+    }
+
+    // 10-30 사용자 「룬들을 빼곡히 넣어서 검증해 보면 어떤 모양들이 들어간지 전혀 알기 힘들다」 — 칸마다 같은 속성 문양이라
+    // 맞닿은 같은 속성 룬이 한 덩어리로 보였다(2px 금선이 판 구역 선과 구별되지 않았다). 놓인 차례대로, 변이 맞닿은 같은 속성 이웃이 안 쓴 밝기를 고른다.
+    private static readonly float[] PieceShades = { 1f, 0.78f, 0.9f };   // 11-02 받침(틈) 색에만 — 그림은 원래 밝기
+    private static readonly Vector2Int[] PieceDirs = { Vector2Int.right, Vector2Int.left, Vector2Int.up, Vector2Int.down };
+    private readonly Dictionary<Vector2Int, int> _shadeCells = new();
+    private readonly List<Shape> _shadePieces = new();
+    private readonly List<int> _shadeOf = new();
+
+    private void RefreshPieceShades()
+    {
+        var bm = BoardManager.Instance;
+        if (bm == null || _inventory == null) return;
+        _shadeCells.Clear();
+        _shadePieces.Clear();
+        _shadeOf.Clear();
+        var placed = _inventory.PlacedItems;
+        for (int i = 0; i < placed.Count; i++)
+        {
+            var s = placed[i] != null ? bm.GetSharedShapeByItem(placed[i].instanceId) : null;
+            var sq = s != null ? s.GetOccupiedSquares() : null;
+            if (sq == null || sq.Count == 0) continue;
+            int idx = _shadePieces.Count;
+            _shadePieces.Add(s);
+            foreach (var q in sq) if (q != null) _shadeCells[new Vector2Int(q.col, q.row)] = idx;
+        }
+        for (int i = 0; i < _shadePieces.Count; i++)
+        {
+            var s = _shadePieces[i];
+            int used = 0;
+            foreach (var q in s.GetOccupiedSquares())
+            {
+                if (q == null) continue;
+                var c = new Vector2Int(q.col, q.row);
+                foreach (var dir in PieceDirs)
+                    if (_shadeCells.TryGetValue(c + dir, out int j) && j < i && _shadePieces[j].ItemData?.element == s.ItemData?.element)
+                        used |= 1 << _shadeOf[j];
+            }
+            int pick = 0;
+            while (pick < PieceShades.Length - 1 && (used & (1 << pick)) != 0) pick++;
+            _shadeOf.Add(pick);
+            s.SetPieceShade(PieceShades[pick]);
+        }
     }
 
     // ── GridManager Event Bridge ──
@@ -1363,9 +1451,7 @@ public sealed partial class UI_GridPanel : UI_Base
     // 그 칸을 기준으로 놓인다. 판정·점유·통보는 드래그와 같은 경로(GridManager.TryPlaceShape)를 탄다.
 
     /// <summary>지금 놓으려는 룬. 보관함에서 고른 것 → 없으면 보관함 첫 룬.</summary>
-    private RuntimeItemData PlacementTarget
-        => _stagingArea?.HighlightedItem
-           ?? (_inventory != null && _inventory.StagingCount > 0 ? _inventory.StagingItems[0] : null);
+    private RuntimeItemData PlacementTarget => _stagingArea?.HighlightedItem;   // 10-30 — 고르기를 풀면(카드 다시 누르기) 판을 눌러도 아무 룬이나 놓이지 않는다
 
     // 룬 돌리기(10-25 사용자 「룬 블록을 회전시키는 기능」) — 끄는 중인 룬, 아니면 보관함에서 고른(놓을) 룬을 E로 90° 돌린다(10-25 사용자 「룬 회전을 E로」).
     // 놓인 룬은 그 자리에서 돌리지 않는다(자리가 맞는지 다시 볼 수 없다) — 집어 들고 돌린다. Update는 UI_GridPanel.Thin.cs에 있다.
@@ -1411,6 +1497,7 @@ public sealed partial class UI_GridPanel : UI_Base
         if (!dragging)
         {
             _stagingArea?.HighlightItem(item);   // 돈 룬 = 고른 룬(다음 칸 누르기도 이 룬)
+            _pickedByHand = true;
             _stagingArea?.PulseItem(item);
         }
         if (_itemInfoPanel != null && (!dragging || _itemInfoPanel.CurrentItem == item))
@@ -1501,8 +1588,8 @@ public sealed partial class UI_GridPanel : UI_Base
         _salvagePendingShape = shape;
         if (_confirmDialogText != null)
             _confirmDialogText.text =
-                $"이 자리의 룬 {_salvageBlockers.Count}개를 분해하고 배치합니다.\n\n" +
-                $"<color={UIPalette.RuneOreHex}>원석 +{ore}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
+                Loc.F("이 자리의 룬 {0}개를 분해하고 배치합니다.\n\n", _salvageBlockers.Count) +
+                Loc.F("<color={0}>원석 +{1}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>", UIPalette.RuneOreHex, ore);
 
         // 확인창을 <b>보관함 전량 폐기</b>와 공유하므로 버튼 동작을 이번 용도로 갈아끼운다.
         // 안 갈아끼우면 [폐기]가 보관함을 통째로 비운다.
@@ -1560,7 +1647,7 @@ public sealed partial class UI_GridPanel : UI_Base
         {
             BoardManager.Instance?.OnShapePlaced(shape);
             GridManager.Instance.ClearPreview();
-            ShowToast($"배치 완료 — 원석 +{ore}");
+            ShowToast(Loc.F("배치 완료 — 원석 +{0}", ore));
         }
         else
         {
@@ -1637,7 +1724,18 @@ public sealed partial class UI_GridPanel : UI_Base
 
     private void OnStagingItemSelected(RuntimeItemData item)
     {
+        // 10-30 사용자 「룬 선택이나 해제」 — 고른 카드를 다시 누르면 고르기가 풀린다(예전엔 풀 방법이 없었다)
+        if (item != null && _stagingArea != null && _stagingArea.HighlightedItem == item && _pickedByHand)
+        {
+            _pickedByHand = false;
+            _stagingArea.HighlightItem(null);
+            _itemInfoPanel?.ShowEmpty();
+            _hexGridView?.SetPlacementElementHint(null);
+            GridManager.Instance?.ClearPreview();
+            return;
+        }
         _stagingArea?.HighlightItem(item);
+        _pickedByHand = item != null;
         _itemInfoPanel?.ShowItem(item, isNew: false);
 
         // 고른 룬의 속성 존을 판에서 강조한다. 이게 없으면 판이 전 칸 균일하게 밝아
@@ -1692,14 +1790,18 @@ public sealed partial class UI_GridPanel : UI_Base
         bool hasItems = _inventory != null && _inventory.StagingCount > 0;
         if (hasItems)
         {
-            var firstItem = _inventory.StagingItems[0];
+            // 10-30 — 고르던 룬이 아직 보관함에 있으면 그대로(다시 열거나 다른 룬을 놓아도 첫 룬으로 튀지 않게)
+            var keep = _stagingArea?.HighlightedItem;
+            var firstItem = keep != null && _inventory.IsStaging(keep.instanceId) ? keep : _inventory.StagingItems[0];
             _itemInfoPanel.ShowItem(firstItem, isNew: false, slideIn: true);
             _stagingArea?.HighlightItem(firstItem);
+            if (firstItem != keep) _pickedByHand = false;   // 저절로 골라진 룬
         }
         else
         {
             _itemInfoPanel.ShowEmpty();
             _stagingArea?.HighlightItem(null);
+            _pickedByHand = false;
         }
     }
 
@@ -1719,7 +1821,7 @@ public sealed partial class UI_GridPanel : UI_Base
     private void RefreshFooter()
     {
         if (_footerCellCountText != null)
-            _footerCellCountText.SetText($"{_totalPlacedCells}/20 셀");
+            _footerCellCountText.SetText(Loc.F("{0}/20 셀", _totalPlacedCells));
 
         if (_footerActiveSynText == null) return;
 
@@ -1978,8 +2080,8 @@ public sealed partial class UI_GridPanel : UI_Base
         bool over = staged > cap;
         // 10-19 — 넘침은 붉은 「못 얻음」이 아니라 「새 룬 자리 정리」(호박색): 판에 놓거나 하나를 분해하면 닫힌다
         string box = over ? $"<color=#E8BA54>{staged}/{cap}</color>" : $"<color=#FFFFFF>{staged}/{cap}</color>";
-        _headerStatusText?.SetText($"보관함 {box}    ·    배치 <color=#FFFFFF>{placed}</color>");
-        _stagingCountText?.SetText(over ? $"<color=#E8BA54>{staged} / {cap}  · 놓거나 하나를 분해</color>" : $"{staged} / {cap}");
+        _headerStatusText?.SetText(Loc.F("보관함 {0}    ·    배치 <color=#FFFFFF>{1}</color>", box, placed));
+        _stagingCountText?.SetText(over ? Loc.F("<color=#E8BA54>{0} / {1}  · 놓거나 하나를 분해</color>", staged, cap) : $"{staged} / {cap}");
     }
 
     /// <summary>

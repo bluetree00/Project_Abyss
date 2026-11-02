@@ -217,7 +217,7 @@ internal static class DragonAbyssFx
     /// <summary>겹친 바닥 가이드 중 이것을 위에 그린다(안전 부채꼴 · 약점 원이 큰 예고 원에 묻히지 않게).</summary>
     public static void DrawOnTop(GameObject guide, int order = 1)
     {
-        if (guide != null && guide.TryGetComponent<MeshRenderer>(out var mr)) mr.sortingOrder = order;
+        if (guide != null && guide.TryGetComponent<MeshRenderer>(out var mr)) mr.sortingOrder = PatternGuideHelper.GuideSortingOrder + order;   // 예고 기본 순서 위(10-30)
     }
 
     // ── 모션 · 이동 ───────────────────────────────────────────

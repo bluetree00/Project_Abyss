@@ -25,7 +25,11 @@ public sealed class BarrageCorridorGame : EventMinigame
     private const float FinalStretch = 5f;
     private const float FinalFactor  = 0.7f;
     private const float HitCooldown  = 1.0f;   // 연속 피격 방지 — 10-29 0.6 → 1.0(탄이 빽빽해졌다)
-    private const float NearMargin   = 0.6f;   // 이 안을 스쳤는데 안 맞으면 「간발!」
+    private const float NearMargin   = 0.6f;   // 이 안을 스쳤는데 안 맞으면 「아슬하게 피함」(10-30 예전 「간발!」)
+    // 등급 문턱 = 맞은 횟수 상한(플래티넘 0 · 골드 1 · 실버 3 · 브론즈 5) — 10-30 카드 보상 줄 · 진행 띠가 같은 값을 읽는다
+    private const int   GoldMaxHits   = 1;
+    private const int   SilverMaxHits = 3;
+    private const int   BronzeMaxHits = 5;
 
     private const float BoltRadius   = 2.2f;
     private const float BoltWarn     = 0.9f;
@@ -58,28 +62,50 @@ public sealed class BarrageCorridorGame : EventMinigame
     private Wave  _lastWave = (Wave)(-1);
     private int   _hits, _nearMisses, _demoHitParity;
     private float _hitCooldown;
+    private int   _statusHits = -1;   // 10-30 상태 줄은 맞은 횟수가 바뀔 때만 다시 만든다(매 프레임 문자열 할당 금지)
+    private string _statusText;
 
     // ── Properties ─────────────────────────────────────────────
     public override string Id => "barrage";
     protected override string Title => "탄막의 회랑";
-    protected override string Rule => "맞지 마라";
-    protected override string GradeHint => "안 맞으면 플래티넘 · 1번 골드 · 3번까지 실버 · 5번까지 브론즈";
+    // 10-30 사용자 「컨셉 대사처럼이 아닌 직관적인 설명 글」 — 명령 한 마디(「맞지 마라」) · 등급 이름 문턱 대신 할 일과 받는 정수(M-01 · M-02)
+    protected override string Rule => Loc.F("{0}초 동안 사방에서 오는 탄을 피한다", Mathf.RoundToInt(PlayDuration));
+    protected override string GradeHint
+    {
+        get
+        {
+            int ch = EventRewards.Chapter(Run);
+            return Loc.F("적게 맞을수록 <color=#73D9C7>정수</color>가 많다 — 0번 {0}", EventRewards.Essence(ChallengeGrade.Platinum, ch))
+                 + Loc.F(" · {0}번 {1}", GoldMaxHits, EventRewards.Essence(ChallengeGrade.Gold, ch))
+                 + Loc.F(" · {0}번까지 {1}", SilverMaxHits, EventRewards.Essence(ChallengeGrade.Silver, ch))
+                 + Loc.F(" · {0}번까지 {1}", BronzeMaxHits, EventRewards.Essence(ChallengeGrade.Bronze, ch));
+        }
+    }
     protected override float Duration => PlayTime;
     protected override float WantRadius => 9f;
+    protected override bool  KeepInsideArena => true;   // 10-30 · 10-31 판 밖(입구 · 가장자리 밖)에선 탄이 닿지 않았다 — 판 안으로 옮기고 가장자리는 벽
     public override ChallengeGrade CurrentGrade => GradeOf(_hits);
 
+    /// <summary>10-30 M-03 — 등급이 내려가면 무엇을 잃는지(「2번 더 맞으면 정수 34 → 24」).</summary>
     protected override string StatusLine
     {
         get
         {
+            if (_hits == _statusHits) return _statusText;
+            _statusHits = _hits;
             var g = CurrentGrade;
-            if (g == ChallengeGrade.Fail) return $"맞은 횟수 {_hits}";
-            int slack = SlackBeforeDrop(_hits, 0, 1, 3, 5);
-            return $"맞은 횟수 {_hits} · {slack}번 더 맞으면 {MinigameHud.GradeName(g - 1)}";
+            int ch = EventRewards.Chapter(Run);
+            if (g == ChallengeGrade.Fail) return _statusText = Loc.F("맞은 횟수 {0} · 정수 {1}", _hits, EventRewards.Essence(g, ch));
+            int slack = SlackBeforeDrop(_hits, 0, GoldMaxHits, SilverMaxHits, BronzeMaxHits);
+            return _statusText = Loc.F("맞은 횟수 {0} · {1}번 더 맞으면 정수 {2} → {3}", _hits, slack, EventRewards.Essence(g, ch), EventRewards.Essence(g - 1, ch));
         }
     }
 
-    protected override string ResultLine => _hits == 0 ? $"한 번도 안 맞았다 · 간발 {_nearMisses}" : $"맞은 횟수 {_hits} · 간발 {_nearMisses}";
+    // 10-30 M-04 「간발」은 설명 없는 말이었다 — 보상과 상관없는 기록이라 「아슬하게 피함」으로만 남긴다
+    protected override string ResultLine => _hits == 0 ? Loc.F("한 번도 안 맞았다 · 아슬하게 피함 {0}", _nearMisses) : Loc.F("맞은 횟수 {0} · 아슬하게 피함 {1}", _hits, _nearMisses);
+
+    /// <summary>10-30 M-18 메달 아래 — 지금 등급이면 받는 정수.</summary>
+    protected override string GradeReward(ChallengeGrade grade) => Loc.F("정수 {0}", EventRewards.Essence(grade, EventRewards.Chapter(Run)));
 
     private float Interval    => MinigameTheme.Pick(Tier, 4.8f, 4.6f, 4.4f, 4.2f) * (Remaining <= FinalStretch ? FinalFactor : 1f);
     private float BulletSpeed => MinigameTheme.Pick(Tier, 2.6f, 2.75f, 2.9f, 3.1f);
@@ -91,7 +117,7 @@ public sealed class BarrageCorridorGame : EventMinigame
     // ── Public Methods ─────────────────────────────────────────
 
     /// <summary>맞은 횟수 → 등급(0 / 1 / 2~3 / 4~5 / 6 이상).</summary>
-    public static ChallengeGrade GradeOf(int hits) => GradeByMax(hits, 0, 1, 3, 5);
+    public static ChallengeGrade GradeOf(int hits) => GradeByMax(hits, 0, GoldMaxHits, SilverMaxHits, BronzeMaxHits);
 
     // ── Stage ──────────────────────────────────────────────────
 
@@ -119,6 +145,7 @@ public sealed class BarrageCorridorGame : EventMinigame
 
     protected override void TickPlay(float dt)
     {
+        ClampInsideArena();   // 10-31 사용자 「원 밖에 나갈 수 있는 것 아닌가」 — 판 가장자리는 벽
         _hitCooldown -= dt;
 
         _nextWave -= dt;
@@ -171,7 +198,7 @@ public sealed class BarrageCorridorGame : EventMinigame
     {
         int essence = EventRewards.Essence(grade, EventRewards.Chapter(Run));
         EventRewards.DropEssence(at, essence);
-        EventRewards.Notice($"탄막의 회랑 — 정수 <color=#73D9C7>+{essence}</color>");
+        EventRewards.Notice(Loc.F("탄막의 회랑 — 정수 <color=#73D9C7>+{0}</color>", essence));
     }
 
     // ── Private Methods ────────────────────────────────────────
@@ -268,7 +295,7 @@ public sealed class BarrageCorridorGame : EventMinigame
     private void NearMiss()
     {
         _nearMisses++;
-        Hud?.Float("간발!", Color.white);
+        Hud?.Float("아슬하게 피함", Color.white);
         MinigameFx.Tick(1.5f);
     }
 

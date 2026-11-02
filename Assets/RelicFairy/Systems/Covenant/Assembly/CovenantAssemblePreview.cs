@@ -92,19 +92,19 @@ public readonly struct CovenantAssemblePreview
         if (!valid) return "";
         return effectKind switch
         {
-            EffectKind.AoeBurst   => $"반경 {M(radius)} 폭발(공격력 {P(effective)})",
-            EffectKind.Curse      => $"적이 {Sec(duration)} 동안 받는 피해 +{P(effective)}",
-            EffectKind.Execute    => $"체력 {P(ExecuteThreshold)} 이하인 적 즉사",
-            EffectKind.Burn       => $"{Sec(duration)} 동안 불탄다(초당 공격력 {P(effective)})",
-            EffectKind.BleedStack => $"{Sec(duration)} 동안 피 흘린다(초당 공격력 {P(effective)})",
+            EffectKind.AoeBurst   => Loc.F("반경 {0} 폭발(공격력 {1})", M(radius), P(effective)),
+            EffectKind.Curse      => Loc.F("적이 {0} 동안 받는 피해 +{1}", Sec(duration), P(effective)),
+            EffectKind.Execute    => Loc.F("체력 {0} 이하인 적 즉사", P(ExecuteThreshold)),
+            EffectKind.Burn       => Loc.F("{0} 동안 불탄다(초당 공격력 {1})", Sec(duration), P(effective)),
+            EffectKind.BleedStack => Loc.F("{0} 동안 피 흘린다(초당 공격력 {1})", Sec(duration), P(effective)),
             EffectKind.Detonate   => causeTargeted
-                ? $"화상 · 출혈 {P(CovenantMath.DetonateFraction)} 터뜨림 · 둘레 {M(radius)}에 그 {P(effective)}"
-                : $"{M(radius)} 안 적 모두의 화상 · 출혈 {P(CovenantMath.DetonateFraction)} 터뜨림",
-            EffectKind.Harvest    => $"화상 · 출혈 걷어 스킬 대기 -{effective:0.0}초 · 골드 +{CovenantMath.HarvestGold}",
+                ? Loc.F("화상 · 출혈 {0} 터뜨림 · 둘레 {1}에 그 {2}", P(CovenantMath.DetonateFraction), M(radius), P(effective))
+                : Loc.F("{0} 안 적 모두의 화상 · 출혈 {1} 터뜨림", M(radius), P(CovenantMath.DetonateFraction)),
+            EffectKind.Harvest    => Loc.F("화상 · 출혈 걷어 스킬 대기 -{0:0.0}초 · 골드 +{1}", effective, CovenantMath.HarvestGold),
             EffectKind.Arcflash   => ArcChain
-                ? $"{CovenantMath.ArcflashChainHop:0}m씩 튀며 적 {ArcCount}마리에게 감전 1개씩"
-                : $"{M(radius)} 안 적 {ArcCount}마리에게 감전 1개씩",
-            EffectKind.Stasis     => $"{M(radius)} 안 감전 1개당 {effective:0.00}초 기절",
+                ? Loc.F("{0:0}m씩 튀며 적 {1}마리에게 감전 1개씩", CovenantMath.ArcflashChainHop, ArcCount)
+                : Loc.F("{0} 안 적 {1}마리에게 감전 1개씩", M(radius), ArcCount),
+            EffectKind.Stasis     => Loc.F("{0} 안 감전 1개당 {1:0.00}초 기절", M(radius), effective),
             _                     => SelfText(),
         };
     }
@@ -130,22 +130,22 @@ public readonly struct CovenantAssemblePreview
         if (!valid) return "";
         return effectKind switch
         {
-            EffectKind.Burn       => $"{who}이 {Sec(duration)} 동안 불탄다(초당 공격력 {P(effective)})",
-            EffectKind.BleedStack => $"{who}이 {Sec(duration)} 동안 피 흘린다(초당 공격력 {P(effective)})",
-            EffectKind.Curse      => $"{who}이 {Sec(duration)} 동안 받는 피해 +{P(effective)}",
+            EffectKind.Burn       => Loc.F("{0}이 {1} 동안 불탄다(초당 공격력 {2})", who, Sec(duration), P(effective)),
+            EffectKind.BleedStack => Loc.F("{0}이 {1} 동안 피 흘린다(초당 공격력 {2})", who, Sec(duration), P(effective)),
+            EffectKind.Curse      => Loc.F("{0}이 {1} 동안 받는 피해 +{2}", who, Sec(duration), P(effective)),
             // 경계 원인(선제 · 개선)의 처형은 받은 적이 아니라 12m 안 체력이 가장 낮은 적을 짚고 기준이 두 배다(CovenantClause.TryExecute)
             EffectKind.Execute    => causeClass == CauseClass.Boundary
-                ? $"{CovenantClause.ExecuteMarkRadius:0}m 안에서 체력이 가장 낮은 적이 체력 {P(ExecuteThreshold)} 이하면 즉사"
-                : $"{who}이 체력 {P(ExecuteThreshold)} 이하면 즉사",
-            EffectKind.AoeBurst   => $"{at}에서 {M(radius)} 폭발(공격력 {P(effective)})",
+                ? Loc.F("{0:0}m 안에서 체력이 가장 낮은 적이 체력 {1} 이하면 즉사", CovenantClause.ExecuteMarkRadius, P(ExecuteThreshold))
+                : Loc.F("{0}이 체력 {1} 이하면 즉사", who, P(ExecuteThreshold)),
+            EffectKind.AoeBurst   => Loc.F("{0}에서 {1} 폭발(공격력 {2})", at, M(radius), P(effective)),
             EffectKind.Arcflash   => ArcChain
-                ? $"{who}과 {CovenantMath.ArcflashChainHop:0}m씩 이어진 적 {ArcCount - 1}마리에게 감전 1개씩"
-                : $"{who}과 그 둘레 {M(radius)} 안 적 {ArcCount - 1}마리에게 감전 1개씩",
-            EffectKind.Stasis     => $"{who} 둘레 {M(radius)} 안 적의 감전을 걷어 1개당 {effective:0.00}초 기절",
+                ? Loc.F("{0}과 {1:0}m씩 이어진 적 {2}마리에게 감전 1개씩", who, CovenantMath.ArcflashChainHop, ArcCount - 1)
+                : Loc.F("{0}과 그 둘레 {1} 안 적 {2}마리에게 감전 1개씩", who, M(radius), ArcCount - 1),
+            EffectKind.Stasis     => Loc.F("{0} 둘레 {1} 안 적의 감전을 걷어 1개당 {2:0.00}초 기절", who, M(radius), effective),
             EffectKind.Detonate   => causeTargeted
-                ? $"{who}의 화상 · 출혈 {P(CovenantMath.DetonateFraction)}를 터뜨리고 {M(radius)} 안 다른 적에게 그 {P(effective)}"
-                : $"{area} {M(radius)} 안 적 모두의 화상 · 출혈 {P(CovenantMath.DetonateFraction)}를 터뜨린다",
-            EffectKind.Harvest    => $"{who}의 화상 · 출혈 {P(CovenantMath.HarvestFraction)}를 걷어 스킬 대기 -{effective:0.0}초 · 골드 +{CovenantMath.HarvestGold}",
+                ? Loc.F("{0}의 화상 · 출혈 {1}를 터뜨리고 {2} 안 다른 적에게 그 {3}", who, P(CovenantMath.DetonateFraction), M(radius), P(effective))
+                : Loc.F("{0} {1} 안 적 모두의 화상 · 출혈 {2}를 터뜨린다", area, M(radius), P(CovenantMath.DetonateFraction)),
+            EffectKind.Harvest    => Loc.F("{0}의 화상 · 출혈 {1}를 걷어 스킬 대기 -{2:0.0}초 · 골드 +{3}", who, P(CovenantMath.HarvestFraction), effective, CovenantMath.HarvestGold),
             _                     => SelfText(),
         };
     }
@@ -163,32 +163,32 @@ public readonly struct CovenantAssemblePreview
     }
 
     /// <summary>「8m 안에서 가장 가까운 적」 — 받을 적이 없을 때 나를 중심으로 찾는 반경(<see cref="CovenantClause.TargetSearchRadius"/>).</summary>
-    public static string NearMe => $"{CovenantClause.TargetSearchRadius:0}m 안에서 가장 가까운 적";
+    public static string NearMe => Loc.F("{0:0}m 안에서 가장 가까운 적", CovenantClause.TargetSearchRadius);
 
     /// <summary>미리보기에만 붙는 덧붙임 — 쌓임 · 상한 · 보스 · 위험 변형(카드 · 서약서 줄엔 길어서 뺀다).</summary>
     private string Detail() => effectKind switch
     {
-        EffectKind.AoeBurst   => $" · 둘레에 상태 걸린 적 1마리당 반경 +{CovenantMath.SupernovaRadiusPerSteeped:0.#}m(최대 {CovenantMath.AoeRadiusCap:0.#}m)",
-        EffectKind.DamageBuff => causeClass == CauseClass.Danger ? $" · 5m 안 적이 {causeThreshold}마리 아래로 줄면 바로 꺼진다" : string.Empty,
-        EffectKind.BleedStack => $" · 다시 걸면 최대 {CovenantMath.BleedMaxStacks}번까지 쌓인다",
-        EffectKind.Execute    => $" · 걸린 상태(화상 · 출혈 · 감전 · 저주) 1종마다 기준 ×{CovenantMath.ExecuteStatusMult:0.#}(최대 {P(CovenantMath.ExecuteThresholdCap)}) · 보스는 즉사 대신 최대 체력의 {P(effective)} 피해",
-        EffectKind.Arcflash   => $" · 감전은 적마다 최대 {CovenantStatus.ShockMaxStacks}개(1개당 이동 속도 -{P(CovenantStatus.ShockSlowPerStack)})",
-        EffectKind.Stasis     => $" · 기절은 최대 {CovenantMath.StasisStunCap:0.#}초",
-        EffectKind.Ward       => $" · {M(radius)} 안 상태 걸린 적 1마리당 -{P(CovenantMath.WardPerSteepedEnemy)}p(최대 -{P(CovenantMath.WardReductionCap)})",
-        EffectKind.StatBuff   => $" · 다시 터지면 겹쳐 쌓인다(최대 {CovenantMath.MomentumStackCap(causeClass)}번)",
+        EffectKind.AoeBurst   => Loc.F(" · 둘레에 상태 걸린 적 1마리당 반경 +{0:0.#}m(최대 {1:0.#}m)", CovenantMath.SupernovaRadiusPerSteeped, CovenantMath.AoeRadiusCap),
+        EffectKind.DamageBuff => causeClass == CauseClass.Danger ? Loc.F(" · 5m 안 적이 {0}마리 아래로 줄면 바로 꺼진다", causeThreshold) : string.Empty,
+        EffectKind.BleedStack => Loc.F(" · 다시 걸면 최대 {0}번까지 쌓인다", CovenantMath.BleedMaxStacks),
+        EffectKind.Execute    => Loc.F(" · 걸린 상태(화상 · 출혈 · 감전 · 저주) 1종마다 기준 ×{0:0.#}(최대 {1}) · 보스는 즉사 대신 최대 체력의 {2} 피해", CovenantMath.ExecuteStatusMult, P(CovenantMath.ExecuteThresholdCap), P(effective)),
+        EffectKind.Arcflash   => Loc.F(" · 감전은 적마다 최대 {0}개(1개당 이동 속도 -{1})", CovenantStatus.ShockMaxStacks, P(CovenantStatus.ShockSlowPerStack)),
+        EffectKind.Stasis     => Loc.F(" · 기절은 최대 {0:0.#}초", CovenantMath.StasisStunCap),
+        EffectKind.Ward       => Loc.F(" · {0} 안 상태 걸린 적 1마리당 -{1}p(최대 -{2})", M(radius), P(CovenantMath.WardPerSteepedEnemy), P(CovenantMath.WardReductionCap)),
+        EffectKind.StatBuff   => Loc.F(" · 다시 터지면 겹쳐 쌓인다(최대 {0}번)", CovenantMath.MomentumStackCap(causeClass)),
         _                     => string.Empty,
     };
 
     /// <summary>「나」 쪽 결과 — 받는 쪽이 없는 효과.</summary>
     private string SelfText() => effectKind switch
     {
-        EffectKind.DamageBuff => $"{Sec(duration)} 동안 내 피해 +{P(FuryAmp)}",
-        EffectKind.Shield     => $"보호막 +{effective:0}",
-        EffectKind.GoldBurst  => $"골드 +{effective:0}",
-        EffectKind.Invincible => $"{effective:0.0}초 무적",
-        EffectKind.DeathSave  => $"죽을 피해 1번 버티기 +1(최대 {effectiveCount}번)",
+        EffectKind.DamageBuff => Loc.F("{0} 동안 내 피해 +{1}", Sec(duration), P(FuryAmp)),
+        EffectKind.Shield     => Loc.F("보호막 +{0:0}", effective),
+        EffectKind.GoldBurst  => Loc.F("골드 +{0:0}", effective),
+        EffectKind.Invincible => Loc.F("{0:0.0}초 무적", effective),
+        EffectKind.DeathSave  => Loc.F("죽을 피해 1번 버티기 +1(최대 {0}번)", effectiveCount),
         EffectKind.StatBuff   => MomentumLabel(),
-        EffectKind.Ward       => $"{Sec(duration)} 동안 받는 피해 -{P(effective)}",
+        EffectKind.Ward       => Loc.F("{0} 동안 받는 피해 -{1}", Sec(duration), P(effective)),
         _                     => $"{effective:0.0}",
     };
 
@@ -198,9 +198,9 @@ public readonly struct CovenantAssemblePreview
         float off = effective * CovenantMath.MomentumOffAxisRatio;
         return causeClass switch
         {
-            CauseClass.Mobility => $"{Sec(duration)} 동안 이동 속도 +{P(effective)} · 공격 속도 +{P(off)}",
-            CauseClass.Kill     => $"{Sec(duration * CovenantMath.MomentumKillDurationMult)} 동안 공격 속도 +{P(effective)} · 이동 속도 +{P(off)}",
-            _                   => $"{Sec(duration)} 동안 이동 속도 +{P(effective)} · 공격 속도 +{P(effective * CovenantMath.MomentumAtkSpeedRatio)}",
+            CauseClass.Mobility => Loc.F("{0} 동안 이동 속도 +{1} · 공격 속도 +{2}", Sec(duration), P(effective), P(off)),
+            CauseClass.Kill     => Loc.F("{0} 동안 공격 속도 +{1} · 이동 속도 +{2}", Sec(duration * CovenantMath.MomentumKillDurationMult), P(effective), P(off)),
+            _                   => Loc.F("{0} 동안 이동 속도 +{1} · 공격 속도 +{2}", Sec(duration), P(effective), P(effective * CovenantMath.MomentumAtkSpeedRatio)),
         };
     }
 
@@ -217,7 +217,7 @@ public readonly struct CovenantAssemblePreview
 
     private static string P(float v)   => $"{v * 100f:0}%";
     private static string M(float r)   => $"{r:0.#}m";
-    private static string Sec(float s) => $"{s:0.#}초";
+    private static string Sec(float s) => Loc.F("{0:0.#}초", s);
 
     /// <summary>카드 통화 배지 문구. 예: "생존 · 보호막".</summary>
     public string Badge => valid ? EffectTaxonomy.Badge(axis, status) : "";
@@ -241,8 +241,8 @@ public readonly struct CovenantAssemblePreview
 
             string coin = (role == StatusRole.Consume ? a.Status : status).DisplayName();
             return role == StatusRole.Consume
-                ? $"시너지  「{a.EffectName}」이(가) 걸어 둔 {coin}을(를) 이 서약이 먹는다"
-                : $"시너지  이 서약이 거는 {coin}을(를) 「{a.EffectName}」이(가) 먹는다";
+                ? Loc.F("시너지  「{0}」이(가) 걸어 둔 {1}을(를) 이 서약이 먹는다", a.EffectName, coin)
+                : Loc.F("시너지  이 서약이 거는 {0}을(를) 「{1}」이(가) 먹는다", coin, a.EffectName);
         }
         return null;
     }

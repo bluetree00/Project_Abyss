@@ -286,7 +286,7 @@ public class UI_SaveSlotPanel : UI_Base
     private void OnSlotDeleteClicked(int slotIndex)
     {
         int n = slotIndex + 1;
-        string body = $"기록 {n}{(n == 2 ? "를" : "을")} 삭제하시겠습니까?\n" +
+        string body = Loc.F("기록 {0}{1} 삭제하시겠습니까?\n", n, (n == 2 ? Loc.K("를") : Loc.K("을"))) +
                       "진행 중인 런과 이 기록의 성장(심연의 정수 · 해금 · 봉인)이 모두 사라지며 되돌릴 수 없습니다.";
         UI_ConfirmDialog.Show("기록 삭제", body, "삭제", "취소", () => DeleteSlot(slotIndex), danger: true);
     }

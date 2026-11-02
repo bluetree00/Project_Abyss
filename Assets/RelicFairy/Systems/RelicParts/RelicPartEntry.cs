@@ -84,7 +84,7 @@ public static class RelicPartAnchor
     }
 
     /// <summary>카드 배지 · 보유 보기에 쓰는 짧은 이름.</summary>
-    public static string Label(string anchor) => anchor switch
+    public static string Label(string anchor) => Loc.T(anchor switch   // 화면 언어(11-02 Q11)
     {
         Dawn     => "여명",
         Noon     => "정오",
@@ -99,7 +99,7 @@ public static class RelicPartAnchor
         Judgment => "심판",
         Reaction => "반응",
         _        => anchor ?? string.Empty,
-    };
+    });
 }
 
 /// <summary>파츠 종류 상수.</summary>

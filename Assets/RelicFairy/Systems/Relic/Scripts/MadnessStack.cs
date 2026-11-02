@@ -12,17 +12,19 @@ using UnityEngine;
 public sealed class MadnessStack : MonoBehaviour, IRelicResource
 {
     private const string RelicKey = "lancelot";
-    private const int V_MAX = 0, V_DECAY_DELAY = 1, V_DECAY_RATE = 2;
+    private const int V_MAX = 0, V_DECAY_DELAY = 1, V_DECAY_RATE = 2, V_TAKEN_CAP = 4;
 
     // 서버(RELIC_STAT_DATA lancelot slot 0) 미도달 시 폴백. CSV와 같은 값으로 맞춰둔다
     // — 어긋나 있으면 CDN 업로드 전후로 광란 빈도가 통째로 달라져 밸런싱이 헛돈다.
     private int   _maxStacks  = 40;
     private float _decayDelay = 2f;
     private float _decayRate  = 1f;
+    private float _takenAtMax = 0.30f;   // 광기 가득일 때 받는 피해 증가 — 라벨 둘째 줄(10-30 H-08 · 피해 계산은 LancelotMadnessRelic이 같은 슬롯으로)
 
     private int   _stacks;
     private float _lastAttackTime = -999f;
     private float _decayAccum;
+    private bool  _decaying;   // 지금 감쇠 중(3초 안 쳤다) — 라벨 「줄어드는 중」(10-30 H-08)
 
     // 광란(Frenzy) 상태 — 빈틈 대체
     private bool  _frenzy;
@@ -59,6 +61,8 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     public float Ratio => _maxStacks > 0 ? (float)_stacks / _maxStacks : 0f;
 
     public bool  IsFrenzy        => _frenzy;
+    /// <summary>지금 광기가 줄어드는 중인가(마지막 적중 뒤 유예가 지났다 · 받침 · 피 냄새면 아니다).</summary>
+    public bool  IsDecaying      => _decaying;
     public float FrenzyRemaining => _frenzy ? Mathf.Max(0f, _frenzyEnd - Time.time) : 0f;
     /// <summary>광란 남은 시간 비율(1 → 0) — HUD 칼 게이지가 칼끝에서 칼자루로 줄어든다(10-18). 연장되면 다시 는다(1에서 멈춤).</summary>
     public float FrenzyRemaining01 => _frenzy ? Mathf.Clamp01(FrenzyRemaining / _lastFrenzyDuration) : 0f;
@@ -86,6 +90,7 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
             _maxStacks  = Mathf.Max(1, m.GetInt(RelicKey, V_MAX, _maxStacks));
             _decayDelay = m.Get(RelicKey, V_DECAY_DELAY, _decayDelay);
             _decayRate  = Mathf.Max(0.01f, m.Get(RelicKey, V_DECAY_RATE, _decayRate));
+            _takenAtMax = m.Get(RelicKey, V_TAKEN_CAP, _takenAtMax);
         }
         _stacks = 0; _lastAttackTime = -999f; _decayAccum = 0f; _frenzy = false;
         OnChanged?.Invoke();
@@ -127,6 +132,7 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
         _endlessUsed = false;          // 새 광란 진입 → 재점화 1회 재충전
         _refill = 0;
         _decayAccum = 0f;
+        _decaying = false;             // 광란 중엔 감쇠가 없다(라벨 「줄어드는 중」이 남지 않게)
         OnChanged?.Invoke();
         OnFrenzyChanged?.Invoke(true);
     }
@@ -178,11 +184,11 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
             }
             return;                 // 광란 중 감쇠 없음
         }
-        if (_stacks <= 0) return;
-        if (Time.time < HoldDecayUntil) return;
-        if (Time.time - _lastAttackTime < _decayDelay) return;
         int floor = _stacks >= _floor ? _floor : 0;   // 받침 위에 있을 때만 받친다
-        if (_stacks <= floor) return;
+        bool decaying = _stacks > floor && Time.time >= HoldDecayUntil && Time.time - _lastAttackTime >= _decayDelay;
+        // 줄기 시작 · 멈춤을 한 번씩 알린다 — 막대 글 둘째 줄 「줄어드는 중」(10-30 H-08 · 「3초 쉬면 준다」가 안 보였다)
+        if (decaying != _decaying) { _decaying = decaying; OnChanged?.Invoke(); }
+        if (!decaying) return;
 
         _decayAccum += Time.deltaTime * _decayRate;
         if (_decayAccum >= 1f)
@@ -199,7 +205,10 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
 
     /// <summary>
     /// 게이지 라벨 — 평시엔 광기 칸 수 「광기 23/40」(10-22 E1 D6 — % 였는데 카드는 「광기 10 · 20 · 30 · 40」이라 단위가 달랐다),
-    /// 광란 중엔 남은 시간 + 할 일 「광란 3.2초」 / 「Q 심판」(두 줄 — 한 줄이면 왼쪽 무기 원에 닿는다 · CombatPanelView.Wuwa).
+    /// 광란 중엔 남은 시간 + 할 일 「광란 3.2초」 / 「Q로 심판의 일격」(두 줄 — 한 줄이면 왼쪽 무기 원에 닿는다 · CombatPanelView.Wuwa).
+    /// 10-30 H-08 · H-09 — 둘째 줄에 대가 「받는 피해 +17%」(광기가 높을수록 더 아프게 맞는다는 게 툴팁에만 있었다) ·
+    /// 줄어드는 동안엔 「줄어드는 중」(3초 안 치면 준다는 게 안 보였다) · 「Q 심판」은 지금 누르라는 뜻인지 흐려 「Q로 심판의 일격」.
+    /// 막대 왼쪽 두 줄 자리라 줄마다 약 110px 안(무기 큰 원 −359까지 131px) — 공격력 몫은 버프 칸 툴팁에 둔다.
     /// 매 프레임 문자열을 새로 만들면 GC가 쌓이므로 표시값이 바뀔 때만 다시 만든다
     /// (광란 잔여는 0.1초 단위로만 갱신 → 초당 10회).
     /// </summary>
@@ -207,13 +216,15 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     {
         get
         {
-            int key = _frenzy ? -Mathf.CeilToInt(FrenzyRemaining * 10f) : _stacks * 1000 + _maxStacks;
+            int key = _frenzy ? -Mathf.CeilToInt(FrenzyRemaining * 10f) : (_stacks * 1000 + _maxStacks) * 2 + (_decaying ? 1 : 0);
             if (key != _labelKey)
             {
                 _labelKey = key;
-                _label = _frenzy
-                    ? $"광란 {FrenzyRemaining:0.0}초\nQ 심판"
-                    : $"광기 {_stacks}/{_maxStacks}";
+                // 화면 언어(11-02 Q11) — 값이 끼는 글은 Loc.F 열쇠(한글 원문 · {n})
+                _label = _frenzy      ? Loc.F("광란 {0}초\nQ로 심판의 일격", FrenzyRemaining.ToString("0.0"))
+                       : _stacks <= 0 ? Loc.F("광기 0/{0}", _maxStacks)
+                       : _decaying    ? Loc.F("광기 {0}/{1}\n줄어드는 중", _stacks, _maxStacks)
+                       :                Loc.F("광기 {0}/{1}\n받는 피해 +{2}%", _stacks, _maxStacks, (Ratio * _takenAtMax * 100f).ToString("0"));
             }
             return _label;
         }

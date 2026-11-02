@@ -144,7 +144,7 @@ public class UI_SaveSlotCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _onDelete  = onDelete;
         _hasSave   = data?.hasActiveRun == true;
 
-        _slotText.text = $"기록 {slotIndex + 1}";
+        _slotText.text = Loc.F("기록 {0}", slotIndex + 1);
         _filledRoot.SetActive(_hasSave);
         _emptyRoot.SetActive(!_hasSave);
         _deleteButton.gameObject.SetActive(_hasSave && onDelete != null);
@@ -167,7 +167,7 @@ public class UI_SaveSlotCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
         _footCount = 0;
         AddFoot("플레이 시간", FormatPlayTime(data.playSeconds));
-        AddFoot("시도", $"{Mathf.Max(1, data.retryCount)}회");
+        AddFoot("시도", Loc.F("{0}회", Mathf.Max(1, data.retryCount)));
         string saved = FormatSavedAt(data.savedAt);
         if (saved != null) AddFoot("마지막 저장", saved);
         for (int i = _footCount; i < FootMax; i++) ShowRow(_footLabel[i], _footValue[i], false);
@@ -358,14 +358,14 @@ public class UI_SaveSlotCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
     {
         int ch = Mathf.Clamp(d.chapter, 1, ChapterMax);
         // 보스 클리어 뒤 저장(10-10)은 다음 챕터 대기방부터 연다
-        _caption.text = d.chapterStartPending ? $"챕터 {ch} · 시작 전" : $"진행 중인 런 · 챕터 {ch}";
+        _caption.text = d.chapterStartPending ? Loc.F("챕터 {0} · 시작 전", ch) : Loc.F("진행 중인 런 · 챕터 {0}", ch);
         _title.text   = ChapterName(ch);
         for (int i = 0; i < ChapterMax; i++)
         {
             int n = i + 1;
             SetPip(i, n < ch ? PipLit : n == ch ? Ink : PipOff, n == ch);
         }
-        _trackText.text = d.roomClearCount > 0 ? $"방 {d.roomClearCount}개 돌파" : "";
+        _trackText.text = d.roomClearCount > 0 ? Loc.F("방 {0}개 돌파", d.roomClearCount) : "";
 
         AddRow("유물", RelicName(d.relicKey));
         AddRow("무기", WeaponLine(d));
@@ -393,11 +393,11 @@ public class UI_SaveSlotCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
             if (lit) done++;
             SetPip(i, lit ? PipLit : PipOff, false);
         }
-        _trackText.text = $"{(freed ? "처치" : "봉인")} {done} / {ChapterMax}";
+        _trackText.text = $"{(freed ? Loc.T("처치") : Loc.T("봉인"))} {done} / {ChapterMax}";
 
         if (meta == null) return;
-        if (meta.highestChapter > 0) AddRow("최고 챕터", $"챕터 {Mathf.Clamp(meta.highestChapter, 1, ChapterMax)}");
-        AddRow("완주", $"{Mathf.Max(0, meta.totalClears)}회");
+        if (meta.highestChapter > 0) AddRow("최고 챕터", Loc.F("챕터 {0}", Mathf.Clamp(meta.highestChapter, 1, ChapterMax)));
+        AddRow("완주", Loc.F("{0}회", Mathf.Max(0, meta.totalClears)));
         AddRow("심연의 정수", $"{Mathf.Max(0, meta.abyssEssence):N0}");
     }
 
@@ -475,7 +475,7 @@ public class UI_SaveSlotCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
         string melee  = WeaponName(d.weapon0PrefabKey);
         string ranged = WeaponName(d.weapon1PrefabKey);
         if (!string.IsNullOrEmpty(melee) && d.weapon0EnhanceLevel > 0)
-            melee += $" 재련 {WeaponReforgeService.CountAt(d.weapon0EnhanceLevel)}";
+            melee += Loc.F(" 재련 {0}", WeaponReforgeService.CountAt(d.weapon0EnhanceLevel));
         if (string.IsNullOrEmpty(melee)) return ranged;
         return string.IsNullOrEmpty(ranged) ? melee : melee + "  ·  " + ranged;
     }
@@ -509,7 +509,7 @@ public class UI_SaveSlotCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
                                System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var utc))
             return null;
         var local = utc.ToLocalTime();
-        return $"{local.Month}월 {local.Day}일 {local:HH:mm}";
+        return Loc.F("{0}월 {1}일 {2:HH:mm}", local.Month, local.Day, local);
     }
 
     /// <summary>누적 플레이 시간 — 1시간 미만은 분 · 초, 넘으면 시간 · 분.</summary>
@@ -517,7 +517,7 @@ public class UI_SaveSlotCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
     {
         if (seconds <= 0) return "--";
         var t = TimeSpan.FromSeconds(seconds);
-        return t.TotalHours >= 1d ? $"{(int)t.TotalHours}시간 {t.Minutes}분" : $"{t.Minutes}분 {t.Seconds}초";
+        return t.TotalHours >= 1d ? Loc.F("{0}시간 {1}분", (int)t.TotalHours, t.Minutes) : Loc.F("{0}분 {1}초", t.Minutes, t.Seconds);
     }
 
     // ─────────────────────────────────────────────────────────

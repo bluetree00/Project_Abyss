@@ -62,6 +62,7 @@ public sealed class BossTitleCard : MonoBehaviour
     public static void Show(string bossName, string title, float seconds = 2.6f)
     {
         if (string.IsNullOrEmpty(bossName)) return;
+        bossName = Loc.T(bossName); title = Loc.T(title);   // 이름 · 칭호 영어(11-02 Q11 L4)
         if (_instance != null) Destroy(_instance.gameObject);
         var card = Create(bossName, title);
         card._start  = Time.unscaledTime;

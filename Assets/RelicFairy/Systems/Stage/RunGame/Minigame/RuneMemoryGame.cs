@@ -24,6 +24,12 @@ public sealed class RuneMemoryGame : EventMinigame
     private const float AfterMiss   = 0.9f;
     private const float AfterRound  = 1.0f;
     private const float DemoStepGap = 0.45f;
+    // 10-30 카드 보상 줄 · 메달 아래 · 보상이 같은 값을 읽는다
+    private const int   GoldMaxMistakes   = 1;   // 등급 문턱 = 틀린 횟수 상한(플래티넘 0 · 골드 1 · 실버 2 · 브론즈 3)
+    private const int   SilverMaxMistakes = 2;
+    private const int   BronzeMaxMistakes = 3;
+    private const int   RerollTop         = 2;   // 근접 증강 다시 뽑기 — 플래티넘 +2 · 브론즈~골드 +1
+    private const int   RerollBase        = 1;
 
     private static readonly Color[] PlateColors =
     {
@@ -52,23 +58,49 @@ public sealed class RuneMemoryGame : EventMinigame
     private bool   _lit;
     private float  _demoTimer;
     private bool   _demoMissed;
+    private int    _statusKey = -1;   // 10-30 상태 줄은 단계 · 밟은 수 · 틀린 횟수가 바뀔 때만 다시 만든다(매 프레임 문자열 할당 금지)
+    private string _statusText;
 
     // ── Properties ─────────────────────────────────────────────
     public override string Id => "memory";
-    protected override string Title => "룬 기억";
-    protected override string Rule => "빛난 순서대로 밟아라";
-    protected override string GradeHint => "안 틀리면 플래티넘 · 1번 골드 · 2번 실버 · 3번 브론즈";
+    // 10-30 「룬 기억」은 룬을 주는 방 · 「유물 기억」으로 읽혔다(R-03) · 규칙은 명령조 대신 할 일과 판 수(M-12)
+    protected override string Title => "발판 순서 외우기";
+    protected override string Rule => Loc.F("발판이 빛난 순서를 외워 그대로 밟는다 · {0}판", _lengths?.Length ?? 2);
+    /// <summary>10-30 M-13 — 등급 이름 대신 받는 것. 근접 무기가 없으면 원석만 나오니 그 줄로.</summary>
+    protected override string GradeHint
+    {
+        get
+        {
+            if (EventRewards.HasMeleeWeapon(Run))
+                return Loc.F("안 틀리면 <color=#8fd3ff>근접 증강 카드 다시 뽑기</color> +{0} · {1}번까지 틀리면 +{2} · 더 틀리면 원석", RerollTop, BronzeMaxMistakes, RerollBase);
+            int ch = EventRewards.Chapter(Run);
+            return Loc.F("적게 틀릴수록 <color=#73B3F2>원석</color>이 많다 — 0번 {0}", EventRewards.Ore(ChallengeGrade.Platinum, ch))
+                 + Loc.F(" · {0}번 {1}", GoldMaxMistakes, EventRewards.Ore(ChallengeGrade.Gold, ch))
+                 + Loc.F(" · {0}번 {1}", SilverMaxMistakes, EventRewards.Ore(ChallengeGrade.Silver, ch))
+                 + Loc.F(" · {0}번 {1}", BronzeMaxMistakes, EventRewards.Ore(ChallengeGrade.Bronze, ch));
+        }
+    }
     protected override float Duration => PlayTime;
     protected override float WantRadius => 7f;
     public override ChallengeGrade CurrentGrade => GradeOf(_mistakes, _round, _lengths?.Length ?? 2, Remaining <= 0f);
     protected override bool FinishedEarly => _lengths != null && _round >= _lengths.Length;
 
-    protected override string StatusLine => _phase switch
+    /// <summary>10-30 M-14 — 지금이 보는 때인지 밟는 때인지(예전 「잘 보고 들어라」 명령조).</summary>
+    protected override string StatusLine
     {
-        Phase.Show  => $"잘 보고 들어라 · 틀린 횟수 {_mistakes}",
-        Phase.Input => $"{_inputIndex} / {_seq.Count} 밟음 · 틀린 횟수 {_mistakes}",
-        _           => $"틀린 횟수 {_mistakes}",
-    };
+        get
+        {
+            int key = (int)_phase | (_inputIndex << 3) | (_seq.Count << 10) | (_mistakes << 17);
+            if (key == _statusKey) return _statusText;
+            _statusKey = key;
+            return _statusText = _phase switch
+            {
+                Phase.Show  => Loc.F("순서 보여 주는 중 · 틀린 횟수 {0}", _mistakes),
+                Phase.Input => Loc.F("{0} / {1} 밟음 · 틀린 횟수 {2}", _inputIndex, _seq.Count, _mistakes),
+                _           => Loc.F("틀린 횟수 {0}", _mistakes),
+            };
+        }
+    }
 
     protected override string DotsLine
     {
@@ -82,8 +114,16 @@ public sealed class RuneMemoryGame : EventMinigame
     }
 
     protected override string ResultLine => FinishedEarly
-        ? (_mistakes == 0 ? "한 번도 안 틀렸다" : $"틀린 횟수 {_mistakes}")
-        : $"{_round} / {_lengths?.Length ?? 2} 라운드 · 틀린 횟수 {_mistakes}";
+        ? (_mistakes == 0 ? "한 번도 안 틀렸다" : Loc.F("틀린 횟수 {0}", _mistakes))
+        : Loc.F("{0} / {1}판 · 틀린 횟수 {2}", _round, _lengths?.Length ?? 2, _mistakes);   // 10-30 규칙 카드와 같은 「판」
+
+    /// <summary>10-30 M-18 메달 아래 — 지금 등급이면 받는 것(GrantReward와 같은 갈래).</summary>
+    protected override string GradeReward(ChallengeGrade grade)
+    {
+        if (grade >= ChallengeGrade.Bronze && EventRewards.HasMeleeWeapon(Run))
+            return Loc.F("다시 뽑기 +{0}", (grade == ChallengeGrade.Platinum ? RerollTop : RerollBase));
+        return Loc.F("원석 {0}", EventRewards.Ore(grade, EventRewards.Chapter(Run)));
+    }
 
     // ── Public Methods ─────────────────────────────────────────
 
@@ -92,7 +132,7 @@ public sealed class RuneMemoryGame : EventMinigame
     /// </summary>
     public static ChallengeGrade GradeOf(int mistakes, int roundsDone, int roundsTotal, bool timedOut)
     {
-        var g = GradeByMax(mistakes, 0, 1, 2, 3);
+        var g = GradeByMax(mistakes, 0, GoldMaxMistakes, SilverMaxMistakes, BronzeMaxMistakes);
         if (!timedOut || roundsDone >= roundsTotal) return g;
         if (roundsDone <= 0) return ChallengeGrade.Fail;
         return g < ChallengeGrade.Bronze ? g : ChallengeGrade.Bronze;
@@ -171,14 +211,14 @@ public sealed class RuneMemoryGame : EventMinigame
     {
         if (grade >= ChallengeGrade.Bronze && EventRewards.HasMeleeWeapon(Run))
         {
-            int n = grade == ChallengeGrade.Platinum ? 2 : 1;
+            int n = grade == ChallengeGrade.Platinum ? RerollTop : RerollBase;
             MeleeAugmentDraft.RerollsLeft += n;   // 런 세이브는 「쓴 수」(RerollsPerRun − 남은 수)로 적어 음수로도 그대로 이어진다
-            EventRewards.Notice($"룬 기억 — 증강 다시 뽑기 <color=#8fd3ff>+{n}</color> · 이번 런");
+            EventRewards.Notice(Loc.F("근접 증강 카드 다시 뽑기 <color=#8fd3ff>+{0}회</color>(이번 런)", n));   // 10-30 M-15 무엇을 다시 뽑는지
             return;
         }
         int ore = EventRewards.Ore(grade, EventRewards.Chapter(Run));
         EventRewards.AddOre(Run, ore);
-        EventRewards.Notice($"룬 기억 — 원석 <color=#73B3F2>+{ore}</color>");
+        EventRewards.Notice(Loc.F("{0} — 원석 <color=#73B3F2>+{1}</color>", Title, ore));
     }
 
     protected override void DemoTick(MinigameDemo mode, float dt)

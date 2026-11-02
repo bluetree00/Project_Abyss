@@ -23,6 +23,7 @@ public struct DoorPlan
     public RoomPlanKind  kind;
     public ZonePoolEntry entry; // 카테고리/키로 선택된 풀 엔트리. 없으면 null.
     public bool          danger; // 위험한 문(10-29 F4 — 해방기 · 악몽 정예 문 일부: 두 번째 파도 정예 둘 확정 · 보상 Epic 이상)
+    public string        runeFocus; // 문에 걸린 속성 룬(ElementDef id · 11-02 Q10 일반 | 일반 갈림길) — 그 방 보상 룬(일반 · 희귀)이 이 속성. 없으면 null
 }
 
 /// <summary>
@@ -359,10 +360,26 @@ public class RunSequencer
             result.Add(MakeDoor(rng, kind, exclude));
         }
         RollDanger(result);
+        RollRuneFocus(result);
 #if UNITY_EDITOR
         ApplyDebugForcedDoor(result);
 #endif
         return result;
+    }
+
+    /// <summary>
+    /// 11-02 Q10 사용자 「일반방만 2개면 고르는 의미가 없다」 — 일반 | 일반 갈림길은 문마다 서로 다른 속성 룬을 건다.
+    /// 그 방 보상 룬(일반 · 희귀)이 그 속성으로 나와 고르는 문이 곧 키울 속성이 된다. 출구 난수와 따로 굴린다(문 구성 · 이어하기 재현 그대로).
+    /// </summary>
+    private void RollRuneFocus(List<DoorPlan> doors)
+    {
+        var order = ElementDef.Order;
+        if (doors.Count < 2 || doors[0].kind != RoomPlanKind.Normal || doors[1].kind != RoomPlanKind.Normal || order.Count < 2) return;
+        var rng = new System.Random(Combine(_seed, 5500 + _visitCount));
+        int a = rng.Next(order.Count);
+        int b = (a + 1 + rng.Next(order.Count - 1)) % order.Count;   // a와 다른 속성
+        var d0 = doors[0]; d0.runeFocus = order[a]; doors[0] = d0;
+        var d1 = doors[1]; d1.runeFocus = order[b]; doors[1] = d1;
     }
 
     // 해방기 재미 F4(10-29 · 2a) — 위험한 문: 해방기 · 악몽 정예 문의 일부. 갈림길(문 둘)에서만 — 갈지 말지 고른다.

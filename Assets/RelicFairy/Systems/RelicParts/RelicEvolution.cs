@@ -29,7 +29,7 @@ public static class RelicEvolution
     public static readonly Def[] All =
     {
         new Def { Index = 1, Id = "evo_gawain_combo",    RelicId = "gawain",   Family = BuildFamily.Combo,  Name = "타오르는 정오",
-                  Desc = "정오에 맞힌 적은 불타고 태양흔이 1개씩 쌓여 가득 차면 터진다(같은 적 3초에 한 번). 공격속도가 최대치를 넘친 만큼 불이 세진다" },
+                  Desc = "정오에 맞힌 적은 불타고 태양흔이 1개씩 쌓여 가득 차면 터진다(같은 적 3초에 한 번). 공격속도가 상한을 넘은 만큼 불 피해가 커진다" },   // 10-30 E-13 「최대치를 넘친 만큼 불이 세진다」
         new Def { Index = 2, Id = "evo_gawain_crit",     RelicId = "gawain",   Family = BuildFamily.Crit,   Name = "천정의 일격",
                   Desc = "정오에 강타(대검 · 석궁처럼 묵직한 공격)나 치명타를 맞히면 그 적에게 작은 해가 떨어진다(1초에 한 번)" },
         new Def { Index = 3, Id = "evo_gawain_ranged",   RelicId = "gawain",   Family = BuildFamily.Ranged, Name = "태양의 화살",
@@ -85,16 +85,17 @@ public static class RelicEvolution
         return best;
     }
 
-    /// <summary>방향을 동작 말로 — 카드 · 알림에 계열 이름(연격 · 필살 · 사격) 대신 쓴다(10-22 E1 D3 · D4 「유물 창에 계열 낱말 0」).</summary>
-    public static string DirectionWord(BuildFamily f) => f switch
+    /// <summary>방향을 동작 말로 — 카드 · 알림에 계열 이름(연격 · 필살 · 사격) 대신 쓴다(10-22 E1 D3 · D4 「유물 창에 계열 낱말 0」).
+    /// 10-30 E-05 — 「몰아치는 빌드」의 「빌드」가 처음 하는 사람에게 뜻이 없었다 → 공격 방식 이름(카드 꼬리표에 그대로 쓴다).</summary>
+    public static string DirectionWord(BuildFamily f) => Loc.T(f switch   // 화면 언어(11-02 Q11)
     {
-        BuildFamily.Crit   => "치명타를 노리는",
-        BuildFamily.Ranged => "원거리로 치는",
-        _                  => "몰아치는",
-    };
+        BuildFamily.Crit   => "치명타형",
+        BuildFamily.Ranged => "원거리형",
+        _                  => "연속 공격형",
+    });
 
     /// <summary>카드 꼬리말 — 「보스를 쓰러뜨려 열렸다」(✓ 기호는 글리프 밖이라 쓰지 않는다 · 10-29 조각 수는 뺐다).</summary>
-    public static string RecipeLine(PlayerLoadout l, Def d) => "보스를 쓰러뜨려 열렸다";
+    public static string RecipeLine(PlayerLoadout l, Def d) => Loc.T("보스를 쓰러뜨려 열렸다");
 
     /// <summary>
     /// 진행 한 줄 — 기억 창 머리 · 일시정지 「되찾은 기억」 맨 위(10-22 E1 B6). 봉인기 · 로드아웃 없음이면 빈 글(진화를 말하지 않는다).
@@ -103,8 +104,8 @@ public static class RelicEvolution
     public static string ProgressLine(PlayerLoadout l)
     {
         if (!Unlocked || l == null) return string.Empty;
-        if (!string.IsNullOrEmpty(l.RelicEvolutionId)) return "유물 진화 완료";
-        return "보스마다 진화를 고를 수 있다";
+        if (!string.IsNullOrEmpty(l.RelicEvolutionId)) return Loc.T("유물 진화 완료");
+        return Loc.T("보스마다 진화를 고를 수 있다");
     }
 
     /// <summary>진화 효과(조각 효과 틀) 만들기.</summary>

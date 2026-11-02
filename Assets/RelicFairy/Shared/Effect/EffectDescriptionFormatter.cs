@@ -83,8 +83,9 @@ public static class EffectDescriptionFormatter
         string triggerText = TriggerLabel(trigger);
         Color color = isRisk ? RiskColor : NormalColor;
 
-        return new EffectDisplay(meta.Label, valueText, triggerText, meta.Category, meta.Unit,
-                                 meta.IconKey, color, isRisk, meta.IsFallback, description);
+        // 11-02 Q11 — 라벨 · 조건 · 차트 설명 원문을 지금 언어로(표에 없으면 한글 그대로)
+        return new EffectDisplay(Loc.T(meta.Label), valueText, Loc.T(triggerText), meta.Category, meta.Unit,
+                                 meta.IconKey, color, isRisk, meta.IsFallback, Loc.T(description));
     }
 
     // ── 룸 버프(HUD) — StatType 기반 ─────────────────────────────
@@ -95,14 +96,14 @@ public static class EffectDescriptionFormatter
     /// </summary>
     public static string FormatStatBuff(StatType type, float value, bool isPercent, int roomsRemaining)
     {
-        string label = StatTypeLabel(type);
+        string label = Loc.T(StatTypeLabel(type));
         string valueStr = isPercent ? FormatValue(EffectUnit.Ratio, value) : FormatValue(EffectUnit.Flat, value);
-        string remain = roomsRemaining > 0 ? $" [{roomsRemaining}방]" : "";
+        string remain = roomsRemaining > 0 ? Loc.F(" [{0}방]", roomsRemaining) : "";
         return $"{label} {valueStr}{remain}";
     }
 
     /// <summary>룸 버프(StatType) → 한글 라벨. 버프 뷰모델(BuffViewItem)이 라벨/수치 분리 생성에 사용.</summary>
-    public static string StatLabel(StatType type) => StatTypeLabel(type);
+    public static string StatLabel(StatType type) => Loc.T(StatTypeLabel(type));
 
     /// <summary>
     /// 스탯 버프 값 한 토막 — 퍼센트 버프는 비율(0.06 = +6%), 치명 확률은 %p, 치명 피해 · 스킬 쿨감은 비율 스탯이라 %로.
@@ -158,7 +159,9 @@ public static class EffectDescriptionFormatter
     /// 실제 UI가 쓸 수 없었다 — 표시 레이어인 여기로 끌어올려 라벨/아이콘의 단일 출처로 만든다.
     /// 미등록 id는 원문을 그대로 노출한다(빠진 게 있으면 화면에서 바로 티가 나도록).
     /// </summary>
-    public static string LabelForStatus(string statusId)
+    public static string LabelForStatus(string statusId) => Loc.T(StatusLabelKo(statusId));   // 11-02 Q11
+
+    private static string StatusLabelKo(string statusId)
     {
         switch (statusId)
         {
@@ -236,10 +239,10 @@ public static class EffectDescriptionFormatter
                 return $"{sign}{Mathf.RoundToInt(value).ToString(ci)}";
 
             case EffectUnit.Duration:
-                return $"{value.ToString("0.#", ci)}초";
+                return Loc.F("{0}초", value.ToString("0.#", ci));
 
             case EffectUnit.Chance:
-                return $"{(value * 100f).ToString("0.#", ci)}% 확률";
+                return Loc.F("{0}% 확률", (value * 100f).ToString("0.#", ci));
 
             case EffectUnit.Percent:
                 return $"{sign}{value.ToString("0.#", ci)}%";

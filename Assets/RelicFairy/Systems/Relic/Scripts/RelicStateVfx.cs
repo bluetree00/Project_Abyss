@@ -149,6 +149,8 @@ public sealed class RelicStateVfx : MonoBehaviour
                 main.loop = false;
             }
         }
+        PlayerFxCalm.LowerSorting(go);                  // 보스 예고 아래로 · 예고가 떠 있으면 옅게(10-30) — 이 인스턴스는 3초 뒤 지운다
+        PlayerFxCalm.ScaleAlpha(go, PlayerFxCalm.Alpha);
 
         if (prewarm > 0f)
         {

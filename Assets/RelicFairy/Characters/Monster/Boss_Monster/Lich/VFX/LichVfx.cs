@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -19,6 +20,7 @@ public static class LichVfx
 
     private static LichVfxSetSO s_set;
     private static bool         s_loading;
+    private static Transform    s_warmRoot;   // 미리 읽기용 꺼진 부모(Warm)
     private static readonly Dictionary<int, bool> s_freshOnly = new();
 
     public static bool IsReady => s_set != null;
@@ -28,6 +30,7 @@ public static class LichVfx
     {
         s_set     = null;
         s_loading = false;
+        s_warmRoot = null;
         s_freshOnly.Clear();
     }
 
@@ -49,6 +52,35 @@ public static class LichVfx
         finally
         {
             s_loading = false;
+        }
+    }
+
+    /// <summary>
+    /// 첫 사용 끊김을 미리 치른다(11-02 Q27 사용자 「리치 패턴들이 프레임 드랍을 많이 낸다」 — 실측: 패턴 · 이펙트 첫 사용 프레임에
+    /// Loading.ReadObject 60~220 ms, 결계 해골 첫 소환 662 ms). 꺼진 부모 아래에 한 번 만들고 바로 지운다 —
+    /// 에셋을 읽어 두기만 하고 스크립트(Awake)는 돌지 않아 부작용이 없다.
+    /// </summary>
+    public static void Warm(GameObject prefab)
+    {
+        if (prefab == null) return;
+        if (s_warmRoot == null)
+        {
+            var root = new GameObject("@LichWarm");
+            root.SetActive(false);
+            s_warmRoot = root.transform;
+        }
+        Object.Destroy(Object.Instantiate(prefab, s_warmRoot));
+    }
+
+    /// <summary>목록의 칸 프리팹을 한 프레임에 하나씩 <see cref="Warm"/> — 전투 전(등장 대기 · 연출) 동안.</summary>
+    public static async UniTask PrewarmAsync(CancellationToken ct)
+    {
+        if (s_set == null) return;
+        foreach (var e in s_set.Entries)
+        {
+            if (e.prefab == null) continue;
+            Warm(e.prefab);
+            await UniTask.Yield(ct);
         }
     }
 

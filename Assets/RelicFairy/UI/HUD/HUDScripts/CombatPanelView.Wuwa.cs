@@ -53,6 +53,8 @@ public sealed partial class CombatPanelView
     private Image _wQRing, _wQGlow, _wStreak;
     private Image _wHpTrack;
     private RectTransform _wQSlot;
+    private RectTransform _wMarkL, _wMarkR;   // 가웨인 각인 눈금(80% · 10-30 H-03) — 문턱은 게이지에서 읽어 옮긴다
+    private float _wMarkAt = -1f;
 
     // ── Private Methods ──
 
@@ -168,6 +170,9 @@ public sealed partial class CombatPanelView
                 _wTipR   = GaugeTip(_sunGaugeRoot, "TipR");
                 EndTick(_sunGaugeRoot, 0f);
                 EndTick(_sunGaugeRoot, 1f);
+                // 각인 눈금 — 여명이 이 자리를 넘으면 금색 = 공격력 +10%(10-30 H-03 · 금색이 「준비됨」으로 읽혔다). 자리는 TickWuwa가 문턱에 맞춘다
+                _wMarkL = MarkTick(_sunGaugeRoot, "MarkTickL");
+                _wMarkR = MarkTick(_sunGaugeRoot, "MarkTickR");
             }
             if (_sunOpenImg   != null) _sunOpenImg.rectTransform.sizeDelta   = Vector2.one * WEmblem;
             if (_sunClosedImg != null)
@@ -183,6 +188,8 @@ public sealed partial class CombatPanelView
                 // 220 → 360 · 한 줄 · 40 → 56 위로(10-22 E1 D5 — 역할 글 「정오! — 터짐 · Q」 · 「황혼 — Q 잠김 · 처치로 앞당김 ×1.4」가 약 115 ~ 250px).
                 // 가운데 ±180이라 오른쪽 하루 띠(게이지 끝 +12 = 232부터)에 닿지 않는다. 「정오!」 한 단어일 땐 정오 태양(92px · 위끝 142) 꼭대기에 얹혀도 됐지만
                 // 글이 넓어져 햇살을 가로질렀다 → 글 아래끝이 정오 태양 위끝 위로 오게 16px 올렸다
+                // 10-30 H-02 — 남은 초 · 각인이 붙어 가장 긴 글(「여명 12초 — 맞힌 적에 태양흔 · 공격력 +10% · 처치 가속 ×1.4」)이 약 415px.
+                // 줄바꿈 없이 가운데에서 넘치므로 ±207 — 하루 띠(232부터)에 닿지 않는다
                 lrt.anchoredPosition = new Vector2(0f, SunCenterY + WSunLabelUp);
                 lrt.sizeDelta        = new Vector2(WSunLabelW, 22f);
                 UITheme.StyleThinText(_sunLabel, UIWeight.Medium, 15f, UITheme.Thin.Ink, shadow: true);
@@ -203,6 +210,7 @@ public sealed partial class CombatPanelView
                 UITheme.StyleThinText(_relicBarLabel, UIWeight.Medium, 15f, UITheme.Thin.Ink, shadow: true);
                 // 광란 글은 두 줄(「광란 3.2초」 / 「Q 심판」 · 10-22 E1 D6) — 한 줄(약 136px)이면 막대 왼쪽 끝 −228에서 −364까지라
                 // 든 무기 큰 원(−437 ~ −359 · y 39 ~ 117)에 닿는다. 두 줄이면 가장 긴 줄이 약 73px(−301까지).
+                // 10-30 H-08 · H-09 — 평시에도 두 줄(「광기 23/40」 / 「받는 피해 +17%」) · 광란 둘째 줄 「Q로 심판의 일격」 — 가장 긴 줄 약 111px(−339까지)
                 var lrt = _relicBarLabel.rectTransform;
                 if (lrt.anchorMin == lrt.anchorMax) lrt.sizeDelta = new Vector2(lrt.sizeDelta.x, WBarLabelH);
                 _relicBarLabel.textWrappingMode = TextWrappingModes.NoWrap;
@@ -245,6 +253,26 @@ public sealed partial class CombatPanelView
         rt.anchorMin = rt.anchorMax = new Vector2(x, 0.5f);
         rt.pivot     = new Vector2(0.5f, 0.5f);
         rt.sizeDelta = new Vector2(UITheme.Thin.Stroke, 14f);
+    }
+
+    /// <summary>각인 눈금 한 개 — 끝 눈금보다 짧고 잉크색(금 채움 위에서도 보인다).</summary>
+    private static RectTransform MarkTick(RectTransform track, string name)
+    {
+        var rt = ShopUIStyle.MakeImage(track, name, UITheme.Thin.InkA(0.6f)).rectTransform;
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(UITheme.Thin.Stroke, 10f);
+        return rt;
+    }
+
+    /// <summary>각인 눈금을 문턱 자리로 — 두 반쪽이 가운데 틈 바깥에서 차오르므로 반쪽마다 같은 비율 자리(GaugeHalf · 끝 빛과 같은 셈).</summary>
+    private void PlaceMarkTicks(float threshold)
+    {
+        _wMarkAt = threshold;
+        float half = WGaugeW * 0.5f - WGaugeGap * 0.5f;
+        float x    = (WGaugeGap * 0.5f + half * Mathf.Clamp01(threshold)) / WGaugeW;
+        if (_wMarkL != null) _wMarkL.anchorMin = _wMarkL.anchorMax = new Vector2(0.5f - x, 0.5f);
+        if (_wMarkR != null) _wMarkR.anchorMin = _wMarkR.anchorMax = new Vector2(0.5f + x, 0.5f);
     }
 
     private static Image MakeGlow(RectTransform host, Vector2 center, Vector2 size)
@@ -512,6 +540,9 @@ public sealed partial class CombatPanelView
             bool dusk = zen != null && zen.CurrentPhase == ZenithGauge.ZPhase.Cooldown;
             shown = dusk ? 1f - fill : fill;
             col   = ready ? WNoon : dusk ? WDusk : zen != null && zen.IsMarkReady ? UITheme.Thin.Gold : WDawn;
+            // 근처에 적이 없어 해가 기다리면 흐리게(10-30 H-01 — 게이지가 왜 안 차는지 몰랐다 · 글은 「— 멈춤(근처에 적 없음)」). 알파 대신 밝기(하드 가드)
+            if (zen != null && zen.WaitingForFoe) col = new Color(col.r * 0.5f, col.g * 0.5f, col.b * 0.5f, col.a);
+            if (zen != null && !Mathf.Approximately(zen.MarkThreshold, _wMarkAt)) PlaceMarkTicks(zen.MarkThreshold);
             _wGaugeL.fillAmount = shown; _wGaugeL.color = col;
             _wGaugeR.fillAmount = shown; _wGaugeR.color = col;
             float h = ready ? WGaugeNoonH : WGaugeH;

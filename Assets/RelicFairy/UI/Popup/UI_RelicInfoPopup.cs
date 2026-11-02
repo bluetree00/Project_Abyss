@@ -168,9 +168,9 @@ public class UI_RelicInfoPopup : UI_Popup
 
         ApplyTheme(_relic.ThemeColor(TitleColor));   // 유물 톤 반영(카드 생성 전에 강조색을 정해둔다)
 
-        _title.text = _relic.DisplayName;
-        SetOrHide(_tagline, _relic.Tagline);
-        SetOrHide(_lore,    _relic.LoreDesc);
+        _title.text = Loc.T(_relic.DisplayName);
+        SetOrHide(_tagline, Loc.T(_relic.Tagline));
+        SetOrHide(_lore,    Loc.T(_relic.LoreDesc));
 
         BindPortrait();
         BuildTags();
@@ -254,7 +254,7 @@ public class UI_RelicInfoPopup : UI_Popup
 
         if (sprite != null) { _portrait.sprite = sprite; return; }
 
-        string name = _relic.DisplayName;
+        string name = Loc.T(_relic.DisplayName);
         _placeholderInitial.text = string.IsNullOrEmpty(name) ? "?" : name.Substring(0, 1);
     }
 
@@ -489,7 +489,7 @@ public class UI_RelicInfoPopup : UI_Popup
         hh.childControlHeight = true; hh.childForceExpandHeight = false;
 
         var name = NewText("Name", head, hero ? 28f : 23f, accent, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-        name.text = a.name;
+        name.text = Loc.T(a.name);
         name.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
         RectTransform badgeHost = head;
@@ -513,14 +513,14 @@ public class UI_RelicInfoPopup : UI_Popup
         }
         var badge = NewText("Badge", badgeHost, 16f, BadgeColor, FontStyles.Normal,
                             badgeHost == head ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.Center);
-        badge.text = string.IsNullOrWhiteSpace(a.badge) ? DefaultBadge(a.kind) : a.badge;
+        badge.text = string.IsNullOrWhiteSpace(a.badge) ? DefaultBadge(a.kind) : Loc.T(a.badge);
         badge.textWrappingMode = TextWrappingModes.NoWrap;
         if (badgeHost == head) badge.gameObject.AddComponent<LayoutElement>().flexibleWidth = 0f;
 
         if (!string.IsNullOrWhiteSpace(a.summary))
         {
             var sum = NewText("Summary", col, 17f, SummaryCol, FontStyles.Normal, TextAlignmentOptions.TopLeft);
-            sum.text = UIKeywordInk.Values(a.summary);   // 수치만 Noto 500(10-15 설명 글 강조)
+            sum.text = UIKeywordInk.Values(Loc.T(a.summary));   // 수치만 Noto 500(10-15 설명 글 강조)
             sum.lineSpacing = -12f;
         }
 
@@ -549,7 +549,7 @@ public class UI_RelicInfoPopup : UI_Popup
         tv.childControlWidth = true;  tv.childForceExpandWidth  = true;
         tv.childControlHeight = true; tv.childForceExpandHeight = false;
 
-        foreach (var raw in stats)
+        foreach (var raw in Localized(stats))   // 11-02 Q11 「라벨|값」 통째로 번역한 뒤 나눈다
         {
             if (string.IsNullOrWhiteSpace(raw)) continue;
 
@@ -637,9 +637,9 @@ public class UI_RelicInfoPopup : UI_Popup
         lv.childControlHeight = true; lv.childForceExpandHeight = false;
         left.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
-        string cond = string.IsNullOrWhiteSpace(a.badge) ? DefaultBadge(a.kind) : a.badge;
+        string cond = string.IsNullOrWhiteSpace(a.badge) ? DefaultBadge(a.kind) : Loc.T(a.badge);
         var head = NewText("Name", left, GlanceNameSize, accent, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-        head.text = $"{a.name}<space=10><size={GlanceCondSize / GlanceNameSize * 100f:0}%><color=#{ColorUtility.ToHtmlStringRGB(BadgeColor)}>{cond}</color></size>";
+        head.text = $"{Loc.T(a.name)}<space=10><size={GlanceCondSize / GlanceNameSize * 100f:0}%><color=#{ColorUtility.ToHtmlStringRGB(BadgeColor)}>{cond}</color></size>";
         head.textWrappingMode = TextWrappingModes.NoWrap;
         head.overflowMode     = TextOverflowModes.Ellipsis;
 
@@ -682,8 +682,8 @@ public class UI_RelicInfoPopup : UI_Popup
     /// <summary>한 줄 요약 — 데이터의 한눈 칸, 비었으면 요약의 첫 문장(마침표 · 줄바꿈까지).</summary>
     private static string GlanceLine(RelicAbilityInfo a)
     {
-        if (!string.IsNullOrWhiteSpace(a.glance)) return a.glance.Trim();
-        string s = a.summary ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(a.glance)) return Loc.T(a.glance).Trim();
+        string s = Loc.T(a.summary) ?? string.Empty;
         int cut = s.IndexOfAny(new[] { '.', '\n' });
         return (cut > 0 ? s.Substring(0, cut) : s).Trim();
     }
@@ -694,7 +694,7 @@ public class UI_RelicInfoPopup : UI_Popup
         var src  = a.glanceStats != null && a.glanceStats.Length > 0 ? a.glanceStats : a.stats;
         var list = new List<(string, string)>(GlanceMaxKeys);
         if (src == null) return list;
-        foreach (var raw in src)
+        foreach (var raw in Localized(src))
         {
             if (string.IsNullOrWhiteSpace(raw)) continue;
             int bar = raw.IndexOf('|');
@@ -707,6 +707,8 @@ public class UI_RelicInfoPopup : UI_Popup
         }
         return list;
     }
+
+    private static IEnumerable<string> Localized(string[] lines) { foreach (var s in lines) yield return Loc.T(s); }
 
     private static string DefaultBadge(RelicAbilityKind kind) => kind switch
     {

@@ -74,6 +74,13 @@ public class UserGameData
     /// 로컬 슬롯 메타에만 남는다(뒤끝 Param엔 넣지 않는다 — inheritedPartId와 같은 규약).</summary>
     public string lastLoadout = "";
 
+    /// <summary>멀린이 맡아 둔 룬(11-02 Q26) — 「룬 id|속성」 · 비어 있으면 없음. 죽은 뒤 고르고 다음 런 시작에 보관함으로(<see cref="MerlinRuneKeep"/>).
+    /// 로컬 슬롯 메타에만 남는다(뒤끝 Param엔 넣지 않는다 — lastLoadout과 같은 규약).</summary>
+    public string keptRune = "";
+
+    /// <summary>도감 「써 봄」(11-02 Q2) — 「종류:id」 쉼표 목록(<see cref="CodexLog"/>). 로컬 슬롯 메타에만(뒤끝 Param 아님).</summary>
+    public string codexSeen = "";
+
     // ── [레거시] 유물의 각성 6계열 ──────────────────────
     // 영구 스탯은 폐기됐다(정본 §1 — 항상 적용되어 숙련 가독성을 훼손). 스탯 적용은 이미 끊겨 있고,
     // 이 필드들은 <b>환급 마이그레이션 원장</b>으로만 남는다. MemoryAltarService가 정수로 되돌린 뒤 0으로 만든다.
@@ -106,6 +113,8 @@ public class UserGameData
         inheritedPartId      = "";
         asceticSigilOn       = false;
         lastLoadout          = "";
+        keptRune             = "";
+        codexSeen            = "";
 
         abyssEssence         = 0;
         awakeningLevelSword  = 0;
@@ -280,6 +289,16 @@ public class UserGameData
     {
         if (string.IsNullOrEmpty(key)) return false;
         if (value <= GetRecord(key)) return false;
+        WriteRecord(key, value);
+        return true;
+    }
+
+    /// <summary>최고 기록 갱신 — 작을수록 좋은 값(시간 · 11-02 Q14). 처음(0)이거나 더 작을 때만. 실제로 바뀌었으면 true.</summary>
+    public bool SetRecordMin(string key, int value)
+    {
+        if (string.IsNullOrEmpty(key) || value <= 0) return false;
+        int cur = GetRecord(key);
+        if (cur > 0 && value >= cur) return false;
         WriteRecord(key, value);
         return true;
     }

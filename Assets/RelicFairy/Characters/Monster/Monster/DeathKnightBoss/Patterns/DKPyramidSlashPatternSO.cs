@@ -104,6 +104,7 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
 
     private Vector2Int   _bossCell;
     private DKSwordColor _swordColor;
+    private bool         _introLethal;   // 인트로 — 피해도 끝난다(11-02 Q4)
 
     public DKPyramidSlashState(DKPyramidSlashPatternSO data) : base(data) { }
 
@@ -120,6 +121,7 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
         _ringList        = null;
         _ringIdx         = 0;
         _armAt           = -1f;
+        _introLethal     = IntroBootstrapper.Instance != null;
 
         var anchor = (ctx.Monster as DeathKnightBossMonster)?.PyramidStrikeAnchor;
         _bossCell   = DKBossRoomContext.WorldToCell(anchor != null ? anchor.position : ctx.Transform.position);
@@ -233,6 +235,7 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
                 Data.impactVfxPrefab, _bossCell, e.ring, _swordColor);
             DKGridPatternHelper.TriggerRingDamage(
                 ctx, _bossCell, e.ring, Data.damageMultiplier, Data.knockbackMultiplier);
+            if (_introLethal) IntroFinish(ctx, e.ring, force: false);
             // §3 타격감 — 세트 첫 링에서만 히트스톱
             if (_ringIdx % 3 == 0)
                 BossImpactFeedback.TriggerHitStop(0.1f);
@@ -242,6 +245,7 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
             bool lastOfSet = _ringIdx >= _ringList.Count || _ringList[_ringIdx].setIndex != e.setIndex;
             if (lastOfSet)
             {
+                if (_introLethal && e.setIndex == 0) IntroFinish(ctx, e.ring, force: true);   // 첫 세트가 서 있는 링을 비켜 갔다 — 그 자리에 한 번 더
                 DKGridPatternHelper.DestroyEdges(_edges);
                 DKGridPatternHelper.DestroyTiles(_tiles);
                 _armAt = -1f;
@@ -260,6 +264,30 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
             _phase = Phase.Done;
             ctx.Monster.ChangeState<AttackReadyState>();
         }
+    }
+
+    /// <summary>
+    /// 인트로 마무리 — 피해도 끝난다(11-02 사용자 「인트로 보스 공격을 다 피하면 영원히 안 끝난다 — 패턴에 맞고 바로 죽게」).
+    /// 서 있는 링이 터지면 구르기 · 저스트 회피 · 무적과 무관하게 쓰러뜨리고, 첫 세트가 그 링을 비켜 갔으면(<paramref name="force"/>)
+    /// 세트 끝에 그 자리 링을 한 번 더 터뜨린다. 쓰러짐은 평소 사망 경로(NotifyHpDepleted → 인트로 사망 처리)를 탄다. 본편은 그대로.
+    /// </summary>
+    private void IntroFinish(MonsterContext ctx, int ring, bool force)
+    {
+        var target = ctx?.Runtime?.PlayerTarget;
+        if (target == null || !target.TryGetComponent(out PlayerController player) || player.RuntimeStats.Hp <= 0) return;
+        Vector2Int pc  = DKBossRoomContext.WorldToCell(target.position);
+        int playerRing = Mathf.Max(Mathf.Abs(pc.x - _bossCell.x), Mathf.Abs(pc.y - _bossCell.y));
+        if (!force && playerRing != ring) return;
+        if (force)
+        {
+            int r = Mathf.Clamp(playerRing, 0, Data.ringCount - 1);
+            DKGridPatternHelper.SpawnRingPerimeterVfx(Data.impactVfxPrefab, _bossCell, r, _swordColor);
+            DKGridPatternHelper.TriggerRingDamage(ctx, _bossCell, r, Data.damageMultiplier, Data.knockbackMultiplier);
+            BossImpactFeedback.TriggerCameraShake(0.12f, 0.28f);
+            if (player.RuntimeStats.Hp <= 0) return;
+        }
+        player.RuntimeStats.SetHp(0);
+        player.NotifyHpDepleted();
     }
 
     // ── 색상 규칙 ────────────────────────────────────────────

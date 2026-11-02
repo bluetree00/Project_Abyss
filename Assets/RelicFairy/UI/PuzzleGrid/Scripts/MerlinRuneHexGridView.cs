@@ -62,6 +62,8 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     private const float EmptyFillMul = 0.30f, EmptyFillA = 0.35f;
     private const float EmptyLineMul = 0.45f, EmptyLineA = 0.50f;
     private const float EmptyFaceRadius = 3f;
+    private const float HintFillMul = 0.75f, HintFillA = 0.55f;   // 10-30 놓을 칸 — 빈 칸보다 바탕 2.5배 · 테 2배 밝게(문양 없이)
+    private const float HintLineMul = 1.10f, HintLineA = 0.95f;
 
     // ── Private fields ──
     private readonly List<GameObject>              _cellObjects       = new();
@@ -332,8 +334,10 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
                 bool canPlace = placeable.Contains(kvp.Key) && RuneZoneRule.Accepts(zc, hintZone, _hintNoCenter);
                 bool match    = hintOn && zc == _hintElementCode;
 
-                if (canPlace && match)       { PaintTile(kvp.Key, kvp.Value, MatchHighlightColor(bc)); pulse = true; }   // 매칭 속성칸 — 강조 + 맥박
-                else if (canPlace && hintOn) PaintTile(kvp.Key, kvp.Value, DimPlaceable(bc));   // 중앙(중립 허브) — 한 단계 낮춤
+                // 10-30 사용자 「룬을 빼곡히 넣으면 어떤 모양들이 들어간지 전혀 알기 힘들다」 — 예전엔 놓을 칸을 타일 그림(속성 문양이 구워져 있다)으로 밝혀
+                // 빈 칸이 흐린 룬처럼 보였다. 이제 빈 칸 틀(코드 타일) 그대로 속성 색만 밝힌다 — 문양은 놓인 룬에만.
+                if (canPlace && match)       { PaintHint(kvp.Key, kvp.Value, bc, true); pulse = true; }   // 매칭 속성칸 — 강조 + 맥박
+                else if (canPlace && hintOn) PaintHint(kvp.Key, kvp.Value, bc, false);   // 중앙(중립 허브) — 한 단계 낮춤
                 // 놓을 룬이 없을 때(보관함이 빔)의 빈 칸도 빈 칸 색 — 예전엔 판 전체가 「놓을 수 있음」 밝기(×1.05 · 0.85)라
                 // 룬 0개인 판이 차 있는 것처럼 보였다(10-11 v2, 리서치 B §3). 놓을 룬이 있으면 힌트가 늘 켜져 있어 안내는 그대로다.
                 else                         PaintEmpty(kvp.Key, kvp.Value, bc);
@@ -873,6 +877,32 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         if (!_cellEmptyFaces.TryGetValue(pos, out var face) || face == null) { img.color = EmptyColor(bc); return; }
         img.color = Color.clear;
         SetEmptyLook(pos, face, true);
+        TintEmptyFace(face, ZoneTint(pos, bc), EmptyFillMul, EmptyFillA, EmptyLineMul, EmptyLineA);   // 힌트가 밝힌 색을 되돌린다
+    }
+
+    /// <summary>
+    /// 고른 룬이 놓일 수 있는 칸(10-30) — 빈 칸 틀을 켠 채 속성 색을 밝힌다(매칭 = 바탕 · 테 모두 밝게, 중앙 = 한 단계 낮게).
+    /// 룬 문양이 없어 「이미 놓인 룬」과 헷갈리지 않는다. 코드 타일이 없는 칸은 예전처럼 타일 명암.
+    /// </summary>
+    private void PaintHint(Vector2Int pos, Image img, Color bc, bool match)
+    {
+        if (!_cellEmptyFaces.TryGetValue(pos, out var face) || face == null) { img.color = match ? MatchHighlightColor(bc) : DimPlaceable(bc); return; }
+        img.color = Color.clear;
+        SetEmptyLook(pos, face, true);
+        var zone = ZoneTint(pos, bc);
+        if (match) TintEmptyFace(face, zone, HintFillMul, HintFillA, HintLineMul, HintLineA);
+        else       TintEmptyFace(face, zone, EmptyFillMul * 1.6f, EmptyFillA, EmptyLineMul * 1.3f, EmptyLineA);
+    }
+
+    /// <summary>빈 칸 틀 색의 기준 — 존 색(코드 타일을 만들 때와 같다). 타일 그림이 있는 칸은 기본색이 흰색이라 그것을 쓰면 회색이 됐다.</summary>
+    private Color ZoneTint(Vector2Int pos, Color fallback)
+        => _cellZones.TryGetValue(pos, out var zc) ? GetZoneColor(zc) : fallback;
+
+    private static void TintEmptyFace(Image fill, Color zone, float fillMul, float fillA, float lineMul, float lineA)
+    {
+        fill.color = new Color(Mathf.Min(1f, zone.r * fillMul), Mathf.Min(1f, zone.g * fillMul), Mathf.Min(1f, zone.b * fillMul), fillA);
+        if (fill.transform.childCount > 0 && fill.transform.GetChild(0).TryGetComponent<Image>(out var line))
+            line.color = new Color(Mathf.Min(1f, zone.r * lineMul), Mathf.Min(1f, zone.g * lineMul), Mathf.Min(1f, zone.b * lineMul), lineA);
     }
 
     /// <summary>빈 칸이 아닌 칸(놓인 칸 · 힌트 칸 · 드래그 미리보기)을 칠한다 — 타일 그림 그대로, 코드 타일은 끈다.</summary>

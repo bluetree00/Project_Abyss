@@ -114,6 +114,8 @@ public class LegendaryRuntime : MonoBehaviour
         if (prefab == null) return;
         var vfx = Instantiate(prefab, pos, rot);
         DisableGrabPassRenderers(vfx);
+        PlayerFxCalm.LowerSorting(vfx);   // 보스 예고 아래로 · 예고가 떠 있으면 옅게(10-30)
+        alpha *= PlayerFxCalm.Alpha;
         var ls = Vector3.one * scale;
         if (yScale >= 0f) ls.y = yScale;
         vfx.transform.localScale = ls;

@@ -35,7 +35,7 @@ public sealed class FireExplosionOnSkillEffect : ItemEffectBase
                 s_buf[i].TakeDamage(damage, ctx.Player.gameObject, knockbackMultiplier: 0.5f);
 
         ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), center, Radius / 1.25f);   // 판정 반경에 맞춤(10-13 실측: 배율 1 → 1.0 m)
-        ItemEffectVfxHelper.ShowNotice($"<color=#FF6622>화염 폭발</color> {damage:F0} 데미지");
+        ItemEffectVfxHelper.ShowNotice(Loc.F("<color=#FF6622>화염 폭발</color> {0:F0} 데미지", damage));
         RFLog.D($"[FireExplosionOnSkill] 화염 폭발 {damage:F0} (반경 {Radius}m)");
     }
 }
@@ -64,7 +64,7 @@ public sealed class LightningOnSkillEffect : ItemEffectBase
                 s_buf[i].TakeDamage(damage, ctx.Player.gameObject, knockbackMultiplier: 0.3f);
 
         ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), center, Radius / 4.3f);   // 판정 반경에 맞춤(10-13 실측: 배율 1 → 4.5 m)
-        ItemEffectVfxHelper.ShowNotice($"<color=#44CCFF>번개 강타</color> {damage:F0} 데미지");
+        ItemEffectVfxHelper.ShowNotice(Loc.F("<color=#44CCFF>번개 강타</color> {0:F0} 데미지", damage));
         RFLog.D($"[LightningOnSkill] 번개 강타 {damage:F0} (반경 {Radius}m)");
     }
 }

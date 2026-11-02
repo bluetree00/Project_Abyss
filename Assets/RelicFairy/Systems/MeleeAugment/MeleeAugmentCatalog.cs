@@ -56,7 +56,7 @@ public sealed class MeleeAugmentDef
         => IsGrowth ? Value2At(1) + Growth2 * MeleeAugmentCatalog.ReforgesSinceEvolution(w) : Value2At(Mathf.Max(1, w != null ? w.AugmentRank(Id) : 1));
 
     /// <summary>이 무기 재련에 맞춘 카드 · 무기 정보 글(자람 증강은 지금 재련 값으로).</summary>
-    public string TextFor(WeaponData w) => string.Format(DescFormat, Shown(ValueFor(w)), Shown(Value2For(w)));
+    public string TextFor(WeaponData w) => Loc.F(DescFormat, Shown(ValueFor(w)), Shown(Value2For(w)));   // 화면 언어(11-02 Q11)
 
     /// <summary>단계(1~3)의 값.</summary>
     public float ValueAt(int rank) => Values[Mathf.Clamp(rank, 1, MaxRank) - 1];
@@ -65,15 +65,15 @@ public sealed class MeleeAugmentDef
     public float Value2At(int rank) => Values2 != null ? Values2[Mathf.Clamp(rank, 1, MaxRank) - 1] : 0f;
 
     /// <summary>카드 · 무기 정보 글 — 「치명 확률 +8%p」처럼 지금 단계 값을 넣는다.</summary>
-    public string Text(int rank) => string.Format(DescFormat, Shown(ValueAt(rank)), Shown(Value2At(rank)));
+    public string Text(int rank) => Loc.F(DescFormat, Shown(ValueAt(rank)), Shown(Value2At(rank)));
 
     /// <summary>진화 뒤 환영이 낼 때의 글(무형검 증강 · ⑧-기획 A) — 없으면 <see cref="Text"/>.</summary>
-    public string PhantomText(int rank) => string.IsNullOrEmpty(PhantomDescFormat) ? Text(rank) : string.Format(PhantomDescFormat, Shown(ValueAt(rank)), Shown(Value2At(rank)));
+    public string PhantomText(int rank) => string.IsNullOrEmpty(PhantomDescFormat) ? Text(rank) : Loc.F(PhantomDescFormat, Shown(ValueAt(rank)), Shown(Value2At(rank)));
 
     private static string Shown(float v) => Mathf.Approximately(v, Mathf.Round(v)) ? v.ToString("0") : v.ToString("0.##");
 
     public static string RankName(int rank) => rank switch { 1 => "I", 2 => "II", 3 => "III", _ => "" };
-    public static string TierName(AugmentTier t) => t switch { AugmentTier.Gold => "금", AugmentTier.Prismatic => "프리즘", AugmentTier.Legend => "전설", _ => "은" };
+    public static string TierName(AugmentTier t) => Loc.T(t switch { AugmentTier.Gold => "금", AugmentTier.Prismatic => "프리즘", AugmentTier.Legend => "전설", _ => "은" });
 
     /// <summary>전설은 단계가 없다(처음부터 완성 · D4) — 카드 · 정보 글에 「I」을 붙이지 않는다.</summary>
     public bool IsLegend => Tier == AugmentTier.Legend;
@@ -120,7 +120,7 @@ public static class MeleeAugmentCatalog
     private static readonly List<MeleeAugmentDef> s_all = new()
     {
         // ── 공용 · 은 ── 모두 「규칙」 — 스탯 한 줄짜리는 두지 않는다(사용자 10-15 「의미 있는 증강 — 그냥 스탯 증가만이 아닌」)
-        new(HeavyHand,         "묵직한 손",   AugmentTier.Silver, BuildFamily.Crit,     MeleeWeaponKind.None, new[] { 4f, 3f, 2f },    "평타 {0}번째 휘두름마다 강타",
+        new(HeavyHand,         "묵직한 손",   AugmentTier.Silver, BuildFamily.Crit,     MeleeWeaponKind.None, new[] { 4f, 3f, 2f },    "평타 {0}번째 휘두름마다 강타 — 그 휘두름 피해 +50% · 손이 잠깐 멎고 적이 크게 움찔한다",
             (d, r) => new HeavySwingAugment(d, r)),
         new("aug_ambush",      "기습",        AugmentTier.Silver, BuildFamily.Mobility, MeleeWeaponKind.None, new[] { 0.5f, 0.75f, 1f }, "평타를 2초 쉬었다 친 첫 타는 반드시 치명 · 일반 몹 {0}초 경직",
             (d, r) => new AmbushAugment(d, r)),
@@ -166,7 +166,7 @@ public static class MeleeAugmentCatalog
         // 10-26 무기 개편 — 재련할수록 자란다(단계 없음 · D9 · 「재련 n회」)
         new(KatanaShadow,      "그림자 파트너", AugmentTier.Gold, BuildFamily.Combo,    MeleeWeaponKind.Katana, new[] { 12f, 12f, 12f }, "곁의 그림자가 평타를 한 박자 늦게 따라 벤다 — 그림자마다 그 타격의 {0}% 피해(스킬도 따라 쓴다 · 절반) · 재련 2 · 4회째에 그림자가 하나씩 는다",
             (d, r) => new ShadowPartnerAugment(d, r), growth: 2f),   // 설계 30 + 6n → 실측 98로 15 + 4n → 10-26 분신 수가 재련으로 는다(1 → 3)라 분신당 12 + 2n
-        new(KatanaGust,        "검풍",        AugmentTier.Silver, BuildFamily.Combo,    MeleeWeaponKind.Katana, new[] { 15f, 15f, 15f }, "적을 맞힌 평타 · 스킬마다 {0}% 확률로 앞 6 m를 꿰뚫는 검기(공격력 {1}%) · 재련할수록 확률 · 피해가 오른다",
+        new(KatanaGust,        "검풍",        AugmentTier.Silver, BuildFamily.Combo,    MeleeWeaponKind.Katana, new[] { 15f, 15f, 15f }, "적을 맞힌 평타 · 스킬마다 {0}% 확률로 곁에 분신이 나와 앞 6 m를 꿰뚫는 검기를 날린다(공격력 {1}%) · 재련할수록 확률 · 피해가 오른다",
             (d, r) => new SwordGustAugment(d, r), new[] { 60f, 60f, 60f }, growth: 4f, growth2: 5f),
         // ── 대검 전용(무게 · 버팀 · 땅) ──
         new("aug_great_bulwark","철벽 자세",  AugmentTier.Silver, BuildFamily.Danger,   MeleeWeaponKind.Greatsword, new[] { 10f, 18f, 25f }, "평타 동작 중 맞아도 경직되지 않고 받는 피해 −{0}%",

@@ -115,7 +115,7 @@ public sealed class ItemInfoPanel : MonoBehaviour
 
         // 이름
         if (itemName != null)
-            itemName.text = item.displayName ?? item.itemId;
+            itemName.text = Loc.T(item.displayName) ?? item.itemId;
 
         // 등급·속성 — 칩 줄이 있으면 룬 선택과 같은 칩으로, 없으면 예전 한 줄 표기.
         if (chipRow != null)

@@ -63,7 +63,7 @@ public sealed class LightLegendAoeEffect : ItemCombatEffectBase
 
     public override void ContributeDynamicStats(ItemEffectContext ctx, ref ItemDynamicStats dyn)
     {
-        if (ctx?.Stats != null && ctx.Stats.HasShield) dyn.attackPercent += AtkWhileShield;   // 보호막이 남아 있는 동안
+        if (_granted && ctx?.Stats != null && ctx.Stats.HasShield) dyn.attackPercent += AtkWhileShield;   // 이 룬이 준 보호막이 남아 있는 동안(10-31 예전엔 아무 보호막에나 켜졌다)
     }
 
     private void TryBurst(ItemEffectContext ctx)

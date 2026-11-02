@@ -327,7 +327,7 @@ public class LichSealBreakerState : InvincibleState<LichSealBreakerPatternSO>
         Debug.Log($"[SealBreaker] 결계 해골 처치 — 남은 {_sealsRemaining}/{Data.sealCount}");
     }
 
-    private void RefreshHud() => _hud?.SetStatus($"결계 해골 {Data.sealCount - _sealsRemaining} / {Data.sealCount}");
+    private void RefreshHud() => _hud?.SetStatus(Loc.F("결계 해골 {0} / {1}", Data.sealCount - _sealsRemaining, Data.sealCount));
 
     private void FinishPattern(MonsterContext ctx, bool success)
     {

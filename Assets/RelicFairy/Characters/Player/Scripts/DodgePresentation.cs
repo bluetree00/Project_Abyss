@@ -38,6 +38,15 @@ public class DodgePresentation : MonoBehaviour
     private const float DashZoomIntensity    = 0.28f;   // 추격 속도선 세기(09-21 실측으로 0.6에서 낮춤 — 빛살이 화면을 덮었다)
     private const float DashZoomDuration     = 0.22f;
 
+    // 유물 Q 무적(11-02 Q23 「랜슬롯 Q가 무적이라는 걸 느낄 수 있게」) — 시전 동안 몸에 옅은 금빛 · 막은 타격마다 잠깐 밝게 + 「틱」
+    private static readonly Color RelicGuardTint = new(1f, 0.84f, 0.5f, 0.25f);   // 알파 = 세기(회피 틴트와 같은 규약)
+    private const float RelicGuardEmission     = 0.6f;
+    private const float RelicGuardPulseScale   = 3f;      // 막은 순간 발광 배수
+    private const float RelicGuardPulseSeconds = 0.1f;
+    private const float RelicGuardSfxGap       = 0.12f;
+    private const float RelicGuardSfxVolume    = 0.45f;
+    private const float RelicGuardSfxPitch     = 1.7f;    // 보스 무적이 막을 때와 같은 「틱」(BossImmunityLook)
+
     // ── Private (refs, Awake 캐싱) ─────────────────────────────────
     private PlayerController     _controller;
     private CharacterData        _data;
@@ -61,6 +70,12 @@ public class DodgePresentation : MonoBehaviour
     private float _ghostIntervalOverride = -1f;  // >0이면 이 간격으로 잔상 스폰
     private bool  _ghostUnscaled;                // 잔상 간격을 실제시간(슬로모 무시)으로 셀지
     private int   _strikePulseGen;               // 반격 발광 펄스 — 겹치면 마지막 것만 원복
+
+    // ── Private (유물 Q 무적) ─────────────────────────────────────
+    private bool  _relicGuard;
+    private bool  _iframeOn;            // 회피 무적 틴트가 켜져 있나 — 유물 무적이 끝날 때 되돌릴 틴트
+    private int   _guardPulseGen;
+    private float _guardSfxAt = -1f;
 
     // ── Private (잔상 풀 — 인스턴스 범위) ──────────────────────────
     private sealed class Ghost
@@ -102,6 +117,8 @@ public class DodgePresentation : MonoBehaviour
         _controller.OnPerfectDodge += HandlePerfectDodge;
         _controller.OnCounterStrike      += HandleCounterStrike;
         _controller.OnCounterWindowEnded += HandleCounterWindowEnded;
+        _controller.OnRelicGuard         += HandleRelicGuard;
+        _controller.OnDamageResolved     += HandleDamageResolved;
     }
 
     private void OnDisable()
@@ -114,7 +131,11 @@ public class DodgePresentation : MonoBehaviour
             _controller.OnPerfectDodge -= HandlePerfectDodge;
             _controller.OnCounterStrike      -= HandleCounterStrike;
             _controller.OnCounterWindowEnded -= HandleCounterWindowEnded;
+            _controller.OnRelicGuard         -= HandleRelicGuard;
+            _controller.OnDamageResolved     -= HandleDamageResolved;
         }
+        _relicGuard = false;
+        _iframeOn   = false;
 
         // 저스트 연출이 걸린 채 비활성화되면 화면이 회색으로 남는다 → 반드시 원복.
         EndPerfectFx();
@@ -146,6 +167,7 @@ public class DodgePresentation : MonoBehaviour
     // OnDodgeIFrame ON → 잔상 스폰 시작 + 틴트, OFF → 스폰 중지 + 틴트 원복 (1:1, 중복 토글 안전).
     private void HandleDodgeIFrame(bool active)
     {
+        _iframeOn = active;
         if (active)
         {
             ApplyIFrameTint();
@@ -155,7 +177,8 @@ public class DodgePresentation : MonoBehaviour
         {
             // 저스트 연출 중이면 i-frame이 끝나도 틴트/잔상을 걷지 않는다(연출이 자기 수명까지 소유).
             if (_perfectActive) return;
-            ClearIFrameTint();
+            if (_relicGuard) ApplyRelicGuardTint(1f);   // 유물 Q 무적이 아직이면 금빛으로 돌아간다
+            else ClearIFrameTint();
             StopGhostSpawn();
         }
     }
@@ -167,6 +190,29 @@ public class DodgePresentation : MonoBehaviour
     }
 
     private void HandleDodgeEnd() => DisableTrail();
+
+    // 유물 Q 무적 켜짐 · 꺼짐 — 회피 · 저스트 틴트가 몸을 쓰는 중이면 그쪽이 먼저(끝날 때 금빛으로 돌아온다)
+    private void HandleRelicGuard(bool on)
+    {
+        _relicGuard = on;
+        _guardPulseGen++;
+        if (_perfectActive) return;
+        if (on) { if (!_iframeOn) ApplyRelicGuardTint(1f); }
+        else if (_iframeOn) ApplyIFrameTint();
+        else ClearIFrameTint();
+    }
+
+    // 유물 Q 무적이 막은 타격 — 금빛을 잠깐 밝히고 「틱」(보스 무적이 막을 때와 같은 소리)
+    private void HandleDamageResolved(GameObject attacker, int raw, int final, PlayerController.DamageOutcome outcome)
+    {
+        if (!_relicGuard || outcome != PlayerController.DamageOutcome.Invincible) return;
+        if (Time.unscaledTime - _guardSfxAt >= RelicGuardSfxGap)
+        {
+            _guardSfxAt = Time.unscaledTime;
+            Managers.Sound?.PlayEffectAtAsync(SoundKey.Sfx.MonsterHit1, transform.position, RelicGuardSfxVolume, RelicGuardSfxPitch).Forget();
+        }
+        if (!_perfectActive && !_iframeOn) RelicGuardPulseAsync(++_guardPulseGen).Forget();
+    }
 
     // ── 저스트 회피 연출 ───────────────────────────────────────────
     // 레퍼런스: 베요네타 Witch Time — "세계는 변하고 플레이어는 안 변한다".
@@ -404,6 +450,31 @@ public class DodgePresentation : MonoBehaviour
             if (_renderers[i] != null) _renderers[i].SetPropertyBlock(_mpb);
 
         _tintActive = true;
+    }
+
+    // 유물 Q 무적 금빛 — i-frame 틴트와 같은 MPB 경로 · 옅게(scale = 막은 순간 발광 배수)
+    private void ApplyRelicGuardTint(float scale)
+    {
+        EnsureRenderers();
+        if (_renderers == null || _renderers.Length == 0) return;
+        float strength = Mathf.Clamp01(RelicGuardTint.a);
+        Color tintRgb  = new Color(RelicGuardTint.r, RelicGuardTint.g, RelicGuardTint.b, 1f);
+        Color baseC    = Color.Lerp(Color.white, tintRgb, strength);
+        baseC.a = 1f;
+        _mpb.Clear();
+        _mpb.SetColor(BaseColorId, baseC);
+        _mpb.SetColor(EmissionColorId, tintRgb * (RelicGuardEmission * strength * scale));
+        for (int i = 0; i < _renderers.Length; i++)
+            if (_renderers[i] != null) _renderers[i].SetPropertyBlock(_mpb);
+        _tintActive = true;
+    }
+
+    private async UniTaskVoid RelicGuardPulseAsync(int gen)
+    {
+        ApplyRelicGuardTint(RelicGuardPulseScale);
+        try { await UniTask.Delay(TimeSpan.FromSeconds(RelicGuardPulseSeconds), DelayType.Realtime, cancellationToken: this.GetCancellationTokenOnDestroy()); }
+        catch (OperationCanceledException) { return; }
+        if (gen == _guardPulseGen && _relicGuard && !_perfectActive && !_iframeOn) ApplyRelicGuardTint(1f);
     }
 
     private void ClearIFrameTint()

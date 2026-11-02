@@ -70,6 +70,9 @@ public class DefaultMoveAbility : IMoveAbility
         // 저스트 회피 슬로모 — 세계는 느려져도 플레이어는 빠르게 움직인다(평소 1이라 무영향).
         currentMaxSpeed *= owner.BonusMoveSpeedMultiplier;
 
+        // 10-31 바닥 장치(보물 창고 진흙 · 가시 · 바람 문양) — 방향(MoveScale)에 곱한 배율은 위 정규화에서 사라져 속도가 그대로였다
+        currentMaxSpeed *= owner.FloorSpeedScale;
+
         // 애니 블렌드용 '의도 속도비' 공개 — 급반전 마찰 제동을 적용하기 전 값이다.
         // 제동은 의도된 순간 감속이라 애니가 그대로 따라가면 달리다가 걷기로 튄다.
         owner.IntendedSpeed01 = runSpd > 0.01f ? Mathf.Clamp01(currentMaxSpeed / runSpd) : 0f;

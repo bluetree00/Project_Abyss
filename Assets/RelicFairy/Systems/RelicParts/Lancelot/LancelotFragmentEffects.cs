@@ -110,7 +110,7 @@ public sealed class LSplitOathEffect : LancelotFragment
         if (Line3 && _count >= 3)
         {
             RefundDash();
-            Say(player.transform.position, "갈라진 맹세");
+            Say(player.transform.position, "스태미나 회복");   // 10-30 H-17 — 떠오르는 글은 조각 이름 대신 일어난 일(회피 1번 몫)
         }
     }
 }
@@ -138,7 +138,7 @@ public sealed class LBloodScentEffect : LancelotFragment
         if (mb == null || Hub == null || !_wounded.Remove(mb.GetInstanceID()) || !Hub.AtRung(1)) return;
         Hub.Madness.HoldDecayUntil = Time.time + Hold;
         Vector3 at = mb.transform.position;
-        Say(at, "피 냄새");
+        Say(at, Loc.F("광기 {0}초 유지", Hold.ToString("0")));   // 10-30 H-17
         if (!Line2) return;
         int b = LancelotMemoryHub.BrandOf(mb);
         if (b <= 0) return;
@@ -235,7 +235,7 @@ public sealed class LBetrayerStepEffect : LancelotFragment
             _slashUntil = Time.unscaledTime + SlashWindow;   // 긴급 회피는 슬로모 — 실시간으로 잰다
             at = mb.transform.position;
         }
-        Say(at, "배신자의 걸음");
+        Say(at, Loc.F("긴급 회피 · 광기 +{0}", StepMadness));   // 10-30 H-17
         if (Line3 && Hub.IsFrenzy && !_usedThisFrenzy)
         {
             _usedThisFrenzy = true;
@@ -251,7 +251,7 @@ public sealed class LBetrayerStepEffect : LancelotFragment
         if (mb != _mark) return;
         _mark = null;
         Cut(mb, Atk * SlashRatio, 2);
-        Say(mb.transform.position, "배신의 일격");
+        Say(mb.transform.position, "반격");   // 10-30 H-17
         RFLog.D($"[LancelotMemory] 배신자의 걸음 ② — 그림자 베기 {mb.name} · {Atk * SlashRatio:0}");
     }
 }
@@ -298,7 +298,7 @@ public sealed class LTornOathBladeEffect : LancelotFragment
             CombatQuery.DealSynergyDamage(mb, Atk * Ratio, Owner, 1f, false, RuneElement.Dark);
         }
         if (Line2 && torn > 0) Hub.SaveGrudge(torn);
-        Say(pos, "작은 심판");
+        Say(pos, "4타 베기");   // 10-30 H-17 — 4번째 평타마다
         Debug.Log($"[LancelotMemory] 작은 심판({(circle ? "원형" : "콘")}) — 벤 {cut} · 찢은 낙인 {torn}");
     }
 }
@@ -359,7 +359,7 @@ public sealed class LLastThresholdEffect : LancelotFragment
         Hub.HoldingThreshold = true;
         _start = _lastHit = Time.time;
         _nextGrudge = 0f;
-        Say(Player.transform.position, "끝의 문턱");
+        Say(Player.transform.position, "광란 미루는 중");   // 10-30 H-17 (HUD 막대 글 H-14와 같은 말)
     }
     private void OnHubHit(HitInfo hit)
     {
@@ -389,7 +389,7 @@ public sealed class LLastThresholdEffect : LancelotFragment
         {
             foreach (var mb in new List<MonsterBase>(Near(Player.transform.position, LancelotMemoryHub.ScreenRadius, Owner, 32)))
                 if (LancelotMemoryHub.BrandOf(mb) > 0 && Hub.FillBrand(mb) >= 0) filled++;
-            Say(Player.transform.position, "문턱을 넘었다");
+            Say(Player.transform.position, "낙인 가득");   // 10-30 H-17 — 낙인 적의 낙인을 상한까지
         }
         Debug.Log($"[LancelotMemory] 끝의 문턱 — {held:0.00}초 미룸 → 광란 +{held:0.00}초{(filled > 0 ? $" · 낙인 상한 {filled}체" : "")}");
     }
@@ -420,7 +420,7 @@ public sealed class LMadnessCrownEffect : LancelotFragment
         Debug.Log($"[LancelotMemory] 광기의 왕관 — 반경 {r:0.#} m · 낙인 +2 {n}체");
         if (Line3 && Hub.Grudge != null && Hub.Grudge.TrySpend(2) && Hub.Relic != null)
         {
-            Say(me + Vector3.up * 0.4f, "왕관의 심판");
+            Say(me + Vector3.up * 0.4f, "심판의 일격 1번");   // 10-30 H-17 — 원한 2를 써서 한 방짜리 심판
             Hub.SkipGrudgeNextJudgment = true;   // 원한 2개는 위에서 썼다 — 이 심판이 남은 원한까지 다 쓰지 않게(10-12 D3 · 글 「원한 2개를 써서」)
             Hub.Relic.PerformJudgmentStrike(Player.transform, 0, 1, LancelotMadnessRelic.InstantJudgmentShare);   // 한 방짜리 심판(막타 몫 · 광란의 심판 횟수는 쓰지 않는다)
         }
@@ -541,7 +541,7 @@ public sealed class LFrenzyStepEffect : LancelotFragment
             hits += Hub.Wave(_trail[i], d, d.magnitude, Atk * TrailRatio);
         }
         _trail.Clear();
-        if (lines > 0) Say(Player.transform.position, "궤적이 베인다");
+        if (lines > 0) Say(Player.transform.position, "회피 길 베기");   // 10-30 H-17
         RFLog.D($"[LancelotMemory] 광란의 걸음 ③ — 궤적 {lines}줄 · 적중 {hits}");
     }
 }
@@ -588,7 +588,7 @@ public sealed class LTearingJudgmentEffect : LancelotFragment
         for (int i = 0; i < n; i++) if (LancelotMemoryHub.BrandOf(Buf[i]) > 0) branded++;
         if (branded < 4) return;   // 실 3줄 = 낙인 적 4
         Hub.Relic.FinisherRangeScale = 2f;
-        Say(pos, "배신의 실 — 막타가 넓어진다");
+        Say(pos, Loc.F("마지막 일격 범위 ×{0}", Hub.Relic.FinisherRangeScale.ToString("0")));   // 10-30 H-17 — 「막타」는 화면 다른 곳에 없는 말
         Debug.Log($"[LancelotMemory] 찢는 심판 ③ — 낙인 적 {branded} → 막타 범위 2배");
     }
     private void OnLanded(Vector3 pos, Vector3 fwd)
@@ -615,7 +615,7 @@ public sealed class LTearingJudgmentEffect : LancelotFragment
                 if (Line2) Hub.AddBrand(e, 1, overflowToGrudge: false, ignoreGap: true);
             }
         }
-        Say(pos, "배신의 실");
+        Say(pos, "낙인 적 사이 베기");   // 10-30 H-17 — 낙인을 찢은 적끼리 이은 선 위를 벤다
         Debug.Log($"[LancelotMemory] 찢는 심판 — 실 {threads}줄 · 벤 적 {cut}");
     }
 }
@@ -704,7 +704,7 @@ public sealed class LBetrayerBrandEffect : LancelotFragment
         ElementVfxPlayer.PlayBurst(RuneElement.Dark, at, 1f);   // 처형은 한 명 — 면적 폭발이 광역으로 읽혔다(10-13)
         mb.TakeDamage(mb.CurrentHp * 10f, player.gameObject, 0.3f);   // 처형(오버킬)
         if (b > 0) Hub.SaveGrudge(b);
-        Say(at, "처형");
+        Say(at, "즉시 처치");   // 10-30 H-17
         RFLog.D($"[LancelotMemory] 배신자의 낙인 — 처형 {mb.name} · 낙인 {b} → 원한");
         if (Line2 && _cracks.Count < MaxCracks)
         {

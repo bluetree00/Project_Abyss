@@ -88,6 +88,8 @@ public sealed class UI_Settings : MonoBehaviour
 
     private TMP_Dropdown _resolutionDropdown;
     private TMP_Text     _windowModeLabel;
+    private TMP_Text     _languageLabel;          // 11-02 Q11 「언어」 줄
+    private Loc.Language _pendingLang;            // 완료 시 적용 — 취소면 그대로
 
     private TMP_Dropdown _presetDropdown, _aaDropdown, _shadowDropdown, _postDropdown, _fpsDropdown;
     private Slider       _renderScaleSlider;
@@ -265,6 +267,7 @@ public sealed class UI_Settings : MonoBehaviour
         Managers.Sound?.SaveVolumePrefs();
         GraphicsQualitySettings.SavePrefs();
         CameraUserSettings.Save();
+        Loc.SetLanguage(_pendingLang);   // 11-02 Q11 언어 — 바뀌었을 때만 알림(열린 창이 글을 다시 쓴다)
 
         // 값이 그대로면 건드리지 않는다 — 같은 해상도로 SetResolution을 부르면 창만 한 번 깜빡인다.
         bool changed = !ScreenSettings.HasSaved
@@ -282,6 +285,8 @@ public sealed class UI_Settings : MonoBehaviour
     private void RefreshFromSystems()
     {
         _suppressCallbacks = true;
+        _pendingLang = Loc.Current;   // 11-02 Q11
+        UpdateLanguageLabel();
 
         var sound = Managers.Sound;
         if (sound != null)
@@ -490,6 +495,11 @@ public sealed class UI_Settings : MonoBehaviour
                          OnToggleVSync, out _vsyncLabel);
         y = AddDropdownRow(panel.transform, ColRightX, y, "프레임 상한", "FrameCap",
                            GraphicsQualitySettings.FpsNames, OnFrameRateChanged, out _fpsDropdown);
+
+        // 11-02 Q11 언어 — 완료 시 적용(영어 표에 없는 글은 한글 그대로)
+        y -= SectionGap;
+        y = AddSectionLabel(panel.transform, ColRightX, y, Loc.T("언어  (완료 시 적용)"));
+        y = AddToggleRow(panel.transform, ColRightX, y, Loc.T("언어"), "Language", OnToggleLanguage, out _languageLabel);
 
         AddBottomButtons(panel.transform);
     }
@@ -1023,6 +1033,18 @@ public sealed class UI_Settings : MonoBehaviour
         Managers.Sound?.PlayUiEvent(SoundEvent.UiSelect);   // 10-29 UI 소리 — 고르기
         GraphicsQualitySettings.SetPostProcessing(index);
         SyncPresetLabel();
+    }
+
+    private void OnToggleLanguage()
+    {
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
+        _pendingLang = _pendingLang == Loc.Language.Korean ? Loc.Language.English : Loc.Language.Korean;
+        UpdateLanguageLabel();
+    }
+
+    private void UpdateLanguageLabel()
+    {
+        if (_languageLabel != null) _languageLabel.text = _pendingLang == Loc.Language.Korean ? "한국어" : "English";
     }
 
     private void OnToggleVSync()

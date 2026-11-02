@@ -489,8 +489,8 @@ public class UI_AwakeningPanel : UI_Popup
         bool ready = left <= 0;
 
         nextGoalText.text  = ready
-            ? $"다음 · 「{goal.Node.DisplayName}」        해금 가능"
-            : $"다음 · 「{goal.Node.DisplayName}」        -{left:N0}";
+            ? Loc.F("다음 · 「{0}」        해금 가능", Loc.T(goal.Node.DisplayName))
+            : Loc.F("다음 · 「{0}」        -{1:N0}", Loc.T(goal.Node.DisplayName), left);
         nextGoalText.color = ready ? AltarPalette.Gold : AltarPalette.TextDim;
         if (nextGoalFill) SetFill(nextGoalFill, goal.Cost > 0 ? (float)essence / goal.Cost : 1f);
     }
@@ -560,7 +560,7 @@ public class UI_AwakeningPanel : UI_Popup
         int waiting = WaitingAchievements();
         if (achievementBadge) achievementBadge.gameObject.SetActive(waiting > 0);
         if (achievementTabLabel)
-            achievementTabLabel.text = waiting > 0 ? $"업적  {waiting}" : "업적";
+            achievementTabLabel.text = waiting > 0 ? Loc.F("업적  {0}", waiting) : "업적";
         if (_viewLinkLabel == null) return;
         if (_achievementMode)
         {
@@ -569,7 +569,7 @@ public class UI_AwakeningPanel : UI_Popup
         }
         else
         {
-            _viewLinkLabel.text  = waiting > 0 ? $"업적  ·  받을 것 {waiting}  →" : "업적 보기  →";
+            _viewLinkLabel.text  = waiting > 0 ? Loc.F("업적  ·  받을 것 {0}  →", waiting) : "업적 보기  →";
             _viewLinkLabel.color = waiting > 0 ? AltarPalette.Gold : AltarPalette.TextPrimary;
         }
         UIAffordGlow.Set(_viewLink.targetGraphic, !_achievementMode && waiting > 0);
@@ -591,8 +591,8 @@ public class UI_AwakeningPanel : UI_Popup
         }
 
         int gain = achievementList != null ? achievementList.PendingEssence() : 0;
-        SetActionText($"받아갈 것이 {waiting}개 있다", BuildClaimLead(gain), "");
-        SetActionButton(true, $"모두 받기 {waiting}", gain > 0 ? $"+{gain:N0}" : "");
+        SetActionText(Loc.F("받아갈 것이 {0}개 있다", waiting), BuildClaimLead(gain), "");
+        SetActionButton(true, Loc.F("모두 받기 {0}", waiting), gain > 0 ? $"+{gain:N0}" : "");
     }
 
     /// <summary>수령 후 무엇이 열리는지 한 줄 — 다음 해금까지 남는 정수를 계산해 붙인다.</summary>
@@ -605,8 +605,8 @@ public class UI_AwakeningPanel : UI_Popup
         int after = MemoryAltarService.Essence + gain;
         int left  = goal.Cost - after;
         return left <= 0
-            ? $"수령하면 +{gain:N0} — 「{goal.Node.DisplayName}」을 바로 열 수 있다"
-            : $"수령하면 +{gain:N0} — 「{goal.Node.DisplayName}」 해금까지 {left:N0} 남는다";
+            ? Loc.F("수령하면 +{0:N0} — 「{1}」을 바로 열 수 있다", gain, Loc.T(goal.Node.DisplayName))
+            : Loc.F("수령하면 +{0:N0} — 「{1}」 해금까지 {2:N0} 남는다", gain, Loc.T(goal.Node.DisplayName), left);
     }
 
     private void SetActionText(string title, string desc, string cond)
@@ -746,8 +746,8 @@ public class UI_AwakeningPanel : UI_Popup
 
         if (_bannerTitle != null)
             _bannerTitle.text = node.IsLeveled
-                ? $"강화 — {node.DisplayName}  Lv {MemoryAltarService.Level(node.Id)}"
-                : $"열렸다 — {node.DisplayName}";
+                ? Loc.F("강화 — {0}  Lv {1}", Loc.T(node.DisplayName), MemoryAltarService.Level(node.Id))
+                : Loc.F("열렸다 — {0}", Loc.T(node.DisplayName));
         if (_bannerDesc  != null) _bannerDesc.text  = node.Description;
 
         _banner.gameObject.SetActive(true);

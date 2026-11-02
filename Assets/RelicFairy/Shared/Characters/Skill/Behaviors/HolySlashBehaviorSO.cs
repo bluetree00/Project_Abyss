@@ -98,8 +98,6 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
             float dashDist = _data.dashDistance * (1f + MeleeAugments.ValueOn(ctx.WeaponData, MeleeAugmentCatalog.KatanaDraw) * 0.01f);   // 발도 연속 증강(10-15)
             _extraHits = _data.extraHitCount + Mathf.RoundToInt(MeleeAugments.Value2On(ctx.WeaponData, MeleeAugmentCatalog.KatanaDraw));
             _dashEnd = ctx.DashEndBeforeWall(_dashStart, dir, dashDist);   // 벽 앞에서 멈춘다(10-14 — 끝점 Lerp가 벽을 뚫었다)
-            MeleeAugments.ReportSkillDash(ctx.WeaponData, ctx.Slot, _dashStart, _dashEnd, _data.dashDuration,
-                                          ctx.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee));   // 일섬 전설 증강(10-24 W7)
 
             if (ctx.Rigidbody != null)
                 ctx.Rigidbody.linearVelocity = Vector3.zero;
@@ -162,7 +160,7 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
             // ease-out: 1 - (1-t)^2 — 초반 가속 / 후반 감속 (자연스러운 일섬 느낌)
             float u = 1f - t;
             float eased = 1f - u * u;
-            Vector3 targetPos = Vector3.Lerp(_dashStart, _dashEnd, eased);
+            Vector3 targetPos = ctx.DashFollowGround(Vector3.Lerp(_dashStart, _dashEnd, eased));   // 경사로 · 계단을 따라(11-02 Q6)
 
             // Rigidbody.MovePosition 으로 적용 — Rigid.interpolation=Interpolate 와 함께
             // Cinemachine 카메라가 부드럽게 추적 (transform 직접 대입 시 보간 우회로 카메라 흔들림)
@@ -187,6 +185,10 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
             if (t >= 1f)
             {
                 _timer = 0f;
+                // 일섬 전설 증강(10-24 W7) — 돌진이 실제로 끝난 순간 실제로 간 구간을 알린다. 시작에 예정 끝점을 알리면 회피로 바로 끊어도
+                // 예정 길 전체를 베고 처치하면 E가 초기화돼 E를 연달아 썼다(11-02 Q32 ⑤ · 베는 시각은 같다 — 도착 + 0.4초)
+                MeleeAugments.ReportSkillDash(ctx.WeaponData, ctx.Slot, _dashStart, ctx.PlayerTransform.position, 0f,
+                                              ctx.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee));
 
                 // 대시 완료 이펙트
                 SpawnEffect(ctx, _data.dashEffectKey,

@@ -60,7 +60,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
     private RectTransform _hpFill;
     private Image      _hpFillImg;
     private TMP_Text   _hpText;
-    private TMP_Text   _txtAtk, _txtDef, _txtLuck, _txtSpd, _txtCdr, _txtMaxHp;
+    private TMP_Text   _txtAtk, _txtDef, _txtCrit, _txtSpd, _txtCdr, _txtMaxHp;
     private ScrollRect _effectScroll;
     private Transform  _effectContent;
     private readonly List<GameObject> _effectRows = new();
@@ -320,7 +320,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
 
         _txtAtk   = StatCard(grid.transform, "공격력",   C_ATK,   new(L,  R1B), new(R,  R1T));
         _txtDef   = StatCard(grid.transform, "방어력",   C_DEF,   new(RL, R1B), new(RR, R1T));
-        _txtLuck  = StatCard(grid.transform, "행운",     C_LUCK,  new(L,  R2B), new(R,  R2T));
+        _txtCrit  = StatCard(grid.transform, "치명 확률", C_LUCK,  new(L,  R2B), new(R,  R2T));   // 11-02 Q19 행운(레거시 · 어디에도 안 쓰임) 자리
         _txtSpd   = StatCard(grid.transform, "이동속도", C_SPD,   new(RL, R2B), new(RR, R2T));
         _txtCdr   = StatCard(grid.transform, "스킬 쿨감", C_CDR,   new(L,  R3B), new(R,  R3T));   // 약어(CDR) 대신 한글
         _txtMaxHp = StatCard(grid.transform, "최대 체력", C_MAXHP, new(RL, R3B), new(RR, R3T));
@@ -479,12 +479,19 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
 
         _txtAtk?.SetText(_stats.AttackPower.ToString());
         _txtDef?.SetText(_stats.Defense.ToString());
-        _txtLuck?.SetText(_stats.Luck.ToString());
+        _txtCrit?.SetText($"{CritChancePercent(_stats):0}%");
         _txtSpd?.SetText($"{_stats.MoveSpeedMultiplier * 100f:F0}%");
 
         float cdr = _stats.SkillCooldownReduction * 100f;
         _txtCdr?.SetText(cdr > 0f ? $"-{cdr:F0}%" : "—");
         _txtMaxHp?.SetText(_stats.MaxHp.ToString());
+    }
+
+    /// <summary>11-02 치명 확률(%) — 지금 든 무기 치명 + 룬 · 유물 · 버프 보너스(피해 계산 CombatCalculator.RollCrit과 같은 합).</summary>
+    public static float CritChancePercent(PlayerRuntimeStats stats)
+    {
+        var w = GameRunBootstrapper.Instance?.Run?.Player?.WeaponManager?.CurrentWeaponData;
+        return Mathf.Clamp((w != null ? w.critChance : 0f) + (stats != null ? stats.CritChanceBonus : 0f), 0f, 100f);
     }
 
     private void RefreshEffects()
@@ -524,9 +531,9 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
                         _         => e.trigger,
                     };
                     // 코드 이름(FireEmber 등)이 그대로 보였다 — 차트 설명의 「N단계 이름」을 쓴다(없을 때만 코드명).
-                    string elemName = ElementDef.GetById(zoneId)?.Name ?? zoneId;
+                    string elemName = Loc.T(ElementDef.GetById(zoneId)?.Name) ?? zoneId;
                     string body = $"{elemName} {TierTitle(e)}";
-                    _effectRows.Add(MakeChip(body, badge, accent, e.description));
+                    _effectRows.Add(MakeChip(body, badge, accent, Loc.T(e.description)));
                     any = true;
                 }
             }
@@ -685,8 +692,9 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
     private static string TierTitle(RuneSynergyEntry e)
     {
         if (string.IsNullOrEmpty(e.description)) return e.effect_type;
-        int colon = e.description.IndexOf(':');
-        return (colon > 0 ? e.description.Substring(0, colon) : e.description).Trim();
+        string d = Loc.T(e.description);   // 11-02 Q11
+        int colon = d.IndexOf(':');
+        return (colon > 0 ? d.Substring(0, colon) : d).Trim();
     }
 
     private GameObject MakeChip(string body, string badge, Color accent, string detail = null)

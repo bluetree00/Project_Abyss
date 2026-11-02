@@ -298,6 +298,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     private async UniTaskVoid BossClearSequenceAsync(Vector3 center)
     {
         var ct = this.GetCancellationTokenOnDestroy();
+        // 사망 정산 중 · 뒤에는 클리어 흐름을 돌리지 않는다 — 보스가 죽은 뒤 3초 안에 남은 탄에 죽거나, 먼저 죽은 뒤 화상 · 장판이 보스를 마저 잡으면
+        // 랭킹 · 엔딩 · 드래프트가 결과창 위로 겹쳤다(11-02 Q32 ④)
+        if (_runEnding) return;
 
         // 리치의 추방(10-11) — 봉인기 첫 붕괴 뒤엔 런 클리어 · 유물 드래프트 대신 추락 → 같은 런으로 Ch1(심연 깊이 그대로).
         if (_exileEntering) return;
@@ -343,11 +346,26 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 Debug.LogError($"[BossClear] 파츠 드래프트 예외 — 건너뛰고 출구를 연다: {e}");
             }
             RelicMemoryRecall.SayReturn();
+
+            RecordBoard.ShowAsync().Forget();   // 11-02 Q14 보스전 · 챕터 전투 기록 줄(신기록 · 1등 · 2등) — 뒤끝을 기다리지 않는다
+
+            // 11-02 Q25 보스 처치 구슬 — 카드 뒤 · 출구 앞, 쓰러진 자리(Epic 이상 룬 3장 중 1장 + 원석 · 강화재료)
+            try
+            {
+                RoomClearGate bossGate = null;
+                foreach (var g in Object.FindObjectsByType<RoomClearGate>(FindObjectsSortMode.None))
+                    if (g.IsBossRoom) { bossGate = g; break; }
+                var fallen = Object.FindFirstObjectByType<BossSpawner>()?.SpawnedBoss;
+                if (bossGate != null) await bossGate.SpawnBossRewardAsync(fallen != null ? fallen.transform.position : center, ct);
+            }
+            catch (System.OperationCanceledException) { return; }
+            catch (System.Exception e) { Debug.LogWarning($"[BossClear] 보스 처치 구슬 예외(건너뜀): {e.Message}"); }
         }
 
         // 2) 최종 보스: 무한 루프 갈림길(계속=심연 회귀 / 귀환=런 종료). 비최종: 이어지는 길로 다음 챕터.
         if (isFinal)
         {
+            if (_runEnding) return;   // 드래프트 · 연출을 기다리는 사이 쓰러졌다 — 랭킹 · 엔딩을 올리지 않는다(11-02 Q32 ④)
             // 10-29 랭킹 — 해방기 · 악몽 리치를 쓰러뜨린 순간의 클리어 시간을 올리고, 귀환 뒤 그 시기 랭킹방을 예약한다
             RankingFlow.OnFinalBossCleared(_run);
 
@@ -679,7 +697,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             "GameScene_Ch1" => "Ch1_Map",
             "GameScene_Ch2" => "Ch2_Map",
             "GameScene_Ch3" => "Ch3_Map",
-            "GameScene_Ch4" => "Ch3_Map",   // 10-29 임시 — Ch4 전용 곡이 오기 전까지 Ch3 곡(예전엔 조용했다)
+            "GameScene_Ch4" => "Ch3_Map",   // 10-30 사용자 「챕터4는 챕터3 곡을 쓰자」(예전엔 조용했다)
             _               => (string)null,
         };
         if (mapBgmKey != null) Managers.Sound.PlayBgmAsync(mapBgmKey).Forget();
@@ -1294,6 +1312,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     public void HandlePlayerDeath() => HandleRunEndAsync(false).Forget();
 
     // 잠긴 세이브(전투 중 종료)를 이어할 때 띄우는 문구 — 사망 정산의 이유를 알린다(10-10 Hades식).
+    // 11-02 Q5 사망 모먼트 — 쓰러짐이 끝난 뒤 멈춘 채 보이는 시간 · 클립이 없을 때 최소(예전 슬로모 0.6초)
+    private readonly object _deathFreezeOwner = new();   // 사망 정지 전용 — 심연 선택(Pause)과 같은 키(this)였다(11-02 Q32 ④)
+    private const float DeathFallSettleSeconds = 1.5f;   // 쓰러짐 클립(Die08 3.3초)은 1.4초에 바닥 — 그 뒤는 누운 채라 기다리지 않는다(11-02 실측)
+    private const float DeathFallHoldSeconds  = 0.35f;
+    private const float DeathMomentMinSeconds = 0.6f;
     private const string AbandonedRunMessage = "전투 중에 멈춘 여정은 이어갈 수 없다\n<size=30>영혼이 거두어졌다…</size>";
 
     /// <summary>최종 챕터 보스 클리어 시 ClearRewardTrigger가 호출. 클리어 연출 후 메타 저장·세이브 폐기·베이스캠프 복귀.</summary>
@@ -1356,22 +1379,25 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var ct = this.GetCancellationTokenOnDestroy();
         try
         {
-            // 1) 사망 모먼트: 카메라 쉐이크 + 슬로우모션 (realtime 대기, finally로 timeScale 복원 보장)
+            // 1) 사망 모먼트 — 주변은 멈추고(배율 0) 플레이어만 실제 시간으로 그 자리에 쓰러진다 → 2) 빨간 비네트 · 암전까지 멈춘 채
+            //    (11-02 Q5 「죽음 연출이 끊기듯 넘어간다 — 주변을 멈추고 플레이어가 그 자리에 쓰러지는 애니로 보여주고 넘기기」)
+            //    예전: 흔들림 + 0.6초 0.25배 슬로모 뒤 바로 암전 — 풀린 시간에 몬스터가 쓰러진 몸을 계속 때렸다.
+            //    흔들림은 뺐다 — 배율 0이면 카메라 흔들림이 멈췄다가 풀린 뒤에 흔들린다(CameraShakeExtension). finally로 배율 복원 보장.
             if (!isCleared && !abandoned)
             {
-                HitFeelService.CameraShake(0.15f, 0.4f);
-                TimeScaleArbiter.Acquire(this, 0.25f, TimeScaleArbiter.Priority.SlowMotion);
-                try { await UniTask.Delay(System.TimeSpan.FromSeconds(0.6f), DelayType.Realtime, cancellationToken: ct); }
-                finally { TimeScaleArbiter.Release(this); }
+                TimeScaleArbiter.Acquire(_deathFreezeOwner, 0f, TimeScaleArbiter.Priority.SlowMotion);
+                try
+                {
+                    float fall = _run?.Player != null ? await _run.Player.PlayDeathFallAsync() : 0f;
+                    await UniTask.Delay(System.TimeSpan.FromSeconds(Mathf.Max(DeathMomentMinSeconds, Mathf.Min(fall, DeathFallSettleSeconds) + DeathFallHoldSeconds)), DelayType.Realtime, cancellationToken: ct);
+                    // 2) 화면 처리: 사망만 빨간 비네트(피격감) — 클리어(승리)는 비네트 없이 암전만 적용해 사망 연출과 구분.
+                    var fx = Managers.UI?.GetOverlayUI<RelicFairy.UI.Overlay.FXLayer>();
+                    fx?.Vignette(new Color(0.5f, 0f, 0f), 1f, 1.5f);
+                    await ScreenFade.Out(1.0f, ct);
+                }
+                finally { TimeScaleArbiter.Release(_deathFreezeOwner); }
             }
-
-            // 2) 화면 처리: 사망만 빨간 비네트(피격감) — 클리어(승리)는 비네트 없이 암전만 적용해 사망 연출과 구분.
-            if (!isCleared && !abandoned)
-            {
-                var fx = Managers.UI?.GetOverlayUI<RelicFairy.UI.Overlay.FXLayer>();
-                fx?.Vignette(new Color(0.5f, 0f, 0f), 1f, 1.5f);
-            }
-            await ScreenFade.Out(abandoned ? 0f : 1.0f, ct);
+            else await ScreenFade.Out(abandoned ? 0f : 1.0f, ct);
             if (abandoned)
             {
                 // 씬 로딩 오버레이가 문구를 가리지 않게 먼저 내린다(덮인 검은 화면 위에 문구만 뜬다).
@@ -1387,6 +1413,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             RunResultSnapshot snap = null;
             try { if (_run != null) snap = RunResultProvider.Capture(_run, AppBootstrapper.Instance?.Loadout, isCleared); }
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] 결과 사본 예외(결과창 건너뜀): {e}"); }   // 런 종료는 계속 — 암전에 멈추지 않게
+            // 11-02 Q26 멀린 룬 보관 — 정산(EndRun)이 인벤토리를 비우기 전에 판의 룬을 떠 둔다(사망만 · 잠긴 세이브 정산은 묻지 않는다)
+            var keepable = !isCleared && !abandoned ? MerlinRuneKeep.CapturePlaced(_run) : null;
+            CodexLog.Sync(_run);   // 11-02 Q2 도감 「써 봄」 — 이번 런에 지닌 것(정산이 비우기 전에)
             var result = _run != null ? _run.EndRun(isCleared, isCleared ? "clear" : "death") : default;
             // 정산(메타 저장)을 했으니 런 세이브도 지금 지운다 — 결과창 · 부활 연출 중에 꺼도 죽은 런이 이어하기로 살아나
             // 정수가 두 번 들어오지 않게(10-08 리뷰 C1). AppBootstrapper.EndRun이 나중에 또 지워도 무해하다.
@@ -1403,14 +1432,22 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
             // 4) 종료 연출 — 클리어 = 종료 메시지(다음 회차 암시) · 사망 = 멀린이 영혼을 다시 엮는 부활 빌드업
             if (isCleared) await ShowRunEndMessageAsync(true, ct);
-            else           await ShowMerlinRevivalAsync(ct);
+            else
+            {
+                await ShowMerlinRevivalAsync(ct);
+                if (keepable != null && keepable.Count > 0)   // 11-02 Q26 「네가 놓았던 룬 하나는 내가 맡아 둘게」 → 다음 런 시작에 돌려준다
+                {
+                    var kept = await MerlinRuneKeepView.PickAsync(keepable, ct);
+                    if (kept != null) MerlinRuneKeep.Keep(kept);
+                }
+            }
 
             // 5) 정리(ClearLocalRun + Loadout.Clear) → 허브 복귀
             AppBootstrapper.Instance?.EndRun();
             if (!TestRunRequest.TryReturnToHub())   // 테스트 허브에서 시작한 런은 허브로 돌아간다
                 AppBootstrapper.Instance?.RequestLoad(Define.Scene.BaseCamp);
         }
-        catch (System.OperationCanceledException) { TimeScaleArbiter.Release(this); }
+        catch (System.OperationCanceledException) { TimeScaleArbiter.Release(this); TimeScaleArbiter.Release(_deathFreezeOwner); }
     }
 
     /// <summary>종료 메시지 경량 오버레이(코드 생성). 입력 시 즉시 스킵, 아니면 홀드 후 자동 진행.</summary>
@@ -1455,7 +1492,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             int depth = _run?.AbyssDepth ?? 0;
             string sub2 = depth > 0
-                ? $"심연 {depth}층까지 내려갔다 돌아왔다\n<size=24>기억의 제단에서 채비하고 — 다음엔 더 깊이</size>"
+                ? Loc.F("심연 {0}층까지 내려갔다 돌아왔다\n<size=24>기억의 제단에서 채비하고 — 다음엔 더 깊이</size>", depth)
                 : "…그러나 심연은 언제든 다시 그대를 부를 것이다";
 
             var subGO = new GameObject("Subtext");
@@ -1531,7 +1568,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
             MakeCenterText(go.transform, "심연이 그대를 놓아주지 않는다",
                 34f, UITheme.Gold, new Vector2(0f, 210f), 46f);
-            MakeCenterText(go.transform, $"더 깊이 들어갈수록 적은 강해진다   ·   심연 깊이 {nextDepth}",
+            MakeCenterText(go.transform, Loc.F("더 깊이 들어갈수록 적은 강해진다   ·   심연 깊이 {0}", nextDepth),
                 20f, UITheme.Mute, new Vector2(0f, 150f), 30f);
 
             // [계속] — 더 깊은 심연으로(주 선택 = 금)
@@ -1632,7 +1669,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
             // 멀린 대사(하단) — 멀린 말투(해체). 이름은 대사창과 같은 규칙(이름 공개 전엔 「???」)
             var merlinTxt = MakeCenterText(go.transform,
-                $"{(StoryProgress.IsMerlinNamed ? "멀린" : "???")} —  「일어나. 네 이야기는 아직 안 끝났어.」",
+                Loc.F("{0} —  「일어나. 네 이야기는 아직 안 끝났어.」", (StoryProgress.IsMerlinNamed ? Loc.T("멀린") : "???")),
                 26f, new Color(0.78f, 0.74f, 0.92f), new Vector2(0f, -400f), 40f);
             merlinTxt.fontStyle = FontStyles.Italic;
             merlinTxt.color = new Color(0.78f, 0.74f, 0.92f, 0f);
@@ -2049,7 +2086,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             roomGO   = roomGO,
             blocks   = blocks,
-            hasCeiling = palette != null && palette.HasCeiling, // 천장 방이면 상공 부감 인트로 스킵(천장만 비치는 문제)
             sealDoorPrefab = palette != null ? palette.SealDoorPrefab : null, // 테마 문(없으면 공용 폴백)
             sealDoorMotion = palette != null ? palette.SealDoorMotion : SealDoorMotion.Drop,
             gateFramePrefab = palette != null ? palette.GateFramePrefab : null,   // 출구 문틀(석문이 열려도 남는다)
@@ -3557,6 +3593,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         UIRootBootstrapper.Instance?.RevealHudAsync(0.6f).Forget();   // 둘러보기 · 대사 뒤 HUD — 샘 앞에서 체력 · 포션이 보이게(10-18 사용자 「대기방에도 UI」)
 
         // 10-29 해방기 · 악몽 시작 선물 — 대사 뒤 세 갈래 중 하나(봉인기는 무동작). 기다리지 않는다(장면 준비 알림을 막지 않게)
+        // 11-02 Q26 지난 런에서 멀린이 맡아 둔 룬 — 보관함으로 돌려주고 한 줄 알린다(Tab으로 판에 놓는다)
+        var returned = MerlinRuneKeep.GrantPending(_run);
+        if (returned != null)
+            ItemEffectVfxHelper.ShowNotice(Loc.F("{0} — 「맡아 뒀던 룬이야.」  {1} → 보관함 · [Tab] 룬판",
+                StoryProgress.IsMerlinNamed ? Loc.T("멀린") : "???", $"<color={UIPalette.GoldHex}>{Loc.T(returned.displayName)}</color>"));
+
         StartGift.OfferAsync(_run, this.GetCancellationTokenOnDestroy()).Forget();
 
         // 던전 빌드(StartProcGenRunAsync)는 여기서 호출하지 않는다 — 출구 게이트가 통과 시 시작한다.
@@ -3775,7 +3817,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             ChapterId.Chapter1 => "Ch1_Map",
             ChapterId.Chapter2 => "Ch2_Map",
             ChapterId.Chapter3 => "Ch3_Map",
-            ChapterId.Chapter4 => "Ch3_Map",   // 10-29 임시 — Ch4 전용 곡이 오기 전까지
+            ChapterId.Chapter4 => "Ch3_Map",   // 10-30 사용자 「챕터4는 챕터3 곡」
             _                  => (string)null,
         };
         if (combatMapKey != null) Managers.Sound?.PlayBgmAsync(combatMapKey).Forget();
@@ -4008,6 +4050,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             currentRoomKind    = save.currentRoomKind,
             currentRoomMirror  = save.currentRoomMirror,
             currentRoomDanger  = save.currentRoomDanger,   // 10-29 F4 위험한 문 방
+            currentRoomFocus   = string.IsNullOrEmpty(save.currentRoomFocus) ? null : save.currentRoomFocus,   // 11-02 Q10 문에 걸린 속성
             currentRoomCleared = save.currentRoomCleared,   // 클리어 상태로 복원 → 몹 재스폰 X
             currentRoomRewardPending = save.currentRoomRewardPending,   // 미수령 보상만 복원(구버전=false)
             crucibleRollIndex  = save.crucibleRollIndex,    // 재련소 RNG 스트림 재개 위치

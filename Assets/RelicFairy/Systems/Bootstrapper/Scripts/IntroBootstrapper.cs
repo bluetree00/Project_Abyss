@@ -9,6 +9,10 @@ using UnityEngine;
 /// </summary>
 public sealed class IntroBootstrapper : MonoBehaviour
 {
+    private const float DeathFallSettleSeconds = 1.5f;   // 쓰러짐 클립(Die08 3.3초)은 1.4초에 바닥 — 그 뒤는 누운 채라 기다리지 않는다(11-02 실측)
+    private const float DeathFallHoldSeconds  = 0.35f;   // 11-02 Q5 쓰러짐이 끝난 뒤 멈춘 채 보이는 시간
+    private const float DeathMomentMinSeconds = 0.6f;    // 클립이 없을 때 최소(예전 슬로모 길이)
+
     public static IntroBootstrapper Instance { get; private set; }
 
     [Header("Spawn")]
@@ -118,9 +122,14 @@ public sealed class IntroBootstrapper : MonoBehaviour
     {
         try
         {
-            // 마지막 일격이 읽히게 — 런 사망과 같은 짧은 슬로모 뒤에 암전(인트로 설계 S16, 10-10).
-            TimeScaleArbiter.Acquire(this, 0.25f, TimeScaleArbiter.Priority.SlowMotion);
-            try { await UniTask.Delay(TimeSpan.FromSeconds(0.6f), DelayType.Realtime, cancellationToken: ct); }
+            // 마지막 일격이 읽히게 — 런 사망과 같은 길: 주변을 멈추고(배율 0) 플레이어가 그 자리에 쓰러진다(11-02 Q5 · 예전 0.25배 슬로모 0.6초).
+            // 쓰러진 끝 자세는 그대로 남아 모르드레드 마무리(DefeatOutro) 동안 보인다.
+            TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.SlowMotion);
+            try
+            {
+                float fall = _player != null ? await _player.PlayDeathFallAsync() : 0f;
+                await UniTask.Delay(TimeSpan.FromSeconds(Mathf.Max(DeathMomentMinSeconds, Mathf.Min(fall, DeathFallSettleSeconds) + DeathFallHoldSeconds)), DelayType.Realtime, cancellationToken: ct);
+            }
             finally { TimeScaleArbiter.Release(this); }
 
             if (DefeatOutro != null)

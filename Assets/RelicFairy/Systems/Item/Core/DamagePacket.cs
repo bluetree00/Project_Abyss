@@ -12,6 +12,10 @@ public struct DamagePacket
     public bool Negated;           // true면 데미지 0으로 처리
     public bool IsCrit;            // 크리티컬 발생 여부
 
+    // 11-02 Q29 한 타 보너스 장부 — 출처별 (곱 − 1). 피해는 예전처럼 FinalDamage에 곱하고(총합 · 적중 효과 그대로),
+    // 받는 쪽이 숫자만 출처별 「추가 피해」로 떼어 띄운다(DamageBonusSplit).
+    public float BonusRune, BonusAugment, BonusLegendary, BonusItem;
+
     public DamagePacket(float damage, GameObject attacker = null, GameObject target = null)
     {
         BaseDamage = damage;
@@ -20,7 +24,33 @@ public struct DamagePacket
         Target = target;
         Negated = false;
         IsCrit = false;
+        BonusRune = BonusAugment = BonusLegendary = BonusItem = 0f;
     }
+
+    /// <summary>장부에 적힌 보너스를 모두 곱한 배율(1 = 보너스 없음).</summary>
+    public float BonusProduct => (1f + BonusRune) * (1f + BonusAugment) * (1f + BonusLegendary) * (1f + BonusItem);
+
+    /// <summary>한 타 보너스를 곱하고 출처를 적는다 — 룬 · 증강 · 전설의 사전 보정은 FinalDamage에 직접 곱하지 말고 이것을 쓴다(11-02 Q29).</summary>
+    public void AddBonus(BonusSource src, float frac)
+    {
+        FinalDamage *= 1f + frac;
+        NoteBonus(src, frac);
+    }
+
+    /// <summary>다른 곳에서 이미 곱한 보너스의 출처만 적는다(④ 저스트가드처럼 FinalDamage를 읽은 뒤의 배율).</summary>
+    public void NoteBonus(BonusSource src, float frac)
+    {
+        if (frac <= 0f) return;   // 깎는 배율은 주 피해 몫
+        switch (src)
+        {
+            case BonusSource.Rune:      BonusRune      = Stack(BonusRune, frac);      break;
+            case BonusSource.Augment:   BonusAugment   = Stack(BonusAugment, frac);   break;
+            case BonusSource.Legendary: BonusLegendary = Stack(BonusLegendary, frac); break;
+            default:                    BonusItem      = Stack(BonusItem, frac);      break;
+        }
+    }
+
+    private static float Stack(float bonus, float frac) => (1f + bonus) * (1f + frac) - 1f;
 }
 
 /// <summary>

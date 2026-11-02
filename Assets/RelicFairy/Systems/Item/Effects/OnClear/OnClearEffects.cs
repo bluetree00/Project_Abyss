@@ -23,7 +23,7 @@ public sealed class HPRegenOnClearEffect : ItemEffectBase
         float amount = ctx.Player.RuntimeStats.MaxHp * _value;
         if (amount <= 0f) return;
         ctx.Player.RuntimeStats.AddShield(amount);
-        ItemGuide.Toast(ctx.Player.transform.position, $"보호막 +{(int)amount}");
+        ItemGuide.Toast(ctx.Player.transform.position, Loc.F("보호막 +{0}", (int)amount));
     }
 }
 
@@ -62,7 +62,7 @@ public sealed class HPRegenOnRecipeEffect : ItemEffectBase
         // 회복 → 보호막. 여긴 value가 고정값이라 비율로 읽지 않는다(사용 아이템 0종).
         if (_value <= 0f) return;
         ctx.Player.RuntimeStats.AddShield(_value);
-        ItemGuide.Toast(ctx.Player.transform.position, $"보호막 +{(int)_value}");
+        ItemGuide.Toast(ctx.Player.transform.position, Loc.F("보호막 +{0}", (int)_value));
     }
 }
 
@@ -141,7 +141,7 @@ public sealed class DefensePermStackEffect : ItemEffectBase
         if (stacks >= cap) return;
 
         mgr.SetPersistentStack(_stackKey, stacks + 1);
-        if (ctx.Player != null) ItemGuide.Toast(ctx.Player.transform.position, $"방어 +{_value} 중첩");
+        if (ctx.Player != null) ItemGuide.Toast(ctx.Player.transform.position, Loc.F("방어 +{0} 중첩", _value));
         Debug.Log($"[DefensePermStack] 방어력 +{_value} 영구 중첩 ({stacks + 1}/{cap})");
     }
 
@@ -163,7 +163,7 @@ public sealed class HPRegenOnBossEnterEffect : ItemEffectBase
         // 회복 → 보호막. 여긴 value가 고정값이라 비율로 읽지 않는다(사용 아이템 0종).
         if (_value <= 0f) return;
         ctx.Player.RuntimeStats.AddShield(_value);
-        ItemGuide.Toast(ctx.Player.transform.position, $"보스방 진입 — 보호막 +{(int)_value}");
+        ItemGuide.Toast(ctx.Player.transform.position, Loc.F("보스방 진입 — 보호막 +{0}", (int)_value));
     }
 }
 
@@ -188,7 +188,7 @@ public sealed class MaxHPDecreasePerRoomEffect : ItemEffectBase
         if (decrease <= 0) return;
 
         stats.DecreaseMaxHp(decrease);
-        ItemGuide.Toast(ctx.Player.transform.position, $"최대 체력 -{decrease}");
+        ItemGuide.Toast(ctx.Player.transform.position, Loc.F("최대 체력 -{0}", decrease));
         Debug.Log($"[MaxHPDecreasePerRoom] 최대 체력 -{decrease} (남은 {stats.MaxHp}, 하한 {floor})");
     }
 }

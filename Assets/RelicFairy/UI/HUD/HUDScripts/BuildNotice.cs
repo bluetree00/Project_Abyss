@@ -40,7 +40,7 @@ public readonly struct BuildNotice
         string bonus = BuildFamilyRules.StageBonusText(f, stage);
         if (bonus.StartsWith(label + " ")) bonus = bonus.Substring(label.Length + 1);   // 칩이 계열 이름을 이미 말한다
         return new BuildNotice(Kind.Imprint, "imprint." + f, label, BuildFamilyRules.ColorOf(f),
-            stage, BuildFamilyRules.Thresholds.Length, $"각인 {stage}단계", bonus, f, null, null);
+            stage, BuildFamilyRules.Thresholds.Length, Loc.F("각인 {0}단계", stage), bonus, f, null, null);
     }
 
     /// <summary>유물 진화 — 「유물 진화 「타오르는 정오」」 / 「몰아치는 빌드에 맞춘 진화」(문장 그림은 뷰가 유물에서 읽는다 · 10-22 E1 — 「각인 +2」를 걷고 동작 말로).</summary>
@@ -48,7 +48,7 @@ public readonly struct BuildNotice
     {
         if (d == null) return default;
         return new BuildNotice(Kind.Evolution, "evo", "유물 진화", BuildFamilyRules.ColorOf(d.Family), 0, 0,
-            $"<color={BuildFamilyRules.Hex(d.Family)}>「{d.Name}」</color>", $"{RelicEvolution.DirectionWord(d.Family)} 빌드에 맞춘 진화",
+            $"<color={BuildFamilyRules.Hex(d.Family)}>「{Loc.T(d.Name)}」</color>", Loc.F("{0} 진화", RelicEvolution.DirectionWord(d.Family)),   // 10-30 E-05 「빌드」를 걷었다(「연속 공격형 진화」)
             d.Family, null, d.Id);
     }
 
@@ -57,9 +57,9 @@ public readonly struct BuildNotice
     {
         var el   = ElementDef.GetById(zoneId);
         string name = TierName(zoneId, tier);
-        return new BuildNotice(Kind.Zone, "zone." + zoneId, el != null ? el.Name : zoneId,
+        return new BuildNotice(Kind.Zone, "zone." + zoneId, el != null ? Loc.T(el.Name) : zoneId,
             ElementDef.IdColor(zoneId, UITheme.Thin.Ink), tier, MaxZoneTier,
-            string.IsNullOrEmpty(name) ? $"존 {tier}단계" : $"존 {tier}단계 — {name}", null, BuildFamily.None, zoneId, null);
+            string.IsNullOrEmpty(name) ? Loc.F("존 {0}단계", tier) : Loc.F("존 {0}단계 — {1}", tier, name), null, BuildFamily.None, zoneId, null);
     }
 
     /// <summary>보류했다 보일 때 아직 참인가 — 룬판에서 놓았다 뺀 단계는 내지 않는다.</summary>
@@ -83,12 +83,13 @@ public readonly struct BuildNotice
         sorted.RemoveAll(e => e == null);
         sorted.Sort((a, b) => a.threshold.CompareTo(b.threshold));
         if (tier > sorted.Count) return null;
-        string desc = sorted[tier - 1].description;
+        string desc = Loc.T(sorted[tier - 1].description);
         if (string.IsNullOrEmpty(desc)) return null;
         int colon = desc.IndexOf(':');
         string head = (colon > 0 ? desc.Substring(0, colon) : desc).Trim();
         int sp = head.IndexOf("단계", System.StringComparison.Ordinal);
         if (sp >= 0) head = head.Substring(sp + 2).Trim();
+        else head = System.Text.RegularExpressions.Regex.Replace(head, @"^Tier\s*\d+\s*", string.Empty);   // 11-02 Q11 영어 「Tier N 이름」
         return head.Length > 0 ? head : null;
     }
 }

@@ -6,6 +6,9 @@ using Game.Inputs;
 // PlayerController — 입력 차단 채널 · 바인딩 · 명령 라우팅 · 이동 기준
 public sealed partial class PlayerController
 {
+    // ── Static ────────────────────────────────────────────────────
+    private static readonly Command[] s_dodgeOnly = { Command.Dodge };   // 회피는 버퍼 어디에 있든 꺼낸다(11-02 Q32 ①)
+
     // ── Public Methods: 입력 차단 채널 ────────────────────────────
     /// <summary>
     /// 플레이어 입력 전체를 활성/비활성화한다(컷신·연출 채널).
@@ -228,7 +231,8 @@ public sealed partial class PlayerController
         // 스킬 중 회피: 언제든 끊고 회피(10-23 사용자 「스킬들이 대시로 캔슬」 · 예전 결정 S2 「피해 뒤만」을 넓힘) —
         // 스킬은 누른 순간 쓴 것(쿨 · 유물 Q 소모 그대로) · 남은 타는 각 런타임 OnExit가 버린다. 못 끊는 구간(대검 R 공중)만 버퍼(0.4초)에 남긴다.
         if (isInSkill && SkillCancelLocked) return;
-        if (InputBuffer.TryConsume(Command.Dodge))
+        // 맨 앞 칸만 보면 스킬 중 미리 누른 다음 스킬(Q/E/R — 스킬 중엔 안 꺼낸다)이 앞에 남아 회피가 0.4초 묻혔다(11-02 Q32 ①)
+        if (InputBuffer.TryConsumeAny(s_dodgeOnly))
         {
             if (IsLaunched) return; // 날아가는 중엔 회피로 탈출 불가
 

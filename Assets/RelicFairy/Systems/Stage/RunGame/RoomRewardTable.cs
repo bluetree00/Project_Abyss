@@ -66,6 +66,7 @@ public static class RoomRewardTable
     // 10-29 사용자 「일반 드랍 전설룬의 확률은 좀 낮아야 — 그래야 정제소가 의미가 있다」: 전설 일반 2 → 1 · 정예 12 → 6(뺀 몫은 Epic · Rare로).
     private static readonly RarityWeights NormalWeights = new(58f, 31f, 10f, 1f);
     private static readonly RarityWeights EliteWeights  = new(0f, 55f, 39f, 6f);
+    private static readonly RarityWeights BossWeights   = new(0f, 0f, 80f, 20f);   // 11-02 Q25 보스 처치 구슬(정본 「보스 E80/L20」)
 
     // ── Public Methods ───────────────────────────────────────────
 
@@ -121,7 +122,7 @@ public static class RoomRewardTable
     /// 세이브(빌드마다 초기화되는 첫 회차 전부)에선 하한 Epic이 Rare로 접혀 <b>정예방과 같은 Rare 3장</b>이 나왔다.
     /// 정제소와 같은 예외 — 값을 치른 자리(원석 · 강적)는 잠긴 등급도 낸다. Legendary 잠금은 그대로 따른다(문이 약속한 것은 영웅).</para>
     /// </summary>
-    public static bool FloorIgnoresAltarLock(RoomPlanKind kind) => kind == RoomPlanKind.MidBoss;
+    public static bool FloorIgnoresAltarLock(RoomPlanKind kind) => kind == RoomPlanKind.MidBoss || kind == RoomPlanKind.Boss;   // 11-02 Q25 보스 처치 구슬도
 
     /// <summary>
     /// 룬 선택 창 확률 막대 값 — 방 가중을 하한까지 올리고(하한 밑 몫은 하한으로) 제단 잠금으로 접는다. 굴림(<see cref="RoomClearGate"/>)과 같은 규칙.
@@ -206,11 +207,12 @@ public static class RoomRewardTable
         // 후보는 다른 방과 같은 3장이다 — 룬 선택지를 3장으로 고정했다(10-01 사용자 결정, 예전 4장).
         // 10-15 사용자 「금화보다 재련소와 정제소의 재화를 높여야 — 도박하는 재미」: 원석 6 → 9 · 강화재료 2 → 4(확률은 낮췄다 · EnhanceTable D3)
         // 10-22 강화재료 4 → 3 — 재련에 확률이 없어져(10-18) 런 끝에 재료가 130 남았다(사용자 「예전처럼 많이 줄 필요 없다」).
-        RoomPlanKind.Elite => new Rule(1f, 3, ItemRarity.Rare, EliteWeights, ore: 9, enhanceMaterial: 3),
+        // 10-30 3 → 5 — 사용자 「전체적으로 재련석의 지급량을 좀 더 늘려」(재련 한 번 10부터 · 형이 재련 1 · 3회째에 붙는다)
+        RoomPlanKind.Elite => new Rule(1f, 3, ItemRarity.Rare, EliteWeights, ore: 9, enhanceMaterial: 5),
 
         // 정예 보스(10-12 「관문지기」) — 정예방 위 · 보스방 아래. Epic 하한 · 원석 12(= 정제 한 번) · 강화재료 4.
         // 그 챕터에서 빠진 전투 두 방 + 정예방 몫을 돌려주는 값이다(배치 설계 §5-2). 골드 · 정수는 처치 · 정수 적립이 맡는다.
-        RoomPlanKind.MidBoss => new Rule(1f, 3, ItemRarity.Epic, EliteWeights, ore: 16, enhanceMaterial: 5),   // 10-15 12 · 4 → 16 · 6 · 10-22 강화재료 6 → 5
+        RoomPlanKind.MidBoss => new Rule(1f, 3, ItemRarity.Epic, EliteWeights, ore: 16, enhanceMaterial: 7),   // 10-15 12 · 4 → 16 · 6 · 10-22 강화재료 6 → 5 · 10-30 5 → 7
 
         // [제거됨 2026-08-12] PreBoss 규칙 —
         // 보스 전 통로는 전 챕터 grid_csv에 스포너가 0개다. 그래서 AttachRoomClearController가
@@ -220,6 +222,10 @@ public static class RoomRewardTable
         // PreBoss는 결전 직전 숨 고르는 순수 통로로 확정한다 — 보상을 주려면 방 데이터에
         // 스포너를 넣어 전투방으로 만들거나, 별도 지급 경로를 세우는 쪽이 정본이다.
 
+        // 보스(11-02 Q25 사용자 「보스를 잡을 때 드랍이 더 좋아야」) — 다음 챕터가 있는 보스만 유물 기억 카드 뒤 쓰러진 자리에 구슬(RoomClearGate.SpawnBossRewardAsync).
+        // Epic 하한(제단 잠금보다 앞섬) · 정예 보스(16 · 7) 위 연료. 골드 · 정수는 처치 · 정수 적립(230)이 맡는다.
+        RoomPlanKind.Boss => new Rule(1f, 3, ItemRarity.Epic, BossWeights, ore: 20, enhanceMaterial: 10),
+
         // 이벤트 — 확정 보상. 등급/개수는 챌린지 성과(ChallengeRewardTable)가 따로 덮어쓴다.
         RoomPlanKind.Event => new Rule(1f, 3, null, NormalWeights, ore: 6, enhanceMaterial: 0),   // 10-15 원석 4 → 6(강화재료는 챌린지 성과)
 
@@ -227,7 +233,8 @@ public static class RoomRewardTable
         // 확정 드롭 — 예전 0.6 고정은 "방을 깼는데 아무것도 안 나오는" 40%를 만들었고,
         // 그 구간이 런 내 도파민의 가장 큰 구멍이었다(§2-2 원칙 2 "바닥은 안전").
         // 10-15: 원석 4 → 6 · 강화재료 0 → 2 — 강화재료가 이벤트 방에만 몰려 런마다 편차가 컸다. 10-22 강화재료 2 → 1(0으로 돌리지 않는다 — 편차).
-        _ => new Rule(1f, 3, null, NormalWeights, ore: 6, enhanceMaterial: 1),
+        // 10-30 1 → 2(사용자 「재련석 지급량을 좀 더 늘려」).
+        _ => new Rule(1f, 3, null, NormalWeights, ore: 6, enhanceMaterial: 2),
     };
 
     /// <summary>드롭 발생 여부 추첨.</summary>

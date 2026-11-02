@@ -210,11 +210,11 @@ public class LichFinalMagicState : UnInterruptibleState<LichFinalMagicPatternSO>
         _ignited++;
         LichSfx.Play(LichSfxSlot.SealComplete, stone.transform.position, 0.6f);
         LichPatternUtil.Impact(LichImpact.Heavy);
-        UI_BossBark.Show($"봉인 사슬 ({_ignited} / {StoneCount})", BossBarkType.PatternAnnounce);
+        UI_BossBark.Show(Loc.F("봉인 사슬 ({0} / {1})", _ignited, StoneCount), BossBarkType.PatternAnnounce);
     }
 
     private void RefreshHud()
-        => _hud?.SetStatus($"봉인석 {_ignited} / {StoneCount} · 남은 시간 {Mathf.Max(0f, Data.channelSeconds - _timer):0}초");
+        => _hud?.SetStatus(Loc.F("봉인석 {0} / {1} · 남은 시간 {2:0}초", _ignited, StoneCount, Mathf.Max(0f, Data.channelSeconds - _timer)));
 
     /// <summary>방해 — 하늘에서 제단 잔해(플레이어 자리 + 코어 어딘가).</summary>
     private void DropDebris(MonsterContext ctx)

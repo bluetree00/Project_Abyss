@@ -48,7 +48,7 @@ public class UI_Button : UI_Popup
     public void OnButtonClicked(PointerEventData data)
     {
         _score++;
-        GetText((int)Texts.ScoreText).text = $"점수 : {_score}";
+        GetText((int)Texts.ScoreText).text = Loc.F("점수 : {0}", _score);
     }
 
 }

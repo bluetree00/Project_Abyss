@@ -261,13 +261,13 @@ public class UI_RangedForgePopup : UI_Popup
         icon.enabled = w.icon != null;   // 아이콘이 없는 무기는 흰 네모 대신 빈 홀더로
         icon.color   = w.icon != null ? Color.white : new Color(1f, 1f, 1f, 0.12f);
 
-        name.text  = w.displayName;
+        name.text  = Loc.T(w.displayName);
         name.color = e.Locked ? LockColor : BodyColor;   // 이름은 잉크 — 금은 누를 것에만
 
         badge.gameObject.SetActive(e.Locked || reserveBadge);
         badge.text = e.Locked ? "■ " + (string.IsNullOrEmpty(e.LockReason) ? "잠금" : e.LockReason) : string.Empty;
 
-        tag.text   = w.tagline ?? string.Empty;
+        tag.text   = Loc.T(w.tagline) ?? string.Empty;
         tag.color  = e.Locked ? LockColor : SubColor;
 
         stats.text = e.Locked ? "<size=17><color=#8A6B6B>기억의 제단에서 해금하는 무기</color></size>" : StatBlock(w);

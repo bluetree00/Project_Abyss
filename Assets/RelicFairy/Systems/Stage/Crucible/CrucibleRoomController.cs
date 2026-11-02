@@ -82,8 +82,8 @@ public class CrucibleRoomController : MonoBehaviour
     public string EventBanner => _event switch
     {
         CrucibleEvent.Discount => "↗ 반값 재련! 지금 안 두드리면 손해지…",
-        CrucibleEvent.Fever    => "▲ 열기 오른 화로 — 이번 방문 카드 +1장!",
-        CrucibleEvent.Bounty   => "◆ 풍요로운 화로 — 다시 뽑기 +1!",
+        CrucibleEvent.Fever    => "▲ 열기 오른 화로 — 재련 카드가 1장 더 나온다!",   // 10-30 X-02 「카드」가 재련 카드라는 말이 없었다
+        CrucibleEvent.Bounty   => "◆ 풍요로운 화로 — 재련 카드 다시 뽑기 +1회!",      // 10-30 X-01 무엇을 다시 뽑는지
         _                      => string.Empty,
     };
 
@@ -100,8 +100,8 @@ public class CrucibleRoomController : MonoBehaviour
     public string EventEffectDesc => _event switch
     {
         CrucibleEvent.Discount => "재련 비용 50%",
-        CrucibleEvent.Fever    => "고르는 카드 +1장",
-        CrucibleEvent.Bounty   => "다시 뽑기 +1",
+        CrucibleEvent.Fever    => "재련 카드가 1장 더 나온다",   // 10-30 X-02
+        CrucibleEvent.Bounty   => "재련 카드 다시 뽑기 +1회",   // 10-30 X-01
         _                      => string.Empty,
     };
 
@@ -249,7 +249,7 @@ public class CrucibleRoomController : MonoBehaviour
         {
             var rw = GetSlot(PlayerWeaponManager.Slot1);
             if (rw == null || !SkillTierResolver.IsRanged(rw)) { reason = "원거리 무기가 없다"; return false; }
-            if (!RangedPartsDraft.HasCandidates(RangedPartsState.Current)) { reason = $"열린 파츠가 모두 Lv{RangedPartsDraft.PartCap}이다 · 다른 파츠는 기억의 제단에서 연다"; return false; }   // 10-23 W6 — 제단에서 연 파츠만 재련(c1 RangedPartsDraft.IsUnlocked)
+            if (!RangedPartsDraft.HasCandidates(RangedPartsState.Current)) { reason = Loc.F("열린 파츠가 모두 Lv{0}이다 · 다른 파츠는 기억의 제단에서 연다", RangedPartsDraft.PartCap); return false; }   // 10-23 W6 — 제단에서 연 파츠만 재련(c1 RangedPartsDraft.IsUnlocked)
         }
         else if (!WeaponReforgeService.CanReforgeMelee(GetSlot(PlayerWeaponManager.Slot0), _table)) { reason = "이미 최대 강화"; return false; }
         if (FuelAmount < ReforgeCost(ranged)) { reason = "재료가 모자란다"; return false; }
@@ -423,7 +423,7 @@ public class CrucibleRoomController : MonoBehaviour
     private void HandleRoomRevealed(GameObject room)
     {
         if (room == null || !transform.IsChildOf(room.transform) || !HasEvent) return;
-        RoomEventNotice.Raise(EventTitle, $"{EventEffectDesc} — 이 방에서만");
+        RoomEventNotice.Raise(EventTitle, Loc.F("{0} — 이 방에서만", Loc.T(EventEffectDesc)));
         if (_chatter != null) _chatter.ShoutFirst(EventShout);
     }
 

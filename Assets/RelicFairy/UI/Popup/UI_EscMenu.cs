@@ -22,7 +22,7 @@ public sealed class UI_EscMenu : MonoBehaviour
     // 10-11 위계 개편(리서치 C §6 「고칠 값」) — 66px 베벨 · 간격 16 → 48px 평판 · 간격 8, 고른 줄은 위아래 1px 금 띠(RoR2 일시정지).
     // 세로 = 위 여백 30 + 제목 44 + 24 + 버튼 5개(5×48 + 4×8 = 272) + 아래 여백 30 = 400.
     // 버튼을 늘리거나 줄이면 PanelH도 ±(BtnH + BtnGap) 해야 여백 대칭이 유지된다.
-    private const float PanelW = 420f, PanelH = 512f;   // 10-13 「장비」 · 10-14 「업적」 버튼 하나씩 더(+BtnH + BtnGap)
+    private const float PanelW = 420f, PanelH = 568f;   // 11-02 Q2 「도감」 하나 더(+BtnH + BtnGap)   // 10-13 「장비」 · 10-14 「업적」 버튼 하나씩 더(+BtnH + BtnGap)
     private const float BtnW   = 320f, BtnH   = 48f, BtnGap = 8f;
     private const float PadY   = 30f, TitleH = 44f, TitleGap = 24f;
     private const float TitleSize = 32f, LabelSize = 22f;
@@ -39,6 +39,7 @@ public sealed class UI_EscMenu : MonoBehaviour
     private GameObject    _root;
     private RectTransform _panel;
     private bool          _quitting;
+    private UI_CodexPage       _codexPage;    // 11-02 Q2 「도감」 — 룬 · 증강 · 서약 · 유물 기억(지금 · 써 봄)
     private UI_RelicMemoryPage _memoryPage;   // 「되찾은 기억」 — 보유 유물 조각 보기(유물 성장 v2 §6-5)
     private UI_EquipmentPage   _equipPage;    // 「장비」 — 무기 두 칸 · 강화 · 형 · 스킬 단계(10-13 4b 요청 8)
     private TMP_Text      _lobbyLabel;
@@ -48,6 +49,9 @@ public sealed class UI_EscMenu : MonoBehaviour
     public bool IsOpen => _root != null && (_root.TryGetComponent<UIFader>(out var f) ? f.Visible : _root.activeSelf);
 
     // ── Lifecycle ────────────────────────────────────────────
+    private void OnEnable()  => Loc.LanguageChanged += Relabel;   // 11-02 Q11
+    private void OnDisable() => Loc.LanguageChanged -= Relabel;
+
     private void OnDestroy()
     {
         // 강제 파괴(씬 전환 등)에도 timeScale이 0으로 남지 않게. Release는 멱등이다.
@@ -71,6 +75,7 @@ public sealed class UI_EscMenu : MonoBehaviour
         DisarmLobby();
         CloseMemoryPage();
         CloseEquipPage();
+        CloseCodexPage();
         if (_root != null) UIFader.On(_root, _panel).Hide();
         TimeScaleArbiter.Release(this);
     }
@@ -79,10 +84,12 @@ public sealed class UI_EscMenu : MonoBehaviour
     public void HandleEscape()
     {
         bool page = (_memoryPage != null && _memoryPage.gameObject.activeSelf)
-                 || (_equipPage  != null && _equipPage.gameObject.activeSelf);
+                 || (_equipPage  != null && _equipPage.gameObject.activeSelf)
+                 || (_codexPage  != null && _codexPage.gameObject.activeSelf);
         if (!page) { Close(); return; }
         CloseMemoryPage();   // 10-29 닫기 소리는 쪽 닫기가 한 번 낸다
         CloseEquipPage();
+        CloseCodexPage();
     }
 
     // ── Private Methods ──────────────────────────────────────
@@ -120,7 +127,7 @@ public sealed class UI_EscMenu : MonoBehaviour
         _panel = prt;
 
         // 제목 — DNF는 이 한 줄에만(가짜 굵게 없음, 부드러운 그림자는 StyleText).
-        UITheme.StyleText(NewLabel("Title", panel.transform, "일시정지", TitleSize, TitleColor,
+        UITheme.StyleText(NewLabel("Title", panel.transform, Loc.T("일시정지"), TitleSize, TitleColor,
                  new Vector2(0f, PanelH * 0.5f - PadY - TitleH * 0.5f), new Vector2(PanelW - 40f, TitleH)), TitleColor);
 
         // 첫 버튼 중심 y — 위 여백 · 제목 · 간격을 뺀 자리에서 버튼 반 높이만큼 내려온다(아래 여백도 PadY로 같다).
@@ -129,11 +136,12 @@ public sealed class UI_EscMenu : MonoBehaviour
         NewButton(panel.transform, "계속하기",   new Vector2(0f, top),            PlateCta,    UITheme.Thin.Gold,   OnResume);
         NewButton(panel.transform, "되찾은 기억", new Vector2(0f, top - step),     PlateIdle,   LabelColor,          OnMemory);
         NewButton(panel.transform, "장비",       new Vector2(0f, top - step * 2f), PlateIdle,   LabelColor,          OnEquipment);
-        NewButton(panel.transform, "업적",       new Vector2(0f, top - step * 3f), PlateIdle,   LabelColor,          OnAchievements);
-        NewButton(panel.transform, "설정",       new Vector2(0f, top - step * 4f), PlateIdle,   LabelColor,          OnSettings);
-        NewButton(panel.transform, "로비로 가기", new Vector2(0f, top - step * 5f), PlateIdle,   LabelColor,          OnLobby);
+        NewButton(panel.transform, "도감",       new Vector2(0f, top - step * 3f), PlateIdle,   LabelColor,          OnCodex);
+        NewButton(panel.transform, "업적",       new Vector2(0f, top - step * 4f), PlateIdle,   LabelColor,          OnAchievements);
+        NewButton(panel.transform, "설정",       new Vector2(0f, top - step * 5f), PlateIdle,   LabelColor,          OnSettings);
+        NewButton(panel.transform, "로비로 가기", new Vector2(0f, top - step * 6f), PlateIdle,   LabelColor,          OnLobby);
         _lobbyLabel = panel.transform.Find("Btn_로비로 가기/Label")?.GetComponent<TMP_Text>();
-        NewButton(panel.transform, "게임 종료",   new Vector2(0f, top - step * 6f), PlateDanger, UITheme.Thin.Danger, OnQuit);
+        NewButton(panel.transform, "게임 종료",   new Vector2(0f, top - step * 7f), PlateDanger, UITheme.Thin.Danger, OnQuit);
     }
 
     private static void Stretch(RectTransform rt)
@@ -198,8 +206,22 @@ public sealed class UI_EscMenu : MonoBehaviour
         img.gameObject.AddComponent<UIButtonFeedback>();
         img.gameObject.AddComponent<SelectBand>().Init(Band(rt, "BandTop", 1f), Band(rt, "BandBottom", 0f));
 
-        var t = NewLabel("Label", img.transform, label, LabelSize, ink, Vector2.zero, new Vector2(BtnW, BtnH));
+        var t = NewLabel("Label", img.transform, Loc.T(label), LabelSize, ink, Vector2.zero, new Vector2(BtnW, BtnH));   // 이름(Btn_한글)은 그대로 — Relabel이 찾는다
         UITheme.StyleThinText(t, UIWeight.Medium, LabelSize, ink);
+    }
+
+    /// <summary>11-02 Q11 언어가 바뀌면 제목 · 단추 글을 다시 쓴다 — 단추 이름(Btn_한글 원문)이 열쇠다.</summary>
+    private void Relabel()
+    {
+        if (_panel == null) return;
+        foreach (var t in _panel.GetComponentsInChildren<TMP_Text>(true))
+        {
+            var parent = t.transform.parent;
+            if (t.name == "Title") t.text = Loc.T("일시정지");
+            else if (t.name == "Label" && parent != null && parent.name.StartsWith("Btn_")) t.text = Loc.T(parent.name.Substring(4));
+        }
+        if (_lobbyArmed) DisarmLobby();
+        if (_codexPage != null && !_codexPage.gameObject.activeSelf) { Destroy(_codexPage.gameObject); _codexPage = null; }   // 도감은 지을 때 글을 쓴다 — 다음 열 때 새로
     }
 
     /// <summary>버튼 위(y=1) · 아래(y=0) 가장자리에 붙는 1px 금 띠. 처음엔 투명.</summary>
@@ -219,7 +241,7 @@ public sealed class UI_EscMenu : MonoBehaviour
     private void DisarmLobby()
     {
         _lobbyArmed = false;
-        if (_lobbyLabel != null) _lobbyLabel.text = "로비로 가기";
+        if (_lobbyLabel != null) _lobbyLabel.text = Loc.T("로비로 가기");
     }
 
     private void CloseEquipPage()
@@ -227,6 +249,14 @@ public sealed class UI_EscMenu : MonoBehaviour
         if (_equipPage == null || !_equipPage.gameObject.activeSelf) return;
         Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);   // 10-29 UI 소리 — 쪽 닫기(돌아가기 · ESC 어느 길이든 한 번)
         _equipPage.Close();
+        if (_panel != null) _panel.gameObject.SetActive(true);
+    }
+
+    private void CloseCodexPage()
+    {
+        if (_codexPage == null || !_codexPage.gameObject.activeSelf) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);
+        _codexPage.Close();
         if (_panel != null) _panel.gameObject.SetActive(true);
     }
 
@@ -250,6 +280,16 @@ public sealed class UI_EscMenu : MonoBehaviour
         Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
         Close();
         UI_AwakeningPanel.OpenAchievementsAsync(readOnlyView: true).Forget();
+    }
+
+    // 11-02 Q2 일시정지 패널 자리에 「도감」 쪽을 연다(같은 캔버스 · 같은 정지). 돌아가기 · ESC로 패널이 돌아온다.
+    private void OnCodex()
+    {
+        if (_root == null) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.EscMemoryPage);
+        _codexPage ??= UI_CodexPage.Create(_root.transform, CloseCodexPage);
+        _panel.gameObject.SetActive(false);
+        _codexPage.Open();
     }
 
     // 일시정지 패널 자리에 「되찾은 기억」 쪽을 연다(같은 캔버스 · 같은 정지). 돌아가기로 패널이 돌아온다.
@@ -283,7 +323,7 @@ public sealed class UI_EscMenu : MonoBehaviour
         {
             _lobbyArmed = true;
             Managers.Sound?.PlayUiEvent(SoundEvent.UiClick);
-            if (_lobbyLabel != null) _lobbyLabel.text = "런 포기 — 한 번 더";
+            if (_lobbyLabel != null) _lobbyLabel.text = Loc.T("런 포기 — 한 번 더");
             return;
         }
 

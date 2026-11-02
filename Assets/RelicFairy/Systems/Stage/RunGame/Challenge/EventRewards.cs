@@ -80,7 +80,7 @@ public static class EventRewards
         string k = poolKey?.ToLowerInvariant() ?? string.Empty;
         var run = GameRunBootstrapper.Instance?.Run;
         if (k.Contains("barrage")) return "탄막의 회랑";
-        if (k.Contains("memory"))  return "룬 기억";
+        if (k.Contains("memory"))  return "발판 순서 외우기";   // 10-30 「룬 기억」 — 룬을 주는 방 · 「유물 기억」으로 읽혔다(보상은 증강 다시 뽑기 · 원석)
         if (k.Contains("greed"))   return "욕심의 상자";
         if (k.Contains("sacrifice") && SacrificeAltarChallenge.CanPayAny(run)) return "제물 제단";
         if (k.Contains("sacrifice") || k.Contains("oracle")) return "신탁의 갈림길";
@@ -92,23 +92,27 @@ public static class EventRewards
 
     /// <summary>
     /// 이벤트방 문 배지 둘째 줄 — <b>보상 먼저</b>(금빛) · 하는 일(10-29 「시험 · 선택」 → 「보상 정수 · 20초 피하기」).
+    /// 10-30 사용자 「컨셉 대사처럼이 아닌 직관적인 설명 글」 — 무엇을 받고 무엇을 하는지를 처음 하는 사람이 한 줄로 알게(구현설계/글_쉬운말_점검_20261030.md R-01~R-06).
+    /// 숫자는 그 방 코드 값을 읽는다(보물 창고 시간 · 상자 수 · 제단 금화).
     /// </summary>
     public static string Badge(string poolKey)
     {
         string k = poolKey?.ToLowerInvariant() ?? string.Empty;
         var run = GameRunBootstrapper.Instance?.Run;
         if (k.Contains("barrage")) return Line("정수", "20초 피하기");
-        if (k.Contains("memory"))  return Line(HasMeleeWeapon(run) ? "증강 다시 뽑기" : "원석", "순서 외우기");
-        if (k.Contains("greed"))   return Line("금화", "열다가 멈추기");
-        if (k.Contains("sacrifice") && SacrificeAltarChallenge.CanPayAny(run)) return Line("유물 기억", "물약 · 금화를 바친다");
+        if (k.Contains("memory"))  return Line(HasMeleeWeapon(run) ? "근접 증강 카드 다시 뽑기" : "원석", "빛난 순서대로 밟기");   // 10-30 제목이 「발판 순서 외우기」라 하는 일은 겹치지 않게
+        if (k.Contains("greed"))   return Line("금화", "상자를 열수록 금화가 늘고 실패하면 물린다");
+        if (k.Contains("sacrifice") && SacrificeAltarChallenge.CanPayAny(run))
+            return Line("유물 기억 카드", Loc.F("물약 1개나 금화 {0}을 낸다", SacrificeAltarChallenge.GoldCost(run)));   // 10-30 둘 다 내는 것처럼 읽혔다
         if (k.Contains("sacrifice") || k.Contains("oracle")) return Line("강화재료 · 금화 · 정수", "하나를 고른다");
-        if (k.Contains("vault") || k.Contains("treasure"))  return Line("금화 · 강화재료 · 정수", "15초 상자 열기");
-        if (k.Contains("sanctum")) return Line("서약", "하나를 맺는다");
+        if (k.Contains("vault") || k.Contains("treasure"))   // 10-31 제한 시간은 방마다 길이로 정한다(달리기만으론 모자라게)
+            return Line("금화 · 강화재료 · 정수", Loc.F("빠듯한 시간 안에 상자 {0}개를 차례로 열기 · 바람 문양을 밟아야 닿는다", TreasureVaultChallenge.ChestCount));
+        if (k.Contains("sanctum")) return Line("서약서 한 줄", "제단에서 서약을 쓴다(이미 있으면 잇는다)");
         if (k.Contains("gamble"))  return Line("룬", "상자 도박");
         return Line("룬 · 강화재료", "성적만큼");   // 옛 전투형 — 룬 고르기 + 강화재료(ChallengeRewardTable)
     }
 
-    private static string Line(string reward, string doing) => $"보상 <color={RewardHex}>{reward}</color> · {doing}";
+    private static string Line(string reward, string doing) => $"{Loc.T("보상")} <color={RewardHex}>{Loc.T(reward)}</color> · {Loc.T(doing)}";   // 11-02 Q11
 
     // ── Private Methods ────────────────────────────────────────
     private static int Grade(ChallengeGrade g) => Mathf.Clamp((int)g, 0, 4);

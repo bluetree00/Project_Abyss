@@ -108,6 +108,6 @@ public static class EraBalance
     public static string Describe(StoryEra era)
     {
         var s = For(era);
-        return $"{era} — 스탯×{s.StatScale:0.##} · 수량×{s.CountScale:0.##} · 정예+{s.EliteBonus:0.##} · 룬 등급 +{s.RarityStep}단 · 연료×{s.FuelScale:0.##} · 골드×{s.GoldScale:0.##} · 놀이 시간×{s.EventTimeScale:0.##} · 두 번째 파도 {s.ExtraWaveChance:P0}";
+        return Loc.F("{0} — 스탯×{1:0.##} · 수량×{2:0.##} · 정예+{3:0.##} · 룬 등급 +{4}단 · 연료×{5:0.##} · 골드×{6:0.##} · 놀이 시간×{7:0.##} · 두 번째 파도 {8:P0}", era, s.StatScale, s.CountScale, s.EliteBonus, s.RarityStep, s.FuelScale, s.GoldScale, s.EventTimeScale, s.ExtraWaveChance);
     }
 }

@@ -12,4 +12,6 @@ public enum DamageKind
     Synergy = 1,
     /// <summary>화상·독 등 지속 피해(DoT) 틱.</summary>
     Dot = 2,
+    /// <summary>룬 · 증강 · 전설의 한 타 보너스 몫 — 주 피해와 한 번에 들어가고 숫자만 따로 뜬다(11-02 Q29 · <see cref="DamageBonusSplit"/>).</summary>
+    Bonus = 3,
 }

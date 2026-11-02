@@ -47,7 +47,7 @@ public class LoginBase : MonoBehaviour
     {
         if ( fieId.Trim().Equals(""))
         {
-            GuideForIncorrectlyEnteredData(image, $"\"{result}\"필드를 채워주세요.");
+            GuideForIncorrectlyEnteredData(image, Loc.F("\"{0}\"필드를 채워주세요.", result));
 
             return true; // 필드 데이터가 비어있음
         }

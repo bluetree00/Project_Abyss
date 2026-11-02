@@ -152,9 +152,9 @@ public sealed class AltarTreePresenter
 
         d.NodeId    = node.Id;
         d.Header    = node.RequiredPoints > 0
-            ? $"{MemoryAltarCatalog.BranchLabel(node.Branch)} · {node.RequiredPoints}포인트 고리"
-            : $"{MemoryAltarCatalog.BranchLabel(node.Branch)} · 첫 고리";
-        d.Name      = node.IsLeveled ? $"{node.DisplayName}   Lv {s.Level}/{s.MaxLevel}" : node.DisplayName;
+            ? Loc.F("{0} · {1}포인트 고리", MemoryAltarCatalog.BranchLabel(node.Branch), node.RequiredPoints)
+            : Loc.F("{0} · 첫 고리", MemoryAltarCatalog.BranchLabel(node.Branch));
+        d.Name      = node.IsLeveled ? $"{Loc.T(node.DisplayName)}   Lv {s.Level}/{s.MaxLevel}" : Loc.T(node.DisplayName);
         d.SizeBadge = node.IsLeveled ? "강화" : node.Size switch { AltarNodeSize.Keystone => "열쇠", AltarNodeSize.Small => "작은 넓힘", _ => "" };
         // 강화 노드 = 「지금 → 다음」(10-14 강화형) · 다 올렸으면 지금 값만
         d.Effect    = !node.IsLeveled ? node.Description
@@ -190,14 +190,14 @@ public sealed class AltarTreePresenter
         else if (s.BlockedByChain)
         {
             d.ButtonLabel = "앞 노드 먼저";
-            d.Reason      = s.MissingParent != null ? $"「{s.MissingParent.DisplayName}」을 먼저 연다" : "";
+            d.Reason      = s.MissingParent != null ? Loc.F("「{0}」을 먼저 연다", Loc.T(s.MissingParent.DisplayName)) : "";
         }
         else if (s.BlockedByPoints)
         {
             // 10-14 세피리아식 — 그 갈래에 포인트(산 단계 수)를 더 쓰면 열린다
             string branch = MemoryAltarCatalog.BranchLabel(node.Branch);
-            d.ButtonLabel = $"{branch} {s.RequiredPoints}포인트부터";
-            d.Reason      = $"{branch} 갈래에 {s.RequiredPoints}포인트를 쓰면 열린다 — 지금 {s.BranchPoints}포인트";
+            d.ButtonLabel = Loc.F("{0} {1}포인트부터", branch, s.RequiredPoints);
+            d.Reason      = Loc.F("{0} 갈래에 {1}포인트를 쓰면 열린다 — 지금 {2}포인트", branch, s.RequiredPoints, s.BranchPoints);
         }
         else if (s.BlockedByRequirement)
         {
@@ -207,8 +207,8 @@ public sealed class AltarTreePresenter
         else if (s.CanBuy)
         {
             d.ButtonLabel   = readOnly ? "제단에서 해금"
-                            : node.IsLeveled ? $"강화  Lv {s.Level + 1}   {s.Cost:N0} ◆"
-                            : $"해금   {s.Cost:N0} ◆";
+                            : node.IsLeveled ? Loc.F("강화  Lv {0}   {1:N0} ◆", s.Level + 1, s.Cost)
+                            : Loc.F("해금   {0:N0} ◆", s.Cost);
             d.ButtonEnabled = !readOnly;
             d.Reason        = readOnly ? "로비에서는 볼 수만 있다" : "";
             d.Cost          = s.Cost;
@@ -217,7 +217,7 @@ public sealed class AltarTreePresenter
         else
         {
             d.ButtonLabel = "정수 부족";
-            d.Reason      = $"{s.Cost - essence:N0} 모자람";
+            d.Reason      = Loc.F("{0:N0} 모자람", s.Cost - essence);
         }
         return d;
     }
@@ -249,12 +249,12 @@ public sealed class AltarTreePresenter
     private static string CostLine(MemoryAltarNode node, in AltarNodeState s)
     {
         if (s.Maxed) return node.IsLeveled ? "<color=#63D9BF>최대 단계</color>" : "<color=#63D9BF>해금됨</color>";
-        if (s.Level > 0) return $"다음 단계  {s.Cost:N0} ◆";
+        if (s.Level > 0) return Loc.F("다음 단계  {0:N0} ◆", s.Cost);
         if (!node.HasCondition || node.ConditionRequired || node.DiscountCost == node.BaseCost)
             return $"{s.Cost:N0} ◆";
         return s.ConditionMet
             ? $"<color=#8A8594><s>{node.BaseCost:N0}</s></color>   {node.DiscountCost:N0} ◆"
-            : $"{node.BaseCost:N0} ◆   <color=#8A8594>조건을 이루면 {node.DiscountCost:N0}</color>";
+            : Loc.F("{0:N0} ◆   <color=#8A8594>조건을 이루면 {1:N0}</color>", node.BaseCost, node.DiscountCost);
     }
 
     private static string ConditionLine(MemoryAltarNode node, in AltarNodeState s)
@@ -263,10 +263,10 @@ public sealed class AltarTreePresenter
         if (!node.HasCondition) return node.RequiredPoints > 0 ? "" : "<color=#8A8594>조건 없음 — 언제든 열 수 있다</color>";
         if (node.ConditionRequired)
             return s.ConditionMet
-                ? $"<color=#63D9BF>◆</color> 선행 조건 · {node.ConditionLabel}"
-                : $"선행 조건 · {node.ConditionLabel}   <color=#E8C07A>{s.Progress}/{s.Target}</color>";
+                ? Loc.F("<color=#63D9BF>◆</color> 선행 조건 · {0}", node.ConditionLabel)
+                : Loc.F("선행 조건 · {0}   <color=#E8C07A>{1}/{2}</color>", node.ConditionLabel, s.Progress, s.Target);
         return s.ConditionMet
-            ? $"<color=#63D9BF>◆</color> {node.ConditionLabel} — 할인 적용"
-            : $"할인 조건 · {node.ConditionLabel}   <color=#E8C07A>{s.Progress}/{s.Target}</color>";
+            ? Loc.F("<color=#63D9BF>◆</color> {0} — 할인 적용", node.ConditionLabel)
+            : Loc.F("할인 조건 · {0}   <color=#E8C07A>{1}/{2}</color>", node.ConditionLabel, s.Progress, s.Target);
     }
 }

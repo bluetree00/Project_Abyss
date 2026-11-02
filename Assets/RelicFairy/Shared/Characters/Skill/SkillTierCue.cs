@@ -19,7 +19,7 @@ public static class SkillTierCue
         int i = slot == SkillType.E ? 0 : 1;
         if (tier <= Mathf.Max(1, shown[i])) return;
         shown[i] = tier;
-        RelicFloatText.Show(player.transform.position, $"{skill.skillName} {tier}단계", TextColor);
+        RelicFloatText.Show(player.transform.position, Loc.F("{0} {1}단계", Loc.T(skill.skillName), tier), TextColor);
         Managers.Sound?.PlayEvent(SoundEvent.SkillTierUp);
     }
 }

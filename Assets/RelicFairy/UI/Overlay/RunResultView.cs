@@ -195,8 +195,8 @@ public sealed class RunResultView : MonoBehaviour
                 if (g.CombatSeconds > 0)
                     Text(nrt, "Combat", x + 12f, TimelineY + 36f, 200f, 24f, UITheme.Thin.Small, UIWeight.Regular, UITheme.Thin.InkA(0.55f))
                         .text = string.IsNullOrEmpty(g.Grade)
-                            ? $"전투 {RunResultPresenter.FormatTime(g.CombatSeconds)}"
-                            : $"전투 {RunResultPresenter.FormatTime(g.CombatSeconds)} · {g.Grade}";
+                            ? Loc.F("전투 {0}", RunResultPresenter.FormatTime(g.CombatSeconds))
+                            : Loc.F("전투 {0} · {1}", RunResultPresenter.FormatTime(g.CombatSeconds), g.Grade);
             }
             _nodes.Add(((x - L) / width, node));
             x += widths[i];
@@ -308,7 +308,7 @@ public sealed class RunResultView : MonoBehaviour
         float boardW = BuildBoard(p, x, by + 28f, 190f, 140f);
         float bx = x + boardW + 24f;
         Text(p, "BoardCount", bx, by + 28f, ColW - boardW - 24f, 28f, UITheme.Thin.Lead, UIWeight.Regular, UITheme.Thin.InkA(0.8f))
-            .text = _snap.RuneCount > 0 ? $"룬 {_snap.RuneCount}개  ·  {_snap.BoardFilled} / {_snap.BoardTotal}칸" : "룬 없음";
+            .text = _snap.RuneCount > 0 ? Loc.F("룬 {0}개  ·  {1} / {2}칸", _snap.RuneCount, _snap.BoardFilled, _snap.BoardTotal) : "룬 없음";
         float cx = bx, cy = by + 64f;
         foreach (var (el, tier) in _snap.Synergies)
         {
@@ -330,8 +330,8 @@ public sealed class RunResultView : MonoBehaviour
         {
             var first = _snap.Covenants[0];
             cov.text = RunResultPresenter.CovenantRich(first);
-            string more = _snap.Covenants.Count > 1 ? $"  ·  외 {_snap.Covenants.Count - 1}개" : string.Empty;
-            sub.text = $"{first.Cause}  ·  발동 {_snap.CovenantFires:N0}회{more}";
+            string more = _snap.Covenants.Count > 1 ? Loc.F("  ·  외 {0}개", _snap.Covenants.Count - 1) : string.Empty;
+            sub.text = Loc.F("{0}  ·  발동 {1:N0}회{2}", first.Cause, _snap.CovenantFires, more);
         }
     }
 

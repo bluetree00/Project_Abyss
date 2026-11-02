@@ -5,7 +5,6 @@ using UnityEngine;
 /// <summary>
 /// 10-13 「되살아난 기억 · 되찾은 기억」 스킨(<see cref="RelicPartDraftSkinSO"/>)을 만들고 Addressables에 <c>UI/RelicPartDraftSkin</c>으로 등록한 뒤
 /// Artsystack 그림을 건다(분석 문서 §3-6 · §4-3). 카드 테(cardFrame)는 비워 둔다 — 등급 테 3단은 코드가 그린다(얇은 v2 경로 유지).
-/// 시작 파츠 창(<see cref="UI_StartPartPopup"/>)도 같은 스킨이라 창 판 · 제목 띠 · 카드 채움이 같이 바뀐다.
 /// 여러 번 눌러도 같다. 로그 「[RelicPartDraftSkin] 끝」.
 /// </summary>
 public static class RelicPartDraftSkinCreator

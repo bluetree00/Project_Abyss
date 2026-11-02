@@ -260,7 +260,7 @@ public sealed class LancelotMemoryHub : MonoBehaviour
         if (_madness == null || _relic == null) return;
         _madness.ExtendFrenzy(_relic.FrenzyDuration);
         _relic.GrantJudgmentCharge();
-        Say(_player.transform.position, "두 번째 광란");
+        Say(_player.transform.position, "광란 연장 · Q +1");   // 10-30 H-17 — 조각 이름 대신 결과(광란이 이어지고 심판 1번 더)
         Debug.Log($"[LancelotMemory] 두 번째 광란 — 광란 +{_relic.FrenzyDuration:0.#}초 · 심판 {_relic.JudgmentCharges}회");
     }
 
@@ -387,7 +387,7 @@ public sealed class LancelotMemoryHub : MonoBehaviour
         try { await UniTask.Delay(TimeSpan.FromSeconds(TearShowDelay), cancellationToken: ct); }
         catch (OperationCanceledException) { return; }
         Managers.Sound?.PlayEvent(SoundEvent.RelicRend);
-        Say(at + Vector3.up * 0.4f, $"찢기 ×{torn}");
+        Say(at + Vector3.up * 0.4f, Loc.F("낙인 폭발 ×{0}", torn));   // 10-30 H-17 — 「찢기」는 화면 다른 곳에 없는 말
     }
 
     /// <summary>X자 참격 이펙트 — 막타 참격을 작게 엇갈려 두 번(× 겹침 수).</summary>
@@ -521,7 +521,7 @@ public sealed class LancelotMemoryHub : MonoBehaviour
             if (now - kv.Value <= CrossLightWindow)
             {
                 _crossLight = true;
-                if (_player != null) Say(_player.transform.position, "엇갈린 빛");   // 10-12 S5 — 다음 찢기가 낙인을 남긴다
+                if (_player != null) Say(_player.transform.position, "엇갈린 빛 켜짐");   // 10-12 S5 — 다음 찢기가 낙인을 남긴다(10-30 가웨인 H-16과 같은 글)
                 CrossLightChanged?.Invoke(true);
                 Debug.Log($"[LancelotMemory] 엇갈린 빛 — {kv.Key} + {reactionKey}");
                 break;

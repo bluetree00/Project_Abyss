@@ -18,7 +18,8 @@ public static class SkillSoundSetup
     private static readonly (string evt, string address, string clip, float volume, float jitter)[] Rows =
     {
         (SoundEvent.SkillCharge,      "sfx_skill_charge",       HovlSfx + "Skill 3.wav",  0.45f, 0.04f),
-        (SoundEvent.SkillBuff,        "sfx_skill_buff",         HovlSfx + "Skill 1.wav",  0.80f, 0.05f),
+        // 11-02 Q21 — 「Skill 1」(늦게 차오르는 쉭)이 화살 소리로 들렸다 → 팩의 강화 이펙트(Leaves buff)에 붙은 「Skill 5」 · 실효 크기가 17 dB 커서 볼륨을 낮춘다
+        (SoundEvent.SkillBuff,        "sfx_skill_buff_v2",      HovlSfx + "Skill 5.wav",  0.30f, 0.05f),
         (SoundEvent.SkillHeavyImpact, "sfx_skill_heavy_impact", HovlSfx + "Skill 10.wav", 0.55f, 0.04f),
     };
 

@@ -25,7 +25,6 @@ public static class DragonThreat
     // 10-23 B4 「메테오가 위협적이지 않다」 — 노림 첫 발이 0.35초 앞이라 걷던 그대로 지나가면 착탄(예고 0.6 + 낙하 0.6초) 때 이미 원 밖이었다.
     // 0.85초 앞 = 곧장 걸으면 착탄 때 원 안(6 m/s · 반폭 2.5 m) · 멈추거나 꺾으면 피한다(예고 = 판정 · 앞섬 1.2초 그대로).
     public const float AimedLead   = 0.85f;
-    public const float EdgeDrop    = 0.3f;    // 바깥 테두리 칸을 뺄 확률
     public const float MeteorReachAtOne = 4.8f; // 운석 이펙트(Meteor.prefab) 배율 1의 땅 효과 보이는 반경(충격파까지 · 10-14 실측 2.14 / 4.81 m) — 10-23부터 멀리 튀는 층만 이 값으로
     // 10-23 B4 사용자 「터지는 이펙트가 잘 느껴지게 · 범위에 맞게 크기」 — 최대 도달(4.8)로 맞추니 몸통(분화구 · 충격파 · 불 · 섬광)이 예고의 0.42~0.46배였다
     // (10-15 fx_fit ×0.31: 90% 반경 0.63~0.69 m · 판정 1.5 m). 몸통은 90% 반경(배율 1당 2.03~2.23 m) = 판정 반폭, 멀리 튀는 층은 예전처럼 최대 도달 = 판정 반폭.
@@ -78,22 +77,46 @@ public static class DragonThreat
         return ScatterRadius[tier];
     }
 
-    /// <summary>반경 r칸 원 — 바깥 테두리 칸을 <paramref name="drop"/> 확률로 뺀다. 방 안쪽 칸만.</summary>
-    public static List<Vector2Int> Footprint(Vector2Int c, int r, float drop)
+    /// <summary>판정 반경(m) — r칸 원의 반폭 r + 0.5칸. 예고 원 · 판정 · 땅 폭발(<see cref="MeteorScale"/>)이 모두 이 값이다(11-02 Q31).</summary>
+    public static float HitRadius(int r) => (r + 0.5f) * DragonBossRoomContext.CellSize;
+
+    /// <summary>
+    /// 예고 원 — 판정 반경 데칼 하나. 11-02 사용자 「메테오 판정과 가이드라인이 제대로 안 돼 있다 — 예고 원 = 판정 = 폭발 크기」:
+    /// 예전엔 1 m 칸 모자이크라 반경 1은 정사각 3×3, 큰 원은 계단 모양으로 판정 원 밖까지 삐져나왔다(11-02 사진 · 녹색 = 판정 원).
+    /// 예고 동안 <see cref="WarnProgress"/>로 가운데서 바깥으로 차오른다. 노림 · 큰 메테오는 진홍.
+    /// </summary>
+    public static GameObject WarnCircle(Vector3 land, int r, bool heavy = false)
     {
-        var cells = new List<Vector2Int>((2 * r + 1) * (2 * r + 1));
-        float outer = (r + 0.4f) * (r + 0.4f), inner = (r - 0.6f) * (r - 0.6f);
-        for (int dx = -r; dx <= r; dx++)
-        for (int dz = -r; dz <= r; dz++)
-        {
-            int d2 = dx * dx + dz * dz;
-            if (d2 > outer) continue;
-            if (d2 > inner && d2 > 0 && Random.value < drop) continue;
-            int x = c.x + dx, z = c.y + dz;
-            if (DragonBossRoomContext.IsInterior(x, z)) cells.Add(new Vector2Int(x, z));
-        }
-        return cells;
+        Color c = heavy ? PatternGuideHelper.AttackHeavy : PatternGuideHelper.AttackFill;
+        return PatternGuideHelper.Prepare(PatternGuideHelper.Disc(land, HitRadius(r), c), c);
     }
+
+    /// <summary>예고 진행 0 ~ 1(채움).</summary>
+    public static void WarnProgress(GameObject circle, float t) => PatternGuideHelper.SetProgress(circle, t);
+
+    /// <summary>판정 — 착탄 자리에서 수평 거리가 판정 반경 안.</summary>
+    public static bool InCircle(Vector3 land, Vector3 p, int r)
+    {
+        float dx = p.x - land.x, dz = p.z - land.z, R = HitRadius(r);
+        return dx * dx + dz * dz <= R * R;
+    }
+
+    /// <summary>
+    /// 착탄 — 예고 원을 판정 색으로 꽉 채워 번쩍인 뒤 <see cref="ImpactCircleLinger"/>초 뒤 걷는다.
+    /// 판정 순간에 바로 걷으면 큰 불덩이(반경 2 · 4)는 아직 공중이라 「원이 사라진 뒤 떨어진다」로 보였다(11-02 사진).
+    /// </summary>
+    public static void ImpactCircle(ref GameObject circle)
+    {
+        if (circle == null) return;
+        PatternGuideHelper.Arm(circle);
+        Object.Destroy(circle, ImpactCircleLinger);
+        circle = null;
+    }
+
+    /// <summary>취소 · 정리 — 바로 걷는다.</summary>
+    public static void DropCircle(ref GameObject circle) => PatternGuideHelper.SafeDestroy(ref circle);
+
+    private const float ImpactCircleLinger = 0.2f;
 
     /// <summary>운석 땅 효과 몸통 배율 — 90% 반경이 판정 반폭(r + 0.5칸)에 맞게(반경 1칸 0.68 · 2칸 1.14 · 3칸 1.59 · 4칸 2.05 · 10-23 B4).
     /// 멀리 튀는 층(파편 · 불티 · 연기)은 <see cref="SpawnMeteor"/>가 × <see cref="DebrisRatio"/>(예전 배율 0.31 ~ 0.94 그대로).</summary>

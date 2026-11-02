@@ -28,6 +28,8 @@ public sealed class ElementVfxRegistry : ScriptableObject
         public float bodyScale;
         [Tooltip("몸 이펙트 색 곱(알파 0 = 원래 색) — 흰 기본 불꽃에 불빛 · 얼음 거품을 옅게(알파)")]
         public Color bodyTint;
+        [Tooltip("몸 이펙트를 위로 세운다 — 앞(+Z)으로 뿜는 원뿔 화염이 몬스터를 가로로 뚫는 브레스처럼 보였다(불 · 10-30 사용자)")]
+        public bool bodyUp;
         [Tooltip("단계 발동 표시 — 플레이어 몸에 1회(버프 문장)")]
         public GameObject burst;
         [Tooltip("타격 1회 — 맞은 적 자리(체인 · 표식 폭발 등 점 타격)")]
@@ -42,6 +44,10 @@ public sealed class ElementVfxRegistry : ScriptableObject
         public float areaRadius;
         [Tooltip("area를 거두는 시각(초). 0이면 기본(2초)")]
         public float areaLife;
+        [Tooltip("area 색 곱(알파 0 = 원래 색) — 팩 원래 색이 주변보다 튈 때(불 작열 가운데 분홍 · 10-30)")]
+        public Color areaTint;
+        [Tooltip("같은 때 보이는 area 최대 수(0 = 제한 없음) — 넘는 것 · 이미 보이는 칸과 같은 자리(반경 절반 안)인 것은 그림만 뺀다(판정 · 피해 그대로 · 불바다 겹침 · 10-30)")]
+        public int areaMaxShown;
         [Tooltip("칼날을 감싸는 입자 재질(대검 R 속성 검 · BladeWrapFx가 칼날 표면에서 속성 색 입자를 낸다)")]
         public Material bladeMaterial;
         [Tooltip("속성 검 칼 궤적 — INab Weapon Trail 프리팹(커진 칼의 칼끝 · 칼밑에 묶는다)")]
@@ -82,6 +88,18 @@ public sealed class ElementVfxRegistry : ScriptableObject
         if (e.bodyScale > 0.01f) scale = e.bodyScale;
         tint = e.bodyTint;
         return e.statusBody;
+    }
+
+    /// <summary>몸 이펙트를 위로 세우나(앞으로 뿜는 원뿔 이펙트).</summary>
+    public bool BodyUp(RuneElement element) => Find(element, out var e) && e.bodyUp;
+
+    /// <summary>광역 폭발 색 곱(알파 0 = 원래 색) · 같은 때 보이는 최대 수(0 = 제한 없음).</summary>
+    public void GetAreaStyle(RuneElement element, out Color tint, out int maxShown)
+    {
+        tint = Color.clear; maxShown = 0;
+        if (!Find(element, out var e)) return;
+        tint = e.areaTint;
+        maxShown = Mathf.Max(0, e.areaMaxShown);
     }
 
     /// <summary>단계 발동 표시(플레이어 몸). 없으면 null.</summary>

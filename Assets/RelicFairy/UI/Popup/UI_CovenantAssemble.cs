@@ -126,7 +126,9 @@ public partial class UI_CovenantAssemble : UI_Popup
         _rng         = rng;
         _rerollsLeft = DefaultRerolls;
         _tcs         = new UniTaskCompletionSource<string>();
-        SetText(_titleText, "봉인된 예언자의 서약서");
+        SetText(_titleText, "서약서 쓰기 — 원인 1개와 효과 1개를 고른다");   // 10-30 C-04 이름뿐인 제목 → 무엇을 하는 창인지
+        if (_forgeButton)   // 10-30 C-06 [서약 새기기](프리팹 글) → 쓰기 판과 같은 [쓰기]
+            foreach (var lbl in _forgeButton.GetComponentsInChildren<TMP_Text>(true)) lbl.text = "쓰기";
         if (_titleText)
         {
             _titleText.fontSize = 28f; FitSingleLine(_titleText);
@@ -766,8 +768,8 @@ public partial class UI_CovenantAssemble : UI_Popup
         RestartFades();
 
         // 등급 줄 — 「◆ 연격 · ◆ 마지막 숨결」. 등급은 「[골드]」 날글자 대신 등급색 마름모(설계서 1장 3). 안 고른 쪽은 흐린 자리 이름.
-        string causeHead  = hasCause  ? $"{TierMark(_causes[_selCause].tier)} {cd.name}"   : $"<color={label}>원인</color>";
-        string effectHead = hasEffect ? $"{TierMark(_effects[_selEffect].tier)} {ed.name}" : $"<color={label}>효과</color>";
+        string causeHead  = hasCause  ? $"{TierMark(_causes[_selCause].tier)} {cd.name}"   : Loc.F("<color={0}>원인</color>", label);
+        string effectHead = hasEffect ? $"{TierMark(_effects[_selEffect].tier)} {ed.name}" : Loc.F("<color={0}>효과</color>", label);
         SetText(_previewTitle, $"{causeHead}  <color={label}>·</color>  {effectHead}");
 
         // 문장 — 앞절(원인 조건) → 뒷절(첫 결과는 「곧바로」 이음이라 머리말 없는 동사구).
@@ -780,7 +782,9 @@ public partial class UI_CovenantAssemble : UI_Popup
         string coef = hasCause
             ? UI_AssembleCard.InkNumbers($"×{CovenantMath.RawCoef(cd, _causes[_selCause].tier):0.0}", num)
             : $"<color={label}>—</color>";
-        SetTextFading(_previewCoef, Row("봉인 계수", coef, label));
+        // 10-30 C-05 「봉인 계수」는 무슨 수인지 몰랐다 — 원인 배율이고 효과에 곱해진다는 것까지 적는다
+        if (hasCause) coef += Loc.F(" <color={0}><size=85%>(효과에 곱해진다)</size></color>", label);
+        SetTextFading(_previewCoef, Row("원인 배율", coef, label));
 
         var p = hasCause && hasEffect
             ? CovenantAssemblePreview.Build(_causes[_selCause].id, _causes[_selCause].tier, _effects[_selEffect].id, _effects[_selEffect].tier)
@@ -805,8 +809,9 @@ public partial class UI_CovenantAssemble : UI_Popup
         bool owned  = both && IsOwned(SelectedId());
         bool banned = both && CovenantPalette.IsBannedPair(_causes[_selCause].id, _effects[_selEffect].id);
         SetForgeReady(both && !owned && !banned);
-        SetText(_forgeSummary, banned ? "봉인된 조합 — 이 원인으로는 이 효과를 벼릴 수 없다"
-                             : owned  ? "이미 보유한 조합 — 원인이나 효과를 바꿔야 벼릴 수 있다"
+        // 10-30 C-06 「벼린다」는 비유 — 하면 되는 일로
+        SetText(_forgeSummary, banned ? "이 원인과 이 효과는 함께 쓸 수 없다"
+                             : owned  ? "이미 가진 서약이다 — 원인이나 효과를 바꾼다"
                              :          string.Empty);
     }
 
@@ -905,7 +910,7 @@ public partial class UI_CovenantAssemble : UI_Popup
     /// </summary>
     private void RefreshRerollText()
     {
-        SetText(_rerollCountText, $"리롤 {_rerollsLeft}");
+        SetText(_rerollCountText, Loc.F("다시 뽑기 {0}회", _rerollsLeft));   // 10-30 C-06 「리롤」 · 「교체」 두 이름 → 「다시 뽑기」 하나
 
         bool canReroll = _rerollsLeft > 0;
         GateReroll(_causeCards,  canReroll);
@@ -954,7 +959,7 @@ public partial class UI_CovenantAssemble : UI_Popup
     {
         var lbl = btn.GetComponentInChildren<TMP_Text>(true);
         if (lbl == null) return;
-        lbl.text = "리롤";
+        lbl.text = "다시";   // 10-30 C-06 아래 「다시 뽑기 n회」와 같은 말 — 칩이 56px라 두 글자만
 
         // 버튼이 카드 비율을 따라가면서 카드가 작을 땐 22px까지 좁아진다 — 14pt 두 글자가 넘친다.
         // 다른 라벨과 같은 규칙으로 박스 안에 가둔다(키우지는 않는다).

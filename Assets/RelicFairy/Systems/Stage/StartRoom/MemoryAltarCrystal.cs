@@ -17,6 +17,12 @@ public sealed class MemoryAltarCrystal : MonoBehaviour
     private const float  PollInterval   = 0.5f;
     private const float  PulseSpeed     = 2.2f;
     private const string AffordableKey  = "basecamp_altar_affordable_v1_slot";
+    // 10-30 바닥 빛 길 — 귀환 자리(광장) → 제단 다리. 열 수 있을 때만 · 제단에 한 번 닿으면 그 방문엔 끈다
+    private const string TrailPath      = "Markers/AltarTrail";
+    private const float  TrailSpacing   = 2.4f;    // 빛 점 사이(m)
+    private const float  TrailStepSec   = 0.11f;   // 점 하나씩 켜지는 간격 — 물결이 제단 쪽으로 흐른다
+    private const float  TrailWaveSec   = 3.2f;    // 물결 한 번
+    private const float  TrailReachDist = 7f;      // 이만큼 다가오면 길을 끈다
 
     private static readonly int BaseColorId     = Shader.PropertyToID("_BaseColor");
     private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
@@ -50,6 +56,11 @@ public sealed class MemoryAltarCrystal : MonoBehaviour
     private MaterialPropertyBlock _mpb;
     private int _affordable = -1;
     private bool _debugForceReady;
+    private Vector3[] _trail;
+    private ParticleSystem _trailPs;
+    private float _trailWaveStart;
+    private int _trailEmitted;
+    private bool _trailReached;
 
     // ── Lifecycle ─────────────────────────────────────────────────
     private void Awake()
@@ -64,6 +75,7 @@ public sealed class MemoryAltarCrystal : MonoBehaviour
         _motes = BaseCampParticles.Motes("~MemoryMotes", transform, core != null ? core.localPosition : Vector3.up * 2f,
                                          new Vector3(1.6f, 0.4f, 1.6f), 0f, 3f, 0.5f, readyColor,
                                          new Vector3(-0.1f, 0.6f, -0.1f), new Vector3(0.1f, 1.3f, 0.1f), moteMaterial);
+        BuildTrail();
     }
 
     private void Start()
@@ -79,6 +91,7 @@ public sealed class MemoryAltarCrystal : MonoBehaviour
         float pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * PulseSpeed);
         SetColor(_core, readyColor * 0.9f, readyColor * Mathf.Lerp(1.2f, 2.6f, pulse));
         if (_light != null) _light.intensity = _lightMax * Mathf.Lerp(0.8f, 1.3f, pulse);
+        TickTrail();
     }
 
     // ── Public Methods ────────────────────────────────────────────
@@ -163,11 +176,51 @@ public sealed class MemoryAltarCrystal : MonoBehaviour
             if (next == null || next.Value.Node == null) return;
             // 새 봉인 한 줄(준비 뒤 0.8초 + 점등 1.6초)이 먼저 지나가게 — 한 순간에 하나만(원칙 5)
             await UniTask.Delay(TimeSpan.FromSeconds(4f), DelayType.UnscaledDeltaTime, cancellationToken: ct);
-            RelicFairy.UI.UI_BossBark.Show(string.Format(affordableLine, next.Value.Node.DisplayName),
+            RelicFairy.UI.UI_BossBark.Show(Loc.F(affordableLine, Loc.T(next.Value.Node.DisplayName)),   // 11-02 Q11
                                            RelicFairy.UI.BossBarkType.MerlinNarration, DialogueSpeaker.Merlin);
             Debug.Log($"[MemoryAltarCrystal] 열 수 있는 것 {before} → {_affordable} — 멀린 한 줄", this);
         }
         catch (OperationCanceledException) { }
+    }
+
+    /// <summary>
+    /// 10-30 사용자 「귀환은 예전처럼 입구 방위 · 제단으로 이끄는 레벨디자인」 — 광장 귀환 자리에서 제단이 화면 오른쪽 밖(58°)이라,
+    /// 발밑에서 제단 다리까지 바닥에 낮은 금빛 점이 차례로 켜졌다 꺼진다(꺾임점 = 프리팹 Markers/AltarTrail 자식 순서). 점은 바닥에 붙인다.
+    /// </summary>
+    private void BuildTrail()
+    {
+        Transform root = null;
+        for (var t = transform.parent; t != null && root == null; t = t.parent) root = t.Find(TrailPath);   // 성소 프리팹이 씬에서 다른 부모 밑에 있어도
+        if (root == null || root.childCount < 2) { Debug.LogWarning($"[MemoryAltarCrystal] 바닥 빛 길 꺾임점 없음({TrailPath})", this); return; }
+        var pts = new System.Collections.Generic.List<Vector3>();
+        for (int i = 1; i < root.childCount; i++)
+        {
+            Vector3 a = root.GetChild(i - 1).position, b = root.GetChild(i).position;
+            int n = Mathf.Max(1, Mathf.RoundToInt(Vector3.Distance(a, b) / TrailSpacing));
+            for (int k = i == 1 ? 0 : 1; k <= n; k++) pts.Add(Snap(Vector3.Lerp(a, b, (float)k / n)));
+        }
+        _trail = pts.ToArray();
+        _trailPs = BaseCampParticles.Motes("~AltarTrail", transform, Vector3.zero, Vector3.zero, 0f, 1.3f, 0.75f, readyColor,
+                                           new Vector3(0f, 0.12f, 0f), new Vector3(0f, 0.25f, 0f), moteMaterial);
+    }
+
+    private static Vector3 Snap(Vector3 p)
+        => Physics.Raycast(p + Vector3.up * 2f, Vector3.down, out var hit, 6f, ~0, QueryTriggerInteraction.Ignore) ? hit.point + Vector3.up * 0.08f : p;
+
+    private void TickTrail()
+    {
+        if (_trail == null || _trailPs == null || _trailReached) return;
+        var player = Managers.Player?.PlayerTransform;
+        if (player != null && (player.position - _trail[^1]).sqrMagnitude < TrailReachDist * TrailReachDist) { _trailReached = true; return; }   // 길 끝(제단 다리)에 닿으면
+        float t = Time.unscaledTime - _trailWaveStart;
+        int upTo = Mathf.Min(_trail.Length, (int)(t / TrailStepSec) + 1);
+        var ep = new ParticleSystem.EmitParams { applyShapeToPosition = false };
+        for (; _trailEmitted < upTo; _trailEmitted++)
+        {
+            ep.position = _trail[_trailEmitted];
+            _trailPs.Emit(ep, 1);
+        }
+        if (t >= TrailWaveSec) { _trailWaveStart = Time.unscaledTime; _trailEmitted = 0; }
     }
 
     private Renderer[] Bind(Transform t)

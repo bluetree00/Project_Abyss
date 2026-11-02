@@ -156,7 +156,7 @@ public class WorldCovenantAltar : MonoBehaviour
 
         if (NightmareRules.BlocksCovenantAltar)
         {
-            ShowNotice("부서진 맹세 — 이 성채에선 서약을 맺을 수 없다");
+            ShowNotice("악몽 규칙 「부서진 맹세」 — 이 챕터에선 새 서약을 쓸 수 없다");   // 10-30 C-01 성채(4챕터) → 이 챕터 · 「악몽 규칙」을 밝힌다
             return;
         }
 
@@ -178,11 +178,12 @@ public class WorldCovenantAltar : MonoBehaviour
             {
                 _used = true;
                 int after = handler.Sentence?.ResultCount ?? 0;
+                // 10-30 C-03 「절」은 화면 다른 곳에 없는 말 — 창 안 말(쓰기 · 잇기 · 고치기)과 「n번째 줄」로
                 ShowNotice(sentence == null
-                    ? "<color=#CC88FF>서약서</color> 첫 줄을 새겼다"
+                    ? "<color=#CC88FF>서약서</color>에 첫 줄을 썼다"
                     : after > before
-                        ? $"<color=#CC88FF>서약서</color> {after}절 — 한 줄을 이어 썼다"
-                        : "<color=#CC88FF>서약서</color> 한 줄을 고쳐 썼다");
+                        ? Loc.F("<color=#CC88FF>서약서</color>에 {0}번째 줄을 이었다", after)
+                        : "<color=#CC88FF>서약서</color> 한 줄을 고쳤다");
                 // 멀린 · 그림자 한 마디(설계서 §6) — 첫 쓰기 · 이어 쓰기 · 고쳐 쓰기 · 가득 참
                 CovenantVoice.Say(sentence == null ? CovenantVoice.FirstWrite
                                   : after <= before ? CovenantVoice.Rewrite
@@ -268,7 +269,7 @@ public class WorldCovenantAltar : MonoBehaviour
         go.transform.SetParent(transform, false);   // 제단 파괴 시 함께 정리
         _guideArrow = go.AddComponent<OnboardingGuideArrow>();
         _guideArrow.SetTarget(transform);
-        ShowNotice("<color=#CC88FF>서약 제단</color> — [F]로 나만의 서약을 조립하라");
+        ShowNotice("<color=#CC88FF>서약 제단</color> — [F]로 서약서에 한 줄을 쓴다");   // 10-30 C-02 명령조 「조립하라」 → 창 안 말 「쓰기」
     }
 
     private void ClearGuide(bool markDone)
@@ -308,7 +309,7 @@ public class WorldCovenantAltar : MonoBehaviour
 
         _worldText = go.AddComponent<TextMeshPro>();
         if (worldTextFont != null) _worldText.font = worldTextFont;
-        _worldText.text = "서약 조립";
+        _worldText.text = "서약서 쓰기";   // 10-30 C-02 「서약 조립」 → 창 안 말과 같게
         _worldText.fontSize = textSize;
         _worldText.alignment = TextAlignmentOptions.Center;
         _worldText.color = new Color(0.8f, 0.5f, 1f);
@@ -334,7 +335,7 @@ public class WorldCovenantAltar : MonoBehaviour
         _promptText.sortingOrder = UISortingOrder.WorldPrompt;
         TMPOutlineHelper.ApplySoftShadow(_promptText);
         if (worldTextFont == null) RelicFloatText.ApplyThin(_promptText);
-        _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> 서약 조립";
+        _promptText.text = Loc.F("<color={0}>[F]</color> 서약서 쓰기", UIPalette.GoldHex);   // 10-30 C-02
         // 10-22 사용자 「서약 근처에 가면 서약 조립 UI가 겹쳐 보인다」 — 글자 크기가 미터라 카메라가 다가가면 화면 아래 HUD까지 덮었다 → 화면 크기 상한
         WorldTextScreenCap.Attach(_promptText, PromptMaxPx, prompt: true);
 

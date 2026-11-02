@@ -5,9 +5,31 @@ using Cysharp.Threading.Tasks;
 // PlayerController — 피해·사망·무적 · 포이즈·날아감 · 스탠스 · 상태이상 · 저스트 회피
 public sealed partial class PlayerController
 {
+    // ── Constants ─────────────────────────────────────────────────
+    private const string WeaponReceiveClipKey = "GreatswordDraw";         // 11-02 Q3 받아 쥐는 동작 = 대검 R 뽑기와 같은 클립(GhostSamurai APose_Equip01 · 검을 들어 올려 쥔다)
+    private const string DeathFallClipKey     = "Player_DeathFall";       // 11-02 Q5 쓰러짐
+    private const float  OneShotFadeIn        = 0.12f;
+    private const float  WeaponReceiveFadeOut = 0.25f;
+
+    // ── Private ───────────────────────────────────────────────────
+    private bool _relicSkillInvulnerable;
+
     // ── Properties ────────────────────────────────────────────────
-    /// <summary>무적 중 여부 (debugInvincible · 긴급 회피 무적 포함).</summary>
-    public bool IsInvincible => debugInvincible || Time.time < _invincibleEnd || PerfectDodge.IsInvulnerable;
+    /// <summary>무적 중 여부 (debugInvincible · 긴급 회피 무적 · 유물 Q 시전 포함).</summary>
+    public bool IsInvincible => debugInvincible || Time.time < _invincibleEnd || PerfectDodge.IsInvulnerable || RelicSkillInvulnerable;
+
+    /// <summary>유물 Q 시전 중 무적 — ActSkillState(Q)가 들어갈 때 켜고 나올 때 끈다(10-30 사용자 「랜슬롯 q나 q스킬은 무적처리」).
+    /// 바뀔 때 <see cref="OnRelicGuard"/> — 몸 금빛 · 막은 타격 반짝임(11-02 Q23 「무적이라는 걸 느낄 수 있게」 · DodgePresentation).</summary>
+    public bool RelicSkillInvulnerable
+    {
+        get => _relicSkillInvulnerable;
+        set
+        {
+            if (_relicSkillInvulnerable == value) return;
+            _relicSkillInvulnerable = value;
+            OnRelicGuard?.Invoke(value);
+        }
+    }
 
     /// <summary>피격 넉백으로 날아가는 중(착지 회복 포함) — 이 동안 모든 조작 불가.</summary>
     private bool IsLaunched => _locoSM?.CurrentId == LocoState.Launched;
@@ -48,6 +70,9 @@ public sealed partial class PlayerController
     /// <summary>피해 판정 결과. 인자: 가해자, 들어온 피해(보정 전), 최종 피해(HP 차감량), 결과.</summary>
     public event Action<GameObject, int, int, DamageOutcome> OnDamageResolved;
 
+    /// <summary>유물 Q 무적이 켜지고 꺼질 때(11-02 Q23) — DodgePresentation이 몸에 금빛을 입히고 걷는다.</summary>
+    public event Action<bool> OnRelicGuard;
+
     // ── Public Methods: 피해 · 회복 · 사망 ─────────────────────────
     /// <param name="ignorePoise">포이즈를 무시하고 확정으로 날아감을 발동한다(보스 대기술 등). 넉백 면역은 그대로 적용.</param>
     /// <param name="weight">피격 연출 등급. Auto면 최종 피해/최대 HP(8%·20%)와 ignorePoise로 판정한다.
@@ -85,7 +110,7 @@ public sealed partial class PlayerController
             return;
         }
 
-        if (debugInvincible || Time.time < _invincibleEnd)
+        if (debugInvincible || Time.time < _invincibleEnd || RelicSkillInvulnerable)
         {
             OnDamageResolved?.Invoke(attacker, rawDmg, 0, DamageOutcome.Invincible);
             return;
@@ -158,7 +183,7 @@ public sealed partial class PlayerController
                 {
                     _invincibleEnd = Time.time + invDur;
                     ItemEffectVfxHelper.AttachLoopVfx("VFX_DeathNegateAura", transform, invDur).Forget();
-                    ItemEffectVfxHelper.ShowNotice($"<color=#FF4444>사망 무효!</color> {invDur:F0}초 무적");
+                    ItemEffectVfxHelper.ShowNotice(Loc.F("<color=#FF4444>사망 무효!</color> {0}초 무적", invDur.ToString("F0")));   // 화면 언어(11-02 Q11)
                 }
                 OnDamageResolved?.Invoke(attacker, rawDmg, 0, DamageOutcome.DeathNegated);
                 return;
@@ -399,6 +424,12 @@ public sealed partial class PlayerController
     /// <summary>10-29 잠깐 빨라짐 — 보물 창고 바람 문양(<paramref name="scale"/> 1 이상 · <paramref name="duration"/>초).</summary>
     public void ApplyHaste(float scale, float duration) => Status.ApplyHaste(scale, duration);
 
+    /// <summary>10-31 바닥 장치 느려짐 — 보물 창고 진흙 · 가시 비틀거림(<see cref="FloorSpeedScale"/>).</summary>
+    public void ApplyFloorSlow(float scale, float duration) => Status.ApplyFloorSlow(scale, duration);
+
+    /// <summary>10-31 바닥 배율(진흙 · 가시 · 바람)을 바로 1로 — 보물 창고가 끝나거나 방이 사라질 때.</summary>
+    public void ClearFloorSpeed() => Status.ClearFloorSpeed();
+
     /// <summary>
     /// 얼음 공격 1회 처리. 반환값: 1=1단계(화면이펙트), 2=빙결 발동, 0=이미 빙결 중(연장만).
     /// </summary>
@@ -420,7 +451,42 @@ public sealed partial class PlayerController
     /// <summary>반격 창 안의 공격이 겨냥할 원인 적(첫 공격 여부 포함). ActAttackState가 콤보 단계 시작에 묻는다.</summary>
     public bool TryGetCounterTarget(out Transform target, out bool isFirst) => PerfectDodge.TryGetCounterTarget(out target, out isFirst);
 
+    // ── Public Methods: 한 번 덮어 재생하는 동작 — 받기 · 쓰러짐(11-02) ──
+    /// <summary>
+    /// Q3 「무기를 얻을 때 애니메이션」 — 받아 쥐는 동작을 한 번 덮어 재생한다(인트로 무형검이 손에 맺히는 순간 · IntroMordredDirector가 부른다).
+    /// 돌려준 초 = 클립 길이(그만큼 기다리면 평소 자세로 돌아와 있다). 클립을 못 찾으면 0.
+    /// </summary>
+    public async UniTask<float> PlayWeaponReceiveAsync()
+    {
+        var clip = await LoadOneShotClipAsync(WeaponReceiveClipKey);
+        if (clip == null || Anim == null) return 0f;
+        PlayerOneShotClip.PlayAsync(Anim, clip, OneShotFadeIn, WeaponReceiveFadeOut, hold: false, unscaled: false, destroyCancellationToken).Forget();
+        return clip.length;
+    }
+
+    /// <summary>
+    /// Q5 「죽음 연출 — 주변을 멈추고 플레이어가 그 자리에 쓰러지는 애니」 — 시간 배율이 0이어도 실제 시간으로 쓰러지고 끝 자세로 남는다.
+    /// GameRunBootstrapper 사망 모먼트가 부른다. 돌려준 초 = 쓰러지기까지(클립을 못 찾으면 0).
+    /// </summary>
+    public async UniTask<float> PlayDeathFallAsync()
+    {
+        var clip = await LoadOneShotClipAsync(DeathFallClipKey);
+        if (clip == null || Anim == null) return 0f;
+        PlayerOneShotClip.PlayAsync(Anim, clip, OneShotFadeIn, 0f, hold: true, unscaled: true, destroyCancellationToken).Forget();
+        return clip.length;
+    }
+
     // ── Private Methods ───────────────────────────────────────────
+    private static async UniTask<AnimationClip> LoadOneShotClipAsync(string key)
+    {
+        var res = Managers.AnimationResources;
+        if (res == null) return null;
+        var clip = res.GetClip(key);
+        if (clip != null) return clip;
+        await res.PreloadClipsAsync(new[] { key });
+        return res.GetClip(key);
+    }
+
     private void TryHandleDeath()
     {
         if (RuntimeStats.Hp > 0 || _dead) return;
@@ -488,7 +554,7 @@ public sealed partial class PlayerController
 
         _invincibleEnd = Mathf.Max(_invincibleEnd, Time.time + MemoryAltarCatalog.ResolveInvulnSeconds);
         // 신호는 작게 — 알림 한 줄 + 짧은 소리(흔들림 · 큰 이펙트 없음 · 10-22 설계 「신호」)
-        ItemEffectVfxHelper.ShowNotice("<color=#E8C07A>결의</color> — 쓰러질 한 방을 체력 1로 버텼다");
+        ItemEffectVfxHelper.ShowNotice(Loc.T("<color=#E8C07A>결의</color> — 쓰러질 한 방을 체력 1로 버텼다"));
         Managers.Sound?.PlayEvent(SoundEvent.SkillBuff);
         Debug.Log($"[MemoryAltar] 결의 — 체력 1로 버팀 (보스 페이지 {page})");
         return true;

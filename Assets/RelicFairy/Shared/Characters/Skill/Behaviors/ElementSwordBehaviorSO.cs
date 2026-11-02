@@ -33,7 +33,8 @@ public class ElementSwordBehaviorSO : SkillBehaviorSO
     [Tooltip("휘두른 뒤 자세(초) — 후딜이라 회피 · 공격 · 스킬로 끊긴다")]
     [SerializeField] private float endDelay = 0.35f;
 
-    public override string StartSoundEvent => SoundEvent.SkillBuff;   // 자기 강화 시작음(10-08 A6)
+    // 시작음 = 검을 뽑는 쇳소리 · 강화음은 뽑기가 끝나 속성이 붙을 때(11-02 Q21 「대검 R 사운드가 화살 소리」 — 예전엔 시작부터 강화음 하나)
+    public override string StartSoundEvent => SoundEvent.SwordPickup;
 
     public override ISkillRuntime CreateRuntime() => new Runtime(this);
 
@@ -87,6 +88,9 @@ public class ElementSwordBehaviorSO : SkillBehaviorSO
             if (_timer < _data.drawTime) return;
             _timer = 0f;
             GiantSwordBuff.Begin(ctx.Controller, GiantSwordBuff.DurationFor(ctx.WeaponData));
+            Managers.Sound?.PlayEvent(SoundEvent.SkillBuff);   // 속성이 붙는 순간 강화음(11-02 Q21)
+            var element = GiantSwordBuff.ElementOf(ctx.Controller);
+            if (element.HasValue) ElementVfxPlayer.PlayActivation(element.Value, ctx.PlayerTransform.position);   // 속성 문장 한 번 — 칼에 속성이 붙었다(11-02 Q21 뽑기 연출)
             ctx.RotateToMouse();
             ctx.LockCancel(true);   // 칼이 닿을 때까지 — 뽑아 든 칼을 휘두르다 끊기면 버프만 남는다
             SkillAnimSync.CrossFadeToEvent(ctx.Animator, _data.swingState, "SpawnSlashEffect", _data.swingContact, 0.08f);
@@ -117,6 +121,8 @@ public class ElementSwordBehaviorSO : SkillBehaviorSO
             float radius = Radius(ctx);
             float dmg = ctx.CalculateDamage(_data.baseDamage);
             CombatQuery.GetNearbyDamageables(center, radius, ctx.Controller.gameObject, 32, _hits);
+            var element = GiantSwordBuff.ElementOf(ctx.Controller);
+            if (element.HasValue) ElementVfxPlayer.PlayBurst(element.Value, center, radius);   // 판정 이펙트 = 판정 반경 그대로(11-02 Q21 「뽑을 때 판정 이펙트」)
             foreach (var go in _hits)
             {
                 float dealt = ctx.DealDamage(go, dmg, _data.knockbackMultiplier, isFinisher: true, hitEffectKey: _data.hitEffectKey, hitEffectScale: _data.hitEffectScale);

@@ -75,6 +75,7 @@ public static class WeaponReforgeService
         int before = w.enhanceLevel;
         w.enhanceLevel = NextMeleeLevel(w, t);
         w.RecomputeEnhancedStats();
+        WeaponFormService.GrantForReforge(w);       // 형 Ⅱ · Ⅲ = 재련 1 · 3회째에 저절로(10-30 · 형 고르기 대신)
         run?.ReportEnhanceLevel(w.enhanceLevel);   // 「석궁」 · 제단 조건 집계(도달한 최고 단계)
         Debug.Log($"[Reforge] 근접 {w.displayName} +{before} → +{w.enhanceLevel}");
 
@@ -102,11 +103,11 @@ public static class WeaponReforgeService
         if (SkillTierResolver.IsRanged(w))
         {
             if (!RangedPartsDraft.HasCandidates(RangedPartsState.Current) || RangedPartsDraft.IsOpen) return false;
-            detail = $"파츠 카드 {RangedPartsDraft.CardCount}장 중 하나";
+            detail = Loc.F("파츠 카드 {0}장 중 하나", RangedPartsDraft.CardCount);   // 화면 언어(11-02 Q11)
             return true;
         }
         if (!CanReforgeMelee(w, t) || MeleeAugmentDraft.Pending != null) return false;
-        detail = $"{w.displayName} 재련 {CountAt(w.enhanceLevel) + 1}회째 · 증강 고르기";
+        detail = Loc.F("{0} 재련 {1}회째 · 증강 고르기", Loc.T(w.displayName), CountAt(w.enhanceLevel) + 1);   // 문장 전체가 열쇠(11-02 Q11)
         return true;
     }
 

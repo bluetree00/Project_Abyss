@@ -19,8 +19,9 @@ public static class StoryDialogue
     public const string LiberationAltar    = "Altar_Liberation";   // 해방기 첫 귀환 — 멀린이 기억의 제단 해방 대비 3칸을 알린다(10-22 C10 D5)
 
     // 해방 대비 안내의 폴백 한 줄 — CSV에 오르기 전에도 첫 귀환에 나온다(이 줄은 그때가 제때라 미루지 않는다 · ExileFallSequence 폴백과 같은 결).
+    // 10-30 D-07 73자로 길고 「여정 갈래 · 한 방에 안 쓰러지기」가 흐렸다 — DIALOGUE_DATA Altar_Liberation #0과 같은 글
     private const string LiberationAltarFallback =
-        "기억의 제단 여정 갈래에 새 칸 셋이 열렸어. 받는 피해 줄이기, 한 방에 안 쓰러지기, 샘 회복 늘리기야. 해방기 적은 더 세니까 그것부터 사 둬.";
+        "기억의 제단 「여정」에 새 칸 3개가 열렸어 — 받는 피해 감소, 쓰러질 피해 한 번 버티기, 요정의 샘 회복 증가. 먼저 사 둬.";
     private const string MerlinIllust = "Illust_God_Default";
 
     /// <summary>이번 복귀에 틀 이야기 비트. 없으면 null — 호출부는 평소 복귀 대사로 간다.</summary>

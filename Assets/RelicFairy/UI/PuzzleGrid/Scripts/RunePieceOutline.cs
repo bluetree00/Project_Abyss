@@ -21,6 +21,7 @@ public sealed class RunePieceOutline : MaskableGraphic
 
     // 받침 — 블록 그림의 청동 테(sRGB ≈ 100,66,26)보다 한 단계 어둡게. 같은 조각 칸 사이 틈이 판 바탕(거의 검정) 대신 이 색으로 메워져 한 덩어리로 읽힌다.
     private static readonly Color PlateColor = new(0.30f, 0.21f, 0.10f, 0.90f);
+    private Color _plate = PlateColor;   // 10-30 — 조각 속성 색(Shape가 넘긴다). 같은 조각 칸 사이 틈이 이 색이라 한 룬이 한 덩어리로 읽힌다
     // 금선 — 평소 = 금과 잉크 사이의 옅은 금(속성 그림의 노랑보다 밝게), 고른 조각(호버 · 정보판 · 끄는 중) = 거의 흰 금.
     private static readonly Color LineIdle = UITheme.Thin.WithA(Color.Lerp(UITheme.Thin.Gold, UITheme.Thin.Ink, 0.35f), 0.80f);
     private static readonly Color LineHot  = UITheme.Thin.WithA(Color.Lerp(UITheme.Thin.Gold, Color.white, 0.65f), 1f);
@@ -45,6 +46,15 @@ public sealed class RunePieceOutline : MaskableGraphic
         SetVerticesDirty();
     }
 
+    /// <summary>받침 색(10-30) — 조각 속성 색 · 번갈이 밝기를 곱한 값. 알파 0이면 옛 청동 받침.</summary>
+    public void SetPlate(Color c)
+    {
+        var next = c.a > 0f ? c : PlateColor;
+        if (next == _plate) return;
+        _plate = next;
+        SetVerticesDirty();
+    }
+
     /// <summary>판에 놓인 조각 위에 커서가 있다 — 선을 밝게.</summary>
     public void SetHovered(bool on)  { if (_hovered  == on) return; _hovered  = on; SetVerticesDirty(); }
 
@@ -64,7 +74,7 @@ public sealed class RunePieceOutline : MaskableGraphic
         float h = _size * 0.5f;
         float g = Mathf.Max(0f, _step - _size);   // 칸 틈
         float w = LineWidth;
-        Color32 plate = PlateColor;
+        Color32 plate = _plate;
         Color32 line  = _hovered || _selected || _dragging ? LineHot : LineIdle;
 
         // ① 받침 — 블록 · 같은 조각 칸 사이 틈 · 2×2 가운데 틈. 서로 겹치지 않는 사각형이라 알파가 고르다.

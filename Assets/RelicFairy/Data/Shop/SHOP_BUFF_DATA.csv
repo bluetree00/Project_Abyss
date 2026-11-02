@@ -19,5 +19,3 @@ shopbuff_critdmg_2,파괴의 가호,CritDamage,0.3,0,2,205,치명타 피해 증�
 shopbuff_cdr_1,각성의 가호,SkillCooldownReduction,0.08,0,1,130,스킬 쿨다운 감소(하급)
 shopbuff_cdr_2,각성의 가호,SkillCooldownReduction,0.15,0,2,215,스킬 쿨다운 감소(중급)
 shopbuff_proj_1,분열의 가호,Projectile,1,0,2,240,투사체 +1
-shopbuff_luck_1,행운의 가호,Luck,5,0,1,100,행운 증가(하급)
-shopbuff_luck_2,행운의 가호,Luck,10,0,2,180,행운 증가(중급)

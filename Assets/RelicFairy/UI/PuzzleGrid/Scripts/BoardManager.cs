@@ -309,7 +309,7 @@ public class BoardManager : MonoBehaviour
 
         activeAsset = gridSO;
         ActivateSession(gridSO);
-        UpdateGridNameUI(data.displayName);
+        UpdateGridNameUI(Loc.T(data.displayName));
     }
 
     /// <summary>동일 id의 퍼즐을 새 데이터로 완전 교체한다. 기존 SO/세션을 모두 재생성한다.</summary>

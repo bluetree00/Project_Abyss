@@ -79,7 +79,7 @@ public static class RelicResonance
                 if (!RelicPartAnchor.Covers(anchor, phase)) continue;
                 int before = GawainCount(l, phase, lookup);
                 int tierBefore = GawainTier(before), tierAfter = GawainTier(before + 1);
-                if (tierAfter > tierBefore) return $"{RelicPartAnchor.Label(phase)} 조각 {before} → {before + 1}: {GawainTierText(phase, tierAfter)}";
+                if (tierAfter > tierBefore) return Loc.F("{0} 조각 {1} → {2}: {3}", RelicPartAnchor.Label(phase), before, before + 1, GawainTierText(phase, tierAfter));   // 화면 언어(11-02 Q11)
             }
             return null;
         }
@@ -87,30 +87,32 @@ public static class RelicResonance
         {
             if (System.Array.IndexOf(RelicPartAnchor.LancelotRungs, anchor) < 0) return null;
             int before = LancelotCount(l, lookup);
-            if (LancelotTier(before + 1) > LancelotTier(before)) return $"광기 10~40 조각 {before} → {before + 1}: {LadderText(before + 1)}";
+            if (LancelotTier(before + 1) > LancelotTier(before)) return Loc.F("광기 10~40 조각 {0} → {1}: {2}", before, before + 1, LadderText(before + 1));
             return null;
         }
         return null;
     }
 
-    /// <summary>가웨인 시간대 단계 효과 한 줄(카드 · 보유 보기 · 첫 발동 자막).</summary>
-    public static string GawainTierText(string phase, int tier) => (phase, tier) switch
+    /// <summary>가웨인 시간대 단계 효과 한 줄(카드 · 보유 보기 · 첫 발동 자막).
+    /// 10-30 E-16 — 「새벽이 길다 —」 같은 비유 머리말을 걷었다(부르는 쪽이 이미 「4단계 —」 · 「여명 조각 3 → 4:」로 조건을 적는다).</summary>
+    public static string GawainTierText(string phase, int tier) => Loc.T((phase, tier) switch   // 화면 언어(11-02 Q11)
     {
         (RelicPartAnchor.Dawn, 2) => "적에게 쌓이는 태양흔 최대치 3 → 5",
-        (RelicPartAnchor.Dawn, 4) => "새벽이 길다 — 여명이 끝나도 해가 최대 10초 기다리고, Q를 누르는 순간 정오가 열린다",
+        (RelicPartAnchor.Dawn, 4) => "여명이 끝나도 해가 최대 10초 기다리고, Q를 누르는 순간 정오가 열린다",
         (RelicPartAnchor.Noon, 2) => "태양흔이 터지면 2m 안 다른 태양흔 적에게 1개씩 더 쌓인다(최대치까지)",
-        (RelicPartAnchor.Noon, 4) => "한낮이 길다 — 정오에도 맞히면 태양흔이 쌓이고, 가득 차면 그 자리에서 터진다",
+        (RelicPartAnchor.Noon, 4) => "정오에도 맞히면 태양흔이 쌓이고, 가득 차면 그 자리에서 터진다",
         (RelicPartAnchor.Dusk, 2) => "황혼에 붙인 불이 꺼지지 않고 다음 여명 첫 1초까지 탄다",
-        (RelicPartAnchor.Dusk, 4) => "밤이 오지 않는다 — 황혼이 끝나면 3초짜리 정오가 한 번 더 온다(태양흔이 터지고 Q)",
+        (RelicPartAnchor.Dusk, 4) => "황혼이 끝나면 3초짜리 정오가 한 번 더 온다(태양흔이 터지고 Q)",
         _ => string.Empty,
-    };
+    });
 
     /// <summary>랜슬롯 광기 칸 공명 효과 한 줄(조각 수 2 · 3 · 4 — 수치는 옛 이어진 계단과 같다: 받침 = 광기 20 · 3부터 30).</summary>
-    public static string LadderText(int count) => count switch
+    public static string LadderText(int count) => Loc.T(count switch   // 화면 언어(11-02 Q11)
     {
-        2 => "받침 — 광기가 줄어도 20 아래로 떨어지지 않는다",
-        3 => "재출발 — 광란이 끝나면 광기 30에서 다시 시작(받침도 30)",
-        4 => "두 번째 광란 — 광란 중 광기가 다시 40이 되면 광란이 이어지고 Q(심판)를 1번 더 쓴다",
+        // 10-30 E-16 — 머리말(받침 · 재출발 · 두 번째 광란)을 걷었다 · 「받침도 30」 → 무엇이 30인지
+        2 => "광기가 줄어도 20 아래로 떨어지지 않는다",
+        3 => "광란이 끝나면 광기 30에서 다시 시작하고, 줄어도 30 아래로 떨어지지 않는다",
+        4 => "광란 중 광기가 다시 40이 되면 광란이 이어지고 Q(심판)를 1번 더 쓴다",
         _ => string.Empty,
-    };
+    });
 }

@@ -299,7 +299,7 @@ public static class BaseCampRouteProbeEditor
     }
 
     /// <summary>
-    /// 스테이션 세 곳을 실제 경로로 채운다(창 없이): 원거리 = 장비 공방 EquipChoiceAsync(활) · 파츠 = 첫 파츠 id + 파츠 얻기 연출(StartPartStation과 같은 두 줄) ·
+    /// 스테이션 두 곳을 실제 경로로 채운다(창 없이): 원거리 = 장비 공방 EquipChoiceAsync(활) ·
     /// 유물 = 첫 유물 제단 Claim(로드아웃·연출·재스폰). 각 얻기 연출 중 0.4·1.0·1.6초 캡처. 플레이어는 광장 소환진에서 첫 화면 방향.
     /// </summary>
     [MenuItem(Root + "Acquire All - Station Paths (Play)")] public static void AcquireAll() => Start(AcquireAllAsync);
@@ -392,11 +392,10 @@ public static class BaseCampRouteProbeEditor
         var lo = AppBootstrapper.Instance?.Loadout;
         var fx = BaseCampFxDirector.Instance;
         var forge = UnityEngine.Object.FindFirstObjectByType<WeaponForgeAltar>();
-        var partSt = UnityEngine.Object.FindFirstObjectByType<StartPartStation>();
         var altar = UnityEngine.Object.FindObjectsByType<RelicAltar>(FindObjectsSortMode.None)
                     .FirstOrDefault(a => typeof(RelicAltar).GetField("relicClass", Inst)?.GetValue(a) != null);
-        if (player == null || root == null || lo == null || fx == null || forge == null || partSt == null || altar == null)
-        { Debug.LogWarning($"[RouteProbe] 준비 안 됨 — player={player != null} lo={lo != null} fx={fx != null} forge={forge != null} part={partSt != null} relic={altar != null}"); return; }
+        if (player == null || root == null || lo == null || fx == null || forge == null || altar == null)
+        { Debug.LogWarning($"[RouteProbe] 준비 안 됨 — player={player != null} lo={lo != null} fx={fx != null} forge={forge != null} relic={altar != null}"); return; }
 
         string dir = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "basecamp_route", $"{DateTime.Now:MMdd_HHmmss}_acquire");
         Directory.CreateDirectory(dir);
@@ -468,13 +467,6 @@ public static class BaseCampRouteProbeEditor
             float wakeLum = await CaptureLumAsync(Path.Combine(dir, "1w_parts_awake.png"), ct);
             sb.AppendLine($"  파츠 작업대: 궤도 구슬 {(orbital == null ? "필드 없음" : $"{(orbBefore ? "켜짐" : "꺼짐")} → {(orbital.activeInHierarchy ? "켜짐" : "꺼짐")}")}" +
                           $" · 원거리 획득 → 「파츠 작업대 깨어남」 {Since(r0, "파츠 작업대 깨어남"):0.00}초 · 캡처 밝기 {wakeLum:0.000}");
-
-            // ② 파츠
-            string partId = Managers.WeaponParts?.All?.Count > 0 ? Managers.WeaponParts.All[0].part_id : null;
-            lo.SetStartPart(partId);
-            fx.PlayAcquire(partSt.transform.position + Vector3.up * 1.3f, BaseCampFxDirector.AcquireKind.Part);
-            await Shots("2_part");
-            sb.AppendLine($"파츠: {partId ?? "null"}");
 
             // ③ 유물 — Claim은 플레이어를 다시 세운다(재스폰)
             typeof(RelicAltar).GetField("_player", Inst)?.SetValue(altar, player);
@@ -997,7 +989,6 @@ public static class BaseCampRouteProbeEditor
                 sb.AppendLine($"  실물 {label}: {(iv ? $"화면 안 ({v2.x:0.00},{v2.y:0.00})" : "화면 밖")} · {Bearing(cam, c.transform.position)} · 마커와 {(gap < 0f ? "마커 없음" : $"{gap:0.0} m{(gap > 3f ? " ⚠️마커가 안 따라옴" : "")}")}");
             }
             Real("장비 공방", UnityEngine.Object.FindFirstObjectByType<WeaponForgeAltar>(), "Markers/ForgeSpot");
-            Real("파츠 공방", UnityEngine.Object.FindFirstObjectByType<StartPartStation>(), "Markers/PartsSpot");
             sb.AppendLine($"필수 스테이션 보임 {mustOk}/{mustAll}");
             var fxDir = BaseCampFxDirector.Instance;
             if (fxDir != null)   // 처음 판엔 멀린의 공간 생성 뒤 — 공방이 다 서 있어야 상호작용할 수 있다

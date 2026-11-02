@@ -9,11 +9,12 @@ using UnityEngine;
 /// 재련할수록 분신이 는다(<see cref="Count"/> 1 → 2 → 3 · 10-26 사용자 「추가 재련 시 분신을 추가」). 자리는 모두 플레이어가 노리는 타격 지점(앞 <see cref="AimDistance"/> m)에
 /// 칼이 닿는 곳 — 왼쪽 옆 · 오른쪽 옆 · 왼쪽 앞(10-26 「분신의 위치가 기본 공격 타격을 유효하게 때리는 위치」). 공격 · 스킬 중에는 그 지점을 보고 벤다.
 /// 분신마다 늦음이 조금씩 달라(<see cref="DelayOf"/>) 잇달아 베는 잔상처럼 보인다.
-/// 피해는 증강(<see cref="ShadowPartnerAugment"/>)이 적중마다 분신마다 같은 늦음으로 따로 준다 — 여기는 모습만.
 /// 플레이어를 통째로 떠 동작을 벗긴 사본(<see cref="PlayerGhostStrike.BuildCopy"/>)에 알파 섞기 그림자 재질을 입힌다.
 /// 시각은 게임 시간이라 멈춘 화면(룬판 · ESC)에서는 따라 하기도 멈춘다. 맞을 것이 없는 방(대기방 · 상점)에서는 숨긴다(전설 고리와 같은 규칙).
-/// 베기 메아리(10-26 사용자 「개선 적용」 — 분신 피해가 숫자로만 보였다): 분신의 피해가 들어가는 순간 그 분신 자리에서 플레이어와 같은 베기를
-/// 어둡고 옅게 한 번(<see cref="EchoSlash"/> · 베기마다 분신당 한 번 · 맞힌 분신만 — 그림 = 판정). 판정 없는 보이기용 사본이다.
+/// 분신 베기(10-30 사용자 「분신이 타격하는 게 제대로 보여야 하고 데미지도 제대로 체크」): 플레이어 평타 베기마다(<see cref="NoteSlash"/>) 분신마다 칼이 닿는 순간
+/// 그 분신 자리에서 플레이어와 같은 베기를 어두운 보라로 내고(판정 없는 보이기용 사본), 플레이어 베기와 같은 판정 모양 안의 적을 벤다(그림 = 판정 · <see cref="Strike"/>).
+/// 피해 = 바탕 × <see cref="Percent"/>% — 바탕은 플레이어가 막 때린 적이면 그 피해(<see cref="NoteHit"/> · 치명 · 룬 포함), 아니면 그 휘두름의 피해(치명 · 방어 전).
+/// 예전엔 플레이어가 맞힌 적에게만 피해를 따라 주고 분신 자리와 상관없었다(분신이 안 닿아도 맞고 · 분신 칼 앞 적은 안 맞음). 스킬 따라 하기는 증강이 준다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class ShadowPartner : MonoBehaviour
@@ -23,21 +24,44 @@ public sealed class ShadowPartner : MonoBehaviour
     private const int   Samples = 48, MaxLayers = 4, MaxFloats = 16;
     private const float IdleCheckInterval = 0.5f, IdleRadius = 25f, Alpha = 0.45f;
     private const float AimDistance = 2.2f, TurnSpeed = 900f;   // 타격 지점(평타 판정 가운데) · 그쪽으로 도는 빠르기(°/초)
-    private const float SlashLife = 0.6f, SlashFresh = 0.5f;      // 베기 메아리 수명 · 플레이어 베기가 이보다 오래되면 메아리 없음
-    private const int   MaxSlashFx = 6;
+    private const float SlashLife = 0.6f, HitFresh = 0.5f;        // 베기 사본 수명 · 플레이어가 막 때린 피해를 그 적의 바탕으로 보는 시간
+    private const int   MaxSlashFx = 6, MaxHitNotes = 64;
     // 분신 자리(플레이어 회전 기준) · 늦음 — 셋 다 타격 지점까지 2 m 안(카타나 평타가 닿는 거리)
     private static readonly Vector3[] Offsets = { new(-1.1f, 0f, 0.3f), new(1.1f, 0f, 0.3f), new(-1.5f, 0f, 1.7f) };
     private static readonly float[]   Delays  = { 0.12f, 0.16f, 0.2f };
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
     private static readonly List<GameObject> s_idleBuf = new(1);
-    // 베기 메아리 색(알파 섞기 · 재질 기본색 ×4라 낮게) — 어두운 보라 그림자
-    private static readonly Color SlashBright = new(0.09f, 0.07f, 0.14f), SlashDeep = new(0.02f, 0.015f, 0.035f);
-    private const float SlashAlpha = 0.7f;
+    private static readonly Collider[] s_overlap = new Collider[64];
+    private static readonly List<RelicFairy.Monster.MonsterBase> s_struck = new(16);
+    // 분신 베기 색(알파 섞기 · 재질 기본색 ×4라 낮게) — 보라 그림자. 10-26 값(0.09 · 0.07 · 0.14)은 어두운 방에서 안 보였다(10-30)
+    private static readonly Color SlashBright = new(0.2f, 0.11f, 0.38f), SlashDeep = new(0.05f, 0.025f, 0.1f);
+    private const float SlashAlpha = 0.85f;
 #if UNITY_EDITOR
     /// <summary>실측 99 F-4 — 베기 메아리 색 후보(투명도 0이면 기본).</summary>
     public static Color ProbeSlashBright, ProbeSlashDeep;
     public static float ProbeSlashAlpha;
+    /// <summary>실측 99 O — 분신 베기가 적을 벴다(분신 칸 · 적 · 피해).</summary>
+    public static Action<int, RelicFairy.Monster.MonsterBase, float> ProbeStruck;
 #endif
+
+    /// <summary>플레이어 평타 베기 한 번 — 플레이어 기준 그림 자리 · 판정 모양 · 피해. 분신이 자기 자리에서 같은 베기를 낸다.</summary>
+    private readonly struct SlashNote
+    {
+        public readonly string Key;
+        public readonly Vector3 Pos;            // 그림(플레이어 기준 — 회전만)
+        public readonly Quaternion Rot;
+        public readonly float Scale;
+        public readonly bool Box;               // 판정 = 상자(아니면 구 · 반경 = Half.x)
+        public readonly Vector3 Center;         // 판정 가운데(플레이어 기준)
+        public readonly Quaternion ShapeRot;
+        public readonly Vector3 Half;
+        public readonly float Damage;           // 그 휘두름의 피해(치명 · 방어 전) — 플레이어가 안 때린 적의 바탕
+
+        public SlashNote(string key, Vector3 pos, Quaternion rot, float scale, bool box, Vector3 center, Quaternion shapeRot, Vector3 half, float damage)
+        {
+            Key = key; Pos = pos; Rot = rot; Scale = scale; Box = box; Center = center; ShapeRot = shapeRot; Half = half; Damage = damage;
+        }
+    }
 
     private struct Pose { public float t; public Vector3 pos; public Quaternion rot; public bool combat; }
     private struct LayerPose { public int hash; public float time; public float weight; }
@@ -47,6 +71,8 @@ public sealed class ShadowPartner : MonoBehaviour
         public string key;
         public GameObject go;
         public ParticleSystem[] ps;
+        public ParticleSystem.MinMaxGradient[] baseColors;   // 칠한 뒤 시작 색 — 보스 예고 중 옅게 했다가 되돌린다(10-30)
+        public bool dimmed;
         public float hideAt = -1f;
     }
 
@@ -71,11 +97,8 @@ public sealed class ShadowPartner : MonoBehaviour
     private bool _enemiesNear, _shown;
     private int _shownCount;
     private readonly List<SlashFx> _slashFx = new();
-    private string _slashKey;
-    private Vector3 _slashPos;          // 플레이어 기준(회전만 · 크기 무관)
-    private Quaternion _slashRot;
-    private float _slashScale, _slashAt = -999f;
-    private int _echoed, _loadingSlash;   // 이번 베기에서 메아리를 낸 분신(비트) · 불러오는 중인 사본 수
+    private int _loadingSlash;          // 불러오는 중인 사본 수
+    private readonly Dictionary<int, (float dmg, float at)> _hitDmg = new();   // 플레이어가 막 때린 적 → 그 피해(분신 피해의 바탕)
 
     // ── Properties ────────────────────────────────────────────────
     /// <summary>증강이 켜져 있고 그 카타나를 쥐었다 — 증강이 틱마다 넣는다.</summary>
@@ -86,6 +109,10 @@ public sealed class ShadowPartner : MonoBehaviour
     public bool Shown => _shown;
     /// <summary>지금 보이는 분신 수(실측).</summary>
     public int ShownCount => _shown ? _shownCount : 0;
+    /// <summary>분신 베기 한 번의 피해(바탕의 %) — 증강이 틱마다 넣는다(재련할수록 자람).</summary>
+    public float Percent { get; set; }
+    /// <summary>분신 베기 수(실측 — 맞힌 적이 없어도 센다).</summary>
+    public int StrikeCount { get; private set; }
     /// <summary>지금 보이는 베기 메아리 수(실측).</summary>
     public int EchoVisible { get { int n = 0; foreach (var f in _slashFx) if (f.go != null && f.go.activeSelf) n++; return n; } }
     /// <summary>베기 메아리 사본에 켜진 충돌체 수 — 0이어야(판정 없는 보이기용 · 실측).</summary>
@@ -154,35 +181,73 @@ public sealed class ShadowPartner : MonoBehaviour
     /// <summary><paramref name="index"/>번째 분신의 늦음(초) — 증강이 그 분신의 칼이 닿을 때 피해를 준다.</summary>
     public static float DelayOf(int index) => Delays[Mathf.Clamp(index, 0, MaxClones - 1)];
 
-    /// <summary>플레이어 평타 베기가 났다(WeaponEffectHandler) — 분신이 맞힐 때 같은 베기를 낼 수 있게 플레이어 기준 자리를 적어 둔다.</summary>
-    public static void NoteSlash(PlayerController p, string key, Vector3 pos, Quaternion rot, float scale)
+    /// <summary>
+    /// 검풍(카타나 증강)을 날릴 그림자 분신 — 보이는 분신 중 <paramref name="left"/> 쪽(없으면 아무나)의 칼끝 자리(<paramref name="dir"/>로 <paramref name="reach"/> m)와
+    /// 그 분신의 칼이 닿기까지 남은 초(늦음). 그림자 분신이 안 보이면 false(10-30 사용자 「분신이 따로 날리는 검풍」).
+    /// </summary>
+    public static bool TryCloneOrigin(PlayerController p, bool left, Vector3 dir, float reach, out Vector3 from, out float lead)
     {
-        if (p == null || string.IsNullOrEmpty(key) || !p.TryGetComponent<ShadowPartner>(out var sp) || !sp._shown) return;
-        var tf = p.transform;
-        var inv = Quaternion.Inverse(tf.rotation);
-        sp._slashKey   = key;
-        sp._slashPos   = inv * (pos - tf.position);
-        sp._slashRot   = inv * rot;
-        sp._slashScale = scale;
-        sp._slashAt    = Time.time;
-        sp._echoed     = 0;
+        from = default; lead = 0f;
+        if (p == null || !p.TryGetComponent<ShadowPartner>(out var sp) || !sp._shown) return false;
+        int pick = -1;
+        int count = Mathf.Clamp(sp.Count, 1, MaxClones);
+        for (int i = 0; i < count; i++)
+        {
+            if (sp._clones[i] == null || !sp._clones[i].go.activeSelf) continue;
+            if (pick < 0 || (Offsets[i].x < 0f) == left && (Offsets[pick].x < 0f) != left) pick = i;
+        }
+        if (pick < 0) return false;
+        from = sp._clones[pick].go.transform.position + dir * reach;
+        from.y = p.transform.position.y;
+        lead = Delays[pick];
+        return true;
     }
 
     /// <summary>
-    /// <paramref name="slot"/>번째 분신의 피해가 들어갔다(증강) — 그 분신 자리에서 마지막 플레이어 베기를 어둡고 옅게 한 번.
-    /// 베기마다 분신당 한 번(여러 적을 맞혀도) · 플레이어 베기가 <see cref="SlashFresh"/>초보다 오래됐으면 없음.
+    /// 플레이어 평타 베기가 판정을 마쳤다(WeaponEffectHandler) — 보이는 분신마다 그 늦음 뒤 자기 자리에서 같은 베기 · 같은 판정을 낸다(<see cref="Strike"/>).
+    /// <paramref name="shape"/> = 그 베기의 판정 콜라이더(상자 · 구만 · 크기 배율이 먹은 뒤) · <paramref name="damage"/> = 그 휘두름의 피해(치명 · 방어 전).
     /// </summary>
-    public void EchoSlash(int slot)
+    public static void NoteSlash(PlayerController p, string key, Transform slash, Collider shape, float damage)
     {
-        if (!_shown || slot < 0 || slot >= MaxClones || _clones[slot] == null || _slashKey == null) return;
-        if (Time.time - _slashAt > SlashFresh || (_echoed & (1 << slot)) != 0) return;
-        _echoed |= 1 << slot;
-        var ctf = _clones[slot].go.transform;
-        Vector3 pos = ctf.position + ctf.rotation * _slashPos;
-        Quaternion rot = ctf.rotation * _slashRot;
-        int shown = ShowOrLoad(_slashKey, pos, rot, _slashScale);
-        if (shown == 1) Log($"베기 메아리 — 분신 {slot + 1}");
-        else if (shown == 2) Log($"베기 메아리 — 분신 {slot + 1}(사본 만듦)");
+        if (p == null || slash == null || string.IsNullOrEmpty(key) || !p.TryGetComponent<ShadowPartner>(out var sp) || !sp._shown) return;
+        var tf = p.transform;
+        var inv = Quaternion.Inverse(tf.rotation);
+        Vector3 center, half;
+        Quaternion shapeRot;
+        if (shape is BoxCollider box)
+        {
+            var t = box.transform;
+            Vector3 s = t.lossyScale;
+            center   = t.TransformPoint(box.center);
+            half     = new Vector3(box.size.x * 0.5f * Mathf.Abs(s.x), box.size.y * 0.5f * Mathf.Abs(s.y), box.size.z * 0.5f * Mathf.Abs(s.z));
+            shapeRot = inv * t.rotation;
+        }
+        else if (shape is SphereCollider sphere)
+        {
+            var t = sphere.transform;
+            Vector3 s = t.lossyScale;
+            center   = t.TransformPoint(sphere.center);
+            half     = Vector3.one * sphere.radius * Mathf.Max(Mathf.Abs(s.x), Mathf.Abs(s.y), Mathf.Abs(s.z));
+            shapeRot = Quaternion.identity;
+        }
+        else return;   // 판정 모양을 모르면 분신 베기 없음(그림만 내면 그림 ≠ 판정)
+        var note = new SlashNote(key, inv * (slash.position - tf.position), inv * slash.rotation, slash.lossyScale.x,
+                                 shape is BoxCollider, inv * (center - tf.position), shapeRot, half, damage);
+        int count = Mathf.Clamp(sp.Count, 1, MaxClones);
+        for (int i = 0; i < count; i++)
+        {
+            if (sp._clones[i] == null) continue;
+            int slot = i;
+            FormStrike.After(p, Delays[slot], () => { if (sp != null) sp.Strike(slot, note); });   // 그 분신의 칼이 닿을 때(분신마다 늦음이 다르다)
+        }
+    }
+
+    /// <summary>플레이어 평타가 그 적에게 준 피해(증강 · 적중마다) — 곧 올 분신 베기가 그 적에게 같은 바탕으로 벤다.</summary>
+    public void NoteHit(RelicFairy.Monster.MonsterBase target, float dealt)
+    {
+        if (target == null || dealt <= 0f) return;
+        if (_hitDmg.Count >= MaxHitNotes) _hitDmg.Clear();
+        _hitDmg[target.GetInstanceID()] = (dealt, Time.time);
     }
 
     /// <summary>
@@ -244,6 +309,44 @@ public sealed class ShadowPartner : MonoBehaviour
         _count = 0;   // 옛 자세(무기 바꾸기 전 · 옛 애니 상태)를 버린다(10-26 검토 I4)
     }
 
+    /// <summary>
+    /// <paramref name="slot"/>번째 분신의 칼이 닿았다 — 그 분신 자리에서 플레이어와 같은 베기를 보라로 내고(그림), 같은 판정 모양 안의 적을 벤다(그림 = 판정).
+    /// 피해 = (플레이어가 막 때린 적이면 그 피해 · 아니면 그 휘두름의 피해) × <see cref="Percent"/>%. 추가 피해라 적중 효과(룬 · 유물 발동)는 붙지 않는다(D5).
+    /// </summary>
+    private void Strike(int slot, SlashNote n)
+    {
+        if (!_shown || _player == null || slot >= MaxClones || _clones[slot] == null || !_clones[slot].go.activeSelf) return;
+        var ctf = _clones[slot].go.transform;
+        Quaternion crot = ctf.rotation;
+        Vector3 cpos = ctf.position;
+        ShowOrLoad(n.Key, cpos + crot * n.Pos, crot * n.Rot, n.Scale);
+        StrikeCount++;
+        Vector3 c = cpos + crot * n.Center;
+        int hits = n.Box
+            ? Physics.OverlapBoxNonAlloc(c, n.Half, s_overlap, crot * n.ShapeRot, RelicFairy.Monster.MonsterBase.HitLayerMask, QueryTriggerInteraction.Collide)
+            : Physics.OverlapSphereNonAlloc(c, n.Half.x, s_overlap, RelicFairy.Monster.MonsterBase.HitLayerMask, QueryTriggerInteraction.Collide);
+        s_struck.Clear();
+        for (int i = 0; i < hits; i++)
+        {
+            var mb = s_overlap[i] != null ? s_overlap[i].GetComponentInParent<RelicFairy.Monster.MonsterBase>() : null;
+            if (mb == null || mb.IsDead || mb.IsMeleeImmuneNow || s_struck.Contains(mb)) continue;
+            s_struck.Add(mb);
+        }
+        float now = Time.time;
+        for (int i = 0; i < s_struck.Count; i++)
+        {
+            var mb = s_struck[i];
+            float basis = _hitDmg.TryGetValue(mb.GetInstanceID(), out var h) && now - h.at <= HitFresh ? h.dmg : n.Damage;
+            float dmg = basis * Percent * 0.01f;
+            if (dmg <= 0f) continue;
+            CombatQuery.DealSynergyDamage(mb, dmg, _player.gameObject);
+#if UNITY_EDITOR
+            ProbeStruck?.Invoke(slot, mb, dmg);
+#endif
+        }
+        Log($"분신 {slot + 1} 베기 — 맞힘 {s_struck.Count}");
+    }
+
     /// <summary>쉬는 사본이 있으면 그 자리에 보인다(1) · 없으면 새로 만든다(2 · 사본 수 상한 <see cref="MaxSlashFx"/>) · 상한이면 0.</summary>
     private int ShowOrLoad(string key, Vector3 pos, Quaternion rot, float scale)
     {
@@ -277,7 +380,10 @@ public sealed class ShadowPartner : MonoBehaviour
         if (ProbeSlashAlpha > 0f) { bright = ProbeSlashBright; deep = ProbeSlashDeep; alpha = ProbeSlashAlpha; }
 #endif
         ElementSlashTint.Paint(go, bright, deep, alpha);
+        PlayerFxCalm.LowerSorting(go);   // 보스 예고 아래로(10-30)
         var f = new SlashFx { key = key, go = go, ps = go.GetComponentsInChildren<ParticleSystem>(true) };
+        f.baseColors = new ParticleSystem.MinMaxGradient[f.ps.Length];
+        for (int i = 0; i < f.ps.Length; i++) f.baseColors[i] = f.ps[i].main.startColor;
         _slashFx.Add(f);
         ShowSlash(f, pos, rot, scale);
     }
@@ -286,6 +392,16 @@ public sealed class ShadowPartner : MonoBehaviour
     {
         f.go.transform.SetPositionAndRotation(pos, rot);
         f.go.transform.localScale = Vector3.one * scale;
+        bool dim = PlayerFxCalm.Active;   // 보스 예고가 떠 있으면 옅게(10-30) — 바뀔 때만 다시 칠한다
+        if (dim != f.dimmed && f.baseColors != null)
+        {
+            f.dimmed = dim;
+            for (int i = 0; i < f.ps.Length; i++)
+            {
+                var main = f.ps[i].main;
+                main.startColor = dim ? PlayerFxCalm.ScaleAlpha(f.baseColors[i], PlayerFxCalm.DimAlpha) : f.baseColors[i];
+            }
+        }
         f.go.SetActive(true);
         foreach (var s in f.ps) { s.Clear(false); s.Play(false); }
         f.hideAt = Time.time + SlashLife;

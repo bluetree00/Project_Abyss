@@ -16,7 +16,7 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     public enum ZPhase { Charging = 0, Noon = 1, Cooldown = 2 }
 
     private const string RelicKey = "gawain";
-    private const int V_CHARGE = 0, V_NOON = 1, V_COOLDOWN = 2, V_MARK_THRESH = 7;
+    private const int V_CHARGE = 0, V_NOON = 1, V_COOLDOWN = 2, V_MARK_THRESH = 7, V_MARK_ATK = 8;
 
     // 잔열 가속 상한 — 3배속까지. 없으면 학살 구간에서 정오가 끊기지 않고 도는 무한 루프가 된다.
     private const float MaxChargeAccel = 2f;
@@ -28,6 +28,7 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     private static readonly List<MonsterBase> s_foes = new();
 
     private float _chargeTime = 20f, _noonTime = 10f, _cooldownTime = 15f, _markThreshold = 0.8f;
+    private float _markAtk = 0.10f;   // 각인 공격력 — 라벨 「 · 공격력 +10%」(10-30 H-03 · 버프는 GawainZenithRelic이 같은 슬롯으로 건다)
 
     private ZPhase _phase = ZPhase.Charging;
     private float  _timer;        // 현재 구간 경과
@@ -36,7 +37,7 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     private bool   _holdNoon;     // [파츠] 영원한 정오 — true면 정오 구간에 고정(황혼·충전 제거)
 
     // 유물 성장 v2(10-02) — 하루를 손대는 손잡이. 아무것도 켜지 않으면 기존 순환 그대로다.
-    private const float HoldDawnMax = 10f;   // 「새벽이 길다」 — 여명 끝에서 해를 붙드는 최대 시간
+    public const float HoldDawnMax = 10f;    // 「새벽이 길다」 — 여명 끝에서 해를 붙드는 최대 시간(10-30 하루 띠 안내 글도 읽는다)
     private bool   _holdDawn;     // 여명 공명 4가 켰다
     private bool   _holding;      // 지금 여명 끝에서 붙들고 있다
     private float  _holdTimer;
@@ -49,7 +50,7 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     private float  _foeCheckTimer;
 
     // 라벨 캐시 — 표시값이 바뀔 때만 문자열을 새로 만든다.
-    private string _label = "여명 — 쳐서 쌓기";
+    private string _label = string.Empty;
     private int    _labelKey = int.MinValue;
 
     public event Action OnChanged;
@@ -66,6 +67,10 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
         : (_phase == ZPhase.Noon ? 1f : 0f);
     /// <summary>각인 발동(충전 중 게이지 임계 이상).</summary>
     public bool IsMarkReady => _phase == ZPhase.Charging && ChargeFill >= _markThreshold;
+    /// <summary>각인 문턱(게이지 0~1) — HUD 게이지의 각인 눈금 자리(10-30 H-03).</summary>
+    public float MarkThreshold => _markThreshold;
+    /// <summary>근처(<see cref="FoeRadius"/>)에 적이 없어 해가 기다리는 중인가 — HUD가 「멈춤(근처에 적 없음)」 · 흐린 게이지로 알린다(10-30 H-01).</summary>
+    public bool WaitingForFoe => !_foeNear && !_holdNoon && IsRunActive;
 
     public void Initialize()
     {
@@ -76,6 +81,7 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
             _noonTime      = m.Get(RelicKey, V_NOON,        _noonTime);
             _cooldownTime  = m.Get(RelicKey, V_COOLDOWN,    _cooldownTime);
             _markThreshold = m.Get(RelicKey, V_MARK_THRESH, _markThreshold);
+            _markAtk       = m.Get(RelicKey, V_MARK_ATK,    _markAtk);
         }
         _phase = ZPhase.Charging; _timer = 0f; _chargeAccel = 0f; _markActiveLast = false;
         OnChanged?.Invoke();
@@ -178,6 +184,22 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
         //    가속은 '해를 앞당기는' 적립이므로 정오에 도달했을 때(=보상을 받았을 때) 소진한다.
         if (_phase == ZPhase.Noon) _chargeAccel = 0f;
         PhaseChanged?.Invoke(old, _phase);
+    }
+
+    /// <summary>라벨 글을 새로 짓는다 — <see cref="Label"/>이 표시값이 바뀔 때만 부른다(초가 바뀔 때 한 번).</summary>
+    private string BuildLabel(int sec, bool idle)
+    {
+        // 화면 언어(11-02 Q11) — 열쇠 = 한글 원문 · 자리표시 {n}(영어 어순은 STRINGS 표에서)
+        string name = Loc.T(_phase switch { ZPhase.Noon => "정오", ZPhase.Charging => "여명", _ => "황혼" });
+        if (idle) return Loc.F("{0} — 멈춤(근처에 적 없음)", name);
+        if (_holding) return Loc.F("여명 연장 {0}초 — Q로 정오 시작", sec);
+        string accel = _chargeAccel > 0.01f ? Loc.F(" · 처치 가속 ×{0}", (1f + _chargeAccel).ToString("0.0")) : string.Empty;
+        return _phase switch
+        {
+            ZPhase.Noon     => _holdNoon ? Loc.T("정오 — 태양흔 폭발 · Q 사용 가능") : Loc.F("정오 {0}초 — 태양흔 폭발 · Q 사용 가능", sec),
+            ZPhase.Charging => IsMarkReady ? Loc.F("여명 {0}초 — 맞힌 적에 태양흔 · 공격력 +{1}%", sec, (_markAtk * 100f).ToString("0")) + accel : Loc.F("여명 {0}초 — 맞힌 적에 태양흔", sec) + accel,
+            _               => accel.Length > 0 ? Loc.F("황혼 {0}초 — Q 잠김", sec) + accel : Loc.F("황혼 {0}초 — Q 잠김 · 처치하면 여명이 빨라짐", sec),
+        };
     }
 
     // ── 유물 성장 v2 손잡이 ─────────────────────────────────
@@ -285,25 +307,25 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
         _               => Mathf.Clamp01(_timer / Mathf.Max(0.01f, _cooldownTime)),
     };
     /// <summary>
-    /// 게이지 라벨 — 시간대 이름 + 그때 하는 일(10-22 E1 D5 「여명 · 정오 · 황혼이 뭔지 모른다」 — 이름만 있었다).
-    /// 「여명 — 쳐서 쌓기」 · 「정오! — 터짐 · Q」 · 「황혼 — Q 잠김」. 잔열 가속이 붙어 있으면 「 · 처치로 앞당김 ×1.4」 —
-    /// 처치가 해를 앞당긴다는 사실이 화면에 보이지 않으면 플레이어는 그런 게 있는지도 모른다.
-    /// 표시값이 바뀔 때만 문자열을 새로 만든다(매 프레임 alloc 방지).
+    /// 게이지 라벨 — 시간대 이름 + 남은 초 + 그때 일어나는 일(10-22 E1 D5 이름 + 할 일 → 10-30 사용자 「컨셉 대사처럼이 아닌 직관적인 설명 글」 · 점검표 H-01~H-03).
+    /// 「여명 12초 — 맞힌 적에 태양흔」 · 「정오 8초 — 태양흔 폭발 · Q 사용 가능」 · 「황혼 9초 — Q 잠김 · 처치하면 여명이 빨라짐」.
+    /// 예전 「쳐서 쌓기 · 터짐」은 무엇을 쌓고 무엇이 터지는지 말하지 않았고 남은 시간도 없었다.
+    /// 각인(80%)부터 「 · 공격력 +10%」(금색이 「준비됨」으로 읽혔다) · 잔열 가속이 붙어 있으면 「 · 처치 가속 ×1.4」 ·
+    /// 근처에 적이 없어 해가 기다리면 「여명 — 멈춤(근처에 적 없음)」(게이지가 왜 안 차는지 몰랐다).
+    /// 표시값(구간 · 남은 초 · 각인 · 가속 · 멈춤)이 바뀔 때만 문자열을 새로 만든다 — 초가 바뀔 때 한 번(매 프레임 alloc 없음).
     /// </summary>
     public string Label
     {
         get
         {
-            int key = (int)_phase * 100 + Mathf.RoundToInt(_chargeAccel * 10f);
+            bool idle = WaitingForFoe;
+            int  sec  = _holdNoon ? 0 : _holding ? Mathf.CeilToInt(Mathf.Max(0f, HoldDawnMax - _holdTimer)) : Mathf.CeilToInt(PhaseRemaining);
+            int  bits = (int)_phase * 8 + (idle ? 4 : 0) + (IsMarkReady ? 2 : 0) + (_holding ? 1 : 0);
+            int  key  = bits * 100000 + Mathf.Min(sec, 999) * 100 + Mathf.RoundToInt(_chargeAccel * 10f);
             if (key != _labelKey)
             {
                 _labelKey = key;
-                _label = _phase switch
-                {
-                    ZPhase.Noon     => "정오! — 터짐 · Q",
-                    ZPhase.Charging => _chargeAccel > 0.01f ? $"여명 — 쳐서 쌓기 · 처치로 앞당김 ×{1f + _chargeAccel:0.0}" : "여명 — 쳐서 쌓기",
-                    _               => _chargeAccel > 0.01f ? $"황혼 — Q 잠김 · 처치로 앞당김 ×{1f + _chargeAccel:0.0}" : "황혼 — Q 잠김",
-                };
+                _label = BuildLabel(sec, idle);
             }
             return _label;
         }

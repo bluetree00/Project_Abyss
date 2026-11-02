@@ -32,7 +32,8 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     private static readonly Color HoldColor  = new(1f, 0.86f, 0.5f, 1f);
     private static readonly Color LabelDim   = new(0.62f, 0.60f, 0.57f, 1f);   // 잉크를 밝기로 흐린 것(알파는 하드 가드가 1로 되돌린다)
     // 「여명 1/4」는 1/4를 여명 진행도로 읽을 수 있었다 → 둘째 줄에 「조각 1/4」(10-18 사용자 「진행」 · 한 줄이면 정오 띠(44px) 이름끼리 겹친다)
-    private static readonly string[] ArcFormat = { "여명\n조각 {0}/4", "정오\n조각 {0}/4", "황혼\n조각 {0}/4" };
+    // 10-30 H-04 — 분모 = 다음 문턱(2개 전 「1/2」 · 그 뒤 「2/4」) · 카드 꼬리말 「여명 조각 1/2」와 같은 셈(첫 단계가 2개인데 분모가 4였다)
+    private static readonly string[] ArcFormat = { "여명\n조각 {0}/{1}", "정오\n조각 {0}/{1}", "황혼\n조각 {0}/{1}" };
     private static readonly Color[] ArcColor =
     {
         new(1f, 0.87f, 0.55f),   // 여명 — 옅은 금
@@ -79,7 +80,9 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     private const float RungCountX   = 14f;
     private const float RungCountW   = 80f;
     private const float LadderHintUp = 22f;    // 문턱 값 가운데 → 처음 안내 가운데(문턱 값 줄 위)
-    private const string RungCountFormat = "조각 {0}/4";
+    // 10-30 H-11 — 「조각 2/4」는 어느 조각인지 · 다음 문턱이 안 보였다 → 「광기 조각 2/3」(분모 = 다음 단계 2 · 3 · 4) · 4개부터 「광기 조각 4개」
+    private const string RungCountFormat     = "광기 조각 {0}/{1}";
+    private const string RungCountFullFormat = "광기 조각 {0}개";
 
     private static Sprite s_dot;
     private static Sprite s_starFill, s_starLine;
@@ -116,6 +119,8 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     private CanvasGroup     _hintGroup;
     private float           _hintSec;
     private float           _hintLeft;
+    private string          _hintNext;      // 이어서 띄울 한 줄(10-30 H-10 — 광기 칸 안내 뒤 마름모 색 범례)
+    private float           _hintNextSec;
 
     // 원한 숫자 · 가득 금 테(10-12 A2)
     private TextMeshProUGUI _grudgeLabel;
@@ -231,7 +236,8 @@ public sealed class RelicMemoryHudView : MonoBehaviour
             _rungIcon[i].color = _rungBase[i];
         }
         if (_rungCount == null) return;
-        _rungCount.SetText(RungCountFormat, Mathf.Min(count, 4));
+        if (count >= 4) _rungCount.SetText(Loc.T(RungCountFullFormat), count);   // 11-02 Q11 형식 글을 표에서
+        else _rungCount.SetText(Loc.T(RungCountFormat), count, count < 2 ? 2 : count + 1);
         _rungCount.color = tier >= 4 ? UITheme.Thin.Gold : tier >= 2 ? UITheme.Thin.Ink : LabelDim;
     }
 
@@ -268,7 +274,8 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         {
             _grudgeLabel.rectTransform.anchoredPosition = new Vector2(rowW + GrudgeLabelGap, 0f);
             _grudgeLabel.color = rim ? UITheme.Thin.Gold : UITheme.Thin.Ink;
-            if (cap > 0) _grudgeLabel.SetText("원한 {0}/{1}", Mathf.Min(value, cap), cap);
+            // 10-30 H-13 — 무엇에 쓰는지 둘째 줄(심판 마지막 일격 뒤 원한 1개당 참격 1줄). 한 줄로 늘이면 16:10에서 물약 C 칸에 닿는다
+            if (cap > 0) _grudgeLabel.SetText("원한 {0}/{1}\n<size=80%>Q 참격 +{0}</size>", Mathf.Min(value, cap), cap);
             else _grudgeLabel.text = string.Empty;
             starX += cap > 0 ? _grudgeLabel.preferredWidth : 0f;
         }
@@ -292,12 +299,15 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         _star.rectTransform.localScale = Vector3.one;
     }
 
-    /// <summary>계단 i(0~3)의 문턱 값(광기 스택) — 첫 칸만 「광기 10」, 나머지는 숫자(카드 자리 이름 「광기 20」과 같은 값).</summary>
-    public void SetRungValue(int i, int value)
+    /// <summary>
+    /// 계단 i(0~3)의 문턱 값(광기 스택) — 첫 칸만 「광기 10」, 나머지는 숫자(카드 자리 이름 「광기 20」과 같은 값).
+    /// <paramref name="brand"/> = 이 광기부터 맞힌 적에 낙인이 붙는다(기본 규칙) — 「20 낙인」(10-30 H-10 · 마름모가 이 문턱의 뜻으로 읽혔다).
+    /// </summary>
+    public void SetRungValue(int i, int value, bool brand = false)
     {
         if (_dial || i < 0 || i >= 4 || _rungLabel[i] == null) return;
-        if (i == 0) _rungLabel[i].SetText("광기 {0}", value);
-        else _rungLabel[i].SetText("{0}", value);
+        if (i == 0) _rungLabel[i].SetText(brand ? "광기 {0} 낙인" : "광기 {0}", value);
+        else _rungLabel[i].SetText(brand ? "{0} 낙인" : "{0}", value);
     }
 
     /// <summary>광기가 계단 i(0~3)를 넘었다 — 표식이 한 번 빛난다.</summary>
@@ -386,7 +396,7 @@ public sealed class RelicMemoryHudView : MonoBehaviour
             nrt.anchoredPosition = new Vector2(x + w * 0.5f, -(StripH * 0.5f + DialLabelGap));
             nrt.sizeDelta = new Vector2(ArcLabelW, DialLabelH);
             arcName.color = LabelDim;
-            arcName.SetText(ArcFormat[i], 0);
+            arcName.SetText(Loc.T(ArcFormat[i]), 0, 2);
             _arcLabel[i] = arcName;
             x += w + StripGap;
         }
@@ -431,7 +441,8 @@ public sealed class RelicMemoryHudView : MonoBehaviour
             for (int j = 0; j < 4; j++)
                 if (_pips[i][j] != null) _pips[i][j].color = j < counts[i] ? (tier >= 4 ? RungLinked : ArcColor[i]) : PipOff;
             if (_arcLabel[i] == null) continue;
-            _arcLabel[i].SetText(ArcFormat[i], Mathf.Min(counts[i], 4));
+            int shown = Mathf.Min(counts[i], 4);
+            _arcLabel[i].SetText(Loc.T(ArcFormat[i]), shown, shown < 2 ? 2 : 4);
             _arcLabel[i].color = tier >= 4 ? UITheme.Thin.Gold : tier >= 2 ? UITheme.Thin.Ink : LabelDim;
         }
     }
@@ -440,9 +451,11 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     /// 처음 안내 한 줄 — <paramref name="seconds"/>초 띄우고 걷는다(들어올 때 0.25초 · 나갈 때 0.5초 흐림).
     /// 게임 시간으로 센다 — 조각을 고른 창(시간 멈춤)이 닫힌 뒤부터 보인다. 가웨인 하루 띠 · 랜슬롯 광기 눈금 둘 다(10-22 E1 A6).
     /// </summary>
-    public void ShowHint(string text, float seconds)
+    public void ShowHint(string text, float seconds, string next = null, float nextSeconds = 0f)
     {
         if (_hint == null) return;
+        _hintNext    = next;   // 이 줄이 걷히면 이어서 띄운다(10-30 H-10)
+        _hintNextSec = nextSeconds;
         _hint.text = text;
         _hintSec = _hintLeft = Mathf.Max(HintFadeIn + HintFadeOut, seconds);
         if (_hintGroup != null) _hintGroup.alpha = 0f;
@@ -471,7 +484,9 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         if (_holdLabel != null && _holdShown != holdingDawn)
         {
             _holdShown = holdingDawn;
-            _holdLabel.text = holdingDawn ? "새벽을 붙들었다 · 낙일로 정오" : string.Empty;
+            // 10-30 H-06 — 「새벽을 붙들었다 · 낙일로 정오」는 비유라 무엇을 누르는지 흐렸다
+            if (holdingDawn) _holdLabel.SetText("여명 연장 중 — Q로 정오 시작(최대 {0}초)", ZenithGauge.HoldDawnMax);
+            else _holdLabel.text = string.Empty;
         }
         TickHint();
         TickStar(dt);
@@ -489,7 +504,7 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         for (int i = 0; i < 4; i++) { _rungIcon[i] = null; _rungFlash[i] = 0f; _rungLabel[i] = null; }
         for (int i = 0; i < 3; i++) { _arc[i] = null; _arcFlash[i] = 0f; _arcLabel[i] = null; }
         _rungCount = null; _emberRow = null; _needle = null; _holdLabel = null; _holdShown = false;
-        _hint = null; _hintGroup = null; _hintSec = _hintLeft = 0f;
+        _hint = null; _hintGroup = null; _hintSec = _hintLeft = 0f; _hintNext = null;
         _grudgeLabel = null; _grudgeRim = null; _holdTick = null; _holdSec = null; _holdKey = -1;
         _star = null; _starOn = false; _starPop = 0f;
         _host = host;
@@ -537,8 +552,9 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         int key = holdLeft > 0f ? Mathf.CeilToInt(holdLeft * 10f) : holding ? -2 : 0;
         if (key == _holdKey) return;
         _holdKey = key;
-        if (key > 0) _holdSec.SetText("멈춤 {0:1}초", key * 0.1f);
-        else _holdSec.text = key == -2 ? "멈춤" : string.Empty;
+        // 10-30 H-14 — 「멈춤」만으론 무엇이 멈췄는지 몰랐다 → 피 냄새 「광기 유지 N초」 · 끝의 문턱 「광란 미루는 중」
+        if (key > 0) _holdSec.SetText("광기 유지 {0:1}초", key * 0.1f);
+        else _holdSec.text = key == -2 ? "광란 미루는 중" : string.Empty;
     }
 
     /// <summary>처음 안내 — 들어오고 머물고 흐려진 뒤 글을 비운다(끄지 않는다 — 하드 가드).</summary>
@@ -548,7 +564,9 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         _hintLeft = Mathf.Max(0f, _hintLeft - Time.deltaTime);
         float a = Mathf.Min(1f, (_hintSec - _hintLeft) / HintFadeIn) * Mathf.Min(1f, _hintLeft / HintFadeOut);
         if (_hintGroup != null) _hintGroup.alpha = a;
-        if (_hintLeft <= 0f) _hint.text = string.Empty;
+        if (_hintLeft > 0f) return;
+        _hint.text = string.Empty;
+        if (_hintNext != null) ShowHint(_hintNext, _hintNextSec);   // 이어지는 한 줄(ShowHint가 다음 칸을 비운다)
     }
 
     /// <summary>켜진 별 — 켜지는 순간 1.5배에서 자리 잡고, 그 뒤 은은히 숨쉰다(배율 ±6% · 알파 0.88~1).</summary>

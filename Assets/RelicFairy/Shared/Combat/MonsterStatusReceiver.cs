@@ -294,7 +294,7 @@ namespace RelicFairy.Monster
                 EffectDescriptionFormatter.LabelForStatus(statusId),
                 Mathf.Max(1, stacks),
                 Mathf.Clamp01(remaining01),
-                remainSec >= 0f ? $"{remainSec:0.0}초" : string.Empty,
+                remainSec >= 0f ? Loc.F("{0}초", remainSec.ToString("0.0")) : string.Empty,   // 화면 언어(11-02 Q11)
                 BuffSource.Status,
                 isDebuff: true);
 

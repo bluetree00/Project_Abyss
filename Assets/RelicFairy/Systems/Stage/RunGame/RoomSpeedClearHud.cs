@@ -116,8 +116,8 @@ public sealed class RoomSpeedClearHud : MonoBehaviour
         _shownRewarded = s_rewarded;
         _text.color = over ? UITheme.Mute : UITheme.Gold;
         _text.text  = s_rewarded
-            ? $"빠른 정리  {RunResultPresenter.FormatTime(fight)} / {RunResultPresenter.FormatTime(limit)}  ·  첫 룬 한 단계 위"
-            : $"빠른 정리  {RunResultPresenter.FormatTime(fight)} / {RunResultPresenter.FormatTime(limit)}";
+            ? Loc.F("빠른 정리  {0} / {1}  ·  첫 룬 한 단계 위", RunResultPresenter.FormatTime(fight), RunResultPresenter.FormatTime(limit))
+            : Loc.F("빠른 정리  {0} / {1}", RunResultPresenter.FormatTime(fight), RunResultPresenter.FormatTime(limit));
     }
 
     /// <summary>한 단계 위가 붙는 순간 한 번 살짝 커졌다 돌아온다(보상 고르기 창이 시간을 멈춰도 돌게 unscaled).</summary>

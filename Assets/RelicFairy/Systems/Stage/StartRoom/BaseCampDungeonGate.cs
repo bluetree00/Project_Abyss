@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 베이스캠프 던전 입장 포탈. 유물(Relic)+무형검(WeaponSlot0)+원거리(WeaponSlot1)+시작 파츠(StartPartId)가 모두 준비되면
+/// 베이스캠프 던전 입장 포탈. 유물(Relic)+무형검(WeaponSlot0)+원거리(WeaponSlot1)가 모두 준비되면
 /// 활성화되고, 활성 상태에서 플레이어가 트리거에 진입하면 던전 씬으로 전환한다(BaseCampBootstrapper.EnterDungeon).
 ///
 /// 순서 강제는 이 게이트 <b>한 곳</b>에서만 한다(스테이션마다 배리어로 막지 않음, 하데스식).

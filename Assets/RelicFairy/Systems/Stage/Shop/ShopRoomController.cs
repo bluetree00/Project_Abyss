@@ -428,7 +428,7 @@ public class ShopRoomController : MonoBehaviour
     private void HandleRoomRevealed(GameObject room)
     {
         if (room == null || !transform.IsChildOf(room.transform) || _event == ShopEvent.None) return;
-        RoomEventNotice.Raise(EventTitle, $"{EventLine} — 이 방에서만");
+        RoomEventNotice.Raise(EventTitle, Loc.F("{0} — 이 방에서만", EventLine));
         if (_chatter != null) _chatter.ShoutFirst(EventShout);
     }
 
@@ -636,7 +636,7 @@ public class ShopRoomController : MonoBehaviour
         int price = shopData.ResolvePrice(entry);   // price_override 우선
         _slots.Add(new ShopSlot(entry, null, ShopCategory.Potion, price,
                                 "체력 포션", ItemRarity.Common, null,
-                                $"즉시 최대 체력의 {Mathf.RoundToInt((0.40f + MemoryAltarService.PotionHealBonus) * 100f)}%를 회복한다. 퀵슬롯(H)에 충전."));
+                                Loc.F("즉시 최대 체력의 {0}%를 회복한다. 퀵슬롯(H)에 충전.", Mathf.RoundToInt((0.40f + MemoryAltarService.PotionHealBonus) * 100f))));
     }
 
     private void BuildSlotsFromChart(System.Random rng)
@@ -707,7 +707,7 @@ public class ShopRoomController : MonoBehaviour
             var itemSO = ItemSORegistry.Find(entry.target_id);
             if (itemSO != null)
             {
-                if (!string.IsNullOrEmpty(itemSO.displayName)) name = itemSO.displayName;
+                if (!string.IsNullOrEmpty(itemSO.displayName)) name = Loc.T(itemSO.displayName);
                 rarity = itemSO.rarity;
                 icon = itemSO.icon;
             }
@@ -719,7 +719,7 @@ public class ShopRoomController : MonoBehaviour
     private ShopSlot BuildSlotFromLegacy(ShopItemSO shopItem)
     {
         var so = shopItem.Item;
-        string name = string.IsNullOrEmpty(so.displayName) ? so.itemId : so.displayName;
+        string name = string.IsNullOrEmpty(so.displayName) ? so.itemId : Loc.T(so.displayName);
         return new ShopSlot(null, shopItem, ShopCategory.Item, shopItem.Price,
                             name, so.rarity, so.icon, BuildDescription(ShopCategory.Item, so.rarity));
     }
@@ -733,7 +733,7 @@ public class ShopRoomController : MonoBehaviour
             ItemRarity.Legendary => "Legendary",
             _ => "Common",
         };
-        return cat == ShopCategory.Weapon ? $"{r} 무기" : $"{r} 아이템";
+        return cat == ShopCategory.Weapon ? Loc.F("{0} 무기", r) : Loc.F("{0} 아이템", r);
     }
 
     // ── 등급 롤 (기존 로직 재사용) ──────────────────────────

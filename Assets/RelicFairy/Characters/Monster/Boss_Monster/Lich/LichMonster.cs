@@ -370,6 +370,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
         _bodyRenderers = (_formController != null ? _formController.transform : transform)
                          .GetComponentsInChildren<Renderer>(true);
         LichVfx.LoadAsync().Forget();   // 패턴 이펙트 목록 — 없어도 패턴은 돈다
+        PrewarmEncounterAsync(destroyCancellationToken).Forget();   // 첫 사용 끊김을 전투 전에(11-02 Q27)
         LichSfx.LoadAsync().Forget();   // 패턴 소리 목록 — 없어도 패턴은 돈다
         FindBookRenderer();
 
@@ -700,6 +701,39 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
         _lichBB?.SetMode(IsPhase2Unlocked);
         _hudPage = 1;
         HudPageMarkersChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// 전투 전에 리치 에셋을 미리 읽는다(11-02 Q27 — 첫 사용 프레임마다 에셋 읽기로 60~660 ms 끊겼다). 이펙트 목록이 오면
+    /// 칸 프리팹 → 패턴 SO가 들고 있는 프리팹(결계 · 소환 해골 등) 순으로 한 프레임에 하나씩 <see cref="LichVfx.Warm"/>.
+    /// 리치가 방에 놓인 순간부터 돌아 등장 대기 · 연출 동안 끝난다.
+    /// </summary>
+    private async UniTaskVoid PrewarmEncounterAsync(CancellationToken ct)
+    {
+        try
+        {
+            float until = Time.realtimeSinceStartup + 15f;
+            while (!LichVfx.IsReady && Time.realtimeSinceStartup < until) await UniTask.Yield(ct);
+            await LichVfx.PrewarmAsync(ct);
+            if (_config is not BossConfigSO boss || boss.patternEntries == null) return;
+            var seen = new System.Collections.Generic.HashSet<GameObject>();
+            const System.Reflection.BindingFlags Fields = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+            foreach (var entry in boss.patternEntries)
+            {
+                if (entry?.patterns == null) continue;
+                foreach (var pattern in entry.patterns)
+                {
+                    if (pattern == null) continue;
+                    foreach (var f in pattern.GetType().GetFields(Fields))
+                    {
+                        if (f.FieldType != typeof(GameObject) || f.GetValue(pattern) is not GameObject prefab || prefab == null || !seen.Add(prefab)) continue;
+                        LichVfx.Warm(prefab);
+                        await UniTask.Yield(ct);
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException) { }
     }
 
     /// <summary>결계 패턴 설정 — 봉인 의식이 주기 공격·방해 해골 값을 빌린다. 없으면 null(기본값).</summary>

@@ -22,8 +22,8 @@ public class ClearRewardTrigger : MonoBehaviour
     // 보상 획득 반경. 2.5m는 정확히 그 위에 올라서야 잡히는 수준이라, 클리어 후 보상을 주우려고
     // 위치를 미세조정하는 불편이 있었다 — 지나가듯 스쳐도 잡히도록 넉넉히 잡는다.
     private const float TriggerRadius    = 4.5f;
-    private const float WorldIconHeight  = 2.8f;
-    private const float WorldCanvasScale = 0.005f;
+    private const float WorldIconHeight  = 2.0f;    // 구슬 중심 위(월드 m) — 11-02 2.8은 0.3배 프리팹에 묻혀 0.84였다
+    private const float WorldCanvasScale = 0.007f;  // 1 px = 0.007 m(월드) — 아이콘 90 px ≈ 0.63 m · 글 26 px ≈ 0.18 m(11-02 예전 0.005는 0.3배 프리팹에 묻혔다)
 
     /// <summary>다중 라운드(챌린지 보상)에서 2라운드부터 차징 길이 배율.</summary>
     private const float MultiRoundChargeScale = 0.4f;
@@ -46,6 +46,8 @@ public class ClearRewardTrigger : MonoBehaviour
     private Image      _worldIconImg;
     private TextMeshProUGUI _distanceText;
     private Sprite     _rewardSprite;
+    private int        _choiceCount;   // 한 번에 고르는 후보 수(룬 N장 중 1장)
+    private int        _shownMeters = -1;
 
 
     // ── Public Methods ─────────────────────────────────────────
@@ -70,7 +72,9 @@ public class ClearRewardTrigger : MonoBehaviour
         if (!TryGetComponent<SphereCollider>(out var col))
             col = gameObject.AddComponent<SphereCollider>();
         col.isTrigger = true;
-        col.radius    = TriggerRadius;
+        col.radius    = TriggerRadius / WorldScale();   // 11-02 보상 프리팹 EndEffect2가 0.3배 — 4.5가 실제 1.35 m였다
+
+        _choiceCount = rewards != null ? rewards.Count / _choiceRounds : 0;
 
         if (rewards != null && rewards.Count > 0)
             _rewardSprite = rewards[0].so?.icon ?? rewards[0].data?.icon;
@@ -333,22 +337,27 @@ public class ClearRewardTrigger : MonoBehaviour
 
     private void CreateWorldIndicator()
     {
+        // 11-02 Q9 부모(보상 프리팹)가 0.3배라 월드 m로 맞춘다 — 예전엔 표시판이 구슬 빛 속에 묻혀 안 보였다
+        float s = WorldScale();
         _worldIndicatorGO = new GameObject("WorldIndicator");
         _worldIndicatorGO.transform.SetParent(transform, false);
-        _worldIndicatorGO.transform.localPosition = Vector3.up * WorldIconHeight;
+        _worldIndicatorGO.transform.localPosition = Vector3.up * (WorldIconHeight / s);
 
         var canvas = _worldIndicatorGO.AddComponent<Canvas>();
-        canvas.renderMode  = RenderMode.WorldSpace;
-        canvas.worldCamera = Camera.main;
+        canvas.renderMode   = RenderMode.WorldSpace;
+        canvas.worldCamera  = Camera.main;
+        canvas.sortingOrder = UISortingOrder.WorldLabel;   // 구슬 입자 위에
 
         var rt = _worldIndicatorGO.GetComponent<RectTransform>();
         rt.sizeDelta  = new Vector2(200f, 140f);
-        rt.localScale = Vector3.one * WorldCanvasScale;
+        rt.localScale = Vector3.one * (WorldCanvasScale / s);
 
         // 아이콘 배경을 최고 등급 색으로 물들인다 — 방을 깨고 돌아보는 순간 "이번 건 금색이다"가
         // 성립하고, 주우러 가는 3초가 통째로 기대감 구간이 된다(ARPG loot beam과 같은 역할, §C-3-a).
         var maxRarity = RewardPresentation.MaxRarity(_rewards);
         var rarityCol = RewardPresentation.FrameColor(maxRarity);
+        // 고르는 보상은 그 등급의 룬 그림 — 첫 후보의 그림은 「그 룬을 받는다」로 읽혔다(11-02 Q9)
+        if (_isChoice && RuneArt.GetArt(maxRarity) is Sprite art) _rewardSprite = art;
 
         var iconBgGO  = new GameObject("IconBG");
         iconBgGO.transform.SetParent(_worldIndicatorGO.transform, false);
@@ -378,7 +387,7 @@ public class ClearRewardTrigger : MonoBehaviour
         var distGO = new GameObject("DistanceText");
         distGO.transform.SetParent(_worldIndicatorGO.transform, false);
         _distanceText           = distGO.AddComponent<TextMeshProUGUI>();
-        _distanceText.fontSize  = 28f;
+        _distanceText.fontSize  = 26f;
         _distanceText.alignment = TextAlignmentOptions.Center;
         _distanceText.color     = Color.white;
         _distanceText.text      = "";
@@ -386,7 +395,7 @@ public class ClearRewardTrigger : MonoBehaviour
         distRT.anchorMin        = new Vector2(0.5f, 0.5f);
         distRT.anchorMax        = new Vector2(0.5f, 0.5f);
         distRT.pivot            = new Vector2(0.5f, 0.5f);
-        distRT.sizeDelta        = new Vector2(160f, 40f);
+        distRT.sizeDelta        = new Vector2(320f, 40f);   // 「룬 3장 중 1장 · 12m」
         distRT.anchoredPosition = new Vector2(0f, -35f);
     }
 
@@ -399,8 +408,14 @@ public class ClearRewardTrigger : MonoBehaviour
         var playerPos = _run?.Player?.transform?.position;
         if (playerPos == null) return;
         float dist = Vector3.Distance(transform.position, playerPos.Value);
-        _distanceText.text = $"{Mathf.RoundToInt(dist)}m";
+        int m = Mathf.RoundToInt(dist);
+        if (m == _shownMeters) return;   // 매 프레임 글을 새로 만들지 않는다
+        _shownMeters = m;
+        _distanceText.text = _isChoice && _choiceCount > 1 ? Loc.F("룬 {0}장 중 1장 · {1}m", _choiceCount, m) : $"{m}m";   // 문 이름표와 같은 말(11-02 Q9)
     }
+
+    /// <summary>이 물체의 월드 배율 — 보상 프리팹(EndEffect2)이 0.3배라 표시판 · 줍기 반경을 월드 m로 맞출 때 나눈다.</summary>
+    private float WorldScale() => Mathf.Max(0.01f, transform.lossyScale.x);
 
     private void HideWorldIndicator()
     {
@@ -439,7 +454,7 @@ public class ClearRewardTrigger : MonoBehaviour
         var textGO = new GameObject("PromptText");
         textGO.transform.SetParent(panelGO.transform, false);
         var tmp    = textGO.AddComponent<TextMeshProUGUI>();
-        tmp.text      = $"<color={UIPalette.GoldHex}>[F]</color>  보상 수령";
+        tmp.text      = Loc.F("<color={0}>[F]</color>  보상 수령", UIPalette.GoldHex);
         tmp.fontSize  = 20f;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color     = Color.white;

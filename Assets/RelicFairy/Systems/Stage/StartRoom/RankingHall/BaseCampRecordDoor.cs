@@ -129,7 +129,7 @@ public sealed class BaseCampRecordDoor : MonoBehaviour
         _prompt.transform.SetParent(transform, false);
         _prompt.transform.localPosition = Vector3.up * (crystalHeight + PromptAboveCrystal);
         var tmp = _prompt.AddComponent<TextMeshPro>();
-        tmp.text             = $"<color={UIPalette.GoldHex}>[F]</color> 기록 보기";
+        tmp.text             = Loc.F("<color={0}>[F]</color> 기록 보기", UIPalette.GoldHex);
         tmp.fontSize         = 4f;
         tmp.alignment        = TextAlignmentOptions.Center;
         tmp.color            = Color.white;

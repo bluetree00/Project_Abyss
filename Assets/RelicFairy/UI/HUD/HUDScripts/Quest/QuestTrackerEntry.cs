@@ -123,7 +123,7 @@ public sealed class QuestTrackerEntry : MonoBehaviour
         if (_quest == null) return;
 
         if (titleText != null)
-            titleText.text = _quest.DisplayName;
+            titleText.text = Loc.T(_quest.DisplayName);
 
         _baseProgress = BuildProgress(_quest);
         ApplyProgressText();
@@ -150,7 +150,7 @@ public sealed class QuestTrackerEntry : MonoBehaviour
             var task = tasks[i];
             if (i > 0) Sb.Append('\n');
 
-            string label = string.IsNullOrEmpty(task.Description) ? quest.Description : task.Description;
+            string label = string.IsNullOrEmpty(task.Description) ? Loc.T(quest.Description) : Loc.T(task.Description);
             Sb.Append(label);
 
             if (task.NeedSuccessToComplete > 1)

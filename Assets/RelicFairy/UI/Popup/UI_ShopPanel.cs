@@ -256,7 +256,7 @@ public sealed class UI_ShopPanel : UI_Popup
         var ex = Row(_win, "Exchange", R - ExchangeW, BandY, ExchangeW, BandH, TextAnchor.MiddleRight, 10f, new RectOffset(0, 8, 0, 0));
         RowIcon(ex, "Emblem", _skin != null ? _skin.ExchangeEmblem : null, 46f, Color.white);
         var rate = RowText(ex, "Rate", 15f, UIWeight.Regular, Mute);
-        rate.text = $"원석 환전  1 → {ShopRoomController.OreToGold}";
+        rate.text = Loc.F("원석 환전  1 → {0}", ShopRoomController.OreToGold);
         Spacer(ex, 4f);
         RowIcon(ex, "OreIcon", _skin != null ? _skin.OreIcon : null, 22f, Color.white);
         _oreText = RowText(ex, "Ore", 20f, UIWeight.Medium, Ink);
@@ -476,6 +476,12 @@ public sealed class UI_ShopPanel : UI_Popup
         _rerollNext  = RowText(rr, "Next",  14f, UIWeight.Regular, Mute);
         _rerollBtn.onClick.AddListener(OnRerollClicked);
 
+        // 11-02 Q18 환전소 — [나가기] 앞
+        var exchange = FootButton(right, "Exchange", 120f, out var xr);
+        var xl = RowText(xr, "Label", 17f, UIWeight.Medium, Ink);
+        xl.text = "환전소";
+        exchange.onClick.AddListener(() => OpenExchangeAsync().Forget());
+
         var exit = FootButton(right, "Exit", 128f, out var er);
         var el = RowText(er, "Label", 17f, UIWeight.Medium, Ink);
         el.text = "나가기";
@@ -490,6 +496,13 @@ public sealed class UI_ShopPanel : UI_Popup
         _selectedIndex = index;
         RefreshCards();
         RefreshSelected();
+    }
+
+    /// <summary>11-02 Q18 환전소 창 — 닫히면 골드 · 원석 · 카드 상태를 새로 그린다.</summary>
+    private async UniTaskVoid OpenExchangeAsync()
+    {
+        await ExchangePopupView.OpenAsync(GameRunBootstrapper.Instance?.Run, this.GetCancellationTokenOnDestroy());
+        if (this != null) RefreshAll();
     }
 
     private void RefreshAll()
@@ -539,8 +552,8 @@ public sealed class UI_ShopPanel : UI_Popup
         // 원석 환전소 — 가진 원석 · 버튼마다 받을 골드
         int ore = _controller != null ? _controller.Ore : 0;
         if (_oreText != null) _oreText.text = ore.ToString("N0");
-        if (_exStepLabel != null) _exStepLabel.text = $"{ShopRoomController.ExchangeStep}개 → {ShopRoomController.ExchangeStep * ShopRoomController.OreToGold}";
-        if (_exAllLabel != null)  _exAllLabel.text  = $"전부 → {(ore * ShopRoomController.OreToGold):N0}";
+        if (_exStepLabel != null) _exStepLabel.text = Loc.F("{0}개 → {1}", ShopRoomController.ExchangeStep, ShopRoomController.ExchangeStep * ShopRoomController.OreToGold);
+        if (_exAllLabel != null)  _exAllLabel.text  = Loc.F("전부 → {0:N0}", (ore * ShopRoomController.OreToGold));
         if (_exStepBtn != null) _exStepBtn.interactable = ore >= ShopRoomController.ExchangeStep;
         if (_exAllBtn != null)  _exAllBtn.interactable  = ore > 0;
     }
@@ -693,7 +706,7 @@ public sealed class UI_ShopPanel : UI_Popup
         }
         else
         {
-            _selCat.text  = bless ? $"가호 · {TierName(p.Rarity)}" : p.CategoryLabel;
+            _selCat.text  = bless ? Loc.F("가호 · {0}", TierName(p.Rarity)) : p.CategoryLabel;
             _selCat.color = bless ? TagColor(p) : Mute;
             sb.Append("▲ ").Append(UIKeywordInk.Values(p.EffectText)).Append('\n');
             if (!string.IsNullOrEmpty(p.DetailText)) sb.Append(Hex(Mute)).Append(p.DetailText).Append("</color>\n");
@@ -740,7 +753,7 @@ public sealed class UI_ShopPanel : UI_Popup
                              : s_owned[i].count > 1 ? $"{s_owned[i].name} ×{s_owned[i].count}" : s_owned[i].name;
         }
 
-        if (_lockText != null && _controller != null) _lockText.text = $"잠금 {_controller.LockedCount} / {_controller.LockCapacity}";
+        if (_lockText != null && _controller != null) _lockText.text = Loc.F("잠금 {0} / {1}", _controller.LockedCount, _controller.LockCapacity);
 
         // 새로고침 — 제단에서 안 열었으면 잠긴 버튼으로 둔다(제단에서 산 것이 상점에 보이게)
         if (_rerollBtn == null || _controller == null) return;
@@ -757,10 +770,10 @@ public sealed class UI_ShopPanel : UI_Popup
             _rerollNext.text = "기억의 제단에서 연다";
             return;
         }
-        _rerollLabel.text  = !left ? "새로고침 끝" : cost == 0 ? "새로고침 무료" : $"새로고침 {cost}";
+        _rerollLabel.text  = !left ? "새로고침 끝" : cost == 0 ? "새로고침 무료" : Loc.F("새로고침 {0}", cost);
         _rerollLabel.color = left && !afford ? Danger : Ink;
         int next = _controller.NextRerollCost;
-        _rerollNext.text = !left ? string.Empty : next < 0 ? "마지막" : $"다음 {next}";
+        _rerollNext.text = !left ? string.Empty : next < 0 ? "마지막" : Loc.F("다음 {0}", next);
     }
 
     // ── 핸들러 ──
@@ -1053,10 +1066,10 @@ public sealed class UI_ShopPanel : UI_Popup
         if (_dialogText == null) return;
         _dialogText.text = p.Category switch
         {
-            ShopProductCategory.Buff     => $"{p.DisplayName} — 몸에 스몄어. 버프 칸을 봐.",
-            ShopProductCategory.Rune     => $"{p.DisplayName} — 보관함에 넣어 뒀어.",
-            ShopProductCategory.Material => $"{p.DisplayName} — 주머니에 챙겼어.",
-            ShopProductCategory.Potion   => $"{p.DisplayName} — 포션 칸에 넣었어.",
+            ShopProductCategory.Buff     => Loc.F("{0} — 몸에 스몄어. 버프 칸을 봐.", Loc.T(p.DisplayName)),
+            ShopProductCategory.Rune     => Loc.F("{0} — 보관함에 넣어 뒀어.", Loc.T(p.DisplayName)),
+            ShopProductCategory.Material => Loc.F("{0} — 주머니에 챙겼어.", Loc.T(p.DisplayName)),
+            ShopProductCategory.Potion   => Loc.F("{0} — 포션 칸에 넣었어.", Loc.T(p.DisplayName)),
             _                            => "고마워! 잘 써.",
         };
         RestoreGreetingAsync(++_reactionGen).Forget();
@@ -1106,7 +1119,7 @@ public sealed class UI_ShopPanel : UI_Popup
     private static string TagText(ShopProduct p)
     {
         if (p.Rune != null) return RuneCardKit.RarityChipText(p.Rune);   // 「◇ Rare · 3칸」 — 칸 수는 칩 글에 이미 있다
-        return p.Category == ShopProductCategory.Buff ? $"가호 · {TierName(p.Rarity)}" : p.CategoryLabel;
+        return p.Category == ShopProductCategory.Buff ? Loc.F("가호 · {0}", TierName(p.Rarity)) : p.CategoryLabel;
     }
 
     private static Color TagColor(ShopProduct p)
@@ -1130,7 +1143,7 @@ public sealed class UI_ShopPanel : UI_Popup
     {
         if (rune == null) return string.Empty;
         var elem = ElementDef.GetById(rune.element);
-        return elem != null ? $"{elem.Name} 속성 · 눌러서 효과 보기" : "눌러서 효과 보기";
+        return elem != null ? Loc.F("{0} 속성 · 눌러서 효과 보기", Loc.T(elem.Name)) : "눌러서 효과 보기";
     }
 
     private static bool TryBlessingStat(ShopProduct p, out StatType stat)

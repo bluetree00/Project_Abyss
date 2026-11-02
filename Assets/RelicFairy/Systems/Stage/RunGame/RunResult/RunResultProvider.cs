@@ -112,7 +112,7 @@ public static class RunResultProvider
         if (w == null || string.IsNullOrEmpty(w.displayName)) return null;
         return new RunResultSnapshot.WeaponLine
         {
-            Name     = w.displayName,
+            Name     = Loc.T(w.displayName),
             Icon     = w.icon,
             Enhance  = w.enhanceLevel,
             FormName = w.form != null ? w.form.DisplayName : string.Empty,
@@ -144,7 +144,7 @@ public static class RunResultProvider
             foreach (var (id, rank) in w.AugmentList())
             {
                 var def = MeleeAugmentCatalog.Get(id);
-                if (def != null) parts.Add(def.IsLegend || def.IsGrowth ? def.Name : $"{def.Name} {MeleeAugmentDef.RankName(rank)}".TrimEnd());   // 전설 · 자람(10-26 재련으로 자람)은 단계가 없다
+                if (def != null) parts.Add(def.IsLegend || def.IsGrowth ? Loc.T(def.Name) : $"{Loc.T(def.Name)} {MeleeAugmentDef.RankName(rank)}".TrimEnd());   // 전설 · 자람(10-26 재련으로 자람)은 단계가 없다
             }
         }
         return string.Join(" · ", parts);

@@ -209,6 +209,7 @@ public sealed class WardSteadyBreathEffect : ItemEffectBase
 {
     private float _lastHurt;
     private bool _granted;
+    private float _own;   // 10-31 이 룬이 준 보호막(남은 보호막을 넘지 않는 만큼으로 본다 — 보호막은 깎일 때 출처를 가리지 않는다)
 
     public WardSteadyBreathEffect(ItemEffectSlot s) : base(s) { }
     public override bool IsActive(ItemEffectContext ctx) => true;
@@ -229,7 +230,12 @@ public sealed class WardSteadyBreathEffect : ItemEffectBase
     {
         if (_granted || ctx?.Stats == null || Time.time - _lastHurt < (_duration > 0f ? _duration : 4f)) return;
         _granted = true;
-        ctx.Stats.AddShield(ctx.Stats.MaxHp * (_value > 0f ? _value : 0.04f));
+        // 10-31 이 룬 몫을 4%까지 채운다 — 예전엔 다시 맞을 때마다 +4%를 더해 보호막이 깎이지 않으면 계속 쌓였다
+        float target = ctx.Stats.MaxHp * (_value > 0f ? _value : 0.04f);
+        float own = Mathf.Min(_own, ctx.Stats.Shield);
+        float add = target - own;
+        if (add > 0.5f) ctx.Stats.AddShield(add);
+        _own = own + Mathf.Max(0f, add);
         MeleeWard.Log($"숨 고르기 — 보호막 {ctx.Stats.Shield}/{ctx.Stats.ShieldCap}");
     }
 }

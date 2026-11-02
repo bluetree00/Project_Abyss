@@ -766,7 +766,7 @@ public sealed partial class UI_CruciblePanel
 
         // 단축키 — 지금 있는 것만(Esc = 나가기 · 연출 중 다시 누름 = 건너뛰고 이어서 · QueueWhileAnimating)
         _v3Hint = NewText(band, "V3Hint", FMin, UIWeight.Regular, TextAlignmentOptions.MidlineRight, UITheme.Thin.InkA(0.55f));
-        _v3Hint.text = $"<color=#ECE6D8>Esc</color>  나가기    ·    연출 중 다시 누르면 건너뛰고 한 번 더";
+        _v3Hint.text = Loc.T("<color=#ECE6D8>Esc</color>  나가기    ·    망치 연출 중 [재련]을 또 누르면 바로 한 번 더");   // 10-30 무엇을 다시 누르는지 없었다
         BP(_v3Hint.rectTransform, 780f, 0f, V3BarW - 780f, V3BarH);
     }
 
@@ -833,8 +833,8 @@ public sealed partial class UI_CruciblePanel
 
         // 왼쪽 — 초점 · 바뀌는 수치(+3 한 번에)
         _v3FocalCap.text = maxed ? "재련 횟수" : "다음 재련";   // 10-19 — 「+N」(강화 단계)이 아니라 재련 횟수
-        _v3Focal.text = maxed ? $"{Reforges(L)}회 <size=50%><color={HexMute}>최대</color></size>"
-                              : $"{Reforges(L)}회 <color={HexMute}>→</color> <color={HexUp}>{Reforges(to)}회</color>";
+        _v3Focal.text = maxed ? Loc.F("{0}회 <size=50%><color={1}>최대</color></size>", Reforges(L), HexMute)
+                              : Loc.F("{0}회 <color={1}>→</color> <color={2}>{3}회</color>", Reforges(L), HexMute, HexUp, Reforges(to));
         _v3Focal.color = UITheme.Thin.Ink;
         FillStatRows(w, L, max, to);
 
@@ -851,13 +851,13 @@ public sealed partial class UI_CruciblePanel
         MaterialV3(cost, have, maxed);
         _v3Fail.text = maxed ? MaxedLine(w)
                      : !can && !string.IsNullOrEmpty(why) && have >= cost ? $"<color={HexDown}>{why}</color>"
-                     : "실패 없음 · 공격 확정 상승 · 증강 하나를 고른다";
+                     : "실패 없음 · 공격력이 오르고 증강 카드 1장을 고른다";
         if (_enhanceBtn != null) _enhanceBtn.interactable = !maxed && can;
         ButtonV3(maxed ? "최대 재련" : "재련", maxed ? 0 : cost, have);
         // 10-18 — 진화 전 무형검: 버튼 아래 예고 한 줄 · 10-22 형이 있으면 그 자리에 「◆ 형 단련」 입구(사용자 「단련은 누르기 힘든 레이아웃 — 확실한 버튼이나 설명」)
         string pre = PreEvolveHint(L);
         if (pre == null && TemperSubLine(out string temper, out bool afford)) { EvolveSubV3(temper, afford); _v3SubOpensForm = true; }
-        else { EvolveSubV3(pre, false); _v3SubOpensForm = false; }
+        else { EvolveSubV3(pre ?? NextFormGrantLine(), false); _v3SubOpensForm = false; }
     }
 
     /// <summary>강화 단계 → 재련 횟수(10-19 · <see cref="WeaponReforgeService.CountAt"/>).</summary>
@@ -877,16 +877,18 @@ public sealed partial class UI_CruciblePanel
         int count = 1 + (band > 1f ? 1 : 0) + (half ? 1 : 0);
         float y0 = ChipMidY - (count * 38f - 6f) * 0.5f;
         int k = 0;
-        RateChip(k++, y0, $"이번 방문 {nth}번째", UITheme.Thin.InkA(0.7f));
-        if (band > 1f) RateChip(k++, y0, $"▼ ×{band:0} {(ranged ? "후반" : "진화 뒤")}", DownRed);
+        RateChip(k++, y0, Loc.F("이번 방문 {0}번째", nth), UITheme.Thin.InkA(0.7f));
+        if (band > 1f) RateChip(k++, y0, $"▼ ×{band:0} {(ranged ? Loc.T("후반") : Loc.T("진화 뒤"))}", DownRed);
         if (half)      RateChip(k++, y0, "▲ 반값 화로", UpGreen);
         return k;
     }
 
     /// <summary>비용 호버 — 규칙 전부(방문 안에서 오름 · 방을 나가면 처음 값 · 단계 띠 · 반값).</summary>
     private static string CostTip(bool ranged)
-        => "이번 방문 1번째 5 · 2번째 10 · 3번째부터 15\n방을 나가면 처음 값으로 돌아간다 · 근접과 원거리가 같은 횟수를 나눠 쓴다\n"
-         + (ranged ? "원거리 재련 5~6번째 ×3 · 7번째부터 ×6" : "진화 뒤(+12~) ×3 · +18부터 ×6")
+        => Loc.F("이번 방문 1번째 {0} · 2번째 {1} · 3번째부터 {2}\n", WeaponReforgeService.BaseCost(1), WeaponReforgeService.BaseCost(2), WeaponReforgeService.BaseCost(3))   // 10-30 옛 5 · 10 · 15가 남아 있었다
+         + "방을 나가면 처음 값으로 돌아간다 · 근접과 원거리가 같은 횟수를 나눠 쓴다\n"
+         + (ranged ? Loc.F("원거리 재련 {0}~{1}번째 ×{2:0} · {3}번째부터 ×{4:0}", WeaponReforgeService.RangedBandCount1, WeaponReforgeService.RangedBandCount2 - 1, WeaponReforgeService.BandMult1, WeaponReforgeService.RangedBandCount2, WeaponReforgeService.BandMult2)
+                   : Loc.F("근접 재련 {0}~{1}번째 ×{2:0} · {3}번째부터 ×{4:0}", Reforges(WeaponReforgeService.MeleeBandLevel1) + 1, Reforges(WeaponReforgeService.MeleeBandLevel2), WeaponReforgeService.BandMult1, Reforges(WeaponReforgeService.MeleeBandLevel2) + 1, WeaponReforgeService.BandMult2))
          + "\n반값 화로 ×0.5";
 
     /// <summary>
@@ -914,17 +916,17 @@ public sealed partial class UI_CruciblePanel
                 {
                     var def = Managers.WeaponParts.GetById(e.partId);
                     if (def == null) continue;
-                    s_ownedRows.Add(($"{def.part_name} <color={HexMute}>Lv{e.level}</color>", PartValueText(def, def.ValueAt(e.level)), def.description ?? ""));
+                    s_ownedRows.Add(($"{Loc.T(def.part_name)} <color={HexMute}>Lv{e.level}</color>", PartValueText(def, def.ValueAt(e.level)), Loc.T(def.description) ?? ""));
                 }
             else if (state != null && all != null)
                 foreach (var def in all)
                 {
                     int lv = state.LevelOf(def.part_id);
                     if (lv <= 0) continue;
-                    s_ownedRows.Add(($"{def.part_name} <color={HexMute}>Lv{lv}</color>", PartValueText(def, def.ValueAt(lv)), def.description ?? ""));
+                    s_ownedRows.Add(($"{Loc.T(def.part_name)} <color={HexMute}>Lv{lv}</color>", PartValueText(def, def.ValueAt(lv)), Loc.T(def.description) ?? ""));
                 }
             headName = history ? "재련 기록" : "켠 파츠";
-            _v3StreakHead.text = $"<color={HexMute}>{headName}</color>  {s_ownedRows.Count}{(history ? "회" : "")}";
+            _v3StreakHead.text = $"<color={HexMute}>{headName}</color>  {s_ownedRows.Count}{(history ? Loc.T("회") : "")}";
         }
         else
         {
@@ -934,21 +936,21 @@ public sealed partial class UI_CruciblePanel
                 {
                     var d = MeleeAugmentCatalog.Get(id);
                     if (d == null) continue;
-                    string name = d.IsLegend || d.IsGrowth ? d.Name : $"{d.Name} {RomanRank(rank)}";   // 전설 · 자람(10-26 재련으로 자람)은 단계가 없다
+                    string name = d.IsLegend || d.IsGrowth ? Loc.T(d.Name) : $"{Loc.T(d.Name)} {RomanRank(rank)}";   // 전설 · 자람(10-26 재련으로 자람)은 단계가 없다
                     if (MeleeAugmentCatalog.RunsAsPhantom(d, w)) name += " <color=#C9D3E6>(환영)</color>";
                     string eff = d.IsGrowth ? d.TextFor(w) : d.Text(rank);
                     s_ownedRows.Add((name, eff, eff));
                 }
             headName = history ? "재련 기록" : "가진 증강";
-            _v3StreakHead.text = $"<color={HexMute}>{headName}</color>  {s_ownedRows.Count}{(history ? "회" : "")}";
+            _v3StreakHead.text = $"<color={HexMute}>{headName}</color>  {s_ownedRows.Count}{(history ? Loc.T("회") : "")}";
         }
-        _v3StreakVal.text  = $"<color={HexMute}>{(history ? "재련마다 고른 것 · 이번 런" : "얻은 순서 · 이번 런")}</color>";
+        _v3StreakVal.text  = $"<color={HexMute}>{(history ? Loc.T("재련마다 고른 것 · 이번 런") : Loc.T("얻은 순서 · 이번 런"))}</color>";
 
         int n = s_ownedRows.Count;
         _v3StreakRule.gameObject.SetActive(n == 0);
         if (n == 0)
         {
-            _v3StreakRule.text = $"<color={HexMute}>아직 없다 — 재련하면 카드를 고른다</color>";
+            _v3StreakRule.text = Loc.F("<color={0}>아직 없다 — 재련하면 카드를 고른다</color>", HexMute);
             _v3StreakRule.alignment = TextAlignmentOptions.TopLeft;
             RP(_v3StreakRule.transform, RPad, OwnedRowsY, RInner, OwnedRowH);
         }
@@ -964,13 +966,13 @@ public sealed partial class UI_CruciblePanel
                 // 넘치면 마지막 줄 = 「+N개 더」 — 손을 올리면 남은 것 전부
                 var rest = new StringBuilder();
                 for (int k = i; k < n; k++) rest.Append(k > i ? "\n" : "").Append(k + 1).Append(". ").Append(StripTags(s_ownedRows[k].name)).Append(" — ").Append(s_ownedRows[k].tip);
-                _ownedName[i].text   = $"<color={HexMute}>+{n - i}개 더</color>";
-                _ownedEffect[i].text = $"<color={HexMute}>손을 올리면 전부</color>";
+                _ownedName[i].text   = Loc.F("<color={0}>+{1}개 더</color>", HexMute, n - i);
+                _ownedEffect[i].text = Loc.F("<color={0}>손을 올리면 전부</color>", HexMute);
                 UITooltipTrigger.Attach(_ownedName[i].gameObject, headName, rest.ToString(), UITheme.Thin.Gold);
                 continue;
             }
             var row = s_ownedRows[i];
-            _ownedName[i].text   = history ? $"<color={HexMute}>재련 {i + 1}</color>  {row.name}" : $"<color={HexMute}>{i + 1}</color>  {row.name}";
+            _ownedName[i].text   = history ? Loc.F("<color={0}>재련 {1}</color>  {2}", HexMute, i + 1, row.name) : $"<color={HexMute}>{i + 1}</color>  {row.name}";
             _ownedEffect[i].text = UIKeywordInk.Values(row.effect);
             UITooltipTrigger.Attach(_ownedName[i].gameObject, StripTags(row.name), row.tip, UITheme.Thin.Gold);
         }
@@ -1036,14 +1038,14 @@ public sealed partial class UI_CruciblePanel
         UITooltipTrigger.Attach(_successText.gameObject, "진화", "카드에서 고른 검으로 바뀐다\n실패 없음 · 되돌릴 수 없다", UITheme.Thin.Gold);
         OwnedListV3(false, w);
         MaterialV3(cost, have, hidden: cost <= 0);
-        _v3Fail.text = $"실패 없음 · 재련 {Reforges(L)}회와 증강은 그대로 이어진다";
+        _v3Fail.text = Loc.F("실패 없음 · 재련 {0}회와 증강은 그대로 이어진다", Reforges(L));
         if (_enhanceBtn != null) _enhanceBtn.interactable = true;   // 재료가 모자란 갈래는 고르기 창의 확정 버튼이 막는다(PickEvolveCard)
         ButtonV3("진화 — 무기 고르기", 0, have);
         Halo(_enhanceBtn, !Choosing);   // 후광은 한 화면 한 곳 — 형 칸 한 줄은 이때 켜지 않는다(RefreshFormRowV3)
 
-        if (maxed) { EvolveSubV3($"{w.displayName} 최대 재련 {Reforges(L)}회 — 진화해야 더 오른다", false); return; }
-        string c = have >= need ? $"강화재료 {need}" : $"강화재료 <color={HexDown}>{need}</color>";
-        EvolveSubV3($"진화 미루고 {w.displayName} 재련 {Reforges(to)}회째 · {c}  <color={HexMute}>▶</color>", have >= need);
+        if (maxed) { EvolveSubV3(Loc.F("{0} 최대 재련 {1}회 — 진화해야 더 오른다", Loc.T(w.displayName), Reforges(L)), false); return; }
+        string c = have >= need ? Loc.F("강화재료 {0}", need) : Loc.F("강화재료 <color={0}>{1}</color>", HexDown, need);
+        EvolveSubV3(Loc.F("진화 미루고 {0} 재련 {1}회째 · {2}  <color={3}>▶</color>", Loc.T(w.displayName), Reforges(to), c, HexMute), have >= need);
     }
 
     /// <summary>진화 전 무기의 버튼 아래 예고 — 「◆ +10에서 다른 검으로 진화 — 빠른 검 또는 묵직한 검」. 갈래가 없거나 이미 열렸으면 null.</summary>
@@ -1056,9 +1058,29 @@ public sealed partial class UI_CruciblePanel
         {
             if (b == null || !b.IsValid) continue;
             if (sb.Length > 0) sb.Append(" 또는 ");
-            sb.Append(Persona(b.target).tag);
+            sb.Append(Persona(b.target).tag).Append('(').Append(Loc.T(b.target.displayName)).Append(')');   // 10-30 — 「빠른 검(칼리번)」
         }
-        return $"<color={HexForm}>◆</color>  재련 {Reforges(at)}회에서 다른 검으로 진화 — {sb}";
+        return Loc.F("<color={0}>◆</color>  재련 {1}회째에 진화 — {2}", HexForm, Reforges(at), sb);
+    }
+
+    /// <summary>
+    /// 형 칸 한 줄(10-30) — 「칼바람 Ⅰ → Ⅱ 쌍풍 → Ⅲ 무풍 · 재련 6회」: 받은 단계는 밝게, 남은 단계는 흐리게 받는 재련 횟수와 함께
+    /// (형 Ⅱ · Ⅲ은 진화 뒤 재련 횟수에서 저절로 받는다 — <see cref="WeaponFormService"/>).
+    /// </summary>
+    private string FormTrack(WeaponData w)
+    {
+        var sb = new StringBuilder();
+        sb.Append(w.form.DisplayName).Append(" Ⅰ");
+        int evolvedAt = Reforges(w.enhanceLevel) - MeleeAugmentCatalog.ReforgesSinceEvolution(w);
+        for (int t = 2; t <= WeaponFormService.MaxTier; t++)
+        {
+            string name = VariantName(w, t);
+            if (name == null && w.form.TryGetReforgeVariant(t, out var v)) name = Loc.T(v.displayName);
+            sb.Append($"  <color={HexMute}>→</color>  ");
+            if (w.formTier >= t) sb.Append(RomanTier(t)).Append(' ').Append(name);
+            else sb.Append(Loc.F("<color={0}>{1} {2} · 재련 {3}회</color>", HexMute, RomanTier(t), name, evolvedAt + WeaponFormService.ReforgeForTier(t)));
+        }
+        return sb.ToString();
     }
 
     /// <summary>버튼 아래 한 줄 — 글이 비면 감춘다. clickable이면 누르는 글(진화 미루고 무형검 강화 · <see cref="OnKeepEnhanceClicked"/>).</summary>
@@ -1067,6 +1089,20 @@ public sealed partial class UI_CruciblePanel
     {
         if (_v3SubOpensForm) ShowEvolvePanel();
         else OnKeepEnhanceClicked();
+    }
+
+    /// <summary>
+    /// 버튼 아래 예고 한 줄 — 「재련 1번 더 하면 형 Ⅱ 쌍풍 — 칼바람이 두 갈래로」(10-30 · 형은 재련 단계에서 저절로 받는다).
+    /// 다음 재련에서 받으면 금빛. 형이 없거나 Ⅲ까지 받았으면 null.
+    /// </summary>
+    private string NextFormGrantLine()
+    {
+        var w = _controller.GetSlot(PlayerWeaponManager.Slot0);
+        if (w == null || !WeaponFormService.NextGrant(w, out int tier, out int atReforge, out var v)) return null;
+        int left = Mathf.Max(1, atReforge - MeleeAugmentCatalog.ReforgesSinceEvolution(w));
+        string head = left == 1 ? Loc.F("<color=#FFCC4D>◆ 이번 재련에서 형 {0} {1}</color>", RomanTier(tier), Loc.T(v.displayName))
+                                : Loc.F("◆ 재련 {0}번 더 하면 형 {1} {2}", left, RomanTier(tier), Loc.T(v.displayName));
+        return string.IsNullOrEmpty(v.line) ? head : $"{head} — {v.line}";
     }
 
     /// <summary>형 단련을 할 수 있는 무기면 버튼 아래 입구 글 — 「◆ 형 단련 Ⅱ로 · 강화재료 12 — 누르면 변주 둘 중 하나를 고른다 ▶」.</summary>
@@ -1079,8 +1115,8 @@ public sealed partial class UI_CruciblePanel
         int have = _controller.FuelAmount;
         afford = have >= cost;
         text = afford
-            ? $"<color=#FFCC4D>◆ 형 단련 {RomanTier(tier)}로</color> · 강화재료 {cost} — 누르면 변주 둘 중 하나를 고른다  ▶"
-            : $"◆ 형 단련 {RomanTier(tier)} — 강화재료 <color={HexDown}>{cost}</color> 필요(지금 {have})";
+            ? Loc.F("<color=#FFCC4D>◆ 형 단련 {0}로</color> · 강화재료 {1} — 누르면 변주 둘 중 하나를 고른다  ▶", RomanTier(tier), cost)
+            : Loc.F("◆ 형 단련 {0} — 강화재료 <color={1}>{2}</color> 필요(지금 {3})", RomanTier(tier), HexDown, cost, have);
         return true;
     }
 
@@ -1101,7 +1137,7 @@ public sealed partial class UI_CruciblePanel
         int n = 0;
         var t = _controller.Table;
         float a0 = WeaponEnhanceService.EffectiveAttackAt(w, t, L);
-        if (L >= max) SetStat(n++, "공격", $"{a0:F1}", $"<color={HexMute}>최대</color>");
+        if (L >= max) SetStat(n++, "공격", $"{a0:F1}", Loc.F("<color={0}>최대</color>", HexMute));
         else
         {
             float a1 = WeaponEnhanceService.EffectiveAttackAt(w, t, to);
@@ -1109,11 +1145,11 @@ public sealed partial class UI_CruciblePanel
 
             int evo = EvolveAt();
             if (evo > 0 && L < evo && to >= evo && CurrentBranches.Count > 0)
-                SetStat(n++, "형", $"<color={HexMute}>잠김 →</color> <color={HexForm}>깨어남</color>", $"<color={HexForm}>◆</color>");
+                SetStat(n++, "형", Loc.F("<color={0}>잠김 →</color> <color={1}>깨어남</color>", HexMute, HexForm), $"<color={HexForm}>◆</color>");
 
             var ms = SkillTierResolver.Milestones(w);
             int t0 = TierAt(ms, L), t1 = TierAt(ms, to);
-            if (t1 > t0 && n < StatRows) SetStat(n++, "스킬 단계", Arrow($"{t0}", $"{t1}단계"), "▲1");
+            if (t1 > t0 && n < StatRows) SetStat(n++, "스킬 단계", Arrow($"{t0}", Loc.F("{0}단계", t1)), "▲1");
         }
 
         // 마스터리(진화 뒤 기본 상한 위) — 스킬 피해 · 재사용
@@ -1129,8 +1165,8 @@ public sealed partial class UI_CruciblePanel
                 var slot   = w.skillE != null ? SkillType.E : SkillType.R;
                 float s0 = SkillCooldownPreview.Seconds(player, w, slot, m0), s1 = SkillCooldownPreview.Seconds(player, w, slot, m1);
                 if (n < StatRows && s0 > 0f)
-                    SetStat(n++, slot == SkillType.E ? "E 재사용" : "R 재사용", m1 > m0 ? Arrow($"{s0:0.0#}", $"{s1:0.0#}초") : $"{s0:0.0#}초",
-                            m1 > m0 ? $"−{s0 - s1:0.0#}초" : "");
+                    SetStat(n++, slot == SkillType.E ? "E 재사용" : "R 재사용", m1 > m0 ? Arrow($"{s0:0.0#}", Loc.F("{0:0.0#}초", s1)) : Loc.F("{0:0.0#}초", s0),
+                            m1 > m0 ? Loc.F("−{0:0.0#}초", s0 - s1) : "");
             }
         }
         for (int i = n; i < StatRows; i++) SetStat(i, null, null, null);
@@ -1161,7 +1197,7 @@ public sealed partial class UI_CruciblePanel
     /// <summary>최대 강화일 때 실패 줄 자리 — 다음 길(진화 · 마스터리).</summary>
     private string MaxedLine(WeaponData w)
     {
-        if (w.CanEvolve) return $"<color={HexForm}>진화하면 다음 구간이 열린다</color>";
+        if (w.CanEvolve) return Loc.F("<color={0}>진화하면 다음 구간이 열린다</color>", HexForm);
         string mastery = MasteryText(w);
         return string.IsNullOrEmpty(mastery) ? "최대 재련에 닿았다" : mastery;
     }
@@ -1184,7 +1220,7 @@ public sealed partial class UI_CruciblePanel
         _v3MatRow.gameObject.SetActive(!hidden);
         if (hidden) return;
         string h = have < need ? $"<color={HexDown}>{have}</color>" : have.ToString();
-        _v3MatValue.text = $"<color={HexMute}>보유</color> {h}  <color={HexMute}>/  필요</color> {need}";
+        _v3MatValue.text = Loc.F("<color={0}>보유</color> {1}  <color={2}>/  필요</color> {3}", HexMute, h, HexMute, need);
         if (_controller.IsDiscountEvent)
         {
             float w = SetV3Chip(_v3MatChipBox, _v3MatChip, "▲ 반값 화로", UpGreen);
@@ -1242,9 +1278,22 @@ public sealed partial class UI_CruciblePanel
             bool evo = evoAt > lv - step && evoAt <= lv;                      // 이 칸(재련 한 번) 안에서 진화 단계를 넘는다
             int skill = -1;
             for (int s = 0; s < tiers.Length; s++) if (tiers[s] > lv - step && tiers[s] <= lv) { skill = s; break; }
-            SetPip(j, PipX0 + span * (j + 0.5f), span, lv <= L, lv > L && lv - step <= L, evo || skill >= 0, false, $"{j + 1}");   // 10-19 — 칸 = 재련 n번째
-            TickTip(_v3PipLabel[j], w, lv, evo, skill);
+            int form = FormTierAtPip(w, lv, step);   // 10-30 형 Ⅱ · Ⅲ을 받는 재련
+            SetPip(j, PipX0 + span * (j + 0.5f), span, lv <= L, lv > L && lv - step <= L, evo || skill >= 0 || form > 0, false, $"{j + 1}");   // 10-19 — 칸 = 재련 n번째
+            TickTip(_v3PipLabel[j], w, lv, evo, skill, form);
         }
+    }
+
+    /// <summary>이 칸(재련 한 번 · 단계 lv−step 초과 ~ lv)에서 받는 형 단계(2 · 3) — 진화한 형 무기만. 없으면 0.</summary>
+    private static int FormTierAtPip(WeaponData w, int lv, int step)
+    {
+        if (w == null || w.form == null || (w.evolution != null && w.evolution.Branches.Count > 0)) return 0;
+        for (int t = 2; t <= WeaponFormService.MaxTier; t++)
+        {
+            int at = MeleeAugmentCatalog.EvolvedAt + WeaponFormService.ReforgeForTier(t) * WeaponReforgeService.MeleeStep;
+            if (at > lv - step && at <= lv) return t;
+        }
+        return 0;
     }
 
     /// <summary>원거리 단계 점 — 파츠 레벨 합 1 … 마지막 스킬 단계 문턱(◇ = 스킬 단계).</summary>
@@ -1296,7 +1345,7 @@ public sealed partial class UI_CruciblePanel
     private string NextLineV3()
     {
         string s = _next1 != null ? SizeTag.Replace(_next1.text ?? string.Empty, string.Empty) : string.Empty;
-        return string.IsNullOrEmpty(s) ? string.Empty : $"<color={HexMute}>다음</color>   {s}";
+        return string.IsNullOrEmpty(s) ? string.Empty : Loc.F("<color={0}>다음</color>   {1}", HexMute, s);
     }
 
     /// <summary>
@@ -1324,7 +1373,7 @@ public sealed partial class UI_CruciblePanel
         UITooltipTrigger.Attach(_successText.gameObject, "재련 비용", CostTip(true), UITheme.Thin.Gold);
         OwnedListV3(true, null);
         MaterialV3(cost, have, hidden: false);
-        _v3Fail.text = can ? $"실패 없음 · 파츠 카드 {RangedPartsDraft.CardCount}장 중 하나를 고른다"
+        _v3Fail.text = can ? Loc.F("실패 없음 · 파츠 카드 {0}장 중 하나를 고른다", RangedPartsDraft.CardCount)
                      : have >= cost && !string.IsNullOrEmpty(why) ? $"<color={HexDown}>{why}</color>" : "재료가 모자란다";
         if (_enhanceBtn != null) _enhanceBtn.interactable = can;
         ButtonV3("재련", cost, have);
@@ -1337,7 +1386,7 @@ public sealed partial class UI_CruciblePanel
     {
         var req = ProjectileRequest.Create("preview", Vector3.zero, Vector3.forward, 100f, null, RangedParts.RangedSlot);
         RangedParts.Apply(ref req);
-        var sb = new StringBuilder($"<color={HexMute}>지금 조합</color>  {Mathf.Max(1, req.count)}발");
+        var sb = new StringBuilder(Loc.F("<color={0}>지금 조합</color>  {1}발", HexMute, Mathf.Max(1, req.count)));
         if (req.pierce > 0) sb.Append(" · 관통 ").Append(req.pierce);
         if (req.explodeRadius > 0f) sb.Append(" · 폭발 ").Append(req.explodeRadius.ToString("0.#")).Append("m");
         if (req.homingStrength > 0f) sb.Append(" · 유도");
@@ -1361,10 +1410,10 @@ public sealed partial class UI_CruciblePanel
     {
         if (!_v3Ready || _v3PartFocal == null) return;
         var def = HoveredPartDef();
-        if (def == null) { _v3PartFocal.text = $"카드 {RangedPartsDraft.CardCount}장"; return; }
+        if (def == null) { _v3PartFocal.text = Loc.F("카드 {0}장", RangedPartsDraft.CardCount); return; }
         int lv  = RangedPartsState.Current?.LevelOf(def.part_id) ?? 0;
         int cap = RangedPartsDraft.CapOf(def);
-        _v3PartFocal.text = lv >= cap ? $"Lv {lv} <size=50%><color={HexMute}>최대</color></size>"
+        _v3PartFocal.text = lv >= cap ? Loc.F("Lv {0} <size=50%><color={1}>최대</color></size>", lv, HexMute)
                                       : $"Lv {lv} <color={HexMute}>→</color> <color={HexUp}>{RangedPartsDraft.NextLevel(lv, cap)}</color>";
     }
 
@@ -1395,7 +1444,7 @@ public sealed partial class UI_CruciblePanel
 
         bool enhanceFirst = _controller.CanReforge(false, out _);   // [재련]을 지금 누를 수 있나(10-18 재련 개편 — 무기 · 상한 · 재료 · 카드 대기)
         var (fa, fb) = BranchForms();
-        string pair = $"{fa?.DisplayName ?? "?"} 또는 {fb?.DisplayName ?? "?"}";
+        string pair = Loc.F("{0} 또는 {1}", fa?.DisplayName ?? "?", fb?.DisplayName ?? "?");
         string body;
         bool click, act, afford = true;
         if (promote)
@@ -1407,12 +1456,12 @@ public sealed partial class UI_CruciblePanel
         else switch (st)
         {
             case FormUi.Locked:
-                body  = $"<color={HexMute}>잠김</color> · 재련 {Reforges(EvolveAt())}회에서 {pair}{Iga(fb?.DisplayName)} 깨어난다";   // 10-19 — 「+N」 대신 재련 횟수
+                body  = Loc.F("<color={0}>잠김</color> · 진화하면 평타 마지막 타가 바뀐다 — {1}  <color={2}>미리 보기</color>", HexMute, pair, HexMute);   // 10-30 진화 시기는 버튼 아래 줄이 말한다
                 click = true;    // 미리 보기 — 진화 카드는 잠긴 채로 열린다(FillEvolveCard)
                 act   = false;
                 break;
             case FormUi.Ready:
-                body   = $"<color=#FFCC4D>깨어날 수 있다</color> — {pair}";
+                body   = Loc.F("<color=#FFCC4D>깨어날 수 있다</color> — {0}", pair);
                 click  = act = true;
                 afford = CanAffordNextForm(false);
                 break;
@@ -1420,20 +1469,20 @@ public sealed partial class UI_CruciblePanel
             {
                 _controller.CanTemperForm(m, out int tier, out int cost);
                 afford = _controller.FuelAmount >= cost;
-                string c = afford ? $"강화재료 {cost}" : $"<color={HexDown}>강화재료 {cost}</color> 필요(지금 {_controller.FuelAmount})";   // 10-22 모자라면 이유까지
-                body  = $"{w.form.DisplayName} {RomanTier(w.formTier)} — 단련 {RomanTier(tier)} · {c}";
+                string c = afford ? Loc.F("강화재료 {0}", cost) : Loc.F("<color={0}>강화재료 {1}</color> 필요(지금 {2})", HexDown, cost, _controller.FuelAmount);   // 10-22 모자라면 이유까지
+                body  = Loc.F("{0} {1} — 단련 {2} · {3}", Loc.T(w.form.DisplayName), RomanTier(w.formTier), RomanTier(tier), c);
                 click = afford;   // 단련은 재료가 모자라면 꺼진다(v2 · 시안 ③ 규칙 그대로)
                 act   = true;
                 break;
             }
             default:
-                body  = $"{w.form.DisplayName} {RomanTier(w.formTier)} · {VariantName(w, 2) ?? "—"} · {VariantName(w, 3) ?? "—"}";
+                body  = FormTrack(w);   // 10-30 「칼바람 Ⅰ · — · —」는 줄표가 무엇인지 몰랐다
                 click = act = false;
                 break;
         }
         if (_evolveLabel != null)
         {
-            _evolveLabel.text  = $"<color={HexMute}>형</color>   {body}" + (click ? $"   <color={HexMute}>▶</color>" : "");
+            _evolveLabel.text  = Loc.F("<color={0}>형</color>   {1}", HexMute, body) + (click ? $"   <color={HexMute}>▶</color>" : "");
             _evolveLabel.color = st == FormUi.Locked && !promote ? UITheme.Thin.InkA(0.85f) : FormInk;
         }
         _evolveBtn.interactable = click;
@@ -1535,7 +1584,7 @@ public sealed partial class UI_CruciblePanel
     private string FormAwakeLine()
     {
         var (fa, fb) = BranchForms();
-        return $"형이 깨어난다 — {fa?.DisplayName ?? "?"} 또는 {fb?.DisplayName ?? "?"}";
+        return Loc.F("형이 깨어난다 — {0} 또는 {1}", fa?.DisplayName ?? "?", fb?.DisplayName ?? "?");
     }
 
     private TMP_Text FocalFor(int slot) => slot == RangedCard ? _v3PartFocal : _v3Focal;

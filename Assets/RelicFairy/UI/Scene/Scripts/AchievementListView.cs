@@ -172,8 +172,8 @@ public class AchievementListView : MonoBehaviour
             achieved = mgr.CompletedAchievements.Count + waiting;   // 받은 것 + 달성했지만 아직 안 받은 것
         }
         if (_summary != null)
-            _summary.text = $"달성 <color=#E8BA54>{achieved}</color> / {total}" +
-                            (waiting > 0 ? $"   <color=#63D9BF>받을 것 {waiting}</color>" : "");
+            _summary.text = Loc.F("달성 <color=#E8BA54>{0}</color> / {1}", achieved, total) +
+                            (waiting > 0 ? Loc.F("   <color=#63D9BF>받을 것 {0}</color>", waiting) : "");
 
         for (int i = 0; i < _chipBg.Count && i < Categories.Length; i++)
         {
@@ -357,17 +357,17 @@ public class AchievementListView : MonoBehaviour
     {
         // 빈 구간은 <b>머리째</b> 접는다. 글자만 숨기면 그 줄의 높이가 남아 목록이 통째로 밀린다.
         if (claimableHeaderRow) claimableHeaderRow.SetActive(claimableCount > 0);
-        if (claimableHeader)    claimableHeader.text = $"수령 가능  {claimableCount}";
+        if (claimableHeader)    claimableHeader.text = Loc.F("수령 가능  {0}", claimableCount);
 
         if (progressHeaderRow)  progressHeaderRow.SetActive(runningCount > 0);
-        if (progressHeader)     progressHeader.text = $"진행 중  {runningCount}";
+        if (progressHeader)     progressHeader.text = Loc.F("진행 중  {0}", runningCount);
 
         if (claimedHeaderRow)   claimedHeaderRow.SetActive(claimedCount > 0);
-        if (claimedHeader)      claimedHeader.text  = $"받음  {claimedCount}   {(_claimedExpanded ? "▲" : "▼")}";
+        if (claimedHeader)      claimedHeader.text  = Loc.F("받음  {0}   {1}", claimedCount, (_claimedExpanded ? "▲" : "▼"));
 
         bool showClaimAll = claimableCount > 0 && !ReadOnly;
         if (claimAllButton) claimAllButton.gameObject.SetActive(showClaimAll);
-        if (claimAllLabel)  claimAllLabel.text = $"모두 받기 {claimableCount}";
+        if (claimAllLabel)  claimAllLabel.text = Loc.F("모두 받기 {0}", claimableCount);
     }
 
 
@@ -376,7 +376,7 @@ public class AchievementListView : MonoBehaviour
         return new AchievementRowState
         {
             Quest         = quest,
-            DisplayName   = quest.DisplayName,
+            DisplayName   = Loc.T(quest.DisplayName),
             ConditionText = BuildConditionText(quest, claimable || claimed),
             Reward        = EssenceOf(quest),
             Progress01    = claimable || claimed ? 1f : ProgressOf(quest),
@@ -388,7 +388,7 @@ public class AchievementListView : MonoBehaviour
     /// <summary>조건 문구에 <b>진척 숫자</b>를 붙인다 — 얼마나 남았는지 안 보이면 목표가 되지 않는다.</summary>
     private static string BuildConditionText(Quest quest, bool done)
     {
-        string desc = quest.Description;
+        string desc = Loc.T(quest.Description);
         if (done) return desc;
 
         var group = quest.CurrentTaskGroup;

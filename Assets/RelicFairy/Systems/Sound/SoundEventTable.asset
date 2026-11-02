@@ -58,8 +58,8 @@ MonoBehaviour:
     volume: 0.45
     pitchJitter: 0.04
   - eventId: skill_buff
-    sfxKey: sfx_skill_buff
-    volume: 0.8
+    sfxKey: sfx_skill_buff_v2
+    volume: 0.3
     pitchJitter: 0.05
   - eventId: skill_heavy_impact
     sfxKey: sfx_skill_heavy_impact

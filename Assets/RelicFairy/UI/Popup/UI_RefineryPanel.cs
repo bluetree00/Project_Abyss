@@ -731,9 +731,16 @@ public sealed partial class UI_RefineryPanel : UI_Popup
         if (rune == null) return string.Empty;
         var e     = string.IsNullOrEmpty(rune.element) ? null : ElementDef.GetById(rune.element);
         int cells = RuneCardKit.CellCount(rune);
-        string a  = cells > 0 ? $"{cells}칸" : "";
-        string b  = e != null ? $"{e.Name} 존" : "";
+        string a  = cells > 0 ? Loc.F("{0}칸", cells) : "";
+        string b  = e != null ? Loc.F("{0} 존", Loc.T(e.Name)) : "";
         return a.Length > 0 && b.Length > 0 ? a + " · " + b : a + b;
+    }
+
+    /// <summary>11-02 Q18 환전소 창 — 닫히면 보유 원석 · 정제 버튼을 새로 그린다.</summary>
+    private async UniTaskVoid OpenExchangeAsync()
+    {
+        await ExchangePopupView.OpenAsync(GameRunBootstrapper.Instance?.Run, this.GetCancellationTokenOnDestroy());
+        if (this != null) Refresh();
     }
 
     private void Refresh()
@@ -770,7 +777,7 @@ public sealed partial class UI_RefineryPanel : UI_Popup
         if (_spinCost != null)
         {
             bool icon = _spinIcon != null && _spinIcon.enabled;
-            _spinCost.text  = icon ? _svc.CurrentCost.ToString() : $"원석 {_svc.CurrentCost}";
+            _spinCost.text  = icon ? _svc.CurrentCost.ToString() : Loc.F("원석 {0}", _svc.CurrentCost);
             _spinCost.color = afford ? UITheme.Thin.Ink : UITheme.Thin.Danger;
         }
         if (_spinIcon != null) _spinIcon.color = new Color(1f, 1f, 1f, ready ? 1f : 0.5f);
@@ -803,7 +810,7 @@ public sealed partial class UI_RefineryPanel : UI_Popup
         int melt = _svc.MeltForNext;
         if (melt <= 0 || !_svc.TryMelt(melt)) { ShopUIStyle.PlaySfx("shop_reject"); Refresh(); return; }
         ShopUIStyle.PlaySfx("shop_select");
-        SetHint($"강화재료를 녹였다 — 원석 +{melt}");
+        SetHint(Loc.F("강화재료를 녹였다 — 원석 +{0}", melt));
         Refresh();
     }
 

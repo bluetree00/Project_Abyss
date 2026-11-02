@@ -47,7 +47,7 @@ public static class NightmareRules
         public RuleInfo(NightmareRuleId id, string name, string description, string iconKey)
         {
             Id = id; Name = name; Description = description; IconKey = iconKey;
-            BuffLabel = $"악몽 · {name}\n<size=85%>{description}</size>";
+            BuffLabel = Loc.F("악몽 · {0}\n<size=85%>{1}</size>", name, description);
         }
     }
 
@@ -57,7 +57,7 @@ public static class NightmareRules
         new(NightmareRuleId.DimLight,      "흐려진 빛",       "포션을 2개까지만 지닐 수 있다",          "heal"),
         new(NightmareRuleId.RootBind,      "뿌리의 속박",     "회피가 스태미나를 더 먹는다 (25 → 35)",  "roll"),
         new(NightmareRuleId.MeltedShield,  "녹아내린 방패",   "보호막 상한이 최대 체력의 15%",          "shield"),
-        new(NightmareRuleId.BrokenOath,    "부서진 맹세",     "이 성채에선 새 서약을 맺을 수 없다",     "special"),
+        new(NightmareRuleId.BrokenOath,    "부서진 맹세",     "이 챕터에선 새 서약을 쓸 수 없다",       "special"),   // 10-30 C-01 「성채」는 4챕터 이름 — 이 규칙은 3챕터(성역)
         new(NightmareRuleId.BackflowSpell, "역류하는 술식",   "무기 스킬 재사용 대기 +25%",             "cooldown"),
     };
 

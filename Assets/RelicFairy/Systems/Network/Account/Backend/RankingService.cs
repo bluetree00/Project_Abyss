@@ -135,10 +135,49 @@ public static class RankingService
 
     private static string TableOf(StoryEra era) => era == StoryEra.NightmareMode ? NightmareTable : LiberationTable;
 
-    private static async UniTask<bool> SubmitCoreAsync(StoryEra era, int centis, string weapon)
+    private static UniTask<bool> SubmitCoreAsync(StoryEra era, int centis, string weapon)
+        => SubmitRowAsync(TableOf(era), UuidOf(era), centis, weapon, era.ToString());
+
+    // ── 11-02 Q14 보스 · 챕터 기록 표(RANK_BOSS_n · RANK_ROOMS_n) — 이름으로 찾고 콘솔에 없으면 올리지 않는다(기기 기록은 RecordBoard) ──
+    private static readonly Dictionary<string, string> s_tableUuids = new();
+    private static bool s_tablesListed;
+
+    /// <summary>표 이름 → 리더보드 uuid(한 번 목록을 훑어 둔다 · 없으면 null).</summary>
+    public static async UniTask<string> ResolveTableAsync(string table)
+    {
+        if (s_tableUuids.TryGetValue(table, out var u)) return u;
+        if (s_tablesListed) return null;   // 이번 실행에 이미 훑었는데 없었다
+        var r = await CallAsync<BackendLeaderboardTableReturnObject>(cb => Backend.Leaderboard.User.GetLeaderboards(cb));
+        if (r == null || !r.IsSuccess()) return null;
+        s_tablesListed = true;
+        foreach (var it in r.GetLeaderboardTableList())
+            if (!string.IsNullOrEmpty(it.table) && !s_tableUuids.ContainsKey(it.table)) s_tableUuids[it.table] = it.uuid;
+        return s_tableUuids.TryGetValue(table, out u) ? u : null;
+    }
+
+    /// <summary>표에 기록을 올린다 — 지난 기록보다 빠를 때만(한 유저 한 줄). 표가 없으면 false.</summary>
+    public static async UniTask<bool> SubmitTableAsync(string table, int centis, string weapon)
+    {
+        string uuid = await ResolveTableAsync(table);
+        return !string.IsNullOrEmpty(uuid) && await SubmitRowAsync(table, uuid, centis, weapon, table);
+    }
+
+    /// <summary>표 상위 <paramref name="count"/>명(1등 · 2등 등) — 표가 없거나 실패하면 빈 목록.</summary>
+    public static async UniTask<List<Entry>> LoadTopAsync(string table, int count)
+    {
+        var top = new List<Entry>();
+        string uuid = await ResolveTableAsync(table);
+        if (string.IsNullOrEmpty(uuid)) return top;
+        string myInDate = Backend.UserInDate;
+        var list = await CallAsync<BackendUserLeaderboardReturnObject>(cb => Backend.Leaderboard.User.GetLeaderboard(uuid, count, cb));
+        if (list != null && list.IsSuccess())
+            foreach (var it in list.GetUserLeaderboardList()) top.Add(ToEntry(it, myInDate));
+        return top;
+    }
+
+    private static async UniTask<bool> SubmitRowAsync(string table, string uuid, int centis, string weapon, string label)
     {
         await EnsureNicknameAsync();
-        string table = TableOf(era);
 
         // 내 줄(한 유저 한 줄) — 없으면 넣는다. 있으면 지난 기록보다 빠를 때만 바꾼다.
         var mine = await CallAsync(cb => Backend.GameData.GetMyData(table, new Where(), cb));
@@ -150,7 +189,7 @@ public static class RankingService
             inDate = rows[0]["inDate"].ToString();
             if (rows[0].ContainsKey(ScoreColumn) && int.TryParse(rows[0][ScoreColumn].ToString(), out int best) && best > 0 && best <= centis)
             {
-                Debug.Log($"[Ranking] {era} 기록 {Format(centis)} — 이전 {Format(best)}보다 느려 그대로");
+                Debug.Log($"[Ranking] {label} 기록 {Format(centis)} — 이전 {Format(best)}보다 느려 그대로");
                 return true;
             }
         }
@@ -167,9 +206,9 @@ public static class RankingService
         var param = new Param();
         param.Add(ScoreColumn, centis);
         param.Add(WeaponColumn, weapon ?? "");
-        var up = await CallAsync<BackendReturnObject>(cb => Backend.Leaderboard.User.UpdateMyDataAndRefreshLeaderboard(UuidOf(era), table, inDate, param, cb));
+        var up = await CallAsync<BackendReturnObject>(cb => Backend.Leaderboard.User.UpdateMyDataAndRefreshLeaderboard(uuid, table, inDate, param, cb));
         bool ok = up != null && up.IsSuccess();
-        Debug.Log(ok ? $"[Ranking] {era} 기록 올림 {Format(centis)} · {weapon}" : $"[Ranking] {era} 기록 올리기 실패: {up?.GetStatusCode()} {up?.GetMessage()}");
+        Debug.Log(ok ? $"[Ranking] {label} 기록 올림 {Format(centis)} · {weapon}" : $"[Ranking] {label} 기록 올리기 실패: {up?.GetStatusCode()} {up?.GetMessage()}");
         return ok;
     }
 
@@ -180,6 +219,9 @@ public static class RankingService
         string name = SteamFriends.GetPersonaName();
         if (string.IsNullOrWhiteSpace(name)) return;
         if (name.Length > 16) name = name.Substring(0, 16);   // 뒤끝 닉네임 길이 여유
+        // 이미 그 이름이면 그대로 — 내 이름을 다시 넣어도 409(같은 이름)라 클리어마다 번호가 붙었다(10-30 실측 「bg000727#4257」)
+        string current = Backend.UserNickName;
+        if (current == name || (current != null && current.StartsWith(name + "#"))) return;
         for (int i = 0; i < 3; i++)
         {
             string tryName = i == 0 ? name : $"{name}#{Random.Range(1000, 9999)}";

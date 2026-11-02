@@ -12,7 +12,9 @@ using UnityEngine;
 /// 동봉된 Addressable TextAsset으로 폴백하므로, 서버 미등록 상태에서도 그대로 동작한다.
 ///
 /// 두 소스의 컬럼은 동일하다:
-///   sequence_id, line_order, speaker, illustration_key, text
+///   sequence_id, line_order, speaker, illustration_key, text[, text_en]
+/// text_en(11-02 Q11 L4 영어 대사본) — 언어가 영어면 <see cref="GetLines"/>가 그 줄을 영어로 돌려준다(비면 한글).
+/// 서버 차트에 text_en 열이 아직 없으면 동봉 CSV의 영어를 (시퀀스 · line_order)로 맞춰 채운다.
 ///   StartRoom, 0, God, Illust_God_Default, "잠에서 깨어나라..."
 /// </summary>
 public class DialogueDataManager
@@ -35,6 +37,9 @@ public class DialogueDataManager
     // ─────────────────────────────────────────────────────────
 
     private readonly Dictionary<string, List<DialogueLine>> _sequences = new();
+    // 영어(Q11 L4) — (시퀀스, line_order) → 영어 · 시퀀스마다 줄의 line_order(_sequences 순서와 같다)
+    private readonly Dictionary<(string seq, int order), string> _en = new();
+    private readonly Dictionary<string, List<int>> _orders = new();
 
     // ─────────────────────────────────────────────────────────
     // Public Methods
@@ -79,12 +84,18 @@ public class DialogueDataManager
         }
     }
 
-    /// <summary>sequenceId로 대화 라인 배열을 가져온다. 없으면 null 반환.</summary>
+    /// <summary>sequenceId로 대화 라인 배열을 가져온다. 없으면 null 반환. 언어가 영어면 영어가 있는 줄만 영어 사본으로(11-02 Q11).</summary>
     public DialogueLine[] GetLines(string sequenceId)
     {
-        if (_sequences.TryGetValue(sequenceId, out var list))
-            return list.ToArray();
-        return null;
+        if (!_sequences.TryGetValue(sequenceId, out var list)) return null;
+        var lines = list.ToArray();
+        if (Loc.Current != Loc.Language.English || _en.Count == 0 || !_orders.TryGetValue(sequenceId, out var orders)) return lines;
+        for (int i = 0; i < lines.Length && i < orders.Count; i++)
+        {
+            if (lines[i] == null || !_en.TryGetValue((sequenceId, orders[i]), out var en) || string.IsNullOrEmpty(en)) continue;
+            lines[i] = new DialogueLine { speaker = lines[i].speaker, illustrationKey = lines[i].illustrationKey, text = en };
+        }
+        return lines;
     }
 
     public bool HasSequence(string sequenceId) => _sequences.ContainsKey(sequenceId);
@@ -279,7 +290,10 @@ public class DialogueDataManager
                 if (!Enum.TryParse<DialogueSpeaker>(row.TryGetString("speaker"), ignoreCase: true, out var spk))
                     spk = DialogueSpeaker.None;
 
-                buffer.Add((seqId, row.TryGetInt("line_order"), buffer.Count, new DialogueLine
+                int order = row.TryGetInt("line_order");
+                string en = row.TryGetString("text_en");
+                if (!string.IsNullOrEmpty(en)) _en[(seqId, order)] = en;
+                buffer.Add((seqId, order, buffer.Count, new DialogueLine
                 {
                     speaker         = spk,
                     illustrationKey = row.TryGetString("illustration_key"),
@@ -299,11 +313,16 @@ public class DialogueDataManager
         buffer.Sort((a, b) => a.order != b.order ? a.order.CompareTo(b.order) : a.idx.CompareTo(b.idx));
 
         _sequences.Clear();
-        foreach (var (seq, _, _, line) in buffer)
+        _orders.Clear();
+        foreach (var (seq, order, _, line) in buffer)
         {
             if (!_sequences.TryGetValue(seq, out var list))
+            {
                 _sequences[seq] = list = new List<DialogueLine>();
+                _orders[seq] = new List<int>();
+            }
             list.Add(line);
+            _orders[seq].Add(order);
         }
         return buffer.Count;
     }
@@ -311,26 +330,34 @@ public class DialogueDataManager
     private void ParseCsv(string csv)
     {
         _sequences.Clear();
-        ParseCsvInto(csv, _sequences);
+        _orders.Clear();
+        ParseCsvInto(csv, _sequences, _orders, _en);
     }
 
     /// <summary>로컬 CSV에서 <see cref="_sequences"/>에 없는 시퀀스만 더한다. 더한 시퀀스 수를 반환.</summary>
     private int MergeMissingFromCsv(string csv)
     {
-        var local = new Dictionary<string, List<DialogueLine>>();
-        ParseCsvInto(csv, local);
+        var local       = new Dictionary<string, List<DialogueLine>>();
+        var localOrders = new Dictionary<string, List<int>>();
+        var localEn     = new Dictionary<(string seq, int order), string>();
+        ParseCsvInto(csv, local, localOrders, localEn);
 
         int added = 0;
         foreach (var kv in local)
         {
             if (_sequences.ContainsKey(kv.Key)) continue;
             _sequences[kv.Key] = kv.Value;
+            _orders[kv.Key]    = localOrders[kv.Key];
             added++;
         }
+        // 영어 — 서버 차트에 text_en이 없는 줄은 동봉 CSV 것으로(서버 영어가 이긴다)
+        foreach (var kv in localEn)
+            if (!_en.ContainsKey(kv.Key)) _en[kv.Key] = kv.Value;
         return added;
     }
 
-    private static void ParseCsvInto(string csv, Dictionary<string, List<DialogueLine>> target)
+    private static void ParseCsvInto(string csv, Dictionary<string, List<DialogueLine>> target,
+                                     Dictionary<string, List<int>> orders, Dictionary<(string seq, int order), string> en)
     {
         var lines = csv.Split('\n');
         for (int i = 1; i < lines.Length; i++) // i=0 헤더 스킵
@@ -345,12 +372,18 @@ public class DialogueDataManager
             string speaker         = cols[2].Trim();
             string illustrationKey = cols[3].Trim();
             string text            = cols[4].Trim();
+            int.TryParse(cols[1].Trim(), out int order);
+            if (cols.Length > 5 && !string.IsNullOrWhiteSpace(cols[5])) en[(seqId, order)] = cols[5].Trim();
 
             if (!Enum.TryParse<DialogueSpeaker>(speaker, ignoreCase: true, out var spkEnum))
                 spkEnum = DialogueSpeaker.None;
 
             if (!target.ContainsKey(seqId))
+            {
                 target[seqId] = new List<DialogueLine>();
+                orders[seqId] = new List<int>();
+            }
+            orders[seqId].Add(order);
 
             target[seqId].Add(new DialogueLine
             {

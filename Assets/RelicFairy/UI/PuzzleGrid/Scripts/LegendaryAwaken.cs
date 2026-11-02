@@ -38,13 +38,13 @@ public static class LegendaryAwaken
         string name = elem != null ? $"<color={ElementDef.IdHex(zone)}>{elem.Name}</color>" : zone;
         if (LegendaryTuning.Awakened(zone))
         {
-            line = $"<color={GoldHex}>각성</color> — {name} 존 4단계";
+            line = Loc.F("<color={0}>각성</color> — {1} 존 4단계", GoldHex, name);
             return true;
         }
         int need = Mathf.Max(0, AwakenCells(zone) - Cells(zone));
         line = need > 0
-            ? $"{name} 존 {LegendaryTuning.Tier(zone)}/4 · 각성까지 {need}칸"
-            : $"{name} 존 {LegendaryTuning.Tier(zone)}/4";
+            ? Loc.F("{0} 존 {1}/4 · 각성까지 {2}칸", name, LegendaryTuning.Tier(zone), need)
+            : Loc.F("{0} 존 {1}/4", name, LegendaryTuning.Tier(zone));
         return true;
     }
 

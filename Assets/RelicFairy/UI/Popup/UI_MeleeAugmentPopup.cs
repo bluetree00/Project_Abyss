@@ -108,12 +108,12 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
         Layout(offer.Cards != null ? offer.Cards.Length : 2);
         int gen = ++_gen;
         var tc = TierColor(offer.Tier);
-        _eyebrow.text = $"재련 {WeaponReforgeService.CountAt(offer.Level)}회째";   // 10-19 — 「+N 강화」 대신 재련 횟수
+        _eyebrow.text = Loc.F("재련 {0}회째", WeaponReforgeService.CountAt(offer.Level));   // 10-19 — 「+N 강화」 대신 재련 횟수
         _title.text   = "증강 하나를 고른다";
-        _tier.text    = offer.HasLegend ? $"{MeleeAugmentDef.TierName(offer.Tier)} 등급 · <color={LegendHex}>전설 한 장</color>" : $"{MeleeAugmentDef.TierName(offer.Tier)} 등급";
+        _tier.text    = offer.HasLegend ? Loc.F("{0} 등급 · <color={1}>전설 한 장</color>", MeleeAugmentDef.TierName(offer.Tier), LegendHex) : Loc.F("{0} 등급", MeleeAugmentDef.TierName(offer.Tier));
         _tier.color   = tc;
         _tier.alpha   = 0f;
-        _sub.text     = $"{offer.Weapon?.displayName}에 붙는다 · 같은 증강을 다시 고르면 단계가 오른다(최대 III)";
+        _sub.text     = Loc.F("{0}에 붙는다 · 같은 증강을 다시 고르면 단계가 오른다(최대 III)", Loc.T(offer.Weapon?.displayName));
         _foot.text    = "카드를 누르면 고른다 · 다시 뽑기는 그 한 장만 바뀐다";
         Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);   // 10-29 UI 소리 — 열기(놓친 단계의 다음 화면도 한 번)
         for (int i = 0; i < _count; i++) ShowBack(_cards[i]);
@@ -138,7 +138,7 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
         _eyebrow.text = "원거리 재련";
         _title.text   = "파츠 하나를 고른다";
         _tier.text    = string.Empty;
-        _sub.text     = $"새 파츠는 Lv1로 켜진다 · 가진 파츠는 다음 눈금까지 오른다(최대 Lv{RangedPartsDraft.PartCap})";
+        _sub.text     = Loc.F("새 파츠는 Lv1로 켜진다 · 가진 파츠는 다음 눈금까지 오른다(최대 Lv{0})", RangedPartsDraft.PartCap);
         _foot.text    = "카드를 누르면 고른다 · 다시 뽑기는 카드 전부가 바뀐다";
         Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);   // 10-29 UI 소리 — 열기
         for (int i = 0; i < _count; i++) ShowBack(_cards[i]);
@@ -398,21 +398,21 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
         c.Chip.color = tc;
         c.Kind.text  = card.IsUpgrade ? "강화" : "새 증강";
         c.Kind.color = card.IsUpgrade ? tc : UITheme.Thin.InkA(0.6f);
-        c.Name.text  = def.Name;
+        c.Name.text  = Loc.T(def.Name);
         if (def.IsGrowth)   // 10-26 재련으로 자라는 증강(그림자 파트너 · 검풍) — 단계가 없다. 「확장은 체감 + UI」: 지금 값과 다음 재련 값을 같이 보인다
         {
             var w = _offer.Weapon;
-            c.Rank.text   = $"재련 {MeleeAugmentCatalog.ReforgesSinceEvolution(w)}회";   // 「재련할수록 …」은 본문이 말한다(세로 카드 폭 240에 넘쳤다)
+            c.Rank.text   = Loc.F("재련 {0}회", MeleeAugmentCatalog.ReforgesSinceEvolution(w));   // 「재련할수록 …」은 본문이 말한다(세로 카드 폭 240에 넘쳤다)
             c.Rank.color  = tc;
             c.Effect.text = UIKeywordInk.Values(w != null ? def.TextFor(w) : def.Text(1));
             c.Now.text    = GrowthLine(def, w);
             return;
         }
         c.Rank.text  = def.IsLegend ? "처음부터 완성"   // 전설은 단계가 없다(W7 D4)
-                     : card.IsUpgrade ? $"단계 {Roman(card.Rank - 1)} → {Roman(card.Rank)}" : $"단계 {Roman(1)}";
+                     : card.IsUpgrade ? Loc.F("단계 {0} → {1}", Roman(card.Rank - 1), Roman(card.Rank)) : Loc.F("단계 {0}", Roman(1));
         c.Rank.color = tc;
         c.Effect.text = UIKeywordInk.Values(def.Text(card.Rank));   // 수치만 Noto 500 · 조용한 잉크(10-15 설명 글 강조)
-        c.Now.text    = card.IsUpgrade ? $"지금  {def.Text(card.Rank - 1)}" : string.Empty;
+        c.Now.text    = card.IsUpgrade ? Loc.F("지금  {0}", def.Text(card.Rank - 1)) : string.Empty;
     }
 
     /// <summary>파츠 카드 앞면 — 새 파츠/재련 · 이름 · 단계(Lv a → b) · 바뀌는 값(재련소 목록과 같은 단위 글) · 파츠 설명.</summary>
@@ -434,12 +434,12 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
             return;
         }
         c.Name.text  = def.part_name;
-        c.Rank.text  = offer.isNew ? $"새로 켬 · Lv{offer.toLevel}" : $"Lv{offer.fromLevel} → Lv{offer.toLevel}";
+        c.Rank.text  = offer.isNew ? Loc.F("새로 켬 · Lv{0}", offer.toLevel) : $"Lv{offer.fromLevel} → Lv{offer.toLevel}";
         c.Rank.color = tc;
         string to = UI_CruciblePanel.PartValueText(def, def.ValueAt(offer.toLevel));
         c.Effect.text = offer.isNew ? UIKeywordInk.Values(to)
                                     : UIKeywordInk.Values($"{UI_CruciblePanel.PartValueText(def, def.ValueAt(offer.fromLevel))} → {to}");
-        c.Now.text    = def.description ?? string.Empty;
+        c.Now.text    = Loc.T(def.description) ?? string.Empty;
     }
 
     // ── 고르기 · 다시 뽑기 ──
@@ -536,7 +536,7 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
         {
             bool onAll = _parts && usable && left > 0;
             _rerollAll.interactable  = onAll;
-            _rerollAllLabel.text  = left > 0 ? $"카드 다시 뽑기 · 남은 {left}" : "다시 뽑기 · 다 썼다";
+            _rerollAllLabel.text  = left > 0 ? Loc.F("카드 다시 뽑기 · 남은 {0}", left) : "다시 뽑기 · 다 썼다";
             _rerollAllLabel.color = onAll ? UITheme.Thin.InkA(0.85f) : UITheme.Thin.InkA(0.4f);
         }
         foreach (var c in _cards)
@@ -544,7 +544,7 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
             if (c == null) continue;
             bool on = usable && left > 0;
             c.Reroll.interactable = on;
-            c.RerollLabel.text  = left > 0 ? $"다시 뽑기 · 남은 {left}" : "다시 뽑기 · 다 썼다";
+            c.RerollLabel.text  = left > 0 ? Loc.F("다시 뽑기 · 남은 {0}", left) : "다시 뽑기 · 다 썼다";
             c.RerollLabel.color = on ? UITheme.Thin.InkA(0.85f) : UITheme.Thin.InkA(0.4f);
         }
     }
@@ -564,13 +564,13 @@ public sealed class UI_MeleeAugmentPopup : UI_Popup
         // 이름표 · 단위는 증강마다 — 휩쓸기는 초(10-26 대검 R 개편으로 자람 증강이 넷이 됐다)
         string body = def.Id switch
         {
-            MeleeAugmentCatalog.KatanaShadow => $"따라 치는 피해 {now:0.#}% → {next:0.#}%",
-            MeleeAugmentCatalog.KatanaGust   => $"확률 {now:0.#}% → {next:0.#}% · 검기 피해 {now2:0.#}% → {next2:0.#}%",
-            MeleeAugmentCatalog.GreatTip     => $"칼끝 추가 피해 {now:0.#}% → {next:0.#}%",
-            MeleeAugmentCatalog.GreatSweep   => $"한 명당 R 대기 −{now:0.##} → −{next:0.##}초 · 지속 +{now2:0.##} → +{next2:0.##}초",
+            MeleeAugmentCatalog.KatanaShadow => Loc.F("따라 치는 피해 {0:0.#}% → {1:0.#}%", now, next),
+            MeleeAugmentCatalog.KatanaGust   => Loc.F("확률 {0:0.#}% → {1:0.#}% · 검기 피해 {2:0.#}% → {3:0.#}%", now, next, now2, next2),
+            MeleeAugmentCatalog.GreatTip     => Loc.F("칼끝 추가 피해 {0:0.#}% → {1:0.#}%", now, next),
+            MeleeAugmentCatalog.GreatSweep   => Loc.F("한 명당 R 대기 −{0:0.##} → −{1:0.##}초 · 지속 +{2:0.##} → +{3:0.##}초", now, next, now2, next2),
             _                                => $"{now:0.##} → {next:0.##}",
         };
-        return $"다음 재련  {body}";
+        return Loc.F("다음 재련  {0}", body);
     }
 
     /// <summary>카드 한 장의 등급 — 전설 카드만 화면 등급과 다르다(<c>card.Def.Tier</c>).</summary>

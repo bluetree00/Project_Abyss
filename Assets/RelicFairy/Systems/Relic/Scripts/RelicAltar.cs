@@ -21,6 +21,17 @@ public class RelicAltar : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics() => s_selected = null;
 
+    /// <summary>
+    /// 거점 유물 제단 중 이 이름의 유물(지난 세팅 복원 · 10-30). 제단이 가진 바로 그 에셋을 돌려준다 —
+    /// 빌드에선 Addressables로 따로 불러온 사본이 제단 것과 다른 인스턴스라 <see cref="SyncSelection"/>이 제단을 못 찾았다(고른 유물인데 제단이 그대로 남음).
+    /// </summary>
+    public static RelicClassSO FindInScene(string assetName)
+    {
+        foreach (var a in FindObjectsByType<RelicAltar>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            if (a.relicClass != null && a.relicClass.name == assetName) return a.relicClass;
+        return null;
+    }
+
     /// <summary>지난 세팅으로 유물을 쥐여 준 채 거점에 들어왔다(10-29) — 그 제단을 고른 상태로 바로 숨긴다(화면이 아직 검다).
     /// 다른 제단을 고르면 지금처럼 이 제단이 디졸브로 돌아온다(<see cref="Deselect"/>).</summary>
     public static void SyncSelection(RelicClassSO relic)
@@ -227,7 +238,7 @@ public class RelicAltar : MonoBehaviour
         _promptText.textWrappingMode = TextWrappingModes.NoWrap;
         _promptText.sortingOrder = UISortingOrder.WorldPrompt;
         TMPOutlineHelper.ApplySoftShadow(_promptText);
-        _promptText.text = $"<color={UIPalette.GoldHex}>[F]</color> 유물 선택";
+        _promptText.text = Loc.F("<color={0}>[F]</color> 유물 선택", UIPalette.GoldHex);   // 화면 언어(11-02 Q11)
 
         _promptGo.SetActive(false);
     }

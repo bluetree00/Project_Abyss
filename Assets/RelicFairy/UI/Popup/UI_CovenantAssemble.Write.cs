@@ -112,7 +112,8 @@ public partial class UI_CovenantAssemble
         _sentence  = sentence;
         _board     = board;
         _tcs       = new UniTaskCompletionSource<string>();
-        SetText(_titleText, $"봉인된 예언자의 서약서 · {sentence.ResultCount}/{CovenantGrammar.MaxResultsNow}절");   // 10-22 몇 절까지 썼나(설계 §0)
+        // 10-30 C-04 이름뿐인 제목 → 무엇을 하는 창인지 · 「절」 → 「줄」(가득 차면 고쳐 쓰기만 된다)
+        SetText(_titleText, Loc.F("{0} · {1}/{2}줄", (IsFull ? Loc.T("서약서 고치기") : Loc.T("서약서 잇기")), sentence.ResultCount, CovenantGrammar.MaxResultsNow));   // 10-22 몇 줄까지 썼나(설계 §0)
         if (_titleText)
         {
             _titleText.fontSize = 28f; FitSingleLine(_titleText);
@@ -144,12 +145,12 @@ public partial class UI_CovenantAssemble
                 card.RerollButton.onClick.AddListener(() => RerollWrite(idx));
                 FixRerollLabel(card.RerollButton);
                 var rl = card.RerollButton.GetComponentInChildren<TMP_Text>(true);
-                if (rl != null) rl.text = "교체";   // 아래 줄 「교체 n」과 같은 말(설계서 §3)
+                if (rl != null) rl.text = "다시";   // 아래 줄 「다시 뽑기 n회」와 같은 말(설계서 §3 · 10-30 C-06 「교체」 → 조립 창과 같은 이름)
                 card.DockReroll(outerLeft: false);
             }
         }
         if (_forgeButton) { _forgeButton.onClick.RemoveAllListeners(); _forgeButton.onClick.AddListener(OnForgeWrite); }
-        foreach (var lbl in _forgeButton.GetComponentsInChildren<TMP_Text>(true)) lbl.text = "새긴다";
+        foreach (var lbl in _forgeButton.GetComponentsInChildren<TMP_Text>(true)) lbl.text = "쓰기";   // 10-30 C-06 「새긴다」는 비유
 
         RefreshWrite();
         RelayoutWireNextFrameAsync().Forget();   // 판 크기를 막 바꾼 프레임 — 카드 자리가 한 프레임 뒤에 확정돼도 선이 맞게
@@ -461,15 +462,15 @@ public partial class UI_CovenantAssemble
         SetText(_guideText, _editIndex switch
         {
             -2 => IsFull ? Now("① 고칠 줄을 누른다") + Dim(" — 서약서가 가득 찼다")
-                         : Now("① 고칠 줄을 누른다") + Dim("  →  ② 오른쪽 바꿀 말  →  ③ [새긴다]"),
+                         : Now("① 고칠 줄을 누른다") + Dim("  →  ② 오른쪽 바꿀 말  →  ③ [쓰기]"),
             -1 => n == 0  ? "이을 말이 없다 — 위 [고쳐 쓰기]로 한 줄을 바꾼다"
-                : hasPick ? Dim("① 이을 말 ✓  →  ") + Now($"② 아래 [새긴다] — {_sentence.ResultCount + 1}절로 붙는다")
-                          : Now("① 오른쪽 이을 말 한 장") + Dim("  →  ② 아래 [새긴다]"),
-            _  => hasPick ? Dim("① ✓  →  ② 바꿀 말 ✓  →  ") + Now("③ 아래 [새긴다]") + Dim("  · 그만두려면 [취소]")
-                          : Dim("① ✓  →  ") + Now("② 오른쪽에서 바꿀 말 한 장") + Dim("  →  ③ [새긴다]  · 그만두려면 [취소]"),
+                : hasPick ? Dim("① 이을 말 ✓  →  ") + Now(Loc.F("② 아래 [쓰기] — {0}번째 줄로 붙는다", _sentence.ResultCount + 1))
+                          : Now("① 오른쪽 이을 말 한 장") + Dim("  →  ② 아래 [쓰기]"),
+            _  => hasPick ? Dim("① ✓  →  ② 바꿀 말 ✓  →  ") + Now("③ 아래 [쓰기]") + Dim("  · 그만두려면 [취소]")
+                          : Dim("① ✓  →  ") + Now("② 오른쪽에서 바꿀 말 한 장") + Dim("  →  ③ [쓰기]  · 그만두려면 [취소]"),
         });
         SetText(_forgeSummary, string.Empty);   // 안내는 지면 머리로 옮겼다 — 아래 띠는 「교체 n」 + [새긴다]만
-        SetText(_rerollCountText, $"교체 {_board.RerollsLeft}회");
+        SetText(_rerollCountText, Loc.F("다시 뽑기 {0}회", _board.RerollsLeft));   // 10-30 C-06 조립 창 「리롤」과 한 이름으로
         GateReroll(_effectCards, _board.RerollsLeft > 0 && _editIndex != -2);
 
         RefreshWire();
@@ -514,7 +515,7 @@ public partial class UI_CovenantAssemble
                 // 이 자리의 효과 배율 — 뒤 절일수록 약해진다(×0.85 · 0.7 · 0.6 · 0.5). 카드 수치엔 이미 곱해져 있다(10-14)
                 int pos = _editIndex == -1 ? _sentence.ResultCount : _editIndex - 1;
                 float mult = CovenantGrammar.PositionMult(pos);
-                if (mult < 0.999f) head += $"  · 이 자리 효과 ×{mult:0.##}";
+                if (mult < 0.999f) head += Loc.F("  · 이 자리 효과 ×{0:0.##}", mult);
             }
             _effectHeaderText.text = head;
         }
@@ -568,12 +569,12 @@ public partial class UI_CovenantAssemble
                 tier = cards[_selWrite].tier;
             }
             if (_editIndex == i + 1) _targetRow = row;
-            SetRow(row++, line, fix: true, active: _editIndex == i + 1, clause: $"{i + 1}절", tier: tier);
+            SetRow(row++, line, fix: true, active: _editIndex == i + 1, clause: Loc.F("{0}줄", i + 1), tier: tier);   // 10-30 「절」 → 「줄」(제목 · 알림과 같은 말)
         }
         int written = row;   // 원인 + 이미 쓴 절
 
         // 이어 쓸 줄
-        string nextClause = $"{_sentence.ResultCount + 1}절";
+        string nextClause = Loc.F("{0}줄", _sentence.ResultCount + 1);
         if (_editIndex == -1 && hasPick && causeCards == null)
         {
             var c = cards[_selWrite];
@@ -588,7 +589,7 @@ public partial class UI_CovenantAssemble
             // 10-23: 금 점선 칸 + 빈 마디 ◇ — 오른쪽 카드에서 이 칸으로 점선 가지가 뻗는다(RefreshWire).
             //        글은 85%(≈22) — 머리칸만큼 줄 폭이 줄어 26이면 「고른다」 한 마디가 다음 줄로 떨어졌다.
             _targetRow = row;
-            SetRow(row++, $"<size={OldPct}><color={LineLabelHex}>＋ 이어 쓸 자리 — 오른쪽에서 이을 말을 한 장 고른다</color></size>", fix: false, active: false,
+            SetRow(row++, Loc.F("<size={0}><color={1}>＋ 이어 쓸 자리 — 오른쪽에서 이을 말을 한 장 고른다</color></size>", OldPct, LineLabelHex), fix: false, active: false,
                    clause: nextClause, slot: true);
             _rowFills[row - 1].color = new Color(RowFillOn.r, RowFillOn.g, RowFillOn.b, 0.10f);
         }

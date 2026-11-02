@@ -6,6 +6,8 @@
 // - 페이즈 바(IBossHudSource 보스): 총 체력을 페이즈 경계로 나눠 페이즈마다 한 줄로 보여 준다.
 //   한 줄을 다 깎으면 바가 깨지고(번쩍 · 흔들림 · 빈 바 붉은 맥동), 전환 연출이 PlayPageRefill을 부르면 다시 차오르고
 //   가득 찬 순간 한 번 더 번쩍인다. 줄 수는 미리 보여 주지 않는다 — 전환을 겪어서 안다(09-29 사용자).
+// - 깎일 때(10-31 사용자 「보간으로 적당한 빠르기로 줄어드는 연출」): 채움은 목표로 미끄러져 내려가고(수치도 같이 세어 내려간다),
+//   그 뒤에 옅은 「깎인 몫」 띠가 잠깐 머물렀다 따라 내려간다 — 방금 넣은 만큼이 눈에 남는다. 차오름 · 새 줄은 바로 그린다.
 //============================================================
 using UnityEngine;
 using UnityEngine.UI;
@@ -70,8 +72,15 @@ public sealed partial class BossPanelView : MonoBehaviour
     private const float FullPunchSeconds  = 0.3f;
     private const float FullPunchScale    = 0.05f;
     // 10-29 사용자 「무적이면 무적 표현이 있어야」 — 얇은 바 위 덮개만으로는 붉은 방에서 안 읽혔다. 이름 옆 글 + 덮개 느린 맥동.
-    private const string InvulnerableTag   = "  <size=78%><color=#A9C2F0>◇ 무적</color></size>";
+    private const string InvulnerableTag   = "  <size=78%><color=#A9C2F0>{0}</color></size>";   // {0} = Loc.T("◇ 무적")
     private const float  InvulnerablePulseHz = 0.8f;
+    // 깎일 때 — 채움이 다가가는 빠르기(지수 · 12면 약 0.25초에 거의 닿는다) · 깎인 몫 띠(머묾 → 따라 내려감)
+    private const float FillFollowRate   = 12f;
+    private const float TrailHoldSeconds = 0.4f;    // 마지막 타 뒤 띠가 머무는 시간
+    private const float TrailMaxHold     = 1.0f;    // 쉬지 않고 때려도 이만큼 머물면 내려가기 시작한다
+    private const float TrailFollowRate  = 4f;
+    private const float TrailMinSpeed    = 0.1f;    // 바 비율/초 — 끝자락이 늘어지지 않게
+    private static readonly Color TrailColor = new(1.00f, 0.90f, 0.72f, 0.85f);
     private static readonly Color NameInk = new(0.96f, 0.92f, 0.84f, 1f);
     private static readonly Color HpInk   = new(0.93f, 0.90f, 0.84f, 0.95f);
     private Image  _invulnerableOverlay;
@@ -101,6 +110,18 @@ public sealed partial class BossPanelView : MonoBehaviour
     private Vector3 _punchBase = Vector3.one;
     private RectTransform _rect;
 
+    // 깎일 때 보간
+    private float _target = 1f;            // 그려야 할 채움 비율(지금 보이는 _shown이 여기로 미끄러진다)
+    private int   _segMax = 1;
+    private int   _shownPage = 1;          // 지금 보이는 채움이 그린 줄 — 줄이 바뀌면 미끄러지지 않고 바로 그린다
+    private bool  _renderPending;          // Render가 새 목표를 남겼다 — 다음 TickDrain이 바로 그릴지 미끄러뜨릴지 정한다
+    private int   _hpTextShown = -1;
+    private int   _hpTextMax   = -1;
+    private float _trail  = 1f;            // 깎인 몫 띠의 오른쪽 끝(비율) — _shown보다 크면 보인다
+    private float _trailHold;
+    private float _trailHeld;
+    private Image _trailImage;
+
     private bool HasSkin => bossTrackSprite != null || bossFillSprite != null || bossFrameSprite != null;
 
     private void Awake()
@@ -112,6 +133,7 @@ public sealed partial class BossPanelView : MonoBehaviour
     private void Update()
     {
         TickRefill();
+        TickDrain();
         TickPageFx();
         if (_vulnerableRemaining <= 0f) return;
 
@@ -211,7 +233,7 @@ public sealed partial class BossPanelView : MonoBehaviour
         _page       = 1;
         _refilling  = false;
 
-        _bossName = bossName ?? string.Empty;
+        _bossName = Loc.T(bossName ?? string.Empty);   // 보스 이름 영어(11-02 Q11 L4 — 표에 없으면 한글 그대로)
         ApplyName();
         Render();
     }
@@ -235,6 +257,9 @@ public sealed partial class BossPanelView : MonoBehaviour
         }
         _shakeT = -1f;
         _punchT = -1f;
+        _trail  = _shown;
+        _trailHold = 0f;
+        _shownPage = 0;   // 새 보스 — 첫 그림은 미끄러지지 않고 바로 그린다
     }
 
     public void SetHP(int hp, int maxHp)
@@ -270,7 +295,11 @@ public sealed partial class BossPanelView : MonoBehaviour
         float ratio  = (float)_lastHp / _maxHp;
         float shown  = Mathf.Clamp01((ratio - lo) / (hi - lo));
         int   segMax = Mathf.Max(1, Mathf.RoundToInt((hi - lo) * _maxHp));
-        ShowFill(shown, segMax);
+        // 그리기는 TickDrain이 한 프레임에 한 번 정한다 — 모드 전환마다 Init(가득) → SetHP가 한 프레임에 이어 오는데,
+        // 여기서 바로 정하면 가득으로 튀었다가 미끄러져 내려왔다(10-31 실측).
+        _segMax = segMax;
+        _target = shown;
+        _renderPending = true;
         // 경계에 붙잡힌 체력(페이지 몫 올림)은 경계와 1 미만 차이 — 표시 반올림과 무관하게 「다 깎였다」로 본다
         NotePageEmpty(_lastHp - lo * _maxHp < 1f);
     }
@@ -389,7 +418,8 @@ public sealed partial class BossPanelView : MonoBehaviour
 
     private void ShowFill(float shown, int segMax)
     {
-        _shown = shown;
+        _shown     = shown;
+        _shownPage = _page;
         FitToFill(_invulnerableOverlay);
         FitToFill(_vulnerableOverlay);
         FitToFill(_refillGlow);
@@ -399,10 +429,89 @@ public sealed partial class BossPanelView : MonoBehaviour
             hpSlider.maxValue = 1f;
             hpSlider.value    = shown;
         }
-        if (hpText != null && segMax > 0)
-            hpText.text = $"{Mathf.RoundToInt(shown * segMax)} / {segMax}";
+        // 수치는 바와 같이 세어 내려간다 — 값이 바뀔 때만 다시 쓴다(미끄러지는 동안 매 프레임 문자열을 만들지 않게)
+        int hpShown = Mathf.RoundToInt(shown * segMax);
+        if (hpText != null && segMax > 0 && (hpShown != _hpTextShown || segMax != _hpTextMax))
+        {
+            _hpTextShown = hpShown;
+            _hpTextMax   = segMax;
+            hpText.text  = $"{hpShown} / {segMax}";
+        }
         EnsureTextVisible();
         ApplyFillColor(shown);
+    }
+
+    /// <summary>
+    /// 깎일 때 — 채움을 목표로 미끄러뜨리고(수치도 같이 세어 내려간다), 깎인 몫 띠는 머문 뒤 따라 내려간다. 실시간(히트스톱 · 슬로모와 무관).
+    /// 차오르는 동안은 연출이 바를 쥐므로 띠만 걷는다.
+    /// </summary>
+    private void TickDrain()
+    {
+        if (_refilling)
+        {
+            _trail = 0f;
+            FitTrail();
+            return;
+        }
+        if (_renderPending)
+        {
+            _renderPending = false;
+            if (_target < _shown && _page == _shownPage)
+            {
+                // 깎임 — 아래에서 미끄러뜨린다. 띠는 지금 보이는 자리부터(이미 떠 있으면 그대로 · 머묾만 늘린다)
+                if (_trail <= _shown) { _trail = _shown; _trailHeld = 0f; }
+                if (_trailHeld < TrailMaxHold) _trailHold = TrailHoldSeconds;
+            }
+            else
+            {
+                // 처음 · 차오름 · 새 줄 — 바로 그린다
+                ShowFill(_target, _segMax);
+                _trail = _target;
+            }
+        }
+        float dt = Time.unscaledDeltaTime;
+        if (_shown > _target)
+        {
+            float next = Mathf.Lerp(_shown, _target, 1f - Mathf.Exp(-FillFollowRate * dt));
+            if (next - _target < 0.0005f) next = _target;
+            ShowFill(next, _segMax);
+        }
+        if (_trail > _shown)
+        {
+            if (_trailHold > 0f)
+            {
+                _trailHold -= dt;
+                _trailHeld += dt;
+            }
+            else
+            {
+                float eased = Mathf.Lerp(_trail, _shown, 1f - Mathf.Exp(-TrailFollowRate * dt));
+                _trail = Mathf.Max(_shown, Mathf.Min(eased, _trail - TrailMinSpeed * dt));
+            }
+        }
+        FitTrail();
+    }
+
+    /// <summary>깎인 몫 띠 — 바 창(Fill Area) 맨 뒤에 깔아 채움 뒤로 [_shown, _trail] 몫만 보이게 한다.</summary>
+    private void FitTrail()
+    {
+        bool show = _trail > _shown + 0.0005f;
+        if (_trailImage == null)
+        {
+            if (!show) return;
+            var area = hpSlider != null && hpSlider.fillRect != null ? hpSlider.fillRect.parent : null;
+            if (area == null) return;
+            _trailImage = EnsureImage("DamageTrail", area, TrailColor);
+            _trailImage.sprite = UIThinShapes.Solid;
+            _trailImage.transform.SetAsFirstSibling();   // 채움 · 덮개보다 뒤
+        }
+        if (_trailImage.enabled != show) _trailImage.enabled = show;
+        if (!show) return;
+        var rt = (RectTransform)_trailImage.transform;
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = new Vector2(Mathf.Clamp01(_trail), 1f);
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
     }
 
     private void TickRefill()
@@ -528,7 +637,7 @@ public sealed partial class BossPanelView : MonoBehaviour
     private void ApplyName()
     {
         if (nameText != null)
-            nameText.text = _invulnerable ? _bossName + InvulnerableTag : _bossName;
+            nameText.text = _invulnerable ? _bossName + string.Format(InvulnerableTag, Loc.T("◇ 무적")) : _bossName;
         FitNameBand();
     }
 

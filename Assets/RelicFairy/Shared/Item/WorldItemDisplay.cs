@@ -166,7 +166,7 @@ public class WorldItemDisplay : MonoBehaviour
             if (col != null) col.enabled = true;
             RefreshPrompt();
             ItemEffectVfxHelper.ShowNotice(
-                $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.StagingCapacity}칸) — 자리를 비우고 다시 주우세요");
+                Loc.F("<color=#FFCC44>보관함 가득 참</color> ({0}칸) — 자리를 비우고 다시 주우세요", RunItemInventory.StagingCapacity));
             return;
         }
 
@@ -192,7 +192,7 @@ public class WorldItemDisplay : MonoBehaviour
 
         // 효과 요약
         var sb = new System.Text.StringBuilder();
-        sb.Append($"<color=#{RarityColorTable.GetHex(_runtimeData.rarity)}>{_runtimeData.displayName}</color> 획득!");
+        sb.Append(Loc.F("<color=#{0}>{1}</color> 획득!", RarityColorTable.GetHex(_runtimeData.rarity), Loc.T(_runtimeData.displayName)));
 
         foreach (var eff in _runtimeData.effects)
         {
@@ -342,6 +342,6 @@ public class WorldItemDisplay : MonoBehaviour
 
         _promptText.text = owned
             ? "<color=#888888>이미 보유 중</color>"
-            : $"<color={UIPalette.GoldHex}>[F]</color> 얻기";
+            : Loc.F("<color={0}>[F]</color> 얻기", UIPalette.GoldHex);
     }
 }

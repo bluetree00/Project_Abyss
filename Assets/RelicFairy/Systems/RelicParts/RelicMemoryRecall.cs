@@ -163,8 +163,8 @@ public static class RelicMemoryRecall
         string label = card.Kind switch
         {
             RelicDraftCardKind.Echo    => "메아리",
-            RelicDraftCardKind.Residue   => $"정수 +{card.ResidueEssence}",
-            RelicDraftCardKind.Evolution => $"진화 — {RelicEvolution.ById(card.EvolutionId)?.Name}",
+            RelicDraftCardKind.Residue   => Loc.F("정수 +{0}", card.ResidueEssence),   // 화면 언어(11-02 Q11)
+            RelicDraftCardKind.Evolution => Loc.F("진화 — {0}", Loc.T(RelicEvolution.ById(card.EvolutionId)?.Name)),
             _                          => card.Entry?.part_name,
         };
         if (!string.IsNullOrEmpty(label)) RelicFloatText.Show(at, label, tint);   // 발밑 — 높이는 RelicFloatText가 더한다

@@ -96,6 +96,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 21d8f4e0c3a8a8541a3422ae6dd0506c
+    m_Address: Player_DeathFall
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2336e21b03e6d85468ba775ae8809a76
     m_Address: SS_Run
     m_ReadOnly: 0

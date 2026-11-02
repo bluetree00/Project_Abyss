@@ -193,13 +193,15 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
 
         // 창 이름 · 부제 — 문구 정본 d6 시나리오 §2-4(「기억을 되찾아간다」)
         if (_titleText == null) _titleText = ShopUIStyle.FindDeep(transform, "Title")?.GetComponent<TMP_Text>();
-        if (_titleText != null) _titleText.text = "되살아난 기억";
+        // 10-30 E-01 — 제목이 이름뿐이었다(「되살아난 기억」) → 무엇을 하는 창인지(사용자 「컨셉 대사처럼이 아닌 설명 글」)
+        if (_titleText != null) _titleText.text = "유물 기억 — 카드 1장 고르기";
         if (_subtitle != null)
         {
             // 할 일을 먼저 말한다 — 「무엇을 먼저 떠올릴까 — 하나를 붙잡는다」는 시였지 안내가 아니었다(10-14 사용자 「어떻게 해야 하는지 모르겠다」)
             // 10-22 E1 B6 — 같은 줄 끝에 진화 진행(「진화까지 조각 1/2」 · 금). 봉인기엔 빈 글이라 붙지 않는다(카드 위 여백은 15px뿐이라 줄을 따로 두지 않는다)
+            // 10-30 E-01 — 「새겨진다」(비유) → 「붙는다」
             string progress = RelicEvolution.ProgressLine(AppBootstrapper.Instance?.Loadout);
-            _subtitle.text = $"카드 한 장을 누르고 [가져간다] — 이번 런 동안 {(string.IsNullOrEmpty(relicName) ? "유물" : relicName)}에 새겨진다"
+            _subtitle.text = Loc.F("카드 1장을 고르고 [가져간다] — 이번 런 동안 {0}에 붙는다", (string.IsNullOrEmpty(relicName) ? Loc.T("유물") : relicName))
                            + (string.IsNullOrEmpty(progress) ? string.Empty : $"   <color={UIPalette.GoldHex}>{progress}</color>");
         }
 
@@ -432,7 +434,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, DescTop), new Vector2(_cardW - 44f, DescH));
         desc.enableWordWrapping = true;
-        desc.text = entry.description ?? string.Empty;
+        desc.text = Loc.T(entry.description) ?? string.Empty;
 
         // 꼬리말 — 선행 파츠가 있으면 그것을, 없으면 이 계열이 무엇을 바꾸는지 한 줄.
         // 카드 아래 3분의 1이 통째로 비어 있던 자리다(09-21 검수).
@@ -451,7 +453,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         foot.enableWordWrapping = true;
         foot.text = string.IsNullOrEmpty(entry.requires)
             ? KindHintOf(entry.part_kind)
-            : $"선행 · {Managers.RelicParts?.GetById(entry.requires)?.part_name ?? entry.requires}";   // id가 아니라 이름(09-29)
+            : Loc.F("선행 · {0}", Managers.RelicParts?.GetById(entry.requires)?.part_name ?? entry.requires);   // id가 아니라 이름(09-29)
     }
 
     // ── v2 카드(유물 기억) ──
@@ -469,23 +471,20 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         _                        => GradeFaint,
     };
 
-    /// <summary>매달리는 자리 기호(카드 문양 자리 임시 — 전용 아트는 계획 4).</summary>
+    /// <summary>매달리는 자리 기호(카드 문양 자리 임시 — 전용 아트는 계획 4).
+    /// 10-30 E-14 — 첫 글자(새 · 낮 · 놀 · 궤 · 응 …)는 뜻을 몰랐다 → 짧은 이름(문양 그림이 없을 때만 보인다 · 칸이 좁아 글자 크기를 줄여 넣는다).</summary>
     private static string AnchorMark(RelicDraftCard c)
     {
-        if (c.Kind == RelicDraftCardKind.Residue) return "잔";
-        if (c.Kind == RelicDraftCardKind.Evolution) return "진";
+        if (c.Kind == RelicDraftCardKind.Residue) return "정수";
+        if (c.Kind == RelicDraftCardKind.Evolution) return "진화";
         string a = c.Entry != null ? c.Entry.anchor : c.Anchor;
-        if (c.Entry != null && c.Entry.IsReaction)
-            return c.Entry.rune_element switch
-            {
-                "fire" => "화", "ice" => "빙", "electric" => "뇌", "grass" => "독", "light" => "광", "dark" => "암", _ => "응",
-            };
+        if (c.Entry != null && c.Entry.IsReaction) return RuneElementLabel(c.Entry.rune_element) + "\n반응";
         return a switch
         {
-            RelicPartAnchor.Dawn => "새", RelicPartAnchor.Noon => "낮", RelicPartAnchor.Dusk => "놀",
-            RelicPartAnchor.DawnNoon or RelicPartAnchor.NoonDusk => "궤",
+            RelicPartAnchor.Dawn => "여명", RelicPartAnchor.Noon => "정오", RelicPartAnchor.Dusk => "황혼",
+            RelicPartAnchor.DawnNoon or RelicPartAnchor.NoonDusk => "두\n시간대",
             RelicPartAnchor.R10 => "10", RelicPartAnchor.R20 => "20", RelicPartAnchor.R30 => "30", RelicPartAnchor.R40 => "40",
-            RelicPartAnchor.Frenzy => "광", RelicPartAnchor.Judgment => "심",
+            RelicPartAnchor.Frenzy => "광란", RelicPartAnchor.Judgment => "심판",
             _ => "·",
         };
     }
@@ -578,6 +577,9 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         {
             var mark = ThinText(ring.transform, "SymbolMark", UIWeight.Medium, 32f, TextAlignmentOptions.Center, ringCol);
             ShopUIStyle.Stretch(mark.rectTransform, RingStroke + 4f);
+            mark.enableAutoSizing = true;   // 10-30 E-14 — 기호가 짧은 이름(2~3자 · 두 줄)이 됐다 — 고리 안에 맞게 줄인다
+            mark.fontSizeMin = 14f;
+            mark.fontSizeMax = 32f;
             mark.text = AnchorMark(c);
         }
         var badgeArt  = relic != null ? draftSkin?.RelicBadge(relic.Id.ToString()) : null;
@@ -597,21 +599,21 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         float tagX = 20f + EmblemSize + 16f, tagW = _cardW - tagX - 16f;
         var evoDef = c.Kind == RelicDraftCardKind.Evolution ? RelicEvolution.ById(c.EvolutionId) : null;
         string anchorLabel = c.Kind == RelicDraftCardKind.Residue ? "정수"
-                           : evoDef != null ? $"{RelicEvolution.DirectionWord(evoDef.Family)} 빌드"   // 등급 줄이 이미 「유물 진화」 — 꼬리표는 방향을
+                           : evoDef != null ? RelicEvolution.DirectionWord(evoDef.Family)   // 등급 줄이 이미 「유물 진화」 — 꼬리표는 방향을(10-30 E-05 「… 빌드」 → 「연속 공격형」 등)
                            : RelicPartAnchor.Label(entry?.anchor ?? c.Anchor);
         MemoryTag(card, "AnchorTag", anchorLabel, ringCol, new Vector2(tagX, -66f), tagW);
         _seenText.Append(anchorLabel).Append('\n');
         if (entry != null && entry.IsReaction) _seenText.Append("반응\n");
         if (evoDef == null && entry != null && entry.IsReaction)
-            MemoryTag(card, "ReactTag", $"{RuneElementLabel(entry.rune_element)} 반응", ringCol, new Vector2(tagX, -94f), tagW);
+            MemoryTag(card, "ReactTag", Loc.F("{0} 반응", RuneElementLabel(entry.rune_element)), ringCol, new Vector2(tagX, -94f), tagW);
 
         // 이름 — 24 · 500(칸 36 = Noto 행 높이). 10-18 — 요약 줄 자리를 내려고 8px 올렸다(문양 아래끝 134에 붙는다)
         var name = ThinText(card, "Name", UIWeight.Medium, 24f, TextAlignmentOptions.Center, UITheme.Thin.Ink);
         ShopUIStyle.Anchor(name.rectTransform, top, top, top, new Vector2(0f, -MemoryNameTop), new Vector2(_cardW - 28f, 36f));
         name.text = c.Kind switch
         {
-            RelicDraftCardKind.Echo      => "메아리",
-            RelicDraftCardKind.Residue   => "잔향",
+            RelicDraftCardKind.Echo      => "빈 조각(개수 +1)",   // 10-30 E-04 — 「메아리 · 잔향」은 이름만 보고 뜻을 몰랐다
+            RelicDraftCardKind.Residue   => "정수로 받기",
             RelicDraftCardKind.Evolution => RelicEvolution.ById(c.EvolutionId)?.Name ?? "진화",
             _                          => entry?.part_name ?? entry?.part_id ?? string.Empty,
         };
@@ -665,7 +667,8 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             what.textWrappingMode = TextWrappingModes.Normal;
             what.fontSizeMin = 15f;
             // 10-22 E1 D3 · D4 — 「연격 각인 +2」 대신 방향이 저절로 정해졌다는 것만(계열 낱말 없음)
-            what.text = "고르면 런 끝까지 유물이 진화한다\n<color=#ECE6D8>방향은 빌드에 맞춰 저절로 정해졌다</color>";
+            // 10-30 E-05 — 「빌드 · 방향」은 처음 하는 사람에게 뜻이 없었다 → 무엇이 붙고 왜 이 효과인지
+            what.text = "고르면 이번 런 끝까지 이 효과가 붙는다\n<color=#ECE6D8>지금 가진 룬 · 무기에 맞춰 골랐다</color>";
             _seenText.Append(what.text).Append('\n');
             BuildEvolutionChecks(card);   // 진화 = 열린 까닭 한 줄(조건 체크 표시 — 설계 §4-3 · 10-22 E1 조건 하나)
         }
@@ -733,21 +736,23 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     }
 
     // 등급 = 드러난 효과 줄 수(RelicMemoryGrade) — 「흐릿한 기억」만으로는 뜻이 안 전해졌다(10-18) → 「· 효과 n줄」을 붙인다
+    // 10-30 E-03 · E-04 · E-07 — 등급 줄은 왼쪽(등급색) + 오른쪽(종류)이 한 줄로 읽힌다: 「선명 · 효과 1→2줄 … 가진 조각 올리기」 ·
+    // 「빈 조각 … 개수만 +1」 · 「유물 진화 … 런당 1번」. 카드 넷(폭 276)에서 두 글이 겹치지 않게 짧게 썼다.
     private static string GradeTitle(RelicDraftCard c) => c.Kind switch
     {
         RelicDraftCardKind.Evolution => "유물 진화",
-        RelicDraftCardKind.Echo    => "메아리",
-        RelicDraftCardKind.Residue => "잔향",
-        RelicDraftCardKind.Sharpen => $"더 {RelicMemoryOdds.Label(c.Grade)}하게 · 효과 {(int)c.Grade}줄",
-        _                          => $"{RelicMemoryOdds.Label(c.Grade)}한 기억 · 효과 {(int)c.Grade}줄",
+        RelicDraftCardKind.Echo    => "빈 조각",
+        RelicDraftCardKind.Residue => "정수로 받기",
+        RelicDraftCardKind.Sharpen => Loc.F("{0} · 효과 {1}→{2}줄", RelicMemoryOdds.Label(c.Grade), (int)c.Grade - 1, (int)c.Grade),
+        _                          => Loc.F("{0}한 기억 · 효과 {1}줄", RelicMemoryOdds.Label(c.Grade), (int)c.Grade),
     };
 
     private static string KindTitle(RelicDraftCard c) => c.Kind switch
     {
-        RelicDraftCardKind.Sharpen => "가진 조각",
+        RelicDraftCardKind.Sharpen => "가진 조각 올리기",
         RelicDraftCardKind.Echo    => "개수만 +1",
         RelicDraftCardKind.Residue => "정수",
-        RelicDraftCardKind.Evolution => "빌드의 완성",
+        RelicDraftCardKind.Evolution => "런당 1번",
         _                          => "새 조각",
     };
 
@@ -761,10 +766,10 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         {
             case RelicDraftCardKind.Echo:
                 return c.Anchor != null && c.Anchor.StartsWith("r")
-                    ? "조각 없이 광기 10~40 조각 개수 +1"   // 10-22 E1 D7 — 옛 「빈 받침」(이어진 계단)을 걷었다
-                    : $"조각 없이 「{RelicPartAnchor.Label(c.Anchor)}」 개수 +1";
+                    ? Loc.T("조각 없이 광기 10~40 조각 개수 +1")   // 10-22 E1 D7 — 옛 「빈 받침」(이어진 계단)을 걷었다
+                    : Loc.F("조각 없이 「{0}」 개수 +1", RelicPartAnchor.Label(c.Anchor));
             case RelicDraftCardKind.Residue:
-                return "더 고를 조각이 없다 → 정수";
+                return Loc.T("더 고를 조각이 없다 → 정수");
             case RelicDraftCardKind.Evolution:
                 return RelicPartPlainText.Summary(c.EvolutionId);
         }
@@ -815,7 +820,6 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
     private const float CompletionTrace   = 0.5f;
     private const float CompletionDelay   = 0.15f;
     private const float EvoCheckSize      = 16f;
-    private const float EvoCheckIcon      = 16f;
     private const float EvoChecksBottom   = 20f;    // 10-14 「진화 조건」 머리 줄이 붙어 세 줄 — 구분선(106) 아래에 들게 내렸다(묶음 아래끝 = 카드 바닥에서)
 
     /// <summary>진화 문양 — 유물 문장(Higgsfield 흰 선화) → 없으면 유물 배지(Artsystack 흰 아이콘). 둘 다 없으면 null(글자 「진」).</summary>
@@ -891,35 +895,12 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         var fit = box.gameObject.AddComponent<ContentSizeFitter>();
         fit.horizontalFit = fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        var head = ThinText(box, "EvoCheckHead", UIWeight.Regular, EvoCheckSize, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.6f));
+        // 10-30 E-06 — 「진화 조건 ✓ 보스 1/1 처치」는 늘 채워진 조건이라 뜻이 없었다 → 규칙 한 줄(체크 줄 · EvoCheckRow를 걷었다)
+        var head = ThinText(box, "EvoCheckHead", UIWeight.Regular, EvoCheckSize, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.88f));
         head.enableAutoSizing = false;
         head.textWrappingMode = TextWrappingModes.NoWrap;
-        head.text = "진화 조건";
-        EvoCheckRow(box, "EvoCheckBoss", "보스", 1, 1, " 처치");   // 10-29 조각 조건 걷음 — 보스마다 열린다
+        head.text = "보스마다 1장 · 진화는 런에 1번";
         LayoutRebuilder.ForceRebuildLayoutImmediate(box);
-    }
-
-    private static void EvoCheckRow(RectTransform parent, string name, string label, int have, int need, string tail)
-    {
-        bool met = have >= need;
-        var row = (RectTransform)new GameObject(name, typeof(RectTransform)).transform;
-        row.SetParent(parent, false);
-        var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
-        h.spacing = 6f;
-        h.childAlignment = TextAnchor.MiddleLeft;
-        h.childControlWidth = h.childControlHeight = true;
-        h.childForceExpandWidth = h.childForceExpandHeight = false;
-
-        var icon = ShopUIStyle.MakeImage(row, "Check", met ? UITheme.Thin.Gold : UITheme.Thin.InkA(0.5f));
-        icon.sprite = met ? UIProceduralSprites.Check(64) : UIThinShapes.Ring(EvoCheckIcon, UITheme.Thin.Stroke);
-        icon.preserveAspect = true;
-        var le = icon.gameObject.AddComponent<LayoutElement>();
-        le.minWidth = le.preferredWidth = le.minHeight = le.preferredHeight = EvoCheckIcon;
-
-        var t = ThinText(row, "Label", UIWeight.Regular, EvoCheckSize, TextAlignmentOptions.MidlineLeft, UITheme.Thin.InkA(0.88f));
-        t.enableAutoSizing = false;
-        t.textWrappingMode = TextWrappingModes.NoWrap;
-        t.text = $"{label} <color={NumberColor}>{Mathf.Min(have, need)}</color>/{need}{tail}";
     }
 
     /// <summary>
@@ -1047,7 +1028,10 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         if (locked > 0)
         {
             if (sb.Length > 0) sb.Append('\n');
-            sb.Append("<color=").Append(LockedLineColor).Append(">선명해지면 +").Append(locked).Append("줄</color>");
+            // 10-30 E-08 — 「선명해지면 +n줄」은 어떻게 해야 하는지가 없었다 → 다시 고를 때마다 1줄씩(남은 줄이 둘이면 최대 +2)
+            sb.Append("<color=").Append(LockedLineColor).Append(">같은 조각을 다시 고르면 +1줄");
+            if (locked > 1) sb.Append("(최대 +").Append(locked).Append("줄)");
+            sb.Append("</color>");
         }
         return sb.ToString();
     }
@@ -1060,10 +1044,10 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             case RelicDraftCardKind.Echo:
                 // 10-18 — 「공명을 하나 더 센다」는 공명을 모르면 뜻이 없었다. 효과가 없다는 것 · 무엇을 세는지를 먼저 말한다
                 return c.Anchor != null && c.Anchor.StartsWith("r")
-                    ? "효과 줄은 없다 — 광기 10~40 조각 개수만 하나 늘린다(2 · 3 · 4개면 한 단계씩 세진다)."
-                    : $"효과 줄은 없다 — 「{RelicPartAnchor.Label(c.Anchor)}」 조각 개수만 하나 늘린다(2 · 4개면 그 시간대가 강해진다).";
+                    ? Loc.T("효과 줄은 없다 — 광기 10~40 조각 개수만 하나 늘린다(2 · 3 · 4개면 한 단계씩 세진다).")
+                    : Loc.F("효과 줄은 없다 — 「{0}」 조각 개수만 하나 늘린다(2 · 4개면 그 시간대가 강해진다).", RelicPartAnchor.Label(c.Anchor));
             case RelicDraftCardKind.Residue:
-                return "더 고를 조각이 남지 않았다 — 대신 정수를 받는다.";
+                return Loc.T("더 고를 조각이 남지 않았다 — 대신 정수를 받는다.");
             case RelicDraftCardKind.Evolution:
                 return Gild(RelicEvolution.ById(c.EvolutionId)?.Desc ?? string.Empty);
         }
@@ -1091,7 +1075,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         string relicId = c.Entry != null ? c.Entry.relic_id : loadout?.Relic != null ? loadout.Relic.Id.ToString().ToLower() : null;
         switch (c.Kind)
         {
-            case RelicDraftCardKind.Residue: return $"정수 +{c.ResidueEssence}";
+            case RelicDraftCardKind.Residue: return Loc.F("정수 +{0}", c.ResidueEssence);
             case RelicDraftCardKind.Evolution:
             {
                 var d = RelicEvolution.ById(c.EvolutionId);
@@ -1104,11 +1088,16 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         if (e == null) return string.Empty;
         // 10-18 — 「룬 전기 1단계 충족 — 반응 조각」은 무엇이 충족됐는지 · 무슨 뜻인지가 안 보였다 → 조건을 그대로 말한다
         // 10-22 E1 B5 — 룬 단계 이름(정전기 …)을 걷고 짧게(반응 조각은 그 룬 1단계가 켜져 있을 때만 후보라 「함께」가 맞다)
-        if (e.IsReaction) return $"{RuneElementLabel(e.rune_element)} 룬과 함께 작동한다";   // ✓는 기호 화이트리스트 밖(□)
+        // 10-30 E-09 — 조각 글(차트)의 「서리」와 꼬리말의 「물 룬」이 한 카드에서 따로 놀았다 → 둘 다 적는다(「물 룬 1단계(서리)」)
+        if (e.IsReaction)
+        {
+            string t1 = RelicPartPlainText.RuneTier1Label(e.rune_element);
+            return Loc.F("{0} 룬 1단계({1}){2} 켜져 있어야 작동한다", RuneElementLabel(e.rune_element), t1, RelicPartPlainText.Particle(t1, Loc.K("이"), Loc.K("가")));   // ✓는 기호 화이트리스트 밖(□)
+        }
         if (c.Kind == RelicDraftCardKind.Sharpen)
         {
             int had = loadout != null ? (int)loadout.GetRelicPartGrade(e.part_id) : (int)c.Grade - 1;
-            return $"효과 {had}줄 → {had + 1}줄(금색 줄이 새로 열린다)";
+            return Loc.F("효과 {0}줄 → {1}줄(금색 줄이 새로 열린다)", had, had + 1);
         }
         return ResonanceFoot(loadout, relicId, e.anchor)
             ?? (relicId == "lancelot" ? "바로 켜진다 — 광기 10~40 조각 수에는 안 센다" : "바로 켜진다");
@@ -1129,7 +1118,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             int covered = 0;
             foreach (var phase in RelicPartAnchor.GawainPhases) if (RelicPartAnchor.Covers(anchor, phase)) covered++;
             if (covered == 0) return null;
-            string unit = covered == 1 ? " 조각 " : " ";   // 「여명 조각 1/2」 · 두 시간대 조각은 짧게 「여명 1/2 · 정오 2/2」
+            string unit = covered == 1 ? " " + Loc.T("조각") + " " : " ";   // 「여명 조각 1/2」 · 두 시간대 조각은 짧게 「여명 1/2 · 정오 2/2」
 
             var sb = new System.Text.StringBuilder();
             string crossed = null;
@@ -1139,7 +1128,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
                 int after = RelicResonance.GawainCount(loadout, phase) + 1;
                 int need  = after <= 2 ? 2 : after <= 4 ? 4 : 0;
                 if (crossed == null && (after == 2 || after == 4))
-                    crossed = $"{RelicPartAnchor.Label(phase)} {after}개 → {RelicPartPlainText.PhaseStep(phase, after)}";
+                    crossed = Loc.F("{0} {1}개 → {2}", RelicPartAnchor.Label(phase), after, Loc.T(RelicPartPlainText.PhaseStep(phase, after)));
                 if (sb.Length > 0) sb.Append(" · ");
                 sb.Append(RelicPartAnchor.Label(phase)).Append(unit);
                 if (need > 0) sb.Append(after).Append('/').Append(need); else sb.Append(after).Append("개");
@@ -1150,8 +1139,8 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         {
             if (System.Array.IndexOf(RelicPartAnchor.LancelotRungs, anchor) < 0) return null;
             int after = RelicResonance.LancelotCount(loadout) + 1;
-            if (after >= 2 && after <= 4) return $"광기 10~40 조각 {after}개 → {RelicPartPlainText.LadderStep(after)}";
-            return after < 2 ? $"광기 10~40 조각 {after}/2" : $"광기 10~40 조각 {after}개";
+            if (after >= 2 && after <= 4) return Loc.F("광기 10~40 조각 {0}개 → {1}", after, Loc.T(RelicPartPlainText.LadderStep(after)));
+            return after < 2 ? Loc.F("광기 10~40 조각 {0}/2", after) : Loc.F("광기 10~40 조각 {0}개", after);
         }
         return null;
     }
@@ -1169,7 +1158,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
             // 창 맞춤(UIWindowFitter)이 글꼴을 키운 뒤에 짓는 버튼이라 그 배율을 같이 먹인다(10-11 v2 · Noto 500)
             var label = ThinText(frame.transform, "Label", UIWeight.Medium, 17f * ChromeFontScale(), TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
             ShopUIStyle.Stretch(label.rectTransform);
-            label.text = "다시 떠올리기";
+            label.text = "다시 뽑기(런당 1번)";   // 10-30 E-02 — 「다시 떠올리기」는 다시 뽑기라는 뜻 · 런당 1번이 안 보였다
             _redrawBtn = frame.transform.parent.gameObject;
             AddClick(_redrawBtn, OnRedrawClicked);
         }
@@ -1240,7 +1229,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
 
         var title = ThinText(panel.transform, "GuideTitle", UIWeight.Light, UITheme.Thin.Title, TextAlignmentOptions.Center, UITheme.Thin.Ink);
         ShopUIStyle.Anchor(title.rectTransform, top, top, top, new Vector2(0f, -24f), new Vector2(GuideW - 64f, 36f));
-        title.text = "되살아난 기억 — 고르기 전에";
+        title.text = "유물 기억 — 고르기 전에";   // 10-30 E-01 — 창 제목과 같은 이름
         var rule = ShopUIStyle.MakeImage(panel.transform, "GuideRule", UITheme.Thin.LineGold);
         ShopUIStyle.Anchor(rule.rectTransform, top, top, top, new Vector2(0f, -66f), new Vector2(GuideW * 0.4f, UITheme.Thin.Stroke));
 

@@ -6493,17 +6493,9 @@ public static class WeaponFormProbeEditor
         var sp = p.GetComponent<ShadowPartner>();
         bool shownNear = sp != null && sp.Shown;
         float shadowSum = 0f; int shadows = 0, hits = 0;
-        Application.LogCallback onLog = (msg, st, type) =>
-        {
-            const string Tag = "[MeleeAugment] 그림자 — ";
-            if (!msg.StartsWith(Tag)) return;
-            string rest = msg.Substring(Tag.Length);
-            int cut = rest.IndexOf(' ');
-            if (cut > 0) rest = rest.Substring(0, cut);   // 「12.3 · 분신 1」 — 첫 숫자만(10-26 분신 여러 명)
-            if (float.TryParse(rest, out float v)) { shadowSum += v; shadows++; }
-        };
+        Action<int, MonsterBase, float> onStruck = (slot, mb, dmg) => { shadowSum += dmg; shadows++; };   // 10-30 — 평타 그림자 피해는 분신 베기가 낸다
         Action<HitInfo> onHit = h => { if (h.Attacker == p.gameObject && h.ActionType == WeaponActionType.GroundLight) hits++; };
-        Application.logMessageReceived += onLog;
+        ShadowPartner.ProbeStruck += onStruck;
         HitFeedbackService.OnHit += onHit;
         if (t != null) t.Dealt = 0f;
         float shotAt = Time.realtimeSinceStartup + 1.2f;
@@ -6519,7 +6511,7 @@ public static class WeaponFormProbeEditor
             });
             await Wait(0.4f, ct);
         }
-        finally { Application.logMessageReceived -= onLog; HitFeedbackService.OnHit -= onHit; }
+        finally { ShadowPartner.ProbeStruck -= onStruck; HitFeedbackService.OnHit -= onHit; }
         float basic = (t != null ? t.Dealt : 0f) - shadowSum;
         float ratio = basic > 0f ? shadowSum / basic : 0f;
         Check(sb, $"③-a 그림자 보임 — 표적 있을 때 {shownNear}", shownNear);
@@ -7177,7 +7169,7 @@ public static class WeaponFormProbeEditor
     }
 
     // 99 — 카타나 · 대검 재련 · 스킬 · 증강 실전(10-26 사용자 「에디터에서 카타나랑 대검의 재련 내용과 스킬을 실제 테스트」)
-    // Temp/weapon99_only.txt에 A(재련) · B(평타 · 스킬) · C(증강 전수) · D(카타나 증강 × 스킬) · E(오크 더미 DPS) · F(카타나 분신 사진) · G(평타 빠르기 · 진짜 클릭 · 세 무기) · H(근접 버팀 · 시작 선물) · J(검풍 검기 다시 터짐) · L(전설 룬 이펙트 · 판정) · M(풀 수명 통일) · N(화살 사거리)와 무기(K · G)를 적으면 그것만(예: 「A B G」) · 없으면 전부
+    // Temp/weapon99_only.txt에 A(재련) · B(평타 · 스킬) · C(증강 전수) · D(카타나 증강 × 스킬) · E(오크 더미 DPS) · F(카타나 분신 사진) · G(평타 빠르기 · 진짜 클릭 · 세 무기) · H(근접 버팀 · 시작 선물) · J(검풍 검기 다시 터짐) · L(전설 룬 이펙트 · 판정) · M(풀 수명 통일) · N(화살 사거리) · O(그림자 분신 베기 · 검풍 분신) · P(형 재련 지급) · Q(유물 Q 무적 · 광기 수급) · R(속성 검 칼날 이펙트)와 무기(K · G)를 적으면 그것만(예: 「A B G」) · 없으면 전부
     private static Vector3 s_fw = Vector3.forward;   // 99 E — DPS 제자리 방향
 
     private static async UniTask Weapon99Async(PlayerController p, StringBuilder sb, CancellationToken ct)
@@ -7210,6 +7202,14 @@ public static class WeaponFormProbeEditor
             if (Want("L")) await W99LegendFx(p, sb, ct);
             if (Want("M")) await W99PoolLife(p, sb, ct);
             if (Want("N")) await W99ArrowRange(p, sb, ct);
+            if (Want("O")) await W99ShadowStrike(p, sb, ct);
+            if (Want("P")) await W99FormGrant(p, sb, ct);
+            if (Want("Q")) await W99RelicQ(p, sb, ct);
+            if (Want("R")) await W99ElementSwordFx(p, sb, ct);
+            if (Want("S")) await W99FireRuneFx(p, sb, ct);
+            if (Want("T")) await W99FireAuraCandidates(p, sb, ct);
+            if (Want("U")) await W99IgniteCandidates(p, sb, ct);
+            if (Want("V")) await W99GreatEShock(p, sb, ct);
         }
         finally
         {
@@ -8414,6 +8414,626 @@ public static class WeaponFormProbeEditor
         {
             bonusField?.SetValue(p.RuntimeStats, bonus0);
             DetachAll();
+        }
+    }
+
+    /// <summary>
+    /// O — ② 그림자 분신 베기(10-30 사용자 「분신이 타격하는 게 제대로 보여야 하고 데미지도 제대로 체크」) · ③ 검풍 = 분신이 따로 날림. 카타나 +21(분신 3).
+    ///   O-1 앞 표적(모든 분신 칼 앞) · 뒤 표적(어느 분신 칼 앞도 아님 · 3 m 뒤) — 평타 3초: 분신 베기 수 ≈ 휘두름 × 3 · 앞 표적만 맞음 · 피해 = 플레이어 피해 × 몫 · 베기 그림이 보임
+    ///   O-2 플레이어가 안 닿는 옆 표적(왼쪽 분신 칼 앞) — 분신만 벤다(바탕 = 휘두름 피해)
+    ///   O-3 검풍(확률 100%) + 그림자 — 검풍은 그림자 분신 자리에서 · O-4 검풍만 — 붉은 분신이 1.6 m 옆에서(몸과 안 겹침) · 사진 W99_O_*.png
+    /// </summary>
+    private static async UniTask W99ShadowStrike(PlayerController p, StringBuilder sb, CancellationToken ct)
+    {
+        sb.AppendLine("── 그림자 분신 베기 · 검풍 분신(O) ──");
+        var struck = new List<(int slot, MonsterBase mb, float dmg, Vector3 clone)>();
+        var thrown = new List<(Vector3 from, bool shadow, Vector3 player, Vector3 fw)>();
+        ShadowPartner sp = null;
+        Action<int, MonsterBase, float> onStruck = (slot, mb, dmg) =>
+        {
+            var arr = sp != null ? typeof(ShadowPartner).GetField("_clones", Inst)?.GetValue(sp) as Array : null;
+            var c = arr != null && slot < arr.Length ? arr.GetValue(slot) : null;
+            var go = c?.GetType().GetField("go")?.GetValue(c) as GameObject;
+            struck.Add((slot, mb, dmg, go != null ? go.transform.position : Vector3.zero));
+        };
+        Action<Vector3, bool> onThrown = (from, shadow) => thrown.Add((from, shadow, p.transform.position, Flat(p.AimForward)));
+        float playerHit = 0f; int playerHits = 0;
+        Action<HitInfo> onHit = h => { if (h.Attacker == p.gameObject && h.ActionType == WeaponActionType.GroundLight) playerHits++; };
+        ShadowPartner.ProbeStruck += onStruck;
+        SwordGustAugment.ProbeThrown += onThrown;
+        HitFeedbackService.OnHit += onHit;
+        try
+        {
+            if (!await W97Setup(p, Katana, MeleeAugmentCatalog.KatanaShadow + ":1", 21, ct, 0)) { sb.AppendLine("  O 카타나 장착 실패"); return; }
+            p.WeaponManager.Weapon0Data.evolutionStage = Mathf.Max(1, p.WeaponManager.Weapon0Data.evolutionStage);
+            DetachAll();
+            s_home = p.transform.position;
+            Vector3 fw = Flat(p.transform.forward), rt = Vector3.Cross(Vector3.up, fw);
+            var front = await TrackAsync(s_home + fw * 2.2f, ct);
+            var back  = await TrackAsync(s_home - fw * 3.2f, ct);
+            HideStrays();
+            await Wait(1.2f, ct);
+            sp = p.GetComponent<ShadowPartner>();
+            int strikes0 = sp != null ? sp.StrikeCount : 0;
+            float pct = sp != null ? sp.Percent : 0f;
+            struck.Clear(); playerHits = 0;
+            if (front != null) front.Dealt = 0f;
+            int echoMax = 0, shot = 0;
+            float sw0 = Time.realtimeSinceStartup;
+            var camGo = new GameObject("~W99OCam");
+            var cam = camGo.AddComponent<Camera>();
+            if (Camera.main != null) cam.CopyFrom(Camera.main);
+            cam.enabled = false;
+            try
+            {
+                await W97Swing(p, front != null ? front.M.transform.position : s_home + fw * 2.2f, 3f, ct, () =>
+                {
+                    if (sp != null) echoMax = Mathf.Max(echoMax, sp.EchoVisible);
+                    float e = Time.realtimeSinceStartup - sw0;
+                    if (shot < 3 && e >= 0.6f + shot * 0.37f && Camera.main != null)
+                    {
+                        CaptureMain(Camera.main, $"Temp/ui_shots/W99_O_game_{shot}.png");
+                        cam.transform.position = s_home - fw * 2.5f + rt * 4f + Vector3.up * 4.5f;
+                        cam.transform.LookAt(s_home + fw * 1.2f + Vector3.up * 0.8f);
+                        CaptureMain(cam, $"Temp/ui_shots/W99_O_side_{shot++}.png");
+                    }
+                });
+                await Wait(0.4f, ct);
+            }
+            finally { UnityEngine.Object.Destroy(camGo); }
+            int strikes = (sp != null ? sp.StrikeCount : 0) - strikes0;
+            int clones = sp != null ? sp.ShownCount : 0;
+            int onFront = 0, onBack = 0; float frontSum = 0f;
+            foreach (var x in struck) { if (front != null && x.mb == front.M) { onFront++; frontSum += x.dmg; } if (back != null && x.mb == back.M) onBack++; }
+            float basic = (front != null ? front.Dealt : 0f) - frontSum;
+            float ratio = basic > 0f && onFront > 0 && playerHits > 0 ? (frontSum / onFront) / (basic / playerHits) : 0f;   // 분신 베기 한 번 대 플레이어 한 타(창 끝 휘두름의 분신 베기가 빠져도 흔들리지 않게)
+            float want = pct * 0.01f;
+            Check(sb, $"O-1a 분신 {clones}명 · 휘두름(맞힘) {playerHits} · 분신 베기 {strikes}(≈ 휘두름 × {clones})", clones == 3 && playerHits > 0 && strikes >= playerHits * clones * 0.8f && strikes <= playerHits * clones * 1.3f + 3);
+            Check(sb, $"O-1b 앞 표적 분신 피해 {onFront}번 · 뒤 표적 {onBack}번(0 — 분신 칼 앞이 아님)", onFront >= playerHits * clones * 0.8f && onBack == 0);
+            Check(sb, $"O-1c 앞 표적 분신 베기 한 번 {(onFront > 0 ? frontSum / onFront : 0f):0.0} / 플레이어 한 타 {(playerHits > 0 ? basic / playerHits : 0f):0.0} = {ratio:0.000}(몫 {pct:0}% = {want:0.00} ± 0.02)", Mathf.Abs(ratio - want) <= 0.02f);
+            Check(sb, $"O-1d 분신 베기 그림 — 동시 최대 {echoMax}(≥ 1) · 사진 W99_O_game_0~2 · W99_O_side_0~2", echoMax >= 1);
+            DetachAll();
+
+            // O-2 — 플레이어 칼은 안 닿고 왼쪽 앞 분신(-1.5, 1.7) 칼 앞에만 있는 표적
+            if (!await W97Setup(p, Katana, MeleeAugmentCatalog.KatanaShadow + ":1", 21, ct, 0)) { sb.AppendLine("  O-2 장착 실패"); return; }
+            DetachAll();
+            s_home = p.transform.position;
+            fw = Flat(p.transform.forward); rt = Vector3.Cross(Vector3.up, fw);
+            var side = await TrackAsync(s_home + fw * 3.4f - rt * 2.6f, ct);
+            HideStrays();
+            await Wait(1.2f, ct);
+            struck.Clear(); playerHits = 0;
+            if (side != null) side.Dealt = 0f;
+            await W97Swing(p, s_home + fw * 2.2f, 2.5f, ct);
+            await Wait(0.4f, ct);
+            int sideHits = 0; float sideSum = 0f; var slots = new HashSet<int>();
+            foreach (var x in struck) if (side != null && x.mb == side.M) { sideHits++; sideSum += x.dmg; slots.Add(x.slot); }
+            float sideDealt = side != null ? side.Dealt : 0f;
+            Check(sb, $"O-2 옆 표적 — 플레이어 맞힘 {playerHits}(0이어야 · 칼 앞이 아님) · 분신 베기 {sideHits}번(≥ 1 · 분신 {string.Join(",", slots)}) · 체력 줄어든 {sideDealt:0} = 분신 피해 {sideSum:0}",
+                  sideHits >= 1 && Mathf.Abs(sideDealt - sideSum) <= Mathf.Max(2f, sideSum * 0.05f));
+            DetachAll();
+
+            // O-3 · O-4 — 검풍(확률 100%)
+            SwordGustAugment.ProbeChance = 100f;
+            foreach (bool withShadow in new[] { true, false })
+            {
+                string augs = withShadow ? MeleeAugmentCatalog.KatanaShadow + ":1," + MeleeAugmentCatalog.KatanaGust + ":1" : MeleeAugmentCatalog.KatanaGust + ":1";
+                if (!await W97Setup(p, Katana, augs, 21, ct, 0)) { sb.AppendLine("  O-3 장착 실패"); continue; }
+                DetachAll();
+                s_home = p.transform.position;
+                fw = Flat(p.transform.forward); rt = Vector3.Cross(Vector3.up, fw);
+                var t = await TrackAsync(s_home + fw * 2.2f, ct);
+                HideStrays();
+                await Wait(1.2f, ct);
+                thrown.Clear();
+                int gshot = 0;
+                await W97Swing(p, t != null ? t.M.transform.position : s_home + fw * 2.2f, 2.2f, ct, () =>
+                {
+                    if (gshot < 2 && thrown.Count > gshot && Camera.main != null) CaptureMain(Camera.main, $"Temp/ui_shots/W99_O_gust_{(withShadow ? "shadow" : "red")}_{gshot++}.png");
+                });
+                await Wait(0.4f, ct);
+                int fromShadow = 0; float minSide = 99f, maxSide = 0f;
+                foreach (var x in thrown)
+                {
+                    if (x.shadow) fromShadow++;
+                    Vector3 d = x.from - x.player; d.y = 0f;
+                    float lateral = Mathf.Abs(Vector3.Dot(d, Vector3.Cross(Vector3.up, x.fw)));
+                    minSide = Mathf.Min(minSide, lateral); maxSide = Mathf.Max(maxSide, lateral);
+                }
+                if (withShadow)
+                    Check(sb, $"O-3 검풍 + 그림자 — 검풍 {thrown.Count}번 · 그림자 분신이 날림 {fromShadow}번(전부) · 플레이어 옆 거리 {minSide:0.0}~{maxSide:0.0} m(분신 자리 ≥ 0.9)",
+                          thrown.Count >= 2 && fromShadow == thrown.Count && minSide >= 0.9f);
+                else
+                    Check(sb, $"O-4 검풍만 — 검풍 {thrown.Count}번 · 붉은 분신(그림자 0 = {fromShadow}) · 플레이어 옆 거리 {minSide:0.0}~{maxSide:0.0} m(1.6) · 사진 W99_O_gust_red_*",
+                          thrown.Count >= 2 && fromShadow == 0 && minSide >= 1.5f && maxSide <= 1.7f);
+                DetachAll();
+            }
+        }
+        finally
+        {
+            SwordGustAugment.ProbeChance = -1f;
+            ShadowPartner.ProbeStruck -= onStruck;
+            SwordGustAugment.ProbeThrown -= onThrown;
+            HitFeedbackService.OnHit -= onHit;
+            DetachAll();
+        }
+    }
+
+    /// <summary>
+    /// P — ④ 형 재련 단계 지급(10-30 사용자 「무기형 고르기는 잘 보기 힘드니 특정 재련 단계에서 지급」). 진화 무기 +9 · 형 Ⅰ에서 실제 재련 4번:
+    ///   +12 형 Ⅱ(칼바람 쌍풍 · 무게 여진) · +15 그대로 · +18 형 Ⅲ(칼바람 무풍 · 무게 무거운 손) · +21 그대로 · 받음 사건 2번 · 형 단련 칸 안 열림
+    /// </summary>
+    private static async UniTask W99FormGrant(PlayerController p, StringBuilder sb, CancellationToken ct)
+    {
+        sb.AppendLine("── 형 재련 단계 지급(P) ──");
+        var got = new List<string>();
+        Action<WeaponData, int, WeaponFormSO.VariantDef> onGrant = (w, tier, v) => got.Add($"{tier}:{v.id}");
+        WeaponFormService.Granted += onGrant;
+        try
+        {
+            foreach (var (path, name, v2, v3) in new[] { (Katana, "카타나", "twin_wind", "still_wind"), (Great, "대검", "aftershock", "heavy_hand") })
+            {
+                if (!await W97Setup(p, path, "", 9, ct, 1)) { sb.AppendLine($"  P {name} 장착 실패"); continue; }
+                var w = p.WeaponManager.Weapon0Data;
+                w.formVariants = "";
+                w.highestEnhanceReached = 9;
+                w.augmentAfterEvolve = false;
+                w.evolutionStage = Mathf.Max(1, w.evolutionStage);
+                got.Clear();
+                var table = WeaponEnhanceService.Table;
+                var run = GameRunBootstrapper.Instance?.Run;
+                var rng = new System.Random(30);
+                var line = new StringBuilder();
+                bool temperShut = !WeaponFormService.CanTemper(w, out _, out _);
+                int[] wantTier = { 2, 2, 3, 3 };
+                bool okAll = true;
+                for (int i = 0; i < 4; i++)
+                {
+                    bool ok = WeaponReforgeService.ReforgeMelee(w, table, run, rng);
+                    await Wait(0.2f, ct);
+                    if (MeleeAugmentDraft.Pending != null) MeleeAugmentDraft.Choose(0);
+                    Managers.UI?.CloseAllPopupUI(); Time.timeScale = 1f;
+                    line.Append($" +{w.enhanceLevel} 형 {w.formTier}({w.formVariants})");
+                    okAll &= ok && w.formTier == wantTier[i];
+                    temperShut &= !WeaponFormService.CanTemper(w, out _, out _);
+                }
+                bool hasNext = WeaponFormService.NextGrant(w, out _, out _, out _);
+                Check(sb, $"P {name} 재련 4번 —{line} · 받음 사건 [{string.Join(" ", got)}] · 형 단련 칸 닫힘 {temperShut} · 다음 받을 형 {(hasNext ? "있음" : "없음")}",
+                      okAll && w.formVariants == v2 + "," + v3 && got.Count == 2 && got[0] == "2:" + v2 && got[1] == "3:" + v3 && temperShut && !hasNext);
+                WeaponFormRuntime.Of(p).Rebuild();
+                var form = WeaponFormRuntime.Of(p).Current;
+                Check(sb, $"P {name} 형 실행 — {(form != null ? form.GetType().Name : "없음")} 단계 {(form != null ? form.Tier : -1)} · 변주 {v2} {w.HasFormVariant(v2)} · {v3} {w.HasFormVariant(v3)}",
+                      form != null && form.Tier == 3 && w.HasFormVariant(v2) && w.HasFormVariant(v3));
+            }
+            // 다음 받을 형 표기(재련소 화면) — 형 Ⅰ · 재련 0
+            if (await W97Setup(p, Katana, "", 9, ct, 1))
+            {
+                var w = p.WeaponManager.Weapon0Data;
+                w.formVariants = "";
+                bool has = WeaponFormService.NextGrant(w, out int tier, out int at, out var v);
+                Check(sb, $"P 다음 받을 형(형 Ⅰ · +9) — 단계 {tier} · 재련 {at}회째 · {v.displayName}(2 · 1 · 쌍풍)", has && tier == 2 && at == 1 && v.id == "twin_wind");
+            }
+        }
+        finally
+        {
+            WeaponFormService.Granted -= onGrant;
+            if (MeleeAugmentDraft.Pending != null) MeleeAugmentDraft.AutoChoose();
+            Managers.UI?.CloseAllPopupUI(); Time.timeScale = 1f;
+            DetachAll();
+        }
+    }
+
+    /// <summary>
+    /// Q — ⑥ 유물 Q 시전 중 무적 · ⑦ 랜슬롯 광기 수급(10-30 사용자 「랜슬롯 q나 q스킬은 무적처리 · 게이지 수급량은 더 줄이고」).
+    ///   Q-1 가웨인 낙일 · Q-2 랜슬롯 심판 — 시전 중 맞음 = 무적 · 끝난 뒤 맞음 = 들어감 · 시전 중 무적 깃발이 끝나면 꺼짐
+    ///   Q-3 랜슬롯 — 카타나 평타 휘두름(맞힘) 수 대 광기 증가(보통 몹 = 휘두름 × 0.5 · 정예 = × 1)
+    /// </summary>
+    private static async UniTask W99RelicQ(PlayerController p, StringBuilder sb, CancellationToken ct)
+    {
+        sb.AppendLine("── 유물 Q 무적 · 광기 수급(Q) ──");
+        var lo = AppBootstrapper.Instance?.Loadout;
+        var original = lo != null ? lo.Relic : null;
+        var outcomes = new List<PlayerController.DamageOutcome>();
+        Action<GameObject, int, int, PlayerController.DamageOutcome> onRes = (a, raw, fin, o) => outcomes.Add(o);
+        p.OnDamageResolved += onRes;
+        var dbgField = typeof(PlayerController).GetField("debugInvincible", Inst);
+        bool dbg0 = dbgField != null && (bool)dbgField.GetValue(p);
+        dbgField?.SetValue(p, false);   // 허브는 디버그 무적 — 끄고 재야 「끝난 뒤 맞음」이 보인다
+        var originalRelic = typeof(PlayerController).GetField("relicClass", Inst)?.GetValue(p) as RelicClassSO;
+        try
+        {
+            foreach (var (asset, name) in new[] { ("Assets/RelicFairy/Systems/Relic/Data/RelicClass_Gawain.asset", "가웨인"), ("Assets/RelicFairy/Systems/Relic/Data/RelicClass_Lancelot.asset", "랜슬롯") })
+            {
+                var relic = AssetDatabase.LoadAssetAtPath<RelicClassSO>(asset);
+                if (relic == null) { sb.AppendLine($"  Q {name} 유물 없음 {asset}"); continue; }
+                SwapRelic(p, relic);
+                if (!await W97Setup(p, Katana, "", 15, ct, 0)) { sb.AppendLine("  Q 카타나 장착 실패"); continue; }
+                DetachAll();
+                s_home = p.transform.position;
+                Vector3 fw = Flat(p.transform.forward);
+                var t = await TrackAsync(s_home + fw * 3f, ct);
+                HideStrays();
+                await Wait(0.8f, ct);
+                if (p.RelicBehavior is GawainZenithRelic && p.GetComponentInChildren<ZenithGauge>(true) is { } zen) { zen.Paused = false; zen.OpenNoonNow(); }
+                if (p.RelicBehavior is LancelotMadnessRelic lm) { lm.Madness.SetStacks(lm.Madness.MaxStacks); if (!lm.Madness.IsFrenzy) lm.Madness.EnterFrenzy(30f); if (lm.JudgmentCharges <= 0) lm.GrantJudgmentCharge(1); }
+                await Wait(0.3f, ct);
+                bool can = p.RelicBehavior != null && p.RelicBehavior.CanUseSkill(SkillType.Q);
+                p.CooldownTracker.ResetCooldown(SkillType.Q);
+                p.InputBuffer.Clear();
+                if (t != null) { AimAt(t.M.transform.position); RequestFace(p, t.M.transform.position); }
+                p.InputBuffer.Push(Command.QSkill);
+                bool sawInvuln = false; int hitsDuring = 0, invulnDuring = 0;
+                outcomes.Clear();
+                float q0 = Time.realtimeSinceStartup;
+                while (Time.realtimeSinceStartup - q0 < 6f)
+                {
+                    RefillAll();
+                    if (p.RelicSkillInvulnerable)
+                    {
+                        sawInvuln = true;
+                        int before = outcomes.Count;
+                        p.TakeDamage(3, t != null ? t.M.gameObject : null);
+                        hitsDuring++;
+                        if (outcomes.Count > before && outcomes[^1] == PlayerController.DamageOutcome.Invincible) invulnDuring++;
+                        await Wait(0.15f, ct);
+                        continue;
+                    }
+                    if (sawInvuln) break;   // 시전이 끝났다
+                    await UniTask.Yield(PlayerLoopTiming.Update, ct);
+                }
+                await Wait(0.6f, ct);
+                bool flagOff = !p.RelicSkillInvulnerable;
+                outcomes.Clear();
+                p.TakeDamage(3, t != null ? t.M.gameObject : null);
+                var after = outcomes.Count > 0 ? outcomes[^1].ToString() : "없음";
+                Check(sb, $"Q-{(name == "가웨인" ? 1 : 2)} {name} Q(쓸 수 있음 {can}) — 시전 중 맞음 {hitsDuring}번 · 무적 {invulnDuring}번 · 시전 {Time.realtimeSinceStartup - q0:0.0}초 · 끝난 뒤 깃발 꺼짐 {flagOff} · 끝난 뒤 맞음 {after}",
+                      can && sawInvuln && hitsDuring >= 2 && invulnDuring == hitsDuring && flagOff && after == "Applied");
+                DetachAll();
+            }
+
+            // Q-3 랜슬롯 광기 수급 — 표적 등급대로(보통 +1 × 0.5 · 정예 이상 +2 × 0.5) · 몬스터 설정 SO는 공유라 등급을 바꾸지 않는다
+            if (p.RelicBehavior is LancelotMadnessRelic lm2)
+            {
+                {
+                    if (!await W97Setup(p, Katana, "", 15, ct, 0)) return;
+                    DetachAll();
+                    s_home = p.transform.position;
+                    Vector3 fw = Flat(p.transform.forward);
+                    var t = await TrackAsync(s_home + fw * 2.2f, ct);
+                    HideStrays();
+                    if (t == null) return;
+                    var grade = t.M.Grade;
+                    await Wait(0.6f, ct);
+                    lm2.Madness.Restore(new RelicResourceState { fill = 0f, aux = 0f });   // 광란 끄고 0부터
+                    int swings = 0;
+                    Action<HitInfo> onHit = h => { if (h.Attacker == p.gameObject && h.ActionType == WeaponActionType.GroundLight) swings++; };
+                    int serial0 = WeaponFormRuntime.Of(p).SwingSerial;
+                    HitFeedbackService.OnHit += onHit;
+                    try { await W97Swing(p, t.M.transform.position, 3f, ct); }
+                    finally { HitFeedbackService.OnHit -= onHit; }
+                    await Wait(0.2f, ct);
+                    int sw = WeaponFormRuntime.Of(p).SwingSerial - serial0;
+                    int stacks = lm2.Madness.Stacks;
+                    float per = sw > 0 ? (float)stacks / sw : 0f;
+                    float want = grade == MonsterGrade.Common ? 0.5f : 1f;
+                    Check(sb, $"Q-3 랜슬롯 광기 — {(grade == MonsterGrade.Common ? "보통" : "정예")} 등급 {t.M.Grade} · 휘두름 {sw} · 적중 {swings} · 광기 {stacks} = 휘두름당 {per:0.00}({want:0.0} — 예전 {want * 2:0})",
+                          sw >= 4 && Mathf.Abs(per - want) <= 0.15f);
+                    DetachAll();
+                }
+            }
+        }
+        finally
+        {
+            p.OnDamageResolved -= onRes;
+            dbgField?.SetValue(p, dbg0);
+            if (originalRelic != null) SwapRelic(p, originalRelic);
+            DetachAll();
+        }
+    }
+
+    /// <summary>실측 전용 — 붙은 유물을 떼고(OnDetach) 「한 번만 적용」 깃발을 풀어 다른 유물을 붙인다(플레이를 멈추면 사라진다).</summary>
+    private static void SwapRelic(PlayerController p, RelicClassSO relic)
+    {
+        if (p == null || relic == null) return;
+        if (typeof(PlayerController).GetField("relicClass", Inst)?.GetValue(p) as RelicClassSO == relic) return;
+        p.RelicBehavior?.OnDetach(p);
+        typeof(PlayerController).GetField("_relicApplied", Inst)?.SetValue(p, false);
+        p.SetRelicAndApply(relic);
+    }
+
+    /// <summary>
+    /// R — ⑤ 대검 R 속성 검(10-30 사용자 「빌드버전에서는 대검의 속성검이 보이지 않아」). R을 쓰고 1.2초 뒤: 칼 크기 · 칼날 이펙트(입자 수 · 재질 · 셰이더 지원) ·
+    ///   칼날 빛(재질 _EMISSION · 발광 색) · 트레일 덮어쓰기 · 사진 W99_R_*.png. Addressables 재생 방식(편집기 자료 · 빌드 번들)을 같이 적는다.
+    /// </summary>
+    private static async UniTask W99ElementSwordFx(PlayerController p, StringBuilder sb, CancellationToken ct)
+    {
+        sb.AppendLine("── 속성 검 칼날 이펙트(R) ──");
+        var st = UnityEditor.AddressableAssets.AddressableAssetSettingsDefaultObject.Settings;
+        var mode = st != null && st.ActivePlayModeDataBuilder != null ? st.ActivePlayModeDataBuilder.Name : "?";
+        sb.AppendLine($"  Addressables 재생 방식 — {mode} · 품질 {QualitySettings.names[QualitySettings.GetQualityLevel()]}");
+        if (!await W97Setup(p, Great, "", 21, ct, 1)) { sb.AppendLine("  R 대검 장착 실패"); return; }
+        p.WeaponManager.Weapon0Data.evolutionStage = Mathf.Max(1, p.WeaponManager.Weapon0Data.evolutionStage);
+        DetachAll();
+        s_home = p.transform.position;
+        Vector3 fw = Flat(p.transform.forward);
+        var t = await TrackAsync(s_home + fw * 2.5f, ct);
+        HideStrays();
+        await Wait(1f, ct);
+        var wi = p.WeaponManager.GetCurrentWeaponComponent<WeaponInstance>();
+        float scale0 = wi != null ? wi.transform.localScale.x : -1f;
+        p.CooldownTracker.ResetCooldown(SkillType.R);
+        p.InputBuffer.Clear();
+        if (t != null) { AimAt(t.M.transform.position); RequestFace(p, t.M.transform.position); }
+        p.InputBuffer.Push(Command.RSkill);
+        await Wait(1.3f, ct);
+        if (Camera.main != null) CaptureMain(Camera.main, "Temp/ui_shots/W99_R_game.png");
+        var buff = p.GetComponent<GiantSwordBuff>();
+        var blade = wi != null ? wi.GetComponentInChildren<BladeWrapFx>(true) : null;
+        var bps = blade != null ? blade.GetComponent<ParticleSystem>() : null;
+        var brd = blade != null ? blade.GetComponent<ParticleSystemRenderer>() : null;
+        var mat = brd != null ? brd.sharedMaterial : null;
+        string shader = mat != null && mat.shader != null ? $"{mat.shader.name}(지원 {mat.shader.isSupported} · 패스 {mat.passCount} · 키워드 {string.Join(",", mat.shaderKeywords)})" : "없음";
+        var glow = new StringBuilder();
+        if (wi != null)
+            foreach (var r in wi.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                var mpb = new MaterialPropertyBlock();
+                for (int m = 0; m < r.sharedMaterials.Length; m++)
+                {
+                    var sm = r.sharedMaterials[m];
+                    if (sm == null) continue;
+                    r.GetPropertyBlock(mpb, m);
+                    Color em = mpb.GetColor("_EmissionColor");
+                    glow.Append($" {r.name}[{m}] {sm.shader.name} _EMISSION {sm.IsKeywordEnabled("_EMISSION")} 발광 {em.r:0.00},{em.g:0.00},{em.b:0.00}");
+                }
+            }
+        var trail = p.GetComponent<PlayerWeaponTrailVfx>();
+        Check(sb, $"R 속성 검 — 버프 {(buff != null && buff.Active)} · 칼 크기 {scale0:0.00} → {(wi != null ? wi.transform.localScale.x : -1f):0.00} · 칼날 이펙트 {(blade != null)} · 입자 {(bps != null ? bps.particleCount : -1)} · 재질 {(mat != null ? mat.name : "없음")} · 셰이더 {shader}",
+              buff != null && buff.Active && blade != null && bps != null && bps.particleCount > 10 && mat != null && mat.shader.isSupported);
+        sb.AppendLine($"  R 칼날 빛 —{glow}");
+        sb.AppendLine($"  R 트레일 덮어쓰기 — {(trail != null ? trail.IsOverriding + " · " + (trail.OverridePrefab != null ? trail.OverridePrefab.name : "없음") : "구동기 없음")} · 사진 W99_R_game.png");
+        DetachAll();
+    }
+
+    /// <summary>
+    /// S — 불 룬 이펙트 한 장씩(10-30 사용자 「불 룬의 이펙트가 적절하지 않아」). 오크 표적 앞 3 m · 게임 카메라 그대로:
+    ///   1단계 잔불 터짐(점 타격 0.5) · 4단계 작열 폭발(4 m) · 2단계 점화 몸불(상태) · 불 오라 · 발동 섬광 — 이펙트마다 사진 W99_S_*.png · 입자 · 가로 반경(판정과 비교).
+    /// </summary>
+    private static async UniTask W99FireRuneFx(PlayerController p, StringBuilder sb, CancellationToken ct)
+    {
+        sb.AppendLine("── 불 룬 이펙트(S) ──");
+        ElementVfxPlayer.Warmup();
+        if (!await W97Setup(p, Katana, "", 9, ct, 0)) { sb.AppendLine("  S 장착 실패"); return; }
+        DetachAll();
+        s_home = p.transform.position;
+        Vector3 fw = Flat(p.transform.forward);
+        var t = await TrackAsync(s_home + fw * 3f, ct);
+        HideStrays();
+        if (t == null) { sb.AppendLine("  S 표적 실패"); return; }
+        await Wait(1.5f, ct);
+        Vector3 at = t.M.transform.position;
+        var sideGo = new GameObject("~W99SCam");
+        var side = sideGo.AddComponent<Camera>();
+        if (Camera.main != null) side.CopyFrom(Camera.main);
+        side.enabled = false;
+        side.fieldOfView = 45f;
+        Vector3 srt = Vector3.Cross(Vector3.up, fw);
+        side.transform.position = at + srt * 6f + Vector3.up * 1.5f;
+        side.transform.LookAt(at + Vector3.up * 0.8f);
+        var cases = new (string key, string name, float judge, Func<int> play, float peak)[]
+        {
+            ("ember",  "1단계 잔불 터짐(점 타격 · 반경 0.5)", 0.5f, () => { ElementVfxPlayer.PlayBurst(RuneElement.Fire, at, 0.5f); return 0; }, 0.25f),
+            ("scorch", "4단계 작열 폭발(반경 4 m)",         4f,   () => { ElementVfxPlayer.PlayBurst(RuneElement.Fire, at, 4f); return 0; }, 0.35f),
+            ("ignite", "2단계 점화 몸불(상태 3초)",          0f,   () => ElementVfxPlayer.AttachStatus(RuneElement.Fire, t.M.transform, 3f), 0.8f),
+            ("aura",   "불 오라(장판 · 반경 2.3)",           2.3f, () => ElementVfxPlayer.AttachAura(RuneElement.Fire, t.M.transform, 3f, 2.3f), 0.8f),
+            ("act",    "발동 섬광(플레이어 발밑)",           0f,   () => { ElementVfxPlayer.PlayActivation(RuneElement.Fire, p.transform.position); return 0; }, 0.3f),
+        };
+        foreach (var c in cases)
+        {
+            var census = new FxCensus(null);
+            int h = c.play();
+            bool shot = false;
+            float t0 = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - t0 < 2.2f)
+            {
+                RefillAll();
+                census.Tick();
+                if (!shot && Time.realtimeSinceStartup - t0 >= c.peak && Camera.main != null)
+                {
+                    shot = true;
+                    Directory.CreateDirectory("Temp/ui_shots");
+                    CaptureMain(Camera.main, $"Temp/ui_shots/W99_S_{c.key}.png");
+                    CaptureMain(side, $"Temp/ui_shots/W99_S_{c.key}_side.png");
+                }
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+            if (h != 0) ElementVfxPlayer.ReleaseAura(h);
+            sb.AppendLine($"  S {c.name} · 판정 반경 {(c.judge > 0f ? c.judge.ToString("0.0") + " m" : "-")} · 사진 W99_S_{c.key}.png");
+            sb.Append(census.Report("    ", 6, null));
+            await Wait(1.2f, ct);
+        }
+        UnityEngine.Object.Destroy(sideGo);
+        DetachAll();
+    }
+
+    private const string FxRoot = "Assets/RelicFairy/_Imported/EffectSource/";
+    /// <summary>실측 99 T 후보 — 불붙은 바닥(오라 · 웅덩이 · 자국). 비우면 기본 목록 · Temp/fire_aura_cand.txt에 경로를 줄마다 적으면 그것만.</summary>
+    private static readonly string[] FireAuraCands =
+    {
+        FxRoot + "Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Auras/Aura_Fire_LWRP.prefab",
+        FxRoot + "Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Spells/Spell_Fire_10_LWRP.prefab",
+        FxRoot + "Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Spells/Spell_Fire_11_LWRP.prefab",
+        FxRoot + "Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Spells/Spell_Fire_12_LWRP.prefab",
+        FxRoot + "Magic Pig Games (Infinity PBR)/Shared Files/Magic Spells & Particles/Particle Components/PComponent Fire Embers.prefab",
+        FxRoot + "Magic Pig Games (Infinity PBR)/Shared Files/Magic Spells & Particles/Magic Spells/Magic Fire Ring.prefab",
+        FxRoot + "Luke Peek/Realistic Fire/Prefabs/Style 2/Style 2 - Fire - Calm.prefab",
+        FxRoot + "SpecialSkillsEffectsPack/AllEffects/EffectsSet_2(ScriptBased)/Effects/Effect_28_FlameWall/Effect_28_Parts/Effect_28_FlameWallPart.prefab",
+    };
+
+    /// <summary>T — 불 오라 후보 렌더 비교. 사진 W99_T_0~n.png(게임 카메라 · 오크 표적 발밑 · 지름 4.6 m).</summary>
+    private static async UniTask W99FireAuraCandidates(PlayerController p, StringBuilder sb, CancellationToken ct)
+    {
+        sb.AppendLine("── 불 오라 후보(T) ──");
+        if (!await W97Setup(p, Katana, "", 9, ct, 0)) { sb.AppendLine("  T 장착 실패"); return; }
+        DetachAll();
+        s_home = p.transform.position;
+        Vector3 fw = Flat(p.transform.forward);
+        var t = await TrackAsync(s_home + fw * 3f, ct);
+        HideStrays();
+        if (t == null) { sb.AppendLine("  T 표적 실패"); return; }
+        await Wait(1.2f, ct);
+        Vector3 at = t.M.transform.position;
+        var list = File.Exists("Temp/fire_aura_cand.txt") ? File.ReadAllLines("Temp/fire_aura_cand.txt") : FireAuraCands;
+        for (int i = 0; i < list.Length; i++)
+        {
+            string path = list[i].Trim();
+            if (path.Length == 0) continue;
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null) { sb.AppendLine($"  T{i} 없음 {path}"); continue; }
+            var go = UnityEngine.Object.Instantiate(prefab, at + Vector3.up * 0.02f, prefab.transform.rotation);
+            foreach (var c in go.GetComponentsInChildren<Collider>(true)) c.enabled = false;
+            foreach (var mb in go.GetComponentsInChildren<MonoBehaviour>(true)) if (mb != null) mb.enabled = false;   // 팩 스크립트(자가 파괴 · 이동) 끔
+            var pss = go.GetComponentsInChildren<ParticleSystem>(true);
+            foreach (var ps in pss) { var m = ps.main; m.loop = true; m.scalingMode = ParticleSystemScalingMode.Hierarchy; ps.Clear(true); ps.Play(true); }
+            int bad = 0;
+            foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+                foreach (var mat in r.sharedMaterials) if (mat != null && (mat.shader == null || !mat.shader.isSupported || mat.shader.name.Contains("InternalError"))) bad++;
+            for (float w8 = 0f; w8 < 1.2f; w8 += Time.unscaledDeltaTime) { RefillAll(); await UniTask.Yield(PlayerLoopTiming.Update, ct); }   // 허브 몬스터가 끼어들지 않게 매 프레임 숨김
+            float size = 0f;
+            foreach (var r in go.GetComponentsInChildren<ParticleSystemRenderer>(true))
+                if (r.enabled && r.TryGetComponent<ParticleSystem>(out var ps0) && ps0.particleCount > 0)
+                {
+                    var b = r.bounds;
+                    float sz = Mathf.Max(b.size.x, b.size.z);
+                    if (sz < 10f) size = Mathf.Max(size, sz);   // 월드에 흩어진 계통(연기 · 불티)은 크기 기준에서 뺀다
+                }
+            float k = size > 0.05f ? 4.6f / size : 1f;
+            go.transform.localScale = go.transform.localScale * k;
+            foreach (var ps in pss) { ps.Clear(true); ps.Play(true); }
+            for (float w8 = 0f; w8 < 1.2f; w8 += Time.unscaledDeltaTime) { RefillAll(); await UniTask.Yield(PlayerLoopTiming.Update, ct); }
+            int parts = 0; foreach (var ps in pss) parts += ps.particleCount;
+            if (Camera.main != null) CaptureMain(Camera.main, $"Temp/ui_shots/W99_T_{i}.png");
+            sb.AppendLine($"  T{i} {System.IO.Path.GetFileNameWithoutExtension(path)} — 배율 1 가로 {size:0.00} m(공칭 반경 {size * 0.5f:0.00}) · 맞춘 배율 ×{k:0.00} · 입자 {parts} · 안 되는 셰이더 {bad} · 사진 W99_T_{i}.png");
+            UnityEngine.Object.Destroy(go);
+            await Wait(0.5f, ct);
+        }
+        DetachAll();
+    }
+
+    /// <summary>U — 점화 몸불 후보(지금 · 지금을 위로 세움 · 다른 팩). (경로, 위로 세움, 크기) — 사진 W99_U_{n}_game · _side.png.</summary>
+    private static readonly (string path, bool up, float scale)[] IgniteCands =
+    {
+        (FxRoot + "Magic Pig Games (Infinity PBR)/Shared Files/Magic Spells & Particles/Particles/Particle Flame.prefab", false, 1f),
+        (FxRoot + "Magic Pig Games (Infinity PBR)/Shared Files/Magic Spells & Particles/Particles/Particle Flame.prefab", true, 0.7f),
+        (FxRoot + "Luke Peek/Realistic Fire/Prefabs/Style 1/Style 1 - Fire - Calm.prefab", false, 0.5f),
+        (FxRoot + "Luke Peek/Realistic Fire/Prefabs/Style 2/Style 2 - Torch Flame.prefab", false, 0.6f),
+        (FxRoot + "Magic Pig Games (Infinity PBR)/Shared Files/Magic Spells & Particles/Particle Components/PComponent Fire Embers.prefab", false, 1f),
+    };
+
+    private static async UniTask W99IgniteCandidates(PlayerController p, StringBuilder sb, CancellationToken ct)
+    {
+        sb.AppendLine("── 점화 몸불 후보(U) ──");
+        if (!await W97Setup(p, Katana, "", 9, ct, 0)) { sb.AppendLine("  U 장착 실패"); return; }
+        DetachAll();
+        s_home = p.transform.position;
+        Vector3 fw = Flat(p.transform.forward), rt = Vector3.Cross(Vector3.up, fw);
+        var t = await TrackAsync(s_home + fw * 3f, ct);
+        HideStrays();
+        if (t == null) { sb.AppendLine("  U 표적 실패"); return; }
+        for (float w8 = 0f; w8 < 1.2f; w8 += Time.unscaledDeltaTime) { RefillAll(); await UniTask.Yield(PlayerLoopTiming.Update, ct); }
+        float bodyY = 1f;
+        foreach (var col in t.M.GetComponentsInChildren<Collider>())
+            if (col != null && !col.isTrigger && col.enabled) { bodyY = Mathf.Clamp(col.bounds.center.y - t.M.transform.position.y, 0f, 3f); break; }
+        var camGo = new GameObject("~W99UCam");
+        var side = camGo.AddComponent<Camera>();
+        if (Camera.main != null) side.CopyFrom(Camera.main);
+        side.enabled = false;
+        side.fieldOfView = 40f;
+        Vector3 c = t.M.transform.position + Vector3.up * bodyY;
+        side.transform.position = c + rt * 5f + Vector3.up * 1.2f;
+        side.transform.LookAt(c);
+        try
+        {
+            for (int i = 0; i < IgniteCands.Length; i++)
+            {
+                var (path, up, scale) = IgniteCands[i];
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (prefab == null) { sb.AppendLine($"  U{i} 없음 {path}"); continue; }
+                var rot = up ? Quaternion.LookRotation(Vector3.up, -fw) : prefab.transform.rotation;
+                var go = UnityEngine.Object.Instantiate(prefab, c, rot, t.M.transform);
+                go.transform.localScale = prefab.transform.localScale * scale;
+                foreach (var col in go.GetComponentsInChildren<Collider>(true)) col.enabled = false;
+                foreach (var mb in go.GetComponentsInChildren<MonoBehaviour>(true)) if (mb != null) mb.enabled = false;
+                foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true)) { var m = ps.main; m.loop = true; m.scalingMode = ParticleSystemScalingMode.Hierarchy; ps.Clear(true); ps.Play(true); }
+                for (float w8 = 0f; w8 < 1.4f; w8 += Time.unscaledDeltaTime) { RefillAll(); await UniTask.Yield(PlayerLoopTiming.Update, ct); }
+                if (Camera.main != null) CaptureMain(Camera.main, $"Temp/ui_shots/W99_U_{i}_game.png");
+                CaptureMain(side, $"Temp/ui_shots/W99_U_{i}_side.png");
+                sb.AppendLine($"  U{i} {System.IO.Path.GetFileNameWithoutExtension(path)}{(up ? " · 위로 세움" : "")} · 크기 ×{scale:0.0} · 사진 W99_U_{i}_game · _side");
+                UnityEngine.Object.Destroy(go);
+                await Wait(0.4f, ct);
+            }
+        }
+        finally { UnityEngine.Object.Destroy(camGo); }
+        DetachAll();
+    }
+
+    /// <summary>V — 대검 일반 E 가운데 충격 이펙트. 사진 W99_V_e{단계}_{n}.png · 부분 W99_V_part_{이름}.png.</summary>
+    private static async UniTask W99GreatEShock(PlayerController p, StringBuilder sb, CancellationToken ct)
+    {
+        sb.AppendLine("── 대검 일반 E 가운데 충격(V) ──");
+        foreach (int lv in new[] { 9, 15 })
+        {
+            if (!await W97Setup(p, Great, "", lv, ct, 0)) { sb.AppendLine("  V 장착 실패"); return; }
+            p.WeaponManager.Weapon0Data.evolutionStage = Mathf.Max(1, p.WeaponManager.Weapon0Data.evolutionStage);
+            p.WeaponManager.RaiseEquippedWeaponRefreshed();
+            DetachAll();
+            s_home = p.transform.position;
+            Vector3 fw = Flat(p.transform.forward);
+            var t = await TrackAsync(s_home + fw * 2.5f, ct);
+            for (float w8 = 0f; w8 < 1f; w8 += Time.unscaledDeltaTime) { RefillAll(); await UniTask.Yield(PlayerLoopTiming.Update, ct); }
+            int tier = SkillTierResolver.Resolve(p.WeaponManager.Weapon0Data);
+            p.CooldownTracker.ResetCooldown(SkillType.E);
+            p.InputBuffer.Clear();
+            p.InputBuffer.Push(Command.ESkill);
+            int shot = 0;
+            float t0 = Time.realtimeSinceStartup;
+            float[] at = { 0.42f, 0.58f, 0.8f, 1.05f };
+            while (Time.realtimeSinceStartup - t0 < 1.6f)
+            {
+                RefillAll();
+                float e = Time.realtimeSinceStartup - t0;
+                if (shot < at.Length && e >= at[shot] && Camera.main != null) CaptureMain(Camera.main, $"Temp/ui_shots/W99_V_e{tier}_{shot++}.png");
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+            sb.AppendLine($"  V-1 대검 +{lv} E {tier}단계 — 사진 W99_V_e{tier}_0~{at.Length - 1}.png(누른 뒤 {string.Join(" · ", at)}초)");
+            DetachAll();
+        }
+        // V-2 부분마다
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/RelicFairy/Weapon/Greatsword/Data/Greatsword_ESkile_Finsh.prefab");
+        if (prefab == null) { sb.AppendLine("  V-2 프리팹 없음"); return; }
+        Vector3 c = p.transform.position + Flat(p.transform.forward) * 2.5f + Vector3.up * 0.1f;
+        var parts = new List<string>();
+        foreach (Transform ch in prefab.transform) parts.Add(ch.name);
+        parts.Add("(전부)");
+        foreach (var part in parts)
+        {
+            var go = UnityEngine.Object.Instantiate(prefab, c, Quaternion.LookRotation(Flat(p.transform.forward)));
+            go.transform.localScale = prefab.transform.localScale * (3.5f * 0.26f);
+            foreach (Transform ch in go.transform) ch.gameObject.SetActive(part == "(전부)" || ch.name == part);
+            foreach (var mb in go.GetComponentsInChildren<MonoBehaviour>(true)) if (mb != null) mb.enabled = false;
+            foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true)) { var m = ps.main; m.scalingMode = ParticleSystemScalingMode.Hierarchy; ps.Clear(true); ps.Play(true); }
+            float t0 = Time.realtimeSinceStartup;
+            bool shot = false;
+            while (Time.realtimeSinceStartup - t0 < 1.2f)
+            {
+                RefillAll();
+                if (!shot && Time.realtimeSinceStartup - t0 >= 0.2f && Camera.main != null) { shot = true; CaptureMain(Camera.main, $"Temp/ui_shots/W99_V_part_{part.Trim('(', ')')}.png"); }
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+            int n = 0; foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true)) if (ps.gameObject.activeInHierarchy) n++;
+            sb.AppendLine($"  V-2 부분 {part} — 입자 계통 {n} · 사진 W99_V_part_{part.Trim('(', ')')}.png");
+            UnityEngine.Object.Destroy(go);
+            await Wait(0.3f, ct);
         }
     }
 

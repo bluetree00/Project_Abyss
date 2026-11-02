@@ -274,6 +274,8 @@ namespace RelicFairy.UI
 
         private void Enqueue(string text, BossBarkType type, DialogueSpeaker speaker, UniTaskCompletionSource tcs)
         {
+            text = Loc.T(text);   // 코드 · SO의 한글 외침도 표(STRINGS)에 영어가 있으면 영어로 — 대사 CSV 줄은 이미 그 언어(11-02 Q11 L4)
+
             // PhaseAnnounce는 큐를 비우고 즉시 표시 (페이즈 전환은 최우선)
             // MerlinNarration은 큐 유지 — 서사 대사는 순서대로 출력
             if (type == BossBarkType.PhaseAnnounce)
@@ -673,7 +675,7 @@ namespace RelicFairy.UI
             _                              => null,
         };
 
-        private static string SpeakerName(DialogueSpeaker speaker) => speaker switch
+        private static string SpeakerName(DialogueSpeaker speaker) => Loc.T(speaker switch
         {
             DialogueSpeaker.Lich    => "리치",
             DialogueSpeaker.Mordred => "모르드레드",
@@ -686,7 +688,7 @@ namespace RelicFairy.UI
             DialogueSpeaker.Dragon  => "화룡",
             DialogueSpeaker.DeathKnight    => "모르드레드",   // 인트로 모르드레드와 같은 인물(10-13 이름 통일 — 옛 「죽음의 기사」)
             _                       => string.Empty,
-        };
+        });
 
         private Color SpeakerColor(DialogueSpeaker speaker) => speaker switch
         {

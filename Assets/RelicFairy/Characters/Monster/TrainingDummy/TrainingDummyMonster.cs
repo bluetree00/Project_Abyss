@@ -226,9 +226,9 @@ public class TrainingDummyMonster : MonsterBase
 
         bar.SetSubLabel(
             $"DPS {dps:F0}\n" +
-            $"최근 {_lastHit:F0}{(_lastHitCrit ? " CRIT" : string.Empty)}\n" +
-            $"최대 {_maxHit:F0}\n" +
-            $"타수 {_hitCount}  크리 {critRate:F0}%");
+            Loc.F("최근 {0:F0}{1}", _lastHit, _lastHitCrit ? " CRIT" : string.Empty) + "\n" +
+            Loc.F("최대 {0:F0}", _maxHit) + "\n" +
+            Loc.F("타수 {0}  크리 {1:F0}%", _hitCount, critRate));
     }
 
     private void Regenerate()

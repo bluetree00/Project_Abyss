@@ -22,7 +22,10 @@ public abstract class GawainReaction : GawainFragment
     protected bool RuneTier(string key) => Player != null && Player.RuneEffectsOrNull != null && Player.RuneEffectsOrNull.IsActive(key);
     protected RuneResourceState Res => Player != null ? Player.RuneEffectsOrNull?.Resources : null;
 
-    /// <summary>반응 표시 + 엇갈린 빛 집계. 같은 반응 글자는 0.5초에 한 번.</summary>
+    /// <summary>
+    /// 반응 표시 + 엇갈린 빛 집계. 같은 반응 글자는 0.5초에 한 번.
+    /// 글 = 반응 이름 + 결과 한 마디(10-30 H-18 — 「해빙 · 과열」처럼 이름만 떠 무엇이 일어났는지 몰랐다).
+    /// </summary>
     protected void Fire(Vector3 at)
     {
         Hub?.NotifyReaction(EffectKey);
@@ -38,7 +41,7 @@ public abstract class GawainReaction : GawainFragment
 public sealed class GRxThawEffect : GawainReaction
 {
     private const string Frost = "frost", Freeze = "freeze";
-    public GRxThawEffect() : base("g_rx_thaw", "IceFrost", "해빙", RuneElement.Ice) { }
+    public GRxThawEffect() : base("g_rx_thaw", "IceFrost", "해빙 — 두 배 폭발", RuneElement.Ice) { }
     protected override void Bind()   => Hub.SunmarkAdded += OnSunmark;
     protected override void Unbind() => Hub.SunmarkAdded -= OnSunmark;
     private void OnSunmark(MonsterBase mb, int added)
@@ -67,7 +70,7 @@ public sealed class GRxOverheatEffect : GawainReaction
 {
     private const string Static = "ElecStatic";
     private const float ChainRadius = 5f, ChainShare = 0.5f;
-    public GRxOverheatEffect() : base("g_rx_overheat", "ElecStatic", "과열", RuneElement.Electric) { }
+    public GRxOverheatEffect() : base("g_rx_overheat", "ElecStatic", "과열 — 연쇄 폭발", RuneElement.Electric) { }
     protected override void Bind()   => Hub.Bloomed += OnBloomed;
     protected override void Unbind() => Hub.Bloomed -= OnBloomed;
     private void OnBloomed(MonsterBase mb, int stacks, GawainMemoryHub.BloomCause cause)
@@ -113,7 +116,7 @@ public sealed class GRxWildfireEffect : GawainReaction
     private readonly HashSet<GroundFieldBase> _fireMist = new();
     private readonly List<GroundFieldBase> _scratch = new();
     private float _tick;
-    public GRxWildfireEffect() : base("g_rx_wildfire", "GrassMist", "들불", RuneElement.Fire) { }
+    public GRxWildfireEffect() : base("g_rx_wildfire", "GrassMist", "들불 — 불안개", RuneElement.Fire) { }
     protected override void Bind()   => Hub.Bloomed += OnBloomed;
     protected override void Unbind() => Hub.Bloomed -= OnBloomed;
     private void OnBloomed(MonsterBase mb, int stacks, GawainMemoryHub.BloomCause cause)
@@ -164,7 +167,7 @@ public sealed class GRxWildfireEffect : GawainReaction
 public sealed class GRxTwinSunEffect : GawainReaction
 {
     private const float EmberRatio = 0.08f, ScorchRatio = 1.5f;
-    public GRxTwinSunEffect() : base("g_rx_twin_sun", "FireEmber", "겹해", RuneElement.Fire) { }
+    public GRxTwinSunEffect() : base("g_rx_twin_sun", "FireEmber", "겹해 — 태양흔 +1", RuneElement.Fire) { }
     protected override void Bind()   { Hub.Hit += OnHubHit; Hub.Bloomed += OnBloomed; }
     protected override void Unbind() { Hub.Hit -= OnHubHit; Hub.Bloomed -= OnBloomed; }
     private void OnHubHit(HitInfo hit)
@@ -194,7 +197,7 @@ public sealed class GRxCoronaEffect : GawainReaction
     private const string Radiance = "LightRadiance";
     private const float  BurstRange = 7f, BurstHalf = 50f;   // 광폭발 원뿔(LightBurstEffect와 같은 값)
     private int _prevGauge;
-    public GRxCoronaEffect() : base("g_rx_corona", "LightRadiance", "일륜", RuneElement.Light) { }
+    public GRxCoronaEffect() : base("g_rx_corona", "LightRadiance", "일륜 — 미리 폭발", RuneElement.Light) { }
     protected override void Bind()   { Hub.Bloomed += OnBloomed; Hub.BloomCanCrit = Line3; }
     protected override void Unbind() { Hub.Bloomed -= OnBloomed; Hub.BloomCanCrit = false; }
     protected override void OnGradeChanged(RelicMemoryGrade before, PlayerController player)
@@ -252,7 +255,7 @@ public sealed class GRxEclipseEffect : GawainReaction
 {
     private const string Gauge = "darkGauge", ReleaseActive = "darkReleaseActive";
     private bool _wasRelease;
-    public GRxEclipseEffect() : base("g_rx_eclipse", "DarkErosion", "일식", RuneElement.Dark) { }
+    public GRxEclipseEffect() : base("g_rx_eclipse", "DarkErosion", "일식 — 흑점 쌓기", RuneElement.Dark) { }
     protected override void Bind()   => Hub.Bloomed += OnBloomed;
     protected override void Unbind() { Hub.Bloomed -= OnBloomed; Hub.EclipseActive = false; if (Hub.Gauge != null) Hub.Gauge.Paused = false; }
     public override void Tick(float dt, PlayerController player)

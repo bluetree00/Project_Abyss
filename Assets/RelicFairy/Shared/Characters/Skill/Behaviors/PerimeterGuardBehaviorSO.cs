@@ -14,10 +14,14 @@ using UnityEngine.Serialization;
 ///   속성 검(대검 R) 동안: 베기 · 고리 반경 × 평타와 같은 배율(×1.3 · R 3단계 ×1.45) · 벤 둘레에 속성 자국(10-26 사용자 「e스킬도 r에 맞게」)
 /// 예전엔 1단계가 평타 1타 클립이었고 누른 뒤 0.15초에 맞았으며, 2 · 3단계는 같은 빠른 회전을 0.5초마다 되풀이해 바빠 보였다.
 /// 충격 고리는 땅에서 퍼지는 것이라 스킬이 끝나도(회피로 끊어도) 이어진다.
+/// 10-30 사용자 「대검 일반 e를 사용할 때 중앙에 충격파 하울링 같은 이펙트가 있는데 이건 빼자」 — 자산의 충격 이펙트(GreatswordEFinish · 흰 돔 · 동심원)를 비웠다.
+/// 비어 있으면 고리 판정은 얇은 바닥 고리(<see cref="FormStrike.GroundRing"/>)로만 보인다.
 /// </summary>
 [CreateAssetMenu(menuName = "Game/Skill/PerimeterGuardBehavior")]
 public class PerimeterGuardBehaviorSO : SkillBehaviorSO
 {
+    private const float RingLineSeconds = 0.4f;   // 충격 이펙트를 뺐을 때 고리 판정 바닥 고리 수명(순간 가이드 0.35초보다 길어야 그린다)
+
     [Header("회전 베기 (전 단계)")]
     [SerializeField] private float baseDamage = 310f;
     [SerializeField] private float detectRadius = 3.5f;
@@ -162,7 +166,8 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
                                        hitEffectKey: data.hitEffectKey, hitEffectScale: data.hitEffectScale);
 
                     SkillRangeRing.Circle(center, radius);
-                    SpawnEffect(ctx, data.shockEffectKey, center + Vector3.up * 0.1f, rot, radius * data.shockScalePerMeter, 1.5f);
+                    if (string.IsNullOrEmpty(data.shockEffectKey)) FormStrike.GroundRing(center, radius, RingLineSeconds);   // 충격 이펙트를 뺐으면 고리 판정은 얇은 바닥 고리로(10-30)
+                    else SpawnEffect(ctx, data.shockEffectKey, center + Vector3.up * 0.1f, rot, radius * data.shockScalePerMeter, 1.5f);
                 }
             }
             catch (OperationCanceledException) { }

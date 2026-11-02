@@ -21,6 +21,7 @@ public sealed class PlayerStatusEffects
 
     private float _slowTimer;
     private float _hasteTimer;
+    private float _floorSlowTimer;   // 10-31 바닥 장치 느려짐
 
     private float       _freezeTimer;
     private AudioSource _freezeLoopAudioSource;
@@ -35,6 +36,8 @@ public sealed class PlayerStatusEffects
     public float SlowScale { get; private set; } = 1f;
     /// <summary>10-29 잠깐 빨라짐(보물 창고 바람 문양) — 슬로우와 따로 곱한다(1 이상). 끝나면 1.</summary>
     public float HasteScale { get; private set; } = 1f;
+    /// <summary>10-31 바닥 장치 느려짐(보물 창고 진흙 · 가시 비틀거림 · 0.1 ~ 1). <see cref="HasteScale"/>와 함께 지상 이동 최고 속도에 곱한다(DefaultMoveAbility).</summary>
+    public float FloorSlowScale { get; private set; } = 1f;
     public bool  IsFrozen    => _freezeTimer > 0f;
     public bool  IsKnockback => _knockbackTimer > 0f;
 
@@ -64,6 +67,12 @@ public sealed class PlayerStatusEffects
             if (_hasteTimer <= 0f)
                 HasteScale = 1f;
         }
+        if (_floorSlowTimer > 0f)
+        {
+            _floorSlowTimer = Mathf.Max(0f, _floorSlowTimer - unscaledDt);
+            if (_floorSlowTimer <= 0f)
+                FloorSlowScale = 1f;
+        }
         if (_iceStage == 1)
         {
             _iceStageTimer -= dt;
@@ -91,6 +100,23 @@ public sealed class PlayerStatusEffects
     {
         HasteScale  = Mathf.Max(HasteScale, Mathf.Max(1f, scale));
         _hasteTimer = Mathf.Max(_hasteTimer, duration);
+    }
+
+    /// <summary>10-31 바닥 장치 느려짐 — 걸려 있는 동안엔 더 센 쪽 · 더 긴 쪽을 남긴다. 0.1 아래로는 내리지 않는다(멈춰 서지 않게).</summary>
+    public void ApplyFloorSlow(float scale, float duration)
+    {
+        scale = Mathf.Clamp(scale, 0.1f, 1f);
+        FloorSlowScale  = _floorSlowTimer > 0f ? Mathf.Min(FloorSlowScale, scale) : scale;
+        _floorSlowTimer = Mathf.Max(_floorSlowTimer, duration);
+    }
+
+    /// <summary>10-31 바닥 배율(느려짐 · 빨라짐)을 바로 1로 — 보물 창고가 끝나거나 방이 사라질 때. 영구로 남지 않게 하는 마지막 안전장치.</summary>
+    public void ClearFloorSpeed()
+    {
+        _floorSlowTimer = 0f;
+        FloorSlowScale  = 1f;
+        _hasteTimer     = 0f;
+        HasteScale      = 1f;
     }
 
     /// <summary>슬로우 상태를 즉시 해제하고 부착된 VFX를 제거한다.</summary>

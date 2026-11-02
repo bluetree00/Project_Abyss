@@ -18,8 +18,9 @@ MonoBehaviour:
       type: 3}
     auraRadius: 2.3
     statusBody: {fileID: 100004, guid: f9b8345316bce4b4eb5a6944fdbb0209, type: 3}
-    bodyScale: 0
+    bodyScale: 0.7
     bodyTint: {r: 1, g: 0.6, b: 0.3, a: 1}
+    bodyUp: 1
     burst: {fileID: 7812585453298936655, guid: 4da2216bfcbd6764c9dee834c281d43d, type: 3}
     impact: {fileID: 6981941031284743971, guid: edbcd3b3c18ccf44db5b7031741faf88,
       type: 3}
@@ -28,6 +29,8 @@ MonoBehaviour:
     area: {fileID: 1953714657109559461, guid: 247bb6dac5e3cbd408b243d6cb32f46a, type: 3}
     areaRadius: 4.1
     areaLife: 1.6
+    areaTint: {r: 1, g: 0.62, b: 0.3, a: 0.75}
+    areaMaxShown: 3
     bladeMaterial: {fileID: 2100000, guid: 456d9710654aafc459d84a9f8e1c0bed, type: 2}
     bladeTrail: {fileID: 2495791995618168641, guid: 63f1d38d5a12c93448cfdff82d8ba6d4,
       type: 3}

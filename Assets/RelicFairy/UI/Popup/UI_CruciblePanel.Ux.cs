@@ -240,6 +240,6 @@ public sealed partial class UI_CruciblePanel
     private string ForgeEventLine()
     {
         if (_controller == null || !_controller.HasEvent) return string.Empty;
-        return $"▲ 화로 · {_controller.EventEffectDesc}";
+        return Loc.F("▲ 화로 · {0}", _controller.EventEffectDesc);
     }
 }

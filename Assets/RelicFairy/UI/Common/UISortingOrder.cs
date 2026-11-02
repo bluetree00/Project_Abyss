@@ -31,6 +31,8 @@ public static class UISortingOrder
     public const int WorldPrompt  = 20;
     /// <summary>캐릭터에 붙는 게이지(스태미나 등).</summary>
     public const int WorldGauge   = 50;
+    /// <summary>피해 숫자 — 몬스터 이름표 · 체력 바 · 게이지 위, HUD 아래(11-02 사용자 「데미지 텍스트가 이름표 · 다른 UI에 가리지 않게」).</summary>
+    public const int WorldDamage  = 60;
 
     // ── 100~199 : HUD(non-diegetic 상시·무간섭) ────────────
     /// <summary>상시 HUD 캔버스.</summary>

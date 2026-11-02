@@ -61,11 +61,11 @@ public sealed class UI_EquipmentPage : MonoBehaviour
         sb.Append("<size=70%><color=").Append(DimHex).Append('>').Append(slot).Append("</color></size>\n");
         if (w == null) return sb.Append("<color=").Append(FaintHex).Append(">비어 있음</color>").ToString();
 
-        sb.Append("<size=").Append(NameSize / BodySize * 100f).Append("%><color=").Append(InkHex).Append('>').Append(w.displayName).Append("</color></size>\n");
+        sb.Append("<size=").Append(NameSize / BodySize * 100f).Append("%><color=").Append(InkHex).Append('>').Append(Loc.T(w.displayName)).Append("</color></size>\n");
         if (SkillTierResolver.IsRanged(w))
             sb.Append(Dim("파츠 합 ")).Append(Gold((RangedPartsState.Current?.TotalLevel ?? 0).ToString()));
         else
-            sb.Append(Dim("재련 ")).Append(Gold($"{WeaponReforgeService.CountAt(w.enhanceLevel)}회")).Append("   ").Append(Dim("형 "))
+            sb.Append(Dim("재련 ")).Append(Gold(Loc.F("{0}회", WeaponReforgeService.CountAt(w.enhanceLevel)))).Append("   ").Append(Dim("형 "))
               .Append(w.HasForm ? Gold($"「{w.form.DisplayName}」") : Faint("없음"));
         sb.Append('\n').Append(Dim("공격력 ")).Append(Ink(w.baseAttack.ToString())).Append("   ")
           .Append(Dim("공속 ")).Append(Ink($"×{w.attackSpeed:0.0}")).Append("\n\n");
@@ -77,10 +77,10 @@ public sealed class UI_EquipmentPage : MonoBehaviour
         for (int tier = SkillTierResolver.MinTier; tier <= SkillTierResolver.MaxTier; tier++)
         {
             int idx = tier - SkillTierResolver.MinTier - 1;
-            string cond = idx < 0 ? "기본" : idx < ms.Length ? (ranged ? $"파츠 합 {ms[idx]}" : $"재련 {WeaponReforgeService.CountAt(ms[idx])}회") : "—";
+            string cond = idx < 0 ? "기본" : idx < ms.Length ? (ranged ? Loc.F("파츠 합 {0}", ms[idx]) : Loc.F("재련 {0}회", WeaponReforgeService.CountAt(ms[idx]))) : "—";
             string body = idx < 0 ? null : UI_CruciblePanel.TierChangeBody(w, tier);
-            string row  = $"{tier}단계  {cond}{(body != null ? $" — {body}" : "")}";
-            sb.Append(tier == now ? Gold($"◆ {row}  · 지금") : tier < now ? Ink($"◆ {row}") : Faint($"◇ {row}")).Append('\n');
+            string row  = Loc.F("{0}단계  {1}{2}", tier, cond, (body != null ? $" — {body}" : ""));
+            sb.Append(tier == now ? Gold(Loc.F("◆ {0}  · 지금", row)) : tier < now ? Ink($"◆ {row}") : Faint($"◇ {row}")).Append('\n');
         }
 
         AppendSkill(sb, "R", w.skillQ, w.skillQCooldown);   // R 스킬(필드명 skillQ는 레거시 — Q는 유물 칸)
@@ -91,8 +91,8 @@ public sealed class UI_EquipmentPage : MonoBehaviour
     private static void AppendSkill(System.Text.StringBuilder sb, string key, SkillSO skill, float cooldown)
     {
         if (skill == null) return;
-        sb.Append('\n').Append(Ink($"[{key}] {skill.skillName}")).Append("  ").Append(Dim($"{cooldown:0.0#}초")).Append('\n');
-        if (!string.IsNullOrEmpty(skill.description)) sb.Append(Dim(skill.description)).Append('\n');
+        sb.Append('\n').Append(Ink($"[{key}] {Loc.T(skill.skillName)}")).Append("  ").Append(Dim(Loc.F("{0:0.0#}초", cooldown))).Append('\n');
+        if (!string.IsNullOrEmpty(skill.description)) sb.Append(Dim(Loc.T(skill.description))).Append('\n');
     }
 
     private static string Gold(string s)  => $"<color={GoldHex}>{s}</color>";

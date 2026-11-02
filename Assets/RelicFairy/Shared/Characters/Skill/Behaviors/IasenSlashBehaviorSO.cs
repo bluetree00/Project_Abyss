@@ -140,7 +140,7 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
         private void UpdateDash(SkillExecutionContext ctx)
         {
             float t = Mathf.Clamp01(_timer / _data.dashDuration);
-            Vector3 targetPos = Vector3.Lerp(_dashStart, _dashEnd, t);
+            Vector3 targetPos = ctx.DashFollowGround(Vector3.Lerp(_dashStart, _dashEnd, t));   // 경사로 · 계단을 따라 — 처음 높이 그대로 밀면 계단 속을 지났다(11-02 Q6)
 
             // Rigidbody.MovePosition 으로 적용 — 벽 등 정적 콜라이더와 정상 충돌 (transform 직접 대입 시 관통 + 잔류 angularVelocity)
             if (ctx.Rigidbody != null && !ctx.Rigidbody.isKinematic)

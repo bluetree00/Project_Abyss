@@ -65,6 +65,7 @@ public class RoomClearGate : MonoBehaviour
     // ── Private fields ─────────────────────────────────────────
     private GameRunSession _run;
     private bool _activated;
+    private bool _bossRewardSpawned;   // 11-02 Q25 보스 처치 구슬은 한 번
     private bool _isBossRoom;
     private ChallengeGrade? _challengeGrade;   // 이벤트 챌린지 성과(있으면 보상 스케일·연료 지급)
     private bool _isInteraction;               // 상호작용 챌린지 보상이면 천장 클램프(§6-3)
@@ -86,6 +87,39 @@ public class RoomClearGate : MonoBehaviour
         if (table      != null) luckTable        = table;
         if (endEffect  != null) endEffectPrefab  = endEffect;
         if (endEffect2 != null) endEffect2Prefab = endEffect2;
+    }
+
+    /// <summary>보스방 클리어 게이트인가 — 보스 처치 구슬(<see cref="SpawnBossRewardAsync"/>)을 세울 곳을 고를 때.</summary>
+    public bool IsBossRoom => _isBossRoom;
+
+    /// <summary>
+    /// 11-02 Q25 보스 처치 구슬 — 유물 기억 카드 뒤 GameRunBootstrapper가 부른다(다음 챕터가 있는 보스만). <paramref name="at"/> = 쓰러진 자리.
+    /// Epic 이상 룬 3장 중 1장 + 원석 · 강화재료(보스 표) · 등급 예고 → 구슬 · 화면 밖이면 가장자리 화살표. 출구는 묶지 않는다(계단은 그대로 선다).
+    /// 끝 = 구슬이 선 때(줍기를 기다리지 않는다).
+    /// </summary>
+    public async UniTask SpawnBossRewardAsync(Vector3 at, System.Threading.CancellationToken ct)
+    {
+        if (!_isBossRoom || _bossRewardSpawned || _run == null) return;
+        _bossRewardSpawned = true;
+        var rule    = RoomRewardTable.For(RoomPlanKind.Boss);
+        var rewards = RollRewardChoices(rule.ChoiceCount, rule.RarityFloor);
+        GrantClearFuel(rule);
+        if (rewards.Count == 0) return;
+
+        ItemRarity top    = RewardPresentation.MaxRarity(rewards);
+        Vector3    spot   = ResolveReachablePosition(at + Vector3.up * effectHeightOffset);
+        float      floorY = spot.y - effectHeightOffset;
+        GoldCoinPickup.PushAwayFrom(spot, RewardClearRadius);
+        EssenceShardPickup.PushAwayFrom(spot, RewardClearRadius);
+        RewardAura aura = null;
+        try { aura = await RewardObjectPresenter.ForetellAsync(spot, floorY, top, ct); }
+        catch (OperationCanceledException) { return; }
+        catch (Exception e) { Debug.LogError($"[RoomClearGate] 보스 구슬 예고 실패 — 구슬은 세운다: {e}"); }
+
+        var rewardGO = SpawnRewardObject(spot, rewards, isChoice: true, choiceRounds: 1);
+        RewardObjectPresenter.Arrive(rewardGO, aura, floorY, top);
+        ExitCompassHud.Create().SetRewardTarget(rewardGO.transform, RewardPresentation.FrameColor(top));
+        Debug.Log($"[RoomClearGate] 보스 처치 구슬 — {rewards.Count}장(최고 {top}) · 원석 {rule.Ore} · 강화재료 {rule.EnhanceMaterial}");
     }
 
     /// <summary>상호작용 챌린지 보상 여부 — true면 개수/연료를 천장 비율로 클램프(§6-3). Activate 전에 호출.</summary>
@@ -135,8 +169,8 @@ public class RoomClearGate : MonoBehaviour
 
         if (_isBossRoom)
         {
-            // 보스 보상은 룬이 아니라 '유물 파츠 드래프트(3지선다)'가 담당한다.
-            // 여기서는 아무 보상도 굴리지 않는다(보상 트리거도 스폰하지 않는다 — 아래 스폰 지점 주석 참조).
+            // 보스 보상은 유물 기억 카드(드래프트)와, 그 뒤 쓰러진 자리의 구슬(11-02 Q25 SpawnBossRewardAsync — GameRunBootstrapper가 부른다).
+            // 여기서는 아무 보상도 굴리지 않는다 — 처치 순간 예고 빛이 유물 기억 연출과 겹치지 않게.
             Debug.Log("[RoomClearGate] 보스방 — 룬 보상 없음(유물 파츠 드래프트 담당)");
         }
         else if (_challengeGrade.HasValue)
@@ -326,7 +360,7 @@ public class RoomClearGate : MonoBehaviour
         if (flow == null || !flow.IsExitHeldBy(this)) return;
 
         var hud = UnityEngine.Object.FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
-        hud?.ShowBuffNotice($"<color={UIPalette.GoldHex}>보상</color>을 받으면 길이 열린다");
+        hud?.ShowBuffNotice(Loc.F("<color={0}>보상</color>을 받으면 길이 열린다", UIPalette.GoldHex));
         Debug.Log("[RoomClearGate] 출구 안내 — 보상을 받으면 길이 열린다");
     }
 
@@ -377,13 +411,13 @@ public class RoomClearGate : MonoBehaviour
         if (rule.Ore > 0)
         {
             bank.Add(FuelKind.RuneOre, rule.Ore);
-            ItemEffectVfxHelper.ShowNotice($"<color={UIPalette.RuneOreHex}>원석 +{rule.Ore}</color>  (정제소 연료)");
+            ItemEffectVfxHelper.ShowNotice(Loc.F("<color={0}>원석 +{1}</color>  (정제소 연료)", UIPalette.RuneOreHex, rule.Ore));
         }
 
         if (rule.EnhanceMaterial > 0)
         {
             bank.Add(FuelKind.EnhanceMaterial, rule.EnhanceMaterial);
-            ItemEffectVfxHelper.ShowNotice($"<color={UIPalette.EnhanceHex}>강화재료 +{rule.EnhanceMaterial}</color>  (재련소 연료)");
+            ItemEffectVfxHelper.ShowNotice(Loc.F("<color={0}>강화재료 +{1}</color>  (재련소 연료)", UIPalette.EnhanceHex, rule.EnhanceMaterial));
         }
     }
 
@@ -424,6 +458,7 @@ public class RoomClearGate : MonoBehaviour
         var picked = new System.Collections.Generic.HashSet<string>();
         // 풀이 작아 중복이 반복될 때를 대비한 안전장치(무한 루프 방지).
         int maxAttempts = count * 8;
+        string focus = _run?.CurrentRoomRuneFocus;   // 11-02 Q10 문에 걸린 속성
 
         for (int attempt = 0; attempt < maxAttempts && result.Count < count; attempt++)
         {
@@ -438,7 +473,9 @@ public class RoomClearGate : MonoBehaviour
             if (!picked.Add(s.itemId)) continue;   // 이미 뽑힌 아이템 → 다시 굴림
             // 둘째 장은 절반 확률로 판에 가장 많은 속성(10-14 빌드 시너지 A4 · 보유 우대) — 속성 존을 키우는 쪽으로 기운다.
             // 속성을 무작위로 받는 등급(일반 · 희귀)만 — 영웅 · 전설은 속성이 데이터로 정해져 있다.
-            if (result.Count == 1) BiasOwnedElement(d);
+            // 11-02 Q10 문에 걸린 속성이 있으면 일반 · 희귀 룬은 모두 그 속성(영웅 · 전설은 데이터가 정한 속성 그대로) — 보유 속성 기울임보다 앞선다
+            if (!string.IsNullOrEmpty(focus) && d.rarity <= ItemRarity.Rare) d.element = focus;
+            else if (result.Count == 1) BiasOwnedElement(d);
             result.Add((d, s));
             _speedBonus = false;   // 10-29 F1 — 한 단계 위는 첫 장만
         }

@@ -22,6 +22,7 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
     private const float MarkerHeight   = 2.6f;    // 목표 위(m)
     private const float NearFadeStart  = 7f;      // 이 거리부터 옅어져
     private const float NearFadeEnd    = 4.5f;    // 여기서 사라진다(스테이션 이름표·[F]가 이어받음)
+    private const float AltarDismissNearGate = 12f;   // 11-02 Q7 성문 앞 이만큼 안이면 제단 표식을 걷는다
     private const float EdgePadding    = 90f;     // 화면 가장자리 여백(px, 1080 기준 배율 전)
     private const float BottomPadding  = 270f;    // 아래쪽은 HUD(무기 칸·체력·스킬) 위까지만 — 표식이 무기 칸에 겹쳤다(09-30 캡처)
     private const float FadeSpeed      = 5f;
@@ -63,6 +64,7 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
     }
 
     private readonly Vector3[] _points = new Vector3[Count];
+    private readonly Vector3[][] _arrive = new Vector3[Count][];   // 「도착」으로 칠 실물 자리(유물 제단 각각 · 공방 · 성문) — 표식 자리와 달라도 거기 서면 옅어진다(10-30)
     private readonly bool[]    _has    = new bool[Count];
     private readonly Marker[]  _markers = new Marker[Count];
     private BaseCampFxDirector _fx;
@@ -73,6 +75,7 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
     private float        _trackerAlpha;
     private readonly System.Text.StringBuilder _sb = new(160);
     private int   _altarAffordable, _altarWaiting, _trackerAltarKey = -1;
+    private bool  _altarDismissed;   // 11-02 Q7 이번 방문에서 제단 표식을 걷었다
     private float _altarPolledAt = -99f;
 
     // ── Lifecycle ─────────────────────────────────────────────
@@ -88,9 +91,16 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
             Vector3 sum = Vector3.zero;
             foreach (var r in relics) sum += r.transform.position;
             Set(Relic, sum / relics.Length);   // 성소 가운데(제단 사이 통로)
+            // 10-30 사용자 「지정된 장소 표기 UI가 도착해도 안 사라진다」 — 표식은 제단 사이 가운데라 한 제단 앞(가운데서 5 m 남짓)에 서도 옅게 남았다
+            _arrive[Relic] = new Vector3[relics.Length];
+            for (int i = 0; i < relics.Length; i++) _arrive[Relic][i] = relics[i].transform.position;
         }
         var altar = FindFirstObjectByType<WorldAwakeningAltar>();
         if (altar != null) Set(Altar, altar.transform.position);
+        var forge = FindFirstObjectByType<WeaponForgeAltar>();
+        if (forge != null) _arrive[Ranged] = new[] { forge.transform.position };   // 표식 자리(공방 마커)와 공방 실물이 떨어져 있어도
+        var gate = FindFirstObjectByType<BaseCampDungeonGate>();
+        if (gate != null) _arrive[Gate] = new[] { gate.transform.position };       // 성문 앞 마커 너머 포탈에 서도
         Build();
         Active = true;
     }
@@ -99,9 +109,13 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
     {
         if (_cam == null) { _cam = Camera.main; if (_cam == null) return; }
 
+        Vector3 playerPos = Managers.Player?.PlayerTransform != null ? Managers.Player.PlayerTransform.position : Vector3.zero;
+        // 11-02 Q7 제단 표식은 한 방문에 한 번 — 성문 앞(12 m)까지 갔거나 제단에 다가갔으면 걷는다(지나친 뒤에도 뒤를 가리켰다)
+        if (!_altarDismissed && Managers.Player?.PlayerTransform != null
+            && ((_has[Gate] && NearestDistance(Gate, playerPos) < AltarDismissNearGate) || (_has[Altar] && NearestDistance(Altar, playerPos) < NearFadeEnd)))
+            _altarDismissed = true;
         int mask = VisibleMask(out int primary);
         if (RankingHall.IsVisiting) mask = 0;   // 10-29 랭킹방(하늘 위 탑) 안에서는 거점 길잡이(목록 · ◆ 거리)가 쉰다
-        Vector3 playerPos = Managers.Player?.PlayerTransform != null ? Managers.Player.PlayerTransform.position : Vector3.zero;
         float dt = Time.unscaledDeltaTime;
         float scale = Screen.height / 1080f;
 
@@ -111,9 +125,7 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
             float target = 0f;
             if ((mask & (1 << i)) != 0)
             {
-                Vector3 flat = _points[i] - playerPos;
-                flat.y = 0f;
-                float dist = flat.magnitude;
+                float dist = NearestDistance(i, playerPos);
                 float near = Mathf.Clamp01((dist - NearFadeEnd) / (NearFadeStart - NearFadeEnd));
                 target = (i == primary ? PrimaryAlpha : SecondaryAlpha) * near;
                 if (target > 0.01f || m.Alpha > 0.01f) Place(m, _points[i] + Vector3.up * MarkerHeight, scale);
@@ -152,6 +164,22 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
     }
 
     // ── Private Methods ───────────────────────────────────────
+    /// <summary>표식 자리와 「도착」 실물 자리 중 가장 가까운 곳까지의 평면 거리 — 옅어짐 · 남은 m 둘 다 이것으로.</summary>
+    private float NearestDistance(int i, Vector3 playerPos)
+    {
+        float best = FlatDistance(_points[i], playerPos);
+        var arrive = _arrive[i];
+        if (arrive != null)
+            for (int k = 0; k < arrive.Length; k++) best = Mathf.Min(best, FlatDistance(arrive[k], playerPos));
+        return best;
+    }
+
+    private static float FlatDistance(Vector3 a, Vector3 b)
+    {
+        float dx = a.x - b.x, dz = a.z - b.z;
+        return Mathf.Sqrt(dx * dx + dz * dz);
+    }
+
     private void Set(int i, Vector3 p)
     {
         _points[i] = p;
@@ -182,15 +210,15 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
             if (!relic && _has[Relic]) mask |= 1 << Relic;
             if (ranged && relic && _has[Gate]) mask |= 1 << Gate;   // 파츠는 10-29부터 제단 해금이 정한다 — 표식 없음
             PollAltar();
-            if (_has[Altar] && (_altarAffordable > 0 || _altarWaiting > 0)) mask |= 1 << Altar;
+            if (_has[Altar] && !_altarDismissed && (_altarAffordable > 0 || _altarWaiting > 0)) mask |= 1 << Altar;
         }
         // 주 목표 = 매 판 걷는 순서(장비 → 파츠 → 유물 → 성문)에서 가장 앞
         if ((mask & (1 << Sword)) != 0) primary = Sword;
         else if ((mask & (1 << Ranged)) != 0) primary = Ranged;
         else if ((mask & (1 << Parts)) != 0) primary = Parts;
         else if ((mask & (1 << Relic)) != 0) primary = Relic;
-        else if ((mask & (1 << Altar)) != 0) primary = Altar;   // 내려가기 전에 — 열 수 있는 것을 먼저
-        else if ((mask & (1 << Gate)) != 0) primary = Gate;
+        else if ((mask & (1 << Gate)) != 0) primary = Gate;     // 11-02 Q7 런 목표가 먼저 — 제단은 곁가지(옅게)
+        else if ((mask & (1 << Altar)) != 0) primary = Altar;
         return mask;
     }
 

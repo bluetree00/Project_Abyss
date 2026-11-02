@@ -22,7 +22,7 @@ public sealed class FirstAttackAfterRollEffect : ItemEffectBase
     public override void OnPreDealDamage(ItemEffectContext ctx, ref DamagePacket pkt)
     {
         if (Time.time >= _windowUntil) return;
-        pkt.FinalDamage *= (1f + _value);
+        pkt.AddBonus(BonusSource.Rune, _value);
         _windowUntil = -999f;   // 1회 소비
         if (_value3 > 0f) ProcCoefficient.ArmHeavyNext();   // 덮치는 그림자(10-14 R2) — 그 타를 강타로
         RFLog.D($"[FirstAttackAfterRoll] 구르기 후 첫 공격 +{_value * 100f:F0}%");
@@ -54,7 +54,7 @@ public sealed class RollLandingDamageEffect : ItemEffectBase
                 s_buf[i].TakeDamage(damage, ctx.Player.gameObject, knockbackMultiplier: 0f);
 
         ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), position, radius / 4.17f);   // 판정 반경(값으로 바뀜)에 맞춤(10-13 실측: 배율 1 → 4.4 m)
-        ItemEffectVfxHelper.ShowNotice($"<color=#FFAA44>착지 충격</color> {damage:F0} 데미지");
+        ItemEffectVfxHelper.ShowNotice(Loc.F("<color=#FFAA44>착지 충격</color> {0:F0} 데미지", damage));
         Debug.Log($"[JumpLandingDamage] 착지 범위 피해 {damage:F0} (반경 {radius}m)");
     }
 }

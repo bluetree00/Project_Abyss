@@ -55,6 +55,7 @@ public class AchievementRowView : MonoBehaviour
     private Action _onClaim;
     private Image  _iconRing;
     private Image  _icon;
+    private float  _condBaseSize;   // 조건 글 원래 크기(11-02 Q11 — 영어 맞춤에서 되돌릴 값)
 
     // ── Public Methods ───────────────────────────────────────────────────
 
@@ -192,6 +193,13 @@ public class AchievementRowView : MonoBehaviour
         {
             conditionText.text  = s.ConditionText;
             conditionText.color = s.Claimed ? AltarPalette.TextFaint : AltarPalette.TextDim;
+            // 11-02 Q11 영어 조건 글이 진행 막대를 덮지 않게 — 영어일 때만 칸 맞춤(최소 70%)
+            if (_condBaseSize <= 0f) _condBaseSize = conditionText.fontSize;
+            bool en = Loc.Current != Loc.Language.Korean;
+            conditionText.fontSizeMax      = _condBaseSize;
+            conditionText.fontSizeMin      = _condBaseSize * 0.7f;
+            conditionText.enableAutoSizing = en;
+            if (!en) conditionText.fontSize = _condBaseSize;
         }
 
         // 게이지 아트 — 채움/바탕/테두리 세 겹. 채움은 fillAmount로 늘어나므로 가로 9-slice가 맞다.

@@ -203,7 +203,7 @@ public sealed class HPRegenOnHitEffect : ItemEffectBase
         // 흡수량은 그대로 두고 보호막으로 바꾼다(적에게서 가져오는 것 없음).
         float amount = Mathf.Max(1f, _value);
         ctx.Player.RuntimeStats.AddShield(amount);
-        ItemGuide.Toast(ctx.Player.transform.position, $"보호막 +{(int)amount}");
+        ItemGuide.Toast(ctx.Player.transform.position, Loc.F("보호막 +{0}", (int)amount));
     }
 }
 

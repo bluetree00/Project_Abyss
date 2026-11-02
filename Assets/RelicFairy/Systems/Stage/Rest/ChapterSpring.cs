@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 
@@ -7,8 +8,8 @@ using UnityEngine;
 /// (GameRunSession.BindPlayer) 회복은 「챕터 시작 특수 오브젝트」가 맡기로 했으나 그 오브젝트가 없었다(RestAtSanctuary 호출처 0).
 /// 적에게서 빼앗는 회복이 아니라 쉼이다 — 흡혈 금지 원칙(효과의 결)과 겹치지 않는다.
 /// 대기방당 한 번. 이미 가득이면 마시지 않고 알려만 준다.
-/// [F]는 바로 마시지 않고 작은 확인 창(UI_ConfirmDialog)을 띄워 「지금 체력 a/b · 포션 c/d → 샘 뒤 a'/b · d'/d」 한 줄을 보여 준다 — [회복]에서 마신다
-/// (10-16 사용자 「F키를 눌렀을때 상호작용 팝업과 내용을 보여줘야해」 · 10-18 「현재 체력 포션 상황을 모르니」).
+/// 11-02 사용자 「근처로 가면 바로 지급하고 지급할 때 연출」 — [F] · 확인 창을 걷고 2.4 m 안에 들어서면 바로 마신다.
+/// 결과는 한 줄(체력 +N · 포션 a→b)로 — 예전 확인 창(10-16 · 10-18)이 보여 주던 「지금 → 뒤」를 마신 뒤에 알린다.
 /// </summary>
 public sealed class ChapterSpring : MonoBehaviour
 {
@@ -24,9 +25,10 @@ public sealed class ChapterSpring : MonoBehaviour
     private static readonly Color SpringInk = new(0.55f, 0.88f, 1f, 1f);
 
     // ── Private ─────────────────────────────────────────────
-    private ShopNpcInteraction _interaction;
     private Light _light;
     private bool  _used;
+    private bool  _wasInside;      // 11-02 들어서는 순간 한 번만
+    private float _lightBase = -1f;
     private TextMeshPro _label;
     private Transform   _cam;
 
@@ -34,7 +36,19 @@ public sealed class ChapterSpring : MonoBehaviour
     private void Start()
     {
         _light = GetComponentInChildren<Light>();
-        if (_interaction != null) _interaction.OnInteract += OpenPrompt;
+        if (_light != null) _lightBase = _light.intensity;
+    }
+
+    /// <summary>11-02 다가가면 바로 마신다 — 2.4 m 안에 들어서는 순간 한 번(나갔다 다시 들어오면 다시 본다).</summary>
+    private void Update()
+    {
+        if (_used) return;
+        var p = Managers.Player != null ? Managers.Player.PlayerTransform : null;
+        if (p == null) return;
+        Vector3 d = p.position - transform.position; d.y = 0f;
+        bool inside = d.sqrMagnitude <= TriggerRadius * TriggerRadius;
+        if (inside && !_wasInside) Approach();
+        _wasInside = inside;
     }
 
     private void LateUpdate()
@@ -44,10 +58,7 @@ public sealed class ChapterSpring : MonoBehaviour
         _label.transform.rotation = _cam.rotation;
     }
 
-    private void OnDestroy()
-    {
-        if (_interaction != null) _interaction.OnInteract -= OpenPrompt;
-    }
+    private void OnDestroy() { }
 
     // ── Public Methods ──────────────────────────────────────
     /// <summary>대기방에 샘을 세운다. 비주얼이 없으면 빛만 있는 샘(기능은 그대로).</summary>
@@ -57,8 +68,7 @@ public sealed class ChapterSpring : MonoBehaviour
         go.transform.position = new Vector3(position.x, ServiceRoomDecorPlacer.GroundYAt(position, position.y), position.z);
         if (visualPrefab != null) Instantiate(visualPrefab, go.transform.position, Quaternion.identity, go.transform);
 
-        var spring = go.AddComponent<ChapterSpring>();
-        spring._interaction = AddInteraction(go.transform, "<color=#FFD700>[F]</color> 요정의 샘 — 체력 · 포션", PromptHeight);
+        var spring = go.AddComponent<ChapterSpring>();   // 11-02 [F] 상호작용 없음 — 다가가면 바로(Update)
         spring.CreateLabel();
         return spring;
     }
@@ -77,42 +87,19 @@ public sealed class ChapterSpring : MonoBehaviour
     }
 
     // ── Event Handlers ──────────────────────────────────────
-    /// <summary>[F] — 마시면 무엇이 바뀌는지 먼저 보여 준다. 이미 가득이면 창 없이 알려만 준다.</summary>
-    private void OpenPrompt()
+    /// <summary>11-02 들어섰다 — 가득이면 한 줄만(샘은 남는다), 아니면 바로 마신다.</summary>
+    private void Approach()
     {
-        if (_used) return;
         var run   = GameRunBootstrapper.Instance?.Run;
         var stats = run?.Player?.RuntimeStats;
         var state = run?.PlayerState;
         if (stats == null || state == null) return;
-
-        bool hpFull     = stats.Hp >= stats.MaxHp;
-        bool potionFull = state.PotionCount >= state.PotionCapacity;
-        if (hpFull && potionFull)
+        if (stats.Hp >= stats.MaxHp && state.PotionCount >= state.PotionCapacity)
         {
-            // 가득이어도 [F]에 창은 뜬다 — 알림 한 줄만으로는 눌렀는지조차 몰랐다(10-16 실측). 마시지 않으니 샘은 그대로 남는다.
-            string full =
-                $"지금 체력 {stats.Hp}/{stats.MaxHp} · 포션 {state.PotionCount}/{state.PotionCapacity}\n" +
-                "<size=85%><color=#9AA0A6>샘이 고요하다 — 이미 가득하다. 다치거나 포션을 쓴 뒤 다시 오면 마실 수 있다</color></size>";
-            UI_ConfirmDialog.Show("요정의 샘", UIKeywordInk.Values(full), "닫기", null, null);
+            Notice("<color=#9AA0A6>샘이 고요하다 — 이미 가득하다 · 다치거나 포션을 쓴 뒤 다시 오면 마실 수 있다</color>");
             return;
         }
-
-        bool nightmare = NightmareRules.IsActive;
-        float ratio    = HealRatioNow(nightmare);
-        int heal       = Mathf.Max(1, Mathf.RoundToInt(stats.MaxHp * ratio));
-        run.EffectManager?.ModifyHeal(ref heal);   // 마실 때(PlayerController.Heal)와 같은 회복 보정 — 창의 숫자가 실제 결과와 맞게
-        int hpAfter    = hpFull ? stats.Hp : Mathf.Min(stats.MaxHp, stats.Hp + heal);
-        int potAfter   = nightmare ? Mathf.Min(state.PotionCapacity, state.PotionCount + NightmarePotions) : state.PotionCapacity;
-        // 지금 → 샘 뒤를 한 줄로(10-18 사용자 「현재 체력 포션 상황을 모르니 샘을 누를 때도 기분이 안 좋아」)
-        string body =
-            $"지금 체력 {stats.Hp}/{stats.MaxHp} · 포션 {state.PotionCount}/{state.PotionCapacity}   →   " +
-            $"샘 뒤 {hpAfter}/{stats.MaxHp} · {potAfter}/{state.PotionCapacity}\n" +
-            "<size=85%><color=#9AA0A6>" +
-            (nightmare ? $"악몽 — 체력 회복 {Mathf.RoundToInt(ratio * 100f)}% · 포션 +{NightmarePotions}"
-                       : $"체력 회복 {Mathf.RoundToInt(ratio * 100f)}% · 포션 가득") +
-            " · 대기방마다 한 번</color></size>";
-        UI_ConfirmDialog.Show("요정의 샘", UIKeywordInk.Values(body), "회복", "닫기", Drink);   // 10-18 「마신다」 → 하는 일(문구 통일)
+        Drink();
     }
 
     private void Drink()
@@ -123,13 +110,7 @@ public sealed class ChapterSpring : MonoBehaviour
         var state = run?.PlayerState;
         if (stats == null || state == null) return;
 
-        bool hpFull     = stats.Hp >= stats.MaxHp;
-        bool potionFull = state.PotionCount >= state.PotionCapacity;
-        if (hpFull && potionFull)
-        {
-            Notice("<color=#9AA0A6>샘이 고요하다 — 이미 가득하다</color>");
-            return;
-        }
+        bool hpFull = stats.Hp >= stats.MaxHp;
 
         bool nightmare = NightmareRules.IsActive;
         int before = stats.Hp;
@@ -139,16 +120,39 @@ public sealed class ChapterSpring : MonoBehaviour
         else           state.RefillPotions();
 
         _used = true;
-        _interaction.SetInteractable(false);
-        if (_light != null) _light.intensity *= 0.35f;   // 마신 샘은 빛이 잦아든다
         if (_label != null)
         {
             _label.text = "요정의 샘\n<size=70%>마셨다</size>";
             _label.color = new Color(SpringInk.r, SpringInk.g, SpringInk.b, 0.45f);
         }
+        // 11-02 지급 연출(절제) — 샘 빛이 잠깐 밝아졌다 잦아들고, 샘 고리 하나 · 플레이어 발밑 작은 빛기둥
+        FlareThenDimAsync(this.GetCancellationTokenOnDestroy()).Forget();
         RunFx.Play(RunFxSlot.Ring, transform.position + Vector3.up * 0.1f, 1f, SpringInk);
+        if (run.Player != null) RunFx.Play(RunFxSlot.Pillar, run.Player.transform.position, 0.05f, SpringInk);
         Managers.Sound?.PlayEvent(SoundEvent.SpringDrink);
-        Notice($"<color=#8FD9FF>요정의 샘</color> — 체력 +{stats.Hp - before} · 포션 {potionsBefore}→{state.PotionCount}");
+        Notice(Loc.F("<color=#8FD9FF>요정의 샘</color> — 체력 +{0} · 포션 {1}→{2}", stats.Hp - before, potionsBefore, state.PotionCount));
+    }
+
+    /// <summary>11-02 마신 순간 샘 빛 — 0.25초에 2배로 밝아졌다가 0.9초에 걸쳐 원래의 35%로 잦아든다(마신 샘).</summary>
+    private async UniTaskVoid FlareThenDimAsync(System.Threading.CancellationToken ct)
+    {
+        if (_light == null) return;
+        float baseI = _lightBase > 0f ? _lightBase : _light.intensity;
+        try
+        {
+            for (float t = 0f; t < 0.25f; t += Time.deltaTime)
+            {
+                _light.intensity = Mathf.Lerp(baseI, baseI * 2f, t / 0.25f);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+            for (float t = 0f; t < 0.9f; t += Time.deltaTime)
+            {
+                _light.intensity = Mathf.Lerp(baseI * 2f, baseI * 0.35f, t / 0.9f);
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (System.OperationCanceledException) { return; }
+        if (_light != null) _light.intensity = baseI * 0.35f;   // 마신 샘은 빛이 잦아든다
     }
 
     /// <summary>멀리서도 보이는 이름표 — [F] 안내는 2.4 m 안에서만 떠 지나치기 쉬웠다(10-22 A7).</summary>
@@ -158,7 +162,7 @@ public sealed class ChapterSpring : MonoBehaviour
         go.transform.SetParent(transform, false);
         go.transform.localPosition = Vector3.up * LabelHeight;
         _label = go.AddComponent<TextMeshPro>();
-        _label.text = "요정의 샘\n<size=70%>체력 · 포션 회복</size>";
+        _label.text = "요정의 샘\n<size=70%>다가가면 체력 · 포션 회복</size>";
         _label.fontSize = LabelSize;
         _label.alignment = TextAlignmentOptions.Center;
         _label.color = SpringInk;

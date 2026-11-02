@@ -309,8 +309,6 @@ public static class HiggsfieldArtImportEditor
         {
             var s = new SerializedObject(draft);
             s.FindProperty("memoryCardFrame").objectReferenceValue = FrameSprite("Frame_RelicMemoryCard.png");
-            s.FindProperty("workshopCardFrame").objectReferenceValue  = FrameSprite("Frame_PartsWorkshopCard.png");
-            s.FindProperty("workshopPanelFrame").objectReferenceValue = FrameSprite("Frame_PartsWorkshopPanel.png");
             SetKeyArt(s.FindProperty("evolutionFrame"), ("Gawain", "Frame_EvolutionCard_Gawain.png"), ("Lancelot", "Frame_EvolutionCard_Lancelot.png"));
             SetKeyArt(s.FindProperty("evolutionCrest"), ("Gawain", "Crest_EvolutionCard_Gawain.png"), ("Lancelot", "Crest_EvolutionCard_Lancelot.png"));
             s.ApplyModifiedPropertiesWithoutUndo();

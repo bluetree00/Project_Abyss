@@ -187,7 +187,8 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
         _hpBar?.UpdateHP((int)_currentHp, (int)maxHp);
 
         // 데미지 팝업 (허수아비도 일관 표시)
-        DamagePopupSpawner.Spawn(transform.position + Vector3.up * (hpBarHeadOffset + 0.9f), amount, isCrit, GetInstanceID());
+        DamageBonusSplit.Spawn(transform.position + Vector3.up * (hpBarHeadOffset + 0.9f), amount, isCrit, GetInstanceID(),
+                               showTotal: true);   // 누적으로 한 번에 넣은 피해를 본다(10-31 · 정예 · 보스는 끔 — 허수아비만)
     }
 
     // ── Private Methods ──────────────────────────────────────────────
@@ -292,9 +293,9 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
 
         _hpBar.SetSubLabel(
             $"DPS {dps:F0}\n" +
-            $"최근 {_lastHit:F0}{(_lastHitCrit ? " CRIT" : string.Empty)}\n" +
-            $"최대 {_maxHit:F0}\n" +
-            $"타수 {_hitCount}  크리 {critRate:F0}%");
+            Loc.F("최근 {0:F0}{1}", _lastHit, _lastHitCrit ? " CRIT" : string.Empty) + "\n" +
+            Loc.F("최대 {0:F0}", _maxHit) + "\n" +
+            Loc.F("타수 {0}  크리 {1:F0}%", _hitCount, critRate));
     }
 
     private async UniTaskVoid InitHPBarAsync(CancellationToken ct)

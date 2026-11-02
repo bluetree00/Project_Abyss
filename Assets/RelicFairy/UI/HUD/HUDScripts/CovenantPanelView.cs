@@ -480,7 +480,7 @@ public sealed class CovenantPanelView : MonoBehaviour
             if (_countLabel != null)
             {
                 _countLabel.gameObject.SetActive(true);
-                _countLabel.text = $"서약서 {sentence.ResultCount}절";
+                _countLabel.text = Loc.F("서약서 {0}절", sentence.ResultCount);
             }
             FitSentence(sentence);
             for (int i = 1; i < _slots.Length; i++) _slots[i]?.SetEmpty();
@@ -495,7 +495,7 @@ public sealed class CovenantPanelView : MonoBehaviour
         if (_countLabel != null)
         {
             _countLabel.gameObject.SetActive(count > 0);
-            _countLabel.text = $"서약 {count}/{Mathf.Max(count, CovenantHandler.Capacity)}";   // 상한 전에 맺어 둔 세이브 복원은 넘칠 수 있다
+            _countLabel.text = Loc.F("서약 {0}/{1}", count, Mathf.Max(count, CovenantHandler.Capacity));   // 상한 전에 맺어 둔 세이브 복원은 넘칠 수 있다
         }
 
         for (int i = 0; i < _slots.Length; i++)

@@ -10,7 +10,6 @@ public sealed class ProcRoomResult
     public GameObject                   roomGO;       // 빌드된 방 루트 (디스폰 시 사용)
     public Vector3                      entryPos;     // 플레이어 진입(등장) 위치 (개구부 안쪽)
     public bool                         hasEntrance;  // 입구 문 존재 여부 (시작방은 false)
-    public bool                         hasCeiling;   // 팔레트 천장 유무 — 상공 부감 인트로 카메라가 천장 방을 스킵할지 판단
     /// <summary>이 방 테마의 봉인 석문 프리팹(BlockPalette). null이면 공용 문으로 폴백.
     /// 문과 통로·벽이 같은 팔레트에서 나와야 테마 컨셉이 어긋나지 않는다.</summary>
     public GameObject                   sealDoorPrefab;

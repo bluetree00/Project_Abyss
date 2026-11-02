@@ -147,7 +147,6 @@ public class WeaponEffectHandler
                     continue;
                 }
 
-                if (basic) ShadowPartner.NoteSlash(_player, e.payloadKey, spawnPos, spawnRot, e.scaleMultiplier * reach);   // 따라 하는 분신이 맞힐 때 같은 베기를 옅게(10-26)
 
                 // 소켓의 forward를 이동 방향으로 전달
                 Vector3 spawnForward = socketTransform.forward;
@@ -179,6 +178,8 @@ public class WeaponEffectHandler
                     embedded.SetBaseScale(effectObj.transform.localScale);   // 단계 크기 배율이 판정 · 그림에 먹게(10-22)
                     embedded.Activate();
                     colliderHandledByCombined = true;
+                    // 따라 하는 분신이 자기 자리에서 같은 베기 · 같은 판정을 낸다(10-30 — 판정 크기 · 피해가 정해진 뒤에 적는다)
+                    if (basic) ShadowPartner.NoteSlash(_player, e.payloadKey, effectObj.transform, effectObj.TryGetComponent<Collider>(out var shape) ? shape : null, embedded.damage);
                 }
 
                 execution?.RegisterEffect(effectObj);

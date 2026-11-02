@@ -227,6 +227,8 @@ public sealed partial class CombatPanelView : MonoBehaviour
     private bool           _qGateOpen = true; // 지금 Q를 쓸 수 있나(실제 문) — 명조형 Q 빛도 이 값을 본다
     private TMP_Text       _qUsesLabel;       // Q 칸 오른쪽 위 「×N」(2회 이상일 때만 · 지연 생성)
     private int            _qUsesShown = -1;
+    private TMP_Text       _qLockLabel;       // Q 칸 안 아래 「정오에 사용」 · 「광란에 사용」(잠긴 동안만 · 지연 생성 · 10-30 H-15)
+    private int            _qLockShown = -1;  // 표시 중인 잠김 글(0 없음 · 1 정오 · 2 광란) — 바뀔 때만 쓴다
 
     // 가웨인 태양 게이지(Style==Sun 전용) — 수평 바 대신 사용. 열린 태양(충전)+게이지 / 닫힌 태양(정오)+내부 감소.
     private RectTransform _sunRoot;
@@ -516,6 +518,9 @@ public sealed partial class CombatPanelView : MonoBehaviour
         // 쿨다운은 전용 연출이 따로 있으므로 잠금 조건에서 제외한다.
         // Q 잠금의 단일 소유자가 여기다(게이지가 매 프레임 변하므로). 프레젠터는 _qHasSkill만 갱신한다.
         skillQ?.SetLocked(!_qHasSkill || !gaugeReady, GetSafeFont());
+        // 잠긴 까닭 한 마디(10-30 H-15) — 게이지가 아직 정오 · 광란이 아닐 때만(정오에 이미 쓴 뒤 · 심판 소진은 까닭이 다르다)
+        bool waitGauge = _qHasSkill && !gaugeReady && _relicResource != null && !_relicResource.IsSkillReady;
+        SetQLockHint(!waitGauge ? 0 : _relicResource is ZenithGauge ? 1 : _relicResource is MadnessStack ? 2 : 0);
 
         SetThinReady(_qThin, _qHasSkill && _qCooldownReady && gaugeReady);   // 톤 v2 — 유물 Q 있음 · 쿨다운 · 게이지 = 유물칸이 그려지며 켜짐
 
@@ -555,6 +560,35 @@ public sealed partial class CombatPanelView : MonoBehaviour
         _qUsesLabel.alignment        = TextAlignmentOptions.Center;
         _qUsesLabel.textWrappingMode = TextWrappingModes.NoWrap;
         _qUsesLabel.raycastTarget    = false;
+    }
+
+    /// <summary>
+    /// Q가 잠긴 까닭 — 칸 안 아래 작은 글(1 「정오에 사용」 · 2 「광란에 사용」 · 0 없음). 바뀔 때만 쓴다(매 프레임 불린다).
+    /// 10-30 H-15 — 잠겨 있을 때 고리만 흐려 「Q가 왜 안 나가는지」 몰랐다. 끌 때는 글자를 비운다(하드 가드).
+    /// </summary>
+    private void SetQLockHint(int kind)
+    {
+        if (kind == _qLockShown) return;
+        _qLockShown = kind;
+        if (kind > 0) EnsureQLockLabel();
+        if (_qLockLabel == null) return;
+        _qLockLabel.text = kind == 1 ? Loc.T("정오에 사용") : kind == 2 ? Loc.T("광란에 사용") : string.Empty;
+    }
+
+    /// <summary>Q 칸 안 아래(아래에서 20% · 잠기면 아이콘이 어두워 글이 읽힌다) 잠김 글 — 처음 잠길 때 짓는다.</summary>
+    private void EnsureQLockLabel()
+    {
+        if (_qLockLabel != null) return;
+        var q = _wQSlot != null ? _wQSlot : FindChildRecursive(transform, "HUD_QSkile") as RectTransform;
+        if (q == null) return;
+        var rt = (RectTransform)new GameObject("QLockHint", typeof(RectTransform)).transform;
+        rt.SetParent(q, false);
+        Anchor(rt, new Vector2(0.5f, 0.2f), Vector2.zero, new Vector2(90f, 20f), new Vector2(0.5f, 0.5f));
+        _qLockLabel = rt.gameObject.AddComponent<TextMeshProUGUI>();
+        UITheme.StyleThinText(_qLockLabel, UIWeight.Medium, UITheme.Thin.Caption, UITheme.Thin.Ink, shadow: true);
+        _qLockLabel.alignment        = TextAlignmentOptions.Center;
+        _qLockLabel.textWrappingMode = TextWrappingModes.NoWrap;
+        _qLockLabel.raycastTarget    = false;
     }
 
     /// <summary>
@@ -812,7 +846,7 @@ public sealed partial class CombatPanelView : MonoBehaviour
                 // 글자를 비워 둬야 HUD 하드 가드가 다시 켜도 안 보인다.
                 bool showLv = false;
                 // 끌 때 글자도 비운다 — HUD 하드 가드가 0.2초마다 전투 패널 글자를 다시 켜서 옛 「+N」이 +0 무기에 떴다(09-28).
-                _weaponLevel[index].text = showLv ? $"재련 {WeaponReforgeService.CountAt(info.EnhanceLevel)}" : string.Empty;   // 10-19 — 「+N」 대신 재련 횟수
+                _weaponLevel[index].text = showLv ? Loc.F("재련 {0}", WeaponReforgeService.CountAt(info.EnhanceLevel)) : string.Empty;   // 10-19 — 「+N」 대신 재련 횟수
                 _weaponLevel[index].gameObject.SetActive(showLv);
             }
             RefreshWeaponFrames();   // 스킨 시 활성/비활성 테두리 스왑(미지정이면 no-op)
@@ -1703,6 +1737,9 @@ public sealed partial class CombatPanelView : MonoBehaviour
 
         // 게이지 조건이 바뀌면 Q 슬롯 사용가능 표시도 즉시 따라간다(쿨다운과 AND).
         RefreshQFrame();
+        // 「여명 12초 — …」 남은 초 · 멈춤도 매 프레임 묻는다(10-30 H-01 · H-02) — 라벨은 OnChanged(구간 전환)로만 갈려 초가 흐르지 않았다.
+        // Label은 표시값(초 · 멈춤 · 각인 · 가속)이 바뀔 때만 새 글을 만들고, 같은 글이면 TMP가 다시 그리지 않는다(광란 글과 같은 방식).
+        RefreshRelicLabel();
 
         if (_sunOpenImg   != null && _sunOpenImg.gameObject.activeSelf   == noon)  _sunOpenImg.gameObject.SetActive(!noon);
         // 명조형은 정오에도 게이지가 남는다 — 남은 정오 시간만큼 흰 금빛으로 타들어 간다(TickWuwa)
@@ -1770,7 +1807,7 @@ public sealed partial class CombatPanelView : MonoBehaviour
     public void SetRelicResource(IRelicResource res, PlayerController owner = null)
     {
         _relicOwner = res != null ? owner : null;
-        if (res == null) SetQUses(0);
+        if (res == null) { SetQUses(0); SetQLockHint(0); }
         if (_relicBar == null) return;
         if (_relicResource != null && _relicChanged != null)
             _relicResource.OnChanged -= _relicChanged;
@@ -2380,9 +2417,9 @@ public sealed partial class CombatPanelView : MonoBehaviour
         };
 
         string text = $"<b>{UIKeywordInk.Values(item.Label)}</b>";   // 효과 글 수치만 Noto 500(10-15)
-        if (item.Stacks > 1) text += $"\n중첩 ×{item.Stacks}";
-        if (!string.IsNullOrEmpty(item.RemainText)) text += $"\n잔여 {item.RemainText}";
-        else if (item.Remaining01 >= 0f) text += $"\n충전 {Mathf.RoundToInt(Mathf.Clamp01(item.Remaining01) * 100f)}%";
+        if (item.Stacks > 1) text += Loc.F("\n중첩 ×{0}", item.Stacks);
+        if (!string.IsNullOrEmpty(item.RemainText)) text += Loc.F("\n잔여 {0}", item.RemainText);
+        else if (item.Remaining01 >= 0f) text += Loc.F("\n충전 {0}%", Mathf.RoundToInt(Mathf.Clamp01(item.Remaining01) * 100f));
         if (!string.IsNullOrEmpty(src)) text += $"\n<size=85%><color=#AAAAAA>{src}</color></size>";
 
         _buffTooltipText.text = text;

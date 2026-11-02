@@ -318,7 +318,7 @@ public static class AbyssPeddlerCatalog
 
         return new ShopProduct(ShopProductCategory.Buff, row.buffName,
             amount,
-            $"적용  런이 끝날 때까지 유지(버프창) · {amount}",
+            Loc.F("적용  런이 끝날 때까지 유지(버프창) · {0}", amount),
             row.price, TierRarity(row.tier), EffectIconRegistry.GetSprite(IconBuff),
             s =>
             {
@@ -404,7 +404,7 @@ public static class AbyssPeddlerCatalog
     {
         int amt = 4 + rng.Next(0, 3);   // 4~6
         int price = 20 * amt;
-        return new ShopProduct(ShopProductCategory.Material, $"강화재료 x{amt}",
+        return new ShopProduct(ShopProductCategory.Material, Loc.F("강화재료 x{0}", amt),
             "재련소 무기강화 연료", "적용  강화재료 은행에 적립",
             price, ItemRarity.Common, EffectIconRegistry.GetSprite(IconMaterial),
             s => { s?.FuelBank?.Add(FuelKind.EnhanceMaterial, amt); return s?.FuelBank != null; });
@@ -415,8 +415,8 @@ public static class AbyssPeddlerCatalog
     {
         int amt = 1 + rng.Next(0, 2);   // 1~2
         int price = 60 * amt;
-        return new ShopProduct(ShopProductCategory.Potion, $"체력 포션 x{amt}",
-            $"최대 체력 {PotionHealPercent}% 즉시 회복", "적용  퀵슬롯 포션 추가",
+        return new ShopProduct(ShopProductCategory.Potion, Loc.F("체력 포션 x{0}", amt),
+            Loc.F("최대 체력 {0}% 즉시 회복", PotionHealPercent), "적용  퀵슬롯 포션 추가",
             price, ItemRarity.Common, EffectIconRegistry.GetSprite(IconPotion),
             s => { if (s?.PlayerState == null) return false; s.PlayerState.AddPotion(amt); return true; }, amount: amt);
     }
@@ -425,7 +425,7 @@ public static class AbyssPeddlerCatalog
     private static ShopProduct BuildOre(System.Random rng)
     {
         int amt = 6 + rng.Next(0, 4);   // 6~9
-        return new ShopProduct(ShopProductCategory.Material, $"원석 x{amt}",
+        return new ShopProduct(ShopProductCategory.Material, Loc.F("원석 x{0}", amt),
             "정제소 룬 재련 연료", "적용  원석 은행에 적립",
             10 * amt, ItemRarity.Common, EffectIconRegistry.GetSprite(IconOre),
             s => { s?.FuelBank?.Add(FuelKind.RuneOre, amt); return s?.FuelBank != null; });
@@ -459,7 +459,7 @@ public static class AbyssPeddlerCatalog
             var m = so.modifiers[0];
             return $"{StatLabel(m.Type)} +{m.Value:0.#}";
         }
-        return so != null ? so.displayName : "";
+        return so != null ? Loc.T(so.displayName) : "";
     }
 
     private static string StatLabel(StatType t) => t switch

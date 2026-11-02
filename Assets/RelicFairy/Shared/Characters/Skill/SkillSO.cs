@@ -64,7 +64,7 @@ public class SkillSO : ScriptableObject
     public string ChangeAtTier(int tier)
     {
         string s = tier == 2 ? _tier2Change : tier == 3 ? _tier3Change : null;
-        return string.IsNullOrEmpty(s) ? null : s;
+        return string.IsNullOrEmpty(s) ? null : Loc.T(s);   // 화면 언어(11-02 Q11)
     }
 
     public Sprite IconForTier(int tier)

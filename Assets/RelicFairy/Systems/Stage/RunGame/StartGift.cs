@@ -112,12 +112,12 @@ public static class StartGift
             int n = 1 + (augment ? 1 : 0) + (relic ? 1 : 0);
             float x = -(n - 1) * (CardW + CardGap) * 0.5f;
             NewCard(go.transform, new Vector2(x, -10f), "룬 하나",
-                    $"{(legend ? "전설 한 장을 포함해 " : "희귀 이상 ")}{runeCount}장 중 하나를 고른다\n룬판에 바로 놓는다", accent,
+                    Loc.F("{0}{1}장 중 하나를 고른다\n룬판에 바로 놓는다", (legend ? Loc.T("전설 한 장을 포함해 ") : Loc.T("희귀 이상 ")), runeCount), accent,
                     () => picked = Branch.Rune);
             x += CardW + CardGap;
             if (augment)
             {
-                NewCard(go.transform, new Vector2(x, -10f), "근접 증강 하나", $"금 증강 {augmentCount}장 중 하나를 고른다\n지금 든 근접 무기에 붙는다", accent,
+                NewCard(go.transform, new Vector2(x, -10f), "근접 증강 하나", Loc.F("금 증강 {0}장 중 하나를 고른다\n지금 든 근접 무기에 붙는다", augmentCount), accent,
                         () => picked = Branch.Augment);
                 x += CardW + CardGap;
             }
@@ -125,7 +125,7 @@ public static class StartGift
             {
                 string relicName = AppBootstrapper.Instance?.Loadout?.Relic?.DisplayName ?? "유물";
                 NewCard(go.transform, new Vector2(x, -10f), relicTimes > 1 ? "유물 기억 둘" : "유물 기억 하나",
-                        $"되살아난 기억 2장 중 하나를 {(relicTimes > 1 ? "두 번 " : "")}고른다\n{relicName}에 새겨진다", accent,
+                        Loc.F("유물 기억 카드 2장 중 1장을 {0}고른다\n{1}에 붙는다", (relicTimes > 1 ? Loc.T("두 번 ") : ""), relicName), accent,   // 10-30 E-01 창 이름과 같게 · 「새겨진다」(비유) → 붙는다
                         () => picked = Branch.Relic);
             }
 

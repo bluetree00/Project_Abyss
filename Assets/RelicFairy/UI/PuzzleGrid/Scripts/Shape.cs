@@ -58,6 +58,8 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     private List<GridSquare> occupiedSquares = new();
     private LayoutElement _layout;
     private RunePieceOutline _outline;   // 조각 바깥 윤곽(10-18) — 루트에 붙는다(RebuildOutline)
+    private float _shade = 1f;           // 번갈이 밝기(10-30 · SetPieceShade)
+    private const float PlateMul = 0.55f;   // 받침 = 속성 색 ×0.55 — 블록 그림 테보다 어둡게, 판 바탕보다 밝게
     private List<Vector2Int> _baseOffsets;   // 돌리기 전 모양(에셋 그대로) — 회전은 늘 여기서 다시 계산한다
     private CancellationTokenSource _spinCts;   // 돌릴 때 칸마다 제자리에서 도는 짧은 연출(10-26)
 
@@ -82,6 +84,14 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     {
         if (_outline != null) _outline.SetHovered(false);
         StopSpin();
+        // 10-30 사용자 「배치된 룬이 투명해 잘 안 보인다」 — 끄는 중에 판이 닫히면(OnEndDrag 없이) 끌기 알파 0.72 · 끌기 배율이 그대로 남았다
+        if (Dragging == this)
+        {
+            Dragging = null;
+            if (rt != null) rt.localScale = cachedStartLocalScale;
+            if (_outline != null) _outline.SetDragging(false);
+        }
+        if (TryGetComponent<CanvasGroup>(out var cg) && cg.alpha < 1f) cg.alpha = 1f;
     }
 
     private void OnDestroy() => _spinCts?.Cancel();
@@ -396,14 +406,16 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
         if (art == null) return;
 
+        var shaded = tint;   // 11-02 Q12 그림은 늘 원래 밝기 — 번갈이를 그림에 곱하자 조각이 어둡고 비쳐 보였다(번갈이는 받침 색에만)
         foreach (Transform child in transform)
         {
             if (!child.TryGetComponent<Image>(out var img)) continue;
             img.sprite         = art;
             img.type           = Image.Type.Simple;
-            img.color          = tint;
+            img.color          = shaded;
             img.preserveAspect = true;
         }
+        if (_outline != null) _outline.SetPlate(PlateTone());
 
         ApplyLegendarySheen();
     }
@@ -442,7 +454,31 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     }
 
     // Placement occupancy
-    public void SetOccupiedSquares(List<GridSquare> squares) => occupiedSquares = squares;
+    public void SetOccupiedSquares(List<GridSquare> squares)
+    {
+        occupiedSquares = squares;
+        if (squares == null || squares.Count == 0) SetPieceShade(1f);   // 판에서 떠나면 번갈이 밝기를 걷는다(10-30)
+    }
+
+    /// <summary>
+    /// 번갈이 밝기(10-30 사용자 「룬을 빼곡히 넣으면 어떤 모양들이 들어간지 모른다」) — 맞닿은 같은 속성 룬끼리 다르게(UI_GridPanel.RefreshPieceShades).
+    /// 받침(칸 사이 틈) 색에만 곱한다(11-02 — 그림에 곱하면 어둡고 비쳐 보였다). 1 = 그대로.
+    /// </summary>
+    public void SetPieceShade(float k)
+    {
+        if (Mathf.Approximately(_shade, k)) return;
+        _shade = k;
+        ApplyRuneArt();
+    }
+
+    /// <summary>받침(칸 사이 틈) 색 — 조각 속성 색을 어둡게 · 번갈이 밝기를 곱한다.</summary>
+    private Color PlateTone()
+    {
+        if (ItemData == null) return Color.clear;
+        var c = ElementDef.IdColor(ItemData.element, new Color(0.6f, 0.45f, 0.25f, 1f));
+        float k = PlateMul * _shade;
+        return new Color(c.r * k, c.g * k, c.b * k, 1f);
+    }
     public List<GridSquare> GetOccupiedSquares() => occupiedSquares;
 
     public void RebuildWithCellSize(float newCellSize)
@@ -485,6 +521,7 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             _outline.raycastTarget = false;   // 루트가 포인터를 먹으면 블록 집기 · 칸 누르기가 막힌다
         }
         _outline.SetCells(cellOffsets, cellSize, visualSize);
+        _outline.SetPlate(PlateTone());   // 10-30 칸 사이 틈 = 속성 색 — 한 룬이 한 덩어리로
     }
 
     private void SetBlocksRaycastTarget(bool enable)

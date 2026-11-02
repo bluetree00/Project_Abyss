@@ -34,8 +34,10 @@ public class WeaponFormSO : ScriptableObject
     [SerializeField, Tooltip("이 시간 동안 못 쌓으면 줄어든다(칼바람) / 비운다(무게)")] private float idleSeconds = 3f;
 
     [Header("단련")]
-    [SerializeField, Tooltip("단련 비용(강화재료) — [0] = Ⅱ, [1] = Ⅲ")] private int[] temperCosts = { 12, 20 };
+    [SerializeField, Tooltip("단련 비용(강화재료) — [0] = Ⅱ, [1] = Ⅲ · 10-30부터 안 쓴다(재련 단계 지급)")] private int[] temperCosts = { 12, 20 };
     [SerializeField] private VariantDef[] variants = Array.Empty<VariantDef>();
+    [SerializeField, Tooltip("재련으로 받는 변주 id — [0] = Ⅱ, [1] = Ⅲ(10-30 형 고르기 대신 재련 단계 지급 · 비우면 그 단계 첫 변주)")]
+    private string[] reforgeVariants = Array.Empty<string>();
 
     [Header("연출 — 비우면 없음")]
     [SerializeField, Tooltip("발동 이펙트 Addressables 키")] private string triggerVfxKey;
@@ -68,6 +70,18 @@ public class WeaponFormSO : ScriptableObject
         into.Clear();
         if (variants == null) return;
         for (int i = 0; i < variants.Length; i++) if (variants[i].tier == tier) into.Add(variants[i]);
+    }
+
+    /// <summary>재련으로 받는 그 단계(2 · 3) 변주 — <see cref="reforgeVariants"/> 칸(비었거나 그 단계 변주가 아니면 그 단계 첫 변주).</summary>
+    public bool TryGetReforgeVariant(int tier, out VariantDef v)
+    {
+        int i = tier - 2;
+        if (reforgeVariants != null && i >= 0 && i < reforgeVariants.Length && TryGetVariant(reforgeVariants[i], out v) && v.tier == tier) return true;
+        v = default;
+        if (variants == null) return false;
+        for (int k = 0; k < variants.Length; k++)
+            if (variants[k].tier == tier) { v = variants[k]; return true; }
+        return false;
     }
 
     public bool TryGetVariant(string id, out VariantDef v)

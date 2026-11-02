@@ -97,7 +97,7 @@ public sealed class DefenseOnHitEffect : ItemEffectBase
         }
 
         _cooldownEnd = Time.time + cooldown;
-        if (ctx.Player != null) ItemGuide.Toast(ctx.Player.transform.position, $"방어 +{_value}");
+        if (ctx.Player != null) ItemGuide.Toast(ctx.Player.transform.position, Loc.F("방어 +{0}", _value));
         RFLog.D($"[DefenseOnHit] 방어력 +{_value} ({_duration}초), 쿨다운 {cooldown}초");
     }
 }
@@ -118,7 +118,7 @@ public sealed class ExtraDamageOnHitEffect : ItemEffectBase
 
         int extraLoss = Mathf.Max(1, Mathf.RoundToInt(stats.MaxHp * Mathf.Abs(_value)));
         stats.Damage(extraLoss);   // 실드/사망무효 우회 — 직접 차감
-        ItemGuide.Toast(ctx.Player.transform.position, $"자해 -{extraLoss}");
+        ItemGuide.Toast(ctx.Player.transform.position, Loc.F("자해 -{0}", extraLoss));
 
         // 자해로 HP가 0이 되면 다음 피격까지 생존하는 버그 방지 — 즉시 사망 판정.
         if (stats.Hp <= 0) ctx.Player.NotifyHpDepleted();

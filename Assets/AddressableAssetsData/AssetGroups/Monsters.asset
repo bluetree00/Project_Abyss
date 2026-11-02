@@ -35,6 +35,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1e886ecb4b43b5544a7eb4175738d8a7
+    m_Address: Mat_MonsterGroundShadow
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 26ca230b5e25e7a4394b9883f13f4527
     m_Address: Lich/VFX/BindRing
     m_ReadOnly: 0

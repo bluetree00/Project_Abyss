@@ -332,9 +332,9 @@ public class CharacterInfoPageView : MonoBehaviour
         {
             if (passive != null)
             {
-                string pText = $"<color=#5B4A2F><b>{passive.passiveName}</b></color>";
+                string pText = $"<color=#5B4A2F><b>{Loc.T(passive.passiveName)}</b></color>";
                 if (!string.IsNullOrEmpty(passive.description))
-                    pText += $"\n<color=#776655>{passive.description}</color>";
+                    pText += $"\n<color=#776655>{Loc.T(passive.description)}</color>";
                 _passiveBlock.text = pText;
             }
             else
@@ -354,7 +354,7 @@ public class CharacterInfoPageView : MonoBehaviour
         s += StatLine("근접 공격력", $"{stats.MeleeAttack}");
         s += StatLine("원거리 공격력", $"{stats.RangedAttack}");
         s += StatLine("방어력", $"{stats.Defense}");
-        s += StatLine("행운", $"{stats.Luck}");
+        s += StatLine("치명 확률", $"{CharacterInfoPanelView.CritChancePercent(stats):0}%");   // 11-02 Q19 행운(레거시) 자리
         s += StatLine("공격 속도", $"x{stats.AttackSpeedMultiplier:F2}");
         s += StatLine("이동 속도", $"x{stats.MoveSpeedMultiplier:F2}");
 
@@ -403,7 +403,7 @@ public class CharacterInfoPageView : MonoBehaviour
             icon.sprite = null;
             icon.color = new Color(0.3f, 0.25f, 0.2f, 0.8f);
             if (fallback != null)
-                fallback.text = w != null && !string.IsNullOrEmpty(w.displayName) ? w.displayName.Substring(0, 1) : "?";
+                fallback.text = w != null && !string.IsNullOrEmpty(w.displayName) ? Loc.T(w.displayName).Substring(0, 1) : "?";
         }
     }
 
@@ -413,26 +413,26 @@ public class CharacterInfoPageView : MonoBehaviour
 
         // 이름은 한글 표시 이름만 — 옆의 영어 enum(Katana)은 걷었다(무형검도 「Katana」로 보였다 · 10-12 요청 8)
         string s = "";
-        s += $"<color=#3D2B1F><b>{w.displayName}</b></color>\n";
+        s += $"<color=#3D2B1F><b>{Loc.T(w.displayName)}</b></color>\n";
         s += GrowthLine(w) + "\n";
-        s += $"공격력 <color=#8B4513>{w.baseAttack}</color>  ";
-        s += $"공속 <color=#8B4513>x{w.attackSpeed:F1}</color>\n";
+        s += Loc.F("공격력 <color=#8B4513>{0}</color>  ", w.baseAttack);
+        s += Loc.F("공속 <color=#8B4513>x{0:F1}</color>\n", w.attackSpeed);
         s += SkillTierTable(w) + "\n";
 
         if (w.skillQ != null)
         {
-            s += $"\n<color=#4A6741><b>[R] {w.skillQ.skillName}</b></color>";   // R 스킬(필드명 skillQ는 레거시) — Q는 유물 칸
+            s += $"\n<color=#4A6741><b>[R] {Loc.T(w.skillQ.skillName)}</b></color>";   // R 스킬(필드명 skillQ는 레거시) — Q는 유물 칸
             s += $"  <color=#807060>({w.skillQCooldown:F1}s)</color>\n";
             if (!string.IsNullOrEmpty(w.skillQ.description))
-                s += $"<color=#555544>{w.skillQ.description}</color>\n";
+                s += $"<color=#555544>{Loc.T(w.skillQ.description)}</color>\n";
         }
 
         if (w.skillE != null)
         {
-            s += $"\n<color=#4A5A6A><b>[E] {w.skillE.skillName}</b></color>";
+            s += $"\n<color=#4A5A6A><b>[E] {Loc.T(w.skillE.skillName)}</b></color>";
             s += $"  <color=#807060>({w.skillECooldown:F1}s)</color>\n";
             if (!string.IsNullOrEmpty(w.skillE.description))
-                s += $"<color=#555544>{w.skillE.description}</color>\n";
+                s += $"<color=#555544>{Loc.T(w.skillE.description)}</color>\n";
         }
 
         return s.TrimEnd('\n');
@@ -442,9 +442,9 @@ public class CharacterInfoPageView : MonoBehaviour
     private static string GrowthLine(WeaponData w)
     {
         if (SkillTierResolver.IsRanged(w))
-            return $"<color=#665544>파츠 합</color> <color=#8B4513>{RangedPartsState.Current?.TotalLevel ?? 0}</color>";
+            return Loc.F("<color=#665544>파츠 합</color> <color=#8B4513>{0}</color>", RangedPartsState.Current?.TotalLevel ?? 0);
         string form = w.HasForm ? $"<color=#8B4513>「{w.form.DisplayName}」</color>" : "<color=#998877>없음</color>";
-        return $"<color=#665544>재련</color> <color=#8B4513>{WeaponReforgeService.CountAt(w.enhanceLevel)}회</color>  <color=#665544>형</color> {form}";
+        return Loc.F("<color=#665544>재련</color> <color=#8B4513>{0}회</color>  <color=#665544>형</color> {1}", WeaponReforgeService.CountAt(w.enhanceLevel), form);
     }
 
     /// <summary>
@@ -460,10 +460,10 @@ public class CharacterInfoPageView : MonoBehaviour
         for (int tier = SkillTierResolver.MinTier; tier <= SkillTierResolver.MaxTier; tier++)
         {
             int idx = tier - SkillTierResolver.MinTier - 1;
-            string cond = idx < 0 ? "기본" : idx < ms.Length ? (ranged ? $"파츠 합 {ms[idx]}" : $"재련 {WeaponReforgeService.CountAt(ms[idx])}회") : "—";
+            string cond = idx < 0 ? "기본" : idx < ms.Length ? (ranged ? Loc.F("파츠 합 {0}", ms[idx]) : Loc.F("재련 {0}회", WeaponReforgeService.CountAt(ms[idx]))) : "—";
             string body = idx < 0 ? null : UI_CruciblePanel.TierChangeBody(w, tier);
-            string row  = $"{tier}단계  {cond}{(body != null ? $" — {body}" : "")}";
-            s += tier == now ? $"\n<color=#8B4513>◆ {row}  · 지금</color>"
+            string row  = Loc.F("{0}단계  {1}{2}", tier, cond, (body != null ? $" — {body}" : ""));
+            s += tier == now ? Loc.F("\n<color=#8B4513>◆ {0}  · 지금</color>", row)
                : tier < now  ? $"\n<color=#665544>◆ {row}</color>"
                              : $"\n<color=#998877>◇ {row}</color>";
         }

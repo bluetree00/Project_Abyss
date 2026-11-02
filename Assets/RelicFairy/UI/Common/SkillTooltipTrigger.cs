@@ -19,8 +19,8 @@ public class SkillTooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPointer
     public void SetData(SkillSO skill)
     {
         if (skill == null) { _name = "---"; _desc = ""; _cooldown = 0; return; }
-        _name = skill.skillName;
-        _desc = skill.description;
+        _name = Loc.T(skill.skillName);
+        _desc = Loc.T(skill.description);
         _cooldown = skill.cooldown;
     }
 
@@ -47,7 +47,7 @@ public class SkillTooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPointer
         if (_tooltipName != null) _tooltipName.text = _name ?? "---";
         if (_tooltipDesc != null) _tooltipDesc.text = _desc ?? "";
         if (_tooltipCooldown != null)
-            _tooltipCooldown.text = _cooldown > 0 ? $"쿨다운: {_cooldown:F1}초" : "";
+            _tooltipCooldown.text = _cooldown > 0 ? Loc.F("쿨다운: {0:F1}초", _cooldown) : "";
 
         // 마우스 위치 근처에 표시
         var rt = _tooltipPanel.GetComponent<RectTransform>();

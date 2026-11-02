@@ -327,7 +327,7 @@ public static class UltimateCinematicService
             _skillNameText.gameObject.SetActive(hasName);
             if (hasName)
             {
-                _skillNameText.text = cfg.skillName;
+                _skillNameText.text = Loc.T(cfg.skillName);
                 _skillNameText.fontSize = cfg.skillNameFontSize;
                 var c = cfg.skillNameColor;
                 _skillNameText.color = new Color(c.r, c.g, c.b, 0f);

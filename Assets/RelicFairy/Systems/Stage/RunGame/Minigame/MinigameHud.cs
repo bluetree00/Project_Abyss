@@ -13,7 +13,7 @@ public sealed class MinigameHud : MonoBehaviour
 {
     // ── Constants ──────────────────────────────────────────────
     private const float BandTop     = -124f;   // 오른쪽 위 재화 줄(위 74 · 높이 40) 아래 — 메달 · 라운드 점이 재화 줄과 겹쳤다(10-01)
-    private const float BandHeight  = 118f;
+    private const float BandHeight  = 136f;    // 10-30 118 → 136 — 규칙 한 줄 · 메달 아래 보상 줄(M-17 · M-18)
     private const float BarWidth    = 520f;
     private const float MedalSize   = 84f;
     private const float StampSize   = 210f;
@@ -34,7 +34,7 @@ public sealed class MinigameHud : MonoBehaviour
     private Color         _theme;
 
     private CanvasGroup     _band;
-    private TextMeshProUGUI _bandTitle, _status, _dots;
+    private TextMeshProUGUI _bandTitle, _status, _dots, _rule, _gradeReward;
     private RectTransform   _barFill;
     private Image           _barFillImg;
     private Image           _medal;
@@ -71,7 +71,8 @@ public sealed class MinigameHud : MonoBehaviour
         if (this != null && gameObject != null) Destroy(gameObject);
     }
 
-    /// <summary>② 규칙 카드 — 위에서 내려와 앉고(튕김 없이), <paramref name="seconds"/> 뒤 사라진다.</summary>
+    /// <summary>② 규칙 카드 — 위에서 내려와 앉고(튕김 없이), <paramref name="seconds"/> 뒤 사라진다.
+    /// 셋째 줄(<paramref name="gradeHint"/>)은 보상 줄이다(10-30 M-16 — 무엇을 얼마나 받는지).</summary>
     public async UniTask ShowCardAsync(string title, string rule, string gradeHint, float seconds, CancellationToken ct)
     {
         // 위쪽 목표판(「▲보스 결전」 등)을 가리지 않게 그 아래에 앉힌다
@@ -124,10 +125,11 @@ public sealed class MinigameHud : MonoBehaviour
         Destroy(num.gameObject);
     }
 
-    /// <summary>④ 진행 띠를 보인다.</summary>
-    public void ShowBand(string title)
+    /// <summary>④ 진행 띠를 보인다. <paramref name="rule"/> = 규칙 한 줄(10-30 M-17 — 카드가 짧게 지나가도 계속 읽히게).</summary>
+    public void ShowBand(string title, string rule = null)
     {
         _bandTitle.text = title;
+        if (_rule != null) _rule.text = rule ?? string.Empty;
         FadeBandAsync(1f).Forget();
     }
 
@@ -165,6 +167,9 @@ public sealed class MinigameHud : MonoBehaviour
     }
 
     public void SetStatus(string text) { if (_status != null) _status.text = text; }
+
+    /// <summary>메달 아래 — 지금 등급이면 받는 것(「정수 34」 · 10-30 M-18). 바뀔 때만 부른다. null이면 비운다.</summary>
+    public void SetGradeReward(string text) { if (_gradeReward != null) _gradeReward.text = text ?? string.Empty; }
 
     /// <summary>라운드 점(●●○) — null이면 숨김.</summary>
     public void SetDots(string text) { if (_dots != null) _dots.text = text ?? string.Empty; }
@@ -260,10 +265,12 @@ public sealed class MinigameHud : MonoBehaviour
         _barFill = fill;
 
         _status = Text(band, "", new Vector2(-150f, -76f), 22f, UITheme.Ink, 620f);
+        _rule   = Text(band, "", new Vector2(-150f, -104f), 18f, UITheme.Mute, 620f);   // 10-30 M-17 규칙 한 줄
 
         // 등급 메달
         _medal = Panel(band, "Medal", new Vector2(250f, -14f), new Vector2(MedalSize, MedalSize), FailColor, MedalSize * 0.5f).GetComponent<Image>();
         _medalText = Text(_medal.rectTransform, "", new Vector2(0f, -MedalSize * 0.5f + 12f), 20f, new Color(0.08f, 0.07f, 0.1f), MedalSize + 30f);
+        _gradeReward = Text(band, "", new Vector2(250f, -102f), 18f, UITheme.Gold, 200f);   // 10-30 M-18 메달 아래 보상 숫자
         _dots = Text(band, "", new Vector2(380f, -40f), 26f, UITheme.Ink, 140f);
     }
 

@@ -17,6 +17,7 @@ public class CameraOcclusionFader : MonoBehaviour
     private const int MaxHits = 32;
     private const float NearMinHeight = 1.5f;    // 근거리 판정은 이만큼 높은 구조물만(촛대 · 잔해 · 보상 오브젝트 같은 작은 것은 빼고)
     private const float NearHoldSeconds = 0.35f; // 근거리로 흐린 것은 이만큼 붙잡는다 — 캡슐 경계에서 들락날락 깜박이지 않게
+    private const float FloorTopAbove   = 0.3f;  // 위 면이 발 + 이만큼 아래인 렌더러 = 바닥 — 흐리지 않는다(11-02 Q1 · 두께와 무관: 입구 굽은 바닥 조각은 4.4 m 두께)
     // 머리 위 가림(10-25 사용자 「카메라를 늘리면 천장 쪽 오브젝트도 카메라를 사이에 두면 투명 처리」) — 천장 타일은 Ground 층이고
     // 촛대 · 장식 · 문 상인방은 콜라이더가 없거나 마스크 밖이라 구 판정(SphereCast)에 안 걸린다. 방이 드러날 때 그 방을 둘로 모은다:
     //  · 천장(Ground 층 · 높이 있는 것 · MapBuilder 천장 조각 이름) — 카메라가 천장 아랫면 근처 · 위로 올라가면 방 천장을 통째로 걷는다(그림자는 남김).
@@ -409,12 +410,18 @@ public class CameraOcclusionFader : MonoBehaviour
             // 원본으로 기억하거나, 곧 시작할 입장 디졸브가 이 페이더의 임시 재질을 원본으로 기억하면 되돌릴 때 빈 재질(마젠타)이 된다.
             // (10-01 Ch1 상점·정제소 — 입장 연출이 없어 벽이 숨김 · 디졸브 중일 때 카메라와 플레이어 사이에 들었다)
             if (!r.enabled || DissolveEffect.IsDissolving(r)) continue;
+            // 바닥은 흐리지 않는다 — 카메라는 늘 플레이어 위라 발 높이 아래 것이 가릴 일이 없는데, 구 판정에 걸린 바닥 조각이 흐려져
+            // 원래 재질에선 안 보이던 면이 반투명으로 비쳤다 — 인트로 입구 바닥이 다가가면 큰 마름모로 바뀌어 보인 원인
+            // (11-02 사용자 Q1 · 페이더 켜고/끄고 사진: 켬 = 복도 마름모가 겹쳐 비침 · 끔 = 깨끗 · 흐려진 것 = 아레나 입구 SM_ArchFloorCurve_01a6)
+            if (IsFloorLike(r)) continue;
             _hitThisFrame.Add(r);
             if (near) _nearHoldUntil[r] = Time.unscaledTime + NearHoldSeconds;
             if (!_fading.ContainsKey(r))
                 BeginFade(r);
         }
     }
+
+    private bool IsFloorLike(Renderer r) => r.bounds.max.y < _playerTransform.position.y + FloorTopAbove;
 
     private void UpdateFading()
     {

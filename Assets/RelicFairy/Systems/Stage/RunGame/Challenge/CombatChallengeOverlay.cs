@@ -103,8 +103,8 @@ public sealed class CombatChallengeOverlay : MonoBehaviour
     private string ObjectiveText() => _type switch
     {
         // 등급 기준을 수치로 — 「빠를수록 · 적을수록 높은 등급」은 얼마나 해야 하는지 말하지 않았다(09-29). 기준은 아래 GradeBy* 와 같다.
-        OverlayType.TimeLimit => $"[속공] 제한 {_param:0}초 — {_param * 0.5f:0}초 안 플래티넘 · {_param * 0.75f:0}초 골드 · {_param:0}초 실버",
-        OverlayType.Hitless   => $"[무결] 피격 0회 플래티넘 · 1회 골드 · {Mathf.Max(1, Mathf.RoundToInt(_param))}회 이하 실버",
+        OverlayType.TimeLimit => Loc.F("[속공] 제한 {0:0}초 — {1:0}초 안 플래티넘 · {2:0}초 골드 · {3:0}초 실버", _param, _param * 0.5f, _param * 0.75f, _param),
+        OverlayType.Hitless   => Loc.F("[무결] 피격 0회 플래티넘 · 1회 골드 · {0}회 이하 실버", Mathf.Max(1, Mathf.RoundToInt(_param))),
         OverlayType.Survival  => "[생존] 클리어 때 HP 85% 이상 플래티넘 · 65% 골드 · 40% 실버",
         OverlayType.NoHeal    => "[고행] 회복 봉인 — 클리어 때 HP 70% 이상 플래티넘 · 50% 골드 · 28% 실버",
         OverlayType.Berserk   => "[배수진] 평균 HP 25% 이하 플래티넘 · 40% 골드 · 60% 실버",
@@ -113,11 +113,11 @@ public sealed class CombatChallengeOverlay : MonoBehaviour
 
     private string StatusText() => _type switch
     {
-        OverlayType.TimeLimit => $"경과 {Elapsed:0.0}초 · {GradeName(Compute())}",
-        OverlayType.Hitless   => $"피격 {_hitCount}회 · {GradeName(Compute())}",
+        OverlayType.TimeLimit => Loc.F("경과 {0:0.0}초 · {1}", Elapsed, GradeName(Compute())),
+        OverlayType.Hitless   => Loc.F("피격 {0}회 · {1}", _hitCount, GradeName(Compute())),
         OverlayType.Survival  => $"HP {Mathf.RoundToInt(HpPct() * 100f)}% · {GradeName(Compute())}",
-        OverlayType.NoHeal    => $"HP {Mathf.RoundToInt(HpPct() * 100f)}% (회복봉인) · {GradeName(Compute())}",
-        OverlayType.Berserk   => $"평균 HP {Mathf.RoundToInt(AvgPct() * 100f)}% · {GradeName(Compute())}",
+        OverlayType.NoHeal    => Loc.F("HP {0}% (회복봉인) · {1}", Mathf.RoundToInt(HpPct() * 100f), GradeName(Compute())),
+        OverlayType.Berserk   => Loc.F("평균 HP {0}% · {1}", Mathf.RoundToInt(AvgPct() * 100f), GradeName(Compute())),
         _                     => "",
     };
 

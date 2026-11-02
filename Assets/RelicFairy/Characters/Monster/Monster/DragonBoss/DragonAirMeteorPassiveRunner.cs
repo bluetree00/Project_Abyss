@@ -235,9 +235,6 @@ public class DragonAirMeteorPassiveRunner
 
     private async UniTask FireMeteorAsync(Vector2Int c, int radius, Kind kind, int tier, CancellationToken ct)
     {
-        var cells = DragonThreat.Footprint(c, radius, kind == Kind.Big ? DragonThreat.EdgeDrop * 0.5f : DragonThreat.EdgeDrop);
-        if (cells.Count == 0) return;
-
         Vector3 cellBase = DragonBossRoomContext.CellToWorld(c.x, c.y, 0f);
         float   floorY   = GetFloorY(cellBase.x, cellBase.z);
         Vector3 landPos  = new Vector3(cellBase.x, floorY + 0.05f, cellBase.z);
@@ -245,50 +242,21 @@ public class DragonAirMeteorPassiveRunner
         float   dmgMul   = kind == Kind.Aimed ? DragonThreat.AimedDamage : kind == Kind.Big ? DragonThreat.BigDamage : DragonThreat.ScatterDamage[tier];
         float   sizeMul  = DragonThreat.MeteorScale(radius);   // 땅 효과 = 판정 크기
 
-        // ── 경고 타일 생성 ──────────────────────────────────────
-        var warnTiles = new List<GameObject>(cells.Count);
-        var warnMats  = new List<Material>(cells.Count);
-        var warnMrs   = new List<MeshRenderer>(cells.Count);
-        // 예고 색 — (10-23 가이드 색 통일) 1 · 2페이지 모두 공용 공격 색(불 · 심연 색은 이펙트만)
-        Color fireBase = PatternGuideHelper.AttackFill;
-
-        foreach (var cell in cells)
-        {
-            Vector3 tileBase = DragonBossRoomContext.CellToWorld(cell.x, cell.y, 0f);
-            float   tileY    = GetFloorY(tileBase.x, tileBase.z);
-            var (go, mr, mat) = QuadTilePool.Rent();
-            go.name = "PassiveMeteorWarn";
-            go.transform.position   = new Vector3(tileBase.x, tileY + 0.1f, tileBase.z);
-            go.transform.rotation   = Quaternion.Euler(90f, 0f, 0f);
-            go.transform.localScale = Vector3.one;
-            mat.color = new Color(fireBase.r, fireBase.g, fireBase.b, 0f);
-            warnTiles.Add(go);
-            warnMats.Add(mat);
-            warnMrs.Add(mr);
-        }
-
-        // ── 경고 페이드인 ──────────────────────────────────────
+        // ── 예고 원(판정 반경 · 11-02 Q31 — 칸 모자이크 대신) — 가운데서 차오른다. 노림 · 큰 메테오는 진홍 ──
+        GameObject warn = DragonThreat.WarnCircle(landPos, radius, heavy: kind != Kind.Scatter);
         try
         {
             float elapsed = 0f;
-            float alpha   = Mathf.Min(1f, _so.WarningColor.a * (kind == Kind.Scatter ? 1f : 1.4f));   // 노림 · 큰 메테오는 더 진하게
             while (elapsed < warnDur)
             {
-                float t = Mathf.Clamp01(elapsed / warnDur);
-                foreach (var mat in warnMats)
-                {
-                    if (mat == null) continue;
-                    Color col = mat.color;
-                    col.a = DragonThreat.WarnAlpha(alpha, t);   // 처음부터 보이게 · 탑다운에선 진하게(10-26)
-                    mat.color = col;
-                }
+                DragonThreat.WarnProgress(warn, Mathf.Clamp01(elapsed / warnDur));
                 elapsed += Time.deltaTime;
                 await UniTask.Yield(ct);
             }
         }
         catch
         {
-            ReturnWarnTiles();   // 취소 · 예외 — 착탄 정리까지 못 가니 여기서 돌려준다
+            DragonThreat.DropCircle(ref warn);   // 취소 · 예외 — 착탄 정리까지 못 가니 여기서 걷는다
             throw;
         }
 
@@ -302,8 +270,8 @@ public class DragonAirMeteorPassiveRunner
         {
             await UniTask.Delay(TimeSpan.FromSeconds(_so.ImpactDelay), cancellationToken: ct);
 
-            ApplyImpact(landPos, cells, sizeMul, dmgMul, kind, (radius + 0.5f) * DragonBossRoomContext.CellSize);
-            ReturnWarnTiles();   // 예고는 착탄 순간까지 남긴다(10-02 — 예전엔 낙하 0.6초 동안 바닥 예고가 비어 있었다)
+            ApplyImpact(landPos, radius, sizeMul, dmgMul, kind, DragonThreat.HitRadius(radius));
+            DragonThreat.ImpactCircle(ref warn);   // 예고는 착탄 순간까지(10-02) — 판정 색으로 번쩍인 뒤 걷힌다(11-02 Q31)
 
             if (projectile != null)
                 foreach (var ps in projectile.GetComponentsInChildren<ParticleSystem>(true))
@@ -315,23 +283,14 @@ public class DragonAirMeteorPassiveRunner
         }
         finally
         {
-            ReturnWarnTiles();
+            DragonThreat.DropCircle(ref warn);
             if (projectile != null) BossEffectPool.Release(projectile);
-        }
-
-        void ReturnWarnTiles()
-        {
-            for (int i = 0; i < warnTiles.Count; i++)
-                QuadTilePool.Return(warnTiles[i], warnMrs[i], warnMats[i]);
-            warnTiles.Clear();
-            warnMats.Clear();
-            warnMrs.Clear();
         }
     }
 
-    // ── 충돌 처리 — 예고 칸에 선 플레이어만 · 폭발은 판정 크기만큼 ─────────
+    // ── 충돌 처리 — 예고 원 안의 플레이어만 · 폭발은 판정 크기만큼 ─────────
 
-    private void ApplyImpact(Vector3 landPos, List<Vector2Int> cells, float sizeMul, float dmgMul, Kind kind, float halfWidth)
+    private void ApplyImpact(Vector3 landPos, int radius, float sizeMul, float dmgMul, Kind kind, float halfWidth)
     {
         if (_so.ExplosionPrefab != null)
         {
@@ -345,8 +304,7 @@ public class DragonAirMeteorPassiveRunner
 
         if (_ctx?.Runtime?.PlayerTarget == null || _ctx.Runtime.IsDead) return;   // 처치 뒤 떨어지는 운석은 이펙트만(10-08 점검)
 
-        Vector2Int pc = DragonBossRoomContext.WorldToCell(_ctx.Runtime.PlayerTarget.position);
-        if (!cells.Contains(pc) || !DragonThreat.TryMeteorHit()) return;
+        if (!DragonThreat.InCircle(landPos, _ctx.Runtime.PlayerTarget.position, radius) || !DragonThreat.TryMeteorHit()) return;
         _ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()
             ?.TakeDamage(Mathf.RoundToInt(_ctx.Config.stat.attackPower * _so.DamageMultiplier * dmgMul), _ctx.Monster.gameObject,
                          false, HitWeight.Auto);   // 수동 운석 — 직격(293)이라 약이 아니다: 피격 연출 · 날아감은 피해량대로(10-01)

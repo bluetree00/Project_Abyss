@@ -182,8 +182,8 @@ public static class CovenantGrammar
     /// </summary>
     public static string Lead(ClauseLink link, string prevEffectId) => link switch
     {
-        ClauseLink.OnDeath => $"{TouchedNoun(prevEffectId)}이 쓰러지면 ",
-        ClauseLink.During  => $"{WindowWhat(prevEffectId)} 동안 적을 쓰러뜨리면 ",
+        ClauseLink.OnDeath => Loc.F("{0}이 쓰러지면 ", TouchedNoun(prevEffectId)),
+        ClauseLink.During  => Loc.F("{0} 동안 적을 쓰러뜨리면 ", WindowWhat(prevEffectId)),
         ClauseLink.Endure  => Normalize(prevEffectId) == "aegis" ? "무적이 끝나면 " : "보호막이 깨지면 ",
         _                  => string.Empty,
     };
@@ -261,17 +261,17 @@ public static class CovenantGrammar
             case ClauseLink.OnDeath:
             {
                 float hold = UnityEngine.Mathf.Clamp(prev.duration, CovenantSentence.DeathEarMin, CovenantSentence.DeathEarMax);
-                return $"{TouchedNoun(prev.id)}이 {hold:0.#}초 안에 쓰러지면 ";
+                return Loc.F("{0}이 {1:0.#}초 안에 쓰러지면 ", TouchedNoun(prev.id), hold);
             }
             case ClauseLink.During:
             {
                 float win = prev.kind == EffectKind.StatBuff && CovenantPalette.TryGetCause(causeId, out var c) && c.cls == CauseClass.Kill
                     ? prev.duration * CovenantMath.MomentumKillDurationMult
                     : prev.duration;
-                return $"{WindowWhat(prev.id)} {win:0.#}초 안에 적을 쓰러뜨리면(1번) ";
+                return Loc.F("{0} {1:0.#}초 안에 적을 쓰러뜨리면(1번) ", WindowWhat(prev.id), win);
             }
             case ClauseLink.Endure:
-                return prev.kind == EffectKind.Invincible ? "무적이 끝나면 " : $"보호막이 {CovenantSentence.ShieldEarSeconds:0}초 안에 깨지면 ";
+                return prev.kind == EffectKind.Invincible ? "무적이 끝나면 " : Loc.F("보호막이 {0:0}초 안에 깨지면 ", CovenantSentence.ShieldEarSeconds);
             default:
                 return Lead(link, prevEffectId);
         }

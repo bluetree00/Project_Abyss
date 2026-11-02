@@ -119,6 +119,7 @@ public sealed class EffectRowWidget : MonoBehaviour
             string prefix = _style.usePrefixArrows ? (display.IsRisk ? "▼ " : "▲ ") : "";
             // 수치만 Noto 500(10-15 설명 글 강조) — 위험 줄은 붉은 글 그대로
             _label.text  = prefix + (_style.inkValues && !display.IsRisk ? UIKeywordInk.Values(core) : core);
+            if (_style.wrap) _label.text = UIGlossary.Append(_label.text);   // 11-02 Q22 「강타」 풀이(줄이 자라는 칸에만)
             _label.color = display.IsRisk ? _style.riskColor : _style.normalColor;
         }
     }

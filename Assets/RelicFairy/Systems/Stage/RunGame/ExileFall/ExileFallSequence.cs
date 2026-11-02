@@ -151,6 +151,25 @@ public static class ExileFallSequence
            && (GameRunBootstrapper.Instance?.Run?.IsRunning ?? false);
 
     /// <summary>
+    /// 추방이 쓸 에셋(층계 세트 · 층마다 보스 모습)을 미리 읽어 둔다 — 봉인 의식이 시작될 때 부른다(추방 약 20초 전).
+    /// 11-02 Q27: 추방 첫 순간(리치가 가리키는 컷) 보스 모델 셋을 처음 읽느라 808 ms 멈췄다. 읽은 것은 AddressableManager 캐시에 남아 무대가 그대로 쓴다.
+    /// </summary>
+    public static async UniTaskVoid PreloadAsync()
+    {
+        try
+        {
+            var am = Managers.AddressableManager;
+            if (am == null) return;
+            await am.TryLoadAssetAsync<StairwaySetSO>(StairwaySetSO.Address);
+            await ExileFallBossCast.PreloadAsync(am);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[Exile] 미리 읽기 예외(건너뜀 — 추방 때 다시 읽는다): {e.Message}");
+        }
+    }
+
+    /// <summary>
     /// ① 추방 — 붕괴 컷신 +9.0초에서 부른다. 리치가 가리키고(Seal_Exile 0) 코어가 무너지고 몸이 떨어진 뒤, 추락(②)을 띄우고 true.
     /// 이때부터 화면 · 몸 · HUD는 추락이 쥔다(부르는 쪽은 정리하지 않는다). 리치가 사라져 끊기면 몸 · 화면을 돌려주고 취소를 그대로 던진다.
     /// 장면 도중 예외는 삼키고 바로 추락으로 넘어간다(소프트락 금지). 추락조차 못 띄우면 false(예전 흐름으로).

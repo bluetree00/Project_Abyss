@@ -48,8 +48,7 @@ public static class NightmareGateChoiceProbeEditor
                 if (loadout.Relic == null) loadout.SetRelic(AssetDatabase.LoadAssetAtPath<RelicClassSO>("Assets/RelicFairy/Systems/Relic/Data/RelicClass_Gawain.asset"));
                 if (loadout.WeaponSlot0 == null) loadout.SetWeaponSlot0(AssetDatabase.LoadAssetAtPath<WeaponSO>("Assets/RelicFairy/Weapon/Nameless/Data/T0_Nameless.asset"));
                 if (loadout.WeaponSlot1 == null) loadout.SetWeaponSlot1(AssetDatabase.LoadAssetAtPath<WeaponSO>("Assets/RelicFairy/Weapon/Bow/Data/T1_Bow.asset"));
-                if (string.IsNullOrEmpty(loadout.StartPartId)) loadout.SetStartPart("probe_part");
-                sb.AppendLine($"로드아웃 유물 {loadout.Relic?.name} · 근접 {loadout.WeaponSlot0?.name} · 원거리 {loadout.WeaponSlot1?.name} · 파츠 {loadout.StartPartId}");
+                sb.AppendLine($"로드아웃 유물 {loadout.Relic?.name} · 근접 {loadout.WeaponSlot0?.name} · 원거리 {loadout.WeaponSlot1?.name}");
             }
             var gate = UnityEngine.Object.FindFirstObjectByType<BaseCampDungeonGate>();
             var player = UnityEngine.Object.FindFirstObjectByType<PlayerController>();

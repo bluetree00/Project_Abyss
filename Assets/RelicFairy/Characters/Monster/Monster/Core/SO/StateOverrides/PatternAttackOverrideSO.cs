@@ -71,6 +71,14 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         public float hitVfxScale = 1f;
         [Tooltip("피격 위치 기준 오프셋.")]
         public Vector3 hitVfxOffset = Vector3.zero;
+
+        [Header("Attack SFX (Optional)")]
+        [Tooltip("공격음 — 소리 정점(castSfxPeakTime)이 피해 순간에 오게 낸다(차오르는 휘두름 소리가 곧 예고). null이면 소리 없음(10-29 박쥐 · 흑기사 공격음).")]
+        public AudioClip castSfx;
+        [Range(0f, 1f)] public float castSfxVolume = 0.6f;
+        public float castSfxPitch = 1f;
+        [Tooltip("클립에서 소리가 가장 큰 시각(초 · 피치 1 기준).")]
+        public float castSfxPeakTime = 0f;
     }
 
     [Tooltip("Ordered list of attack patterns. Highest priority among valid patterns wins.")]
@@ -984,6 +992,8 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         private bool _animFirstCycleDone;
         private float _castVfxDelayTimer;
         private bool _castVfxSpawned;
+        private float _sfxTimer;     // 공격음까지 남은 실제 초 — 음수면 그만큼 클립 앞을 건너뛴다
+        private bool _sfxPending;
         private float _speed = 1f;   // 공격 속도 배율(10-11 P2-③) — 들어갈 때 잡아 공격 하나 동안 고정
         private MonsterTelegraph _telegraph;          // 이 공격의 범위 예고(끊기면 지운다)
         private Vector3 _lockOrigin, _lockForward;   // 예고를 띄운 순간의 자리 · 방향 — 격자 판정도 여기서(D2)
@@ -1057,6 +1067,9 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
             if (ctx.Monster.Grade == MonsterGrade.Elite) MonsterRootXZLock.Begin(ctx.Monster);   // 몸 = 판정 자리(10-14 정예 점검)
             _speed = Mathf.Max(0.1f, ctx.Monster.AttackSpeedMultiplier);
             if (ctx.Animator != null) ctx.Animator.speed = _speed;   // PlayAttackAnimation이 1로 둔 뒤 — 애니도 같은 배율
+            // 공격음 정점 = 피해 순간(실제 초 — 공격 속도 배율 · 피치 반영 · 10-29 박쥐 · 흑기사 공격음)
+            _sfxPending = _pattern.castSfx != null;
+            if (_sfxPending) _sfxTimer = _damageTimer / _speed - _pattern.castSfxPeakTime / Mathf.Max(0.1f, _pattern.castSfxPitch);
             // 예고는 배율을 잡은 뒤에 — 예전엔 배율 전 시간으로 그려 빨라진 공격과 앞줄 박자가 어긋났다
             if (early)
             {
@@ -1091,6 +1104,17 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         {
             _runtime.Tick(Time.deltaTime);
             float dt = Time.deltaTime * _speed;   // 공격 시간표(이펙트 · 피해 · 쿨다운)는 배율만큼 빨리
+
+            if (_sfxPending)
+            {
+                _sfxTimer -= Time.deltaTime;
+                if (_sfxTimer <= 0f)
+                {
+                    _sfxPending = false;
+                    float skip = Mathf.Min(-_sfxTimer * _pattern.castSfxPitch, _pattern.castSfx.length * 0.9f);
+                    Managers.Sound?.PlayEffectAt(_pattern.castSfx, ctx.Transform.position, _pattern.castSfxVolume, _pattern.castSfxPitch, startTime: skip);
+                }
+            }
 
             if (!_castVfxSpawned)
             {

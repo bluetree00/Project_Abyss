@@ -27,7 +27,7 @@ public sealed class GiantSwordBuff : MonoBehaviour
     public const float BaseSeconds = 6f, PerReforgeSeconds = 0.5f, MaxExtendSeconds = 3f;   // 10-26 사용자 「r 상태의 평타가 메인 재미 — 시간을 늘리고」 4 → 6초
     /// <summary>속성 검 동안 평타 범위 배율 — R 3단계(+12)면 더 넓다(10-26 「R까지 키면 더 좋은 범위에 효율」).</summary>
     public const float RangeMult = 1.3f, RangeMultTier3 = 1.45f;
-    private const float ModelScale = 1.6f, GrowSeconds = 0.15f, ShrinkSeconds = 0.3f, BladeGlow = 1.2f;   // 칼날 속성 빛 = 속성 대표 색 × 1.2(형 빛 0.6보다 또렷하게)
+    private const float ModelScale = 1.6f, GrowSeconds = 0.15f, ShrinkSeconds = 0.3f, BladeGlow = 1.8f;   // 칼날 속성 빛 = 속성 대표 색 × 1.8(형 빛 0.6보다 또렷하게 · 10-30 게임 화면에서 읽히게 1.2 → 1.8)
     private const float ZoneSeconds = 2f, ZoneTickGap = 0.45f, SameSpot = 1f, HitBurstRadius = 0.8f;   // 장판 수명 · 몬스터마다 틱 간격 · 이만큼 가까우면 같은 자리 · 맞은 적 점 타격 크기
     private const int   MaxZones = 3;
     private const float BurnRatio = 0.2f, FrostSlow = 0.4f, ShockRatio = 0.12f, ShockAmp = 0.1f, PoisonRatio = 0.04f,
@@ -176,6 +176,8 @@ public sealed class GiantSwordBuff : MonoBehaviour
         BeginTrail(wi);   // 칼 궤적 = 속성 트레일 — 커진 칼의 칼끝 · 칼밑(10-26 사용자 「트레일도 큰 검에 맞게 · 속성별」)
         _player.RaiseSkillBuffStarted(SkillType.R, seconds);   // HUD 남은 시간 막대(석궁 강화와 같은 길)
         Log($"속성 검 — {Element} · {seconds:0.0}초 · 칼날 이펙트 {_blade != null}");
+        // 빌드에서도 남긴다(10-30 「빌드에서 속성 검이 안 보임」 확인 — 시전마다 한 줄 · 재사용 대기 9초라 잦지 않다)
+        Debug.Log($"[ElementSword] {Element} · 칼날 이펙트 {(_blade != null ? "붙음" : "없음")} · 재질 {(ElementVfxPlayer.GetBladeMaterial(Element) != null ? ElementVfxPlayer.GetBladeMaterial(Element).name : "없음")} · 칼 {(wi != null ? wi.name : "없음")}");
     }
 
     private void End(bool instant)

@@ -74,7 +74,7 @@ public sealed class QuestNotifierPresenter : MonoBehaviour
     {
         if (quest == null || view == null) return;
 
-        _queue.Enqueue(new ToastData(quest.Icon, quest.DisplayName, label));
+        _queue.Enqueue(new ToastData(quest.Icon, Loc.T(quest.DisplayName), label));
         if (!_isProcessing)
             ProcessQueueAsync(_cts.Token).Forget();
     }

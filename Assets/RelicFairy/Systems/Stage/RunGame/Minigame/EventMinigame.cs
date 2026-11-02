@@ -14,13 +14,13 @@ public enum MinigameDemo { None, Perfect, Normal, Idle }
 /// 시간 제한이 곧 탈출구다 — 어떤 놀이도 제한 시간이 지나면 그때까지의 성적으로 끝난다. 뼈대에서 예외가 나도 브론즈로 끝낸다(소프트락 금지).
 ///
 /// 출구: 보상을 준 뒤 <see cref="OnResolved"/> — 10-29 룬 고르기 창(RoomClearGate)을 걷어 끝나는 순간 출구가 열린다(설계 「룬이 아닌 특별한 보상」).
-/// 규칙 카드는 처음 보는 놀이만 길게(4초), 다음부터는 1초 — 「빨리 끝나는 이벤트」.
+/// 규칙 카드는 처음 보는 놀이만 길게(4초), 다음부터는 2초 — 「빨리 끝나는 이벤트」. 규칙 한 줄은 진행 띠에 계속 남는다(10-30 M-17).
 /// 시작 시점: RunFlowController가 <see cref="OnResolved"/>를 구독하는 순간 = 방 입장 연출이 끝나고 조작이 풀린 뒤.
 /// </summary>
 public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
 {
     // ── Constants ──────────────────────────────────────────────
-    private const float CardSeconds      = 1f;     // 10-29 2.5 → 1 — 두 번째부터는 제목만 스친다
+    private const float CardSeconds      = 2f;     // 10-29 2.5 → 1 · 10-30 1 → 2 — 1초로는 다시 못 읽었다(규칙은 진행 띠에도 남긴다)
     private const float CardFirstSeconds = 4f;
     private const float LowTimeSeconds   = 5f;
 
@@ -56,6 +56,7 @@ public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
     private bool  _resolved;
     private bool  _startNow;
     private int   _lastTickSecond = -1;
+    private int   _rewardShownKey = int.MinValue;
 
     // ── Properties ─────────────────────────────────────────────
     public event Action OnResolved;
@@ -71,6 +72,7 @@ public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
     public abstract string Id { get; }
     protected abstract string Title { get; }
     protected abstract string Rule { get; }
+    /// <summary>규칙 카드 셋째 줄 = <b>보상 줄</b> — 무엇을 받고, 성적에 따라 얼마인지(10-30 M-16 · 예전엔 등급 이름 문턱뿐이었다).</summary>
     protected abstract string GradeHint { get; }
     protected abstract float  Duration { get; }
     /// <summary>놀이판 반경(원하는 값 — 방이 좁으면 줄어든다).</summary>
@@ -89,6 +91,50 @@ public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
     protected virtual Vector3 RewardSpot => Center;
     /// <summary>③ 카운트다운을 쓰는가(욕심의 상자는 바로 시작 — 10-29).</summary>
     protected virtual bool UseCountdown => true;
+    /// <summary>
+    /// 판(원) 안에서만 하는 놀이인가(10-30 · 10-31 탄막) — 시작 때 판 밖이면 판 안으로 옮기고, 진행 중엔 가장자리를 벽처럼 막는다
+    /// (<see cref="ClampInsideArena"/>을 놀이가 TickPlay에서 부른다). 위험이 판 안에서만 닿아 판 밖이 안전 지대였다.
+    /// </summary>
+    protected virtual bool KeepInsideArena => false;
+    private const float EnterInsideFrac = 0.8f;   // 판 반경의 이만큼 안이면 들어선 것
+    private const float EnterSpotFrac   = 0.6f;   // 옮길 때 — 입구 쪽 반경 0.6
+    private const float WallInset       = 0.25f;  // 가장자리 벽 — 반경에서 이만큼 안쪽
+
+    private bool InsideArena(float frac)
+    {
+        if (PlayerT == null) return true;
+        Vector3 d = PlayerT.position - Center; d.y = 0f;
+        return d.magnitude <= Radius * frac;
+    }
+
+    /// <summary>진행 중 판 가장자리 벽 — 반경 밖으로 나가면 가장자리 안쪽으로 되돌린다(회피로 밀고 나가도).</summary>
+    protected void ClampInsideArena()
+    {
+        if (PlayerT == null) return;
+        Vector3 d = PlayerT.position - Center; d.y = 0f;
+        float max = Radius - WallInset;
+        if (d.magnitude <= max) return;
+        Vector3 to = Center + d.normalized * max;
+        to.y = PlayerT.position.y;
+        MovePlayer(to);
+    }
+
+    /// <summary>플레이어 위치를 옮긴다 — Rigidbody 위치 · 속도까지(RunFlowController.MovePlayer와 같은 방식).</summary>
+    private void MovePlayer(Vector3 to)
+    {
+        if (PlayerT == null) return;
+        PlayerT.position = to;
+        if (PlayerT.TryGetComponent<Rigidbody>(out var rb))
+        {
+            rb.position = to;
+            var v = rb.linearVelocity; v.x = 0f; v.z = 0f;
+            rb.linearVelocity = v;
+        }
+    }
+    /// <summary>메달 아래 「지금 등급이면 받는 것」(「정수 34」) — 10-30 M-18 등급 이름이 받는 양과 이어지지 않았다. null이면 줄 없음.</summary>
+    protected virtual string GradeReward(ChallengeGrade grade) => null;
+    /// <summary><see cref="GradeReward"/>를 다시 만들 때 — 이 값이 바뀔 때만(매 프레임 문자열 할당 금지). 기본 = 지금 등급.</summary>
+    protected virtual int RewardKey => (int)CurrentGrade;
 
     /// <summary>① 무대 소품을 세운다(발판 · 상자 — 아래에서 솟는 연출 포함, 약 0.6초).</summary>
     protected abstract UniTask BuildStageAsync(CancellationToken ct);
@@ -227,11 +273,22 @@ public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
             await Hud.ShowCardAsync(Title, Rule, GradeHint, first ? CardFirstSeconds : CardSeconds, ct);
             if (first) StoryProgress.MarkSeen(seenKey);
 
+            // ②-b 판 안으로(10-30 · 10-31) — 판 밖 입구에 선 채로 시작하면 위험이 닿지 않아 「탄이 안 나오고 끝났다」로 보였다.
+            //   기다리게 하지 않는다(사용자 「너무 시간을 쓰게 하면 안 된다」) — 판 밖이면 판 안 입구 쪽으로 옮긴다.
+            if (KeepInsideArena && !InsideArena(EnterInsideFrac))
+            {
+                Vector3 d = PlayerT.position - Center; d.y = 0f;
+                Vector3 to = Center + (d.sqrMagnitude > 0.01f ? d.normalized : Vector3.back) * (Radius * EnterSpotFrac);
+                if (MinigameArena.Snap(to, 1.5f, out var onMesh)) to = onMesh;
+                MinigameFx.Flash(Theme, 0.35f, 0.08f);
+                MovePlayer(to);
+            }
+
             // ③ 카운트다운
             if (UseCountdown) await Hud.CountdownAsync(ct);
 
             // ④ 진행
-            Hud.ShowBand(Title);
+            Hud.ShowBand(Title, Rule);   // 10-30 M-17 규칙 한 줄을 진행 띠에 계속 둔다
             Playing = true;
             OnPlayStart();
             while (Elapsed < PlayDuration && !FinishedEarly)
@@ -271,6 +328,12 @@ public abstract class EventMinigame : MonoBehaviour, IInteractionChallenge
         float left = Remaining;
         Hud.SetTime(PlayDuration > 0f ? left / PlayDuration : 0f, left);
         Hud.SetGrade(CurrentGrade);
+        int rewardKey = RewardKey;
+        if (rewardKey != _rewardShownKey)
+        {
+            _rewardShownKey = rewardKey;
+            Hud.SetGradeReward(GradeReward(CurrentGrade));
+        }
         Hud.SetStatus(StatusLine);
         Hud.SetDots(DotsLine);
 

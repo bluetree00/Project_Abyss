@@ -441,7 +441,7 @@ public sealed partial class UI_RefineryPanel
 
         c.Grade.text  = GradeName(c.Tier);
         c.Grade.color = GradeColor(c.Tier);
-        c.Name.text   = rune != null ? rune.displayName : "";
+        c.Name.text   = rune != null ? Loc.T(rune.displayName) : "";
         c.Name.color  = UITheme.Thin.Ink;
         c.Attr.text   = RuneFootText(rune);
         c.Effect.text = UIKeywordInk.Values(RuneEffectText(rune));   // 수치만 Noto 500(10-15 설명 글 강조)
@@ -482,8 +482,8 @@ public sealed partial class UI_RefineryPanel
         if (_wAgainLabel == null || _svc == null) return;
         int cost = _svc.CurrentCost;
         _wAgainLabel.text = afford
-            ? $"다시 정제 · 원석 {cost}"
-            : $"다시 정제 · <color=#{ColorUtility.ToHtmlStringRGB(UITheme.Thin.Danger)}>원석 {cost}</color>";
+            ? Loc.F("다시 정제 · 원석 {0}", cost)
+            : Loc.F("다시 정제 · <color=#{0}>원석 {1}</color>", ColorUtility.ToHtmlStringRGB(UITheme.Thin.Danger), cost);
         _wAgainLabel.color = ready ? UITheme.Thin.Ink : UITheme.Thin.InkA(0.45f);
         SetLine(_wAgainLine, ready ? UITheme.Thin.InkA(0.35f) : UITheme.Thin.LineIdle);
     }

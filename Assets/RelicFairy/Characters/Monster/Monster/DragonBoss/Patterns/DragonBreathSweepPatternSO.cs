@@ -209,8 +209,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private struct MeteorEntry
     {
-        public List<GameObject> WarnTiles;
-        public List<Material>   WarnMats;
+        public GameObject WarnCircle;   // 예고 원 = 판정 원(11-02 Q31 — 예전 정사각 3×3 · 5×5는 둥근 폭발 밖 모서리도 맞았다)
         public GameObject Projectile;
         public Vector3 LandPos;
         public float WarnTimer;
@@ -218,7 +217,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         public bool  Falling;
         public bool  ImpactApplied;
         public bool  Landed;
-        public int   HalfR; // 경고/피격 범위 반경: 1=3×3, 2=5×5
+        public int   HalfR; // 경고/피격 범위 반경(칸): 1 · 2
     }
 
     private const float FlyThroughPadding   = 3f;
@@ -1090,6 +1089,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             go.transform.SetPositionAndRotation(pos, rot);
             go.transform.localScale = new Vector3(length, width, 1f);
             mr.sharedMaterial = mat;
+            mr.sortingOrder   = 0;   // 그을음은 장식 — 예고 순서(QuadTilePool.Rent)로 플레이어 이펙트를 덮지 않게(10-30)
 
             _scorches.Add(new ScorchEntry { Go = go, Mr = mr, OwnedMat = ownedMat, Timer = 0f, MaxTimer = Data.ScorchDuration });
         }
@@ -1267,37 +1267,18 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             landPos.y = ctx.Runtime.SpawnPosition.y + 0.05f;
         }
 
-        int halfR = Random.Range(1, 3); // 1=3×3, 2=5×5
+        int halfR = Random.Range(1, 3); // 반경 1 · 2칸 원
 
         var entry = new MeteorEntry
         {
-            WarnTiles     = new List<GameObject>(),
-            WarnMats      = new List<Material>(),
             LandPos       = landPos,
             WarnTimer     = 0f,
             Falling       = false,
             ImpactApplied = false,
             Landed        = false,
             HalfR         = halfR,
+            WarnCircle    = DragonThreat.WarnCircle(landPos, halfR),
         };
-
-        Color meteorFireBase = PatternGuideHelper.AttackFill;   // (10-23 가이드 색 통일)
-        for (int dx = -halfR; dx <= halfR; dx++)
-        for (int dz = -halfR; dz <= halfR; dz++)
-        {
-            int tx = cx + dx, tz = cz + dz;
-            if (!DragonBossRoomContext.IsInterior(tx, tz)) continue;
-
-            Vector3 tilePos = DragonBossRoomContext.CellToWorld(tx, tz, 0.1f);
-            var (go, _, mat) = QuadTilePool.Rent();
-            go.name = "MeteorWarn";
-            go.transform.position   = tilePos;
-            go.transform.rotation   = Quaternion.Euler(90f, 0f, 0f);
-            go.transform.localScale = Vector3.one;
-            mat.color = new Color(meteorFireBase.r, meteorFireBase.g, meteorFireBase.b, 0f);
-            entry.WarnTiles.Add(go);
-            entry.WarnMats.Add(mat);
-        }
 
         _meteors.Add(entry);
     }
@@ -1324,14 +1305,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             if (!e.Falling)
             {
                 e.WarnTimer += Time.deltaTime;
-                float t = Mathf.Clamp01(e.WarnTimer / Data.MeteorPattern.WarningDuration);
-                foreach (var mat in e.WarnMats)
-                {
-                    if (mat == null) continue;
-                    Color c = mat.color;
-                    c.a = DragonThreat.WarnAlpha(Data.MeteorPattern.WarningColor.a, t);   // 처음부터 보이게 · 탑다운에선 진하게(10-26)
-                    mat.color = c;
-                }
+                DragonThreat.WarnProgress(e.WarnCircle, Mathf.Clamp01(e.WarnTimer / Data.MeteorPattern.WarningDuration));
 
                 if (e.WarnTimer >= Data.MeteorPattern.WarningDuration)
                 {
@@ -1351,7 +1325,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
                 if (!e.ImpactApplied && e.FallTimer >= Data.MeteorPattern.ImpactDelay)
                 {
                     e.ImpactApplied = true;
-                    DestroyMeteorWarnTiles(ref e);
+                    DragonThreat.ImpactCircle(ref e.WarnCircle);   // 판정 색으로 번쩍 → 0.2초 뒤 걷힌다
                     ApplyMeteorImpact(ctx, ref e);
                     if (e.Projectile != null)
                         foreach (var ps in e.Projectile.GetComponentsInChildren<ParticleSystem>(true))
@@ -1381,24 +1355,9 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
         if (ctx?.Runtime?.PlayerTarget != null)
         {
-            Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
-            float halfExtent = (e.HalfR + 0.5f) * DragonBossRoomContext.CellSize;
-            Vector3 d = playerPos - e.LandPos;
-            if (Mathf.Abs(d.x) <= halfExtent && Mathf.Abs(d.z) <= halfExtent)
+            if (DragonThreat.InCircle(e.LandPos, ctx.Runtime.PlayerTarget.position, e.HalfR))
                 ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()?.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.MeteorPattern.DamageMultiplier), ctx.Monster.gameObject);   // 공격자 = 화룡(10-08 점검)
         }
-    }
-
-    private static void DestroyMeteorWarnTiles(ref MeteorEntry e)
-    {
-        for (int i = 0; i < e.WarnTiles.Count; i++)
-        {
-            var go = e.WarnTiles[i];
-            if (go == null) continue;
-            QuadTilePool.Return(go, go.GetComponent<MeshRenderer>(), e.WarnMats[i]);
-        }
-        e.WarnTiles.Clear();
-        e.WarnMats.Clear();
     }
 
     private void CleanupAllMeteors()
@@ -1406,7 +1365,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         for (int i = 0; i < _meteors.Count; i++)
         {
             var e = _meteors[i];
-            DestroyMeteorWarnTiles(ref e);
+            DragonThreat.DropCircle(ref e.WarnCircle);
             if (e.Projectile != null) BossEffectPool.Release(e.Projectile);
         }
         _meteors.Clear();

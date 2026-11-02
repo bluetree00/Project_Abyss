@@ -63,14 +63,14 @@ public sealed class AltarConfirmCard : MonoBehaviour
     public void Show(in AltarDetailModel m, int essence)
     {
         _header.text = string.IsNullOrEmpty(m.LevelLine) ? m.Header ?? "" : $"{m.Header} · {m.LevelLine}";
-        _eyebrow.text = string.IsNullOrEmpty(m.LevelLine) ? "해금하기 — 정수를 써서 영구히 연다" : $"강화하기 — {m.LevelLine}";
+        _eyebrow.text = string.IsNullOrEmpty(m.LevelLine) ? "해금하기 — 정수를 써서 영구히 연다" : Loc.F("강화하기 — {0}", m.LevelLine);
         _name.text   = m.Name ?? "";
         _effect.text = UIKeywordInk.Values(m.Effect ?? "");   // 수치만 Noto 500(10-15 설명 글 강조)
         int after    = Mathf.Max(0, essence - m.Cost);
-        _cost.text   = $"정수 <color=#FFCC4D>◆ {m.Cost:N0}</color> 사용     →     남는 정수 ◆ {after:N0}";
+        _cost.text   = Loc.F("정수 <color=#FFCC4D>◆ {0:N0}</color> 사용     →     남는 정수 ◆ {1:N0}", m.Cost, after);
         _condition.text = m.Condition ?? "";
         _next.text   = string.IsNullOrEmpty(m.NextNames) ? "" : "이어서 열 수 있는 것 · " + m.NextNames;
-        _confirmLabel.text = string.IsNullOrEmpty(m.LevelLine) ? $"해금한다   ◆ {m.Cost:N0}" : $"강화한다   ◆ {m.Cost:N0}";
+        _confirmLabel.text = string.IsNullOrEmpty(m.LevelLine) ? Loc.F("해금한다   ◆ {0:N0}", m.Cost) : Loc.F("강화한다   ◆ {0:N0}", m.Cost);
 
         var icon = UISkin.Achievement != null ? UISkin.Achievement.NodeIcon(m.NodeId) : null;
         _icon.sprite  = icon;

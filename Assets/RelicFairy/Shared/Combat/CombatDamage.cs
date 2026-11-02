@@ -247,7 +247,7 @@ public static class CombatDamage
         MonsterBase tgtMb = isPlayerAtk ? target.GetComponentInParent<MonsterBase>() : null;
         if (tgtMb != null && tgtMb.IsTelegraphingAttack)
         {
-            if (mods.justGuardBonus > 0f) baseFinal *= 1f + mods.justGuardBonus;
+            if (mods.justGuardBonus > 0f) { baseFinal *= 1f + mods.justGuardBonus; pkt.NoteBonus(BonusSource.Item, mods.justGuardBonus); }   // 11-02 Q29 숫자는 추가 피해로
             if (mods.attackInterrupt)     tgtMb.CancelTelegraphedAttack();
         }
 
@@ -267,6 +267,9 @@ public static class CombatDamage
         //      유물 Q(행동 Q) · 룬 시너지 · 서약 · 지속 피해는 이 길을 안 타거나 행동이 달라 그대로. 중간 보스(정예)는 빼다(47 제안 · 일반 방 흐름의 짧은 싸움)
         if (isPlayerAtk && tgtMb != null && finalDmg > 0f && IsBossRangedHalf(tgtMb, weaponData, actionType))
             finalDmg *= BossRangedMult;
+
+        // 11-02 Q29 이 타의 보너스 몫(룬 · 증강 · 전설 · 예약)은 받는 쪽이 「추가 피해」 숫자로 따로 띄운다 — 피해 · 적중 효과는 그대로 한 번(⑦ 뒤 해제)
+        DamageBonusSplit.Begin(in pkt, tgtMb != null ? tgtMb.GetInstanceID() : damageable is Component dmgComp ? dmgComp.GetInstanceID() : 0);
 
         // ⑥ 아이템 광기의 파동: 무장된 일반(근접) 공격 1타를 실제 방어무시로 적용.
         bool penetrated = false;
@@ -299,6 +302,7 @@ public static class CombatDamage
             try { damageable.TakeDamage(finalDmg, owner, req.NoFlinch || relayed ? 0f : req.KnockbackMultiplier, isCrit); }
             finally { MonsterPoise.PendingHitWeight = MonsterPoise.RestingWeight; MonsterPoise.PendingNoFlinch = false; }
         }
+        DamageBonusSplit.End();
 
         // ⑧ 타격감 (HitFeedbackService 허브 경유 → 구독자 전파)
         Vector3 hitPoint = req.HitPoint.sqrMagnitude > 0.0001f ? req.HitPoint : target.transform.position;
@@ -329,7 +333,9 @@ public static class CombatDamage
             isCritical:      isCrit,
             actionType:      actionType,
             weaponType:      weaponData != null ? weaponData.weaponType : WeaponType.None,
-            isFinisher:      req.IsFinisher);
+            isFinisher:      req.IsFinisher,
+            isHeavy:         isHeavy,          // 10-31 연출 쪽 타격 정보에도 강타 — 예전엔 빠져 늘 false(판정 쪽 DamageReport엔 있었다)
+            isRanged:        req.IsRanged);
 
         if (req.NoHitFeel) HitFeedbackService.RaiseHitQuiet(hitInfo);
         else               HitFeedbackService.RaiseHit(hitInfo);

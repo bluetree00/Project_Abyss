@@ -13,7 +13,6 @@ using UnityEngine.UI;
 /// <summary>
 /// 10-19 빌드 피드백 UI 반입 실측(테스트 허브 · 플레이 중) — 바탕화면 구현설계/세션별_남은작업_20261019/00_모음.md.
 /// <list type="number">
-/// <item>⑥ 파츠 공방 — 힉스필드 새 틀(카드 · 창 · 잠긴 칸)이 깔렸나 · 고른 표시.</item>
 /// <item>② 거점에서 ESC 「로비로」 → 로비에 HUD가 남지 않나.</item>
 /// <item>① 로비 세이브 카드 — 거점 세이브면 「포션 0/3」 대신 최고 챕터 · 완주 · 정수.</item>
 /// </list>
@@ -26,7 +25,7 @@ public static class Fb1019UiProbeEditor
     private const string ShotDir = "Temp/ui_shots";
     private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
-    [MenuItem("RelicFairy/Debug/10-19 UI 반입 촬영 — 파츠 공방 · 로비 HUD · 세이브 카드 (테스트 허브, 플레이 중)")]
+    [MenuItem("RelicFairy/Debug/10-19 UI 반입 촬영 — 로비 HUD · 세이브 카드 (테스트 허브, 플레이 중)")]
     private static void Run()
     {
         if (!EditorApplication.isPlaying) { Debug.LogWarning($"{Tag} 플레이 중(테스트 허브)에만 동작한다."); return; }
@@ -41,38 +40,6 @@ public static class Fb1019UiProbeEditor
         {
             await Wait(2f);
             Invoke("HideTestHubGui");
-
-            // ── ⑥ 파츠 공방
-            var all = Managers.WeaponParts?.All;
-            if (all == null || all.Count == 0) sb.AppendLine("⑥ 파츠 데이터 없음");
-            else
-            {
-                var cards = new List<UI_StartPartPopup.Card>(all.Count);
-                foreach (var def in all)
-                    cards.Add(new UI_StartPartPopup.Card { Part = def, Unlocked = StartPartStation.IsUnlocked(def.part_id), UnlockHint = "기억의 제단에서 해금" });
-                var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_StartPartPopup>();
-                popup.Setup(cards, all[0].part_id);
-                await Wait(0.9f);
-                int framed = 0, lockedFramed = 0;
-                foreach (var img in popup.GetComponentsInChildren<Image>(true))
-                {
-                    if (img.sprite == null || img.sprite.name != "Frame_PartsWorkshopCard") continue;
-                    if (img.transform.parent != null && img.transform.parent.name.StartsWith("Locked_")) lockedFramed++; else framed++;
-                }
-                bool panel = false;
-                foreach (var img in popup.GetComponentsInChildren<Image>(true))
-                    if (img.sprite != null && img.sprite.name == "Frame_PartsWorkshopPanel") { panel = true; break; }
-                int unlocked = 0; foreach (var c in cards) if (c.Unlocked) unlocked++;
-                Check(sb, $"⑥ 공방 카드 틀 {framed}/{unlocked} · 잠긴 칸 틀 {lockedFramed}/{cards.Count - unlocked} · 창 틀 {panel}",
-                      framed == unlocked && lockedFramed == cards.Count - unlocked && panel);
-                await ShotAsync("FB19_1_workshop");
-                typeof(UI_StartPartPopup).GetMethod("SetSelected", Any)?.Invoke(popup, new object[] { 0, true });
-                await Wait(0.6f);
-                await ShotAsync("FB19_2_workshop_selected");
-                Managers.UI.CloseAllPopupUI();
-                Time.timeScale = 1f;
-                await Wait(0.5f);
-            }
 
             // ── ⑦ 원거리 무기 고르기 창 부제(96 다시 고르기와 짝)
             var bow = AssetDatabase.LoadAssetAtPath<WeaponSO>("Assets/RelicFairy/Weapon/Bow/Data/T1_Bow.asset");

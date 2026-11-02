@@ -50,7 +50,7 @@ public class WeaponDisplay : MonoBehaviour
     {
         _so = so;
         if (nameText != null)
-            nameText.text = so.displayName;
+            nameText.text = Loc.T(so.displayName);
 
         // 가격/설명 등도 있으면 세팅
         // priceText?.text = so.cost.ToString();

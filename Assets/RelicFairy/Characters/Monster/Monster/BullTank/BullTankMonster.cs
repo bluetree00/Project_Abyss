@@ -133,7 +133,8 @@ public partial class BullTankMonster : MonsterBase
 
     public override bool   IsEliteBoss => true;
     // 챕터 이름(10-16 사용자 「제대로 된 이름 · 챕터별 개성」) — 봉인기 「가시뿔 황소」 · 해방기부터 「사슬 끊은 가시뿔 황소」(머리 위는 영문 — 09-27)
-    public override string BossName    => StoryProgress.IsLiberated ? "사슬 끊은 " + ThemeNameKo(_theme) : ThemeNameKo(_theme);
+    public override string BossName    => Loc.Current == Loc.Language.English ? DisplayName   // 영어면 머리 위 이름과 같게(11-02 Q11 L4)
+                                        : StoryProgress.IsLiberated ? "사슬 끊은 " + ThemeNameKo(_theme) : ThemeNameKo(_theme);
     public override string DisplayName => StoryProgress.IsLiberated ? "Unchained " + ThemeNameEn(_theme) : ThemeNameEn(_theme);
     protected override string StaggerStateName => AnimChargeEnd;   // 휘청 = 벽에 박힌 비틀거림(Hit 0.5초로는 1.5초를 못 채운다 · 10-14 정예 애니 점검)
 

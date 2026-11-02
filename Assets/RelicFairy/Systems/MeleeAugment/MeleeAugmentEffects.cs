@@ -187,7 +187,12 @@ public sealed class MarkerAugment : MeleeAugmentEffect
 /// </summary>
 public sealed class HeavySwingAugment : MeleeAugmentEffect
 {
-    private int _seen = -1, _count;
+    // 10-31 강타는 그 자체로 피해 · 연출이 없는 꼬리표라(몬스터 경직만 0.7 → 1.5) 이 증강만 가진 무형검 · 카타나는 체감이 0이었다 — 강타 휘두름 몫을 이 증강이 준다
+    private const float HeavyBonus = 0.5f;                      // 그 휘두름 피해 +50%
+    private const float StopScale = 0.08f, StopSeconds = 0.06f; // 손맛 멈춤 — 치명(0.02 · 최대 0.11초)보다 옅고 짧게
+    private static readonly Color HeavyColor = new(1f, 0.78f, 0.45f);
+
+    private int _seen = -1, _count, _feltSwing = -1;
     private float _lastAt = -999f;
     private bool _heavyNow;
     public HeavySwingAugment(MeleeAugmentDef d, int r) : base(d, r) { }
@@ -205,7 +210,18 @@ public sealed class HeavySwingAugment : MeleeAugmentEffect
             _heavyNow = _count % Mathf.Max(1, Mathf.RoundToInt(V)) == 0;
             if (_heavyNow) Log($"묵직한 손 — 휘두름 {_seen} 강타");
         }
-        if (_heavyNow) ProcCoefficient.ArmHeavyNext();
+        if (!_heavyNow) return;
+        ProcCoefficient.ArmHeavyNext();
+        pkt.AddBonus(BonusSource.Augment, HeavyBonus);
+    }
+
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
+    {
+        if (!_heavyNow || !report.IsHeavy || report.DamageDealt <= 0f || report.Target == null || _feltSwing == _seen) return;
+        _feltSwing = _seen;   // 휘두름당 한 번(여러 적을 베도)
+        HitFeelService.HitStop(StopScale, StopSeconds);
+        RunFx.Play(RunFxSlot.Ring, report.HitPosition, 0.3f, HeavyColor);
+        Log($"묵직한 손 — 휘두름 {_seen} 강타 적중");
     }
 }
 
@@ -643,7 +659,7 @@ public abstract class LegendAugment : MeleeAugmentEffect
     {
         MeleeAugments.RaiseLegendProcced(Def.Id);
         if (p == null || !s_shown.Add(Def.Id)) return;
-        RelicFloatText.Show(p.transform.position + Vector3.up * 0.6f, Def.Name, NameColor);
+        RelicFloatText.Show(p.transform.position + Vector3.up * 0.6f, Loc.T(Def.Name), NameColor);   // 화면 언어(11-02 Q11)
     }
 }
 
@@ -877,7 +893,8 @@ public sealed class RiftLegend : LegendAugment
 /// 그림자 파트너(카타나 · 10-26 무기 개편) — 곁의 그림자(<see cref="ShadowPartner"/> · 동작을 따라 하는 분신)가 평타 · 스킬(E · R)을 조금 늦게 따라 벤다: 분신마다 그 타격의 값%(재련할수록 +2%p).
 /// 재련 2 · 4회째에 분신이 하나씩 는다(<see cref="CloneCount"/> 1 → 3 · 10-26 사용자 「추가 재련 시 분신을 추가」).
 /// 그림자는 애니메이터를 그대로 따라 하므로 스킬 동작도 같이 하고, 스킬 타격은 약한 계수(<see cref="SkillShare"/> = 평타 몫의 절반)로 따라 벤다(10-26 사용자 「분신도 따라 스킬을 쓰되 약한 계수」).
-/// 추가 피해라 적중 효과(룬 · 유물 발동)는 붙지 않는다(D5). 평타는 맞힌 분신 자리에 옅은 어두운 베기가 난다(<see cref="ShadowPartner.EchoSlash"/>).
+/// 추가 피해라 적중 효과(룬 · 유물 발동)는 붙지 않는다(D5).
+/// 평타는 분신이 자기 자리에서 플레이어와 같은 베기 · 같은 판정으로 벤다(10-30 · <see cref="ShadowPartner"/> 분신 베기) — 여기는 그 바탕(플레이어가 막 때린 피해)과 %만 넣는다.
 /// </summary>
 public sealed class ShadowPartnerAugment : MeleeAugmentEffect
 {
@@ -902,8 +919,11 @@ public sealed class ShadowPartnerAugment : MeleeAugmentEffect
     {
         if (ctx?.Player == null) return;
         if (_sp == null) _sp = ShadowPartner.Ensure(ctx.Player);
-        _sp.Wanted = IsActive(ctx);
-        _sp.Count  = CloneCount(Weapon);
+        bool active = IsActive(ctx);
+        _sp.Wanted = active;
+        if (!active) return;
+        _sp.Count   = CloneCount(Weapon);
+        _sp.Percent = Def.ValueFor(Weapon);
     }
 
     /// <summary>분신 수 — 진화 뒤 재련 0 ~ 1회 1 · 2 ~ 3회 2 · 4회 3.</summary>
@@ -915,7 +935,12 @@ public sealed class ShadowPartnerAugment : MeleeAugmentEffect
         var p = ctx.Player;
         var target = report.Target;
         bool skill = report.ActionType == WeaponActionType.ESkill || report.ActionType == WeaponActionType.RSkill;
-        float dmg = report.DamageDealt * Def.ValueFor(Weapon) * 0.01f * (skill ? SkillShare : 1f);
+        if (!skill)
+        {
+            _sp?.NoteHit(Monster(target), report.DamageDealt);   // 평타 — 분신 베기가 이 적을 벨 때의 바탕(10-30)
+            return;
+        }
+        float dmg = report.DamageDealt * Def.ValueFor(Weapon) * 0.01f * SkillShare;
         int clones = CloneCount(Weapon);
         for (int i = 0; i < clones; i++)
         {
@@ -924,8 +949,7 @@ public sealed class ShadowPartnerAugment : MeleeAugmentEffect
             {
                 if (target == null || !target.activeInHierarchy) return;
                 CombatQuery.DealSynergyDamage(target, dmg, p.gameObject);
-                if (!skill && _sp != null) _sp.EchoSlash(slot);   // 맞힌 분신 자리에 옅은 어두운 베기(10-26 · 스킬은 적중이 많아 그림 없음)
-                Log($"그림자 — {dmg:0.0}{(skill ? " · 스킬" : "")} · 분신 {slot + 1}");
+                Log($"그림자 — {dmg:0.0} · 스킬 · 분신 {slot + 1}");
             });
         }
     }
@@ -935,15 +959,19 @@ public sealed class ShadowPartnerAugment : MeleeAugmentEffect
 /// 검풍(카타나 · 10-26 무기 개편) — 적을 맞힌 평타 휘두름 · 스킬(E · R) 한 번마다 값% 확률로 앞 6 m 관통 검기(공격력 둘째 값%) · 재련할수록 확률 +4%p · 피해 +5%p.
 /// 스킬은 여러 타가 나와도 한 번 시전에 한 번만 굴린다(E · R을 쓸 때 걸어 두고 그 시전의 첫 적중에 쓴다 · 10-26 사용자 「카타나도 증강 내용이 스킬에 적용」).
 /// 검기 분신(10-26 사용자 「분신 2종 — 검기를 날리는 분신 · 행동을 따라 하는 분신 · 엄청난 속도에 분신처럼 보인다는 컨셉」) — 발동하면 옆(좌우 번갈아)에
-/// 잔상 분신(<see cref="PlayerGhostStrike.ForWave"/> · 카타나 붉은 잔상 — 그림자 파트너의 어두운 실루엣과 다른 모습)이 나타나 앞으로 휘두르고, 그 칼이 닿는 순간 검기가 나간다.
+/// 잔상 분신(<see cref="PlayerGhostStrike.Play"/> · 카타나 붉은 잔상 — 그림자 파트너의 어두운 실루엣과 다른 모습)이 나타나 앞으로 휘두르고, 그 칼끝에서 칼이 닿는 순간 검기가 나간다.
+/// 10-30 사용자 「(칼바람 스택과) 별개로 분신이 따로 날리는 검풍」 — 붉은 분신은 플레이어에서 <see cref="SideOffset"/> m 옆에 선다(예전 0.9 m · 뒤로 0.9 m라 몸과 겹쳐 플레이어 검기로 보였다).
+/// 그림자 파트너 분신이 곁에 있으면 그 분신이 자기 칼이 닿는 순간 자기 자리에서 날린다(<see cref="ShadowPartner.TryCloneOrigin"/> · 굴림은 휘두름당 한 번 그대로).
 /// 풍절이 나가는 휘두름에는 내지 않는다.
 /// </summary>
 public sealed class SwordGustAugment : MeleeAugmentEffect
 {
-    private const float Length = 6f, HalfWidth = 0.9f, SideOffset = 0.9f;
+    private const float Length = 6f, HalfWidth = 0.9f, SideOffset = 1.6f, GhostReach = 0.9f;   // 붉은 분신 옆 거리 · 분신 칼끝(검기가 나가는 자리)
 #if UNITY_EDITOR
     /// <summary>실측 99 D — 확률을 이 값(%)으로(−1 = 증강 값).</summary>
     public static float ProbeChance = -1f;
+    /// <summary>실측 99 O — 검풍이 나간 자리 · 그림자 분신이 날렸나.</summary>
+    public static System.Action<Vector3, bool> ProbeThrown;
 #endif
     private bool _skillArmed;   // E · R을 썼다 — 그 시전의 첫 적중에 한 번 굴린다(10-26 검토 I5 · 옛 1초 창은 E 직후 R을 못 굴렸다)
     private bool _left;
@@ -984,10 +1012,18 @@ public sealed class SwordGustAugment : MeleeAugmentEffect
         fw.y = 0f;
         fw = fw.sqrMagnitude > 0.0001f ? fw.normalized : p.transform.forward;
         _left = !_left;
-        Vector3 from = p.transform.position + Vector3.Cross(Vector3.up, fw) * (_left ? -SideOffset : SideOffset);
-        float lead = PlayerGhostStrike.ForWave(p, from, fw);   // 옆에 잔상 분신 — 휘두른 칼이 닿을 때 검기가 나간다
+        bool shadow = ShadowPartner.TryCloneOrigin(p, _left, fw, GhostReach, out var from, out float lead);   // 그림자 분신이 곁에 있으면 그 분신이 날린다
+        if (!shadow)
+        {
+            Vector3 stand = p.transform.position + Vector3.Cross(Vector3.up, fw) * (_left ? -SideOffset : SideOffset);
+            lead = PlayerGhostStrike.Play(p, stand, fw);   // 옆에 붉은 분신 — 휘두른 칼이 닿을 때 칼끝에서 검기가 나간다
+            from = stand + fw * GhostReach;
+        }
+#if UNITY_EDITOR
+        ProbeThrown?.Invoke(from, shadow);
+#endif
         FormStrike.LineTravel(p, from, fw, Length, HalfWidth, dmg, WaveVfx, lead, null,
-                              n => Log($"검풍 — 피해 {dmg:0.0} · 공격력 {atk:0.0} · 맞힘 {n}"), StripBody, StripSeconds);
+                              n => Log($"검풍 — 피해 {dmg:0.0} · 공격력 {atk:0.0} · 맞힘 {n}{(shadow ? " · 그림자 분신" : "")}"), StripBody, StripSeconds);
     }
 }
 

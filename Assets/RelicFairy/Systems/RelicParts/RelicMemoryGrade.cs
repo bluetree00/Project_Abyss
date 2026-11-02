@@ -55,11 +55,11 @@ public static class RelicMemoryOdds
     }
 
     /// <summary>등급 이름(카드 · 보유 보기).</summary>
-    public static string Label(RelicMemoryGrade g) => g switch
+    public static string Label(RelicMemoryGrade g) => Loc.T(g switch   // 화면 언어(11-02 Q11)
     {
         RelicMemoryGrade.Faint   => "흐릿",
         RelicMemoryGrade.Clear   => "선명",
         RelicMemoryGrade.Radiant => "찬란",
         _                        => string.Empty,
-    };
+    });
 }

@@ -556,7 +556,7 @@ public sealed class StagingAreaView : MonoBehaviour
         if (string.IsNullOrEmpty(slot.effectType)) return "";
         var meta = EffectMetaRegistry.Get(slot.effectType);
         string val = EffectDescriptionFormatter.FormatValue(meta.Unit, slot.value);
-        return $"{meta.Label} {val}";
+        return $"{Loc.T(meta.Label)} {val}";
     }
 
     private void BuildCardContent(GameObject slotGO, RuntimeItemData item, bool isNew)
@@ -608,7 +608,7 @@ public sealed class StagingAreaView : MonoBehaviour
         nameRT.offsetMax        = new Vector2(-8f, 0f);
         var nameTxt = nameTxtGO.AddComponent<TextMeshProUGUI>();
         if (cardFont != null) nameTxt.font = cardFont;
-        nameTxt.text              = item.displayName ?? item.itemId;
+        nameTxt.text              = Loc.T(item.displayName) ?? item.itemId;
         nameTxt.fontSize          = 18f;   // 룬 선택 규격 — 카드 이름은 효과(16)보다 한 단 크게
         nameTxt.fontStyle         = FontStyles.Bold;
         nameTxt.color             = _highlightedItem == item ? SelectedNameInk : NameInk;   // 잉크 판 위 양피지 흰색 · 고르면 금빛
@@ -1220,8 +1220,8 @@ public sealed class StagingAreaView : MonoBehaviour
             // 「폐기 → 원석 → 정제소」 순환을 플레이어가 인지하지 못한다.
             int ore = RuneSalvage.OreValueOf(item);
             _discardDialogText.text =
-                $"\"{item.displayName ?? item.itemId}\"\n분해합니까?\n\n" +
-                $"<color={UIPalette.RuneOreHex}>원석 +{ore}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>";
+                Loc.F("\"{0}\"\n분해합니까?\n\n", Loc.T(item.displayName) ?? item.itemId) +
+                Loc.F("<color={0}>원석 +{1}</color>  <size=80%>정제소에서 다시 뽑을 수 있다</size>", UIPalette.RuneOreHex, ore);
         }
         if (_discardDialog != null)
         {

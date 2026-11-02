@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -47,6 +48,10 @@ public static class PatternGuideHelper
     public static readonly Color Reversed  = new Color(0.60f, 0.15f, 0.95f); // 보라 — 역류한 봉인
     /// <summary>예고의 자리 · 방향이 굳은 뒤 판정까지 최소(공용 예고 규칙 — 일반 몬스터 MonsterTelegraph.MinLead와 같다 · 10-13).</summary>
     public const float MinLead = 0.45f;
+    /// <summary>예고 · 가이드 렌더러 정렬 순서 — 플레이어 이펙트(대부분 0~5) 위 · 월드 이름표(<see cref="UISortingOrder.WorldLabel"/>) 아래.
+    /// 투명끼리는 정렬 순서가 렌더 큐보다 먼저라 큐(둘 다 3000)만으론 못 올린다 — 같으면 카메라에서 먼 바닥 예고가 먼저 그려져 위 이펙트에 덮였다
+    /// (10-30 사용자 「플레이어의 이펙트가 보스의 패턴과 가이드라인을 가린다」). 겹친 예고 위 그리기는 이 값 + n(<see cref="DragonAbyssFx.DrawOnTop"/> — 이름표 아래까지).</summary>
+    public const int GuideSortingOrder = UISortingOrder.WorldLabel - 3;
     private static readonly int TailFadeId = Shader.PropertyToID("_TailFade");
 
     private static readonly int SectorId = Shader.PropertyToID("_Sector");
@@ -71,10 +76,34 @@ public static class PatternGuideHelper
     private static Material              _unlitShared; // 프리미티브 폴백 공유 머티리얼
     private static MaterialPropertyBlock _mpb;         // 재사용 — 매 스폰 alloc 회피
 
+    // ── 지금 보이는 예고(10-30 47 — 보스 예고가 떠 있는 동안 플레이어 이펙트를 옅게) ──
+    private static readonly List<Renderer> s_liveGuides = new();   // 만든 가이드 렌더러 — 사라진 것은 읽을 때 걷는다
+    private static int  s_telegraphFrame = -1;
+    private static bool s_anyTelegraph;
+
     // ── 아레나 대비(10-23) — 붉은 바닥(화룡)에서 가산 예고가 바닥에 묻혔다 ──
     private static float s_arenaBoost    = 1f;   // 밝기(_Intensity) 배율
     private static float s_arenaEdgeLift;        // 공격 예고 테두리(_Color)를 흰빛 쪽으로(0 = 그대로)
     private static readonly Color ArenaEdgeTarget = new Color(1.00f, 0.92f, 0.80f);
+
+    /// <summary>지금 화면에 켜진 보스 예고 · 가이드가 있는가 — 가이드 데칼 · 도형 + 바닥 예고 칸(그을음 제외).
+    /// 플레이어 이펙트를 그동안만 옅게 하는 쪽(47)이 읽는다(10-30 「플레이어 이펙트가 보스 패턴 · 가이드라인을 가린다」). 매 프레임 읽어도 한 번만 센다.</summary>
+    public static bool AnyBossTelegraph
+    {
+        get
+        {
+            if (s_telegraphFrame == Time.frameCount) return s_anyTelegraph;
+            s_telegraphFrame = Time.frameCount;
+            s_anyTelegraph = QuadTilePool.AnyGuideTile();
+            for (int i = s_liveGuides.Count - 1; i >= 0; i--)
+            {
+                var r = s_liveGuides[i];
+                if (r == null) { s_liveGuides.RemoveAt(i); continue; }
+                if (!s_anyTelegraph && r.enabled && r.gameObject.activeInHierarchy) s_anyTelegraph = true;
+            }
+            return s_anyTelegraph;
+        }
+    }
 
     /// <summary>지금 주입된 원 · 화살표 재질(없으면 null) — 잠깐 바꿔 쓰는 쪽이 끝나고 돌려놓을 때 읽는다(이벤트방 놀이).</summary>
     public static Material CircleMaterial => _circleSource;
@@ -321,6 +350,8 @@ public static class PatternGuideHelper
         var mr = go.AddComponent<MeshRenderer>();
         mr.shadowCastingMode = ShadowCastingMode.Off;
         mr.receiveShadows    = false;
+        mr.sortingOrder      = GuideSortingOrder;
+        s_liveGuides.Add(mr);
         mr.sharedMaterial    = source; // 공유 — 인스턴스 미생성
         ApplyGuideColor(mr, color, setSector, sector);
         if (s_arenaBoost > 1f) SetIntensity(go, 1f);   // 아레나 대비(10-23)
@@ -338,7 +369,11 @@ public static class PatternGuideHelper
 
         // 공유 Unlit/Color 머티리얼 — 조명 무관하게 항상 보임. 색은 MPB로 per-renderer.
         var mr = go.GetComponent<MeshRenderer>();
-        mr.sharedMaterial = UnlitShared;
+        var mat = UnlitShared;
+        mr.sharedMaterial = mat;
+        if (mat == null) mr.enabled = false;   // 10-30 셰이더가 하나도 없으면 그리지만 않는다(판정 · 흐름은 그대로 — 예외로 이벤트 · 보스 패턴이 끊기지 않게)
+        mr.sortingOrder   = GuideSortingOrder;
+        s_liveGuides.Add(mr);
         ApplyGuideColor(mr, color, setSector: false, sector: 0f);
 
         return go;
@@ -380,6 +415,14 @@ public static class PatternGuideHelper
         mr.SetPropertyBlock(_mpb);
     }
 
+#if UNITY_EDITOR
+    /// <summary>실측 전용(10-30) — 빌드처럼 「Unlit/Color」를 못 찾은 셈 치고 대체 사슬을 탄다(EventRoomSweep1030ProbeEditor).</summary>
+    public static bool DebugNoUnlitColor;
+    private static Shader FindUnlitColor() => DebugNoUnlitColor ? null : Shader.Find("Unlit/Color");
+#else
+    private static Shader FindUnlitColor() => Shader.Find("Unlit/Color");
+#endif
+
     /// <summary>프리미티브 폴백용 공유 Unlit/Color 머티리얼 — Shader.Find/new Material 1회만.</summary>
     private static Material UnlitShared
     {
@@ -387,7 +430,12 @@ public static class PatternGuideHelper
         {
             if (_unlitShared == null)
             {
-                if (_unlitShader == null) _unlitShader = Shader.Find("Unlit/Color");
+                // 10-30 빌드에서 「Unlit/Color」가 빠져 Shader.Find가 null → new Material(null) 예외 — 탄막의 회랑이 탄 0발로 0.3초 만에 끝나고
+                // 보물 창고가 매 프레임 다시 세워졌다(빌드 Player.log 3,670번 · 에디터는 늘 찾아져 실측이 못 잡았다).
+                // 빌드 포함 목록에 넣었고(UnlitColorAlwaysInclude1030Editor), 그래도 없으면 늘 들어가는 Sprites/Default → URP Unlit.
+                if (_unlitShader == null)
+                    _unlitShader = FindUnlitColor() ?? Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Unlit");
+                if (_unlitShader == null) return null;
                 _unlitShared = new Material(_unlitShader);
             }
             return _unlitShared;

@@ -86,6 +86,7 @@ public sealed class LichSealRitual
     {
         try
         {
+            ExileFallSequence.PreloadAsync().Forget();   // 추방 첫 순간 에셋 읽기 끊김을 의식 동안으로(11-02 Q27)
             ResolveArena();
             await RunRitualAsync(ct);
 
@@ -211,13 +212,13 @@ public sealed class LichSealRitual
         LichPatternUtil.Impact(LichImpact.Heavy);
         // 최신 값만 — 빨리 치면 앞 값이 줄 서서 붕괴 컷신 위까지 늦게 나왔다(10-01 f5 전주기 시뮬). 다 켜지면 낡은 값은 걷는다.
         if (_ignited < StoneCount)
-            UI_BossBark.ShowLatest($"봉인석 점화 ({_ignited} / {StoneCount})", BossBarkType.PatternAnnounce);
+            UI_BossBark.ShowLatest(Loc.F("봉인석 점화 ({0} / {1})", _ignited, StoneCount), BossBarkType.PatternAnnounce);
         else
             UI_BossBark.Dismiss(0f);
         Debug.Log($"[LichSeal] 봉인석 점화 {_ignited}/{StoneCount}", _lich);
     }
 
-    private void RefreshHud() => _hud?.SetStatus($"봉인석 {_ignited} / {StoneCount}");
+    private void RefreshHud() => _hud?.SetStatus(Loc.F("봉인석 {0} / {1}", _ignited, StoneCount));
 
     /// <summary>봉인 완성 — 금 = 플레이어의 봉인(색 규약). 설계서 §3-5 「정지 1초」.</summary>
     private void PlaySealComplete()

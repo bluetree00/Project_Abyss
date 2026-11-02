@@ -216,7 +216,7 @@ public sealed class FireLegendProjectileEffect : ItemCombatEffectBase
             _emberTarget = pkt.Target;
             EndEmber();
         }
-        pkt.FinalDamage *= LegendaryTuning.Pick(NewRow, _value2, 1.3f);
+        pkt.AddBonus(BonusSource.Legendary, LegendaryTuning.Pick(NewRow, _value2, 1.3f) - 1f);
     }
 
     public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)

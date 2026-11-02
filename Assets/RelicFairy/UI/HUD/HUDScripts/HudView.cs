@@ -29,6 +29,11 @@ public sealed class HudView : MonoBehaviour
     private const string TipEnhanceBody  = "재련소에서 무기를 강화·진화한다.\n런이 끝나면 사라진다.";
     private const string TipEssenceTitle = "심연의 정수";
     private const string TipEssenceBody  = "런을 넘어 남는 유일한 재화. 기억의 제단에서 해금에 쓴다.";
+    // 11-02 Q13 Tab 안내 칸
+    private const string TipRuneTabTitle = "룬판";
+    private const string TipRuneTabBody  = "Tab 키로 연다. 보관함의 룬을 판에 놓아 속성 칸을 채우면 시너지가 켜진다.";
+    private const float  RuneTabPillWidth = 176f;
+    private static readonly Color RuneTabFrameTint = new(0.80f, 0.74f, 0.58f);
     private const string TipRuneOreTitle = "원석";
     private const string TipRuneOreBody  = "정제소에서 무작위 룬을 뽑는다.\n런이 끝나면 사라진다.";
 
@@ -83,6 +88,10 @@ public sealed class HudView : MonoBehaviour
     // 재화 라인 — 골드/강화재료/원석이 같은 줄에 같은 배경으로. 0이면 연료 pill 숨김.
     private RectTransform _currencyRow;
     private CurrencyGainFeedView _gainFeed;   // 재화 획득 목록 — 재화 칸 바로 아래(10-22)
+    private GameObject _runeTabSlot;          // 11-02 Q13 「Tab 룬판 · 보관함 N」 — 재화 줄 맨 왼쪽
+    private TMP_Text   _runeTabText;
+    private int        _runeTabShown = -2;    // 지금 보이는 보관함 수(-1 = 숨김) — 바뀔 때만 글을 쓴다
+    private Loc.Language _runeTabLang;        // 그 글의 언어(11-02 Q11 — 언어가 바뀌어도 다시 쓴다)
     private GameObject    _goldSlot;
     private GameObject    _enhanceMatSlot;
     private GameObject    _runeOreSlot;
@@ -140,6 +149,7 @@ public sealed class HudView : MonoBehaviour
     {
         if (!_currencyFontsApplied) TryStyleCurrencyFonts();
         LayoutLeftColumn();
+        RefreshRuneTabHint();
     }
 
     /// <summary>
@@ -202,6 +212,31 @@ public sealed class HudView : MonoBehaviour
         _enhanceMatSlot.SetActive(false);
         _runeOreSlot.SetActive(false);
         _essenceSlot.SetActive(false);
+
+        // 11-02 Q13 「Tab으로 룬판을 연다」 안내 — 재화 줄 맨 왼쪽 칸(오른쪽 정렬 줄이라 보이는 재화 수를 따라 자리가 붙는다)
+        _runeTabSlot = MakeCurrencyPill("Pill_RuneTab", currencyFrameSprite, null, RuneTabFrameTint, Loc.T(TipRuneTabTitle), Loc.T(TipRuneTabBody), out _runeTabText);
+        _runeTabSlot.transform.SetAsFirstSibling();
+        var tabLe = _runeTabSlot.GetComponent<LayoutElement>();
+        tabLe.preferredWidth = tabLe.minWidth = RuneTabPillWidth;
+        _runeTabText.alignment = TextAlignmentOptions.Center;
+        _runeTabSlot.SetActive(false);
+    }
+
+    /// <summary>11-02 Q13 Tab 안내 칸 — 런 중(보스전 제외)에만 · 보관함에 놓지 않은 룬이 있으면 금빛 수. 수가 바뀔 때만 글을 쓴다.</summary>
+    private void RefreshRuneTabHint()
+    {
+        if (_runeTabSlot == null) return;
+        var inv = GameRunBootstrapper.Instance?.Run?.ItemInventory;
+        bool boss = bossPanelView != null && bossPanelView.isActiveAndEnabled;
+        int n = inv == null || boss ? -1 : inv.StagingCount;
+        if (n == _runeTabShown && _runeTabLang == Loc.Current) return;
+        _runeTabShown = n;
+        _runeTabLang  = Loc.Current;
+        _runeTabSlot.SetActive(n >= 0);
+        if (n >= 0)
+            _runeTabText.text = n > 0
+                ? $"<color={UIPalette.GoldHex}>Tab</color>  {Loc.T("룬판")} · <color={UIPalette.GoldHex}>{Loc.F("보관함 {0}", n)}</color>"
+                : $"<color={UIPalette.GoldHex}>Tab</color>  {Loc.T("룬판")}";
     }
 
     /// <summary>재화 pill 1개: 공통 배경(골드바 내부) + 테두리(선택) + 아이콘(선택) + 수치.</summary>

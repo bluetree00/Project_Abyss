@@ -15,10 +15,13 @@ public sealed class TargetGradeBonusEffect : ItemEffectBase
     public TargetGradeBonusEffect(ItemEffectSlot s) : base(s) { }
     public override bool IsActive(ItemEffectContext ctx) => true;
 
+    /// <summary>10-31 정예 · 보스에게 곱할 배율 — 시너지 · 격발 · 전설 · 도트 경로가 읽는다(<see cref="ItemEffectManager.GradeDamageMultiplier"/>).</summary>
+    public float Multiplier => 1f + _value;
+
     public override void OnPreDealDamage(ItemEffectContext ctx, ref DamagePacket pkt)
     {
         var mb = pkt.Target != null ? pkt.Target.GetComponentInParent<MonsterBase>() : null;
-        if (mb != null && (mb.Grade == MonsterGrade.Elite || mb.Grade == MonsterGrade.Boss)) pkt.FinalDamage *= 1f + _value;
+        if (mb != null && (mb.Grade == MonsterGrade.Elite || mb.Grade == MonsterGrade.Boss)) pkt.AddBonus(BonusSource.Rune, _value);
     }
 }
 
@@ -33,7 +36,7 @@ public sealed class FarHitBonusEffect : ItemEffectBase
         if (ctx?.Player == null || pkt.Target == null) return;
         Vector3 d = pkt.Target.transform.position - ctx.Player.transform.position; d.y = 0f;
         float far = _value2 > 0f ? _value2 : 5f;
-        if (d.sqrMagnitude >= far * far) pkt.FinalDamage *= 1f + _value;
+        if (d.sqrMagnitude >= far * far) pkt.AddBonus(BonusSource.Rune, _value);
     }
 }
 
@@ -65,7 +68,7 @@ public sealed class MoveChargeNextHitEffect : ItemEffectBase
     {
         if (!_armed) return;
         _armed = false;
-        pkt.FinalDamage *= 1f + _value;
+        pkt.AddBonus(BonusSource.Rune, _value);
     }
 }
 
@@ -80,6 +83,8 @@ public sealed class CalmNextCritEffect : ItemEffectBase
     public CalmNextCritEffect(ItemEffectSlot s) : base(s) { }
     public override bool IsActive(ItemEffectContext ctx) => true;
 
+    // 10-31 룬을 놓거나 빼 효과가 새로 만들어지면(Rebuild) 예전엔 -999라 바로 장전됐다(아무 룬이나 놓기만 해도 +100%) — 새로 만들어질 때부터 센다
+    public override void OnActivate(ItemEffectContext ctx) => _lastHurt = Time.time;
     public override void OnRoomEnter(ItemEffectContext ctx) => _lastHurt = Time.time;
     public override void OnPostTakeDamage(ItemEffectContext ctx, DamageReport report) => _lastHurt = Time.time;
 
@@ -157,17 +162,18 @@ public sealed class HeavyBreakVulnerableEffect : ItemEffectBase
 /// <summary>견고한 파괴(필살 · 강타 룬) — 이 방 첫 강타의 피해 +value(100%).</summary>
 public sealed class FirstHeavyInRoomEffect : ItemEffectBase
 {
-    private bool _armed;
+    // 10-31 쓴 방 = 방 진입 순번 + 1(0 = 아직) — Rebuild를 넘어 남는 스택에 둔다. 예전엔 방에 들어설 때만 장전돼, 방 안에서 룬을 놓거나 빼면 그 방에선 꺼졌다
+    private const string UsedKey = "first_heavy_room";
 
     public FirstHeavyInRoomEffect(ItemEffectSlot s) : base(s) { }
     public override bool IsActive(ItemEffectContext ctx) => true;
 
-    public override void OnRoomEnter(ItemEffectContext ctx) => _armed = true;
-
     public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
-        if (!_armed || !report.IsHeavy || report.DamageDealt <= 0f || ctx?.Player == null || report.Target == null) return;
-        _armed = false;
+        var mgr = ctx?.Session?.EffectManager;
+        if (mgr == null || mgr.GetPersistentStack(UsedKey) == ctx.Session.RoomEnterSerial + 1) return;
+        if (!report.IsHeavy || report.DamageDealt <= 0f || ctx.Player == null || report.Target == null) return;
+        mgr.SetPersistentStack(UsedKey, ctx.Session.RoomEnterSerial + 1);
         CombatQuery.DealSynergyDamage(report.Target, report.DamageDealt * _value, ctx.Player.gameObject, 1f, report.IsCrit);
         ItemGuide.Toast(report.Target.transform.position, "첫 강타");
     }
@@ -188,7 +194,7 @@ public sealed class FrostOnHitEffect : ItemEffectBase
     public override void OnPreDealDamage(ItemEffectContext ctx, ref DamagePacket pkt)
     {
         var mb = pkt.Target != null ? pkt.Target.GetComponentInParent<MonsterBase>() : null;
-        if (mb != null && mb.Status.GetSlowStacks(FrostId) >= 2) pkt.FinalDamage *= 1f + _value;
+        if (mb != null && mb.Status.GetSlowStacks(FrostId) >= 2) pkt.AddBonus(BonusSource.Rune, _value);
     }
 
     public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
@@ -253,7 +259,7 @@ public sealed class RoomShieldBurstEffect : ItemEffectBase
     public override void OnRoomEnter(ItemEffectContext ctx)
     {
         if (ctx?.Stats == null) return;
-        ctx.Stats.AddShield(Mathf.Max(1f, ctx.Stats.MaxHp * _value));
+        ctx.Stats.AddRoomShield(Mathf.Max(1f, ctx.Stats.MaxHp * _value));   // 10-31 「방까지」 보호막 — 보통 보호막이라 방마다 상한까지 쌓였다
         _watch = true;
         _hadShield = true;
     }
@@ -378,6 +384,6 @@ public sealed class PierceChainBonusEffect : ItemEffectBase
         float now = Time.time;
         _chain = now - _lastAt <= ChainWindow && pkt.Target != _lastTarget ? Mathf.Min(_chain + 1, MaxChain) : 0;
         _lastAt = now; _lastTarget = pkt.Target;
-        if (_chain > 0) pkt.FinalDamage *= 1f + _value * _chain;
+        if (_chain > 0) pkt.AddBonus(BonusSource.Rune, _value * _chain);
     }
 }

@@ -141,7 +141,7 @@ public sealed class RuneBoardMini
         var total = Label(panel, "Total", UIWeight.Regular, TextSize, TextAlignmentOptions.MidlineRight, ShopUIStyle.TextDim);
         PlaceTL(total.rectTransform, width * 0.5f, TitleY, width * 0.5f - Pad, TitleH);
         // 판 전체 칸(132)이 아니라 룬 수 상한 — 판에 놓을 수 있는 룬은 RuneBlockBudget.Max개까지다(10-08 · 10-10 칸 → 개수).
-        total.text = $"룬 <color=#{ColorUtility.ToHtmlStringRGB(ShopUIStyle.TextPrimary)}>{RuneBlockBudget.Used}</color> / {RuneBlockBudget.Max}";
+        total.text = Loc.F("룬 <color=#{0}>{1}</color> / {2}", ColorUtility.ToHtmlStringRGB(ShopUIStyle.TextPrimary), RuneBlockBudget.Used, RuneBlockBudget.Max);
 
         // ── 속성 줄 — 채운 칸 / 존 칸 · 단계 ──
         float y = BoardY + rowCount * step + RowsGap;
@@ -164,7 +164,7 @@ public sealed class RuneBoardMini
 
             var name = Label(row, "Name", UIWeight.Medium, TextSize, TextAlignmentOptions.MidlineLeft, def.Color);
             PlaceTL(name.rectTransform, TileSize + 6f, 0f, NameW, RowH);
-            name.text = def.Name;
+            name.text = Loc.T(def.Name);
 
             var count = Label(row, "Count", UIWeight.Regular, TextSize, TextAlignmentOptions.MidlineRight,
                               zf > 0 ? ShopUIStyle.TextPrimary : ShopUIStyle.TextDim);

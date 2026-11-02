@@ -34,7 +34,9 @@ public static class RunFx
     /// <summary>목록을 읽는다(이미 읽었거나 읽는 중이면 바로 돌아온다).</summary>
     public static async UniTask LoadAsync()
     {
-        if (s_set != null || s_loading) return;
+        if (s_set != null) return;
+        // 10-30 읽는 중이면 끝날 때까지 기다린다 — 예전엔 바로 돌아와 원 데칼 재질 없이 놀이가 시작될 수 있었다(기본 도형 폴백)
+        if (s_loading) { await UniTask.WaitWhile(() => s_loading); return; }
         s_loading = true;
         try
         {
