@@ -760,8 +760,9 @@ public class RunFlowController : MonoBehaviour
         var pm   = RunProgressManager.Instance;
         var prev = pm != null ? pm.LoadLocalRun(pm.ActiveSlotIndex) : null;
         if (prev == null || !prev.chapterStartPending || prev.combatLocked) return;
-        SaveRunState(default, DoorEdge.North, 0, chapterStart: true);
-        Debug.Log($"[RunFlow] 대기방 저장(다음 챕터 대기방부터) — {reason}");
+        bool altarUsed = GameRunBootstrapper.Instance?.Run?.WaitingAltarUsed ?? false;
+        SaveRunState(default, DoorEdge.North, 0, chapterStart: true, altarUsed: altarUsed);
+        Debug.Log($"[RunFlow] 대기방 저장(다음 챕터 대기방부터{(altarUsed ? " · 제단 씀" : "")}) — {reason}");
     }
 
     /// <summary>
@@ -882,7 +883,7 @@ public class RunFlowController : MonoBehaviour
     }
 
     /// <summary>현재 런 전체 상태를 로컬에 직렬화한다(방 입장 · 클리어 뒤 · 보스 클리어 뒤). 새로 쓰므로 잠금은 풀린 채다.</summary>
-    private void SaveRunState(DoorPlan plan, DoorEdge fromEdge, int mirror, bool chapterStart = false)
+    private void SaveRunState(DoorPlan plan, DoorEdge fromEdge, int mirror, bool chapterStart = false, bool altarUsed = false)
     {
         var pm      = RunProgressManager.Instance;
         var session = GameRunBootstrapper.Instance?.Run;
@@ -933,10 +934,12 @@ public class RunFlowController : MonoBehaviour
             abyssDepth         = session.AbyssDepth,
             cooldowns          = cooldowns,
             chapterStartPending = chapterStart,
+            waitingAltarUsed    = chapterStart && altarUsed,   // 보스 뒤 저장은 늘 false — 다음 챕터 대기방 제단은 새것
         };
 
         pm.SaveRunLocal(session, meta);
         _combatLocked = false;
+        MerlinRuneKeep.CommitClaim(session);   // 11-02 Q32 B4 — 돌려준 룬이 런 세이브에 실렸다 → 맡긴 칸을 비운다
     }
 
     private void MovePlayer(Vector3 pos)

@@ -95,6 +95,7 @@ public static class LichSpikeProbeEditor
             bool lichGone = false;
             float lastStoneHit = 0f;
             float goneAt = -1f;
+            float lastBreakdown = -10f;
             while (Time.realtimeSinceStartup - start < RunCap)
             {
                 await UniTask.Yield(PlayerLoopTiming.Update);
@@ -109,9 +110,18 @@ public static class LichSpikeProbeEditor
                 {
                     cur.spikes++;
                     var top = recs.Select(x => (x.n, ms: x.r.isValid ? x.r.elapsedNanoseconds / 1e6f : -1f)).Where(x => x.ms > 1f).OrderByDescending(x => x.ms).Take(5).ToList();
-                    int ps = UnityEngine.Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None).Count(p => p.isPlaying);
+                    var playing = UnityEngine.Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None).Where(p => p.isPlaying).ToList();
+                    int ps = playing.Count;
                     sb.AppendLine($"  [{now - start,6:0.00}] {dt:0} ms · {st} · 입자계 {ps} · GC +{gc - lastGc} · 표식 {string.Join(" · ", top.Select(x => $"{x.n} {x.ms:0.0}"))}");
                     foreach (var l in recent) sb.AppendLine("        " + l);
+                    // 11-02 Q27 (a) 이펙트 양 끊김 — 입자계가 많을 때 2초에 한 번, 이펙트(입자계를 가진 가장 위 부모)별 개수 · 살아 있는 입자 수 상위
+                    if (ps >= 100 && now - lastBreakdown > 2f)
+                    {
+                        lastBreakdown = now;
+                        foreach (var g in playing.GroupBy(EffectRootName).Select(g => (name: g.Key, n: g.Count(), live: g.Sum(p => p.particleCount)))
+                                                 .OrderByDescending(x => x.n).Take(10))
+                            sb.AppendLine($"        · 이펙트 {g.name} — 입자계 {g.n} · 입자 {g.live}");
+                    }
                 }
                 lastGc = gc;
 
@@ -162,6 +172,18 @@ public static class LichSpikeProbeEditor
     private static readonly FieldInfo s_exileActive = typeof(ExileFallSequence).GetField("s_active", BindingFlags.Static | BindingFlags.NonPublic);
 
     private static float P(List<float> sorted, float q) => sorted.Count == 0 ? 0f : sorted[Mathf.Clamp((int)(sorted.Count * q), 0, sorted.Count - 1)];
+
+    /// <summary>이펙트 이름 — 가장 가까운 만들어진 프리팹 루트(이름에 「(Clone)」 — 리치 몸에 붙은 이펙트도 리치로 뭉치지 않게). 없으면 입자계를 가진 가장 위 부모.</summary>
+    private static string EffectRootName(ParticleSystem p)
+    {
+        Transform clone = null, top = p.transform;
+        for (var t = p.transform; t != null; t = t.parent)
+        {
+            if (clone == null && t.name.EndsWith("(Clone)", StringComparison.Ordinal)) clone = t;
+            if (t.GetComponent<ParticleSystem>() != null) top = t;
+        }
+        return (clone ?? top).name.Replace("(Clone)", string.Empty).Trim();
+    }
 
     private static string StateOf(MonsterBase boss)
     {

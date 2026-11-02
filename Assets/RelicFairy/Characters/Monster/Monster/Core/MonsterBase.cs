@@ -337,6 +337,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>보스 HUD 이름. 전투 모드에 따라 이름이 바뀌는 보스(리치 봉인/해방)가 오버라이드한다.</summary>
     public virtual string BossName => _config != null ? _config.monsterName : string.Empty;
 
+    /// <summary>지금 상태 이름 — 진단 기록용(<see cref="HitchLog"/> · 11-02 Q27).</summary>
+    public string DebugStateName => _fsm?.CurrentType?.Name ?? "-";
+
     /// <summary>중간 엘리트 보스(황소 탱크 등) — 상단 체력바에 「정예 보스」 꼬리표를 켠다(10-12 중간 보스 · HUD는 83).</summary>
     public virtual bool IsEliteBoss => false;
 
@@ -1662,6 +1665,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _generationId++;
 
         _activeMonsters.Add(this);
+        if (this is IBoss) HitchLog.Enter(this, "보스전", this);   // 빌드 끊김 기록 — 모든 보스전(11-02 화룡 프레임 튐 · 풀링 점검)
         _poise?.Reset();   // 풀 재사용 — 이전 몸의 포이즈 · 접두어 배율이 남지 않게
 
         // 죽지 않고 풀로 돌아간 인스턴스에는 이전 방 컨트롤러의 OnDied 구독이 그대로 남는다
@@ -1763,6 +1767,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     protected virtual void OnDisable()
     {
         _activeMonsters.Remove(this);
+        HitchLog.Exit(this);
 
         // 비활성화 시 활성화 토큰을 취소 — 풀 반환 중 남아있는 DissolveEffect 복원 태스크를 차단한다.
         _activationCts?.Cancel();

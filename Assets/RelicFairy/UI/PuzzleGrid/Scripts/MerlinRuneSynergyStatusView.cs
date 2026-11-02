@@ -786,7 +786,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         string text = sb.ToString().TrimEnd();
         _tooltipText.enableAutoSizing = false;
         _tooltipText.fontSize = TooltipFont;
-        _tooltipText.SetText(text);
+        _tooltipText.text = text;   // 11-02 Q11 .text(안전망)
 
         // 폭 = 가장 긴 줄(줄바꿈 없음). 최대 폭을 넘는 긴 설명만 글자를 줄여 판 안에 넣는다.
         float need = _tooltipText.GetPreferredValues(text, float.PositiveInfinity, 0f).x + TooltipPadX * 2f + 4f;

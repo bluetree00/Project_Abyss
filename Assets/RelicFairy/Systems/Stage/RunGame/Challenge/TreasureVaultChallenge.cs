@@ -179,7 +179,7 @@ public sealed class TreasureVaultChallenge : WorldInteractionChallenge
         {
             _shownSecond = sec;
             _shownOpened = _opened;
-            _timerLabel.SetText("남은 시간 {0}초 · 상자 {1}/{2}", sec, _opened, ChestCount);   // 10-30 몇 개 남았는지가 없었다
+            _timerLabel.SetText(Loc.T("남은 시간 {0}초 · 상자 {1}/{2}"), sec, _opened, ChestCount);   // 10-30 몇 개 남았는지가 없었다
         }
         if (_timeLeft <= 0f) Resolve();
     }

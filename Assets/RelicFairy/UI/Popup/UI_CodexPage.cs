@@ -232,7 +232,7 @@ public sealed class UI_CodexPage : MonoBehaviour
     }
 
     /// <summary>룬 효과 줄 — CSV 원문이 있으면 그것, 없으면 「조건 이름 값」 조립(룬 카드와 같은 출처).</summary>
-    private static string RuneDesc(RuntimeItemData d)
+    internal static string RuneDesc(RuntimeItemData d)   // 멀린 룬 보관 창도 쓴다(11-02)
     {
         if (d?.effects == null) return null;
         var sb = new System.Text.StringBuilder();

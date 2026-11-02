@@ -220,12 +220,12 @@ public sealed class UI_CovenantSlot : MonoBehaviour
                     ? prefix + "  " + fill + new string('●', cur) + End + Off + new string('○', p.max - cur) + End
                     : prefix + "  " + fill + cur + "/" + p.max + End;
         }
-        _fmtSeconds      = prefix + "  " + fill + "{0:1}초" + End;
+        _fmtSeconds      = prefix + "  " + fill + Loc.T("{0:1}초") + End;   // 11-02 Q11 SetText(형식)은 안전망을 안 탄다 — 원천에서
         _fmtMeters       = prefix + "  " + fill + "{0:0}m" + End;
-        _fmtCooldown     = prefix + "  " + Off + "재정비 {0:1}초" + End;
-        _fmtWindow       = prefix + "  " + ready + "{0:1}초 안에!" + End;
-        _labelIdle       = prefix + "  " + Off + "전투 대기" + End;
-        _labelWindowWait = prefix + "  " + Off + "기회 대기" + End;
+        _fmtCooldown     = prefix + "  " + Off + Loc.T("재정비 {0:1}초") + End;
+        _fmtWindow       = prefix + "  " + ready + Loc.T("{0:1}초 안에!") + End;
+        _labelIdle       = prefix + "  " + Off + Loc.T("전투 대기") + End;
+        _labelWindowWait = prefix + "  " + Off + Loc.T("기회 대기") + End;
         _labelArmed      = prefix + "  " + ready + "준비됨" + End;
         _labelSpent      = prefix + "  " + Off + "이 방은 끝" + End;
     }

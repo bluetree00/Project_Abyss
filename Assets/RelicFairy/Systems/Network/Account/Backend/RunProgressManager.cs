@@ -272,6 +272,7 @@ public class RunProgressManager : MonoBehaviour
         d.maxEnhanceLevel = m.maxEnhanceLevel;
         d.abyssDepth      = m.abyssDepth;              // 순환 중 이어하기
         d.chapterStartPending = m.chapterStartPending; // 보스 클리어 뒤 저장 → 다음 챕터 대기방부터(10-10)
+        d.waitingAltarUsed    = m.waitingAltarUsed;    // 대기방 서약 제단을 이미 썼다(11-02)
 
         var cdw = new CooldownListWrapper();
         if (m.cooldowns != null) cdw.items.AddRange(m.cooldowns);

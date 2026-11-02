@@ -738,13 +738,13 @@ Q 마지막 일격 뒤 → 화살 줄기 12m,After Q's final blow → a 12m line
 광란에 사용,Use in Frenzy
 "여명
 조각 {0}/{1}","Dawn
-Pieces {0}/{1}"
+{0}/{1}"
 "정오
 조각 {0}/{1}","Noon
-Pieces {0}/{1}"
+{0}/{1}"
 "황혼
 조각 {0}/{1}","Dusk
-Pieces {0}/{1}"
+{0}/{1}"
 광기 조각 {0}/{1},Madness Pieces {0}/{1}
 광기 조각 {0}개,Madness Pieces ×{0}
 조각 없이 광기 10~40 조각 개수 +1,No piece — Madness 10–40 piece count +1
@@ -4400,3 +4400,48 @@ Salvage it?
  — 판에서 빠지고 효과도 사라진다, — it leaves the board and its effect ends
 비어 있음,Empty
 방 보상보다 높게 · 정제 등급 +{0:F0}%p,Above room rewards · Refine grade +{0:F0}%p
+부패의 숲,Forest of Decay
+용암 대지,Lava Plains
+잠식된 성채,Eroded Citadel
+암흑대지,Darklands
+한때 아서왕의 기사들이 순례하던 성스러운 숲. 흑수에 잠식됨,A sacred forest once walked by King Arthur's knights on pilgrimage. Now consumed by black water
+고대 지형이 용암으로 뒤덮인 불길의 협곡,A fiery canyon where ancient land lies buried under lava
+한때 영웅의 성채. 이제는 리치의 거점,Once a hero's citadel. Now the Lich's stronghold
+기본 카타나,Basic Katana
+강화된 카타나,Reinforced Katana
+전설의 카타나,Legendary Katana
+기본 대검,Basic Greatsword
+강화된 대검,Reinforced Greatsword
+전설의 대검,Legendary Greatsword
+공속,Atk Spd
+"맞은 적이 X자로 갈라진 뒤, 8m 안 가까운 적부터 차례로 3번 더 옮겨 벤다(번마다 공격력의 100%).","After the X-cut, slashes 3 more times, hopping to the nearest enemies within 8m (100% of ATK each)."
+"맞은 적이 X자로 갈라진 뒤, 그중 체력이 가장 많은 적에게 큰 X자를 한 번 더 벤다(공격력의 360% · 둘레 2.4m까지).","After the X-cut, lands one big X on the toughest enemy it hit (360% of ATK · reaches 2.4m around)."
+적이 여럿 흩어졌을 때,When enemies are spread out
+단단한 적 하나를 잡을 때,To take down one tough enemy
+<color={0}>보유</color> {1},<color={0}>Owned</color> {1}
+<color={0}>보유</color> {1}  <color={2}>· {3} 모자람</color>,<color={0}>Owned</color> {1}  <color={2}>· {3} short</color>
+랭킹,Rankings
+챕터 전투,Chapter Combat
+챕터 {0} 보스전 — 보스방에서 싸운 시간,Chapter {0} Boss Fight — time fighting in the boss room
+챕터 {0} 전투 — 그 챕터 방들에서 싸운 시간,Chapter {0} Combat — time fighting in that chapter's rooms
+랭킹 서버에 닿지 않는다 — 잠시 뒤 다시 읽는다,Can't reach the ranking server — retrying shortly
+실시간 · 모든 플레이어 · 전체 {0}명 · {1} 갱신,Live · All players · {0} total · updated {1}
+모든 플레이어의 기록이 모이는 곳,Where every player's records gather
+이 랭킹은 아직 준비 중 — 내 기록은 기기에 남아 있다,This ranking isn't open yet — your record is saved on this device
+아직 아무도 기록을 남기지 않았다 — 첫 이름이 되어 보자,No records yet — be the first name here
+<color=#9A98A0>아직 내 기록이 없다 — 챕터 {0} 보스를 쓰러뜨리면 남는다</color>,<color=#9A98A0>No record yet — defeat the Chapter {0} boss to set one</color>
+내 최고  {0}   ·   {1}위 / {2}명,My best  {0}   ·   #{1} of {2}
+내 최고  {0},My best  {0}
+챕터 {0} · 기록,Chapter {0} · Records
+순위 불러오는 중…,Loading rank…
+Esc › 랭킹 — 모든 플레이어의 기록,Esc › Rankings — every player's records
+랭킹 서버에 닿지 않는다 — 내 기록은 기기에 남았다,Can't reach the ranking server — your record is saved on this device
+이 랭킹은 아직 준비 중 — 내 기록은 기기에 남았다,This ranking isn't open yet — your record is saved on this device
+랭킹에 올리지 못했다 — 다음 신기록 때 다시 올린다,Couldn't post to the ranking — it will post with your next record
+랭킹에 아직 내 기록이 없다 — 신기록을 세우면 오른다,You're not on this ranking yet — set a new record to appear
+<color=#FFD147>1위</color> / {0}명 — 모든 플레이어 중 가장 빠르다,<color=#FFD147>#1</color> of {0} — the fastest of all players
+{0}위 / {1}명  ·  1위 {2} {3},#{0} of {1}  ·  #1 {2} {3}
+{0}위 / {1}명,#{0} of {1}
+「네가 얻은 룬 하나는 내가 맡아 둘게. 다음 길에서 돌려줄게.」,"""I'll hold on to one rune you found. You'll get it back on the next path."""
+고른 룬은 다음 런을 시작할 때 보관함으로 돌아온다 · 돌려받은 룬은 다시 맡길 수 없다,The chosen rune returns to your storage when the next run starts · A returned rune can't be kept again
+카드를 눌러 고른다  ·  ← → 고르기  ·  Enter 맡기기,Click a card to choose  ·  ← → select  ·  Enter to keep

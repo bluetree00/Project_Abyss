@@ -1828,7 +1828,7 @@ public sealed partial class UI_GridPanel : UI_Base
         var runeData = Managers.RuneData;
         if (runeData == null)
         {
-            _footerActiveSynText.SetText("존 시너지: <color=#556677>데이터 로딩 중…</color>");
+            _footerActiveSynText.text = "존 시너지: <color=#556677>데이터 로딩 중…</color>";   // 11-02 Q11 .text(안전망)
             return;
         }
 
@@ -1854,7 +1854,7 @@ public sealed partial class UI_GridPanel : UI_Base
                 sb.Append($"<color=#445566>◇{zoneId}</color>  ");
         }
 
-        _footerActiveSynText.SetText(sb.ToString().TrimEnd());
+        _footerActiveSynText.text = sb.ToString().TrimEnd();
 
         if (_footerCenterText != null)
         {

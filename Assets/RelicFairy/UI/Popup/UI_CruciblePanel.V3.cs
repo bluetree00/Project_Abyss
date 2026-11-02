@@ -1214,13 +1214,15 @@ public sealed partial class UI_CruciblePanel
         for (int i = from; i < _v3ChipBox.Length; i++) if (_v3ChipBox[i] != null) _v3ChipBox[i].gameObject.SetActive(false);
     }
 
-    /// <summary>재료 줄 — 보유/필요(모자라면 보유만 빨강 · 리서치 B-2-2) · 반값 화로면 칩.</summary>
+    /// <summary>재료 줄 — 보유(모자라면 빨강 + 「N 모자람」 · 리서치 B-2-2) · 반값 화로면 칩.</summary>
     private void MaterialV3(int need, int have, bool hidden)
     {
         _v3MatRow.gameObject.SetActive(!hidden);
         if (hidden) return;
-        string h = have < need ? $"<color={HexDown}>{have}</color>" : have.ToString();
-        _v3MatValue.text = Loc.F("<color={0}>보유</color> {1}  <color={2}>/  필요</color> {3}", HexMute, h, HexMute, need);
+        // 11-02 — 필요량은 바로 위 큰 비용 · 단추에 있어 「/ 필요 N」은 세 번째 같은 수였다 → 보유만, 모자라면 얼마 모자란지
+        _v3MatValue.text = have < need
+            ? Loc.F("<color={0}>보유</color> {1}  <color={2}>· {3} 모자람</color>", HexMute, $"<color={HexDown}>{have}</color>", HexDown, need - have)
+            : Loc.F("<color={0}>보유</color> {1}", HexMute, have);
         if (_controller.IsDiscountEvent)
         {
             float w = SetV3Chip(_v3MatChipBox, _v3MatChip, "▲ 반값 화로", UpGreen);

@@ -22,7 +22,7 @@ public sealed class UI_EscMenu : MonoBehaviour
     // 10-11 위계 개편(리서치 C §6 「고칠 값」) — 66px 베벨 · 간격 16 → 48px 평판 · 간격 8, 고른 줄은 위아래 1px 금 띠(RoR2 일시정지).
     // 세로 = 위 여백 30 + 제목 44 + 24 + 버튼 5개(5×48 + 4×8 = 272) + 아래 여백 30 = 400.
     // 버튼을 늘리거나 줄이면 PanelH도 ±(BtnH + BtnGap) 해야 여백 대칭이 유지된다.
-    private const float PanelW = 420f, PanelH = 568f;   // 11-02 Q2 「도감」 하나 더(+BtnH + BtnGap)   // 10-13 「장비」 · 10-14 「업적」 버튼 하나씩 더(+BtnH + BtnGap)
+    private const float PanelW = 420f, PanelH = 624f;   // 11-02 「랭킹」 · Q2 「도감」 하나씩 더(+BtnH + BtnGap)   // 10-13 「장비」 · 10-14 「업적」 버튼 하나씩 더(+BtnH + BtnGap)
     private const float BtnW   = 320f, BtnH   = 48f, BtnGap = 8f;
     private const float PadY   = 30f, TitleH = 44f, TitleGap = 24f;
     private const float TitleSize = 32f, LabelSize = 22f;
@@ -40,6 +40,7 @@ public sealed class UI_EscMenu : MonoBehaviour
     private RectTransform _panel;
     private bool          _quitting;
     private UI_CodexPage       _codexPage;    // 11-02 Q2 「도감」 — 룬 · 증강 · 서약 · 유물 기억(지금 · 써 봄)
+    private UI_RankingPage     _rankingPage;  // 11-02 「랭킹」 — 모든 플레이어 기록(해방기 · 악몽 · 보스전 · 챕터 전투)
     private UI_RelicMemoryPage _memoryPage;   // 「되찾은 기억」 — 보유 유물 조각 보기(유물 성장 v2 §6-5)
     private UI_EquipmentPage   _equipPage;    // 「장비」 — 무기 두 칸 · 강화 · 형 · 스킬 단계(10-13 4b 요청 8)
     private TMP_Text      _lobbyLabel;
@@ -47,6 +48,12 @@ public sealed class UI_EscMenu : MonoBehaviour
 
     // ── Properties ───────────────────────────────────────────
     public bool IsOpen => _root != null && (_root.TryGetComponent<UIFader>(out var f) ? f.Visible : _root.activeSelf);
+
+    /// <summary>ESC 메뉴가 떠 있다(11-02 Q32 A1) — 팝업 스택 밖이라 월드 F · Tab 룬판이 밑에서 열렸다. <see cref="UIInputGate"/>가 본다.</summary>
+    public static bool AnyOpen { get; private set; }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => AnyOpen = false;
 
     // ── Lifecycle ────────────────────────────────────────────
     private void OnEnable()  => Loc.LanguageChanged += Relabel;   // 11-02 Q11
@@ -56,6 +63,7 @@ public sealed class UI_EscMenu : MonoBehaviour
     {
         // 강제 파괴(씬 전환 등)에도 timeScale이 0으로 남지 않게. Release는 멱등이다.
         TimeScaleArbiter.Release(this);
+        AnyOpen = false;
     }
 
     // ── Public Methods ───────────────────────────────────────
@@ -67,6 +75,7 @@ public sealed class UI_EscMenu : MonoBehaviour
 
         UIFader.On(_root, _panel).Show();   // 순간 등장 → 공통 박자(09-28)
         TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
+        AnyOpen = true;
     }
 
     public void Close()
@@ -76,8 +85,10 @@ public sealed class UI_EscMenu : MonoBehaviour
         CloseMemoryPage();
         CloseEquipPage();
         CloseCodexPage();
+        CloseRankingPage();
         if (_root != null) UIFader.On(_root, _panel).Hide();
         TimeScaleArbiter.Release(this);
+        AnyOpen = false;
     }
 
     /// <summary>ESC — 「되찾은 기억」 · 「장비」 쪽이 열려 있으면 그것만 닫고 일시정지 패널로 돌아간다. 아니면 메뉴를 닫는다(10-25).</summary>
@@ -85,11 +96,13 @@ public sealed class UI_EscMenu : MonoBehaviour
     {
         bool page = (_memoryPage != null && _memoryPage.gameObject.activeSelf)
                  || (_equipPage  != null && _equipPage.gameObject.activeSelf)
-                 || (_codexPage  != null && _codexPage.gameObject.activeSelf);
+                 || (_codexPage  != null && _codexPage.gameObject.activeSelf)
+                 || (_rankingPage != null && _rankingPage.gameObject.activeSelf);
         if (!page) { Close(); return; }
         CloseMemoryPage();   // 10-29 닫기 소리는 쪽 닫기가 한 번 낸다
         CloseEquipPage();
         CloseCodexPage();
+        CloseRankingPage();
     }
 
     // ── Private Methods ──────────────────────────────────────
@@ -137,11 +150,12 @@ public sealed class UI_EscMenu : MonoBehaviour
         NewButton(panel.transform, "되찾은 기억", new Vector2(0f, top - step),     PlateIdle,   LabelColor,          OnMemory);
         NewButton(panel.transform, "장비",       new Vector2(0f, top - step * 2f), PlateIdle,   LabelColor,          OnEquipment);
         NewButton(panel.transform, "도감",       new Vector2(0f, top - step * 3f), PlateIdle,   LabelColor,          OnCodex);
-        NewButton(panel.transform, "업적",       new Vector2(0f, top - step * 4f), PlateIdle,   LabelColor,          OnAchievements);
-        NewButton(panel.transform, "설정",       new Vector2(0f, top - step * 5f), PlateIdle,   LabelColor,          OnSettings);
-        NewButton(panel.transform, "로비로 가기", new Vector2(0f, top - step * 6f), PlateIdle,   LabelColor,          OnLobby);
+        NewButton(panel.transform, "랭킹",       new Vector2(0f, top - step * 4f), PlateIdle,   LabelColor,          OnRanking);
+        NewButton(panel.transform, "업적",       new Vector2(0f, top - step * 5f), PlateIdle,   LabelColor,          OnAchievements);
+        NewButton(panel.transform, "설정",       new Vector2(0f, top - step * 6f), PlateIdle,   LabelColor,          OnSettings);
+        NewButton(panel.transform, "로비로 가기", new Vector2(0f, top - step * 7f), PlateIdle,   LabelColor,          OnLobby);
         _lobbyLabel = panel.transform.Find("Btn_로비로 가기/Label")?.GetComponent<TMP_Text>();
-        NewButton(panel.transform, "게임 종료",   new Vector2(0f, top - step * 7f), PlateDanger, UITheme.Thin.Danger, OnQuit);
+        NewButton(panel.transform, "게임 종료",   new Vector2(0f, top - step * 8f), PlateDanger, UITheme.Thin.Danger, OnQuit);
     }
 
     private static void Stretch(RectTransform rt)
@@ -222,6 +236,7 @@ public sealed class UI_EscMenu : MonoBehaviour
         }
         if (_lobbyArmed) DisarmLobby();
         if (_codexPage != null && !_codexPage.gameObject.activeSelf) { Destroy(_codexPage.gameObject); _codexPage = null; }   // 도감은 지을 때 글을 쓴다 — 다음 열 때 새로
+        if (_rankingPage != null && !_rankingPage.gameObject.activeSelf) { Destroy(_rankingPage.gameObject); _rankingPage = null; }   // 랭킹 쪽도
     }
 
     /// <summary>버튼 위(y=1) · 아래(y=0) 가장자리에 붙는 1px 금 띠. 처음엔 투명.</summary>
@@ -250,6 +265,24 @@ public sealed class UI_EscMenu : MonoBehaviour
         Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);   // 10-29 UI 소리 — 쪽 닫기(돌아가기 · ESC 어느 길이든 한 번)
         _equipPage.Close();
         if (_panel != null) _panel.gameObject.SetActive(true);
+    }
+
+    private void CloseRankingPage()
+    {
+        if (_rankingPage == null || !_rankingPage.gameObject.activeSelf) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.UiClose);
+        _rankingPage.Close();
+        if (_panel != null) _panel.gameObject.SetActive(true);
+    }
+
+    // 11-02 일시정지 패널 자리에 「랭킹」 쪽(같은 캔버스 · 같은 정지) — 모든 플레이어의 기록을 뒤끝에서 바로 읽는다. 돌아가기 · ESC로 패널.
+    private void OnRanking()
+    {
+        if (_root == null) return;
+        Managers.Sound?.PlayUiEvent(SoundEvent.EscMemoryPage);
+        _rankingPage ??= UI_RankingPage.Create(_root.transform, CloseRankingPage);
+        _panel.gameObject.SetActive(false);
+        _rankingPage.Open();
     }
 
     private void CloseCodexPage()

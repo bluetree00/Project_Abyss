@@ -31,6 +31,8 @@ public sealed class LocTextGuard : MonoBehaviour, ITextPreprocessor
     private readonly List<TMP_Text>           _fitPending = new(32);
     private readonly HashSet<TMP_Text>        _fitSet     = new();   // 이번 프레임 맞춤 대기(겹침 막기)
     private readonly Dictionary<TMP_Text, float> _fitted  = new();   // 줄이기로 돌린 글 → 원래 글자 크기
+    private readonly List<TMP_Text>           _reparse    = new(16);   // 전처리기를 안 탄 글(SetText(글)) — 다음 프레임 다시 해석
+    private readonly Dictionary<TMP_Text, string> _reparsedSrc = new();   // 다시 해석한 원문 — 같은 원문이면 또 하지 않는다
     private TextMeshProUGUI _measurer;                                  // 한국어 원문 폭을 재는 숨은 글(캔버스 밖 — 그려지지 않는다)
     private bool   _record;
     private string _seenPath;
@@ -71,6 +73,17 @@ public sealed class LocTextGuard : MonoBehaviour, ITextPreprocessor
 
     private void LateUpdate()
     {
+        if (_reparse.Count > 0)
+        {
+            for (int i = 0; i < _reparse.Count; i++)
+            {
+                var r = _reparse[i];
+                if (r == null) continue;
+                _reparsedSrc[r] = r.text;
+                r.ForceMeshUpdate(true, true);   // 전처리기를 거쳐 다시 해석
+            }
+            _reparse.Clear();
+        }
         if (_fitPending.Count > 0)
         {
             for (int i = 0; i < _fitPending.Count; i++) Fit(_fitPending[i]);
@@ -183,14 +196,10 @@ public sealed class LocTextGuard : MonoBehaviour, ITextPreprocessor
         {
             if (t.textPreprocessor == null) t.textPreprocessor = this;
             else if (!ReferenceEquals(t.textPreprocessor, this)) continue;   // 다른 전처리기는 건드리지 않는다
-            if (redraw) t.SetAllDirty();
+            if (!redraw) continue;
+            if (t.isActiveAndEnabled) t.ForceMeshUpdate(true, true);   // SetText 길 글도 지금 언어로 다시 해석
+            else t.SetAllDirty();
         }
-    }
-
-    private void Record(TMP_Text t)
-    {
-        string shown = PreprocessText(t.text);
-        if (HasHangul(shown)) Write(PathOf(t.transform) + " | " + shown.Replace("\n", "\\n"));
     }
 
     /// <summary>
@@ -262,14 +271,25 @@ public sealed class LocTextGuard : MonoBehaviour, ITextPreprocessor
             return;
         }
         if (!ReferenceEquals(t.textPreprocessor, this) || ReferenceEquals(t, _measurer)) return;
-        if (_record) Record(t);
-        if (t is TextMeshProUGUI && !t.enableAutoSizing && PreprocessText(t.text) != t.text && _fitSet.Add(t))
-            _fitPending.Add(t);   // 영어로 바뀐 글만 — 다음 LateUpdate에 칸 맞춤을 본다
+        string src = t.text;
+        if (!HasHangul(src)) return;
+        // 실제로 그려진 글 — 원문에 한글이 있을 때만 본다(SetText(글)은 전처리기를 건너뛰어 원문 그대로 그려진다)
+        string parsed = t.GetParsedText();
+        if (HasHangul(parsed))
+        {
+            bool tried = _reparsedSrc.TryGetValue(t, out var last) && last == src;
+            if (!tried && PreprocessText(src) != src) { if (!_reparse.Contains(t)) _reparse.Add(t); }
+            else if (_record) Write(PathOf(t.transform) + " | " + parsed.Replace("\n", "\\n"));   // 정말 화면에 남은 한글
+            return;
+        }
+        if (t is TextMeshProUGUI && !t.enableAutoSizing && _fitSet.Add(t))
+            _fitPending.Add(t);   // 영어로 바뀐 글 — 다음 LateUpdate에 칸 맞춤을 본다
     }
 
     private void OnLanguageChanged()
     {
         _cache.Clear();
+        _reparsedSrc.Clear();
         Unfit();   // 한국어든 영어든 원래 크기에서 다시 본다
         AttachAll(true);
     }

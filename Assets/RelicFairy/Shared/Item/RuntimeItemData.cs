@@ -30,6 +30,10 @@ public class RuntimeItemData
     /// 직렬화되므로 세이브 복원 시 유지된다(빈 경우에만 새로 배정).</summary>
     public string element;
 
+    /// <summary>멀린이 맡아 뒀다 돌려준 룬(11-02 밤 사용자) — 다시 맡길 수 없다(<see cref="MerlinRuneKeep.CaptureOwned"/>가 뺀다). 런 세이브에 실린다.
+    /// 같은 룬을 다음 런에서 새로 얻으면 표시 없는 새 사본이라 맡길 수 있다.</summary>
+    public bool fromMerlinKeep;
+
     // ── 액티브 ──
     public float cooldown;
 

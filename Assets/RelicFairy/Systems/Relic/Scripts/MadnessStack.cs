@@ -45,6 +45,7 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     // 라벨 캐시 — 표시값이 바뀔 때만 문자열을 새로 만든다(매 프레임 alloc 방지).
     private string _label = "광기 0/40";
     private int    _labelKey = int.MinValue;
+    private Loc.Language _labelLang;   // 언어가 바뀌어도 다시 짓는다(11-02 Q11)
 
     public event Action OnChanged;
     public event Action OnMaxReached;
@@ -217,9 +218,10 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
         get
         {
             int key = _frenzy ? -Mathf.CeilToInt(FrenzyRemaining * 10f) : (_stacks * 1000 + _maxStacks) * 2 + (_decaying ? 1 : 0);
-            if (key != _labelKey)
+            if (key != _labelKey || _labelLang != Loc.Current)
             {
                 _labelKey = key;
+                _labelLang = Loc.Current;
                 // 화면 언어(11-02 Q11) — 값이 끼는 글은 Loc.F 열쇠(한글 원문 · {n})
                 _label = _frenzy      ? Loc.F("광란 {0}초\nQ로 심판의 일격", FrenzyRemaining.ToString("0.0"))
                        : _stacks <= 0 ? Loc.F("광기 0/{0}", _maxStacks)

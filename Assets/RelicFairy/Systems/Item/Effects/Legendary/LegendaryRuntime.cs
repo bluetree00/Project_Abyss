@@ -18,12 +18,22 @@ public class LegendaryRuntime : MonoBehaviour
         "GAPH Custom Shader/Distortion Effect", "Hovl/Particles/Distortion", "Hovl/Particles/BlendDistort",
     };
 
+    // 풀링 #7(11-02) — 전설 이펙트 전용 풀. BossEffectPool과 사본을 나누지 않는다: 같은 프리팹을 쓰는 리치 쪽이 사본의 입자 크기 모드 · 반복 · 색을 바꿔 둔다.
+    private const int FxPoolCap = 16;   // 프리팹당 쉬는 사본 상한 — 넘치면 지운다
+    private static readonly Dictionary<GameObject, Stack<GameObject>> s_fxPool = new();
+    private static readonly Dictionary<GameObject, bool> s_poolable = new();
+    private static readonly List<ParticleSystem> s_psBuf = new();
+    private static readonly List<TrailRenderer> s_trailBuf = new();
+
     public static LegendaryRuntime Instance { get; private set; }
     public static LegendaryVfxCatalog Catalog => Instance?._catalog;
 
     [SerializeField] private LegendaryVfxCatalog _catalog;
 
     private readonly List<GameObject> _agents = new();
+    private readonly List<PooledFx> _fxLive = new();
+
+    private struct PooledFx { public GameObject go; public GameObject prefab; public float releaseAt; }
 
     public static void EnsureExists()
     {
@@ -56,6 +66,18 @@ public class LegendaryRuntime : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(this); return; }
         Instance = this;
+    }
+
+    // 풀에서 빌린 이펙트를 수명이 다하면 돌려준다(Destroy(go, 수명)과 같은 게임 시간)
+    private void Update()
+    {
+        for (int i = _fxLive.Count - 1; i >= 0; i--)
+        {
+            var fx = _fxLive[i];
+            if (fx.go != null && Time.time < fx.releaseAt) continue;
+            _fxLive.RemoveAt(i);
+            ReturnFx(fx.go, fx.prefab);
+        }
     }
 
     private void OnDestroy()
@@ -112,12 +134,21 @@ public class LegendaryRuntime : MonoBehaviour
     public static void SpawnVfx(GameObject prefab, Vector3 pos, Quaternion rot, float lifetime = 3f, float scale = 1f, float alpha = 1f, float yScale = -1f, Transform follow = null)
     {
         if (prefab == null) return;
-        var vfx = Instantiate(prefab, pos, rot);
-        DisableGrabPassRenderers(vfx);
-        PlayerFxCalm.LowerSorting(vfx);   // 보스 예고 아래로 · 예고가 떠 있으면 옅게(10-30)
-        alpha *= PlayerFxCalm.Alpha;
+        alpha *= PlayerFxCalm.Alpha;   // 예고가 떠 있으면 옅게(10-30)
         var ls = Vector3.one * scale;
         if (yScale >= 0f) ls.y = yScale;
+
+        // 풀링 #7(11-02 실측: 매번 만들기 0.13~2.4 ms · 재사용 0.02~0.09 ms) — 따라붙지 않고 · 알파를 안 칠하고 · 스크립트 없는 것만 풀로.
+        // 알파 칠은 사본 색을 바꾸고, follow는 부모와 함께 지워지고, 팩 스크립트는 재사용하면 그림이 달라진다(10-29 문서 7절).
+        if (follow == null && Mathf.Approximately(alpha, 1f) && Instance != null && IsPoolable(prefab))
+        {
+            Instance._fxLive.Add(new PooledFx { go = RentFx(prefab, pos, rot, ls), prefab = prefab, releaseAt = Time.time + lifetime });
+            return;
+        }
+
+        var vfx = Instantiate(prefab, pos, rot);
+        DisableGrabPassRenderers(vfx);
+        PlayerFxCalm.LowerSorting(vfx);   // 보스 예고 아래로(10-30)
         vfx.transform.localScale = ls;
         if (follow != null) vfx.transform.SetParent(follow, true);   // 판정이 따라가는 광역 — 그림도 붙인다(10-13 이펙트 = 판정)
         if (!Mathf.Approximately(alpha, 1f))
@@ -183,5 +214,58 @@ public class LegendaryRuntime : MonoBehaviour
             Quaternion rot = dir.sqrMagnitude > 0.01f ? Quaternion.LookRotation(dir) : Quaternion.identity;
             SpawnVfx(prefab, spawnPos, rot, lifetime, scale, alpha);
         }
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetFxPool()
+    {
+        s_fxPool.Clear();
+        s_poolable.Clear();
+    }
+
+    /// <summary>스크립트 없는(입자만 있는) 프리팹인가 — 재사용해도 그림이 같다(프리팹당 한 번 검사).</summary>
+    private static bool IsPoolable(GameObject prefab)
+    {
+        if (!s_poolable.TryGetValue(prefab, out bool ok))
+        {
+            ok = prefab.GetComponentsInChildren<MonoBehaviour>(true).Length == 0;
+            s_poolable[prefab] = ok;
+        }
+        return ok;
+    }
+
+    /// <summary>쉬는 사본을 꺼내거나(씬과 함께 지워진 것은 버린다) 새로 만들어 처음부터 다시 튼다. 손질(왜곡 끔 · 정렬 낮춤 · 충돌 끔)은 만들 때 한 번.</summary>
+    private static GameObject RentFx(GameObject prefab, Vector3 pos, Quaternion rot, Vector3 scale)
+    {
+        GameObject go = null;
+        if (s_fxPool.TryGetValue(prefab, out var stack))
+            while (go == null && stack.Count > 0) go = stack.Pop();
+        if (go == null)
+        {
+            go = Instantiate(prefab, pos, rot);
+            DisableGrabPassRenderers(go);
+            PlayerFxCalm.LowerSorting(go);   // 보스 예고 아래로(10-30)
+            foreach (var col in go.GetComponentsInChildren<Collider>())
+                col.enabled = false;
+        }
+        go.transform.SetPositionAndRotation(pos, rot);
+        go.transform.localScale = scale;
+        go.SetActive(true);
+        go.GetComponentsInChildren(s_trailBuf);
+        for (int i = 0; i < s_trailBuf.Count; i++) s_trailBuf[i].Clear();
+        s_trailBuf.Clear();
+        go.GetComponentsInChildren(s_psBuf);
+        for (int i = 0; i < s_psBuf.Count; i++) { s_psBuf[i].Clear(true); s_psBuf[i].Play(true); }
+        s_psBuf.Clear();
+        return go;
+    }
+
+    private static void ReturnFx(GameObject go, GameObject prefab)
+    {
+        if (go == null) return;
+        if (!s_fxPool.TryGetValue(prefab, out var stack)) s_fxPool[prefab] = stack = new Stack<GameObject>();
+        if (stack.Count >= FxPoolCap) { Destroy(go); return; }
+        go.SetActive(false);
+        stack.Push(go);
     }
 }

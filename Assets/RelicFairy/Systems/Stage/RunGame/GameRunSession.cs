@@ -1197,6 +1197,12 @@ public sealed class GameRunSession
     /// <summary>「부활 1회」를 이 런에서 이미 썼는가. 이어하기로 되살아나지 않도록 세이브에 실린다.</summary>
     public bool MetaReviveUsed { get; private set; }
 
+    /// <summary>멀린이 맡아 둔 룬을 이 런 보관함에 돌려줬고, 맡긴 칸은 첫 런 저장 때 비운다(11-02 Q32 B4 · <see cref="MerlinRuneKeep.CommitClaim"/>).</summary>
+    public bool KeptRunePending { get; set; }
+
+    /// <summary>지금 대기방의 서약 제단을 이미 썼다(11-02) — 대기방 저장에 실리고, 대기방을 새로 지을 때 지운다(이어하기면 저장값).</summary>
+    public bool WaitingAltarUsed { get; set; }
+
     /// <summary>
     /// 「부활 1회」를 소모한다. 해금돼 있고 아직 안 썼을 때만 true.
     /// <para>런 스코프라 사망 시 자연히 사라진다 — 다음 런에 다시 1회가 주어진다.</para>

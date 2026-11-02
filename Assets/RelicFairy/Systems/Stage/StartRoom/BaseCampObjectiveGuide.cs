@@ -258,7 +258,7 @@ public sealed class BaseCampObjectiveGuide : MonoBehaviour
         AppendLine(primary, true);
         for (int i = 0; i < Count; i++)
             if (i != primary && (mask & (1 << i)) != 0) AppendLine(i, false);
-        _tracker.SetText(_sb);
+        _tracker.text = _sb.ToString();   // 11-02 Q11 — .text(안전망을 탄다 · 글이 바뀔 때만 짓는다)
     }
 
     private void AppendLine(int i, bool primary)

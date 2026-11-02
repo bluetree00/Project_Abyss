@@ -15,7 +15,9 @@ public sealed class LichVfxScaleCache : MonoBehaviour
     private ParticleSystem[]                        _systems;
     private bool[]                                  _originalLoop;
     private ParticleSystem.MinMaxGradient[]         _originalColor;
+    private float[]                                 _originalRate;
     private Color                                   _appliedTint = Color.clear;
+    private float                                   _appliedEmission = 1f;
     private bool                                    _hierarchy;
 
     /// <summary>스폰 직후(같은 프레임) 호출 — 데모 스크립트의 Start가 돌기 전에 끈다.</summary>
@@ -26,11 +28,13 @@ public sealed class LichVfxScaleCache : MonoBehaviour
             _systems       = GetComponentsInChildren<ParticleSystem>(true);
             _originalLoop  = new bool[_systems.Length];
             _originalColor = new ParticleSystem.MinMaxGradient[_systems.Length];
+            _originalRate  = new float[_systems.Length];
             for (int i = 0; i < _systems.Length; i++)
             {
                 var main = _systems[i].main;
                 _originalLoop[i]  = main.loop;
                 _originalColor[i] = main.startColor;
+                _originalRate[i]  = _systems[i].emission.rateOverTimeMultiplier;
             }
 
             foreach (var demo in GetComponentsInChildren<ZakhanSpellsPack.CreateProjectile>(true))
@@ -39,6 +43,7 @@ public sealed class LichVfxScaleCache : MonoBehaviour
 
         for (int i = 0; i < _systems.Length; i++)
         {
+            if (_systems[i] == null) continue;   // 팩 StopAction · 스크립트가 자식을 스스로 파괴했다(11-02 빌드 NRE — 원소 버스트 · 저스트 회피가 끊겼다)
             var main = _systems[i].main;
             main.loop = loop || _originalLoop[i];
         }
@@ -53,8 +58,22 @@ public sealed class LichVfxScaleCache : MonoBehaviour
         bool restore = tint.a <= 0f;
         for (int i = 0; i < _systems.Length; i++)
         {
+            if (_systems[i] == null) continue;
             var main = _systems[i].main;
             main.startColor = restore ? _originalColor[i] : Multiply(_originalColor[i], tint);
+        }
+    }
+
+    /// <summary>초당 방출을 원래 값 × <paramref name="factor"/>로(풀에서 다시 꺼내도 원래 값 기준 — 곱이 쌓이지 않는다). <see cref="Prepare"/> 뒤에 부른다.</summary>
+    public void ApplyEmission(float factor)
+    {
+        if (_systems == null || Mathf.Approximately(factor, _appliedEmission)) return;
+        _appliedEmission = factor;
+        for (int i = 0; i < _systems.Length; i++)
+        {
+            if (_systems[i] == null) continue;
+            var em = _systems[i].emission;
+            em.rateOverTimeMultiplier = _originalRate[i] * factor;
         }
     }
 

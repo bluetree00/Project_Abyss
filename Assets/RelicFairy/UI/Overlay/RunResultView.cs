@@ -438,7 +438,7 @@ public sealed class RunResultView : MonoBehaviour
             long v = (long)Mathf.Round(value * count);
             if (v == _counterShown[i]) continue;
             _counterShown[i] = v;
-            label.SetText(string.Format(format, v));
+            label.text = string.Format(Loc.T(format), v);   // 11-02 Q11 — .text(안전망을 탄다) · 형식 글은 표에서
         }
 
         for (int i = 0; i < _cols.Length; i++)

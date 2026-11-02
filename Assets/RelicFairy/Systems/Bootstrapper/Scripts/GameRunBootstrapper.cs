@@ -336,6 +336,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             }
             catch (System.OperationCanceledException) { return; }
             catch (System.Exception e) { Debug.LogWarning($"[BossClear] 되찾은 기억 연출 예외(건너뜀): {e.Message}"); }
+            if (_runEnding) return;   // 11-02 Q32 B2 — 연출을 기다리는 사이 남은 탄에 쓰러졌다 — 카드 · 기록 · 구슬을 결과창 위로 올리지 않는다
 
             // 처치 · 봉인 대사가 드래프트 창 위에 겹쳐 남았다(10-01 f5 전주기 시뮬) — 창을 열기 전에 걷는다(대기 상한을 넘긴 경우).
             RelicFairy.UI.UI_BossBark.Dismiss(0f);
@@ -346,6 +347,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 Debug.LogError($"[BossClear] 파츠 드래프트 예외 — 건너뛰고 출구를 연다: {e}");
             }
             RelicMemoryRecall.SayReturn();
+            if (_runEnding) return;   // 11-02 Q32 B2 — 카드를 고르는 동안(시간은 멈추지만 화상 · 장판 판정이 남는 틈) 쓰러졌다
 
             RecordBoard.ShowAsync().Forget();   // 11-02 Q14 보스전 · 챕터 전투 기록 줄(신기록 · 1등 · 2등) — 뒤끝을 기다리지 않는다
 
@@ -1413,8 +1415,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             RunResultSnapshot snap = null;
             try { if (_run != null) snap = RunResultProvider.Capture(_run, AppBootstrapper.Instance?.Loadout, isCleared); }
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] 결과 사본 예외(결과창 건너뜀): {e}"); }   // 런 종료는 계속 — 암전에 멈추지 않게
-            // 11-02 Q26 멀린 룬 보관 — 정산(EndRun)이 인벤토리를 비우기 전에 판의 룬을 떠 둔다(사망만 · 잠긴 세이브 정산은 묻지 않는다)
-            var keepable = !isCleared && !abandoned ? MerlinRuneKeep.CapturePlaced(_run) : null;
+            // 11-02 Q26 멀린 룬 보관 — 정산(EndRun)이 인벤토리를 비우기 전에 이번 런 룬(판 · 보관함 · 돌려받은 룬 빼고)을 떠 둔다(사망만 · 잠긴 세이브 정산은 묻지 않는다)
+            var keepable = !isCleared && !abandoned ? MerlinRuneKeep.CaptureOwned(_run) : null;
             CodexLog.Sync(_run);   // 11-02 Q2 도감 「써 봄」 — 이번 런에 지닌 것(정산이 비우기 전에)
             var result = _run != null ? _run.EndRun(isCleared, isCleared ? "clear" : "death") : default;
             // 정산(메타 저장)을 했으니 런 세이브도 지금 지운다 — 결과창 · 부활 연출 중에 꺼도 죽은 런이 이어하기로 살아나
@@ -3648,6 +3650,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// </summary>
     private async UniTask StartRoomAsync()
     {
+        if (_run != null) _run.WaitingAltarUsed = false;   // 11-02 새 대기방 — 서약 제단은 새것
         // 대화·위스프 구간 동안 HUD 숨김 — 캐릭터 획득 시점에 복원
         UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
 
@@ -3930,6 +3933,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         // 챕터 전환도 첫 챕터와 동일하게 "대기 방"을 띄운 뒤 출구 게이트로 던전에 진입한다.
         // (이전엔 곧장 던전으로 들어가 챕터별 대기방이 없었음 — 우선 방 구조만, 준비 스테이션은 후속.)
+        // 11-02 서약 제단 — 새 대기방이면 새것, 대기방 저장에서 이어하면 저장값(이미 썼으면 제단을 걷는다)
+        if (_run != null) _run.WaitingAltarUsed = restoreFrom != null && restoreFrom.waitingAltarUsed;
         UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
         UIRootBootstrapper.Instance?.BindHudToRun(_run);
         _run?.RequestHudMode(HUDIds.Mode.Combat);

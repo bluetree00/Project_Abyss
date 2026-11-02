@@ -149,10 +149,13 @@ public class DragonWalkChaseState : IMonsterState
 {
     private static readonly float DestSqThreshold = 0.09f;
     private const float DirThreshold = 50f;
+    private const float StartMoveSpeed = 0.3f;    // 이만큼 움직이기 시작하면 걷기 동작(공용 ChaseState와 같은 값)
+    private const float IdleBlend      = 0.15f;
 
     private Vector3 _lastDest      = Vector3.positiveInfinity;
     private string  _currentAnim;
     private float   _savedAngularSpeed;
+    private bool    _waitingToMove;   // 서 있는 채 들어왔다 — 움직이기 전엔 전투 대기(11-02 착지 · 공격 뒤 제자리 걷기 0.2~0.45초)
 
     public void Enter(MonsterContext ctx)
     {
@@ -166,9 +169,23 @@ public class DragonWalkChaseState : IMonsterState
             ctx.Agent.stoppingDistance = ctx.Monster.GetCombatStopDistance(ctx);
             ctx.Agent.angularSpeed     = dragon != null ? dragon.ChaseAngularSpeed : 35f;
         }
-        _lastDest    = Vector3.positiveInfinity;
-        _currentAnim = null;
-        UpdateDirectionAnim(ctx);
+        _lastDest      = Vector3.positiveInfinity;
+        _currentAnim   = null;
+        _waitingToMove = EnterIdleIfStill(ctx);
+        if (!_waitingToMove) UpdateDirectionAnim(ctx);
+    }
+
+    /// <summary>아직 서 있으면 전투 대기로 — 진입부터 걷기를 틀면 움직이기 전까지 제자리 걷기였다(공용 ChaseState.EnterIdleIfStill과 같은 규칙).</summary>
+    private static bool EnterIdleIfStill(MonsterContext ctx)
+    {
+        if (ctx.Animator == null || ctx.Agent == null || !ctx.Agent.isOnNavMesh || string.IsNullOrEmpty(ctx.Animation.attackReadyStateName)) return false;
+        int idle = Animator.StringToHash(ctx.Animation.attackReadyStateName);
+        if (!ctx.Animator.HasState(0, idle)) return false;
+        Vector3 v = ctx.Agent.velocity; v.y = 0f;
+        if (v.magnitude >= StartMoveSpeed) return false;
+        ctx.Animator.speed = 1f;
+        ctx.Animator.CrossFadeInFixedTime(idle, IdleBlend, 0);
+        return true;
     }
 
     private static void EnsureAgentReady(MonsterContext ctx)
@@ -195,13 +212,22 @@ public class DragonWalkChaseState : IMonsterState
             return;
         }
 
+        if (_waitingToMove)
+        {
+            Move(ctx);
+            if (ctx.Agent == null) { _waitingToMove = false; return; }
+            Vector3 v = ctx.Agent.velocity; v.y = 0f;
+            if (v.magnitude < StartMoveSpeed) return;   // 아직 서 있다 — 대기 자세 그대로
+            _waitingToMove = false;
+        }
         UpdateDirectionAnim(ctx);
         Move(ctx);
     }
 
     public void Exit(MonsterContext ctx)
     {
-        _currentAnim = null;
+        _currentAnim   = null;
+        _waitingToMove = false;
         if (ctx.Agent != null)
         {
             ctx.Agent.angularSpeed = _savedAngularSpeed;

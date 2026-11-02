@@ -233,6 +233,7 @@ MonoBehaviour:
     note: "SSEP1 \uC5BC\uC74C \uC7A5\uD310(\uD480 \uBC16 \uC0DD\uC131)"
     beamLength: 0
     tint: {r: 0, g: 0, b: 0, a: 0}
+    emission: 0.1
   - slot: 32
     prefab: {fileID: 2790239246667695447, guid: 2f0c96fa9be733c49b02f90a5800ef48,
       type: 3}

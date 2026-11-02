@@ -140,16 +140,19 @@ public static class RankingService
 
     // ── 11-02 Q14 보스 · 챕터 기록 표(RANK_BOSS_n · RANK_ROOMS_n) — 이름으로 찾고 콘솔에 없으면 올리지 않는다(기기 기록은 RecordBoard) ──
     private static readonly Dictionary<string, string> s_tableUuids = new();
-    private static bool s_tablesListed;
+    private static bool  s_tablesListed;
+    private static float s_listedAt;
+    private const float  RelistSeconds = 60f;   // 없던 표는 1분 뒤 다시 훑는다(11-02 — 콘솔에서 나중에 만든 표)
 
     /// <summary>표 이름 → 리더보드 uuid(한 번 목록을 훑어 둔다 · 없으면 null).</summary>
     public static async UniTask<string> ResolveTableAsync(string table)
     {
         if (s_tableUuids.TryGetValue(table, out var u)) return u;
-        if (s_tablesListed) return null;   // 이번 실행에 이미 훑었는데 없었다
+        if (s_tablesListed && Time.realtimeSinceStartup - s_listedAt < RelistSeconds) return null;   // 방금 훑었는데 없었다
         var r = await CallAsync<BackendLeaderboardTableReturnObject>(cb => Backend.Leaderboard.User.GetLeaderboards(cb));
         if (r == null || !r.IsSuccess()) return null;
         s_tablesListed = true;
+        s_listedAt     = Time.realtimeSinceStartup;
         foreach (var it in r.GetLeaderboardTableList())
             if (!string.IsNullOrEmpty(it.table) && !s_tableUuids.ContainsKey(it.table)) s_tableUuids[it.table] = it.uuid;
         return s_tableUuids.TryGetValue(table, out u) ? u : null;
@@ -173,6 +176,47 @@ public static class RankingService
         if (list != null && list.IsSuccess())
             foreach (var it in list.GetUserLeaderboardList()) top.Add(ToEntry(it, myInDate));
         return top;
+    }
+
+    /// <summary>한 표의 판(11-02 랭킹 쪽 · 기록 카드) — 콘솔에 표가 있나 · 상위 · 내 줄 · 전체 인원.</summary>
+    public readonly struct Board
+    {
+        public readonly bool        Ready;   // 콘솔에 표가 있다(없으면 기기 기록만)
+        public readonly List<Entry> Top;
+        public readonly Entry?      Mine;
+        public readonly int         Total;
+        public Board(bool ready, List<Entry> top, Entry? mine, int total) { Ready = ready; Top = top; Mine = mine; Total = total; }
+    }
+
+    /// <summary>표 이름으로 상위 <paramref name="count"/>명 · 내 줄(상위에 없으면 따로 읽는다) · 전체 인원. 표가 없으면 Ready = false.</summary>
+    public static async UniTask<Board> LoadBoardAsync(string table, int count = TopCount)
+    {
+        var top = new List<Entry>();
+        string uuid = await ResolveTableAsync(table);
+        if (string.IsNullOrEmpty(uuid)) return new Board(false, top, null, 0);
+
+        string myInDate = Backend.UserInDate;
+        Entry? mine  = null;
+        int    total = 0;
+        var list = await CallAsync<BackendUserLeaderboardReturnObject>(cb => Backend.Leaderboard.User.GetLeaderboard(uuid, count, cb));
+        if (list != null && list.IsSuccess())
+        {
+            total = (int)list.GetTotalCount();
+            foreach (var it in list.GetUserLeaderboardList())
+            {
+                var e = ToEntry(it, myInDate);
+                top.Add(e);
+                if (e.IsMine) mine = e;
+            }
+        }
+        if (mine == null)
+        {
+            var me = await CallAsync<BackendUserLeaderboardReturnObject>(cb => Backend.Leaderboard.User.GetMyLeaderboard(uuid, cb));
+            if (me != null && me.IsSuccess())
+                foreach (var it in me.GetUserLeaderboardList())
+                    if (it.gamerInDate == myInDate) { mine = ToEntry(it, myInDate); break; }
+        }
+        return new Board(true, top, mine, Mathf.Max(total, top.Count));
     }
 
     private static async UniTask<bool> SubmitRowAsync(string table, string uuid, int centis, string weapon, string label)

@@ -101,6 +101,9 @@ public sealed class CrucibleSkinSO : ScriptableObject
     [Tooltip("진화 카드 형 문장(둥글게 흐려진 정사각) — 칼바람 · 무게. 비우면 글자만.")]
     [SerializeField] private Sprite evolveFormWindblade;
     [SerializeField] private Sprite evolveFormWeight;
+    [Header("각인 고르기 그림(11-02)")]
+    [Tooltip("X자 베기 한 획 — 환영베기 X자 이펙트의 베기 그림(Slash_6 한 칸 · 호 가운데 맞춤). 카드 그림이 ±45°로 엇갈려 X자로 그린다. 비우면 얇은 선.")]
+    [SerializeField] private Sprite engraveSlash;
 
     public Sprite LevelTag      => levelTag;
     public Sprite CurrencyInner => currencyInner;
@@ -118,4 +121,5 @@ public sealed class CrucibleSkinSO : ScriptableObject
     /// <summary>진화 카드 형 문장 — 형 id(weight · windblade)로.</summary>
     public Sprite EvolveFormEmblem(string formId) => formId == "weight" ? evolveFormWeight : formId == "windblade" ? evolveFormWindblade : null;
     public Sprite ChooserRangedArt   => chooserRangedArt;
+    public Sprite EngraveSlash       => engraveSlash;
 }

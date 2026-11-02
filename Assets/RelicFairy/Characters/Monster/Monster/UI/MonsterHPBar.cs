@@ -629,7 +629,7 @@ public class MonsterHPBar : MonoBehaviour
         if (text)
         {
             EnsureMarkCount(cell);
-            cell.count.SetText("흑점 {0}", _marks != null ? _marks.Blackspot : item.Stacks);
+            cell.count.SetText(Loc.T("흑점 {0}"), _marks != null ? _marks.Blackspot : item.Stacks);   // 11-02 Q11
             return MarkGap + BlackspotTextW;
         }
 

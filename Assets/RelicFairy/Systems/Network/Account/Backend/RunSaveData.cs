@@ -132,6 +132,8 @@ public class RunSaveData
     public bool   combatLocked;
     // 10-10 보스 클리어 뒤 저장 — 이어하면 보스방이 아니라 다음 챕터 대기방부터 연다(chapter = 다음 챕터)
     public bool   chapterStartPending;
+    // 11-02 대기방 서약 제단을 이미 썼다(대기방 저장) — 이어하면 제단을 걷고 문을 연다(끄고 다시 써 한 줄 더 쓰기 차단)
+    public bool   waitingAltarUsed;
 }
 
 // ── 로컬 세이브 확장용 래퍼/엔트리 ──

@@ -56,6 +56,14 @@ public class WorldCovenantAltar : MonoBehaviour
     // ── Lifecycle ────────────────────────────────────────
     private void Start()
     {
+        // 11-02 이 대기방 제단은 이미 썼다(대기방 저장 뒤 끄고 이어함) — 한 번 더 쓰지 못하게 걷고, 문은 평소 길(서약 완료 신호)로 연다
+        if (GameRunBootstrapper.Instance?.Run?.WaitingAltarUsed == true)
+        {
+            _used = true;
+            OnCovenantAssembled?.Invoke();
+            gameObject.SetActive(false);
+            return;
+        }
         _camTransform = Camera.main != null ? Camera.main.transform : null;
         CreateWorldText();
         CreatePrompt();
@@ -177,6 +185,8 @@ public class WorldCovenantAltar : MonoBehaviour
             if (id != null && handler.TryWriteSentence(id))
             {
                 _used = true;
+                run.WaitingAltarUsed = true;                        // 11-02 — 대기방 저장에 실어 끄고 이어해도 다시 못 쓴다
+                RunFlowController.Active?.SaveNow("covenant-altar");
                 int after = handler.Sentence?.ResultCount ?? 0;
                 // 10-30 C-03 「절」은 화면 다른 곳에 없는 말 — 창 안 말(쓰기 · 잇기 · 고치기)과 「n번째 줄」로
                 ShowNotice(sentence == null

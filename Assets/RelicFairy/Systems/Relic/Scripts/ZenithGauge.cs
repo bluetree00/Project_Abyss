@@ -52,6 +52,7 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     // 라벨 캐시 — 표시값이 바뀔 때만 문자열을 새로 만든다.
     private string _label = string.Empty;
     private int    _labelKey = int.MinValue;
+    private Loc.Language _labelLang;   // 언어가 바뀌어도 다시 짓는다(11-02 Q11)
 
     public event Action OnChanged;
 
@@ -322,9 +323,10 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
             int  sec  = _holdNoon ? 0 : _holding ? Mathf.CeilToInt(Mathf.Max(0f, HoldDawnMax - _holdTimer)) : Mathf.CeilToInt(PhaseRemaining);
             int  bits = (int)_phase * 8 + (idle ? 4 : 0) + (IsMarkReady ? 2 : 0) + (_holding ? 1 : 0);
             int  key  = bits * 100000 + Mathf.Min(sec, 999) * 100 + Mathf.RoundToInt(_chargeAccel * 10f);
-            if (key != _labelKey)
+            if (key != _labelKey || _labelLang != Loc.Current)
             {
                 _labelKey = key;
+                _labelLang = Loc.Current;
                 _label = BuildLabel(sec, idle);
             }
             return _label;

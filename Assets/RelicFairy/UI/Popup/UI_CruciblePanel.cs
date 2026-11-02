@@ -74,7 +74,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
     private const float ResultPopDur    = 0.12f;  // 등장(큰 글씨 → 제자리)
     private const float ResultHoldDur   = 0.85f;
     private const float ResultFadeDur   = 0.30f;
-    private const float StampTierHold   = 0.80f;  // 도장 아래 「스킬 N단계 — …」 줄이 있으면 더 머문다(두 줄을 읽는 틈)
+    private const float StampTierHold   = 1.20f;  // 도장 아래 「스킬 N단계 · E … · R …」 줄이 있으면 더 머문다(세 줄을 읽는 틈 · 11-02)
     private const float SuccessFontSize = 64f;    // 무기 위 한가운데 도장
     private const float SuccessPopScale = 1.35f;
     private const float RejectFontSize  = 32f;    // 거부(재료 부족 등)는 판정이 아니라 안내
@@ -141,6 +141,8 @@ public sealed partial class UI_CruciblePanel : UI_Popup
     private static readonly Color OreTint      = new(0.35f, 0.70f, 0.95f, 1f);    // HUD 원석 테두리색
     private static readonly Color CostInk      = new(1f, 0.89f, 0.66f, 1f);
     private static readonly Color GlowColor    = new(1f, 0.59f, 0.24f, 0f);
+    private static readonly Color LegendGlow   = new(1f, 0.82f, 0.36f, 0f);   // 11-02 전설 승급 — 달굼 빛을 금빛으로
+    private static readonly Color LegendArtTint = new(1f, 0.94f, 0.80f, 1f);  //   · 검 그림을 옅은 금빛으로(전설 전용 그림 없이)
     private static readonly Color ForgeGlowColor = new(1f, 0.43f, 0.12f, 0.42f);
     private static readonly Color HeatColor    = new(1f, 0.35f, 0.08f, 0f);
     private static readonly Color EmberColor   = new(1f, 0.59f, 0.24f, 1f);
@@ -204,7 +206,8 @@ public sealed partial class UI_CruciblePanel : UI_Popup
     // 스킬 각인 택1 — 구운 프리팹에 없고 처음 필요할 때 만든다(EnsureEngravePanel).
     private GameObject _engravePanel;
     private TMP_Text   _engraveTitle, _engraveEyebrow;
-    private readonly TMP_Text[] _engraveName = new TMP_Text[2], _engraveDesc = new TMP_Text[2], _engraveKind = new TMP_Text[2];
+    private readonly TMP_Text[] _engraveName = new TMP_Text[2], _engraveDesc = new TMP_Text[2], _engraveKind = new TMP_Text[2], _engraveBest = new TMP_Text[2];
+    private readonly UI_EngraveDiagram[] _engraveDiagram = new UI_EngraveDiagram[2];   // 11-02 카드 그림
     private readonly RectTransform[] _engraveEdge = new RectTransform[2];
     private readonly List<SkillSO.EngravingDef> _engraveOptions = new();
     private WeaponData _engraveWeapon;
@@ -324,6 +327,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
     // 런타임 전용 — 코드로 그린 스프라이트·입자 풀은 프리팹에 저장할 수 없어 Bind에서 만든다.
     private bool      _fxReady;
     private float     _heatLevel01;     // 무기 달굼 목표(단계/상한)
+    private bool      _isLegend;        // 11-02 전설로 승급한 무기 — 그림 금빛 · 달굼 빛 금빛
     private float     _glowShown;       // 화면에 보이는 달굼(목표를 따라 천천히)
     private float     _focus01;
     private int       _hammerGen, _flashGen;
@@ -811,13 +815,13 @@ public sealed partial class UI_CruciblePanel : UI_Popup
             rt.sizeDelta = new Vector2(0f, 32f);
             if (_v3Ready)
             {
-                // v3 — 도장이 무기 열(356) 안이라 두 줄로 접는다 · 본문 최소 16
+                // v3 — 도장이 무기 열(356) 안이라 접는다 · 본문 최소 16 · 단계 · E · R 세 줄(접히면 여섯 줄까지 — 104는 다섯째 줄이 잘렸다 · 11-02)
                 _stampTier.textWrappingMode = TextWrappingModes.Normal;
                 _stampTier.alignment   = TextAlignmentOptions.Top;
                 _stampTier.fontSizeMin = FMin;
                 _stampTier.fontSizeMax = FTable;
                 _stampTier.fontSize    = FTable;
-                rt.sizeDelta = new Vector2(0f, 52f);
+                rt.sizeDelta = new Vector2(0f, 128f);
             }
             TMPOutlineHelper.ApplySoftShadow(_stampTier);   // 무대 마법진 위에서 읽히게
         }
@@ -841,8 +845,13 @@ public sealed partial class UI_CruciblePanel : UI_Popup
         for (int i = 0; i < ms.Length; i++) crossed |= ms[i] > before && ms[i] <= after;
         if (!crossed) return null;
         int tier = SkillTierResolver.Resolve(w);
-        string body = TierChangeBody(w, tier);
-        return body != null ? Loc.F("스킬 {0}단계 — {1}", tier, body) : Loc.F("스킬 {0}단계", tier);
+        // 11-02 — E · R 변화를 「 · 」로 한 줄에 이으면 무기 열(356)에서 「…」로 잘렸다 → 단계 · E · R을 줄로 나눈다
+        string e    = w.skillE != null ? w.skillE.ChangeAtTier(tier) : null;
+        string q    = w.skillQ != null ? w.skillQ.ChangeAtTier(tier) : null;
+        string line = Loc.F("스킬 {0}단계", tier);
+        if (e != null) line += "\nE " + e;
+        if (q != null) line += "\nR " + q;
+        return line;
     }
 
     private void HideStageResult()
@@ -2225,6 +2234,9 @@ public sealed partial class UI_CruciblePanel : UI_Popup
                 _engraveKind[k].text = $"{key} {skillName}";
                 _engraveName[k].text = Loc.T(_engraveOptions[k].displayName);
                 _engraveDesc[k].text = UIKeywordInk.Values(Loc.T(_engraveOptions[k].description));   // 수치만 Noto 500(10-15 설명 글 강조)
+                string best = _engraveOptions[k].bestFor;
+                _engraveBest[k].text = string.IsNullOrEmpty(best) ? "" : "◇ " + Loc.T(best);
+                _engraveDiagram[k].Show(_engraveOptions[k].illustration, UISkin.Crucible?.EngraveSlash, skill.IconForTier(tier));
                 SetBoxLine(_engraveEdge[k], UITheme.Thin.LineIdle);
             }
             _engravePanel.transform.SetAsLastSibling();
@@ -2313,8 +2325,13 @@ public sealed partial class UI_CruciblePanel : UI_Popup
     private static readonly Color EgPanelC = new(0.055f, 0.051f, 0.086f, 0.97f);
     private static readonly Color EgCardC  = new(0.090f, 0.086f, 0.140f, 1f);
     private static readonly Color EgKindC  = new(0.80f, 0.82f, 0.88f, 1f);
+    private static readonly Color EgBestC  = new(1f, 0.80f, 0.302f, 0.78f);   // 금(얇은 톤) — 「언제 고르나」 한 줄
+    private const float EgDiagramH = 150f;
 
-    /// <summary>스킬 효과 카드 — 세로 쇠 틀(augmentCardFrame) · 위: 스킬 이름 / 효과 이름 / 1px 선 / 설명 / 아래: 고르기 안내. 손을 올리면 안쪽 선이 밝아진다.</summary>
+    /// <summary>
+    /// 스킬 효과 카드 — 세로 쇠 틀(augmentCardFrame) · 위: 스킬 이름 / 효과 이름 / 1px 선 / 그림(11-02) / 설명 / 언제 고르나 / 아래: 고르기 안내.
+    /// 손을 올리면 안쪽 선이 밝아진다.
+    /// </summary>
     private Button BuildSkillChoiceCard(RectTransform panel, int k, float x)
     {
         var bg = ShopUIStyle.MakeImage(panel, $"EngraveCard{k}", EgCardC, raycast: true);
@@ -2332,18 +2349,25 @@ public sealed partial class UI_CruciblePanel : UI_Popup
         name.enableAutoSizing = true;
         name.fontSizeMax = 28f;
         name.fontSizeMin = 20f;
-        PlaceIn(name.rectTransform, EgCardPad, 74f, w, 44f, EgCardW, EgCardH);
+        PlaceIn(name.rectTransform, EgCardPad, 68f, w, 40f, EgCardW, EgCardH);
         _engraveName[k] = name;
         var line = ShopUIStyle.MakeImage(rt, "Rule", UITheme.Thin.LineIdle);
-        PlaceIn(line.rectTransform, EgCardPad + 20f, 132f, w - 40f, 1f, EgCardW, EgCardH);
+        PlaceIn(line.rectTransform, EgCardPad + 20f, 116f, w - 40f, 1f, EgCardW, EgCardH);
+        // 11-02 그림 칸(240×150) — 효과가 들어가는 모양을 되풀이한다
+        var diagram = ShopUIStyle.MakeRect(rt, "Diagram", typeof(CanvasGroup));
+        PlaceIn((RectTransform)diagram.transform, EgCardPad, 128f, w, EgDiagramH, EgCardW, EgCardH);
+        _engraveDiagram[k] = diagram.AddComponent<UI_EngraveDiagram>();
         var desc = NewText(rt, "Desc", UITheme.Thin.Lead, UIWeight.Regular, TextAlignmentOptions.TopLeft, UITheme.Thin.InkA(0.85f));
         desc.textWrappingMode = TextWrappingModes.Normal;
         desc.enableAutoSizing = true;
         desc.fontSizeMax = UITheme.Thin.Lead;
         desc.fontSizeMin = 16f;
         desc.overflowMode = TextOverflowModes.Ellipsis;
-        PlaceIn(desc.rectTransform, EgCardPad, 150f, w, 240f, EgCardW, EgCardH);
+        PlaceIn(desc.rectTransform, EgCardPad, 288f, w, 96f, EgCardW, EgCardH);
         _engraveDesc[k] = desc;
+        var best = NewText(rt, "Best", 16f, UIWeight.Regular, TextAlignmentOptions.Center, EgBestC);
+        PlaceIn(best.rectTransform, EgCardPad, 388f, w, 24f, EgCardW, EgCardH);
+        _engraveBest[k] = best;
         var hint = NewText(rt, "Hint", 16f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.55f));
         hint.text = "눌러서 고른다";
         PlaceIn(hint.rectTransform, EgCardPad, EgCardH - 54f, w, 24f, EgCardW, EgCardH);
@@ -2802,7 +2826,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
     private void HoldBeforeState(EnhanceResult r, int max)
     {
         var w = _controller.GetSlot(PlayerWeaponManager.Slot0);
-        if (w != null && _cardAtk[0] != null) _cardAtk[0].SetText(AtkHoldFormat, AttackAt(w, r.beforeLevel));
+        if (w != null && _cardAtk[0] != null) _cardAtk[0].SetText(Loc.T(AtkHoldFormat), AttackAt(w, r.beforeLevel));
         _heatLevel01 = max > 0 ? Mathf.Clamp01((float)r.beforeLevel / max) : 0f;
 
         RefreshTicks(w, r.beforeLevel, max);
@@ -3102,8 +3126,10 @@ public sealed partial class UI_CruciblePanel : UI_Popup
                 _glowShown = Mathf.MoveTowards(_glowShown, _heatLevel01, dt * 1.5f);
                 if (_weaponGlow != null)
                 {
-                    var c = GlowColor;
-                    c.a = (0.15f + 0.6f * _glowShown) * (0.85f + 0.15f * Mathf.Sin(time * 2.2f));
+                    var c = _isLegend ? LegendGlow : GlowColor;
+                    c.a = _isLegend
+                        ? 0.42f + 0.12f * Mathf.Sin(time * 1.6f)   // 전설 — 다 달군 뒤에도 금빛으로 천천히 숨 쉰다
+                        : (0.15f + 0.6f * _glowShown) * (0.85f + 0.15f * Mathf.Sin(time * 2.2f));
                     _weaponGlow.color = c;
                 }
                 if (_gaugeGhost != null && _gaugeGhost.gameObject.activeSelf)
@@ -3347,7 +3373,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
         if (w == null || atk == null) return;
 
         float from = AttackAt(w, beforeLevel), to = AttackAt(w, afterLevel);
-        string fmt = to >= from ? AtkUpFormat : AtkDownFormat;
+        string fmt = Loc.T(to >= from ? AtkUpFormat : AtkDownFormat);   // 11-02 Q11
         float t = 0f;
         while (t < AtkCountDur)
         {
@@ -3394,6 +3420,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
                 if (_focusTypeText != null)   _focusTypeText.text = "";
                 SetGauge(i, 0, 1);
                 _heatLevel01 = 0f;
+                _isLegend = false;
             }
             else
             {
@@ -3408,7 +3435,8 @@ public sealed partial class UI_CruciblePanel : UI_Popup
                 _heatLevel01 = max > 0 ? Mathf.Clamp01((float)w.enhanceLevel / max) : 0f;
                 // 무기 그림 — 재련소 검 그림(10-30 · 없으면 장착 무기 아이콘). 진화로 무기가 바뀌면 그림도 따라 바뀐다.
                 var art = WeaponArt(w);
-                if (_weaponImg != null && art != null) { _weaponImg.sprite = art; _weaponImg.color = Color.white; }
+                _isLegend = !string.IsNullOrEmpty(w.legendId);
+                if (_weaponImg != null && art != null) { _weaponImg.sprite = art; _weaponImg.color = _isLegend ? LegendArtTint : Color.white; }
             }
         }
 

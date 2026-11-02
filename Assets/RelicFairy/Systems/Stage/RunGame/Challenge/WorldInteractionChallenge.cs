@@ -397,7 +397,7 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
         if (_autoTimer == null)
         {
             string hint = AutoResolveHint;
-            _autoTimerFormat = string.IsNullOrEmpty(hint) ? "남은 시간 {0}초" : "남은 시간 {0}초\n<size=70%>" + hint + "</size>";
+            _autoTimerFormat = string.IsNullOrEmpty(hint) ? Loc.T("남은 시간 {0}초") : Loc.T("남은 시간 {0}초") + "\n<size=70%>" + Loc.T(hint) + "</size>";   // 11-02 Q11
             _autoTimer = MakeText(string.Empty, _stage + Vector3.up * AutoTimerHeight, 3.4f, AutoTimerColor, 12);
         }
         _autoTimer.SetText(_autoTimerFormat, sec);

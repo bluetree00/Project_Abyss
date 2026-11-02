@@ -125,7 +125,7 @@ MonoBehaviour:
     prefab: {fileID: 1105777178367904, guid: 16b914e11b128e54fb9f85a547c95812, type: 3}
     scale: 1.4
     offset: {x: 0, y: 0, z: 0}
-    lifetime: 0
+    lifetime: 0.6
     note: "\uC77C\uBC18 \uBAAC\uC2A4\uD130 \uACF5\uACA9 \uC608\uACE0 \uBC18\uC9DD\uC784
       \u2014 \uB9DE\uD788\uAE30 0.45\uCD08 \uC804 \uBA38\uB9AC\uC5D0\uC11C(Hovl RPG
       Yellow Flash \xB7 \uC5F0\uAE30 \uB450 \uCE35 \uB054, \uBAB8 \uB192\uC774\uB85C

@@ -275,7 +275,7 @@ public sealed class RelicMemoryHudView : MonoBehaviour
             _grudgeLabel.rectTransform.anchoredPosition = new Vector2(rowW + GrudgeLabelGap, 0f);
             _grudgeLabel.color = rim ? UITheme.Thin.Gold : UITheme.Thin.Ink;
             // 10-30 H-13 — 무엇에 쓰는지 둘째 줄(심판 마지막 일격 뒤 원한 1개당 참격 1줄). 한 줄로 늘이면 16:10에서 물약 C 칸에 닿는다
-            if (cap > 0) _grudgeLabel.SetText("원한 {0}/{1}\n<size=80%>Q 참격 +{0}</size>", Mathf.Min(value, cap), cap);
+            if (cap > 0) _grudgeLabel.SetText(Loc.T("원한 {0}/{1}\n<size=80%>Q 참격 +{0}</size>"), Mathf.Min(value, cap), cap);
             else _grudgeLabel.text = string.Empty;
             starX += cap > 0 ? _grudgeLabel.preferredWidth : 0f;
         }
@@ -306,8 +306,8 @@ public sealed class RelicMemoryHudView : MonoBehaviour
     public void SetRungValue(int i, int value, bool brand = false)
     {
         if (_dial || i < 0 || i >= 4 || _rungLabel[i] == null) return;
-        if (i == 0) _rungLabel[i].SetText(brand ? "광기 {0} 낙인" : "광기 {0}", value);
-        else _rungLabel[i].SetText(brand ? "{0} 낙인" : "{0}", value);
+        if (i == 0) _rungLabel[i].SetText(Loc.T(brand ? "광기 {0} 낙인" : "광기 {0}"), value);
+        else _rungLabel[i].SetText(brand ? Loc.T("{0} 낙인") : "{0}", value);
     }
 
     /// <summary>광기가 계단 i(0~3)를 넘었다 — 표식이 한 번 빛난다.</summary>
@@ -485,7 +485,7 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         {
             _holdShown = holdingDawn;
             // 10-30 H-06 — 「새벽을 붙들었다 · 낙일로 정오」는 비유라 무엇을 누르는지 흐렸다
-            if (holdingDawn) _holdLabel.SetText("여명 연장 중 — Q로 정오 시작(최대 {0}초)", ZenithGauge.HoldDawnMax);
+            if (holdingDawn) _holdLabel.SetText(Loc.T("여명 연장 중 — Q로 정오 시작(최대 {0}초)"), ZenithGauge.HoldDawnMax);
             else _holdLabel.text = string.Empty;
         }
         TickHint();
@@ -553,7 +553,7 @@ public sealed class RelicMemoryHudView : MonoBehaviour
         if (key == _holdKey) return;
         _holdKey = key;
         // 10-30 H-14 — 「멈춤」만으론 무엇이 멈췄는지 몰랐다 → 피 냄새 「광기 유지 N초」 · 끝의 문턱 「광란 미루는 중」
-        if (key > 0) _holdSec.SetText("광기 유지 {0:1}초", key * 0.1f);
+        if (key > 0) _holdSec.SetText(Loc.T("광기 유지 {0:1}초"), key * 0.1f);
         else _holdSec.text = key == -2 ? "광란 미루는 중" : string.Empty;
     }
 

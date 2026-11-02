@@ -33,6 +33,56 @@ public static class Q1SymmetryProbeEditor
         Measure("boss_room", player.transform.position, spawner.transform.position);
     }
 
+    [MenuItem("RelicFairy/Debug/11-02 Q1 길 · 입구 대칭 — 지금 방 플레이어 앞 40 m (Play)")]
+    private static void RoomAhead()
+    {
+        if (!EditorApplication.isPlaying) { Debug.LogWarning("[Q1Sym] 플레이 중에"); return; }
+        var player = GameRunBootstrapper.Instance?.Run?.Player;
+        if (player == null) { Debug.LogWarning("[Q1Sym] 끝 — 플레이어 없음"); return; }
+        Vector3 f = player.transform.forward; f.y = 0f;
+        Measure("room_ahead", player.transform.position, player.transform.position + f.normalized * 40f);
+    }
+
+    [MenuItem("RelicFairy/Debug/11-02 Q1 길 · 입구 대칭 — 챕터 3 보스 앞 길 (보스방, Play)")]
+    private static void Ch3Road()
+    {
+        if (!EditorApplication.isPlaying) { Debug.LogWarning("[Q1Sym] 플레이 중에"); return; }
+        var road = UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                                     .FirstOrDefault(t => t.name == "Road_Boss_Ch3(Clone)");
+        if (road == null) { Debug.LogWarning("[Q1Sym] 끝 — 보스 앞 길 없음"); return; }
+        // 길 회랑(바닥 가운데 z −55 · 벽 ±4.25)을 앞에서 끝까지 — 길 프리팹 기준
+        Measure("ch3_road", road.TransformPoint(new Vector3(0f, 0f, -88f)), road.TransformPoint(new Vector3(0f, 0f, -20f)));
+    }
+
+    [MenuItem("RelicFairy/Debug/11-02 Q1 길 · 입구 대칭 — 챕터 3 보스 앞 길 프리팹 (편집 모드)")]
+    private static void Ch3RoadPrefab()
+    {
+        if (EditorApplication.isPlaying) { Debug.LogWarning("[Q1Sym] 편집 모드에서"); return; }
+        const string path = "Assets/RelicFairy/Systems/Stage/MapGen/Prefabs/Road_Boss_Ch3.prefab";
+        var root = PrefabUtility.LoadPrefabContents(path);
+        try
+        {
+            Physics.SyncTransforms();
+            var ps = root.scene.GetPhysicsScene();
+            var sb = new StringBuilder("Q1 대칭 — Road_Boss_Ch3 프리팹(편집 모드 · 미리보기 물리) · 길 기준 z −88 → −20" + Environment.NewLine);
+            sb.AppendLine("  z | 왼 | 오른 | 가운데 비킴(+오른) | 왼쪽 맞음 | 오른쪽 맞음");
+            for (float z = -88f; z <= -20f; z += 2f)
+            {
+                Vector3 o = root.transform.TransformPoint(new Vector3(0f, 1.2f, z));
+                Vector3 r = root.transform.right;
+                bool hl = ps.Raycast(o, -r, out var L, 30f, ~0, QueryTriggerInteraction.Ignore);
+                bool hr = ps.Raycast(o,  r, out var R, 30f, ~0, QueryTriggerInteraction.Ignore);
+                float dl = hl ? L.distance : 30f, dr = hr ? R.distance : 30f;
+                sb.AppendLine($"  {z,5:0} | {dl,5:0.00} | {dr,5:0.00} | {(dr - dl) * 0.5f,6:+0.00;-0.00} | {(hl ? L.collider.name : "-")} | {(hr ? R.collider.name : "-")}");
+            }
+            string dir = Path.Combine(Directory.GetCurrentDirectory(), "Temp", "q1_symmetry");
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "ch3_road_prefab.txt"), sb.ToString(), Encoding.UTF8);
+        }
+        finally { PrefabUtility.UnloadPrefabContents(root); }
+        Debug.Log("[Q1Sym] 끝 — ch3_road_prefab");
+    }
+
     private static async UniTaskVoid IntroAsync()
     {
         string key = "game_intro_done_v1_slot" + (RunProgressManager.Instance?.ActiveSlotIndex ?? 0);

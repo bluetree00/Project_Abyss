@@ -76,4 +76,7 @@ public struct RunMetaSnapshot
 
     /// <summary>보스 클리어 뒤 저장(10-10) — 이어하면 다음 챕터 대기방부터 연다.</summary>
     public bool chapterStartPending;
+
+    /// <summary>대기방 서약 제단을 이미 썼다(11-02 · 대기방 저장만).</summary>
+    public bool waitingAltarUsed;
 }

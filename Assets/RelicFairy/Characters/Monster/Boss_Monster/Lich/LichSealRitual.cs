@@ -32,11 +32,12 @@ public sealed class LichSealRitual
     private const float SkeletonDistance        = 6f;
     private const float SealFreezeSeconds       = 1f;
     private const float DoneLineSeconds         = 2.5f;
-    private const float StoneShotMove           = 0.4f;    // 봉인석 차례 비추기(10-03) — 다음 돌로 옮겨 가는 시간
-    private const float StoneShotHold           = 0.25f;   //   · 머무는 시간(돌 하나 약 0.65초)
-    private const float StoneShotBack           = 7f;      //   · 돌 바깥으로 물러선 거리(m) — 낮게 비춰 돌 너머로 무릎 꿇은 리치가 함께 잡힌다
-    private const float StoneShotHeight         = 3f;
-    private const float StoneShotLook           = 1.2f;    //   · 돌 몸통 높이를 본다
+    private const float RevealMove              = 0.8f;    // 봉인석 세우기 전경(11-02) — 보던 방향 그대로 뒤 · 위로 물러나는 시간
+    private const float StoneRiseGap            = 0.4f;    //   · 돌 사이 간격(카메라는 멈춘 채)
+    private const float RevealHold              = 0.4f;    //   · 마지막 돌 뒤 머무름(솟기 0.6초가 끝나게)
+    private const float RevealBack              = 1.6f;    //   · 중심에서 뒤로(돌 거리 배수) — 화각 78°에서 네 돌 · 리치가 한 화면
+    private const float RevealHeight            = 1.9f;    //   · 높이(돌 거리 배수)
+    private const float RevealLookShift         = 0.45f;   //   · 중심보다 카메라 쪽을 본다 — 가까운 돌이 화면 아래 대사 띠(아래 30%) 위에 오게
     private const float StoneRevealVfxScale     = 0.6f;    // 솟는 돌 발밑 청록 원(TileRestore 칸)
     private const float RevealSafety            = 1.5f;    // 카메라가 돌아오는 동안까지 무적
 
@@ -162,8 +163,9 @@ public sealed class LichSealRitual
     }
 
     /// <summary>
-    /// 봉인석 넷을 북 → 동 → 남 → 서로 하나씩 세우며 카메라가 차례로 비춘다(돌 하나 약 0.65초, 10-03) —
-    /// 돌은 디졸브로 솟고 발밑에 청록 원(칠 수 있음)이 핀다. 리치는 무릎 꿇은 채 · 방해 전이라 입력을 잠그고, 끝나면 플레이어 카메라로.
+    /// 봉인석 넷을 북 → 동 → 남 → 서로 하나씩 세운다 — 카메라는 보던 방향 그대로 높이 물러나 제단 전체를 한 화면에 잡고 멈춘 채 돌만 차례로 솟는다
+    /// (11-02 사용자: 돌마다 90°씩 돌며 비추면 어지럽다). 돌은 디졸브로 솟고 발밑에 청록 원(칠 수 있음)이 핀다.
+    /// 리치는 무릎 꿇은 채 · 방해 전이라 입력을 잠그고, 끝나면 플레이어 카메라로.
     /// </summary>
     private async UniTask RevealStonesAsync(float distance, CancellationToken ct)
     {
@@ -172,11 +174,18 @@ public sealed class LichSealRitual
         if (camera)
         {
             player.SetInputEnabled(false);
-            player.SetInvincible(StoneCount * (StoneShotMove + StoneShotHold) + RevealSafety);
+            player.SetInvincible(RevealMove + StoneCount * StoneRiseGap + RevealHold + RevealSafety);
             LichCinematics.TakeCamera();
         }
         try
         {
+            if (camera)
+            {
+                // 화면이 돌지 않게 수평 방향은 그대로 — 뒤 · 위로만 물러난다.
+                Vector3 heading = ViewHeading();
+                await LichCinematics.ShotAsync(_center - heading * (distance * RevealBack) + Vector3.up * (distance * RevealHeight),
+                                               _center - heading * (distance * RevealLookShift), RevealMove, ct);
+            }
             for (int i = 0; i < StoneCount; i++)
             {
                 Vector3 dir = Quaternion.Euler(0f, 90f * i, 0f) * Vector3.forward;
@@ -184,15 +193,11 @@ public sealed class LichSealRitual
                 _stones.Add(LichSealStone.Create(at, _lich.transform, OnStoneIgnited));
                 LichVfx.Play(LichVfxSlot.TileRestore, at + Vector3.up * 0.05f, Quaternion.identity, StoneRevealVfxScale);
                 LichSfx.Play(LichSfxSlot.CircleSpawn, at);
-                if (!camera) continue;
-
-                // 돌 바깥 위에서 안쪽을 본다 — 돌 너머로 무릎 꿇은 리치(제단 중심)가 함께 잡혀 위치가 읽힌다.
-                await LichCinematics.ShotAsync(at + dir * StoneShotBack + Vector3.up * StoneShotHeight,
-                                               at + Vector3.up * StoneShotLook, StoneShotMove, ct);
-                await Wait(StoneShotHold, ct);
+                if (camera) await Wait(StoneRiseGap, ct);
             }
             if (camera)
             {
+                await Wait(RevealHold, ct);
                 await LichCinematics.ReturnToPlayerAsync(player.transform, ct);
                 camera = false;
             }
@@ -202,6 +207,15 @@ public sealed class LichSealRitual
             if (camera && player != null) LichCinematics.ReturnToPlayerAsync(player.transform, CancellationToken.None).Forget();
             if (player != null) player.SetInputEnabled(true);
         }
+    }
+
+    /// <summary>지금 카메라가 보는 수평 방향.</summary>
+    private static Vector3 ViewHeading()
+    {
+        var cam = GameCameraController.Instance;
+        Vector3 f = cam != null ? cam.transform.forward : Vector3.forward;
+        f.y = 0f;
+        return f.sqrMagnitude > 0.01f ? f.normalized : Vector3.forward;
     }
 
     private void OnStoneIgnited(LichSealStone stone)

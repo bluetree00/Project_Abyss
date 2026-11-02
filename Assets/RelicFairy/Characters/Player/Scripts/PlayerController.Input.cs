@@ -158,8 +158,8 @@ public sealed partial class PlayerController
 
         var panel = UI_GridPanel.Instance;
         if (panel != null && panel.IsOpen)
-            panel.Close();
-        else
+            panel.TryHandleEscape();   // 11-02 Q32 A5 — 「돌아가기」 · ESC와 같은 길(보관함이 넘치면 정리 창이 먼저) · 바로 Close()는 상한을 건너뛰었다
+        else if (!UI_EscMenu.AnyOpen)   // A1 — ESC 메뉴 밑에서 룬판이 열리지 않게
             panel?.Open();
     }
 

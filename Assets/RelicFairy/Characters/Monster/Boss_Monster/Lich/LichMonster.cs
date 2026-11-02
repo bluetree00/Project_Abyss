@@ -518,10 +518,12 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance, IBossHudSource
 
         BindBossHud();
         ArenaTileGrid.TileRestoring += HandleTileRestoring;
+        HitchLog.Enter(this, "리치전", this);   // 빌드 끊김 기록(11-02 Q27)
     }
 
     protected override void OnDisable()
     {
+        HitchLog.Exit(this);
         ArenaTileGrid.TileRestoring -= HandleTileRestoring;
         UnbindBossHudIfBound();
         LichHazards.Clear();

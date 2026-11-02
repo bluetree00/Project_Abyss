@@ -299,6 +299,7 @@ public static class LichVfx
             cache = go.AddComponent<LichVfxScaleCache>();
         cache.Prepare(loop);
         cache.ApplyTint(tint ?? entry.tint);
+        cache.ApplyEmission(entry.emission > 0f ? entry.emission : 1f);
 
         float s =(entry.scale > 0f ? entry.scale : 1f) * scale;
         go.transform.localScale = entry.prefab.transform.localScale * s;

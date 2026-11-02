@@ -27,6 +27,9 @@ public class SkillSO : ScriptableObject
     [Tooltip("3단계가 되면 바뀌는 것(짧게).")]
     [SerializeField] private string _tier3Change;
 
+    /// <summary>각인 고르기 카드 그림 — 위에서 본 작은 그림으로 효과가 들어가는 모양(11-02 · <see cref="UI_EngraveDiagram"/>).</summary>
+    public enum EngraveIllustration { None, Spread, Focus }
+
     [Serializable]
     public struct EngravingDef
     {
@@ -36,6 +39,10 @@ public class SkillSO : ScriptableObject
         public int    tier;
         public string displayName;
         [TextArea] public string description;
+        [Tooltip("이럴 때 고른다(짧게, 예: 「적이 여럿 흩어졌을 때」) — 고르기 카드 아래 한 줄. 비우면 숨긴다(11-02).")]
+        public string bestFor;
+        [Tooltip("고르기 카드 그림 — Spread = 가까운 적으로 옮겨 간다 · Focus = 한 적에게 모인다. None이면 그림 없이 글만(11-02).")]
+        public EngraveIllustration illustration;
     }
 
     [Header("각인 — 단계에 오를 때 같은 단계 각인 중 하나를 고른다 (09-25 시범: 환영베기)")]

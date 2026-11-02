@@ -112,6 +112,8 @@ public struct LichVfxEntry
     public float       beamLength;
     [Tooltip("입자 시작 색에 곱할 색 — 팩 색을 규약 색(낫 = 빨강 등)으로 바꿀 때. 알파 0이면 원래 색")]
     public Color       tint;
+    [Tooltip("초당 방출 배율(0이면 1) — 한 번짜리 팩 이펙트를 반복 장판으로 쓸 때 입자가 쌓이지 않게(11-02 Q27 얼음 장판 1개 약 7,000개)")]
+    public float       emission;
 }
 
 /// <summary>

@@ -84,6 +84,7 @@ public static class ExileFallSequence
 
     // ── Static ────────────────────────────────────────────────────
     private static bool  s_active;            // 추방이 시작됐다 — 보스 클리어가 런 클리어 대신 Ch1로 간다
+    private static readonly object s_hitchScope = new object();   // 빌드 끊김 기록 범위(11-02 Q27 HitchLog)
     private static bool  s_claimed;           // 부트스트래퍼가 전환을 맡았다
     private static bool  s_expectRoomClear;   // 보스방 클리어 신호가 올 길인가(직접 실측은 아니다)
     private static bool  s_landed;
@@ -259,6 +260,7 @@ public static class ExileFallSequence
         s_body   = null;
         s_stage  = null;   // 무대는 씬과 함께 사라진다
         Note("Ch1로 — 같은 런 · 같은 빌드");
+        HitchLog.Exit(s_hitchScope);
     }
 
     /// <summary>추방으로 떨어져 온 챕터 진입인가(한 번 읽으면 꺼진다).</summary>
@@ -281,6 +283,7 @@ public static class ExileFallSequence
         s_body   = null;
         s_stage  = null;
         s_active = false;
+        HitchLog.Exit(s_hitchScope);
 
         if (stage != null)
         {
@@ -488,6 +491,7 @@ public static class ExileFallSequence
         s_trace.Clear();
 #endif
         Note($"추방 시작({from}) · 시기 {StoryProgress.Era} · 챕터 {GameRunBootstrapper.Instance?.Run?.CurrentChapter}");
+        HitchLog.Enter(s_hitchScope, "추방");
 
         // 무대는 가리키는 동안 미리 짓는다(y −3000 — 화면에 안 든다) — 떨어지는 순간 읽기를 기다리지 않게.
         s_stage = ExileFallStage.Create(at, away);

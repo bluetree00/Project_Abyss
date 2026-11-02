@@ -66,6 +66,7 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
     {
         GawainMemoryHub.Bound   += OnGawainHub;
         LancelotMemoryHub.Bound += OnLancelotHub;
+        Loc.LanguageChanged     += OnLanguageChanged;   // 11-02 Q11
 
         // 꺼져 있는 동안 허브가 생기면 Bound를 놓친다 — Ch2 · 심연 루프는 @HUD가 꺼진 채 첫 조각이 붙고
         // Bound는 다시 오지 않아 유물 HUD가 끝까지 안 떴다. 켜질 때 지금 허브를 다시 묻는다(10-09 출시 점검).
@@ -100,6 +101,15 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
     {
         GawainMemoryHub.Bound   -= OnGawainHub;
         LancelotMemoryHub.Bound -= OnLancelotHub;
+        Loc.LanguageChanged     -= OnLanguageChanged;
+    }
+
+    /// <summary>11-02 Q11 — 띠 이름 · 계단 값은 SetText(형식, 값)라 안전망이 다시 못 쓴다. 언어가 바뀌면 지금 값으로 다시 쓴다.</summary>
+    private void OnLanguageChanged()
+    {
+        if (_view == null) return;
+        if (_lHub != null) for (int k = 1; k <= 4; k++) _view.SetRungValue(k - 1, _lHub.Rung(k), brand: k == 2);
+        RefreshAll();
     }
 
     private void OnDestroy() => Detach();

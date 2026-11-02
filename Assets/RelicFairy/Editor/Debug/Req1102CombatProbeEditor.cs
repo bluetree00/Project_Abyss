@@ -856,6 +856,389 @@ public static class Req1102CombatProbeEditor
         }
     }
 
+    // ── 11-02 26 점검 「안 된 것」 전투 몫 ─────────────────────────────
+    private const string FireAuraNow  = "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Auras/Aura_Fire_LWRP.prefab";
+    private const string FireAuraCand = "Assets/RelicFairy/_Imported/EffectSource/Spells Pack/LWRP(URP)/Particles_LWRP/Prefabs/Spells/Spell_Fire_11_LWRP.prefab";
+    private static readonly float[] FireTimes = { 0.15f, 0.4f, 0.8f, 1.2f, 2f, 3f, 4f, 5f, 5.8f, 6.5f };
+    private static readonly float[] FireShots = { 0.15f, 0.8f, 2f, 4f, 5.8f };
+    private static readonly ParticleSystem.Particle[] s_fireParts = new ParticleSystem.Particle[4096];
+
+    /// <summary>불 오라(불붙은 바닥) 교체 — ① 프리팹 그대로(배율 1 · 자체 반복) 시간순 가로 폭 · 입자 · 사진(5.6초 주기에 다시 터지나)
+    /// ② 실제 길(ElementVfxPlayer.AttachAura 불 · 반경 3 m · 4초 = 전설 불바다와 같은 수명) 시간순 가로 폭 — 판정 지름 6 m와 맞나.
+    /// 결과 Temp/req1102_fireaura.txt · 사진 R1102_Fire_{raw_now|raw_cand|real}_{n}.png.</summary>
+    [MenuItem("RelicFairy/Debug/11-02 전투/불 오라 후보 시간순 · 실제 길 (Build/BaseCamp, 플레이 중)")]
+    private static void RunFireAura() { if (EditorApplication.isPlaying) RunFireAuraAsync().Forget(); }
+
+    private static async UniTaskVoid RunFireAuraAsync()
+    {
+        var sb = new StringBuilder("11-02 불 오라 후보\n");
+        var ct = CancellationToken.None;
+        GameObject anchor = null;
+        int h = 0;
+        try
+        {
+            var p = await FindPlayerAsync();
+            if (p == null) { sb.AppendLine("플레이어 없음"); return; }
+            Vector3 fw = p.transform.forward;
+            Vector3 at = p.transform.position + fw * 4f;
+            if (Physics.Raycast(at + Vector3.up * 1.5f, Vector3.down, out var hit, 4f, LayerMask.GetMask("Ground"))) at = hit.point;
+            sb.AppendLine($"자리 {at} · 배율 {Time.timeScale}");
+            // 후보 목록 — Temp/fire_aura_cand2.txt(줄마다 경로)가 있으면 그것(11-02 밤 「계속 타는 바닥 불」 찾기)
+            var paths = File.Exists("Temp/fire_aura_cand2.txt") ? File.ReadAllLines("Temp/fire_aura_cand2.txt") : new[] { FireAuraNow, FireAuraCand };
+            for (int pi = 0; pi < paths.Length; pi++)
+            {
+                string path = paths[pi].Trim();
+                if (path.Length == 0) continue;
+                if (Time.timeScale == 0f) Managers.UI?.CloseAllPopupUI();
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (prefab == null) { sb.AppendLine("없음 " + path); continue; }
+                string key = path == FireAuraNow ? "now" : path == FireAuraCand ? "cand" : "c" + pi;
+                var go = UnityEngine.Object.Instantiate(prefab, at + Vector3.up * 0.02f, prefab.transform.rotation);
+                foreach (var c in go.GetComponentsInChildren<Collider>(true)) c.enabled = false;
+                var pss = go.GetComponentsInChildren<ParticleSystem>(true);
+                // 실제 길(ElementVfxPlayer.RestartParticles)처럼 다시 튼다. 거점 Camera.main은 이 자리를 안 비춰 「화면 밖 멈춤」 계통이 멈췄다 — 실측만 늘 돌린다
+                foreach (var ps in pss) { var m = ps.main; m.scalingMode = ParticleSystemScalingMode.Hierarchy; m.cullingMode = ParticleSystemCullingMode.AlwaysSimulate; ps.Clear(true); ps.Play(true); }
+                sb.AppendLine($"① {prefab.name} 배율 1 · 계통 {pss.Length} · 반복 {(pss.Length > 0 && pss[0].main.loop)} · 길이 {(pss.Length > 0 ? pss[0].main.duration : 0f):0.0}초");
+                await SampleFireAsync(go.transform, at, fw, "R1102_Fire_raw_" + key, sb, ct);
+                UnityEngine.Object.Destroy(go);
+                await UniTask.Delay(600, ignoreTimeScale: true);
+            }
+
+            // ② 실제 길 — 속성 이펙트 목록(ElementVfxRegistry)에 지금 든 불 오라
+            anchor = new GameObject("~R1102FireAnchor");
+            anchor.transform.position = at;
+            ElementVfxPlayer.Warmup();   // 목록은 처음 부를 때 비동기로 불러온다 — 될 때까지 다시 건다
+            for (float w = 0f; w < 8f && (h = ElementVfxPlayer.AttachAura(RuneElement.Fire, anchor.transform, 4f, 3f)) == 0; w += 0.25f)
+                await UniTask.Delay(250, ignoreTimeScale: true);
+            Transform real = null;
+            var player = UnityEngine.Object.FindFirstObjectByType<ElementVfxPlayer>();
+            if (player != null)
+                foreach (Transform c in player.transform)
+                    if (c.gameObject.activeSelf && (c.position - at).sqrMagnitude < 0.25f) { real = c; break; }
+            sb.AppendLine($"② 실제 길 AttachAura(불 · 반경 3 m = 지름 6 m · 4초) 핸들 {h} · {(real != null ? real.name + " 배율 " + real.localScale.x.ToString("0.00") : "인스턴스 못 찾음")}");
+            if (real != null)
+            {
+                foreach (var ps in real.GetComponentsInChildren<ParticleSystem>(true)) { var m = ps.main; m.cullingMode = ParticleSystemCullingMode.AlwaysSimulate; ps.Clear(true); ps.Play(true); }   // 위 ①과 같은 이유
+                await SampleFireAsync(real, at, fw, "R1102_Fire_real", sb, ct);
+            }
+        }
+        catch (Exception e) { sb.AppendLine("예외 " + e); }
+        finally
+        {
+            if (h != 0) ElementVfxPlayer.ReleaseAura(h);
+            if (anchor != null) UnityEngine.Object.Destroy(anchor);
+            File.WriteAllText("Temp/req1102_fireaura.txt", sb.ToString());
+            Debug.Log($"{Tag} 끝 → Temp/req1102_fireaura.txt");
+        }
+    }
+
+    /// <summary>시간순 가로 폭(입자 있는 렌더러 묶음 상자의 x · z 큰 쪽 · 12 m 넘는 흩어진 계통 뺌) · 입자 수 · 사진(앞 위에서 자리를 내려다봄).</summary>
+    private static async UniTask SampleFireAsync(Transform root, Vector3 at, Vector3 fw, string shot, StringBuilder sb, CancellationToken ct)
+    {
+        float t0 = Time.realtimeSinceStartup;
+        int ti = 0, si = 0;
+        while (ti < FireTimes.Length)
+        {
+            float e = Time.realtimeSinceStartup - t0;
+            if (Time.timeScale == 0f) Managers.UI?.CloseAllPopupUI();   // 거점 도착 대사가 늦게 떠 시간을 멈췄다(배율 0 → 입자 멈춤)
+            if (si < FireShots.Length && e >= FireShots[si]) CaptureAt(at, fw, $"Temp/ui_shots/{shot}_{si++}.png");
+            if (e >= FireTimes[ti])
+            {
+                var rs = new List<float>();
+                int parts = 0;
+                if (root != null)
+                    foreach (var ps in root.GetComponentsInChildren<ParticleSystem>())
+                    {
+                        if (!ps.TryGetComponent<ParticleSystemRenderer>(out var pr) || !pr.enabled) continue;
+                        int n = ps.GetParticles(s_fireParts);
+                        parts += n;
+                        bool world = ps.main.simulationSpace == ParticleSystemSimulationSpace.World;
+                        for (int k = 0; k < n; k++)
+                        {
+                            Vector3 wp = world ? s_fireParts[k].position : ps.transform.TransformPoint(s_fireParts[k].position);
+                            rs.Add(new Vector2(wp.x - at.x, wp.z - at.z).magnitude);
+                        }
+                    }
+                rs.Sort();
+                float r90 = rs.Count > 0 ? rs[Mathf.Min(rs.Count - 1, (int)(rs.Count * 0.9f))] : 0f;
+                float rMax = rs.Count > 0 ? rs[rs.Count - 1] : 0f;
+                sb.AppendLine($"   {FireTimes[ti]:0.00}초 반경 90% {r90:0.00} · 최대 {rMax:0.00} m · 입자 {parts} · 배율 {Time.timeScale:0.##}");
+                ti++;
+            }
+            await UniTask.Yield(PlayerLoopTiming.Update, ct);
+        }
+    }
+
+    private static void CaptureAt(Vector3 at, Vector3 fw, string path)
+    {
+        var go = new GameObject("~R1102At");
+        try
+        {
+            var cam = go.AddComponent<Camera>();
+            if (Camera.main != null) cam.CopyFrom(Camera.main);
+            cam.enabled = false;
+            cam.fieldOfView = 45f;
+            cam.transform.position = at - fw * 7f + Vector3.up * 6f;
+            cam.transform.LookAt(at);
+            CaptureMain(cam, path);
+        }
+        finally { UnityEngine.Object.Destroy(go); }
+    }
+
+    /// <summary>풀링 점검 #7(구현설계 RelicFairy_풀링·대량스폰·이펙트_점검_20261029.md) — 전설 룬 이펙트(LegendaryRuntime.SpawnVfx = 매번 Instantiate · 나중에 Destroy)의
+    /// 한 번 비용을 풀 재사용(BossEffectPool.Spawn → Release)과 견준다. 카탈로그(LegendaryVfxCatalog)의 프리팹마다 데운 뒤 20번씩 · 편집기 플레이(빌드보다 느리다).
+    /// 지우기 = 같은 수를 Instantiate한 뒤 DestroyImmediate(나중 Destroy 비용의 상한). 결과 Temp/req1102_legfx.txt.</summary>
+    [MenuItem("RelicFairy/Debug/11-02 전투/풀링 #7 전설 룬 이펙트 한 번 비용 (Build/BaseCamp, 플레이 중)")]
+    private static void RunLegFx() { if (EditorApplication.isPlaying) RunLegFxAsync().Forget(); }
+
+    private static async UniTaskVoid RunLegFxAsync()
+    {
+        const int N = 20;
+        var sb = new StringBuilder("11-02 풀링 #7 전설 룬 이펙트 한 번 비용(ms · 편집기 플레이)\n");
+        try
+        {
+            var p = await FindPlayerAsync();
+            var guids = AssetDatabase.FindAssets("t:LegendaryVfxCatalog");
+            var cat = guids.Length > 0 ? AssetDatabase.LoadAssetAtPath<LegendaryVfxCatalog>(AssetDatabase.GUIDToAssetPath(guids[0])) : null;
+            if (cat == null) { sb.AppendLine("카탈로그 없음"); return; }
+            Vector3 at = (p != null ? p.transform.position : Vector3.zero) + Vector3.down * 50f;   // 화면 밖 — 그리기 비용은 빼고 만들기만 잰다
+            var sw = new System.Diagnostics.Stopwatch();
+            var seen = new HashSet<GameObject>();
+            var made = new GameObject[N];
+            double worst = 0, worstNow = 0;
+            string worstName = "", worstNowName = "";
+            foreach (var fi in typeof(LegendaryVfxCatalog).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                if (fi.FieldType != typeof(GameObject) || !(fi.GetValue(cat) is GameObject prefab) || prefab == null || !seen.Add(prefab)) continue;   // 빈 칸(Unity null)도 건너뜀
+                // 거점 도착 대사가 늦게 떠 시간을 멈췄다(배율 0 → 수명이 안 흘러 풀에 안 돌아옴 · 입자 0) — 닫고 다시 흐를 때까지
+                for (float w = 0f; w < 3f && Time.timeScale == 0f; w += 0.1f) { Managers.UI?.CloseAllPopupUI(); await UniTask.Delay(100, ignoreTimeScale: true); }
+                int psN = prefab.GetComponentsInChildren<ParticleSystem>(true).Length;
+                LegendaryRuntime.SpawnVfx(prefab, at, Quaternion.identity, 0.05f, 1f, 0.5f);   // 데우기(첫 로드 · 셰이더)
+                await UniTask.Yield();
+
+                long a0 = GC.GetAllocatedBytesForCurrentThread();
+                sw.Restart();
+                for (int i = 0; i < N; i++) LegendaryRuntime.SpawnVfx(prefab, at, Quaternion.identity, 0.05f, 1f, 0.5f);   // 알파 칠 길까지(무거운 쪽)
+                sw.Stop();
+                double make = sw.Elapsed.TotalMilliseconds / N;
+                double kb = (GC.GetAllocatedBytesForCurrentThread() - a0) / 1024.0 / N;
+
+                for (int i = 0; i < N; i++) made[i] = UnityEngine.Object.Instantiate(prefab, at, Quaternion.identity);
+                sw.Restart();
+                for (int i = 0; i < N; i++) UnityEngine.Object.DestroyImmediate(made[i]);
+                sw.Stop();
+                double kill = sw.Elapsed.TotalMilliseconds / N;
+
+                RelicFairy.Monster.BossEffectPool.Release(RelicFairy.Monster.BossEffectPool.Spawn(prefab, at, Quaternion.identity));   // 풀 데우기
+                sw.Restart();
+                for (int i = 0; i < N; i++) RelicFairy.Monster.BossEffectPool.Release(RelicFairy.Monster.BossEffectPool.Spawn(prefab, at, Quaternion.identity));
+                sw.Stop();
+                double pool = sw.Elapsed.TotalMilliseconds / N;
+
+                // 새 길(11-02 풀링 #7) — 알파 1 · follow 없음이면 스크립트 없는 프리팹은 전용 풀. 데우기(N개) → 돌아올 때까지 → N번
+                for (int i = 0; i < N; i++) LegendaryRuntime.SpawnVfx(prefab, at, Quaternion.identity, 0.05f);
+                await UniTask.Delay(400, ignoreTimeScale: true);
+                sw.Restart();
+                for (int i = 0; i < N; i++) LegendaryRuntime.SpawnVfx(prefab, at, Quaternion.identity, 0.05f);
+                sw.Stop();
+                double now = sw.Elapsed.TotalMilliseconds / N;
+                await UniTask.Delay(400, ignoreTimeScale: true);
+                LegendaryRuntime.SpawnVfx(prefab, at, Quaternion.identity, 1f);   // 다시 쓴 사본 — 처음부터 다시 도나
+                await UniTask.Delay(150, ignoreTimeScale: true);
+                int live = 0;
+                var roots = new HashSet<Transform>();
+                foreach (var ps in UnityEngine.Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None))
+                    if (ps.transform.root.name == prefab.name + "(Clone)" && (ps.transform.position - at).sqrMagnitude < 25f) { live += ps.particleCount; roots.Add(ps.transform.root); }
+                int actives = roots.Count;
+                sb.AppendLine($"  {fi.Name} · {prefab.name} · 계통 {psN} · 만들기 {make:0.000} + 지우기 {kill:0.000} · 보스 풀 {pool:0.000} · 새 길 {now:0.000} · 다시 쓴 사본 {actives}개 입자 {live} · 할당 {kb:0.0} KB · 배율 {Time.timeScale:0.##}");
+                if (make + kill > worst) { worst = make + kill; worstName = fi.Name; }
+                if (now > worstNow) { worstNow = now; worstNowName = fi.Name; }
+                await UniTask.Delay(150, ignoreTimeScale: true);
+            }
+            sb.AppendLine($"옛 길 가장 무거운 것 {worstName} {worst:0.000} ms/번 · 한 프레임 8번(광역 맞음 · 몬스터 8) {worst * 8:0.00} ms");
+            sb.AppendLine($"새 길 가장 무거운 것 {worstNowName} {worstNow:0.000} ms/번 · 한 프레임 8번 {worstNow * 8:0.00} ms");
+        }
+        catch (Exception e) { sb.AppendLine("예외 " + e); }
+        finally
+        {
+            File.WriteAllText("Temp/req1102_legfx.txt", sb.ToString());
+            Debug.Log($"{Tag} 끝 → Temp/req1102_legfx.txt");
+        }
+    }
+
+    /// <summary>풀링 #8(10-29 문서) — 몬스터 폴더 SO(공격 모양 · 패턴 · 원거리 · 특수 상태 …)가 든 입자 프리팹마다
+    /// 한 번 만들기(Instantiate) + 지우기(DestroyImmediate · 나중 Destroy의 상한)를 BossEffectPool 재사용(Spawn → Release)과 견준다. 편집기 플레이.
+    /// 스크립트가 붙은 것은 풀 재사용을 재지 않는다(재사용하면 달라질 수 있어 풀 대상이 아니다). 결과 Temp/req1102_monfx.txt(비싼 순).</summary>
+    [MenuItem("RelicFairy/Debug/11-02 전투/풀링 #8 몬스터 공격 이펙트 한 번 비용 (Build/BaseCamp, 플레이 중)")]
+    private static void RunMonFx() { if (EditorApplication.isPlaying) RunMonFxAsync().Forget(); }
+
+    private static async UniTaskVoid RunMonFxAsync()
+    {
+        const int N = 10;
+        var sb = new StringBuilder("11-02 풀링 #8 몬스터 공격 이펙트 한 번 비용(ms · 편집기 플레이)\n");
+        try
+        {
+            var p = await FindPlayerAsync();
+            Vector3 at = (p != null ? p.transform.position : Vector3.zero) + Vector3.down * 50f;   // 화면 밖 — 만들기만 잰다
+            var found = new Dictionary<GameObject, string>();
+            foreach (var guid in AssetDatabase.FindAssets("t:ScriptableObject", new[] { "Assets/RelicFairy/Characters/Monster" }))
+            {
+                var so = AssetDatabase.LoadAssetAtPath<ScriptableObject>(AssetDatabase.GUIDToAssetPath(guid));
+                if (so == null) continue;
+                var it = new SerializedObject(so).GetIterator();
+                while (it.Next(true))
+                    if (it.propertyType == SerializedPropertyType.ObjectReference && it.objectReferenceValue is GameObject go && go != null
+                        && go.GetComponentInChildren<ParticleSystem>(true) != null && !found.ContainsKey(go))
+                        found[go] = $"{so.GetType().Name}.{it.propertyPath}({so.name})";
+            }
+            sb.AppendLine($"입자 프리팹 {found.Count}종");
+            var rows = new List<(double cost, string line)>();
+            var sw = new System.Diagnostics.Stopwatch();
+            var made = new GameObject[N];
+            foreach (var kv in found)
+            {
+                for (float w = 0f; w < 3f && Time.timeScale == 0f; w += 0.1f) { Managers.UI?.CloseAllPopupUI(); await UniTask.Delay(100, ignoreTimeScale: true); }
+                var prefab = kv.Key;
+                int psN = prefab.GetComponentsInChildren<ParticleSystem>(true).Length;
+                int scripts = prefab.GetComponentsInChildren<MonoBehaviour>(true).Length;
+                UnityEngine.Object.DestroyImmediate(UnityEngine.Object.Instantiate(prefab, at, Quaternion.identity));   // 데우기
+                sw.Restart();
+                for (int i = 0; i < N; i++) made[i] = UnityEngine.Object.Instantiate(prefab, at, Quaternion.identity);
+                sw.Stop();
+                double make = sw.Elapsed.TotalMilliseconds / N;
+                sw.Restart();
+                for (int i = 0; i < N; i++) UnityEngine.Object.DestroyImmediate(made[i]);
+                sw.Stop();
+                double kill = sw.Elapsed.TotalMilliseconds / N;
+                string pool = "-";
+                if (scripts == 0)
+                {
+                    RelicFairy.Monster.BossEffectPool.Release(RelicFairy.Monster.BossEffectPool.Spawn(prefab, at, Quaternion.identity));
+                    sw.Restart();
+                    for (int i = 0; i < N; i++) RelicFairy.Monster.BossEffectPool.Release(RelicFairy.Monster.BossEffectPool.Spawn(prefab, at, Quaternion.identity));
+                    sw.Stop();
+                    pool = (sw.Elapsed.TotalMilliseconds / N).ToString("0.000");
+                }
+                rows.Add((make + kill, $"  {make + kill:0.000} = 만들기 {make:0.000} + 지우기 {kill:0.000} · 보스 풀 {pool} · 계통 {psN} · 스크립트 {scripts} · {prefab.name} ← {kv.Value}"));
+                await UniTask.Yield();
+            }
+            rows.Sort((a, b) => b.cost.CompareTo(a.cost));
+            foreach (var r in rows) sb.AppendLine(r.line);
+        }
+        catch (Exception e) { sb.AppendLine("예외 " + e); }
+        finally
+        {
+            File.WriteAllText("Temp/req1102_monfx.txt", sb.ToString());
+            Debug.Log($"{Tag} 끝 → Temp/req1102_monfx.txt");
+        }
+    }
+
+    private const string FreshFromSlotPref = "SanctumDebug.FreshFromSlot";   // BaseCampSanctumDebugMenu 11번(되돌리기)과 같은 열쇠
+
+    /// <summary>10-21 ④ 「첫 베이스캠프 진입시 다시 무형검을 얻는 연출」 — 빈 슬롯으로 새 게임 첫 진입을 재현해
+    /// 대사 뒤 WorldSwordAwakening.GrantOnArrivalAsync가 [F] 없이 검을 쥐여 주나 본다(대사는 넘김 단추를 눌러 넘김).
+    /// 시험 슬롯은 0 · 1 중 빈 곳만(2는 사용자 슬롯 — 쓰지 않는다) · 끝나면 원래 슬롯으로 돌아가고 시험 슬롯을 비운다.
+    /// 결과 Temp/req1102_sword.txt · 사진 R1102_Sword_{n}.png.</summary>
+    [MenuItem("RelicFairy/Debug/11-02 전투/④ 첫 진입 무형검 자동 받기 (Build/BaseCamp, 플레이 중)")]
+    private static void RunFirstSword() { if (EditorApplication.isPlaying) RunFirstSwordAsync().Forget(); }
+
+    private static async UniTaskVoid RunFirstSwordAsync()
+    {
+        var sb = new StringBuilder("11-02 ④ 첫 진입 무형검 자동 받기\n");
+        var logs = new List<string>();
+        float t0 = Time.realtimeSinceStartup;
+        void OnLog(string msg, string st, LogType type)
+        {
+            if (msg.StartsWith("[WorldSwordAwakening]") || msg.StartsWith("[BaseCampBootstrapper]") || msg.StartsWith("[BaseCampFx]") || type == LogType.Exception)
+                logs.Add($"  {Time.realtimeSinceStartup - t0:0.00}초 {msg.Split('\n')[0]}");
+        }
+        RunProgressManager rpm = null;
+        int orig = -1, test = -1;
+        Application.logMessageReceived += OnLog;
+        try
+        {
+            PlayerController old = null;
+            for (float t = 0f; t < 30f && (old = UnityEngine.Object.FindFirstObjectByType<PlayerController>()) == null; t += 0.5f)
+                await UniTask.Delay(500, ignoreTimeScale: true);
+            await UniTask.Delay(3000, ignoreTimeScale: true);
+            rpm = RunProgressManager.Instance;
+            var app = AppBootstrapper.Instance;
+            if (rpm == null || app == null) { sb.AppendLine("RunProgressManager/AppBootstrapper 없음"); return; }
+            orig = rpm.ActiveSlotIndex;
+            for (int s = 0; s <= 1; s++)   // 2는 사용자 슬롯 — 쓰지 않는다
+                if (s != orig && !rpm.HasLocalRun(s) && !SaveFileIO.Exists(SaveFileIO.PathFor($"meta_save_{s}.json")) && RunProgressManager.GetRetryCount(s) == 0)
+                { test = s; break; }
+            if (test < 0) { sb.AppendLine($"빈 시험 슬롯(0 · 1) 없음 · 원래 {orig} — 중단"); return; }
+            sb.AppendLine($"원래 슬롯 {orig} → 시험 슬롯 {test}");
+            EditorPrefs.SetInt(FreshFromSlotPref, orig);
+            rpm.ResetSlot(test);
+            rpm.ActiveSlotIndex = test;
+            BackendGameData.Instance?.ApplyActiveSlot();
+            Managers.Quest?.ReloadForActiveSlot();
+            app.Loadout?.Clear();
+            app.MarkFromIntro();
+            t0 = Time.realtimeSinceStartup;
+            app.RequestLoad(Define.Scene.BaseCamp);
+
+            PlayerController p = null;
+            for (float t = 0f; t < 40f && p == null; t += 0.25f)
+            {
+                var q = UnityEngine.Object.FindFirstObjectByType<PlayerController>();
+                if (q != null && q != old) p = q;
+                else await UniTask.Delay(250, ignoreTimeScale: true);
+            }
+            if (p == null) { sb.AppendLine("새 플레이어 없음"); return; }
+            sb.AppendLine($"{Time.realtimeSinceStartup - t0:0.0}초 새 플레이어 · 로드아웃 준비 {app.Loadout?.IsReady} · 제단 {UnityEngine.Object.FindFirstObjectByType<WorldSwordAwakening>() != null}");
+
+            var adv = typeof(UI_DialoguePopup).GetMethod("OnAdvanceClicked", Inst);
+            var locks = new List<FieldInfo>();
+            foreach (var n in new[] { "_inputDisabledExternally", "_inputBlockedByUI", "_controlSuspended" })
+            { var fi = typeof(PlayerController).GetField(n, Inst); if (fi != null) locks.Add(fi); }
+            int clicks = 0, shots = 0;
+            float lastPopup = -1f, awakeAt = -1f, lockStart = -1f, lockMax = 0f, nextClick = 0f, nextShot = 0f;
+            while (Time.realtimeSinceStartup - t0 < 90f)
+            {
+                float now = Time.realtimeSinceStartup;
+                var popup = UnityEngine.Object.FindFirstObjectByType<UI_DialoguePopup>();
+                if (popup != null && popup.isActiveAndEnabled)
+                {
+                    lastPopup = now;
+                    if (now >= nextClick && adv != null) { adv.Invoke(popup, null); clicks++; nextClick = now + 0.35f; }
+                }
+                bool locked = false;
+                foreach (var fi in locks) if (fi.GetValue(p) is bool b && b) locked = true;
+                bool afterTalk = clicks > 0 && popup == null && now - lastPopup > 0.3f;
+                if (afterTalk && locked) { if (lockStart < 0f) lockStart = now; lockMax = Mathf.Max(lockMax, now - lockStart); }
+                else lockStart = -1f;
+                if (afterTalk && shots < 10 && now >= nextShot) { CaptureFollow(p, $"Temp/ui_shots/R1102_Sword_{shots++}.png"); nextShot = now + 0.5f; }
+                if (awakeAt < 0f) foreach (var l in logs) if (l.Contains("무형검 각성")) { awakeAt = now; break; }
+                if (awakeAt > 0f && now - awakeAt > 1.5f) break;
+                await UniTask.Yield(PlayerLoopTiming.Update);
+            }
+            var lo = app.Loadout;
+            sb.AppendLine($"대사 넘김 {clicks}번 · 마지막 대사 {(lastPopup > 0f ? (lastPopup - t0).ToString("0.0") + "초" : "없음")} · 각성 {(awakeAt > 0f ? (awakeAt - t0).ToString("0.0") + "초" : "없음")}");
+            sb.AppendLine($"대사 뒤 입력 막힘 최장 {lockMax:0.00}초(기준 ≤ 1.5) · 슬롯0 {(lo?.WeaponSlot0 != null ? lo.WeaponSlot0.name : "없음")} · 받은 기록 {BaseCampBootstrapper.HasAwakenedSword()} · 제단 남음 {UnityEngine.Object.FindFirstObjectByType<WorldSwordAwakening>() != null} · 사진 {shots}장");
+        }
+        catch (Exception e) { sb.AppendLine("예외 " + e); }
+        finally
+        {
+            Application.logMessageReceived -= OnLog;
+            sb.AppendLine("로그:");
+            foreach (var l in logs) sb.AppendLine(l);
+            if (rpm != null && test >= 0 && rpm.ActiveSlotIndex == test)
+            {
+                rpm.ActiveSlotIndex = orig;
+                BackendGameData.Instance?.ApplyActiveSlot();
+                Managers.Quest?.ReloadForActiveSlot();
+                rpm.ResetSlot(test);
+                EditorPrefs.DeleteKey(FreshFromSlotPref);
+                sb.AppendLine($"원래 슬롯 {orig}로 복귀 · 시험 슬롯 {test} 비움");
+            }
+            File.WriteAllText("Temp/req1102_sword.txt", sb.ToString());
+            Debug.Log($"{Tag} 끝 → Temp/req1102_sword.txt");
+        }
+    }
+
     private static async UniTask<PlayerController> FindPlayerAsync()
     {
         PlayerController p = null;
