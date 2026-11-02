@@ -29,8 +29,8 @@ public sealed class UI_EngraveDiagram : MonoBehaviour
     private const float EnemySize = 18f, BigEnemySize = 30f, PulseSize = 84f;
     private const float IconSize  = 30f;
 
-    private static readonly Color CutColor   = new(1f, 0.70f, 0.66f, 1f);    // 카타나 베기(붉은 섬광) — 그림은 흰 베기라 곱해 물든다
-    private static readonly Color TrailColor = new(1f, 0.70f, 0.66f, 0.4f);
+    private const float BurstAt   = 0.85f;   // Burst — 맞은 적마다 고리가 퍼지는 때
+    private static readonly Color CutColorDefault = new(1f, 0.70f, 0.66f, 1f);    // 카타나 베기(붉은 섬광) — 그림은 흰 베기라 곱해 물든다
     private static readonly Color EnemyColor = new(0.925f, 0.902f, 0.847f, 0.35f);   // 적 고리는 옅게 — X자가 앞에 선다
     private static readonly Color BigColor   = new(0.925f, 0.902f, 0.847f, 0.6f);
 
@@ -40,9 +40,11 @@ public sealed class UI_EngraveDiagram : MonoBehaviour
     // ── Private ───────────────────────────────────────────────────
     private readonly List<Mark> _marks = new(6);
     private readonly List<Line> _lines = new(4);
+    private readonly List<(Image Img, float At)> _pulses = new(3);
     private CanvasGroup _group;
-    private Image       _pulse;
     private Sprite      _slash;
+    private Color       _cut = CutColorDefault;   // 표식 색(카타나 붉은 섬광 · 대검 속성 호박색)
+    private Color       _trail;
     private float       _t;
     private bool        _on;
 
@@ -58,19 +60,22 @@ public sealed class UI_EngraveDiagram : MonoBehaviour
     }
 
     // ── Public Methods ────────────────────────────────────────────
-    /// <summary>그림 종류로 다시 짓는다. None이면 칸을 숨긴다.</summary>
-    public void Show(SkillSO.EngraveIllustration kind, Sprite slash, Sprite icon)
+    /// <summary>그림 종류로 다시 짓는다. None이면 칸을 숨긴다. <paramref name="mark"/> = 표식 그림(카타나 X자 베기 · 대검 속성 고리) · <paramref name="tint"/> = 표식 색.</summary>
+    public void Show(SkillSO.EngraveIllustration kind, Sprite mark, Sprite icon, Color tint)
     {
+        _cut   = tint.a > 0f ? tint : CutColorDefault;
+        _trail = new Color(_cut.r, _cut.g, _cut.b, 0.4f);
         EnsureGroup();   // 꺼진 창에서 처음 불려도(Awake 전) 그린다
         Clear();
         _on = kind != SkillSO.EngraveIllustration.None;
         gameObject.SetActive(_on);
         if (!_on) return;
 
-        _slash = slash;
+        _slash = mark;
         AddIcon(icon, new Vector2(120f, 22f));
-        if (kind == SkillSO.EngraveIllustration.Spread) BuildSpread();
-        else                                            BuildFocus();
+        if (kind == SkillSO.EngraveIllustration.Spread)     BuildSpread();
+        else if (kind == SkillSO.EngraveIllustration.Burst) BuildBurst();
+        else                                                BuildFocus();
         _t = 0f;
         Apply();
     }
@@ -108,9 +113,34 @@ public sealed class UI_EngraveDiagram : MonoBehaviour
         AddMark(big, MarkSize * 0.8f, CutAt, GatherAt);
         AddLine(a, big, GatherAt, GatherDur);
         AddLine(b, big, GatherAt, GatherDur);
-        _pulse = NewImage("Pulse", UIProceduralSprites.Ring(0.06f, 128), Color.clear, big, new Vector2(PulseSize, PulseSize));
+        AddPulse(big, BigCutAt, PulseSize);
         AddMark(big, BigMarkSize, BigCutAt, -1f);
     }
+
+    // 번지는 속성(대검) — 휘두름에 맞은 적 둘 → 그 자리마다 고리가 퍼져 곁의 적 셋까지
+    private void BuildBurst()
+    {
+        var h1 = new Vector2(96f, 70f);
+        var h2 = new Vector2(152f, 74f);
+        var n1 = new Vector2(48f, 110f);
+        var n2 = new Vector2(124f, 124f);
+        var n3 = new Vector2(200f, 108f);
+        AddEnemy(h1, EnemySize, EnemyColor);
+        AddEnemy(h2, EnemySize, EnemyColor);
+        AddEnemy(n1, EnemySize, EnemyColor);
+        AddEnemy(n2, EnemySize, EnemyColor);
+        AddEnemy(n3, EnemySize, EnemyColor);
+        AddMark(h1, MarkSize, CutAt, -1f);
+        AddMark(h2, MarkSize, CutAt, -1f);
+        AddPulse(h1, BurstAt, PulseSize);
+        AddPulse(h2, BurstAt, PulseSize);
+        AddMark(n1, MarkSize * 0.75f, BurstAt + 0.15f, -1f);
+        AddMark(n2, MarkSize * 0.75f, BurstAt + 0.15f, -1f);
+        AddMark(n3, MarkSize * 0.75f, BurstAt + 0.15f, -1f);
+    }
+
+    private void AddPulse(Vector2 at, float appearAt, float size)
+        => _pulses.Add((NewImage("Pulse", UIProceduralSprites.Ring(0.06f, 128), Color.clear, at, new Vector2(size, size)), appearAt));
 
     private void Apply()
     {
@@ -124,7 +154,7 @@ public sealed class UI_EngraveDiagram : MonoBehaviour
             float a = k;
             if (m.DimAt >= 0f) a *= Mathf.Lerp(1f, 0.25f, Mathf.Clamp01((_t - m.DimAt) / GatherDur));   // 모음 — 큰 적으로 빨려 든다
             m.Rt.localScale = Vector3.one * Mathf.Lerp(1.4f, 1f, e);
-            var c = CutColor; c.a = a;
+            var c = _cut; c.a = a;
             m.A.color = c;
             m.B.color = c;
         }
@@ -134,15 +164,16 @@ public sealed class UI_EngraveDiagram : MonoBehaviour
             var l = _lines[i];
             float k = Mathf.Clamp01((_t - l.At) / l.Dur);
             l.Rt.sizeDelta = new Vector2(l.Len * k, 1.5f);
-            l.Img.color = k > 0f ? TrailColor : Color.clear;
+            l.Img.color = k > 0f ? _trail : Color.clear;
         }
 
-        if (_pulse != null)
+        for (int i = 0; i < _pulses.Count; i++)
         {
-            float k = Mathf.Clamp01((_t - BigCutAt) / PulseDur);
-            _pulse.rectTransform.localScale = Vector3.one * Mathf.Lerp(0.45f, 1f, 1f - (1f - k) * (1f - k));
-            var c = CutColor; c.a = k > 0f ? Mathf.Lerp(0.75f, 0.3f, k) : 0f;
-            _pulse.color = c;
+            var (img, at) = _pulses[i];
+            float k = Mathf.Clamp01((_t - at) / PulseDur);
+            img.rectTransform.localScale = Vector3.one * Mathf.Lerp(0.45f, 1f, 1f - (1f - k) * (1f - k));
+            var c = _cut; c.a = k > 0f ? Mathf.Lerp(0.75f, 0.3f, k) : 0f;
+            img.color = c;
         }
     }
 
@@ -159,7 +190,7 @@ public sealed class UI_EngraveDiagram : MonoBehaviour
         for (int i = transform.childCount - 1; i >= 0; i--) Destroy(transform.GetChild(i).gameObject);
         _marks.Clear();
         _lines.Clear();
-        _pulse = null;
+        _pulses.Clear();
     }
 
     private void AddIcon(Sprite icon, Vector2 at)

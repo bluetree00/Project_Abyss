@@ -28,7 +28,7 @@ public class SkillSO : ScriptableObject
     [SerializeField] private string _tier3Change;
 
     /// <summary>각인 고르기 카드 그림 — 위에서 본 작은 그림으로 효과가 들어가는 모양(11-02 · <see cref="UI_EngraveDiagram"/>).</summary>
-    public enum EngraveIllustration { None, Spread, Focus }
+    public enum EngraveIllustration { None, Spread, Focus, Burst }   // Burst = 맞은 적마다 고리가 퍼져 곁의 적까지(대검 · 11-03)
 
     [Serializable]
     public struct EngravingDef

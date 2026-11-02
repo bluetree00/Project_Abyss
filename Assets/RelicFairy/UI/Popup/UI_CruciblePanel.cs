@@ -2236,7 +2236,9 @@ public sealed partial class UI_CruciblePanel : UI_Popup
                 _engraveDesc[k].text = UIKeywordInk.Values(Loc.T(_engraveOptions[k].description));   // 수치만 Noto 500(10-15 설명 글 강조)
                 string best = _engraveOptions[k].bestFor;
                 _engraveBest[k].text = string.IsNullOrEmpty(best) ? "" : "◇ " + Loc.T(best);
-                _engraveDiagram[k].Show(_engraveOptions[k].illustration, UISkin.Crucible?.EngraveSlash, skill.IconForTier(tier));
+                bool great = w.weaponType == WeaponType.Greatsword;   // 대검 = 속성 고리(호박색) · 카타나 = X자 베기(붉은 섬광)
+                _engraveDiagram[k].Show(_engraveOptions[k].illustration, great ? UIProceduralSprites.Ring(0.09f, 64) : UISkin.Crucible?.EngraveSlash,   // 고리는 가늘게(0.22는 도넛처럼 무거웠다)
+                                        skill.IconForTier(tier), great ? EgBurstTint : EgCutTint);
                 SetBoxLine(_engraveEdge[k], UITheme.Thin.LineIdle);
             }
             _engravePanel.transform.SetAsLastSibling();
@@ -2303,6 +2305,10 @@ public sealed partial class UI_CruciblePanel : UI_Popup
         var sub = NewText(panel, "EngraveSub", 17f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.62f));
         sub.text = "고른 효과가 이 스킬에 붙는다 · 고르면 바꿀 수 없다 · 재련 횟수와 증강은 그대로";
         PlaceIn(sub.rectTransform, EgPad, 132f, EgPanelW - EgPad * 2f, 28f, EgPanelW, EgPanelH);
+        sub.textWrappingMode = TextWrappingModes.NoWrap;   // 11-03 영어가 창 양옆으로 잘렸다 — 한 줄에 줄여 넣는다
+        sub.enableAutoSizing = true;
+        sub.fontSizeMin = 12f;
+        sub.fontSizeMax = 17f;
 
         float x0 = (EgPanelW - EgCardW * 2f - EgCardGap) * 0.5f;
         for (int k = 0; k < 2; k++)
@@ -2326,6 +2332,8 @@ public sealed partial class UI_CruciblePanel : UI_Popup
     private static readonly Color EgCardC  = new(0.090f, 0.086f, 0.140f, 1f);
     private static readonly Color EgKindC  = new(0.80f, 0.82f, 0.88f, 1f);
     private static readonly Color EgBestC  = new(1f, 0.80f, 0.302f, 0.78f);   // 금(얇은 톤) — 「언제 고르나」 한 줄
+    private static readonly Color EgCutTint   = new(1f, 0.70f, 0.66f, 1f);    // 각인 그림 — 카타나 X자(붉은 섬광)
+    private static readonly Color EgBurstTint = new(1f, 0.72f, 0.36f, 1f);    //   · 대검 속성 고리(호박색)
     private const float EgDiagramH = 150f;
 
     /// <summary>
@@ -2367,6 +2375,10 @@ public sealed partial class UI_CruciblePanel : UI_Popup
         _engraveDesc[k] = desc;
         var best = NewText(rt, "Best", 16f, UIWeight.Regular, TextAlignmentOptions.Center, EgBestC);
         PlaceIn(best.rectTransform, EgCardPad, 388f, w, 24f, EgCardW, EgCardH);
+        best.textWrappingMode = TextWrappingModes.NoWrap;   // 영어 「When enemies are packed together」가 카드 폭에 꽉 찼다
+        best.enableAutoSizing = true;
+        best.fontSizeMin = 12f;
+        best.fontSizeMax = 16f;
         _engraveBest[k] = best;
         var hint = NewText(rt, "Hint", 16f, UIWeight.Regular, TextAlignmentOptions.Center, UITheme.Thin.InkA(0.55f));
         hint.text = "눌러서 고른다";

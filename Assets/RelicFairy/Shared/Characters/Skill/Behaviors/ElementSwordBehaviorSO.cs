@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using RelicFairy.Monster;
 using UnityEngine;
 
 /// <summary>
@@ -12,6 +13,11 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "Game/Skill/ElementSwordBehavior")]
 public class ElementSwordBehaviorSO : SkillBehaviorSO
 {
+    // 2단계 각인(11-03 사용자 「클라렌트만 없으면 이상한데 · 변형할 수 있는 추가 이점」) — 칼리번 환영베기(잔상 추격 · 응축)와 짝
+    public const string EngraveSpread   = "element_spread";     // 번지는 속성
+    public const string EngraveCondense = "element_condense";   // 모이는 속성
+    private const int   MaxSpreadFx     = 5;                    // 번지는 폭발 이펙트 상한(판정은 다 낸다 · 이펙트 절제)
+
     [Header("검 뽑기")]
     [SerializeField] private string drawState = "QSkill_01";
     [Tooltip("뽑기 클립 앞부분을 건너뛴다(상태 시간 초) — 빈 손으로 손잡이를 잡으러 가는 구간")]
@@ -29,6 +35,18 @@ public class ElementSwordBehaviorSO : SkillBehaviorSO
     [SerializeField] private string hitEffectKey = "SwordStrikeFlash";
     [SerializeField] private float hitEffectScale = 1.2f;
 
+    [Header("2단계: 각인 택1 — 번지는 속성 / 모이는 속성(11-03)")]
+    [Tooltip("휘두름 뒤 각인이 터지기까지(초) — 한 박자 뒤에 번지거나 모인다")]
+    [SerializeField] private float engraveDelay = 0.18f;
+    [Tooltip("번지는 속성 — 맞은 적 자리에서 다시 터지는 둘레(m · 이펙트 크기 = 판정)")]
+    [SerializeField] private float spreadRadius = 3f;
+    [Tooltip("번지는 속성 — 피해(공격력 %) · 적마다 한 번")]
+    [SerializeField] private float spreadDamage = 120f;
+    [Tooltip("모이는 속성 — 가장 단단한 적에게 모아 내려치는 피해(공격력 %)")]
+    [SerializeField] private float condenseDamage = 360f;
+    [Tooltip("모이는 속성 — 그 적 둘레(m · 이펙트 크기 = 판정)")]
+    [SerializeField] private float condenseRadius = 2f;
+
     [Header("마무리")]
     [Tooltip("휘두른 뒤 자세(초) — 후딜이라 회피 · 공격 · 스킬로 끊긴다")]
     [SerializeField] private float endDelay = 0.35f;
@@ -41,10 +59,15 @@ public class ElementSwordBehaviorSO : SkillBehaviorSO
     private class Runtime : ISkillRuntime
     {
         private readonly ElementSwordBehaviorSO _data;
-        private enum Phase { Draw, Swing, End }
+        private enum Phase { Draw, Swing, Engrave, End }
         private Phase _phase;
         private float _timer;
+        private int   _skillTier;
+        private bool  _condense;
+        private RuneElement? _element;
         private readonly List<GameObject> _hits = new();
+        private readonly List<GameObject> _buf  = new();
+        private readonly HashSet<GameObject> _burstHit = new();
 
         public Runtime(ElementSwordBehaviorSO data) => _data = data;
 
@@ -52,6 +75,8 @@ public class ElementSwordBehaviorSO : SkillBehaviorSO
         {
             _timer = 0f;
             _phase = Phase.Draw;
+            _skillTier = ctx.SkillTier;
+            _condense  = ctx.WeaponData != null && !ctx.WeaponData.HasEngraving(EngraveSpread) && ctx.WeaponData.HasEngraving(EngraveCondense);
             ctx.RotateToMouse();
             ctx.SetMoveScale(0f);
             if (ctx.Rigidbody != null) ctx.Rigidbody.linearVelocity = Vector3.zero;
@@ -65,8 +90,9 @@ public class ElementSwordBehaviorSO : SkillBehaviorSO
             switch (_phase)
             {
                 case Phase.Draw:  UpdateDraw(ctx);  break;
-                case Phase.Swing: UpdateSwing(ctx); break;
-                case Phase.End:   UpdateEnd(ctx);   break;
+                case Phase.Swing:   UpdateSwing(ctx);   break;
+                case Phase.Engrave: UpdateEngrave(ctx); break;
+                case Phase.End:     UpdateEnd(ctx);     break;
             }
         }
 
@@ -75,6 +101,8 @@ public class ElementSwordBehaviorSO : SkillBehaviorSO
             ctx.SetMoveScale(1f);
             ctx.LockCancel(false);
             _hits.Clear();
+            _buf.Clear();
+            _burstHit.Clear();
             if (ctx.Rigidbody != null)
             {
                 ctx.Rigidbody.linearVelocity  = Vector3.zero;
@@ -105,7 +133,64 @@ public class ElementSwordBehaviorSO : SkillBehaviorSO
             _timer = 0f;
             ctx.LockCancel(false);
             Strike(ctx);
+            // 2단계 — 맞힌 적이 있으면 한 박자 뒤 각인(번지거나 모인다)
+            _phase = _skillTier >= 2 && _hits.Count > 0 && _element.HasValue ? Phase.Engrave : Phase.End;
+        }
+
+        // ── ③ 2단계 각인 — 번지는 속성 / 모이는 속성 ──
+        private void UpdateEngrave(SkillExecutionContext ctx)
+        {
+            if (_timer < _data.engraveDelay) return;
+            _timer = 0f;
+            if (_condense) Condense(ctx, _element.Value);
+            else           Spread(ctx, _element.Value);
             _phase = Phase.End;
+        }
+
+        /// <summary>번지는 속성 — 맞은 적마다 그 자리에서 속성이 한 번 더 터진다(둘레 · 적마다 한 번 · 곁의 적도 속성 효과).</summary>
+        private void Spread(SkillExecutionContext ctx, RuneElement element)
+        {
+            float dmg = ctx.CalculateDamage(_data.spreadDamage);
+            _burstHit.Clear();
+            int bursts = 0;
+            for (int i = 0; i < _hits.Count; i++)
+            {
+                var src = _hits[i];
+                if (src == null) continue;
+                Vector3 at = src.transform.position;
+                if (bursts++ < MaxSpreadFx) ElementVfxPlayer.PlayBurst(element, at, _data.spreadRadius);   // 그림 = 판정 반경
+                CombatQuery.GetNearbyDamageables(at, _data.spreadRadius, ctx.Controller.gameObject, 32, _buf);
+                foreach (var go in _buf)
+                {
+                    if (!_burstHit.Add(go)) continue;
+                    if (ctx.DealDamage(go, dmg, _data.knockbackMultiplier * 0.5f, false, skipHitVfx: true) > 0f)
+                        GiantSwordBuff.HitElement(ctx.Controller, go);   // 곁의 적도 속성 효과(맞은 적은 0.45초 틱 간격이라 두 번 안 걸린다)
+                }
+            }
+            Debug.Log($"[ElementSword] 번지는 속성 — 터짐 {bursts} · 맞은 적 {_burstHit.Count}");
+        }
+
+        /// <summary>모이는 속성 — 맞은 적 중 체력이 가장 많은 적에게 모아 한 번 더 내려친다(둘레 함께).</summary>
+        private void Condense(SkillExecutionContext ctx, RuneElement element)
+        {
+            GameObject target = null;
+            int bestHp = -1;
+            foreach (var go in _hits)
+            {
+                if (go == null || !go.activeInHierarchy) continue;
+                int hp = go.TryGetComponent<MonsterBase>(out var mb) ? mb.CurrentHp : 0;
+                if (target == null || hp > bestHp) { target = go; bestHp = hp; }
+            }
+            if (target == null) return;
+            Vector3 at = target.transform.position;
+            float dmg = ctx.CalculateDamage(_data.condenseDamage);
+            ElementVfxPlayer.PlayBurst(element, at, _data.condenseRadius);   // 그림 = 판정 반경
+            CombatQuery.GetNearbyDamageables(at, _data.condenseRadius, ctx.Controller.gameObject, 16, _buf);
+            int n = 0;
+            foreach (var go in _buf)
+                if (ctx.DealDamage(go, dmg, _data.knockbackMultiplier, isFinisher: true, hitEffectKey: _data.hitEffectKey, hitEffectScale: _data.hitEffectScale) > 0f) n++;
+            HitFeelService.CameraShake(HitFeelService.DealtShakeFinisher, 0.2f);
+            Debug.Log($"[ElementSword] 모이는 속성 — {target.name} · 맞은 적 {n}");
         }
 
         private void UpdateEnd(SkillExecutionContext ctx)
@@ -122,6 +207,7 @@ public class ElementSwordBehaviorSO : SkillBehaviorSO
             float dmg = ctx.CalculateDamage(_data.baseDamage);
             CombatQuery.GetNearbyDamageables(center, radius, ctx.Controller.gameObject, 32, _hits);
             var element = GiantSwordBuff.ElementOf(ctx.Controller);
+            _element = element;
             if (element.HasValue) ElementVfxPlayer.PlayBurst(element.Value, center, radius);   // 판정 이펙트 = 판정 반경 그대로(11-02 Q21 「뽑을 때 판정 이펙트」)
             foreach (var go in _hits)
             {

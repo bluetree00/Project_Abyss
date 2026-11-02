@@ -4445,3 +4445,9 @@ Esc › 랭킹 — 모든 플레이어의 기록,Esc › Rankings — every play
 「네가 얻은 룬 하나는 내가 맡아 둘게. 다음 길에서 돌려줄게.」,"""I'll hold on to one rune you found. You'll get it back on the next path."""
 고른 룬은 다음 런을 시작할 때 보관함으로 돌아온다 · 돌려받은 룬은 다시 맡길 수 없다,The chosen rune returns to your storage when the next run starts · A returned rune can't be kept again
 카드를 눌러 고른다  ·  ← → 고르기  ·  Enter 맡기기,Click a card to choose  ·  ← → select  ·  Enter to keep
+각인 택1(번짐 · 모음),Choose an engraving (Spread · Gather)
+번지는 속성,Spreading Element
+휘두름에 맞은 적마다 그 자리에서 속성이 한 번 더 터진다(둘레 3m · 공격력의 120%). 곁에 있던 적까지 속성에 걸린다.,Each enemy hit bursts with the element once more (3m around · 120% of ATK). Enemies nearby are caught by the element too.
+적이 몰려 있을 때,When enemies are packed together
+모이는 속성,Gathered Element
+휘두름에 맞은 적 중 체력이 가장 많은 적에게 속성을 모아 한 번 더 내려친다(공격력의 360% · 둘레 2m까지).,Gathers the element onto the toughest enemy hit and strikes it again (360% of ATK · reaches 2m around).
