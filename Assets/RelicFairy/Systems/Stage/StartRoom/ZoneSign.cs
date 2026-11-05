@@ -28,7 +28,7 @@ public sealed class ZoneSign : MonoBehaviour
     private const float ObjectivePickRange = 16f;   // 목표에서 이 안의 가장 가까운 구역이 목표 구역
     private const float ArrivalCooldown = 20f;      // 같은 구역 도착 표시를 이 안에 다시 띄우지 않는다(경계를 오가도 겹치지 않게)
 
-    /// <summary>베이스캠프 구역 id 전량 — 슬롯 초기화·디버그 메뉴가 「처음 한 번」 기록을 지울 때 쓴다(PlayerPrefs는 키를 나열할 수 없다).
+    /// <summary>베이스캠프 구역 id 전량 — 슬롯 초기화·디버그 메뉴가 「처음 한 번」 기록을 지울 때 쓴다(ProgressPrefs는 키를 나열할 수 없다).
     /// 씬의 ZoneSign.zoneId를 늘리면 여기도 늘릴 것.</summary>
     public static readonly string[] KnownZoneIds = { "summon", "forge", "parts", "relic", "memory", "seal", "trial", "abyss" };
 
@@ -186,7 +186,7 @@ public sealed class ZoneSign : MonoBehaviour
         if (_playerInside > 1) return;   // 플레이어 콜라이더가 여럿 — 들어서는 순간 한 번만
         // 처음 들어가면 제목 + 설명 배너(슬롯당 한 번). 온보딩 동안은 목표 구역만 — 한 순간에 하나만(유도설계 원칙 5),
         // 다른 구역의 처음 배너는 온보딩이 끝난 뒤 처음 들어갈 때로 미룬다.
-        if (!_announced && PlayerPrefs.GetInt(SeenKey(zoneId), 0) == 0
+        if (!_announced && ProgressPrefs.GetInt(SeenKey(zoneId), 0) == 0
             && !(BaseCampOnboardingDirector.InProgress && s_objective != this))
         {
             _announced = true;
@@ -243,8 +243,8 @@ public sealed class ZoneSign : MonoBehaviour
     /// <summary>슬롯 삭제 시 구역 기록도 지운다(새 게임이면 다시 처음처럼).</summary>
     public static void ClearForSlot(int slot, params string[] zoneIds)
     {
-        foreach (var id in zoneIds) PlayerPrefs.DeleteKey(SeenKeyPrefix + slot + "_" + id);
-        PlayerPrefs.Save();
+        foreach (var id in zoneIds) ProgressPrefs.DeleteKey(SeenKeyPrefix + slot + "_" + id);
+        ProgressPrefs.Save();
     }
 
     // ── Private Methods ───────────────────────────────────────
@@ -263,8 +263,8 @@ public sealed class ZoneSign : MonoBehaviour
             await UniTask.WaitUntil(() => (BaseCampBootstrapper.Instance == null || BaseCampBootstrapper.Instance.IsReady) && !LabelsHidden,
                                     cancellationToken: ct);
             if (_playerInside <= 0) { _announced = false; return; }
-            PlayerPrefs.SetInt(SeenKey(zoneId), 1);
-            PlayerPrefs.Save();
+            ProgressPrefs.SetInt(SeenKey(zoneId), 1);
+            ProgressPrefs.Save();
             if (!string.IsNullOrEmpty(firstEntryMerlinLine))
             {
                 // 배너와 멀린이 같이 말하면 두 갈래가 된다(원칙 5) — 이 구역은 멀린 한 줄이 제목을 대신한다

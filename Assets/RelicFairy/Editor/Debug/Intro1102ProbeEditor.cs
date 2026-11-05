@@ -13,7 +13,7 @@ using UnityEngine.SceneManagement;
 /// 11-02 인트로 실측 — Q3 「무형검 근처에 가면 바로 시작 · 검 곁으로 옮겨 등 뒤 구도」 · Q4 「보스 공격을 다 피하면 안 끝난다 → 패턴에 맞고 바로 죽게」.
 /// 테스트 허브 플레이 중: Game_Intro를 열고 오프닝을 넘긴 뒤 플레이어를 검 범위 안 비스듬한 자리에 세운다(F · 사건 호출 없음 — 다가옴만으로 시작하는지).
 /// 옮겨진 자리 · 바라보는 방향 · 쇼트마다 사진. 전투가 열리면 플레이어를 무적(debugInvincible — 모든 공격을 피한 것과 같다)으로 두고
-/// 쓰러지기까지 · 그때 기사 상태를 적는다. 인트로 완료 기록(PlayerPrefs)은 되돌린다.
+/// 쓰러지기까지 · 그때 기사 상태를 적는다. 인트로 완료 기록(ProgressPrefs)은 되돌린다.
 /// 결과: Temp/intro1102/probe.txt · 사진 · 로그 「[Intro1102] 끝」.
 /// </summary>
 public static class Intro1102ProbeEditor
@@ -34,8 +34,8 @@ public static class Intro1102ProbeEditor
         Directory.CreateDirectory(dir);
         var sb = new StringBuilder("11-02 인트로 실측\n");
         string key = "game_intro_done_v1_slot" + (RunProgressManager.Instance?.ActiveSlotIndex ?? 0);
-        bool hadKey = PlayerPrefs.HasKey(key);
-        int  wasVal = PlayerPrefs.GetInt(key, 0);
+        bool hadKey = ProgressPrefs.HasKey(key);
+        int  wasVal = ProgressPrefs.GetInt(key, 0);
         try
         {
             AppBootstrapper.Instance?.RequestLoad(Define.Scene.Game_Intro);
@@ -143,8 +143,8 @@ public static class Intro1102ProbeEditor
         catch (Exception e) { sb.AppendLine("예외: " + e); }
         finally
         {
-            if (hadKey) PlayerPrefs.SetInt(key, wasVal); else PlayerPrefs.DeleteKey(key);
-            PlayerPrefs.Save();
+            if (hadKey) ProgressPrefs.SetInt(key, wasVal); else ProgressPrefs.DeleteKey(key);
+            ProgressPrefs.Save();
             sb.AppendLine($"인트로 완료 기록 {key} 되돌림 → {(hadKey ? wasVal.ToString() : "없음")}");
             File.WriteAllText(Path.Combine(dir, "probe.txt"), sb.ToString(), Encoding.UTF8);
             Debug.Log("[Intro1102] 끝\n" + sb);

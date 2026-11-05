@@ -214,7 +214,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         GetComponent<BoxCollider>().isTrigger = true;
         _destroyCt = this.GetCancellationTokenOnDestroy();
 
-        _conjurePending = PlayerPrefs.GetInt(ConjureKey(), 0) == 0;
+        _conjurePending = ProgressPrefs.GetInt(ConjureKey(), 0) == 0;
         if (_conjurePending) SetStationsActive(false);
         _openColor = runeLitColor;
     }
@@ -270,11 +270,11 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     /// <summary>「처음 한 번」 연출 기록(공간 생성 · 얻기)을 슬롯에서 지운다 — 새 게임·디버그 메뉴.</summary>
     public static void ClearFirstTimeForSlot(int slot)
     {
-        PlayerPrefs.DeleteKey(ConjureKeyPrefix + slot);
-        PlayerPrefs.DeleteKey(RecordSeenKeyPrefix + slot);
+        ProgressPrefs.DeleteKey(ConjureKeyPrefix + slot);
+        ProgressPrefs.DeleteKey(RecordSeenKeyPrefix + slot);
         foreach (AcquireKind k in Enum.GetValues(typeof(AcquireKind)))
-            PlayerPrefs.DeleteKey(AcquireKeyPrefix + slot + "_" + k);
-        PlayerPrefs.Save();
+            ProgressPrefs.DeleteKey(AcquireKeyPrefix + slot + "_" + k);
+        ProgressPrefs.Save();
     }
 
     /// <summary>
@@ -525,8 +525,8 @@ public sealed class BaseCampFxDirector : MonoBehaviour
             await camTask;
 
             _conjurePending = false;
-            PlayerPrefs.SetInt(ConjureKey(), 1);
-            PlayerPrefs.Save();
+            ProgressPrefs.SetInt(ConjureKey(), 1);
+            ProgressPrefs.Save();
         }
         catch (OperationCanceledException) { }
         finally
@@ -549,8 +549,8 @@ public sealed class BaseCampFxDirector : MonoBehaviour
     {
         if (runeGlowMaterial == null) return;
         string key = AcquireKeyPrefix + ActiveSlot() + "_" + kind;
-        bool first = PlayerPrefs.GetInt(key, 0) == 0;
-        if (first) { PlayerPrefs.SetInt(key, 1); PlayerPrefs.Save(); }
+        bool first = ProgressPrefs.GetInt(key, 0) == 0;
+        if (first) { ProgressPrefs.SetInt(key, 1); ProgressPrefs.Save(); }
         Debug.Log($"[BaseCampFx] 얻기 연출 — {kind}{(first ? " (처음)" : "")}");
 
         ParticleSystem mote = null;
@@ -1287,7 +1287,7 @@ public sealed class BaseCampFxDirector : MonoBehaviour
         door.Setup(crystal, runeLitColor, crystalY);
 
         // 드러남(디졸브 + 번쩍)은 해금 뒤 첫 방문에만 — 매 방문 「새로 생긴 것」처럼 보였다(10-11 이펙트 톤 2차 D-7). 본 뒤로는 처음부터 서 있다.
-        if (PlayerPrefs.GetInt(RecordSeenKey(), 0) == 1)
+        if (ProgressPrefs.GetInt(RecordSeenKey(), 0) == 1)
         {
             door.MarkReady();
             return;
@@ -1306,8 +1306,8 @@ public sealed class BaseCampFxDirector : MonoBehaviour
                                     cancellationToken: ct);
             await UniTask.Delay(TimeSpan.FromSeconds(0.8f), DelayType.UnscaledDeltaTime, cancellationToken: ct);
             if (root == null) return;
-            PlayerPrefs.SetInt(RecordSeenKey(), 1);
-            PlayerPrefs.Save();
+            ProgressPrefs.SetInt(RecordSeenKey(), 1);
+            ProgressPrefs.Save();
             root.SetActive(true);
             DissolveEffect.PlayAppear(root, NightmareRevealSeconds, null, default, runeLitColor);
             FlashAsync(root.transform.position + Vector3.up * 1.6f, ct, RuneFlashPeak).Forget();

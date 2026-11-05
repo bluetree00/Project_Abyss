@@ -12,7 +12,7 @@ using UnityEngine;
 /// 10-16 인트로 보스 실측 — 사용자 「보스전을 시작할 때 보스가 바닥보다 위에 떠 있다」 · 「인트로 보스는 가장 강력한 광역 패턴으로 끝내자」.
 /// 「10-10 인트로 연출 실측」이 전투까지 몰고 가는 동안 함께 돌린다: 기사가 나타나면 0.25초마다 높이 · 발밑 바닥(콜라이더) · 몸 아래(스킨드 메시) ·
 /// 상태를 적고 몇 장 찍는다. 플레이어가 쓰러지면 그 순간 기사 상태(= 끝낸 공격)를 적는다.
-/// 인트로 사망이 켜는 완료 기록(PlayerPrefs game_intro_done_v1_slotN)은 실측 전 값으로 되돌린다.
+/// 인트로 사망이 켜는 완료 기록(ProgressPrefs game_intro_done_v1_slotN)은 실측 전 값으로 되돌린다.
 /// 결과: Logs/boss_fight_sim/intro_boss_*/watch.txt · 사진 · 로그 「[IntroBoss] 끝」.
 /// </summary>
 public static class IntroBossProbeEditor
@@ -45,8 +45,8 @@ public static class IntroBossProbeEditor
     private static async UniTaskVoid RunAsync()
     {
         string key = "game_intro_done_v1_slot" + (RunProgressManager.Instance?.ActiveSlotIndex ?? 0);
-        bool hadKey = PlayerPrefs.HasKey(key);
-        int  wasVal = PlayerPrefs.GetInt(key, 0);
+        bool hadKey = ProgressPrefs.HasKey(key);
+        int  wasVal = ProgressPrefs.GetInt(key, 0);
         string dir = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "boss_fight_sim", $"intro_boss_{DateTime.Now:MMdd_HHmmss}");
         Directory.CreateDirectory(dir);
         var sb = new StringBuilder("인트로 보스 — 시각(기사 첫 발견 기준) · 높이 = 기사 피벗 − 발밑 바닥 · 몸 아래 = 스킨드 메시 바닥 − 발밑 바닥 · 상태\n");
@@ -93,8 +93,8 @@ public static class IntroBossProbeEditor
         finally
         {
             QualitySettings.lodBias = lodWas;
-            if (hadKey) PlayerPrefs.SetInt(key, wasVal); else PlayerPrefs.DeleteKey(key);
-            PlayerPrefs.Save();
+            if (hadKey) ProgressPrefs.SetInt(key, wasVal); else ProgressPrefs.DeleteKey(key);
+            ProgressPrefs.Save();
             sb.AppendLine($"인트로 완료 기록 {key} 되돌림 → {(hadKey ? wasVal.ToString() : "없음")}");
             File.WriteAllText(Path.Combine(dir, "watch.txt"), sb.ToString(), Encoding.UTF8);
             Debug.Log($"[IntroBoss] 끝 — {dir}");

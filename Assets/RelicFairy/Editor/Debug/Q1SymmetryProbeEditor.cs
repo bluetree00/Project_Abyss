@@ -86,8 +86,8 @@ public static class Q1SymmetryProbeEditor
     private static async UniTaskVoid IntroAsync()
     {
         string key = "game_intro_done_v1_slot" + (RunProgressManager.Instance?.ActiveSlotIndex ?? 0);
-        bool hadKey = PlayerPrefs.HasKey(key);
-        int  wasVal = PlayerPrefs.GetInt(key, 0);
+        bool hadKey = ProgressPrefs.HasKey(key);
+        int  wasVal = ProgressPrefs.GetInt(key, 0);
         try
         {
             AppBootstrapper.Instance?.RequestLoad(Define.Scene.Game_Intro);
@@ -109,8 +109,8 @@ public static class Q1SymmetryProbeEditor
         }
         finally
         {
-            if (hadKey) PlayerPrefs.SetInt(key, wasVal); else PlayerPrefs.DeleteKey(key);
-            PlayerPrefs.Save();
+            if (hadKey) ProgressPrefs.SetInt(key, wasVal); else ProgressPrefs.DeleteKey(key);
+            ProgressPrefs.Save();
         }
     }
 

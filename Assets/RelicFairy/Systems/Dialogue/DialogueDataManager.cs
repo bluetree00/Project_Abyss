@@ -101,7 +101,7 @@ public class DialogueDataManager
     public bool HasSequence(string sequenceId) => _sequences.ContainsKey(sequenceId);
 
     /// <summary>
-    /// 방문 횟수 기반 변형 대사 선택(로그라이크 반복 재미). 호출 시 방문 횟수를 1 증가(PlayerPrefs 영속).
+    /// 방문 횟수 기반 변형 대사 선택(로그라이크 반복 재미). 호출 시 방문 횟수를 1 증가(ProgressPrefs 영속).
     /// 시기판 키(<see cref="EraKey"/>)가 있으면 그 키로 고르고 횟수도 그 키로 센다 — 시기가 바뀌면 그 시기의 첫 대사부터.
     /// 첫 방문(count 0) → <c>{key}_First</c>(없으면 key), 재방문 → 횟수 단계 풀(<see cref="PickRepeat"/>).
     /// 예: GetVisitLines("Chapter1_Enter"), GetVisitLines("Lich_Encounter").
@@ -112,10 +112,10 @@ public class DialogueDataManager
 
         string key = EraKey(baseKey);
         string prefsKey = VisitKeyOf(key);
-        int count = PlayerPrefs.GetInt(prefsKey, 0);
-        PlayerPrefs.SetInt(prefsKey, count + 1);
+        int count = ProgressPrefs.GetInt(prefsKey, 0);
+        ProgressPrefs.SetInt(prefsKey, count + 1);
         RememberVisitKey(key); // 새 게임 시 일괄 초기화할 수 있도록 키를 인덱스에 남긴다
-        PlayerPrefs.Save();    // 튕겨도 대사 단계가 되감기지 않게
+        ProgressPrefs.Save();    // 튕겨도 대사 단계가 되감기지 않게
 
         if (count == 0)
         {
@@ -166,30 +166,30 @@ public class DialogueDataManager
     /// <summary>방문 키를 인덱스(쉼표 구분)에 누적 기록. ResetVisitCounts가 이걸로 전부 지운다.</summary>
     private static void RememberVisitKey(string baseKey)
     {
-        string index = PlayerPrefs.GetString(IndexKeyOf(), string.Empty);
+        string index = ProgressPrefs.GetString(IndexKeyOf(), string.Empty);
         if (index.Length == 0)
         {
-            PlayerPrefs.SetString(IndexKeyOf(), baseKey);
+            ProgressPrefs.SetString(IndexKeyOf(), baseKey);
             return;
         }
         // 이미 기록된 키면 스킵(중복 누적 방지)
         foreach (var k in index.Split(','))
             if (k == baseKey) return;
 
-        PlayerPrefs.SetString(IndexKeyOf(), index + "," + baseKey);
+        ProgressPrefs.SetString(IndexKeyOf(), index + "," + baseKey);
     }
 
     /// <summary>새 게임 시작 — 활성 슬롯의 방문 횟수를 초기화한다.
     /// 이게 없으면 이전 플레이의 카운트가 남아 첫 진입부터 재방문(_R*) 대사가 나온다.</summary>
     public static void ResetVisitCounts()
     {
-        string index = PlayerPrefs.GetString(IndexKeyOf(), string.Empty);
+        string index = ProgressPrefs.GetString(IndexKeyOf(), string.Empty);
         if (index.Length > 0)
             foreach (var k in index.Split(','))
-                if (!string.IsNullOrEmpty(k)) PlayerPrefs.DeleteKey(VisitKeyOf(k));
+                if (!string.IsNullOrEmpty(k)) ProgressPrefs.DeleteKey(VisitKeyOf(k));
 
-        PlayerPrefs.DeleteKey(IndexKeyOf());
-        PlayerPrefs.Save();
+        ProgressPrefs.DeleteKey(IndexKeyOf());
+        ProgressPrefs.Save();
     }
 
     // 반복 대사 단계(방문 · 횟수 공용, 내림차순) — 그 횟수 이상이면 {key}_T{n}_R* 풀.

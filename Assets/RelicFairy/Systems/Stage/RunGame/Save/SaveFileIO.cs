@@ -13,9 +13,10 @@ using UnityEngine;
 /// </summary>
 public static class SaveFileIO
 {
-    public static string Dir => Application.persistentDataPath;
+    /// <summary>진행 세이브 폴더 — Steam 계정 폴더(Steam 클라우드 · 11-06) · Steam이 꺼져 있으면 persistentDataPath(<see cref="SaveRoot"/>).</summary>
+    public static string Dir => SaveRoot.Dir;
 
-    /// <summary>persistentDataPath 기준 절대 경로.</summary>
+    /// <summary>진행 세이브 폴더 기준 절대 경로.</summary>
     public static string PathFor(string fileName) => Path.Combine(Dir, fileName);
 
     public static string BakPathOf(string mainPath) => Path.ChangeExtension(mainPath, ".bak");

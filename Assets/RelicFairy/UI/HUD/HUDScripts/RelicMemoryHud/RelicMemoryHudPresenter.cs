@@ -252,16 +252,16 @@ public sealed class RelicMemoryHudPresenter : MonoBehaviour
     /// <summary>계정에 한 번 처음 안내 한 줄(+ 이어지는 한 줄). 이미 띄운 키면 아무것도 안 한다.</summary>
     private void TryHintOnce(string key, string text, float seconds, string next = null, float nextSeconds = 0f)
     {
-        if (PlayerPrefs.GetInt(key, 0) != 0) return;
-        PlayerPrefs.SetInt(key, 1);
-        PlayerPrefs.Save();
+        if (ProgressPrefs.GetInt(key, 0) != 0) return;
+        ProgressPrefs.SetInt(key, 1);
+        ProgressPrefs.Save();
         _view.ShowHint(text, seconds, next, nextSeconds);
     }
 
     /// <summary>빈 별(엇갈린 빛 대기)이 처음 뜰 때 한 번 — 무엇을 하면 켜지는지(10-30 H-07). 반응 조각 2개째를 고른 직후라 다른 처음 안내와 겹치지 않는다.</summary>
     private void TryCrossHint(float window)
     {
-        if (PlayerPrefs.GetInt(CrossHintKey, 0) != 0) return;
+        if (ProgressPrefs.GetInt(CrossHintKey, 0) != 0) return;
         TryHintOnce(CrossHintKey, Loc.F("빈 별 = 엇갈린 빛 — 서로 다른 반응 2개를 {0:0}초 안에 일으키면 켜진다", window), CrossHintSec);
     }
 

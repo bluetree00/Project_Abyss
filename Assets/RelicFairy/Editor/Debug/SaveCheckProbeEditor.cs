@@ -79,15 +79,15 @@ public static class SaveCheckProbeEditor
 
             // ③ 대사 방문 · 사망 기록 — 슬롯별 키
             Managers.DialogueData?.GetVisitLines("SaveProbe_Key");
-            Check("대사 방문 — 2번 슬롯 키", PlayerPrefs.HasKey("dlgVisit_s2_SaveProbe_Key") && !PlayerPrefs.HasKey("dlgVisit_SaveProbe_Key"), "");
-            int death0 = PlayerPrefs.GetInt("run_death_count", 0);
+            Check("대사 방문 — 2번 슬롯 키", ProgressPrefs.HasKey("dlgVisit_s2_SaveProbe_Key") && !ProgressPrefs.HasKey("dlgVisit_SaveProbe_Key"), "");
+            int death0 = ProgressPrefs.GetInt("run_death_count", 0);
             RunReturnTracker.RecordRunEnd(false);
-            Check("사망 수 — 2번 슬롯 키", PlayerPrefs.GetInt("run_death_count_s2", 0) == 1 && PlayerPrefs.GetInt("run_death_count", 0) == death0,
-                  $"s2={PlayerPrefs.GetInt("run_death_count_s2", 0)} · 0번={PlayerPrefs.GetInt("run_death_count", 0)}(전 {death0})");
+            Check("사망 수 — 2번 슬롯 키", ProgressPrefs.GetInt("run_death_count_s2", 0) == 1 && ProgressPrefs.GetInt("run_death_count", 0) == death0,
+                  $"s2={ProgressPrefs.GetInt("run_death_count_s2", 0)} · 0번={ProgressPrefs.GetInt("run_death_count", 0)}(전 {death0})");
             RunReturnTracker.ConsumeReason(out _);
 
             // ④ 런 종료 = 허브 기록 · 지워진 슬롯 복구 · 프롤로그 전 슬롯은 지움
-            PlayerPrefs.SetInt("game_intro_done_v1_slot" + TestSlot, 1);
+            ProgressPrefs.SetInt("game_intro_done_v1_slot" + TestSlot, 1);
             rpm.ClearLocalRun(TestSlot);
             var hub = rpm.LoadLocalRun(TestSlot);
             Check("런 종료 → 허브 기록", hub != null && hub.hasActiveRun && hub.isInStartRoom, "");

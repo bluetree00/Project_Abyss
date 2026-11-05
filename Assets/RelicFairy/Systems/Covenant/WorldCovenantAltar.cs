@@ -277,7 +277,7 @@ public class WorldCovenantAltar : MonoBehaviour
     /// <summary>최초 서약(계정 1회)일 때만 제단으로 유도하는 가이드 화살표+안내를 띄운다.</summary>
     private void TrySpawnFirstTimeGuide()
     {
-        if (PlayerPrefs.GetInt(GuideShownKey, 0) == 1) return;
+        if (ProgressPrefs.GetInt(GuideShownKey, 0) == 1) return;
         var run = GameRunBootstrapper.Instance?.Run;
         if (run?.CovenantHandler == null || run.CovenantHandler.Covenants.Count > 0) return;
 
@@ -292,8 +292,8 @@ public class WorldCovenantAltar : MonoBehaviour
     {
         if (markDone)
         {
-            PlayerPrefs.SetInt(GuideShownKey, 1);
-            PlayerPrefs.Save();
+            ProgressPrefs.SetInt(GuideShownKey, 1);
+            ProgressPrefs.Save();
         }
         if (_guideArrow != null)
         {

@@ -28,7 +28,7 @@ public static class SlotDeleteIntroProbeEditor
             if (rpm.HasLocalRun(TestSlot)) { sb.AppendLine("가상 슬롯 99에 기록이 이미 있음 — 멈춤"); return; }
 
             // 프롤로그를 끝낸 슬롯(이어하기면 거점으로 가는 상태)
-            PlayerPrefs.SetInt("game_intro_done_v1_slot" + TestSlot, 1);
+            ProgressPrefs.SetInt("game_intro_done_v1_slot" + TestSlot, 1);
             Check("준비: 프롤로그 완료로 표시", IntroCompletionTracker.IsCompletedForSlot(TestSlot));
 
             // 슬롯 삭제 → 로비 카드 새로고침
@@ -43,8 +43,8 @@ public static class SlotDeleteIntroProbeEditor
         {
             // 뒷정리 — 가상 슬롯의 흔적을 남기지 않는다
             if (rpm != null) rpm.ResetSlot(TestSlot);
-            PlayerPrefs.DeleteKey("game_intro_done_v1_slot" + TestSlot);
-            PlayerPrefs.Save();
+            ProgressPrefs.DeleteKey("game_intro_done_v1_slot" + TestSlot);
+            ProgressPrefs.Save();
             sb.AppendLine($"뒷정리 뒤 가상 슬롯 기록 남음: {(rpm != null && rpm.HasLocalRun(TestSlot))}");
             sb.AppendLine($"CHECK 합계 {pass}/{total}");
             File.WriteAllText("Temp/slot_delete_intro_probe.txt", sb.ToString());

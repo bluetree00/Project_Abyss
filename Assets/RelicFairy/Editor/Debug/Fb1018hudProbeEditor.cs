@@ -17,7 +17,7 @@ using UnityEngine.UI;
 /// ⑬ 하루 띠 이름 · 조각 수(「여명 1/4」) · 처음 안내 한 줄 · 띠가 게이지 끝과 안 겹침 · 물약 C · E 칸과 안 겹침.
 /// 런이 없으면 Ch1 가웨인으로 띄운다(Temp/fb1018_hud_args.txt = 「lancelot」이면 랜슬롯 — 계단 문턱 값 · 「원한 N/5」만 찍는다).
 /// 조각(가웨인 g_zenith · g_sundial · g_dawn_to_noon · g_ember_path / 랜슬롯 l_split_oath · l_black_afterimage)을 런에 더한다 — 테스트 런에 남는다.
-/// 처음 안내 키(relic_hud_dial_hint_v1)는 지웠다가 다시 1이 된다(에디터 PlayerPrefs).
+/// 처음 안내 키(relic_hud_dial_hint_v1)는 지웠다가 다시 1이 된다(에디터 ProgressPrefs).
 /// 결과 Temp/fb1018_hud.txt · Temp/ui_shots/FB18_hud_*.png · 로그 「[FB18hud] 끝」. CHECK 줄이 전부 True면 합격.
 /// </summary>
 public static class Fb1018hudProbeEditor
@@ -90,7 +90,7 @@ public static class Fb1018hudProbeEditor
         await UniTask.Delay(500, DelayType.Realtime);
 
         // ⑬ 처음 안내 — 키를 지우고 허브를 다시 묶는다(첫 조각을 집은 순간과 같은 길)
-        PlayerPrefs.DeleteKey(HintKey);
+        ProgressPrefs.DeleteKey(HintKey);
         typeof(RelicMemoryHudPresenter).GetMethod("OnGawainHub", Any)?.Invoke(presenter, new object[] { hub });
         await UniTask.Delay(1000, DelayType.Realtime);
         var hint      = Get(view, "_hint") as TMP_Text;
@@ -98,8 +98,8 @@ public static class Fb1018hudProbeEditor
         string hintText = hint != null ? hint.GetParsedText() : "";
         float  hintA    = hintGroup != null ? hintGroup.alpha : -1f;
         await ShotAsync("FB18_hud_1_hint");
-        sb.AppendLine($"[⑬ 처음 안내] 「{hintText}」 · 알파 {hintA:0.00} · 키 {PlayerPrefs.GetInt(HintKey, 0)}");
-        sb.AppendLine($"  CHECK 처음 안내가 뜬다 · 키 1: {hintText.Length > 0 && hintA > 0.9f && PlayerPrefs.GetInt(HintKey, 0) == 1}");
+        sb.AppendLine($"[⑬ 처음 안내] 「{hintText}」 · 알파 {hintA:0.00} · 키 {ProgressPrefs.GetInt(HintKey, 0)}");
+        sb.AppendLine($"  CHECK 처음 안내가 뜬다 · 키 1: {hintText.Length > 0 && hintA > 0.9f && ProgressPrefs.GetInt(HintKey, 0) == 1}");
         var eSlot = Find(hud.transform, "HUD_ESkile") as RectTransform;
         var cSlot = Find(hud.transform, "HUD_Active_01") as RectTransform;
         var hintRect = TextRect(hint);

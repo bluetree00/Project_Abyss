@@ -467,7 +467,7 @@ public sealed partial class MonsterTraits : MonoBehaviour
     /// </summary>
     public static void NoticeRoomPrefix(MonsterBase elite, MonsterTraitKind k)
     {
-        if (elite == null || PlayerPrefs.GetInt(SeenPrefsPrefix + k, 0) == 0) return;
+        if (elite == null || ProgressPrefs.GetInt(SeenPrefsPrefix + k, 0) == 0) return;
         NoticeRoomPrefixAsync(elite, k).Forget();
     }
 
@@ -566,9 +566,9 @@ public sealed partial class MonsterTraits : MonoBehaviour
         {
             if (!s_noticedThisSession.Add(k)) continue;
             string key = SeenPrefsPrefix + k;
-            if (PlayerPrefs.GetInt(key, 0) != 0) continue;
-            PlayerPrefs.SetInt(key, 1);
-            PlayerPrefs.Save();   // 튕기면 첫 안내가 또 뜨지 않게
+            if (ProgressPrefs.GetInt(key, 0) != 0) continue;
+            ProgressPrefs.SetInt(key, 1);
+            ProgressPrefs.Save();   // 튕기면 첫 안내가 또 뜨지 않게
             var d = MonsterTraitTable.Of(k);
             msg = msg == null ? $"{Loc.T(d.name)}: {Loc.T(d.desc)}" : $"{msg}   ·   {Loc.T(d.name)}: {Loc.T(d.desc)}";
         }

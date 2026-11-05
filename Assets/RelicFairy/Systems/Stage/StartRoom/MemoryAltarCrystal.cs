@@ -151,8 +151,8 @@ public sealed class MemoryAltarCrystal : MonoBehaviour
     /// <summary>슬롯 초기화(새 게임 · 삭제) — 「지난번 열 수 있던 수」 기록도 지운다(10-09 출시 점검: 새 슬롯에 남아 첫 한 줄이 안 나왔다).</summary>
     public static void ClearForSlot(int slot)
     {
-        PlayerPrefs.DeleteKey(AffordableKey + slot);
-        PlayerPrefs.Save();
+        ProgressPrefs.DeleteKey(AffordableKey + slot);
+        ProgressPrefs.Save();
     }
 
     /// <summary>복귀 판 — 열 수 있는 수가 지난번보다 늘었으면 멀린 한 줄. 첫 판 온보딩 중에는 말하지 않는다.</summary>
@@ -165,9 +165,9 @@ public sealed class MemoryAltarCrystal : MonoBehaviour
             if (BaseCampOnboardingDirector.InProgress) return;
 
             string key = AffordableKey + (RunProgressManager.Instance?.ActiveSlotIndex ?? 0);
-            int before = PlayerPrefs.GetInt(key, 0);
-            PlayerPrefs.SetInt(key, _affordable);
-            PlayerPrefs.Save();
+            int before = ProgressPrefs.GetInt(key, 0);
+            ProgressPrefs.SetInt(key, _affordable);
+            ProgressPrefs.Save();
             if (_affordable <= before || string.IsNullOrEmpty(affordableLine)) return;
 
             var next = MemoryAltarService.GetNextGoal();   // 해방기엔 해방 대비 칸이 먼저(10-22 D5) — 지금 열 수 있을 때만 그 칸을 부른다

@@ -37,7 +37,7 @@ public sealed class AppBootstrapper : MonoBehaviour
     private bool _uiRootEnsured;
 
     [Header("Steam Login")]
-    [SerializeField] private bool useSteamLogin = false;
+    [SerializeField] private bool useSteamLogin = true;   // 11-06 기본 켬 — Steam이 꺼졌거나 실패하면 기기 ID 로그인으로(Start 6)
 
     [Header("Auto Login (Device ID)")]
     [SerializeField] private bool useAutoLogin = true;
@@ -499,6 +499,11 @@ public sealed class AppBootstrapper : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
+        // 11-06 Steam 클라우드 — 진행 세이브 폴더가 Steam 계정마다 갈린다(SaveRoot). 세이브를 처음 만지는 RunProgressManager보다 먼저 켠다
+        // (Start 6-0에서 켜면 그 전에 읽은 세이브가 계정 폴더 밖을 봤다). Steam이 꺼져 있으면 오류만 남기고 persistentDataPath 그대로.
+        if (SteamManager.Instance == null)
+            new GameObject("@SteamManager").AddComponent<SteamManager>();
+
         LegendaryRuntime.EnsureExists();
 
         // RunProgressManager (이어하기 저장) — 뒤끝 로그인 전부터 인스턴스 준비
@@ -609,37 +614,29 @@ public sealed class AppBootstrapper : MonoBehaviour
         if (SteamManager.Instance == null)
             new GameObject("@SteamManager").AddComponent<SteamManager>();
 
-        // 6) (선택) Steam 로그인 → Lobby로 직행
-        if (useSteamLogin)
+        // 6) Steam 계정 로그인(11-06 기본 켬) — 뒤끝 계정이 Steam 계정을 따라가 PC를 바꿔도 한 사람 = 한 기록(예전 기기 ID는 PC마다 새 계정 · 랭킹이 갈렸다).
+        //    Steam이 꺼졌거나 실패하면 아래 기기 ID 로그인으로 — 게임은 늘 켜진다(예전 Steam 길은 실패하면 「시작할 수 없습니다」로 멈췄고 메타도 안 읽었다).
+        bool steamOk = false;
+        if (useSteamLogin && SteamManager.Initialized)
         {
-
-            bool steamOk = await SteamLoginService.LoginAsync();
-            if (!steamOk)
-            {
-                Debug.LogError("[AppBootstrapper] Steam 로그인 실패. 게임을 시작할 수 없습니다.");
-                return;
-            }
-
-            await UniTask.WhenAll(
-                Managers.ItemData.InitializeAsync(),
-                Managers.RuneData.InitializeAsync(),
-                Managers.RelicStatData.InitializeAsync(),
-                Managers.RelicParts.InitializeAsync(),
-                Managers.WeaponParts.InitializeAsync()    // 원거리 파츠 정적 정의
-            );
-            startScene = Define.Scene.Lobby;
+            steamOk = await SteamLoginService.LoginAsync();
+            if (!steamOk) Debug.LogWarning("[AppBootstrapper] Steam 로그인 실패 → 기기 ID 로그인으로");
         }
 
-        // 6-b) 디바이스 ID 자동 로그인 (Login 씬 제거 — 성공/실패 모두 Lobby로)
-        if (useAutoLogin && !useSteamLogin)
+        // 6-b) 디바이스 ID 자동 로그인 (Login 씬 제거 — 성공/실패 모두 Lobby로) · Steam으로 들어왔으면 건너뛰고 같은 마무리
+        if (steamOk || useAutoLogin)
         {
-            // 콜백이 끝내 안 오면 여기서 멈춰 IsReady에 못 간다 — 시간을 넘기면 실패로 보고 아래 폴백 경로로.
-            // (늦게 온 콜백은 TrySetResult라 무해. 그 판은 오프라인 데이터로 돈다.)
-            var (timedOut, loginOk) = await DeviceAutoLoginAsync()
-                .TimeoutWithoutException(TimeSpan.FromSeconds(autoLoginTimeoutSec), DelayType.Realtime);
-            if (timedOut)
-                Debug.LogWarning($"[AppBootstrapper] 자동 로그인 {autoLoginTimeoutSec:0}초 응답 없음 → 실패로 처리");
-            bool autoOk = !timedOut && loginOk;
+            bool autoOk = steamOk;
+            if (!steamOk)
+            {
+                // 콜백이 끝내 안 오면 여기서 멈춰 IsReady에 못 간다 — 시간을 넘기면 실패로 보고 아래 폴백 경로로.
+                // (늦게 온 콜백은 TrySetResult라 무해. 그 판은 오프라인 데이터로 돈다.)
+                var (timedOut, loginOk) = await DeviceAutoLoginAsync()
+                    .TimeoutWithoutException(TimeSpan.FromSeconds(autoLoginTimeoutSec), DelayType.Realtime);
+                if (timedOut)
+                    Debug.LogWarning($"[AppBootstrapper] 자동 로그인 {autoLoginTimeoutSec:0}초 응답 없음 → 실패로 처리");
+                autoOk = !timedOut && loginOk;
+            }
             if (autoOk)
             {
                 IsAutoLoggedIn = true;
@@ -652,7 +649,7 @@ public sealed class AppBootstrapper : MonoBehaviour
                     Managers.WeaponParts.InitializeAsync(),   // 원거리 파츠 정적 정의
                     BackendGameData.Instance.LoadAsync()
                 );
-                Debug.Log("[AppBootstrapper] 자동 로그인 성공");
+                Debug.Log(steamOk ? "[AppBootstrapper] 자동 로그인 성공(Steam 계정)" : "[AppBootstrapper] 자동 로그인 성공");
                 RankingService.SyncNicknameAsync().Forget();   // 11-05 랭킹 이름 = 스팀 이름(기록을 올리기 전에도 · 이름을 바꾸면 다음 실행 때)
             }
             else
@@ -866,7 +863,10 @@ public sealed class AppBootstrapper : MonoBehaviour
         Debug.Log($"[AppBootstrapper] 퀘스트 라벨 로드 — 퀘스트 {pureQuests.Count} · 업적 {achievementList.Count}");
 
         if (pureQuests.Count > 0 || achievementList.Count > 0)
+        {
             Managers.Quest.Initialize(pureQuests, achievementList);
+            SteamAchievements.Bind(Managers.Quest);   // 11-06 Steam 도전과제 — 달성 · 받기 · 슬롯 읽기에 붙고 지금 슬롯 따라잡기
+        }
         else
             Debug.LogWarning($"[AppBootstrapper] 라벨 '{QuestLabels.Quest}'/'{QuestLabels.Achievement}'에 걸린 에셋이 없습니다 — " +
                              "메뉴 「RelicFairy/Gameplay/Quest/Generate From CSV」로 생성·라벨링하세요.");

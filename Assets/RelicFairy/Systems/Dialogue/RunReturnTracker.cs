@@ -1,8 +1,8 @@
 ﻿using UnityEngine;
 
 /// <summary>
-/// 런 종료(사망/클리어) 사유·누적 횟수를 PlayerPrefs로 기록하고 BaseCamp 진입 시 소비한다.
-/// 복귀 대사(GetCountLines)의 랜덤 풀/마일스톤 선택에 쓰인다. (기존 방문 대사 GetVisitLines와 동일한 PlayerPrefs 관례.)
+/// 런 종료(사망/클리어) 사유·누적 횟수를 ProgressPrefs로 기록하고 BaseCamp 진입 시 소비한다.
+/// 복귀 대사(GetCountLines)의 랜덤 풀/마일스톤 선택에 쓰인다. (기존 방문 대사 GetVisitLines와 동일한 ProgressPrefs 관례.)
 /// </summary>
 public static class RunReturnTracker
 {
@@ -16,49 +16,49 @@ public static class RunReturnTracker
     public enum Reason { None = 0, Death = 1, Clear = 2 }
 
     /// <summary>누적 사망 횟수(읽기 전용). 이야기 진행 판정(멀린 이름 공개 등)에 쓴다.</summary>
-    public static int DeathCount => PlayerPrefs.GetInt(DeathCountKey, 0);
+    public static int DeathCount => ProgressPrefs.GetInt(DeathCountKey, 0);
 
     /// <summary>런 종료 시 호출 — 해당 카운트 +1, 복귀 사유 기록.</summary>
     public static void RecordRunEnd(bool isCleared)
     {
         if (isCleared)
         {
-            PlayerPrefs.SetInt(ClearCountKey, PlayerPrefs.GetInt(ClearCountKey, 0) + 1);
-            PlayerPrefs.SetInt(ReasonKey, (int)Reason.Clear);
+            ProgressPrefs.SetInt(ClearCountKey, ProgressPrefs.GetInt(ClearCountKey, 0) + 1);
+            ProgressPrefs.SetInt(ReasonKey, (int)Reason.Clear);
         }
         else
         {
-            PlayerPrefs.SetInt(DeathCountKey, PlayerPrefs.GetInt(DeathCountKey, 0) + 1);
-            PlayerPrefs.SetInt(ReasonKey, (int)Reason.Death);
+            ProgressPrefs.SetInt(DeathCountKey, ProgressPrefs.GetInt(DeathCountKey, 0) + 1);
+            ProgressPrefs.SetInt(ReasonKey, (int)Reason.Death);
         }
-        PlayerPrefs.Save();
+        ProgressPrefs.Save();
     }
 
     /// <summary>새 게임 시작 — 활성 슬롯의 사유·누적 횟수를 전부 초기화한다. 이게 없으면 이전 플레이의
     /// 사망/클리어 횟수가 남아 첫 복귀부터 반복 대사가 나온다.</summary>
     public static void ResetAll()
     {
-        PlayerPrefs.DeleteKey(ReasonKey);
-        PlayerPrefs.DeleteKey(DeathCountKey);
-        PlayerPrefs.DeleteKey(ClearCountKey);
-        PlayerPrefs.Save();
+        ProgressPrefs.DeleteKey(ReasonKey);
+        ProgressPrefs.DeleteKey(DeathCountKey);
+        ProgressPrefs.DeleteKey(ClearCountKey);
+        ProgressPrefs.Save();
     }
 
     /// <summary>사유를 소비하지 않고 읽는다 — 복귀 소환 연출 색(사망 보랏빛 / 클리어 금빛)을 대사보다 먼저 정할 때.</summary>
-    public static Reason PeekReason() => (Reason)PlayerPrefs.GetInt(ReasonKey, 0);
+    public static Reason PeekReason() => (Reason)ProgressPrefs.GetInt(ReasonKey, 0);
 
     /// <summary>BaseCamp 진입 시 호출 — 사유를 읽고 1회성 소비. count=해당 사유의 누적 횟수(없으면 0).</summary>
     public static Reason ConsumeReason(out int count)
     {
-        var reason = (Reason)PlayerPrefs.GetInt(ReasonKey, 0);
-        PlayerPrefs.SetInt(ReasonKey, (int)Reason.None);
+        var reason = (Reason)ProgressPrefs.GetInt(ReasonKey, 0);
+        ProgressPrefs.SetInt(ReasonKey, (int)Reason.None);
         count = reason switch
         {
-            Reason.Death => PlayerPrefs.GetInt(DeathCountKey, 1),
-            Reason.Clear => PlayerPrefs.GetInt(ClearCountKey, 1),
+            Reason.Death => ProgressPrefs.GetInt(DeathCountKey, 1),
+            Reason.Clear => ProgressPrefs.GetInt(ClearCountKey, 1),
             _            => 0,
         };
-        PlayerPrefs.Save();
+        ProgressPrefs.Save();
         return reason;
     }
 }

@@ -14,6 +14,8 @@ public static class SteamLoginService
 {
     public static bool IsLoggedIn { get; private set; }
     private const string SALT = "RelicFairy_4488270_Steam";
+    // 11-06 — 이름 바꾸기(Abyss → RelicFairy) 전 소금. 그때 만든 계정은 새 소금 비밀번호로는 401이고 가입은 409(이미 있음)라 Steam 로그인이 늘 실패했다 → 한 번 더 시도.
+    private const string LegacySalt = "Abyss_4488270_Steam";
 
     public static UniTask<bool> LoginAsync()
     {
@@ -35,6 +37,15 @@ public static class SteamLoginService
         if (loginResult.IsSuccess())
         {
             Debug.Log("[SteamLogin] 커스텀 로그인 성공!");
+            IsLoggedIn = true;
+            return UniTask.FromResult(true);
+        }
+
+        // 이름 바꾸기 전 소금으로 만든 계정 — 그 비밀번호로 한 번 더(없는 계정이면 이것도 401이라 아래 가입으로)
+        var legacyResult = Backend.BMember.CustomLogin(steamId, GeneratePassword(steamId, LegacySalt));
+        if (legacyResult.IsSuccess())
+        {
+            Debug.Log("[SteamLogin] 커스텀 로그인 성공(이름 바꾸기 전 계정)");
             IsLoggedIn = true;
             return UniTask.FromResult(true);
         }
@@ -75,10 +86,10 @@ public static class SteamLoginService
     /// Steam 클라이언트가 실행된 상태에서만 SteamID를 획득할 수 있으므로
     /// 외부에서 임의 로그인 방지
     /// </summary>
-    private static string GeneratePassword(string steamId)
+    private static string GeneratePassword(string steamId, string salt = SALT)
     {
         using var sha = SHA256.Create();
-        byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(steamId + SALT));
+        byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(steamId + salt));
         var sb = new StringBuilder();
         foreach (byte b in hash) sb.AppendFormat("{0:x2}", b);
         return sb.ToString();

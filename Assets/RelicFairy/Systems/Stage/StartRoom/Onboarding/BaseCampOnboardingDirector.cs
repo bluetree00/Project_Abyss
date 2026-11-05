@@ -17,7 +17,7 @@ using UnityEngine;
 /// 각 단계 완료를 퀘스트 보고 카테고리(SwordAwaken/Equip/Relic)로 감지해 다음 구역 배리어를 제거하고,
 /// 단계 진입 시 그 대상을 카메라 연출(RevealAsync → PlayOnboardingRevealAsync)로 보여준다.
 /// 연출 시점은 <b>현재 카메라 heading 기준</b>으로 오프셋이 회전하므로 접근 방향에 맞춰 자연스럽게 잡힌다.
-/// 가이드 화살표·가이드 문구 동반. 완료는 PlayerPrefs(슬롯별)로 영속 → 2회차부터 전 구역 개방·연출 스킵.
+/// 가이드 화살표·가이드 문구 동반. 완료는 ProgressPrefs(슬롯별)로 영속 → 2회차부터 전 구역 개방·연출 스킵.
 /// </summary>
 public sealed class BaseCampOnboardingDirector : MonoBehaviour
 {
@@ -75,7 +75,7 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
     private readonly HashSet<string> _reported = new();   // 받은 보고 카테고리 — 순서 밖에서 먼저 끝낸 단계도 기억한다
 
     /// <summary>현재 활성 슬롯의 온보딩 완료 여부. 초회 판정(입구 스폰 + 가이드) 근거.</summary>
-    public static bool IsCompleted => PlayerPrefs.GetInt(SaveKeyFor(ActiveSlot), 0) == 1;
+    public static bool IsCompleted => ProgressPrefs.GetInt(SaveKeyFor(ActiveSlot), 0) == 1;
 
     /// <summary>첫 판 온보딩이 도는 중인가 — 구역 표지는 이 동안 목표 구역만 알린다(한 순간에 하나만, 2차 개편 09-29).</summary>
     public static bool InProgress { get; private set; }
@@ -87,8 +87,8 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
     /// <summary>슬롯 삭제 시 온보딩 기록도 함께 초기화 → 그 슬롯으로 새로 시작하면 초회로 다시 진행된다.</summary>
     public static void ClearForSlot(int slot)
     {
-        PlayerPrefs.DeleteKey(SaveKeyFor(slot));
-        PlayerPrefs.Save();
+        ProgressPrefs.DeleteKey(SaveKeyFor(slot));
+        ProgressPrefs.Save();
     }
 
     private void Start()
@@ -263,8 +263,8 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
 
     private static void MarkCompleted()
     {
-        PlayerPrefs.SetInt(SaveKeyFor(ActiveSlot), 1);
-        PlayerPrefs.Save();
+        ProgressPrefs.SetInt(SaveKeyFor(ActiveSlot), 1);
+        ProgressPrefs.Save();
     }
 
     // ── Event Handlers ────────────────────────────────────────

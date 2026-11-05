@@ -109,8 +109,8 @@ public static class BossSpotFloorShotEditor
         Directory.CreateDirectory(dir);
         var sb = new StringBuilder("인트로 모르드레드 자리 바닥" + Environment.NewLine);
         string key = "game_intro_done_v1_slot" + (RunProgressManager.Instance?.ActiveSlotIndex ?? 0);
-        bool hadKey = PlayerPrefs.HasKey(key);
-        int  wasVal = PlayerPrefs.GetInt(key, 0);
+        bool hadKey = ProgressPrefs.HasKey(key);
+        int  wasVal = ProgressPrefs.GetInt(key, 0);
         GameObject go = null;
         RenderTexture rt = null;
         var debris = new List<Renderer>();
@@ -159,8 +159,8 @@ public static class BossSpotFloorShotEditor
             foreach (var r in debris) if (r != null) r.enabled = true;
             if (rt != null) rt.Release();
             if (go != null) UnityEngine.Object.Destroy(go);
-            if (hadKey) PlayerPrefs.SetInt(key, wasVal); else PlayerPrefs.DeleteKey(key);
-            PlayerPrefs.Save();
+            if (hadKey) ProgressPrefs.SetInt(key, wasVal); else ProgressPrefs.DeleteKey(key);
+            ProgressPrefs.Save();
             File.WriteAllText(Path.Combine(dir, "spot.txt"), sb.ToString(), Encoding.UTF8);
             Debug.Log($"[BossSpotFloor] 인트로 끝 — {dir}");
         }

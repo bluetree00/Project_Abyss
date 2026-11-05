@@ -22,7 +22,7 @@ public sealed class LocalFileRunSaveStore : IRunSaveStore
     private const string LegacyArchive    = "run_save.legacy.bak";
     private const string LegacyBakArchive = "run_save.legacy2.bak";
 
-    private static string Dir => Application.persistentDataPath;
+    private static string Dir => SaveRoot.Dir;   // Steam 계정 폴더(Steam 클라우드 · 11-06)
 
     private static string FilePath(int slot) => Path.Combine(Dir, $"run_save_{slot}.json");
     private static string TempPath(int slot) => Path.Combine(Dir, $"run_save_{slot}.tmp");

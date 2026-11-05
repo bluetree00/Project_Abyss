@@ -103,8 +103,8 @@ public static class FloorWalkProbeEditor
         Directory.CreateDirectory(dir);
         var sb = new StringBuilder("입구 바닥 — 페이더 켜고(a) · 끄고(b)" + Environment.NewLine);
         string key = "game_intro_done_v1_slot" + (RunProgressManager.Instance?.ActiveSlotIndex ?? 0);
-        bool hadKey = PlayerPrefs.HasKey(key);
-        int  wasVal = PlayerPrefs.GetInt(key, 0);
+        bool hadKey = ProgressPrefs.HasKey(key);
+        int  wasVal = ProgressPrefs.GetInt(key, 0);
         float biasWas = QualitySettings.lodBias;
         try
         {
@@ -153,8 +153,8 @@ public static class FloorWalkProbeEditor
         finally
         {
             QualitySettings.lodBias = biasWas;
-            if (hadKey) PlayerPrefs.SetInt(key, wasVal); else PlayerPrefs.DeleteKey(key);
-            PlayerPrefs.Save();
+            if (hadKey) ProgressPrefs.SetInt(key, wasVal); else ProgressPrefs.DeleteKey(key);
+            ProgressPrefs.Save();
             File.WriteAllText(Path.Combine(dir, "ab.txt"), sb.ToString(), Encoding.UTF8);
             Debug.Log($"[FloorWalk] 페이더 비교 끝 — {dir}");
         }
@@ -166,8 +166,8 @@ public static class FloorWalkProbeEditor
         Directory.CreateDirectory(dir);
         var sb = new StringBuilder($"바닥 걸으며 LOD — {(intro ? "인트로 스폰 → 무형검" : "지금 자리 → 앞 40 m")}\n");
         string key = "game_intro_done_v1_slot" + (RunProgressManager.Instance?.ActiveSlotIndex ?? 0);
-        bool hadKey = PlayerPrefs.HasKey(key);
-        int  wasVal = PlayerPrefs.GetInt(key, 0);
+        bool hadKey = ProgressPrefs.HasKey(key);
+        int  wasVal = ProgressPrefs.GetInt(key, 0);
         string scene = SceneManager.GetActiveScene().name;
         float biasWas = QualitySettings.lodBias;
         try
@@ -261,7 +261,7 @@ public static class FloorWalkProbeEditor
         finally
         {
             QualitySettings.lodBias = biasWas;
-            if (intro) { if (hadKey) PlayerPrefs.SetInt(key, wasVal); else PlayerPrefs.DeleteKey(key); PlayerPrefs.Save(); }
+            if (intro) { if (hadKey) ProgressPrefs.SetInt(key, wasVal); else ProgressPrefs.DeleteKey(key); ProgressPrefs.Save(); }
             string file = Path.Combine(Directory.GetCurrentDirectory(), "Temp", $"floor_walk_{scene}.txt");
             File.WriteAllText(file, sb.ToString(), Encoding.UTF8);
             Debug.Log($"[FloorWalk] 끝 — {file}");

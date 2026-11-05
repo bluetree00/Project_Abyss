@@ -29,6 +29,8 @@ public class QuestManager
 
     public event QuestRegisterHandler onAchievementRegistered;
     public event QuestCompletedHandler onAchievementCompleted;
+    /// <summary>업적 조건을 막 채웠다(제단에서 받기 전 · WaitingForCompletion으로 넘어간 순간) — Steam 도전과제가 듣는다(11-06). 슬롯을 읽을 때는 쏘지 않는다.</summary>
+    public event QuestCompletedHandler onAchievementAchieved;
 
     /// <summary>QuestDatabase 주입(Initialize) 완료 시 1회 발행. 비동기 부트스트랩 이후 등록을 거는 소비자용.</summary>
     public event Action onInitialized;
@@ -200,7 +202,13 @@ public class QuestManager
     public void ReceiveReport(string category, object target, int successCount)
     {
         ReceiveReport(_activeQuests, category, target, successCount);
-        ReceiveReport(_activeAchievements, category, target, successCount);
+        // 업적은 「막 채움」을 알린다(11-06 Steam 도전과제) — 예전엔 받기(Complete) 때만 사건이 있어 달성 순간을 몰랐다
+        foreach (var achievement in _activeAchievements.ToArray())
+        {
+            bool was = achievement.IsCompltable || achievement.IsComplete;
+            achievement.ReceiveReport(category, target, successCount);
+            if (!was && (achievement.IsCompltable || achievement.IsComplete)) onAchievementAchieved?.Invoke(achievement);
+        }
     }
 
     public void ReceiveReport(Category category, TaskTarget target, int successCount)

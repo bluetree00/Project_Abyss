@@ -131,24 +131,24 @@ public class RunProgressManager : MonoBehaviour
     }
 
     // ── 시도 횟수 (슬롯별) ─────────────────────────────────────
-    // 세이브 파일에 두면 런 종료 시 파일과 함께 지워져 항상 0이 된다. 슬롯 스코프 PlayerPrefs가 정본.
+    // 세이브 파일에 두면 런 종료 시 파일과 함께 지워져 항상 0이 된다. 슬롯 스코프 ProgressPrefs가 정본.
 
     private static string RetryKey(int slot) => "run_retry_count_slot" + slot;
 
     /// <summary>이 슬롯에서 런을 시작한 누적 횟수.</summary>
-    public static int GetRetryCount(int slot) => Mathf.Max(0, PlayerPrefs.GetInt(RetryKey(slot), 0));
+    public static int GetRetryCount(int slot) => Mathf.Max(0, ProgressPrefs.GetInt(RetryKey(slot), 0));
 
     /// <summary>새 런 진입 시 +1. 세이브 표시(로비 카드)의 "시도 N회" 근거.</summary>
     public static void BumpRetryCount(int slot)
     {
-        PlayerPrefs.SetInt(RetryKey(slot), GetRetryCount(slot) + 1);
-        PlayerPrefs.Save();
+        ProgressPrefs.SetInt(RetryKey(slot), GetRetryCount(slot) + 1);
+        ProgressPrefs.Save();
     }
 
     public static void ClearRetryCount(int slot)
     {
-        PlayerPrefs.DeleteKey(RetryKey(slot));
-        PlayerPrefs.Save();
+        ProgressPrefs.DeleteKey(RetryKey(slot));
+        ProgressPrefs.Save();
     }
 
     /// <summary>

@@ -165,7 +165,7 @@ public static class Fb1024ProbeEditor
             if (dir != null)
             {
                 string key = "basecamp_onboarding_done_v1_slot" + (RunProgressManager.Instance?.ActiveSlotIndex ?? 0);
-                int keepDone = PlayerPrefs.GetInt(key, 0);
+                int keepDone = ProgressPrefs.GetInt(key, 0);
                 var t = typeof(BaseCampOnboardingDirector);
                 t.GetField("_active", Any)?.SetValue(dir, true);
                 t.GetField("_swordPhase", Any)?.SetValue(dir, false);
@@ -188,7 +188,7 @@ public static class Fb1024ProbeEditor
                 t.GetField("_active", Any)?.SetValue(dir, false);
                 arrow?.Clear();
                 ZoneSign.SetObjective(null);
-                PlayerPrefs.SetInt(key, keepDone); PlayerPrefs.Save();
+                ProgressPrefs.SetInt(key, keepDone); ProgressPrefs.Save();
                 BaseCampOnboardingDirector_ResetInProgress();
             }
             else sb.AppendLine("    이 씬에 온보딩 감독이 없다 — 첫 안내 순서는 건너뜀");
