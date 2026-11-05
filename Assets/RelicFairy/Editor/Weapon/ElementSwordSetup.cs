@@ -16,6 +16,9 @@ public static class ElementSwordSetup
     private const string DrawTo   = DrawDir + "/GhostSamurai_APose_Equip01_Inplace.FBX";
     private const string DrawKey  = "GreatswordDraw", SwingKey = "GreatswordAttack_03";
     private const string SkillPath    = "Assets/RelicFairy/Weapon/Greatsword/Data/Greatsword_QSkill.asset";
+    /// <summary>대검 R(속성 검) 설명 글 — 11-05 재사용은 끝난 뒤부터 · 평타 +30% · 속성별 효과.</summary>
+    public const string GreatswordRDescription =
+        "검을 뽑아 속성 검을 들고 크게 휘두른다(둘레 공격력의 400%). 속성 = 룬판에 가장 많은 속성(없으면 불). 속성 검 동안 칼이 커지고 평타 범위 ×1.3 · 평타 피해 +30% · 평타에 맞은 적에게 속성 효과 — 6초 + 재련할 때마다 0.5초 · 재사용 대기는 속성 검이 끝난 뒤부터. 불: 화상(공격력 45%/초) · 타는 적을 치면 주위로 번짐 / 얼음: 두 번째 적중에 빙결 · 언 적을 치면 깨짐(공격력 120%) / 전기: 감전(공격력 20% · 받는 피해 +10%)이 가까운 적 둘에게 번짐 / 풀: 독이 8번 쌓이면 터짐(남은 독 ×1.5) / 빛: 표식 위 평타의 80%가 치명 피해를 더 줌 / 어둠: 받는 피해 +5%씩 쌓임(최대 +25%) · 쓰러지면 터짐";
     private const string ESkillPath   = "Assets/RelicFairy/Weapon/Greatsword/Data/Greatsword_ESkill.asset";
     private const string BehaviorPath = "Assets/RelicFairy/Weapon/Greatsword/Data/Greatsword_ElementSwordBehavior.asset";
     private const string AnimSetPath  = "Assets/RelicFairy/Weapon/Greatsword/Data/GreatswordBase/GreatswordAnimation.asset";
@@ -74,9 +77,7 @@ public static class ElementSwordSetup
             var so = new SerializedObject(skill);
             so.FindProperty("behavior").objectReferenceValue = behavior;
             so.FindProperty("skillName").stringValue = "속성 검";
-            so.FindProperty("description").stringValue =
-                "검을 뽑아 속성 검을 들고 크게 휘두른다(둘레 공격력의 400%). 속성 = 룬판에 가장 많은 속성(없으면 불). " +
-                "속성 검 동안 칼이 커지고 평타 범위 ×1.3 · 휘두른 자리에 속성 자국 — 6초 + 재련할 때마다 0.5초.";
+            so.FindProperty("description").stringValue = GreatswordRDescription;   // 11-05 속성별 효과 · 재사용 규칙(Req1102CombatProbeEditor와 같은 글)
             so.FindProperty("_tier2Change").stringValue = "속성 검 휘두름 공격력의 400% · 속성 자국";
             so.FindProperty("_tier3Change").stringValue = "속성 검 동안 평타 범위 ×1.3 → ×1.45";
             so.ApplyModifiedPropertiesWithoutUndo();

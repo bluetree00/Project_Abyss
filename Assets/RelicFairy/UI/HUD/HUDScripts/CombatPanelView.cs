@@ -892,6 +892,8 @@ public sealed partial class CombatPanelView : MonoBehaviour
         if (skill == SkillType.R)
         {
             bool onCd = !ready;
+            _rOnCd = onCd;
+            if (onCd && _rActiveLook) EndRActiveLook();   // 11-05 켜짐(대검 속성 검) → 재사용으로 넘어간다
             if (_rCooldownBg != null) _rCooldownBg.SetActive(onCd);
             if (_rCooldownFill != null)
                 _rCooldownFill.fillAmount = (onCd && total > 0f) ? remaining / total : 0f;

@@ -16,7 +16,8 @@ using UnityEngine;
 /// 피해 = 바탕 × <see cref="Percent"/>% — 바탕은 플레이어가 막 때린 적이면 그 피해(<see cref="NoteHit"/> · 치명 · 룬 포함), 아니면 그 휘두름의 피해(치명 · 방어 전).
 /// 예전엔 플레이어가 맞힌 적에게만 피해를 따라 주고 분신 자리와 상관없었다(분신이 안 닿아도 맞고 · 분신 칼 앞 적은 안 맞음).
 /// 11-05 사용자 「공격은 자기 방향의 상대에게」 — 분신마다 자기 앞(플레이어가 보는 쪽 콘)의 가장 가까운 적을 노려(<see cref="PickAim"/>) 그쪽을 보고 벤다(이동은 그대로 플레이어 기준).
-/// 스킬(E · R)도 분신마다 자기 앞 적을 벤다(<see cref="EchoSkillHit"/> · 증강이 부른다) · 검풍은 분신마다 따로 낮은 확률로 쏜다(<see cref="CloneShots"/>).
+/// 스킬(E · R)도 분신마다 자기 앞 적을 벤다(<see cref="EchoSkillHit"/> · 증강이 부른다). 분신 공격이 적을 맞히면 <see cref="CloneStruck"/> — 검풍이 그림자 자기 확률로 굴려
+/// 그 분신 칼끝에서 날리고(<see cref="CloneShot"/>) 그림은 그림자 보라 검기(<see cref="PlayDarkWave"/> · 11-05 #17 정정).
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class ShadowPartner : MonoBehaviour
@@ -27,7 +28,7 @@ public sealed class ShadowPartner : MonoBehaviour
     private const float IdleCheckInterval = 0.5f, IdleRadius = 25f, Alpha = 0.45f;
     private const float AimDistance = 2.2f, TurnSpeed = 900f;   // 타격 지점(평타 판정 가운데) · 그쪽으로 도는 빠르기(°/초)
     private const float SlashLife = 0.6f, HitFresh = 0.5f;        // 베기 사본 수명 · 플레이어가 막 때린 피해를 그 적의 바탕으로 보는 시간
-    private const int   MaxSlashFx = 6, MaxHitNotes = 64;
+    private const int   MaxSlashFx = 9, MaxHitNotes = 64;   // 베기 사본 6 + 그림자 검풍 검기 3(11-05 #17)
     private const float AimRange = 3.5f, AimHalfAngle = 60f, AimHold = 0.6f;   // 분신이 노릴 적 — 자기 자리에서 앞 콘 · 노린 적을 붙잡는 시간(11-05 #17)
     private const string SkillEchoKey = "SlashAttack";                         // 스킬 따라 베기 그림(카타나 베기 · 보라로 칠한 사본)
     // 분신 자리(플레이어 회전 기준) · 늦음 — 셋 다 타격 지점까지 2 m 안(카타나 평타가 닿는 거리)
@@ -38,9 +39,14 @@ public sealed class ShadowPartner : MonoBehaviour
     private static readonly Collider[] s_overlap = new Collider[64];
     private static readonly List<RelicFairy.Monster.MonsterBase> s_struck = new(16);
     private static readonly List<GameObject> s_aimBuf = new(8);
+    /// <summary>분신 공격이 적을 맞혔다(플레이어 · 분신 칸) — 평타 따라 베기는 휘두름마다 · 스킬 따라 베기는 시전마다 한 번. 검풍이 그림자 자기 확률로 굴린다(11-05 #17).</summary>
+    public static event Action<PlayerController, int> CloneStruck;
     // 분신 베기 색(알파 섞기 · 재질 기본색 ×4라 낮게) — 보라 그림자. 10-26 값(0.09 · 0.07 · 0.14)은 어두운 방에서 안 보였다(10-30)
     private static readonly Color SlashBright = new(0.2f, 0.11f, 0.38f), SlashDeep = new(0.05f, 0.025f, 0.1f);
     private const float SlashAlpha = 0.85f;
+    // 그림자 검풍 검기(11-05 #17) — 플레이어 검기(카타나 빨강 · 대검 파랑)와 갈리는 또렷한 보라 · 투명도는 원본 거의 그대로(사용자 「너무 안 보여도 안 돼」 · 밝기는 플레이어 검기 정도)
+    private static readonly Color WaveBright = new(0.6f, 0.3f, 1f), WaveDeep = new(0.32f, 0.12f, 0.62f);
+    private const float WaveAlpha = 0.9f;
 #if UNITY_EDITOR
     /// <summary>실측 99 F-4 — 베기 메아리 색 후보(투명도 0이면 기본).</summary>
     public static Color ProbeSlashBright, ProbeSlashDeep;
@@ -79,6 +85,8 @@ public sealed class ShadowPartner : MonoBehaviour
         public ParticleSystem.MinMaxGradient[] baseColors;   // 칠한 뒤 시작 색 — 보스 예고 중 옅게 했다가 되돌린다(10-30)
         public bool dimmed;
         public float hideAt = -1f;
+        public Vector3 scale0;   // 사본 원래 크기 — 검기는 판정 모양 배율을 여기에 곱한다(RelicStateVfx 한 번 재생과 같은 규칙)
+        public bool relative;
     }
 
     private sealed class Clone
@@ -189,30 +197,38 @@ public sealed class ShadowPartner : MonoBehaviour
     public static float DelayOf(int index) => Delays[Mathf.Clamp(index, 0, MaxClones - 1)];
 
     /// <summary>
-    /// 검풍(카타나 증강)을 그림자마다 따로 날릴 자리(11-05 사용자 「검풍은 그림자마다 따로」) — 보이는 분신마다 칼끝 자리(<paramref name="reach"/> m) ·
-    /// 방향(그 분신이 노리는 적 쪽 · 없으면 분신 정면) · 그 분신의 칼이 닿기까지 남은 초(늦음). 그림자가 안 보이면 0.
+    /// 분신 <paramref name="slot"/>이 검풍을 날릴 자리(그 분신 칼끝 <paramref name="reach"/> m) · 방향(그 분신이 노린 적 쪽 · 없으면 분신 정면) ·
+    /// 피해 몫(<see cref="Percent"/> ÷ 100). 그 분신이 안 보이면 false(11-05 사용자 「그림자 파트너도 자신만의 검풍확률을 가지고 공격때」).
     /// </summary>
-    public static int CloneShots(PlayerController p, float reach, List<(Vector3 from, Vector3 dir, float lead)> buf)
+    public static bool CloneShot(PlayerController p, int slot, float reach, out Vector3 from, out Vector3 dir, out float share)
     {
-        buf.Clear();
-        if (p == null || !p.TryGetComponent<ShadowPartner>(out var sp) || !sp._shown) return 0;
-        int count = Mathf.Clamp(sp.Count, 1, MaxClones);
-        Vector3 fwd = p.transform.forward;
-        for (int i = 0; i < count; i++)
-        {
-            var c = sp._clones[i];
-            if (c == null || !c.go.activeSelf) continue;
-            var aim = sp.AimOf(i);
-            if (aim == null) aim = sp.PickAim(i, fwd);
-            Vector3 cpos = c.go.transform.position;
-            Vector3 dir = aim != null ? aim.transform.position - cpos : c.go.transform.forward;
-            dir.y = 0f;
-            dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : fwd;
-            Vector3 from = cpos + dir * reach;
-            from.y = p.transform.position.y;
-            buf.Add((from, dir, Delays[i]));
-        }
-        return buf.Count;
+        from = dir = default;
+        share = 0f;
+        if (p == null || slot < 0 || slot >= MaxClones || !p.TryGetComponent<ShadowPartner>(out var sp) || !sp._shown) return false;
+        var c = sp._clones[slot];
+        if (c == null || !c.go.activeSelf) return false;
+        Vector3 cpos = c.go.transform.position;
+        var aim = sp.AimOf(slot);
+        dir = aim != null ? aim.transform.position - cpos : c.go.transform.forward;
+        dir.y = 0f;
+        dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : p.transform.forward;
+        from = cpos + dir * reach;
+        from.y = p.transform.position.y;
+        share = sp.Percent * 0.01f;
+        return true;
+    }
+
+    /// <summary>
+    /// 그림자 분신이 날린 검풍 그림 — 검기(<paramref name="key"/>)를 그림자 보라(<see cref="WaveBright"/> · 플레이어 검기와 갈리고 또렷하게) 판정 모양(앞 <paramref name="length"/> m ·
+    /// 옆 ±<paramref name="lateral"/> m)에 맞춰 한 번(<see cref="FormStrike.PlayWave"/>와 같은 크기 규칙 · 11-05 사용자 「그림자 파트너의 이펙트로 보이게」).
+    /// </summary>
+    public static void PlayDarkWave(PlayerController p, string key, Vector3 at, Vector3 forward, float length, float lateral)
+    {
+        forward.y = 0f;
+        if (string.IsNullOrEmpty(key) || length <= 0f || lateral <= 0f || forward.sqrMagnitude < 1e-4f) return;
+        float sz = length / FormStrike.WaveForwardPerScale, sx = lateral / FormStrike.WaveLateralPerScale;
+        var sp = Ensure(p);
+        if (sp != null) sp.ShowOrLoad(key, at, Quaternion.LookRotation(forward.normalized, Vector3.up), new Vector3(sx, Mathf.Sqrt(sx * sz), sz), relative: true);
     }
 
     /// <summary>
@@ -290,7 +306,7 @@ public sealed class ShadowPartner : MonoBehaviour
     {
         if (string.IsNullOrEmpty(key)) return;
         var sp = Ensure(p);
-        if (sp != null && sp.ShowOrLoad(key, pos, rot, scale) == 2) Log("어두운 베기(사본 만듦)");
+        if (sp != null && sp.ShowOrLoad(key, pos, rot, Vector3.one * scale) == 2) Log("어두운 베기(사본 만듦)");
     }
 
     // ── Private Methods ───────────────────────────────────────────
@@ -342,8 +358,9 @@ public sealed class ShadowPartner : MonoBehaviour
         Vector3 to = aim.transform.position - ctf.position;
         to.y = 0f;
         if (to.sqrMagnitude > 0.01f) ctf.rotation = Quaternion.LookRotation(to);
-        if (showSlash) ShowOrLoad(SkillEchoKey, ctf.position + ctf.forward * 1.2f + Vector3.up, ctf.rotation * Quaternion.Euler(0f, 0f, 8f), 1f);
+        if (showSlash) ShowOrLoad(SkillEchoKey, ctf.position + ctf.forward * 1.2f + Vector3.up, ctf.rotation * Quaternion.Euler(0f, 0f, 8f), Vector3.one);
         CombatQuery.DealSynergyDamage(aim, dmg, _player.gameObject);
+        if (showSlash) CloneStruck?.Invoke(_player, slot);   // 시전마다 한 번 — 그림자 검풍 굴림
 #if UNITY_EDITOR
         ProbeStruck?.Invoke(slot, aim, dmg);
 #endif
@@ -405,7 +422,7 @@ public sealed class ShadowPartner : MonoBehaviour
             if (to.sqrMagnitude > 0.01f) ctf.rotation = Quaternion.LookRotation(to);
         }
         Quaternion crot = ctf.rotation;
-        ShowOrLoad(n.Key, cpos + crot * n.Pos, crot * n.Rot, n.Scale);
+        ShowOrLoad(n.Key, cpos + crot * n.Pos, crot * n.Rot, Vector3.one * n.Scale);
         StrikeCount++;
         Vector3 c = cpos + crot * n.Center;
         int hits = n.Box
@@ -419,6 +436,7 @@ public sealed class ShadowPartner : MonoBehaviour
             s_struck.Add(mb);
         }
         float now = Time.time;
+        int dealt = 0;
         for (int i = 0; i < s_struck.Count; i++)
         {
             var mb = s_struck[i];
@@ -426,25 +444,28 @@ public sealed class ShadowPartner : MonoBehaviour
             float dmg = basis * Percent * 0.01f;
             if (dmg <= 0f) continue;
             CombatQuery.DealSynergyDamage(mb, dmg, _player.gameObject);
+            dealt++;
 #if UNITY_EDITOR
             ProbeStruck?.Invoke(slot, mb, dmg);
 #endif
         }
         Log($"분신 {slot + 1} 베기 — 맞힘 {s_struck.Count}");
+        if (dealt > 0) CloneStruck?.Invoke(_player, slot);   // 휘두름마다 한 번 — 그림자 검풍 굴림
     }
 
-    /// <summary>쉬는 사본이 있으면 그 자리에 보인다(1) · 없으면 새로 만든다(2 · 사본 수 상한 <see cref="MaxSlashFx"/>) · 상한이면 0.</summary>
-    private int ShowOrLoad(string key, Vector3 pos, Quaternion rot, float scale)
+    /// <summary>쉬는 사본이 있으면 그 자리에 보인다(1) · 없으면 새로 만든다(2 · 사본 수 상한 <see cref="MaxSlashFx"/>) · 상한이면 0.
+    /// <paramref name="relative"/> = 크기를 사본 원래 크기에 곱한다 · 한 번만 재생(검기 — 팩 프리팹이 반복이라).</summary>
+    private int ShowOrLoad(string key, Vector3 pos, Quaternion rot, Vector3 scale, bool relative = false)
     {
         foreach (var f in _slashFx)
             if (f.key == key && f.go != null && !f.go.activeSelf) { ShowSlash(f, pos, rot, scale); return 1; }
         if (_slashFx.Count + _loadingSlash >= MaxSlashFx) return 0;
-        LoadSlashAsync(key, pos, rot, scale, this.GetCancellationTokenOnDestroy()).Forget();
+        LoadSlashAsync(key, pos, rot, scale, relative, this.GetCancellationTokenOnDestroy()).Forget();
         return 2;
     }
 
     /// <summary>베기 사본을 만든다 — 무기 페이로드를 겸하는 프리팹이라 판정(충돌체 · 풀 회수 · 판정체)을 끄고 보이기만 · 어두운 색으로 한 번 칠한다.</summary>
-    private async UniTaskVoid LoadSlashAsync(string key, Vector3 pos, Quaternion rot, float scale, CancellationToken ct)
+    private async UniTaskVoid LoadSlashAsync(string key, Vector3 pos, Quaternion rot, Vector3 scale, bool relative, CancellationToken ct)
     {
         _loadingSlash++;
         GameObject go = null;
@@ -460,24 +481,26 @@ public sealed class ShadowPartner : MonoBehaviour
         foreach (var c in go.GetComponentsInChildren<Collider>(true)) c.enabled = false;
         foreach (var b in go.GetComponentsInChildren<EffectBehaviour>(true)) b.enabled = false;
         foreach (var c in go.GetComponentsInChildren<ColliderInstance>(true)) c.enabled = false;
-        Color bright = SlashBright, deep = SlashDeep;
-        float alpha = SlashAlpha;
+        if (relative)   // 검기 팩 프리팹은 2초 주기 반복 — 보일 때 한 번만(RelicStateVfx 한 번 재생과 같은 규칙)
+            foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true)) { var m = ps.main; m.loop = false; }
+        Color bright = relative ? WaveBright : SlashBright, deep = relative ? WaveDeep : SlashDeep;
+        float alpha = relative ? WaveAlpha : SlashAlpha;
 #if UNITY_EDITOR
         if (ProbeSlashAlpha > 0f) { bright = ProbeSlashBright; deep = ProbeSlashDeep; alpha = ProbeSlashAlpha; }
 #endif
         ElementSlashTint.Paint(go, bright, deep, alpha);
         PlayerFxCalm.LowerSorting(go);   // 보스 예고 아래로(10-30)
-        var f = new SlashFx { key = key, go = go, ps = go.GetComponentsInChildren<ParticleSystem>(true) };
+        var f = new SlashFx { key = key, go = go, ps = go.GetComponentsInChildren<ParticleSystem>(true), scale0 = go.transform.localScale, relative = relative };
         f.baseColors = new ParticleSystem.MinMaxGradient[f.ps.Length];
         for (int i = 0; i < f.ps.Length; i++) f.baseColors[i] = f.ps[i].main.startColor;
         _slashFx.Add(f);
         ShowSlash(f, pos, rot, scale);
     }
 
-    private void ShowSlash(SlashFx f, Vector3 pos, Quaternion rot, float scale)
+    private void ShowSlash(SlashFx f, Vector3 pos, Quaternion rot, Vector3 scale)
     {
         f.go.transform.SetPositionAndRotation(pos, rot);
-        f.go.transform.localScale = Vector3.one * scale;
+        f.go.transform.localScale = f.relative ? Vector3.Scale(f.scale0, scale) : scale;
         bool dim = PlayerFxCalm.Active;   // 보스 예고가 떠 있으면 옅게(10-30) — 바뀔 때만 다시 칠한다
         if (dim != f.dimmed && f.baseColors != null)
         {
@@ -507,6 +530,10 @@ public sealed class ShadowPartner : MonoBehaviour
 
     [System.Diagnostics.Conditional("UNITY_EDITOR")]
     private static void Log(string msg) => Debug.Log("[ShadowPartner] " + msg);
+
+    // 도메인 리로드를 끈 플레이 2회차에 지난 판 구독이 남지 않게
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => CloneStruck = null;
 
     /// <summary>지금 자리 · 회전 · 애니 층마다 상태를 적는다(게임 시각이 그대로면 마지막 칸을 덮는다 — 멈춘 화면).</summary>
     private void Record()

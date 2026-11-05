@@ -960,27 +960,42 @@ public sealed class ShadowPartnerAugment : MeleeAugmentEffect
 /// 검기 분신(10-26 사용자 「분신 2종 — 검기를 날리는 분신 · 행동을 따라 하는 분신 · 엄청난 속도에 분신처럼 보인다는 컨셉」) — 발동하면 옆(좌우 번갈아)에
 /// 잔상 분신(<see cref="PlayerGhostStrike.Play"/> · 카타나 붉은 잔상 — 그림자 파트너의 어두운 실루엣과 다른 모습)이 나타나 앞으로 휘두르고, 그 칼끝에서 칼이 닿는 순간 검기가 나간다.
 /// 10-30 사용자 「(칼바람 스택과) 별개로 분신이 따로 날리는 검풍」 — 붉은 분신은 플레이어에서 <see cref="SideOffset"/> m 옆에 선다(예전 0.9 m · 뒤로 0.9 m라 몸과 겹쳐 플레이어 검기로 보였다).
-/// 그림자 파트너 분신이 곁에 있으면 분신마다 따로 낮은 확률(<see cref="CloneGustChance"/>배)로 자기 칼끝에서 자기가 노리는 적 쪽으로 날린다(<see cref="ShadowPartner.CloneShots"/> ·
-/// 11-05 사용자 「검풍은 그림자마다 따로 · 낮은 퍼센트로 따라 함」) — 그때 플레이어 자신의 검풍은 붉은 분신 없이 자기 칼끝에서 나간다(두 실루엣이 겹치지 않게).
+/// 그림자 파트너 분신도 자기 검풍 확률(플레이어와 같은 값)을 갖는다 — 분신 공격이 적을 맞히면(평타 따라 베기 휘두름마다 · 스킬 따라 베기 시전마다) 따로 굴려
+/// 그 분신 칼끝에서 그 분신이 노린 적 쪽으로 날린다(<see cref="ShadowPartner.CloneStruck"/> · <see cref="ShadowPartner.CloneShot"/>). 피해만 그림자 몫(분신 베기와 같은 %) ·
+/// 그림은 그림자 보라 검기(<see cref="ShadowPartner.PlayDarkWave"/>) — 11-05 사용자 「자신만의 검풍확률 · 공격때 확률로」 · 「데미지량을 낮게」 · 「그림자 파트너의 이펙트로」.
+/// 그림자가 곁에 있으면 플레이어 자신의 검풍은 붉은 분신 없이 자기 칼끝에서 나간다(두 실루엣이 겹치지 않게).
 /// 풍절이 나가는 휘두름에는 내지 않는다.
 /// </summary>
 public sealed class SwordGustAugment : MeleeAugmentEffect
 {
     private const float Length = 6f, HalfWidth = 0.9f, SideOffset = 1.6f, GhostReach = 0.9f;   // 붉은 분신 옆 거리 · 분신 칼끝(검기가 나가는 자리)
-    private const float CloneGustChance = 0.4f;   // 그림자 분신마다 따로 굴리는 확률 배율(11-05 #17)
-    private static readonly List<(Vector3 from, Vector3 dir, float lead)> s_shots = new(ShadowPartner.MaxClones);
 #if UNITY_EDITOR
     /// <summary>실측 99 D — 확률을 이 값(%)으로(−1 = 증강 값).</summary>
     public static float ProbeChance = -1f;
-    /// <summary>실측 99 O — 검풍이 나간 자리 · 그림자 분신이 날렸나.</summary>
-    public static System.Action<Vector3, bool> ProbeThrown;
+    /// <summary>실측 99 O — 검풍이 나간 자리 · 누가 날렸나(−1 = 플레이어 · 0~ = 그림자 분신 칸) · 피해.</summary>
+    public static System.Action<Vector3, int, float> ProbeThrown;
 #endif
     private bool _skillArmed;   // E · R을 썼다 — 그 시전의 첫 적중에 한 번 굴린다(10-26 검토 I5 · 옛 1초 창은 E 직후 R을 못 굴렸다)
     private bool _left;
+    private ItemEffectContext _ctx;   // 그림자 검풍(분신 공격 때 — 플레이어 피해 보고 밖)이 활성 · 공격력을 읽는다
 
     public SwordGustAugment(MeleeAugmentDef d, int r) : base(d, r) { }
 
     protected override bool UsesGhost => true;   // 잔상 분신을 미리 만들어 둔다(애니 이벤트 안에서 만들면 거부된다)
+
+    public override void OnActivate(ItemEffectContext ctx)
+    {
+        base.OnActivate(ctx);
+        _ctx = ctx;
+        ShadowPartner.CloneStruck -= OnCloneStruck;
+        ShadowPartner.CloneStruck += OnCloneStruck;
+    }
+
+    public override void OnDeactivate()
+    {
+        ShadowPartner.CloneStruck -= OnCloneStruck;
+        _ctx = null;
+    }
 
     public override void OnSkillUse(ItemEffectContext ctx, SkillType skill)
     {
@@ -1002,10 +1017,7 @@ public sealed class SwordGustAugment : MeleeAugmentEffect
             if (WindReleasesThisSwing(ctx)) { Log("검풍 — 풍절 휘두름이라 건너뜀"); return; }
         }
         Log(skill ? "검풍 굴림(스킬)" : "검풍 굴림");
-        float chance = Def.ValueFor(Weapon);
-#if UNITY_EDITOR
-        if (ProbeChance >= 0f) chance = ProbeChance;
-#endif
+        if (!Roll()) return;
         var p = ctx.Player;
         float atk = Atk(ctx);
         float dmg = atk * Def.Value2For(Weapon) * 0.01f;
@@ -1013,16 +1025,9 @@ public sealed class SwordGustAugment : MeleeAugmentEffect
         fw.y = 0f;
         fw = fw.sqrMagnitude > 0.0001f ? fw.normalized : p.transform.forward;
 
-        // 그림자 분신마다 따로 낮은 확률로 — 그 분신 칼끝에서 그 분신이 노리는 적 쪽으로(11-05 #17)
-        int shots = ShadowPartner.CloneShots(p, GhostReach, s_shots);
-        for (int i = 0; i < shots; i++)
-            if (UnityEngine.Random.value * 100f < chance * CloneGustChance)
-                Throw(p, s_shots[i].from, s_shots[i].dir, s_shots[i].lead, dmg, atk, true);
-
-        if (UnityEngine.Random.value * 100f >= chance) return;
         Vector3 from;
         float lead;
-        if (shots > 0)
+        if (p.TryGetComponent<ShadowPartner>(out var sp) && sp.Shown)
         {
             from = p.transform.position + fw * GhostReach;   // 그림자가 있으면 자기 칼끝에서 — 붉은 분신과 그림자가 겹쳐 보이지 않게
             lead = 0f;
@@ -1034,16 +1039,39 @@ public sealed class SwordGustAugment : MeleeAugmentEffect
             lead = PlayerGhostStrike.Play(p, stand, fw);   // 옆에 붉은 분신 — 휘두른 칼이 닿을 때 칼끝에서 검기가 나간다
             from = stand + fw * GhostReach;
         }
-        Throw(p, from, fw, lead, dmg, atk, false);
+        Throw(p, from, fw, lead, dmg, atk, -1);
     }
 
-    private void Throw(PlayerController p, Vector3 from, Vector3 dir, float lead, float dmg, float atk, bool shadow)
+    /// <summary>검풍 확률 한 번(재련할수록 +4%p) — 플레이어 · 그림자 분신이 따로 굴린다.</summary>
+    private bool Roll()
+    {
+        float chance = Def.ValueFor(Weapon);
+#if UNITY_EDITOR
+        if (ProbeChance >= 0f) chance = ProbeChance;
+#endif
+        return UnityEngine.Random.value * 100f < chance;
+    }
+
+    /// <param name="shadow">−1 = 플레이어 · 0~ = 그 그림자 분신 칸(그림 = 그림자 보라 검기).</param>
+    private void Throw(PlayerController p, Vector3 from, Vector3 dir, float lead, float dmg, float atk, int shadow)
     {
 #if UNITY_EDITOR
-        ProbeThrown?.Invoke(from, shadow);
+        ProbeThrown?.Invoke(from, shadow, dmg);
 #endif
-        FormStrike.LineTravel(p, from, dir, Length, HalfWidth, dmg, WaveVfx, lead, null,
-                              n => Log($"검풍 — 피해 {dmg:0.0} · 공격력 {atk:0.0} · 맞힘 {n}{(shadow ? " · 그림자 분신" : "")}"), StripBody, StripSeconds);
+        bool clone = shadow >= 0;
+        if (clone) ShadowPartner.PlayDarkWave(p, WaveVfx, from + Vector3.up, dir, Length, HalfWidth + StripBody);   // 판정 모양에 맞춘 같은 크기 — 색만 그림자 톤
+        FormStrike.LineTravel(p, from, dir, Length, HalfWidth, dmg, clone ? null : WaveVfx, lead, null,
+                              n => Log($"검풍 — 피해 {dmg:0.0} · 공격력 {atk:0.0} · 맞힘 {n}{(clone ? $" · 그림자 분신 {shadow + 1}" : "")}"), StripBody, StripSeconds);
+    }
+
+    // ── Event Handlers ──
+    /// <summary>그림자 분신 공격이 적을 맞혔다 — 그 분신이 자기 확률로 굴려 자기 칼끝에서 자기가 노린 적 쪽으로(피해 = 플레이어 검풍 × 그림자 몫).</summary>
+    private void OnCloneStruck(PlayerController p, int slot)
+    {
+        if (_ctx == null || p == null || _ctx.Player != p || !IsActive(_ctx) || !Roll()) return;
+        if (!ShadowPartner.CloneShot(p, slot, GhostReach, out var from, out var dir, out float share) || share <= 0f) return;
+        float atk = Atk(_ctx);
+        Throw(p, from, dir, 0f, atk * Def.Value2For(Weapon) * 0.01f * share, atk, slot);
     }
 }
 

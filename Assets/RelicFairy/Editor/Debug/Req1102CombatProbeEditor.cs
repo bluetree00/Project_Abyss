@@ -1099,6 +1099,25 @@ public static class Req1102CombatProbeEditor
         Debug.Log($"{Tag} 끝 → Temp/req1105_katana_asset.txt\n{msg}");
     }
 
+    /// <summary>11-05 대검 R 설명 글(재사용은 속성 검이 끝난 뒤부터 · 평타 +30% · 속성별 효과) — 스킬 에셋 description. 결과 Temp/req1105_great_desc.txt.</summary>
+    [MenuItem("RelicFairy/Debug/11-02 전투/11-05 대검 R 설명 글 반입 (편집 모드)")]
+    private static void ApplyGreatRDesc()
+    {
+        const string path = "Assets/RelicFairy/Weapon/Greatsword/Data/Greatsword_QSkill.asset";
+        var so = AssetDatabase.LoadAssetAtPath<ScriptableObject>(path);
+        if (so == null) { Debug.LogWarning($"{Tag} 대검 R 스킬 에셋 없음"); return; }
+        var s = new SerializedObject(so);
+        var d = s.FindProperty("description");
+        string before = d.stringValue;
+        d.stringValue = ElementSwordSetup.GreatswordRDescription;
+        s.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(so);
+        AssetDatabase.SaveAssets();
+        string msg = $"전: {before}\n뒤: {d.stringValue}";
+        File.WriteAllText("Temp/req1105_great_desc.txt", msg);
+        Debug.Log($"{Tag} 끝 → Temp/req1105_great_desc.txt\n{msg}");
+    }
+
     /// <summary>11-05 #19 「골렘이 잘 맞지 않는다」 — 루트 캡슐(반경 0.47 · 높이 2.59 · 중심 0.89 → 바닥이 발밑 0.4 m 아래 · 윗몸이 빠졌다)을
     /// 그림(렌더러 묶음 상자)에 맞춘다: 그림 바닥부터 그림 높이 97% · 반경 = 좁은 쪽 폭의 28%(0.5 ~ 0.65). 그림 크기가 이상하면(높이 2 ~ 4 밖) 정한 값(0.62 · 2.95 · 1.47).
     /// 결과 Temp/req1105_golem.txt.</summary>

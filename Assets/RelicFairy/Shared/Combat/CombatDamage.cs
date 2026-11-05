@@ -209,6 +209,10 @@ public static class CombatDamage
             float skillBonus = skillOwner.RuntimeStats != null ? skillOwner.RuntimeStats.SkillDamageBonus : 0f;
             if (skillBonus != 0f) baseDamage *= 1f + skillBonus;
         }
+        // ①-b 대검 속성 검(R) 동안 평타 피해 +30% — 재사용이 버프가 끝난 뒤부터라 가동률이 준 만큼 켜진 동안을 세게(11-05 사용자 「이점이 좋아야」)
+        if (owner != null && !req.IsRanged && IsMeleeAction(actionType)
+            && owner.TryGetComponent<PlayerController>(out var gsOwner) && GiantSwordBuff.IsActive(gsOwner))
+            baseDamage *= 1f + GiantSwordBuff.BasicDamageBonus;
 
         // ② 아이템 사전 보정
         // 원거리는 근접으로 치지 않는다 — 확정크릿/다음공격강화가 화살로 새면 안 된다.

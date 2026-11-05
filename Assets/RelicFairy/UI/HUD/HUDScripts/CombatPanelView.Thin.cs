@@ -21,6 +21,10 @@ public sealed partial class CombatPanelView
     private const float HealSweepSec  = 0.4f;
     private const float BuffBarHeight = 3f;    // 강화 남은 시간 막대(1080 기준 px)
     private const float BuffBarInset  = 10f;   // 칸 안쪽 아래 — 장식 테 안
+    // R 「켜짐」 부채꼴(11-05 대검 속성 검) — 속성 색이 밴 어두운 덮개(검정 쪽 55% · 알파 0.55) · 재사용 베일(검정 0.65)과 색으로 갈리고 흰 숫자가 읽힌다
+    // (밝은 금빛 0.3 · 0.2 덮개는 흰 칼 아이콘과 숫자가 섞여 읽히지 않았다 — 11-05 실측 사진)
+    private const float RActiveDim = 0.45f, RActiveAlpha = 0.55f;
+    private static Color RActiveTone(Color c) => new(c.r * RActiveDim, c.g * RActiveDim, c.b * RActiveDim, RActiveAlpha);
 
     // ── Private ──
     private UIThinFrame _qThin;
@@ -34,6 +38,10 @@ public sealed partial class CombatPanelView
     private readonly RectTransform[] _buffFill  = new RectTransform[2];   // 0 = E · 1 = R
     private readonly float[]         _buffLeft  = new float[2];
     private readonly float[]         _buffTotal = new float[2];
+    private bool  _rOnCd;                  // R 재사용 대기 중(SetSkillCooldown) — 켜짐 표시는 대기가 아닐 때만
+    private bool  _rActiveLook;            // R 칸이 지금 「켜짐」으로 그려져 있다
+    private int   _rActiveTenths = -1;     // 켜짐 숫자를 0.1초가 바뀔 때만 다시 쓴다
+    private Color _rFillBase, _rTxtBase;   // 켜짐 전 부채꼴 · 숫자 색(돌려놓을 값)
 
     // ── Public Methods ──
 
@@ -223,5 +231,45 @@ public sealed partial class CombatPanelView
             _buffTotal[i] = 0f;
             fill.parent.gameObject.SetActive(false);
         }
+        TickRActive();
+    }
+
+    /// <summary>
+    /// R 「켜짐」(11-05 사용자 「쿨타임이 속성 검이 끝난 후로 센다면 활성화 UI가 좋아야」) — 강화 신호가 살아 있고 재사용 대기가 아니면
+    /// 칸 전체 금빛 부채꼴이 남은 시간만큼 줄고 · 금빛 남은 초(재사용 숫자와 같은 칸 · 같은 글). 끝나면 숨기고 · 재사용이 오면 예전 베일로.
+    /// </summary>
+    private void TickRActive()
+    {
+        // 대검 속성 검은 재사용을 버프가 꺼진 뒤로 미룬다(GiantSwordBuff.DeferCooldown) — 켜진 동안 R 추적기 = 0이라 대기가 아니다
+        bool on = !_rOnCd && _buffTotal[1] > 0f && _buffLeft[1] > 0f;
+        if (!on) { if (_rActiveLook) EndRActiveLook(); return; }
+        if (_rCooldownBg == null) return;
+        if (!_rActiveLook)
+        {
+            _rActiveLook = true;
+            _rActiveTenths = -1;
+            _rCooldownBg.SetActive(true);
+            // 속성 검이면 그 속성의 밝은 색(칼날 빛과 같은 계열) · 아니면 금빛 — 켜질 때 한 번만 읽는다
+            var el = GiantSwordBuff.ElementOf(GameRunBootstrapper.Instance?.Run?.Player);
+            Color tone = el.HasValue ? ElementPalette.Bright(el.Value) : UITheme.Thin.Gold;
+            if (_rCooldownFill != null) { _rFillBase = _rCooldownFill.color; _rCooldownFill.color = RActiveTone(tone); }
+            if (_rCooldownTxt  != null) _rTxtBase = _rCooldownTxt.color;   // 숫자는 흰 잉크 그대로 — 금빛 부채꼴 위 금빛 숫자는 읽히지 않았다(11-05 실측 사진)
+        }
+        if (_rCooldownFill != null) _rCooldownFill.fillAmount = _buffLeft[1] / _buffTotal[1];
+        int tenths = Mathf.CeilToInt(_buffLeft[1] * 10f);
+        if (tenths == _rActiveTenths) return;
+        _rActiveTenths = tenths;
+        SetCooldownLabel(_rCooldownTxt, _buffLeft[1]);
+    }
+
+    /// <summary>R 「켜짐」을 걷는다 — 색을 돌려놓고, 재사용 대기가 아니면 칸 덮개도 숨긴다(대기면 SetSkillCooldown이 이어 그린다).</summary>
+    private void EndRActiveLook()
+    {
+        _rActiveLook = false;
+        if (_rCooldownFill != null) _rCooldownFill.color = _rFillBase;
+        if (_rCooldownTxt  != null) _rCooldownTxt.color  = _rTxtBase;
+        if (_rOnCd || _rCooldownBg == null) return;   // 대기면 SetSkillCooldown이 베일 · 숫자를 그린다
+        _rCooldownBg.SetActive(false);
+        if (_rCooldownTxt != null) _rCooldownTxt.text = string.Empty;
     }
 }

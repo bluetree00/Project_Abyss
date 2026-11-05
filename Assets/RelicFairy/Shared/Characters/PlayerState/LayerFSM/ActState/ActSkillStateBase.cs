@@ -81,6 +81,8 @@ public abstract class ActSkillStateBase : LayerStateBase<ActState>
         float cd = GetCooldown();
         // 악몽 규칙(역류하는 술식) — 무기 스킬(E·R)만 늘린다. Q는 유물 전용(자원 게이트)이다.
         if (Slot != SkillType.Q) cd *= NightmareRules.WeaponSkillCooldownMultiplier;
+        // 대검 R 속성 검 — 재사용은 버프가 꺼지는 순간부터(그때 GiantSwordBuff가 시작한다 · 11-05 사용자 「대검 쿨타임이 짧다」)
+        if (Slot == SkillType.R && GiantSwordBuff.DeferCooldown(_controller, cd)) cd = 0f;
         if (cd > 0f)
             _controller.CooldownTracker.StartCooldown(Slot, cd, _controller.RuntimeStats.SkillCooldownReduction);
 

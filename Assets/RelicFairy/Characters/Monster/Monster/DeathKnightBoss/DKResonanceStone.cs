@@ -43,6 +43,10 @@ public sealed class DKResonanceStone : MonoBehaviour, IDamageable, IDamageRelay
 
     private static readonly int   EmissionId = Shader.PropertyToID("_EmissionColor");
     private static readonly Collider[] s_overlap = new Collider[8];
+#if UNITY_EDITOR
+    /// <summary>실측 11-05 #4 — 주 타격을 받았다(기사에게 넘기기 직전).</summary>
+    public static Action<DKResonanceStone> ProbeAccepted;
+#endif
 
     // ── Private ───────────────────────────────────────────────────
     private DeathKnightBossMonster _boss;
@@ -129,6 +133,9 @@ public sealed class DKResonanceStone : MonoBehaviour, IDamageable, IDamageRelay
             FlashBeam();
             FlashAsync(destroyCancellationToken).Forget();
         }
+#if UNITY_EDITOR
+        ProbeAccepted?.Invoke(this);
+#endif
         return true;
     }
 

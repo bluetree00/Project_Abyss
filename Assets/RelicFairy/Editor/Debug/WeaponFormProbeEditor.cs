@@ -7210,6 +7210,9 @@ public static class WeaponFormProbeEditor
             if (Want("T")) await W99FireAuraCandidates(p, sb, ct);
             if (Want("U")) await W99IgniteCandidates(p, sb, ct);
             if (Want("V")) await W99GreatEShock(p, sb, ct);
+            if (Want("W")) await W99GreatRCooldown(p, sb, ct);
+            if (Want("X")) await W99GreatElements(p, sb, ct);
+            if (Want("Y")) await W99GreatElements(p, sb, ct, old: false, seconds: 48f);
         }
         finally
         {
@@ -8418,16 +8421,199 @@ public static class WeaponFormProbeEditor
     }
 
     /// <summary>
+    /// X — 대검 속성 검 속성별 초당 피해(11-05 사용자 「속성검의 이점을 잘 구성해야 해 속성별로」). 오크 셋 앞 · R이 준비되면 바로 · 나머지 평타로 속성마다 <paramref name="seconds"/>초:
+    ///   한 바퀴 평균(첫 시전 ~ 마지막 시전) · 켜진 동안 · 꺼진 동안 초당 피해 · 가동률. <paramref name="old"/> = 옛 재사용(시전 끝부터 · 평타 보너스 없음) — 고치기 전 기준.
+    /// </summary>
+    private static async UniTask W99GreatElements(PlayerController p, StringBuilder sb, CancellationToken ct, bool old = true, float seconds = 33f)
+    {
+        sb.AppendLine($"── 대검 속성 검 속성별(X · {(old ? "고치기 전 — 옛 재사용 · 옛 속성 틱" : "고친 뒤")}) ──");
+        try
+        {
+            string pick = File.Exists("Temp/weapon99_elem.txt") ? File.ReadAllText("Temp/weapon99_elem.txt").Trim() : "";   // 속성 고르기(비면 전부)
+            foreach (RuneElement el in new[] { RuneElement.Fire, RuneElement.Ice, RuneElement.Electric, RuneElement.Grass, RuneElement.Light, RuneElement.Dark })
+            {
+                if (pick.Length > 0 && !pick.Contains(el.ToString())) continue;
+                GiantSwordBuff.ProbeOldCooldown = old;
+                GiantSwordBuff.ProbeElement = (int)el;
+                if (!await W97Setup(p, Great, "", 9, ct, 0)) { sb.AppendLine($"  X {el} 장착 실패"); continue; }
+                DetachAll();
+                s_home = p.transform.position;
+                Vector3 fw = Flat(p.transform.forward), rt = Vector3.Cross(Vector3.up, fw);
+                var orcs = new List<HpTrack>();
+                for (int i = 0; i < 3; i++) { var o = await TrackOrcAsync(s_home + fw * 2.2f + rt * ((i - 1) * 1.1f), ct); if (o != null) orcs.Add(o); }
+                HideStrays();
+                await Wait(0.5f, ct);
+                GiantSwordBuff.Begin(p, 0.01f);
+                await Wait(0.2f, ct);
+                p.CooldownTracker.ResetCooldown(SkillType.R);
+                foreach (var o in orcs) o.Dealt = 0f;
+                float Dealt() { float s = 0f; foreach (var o in orcs) s += o.Dealt; return s; }
+                bool was = false;
+                int casts = 0;
+                float t0 = Time.time, first = -1f, lastStart = -1f, on = 0f, off = 0f, dFirst = 0f, dLast = 0f, dOn = 0f, dOff = 0f, dPrev = 0f;
+                while (Time.time - t0 < seconds)
+                {
+                    RefillAll(); Steer(p, s_home + fw * 2.2f);
+                    bool active = GiantSwordBuff.IsActive(p);
+                    float dNow = Dealt(), dd = dNow - dPrev;
+                    dPrev = dNow;
+                    if (first >= 0f) { if (was) { dOn += dd; on += Time.deltaTime; } else { dOff += dd; off += Time.deltaTime; } }
+                    if (active && !was) { casts++; if (first < 0f) { first = Time.time; dFirst = dNow; } lastStart = Time.time; dLast = dNow; }
+                    was = active;
+                    if (!p.IsInSkillAction)
+                    {
+                        if (!active && p.CooldownTracker.IsReady(SkillType.R)) p.InputBuffer.Push(Command.RSkill);
+                        else if (p.InputBuffer.Count < 2) p.InputBuffer.Push(Command.Light);
+                    }
+                    await UniTask.Yield(PlayerLoopTiming.Update, ct);
+                }
+                p.InputBuffer.Clear();
+                float cycleT = lastStart - first, total = Time.time - (first >= 0f ? first : t0);
+                sb.AppendLine($"  {el} — 시전 {casts} · 가동률 {(total > 0f ? on / total : 0f):P0} · 초당 피해 한 바퀴 평균 {(cycleT > 1f ? (dLast - dFirst) / cycleT : 0f):0}({cycleT:0.0}초) · 켜진 동안 {(on > 0f ? dOn / on : 0f):0} · 꺼진 동안 {(off > 0f ? dOff / off : 0f):0}");
+                DetachAll();
+            }
+        }
+        finally
+        {
+            GiantSwordBuff.ProbeOldCooldown = false;
+            GiantSwordBuff.ProbeElement = -1;
+            p.InputBuffer.Clear();
+            GiantSwordBuff.Begin(p, 0.01f);
+            DetachAll();
+        }
+    }
+
+    /// <summary>
+    /// W — 대검 R 재사용(11-05 사용자 「대검의 경우 쿨타임이 짧은 것 같은데 체크해줄래」 · 「쿨타임이 속성검이 끝난 후로 센다면 활성화 UI와 이점이 좋아야해」).
+    /// 오크 셋(휩쓸기가 걸리게) 앞에서 R이 준비되면 바로 · 켜진 동안엔 0.5초마다 R을 다시 눌러 보고 · 나머지는 평타로 48초:
+    ///   가동률(켜진 시간 ÷ 첫 시전부터) · 시전 수 · 버프 길이 · 버프 끝 → 다음 시전 · 켜진 동안 다시 시전 · 켜진 동안 R 추적기 대기(0이어야 — HUD 「켜짐」) · 거절 표시 수 ·
+    ///   초당 피해(한 바퀴 평균 = 첫 시전 ~ 마지막 시전 · 켜진 동안 · 꺼진 동안 · 오크 셋 합). 고치기 전(<see cref="GiantSwordBuff.ProbeOldCooldown"/>) ↔ 고친 뒤(평타 보너스 0 · +30%).
+    /// </summary>
+    private static async UniTask W99GreatRCooldown(PlayerController p, StringBuilder sb, CancellationToken ct)
+    {
+        sb.AppendLine("── 대검 R 재사용 대기(W) ──");
+        var cdrProp = typeof(PlayerRuntimeStats).GetProperty("SkillCooldownReduction", Inst);
+        int begins = 0, recastDuring = 0, rejected = 0;
+        bool wasActive = false;
+        Application.LogCallback onLog = (msg, st, type) =>
+        {
+            if (!msg.StartsWith("[ElementSword]", StringComparison.Ordinal) || msg.IndexOf("칼날 이펙트", StringComparison.Ordinal) < 0) return;   // 뽑기만(각인 「번지는 · 모이는 속성」 줄은 빼고)
+            begins++;
+            if (wasActive) recastDuring++;   // 앞 프레임에 켜져 있었는데 또 뽑았다 — 켜진 동안 다시 시전
+        };
+        Action<SkillType> onReject = s => { if (s == SkillType.R) rejected++; };
+        string extra = MeleeAugmentCatalog.GreatFinal + ":3," + MeleeAugmentCatalog.GreatSweep + ":1";
+        var cycleBy = new Dictionary<string, float>();
+        Application.logMessageReceived += onLog;
+        p.SkillRejected += onReject;
+        try
+        {
+            foreach (var (old, build, label, cdr, augs, bonus) in new[]
+            {
+                (true,  "바탕", "고치기 전 · 바탕", 0f, "", -1f),
+                (false, "바탕", "고친 뒤 · 바탕 · 평타 보너스 0", 0f, "", 0f),
+                (false, "바탕", "고친 뒤 · 바탕 · 평타 +30%", 0f, "", -1f),
+                (true,  "강화", "고치기 전 · 쿨감 20% + 연장 III + 휩쓸기", 0.2f, extra, -1f),
+                (false, "강화", "고친 뒤 · 쿨감 20% + 연장 III + 휩쓸기 · 평타 +30%", 0.2f, extra, -1f),
+            })
+            {
+                GiantSwordBuff.ProbeOldCooldown = old;
+                GiantSwordBuff.ProbeBasicBonus = bonus;
+                if (!await W97Setup(p, Great, augs, 9, ct, 0)) { sb.AppendLine($"  W {label} 장착 실패"); continue; }
+                DetachAll();
+                s_home = p.transform.position;
+                Vector3 fw = Flat(p.transform.forward), rt = Vector3.Cross(Vector3.up, fw);
+                var orcs = new List<HpTrack>();
+                for (int i = 0; i < 3; i++) { var o = await TrackOrcAsync(s_home + fw * 2.2f + rt * ((i - 1) * 1.1f), ct); if (o != null) orcs.Add(o); }
+                HideStrays();
+                await Wait(0.5f, ct);
+                GiantSwordBuff.Begin(p, 0.01f);   // 앞 칸의 버프를 끈다
+                await Wait(0.2f, ct);
+                p.CooldownTracker.ResetCooldown(SkillType.R);
+                begins = 0; recastDuring = 0; rejected = 0; wasActive = false;
+                foreach (var o in orcs) o.Dealt = 0f;
+                float Dealt() { float s = 0f; foreach (var o in orcs) s += o.Dealt; return s; }
+                float dur = GiantSwordBuff.DurationFor(p.WeaponManager.Weapon0Data);
+                float t0 = Time.time, first = -1f, lastStart = -1f, on = 0f, off = 0f, startAt = -1f, endAt = -1f, nextTry = 0f, cdDuring = 0f;
+                float dFirst = 0f, dLastStart = 0f, dOn = 0f, dOff = 0f, dPrev = 0f;
+                var gaps = new List<float>();
+                var lens = new List<float>();
+                while (Time.time - t0 < 48f)
+                {
+                    cdrProp?.SetValue(p.RuntimeStats, cdr);
+                    RefillAll(); Steer(p, s_home + fw * 2.2f);
+                    bool active = GiantSwordBuff.IsActive(p);
+                    float dNow = Dealt(), dd = dNow - dPrev;
+                    dPrev = dNow;
+                    if (first >= 0f) { if (wasActive) { dOn += dd; on += Time.deltaTime; } else { dOff += dd; off += Time.deltaTime; } }
+                    if (active && !wasActive)
+                    {
+                        if (first < 0f) { first = Time.time; dFirst = dNow; }
+                        if (endAt >= 0f) gaps.Add(Time.time - endAt);
+                        startAt = lastStart = Time.time;
+                        dLastStart = dNow;
+                    }
+                    if (!active && wasActive) { endAt = Time.time; lens.Add(Time.time - startAt); }
+                    if (active) cdDuring = Mathf.Max(cdDuring, p.CooldownTracker.GetRemaining(SkillType.R));
+                    wasActive = active;
+                    if (!p.IsInSkillAction)
+                    {
+                        if (!active && p.CooldownTracker.IsReady(SkillType.R)) p.InputBuffer.Push(Command.RSkill);
+                        else if (active && Time.time >= nextTry) { nextTry = Time.time + 0.5f; p.InputBuffer.Push(Command.RSkill); }   // 켜진 동안 다시 눌러 본다
+                        else if (p.InputBuffer.Count < 2) p.InputBuffer.Push(Command.Light);
+                    }
+                    await UniTask.Yield(PlayerLoopTiming.Update, ct);
+                }
+                p.InputBuffer.Clear();
+                float total = Time.time - (first >= 0f ? first : t0);
+                float up = total > 0f ? on / total : 0f;
+                float cycleT = lastStart - first;
+                float cycleDps = cycleT > 1f ? (dLastStart - dFirst) / cycleT : 0f;   // 첫 시전 ~ 마지막 시전(온전한 바퀴만)
+                if (!cycleBy.ContainsKey(label)) cycleBy[label] = cycleDps;
+                string Join(List<float> xs) { var s = new StringBuilder(); foreach (var x in xs) s.Append(s.Length > 0 ? " · " : "").Append(x.ToString("0.0")); return s.Length > 0 ? s.ToString() : "-"; }
+                float gapAvg = 0f;
+                foreach (var g in gaps) gapAvg += g;
+                gapAvg = gaps.Count > 0 ? gapAvg / gaps.Count : 0f;
+                float cd = 9f * (1f - cdr);
+                sb.AppendLine($"  {label} — 지속 {dur:0.0}초 · 시전 {begins}번 · 가동률 {up:P0}(켜진 {on:0.0} / {total:0.0}초) · 버프 길이 {Join(lens)} · 버프 끝 → 다음 시전 {Join(gaps)}초 · 켜진 동안 다시 시전 {recastDuring} · 거절 표시 {rejected} · 켜진 동안 R 추적기 대기 최대 {cdDuring:0.0}초");
+                sb.AppendLine($"    초당 피해(오크 셋 합) — 한 바퀴 평균 {cycleDps:0}({cycleT:0.0}초 · 온전한 바퀴) · 켜진 동안 {(on > 0f ? dOn / on : 0f):0} · 꺼진 동안 {(off > 0f ? dOff / off : 0f):0}");
+                if (!old)
+                    Check(sb, $"W {label} — 켜진 동안 다시 시전 0({recastDuring}) · 거절 표시 ≥ 1({rejected}) · 켜진 동안 추적기 0({cdDuring:0.00}) · 버프 끝 → 다음 시전 평균 {gapAvg:0.0}초(≈ {cd:0.0}초 + 뽑기)",
+                          begins >= 2 && recastDuring == 0 && rejected >= 1 && cdDuring <= 0.01f && gaps.Count > 0 && gapAvg >= cd - 0.2f && gapAvg <= cd + 1.2f);
+                DetachAll();
+            }
+            float Get(string k) => cycleBy.TryGetValue(k, out var v) ? v : 0f;
+            float b0 = Get("고치기 전 · 바탕"), b1 = Get("고친 뒤 · 바탕 · 평타 +30%"), b2 = Get("고친 뒤 · 바탕 · 평타 보너스 0");
+            float e0 = Get("고치기 전 · 쿨감 20% + 연장 III + 휩쓸기"), e1 = Get("고친 뒤 · 쿨감 20% + 연장 III + 휩쓸기 · 평타 +30%");
+            Check(sb, $"W 한 바퀴 평균 초당 피해 — 바탕: 고치기 전 {b0:0} · 고친 뒤 보너스 0 {b2:0} · +30% {b1:0}({(b0 > 0f ? b1 / b0 : 0f):P0}) · 강화: 고치기 전 {e0:0} · 고친 뒤 {e1:0}({(e0 > 0f ? e1 / e0 : 0f):P0}) — 고친 뒤 ≥ 고치기 전",
+                  b0 > 0f && b1 >= b0 && e0 > 0f && e1 >= e0 * 0.97f);
+        }
+        finally
+        {
+            Application.logMessageReceived -= onLog;
+            p.SkillRejected -= onReject;
+            GiantSwordBuff.ProbeOldCooldown = false;
+            GiantSwordBuff.ProbeBasicBonus = -1f;
+            cdrProp?.SetValue(p.RuntimeStats, 0f);
+            p.InputBuffer.Clear();
+            GiantSwordBuff.Begin(p, 0.01f);
+            DetachAll();
+        }
+    }
+
+    /// <summary>
     /// O — ② 그림자 분신 베기(10-30 사용자 「분신이 타격하는 게 제대로 보여야 하고 데미지도 제대로 체크」) · ③ 검풍 = 분신이 따로 날림. 카타나 +21(분신 3).
     ///   O-1 앞 표적(모든 분신 칼 앞) · 뒤 표적(어느 분신 칼 앞도 아님 · 3 m 뒤) — 평타 3초: 분신 베기 수 ≈ 휘두름 × 3 · 앞 표적만 맞음 · 피해 = 플레이어 피해 × 몫 · 베기 그림이 보임
     ///   O-2 플레이어가 안 닿는 옆 표적(왼쪽 분신 칼 앞) — 분신만 벤다(바탕 = 휘두름 피해)
-    ///   O-3 검풍(확률 100%) + 그림자 — 검풍은 그림자 분신 자리에서 · O-4 검풍만 — 붉은 분신이 1.6 m 옆에서(몸과 안 겹침) · 사진 W99_O_*.png
+    ///   O-3 검풍(확률 100%) + 그림자 — 그림자마다 자기 베기가 맞힌 휘두름 = 자기 검풍 · 그림자 자리에서 · 피해 = 플레이어 검풍 × 그림자 몫 · 둘이 같이 나간 사진(11-05 #17 정정)
+    ///   O-3b 검풍 50% — 플레이어 · 그림자 검풍 비율 ≈ 확률(따로 굴림 — 플레이어 없이 나간 그림자 검풍이 있다) · O-3c 왼쪽 앞 분신 칼 앞에만 표적 — 못 맞힌 분신은 안 날린다
+    ///   O-4 검풍만 — 붉은 분신이 1.6 m 옆에서(몸과 안 겹침) · 사진 W99_O_*.png
     /// </summary>
     private static async UniTask W99ShadowStrike(PlayerController p, StringBuilder sb, CancellationToken ct)
     {
         sb.AppendLine("── 그림자 분신 베기 · 검풍 분신(O) ──");
         var struck = new List<(int slot, MonsterBase mb, float dmg, Vector3 clone)>();
-        var thrown = new List<(Vector3 from, bool shadow, Vector3 player, Vector3 fw)>();
+        var thrown = new List<(Vector3 from, int slot, Vector3 player, Vector3 fw, float dmg, float at)>();
         ShadowPartner sp = null;
         Action<int, MonsterBase, float> onStruck = (slot, mb, dmg) =>
         {
@@ -8436,7 +8622,7 @@ public static class WeaponFormProbeEditor
             var go = c?.GetType().GetField("go")?.GetValue(c) as GameObject;
             struck.Add((slot, mb, dmg, go != null ? go.transform.position : Vector3.zero));
         };
-        Action<Vector3, bool> onThrown = (from, shadow) => thrown.Add((from, shadow, p.transform.position, Flat(p.AimForward)));
+        Action<Vector3, int, float> onThrown = (from, slot, dmg) => thrown.Add((from, slot, p.transform.position, Flat(p.AimForward), dmg, Time.realtimeSinceStartup));
         float playerHit = 0f; int playerHits = 0;
         Action<HitInfo> onHit = h => { if (h.Attacker == p.gameObject && h.ActionType == WeaponActionType.GroundLight) playerHits++; };
         ShadowPartner.ProbeStruck += onStruck;
@@ -8513,39 +8699,73 @@ public static class WeaponFormProbeEditor
                   sideHits >= 1 && Mathf.Abs(sideDealt - sideSum) <= Mathf.Max(2f, sideSum * 0.05f));
             DetachAll();
 
-            // O-3 · O-4 — 검풍(확률 100%)
-            SwordGustAugment.ProbeChance = 100f;
-            foreach (bool withShadow in new[] { true, false })
+            // O-3 · O-3b · O-3c · O-4 — 검풍(11-05 #17 정정: 그림자도 자기 공격 때 자기 확률로 따로 · 피해만 그림자 몫 · 그림자 보라 검기)
+            foreach (var (round, gustChance) in new[] { ("O-3", 100f), ("O-3b", 50f), ("O-3c", 100f), ("O-4", 100f) })
             {
+                bool withShadow = round != "O-4", sideOnly = round == "O-3c";
+                SwordGustAugment.ProbeChance = gustChance;
                 string augs = withShadow ? MeleeAugmentCatalog.KatanaShadow + ":1," + MeleeAugmentCatalog.KatanaGust + ":1" : MeleeAugmentCatalog.KatanaGust + ":1";
-                if (!await W97Setup(p, Katana, augs, 21, ct, 0)) { sb.AppendLine("  O-3 장착 실패"); continue; }
+                if (!await W97Setup(p, Katana, augs, 21, ct, 0)) { sb.AppendLine($"  {round} 장착 실패"); continue; }
                 DetachAll();
                 s_home = p.transform.position;
                 fw = Flat(p.transform.forward); rt = Vector3.Cross(Vector3.up, fw);
-                var t = await TrackAsync(s_home + fw * 2.2f, ct);
+                var t = await TrackAsync(sideOnly ? s_home + fw * 3.4f - rt * 2.6f : s_home + fw * 2.2f, ct);   // O-3c = 왼쪽 앞 분신 칼 앞에만(O-2와 같은 자리)
                 HideStrays();
                 await Wait(1.2f, ct);
-                thrown.Clear();
+                thrown.Clear(); struck.Clear(); playerHits = 0;
+                var spNow = p.GetComponent<ShadowPartner>();
+                int gStrikes0 = spNow != null ? spNow.StrikeCount : 0;
                 int gshot = 0;
-                await W97Swing(p, t != null ? t.M.transform.position : s_home + fw * 2.2f, 2.2f, ct, () =>
+                bool both = false;
+                await W97Swing(p, sideOnly || t == null ? s_home + fw * 2.2f : t.M.transform.position, gustChance < 100f ? 6f : 3f, ct, () =>
                 {
-                    if (gshot < 2 && thrown.Count > gshot && Camera.main != null) CaptureMain(Camera.main, $"Temp/ui_shots/W99_O_gust_{(withShadow ? "shadow" : "red")}_{gshot++}.png");
+                    float lastOwn = -1f, lastShadow = -1f, now = Time.realtimeSinceStartup;
+                    foreach (var x in thrown) { if (x.slot < 0) lastOwn = Mathf.Max(lastOwn, x.at); else lastShadow = Mathf.Max(lastShadow, x.at); }
+                    if (round == "O-3" && !both && lastOwn > 0f && lastShadow > 0f && Mathf.Abs(lastShadow - lastOwn) < 0.35f && now - Mathf.Max(lastOwn, lastShadow) > 0.1f && Camera.main != null)
+                    { both = true; CaptureMain(Camera.main, "Temp/ui_shots/W99_O_gust_both.png"); }   // 플레이어 검풍(붉은) · 그림자 검풍(보라)이 같이 나간 순간
+                    if (round == "O-4" && gshot < 2 && thrown.Count > gshot && Camera.main != null) CaptureMain(Camera.main, $"Temp/ui_shots/W99_O_gust_red_{gshot++}.png");
                 });
-                await Wait(0.4f, ct);
-                int fromShadow = 0; float minSide = 99f, maxSide = 0f;
+                await Wait(0.5f, ct);
+                spNow = p.GetComponent<ShadowPartner>();
+                int nClones = withShadow && spNow != null ? spNow.ShownCount : 0;
+                float share = spNow != null ? spNow.Percent * 0.01f : 0f;
+                int strikesN = (spNow != null ? spNow.StrikeCount : 0) - gStrikes0;
+                int own = 0, lone = 0;
+                float ownDmg = 0f, shadowDmg = 0f, minSide = 99f, maxSide = 0f;
+                var bySlot = new int[ShadowPartner.MaxClones];
+                var hitBySlot = new int[ShadowPartner.MaxClones];   // 그 분신 베기가 적을 맞힌 휘두름(표적 하나 — 맞음 한 번 = 휘두름 한 번)
+                foreach (var x in struck) if (x.slot >= 0 && x.slot < hitBySlot.Length) hitBySlot[x.slot]++;
                 foreach (var x in thrown)
                 {
-                    if (x.shadow) fromShadow++;
                     Vector3 d = x.from - x.player; d.y = 0f;
                     float lateral = Mathf.Abs(Vector3.Dot(d, Vector3.Cross(Vector3.up, x.fw)));
-                    minSide = Mathf.Min(minSide, lateral); maxSide = Mathf.Max(maxSide, lateral);
+                    if (x.slot < 0) { own++; ownDmg += x.dmg; }
+                    else
+                    {
+                        if (x.slot < bySlot.Length) bySlot[x.slot]++;
+                        shadowDmg += x.dmg;
+                        bool withOwn = false;   // 바로 앞 0.35초 안에 플레이어 검풍이 있었나 — 없으면 따로 굴린 증거
+                        foreach (var o in thrown) if (o.slot < 0 && x.at - o.at >= -0.05f && x.at - o.at < 0.35f) { withOwn = true; break; }
+                        if (!withOwn) lone++;
+                    }
+                    if ((x.slot >= 0) == withShadow) { minSide = Mathf.Min(minSide, lateral); maxSide = Mathf.Max(maxSide, lateral); }   // 그림자 있으면 그림자 자리 · 없으면 붉은 분신 자리
                 }
-                if (withShadow)
-                    Check(sb, $"O-3 검풍 + 그림자 — 검풍 {thrown.Count}번 · 그림자 분신이 날림 {fromShadow}번(전부) · 플레이어 옆 거리 {minSide:0.0}~{maxSide:0.0} m(분신 자리 ≥ 0.9)",
-                          thrown.Count >= 2 && fromShadow == thrown.Count && minSide >= 0.9f);
+                int shadowThrows = thrown.Count - own, shadowHits = hitBySlot[0] + hitBySlot[1] + hitBySlot[2];
+                bool slotsMatch = bySlot[0] == hitBySlot[0] && bySlot[1] == hitBySlot[1] && bySlot[2] == hitBySlot[2];
+                float dmgRatio = own > 0 && shadowThrows > 0 ? (shadowDmg / shadowThrows) / (ownDmg / own) : -1f;
+                string slotTxt = $"분신 1 {bySlot[0]}/{hitBySlot[0]} · 2 {bySlot[1]}/{hitBySlot[1]} · 3 {bySlot[2]}/{hitBySlot[2]}(검풍 / 맞힌 휘두름)";
+                if (round == "O-3")
+                    Check(sb, $"O-3 검풍 100% + 그림자 {nClones} — 플레이어 검풍 {own}(맞힌 휘두름 {playerHits}) · 그림자 검풍 {shadowThrows} · {slotTxt} · 그림자 옆 거리 {minSide:0.0}~{maxSide:0.0} m(≥ 0.5 — 플레이어 칼끝 줄 0과 갈림) · 그림자 한 줄 피해 / 플레이어 한 줄 = {dmgRatio:0.000}(그림자 몫 {share:0.00}) · 사진 W99_O_gust_both {(both ? "찍음" : "없음")}",
+                          own >= 2 && own <= playerHits && nClones == 3 && slotsMatch && shadowHits >= nClones && minSide >= 0.5f && Mathf.Abs(dmgRatio - share) <= 0.005f && both);
+                else if (round == "O-3b")
+                    Check(sb, $"O-3b 검풍 50% — 플레이어 {own}/{playerHits} = {(playerHits > 0 ? (float)own / playerHits : 0f):P0} · 그림자 {shadowThrows}/{shadowHits} = {(shadowHits > 0 ? (float)shadowThrows / shadowHits : 0f):P0} · {slotTxt} · 플레이어 없이 나간 그림자 검풍 {lone}(따로 굴림)",
+                          playerHits >= 6 && shadowHits >= 12 && own > 0 && own < playerHits && shadowThrows > 0 && shadowThrows < shadowHits && lone > 0);
+                else if (round == "O-3c")
+                    Check(sb, $"O-3c 왼쪽 앞 분신 칼 앞 표적 — 플레이어 검풍 {own}(0 — 안 닿음) · 분신 베기 {strikesN}번 중 맞힘 {shadowHits} · {slotTxt}(못 맞힌 분신 · 휘두름은 안 날림)",
+                          own == 0 && shadowHits >= 1 && slotsMatch && strikesN > shadowHits);
                 else
-                    Check(sb, $"O-4 검풍만 — 검풍 {thrown.Count}번 · 붉은 분신(그림자 0 = {fromShadow}) · 플레이어 옆 거리 {minSide:0.0}~{maxSide:0.0} m(1.6) · 사진 W99_O_gust_red_*",
-                          thrown.Count >= 2 && fromShadow == 0 && minSide >= 1.5f && maxSide <= 1.7f);
+                    Check(sb, $"O-4 검풍만 — 검풍 {thrown.Count}번 · 붉은 분신(그림자 0 = {shadowThrows}) · 플레이어 옆 거리 {minSide:0.0}~{maxSide:0.0} m(1.6) · 사진 W99_O_gust_red_*",
+                          thrown.Count >= 2 && shadowThrows == 0 && minSide >= 1.5f && maxSide <= 1.7f);
                 DetachAll();
             }
         }
@@ -14389,6 +14609,245 @@ public static class WeaponFormProbeEditor
 
     // ── 공통 ────────────────────────────────────────────────────
     private static void Check(StringBuilder sb, string name, bool ok) => sb.AppendLine($"{(ok ? "통과" : "실패")} — {name}");
+
+    // ── 11-05 #4 정정 — 챕터 3 보스 성흔석 × 많은 화살 ─────────────────────
+    private const float StoneShootDist = 4.5f, StoneSeconds = 10f;
+
+    private sealed class StoneTally { public int Shots, Acc, Relayed, Blocked, Dropped, ZeroLoss, Hits; public float RelayDmg, HitDmg, HpLoss, Secs; }
+
+    /// <summary>
+    /// 11-05 #4 정정(사용자 「챕터3 보스의 타격용 돌 오브젝트 — 화살량이 많을 때 데미지를 제대로 받지 않는다」) — 테스트 허브 Ch3 보스방(입구를 밟아 전투를 연다).
+    /// 활 · 파츠 없음 / 파츠 전부 최대(다발 · 관통 · 연사 · 추적 · 폭발 …)로 가운데 성흔석 앞 <see cref="StoneShootDist"/> m에서 각 <see cref="StoneSeconds"/>초:
+    /// 쏜 화살 · 성흔석이 받은 타격 · 기사에게 넘어간 타격(받은 그 호출의 맞음) · 기사 무적으로 막힘 · 버려짐(받고 안 넘어감 · 무적 아님 — 0이어야) · 넘긴 피해 · 기사 체력 감소.
+    /// 기준 = 같은 자리에서 결계 · 성흔석 판정을 끄고 기사 직접. 기사 체력은 0.1초마다 95% 아래면 가득으로(영혼 소환 하한 · 페이지를 안 밟게). 결과 Temp/req1105_stone.txt.
+    /// </summary>
+    [MenuItem(Root + "11-05 #4 성흔석 × 많은 화살 (테스트 허브 Ch3 보스방, 플레이 중)")]
+    private static void RunStoneArrows() { if (EditorApplication.isPlaying) RunStoneArrowsAsync().Forget(); }
+
+    private static async UniTaskVoid RunStoneArrowsAsync()
+    {
+        var sb = new StringBuilder("11-05 #4 성흔석 × 많은 화살\n");
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(300));
+        var ct = cts.Token;
+        var inv = typeof(PlayerController).GetField("debugInvincible", Inst);
+        var state = RangedPartsState.Current;
+        var glass = new List<Collider>();
+        var offStones = new List<DKResonanceStone>();
+        PlayerController p = null;
+        try
+        {
+            BossRoomController room = null;
+            for (float w = 0f; w < 90f && (p == null || room == null); w += 0.5f)
+            {
+                p = GameRunBootstrapper.Instance?.Run?.Player;
+                room = UnityEngine.Object.FindFirstObjectByType<BossRoomController>();
+                if (p == null || room == null) await Wait(0.5f, ct);
+            }
+            if (p == null || room == null) { sb.AppendLine("보스방 아님(플레이어 · BossRoomController)"); return; }
+            inv?.SetValue(p, true);
+            await Wait(1.5f, ct);
+            EditorApplication.ExecuteMenuItem("RelicFairy/Test Run/Boss Room/1 Step Into Entrance (Play)");
+            await Wait(0.3f, ct);
+            EditorApplication.ExecuteMenuItem("RelicFairy/Test Run/Boss Room/2 Step Past Entrance (Play)");
+            var cam = GameCameraController.Instance;
+            var panning = typeof(GameCameraController).GetField("_isPanning", Inst);
+            var inputOff = typeof(PlayerController).GetField("_inputDisabledExternally", Inst);
+            DeathKnightBossMonster dk = null;
+            var stones = Array.Empty<DKResonanceStone>();
+            float t0 = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - t0 < 90f)
+            {
+                if (Time.timeScale == 0f) Managers.UI?.CloseAllPopupUI();
+                if (dk == null) dk = UnityEngine.Object.FindFirstObjectByType<DeathKnightBossMonster>();
+                stones = UnityEngine.Object.FindObjectsByType<DKResonanceStone>(FindObjectsSortMode.None);
+                bool camManual = cam != null && panning != null && (bool)panning.GetValue(cam);
+                bool locked = inputOff != null && (bool)inputOff.GetValue(p);
+                if (dk != null && stones.Length >= 3 && !camManual && !locked) break;
+                await Wait(0.25f, ct);
+            }
+            if (dk == null || stones.Length == 0) { sb.AppendLine($"기사 {dk != null} · 성흔석 {stones.Length}(90초)"); return; }
+            await Wait(1.5f, ct);   // 성흔석이 다 서고(디졸브) 첫 패턴
+            if (!await EquipAsync(p, Bow, ct, RangedParts.RangedSlot)) { sb.AppendLine("활 장착 실패"); return; }   // 파츠는 원거리 칸 무기에만 걸린다
+            await Wait(0.6f, ct);
+
+            Vector3 avg = Vector3.zero;
+            foreach (var s in stones) avg += Flat(s.transform.position - dk.transform.position).normalized;
+            DKResonanceStone mid = stones[0];
+            float best = -2f;
+            foreach (var s in stones)
+            {
+                float d = Vector3.Dot(Flat(s.transform.position - dk.transform.position).normalized, avg.normalized);
+                if (d > best) { best = d; mid = s; }
+            }
+            Vector3 outward = Flat(p.transform.position - mid.transform.position).normalized;   // 플레이어 쪽(기사가 돌 가까이 나오면 「돌 − 기사」가 0이 됐다)
+            if (outward.sqrMagnitude < 0.01f) outward = Flat(mid.transform.position - dk.transform.position).normalized;
+            Vector3 home = mid.transform.position + outward * StoneShootDist;
+            home.y = Physics.Raycast(home + Vector3.up * 4f, Vector3.down, out var gh, 12f, LayerMask.GetMask("Ground"), QueryTriggerInteraction.Ignore) ? gh.point.y : mid.transform.position.y;
+            Vector3 stoneAim = mid.transform.position + Vector3.up * 1.2f, bossAim = dk.transform.position + Vector3.up * 1.2f;
+            sb.AppendLine($"기사 최대 체력 {dk.EffectiveMaxHp} · 성흔석 {stones.Length}개 · 가운데 성흔석 앞 {StoneShootDist} m · 기사까지 {Flat(dk.transform.position - home).magnitude:0.0} m · 무기 활 · 각 {StoneSeconds}초");
+
+            foreach (var (title, parts) in new[] { ("파츠 없음", ""), ("파츠 전부 최대", "*") })
+            {
+                ResetParts(state);
+                var names = new List<string>();
+                if (parts.Length > 0 && Managers.WeaponParts?.All != null)
+                    foreach (var e in Managers.WeaponParts.All) { state.Equip(e.part_id, Mathf.Max(1, e.max_level)); names.Add($"{e.part_id}:{Mathf.Max(1, e.max_level)}"); }
+                await Wait(0.5f, ct);
+                var a = await StoneRoundAsync(p, dk, home, stoneAim, ct);
+
+                // 기준 — 결계 · 성흔석 판정을 끄고 같은 자리에서 기사 직접
+                foreach (var sbar in UnityEngine.Object.FindObjectsByType<SoftBarrier>(FindObjectsSortMode.None))
+                    foreach (var c in sbar.GetComponentsInChildren<Collider>())
+                        if (c.enabled) { c.enabled = false; glass.Add(c); }
+                foreach (var s in stones)
+                    if (s != null && s.RelayBody != null && s.RelayBody.enabled) { s.RelayBody.enabled = false; DamageRelays.Unregister(s); offStones.Add(s); }
+                StoneTally b;
+                try { b = await StoneRoundAsync(p, dk, home, bossAim, ct); }
+                finally { RestoreStoneRound(glass, offStones); }
+
+                float perA = a.Relayed > 0 ? a.HpLoss / a.Relayed : 0f, perB = b.Hits > 0 ? b.HpLoss / b.Hits : 0f;
+                float rate = a.Secs > 0f ? a.Acc / a.Secs : 0f;
+                float oldRate = rate * 3f <= 12f ? rate : 12f / (12f / Mathf.Max(0.01f, rate) + 1.5f);   // 옛 과열(3초 12타 → 1.5초 식음)
+                sb.AppendLine($"── {title}{(names.Count > 0 ? " (" + string.Join(" ", names) + ")" : "")}");
+                sb.AppendLine($"  성흔석 {a.Secs:0.0}초 — 쏜 화살 {a.Shots}({a.Shots / Mathf.Max(0.01f, a.Secs):0}/초) · 성흔석이 받은 타격 {a.Acc}({rate:0.0}/초) · 기사에게 넘어감 {a.Relayed} · 기사 무적으로 막힘 {a.Blocked} · 버려짐 {a.Dropped} · 넘어갔는데 체력 그대로 {a.ZeroLoss} · 성흔석 아닌 맞음 {a.Hits - a.Relayed}");
+                sb.AppendLine($"    넘긴 피해 합 {a.RelayDmg:0} · 기사 체력 감소 {a.HpLoss:0} · 한 타 {(a.Relayed > 0 ? a.RelayDmg / a.Relayed : 0f):0.0} → 체력 {perA:0.0} · 화살 한 발당 체력 {(a.Shots > 0 ? a.HpLoss / a.Shots : 0f):0.0}");
+                sb.AppendLine($"  기준(기사 직접 · 결계 · 성흔석 끔) {b.Secs:0.0}초 — 쏜 화살 {b.Shots} · 맞음 {b.Hits} · 피해 합 {b.HitDmg:0} · 기사 체력 감소 {b.HpLoss:0} · 한 타 {(b.Hits > 0 ? b.HitDmg / b.Hits : 0f):0.0} → 체력 {perB:0.0} · 화살 한 발당 체력 {(b.Shots > 0 ? b.HpLoss / b.Shots : 0f):0.0}");
+                sb.AppendLine($"  옛 규칙(과열 3초 12타 → 1.5초 · 넘김 0.8)이면 받는 타격 {oldRate:0.0}/초(지금의 {(rate > 0f ? oldRate / rate : 0f):P0}) · 피해는 ×0.8 → 지금의 {(rate > 0f ? oldRate / rate * 0.8f : 0f):P0}");
+                Check(sb, $"{title} — 받은 {a.Acc} = 넘어감 {a.Relayed} + 무적 막힘 {a.Blocked}(버려짐 {a.Dropped} · 체력 그대로 {a.ZeroLoss}) · 한 타 체력 성흔석 / 직접 = {(perB > 0f ? perA / perB : 0f):0.00}(알림 — 치명 · 갈래 무게로 흔들린다)",
+                      a.Acc > 0 && a.Dropped == 0 && a.ZeroLoss == 0 && a.Acc == a.Relayed + a.Blocked);
+            }
+            ResetParts(state);
+            // 11-05 #17 사진 — 어두운 바닥(Ch3 보스방)에서 플레이어 검풍 · 그림자 검풍이 같이 나간 순간(맨 끝 — 떠도는 몬스터 숨김이 기사도 숨긴다)
+            await GustPhotoAsync(p, home, outward, "Temp/ui_shots/W99_O_gust_both_dark.png", sb, ct);
+        }
+        catch (OperationCanceledException) { sb.AppendLine("시간 초과(300초)"); }
+        catch (Exception e) { sb.AppendLine("예외 " + e); }
+        finally
+        {
+            RestoreStoneRound(glass, offStones);
+            ResetParts(state);
+            if (p != null) { p.InputBuffer.Clear(); inv?.SetValue(p, false); }
+            File.WriteAllText("Temp/req1105_stone.txt", sb.ToString());
+            Debug.Log("[WeaponFormProbe] 끝 → Temp/req1105_stone.txt\n" + sb);
+        }
+    }
+
+    private static void RestoreStoneRound(List<Collider> glass, List<DKResonanceStone> offStones)
+    {
+        foreach (var c in glass) if (c != null) c.enabled = true;
+        glass.Clear();
+        foreach (var s in offStones) if (s != null && s.RelayBody != null) { s.RelayBody.enabled = true; DamageRelays.Register(s); }
+        offStones.Clear();
+    }
+
+    /// <summary>
+    /// 한 판 — <paramref name="aim"/>을 겨눠 평타(활)를 계속 민다. 성흔석이 받은 타격(실측 고리)과 바로 이어지는 기사 맞음(같은 호출 — 피해 처리는 한 프레임 안에서 끝난다)을 짝짓는다:
+    /// 짝이 없으면 그때 기사가 무적이면 막힘 · 아니면 버려짐. 쏜 화살 = 발사 세대가 바뀐 화살 수.
+    /// </summary>
+    private static async UniTask<StoneTally> StoneRoundAsync(PlayerController p, DeathKnightBossMonster dk, Vector3 home, Vector3 aim, CancellationToken ct)
+    {
+        var t = new StoneTally();
+        bool pending = false, pendImm = false;
+        int hpAt = 0, last = dk.CurrentHp;
+        void Settle() { if (!pending) return; pending = false; if (pendImm) t.Blocked++; else t.Dropped++; }
+        Action<DKResonanceStone> onAcc = s => { Settle(); pending = true; pendImm = dk.IsDamageImmuneNow; hpAt = dk.CurrentHp; t.Acc++; };
+        Action<HitInfo> onHit = h =>
+        {
+            if (h.Target != dk.gameObject || h.Attacker != p.gameObject) return;
+            t.Hits++;
+            t.HitDmg += h.Damage;
+            if (!pending) return;
+            pending = false;
+            t.Relayed++;
+            t.RelayDmg += h.Damage;
+            if (hpAt - dk.CurrentHp <= 0) t.ZeroLoss++;
+        };
+        Action<int, int> onHp = (cur, max) => { if (cur < last) t.HpLoss += last - cur; last = cur; };
+        var genF = typeof(BasicArrow).GetField("_generation", Inst);
+        var gens = new Dictionary<BasicArrow, int>();
+        s_home = home;
+        if (p.TryGetComponent<Rigidbody>(out var rb)) { rb.position = home; rb.linearVelocity = Vector3.zero; }
+        p.transform.position = home;
+        await Wait(0.3f, ct);
+        DKResonanceStone.ProbeAccepted += onAcc;
+        HitFeedbackService.OnHit += onHit;
+        dk.OnHPChanged += onHp;
+        try
+        {
+            float t0 = Time.time, nextRefill = 0f;
+            while (Time.time - t0 < StoneSeconds)
+            {
+                if (Time.timeScale == 0f) Managers.UI?.CloseAllPopupUI();
+                Steer(p, aim);
+                if (p.InputBuffer.Count < 2) p.InputBuffer.Push(Command.Light);
+                if (Time.time >= nextRefill)
+                {
+                    nextRefill = Time.time + 0.1f;
+                    if (dk.CurrentHp < dk.EffectiveMaxHp * 0.95f) { SetMonsterHp(dk, dk.EffectiveMaxHp); last = dk.CurrentHp; }
+                }
+                foreach (var ar in UnityEngine.Object.FindObjectsByType<BasicArrow>(FindObjectsSortMode.None))
+                {
+                    if (ar == null || !ar.gameObject.activeInHierarchy) continue;
+                    int g = genF != null ? (int)genF.GetValue(ar) : 0;
+                    if (!gens.TryGetValue(ar, out int g0) || g0 != g) { gens[ar] = g; t.Shots++; }
+                }
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+            t.Secs = Time.time - t0;
+            p.InputBuffer.Clear();
+            await Wait(1.2f, ct);   // 날아가는 화살까지 센다
+            Settle();
+        }
+        finally
+        {
+            DKResonanceStone.ProbeAccepted -= onAcc;
+            HitFeedbackService.OnHit -= onHit;
+            dk.OnHPChanged -= onHp;
+        }
+        return t;
+    }
+
+    /// <summary>11-05 #17 사진 — 카타나 +21 · 그림자 파트너 · 검풍 100%로 앞 표적을 베어 플레이어 검풍(빨강)과 그림자 검풍(보라)이 같이 나간 순간을 찍는다.</summary>
+    private static async UniTask GustPhotoAsync(PlayerController p, Vector3 home, Vector3 back, string path, StringBuilder sb, CancellationToken ct)
+    {
+        float lastOwn = -1f, lastShadow = -1f;
+        Action<Vector3, int, float> onThrown = (from, slot, dmg) => { if (slot < 0) lastOwn = Time.realtimeSinceStartup; else lastShadow = Time.realtimeSinceStartup; };
+        SwordGustAugment.ProbeThrown += onThrown;
+        SwordGustAugment.ProbeChance = 100f;
+        bool shot = false;
+        try
+        {
+            if (!await W97Setup(p, Katana, MeleeAugmentCatalog.KatanaShadow + ":1," + MeleeAugmentCatalog.KatanaGust + ":1", 21, ct, 0)) { sb.AppendLine("사진 — 카타나 장착 실패"); return; }
+            DetachAll();
+            Directory.CreateDirectory("Temp/ui_shots");
+            Vector3 fw = Flat(-back).normalized;
+            s_home = home;
+            if (p.TryGetComponent<Rigidbody>(out var rb)) { rb.position = home; rb.linearVelocity = Vector3.zero; }
+            p.transform.SetPositionAndRotation(home, Quaternion.LookRotation(fw));
+            var t = await TrackAsync(home + fw * 2.2f, ct);
+            await Wait(1.2f, ct);
+            await W97Swing(p, t != null ? t.M.transform.position : home + fw * 2.2f, 4f, ct, () =>
+            {
+                float now = Time.realtimeSinceStartup;
+                if (!shot && lastOwn > 0f && lastShadow > 0f && Mathf.Abs(lastShadow - lastOwn) < 0.35f && now - Mathf.Max(lastOwn, lastShadow) > 0.1f && Camera.main != null)
+                { shot = true; CaptureMain(Camera.main, path); }
+            });
+            sb.AppendLine($"사진(어두운 바닥 · Ch3 보스방) — 플레이어 · 그림자 검풍이 같이 나간 순간 {(shot ? path : "못 찍음")}");
+        }
+        finally
+        {
+            SwordGustAugment.ProbeThrown -= onThrown;
+            SwordGustAugment.ProbeChance = -1f;
+            DetachAll();
+        }
+    }
+
+    private static void SetMonsterHp(MonsterBase m, int hp)
+    {
+        var rt = typeof(MonsterBase).GetField("_runtime", Inst)?.GetValue(m);
+        var f = rt?.GetType().GetField("CurrentHp", Inst);
+        if (f != null) f.SetValue(rt, Convert.ChangeType(hp, f.FieldType));
+    }
 
     private static async UniTask<bool> EquipAsync(PlayerController p, string soPath, CancellationToken ct, int slot = PlayerWeaponManager.Slot0)
     {

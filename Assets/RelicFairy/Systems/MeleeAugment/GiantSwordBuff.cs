@@ -9,7 +9,9 @@ using UnityEngine;
 /// 속성 검(10-26 대검 R 개편 · 설계 기획/RelicFairy_대검R_속성검버프_설계_20261026.md §7) — R에서 검을 뽑으면 칼이 커지고(×1.6) 룬판에 가장 많은 속성(없으면 불)이 붙는다.
 /// 지속 동안 평타 범위 ×1.3(<see cref="GreatswordReach"/>)이고, 평타 · R에 맞은 적은 모두 그 자리에서 속성 효과를 받는다(<see cref="HitElement"/> · 속성 점 타격 이펙트) —
 /// 범위 안 전체가 속성 피해를 받는 느낌(10-26 사용자 「범위 안 전체에 피해를 준다는 느낌 · 지금은 끝 가장자리만」 · 「장판이 휘두르는 건 톤이 안 맞네 · e는 좋은 것 같아」).
-/// E 회전 베기만 판정 원 전체에 속성 장판(2초 · <see cref="SpawnField"/>)을 깐다. 베기 이펙트도 속성 색(<see cref="ElementSlashTint"/>). 지속 = 6초 + 재련 n × 0.5초 + 「속성 검 연장」(<see cref="DurationFor"/>) · 재사용 9초 그대로.
+/// E 회전 베기만 판정 원 전체에 속성 장판(2초 · <see cref="SpawnField"/>)을 깐다. 베기 이펙트도 속성 색(<see cref="ElementSlashTint"/>). 지속 = 6초 + 재련 n × 0.5초 + 「속성 검 연장」(<see cref="DurationFor"/>) · 재사용 9초는
+/// 속성 검이 끝난 뒤부터 센다 — 켜져 있는 동안 R은 다시 쓸 수 없고(<see cref="LocksRecast"/>) 시전 끝의 재사용은 꺼지는 순간으로 미룬다(<see cref="DeferCooldown"/>)
+/// (11-05 사용자 「대검 쿨타임이 짧다」 — 시전 끝에서 흐르던 9초가 버프와 겹쳐 실제 대기 3초 · 「이점이 좋아야」 → 켜진 동안 평타 피해 +<see cref="BasicBonus"/>).
 /// 지속 동안 칼 궤적은 속성별 트레일(<see cref="ElementVfxRegistry"/> 칼날 트레일 칸 · 커진 칼의 칼끝 · 칼밑에 묶인다).
 /// 「휩쓸기」 증강이 여럿을 맞힌 만큼 늘린다(<see cref="Extend"/> · 한 번 시전에 최대 3초).
 /// 남은 시간은 게임 시간이라 멈춘 화면에서 줄지 않는다. 무기를 바꾸거나 쓰러지면 바로 끝난다(자국은 남은 수명대로).
@@ -27,18 +29,35 @@ public sealed class GiantSwordBuff : MonoBehaviour
     public const float BaseSeconds = 6f, PerReforgeSeconds = 0.5f, MaxExtendSeconds = 3f;   // 10-26 사용자 「r 상태의 평타가 메인 재미 — 시간을 늘리고」 4 → 6초
     /// <summary>속성 검 동안 평타 범위 배율 — R 3단계(+12)면 더 넓다(10-26 「R까지 키면 더 좋은 범위에 효율」).</summary>
     public const float RangeMult = 1.3f, RangeMultTier3 = 1.45f;
+    /// <summary>켜진 동안 평타 피해 +30% — 재사용이 버프 뒤로 밀려 가동률이 준 만큼 켜진 동안을 세게(11-05 사용자 「이점이 좋아야」 · <see cref="CombatDamage"/>가 읽는다).</summary>
+    public const float BasicBonus = 0.3f;
     private const float ModelScale = 1.6f, GrowSeconds = 0.15f, ShrinkSeconds = 0.3f, BladeGlow = 1.8f;   // 칼날 속성 빛 = 속성 대표 색 × 1.8(형 빛 0.6보다 또렷하게 · 10-30 게임 화면에서 읽히게 1.2 → 1.8)
     private const float ZoneSeconds = 2f, ZoneTickGap = 0.45f, SameSpot = 1f, HitBurstRadius = 0.8f;   // 장판 수명 · 몬스터마다 틱 간격 · 이만큼 가까우면 같은 자리 · 맞은 적 점 타격 크기
     private const int   MaxZones = 3;
-    private const float BurnRatio = 0.2f, FrostSlow = 0.4f, ShockRatio = 0.12f, ShockAmp = 0.1f, PoisonRatio = 0.04f,
-                        DarkAmp = 0.12f, LightCritChance = 0.2f, StatusSeconds = 0.6f, FreezeSeconds = 1f, FrostHitWindow = 2f;
+    // 속성별 역할(11-05 사용자 「속성검의 이점을 잘 구성해야 해 속성별로」 — 재사용이 버프 뒤로 밀려 가동률이 준 만큼 켜진 동안 속성마다 뚜렷하게)
+    private const float BurnRatio = 0.45f, BurnSpread = 2.5f;                                            // 불 — 화상 공격력 45%/초 · 3초 · 타는 적을 치면 주위로 번짐
+    private const int   BurnTicks = 3;
+    private const float FrostSlow = 0.4f, FrostSeconds = 1.5f, FreezeSeconds = 1f, FrostHitWindow = 2f,   // 얼음 — 둔화 → 두 번째 적중에 빙결 → 언 적을 치면 깨짐
+                        ShatterRatio = 1.2f, BossShatterRatio = 0.8f;                                     //   보스는 얼지 않고 두 번째 적중에 바로 깨짐(약하게)
+    private const float ShockRatio = 0.2f, ShockAmp = 0.1f, ShockSeconds = 1.5f, ChainRange = 4f;         // 전기 — 감전(공격력 20% · 받는 피해 +10%)이 4 m 안 적 둘에게 번짐
+    private const int   ChainCount = 2;
+    private const float PoisonRatio = 0.08f, PoisonBurstMult = 1.5f, PoisonSplash = 2f, PoisonSplashShare = 0.5f;   // 풀 — 독 8%/중첩 · 8중첩이면 남은 독 × 1.5가 터짐(주위 2 m에 절반)
+    private const int   PoisonMax = 8, PoisonTicks = 4;
+    private const float LightCritChance = 0.8f, LightSeconds = 2f;                                        // 빛 — 표식 2초 · 표식 위 평타 80%가 치명 피해를 더 준다
+    private const float DarkStackAmp = 0.05f, DarkSeconds = 3f, DarkBurstPerStack = 0.3f, DarkBurstRadius = 2.5f;  // 어둠 — 받는 피해 +5%씩(최대 5) · 쓰러지면 30% × 쌓인 수로 터짐
+    private const int   DarkMaxStacks = 5, MaxDarkNotes = 64;
     private const string ZoneTick = "giant_zone", Burn = "giant_burn", Frost = "giant_frost", FrostHit = "giant_frost_hit",
-                         Shock = "giant_shock", Poison = "item_poison", LightMark = "giant_light", Dark = "giant_dark";
+                         Shock = "giant_shock", Poison = "item_poison", LightMark = "giant_light", Dark = "giant_dark", Freeze = "freeze";
 
     // ── Static ────────────────────────────────────────────────────
+    private static readonly List<MonsterBase> s_near = new(16);
 #if UNITY_EDITOR
     /// <summary>실측 97 ⑨ — 룬판과 상관없이 이 속성으로(−1 = 룬판).</summary>
     public static int ProbeElement = -1;
+    /// <summary>실측 99 W — 고치기 전(버프 중 잠금 · 재사용 미루기 · 평타 보너스 없이 · 시전 끝부터 흐름).</summary>
+    public static bool ProbeOldCooldown;
+    /// <summary>실측 99 W — 평타 보너스를 이 값으로(−1 = <see cref="BasicBonus"/>).</summary>
+    public static float ProbeBasicBonus = -1f;
 #endif
 
     // ── Private ───────────────────────────────────────────────────
@@ -50,10 +69,12 @@ public sealed class GiantSwordBuff : MonoBehaviour
     private Vector3 _modelScale0;
     private BladeWrapFx _blade;
     private float _extended;   // 이번 시전에 「휩쓸기」로 늘린 초
+    private float _deferredCd; // 미뤄 둔 R 재사용(초 · 악몽 배율 포함 · 쿨감 전) — 버프가 꺼질 때 시작한다
     private bool _running;     // 켜진 뒤 아직 안 끝났다 — 칼날 이펙트가 못 붙어도(목록 미로드 등) 끝낼 때 칼 크기 · 빛을 되돌린다(10-26 검토 I1)
     private CancellationTokenSource _scaleCts;
     private readonly List<LegendGroundField> _zones = new(MaxZones);
     private Action<MonsterBase> _tick;
+    private readonly Dictionary<int, (int n, float until)> _dark = new();   // 어둠 — 몬스터마다 쌓인 수 · 끝나는 때
 
     // ── Properties ────────────────────────────────────────────────
     public bool Active => Remaining > 0f;
@@ -101,6 +122,33 @@ public sealed class GiantSwordBuff : MonoBehaviour
 
     // ── Public Methods ────────────────────────────────────────────
     public static bool IsActive(PlayerController p) => p != null && p.TryGetComponent<GiantSwordBuff>(out var b) && b.Active;
+
+    /// <summary>켜진 동안 평타 피해 배율에 더하는 몫(<see cref="BasicBonus"/>).</summary>
+    public static float BasicDamageBonus
+    {
+        get
+        {
+#if UNITY_EDITOR
+            if (ProbeOldCooldown) return 0f;
+            if (ProbeBasicBonus >= 0f) return ProbeBasicBonus;
+#endif
+            return BasicBonus;
+        }
+    }
+
+    /// <summary>R을 다시 쓸 수 없나 — 속성 검이 켜져 있는 동안(재사용은 꺼진 뒤부터 · 11-05). 입력 단계(PlayerController.CanUseSkillNow)가 읽는다.</summary>
+    public static bool LocksRecast(PlayerController p) => !OldCooldownProbe && IsActive(p);
+
+    /// <summary>
+    /// R 시전이 끝날 때(ActSkillStateBase.Exit) — 속성 검이 켜져 있으면 재사용 <paramref name="seconds"/>초를 버프가 꺼지는 순간으로 미룬다(true · 그동안 추적기는 0 —
+    /// HUD R 칸이 「켜짐」으로 그린다). 꺼져 있으면 false(바로 시작).
+    /// </summary>
+    public static bool DeferCooldown(PlayerController p, float seconds)
+    {
+        if (OldCooldownProbe || seconds <= 0f || p == null || !p.TryGetComponent<GiantSwordBuff>(out var b) || !b.Active) return false;
+        b._deferredCd = seconds;
+        return true;
+    }
 
     /// <summary>이 무기의 속성 검 지속(초) — 6초 + 진화 뒤 재련 n × 0.5초 + 「속성 검 연장」(10-26 사용자 「재련 내용에 맞게 유지」 · 「시간을 늘리고」).</summary>
     public static float DurationFor(WeaponData w)
@@ -184,11 +232,26 @@ public sealed class GiantSwordBuff : MonoBehaviour
     {
         if (!_running) return;
         _running = false;
+        if (_deferredCd > 0f && _player != null && _player.CooldownTracker != null)   // 미뤄 둔 R 재사용 — 버프가 꺼지는 지금부터(일찍 끝남 포함 · 쿨감은 지금 값)
+            _player.CooldownTracker.StartCooldown(SkillType.R, _deferredCd, _player.RuntimeStats != null ? _player.RuntimeStats.SkillCooldownReduction : 0f);
+        _deferredCd = 0f;
         if (instant && Remaining > 0.05f && _player != null) _player.RaiseSkillBuffStarted(SkillType.R, 0.01f);   // 일찍 끝남(무기 바꿈 · 쓰러짐) — HUD 남은 시간 막대도 바로 끈다
         Remaining = 0f;
         ReleaseBlade();
         if (instant) RestoreModel();
         else if (_model != null) ScaleTo(_modelScale0, ShrinkSeconds);
+    }
+
+    private static bool OldCooldownProbe
+    {
+        get
+        {
+#if UNITY_EDITOR
+            return ProbeOldCooldown;
+#else
+            return false;
+#endif
+        }
     }
 
     private void SpawnZone(float swingR)
@@ -272,18 +335,109 @@ public sealed class GiantSwordBuff : MonoBehaviour
         var self = _player.gameObject;
         switch (Element)
         {
-            case RuneElement.Fire:     mb.Status.ApplyDot(Burn, atk * BurnRatio, 1f, 1, self); break;
-            case RuneElement.Ice:      mb.Status.ApplySlow(Frost, FrostSlow, StatusSeconds); break;
-            case RuneElement.Electric:
-                CombatQuery.DealSynergyDamage(mb, atk * ShockRatio, self, element: RuneElement.Electric);
-                mb.ApplyDamageTakenAmp(ShockAmp, StatusSeconds, Shock);
-                Log("전류 틱");   // 실측 97 ⑦-b — 자국이 겹쳐도 몬스터마다 0.45초에 한 번
-                break;
-            case RuneElement.Grass:    mb.Status.ApplyStackingDot(Poison, Mathf.Max(1f, atk * PoisonRatio), 1f, 4, 8, self); break;
-            case RuneElement.Light:    mb.Status.SetCooldown(LightMark, StatusSeconds); break;
-            case RuneElement.Dark:     mb.ApplyDamageTakenAmp(DarkAmp, StatusSeconds, Dark); break;
+            case RuneElement.Fire:     Ignite(mb, atk, self); break;
+            case RuneElement.Ice:      mb.Status.ApplySlow(Frost, FrostSlow, FrostSeconds); break;
+            case RuneElement.Electric: Chain(mb, atk, self); break;
+            case RuneElement.Grass:    Poisoned(mb, atk, self); break;
+            case RuneElement.Light:    mb.Status.SetCooldown(LightMark, LightSeconds); break;
+            case RuneElement.Dark:     Darken(mb); break;
         }
         return true;
+    }
+
+    /// <summary>불 — 화상(공격력 45%/초 · 3초 · 다시 걸면 3초로). 이미 타는 적을 치면 주위 2.5 m로 번진다(번진 불은 거기서 다시 번지지 않는다).</summary>
+    private void Ignite(MonsterBase mb, float atk, GameObject self)
+    {
+        bool burning = mb.Status.GetRemainingDotDamage(Burn) > 0f;
+        mb.Status.ApplyDot(Burn, atk * BurnRatio, 1f, BurnTicks, self);
+        if (!burning) return;
+        int n = CombatQuery.GetNearbyEnemies(mb.transform.position, BurnSpread, self, 16, s_near);
+        for (int i = 0; i < n; i++)
+        {
+            var e = s_near[i];
+            if (e == null || e == mb || e.IsDead) continue;
+            e.Status.ApplyDot(Burn, atk * BurnRatio, 1f, BurnTicks, self);
+        }
+        ElementVfxPlayer.PlayBurst(RuneElement.Fire, mb.transform.position, BurnSpread);   // 그림 = 번지는 반경
+    }
+
+    /// <summary>전기 — 맞은 적 감전(공격력 20% · 받는 피해 +10% 1.5초) → 4 m 안 다른 적 둘에게 같은 감전이 번진다.</summary>
+    private void Chain(MonsterBase mb, float atk, GameObject self)
+    {
+        ShockOne(mb, atk, self);
+        Log("전류 틱");   // 실측 97 ⑦-b — 자국이 겹쳐도 몬스터마다 0.45초에 한 번(맞은 적 기준)
+        int n = CombatQuery.GetNearbyEnemies(mb.transform.position, ChainRange, self, 16, s_near);
+        int chained = 0;
+        for (int i = 0; i < n && chained < ChainCount; i++)
+        {
+            var e = s_near[i];
+            if (e == null || e == mb || e.IsDead) continue;
+            ShockOne(e, atk, self);
+            ElementVfxPlayer.PlayBurst(RuneElement.Electric, e.transform.position, HitBurstRadius);   // 번진 자리
+            chained++;
+        }
+        Log($"감전 — 번짐 {chained}");
+    }
+
+    private static void ShockOne(MonsterBase e, float atk, GameObject self)
+    {
+        CombatQuery.DealSynergyDamage(e, atk * ShockRatio, self, element: RuneElement.Electric);
+        e.ApplyDamageTakenAmp(ShockAmp, ShockSeconds, Shock);
+    }
+
+    /// <summary>풀 — 독 중첩(공격력 8% × 중첩/초 · 4초 · 최대 8). 8중첩이 되면 터진다 — 남은 독 피해 × 1.5를 한 번에 · 2 m 안 다른 적에게 그 절반 · 중첩이 비워진다.</summary>
+    private void Poisoned(MonsterBase mb, float atk, GameObject self)
+    {
+        mb.Status.ApplyStackingDot(Poison, Mathf.Max(1f, atk * PoisonRatio), 1f, PoisonTicks, PoisonMax, self);
+        if (mb.Status.GetDotStacks(Poison) < PoisonMax) return;
+        float burst = mb.Status.ConsumeDot(Poison, 1f) * PoisonBurstMult;
+        if (burst <= 0f) return;
+        CombatQuery.DealSynergyDamage(mb, burst, self, element: RuneElement.Grass);
+        int n = CombatQuery.GetNearbyEnemies(mb.transform.position, PoisonSplash, self, 16, s_near);
+        for (int i = 0; i < n; i++)
+        {
+            var e = s_near[i];
+            if (e == null || e == mb || e.IsDead) continue;
+            CombatQuery.DealSynergyDamage(e, burst * PoisonSplashShare, self, element: RuneElement.Grass);
+        }
+        ElementVfxPlayer.PlayBurst(RuneElement.Grass, mb.transform.position, PoisonSplash);
+        Log($"독 터짐 — {burst:0}");
+    }
+
+    /// <summary>어둠 — 칠 때마다 받는 피해 +5%가 쌓인다(최대 5 = +25% · 3초 · 칠 때마다 다시 3초).</summary>
+    private void Darken(MonsterBase mb)
+    {
+        if (_dark.Count >= MaxDarkNotes) _dark.Clear();
+        int id = mb.GetInstanceID();
+        int n = _dark.TryGetValue(id, out var d) && Time.time < d.until ? Mathf.Min(DarkMaxStacks, d.n + 1) : 1;
+        _dark[id] = (n, Time.time + DarkSeconds);
+        mb.ApplyDamageTakenAmp(DarkStackAmp * n, DarkSeconds, Dark);
+    }
+
+    /// <summary>어둠 — 쌓인 적이 평타에 쓰러지면 터진다(2.5 m · 공격력 30% × 쌓인 수).</summary>
+    private void DarkBurst(MonsterBase mb)
+    {
+        int id = mb.GetInstanceID();
+        if (!_dark.TryGetValue(id, out var d) || Time.time >= d.until || _player == null) return;
+        _dark.Remove(id);
+        float dmg = _player.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee) * DarkBurstPerStack * d.n;
+        int n = CombatQuery.GetNearbyEnemies(mb.transform.position, DarkBurstRadius, _player.gameObject, 16, s_near);
+        for (int i = 0; i < n; i++)
+        {
+            var e = s_near[i];
+            if (e == null || e == mb || e.IsDead) continue;
+            CombatQuery.DealSynergyDamage(e, dmg, _player.gameObject, element: RuneElement.Dark);
+        }
+        ElementVfxPlayer.PlayBurst(RuneElement.Dark, mb.transform.position, DarkBurstRadius);
+        Log($"어둠 터짐 — {d.n}중첩 · {dmg:0}");
+    }
+
+    /// <summary>얼음 — 깨짐(공격력 × <paramref name="ratio"/>).</summary>
+    private void Shatter(MonsterBase mb, float ratio)
+    {
+        if (_player == null) return;
+        CombatQuery.DealSynergyDamage(mb, _player.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee) * ratio, _player.gameObject, element: RuneElement.Ice);
+        ElementVfxPlayer.PlayBurst(RuneElement.Ice, mb.transform.position, HitBurstRadius);
     }
 
     [System.Diagnostics.Conditional("UNITY_EDITOR")]
@@ -299,14 +453,23 @@ public sealed class GiantSwordBuff : MonoBehaviour
         if (h.ActionType != WeaponActionType.GroundLight && h.ActionType != WeaponActionType.AirLight) return;
         if (MeleeAugmentCatalog.KindOf(_player.WeaponManager != null ? _player.WeaponManager.CurrentWeaponData : null) != MeleeWeaponKind.Greatsword) return;
         var mb = h.Target.GetComponentInParent<MonsterBase>();
-        if (mb == null || mb.IsDead) return;
+        if (mb == null) return;
+        if (mb.IsDead) { if (Active && Element == RuneElement.Dark) DarkBurst(mb); return; }   // 어둠 — 쌓인 적이 이 평타에 쓰러졌다
+        if (Active && Element == RuneElement.Ice && mb.Status.HasCc(Freeze))   // 얼음 — 언 적을 치면 깨진다(빙결이 풀리고 셈은 처음부터)
+        {
+            mb.Status.ClearCc(Freeze);
+            Shatter(mb, ShatterRatio);
+            mb.Status.SetCooldown(FrostHit, 0.01f);
+            return;
+        }
         if (Active && TryTick(mb))
             ElementVfxPlayer.PlayBurst(Element, mb.transform.position, HitBurstRadius);   // 속성 점 타격(파란 대검 타격 대신 — 베기 쪽은 흰 섬광) · 속성 효과가 걸릴 때만
         if (mb.Status.GetSlowStacks(Frost) > 0)
         {
             if (mb.Status.IsOnCooldown(FrostHit))   // 서리 위 두 번째 적중
             {
-                if (mb.Grade != MonsterGrade.Boss) mb.Status.ApplyCc("freeze", FreezeSeconds);
+                if (mb.Grade != MonsterGrade.Boss) mb.Status.ApplyCc(Freeze, FreezeSeconds);
+                else if (Active && Element == RuneElement.Ice) Shatter(mb, BossShatterRatio);   // 보스는 얼지 않는다 — 바로 깨짐(약하게)
                 mb.Status.SetCooldown(FrostHit, 0.01f);   // 셈을 비운다 — 다음 적중이 다시 첫 번째
             }
             else mb.Status.SetCooldown(FrostHit, FrostHitWindow);

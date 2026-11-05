@@ -73,6 +73,7 @@ public sealed partial class PlayerController
         if (!HasSkillInSlot(slot)) return false;
         if (IsSkillSealed(slot)) return false;
         if (!IsSkillGateOpen(slot)) return false;
+        if (slot == SkillType.R && GiantSwordBuff.LocksRecast(this)) return false;   // 대검 속성 검이 켜져 있는 동안(재사용은 꺼진 뒤부터 · 11-05)
         return CooldownTracker == null || CooldownTracker.IsReady(slot);
     }
 

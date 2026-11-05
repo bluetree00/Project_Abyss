@@ -213,7 +213,7 @@ public sealed partial class PlayerController
         if ((!isInSkill || chainFromSkill) && !isDodging && InputBuffer.TryConsume(Command.RSkill))
         {
             if (CanAttack() && (!isInSkill || chainFromSkill) && CanUseSkillNow(SkillType.R)) _actSM.Change(ActState.RSkill);
-            else if (!CooldownTracker.IsReady(SkillType.R)) SkillRejected?.Invoke(SkillType.R);
+            else if (!CooldownTracker.IsReady(SkillType.R) || GiantSwordBuff.LocksRecast(this)) SkillRejected?.Invoke(SkillType.R);   // 속성 검 켜짐 중 누름도 칸 흔들림(11-05)
             return;
         }
 
