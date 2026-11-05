@@ -658,7 +658,9 @@ public class BoardManager : MonoBehaviour
         var owningAsset = activeAsset;
         if (owningAsset == null)
         {
-            var ownerGrid = squares[0] != null ? squares[0].GetComponentInParent<Grid>() : null;
+            // 11-05 #15 — 판(UI_GridPanel)이 닫혀 칸이 꺼져 있다 · 꺼진 칸에서 GetComponentInParent()는 null이라 소속 판이 비고,
+            // 첫 오픈이 이 배치를 「다른 판 것」으로 걷어 조각이 숨은 보관 자리로 갔다(칸엔 바탕 그림만 = 「투명한 룬」) → 꺼진 것도 찾는다
+            var ownerGrid = squares[0] != null ? squares[0].GetComponentInParent<Grid>(true) : null;
             if (ownerGrid != null) owningAsset = ownerGrid.gridAsset;
         }
 

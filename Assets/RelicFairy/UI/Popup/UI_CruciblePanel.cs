@@ -528,6 +528,10 @@ public sealed partial class UI_CruciblePanel : UI_Popup
         Rewire(_enhanceBtn, OnEnhanceClicked);
         Rewire(_evolveBtn,  ShowEvolvePanel);
         Rewire(FindDeep("Exit")?.GetComponent<Button>(),          ClosePopupUI);
+        // 11-05 #10 사용자 「재련소에도 환전소 넣기」 — 11-02 Q18 버튼은 짓는 길(BuildChrome)에만 넣어 구운 프리팹엔 없었다 → 없으면 여기서 짓는다(v3가 머리 줄로 옮긴다)
+        var exchange = FindDeep("Exchange")?.GetComponent<Button>();
+        if (exchange == null && _window != null) exchange = MakeExchangeButton(_window);
+        Rewire(exchange, () => OpenExchangeAsync().Forget());
 
         // 탭 클릭은 람다로 건 <b>비영속 리스너</b>라 프리팹에 저장되지 않는다 —
         // 다시 걸지 않으면 구운 화면에서 원거리 파츠 탭으로 갈 길 자체가 없다.
@@ -592,6 +596,12 @@ public sealed partial class UI_CruciblePanel : UI_Popup
         exitBtn.onClick.AddListener(ClosePopupUI);
 
         // 11-02 Q18 환전소 — 나가기와 같은 청동 · 닫으면 재화 칸을 새로 그린다
+        MakeExchangeButton(w).onClick.AddListener(() => OpenExchangeAsync().Forget());
+    }
+
+    /// <summary>환전소 버튼(나가기와 같은 청동) — 짓는 길과 구운 프리팹(없을 때) 둘 다 쓴다. 동작은 부르는 쪽이 건다.</summary>
+    private static Button MakeExchangeButton(Transform w)
+    {
         var exBtn = MakeStyledButton(w, "Exchange", "환전소", out var exLbl);
         Place((RectTransform)exBtn.transform, ExchangeX, ExitY, ExchangeW, ExitH);
         exBtn.GetComponent<Image>().color = BronzeEdge;
@@ -600,7 +610,7 @@ public sealed partial class UI_CruciblePanel : UI_Popup
         exFill.transform.SetAsFirstSibling();
         ShopUIStyle.ApplyButtonColors(exBtn, exFill);
         exLbl.color = BronzeInk;
-        exBtn.onClick.AddListener(() => OpenExchangeAsync().Forget());
+        return exBtn;
     }
 
     /// <summary>

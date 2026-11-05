@@ -56,6 +56,7 @@ public sealed class ChapterStairway : MonoBehaviour
     private const float ClearHeight     = 6f;     // 막힘 검사 높이 — 층계참 2 m + 아치 3.8 m
     private const float ClearSide       = 0.4f;   // 막힘 검사 폭 여유(한쪽) — 아치 기둥이 디딤판보다 조금 넓다
     private const float FloorSlabMin    = 12f;    // 가로 · 세로 모두 이보다 넓은 콜라이더는 바닥 판으로 본다(막힘 아님)
+    private const float EvictMargin     = 0.5f;   // 계단 자리 밖 여유(몸 반경 + 걸음) — 이 안에 서 있으면 솟기 전에 밖으로 옮긴다(11-05)
 
     private static readonly Color WipeColor = new(0.05f, 0.04f, 0.09f, 1f);
     private static readonly AnimationCurve WipeCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
@@ -145,11 +146,13 @@ public sealed class ChapterStairway : MonoBehaviour
             await UniTask.Delay(TimeSpan.FromSeconds(AssembleDelay), DelayType.UnscaledDeltaTime, cancellationToken: ct);
             for (int k = 0; k < columns.Count; k++)
             {
+                EvictPlayerFromFootprint();   // 솟는 도중 걸어 들어와도 — 단마다 확인(11-05 「계단 자리에 있으면 갇힌다」)
                 RiseAsync(columns[k], RiseDuration, ct).Forget();
                 if (k % 2 == 0) Managers.Sound?.PlayEvent(SoundEvent.StairRise);
                 await UniTask.Delay(TimeSpan.FromSeconds(StepInterval), DelayType.UnscaledDeltaTime, cancellationToken: ct);
             }
             Managers.Sound?.PlayEvent(SoundEvent.StairRise);
+            EvictPlayerFromFootprint();
             await RiseAsync(landing, LandingRise, ct);
 
             // 3) 꼭대기 — 돌 아치(디졸브) · 아치 안 포탈이 작게 열려 커진다.
@@ -297,6 +300,41 @@ public sealed class ChapterStairway : MonoBehaviour
         ChapterId.Chapter4 => "Ch3_Map",
         _ => null,
     };
+
+    /// <summary>
+    /// 계단 자리 안에 플레이어가 서 있으면 밖으로 옮긴다(11-05 사용자 「계단이 올라올 때 그 자리에 있으면 갇힌다」 —
+    /// 솟는 상자가 발 위로 올라오면 접지 검사가 상자 안에서 시작해 빠져나오지 못했다). 계단 발치 → 가까운 옆 → 먼 옆 순으로 디딜 자리.
+    /// </summary>
+    private void EvictPlayerFromFootprint()
+    {
+        var player = GameRunBootstrapper.Instance?.Run?.Player;
+        if (player == null || _entry == null) return;
+        const float halfW = StairWidth * 0.5f + EvictMargin;
+        const float zMin  = -(LandingDepth * 0.5f + StepCount * StepRun) - EvictMargin;
+        const float zMax  = LandingDepth * 0.5f + EvictMargin;
+        Vector3 local = _entry.InverseTransformPoint(player.transform.position);
+        if (Mathf.Abs(local.x) > halfW || local.z < zMin || local.z > zMax) return;
+
+        float side = (local.x >= 0f ? 1f : -1f) * (halfW + 0.5f);
+        float z    = Mathf.Clamp(local.z, zMin, zMax);
+        Vector3[] candidates = { new(0f, 0f, zMin - 0.5f), new(side, 0f, z), new(-side, 0f, z) };
+        foreach (var c in candidates)
+        {
+            Vector3 world = _entry.TransformPoint(c);
+            Vector3 to;
+            if (UnityEngine.AI.NavMesh.SamplePosition(world, out var nav, 1f, UnityEngine.AI.NavMesh.AllAreas)) to = nav.position;
+            else if (Physics.Raycast(world + Vector3.up * 2f, Vector3.down, out var ground, 4f, LayerMask.GetMask("Ground"), QueryTriggerInteraction.Ignore)) to = ground.point;
+            else continue;
+            Vector3 l = _entry.InverseTransformPoint(to);
+            if (Mathf.Abs(l.x) <= halfW && l.z >= zMin && l.z <= zMax) continue;   // 다시 계단 자리 안
+            to += Vector3.up * 0.05f;
+            player.transform.position = to;
+            if (player.TryGetComponent<Rigidbody>(out var rb)) { rb.position = to; rb.linearVelocity = Vector3.zero; }
+            Debug.Log($"[Stairway] 계단 자리에 서 있던 플레이어를 옮김 → {to}");
+            return;
+        }
+        Debug.LogWarning("[Stairway] 계단 자리 밖 디딜 곳을 못 찾았다 — 플레이어 그대로");
+    }
 
     /// <summary>바닥 아래에서 제자리(로컬 y 0)로 솟는다 — 감속.</summary>
     private static async UniTask RiseAsync(Transform t, float seconds, CancellationToken ct)
@@ -523,18 +561,8 @@ public sealed class ChapterStairway : MonoBehaviour
             tmp.fontMaterial.SetFloat(ShaderUtilities.ID_FaceDilate, LabelDilate);
     }
 
-    /// <summary>얇은 본문체 — 기본 폰트의 폴백 목록에 들어 있다(DnfFontAssetGenerator가 NotoSansKR를 폴백으로 건다).</summary>
-    private static TMP_FontAsset ThinFont()
-    {
-        var def = TMP_Settings.defaultFontAsset;
-        if (def == null) return null;
-        if (def.name.Contains("NotoSansKR")) return def;
-        var table = def.fallbackFontAssetTable;
-        if (table == null) return null;
-        for (int i = 0; i < table.Count; i++)
-            if (table[i] != null && table[i].name.Contains("NotoSansKR")) return table[i];
-        return null;
-    }
+    /// <summary>얇은 본문체 — 공용 UICodeOverlay.ThinFont(11-05 #6 큰 글자 선명도 · 60) 그대로.</summary>
+    private static TMP_FontAsset ThinFont() => UICodeOverlay.ThinFont();
 
     /// <summary>계단 꼭대기 — 보스방을 떠나 회랑으로.</summary>
     private async UniTaskVoid EnterCorridorAsync()

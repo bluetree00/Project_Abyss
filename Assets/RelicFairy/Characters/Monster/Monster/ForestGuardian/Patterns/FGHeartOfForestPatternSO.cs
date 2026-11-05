@@ -235,10 +235,11 @@ public class FGHeartOfForestState : FullLockState<FGHeartOfForestPatternSO>
         if (ctx.Monster is ForestGuardianMonster fg)
         {
             // 가장자리 가시가 채널링 동안 안쪽으로 차오른다 — 영구 띠와 같은 색 · 피해의 임시 띠(끝나면 걷는다)
+            // 11-05 #9 원형 아레나 — 사각 띠는 대각선이 안전지대였고 처음 6초 동안 아무것도 안 보였다. 안쪽 반경 = creepInnerHalfSize
             Bounds arena = fg.ArenaBoundsXZ;
-            float  half  = Mathf.Min(arena.extents.x, arena.extents.z);
-            float  band  = Mathf.Max(0.5f, half - Data.creepInnerHalfSize);
-            _creep = BossStageHazard.CreateEdgeBand(fg, arena, fg.ArenaFloorY, band, Data.channelDuration,
+            float  outer = Mathf.Min(arena.extents.x, arena.extents.z) - BossStageHazard.RingInset;
+            float  band  = Mathf.Max(0.5f, outer - Data.creepInnerHalfSize);
+            _creep = BossStageHazard.CreateEdgeRing(fg, arena.center, outer, fg.ArenaFloorY, band, Data.channelDuration,
                                                     fg.ThornBandColor, null, 1f, fg.ThornBandDamageMult);
             _creep.SkipWhereCovered(fg.ThornBand);   // 영구 띠와 겹친 가장자리는 영구 띠만 찌른다 — 주기마다 두 번 맞았다(10-08 점검)
             fg.NotifyVulnerableWindow(Data.channelDuration);

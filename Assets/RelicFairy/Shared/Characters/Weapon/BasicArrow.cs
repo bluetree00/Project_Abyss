@@ -455,6 +455,7 @@ public class BasicArrow : MonoBehaviour, IPooledObject
 
         int n = CombatQuery.GetNearbyDamageables(transform.position, HomingSearchRadius, _instigator,
                                                  HomingSearchMax, s_homingBuffer);
+        Component best = null;
         for (int i = 0; i < n; i++)
         {
             var go = s_homingBuffer[i];
@@ -464,16 +465,41 @@ public class BasicArrow : MonoBehaviour, IPooledObject
             Component c = go.TryGetComponent<MonsterBase>(out var mb) ? mb
                         : go.TryGetComponent<IKillable>(out var k) ? k as Component : null;
             if (!IsLiveTarget(c)) continue;
-            _homingTarget = c;
-            return c.transform;
+            best = c;
+            break;
         }
-        return null;
+        // 중계 물체(공명 성흔석 — Player 층이라 위 조회에 안 잡힌다)가 더 가까우면 그쪽 — 유리 너머 기사만 노려 유리에 막혔다(11-05 #4)
+        var relay = NearestRelay(transform.position, HomingSearchRadius);
+        if (relay != null && (best == null || (relay.transform.position - transform.position).sqrMagnitude
+                                            < (best.transform.position - transform.position).sqrMagnitude))
+            best = relay;
+        if (best == null) return null;
+        _homingTarget = best;
+        return best.transform;
     }
 
-    /// <summary>쫓을 만한 산 적인가 — 몬스터는 HP, 잡몹(IKillable)은 사망 여부로 본다.</summary>
+    /// <summary>가장 가까운 살아 있는 중계 물체(<see cref="DamageRelays"/>) — 넘겨받을 대상이 맞을 수 있을 때만.</summary>
+    private Component NearestRelay(Vector3 from, float radius)
+    {
+        Component best = null;
+        float bestSq = radius * radius;
+        var all = DamageRelays.All;
+        for (int i = 0; i < all.Count; i++)
+        {
+            if (!(all[i] is Component rc) || rc == null || !IsLiveTarget(rc)) continue;
+            if (_pierced != null && _pierced.Contains(rc.gameObject)) continue;
+            float sq = (rc.transform.position - from).sqrMagnitude;
+            if (sq < bestSq) { bestSq = sq; best = rc; }
+        }
+        return best;
+    }
+
+    /// <summary>쫓을 만한 산 적인가 — 몬스터는 HP, 잡몹(IKillable)은 사망 여부, 중계 물체(성흔석)는 넘겨받을 대상이 맞을 수 있는가로 본다.</summary>
     private static bool IsLiveTarget(Component c) =>
         c != null && c.gameObject.activeInHierarchy &&
-        (c is MonsterBase mb ? mb.CurrentHp > 0 && !mb.IsDamageImmuneNow : c is IKillable k && !k.IsDead);   // 무적인 몬스터는 놓는다 — 화살이 수명 끝까지 맴돌며 쌓였다(10-29 화룡)
+        (c is MonsterBase mb ? mb.CurrentHp > 0 && !mb.IsDamageImmuneNow
+         : c is IDamageRelay rl ? rl.RelayTarget != null && !(rl.RelayTarget.TryGetComponent<MonsterBase>(out var rb) && rb.IsDamageImmuneNow)
+         : c is IKillable k && !k.IsDead);   // 무적인 몬스터는 놓는다 — 화살이 수명 끝까지 맴돌며 쌓였다(10-29 화룡)
 
     /// <summary>
     /// 몬스터가 스스로 화살 위로 걸어 들어오는 경우를 위한 보조 경로.

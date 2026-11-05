@@ -77,13 +77,15 @@ public class SkillExecutionContext
     /// <summary>
     /// 돌진 끝점 — <paramref name="dir"/>로 <paramref name="distance"/>만큼 가되 첫 벽 앞에서 멈춘다(적은 꿰뚫고 지나간다 · <see cref="PlayerController.ClearDistanceAhead"/>).
     /// 끝점을 정해 두고 Lerp로 MovePosition하면 한 프레임에 1~2 m씩 건너뛰어 벽을 뚫었다(10-14 사용자 「무형검 R · 대시 스킬이 벽을 뚫는다」).
+    /// 끝자리가 허공이면 바닥이 있는 가장 먼 자리까지(<see cref="PlayerController.GroundedDistanceAhead"/> · 11-05 Q32 벼랑 밖 돌진).
     /// </summary>
     public UnityEngine.Vector3 DashEndBeforeWall(UnityEngine.Vector3 start, UnityEngine.Vector3 dir, float distance)
     {
         dir.y = 0f;
         if (dir.sqrMagnitude < 0.0001f || distance <= 0f) return start;
         dir.Normalize();
-        return start + dir * Controller.ClearDistanceAhead(start, dir, distance);
+        float clear = Controller.ClearDistanceAhead(start, dir, distance);
+        return start + dir * Controller.GroundedDistanceAhead(start, dir, clear);
     }
     /// <summary>돌진 목표 높이를 발밑 바닥에 맞춘다 — 경사로 · 계단을 따라 오르내린다(<see cref="PlayerController.DashFollowGround"/> · 11-02 Q6).</summary>
     public UnityEngine.Vector3 DashFollowGround(UnityEngine.Vector3 target) => Controller.DashFollowGround(target, PlayerTransform.position.y);

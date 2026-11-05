@@ -120,7 +120,7 @@ public class BossRoomController : MonoBehaviour
     {
         _playerTransform  = player.transform;
         _playerController = player;
-        if (lockInputOnEnter) player.SetInputEnabled(false);
+        if (lockInputOnEnter) { player.SetInputEnabled(false); player.CancelActions(); }   // 하던 공격 · 스킬도 끊는다 — 입력만 끄면 진행 중 동작이 보스를 때려 등장이 깨졌다(11-05 #1)
         if (suppressCombatFraming)
             GameCameraController.Instance?.SetCombatFramingSuppressed(this, true);
 
@@ -201,6 +201,7 @@ public class BossRoomController : MonoBehaviour
             entrance.OnEntranceRequested -= entranceHandler;
             if (this == null) return;
             _playerController?.SetInputEnabled(false);
+            _playerController?.CancelActions();   // 하던 공격 · 스킬도 끊는다(11-05 #1)
             DoCameraAndTriggerAsync(entrance, destroyCancellationToken).Forget();
         };
         entrance.OnEntranceRequested += entranceHandler;

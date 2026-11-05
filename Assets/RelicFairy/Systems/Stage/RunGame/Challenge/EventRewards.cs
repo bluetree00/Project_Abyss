@@ -85,6 +85,7 @@ public static class EventRewards
         if (k.Contains("sacrifice") && SacrificeAltarChallenge.CanPayAny(run)) return "제물 제단";
         if (k.Contains("sacrifice") || k.Contains("oracle")) return "신탁의 갈림길";
         if (k.Contains("vault") || k.Contains("treasure"))  return "보물 창고";
+        if (k.Contains("runeshrine")) return "룬 성소";   // 11-05 #20
         if (k.Contains("sanctum")) return "서약 성소";
         if (k.Contains("gamble"))  return "도박 상자";
         return "전투 시험";   // 옛 전투형(빨리 · 안 맞기 · 버티기 …) — 방 풀 CDN 업로드 전 빌드에 남아 있다
@@ -107,6 +108,7 @@ public static class EventRewards
         if (k.Contains("sacrifice") || k.Contains("oracle")) return Line("강화재료 · 금화 · 정수", "하나를 고른다");
         if (k.Contains("vault") || k.Contains("treasure"))   // 10-31 제한 시간은 방마다 길이로 정한다(달리기만으론 모자라게)
             return Line("금화 · 강화재료 · 정수", Loc.F("빠듯한 시간 안에 상자 {0}개를 차례로 열기 · 바람 문양을 밟아야 닿는다", TreasureVaultChallenge.ChestCount));
+        if (k.Contains("runeshrine")) return Line("한 칸 영웅 룬", "제단 셋 중 하나를 고른다");   // 11-05 #20
         if (k.Contains("sanctum")) return Line("서약서 한 줄", "제단에서 서약을 쓴다(이미 있으면 잇는다)");
         if (k.Contains("gamble"))  return Line("룬", "상자 도박");
         return Line("룬 · 강화재료", "성적만큼");   // 옛 전투형 — 룬 고르기 + 강화재료(ChallengeRewardTable)

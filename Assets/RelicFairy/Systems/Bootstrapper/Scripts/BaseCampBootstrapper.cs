@@ -107,6 +107,15 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
                 if (_spawnYaw.HasValue) cam.SetHeadingImmediate(_spawnYaw.Value);
             }
 
+            // 11-05 #21 사용자 「클리어하면 바로 랭킹방에 갔다가 베이스캠프로」 — 해방기 · 악몽 리치를 깨고 돌아왔으면 거점을 보이기 전(검은 화면)
+            // 랭킹방부터(둘러보기 · 비석 · 돌아가는 문). 돌아올 때 검은 채로 끝내 아래 소환 · 밝히기가 「문 → 거점 도착」이 된다.
+            var rankEra = RankingFlow.ConsumePendingRoom();
+            if (rankEra.HasValue && _player != null)
+            {
+                AppBootstrapper.Instance?.NotifySceneReady();   // 로딩 UI를 먼저 걷는다(랭킹방이 그 아래 가리지 않게)
+                await RankingHall.VisitAsync(rankEra.Value, _player, ct, fadeInOnReturn: false);
+            }
+
             // 소환 연출 — 화면이 검을 때 디졸브 재질을 데운 뒤 시작해 페이드인과 나란히 돈다(첫 프레임부터 몸이 가려진다).
             var fx = BaseCampFxDirector.Instance;
             if (fx != null && _player != null)
@@ -136,11 +145,6 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             await summon;
             if (introDialogueDelay > 0f)
                 await UniTask.Delay(TimeSpan.FromSeconds(introDialogueDelay), cancellationToken: ct);
-
-            // 10-29 설계 §5 — 해방기 · 악몽 리치를 깨고 돌아왔으면 그 랭킹방에 먼저 들렀다가(비석 · 돌아가는 문) 귀환 대사로
-            var rankEra = RankingFlow.ConsumePendingRoom();
-            if (rankEra.HasValue && _player != null)
-                await RankingHall.VisitAsync(rankEra.Value, _player, ct);
 
             await ShowIntroDialogueAsync(ct);
 

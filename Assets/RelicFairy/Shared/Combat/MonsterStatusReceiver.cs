@@ -154,6 +154,7 @@ namespace RelicFairy.Monster
 
         /// <summary>
         /// 중첩형 지속피해(독 · 10-14 빌드 시너지 A3) — 걸 때마다 중첩 +1(최대 <paramref name="maxStacks"/>) · 틱 피해 = 중첩당 × 중첩 수 · 잔여 틱은 다시 채운다.
+        /// 중첩당 값은 지금 걸린 것과 새로 건 것 중 센 쪽(11-05) — 끝난 독(isNew)이면 새 값 그대로.
         /// 연타 무기가 빨리 쌓아 키우는 축이다(PoE · Dead Cells의 독). 진행 중 타이머는 보존한다(연타 preempt 방지 — ApplyDot과 같은 규칙).
         /// </summary>
         public void ApplyStackingDot(string id, float damagePerStack, float tickInterval, int tickCount, int maxStacks, GameObject instigator)
@@ -162,8 +163,10 @@ namespace RelicFairy.Monster
             bool isNew = !_dot.TryGetValue(id, out var d) || d.remainingTicks <= 0;
             if (d == null) { d = new DotSlot(); _dot[id] = d; }
             if (isNew) { d.timer = tickInterval; d.stacks = 0; d.totalTicks = 0; }
+            // 11-05 중첩당 피해는 걸린 독 중 센 쪽 — 예전엔 마지막에 건 값으로 덮여, 약한 룬(응축된 숲 2%)을 더 끼면 센 독(4%)이 반으로 깎였다
+            float perStack   = d.stacks > 0 ? Mathf.Max(damagePerStack, d.damagePerTick / d.stacks) : damagePerStack;
             d.stacks         = Mathf.Clamp(d.stacks + 1, 1, Mathf.Max(1, maxStacks));
-            d.damagePerTick  = damagePerStack * d.stacks;
+            d.damagePerTick  = perStack * d.stacks;
             d.interval       = tickInterval;
             d.instigator     = instigator;
             d.defenseIgnore  = 1f;

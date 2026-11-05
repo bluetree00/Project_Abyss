@@ -24,6 +24,11 @@ public class ClearRewardTrigger : MonoBehaviour
     private const float TriggerRadius    = 4.5f;
     private const float WorldIconHeight  = 2.0f;    // 구슬 중심 위(월드 m) — 11-02 2.8은 0.3배 프리팹에 묻혀 0.84였다
     private const float WorldCanvasScale = 0.007f;  // 1 px = 0.007 m(월드) — 아이콘 90 px ≈ 0.63 m · 글 26 px ≈ 0.18 m(11-02 예전 0.005는 0.3배 프리팹에 묻혔다)
+    // 고르는 보상 표시판 — 후보마다 속성 블록 타일 한 칸(11-05)
+    private const int   MaxIndicatorTiles = 4;
+    private const float IndicatorTile     = 52f;   // ≈ 0.36 m(44는 옛 그림 74 px보다 작아 멀리서 덜 읽혔다)
+    private const float IndicatorTileGap  = 6f;
+    private const float IndicatorPad      = 10f;
 
     /// <summary>다중 라운드(챌린지 보상)에서 2라운드부터 차징 길이 배율.</summary>
     private const float MultiRoundChargeScale = 0.4f;
@@ -143,6 +148,8 @@ public class ClearRewardTrigger : MonoBehaviour
         // 카메라·슬로우모·히트스톱이 전부 무효가 된다(구현설계_보상공개연출 §A-5).
         try { await PlayChargeUpAsync(ct); }
         catch (OperationCanceledException) { return; }
+        // 충전 연출 사이 쓰러졌으면 창을 열지 않는다 — 사망 연출 위로 룬 고르기 창이 열렸다(11-05 Q32 B1)
+        if (GameRunBootstrapper.Instance != null && GameRunBootstrapper.Instance.IsRunEnding) return;
 
         // 수령 확인 팝업(UI_ClearReward)은 뺐다 — [F]로 이미 "받겠다"고 누른 뒤라
         // 같은 질문을 한 번 더 하는 셈이었고, 실제 보상 화면(룬 선택/획득)이 바로 뒤에 또 뜬다.
@@ -356,8 +363,10 @@ public class ClearRewardTrigger : MonoBehaviour
         // 성립하고, 주우러 가는 3초가 통째로 기대감 구간이 된다(ARPG loot beam과 같은 역할, §C-3-a).
         var maxRarity = RewardPresentation.MaxRarity(_rewards);
         var rarityCol = RewardPresentation.FrameColor(maxRarity);
-        // 고르는 보상은 그 등급의 룬 그림 — 첫 후보의 그림은 「그 룬을 받는다」로 읽혔다(11-02 Q9)
-        if (_isChoice && RuneArt.GetArt(maxRarity) is Sprite art) _rewardSprite = art;
+        // 11-05 사용자 「룬 위 그림이 옛 룬 그림」(등급 돌판 룬1~5 · 옛 아이템 아이콘) → 룬판 · 획득 창과 같은 그림으로.
+        // 고르는 보상 = 첫 판 후보마다 속성 블록 타일을 나란히(한 장만 보이면 「그 룬을 받는다」로 읽혔다 — 11-02 Q9) · 한 장 보상 = 그 룬 문양.
+        int tiles = _isChoice ? Mathf.Clamp(_choiceCount, 1, MaxIndicatorTiles) : 0;
+        if (!_isChoice && _rewards.Count > 0 && RuneArt.ResolveRuneIcon(_rewards[0].data) is Sprite glyph) _rewardSprite = glyph;
 
         var iconBgGO  = new GameObject("IconBG");
         iconBgGO.transform.SetParent(_worldIndicatorGO.transform, false);
@@ -370,19 +379,26 @@ public class ClearRewardTrigger : MonoBehaviour
         iconBgRT.anchorMin        = new Vector2(0.5f, 0.5f);
         iconBgRT.anchorMax        = new Vector2(0.5f, 0.5f);
         iconBgRT.pivot            = new Vector2(0.5f, 0.5f);
-        iconBgRT.sizeDelta        = new Vector2(90f, 90f);
+        iconBgRT.sizeDelta        = tiles > 0
+            ? new Vector2(tiles * IndicatorTile + (tiles - 1) * IndicatorTileGap + IndicatorPad * 2f, IndicatorTile + IndicatorPad * 2f)
+            : new Vector2(90f, 90f);
         iconBgRT.anchoredPosition = new Vector2(0f, 25f);
 
-        var iconGO = new GameObject("Icon");
-        iconGO.transform.SetParent(iconBgGO.transform, false);
-        _worldIconImg        = iconGO.AddComponent<Image>();
-        _worldIconImg.sprite = _rewardSprite;
-        _worldIconImg.gameObject.SetActive(_rewardSprite != null);
-        var iconRT = iconGO.GetComponent<RectTransform>();
-        iconRT.anchorMin = Vector2.zero;
-        iconRT.anchorMax = Vector2.one;
-        iconRT.offsetMin = new Vector2(8f, 8f);
-        iconRT.offsetMax = new Vector2(-8f, -8f);
+        if (tiles > 0) BuildCandidateTiles(iconBgRT, tiles);
+        else
+        {
+            var iconGO = new GameObject("Icon");
+            iconGO.transform.SetParent(iconBgGO.transform, false);
+            _worldIconImg        = iconGO.AddComponent<Image>();
+            _worldIconImg.sprite = _rewardSprite;
+            _worldIconImg.preserveAspect = true;
+            _worldIconImg.gameObject.SetActive(_rewardSprite != null);
+            var iconRT = iconGO.GetComponent<RectTransform>();
+            iconRT.anchorMin = Vector2.zero;
+            iconRT.anchorMax = Vector2.one;
+            iconRT.offsetMin = new Vector2(8f, 8f);
+            iconRT.offsetMax = new Vector2(-8f, -8f);
+        }
 
         var distGO = new GameObject("DistanceText");
         distGO.transform.SetParent(_worldIndicatorGO.transform, false);
@@ -397,6 +413,27 @@ public class ClearRewardTrigger : MonoBehaviour
         distRT.pivot            = new Vector2(0.5f, 0.5f);
         distRT.sizeDelta        = new Vector2(320f, 40f);   // 「룬 3장 중 1장 · 12m」
         distRT.anchoredPosition = new Vector2(0f, -35f);
+    }
+
+    /// <summary>고르는 보상 표시판 — 첫 판 후보마다 속성 블록 타일 한 칸(룬판 · 획득 창과 같은 그림). 타일이 없으면 그 룬 문양 · 그것도 없으면 속성색 칸.</summary>
+    private void BuildCandidateTiles(RectTransform box, int count)
+    {
+        float x0 = -(count - 1) * (IndicatorTile + IndicatorTileGap) * 0.5f;
+        for (int i = 0; i < count && i < _rewards.Count; i++)
+        {
+            var data = _rewards[i].data;
+            var art  = data != null ? RuneArt.GetBlockTile(data.element) ?? RuneArt.ResolveRuneIcon(data) : null;
+            var go   = new GameObject("Tile", typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(box, false);
+            var img = go.GetComponent<Image>();
+            img.sprite         = art;
+            img.color          = art != null ? Color.white : ElementDef.IdColor(data?.element, new Color(0.6f, 0.6f, 0.65f));
+            img.preserveAspect = true;
+            img.raycastTarget  = false;
+            var trt = (RectTransform)go.transform;
+            trt.sizeDelta        = Vector2.one * IndicatorTile;
+            trt.anchoredPosition = new Vector2(x0 + i * (IndicatorTile + IndicatorTileGap), 0f);
+        }
     }
 
     private void UpdateWorldIndicator()

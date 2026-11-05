@@ -302,8 +302,8 @@ public static class ExileFallSequence
     }
 
     /// <summary>
-    /// ④ Ch1 첫 방 — 화면이 걷히기 전에 엎드린 자세를 걸고 조작을 멈춘다. 엎드림 클립(@GameRun)이 있으면 그 마지막 프레임,
-    /// 없으면 큰 피격(Large_Hit) 첫 프레임에 멈춰 둔다. <see cref="PlayLandingAsync"/>가 일으켜 세운다.
+    /// ④ Ch1 첫 방 — 화면이 걷히기 전에 누운 자세를 걸고 조작을 멈춘다. 일어남 클립(@GameRun)이 있으면 그 첫 프레임(누움),
+    /// 없으면 엎드림 클립 마지막 프레임 · 큰 피격(Large_Hit) 첫 프레임에 멈춰 둔다. <see cref="PlayLandingAsync"/>가 일으켜 세운다.
     /// </summary>
     public static void BeginLandingPose(PlayerController player)
     {
@@ -312,12 +312,15 @@ public static class ExileFallSequence
         player.SetInputEnabled(false);
         player.SetControlSuspended(true);
 
-        var boot = GameRunBootstrapper.Instance;
-        var anim = player.Anim;
-        var down = boot != null ? boot.ExileDownClip : null;
-        s_landPose = down != null
-            ? ExilePose.Play(anim, down, down.length, 0f)
-            : ExilePose.Play(anim, ExilePose.FindControllerClip(anim, ExilePose.DefaultLandClip), 0f, 0f);
+        var boot  = GameRunBootstrapper.Instance;
+        var anim  = player.Anim;
+        var down  = boot != null ? boot.ExileDownClip : null;
+        var getUp = boot != null ? boot.ExileGetUpClip : null;
+        // 11-05 #7 일어남 클립 첫 프레임(누움)에 멈춰 둔다 — 엎드림 칸 클립(Falldown_F_End)의 마지막 프레임은 이미 선 자세라
+        // 화면이 걷히면 서 있다가 누움으로 튄 뒤 일어났다(사용자 「서 있는 자세에서 다시 일어난다」)
+        s_landPose = getUp != null ? ExilePose.Play(anim, getUp, 0f, 0f)
+                   : down  != null ? ExilePose.Play(anim, down, down.length, 0f)
+                   : ExilePose.Play(anim, ExilePose.FindControllerClip(anim, ExilePose.DefaultLandClip), 0f, 0f);
         Note($"착지 자세 — {(s_landPose != null ? s_landPose.Clip.name : "없음(컨트롤러 그대로)")}");
         TakeLandingCamera(player);
     }
@@ -333,8 +336,9 @@ public static class ExileFallSequence
             {
                 var boot  = GameRunBootstrapper.Instance;
                 var getUp = boot != null ? boot.ExileGetUpClip : null;
-                if (getUp != null) pose.Swap(getUp, 0f, 1f);
-                else               pose.SetSpeed(1f);
+                if (getUp != null && pose.Clip == getUp) pose.SetSpeed(1f);   // 누운 첫 프레임에서 그대로 이어 일어난다(11-05 #7)
+                else if (getUp != null)                  pose.Swap(getUp, 0f, 1f);
+                else                                     pose.SetSpeed(1f);
                 float left = Mathf.Max(0f, pose.Length - pose.ClipTime - PoseBlendSeconds);
                 Note($"일어난다 — {pose.Clip.name} {left:0.0}초");
                 await Wait(left, ct);

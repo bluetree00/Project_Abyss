@@ -12,6 +12,7 @@ IL2CPP / Burst 개발 빌드는 실행 파일 옆에 아래 폴더를 생성한�
 |---|---|---|
 | `*_BackUpThisFolder_ButDontShipItWithYourGame` | IL2CPP 심볼 백업(크래시 심볼리케이션용) | **제외** |
 | `*_BurstDebugInformation_DoNotShip` | Burst 컴파일 디버그 정보 | **제외** |
+| `steam_appid.txt` | Steam 밖에서 exe를 직접 켤 때 Steam을 붙이는 앱 번호(빌드가 자동 복사 · 11-05) | **Steam 업로드에서 제외** — Steam으로 켜면 Steam이 앱 번호를 넘겨준다 |
 
 예: 빌드 경로가 `C:/Users/u/Desktop/RelicFairyBuild/RelicFairy.exe` 이면
 - `RelicFairyBuild/RelicFairy_BackUpThisFolder_ButDontShipItWithYourGame/`

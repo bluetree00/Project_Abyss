@@ -68,6 +68,17 @@ public sealed partial class MonsterTraits
     private const float ThornsDmgMul     = 1.2f;
     private const float ThornsCooldown   = 3f;         // 터진 뒤 가시가 안 쌓이는 시간 — 빠른 무기에 1초마다 터지지 않게
     private const float ThornsFxScale    = 2.75f;      // 폭발이 판정 원(2.5 m)을 덮게 — 0.5는 0.4 m였다(10-13 실측)
+    // 악몽 보스판(11-05) — 긴 싸움 · 큰 몸이라 덜 자주 · 원은 조금 크게 · 예고는 정예보다 길게
+    private const int   BossThornsMax      = 6;
+    private const float BossThornsWarn     = 0.8f;
+    private const float BossThornsRadius   = 3f;
+    private const float BossThornsDmgMul   = 0.7f;
+    private const float BossThornsCooldown = 5f;
+    private const float BossThornsFxScale  = 3.3f;
+    private const float BossMortarEvery    = 10f;      // 악몽 쿨 ×0.8(Cooldown) = 8초
+    private const float BossMortarFirst    = 6f;
+    private const float BossMortarResume   = 1.5f;     // 쉬다(무적 · 장면) 돌아오면 이만큼 뒤에야 쏜다
+    private const float BossMortarDmgMul   = 0.6f;
     // 복수
     private const float AvengeRadius     = 10f;
     private const float AvengeWatch      = 12f;
@@ -108,10 +119,10 @@ public sealed partial class MonsterTraits
     public static bool IsDropless(MonsterBase m)
         => m != null && m.TryGetComponent<MonsterTraits>(out var t) && t._isMinion && !t._reverted;
 
-    /// <summary>머리 위 이름 앞에 접두어(영문 · 분류색)를 붙인다 — <see cref="MonsterBase.DisplayName"/>이 부른다.</summary>
+    /// <summary>머리 위 이름 앞에 접두어(영문 · 분류색)를 붙인다 — <see cref="MonsterBase.DisplayName"/>이 부른다. 보스는 이름 그대로(특성은 보스바 줄).</summary>
     public string DecorateName(string baseName)
     {
-        if (_reverted) return baseName;
+        if (_reverted || _boss) return baseName;
         foreach (var k in _kinds)
         {
             string label = MonsterTraitTable.PrefixLabel(k);
@@ -138,7 +149,7 @@ public sealed partial class MonsterTraits
             if (MonsterTraitTable.Of(k).elitePrefix) { _elite = true; break; }
         if (!_elite) return;
 
-        float first = Has(MonsterTraitKind.Charger) ? ChargeFirst : Has(MonsterTraitKind.Summoner) ? SummonFirst : MortarFirst;
+        float first = _boss ? BossMortarFirst : Has(MonsterTraitKind.Charger) ? ChargeFirst : Has(MonsterTraitKind.Summoner) ? SummonFirst : MortarFirst;
         _nextAbilityAt = Time.time + first;
         _avengeScanAt  = Time.time;
         _playerLast    = PlayerPos();
@@ -168,6 +179,7 @@ public sealed partial class MonsterTraits
     {
         if (!_elite) return;
         TrackPlayer();
+        if (_boss) { TickBossElite(); return; }
         if (_thorns > 0 && Time.time >= _thornsExpireAt) { _thorns = 0; RebuildBadges(); PushBadges(); }
         if (Has(MonsterTraitKind.Avenger) && Time.time >= _avengeScanAt) ScanAllies();
         if (Time.time < _nextAbilityAt || _monster.IsCcActive) return;
@@ -504,27 +516,55 @@ public sealed partial class MonsterTraits
     private void AddThorn()
     {
         if (Time.time < _thornsReadyAt) return;
+        if (_boss && BossPaused()) return;   // 무적 · 장면 중엔 안 쌓인다
+        int max = _boss ? BossThornsMax : ThornsMax;
         _thorns++;
         _thornsExpireAt = Time.time + ThornsStackLife;
-        if (_thorns >= ThornsMax)
+        if (_thorns >= max)
         {
             _thorns = 0;
-            _thornsReadyAt = Time.time + ThornsWarn + ThornsCooldown;
-            ThornsBurstAsync(_monster.transform.position, AttackDamage(ThornsDmgMul), _monster.gameObject).Forget();
+            if (_boss)
+            {
+                _thornsReadyAt = Time.time + BossThornsWarn + BossThornsCooldown;
+                ThornsBurstAsync(_monster.transform.position, AttackDamage(BossThornsDmgMul), _monster.gameObject, BossThornsRadius, BossThornsWarn, BossThornsFxScale).Forget();
+            }
+            else
+            {
+                _thornsReadyAt = Time.time + ThornsWarn + ThornsCooldown;
+                ThornsBurstAsync(_monster.transform.position, AttackDamage(ThornsDmgMul), _monster.gameObject, ThornsRadius, ThornsWarn, ThornsFxScale).Forget();
+            }
         }
         RebuildBadges();
         PushBadges();
     }
 
-    private static async UniTaskVoid ThornsBurstAsync(Vector3 at, int dmg, GameObject src)
+    private static async UniTaskVoid ThornsBurstAsync(Vector3 at, int dmg, GameObject src, float radius, float warn, float fxScale)
     {
-        var tele = MonsterTelegraph.Circle(at, ThornsRadius, ThornsWarn, MonsterTelegraph.Heavy, face: true);
+        var tele = MonsterTelegraph.Circle(at, radius, warn, MonsterTelegraph.Heavy, face: true);
         RoomScopedDrop.Mark(tele.gameObject);
-        Debug.Log($"[ElitePrefix] 가시 예고 시작 t={Time.time:F2}");
-        if (!await WaitTelegraph(tele, ThornsWarn)) return;
-        RunFx.Play(RunFxSlot.Burst, at, ThornsFxScale, ThornsColor);
-        bool hit = HurtPlayerWithin(at, ThornsRadius, dmg, HitWeight.Medium, src);
+        Debug.Log($"[ElitePrefix] 가시 예고 시작 t={Time.time:F2} 반경 {radius:0.#} m · 피해 {dmg}");
+        if (!await WaitTelegraph(tele, warn)) return;
+        RunFx.Play(RunFxSlot.Burst, at, fxScale, ThornsColor);
+        bool hit = HurtPlayerWithin(at, radius, dmg, HitWeight.Medium, src);
         Debug.Log($"[ElitePrefix] 가시 판정 t={Time.time:F2}{(hit ? " — 명중" : "")}");
+    }
+
+    // ── 악몽 보스판(11-05) — 박격은 보스 패턴과 따로 돈다(정예처럼 「한가할 때」를 기다리면 보스는 늘 패턴 중이라 안 나온다) ──
+    private void TickBossElite()
+    {
+        if (_thorns > 0 && Time.time >= _thornsExpireAt) { _thorns = 0; RebuildBadges(); PushBadges(); }
+        if (!Has(MonsterTraitKind.Mortar)) return;
+        if (BossPaused()) { _nextAbilityAt = Mathf.Max(_nextAbilityAt, Time.time + BossMortarResume); return; }
+        if (Time.time < _nextAbilityAt) return;
+        Transform pt = PlayerTransform();
+        if (pt == null) return;
+        _nextAbilityAt = Time.time + Cooldown(BossMortarEvery);
+        Vector3 fwd = _playerVel; fwd.y = 0f;
+        if (fwd.sqrMagnitude < 0.25f) { fwd = pt.position - _monster.transform.position; fwd.y = 0f; }
+        fwd = fwd.sqrMagnitude > 0.0001f ? fwd.normalized : Vector3.forward;
+        int dmg = AttackDamage(BossMortarDmgMul);
+        Debug.Log($"[BossAffix] 박격 — 피해 {dmg}");
+        MortarVolleyAsync(pt.position, fwd, dmg, _monster.gameObject).Forget();
     }
 
     // ── 복수 ───────────────────────────────────────────────
@@ -562,6 +602,7 @@ public sealed partial class MonsterTraits
         foreach (var mn in _minions)
             if (mn != null && !mn.IsDead && mn.isActiveAndEnabled) mn.ChangeState<DieState>();
         _minions.Clear();
+        if (_boss) return;   // 보스는 정예 원석 대신 보스 처치 구슬(11-02 Q25)
         var bank = GameRunBootstrapper.Instance?.Run?.FuelBank;
         if (bank == null) return;
         bank.Add(FuelKind.RuneOre, EliteOreReward);

@@ -13,15 +13,15 @@ MonoBehaviour:
   m_Name: PhantomDance
   m_EditorClassIdentifier: 
   drawHitTimes:
-  - 0.35
-  drawRange: 4.5
-  drawAngle: 120
+  - 0.25
+  drawRange: 5
+  drawAngle: 90
   drawDamage: 600
   knockbackMultiplier: 0.1
-  cutDelay: 0.53
+  cutDelay: 0.4
   cutDamage: 410
   slashProjectileCount: 3
-  slashProjectileDelay: 0.1
+  slashProjectileDelay: 0.08
   slashProjectileDamage: 100
   pursuitRadius: 8
   pursuitHitRadius: 1.2
@@ -30,12 +30,12 @@ MonoBehaviour:
   condenseEffectScaleMult: 2
   slashExplodeRadius: 3
   slashExplodeDamage: 250
-  endDelay: 0.2
+  endDelay: 0.12
   drawEffectKey: SlashAttack
-  drawEffectScale: 1
+  drawEffectScale: 1.25
   cutEffectKey: KatanaDelayedCut
   cutEffectScale: 0.15
   explodeEffectScale: 0.3
-  drawState: QSkill_02
   hitEffectKey: SwordHitImpact
   hitEffectScale: 0.29
+  drawState: QSkill_02

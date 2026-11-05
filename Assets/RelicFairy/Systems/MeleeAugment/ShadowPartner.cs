@@ -14,7 +14,9 @@ using UnityEngine;
 /// 분신 베기(10-30 사용자 「분신이 타격하는 게 제대로 보여야 하고 데미지도 제대로 체크」): 플레이어 평타 베기마다(<see cref="NoteSlash"/>) 분신마다 칼이 닿는 순간
 /// 그 분신 자리에서 플레이어와 같은 베기를 어두운 보라로 내고(판정 없는 보이기용 사본), 플레이어 베기와 같은 판정 모양 안의 적을 벤다(그림 = 판정 · <see cref="Strike"/>).
 /// 피해 = 바탕 × <see cref="Percent"/>% — 바탕은 플레이어가 막 때린 적이면 그 피해(<see cref="NoteHit"/> · 치명 · 룬 포함), 아니면 그 휘두름의 피해(치명 · 방어 전).
-/// 예전엔 플레이어가 맞힌 적에게만 피해를 따라 주고 분신 자리와 상관없었다(분신이 안 닿아도 맞고 · 분신 칼 앞 적은 안 맞음). 스킬 따라 하기는 증강이 준다.
+/// 예전엔 플레이어가 맞힌 적에게만 피해를 따라 주고 분신 자리와 상관없었다(분신이 안 닿아도 맞고 · 분신 칼 앞 적은 안 맞음).
+/// 11-05 사용자 「공격은 자기 방향의 상대에게」 — 분신마다 자기 앞(플레이어가 보는 쪽 콘)의 가장 가까운 적을 노려(<see cref="PickAim"/>) 그쪽을 보고 벤다(이동은 그대로 플레이어 기준).
+/// 스킬(E · R)도 분신마다 자기 앞 적을 벤다(<see cref="EchoSkillHit"/> · 증강이 부른다) · 검풍은 분신마다 따로 낮은 확률로 쏜다(<see cref="CloneShots"/>).
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class ShadowPartner : MonoBehaviour
@@ -26,6 +28,8 @@ public sealed class ShadowPartner : MonoBehaviour
     private const float AimDistance = 2.2f, TurnSpeed = 900f;   // 타격 지점(평타 판정 가운데) · 그쪽으로 도는 빠르기(°/초)
     private const float SlashLife = 0.6f, HitFresh = 0.5f;        // 베기 사본 수명 · 플레이어가 막 때린 피해를 그 적의 바탕으로 보는 시간
     private const int   MaxSlashFx = 6, MaxHitNotes = 64;
+    private const float AimRange = 3.5f, AimHalfAngle = 60f, AimHold = 0.6f;   // 분신이 노릴 적 — 자기 자리에서 앞 콘 · 노린 적을 붙잡는 시간(11-05 #17)
+    private const string SkillEchoKey = "SlashAttack";                         // 스킬 따라 베기 그림(카타나 베기 · 보라로 칠한 사본)
     // 분신 자리(플레이어 회전 기준) · 늦음 — 셋 다 타격 지점까지 2 m 안(카타나 평타가 닿는 거리)
     private static readonly Vector3[] Offsets = { new(-1.1f, 0f, 0.3f), new(1.1f, 0f, 0.3f), new(-1.5f, 0f, 1.7f) };
     private static readonly float[]   Delays  = { 0.12f, 0.16f, 0.2f };
@@ -33,6 +37,7 @@ public sealed class ShadowPartner : MonoBehaviour
     private static readonly List<GameObject> s_idleBuf = new(1);
     private static readonly Collider[] s_overlap = new Collider[64];
     private static readonly List<RelicFairy.Monster.MonsterBase> s_struck = new(16);
+    private static readonly List<GameObject> s_aimBuf = new(8);
     // 분신 베기 색(알파 섞기 · 재질 기본색 ×4라 낮게) — 보라 그림자. 10-26 값(0.09 · 0.07 · 0.14)은 어두운 방에서 안 보였다(10-30)
     private static readonly Color SlashBright = new(0.2f, 0.11f, 0.38f), SlashDeep = new(0.05f, 0.025f, 0.1f);
     private const float SlashAlpha = 0.85f;
@@ -99,6 +104,8 @@ public sealed class ShadowPartner : MonoBehaviour
     private readonly List<SlashFx> _slashFx = new();
     private int _loadingSlash;          // 불러오는 중인 사본 수
     private readonly Dictionary<int, (float dmg, float at)> _hitDmg = new();   // 플레이어가 막 때린 적 → 그 피해(분신 피해의 바탕)
+    private readonly RelicFairy.Monster.MonsterBase[] _aim = new RelicFairy.Monster.MonsterBase[MaxClones];   // 분신마다 노리는 적(11-05 #17)
+    private readonly float[] _aimUntil = new float[MaxClones];
 
     // ── Properties ────────────────────────────────────────────────
     /// <summary>증강이 켜져 있고 그 카타나를 쥐었다 — 증강이 틱마다 넣는다.</summary>
@@ -182,25 +189,49 @@ public sealed class ShadowPartner : MonoBehaviour
     public static float DelayOf(int index) => Delays[Mathf.Clamp(index, 0, MaxClones - 1)];
 
     /// <summary>
-    /// 검풍(카타나 증강)을 날릴 그림자 분신 — 보이는 분신 중 <paramref name="left"/> 쪽(없으면 아무나)의 칼끝 자리(<paramref name="dir"/>로 <paramref name="reach"/> m)와
-    /// 그 분신의 칼이 닿기까지 남은 초(늦음). 그림자 분신이 안 보이면 false(10-30 사용자 「분신이 따로 날리는 검풍」).
+    /// 검풍(카타나 증강)을 그림자마다 따로 날릴 자리(11-05 사용자 「검풍은 그림자마다 따로」) — 보이는 분신마다 칼끝 자리(<paramref name="reach"/> m) ·
+    /// 방향(그 분신이 노리는 적 쪽 · 없으면 분신 정면) · 그 분신의 칼이 닿기까지 남은 초(늦음). 그림자가 안 보이면 0.
     /// </summary>
-    public static bool TryCloneOrigin(PlayerController p, bool left, Vector3 dir, float reach, out Vector3 from, out float lead)
+    public static int CloneShots(PlayerController p, float reach, List<(Vector3 from, Vector3 dir, float lead)> buf)
     {
-        from = default; lead = 0f;
-        if (p == null || !p.TryGetComponent<ShadowPartner>(out var sp) || !sp._shown) return false;
-        int pick = -1;
+        buf.Clear();
+        if (p == null || !p.TryGetComponent<ShadowPartner>(out var sp) || !sp._shown) return 0;
         int count = Mathf.Clamp(sp.Count, 1, MaxClones);
+        Vector3 fwd = p.transform.forward;
+        for (int i = 0; i < count; i++)
+        {
+            var c = sp._clones[i];
+            if (c == null || !c.go.activeSelf) continue;
+            var aim = sp.AimOf(i);
+            if (aim == null) aim = sp.PickAim(i, fwd);
+            Vector3 cpos = c.go.transform.position;
+            Vector3 dir = aim != null ? aim.transform.position - cpos : c.go.transform.forward;
+            dir.y = 0f;
+            dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : fwd;
+            Vector3 from = cpos + dir * reach;
+            from.y = p.transform.position.y;
+            buf.Add((from, dir, Delays[i]));
+        }
+        return buf.Count;
+    }
+
+    /// <summary>
+    /// 스킬(E · R) 적중 한 번을 분신마다 따라 벤다(11-05 사용자 「같은 스킬을 쓴다 · 공격은 자기 방향의 상대에게」) — 그 분신의 칼이 닿을 때
+    /// 자기 앞 적(플레이어가 맞힌 <paramref name="playerTarget"/>이 그 앞이면 그 적)에게 <paramref name="dmg"/>. <paramref name="showSlash"/>면 그 분신 자리에 보라 베기를 보인다(시전마다 한 번).
+    /// </summary>
+    public static void EchoSkillHit(PlayerController p, GameObject playerTarget, float dmg, bool showSlash)
+    {
+        if (p == null || dmg <= 0f || !p.TryGetComponent<ShadowPartner>(out var sp) || !sp._shown) return;
+        int count = Mathf.Clamp(sp.Count, 1, MaxClones);
+        Vector3 fwd = p.transform.forward;
         for (int i = 0; i < count; i++)
         {
             if (sp._clones[i] == null || !sp._clones[i].go.activeSelf) continue;
-            if (pick < 0 || (Offsets[i].x < 0f) == left && (Offsets[pick].x < 0f) != left) pick = i;
+            var aim = sp.PickAim(i, fwd, playerTarget);
+            if (aim == null) continue;
+            int slot = i;
+            FormStrike.After(p, Delays[slot], () => { if (sp != null) sp.SkillStrike(slot, aim, dmg, showSlash); });   // 그 분신의 칼이 닿을 때
         }
-        if (pick < 0) return false;
-        from = sp._clones[pick].go.transform.position + dir * reach;
-        from.y = p.transform.position.y;
-        lead = Delays[pick];
-        return true;
     }
 
     /// <summary>
@@ -237,6 +268,7 @@ public sealed class ShadowPartner : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             if (sp._clones[i] == null) continue;
+            sp.PickAim(i, tf.forward);   // 자기 앞 적을 노린다(11-05 #17) — 없으면 플레이어 타격 지점
             int slot = i;
             FormStrike.After(p, Delays[slot], () => { if (sp != null) sp.Strike(slot, note); });   // 그 분신의 칼이 닿을 때(분신마다 늦음이 다르다)
         }
@@ -269,6 +301,53 @@ public sealed class ShadowPartner : MonoBehaviour
         _idleCheck = IdleCheckInterval;
         _enemiesNear = CombatQuery.GetNearbyDamageables(_player.transform.position, IdleRadius, _player.gameObject, 1, s_idleBuf) > 0;
         return _enemiesNear;
+    }
+
+    /// <summary>
+    /// 분신 <paramref name="slot"/>이 노릴 적 — 분신 자리에서 <paramref name="fwd"/>(플레이어가 보는 쪽) 콘 안의 가장 가까운 산 몬스터(11-05 #17).
+    /// <paramref name="prefer"/>가 그 콘 안이면 그 적. 노린 적은 <see cref="AimHold"/>초 붙잡는다(분신이 그쪽을 보고 벤다).
+    /// </summary>
+    private RelicFairy.Monster.MonsterBase PickAim(int slot, Vector3 fwd, GameObject prefer = null)
+    {
+        var c = _clones[slot];
+        RelicFairy.Monster.MonsterBase pick = null;
+        if (c != null && c.go.activeSelf)
+        {
+            CombatQuery.GetDamageablesInCone(c.go.transform.position, fwd, AimRange, AimHalfAngle, _player.gameObject, 8, s_aimBuf, showGuide: false);
+            for (int i = 0; i < s_aimBuf.Count; i++)
+            {
+                if (!s_aimBuf[i].TryGetComponent<RelicFairy.Monster.MonsterBase>(out var mb) || mb.IsDead) continue;
+                if (s_aimBuf[i] == prefer) { pick = mb; break; }
+                if (pick == null) pick = mb;   // 가까운 순
+            }
+        }
+        _aim[slot] = pick;
+        _aimUntil[slot] = pick != null ? Time.time + AimHold : 0f;
+        return pick;
+    }
+
+    /// <summary>분신이 지금 노리는 적(붙잡는 시간 안 · 살아 있을 때) — 없으면 null.</summary>
+    private RelicFairy.Monster.MonsterBase AimOf(int slot)
+    {
+        var a = _aim[slot];
+        return a != null && !a.IsDead && Time.time < _aimUntil[slot] ? a : null;
+    }
+
+    /// <summary>스킬 따라 베기 — 그 분신이 노린 적 쪽을 보고(보라 베기 · 시전마다 한 번) 피해(추가 피해라 적중 효과는 붙지 않는다 · D5).</summary>
+    private void SkillStrike(int slot, RelicFairy.Monster.MonsterBase aim, float dmg, bool showSlash)
+    {
+        if (!_shown || _player == null || _clones[slot] == null || !_clones[slot].go.activeSelf) return;
+        if (aim == null || aim.IsDead || aim.IsMeleeImmuneNow) return;
+        var ctf = _clones[slot].go.transform;
+        Vector3 to = aim.transform.position - ctf.position;
+        to.y = 0f;
+        if (to.sqrMagnitude > 0.01f) ctf.rotation = Quaternion.LookRotation(to);
+        if (showSlash) ShowOrLoad(SkillEchoKey, ctf.position + ctf.forward * 1.2f + Vector3.up, ctf.rotation * Quaternion.Euler(0f, 0f, 8f), 1f);
+        CombatQuery.DealSynergyDamage(aim, dmg, _player.gameObject);
+#if UNITY_EDITOR
+        ProbeStruck?.Invoke(slot, aim, dmg);
+#endif
+        Log($"분신 {slot + 1} 스킬 따라 베기 — {dmg:0.0}");
     }
 
     /// <summary>아직 없는 분신을 하나 만든다(한 프레임에 하나).</summary>
@@ -317,8 +396,15 @@ public sealed class ShadowPartner : MonoBehaviour
     {
         if (!_shown || _player == null || slot >= MaxClones || _clones[slot] == null || !_clones[slot].go.activeSelf) return;
         var ctf = _clones[slot].go.transform;
-        Quaternion crot = ctf.rotation;
         Vector3 cpos = ctf.position;
+        var aim = AimOf(slot);
+        if (aim != null)   // 자기 앞 적 쪽으로 돌아 벤다 — 그림과 판정이 같은 회전(11-05 #17)
+        {
+            Vector3 to = aim.transform.position - cpos;
+            to.y = 0f;
+            if (to.sqrMagnitude > 0.01f) ctf.rotation = Quaternion.LookRotation(to);
+        }
+        Quaternion crot = ctf.rotation;
         ShowOrLoad(n.Key, cpos + crot * n.Pos, crot * n.Rot, n.Scale);
         StrikeCount++;
         Vector3 c = cpos + crot * n.Center;
@@ -460,7 +546,8 @@ public sealed class ShadowPartner : MonoBehaviour
         Quaternion rot = pose.rot;
         if (pose.combat)
         {
-            Vector3 look = pose.pos + pose.rot * Vector3.forward * AimDistance - pos;   // 플레이어가 노리는 타격 지점을 본다
+            var aim = AimOf(slot);   // 자기 앞 적을 노렸으면 그 적(11-05 #17) · 아니면 플레이어가 노리는 타격 지점
+            Vector3 look = (aim != null ? aim.transform.position : pose.pos + pose.rot * Vector3.forward * AimDistance) - pos;
             look.y = 0f;
             if (look.sqrMagnitude > 0.01f) rot = Quaternion.LookRotation(look);
         }

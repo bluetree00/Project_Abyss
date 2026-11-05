@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using BackEnd;
 using BackEnd.Leaderboard;
 using Cysharp.Threading.Tasks;
@@ -22,6 +23,7 @@ public static class RankingService
     private const string WeaponColumn   = "weapon";
     private const string PendingKey     = "RelicFairy.Ranking.Pending";   // 「시기|1/100초|무기」 — 올리지 못한 기록
     public  const int    TopCount       = 10;
+    private const int    MaxNickname    = 16;   // 뒤끝 닉네임 길이 여유(글자 단위)
 
     // ── Static ────────────────────────────────────────────────
     private static string _liberationUuid;   // 표 이름으로 찾은 리더보드 uuid(못 찾으면 비어 있다 — 다음에 다시 찾는다)
@@ -61,13 +63,24 @@ public static class RankingService
         return IsReady(era);
     }
 
-    /// <summary>1/100초 → 「12:34.56」.</summary>
+    /// <summary>
+    /// 1/100초 → 단위를 붙인 시간(11-05 사용자 「32:23.48 같이 분인지 초인지도 한눈에 · 영어 버전도 맞게 통일하자 영어로」) —
+    /// 언어와 상관없이 「52.97s」 · 「32m 23.48s」 · 「1h 02m 03.45s」. 랭킹판 · 기록 카드 · 비석 · 결과창이 같이 쓴다.
+    /// </summary>
     public static string Format(int centis)
     {
         if (centis <= 0) return "—";
-        int s = centis / 100, m = s / 60;
-        return m >= 60 ? $"{m / 60}:{m % 60:00}:{s % 60:00}.{centis % 100:00}" : $"{m}:{s % 60:00}.{centis % 100:00}";
+        int s = centis / 100, m = s / 60, cs = centis % 100;
+        if (m >= 60) return $"{m / 60}h {m % 60:00}m {s % 60:00}.{cs:00}s";
+        if (m > 0)   return $"{m}m {s % 60:00}.{cs:00}s";
+        return $"{s}.{cs:00}s";
     }
+
+    /// <summary>
+    /// 랭킹 이름을 스팀 닉네임에 맞춘다 — 로그인 직후(AppBootstrapper)와 기록을 올리기 전(11-05 사용자 「다른 PC에서 켰을 때 이름 없음」).
+    /// 예전엔 기록을 올릴 때만 맞춰, 그때 Steam이 안 붙어 있으면(exe 직접 실행 · 옆에 steam_appid.txt 없음) 이름이 끝까지 비었다.
+    /// </summary>
+    public static UniTask SyncNicknameAsync() => EnsureNicknameAsync();
 
     /// <summary>클리어 기록을 올린다 — 이전 기록보다 빠를 때만. 실패하면 기기에 남긴다. 해방기 · 악몽만.</summary>
     public static async UniTask<bool> SubmitAsync(StoryEra era, float seconds, string weapon)
@@ -138,7 +151,7 @@ public static class RankingService
     private static UniTask<bool> SubmitCoreAsync(StoryEra era, int centis, string weapon)
         => SubmitRowAsync(TableOf(era), UuidOf(era), centis, weapon, era.ToString());
 
-    // ── 11-02 Q14 보스 · 챕터 기록 표(RANK_BOSS_n · RANK_ROOMS_n) — 이름으로 찾고 콘솔에 없으면 올리지 않는다(기기 기록은 RecordBoard) ──
+    // ── 11-02 Q14 보스 · 챕터 기록 표(11-03 시기별 RANK_BOSS_n_LIB · RANK_ROOMS_n_NM 등) — 이름으로 찾고 콘솔에 없으면 올리지 않는다(기기 기록은 RecordBoard) ──
     private static readonly Dictionary<string, string> s_tableUuids = new();
     private static bool  s_tablesListed;
     private static float s_listedAt;
@@ -147,6 +160,7 @@ public static class RankingService
     /// <summary>표 이름 → 리더보드 uuid(한 번 목록을 훑어 둔다 · 없으면 null).</summary>
     public static async UniTask<string> ResolveTableAsync(string table)
     {
+        if (string.IsNullOrEmpty(table)) return null;   // 봉인기 — 챕터 기록 표가 없다(RecordBoard.TableOf)
         if (s_tableUuids.TryGetValue(table, out var u)) return u;
         if (s_tablesListed && Time.realtimeSinceStartup - s_listedAt < RelistSeconds) return null;   // 방금 훑었는데 없었다
         var r = await CallAsync<BackendLeaderboardTableReturnObject>(cb => Backend.Leaderboard.User.GetLeaderboards(cb));
@@ -259,10 +273,11 @@ public static class RankingService
     /// <summary>랭킹 이름 = 스팀 닉네임 — 같은 이름이 있으면 뒤에 번호를 붙인다. 스팀이 없으면 그대로 둔다.</summary>
     private static async UniTask EnsureNicknameAsync()
     {
-        if (!SteamManager.Initialized) return;
-        string name = SteamFriends.GetPersonaName();
-        if (string.IsNullOrWhiteSpace(name)) return;
-        if (name.Length > 16) name = name.Substring(0, 16);   // 뒤끝 닉네임 길이 여유
+        if (!SteamManager.Initialized) { Debug.LogWarning("[Ranking] Steam 연결 없음 — 랭킹 이름을 스팀 이름으로 못 맞춤(Steam에서 실행하거나 exe 옆에 steam_appid.txt)"); return; }
+        string name = SteamFriends.GetPersonaName()?.Trim();
+        if (string.IsNullOrEmpty(name)) { Debug.LogWarning("[Ranking] 스팀 이름이 비어 있다 — 랭킹 이름 그대로"); return; }
+        var letters = new StringInfo(name);
+        if (letters.LengthInTextElements > MaxNickname) name = letters.SubstringByTextElements(0, MaxNickname);   // 글자 단위로 자른다(이모지 반쪽 방지)
         // 이미 그 이름이면 그대로 — 내 이름을 다시 넣어도 409(같은 이름)라 클리어마다 번호가 붙었다(10-30 실측 「bg000727#4257」)
         string current = Backend.UserNickName;
         if (current == name || (current != null && current.StartsWith(name + "#"))) return;
@@ -270,12 +285,17 @@ public static class RankingService
         {
             string tryName = i == 0 ? name : $"{name}#{Random.Range(1000, 9999)}";
             var r = await CallAsync(cb => Backend.BMember.UpdateNickname(tryName, cb));
-            if (r != null && r.IsSuccess()) return;
+            if (r != null && r.IsSuccess()) { Debug.Log($"[Ranking] 랭킹 이름 = {tryName}"); return; }
             if (r != null && r.GetStatusCode() == "409") continue;   // 같은 이름 — 번호를 붙여 다시
             r = await CallAsync(cb => Backend.BMember.CreateNickname(tryName, cb));
-            if (r != null && r.IsSuccess()) return;
-            if (r == null || r.GetStatusCode() != "409") return;
+            if (r != null && r.IsSuccess()) { Debug.Log($"[Ranking] 랭킹 이름 = {tryName}"); return; }
+            if (r == null || r.GetStatusCode() != "409")
+            {
+                Debug.LogWarning($"[Ranking] 랭킹 이름 정하기 실패({tryName}): {r?.GetStatusCode()} {r?.GetMessage()}");
+                return;
+            }
         }
+        Debug.LogWarning($"[Ranking] 랭킹 이름 정하기 실패 — 「{name}」과 같은 이름이 이미 있다(번호를 붙여도)");
     }
 
     private static Entry ToEntry(UserLeaderboardItem it, string myInDate)

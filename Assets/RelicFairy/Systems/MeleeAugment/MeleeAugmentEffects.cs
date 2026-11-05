@@ -892,7 +892,8 @@ public sealed class RiftLegend : LegendAugment
 /// <summary>
 /// 그림자 파트너(카타나 · 10-26 무기 개편) — 곁의 그림자(<see cref="ShadowPartner"/> · 동작을 따라 하는 분신)가 평타 · 스킬(E · R)을 조금 늦게 따라 벤다: 분신마다 그 타격의 값%(재련할수록 +2%p).
 /// 재련 2 · 4회째에 분신이 하나씩 는다(<see cref="CloneCount"/> 1 → 3 · 10-26 사용자 「추가 재련 시 분신을 추가」).
-/// 그림자는 애니메이터를 그대로 따라 하므로 스킬 동작도 같이 하고, 스킬 타격은 약한 계수(<see cref="SkillShare"/> = 평타 몫의 절반)로 따라 벤다(10-26 사용자 「분신도 따라 스킬을 쓰되 약한 계수」).
+/// 그림자는 애니메이터를 그대로 따라 하므로 스킬 동작도 같이 하고, 스킬 타격은 약한 계수(<see cref="SkillShare"/> = 평타 몫의 절반)로 따라 벤다(10-26 사용자 「분신도 따라 스킬을 쓰되 약한 계수」) —
+/// 11-05부터 분신마다 자기 앞 적에게(<see cref="ShadowPartner.EchoSkillHit"/> · 사용자 「공격은 자기 방향의 상대에게」).
 /// 추가 피해라 적중 효과(룬 · 유물 발동)는 붙지 않는다(D5).
 /// 평타는 분신이 자기 자리에서 플레이어와 같은 베기 · 같은 판정으로 벤다(10-30 · <see cref="ShadowPartner"/> 분신 베기) — 여기는 그 바탕(플레이어가 막 때린 피해)과 %만 넣는다.
 /// </summary>
@@ -901,6 +902,7 @@ public sealed class ShadowPartnerAugment : MeleeAugmentEffect
     private const float SkillShare = 0.5f;
     private PlayerController _player;
     private ShadowPartner _sp;   // 틱마다 찾지 않는다(10-26 검토 M5)
+    private int _castSerial, _echoedSerial = -1;   // E · R 시전마다 첫 적중에만 분신 베기 그림
 
     public ShadowPartnerAugment(MeleeAugmentDef d, int r) : base(d, r) { }
 
@@ -926,6 +928,11 @@ public sealed class ShadowPartnerAugment : MeleeAugmentEffect
         _sp.Percent = Def.ValueFor(Weapon);
     }
 
+    public override void OnSkillUse(ItemEffectContext ctx, SkillType skill)
+    {
+        if (skill == SkillType.E || skill == SkillType.R) _castSerial++;
+    }
+
     /// <summary>분신 수 — 진화 뒤 재련 0 ~ 1회 1 · 2 ~ 3회 2 · 4회 3.</summary>
     public static int CloneCount(WeaponData w) => Mathf.Min(ShadowPartner.MaxClones, 1 + MeleeAugmentCatalog.ReforgesSinceEvolution(w) / 2);
 
@@ -941,17 +948,9 @@ public sealed class ShadowPartnerAugment : MeleeAugmentEffect
             return;
         }
         float dmg = report.DamageDealt * Def.ValueFor(Weapon) * 0.01f * SkillShare;
-        int clones = CloneCount(Weapon);
-        for (int i = 0; i < clones; i++)
-        {
-            int slot = i;
-            FormStrike.After(p, ShadowPartner.DelayOf(slot), () =>   // 그 분신의 칼이 닿을 때(분신마다 늦음이 다르다)
-            {
-                if (target == null || !target.activeInHierarchy) return;
-                CombatQuery.DealSynergyDamage(target, dmg, p.gameObject);
-                Log($"그림자 — {dmg:0.0} · 스킬 · 분신 {slot + 1}");
-            });
-        }
+        bool first = _echoedSerial != _castSerial;
+        _echoedSerial = _castSerial;
+        ShadowPartner.EchoSkillHit(p, target, dmg, first);   // 분신마다 자기 앞 적에게(그 분신의 칼이 닿을 때 · 11-05 #17)
     }
 }
 
@@ -961,12 +960,15 @@ public sealed class ShadowPartnerAugment : MeleeAugmentEffect
 /// 검기 분신(10-26 사용자 「분신 2종 — 검기를 날리는 분신 · 행동을 따라 하는 분신 · 엄청난 속도에 분신처럼 보인다는 컨셉」) — 발동하면 옆(좌우 번갈아)에
 /// 잔상 분신(<see cref="PlayerGhostStrike.Play"/> · 카타나 붉은 잔상 — 그림자 파트너의 어두운 실루엣과 다른 모습)이 나타나 앞으로 휘두르고, 그 칼끝에서 칼이 닿는 순간 검기가 나간다.
 /// 10-30 사용자 「(칼바람 스택과) 별개로 분신이 따로 날리는 검풍」 — 붉은 분신은 플레이어에서 <see cref="SideOffset"/> m 옆에 선다(예전 0.9 m · 뒤로 0.9 m라 몸과 겹쳐 플레이어 검기로 보였다).
-/// 그림자 파트너 분신이 곁에 있으면 그 분신이 자기 칼이 닿는 순간 자기 자리에서 날린다(<see cref="ShadowPartner.TryCloneOrigin"/> · 굴림은 휘두름당 한 번 그대로).
+/// 그림자 파트너 분신이 곁에 있으면 분신마다 따로 낮은 확률(<see cref="CloneGustChance"/>배)로 자기 칼끝에서 자기가 노리는 적 쪽으로 날린다(<see cref="ShadowPartner.CloneShots"/> ·
+/// 11-05 사용자 「검풍은 그림자마다 따로 · 낮은 퍼센트로 따라 함」) — 그때 플레이어 자신의 검풍은 붉은 분신 없이 자기 칼끝에서 나간다(두 실루엣이 겹치지 않게).
 /// 풍절이 나가는 휘두름에는 내지 않는다.
 /// </summary>
 public sealed class SwordGustAugment : MeleeAugmentEffect
 {
     private const float Length = 6f, HalfWidth = 0.9f, SideOffset = 1.6f, GhostReach = 0.9f;   // 붉은 분신 옆 거리 · 분신 칼끝(검기가 나가는 자리)
+    private const float CloneGustChance = 0.4f;   // 그림자 분신마다 따로 굴리는 확률 배율(11-05 #17)
+    private static readonly List<(Vector3 from, Vector3 dir, float lead)> s_shots = new(ShadowPartner.MaxClones);
 #if UNITY_EDITOR
     /// <summary>실측 99 D — 확률을 이 값(%)으로(−1 = 증강 값).</summary>
     public static float ProbeChance = -1f;
@@ -1004,25 +1006,43 @@ public sealed class SwordGustAugment : MeleeAugmentEffect
 #if UNITY_EDITOR
         if (ProbeChance >= 0f) chance = ProbeChance;
 #endif
-        if (UnityEngine.Random.value * 100f >= chance) return;
         var p = ctx.Player;
         float atk = Atk(ctx);
         float dmg = atk * Def.Value2For(Weapon) * 0.01f;
         Vector3 fw = p.AimForward;
         fw.y = 0f;
         fw = fw.sqrMagnitude > 0.0001f ? fw.normalized : p.transform.forward;
-        _left = !_left;
-        bool shadow = ShadowPartner.TryCloneOrigin(p, _left, fw, GhostReach, out var from, out float lead);   // 그림자 분신이 곁에 있으면 그 분신이 날린다
-        if (!shadow)
+
+        // 그림자 분신마다 따로 낮은 확률로 — 그 분신 칼끝에서 그 분신이 노리는 적 쪽으로(11-05 #17)
+        int shots = ShadowPartner.CloneShots(p, GhostReach, s_shots);
+        for (int i = 0; i < shots; i++)
+            if (UnityEngine.Random.value * 100f < chance * CloneGustChance)
+                Throw(p, s_shots[i].from, s_shots[i].dir, s_shots[i].lead, dmg, atk, true);
+
+        if (UnityEngine.Random.value * 100f >= chance) return;
+        Vector3 from;
+        float lead;
+        if (shots > 0)
         {
+            from = p.transform.position + fw * GhostReach;   // 그림자가 있으면 자기 칼끝에서 — 붉은 분신과 그림자가 겹쳐 보이지 않게
+            lead = 0f;
+        }
+        else
+        {
+            _left = !_left;
             Vector3 stand = p.transform.position + Vector3.Cross(Vector3.up, fw) * (_left ? -SideOffset : SideOffset);
             lead = PlayerGhostStrike.Play(p, stand, fw);   // 옆에 붉은 분신 — 휘두른 칼이 닿을 때 칼끝에서 검기가 나간다
             from = stand + fw * GhostReach;
         }
+        Throw(p, from, fw, lead, dmg, atk, false);
+    }
+
+    private void Throw(PlayerController p, Vector3 from, Vector3 dir, float lead, float dmg, float atk, bool shadow)
+    {
 #if UNITY_EDITOR
         ProbeThrown?.Invoke(from, shadow);
 #endif
-        FormStrike.LineTravel(p, from, fw, Length, HalfWidth, dmg, WaveVfx, lead, null,
+        FormStrike.LineTravel(p, from, dir, Length, HalfWidth, dmg, WaveVfx, lead, null,
                               n => Log($"검풍 — 피해 {dmg:0.0} · 공격력 {atk:0.0} · 맞힘 {n}{(shadow ? " · 그림자 분신" : "")}"), StripBody, StripSeconds);
     }
 }

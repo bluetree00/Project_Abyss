@@ -1871,7 +1871,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     }
 
     /// <summary>흰색 + 알파 텍스처 한 장. 저장·언로드 대상이 아니다(HideAndDontSave) — 씬이 바뀌어도 살아 있다.</summary>
-    internal static Sprite MakeProcSprite(string spriteName, int w, int h, Func<float, float, float> alpha)
+    internal static Sprite MakeProcSprite(string spriteName, int w, int h, Func<float, float, float> alpha, Vector4 border = default)
     {
         var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
         {
@@ -1888,7 +1888,9 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         tex.SetPixels32(px);
         tex.Apply(false, true);
 
-        var sprite = Sprite.Create(tex, new Rect(0f, 0f, w, h), new Vector2(0.5f, 0.5f), 100f);
+        var sprite = border == Vector4.zero
+            ? Sprite.Create(tex, new Rect(0f, 0f, w, h), new Vector2(0.5f, 0.5f), 100f)
+            : Sprite.Create(tex, new Rect(0f, 0f, w, h), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, border);   // 9-slice 테(11-05 HUD Tab 칸)
         sprite.name = spriteName;
         sprite.hideFlags = HideFlags.HideAndDontSave;
         return sprite;

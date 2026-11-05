@@ -20,7 +20,6 @@ public sealed class RankingHall : MonoBehaviour
     private const float FadeInSec    = 0.6f;
     private const float SteleRange   = 2.6f;
     private const float VistaSeconds = 3.8f;   // 아래 풍경을 훑는 시간
-    private const float VistaReturn  = 1.4f;   // 플레이어 뒤로 돌아오는 시간
 
     // ── Static ────────────────────────────────────────────────
     private static RankingHall s_open;
@@ -91,7 +90,9 @@ public sealed class RankingHall : MonoBehaviour
     /// 랭킹방에 들렀다 돌아온다 — 불러 두기 · 어둡게 · 홀 시작 자리 · 밝게 · 비석 창(처음 한 번) · 돌아가는 문 기다림 · 어둡게 · 원래 자리 · 밝게.
     /// 끝나면 홀은 내린다. 같은 때 두 번 부르면 뒤의 것은 그냥 돌아간다.
     /// </summary>
-    public static async UniTask VisitAsync(StoryEra era, PlayerController player, CancellationToken ct, bool showBoardOnArrival = true)
+    /// <param name="fadeInOnReturn">false면 돌아와서 검은 채로 끝낸다 — 클리어 귀환(11-05)은 거점의 소환 · 밝히기가 이어 받는다.</param>
+    public static async UniTask VisitAsync(StoryEra era, PlayerController player, CancellationToken ct, bool showBoardOnArrival = true,
+                                           bool fadeInOnReturn = true)
     {
         if (player == null || s_open != null) return;
         GameObject go = null;
@@ -124,7 +125,7 @@ public sealed class RankingHall : MonoBehaviour
             Teleport(player, backPos, backRot);
             GameCameraController.Instance?.HandToGameplayCamera(player.transform, alignHeadingToTarget: true);
             ReleaseHall(ref go);
-            await ScreenFade.In(FadeInSec, ct);
+            if (fadeInOnReturn) await ScreenFade.In(FadeInSec, ct);
             Debug.Log("[RankingHall] 돌아옴");
         }
         catch (OperationCanceledException) { }
@@ -161,7 +162,9 @@ public sealed class RankingHall : MonoBehaviour
         try
         {
             await cam.MoveManualCameraAsync(_vistaTo.position, _vistaLook.position, VistaSeconds, ct);
-            await cam.ReturnToPlayerAsync(player.transform, VistaReturn, ct);
+            // 11-05 #21 카메라 고정 — ReturnToPlayerAsync는 수동 제어 전 Brain 상태로 되돌리는데, 그 상태가 도착 블렌드가 잠깐 끈 값(꺼짐)이라
+            // 둘러보기 뒤 카메라가 얼었다. 인계 블렌드는 끝에서 Brain을 늘 켠다.
+            await cam.HandToGameplayCameraAsync(player.transform, alignHeadingToTarget: false, ct);
         }
         catch (OperationCanceledException)
         {

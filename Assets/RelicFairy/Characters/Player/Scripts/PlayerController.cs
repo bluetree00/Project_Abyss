@@ -351,6 +351,8 @@ public sealed partial class PlayerController : CharacterBase
         GameRunBootstrapper.Instance?.Run?.CovenantHandler?.Tick(Time.deltaTime);
         GameRunBootstrapper.Instance?.Run?.EffectManager?.OnTick(Time.deltaTime);   // 아이템 타임드/동적 효과 구동
         TickSkillSeals();   // 빙결 중에도 흘러야 하므로 빙결 조기 반환보다 앞
+        // 저스트 회피 슬로모 만료 (unscaled — 느려진 시간에 영향받지 않아야 한다). 빙결 조기 반환보다 앞 — 뒤에 있어 빙결이 풀릴 때까지 시간이 느린 채였다(11-05 Q32)
+        PerfectDodge.Tick();
 
         // 일시정지(룬판 Tab · ESC · 막는 팝업) 동안엔 실시간 타이머도 멈춘다 — 쿨다운 · 둔화 · 빙결이 멈춘 화면 뒤에서 흘렀다(10-09 출시 점검)
         bool paused = TimeScaleArbiter.HasRequestAtOrAbove(TimeScaleArbiter.Priority.Pause);
@@ -377,8 +379,6 @@ public sealed partial class PlayerController : CharacterBase
             Stamina.Tick(Time.deltaTime, RuntimeStats.MaxStamina, CharacterData.staminaRegenPerSec);
         }
 
-        // 저스트 회피 슬로모 만료 (unscaled — 느려진 시간에 영향받지 않아야 한다)
-        PerfectDodge.Tick();
         RouteInputs();
 
         _locoSM?.Update();

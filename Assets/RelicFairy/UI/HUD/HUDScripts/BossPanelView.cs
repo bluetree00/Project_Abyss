@@ -87,6 +87,7 @@ public sealed partial class BossPanelView : MonoBehaviour
     private bool   _invulnerable;
     private string _bossName = string.Empty;
     private Image _vulnerableOverlay;
+    private TMP_Text _affixText;   // 악몽 보스 특성 줄(11-05) — 체력바 아래 가운데
     private float _vulnerableRemaining;
 
     // 페이즈 바
@@ -219,6 +220,38 @@ public sealed partial class BossPanelView : MonoBehaviour
         _vulnerableOverlay.enabled = true;
         FitToFill(_vulnerableOverlay);
         _vulnerableRemaining       = seconds;
+    }
+
+    /// <summary>악몽 보스 특성 줄(11-05) — 체력바 바로 아래 가운데(이름 글꼴 · 작게). 빈 글이면 숨긴다.</summary>
+    public void SetAffixes(string line)
+    {
+        if (string.IsNullOrEmpty(line))
+        {
+            if (_affixText != null) _affixText.gameObject.SetActive(false);
+            return;
+        }
+        EnsureWired();
+        if (_affixText == null)
+        {
+            var parent = hpSlider != null ? (RectTransform)hpSlider.transform : (RectTransform)transform;
+            var go = new GameObject("Affixes", typeof(RectTransform));
+            var rt = (RectTransform)go.transform;
+            rt.SetParent(parent, false);
+            rt.anchorMin = new Vector2(0f, 0f);
+            rt.anchorMax = new Vector2(1f, 0f);
+            rt.pivot     = new Vector2(0.5f, 1f);
+            rt.anchoredPosition = new Vector2(0f, -8f);
+            rt.sizeDelta = new Vector2(0f, 30f);
+            var t = go.AddComponent<TextMeshProUGUI>();
+            if (nameText != null) { t.font = nameText.font; t.fontSharedMaterial = nameText.fontSharedMaterial; }
+            t.fontSize = nameText != null ? Mathf.Max(16f, nameText.fontSize * 0.62f) : 18f;
+            t.alignment = TextAlignmentOptions.Center;
+            t.textWrappingMode = TextWrappingModes.NoWrap;
+            t.raycastTarget = false;
+            _affixText = t;
+        }
+        _affixText.gameObject.SetActive(true);
+        _affixText.text = line;
     }
 
     public void Init(int maxHp, string bossName)

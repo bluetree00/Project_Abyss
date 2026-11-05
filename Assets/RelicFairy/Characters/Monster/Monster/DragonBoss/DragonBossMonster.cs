@@ -764,12 +764,19 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedBoss, 
 
     /// <summary>소환 게이트(무적) 구간도 「막힘」으로 읽히게 한다(공용 규약).</summary>
     // 소환 기준선에 닿은 뒤 소환이 시작할 때까진 체력 하한(SummonFloorHp)만 — 무적 · 막힘 표시는 소환 패턴이 켠다(10-29 사용자 — 무적은 패턴 발동이 보인 뒤에)
-    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || (_dragonBB != null && _dragonBB.IsSummonGated);
+    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || (_dragonBB != null && _dragonBB.IsSummonGated) || EntranceShielded;
+
+    /// <summary>
+    /// 등장 연출(등장 대기 상태) 중엔 피해를 통째로 막는다 — 맞으면 공용 규칙(MonsterBase.TakeDamage)이 전투 상태로 깨워 연출과 전투 AI가 함께 돌며
+    /// 카메라가 묶였다(11-05 #1 · #12 · 리치 10-23과 같은 규칙). 지금 그 상태에 있을 때만 — 다른 길로 상태가 바뀌면 바로 풀린다.
+    /// </summary>
+    private bool EntranceShielded => _fsm != null && _fsm.IsCurrent(_dormantState);   // 등장 대기는 등록 키 없이 넣는 상태 — IsInState<T>로는 늘 거짓
 
     public override void TakeDamage(float amount, GameObject instigator,
         float knockbackMultiplier = 1f,
         bool isCrit = false)
     {
+        if (EntranceShielded) { NotifyBlockedHit(transform.position + Vector3.up); return; }   // 파이프라인을 거치지 않는 직접 피해도
         if (_dragonBB != null && instigator != null)
         {
             Vector3 dir = instigator.transform.position - transform.position;

@@ -1264,6 +1264,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// <param name="startAtBossApproach">테스트 허브 전용 — 일반 방 없이 보스 대기방부터 시작.</param>
     public async UniTask StartProcGenRunAsync(bool startAtBossApproach = false)
     {
+        // 11-05 #11 「대기방 서약 제단 이미 씀」은 대기방에서만 — 던전에 들면 지운다(그대로 두면 WorldCovenantAltar.Start가 던전 서약 성소 제단까지 껐다)
+        if (_run != null) _run.WaitingAltarUsed = false;
         var flow = runFlowController != null ? runFlowController : gameObject.AddComponent<RunFlowController>();
         flow.SetBossThresholdOverride(debugBossThresholdOverride);
 
@@ -1309,6 +1311,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     // ── 런 종료 (사망/클리어) ──────────────────────────────────────
     private bool _runEnding;
+    /// <summary>런을 끝내는 중(사망 · 클리어 연출부터) — 보상 창이 그 위로 열리지 않게(11-05 Q32 B1).</summary>
+    public bool IsRunEnding => _runEnding;
 
     /// <summary>플레이어 사망 시 PlayerController가 호출. 사망 연출 후 메타 저장·세이브 폐기·베이스캠프 복귀.</summary>
     public void HandlePlayerDeath() => HandleRunEndAsync(false).Forget();
@@ -1379,6 +1383,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         _runEnding = true;
 
         var ct = this.GetCancellationTokenOnDestroy();
+        bool settled = false;   // 정산(EndRun)을 했나 — 예외로 끊겨도 한 번은 하고 허브로(11-05 Q32)
         try
         {
             // 1) 사망 모먼트 — 주변은 멈추고(배율 0) 플레이어만 실제 시간으로 그 자리에 쓰러진다 → 2) 빨간 비네트 · 암전까지 멈춘 채
@@ -1419,6 +1424,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             var keepable = !isCleared && !abandoned ? MerlinRuneKeep.CaptureOwned(_run) : null;
             CodexLog.Sync(_run);   // 11-02 Q2 도감 「써 봄」 — 이번 런에 지닌 것(정산이 비우기 전에)
             var result = _run != null ? _run.EndRun(isCleared, isCleared ? "clear" : "death") : default;
+            settled = true;
             // 정산(메타 저장)을 했으니 런 세이브도 지금 지운다 — 결과창 · 부활 연출 중에 꺼도 죽은 런이 이어하기로 살아나
             // 정수가 두 번 들어오지 않게(10-08 리뷰 C1). AppBootstrapper.EndRun이 나중에 또 지워도 무해하다.
             var rpm = RunProgressManager.Instance;
@@ -1450,6 +1456,21 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 AppBootstrapper.Instance?.RequestLoad(Define.Scene.BaseCamp);
         }
         catch (System.OperationCanceledException) { TimeScaleArbiter.Release(this); TimeScaleArbiter.Release(_deathFreezeOwner); }
+        catch (System.Exception e)
+        {
+            // 11-05 Q32 — 부활 연출 · 멀린 룬 보관 · 문구 단계의 다른 예외가 암전에서 멈추게 했다(소프트락) — 정산을 마치고 허브로 보낸다
+            Debug.LogError($"[GameRunBootstrapper] 런 종료 흐름 예외(허브로 복귀): {e}");
+            TimeScaleArbiter.Release(this);
+            TimeScaleArbiter.Release(_deathFreezeOwner);
+            if (!settled && _run != null)
+            {
+                try { _run.EndRun(isCleared, isCleared ? "clear" : "death"); }
+                catch (System.Exception e2) { Debug.LogError($"[GameRunBootstrapper] 예외 뒤 정산도 실패: {e2}"); }
+            }
+            AppBootstrapper.Instance?.EndRun();
+            if (!TestRunRequest.TryReturnToHub())
+                AppBootstrapper.Instance?.RequestLoad(Define.Scene.BaseCamp);
+        }
     }
 
     /// <summary>종료 메시지 경량 오버레이(코드 생성). 입력 시 즉시 스킵, 아니면 홀드 후 자동 진행.</summary>
@@ -2942,6 +2963,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             c.Initialize(_run, seed);
             Debug.Log($"[GameRunBootstrapper] 이벤트 보물고 부착 (seed={seed}) — {typeHint}");
         }
+        else if (kh.Contains("runeshrine"))
+        {
+            // 11-05 #20 룬 성소 — 속성이 다른 한 칸 영웅 룬 셋 중 하나(방 시드로 제단이 정해진다)
+            var c = roomGO.AddComponent<RuneShrineChallenge>();
+            c.Initialize(_run, seed);
+            Debug.Log($"[GameRunBootstrapper] 이벤트 룬 성소 부착 (seed={seed}) — {typeHint}");
+        }
     }
 
     /// <summary>
@@ -3699,10 +3727,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var existing = Object.FindFirstObjectByType<WorldCovenantAltar>(FindObjectsInactive.Include);
         if (existing != null)
         {
+            existing.MarkWaitingRoom();   // 배치표가 세운 대기방 제단도 대기방 제단으로(11-05 #11)
             Debug.Log($"[GameRunBootstrapper] 서약 제단이 이미 있음({existing.name}) — 코드 스폰 생략");
             return;
         }
-        WorldCovenantAltar.SpawnAt(basePos + new Vector3(-4f, 0f, 2f));
+        WorldCovenantAltar.SpawnAt(basePos + new Vector3(-4f, 0f, 2f), waitingRoom: true);
     }
 
     /// <summary>추락 착지 「재정비」 대사(10-22 A10 · Seal_Regroup) — 대사창이 닫힐 때까지 기다린다.</summary>

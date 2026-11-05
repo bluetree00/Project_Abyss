@@ -106,14 +106,16 @@ public static class Ranking1102ProbeEditor
         var page = typeof(UI_EscMenu).GetField("_rankingPage", Inst)?.GetValue(menu) as Component;
         if (page == null) { sb.AppendLine("랭킹 쪽 없음"); return; }
         var show = page.GetType().GetMethod("ShowTab", Inst);
-        int[][] tabs = full ? new[] { new[] { 0, 1 }, new[] { 1, 1 }, new[] { 2, 1 }, new[] { 3, 2 } } : new[] { new[] { 0, 1 }, new[] { 2, 1 } };
-        foreach (var t in tabs)
+        // 11-03 시기(1 해방기 · 2 악몽) · 종류(0 클리어 · 1 보스전 · 2 챕터 전투) · 챕터
+        int[][] tabs = full ? new[] { new[] { 1, 0, 1 }, new[] { 2, 0, 1 }, new[] { 1, 1, 1 }, new[] { 2, 2, 2 } } : new[] { new[] { 1, 0, 1 }, new[] { 1, 1, 1 } };
+        for (int i = 0; i < tabs.Length; i++)
         {
-            show?.Invoke(page, new object[] { t[0], t[1] });
-            if (full && t[0] == 0) { await Wait(0.12f, ct); await Shot($"RK1102_{lang}_tab0_anim"); }
+            var t = tabs[i];
+            show?.Invoke(page, new object[] { (StoryEra)t[0], t[1], t[2] });
+            if (full && i == 0) { await Wait(0.12f, ct); await Shot($"RK1102_{lang}_tab0_anim"); }
             await Wait(2.4f, ct);
-            await Shot($"RK1102_{lang}_tab{t[0]}");
-            Dump(sb, $"랭킹 탭 {t[0]} 챕터 {t[1]}", page.gameObject);
+            await Shot($"RK1102_{lang}_tab{i}");
+            Dump(sb, $"랭킹 {(StoryEra)t[0]} 종류 {t[1]} 챕터 {t[2]}", page.gameObject);
         }
         menu.HandleEscape();
         await Wait(0.4f, ct);
@@ -140,8 +142,8 @@ public static class Ranking1102ProbeEditor
 
         // 기록 카드 — 보스전 줄은 해방기 표(실제 서버 순위) · 챕터 전투 줄은 아직 없는 표
         var boss  = new UI_RecordCard.Line(Loc.T("보스전"), 5241, true, 6010, RankingService.LiberationTable);
-        var rooms = new UI_RecordCard.Line(Loc.F("챕터 {0} 전투", 2), 10810, false, 10002, RecordBoard.RoomsTablePrefix + 2);
-        UI_RecordCard.Show(2, boss, rooms, UniTask.CompletedTask);
+        var rooms = new UI_RecordCard.Line(Loc.F("챕터 {0} 전투", 2), 10810, false, 10002, RecordBoard.TableOf(false, 2, StoryEra.Liberated));
+        UI_RecordCard.Show(2, StoryEra.Liberated, boss, rooms, UniTask.CompletedTask);
         float t0 = Time.realtimeSinceStartup;
         float[] at = full ? new[] { 0.25f, 1.0f, 4.5f } : new[] { 4.5f };
         for (int i = 0; i < at.Length; i++)
@@ -152,6 +154,15 @@ public static class Ranking1102ProbeEditor
         Dump(sb, "기록 카드", GameObject.Find("@RecordCard"));
         while (GameObject.Find("@RecordCard") != null && Time.realtimeSinceStartup - t0 < 14f) await UniTask.Yield(PlayerLoopTiming.Update, ct);
         sb.AppendLine($"  카드 물러남 {Time.realtimeSinceStartup - t0:0.0}초");
+
+        // 11-03 봉인기 카드 — 표 없음(랭킹 없음 · 기기 기록만)
+        var sealedBoss = new UI_RecordCard.Line(Loc.T("보스전"), 6120, true, 0, RecordBoard.TableOf(true, 1, StoryEra.Sealed));
+        UI_RecordCard.Show(1, StoryEra.Sealed, sealedBoss, default, UniTask.CompletedTask);
+        await Wait(4.5f, ct);
+        await Shot($"RK1102_{lang}_card_sealed");
+        Dump(sb, "봉인기 기록 카드", GameObject.Find("@RecordCard"));
+        var sealedCard = GameObject.Find("@RecordCard");
+        if (sealedCard != null) UnityEngine.Object.Destroy(sealedCard);
     }
 
     private static async UniTask AltarCheckAsync(StringBuilder sb, PlayerController p, CancellationToken ct)

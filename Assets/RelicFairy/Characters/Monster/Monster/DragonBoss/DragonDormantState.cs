@@ -26,6 +26,7 @@ public class DragonDormantState : IMonsterState
     private const float  GroundedEpsilon     = 0.1f;
 
     private const float AutoTriggerTimeout = 1.5f;
+    private const float EntranceLoopLimit  = 10f;   // 비행 · 하강 루프 시간 상한(게임 시간 · 보통 몇 초)
 
     private const float FallbackPanDuration    = 2.0f;
     private const float FallbackHoldDuration   = 7.0f;
@@ -51,6 +52,7 @@ public class DragonDormantState : IMonsterState
     private bool  _cameraTriggered;
     private bool  _landed;
     private bool  _combatTriggered;
+    private BossRoomController _room;   // 씬에 있으면 폴백 자동 시작을 하지 않는다 — 방 카메라 팬과 같은 1.5초라 경합했다(11-05 #12 · DK와 같다)
 
     public bool IsActive { get; private set; } = true;
 
@@ -68,6 +70,7 @@ public class DragonDormantState : IMonsterState
         _landed          = false;
         _combatTriggered = false;
         IsActive         = true;
+        _room            = UnityEngine.Object.FindFirstObjectByType<BossRoomController>();
 
         var dragon = ctx.Monster as DragonBossMonster;
 
@@ -136,7 +139,7 @@ public class DragonDormantState : IMonsterState
             (ctx.Monster as DragonBossMonster)?.FireEntranceRequest();
         }
 
-        if (!_cameraTriggered && _waitTimer >= AutoTriggerTimeout)
+        if (!_cameraTriggered && _room == null && _waitTimer >= AutoTriggerTimeout)
         {
             _cameraTriggered = true;
             DoFallbackCameraAsync(ctx).Forget();
@@ -274,9 +277,11 @@ public class DragonDormantState : IMonsterState
         }
 
         // 비행 루프 — 진행도에 맞춰 카메라를 U자 베지어 위에서 실시간 이동
+        float flySpent = 0f;
         while (Vector3.Distance(ctx.Transform.position, targetPos) > 0.05f)
         {
             ct.ThrowIfCancellationRequested();
+            if ((flySpent += Time.deltaTime) > EntranceLoopLimit) break;   // 안전망 — 무엇이 보스를 붙잡아도 연출이 끝난다(11-05 #12 · 끝나면 착지 지점에 놓는다)
             ctx.Transform.position = Vector3.MoveTowards(ctx.Transform.position, targetPos, speed * Time.deltaTime);
 
             if (cam != null && totalDist > 0.01f)
@@ -332,6 +337,7 @@ public class DragonDormantState : IMonsterState
             TrackCameraAsync(cam, ctx.Transform, dragon.EntranceDescentCamOffset, dragon.EntranceDescentCamLookOffset, targetY, 0f, descentTrackCts.Token)
                 .SuppressCancellationThrow().Forget();
 
+        float fallSpent = 0f;
         while (true)
         {
             ct.ThrowIfCancellationRequested();
@@ -339,7 +345,7 @@ public class DragonDormantState : IMonsterState
             Vector3 pos         = ctx.Transform.position;
             float   distToGround = pos.y - targetY;
 
-            if (distToGround <= GroundedEpsilon)
+            if (distToGround <= GroundedEpsilon || (fallSpent += Time.deltaTime) > EntranceLoopLimit)   // 시간 상한 = 안전망(11-05 #12)
             {
                 pos.y = targetY;
                 ctx.Transform.position = pos;
@@ -573,11 +579,12 @@ public class DragonDormantState : IMonsterState
         }
         catch (OperationCanceledException)
         {
-            player?.SetInputEnabled(true);
+            if (!_triggered) player?.SetInputEnabled(true);
             return;
         }
 
-        player?.SetInputEnabled(true);
+        // 연출이 시작됐으면 입력은 연출 끝이 돌려준다 — 팬이 연출의 카메라 넘겨받기로 끊겨도 정상 반환해 연출 내내 평타가 열렸다(11-05 #12)
+        if (!_triggered) player?.SetInputEnabled(true);
     }
 }
 }

@@ -4,16 +4,18 @@ using Cysharp.Threading.Tasks;
 /// <summary>
 /// 도감 기록(11-02 Q2 사용자 「지금 활성화한 내용 · 사용한 것들은 도감에 체크」).
 /// 「써 봄」 = 한 번이라도 지녀 본 것 — 슬롯 메타 <see cref="UserGameData.codexSeen"/>(로컬만 · 뒤끝 Param 아님)에 「종류:id」를 쉼표로.
-/// 다른 시스템을 고치지 않고, 도감을 열 때와 런이 끝날 때 지금 지닌 것을 훑어 더한다(<see cref="Sync"/>).
+/// 도감을 열 때 · 런이 끝날 때 · 「로비로 가기」 때 지금 지닌 것을 훑어 더하고 저장한다(<see cref="Sync"/>).
+/// 룬판 · 서약 · 각인이 바뀔 때마다도 더해 둔다(<see cref="Note"/> · 저장은 다음 Sync — 잠깐 놓았다 뺀 룬이 빠졌다 · 11-05 Q32 D3).
 /// 종류: r 룬(itemId) · a 근접 증강 · c 서약 원인 · e 서약 결과 · p 유물 기억 조각(effect_key) · v 유물 진화.
 /// </summary>
 public static class CodexLog
 {
     private static readonly HashSet<string> s_seen = new();
     private static string s_parsedFrom;
+    private static bool   s_dirty;   // Note로 더했지만 아직 저장하지 않았다
 
     [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void ResetStatics() { s_seen.Clear(); s_parsedFrom = null; }
+    private static void ResetStatics() { s_seen.Clear(); s_parsedFrom = null; s_dirty = false; }
 
     /// <summary>한 번이라도 지녀 봤나.</summary>
     public static bool IsSeen(char kind, string id)
@@ -58,11 +60,25 @@ public static class CodexLog
         return set;
     }
 
-    /// <summary>지금 지닌 것을 「써 봄」에 더한다 — 새로 더한 게 있을 때만 저장.</summary>
+    /// <summary>지금 지닌 것을 「써 봄」에 더한다 — 새로 더했거나 <see cref="Note"/>로 더해 둔 게 있을 때만 저장.</summary>
     public static void Sync(GameRunSession run)
     {
+        if (BackendGameData.Instance?.Data == null) return;
+        if (!Add(run) && !s_dirty) return;
+        s_dirty = false;
+        BackendGameData.Instance.SaveAsync().Forget();
+    }
+
+    /// <summary>지금 지닌 것을 「써 봄」에 더하되 저장은 다음 <see cref="Sync"/>로 미룬다 — 룬판 · 서약 · 각인이 바뀔 때마다(11-05 Q32 D3).</summary>
+    public static void Note(GameRunSession run)
+    {
+        if (Add(run)) s_dirty = true;
+    }
+
+    private static bool Add(GameRunSession run)
+    {
         var data = BackendGameData.Instance?.Data;
-        if (data == null || run == null) return;
+        if (data == null || run == null) return false;
         Parse();
         bool added = false;
         foreach (var key in Active(run))
@@ -72,7 +88,7 @@ public static class CodexLog
             added = true;
         }
         s_parsedFrom = data.codexSeen;
-        if (added) BackendGameData.Instance.SaveAsync().Forget();
+        return added;
     }
 
     private static void Parse()

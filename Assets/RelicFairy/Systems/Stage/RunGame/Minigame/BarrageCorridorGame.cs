@@ -17,6 +17,7 @@ using UnityEngine;
 ///   · 낙뢰 · 가르는 빛 · 고리 · 쫓는 구체는 양념으로 4.8~4.2초마다(예전 3.0~2.7) · 쫓는 구체도 탄과 같은 빠르기
 ///   · 판이 좁으면(방 자리가 막혔다) 탄 수를 줄인다
 /// 판정은 자체 거리 계산(원 · 띠 · 고리 · 구체). 회피 무적 중엔 맞지 않는다(대시로 뚫고 지나가도 된다).
+/// 11-05 회피 중 스친 위험은 저스트 회피를 일으킨다 — 전투의 투사체와 같은 규칙(긴급 무적 · 슬로모 · 게이지 환급).
 /// </summary>
 public sealed class BarrageCorridorGame : EventMinigame
 {
@@ -281,9 +282,12 @@ public sealed class BarrageCorridorGame : EventMinigame
 
     private Vector3 RimPoint(float yaw) => Center + Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * Radius;
 
-    /// <summary>맞음 한 번(쿨다운 · 회피 무적 · 시연 흡수 반영). 실제로 셌으면 true.</summary>
+    /// <summary>맞음 한 번(저스트 회피 · 쿨다운 · 회피 무적 · 시연 흡수 반영). 실제로 셌으면 true.</summary>
     private bool TryHit()
     {
+        // 11-05 #5 사용자 「탄막 이벤트를 회피로 피할 수 있어야 한다」 — 맞음은 피해 4%짜리 약(Light)이라 장판 틱처럼 다뤄져
+        //   회피가 무적 0.18초뿐이고 저스트 회피가 나지 않았다. 회피 중 스친 위험은 전투의 투사체처럼 저스트 회피(긴급 무적 · 슬로모 · 게이지 환급).
+        if (Player != null && Player.TryEvadeHit(null)) return false;
         if (_hitCooldown > 0f) return false;
         if (Absorb()) { NearMiss(); return false; }
         if (!HurtPlayer()) return false;

@@ -180,6 +180,7 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
         if (IsDead) return;
         IsDead = true;
         if (_agent != null) _agent.enabled = false;
+        DisableColliders();
         CancelBreathTelegraph();
         OnDied?.Invoke(this);
         VanishAsync(0f).Forget();
@@ -313,11 +314,20 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
     {
         IsDead = true;
         if (_agent != null) _agent.enabled = false;
+        DisableColliders();
         if (_animator != null && _animator.HasState(0, DeathHash))
             _animator.CrossFade("Death", 0.15f);
         CancelBreathTelegraph();
         OnDied?.Invoke(this);
         VanishAsync(DeathLinger - DisappearSeconds).Forget();
+    }
+
+    /// <summary>죽는 순간 맞는 판정을 끈다 — 시체가 사라지기까지(3초) 계속 맞아 타격감 · 적중 효과가 돌았다(11-05 #13 · 일반 몬스터 DieState와 같다).
+    /// 리지드바디는 키네마틱 · 중력 꺼짐이라 떨어지지 않는다.</summary>
+    private void DisableColliders()
+    {
+        foreach (var col in GetComponentsInChildren<Collider>(true))
+            col.enabled = false;
     }
 
     /// <summary><paramref name="delay"/>초 뒤 디졸브로 사라진 다음 파괴한다(퇴장은 재질을 되돌리지 않으므로 파괴 직전에만).</summary>

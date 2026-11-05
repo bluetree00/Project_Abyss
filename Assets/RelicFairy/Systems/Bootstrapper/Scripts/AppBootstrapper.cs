@@ -653,6 +653,7 @@ public sealed class AppBootstrapper : MonoBehaviour
                     BackendGameData.Instance.LoadAsync()
                 );
                 Debug.Log("[AppBootstrapper] 자동 로그인 성공");
+                RankingService.SyncNicknameAsync().Forget();   // 11-05 랭킹 이름 = 스팀 이름(기록을 올리기 전에도 · 이름을 바꾸면 다음 실행 때)
             }
             else
             {

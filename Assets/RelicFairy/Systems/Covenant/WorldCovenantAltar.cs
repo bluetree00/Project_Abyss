@@ -44,6 +44,7 @@ public class WorldCovenantAltar : MonoBehaviour
     private bool         _playerInRange;
     private bool         _opening;
     private bool         _used;
+    private bool         _waitingRoom;   // 대기방 제단(11-05 #11) — 「이미 씀」 저장 · 숨김은 이 제단만. 던전 서약 성소는 무관
     private CovenantWriteBoard _board;   // 이 제단의 서약서 판 — 닫았다 열어도 같은 카드 · 남은 교체(설계서 §3)
     private Transform    _camTransform;
     private TextMeshPro  _worldText;
@@ -57,7 +58,7 @@ public class WorldCovenantAltar : MonoBehaviour
     private void Start()
     {
         // 11-02 이 대기방 제단은 이미 썼다(대기방 저장 뒤 끄고 이어함) — 한 번 더 쓰지 못하게 걷고, 문은 평소 길(서약 완료 신호)로 연다
-        if (GameRunBootstrapper.Instance?.Run?.WaitingAltarUsed == true)
+        if (_waitingRoom && GameRunBootstrapper.Instance?.Run?.WaitingAltarUsed == true)
         {
             _used = true;
             OnCovenantAssembled?.Invoke();
@@ -83,7 +84,7 @@ public class WorldCovenantAltar : MonoBehaviour
     }
 
     // ── Public Methods ───────────────────────────────────
-    public static WorldCovenantAltar SpawnAt(Vector3 position)
+    public static WorldCovenantAltar SpawnAt(Vector3 position, bool waitingRoom = false)
     {
         var go = new GameObject("CovenantAltar");
         go.transform.position = position;
@@ -92,8 +93,13 @@ public class WorldCovenantAltar : MonoBehaviour
         col.isTrigger = true;
         col.radius = 2f;
 
-        return go.AddComponent<WorldCovenantAltar>();
+        var altar = go.AddComponent<WorldCovenantAltar>();
+        altar._waitingRoom = waitingRoom;
+        return altar;
     }
+
+    /// <summary>대기방 제단으로 표시 — 대기방 배치표(CV 토큰)가 먼저 세운 제단도 대기방 코드가 찾아 표시한다(11-05 #11).</summary>
+    public void MarkWaitingRoom() => _waitingRoom = true;
 
     // ── Private Methods ──────────────────────────────────
 
@@ -185,7 +191,7 @@ public class WorldCovenantAltar : MonoBehaviour
             if (id != null && handler.TryWriteSentence(id))
             {
                 _used = true;
-                run.WaitingAltarUsed = true;                        // 11-02 — 대기방 저장에 실어 끄고 이어해도 다시 못 쓴다
+                if (_waitingRoom) run.WaitingAltarUsed = true;      // 11-02 — 대기방 저장에 실어 끄고 이어해도 다시 못 쓴다(대기방 제단만 — 11-05 #11)
                 RunFlowController.Active?.SaveNow("covenant-altar");
                 int after = handler.Sentence?.ResultCount ?? 0;
                 // 10-30 C-03 「절」은 화면 다른 곳에 없는 말 — 창 안 말(쓰기 · 잇기 · 고치기)과 「n번째 줄」로

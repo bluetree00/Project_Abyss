@@ -494,18 +494,8 @@ public class StartRoomGate : MonoBehaviour
         return go;
     }
 
-    /// <summary>얇은 본문체 — 기본 폰트의 폴백 목록에 들어 있다(ChapterStairway와 같은 길).</summary>
-    private static TMP_FontAsset ThinFont()
-    {
-        var def = TMP_Settings.defaultFontAsset;
-        if (def == null) return null;
-        if (def.name.Contains("NotoSansKR")) return def;
-        var table = def.fallbackFontAssetTable;
-        if (table == null) return null;
-        for (int i = 0; i < table.Count; i++)
-            if (table[i] != null && table[i].name.Contains("NotoSansKR")) return table[i];
-        return null;
-    }
+    /// <summary>얇은 본문체 — 공용 길(<see cref="UICodeOverlay.ThinFont"/> · 11-05 흐린 16pt 가변 글꼴 대신 톤 Light 90pt).</summary>
+    private static TMP_FontAsset ThinFont() => UICodeOverlay.ThinFont();
 
     /// <summary>DoorEdge → 게이트 로컬 기준 통로가 뻗는 방향(BuildDoorCorridor의 outward와 동일 규약).</summary>
     private static Vector3 CorridorLocalDir(DoorEdge edge) => edge switch

@@ -164,7 +164,7 @@ public static class MeleeAugmentCatalog
             (d, r) => new GaleAugment(d, r)),
 
         // 10-26 무기 개편 — 재련할수록 자란다(단계 없음 · D9 · 「재련 n회」)
-        new(KatanaShadow,      "그림자 파트너", AugmentTier.Gold, BuildFamily.Combo,    MeleeWeaponKind.Katana, new[] { 12f, 12f, 12f }, "곁의 그림자가 평타를 한 박자 늦게 따라 벤다 — 그림자마다 그 타격의 {0}% 피해(스킬도 따라 쓴다 · 절반) · 재련 2 · 4회째에 그림자가 하나씩 는다",
+        new(KatanaShadow,      "그림자 파트너", AugmentTier.Gold, BuildFamily.Combo,    MeleeWeaponKind.Katana, new[] { 12f, 12f, 12f }, "곁의 그림자가 평타 · 스킬을 한 박자 늦게 따라 쓴다 — 그림자마다 자기 앞 적에게 그 타격의 {0}% 피해(스킬은 절반) · 검풍도 그림자마다 따로(확률 40%) · 재련 2 · 4회째에 그림자가 하나씩 는다",
             (d, r) => new ShadowPartnerAugment(d, r), growth: 2f),   // 설계 30 + 6n → 실측 98로 15 + 4n → 10-26 분신 수가 재련으로 는다(1 → 3)라 분신당 12 + 2n
         new(KatanaGust,        "검풍",        AugmentTier.Silver, BuildFamily.Combo,    MeleeWeaponKind.Katana, new[] { 15f, 15f, 15f }, "적을 맞힌 평타 · 스킬마다 {0}% 확률로 곁에 분신이 나와 앞 6 m를 꿰뚫는 검기를 날린다(공격력 {1}%) · 재련할수록 확률 · 피해가 오른다",
             (d, r) => new SwordGustAugment(d, r), new[] { 60f, 60f, 60f }, growth: 4f, growth2: 5f),

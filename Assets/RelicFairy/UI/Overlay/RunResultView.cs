@@ -158,6 +158,17 @@ public sealed class RunResultView : MonoBehaviour
         tl.text = "걸린 시간";
         Text(p, "Time", R - 600f, 124f, 600f, 104f, UITheme.Thin.Display, UIWeight.Light, UITheme.Thin.InkA(0.96f), TextAlignmentOptions.TopRight)
             .text = RunResultPresenter.FormatTime(_snap.PlaySeconds);
+
+        // 11-05 사용자 「시간도 제대로 파악할 수 없는 숫자」 — 걸린 시간(실제 시간 전부) 아래 랭킹에 오른 시간과 무엇을 뺐는지
+        if (_snap.RankCentis > 0)
+        {
+            var rank = Text(p, "RankTime", R - 520f, 236f, 520f, 28f, UITheme.Thin.Small, UIWeight.Medium, UITheme.Thin.InkA(0.72f), TextAlignmentOptions.TopRight);
+            rank.text = Loc.F("랭킹 기록 <color=#FFD147>{0}</color> · 일시정지 · 컷신 · 로딩 뺌", RankingService.Format(_snap.RankCentis));
+            rank.textWrappingMode = TextWrappingModes.NoWrap;
+            rank.enableAutoSizing = true;
+            rank.fontSizeMin = 12f;
+            rank.fontSizeMax = rank.fontSize;
+        }
     }
 
     private void BuildTimeline(RectTransform stage)

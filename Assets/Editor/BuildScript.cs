@@ -54,6 +54,14 @@ public static class BuildScript
 
         Debug.Log($"[Build] 씬 {scenes.Length}개로 빌드 시작 → {outputPath}");
         var report = BuildPipeline.BuildPlayer(options);
+
+        // 11-05 사용자 「다른 PC에서 켰을 때 이름 없음」 — exe를 직접 켜도(Steam 라이브러리 밖) Steam이 붙게 앱 번호 파일을 옆에 둔다.
+        // Steam에서 실행하면 필요 없다 — Steam 업로드(SteamPipe) 배포본에서는 뺀다(docs/build-distribution-checklist.md).
+        if (report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded && System.IO.File.Exists("steam_appid.txt"))
+        {
+            System.IO.File.Copy("steam_appid.txt", System.IO.Path.Combine(System.IO.Path.GetDirectoryName(outputPath), "steam_appid.txt"), true);
+            Debug.Log("[Build] steam_appid.txt 복사 — Steam 밖 실행에서도 Steam 연결(Steam 업로드에서는 뺄 것)");
+        }
         Debug.Log($"[Build] 결과: {report.summary.result} | 경로: {outputPath}");
     }
 }

@@ -122,7 +122,45 @@ public static class MonsterTraitTable
 #if UNITY_EDITOR
     /// <summary>[실측] 정예에 이 접두어를 강제한다(시기 · 챕터 · 상한 무시) — 메뉴 RelicFairy/Monster/Elite Prefix.</summary>
     public static MonsterTraitKind? DebugForcePrefix;
+    /// <summary>[실측] 악몽 보스 특성을 이것으로 강제한다(시기는 그대로 본다).</summary>
+    public static MonsterTraitKind[] DebugForceBossAffixes;
 #endif
+
+    // ── 악몽 보스 특성(11-05 사용자 「보스도 앨리트 버프를 보스용으로 해서 맞게 랜덤으로 몇 개」) ──
+    // 보스에 맞는 것만 — 강철(보스 패턴은 거의 정면이라 못 때리는 구간) · 흔적(숲 악몽 「흔적」과 겹침) · 돌격(패턴 러너와 겹침) ·
+    // 소환 · 지휘 · 복수(보스방엔 아군이 없다) · 잠복(등장 · 보스바와 충돌) · 분열 · 폭발 유해(사망 뒤 봉인 · 추방 장면)는 뺀다.
+    private static readonly MonsterTraitKind[] BossPool     = { MonsterTraitKind.Ward, MonsterTraitKind.Resist, MonsterTraitKind.Thorns, MonsterTraitKind.Mortar };
+    private static readonly MonsterTraitKind[] BossPoolLich = { MonsterTraitKind.Ward, MonsterTraitKind.Resist };   // 리치 — 바닥 붕괴 · 봉인 · 추방이 얽혀 공격 특성은 뺀다
+    public const int BossAffixCount = 2;
+
+    /// <summary>악몽 보스가 받을 특성 — 해방기 · 봉인기는 없음. 리치는 방어 1개 · 나머지는 서로 다른 2개.</summary>
+    public static List<MonsterTraitKind> RollBoss(StoryEra era, bool lich)
+    {
+        var result = new List<MonsterTraitKind>(BossAffixCount);
+        if (era != StoryEra.NightmareMode) return result;
+#if UNITY_EDITOR
+        if (DebugForceBossAffixes != null) { result.AddRange(DebugForceBossAffixes); return result; }
+#endif
+        var pool = new List<MonsterTraitKind>(lich ? BossPoolLich : BossPool);
+        int want = lich ? 1 : BossAffixCount;
+        for (int i = 0; i < want && pool.Count > 0; i++)
+        {
+            int j = Random.Range(0, pool.Count);
+            result.Add(pool[j]);
+            pool.RemoveAt(j);
+        }
+        return result;
+    }
+
+    /// <summary>보스판 설명(전투 시작 안내) — 정예와 수치가 달라 따로.</summary>
+    public static string BossDesc(MonsterTraitKind k) => k switch
+    {
+        MonsterTraitKind.Ward   => "막이 깨지기 전엔 받는 피해 −50%",
+        MonsterTraitKind.Resist => "한 속성의 피해 −30%",
+        MonsterTraitKind.Thorns => "여섯 번 맞으면 둘레가 터진다 — 붉은 원 밖으로",
+        MonsterTraitKind.Mortar => "때때로 발밑에 원 셋을 떨어뜨린다 — 원 밖으로",
+        _                       => Of(k).desc,
+    };
 
     /// <summary>
     /// 이 몬스터가 받을 특성(없으면 빈 목록). 일반 · 희귀 = 확률로 1개, 정예 = 해방기 1개(30% 둘) · 악몽 2개(다른 분류). 보스 · 봉인기 = 없음.

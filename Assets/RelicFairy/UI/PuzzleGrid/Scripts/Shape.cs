@@ -73,10 +73,14 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         CacheStartTransform();
 
         // If asset already assigned in inspector, build now.
-        if (shapeAsset != null)
-            ApplyAsset(shapeAsset);
-        else
-            BuildShapeBlocks();
+        // 11-05 #15 — 이어하기는 꺼진 판 아래에서 이미 지었다(ApplyAsset → BindItem 회전). 늦은 Awake가 다시 지으면 회전이 풀린다 → 지은 적 없을 때만.
+        if (_baseOffsets == null)
+        {
+            if (shapeAsset != null)
+                ApplyAsset(shapeAsset);
+            else
+                BuildShapeBlocks();
+        }
     }
 
     // 판이 닫히는 등 커서가 빠져나간 알림 없이 꺼지면 다음에 열 때까지 밝은 채로 남는다.
@@ -128,9 +132,13 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
     private void BuildShapeBlocks()
     {
-        // Clear
+        // Clear — 바로 떼어 낸다(11-05 #15 · Destroy는 프레임 끝이라 남은 옛 블록을 GetChild(0)이 집어 판 자리 맞추기가 어긋났다)
         for (int i = transform.childCount - 1; i >= 0; i--)
-            Destroy(transform.GetChild(i).gameObject);
+        {
+            var child = transform.GetChild(i);
+            child.SetParent(null, false);
+            Destroy(child.gameObject);
+        }
 
         if (shapeBlockPrefab == null) return;
 

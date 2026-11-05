@@ -35,6 +35,9 @@ public static class ScreenFade
     // 테두리·마법진 빛에 섞는 흰빛 — 방 종류색을 그대로 쓰면 원색이 눈을 찌른다.
     private const float InkRimWhite       = 0.40f;
 
+    /// <summary>화면을 덮고 있나(덮는 중 · 덮인 채 · 걷는 중) — 덮개 밑에서 ESC 메뉴 · 룬판 · 월드 [F]가 열리지 않게(<see cref="UIInputGate"/> · 11-05 Q32 C3).</summary>
+    public static bool Covering => _cg != null && _cg.blocksRaycasts;
+
     // ── 알파 페이드 ──
     public static UniTask Out(float duration, CancellationToken ct = default) => FadeTo(1f, duration, ct);
     public static UniTask In(float duration, CancellationToken ct = default)  => FadeTo(0f, duration, ct);

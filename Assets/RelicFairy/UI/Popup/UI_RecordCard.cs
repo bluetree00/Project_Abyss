@@ -18,7 +18,7 @@ public sealed class UI_RecordCard : MonoBehaviour
         public readonly string Label;
         public readonly int    Centis, Best;
         public readonly bool   IsNew;
-        public readonly string Table;
+        public readonly string Table;   // 뒤끝 표 — null이면 봉인기(랭킹 없음 · 기기 기록만)
         public Line(string label, int centis, bool isNew, int best, string table)
         { Label = label; Centis = centis; IsNew = isNew; Best = best; Table = table; }
     }
@@ -48,7 +48,7 @@ public sealed class UI_RecordCard : MonoBehaviour
 
     // ── Public Methods ────────────────────────────────────────
     /// <summary>카드를 띄운다(앞 카드는 걷는다). <paramref name="submitted"/>가 끝나면(최대 4초) 순위를 읽는다.</summary>
-    public static void Show(int chapter, Line boss, Line rooms, UniTask submitted)
+    public static void Show(int chapter, StoryEra era, Line boss, Line rooms, UniTask submitted)
     {
         if (boss.Centis <= 0 && rooms.Centis <= 0) return;
         if (s_current != null) Destroy(s_current.gameObject);
@@ -58,13 +58,13 @@ public sealed class UI_RecordCard : MonoBehaviour
         DontDestroyOnLoad(go);          // 보스방 → 출구 계단으로 씬이 바뀌어도 끝까지
         var card = go.AddComponent<UI_RecordCard>();
         card._group = group;
-        card.Build(root, chapter, boss, rooms);
+        card.Build(root, chapter, era, boss, rooms);
         s_current = card;
         card.RunAsync(submitted).Forget();
     }
 
     // ── Private Methods ───────────────────────────────────────
-    private void Build(RectTransform root, int chapter, Line boss, Line rooms)
+    private void Build(RectTransform root, int chapter, StoryEra era, Line boss, Line rooms)
     {
         _count = 0;
         if (boss.Centis > 0)  _blocks[_count++] = new Block { Data = boss };
@@ -79,7 +79,7 @@ public sealed class UI_RecordCard : MonoBehaviour
         UICodeOverlay.Line(_card, new Color(GoldC.r, GoldC.g, GoldC.b, 0.5f));
 
         float top = h * 0.5f;
-        var head = UICodeOverlay.Txt(_card, Loc.F("챕터 {0} · 기록", chapter), 17f, UICodeOverlay.Mist, new Vector2(0f, top - 24f), CardW - 48f, align: TextAlignmentOptions.Left);
+        var head = UICodeOverlay.Txt(_card, Loc.F("챕터 {0} · {1} 기록", chapter, EraName(era)), 17f, UICodeOverlay.Mist, new Vector2(0f, top - 24f), CardW - 48f, align: TextAlignmentOptions.Left);
         head.rectTransform.sizeDelta = new Vector2(CardW - 48f, 30f);
         var rule = UICodeOverlay.Img(_card, "Rule", new Vector2(0f, top - HeadH + 2f), new Vector2(CardW - 48f, 1f), new Color(GoldC.r, GoldC.g, GoldC.b, 0.25f));
         rule.raycastTarget = false;
@@ -181,6 +181,7 @@ public sealed class UI_RecordCard : MonoBehaviour
             await UniTask.WhenAny(submitted, UniTask.Delay(TimeSpan.FromSeconds(RankTimeout), ignoreTimeScale: true, cancellationToken: ct));
             for (int i = 0; i < _count; i++)
             {
+                if (_blocks[i].Data.Table == null) { _blocks[i].Rank.text = Loc.T("봉인기 기록은 기기에만 남는다 — 랭킹은 해방기부터"); continue; }
                 var (answered, board) = await UniTask.WhenAny(RankingService.LoadBoardAsync(_blocks[i].Data.Table, 1),
                                                               UniTask.Delay(TimeSpan.FromSeconds(RankTimeout), ignoreTimeScale: true, cancellationToken: ct));
                 if (this == null) return;
@@ -190,6 +191,13 @@ public sealed class UI_RecordCard : MonoBehaviour
         }
         catch (OperationCanceledException) { }
     }
+
+    private static string EraName(StoryEra era) => era switch
+    {
+        StoryEra.Liberated     => Loc.T("해방기"),
+        StoryEra.NightmareMode => Loc.T("악몽"),
+        _                      => Loc.T("봉인기"),
+    };
 
     /// <summary>「23위 / 128명 · 1위 이름 0:31.00」 · 내가 1위면 「1위 / 128명 — 모든 플레이어 중 가장 빠르다」.</summary>
     private static string RankLine(bool answered, RankingService.Board board, bool isNew)

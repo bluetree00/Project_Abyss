@@ -231,6 +231,23 @@ public class RunProgressManager : MonoBehaviour
         _localStore.Save(slot, d);
     }
 
+    /// <summary>
+    /// 끌 때 시계만 잇는다(11-05 랭킹 시계) — 직전 저장 내용은 그대로 두고 클리어 · 전투 시간 · 플레이 시간만 지금 값으로 올린다.
+    /// 싸우는 중이라 저장을 건너뛴 방에서 꺼도 이어하기에서 그 방에서 쓴 시간이 되돌아가지 않는다. 저장 뒤 챕터가 넘어갔으면 건너뛴다.
+    /// </summary>
+    public void SaveRunClock(GameRunSession session)
+    {
+        if (session == null || !session.IsRunning || session.RunStats == null) return;
+        int slot = ActiveSlotIndex;
+        var d = _localStore.Load(slot);
+        if (d == null || !d.hasActiveRun || d.isInStartRoom) return;
+        var saved = RunStats.FromJson(d.runStatsJson);
+        if (!saved.TakeClockFrom(session.RunStats)) return;
+        d.runStatsJson = saved.ToJson();
+        d.playSeconds  = Mathf.Max(d.playSeconds, session.PlaySeconds);
+        _localStore.Save(slot, d);
+    }
+
     /// <summary>로컬 세이브 전용 확장 필드 채움. BuildSaveData 공통 필드와 별개.</summary>
     private static void ApplyExtendedFields(RunSaveData d, GameRunSession s, in RunMetaSnapshot m, RunSaveData prev)
     {

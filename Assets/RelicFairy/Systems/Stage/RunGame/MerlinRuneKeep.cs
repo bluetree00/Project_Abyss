@@ -58,7 +58,8 @@ public static class MerlinRuneKeep
         int cut = raw.IndexOf(Sep);
         string id = cut >= 0 ? raw.Substring(0, cut) : raw;
         string element = cut >= 0 ? raw.Substring(cut + 1) : "";
-        var data = RuntimeItemData.FromSO(ItemSORegistry.Find(id));
+        // 성소 룬(11-05 #20)은 ItemSO가 없다 — 차트에서 만든다. 예전엔 SO로만 찾아 맡긴 성소 룬이 「데이터에서 사라진 룬」으로 지워졌다
+        var data = RuntimeItemData.FromSO(ItemSORegistry.Find(id)) ?? RuntimeItemData.FromServer(Managers.ItemData?.GetItem(id));
         if (data != null)
         {
             if (!string.IsNullOrEmpty(element)) data.element = element;   // 일반 · 희귀는 그 판의 속성 그대로

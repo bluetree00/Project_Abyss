@@ -83,9 +83,14 @@ public static class UICodeOverlay
         return btn;
     }
 
-    /// <summary>얇은 한글 글꼴(NotoSansKR) — 기본 글꼴이 굵어 덮개 글에 쓰지 않는다(UI 톤).</summary>
+    /// <summary>
+    /// 얇은 한글 글꼴 — 기본 글꼴(DNF)이 굵어 덮개 글에 쓰지 않는다(UI 톤). 톤 v2 Light(Noto · 샘플 90pt)를 먼저 쓴다(11-05 사용자 「팝업 텍스트 선명도가 깨진다」 —
+    /// 예전엔 기본 글꼴 폴백의 Noto 가변(Thin · 샘플 16pt · 여백 5)을 골라 34~48px로 늘리면 흐렸다). 톤 글꼴이 아직 안 올라왔을 때만 그 폴백.
+    /// </summary>
     public static TMP_FontAsset ThinFont()
     {
+        var themed = UISkin.ThemeFonts != null ? UISkin.ThemeFonts.Get(UIWeight.Light) : null;
+        if (themed != null) return themed;
         var def = TMP_Settings.defaultFontAsset;
         if (def == null) return null;
         if (def.name.Contains("NotoSansKR")) return def;

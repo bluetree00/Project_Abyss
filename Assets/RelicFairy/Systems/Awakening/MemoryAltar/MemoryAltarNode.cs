@@ -132,11 +132,11 @@ public sealed class MemoryAltarNode
         Branch            = branch;
         DisplayName       = displayName;
         Description       = description;
-        BaseCost          = baseCost;
+        BaseCost          = MemoryAltarCatalog.ScaleCost(baseCost);
         ConditionKey      = conditionKey;
         ConditionTarget   = conditionTarget;
         ConditionLabel    = conditionLabel;
-        DiscountCost      = discountCost > 0 ? discountCost : baseCost;
+        DiscountCost      = discountCost > 0 ? MemoryAltarCatalog.ScaleCost(discountCost) : BaseCost;
         ConditionRequired = conditionRequired;
         Parents           = parents ?? System.Array.Empty<string>();
         Size              = size;
@@ -156,6 +156,16 @@ public sealed class MemoryAltarNode
 /// </summary>
 public static class MemoryAltarCatalog
 {
+    // ── 값 배율(11-05) ──
+    /// <summary>
+    /// 노드 목록의 기본가 · 할인가에 곱하는 배율(11-05 사용자 「게임의 목표가 랭킹이 생긴 이상 해금은 빠르게 · 해방기를 3~5번 다 클리어할 때쯤」) — 10 단위로 맞춘다.
+    /// ×0.6 = 합 92,940 → 55,820 · 보통 진행에서 해방기 4회째 클리어 무렵 다 찬다(약 18~19런 · 11시간 · ×1.0이면 12~14회째 · 30런).
+    /// 「악몽 보스 처치」 조건 3칸은 값과 상관없이 악몽을 해야 열린다. 목록 숫자는 설계 값 그대로 둔다.
+    /// </summary>
+    public const float CostScale = 0.6f;
+
+    public static int ScaleCost(int cost) => System.Math.Max(10, (int)System.Math.Round(cost * CostScale / 10.0) * 10);
+
     // ── 강화형(10-14) — 단계 값 곡선 · 갈래 포인트 단계 ──
     /// <summary>강화 단계 값 곡선(1단계 = 기본가) — 5단계까지. 단계가 오를수록 값이 오른다(하데스 「밤의 거울」 결).</summary>
     public static readonly float[] LevelCurve = { 1f, 1.4f, 1.9f, 2.5f, 3.2f };
@@ -388,6 +398,7 @@ public static class MemoryAltarCatalog
         // · 열림 = 그 갈래 포인트가 requiredPoints(0 · 3 · 8 · 15) 이상. 부모(parents)는 뜻으로 묶인 것만(Epic 확률 ← Epic 등장 등).
         // · 시기 고리(era)는 그대로 — 붕괴 · 엔딩 전엔 그 칸을 그리지도 팔지도 않는다(스포일러 금지).
         // · 값 합 ≈ 73,900(사용자 결정 「약 72,000」) · 1단계 값 220 ~ 560 — 귀환마다 무엇이든 하나는 오른다.
+        //   (11-05 아래 숫자는 설계 값 — 실제 값은 CostScale ×0.6 · 지금 목록 합 92,940 → 55,820)
 
         // ── 가운데 · 유물의 기억 ─────────────────────────
         new(MemRedraw,  AltarBranch.Memory, "다시 떠올리기", "런당 1회 — 보스를 쓰러뜨린 뒤 기억 카드 3장을 다시 굴린다", 1400,

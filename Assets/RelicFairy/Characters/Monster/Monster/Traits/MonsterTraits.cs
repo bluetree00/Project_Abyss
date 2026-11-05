@@ -50,6 +50,9 @@ public sealed partial class MonsterTraits : MonoBehaviour
     private const float ChampionHpScale   = 1.8f;
     private const float ChampionBodyScale = 1.12f;
     private const float EliteTraitPower   = 1.5f;
+    // 악몽 보스판(11-05) — 긴 싸움이라 정예보다 순하게
+    private const float BossWardShare     = 0.1f;
+    private const float BossResistCut     = 0.7f;
     /// <summary>챔피언 골드 배율 — <see cref="DieState"/>가 등급 배율에 곱한다.</summary>
     public const float ChampionGoldMul    = 1.5f;
 
@@ -59,6 +62,9 @@ public sealed partial class MonsterTraits : MonoBehaviour
     private static readonly List<MonsterTraits> s_commanders = new();
     private static readonly List<MonsterBase>   s_scan       = new();
     private static readonly HashSet<MonsterTraitKind> s_noticedThisSession = new();
+
+    /// <summary>보스 특성 줄이 바뀌었다(붙음 · 수호막 깎임 · 가시 쌓임) — 보스바(<see cref="HudPresenter"/>)가 받는다.</summary>
+    public static event Action<MonsterBase> BossAffixesChanged;
 
     // ── Private ────────────────────────────────────────────────
     private readonly List<MonsterTraitKind>  _kinds  = new(2);
@@ -84,6 +90,9 @@ public sealed partial class MonsterTraits : MonoBehaviour
     private bool         _champion;
     private Vector3      _championBaseScale;
     private float        _power = 1f;   // 특성 세기 — 정예 1.5(질주 · 수호막 · 지휘 · 폭발 · 흔적)
+    private bool         _boss;         // 악몽 보스판(11-05) — 보스바 줄 · 쉬는 때 · 순한 수치
+    private float        _wardMax;
+    private IBossHudSource _bossHud;
 
     // ── Properties ─────────────────────────────────────────────
     public IReadOnlyList<MonsterTraitKind>  Kinds  => _kinds;
@@ -147,7 +156,7 @@ public sealed partial class MonsterTraits : MonoBehaviour
         if (_reverted) return actual;
         actual = ModifyIncomingElite(actual, instigator, direct);
         if (element.HasValue && Has(MonsterTraitKind.Resist) && element.Value == _resist)
-            actual *= ResistCut;
+            actual *= _boss ? BossResistCut : ResistCut;
         if (_wardLeft > 0f && Has(MonsterTraitKind.Ward))
         {
             actual *= WardCut;
@@ -158,6 +167,7 @@ public sealed partial class MonsterTraits : MonoBehaviour
                 RebuildBadges();   // 깨진 막은 배지에서 뺀다
                 PushBadges();
             }
+            else if (_boss) BossAffixesChanged?.Invoke(_monster);   // 보스바 줄의 남은 막(%)
         }
         return Mathf.Max(1f, actual);
     }
@@ -185,6 +195,8 @@ public sealed partial class MonsterTraits : MonoBehaviour
         _kinds.AddRange(kinds);
         monster.BindTraits(this);
         _power = monster.Grade == MonsterGrade.Elite ? EliteTraitPower : 1f;
+        _boss  = monster.Grade == MonsterGrade.Boss;
+        _bossHud = _boss ? monster as IBossHudSource : null;
         // 챔피언 — 시기 특성을 받은 일반 · 위협 몹(정예 접두어 · 분신 · 졸개는 아니다). 수호막 몫보다 먼저 체력을 키운다.
         if (monster.Grade == MonsterGrade.Common || monster.Grade == MonsterGrade.Rare)
         {
@@ -200,7 +212,7 @@ public sealed partial class MonsterTraits : MonoBehaviour
         RunFx.LoadAsync().Forget();   // 폭발 · 흔적 장판의 바닥 원 재질
 
         if (Has(MonsterTraitKind.Resist)) _resist = (RuneElement)UnityEngine.Random.Range(0, 6);
-        if (Has(MonsterTraitKind.Ward))   _wardLeft = Mathf.Max(1f, monster.EffectiveMaxHp * WardShare * _power);
+        if (Has(MonsterTraitKind.Ward))   _wardLeft = _wardMax = Mathf.Max(1f, monster.EffectiveMaxHp * (_boss ? BossWardShare : WardShare) * _power);
         if (Has(MonsterTraitKind.Commander)) s_commanders.Add(this);
         if (Has(MonsterTraitKind.Volatile))  monster.OnDied += HandleDiedVolatile;
         if (Has(MonsterTraitKind.Splitter))  monster.OnHPChanged += HandleHpSplitter;
@@ -210,7 +222,8 @@ public sealed partial class MonsterTraits : MonoBehaviour
 
         RebuildBadges();
         PushBadges();
-        NoticeFirstEncounter(_kinds);
+        if (_boss) NoticeBossAffixes(_kinds, monster.GetCancellationTokenOnDestroy());
+        else       NoticeFirstEncounter(_kinds);
 #if UNITY_EDITOR   // 등장마다 로그는 에디터 실측에서만(10-29 풀링 점검 #6)
         Debug.Log($"[MonsterTrait] {monster.name}: {string.Join(", ", _kinds)}{(Has(MonsterTraitKind.Resist) ? $" (저항 {_resist})" : "")}{(_champion ? " · 챔피언" : "")}{(_power > 1f ? $" · 세기 ×{_power:0.#}" : "")}");
 #endif
@@ -257,6 +270,7 @@ public sealed partial class MonsterTraits : MonoBehaviour
 
     private void PushBadges()
     {
+        if (_boss) { BossAffixesChanged?.Invoke(_monster); return; }   // 보스는 머리 위 바 대신 보스바 줄
         var bar = _monster != null ? _monster.WorldHPBar : null;
         if (bar == null) return;
         bar.SetTraitBadges(_badges);
@@ -469,6 +483,79 @@ public sealed partial class MonsterTraits : MonoBehaviour
         string msg = Loc.F("이 방 정예 — {0}: {1}", Loc.T(d.name), cut >= 0 ? desc.Substring(cut + 3) : desc);
         FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include)?.ShowBuffNotice(msg);
         Debug.Log("[F3] " + msg);
+    }
+
+    /// <summary>보스바 아래 줄(11-05 악몽 보스 특성) — 「수호막 62% · 박격의」(분류색). 깨진 막은 빠진다 · 가시는 쌓인 수. 보스판이 아니면 빈 글.</summary>
+    public string BossAffixLine()
+    {
+        if (!_boss || _reverted) return string.Empty;
+        var sb = new System.Text.StringBuilder(64);
+        foreach (var k in _kinds)
+        {
+            var d = MonsterTraitTable.Of(k);
+            string label = Loc.T(d.name);
+            if (k == MonsterTraitKind.Ward)
+            {
+                if (_wardLeft <= 0f) continue;
+                label += $" {Mathf.CeilToInt(_wardLeft / Mathf.Max(1f, _wardMax) * 100f)}%";
+            }
+            else if (k == MonsterTraitKind.Resist) label += $" · {Loc.T(ElementName(_resist))}";
+            else if (k == MonsterTraitKind.Thorns && _thorns > 0) label += $" {_thorns}/{BossThornsMax}";
+            if (sb.Length > 0) sb.Append("     ");
+            sb.Append("<color=#").Append(ColorUtility.ToHtmlStringRGB(MonsterTraitTable.CategoryColor(d.category))).Append('>').Append(label).Append("</color>");
+        }
+        return sb.ToString();
+    }
+
+    private static string ElementName(RuneElement e) => e switch
+    {
+        RuneElement.Fire     => "불",
+        RuneElement.Ice      => "물",
+        RuneElement.Electric => "전기",
+        RuneElement.Grass    => "풀",
+        RuneElement.Light    => "빛",
+        _                    => "어둠",
+    };
+
+    /// <summary>
+    /// 쉬는 때(보스판) — 아직 붙기 전 · 무적(◇ 무적) · 컷신(등장 · 페이지 전환 장면). 이때는 가시가 안 쌓이고 박격도 안 쏜다.
+    /// 시간이 멈춘 창은 Time.time이 멈춰 저절로 쉰다.
+    /// </summary>
+    private bool BossPaused()
+    {
+        if (_monster == null || _monster.IsDead) return true;
+        if (_bossHud != null && _bossHud.HudInvulnerable) return true;
+        var run = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.Run : null;
+        return run != null && run.TryGetHudMode(out var mode) && (mode == HUDIds.Mode.Cutscene || mode == HUDIds.Mode.BossCutscene);
+    }
+
+    // 보스 특성 안내 — 보스마다 조합이 달라 싸움마다 한 줄(보스판 수치로)
+    private static void NoticeBossAffixes(List<MonsterTraitKind> kinds, System.Threading.CancellationToken ct)
+    {
+        string msg = null;
+        foreach (var k in kinds)
+        {
+            var d = MonsterTraitTable.Of(k);
+            string part = $"{Loc.T(d.name)}: {Loc.T(MonsterTraitTable.BossDesc(k))}";
+            msg = msg == null ? part : $"{msg}   ·   {part}";
+        }
+        if (msg == null) return;
+        Debug.Log($"[BossAffix] 붙음: {string.Join(", ", kinds)}");
+        ShowBossNoticeAsync(Loc.F("악몽 보스 특성 — {0}", msg), ct).Forget();
+    }
+
+    // 전투 시작 대사(멀린 · 보스 한마디)가 같은 자리에 겹쳤다(11-05 실측) — 대사가 걷힌 뒤에 띄운다(최대 12초 기다림)
+    private static async UniTaskVoid ShowBossNoticeAsync(string msg, System.Threading.CancellationToken ct)
+    {
+        float t0 = Time.realtimeSinceStartup;
+        try
+        {
+            while (RelicFairy.UI.UI_BossBark.IsShowing && Time.realtimeSinceStartup - t0 < 12f)
+                await UniTask.Delay(200, DelayType.Realtime, cancellationToken: ct);
+        }
+        catch (OperationCanceledException) { return; }
+        var hud = FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
+        hud?.ShowBuffNotice(msg);
     }
 
     // 첫 조우 안내 — 특성마다 한 번(프로필 기준). 정예 둘이 처음이면 한 줄에 같이(알림 칸이 하나라 따로 띄우면 덮인다).

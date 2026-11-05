@@ -31,10 +31,10 @@ public sealed class RunStats
     // 챕터 전투 시계(10-24 U5 · 기록만) — RunCombatClock이 싸우는 동안만 더한다. 마친 챕터 값은 chapterIds와 같은 차례(-1 = 옛 세이브라 모름)
     [SerializeField] private List<float> chapterCombatSeconds = new();
     [SerializeField] private List<float> chapterBaseSeconds = new();
-    [SerializeField] private float combatSeconds;                   // 지금 챕터 — 싸운 시간
+    [SerializeField] private double combatSeconds;                  // 지금 챕터 — 싸운 시간(11-05 double — float 누적은 45분 고정 프레임에서 초 단위로 어긋났다)
     [SerializeField] private float baseSeconds;                     // 지금 챕터 — 싸운 방 기준 시간의 합
-    // 해방기 · 악몽 클리어 시간(10-29 랭킹) — 해방기 · 악몽 시기 동안 게임 시간(컷신 뺌 · 시간 0인 창은 저절로 빠짐) · 챕터가 넘어가도 비우지 않는다
-    [SerializeField] private float clearSeconds;
+    // 해방기 · 악몽 클리어 시간(10-29 랭킹) — 해방기 · 악몽 시기 동안 실제로 흐른 시간(11-05 · 시간이 멈춘 창 · 컷신 · 로딩은 뺌) · 챕터가 넘어가도 비우지 않는다
+    [SerializeField] private double clearSeconds;
 
     // ── Properties ──
     public int ChapterEndCount => chapterEndSeconds.Count;
@@ -44,9 +44,9 @@ public sealed class RunStats
     public int CovenantFires => covenantFires;
     public int BiggestHit => biggestHit;
     public DamageSource BiggestHitSource => (DamageSource)biggestHitSource;
-    public float CombatSeconds => combatSeconds;
+    public float CombatSeconds => (float)combatSeconds;
     public float BaseSeconds => baseSeconds;
-    public float ClearSeconds => clearSeconds;
+    public float ClearSeconds => (float)clearSeconds;
 
     /// <summary>
     /// 정예 보스 번갈이(<see cref="RunSequencer.MidBossScheduled"/>) 시드 — 런에 하나. 처음 읽을 때 정하고 이어하기 세이브에 같이 실린다.
@@ -100,9 +100,21 @@ public sealed class RunStats
     {
         chapterIds.Add(chapter);
         chapterEndSeconds.Add(Mathf.Max(0, playSeconds));
-        chapterCombatSeconds.Add(combatSeconds);
+        chapterCombatSeconds.Add((float)combatSeconds);
         chapterBaseSeconds.Add(baseSeconds);
         combatSeconds = baseSeconds = 0f;   // 다음 챕터는 새로 잰다
+    }
+
+    /// <summary>
+    /// 끌 때 시계만 잇는다(11-05) — 저장해 둔 집계(<c>this</c>)에 라이브 집계의 클리어 · 전투 시간을 옮긴다. 방 입장 저장 뒤 흐른 시간이
+    /// 이어하기에서 사라지지 않게. 저장 뒤 챕터가 넘어갔으면(전투 시계를 비웠다) false.
+    /// </summary>
+    public bool TakeClockFrom(RunStats live)
+    {
+        if (live == null || live.chapterIds.Count != chapterIds.Count) return false;
+        if (live.clearSeconds > clearSeconds) clearSeconds = live.clearSeconds;
+        if (live.combatSeconds > combatSeconds) combatSeconds = live.combatSeconds;
+        return true;
     }
 
     /// <summary>빈 이름(투사체 · 함정 등 몬스터가 아닌 것)은 덮어쓰지 않는다 — 마지막으로 이름 있는 상대가 남는다.</summary>

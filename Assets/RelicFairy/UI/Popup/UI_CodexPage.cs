@@ -164,19 +164,33 @@ public sealed class UI_CodexPage : MonoBehaviour
         switch (tab)
         {
             case 0:
-                var runes = new List<ItemSO>(ItemSORegistry.All);
-                runes.Sort((a, b) => a.rarity != b.rarity ? a.rarity.CompareTo(b.rarity) : string.CompareOrdinal(a.displayName, b.displayName));
-                foreach (var so in runes)
+                // 룬 = 아이템 SO + SO 없는 ITEM_DATA 룬(11-05 룬 성소 한 칸 영웅 6종 · 수호 룬 — 드랍 풀에 안 섞이게 SO를 안 만들어 도감에 없었다)
+                var runes = new List<(string id, string name, ItemRarity rarity, RuntimeItemData d, ItemSO so)>();
+                var withSo = new HashSet<string>();
+                foreach (var so in ItemSORegistry.All)
                 {
                     if (so == null || string.IsNullOrEmpty(so.itemId)) continue;
-                    var d = RuntimeItemData.FromSO(so);
-                    var el = ElementDef.GetById(d?.element);
+                    withSo.Add(so.itemId);
+                    runes.Add((so.itemId, so.displayName, so.rarity, RuntimeItemData.FromSO(so), so));
+                }
+                var table = Managers.ItemData?.GetAllItems();
+                if (table != null)
+                    foreach (var kv in table)
+                    {
+                        if (withSo.Contains(kv.Key)) continue;
+                        var d = RuntimeItemData.FromServer(kv.Value);
+                        if (d != null && d.shapeId > 0) runes.Add((kv.Key, d.displayName, d.rarity, d, null));
+                    }
+                runes.Sort((a, b) => a.rarity != b.rarity ? a.rarity.CompareTo(b.rarity) : string.CompareOrdinal(a.name, b.name));
+                foreach (var r in runes)
+                {
+                    var el = ElementDef.GetById(r.d?.element);
                     yield return new Entry
                     {
-                        Name = Loc.T(so.displayName), Icon = RuneIcon(so, d),
-                        Sub  = so.rarity + (el != null && so.rarity >= ItemRarity.Epic ? $" · <color=#{ColorUtility.ToHtmlStringRGB(el.Color)}>{el.Name}</color>" : ""),
-                        Desc = RuneDesc(d),
-                        Active = _active.Contains("r:" + so.itemId), Seen = CodexLog.IsSeen('r', so.itemId),
+                        Name = Loc.T(r.name), Icon = RuneIcon(r.so, r.d),
+                        Sub  = r.rarity + (el != null && r.rarity >= ItemRarity.Epic ? $" · <color=#{ColorUtility.ToHtmlStringRGB(el.Color)}>{el.Name}</color>" : ""),
+                        Desc = RuneDesc(r.d),
+                        Active = _active.Contains("r:" + r.id), Seen = CodexLog.IsSeen('r', r.id),
                     };
                 }
                 break;
@@ -223,12 +237,13 @@ public sealed class UI_CodexPage : MonoBehaviour
         }
     }
 
-    /// <summary>룬 그림 — SO 아이콘이 비어 있으면(룬 대부분) 룬판과 같은 효과 문양, 그것도 없으면 등급 룬 그림.</summary>
+    /// <summary>룬 그림 — 룬판 · 보관함 · 획득 창과 같은 문양(<see cref="RuneArt.ResolveRuneIcon"/>), 없으면 SO 아이콘.
+    /// 11-05 — 예전엔 SO 아이콘 → 효과 문양 → 옛 등급 돌판 순이라 같은 룬이 도감에서만 다른 얼굴이었다.</summary>
     private static Sprite RuneIcon(ItemSO so, RuntimeItemData d)
     {
-        if (so.icon != null) return so.icon;
-        var byEffect = d != null ? RuneArt.GetIconByEffect(RuneArt.EffectTypeOf(d)) : null;
-        return byEffect != null ? byEffect : RuneArt.GetArt(so.rarity);
+        var art = RuneArt.ResolveRuneIcon(d);
+        if (art != null) return art;
+        return so != null ? so.icon : null;
     }
 
     /// <summary>룬 효과 줄 — CSV 원문이 있으면 그것, 없으면 「조건 이름 값」 조립(룬 카드와 같은 출처).</summary>

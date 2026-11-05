@@ -87,8 +87,6 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
             var dir = aimRot * Vector3.forward;
             _dashStart = ctx.PlayerTransform.position;
             _dashEnd = ctx.DashEndBeforeWall(_dashStart, dir, _data.dashDistance);   // 벽 앞에서 멈춘다(10-14 — 끝점 Lerp가 벽을 뚫었다)
-            MeleeAugments.ReportSkillDash(ctx.WeaponData, ctx.Slot, _dashStart, _dashEnd, _data.dashDuration,
-                                          ctx.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee));   // 무형일섬 잔상 증강(10-15)
 
             if (ctx.Rigidbody != null)
             {
@@ -164,6 +162,10 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
             if (t >= 1f)
             {
                 _timer = 0f;
+                // 무형일섬 잔상 증강(10-15) — 돌진이 실제로 끝난 순간 실제로 간 구간을 알린다. 시작에 예정 끝점을 알리면 회피로 바로 끊어도
+                // 가지 않은 길까지 벴다(11-05 #18 · 성광베기 11-02 Q32 ⑤와 같은 결함 · 베는 시각은 같다 — 도착 기준)
+                MeleeAugments.ReportSkillDash(ctx.WeaponData, ctx.Slot, _dashStart, ctx.PlayerTransform.position, 0f,
+                                              ctx.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee));
                 // A3(10-08): 스쳐 간 적이 없으면 연참(5 × 0.15초)을 접고 바로 끝 — 예전엔 아무도 없는데 0.75초 서 있었다.
                 // 3단계 길 가르기는 길 폭(3 m)이 감지(2 m)보다 넓어 헛스윙이어도 벤다(C1)
                 _phase = _hitTargets.Count > 0 ? Phase.Slash : Phase.End;

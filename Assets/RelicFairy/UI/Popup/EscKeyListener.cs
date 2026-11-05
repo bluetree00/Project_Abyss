@@ -42,10 +42,12 @@ public sealed class EscKeyListener : MonoBehaviour
         if (RunResultView.Active != null) { RunResultView.Active.Continue(); return; }
         // 로딩 화면(900)이 덮는 동안엔 무시 — 그 아래(500)에 메뉴가 열려 시간을 멈춘 채 다음 씬으로 넘어갔다(10-09 출시 점검)
         if (UI_SceneLoading.Instance != null && UI_SceneLoading.Instance.IsCovering) return;
+        // 방 전환 덮개(잉크 와이프 · 암전) 동안도 — 덮개 밑에 메뉴가 열렸다가 다음 방에서 드러났다(11-05 Q32 C3)
+        if (ScreenFade.Covering) return;
         // 악몽 갈림길 창은 ESC를 직접 받아 닫는다(그 밑 500에 메뉴가 숨어 열렸다)
         if (NightmareGateChoice.IsOpen || RankingBoardOverlay.IsOpen || StartGift.IsOpen) return;   // 10-29 던전 입구 「해방기 / 악몽」 창 · 랭킹 비석도 같다
         // 11-02 Q32 환전소(서비스 창 위) · 멀린 룬 보관 — ESC가 밑의 상점 · 재련소 · 정제소 창까지 닫았다(덮개는 팝업 스택 밖)
-        if (ExchangePopupView.IsOpen || MerlinRuneKeepView.IsOpen) return;
+        if (ExchangePopupView.IsOpen || MerlinRuneKeepView.IsOpen || StatDetailView.IsOpen) return;   // 11-05 스탯 상세 창도 Esc를 스스로 받는다
 
         // 확인 창(종료 · 요정의 샘 등)은 무엇보다 위에 뜬다 — 가장 먼저 취소로 닫는다(10-16).
         if (UI_ConfirmDialog.CloseIfOpen()) return;

@@ -12,11 +12,10 @@ namespace RelicFairy.Monster
 /// (09-26 사용자 결정 A안 · 기획서 RelicFairy_죽음의기사_근접기회_설계_20260926.md)
 ///
 /// · 유리 앞(플레이어 쪽)에 3개 — 기사에서 플레이어 쪽을 보는 방향 기준 −30°·0°·+30°, 유리 콜라이더에서 <see cref="FrontOffset"/>m 바깥.
-/// · <b>근접 타격만 받는다</b> — 콜라이더를 Player 레이어에 둔다. 근접 판정(ColliderInstance: MonsterHit|Player)만 이 레이어를 보고,
-///   투사체·광역 질의(MonsterBase.HitLayerMask = MonsterHit)는 안 보므로 기사를 향한 화살을 가로막지 않는다.
-/// · 받은 피해 × <see cref="TransferRatio"/>를 유리 너머 기사에게 전한다(기사 방어·무적 그대로) — 성흔석에서 기사까지 빛줄기가 번쩍인다.
-/// · 과열: <see cref="OverheatWindow"/>초 안에 <see cref="OverheatHits"/>타를 넘으면 <see cref="CooldownSeconds"/>초 식는다 — 한 자리에 붙어
-///   치지 말고 옮겨 치게(기사 공격은 플레이어 칸·행·열을 노린다).
+/// · 콜라이더는 Player 레이어 — 근접 판정(ColliderInstance: MonsterHit|Player)과 화살(모든 층을 훑는다)이 맞히고,
+///   광역 질의는 중계 등록부(<see cref="DamageRelays"/>)로 기사 몸처럼 본다. 추적 화살도 가까우면 성흔석을 쫓는다(11-05 #4).
+/// · 받은 피해를 그대로(<see cref="TransferRatio"/>) 유리 너머 기사에게 전한다(기사 방어·무적 그대로) — 성흔석에서 기사까지 빛줄기가 번쩍인다.
+/// · 과열(3초 12타 → 1.5초 식음)은 11-05 사용자 「돌이 모든 타격을 그대로 전달해야 한다」로 없앴다 — 화살 연사 타격이 식는 동안 버려졌다.
 /// · 부서지지 않는다. 청록 = 칠 수 있음(해방 페이지 설계 §7 색 규칙). 모양 = 리치 봉인석 룬석 모델 재활용.
 /// · 기사가 죽거나 사라지면 함께 사라진다.
 /// </summary>
@@ -25,10 +24,7 @@ public sealed class DKResonanceStone : MonoBehaviour, IDamageable, IDamageRelay
     // ── Constants ─────────────────────────────────────────────────
     private const string ModelKey        = "Lich/VFX/SealStoneModel";
     private const string MeleeOnlyLayer  = "Player";
-    private const float  TransferRatio   = 0.8f;
-    private const int    OverheatHits    = 12;    // 10-22 A1b 6 → 12 · 2 → 1.5초 — 주 타격만 센 뒤에도 빠른 빌드가 절반 가까이 식어 있었다
-    private const float  OverheatWindow  = 3f;
-    private const float  CooldownSeconds = 1.5f;
+    private const float  TransferRatio   = 1f;    // 11-05 #4 — 모든 타격 그대로(옛 0.8)
     private const float  Radius          = 0.9f;
     private const float  Height          = 2.6f;
     private const float  FrontOffset     = 2.5f;
@@ -43,11 +39,9 @@ public sealed class DKResonanceStone : MonoBehaviour, IDamageable, IDamageRelay
     private const float  FlashSeconds    = 0.08f;
     private const float  IdleGlow        = 1.6f;
     private const float  FlashGlow       = 6f;
-    private const float  CoolGlow        = 0.35f;
     private const float  FadeSeconds     = 0.6f;    // 서고 사라질 때 디졸브(10-12 디졸브 원칙)
 
     private static readonly int   EmissionId = Shader.PropertyToID("_EmissionColor");
-    private static readonly Color HotColor   = new Color(1f, 0.32f, 0.12f);
     private static readonly Collider[] s_overlap = new Collider[8];
 
     // ── Private ───────────────────────────────────────────────────
@@ -55,13 +49,12 @@ public sealed class DKResonanceStone : MonoBehaviour, IDamageable, IDamageRelay
     private Renderer[]             _renderers;
     private GameObject             _fallback;
     private MaterialPropertyBlock  _mpb;
-    private readonly Queue<float>  _recentHits = new();
-    private float                  _coolUntil = float.NegativeInfinity;
+    private float                  _nextFlashAt;   // 빛줄기 · 번쩍임은 BeamSeconds에 한 번
     private CapsuleCollider        _capsule;
     private bool                   _leaving;
 
     // ── Properties ────────────────────────────────────────────────
-    public bool IsCooling => Time.time < _coolUntil;
+    public bool IsCooling => false;   // 과열 없앰(11-05 #4) — 실측 도구 두 곳(Ch3BossCheck · LevelSimBuildProbe)이 읽는다
     public GameObject RelayTarget => _boss != null && !_boss.IsDead && !_leaving ? _boss.gameObject : null;
     public float RelayRatio => TransferRatio;
     public Collider RelayBody => _capsule;
@@ -76,12 +69,6 @@ public sealed class DKResonanceStone : MonoBehaviour, IDamageable, IDamageRelay
         {
             Leave();
             return;
-        }
-        // 식는 중 → 다 식으면 청록으로 되돌린다(프레임마다 색을 쓰지 않게 전환 순간만)
-        if (_coolUntil > 0f && Time.time >= _coolUntil)
-        {
-            _coolUntil = 0f;
-            ApplyLook(PatternGuideHelper.Breakable, IdleGlow);
         }
     }
 
@@ -132,24 +119,16 @@ public sealed class DKResonanceStone : MonoBehaviour, IDamageable, IDamageRelay
         _boss.TakeDamage(amount * TransferRatio, instigator, 0f, isCrit);
     }
 
-    /// <summary>주 타격 한 번 — 식는 중이면 false. 과열: <see cref="OverheatWindow"/>초 안에 <see cref="OverheatHits"/>타를 넘으면 식는다(그 타는 들어간다).</summary>
+    /// <summary>주 타격 한 번 — 기사가 있으면 늘 받는다(11-05 #4 과열 없앰). 빛줄기 · 번쩍임은 <see cref="BeamSeconds"/>에 한 번(화살 연사).</summary>
     public bool TryAcceptHit()
     {
-        if (_boss == null || _boss.IsDead || _leaving || IsCooling) return false;
-
-        float now = Time.time;
-        _recentHits.Enqueue(now);
-        while (_recentHits.Count > 0 && now - _recentHits.Peek() > OverheatWindow) _recentHits.Dequeue();
-        FlashBeam();
-
-        if (_recentHits.Count > OverheatHits)
+        if (_boss == null || _boss.IsDead || _leaving) return false;
+        if (Time.time >= _nextFlashAt)
         {
-            _recentHits.Clear();
-            _coolUntil = now + CooldownSeconds;
-            ApplyLook(HotColor, CoolGlow);
-            return true;
+            _nextFlashAt = Time.time + BeamSeconds;
+            FlashBeam();
+            FlashAsync(destroyCancellationToken).Forget();
         }
-        FlashAsync(destroyCancellationToken).Forget();
         return true;
     }
 

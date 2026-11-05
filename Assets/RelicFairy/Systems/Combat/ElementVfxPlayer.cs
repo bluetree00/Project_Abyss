@@ -24,6 +24,7 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     private const float  PointReach  = 0.6f;   // 점 타격 1 = 보이는 반경(m) — 무기 섬광(0.4~0.6 m)보다 조금 크게(10-22 B2: 어둠 3 m+가 무기 타격과 헷갈렸다)
     private const float  FadeTail    = 0.5f;   // 수명이 다하면 방출만 멈추고 남은 입자가 이만큼 사그라든 뒤 거둔다(10-11 톤 2차 — 툭 끊김)
     private const float  LightDim    = 0.4f;   // 팩 이펙트 점광원 세기 배율 — 빛 오라(세기 3 · 5 m)가 바닥을 덮었다(10-11 톤 2차)
+    private const float  FloorLift   = 0.05f;  // 바닥 장판 · 광역 그림을 살짝 띄운다 — 바닥과 같은 높이면 겹쳐 깜박였다(11-05 #8)
 
     private sealed class VfxItem
     {
@@ -280,7 +281,7 @@ public sealed class ElementVfxPlayer : MonoBehaviour
             {
                 _registry.GetAreaStyle(element, out var areaTint, out int maxShown);
                 if (maxShown > 0 && !AreaRoom(area, pos, radiusScale, maxShown)) return;   // 그림만 뺀다 — 판정 · 피해는 부른 쪽이 이미 냈다(10-30 불바다 겹침)
-                DoPlayPrefab(area, pos, radiusScale / nominal, life > 0f ? life : BurstTtl, tint.a > 0f ? tint : areaTint);
+                DoPlayPrefab(area, pos + Vector3.up * FloorLift, radiusScale / nominal, life > 0f ? life : BurstTtl, tint.a > 0f ? tint : areaTint);
                 return;
             }
         }
@@ -340,7 +341,7 @@ public sealed class ElementVfxPlayer : MonoBehaviour
 
         // 장판: scale = 장판 반경(m) → 프리팹 공칭 반경으로 나눠 배율을 낸다.
         var aura = _registry.GetAura(element, out float nominal);
-        return DoAttachPrefab(aura, target, duration, scale / nominal, key);
+        return DoAttachPrefab(aura, target, duration, scale / nominal, key, Vector3.up * FloorLift);
     }
 
     private int DoAttachPrefab(GameObject prefab, Transform target, float duration, float scale, string key,

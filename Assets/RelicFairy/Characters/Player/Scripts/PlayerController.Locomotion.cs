@@ -101,6 +101,8 @@ public sealed partial class PlayerController
     private static readonly RaycastHit[] s_clearHits = new RaycastHit[16];
     // 돌진 바닥 따라가기(11-02 Q6) — 한 프레임에 오르는 높이 상한(그 위는 벽) · 내려가는 높이 상한(그 아래는 낭떠러지 — 높이 유지) · 바닥 위 띄움
     private const float DashStepUp = 1f, DashStepDown = 1.2f, DashGroundLift = 0.02f;
+    // 돌진 끝 허공 막기(11-05 Q32) — 끝자리 아래 이만큼 안에 바닥이 없으면 허공(아래층 내려가기는 그대로) · 뒤로 당기며 재는 간격
+    private const float DashVoidDepth = 6f, DashVoidStep = 0.5f;
 
     /// <summary>
     /// <paramref name="from"/>에서 <paramref name="dir"/>로 막힘 없이 갈 수 있는 거리(m, 최대 <paramref name="max"/>) — 첫 벽 앞까지.
@@ -127,6 +129,24 @@ public sealed partial class PlayerController
             if (s < stop) stop = s;
         }
         return Mathf.Max(0f, stop);
+    }
+
+    /// <summary>
+    /// 돌진이 허공(끝자리 아래 <see cref="DashVoidDepth"/> m 안에 바닥이 없는 곳)에서 끝나지 않게 — <paramref name="dist"/> 안에서 바닥이 있는 가장 먼 자리까지의 거리.
+    /// 끝자리만 본다(사이의 틈은 건넌다). 바닥 층을 모르면 그대로(11-05 Q32 「조준 보조가 공중 적에 스냅해 돌진이 벼랑 밖으로」).
+    /// </summary>
+    public float GroundedDistanceAhead(Vector3 from, Vector3 dir, float dist)
+    {
+        int ground = CharacterData != null ? CharacterData.groundLayer.value : 0;
+        dir.y = 0f;
+        if (ground == 0 || dist <= 0f || dir.sqrMagnitude < 0.0001f) return dist;
+        dir.Normalize();
+        for (float d = dist; d > 0f; d -= DashVoidStep)
+        {
+            var top = from + dir * d + Vector3.up * DashStepUp;
+            if (Physics.Raycast(top, Vector3.down, DashStepUp + DashVoidDepth, ground, QueryTriggerInteraction.Ignore)) return d;
+        }
+        return 0f;
     }
 
     /// <summary>

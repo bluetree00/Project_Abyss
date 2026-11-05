@@ -135,6 +135,22 @@ public sealed partial class UI_CruciblePanel
         if (_enhanceBtn != null) _enhanceBtn.gameObject.SetActive(true);   // 두 탭 공용 — 파츠 탭에선 고른 파츠를 올린다
     }
 
+    /// <summary>머리 줄 버튼(나가기 · 환전소) — v3 판으로 옮겨 청동을 걷고 얇은 유리 + 가는 테 + 표 글꼴.</summary>
+    private void LayoutV3HeaderButton(RectTransform button, float x, float width)
+    {
+        button.SetParent(_v3Root, false);
+        V3Place(button, x, 14f, width, 36f);
+        if (button.TryGetComponent<Image>(out var img)) { img.sprite = null; img.color = Color.clear; }
+        if (button.Find("Fill")?.GetComponent<Image>() is Image fill)
+        {
+            fill.sprite = null;
+            fill.color  = UITheme.Thin.GlassFill;
+            ShopUIStyle.Stretch(fill.rectTransform, 1f);
+        }
+        UIThinBox.Create(button, "V3Edge", Vector2.zero, Vector2.one, 0f, UITheme.Thin.LineIdle, Color.clear, Color.clear);
+        V3Text(button.GetComponentInChildren<TMP_Text>(true), UIWeight.Medium, FTable, UITheme.Thin.InkA(0.85f));
+    }
+
     /// <summary>창 안 가운데 1560×880 — 불투명 남색 바탕 + 제단 창 판(InfoBox 남색 재색칠) + 1px 금선 · 모서리 눈금. 맨 뒤 형제(덮개 창이 위로).</summary>
     private void BuildV3Root()
     {
@@ -196,20 +212,9 @@ public sealed partial class UI_CruciblePanel
         LayoutV3Pill(_matPill, 1100f, _fuelText, _skin?.MaterialIcon, MatTint);
         LayoutV3Pill(_orePill, 1262f, _oreText, _skin?.OreIcon, OreTint);
 
-        if (_window.Find("Exit") is RectTransform exit)
-        {
-            exit.SetParent(_v3Root, false);
-            V3Place(exit, 1424f, 14f, 96f, 36f);
-            if (exit.TryGetComponent<Image>(out var ei)) { ei.sprite = null; ei.color = Color.clear; }
-            if (exit.Find("Fill")?.GetComponent<Image>() is Image fill)
-            {
-                fill.sprite = null;
-                fill.color  = UITheme.Thin.GlassFill;
-                ShopUIStyle.Stretch(fill.rectTransform, 1f);
-            }
-            UIThinBox.Create(exit, "V3Edge", Vector2.zero, Vector2.one, 0f, UITheme.Thin.LineIdle, Color.clear, Color.clear);
-            V3Text(exit.GetComponentInChildren<TMP_Text>(true), UIWeight.Medium, FTable, UITheme.Thin.InkA(0.85f));
-        }
+        if (_window.Find("Exit") is RectTransform exit) LayoutV3HeaderButton(exit, 1424f, 96f);
+        // 11-05 사용자 「재련소에도 환전소 넣기」 — 11-02 Q18 버튼이 v2 창 자리(878, 30)에 남아 v3 판 뒤에 가려져 있었다 → 머리 줄 재화 칸 왼쪽(나가기와 같은 얇은 유리)
+        if (_window.Find("Exchange") is RectTransform exchange) LayoutV3HeaderButton(exchange, 966f, 120f);
 
         var rule = ShopUIStyle.MakeImage(_v3Root, "V3HeadRule", UITheme.Thin.WithA(UITheme.Thin.Gold, 0.22f));
         V3Place(rule.rectTransform, V3LeftX, V3HeadH, V3W - V3LeftX * 2f, 1f);

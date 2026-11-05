@@ -193,6 +193,7 @@ public static class CombatDamage
             relayed    = true;
         }
         if (!target.TryGetComponent<IDamageable>(out var damageable)) return 0f;
+        if (damageable is IKillable killable && killable.IsDead) return 0f;   // 죽은 잡몹(새끼 용 — MonsterBase가 아니다)은 타격감 · 아이템 · 서약을 돌리지 않는다(11-05 #13)
 
         var mgr        = GameRunBootstrapper.Instance?.Run?.EffectManager;
         var weaponData = GameRunBootstrapper.Instance?.Run?.Player?.WeaponManager?.CurrentWeaponData;

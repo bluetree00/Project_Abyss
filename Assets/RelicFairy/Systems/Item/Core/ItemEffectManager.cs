@@ -153,12 +153,16 @@ public sealed class ItemEffectManager
     /// 현재 조건이 충족된 활성 지속 버프(조건부 Cond* 등)를 버프창 표시 항목으로 수집.
     /// 읽기 전용 — 효과 상태/조건을 질의만 한다(동작/밸런스 무변경). HUD 어댑터(ItemBuffViewSource)가 폴링 호출.
     /// </summary>
-    public void CollectActiveBuffViews(List<BuffViewItem> into)
+    /// <param name="skipPassive">상시 스탯 룬(<see cref="PassiveStatEffectBase"/>)은 빼고 조건이 붙은 것만 — 스탯 상세 창 「지금 켜진 조건부 효과」(11-05).</param>
+    public void CollectActiveBuffViews(List<BuffViewItem> into, bool skipPassive = false)
     {
         if (into == null) return;
         for (int i = 0; i < _activeEffects.Count; i++)
+        {
+            if (skipPassive && _activeEffects[i] is PassiveStatEffectBase) continue;
             if (_activeEffects[i] is IItemBuffViewProvider p && p.TryGetBuffView(_ctx, out var item))
                 into.Add(item);
+        }
     }
 
     // ── 스탯 합산 ───────────────────────────────────────────

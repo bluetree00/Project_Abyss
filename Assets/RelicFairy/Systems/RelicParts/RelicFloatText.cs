@@ -32,7 +32,6 @@ public sealed class RelicFloatText : MonoBehaviour
     }
 
     private static RelicFloatText s_instance;
-    private static TMP_FontAsset  s_thinFont;
     private static Material       s_thinMat;
 
     private readonly Item[] _items = new Item[PoolSize];
@@ -95,19 +94,8 @@ public sealed class RelicFloatText : MonoBehaviour
         if (thin != null) tmp.fontSharedMaterial = ThinMaterial(tmp.fontSharedMaterial);
     }
 
-    /// <summary>얇은 본문체 — 기본 폰트의 폴백 목록에 이미 들어 있어(DnfFontAssetGenerator가 NotoSansKR를 폴백으로 건다) 따로 불러오지 않는다.</summary>
-    private static TMP_FontAsset ThinFont()
-    {
-        if (s_thinFont != null) return s_thinFont;
-        var def = TMP_Settings.defaultFontAsset;
-        if (def == null) return null;
-        if (def.name.Contains("NotoSansKR")) return s_thinFont = def;
-        var table = def.fallbackFontAssetTable;
-        if (table == null) return null;
-        for (int i = 0; i < table.Count; i++)
-            if (table[i] != null && table[i].name.Contains("NotoSansKR")) return s_thinFont = table[i];
-        return null;
-    }
+    /// <summary>얇은 본문체 — 공용 길(<see cref="UICodeOverlay.ThinFont"/> · 11-05 흐린 16pt 가변 글꼴 대신 톤 Light 90pt).</summary>
+    private static TMP_FontAsset ThinFont() => UICodeOverlay.ThinFont();
 
     /// <summary>부드러운 그림자 재질을 한 벌 복사해 획 두께만 줄인다(글자마다 재질을 만들지 않는다 — 배칭 유지).</summary>
     private static Material ThinMaterial(Material soft)

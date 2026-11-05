@@ -389,8 +389,17 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
     // 피격 처리 (강인도)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || EntranceShielded;
+
+    /// <summary>
+    /// 등장 연출(등장 대기 상태) 중엔 피해를 통째로 막는다 — 맞으면 공용 규칙(MonsterBase.TakeDamage)이 전투 상태로 깨워 연출과 전투 AI가 함께 돌며
+    /// 카메라가 묶였다(11-05 #1 · #12 · 리치 10-23과 같은 규칙). 지금 그 상태에 있을 때만 — 다른 길로 상태가 바뀌면 바로 풀린다.
+    /// </summary>
+    private bool EntranceShielded => _fsm != null && _fsm.IsCurrent(_dormantState);   // 등장 대기는 등록 키 없이 넣는 상태 — IsInState<T>로는 늘 거짓
+
     public override void TakeDamage(float amount, UnityEngine.GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
     {
+        if (EntranceShielded) { NotifyBlockedHit(transform.position + Vector3.up); return; }   // 파이프라인을 거치지 않는 직접 피해도
         if (_fgBB != null && instigator != null)
         {
             bool isHeavy = _fgBB.IsBigWindowOpen;
@@ -714,7 +723,9 @@ public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance, IPagedBo
     {
         ClearStageHazard();
         EnsureArena();
-        _stageHazard = BossStageHazard.CreateEdgeBand(this, _arenaBounds, _arenaFloorY, _thornBandWidth, seconds,
+        // 11-05 #9 Ch1 아레나는 원(돌기둥 벽 반경 ≈ 15) — 사각 띠는 대각선이 안전지대 · 가시가 벽 너머에 깔렸다
+        float ringOuter = Mathf.Min(_arenaBounds.extents.x, _arenaBounds.extents.z) - BossStageHazard.RingInset;
+        _stageHazard = BossStageHazard.CreateEdgeRing(this, _arenaBounds.center, ringOuter, _arenaFloorY, _thornBandWidth, seconds,
                                                       _thornBandColor, _thornBandVfxPrefab, _thornBandVfxScale, _thornBandDamageMult);
         TintBodyOverAsync(_page2BodyTint, seconds).Forget();   // 바가 차오르는 동안 몸이 붉게 물든다 — 카메라가 보고 있을 때(09-29)
         Debug.Log($"[FG] 2페이지 무대 — 가시 뿌리 띠 {_thornBandWidth:F1} m · 아레나 {_arenaBounds.size.x:F0}×{_arenaBounds.size.z:F0} m", this);

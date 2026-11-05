@@ -27,14 +27,21 @@ public sealed class BossStageHazard : MonoBehaviour
     private const int   MaxLineVfx     = 16;
     private const float LineVfxPop     = 0.5f;   // 자라는 줄 끝이 이만큼 지나가면 가시가 다 돋는다 (m)
 
+    private const int   RingSegments = 72;    // 원형 띠 고리 메시 조각 수
+    /// <summary>원형 아레나 — 바닥 상자 반폭에서 이만큼 안쪽이 걸을 수 있는 원(Ch1 돌기둥 벽 반경 ≈ 15 · 바닥 상자 ±16).</summary>
+    public const  float RingInset    = 1.5f;
+
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
     private static Material s_bandMat;
 
     // ── Private ────────────────────────────────────────────────
-    private enum Shape { EdgeBand, Rect, Line }
+    private enum Shape { EdgeBand, Rect, Line, EdgeRing }
 
     private Shape       _shape;
-    private Bounds      _arena;          // EdgeBand: 아레나 XZ 경계 / Rect: 구역
+    private Bounds      _arena;          // EdgeBand: 아레나 XZ 경계 / Rect: 구역 / EdgeRing: 원을 감싼 상자
+    private Vector3     _ringCenter;     // EdgeRing: 원 가운데(XZ)
+    private float       _ringOuter;      // EdgeRing: 바깥 반경
+    private Mesh        _ringMesh;
     private float       _band;           // EdgeBand 현재 목표 폭
     private float       _shownBand;      // 자라는 중인 폭
     private float       _builtBand = -1f;
@@ -77,6 +84,11 @@ public sealed class BossStageHazard : MonoBehaviour
     {
         get
         {
+            if (_shape == Shape.EdgeRing)
+            {
+                float r = Mathf.Max(0.5f, (_ringOuter - _band) * 0.7071f);   // 안쪽 원에 들어가는 정사각
+                return new Bounds(_ringCenter, new Vector3(r * 2f, 0f, r * 2f));
+            }
             if (_shape != Shape.EdgeBand) return _arena;
             var b = _arena;
             b.Expand(new Vector3(-_band * 2f, 0f, -_band * 2f));
@@ -99,6 +111,28 @@ public sealed class BossStageHazard : MonoBehaviour
         h._band      = Mathf.Max(0.5f, bandWidth);
         h._shownBand = 0f;
         h._growSpeed = h._band / Mathf.Max(0.1f, growSeconds);
+        h.RebuildVisuals();
+        return h;
+    }
+
+    /// <summary>
+    /// 원형 아레나 가장자리 띠 — 바깥 반경 <paramref name="outerRadius"/>에서 안쪽으로 <paramref name="bandWidth"/>까지(11-05 #9).
+    /// 원 아레나(Ch1 숲)에 사각 띠를 깔면 대각선이 띠 밖(안전지대)이고 가시가 벽 너머에 깔렸다.
+    /// </summary>
+    public static BossStageHazard CreateEdgeRing(MonsterBase boss, Vector3 center, float outerRadius, float floorY, float bandWidth, float growSeconds,
+                                                 Color color, GameObject vfxPrefab, float vfxScale, float damageMultPerTick,
+                                                 float vfxSpacing = VfxSpacing)
+    {
+        var h = Create("~BossStageHazard_Ring", boss, color, vfxPrefab, vfxScale, damageMultPerTick);
+        h._shape      = Shape.EdgeRing;
+        h._vfxSpacing = Mathf.Max(1f, vfxSpacing);
+        h._ringCenter = new Vector3(center.x, floorY, center.z);
+        h._ringOuter  = Mathf.Max(1f, outerRadius);
+        h._arena      = new Bounds(h._ringCenter, new Vector3(h._ringOuter * 2f, 0f, h._ringOuter * 2f));
+        h._floorY     = floorY;
+        h._band       = Mathf.Clamp(bandWidth, 0.5f, h._ringOuter - 0.5f);
+        h._shownBand  = 0f;
+        h._growSpeed  = h._band / Mathf.Max(0.1f, growSeconds);
         h.RebuildVisuals();
         return h;
     }
@@ -145,7 +179,7 @@ public sealed class BossStageHazard : MonoBehaviour
     /// <summary>띠를 <paramref name="extra"/> m 넓힌다(영구 · 한 번에 자라남).</summary>
     public void Widen(float extra)
     {
-        if (_shape != Shape.EdgeBand || extra <= 0f) return;
+        if ((_shape != Shape.EdgeBand && _shape != Shape.EdgeRing) || extra <= 0f) return;
         _band += extra;
     }
 
@@ -176,6 +210,12 @@ public sealed class BossStageHazard : MonoBehaviour
             return _shownBand >= 0.99f && p.x >= _arena.min.x && p.x <= _arena.max.x && p.z >= _arena.min.z && p.z <= _arena.max.z;
         float b = _shownBand;
         if (b <= 0.01f) return false;
+        if (_shape == Shape.EdgeRing)
+        {
+            float dx = p.x - _ringCenter.x, dz = p.z - _ringCenter.z;
+            float d  = Mathf.Sqrt(dx * dx + dz * dz);
+            return d <= _ringOuter && d >= _ringOuter - b;
+        }
         bool insideArena = p.x >= _arena.min.x && p.x <= _arena.max.x && p.z >= _arena.min.z && p.z <= _arena.max.z;
         bool insideInner = p.x >= _arena.min.x + b && p.x <= _arena.max.x - b && p.z >= _arena.min.z + b && p.z <= _arena.max.z - b;
         return insideArena && !insideInner;
@@ -192,7 +232,7 @@ public sealed class BossStageHazard : MonoBehaviour
         }
         else if (_retreat >= 0f) { TickRetreat(); return; }
 
-        float target = _shape == Shape.EdgeBand ? _band : 1f;
+        float target = _shape == Shape.EdgeBand || _shape == Shape.EdgeRing ? _band : 1f;
         if (_shownBand < target)
         {
             _shownBand = Mathf.MoveTowards(_shownBand, target, _growSpeed * Time.deltaTime);
@@ -215,6 +255,7 @@ public sealed class BossStageHazard : MonoBehaviour
     {
         foreach (var s in _strips) if (s != null) Destroy(s);
         foreach (var v in _vfx) if (v != null) Destroy(v);
+        if (_ringMesh != null) Destroy(_ringMesh);
     }
 
     // ── Private Methods ────────────────────────────────────────
@@ -260,6 +301,12 @@ public sealed class BossStageHazard : MonoBehaviour
 
         float b = _shownBand;
         if (b <= 0.05f) return;
+        if (_shape == Shape.EdgeRing)
+        {
+            AddRing(_ringOuter - b, _ringOuter);
+            if (_vfxPrefab != null && b >= _band - 0.01f) RespawnRingVfx(b);
+            return;
+        }
         var a = _arena;
         float w = a.size.x, d = a.size.z;
         // 네 변 — 북 · 남은 전체 폭, 동 · 서는 북남 띠 사이만.
@@ -360,6 +407,59 @@ public sealed class BossStageHazard : MonoBehaviour
         mr.SetPropertyBlock(mpb);
         _strips.Add(q);
         _stripRenderers.Add(mr);
+    }
+
+    /// <summary>원형 띠 — 안 · 바깥 반경 사이 고리 판 하나(메시는 다시 깔 때마다 새로 · 옛것은 버린다).</summary>
+    private void AddRing(float inner, float outer)
+    {
+        inner = Mathf.Max(0f, inner);
+        if (_ringMesh != null) Destroy(_ringMesh);
+        _ringMesh = new Mesh { name = "HazardRing" };
+        var verts = new Vector3[(RingSegments + 1) * 2];
+        var tris  = new int[RingSegments * 6];
+        for (int i = 0; i <= RingSegments; i++)
+        {
+            float a = i * Mathf.PI * 2f / RingSegments;
+            var dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+            verts[i * 2]     = dir * inner;
+            verts[i * 2 + 1] = dir * outer;
+            if (i == RingSegments) break;
+            int v = i * 2, t = i * 6;
+            tris[t] = v; tris[t + 1] = v + 2; tris[t + 2] = v + 1;
+            tris[t + 3] = v + 1; tris[t + 4] = v + 2; tris[t + 5] = v + 3;
+        }
+        _ringMesh.vertices  = verts;
+        _ringMesh.triangles = tris;
+        _ringMesh.RecalculateBounds();
+
+        var go = new GameObject("HazardRing");
+        go.transform.SetParent(transform, false);
+        go.transform.position = new Vector3(_ringCenter.x, _floorY + FloorLift, _ringCenter.z);
+        go.AddComponent<MeshFilter>().sharedMesh = _ringMesh;
+        var mr = go.AddComponent<MeshRenderer>();
+        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        mr.receiveShadows    = false;
+        mr.sharedMaterial    = BandMaterial;
+        var mpb = new MaterialPropertyBlock();
+        mpb.SetColor("_BaseColor", _color);
+        mr.SetPropertyBlock(mpb);
+        _strips.Add(go);
+        _stripRenderers.Add(mr);
+    }
+
+    /// <summary>원형 띠 가시 — 띠 가운데 원을 따라 일정 간격.</summary>
+    private void RespawnRingVfx(float b)
+    {
+        foreach (var v in _vfx) if (v != null) Destroy(v);
+        _vfx.Clear();
+        _vfxParticles.Clear();
+        float r = _ringOuter - b * 0.5f;
+        int n = Mathf.Clamp(Mathf.FloorToInt(2f * Mathf.PI * r / _vfxSpacing), 4, MaxVfx);
+        for (int i = 0; i < n; i++)
+        {
+            float a = i * Mathf.PI * 2f / n;
+            SpawnOneVfx(new Vector3(_ringCenter.x + Mathf.Cos(a) * r, _floorY, _ringCenter.z + Mathf.Sin(a) * r));
+        }
     }
 
     /// <summary>URP Unlit 반투명 공유 재질(색은 MPB).</summary>

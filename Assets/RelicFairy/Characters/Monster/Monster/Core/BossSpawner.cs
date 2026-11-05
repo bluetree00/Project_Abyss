@@ -102,6 +102,28 @@ public class BossSpawner : MonoBehaviour
     // 직접 배치 보스 활성화
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+    /// <summary>
+    /// 악몽 보스 특성(11-05 사용자 「보스도 앨리트 버프를 보스용으로 해서 맞게 랜덤으로 몇 개」) — 정예 버프의 보스판(리치 1 · 나머지 2).
+    /// 등장 연출이 있으면 전투가 시작될 때(OnBossCombatReady) 붙인다 — 연출 중 꺼졌다 켜지는 몸에서 떨어지지 않게 · 보스바가 뜨는 순간 줄도 뜨게.
+    /// </summary>
+    private async UniTaskVoid AttachNightmareAffixesAsync(MonsterBase boss)
+    {
+        if (boss == null) return;
+        var kinds = MonsterTraitTable.RollBoss(StoryProgress.Era, boss is LichMonster);
+        if (kinds.Count == 0) return;
+        bool ready = !boss.HasEntranceAnimation;
+        System.Action onReady = () => ready = true;
+        if (!ready) boss.OnBossCombatReady += onReady;
+        try
+        {
+            await UniTask.WaitUntil(() => boss == null || boss.IsDead || (ready && boss.isActiveAndEnabled), cancellationToken: destroyCancellationToken);
+        }
+        catch (System.OperationCanceledException) { return; }
+        finally { if (boss != null) boss.OnBossCombatReady -= onReady; }
+        if (boss == null || boss.IsDead) return;
+        MonsterTraits.Attach(boss, kinds, null);
+    }
+
     private async UniTaskVoid ActivatePlacedBossAsync()
     {
         if (spawnDelay > 0f)
@@ -122,6 +144,7 @@ public class BossSpawner : MonoBehaviour
         // RoomClearController가 OnDied를 체이닝할 수 있도록 먼저 알림
         SpawnedBoss = placedBoss;
         OnMonsterSpawned?.Invoke(placedBoss);
+        AttachNightmareAffixesAsync(placedBoss).Forget();   // 11-05 악몽 보스 특성
 
         PlaySpawnEffectAsync(placedBoss.transform.position).Forget();
 
@@ -220,6 +243,7 @@ public class BossSpawner : MonoBehaviour
         _spawnedBossGO = bossGO;
         SpawnedBoss = boss;
         OnMonsterSpawned?.Invoke(boss);
+        AttachNightmareAffixesAsync(boss).Forget();   // 11-05 악몽 보스 특성
 
         PlaySpawnEffectAsync(transform.position).Forget();
 

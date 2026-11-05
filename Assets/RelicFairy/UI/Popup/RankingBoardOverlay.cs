@@ -52,7 +52,7 @@ public static class RankingBoardOverlay
             veilBtn.onClick.AddListener(() => closed = true);
 
             var page = UI_RankingPage.Create(go.transform, () => closed = true);
-            page.Open(UI_RankingPage.TabOf(era));
+            page.Open(era);
 
             FadeAsync(group, 1f, UIFader.OpenSec, ct).Forget();
             Managers.Sound?.PlayUiEvent(SoundEvent.UiOpen);   // 10-29 UI 소리 — 열기

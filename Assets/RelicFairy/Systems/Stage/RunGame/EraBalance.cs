@@ -44,7 +44,8 @@ public static class EraBalance
     // 10-21 체력은 따로(hp) — 같은 빌드 악몽 DPS가 봉인기의 ×2.75~3.2(10-15 실측 P2 Ch4 3,914 · Ch2 2,817)라 체력을 거기 맞추고, 공격은 그대로 둔다.
     private static readonly Spec SealedSpec    = new(stat: 1.0f, hp: 1.0f, count: 1.0f, elite: 0.00f, rarityStep: 0, fuel: 1.00f, gold: 1.0f, eventTime: 1.00f, extraWave: 0.5f);
     private static readonly Spec LiberatedSpec = new(stat: 1.3f, hp: 2.0f, count: 1.15f, elite: 0.08f, rarityStep: 1, fuel: 1.25f, gold: 1.2f, eventTime: 1.00f, extraWave: 0.7f);   // 10-22 A10 1.2 · 1.6 · 1.1 · 0.05 · 0.5에서
-    private static readonly Spec NightmareSpec = new(stat: 1.2f, hp: 2.6f, count: 1.2f, elite: 0.10f, rarityStep: 2, fuel: 1.50f, gold: 1.4f, eventTime: 0.85f, extraWave: 1.0f);
+    // 11-05 사용자 「악몽은 기본 스탯을 해방기보다 조금만 높게(보스는 정예 버프 보스판으로)」 — 1.2 · 2.6에서 해방기(1.3 · 2.0) 바로 위로
+    private static readonly Spec NightmareSpec = new(stat: 1.4f, hp: 2.2f, count: 1.2f, elite: 0.10f, rarityStep: 2, fuel: 1.50f, gold: 1.4f, eventTime: 0.85f, extraWave: 1.0f);
 
     // 두 번째 파도 구성 — 정예가 이끄는 작은 무리(첫 파도의 3~4할). 마릿수는 챕터 · 시기 수량 배율을 그대로 받는다.
     private const int ExtraWaveCommons = 3;
@@ -71,7 +72,7 @@ public static class EraBalance
     public static Spec For(StoryEra era) => era switch
     {
         StoryEra.Liberated     => LiberatedSpec,
-        StoryEra.NightmareMode => NightmareSpec,   // 공격 1.4 → 1.2(10-23 B5 — ChapterBalance 전체 공격 ×1.25 위에 곱해져 실효 1.5 · 악몽은 체력 위주)
+        StoryEra.NightmareMode => NightmareSpec,   // 10-23 B5 공격 1.4 → 1.2(체력 위주) · 11-05 다시 공격 1.4 · 체력 2.2(해방기 바로 위 — 악몽 몫은 보스 특성)
         _                      => SealedSpec,
     };
 

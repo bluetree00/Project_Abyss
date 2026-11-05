@@ -13,12 +13,16 @@ public static class RunResultPresenter
 
     // ── Public Methods ──
 
-    /// <summary>m:ss · 1시간 넘으면 h:mm:ss.</summary>
+    /// <summary>
+    /// 초 → 단위를 붙인 시간(11-05 사용자 「분인지 초인지도 한눈에 · 영어로 통일」 — 랭킹 <see cref="RankingService.Format"/>과 같은 꼴) —
+    /// 언어와 상관없이 「42s」 · 「46m 20s」 · 「1h 02m 03s」.
+    /// </summary>
     public static string FormatTime(int seconds)
     {
         seconds = Mathf.Max(0, seconds);
         int h = seconds / 3600, m = seconds / 60 % 60, s = seconds % 60;
-        return h > 0 ? $"{h}:{m:00}:{s:00}" : $"{seconds / 60}:{s:00}";
+        if (h > 0) return $"{h}h {m:00}m {s:00}s";
+        return seconds >= 60 ? $"{seconds / 60}m {s:00}s" : $"{s}s";
     }
 
     /// <summary>

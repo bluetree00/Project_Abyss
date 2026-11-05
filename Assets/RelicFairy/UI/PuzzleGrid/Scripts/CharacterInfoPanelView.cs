@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -44,6 +45,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
     // 좌측 열 공통 좌우 여백 — 아래 속성 시너지(MerlinRuneSynergyStatusView.Gutter)와 같은 값(09-28, 섹션마다 0~25px로 제각각이었다).
     public  const float Gutter  = 12f;
     private const float NameX   = 64f;   // 초상(52) + 12 — 초상이 없으면 0으로 당긴다
+    private const float DetailBtnW = 124f;   // 머리 오른쪽 [스탯 상세] 단추(11-05) — 이름 · 부제는 그만큼 비킨다
     // 섹션 머리띠 — 속성 시너지 머리띠와 같은 모양(색·글자). 같은 열의 두 제목이 서로 다른 띠라 조각나 보였다.
     public static readonly Color SectionBand = new(0.14f, 0.18f, 0.26f, 0.88f);
     public static readonly Color SectionInk  = new(0.75f, 0.90f, 1.00f, 1f);
@@ -249,7 +251,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         nrt.anchorMin = new Vector2(0f, 0.45f);
         nrt.anchorMax = new Vector2(1f, 1f);
         nrt.offsetMin = new Vector2(NameX, 0f);
-        nrt.offsetMax = Vector2.zero;
+        nrt.offsetMax = new Vector2(-(DetailBtnW + 8f), 0f);
         _nameText.alignment = TextAlignmentOptions.MidlineLeft;
         _nameRT = nrt;
 
@@ -259,9 +261,15 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         srt2.anchorMin = new Vector2(0f, 0f);
         srt2.anchorMax = new Vector2(1f, 0.52f);
         srt2.offsetMin = new Vector2(NameX, 2f);
-        srt2.offsetMax = Vector2.zero;
+        srt2.offsetMax = new Vector2(-(DetailBtnW + 8f), 0f);
         subTxt.alignment = TextAlignmentOptions.MidlineLeft;
         _subRT = srt2;
+
+        // 11-05 사용자 「스탯 상세보기 팝업을 열 수 있게 잘 보이게」 — 머리 오른쪽 금선 단추(룬판을 열면 왼쪽 위에 바로 보인다)
+        var detailBtn = UICodeOverlay.Btn((RectTransform)go.transform, "스탯 상세", Vector2.zero, new Vector2(DetailBtnW, 36f), 17f, OnStatDetailClicked);
+        var dbrt = (RectTransform)detailBtn.transform;
+        dbrt.anchorMin = dbrt.anchorMax = dbrt.pivot = new Vector2(1f, 0.5f);
+        dbrt.anchoredPosition = Vector2.zero;
     }
 
     // ── HP Section ────────────────────────────────────────────────
@@ -791,6 +799,13 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
     private void OnStatsChanged()              => RefreshStats();
     private void OnSynergyActivated(string _)  => RefreshEffects();
     private void OnEffectsChanged()            => RefreshEffects();
+
+    /// <summary>[스탯 상세] — 지금 능력치 · 적용된 룬 효과 전부를 한 창에(11-05).</summary>
+    private void OnStatDetailClicked()
+    {
+        if (_run == null || StatDetailView.IsOpen) return;
+        StatDetailView.OpenAsync(_run, this.GetCancellationTokenOnDestroy()).Forget();
+    }
 
     // ── Static Helpers ────────────────────────────────────────────
 

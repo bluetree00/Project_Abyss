@@ -367,6 +367,8 @@ public sealed class HudPresenter : MonoBehaviour
 
         _boss = boss;
         _boss.OnHPChanged += HandleBossHPChanged;
+        MonsterTraits.BossAffixesChanged += HandleBossAffixesChanged;   // 11-05 악몽 보스 특성 줄
+        view?.BossPanel?.SetAffixes(AffixLineOf(boss));
 
         view?.BossPanel?.ResetPageFx();   // 새 보스 — 지난 전투의 체력바 깨짐 연출을 걷는다
         view?.BossPanel?.Init(maxHp, boss.BossName);
@@ -423,6 +425,8 @@ public sealed class HudPresenter : MonoBehaviour
             _boss.OnBossCombatReady -= HandleBossCombatReady;
             _boss = null;
         }
+        MonsterTraits.BossAffixesChanged -= HandleBossAffixesChanged;
+        view?.BossPanel?.SetAffixes(null);
         AttachBossHudSource(null);
 
         _bossPanelSuppressed = false;
@@ -461,6 +465,15 @@ public sealed class HudPresenter : MonoBehaviour
     private void HandleBossVulnerableWindow(float seconds) => view?.BossPanel?.FlashVulnerable(seconds);
     private void HandleBossPageMarkersChanged() => view?.BossPanel?.SetPages(_bossHud?.HudPageMarkers, _bossHud?.HudPage ?? 1);
     private void HandleBossPageRefill(int page, float seconds) => view?.BossPanel?.PlayPageRefill(page, seconds);
+
+    // 11-05 악몽 보스 특성 줄 — 붙음 · 수호막 깎임 · 가시 쌓임
+    private void HandleBossAffixesChanged(MonsterBase m)
+    {
+        if (m != null && ReferenceEquals(m, _boss)) view?.BossPanel?.SetAffixes(AffixLineOf(m));
+    }
+
+    private static string AffixLineOf(MonsterBase boss)
+        => boss != null && boss.TryGetComponent<MonsterTraits>(out var t) ? t.BossAffixLine() : null;
 
     private void HandleHpChanged(int hp, int maxHp) => view?.CombatPanel?.SetHp(hp, maxHp);
     private void HandleGoldChanged(int gold)

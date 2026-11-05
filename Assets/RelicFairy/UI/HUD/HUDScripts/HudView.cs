@@ -33,6 +33,7 @@ public sealed class HudView : MonoBehaviour
     private const string TipRuneTabTitle = "룬판";
     private const string TipRuneTabBody  = "Tab 키로 연다. 보관함의 룬을 판에 놓아 속성 칸을 채우면 시너지가 켜진다.";
     private const float  RuneTabPillWidth = 176f;
+    private const float  RuneTabTextMargin = 8f;   // 11-05 #3 칸 폭 = 글 폭 + 안쪽 여백 + 이만큼(글 양옆 숨)
     private static readonly Color RuneTabFrameTint = new(0.80f, 0.74f, 0.58f);
     private const string TipRuneOreTitle = "원석";
     private const string TipRuneOreBody  = "정제소에서 무작위 룬을 뽑는다.\n런이 끝나면 사라진다.";
@@ -90,6 +91,7 @@ public sealed class HudView : MonoBehaviour
     private CurrencyGainFeedView _gainFeed;   // 재화 획득 목록 — 재화 칸 바로 아래(10-22)
     private GameObject _runeTabSlot;          // 11-02 Q13 「Tab 룬판 · 보관함 N」 — 재화 줄 맨 왼쪽
     private TMP_Text   _runeTabText;
+    private LayoutElement _runeTabLe;
     private int        _runeTabShown = -2;    // 지금 보이는 보관함 수(-1 = 숨김) — 바뀔 때만 글을 쓴다
     private Loc.Language _runeTabLang;        // 그 글의 언어(11-02 Q11 — 언어가 바뀌어도 다시 쓴다)
     private GameObject    _goldSlot;
@@ -186,6 +188,9 @@ public sealed class HudView : MonoBehaviour
         hlg.childAlignment     = TextAnchor.MiddleRight;
         hlg.childControlWidth  = true;  hlg.childControlHeight = true;
         hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+        // 11-05 #3 줄 폭 = 보이는 칸 합 — 고정 폭(재화 4칸)이면 Tab 칸까지 다섯 칸일 때 넘친 만큼 오른쪽(화면 밖)으로 밀렸다
+        // (가로 정렬은 넘치면 오른쪽 정렬을 안 지킨다). 피벗이 오른쪽이라 왼쪽으로 자란다.
+        rowGo.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         // 골드 — 기존 goldText를 pill 안으로 이동(래거시 위치 정리).
         // 공용 칸 테두리(새 「재화 UI」 세트)가 있으면 그걸 쓴다 — 옛 @2x 골드바 테두리는 코인이 박힌 6.5:1 아트라
@@ -216,9 +221,16 @@ public sealed class HudView : MonoBehaviour
         // 11-02 Q13 「Tab으로 룬판을 연다」 안내 — 재화 줄 맨 왼쪽 칸(오른쪽 정렬 줄이라 보이는 재화 수를 따라 자리가 붙는다)
         _runeTabSlot = MakeCurrencyPill("Pill_RuneTab", currencyFrameSprite, null, RuneTabFrameTint, Loc.T(TipRuneTabTitle), Loc.T(TipRuneTabBody), out _runeTabText);
         _runeTabSlot.transform.SetAsFirstSibling();
-        var tabLe = _runeTabSlot.GetComponent<LayoutElement>();
-        tabLe.preferredWidth = tabLe.minWidth = RuneTabPillWidth;
+        _runeTabLe = _runeTabSlot.GetComponent<LayoutElement>();
+        _runeTabLe.preferredWidth = _runeTabLe.minWidth = RuneTabPillWidth;
         _runeTabText.alignment = TextAlignmentOptions.Center;
+        // 11-05 #3 글 길이에 맞춰 칸이 넓어진다 — 1px 테는 뾰족한 끝을 그대로 두고 가운데만 늘린다(9-slice · 테는 2배 해상도)
+        var tabFrame = _runeTabSlot.transform.Find("Frame");
+        if (CombatPanelView.ThinHud && tabFrame != null && tabFrame.TryGetComponent<Image>(out var tabLine))
+        {
+            tabLine.type = Image.Type.Sliced;
+            tabLine.pixelsPerUnitMultiplier = UIThinShapes.Oversample;
+        }
         _runeTabSlot.SetActive(false);
     }
 
@@ -233,10 +245,13 @@ public sealed class HudView : MonoBehaviour
         _runeTabShown = n;
         _runeTabLang  = Loc.Current;
         _runeTabSlot.SetActive(n >= 0);
-        if (n >= 0)
-            _runeTabText.text = n > 0
-                ? $"<color={UIPalette.GoldHex}>Tab</color>  {Loc.T("룬판")} · <color={UIPalette.GoldHex}>{Loc.F("보관함 {0}", n)}</color>"
-                : $"<color={UIPalette.GoldHex}>Tab</color>  {Loc.T("룬판")}";
+        if (n < 0) return;
+        _runeTabText.text = n > 0
+            ? $"<color={UIPalette.GoldHex}>Tab</color>  {Loc.T("룬판")} · <color={UIPalette.GoldHex}>{Loc.F("보관함 {0}", n)}</color>"
+            : $"<color={UIPalette.GoldHex}>Tab</color>  {Loc.T("룬판")}";
+        // 11-05 #3 칸 폭 = 글 폭 + 안쪽 여백 — 176 고정이면 「Tab  룬판 · 보관함 1」(199) · 영어(317)가 칸 밖으로 나갔다
+        _runeTabLe.preferredWidth = _runeTabLe.minWidth = Mathf.Max(RuneTabPillWidth,
+            Mathf.Ceil(_runeTabText.GetPreferredValues(_runeTabText.text).x) + currencyPillPadding.x + currencyPillPadding.z + RuneTabTextMargin);
     }
 
     /// <summary>재화 pill 1개: 공통 배경(골드바 내부) + 테두리(선택) + 아이콘(선택) + 수치.</summary>
@@ -353,7 +368,8 @@ public sealed class HudView : MonoBehaviour
         float s  = UITheme.Thin.Stroke * k;
         float hx = tw * 0.5f - s * 0.5f - 0.5f, hy = th * 0.5f - s * 0.5f - 0.5f;   // 선 가운데가 지나는 반폭 · 반높이
         float ex = hx - tw * PillSlant;                                               // 윗변 · 아랫변 끝(뾰족한 끝이 시작되는 곳)
-        _pillLine = UI_RuneSelectPopup.MakeProcSprite("ThinCurrencyPill", tw, th, (u, v) =>
+        float bx = Mathf.Ceil(tw * PillSlant + s + 1f);                               // 9-slice 좌우 몫 = 뾰족한 끝(Tab 칸만 늘려 쓴다 · 11-05 #3)
+        _pillLine = UI_RuneSelectPopup.MakeProcSprite("ThinCurrencyPill", tw, th, border: new Vector4(bx, 0f, bx, 0f), alpha: (u, v) =>
         {
             float x = Mathf.Abs((u - 0.5f) * tw), y = Mathf.Abs((v - 0.5f) * th);
             float d = Mathf.Min(SegDist(x, y, 0f, hy, ex, hy), SegDist(x, y, ex, hy, hx, 0f));   // 한 사분면 = 윗변 + 빗변

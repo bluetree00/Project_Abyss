@@ -94,6 +94,7 @@ public static class TokenParser
         for (int x = 0; x < gw; x++)
         for (int gz = 0; gz < gh; gz++)
         {
+            if (x == 0 || gz == 0 || x == gw - 1 || gz == gh - 1) continue;   // 바깥 테두리 줄(벽 · 문)은 빼고 — 열린 문 칸이 Floor라 경계가 문간까지 닿았다(11-05 #14)
             var t = grid[x, gz];
             if (t == TileType.Wall || t == TileType.Empty || t == TileType.Ceiling) continue;
 

@@ -20,6 +20,7 @@ public static class RunResultProvider
         snap.Era           = s.StartEra;
         snap.AbyssDepth    = s.AbyssDepth;
         snap.PlaySeconds   = s.PlaySeconds;
+        snap.RankCentis    = RankingFlow.ConsumeResultCentis();
         snap.KilledBy      = cleared ? string.Empty : stats.LastHitBy;
         BuildSegments(snap, s, stats);
 

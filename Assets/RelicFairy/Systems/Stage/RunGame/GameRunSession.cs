@@ -1091,6 +1091,7 @@ public sealed class GameRunSession
     {
         EffectManager.RefreshContext(Player, this);
         EffectManager.Rebuild();
+        CodexLog.Note(this);   // 도감 「써 봄」 — 놓을 때마다(잠깐 놓았다 뺀 룬도 · 11-05 Q32 D3) · 저장은 다음 Sync
         RFLog.D($"[GridChk] 효과 rebuild (frame {Time.frameCount}) placed={ItemInventory.PlacedCount} → 효과수={EffectManager.ActiveEffects.Count}");
         RefreshPlayerItemStats();   // 새 효과 목록으로 스탯을 다시 모은다
     }

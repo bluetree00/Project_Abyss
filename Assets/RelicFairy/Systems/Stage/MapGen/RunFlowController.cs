@@ -1633,6 +1633,13 @@ public class RunFlowController : MonoBehaviour
         panel.transform.localScale = new Vector3(openW, openH, 0.12f);
 
         panel.TryGetComponent(out blocker);
+        // 11-05 #14 봉인 중엔 길찾기 판도 끊는다 — 콜라이더만으론 NavMesh를 따라 걷는 몬스터가 문 밖 복도로 나갔다(해방기 Ch3 「문 뒤 스폰」).
+        // 열릴 때(통과 차단 해제) 같이 끈다. 패널 두께 0.12 → 길찾기 판에선 1 m 두께로 깎는다.
+        var obstacle = panel.AddComponent<UnityEngine.AI.NavMeshObstacle>();
+        obstacle.shape               = UnityEngine.AI.NavMeshObstacleShape.Box;
+        obstacle.size                = new Vector3(1f, 1f, 1f / 0.12f);
+        obstacle.carving             = true;
+        obstacle.carveOnlyStationary = true;
         panel.TryGetComponent(out marker);
         // 빌드에서 프리미티브 기본 머티리얼이 핑크로 스트립되는 문제 → URP/Lit 명시 할당.
         RuntimePrimitiveMaterial.Apply(marker, color);
@@ -1752,7 +1759,11 @@ public class RunFlowController : MonoBehaviour
         catch (OperationCanceledException) { return; }
         if (label != null) { var lc = label.color; lc.a = 1f; label.color = lc; }
 
-        if (view.blocker != null) view.blocker.enabled = false; // 통과 차단 해제
+        if (view.blocker != null)
+        {
+            view.blocker.enabled = false;                                                  // 통과 차단 해제
+            if (view.blocker.TryGetComponent<UnityEngine.AI.NavMeshObstacle>(out var ob)) ob.enabled = false;   // 길찾기 판도 다시 잇는다(11-05 #14)
+        }
         view.gate?.Reveal(plan);                                 // plan 바인딩 + arm
     }
 
@@ -1998,7 +2009,12 @@ public class RunFlowController : MonoBehaviour
     /// ※ "로비로 가기"는 여기 오지 않는다 — 그 경로는 EndRun()으로 세이브를 의도적으로 폐기한다(런 포기).
     /// ※ 잠금 중(피해를 받은 뒤)이나 클리어 전 전투방이면 SaveNow가 쓰지 않는다 — 잠긴 세이브가 남아 이어하기에서 사망 정산된다(10-10).
     /// </summary>
-    private void OnApplicationQuit() => SaveNow("app-quit");
+    private void OnApplicationQuit()
+    {
+        SaveNow("app-quit");
+        // 11-05 랭킹 시계 — 저장을 건너뛴 방(싸우는 중 · 잠금)에서 꺼도 흐른 시간은 남긴다(내용은 그대로 · 이어하면 시간이 되돌아가지 않게)
+        if (!_resuming) RunProgressManager.Instance?.SaveRunClock(GameRunBootstrapper.Instance?.Run);
+    }
 
     private void OnDestroy()
     {

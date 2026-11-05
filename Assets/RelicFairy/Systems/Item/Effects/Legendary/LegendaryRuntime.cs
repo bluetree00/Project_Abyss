@@ -18,6 +18,8 @@ public class LegendaryRuntime : MonoBehaviour
         "GAPH Custom Shader/Distortion Effect", "Hovl/Particles/Distortion", "Hovl/Particles/BlendDistort",
     };
 
+    private const float FloorLift = 0.05f;   // 바닥 광역 · 장판 그림을 살짝 띄운다 — 바닥과 같은 높이면 겹쳐 깜박였다(11-05 #8 · 맞은 자리 그림은 5 cm라 티 안 남)
+
     // 풀링 #7(11-02) — 전설 이펙트 전용 풀. BossEffectPool과 사본을 나누지 않는다: 같은 프리팹을 쓰는 리치 쪽이 사본의 입자 크기 모드 · 반복 · 색을 바꿔 둔다.
     private const int FxPoolCap = 16;   // 프리팹당 쉬는 사본 상한 — 넘치면 지운다
     private static readonly Dictionary<GameObject, Stack<GameObject>> s_fxPool = new();
@@ -134,6 +136,7 @@ public class LegendaryRuntime : MonoBehaviour
     public static void SpawnVfx(GameObject prefab, Vector3 pos, Quaternion rot, float lifetime = 3f, float scale = 1f, float alpha = 1f, float yScale = -1f, Transform follow = null)
     {
         if (prefab == null) return;
+        pos.y += FloorLift;
         alpha *= PlayerFxCalm.Alpha;   // 예고가 떠 있으면 옅게(10-30)
         var ls = Vector3.one * scale;
         if (yScale >= 0f) ls.y = yScale;

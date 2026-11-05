@@ -13,6 +13,7 @@ using UnityEngine;
 /// </summary>
 public static class UIInputGate
 {
-    /// <summary>차단형 팝업 · ESC 메뉴가 열려 있으면 true — 월드 상호작용 원시 입력을 무시할 것(ESC 메뉴는 팝업 스택 밖이라 따로 · 11-02 Q32 A1).</summary>
-    public static bool Blocked => (Managers.UI?.IsGameplayBlocked ?? false) || UI_EscMenu.AnyOpen;
+    /// <summary>차단형 팝업 · ESC 메뉴가 열려 있으면 true — 월드 상호작용 원시 입력을 무시할 것(ESC 메뉴는 팝업 스택 밖이라 따로 · 11-02 Q32 A1).
+    /// 방 전환 덮개(ScreenFade)가 화면을 덮는 동안도 — 덮개 밑에서 [F]가 창을 열었다(11-05 Q32 C3).</summary>
+    public static bool Blocked => (Managers.UI?.IsGameplayBlocked ?? false) || UI_EscMenu.AnyOpen || ScreenFade.Covering;
 }

@@ -4451,3 +4451,77 @@ Esc › 랭킹 — 모든 플레이어의 기록,Esc › Rankings — every play
 적이 몰려 있을 때,When enemies are packed together
 모이는 속성,Gathered Element
 휘두름에 맞은 적 중 체력이 가장 많은 적에게 속성을 모아 한 번 더 내려친다(공격력의 360% · 둘레 2m까지).,Gathers the element onto the toughest enemy hit and strikes it again (360% of ATK · reaches 2m around).
+클리어 시간,Clear Time
+챕터 {0} · {1} 기록,Chapter {0} · {1} Records
+{0} · 챕터 {1} 보스전 — 보스방에서 싸운 시간,{0} · Chapter {1} Boss Fight — time fighting in the boss room
+{0} · 챕터 {1} 전투 — 그 챕터 방들에서 싸운 시간,{0} · Chapter {1} Combat — time fighting in that chapter's rooms
+봉인기 기록은 기기에만 남는다 — 랭킹은 해방기부터,Sealed Era records stay on this device — rankings start in the Liberation Era
+실시간 · 전체 {0}명 · <color=#FFD147>지금 내 순위 {1}위</color> · {2} 갱신,Live · {0} total · <color=#FFD147>You're #{1} now</color> · updated {2}
+실시간 · 전체 {0}명 · 내 기록 없음 · {1} 갱신,Live · {0} total · no record yet · updated {1}
+런 시작부터 리치 처치까지 실제로 흐른 시간 — 일시정지 · 고르기 창 · 대사 · 컷신 · 로딩은 뺀다,"Real time from run start to the Lich's defeat — pauses, choice windows, dialogue, cutscenes and loading excluded"
+랭킹 기록 <color=#FFD147>{0}</color> · 일시정지 · 컷신 · 로딩 뺌,"Ranking time <color=#FFD147>{0}</color> · pauses, cutscenes, loading excluded"
+한 속성의 피해 −30%,−30% damage from one element
+여섯 번 맞으면 둘레가 터진다 — 붉은 원 밖으로,Bursts after six hits — step out of the red circle
+때때로 발밑에 원 셋을 떨어뜨린다 — 원 밖으로,Drops three circles at your feet now and then — step out
+악몽 보스 특성 — {0},Nightmare boss traits — {0}
+곁의 그림자가 평타 · 스킬을 한 박자 늦게 따라 쓴다 — 그림자마다 자기 앞 적에게 그 타격의 {0}% 피해(스킬은 절반) · 검풍도 그림자마다 따로(확률 40%) · 재련 2 · 4회째에 그림자가 하나씩 는다,Shadows at your side copy your basic attacks and skills a beat later — each strikes the enemy in front of it for {0}% of that hit (half for skills) · each shadow also rolls Sword Gale on its own (40% of the chance) · gain one more shadow at the 2nd and 4th Reforge
+응축된 화염의 룬,Condensed Rune of Flame
+응축된 얼음의 룬,Condensed Rune of Frost
+응축된 번개의 룬,Condensed Rune of Lightning
+응축된 숲의 룬,Condensed Rune of the Forest
+응축된 성광의 룬,Condensed Rune of Radiance
+응축된 그림자의 룬,Condensed Rune of Shadow
+치명타 피해 +12%,Crit Damage +12%
+적중 시 6% 확률로 같은 피해 1회 추가,6% chance on hit to deal the same damage once more
+방어력 +6,Defense +6
+적중 시 서리 1중첩(같은 적 0.5초에 한 번) · 서리 2중첩 적에게 피해 +8%,Hits apply 1 Frost stack (once per 0.5s per enemy) · +8% damage to enemies with 2 Frost stacks
+공격속도 +7%,Attack Speed +7%
+같은 적 5번마다 번개 일격 공격력 7.5% + 2명 연쇄,"Every 5 hits on the same enemy, a lightning strike for 7.5% ATK + chains to 2 enemies"
+최대 체력 +60,Max HP +60
+적중 시 독 1중첩(최대 8 · 중첩당 초당 공격력 2% · 4초),Hits apply 1 Poison stack (max 8 · 2% ATK per stack per second · 4s)
+치명타 확률 +4%,Crit Chance +4%
+강타 뒤 3초간 치명 피해 +15%,Crit Damage +15% for 3s after a Heavy Hit
+공격력 +6%,ATK +6%
+구르기 직후 첫 공격 +40% · 그 타는 강타,First attack right after a roll +40% · that hit is a Heavy Hit
+룬 성소,Rune Shrine
+한 칸 영웅 룬,One-cell Epic Rune
+제단 셋 중 하나를 고른다,Pick one of three altars
+안 고르면 룬 없이 끝난다,"No choice, no rune"
+<color=#B8C0CC>[F]</color> 빈 제단 — 정수 · 금화 받기,<color=#B8C0CC>[F]</color> Empty altar — take Essence · Gold
+{0} — 받을 룬이 남아 있지 않다 · 정수와 금화를 대신 받는다,{0} — no runes left to take · you get Essence and Gold instead
+"<color={0}>[F]</color> 받기
+<size=60%>{1}</size>","<color={0}>[F]</color> Take
+<size=60%>{1}</size>"
+{0} — 제단 {1}개 중 <color=#B892E6>1개만</color> 고른다 · 한 칸짜리 영웅 룬,{0} — choose <color=#B892E6>only 1</color> of {1} altars · one-cell Epic runes
+닫힘,Closed
+룬 대신 — 정수 +{0} · 금화 +{1},Instead of a rune — Essence +{0} · Gold +{1}
+<color={0}>{1}</color> — 룬판의 {2} 칸이나 가운데에 놓는다,<color={0}>{1}</color> — place it in a {2} zone or the center of the rune board
+스탯 상세,Stat Details
+지금 적용 중인 값 — 룬 · 유물 · 버프 · 각인을 모두 합친 결과,"Current values — runes, relic, buffs and imprints combined"
+능력치,Stats
+룬 효과,Rune Effects
+한 타에 붙는 보너스(룬 · 증강 · 전설)는 서로 곱해진다   ·   Esc · Tab 닫기,Per-hit bonuses (runes · augments · legendaries) multiply together   ·   Esc · Tab to close
+이동 · 기술,Movement · Skills
+그 밖,Other
+치명 피해,Crit Damage
+받는 피해 감소,Damage Reduction
+받는 회복,Healing Received
+상태이상 저항,Status Resistance
+구르기 재사용,Roll Cooldown
+추가 투사체,Extra Projectiles
+고등급 룬 확률,High-Grade Rune Chance
+소모품 칸,Consumable Slots
+룬 {0},Runes {0}
+속성 시너지,Element Synergy
+켜진 속성 시너지가 없다 — 같은 속성 룬을 그 속성 구역에 모으면 단계가 켜진다,No element synergy active — gather runes of one element in that element's zone to unlock tiers
+단계 없음,No tier
+발동 계열 각인,Trigger-Family Imprints
+모은 발동 계열이 없다 — 같은 때 터지는 룬을 2 · 4 · 6개 모으면 그 계열 룬 효과가 커진다,No trigger family yet — collect 2 · 4 · 6 runes that fire on the same trigger to boost that family's rune effects
+아직 단계 없음,No tier yet
+다음 단계까지 {0} · {1},{0} more to the next tier · {1}
+각인 {0},Imprint {0}
+놓인 룬,Placed Runes
+룬판에 놓인 룬이 없다 — 보관함의 룬을 판에 놓으면 여기 효과가 쌓인다,No runes on the board — place runes from storage and their effects will stack here
+{0} 각인 ×{1},{0} imprint ×{1}
+지금 켜진 조건부 효과,Conditional Effects Active Now
+지금 조건이 충족된 효과가 없다 — 조건(체력 · 연타 · 처치 …)이 맞으면 여기 뜬다,No conditions met right now — effects appear here when their condition (HP · combo · kill …) is met

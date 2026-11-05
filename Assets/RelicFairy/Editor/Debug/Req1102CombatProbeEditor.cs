@@ -1066,71 +1066,405 @@ public static class Req1102CombatProbeEditor
         }
     }
 
-    /// <summary>풀링 #8(10-29 문서) — 몬스터 폴더 SO(공격 모양 · 패턴 · 원거리 · 특수 상태 …)가 든 입자 프리팹마다
-    /// 한 번 만들기(Instantiate) + 지우기(DestroyImmediate · 나중 Destroy의 상한)를 BossEffectPool 재사용(Spawn → Release)과 견준다. 편집기 플레이.
-    /// 스크립트가 붙은 것은 풀 재사용을 재지 않는다(재사용하면 달라질 수 있어 풀 대상이 아니다). 결과 Temp/req1102_monfx.txt(비싼 순).</summary>
-    [MenuItem("RelicFairy/Debug/11-02 전투/풀링 #8 몬스터 공격 이펙트 한 번 비용 (Build/BaseCamp, 플레이 중)")]
-    private static void RunMonFx() { if (EditorApplication.isPlaying) RunMonFxAsync().Forget(); }
+    private const string KatanaT1 = "Assets/RelicFairy/Weapon/Katana/Data/T1_Katana.asset";
+    private const string PhantomDanceAsset = "Assets/RelicFairy/Weapon/Katana/Data/KatanaBase/PhantomDance.asset";
+    private const string GolemPrefab = "Assets/RelicFairy/Characters/Monster/Monster/Golem/Prefab/Golem.prefab";
 
-    private static async UniTaskVoid RunMonFxAsync()
+    /// <summary>11-05 #16 「카타나 R 조작감 — 딜레이 · 범위 · 속도」 — 발도 0.35 → 0.25 · X자 대기 0.53 → 0.40 · 후딜 0.20 → 0.12 · 이어 갈라짐 간격 0.10 → 0.08 ·
+    /// 사거리 4.5 → 5 · 각도 120 → 90 · 발도 그림 1 → 1.25(그림 = 판정). 결과 Temp/req1105_katana_asset.txt.</summary>
+    [MenuItem("RelicFairy/Debug/11-02 전투/11-05 #16 환영베기 값 반입 (편집 모드)")]
+    private static void ApplyKatanaR()
     {
-        const int N = 10;
-        var sb = new StringBuilder("11-02 풀링 #8 몬스터 공격 이펙트 한 번 비용(ms · 편집기 플레이)\n");
+        var so = AssetDatabase.LoadAssetAtPath<ScriptableObject>(PhantomDanceAsset);
+        if (so == null) { Debug.LogWarning($"{Tag} 환영베기 에셋 없음"); return; }
+        var s = new SerializedObject(so);
+        var dh = s.FindProperty("drawHitTimes");
+        string Read() => $"발도 {(dh.arraySize > 0 ? dh.GetArrayElementAtIndex(0).floatValue : -1f)} · X자 대기 {s.FindProperty("cutDelay").floatValue} · 후딜 {s.FindProperty("endDelay").floatValue}"
+                       + $" · 이어 간격 {s.FindProperty("slashProjectileDelay").floatValue} · 사거리 {s.FindProperty("drawRange").floatValue} · 각도 {s.FindProperty("drawAngle").floatValue}"
+                       + $" · 발도 그림 {s.FindProperty("drawEffectScale").floatValue}";
+        string before = Read();
+        dh.arraySize = 1;
+        dh.GetArrayElementAtIndex(0).floatValue = 0.25f;
+        s.FindProperty("cutDelay").floatValue = 0.40f;
+        s.FindProperty("endDelay").floatValue = 0.12f;
+        s.FindProperty("slashProjectileDelay").floatValue = 0.08f;
+        s.FindProperty("drawRange").floatValue = 5f;
+        s.FindProperty("drawAngle").floatValue = 90f;
+        s.FindProperty("drawEffectScale").floatValue = 1.25f;
+        s.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(so);
+        AssetDatabase.SaveAssets();
+        string msg = $"전: {before}\n뒤: {Read()}";
+        File.WriteAllText("Temp/req1105_katana_asset.txt", msg);
+        Debug.Log($"{Tag} 끝 → Temp/req1105_katana_asset.txt\n{msg}");
+    }
+
+    /// <summary>11-05 #19 「골렘이 잘 맞지 않는다」 — 루트 캡슐(반경 0.47 · 높이 2.59 · 중심 0.89 → 바닥이 발밑 0.4 m 아래 · 윗몸이 빠졌다)을
+    /// 그림(렌더러 묶음 상자)에 맞춘다: 그림 바닥부터 그림 높이 97% · 반경 = 좁은 쪽 폭의 28%(0.5 ~ 0.65). 그림 크기가 이상하면(높이 2 ~ 4 밖) 정한 값(0.62 · 2.95 · 1.47).
+    /// 결과 Temp/req1105_golem.txt.</summary>
+    [MenuItem("RelicFairy/Debug/11-02 전투/11-05 #19 골렘 캡슐 맞추기 (편집 모드)")]
+    private static void FitGolemCapsule()
+    {
+        var root = PrefabUtility.LoadPrefabContents(GolemPrefab);
+        var sb = new StringBuilder("11-05 #19 골렘 캡슐\n");
+        try
+        {
+            var cap = root.GetComponent<CapsuleCollider>();
+            if (cap == null) { sb.AppendLine("루트 캡슐 없음"); return; }
+            var b = new Bounds();
+            bool any = false;
+            foreach (var r in root.GetComponentsInChildren<Renderer>(true))
+            {
+                if (r is ParticleSystemRenderer || r is LineRenderer || r is TrailRenderer) continue;
+                if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds);
+            }
+            Vector3 rp = root.transform.position, rs = root.transform.lossyScale;
+            sb.AppendLine($"전: 캡슐 반경 {cap.radius} · 높이 {cap.height} · 중심 {cap.center} · 루트 {rp} 배율 {rs}");
+            sb.AppendLine($"그림: 가운데 {b.center} · 크기 {b.size} · 바닥 {b.min.y:0.000}");
+            float sy = Mathf.Max(0.0001f, Mathf.Abs(rs.y)), sxz = Mathf.Max(0.0001f, Mathf.Max(Mathf.Abs(rs.x), Mathf.Abs(rs.z)));
+            float h = b.size.y / sy, w = Mathf.Min(b.size.x, b.size.z) / sxz;
+            float radius, height, cy, cz;
+            if (any && h >= 2f && h <= 4f)
+            {
+                height = h * 0.97f;
+                radius = Mathf.Clamp(w * 0.28f, 0.5f, 0.65f);   // 내비 반경(0.5)보다 너무 크면 몸으로 막는 거리가 는다
+                cy = (b.min.y - rp.y) / sy + height * 0.5f;
+                cz = Mathf.Clamp((b.center.z - rp.z) / sxz, -0.3f, 0.3f);
+                sb.AppendLine("그림 크기로 맞춤");
+            }
+            else
+            {
+                radius = 0.62f; height = 2.95f; cy = 1.47f; cz = 0.1f;
+                sb.AppendLine("그림 크기가 이상해 정한 값으로");
+            }
+            cap.radius = radius;
+            cap.height = Mathf.Max(height, radius * 2f);
+            cap.center = new Vector3(0f, Mathf.Max(cy, radius), cz);
+            PrefabUtility.SaveAsPrefabAsset(root, GolemPrefab);
+            sb.AppendLine($"뒤: 캡슐 반경 {cap.radius:0.000} · 높이 {cap.height:0.000} · 중심 {cap.center}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+            File.WriteAllText("Temp/req1105_golem.txt", sb.ToString());
+            Debug.Log($"{Tag} 끝 → Temp/req1105_golem.txt\n{sb}");
+        }
+    }
+
+    /// <summary>11-05 #16 카타나 R(환영베기) — 플레이어 안내(판정 부채꼴)를 켜고 R을 써 발도 그림과 판정을 같은 사진에(0.18 · 0.25 · 0.3 · 0.4초) ·
+    /// 스킬 끝 시각을 적는다. 결과 Temp/req1102_katanar.txt · 사진 R1102_KatanaR_{n}.png.</summary>
+    [MenuItem("RelicFairy/Debug/11-02 전투/카타나 R 그림 · 판정 · 박자 (Build/BaseCamp, 플레이 중)")]
+    private static void RunKatanaR() { if (EditorApplication.isPlaying) RunKatanaRAsync().Forget(); }
+
+    private static async UniTaskVoid RunKatanaRAsync()
+    {
+        var sb = new StringBuilder("11-05 #16 카타나 R\n");
+        var ct = CancellationToken.None;
+        bool guides = SkillRangeRing.PlayerGuides;
         try
         {
             var p = await FindPlayerAsync();
-            Vector3 at = (p != null ? p.transform.position : Vector3.zero) + Vector3.down * 50f;   // 화면 밖 — 만들기만 잰다
-            var found = new Dictionary<GameObject, string>();
-            foreach (var guid in AssetDatabase.FindAssets("t:ScriptableObject", new[] { "Assets/RelicFairy/Characters/Monster" }))
+            if (p == null) { sb.AppendLine("플레이어 없음"); return; }
+            var equip = typeof(WeaponFormProbeEditor).GetMethod("EquipAsync", SAny);
+            if (equip == null || !await (UniTask<bool>)equip.Invoke(null, new object[] { p, KatanaT1, ct, PlayerWeaponManager.Slot0 })) { sb.AppendLine("카타나 장착 실패"); return; }
+            SkillRangeRing.PlayerGuides = true;
+            for (int run = 0; run < 2; run++)
             {
-                var so = AssetDatabase.LoadAssetAtPath<ScriptableObject>(AssetDatabase.GUIDToAssetPath(guid));
-                if (so == null) continue;
-                var it = new SerializedObject(so).GetIterator();
-                while (it.Next(true))
-                    if (it.propertyType == SerializedPropertyType.ObjectReference && it.objectReferenceValue is GameObject go && go != null
-                        && go.GetComponentInChildren<ParticleSystem>(true) != null && !found.ContainsKey(go))
-                        found[go] = $"{so.GetType().Name}.{it.propertyPath}({so.name})";
-            }
-            sb.AppendLine($"입자 프리팹 {found.Count}종");
-            var rows = new List<(double cost, string line)>();
-            var sw = new System.Diagnostics.Stopwatch();
-            var made = new GameObject[N];
-            foreach (var kv in found)
-            {
-                for (float w = 0f; w < 3f && Time.timeScale == 0f; w += 0.1f) { Managers.UI?.CloseAllPopupUI(); await UniTask.Delay(100, ignoreTimeScale: true); }
-                var prefab = kv.Key;
-                int psN = prefab.GetComponentsInChildren<ParticleSystem>(true).Length;
-                int scripts = prefab.GetComponentsInChildren<MonoBehaviour>(true).Length;
-                UnityEngine.Object.DestroyImmediate(UnityEngine.Object.Instantiate(prefab, at, Quaternion.identity));   // 데우기
-                sw.Restart();
-                for (int i = 0; i < N; i++) made[i] = UnityEngine.Object.Instantiate(prefab, at, Quaternion.identity);
-                sw.Stop();
-                double make = sw.Elapsed.TotalMilliseconds / N;
-                sw.Restart();
-                for (int i = 0; i < N; i++) UnityEngine.Object.DestroyImmediate(made[i]);
-                sw.Stop();
-                double kill = sw.Elapsed.TotalMilliseconds / N;
-                string pool = "-";
-                if (scripts == 0)
+                if (Time.timeScale == 0f) Managers.UI?.CloseAllPopupUI();
+                await UniTask.Delay(900, ignoreTimeScale: true);
+                p.CooldownTracker.ResetCooldown(SkillType.R);
+                p.InputBuffer.Clear();
+                p.InputBuffer.Push(Command.RSkill);
+                float t0 = Time.realtimeSinceStartup, started = -1f, ended = -1f;
+                float[] at = { 0.18f, 0.25f, 0.3f, 0.4f };
+                int k = 0;
+                while (Time.realtimeSinceStartup - t0 < 2.5f)
                 {
-                    RelicFairy.Monster.BossEffectPool.Release(RelicFairy.Monster.BossEffectPool.Spawn(prefab, at, Quaternion.identity));
-                    sw.Restart();
-                    for (int i = 0; i < N; i++) RelicFairy.Monster.BossEffectPool.Release(RelicFairy.Monster.BossEffectPool.Spawn(prefab, at, Quaternion.identity));
-                    sw.Stop();
-                    pool = (sw.Elapsed.TotalMilliseconds / N).ToString("0.000");
+                    float e = Time.realtimeSinceStartup - t0;
+                    bool inSkill = p.IsInSkillAction;
+                    if (inSkill && started < 0f) started = e;
+                    if (!inSkill && started >= 0f && ended < 0f) ended = e;
+                    if (run == 0 && started >= 0f && k < at.Length && e - started >= at[k]) CaptureFollow(p, $"Temp/ui_shots/R1102_KatanaR_{k++}.png");
+                    await UniTask.Yield(PlayerLoopTiming.Update, ct);
                 }
-                rows.Add((make + kill, $"  {make + kill:0.000} = 만들기 {make:0.000} + 지우기 {kill:0.000} · 보스 풀 {pool} · 계통 {psN} · 스크립트 {scripts} · {prefab.name} ← {kv.Value}"));
-                await UniTask.Yield();
+                sb.AppendLine($"R {run + 1} — 시작 {started:0.00}초 · 끝 {(ended >= 0f ? (ended - started).ToString("0.00") + "초" : "안 끝남")} · 배율 {Time.timeScale:0.##}");
             }
-            rows.Sort((a, b) => b.cost.CompareTo(a.cost));
-            foreach (var r in rows) sb.AppendLine(r.line);
         }
         catch (Exception e) { sb.AppendLine("예외 " + e); }
         finally
         {
-            File.WriteAllText("Temp/req1102_monfx.txt", sb.ToString());
-            Debug.Log($"{Tag} 끝 → Temp/req1102_monfx.txt");
+            SkillRangeRing.PlayerGuides = guides;
+            File.WriteAllText("Temp/req1102_katanar.txt", sb.ToString());
+            Debug.Log($"{Tag} 끝 → Temp/req1102_katanar.txt");
         }
+    }
+
+    /// <summary>11-05 #1 「보스 시작 때 공격하면 화면이 고정된다」 · #12 「화룡 등장 때 평타를 치며 들어가면 연출이 끝없이」 — 테스트 허브 보스방에서
+    /// 평타를 치며 입구로 들어가(테스트 허브 메뉴 1 · 2) 등장 중에도 0.12초마다 평타를 6초 민다. 보스 HP · 무적 · 등장 대기 상태 · 입력 잠금 · 카메라 수동 제어를 적는다.
+    /// 결과 Temp/req1105_bossentrance.txt.</summary>
+    [MenuItem("RelicFairy/Debug/11-02 전투/11-05 #1 · #12 보스 등장 중 평타 (테스트 허브 보스방, 플레이 중)")]
+    private static void RunBossEntrance() { if (EditorApplication.isPlaying) RunBossEntranceAsync().Forget(); }
+
+    private static async UniTaskVoid RunBossEntranceAsync()
+    {
+        var sb = new StringBuilder("11-05 #1 · #12 보스 등장 중 평타\n");
+        try
+        {
+            PlayerController p = null;
+            BossRoomController room = null;
+            for (float t = 0f; t < 90f && (p == null || room == null); t += 0.5f)
+            {
+                p = GameRunBootstrapper.Instance?.Run?.Player;
+                room = UnityEngine.Object.FindFirstObjectByType<BossRoomController>();
+                if (p == null || room == null) await UniTask.Delay(500, ignoreTimeScale: true);
+            }
+            if (p == null || room == null) { sb.AppendLine("보스방 아님(플레이어 · BossRoomController)"); return; }
+            await UniTask.Delay(1500, ignoreTimeScale: true);
+            var cam = GameCameraController.Instance;
+            var panning = typeof(GameCameraController).GetField("_isPanning", Inst);
+            var inputOff = typeof(PlayerController).GetField("_inputDisabledExternally", Inst);
+            RelicFairy.Monster.MonsterBase boss = null;   // 보스는 입구를 밟아야 나온다(BossSpawner waitForExternalTrigger)
+            var fsmF = typeof(RelicFairy.Monster.MonsterBase).GetField("_fsm", Inst);
+            bool Dormant()   // 등장 대기 인스턴스가 지금 상태인가(등록 키가 없어 IsInState로는 못 묻는다)
+            {
+                if (boss == null) return false;
+                var ds = boss.GetType().GetField("_dormantState", Inst)?.GetValue(boss) as RelicFairy.Monster.IMonsterState;
+                return fsmF?.GetValue(boss) is RelicFairy.Monster.MonsterFSM fsm && fsm.IsCurrent(ds);
+            }
+            int probeHits = 0, probeDealt = 0, probeHp0 = -1, probeHp1 = -1;
+            float nextProbe = 0f;
+
+            float t0 = Time.realtimeSinceStartup, lastPush = -1f, doneAt = -1f, immuneSeen = -1f, bossAt = -1f;
+            int pushes = 0, hp0 = -1, blockedHp = -1;
+            bool stepped = false, past = false;
+            while (Time.realtimeSinceStartup - t0 < 90f)
+            {
+                float e = Time.realtimeSinceStartup - t0;
+                if (e < 9f && e - lastPush >= 0.12f) { p.InputBuffer.Push(Command.Light); lastPush = e; pushes++; }   // 평타를 치면서 들어간다(사용자 재현)
+                if (!stepped && e >= 0.6f) { EditorApplication.ExecuteMenuItem("RelicFairy/Test Run/Boss Room/1 Step Into Entrance (Play)"); stepped = true; }
+                else if (stepped && !past && e >= 0.9f) { EditorApplication.ExecuteMenuItem("RelicFairy/Test Run/Boss Room/2 Step Past Entrance (Play)"); past = true; }
+                if (boss == null)
+                    foreach (var m in UnityEngine.Object.FindObjectsByType<RelicFairy.Monster.MonsterBase>(FindObjectsSortMode.None))
+                        if (m is RelicFairy.Monster.DragonBossMonster || m is RelicFairy.Monster.DeathKnightBossMonster || m is RelicFairy.Monster.ForestGuardianMonster)
+                        { boss = m; bossAt = e; hp0 = blockedHp = m.CurrentHp; sb.AppendLine($"{e:0.0}초 보스 {m.name} · HP {hp0} · 등장 대기 {Dormant()} · 무적 {m.IsDamageImmuneNow}"); break; }
+                bool dormant = Dormant();
+                // 등장 중 주 피해 길로 직접 넣어 본다(0.5초마다) — 막히면 피해 0 · HP 그대로(평타는 거리상 안 닿을 수 있다)
+                if (dormant && boss.CurrentHp > 0 && e >= nextProbe)
+                {
+                    nextProbe = e + 0.5f;
+                    if (probeHp0 < 0) probeHp0 = boss.CurrentHp;
+                    float dealt = CombatDamage.Deal(new CombatDamage.Request
+                    {
+                        Target = boss.gameObject, BaseDamage = 100f, Owner = p.gameObject, ActionType = WeaponActionType.GroundLight,
+                        KnockbackMultiplier = 1f, HitPoint = boss.transform.position + Vector3.up, SourcePosition = p.transform.position,
+                    });
+                    probeHits++;
+                    if (dealt > 0f) probeDealt++;
+                    probeHp1 = boss.CurrentHp;
+                }
+                if (boss != null && boss.IsDamageImmuneNow && immuneSeen < 0f) immuneSeen = e;
+                if (dormant) blockedHp = boss.CurrentHp;
+                bool camManual = cam != null && panning != null && (bool)panning.GetValue(cam);
+                bool locked = inputOff != null && (bool)inputOff.GetValue(p);
+                if (boss != null && past && e - bossAt > 1f && !dormant && !camManual && !locked) { doneAt = e; break; }
+                if (Time.timeScale == 0f) Managers.UI?.CloseAllPopupUI();
+                await UniTask.Yield(PlayerLoopTiming.Update);
+            }
+            if (boss == null) { sb.AppendLine("보스가 안 나왔다(90초)"); return; }
+            if (doneAt >= 0f)   // 등장이 끝나면 무적이 풀리나 — 한 번 넣어 HP가 주나
+            {
+                await UniTask.Delay(500, ignoreTimeScale: true);
+                int before = boss.CurrentHp;
+                float dealt = CombatDamage.Deal(new CombatDamage.Request
+                {
+                    Target = boss.gameObject, BaseDamage = 100f, Owner = p.gameObject, ActionType = WeaponActionType.GroundLight,
+                    KnockbackMultiplier = 1f, HitPoint = boss.transform.position + Vector3.up, SourcePosition = p.transform.position,
+                });
+                sb.AppendLine($"등장 뒤 직접 피해 {dealt:0.0} · HP {before} → {boss.CurrentHp} · 무적 {boss.IsDamageImmuneNow}(들어가야 정상)");
+            }
+            bool camM = cam != null && panning != null && (bool)panning.GetValue(cam);
+            bool lockedEnd = inputOff != null && (bool)inputOff.GetValue(p);
+            sb.AppendLine($"평타 민 수 {pushes} · 처음 무적 {(immuneSeen >= 0f ? immuneSeen.ToString("0.0") + "초" : "없음")} · 등장 중 HP {hp0} → {blockedHp}(깎이면 등장 중 맞음)");
+            sb.AppendLine($"등장 중 직접 피해 {probeHits}번 · 들어감 {probeDealt}번 · HP {probeHp0} → {probeHp1}(0번 · 그대로면 막힘)");
+            sb.AppendLine($"등장 끝 {(doneAt >= 0f ? doneAt.ToString("0.0") + "초" : "90초 안에 안 끝남")} · 등장 대기 남음 {Dormant()} · 카메라 수동 {camM} · 입력 잠금 {lockedEnd} · 지금 HP {boss.CurrentHp}");
+        }
+        catch (Exception e) { sb.AppendLine("예외 " + e); }
+        finally
+        {
+            File.WriteAllText("Temp/req1105_bossentrance.txt", sb.ToString());
+            Debug.Log($"{Tag} 끝 → Temp/req1105_bossentrance.txt");
+        }
+    }
+
+    /// <summary>11-05 #5 「탄막 이벤트를 회피로 피할 수 있어야 한다」(사용자 확인 = 탄막의 회랑) — 몬스터 없는 방(테스트 허브 보스 대기방)에서
+    /// 탄막을 「가만히」 1판 · 「탄 · 구체가 닿기 직전 회피(8방향 중 대시 끝자리가 탄에서 가장 먼 쪽)」 2판. 맞음(OnDamageResolved 가해자 없음)마다
+    /// 회피 중 · 회피 시작 뒤 초 · 스태미나 · 회피 가능 · 가까운 위험을 적는다. 결과 Temp/req1105_barrage.txt.</summary>
+    [MenuItem("RelicFairy/Debug/11-02 전투/11-05 #5 탄막의 회랑 회피 (런 안 · 몬스터 없는 방, 플레이 중)")]
+    private static void RunBarrageDodge() { if (EditorApplication.isPlaying) RunBarrageDodgeAsync().Forget(); }
+
+    private static async UniTaskVoid RunBarrageDodgeAsync()
+    {
+        var sb = new StringBuilder("11-05 #5 탄막의 회랑 회피\n");
+        try
+        {
+            var p = GameRunBootstrapper.Instance?.Run?.Player;
+            if (p == null) { sb.AppendLine("런 · 플레이어 없음"); return; }
+            sb.AppendLine($"대시 {p.CharacterData.dashSpeed} m/s × {p.CharacterData.dashDuration}초 · 무적 {p.CharacterData.dodgeIFrameDuration}초 · 스태미나 {p.RuntimeStats.MaxStamina} · 회피 {p.CharacterData.dodgeStaminaCost}");
+            string[] modes = { "가만히", "직전 회피", "직전 회피" };
+            for (int r = 0; r < modes.Length; r++)
+            {
+                await BarrageRoundAsync(p, r, modes[r] != "가만히", modes[r], sb);
+                await UniTask.Delay(2500, ignoreTimeScale: true);
+            }
+        }
+        catch (Exception e) { sb.AppendLine("예외 " + e); }
+        finally
+        {
+            s_invincible?.SetValue(GameRunBootstrapper.Instance?.Run?.Player, false);
+            File.WriteAllText("Temp/req1105_barrage.txt", sb.ToString());
+            Debug.Log($"{Tag} 끝 → Temp/req1105_barrage.txt");
+        }
+    }
+
+    private static async UniTask BarrageRoundAsync(PlayerController p, int round, bool dodge, string label, StringBuilder sb)
+    {
+        EventMinigame.DebugDemo = MinigameDemo.None;
+        s_invincible?.SetValue(p, false);
+        p.RuntimeStats.SetHp(p.RuntimeStats.MaxHp);   // 실측 — 체력 1이면 맞음이 0이 되어 세지 않는다
+        p.Stamina?.Refund(p.RuntimeStats.MaxStamina, p.RuntimeStats.MaxStamina);
+        EditorApplication.ExecuteMenuItem("RelicFairy/Minigame/Play Here/Barrage (Play)");
+        BarrageCorridorGame game = null;
+        for (int i = 0; i < 40 && game == null; i++) { await UniTask.Delay(100, ignoreTimeScale: true); game = EventMinigame.Active as BarrageCorridorGame; }
+        if (game == null) { sb.AppendLine($"{label}: 놀이가 안 섰다"); return; }
+
+        var gt = typeof(BarrageCorridorGame);
+        var hazardsF = gt.GetField("_hazards", Inst);
+        var hitsF    = gt.GetField("_hits", Inst);
+        var radiusF  = typeof(EventMinigame).GetField("Radius", Inst);
+        var centerF  = typeof(EventMinigame).GetField("Center", Inst);
+        var bulletT  = gt.GetNestedType("BulletHazard", BindingFlags.NonPublic);
+        var orbT     = gt.GetNestedType("OrbHazard", BindingFlags.NonPublic);
+        var hazT     = gt.GetNestedType("Hazard", BindingFlags.NonPublic);
+        var anchorF  = hazT.GetField("Anchor", Inst);
+        var bDirF    = bulletT.GetField("_dir", Inst);
+        var bSpdF    = bulletT.GetField("_speed", Inst);
+        var bTF      = bulletT.GetField("_t", Inst);
+        float cost   = p.CharacterData.dodgeStaminaCost;
+
+        int applied = 0, blocked = 0, perfect = 0, pdTriggers = 0, dodgeAsks = 0, dodgeStarts = 0;
+        float lastDodgeAt = -99f;
+        bool wasDodging = false;
+        var hitLines = new List<string>();
+        string Nearest()
+        {
+            var list = hazardsF.GetValue(game) as System.Collections.IList;
+            string best = "장판(낙뢰 · 빛 · 고리)"; float bd = float.MaxValue;
+            if (list == null) return best;
+            Vector3 pp = p.transform.position; pp.y = 0f;
+            foreach (var h in list)
+            {
+                var a = (Vector3)anchorF.GetValue(h); a.y = 0f;
+                float d = Vector3.Distance(a, pp);
+                if (h.GetType() == bulletT && d <= 0.7f && d < bd) { bd = d; best = "탄"; }
+                else if (h.GetType() == orbT && d <= 1f && d < bd) { bd = d; best = "쫓는 구체"; }
+            }
+            return best;
+        }
+        void OnResolved(GameObject attacker, int raw, int fin, PlayerController.DamageOutcome o)
+        {
+            if (attacker != null) return;
+            bool dg = p.LocoSM != null && p.LocoSM.CurrentId == LocoState.Dodge;
+            if (o == PlayerController.DamageOutcome.Applied)
+            {
+                applied++;
+                bool can = !dg && Time.time >= p.DodgeCooldownEnd && (p.Stamina == null || p.Stamina.Current >= cost);
+                if (hitLines.Count < 14)
+                    hitLines.Add($"  맞음 {game.Remaining:0.0}초 남음 · {Nearest()} · 회피 중 {dg} · 회피 시작 뒤 {(lastDodgeAt > 0f ? (Time.time - lastDodgeAt).ToString("0.00") + "초" : "-")} · 스태미나 {(p.Stamina != null ? p.Stamina.Current : -1f):0} · 회피 가능 {can}");
+            }
+            else if (o == PlayerController.DamageOutcome.PerfectDodge) perfect++;
+            else blocked++;
+        }
+        void OnPd(float _) => pdTriggers++;
+        p.OnDamageResolved += OnResolved;
+        p.OnPerfectDodge   += OnPd;
+        bool placed = false;
+        float radius = 0f;
+        Vector3 center = Vector3.zero;
+        try
+        {
+            while (EventMinigame.Active == game && game != null)
+            {
+                if (Time.timeScale == 0f) Managers.UI?.CloseAllPopupUI();
+                radius = (float)radiusF.GetValue(game);
+                if (!placed && radius > 0f)
+                {
+                    placed = true;
+                    center = (Vector3)centerF.GetValue(game);
+                    var pos = new Vector3(center.x, p.transform.position.y, center.z);
+                    p.transform.position = pos;
+                    if (p.Rigid != null) { p.Rigid.position = pos; p.Rigid.linearVelocity = Vector3.zero; }
+                }
+                bool dodging = p.LocoSM != null && p.LocoSM.CurrentId == LocoState.Dodge;
+                if (dodging && !wasDodging) { dodgeStarts++; lastDodgeAt = Time.time; }
+                wasDodging = dodging;
+
+                if (dodge && game.IsPlaying && !dodging && Time.time >= p.DodgeCooldownEnd && (p.Stamina == null || p.Stamina.Current >= cost))
+                {
+                    // 위협 — 탄이 0.06초 안에 몸(0.55 m)에 닿는가 · 구체가 0.85 m 안
+                    var list = hazardsF.GetValue(game) as System.Collections.IList;
+                    Vector3 pp = p.transform.position; pp.y = 0f;
+                    bool threat = false;
+                    if (list != null)
+                        foreach (var h in list)
+                        {
+                            var a = (Vector3)anchorF.GetValue(h); a.y = 0f;
+                            if (h.GetType() == bulletT)
+                            {
+                                var dir = (Vector3)bDirF.GetValue(h); float spd = (float)bSpdF.GetValue(h);
+                                if ((float)bTF.GetValue(h) < 0.3f) continue;
+                                Vector3 rel = a - pp;
+                                float tau = Mathf.Clamp(-Vector3.Dot(rel, dir) / Mathf.Max(0.01f, spd), 0f, 0.06f);
+                                if ((rel + dir * spd * tau).magnitude <= 0.6f) threat = true;
+                            }
+                            else if (h.GetType() == orbT && Vector3.Distance(a, pp) <= 0.85f) threat = true;
+                        }
+                    if (threat)
+                    {
+                        // 8방향 중 대시 끝자리(4 m)가 판 안이고, 0.25초 뒤 탄 자리에서 가장 먼 쪽
+                        float reach = p.CharacterData.dashSpeed * p.CharacterData.dashDuration;
+                        Vector3 bestDir = p.transform.forward; float bestScore = float.MinValue;
+                        for (int k = 0; k < 8; k++)
+                        {
+                            Vector3 d = Quaternion.Euler(0f, k * 45f, 0f) * Vector3.forward;
+                            Vector3 e = pp + d * reach;
+                            Vector3 ec = e - new Vector3(center.x, 0f, center.z);
+                            if (ec.magnitude > radius - 0.8f) continue;
+                            float score = float.MaxValue;
+                            foreach (var h in list)
+                            {
+                                if (h.GetType() != bulletT && h.GetType() != orbT) continue;
+                                var a = (Vector3)anchorF.GetValue(h); a.y = 0f;
+                                if (h.GetType() == bulletT) a += (Vector3)bDirF.GetValue(h) * ((float)bSpdF.GetValue(h) * 0.25f);
+                                score = Mathf.Min(score, Vector3.Distance(a, e));
+                            }
+                            if (score > bestScore) { bestScore = score; bestDir = d; }
+                        }
+                        if (p.Rigid != null) p.Rigid.linearVelocity = new Vector3(bestDir.x * 3f, p.Rigid.linearVelocity.y, bestDir.z * 3f);
+                        p.InputBuffer.Push(Command.Dodge);
+                        dodgeAsks++;
+                    }
+                }
+                await UniTask.Yield(PlayerLoopTiming.Update);
+            }
+        }
+        finally
+        {
+            p.OnDamageResolved -= OnResolved;
+            p.OnPerfectDodge   -= OnPd;
+        }
+        int hits = game != null ? (int)hitsF.GetValue(game) : -1;
+        sb.AppendLine($"{round + 1}판 {label}: 판 반경 {radius:0.0} m · 놀이가 센 맞음 {hits} · 실제 피해 {applied} · 회피 무적으로 막힘 {blocked} · 저스트 회피로 막힘 {perfect} · 저스트 회피 발동 {pdTriggers} · 회피 누름 {dodgeAsks} · 회피 시작 {dodgeStarts}");
+        foreach (var l in hitLines) sb.AppendLine(l);
     }
 
     private const string FreshFromSlotPref = "SanctumDebug.FreshFromSlot";   // BaseCampSanctumDebugMenu 11번(되돌리기)과 같은 열쇠

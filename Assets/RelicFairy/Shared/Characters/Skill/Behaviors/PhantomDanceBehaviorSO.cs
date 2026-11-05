@@ -133,6 +133,17 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
         public void OnExit(SkillExecutionContext ctx)
         {
             ctx.SetMoveScale(1f);
+            // 대시로 끊어도 발도에 이미 벤 적의 X자는 원래 박자에 들어간다 — 버리는 건 아직 안 벤 이어 갈라짐 · 응축뿐(11-05 #18).
+            // 피해는 지금 무기로 미리 잰다(그 사이 무기를 바꿔도 같은 값) · 회피 중에 막타 멈칫이 걸리지 않게 마무리는 끈다
+            if (_phase == Phase.Cut && _cutTargets.Count > 0 && ctx.Controller != null && ctx.RuntimeStats.Hp > 0)
+            {
+                var targets = new List<GameObject>(_cutTargets);
+                float dmg = ctx.CalculateDamage(_data.cutDamage);
+                float burstDmg = ctx.CalculateDamage(_data.slashExplodeDamage);
+                bool burst = _skillTier >= 3;
+                FormStrike.After(ctx.Controller, Mathf.Max(0f, _data.cutDelay - _timer),
+                                 () => ApplyCut(ctx, targets, dmg, burstDmg, false, burst, new HashSet<GameObject>()));
+            }
             _cutTargets.Clear();
             _chainTargets.Clear();
             _burstHit.Clear();
@@ -183,22 +194,8 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
             _timer = 0f;
 
             bool finisher = _skillTier < 2;   // 2단계부터는 뒤 이어 갈라짐이 마무리(A5)
-            bool burst = _skillTier >= 3;
-            float dmg = ctx.CalculateDamage(_data.cutDamage);
-            float burstDmg = ctx.CalculateDamage(_data.slashExplodeDamage);
-            Managers.Sound?.PlayEvent(SoundEvent.PlayerSwing);
-            foreach (var go in _cutTargets)
-            {
-                if (go == null || !go.activeInHierarchy) continue;
-                var at = go.transform.position;
-                ctx.DealDamage(go, dmg, _data.knockbackMultiplier * 2f, finisher, hitEffectKey: _data.hitEffectKey, hitEffectScale: _data.hitEffectScale);
-                SpawnCross(ctx, at + Vector3.up * 1f, burst ? _data.explodeEffectScale : _data.cutEffectScale);
-                if (!burst) continue;
-
-                CombatQuery.GetNearbyDamageables(at, _data.slashExplodeRadius, ctx.Controller.gameObject, 32, _buf);
-                foreach (var b in _buf)
-                    if (_burstHit.Add(b)) ctx.DealDamage(b, burstDmg, _data.knockbackMultiplier * 2f, finisher, skipHitVfx: true);   // 터짐 — 타격 이펙트는 X자가 맡는다
-            }
+            ApplyCut(ctx, _cutTargets, ctx.CalculateDamage(_data.cutDamage), ctx.CalculateDamage(_data.slashExplodeDamage),
+                     finisher, _skillTier >= 3, _burstHit);
 
             if (_skillTier < 2) { _phase = Phase.End; return; }
             if (!_condense)
@@ -209,6 +206,24 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
             }
             _chainIndex = 0;
             _phase = Phase.Chain;
+        }
+
+        /// <summary>X자 피해 — 맞은 적마다(3단계는 둘레로 터진다). 대시로 끊겼을 때 OnExit도 같은 걸 흘려보낸다(11-05 #18).</summary>
+        private void ApplyCut(SkillExecutionContext ctx, List<GameObject> targets, float dmg, float burstDmg, bool finisher, bool burst, HashSet<GameObject> burstHit)
+        {
+            Managers.Sound?.PlayEvent(SoundEvent.PlayerSwing);
+            foreach (var go in targets)
+            {
+                if (go == null || !go.activeInHierarchy) continue;
+                var at = go.transform.position;
+                ctx.DealDamage(go, dmg, _data.knockbackMultiplier * 2f, finisher, hitEffectKey: _data.hitEffectKey, hitEffectScale: _data.hitEffectScale);
+                SpawnCross(ctx, at + Vector3.up * 1f, burst ? _data.explodeEffectScale : _data.cutEffectScale);
+                if (!burst) continue;
+
+                CombatQuery.GetNearbyDamageables(at, _data.slashExplodeRadius, ctx.Controller.gameObject, 32, _buf);
+                foreach (var b in _buf)
+                    if (burstHit.Add(b)) ctx.DealDamage(b, burstDmg, _data.knockbackMultiplier * 2f, finisher, skipHitVfx: true);   // 터짐 — 타격 이펙트는 X자가 맡는다
+            }
         }
 
         // ── 2단계: 이어 갈라짐 ──

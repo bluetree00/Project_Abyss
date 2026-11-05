@@ -373,6 +373,7 @@ public sealed class UI_EscMenu : MonoBehaviour
         // 세션 종료가 돌아 <b>포기한 런에는 정산(정수·골드)을 주지 않는다</b>는 계약이 지켜진다.
         // 정리만 태우고 보상은 주지 않는 경로가 이것뿐이라 순서에 의미가 있다.
         var run = GameRunBootstrapper.Instance?.Run ?? AppBootstrapper.Instance?.CurrentRun;
+        CodexLog.Sync(run);   // 포기한 런도 도감 「써 봄」에 — 정산 길을 안 타 빠졌다(11-05 Q32 D3)
         if (AppBootstrapper.Instance != null && AppBootstrapper.Instance.CurrentRun != null)
             AppBootstrapper.Instance.EndRun();
         run?.EndRun(isCleared: false, reason: "abandon");

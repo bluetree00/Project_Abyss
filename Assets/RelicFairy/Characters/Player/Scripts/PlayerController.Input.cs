@@ -155,11 +155,12 @@ public sealed partial class PlayerController
     {
         var run = GameRunBootstrapper.Instance?.Run;
         if (run == null) return;
+        if (StatDetailView.IsOpen) return;   // 11-05 스탯 상세 창이 Tab을 받아 저만 닫는다(룬판은 남는다)
 
         var panel = UI_GridPanel.Instance;
         if (panel != null && panel.IsOpen)
             panel.TryHandleEscape();   // 11-02 Q32 A5 — 「돌아가기」 · ESC와 같은 길(보관함이 넘치면 정리 창이 먼저) · 바로 Close()는 상한을 건너뛰었다
-        else if (!UI_EscMenu.AnyOpen)   // A1 — ESC 메뉴 밑에서 룬판이 열리지 않게
+        else if (!UI_EscMenu.AnyOpen && !ScreenFade.Covering)   // A1 — ESC 메뉴 밑에서 · 11-05 C3 — 방 전환 덮개 밑에서 룬판이 열리지 않게
             panel?.Open();
     }
 

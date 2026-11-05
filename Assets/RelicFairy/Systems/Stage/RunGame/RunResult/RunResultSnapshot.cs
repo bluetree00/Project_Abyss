@@ -16,6 +16,7 @@ public sealed class RunResultSnapshot
     public int AbyssDepth;
     public string KilledBy = string.Empty;
     public int PlaySeconds;
+    public int RankCentis;   // 랭킹 기록(11-05) — 이번 런이 올린 해방기 · 악몽 클리어 시간(1/100초 · 없으면 0)
     public List<Segment> Segments = new();
 
     // ── 재화 ──

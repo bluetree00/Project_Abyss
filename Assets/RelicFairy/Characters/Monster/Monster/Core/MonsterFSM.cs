@@ -33,6 +33,9 @@ public class MonsterFSM
     public bool IsIn<TKey>() where TKey : IMonsterState
         => _current != null && _states.TryGetValue(typeof(TKey), out var s) && ReferenceEquals(s, _current);
 
+    /// <summary>지금 이 상태 인스턴스인가 — 직접 참조로 넣는 특수 상태(보스 등장 대기 등)는 등록 키가 없어 <see cref="IsIn{TKey}"/>가 늘 거짓이다(11-05).</summary>
+    public bool IsCurrent(IMonsterState state) => state != null && ReferenceEquals(state, _current);
+
     /// <summary>
     /// 현재 특수 상태의 제약 플래그.
     /// 공용 상태이거나 특수 상태가 아닐 경우 None 반환.

@@ -33,6 +33,7 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
 
     private readonly List<Marker> _markers = new();
     private Transform _camT;
+    private Camera _cam;   // 11-05 남은 시간 글을 화면 안으로 끌어들일 때
     private bool _placed;
     private bool _broken;   // 10-30 세우기 · 진행 예외 — 조작이 풀리면 브론즈로 끝낸다
     private bool _resolved;
@@ -46,6 +47,11 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
     private const float StageWant     = 7f;    // 무대 반경 상한
     private const float PropWallClear = 1.0f;  // 소품 자리는 벽(걸을 수 있는 면 가장자리)에서 이만큼 떨어진다
     private const float AutoTimerHeight = 4.2f;   // 10-30 남은 시간 글 — 문 · 제단 이름표(1.4 · 2.0 m)보다 위
+    private const float AutoTimerSize   = 2.6f;   // 11-05 3.4는 가까운 카메라에서 화면 폭 ⅓을 덮었다
+    // 11-05 남은 시간 글이 무대 위에만 서 있어 플레이어가 한쪽에 서면 화면 밖으로 나가고, 가운데서도 위 재화 띠와 겹쳤다 — 이 화면 띠 안으로 끌어들인다
+    // (1920×1080 HUD 실측: 재화 띠 아래끝 y 0.884 · 기술 칸 위끝 0.13 · 왼쪽 서약 판 오른끝 x 0.16)
+    private const float TimerViewLeft = 0.18f, TimerViewRight = 0.97f, TimerViewTop = 0.86f, TimerViewBottom = 0.18f;
+    private const float TimerMinDepth = 5f;   // 11-05 카메라가 낮은 방(Ch3)에선 글이 카메라 2.4 m 앞에 서 화면 ⅓을 덮었고, 무대 뒤쪽에 서면 카메라 뒤로 가 안 보였다
     private static readonly Color AutoTimerColor = new(0.75f, 0.78f, 0.84f);
 
     private TextMeshPro _autoTimer;   // 10-30 O-02 자동 해결까지 남은 시간(보이지 않는 60초였다)
@@ -140,7 +146,8 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
     private void PlaceOnce(Transform pt)
     {
         {
-            _camT = Camera.main != null ? Camera.main.transform : null;
+            _cam  = Camera.main;
+            _camT = _cam != null ? _cam.transform : null;
             ServiceRoomDecorPlacer.SyncPhysics();   // 방 블록이 막 생성됨 — 물리 쿼리 전 콜라이더 등록 보장
             _inward = ServiceRoomDecorPlacer.ResolveOpenDirection(pt.position, pt.forward);
             // 10-29 무대 — 입구 4~5 m 앞에 세우면 안쪽 벽(제물 제단 방은 가운데 띠가 좁다)에 박혔다. 방 가운데를 무대로 삼는다.
@@ -398,15 +405,38 @@ public abstract class WorldInteractionChallenge : MonoBehaviour, IInteractionCha
         {
             string hint = AutoResolveHint;
             _autoTimerFormat = string.IsNullOrEmpty(hint) ? Loc.T("남은 시간 {0}초") : Loc.T("남은 시간 {0}초") + "\n<size=70%>" + Loc.T(hint) + "</size>";   // 11-02 Q11
-            _autoTimer = MakeText(string.Empty, _stage + Vector3.up * AutoTimerHeight, 3.4f, AutoTimerColor, 12);
+            _autoTimer = MakeText(string.Empty, _stage + Vector3.up * AutoTimerHeight, AutoTimerSize, AutoTimerColor, 12);
+            RelicFloatText.ApplyThin(_autoTimer);   // 3D 글자는 얇게(굵은 DNF였다)
         }
         _autoTimer.SetText(_autoTimerFormat, sec);
     }
+
+    /// <summary>
+    /// 남은 시간 글을 무대 위 자리에서 화면 띠 안으로 끌어들인다(11-05). 카메라에 너무 가까우면 같은 화면 자리에서 <see cref="TimerMinDepth"/>로 물리고(작게),
+    /// 무대가 카메라 뒤면 화면 위 가운데에 둔다.
+    /// </summary>
+    private void KeepTimerOnScreen()
+    {
+        if (_autoTimer == null || _cam == null || !_autoTimer.gameObject.activeSelf) return;
+        Vector3 vp = _cam.WorldToViewportPoint(_stage + Vector3.up * AutoTimerHeight);
+        if (vp.z <= 0.1f) vp = new Vector3(0.5f, TimerViewTop, TimerMinDepth);
+        else if (vp.z < TimerMinDepth) vp.z = TimerMinDepth;
+        float viewH = _cam.orthographic ? 2f * _cam.orthographicSize : 2f * vp.z * Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad);   // 그 깊이의 화면 높이(m)
+        Vector3 ext = _autoTimer.textBounds.extents;   // 글 반폭 · 반높이(m · 카메라 축 · 배율 1)
+        float hy = ext.y / viewH, hx = ext.x / (viewH * _cam.aspect);
+        vp.x = ClampBand(vp.x, TimerViewLeft + hx, TimerViewRight - hx);
+        vp.y = ClampBand(vp.y, TimerViewBottom + hy, TimerViewTop - hy);
+        _autoTimer.transform.position = _cam.ViewportToWorldPoint(vp);
+    }
+
+    /// <summary>띠가 글보다 좁으면(lo &gt; hi) 띠 가운데.</summary>
+    private static float ClampBand(float v, float lo, float hi) => lo <= hi ? Mathf.Clamp(v, lo, hi) : (lo + hi) * 0.5f;
 
     private void Billboard()
     {
         if (_camT == null) return;
         if (_autoTimer != null) _autoTimer.transform.rotation = _camT.rotation;
+        KeepTimerOnScreen();
         foreach (var m in _markers)
         {
             if (m.Label  != null) m.Label.transform.rotation  = _camT.rotation;

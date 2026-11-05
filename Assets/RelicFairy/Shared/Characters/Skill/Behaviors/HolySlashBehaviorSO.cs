@@ -143,6 +143,13 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
         public void OnExit(SkillExecutionContext ctx)
         {
             ctx.SetMoveScale(1f);
+            // 돌진 중 대시로 끊겨도 이미 지나간 적에겐 돌진 피해가 들어간다 — 원래도 0.15초 안에 들어갈 피해(11-05 #18).
+            // 잔상 알림(ReportSkillDash)은 하지 않는다 — 돌진을 끊고 E 초기화를 노리는 악용 막기(11-02 Q32 ⑤)
+            if (_phase == Phase.Dash && _hitTargets.Count > 0 && ctx.Controller != null && ctx.RuntimeStats.Hp > 0)
+            {
+                ApplyDamageToAll(ctx, _data.baseDashDamage, finisher: false);
+                SpawnHitEffects(ctx);
+            }
             _hitTargets.Clear();
             _hitObjects.Clear();
 

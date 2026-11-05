@@ -11,6 +11,7 @@ public static class RankingFlow
 {
     // ── Static ────────────────────────────────────────────────
     private static StoryEra? s_pendingRoom;
+    private static int s_resultCentis;   // 결과창 「랭킹 기록」 한 줄(11-05) — 이번 런이 올린 클리어 시간 · 결과창이 한 번 읽으면 지운다
 
     private const string NightmareClearKey = "NightmareClear";   // 악몽을 한 번이라도 깼다(거점 「기록의 문」 악몽 갈래)
 
@@ -28,7 +29,15 @@ public static class RankingFlow
     public static int LastCentis { get; private set; }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void ResetStatics() { s_pendingRoom = null; LastEra = StoryEra.Sealed; LastCentis = 0; }
+    private static void ResetStatics() { s_pendingRoom = null; s_resultCentis = 0; LastEra = StoryEra.Sealed; LastCentis = 0; }
+
+    /// <summary>결과창 「랭킹 기록」 — 이번 런이 해방기 · 악몽 리치를 쓰러뜨려 올린 클리어 시간(1/100초 · 없으면 0). 한 번 읽으면 지운다.</summary>
+    public static int ConsumeResultCentis()
+    {
+        int c = s_resultCentis;
+        s_resultCentis = 0;
+        return c;
+    }
 
     // ── Public Methods ────────────────────────────────────────
 
@@ -42,6 +51,7 @@ public static class RankingFlow
                       ? run.Player.WeaponManager.CurrentWeaponData.displayName : "";
         LastEra    = era;
         LastCentis = Mathf.RoundToInt(seconds * 100f);
+        s_resultCentis = LastCentis;
         s_pendingRoom = era;
         if (era == StoryEra.NightmareMode) StoryProgress.MarkSeen(NightmareClearKey);
         int tier = TitleTier(era, LastCentis);

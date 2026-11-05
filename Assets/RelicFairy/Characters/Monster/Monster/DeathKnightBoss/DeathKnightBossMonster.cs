@@ -603,12 +603,19 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance, IPagedB
 
     /// <summary>영혼 소환·방패 구간의 자체 무적도 「막힘」으로 읽히게 한다(공용 규약).</summary>
     // 기준선에 닿아 소환을 기다리는 동안(SoulGateHolding)은 무적 · 막힘 표시를 켜지 않는다 — 하던 공격 중에 갑자기 막혀 버그처럼 보였다(10-29 사용자 — 무적 표현 · 화룡과 같은 규칙)
-    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || (_dkBB != null && _dkBB.IsInvincible);
+    public override bool IsDamageImmuneNow => base.IsDamageImmuneNow || (_dkBB != null && _dkBB.IsInvincible) || EntranceShielded;
+
+    /// <summary>
+    /// 등장 연출(등장 대기 상태) 중엔 피해를 통째로 막는다 — 맞으면 공용 규칙(MonsterBase.TakeDamage)이 전투 상태로 깨워 연출과 전투 AI가 함께 돌며
+    /// 카메라가 묶였다(11-05 #1 · #12 · 리치 10-23과 같은 규칙). 지금 그 상태에 있을 때만 — 다른 길로 상태가 바뀌면 바로 풀린다.
+    /// </summary>
+    private bool EntranceShielded => _fsm != null && _fsm.IsCurrent(_dormantState);   // 등장 대기는 등록 키 없이 넣는 상태 — IsInState<T>로는 늘 거짓
 
     public override void TakeDamage(float amount, UnityEngine.GameObject instigator,
                                     float knockbackMultiplier = 1f,
                                     bool isCrit = false)
     {
+        if (EntranceShielded) { NotifyBlockedHit(transform.position + UnityEngine.Vector3.up); return; }   // 파이프라인을 거치지 않는 직접 피해도
         if (_dkBB != null && _dkBB.IsInvincible) return;
         if (SoulGateHolding) return;   // 영혼 소환 대기 — 피해 · 경직만 막는다(경직이 소환을 늦췄다 · 10-06) · 막힘 표시는 소환이 시작해 방패가 서면(10-29). 하한은 DamageHpFloor가 지킨다
         base.TakeDamage(amount, instigator, knockbackMultiplier, isCrit);

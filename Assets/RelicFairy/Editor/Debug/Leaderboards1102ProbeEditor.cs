@@ -11,12 +11,16 @@ using UnityEngine;
 /// </summary>
 public static class Leaderboards1102ProbeEditor
 {
-    private static readonly string[] Tables =
+    private static readonly string[] Tables = BuildTables();   // 11-03 챕터 기록 시기별 — 2 + 16(게임이 쓰는 이름 그대로)
+
+    private static string[] BuildTables()
     {
-        RankingService.LiberationTable, RankingService.NightmareTable,
-        "RANK_BOSS_1", "RANK_BOSS_2", "RANK_BOSS_3", "RANK_BOSS_4",
-        "RANK_ROOMS_1", "RANK_ROOMS_2", "RANK_ROOMS_3", "RANK_ROOMS_4",
-    };
+        var list = new System.Collections.Generic.List<string> { RankingService.LiberationTable, RankingService.NightmareTable };
+        foreach (var era in new[] { StoryEra.Liberated, StoryEra.NightmareMode })
+            foreach (bool boss in new[] { true, false })
+                for (int ch = 1; ch <= 4; ch++) list.Add(RecordBoard.TableOf(boss, ch, era));
+        return list.ToArray();
+    }
 
     [MenuItem("RelicFairy/Debug/11-02 뒤끝 리더보드 목록 (플레이 중)")]
     private static void Run()

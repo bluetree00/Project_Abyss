@@ -146,6 +146,7 @@ public static class AbyssPeddlerCatalog
     private static int PotionHealPercent => Mathf.RoundToInt((0.40f + MemoryAltarService.PotionHealBonus) * 100f);
     private const float SpecialDiscount = 0.5f;      // 특가 50% 할인
     private const float ClearanceDiscount = 0.3f;    // 돌발 「떨이」 −30%(10-15)
+    private const float OneCellCommonWeight = 1.5f;  // 룬 칸 — 한 칸 · 평범 룬 가중치(11-05 #20 · 나머지 1)
 
     public sealed class Result
     {
@@ -345,11 +346,13 @@ public static class AbyssPeddlerCatalog
         var runeIds = all.Where(kv => kv.Value != null && kv.Value.Count > 0 && kv.Value[0].shape_id > 0
                                       && ParseRarity(kv.Value[0].ResolvedRarity) <= maxRarity
                                       && (exact == null || ParseRarity(kv.Value[0].ResolvedRarity) == exact.Value)
-                                      && (peddlerInv == null || !peddlerInv.IsAtMaxStack(kv.Key)))
+                                      && (peddlerInv == null || !peddlerInv.IsAtMaxStack(kv.Key))
+                                      && !RuneShrineChallenge.IsShrineRune(kv.Key))   // 11-05 #20 성소 룬은 룬 성소에서만
                          .Select(kv => kv.Key).ToList();
         if (runeIds.Count == 0) return null;
 
-        string id = runeIds[rng.Next(runeIds.Count)];
+        // 11-05 #20 한 칸 · 평범 룬은 조금 더 자주 — 사용자 「상점은 성능이 낮은 한 칸 룬 확률을 조금 올리기」
+        string id = runeIds[PickWeighted(rng, runeIds.Select(rid => IsOneCellCommon(all[rid][0]) ? OneCellCommonWeight : 1f).ToList())];
         var entries = itemData.GetItem(id);
         if (entries == null || entries.Count == 0) return null;
 
@@ -382,6 +385,32 @@ public static class AbyssPeddlerCatalog
                 return true;
             },
             rune: shown);   // 표시 전용 사본 — 효과 전부·속성·칸 수·놓을 자리(받는 룬과 같은 속성)
+    }
+
+    /// <summary>한 칸 · 평범 등급 룬인가(11-05 #20 상점 가중치).</summary>
+    private static bool IsOneCellCommon(ItemEntry e)
+    {
+        if (e == null || ParseRarity(e.ResolvedRarity) != ItemRarity.Common) return false;
+        var shape = Managers.RuneData?.GetShape(e.shape_id);
+        if (shape == null) return false;
+        int cells = 0;
+        foreach (var row in new[] { shape.r1, shape.r2, shape.r3, shape.r4 })
+            if (!string.IsNullOrEmpty(row)) foreach (char c in row) if (c == '1') cells++;
+        return cells == 1;
+    }
+
+    /// <summary>가중치대로 한 칸을 고른다.</summary>
+    private static int PickWeighted(System.Random rng, List<float> weights)
+    {
+        float total = 0f;
+        foreach (float w in weights) total += w;
+        double r = rng.NextDouble() * total;
+        for (int i = 0; i < weights.Count; i++)
+        {
+            r -= weights[i];
+            if (r < 0) return i;
+        }
+        return weights.Count - 1;
     }
 
     /// <summary>구매한 룬을 즉시 배치할 수 있도록 룬판을 연다.</summary>
