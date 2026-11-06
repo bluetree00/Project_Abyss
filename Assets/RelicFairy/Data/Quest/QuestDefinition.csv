@@ -21,7 +21,7 @@ achievement,boss_10,왕을 베는 자,보스 10회 처치,Record,bossKills,Simpl
 achievement,enhance_6,벼려낸 것,무기 +6 도달,Record,maxEnhance,SimpleSet,6,Essence,200,false,true,0,,None,,None,,0
 achievement,enhance_9,명장의 손,무기 +9 도달,Record,maxEnhance,SimpleSet,9,Essence,400,false,true,0,,None,,None,,0
 achievement,refine_30,응축의 이해,정제 30회,Record,refineCount,SimpleSet,30,Essence,300,false,true,0,,None,,None,,0
-achievement,refine_100,존핵 장인,정제 100회,Record,refineCount,SimpleSet,100,Essence,700,false,true,0,,None,,None,,0
+achievement,refine_100,응축의 장인,정제 100회,Record,refineCount,SimpleSet,100,Essence,700,false,true,0,,None,,None,,0
 achievement,clear_50_rooms,방 탐험가,방 50개 클리어,Record,roomClears,SimpleSet,50,Essence,150,false,true,0,,None,,None,,0
 achievement,clear_300_rooms,심연의 지도,방 300개 클리어,Record,roomClears,SimpleSet,300,Essence,500,false,true,0,,None,,None,,0
 achievement,shop_5,단골,상점 5회 이용,Record,shopUses,SimpleSet,5,Essence,150,false,true,0,,None,,None,,0

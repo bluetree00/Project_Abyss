@@ -11,6 +11,7 @@ using UnityEngine;
 /// 해제 상태는 Steam이 정본 — 따로 저장하지 않는다(Steam 문서: 자체 캐시는 PC를 옮기면 진행이 되돌아간 것처럼 보이게 한다).
 /// StoreStats는 한 프레임에 모아 한 번(<see cref="Tick"/> · SteamManager.Update) — 자주 부르면 제한이 걸린다.
 /// Steamworks.NET 2025.163(SDK 1.63)은 통계를 Steam이 미리 불러 둔다 — RequestCurrentStats 없이 바로 쓴다.
+/// 다만 11-06 실측에서 게시 직후 자동 로드가 15초 넘게 0개였다(RequestUserStats로 직접 받자 0.4초) → 붙을 때 직접 받고, 오면 따라잡기를 한 번 더.
 /// </summary>
 public static class SteamAchievements
 {
@@ -21,9 +22,10 @@ public static class SteamAchievements
     private static readonly HashSet<string> s_warned = new();
     private static QuestManager s_bound;
     private static bool s_dirty;
+    private static CallResult<UserStatsReceived_t> s_statsCall;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void ResetStatics() { s_warned.Clear(); s_bound = null; s_dirty = false; }
+    private static void ResetStatics() { s_warned.Clear(); s_bound = null; s_dirty = false; s_statsCall?.Dispose(); s_statsCall = null; }
 
     // ── Public Methods ────────────────────────────────────────
     /// <summary>업적 codeName → Steam API 이름.</summary>
@@ -40,6 +42,7 @@ public static class SteamAchievements
         qm.onInitialized          += OnSlotLoaded;
         qm.onReloaded             += OnSlotLoaded;
         SyncAll();
+        RequestStats();
     }
 
     public static void Unbind()
@@ -69,7 +72,7 @@ public static class SteamAchievements
         string api = ApiName(codeName);
         if (!SteamUserStats.GetAchievement(api, out bool achieved))
         {
-            if (s_warned.Add(api)) Debug.LogWarning($"[SteamAchievements] Steam에 「{api}」 도전과제가 없다(Steamworks 등록 · 게시 전) — 건너뜀");
+            if (s_warned.Add(api)) Debug.LogWarning($"[SteamAchievements] Steam에 「{api}」 도전과제가 없다(Steamworks 등록 · 게시 전이거나 통계를 아직 못 받음) — 건너뜀");
             return false;
         }
         if (achieved || !SteamUserStats.SetAchievement(api)) return false;
@@ -86,6 +89,15 @@ public static class SteamAchievements
         SteamUserStats.StoreStats();
     }
 
+    // ── Private Methods ───────────────────────────────────────
+    /// <summary>내 Steam 통계를 직접 받아 온다 — 부트 따라잡기가 통계보다 먼저 돌면 「없다」로 건너뛰기 때문(받으면 <see cref="OnStatsReceived"/>).</summary>
+    private static void RequestStats()
+    {
+        if (!SteamManager.Initialized) return;
+        s_statsCall ??= CallResult<UserStatsReceived_t>.Create(OnStatsReceived);
+        s_statsCall.Set(SteamUserStats.RequestUserStats(SteamUser.GetSteamID()));
+    }
+
     // ── Event Handlers ────────────────────────────────────────
     private static void OnAchieved(Quest quest)
     {
@@ -93,4 +105,16 @@ public static class SteamAchievements
     }
 
     private static void OnSlotLoaded() => SyncAll();
+
+    private static void OnStatsReceived(UserStatsReceived_t e, bool ioFailure)
+    {
+        if (ioFailure || e.m_eResult != EResult.k_EResultOK)
+        {
+            Debug.LogWarning($"[SteamAchievements] Steam 통계 못 받음 — {(ioFailure ? "IO 실패" : e.m_eResult.ToString())}");
+            return;
+        }
+        s_warned.Clear();   // 통계 오기 전 「없다」 경고는 무효 — 진짜 없는 것만 다시 경고
+        int n = SyncAll();
+        Debug.Log($"[SteamAchievements] Steam 통계 받음 — 도전과제 {SteamUserStats.GetNumAchievements()}개 · 따라잡기 {n}");
+    }
 }
